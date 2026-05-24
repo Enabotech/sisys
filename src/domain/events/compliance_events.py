@@ -323,3 +323,65 @@ class PIPLDataAccessRequested(DomainEvent):
             object.__setattr__(self, "aggregate_id", self.access_id)
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "PIPLCompliance")
+
+
+@dataclass(frozen=True)
+class BackupCompletedEvent(DomainEvent):
+    """备份完成时触发的事件
+
+    由 BackupRecoveryService 在备份操作成功完成后触发
+    用于等保2.0三级备份恢复审计
+
+    Attributes:
+        backup_id: 备份唯一标识符
+        event_type: 事件类型，固定为"BackupCompletedEvent"
+        backup_type: 备份类型（postgresql/minio/redis/full）
+        size_bytes: 备份大小（字节）
+        checksum: 备份校验和
+        completed_at: 完成时间
+    """
+
+    backup_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    event_type: str = field(default="BackupCompletedEvent", init=False)
+    backup_type: str = ""
+    size_bytes: int = 0
+    checksum: str = ""
+    completed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        """设置aggregate_id和aggregate_type"""
+        if self.aggregate_id is None:
+            object.__setattr__(self, "aggregate_id", self.backup_id)
+        if not self.aggregate_type:
+            object.__setattr__(self, "aggregate_type", "BackupRecovery")
+
+
+@dataclass(frozen=True)
+class EncryptionKeyRotatedEvent(DomainEvent):
+    """加密密钥轮换完成时触发的事件
+
+    由 StorageEncryptionService 在密钥轮换操作完成后触发
+    用于等保2.0三级数据保密性审计
+
+    Attributes:
+        key_rotation_id: 密钥轮换唯一标识符
+        event_type: 事件类型，固定为"EncryptionKeyRotatedEvent"
+        old_key_id: 旧密钥标识符
+        new_key_id: 新密钥标识符
+        re_encrypted_count: 重新加密的记录数量
+        rotated_at: 轮换时间
+    """
+
+    key_rotation_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    event_type: str = field(default="EncryptionKeyRotatedEvent", init=False)
+    old_key_id: str = ""
+    new_key_id: str = ""
+    re_encrypted_count: int = 0
+    rotated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        """设置aggregate_id和aggregate_type"""
+        if self.aggregate_id is None:
+            object.__setattr__(self, "aggregate_id", self.key_rotation_id)
+        if not self.aggregate_type:
+            object.__setattr__(self, "aggregate_type", "EncryptionKeyManagement")

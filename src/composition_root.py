@@ -64,11 +64,15 @@ def bootstrap() -> None:
     from src.application.ports.session_cache_port import SessionCachePort
     from src.application.ports.text_extractor_service import TextExtractorService
     from src.application.services.unified_storage_gateway import UnifiedStorageGateway
+    from src.domain.ports.api_security_service import APISecurityServicePort
     from src.domain.ports.audit_repository import AuditRepositoryPort
     from src.domain.ports.audit_service import AuditServicePort
 
     # Auth ports
     from src.domain.ports.auth_service import AuthServicePort
+
+    # Security Level 3 Compliance Ports (等保2.0三级)
+    from src.domain.ports.backup_recovery_service import BackupRecoveryServicePort
 
     # Other domain ports
     # Compliance ports
@@ -76,7 +80,9 @@ def bootstrap() -> None:
 
     # Connection manager
     from src.domain.ports.connection_manager import ConnectionManager
+    from src.domain.ports.container_security_service import ContainerSecurityServicePort
     from src.domain.ports.cross_border_transfer_service import CrossBorderTransferServicePort
+    from src.domain.ports.data_integrity_service import DataIntegrityServicePort
     from src.domain.ports.data_residency_enforcer import DataResidencyEnforcerPort
 
     # Event listener port
@@ -85,6 +91,7 @@ def bootstrap() -> None:
     # Event ports
     from src.domain.ports.event_publisher import EventPublisher
     from src.domain.ports.hash_router_protocol import HashRouterProtocol
+    from src.domain.ports.intrusion_detection_service import IntrusionDetectionServicePort
     from src.domain.ports.l0_storage import L0StoragePort
     from src.domain.ports.l1_cache import L1CachePort
     from src.domain.ports.login_attempt_repository import LoginAttemptRepositoryPort
@@ -101,6 +108,7 @@ def bootstrap() -> None:
     from src.domain.ports.sensitive_data_detector import SensitiveDataDetectorPort
     from src.domain.ports.session_storage import SessionStorage
     from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
+    from src.domain.ports.storage_encryption_service import StorageEncryptionServicePort
     from src.domain.ports.token_blacklist import TokenBlacklistPort
     from src.domain.ports.unified_storage import UnifiedStoragePort
 
@@ -666,6 +674,73 @@ def bootstrap() -> None:
         module="src.infrastructure.security.cross_border_transfer_service_impl",
         lifetime=Lifetime.SINGLETON,
         owner="compliance-team",
+    )
+
+    # === Security Level 3 Compliance Ports (等保2.0三级) ===
+    register_port(
+        name="intrusion_detection_service",
+        version="v1.0.0",
+        interface=IntrusionDetectionServicePort,
+        impl="src.infrastructure.security.intrusion_detection_service_impl.IntrusionDetectionServiceImpl",
+        module="src.infrastructure.security.intrusion_detection_service_impl",
+        lifetime=Lifetime.SINGLETON,
+        owner="compliance-team",
+        tags=("security", "compliance", "intrusion-detection"),
+    )
+
+    register_port(
+        name="data_integrity_service",
+        version="v1.0.0",
+        interface=DataIntegrityServicePort,
+        impl="src.infrastructure.security.data_integrity_service_impl.DataIntegrityServiceImpl",
+        module="src.infrastructure.security.data_integrity_service_impl",
+        lifetime=Lifetime.SINGLETON,
+        owner="compliance-team",
+        tags=("security", "compliance", "data-integrity"),
+    )
+
+    register_port(
+        name="backup_recovery_service",
+        version="v1.0.0",
+        interface=BackupRecoveryServicePort,
+        impl="src.infrastructure.security.backup_recovery_service_impl.BackupRecoveryServiceImpl",
+        module="src.infrastructure.security.backup_recovery_service_impl",
+        lifetime=Lifetime.SINGLETON,
+        owner="compliance-team",
+        tags=("security", "compliance", "backup-recovery"),
+    )
+
+    register_port(
+        name="storage_encryption_service",
+        version="v1.0.0",
+        interface=StorageEncryptionServicePort,
+        impl="src.infrastructure.security.storage_encryption_service_impl.StorageEncryptionServiceImpl",
+        module="src.infrastructure.security.storage_encryption_service_impl",
+        lifetime=Lifetime.SINGLETON,
+        owner="compliance-team",
+        tags=("security", "compliance", "encryption"),
+    )
+
+    register_port(
+        name="api_security_service",
+        version="v1.0.0",
+        interface=APISecurityServicePort,
+        impl="src.infrastructure.security.api_security_service_impl.APISecurityServiceImpl",
+        module="src.infrastructure.security.api_security_service_impl",
+        lifetime=Lifetime.SINGLETON,
+        owner="compliance-team",
+        tags=("security", "compliance", "api-security"),
+    )
+
+    register_port(
+        name="container_security_service",
+        version="v1.0.0",
+        interface=ContainerSecurityServicePort,
+        impl="src.infrastructure.security.container_security_service_impl.ContainerSecurityServiceImpl",
+        module="src.infrastructure.security.container_security_service_impl",
+        lifetime=Lifetime.SINGLETON,
+        owner="compliance-team",
+        tags=("security", "compliance", "container-security"),
     )
 
     # === Application Layer Ports ===
