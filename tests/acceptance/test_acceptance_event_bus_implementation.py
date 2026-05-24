@@ -23,11 +23,10 @@ from src.domain.events.agent_events import AgentDecided
 from src.domain.events.document_events import DocumentProcessed
 from src.domain.events.heartbeat_events import HeartbeatTriggered
 from src.domain.events.tool_events import ToolExecuted
+from src.domain.ports.resolver import Resolver
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.messaging.inmemory_dead_letter_queue import InMemoryDeadLetterQueue
-from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
-from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 from src.infrastructure.messaging.retry.checker import IdempotencyChecker
 from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
@@ -82,15 +81,15 @@ def unique_prefix() -> str:
 
 
 @pytest.fixture
-def redis_publisher(redis_config: RedisConfig) -> RedisEventPublisher:
-    """Real Redis event publisher instance."""
-    return RedisEventPublisher(redis_config)
+def redis_publisher(resolver: Resolver):
+    """Real Redis event publisher instance via Resolver."""
+    return resolver.resolve("event_publisher")
 
 
 @pytest.fixture
-def redis_subscriber(redis_config: RedisConfig) -> RedisEventSubscriber:
-    """Real Redis event subscriber instance."""
-    return RedisEventSubscriber(redis_config)
+def redis_subscriber(resolver: Resolver):
+    """Real Redis event subscriber instance via Resolver."""
+    return resolver.resolve("event_subscriber")
 
 
 @pytest.fixture
@@ -170,7 +169,7 @@ def redis_available(redis_config: RedisConfig) -> None:
 @when("我发布一个 DocumentProcessed 事件到 Redis channel")
 def publish_documentprocessed_to_redis_channel(
     context: dict,
-    redis_publisher: RedisEventPublisher,
+    redis_publisher,
     unique_prefix: str,
 ) -> None:
     """Publish DocumentProcessed event to Redis channel."""
@@ -183,13 +182,13 @@ def publish_documentprocessed_to_redis_channel(
     )
     context["published_event"] = event
 
-    asyncio.run(redis_publisher.publish(event, channel))
+    asyncio.run(redis_publisher.publish(event))
 
 
 @when("我发布一个 HeartbeatTriggered 事件到 Redis channel")
 def publish_heartbeattriggered_to_redis_channel(
     context: dict,
-    redis_publisher: RedisEventPublisher,
+    redis_publisher,
     unique_prefix: str,
 ) -> None:
     """Publish HeartbeatTriggered event to Redis channel."""
@@ -204,7 +203,7 @@ def publish_heartbeattriggered_to_redis_channel(
     )
     context["published_event"] = event
 
-    asyncio.run(redis_publisher.publish(event, channel))
+    asyncio.run(redis_publisher.publish(event))
 
 
 @then("订阅者应该接收到该事件")

@@ -1,5 +1,6 @@
 """Shared pytest configuration."""
 
+import os
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -9,6 +10,9 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Import all fixtures from fixtures.py for shared access
+from tests.fixtures import *  # noqa: F403, F401
+
 # Add project root to Python path so `src` can be imported
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -17,6 +21,19 @@ sys.path.insert(0, str(ROOT))
 @pytest.fixture(scope="session", autouse=True)
 def _bootstrap_once() -> None:
     """Bootstrap the port registry once per test session."""
+    # 在 bootstrap 之前初始化 os.environ（从 .env 读取）
+    # 这样 production 代码的 AuthConfig.from_env() 就能获取正确的值
+    from pathlib import Path
+
+    from dotenv import dotenv_values
+
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        env_values = dotenv_values(env_path)
+        for key, value in env_values.items():
+            if value is not None and key not in os.environ:
+                os.environ[key] = value
+
     from src.composition_root import bootstrap
 
     bootstrap()

@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import logging
-from typing import Any, Type, TypeVar
+from typing import Any, Type, TypeVar, cast
 
 from src.domain.ports.registry import Lifetime, PortRegistry, PortSpec, _global_registry
 
@@ -74,6 +74,34 @@ class Resolver:
             logger.warning("Using deprecated port: %s", port_name)
 
         return self._create_instance(spec)
+
+    def resolve_as(self, port_name: str, interface: Type[T] | None = None) -> T:
+        """通过名称解析端口并返回指定类型
+
+        Args:
+            port_name: 待解析的端口名称
+            interface: 可选接口类型（用于类型验证）
+
+        Returns:
+            端口实现实例（类型为 T）
+
+        Raises:
+            KeyError: 端口未注册时抛出
+            RuntimeError: 端口已废弃时抛出
+        """
+        if port_name in self._overrides:
+            result = self._overrides[port_name]
+        else:
+            spec = self._registry.get(port_name)
+            if spec is None:
+                raise KeyError(f"Port not registered: {port_name}")
+            if spec.deprecated:
+                logger.warning("Using deprecated port: %s", port_name)
+            result = self._create_instance(spec)
+
+        if interface is not None and not isinstance(result, interface):
+            raise TypeError(f"Port {port_name} is not an instance of {interface.__name__}")
+        return cast(T, result)
 
     def resolve_by_interface(self, interface: Type[T] | str) -> Any:
         """通过接口类型解析端口

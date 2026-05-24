@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections.abc import Generator
 from typing import Any
 
 import pytest
@@ -27,6 +26,7 @@ from src.domain.events.base import DomainEvent
 from src.domain.events.document_events import DocumentProcessed
 from src.domain.events.heartbeat_events import HeartbeatTriggered
 from src.domain.events.tool_events import ToolExecuted
+from src.domain.ports.resolver import Resolver
 from src.domain.services.auto_trigger_service import AutoTriggerService
 from src.domain.value_objects.auto_trigger_context import AutoTriggerContext
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
@@ -100,42 +100,15 @@ def redis_subscriber(redis_config: RedisConfig) -> RedisEventSubscriber:
 
 
 @pytest.fixture
-def trigger_service(redis_publisher: RedisEventPublisher) -> AutoTriggerService:
-    """AutoTriggerService instance with real Redis publisher for acceptance testing."""
-    return AutoTriggerService(publisher=redis_publisher)
+def trigger_service(resolver: Resolver) -> AutoTriggerService:
+    """AutoTriggerService instance via Resolver for acceptance testing."""
+    return resolver.resolve_as("auto_trigger_service", AutoTriggerService)
 
 
 @pytest.fixture
-def heartbeat_scheduler(
-    redis_config: RedisConfig,
-    redis_publisher: RedisEventPublisher,
-    event_loop,
-) -> Generator[HeartbeatScheduler, None, None]:
-    """HeartbeatScheduler instance with real publisher for acceptance testing."""
-
-    async def publish_heartbeat(event: HeartbeatTriggered) -> None:
-        await redis_publisher.publish(event)
-
-    scheduler = HeartbeatScheduler(
-        redis_config=redis_config,
-        interval_seconds=60,
-        publisher=publish_heartbeat,
-    )
-
-    yield scheduler
-
-    # Cleanup: ensure scheduler is properly stopped (pure asyncio version)
-    if scheduler._running:
-        try:
-            # Signal stop
-            scheduler._running = False
-
-            # Cancel heartbeat task
-            if scheduler._heartbeat_task:
-                scheduler._heartbeat_task.cancel()
-                scheduler._heartbeat_task = None
-        except Exception:
-            pass
+def heartbeat_scheduler(resolver: Resolver) -> HeartbeatScheduler:
+    """HeartbeatScheduler instance via Resolver for acceptance testing."""
+    return resolver.resolve_as("heartbeat_scheduler", HeartbeatScheduler)
 
 
 # ===================================================================
