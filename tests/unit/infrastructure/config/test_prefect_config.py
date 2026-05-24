@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
@@ -71,7 +72,7 @@ class TestPrefectConfigFrozen:
     def test_frozen_dataclass(self) -> None:
         config = PrefectConfig()
         with pytest.raises(AttributeError):
-            config.api_url = "http://changed"  # type: ignore[misc]
+            cast(Any, config).api_url = "http://changed"
 
 
 class TestPrefectConfigEmptyEnv:

@@ -11,6 +11,7 @@ Copyright:
 from __future__ import annotations
 
 import uuid
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -22,15 +23,15 @@ from src.domain.value_objects.compliance_result import ComplianceResult
 from src.domain.value_objects.udmr_task import UDMRTask
 
 
-def _make_task(**kwargs: object) -> UDMRTask:
+def _make_task(**kwargs: Any) -> UDMRTask:
     """辅助构造 UDMRTask."""
-    defaults: dict[str, object] = {
+    defaults: dict[str, Any] = {
         "task_id": uuid.uuid4(),
         "input": "test input",
         "data_residency": "CHINA_DOMESTIC",
     }
     defaults.update(kwargs)
-    return UDMRTask(**defaults)  # type: ignore[arg-type]
+    return UDMRTask(**defaults)
 
 
 def _make_compliance(

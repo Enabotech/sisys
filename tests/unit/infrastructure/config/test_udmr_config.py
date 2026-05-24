@@ -11,6 +11,7 @@ Copyright:
 from __future__ import annotations
 
 import os
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
@@ -40,7 +41,7 @@ class TestCloudModelConfig:
         """应为不可变 dataclass."""
         cfg = CloudModelConfig()
         with pytest.raises(AttributeError):
-            cfg.api_type = "anthropic"  # type: ignore[misc]
+            cast(Any, cfg).api_type = "anthropic"
 
     def test_api_type_literal_values(self) -> None:
         """api_type 应接受合法值."""
@@ -90,7 +91,7 @@ class TestUDMRConfig:
         """应为不可变 dataclass."""
         cfg = UDMRConfig()
         with pytest.raises(AttributeError):
-            cfg.enabled = False  # type: ignore[misc]
+            cast(Any, cfg).enabled = False
 
     def test_from_env_defaults(self) -> None:
         """环境变量未设置时应使用默认值."""
