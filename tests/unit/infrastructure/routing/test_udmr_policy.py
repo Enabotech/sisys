@@ -10,6 +10,9 @@ Copyright:
 
 from __future__ import annotations
 
+from typing import Any, Literal
+from uuid import uuid4
+
 import pytest
 
 from src.domain.value_objects.compliance_result import ComplianceResult
@@ -21,11 +24,11 @@ from src.infrastructure.routing.udmr_policy import StaticUdmrPolicy
 def _make_cloud(
     model: str = "MiniMax-M2.7",
     enabled: bool = True,
-    api_type: str = "anthropic",
+    api_type: Literal["openai", "anthropic", "openai_responses"] = "anthropic",
 ) -> CloudModelConfig:
     """辅助构造 CloudModelConfig."""
     return CloudModelConfig(
-        api_type=api_type,  # type: ignore[arg-type]
+        api_type=api_type,
         endpoint="https://api.example.com",
         api_key="TESTING_DUMMY_KEY",
         model=model,
@@ -34,9 +37,15 @@ def _make_cloud(
     )
 
 
-def _make_task(**kwargs: object) -> UDMRTask:
+def _make_task(**kwargs: Any) -> UDMRTask:
     """辅助构造 UDMRTask."""
-    return UDMRTask(**kwargs)  # type: ignore[arg-type]
+    defaults: dict[str, Any] = {
+        "task_id": uuid4(),
+        "input": "test input",
+        "data_residency": "CHINA_DOMESTIC",
+    }
+    defaults.update(kwargs)
+    return UDMRTask(**defaults)
 
 
 def _make_compliance(
