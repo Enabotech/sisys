@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import logging
-from typing import Any, Type, TypeVar
+from typing import Any, NoReturn, Type, TypeVar, cast, overload
 
 from src.domain.ports.registry import Lifetime, PortRegistry, PortSpec, _global_registry
 
@@ -50,21 +50,36 @@ class Resolver:
         self._instances: dict[str, Any] = {}
         self._scoped_context: dict[str, Any] = {}
 
-    def resolve(self, port_name: str) -> Any:
+    @overload
+    def resolve(self, port_name: str) -> Any: ...
+
+    @overload
+    def resolve(self, port_name: str, interface: Type[T]) -> T: ...
+
+    def resolve(self, port_name: str, interface: Type[T] | None = None) -> Any:
         """通过名称解析端口并返回实例
 
         Args:
             port_name: 待解析的端口名称
+            interface: 可选接口类型（传入时启用编译期类型推断和运行时验证）
 
         Returns:
-            端口实现实例
+            端口实现实例（传入 interface 时返回类型为 T）
 
         Raises:
             KeyError: 端口未注册时抛出
-            RuntimeError: 端口已废弃时抛出
+            TypeError: 传入 interface 但实例类型不匹配时抛出
         """
+        # 覆盖路径（测试注入）
         if port_name in self._overrides:
-            return self._overrides[port_name]
+            override = self._overrides[port_name]
+            if interface is not None:
+                if not isinstance(override, interface):
+                    raise TypeError(
+                        f"Override for '{port_name}' ({type(override).__name__}) does not match interface {interface.__name__}"
+                    )
+                return cast(T, override)
+            return override
 
         spec = self._registry.get(port_name)
         if spec is None:
@@ -73,26 +88,48 @@ class Resolver:
         if spec.deprecated:
             logger.warning("Using deprecated port: %s", port_name)
 
-        return self._create_instance(spec)
+        instance = self._create_instance(spec)
+
+        # 类型安全路径：运行时验证 + 编译期推断
+        if interface is not None:
+            if not isinstance(instance, interface):
+                raise TypeError(f"Resolved instance {type(instance).__name__} does not match interface {interface.__name__}")
+            return cast(T, instance)
+
+        return instance
+
+    @overload
+    def resolve_by_interface(self, interface: Type[T]) -> T: ...
+
+    @overload
+    def resolve_by_interface(self, interface: str) -> NoReturn: ...
 
     def resolve_by_interface(self, interface: Type[T] | str) -> Any:
-        """通过接口类型解析端口
+        """通过接口类型解析端口（类型安全入口）
 
         Args:
-            interface: 接口类型
+            interface: 接口类型（传入字符串时抛出 KeyError）
 
         Returns:
-            端口实现实例
+            符合接口类型的端口实例
 
         Raises:
             KeyError: 未找到匹配接口的端口时抛出
+            TypeError: 实例类型与接口不匹配时抛出（防御性校验）
         """
         if isinstance(interface, str):
             raise KeyError(f"Cannot resolve forward-reference annotation: {interface}")
+
         spec = self._registry.get_by_interface(interface)
         if spec is None:
             raise KeyError(f"Port not found for interface: {interface.__name__}")
-        return self._create_instance(spec)
+
+        instance = self._create_instance(spec)
+
+        if not isinstance(instance, interface):
+            raise TypeError(f"Resolved instance {type(instance).__name__} does not match interface {interface.__name__}")
+
+        return cast(T, instance)
 
     def _create_instance(self, spec: PortSpec) -> Any:
         """根据生命周期策略创建实例"""

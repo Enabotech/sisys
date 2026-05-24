@@ -125,11 +125,11 @@ class DataIntegrityServiceImpl(DataIntegrityServicePort):
         )
 
         if not valid and self._event_publisher:
-            self._publish_integrity_violation(data_id, stored_hash, actual_hash)
+            await self._publish_integrity_violation(data_id, stored_hash, actual_hash)
 
         return result
 
-    def _publish_integrity_violation(
+    async def _publish_integrity_violation(
         self,
         data_id: str,
         expected_hash: str,
@@ -143,7 +143,7 @@ class DataIntegrityServiceImpl(DataIntegrityServicePort):
             actual_hash: 实际哈希
         """
         try:
-            self._event_publisher.publish(
+            await self._event_publisher.publish(
                 {
                     "event_type": "DataIntegrityViolation",
                     "data_id": data_id,

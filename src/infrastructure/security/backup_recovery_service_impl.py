@@ -107,7 +107,7 @@ class BackupRecoveryServiceImpl(BackupRecoveryServicePort):
         # 发布事件（如果配置了）
         if self._event_publisher:
             try:
-                self._event_publisher.publish(
+                await self._event_publisher.publish(
                     {
                         "event_type": "BackupCompleted",
                         "backup_id": backup_id,
