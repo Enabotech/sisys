@@ -80,7 +80,7 @@ def pipl_service(resolver: Resolver):
 @pytest.fixture
 def compliance_gateway(resolver: Resolver) -> ComplianceGatewayImpl:
     """Real compliance gateway from composition root."""
-    return resolver.resolve_as("compliance_gateway", ComplianceGatewayImpl)
+    return resolver.resolve("compliance_gateway", ComplianceGatewayImpl)
 
 
 # ===================================================================

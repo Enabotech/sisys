@@ -81,19 +81,19 @@ def redis_subscriber(redis_config: RedisConfig) -> RedisEventSubscriber:
 @pytest.fixture
 def hash_router(resolver: Resolver) -> HashRouter:
     """HashRouter instance from resolver."""
-    return resolver.resolve_as("hash_router", HashRouter)
+    return resolver.resolve("hash_router", HashRouter)
 
 
 @pytest.fixture
 def semantic_router(resolver: Resolver) -> SemanticRouter:
     """SemanticRouter instance from resolver."""
-    return resolver.resolve_as("semantic_router", SemanticRouter)
+    return resolver.resolve("semantic_router", SemanticRouter)
 
 
 @pytest.fixture
 def route_service(resolver: Resolver) -> AutoRouteService:
     """AutoRouteService instance from resolver."""
-    return resolver.resolve_as("auto_route_service", AutoRouteService)
+    return resolver.resolve("auto_route_service", AutoRouteService)
 
 
 # ===================================================================
