@@ -18,7 +18,7 @@ from enum import Enum
 class FlowStatus(str, Enum):
     """工作流执行状态枚举
 
-    业务层状态抽象，不直接映射 Prefect 全部技术状态（9→5 映射由 PrefectEngine 完成）。
+    业务层状态抽象，不直接映射 Prefect 全部技术状态（9→5 映射由 PrefectEngine 完成）
 
     映射关系：
     - PENDING: Prefect SCHEDULED/PENDING

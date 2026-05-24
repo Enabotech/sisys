@@ -1,6 +1,6 @@
 """Acceptance tests for Story 1.17 - UDMR 基础路由（云端优先静态配置）.
 
-BDD 步骤实现，使用 mock 隔离外部依赖。
+BDD 步骤实现，使用 mock 隔离外部依赖
 
 Run with: poetry run pytest tests/acceptance/test_acceptance_udmr-basic-routing.py -v
 

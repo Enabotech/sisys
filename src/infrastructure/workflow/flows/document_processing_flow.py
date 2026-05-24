@@ -40,7 +40,7 @@ async def document_processing_flow(
     """文档处理工作流
 
     编排：parse_document → generate_embedding → index_document
-    完成后通过 EventPublisher 发布 DocumentProcessed 事件。
+    完成后通过 EventPublisher 发布 DocumentProcessed 事件
 
     Args:
         document_id: 文档 UUID

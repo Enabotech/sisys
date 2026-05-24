@@ -64,8 +64,8 @@ def _create_mock_session() -> AsyncMock:
 async def pg_session() -> AsyncGenerator[AsyncMock, None]:
     """标准 PostgreSQL mock session fixture
 
-    自动管理 ContextVar 生命周期，测试结束后自动清理。
-    替代分散在各测试文件中的 set_session()/reset_session() 手动管理。
+    自动管理 ContextVar 生命周期，测试结束后自动清理
+    替代分散在各测试文件中的 set_session()/reset_session() 手动管理
 
     用法::
 

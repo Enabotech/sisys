@@ -29,7 +29,7 @@ class CloudHealthChecker:
     - check(): 检查第一个 enabled 云端模型的 API 可用性
     - close(): 释放 HTTP 客户端资源
 
-    支持 TTL 缓存避免每次路由都执行 HTTP 检查。
+    支持 TTL 缓存避免每次路由都执行 HTTP 检查
     """
 
     def __init__(
@@ -48,7 +48,7 @@ class CloudHealthChecker:
     async def check(self) -> bool:
         """检查第一个 enabled 云端模型是否可用.
 
-        使用 TTL 缓存避免频繁 HTTP 检查。
+        使用 TTL 缓存避免频繁 HTTP 检查
 
         Returns:
             True 如果云端 API 可达，False 否则

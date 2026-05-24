@@ -36,10 +36,10 @@ logger = logging.getLogger(__name__)
 class UDMRService:
     """UDMR 三层决策服务.
 
-    MVP 阶段实现 L1 合规检查 + L3 静态路由策略。
-    L2 四因子评分由 Epic 11 Story 11.1 实现。
+    MVP 阶段实现 L1 合规检查 + L3 静态路由策略
+    L2 四因子评分由 Epic 11 Story 11.1 实现
 
-    构造器注入原始值（不依赖 UDMRConfig），遵循六边形架构。
+    构造器注入原始值（不依赖 UDMRConfig），遵循六边形架构
     """
 
     def __init__(

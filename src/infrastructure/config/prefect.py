@@ -20,8 +20,8 @@ from dataclasses import dataclass
 class PrefectConfig:
     """Prefect 连接配置
 
-    通过环境变量注入，支持多环境部署。
-    模式参考 AutoExecuteConfig（frozen dataclass + from_env()）。
+    通过环境变量注入，支持多环境部署
+    模式参考 AutoExecuteConfig（frozen dataclass + from_env()）
     """
 
     api_url: str = "http://localhost:4200/api"
@@ -35,7 +35,7 @@ class PrefectConfig:
     def from_env(cls) -> PrefectConfig:
         """从环境变量创建配置实例
 
-        空字符串环境变量视为未设置，使用默认值。
+        空字符串环境变量视为未设置，使用默认值
 
         Returns:
             PrefectConfig 实例

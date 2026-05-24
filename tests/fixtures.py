@@ -357,7 +357,7 @@ T = TypeVar("T")
 def resolver() -> Resolver:
     """通过 Resolver 获取端口实例（统一端口管理）
 
-    所有验收测试应通过此 fixture 访问接口，保证测试与生产环境一致的接口管理。
+    所有验收测试应通过此 fixture 访问接口，保证测试与生产环境一致的接口管理
 
     用法::
 

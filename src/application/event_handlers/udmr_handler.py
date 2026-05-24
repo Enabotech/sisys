@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 class UDMRHandler:
     """UDMR 事件处理器（带外模式）.
 
-    并行消费 AutoRouted 事件，调用 UDMRService.decide() 发布 RoutingDecided 事件。
-    不阻塞 AutoExecuteService 执行管线。
+    并行消费 AutoRouted 事件，调用 UDMRService.decide() 发布 RoutingDecided 事件
+    不阻塞 AutoExecuteService 执行管线
 
     Attributes:
         _udmr_service: UDMR 三层决策服务

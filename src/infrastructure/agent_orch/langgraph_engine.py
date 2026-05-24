@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 class LangGraphEngine:
     """AgentEnginePort 的 LangGraph 实现
 
-    负责状态图生命周期管理（提交、状态查询、事件发布）。
-    所有 LangGraph SDK 导入限定于此模块及子模块。
+    负责状态图生命周期管理（提交、状态查询、事件发布）
+    所有 LangGraph SDK 导入限定于此模块及子模块
 
     Args:
         config: LangGraph 连接配置
@@ -48,9 +48,9 @@ class LangGraphEngine:
     async def submit_graph(self, graph_name: str, parameters: dict[str, Any]) -> str:
         """提交 Agent 状态图执行
 
-        构建 StateGraph、编译并执行，返回运行标识符。
-        MVP 阶段为阻塞执行（ainvoke 等待完成）。
-        完成后发布 AgentDecided 事件。
+        构建 StateGraph、编译并执行，返回运行标识符
+        MVP 阶段为阻塞执行（ainvoke 等待完成）
+        完成后发布 AgentDecided 事件
 
         Args:
             graph_name: 状态图名称（如 "BasicAgent"）
@@ -110,8 +110,8 @@ class LangGraphEngine:
     def _build_graph(self, graph_name: str, parameters: dict[str, Any]) -> Any:
         """构建并编译状态图
 
-        根据 graph_name 选择对应的图定义，编译后返回可执行图。
-        MVP 阶段仅支持 BasicAgent，不支持的名称记录警告日志。
+        根据 graph_name 选择对应的图定义，编译后返回可执行图
+        MVP 阶段仅支持 BasicAgent，不支持的名称记录警告日志
 
         Args:
             graph_name: 状态图名称

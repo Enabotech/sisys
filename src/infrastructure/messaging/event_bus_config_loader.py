@@ -28,8 +28,8 @@ DEFAULT_CONFIG_PATH = Path(__file__).parent.parent.parent.parent / "config" / "e
 class EventBusConfigLoader:
     """事件通道配置加载器
 
-    从 YAML 文件加载通道配置，覆盖 DEFAULT_MAPPINGS 基线。
-    YAML 配置优先，支持多环境差异化和运维独立调整。
+    从 YAML 文件加载通道配置，覆盖 DEFAULT_MAPPINGS 基线
+    YAML 配置优先，支持多环境差异化和运维独立调整
     """
 
     @classmethod

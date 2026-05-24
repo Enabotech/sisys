@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 class PrefectEngine:
     """WorkflowEnginePort 的 Prefect 实现
 
-    负责工作流生命周期管理（提交、状态查询、事件发布）。
-    所有 Prefect SDK 导入限定于此模块及子模块。
+    负责工作流生命周期管理（提交、状态查询、事件发布）
+    所有 Prefect SDK 导入限定于此模块及子模块
 
     Args:
         config: Prefect 连接配置
@@ -47,8 +47,8 @@ class PrefectEngine:
         """通过 Deployment 提交工作流执行
 
         使用 Prefect 推荐的 deployment 模式触发远程工作流，
-        避免直接使用 Flow 对象（仅适用于进程内调用）。
-        成功后发布 WorkflowSubmitted 事件。
+        避免直接使用 Flow 对象（仅适用于进程内调用）
+        成功后发布 WorkflowSubmitted 事件
 
         Args:
             flow_name: Deployment 名称，格式为 <FLOW_NAME>/<DEPLOYMENT_NAME>
