@@ -19,15 +19,7 @@ sys.path.insert(0, str(ROOT))
 
 @pytest.fixture(scope="session", autouse=True)
 def _bootstrap_once() -> None:
-    """Bootstrap the port registry once per test session.
-
-    先调用 get_test_env() 将测试环境配置同步到 os.environ，
-    确保 bootstrap() 注册的端口在解析时能读到正确的服务地址。
-    """
-    from tests.environments import get_test_env
-
-    get_test_env()
-
+    """Bootstrap the port registry once per test session."""
     from src.composition_root import bootstrap
 
     bootstrap()

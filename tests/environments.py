@@ -329,10 +329,6 @@ def get_test_env() -> TestEnvConfig:
         # os环境变量最后覆盖（最高优先级）
         config = _override_config_from_env(config)
 
-        # 将最终计算出的配置同步到 os.environ，
-        # 确保生产代码的 Config.from_env() 也能读到一致的值
-        _sync_config_to_environ(config)
-
         _test_env_config = config
         return _test_env_config
 
