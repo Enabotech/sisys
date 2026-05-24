@@ -31,7 +31,7 @@ class TestUdmrPolicyContract:
     def test_implementation_has_required_methods(self, registry) -> None:
         """实现类必须包含协议定义的所有方法.
 
-        直接从模块导入实现类验证方法存在性（避免 resolve 触发 env 解析）
+        直接导入实现类验证方法签名（避免 resolve 触发 UDMRConfig.from_env 环境变量解析）
         """
         from src.infrastructure.routing.udmr_policy import StaticUdmrPolicy
 

@@ -236,11 +236,9 @@ def auth_service(pg_session, resolver: "Resolver"):
 
 
 @pytest.fixture
-def password_validation_service():
-    """Real password validation service."""
-    from src.infrastructure.security.password_validation_service import PasswordValidationService
-
-    return PasswordValidationService()
+def password_validation_service(resolver):
+    """通过 Resolver 获取密码验证服务."""
+    return resolver.resolve("password_validation")
 
 
 # ===================================================================

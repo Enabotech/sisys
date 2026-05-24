@@ -13,9 +13,7 @@ from typing import Any
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from src.infrastructure.security.backup_recovery_service_impl import BackupRecoveryServiceImpl
-from src.infrastructure.security.data_integrity_service_impl import DataIntegrityServiceImpl
-from src.infrastructure.security.intrusion_detection_service_impl import IntrusionDetectionServiceImpl
+from src.domain.ports.resolver import Resolver
 
 scenarios("test_acceptance_equilibrium_level_3_compliance.feature")
 
@@ -29,6 +27,12 @@ scenarios("test_acceptance_equilibrium_level_3_compliance.feature")
 def context() -> dict[str, Any]:
     """Share state between BDD steps."""
     return {}
+
+
+@pytest.fixture
+def resolver() -> Resolver:
+    """Resolver 实例用于通过端口获取服务."""
+    return Resolver()
 
 
 # ==================== 背景 ====================
@@ -56,23 +60,23 @@ def security_ports_registered(context: dict[str, Any]) -> None:
 
 # ==================== 入侵检测 ====================
 @given("入侵检测服务可用")
-def intrusion_detection_service_available(context: dict[str, Any]) -> None:
+def intrusion_detection_service_available(context: dict[str, Any], resolver: Resolver) -> None:
     """入侵检测服务可用"""
-    service = IntrusionDetectionServiceImpl()
+    service = resolver.resolve("intrusion_detection_service")
     context["intrusion_service"] = service
 
 
 @given("数据完整性服务可用")
-def data_integrity_service_available(context: dict[str, Any]) -> None:
+def data_integrity_service_available(context: dict[str, Any], resolver: Resolver) -> None:
     """数据完整性服务可用"""
-    service = DataIntegrityServiceImpl()
+    service = resolver.resolve("data_integrity_service")
     context["integrity_service"] = service
 
 
 @given("备份恢复服务可用")
-def backup_recovery_service_available(context: dict[str, Any]) -> None:
+def backup_recovery_service_available(context: dict[str, Any], resolver: Resolver) -> None:
     """备份恢复服务可用"""
-    service = BackupRecoveryServiceImpl()
+    service = resolver.resolve("backup_recovery_service")
     context["backup_service"] = service
 
 
