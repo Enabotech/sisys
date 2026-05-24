@@ -200,7 +200,7 @@
 | 端口名称 | 版本 | Owner | 注册 | 解析 | 契约测试 | 状态 |
 |---------|------|-------|------|------|---------|------|
 | ComplianceGatewayPort | 1.0 | compliance-team | ✅ | ✅ | ✅ | 复用 |
-| HealthCheckPort | 1.0 | infrastructure-team | 新建 | 新建 | 新建 | **新建** |
+| HealthCheckPort | 1.0 | routing-team | 新建 | 新建 | 新建 | **新建** |
 | RoutingDecisionLogRepository | 1.0 | auto-invocation-team | ✅ | ✅ | ✅ | 复用 |
 | EventPublisher | 1.0 | auto-invocation-team | ✅ | ✅ | ✅ | 复用 |
 | UdmrPolicyPort | 1.0 | routing-team | 新建 | 新建 | 新建 | **新建** |
@@ -582,6 +582,9 @@
 - [x] [Review][Patch] 健康检查缓存缺失 [cloud_health_checker.py] — AC-3要求TTL缓存避免频繁HTTP检查
 - [x] [Review][Patch] 生产assert风险 [udmr_service.py:49] — 改为显式RuntimeError验证
 - [x] [Review][Patch] 健康检查影响路由决策 [udmr_service.py] — 云端健康失败时回退本地
+  - **注意:** 健康检查回退逻辑在 UDMRService 层执行（decide() 步骤3），不在 StaticUdmrPolicy 层
+  - StaticUdmrPolicy.route() 仅执行静态路由决策，返回 route_type；健康检查由 UDMRService 调用 HealthCheckPort
+  - `health_check_failed` fallback_reason 仅在 UDMRService 层触发
 - [x] [Review][Patch] AC-1 max_tokens规范更新 [1-17-udmr-basic-routing.md:57] — 默认值改为None（Anthropic必需时强制验证）
 
 #### 已推迟 Defer
@@ -952,7 +955,7 @@ UDMRClient (统一接口)
 | **Story ID** | 1.17 |
 | **Story Key** | 1-17-udmr-basic-routing |
 | **File** | `_bmad-output/implementation-artifacts/stories/1-17-udmr-basic-routing.md` |
-| **Status** | `review` |
+| **Status** | `done` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 6: MVP 关键机制增强 |
 | **优先级** | P0-17（MVP，ARCH UDMR 基础） |
@@ -966,114 +969,6 @@ UDMRClient (统一接口)
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
 5. [ ] Sprint status synced to `ready-for-dev`
 
-### 🔧 对抗性审查修复（Adversarial Review Fixes）
-
-> **Round 1 (2026-05-22):** 基于3个并行Agent调研实际代码实现，发现并修复4个P0问题
-> - P0-1: UDMRService 构造器从依赖 UDMRConfig 改为注入原始值（local_first/local_model/llm_timeout），遵循六边形架构
-> - P0-2: 扩展 Lessons Learned 明确 UDMRService._persist_decision_log() 必须填充 selected_model/cost_actual/fallback_reason
-> - P0-3: 文件清单添加 src/domain/ports/__init__.py 导出 UdmrPolicyPort
-> - P0-4: HealthCheckPort 状态从"复用"修正为"新建"（composition_root.py 未注册，需新建实现注册）
->
-> **Round 2 (2026-05-22):** 基于3个并行Agent调研，发现并修复3个P0问题+6个P1问题
-> - P0-1: 事件流架构矛盾 — 数据流从顺序改为带外并行模式（AutoExecuteService不等待RoutingDecided）
-> - P0-2: AutoRouted.task_context→UDMRTask映射补充完整字段映射规范
-> - P0-3: RoutingDecided循环风险 — 补充event_id因果链防循环机制
-> - P0-4: UdmrPolicyPort.route()返回类型修正 float|None → str|None
-> - P1: 移除"向后兼容UDMR_CLOUD_MODELS"（无代码依据）
-> - P1: DI注册改为lambda内联UDMRConfig.from_env()模式（遵循现有惯例）
-> - P1: 零依赖原则列表补充HealthCheckPort
-> - P1: 文件清单添加external_services/llm/__init__.py
-> - P1: AC-1补充api_type=="anthropic"时max_tokens必需验证
-> - P1: AC-4补充带外模式验证标准
->
-> **Round 3 (2026-05-22):** 科学性与合理性审查，修复2个P0问题+3个P1问题
-> - P0: Story标题从"本地优先"修正为"云端优先静态配置"（与策略和配置一致）
-> - P0: AC-5指标从"本地路由占比≥80%"改为"路由决策日志完整性≥95%"（带外模式下决策不影响执行）
-> - P0: 明确MVP限制说明（RoutingDecided仅用于审计，不影响AutoExecuteService）
-> - P1: 添加参数合理性说明（llm_timeout/healthcheck_interval/local_first）
-> - P1: AC-5补充健康检查超时性能指标
-> - P1: 补充ComplianceGatewayImpl子服务注入说明（pipl_service/cross_border_service参数名不匹配为已知问题）
->
-> **Round 4 (2026-05-22):** 跨文档一致性+实现可行性+内部一致性审查，修复4个P0问题+8个P1问题
-> - P0: 追溯矩阵Subtask 1.4-1.6不存在，合并到1.1-1.3
-> - P0: 循环防护从"event_id因果链"改为具体实现指导（排除AutoTriggerHandler中的RoutingDecided）
-> - P0: CloudHealthChecker多模型策略明确（构造时绑定cloud_configs，check()检查第一个enabled模型）
-> - P0: 添加陈旧.pyc缓存清理步骤到Task 0
-> - P1: 价值组归属修正（5→6:MVP关键机制增强）
-> - P1: EventPublisher添加到端口契约清单表格
-> - P1: AC-1字段名修正（timeout→llm_timeout）
-> - P1: TDD标题拼写修正（UDR→UDMR）
-> - P1: HealthCheckPort分类修正（从"复用"移至"需新建实现注册")
-> - P1: test_cloud_model_config合并到test_udmr_config
-> - P1: 补充UDMR_ENABLED=false行为和UDMRHandler订阅机制
-> - 用户反馈: static_routing_strategy重命名为udmr_policy（UdmrPolicyPort/StaticUdmrPolicy）
->
-> **Round 5 (2026-05-22):** 最终质量确认，无P0问题，修复4个P1+2个P2
-> - P1: DI参数名strategy→policy同步重命名（第480行）
-> - P1: 价值组归属第19行和第866行从"5"更新为"6"（Round 4遗漏）
-> - P1: UDMRHandler DI注册补充event_listener参数注入
-> - P1: 依赖方向矩阵标签Strategy→Policy
-> - P2: AC-1默认值false→False（Python布尔值大写）
-> - P2: 中英文间距修正
->
-> **--- 第二批审查 ---**
->
-> **第二批 Round 1 (2026-05-22):** 3个并行Agent管线集成/数据模型/DI架构深度验证，修复3个P0+2个P1
-> - P0: causation_id循环防护无效—AutoTriggerHandler不检查causation_id无条件调用on_domain_event()，必须从_registered_event_types排除RoutingDecided
-> - P0: DualChannelEventBus.publish()不调用InMemoryEventListener.dispatch()，event_listener.on_event()模式仅MVP/测试环境有效，生产环境需单独订阅机制
-> - P0: AutoRouted事件当前无InMemoryEventListener消费者（AutoRouteHandler无register_handlers()），UDMRHandler将是第一个
-> - P1: data_residency默认值"default"→"CHINA_DOMESTIC"（与UDMRTask默认值对齐）
-> - P1: Lessons Learned循环防护描述修正（移除causation_id有效性暗示）
->
-> **第二批 Round 2 (2026-05-22):** 3个并行Agent端口契约/事件数据模型/DI模式深度验证，修复2个P0
-> - P0: DI注册lambda无参写法错误—Resolver._instantiate()调用spec.impl(resolver=self)，所有lambda必须为`lambda resolver:`格式而非`lambda:`
-> - P0: HealthCheckPort遗漏close()方法—端口实际定义check()+close()两个方法，CloudHealthChecker必须同时实现close()释放资源
->
-> **第二批 Round 3-4 (2026-05-22):** 跨文档一致性+DI完整性+数据流验证，修复3个P0
-> - P0: 事件订阅统一改为DualChannelEventBus（用户决策），InMemoryEventListener仅用于测试mock；UDMRHandler.subscribe()订阅Redis REALTIME通道
-> - P0: 上游AutoTriggerContext.ALLOWED_CONTEXT_KEYS缺失UDMR字段（input/data_residency/preferred_model/allowed_models），MVP阶段使用默认值
-> - P0: UDMRHandler DI注册从event_listener改为event_bus（DualChannelEventBus实例）
->
-> **第二批 Round 5 (2026-05-22):** 最终质量确认，3个并行Agent设计规则+测试策略+文档质量全量验证，无P0问题
-> - 设计规则验证：8项全部合规（六边形架构/frozen/DI模式/事件订阅统一/循环防护/端口契约/数据流/MVP限制）
-> - 测试策略验证：6项全部通过（文件清单/覆盖率/TDD循环/隔离约束/契约测试/Gherkin场景）
-> - 文档质量验证：6项全部通过（模板合规/章节完整/内部一致/审查记录/概念澄清/格式规范）
->
-> **用户补充决策 (2026-05-22):**
-> - 事件订阅统一使用 DualChannelEventBus，InMemoryEventListener 仅供备用或测试需要时使用
-> - DualChannelEventBus 当前仅有 publish() 能力，subscribe() 消费机制需在本 Story 中实现（新增 Subtask 4.4-4.6、测试文件、更新文件清单）
->
-> **第三批 Round 1 (2026-05-22):** 3个并行Agent基于事件总线设计文档深度验证，发现3个P0问题
-> - P0: Story声称"DualChannelEventBus仅有publish()能力"是错误的—subscribe()/subscribe_async()/start()/close()均已实现
-> - P0: RedisEventBus.subscribe()存在3个已知BUG（P0-29/30/31）：频道名不匹配、subscribe_async()调用不存在方法、handler收到dict非DomainEvent
-> - P0: Subtask 4.4-4.6从"从零实现subscribe()"改为"修复RedisEventBus现有BUG"；测试文件重命名为test_redis_event_bus_subscribe_fix.py
->
-> **第三批 Round 2 (2026-05-22):** 3个并行Agent修复方案+订阅模式+跨文档一致性验证，修复3个P0
-> - P0: UDMRHandler应用subscribe_async()非subscribe()（UDMRService.decide()是async方法，需异步handler）
-> - P0: Subtask 4.2移除基础设施层频道名sisys:rt:auto_routed（应用层通过ChannelRouter自动解析）
-> - P0: 补充bus.start()启动依赖说明（Redis监听循环必须在subscribe_async()后启动，在app.py lifespan中调用）
-> - P1: 更新文件清单添加redis_subscriber.py和app.py
->
-> **第三批 Round 3 (2026-05-22):** 单Agent最终验证，6项验证标准全部通过，0个P0问题
-> - 验证subscribe_async()正确性：UDMRHandler使用subscribe_async()匹配EventSubscriber Protocol ✅
-> - 验证BUG修复设计：P0-29/30/31修复方案与sisys-port-impl-refactor.md一致 ✅
-> - 验证DI注册：所有resolver.resolve()名称与composition_root.py注册匹配 ✅
-> - 验证文件清单完整性：所有新建/更新文件路径正确 ✅
-> - 验证Dev Notes一致性：事件订阅方案与最新设计决策一致 ✅
-> - 验证循环防护：AutoTriggerHandler排除RoutingDecided方案明确 ✅
->
-> **第三批 Round 4 (2026-05-22):** 3个并行Agent配置层/事件数据流/六边形架构全量验证，0个P0问题
-> - 配置层验证10项全部通过（frozen/from_env/字段/端口签名/DI格式/resolver名称/内联模式/HealthCheckPort/config导出）
-> - 事件数据流验证全部通过（AutoRouted/RoutingDecided字段、BUG位置P0-29/30/31确认、subscribe链路、start()顺序、DomainEvent.from_dict方案）
-> - 六边形架构验证通过（依赖方向矩阵、内部一致性、循环防护、文件清单完整性）
-> - P1: UDMRHandler通过DI持有infrastructure层DualChannelEventBus引用（编译时不违规，运行时由DI容器装配），建议补充说明端口注入模式
->
-> **第三批 Round 5 (2026-05-22):** 3个并行Agent模板合规/技术准确性/跨文档一致性最终验证，0个P0问题，2个P1修复
-> - 模板合规验证：8个必需章节全部存在且顺序正确，Status/Note声明/版本历史/对抗审查记录全部合规
-> - 技术准确性验证：API调研/性能指标/MVP限制/环境变量/代码行号引用全部通过
-> - 跨文档一致性验证：architecture.md/epics_v1.0.md/event-bus-design/port-impl-refactor/Lessons Learned全部一致
-> - P1-1 修复：FR-CP-05覆盖声明修正为"ARCH UDMR（静态路由基础），FR-CP-05部分覆盖（L1+L3 MVP）"
-> - P1-2 记录：前置依赖1.14c未在epics中声明（依赖关系合理，epics文档遗漏）
 
 ### 下一步 Next Steps
 
