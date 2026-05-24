@@ -21,7 +21,9 @@ sys.path.insert(0, str(ROOT))
 def _bootstrap_once() -> None:
     """Bootstrap the port registry once per test session."""
     from src.composition_root import bootstrap
+    from tests.environments import get_test_env
 
+    get_test_env()
     bootstrap()
 
 
