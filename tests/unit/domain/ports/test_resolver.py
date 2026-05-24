@@ -22,7 +22,7 @@ class _MockInterface:
         return ""
 
 
-class _MockImplA:
+class _MockImplA(_MockInterface):
     """模拟实现 A"""
 
     def __init__(self, config: str = "default") -> None:
@@ -32,7 +32,7 @@ class _MockImplA:
         return "impl_a"
 
 
-class _MockImplB:
+class _MockImplB(_MockInterface):
     """模拟实现 B（需要依赖注入）"""
 
     def __init__(self, dependency: _MockImplA) -> None:
@@ -42,7 +42,7 @@ class _MockImplB:
         return "impl_b"
 
 
-class _MockImplC:
+class _MockImplC(_MockInterface):
     """模拟实现 C（无依赖）"""
 
     def execute(self) -> str:
@@ -418,3 +418,136 @@ class TestGlobalResolver:
             result = resolve("some_port")
             mock_resolve.assert_called_once_with("some_port")
             assert result == "mock_result"
+
+
+class _MismatchedImpl:
+    """不符合 _MockInterface 的实现（不继承）"""
+
+    def run(self) -> str:
+        return "mismatched"
+
+
+class TestResolveWithTypeSafety:
+    """Resolver.resolve(name, interface) 类型安全测试"""
+
+    @pytest.fixture
+    def registry(self) -> PortRegistry:
+        """创建独立的注册表实例（不污染全局单例）。"""
+        reg = object.__new__(PortRegistry)
+        reg._ports = {}
+        return reg
+
+    def test_resolve_with_interface_returns_typed_instance(self, registry: PortRegistry) -> None:
+        """传入 interface 参数应返回经过运行时验证的类型安全实例"""
+        spec = PortSpec(
+            name="typed_port",
+            version="1.0.0",
+            interface=_MockInterface,
+            impl=_MockImplC,
+            module="test.module",
+            lifetime=Lifetime.TRANSIENT,
+        )
+        registry.register(spec)
+        resolver = Resolver(registry=registry)
+
+        result = resolver.resolve("typed_port", _MockInterface)
+        assert isinstance(result, _MockImplC)
+        assert result.execute() == "impl_c"
+
+    def test_resolve_with_interface_raises_on_type_mismatch(self, registry: PortRegistry) -> None:
+        """实例类型不匹配 interface 时应抛出 TypeError"""
+        spec = PortSpec(
+            name="mismatched_port",
+            version="1.0.0",
+            interface=_MockInterface,
+            impl=_MismatchedImpl,
+            module="test.module",
+            lifetime=Lifetime.TRANSIENT,
+        )
+        registry.register(spec)
+        resolver = Resolver(registry=registry)
+
+        with pytest.raises(TypeError, match="does not match interface"):
+            resolver.resolve("mismatched_port", _MockInterface)
+
+    def test_resolve_with_interface_validates_override(self, registry: PortRegistry) -> None:
+        """覆盖实例也应通过 isinstance 检查"""
+        typed_instance = _MockImplC()
+        resolver = Resolver(registry=registry, overrides={"typed_port": typed_instance})
+
+        result = resolver.resolve("typed_port", _MockInterface)
+        assert result is typed_instance
+
+    def test_resolve_with_interface_rejects_mismatched_override(self, registry: PortRegistry) -> None:
+        """覆盖实例不匹配 interface 时应抛出 TypeError"""
+        mismatched_instance = _MismatchedImpl()
+        resolver = Resolver(registry=registry, overrides={"typed_port": mismatched_instance})
+
+        with pytest.raises(TypeError, match="does not match interface"):
+            resolver.resolve("typed_port", _MockInterface)
+
+    def test_resolve_without_interface_behaves_unchanged(self, registry: PortRegistry) -> None:
+        """不传 interface 参数时行为应与原来完全一致"""
+        spec = PortSpec(
+            name="untyped_port",
+            version="1.0.0",
+            interface=_MockInterface,
+            impl=_MockImplC,
+            module="test.module",
+            lifetime=Lifetime.TRANSIENT,
+        )
+        registry.register(spec)
+        resolver = Resolver(registry=registry)
+
+        result = resolver.resolve("untyped_port")
+        assert isinstance(result, _MockImplC)
+
+    def test_resolve_with_interface_unregistered_raises_key_error(self, registry: PortRegistry) -> None:
+        """未注册端口传入 interface 时仍应抛出 KeyError"""
+        resolver = Resolver(registry=registry)
+        with pytest.raises(KeyError, match="Port not registered"):
+            resolver.resolve("nonexistent", _MockInterface)
+
+
+class TestResolveByInterfaceTypeSafety:
+    """Resolver.resolve_by_interface 类型安全增强测试"""
+
+    @pytest.fixture
+    def registry(self) -> PortRegistry:
+        """创建独立的注册表实例（不污染全局单例）。"""
+        reg = object.__new__(PortRegistry)
+        reg._ports = {}
+        return reg
+
+    def test_resolve_by_interface_returns_typed_instance(self, registry: PortRegistry) -> None:
+        """resolve_by_interface 应返回经过运行时验证的类型安全实例"""
+        spec = PortSpec(
+            name="typed_interface_port",
+            version="1.0.0",
+            interface=_MockInterface,
+            impl=_MockImplC,
+            module="test.module",
+            lifetime=Lifetime.TRANSIENT,
+        )
+        registry.register(spec)
+        resolver = Resolver(registry=registry)
+
+        result = resolver.resolve_by_interface(_MockInterface)
+        assert isinstance(result, _MockImplC)
+        assert result.execute() == "impl_c"
+
+    def test_resolve_by_interface_raises_on_type_mismatch(self, registry: PortRegistry) -> None:
+        """实现类不匹配接口时应抛出 TypeError"""
+        spec = PortSpec(
+            name="mismatched_interface_port",
+            version="1.0.0",
+            interface=_MockInterface,
+            impl=_MismatchedImpl,
+            module="test.module",
+            lifetime=Lifetime.TRANSIENT,
+        )
+        registry.register(spec)
+        resolver = Resolver(registry=registry)
+
+        with pytest.raises(TypeError, match="does not match interface"):
+            resolver.resolve_by_interface(_MockInterface)

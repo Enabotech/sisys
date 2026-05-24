@@ -153,7 +153,8 @@ def verify_frozen() -> None:
     from src.infrastructure.config.langgraph import LangGraphConfig
 
     config = LangGraphConfig()
-    assert config.__dataclass_params__.frozen  # type: ignore[attr-defined]
+    params = getattr(type(config), "__dataclass_params__", None)
+    assert params is not None and params.frozen
 
 
 # =========================================================================

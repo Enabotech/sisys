@@ -13,6 +13,7 @@ Copyright:
 from __future__ import annotations
 
 import uuid
+from typing import Any, cast
 
 import pytest
 
@@ -56,7 +57,7 @@ class TestRAGIndexedEvent:
 
         event = RAGIndexed()
         with pytest.raises(AttributeError):
-            event.index_name = "changed"  # type: ignore[misc]
+            cast(Any, event).index_name = "changed"
 
     def test_auto_registered_in_domain_event_registry(self) -> None:
         """RAGIndexed 应自动注册到 DomainEvent._registry"""
@@ -104,7 +105,7 @@ class TestReportGeneratedEvent:
 
         event = ReportGenerated()
         with pytest.raises(AttributeError):
-            event.report_type = "changed"  # type: ignore[misc]
+            cast(Any, event).report_type = "changed"
 
     def test_auto_registered_in_domain_event_registry(self) -> None:
         """ReportGenerated 应自动注册到 DomainEvent._registry"""
@@ -167,7 +168,7 @@ class TestWorkflowSubmittedEvent:
 
         event = WorkflowSubmitted()
         with pytest.raises(AttributeError):
-            event.flow_name = "changed"  # type: ignore[misc]
+            cast(Any, event).flow_name = "changed"
 
     def test_auto_registered_in_domain_event_registry(self) -> None:
         """WorkflowSubmitted 应自动注册到 DomainEvent._registry"""

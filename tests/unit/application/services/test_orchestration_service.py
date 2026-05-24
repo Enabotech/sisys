@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -165,7 +166,7 @@ class TestWorkflowTaskValueObject:
             task_type="data_pipeline",
         )
         with pytest.raises(AttributeError):
-            task.flow_name = "changed"  # type: ignore[misc]
+            cast(Any, task).flow_name = "changed"
 
     def test_workflow_result_is_frozen(self) -> None:
         """WorkflowResult 应为 frozen dataclass"""
@@ -177,7 +178,7 @@ class TestWorkflowTaskValueObject:
             submitted_at=datetime.now(),
         )
         with pytest.raises(AttributeError):
-            result.flow_run_id = "changed"  # type: ignore[misc]
+            cast(Any, result).flow_run_id = "changed"
 
 
 class TestOrchestrationServiceValidation:
