@@ -322,6 +322,11 @@ def get_test_env() -> TestEnvConfig:
 
         # 加载 .env 配置（用于填充空值）
         env_values = dotenv_values(ROOT / ".env")
+        # 将 .env 中尚未存在于 os.environ 的键值同步写入，
+        # 确保生产代码的 Config.from_env() 也能读到一致的值
+        for key, value in env_values.items():
+            if value is not None and key not in os.environ:
+                os.environ[key] = value
 
         # 差异化环境配置覆盖.env相关字段（仅当环境配置使用默认值时）
         _apply_dotenv_if_empty(config, env_values)
