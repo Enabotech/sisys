@@ -27,8 +27,8 @@ class TestQdrantManager:
 
         wrapper = QdrantManager()
         assert wrapper._config.host == get_test_env().qdrant.host
-        assert wrapper._config.port == 6333
-        assert wrapper._config.grpc_port == 6334
+        assert wrapper._config.port == get_test_env().qdrant.port
+        assert wrapper._config.grpc_port == get_test_env().qdrant.grpc_port
         assert wrapper._config.api_key is None
         assert wrapper._config.https is False
         assert wrapper._config.timeout == 30.0
