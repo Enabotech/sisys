@@ -378,4 +378,4 @@ def resolver() -> Resolver:
 
 def resolve_port(resolver: Resolver, port_name: str, interface: type[T]) -> T:
     """解析端口并返回正确类型（用于 fixture 返回类型推导）"""
-    return resolver.resolve_as(port_name, interface)
+    return resolver.resolve(port_name, interface)

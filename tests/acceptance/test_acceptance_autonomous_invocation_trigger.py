@@ -102,13 +102,13 @@ def redis_subscriber(redis_config: RedisConfig) -> RedisEventSubscriber:
 @pytest.fixture
 def trigger_service(resolver: Resolver) -> AutoTriggerService:
     """AutoTriggerService instance via Resolver for acceptance testing."""
-    return resolver.resolve_as("auto_trigger_service", AutoTriggerService)
+    return resolver.resolve("auto_trigger_service", AutoTriggerService)
 
 
 @pytest.fixture
 def heartbeat_scheduler(resolver: Resolver) -> HeartbeatScheduler:
     """HeartbeatScheduler instance via Resolver for acceptance testing."""
-    return resolver.resolve_as("heartbeat_scheduler", HeartbeatScheduler)
+    return resolver.resolve("heartbeat_scheduler", HeartbeatScheduler)
 
 
 # ===================================================================

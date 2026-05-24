@@ -103,19 +103,19 @@ def redis_config() -> RedisConfig:
 @pytest.fixture
 def sandbox(resolver: Resolver) -> DockerSandboxAdapter:
     """通过 Resolver 获取沙箱适配器（统一端口管理）."""
-    return resolver.resolve_as("sandbox_executor", DockerSandboxAdapter)
+    return resolver.resolve("sandbox_executor", DockerSandboxAdapter)
 
 
 @pytest.fixture
 def redis_snapshot_store(resolver: Resolver) -> RedisSnapshotStore:
     """通过 Resolver 获取快照存储（统一端口管理）."""
-    return resolver.resolve_as("snapshot_repository", RedisSnapshotStore)
+    return resolver.resolve("snapshot_repository", RedisSnapshotStore)
 
 
 @pytest.fixture
 def execute_service(resolver: Resolver) -> AutoExecuteService:
     """通过 Resolver 获取执行服务（统一端口管理）."""
-    return resolver.resolve_as("auto_execute_service", AutoExecuteService)
+    return resolver.resolve("auto_execute_service", AutoExecuteService)
 
 
 @pytest.fixture
