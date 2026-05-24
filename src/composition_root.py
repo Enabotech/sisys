@@ -830,10 +830,16 @@ def bootstrap() -> None:
         name="snapshot_repository",
         version="v1.0.0",
         interface=SnapshotRepositoryProtocol,
-        impl="src.infrastructure.storage.redis.redis_snapshot_store.RedisSnapshotStore",
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.redis.redis_snapshot_store",
+            fromlist=["RedisSnapshotStore"],
+        ).RedisSnapshotStore(
+            adapter=resolver.resolve("redis_adapter"),
+        ),
         module="src.infrastructure.storage.redis.redis_snapshot_store",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
+        tags=("redis", "snapshot"),
     )
 
     register_port(
