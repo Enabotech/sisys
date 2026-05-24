@@ -11,9 +11,11 @@ import asyncio
 import uuid
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
+from typing import TypeVar
 
 import pytest
 
+from src.domain.ports.resolver import Resolver
 from tests.environments import TestEnvConfig, get_test_env, reset_test_env
 from tests.isolation import (
     TenantContext,
@@ -343,3 +345,37 @@ def unique_collection_name(unique_id: str) -> str:
 def unique_redis_key(unique_id: str) -> str:
     """生成唯一的 Redis key"""
     return f"test:{unique_id}:key"
+
+
+# =============================================================================
+# Resolver Fixture - 统一端口管理
+# =============================================================================
+T = TypeVar("T")
+
+
+@pytest.fixture
+def resolver() -> Resolver:
+    """通过 Resolver 获取端口实例（统一端口管理）
+
+    所有验收测试应通过此 fixture 访问接口，保证测试与生产环境一致的接口管理。
+
+    用法::
+
+        def test_something(resolver):
+            service = resolver.resolve("my_service")
+            result = await service.do_something()
+            assert result is not None
+
+    注意:
+        - 此 fixture 依赖 session 级 bootstrap() fixture（conftest.py）
+        - 获取的是全局单例实例
+        - 如需覆盖默认实现，传入 overrides 参数
+    """
+    from src.domain.ports.resolver import Resolver
+
+    return Resolver()
+
+
+def resolve_port(resolver: Resolver, port_name: str, interface: type[T]) -> T:
+    """解析端口并返回正确类型（用于 fixture 返回类型推导）"""
+    return resolver.resolve_as(port_name, interface)

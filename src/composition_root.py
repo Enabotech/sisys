@@ -127,6 +127,11 @@ def bootstrap() -> None:
     )
     from src.infrastructure.saga.saga_repository import PostgreSQLSagaRepository
     from src.infrastructure.scheduler.heartbeat_scheduler import HeartbeatScheduler
+    from src.infrastructure.security.audit_service_impl import AuditServiceImpl
+    from src.infrastructure.security.auth_service_impl import AuthServiceImpl
+    from src.infrastructure.security.encryption_service import EncryptionService
+    from src.infrastructure.security.jwt_service import JWTService
+    from src.infrastructure.security.token_blacklist import RedisTokenBlacklist
     from src.infrastructure.storage.redis.redis_manager import RedisManager
 
     register_port(
@@ -412,8 +417,8 @@ def bootstrap() -> None:
         name="audit_repo",
         version="v1.0.0",
         interface=AuditRepositoryPort,
-        impl="src.infrastructure.storage.postgresql.repository.audit_repository.AuditRepository",
-        module="src.infrastructure.storage.postgresql.repository.audit_repository",
+        impl="src.infrastructure.security.audit_repository_impl.AuditRepository",
+        module="src.infrastructure.security.audit_repository_impl",
         lifetime=Lifetime.SCOPED,
         owner="compliance-team",
     )
@@ -422,19 +427,29 @@ def bootstrap() -> None:
         name="audit_service",
         version="v1.0.0",
         interface=AuditServicePort,
-        impl="src.infrastructure.services.audit_service_impl.AuditServiceImpl",
-        module="src.infrastructure.services.audit_service_impl",
+        impl=lambda resolver: AuditServiceImpl(
+            audit_repository=resolver.resolve("audit_repo"),
+        ),
+        module="src.infrastructure.security.audit_service_impl",
         lifetime=Lifetime.SINGLETON,
         owner="compliance-team",
     )
 
     # === Auth Ports ===
+    from src.infrastructure.config.auth import AuthConfig
+
     register_port(
         name="auth_service",
         version="v1.0.0",
         interface=AuthServicePort,
-        impl="src.infrastructure.services.auth_service_impl.AuthServiceImpl",
-        module="src.infrastructure.services.auth_service_impl",
+        impl=lambda resolver: AuthServiceImpl(
+            jwt_service=JWTService(AuthConfig.from_env()),
+            encryption_service=EncryptionService(),
+            user_repository=resolver.resolve("user_repo"),
+            user_role_repository=resolver.resolve("user_role_repo"),
+            login_attempt_repository=resolver.resolve("login_attempt_repo"),
+        ),
+        module="src.infrastructure.security.auth_service_impl",
         lifetime=Lifetime.SINGLETON,
         owner="security-team",
     )
@@ -443,8 +458,8 @@ def bootstrap() -> None:
         name="permission_service",
         version="v1.0.0",
         interface=PermissionServicePort,
-        impl="src.infrastructure.services.permission_service_impl.PermissionServiceImpl",
-        module="src.infrastructure.services.permission_service_impl",
+        impl="src.infrastructure.security.permission_service_impl.PermissionServiceImpl",
+        module="src.infrastructure.security.permission_service_impl",
         lifetime=Lifetime.SINGLETON,
         owner="security-team",
     )
@@ -453,8 +468,8 @@ def bootstrap() -> None:
         name="token_blacklist",
         version="v1.0.0",
         interface=TokenBlacklistPort,
-        impl="src.infrastructure.services.token_blacklist_impl.RedisTokenBlacklist",
-        module="src.infrastructure.services.token_blacklist_impl",
+        impl=lambda resolver: RedisTokenBlacklist(redis_client=resolver.resolve("redis_client")),
+        module="src.infrastructure.security.token_blacklist",
         lifetime=Lifetime.SCOPED,
         owner="security-team",
     )
@@ -463,8 +478,8 @@ def bootstrap() -> None:
         name="password_validation",
         version="v1.0.0",
         interface=PasswordValidationServicePort,
-        impl="src.infrastructure.services.password_validation_impl.PasswordValidationService",
-        module="src.infrastructure.services.password_validation_impl",
+        impl="src.infrastructure.security.password_validation_service.PasswordValidationService",
+        module="src.infrastructure.security.password_validation_service",
         lifetime=Lifetime.SINGLETON,
         owner="security-team",
     )
@@ -680,7 +695,7 @@ def bootstrap() -> None:
         interface=SandboxExecutor,
         impl="src.infrastructure.external_services.sandbox.docker_sandbox_adapter.DockerSandboxAdapter",
         module="src.infrastructure.external_services.sandbox.docker_sandbox_adapter",
-        lifetime=Lifetime.TRANSIENT,
+        lifetime=Lifetime.SCOPED,
         owner="sandbox-team",
     )
 

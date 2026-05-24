@@ -33,6 +33,7 @@ from src.application.event_handlers.auto_execute_completed_handler import (
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.auto_route_events import AutoRouted
+from src.domain.ports.resolver import Resolver
 from src.domain.services.auto_execute_service import AutoExecuteService
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import DockerSandboxAdapter
@@ -100,36 +101,21 @@ def redis_config() -> RedisConfig:
 
 
 @pytest.fixture
-def sandbox() -> Generator[DockerSandboxAdapter, None, None]:
-    """Create DockerSandboxAdapter for testing."""
-    adapter = DockerSandboxAdapter()
-    yield adapter
-    adapter._running_containers.clear()
+def sandbox(resolver: Resolver) -> DockerSandboxAdapter:
+    """通过 Resolver 获取沙箱适配器（统一端口管理）."""
+    return resolver.resolve_as("sandbox_executor", DockerSandboxAdapter)
 
 
 @pytest.fixture
-def redis_snapshot_store(redis_config: RedisConfig) -> RedisSnapshotStore:
-    """Create RedisSnapshotStore with async Redis client."""
-    # Use async Redis client for the store
-    async_client = redis.asyncio.Redis(
-        host=redis_config.host,
-        port=redis_config.port,
-        db=redis_config.db,
-        password=redis_config.password,
-        decode_responses=True,
-    )
-    store = RedisSnapshotStore(async_client)
-    store.set_ttl(86400)  # 24 hours for tests
-    return store
+def redis_snapshot_store(resolver: Resolver) -> RedisSnapshotStore:
+    """通过 Resolver 获取快照存储（统一端口管理）."""
+    return resolver.resolve_as("snapshot_repository", RedisSnapshotStore)
 
 
 @pytest.fixture
-def execute_service(
-    sandbox: DockerSandboxAdapter,
-    redis_snapshot_store: RedisSnapshotStore,
-) -> AutoExecuteService:
-    """Create AutoExecuteService with real sandbox and snapshot store."""
-    return AutoExecuteService(sandbox=sandbox, snapshot_repo=redis_snapshot_store)
+def execute_service(resolver: Resolver) -> AutoExecuteService:
+    """通过 Resolver 获取执行服务（统一端口管理）."""
+    return resolver.resolve_as("auto_execute_service", AutoExecuteService)
 
 
 @pytest.fixture

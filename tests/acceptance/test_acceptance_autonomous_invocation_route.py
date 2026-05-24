@@ -21,6 +21,7 @@ from pytest_bdd import given, scenarios, then, when
 
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.events.auto_trigger_events import AutoTriggered
+from src.domain.ports.resolver import Resolver
 from src.domain.services.auto_route_service import AutoRouteService
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
@@ -78,59 +79,21 @@ def redis_subscriber(redis_config: RedisConfig) -> RedisEventSubscriber:
 
 
 @pytest.fixture
-def hash_router() -> HashRouter:
-    """HashRouter instance for testing."""
-    return HashRouter(nodes=["node-A", "node-B", "node-C"])
+def hash_router(resolver: Resolver) -> HashRouter:
+    """HashRouter instance from resolver."""
+    return resolver.resolve_as("hash_router", HashRouter)
 
 
 @pytest.fixture
-def semantic_router() -> SemanticRouter:
-    """SemanticRouter instance with test candidates."""
-
-    def make_embedding(marker: int, dim: int = 1024) -> list[float]:
-        embedding = []
-        for i in range(dim):
-            if i % 3 == marker:
-                embedding.append(0.8)
-            elif i % 3 == (marker + 1) % 3:
-                embedding.append(0.1)
-            else:
-                embedding.append(0.1)
-        return embedding
-
-    cfo_candidate = Candidate(
-        candidate_id="cfo-agent",
-        name="CFO Agent",
-        description="Financial analysis, risk assessment, and investment planning",
-        embedding=make_embedding(0),
-    )
-    ceo_candidate = Candidate(
-        candidate_id="ceo-agent",
-        name="CEO Agent",
-        description="Strategic planning and executive decision making",
-        embedding=make_embedding(1),
-    )
-    cto_candidate = Candidate(
-        candidate_id="cto-agent",
-        name="CTO Agent",
-        description="Technology strategy, software architecture, and digital transformation",
-        embedding=make_embedding(2),
-    )
-    return SemanticRouter(candidates=[cfo_candidate, ceo_candidate, cto_candidate])
+def semantic_router(resolver: Resolver) -> SemanticRouter:
+    """SemanticRouter instance from resolver."""
+    return resolver.resolve_as("semantic_router", SemanticRouter)
 
 
 @pytest.fixture
-def route_service(
-    redis_publisher: RedisEventPublisher,
-    hash_router: HashRouter,
-    semantic_router: SemanticRouter,
-) -> AutoRouteService:
-    """AutoRouteService instance with real publishers and routers."""
-    return AutoRouteService(
-        publisher=redis_publisher,
-        hash_router=hash_router,
-        semantic_router=semantic_router,
-    )
+def route_service(resolver: Resolver) -> AutoRouteService:
+    """AutoRouteService instance from resolver."""
+    return resolver.resolve_as("auto_route_service", AutoRouteService)
 
 
 # ===================================================================

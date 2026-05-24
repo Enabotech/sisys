@@ -28,14 +28,10 @@ from src.domain.entities.pipl_compliance_record import (
 )
 from src.domain.entities.sensitive_data_result import SensitiveDataResult
 from src.domain.events.compliance_events import SensitiveType
+from src.domain.ports.resolver import Resolver
 from src.domain.value_objects.compliance_result import ComplianceResult
 from src.domain.value_objects.udmr_task import UDMRTask
 from src.infrastructure.security.compliance_gateway_impl import ComplianceGatewayImpl
-from src.infrastructure.security.cross_border_transfer_service_impl import CrossBorderTransferServiceImpl
-from src.infrastructure.security.data_residency_enforcer_impl import DataResidencyEnforcerImpl
-from src.infrastructure.security.pipl_compliance_service_impl import PIPLComplianceServiceImpl
-from src.infrastructure.security.sensitive_data_detector_impl import SensitiveDataDetectorImpl
-from src.infrastructure.security.whitelist_service_impl import WhitelistServiceImpl
 
 scenarios("test_acceptance_data_sovereignty_isolation.feature")
 
@@ -52,51 +48,39 @@ def context() -> dict[str, Any]:
 
 
 @pytest.fixture
-def sensitive_data_detector():
+def sensitive_data_detector(resolver: Resolver):
     """Real sensitive data detector service."""
-    return SensitiveDataDetectorImpl()
+    return resolver.resolve("sensitive_data_detector")
 
 
 @pytest.fixture
-def data_residency_enforcer():
+def data_residency_enforcer(resolver: Resolver):
     """Real data residency enforcer service."""
-    return DataResidencyEnforcerImpl()
+    return resolver.resolve("data_residency_enforcer")
 
 
 @pytest.fixture
-def whitelist_service():
+def whitelist_service(resolver: Resolver):
     """Real whitelist service."""
-    return WhitelistServiceImpl()
+    return resolver.resolve("whitelist_service")
 
 
 @pytest.fixture
-def cross_border_service():
+def cross_border_service(resolver: Resolver):
     """Real cross-border transfer service."""
-    return CrossBorderTransferServiceImpl()
+    return resolver.resolve("cross_border_transfer")
 
 
 @pytest.fixture
-def pipl_service():
+def pipl_service(resolver: Resolver):
     """Real PIPL compliance service."""
-    return PIPLComplianceServiceImpl()
+    return resolver.resolve("pipl_compliance")
 
 
 @pytest.fixture
-def compliance_gateway(
-    sensitive_data_detector,
-    data_residency_enforcer,
-    whitelist_service,
-    pipl_service,
-    cross_border_service,
-):
-    """Real compliance gateway with all dependencies."""
-    return ComplianceGatewayImpl(
-        sensitive_data_detector=sensitive_data_detector,
-        data_residency_enforcer=data_residency_enforcer,
-        whitelist_service=whitelist_service,
-        pipl_service=pipl_service,
-        cross_border_service=cross_border_service,
-    )
+def compliance_gateway(resolver: Resolver) -> ComplianceGatewayImpl:
+    """Real compliance gateway from composition root."""
+    return resolver.resolve_as("compliance_gateway", ComplianceGatewayImpl)
 
 
 # ===================================================================

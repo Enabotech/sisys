@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
 from src.domain.events.listener import EventListenerAsync
+from src.domain.ports.resolver import Resolver
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.messaging.event_store import PostgreSQLEventStore, VersionError
@@ -81,6 +82,12 @@ def pg_config() -> PostgreSQLConfig:
 def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLManager:
     """Real database engine instance."""
     return PostgreSQLManager(pg_config)
+
+
+@pytest.fixture
+def uow_factory(resolver: Resolver):
+    """UnitOfWork factory via Resolver."""
+    return resolver.resolve("uow_factory")
 
 
 @pytest.fixture

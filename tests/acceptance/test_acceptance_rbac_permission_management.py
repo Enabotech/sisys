@@ -29,6 +29,7 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.ports.resolver import Resolver
 from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from tests.environments import get_test_env
@@ -186,65 +187,52 @@ def jwt_service(jwt_secret_key):
 
 
 @pytest.fixture
-def role_service(pg_session):
-    """Real role service."""
+def role_service(pg_session, resolver: "Resolver"):
+    """Real role service from composition root."""
     from src.application.use_cases.role_management import RoleService
-    from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
-    from src.infrastructure.storage.postgresql.repository.user_role_repository import UserRoleRepository
 
     token = set_session(pg_session)
-    role_repo = RoleRepository()
-    user_role_repo = UserRoleRepository()
+    role_repo = resolver.resolve("role_repo")
+    user_role_repo = resolver.resolve("user_role_repo")
     service = RoleService(role_repo, user_role_repo)
     yield service
     reset_session(token)
 
 
 @pytest.fixture
-def user_repository(pg_session):
-    """Real user repository."""
-    from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
-
+def user_repository(pg_session, resolver: "Resolver"):
+    """Real user repository from composition root."""
     token = set_session(pg_session)
-    repo = UserRepository()
+    repo = resolver.resolve("user_repo")
     yield repo
     reset_session(token)
 
 
 @pytest.fixture
-def login_attempt_repository(pg_session):
-    """Real login attempt repository."""
-    from src.infrastructure.storage.postgresql.repository.login_attempt_repository import LoginAttemptRepository
-
+def login_attempt_repository(pg_session, resolver: "Resolver"):
+    """Real login attempt repository from composition root."""
     token = set_session(pg_session)
-    repo = LoginAttemptRepository()
+    repo = resolver.resolve("login_attempt_repo")
     yield repo
     reset_session(token)
 
 
 @pytest.fixture
-def user_role_repository(pg_session):
-    """Real user-role association repository."""
-    from src.infrastructure.storage.postgresql.repository.user_role_repository import UserRoleRepository
-
+def user_role_repository(pg_session, resolver: "Resolver"):
+    """Real user-role association repository from composition root."""
     token = set_session(pg_session)
-    repo = UserRoleRepository()
+    repo = resolver.resolve("user_role_repo")
     yield repo
     reset_session(token)
 
 
 @pytest.fixture
-def auth_service(jwt_service, encryption_service, user_repository, user_role_repository, login_attempt_repository):
-    """Real auth service with login attempt tracking."""
-    from src.infrastructure.security.auth_service_impl import AuthServiceImpl
-
-    return AuthServiceImpl(
-        jwt_service=jwt_service,
-        encryption_service=encryption_service,
-        user_repository=user_repository,
-        user_role_repository=user_role_repository,
-        login_attempt_repository=login_attempt_repository,
-    )
+def auth_service(pg_session, resolver: "Resolver"):
+    """Real auth service from composition root."""
+    token = set_session(pg_session)
+    service = resolver.resolve("auth_service")
+    yield service
+    reset_session(token)
 
 
 @pytest.fixture
