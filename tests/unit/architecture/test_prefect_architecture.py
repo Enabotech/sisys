@@ -131,7 +131,7 @@ class TestPrefectEngineProtocolCompliance:
             async def publish(self, event):
                 pass
 
-        engine = PrefectEngine(config, FakePublisher())  # type: ignore[arg-type]
+        engine = PrefectEngine(config, FakePublisher())
         assert isinstance(engine, WorkflowEnginePort)
 
 

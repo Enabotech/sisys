@@ -95,7 +95,7 @@ def udmr_service(
 ) -> UDMRService:
     """真实 UDMRService 实例."""
     return UDMRService(
-        compliance_gateway=mock_compliance_gateway,  # type: ignore[arg-type]
+        compliance_gateway=mock_compliance_gateway,
         policy=policy,
         health_checker=mock_health_checker,
         log_repo=mock_log_repo,
@@ -163,7 +163,7 @@ class TestUDMREndToEnd:
         mock_compliance_gateway.check.return_value = ComplianceResult(allowed=True, forced_local=True, reason="PII detected")
 
         service = UDMRService(
-            compliance_gateway=mock_compliance_gateway,  # type: ignore[arg-type]
+            compliance_gateway=mock_compliance_gateway,
             policy=policy,
             health_checker=mock_health_checker,
             log_repo=mock_log_repo,
@@ -194,7 +194,7 @@ class TestUDMREndToEnd:
         )
 
         service = UDMRService(
-            compliance_gateway=mock_compliance_gateway,  # type: ignore[arg-type]
+            compliance_gateway=mock_compliance_gateway,
             policy=policy,
             health_checker=mock_health_checker,
             log_repo=mock_log_repo,

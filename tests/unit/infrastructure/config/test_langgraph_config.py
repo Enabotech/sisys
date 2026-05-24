@@ -13,6 +13,7 @@ Copyright:
 from __future__ import annotations
 
 import os
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
@@ -78,7 +79,7 @@ class TestLangGraphConfigFrozen:
     def test_frozen_dataclass(self) -> None:
         config = LangGraphConfig()
         with pytest.raises(AttributeError):
-            config.api_url = "http://changed"  # type: ignore[misc]
+            cast(Any, config).api_url = "http://changed"
 
 
 class TestLangGraphConfigEmptyEnv:

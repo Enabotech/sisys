@@ -133,7 +133,7 @@ class TestLangGraphEngineProtocolCompliance:
 
                 return PublishResult(event_id="fake", results=(ChannelResult("realtime", True),))
 
-        engine = LangGraphEngine(config, FakePublisher())  # type: ignore[arg-type]
+        engine = LangGraphEngine(config, FakePublisher())
         assert isinstance(engine, AgentEnginePort)
 
 
