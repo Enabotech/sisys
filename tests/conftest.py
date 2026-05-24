@@ -1,6 +1,5 @@
 """Shared pytest configuration."""
 
-import os
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -23,16 +22,16 @@ def _bootstrap_once() -> None:
     """Bootstrap the port registry once per test session."""
     # 在 bootstrap 之前初始化 os.environ（从 .env 读取）
     # 这样 production 代码的 AuthConfig.from_env() 就能获取正确的值
-    from pathlib import Path
+    # from pathlib import Path
 
-    from dotenv import dotenv_values
+    # from dotenv import dotenv_values
 
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-    if env_path.exists():
-        env_values = dotenv_values(env_path)
-        for key, value in env_values.items():
-            if value is not None and key not in os.environ:
-                os.environ[key] = value
+    # env_path = Path(__file__).resolve().parent.parent / ".env"
+    # if env_path.exists():
+    #     env_values = dotenv_values(env_path)
+    #     for key, value in env_values.items():
+    #         if value is not None and key not in os.environ:
+    #             os.environ[key] = value
 
     from src.composition_root import bootstrap
 
