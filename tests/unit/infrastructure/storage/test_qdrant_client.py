@@ -22,8 +22,11 @@ class TestQdrantManager:
 
     def test_default_initialization(self):
         """测试默认初始化"""
+
+        from tests.environments import get_test_env
+
         wrapper = QdrantManager()
-        assert wrapper._config.host == "localhost"
+        assert wrapper._config.host == get_test_env().qdrant.host
         assert wrapper._config.port == 6333
         assert wrapper._config.grpc_port == 6334
         assert wrapper._config.api_key is None
