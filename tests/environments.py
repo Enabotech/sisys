@@ -322,17 +322,16 @@ def get_test_env() -> TestEnvConfig:
 
         # 加载 .env 配置（用于填充空值）
         env_values = dotenv_values(ROOT / ".env")
-        # 将 .env 中尚未存在于 os.environ 的键值同步写入，
-        # 确保生产代码的 Config.from_env() 也能读到一致的值
-        for key, value in env_values.items():
-            if value is not None and key not in os.environ:
-                os.environ[key] = value
 
         # 差异化环境配置覆盖.env相关字段（仅当环境配置使用默认值时）
         _apply_dotenv_if_empty(config, env_values)
 
         # os环境变量最后覆盖（最高优先级）
-        _override_config_from_env(config)
+        config = _override_config_from_env(config)
+
+        # 将最终计算出的配置同步到 os.environ，
+        # 确保生产代码的 Config.from_env() 也能读到一致的值
+        _sync_config_to_environ(config)
 
         _test_env_config = config
         return _test_env_config
@@ -439,6 +438,47 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
         config.app.secret_key = secret_key
 
     return config
+
+
+def _sync_config_to_environ(config: TestEnvConfig) -> None:
+    """将最终测试环境配置同步到 os.environ
+
+    确保生产代码的 Config.from_env()（读 os.getenv）也能拿到与测试环境一致的值。
+    使用 setdefault 而非直接赋值，尊重用户显式设置的环境变量（最高优先级）。
+
+    Args:
+        config: 计算完成的测试环境配置
+    """
+    # Redis
+    os.environ.setdefault("REDIS_HOST", config.redis.host)
+    os.environ.setdefault("REDIS_PORT", str(config.redis.port))
+    if config.redis.password:
+        os.environ.setdefault("REDIS_PASSWORD", config.redis.password)
+
+    # PostgreSQL
+    os.environ.setdefault("POSTGRES_HOST", config.postgres.host)
+    os.environ.setdefault("POSTGRES_PORT", str(config.postgres.port))
+    os.environ.setdefault("POSTGRES_USERNAME", config.postgres.username)
+    os.environ.setdefault("POSTGRES_PASSWORD", config.postgres.password)
+    os.environ.setdefault("POSTGRES_DATABASE", config.postgres.database)
+
+    # Qdrant
+    os.environ.setdefault("QDRANT_HOST", config.qdrant.host)
+    os.environ.setdefault("QDRANT_PORT", str(config.qdrant.port))
+    os.environ.setdefault("QDRANT_GRPC_PORT", str(config.qdrant.grpc_port))
+
+    # Neo4j
+    os.environ.setdefault("NEO4J_HOST", config.neo4j.host)
+
+    # RabbitMQ
+    os.environ.setdefault("RABBITMQ_HOST", config.rabbitmq.host)
+    os.environ.setdefault("RABBITMQ_PORT", str(config.rabbitmq.port))
+
+    # 应用配置
+    if config.app.jwt_secret_key:
+        os.environ.setdefault("JWT_SECRET_KEY", config.app.jwt_secret_key)
+    if config.app.secret_key:
+        os.environ.setdefault("SECRET_KEY", config.app.secret_key)
 
 
 def reset_test_env() -> None:
