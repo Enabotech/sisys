@@ -18,7 +18,7 @@ from typing import TypedDict
 class BasicAgentState(TypedDict, total=False):
     """BasicAgent 状态图状态定义
 
-    MVP 阶段最小状态，验证编排架构而非业务逻辑。
+    MVP 阶段最小状态，验证编排架构而非业务逻辑
 
     Attributes:
         task_description: 任务描述

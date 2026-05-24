@@ -23,7 +23,7 @@ from typing import Any
 class CheckpointSnapshot:
     """会话状态快照领域实体
 
-    创建后不可变。序列化/反序列化由基础设施层适配器负责。
+    创建后不可变。序列化/反序列化由基础设施层适配器负责
 
     Attributes:
         snapshot_id: Unique identifier for this snapshot

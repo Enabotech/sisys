@@ -23,7 +23,7 @@ from src.domain.events.base import DomainEvent
 class WorkflowSubmitted(DomainEvent):
     """工作流提交事件
 
-    PrefectEngine 成功提交工作流后触发，与 LangGraphEngine 的 AgentDecided 形成对称模式。
+    PrefectEngine 成功提交工作流后触发，与 LangGraphEngine 的 AgentDecided 形成对称模式
     """
 
     flow_run_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -42,7 +42,7 @@ class WorkflowSubmitted(DomainEvent):
 class RAGIndexed(DomainEvent):
     """RAG 索引完成事件
 
-    文档解析和嵌入完成后触发，由 Epic 2/3 故事实现生产者。
+    文档解析和嵌入完成后触发，由 Epic 2/3 故事实现生产者
     """
 
     document_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -61,7 +61,7 @@ class RAGIndexed(DomainEvent):
 class ReportGenerated(DomainEvent):
     """报告生成完成事件
 
-    报告生成完成后触发，由 Epic 6 故事实现生产者。
+    报告生成完成后触发，由 Epic 6 故事实现生产者
     """
 
     report_id: uuid.UUID = field(default_factory=uuid.uuid4)

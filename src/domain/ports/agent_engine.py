@@ -21,8 +21,8 @@ from src.domain.value_objects.flow_status import FlowStatus
 class AgentEnginePort(Protocol):
     """Agent 引擎端口
 
-    定义 Agent 状态图提交和状态查询的标准接口。
-    六边形架构约束：仅使用 Python 标准库类型，不导入 langgraph/langchain。
+    定义 Agent 状态图提交和状态查询的标准接口
+    六边形架构约束：仅使用 Python 标准库类型，不导入 langgraph/langchain
     """
 
     async def submit_graph(self, graph_name: str, parameters: dict[str, Any]) -> str:

@@ -1,6 +1,6 @@
 """Saga 上下文 Protocol - 领域层接口定义
 
-定义 SagaContext 的接口契约，供 SagaStep 和 SagaRepositoryProtocol 引用。
+定义 SagaContext 的接口契约，供 SagaStep 和 SagaRepositoryProtocol 引用
 具体实现位于 infrastructure/saga/saga_context.py
 """
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class SagaContext(Protocol):
-    """Saga 执行上下文 Protocol。
+    """Saga 执行上下文 Protocol
 
     定义 Saga 执行过程中的状态管理接口：
     - 记录当前执行状态

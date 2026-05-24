@@ -127,7 +127,7 @@ class SagaContext:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> SagaContext:
-        """从字典反序列化。
+        """从字典反序列化
 
         Args:
             data: 序列化数据

@@ -20,7 +20,7 @@ from src.infrastructure.agent_orch.schemas import BasicAgentState
 def analyze_node(state: BasicAgentState) -> dict[str, Any]:
     """分析节点
 
-    MVP 简化实现：直接设置分析结果。
+    MVP 简化实现：直接设置分析结果
 
     Args:
         state: 当前状态
@@ -34,7 +34,7 @@ def analyze_node(state: BasicAgentState) -> dict[str, Any]:
 def synthesize_node(state: BasicAgentState) -> dict[str, Any]:
     """综合节点
 
-    MVP 简化实现：直接设置综合结果。
+    MVP 简化实现：直接设置综合结果
 
     Args:
         state: 当前状态

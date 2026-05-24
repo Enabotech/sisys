@@ -22,8 +22,8 @@ from prefect import task
 async def parse_document(document_id: uuid.UUID, file_path: str) -> dict[str, Any]:
     """解析文档任务
 
-    MVP 占位实现，返回 mock 数据。
-    真实解析逻辑由 Epic 2/3 故事补充。
+    MVP 占位实现，返回 mock 数据
+    真实解析逻辑由 Epic 2/3 故事补充
 
     Args:
         document_id: 文档 UUID
@@ -39,8 +39,8 @@ async def parse_document(document_id: uuid.UUID, file_path: str) -> dict[str, An
 async def generate_embedding(parse_result: dict[str, Any]) -> list[float]:
     """生成嵌入向量任务
 
-    MVP 占位实现，返回 mock 数据。
-    真实嵌入逻辑由 Epic 2/3 故事补充。
+    MVP 占位实现，返回 mock 数据
+    真实嵌入逻辑由 Epic 2/3 故事补充
 
     Args:
         parse_result: 解析结果
@@ -55,8 +55,8 @@ async def generate_embedding(parse_result: dict[str, Any]) -> list[float]:
 async def index_document(embedding_result: list[float]) -> dict[str, Any]:
     """索引文档任务
 
-    MVP 占位实现，返回 mock 数据。
-    真实索引逻辑由 Epic 2/3 故事补充。
+    MVP 占位实现，返回 mock 数据
+    真实索引逻辑由 Epic 2/3 故事补充
 
     Args:
         embedding_result: 嵌入结果
