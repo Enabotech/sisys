@@ -32,7 +32,6 @@ class TestInMemoryOutboxStateTransition:
         """创建 InMemoryOutboxRepository 实例"""
         return InMemoryOutboxRepository()
 
-    @pytest.mark.asyncio
     async def test_mark_published_calls_entity_method(self, repository: InMemoryOutboxRepository) -> None:
         """mark_published() 应调用 entity.mark_published() 而非直接赋值"""
         entity = OutboxEntity(event_id=uuid4(), event_type="test", payload={}, status="pending")
@@ -43,7 +42,6 @@ class TestInMemoryOutboxStateTransition:
 
             mock_mark.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_mark_published_raises_on_invalid_state(self, repository: InMemoryOutboxRepository) -> None:
         """从非 pending 状态调用 mark_published 应抛出异常"""
         entity = OutboxEntity(event_id=uuid4(), event_type="test", payload={}, status="failed")
@@ -52,7 +50,6 @@ class TestInMemoryOutboxStateTransition:
         with pytest.raises(InvalidStateTransitionError):
             await repository.mark_published(entity.event_id)
 
-    @pytest.mark.asyncio
     async def test_mark_failed_calls_entity_method(self, repository: InMemoryOutboxRepository) -> None:
         """mark_failed() 应调用 entity.mark_failed() 而非直接赋值"""
         entity = OutboxEntity(event_id=uuid4(), event_type="test", payload={}, status="pending")
@@ -63,7 +60,6 @@ class TestInMemoryOutboxStateTransition:
 
             mock_mark.assert_called_once_with("test error")
 
-    @pytest.mark.asyncio
     async def test_mark_failed_raises_on_invalid_state(self, repository: InMemoryOutboxRepository) -> None:
         """从 published 状态调用 mark_failed 应抛出异常"""
         entity = OutboxEntity(event_id=uuid4(), event_type="test", payload={}, status="published")
@@ -72,7 +68,6 @@ class TestInMemoryOutboxStateTransition:
         with pytest.raises(InvalidStateTransitionError):
             await repository.mark_failed(entity.event_id, "test error")
 
-    @pytest.mark.asyncio
     async def test_mark_failed_allows_from_failed_state(self, repository: InMemoryOutboxRepository) -> None:
         """mark_failed() 应允许从 failed 状态再次调用（递增 retry_count）"""
         entity = OutboxEntity(event_id=uuid4(), event_type="test", payload={}, status="failed", retry_count=1)
@@ -113,7 +108,6 @@ class TestOutboxEntityArchivedState:
 class TestPostgreSQLOutboxStateTransition:
     """验证 PostgreSQLOutboxRepository 状态转换校验"""
 
-    @pytest.mark.asyncio
     async def test_mark_published_validates_pending_status(self) -> None:
         """mark_published() 仅允许从 pending 状态转换"""
         from unittest import mock
@@ -149,7 +143,6 @@ class TestPostgreSQLOutboxStateTransition:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_mark_failed_validates_allowed_status(self) -> None:
         """mark_failed() 仅允许从 pending/failed 状态转换"""
         from unittest import mock

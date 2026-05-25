@@ -13,8 +13,6 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import MagicMock
 
-import pytest
-
 
 class TestAsyncioRunPatternElimination:
     """验证 asyncio.run() 反模式已消除"""
@@ -56,7 +54,6 @@ class TestAsyncioRunPatternElimination:
 class TestToThreadEncapsulation:
     """验证 to_thread 正确封装同步操作"""
 
-    @pytest.mark.asyncio
     async def test_memory_index_uses_to_thread(self):
         """验证 MemoryIndex 使用 to_thread 封装"""
         from src.infrastructure.config.memory import MemoryConfig
@@ -74,7 +71,6 @@ class TestToThreadEncapsulation:
         # read_entries 应该是异步的（使用 to_thread）
         assert asyncio.iscoroutinefunction(index.read_entries)
 
-    @pytest.mark.asyncio
     async def test_file_memory_adapter_write_uses_aiofiles(self):
         """验证 FileMemoryAdapter.write 使用 aiofiles"""
         from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
@@ -82,7 +78,6 @@ class TestToThreadEncapsulation:
         # write 应该是异步的
         assert asyncio.iscoroutinefunction(FileMemoryAdapter.write)
 
-    @pytest.mark.asyncio
     async def test_to_thread_preserves_lock_semantics(self):
         """验证 to_thread 保留 fcntl.flock 锁语义"""
         from src.infrastructure.config.memory import MemoryConfig
@@ -119,7 +114,6 @@ class TestCPUBoundMethodsNotBlocking:
 class TestEventLoopSafety:
     """验证事件循环安全"""
 
-    @pytest.mark.asyncio
     async def test_async_methods_can_be_called_from_async_context(self):
         """验证异步方法可以从 async 上下文中调用"""
         from src.infrastructure.config.memory import MemoryConfig
@@ -134,7 +128,6 @@ class TestEventLoopSafety:
         # 使用 gather 可以并发执行
         await asyncio.gather(index.read_entries(), return_exceptions=True)
 
-    @pytest.mark.asyncio
     async def test_no_blocking_calls_in_event_loop(self):
         """验证事件循环中没有阻塞调用"""
         from src.infrastructure.config.memory import MemoryConfig

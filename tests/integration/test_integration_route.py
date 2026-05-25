@@ -168,7 +168,6 @@ def route_service(
 # ===================================================================
 
 
-@pytest.mark.asyncio
 async def test_triggered_to_routed_end_to_end(
     route_service: AutoRouteService,
     redis_subscriber: RedisEventSubscriber,
@@ -233,7 +232,6 @@ async def test_triggered_to_routed_end_to_end(
     assert result.route_type in ("hash", "semantic", "mixed"), "Route type should be valid"
 
 
-@pytest.mark.asyncio
 async def test_hash_routing_consistency(
     route_service: AutoRouteService,
     event_loop,
@@ -258,7 +256,6 @@ async def test_hash_routing_consistency(
     assert route_targets.count(route_targets[0]) == len(route_targets), "100% consistency not achieved"
 
 
-@pytest.mark.asyncio
 async def test_semantic_routing_with_task_context(
     route_service: AutoRouteService,
     event_loop,
@@ -281,7 +278,6 @@ async def test_semantic_routing_with_task_context(
     assert result.route_type in ("semantic", "mixed"), f"Expected semantic or mixed routing, got {result.route_type}"
 
 
-@pytest.mark.asyncio
 async def test_route_service_publishes_to_redis(
     route_service: AutoRouteService,
     redis_subscriber: RedisEventSubscriber,
@@ -326,7 +322,6 @@ async def test_route_service_publishes_to_redis(
     assert len(received_payloads) > 0, "No events received on Redis channel"
 
 
-@pytest.mark.asyncio
 async def test_route_decision_log_fields(
     route_service: AutoRouteService,
     event_loop,
@@ -348,7 +343,6 @@ async def test_route_decision_log_fields(
     assert isinstance(result.task_context, dict), "task_context should be dict"
 
 
-@pytest.mark.asyncio
 async def test_mixed_routing_mode(
     route_service: AutoRouteService,
     event_loop,
@@ -368,7 +362,6 @@ async def test_mixed_routing_mode(
     assert result.route_type in ("hash", "semantic", "mixed"), f"Invalid route_type: {result.route_type}"
 
 
-@pytest.mark.asyncio
 async def test_route_performance_under_load(
     route_service: AutoRouteService,
     event_loop,
@@ -400,7 +393,6 @@ async def test_route_performance_under_load(
     assert p95_latency < 100, f"P95 latency {p95_latency:.2f}ms too high under load"
 
 
-@pytest.mark.asyncio
 async def test_idempotent_routing(
     route_service: AutoRouteService,
     event_loop,
@@ -423,7 +415,6 @@ async def test_idempotent_routing(
         assert result.route_target == first.route_target, f"Result {i} route_target differs"
 
 
-@pytest.mark.asyncio
 async def test_route_service_graceful_no_publisher(
     hash_router: HashRouter,
     semantic_router: SemanticRouter,
@@ -448,7 +439,6 @@ async def test_route_service_graceful_no_publisher(
     assert isinstance(result, AutoRouted)
 
 
-@pytest.mark.asyncio
 async def test_route_service_graceful_no_routers(
     redis_publisher: RedisEventPublisher,
     event_loop,
@@ -474,7 +464,6 @@ async def test_route_service_graceful_no_routers(
     assert result.route_score == 0.0
 
 
-@pytest.mark.asyncio
 async def test_hash_router_node_rebalancing(
     redis_publisher: RedisEventPublisher,
     event_loop,
@@ -501,7 +490,6 @@ async def test_hash_router_node_rebalancing(
     assert unchanged_percent >= 50, f"Too much rebalancing: only {unchanged_percent:.1f}% unchanged"
 
 
-@pytest.mark.asyncio
 async def test_concurrent_routing_requests(
     route_service: AutoRouteService,
     event_loop,
@@ -525,7 +513,6 @@ async def test_concurrent_routing_requests(
     assert all(isinstance(r, AutoRouted) for r in results)
 
 
-@pytest.mark.asyncio
 async def test_event_loop_isolation(
     route_service: AutoRouteService,
     event_loop,

@@ -217,7 +217,6 @@ class TestAsyncOutboxPoller:
         """Create a ChannelRouter for tests."""
         return ChannelRouter()
 
-    @pytest.mark.asyncio
     async def test_poll_once_publishes_pending_events(self, router: ChannelRouter):
         """poll_once should publish pending events."""
         repo = _create_mock_repo()
@@ -240,7 +239,6 @@ class TestAsyncOutboxPoller:
         mock_publisher.async_publish.assert_called_once()
         repo.mark_published.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_poll_once_marks_published_after_success(self, router: ChannelRouter):
         """poll_once should mark event as published after successful publish."""
         repo = _create_mock_repo()
@@ -262,7 +260,6 @@ class TestAsyncOutboxPoller:
 
         repo.mark_published.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_poll_once_marks_failed_on_error(self, router: ChannelRouter):
         """poll_once should mark events as failed on publish error."""
         repo = _create_mock_repo()
@@ -285,7 +282,6 @@ class TestAsyncOutboxPoller:
 
         repo.mark_failed.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_poller_runs_loop(self, router: ChannelRouter):
         """run should execute poll_once at least once before stopped."""
         repo = _create_mock_repo()
@@ -305,7 +301,6 @@ class TestAsyncOutboxPoller:
         await poller.poll_once()
         repo.get_unpublished.assert_called()
 
-    @pytest.mark.asyncio
     async def test_poller_graceful_stop(self, router: ChannelRouter):
         """stop should gracefully stop the polling loop."""
         repo = _create_mock_repo()

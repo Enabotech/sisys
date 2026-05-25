@@ -31,7 +31,6 @@ class TestFileMemoryAdapterInit:
 class TestFileMemoryAdapterWrite:
     """FileMemoryAdapter 写入操作验证"""
 
-    @pytest.mark.asyncio
     async def test_write_creates_file(self, tmp_path):
         """验证写入创建文件"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
@@ -51,7 +50,6 @@ originSessionId: test-session
         file_path = tmp_path / "user" / f"{memory_id}.md"
         assert file_path.exists()
 
-    @pytest.mark.asyncio
     async def test_write_creates_directory(self, tmp_path):
         """验证写入自动创建目录"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
@@ -62,7 +60,6 @@ originSessionId: test-session
         dir_path = tmp_path / "feedback"
         assert dir_path.exists() and dir_path.is_dir()
 
-    @pytest.mark.asyncio
     async def test_write_content_correct(self, tmp_path):
         """验证写入内容正确"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
@@ -78,7 +75,6 @@ originSessionId: test-session
 class TestFileMemoryAdapterRead:
     """FileMemoryAdapter 读取操作验证"""
 
-    @pytest.mark.asyncio
     async def test_read_existing_file(self, tmp_path):
         """验证读取已存在文件"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
@@ -92,7 +88,6 @@ class TestFileMemoryAdapterRead:
         read_content = await adapter.read(memory_id, "user")
         assert read_content == content
 
-    @pytest.mark.asyncio
     async def test_read_nonexistent_raises(self, tmp_path):
         """验证读取不存在的文件抛出异常"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
@@ -104,7 +99,6 @@ class TestFileMemoryAdapterRead:
 class TestFileMemoryAdapterDelete:
     """FileMemoryAdapter 删除操作验证"""
 
-    @pytest.mark.asyncio
     async def test_delete_existing_file(self, tmp_path):
         """验证删除已存在文件"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
@@ -117,7 +111,6 @@ class TestFileMemoryAdapterDelete:
         await adapter.delete(memory_id, "user")
         assert not file_path.exists()
 
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_no_raise(self, tmp_path):
         """验证删除不存在的文件不抛出异常"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
@@ -129,7 +122,6 @@ class TestFileMemoryAdapterDelete:
 class TestFileMemoryAdapterList:
     """FileMemoryAdapter 列表操作验证"""
 
-    @pytest.mark.asyncio
     async def test_list_memories(self, tmp_path):
         """验证列出记忆"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
@@ -142,7 +134,6 @@ class TestFileMemoryAdapterList:
         memories = await adapter.list_memories("user")
         assert len(memories) == 3
 
-    @pytest.mark.asyncio
     async def test_list_empty_type(self, tmp_path):
         """验证列出空类型返回空列表"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
@@ -175,7 +166,6 @@ class TestFileMemoryAdapterUpdateIndex:
 class TestFileMemoryAdapterPathResolution:
     """FileMemoryAdapter 路径解析验证"""
 
-    @pytest.mark.asyncio
     async def test_path_format(self, tmp_path):
         """验证路径格式 {type}/{memory_id}.md"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))

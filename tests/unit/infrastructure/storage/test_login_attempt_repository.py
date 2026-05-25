@@ -31,7 +31,6 @@ def repository(mock_session):
 class TestLoginAttemptRepository:
     """LoginAttemptRepository 测试."""
 
-    @pytest.mark.asyncio
     async def test_record_attempt_success(self, repository, mock_session):
         """测试记录成功登录尝试."""
         username = "testuser"
@@ -49,7 +48,6 @@ class TestLoginAttemptRepository:
         mock_session.add.assert_called_once()
         mock_session.flush.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_record_attempt_failure(self, repository, mock_session):
         """测试记录失败登录尝试."""
         username = "testuser"
@@ -67,7 +65,6 @@ class TestLoginAttemptRepository:
         mock_session.add.assert_called_once()
         mock_session.flush.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_is_account_locked_when_not_locked(self, repository, mock_session):
         """测试账户未锁定时返回 False."""
         username = "testuser"
@@ -81,7 +78,6 @@ class TestLoginAttemptRepository:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_is_account_locked_when_locked(self, repository, mock_session):
         """测试账户被锁定时返回 True (5次失败)."""
         username = "testuser"
@@ -98,7 +94,6 @@ class TestLoginAttemptRepository:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_get_lockout_remaining_minutes(self, repository, mock_session):
         """测试获取锁定剩余分钟数."""
         username = "testuser"
@@ -118,7 +113,6 @@ class TestLoginAttemptRepository:
         assert remaining is not None
         assert remaining > 0
 
-    @pytest.mark.asyncio
     async def test_clear_attempts(self, repository, mock_session):
         """测试清除登录尝试记录."""
         username = "testuser"
@@ -127,7 +121,6 @@ class TestLoginAttemptRepository:
 
         mock_session.execute.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_check_and_record_lockout_when_not_locked(self, repository, mock_session):
         """测试 check_and_record_lockout 返回未锁定状态."""
         username = "testuser"
@@ -142,7 +135,6 @@ class TestLoginAttemptRepository:
 
         assert result == (False, 0)
 
-    @pytest.mark.asyncio
     async def test_check_and_record_lockout_when_locked(self, repository, mock_session):
         """测试 check_and_record_lockout 返回锁定状态."""
         username = "testuser"
@@ -160,7 +152,6 @@ class TestLoginAttemptRepository:
         assert result[0] is True
         assert result[1] >= 0
 
-    @pytest.mark.asyncio
     async def test_record_attempt_and_check_lockout_success(self, repository, mock_session):
         """测试 record_attempt_and_check_lockout 成功登录不清除."""
         username = "testuser"
@@ -180,7 +171,6 @@ class TestLoginAttemptRepository:
         # flush is called twice: once for record_attempt, once for clear_attempts
         assert mock_session.flush.call_count == 2
 
-    @pytest.mark.asyncio
     async def test_record_attempt_and_check_lockout_failure_under_threshold(self, repository, mock_session):
         """测试 record_attempt_and_check_lockout 失败但未达锁定阈值."""
         username = "testuser"
@@ -205,7 +195,6 @@ class TestLoginAttemptRepository:
 
         assert result == (False, 0)
 
-    @pytest.mark.asyncio
     async def test_record_attempt_and_check_lockout_failure_triggers_lockout(self, repository, mock_session):
         """测试 record_attempt_and_check_lockout 失败达到锁定阈值."""
         username = "testuser"

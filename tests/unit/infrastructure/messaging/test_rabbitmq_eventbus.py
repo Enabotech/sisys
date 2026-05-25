@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import PublishResult
 from src.infrastructure.messaging.channel_router import ChannelMapping, ChannelRouter, DeliveryMode
@@ -23,7 +21,6 @@ class TestRabbitMQEventBusImplementsInterfaces:
 class TestRabbitMQEventBusPublish:
     """Test RabbitMQEventBus.publish method."""
 
-    @pytest.mark.asyncio
     async def test_publish_returns_publish_result(self) -> None:
         """publish should return a PublishResult."""
         router = ChannelRouter()
@@ -38,7 +35,6 @@ class TestRabbitMQEventBusPublish:
 
         assert isinstance(result, PublishResult)
 
-    @pytest.mark.asyncio
     async def test_publish_returns_outbox_saved_true_on_success(self) -> None:
         """publish should return outbox_saved=True on successful save."""
         router = ChannelRouter()
@@ -55,7 +51,6 @@ class TestRabbitMQEventBusPublish:
         assert result.outbox_saved is True
         assert result.redis_success is False
 
-    @pytest.mark.asyncio
     async def test_publish_calls_outbox_save(self) -> None:
         """publish should call outbox_repository.save with the event."""
         router = ChannelRouter()
@@ -71,7 +66,6 @@ class TestRabbitMQEventBusPublish:
 
         outbox_repo.save.assert_called_once_with(event)
 
-    @pytest.mark.asyncio
     async def test_publish_returns_outbox_saved_false_when_no_routing_key(self) -> None:
         """publish should return outbox_saved=False when no RabbitMQ routing key."""
         router = ChannelRouter(load_defaults=False)
@@ -95,7 +89,6 @@ class TestRabbitMQEventBusPublish:
         assert result.outbox_saved is False
         outbox_repo.save.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_publish_returns_error_on_outbox_failure(self) -> None:
         """publish should return outbox_error when save fails."""
         router = ChannelRouter()
@@ -116,7 +109,6 @@ class TestRabbitMQEventBusPublish:
 class TestRabbitMQEventBusClose:
     """Test RabbitMQEventBus.close method."""
 
-    @pytest.mark.asyncio
     async def test_close_is_async(self) -> None:
         """close should be an async method."""
         import inspect
@@ -127,7 +119,6 @@ class TestRabbitMQEventBusClose:
 
         assert inspect.iscoroutinefunction(bus.close)
 
-    @pytest.mark.asyncio
     async def test_close_does_not_raise(self) -> None:
         """close should not raise (no resources to clean up)."""
         router = ChannelRouter()

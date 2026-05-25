@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-import pytest
-
 from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import (
     PostgreSQLUnitOfWork,
 )
@@ -15,7 +13,6 @@ from src.infrastructure.storage.postgresql.session_context import reset_session,
 class TestPostgreSQLUnitOfWorkInstanceIsolation:
     """测试 PostgreSQLUnitOfWork 实例级标志位隔离"""
 
-    @pytest.mark.asyncio
     async def test_two_instances_have_independent_state(self) -> None:
         """两个实例的 _committed/_rolled_back 状态完全独立"""
         mock_session = AsyncMock()
@@ -31,7 +28,6 @@ class TestPostgreSQLUnitOfWorkInstanceIsolation:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_two_instances_rollback_isolation(self) -> None:
         """一个实例 rollback 不影响另一个实例"""
         mock_session = AsyncMock()
@@ -47,7 +43,6 @@ class TestPostgreSQLUnitOfWorkInstanceIsolation:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_new_instance_has_clean_state(self) -> None:
         """新创建的实例标志位均为 False"""
         mock_session = AsyncMock()
@@ -63,7 +58,6 @@ class TestPostgreSQLUnitOfWorkInstanceIsolation:
 class TestPostgreSQLUnitOfWorkContextManager:
     """测试 PostgreSQLUnitOfWork 异步上下文管理器协议"""
 
-    @pytest.mark.asyncio
     async def test_aenter_calls_begin(self) -> None:
         """__aenter__ 应调用 begin()"""
         mock_session = AsyncMock()
@@ -78,7 +72,6 @@ class TestPostgreSQLUnitOfWorkContextManager:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_aexit_commits_on_no_exception(self) -> None:
         """__aexit__ 无异常时应 commit 但不 close"""
         mock_session = AsyncMock()
@@ -94,7 +87,6 @@ class TestPostgreSQLUnitOfWorkContextManager:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_aexit_rollback_on_exception(self) -> None:
         """__aexit__ 有异常时应 rollback 但不 close"""
         mock_session = AsyncMock()
@@ -110,7 +102,6 @@ class TestPostgreSQLUnitOfWorkContextManager:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_full_context_manager_cycle(self) -> None:
         """完整上下文管理器生命周期（不 close）"""
         mock_session = AsyncMock()
@@ -128,7 +119,6 @@ class TestPostgreSQLUnitOfWorkContextManager:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_full_context_manager_with_exception(self) -> None:
         """上下文管理器中发生异常时应 rollback（不 close）"""
         mock_session = AsyncMock()
@@ -149,7 +139,6 @@ class TestPostgreSQLUnitOfWorkContextManager:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_aexit_does_not_close_session(self) -> None:
         """__aexit__ 不应调用 session.close()"""
         mock_session = AsyncMock()

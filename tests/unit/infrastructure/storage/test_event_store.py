@@ -145,7 +145,6 @@ class TestEventStoreModel:
 class TestPostgreSQLEventStore:
     """PostgreSQLEventStore tests."""
 
-    @pytest.mark.asyncio
     async def test_append_adds_event_to_database(self, event_store, mock_session):
         """append should persist an event to PostgreSQL."""
         from src.domain.events import DocumentProcessed
@@ -166,7 +165,6 @@ class TestPostgreSQLEventStore:
         assert params["aggregate_id"] == str(event.aggregate_id)
         assert params["event_type"] == event.event_type
 
-    @pytest.mark.asyncio
     async def test_append_with_optimistic_locking(self, event_store, mock_session):
         """append should raise error on version conflict."""
         from src.domain.events import DocumentProcessed
@@ -186,7 +184,6 @@ class TestPostgreSQLEventStore:
         with pytest.raises(VersionError):
             await event_store.append(event)
 
-    @pytest.mark.asyncio
     async def test_get_events_returns_events_for_aggregate(self, event_store, mock_session):
         """get_events should return all events for an aggregate."""
         agg_id = uuid4()
@@ -213,7 +210,6 @@ class TestPostgreSQLEventStore:
         assert events[0].event_type == "DocumentProcessed"
         assert events[0].payload["parse_result"] == {"pages": 10}
 
-    @pytest.mark.asyncio
     async def test_get_events_returns_empty_list_for_no_events(self, event_store, mock_session):
         """get_events should return empty list when no events exist."""
         mock_result = mock.MagicMock()
@@ -224,7 +220,6 @@ class TestPostgreSQLEventStore:
 
         assert events == []
 
-    @pytest.mark.asyncio
     async def test_get_events_by_type_filters_by_event_type(self, event_store, mock_session):
         """get_events_by_type should filter by event type and time range."""
         doc_id = uuid4()
@@ -250,7 +245,6 @@ class TestPostgreSQLEventStore:
         assert len(events) == 1
         assert events[0].event_type == "DocumentProcessed"
 
-    @pytest.mark.asyncio
     async def test_get_events_by_type_returns_empty_list(self, event_store, mock_session):
         """get_events_by_type should return empty list when no matches."""
         mock_result = mock.MagicMock()

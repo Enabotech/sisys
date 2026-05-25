@@ -107,7 +107,6 @@ class TestAsyncOutboxPoller:
         )
         assert poller._retry_policy.max_retries == 3
 
-    @pytest.mark.asyncio
     async def test_poll_once_no_events(self, poller: AsyncOutboxPoller, mock_repo: MagicMock) -> None:
         """无待处理事件时不发布"""
         mock_repo.get_unpublished.return_value = []
@@ -116,7 +115,6 @@ class TestAsyncOutboxPoller:
 
         mock_repo.get_unpublished.assert_awaited_once_with(limit=5)
 
-    @pytest.mark.asyncio
     async def test_poll_once_publishes_and_marks_published(
         self,
         poller: AsyncOutboxPoller,
@@ -132,7 +130,6 @@ class TestAsyncOutboxPoller:
         mock_publisher.async_publish.assert_awaited_once()
         mock_repo.mark_published.assert_awaited_once_with(event.event_id)
 
-    @pytest.mark.asyncio
     async def test_poll_once_marks_failed_on_error(
         self,
         poller: AsyncOutboxPoller,
@@ -148,7 +145,6 @@ class TestAsyncOutboxPoller:
 
         mock_repo.mark_failed.assert_awaited_once_with(event.event_id, "Publish failed")
 
-    @pytest.mark.asyncio
     async def test_poll_once_retries_on_transient_error(
         self,
         mock_repo: MagicMock,
@@ -183,7 +179,6 @@ class TestAsyncOutboxPoller:
         mock_repo.mark_published.assert_awaited_once_with(event.event_id)
         mock_repo.mark_failed.assert_not_awaited()
 
-    @pytest.mark.asyncio
     async def test_poll_once_marks_failed_after_retries_exhausted(
         self,
         mock_repo: MagicMock,
@@ -210,7 +205,6 @@ class TestAsyncOutboxPoller:
         mock_repo.mark_failed.assert_awaited_once_with(event.event_id, "Persistent error")
         mock_repo.mark_published.assert_not_awaited()
 
-    @pytest.mark.asyncio
     async def test_poll_once_uses_correct_routing_key(
         self,
         mock_repo: MagicMock,
@@ -237,7 +231,6 @@ class TestAsyncOutboxPoller:
         assert call_args.kwargs["routing_key"] == "sisys.events.reliable.document_processed"
         router.get_rabbitmq_routing_key.assert_called_once_with("DocumentProcessed")
 
-    @pytest.mark.asyncio
     async def test_poll_once_concurrent_processing(
         self,
         poller: AsyncOutboxPoller,
@@ -259,7 +252,6 @@ class TestAsyncOutboxPoller:
         poller.stop()
         assert poller._running is False
 
-    @pytest.mark.asyncio
     async def test_run_starts_and_stops(self, poller: AsyncOutboxPoller) -> None:
         """run() 启动后 stop() 可停止"""
 
@@ -270,7 +262,6 @@ class TestAsyncOutboxPoller:
         await asyncio.gather(poller.run(), run_and_stop())
         assert poller._running is False
 
-    @pytest.mark.asyncio
     async def test_run_logs_start_message(self, poller: AsyncOutboxPoller, caplog: pytest.LogCaptureFixture) -> None:
         """run() 启动时记录日志"""
 
@@ -284,7 +275,6 @@ class TestAsyncOutboxPoller:
 
         assert "AsyncOutboxPoller started" in caplog.text
 
-    @pytest.mark.asyncio
     async def test_run_stops_on_stop_message(self, poller: AsyncOutboxPoller, caplog: pytest.LogCaptureFixture) -> None:
         """stop() 记录停止日志"""
         with caplog.at_level(logging.INFO):
@@ -297,7 +287,6 @@ class TestAsyncOutboxPoller:
 
         assert "AsyncOutboxPoller stopping" in caplog.text
 
-    @pytest.mark.asyncio
     async def test_run_polls_repeatedly(self, poller: AsyncOutboxPoller) -> None:
         """run() 循环调用 poll_once"""
         call_count = 0
@@ -314,7 +303,6 @@ class TestAsyncOutboxPoller:
 
         assert call_count >= 3
 
-    @pytest.mark.asyncio
     async def test_run_exception_handling(self, poller: AsyncOutboxPoller, caplog: pytest.LogCaptureFixture) -> None:
         """poll_once 异常时 run() 捕获并记录错误，继续运行"""
         call_count = 0
@@ -334,7 +322,6 @@ class TestAsyncOutboxPoller:
             with caplog.at_level(logging.ERROR):
                 await poller.run()
 
-    @pytest.mark.asyncio
     async def test_run_exception_in_poll_once_logs_error(
         self, poller: AsyncOutboxPoller, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -354,7 +341,6 @@ class TestAsyncOutboxPoller:
 
         assert "Error in poll_once" in caplog.text
 
-    @pytest.mark.asyncio
     async def test_poll_once_processes_multiple_events(
         self, poller: AsyncOutboxPoller, mock_repo: MagicMock, mock_publisher: MagicMock
     ) -> None:
@@ -367,7 +353,6 @@ class TestAsyncOutboxPoller:
         assert mock_publisher.async_publish.call_count == 5
         assert mock_repo.mark_published.call_count == 5
 
-    @pytest.mark.asyncio
     async def test_run_terminates_cleanly(self, poller: AsyncOutboxPoller) -> None:
         """多次调用 stop() 应正常工作"""
 

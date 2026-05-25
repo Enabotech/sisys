@@ -23,7 +23,6 @@ class TestDockerSandboxAdapter:
         yield
         self._adapter._running_containers.clear()
 
-    @pytest.mark.asyncio
     async def test_start_container_creates_container(self) -> None:
         """RED: start_container should mark container as running."""
         adapter = self._adapter
@@ -32,7 +31,6 @@ class TestDockerSandboxAdapter:
 
         assert await adapter.is_container_running("session-1") is True
 
-    @pytest.mark.asyncio
     async def test_start_container_idempotent(self) -> None:
         """RED: start_container should be safe to call multiple times."""
         adapter = self._adapter
@@ -42,7 +40,6 @@ class TestDockerSandboxAdapter:
 
         assert await adapter.is_container_running("session-1") is True
 
-    @pytest.mark.asyncio
     async def test_execute_code_requires_running_container(self) -> None:
         """RED: execute_code should fail if container not running."""
         adapter = self._adapter
@@ -50,7 +47,6 @@ class TestDockerSandboxAdapter:
         with pytest.raises(ExecutionError):
             await adapter.execute_code("session-not-running", "print('hello')")
 
-    @pytest.mark.asyncio
     async def test_execute_code_returns_result(self) -> None:
         """RED: execute_code should return execution result dict."""
         adapter = self._adapter
@@ -61,7 +57,6 @@ class TestDockerSandboxAdapter:
         assert result["status"] == "completed"
         assert "output" in result
 
-    @pytest.mark.asyncio
     async def test_stop_container(self) -> None:
         """RED: stop_container should mark container as not running."""
         adapter = self._adapter
@@ -71,7 +66,6 @@ class TestDockerSandboxAdapter:
 
         assert await adapter.is_container_running("session-1") is False
 
-    @pytest.mark.asyncio
     async def test_stop_container_idempotent(self) -> None:
         """RED: stop_container should be safe to call multiple times."""
         adapter = self._adapter
@@ -82,7 +76,6 @@ class TestDockerSandboxAdapter:
 
         assert await adapter.is_container_running("session-1") is False
 
-    @pytest.mark.asyncio
     async def test_stop_nonexistent_container(self) -> None:
         """RED: stop_container should handle non-existent container gracefully."""
         adapter = self._adapter
@@ -92,7 +85,6 @@ class TestDockerSandboxAdapter:
 
         assert await adapter.is_container_running("nonexistent-session") is False
 
-    @pytest.mark.asyncio
     async def test_execute_code_raises_when_not_running(self) -> None:
         """Coverage: execute_code raises ExecutionError when container not running."""
         adapter = self._adapter
@@ -102,7 +94,6 @@ class TestDockerSandboxAdapter:
 
         assert "No running container" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_is_container_running_returns_false_for_unknown(self) -> None:
         """Coverage: is_container_running returns False for unknown session."""
         adapter = self._adapter
@@ -111,7 +102,6 @@ class TestDockerSandboxAdapter:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_start_container_idempotent_already_running(self) -> None:
         """Coverage: start_container early return when already running."""
         adapter = self._adapter
@@ -123,7 +113,6 @@ class TestDockerSandboxAdapter:
         # Container should still be running
         assert await adapter.is_container_running("session-1") is True
 
-    @pytest.mark.asyncio
     async def test_start_container_exception_handler(self) -> None:
         """Coverage: start_container exception handler (lines 68-70).
 
@@ -151,7 +140,6 @@ class TestDockerSandboxAdapter:
         finally:
             dsa_module.logger = original_logger
 
-    @pytest.mark.asyncio
     async def test_execute_code_exception_handler(self) -> None:
         """Coverage: execute_code exception handler (lines 104-106).
 
@@ -179,7 +167,6 @@ class TestDockerSandboxAdapter:
         finally:
             dsa_module.logger = original_logger
 
-    @pytest.mark.asyncio
     async def test_stop_container_exception_handler(self) -> None:
         """Coverage: stop_container exception handler (lines 127-129).
 

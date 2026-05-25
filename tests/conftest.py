@@ -58,7 +58,6 @@ async def pg_session() -> AsyncGenerator[AsyncMock, None]:
 
     用法::
 
-        @pytest.mark.asyncio
         async def test_save(pg_session):
             repo = UserRepository()
             await repo.save(entity)

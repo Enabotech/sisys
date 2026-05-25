@@ -97,7 +97,6 @@ class TestDocumentTasks:
 class TestDocumentTasksFn:
     """测试任务底层函数（通过 .fn() 绕过 Prefect 运行时）"""
 
-    @pytest.mark.asyncio
     async def test_parse_document_fn_returns_dict(self) -> None:
         """parse_document.fn() 应返回 dict"""
         from src.infrastructure.workflow.tasks.document_tasks import parse_document
@@ -106,7 +105,6 @@ class TestDocumentTasksFn:
         assert isinstance(result, dict)
         assert "status" in result
 
-    @pytest.mark.asyncio
     async def test_generate_embedding_fn_returns_list(self) -> None:
         """generate_embedding.fn() 应返回 list"""
         from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
@@ -114,7 +112,6 @@ class TestDocumentTasksFn:
         result = await generate_embedding.fn({"status": "parsed"})
         assert isinstance(result, list)
 
-    @pytest.mark.asyncio
     async def test_index_document_fn_returns_dict(self) -> None:
         """index_document.fn() 应返回 dict"""
         from src.infrastructure.workflow.tasks.document_tasks import index_document
@@ -127,7 +124,6 @@ class TestDocumentTasksFn:
 class TestEventPublishLogic:
     """验证事件发布逻辑"""
 
-    @pytest.mark.asyncio
     async def test_document_processed_event_created_correctly(self, mock_event_publisher: AsyncMock) -> None:
         """验证 DocumentProcessed 事件正确创建"""
         document_id = uuid.uuid4()
@@ -145,7 +141,6 @@ class TestEventPublishLogic:
         assert event.embedding == embedding
         assert event.event_type == "DocumentProcessed"
 
-    @pytest.mark.asyncio
     async def test_event_publisher_publish_called(self, mock_event_publisher: AsyncMock) -> None:
         """验证 EventPublisher.publish 被正确调用"""
         event = DocumentProcessed(document_id=uuid.uuid4())

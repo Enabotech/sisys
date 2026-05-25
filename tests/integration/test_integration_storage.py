@@ -109,7 +109,6 @@ def l0_storage(temp_memory_dir: Path) -> L0StoragePort:
 class TestL0FileSystem:
     """L0 file system integration tests using real files."""
 
-    @pytest.mark.asyncio
     async def test_memory_index_creates_index_file(self, memory_config, temp_memory_dir: Path):
         """Verify MemoryIndex creates MEMORY.md index file."""
         memory_index = MemoryIndex(memory_config)
@@ -127,7 +126,6 @@ class TestL0FileSystem:
 
         assert index_path.exists()
 
-    @pytest.mark.asyncio
     async def test_memory_index_truncates_over_200_lines(self, memory_config, temp_memory_dir: Path):
         """Verify MemoryIndex truncates to 200 lines when exceeded."""
         memory_index = MemoryIndex(memory_config)
@@ -151,7 +149,6 @@ class TestL0FileSystem:
         lines = index_path.read_text().strip().split("\n")
         assert len(lines) <= 200
 
-    @pytest.mark.asyncio
     async def test_memory_index_read_entries(self, memory_config, temp_memory_dir: Path):
         """Verify MemoryIndex can read entries."""
         memory_index = MemoryIndex(memory_config)
@@ -169,7 +166,6 @@ class TestL0FileSystem:
         entries = await memory_index.read_entries()
         assert len(entries) == 5
 
-    @pytest.mark.asyncio
     async def test_memory_index_search(self, memory_config, temp_memory_dir: Path):
         """Verify MemoryIndex search functionality."""
         memory_index = MemoryIndex(memory_config)
@@ -187,7 +183,6 @@ class TestL0FileSystem:
         results = await memory_index.search("bun")
         assert len(results) >= 5
 
-    @pytest.mark.asyncio
     async def test_l0_write_and_read(self, l0_storage: L0StoragePort, temp_memory_dir: Path):
         """Verify L0 storage write and read operations."""
         memory_id = str(uuid.uuid4())
@@ -202,7 +197,6 @@ class TestL0FileSystem:
         result = await l0_storage.read(memory_id, memory_type)
         assert result == content
 
-    @pytest.mark.asyncio
     async def test_l0_delete(self, l0_storage: L0StoragePort, temp_memory_dir: Path):
         """Verify L0 storage delete operation."""
         memory_id = str(uuid.uuid4())
@@ -218,7 +212,6 @@ class TestL0FileSystem:
         with pytest.raises(FileNotFoundError):
             await l0_storage.read(memory_id, memory_type)
 
-    @pytest.mark.asyncio
     async def test_l0_storage_raises_on_missing_file(self, l0_storage: L0StoragePort, temp_memory_dir: Path):
         """Verify L0 storage read raises FileNotFoundError for missing file."""
         memory_id = str(uuid.uuid4())
@@ -227,7 +220,6 @@ class TestL0FileSystem:
         with pytest.raises(FileNotFoundError):
             await l0_storage.read(memory_id, memory_type)
 
-    @pytest.mark.asyncio
     async def test_l0_storage_delete_nonexistent_returns_false(self, l0_storage: L0StoragePort, temp_memory_dir: Path):
         """Verify L0 storage delete returns False for nonexistent file."""
         memory_id = str(uuid.uuid4())
@@ -245,7 +237,6 @@ class TestL0FileSystem:
 class TestL1RedisCache:
     """L1 Redis cache integration tests using real Redis."""
 
-    @pytest.mark.asyncio
     async def test_redis_cache_set_and_get(self, redis_cache, real_redis, real_redis_sync):
         """Verify Redis cache set and get operations."""
         memory_type = "user"
@@ -261,7 +252,6 @@ class TestL1RedisCache:
         # Cleanup via adapter
         await redis_cache.delete_memory(memory_type, owner_id, name)
 
-    @pytest.mark.asyncio
     async def test_redis_cache_delete(self, redis_cache, real_redis, real_redis_sync):
         """Verify Redis cache delete operation."""
         memory_type = "user"
@@ -274,7 +264,6 @@ class TestL1RedisCache:
         result = await redis_cache.get_memory(memory_type, owner_id, name)
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_redis_cache_ttl_range(self, redis_cache, real_redis, real_redis_sync):
         """Verify Redis cache TTL is in 24h-30h range."""
         memory_type = "user"
@@ -291,13 +280,11 @@ class TestL1RedisCache:
         # Cleanup via adapter
         await redis_cache.delete_memory(memory_type, owner_id, name)
 
-    @pytest.mark.asyncio
     async def test_redis_cache_get_returns_none_when_not_cached(self, redis_cache):
         """Verify Redis cache get returns None when not cached."""
         result = await redis_cache.get_memory("user", "nonexistent-owner", "nonexistent")
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_redis_cache_invalidate_pattern(self, redis_cache, real_redis, real_redis_sync):
         """Verify invalidate_owner deletes all matching keys."""
         memory_type = "user"
@@ -328,7 +315,6 @@ class TestL1RedisCache:
 class TestL0L1Coordination:
     """Test L0 file system and L1 cache coordination."""
 
-    @pytest.mark.asyncio
     async def test_l1_cache_delete_invalidates_l0_cache(
         self, l0_storage: L0StoragePort, redis_cache: RedisMemoryCache, real_redis_sync
     ):
@@ -351,7 +337,6 @@ class TestL0L1Coordination:
         # Verify cache deleted
         assert real_redis_sync.exists(key) == 0
 
-    @pytest.mark.asyncio
     async def test_l1_cache_survives_l0_write(self, l0_storage: L0StoragePort, redis_cache: RedisMemoryCache, real_redis_sync):
         """Verify L1 cache persists after L0 write."""
         memory_type = "user"

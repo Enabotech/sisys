@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-import pytest
-
 from src.infrastructure.saga.saga_context import SagaContext
 from src.infrastructure.saga.saga_status import SagaStatus
 
@@ -29,7 +27,6 @@ class TestSagaRepositoryProtocol:
 class TestPostgreSQLSagaRepository:
     """验证 PostgreSQLSagaRepository 实现"""
 
-    @pytest.mark.asyncio
     async def test_save_and_load_context(self) -> None:
         """save() 后 load() 应返回相同上下文"""
         from unittest import mock
@@ -59,7 +56,6 @@ class TestPostgreSQLSagaRepository:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_update_status(self) -> None:
         """update_status() 应更新 Saga 状态"""
         from unittest import mock

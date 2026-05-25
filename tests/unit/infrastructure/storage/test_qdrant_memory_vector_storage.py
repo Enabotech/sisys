@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.infrastructure.storage.qdrant.qdrant_memory_vector_storage import (
     MEMORY_COLLECTION,
     QdrantMemoryVectorStorage,
@@ -89,7 +87,6 @@ class TestDeterministicEmbed:
 class TestQdrantMemoryVectorStorageDelegation:
     """验证 L3VectorPort 方法正确委托给适配器"""
 
-    @pytest.mark.asyncio
     async def test_upsert_points_delegates_to_adapter(self):
         """验证 upsert_points 正确委托"""
         mock_adapter = AsyncMock()
@@ -103,7 +100,6 @@ class TestQdrantMemoryVectorStorageDelegation:
         assert result is True
         mock_adapter.upsert_points.assert_called_once_with("test-collection", points)
 
-    @pytest.mark.asyncio
     async def test_delete_points_delegates_to_adapter(self):
         """验证 delete_points 正确委托"""
         mock_adapter = AsyncMock()
@@ -115,7 +111,6 @@ class TestQdrantMemoryVectorStorageDelegation:
         assert result is True
         mock_adapter.delete_points.assert_called_once_with("test-collection", ["id1", "id2"])
 
-    @pytest.mark.asyncio
     async def test_get_point_delegates_to_adapter(self):
         """验证 get_point 正确委托"""
         mock_adapter = AsyncMock()
@@ -128,7 +123,6 @@ class TestQdrantMemoryVectorStorageDelegation:
         assert result == expected
         mock_adapter.get_point.assert_called_once_with("test-collection", "p1")
 
-    @pytest.mark.asyncio
     async def test_search_delegates_to_adapter(self):
         """验证 search 正确委托"""
         mock_adapter = AsyncMock()
@@ -146,7 +140,6 @@ class TestQdrantMemoryVectorStorageDelegation:
         assert result == expected
         mock_adapter.search.assert_called_once_with("test-collection", [0.1] * 128, 5, {"type": "user"})
 
-    @pytest.mark.asyncio
     async def test_search_sparse_delegates_to_adapter(self):
         """验证 search_sparse 正确委托"""
         mock_adapter = AsyncMock()
@@ -165,7 +158,6 @@ class TestQdrantMemoryVectorStorageDelegation:
         assert result == expected
         mock_adapter.search_sparse.assert_called_once_with("test-collection", sparse_vector, 10, {"owner": "user1"})
 
-    @pytest.mark.asyncio
     async def test_create_collection_delegates_to_adapter(self):
         """验证 create_collection 正确委托"""
         mock_adapter = AsyncMock()
@@ -177,7 +169,6 @@ class TestQdrantMemoryVectorStorageDelegation:
         assert result is True
         mock_adapter.create_collection.assert_called_once_with("new-collection", 128, {"distance": "Cosine"})
 
-    @pytest.mark.asyncio
     async def test_delete_collection_delegates_to_adapter(self):
         """验证 delete_collection 正确委托"""
         mock_adapter = AsyncMock()
@@ -189,7 +180,6 @@ class TestQdrantMemoryVectorStorageDelegation:
         assert result is True
         mock_adapter.delete_collection.assert_called_once_with("old-collection")
 
-    @pytest.mark.asyncio
     async def test_collection_exists_delegates_to_adapter(self):
         """验证 collection_exists 正确委托"""
         mock_adapter = AsyncMock()
@@ -201,7 +191,6 @@ class TestQdrantMemoryVectorStorageDelegation:
         assert result is True
         mock_adapter.collection_exists.assert_called_once_with("test-collection")
 
-    @pytest.mark.asyncio
     async def test_list_collections_delegates_to_adapter(self):
         """验证 list_collections 正确委托"""
         mock_adapter = AsyncMock()
@@ -218,7 +207,6 @@ class TestQdrantMemoryVectorStorageDelegation:
 class TestIndexMemory:
     """index_memory 方法验证（特有行为）"""
 
-    @pytest.mark.asyncio
     async def test_generates_embedding_and_upserts(self):
         """验证自动生成 embedding 并存储"""
         mock_adapter = AsyncMock()
@@ -244,7 +232,6 @@ class TestIndexMemory:
         assert points[0]["payload"]["memory_type"] == "conversation"
         assert points[0]["payload"]["owner_id"] == "user-456"
 
-    @pytest.mark.asyncio
     async def test_uses_custom_embed_fn(self) -> None:
         """验证使用自定义 embedding 函数"""
         mock_adapter = AsyncMock()
@@ -267,7 +254,6 @@ class TestIndexMemory:
         points = call_args[0][1]
         assert points[0]["vector"] == custom_vector
 
-    @pytest.mark.asyncio
     async def test_uses_custom_collection(self):
         """验证使用自定义 collection"""
         mock_adapter = AsyncMock()
@@ -288,7 +274,6 @@ class TestIndexMemory:
 class TestSearchSimilarMemories:
     """search_similar_memories 方法验证（特有行为）"""
 
-    @pytest.mark.asyncio
     async def test_generates_embedding_and_searches(self):
         """验证自动生成查询 embedding 并检索"""
         mock_adapter = AsyncMock()
@@ -309,7 +294,6 @@ class TestSearchSimilarMemories:
         assert call_args[1]["limit"] == 5
         assert call_args[1]["filter_payload"] is None
 
-    @pytest.mark.asyncio
     async def test_builds_filter_payload_with_owner_id(self):
         """验证构建 owner_id 过滤条件"""
         mock_adapter = AsyncMock()
@@ -324,7 +308,6 @@ class TestSearchSimilarMemories:
         call_args = mock_adapter.search.call_args
         assert call_args[1]["filter_payload"] == {"owner_id": "user-123"}
 
-    @pytest.mark.asyncio
     async def test_builds_filter_payload_with_memory_type(self):
         """验证构建 memory_type 过滤条件"""
         mock_adapter = AsyncMock()
@@ -339,7 +322,6 @@ class TestSearchSimilarMemories:
         call_args = mock_adapter.search.call_args
         assert call_args[1]["filter_payload"] == {"memory_type": "conversation"}
 
-    @pytest.mark.asyncio
     async def test_builds_filter_payload_with_both_filters(self):
         """验证同时构建 owner_id 和 memory_type 过滤条件"""
         mock_adapter = AsyncMock()
@@ -356,7 +338,6 @@ class TestSearchSimilarMemories:
         expected_filter = {"owner_id": "user-456", "memory_type": "note"}
         assert call_args[1]["filter_payload"] == expected_filter
 
-    @pytest.mark.asyncio
     async def test_uses_custom_embed_fn_for_query(self) -> None:
         """验证查询使用自定义 embedding 函数"""
         mock_adapter = AsyncMock()
@@ -373,7 +354,6 @@ class TestSearchSimilarMemories:
         call_args = mock_adapter.search.call_args
         assert call_args[0][1] == custom_vector
 
-    @pytest.mark.asyncio
     async def test_uses_custom_collection(self):
         """验证使用自定义 collection"""
         mock_adapter = AsyncMock()

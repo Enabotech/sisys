@@ -290,12 +290,16 @@ def resolve_env() -> TestEnvironment:
 def get_test_env() -> TestEnvConfig:
     """获取测试环境配置（单例）
 
-    架构（5层覆盖顺序，从低到高）：
-    1. 配置差异化测试环境（CI_CONFIG/K8S_CONFIG/LOCAL_CONFIG）
-    2. 加载.env配置（所有环境共享基础配置）
-    3. 判断测试环境（resolve_env）
-    4. 差异化环境配置覆盖.env相关字段
-    5. os环境变量最后覆盖（最高优先级）
+    三层配置覆盖链（从低到高优先级）：
+    Layer 1: 环境检测 + 预设配置
+        → resolve_env() 自动检测环境类型（CI/K8S/LOCAL）
+        → 选择对应预设配置（CI_CONFIG/K8S_CONFIG/LOCAL_CONFIG/TEST_CONFIG）
+        → SISYS_USE_TEST_PORTS=1 切换到独立测试端口
+    Layer 2: .env 文件填充
+        → 仅填充 Layer 1 输出中的空值/默认值，不覆盖已有值
+    Layer 3: os.environ 显式设置
+        → 绝对最高优先级，不可被任何机制覆盖
+        → _sync_config_to_environ() 使用 setdefault 确保生产代码也能读取
     """
     global _test_env_config
 
@@ -306,13 +310,14 @@ def get_test_env() -> TestEnvConfig:
         if _test_env_config is not None:
             return _test_env_config
 
-        # 配置差异化测试环境
+        # Layer 1: 环境检测 + 预设配置（合并为单一步骤）
         env = resolve_env()
         if env == TestEnvironment.CI:
             config = copy.deepcopy(CI_CONFIG)
         elif env == TestEnvironment.K8S:
             config = copy.deepcopy(K8S_CONFIG)
         elif env == TestEnvironment.LOCAL:
+            # 端口切换内嵌在 LOCAL 分支中
             if os.getenv("SISYS_USE_TEST_PORTS", "").lower() in ("1", "true", "yes"):
                 config = copy.deepcopy(TEST_CONFIG)
             else:
@@ -320,16 +325,14 @@ def get_test_env() -> TestEnvConfig:
         else:
             config = copy.deepcopy(LOCAL_CONFIG)
 
-        # 加载 .env 配置（用于填充空值）
+        # Layer 2: .env 文件填充（仅填充空值/默认值）
         env_values = dotenv_values(ROOT / ".env")
-
-        # 差异化环境配置覆盖.env相关字段（仅当环境配置使用默认值时）
         _apply_dotenv_if_empty(config, env_values)
 
-        # os环境变量最后覆盖（最高优先级）
+        # Layer 3: os.environ 显式设置覆盖（最高优先级）
         config = _override_config_from_env(config)
 
-        # 确保生产代码的 Config.from_env() 也能读到一致的值
+        # 同步到 os.environ，确保生产代码的 Config.from_env() 也能读取
         _sync_config_to_environ(config)
 
         _test_env_config = config
@@ -417,8 +420,14 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
 
     # MinIO
     if minio_host := os.getenv("MINIO_HOST"):
-        # MinIO endpoint 格式是 host:port
-        config.minio.endpoint = f"{minio_host}:9000"
+        minio_port = os.getenv("MINIO_API_PORT", "9000")
+        config.minio.endpoint = f"{minio_host}:{minio_port}"
+    if minio_access_key := os.getenv("MINIO_ACCESS_KEY"):
+        config.minio.access_key = minio_access_key
+    if minio_secret_key := os.getenv("MINIO_SECRET_KEY"):
+        config.minio.secret_key = minio_secret_key
+    if minio_bucket := os.getenv("MINIO_BUCKET"):
+        config.minio.bucket = minio_bucket
 
     # Neo4j
     if neo4j_host := os.getenv("NEO4J_HOST"):
@@ -429,6 +438,12 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
         config.rabbitmq.host = rmq_host
     if rmq_port := os.getenv("RABBITMQ_PORT"):
         config.rabbitmq.port = int(rmq_port)
+    if rmq_mgmt_port := os.getenv("RABBITMQ_MGMT_PORT"):
+        config.rabbitmq.mgmt_port = int(rmq_mgmt_port)
+    if rmq_username := os.getenv("RABBITMQ_USERNAME"):
+        config.rabbitmq.username = rmq_username
+    if rmq_password := os.getenv("RABBITMQ_PASSWORD"):
+        config.rabbitmq.password = rmq_password
 
     # 应用配置
     if jwt_key := os.getenv("JWT_SECRET_KEY"):
@@ -468,10 +483,21 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
 
     # Neo4j
     os.environ.setdefault("NEO4J_HOST", config.neo4j.host)
+    os.environ.setdefault("NEO4J_HTTP_PORT", str(config.neo4j.http_port))
+    os.environ.setdefault("NEO4J_BOLT_PORT", str(config.neo4j.bolt_port))
 
     # RabbitMQ
     os.environ.setdefault("RABBITMQ_HOST", config.rabbitmq.host)
     os.environ.setdefault("RABBITMQ_PORT", str(config.rabbitmq.port))
+    os.environ.setdefault("RABBITMQ_MGMT_PORT", str(config.rabbitmq.mgmt_port))
+    os.environ.setdefault("RABBITMQ_USERNAME", config.rabbitmq.username)
+    os.environ.setdefault("RABBITMQ_PASSWORD", config.rabbitmq.password)
+
+    # MinIO
+    os.environ.setdefault("MINIO_ENDPOINT", config.minio.endpoint)
+    os.environ.setdefault("MINIO_ACCESS_KEY", config.minio.access_key)
+    os.environ.setdefault("MINIO_SECRET_KEY", config.minio.secret_key)
+    os.environ.setdefault("MINIO_BUCKET", config.minio.bucket)
 
     # 应用配置
     if config.app.jwt_secret_key:

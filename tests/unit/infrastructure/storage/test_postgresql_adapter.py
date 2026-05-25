@@ -48,7 +48,6 @@ def repository(mock_session):
 class TestPostgreSQLAdapter:
     """PostgreSQLAdapter 测试"""
 
-    @pytest.mark.asyncio
     async def test_get_by_id_exists(self, repository, mock_session):
         """测试获取存在的实体"""
         user = mock.Mock()
@@ -61,7 +60,6 @@ class TestPostgreSQLAdapter:
         assert result == user
         mock_session.execute.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_get_by_id_not_found(self, repository, mock_session):
         """测试获取不存在的实体"""
         mock_result = mock.Mock()
@@ -72,7 +70,6 @@ class TestPostgreSQLAdapter:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_save_insert(self, repository, mock_session):
         """测试保存实体（_do_save 默认插入）"""
         user = mock.Mock()
@@ -84,7 +81,6 @@ class TestPostgreSQLAdapter:
         mock_session.add.assert_called_once_with(user)
         mock_session.flush.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_delete_hard(self, repository, mock_session):
         """测试硬删除存在的实体"""
         user = mock.Mock()
@@ -100,7 +96,6 @@ class TestPostgreSQLAdapter:
         mock_session.delete.assert_called_once_with(user)
         mock_session.flush.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_delete_not_found(self, repository, mock_session):
         """测试删除不存在的实体（无操作）"""
         mock_result = mock.Mock()
@@ -111,7 +106,6 @@ class TestPostgreSQLAdapter:
 
         mock_session.delete.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_list_all(self, repository, mock_session):
         """测试获取实体列表"""
         users = [mock.Mock(), mock.Mock()]
@@ -125,7 +119,6 @@ class TestPostgreSQLAdapter:
 
         assert len(result) == 2
 
-    @pytest.mark.asyncio
     async def test_count(self, repository, mock_session):
         """测试获取实体总数"""
         mock_result = mock.Mock()
@@ -161,7 +154,6 @@ class TestSessionContextFriendlyError:
         with pytest.raises(RuntimeError, match="SessionMiddleware or session_context"):
             _ = repo._session
 
-    @pytest.mark.asyncio
     async def test_session_set_works_normally(self, mock_session):
         """验证 ContextVar 已设置时正常工作"""
         token = set_session(mock_session)

@@ -58,7 +58,6 @@ class TestOrchestrationServiceProtocolCompliance:
 class TestOrchestrationServiceExecute:
     """OrchestrationService.execute() 路由测试"""
 
-    @pytest.mark.asyncio
     async def test_execute_data_pipeline_routes_to_workflow_engine(
         self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock
     ) -> None:
@@ -82,7 +81,6 @@ class TestOrchestrationServiceExecute:
             {"document_id": task.parameters["document_id"], "file_path": "/test.pdf"},
         )
 
-    @pytest.mark.asyncio
     async def test_execute_returns_workflow_result(self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock) -> None:
         """execute 应返回 WorkflowResult"""
         from src.application.services.orchestration_service import (
@@ -105,7 +103,6 @@ class TestOrchestrationServiceExecute:
         assert isinstance(result.status, FlowStatus)
         assert isinstance(result.submitted_at, datetime)
 
-    @pytest.mark.asyncio
     async def test_execute_data_pipeline_returns_submitted_status(
         self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock
     ) -> None:
@@ -127,7 +124,6 @@ class TestOrchestrationServiceExecute:
         result = await service.execute(task)
         assert result.status == FlowStatus.RUNNING
 
-    @pytest.mark.asyncio
     async def test_execute_agent_reasoning_routes_to_agent_engine(
         self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock
     ) -> None:
@@ -184,7 +180,6 @@ class TestWorkflowTaskValueObject:
 class TestOrchestrationServiceValidation:
     """参数验证测试"""
 
-    @pytest.mark.asyncio
     async def test_execute_rejects_empty_flow_name(self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock) -> None:
         """空 flow_name 应抛出 ValueError"""
         from src.application.services.orchestration_service import (
@@ -198,7 +193,6 @@ class TestOrchestrationServiceValidation:
         with pytest.raises(ValueError, match="flow_name 不能为空"):
             await service.execute(task)
 
-    @pytest.mark.asyncio
     async def test_execute_rejects_empty_parameters_for_data_pipeline(
         self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock
     ) -> None:
@@ -214,7 +208,6 @@ class TestOrchestrationServiceValidation:
         with pytest.raises(ValueError, match="parameters"):
             await service.execute(task)
 
-    @pytest.mark.asyncio
     async def test_execute_rejects_missing_graph_name_for_agent_reasoning(
         self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock
     ) -> None:

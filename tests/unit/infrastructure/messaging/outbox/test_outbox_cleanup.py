@@ -9,15 +9,12 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-import pytest
-
 from src.infrastructure.messaging.outbox.outbox import OutboxEntity
 
 
 class TestOutboxCleanupStrategy:
     """验证 InMemoryOutboxRepository 清理策略"""
 
-    @pytest.mark.asyncio
     async def test_cleanup_removes_old_published_records(self) -> None:
         """cleanup_old_published_records() 应移除超过保留期的已发布记录"""
         from src.infrastructure.messaging.outbox.inmemory_outbox import InMemoryOutboxRepository
@@ -46,7 +43,6 @@ class TestOutboxCleanupStrategy:
         assert len(repo._entities) == 1
         assert repo._entities[0].event_id == recent_entity.event_id
 
-    @pytest.mark.asyncio
     async def test_cleanup_does_not_remove_pending_records(self) -> None:
         """cleanup_old_published_records() 不应移除 pending 记录"""
         from src.infrastructure.messaging.outbox.inmemory_outbox import InMemoryOutboxRepository
@@ -67,7 +63,6 @@ class TestOutboxCleanupStrategy:
         assert removed == 0
         assert len(repo._entities) == 1
 
-    @pytest.mark.asyncio
     async def test_cleanup_does_not_remove_failed_records(self) -> None:
         """cleanup_old_published_records() 不应移除 failed 记录"""
         from src.infrastructure.messaging.outbox.inmemory_outbox import InMemoryOutboxRepository
@@ -88,7 +83,6 @@ class TestOutboxCleanupStrategy:
         assert removed == 0
         assert len(repo._entities) == 1
 
-    @pytest.mark.asyncio
     async def test_cleanup_respects_retention_period(self) -> None:
         """cleanup_old_published_records() 应遵守保留期"""
         from src.infrastructure.messaging.outbox.inmemory_outbox import InMemoryOutboxRepository

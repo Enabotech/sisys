@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.infrastructure.storage.neo4j.neo4j_adapter import Neo4jAdapter
 
 
@@ -26,7 +24,6 @@ class TestNeo4jAdapterInterface:
 class TestNeo4jAdapterCreateEntity:
     """create_entity 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_create_entity_uses_merge_semantics(self):
         """验证使用 MERGE 语义（已存在不报错）"""
         mock_storage = AsyncMock()
@@ -45,7 +42,6 @@ class TestNeo4jAdapterCreateEntity:
         assert "MERGE" in cypher
         assert "$memory_id" in cypher
 
-    @pytest.mark.asyncio
     async def test_create_entity_returns_false_when_fail(self):
         """验证执行失败返回 False"""
         mock_storage = AsyncMock()
@@ -64,7 +60,6 @@ class TestNeo4jAdapterCreateEntity:
 class TestNeo4jAdapterGetEntity:
     """get_entity 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_get_entity_returns_none_when_not_found(self):
         """验证不存在时返回 None"""
         mock_storage = AsyncMock()
@@ -75,7 +70,6 @@ class TestNeo4jAdapterGetEntity:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_entity_returns_dict_with_id_type_properties(self):
         """验证返回正确结构的 dict"""
         mock_storage = AsyncMock()
@@ -95,7 +89,6 @@ class TestNeo4jAdapterGetEntity:
 class TestNeo4jAdapterDeleteEntity:
     """delete_entity 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_delete_entity_always_returns_true(self):
         """验证删除总是返回 True（即使不存在）"""
         mock_storage = AsyncMock()
@@ -112,7 +105,6 @@ class TestNeo4jAdapterDeleteEntity:
 class TestNeo4jAdapterRelationships:
     """关系操作方法验证"""
 
-    @pytest.mark.asyncio
     async def test_create_relationship_uses_merge(self):
         """验证 create_relationship 使用 MERGE 语义"""
         mock_storage = AsyncMock()
@@ -131,7 +123,6 @@ class TestNeo4jAdapterRelationships:
         assert "MERGE" in cypher
         assert "DEPENDS_ON" in cypher
 
-    @pytest.mark.asyncio
     async def test_delete_relationship_returns_true(self):
         """验证删除关系返回 True"""
         mock_storage = AsyncMock()
@@ -146,7 +137,6 @@ class TestNeo4jAdapterRelationships:
 class TestNeo4jAdapterFindRelated:
     """find_related 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_find_related_with_specific_relationship_type(self):
         """验证带关系类型过滤的遍历"""
         mock_storage = AsyncMock()
@@ -158,7 +148,6 @@ class TestNeo4jAdapterFindRelated:
         cypher = mock_storage.execute_query.call_args[0][0]
         assert "DEPENDS_ON" in cypher
 
-    @pytest.mark.asyncio
     async def test_find_related_without_relationship_type(self):
         """验证不带关系类型过滤的遍历"""
         mock_storage = AsyncMock()
@@ -170,7 +159,6 @@ class TestNeo4jAdapterFindRelated:
         cypher = mock_storage.execute_query.call_args[0][0]
         assert "DEPENDS_ON" not in cypher
 
-    @pytest.mark.asyncio
     async def test_find_related_returns_list_of_dict(self):
         """验证返回正确结构的列表"""
         mock_storage = AsyncMock()
@@ -191,7 +179,6 @@ class TestNeo4jAdapterFindRelated:
 class TestNeo4jAdapterExecuteQuery:
     """execute_query 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_execute_query_delegates_to_storage(self):
         """验证只读查询委托"""
         mock_storage = AsyncMock()
@@ -203,7 +190,6 @@ class TestNeo4jAdapterExecuteQuery:
         assert len(result) == 1
         mock_storage.execute_query.assert_called_once_with("MATCH (n) RETURN n", {"limit": 10})
 
-    @pytest.mark.asyncio
     async def test_execute_write_query_delegates(self):
         """验证写入查询委托"""
         mock_storage = AsyncMock()

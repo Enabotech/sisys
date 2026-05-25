@@ -50,7 +50,6 @@ class TestExecuteIntegration:
         """Create AutoExecuteCompletedListener with mock publisher."""
         return AutoExecuteCompletedHandler(publisher=mock_publisher)
 
-    @pytest.mark.asyncio
     async def test_routed_to_executed_flow(
         self,
         execute_service: AutoExecuteService,
@@ -79,7 +78,6 @@ class TestExecuteIntegration:
         assert executed.business_event_type == "ToolExecuted"
         assert executed.route_target == "docker-sandbox"
 
-    @pytest.mark.asyncio
     async def test_sandbox_container_lifecycle(
         self,
         sandbox: DockerSandboxAdapter,
@@ -99,7 +97,6 @@ class TestExecuteIntegration:
         await sandbox.stop_container(session_id)
         assert await sandbox.is_container_running(session_id) is False
 
-    @pytest.mark.asyncio
     async def test_session_namespace_isolation(
         self,
         sandbox: DockerSandboxAdapter,
@@ -124,7 +121,6 @@ class TestExecuteIntegration:
         # Cleanup
         await sandbox.stop_container(session_b)
 
-    @pytest.mark.asyncio
     async def test_executed_to_downstream_event_flow(
         self,
         execute_service: AutoExecuteService,
@@ -158,7 +154,6 @@ class TestExecuteIntegration:
         published_event = call_args[0][0]
         assert published_event.event_type == "ToolExecuted"
 
-    @pytest.mark.asyncio
     async def test_executed_with_document_processed_type(
         self,
         execute_service: AutoExecuteService,
@@ -189,7 +184,6 @@ class TestExecuteIntegration:
         published_event = call_args[0][0]
         assert published_event.event_type == "DocumentProcessed"
 
-    @pytest.mark.asyncio
     async def test_executed_with_agent_decided_type(
         self,
         execute_service: AutoExecuteService,
@@ -220,7 +214,6 @@ class TestExecuteIntegration:
         published_event = call_args[0][0]
         assert published_event.event_type == "AgentDecided"
 
-    @pytest.mark.asyncio
     async def test_execute_without_sandbox(
         self,
         execute_service: AutoExecuteService,
@@ -246,7 +239,6 @@ class TestExecuteIntegration:
         assert executed is not None
         assert executed.session_id == routed_event.session_id
 
-    @pytest.mark.asyncio
     async def test_checkpoint_snapshot_creation_with_repo(
         self,
         sandbox: DockerSandboxAdapter,
@@ -285,7 +277,6 @@ class TestExecuteIntegration:
         assert executed is not None
         # Snapshot creation is internal, repo stores it
 
-    @pytest.mark.asyncio
     async def test_restore_snapshot_flow(
         self,
         sandbox: DockerSandboxAdapter,
@@ -320,7 +311,6 @@ class TestExecuteIntegration:
         assert restored.session_id == session_id
         assert restored.state_version == 2
 
-    @pytest.mark.asyncio
     async def test_concurrent_execution_same_session(
         self,
         sandbox: DockerSandboxAdapter,
@@ -353,7 +343,6 @@ class TestExecuteIntegration:
         for result in results:
             assert result is not None
 
-    @pytest.mark.asyncio
     async def test_executed_event_contains_full_context(
         self,
         execute_service: AutoExecuteService,
@@ -386,7 +375,6 @@ class TestExecuteIntegration:
         assert executed.business_event_type == "ToolExecuted"
         assert executed.latency_ms >= 0
 
-    @pytest.mark.asyncio
     async def test_execution_creates_new_container_for_new_session(
         self,
         sandbox: DockerSandboxAdapter,

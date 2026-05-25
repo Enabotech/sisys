@@ -13,8 +13,6 @@ from __future__ import annotations
 from typing import Any, Literal
 from uuid import uuid4
 
-import pytest
-
 from src.domain.value_objects.compliance_result import ComplianceResult
 from src.domain.value_objects.udmr_task import UDMRTask
 from src.infrastructure.config.udmr import CloudModelConfig
@@ -84,7 +82,6 @@ class TestStaticUdmrPolicyInit:
 class TestStaticUdmrPolicyCloudFirst:
     """云端优先路由测试."""
 
-    @pytest.mark.asyncio
     async def test_cloud_first_when_available(self) -> None:
         """合规通过 + 云端可用 → cloud + 第一个 enabled 模型."""
         clouds = [_make_cloud("MiniMax-M2.7"), _make_cloud("deepseek-chat")]
@@ -98,7 +95,6 @@ class TestStaticUdmrPolicyCloudFirst:
         assert model == "MiniMax-M2.7"
         assert fallback is None
 
-    @pytest.mark.asyncio
     async def test_skips_disabled_clouds(self) -> None:
         """应跳过 disabled 的云端模型."""
         clouds = [_make_cloud("model-a", enabled=False), _make_cloud("model-b")]
@@ -111,7 +107,6 @@ class TestStaticUdmrPolicyCloudFirst:
         assert route_type == "cloud"
         assert model == "model-b"
 
-    @pytest.mark.asyncio
     async def test_fallback_to_local_when_all_clouds_disabled(self) -> None:
         """所有云端 disabled → local + fallback_reason=unavailable."""
         clouds = [_make_cloud("model-a", enabled=False)]
@@ -125,7 +120,6 @@ class TestStaticUdmrPolicyCloudFirst:
         assert model == "qwen2.5:7b"
         assert fallback == "unavailable"
 
-    @pytest.mark.asyncio
     async def test_fallback_to_local_when_no_clouds(self) -> None:
         """无云端配置 → local + fallback_reason=unavailable."""
         policy = StaticUdmrPolicy(cloud_configs=[], local_model="qwen2.5:7b")
@@ -147,7 +141,6 @@ class TestStaticUdmrPolicyCloudFirst:
 class TestStaticUdmrPolicyCompliance:
     """L1 合规强制本地路由测试."""
 
-    @pytest.mark.asyncio
     async def test_forced_local_overrides_cloud(self) -> None:
         """forced_local=True → local（即使云端可用）."""
         clouds = [_make_cloud("MiniMax-M2.7")]
@@ -170,7 +163,6 @@ class TestStaticUdmrPolicyCompliance:
 class TestStaticUdmrPolicyLocalFirst:
     """本地优先模式测试."""
 
-    @pytest.mark.asyncio
     async def test_local_first_uses_local(self) -> None:
         """local_first=True → local（即使云端可用）."""
         clouds = [_make_cloud("MiniMax-M2.7")]

@@ -224,6 +224,7 @@ python_functions = "test_*"
 markers = [
     "unit: 单元测试（Mock 外部依赖，快速执行）",
     "integration: 集成测试（Docker Compose 真实实例，较慢执行）",
+    "acceptance: 验收测试（BDD Gherkin 场景，真实服务）",
     "e2e: 端到端验收测试（Gherkin BDD 场景）",
     "asyncio: 异步测试（aio-pika 组件需要）",
     "slow: 慢速测试（>1 秒）",

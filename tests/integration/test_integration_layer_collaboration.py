@@ -26,13 +26,11 @@ from src.domain.ports.outbox import OutboxRepository
 class TestLayerCollaboration:
     """Verify application layer orchestrates domain and infrastructure."""
 
-    @pytest.mark.asyncio
     async def test_use_case_can_be_constructed(self, outbox_repo: AsyncMock) -> None:
         """DocumentProcessingUseCase should accept OutboxRepository."""
         use_case = DocumentProcessingUseCase(outbox_repo=outbox_repo)
         assert use_case is not None
 
-    @pytest.mark.asyncio
     async def test_use_case_calls_domain_interface(self, outbox_repo: AsyncMock) -> None:
         """Use case should call domain layer's OutboxRepository interface."""
         use_case = DocumentProcessingUseCase(outbox_repo=outbox_repo)
@@ -41,7 +39,6 @@ class TestLayerCollaboration:
         assert result["status"] == "success"
         assert result["document_id"] == "test-doc-1"
 
-    @pytest.mark.asyncio
     async def test_use_case_publishes_event_to_outbox(self, outbox_repo: AsyncMock) -> None:
         """Use case processing should result in event being saved to outbox."""
         use_case = DocumentProcessingUseCase(outbox_repo=outbox_repo)
@@ -54,7 +51,6 @@ class TestLayerCollaboration:
         assert saved_event.event_type == "DocumentProcessed"
         assert saved_event.payload["document_id"] == "test-doc-1"
 
-    @pytest.mark.asyncio
     async def test_use_case_with_custom_metadata(self, outbox_repo: AsyncMock) -> None:
         """Use case should accept optional metadata."""
         use_case = DocumentProcessingUseCase(outbox_repo=outbox_repo)
@@ -75,7 +71,6 @@ class TestLayerCollaboration:
 class TestErrorPropagation:
     """Verify errors propagate correctly from infrastructure → application."""
 
-    @pytest.mark.asyncio
     async def test_use_case_raises_on_infrastructure_failure(self) -> None:
         """When infrastructure layer fails, use case should raise RuntimeError."""
 
@@ -106,7 +101,6 @@ class TestErrorPropagation:
         assert "Failed to process document fail-doc" in str(exc_info.value)
         assert "Simulated infrastructure failure" in str(exc_info.value.__cause__)
 
-    @pytest.mark.asyncio
     async def test_error_preserves_original_exception(
         self,
     ) -> None:
@@ -137,7 +131,6 @@ class TestErrorPropagation:
         assert exc_info.value.__cause__ is not None
         assert isinstance(exc_info.value.__cause__, ValueError)
 
-    @pytest.mark.asyncio
     async def test_layer_data_integrity_across_layers(self, outbox_repo: AsyncMock) -> None:
         """DomainEvent objects should maintain integrity across layers."""
         use_case = DocumentProcessingUseCase(outbox_repo=outbox_repo)

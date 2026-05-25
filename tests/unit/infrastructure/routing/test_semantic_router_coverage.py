@@ -48,14 +48,12 @@ class TestSemanticRouterInit:
 class TestSemanticRouterGetTaskEmbedding:
     """测试 _get_task_embedding 方法"""
 
-    @pytest.mark.asyncio
     async def test_get_task_embedding_returns_zeros_when_no_model(self) -> None:
         """无 embedding model 时应返回零向量"""
         router = SemanticRouter()
         embedding = await router._get_task_embedding("test text")
         assert embedding == [0.0] * SemanticRouter.DEFAULT_EMBEDDING_DIM
 
-    @pytest.mark.asyncio
     async def test_get_task_embedding_when_model_returns_empty_list(self) -> None:
         """embedding model 返回空列表时应返回零向量"""
         mock_model = AsyncMock(spec=EmbeddingModelProtocol)
@@ -65,7 +63,6 @@ class TestSemanticRouterGetTaskEmbedding:
         embedding = await router._get_task_embedding("test text")
         assert embedding == [0.0] * SemanticRouter.DEFAULT_EMBEDDING_DIM
 
-    @pytest.mark.asyncio
     async def test_get_task_embedding_cache_not_updated_when_full(self) -> None:
         """缓存已满时应淘汰最旧条目后添加新条目（LRU 淘汰）"""
         router = SemanticRouter()
@@ -88,7 +85,6 @@ class TestSemanticRouterGetTaskEmbedding:
         # 仍应返回 embedding（零向量）
         assert embedding == [0.0] * SemanticRouter.DEFAULT_EMBEDDING_DIM
 
-    @pytest.mark.asyncio
     async def test_get_task_embedding_with_valid_embedding_model(self) -> None:
         """有 embedding model 时应调用并返回结果"""
         mock_model = AsyncMock(spec=EmbeddingModelProtocol)
@@ -204,7 +200,6 @@ class TestSemanticRouterRoute:
             embedding=[1.0] * 1024,  # 非零 embedding
         )
 
-    @pytest.mark.asyncio
     async def test_route_with_positive_similarity_score(self) -> None:
         """当 embedding 匹配时应返回正相似度分数"""
         # 创建 mock embedding model 返回与 candidate 相同的 embedding
@@ -225,7 +220,6 @@ class TestSemanticRouterRoute:
         assert target == "match-agent"
         assert score == 1.0  # 完全相同的向量，cosine similarity = 1.0
 
-    @pytest.mark.asyncio
     async def test_route_returns_best_match_not_first(self) -> None:
         """应返回最佳匹配而非第一个 candidate"""
         mock_model = AsyncMock(spec=EmbeddingModelProtocol)
@@ -252,7 +246,6 @@ class TestSemanticRouterRoute:
         assert target == "agent-2"
         assert score > 0.9  # 高相似度
 
-    @pytest.mark.asyncio
     async def test_route_with_negative_similarity(self) -> None:
         """应正确处理负相似度分数（不更新 best_score，因为 score > best_score 不成立）"""
         mock_model = AsyncMock(spec=EmbeddingModelProtocol)

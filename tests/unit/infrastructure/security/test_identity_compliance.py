@@ -102,7 +102,6 @@ class TestPasswordComplexityCompliance:
 class TestAuthenticationLockoutCompliance:
     """认证失败锁定合规验证 (AC-1.3)"""
 
-    @pytest.mark.asyncio
     async def test_lockout_after_5_consecutive_failures(self, auth_service: AuthServiceImpl) -> None:
         """连续5次认证失败后应锁定账户"""
         # 等保2.0三级要求: 连续5次失败锁定30分钟
@@ -112,7 +111,6 @@ class TestAuthenticationLockoutCompliance:
         locked = await auth_service._login_attempt_repo.is_account_locked("testuser")
         assert locked is True, "连续5次失败后账户应被锁定"
 
-    @pytest.mark.asyncio
     async def test_lockout_mechanism_exists(self, auth_service: AuthServiceImpl) -> None:
         """认证服务应具备锁定机制"""
         assert hasattr(auth_service, "_login_attempt_repo")

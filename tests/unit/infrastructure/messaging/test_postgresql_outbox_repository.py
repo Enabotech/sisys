@@ -33,7 +33,6 @@ def repository(mock_session):
 class TestPostgreSQLOutboxRepository:
     """PostgreSQLOutboxRepository 测试"""
 
-    @pytest.mark.asyncio
     async def test_save(self, repository, mock_session):
         """测试保存事件"""
         event = DomainEvent(
@@ -48,7 +47,6 @@ class TestPostgreSQLOutboxRepository:
 
         mock_session.add.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_get_unpublished(self, repository, mock_session):
         """测试异步获取未发布事件"""
         # 注册测试事件类型
@@ -83,7 +81,6 @@ class TestPostgreSQLOutboxRepository:
 
         assert len(result) == 2
 
-    @pytest.mark.asyncio
     async def test_mark_published(self, repository, mock_session):
         """测试异步标记已发布"""
         event_id = uuid4()
@@ -98,7 +95,6 @@ class TestPostgreSQLOutboxRepository:
         assert mock_model.status == "published"
         assert mock_model.published_at is not None
 
-    @pytest.mark.asyncio
     async def test_mark_failed(self, repository, mock_session):
         """测试异步标记失败"""
         event_id = uuid4()
@@ -115,7 +111,6 @@ class TestPostgreSQLOutboxRepository:
         assert mock_model.retry_count == 1
         assert mock_model.error_message == "Test error"
 
-    @pytest.mark.asyncio
     async def test_internal_get_unpublished(self, repository, mock_session):
         """测试内部方法获取未发布实体"""
         models = [mock.Mock(), mock.Mock()]
@@ -129,7 +124,6 @@ class TestPostgreSQLOutboxRepository:
 
         assert len(result) == 2
 
-    @pytest.mark.asyncio
     async def test_internal_mark_published_entity(self, repository, mock_session):
         """测试内部方法标记已发布实体"""
         model = mock.Mock()
@@ -140,7 +134,6 @@ class TestPostgreSQLOutboxRepository:
         assert model.status == "published"
         assert model.published_at is not None
 
-    @pytest.mark.asyncio
     async def test_internal_mark_failed_entity(self, repository, mock_session):
         """测试内部方法标记失败实体"""
         model = mock.Mock()

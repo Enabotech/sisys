@@ -28,7 +28,6 @@ class TestTriggerIntegration:
         """Create AutoTriggerService with mock publisher."""
         return AutoTriggerService(publisher=mock_publisher)
 
-    @pytest.mark.asyncio
     async def test_domain_event_to_triggered_flow(
         self,
         trigger_service: AutoTriggerService,
@@ -59,7 +58,6 @@ class TestTriggerIntegration:
         # Verify published to mock
         mock_publisher.publish.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_heartbeat_to_triggered_flow(
         self,
         trigger_service: AutoTriggerService,
@@ -127,7 +125,6 @@ class TestTriggerIntegration:
         assert context.task_context["todo_items"] == ["task_a", "task_b", "task_c"]
         assert context.task_context["cost_budget"] == 250.0
 
-    @pytest.mark.asyncio
     async def test_heartbeat_scheduler_lifecycle(self) -> None:
         """Verify HeartbeatScheduler start/stop lifecycle."""
         config = RedisConfig()
@@ -145,7 +142,6 @@ class TestTriggerIntegration:
         await scheduler.stop()
         assert scheduler._running is False
 
-    @pytest.mark.asyncio
     async def test_triggered_event_serialization_roundtrip(self) -> None:
         """Verify AutoTriggered event can serialize and deserialize correctly."""
         import uuid

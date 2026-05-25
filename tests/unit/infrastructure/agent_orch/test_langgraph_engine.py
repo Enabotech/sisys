@@ -54,7 +54,6 @@ class TestLangGraphEngineProtocolCompliance:
 class TestLangGraphEngineSubmitGraph:
     """submit_graph 测试"""
 
-    @pytest.mark.asyncio
     async def test_submit_graph_returns_string_id(self, engine: LangGraphEngine) -> None:
         """submit_graph 应返回 graph_run_id 字符串"""
         mock_compiled = AsyncMock()
@@ -76,19 +75,16 @@ class TestLangGraphEngineSubmitGraph:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @pytest.mark.asyncio
     async def test_submit_graph_rejects_empty_graph_name(self, engine: LangGraphEngine) -> None:
         """空 graph_name 应抛出 ValueError"""
         with pytest.raises(ValueError, match="graph_name"):
             await engine.submit_graph("", {})
 
-    @pytest.mark.asyncio
     async def test_submit_graph_rejects_empty_parameters(self, engine: LangGraphEngine) -> None:
         """空 parameters 应抛出 ValueError"""
         with pytest.raises(ValueError, match="parameters"):
             await engine.submit_graph("BasicAgent", {})
 
-    @pytest.mark.asyncio
     async def test_submit_graph_runtime_error_on_exception(self, engine: LangGraphEngine) -> None:
         """SDK 异常应转换为 RuntimeError"""
         mock_compiled = AsyncMock()
@@ -102,7 +98,6 @@ class TestLangGraphEngineSubmitGraph:
 class TestLangGraphEngineEventPublishing:
     """AgentDecided 事件发布测试"""
 
-    @pytest.mark.asyncio
     async def test_submit_graph_publishes_agent_decided(self, engine: LangGraphEngine, mock_event_publisher: AsyncMock) -> None:
         """submit_graph 完成后应发布 AgentDecided 事件"""
         from src.domain.events.agent_events import AgentDecided
@@ -125,7 +120,6 @@ class TestLangGraphEngineEventPublishing:
         assert isinstance(event, AgentDecided)
         assert event.confidence == 0.9
 
-    @pytest.mark.asyncio
     async def test_submit_graph_no_event_on_failure(self, engine: LangGraphEngine, mock_event_publisher: AsyncMock) -> None:
         """submit_graph 失败时不应发布事件"""
         mock_compiled = AsyncMock()
@@ -137,7 +131,6 @@ class TestLangGraphEngineEventPublishing:
 
         mock_event_publisher.publish.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_submit_graph_remains_completed_on_publish_exception(
         self, engine: LangGraphEngine, mock_event_publisher: AsyncMock
     ) -> None:
@@ -159,7 +152,6 @@ class TestLangGraphEngineEventPublishing:
         status = await engine.get_graph_status(run_id)
         assert status == FlowStatus.COMPLETED
 
-    @pytest.mark.asyncio
     async def test_submit_graph_handles_publish_returning_none(
         self, engine: LangGraphEngine, mock_event_publisher: AsyncMock
     ) -> None:
@@ -181,7 +173,6 @@ class TestLangGraphEngineEventPublishing:
         status = await engine.get_graph_status(run_id)
         assert status == FlowStatus.COMPLETED
 
-    @pytest.mark.asyncio
     async def test_submit_graph_logs_warning_on_full_failure(
         self, engine: LangGraphEngine, mock_event_publisher: AsyncMock
     ) -> None:
@@ -209,7 +200,6 @@ class TestLangGraphEngineEventPublishing:
 class TestLangGraphEngineGetGraphStatus:
     """get_graph_status 测试"""
 
-    @pytest.mark.asyncio
     async def test_get_graph_status_completed(self, engine: LangGraphEngine) -> None:
         """已完成的 run_id 返回 COMPLETED"""
         run_id = str(uuid.uuid4())
@@ -219,7 +209,6 @@ class TestLangGraphEngineGetGraphStatus:
         status = await engine.get_graph_status(run_id)
         assert status == FlowStatus.COMPLETED
 
-    @pytest.mark.asyncio
     async def test_get_graph_status_failed(self, engine: LangGraphEngine) -> None:
         """失败的 run_id 返回 FAILED"""
         run_id = str(uuid.uuid4())
@@ -228,13 +217,11 @@ class TestLangGraphEngineGetGraphStatus:
         status = await engine.get_graph_status(run_id)
         assert status == FlowStatus.FAILED
 
-    @pytest.mark.asyncio
     async def test_get_graph_status_rejects_empty_id(self, engine: LangGraphEngine) -> None:
         """空 graph_run_id 应抛出 ValueError"""
         with pytest.raises(ValueError, match="graph_run_id"):
             await engine.get_graph_status("")
 
-    @pytest.mark.asyncio
     async def test_get_graph_status_unknown_id_returns_failed(self, engine: LangGraphEngine) -> None:
         """未知 run_id 返回 FAILED"""
         status = await engine.get_graph_status(str(uuid.uuid4()))

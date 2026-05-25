@@ -42,7 +42,6 @@ class TestHeartbeatSchedulerCreation:
 class TestHeartbeatSchedulerLifecycle:
     """Test HeartbeatScheduler start/stop lifecycle."""
 
-    @pytest.mark.asyncio
     async def test_start_sets_running_flag(self) -> None:
         """Verify start() sets running flag to True."""
         config = RedisConfig()
@@ -56,7 +55,6 @@ class TestHeartbeatSchedulerLifecycle:
         # Cleanup
         await scheduler.stop()
 
-    @pytest.mark.asyncio
     async def test_stop_clears_running_flag(self) -> None:
         """Verify stop() sets running flag to False."""
         config = RedisConfig()
@@ -68,7 +66,6 @@ class TestHeartbeatSchedulerLifecycle:
 
         assert scheduler._running is False
 
-    @pytest.mark.asyncio
     async def test_double_start_no_op(self) -> None:
         """Verify starting twice is a no-op."""
         config = RedisConfig()
@@ -83,7 +80,6 @@ class TestHeartbeatSchedulerLifecycle:
         # Cleanup
         await scheduler.stop()
 
-    @pytest.mark.asyncio
     async def test_stop_already_stopped_no_op(self) -> None:
         """Verify stop() on already stopped scheduler is no-op."""
         config = RedisConfig()
@@ -99,7 +95,6 @@ class TestHeartbeatSchedulerLifecycle:
 class TestHeartbeatSchedulerHeartbeatLoop:
     """Test _heartbeat_loop method."""
 
-    @pytest.mark.asyncio
     async def test_heartbeat_loop_fires_periodically(self) -> None:
         """Verify _heartbeat_loop fires heartbeat at interval."""
         config = RedisConfig()
@@ -119,7 +114,6 @@ class TestHeartbeatSchedulerHeartbeatLoop:
 
         assert fire_count >= 2
 
-    @pytest.mark.asyncio
     async def test_heartbeat_loop_respects_running_flag(self) -> None:
         """Verify _heartbeat_loop exits when _running becomes False."""
         config = RedisConfig()
@@ -140,7 +134,6 @@ class TestHeartbeatSchedulerHeartbeatLoop:
 
         assert fire_count == 1
 
-    @pytest.mark.asyncio
     async def test_heartbeat_loop_handles_cancellation(self) -> None:
         """Verify _heartbeat_loop handles cancellation gracefully."""
         config = RedisConfig()
@@ -166,7 +159,6 @@ class TestHeartbeatSchedulerHeartbeatLoop:
 class TestHeartbeatSchedulerFireHeartbeat:
     """Test _fire_heartbeat method."""
 
-    @pytest.mark.asyncio
     async def test_fire_heartbeat_generates_event(self) -> None:
         """Verify _fire_heartbeat generates HeartbeatTriggered event."""
         config = RedisConfig()
@@ -186,7 +178,6 @@ class TestHeartbeatSchedulerFireHeartbeat:
         assert isinstance(event, HeartbeatTriggered)
         assert event.wake_reason == "scheduled"
 
-    @pytest.mark.asyncio
     async def test_fire_heartbeat_no_publisher(self) -> None:
         """Verify _fire_heartbeat handles missing publisher gracefully."""
         config = RedisConfig()
@@ -200,7 +191,6 @@ class TestHeartbeatSchedulerFireHeartbeat:
             # Should not raise even without publisher
             await scheduler._fire_heartbeat()
 
-    @pytest.mark.asyncio
     async def test_fire_heartbeat_stores_heartbeat(self) -> None:
         """Verify _fire_heartbeat calls _store_heartbeat."""
         config = RedisConfig()
@@ -218,7 +208,6 @@ class TestHeartbeatSchedulerFireHeartbeat:
 class TestHeartbeatSchedulerGetPool:
     """Test _get_pool method coverage."""
 
-    @pytest.mark.asyncio
     async def test_get_pool_returns_existing_pool(self) -> None:
         """Verify _get_pool returns cached pool."""
         config = RedisConfig()
@@ -248,7 +237,6 @@ class TestHeartbeatSchedulerRedisOperations:
 
         return client
 
-    @pytest.mark.asyncio
     async def test_store_heartbeat_calls_zadd_and_expire(self, mock_redis_client) -> None:
         """Verify _store_heartbeat calls Redis zadd and expire."""
         config = RedisConfig()
@@ -263,7 +251,6 @@ class TestHeartbeatSchedulerRedisOperations:
         mock_redis_client.zadd.assert_called_once()
         mock_redis_client.expire.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_store_heartbeat_handles_exception(self, mock_redis_client) -> None:
         """Verify _store_heartbeat handles Redis exceptions gracefully."""
         config = RedisConfig()
@@ -278,7 +265,6 @@ class TestHeartbeatSchedulerRedisOperations:
                 # Should not raise, just log error
                 await scheduler._store_heartbeat(heartbeat_id, timestamp)
 
-    @pytest.mark.asyncio
     async def test_schedule_heartbeat_calls_redis_zadd(self, mock_redis_client) -> None:
         """Verify schedule_heartbeat calls Redis zadd."""
         config = RedisConfig()
@@ -291,7 +277,6 @@ class TestHeartbeatSchedulerRedisOperations:
 
         mock_redis_client.zadd.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_schedule_heartbeat_handles_exception(self, mock_redis_client) -> None:
         """Verify schedule_heartbeat handles Redis exceptions."""
         config = RedisConfig()
@@ -305,7 +290,6 @@ class TestHeartbeatSchedulerRedisOperations:
                 with pytest.raises(Exception):
                     await scheduler.schedule_heartbeat(heartbeat_id, delay_seconds=30)
 
-    @pytest.mark.asyncio
     async def test_get_pool_creates_connection(self, mock_redis_client) -> None:
         """Verify _get_pool creates new connection pool."""
         config = RedisConfig()
@@ -320,7 +304,6 @@ class TestHeartbeatSchedulerRedisOperations:
                 assert result is mock_pool
                 assert scheduler._pool is mock_pool
 
-    @pytest.mark.asyncio
     async def test_get_pool_handles_connection_error(self) -> None:
         """Verify _get_pool handles connection errors."""
         config = RedisConfig()
@@ -336,7 +319,6 @@ class TestHeartbeatSchedulerRedisOperations:
 class TestHeartbeatSchedulerStop:
     """Test stop method coverage."""
 
-    @pytest.mark.asyncio
     async def test_stop_cancels_heartbeat_task(self) -> None:
         """Verify stop() cancels heartbeat task."""
         config = RedisConfig()
@@ -353,7 +335,6 @@ class TestHeartbeatSchedulerStop:
 
         assert scheduler._running is False
 
-    @pytest.mark.asyncio
     async def test_stop_with_no_task(self) -> None:
         """Verify stop() handles case with no heartbeat task."""
         config = RedisConfig()

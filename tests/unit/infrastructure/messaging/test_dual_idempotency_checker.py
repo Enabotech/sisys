@@ -66,14 +66,12 @@ class TestIdempotencyRecordModel:
 class TestDualIdempotencyChecker:
     """DualIdempotencyChecker tests."""
 
-    @pytest.mark.asyncio
     async def test_try_acquire_returns_true_first_time(self, checker):
         """try_acquire should return True on first call."""
         event_id = uuid4()
         result = await checker.try_acquire(event_id)
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_try_acquire_returns_false_second_time(self, checker, redis_client):
         """try_acquire should return False on duplicate call."""
         event_id = uuid4()
@@ -84,7 +82,6 @@ class TestDualIdempotencyChecker:
         # Second call with same event_id - should fail
         assert await checker.try_acquire(event_id) is False
 
-    @pytest.mark.asyncio
     async def test_try_acquire_uses_correct_redis_key(self, checker, redis_client):
         """try_acquire should use correct Redis key format."""
         event_id = uuid4()
@@ -96,7 +93,6 @@ class TestDualIdempotencyChecker:
         exists = await redis_client.exists(expected_key)
         assert exists == 1
 
-    @pytest.mark.asyncio
     async def test_try_acquire_uses_default_ttl(self, checker, redis_client):
         """try_acquire should use default 7-day TTL."""
         event_id = uuid4()
@@ -110,7 +106,6 @@ class TestDualIdempotencyChecker:
         assert ttl > 0
         assert ttl <= DEFAULT_TTL
 
-    @pytest.mark.asyncio
     async def test_try_acquire_falls_back_to_postgresql_on_redis_error(self, redis_client, mock_session):
         """try_acquire should fall back to PostgreSQL when Redis fails."""
         event_id = uuid4()
@@ -135,7 +130,6 @@ class TestDualIdempotencyChecker:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_is_processed_checks_redis_first(self, checker, redis_client, mock_session):
         """is_processed should check Redis first."""
         event_id = uuid4()
@@ -158,7 +152,6 @@ class TestDualIdempotencyChecker:
         # Now should be processed
         assert await checker.is_processed(event_id) is True
 
-    @pytest.mark.asyncio
     async def test_is_processed_falls_back_to_postgresql_on_redis_error(self, redis_client, mock_session):
         """is_processed should fall back to PostgreSQL when Redis fails."""
         event_id = uuid4()
@@ -182,7 +175,6 @@ class TestDualIdempotencyChecker:
         # Should fall back to PostgreSQL
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_try_acquire_writes_to_postgresql_on_success(self, checker, mock_session):
         """try_acquire should write to PostgreSQL after Redis success."""
         event_id = uuid4()
@@ -192,7 +184,6 @@ class TestDualIdempotencyChecker:
         # Verify PostgreSQL write was attempted
         mock_session.execute.assert_called()
 
-    @pytest.mark.asyncio
     async def test_idempotency_record_model_table_name(self):
         """IdempotencyRecordModel should use correct table name."""
         assert IdempotencyRecordModel.__tablename__ == IDEMPOTENCY_TABLE

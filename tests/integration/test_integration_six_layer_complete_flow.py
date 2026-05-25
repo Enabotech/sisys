@@ -388,7 +388,6 @@ class TestSixLayerCompleteFlow:
     - L5: Graph (triggered for entity extraction)
     """
 
-    @pytest.mark.asyncio
     async def test_complete_flow_long_content_via_gateway(
         self,
         unified_storage_gateway: UnifiedStorageGateway,
@@ -553,7 +552,6 @@ class TestSixLayerCompleteFlow:
         await unified_storage_gateway._memory_cache.delete_memory(memory_type, owner_id, name)
         await unified_storage_gateway._l2_meta.delete(uuid.UUID(memory_id))
 
-    @pytest.mark.asyncio
     async def test_gateway_save_and_read_cycle(
         self,
         unified_storage_gateway: UnifiedStorageGateway,
@@ -611,7 +609,6 @@ class TestSixLayerCompleteFlow:
         await unified_storage_gateway._memory_cache.delete_memory(memory_type, owner_id, name)
         await unified_storage_gateway._l2_meta.delete(uuid.UUID(memory_id))
 
-    @pytest.mark.asyncio
     async def test_gateway_respects_tier_decision(
         self,
         l0_storage: L0StoragePort,
@@ -645,7 +642,6 @@ class TestSixLayerCompleteFlow:
         )
         assert decision.tier in (StorageTier.COLD, StorageTier.FROZEN)
 
-    @pytest.mark.asyncio
     async def test_short_content_skips_l3_vector(
         self,
         unified_storage_gateway: UnifiedStorageGateway,
@@ -706,7 +702,6 @@ class TestSixLayerCompleteFlow:
 class TestLayerIndependence:
     """Verify layers operate independently."""
 
-    @pytest.mark.asyncio
     async def test_l0_write_independent_of_memory_cache_l2(
         self,
         l0_storage: L0StoragePort,
@@ -725,7 +720,6 @@ class TestLayerIndependence:
 
         await l0_storage.delete(memory_id, memory_type)
 
-    @pytest.mark.asyncio
     async def test_memory_cache_cache_operations_are_independent(
         self,
         redis_cache: RedisMemoryCache,
@@ -749,7 +743,6 @@ class TestLayerIndependence:
 class TestLayerCoordinationInvariants:
     """Verify layer coordination invariants from architecture.md §11.2.9."""
 
-    @pytest.mark.asyncio
     async def test_l0_is_source_of_truth(
         self,
         l0_storage: L0StoragePort,
@@ -776,7 +769,6 @@ class TestLayerCoordinationInvariants:
         await redis_cache.delete_memory(memory_type, owner_id, name)
         await l0_storage.delete(memory_id, memory_type)
 
-    @pytest.mark.asyncio
     async def test_event_driven_layer_updates(
         self,
         unified_storage_gateway: UnifiedStorageGateway,

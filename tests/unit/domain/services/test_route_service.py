@@ -50,7 +50,6 @@ class TestAutoRouteService:
             semantic_router=mock_semantic_router,
         )
 
-    @pytest.mark.asyncio
     async def test_on_triggered_event_publishes_routed(
         self,
         route_service: AutoRouteService,
@@ -69,7 +68,6 @@ class TestAutoRouteService:
         assert result.session_id == "session-123"
         mock_publisher.publish.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_triggered_event_with_hash_router(
         self,
         mock_hash_router: MagicMock,
@@ -101,7 +99,6 @@ class TestAutoRouteService:
         assert result.route_target == "node-A"
         assert result.route_score == 1.0
 
-    @pytest.mark.asyncio
     async def test_on_triggered_event_with_semantic_router(
         self,
         mock_hash_router: MagicMock,
@@ -133,7 +130,6 @@ class TestAutoRouteService:
         assert result.route_target == "cfo-agent"
         assert result.route_score == 0.95
 
-    @pytest.mark.asyncio
     async def test_on_triggered_event_no_publisher(
         self,
         mock_hash_router: MagicMock,
@@ -155,7 +151,6 @@ class TestAutoRouteService:
         result = await route_service.on_triggered_event(triggered)
         assert result is not None
 
-    @pytest.mark.asyncio
     async def test_on_triggered_event_mixed_routing(
         self,
         mock_publisher: AsyncMock,
@@ -184,7 +179,6 @@ class TestAutoRouteService:
         assert result.route_type == "mixed"
         assert result.route_score == 0.95
 
-    @pytest.mark.asyncio
     async def test_on_triggered_event_no_routers(
         self,
         mock_publisher: AsyncMock,
@@ -228,7 +222,6 @@ class TestAutoRouteService:
         assert service._hash_router is None
         assert service._semantic_router is None
 
-    @pytest.mark.asyncio
     async def test_on_triggered_event_publisher_exception(
         self,
         mock_hash_router: MagicMock,

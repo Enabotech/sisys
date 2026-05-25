@@ -42,7 +42,6 @@ class TestAutoTriggerServiceUnit:
     def trigger_service(self, publisher: DummyPublisher) -> AutoTriggerService:
         return AutoTriggerService(publisher=publisher)
 
-    @pytest.mark.asyncio
     async def test_on_domain_event_publishes_triggered(
         self,
         trigger_service: AutoTriggerService,
@@ -64,7 +63,6 @@ class TestAutoTriggerServiceUnit:
         assert result.source_event_type == "DocumentProcessed"
         assert len(publisher.published_events) == 1
 
-    @pytest.mark.asyncio
     async def test_on_heartbeat_event_publishes_triggered(
         self,
         trigger_service: AutoTriggerService,
@@ -124,7 +122,6 @@ class TestAutoTriggerServiceUnit:
         assert context.task_context["wake_reason"] == "user_request"
         assert context.task_context["cost_budget"] == 50.0
 
-    @pytest.mark.asyncio
     async def test_on_domain_event_no_publisher(self) -> None:
         """Verify no crash when no publisher configured."""
         trigger_service = AutoTriggerService(publisher=None)
@@ -140,7 +137,6 @@ class TestAutoTriggerServiceUnit:
         assert result is not None
         assert result.trigger_type == "domain_event"
 
-    @pytest.mark.asyncio
     async def test_publish_error_handling(
         self,
         trigger_service: AutoTriggerService,

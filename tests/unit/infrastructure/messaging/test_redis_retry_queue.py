@@ -98,7 +98,6 @@ class TestRetryQueueEntry:
 class TestRedisRetryQueue:
     """RedisRetryQueue tests using fakeredis."""
 
-    @pytest.mark.asyncio
     async def test_enqueue_adds_event_to_zset(self, retry_queue):
         """enqueue should add event to Redis ZSET."""
         event = _make_event()
@@ -115,7 +114,6 @@ class TestRedisRetryQueue:
         count = await retry_queue.count()
         assert count == 1
 
-    @pytest.mark.asyncio
     async def test_dequeue_returns_expired_events(self, retry_queue, redis_client):
         """dequeue should return events whose retry_at has passed."""
         event = _make_event()
@@ -140,7 +138,6 @@ class TestRedisRetryQueue:
         count = await retry_queue.count()
         assert count == 0
 
-    @pytest.mark.asyncio
     async def test_dequeue_does_not_return_future_events(self, retry_queue):
         """dequeue should NOT return events with future retry_at."""
         event = _make_event()
@@ -162,13 +159,11 @@ class TestRedisRetryQueue:
         count = await retry_queue.count()
         assert count == 1
 
-    @pytest.mark.asyncio
     async def test_dequeue_on_empty_queue_returns_empty(self, retry_queue):
         """dequeue on empty queue should return empty list."""
         entries = await retry_queue.dequeue(limit=10)
         assert entries == []
 
-    @pytest.mark.asyncio
     async def test_count_returns_queue_size(self, retry_queue):
         """count should return number of events in queue."""
         event1 = _make_event()
@@ -181,7 +176,6 @@ class TestRedisRetryQueue:
         count = await retry_queue.count()
         assert count == 2
 
-    @pytest.mark.asyncio
     async def test_peek_returns_events_without_removing(self, retry_queue):
         """peek should return events without removing them."""
         event = _make_event()
@@ -202,7 +196,6 @@ class TestRedisRetryQueue:
         count = await retry_queue.count()
         assert count == 1
 
-    @pytest.mark.asyncio
     async def test_remove_deletes_specific_event(self, retry_queue):
         """remove should delete the specified event by ID."""
         event = _make_event()
@@ -222,13 +215,11 @@ class TestRedisRetryQueue:
         count = await retry_queue.count()
         assert count == 0
 
-    @pytest.mark.asyncio
     async def test_remove_returns_false_for_nonexistent_event(self, retry_queue):
         """remove should return False if event not found."""
         removed = await retry_queue.remove(uuid4())
         assert removed is False
 
-    @pytest.mark.asyncio
     async def test_clear_removes_all_events(self, retry_queue):
         """clear should remove all events from queue."""
         event1 = _make_event()
@@ -243,7 +234,6 @@ class TestRedisRetryQueue:
         count = await retry_queue.count()
         assert count == 0
 
-    @pytest.mark.asyncio
     async def test_multiple_events_ordered_by_retry_at(self, retry_queue):
         """Events should be dequeued in order of retry_at (oldest first)."""
         event1 = _make_event()

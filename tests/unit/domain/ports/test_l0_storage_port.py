@@ -5,8 +5,6 @@ from __future__ import annotations
 import inspect
 from unittest.mock import AsyncMock
 
-import pytest
-
 from src.domain.ports.l0_storage import L0StoragePort
 
 
@@ -103,7 +101,6 @@ class ConcreteL0StorageAdapter(L0StoragePort):
         return list(self._memories[memory_type].keys())
 
 
-@pytest.mark.asyncio
 async def test_concrete_write_and_read():
     """Concrete implementation should support write and read."""
     adapter = ConcreteL0StorageAdapter()
@@ -112,7 +109,6 @@ async def test_concrete_write_and_read():
     assert content == "test content"
 
 
-@pytest.mark.asyncio
 async def test_concrete_delete():
     """Concrete implementation should support delete."""
     adapter = ConcreteL0StorageAdapter()
@@ -122,7 +118,6 @@ async def test_concrete_delete():
     assert await adapter.exists("test-id", "user") is False
 
 
-@pytest.mark.asyncio
 async def test_concrete_list_memories():
     """Concrete implementation should support list_memories."""
     adapter = ConcreteL0StorageAdapter()

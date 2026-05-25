@@ -14,7 +14,6 @@ import pytest
 class TestIsolationLevel:
     """验证隔离级别配置"""
 
-    @pytest.mark.asyncio
     async def test_get_session_with_serializable_isolation(self) -> None:
         """get_session_with_isolation('SERIALIZABLE') 应创建 SERIALIZABLE 隔离级别的 session"""
         from src.infrastructure.config.postgresql import PostgreSQLConfig
@@ -43,7 +42,6 @@ class TestIsolationLevel:
             call_kwargs = mock_maker.call_args[1]
             assert call_kwargs["isolation_level"] == "SERIALIZABLE"
 
-    @pytest.mark.asyncio
     async def test_get_session_with_repeatable_read_isolation(self) -> None:
         """get_session_with_isolation('REPEATABLE READ') 应创建 REPEATABLE READ 隔离级别的 session"""
         from src.infrastructure.config.postgresql import PostgreSQLConfig
@@ -76,7 +74,6 @@ class TestIsolationLevel:
 class TestAuditUnitOfWork:
     """验证审计专用 UoW"""
 
-    @pytest.mark.asyncio
     async def test_audit_uow_uses_serializable_isolation(self) -> None:
         """AuditUnitOfWork.begin() 应通过 get_session_with_isolation 创建 SERIALIZABLE 隔离级别的 session"""
         from src.infrastructure.messaging.unit_of_work.audit_unit_of_work import AuditUnitOfWork
@@ -98,7 +95,6 @@ class TestAuditUnitOfWork:
         mock_manager.get_session_with_isolation.assert_called_once_with("SERIALIZABLE")
         mock_session.begin.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_audit_uow_context_manager(self) -> None:
         """AuditUnitOfWork 应支持上下文管理器"""
         from src.infrastructure.messaging.unit_of_work.audit_unit_of_work import AuditUnitOfWork
@@ -122,7 +118,6 @@ class TestAuditUnitOfWork:
         mock_session.commit.assert_awaited_once()
         isolation_ctx.__aexit__.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_audit_uow_session_property_raises_before_begin(self) -> None:
         """AuditUnitOfWork.session 在 begin() 前应抛出 RuntimeError"""
         from src.infrastructure.messaging.unit_of_work.audit_unit_of_work import AuditUnitOfWork

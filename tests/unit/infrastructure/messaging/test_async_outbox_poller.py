@@ -48,19 +48,16 @@ class TestAsyncOutboxPollerBehavior:
             batch_size=10,
         )
 
-    @pytest.mark.asyncio
     async def test_poll_once_calls_get_unpublished(self, poller, mock_repo):
         """poll_once should call get_unpublished."""
         await poller.poll_once()
         mock_repo.get_unpublished.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_poll_once_handles_empty_queue(self, poller, mock_repo):
         """poll_once should handle empty queue gracefully."""
         mock_repo.get_unpublished.return_value = []
         await poller.poll_once()  # Should not raise
 
-    @pytest.mark.asyncio
     async def test_poller_stops_cleanly(self, poller):
         """stop() should set _running to False."""
         poller.stop()

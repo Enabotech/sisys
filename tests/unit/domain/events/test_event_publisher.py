@@ -14,7 +14,6 @@ from src.infrastructure.messaging.inmemory_event_listener import InMemoryEventLi
 class TestInMemoryEventBusPublish:
     """Test InMemoryEventBus publish functionality."""
 
-    @pytest.mark.asyncio
     async def test_publish_single_event(self):
         """Can publish a single event."""
         bus = InMemoryEventBus()
@@ -23,7 +22,6 @@ class TestInMemoryEventBusPublish:
         assert len(bus.published_events) == 1
         assert bus.published_events[0].event_id == event.event_id
 
-    @pytest.mark.asyncio
     async def test_publish_multiple_events(self):
         """Can publish multiple events in order."""
         bus = InMemoryEventBus()
@@ -37,7 +35,6 @@ class TestInMemoryEventBusPublish:
         assert len(bus.published_events) == 3
         assert [e.event_id for e in bus.published_events] == [e.event_id for e in events]
 
-    @pytest.mark.asyncio
     async def test_publish_records_event_id(self):
         """Published event's ID is recorded in processed set."""
         bus = InMemoryEventBus()
@@ -45,7 +42,6 @@ class TestInMemoryEventBusPublish:
         await bus.publish(event)
         assert event.event_id in bus.processed_event_ids
 
-    @pytest.mark.asyncio
     async def test_publish_none_raises(self):
         """Publishing None raises ValueError."""
         bus = InMemoryEventBus()
@@ -56,7 +52,6 @@ class TestInMemoryEventBusPublish:
 class TestInMemoryEventBusIdempotency:
     """Test InMemoryEventBus idempotency (deduplication)."""
 
-    @pytest.mark.asyncio
     async def test_duplicate_event_not_published(self):
         """Publishing same event twice only records it once."""
         bus = InMemoryEventBus()
@@ -65,7 +60,6 @@ class TestInMemoryEventBusIdempotency:
         await bus.publish(event)  # Duplicate
         assert len(bus.published_events) == 1
 
-    @pytest.mark.asyncio
     async def test_duplicate_event_idempotency_check(self):
         """Idempotency check prevents re-processing."""
         bus = InMemoryEventBus()
@@ -75,7 +69,6 @@ class TestInMemoryEventBusIdempotency:
         await bus.publish(event)
         assert len(bus.processed_event_ids) == initial_count  # No new entries
 
-    @pytest.mark.asyncio
     async def test_different_events_both_published(self):
         """Two different events are both published."""
         bus = InMemoryEventBus()
@@ -89,7 +82,6 @@ class TestInMemoryEventBusIdempotency:
 class TestInMemoryEventBusDispatch:
     """Test InMemoryEventBus event dispatch to listener."""
 
-    @pytest.mark.asyncio
     async def test_dispatch_to_listener(self) -> None:
         """Events are dispatched to registered listener."""
         listener = InMemoryEventListener()
@@ -108,7 +100,6 @@ class TestInMemoryEventBusDispatch:
         assert len(received_events) == 1
         assert received_events[0].event_id == event.event_id
 
-    @pytest.mark.asyncio
     async def test_dispatch_filters_by_event_type(self) -> None:
         """Only handlers for the matching event type are called."""
         listener = InMemoryEventListener()
@@ -131,7 +122,6 @@ class TestInMemoryEventBusDispatch:
         assert received == ["doc"]
         assert "tool" not in received
 
-    @pytest.mark.asyncio
     async def test_no_listener_no_error(self):
         """Publishing without listeners works fine."""
         bus = InMemoryEventBus()
@@ -139,7 +129,6 @@ class TestInMemoryEventBusDispatch:
         await bus.publish(event)  # Should not raise
         assert len(bus.published_events) == 1
 
-    @pytest.mark.asyncio
     async def test_multiple_handlers_same_event_type(self) -> None:
         """Multiple handlers for same event type all receive event."""
         listener = InMemoryEventListener()
@@ -169,7 +158,6 @@ class TestInMemoryEventBusDispatch:
 class TestInMemoryEventBusReset:
     """Test InMemoryEventBus reset functionality."""
 
-    @pytest.mark.asyncio
     async def test_reset_clears_processed_ids(self):
         """Reset clears processed event IDs."""
         bus = InMemoryEventBus()
@@ -178,7 +166,6 @@ class TestInMemoryEventBusReset:
         bus.reset()
         assert len(bus.processed_event_ids) == 0
 
-    @pytest.mark.asyncio
     async def test_reset_clears_published_events(self):
         """Reset clears published events list."""
         bus = InMemoryEventBus()
@@ -191,7 +178,6 @@ class TestInMemoryEventBusReset:
 class TestInMemoryEventBusDispatchOrder:
     """Test dispatch-before-record ordering (P0-5)."""
 
-    @pytest.mark.asyncio
     async def test_dispatch_before_record(self) -> None:
         """Event is dispatched before being marked as processed."""
         listener = InMemoryEventListener()

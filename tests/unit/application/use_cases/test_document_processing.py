@@ -29,7 +29,6 @@ class TestDocumentProcessingUseCase:
         """创建 DocumentProcessingUseCase 实例"""
         return DocumentProcessingUseCase(mock_outbox_repo)
 
-    @pytest.mark.asyncio
     async def test_process_document_success(
         self, use_case: DocumentProcessingUseCase, mock_outbox_repo: mock.AsyncMock
     ) -> None:
@@ -40,7 +39,6 @@ class TestDocumentProcessingUseCase:
         assert result["document_id"] == "doc-123"
         mock_outbox_repo.save.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_process_document_with_metadata(
         self, use_case: DocumentProcessingUseCase, mock_outbox_repo: mock.AsyncMock
     ) -> None:
@@ -51,7 +49,6 @@ class TestDocumentProcessingUseCase:
         assert result["status"] == "success"
         assert result["document_id"] == "doc-456"
 
-    @pytest.mark.asyncio
     async def test_process_document_publishes_event(
         self, use_case: DocumentProcessingUseCase, mock_outbox_repo: mock.AsyncMock
     ) -> None:
@@ -62,13 +59,11 @@ class TestDocumentProcessingUseCase:
         event = mock_outbox_repo.save.call_args[0][0]
         assert event.source == "DocumentProcessingUseCase"
 
-    @pytest.mark.asyncio
     async def test_init_requires_outbox_repo(self, mock_outbox_repo: mock.AsyncMock) -> None:
         """验证初始化需要 outbox_repo 参数"""
         use_case = DocumentProcessingUseCase(mock_outbox_repo)
         assert use_case._outbox_repo is mock_outbox_repo
 
-    @pytest.mark.asyncio
     async def test_process_document_event_payload(
         self, use_case: DocumentProcessingUseCase, mock_outbox_repo: mock.AsyncMock
     ) -> None:

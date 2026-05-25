@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.infrastructure.storage.neo4j.neo4j_memory_graph_storage import (
     Neo4jMemoryGraphStorage,
     _content_hash,
@@ -56,7 +54,6 @@ class TestContentHash:
 class TestNeo4jMemoryGraphStorageDelegation:
     """验证 L5GraphPort 方法正确委托给适配器"""
 
-    @pytest.mark.asyncio
     async def test_create_entity_delegates_to_adapter(self):
         """验证 create_entity 正确委托"""
         mock_adapter = AsyncMock()
@@ -72,7 +69,6 @@ class TestNeo4jMemoryGraphStorageDelegation:
         assert result is True
         mock_adapter.create_entity.assert_called_once_with("mem-123", "project", {"name": "Test"})
 
-    @pytest.mark.asyncio
     async def test_get_entity_delegates_to_adapter(self):
         """验证 get_entity 正确委托"""
         mock_adapter = AsyncMock()
@@ -85,7 +81,6 @@ class TestNeo4jMemoryGraphStorageDelegation:
         assert result == expected
         mock_adapter.get_entity.assert_called_once_with("mem-123")
 
-    @pytest.mark.asyncio
     async def test_delete_entity_delegates_to_adapter(self):
         """验证 delete_entity 正确委托"""
         mock_adapter = AsyncMock()
@@ -97,7 +92,6 @@ class TestNeo4jMemoryGraphStorageDelegation:
         assert result is True
         mock_adapter.delete_entity.assert_called_once_with("mem-123")
 
-    @pytest.mark.asyncio
     async def test_create_relationship_delegates_to_adapter(self):
         """验证 create_relationship 正确委托"""
         mock_adapter = AsyncMock()
@@ -114,7 +108,6 @@ class TestNeo4jMemoryGraphStorageDelegation:
         assert result is True
         mock_adapter.create_relationship.assert_called_once_with("mem-1", "mem-2", "DEPENDS_ON", {"weight": 1})
 
-    @pytest.mark.asyncio
     async def test_create_relationship_without_properties(self):
         """验证 create_relationship 无属性时传递 None"""
         mock_adapter = AsyncMock()
@@ -130,7 +123,6 @@ class TestNeo4jMemoryGraphStorageDelegation:
         assert result is True
         mock_adapter.create_relationship.assert_called_once_with("mem-1", "mem-2", "RELATED_TO", None)
 
-    @pytest.mark.asyncio
     async def test_delete_relationship_delegates_to_adapter(self):
         """验证 delete_relationship 正确委托"""
         mock_adapter = AsyncMock()
@@ -142,7 +134,6 @@ class TestNeo4jMemoryGraphStorageDelegation:
         assert result is True
         mock_adapter.delete_relationship.assert_called_once_with("mem-1", "mem-2", "DEPENDS_ON")
 
-    @pytest.mark.asyncio
     async def test_find_related_delegates_to_adapter(self):
         """验证 find_related 正确委托"""
         mock_adapter = AsyncMock()
@@ -155,7 +146,6 @@ class TestNeo4jMemoryGraphStorageDelegation:
         assert result == expected
         mock_adapter.find_related.assert_called_once_with("mem-1", 3, "DEPENDS_ON")
 
-    @pytest.mark.asyncio
     async def test_execute_query_delegates_to_adapter(self):
         """验证 execute_query 正确委托"""
         mock_adapter = AsyncMock()
@@ -168,7 +158,6 @@ class TestNeo4jMemoryGraphStorageDelegation:
         assert result == expected
         mock_adapter.execute_query.assert_called_once_with("MATCH (n) RETURN n", {"limit": 10})
 
-    @pytest.mark.asyncio
     async def test_execute_write_query_delegates_to_adapter(self):
         """验证 execute_write_query 正确委托"""
         mock_adapter = AsyncMock()
@@ -181,7 +170,6 @@ class TestNeo4jMemoryGraphStorageDelegation:
         assert result == expected
         mock_adapter.execute_write_query.assert_called_once_with("CREATE (n:Memory {id: $id})", {"id": "mem-123"})
 
-    @pytest.mark.asyncio
     async def test_get_neighbors_delegates_to_adapter(self):
         """验证 get_neighbors 正确委托"""
         mock_adapter = AsyncMock()
@@ -198,7 +186,6 @@ class TestNeo4jMemoryGraphStorageDelegation:
 class TestIndexMemoryRelations:
     """index_memory_relations 方法验证（特有行为）"""
 
-    @pytest.mark.asyncio
     async def test_creates_memory_entity_with_content_hash(self):
         """验证创建 Memory 实体并包含 content_hash"""
         mock_adapter = AsyncMock()
@@ -219,7 +206,6 @@ class TestIndexMemoryRelations:
         assert "content_hash" in properties
         assert len(properties["content_hash"]) == 16
 
-    @pytest.mark.asyncio
     async def test_returns_1_as_relation_count(self):
         """验证固定返回 1（简单实现）"""
         mock_adapter = AsyncMock()
@@ -237,7 +223,6 @@ class TestIndexMemoryRelations:
 class TestGetKnowledgeGraph:
     """get_knowledge_graph 方法验证（特有行为）"""
 
-    @pytest.mark.asyncio
     async def test_returns_empty_when_entity_is_none(self):
         """验证实体不存在时返回空图谱"""
         mock_adapter = AsyncMock()
@@ -249,7 +234,6 @@ class TestGetKnowledgeGraph:
         assert result == {"entities": [], "connections": []}
         mock_adapter.get_entity.assert_called_once_with("nonexistent-id")
 
-    @pytest.mark.asyncio
     async def test_returns_entity_and_related(self):
         """验证返回实体和关联实体"""
         mock_adapter = AsyncMock()
@@ -270,7 +254,6 @@ class TestGetKnowledgeGraph:
         assert result["entities"][2]["id"] == "mem-3"
         assert result["connections"] == related
 
-    @pytest.mark.asyncio
     async def test_calls_find_related_with_correct_depth(self):
         """验证使用正确深度调用 find_related"""
         mock_adapter = AsyncMock()
@@ -283,7 +266,6 @@ class TestGetKnowledgeGraph:
 
         mock_adapter.find_related.assert_called_once_with("mem-1", max_depth=3)
 
-    @pytest.mark.asyncio
     async def test_handles_related_with_missing_fields(self):
         """验证关联实体缺少字段时使用默认值"""
         mock_adapter = AsyncMock()
@@ -301,7 +283,6 @@ class TestGetKnowledgeGraph:
         assert result["entities"][1]["type"] is None
         assert result["entities"][1]["properties"] == {}
 
-    @pytest.mark.asyncio
     async def test_uses_default_depth_of_2(self):
         """验证默认深度为 2"""
         mock_adapter = AsyncMock()

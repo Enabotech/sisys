@@ -26,7 +26,6 @@ class TestAutoRouteHandlerInit:
 class TestAutoRouteHandlerOnTriggered:
     """Test on_triggered method."""
 
-    @pytest.mark.asyncio
     async def test_on_triggered_with_non_auto_triggered_event(self) -> None:
         """Coverage: Returns None for non-AutoTriggered event."""
         from src.application.event_handlers.auto_route_handler import AutoRouteHandler
@@ -39,7 +38,6 @@ class TestAutoRouteHandlerOnTriggered:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_on_triggered_returns_none_when_service_returns_none(self) -> None:
         """Coverage: Returns None when AutoRouteService returns None."""
         from src.application.event_handlers.auto_route_handler import AutoRouteHandler
@@ -59,7 +57,6 @@ class TestAutoRouteHandlerOnTriggered:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_on_triggered_with_auto_triggered_event(self) -> None:
         """Coverage: Processes AutoTriggered event and returns AutoRouted."""
         from src.application.event_handlers.auto_route_handler import AutoRouteHandler
@@ -89,7 +86,6 @@ class TestAutoRouteHandlerOnTriggered:
         assert result is routed_event
         mock_service.on_triggered_event.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_triggered_logs_warning_when_service_returns_none(self) -> None:
         """Coverage: Logs warning when AutoRouteService returns None."""
         from src.application.event_handlers.auto_route_handler import AutoRouteHandler
@@ -109,7 +105,6 @@ class TestAutoRouteHandlerOnTriggered:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_on_triggered_raises_exception_on_service_error(self) -> None:
         """Coverage: Raises exception when AutoRouteService fails."""
         from src.application.event_handlers.auto_route_handler import AutoRouteHandler

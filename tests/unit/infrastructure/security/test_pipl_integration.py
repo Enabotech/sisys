@@ -28,7 +28,6 @@ def pipl_service() -> PIPLComplianceServiceImpl:
 class TestPIPLComplianceIntegration:
     """PIPL 合规集成验证"""
 
-    @pytest.mark.asyncio
     async def test_pipl_service_has_record_access(
         self,
         pipl_service: PIPLComplianceServiceImpl,
@@ -37,7 +36,6 @@ class TestPIPLComplianceIntegration:
         assert hasattr(pipl_service, "record_access")
         assert callable(pipl_service.record_access)
 
-    @pytest.mark.asyncio
     async def test_pipl_service_has_deletion_request(
         self,
         pipl_service: PIPLComplianceServiceImpl,
@@ -46,7 +44,6 @@ class TestPIPLComplianceIntegration:
         assert hasattr(pipl_service, "respond_to_deletion_request")
         assert callable(pipl_service.respond_to_deletion_request)
 
-    @pytest.mark.asyncio
     async def test_pipl_service_has_access_request(
         self,
         pipl_service: PIPLComplianceServiceImpl,
@@ -55,7 +52,6 @@ class TestPIPLComplianceIntegration:
         assert hasattr(pipl_service, "respond_to_access_request")
         assert callable(pipl_service.respond_to_access_request)
 
-    @pytest.mark.asyncio
     async def test_pipl_service_has_portability_request(
         self,
         pipl_service: PIPLComplianceServiceImpl,
@@ -64,7 +60,6 @@ class TestPIPLComplianceIntegration:
         assert hasattr(pipl_service, "respond_to_portability_request")
         assert callable(pipl_service.respond_to_portability_request)
 
-    @pytest.mark.asyncio
     async def test_deletion_request_response_returns_dict(
         self,
         pipl_service: PIPLComplianceServiceImpl,
@@ -74,7 +69,6 @@ class TestPIPLComplianceIntegration:
         assert isinstance(result, dict)
         assert "status" in result
 
-    @pytest.mark.asyncio
     async def test_access_request_response_returns_dict(
         self,
         pipl_service: PIPLComplianceServiceImpl,

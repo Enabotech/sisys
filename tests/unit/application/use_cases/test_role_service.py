@@ -30,7 +30,6 @@ class TestRoleServiceCreation:
         self.mock_repo = mock.AsyncMock(spec=RoleRepositoryPort)
         self.service = RoleService(self.mock_repo)
 
-    @pytest.mark.asyncio
     async def test_create_role_returns_role(self):
         """🔴 RED: create_role should return a Role instance."""
         self.mock_repo.get_by_name.return_value = None
@@ -54,7 +53,6 @@ class TestRoleServiceCreation:
         assert isinstance(result, Role)
         assert result.name == "test_role"
 
-    @pytest.mark.asyncio
     async def test_create_role_with_duplicate_name_raises_error(self):
         """🔴 RED: Creating a role with existing name should raise RoleAlreadyExistsError."""
         existing_role = Role(
@@ -70,7 +68,6 @@ class TestRoleServiceCreation:
         with pytest.raises(RoleAlreadyExistsError):
             await self.service.create_role(name="test_role", permissions=[])
 
-    @pytest.mark.asyncio
     async def test_create_role_saves_to_repository(self):
         """🔴 RED: create_role should save the role to repository."""
         self.mock_repo.get_by_name.return_value = None
@@ -102,7 +99,6 @@ class TestRoleServiceRetrieval:
         self.mock_repo = mock.AsyncMock(spec=RoleRepositoryPort)
         self.service = RoleService(self.mock_repo)
 
-    @pytest.mark.asyncio
     async def test_get_role_returns_role(self):
         """🔴 RED: get_role should return a Role instance."""
         role_id = uuid4()
@@ -123,7 +119,6 @@ class TestRoleServiceRetrieval:
         assert result.name == "admin"
         assert result.is_system_reserved is True
 
-    @pytest.mark.asyncio
     async def test_get_role_raises_when_not_found(self):
         """get_role should raise RoleNotFoundError when role doesn't exist."""
         from src.application.use_cases.role_management import RoleNotFoundError
@@ -134,7 +129,6 @@ class TestRoleServiceRetrieval:
         with pytest.raises(RoleNotFoundError):
             await self.service.get_role(role_id)
 
-    @pytest.mark.asyncio
     async def test_list_roles_returns_list(self):
         """🔴 RED: list_roles should return a list of roles."""
         roles = [
@@ -148,7 +142,6 @@ class TestRoleServiceRetrieval:
         assert isinstance(result, list)
         assert len(result) == 2
 
-    @pytest.mark.asyncio
     async def test_list_roles_filters_inactive(self):
         """🔴 RED: list_roles with active_only=True should filter inactive roles."""
         roles = [
@@ -185,7 +178,6 @@ class TestRoleServiceDeletion:
         self.mock_repo = mock.AsyncMock(spec=RoleRepositoryPort)
         self.service = RoleService(self.mock_repo)
 
-    @pytest.mark.asyncio
     async def test_delete_role_returns_true(self):
         """🔴 RED: delete_role should return True on success."""
         role_id = uuid4()
@@ -205,7 +197,6 @@ class TestRoleServiceDeletion:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_role_raises_error(self):
         """🔴 RED: Deleting non-existent role should raise RoleNotFoundError."""
         role_id = uuid4()
@@ -214,7 +205,6 @@ class TestRoleServiceDeletion:
         with pytest.raises(RoleNotFoundError):
             await self.service.delete_role(role_id)
 
-    @pytest.mark.asyncio
     async def test_delete_system_role_raises_error(self):
         """🔴 RED: Deleting system-reserved role should raise CannotDeleteSystemRoleError."""
         role_id = uuid4()
@@ -241,7 +231,6 @@ class TestRoleServiceUpdate:
         self.mock_repo = mock.AsyncMock(spec=RoleRepositoryPort)
         self.service = RoleService(self.mock_repo)
 
-    @pytest.mark.asyncio
     async def test_update_role_permissions(self):
         """🔴 RED: update_role should update permissions."""
         role_id = uuid4()
@@ -274,7 +263,6 @@ class TestRoleServiceUpdate:
 
         assert result.permissions == ("document:read", "document:write")
 
-    @pytest.mark.asyncio
     async def test_update_nonexistent_role_raises_error(self):
         """🔴 RED: Updating non-existent role should raise RoleNotFoundError."""
         role_id = uuid4()
@@ -283,7 +271,6 @@ class TestRoleServiceUpdate:
         with pytest.raises(RoleNotFoundError):
             await self.service.update_role(role_id, name="new_name")
 
-    @pytest.mark.asyncio
     async def test_add_permission_to_role(self):
         """🔴 RED: add_permission should add a single permission to existing permissions."""
         role_id = uuid4()

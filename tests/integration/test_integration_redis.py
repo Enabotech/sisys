@@ -9,7 +9,6 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import fakeredis.aioredis
-import pytest
 
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
@@ -48,7 +47,6 @@ def _create_public_blackboard(fake_redis: fakeredis.aioredis.FakeRedis) -> Redis
 
 
 class TestSessionStorageIntegration:
-    @pytest.mark.asyncio
     async def test_full_session_lifecycle(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = _create_session_storage(fake_redis)
@@ -69,7 +67,6 @@ class TestSessionStorageIntegration:
 
 
 class TestSemanticCacheIntegration:
-    @pytest.mark.asyncio
     async def test_cache_set_and_invalidate(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         cache = _create_semantic_cache(fake_redis)
@@ -82,7 +79,6 @@ class TestSemanticCacheIntegration:
         # Verify key deleted in fakeredis
         assert await fake_redis.exists(f"sisys:cache:semantic:{cache_key}") == 0
 
-    @pytest.mark.asyncio
     async def test_cache_hit_with_mocked_search(self) -> None:
         from src.infrastructure.utils import json_dumps
 
@@ -130,7 +126,6 @@ class TestSemanticCacheIntegration:
 
 
 class TestPublicBlackboardIntegration:
-    @pytest.mark.asyncio
     async def test_multi_agent_collaboration(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_public_blackboard(fake_redis)
@@ -165,7 +160,6 @@ class TestPublicBlackboardIntegration:
 
 
 class TestCombinedFlow:
-    @pytest.mark.asyncio
     async def test_full_agent_workflow(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = _create_session_storage(fake_redis)

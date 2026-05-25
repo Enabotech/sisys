@@ -5,8 +5,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
-
 from src.infrastructure.security.permission_service_impl import PermissionServiceImpl
 
 
@@ -23,7 +21,6 @@ class TestPermissionServiceImpl:
             role_repo=self.mock_role_repo,
         )
 
-    @pytest.mark.asyncio
     async def test_check_permission_has_permission(self):
         """User with matching role returns True."""
         role = MagicMock()
@@ -39,7 +36,6 @@ class TestPermissionServiceImpl:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_check_permission_no_permission(self):
         """User without matching role returns False."""
         role = MagicMock()
@@ -55,7 +51,6 @@ class TestPermissionServiceImpl:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_check_permission_wildcard_resource(self):
         """Role with *:* permission grants all access."""
         role = MagicMock()
@@ -71,7 +66,6 @@ class TestPermissionServiceImpl:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_check_permission_wildcard_action(self):
         """Role with resource:* permission grants all actions on resource."""
         role = MagicMock()
@@ -87,7 +81,6 @@ class TestPermissionServiceImpl:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_check_permission_no_roles(self):
         """User with no roles returns False."""
         self.mock_user_role_repo.get_user_roles.return_value = []
@@ -100,7 +93,6 @@ class TestPermissionServiceImpl:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_check_permission_multiple_roles_one_matches(self):
         """If any role has permission, returns True."""
         role1 = MagicMock()
@@ -119,7 +111,6 @@ class TestPermissionServiceImpl:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_get_user_permissions_returns_all_permissions(self):
         """get_user_permissions returns combined permissions from all roles."""
         role1 = MagicMock()
@@ -137,7 +128,6 @@ class TestPermissionServiceImpl:
         assert "agent:execute" in result
         assert len(result) == 3  # document:read only appears once (set)
 
-    @pytest.mark.asyncio
     async def test_get_user_permissions_no_roles(self):
         """get_user_permissions returns empty list when user has no roles."""
         self.mock_user_role_repo.get_user_roles.return_value = []

@@ -42,7 +42,6 @@ def intrusion_service() -> IntrusionDetectionServiceImpl:
 class TestSQLInjectionDetection:
     """SQL注入检测验证 (AC-4.1)"""
 
-    @pytest.mark.asyncio
     async def test_detect_basic_sql_injection(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -60,7 +59,6 @@ class TestSQLInjectionDetection:
             IntrusionSeverity.CRITICAL.value,
         ]
 
-    @pytest.mark.asyncio
     async def test_detect_union_sql_injection(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -74,7 +72,6 @@ class TestSQLInjectionDetection:
         assert result.detected is True
         assert result.attack_type == AttackType.SQL_INJECTION.value
 
-    @pytest.mark.asyncio
     async def test_detect_sql_injection_drop_table(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -89,7 +86,6 @@ class TestSQLInjectionDetection:
         assert result.attack_type == AttackType.SQL_INJECTION.value
         assert result.severity == IntrusionSeverity.CRITICAL.value
 
-    @pytest.mark.asyncio
     async def test_no_false_positive_normal_query(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -107,7 +103,6 @@ class TestSQLInjectionDetection:
 class TestXSSDetection:
     """XSS攻击检测验证 (AC-4.2)"""
 
-    @pytest.mark.asyncio
     async def test_detect_script_tag_xss(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -121,7 +116,6 @@ class TestXSSDetection:
         assert result.detected is True
         assert result.attack_type == AttackType.XSS.value
 
-    @pytest.mark.asyncio
     async def test_detect_onclick_xss(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -135,7 +129,6 @@ class TestXSSDetection:
         assert result.detected is True
         assert result.attack_type == AttackType.XSS.value
 
-    @pytest.mark.asyncio
     async def test_detect_javascript_protocol_xss(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -153,7 +146,6 @@ class TestXSSDetection:
 class TestBruteForceDetection:
     """暴力破解检测验证 (AC-4.3)"""
 
-    @pytest.mark.asyncio
     async def test_detect_brute_force_from_same_ip(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -181,7 +173,6 @@ class TestBruteForceDetection:
 class TestCommandInjectionDetection:
     """命令注入检测验证"""
 
-    @pytest.mark.asyncio
     async def test_detect_command_injection_pipe(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -195,7 +186,6 @@ class TestCommandInjectionDetection:
         assert result.detected is True
         assert result.attack_type == AttackType.COMMAND_INJECTION.value
 
-    @pytest.mark.asyncio
     async def test_detect_command_injection_backticks(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -213,7 +203,6 @@ class TestCommandInjectionDetection:
 class TestPathTraversalDetection:
     """路径遍历检测验证"""
 
-    @pytest.mark.asyncio
     async def test_detect_path_traversal_dotdot(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -227,7 +216,6 @@ class TestPathTraversalDetection:
         assert result.detected is True
         assert result.attack_type == AttackType.PATH_TRAVERSAL.value
 
-    @pytest.mark.asyncio
     async def test_detect_path_traversal_encoded(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -245,7 +233,6 @@ class TestPathTraversalDetection:
 class TestRateLimitViolationDetection:
     """速率限制违规检测验证"""
 
-    @pytest.mark.asyncio
     async def test_detect_rate_limit_violation(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -272,7 +259,6 @@ class TestRateLimitViolationDetection:
 class TestIntrusionStats:
     """入侵统计数据验证 (AC-4.4)"""
 
-    @pytest.mark.asyncio
     async def test_get_intrusion_stats_returns_stats(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -289,7 +275,6 @@ class TestIntrusionStats:
 class TestIPBlocking:
     """IP阻断机制验证 (AC-4.6)"""
 
-    @pytest.mark.asyncio
     async def test_block_ip_returns_true(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -302,7 +287,6 @@ class TestIPBlocking:
         )
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_blocked_ip_in_stats(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -316,7 +300,6 @@ class TestIPBlocking:
         stats = await intrusion_service.get_intrusion_stats(period_hours=24)
         assert "10.0.0.50" in stats.blocked_ips
 
-    @pytest.mark.asyncio
     async def test_blocked_ip_detection_action(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,
@@ -339,7 +322,6 @@ class TestIPBlocking:
 class TestDetectionResultStructure:
     """检测结果结构验证"""
 
-    @pytest.mark.asyncio
     async def test_detection_result_has_required_fields(
         self,
         intrusion_service: IntrusionDetectionServiceImpl,

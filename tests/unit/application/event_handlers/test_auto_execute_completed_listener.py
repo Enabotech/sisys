@@ -18,7 +18,6 @@ class TestAutoExecuteCompletedListener:
         publisher.publish = AsyncMock()
         return publisher
 
-    @pytest.mark.asyncio
     async def test_on_executed_publishes_tool_executed(self, mock_publisher: MagicMock) -> None:
         """RED: on_executed should publish ToolExecuted for business_event_type=ToolExecuted."""
         listener = AutoExecuteCompletedHandler(publisher=mock_publisher)
@@ -36,7 +35,6 @@ class TestAutoExecuteCompletedListener:
         published_event = call_args[0][0]
         assert published_event.event_type == "ToolExecuted"
 
-    @pytest.mark.asyncio
     async def test_on_executed_publishes_document_processed(self, mock_publisher: MagicMock) -> None:
         """RED: on_executed should publish DocumentProcessed for business_event_type=DocumentProcessed."""
         listener = AutoExecuteCompletedHandler(publisher=mock_publisher)
@@ -54,7 +52,6 @@ class TestAutoExecuteCompletedListener:
         published_event = call_args[0][0]
         assert published_event.event_type == "DocumentProcessed"
 
-    @pytest.mark.asyncio
     async def test_on_executed_publishes_agent_decided(self, mock_publisher: MagicMock) -> None:
         """RED: on_executed should publish AgentDecided for business_event_type=AgentDecided."""
         listener = AutoExecuteCompletedHandler(publisher=mock_publisher)
@@ -72,7 +69,6 @@ class TestAutoExecuteCompletedListener:
         published_event = call_args[0][0]
         assert published_event.event_type == "AgentDecided"
 
-    @pytest.mark.asyncio
     async def test_on_executed_defaults_to_tool_executed(self, mock_publisher: MagicMock) -> None:
         """RED: on_executed should default to ToolExecuted for unknown business_event_type."""
         listener = AutoExecuteCompletedHandler(publisher=mock_publisher)
@@ -90,7 +86,6 @@ class TestAutoExecuteCompletedListener:
         published_event = call_args[0][0]
         assert published_event.event_type == "ToolExecuted"
 
-    @pytest.mark.asyncio
     async def test_on_executed_with_unknown_type_logs_warning(self) -> None:
         """Coverage: unknown business_event_type logs warning and defaults (lines 68-69)."""
         mock_publisher = MagicMock()
@@ -109,7 +104,6 @@ class TestAutoExecuteCompletedListener:
 
         mock_publisher.publish.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_publish_without_publisher_logs_warning(self) -> None:
         """Coverage: _publish without publisher logs warning (lines 117-118)."""
         listener = AutoExecuteCompletedHandler(publisher=None)
@@ -125,7 +119,6 @@ class TestAutoExecuteCompletedListener:
         # Should not raise, just log warning
         await listener._publish(event)
 
-    @pytest.mark.asyncio
     async def test_publish_handles_exception(self, mock_publisher: MagicMock) -> None:
         """Coverage: _publish exception handler (lines 123-125)."""
         mock_publisher.publish = AsyncMock(side_effect=Exception("publish failed"))

@@ -141,7 +141,6 @@ class TestOutboxEntityInvalidStateTransitionError:
 class TestOutboxRepositoryMockBehavior:
     """Mock behavior tests — verify OutboxRepository Protocol contract via spec约束."""
 
-    @pytest.mark.asyncio
     async def test_mock_save_verified(self):
         """Mock save should be verifiable."""
         from unittest.mock import AsyncMock
@@ -163,7 +162,6 @@ class TestOutboxRepositoryMockBehavior:
         await mock.save(event)
         mock.save.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_mock_get_unpublished_verified(self):
         """Mock get_unpublished should be verifiable."""
         from unittest.mock import AsyncMock
@@ -175,7 +173,6 @@ class TestOutboxRepositoryMockBehavior:
         assert result == []
         mock.get_unpublished.assert_called_once_with(10)
 
-    @pytest.mark.asyncio
     async def test_mock_mark_published_verified(self):
         """Mock mark_published should be verifiable."""
         from unittest.mock import AsyncMock
@@ -188,7 +185,6 @@ class TestOutboxRepositoryMockBehavior:
         await mock.mark_published(event_id)
         mock.mark_published.assert_called_once_with(event_id)
 
-    @pytest.mark.asyncio
     async def test_mock_mark_failed_verified(self):
         """Mock mark_failed should be verifiable."""
         from unittest.mock import AsyncMock

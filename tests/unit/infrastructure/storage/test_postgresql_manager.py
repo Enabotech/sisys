@@ -58,7 +58,6 @@ class TestPostgreSQLManager:
         engine2 = engine.get_sync_engine()
         assert engine1 is engine2
 
-    @pytest.mark.asyncio
     async def test_health_check_success(self, engine):
         """测试健康检查成功"""
         with mock.patch.object(engine, "get_async_engine") as mock_get:
@@ -78,7 +77,6 @@ class TestPostgreSQLManager:
             result = await engine.health_check()
             assert result is True
 
-    @pytest.mark.asyncio
     async def test_health_check_failure(self, engine):
         """测试健康检查失败"""
         with mock.patch.object(engine, "get_async_engine") as mock_get:
@@ -87,7 +85,6 @@ class TestPostgreSQLManager:
             result = await engine.health_check()
             assert result is False
 
-    @pytest.mark.asyncio
     async def test_close_disposes_engines(self, config):
         """测试关闭引擎"""
         engine = PostgreSQLManager(config)

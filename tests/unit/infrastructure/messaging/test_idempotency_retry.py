@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import fakeredis.aioredis
-import pytest
 import redis.asyncio as aioredis
 
 from src.domain.events import DocumentProcessed
@@ -35,7 +34,6 @@ def _make_event():
 class TestIdempotencyChecker:
     """IdempotencyChecker tests using fakeredis."""
 
-    @pytest.mark.asyncio
     async def test_try_acquire_returns_true_first_time(self):
         """try_acquire should return True on first call."""
         checker = IdempotencyChecker(redis_client=fakeredis.aioredis.FakeRedis())
@@ -43,7 +41,6 @@ class TestIdempotencyChecker:
         result = await checker.try_acquire(event_id)
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_try_acquire_returns_false_second_time(self):
         """try_acquire should return False on duplicate call."""
         fake_redis = fakeredis.aioredis.FakeRedis()
@@ -55,7 +52,6 @@ class TestIdempotencyChecker:
         checker2 = IdempotencyChecker(redis_client=fake_redis)
         assert await checker2.try_acquire(event_id) is False
 
-    @pytest.mark.asyncio
     async def test_try_acquire_uses_default_ttl(self):
         """try_acquire should use default 7-day TTL."""
         checker = IdempotencyChecker(redis_client=fakeredis.aioredis.FakeRedis())
@@ -66,7 +62,6 @@ class TestIdempotencyChecker:
         redis_client = checker._redis
         assert await redis_client.exists(f"idempotency:{event_id}") == 1
 
-    @pytest.mark.asyncio
     async def test_try_acquire_fail_open_on_connection_error(self):
         """try_acquire should return True (fail-open) on Redis connection error."""
         # Create a checker with a mock Redis that raises ConnectionError
@@ -79,7 +74,6 @@ class TestIdempotencyChecker:
         result = await checker.try_acquire(uuid4())
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_try_acquire_fail_open_on_timeout_error(self):
         """try_acquire should return True (fail-open) on Redis timeout error."""
         mock_redis = MagicMock()
@@ -91,7 +85,6 @@ class TestIdempotencyChecker:
         result = await checker.try_acquire(uuid4())
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_concurrent_try_acquire_only_one_succeeds(self):
         """Concurrent try_acquire calls should only return True once."""
         fake_redis = fakeredis.aioredis.FakeRedis()
@@ -204,7 +197,6 @@ class TestRetryPolicy:
 class TestDeadLetterQueue:
     """DeadLetterQueue tests."""
 
-    @pytest.mark.asyncio
     async def test_enqueue_adds_event(self):
         """enqueue should add event to DLQ."""
         dlq = InMemoryDeadLetterQueue()
@@ -213,7 +205,6 @@ class TestDeadLetterQueue:
 
         assert len(dlq) == 1
 
-    @pytest.mark.asyncio
     async def test_dequeue_removes_event(self):
         """dequeue should remove and return event."""
         dlq = InMemoryDeadLetterQueue()
@@ -225,14 +216,12 @@ class TestDeadLetterQueue:
         assert error == "error message"
         assert len(dlq) == 0
 
-    @pytest.mark.asyncio
     async def test_dequeue_empty_returns_none(self):
         """dequeue on empty DLQ should return None."""
         dlq = InMemoryDeadLetterQueue()
         result = await dlq.dequeue()
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_fifo_order(self):
         """DLQ should follow FIFO order."""
         dlq = InMemoryDeadLetterQueue()

@@ -81,13 +81,11 @@ class TestEventRegistry:
 class TestIdempotencyAndRetry:
     """Verify idempotency checker and retry policy at smoke level."""
 
-    @pytest.mark.asyncio
     async def test_idempotency_try_acquire_atomic(self, idempotency_checker: IdempotencyChecker, event_id: UUID) -> None:
         """try_acquire should be atomic — only first call succeeds."""
         assert await idempotency_checker.try_acquire(event_id) is True
         assert await idempotency_checker.try_acquire(event_id) is False
 
-    @pytest.mark.asyncio
     async def test_idempotency_different_events_independent(self, idempotency_checker: IdempotencyChecker) -> None:
         """Different event IDs should be independent."""
         id1 = uuid4()

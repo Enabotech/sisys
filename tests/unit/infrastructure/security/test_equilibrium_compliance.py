@@ -63,7 +63,6 @@ def compliance_verifier() -> EquilibriumComplianceVerifier:
 class TestIdentityAuthenticationVerification:
     """身份鉴别验证 (SC-1)"""
 
-    @pytest.mark.asyncio
     async def test_verify_identity_authentication(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -74,7 +73,6 @@ class TestIdentityAuthenticationVerification:
         assert result.domain == "identity_authentication"
         assert result.status in [ComplianceStatus.COMPLIANT, ComplianceStatus.NON_COMPLIANT]
 
-    @pytest.mark.asyncio
     async def test_identity_auth_checks_password_policy(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -89,7 +87,6 @@ class TestIdentityAuthenticationVerification:
 class TestAccessControlVerification:
     """访问控制验证 (SC-2)"""
 
-    @pytest.mark.asyncio
     async def test_verify_access_control(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -99,7 +96,6 @@ class TestAccessControlVerification:
         assert isinstance(result, SecurityDomainResult)
         assert result.domain == "access_control"
 
-    @pytest.mark.asyncio
     async def test_access_control_checks_rbac(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -113,7 +109,6 @@ class TestAccessControlVerification:
 class TestSecurityAuditVerification:
     """安全审计验证 (SC-3)"""
 
-    @pytest.mark.asyncio
     async def test_verify_security_audit(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -123,7 +118,6 @@ class TestSecurityAuditVerification:
         assert isinstance(result, SecurityDomainResult)
         assert result.domain == "security_audit"
 
-    @pytest.mark.asyncio
     async def test_audit_checks_event_recording(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -137,7 +131,6 @@ class TestSecurityAuditVerification:
 class TestIntrusionPreventionVerification:
     """入侵防范验证 (SC-4)"""
 
-    @pytest.mark.asyncio
     async def test_verify_intrusion_prevention(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -147,7 +140,6 @@ class TestIntrusionPreventionVerification:
         assert isinstance(result, SecurityDomainResult)
         assert result.domain == "intrusion_prevention"
 
-    @pytest.mark.asyncio
     async def test_intrusion_checks_detection_capability(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -161,7 +153,6 @@ class TestIntrusionPreventionVerification:
 class TestDataIntegrityVerification:
     """数据完整性验证 (SC-5)"""
 
-    @pytest.mark.asyncio
     async def test_verify_data_integrity(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -171,7 +162,6 @@ class TestDataIntegrityVerification:
         assert isinstance(result, SecurityDomainResult)
         assert result.domain == "data_integrity"
 
-    @pytest.mark.asyncio
     async def test_integrity_checks_checksum(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -185,7 +175,6 @@ class TestDataIntegrityVerification:
 class TestBackupRecoveryVerification:
     """备份恢复验证 (SC-6)"""
 
-    @pytest.mark.asyncio
     async def test_verify_backup_recovery(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -195,7 +184,6 @@ class TestBackupRecoveryVerification:
         assert isinstance(result, SecurityDomainResult)
         assert result.domain == "backup_recovery"
 
-    @pytest.mark.asyncio
     async def test_backup_checks_mechanism(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -209,7 +197,6 @@ class TestBackupRecoveryVerification:
 class TestComprehensiveReport:
     """合规报告生成验证 (SC-7)"""
 
-    @pytest.mark.asyncio
     async def test_generate_compliance_report(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -221,7 +208,6 @@ class TestComprehensiveReport:
         assert isinstance(report.results, list)
         assert len(report.results) == report.total_domains
 
-    @pytest.mark.asyncio
     async def test_report_contains_all_domains(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -236,7 +222,6 @@ class TestComprehensiveReport:
         assert "data_integrity" in domains
         assert "backup_recovery" in domains
 
-    @pytest.mark.asyncio
     async def test_report_has_compliance_score(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -246,7 +231,6 @@ class TestComprehensiveReport:
         assert hasattr(report, "compliance_score")
         assert 0.0 <= report.compliance_score <= 1.0
 
-    @pytest.mark.asyncio
     async def test_report_has_summary(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,
@@ -261,7 +245,6 @@ class TestComprehensiveReport:
 class TestSecurityDomainResultStructure:
     """安全层面结果结构验证"""
 
-    @pytest.mark.asyncio
     async def test_result_has_required_fields(
         self,
         compliance_verifier: EquilibriumComplianceVerifier,

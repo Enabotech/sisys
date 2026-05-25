@@ -89,7 +89,6 @@ class TestSemanticRouter:
         """Create SemanticRouter with test candidates."""
         return SemanticRouter(candidates=[cfo_candidate, ceo_candidate, cto_candidate])
 
-    @pytest.mark.asyncio
     async def test_route_returns_best_match(self, semantic_router: SemanticRouter) -> None:
         """Route should return highest similarity candidate."""
         # Without embedding model, all candidates get 0.0 score
@@ -99,7 +98,6 @@ class TestSemanticRouter:
         assert target == "cfo-agent"  # First candidate since all scores are 0
         assert score == 0.0
 
-    @pytest.mark.asyncio
     async def test_route_with_empty_candidates(self) -> None:
         """Route with no candidates should return empty tuple."""
         router = SemanticRouter(candidates=[])
@@ -107,7 +105,6 @@ class TestSemanticRouter:
         assert target == ""
         assert score == 0.0
 
-    @pytest.mark.asyncio
     async def test_route_without_embedding_model(self, cfo_candidate: Candidate) -> None:
         """Route without embedding model returns zero similarity."""
         router = SemanticRouter(candidates=[cfo_candidate])
@@ -115,7 +112,6 @@ class TestSemanticRouter:
         assert target == "cfo-agent"
         assert score == 0.0
 
-    @pytest.mark.asyncio
     async def test_route_with_empty_task_context(self) -> None:
         """Route with empty task context returns empty target."""
         router = SemanticRouter(
@@ -132,7 +128,6 @@ class TestSemanticRouter:
         assert target == ""
         assert score == 0.0
 
-    @pytest.mark.asyncio
     async def test_route_with_embedding_model(
         self,
         cfo_candidate: Candidate,
@@ -239,7 +234,6 @@ class TestSemanticRouter:
         score = SemanticRouter._cosine_similarity([0.0, 0.0], [1.0, 2.0])
         assert score == 0.0
 
-    @pytest.mark.asyncio
     async def test_embedding_cache(self, cfo_candidate: Candidate) -> None:
         """Same text should be cached and not re-embedded."""
         mock_model = AsyncMock(spec=EmbeddingModelProtocol)
@@ -256,7 +250,6 @@ class TestSemanticRouter:
         await router._get_task_embedding(task_text)
         assert mock_model.embed.call_count == 1  # Still 1, not 2
 
-    @pytest.mark.asyncio
     async def test_cache_size_limit(self) -> None:
         """Cache should not exceed MAX_CACHE_SIZE."""
         router = SemanticRouter()
@@ -270,7 +263,6 @@ class TestSemanticRouter:
         router._embedding_cache[f"text-{SemanticRouter.MAX_CACHE_SIZE}"] = [0.1] * 1024
         assert len(router._embedding_cache) == SemanticRouter.MAX_CACHE_SIZE
 
-    @pytest.mark.asyncio
     async def test_route_with_real_semantic_matching(
         self,
         cfo_candidate: Candidate,
@@ -295,7 +287,6 @@ class TestSemanticRouter:
         assert target == "cfo-agent"
         assert score > 0.0
 
-    @pytest.mark.asyncio
     async def test_route_with_dict_description(self) -> None:
         """description 为 dict 类型时应转为字符串"""
         candidate = Candidate(
@@ -309,7 +300,6 @@ class TestSemanticRouter:
         # 没有 embedding model 所以 score=0，但不应报错
         assert target == "agent-1"
 
-    @pytest.mark.asyncio
     async def test_route_with_none_description_value(self) -> None:
         """description 为 None 时应跳过该字段"""
         candidate = Candidate(
@@ -322,7 +312,6 @@ class TestSemanticRouter:
         target, score = await router.route({"description": None, "task_type": "analysis"})
         assert target == "agent-1"
 
-    @pytest.mark.asyncio
     async def test_route_with_empty_string_description(self) -> None:
         """空字符串 description 应被跳过"""
         candidate = Candidate(
@@ -335,7 +324,6 @@ class TestSemanticRouter:
         target, score = await router.route({"description": ""})
         assert score == 0.0
 
-    @pytest.mark.asyncio
     async def test_route_none_init_creates_empty_router(self) -> None:
         """candidates=None 应创建空路由器"""
         router = SemanticRouter(candidates=None)
@@ -344,7 +332,6 @@ class TestSemanticRouter:
         assert target == ""
         assert score == 0.0
 
-    @pytest.mark.asyncio
     async def test_add_candidate_replaces_existing(self) -> None:
         """添加同 ID 候选应替换"""
         router = SemanticRouter()
@@ -377,7 +364,6 @@ class TestSemanticRouter:
         score = SemanticRouter._cosine_similarity(a, b)
         assert 0.0 <= abs(score) <= 1.0
 
-    @pytest.mark.asyncio
     async def test_get_task_embedding_no_model_returns_zeros(self) -> None:
         """无 embedding model 时应返回零向量"""
         router = SemanticRouter()
@@ -385,7 +371,6 @@ class TestSemanticRouter:
         assert len(embedding) == SemanticRouter.DEFAULT_EMBEDDING_DIM
         assert all(v == 0.0 for v in embedding)
 
-    @pytest.mark.asyncio
     async def test_get_task_embedding_model_returns_empty(self) -> None:
         """embedding model 返回空列表时应回退零向量"""
         mock_model = AsyncMock(spec=EmbeddingModelProtocol)
@@ -401,7 +386,6 @@ class TestSemanticRouter:
         router.add_candidate(Candidate(candidate_id="a", name="A", description="a", embedding=[0.0]))
         assert router.candidate_count == 1
 
-    @pytest.mark.asyncio
     async def test_embedding_cache_not_exceeding_max(self) -> None:
         """缓存满时应淘汰最旧条目后添加新条目（LRU 淘汰）"""
         router = SemanticRouter()

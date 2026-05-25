@@ -31,7 +31,6 @@ class TestDeadLetterQueueIntegration:
         yield session
         reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_enqueue_integration(self, mock_session):
         """enqueue should persist DLQ entry to database via session."""
         from src.infrastructure.messaging.outbox.postgres_dead_letter_queue import (
@@ -56,7 +55,6 @@ class TestDeadLetterQueueIntegration:
         assert model.retry_count == 3
         assert model.status == "pending"
 
-    @pytest.mark.asyncio
     async def test_dequeue_integration(self, mock_session):
         """dequeue should retrieve and mark DLQ entry as processed."""
         from src.infrastructure.messaging.outbox.postgres_dead_letter_queue import (
@@ -96,7 +94,6 @@ class TestDeadLetterQueueIntegration:
         assert retries == 2
         assert mock_model.status == "processed"
 
-    @pytest.mark.asyncio
     async def test_get_all_integration(self, mock_session):
         """get_all should return all DLQ entries."""
         from src.infrastructure.messaging.outbox.postgres_dead_letter_queue import (
@@ -138,7 +135,6 @@ class TestDeadLetterQueueIntegration:
 
         assert len(entries) == 2
 
-    @pytest.mark.asyncio
     async def test_mark_action_taken_integration(self, mock_session):
         """mark_action_taken should update entry status and action."""
         from src.infrastructure.messaging.outbox.postgres_dead_letter_queue import (
@@ -176,7 +172,6 @@ class TestEventStoreIntegration:
         yield session
         reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_append_integration(self, mock_session):
         """append should persist event to event_store table."""
         from src.infrastructure.messaging.event_store import PostgreSQLEventStore
@@ -202,7 +197,6 @@ class TestEventStoreIntegration:
 
         assert mock_session.execute.call_count >= 1
 
-    @pytest.mark.asyncio
     async def test_get_events_integration(self, mock_session):
         """get_events should retrieve events for aggregate."""
         from src.infrastructure.messaging.event_store import PostgreSQLEventStore
@@ -219,7 +213,6 @@ class TestEventStoreIntegration:
 
         assert isinstance(events, list)
 
-    @pytest.mark.asyncio
     async def test_get_events_by_type_integration(self, mock_session):
         """get_events_by_type should filter events by type and time range."""
         from src.infrastructure.messaging.event_store import PostgreSQLEventStore
@@ -238,7 +231,6 @@ class TestEventStoreIntegration:
 
         assert isinstance(events, list)
 
-    @pytest.mark.asyncio
     async def test_version_conflict_raises_error_integration(self, mock_session):
         """append should raise VersionError on duplicate aggregate_id + version."""
         from src.infrastructure.messaging.event_store import PostgreSQLEventStore, VersionError

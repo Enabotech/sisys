@@ -32,7 +32,6 @@ def mock_qdrant_setup():
 class TestQdrantIntegration:
     """Qdrant 集成测试类"""
 
-    @pytest.mark.asyncio
     async def test_collection_lifecycle(self, mock_qdrant_setup):
         """测试 Collection 生命周期（创建→验证→删除）"""
         setup = mock_qdrant_setup
@@ -75,7 +74,6 @@ class TestQdrantIntegration:
         assert result is True
         assert mock_client.delete_collection.called
 
-    @pytest.mark.asyncio
     async def test_vector_point_storage(self, mock_qdrant_setup):
         """测试向量点存储端到端流程"""
         setup = mock_qdrant_setup
@@ -100,7 +98,6 @@ class TestQdrantIntegration:
         await storage.get_point("sisys:documents:finance", "point-1")
         mock_client.retrieve.assert_called()
 
-    @pytest.mark.asyncio
     async def test_dense_search_flow(self, mock_qdrant_setup):
         """测试 Dense 语义检索端到端流程"""
         setup = mock_qdrant_setup
@@ -119,7 +116,6 @@ class TestQdrantIntegration:
         assert len(results) == 1
         assert results[0]["score"] == 0.95
 
-    @pytest.mark.asyncio
     async def test_bm25_sparse_search_flow(self, mock_qdrant_setup):
         """测试 BM25 稀疏检索端到端流程"""
         setup = mock_qdrant_setup
@@ -142,7 +138,6 @@ class TestQdrantIntegration:
         assert len(results) == 1
         assert results[0]["id"] == "point-1"
 
-    @pytest.mark.asyncio
     async def test_multi_tenant_isolation(self, mock_qdrant_setup):
         """测试多租户隔离"""
         setup = mock_qdrant_setup
