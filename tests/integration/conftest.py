@@ -49,7 +49,7 @@ from tests.environments import get_test_env  # noqa: E402
 from tests.fixtures import reset_test_environment  # noqa: F401
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """自动为 integration 目录下的测试添加 marker
 
     1. 所有 integration 测试添加 @pytest.mark.integration
