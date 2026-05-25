@@ -360,6 +360,97 @@ class TestRoutingDecisionLogBoundaryValues:
             log.validate()
 
 
+class TestRoutingDecisionLogTokenFields:
+    """Token 消耗扩展字段测试（Story 1.19）"""
+
+    def test_token_fields_default_zero(self) -> None:
+        """Token 字段默认值应为 0（向后兼容）"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="local",
+            route_target="qwen2.5:7b",
+            route_score=1.0,
+        )
+        assert log.prompt_tokens == 0
+        assert log.completion_tokens == 0
+        assert log.total_tokens == 0
+
+    def test_token_fields_set(self) -> None:
+        """Token 字段应可正确赋值"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="cloud",
+            route_target="MiniMax-M2.7",
+            route_score=0.9,
+            prompt_tokens=512,
+            completion_tokens=1024,
+            total_tokens=1536,
+        )
+        assert log.prompt_tokens == 512
+        assert log.completion_tokens == 1024
+        assert log.total_tokens == 1536
+
+    def test_validate_prompt_tokens_negative(self) -> None:
+        """prompt_tokens < 0 应无效"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="local",
+            route_target="test",
+            route_score=1.0,
+            prompt_tokens=-1,
+        )
+        with pytest.raises(ValueError, match="prompt_tokens must be non-negative"):
+            log.validate()
+
+    def test_validate_completion_tokens_negative(self) -> None:
+        """completion_tokens < 0 应无效"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="local",
+            route_target="test",
+            route_score=1.0,
+            completion_tokens=-1,
+        )
+        with pytest.raises(ValueError, match="completion_tokens must be non-negative"):
+            log.validate()
+
+    def test_validate_total_tokens_negative(self) -> None:
+        """total_tokens < 0 应无效"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="local",
+            route_target="test",
+            route_score=1.0,
+            total_tokens=-1,
+        )
+        with pytest.raises(ValueError, match="total_tokens must be non-negative"):
+            log.validate()
+
+    def test_token_fields_do_not_break_existing_construction(self) -> None:
+        """已有构造方式不受影响（向后兼容）"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="hash",
+            route_target="node-A",
+            route_score=1.0,
+        )
+        log.validate()
+        assert log.cost_estimate == 0.0
+        assert log.prompt_tokens == 0
+
+
 class TestRoutingDecisionLogUDMRFields:
     """UDMR 扩展字段测试"""
 

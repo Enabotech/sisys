@@ -95,6 +95,27 @@ class MetricsPortImpl(MetricsPort):
         """更新事件处理速率"""
         self._business_metrics.update_processing_rate()
 
+    def record_token_usage(self, prompt: int, completion: int, model: str, route_type: str) -> None:
+        """记录 LLM Token 使用量
+
+        Args:
+            prompt: Prompt Token 数量
+            completion: Completion Token 数量
+            model: 模型名称
+            route_type: 路由类型
+        """
+        self._business_metrics.record_token_usage(prompt, completion, model, route_type)
+
+    def record_cost(self, cost: float, model: str, route_type: str) -> None:
+        """记录 LLM 调用成本（CNY）
+
+        Args:
+            cost: 本次调用成本（人民币元）
+            model: 模型名称
+            route_type: 路由类型
+        """
+        self._business_metrics.record_cost(cost, model, route_type)
+
     def get_hit_rate(self) -> float:
         """获取当前缓存命中率
 

@@ -12,9 +12,28 @@ Copyright:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from src.domain.entities.routing_decision_log import RoutingDecisionLog
+
+
+@dataclass(frozen=True)
+class CostSummary:
+    """成本聚合摘要
+
+    Attributes:
+        total_cost: 总成本（元）
+        total_prompt_tokens: 总 prompt Token 数
+        total_completion_tokens: 总 completion Token 数
+        record_count: 记录数
+    """
+
+    total_cost: float = 0.0
+    total_prompt_tokens: int = 0
+    total_completion_tokens: int = 0
+    record_count: int = 0
 
 
 @runtime_checkable
@@ -40,5 +59,23 @@ class RoutingDecisionLogRepository(Protocol):
 
         Returns:
             匹配的路由决策日志，未找到返回 None
+        """
+        ...
+
+    async def query_cost_summary(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        route_type: str | None = None,
+    ) -> CostSummary:
+        """按时间范围聚合查询成本摘要
+
+        Args:
+            start_time: 起始时间（含）
+            end_time: 结束时间（含）
+            route_type: 可选路由类型过滤
+
+        Returns:
+            成本聚合摘要
         """
         ...

@@ -36,6 +36,8 @@ class TestCloudModelConfig:
         assert cfg.enabled is True
         assert cfg.max_tokens is None
         assert cfg.temperature == 0.7
+        assert cfg.price_per_input_1k_tokens == 0.02
+        assert cfg.price_per_output_1k_tokens == 0.02
 
     def test_frozen(self) -> None:
         """应为不可变 dataclass."""
@@ -298,3 +300,81 @@ class TestUDMRConfig:
         with patch.dict(os.environ, env, clear=True):
             cfg = UDMRConfig.from_env()
         assert cfg.cloud_configs[0].temperature == 0.3
+
+
+class TestCloudModelConfigPricing:
+    """CloudModelConfig 定价字段测试（Story 1.19）."""
+
+    def test_pricing_default_values(self) -> None:
+        """定价默认值应为 ¥0.02/1K."""
+        cfg = CloudModelConfig()
+        assert cfg.price_per_input_1k_tokens == 0.02
+        assert cfg.price_per_output_1k_tokens == 0.02
+
+    def test_pricing_custom_values(self) -> None:
+        """自定义定价应正确."""
+        cfg = CloudModelConfig(
+            api_type="openai",
+            model="test",
+            price_per_input_1k_tokens=0.03,
+            price_per_output_1k_tokens=0.04,
+        )
+        assert cfg.price_per_input_1k_tokens == 0.03
+        assert cfg.price_per_output_1k_tokens == 0.04
+
+    def test_pricing_from_env(self) -> None:
+        """从环境变量解析定价."""
+        env = {
+            "UDMR_CLOUD_0_ENABLED": "true",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_ENDPOINT": "https://example.com",
+            "UDMR_CLOUD_0_API_KEY": "TESTING_DUMMY_KEY",
+            "UDMR_CLOUD_0_MODEL": "test-model",
+            "UDMR_CLOUD_0_PRICE_INPUT": "0.03",
+            "UDMR_CLOUD_0_PRICE_OUTPUT": "0.04",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            cfg = UDMRConfig.from_env()
+        cloud = cfg.cloud_configs[0]
+        assert cloud.price_per_input_1k_tokens == 0.03
+        assert cloud.price_per_output_1k_tokens == 0.04
+
+    def test_pricing_defaults_when_env_not_set(self) -> None:
+        """环境变量未设置时使用默认定价."""
+        env = {
+            "UDMR_CLOUD_0_ENABLED": "true",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_MODEL": "test-model",
+            "UDMR_CLOUD_0_API_KEY": "TESTING_DUMMY_KEY",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            cfg = UDMRConfig.from_env()
+        cloud = cfg.cloud_configs[0]
+        assert cloud.price_per_input_1k_tokens == 0.02
+        assert cloud.price_per_output_1k_tokens == 0.02
+
+    def test_pricing_negative_raises(self) -> None:
+        """负定价应抛出 ValueError."""
+        env = {
+            "UDMR_CLOUD_0_ENABLED": "true",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_MODEL": "test-model",
+            "UDMR_CLOUD_0_API_KEY": "TESTING_DUMMY_KEY",
+            "UDMR_CLOUD_0_PRICE_INPUT": "-0.01",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(ValueError, match="PRICE_INPUT"):
+                UDMRConfig.from_env()
+
+    def test_pricing_output_negative_raises(self) -> None:
+        """负输出定价应抛出 ValueError."""
+        env = {
+            "UDMR_CLOUD_0_ENABLED": "true",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_MODEL": "test-model",
+            "UDMR_CLOUD_0_API_KEY": "TESTING_DUMMY_KEY",
+            "UDMR_CLOUD_0_PRICE_OUTPUT": "-0.01",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(ValueError, match="PRICE_OUTPUT"):
+                UDMRConfig.from_env()

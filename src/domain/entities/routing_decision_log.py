@@ -62,6 +62,10 @@ class RoutingDecisionLog:
     selected_model: str = ""  # Selected model for UDMR (local/cloud)
     cost_actual: float = 0.0  # Actual cost in USD
     fallback_reason: str | None = None  # Fallback reason for UDMR
+    # Token consumption fields (Story 1.19)
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
 
     def validate(self) -> None:
         """验证不变量约束
@@ -93,3 +97,10 @@ class RoutingDecisionLog:
             raise ValueError(
                 f"fallback_reason must be one of: timeout, unavailable, health_check_failed. Got: {self.fallback_reason}"
             )
+        # Token fields validation (Story 1.19)
+        if self.prompt_tokens < 0:
+            raise ValueError(f"prompt_tokens must be non-negative. Got: {self.prompt_tokens}")
+        if self.completion_tokens < 0:
+            raise ValueError(f"completion_tokens must be non-negative. Got: {self.completion_tokens}")
+        if self.total_tokens < 0:
+            raise ValueError(f"total_tokens must be non-negative. Got: {self.total_tokens}")
