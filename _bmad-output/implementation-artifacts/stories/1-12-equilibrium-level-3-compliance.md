@@ -949,7 +949,7 @@ sisys/
 6. [x] 5轮系统性审查完成，所有P0问题已修复
 7. [x] Task 0-4 全部实现完成（端口定义 + 服务实现 + 测试通过）
 8. [x] Task 5 基础验证完成（Subtask 5.1-5.19）
-9. [x] `src/interfaces/api/security.py` 已创建（API路由完整）
+9. [x] `src/interfaces/api/equilibrium_security.py` 已创建（API路由完整）
 10. [ ] Epic 13 阻塞项待后续实现（AES-256/容器安全/接口安全）
 
 ### 下一步 Next Steps
