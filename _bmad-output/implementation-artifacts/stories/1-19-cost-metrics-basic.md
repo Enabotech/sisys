@@ -838,7 +838,7 @@ export UDMR_CLOUD_1_PRICE_OUTPUT=0.02
 
 ### 下一步 Next Steps
 
-- [x] Story created with `ready-for-dev` status
+- [x] Story created with `done` status
 - [x] 运行 `dev-story` 开始实施
 - [x] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）

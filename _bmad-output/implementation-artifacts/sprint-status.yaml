@@ -94,7 +94,7 @@ development_status:
   1-17-udmr-basic-routing: done
   1-18a-prefect-workflow-integration: done
   1-18b-langgraph-agent-orchestration: done
-  1-19-cost-metrics-basic: ready-for-dev
+  1-19-cost-metrics-basic: done
   epic-1-retrospective: optional
 
   # ===========================================================================
