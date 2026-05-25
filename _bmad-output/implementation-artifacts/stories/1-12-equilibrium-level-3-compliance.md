@@ -904,7 +904,7 @@ sisys/
 | `src/infrastructure/security/storage_encryption_service_impl.py` | StorageEncryptionServiceImpl 实现 | Task 5 (Subtask 5.21) |
 | `src/infrastructure/security/api_security_service_impl.py` | APISecurityServiceImpl 实现 | Task 5 (Subtask 5.25) |
 | `src/infrastructure/security/container_security_service_impl.py` | ContainerSecurityServiceImpl 实现 | Task 5 (Subtask 5.23) |
-| `src/interfaces/api/security.py` | 安全监控 API 路由 | Task 0 | ✅ 已创建 |
+| `src/interfaces/api/equilibrium_security.py` | 等保合规安全 API 路由 | Task 0 | ✅ 已创建 |
 | `src/composition_root.py` | 端口注册（新增5个端口） | Task 0 (Subtask 0.10/0.13/0.16) |
 | `tests/unit/infrastructure/security/test_intrusion_detection_service.py` | 入侵检测服务测试 | Task 2 |
 | `tests/unit/infrastructure/security/test_data_integrity_service.py` | 数据完整性服务测试 | Task 3 |
