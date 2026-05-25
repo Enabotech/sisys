@@ -328,16 +328,16 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、端口契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 定义 TokenEstimatorPort 端口（`src/domain/ports/token_estimator.py`）
-- [ ] Subtask 0.2: 定义端口契约测试（`tests/contracts/test_port_contract_token_estimator.py`）
-- [ ] Subtask 0.3: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_cost_metrics_basic.feature`
-- [ ] Subtask 0.4: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_cost_metrics_basic.py`
-- [ ] Subtask 0.5: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义 TokenEstimatorPort 端口（`src/domain/ports/token_estimator.py`）
+- [x] Subtask 0.2: 定义端口契约测试（`tests/contracts/test_port_contract_token_estimator.py`）
+- [x] Subtask 0.3: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_cost_metrics_basic.feature`
+- [x] Subtask 0.4: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_cost_metrics_basic.py`
+- [x] Subtask 0.5: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 端口契约测试通过（验证 Protocol 结构）
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 端口契约测试通过（验证 Protocol 结构）
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -353,12 +353,12 @@
 | 🟢 绿 | 实现 `src/domain/value_objects/token_consumption.py`（TokenConsumption frozen dataclass） |
 | 🔄 重构 | 优化不变量校验，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 TokenConsumption 失败测试
+- [x] Subtask 1.1: 🔴 红 — 编写 TokenConsumption 失败测试
   - total_tokens 必须等于 prompt_tokens + completion_tokens（不变量）
   - 所有字段非负
   - frozen 验证
-- [ ] Subtask 1.2: 🟢 绿 — 实现 TokenConsumption frozen dataclass
-- [ ] Subtask 1.3: 🔄 重构 — 优化不变量校验
+- [x] Subtask 1.2: 🟢 绿 — 实现 TokenConsumption frozen dataclass
+- [x] Subtask 1.3: 🔄 重构 — 优化不变量校验
 
 #### TDD 循环 [B]：RoutingDecided/Log 扩展
 
@@ -368,21 +368,21 @@
 | 🟢 绿 | 扩展 `src/domain/events/routing_events.py` 和 `src/domain/entities/routing_decision_log.py` |
 | 🔄 重构 | 确保向后兼容，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写 RoutingDecided 扩展字段测试
+- [x] Subtask 1.4: 🔴 红 — 编写 RoutingDecided 扩展字段测试
   - 新增 prompt_tokens/completion_tokens/total_tokens/cost_actual 字段
   - 默认值为 0/0.0（向后兼容）
-- [ ] Subtask 1.5: 🔴 红 — 编写 RoutingDecisionLog 扩展字段测试
+- [x] Subtask 1.5: 🔴 红 — 编写 RoutingDecisionLog 扩展字段测试
   - 新增 prompt_tokens/completion_tokens/total_tokens 字段
   - validate() 新增非负校验
-- [ ] Subtask 1.6: 🟢 绿 — 扩展事件和实体字段
-- [ ] Subtask 1.7: 🔄 重构 — 确保向后兼容
+- [x] Subtask 1.6: 🟢 绿 — 扩展事件和实体字段
+- [x] Subtask 1.7: 🔄 重构 — 确保向后兼容
 
 **完成标准/Definition of Done:**
-- [ ] TokenConsumption frozen dataclass 实现完成
-- [ ] RoutingDecided 新增 4 个字段（向后兼容）
-- [ ] RoutingDecisionLog 新增 3 个字段（向后兼容）
-- [ ] 已有测试不受影响
-- [ ] TDD 循环全部通过
+- [x] TokenConsumption frozen dataclass 实现完成
+- [x] RoutingDecided 新增 4 个字段（向后兼容）
+- [x] RoutingDecisionLog 新增 3 个字段（向后兼容）
+- [x] 已有测试不受影响
+- [x] TDD 循环全部通过
 
 ---
 
@@ -398,16 +398,16 @@
 | 🟢 绿 | 实现 `src/domain/services/cost_calculator.py`（CostCalculator 领域服务） |
 | 🔄 重构 | 优化计算逻辑，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 CostCalculator 失败测试
+- [x] Subtask 2.1: 🔴 红 — 编写 CostCalculator 失败测试
   - 本地路由成本：256 prompt × ¥0.002/1K + 512 completion × ¥0.002/1K = ¥0.001536
   - 云端路由成本：512 prompt × ¥0.02/1K + 1024 completion × ¥0.02/1K = ¥0.03072
   - 零 token 输入 → 成本为 0.0
   - 未匹配模型 → 使用默认定价
-- [ ] Subtask 2.2: 🟢 绿 — 实现 CostCalculator
+- [x] Subtask 2.2: 🟢 绿 — 实现 CostCalculator
   - 构造器注入原始值：local_input_price, local_output_price, cloud_input_price, cloud_output_price, model_pricing_map
   - calculate(token_consumption, route_type, model) -> float
   - 成本公式: `(prompt × input_price + completion × output_price) / 1000`
-- [ ] Subtask 2.3: 🔄 重构 — 优化计算逻辑
+- [x] Subtask 2.3: 🔄 重构 — 优化计算逻辑
 
 #### TDD 循环 [B]：CloudModelConfig 定价字段扩展
 
@@ -417,18 +417,18 @@
 | 🟢 绿 | 扩展 `src/infrastructure/config/udmr.py`（CloudModelConfig 新增字段） |
 | 🔄 重构 | 确保 from_env() 向后兼容 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写 CloudModelConfig 定价解析失败测试
+- [x] Subtask 2.4: 🔴 红 — 编写 CloudModelConfig 定价解析失败测试
   - 解析 `UDMR_CLOUD_0_PRICE_INPUT` 和 `UDMR_CLOUD_0_PRICE_OUTPUT`
   - 默认值 ¥0.02/1K
   - 非负校验
-- [ ] Subtask 2.5: 🟢 绿 — 扩展 CloudModelConfig
-- [ ] Subtask 2.6: 🔄 重构 — 确保 from_env() 向后兼容
+- [x] Subtask 2.5: 🟢 绿 — 扩展 CloudModelConfig
+- [x] Subtask 2.6: 🔄 重构 — 确保 from_env() 向后兼容
 
 **完成标准/Definition of Done:**
-- [ ] CostCalculator 实现完成
-- [ ] CloudModelConfig 扩展 2 个定价字段（向后兼容）
-- [ ] 成本计算准确率 100%
-- [ ] TDD 循环全部通过
+- [x] CostCalculator 实现完成
+- [x] CloudModelConfig 扩展 2 个定价字段（向后兼容）
+- [x] 成本计算准确率 100%
+- [x] TDD 循环全部通过
 
 ---
 
@@ -444,12 +444,12 @@
 | 🟢 绿 | 实现 `src/infrastructure/monitoring/static_token_estimator.py` |
 | 🔄 重构 | 优化估算逻辑 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 StaticTokenEstimator 失败测试
+- [x] Subtask 3.1: 🔴 红 — 编写 StaticTokenEstimator 失败测试
   - 本地模型估算: prompt=256, completion=512
   - 云端模型估算: prompt=512, completion=1024
   - 实现 TokenEstimatorPort（check + close 可选）
-- [ ] Subtask 3.2: 🟢 绿 — 实现 StaticTokenEstimator
-- [ ] Subtask 3.3: 🔄 重构 — 优化估算逻辑
+- [x] Subtask 3.2: 🟢 绿 — 实现 StaticTokenEstimator
+- [x] Subtask 3.3: 🔄 重构 — 优化估算逻辑
 
 #### TDD 循环 [B]：MetricsPort 扩展 + Prometheus 指标
 
@@ -459,13 +459,13 @@
 | 🟢 绿 | 扩展 `src/application/ports/metrics_port.py` + `src/infrastructure/monitoring/metrics_port_impl.py` + `src/infrastructure/monitoring/business_metrics.py` |
 | 🔄 重构 | 优化指标收集 |
 
-- [ ] Subtask 3.4: 🔴 红 — 编写 MetricsPort 扩展失败测试
+- [x] Subtask 3.4: 🔴 红 — 编写 MetricsPort 扩展失败测试
   - record_token_usage(prompt, completion, model, route_type)
   - record_cost(cost, model, route_type)
   - Prometheus Counter: sisys_token_prompt_total, sisys_token_completion_total（按 model/route_type 标签）
   - Prometheus Gauge: sisys_cost_total_cny, sisys_cost_by_model_cny（按 model 标签）
-- [ ] Subtask 3.5: 🟢 绿 — 扩展 MetricsPort 接口和实现
-- [ ] Subtask 3.6: 🔄 重构 — 优化指标收集
+- [x] Subtask 3.5: 🟢 绿 — 扩展 MetricsPort 接口和实现
+- [x] Subtask 3.6: 🔄 重构 — 优化指标收集
 
 #### TDD 循环 [C]：RoutingDecisionLogRepository 聚合查询扩展
 
@@ -475,18 +475,18 @@
 | 🟢 绿 | 扩展 `src/domain/ports/routing_decision_log_repository.py` + `src/infrastructure/messaging/inmemory_routing_decision_log_repository.py` |
 | 🔄 重构 | 优化聚合逻辑 |
 
-- [ ] Subtask 3.7: 🔴 红 — 编写聚合查询失败测试
+- [x] Subtask 3.7: 🔴 红 — 编写聚合查询失败测试
   - query_cost_summary(start_time, end_time, route_type=None) -> CostSummary
   - CostSummary 包含: total_cost, total_prompt_tokens, total_completion_tokens, record_count
-- [ ] Subtask 3.8: 🟢 绿 — 扩展 Repository 端口和实现
-- [ ] Subtask 3.9: 🔄 重构 — 优化聚合逻辑
+- [x] Subtask 3.8: 🟢 绿 — 扩展 Repository 端口和实现
+- [x] Subtask 3.9: 🔄 重构 — 优化聚合逻辑
 
 **完成标准/Definition of Done:**
-- [ ] StaticTokenEstimator 实现 TokenEstimatorPort
-- [ ] MetricsPort 扩展 2 个新方法
-- [ ] 4 个新 Prometheus 指标注册
-- [ ] RoutingDecisionLogRepository 扩展聚合查询
-- [ ] TDD 循环全部通过
+- [x] StaticTokenEstimator 实现 TokenEstimatorPort
+- [x] MetricsPort 扩展 2 个新方法
+- [x] 4 个新 Prometheus 指标注册
+- [x] RoutingDecisionLogRepository 扩展聚合查询
+- [x] TDD 循环全部通过
 
 ---
 
@@ -502,19 +502,19 @@
 | 🟢 绿 | 实现 `src/application/event_handlers/cost_metrics_handler.py` |
 | 🔄 重构 | 优化事件处理逻辑 |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写 CostMetricsListener 失败测试
+- [x] Subtask 4.1: 🔴 红 — 编写 CostMetricsListener 失败测试
   - on_routing_decided() 接收 RoutingDecided → 调用 TokenEstimatorPort.estimate() → 构造 TokenConsumption → 调用 CostCalculator.calculate() → 更新 RoutingDecisionLog → 记录 Prometheus 指标
   - prompt_tokens/completion_tokens/total_tokens 为 0 时（MVP，从估算获取）
   - cost_actual 从 0.0 改为实际度量值
-- [ ] Subtask 4.2: 🟢 绿 — 实现 CostMetricsListener
+- [x] Subtask 4.2: 🟢 绿 — 实现 CostMetricsListener
   - 订阅 RoutingDecided 事件（通过 DualChannelEventBus.subscribe_async()）
   - 事件处理流：估算 Token → 计算成本 → 更新日志 → 记录指标
   - **注意:** MVP 阶段 Token 数据来自估算而非实际 LLM 调用
-- [ ] Subtask 4.3: 🔄 重构 — 优化处理器逻辑
+- [x] Subtask 4.3: 🔄 重构 — 优化处理器逻辑
 
 #### DI 注册
 
-- [ ] Subtask 4.4: 更新 `src/composition_root.py` 注册（遵循 lambda resolver: 内联 config 模式）
+- [x] Subtask 4.4: 更新 `src/composition_root.py` 注册（遵循 lambda resolver: 内联 config 模式）
   - `token_estimator` → `lambda resolver:` StaticTokenEstimator()
   - `cost_calculator` → `lambda resolver:` CostCalculator(
     local_input_price=..., local_output_price=..., cloud_input_price=..., cloud_output_price=...,
@@ -529,9 +529,9 @@
   - **注意:** Resolver._instantiate() 调用 `spec.impl(resolver=self)`，lambda 必须接收 resolver 参数
 
 **完成标准/Definition of Done:**
-- [ ] CostMetricsListener 实现完成
-- [ ] composition_root.py 注册新组件
-- [ ] TDD 循环全部通过
+- [x] CostMetricsListener 实现完成
+- [x] composition_root.py 注册新组件
+- [x] TDD 循环全部通过
 
 ---
 
@@ -543,18 +543,18 @@
 
 #### 架构验证测试实现
 
-- [ ] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_cost_metrics.py`
-- [ ] Subtask 5.2: 验证 CostCalculator 仅依赖领域层（无外部依赖）
-- [ ] Subtask 5.3: 验证 CostMetricsListener 位于应用层（不直接调用基础设施层）
-- [ ] Subtask 5.4: 验证 StaticTokenEstimator 实现端口（依赖倒置）
-- [ ] Subtask 5.5: 创建 `tests/integration/test_integration_cost_metrics_basic.py`
+- [x] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_cost_metrics.py`
+- [x] Subtask 5.2: 验证 CostCalculator 仅依赖领域层（无外部依赖）
+- [x] Subtask 5.3: 验证 CostMetricsListener 位于应用层（不直接调用基础设施层）
+- [x] Subtask 5.4: 验证 StaticTokenEstimator 实现端口（依赖倒置）
+- [x] Subtask 5.5: 创建 `tests/integration/test_integration_cost_metrics_basic.py`
   - 端到端：RoutingDecided → CostMetricsListener → CostCalculator → Prometheus 指标
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构约束测试通过
-- [ ] 集成测试通过
-- [ ] 无循环依赖
-- [ ] 领域层零外部依赖
+- [x] 所有架构约束测试通过
+- [x] 集成测试通过
+- [x] 无循环依赖
+- [x] 领域层零外部依赖
 
 ---
 
@@ -564,16 +564,16 @@
 
 > **性质说明：** 对 Story 收尾阶段的交付物与完成清单进行最终验收。
 
-- [ ] Subtask 6.1: 场景 1 — 验证 `src` 完成清单的逐项确认
-- [ ] Subtask 6.2: 场景 2 — 验证 `tests/unit`、`tests/contracts`、`tests/acceptance` 完成清单
-- [ ] Subtask 6.3: 运行开发结束验收测试并确认通过
-- [ ] Subtask 6.4: 运行 `poetry run pytest --tb=short -q`、`poetry run ruff check`、`poetry run mypy`
+- [x] Subtask 6.1: 场景 1 — 验证 `src` 完成清单的逐项确认
+- [x] Subtask 6.2: 场景 2 — 验证 `tests/unit`、`tests/contracts`、`tests/acceptance` 完成清单
+- [x] Subtask 6.3: 运行开发结束验收测试并确认通过
+- [x] Subtask 6.4: 运行 `poetry run pytest --tb=short -q`、`poetry run ruff check`、`poetry run mypy`
 
 **完成标准/Definition of Done:**
-- [ ] `src` 完成清单已逐项验证确认
-- [ ] `tests` 完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `done`
+- [x] `src` 完成清单已逐项验证确认
+- [x] `tests` 完成清单已逐项验证确认
+- [x] 开发结束验收测试通过
+- [x] Story 可进入 `done`
 
 ---
 

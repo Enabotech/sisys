@@ -47,6 +47,8 @@ class CloudModelConfig:
     enabled: bool = True
     max_tokens: int | None = None
     temperature: float = 0.7
+    price_per_input_1k_tokens: float = 0.02
+    price_per_output_1k_tokens: float = 0.02
 
 
 @dataclass(frozen=True)
@@ -128,7 +130,7 @@ def _parse_cloud_config(index: int) -> CloudModelConfig | None:
         CloudModelConfig 实例，或 None（未配置/禁用/无效）
 
     Raises:
-        ValueError: api_type 无效或 Anthropic 缺少 max_tokens
+        ValueError: api_type 无效或 Anthropic 缺少 max_tokens 或定价为负
     """
     prefix = f"UDMR_CLOUD_{index}_"
     enabled_str = os.getenv(prefix + "ENABLED", "true").lower()
@@ -170,6 +172,23 @@ def _parse_cloud_config(index: int) -> CloudModelConfig | None:
     except ValueError:
         raise ValueError(f"Invalid UDMR_CLOUD_{index}_TEMPERATURE: {temperature_str}") from None
 
+    # 定价解析（Story 1.19）
+    price_input_str = os.getenv(prefix + "PRICE_INPUT", "0.02")
+    try:
+        price_input = float(price_input_str)
+    except ValueError:
+        raise ValueError(f"Invalid UDMR_CLOUD_{index}_PRICE_INPUT: {price_input_str}") from None
+    if price_input < 0:
+        raise ValueError(f"UDMR_CLOUD_{index}_PRICE_INPUT must be non-negative. Got: {price_input}")
+
+    price_output_str = os.getenv(prefix + "PRICE_OUTPUT", "0.02")
+    try:
+        price_output = float(price_output_str)
+    except ValueError:
+        raise ValueError(f"Invalid UDMR_CLOUD_{index}_PRICE_OUTPUT: {price_output_str}") from None
+    if price_output < 0:
+        raise ValueError(f"UDMR_CLOUD_{index}_PRICE_OUTPUT must be non-negative. Got: {price_output}")
+
     return CloudModelConfig(
         api_type=api_type,
         endpoint=endpoint,
@@ -178,4 +197,6 @@ def _parse_cloud_config(index: int) -> CloudModelConfig | None:
         enabled=True,
         max_tokens=max_tokens,
         temperature=temperature,
+        price_per_input_1k_tokens=price_input,
+        price_per_output_1k_tokens=price_output,
     )

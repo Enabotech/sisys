@@ -1127,16 +1127,20 @@ def bootstrap() -> None:
     )
 
     # === UDMR (Unified Dynamic Model Routing) ===
+    from src.application.event_handlers.cost_metrics_handler import CostMetricsListener
     from src.domain.ports.health_check import HealthCheckPort
     from src.domain.ports.routing_decision_log_repository import (
         RoutingDecisionLogRepository,
     )
+    from src.domain.ports.token_estimator import TokenEstimatorPort
     from src.domain.ports.udmr_policy import UdmrPolicyPort
+    from src.domain.services.cost_calculator import CostCalculator
     from src.domain.services.udmr_service import UDMRService
     from src.infrastructure.config.udmr import UDMRConfig
     from src.infrastructure.external_services.llm.cloud_health_checker import (
         CloudHealthChecker,
     )
+    from src.infrastructure.monitoring.static_token_estimator import StaticTokenEstimator
     from src.infrastructure.routing.udmr_policy import StaticUdmrPolicy
 
     # UDMR Policy — 静态路由策略
@@ -1206,6 +1210,70 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="routing-team",
         tags=("udmr", "handler", "application"),
+    )
+
+    # === Cost Metrics (Story 1.19) ===
+
+    # TokenEstimatorPort — 静态 Token 估算器
+    register_port(
+        name="token_estimator",
+        version="v1.0.0",
+        interface=TokenEstimatorPort,
+        impl=lambda resolver: StaticTokenEstimator(),
+        module="src.infrastructure.monitoring.static_token_estimator",
+        lifetime=Lifetime.SINGLETON,
+        owner="routing-team",
+        tags=("udmr", "cost", "infrastructure"),
+    )
+
+    # CostCalculator — 成本计算领域服务
+    register_port(
+        name="cost_calculator",
+        version="v1.0.0",
+        interface=CostCalculator,
+        impl=lambda resolver: CostCalculator(
+            local_input_price=0.002,
+            local_output_price=0.002,
+            cloud_input_price=(
+                UDMRConfig.from_env().cloud_configs[0].price_per_input_1k_tokens
+                if UDMRConfig.from_env().cloud_configs
+                else 0.02
+            ),
+            cloud_output_price=(
+                UDMRConfig.from_env().cloud_configs[0].price_per_output_1k_tokens
+                if UDMRConfig.from_env().cloud_configs
+                else 0.02
+            ),
+            model_pricing_map={
+                cfg.model: {
+                    "input": cfg.price_per_input_1k_tokens,
+                    "output": cfg.price_per_output_1k_tokens,
+                }
+                for cfg in UDMRConfig.from_env().cloud_configs
+            },
+        ),
+        module="src.domain.services.cost_calculator",
+        lifetime=Lifetime.SINGLETON,
+        owner="routing-team",
+        tags=("udmr", "cost", "domain"),
+    )
+
+    # CostMetricsListener — 成本度量事件处理器
+    register_port(
+        name="cost_metrics_handler",
+        version="v1.0.0",
+        interface=CostMetricsListener,
+        impl=lambda resolver: CostMetricsListener(
+            token_estimator=resolver.resolve("token_estimator"),
+            cost_calculator=resolver.resolve("cost_calculator"),
+            log_repo=resolver.resolve("routing_decision_log_repository"),
+            metrics=resolver.resolve("metrics"),
+            event_bus=resolver.resolve("event_subscriber"),
+        ),
+        module="src.application.event_handlers.cost_metrics_handler",
+        lifetime=Lifetime.SINGLETON,
+        owner="routing-team",
+        tags=("udmr", "cost", "handler", "application"),
     )
 
     logger.info("Registered %d ports", len(_global_registry.list_all()))

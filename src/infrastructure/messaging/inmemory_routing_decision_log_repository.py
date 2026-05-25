@@ -13,8 +13,10 @@ Copyright:
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from src.domain.entities.routing_decision_log import RoutingDecisionLog
+from src.domain.ports.routing_decision_log_repository import CostSummary
 
 logger = logging.getLogger(__name__)
 
@@ -36,3 +38,32 @@ class InMemoryRoutingDecisionLogRepository:
             if log.task_id == task_id:
                 return log
         return None
+
+    async def query_cost_summary(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        route_type: str | None = None,
+    ) -> CostSummary:
+        """按时间范围聚合查询成本摘要"""
+        total_cost = 0.0
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        record_count = 0
+
+        for log in self._logs.values():
+            if log.timestamp < start_time or log.timestamp > end_time:
+                continue
+            if route_type is not None and log.route_type != route_type:
+                continue
+            total_cost += log.cost_actual
+            total_prompt_tokens += log.prompt_tokens
+            total_completion_tokens += log.completion_tokens
+            record_count += 1
+
+        return CostSummary(
+            total_cost=total_cost,
+            total_prompt_tokens=total_prompt_tokens,
+            total_completion_tokens=total_completion_tokens,
+            record_count=record_count,
+        )

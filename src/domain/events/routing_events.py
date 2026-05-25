@@ -53,6 +53,11 @@ class RoutingDecided(DomainEvent):
     # 健康检查结果（Story 1.17）
     health_check_passed: bool = True
     health_check_latency_ms: float = 0.0
+    # Token consumption and cost fields (Story 1.19)
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    cost_actual: float = 0.0
 
     def __post_init__(self) -> None:
         """设置aggregate_id和aggregate_type"""

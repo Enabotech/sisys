@@ -70,7 +70,7 @@ class BusinessMetricsCollector:
         Args:
             registry: prometheus_client CollectorRegistry 实例，None 时使用默认 Registry
         """
-        from prometheus_client import Gauge
+        from prometheus_client import Counter, Gauge
 
         if registry is None:
             from prometheus_client import REGISTRY
@@ -101,7 +101,33 @@ class BusinessMetricsCollector:
             registry=registry,
         )
 
+        # 初始化成本度量 Prometheus 指标
+        self._token_prompt_counter = Counter(
+            "sisys_token_prompt_total",
+            "Total prompt tokens consumed by LLM calls",
+            ["model", "route_type"],
+            registry=registry,
+        )
+        self._token_completion_counter = Counter(
+            "sisys_token_completion_total",
+            "Total completion tokens consumed by LLM calls",
+            ["model", "route_type"],
+            registry=registry,
+        )
+        self._cost_total_gauge = Gauge(
+            "sisys_cost_total_cny",
+            "Total accumulated LLM call cost in CNY",
+            registry=registry,
+        )
+        self._cost_by_model_gauge = Gauge(
+            "sisys_cost_by_model_cny",
+            "LLM call cost in CNY by model and route type",
+            ["model", "route_type"],
+            registry=registry,
+        )
+
         self._metrics = BusinessMetrics()
+        self._total_cost_cny: float = 0.0
         self._lock = threading.Lock()
 
     def record_sessions(self, n: int) -> None:
@@ -170,6 +196,34 @@ class BusinessMetricsCollector:
         if total > 0:
             self._metrics.cache_hit_rate = self._metrics.cache_hits_total / total
             self._cache_hit_rate_gauge.set(self._metrics.cache_hit_rate)
+
+    def record_token_usage(self, prompt: int, completion: int, model: str, route_type: str) -> None:
+        """记录 LLM Token 使用量
+
+        Args:
+            prompt: Prompt Token 数量
+            completion: Completion Token 数量
+            model: 模型名称（如 claude-3-opus）
+            route_type: 路由类型（如 planning / execution）
+        """
+        with self._lock:
+            self._token_prompt_counter.labels(model=model, route_type=route_type).inc(prompt)
+            self._token_completion_counter.labels(model=model, route_type=route_type).inc(completion)
+        logger.debug("Recorded token usage: prompt=%d, completion=%d, model=%s", prompt, completion, model)
+
+    def record_cost(self, cost: float, model: str, route_type: str) -> None:
+        """记录 LLM 调用成本（CNY）
+
+        Args:
+            cost: 本次调用成本（人民币元）
+            model: 模型名称
+            route_type: 路由类型
+        """
+        with self._lock:
+            self._total_cost_cny += cost
+            self._cost_total_gauge.set(self._total_cost_cny)
+            self._cost_by_model_gauge.labels(model=model, route_type=route_type).set(cost)
+        logger.debug("Recorded cost: %.4f CNY, model=%s, route_type=%s", cost, model, route_type)
 
     @property
     def hit_rate(self) -> float:
