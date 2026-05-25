@@ -555,7 +555,7 @@
 4. [ ] Previous story learnings integrated 前一个故事学习经验已整合
 5. [ ] Sprint status synced to `ready-for-dev`
 
-### 🔧 文档审查修复 Docs Review Fixes
+### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
 > 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有对故事文件的修复项。
 
@@ -565,22 +565,22 @@
 
 ---
 
-### 🔍 代码审查发现 Review Findings
+### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
 **审查日期:** 2026-05-22
 **审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
 
 #### 需决策 Decision Needed
 
-- [x] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch] **`_build_graph` 需添加 `graph_name` 白名单校验 + 日志警告** — 决策：Option C，对不支持的 graph_name 记录 WARNING 日志但不抛异常，MVP 仅支持 `"BasicAgent"` [blind+edge] `src/infrastructure/agent_orch/langgraph_engine.py:104-123`
+- [ ] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch | Defer] **[问题精准描述]** — 决策：[决策精准描述] [blind | edge | audit] `[相对路径]:[行号范围]`
 
 #### 已修复 Patch
 
-- [x] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch] Async handlers未await [redis_subscriber.py:174] — _dispatch_message需async并await协程
+- [ ] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch] [问题精准描述] [相对路径:行号] — [解决方案精准描述]
 
 #### 已推迟 Defer
 
-- [x] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Defer] HEAD请求405误判 — deferred，可达性检测对MVP足够
+- [ ] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Defer] [问题精准描述] — deferred，[原因精准描述]
 
 ---
 
