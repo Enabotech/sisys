@@ -436,6 +436,37 @@ class TestRoutingDecisionLogTokenFields:
         with pytest.raises(ValueError, match="total_tokens must be non-negative"):
             log.validate()
 
+    def test_validate_total_tokens_invariant_mismatch(self) -> None:
+        """total_tokens != prompt_tokens + completion_tokens 应无效"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="local",
+            route_target="test",
+            route_score=1.0,
+            prompt_tokens=100,
+            completion_tokens=200,
+            total_tokens=999,
+        )
+        with pytest.raises(ValueError, match="total_tokens must equal prompt_tokens"):
+            log.validate()
+
+    def test_validate_total_tokens_invariant_correct(self) -> None:
+        """total_tokens == prompt_tokens + completion_tokens 应有效"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="local",
+            route_target="test",
+            route_score=1.0,
+            prompt_tokens=100,
+            completion_tokens=200,
+            total_tokens=300,
+        )
+        log.validate()
+
     def test_token_fields_do_not_break_existing_construction(self) -> None:
         """已有构造方式不受影响（向后兼容）"""
         log = RoutingDecisionLog(

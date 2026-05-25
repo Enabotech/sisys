@@ -125,9 +125,16 @@ class BusinessMetricsCollector:
             ["model", "route_type"],
             registry=registry,
         )
+        self._cost_by_model_counter = Counter(
+            "sisys_cost_model_cny_total",
+            "Total accumulated LLM call cost in CNY by model and route type",
+            ["model", "route_type"],
+            registry=registry,
+        )
 
         self._metrics = BusinessMetrics()
         self._total_cost_cny: float = 0.0
+        self._model_costs: dict[str, float] = {}
         self._lock = threading.Lock()
 
     def record_sessions(self, n: int) -> None:
@@ -223,6 +230,7 @@ class BusinessMetricsCollector:
             self._total_cost_cny += cost
             self._cost_total_gauge.set(self._total_cost_cny)
             self._cost_by_model_gauge.labels(model=model, route_type=route_type).set(cost)
+            self._cost_by_model_counter.labels(model=model, route_type=route_type).inc(cost)
         logger.debug("Recorded cost: %.4f CNY, model=%s, route_type=%s", cost, model, route_type)
 
     @property

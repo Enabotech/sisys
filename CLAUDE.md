@@ -64,10 +64,8 @@ src/
 
 ## 6. Gotchas
 
-- 跑测试前必须先执行 `composition_root.bootstrap()` 初始化端口注册表（conftest.py 已自动处理，手动写测试时别忘）
 - `asyncio.Lock` 必须声明为**类变量**而非实例变量，否则在协程间不共享
 - 本地开发需配置 `.env`（参考 `.env.example`），至少需要 PostgreSQL + Redis 连接信息
-- `SISYS_TEST_ENV` 环境变量控制测试环境（local/ci/k8s/test），默认 local；本地跑集成测试需先启动 Docker 服务
 - `SISYS_USE_TEST_PORTS=1` 切换到独立测试端口（避免与本地开发服务冲突）
 - impl 为字符串的端口是延迟加载（lazy import），调试时注意模块路径写错不会立即报错
 - 存储层端口命名：`l0_storage`（文件系统）→ `l1_cache`（Redis）→ `l2_rdb`（PostgreSQL）→ `l3_vector`（Qdrant）→ `l4_object`（MinIO）→ `l5_graph`（Neo4j），不是从 1 开始

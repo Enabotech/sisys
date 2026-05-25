@@ -1227,31 +1227,24 @@ def bootstrap() -> None:
     )
 
     # CostCalculator — 成本计算领域服务
+    def _make_cost_calculator(resolver: object) -> CostCalculator:
+        cfg = UDMRConfig.from_env()
+        return CostCalculator(
+            local_input_price=0.002,
+            local_output_price=0.002,
+            cloud_input_price=(cfg.cloud_configs[0].price_per_input_1k_tokens if cfg.cloud_configs else 0.02),
+            cloud_output_price=(cfg.cloud_configs[0].price_per_output_1k_tokens if cfg.cloud_configs else 0.02),
+            model_pricing_map={
+                c.model: {"input": c.price_per_input_1k_tokens, "output": c.price_per_output_1k_tokens}
+                for c in cfg.cloud_configs
+            },
+        )
+
     register_port(
         name="cost_calculator",
         version="v1.0.0",
         interface=CostCalculator,
-        impl=lambda resolver: CostCalculator(
-            local_input_price=0.002,
-            local_output_price=0.002,
-            cloud_input_price=(
-                UDMRConfig.from_env().cloud_configs[0].price_per_input_1k_tokens
-                if UDMRConfig.from_env().cloud_configs
-                else 0.02
-            ),
-            cloud_output_price=(
-                UDMRConfig.from_env().cloud_configs[0].price_per_output_1k_tokens
-                if UDMRConfig.from_env().cloud_configs
-                else 0.02
-            ),
-            model_pricing_map={
-                cfg.model: {
-                    "input": cfg.price_per_input_1k_tokens,
-                    "output": cfg.price_per_output_1k_tokens,
-                }
-                for cfg in UDMRConfig.from_env().cloud_configs
-            },
-        ),
+        impl=_make_cost_calculator,
         module="src.domain.services.cost_calculator",
         lifetime=Lifetime.SINGLETON,
         owner="routing-team",
