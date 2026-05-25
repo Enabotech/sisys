@@ -838,7 +838,7 @@ sisys/
 │   │       └── backup_recovery_service_impl.py       # 备份恢复实现
 │   └── interfaces/
 │       └── api/
-│           └── security.py                     # 安全监控 API 路由
+│           └── equilibrium_security.py                     # 安全监控 API 路由
 └── tests/
     ├── contracts/
     │   ├── test_api_contract_equilibrium.py   # API 契约测试
