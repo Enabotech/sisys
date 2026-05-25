@@ -31,7 +31,6 @@ def repository(mock_session):
 class TestRoleRepository:
     """RoleRepository 测试"""
 
-    @pytest.mark.asyncio
     async def test_get_by_name_not_found(self, repository, mock_session):
         """测试根据名称获取不存在的角色"""
         mock_result = mock.Mock()
@@ -42,7 +41,6 @@ class TestRoleRepository:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_by_name_found(self, repository, mock_session):
         """测试根据名称获取存在的角色"""
         role_id = uuid4()
@@ -70,7 +68,6 @@ class TestRoleRepository:
         assert result.name == "admin"
         assert result.id == role_id
 
-    @pytest.mark.asyncio
     async def test_get_permissions_for_role(self, repository, mock_session):
         """测试获取角色的权限列表"""
         permissions = [mock.Mock(), mock.Mock()]
@@ -84,7 +81,6 @@ class TestRoleRepository:
 
         assert len(result) == 2
 
-    @pytest.mark.asyncio
     async def test_delete_role_not_found(self, repository, mock_session):
         """测试删除不存在的角色抛出异常"""
         mock_session.get.return_value = None
@@ -92,7 +88,6 @@ class TestRoleRepository:
         with pytest.raises(RoleNotFoundError):
             await repository.delete(uuid4())
 
-    @pytest.mark.asyncio
     async def test_delete_role_success(self, repository, mock_session):
         """测试删除存在的角色"""
         mock_model = mock.Mock()
@@ -104,7 +99,6 @@ class TestRoleRepository:
         mock_session.delete.assert_called_once_with(mock_model)
         mock_session.flush.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_save_role_integrity_error(self, repository, mock_session):
         """测试保存角色时唯一约束违反"""
         from src.domain.entities.role import Role
@@ -125,7 +119,6 @@ class TestRoleRepository:
         with pytest.raises(RoleAlreadyExistsError):
             await repository.save(role)
 
-    @pytest.mark.asyncio
     async def test_get_by_id_not_found(self, repository, mock_session):
         """测试根据 ID 获取不存在的角色"""
         mock_result = mock.Mock()
@@ -136,7 +129,6 @@ class TestRoleRepository:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_by_id_found(self, repository, mock_session):
         """测试根据 ID 获取存在的角色"""
         role_id = uuid4()
@@ -163,7 +155,6 @@ class TestRoleRepository:
         assert result.name == "admin"
         assert result.id == role_id
 
-    @pytest.mark.asyncio
     async def test_list_all_empty(self, repository, mock_session):
         """测试列出所有角色为空"""
         mock_scalars = mock.Mock()
@@ -176,7 +167,6 @@ class TestRoleRepository:
 
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_list_all_with_roles(self, repository, mock_session):
         """测试列出所有角色"""
         role_id = uuid4()

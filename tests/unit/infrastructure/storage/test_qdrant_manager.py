@@ -18,7 +18,6 @@ def mock_client():
 class TestQdrantManager:
     """QdrantCollectionManager 测试类"""
 
-    @pytest.mark.asyncio
     async def test_create_collection_success(self, mock_client):
         """测试成功创建 Collection"""
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[]))
@@ -29,7 +28,6 @@ class TestQdrantManager:
         assert result is True
         mock_client.create_collection.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_collection_already_exists(self, mock_client):
         """测试 Collection 已存在时返回 False"""
         existing_collection = MagicMock()
@@ -42,7 +40,6 @@ class TestQdrantManager:
         assert result is False
         mock_client.create_collection.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_delete_collection_success(self, mock_client):
         """测试成功删除 Collection"""
         existing_collection = MagicMock()
@@ -56,7 +53,6 @@ class TestQdrantManager:
         assert result is True
         mock_client.delete_collection.assert_called_once_with(collection_name="sisys:documents:finance")
 
-    @pytest.mark.asyncio
     async def test_delete_collection_not_exists(self, mock_client):
         """测试删除不存在的 Collection 返回 False"""
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[]))
@@ -67,7 +63,6 @@ class TestQdrantManager:
         assert result is False
         mock_client.delete_collection.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_collection_exists_true(self, mock_client):
         """测试 Collection 存在时返回 True"""
         existing_collection = MagicMock()
@@ -79,7 +74,6 @@ class TestQdrantManager:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_collection_exists_false(self, mock_client):
         """测试 Collection 不存在时返回 False"""
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[]))
@@ -89,7 +83,6 @@ class TestQdrantManager:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_collection_exists_exception(self, mock_client):
         """测试异常时返回 False"""
         mock_client.get_collections = AsyncMock(side_effect=Exception("Connection error"))
@@ -99,7 +92,6 @@ class TestQdrantManager:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_list_collections(self, mock_client):
         """测试列出所有 Collection"""
         col1 = MagicMock()
@@ -113,7 +105,6 @@ class TestQdrantManager:
 
         assert result == ["sisys:documents:finance", "sisys:documents:hr"]
 
-    @pytest.mark.asyncio
     async def test_list_collections_exception(self, mock_client):
         """测试异常时返回空列表"""
         mock_client.get_collections = AsyncMock(side_effect=Exception("Connection error"))
@@ -123,7 +114,6 @@ class TestQdrantManager:
 
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_create_collection_with_custom_config(self, mock_client):
         """测试使用自定义配置创建 Collection"""
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[]))

@@ -15,8 +15,6 @@ from __future__ import annotations
 import uuid
 from unittest.mock import AsyncMock
 
-import pytest
-
 from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.domain.value_objects.flow_status import FlowStatus
 
@@ -24,7 +22,6 @@ from src.domain.value_objects.flow_status import FlowStatus
 class TestAgentReasoningFullChain:
     """OrchestrationService → LangGraphEngine 端到端"""
 
-    @pytest.mark.asyncio
     async def test_agent_reasoning_full_chain(self) -> None:
         """agent_reasoning 完整链路：OrchestrationService → LangGraphEngine.submit_graph"""
         from src.application.services.orchestration_service import (
@@ -57,7 +54,6 @@ class TestAgentReasoningFullChain:
         assert isinstance(result.flow_run_id, str)
         assert result.status == FlowStatus.COMPLETED
 
-    @pytest.mark.asyncio
     async def test_agent_reasoning_get_status(self) -> None:
         """agent_reasoning 提交后应能查询状态"""
         from src.infrastructure.agent_orch.langgraph_engine import LangGraphEngine
@@ -82,7 +78,6 @@ class TestAgentReasoningFullChain:
 class TestDualEngineRouting:
     """双引擎路由验证"""
 
-    @pytest.mark.asyncio
     async def test_data_pipeline_routes_to_prefect(self) -> None:
         """data_pipeline 应路由到 WorkflowEnginePort"""
         from src.application.services.orchestration_service import (
@@ -108,7 +103,6 @@ class TestDualEngineRouting:
         mock_workflow_engine.submit_flow.assert_called_once()
         mock_agent_engine.submit_graph.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_agent_reasoning_routes_to_langgraph(self) -> None:
         """agent_reasoning 应路由到 AgentEnginePort"""
         from src.application.services.orchestration_service import (

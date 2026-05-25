@@ -244,7 +244,6 @@ def listener_with_real_services(redis_cache, metadata_repository, history_reposi
 class TestMemoryChangedListenerL2WriteRealPostgreSQL:
     """L2 PostgreSQL write tests using real repository."""
 
-    @pytest.mark.asyncio
     async def test_listener_writes_metadata_to_postgresql(self, listener_with_real_services, metadata_repository, pg_session):
         """Verify listener writes metadata to PostgreSQL after handle()."""
         memory_id = str(uuid.uuid4())
@@ -279,7 +278,6 @@ class TestMemoryChangedListenerL2WriteRealPostgreSQL:
         assert metadata.user_id == user_id, f"Expected user_id={user_id}, got {metadata.user_id}"
         assert metadata.type == memory_type, f"Expected type={memory_type}, got {metadata.type}"
 
-    @pytest.mark.asyncio
     async def test_listener_writes_history_to_postgresql(self, listener_with_real_services, history_repository, pg_session):
         """Verify listener writes history to PostgreSQL after handle()."""
         memory_id = str(uuid.uuid4())
@@ -317,7 +315,6 @@ class TestMemoryChangedListenerL2WriteRealPostgreSQL:
 class TestMemoryChangedListenerCompleteFlow:
     """Complete flow integration test with real PostgreSQL + Redis."""
 
-    @pytest.mark.asyncio
     async def test_save_memory_triggers_listener_and_l2_write(
         self,
         listener_with_real_services,

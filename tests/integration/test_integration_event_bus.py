@@ -21,7 +21,6 @@ from src.infrastructure.messaging.redis_event_bus import RedisEventBus
 class TestRealtimeEventPublishToRedis:
     """AC-10.1: REALTIME events should publish directly to Redis."""
 
-    @pytest.mark.asyncio
     async def test_auto_triggered_event_publishes_to_redis(self) -> None:
         """AutoTriggered (REALTIME) should publish via RedisEventBus."""
         router = ChannelRouter()
@@ -46,7 +45,6 @@ class TestRealtimeEventPublishToRedis:
         rabbitmq_bus.publish.assert_not_called()
         assert result.redis_success is True
 
-    @pytest.mark.asyncio
     async def test_auto_routed_event_publishes_to_redis(self) -> None:
         """AutoRouted (REALTIME) should publish via RedisEventBus."""
         router = ChannelRouter()
@@ -74,7 +72,6 @@ class TestRealtimeEventPublishToRedis:
 class TestReliableEventWritesToOutbox:
     """AC-10.2: RELIABLE events should write to Outbox."""
 
-    @pytest.mark.asyncio
     async def test_document_processed_event_writes_to_outbox(self) -> None:
         """DocumentProcessed (RELIABLE) should publish via RabbitMQEventBus/Outbox."""
         router = ChannelRouter()
@@ -99,7 +96,6 @@ class TestReliableEventWritesToOutbox:
         redis_bus.publish.assert_not_called()
         assert result.outbox_saved is True
 
-    @pytest.mark.asyncio
     async def test_memory_changed_event_writes_to_outbox(self) -> None:
         """MemoryChanged (RELIABLE) should publish via RabbitMQEventBus/Outbox."""
         router = ChannelRouter()
@@ -123,7 +119,6 @@ class TestReliableEventWritesToOutbox:
         rabbitmq_bus.publish.assert_called_once_with(event)
         assert result.outbox_saved is True
 
-    @pytest.mark.asyncio
     async def test_audit_event_writes_to_outbox(self) -> None:
         """AuditEvent (RELIABLE) should publish via RabbitMQEventBus/Outbox."""
         router = ChannelRouter()
@@ -151,7 +146,6 @@ class TestReliableEventWritesToOutbox:
 class TestPollerPublishesToRabbitMQ:
     """AC-10.3: Poller should correctly publish Outbox events to RabbitMQ."""
 
-    @pytest.mark.asyncio
     async def test_poller_reads_unpublished_events_and_publishes(self) -> None:
         """AsyncOutboxPoller should read unpublished events and publish to RabbitMQ."""
         from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
@@ -183,7 +177,6 @@ class TestPollerPublishesToRabbitMQ:
 class TestSubscribeOnlyForRealtime:
     """AC-10.4: subscribe() should only work for REALTIME events."""
 
-    @pytest.mark.asyncio
     async def test_subscribe_raises_for_reliable_event(self) -> None:
         """subscribe() should raise ValueError for RELIABLE event type."""
         router = ChannelRouter()
@@ -201,7 +194,6 @@ class TestSubscribeOnlyForRealtime:
         with pytest.raises(ValueError, match="RELIABLE mode"):
             await bus.subscribe("DocumentProcessed", handler)
 
-    @pytest.mark.asyncio
     async def test_subscribe_works_for_realtime_event(self) -> None:
         """subscribe() should work for REALTIME event type."""
         router = ChannelRouter()

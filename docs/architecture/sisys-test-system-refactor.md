@@ -262,7 +262,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 1.0 TEM 配置覆盖链重构：5 层 → 3 层
 
-- [ ] **1.0.1** 重构 `get_test_env()` 注释和文档字符串
+- [x] **1.0.1** 重构 `get_test_env()` 注释和文档字符串
   - 文件：`tests/environments.py` 第290-299行
   - 修改：将文档字符串更新为三层模型描述
   - 代码：
@@ -277,7 +277,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
         """
     ```
 
-- [ ] **1.0.2** 合并 Layer 1：统一环境检测和预设选择
+- [x] **1.0.2** 合并 Layer 1：统一环境检测和预设选择
   - 文件：`tests/environments.py` 第309-321行
   - 修改：将 resolve_env() 和预设选择合并为单一步骤
   - 代码：
@@ -298,15 +298,15 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
         config = copy.deepcopy(LOCAL_CONFIG)
     ```
 
-- [ ] **1.0.3** 简化 Layer 2：确认 `_apply_dotenv_if_empty()` 仅填充空值
+- [x] **1.0.3** 简化 Layer 2：确认 `_apply_dotenv_if_empty()` 仅填充空值
   - 文件：`tests/environments.py` 第327行
   - 验证：当前实现已是仅填充空值，无需修改
 
-- [ ] **1.0.4** 保持 Layer 3：`_override_config_from_env()` 不变
+- [x] **1.0.4** 保持 Layer 3：`_override_config_from_env()` 不变
   - 文件：`tests/environments.py` 第330行
   - 验证：当前实现正确，os.environ 最高优先级
 
-- [ ] **1.0.5** 消除冗余步骤
+- [x] **1.0.5** 消除冗余步骤
   - 文件：`tests/environments.py`
   - 修改：删除代码注释中"步骤 3 判断测试环境"和"步骤 4 覆盖"的描述
 
@@ -314,7 +314,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 1.1 TEM 配置同步补全
 
-- [ ] **1.1.1** MinIO 配置同步
+- [x] **1.1.1** MinIO 配置同步
   - 文件：`tests/environments.py` `_sync_config_to_environ()` 函数
   - 添加：
     ```python
@@ -325,7 +325,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
     os.environ.setdefault("MINIO_BUCKET", config.minio.bucket)
     ```
 
-- [ ] **1.1.2** RabbitMQ mgmt_port/认证同步
+- [x] **1.1.2** RabbitMQ mgmt_port/认证同步
   - 文件：`tests/environments.py` `_sync_config_to_environ()` 函数
   - 添加：
     ```python
@@ -334,7 +334,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
     os.environ.setdefault("RABBITMQ_PASSWORD", config.rabbitmq.password)
     ```
 
-- [ ] **1.1.3** Neo4j port 同步
+- [x] **1.1.3** Neo4j port 同步
   - 文件：`tests/environments.py` `_sync_config_to_environ()` 函数
   - 添加：
     ```python
@@ -342,7 +342,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
     os.environ.setdefault("NEO4J_BOLT_PORT", str(config.neo4j.bolt_port))
     ```
 
-- [ ] **1.1.4** MinIO endpoint 端口动态解析
+- [x] **1.1.4** MinIO endpoint 端口动态解析
   - 文件：`tests/environments.py` `_override_config_from_env()` 第419-421行
   - 修改：
     ```python
@@ -351,7 +351,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
         config.minio.endpoint = f"{minio_host}:{minio_port}"
     ```
 
-- [ ] **1.1.5** RabbitMQ mgmt_port 覆盖
+- [x] **1.1.5** RabbitMQ mgmt_port 覆盖
   - 文件：`tests/environments.py` `_override_config_from_env()` 函数
   - 添加：
     ```python
@@ -363,7 +363,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 1.2 TIL `_get_task_id()` 修复
 
-- [ ] **1.2.1** 修改 `_get_task_id()`：优先使用 `task.ident`
+- [x] **1.2.1** 修改 `_get_task_id()`：优先使用 `task.ident`
   - 文件：`tests/isolation.py` 第94-111行
   - 修改：
     ```python
@@ -397,11 +397,11 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 1.3 Fixtures RabbitMQ 清理修复
 
-- [ ] **1.3.1** 修改 `_cleanup_tenant_resources()` RabbitMQ 部分
+- [x] **1.3.1** 修改 `_cleanup_tenant_resources()` RabbitMQ 部分
   - 文件：`tests/fixtures.py` 第189-212行
   - 修改：使用 aiohttp Management HTTP API
 
-- [ ] **1.3.2** 实现 Management API 队列列出
+- [x] **1.3.2** 实现 Management API 队列列出
   - 代码：
     ```python
     import aiohttp
@@ -424,7 +424,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
                 # ... 删除匹配前缀的队列
     ```
 
-- [ ] **1.3.3** 实现队列删除
+- [x] **1.3.3** 实现队列删除
   - 代码：
     ```python
     prefix = tenant.rabbitmq_queue_prefix
@@ -441,7 +441,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 1.4 TIL TestTenant 增强
 
-- [ ] **1.4.1** 添加 `rabbitmq_exchange_prefix` 属性
+- [x] **1.4.1** 添加 `rabbitmq_exchange_prefix` 属性
   - 文件：`tests/isolation.py` TestTenant 类
   - 添加：
     ```python
@@ -451,7 +451,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
         return f"test_{self.id}_exchange"
     ```
 
-- [ ] **1.4.2** 删除 TenantAwareMock._prefix_name() 重复代码
+- [x] **1.4.2** 删除 TenantAwareMock._prefix_name() 重复代码
   - 文件：`tests/isolation.py` 第192行
   - 操作：删除重复的 `return f"{self._tenant.id}_{name}"`
 
@@ -461,10 +461,10 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 2.1 创建 tests/unit/conftest.py
 
-- [ ] **2.1.1** 创建文件
+- [x] **2.1.1** 创建文件
   - 文件：`tests/unit/conftest.py`（新建）
 
-- [ ] **2.1.2** 定义 pytest_collection_modifyitems hook
+- [x] **2.1.2** 定义 pytest_collection_modifyitems hook
   - 代码：
     ```python
     def pytest_collection_modifyitems(config, items):
@@ -474,7 +474,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
                 item.add_marker("unit")
     ```
 
-- [ ] **2.1.3** 导入根 fixtures.py 中适用于 unit 的 fixture
+- [x] **2.1.3** 导入根 fixtures.py 中适用于 unit 的 fixture
   - 代码：
     ```python
     from tests.fixtures import (
@@ -489,10 +489,10 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 2.2 创建 tests/acceptance/conftest.py
 
-- [ ] **2.2.1** 创建文件
+- [x] **2.2.1** 创建文件
   - 文件：`tests/acceptance/conftest.py`（新建）
 
-- [ ] **2.2.2** 定义 acceptance 专属 fixture
+- [x] **2.2.2** 定义 acceptance 专属 fixture
   - 代码：
     ```python
     from tests.environments import get_test_env, TestEnvConfig
@@ -503,7 +503,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
         return get_test_env()
     ```
 
-- [ ] **2.2.3** 添加 @pytest.mark.acceptance 自动标记
+- [x] **2.2.3** 添加 @pytest.mark.acceptance 自动标记
   - 代码：
     ```python
     def pytest_collection_modifyitems(config, items):
@@ -516,17 +516,17 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 2.3 创建 tests/deploy/conftest.py
 
-- [ ] **2.3.1** 创建文件
+- [x] **2.3.1** 创建文件
   - 文件：`tests/deploy/conftest.py`（新建）
 
-- [ ] **2.3.2** 导入 config.py 和 k8s_helpers.py
+- [x] **2.3.2** 导入 config.py 和 k8s_helpers.py
   - 代码：
     ```python
     from tests.deploy.config import TestConfig
     from tests.deploy.k8s_helpers import run_kubectl, wait, temporary_resource
     ```
 
-- [ ] **2.3.3** 添加 @pytest.mark.k8s 自动标记
+- [x] **2.3.3** 添加 @pytest.mark.k8s 自动标记
   - 代码：
     ```python
     def pytest_collection_modifyitems(config, items):
@@ -541,31 +541,31 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 3.1 清理冗余 asyncio marker
 
-- [ ] **3.1.1** 分析：哪些测试需要保留 asyncio marker
+- [x] **3.1.1** 分析：哪些测试需要保留 asyncio marker
   - 说明：`asyncio_mode = "auto"` 下，`async def test_*` 自动处理，通常无需显式标记
   - 例外：BDD 步骤中使用 `event_loop.run_until_complete()` 的场景无需 asyncio marker
 
-- [ ] **3.1.2** 执行清理：移除冗余 asyncio marker
+- [x] **3.1.2** 执行清理：移除冗余 asyncio marker
   - 范围：acceptance（926 处）、integration（147 处）
   - 操作：批量删除 `@pytest.mark.asyncio` 装饰器
 
-- [ ] **3.1.3** 验证：pytest collect 无警告
+- [x] **3.1.3** 验证：pytest collect 无警告
   - 命令：`poetry run pytest tests/ -v --collect-only`
 
 ---
 
 #### 3.2 自动 marker 应用策略
 
-- [ ] **3.2.1** unit 测试自动标记 @pytest.mark.unit
+- [x] **3.2.1** unit 测试自动标记 @pytest.mark.unit
   - 已在 Phase 2.1 实现
 
-- [ ] **3.2.2** integration 测试自动标记 @pytest.mark.integration
+- [x] **3.2.2** integration 测试自动标记 @pytest.mark.integration
   - 修改：`tests/integration/conftest.py` 添加 pytest_collection_modifyitems
 
-- [ ] **3.2.3** acceptance 测试自动标记 @pytest.mark.acceptance
+- [x] **3.2.3** acceptance 测试自动标记 @pytest.mark.acceptance
   - 已在 Phase 2.2 实现
 
-- [ ] **3.2.4** 按服务依赖自动标记（可选）
+- [x] **3.2.4** 按服务依赖自动标记（可选）
   - 说明：需分析测试代码中的服务依赖，添加到 conftest hook
 
 ---
@@ -574,15 +574,15 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 4.1 docker-compose.test.yml 适配
 
-- [ ] **4.1.1** 分析 CI workflow 当前 compose 文件
+- [x] **4.1.1** 分析 CI workflow 当前 compose 文件
   - 文件：`.gitea/workflows/ci.yaml` 第325行
   - 当前：`docker compose -f ./deploy/app/docker-compose.yml up -d`
 
-- [ ] **4.1.2** 确认 CI 是否设置 SISYS_TEST_ENV=ci
+- [x] **4.1.2** 确认 CI 是否设置 SISYS_TEST_ENV=ci
   - 文件：`.gitea/workflows/ci.yaml`
   - 搜索：`SISYS_TEST_ENV` 环境变量设置
 
-- [ ] **4.1.3** 修改 CI 使用 docker-compose.test.yml
+- [x] **4.1.3** (已评估：不切换，当前 CI 方案正确) 修改 CI 使用 docker-compose.test.yml
   - 如需要，修改第325行：
     ```yaml
     docker compose -f ./deploy/app/docker-compose.test.yml up -d
@@ -592,10 +592,10 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 4.2 分层覆盖率门禁脚本
 
-- [ ] **4.2.1** 创建 scripts/check_coverage_gates.py
+- [x] **4.2.1** 创建 scripts/check_coverage_gates.py
   - 文件：`scripts/check_coverage_gates.py`（新建）
 
-- [ ] **4.2.2** 实现按模块检查覆盖率
+- [x] **4.2.2** 实现按模块检查覆盖率
   - 代码：
     ```python
     import subprocess
@@ -618,7 +618,7 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
     sys.exit(0 if all_pass else 1)
     ```
 
-- [ ] **4.2.3** 添加到 CI pipeline
+- [x] **4.2.3** 添加到 CI pipeline
   - 文件：`.gitea/workflows/ci.yaml`
   - 位置：coverage report 后
   - 添加：
@@ -634,46 +634,46 @@ async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
 
 #### 5.1 Phase 4 验证与优化
 
-- [ ] **5.1.1** 本地运行验收测试套件
+- [x] **5.1.1** 本地运行验收测试套件
   - 命令：`poetry run pytest tests/acceptance -v --tb=short`
 
 - [ ] **5.1.2** CI 运行验收测试套件
   - 操作：推送后观察 CI logs
 
-- [ ] **5.1.3** 验证 3 个之前失败的测试通过
+- [x] **5.1.3** 验证 3 个之前失败的测试通过
   - test_ac2_rabbitmq_agentdecided
   - test_ac2_rabbitmq_documentprocessed
   - test_dense_search_with_filter
 
-- [ ] **5.1.4** 架构约束验证测试通过
+- [x] **5.1.4** 架构约束验证测试通过
   - 命令：`poetry run pytest tests/unit/architecture -v`
 
-- [ ] **5.1.5** 检查测试运行时间，优化慢速测试
+- [x] **5.1.5** 检查测试运行时间，优化慢速测试
   - 命令：`poetry run pytest tests/ --durations=20`
 
-- [ ] **5.1.6** 更新覆盖率门禁配置
+- [x] **5.1.6** 更新覆盖率门禁配置
   - 已在 Phase 4.2 实现
 
-- [ ] **5.1.7** 更新 README（测试环境变量、租户隔离）
+- [x] **5.1.7** 更新 README（测试环境变量、租户隔离）
   - 文件：项目根目录 README.md
 
-- [ ] **5.1.8** 更新 CI README
+- [x] **5.1.8** 更新 CI README
   - 文件：`.gitea/README.md`（如存在）
 
 ---
 
 #### 5.2 Phase 5-8 重构清单
 
-- [ ] **5.2.1** A1-A10：acceptance 测试文件重构
+- [x] **5.2.1** A1-A10：acceptance 测试文件重构
   - 参考：sisys-testing-framework.md 第1870-1903行
 
-- [ ] **5.2.2** I1-I8：integration 测试文件验证
+- [x] **5.2.2** I1-I8：integration 测试文件验证
   - 参考：sisys-testing-framework.md 第1906-1924行
 
-- [ ] **5.2.3** R1-R7：integration_real 测试文件更新
+- [x] **5.2.3** R1-R7：integration_real 测试文件更新
   - 参考：sisys-testing-framework.md 第1928-1951行
 
-- [ ] **5.2.4** U1-U6：unit 测试文件验证
+- [x] **5.2.4** U1-U6：unit 测试文件验证
   - 参考：sisys-testing-framework.md 第1955-1979行
 
 ---

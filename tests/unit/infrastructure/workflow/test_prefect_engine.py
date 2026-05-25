@@ -41,7 +41,6 @@ class TestPrefectEngineProtocolCompliance:
 class TestPrefectEngineSubmitFlow:
     """submit_flow 测试"""
 
-    @pytest.mark.asyncio
     async def test_submit_flow_returns_string_id(self, engine: PrefectEngine) -> None:
         mock_deployment = MagicMock()
         mock_deployment.id = uuid.uuid4()
@@ -70,7 +69,6 @@ class TestPrefectEngineSubmitFlow:
 class TestPrefectEngineGetFlowStatus:
     """get_flow_status 状态映射测试"""
 
-    @pytest.mark.asyncio
     async def test_running_maps_to_running(self, engine: PrefectEngine) -> None:
         from prefect.states import StateType
 
@@ -89,7 +87,6 @@ class TestPrefectEngineGetFlowStatus:
 
         assert status == FlowStatus.RUNNING
 
-    @pytest.mark.asyncio
     async def test_completed_maps_to_completed(self, engine: PrefectEngine) -> None:
         from prefect.states import StateType
 
@@ -108,7 +105,6 @@ class TestPrefectEngineGetFlowStatus:
 
         assert status == FlowStatus.COMPLETED
 
-    @pytest.mark.asyncio
     async def test_failed_maps_to_failed(self, engine: PrefectEngine) -> None:
         from prefect.states import StateType
 
@@ -128,7 +124,6 @@ class TestPrefectEngineGetFlowStatus:
 
         assert status == FlowStatus.FAILED
 
-    @pytest.mark.asyncio
     async def test_scheduled_maps_to_pending(self, engine: PrefectEngine) -> None:
         from prefect.states import StateType
 
@@ -151,25 +146,21 @@ class TestPrefectEngineGetFlowStatus:
 class TestPrefectEngineInputValidation:
     """输入验证测试"""
 
-    @pytest.mark.asyncio
     async def test_submit_flow_rejects_empty_flow_name(self, engine: PrefectEngine) -> None:
         """空 flow_name 应抛出 ValueError"""
         with pytest.raises(ValueError, match="flow_name 格式无效"):
             await engine.submit_flow("", {})
 
-    @pytest.mark.asyncio
     async def test_submit_flow_rejects_flow_name_without_slash(self, engine: PrefectEngine) -> None:
         """无斜杠的 flow_name 应抛出 ValueError"""
         with pytest.raises(ValueError, match="flow_name 格式无效"):
             await engine.submit_flow("NoSlashHere", {})
 
-    @pytest.mark.asyncio
     async def test_get_flow_status_rejects_invalid_uuid(self, engine: PrefectEngine) -> None:
         """无效 UUID 格式应抛出 ValueError"""
         with pytest.raises(ValueError, match="flow_run_id 格式无效"):
             await engine.get_flow_status("not-a-uuid")
 
-    @pytest.mark.asyncio
     async def test_get_flow_status_rejects_empty_string(self, engine: PrefectEngine) -> None:
         """空字符串应抛出 ValueError"""
         with pytest.raises(ValueError, match="flow_run_id 格式无效"):
@@ -179,7 +170,6 @@ class TestPrefectEngineInputValidation:
 class TestPrefectEngineEventPublishing:
     """PrefectEngine 事件发布测试"""
 
-    @pytest.mark.asyncio
     async def test_submit_flow_publishes_workflow_submitted(
         self, engine: PrefectEngine, mock_event_publisher: AsyncMock
     ) -> None:
@@ -210,7 +200,6 @@ class TestPrefectEngineEventPublishing:
         assert event.flow_name == "DocumentProcessing/default"
         assert event.parameters == {"document_id": "abc"}
 
-    @pytest.mark.asyncio
     async def test_submit_flow_returns_id_even_when_publish_fails(
         self, engine: PrefectEngine, mock_event_publisher: AsyncMock
     ) -> None:
@@ -234,7 +223,6 @@ class TestPrefectEngineEventPublishing:
 
         assert isinstance(result, str)
 
-    @pytest.mark.asyncio
     async def test_submit_flow_logs_warning_on_full_failure(
         self, engine: PrefectEngine, mock_event_publisher: AsyncMock
     ) -> None:
@@ -271,7 +259,6 @@ class TestPrefectEngineEventPublishing:
         mock_logger.warning.assert_called()
         assert mock_event_publisher.publish.called
 
-    @pytest.mark.asyncio
     async def test_submit_flow_does_not_publish_on_failure(
         self, engine: PrefectEngine, mock_event_publisher: AsyncMock
     ) -> None:

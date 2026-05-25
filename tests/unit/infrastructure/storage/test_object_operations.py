@@ -92,7 +92,6 @@ class TestUploadObject:
 class TestDownloadObject:
     """下载对象测试"""
 
-    @pytest.mark.asyncio
     async def test_download_object_streaming(self):
         """流式下载对象"""
         config = MinIOConfig()
@@ -114,7 +113,6 @@ class TestDownloadObject:
         assert chunks == [b"chunk1", b"chunk2"]
         mock_response.close.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_download_object_with_version(self):
         """带版本 ID 下载"""
         config = MinIOConfig()
@@ -207,7 +205,6 @@ class TestDeleteObject:
 class TestResumeMultipartUpload:
     """恢复分片上传测试"""
 
-    @pytest.mark.asyncio
     async def test_resume_multipart_upload(self):
         """恢复分片上传 - all parts already uploaded, completes immediately."""
         from unittest.mock import mock_open
@@ -248,7 +245,6 @@ class TestResumeMultipartUpload:
         # Verify Redis state was cleaned
         mock_redis.delete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_resume_multipart_no_state_raises(self):
         """无状态抛出 KeyError"""
         config = MinIOConfig()
@@ -271,7 +267,6 @@ class TestResumeMultipartUpload:
 class TestSaveMultipartState:
     """保存分片状态测试"""
 
-    @pytest.mark.asyncio
     async def test_save_multipart_state(self):
         """保存分片上传状态到 Redis"""
         config = MinIOConfig()

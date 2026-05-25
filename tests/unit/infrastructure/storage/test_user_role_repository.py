@@ -6,8 +6,6 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
-
 from src.infrastructure.storage.postgresql.repository.user_role_repository import UserRoleRepository
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
@@ -25,7 +23,6 @@ class TestUserRoleRepository:
         """Tear down test fixtures."""
         reset_session(self._token)
 
-    @pytest.mark.asyncio
     async def test_assign_role_user_not_found(self):
         """assign_role returns False when user doesn't exist."""
         self.mock_session.get.return_value = None  # User not found
@@ -34,7 +31,6 @@ class TestUserRoleRepository:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_assign_role_role_not_found(self):
         """assign_role returns False when role doesn't exist."""
         mock_user = MagicMock()
@@ -46,7 +42,6 @@ class TestUserRoleRepository:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_assign_role_success(self):
         """assign_role returns True when both user and role exist."""
         mock_user = MagicMock()
@@ -61,7 +56,6 @@ class TestUserRoleRepository:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_revoke_role_success(self):
         """revoke_role returns True when delete succeeds."""
         mock_result = MagicMock()
@@ -74,7 +68,6 @@ class TestUserRoleRepository:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_revoke_role_not_found(self):
         """revoke_role returns False when no association exists."""
         mock_result = MagicMock()
@@ -87,7 +80,6 @@ class TestUserRoleRepository:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_get_role_users_returns_user_ids(self):
         """get_role_users returns list of user UUIDs."""
         user_id_1 = uuid4()
@@ -103,7 +95,6 @@ class TestUserRoleRepository:
         assert user_id_1 in result
         assert user_id_2 in result
 
-    @pytest.mark.asyncio
     async def test_get_role_users_empty_when_no_users(self):
         """get_role_users returns empty list when no users have role."""
         mock_result = MagicMock()
@@ -115,7 +106,6 @@ class TestUserRoleRepository:
 
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_get_user_roles_returns_role_list(self):
         """get_user_roles returns list of Role entities."""
         role_id_1 = uuid4()
@@ -149,7 +139,6 @@ class TestUserRoleRepository:
 
         assert len(result) == 2
 
-    @pytest.mark.asyncio
     async def test_get_user_roles_empty_when_no_roles(self):
         """get_user_roles returns empty list when user has no roles."""
         mock_scalars = MagicMock()

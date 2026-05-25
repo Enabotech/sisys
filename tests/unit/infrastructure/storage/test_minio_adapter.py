@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.infrastructure.storage.minio.minio_adapter import MinIOAdapter
 
 
@@ -26,7 +24,6 @@ class TestMinIOAdapterInterface:
 class TestMinIOAdapterStore:
     """store 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_store_delegates_with_all_params(self):
         """验证 store 正确委托所有参数"""
         mock_repository = AsyncMock()
@@ -50,7 +47,6 @@ class TestMinIOAdapterStore:
             tags={"department": "engineering"},
         )
 
-    @pytest.mark.asyncio
     async def test_store_returns_string_etag(self):
         """验证返回字符串类型 ETag"""
         mock_repository = AsyncMock()
@@ -94,7 +90,6 @@ class TestMinIOAdapterRetrieve:
 class TestMinIOAdapterDelete:
     """delete 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_delete_delegates_correctly(self):
         """验证 delete 正确委托"""
         mock_repository = AsyncMock()
@@ -118,7 +113,6 @@ class TestMinIOAdapterDelete:
 class TestMinIOAdapterGetMetadata:
     """get_metadata 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_get_metadata_returns_dict(self):
         """验证返回元数据字典"""
         mock_repository = AsyncMock()
@@ -134,7 +128,6 @@ class TestMinIOAdapterGetMetadata:
 
         assert result == expected
 
-    @pytest.mark.asyncio
     async def test_get_metadata_delegates_with_params(self):
         """验证委托时传递所有参数"""
         mock_repository = AsyncMock()
@@ -153,7 +146,6 @@ class TestMinIOAdapterGetMetadata:
 class TestMinIOAdapterArchive:
     """archive 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_archive_delegates_with_retention_days(self):
         """验证 archive 委托并传递 retention_days"""
         mock_repository = AsyncMock()
@@ -171,7 +163,6 @@ class TestMinIOAdapterArchive:
         call_kwargs = mock_repository.archive.call_args[1]
         assert call_kwargs["retention_days"] == 2555
 
-    @pytest.mark.asyncio
     async def test_archive_with_content(self):
         """验证带内容的归档"""
         mock_repository = AsyncMock()

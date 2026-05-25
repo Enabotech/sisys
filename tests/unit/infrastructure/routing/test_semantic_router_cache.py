@@ -53,7 +53,6 @@ class TestSemanticRouterCache:
             embedding=embedding,
         )
 
-    @pytest.mark.asyncio
     async def test_cache_hit_on_repeated_text(
         self,
         test_candidate: Candidate,
@@ -74,7 +73,6 @@ class TestSemanticRouterCache:
         # Should only be called once (second call uses cache)
         assert second_call_count == first_call_count, "Cache not working - embed called twice"
 
-    @pytest.mark.asyncio
     async def test_cache_miss_on_different_text(
         self,
         test_candidate: Candidate,
@@ -94,7 +92,6 @@ class TestSemanticRouterCache:
         # Should be called twice
         assert second_call_count == first_call_count + 1, "Different text should trigger new embed call"
 
-    @pytest.mark.asyncio
     async def test_cache_eviction_when_full(
         self,
         mock_embedding_model: AsyncMock,
@@ -121,7 +118,6 @@ class TestSemanticRouterCache:
         assert "beyond-limit-text" in router._embedding_cache
         assert "text-0" not in router._embedding_cache  # oldest evicted
 
-    @pytest.mark.asyncio
     async def test_cache_keys_case_sensitive(
         self,
         test_candidate: Candidate,
@@ -140,13 +136,11 @@ class TestSemanticRouterCache:
         # Both should have called embed (case sensitive)
         assert count_after_lower >= count_after_cap
 
-    @pytest.mark.asyncio
     async def test_empty_cache_on_init(self) -> None:
         """Cache should be empty on initialization."""
         router = SemanticRouter()
         assert len(router._embedding_cache) == 0
 
-    @pytest.mark.asyncio
     async def test_cache_works_without_embedding_model(self) -> None:
         """Cache should work even without embedding model."""
         router = SemanticRouter(candidates=[])
@@ -160,7 +154,6 @@ class TestSemanticRouterCache:
         assert result1 == result2
         assert all(v == 0.0 for v in result1)
 
-    @pytest.mark.asyncio
     async def test_cache_isolation_between_router_instances(
         self,
         mock_embedding_model: AsyncMock,
@@ -178,7 +171,6 @@ class TestSemanticRouterCache:
         # router2's cache should not have it
         assert "shared-text" not in router2._embedding_cache
 
-    @pytest.mark.asyncio
     async def test_parallel_cache_access(
         self,
         test_candidate: Candidate,

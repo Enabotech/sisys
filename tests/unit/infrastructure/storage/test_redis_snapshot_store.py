@@ -35,7 +35,6 @@ class TestRedisSnapshotStore:
         adapter.raw_client = raw
         return adapter
 
-    @pytest.mark.asyncio
     async def test_save_snapshot_to_redis(self, mock_adapter: MagicMock) -> None:
         """save 应存储快照到 Redis Hash"""
         store = RedisSnapshotStore(adapter=mock_adapter)
@@ -51,7 +50,6 @@ class TestRedisSnapshotStore:
         mock_adapter.raw_client.hset.assert_called_once()
         mock_adapter.raw_client.expire.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_load_snapshot_from_redis(self, mock_adapter: MagicMock) -> None:
         """load 应从 Redis Hash 读取快照"""
         import json
@@ -73,7 +71,6 @@ class TestRedisSnapshotStore:
         assert result.stage_id == "execution"
         assert result.state_version == 2
 
-    @pytest.mark.asyncio
     async def test_load_returns_none_when_not_found(self, mock_adapter: MagicMock) -> None:
         """load 应在快照不存在时返回 None"""
         store = RedisSnapshotStore(adapter=mock_adapter)
@@ -83,7 +80,6 @@ class TestRedisSnapshotStore:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_delete_snapshot(self, mock_adapter: MagicMock) -> None:
         """delete 应删除快照"""
         store = RedisSnapshotStore(adapter=mock_adapter)
@@ -92,7 +88,6 @@ class TestRedisSnapshotStore:
 
         mock_adapter.delete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_exists_check(self, mock_adapter: MagicMock) -> None:
         """exists 应在快照存在时返回 True"""
         store = RedisSnapshotStore(adapter=mock_adapter)
@@ -102,7 +97,6 @@ class TestRedisSnapshotStore:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_exists_false_when_missing(self, mock_adapter: MagicMock) -> None:
         """exists 应在快照不存在时返回 False"""
         store = RedisSnapshotStore(adapter=mock_adapter)
@@ -131,7 +125,6 @@ class TestRedisSnapshotStore:
 
         assert store._ttl_seconds == 3600
 
-    @pytest.mark.asyncio
     async def test_save_handles_exception(self, mock_adapter: MagicMock) -> None:
         """save 应在 Redis 异常时抛出 RuntimeError"""
         store = RedisSnapshotStore(adapter=mock_adapter)
@@ -148,7 +141,6 @@ class TestRedisSnapshotStore:
 
         assert "Failed to save snapshot" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_load_handles_exception(self, mock_adapter: MagicMock) -> None:
         """load 应在 Redis 异常时返回 None"""
         store = RedisSnapshotStore(adapter=mock_adapter)
@@ -158,7 +150,6 @@ class TestRedisSnapshotStore:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_delete_handles_exception(self, mock_adapter: MagicMock) -> None:
         """delete 应在 Redis 异常时抛出 RuntimeError"""
         store = RedisSnapshotStore(adapter=mock_adapter)

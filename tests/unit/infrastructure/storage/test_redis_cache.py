@@ -16,7 +16,6 @@ from unittest.mock import patch
 
 import fakeredis
 import fakeredis.aioredis
-import pytest
 
 from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
@@ -152,7 +151,6 @@ class TestSerializationPerformance:
 class TestReadLatencyPerformance:
     """验证读取延迟 P95 <5ms"""
 
-    @pytest.mark.asyncio
     async def test_session_read_latency_p95_under_5ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = RedisSessionStorage(redis_client=fake_redis)
@@ -170,7 +168,6 @@ class TestReadLatencyPerformance:
         assert statistics.mean(latencies) < PERF_THRESHOLDS["read_p95_ms"]
         assert _percentile(latencies, 95) < PERF_THRESHOLDS["read_p95_ms"]
 
-    @pytest.mark.asyncio
     async def test_blackboard_read_latency_p95_under_5ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         blackboard = RedisPublicBlackboard(redis_client=fake_redis)
@@ -203,7 +200,6 @@ class TestReadLatencyPerformance:
 class TestWriteLatencyPerformance:
     """验证写入延迟 P95 <10ms"""
 
-    @pytest.mark.asyncio
     async def test_session_write_latency_p95_under_10ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = RedisSessionStorage(redis_client=fake_redis)
@@ -219,7 +215,6 @@ class TestWriteLatencyPerformance:
         assert statistics.mean(latencies) < PERF_THRESHOLDS["write_p95_ms"]
         assert _percentile(latencies, 95) < PERF_THRESHOLDS["write_p95_ms"]
 
-    @pytest.mark.asyncio
     async def test_blackboard_write_latency_p95_under_10ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         blackboard = RedisPublicBlackboard(redis_client=fake_redis)
@@ -241,7 +236,6 @@ class TestWriteLatencyPerformance:
         assert statistics.mean(latencies) < PERF_THRESHOLDS["write_p95_ms"]
         assert _percentile(latencies, 95) < PERF_THRESHOLDS["write_p95_ms"]
 
-    @pytest.mark.asyncio
     async def test_cache_set_latency_p95_under_10ms(self) -> None:
 
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
@@ -274,7 +268,6 @@ class TestWriteLatencyPerformance:
 class TestTTLBehavior:
     """验证 TTL 过期策略"""
 
-    @pytest.mark.asyncio
     async def test_session_ttl_is_applied(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = RedisSessionStorage(redis_client=fake_redis)
@@ -283,7 +276,6 @@ class TestTTLBehavior:
         ttl = await fake_redis.ttl(build_key(storage._NAMESPACE, "test-ttl-session"))
         assert 0 < ttl <= 60
 
-    @pytest.mark.asyncio
     async def test_cache_ttl_is_applied(self) -> None:
 
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)

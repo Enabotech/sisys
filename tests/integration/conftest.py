@@ -48,6 +48,35 @@ from tests.environments import get_test_env  # noqa: E402
 # Note: reset_test_environment in tests/fixtures.py is already autouse=True
 from tests.fixtures import reset_test_environment  # noqa: F401
 
+
+def pytest_collection_modifyitems(config, items):
+    """自动为 integration 目录下的测试添加 marker
+
+    1. 所有 integration 测试添加 @pytest.mark.integration
+    2. 根据文件名中的服务关键词添加服务依赖 marker
+    """
+    service_markers: dict[str, str] = {
+        "redis": "redis",
+        "qdrant": "qdrant",
+        "postgres": "database",
+        "minio": "minio",
+        "neo4j": "neo4j",
+        "rabbitmq": "database",
+    }
+
+    for item in items:
+        if "tests/integration" not in str(item.fspath):
+            continue
+
+        item.add_marker("integration")
+
+        # 按文件名检测服务依赖并自动标记
+        filename = str(item.fspath).lower()
+        for keyword, marker in service_markers.items():
+            if keyword in filename:
+                item.add_marker(marker)
+
+
 # ===================================================================
 # Mock Fixtures (for isolated unit-level integration tests)
 # ===================================================================

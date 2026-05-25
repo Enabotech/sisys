@@ -9,8 +9,6 @@ from __future__ import annotations
 from unittest import mock
 from uuid import uuid4
 
-import pytest
-
 from src.domain.ports.saga import SagaStep
 from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
 from src.infrastructure.saga.saga_status import SagaStatus
@@ -28,7 +26,6 @@ def _make_mock_repository() -> mock.AsyncMock:
 class TestDocumentProcessingSaga:
     """S01: 文档处理 Saga — 正向流程和补偿"""
 
-    @pytest.mark.asyncio
     async def test_s01_forward_execution(self) -> None:
         """S01 文档处理 Saga 应完整执行 4 个步骤"""
         repo = _make_mock_repository()
@@ -54,7 +51,6 @@ class TestDocumentProcessingSaga:
             step.execute.assert_awaited_once()
             step.compensate.assert_not_awaited()
 
-    @pytest.mark.asyncio
     async def test_s01_compensation_on_embedding_failure(self) -> None:
         """S01 generate_embedding 失败时补偿前两步"""
         repo = _make_mock_repository()
@@ -92,7 +88,6 @@ class TestDocumentProcessingSaga:
 class TestMemoryManagementSaga:
     """S02: 记忆管理 Saga"""
 
-    @pytest.mark.asyncio
     async def test_s02_forward_execution(self) -> None:
         """S02 记忆管理 Saga 应完整执行"""
         repo = _make_mock_repository()
@@ -119,7 +114,6 @@ class TestMemoryManagementSaga:
 class TestCrossStorageSyncSaga:
     """S03: 跨存储同步 Saga"""
 
-    @pytest.mark.asyncio
     async def test_s03_sync_with_compensation(self) -> None:
         """S03 跨存储同步失败时应补偿已完成的存储操作"""
         repo = _make_mock_repository()

@@ -169,7 +169,6 @@ class TestAutoTriggerListenerStop:
 class TestAutoTriggerListenerProcessEvent:
     """Test _process_event method."""
 
-    @pytest.mark.asyncio
     async def test_process_event_heartbeat_triggered(self) -> None:
         """Coverage: HeartbeatTriggered uses special handler."""
         from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
@@ -203,7 +202,6 @@ class TestAutoTriggerListenerProcessEvent:
         # Note: Due to threading complexity, we mainly verify no exception is raised
         listener.stop()
 
-    @pytest.mark.asyncio
     async def test_process_event_logs_warning_on_none_trigger(self) -> None:
         """Coverage: _process_event logs warning when AutoTriggerService returns None."""
         from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
@@ -226,7 +224,6 @@ class TestAutoTriggerListenerProcessEvent:
 
         mock_auto_trigger_service.on_domain_event.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_process_event_handles_exception(self) -> None:
         """Coverage: _process_event handles exceptions gracefully."""
         from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler

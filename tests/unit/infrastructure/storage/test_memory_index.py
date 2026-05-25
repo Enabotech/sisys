@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
-
 from src.infrastructure.config.memory import MemoryConfig
 from src.infrastructure.storage.fs.memory_index import MemoryIndex
 
@@ -33,7 +31,6 @@ class TestMemoryIndexInit:
 class TestMemoryIndexUpdateEntry:
     """MemoryIndex 更新条目验证"""
 
-    @pytest.mark.asyncio
     async def test_update_entry_creates_index(self, tmp_path):
         """验证更新条目时创建索引文件"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -50,7 +47,6 @@ class TestMemoryIndexUpdateEntry:
         index_path = tmp_path / "MEMORY.md"
         assert index_path.exists()
 
-    @pytest.mark.asyncio
     async def test_update_entry_format(self, tmp_path):
         """验证索引条目格式正确"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -68,7 +64,6 @@ class TestMemoryIndexUpdateEntry:
         content = (tmp_path / "MEMORY.md").read_text()
         assert f"- [my-test-memory](user/{memory_id}.md) — 这是描述" in content
 
-    @pytest.mark.asyncio
     async def test_update_entry_multiple_types(self, tmp_path):
         """验证多种类型的索引条目"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -89,7 +84,6 @@ class TestMemoryIndexUpdateEntry:
         assert "- [project-info](project/" in content
         assert "- [ref-doc](reference/" in content
 
-    @pytest.mark.asyncio
     async def test_update_entry_same_memory_id_updates(self, tmp_path):
         """验证相同 memory_id 更新条目"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -120,7 +114,6 @@ class TestMemoryIndexUpdateEntry:
 class TestMemoryIndexRemoveEntry:
     """MemoryIndex 移除条目验证"""
 
-    @pytest.mark.asyncio
     async def test_remove_entry_existing(self, tmp_path):
         """验证移除已存在的条目"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -141,7 +134,6 @@ class TestMemoryIndexRemoveEntry:
         content = (tmp_path / "MEMORY.md").read_text()
         assert "to-be-removed" not in content
 
-    @pytest.mark.asyncio
     async def test_remove_entry_nonexistent_no_raise(self, tmp_path):
         """验证移除不存在的条目不抛出异常"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -154,7 +146,6 @@ class TestMemoryIndexRemoveEntry:
 class TestMemoryIndexReadEntries:
     """MemoryIndex 读取条目验证"""
 
-    @pytest.mark.asyncio
     async def test_read_entries_empty(self, tmp_path):
         """验证读取空索引"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -163,7 +154,6 @@ class TestMemoryIndexReadEntries:
         entries = await index.read_entries()
         assert entries == []
 
-    @pytest.mark.asyncio
     async def test_read_entries_multiple(self, tmp_path):
         """验证读取多个条目"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -182,7 +172,6 @@ class TestMemoryIndexReadEntries:
         assert "memory-1" in names
         assert "memory-2" in names
 
-    @pytest.mark.asyncio
     async def test_read_entries_returns_dict_with_required_fields(self, tmp_path):
         """验证读取条目包含必需字段"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -208,7 +197,6 @@ class TestMemoryIndexReadEntries:
 class TestMemoryIndexTruncation:
     """MemoryIndex 截断策略验证"""
 
-    @pytest.mark.asyncio
     async def test_truncate_preserves_latest_200_lines(self, tmp_path):
         """验证截断保留最新 200 行"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -239,7 +227,6 @@ class TestMemoryIndexTruncation:
         # 第一行应该是 memory-50（最旧保留）
         assert "memory-50" in lines[0]
 
-    @pytest.mark.asyncio
     async def test_truncate_under_200_lines_no_change(self, tmp_path):
         """验证不足 200 行时不截断"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -266,7 +253,6 @@ class TestMemoryIndexTruncation:
 
         assert len(lines_before) == len(lines_after) == 50
 
-    @pytest.mark.asyncio
     async def test_truncate_exactly_200_lines_no_change(self, tmp_path):
         """验证正好 200 行时不截断"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -296,7 +282,6 @@ class TestMemoryIndexTruncation:
 class TestMemoryIndexSearch:
     """MemoryIndex 搜索功能验证"""
 
-    @pytest.mark.asyncio
     async def test_search_by_name(self, tmp_path):
         """验证按名称搜索"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -316,7 +301,6 @@ class TestMemoryIndexSearch:
         assert "apple-pie" in names
         assert "apple-juice" in names
 
-    @pytest.mark.asyncio
     async def test_search_case_insensitive(self, tmp_path):
         """验证搜索大小写不敏感"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -334,7 +318,6 @@ class TestMemoryIndexSearch:
         assert len(results) == 1
         assert results[0]["name"] == "TestMemory"
 
-    @pytest.mark.asyncio
     async def test_search_no_match(self, tmp_path):
         """验证搜索无匹配"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -355,7 +338,6 @@ class TestMemoryIndexSearch:
 class TestMemoryIndexGroupIsolation:
     """MemoryIndex 分组隔离验证"""
 
-    @pytest.mark.asyncio
     async def test_private_memory_path(self, tmp_path):
         """验证 Private 记忆路径格式"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))
@@ -372,7 +354,6 @@ class TestMemoryIndexGroupIsolation:
         content = (tmp_path / "MEMORY.md").read_text()
         assert "user/" in content  # Private 使用 user/ 而非 group/user/
 
-    @pytest.mark.asyncio
     async def test_group_memory_path(self, tmp_path):
         """验证 Group 记忆路径格式"""
         config = MemoryConfig(memory_l0_path=str(tmp_path))

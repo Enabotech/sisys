@@ -45,7 +45,6 @@ def repository(mock_session):
 class TestUserRepository:
     """UserRepository 测试"""
 
-    @pytest.mark.asyncio
     async def test_get_by_username(self, repository, mock_session):
         """测试根据用户名获取用户"""
         model = _make_user_model_mock()
@@ -60,7 +59,6 @@ class TestUserRepository:
         assert result.username == model.username
         assert result.email == model.email
 
-    @pytest.mark.asyncio
     async def test_get_by_username_not_found(self, repository, mock_session):
         """测试根据用户名获取不存在的用户"""
         mock_result = mock.Mock()
@@ -71,7 +69,6 @@ class TestUserRepository:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_by_email(self, repository, mock_session):
         """测试根据邮箱获取用户"""
         model = _make_user_model_mock()

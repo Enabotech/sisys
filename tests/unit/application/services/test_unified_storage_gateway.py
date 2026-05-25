@@ -136,7 +136,6 @@ class TestUnifiedStorageGatewayBehavior:
             l2_history=mock_l2_history,
         )
 
-    @pytest.mark.asyncio
     async def test_save_writes_to_l0(self, gateway, mock_l0_storage) -> None:
         """save 应写入 L0 文件系统"""
         result = await gateway.save(
@@ -150,7 +149,6 @@ class TestUnifiedStorageGatewayBehavior:
         mock_l0_storage.write.assert_called_once()
         assert any(k.value == "l0_file" for k in result.keys())
 
-    @pytest.mark.asyncio
     async def test_save_warms_l1_cache(self, gateway, mock_l1_cache) -> None:
         """L0 写入成功后应预热 L1 缓存"""
         await gateway.save(
@@ -163,7 +161,6 @@ class TestUnifiedStorageGatewayBehavior:
 
         mock_l1_cache.set_memory.assert_called_once_with("private", "user123", "test-memory", "test content")
 
-    @pytest.mark.asyncio
     async def test_read_with_cache_miss_falls_back_to_l0(self, gateway, mock_l0_storage) -> None:
         """缓存未命中时应回退到 L0"""
         mock_l0_storage.read.return_value = "memory from L0"
@@ -179,7 +176,6 @@ class TestUnifiedStorageGatewayBehavior:
         assert result == "memory from L0"
         mock_l0_storage.read.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_read_with_cache_hit_returns_cached(self, gateway, mock_l1_cache, mock_l0_storage) -> None:
         """缓存命中时应直接返回"""
         mock_l1_cache.get_memory.return_value = "cached content"
@@ -195,7 +191,6 @@ class TestUnifiedStorageGatewayBehavior:
         assert result == "cached content"
         mock_l0_storage.read.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_delete_removes_from_l0(self, gateway, mock_l0_storage) -> None:
         """delete 应从 L0 删除"""
         result = await gateway.delete(
@@ -208,7 +203,6 @@ class TestUnifiedStorageGatewayBehavior:
         mock_l0_storage.delete.assert_called_once()
         assert any(k.value == "l0_file" for k in result.keys())
 
-    @pytest.mark.asyncio
     async def test_delete_invalidates_l1_cache(self, gateway, mock_l1_cache) -> None:
         """delete 应始终失效 L1 缓存"""
         await gateway.delete(
@@ -220,7 +214,6 @@ class TestUnifiedStorageGatewayBehavior:
 
         mock_l1_cache.delete_memory.assert_called_once_with("private", "user123", "test-memory")
 
-    @pytest.mark.asyncio
     async def test_exists_checks_l0(self, gateway, mock_l0_storage, mock_l2_metadata) -> None:
         """exists 应检查 L0"""
         mock_l0_storage.exists.return_value = True

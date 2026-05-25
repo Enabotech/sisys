@@ -5,8 +5,6 @@ from __future__ import annotations
 import inspect
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.domain.ports.integrity import IntegrityPort
 
 
@@ -85,7 +83,6 @@ class ConcreteIntegrityAdapter(IntegrityPort):
         return actual.lower() == expected_hash.lower()
 
 
-@pytest.mark.asyncio
 async def test_concrete_verify_file():
     """Concrete implementation should support verify_file."""
     adapter = ConcreteIntegrityAdapter()

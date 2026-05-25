@@ -9,8 +9,6 @@ from __future__ import annotations
 from unittest import mock
 from uuid import uuid4
 
-import pytest
-
 
 class PermissionService:
     """Permission management service.
@@ -65,7 +63,6 @@ class TestPermissionServiceCheckPermission:
             self.mock_permission_repo,
         )
 
-    @pytest.mark.asyncio
     async def test_check_permission_returns_true_when_allowed(self):
         """🔴 RED: check_permission should return True when user has permission."""
         user_id = uuid4()
@@ -77,7 +74,6 @@ class TestPermissionServiceCheckPermission:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_check_permission_returns_false_when_denied(self):
         """🔴 RED: check_permission should return False when user lacks permission."""
         user_id = uuid4()
@@ -89,7 +85,6 @@ class TestPermissionServiceCheckPermission:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_check_permission_with_wildcard_action(self):
         """🔴 RED: Permission with wildcard action (*) should match any action."""
         user_id = uuid4()
@@ -101,7 +96,6 @@ class TestPermissionServiceCheckPermission:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_check_permission_with_wildcard_resource_action(self):
         """🔴 RED: Permission *:* should match any resource:action."""
         user_id = uuid4()
@@ -113,7 +107,6 @@ class TestPermissionServiceCheckPermission:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_check_permission_returns_false_when_no_roles(self):
         """🔴 RED: User with no roles should have no permissions."""
         user_id = uuid4()
@@ -138,7 +131,6 @@ class TestPermissionServiceGetUserPermissions:
             self.mock_permission_repo,
         )
 
-    @pytest.mark.asyncio
     async def test_get_user_permissions_returns_permissions(self):
         """🔴 RED: get_user_permissions should return list of permissions."""
         user_id = uuid4()
@@ -153,7 +145,6 @@ class TestPermissionServiceGetUserPermissions:
         assert isinstance(result, list)
         assert len(result) == 3
 
-    @pytest.mark.asyncio
     async def test_get_user_permissions_deduplicates(self):
         """🔴 RED: get_user_permissions should deduplicate permissions from multiple roles."""
         user_id = uuid4()
@@ -167,7 +158,6 @@ class TestPermissionServiceGetUserPermissions:
 
         assert len(result) == 1
 
-    @pytest.mark.asyncio
     async def test_get_user_permissions_empty_for_no_roles(self):
         """🔴 RED: User with no roles should return empty list."""
         user_id = uuid4()

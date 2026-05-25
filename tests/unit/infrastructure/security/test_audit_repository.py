@@ -35,7 +35,6 @@ def repo(mock_session: mock.AsyncMock):
 class TestAuditRepository:
     """Test AuditRepository implementation."""
 
-    @pytest.mark.asyncio
     async def test_save_creates_log(
         self,
         repo: AuditRepository,
@@ -63,7 +62,6 @@ class TestAuditRepository:
         mock_session.add.assert_called_once()
         mock_session.flush.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_get_by_id_returns_none_for_missing(
         self,
         repo: AuditRepository,
@@ -79,7 +77,6 @@ class TestAuditRepository:
         assert result is None
         mock_session.execute.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_search_with_no_criteria_returns_empty(
         self,
         repo: AuditRepository,
@@ -97,7 +94,6 @@ class TestAuditRepository:
         assert result.items == ()
         assert result.total == 0
 
-    @pytest.mark.asyncio
     async def test_search_with_offset_and_limit(
         self,
         repo: AuditRepository,
@@ -115,7 +111,6 @@ class TestAuditRepository:
         assert result.offset == 0
         assert result.limit == 10
 
-    @pytest.mark.asyncio
     async def test_update_archive_status_returns_false_for_missing(
         self,
         repo: AuditRepository,
@@ -129,7 +124,6 @@ class TestAuditRepository:
         result = await repo.update_archive_status(uuid4(), True, datetime.now(UTC))
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_get_archive_status_returns_none_for_missing(
         self,
         repo: AuditRepository,
@@ -143,7 +137,6 @@ class TestAuditRepository:
         result = await repo.get_archive_status(uuid4())
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_search_with_match_any_true(
         self,
         repo: AuditRepository,
@@ -163,7 +156,6 @@ class TestAuditRepository:
 
         assert isinstance(result, AuditSearchResult)
 
-    @pytest.mark.asyncio
     async def test_search_with_match_any_false(
         self,
         repo: AuditRepository,
@@ -183,7 +175,6 @@ class TestAuditRepository:
 
         assert isinstance(result, AuditSearchResult)
 
-    @pytest.mark.asyncio
     async def test_search_with_time_range(
         self,
         repo: AuditRepository,
@@ -203,7 +194,6 @@ class TestAuditRepository:
 
         assert isinstance(result, AuditSearchResult)
 
-    @pytest.mark.asyncio
     async def test_search_with_all_criteria(
         self,
         repo: AuditRepository,
@@ -231,7 +221,6 @@ class TestAuditRepository:
         assert result.offset == 0
         assert result.limit == 20
 
-    @pytest.mark.asyncio
     async def test_search_conditions_built_correctly(
         self,
         repo: AuditRepository,
@@ -254,7 +243,6 @@ class TestAuditRepository:
         assert isinstance(result, AuditSearchResult)
         assert result.total >= 0
 
-    @pytest.mark.asyncio
     async def test_search_no_conditions(
         self,
         repo: AuditRepository,
@@ -272,7 +260,6 @@ class TestAuditRepository:
         assert result.total == 0
         assert result.items == ()
 
-    @pytest.mark.asyncio
     async def test_search_pagination_offset(
         self,
         repo: AuditRepository,

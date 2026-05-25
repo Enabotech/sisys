@@ -17,8 +17,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
-import pytest
-
 from src.infrastructure.security.audit_service_impl import AuditServiceImpl
 
 
@@ -34,7 +32,6 @@ def _make_audit_service() -> AuditServiceImpl:
 class TestAuditEventRecordingCompliance:
     """审计事件记录合规验证 (AC-3.1)"""
 
-    @pytest.mark.asyncio
     async def test_login_event_recorded(self) -> None:
         """登录事件应被记录"""
         audit_service = _make_audit_service()
@@ -47,7 +44,6 @@ class TestAuditEventRecordingCompliance:
         assert record.actor == "user123"
         assert record.action_type == "login"
 
-    @pytest.mark.asyncio
     async def test_logout_event_recorded(self) -> None:
         """登出事件应被记录"""
         audit_service = _make_audit_service()
@@ -59,7 +55,6 @@ class TestAuditEventRecordingCompliance:
         assert record is not None
         assert record.action_type == "logout"
 
-    @pytest.mark.asyncio
     async def test_login_failure_event_recorded(self) -> None:
         """登录失败事件应被记录"""
         audit_service = _make_audit_service()
@@ -75,7 +70,6 @@ class TestAuditEventRecordingCompliance:
 class TestPermissionChangeEventRecordingCompliance:
     """权限变更事件记录合规验证 (AC-3.2)"""
 
-    @pytest.mark.asyncio
     async def test_role_assignment_recorded(self) -> None:
         """角色分配事件应被记录"""
         audit_service = _make_audit_service()
@@ -88,7 +82,6 @@ class TestPermissionChangeEventRecordingCompliance:
         assert record is not None
         assert record.action_type == "role_assigned"
 
-    @pytest.mark.asyncio
     async def test_permission_change_recorded(self) -> None:
         """权限变更事件应被记录"""
         audit_service = _make_audit_service()
@@ -104,7 +97,6 @@ class TestPermissionChangeEventRecordingCompliance:
 class TestSensitiveOperationRecordingCompliance:
     """敏感操作事件记录合规验证 (AC-3.3)"""
 
-    @pytest.mark.asyncio
     async def test_delete_operation_recorded(self) -> None:
         """删除操作应被记录"""
         audit_service = _make_audit_service()
@@ -117,7 +109,6 @@ class TestSensitiveOperationRecordingCompliance:
         assert record is not None
         assert record.action_type == "delete"
 
-    @pytest.mark.asyncio
     async def test_export_operation_recorded(self) -> None:
         """导出操作应被记录"""
         audit_service = _make_audit_service()
@@ -133,7 +124,6 @@ class TestSensitiveOperationRecordingCompliance:
 class TestAuditIntegrityCompliance:
     """审计完整性合规验证 (AC-3.4)"""
 
-    @pytest.mark.asyncio
     async def test_verify_integrity_returns_bool(self) -> None:
         """完整性验证应返回布尔值"""
         import hashlib
@@ -160,7 +150,6 @@ class TestAuditIntegrityCompliance:
         assert isinstance(result, bool)
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_checksum_sha256_algorithm_used(self) -> None:
         """审计服务应使用 SHA256 算法计算校验和"""
         import hashlib
@@ -169,7 +158,6 @@ class TestAuditIntegrityCompliance:
         checksum = hashlib.sha256(test_data.encode()).hexdigest()
         assert len(checksum) == 64, "SHA256应生成64位十六进制哈希"
 
-    @pytest.mark.asyncio
     async def test_batch_verification_supported(self) -> None:
         """批量验证应支持"""
         audit_service = _make_audit_service()
@@ -180,14 +168,12 @@ class TestAuditIntegrityCompliance:
 class TestWORMArchiveCompliance:
     """WORM 归档合规验证 (AC-3.5)"""
 
-    @pytest.mark.asyncio
     async def test_archive_functionality_exists(self) -> None:
         """归档功能应存在"""
         audit_service = _make_audit_service()
         assert hasattr(audit_service, "archive")
         assert callable(audit_service.archive)
 
-    @pytest.mark.asyncio
     async def test_archive_older_than_days(self) -> None:
         """归档应支持按天过滤"""
         audit_service = _make_audit_service()

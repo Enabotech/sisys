@@ -16,15 +16,12 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
-import pytest
-
 from src.infrastructure.security.permission_service_impl import PermissionServiceImpl
 
 
 class TestRBACPermissionCompliance:
     """RBAC 权限合规验证 (AC-2.1)"""
 
-    @pytest.mark.asyncio
     async def test_admin_has_all_permissions(self) -> None:
         """管理员应拥有所有权限"""
         user_id = uuid4()
@@ -38,7 +35,6 @@ class TestRBACPermissionCompliance:
         has_perm = await permission_service.check_permission(user_id, "document", "delete")
         assert isinstance(has_perm, bool)
 
-    @pytest.mark.asyncio
     async def test_regular_user_denied_admin_resource(self) -> None:
         """普通用户应被拒绝管理资源访问"""
         user_id = uuid4()
@@ -50,7 +46,6 @@ class TestRBACPermissionCompliance:
         has_perm = await permission_service.check_permission(user_id, "admin_panel", "access")
         assert has_perm is False, "普通用户不应访问管理面板"
 
-    @pytest.mark.asyncio
     async def test_permission_check_returns_bool(self) -> None:
         """权限检查应返回布尔值"""
         user_id = uuid4()
@@ -60,7 +55,6 @@ class TestRBACPermissionCompliance:
         result = await permission_service.check_permission(user_id, "document", "read")
         assert isinstance(result, bool)
 
-    @pytest.mark.asyncio
     async def test_get_user_permissions_returns_list(self) -> None:
         """获取用户权限应返回列表"""
         user_id = uuid4()
@@ -76,7 +70,6 @@ class TestRBACPermissionCompliance:
 class TestVerticalPrivilegeEscalationCompliance:
     """垂直越权防护合规验证 (AC-2.4)"""
 
-    @pytest.mark.asyncio
     async def test_low_privilege_user_cannot_access_high_privilege_resource(self) -> None:
         """低权限用户不能访问高权限资源"""
         user_id = uuid4()
@@ -92,7 +85,6 @@ class TestVerticalPrivilegeEscalationCompliance:
 class TestHorizontalPrivilegeEscalationCompliance:
     """水平越权防护合规验证 (AC-2.3)"""
 
-    @pytest.mark.asyncio
     async def test_user_cannot_access_other_user_resource(self) -> None:
         """用户不能访问其他用户的资源"""
         user_id = uuid4()

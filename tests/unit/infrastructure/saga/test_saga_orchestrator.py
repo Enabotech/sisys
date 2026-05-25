@@ -34,7 +34,6 @@ def _make_mock_repository() -> mock.AsyncMock:
 class TestSagaOrchestrator:
     """验证 SagaOrchestrator 正向执行和补偿流程"""
 
-    @pytest.mark.asyncio
     async def test_orchestrator_forward_execution(self) -> None:
         """SagaOrchestrator 应正确执行正向流程"""
         from src.domain.ports.saga import SagaStep
@@ -69,7 +68,6 @@ class TestSagaOrchestrator:
         step1.compensate.assert_not_awaited()
         step2.compensate.assert_not_awaited()
 
-    @pytest.mark.asyncio
     async def test_orchestrator_compensation_on_step_failure(self) -> None:
         """中间步骤失败时应触发补偿"""
         from src.domain.ports.saga import SagaStep
@@ -102,7 +100,6 @@ class TestSagaOrchestrator:
         step1.compensate.assert_awaited_once()
         step2.compensate.assert_not_awaited()
 
-    @pytest.mark.asyncio
     async def test_orchestrator_compensation_failure_marks_failed(self) -> None:
         """补偿失败时应标记为 FAILED"""
         from src.domain.ports.saga import SagaStep
@@ -133,7 +130,6 @@ class TestSagaOrchestrator:
         assert result.errors is not None
         assert len(result.errors) > 0
 
-    @pytest.mark.asyncio
     async def test_orchestrator_context_preserves_step_data(self) -> None:
         """SagaContext 应保存各步骤输出"""
         from src.domain.ports.saga import SagaStep
@@ -163,7 +159,6 @@ class TestSagaOrchestrator:
         assert "step1" in result.steps_data
         assert "step2" in result.steps_data
 
-    @pytest.mark.asyncio
     async def test_orchestrator_empty_steps_raises(self) -> None:
         """空步骤列表应抛出 ValueError"""
         from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
@@ -178,7 +173,6 @@ class TestSagaOrchestrator:
                 repository=repo,
             )
 
-    @pytest.mark.asyncio
     async def test_orchestrator_first_step_failure_goes_failed(self) -> None:
         """第一步失败时没有可补偿步骤，直接标记为 FAILED"""
         from src.domain.ports.saga import SagaStep
@@ -203,7 +197,6 @@ class TestSagaOrchestrator:
         assert result.status == SagaStatus.FAILED
         step1.compensate.assert_not_awaited()
 
-    @pytest.mark.asyncio
     async def test_orchestrator_saves_after_each_step(self) -> None:
         """每步执行后应调用 repository.save"""
         from src.domain.ports.saga import SagaStep

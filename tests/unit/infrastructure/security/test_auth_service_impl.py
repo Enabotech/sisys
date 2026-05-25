@@ -38,7 +38,6 @@ class TestAuthServiceImpl:
             refresh_token_store=self.mock_refresh_token_store,
         )
 
-    @pytest.mark.asyncio
     async def test_authenticate_success(self):
         """Valid credentials return access token."""
         mock_user = MagicMock()
@@ -63,7 +62,6 @@ class TestAuthServiceImpl:
         assert result.refresh_token == "refresh_token"
         self.mock_login_attempt_repo.clear_attempts.assert_called_once_with("testuser")
 
-    @pytest.mark.asyncio
     async def test_authenticate_user_not_found(self):
         """User not found raises AuthenticationError."""
         self.mock_user_repo.get_by_username.return_value = None
@@ -77,7 +75,6 @@ class TestAuthServiceImpl:
         call_args = self.mock_encryption.timing_safe_verify.call_args
         assert call_args[0][0] == "password"  # First arg is password
 
-    @pytest.mark.asyncio
     async def test_authenticate_inactive_user(self):
         """Inactive user raises AuthenticationError."""
         mock_user = MagicMock()
@@ -91,7 +88,6 @@ class TestAuthServiceImpl:
 
         assert "inactive" in str(exc_info.value).lower()
 
-    @pytest.mark.asyncio
     async def test_authenticate_locked_user(self):
         """Locked user raises AuthenticationError."""
         mock_user = MagicMock()
@@ -106,7 +102,6 @@ class TestAuthServiceImpl:
 
         assert "locked" in str(exc_info.value).lower()
 
-    @pytest.mark.asyncio
     async def test_authenticate_wrong_password(self):
         """Wrong password raises AuthenticationError."""
         mock_user = MagicMock()
@@ -126,7 +121,6 @@ class TestAuthServiceImpl:
 
         assert "Invalid credentials" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_verify_token_success(self):
         """Valid token returns TokenPayload."""
         mock_payload = MagicMock()
@@ -138,7 +132,6 @@ class TestAuthServiceImpl:
 
         assert result == mock_payload
 
-    @pytest.mark.asyncio
     async def test_verify_token_blacklisted(self):
         """Blacklisted token raises AuthenticationError."""
         self.mock_token_blacklist.is_blacklisted.return_value = True
@@ -148,14 +141,12 @@ class TestAuthServiceImpl:
 
         assert "revoked" in str(exc_info.value).lower()
 
-    @pytest.mark.asyncio
     async def test_logout_adds_to_blacklist(self):
         """logout() adds token to blacklist."""
         await self.service.logout("token_to_revoke")
 
         self.mock_token_blacklist.add.assert_called_once_with("token_to_revoke")
 
-    @pytest.mark.asyncio
     async def test_logout_no_blacklist(self):
         """logout() does nothing when no blacklist configured."""
         service_no_blacklist = AuthServiceImpl(
@@ -169,7 +160,6 @@ class TestAuthServiceImpl:
 
         # No error should occur
 
-    @pytest.mark.asyncio
     async def test_refresh_token_success(self):
         """Valid refresh token returns new access token."""
         user_id = uuid4()
@@ -194,7 +184,6 @@ class TestAuthServiceImpl:
         assert result == "new_access_token"
         self.mock_refresh_token_store.mark_used.assert_called_once_with("jti_123", user_id)
 
-    @pytest.mark.asyncio
     async def test_refresh_token_reuse_detected(self):
         """Reused refresh token raises AuthenticationError."""
         user_id = uuid4()
@@ -208,7 +197,6 @@ class TestAuthServiceImpl:
 
         assert "reuse" in str(exc_info.value).lower() or "attack" in str(exc_info.value).lower()
 
-    @pytest.mark.asyncio
     async def test_refresh_token_user_not_found(self):
         """Refresh token for non-existent user raises error."""
         user_id = uuid4()
@@ -224,7 +212,6 @@ class TestAuthServiceImpl:
 
         assert "not found" in str(exc_info.value).lower()
 
-    @pytest.mark.asyncio
     async def test_get_user_roles_returns_role_names(self):
         """_get_user_roles returns list of role names."""
         role1 = MagicMock()

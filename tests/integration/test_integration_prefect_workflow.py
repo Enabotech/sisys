@@ -15,8 +15,6 @@ from __future__ import annotations
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.domain.value_objects.flow_status import FlowStatus
 
@@ -24,7 +22,6 @@ from src.domain.value_objects.flow_status import FlowStatus
 class TestOrchestrationEndToEnd:
     """OrchestrationService → PrefectEngine → EventPublisher 端到端"""
 
-    @pytest.mark.asyncio
     async def test_data_pipeline_full_chain(self) -> None:
         """data_pipeline 完整链路：OrchestrationService → PrefectEngine.submit_flow"""
         from src.application.services.orchestration_service import (
@@ -87,7 +84,6 @@ class TestOrchestrationEndToEnd:
 class TestPrefectEngineStatusMapping:
     """PrefectEngine 状态映射集成验证"""
 
-    @pytest.mark.asyncio
     async def test_all_state_types_mapped(self) -> None:
         """验证所有 Prefect StateType 都有映射"""
         from prefect.states import StateType

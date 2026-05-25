@@ -90,7 +90,6 @@ class TestUDMRHandlerInit:
 class TestUDMRHandlerOnRouted:
     """on_routed() 测试."""
 
-    @pytest.mark.asyncio
     async def test_on_routed_calls_decide(
         self,
         handler: UDMRHandler,
@@ -106,7 +105,6 @@ class TestUDMRHandlerOnRouted:
         await handler.on_routed(event)
         mock_udmr_service.decide.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_routed_disabled_skips(
         self,
         mock_udmr_service: AsyncMock,
@@ -118,7 +116,6 @@ class TestUDMRHandlerOnRouted:
         await h.on_routed(event)
         mock_udmr_service.decide.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_on_routed_non_auto_routed_skips(
         self,
         handler: UDMRHandler,
@@ -129,7 +126,6 @@ class TestUDMRHandlerOnRouted:
         await handler.on_routed(event)
         mock_udmr_service.decide.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_on_routed_task_context_extraction(
         self,
         handler: UDMRHandler,
@@ -158,7 +154,6 @@ class TestUDMRHandlerOnRouted:
 class TestUDMRHandlerRegister:
     """register() 测试."""
 
-    @pytest.mark.asyncio
     async def test_register_calls_subscribe_async(
         self,
         handler: UDMRHandler,

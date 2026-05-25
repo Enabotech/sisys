@@ -13,8 +13,6 @@ from __future__ import annotations
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.application.event_handlers.memory_changed_handler import (
     MemoryChangedHandler,
 )
@@ -50,7 +48,6 @@ class TestMemoryChangedListenerIndexManagerPort:
         # index_manager 允许为 None（向后兼容）
         assert listener._index_manager is None
 
-    @pytest.mark.asyncio
     async def test_handle_updates_index_on_memory_change(self):
         """验证 handle() 方法调用 index_manager.update_entry()"""
         mock_l1_cache = AsyncMock()

@@ -33,7 +33,6 @@ def integrity_service() -> DataIntegrityServiceImpl:
 class TestChecksumCalculation:
     """校验和计算验证 (AC-5.1)"""
 
-    @pytest.mark.asyncio
     async def test_calculate_sha256_checksum_string(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -49,7 +48,6 @@ class TestChecksumCalculation:
         assert checksum == checksum.lower()
         assert all(c in "0123456789abcdef" for c in checksum)
 
-    @pytest.mark.asyncio
     async def test_calculate_sha256_checksum_bytes(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -62,7 +60,6 @@ class TestChecksumCalculation:
         assert isinstance(checksum, str)
         assert len(checksum) == 64
 
-    @pytest.mark.asyncio
     async def test_calculate_checksum_returns_hex_lowercase(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -75,7 +72,6 @@ class TestChecksumCalculation:
         assert checksum == checksum.lower()
         assert all(c in "0123456789abcdef" for c in checksum)
 
-    @pytest.mark.asyncio
     async def test_calculate_checksum_deterministic(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -91,7 +87,6 @@ class TestChecksumCalculation:
         )
         assert checksum1 == checksum2
 
-    @pytest.mark.asyncio
     async def test_calculate_checksum_different_data_different_result(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -111,7 +106,6 @@ class TestChecksumCalculation:
 class TestChecksumVerification:
     """校验和验证"""
 
-    @pytest.mark.asyncio
     async def test_verify_checksum_match(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -124,7 +118,6 @@ class TestChecksumVerification:
         assert result.expected_hash == checksum
         assert result.actual_hash == checksum
 
-    @pytest.mark.asyncio
     async def test_verify_checksum_mismatch(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -138,7 +131,6 @@ class TestChecksumVerification:
         assert result.actual_hash != wrong_checksum
         assert result.error_message != ""
 
-    @pytest.mark.asyncio
     async def test_verify_checksum_tampered_data(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -155,7 +147,6 @@ class TestChecksumVerification:
 class TestDataIntegrityVerification:
     """数据完整性验证 (AC-5.2)"""
 
-    @pytest.mark.asyncio
     async def test_verify_data_integrity_valid(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -168,7 +159,6 @@ class TestDataIntegrityVerification:
         assert result.valid is True
         assert result.data_id == data_id
 
-    @pytest.mark.asyncio
     async def test_verify_data_integrity_invalid(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -182,7 +172,6 @@ class TestDataIntegrityVerification:
         assert result.data_id == data_id
         assert result.error_message != ""
 
-    @pytest.mark.asyncio
     async def test_verify_data_integrity_publishes_event_on_failure(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -200,7 +189,6 @@ class TestDataIntegrityVerification:
 class TestAlgorithmSupport:
     """算法支持验证"""
 
-    @pytest.mark.asyncio
     async def test_default_algorithm_is_sha256(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -209,7 +197,6 @@ class TestAlgorithmSupport:
         checksum = await integrity_service.calculate_checksum("test")
         assert len(checksum) == 64  # SHA256 特征
 
-    @pytest.mark.asyncio
     async def test_sha512_algorithm_supported(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -218,7 +205,6 @@ class TestAlgorithmSupport:
         checksum = await integrity_service.calculate_checksum("test", algorithm="sha512")
         assert len(checksum) == 128  # SHA512 输出 128 位十六进制
 
-    @pytest.mark.asyncio
     async def test_md5_algorithm_supported(
         self,
         integrity_service: DataIntegrityServiceImpl,
@@ -231,7 +217,6 @@ class TestAlgorithmSupport:
 class TestIntegrityResultStructure:
     """完整性结果结构验证"""
 
-    @pytest.mark.asyncio
     async def test_result_has_required_fields(
         self,
         integrity_service: DataIntegrityServiceImpl,

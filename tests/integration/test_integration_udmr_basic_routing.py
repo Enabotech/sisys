@@ -126,7 +126,6 @@ def handler(
 class TestUDMREndToEnd:
     """UDMR 管线端到端测试."""
 
-    @pytest.mark.asyncio
     async def test_auto_routed_to_routing_decided(
         self,
         handler: UDMRHandler,
@@ -147,7 +146,6 @@ class TestUDMREndToEnd:
         assert result.route_type == "cloud"
         assert result.selected_model == "MiniMax-M2.7"
 
-    @pytest.mark.asyncio
     async def test_forced_local_routing(
         self,
         mock_compliance_gateway: AsyncMock,
@@ -176,7 +174,6 @@ class TestUDMREndToEnd:
         assert result.route_type == "local"
         assert result.selected_model == "qwen2.5:7b"
 
-    @pytest.mark.asyncio
     async def test_cloud_unavailable_fallback(
         self,
         mock_compliance_gateway: AsyncMock,
@@ -207,7 +204,6 @@ class TestUDMREndToEnd:
         assert result.route_type == "local"
         assert result.fallback_reason == "unavailable"
 
-    @pytest.mark.asyncio
     async def test_handler_register_subscribes(
         self,
         handler: UDMRHandler,

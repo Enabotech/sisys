@@ -39,7 +39,6 @@ def backup_service() -> BackupRecoveryServiceImpl:
 class TestPostgreSQLBackup:
     """PostgreSQL 备份验证 (AC-6.1)"""
 
-    @pytest.mark.asyncio
     async def test_create_postgresql_backup(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -55,7 +54,6 @@ class TestPostgreSQLBackup:
         assert result.backup_id != ""
         assert result.checksum != ""
 
-    @pytest.mark.asyncio
     async def test_postgresql_backup_has_checksum(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -64,7 +62,6 @@ class TestPostgreSQLBackup:
         result = await backup_service.create_backup(backup_type="postgresql")
         assert len(result.checksum) == 64  # SHA256 校验和
 
-    @pytest.mark.asyncio
     async def test_postgresql_backup_has_size(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -77,7 +74,6 @@ class TestPostgreSQLBackup:
 class TestMinIOBackup:
     """MinIO 对象存储备份验证 (AC-6.2)"""
 
-    @pytest.mark.asyncio
     async def test_create_minio_backup(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -91,7 +87,6 @@ class TestMinIOBackup:
         assert result.backup_type == "minio"
         assert result.checksum != ""
 
-    @pytest.mark.asyncio
     async def test_minio_backup_has_checksum(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -104,7 +99,6 @@ class TestMinIOBackup:
 class TestRedisBackup:
     """Redis 缓存备份验证 (AC-6.3)"""
 
-    @pytest.mark.asyncio
     async def test_create_redis_backup(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -122,7 +116,6 @@ class TestRedisBackup:
 class TestFullBackup:
     """全量备份验证"""
 
-    @pytest.mark.asyncio
     async def test_create_full_backup(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -135,7 +128,6 @@ class TestFullBackup:
         assert result.success is True
         assert result.backup_type == "full"
 
-    @pytest.mark.asyncio
     async def test_full_backup_includes_all_components(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -149,7 +141,6 @@ class TestFullBackup:
 class TestBackupRestore:
     """备份恢复验证 (AC-6.5)"""
 
-    @pytest.mark.asyncio
     async def test_restore_from_backup(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -162,7 +153,6 @@ class TestBackupRestore:
         assert result.backup_id == backup.backup_id
         assert result.restored_items >= 0
 
-    @pytest.mark.asyncio
     async def test_restore_nonexistent_backup_fails(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -172,7 +162,6 @@ class TestBackupRestore:
         assert result.success is False
         assert result.error_message != ""
 
-    @pytest.mark.asyncio
     async def test_restore_with_target_components(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -189,7 +178,6 @@ class TestBackupRestore:
 class TestBackupIntegrityVerification:
     """备份完整性验证 (AC-6.4)"""
 
-    @pytest.mark.asyncio
     async def test_verify_backup_integrity_valid(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -199,7 +187,6 @@ class TestBackupIntegrityVerification:
         result = await backup_service.verify_backup_integrity(backup.backup_id)
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_verify_backup_integrity_nonexistent(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -212,7 +199,6 @@ class TestBackupIntegrityVerification:
 class TestBackupStatus:
     """备份状态查询验证"""
 
-    @pytest.mark.asyncio
     async def test_get_backup_status_completed(
         self,
         backup_service: BackupRecoveryServiceImpl,
@@ -225,7 +211,6 @@ class TestBackupStatus:
         assert status.status == "completed"
         assert status.backup_type == "postgresql"
 
-    @pytest.mark.asyncio
     async def test_get_backup_status_nonexistent(
         self,
         backup_service: BackupRecoveryServiceImpl,

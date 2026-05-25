@@ -240,7 +240,6 @@ class TestL0L1L2CrossLayer:
     3. Listener 执行 L1 失效 + L2 写入
     """
 
-    @pytest.mark.asyncio
     async def test_gateway_save_triggers_listener_and_l2_write(
         self,
         l0_storage: L0StoragePort,
@@ -310,7 +309,6 @@ class TestL0L1L2CrossLayer:
         assert len(history_list) > 0, "L2 history should be recorded after listener.handle()"
         assert history_list[0].change_type == "create"
 
-    @pytest.mark.asyncio
     async def test_l0_write_l1_cache_and_l2_metadata_consistency(
         self,
         l0_storage: L0StoragePort,
@@ -378,7 +376,6 @@ class TestL0L1L2CrossLayer:
 class TestL0L1Coordination:
     """L0-L1 两层协调测试."""
 
-    @pytest.mark.asyncio
     async def test_l1_cache_survives_l0_write(
         self,
         l0_storage: L0StoragePort,
@@ -409,7 +406,6 @@ class TestL0L1Coordination:
         await l0_storage.delete(memory_id, memory_type)
         await redis_cache.delete_memory(memory_type, owner_id, name)
 
-    @pytest.mark.asyncio
     async def test_l0_delete_does_not_affect_l1_cache_directly(
         self,
         l0_storage: L0StoragePort,

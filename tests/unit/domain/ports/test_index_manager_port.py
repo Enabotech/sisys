@@ -5,8 +5,6 @@ from __future__ import annotations
 import inspect
 from unittest.mock import AsyncMock
 
-import pytest
-
 from src.domain.ports.index_manager import IndexManagerPort
 
 
@@ -91,7 +89,6 @@ class ConcreteIndexManagerAdapter(IndexManagerPort):
             self._entries = self._entries[-200:]
 
 
-@pytest.mark.asyncio
 async def test_concrete_update_and_read():
     """Concrete implementation should support update and read."""
     adapter = ConcreteIndexManagerAdapter()
@@ -101,7 +98,6 @@ async def test_concrete_update_and_read():
     assert entries[0]["memory_id"] == "id1"
 
 
-@pytest.mark.asyncio
 async def test_concrete_search():
     """Concrete implementation should support search."""
     adapter = ConcreteIndexManagerAdapter()
@@ -112,7 +108,6 @@ async def test_concrete_search():
     assert results[0]["memory_id"] == "id1"
 
 
-@pytest.mark.asyncio
 async def test_concrete_truncate():
     """Concrete implementation should support truncate."""
     adapter = ConcreteIndexManagerAdapter()

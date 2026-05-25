@@ -7,7 +7,6 @@ import os
 from uuid import uuid4
 
 import fakeredis.aioredis
-import pytest
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
@@ -87,7 +86,6 @@ class TestRedisEventPublisher:
             embedding=[0.1] * 1024,
         )
 
-    @pytest.mark.asyncio
     async def test_publish_serializes_event_to_json(self):
         from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 
@@ -105,7 +103,6 @@ class TestRedisEventPublisher:
         # 注意：fakeredis 中 publish 后消息不会回退给已有订阅者
         # 所以我们只验证不抛异常即可
 
-    @pytest.mark.asyncio
     async def test_publish_uses_connection_pool(self):
         from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 
@@ -113,7 +110,6 @@ class TestRedisEventPublisher:
         publisher = RedisEventPublisher(config)
         assert publisher._pool is None
 
-    @pytest.mark.asyncio
     async def test_publish_returns_result_on_connection_error(self):
         """RedisEventPublisher 连接失败应返回 PublishResult（优雅降级）"""
         from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
@@ -128,7 +124,6 @@ class TestRedisEventPublisher:
         assert result.redis_success is False
         assert result.redis_error is not None
 
-    @pytest.mark.asyncio
     async def test_close_disconnects_pool(self):
         from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 
@@ -159,7 +154,6 @@ class TestRedisEventSubscriber:
         subscriber.subscribe("sisys:rt:test", handler)
         assert "sisys:rt:test" in subscriber._handlers
 
-    @pytest.mark.asyncio
     async def test_deserializes_json_event(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
@@ -186,7 +180,6 @@ class TestRedisEventSubscriber:
         assert len(received) == 1
         assert received[0].event_type == "DocumentProcessed"
 
-    @pytest.mark.asyncio
     async def test_handles_deserialization_error(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
@@ -207,7 +200,6 @@ class TestRedisEventSubscriber:
 
         assert len(errors) == 1
 
-    @pytest.mark.asyncio
     async def test_close_stops_subscription(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
@@ -215,7 +207,6 @@ class TestRedisEventSubscriber:
         subscriber = RedisEventSubscriber(config)
         await subscriber.close()
 
-    @pytest.mark.asyncio
     async def test_close_handles_empty_pubsub(self):
         """close should handle case where pubsub was never created."""
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
@@ -224,7 +215,6 @@ class TestRedisEventSubscriber:
         subscriber = RedisEventSubscriber(config)
         await subscriber.close()
 
-    @pytest.mark.asyncio
     async def test_close_clears_state(self):
         """close should clear handlers and error_handlers."""
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
@@ -236,7 +226,6 @@ class TestRedisEventSubscriber:
         assert subscriber._handlers == {}
         assert subscriber._error_handlers == {}
 
-    @pytest.mark.asyncio
     async def test_close_with_active_pool_disconnects(self):
         """close should disconnect active connection pool."""
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
@@ -248,7 +237,6 @@ class TestRedisEventSubscriber:
         await subscriber.close()
         assert subscriber._pool is None
 
-    @pytest.mark.asyncio
     async def test_get_pool_creates_pool_on_first_call(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
@@ -260,7 +248,6 @@ class TestRedisEventSubscriber:
         assert pool is not None
         assert subscriber._pool is pool
 
-    @pytest.mark.asyncio
     async def test_get_pool_reuses_existing_pool(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
@@ -290,7 +277,6 @@ class TestRedisEventSubscriber:
 
         assert len(subscriber._handlers["channel1"]) == 2
 
-    @pytest.mark.asyncio
     async def test_subscribe_only_first_error_handler_is_used(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
@@ -317,7 +303,6 @@ class TestRedisEventSubscriber:
         assert len(first_errors) == 1
         assert len(second_errors) == 0
 
-    @pytest.mark.asyncio
     async def test_dispatch_calls_all_handlers_even_if_first_raises(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
@@ -345,7 +330,6 @@ class TestRedisEventSubscriber:
 
         assert results == ["h1", "h2"]
 
-    @pytest.mark.asyncio
     async def test_dispatch_logs_warning_for_no_handlers(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
@@ -353,7 +337,6 @@ class TestRedisEventSubscriber:
         subscriber = RedisEventSubscriber(config)
         await subscriber._dispatch_message("nonexistent", '{"key": "value"}')
 
-    @pytest.mark.asyncio
     async def test_start_is_idempotent(self):
         from unittest.mock import AsyncMock, MagicMock
 

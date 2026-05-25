@@ -132,7 +132,6 @@ class TestDeadLetterQueueEntry:
 class TestPostgresDeadLetterQueue:
     """PostgresDeadLetterQueue tests using mock AsyncSession."""
 
-    @pytest.mark.asyncio
     async def test_enqueue_adds_entry_to_database(self, mock_session):
         """enqueue should persist a DLQ entry to PostgreSQL."""
         token = set_session(mock_session)
@@ -159,7 +158,6 @@ class TestPostgresDeadLetterQueue:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_enqueue_with_context(self, mock_session):
         """enqueue should store additional context."""
         token = set_session(mock_session)
@@ -175,7 +173,6 @@ class TestPostgresDeadLetterQueue:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_dequeue_returns_oldest_pending_entry(self, mock_session):
         """dequeue should return (event, error, retry_count) and mark as processed."""
         token = set_session(mock_session)
@@ -199,7 +196,6 @@ class TestPostgresDeadLetterQueue:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_dequeue_on_empty_queue_returns_none(self, mock_session):
         """dequeue on empty DLQ should return None."""
         token = set_session(mock_session)
@@ -214,7 +210,6 @@ class TestPostgresDeadLetterQueue:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_get_all_returns_entries_ordered_by_created_at_desc(self, mock_session):
         """get_all should return all DLQ entries ordered by created_at desc."""
         token = set_session(mock_session)
@@ -236,7 +231,6 @@ class TestPostgresDeadLetterQueue:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_get_by_status_filters_correctly(self, mock_session):
         """get_by_status should filter entries by status."""
         token = set_session(mock_session)
@@ -254,7 +248,6 @@ class TestPostgresDeadLetterQueue:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_mark_action_taken_updates_entry(self, mock_session):
         """mark_action_taken should update action_taken and status."""
         token = set_session(mock_session)
@@ -275,7 +268,6 @@ class TestPostgresDeadLetterQueue:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_count_pending_returns_count(self, mock_session):
         """count_pending should return the count of pending entries."""
         token = set_session(mock_session)

@@ -126,7 +126,6 @@ class MockWormManager:
 class TestAuditServiceRecordExceptions:
     """Test exception handling in AuditService.record()."""
 
-    @pytest.mark.asyncio
     async def test_record_raises_audit_error_on_save_failure(self) -> None:
         """Test record() raises AuditError when save fails."""
         failing_repo = FailingAuditRepository(fail_on="save")
@@ -139,7 +138,6 @@ class TestAuditServiceRecordExceptions:
                 target_resource="/api/v1/auth/login",
             )
 
-    @pytest.mark.asyncio
     async def test_record_raises_audit_error_when_publisher_fails(self) -> None:
         """Test record() raises AuditError when event publisher fails.
 
@@ -165,7 +163,6 @@ class TestAuditServiceRecordExceptions:
 class TestAuditServiceVerifyIntegrityExceptions:
     """Test exception handling in AuditService.verify_integrity()."""
 
-    @pytest.mark.asyncio
     async def test_verify_integrity_raises_audit_error_on_get_by_id_failure(self) -> None:
         """Test verify_integrity raises AuditError when get_by_id fails."""
         failing_repo = FailingAuditRepository(fail_on="get_by_id")
@@ -192,7 +189,6 @@ class TestAuditServiceVerifyIntegrityExceptions:
 class TestAuditServiceVerifyBatchExceptions:
     """Test exception handling in AuditService.verify_batch()."""
 
-    @pytest.mark.asyncio
     async def test_verify_batch_raises_audit_error_on_search_failure(self) -> None:
         """Test verify_batch raises AuditError when search fails."""
         failing_repo = FailingAuditRepository(fail_on="search")
@@ -201,7 +197,6 @@ class TestAuditServiceVerifyBatchExceptions:
         with pytest.raises(AuditError, match="Failed to verify batch"):
             await service.verify_batch(None)
 
-    @pytest.mark.asyncio
     async def test_verify_batch_with_empty_list(self) -> None:
         """Test verify_batch with empty list returns zero counts."""
         repo = FailingAuditRepository()
@@ -217,7 +212,6 @@ class TestAuditServiceVerifyBatchExceptions:
 class TestAuditServiceArchiveExceptions:
     """Test exception handling in AuditService.archive()."""
 
-    @pytest.mark.asyncio
     async def test_archive_raises_audit_error_when_search_fails(self) -> None:
         """Test archive raises AuditError when search fails.
 
@@ -232,7 +226,6 @@ class TestAuditServiceArchiveExceptions:
         with pytest.raises(AuditError, match="Failed to archive logs"):
             await service.archive(older_than_days=30)
 
-    @pytest.mark.asyncio
     async def test_archive_continues_when_worm_manager_fails(self) -> None:
         """Test archive continues when WORM manager fails."""
         repo = FailingAuditRepository()
@@ -262,7 +255,6 @@ class TestAuditServiceArchiveExceptions:
         # Archive should succeed in DB even though WORM failed
         assert count == 1
 
-    @pytest.mark.asyncio
     async def test_archive_with_worm_manager_success(self) -> None:
         """Test archive succeeds with WORM manager."""
         repo = FailingAuditRepository()
@@ -292,7 +284,6 @@ class TestAuditServiceArchiveExceptions:
         assert count == 1
         assert len(worm_manager.archived_objects) == 1
 
-    @pytest.mark.asyncio
     async def test_archive_returns_zero_when_no_old_logs(self) -> None:
         """Test archive returns 0 when no logs match criteria."""
         repo = FailingAuditRepository()
@@ -322,7 +313,6 @@ class TestAuditServiceArchiveExceptions:
 class TestAuditServiceEdgeCases:
     """Test edge cases in AuditService."""
 
-    @pytest.mark.asyncio
     async def test_record_with_all_fields(self) -> None:
         """Test record with all optional fields populated."""
         repo = FailingAuditRepository()
@@ -342,7 +332,6 @@ class TestAuditServiceEdgeCases:
         assert record.old_value == {"role": "viewer"}
         assert record.new_value == {"role": "admin"}
 
-    @pytest.mark.asyncio
     async def test_verify_integrity_rechecksum_computation(self) -> None:
         """Test verify_integrity correctly recomputes checksum."""
         import hashlib
@@ -384,7 +373,6 @@ class TestAuditServiceEdgeCases:
         expected_checksum = hashlib.sha256(content.encode()).hexdigest()
         assert stored_checksum == expected_checksum
 
-    @pytest.mark.asyncio
     async def test_verify_batch_with_tampered_log(self) -> None:
         """Test verify_batch detects tampered logs."""
         repo = FailingAuditRepository()

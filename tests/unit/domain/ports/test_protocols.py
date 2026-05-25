@@ -108,7 +108,6 @@ class TestSandboxExecutor:
         instance = PartialExecutor()
         assert not isinstance(instance, SandboxExecutor)
 
-    @pytest.mark.asyncio
     async def test_execute_code_returns_dict(self) -> None:
         """execute_code 应返回 dict"""
 

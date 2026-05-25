@@ -2,8 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.services.auto_execute_service import AutoExecuteService
@@ -29,7 +27,6 @@ class TestAutoExecuteService:
         assert service._sandbox is mock_sandbox
         assert service._snapshot_repo is mock_repo
 
-    @pytest.mark.asyncio
     async def test_on_routed_event_returns_executed_event(self) -> None:
         """RED: on_routed_event should return AutoExecuted event on success."""
         service = AutoExecuteService()
@@ -48,7 +45,6 @@ class TestAutoExecuteService:
         assert isinstance(result, AutoExecuted)
         assert result.session_id == "test-session"
 
-    @pytest.mark.asyncio
     async def test_on_routed_event_without_session_id_returns_none(self) -> None:
         """RED: on_routed_event should return None if session_id is missing."""
         service = AutoExecuteService()
@@ -59,7 +55,6 @@ class TestAutoExecuteService:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_on_routed_event_publishes_executed_event(self) -> None:
         """RED: on_routed_event should populate all fields correctly."""
         service = AutoExecuteService()
@@ -85,7 +80,6 @@ class TestAutoExecuteService:
         assert result.route_target == "ceo-agent"
         assert result.route_score == 0.95
 
-    @pytest.mark.asyncio
     async def test_create_snapshot_returns_snapshot(self) -> None:
         """RED: create_snapshot should create and return CheckpointSnapshot."""
         mock_repo = AsyncMock()
@@ -104,7 +98,6 @@ class TestAutoExecuteService:
         assert result.stage_id == "planning"
         mock_repo.save.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_snapshot_increments_version(self) -> None:
         """RED: create_snapshot should increment version if existing snapshot."""
         existing_snapshot = MagicMock()
@@ -123,7 +116,6 @@ class TestAutoExecuteService:
         assert result is not None
         assert result.state_version == 4
 
-    @pytest.mark.asyncio
     async def test_on_routed_event_handles_exception(self) -> None:
         """Coverage: on_routed_event exception handler (lines 163-179)."""
         mock_sandbox = AsyncMock()
@@ -147,7 +139,6 @@ class TestAutoExecuteService:
         assert result.execution_result["status"] == "failed"
         assert "execution failed" in result.execution_result["error"]
 
-    @pytest.mark.asyncio
     async def test_restore_snapshot_returns_none_when_no_repo(self) -> None:
         """Coverage: restore_snapshot when no repo configured (lines 226-227)."""
         service = AutoExecuteService(snapshot_repo=None)
@@ -156,7 +147,6 @@ class TestAutoExecuteService:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_restore_snapshot_returns_none_when_not_found(self) -> None:
         """Coverage: restore_snapshot when no snapshot exists (lines 232-233)."""
         mock_repo = AsyncMock()
@@ -167,7 +157,6 @@ class TestAutoExecuteService:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_on_routed_event_returns_executed_when_sandbox_fails(self) -> None:
         """Coverage: on_routed_event returns AutoExecuted even if sandbox.execute_code fails."""
         mock_sandbox = AsyncMock()

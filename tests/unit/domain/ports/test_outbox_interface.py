@@ -73,7 +73,6 @@ class TestOutboxRepositoryInterface:
 class TestOutboxRepositoryBehavior:
     """验证 OutboxRepository 行为正确性"""
 
-    @pytest.mark.asyncio
     async def test_save_accepts_domain_event(self, mock_outbox_repo):
         """save 方法应接受 DomainEvent 实例"""
         from datetime import UTC, datetime
@@ -92,19 +91,16 @@ class TestOutboxRepositoryBehavior:
         # 不应抛出异常
         await mock_outbox_repo.save(event)
 
-    @pytest.mark.asyncio
     async def test_get_unpublished_returns_list(self, mock_outbox_repo):
         """get_unpublished 应返回列表"""
         result = await mock_outbox_repo.get_unpublished(limit=10)
         assert isinstance(result, list)
 
-    @pytest.mark.asyncio
     async def test_mark_published_accepts_uuid(self, mock_outbox_repo):
         """mark_published 应接受 UUID"""
         event_id = uuid4()
         await mock_outbox_repo.mark_published(event_id)
 
-    @pytest.mark.asyncio
     async def test_mark_failed_accepts_uuid_and_string(self, mock_outbox_repo):
         """mark_failed 应接受 UUID 和字符串错误信息"""
         event_id = uuid4()

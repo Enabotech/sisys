@@ -103,7 +103,6 @@ class TestAuthIntegrationFlow:
             self.role_repo,
         )
 
-    @pytest.mark.asyncio
     async def test_complete_auth_flow(self):
         """🔴 Integration: Complete auth flow from login to resource access."""
         # Step 1: Create roles
@@ -137,7 +136,6 @@ class TestAuthIntegrationFlow:
         has_access = await self.permission_service.check_permission(user_id, "document", "read")
         assert has_access is True
 
-    @pytest.mark.asyncio
     async def test_role_management_flow(self):
         """🔴 Integration: Role CRUD flow."""
         # Create role
@@ -170,7 +168,6 @@ class TestAuthIntegrationFlow:
         with pytest.raises(RoleNotFoundError):
             await self.role_service.get_role(role.id)
 
-    @pytest.mark.asyncio
     async def test_privilege_escalation_blocked(self):
         """🔴 Integration: Privilege escalation attempt blocked."""
         # Create regular user role (no wildcard permissions)
@@ -215,7 +212,6 @@ class TestPermissionFlow:
             self.role_repo,
         )
 
-    @pytest.mark.asyncio
     async def test_permission_check_with_wildcard(self):
         """🔴 Integration: Wildcard permission grants access to matching actions."""
         # Create role with wildcard
@@ -233,7 +229,6 @@ class TestPermissionFlow:
             has_perm = await self.permission_service.check_permission(user_id, "document", action)
             assert has_perm is True
 
-    @pytest.mark.asyncio
     async def test_permission_denied_without_role(self):
         """🔴 Integration: User without role has no permissions."""
         user_id = uuid4()
@@ -242,7 +237,6 @@ class TestPermissionFlow:
         has_perm = await self.permission_service.check_permission(user_id, "document", "read")
         assert has_perm is False
 
-    @pytest.mark.asyncio
     async def test_multiple_roles_combined(self):
         """🔴 Integration: Permissions from multiple roles are combined."""
         role1 = await self.role_service.create_role(

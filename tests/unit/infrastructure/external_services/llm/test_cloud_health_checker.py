@@ -12,8 +12,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
 from src.infrastructure.config.udmr import CloudModelConfig
 from src.infrastructure.external_services.llm.cloud_health_checker import (
     CloudHealthChecker,
@@ -65,7 +63,6 @@ class TestCloudHealthCheckerInit:
 class TestCloudHealthCheckerCheck:
     """check() 测试."""
 
-    @pytest.mark.asyncio
     async def test_check_returns_true_when_healthy(self) -> None:
         """云端可用时返回 True."""
         clouds = [_make_cloud()]
@@ -74,7 +71,6 @@ class TestCloudHealthCheckerCheck:
             result = await checker.check()
             assert result is True
 
-    @pytest.mark.asyncio
     async def test_check_returns_false_when_unhealthy(self) -> None:
         """云端不可用时返回 False."""
         clouds = [_make_cloud()]
@@ -83,7 +79,6 @@ class TestCloudHealthCheckerCheck:
             result = await checker.check()
             assert result is False
 
-    @pytest.mark.asyncio
     async def test_check_skips_disabled_clouds(self) -> None:
         """应跳过 disabled 的云端模型."""
         clouds = [_make_cloud(), CloudModelConfig(model="disabled-model", enabled=False)]
@@ -93,7 +88,6 @@ class TestCloudHealthCheckerCheck:
             # 只检查第一个 enabled 模型
             mock.assert_called_once_with(clouds[0])
 
-    @pytest.mark.asyncio
     async def test_check_returns_false_when_no_enabled_clouds(self) -> None:
         """无 enabled 云端模型时返回 False."""
         clouds = [CloudModelConfig(model="disabled", enabled=False)]
@@ -101,14 +95,12 @@ class TestCloudHealthCheckerCheck:
         result = await checker.check()
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_check_returns_false_when_no_clouds(self) -> None:
         """无云端配置时返回 False."""
         checker = CloudHealthChecker(cloud_configs=[], timeout=30)
         result = await checker.check()
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_check_returns_false_on_exception(self) -> None:
         """检查异常时返回 False."""
         clouds = [_make_cloud()]
@@ -126,13 +118,11 @@ class TestCloudHealthCheckerCheck:
 class TestCloudHealthCheckerClose:
     """close() 测试."""
 
-    @pytest.mark.asyncio
     async def test_close_releases_resources(self) -> None:
         """close() 应释放资源（无异常）."""
         checker = CloudHealthChecker(cloud_configs=[])
         await checker.close()  # 无异常即为成功
 
-    @pytest.mark.asyncio
     async def test_close_multiple_calls(self) -> None:
         """多次调用 close() 应无异常."""
         checker = CloudHealthChecker(cloud_configs=[])

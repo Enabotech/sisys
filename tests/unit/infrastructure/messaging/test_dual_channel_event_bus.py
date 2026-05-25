@@ -38,7 +38,6 @@ class TestDualChannelEventBusInit:
 class TestDualChannelEventBusPublish:
     """Test DualChannelEventBus.publish method."""
 
-    @pytest.mark.asyncio
     async def test_publish_routes_realtime_to_redis(self) -> None:
         """REALTIME event should be published via RedisEventBus."""
         router = ChannelRouter()
@@ -58,7 +57,6 @@ class TestDualChannelEventBusPublish:
         rabbitmq_bus.publish.assert_not_called()
         assert result.redis_success is True
 
-    @pytest.mark.asyncio
     async def test_publish_routes_reliable_to_rabbitmq(self) -> None:
         """RELIABLE event should be published via RabbitMQEventBus (Outbox)."""
         router = ChannelRouter()
@@ -82,7 +80,6 @@ class TestDualChannelEventBusPublish:
 class TestDualChannelEventBusSubscribe:
     """Test DualChannelEventBus.subscribe method."""
 
-    @pytest.mark.asyncio
     async def test_subscribe_raises_for_reliable_mode(self) -> None:
         """subscribe should raise ValueError for RELIABLE event type."""
         router = ChannelRouter()
@@ -95,7 +92,6 @@ class TestDualChannelEventBusSubscribe:
         with pytest.raises(ValueError, match="RELIABLE mode.*subscribe"):
             await bus.subscribe("DocumentProcessed", handler)
 
-    @pytest.mark.asyncio
     async def test_subscribe_delegates_to_redis_for_realtime(self) -> None:
         """subscribe should delegate to RedisEventBus for REALTIME event type."""
         router = ChannelRouter()
@@ -113,7 +109,6 @@ class TestDualChannelEventBusSubscribe:
 class TestDualChannelEventBusLifecycle:
     """Test DualChannelEventBus start and close methods."""
 
-    @pytest.mark.asyncio
     async def test_start_calls_redis_start(self) -> None:
         """start should call redis_bus.start()."""
         router = ChannelRouter()
@@ -126,7 +121,6 @@ class TestDualChannelEventBusLifecycle:
 
         redis_bus.start.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_close_calls_both_buses_close(self) -> None:
         """close should call both redis_bus.close() and rabbitmq_bus.close()."""
         router = ChannelRouter()

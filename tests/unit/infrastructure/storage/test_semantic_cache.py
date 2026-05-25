@@ -92,7 +92,6 @@ class TestVectorToBytes:
 class TestRedisSemanticCache:
     """RedisSemanticCache tests with mocked FT.SEARCH."""
 
-    @pytest.mark.asyncio
     async def test_set_creates_index_and_stores(self) -> None:
         cache, mock_redis = _make_cache()
         mock_redis.execute_command = AsyncMock(return_value="OK")
@@ -114,7 +113,6 @@ class TestRedisSemanticCache:
         assert "embedding" in hset_args[1]["mapping"]
         assert "result" in hset_args[1]["mapping"]
 
-    @pytest.mark.asyncio
     async def test_get_hit(self) -> None:
         cache, mock_redis = _make_cache()
         result_data = {"answer": "test"}
@@ -124,7 +122,6 @@ class TestRedisSemanticCache:
         assert found is not None
         assert found["answer"] == "test"
 
-    @pytest.mark.asyncio
     async def test_get_miss_empty(self) -> None:
         cache, mock_redis = _make_cache()
         mock_redis.execute_command = AsyncMock(return_value=[0])
@@ -132,7 +129,6 @@ class TestRedisSemanticCache:
         found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
         assert found is None
 
-    @pytest.mark.asyncio
     async def test_get_miss_below_threshold(self) -> None:
         cache, mock_redis = _make_cache()
         mock_redis.execute_command = AsyncMock(return_value=_ft_search_response(json_dumps({"answer": "test"}), 0.5))
@@ -141,7 +137,6 @@ class TestRedisSemanticCache:
         found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
         assert found is None
 
-    @pytest.mark.asyncio
     async def test_invalidate(self) -> None:
         cache, mock_redis = _make_cache()
         mock_redis.execute_command = AsyncMock(return_value="OK")
@@ -153,7 +148,6 @@ class TestRedisSemanticCache:
 
         mock_redis.delete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_metrics_recording(self) -> None:
         metrics = EventMetricsCollector()
 
@@ -168,20 +162,17 @@ class TestRedisSemanticCache:
         await cache.get([0.1], threshold=0.9)
         assert metrics.metrics.cache_hits_total == 1
 
-    @pytest.mark.asyncio
     async def test_context_manager(self) -> None:
         cache, _mock_redis = _make_cache()
         async with cache:
             pass
 
-    @pytest.mark.asyncio
     async def test_deterministic_cache_key(self) -> None:
         cache, _mock_redis = _make_cache()
         key1 = cache._build_cache_key([0.1, 0.2, 0.3])
         key2 = cache._build_cache_key([0.1, 0.2, 0.3])
         assert key1 == key2
 
-    @pytest.mark.asyncio
     async def test_index_already_exists_is_ok(self) -> None:
         cache, mock_redis = _make_cache()
         mock_redis.execute_command = AsyncMock(side_effect=Exception("Index already exists"))

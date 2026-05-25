@@ -107,7 +107,6 @@ class TestAuditServiceImpl:
     def audit_service(self, fake_repo: FakeAuditRepository) -> AuditServiceImpl:
         return AuditServiceImpl(audit_repository=fake_repo)
 
-    @pytest.mark.asyncio
     async def test_record_creates_audit_log(
         self,
         audit_service: AuditServiceImpl,
@@ -137,7 +136,6 @@ class TestAuditServiceImpl:
         assert saved_log["actor"] == "user-123"
         assert saved_log["checksum"] is not None  # Checksum should be computed
 
-    @pytest.mark.asyncio
     async def test_record_with_old_and_new_value(
         self,
         audit_service: AuditServiceImpl,
@@ -156,7 +154,6 @@ class TestAuditServiceImpl:
         assert record.old_value == {"role": "viewer"}
         assert record.new_value == {"role": "admin"}
 
-    @pytest.mark.asyncio
     async def test_record_computes_checksum(
         self,
         audit_service: AuditServiceImpl,
@@ -174,7 +171,6 @@ class TestAuditServiceImpl:
         assert saved_log is not None
         assert len(saved_log["checksum"]) == 64  # SHA256 hex digest length
 
-    @pytest.mark.asyncio
     async def test_verify_integrity_returns_true_for_valid_log(
         self,
         audit_service: AuditServiceImpl,
@@ -192,7 +188,6 @@ class TestAuditServiceImpl:
         is_valid = await audit_service.verify_integrity(record.log_id)
         assert is_valid is True
 
-    @pytest.mark.asyncio
     async def test_verify_integrity_returns_false_for_tampered_log(
         self,
         audit_service: AuditServiceImpl,
@@ -216,7 +211,6 @@ class TestAuditServiceImpl:
         is_valid = await audit_service.verify_integrity(record.log_id)
         assert is_valid is False
 
-    @pytest.mark.asyncio
     async def test_verify_integrity_raises_for_missing_log(
         self,
         audit_service: AuditServiceImpl,
@@ -227,7 +221,6 @@ class TestAuditServiceImpl:
         with pytest.raises(AuditError, match="not found"):
             await audit_service.verify_integrity(non_existent_id)
 
-    @pytest.mark.asyncio
     async def test_verify_batch_returns_summary(
         self,
         audit_service: AuditServiceImpl,
@@ -251,7 +244,6 @@ class TestAuditServiceImpl:
         assert result["failed"] == 0
         assert len(result["details"]) == 3
 
-    @pytest.mark.asyncio
     async def test_verify_batch_with_empty_list_verifies_all(
         self,
         audit_service: AuditServiceImpl,
@@ -271,7 +263,6 @@ class TestAuditServiceImpl:
         assert result["total"] == 2
         assert result["passed"] == 2
 
-    @pytest.mark.asyncio
     async def test_archive_returns_count(
         self,
         audit_service: AuditServiceImpl,
@@ -288,7 +279,6 @@ class TestAuditServiceImpl:
         assert isinstance(count, int)
         assert count >= 0
 
-    @pytest.mark.asyncio
     async def test_search_with_match_any_or_condition(
         self,
         fake_repo: FakeAuditRepository,
@@ -341,7 +331,6 @@ class TestAuditServiceImpl:
         assert "user-A" in actors
         assert "user-B" in actors
 
-    @pytest.mark.asyncio
     async def test_search_without_match_any_and_condition(
         self,
         fake_repo: FakeAuditRepository,
@@ -381,7 +370,6 @@ class TestAuditServiceImpl:
         assert result.items[0]["actor"] == "user-A"
         assert "authentication" in result.items[0]["action_type"]
 
-    @pytest.mark.asyncio
     async def test_record_with_event_publisher(
         self,
         fake_repo: FakeAuditRepository,
@@ -408,7 +396,6 @@ class TestAuditServiceImpl:
         assert len(published_events) == 1
         assert published_events[0].actor == "user-123"
 
-    @pytest.mark.asyncio
     async def test_record_without_event_publisher(
         self,
         fake_repo: FakeAuditRepository,
@@ -425,7 +412,6 @@ class TestAuditServiceImpl:
         assert record is not None
         assert record.actor == "user-123"
 
-    @pytest.mark.asyncio
     async def test_verify_batch_with_specific_log_ids(
         self,
         audit_service: AuditServiceImpl,
@@ -448,7 +434,6 @@ class TestAuditServiceImpl:
         assert result["passed"] == 2
         assert result["failed"] == 0
 
-    @pytest.mark.asyncio
     async def test_verify_batch_with_mixed_results(
         self,
         fake_repo: FakeAuditRepository,
@@ -486,7 +471,6 @@ class TestAuditServiceImpl:
         assert result["passed"] == 1
         assert result["failed"] == 1
 
-    @pytest.mark.asyncio
     async def test_verify_batch_none_verifies_all(
         self,
         audit_service: AuditServiceImpl,
@@ -506,7 +490,6 @@ class TestAuditServiceImpl:
         assert result["passed"] == 2
         assert len(result["details"]) == 2
 
-    @pytest.mark.asyncio
     async def test_archive_with_old_logs(
         self,
         fake_repo: FakeAuditRepository,

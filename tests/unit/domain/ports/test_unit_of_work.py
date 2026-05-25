@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Protocol
 
-import pytest
-
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
@@ -66,7 +64,6 @@ class TestPostgreSQLUnitOfWork:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_begin_starts_transaction(self):
         """begin() 应启动事务。"""
         from unittest import mock
@@ -83,7 +80,6 @@ class TestPostgreSQLUnitOfWork:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_commit_commits_transaction(self):
         """commit() 应提交事务。"""
         from unittest import mock
@@ -100,7 +96,6 @@ class TestPostgreSQLUnitOfWork:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_rollback_rolls_back_transaction(self):
         """rollback() 应回滚事务。"""
         from unittest import mock
@@ -117,7 +112,6 @@ class TestPostgreSQLUnitOfWork:
         finally:
             reset_session(token)
 
-    @pytest.mark.asyncio
     async def test_context_manager_protocol(self):
         """UnitOfWork 应支持上下文管理器协议。"""
         from unittest import mock

@@ -10,8 +10,6 @@ RED PHASE: 验证 Fake 实现存在
 
 from __future__ import annotations
 
-import pytest
-
 from src.domain.ports.index_manager import IndexManagerPort
 from src.domain.ports.integrity import IntegrityPort
 from src.domain.ports.l0_storage import L0StoragePort
@@ -99,7 +97,6 @@ class TestFakeL0StorageAdapter:
         assert hasattr(fake, "read")
         assert hasattr(fake, "exists")
 
-    @pytest.mark.asyncio
     async def test_write_and_read(self):
         """验证写入和读取"""
         fake = FakeL0StorageAdapter()
@@ -107,7 +104,6 @@ class TestFakeL0StorageAdapter:
         result = await fake.read("id-1", "user")
         assert result == "test content"
 
-    @pytest.mark.asyncio
     async def test_exists(self):
         """验证 exists 方法"""
         fake = FakeL0StorageAdapter()
@@ -125,7 +121,6 @@ class TestFakeMemoryIndex:
         assert hasattr(fake, "update_entry")
         assert hasattr(fake, "read_entries")
 
-    @pytest.mark.asyncio
     async def test_update_and_read(self):
         """验证更新和读取"""
         fake = FakeMemoryIndex()
@@ -134,7 +129,6 @@ class TestFakeMemoryIndex:
         assert len(entries) == 1
         assert entries[0]["memory_id"] == "id-1"
 
-    @pytest.mark.asyncio
     async def test_search(self):
         """验证搜索"""
         fake = FakeMemoryIndex()

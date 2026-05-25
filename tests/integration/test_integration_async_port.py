@@ -36,14 +36,12 @@ class TestL0StoragePortIntegration:
         storage.list_memories = AsyncMock(return_value=["id-1", "id-2"])
         return storage
 
-    @pytest.mark.asyncio
     async def test_write_via_port(self, mock_l0_storage):
         """验证通过 Port 写入"""
         memory_id = str(uuid.uuid4())
         await mock_l0_storage.write(memory_id, "user", "test content")
         mock_l0_storage.write.assert_called_once_with(memory_id, "user", "test content")
 
-    @pytest.mark.asyncio
     async def test_read_via_port(self, mock_l0_storage):
         """验证通过 Port 读取"""
         memory_id = "test-id"
@@ -51,14 +49,12 @@ class TestL0StoragePortIntegration:
         assert content == "test content"
         mock_l0_storage.read.assert_called_once_with(memory_id, "user")
 
-    @pytest.mark.asyncio
     async def test_delete_via_port(self, mock_l0_storage):
         """验证通过 Port 删除"""
         memory_id = "test-id"
         await mock_l0_storage.delete(memory_id, "user")
         mock_l0_storage.delete.assert_called_once_with(memory_id, "user")
 
-    @pytest.mark.asyncio
     async def test_exists_via_port(self, mock_l0_storage):
         """验证通过 Port 检查存在"""
         memory_id = "test-id"
@@ -81,28 +77,24 @@ class TestIndexManagerPortIntegration:
         manager.truncate = AsyncMock(return_value=None)
         return manager
 
-    @pytest.mark.asyncio
     async def test_update_entry_via_port(self, mock_index_manager):
         """验证通过 Port 更新索引"""
         entry = {"memory_id": "id-1", "name": "test", "type": "user"}
         await mock_index_manager.update_entry(entry)
         mock_index_manager.update_entry.assert_called_once_with(entry)
 
-    @pytest.mark.asyncio
     async def test_read_entries_via_port(self, mock_index_manager):
         """验证通过 Port 读取索引"""
         entries = await mock_index_manager.read_entries()
         assert len(entries) == 1
         assert entries[0]["memory_id"] == "id-1"
 
-    @pytest.mark.asyncio
     async def test_search_via_port(self, mock_index_manager):
         """验证通过 Port 搜索索引"""
         results = await mock_index_manager.search("bun")
         assert len(results) >= 1
         mock_index_manager.search.assert_called_once_with("bun")
 
-    @pytest.mark.asyncio
     async def test_remove_entry_via_port(self, mock_index_manager):
         """验证通过 Port 移除索引"""
         memory_id = "id-1"
@@ -121,14 +113,12 @@ class TestHealthCheckPortIntegration:
         health.close = AsyncMock(return_value=None)
         return health
 
-    @pytest.mark.asyncio
     async def test_check_via_port(self, mock_health_check):
         """验证通过 Port 健康检查"""
         is_healthy = await mock_health_check.check()
         assert is_healthy is True
         mock_health_check.check.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_close_via_port(self, mock_health_check):
         """验证通过 Port 关闭连接"""
         await mock_health_check.close()
@@ -147,7 +137,6 @@ class TestIntegrityPortIntegration:
         integrity.verify_hash = MagicMock(return_value=True)
         return integrity
 
-    @pytest.mark.asyncio
     async def test_verify_file_via_port(self, mock_integrity):
         """验证通过 Port 验证文件"""
         result = await mock_integrity.verify_file("/path/to/file", "expected_hash")
@@ -170,7 +159,6 @@ class TestIntegrityPortIntegration:
 class TestPortChainIntegration:
     """Port 链式调用集成测试"""
 
-    @pytest.mark.asyncio
     async def test_l0_to_index_chain(self):
         """验证 L0Storage → IndexManager 链式调用"""
         # 模拟完整流程：写入 L0 → 更新索引
@@ -197,7 +185,6 @@ class TestPortChainIntegration:
         mock_l0.write.assert_called_once()
         mock_index.update_entry.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_health_check_before_operation(self):
         """验证操作前健康检查"""
         mock_health = MagicMock(spec=HealthCheckPort)

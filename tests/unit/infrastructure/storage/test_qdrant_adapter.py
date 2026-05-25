@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.infrastructure.storage.qdrant.qdrant_adapter import QdrantAdapter
 
 
@@ -26,7 +24,6 @@ class TestQdrantAdapterInterface:
 class TestQdrantAdapterUpsertPoints:
     """upsert_points 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_upsert_points_converts_dict_to_vector_point(self):
         """验证 dict 转换为 VectorPoint"""
         mock_storage = MagicMock()
@@ -49,7 +46,6 @@ class TestQdrantAdapterUpsertPoints:
         assert vector_points[0].id == "mem-1"
         assert len(vector_points[0].vector) == 1024
 
-    @pytest.mark.asyncio
     async def test_upsert_points_handles_empty_payload(self):
         """验证空 payload 使用默认空字典"""
         mock_storage = MagicMock()
@@ -68,7 +64,6 @@ class TestQdrantAdapterUpsertPoints:
 class TestQdrantAdapterDeletePoints:
     """delete_points 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_delete_points_delegates_correctly(self):
         """验证 delete_points 正确委托"""
         mock_storage = AsyncMock()
@@ -84,7 +79,6 @@ class TestQdrantAdapterDeletePoints:
 class TestQdrantAdapterGetPoint:
     """get_point 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_get_point_returns_none_when_not_found(self):
         """验证不存在时返回 None"""
         mock_storage = AsyncMock()
@@ -95,7 +89,6 @@ class TestQdrantAdapterGetPoint:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_point_returns_dict(self):
         """验证返回 dict 类型"""
         mock_storage = AsyncMock()
@@ -111,7 +104,6 @@ class TestQdrantAdapterGetPoint:
 class TestQdrantAdapterSearch:
     """search 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_search_delegates_with_filter(self):
         """验证 search 正确委托"""
         mock_storage = AsyncMock()
@@ -122,7 +114,6 @@ class TestQdrantAdapterSearch:
 
         mock_storage.search.assert_called_once_with("test-collection", [0.1, 0.2], limit=5, filter_payload={"type": "user"})
 
-    @pytest.mark.asyncio
     async def test_search_returns_list_of_dict(self):
         """验证 search 返回 list[dict]"""
         mock_storage = AsyncMock()
@@ -142,7 +133,6 @@ class TestQdrantAdapterSearch:
 class TestQdrantAdapterSearchSparse:
     """search_sparse 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_search_sparse_converts_sparse_vector(self):
         """验证稀疏向量转换"""
         mock_storage = AsyncMock()
@@ -160,7 +150,6 @@ class TestQdrantAdapterSearchSparse:
         assert sv.indices == [0, 5, 10]
         assert sv.values == [1.0, 0.5, 0.8]
 
-    @pytest.mark.asyncio
     async def test_search_sparse_returns_list(self):
         """验证返回 list[dict]"""
         mock_storage = AsyncMock()

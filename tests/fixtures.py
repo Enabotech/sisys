@@ -8,11 +8,13 @@
 from __future__ import annotations
 
 import asyncio
+import urllib.parse
 import uuid
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
 from typing import TypeVar
 
+import aiohttp
 import pytest
 
 from src.domain.ports.resolver import Resolver
@@ -186,28 +188,33 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
     except Exception as e:
         logger.error(f"Neo4j cleanup failed for tenant {tenant.id}: {e}")
 
-    # RabbitMQ 清理
+    # RabbitMQ 清理 - 使用 Management HTTP API
     try:
-        import importlib
+        mgmt_host = env_config.rabbitmq.host
+        mgmt_port = env_config.rabbitmq.mgmt_port
+        base_url = f"http://{mgmt_host}:{mgmt_port}/api"
 
-        pika = importlib.import_module("pika")
-
-        credentials = pika.PlainCredentials(env_config.rabbitmq.username, env_config.rabbitmq.password)
-        parameters = pika.ConnectionParameters(
-            host=env_config.rabbitmq.host, port=env_config.rabbitmq.port, credentials=credentials
+        auth = aiohttp.BasicAuth(
+            env_config.rabbitmq.username or "guest",
+            env_config.rabbitmq.password or "guest",
         )
-        connection = pika.BlockingConnection(parameters)
-        _channel = connection.channel()
+        timeout = aiohttp.ClientTimeout(total=10)
 
-        # 列出所有队列并删除匹配前缀的队列
-        prefix = tenant.rabbitmq_queue_prefix
-        result = _channel.queue_declare("", passive=True)
-        for q in result:
-            if q.name.startswith(prefix):
-                _channel.queue_delete(q.name)
-                logger.debug(f"Cleaned RabbitMQ queue {q.name} for tenant {tenant.id}")
-
-        connection.close()
+        async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
+            async with session.get(f"{base_url}/queues") as resp:
+                if resp.status == 200:
+                    queues = await resp.json()
+                    prefix = tenant.rabbitmq_queue_prefix
+                    for q in queues:
+                        qname = q.get("name", "")
+                        if qname.startswith(prefix):
+                            vhost = urllib.parse.quote(q.get("vhost", "/"), safe="")
+                            encoded_qname = urllib.parse.quote(qname, safe="")
+                            async with session.delete(f"{base_url}/queues/{vhost}/{encoded_qname}") as del_resp:
+                                if del_resp.status == 204:
+                                    logger.debug(f"Deleted RabbitMQ queue {qname} for tenant {tenant.id}")
+                else:
+                    logger.warning(f"RabbitMQ Management API returned {resp.status}")
     except Exception as e:
         logger.error(f"RabbitMQ cleanup failed for tenant {tenant.id}: {e}")
 

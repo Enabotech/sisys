@@ -8,8 +8,6 @@ from __future__ import annotations
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.domain.events.memory_events import MemoryChanged
 
 
@@ -70,7 +68,6 @@ class TestMemoryChangedListenerInit:
 class TestMemoryChangedListenerHandle:
     """MemoryChangedListener handle 方法验证"""
 
-    @pytest.mark.asyncio
     async def test_handle_calls_invalidate_l1_cache(self):
         """验证 handle 调用 L1 缓存失效"""
         mock_l1_cache = AsyncMock()
@@ -95,7 +92,6 @@ class TestMemoryChangedListenerHandle:
         assert call_args[0][1] == "user-456"  # owner_id
         assert call_args[0][2] == "test-memory"  # name
 
-    @pytest.mark.asyncio
     async def test_handle_calls_write_to_l2(self):
         """验证 handle 调用 L2 写入"""
         mock_l1_cache = AsyncMock()
@@ -118,7 +114,6 @@ class TestMemoryChangedListenerHandle:
 class TestMemoryChangedListenerL1Invalidation:
     """L1 缓存失效验证"""
 
-    @pytest.mark.asyncio
     async def test_invalidate_l1_cache_with_private_memory(self):
         """验证 private 记忆的 L1 缓存失效"""
         mock_l1_cache = AsyncMock()
@@ -142,7 +137,6 @@ class TestMemoryChangedListenerL1Invalidation:
             "test-memory",
         )
 
-    @pytest.mark.asyncio
     async def test_invalidate_l1_cache_with_group_memory(self):
         """验证 group 记忆的 L1 缓存失效"""
         mock_l1_cache = AsyncMock()
@@ -171,7 +165,6 @@ class TestMemoryChangedListenerL1Invalidation:
             "test-memory",
         )
 
-    @pytest.mark.asyncio
     async def test_invalidate_l1_cache_no_l1_cache(self):
         """验证无 memory_cache 时跳过失效"""
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
@@ -190,7 +183,6 @@ class TestMemoryChangedListenerL1Invalidation:
 class TestMemoryChangedListenerL2Write:
     """L2 PostgreSQL 写入验证"""
 
-    @pytest.mark.asyncio
     async def test_write_to_l2_with_both_repositories(self):
         """验证同时使用两个 repository"""
         mock_metadata_repo = AsyncMock()
@@ -211,7 +203,6 @@ class TestMemoryChangedListenerL2Write:
         mock_metadata_repo.save.assert_called_once()
         mock_history_repo.save.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_write_to_l2_no_repositories(self):
         """验证无 repository 时跳过写入"""
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler

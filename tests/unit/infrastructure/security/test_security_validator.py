@@ -9,8 +9,6 @@ from __future__ import annotations
 from unittest import mock
 from uuid import uuid4
 
-import pytest
-
 from src.domain.entities.role import Role
 from src.domain.entities.user import User
 
@@ -96,7 +94,6 @@ class TestHorizontalPrivilegeEscalation:
             self.mock_user_repo,
         )
 
-    @pytest.mark.asyncio
     async def test_user_can_access_own_resource(self):
         """🔴 RED: User should be able to access their own resources."""
         user_id = uuid4()
@@ -108,7 +105,6 @@ class TestHorizontalPrivilegeEscalation:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_user_cannot_access_other_user_resource_without_admin(self):
         """🔴 RED: User should NOT access other user's resources without admin role."""
         user_id = uuid4()
@@ -128,7 +124,6 @@ class TestHorizontalPrivilegeEscalation:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_admin_can_access_any_resource(self):
         """🔴 RED: Admin should be able to access any user's resources."""
         user_id = uuid4()
@@ -160,7 +155,6 @@ class TestVerticalPrivilegeEscalation:
             self.mock_user_repo,
         )
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_assign_admin_role(self):
         """🔴 RED: Regular user should NOT be able to assign admin role."""
         user_id = uuid4()
@@ -179,7 +173,6 @@ class TestVerticalPrivilegeEscalation:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_admin_can_assign_admin_role(self):
         """🔴 RED: Admin should be able to assign admin role."""
         user_id = uuid4()
@@ -198,7 +191,6 @@ class TestVerticalPrivilegeEscalation:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_user_cannot_assign_wildcard_permission_role(self):
         """🔴 RED: User should NOT be able to assign role with wildcard permissions."""
         user_id = uuid4()
@@ -217,7 +209,6 @@ class TestVerticalPrivilegeEscalation:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_user_can_assign_regular_role(self):
         """🔴 RED: User should be able to assign regular (non-privileged) role."""
         user_id = uuid4()

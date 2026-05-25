@@ -9,8 +9,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.infrastructure.storage.minio.minio_document_storage import MinIODocumentStorage
 
 
@@ -27,7 +25,6 @@ class TestMinIODocumentStorageInterface:
 class TestMinIODocumentStorageDelegation:
     """验证 L4ObjectPort 方法正确委托给适配器"""
 
-    @pytest.mark.asyncio
     async def test_store_delegates_to_adapter(self):
         """验证 store 正确委托"""
         mock_adapter = AsyncMock()
@@ -63,7 +60,6 @@ class TestMinIODocumentStorageDelegation:
         assert result is mock_stream
         mock_adapter.retrieve.assert_called_once_with("raw-documents", "test/file.pdf", "v1")
 
-    @pytest.mark.asyncio
     async def test_delete_delegates_to_adapter(self):
         """验证 delete 正确委托"""
         mock_adapter = AsyncMock()
@@ -75,7 +71,6 @@ class TestMinIODocumentStorageDelegation:
         assert result is True
         mock_adapter.delete.assert_called_once_with("raw-documents", "test/file.pdf", "v1")
 
-    @pytest.mark.asyncio
     async def test_get_metadata_delegates_to_adapter(self):
         """验证 get_metadata 正确委托"""
         mock_adapter = AsyncMock()
@@ -88,7 +83,6 @@ class TestMinIODocumentStorageDelegation:
         assert result == expected
         mock_adapter.get_metadata.assert_called_once_with("raw-documents", "test/file.pdf", None)
 
-    @pytest.mark.asyncio
     async def test_archive_delegates_to_adapter(self):
         """验证 archive 正确委托"""
         mock_adapter = AsyncMock()
@@ -105,7 +99,6 @@ class TestMinIODocumentStorageDelegation:
         assert result == "archived-etag"
         mock_adapter.archive.assert_called_once_with("raw-documents", "old/file.pdf", b"data", 365)
 
-    @pytest.mark.asyncio
     async def test_list_objects_delegates_to_adapter(self):
         """验证 list_objects 正确委托"""
         mock_adapter = AsyncMock()
@@ -122,7 +115,6 @@ class TestMinIODocumentStorageDelegation:
 class TestStoreDocument:
     """store_document 方法验证（特有行为）"""
 
-    @pytest.mark.asyncio
     async def test_auto_generates_path_with_correct_format(self):
         """验证自动生成路径格式: documents/{user_id}/{doc_type}/{YYYY-MM}/{timestamp}"""
         mock_adapter = AsyncMock()
@@ -144,7 +136,6 @@ class TestStoreDocument:
         now = datetime.now(UTC)
         assert parts[3] == now.strftime("%Y-%m")
 
-    @pytest.mark.asyncio
     async def test_uses_raw_documents_bucket(self):
         """验证使用 raw-documents bucket 类型"""
         mock_adapter = AsyncMock()
@@ -161,7 +152,6 @@ class TestStoreDocument:
         call_args = mock_adapter.store.call_args
         assert call_args[0][0] == "raw-documents"
 
-    @pytest.mark.asyncio
     async def test_adds_user_id_and_doc_type_tags(self):
         """验证自动添加 user_id 和 doc_type 标签"""
         mock_adapter = AsyncMock()
@@ -179,7 +169,6 @@ class TestStoreDocument:
         assert tags["user_id"] == "user-789"
         assert tags["doc_type"] == "contract"
 
-    @pytest.mark.asyncio
     async def test_adds_metadata_as_prefixed_tags(self):
         """验证 metadata 以 meta_ 前缀添加到标签"""
         mock_adapter = AsyncMock()
@@ -198,7 +187,6 @@ class TestStoreDocument:
         assert tags["meta_department"] == "finance"
         assert tags["meta_priority"] == "high"
 
-    @pytest.mark.asyncio
     async def test_no_metadata_tags_when_metadata_is_none(self):
         """验证 metadata 为 None 时不添加额外标签"""
         mock_adapter = AsyncMock()
@@ -216,7 +204,6 @@ class TestStoreDocument:
         tags = call_args[1]["tags"]
         assert "meta_" not in str(tags.keys())
 
-    @pytest.mark.asyncio
     async def test_returns_generated_object_key(self):
         """验证返回生成的 object_key"""
         mock_adapter = AsyncMock()
@@ -237,7 +224,6 @@ class TestStoreDocument:
 class TestListUserDocuments:
     """list_user_documents 方法验证（特有行为）"""
 
-    @pytest.mark.asyncio
     async def test_builds_prefix_with_user_id_only(self):
         """验证仅 user_id 时构建前缀 documents/{user_id}/"""
         mock_adapter = AsyncMock()
@@ -251,7 +237,6 @@ class TestListUserDocuments:
         assert call_args[0][0] == "raw-documents"
         assert call_args[1]["prefix"] == "documents/user-123/"
 
-    @pytest.mark.asyncio
     async def test_builds_prefix_with_user_id_and_doc_type(self):
         """验证带 doc_type 时构建前缀 documents/{user_id}/{doc_type}/"""
         mock_adapter = AsyncMock()
@@ -263,7 +248,6 @@ class TestListUserDocuments:
         call_args = mock_adapter.list_objects.call_args
         assert call_args[1]["prefix"] == "documents/user-456/invoice/"
 
-    @pytest.mark.asyncio
     async def test_returns_adapter_result(self):
         """验证返回适配器的结果"""
         mock_adapter = AsyncMock()
@@ -278,7 +262,6 @@ class TestListUserDocuments:
 
         assert result == expected
 
-    @pytest.mark.asyncio
     async def test_uses_raw_documents_bucket(self):
         """验证使用 raw-documents bucket"""
         mock_adapter = AsyncMock()
@@ -294,7 +277,6 @@ class TestListUserDocuments:
 class TestGetDocumentMetadata:
     """get_document_metadata 方法验证（特有行为）"""
 
-    @pytest.mark.asyncio
     async def test_returns_metadata_on_success(self):
         """验证成功时返回元数据"""
         mock_adapter = AsyncMock()
@@ -310,7 +292,6 @@ class TestGetDocumentMetadata:
             "documents/user-123/pdf/2025-05/file",
         )
 
-    @pytest.mark.asyncio
     async def test_returns_none_on_exception(self):
         """验证异常时返回 None"""
         mock_adapter = AsyncMock()
@@ -321,7 +302,6 @@ class TestGetDocumentMetadata:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_returns_none_on_runtime_error(self):
         """验证运行时错误时返回 None"""
         mock_adapter = AsyncMock()

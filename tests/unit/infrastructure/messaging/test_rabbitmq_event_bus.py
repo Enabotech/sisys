@@ -85,7 +85,6 @@ class TestRabbitMQConfig:
 class TestAsyncRabbitMQPublisher:
     """RabbitMQPublisher tests using mocks."""
 
-    @pytest.mark.asyncio
     async def test_connect_declares_exchange(self):
         """Connect should declare exchange on channel."""
         from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
@@ -109,7 +108,6 @@ class TestAsyncRabbitMQPublisher:
             durable=True,
         )
 
-    @pytest.mark.asyncio
     async def test_async_publish_sends_message(self):
         """async_publish should send message with correct routing key."""
         import aio_pika
@@ -135,7 +133,6 @@ class TestAsyncRabbitMQPublisher:
         assert routing_key == "sisys.events.reliable.DocumentProcessed"
         assert message.delivery_mode == aio_pika.DeliveryMode.PERSISTENT
 
-    @pytest.mark.asyncio
     async def test_async_publish_sends_with_retry_count(self):
         """async_publish should include retry_count in message headers."""
         from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
@@ -152,7 +149,6 @@ class TestAsyncRabbitMQPublisher:
         message = mock_exchange.publish.call_args.args[0]
         assert message.headers["x-retry-count"] == "3"
 
-    @pytest.mark.asyncio
     async def test_async_publish_raises_if_not_connected(self):
         """async_publish should raise RuntimeError if not connected."""
         from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
@@ -164,7 +160,6 @@ class TestAsyncRabbitMQPublisher:
         with pytest.raises(RuntimeError, match="Not connected"):
             await publisher.async_publish(event, routing_key="test")
 
-    @pytest.mark.asyncio
     async def test_close_connection(self):
         """close should close connection."""
         from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
@@ -179,7 +174,6 @@ class TestAsyncRabbitMQPublisher:
         await publisher.close()
         mock_connection.close.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_close_skips_if_already_closed(self):
         """close should not raise if connection already closed."""
         from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
@@ -191,7 +185,6 @@ class TestAsyncRabbitMQPublisher:
 
         await publisher.close()  # Should not raise
 
-    @pytest.mark.asyncio
     async def test_close_skips_if_no_connection(self):
         """close should not raise if no connection set."""
         from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
@@ -255,7 +248,6 @@ class TestAsyncRabbitMQConsumer:
         consumer.register_handler("q1", h2)
         assert len(consumer._handlers["q1"]) == 2
 
-    @pytest.mark.asyncio
     async def test_connect_sets_channel_and_qos(self):
         """connect should create channel and set QoS."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -274,7 +266,6 @@ class TestAsyncRabbitMQConsumer:
         mock_channel.set_qos.assert_called_once_with(prefetch_count=config.prefetch_count)
         assert consumer._channel is not None
 
-    @pytest.mark.asyncio
     async def test_on_message_acks_on_success_with_handler(self):
         """_on_message should ack when handler succeeds."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -311,7 +302,6 @@ class TestAsyncRabbitMQConsumer:
         assert len(handler_called) == 1
         mock_message.ack.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_message_acks_duplicate_event(self):
         """_on_message should ack when try_acquire returns False (duplicate)."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -343,7 +333,6 @@ class TestAsyncRabbitMQConsumer:
 
         mock_message.ack.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_message_enqueues_to_retry_queue_on_handler_failure(self):
         """_on_message should enqueue to RedisRetryQueue and ack when handler fails."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -379,7 +368,6 @@ class TestAsyncRabbitMQConsumer:
         mock_retry_queue.enqueue.assert_called_once()
         mock_message.ack.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_message_nacks_to_dlq_when_max_retries_exceeded(self):
         """_on_message should nack(requeue=False) and enqueue to DLQ when retries exhausted."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -416,7 +404,6 @@ class TestAsyncRabbitMQConsumer:
         mock_message.nack.assert_called_once_with(requeue=False)
         mock_dlq.enqueue.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_message_nacks_requeue_when_no_retry_queue(self):
         """_on_message should nack(requeue=True) when no retry queue configured."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -464,7 +451,6 @@ class TestAsyncRabbitMQConsumer:
 
         mock_message.nack.assert_called_once_with(requeue=False)
 
-    @pytest.mark.asyncio
     async def test_on_message_nacks_invalid_json(self):
         """_on_message should nack(requeue=False) for invalid JSON."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -480,7 +466,6 @@ class TestAsyncRabbitMQConsumer:
 
         mock_message.nack.assert_called_once_with(requeue=False)
 
-    @pytest.mark.asyncio
     async def test_on_message_records_metrics_on_success(self):
         """_on_message should record metrics on successful processing."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -514,7 +499,6 @@ class TestAsyncRabbitMQConsumer:
 
         mock_collector.record_processed.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_message_records_retry_metric(self):
         """_on_message should record retry metric when enqueuing to retry queue."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -552,7 +536,6 @@ class TestAsyncRabbitMQConsumer:
 
         mock_collector.record_retried.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_message_records_dlq_metric(self):
         """_on_message should record DLQ metric when event goes to DLQ."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -590,7 +573,6 @@ class TestAsyncRabbitMQConsumer:
 
         mock_collector.record_dlq.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_message_no_handler_acks_message(self):
         """_on_message should ack when no handler is registered (event silently dropped)."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -619,7 +601,6 @@ class TestAsyncRabbitMQConsumer:
 
         mock_message.ack.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_on_message_handles_non_numeric_retry_header(self):
         """_on_message should handle non-numeric x-retry-count header gracefully."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -655,7 +636,6 @@ class TestAsyncRabbitMQConsumer:
         # Should not crash, should enqueue to retry queue with default count 0
         mock_retry_queue.enqueue.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_close_connection(self):
         """close should close connection."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -670,7 +650,6 @@ class TestAsyncRabbitMQConsumer:
         await consumer.close()
         mock_connection.close.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_close_skips_if_already_closed(self):
         """close should not raise if connection already closed."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
@@ -684,7 +663,6 @@ class TestAsyncRabbitMQConsumer:
 
         await consumer.close()  # Should not raise
 
-    @pytest.mark.asyncio
     async def test_close_skips_if_no_connection(self):
         """close should not raise if no connection set."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer

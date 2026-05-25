@@ -39,6 +39,11 @@ class TestTenant:
         return f"test_{self.id}_"
 
     @property
+    def rabbitmq_exchange_prefix(self) -> str:
+        """RabbitMQ exchange 前缀"""
+        return f"test_{self.id}_exchange"
+
+    @property
     def qdrant_collection_prefix(self) -> str:
         """Qdrant collection 前缀"""
         return f"test_{self.id}_"
@@ -92,23 +97,31 @@ class TenantContext:
 
     @classmethod
     def _get_task_id(cls) -> int:
-        """获取当前协程/任务的唯一 ID"""
+        """获取当前协程/任务的唯一 ID
+
+        pytest-xdist 多进程隔离原理：
+        - 每个 worker 进程独立内存空间，天然隔离
+        - task.ident 用于同一进程内的协程区分
+        - 若 task.ident 为 None，使用 uuid 避免碰撞
+        """
         try:
             task = asyncio.current_task()
             if task is None:
-                # 不在异步上下文中，使用线程 ID
                 import threading
 
                 tid = threading.current_thread().ident
-                return tid if tid is not None else 0
-            # 使用 id(task) 获取任务唯一标识，兼容性好
-            return id(task)
+                return tid if tid is not None else uuid.uuid4().int
+            # 使用 task.ident（而非 id(task)），避免跨进程地址空间碰撞
+            task_ident = getattr(task, "ident", None)
+            if task_ident is not None:
+                return int(task_ident)
+            # fallback: 使用 uuid 避免跨进程碰撞
+            return uuid.uuid4().int
         except RuntimeError:
-            #  outside of event loop, use thread identity
             import threading
 
             tid = threading.current_thread().ident
-            return tid if tid is not None else 0
+            return tid if tid is not None else uuid.uuid4().int
 
     @classmethod
     async def _async_set(cls, tenant: TestTenant) -> None:
@@ -188,7 +201,6 @@ class TenantAwareMock:
             return f"{self._tenant.minio_bucket}/{name[7:]}"
         else:
             # 默认：直接添加 uuid 前缀
-            return f"{self._tenant.id}_{name}"
             return f"{self._tenant.id}_{name}"
 
 

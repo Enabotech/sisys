@@ -39,7 +39,6 @@ class TestRabbitMQEventListenerIntegration:
         mock_config.prefetch_count = 10
         return mock_redis, mock_config
 
-    @pytest.mark.asyncio
     async def test_async_handle_calls_process_event(self, mock_dependencies):
         """async_handle should process the event and return None."""
         from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener
@@ -56,7 +55,6 @@ class TestRabbitMQEventListenerIntegration:
         # Should not raise
         await listener.async_handle(event)
 
-    @pytest.mark.asyncio
     async def test_async_handle_with_document_processed(self, mock_dependencies):
         """async_handle should handle DocumentProcessed event."""
         from src.domain.events import DocumentProcessed
@@ -77,7 +75,6 @@ class TestRabbitMQEventListenerIntegration:
 
         await listener.async_handle(event)
 
-    @pytest.mark.asyncio
     async def test_listener_uses_idempotency_checker(self, mock_dependencies):
         """Listener should use DualIdempotencyChecker for idempotency."""
         from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener
@@ -92,7 +89,6 @@ class TestRabbitMQEventListenerIntegration:
         # Verify idempotency checker is initialized
         assert listener._idempotency is not None
 
-    @pytest.mark.asyncio
     async def test_listener_uses_retry_queue(self, mock_dependencies):
         """Listener should use RedisRetryQueue for retries."""
         from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener
@@ -107,7 +103,6 @@ class TestRabbitMQEventListenerIntegration:
         # Verify retry queue is initialized
         assert listener._retry_queue is not None
 
-    @pytest.mark.asyncio
     async def test_listener_has_set_dead_letter_queue_method(self, mock_dependencies):
         """Listener should have set_dead_letter_queue method."""
         from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener

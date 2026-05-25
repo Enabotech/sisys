@@ -146,7 +146,6 @@ class TestCurrentUser:
 class TestPermissionContext:
     """Test PermissionContext class."""
 
-    @pytest.mark.asyncio
     async def test_check_has_permission(self):
         """check() returns True when user has permission."""
         mock_user = MagicMock(spec=TokenPayload)
@@ -162,7 +161,6 @@ class TestPermissionContext:
         assert result is True
         mock_perm_service.check_permission.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_check_no_permission(self):
         """check() returns False when user lacks permission."""
         mock_user = MagicMock(spec=TokenPayload)
@@ -177,7 +175,6 @@ class TestPermissionContext:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_require_has_permission(self):
         """require() succeeds when user has permission."""
         mock_user = MagicMock(spec=TokenPayload)
@@ -191,7 +188,6 @@ class TestPermissionContext:
         # Should not raise
         await ctx.require("document", "read")
 
-    @pytest.mark.asyncio
     async def test_require_no_permission_raises_403(self):
         """require() raises 403 when user lacks permission."""
         mock_user = MagicMock(spec=TokenPayload)
@@ -208,7 +204,6 @@ class TestPermissionContext:
         assert exc_info.value.status_code == 403
         assert "Permission denied" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_require_uses_resource_id(self):
         """require() passes resource_id to permission service."""
         mock_user = MagicMock(spec=TokenPayload)

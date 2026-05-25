@@ -6,8 +6,6 @@ import asyncio
 import queue
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from src.domain.events.base import DomainEvent
 from src.domain.services.auto_trigger_service import AutoTriggerService
 
@@ -15,7 +13,6 @@ from src.domain.services.auto_trigger_service import AutoTriggerService
 class TestAutoTriggerHandlerQueueFull:
     """Test queue full scenario."""
 
-    @pytest.mark.asyncio
     async def test_handler_handles_queue_put_exception(self) -> None:
         """Coverage: _create_handler handles queue.Full exception."""
         from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
@@ -41,7 +38,6 @@ class TestAutoTriggerHandlerQueueFull:
 class TestAutoTriggerHandlerWorkerLoop:
     """Test worker loop branches."""
 
-    @pytest.mark.asyncio
     async def test_process_event_heartbeat_triggered_special_handling(self) -> None:
         """Coverage: _process_event with HeartbeatTriggered calls on_heartbeat_event."""
         from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
@@ -72,7 +68,6 @@ class TestAutoTriggerHandlerWorkerLoop:
         except Exception:
             pass  # Expected if from_dict doesn't work as mock
 
-    @pytest.mark.asyncio
     async def test_process_event_domain_event(self) -> None:
         """Coverage: _process_event with domain event calls on_domain_event."""
         from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
@@ -93,7 +88,6 @@ class TestAutoTriggerHandlerWorkerLoop:
 
         mock_auto_trigger_service.on_domain_event.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_process_event_logs_warning_when_triggered_is_none(self) -> None:
         """Coverage: _process_event logs warning when triggered is None."""
         from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
@@ -118,7 +112,6 @@ class TestAutoTriggerHandlerWorkerLoop:
 class TestAutoTriggerHandlerConcurrency:
     """Test concurrency control branches."""
 
-    @pytest.mark.asyncio
     async def test_worker_loop_respects_max_concurrent_tasks(self) -> None:
         """Coverage: Worker loop waits when MAX_CONCURRENT_TASKS exceeded."""
         from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
@@ -156,7 +149,6 @@ class TestAutoTriggerHandlerConcurrency:
 class TestAutoTriggerHandlerTaskTimeout:
     """Test task timeout handling."""
 
-    @pytest.mark.asyncio
     async def test_worker_loop_task_timeout(self) -> None:
         """Coverage: Worker loop handles task timeout."""
         from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler

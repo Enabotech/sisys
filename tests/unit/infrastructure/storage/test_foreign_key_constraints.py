@@ -75,7 +75,6 @@ class TestForeignKeyConstraints:
 class TestForeignKeyViolation:
     """验证外键约束违规时抛出 IntegrityError"""
 
-    @pytest.mark.asyncio
     async def test_insert_orphan_user_role_fails(self):
         """插入不存在的 user_id 的 user_role 应失败"""
         from uuid import uuid4
@@ -92,7 +91,6 @@ class TestForeignKeyViolation:
                 orig=mock.Mock(),
             )
 
-    @pytest.mark.asyncio
     async def test_insert_orphan_role_permission_fails(self):
         """插入不存在的 role_id 的 role_permission 应失败"""
         from uuid import uuid4

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import PublishResult
 from src.infrastructure.messaging.channel_router import ChannelRouter, DeliveryMode
@@ -30,7 +28,6 @@ class TestRedisEventBusImplementsInterfaces:
 class TestRedisEventBusPublish:
     """Test RedisEventBus.publish method."""
 
-    @pytest.mark.asyncio
     async def test_publish_returns_publish_result(self) -> None:
         """publish should return a PublishResult."""
         router = ChannelRouter()
@@ -47,7 +44,6 @@ class TestRedisEventBusPublish:
 
         assert isinstance(result, PublishResult)
 
-    @pytest.mark.asyncio
     async def test_publish_returns_redis_success_true_on_success(self) -> None:
         """publish should return redis_success=True on successful publish."""
         router = ChannelRouter()
@@ -63,7 +59,6 @@ class TestRedisEventBusPublish:
 
         assert result.redis_success is True
 
-    @pytest.mark.asyncio
     async def test_publish_returns_redis_success_false_when_no_channel(self) -> None:
         """publish should return redis_success=False when no Redis channel configured."""
         router = ChannelRouter(load_defaults=False)
@@ -88,7 +83,6 @@ class TestRedisEventBusPublish:
 
         assert result.redis_success is False
 
-    @pytest.mark.asyncio
     async def test_publish_calls_publisher_with_correct_channel(self) -> None:
         """publish should call publisher.publish with the correct channel."""
         router = ChannelRouter()
@@ -110,7 +104,6 @@ class TestRedisEventBusPublish:
 class TestRedisEventBusSubscribe:
     """Test RedisEventBus.subscribe and subscribe_async methods."""
 
-    @pytest.mark.asyncio
     async def test_subscribe_is_async(self) -> None:
         """subscribe should be an async method."""
         import inspect
@@ -122,7 +115,6 @@ class TestRedisEventBusSubscribe:
 
         assert inspect.iscoroutinefunction(bus.subscribe)
 
-    @pytest.mark.asyncio
     async def test_subscribe_async_is_async(self) -> None:
         """subscribe_async should be an async method."""
         import inspect
@@ -134,7 +126,6 @@ class TestRedisEventBusSubscribe:
 
         assert inspect.iscoroutinefunction(bus.subscribe_async)
 
-    @pytest.mark.asyncio
     async def test_subscribe_calls_subscriber_subscribe(self) -> None:
         """subscribe should delegate to subscriber.subscribe."""
         router = ChannelRouter()
@@ -152,7 +143,6 @@ class TestRedisEventBusSubscribe:
 class TestRedisEventBusLifecycle:
     """Test RedisEventBus start and close methods."""
 
-    @pytest.mark.asyncio
     async def test_start_is_async(self) -> None:
         """start should be an async method."""
         import inspect
@@ -164,7 +154,6 @@ class TestRedisEventBusLifecycle:
 
         assert inspect.iscoroutinefunction(bus.start)
 
-    @pytest.mark.asyncio
     async def test_close_is_async(self) -> None:
         """close should be an async method."""
         import inspect
@@ -176,7 +165,6 @@ class TestRedisEventBusLifecycle:
 
         assert inspect.iscoroutinefunction(bus.close)
 
-    @pytest.mark.asyncio
     async def test_start_calls_subscriber_start(self) -> None:
         """start should call subscriber.start()."""
         router = ChannelRouter()
@@ -188,7 +176,6 @@ class TestRedisEventBusLifecycle:
 
         subscriber.start.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_close_calls_publisher_and_subscriber_close(self) -> None:
         """close should call both publisher.close() and subscriber.close()."""
         router = ChannelRouter()

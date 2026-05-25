@@ -31,7 +31,6 @@ class TestInMemoryOutboxRepository:
         """创建 InMemoryOutboxRepository 实例"""
         return InMemoryOutboxRepository()
 
-    @pytest.mark.asyncio
     async def test_save_adds_event_to_entities(self, repository: InMemoryOutboxRepository) -> None:
         """验证 save() 添加事件到实体列表"""
         DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
@@ -42,7 +41,6 @@ class TestInMemoryOutboxRepository:
         assert len(unpublished) == 1
         assert unpublished[0].event_type == "TestEventForOutbox"
 
-    @pytest.mark.asyncio
     async def test_get_unpublished_returns_pending_events(self, repository: InMemoryOutboxRepository) -> None:
         """验证 get_unpublished() 返回待处理事件"""
         DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
@@ -54,7 +52,6 @@ class TestInMemoryOutboxRepository:
         unpublished = await repository.get_unpublished(limit=10)
         assert len(unpublished) == 2
 
-    @pytest.mark.asyncio
     async def test_get_unpublished_respects_limit(self, repository: InMemoryOutboxRepository) -> None:
         """验证 get_unpublished() 遵守限制"""
         DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
@@ -65,13 +62,11 @@ class TestInMemoryOutboxRepository:
         unpublished = await repository.get_unpublished(limit=2)
         assert len(unpublished) == 2
 
-    @pytest.mark.asyncio
     async def test_get_unpublished_returns_empty_when_none(self, repository: InMemoryOutboxRepository) -> None:
         """验证没有待处理事件时返回空列表"""
         unpublished = await repository.get_unpublished(limit=10)
         assert unpublished == []
 
-    @pytest.mark.asyncio
     async def test_mark_published_updates_status(self, repository: InMemoryOutboxRepository) -> None:
         """验证 mark_published() 更新状态"""
         DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
@@ -85,12 +80,10 @@ class TestInMemoryOutboxRepository:
         unpublished_after = await repository.get_unpublished(limit=10)
         assert len(unpublished_after) == 0
 
-    @pytest.mark.asyncio
     async def test_mark_published_handles_unknown_id(self, repository: InMemoryOutboxRepository) -> None:
         """验证 mark_published() 处理未知 ID"""
         await repository.mark_published(uuid4())  # Should not raise
 
-    @pytest.mark.asyncio
     async def test_mark_failed_updates_status(self, repository: InMemoryOutboxRepository) -> None:
         """验证 mark_failed() 更新状态"""
         DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
@@ -104,7 +97,6 @@ class TestInMemoryOutboxRepository:
         unpublished_after = await repository.get_unpublished(limit=10)
         assert len(unpublished_after) == 0
 
-    @pytest.mark.asyncio
     async def test_mark_failed_handles_unknown_id(self, repository: InMemoryOutboxRepository) -> None:
         """验证 mark_failed() 处理未知 ID"""
         await repository.mark_failed(uuid4(), "Test error")  # Should not raise
@@ -118,7 +110,6 @@ class TestInMemoryOutboxRepositoryInternalMethods:
         """创建 InMemoryOutboxRepository 实例"""
         return InMemoryOutboxRepository()
 
-    @pytest.mark.asyncio
     async def test_get_unpublished_entities(self, repository: InMemoryOutboxRepository) -> None:
         """验证 _get_unpublished_entities() 内部方法"""
         event = DomainEvent(event_type="TestEventForOutbox", source="test")
@@ -128,7 +119,6 @@ class TestInMemoryOutboxRepositoryInternalMethods:
         assert len(entities) == 1
         assert entities[0].event_type == "TestEventForOutbox"
 
-    @pytest.mark.asyncio
     async def test_mark_published_entity(self, repository: InMemoryOutboxRepository) -> None:
         """验证 _mark_published_entity() 内部方法"""
         event = DomainEvent(event_type="TestEventForOutbox", source="test")
@@ -141,7 +131,6 @@ class TestInMemoryOutboxRepositoryInternalMethods:
         entities_after = await repository._get_unpublished_entities(limit=10)
         assert len(entities_after) == 0
 
-    @pytest.mark.asyncio
     async def test_mark_failed_entity(self, repository: InMemoryOutboxRepository) -> None:
         """验证 _mark_failed_entity() 内部方法"""
         event = DomainEvent(event_type="TestEventForOutbox", source="test")
@@ -154,7 +143,6 @@ class TestInMemoryOutboxRepositoryInternalMethods:
         entities_after = await repository._get_unpublished_entities(limit=10)
         assert len(entities_after) == 0
 
-    @pytest.mark.asyncio
     async def test_entities_initially_empty(self, repository: InMemoryOutboxRepository) -> None:
         """验证实体列表初始为空"""
         unpublished = await repository.get_unpublished(limit=10)
@@ -169,7 +157,6 @@ class TestInMemoryOutboxRepositoryFIFO:
         """创建 InMemoryOutboxRepository 实例"""
         return InMemoryOutboxRepository()
 
-    @pytest.mark.asyncio
     async def test_fifo_ordering(self, repository: InMemoryOutboxRepository) -> None:
         """验证 FIFO 顺序：先创建的事件先返回"""
         import time
@@ -192,7 +179,6 @@ class TestInMemoryOutboxRepositoryFIFO:
         assert unpublished[1].event_id == ids[1]
         assert unpublished[2].event_id == ids[2]
 
-    @pytest.mark.asyncio
     async def test_fifo_after_mark_published(self, repository: InMemoryOutboxRepository) -> None:
         """验证 mark_published 后的 FIFO 顺序"""
         DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)

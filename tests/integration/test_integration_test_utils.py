@@ -23,7 +23,6 @@ from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 class TestTestFixtureConfiguration:
     """Verify test fixtures are correctly configured and isolated."""
 
-    @pytest.mark.asyncio
     async def test_outbox_repo_fixture_is_fresh_mock(self, outbox_repo: AsyncMock) -> None:
         """Each test should get a fresh mock OutboxRepository."""
         outbox_repo.get_unpublished.return_value = []
@@ -93,13 +92,11 @@ class TestMockConfiguration:
         """Mock Redis should be a fakeredis instance."""
         assert isinstance(mock_redis, fakeredis.aioredis.FakeRedis)
 
-    @pytest.mark.asyncio
     async def test_mock_redis_can_set_and_get(self, mock_redis: fakeredis.aioredis.FakeRedis) -> None:
         """Mock Redis should support basic set/get operations."""
         await mock_redis.set("key", "value")
         assert await mock_redis.get("key") == "value"
 
-    @pytest.mark.asyncio
     async def test_mock_redis_set_nx_atomic(self, mock_redis: fakeredis.aioredis.FakeRedis) -> None:
         """Mock Redis SET NX should be atomic (first call succeeds, second fails)."""
         result1 = await mock_redis.set("idempotency:test", "1", nx=True, ex=3600)
@@ -123,18 +120,15 @@ class TestMockConfiguration:
 class TestIdempotencyChecker:
     """Verify IdempotencyChecker uses fakeredis atomically."""
 
-    @pytest.mark.asyncio
     async def test_try_acquire_first_time_succeeds(self, idempotency_checker: IdempotencyChecker, event_id: UUID) -> None:
         """First try_acquire should return True."""
         assert await idempotency_checker.try_acquire(event_id) is True
 
-    @pytest.mark.asyncio
     async def test_try_acquire_second_time_fails(self, idempotency_checker: IdempotencyChecker, event_id: UUID) -> None:
         """Second try_acquire for same event_id should return False."""
         await idempotency_checker.try_acquire(event_id)
         assert await idempotency_checker.try_acquire(event_id) is False
 
-    @pytest.mark.asyncio
     async def test_try_acquire_different_events_both_succeed(self, idempotency_checker: IdempotencyChecker) -> None:
         """Different event_ids should both succeed independently."""
         id1 = uuid4()

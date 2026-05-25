@@ -6,8 +6,6 @@ Tests that DualChannelEventBus implementation satisfies the EventPublisher Proto
 
 from __future__ import annotations
 
-import pytest
-
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import PublishResult
 from src.domain.ports.event_publisher import EventPublisher
@@ -50,7 +48,6 @@ class TestEventPublisherContract:
         assert spec.owner, "Port owner is empty"
         assert spec.module, "Port module is empty"
 
-    @pytest.mark.asyncio
     async def test_publish_returns_publish_result(self, registry) -> None:
         """publish() must return PublishResult (async test)."""
         from src.domain.ports.resolver import Resolver

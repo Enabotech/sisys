@@ -109,7 +109,6 @@ def service(
 class TestUDMRServiceDecide:
     """UDMRService.decide() 测试."""
 
-    @pytest.mark.asyncio
     async def test_decide_returns_routing_decided(
         self,
         service: UDMRService,
@@ -127,7 +126,6 @@ class TestUDMRServiceDecide:
         assert result.route_type == "cloud"
         assert result.selected_model == "MiniMax-M2.7"
 
-    @pytest.mark.asyncio
     async def test_decide_calls_compliance_check(
         self,
         service: UDMRService,
@@ -138,7 +136,6 @@ class TestUDMRServiceDecide:
         await service.decide(task)
         mock_compliance_gateway.check.assert_called_once_with(task)
 
-    @pytest.mark.asyncio
     async def test_decide_calls_policy_route(
         self,
         service: UDMRService,
@@ -154,7 +151,6 @@ class TestUDMRServiceDecide:
 
         mock_policy.route.assert_called_once_with(task, compliance)
 
-    @pytest.mark.asyncio
     async def test_decide_publishes_event(
         self,
         service: UDMRService,
@@ -167,7 +163,6 @@ class TestUDMRServiceDecide:
         event = mock_publisher.publish.call_args[0][0]
         assert isinstance(event, RoutingDecided)
 
-    @pytest.mark.asyncio
     async def test_decide_cloud_with_fallback_reason(
         self,
         service: UDMRService,
@@ -184,7 +179,6 @@ class TestUDMRServiceDecide:
         assert result.selected_model == "qwen2.5:7b"
         assert result.fallback_reason == "unavailable"
 
-    @pytest.mark.asyncio
     async def test_decide_health_check_result_in_event(
         self,
         service: UDMRService,
@@ -198,7 +192,6 @@ class TestUDMRServiceDecide:
 
         assert result.health_check_passed is False
 
-    @pytest.mark.asyncio
     async def test_decide_health_check_passed(
         self,
         service: UDMRService,
@@ -212,7 +205,6 @@ class TestUDMRServiceDecide:
 
         assert result.health_check_passed is True
 
-    @pytest.mark.asyncio
     async def test_decide_persist_log(
         self,
         service: UDMRService,
@@ -234,7 +226,6 @@ class TestUDMRServiceDecide:
         assert log.route_type == "cloud"
         assert log.fallback_reason is None
 
-    @pytest.mark.asyncio
     async def test_decide_persist_log_with_fallback(
         self,
         service: UDMRService,
@@ -254,7 +245,6 @@ class TestUDMRServiceDecide:
         assert log.fallback_reason == "unavailable"
         assert log.selected_model == "qwen2.5:7b"
 
-    @pytest.mark.asyncio
     async def test_decide_task_id_in_event(
         self,
         service: UDMRService,
@@ -276,7 +266,6 @@ class TestUDMRServiceDecide:
 class TestUDMRServiceOptionalDeps:
     """可选依赖为 None 时的行为."""
 
-    @pytest.mark.asyncio
     async def test_decide_without_publisher(
         self,
         mock_compliance_gateway: AsyncMock,
@@ -295,7 +284,6 @@ class TestUDMRServiceOptionalDeps:
         result = await svc.decide(task)
         assert isinstance(result, RoutingDecided)
 
-    @pytest.mark.asyncio
     async def test_decide_without_log_repo(
         self,
         mock_compliance_gateway: AsyncMock,

@@ -19,8 +19,6 @@ import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from src.domain.events.base import DomainEvent
 from src.infrastructure.messaging.channel_router import ChannelRouter
 from src.infrastructure.messaging.redis_event_bus import RedisEventBus
@@ -58,7 +56,6 @@ def _make_event_dict() -> dict[str, str | int]:
 class TestSubscribeChannelNameResolution:
     """验证 subscribe() 使用 ChannelRouter 解析频道名."""
 
-    @pytest.mark.asyncio
     async def test_subscribe_resolves_channel_name(self) -> None:
         """subscribe("AutoTriggered") 应订阅 Redis channel "sisys:rt:auto_triggered"."""
         router = ChannelRouter()
@@ -82,7 +79,6 @@ class TestSubscribeChannelNameResolution:
             f"Expected channel 'sisys:rt:auto_triggered', got {call_args[0][0]}"
         )
 
-    @pytest.mark.asyncio
     async def test_subscribe_routing_decided_channel(self) -> None:
         """subscribe("RoutingDecided") 应订阅 Redis channel "sisys:rt:routing_decided"."""
         router = ChannelRouter()
@@ -102,7 +98,6 @@ class TestSubscribeChannelNameResolution:
         call_args = mock_subscriber.subscribe.call_args
         assert call_args[0][0] == "sisys:rt:routing_decided"
 
-    @pytest.mark.asyncio
     async def test_subscribe_unknown_event_type_passes_none(self) -> None:
         """未知 event_type 时 get_redis_channel 返回 None，应传递 None 给 subscriber."""
         router = ChannelRouter()
@@ -140,7 +135,6 @@ class TestSubscribeAsyncMethodExists:
         assert hasattr(subscriber, "subscribe_async"), "RedisEventSubscriber missing subscribe_async() method"
         assert callable(subscriber.subscribe_async)
 
-    @pytest.mark.asyncio
     async def test_bus_subscribe_async_delegates_correctly(self) -> None:
         """RedisEventBus.subscribe_async() 应正确委托给 subscriber.subscribe_async()."""
         router = ChannelRouter()
@@ -173,7 +167,6 @@ class TestSubscribeAsyncMethodExists:
 class TestHandlerReceivesDomainEvent:
     """验证 handler 收到 DomainEvent 对象而非 dict."""
 
-    @pytest.mark.asyncio
     async def test_dispatch_message_deserializes_to_domain_event(self) -> None:
         """_dispatch_message 应调用 DomainEvent.from_dict 反序列化."""
         from src.infrastructure.config.redis import RedisConfig
@@ -199,7 +192,6 @@ class TestHandlerReceivesDomainEvent:
         assert len(received) == 1
         assert isinstance(received[0], DomainEvent), f"Handler received {type(received[0])}, expected DomainEvent"
 
-    @pytest.mark.asyncio
     async def test_dispatch_message_with_real_event_dict(self) -> None:
         """使用完整事件 dict 测试反序列化."""
         import json
@@ -233,7 +225,6 @@ class TestHandlerReceivesDomainEvent:
 class TestSubscribeIntegration:
     """端到端验证订阅流程."""
 
-    @pytest.mark.asyncio
     async def test_full_subscribe_flow_with_channel_resolution(self) -> None:
         """完整订阅流程：event_type → channel → handler 注册."""
         router = ChannelRouter()
