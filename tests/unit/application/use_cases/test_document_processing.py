@@ -74,3 +74,24 @@ class TestDocumentProcessingUseCase:
         assert event.payload["document_id"] == "doc-999"
         assert event.payload["status"] == "processed"
         assert event.event_type == "DocumentProcessed"
+
+    async def test_process_document_wraps_outbox_error(
+        self, use_case: DocumentProcessingUseCase, mock_outbox_repo: mock.AsyncMock
+    ) -> None:
+        """outbox_repo.save 抛异常时应包装为 RuntimeError"""
+        mock_outbox_repo.save.side_effect = ConnectionError("db down")
+
+        with pytest.raises(RuntimeError, match="Failed to process document doc-error"):
+            await use_case.process_document("doc-error")
+
+    async def test_process_document_preserves_cause(
+        self, use_case: DocumentProcessingUseCase, mock_outbox_repo: mock.AsyncMock
+    ) -> None:
+        """RuntimeError 应保留原始异常链"""
+        original = ValueError("bad data")
+        mock_outbox_repo.save.side_effect = original
+
+        with pytest.raises(RuntimeError) as exc_info:
+            await use_case.process_document("doc-chain")
+
+        assert exc_info.value.__cause__ is original

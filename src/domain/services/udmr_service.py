@@ -12,7 +12,6 @@ Copyright:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 import uuid
@@ -26,7 +25,9 @@ from src.domain.ports.health_check import HealthCheckPort
 from src.domain.ports.routing_decision_log_repository import (
     RoutingDecisionLogRepository,
 )
+from src.domain.ports.token_estimator import TokenEstimatorPort
 from src.domain.ports.udmr_policy import UdmrPolicyPort
+from src.domain.services.cost_calculator import CostCalculator
 from src.domain.value_objects.compliance_result import ComplianceResult
 from src.domain.value_objects.udmr_task import UDMRTask
 
@@ -52,6 +53,8 @@ class UDMRService:
         local_first: bool = False,
         local_model: str = "qwen2.5:7b",
         llm_timeout: int = 600,
+        token_estimator: TokenEstimatorPort | None = None,
+        cost_calculator: CostCalculator | None = None,
     ) -> None:
         self._compliance_gateway = compliance_gateway
         self._policy = policy
@@ -61,6 +64,8 @@ class UDMRService:
         self._local_first = local_first
         self._local_model = local_model
         self._llm_timeout = llm_timeout
+        self._token_estimator = token_estimator
+        self._cost_calculator = cost_calculator
 
     async def decide(
         self,
@@ -131,7 +136,7 @@ class UDMRService:
                 logger.exception("Failed to publish RoutingDecided event")
 
         # 6. 持久化日志
-        self._persist_decision_log(event, task)
+        await self._persist_decision_log(event, task)
 
         return event
 
@@ -155,10 +160,28 @@ class UDMRService:
             logger.exception("Health check failed")
             return False
 
-    def _persist_decision_log(self, event: RoutingDecided, task: UDMRTask) -> None:
+    async def _persist_decision_log(self, event: RoutingDecided, task: UDMRTask) -> None:
         """异步持久化路由决策日志."""
         if self._log_repo is None:
             return
+
+        # 估算初始 Token 和成本
+        prompt_tokens = 0
+        completion_tokens = 0
+        cost_actual = 0.0
+
+        if self._token_estimator is not None and self._cost_calculator is not None:
+            try:
+                prompt_tokens, completion_tokens = await self._token_estimator.estimate(event.route_type, event.selected_model)
+                from src.domain.value_objects.token_consumption import TokenConsumption
+
+                consumption = TokenConsumption(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                )
+                cost_actual = self._cost_calculator.calculate(consumption, event.route_type, event.selected_model)
+            except Exception:
+                logger.exception("Token 估算或成本计算失败，使用默认值 0.0")
 
         log_entry = RoutingDecisionLog(
             log_id=uuid.uuid4(),
@@ -168,20 +191,15 @@ class UDMRService:
             route_target=event.selected_model,
             route_score=1.0,  # 静态路由固定评分
             selected_model=event.selected_model,
-            cost_actual=0.0,  # MVP 阶段使用默认值
+            cost_actual=cost_actual,
             fallback_reason=event.fallback_reason,
             timestamp=datetime.now(UTC),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
         )
 
-        async def _save() -> None:
-            if self._log_repo is None:
-                return
-            try:
-                await self._log_repo.save(log_entry)
-            except Exception:
-                logger.exception("Failed to persist routing decision log")
-
         try:
-            asyncio.get_running_loop().create_task(_save())
-        except RuntimeError:
-            logger.debug("No running loop, skipping async decision log persist")
+            await self._log_repo.save(log_entry)
+        except Exception:
+            logger.exception("Failed to persist routing decision log")

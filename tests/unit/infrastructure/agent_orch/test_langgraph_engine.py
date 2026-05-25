@@ -13,6 +13,7 @@ Copyright:
 
 from __future__ import annotations
 
+import time
 import uuid
 from unittest.mock import AsyncMock, patch
 
@@ -204,7 +205,7 @@ class TestLangGraphEngineGetGraphStatus:
         """已完成的 run_id 返回 COMPLETED"""
         run_id = str(uuid.uuid4())
         # 模拟 submit_graph 将结果存入 _runs
-        engine._runs[run_id] = FlowStatus.COMPLETED
+        engine._runs[run_id] = (FlowStatus.COMPLETED, 0.0)
 
         status = await engine.get_graph_status(run_id)
         assert status == FlowStatus.COMPLETED
@@ -212,7 +213,7 @@ class TestLangGraphEngineGetGraphStatus:
     async def test_get_graph_status_failed(self, engine: LangGraphEngine) -> None:
         """失败的 run_id 返回 FAILED"""
         run_id = str(uuid.uuid4())
-        engine._runs[run_id] = FlowStatus.FAILED
+        engine._runs[run_id] = (FlowStatus.FAILED, 0.0)
 
         status = await engine.get_graph_status(run_id)
         assert status == FlowStatus.FAILED
@@ -226,3 +227,83 @@ class TestLangGraphEngineGetGraphStatus:
         """未知 run_id 返回 FAILED"""
         status = await engine.get_graph_status(str(uuid.uuid4()))
         assert status == FlowStatus.FAILED
+
+
+class TestLangGraphEngineRunsEviction:
+    """_runs 字典淘汰机制测试"""
+
+    async def test_cleanup_evicts_expired_entries(self, engine: LangGraphEngine) -> None:
+        """TTL 过期的记录应被淘汰"""
+        run_id = str(uuid.uuid4())
+        # 插入一条 timestamp=0 的过期记录（epoch 起点，远超 TTL）
+        engine._runs[run_id] = (FlowStatus.COMPLETED, 0.0)
+
+        # 触发一次 submit_graph 以执行 _cleanup_runs
+        mock_compiled = AsyncMock()
+        mock_compiled.ainvoke = AsyncMock(
+            return_value={
+                "task_description": "t",
+                "agent_role": "a",
+                "analysis_result": "r",
+                "synthesis_result": "s",
+            }
+        )
+        with patch.object(engine, "_build_graph", return_value=mock_compiled):
+            await engine.submit_graph("BasicAgent", {"task_description": "test"})
+
+        # 过期记录应被淘汰
+        assert run_id not in engine._runs
+
+    async def test_cleanup_keeps_fresh_entries(self, engine: LangGraphEngine) -> None:
+        """未过期的记录应保留"""
+        run_id = str(uuid.uuid4())
+        engine._runs[run_id] = (FlowStatus.COMPLETED, time.monotonic())
+
+        mock_compiled = AsyncMock()
+        mock_compiled.ainvoke = AsyncMock(
+            return_value={
+                "task_description": "t",
+                "agent_role": "a",
+                "analysis_result": "r",
+                "synthesis_result": "s",
+            }
+        )
+        with patch.object(engine, "_build_graph", return_value=mock_compiled):
+            await engine.submit_graph("BasicAgent", {"task_description": "test"})
+
+        # 新鲜记录应保留
+        assert run_id in engine._runs
+
+    async def test_max_size_fifo_eviction(self) -> None:
+        """超过 max_size 时 FIFO 淘汰最早记录"""
+        config = LangGraphConfig()
+        publisher = AsyncMock()
+        publish_result = AsyncMock()
+        publish_result.is_full_failure = False
+        publisher.publish = AsyncMock(return_value=publish_result)
+        engine = LangGraphEngine(config, publisher)
+        engine._MAX_RUNS = 3
+
+        now = time.monotonic()
+        # 手动填满 _runs 到 max_size
+        engine._runs["old-1"] = (FlowStatus.COMPLETED, now)
+        engine._runs["old-2"] = (FlowStatus.COMPLETED, now)
+        engine._runs["old-3"] = (FlowStatus.COMPLETED, now)
+
+        mock_compiled = AsyncMock()
+        mock_compiled.ainvoke = AsyncMock(
+            return_value={
+                "task_description": "t",
+                "agent_role": "a",
+                "analysis_result": "r",
+                "synthesis_result": "s",
+            }
+        )
+        with patch.object(engine, "_build_graph", return_value=mock_compiled):
+            await engine.submit_graph("BasicAgent", {"task_description": "test"})
+
+        # 最早记录应被淘汰
+        assert "old-1" not in engine._runs
+        # 较新记录保留
+        assert "old-2" in engine._runs
+        assert len(engine._runs) <= engine._MAX_RUNS

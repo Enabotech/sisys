@@ -1189,6 +1189,8 @@ def bootstrap() -> None:
             local_first=UDMRConfig.from_env().local_first,
             local_model=UDMRConfig.from_env().local_model,
             llm_timeout=UDMRConfig.from_env().llm_timeout,
+            token_estimator=resolver.resolve("token_estimator"),
+            cost_calculator=resolver.resolve("cost_calculator"),
         ),
         module="src.domain.services.udmr_service",
         lifetime=Lifetime.SINGLETON,
