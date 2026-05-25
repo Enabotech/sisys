@@ -19,7 +19,7 @@
 
 ## Deferred from: code review of 1-18b-langgraph-agent-orchestration (2026-05-20)
 
-- `_runs` 字典无限增长（内存泄漏）— SINGLETON 生命周期下只增不删，需引入 TTL 驱逐机制。`src/infrastructure/agent_orch/langgraph_engine.py:46`
+- ~~`_runs` 字典无限增长（内存泄漏）~~ — **RESOLVED** (2026-05-25)：引入 OrderedDict + TTL(3600s) + FIFO(1000) 淘汰机制。`src/infrastructure/agent_orch/langgraph_engine.py`
 - `LangGraphConfig` 配置字段从未被 `LangGraphEngine` 使用 — retry/timeout 配置为 MVP 预留，后续实现重试/超时逻辑时使用。`src/infrastructure/agent_orch/langgraph_engine.py:42`
 - `get_graph_status` 对未知 ID 返回 FAILED 而非抛异常 — MVP 设计选择，spec 明确说"仅返回 COMPLETED 或 FAILED"。`src/infrastructure/agent_orch/langgraph_engine.py:102`
 - 阻塞式执行导致 RUNNING/PENDING 不可观察 — spec 明确说"MVP 阻塞语义...RUNNING/PENDING 在本地模式下不可观察"。`src/infrastructure/agent_orch/langgraph_engine.py:76-77`
@@ -35,4 +35,4 @@
 
 ## Deferred from: code review of 1-19-cost-metrics-basic (2026-05-25)
 
-- InMemoryRoutingDecisionLogRepository 非线程安全 — dict 在 asyncio 并发 save/query 下可能 RuntimeError: dictionary changed size during iteration。测试用内存实现，生产用 PostgreSQL，非本 Story 修复范围。`src/infrastructure/messaging/inmemory_routing_decision_log_repository.py`
+- ~~InMemoryRoutingDecisionLogRepository 非线程安全~~ — **RESOLVED** (2026-05-25)：引入 asyncio.Lock + max_size(1000) + TTL(24h) 淘汰。`src/infrastructure/messaging/inmemory_routing_decision_log_repository.py`
