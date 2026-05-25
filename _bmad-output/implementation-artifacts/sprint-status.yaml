@@ -100,6 +100,7 @@ development_status:
   # ===========================================================================
   # Epic 2: 文档与数据管理 - 📋 待开始
   # ===========================================================================
+  epic-2: backlog
   2-1-document-upload-17-formats: backlog
   2-2a-document-parsing-basic-formats: backlog
   2-2b-document-parsing-extended-formats: backlog
@@ -114,6 +115,7 @@ development_status:
   # ===========================================================================
   # Epic 3: 智能检索与知识发现 - 📋 待开始
   # ===========================================================================
+  epic-3: backlog
   3-1a-dense-semantic-search: backlog
   3-1b-bm25-sparse-search-rrf-fusion: backlog
   3-2-entity-extraction-llm-rules: backlog
@@ -132,6 +134,7 @@ development_status:
   # ===========================================================================
   # Epic 4: 战略工具箱 - 📋 待开始
   # ===========================================================================
+  epic-4: backlog
   4-1-strategic-tool-registration-23-tools: backlog
   4-2-toolchain-orchestration-dag: backlog
   4-3-tool-io-schema-validation: backlog
@@ -142,6 +145,7 @@ development_status:
   # ===========================================================================
   # Epic 5: Agent 协作系统 - 📋 待开始
   # ===========================================================================
+  epic-5: backlog
   5-1-ceo-agent-instantiation-mvp: backlog
   5-2-agent-identity-profile-loading: backlog
   5-3-single-agent-workflow: backlog
@@ -153,6 +157,7 @@ development_status:
   # ===========================================================================
   # Epic 6: 战略规划流程 (BLM 前两阶段) - 📋 待开始
   # ===========================================================================
+  epic-6: backlog
   6-1-blm-first-two-phases: backlog
   6-2-market-insight-six-substeps: backlog
   6-3-checkpoint-snapshot-creation: backlog  # TODO: 实现 1.15b L3(Qdrant)/L4(MinIO) 触发
@@ -170,6 +175,7 @@ development_status:
   # ===========================================================================
   # Epic 7: 多触点用户界面与 API 集成 - 📋 待开始
   # ===========================================================================
+  epic-7: backlog
   7-1-cli-command-interface: backlog
   7-2-rest-api-interface: backlog
   7-3-api-gateway-unified-entry: backlog
@@ -183,6 +189,7 @@ development_status:
   # ===========================================================================
   # Epic 8: 用户权限管理与审计合规 - 📋 待开始
   # ===========================================================================
+  epic-8: backlog
   8-1-audit-log-multi-dimensional-search: backlog
   8-2-correction-level-determination-basic: backlog
   8-3-l0-l1-correction-auto-solidification: backlog
@@ -194,6 +201,7 @@ development_status:
   # ===========================================================================
   # Epic 9: 完整多 Agent 协作 (V1) - 📋 待开始
   # ===========================================================================
+  epic-9: backlog
   9-1-multi-agent-task-decomposition: backlog
   9-2-collaboration-dependency-graph: backlog
   9-3-dynamic-isolation-level-adjustment: backlog
@@ -207,6 +215,7 @@ development_status:
   # ===========================================================================
   # Epic 10: 完整 BLM 六阶段与 Checkpoint 恢复 (V1) - 📋 待开始
   # ===========================================================================
+  epic-10: backlog
   10-1-complete-blm-six-phases: backlog
   10-2-replay-mode: backlog
   10-3-impact-range-evaluation: backlog
@@ -218,6 +227,7 @@ development_status:
   # ===========================================================================
   # Epic 11: UDMR 动态模型路由 (V1) - 📋 待开始
   # ===========================================================================
+  epic-11: backlog
   11-1-udmr-three-layer-decision: backlog
   11-2-four-factor-scoring-routing: backlog
   11-3-three-level-cost-circuit-breaker: backlog
@@ -229,6 +239,7 @@ development_status:
   # ===========================================================================
   # Epic 12: 知识图谱与 GraphRAG (V1) - 📋 待开始
   # ===========================================================================
+  epic-12: backlog
   12-1-entity-alignment-disambiguation: backlog
   12-2-query-routing-engine: backlog
   12-3-summary-quality-evaluation: backlog
@@ -240,6 +251,7 @@ development_status:
   # ===========================================================================
   # Epic 13: 高级系统管理与合规 (V1) - 📋 待开始
   # ===========================================================================
+  epic-13: backlog
   13-1-sensitive-data-masking: backlog
   13-2-l2-correction-expert-confirmation: backlog
   13-3-l3-correction-committee-approval: backlog
@@ -253,6 +265,7 @@ development_status:
   # ===========================================================================
   # Epic 14: 用户体验增强 (V1) - 📋 待开始
   # ===========================================================================
+  epic-14: backlog
   14-1-decision-process-visualization: backlog
   14-2-branch-management: backlog
   14-3-checkpoint-recovery-mode-selection: backlog
@@ -262,6 +275,7 @@ development_status:
   # ===========================================================================
   # Epic 15: BEM 战略解码 (V2) - 📋 待开始
   # ===========================================================================
+  epic-15: backlog
   15-1-bem-six-phases-strategic-decoding: backlog
   15-2-sp-to-bp-structural-mapping: backlog
   epic-15-retrospective: optional
@@ -269,6 +283,7 @@ development_status:
   # ===========================================================================
   # Epic 16: 高级安全与合规 (V2) - 📋 待开始
   # ===========================================================================
+  epic-16: backlog
   16-1-iso-27001-certification: backlog
   16-2-cbirc-regulation-1104-east: backlog
   16-3-blockchain-hash-chain-audit-log: backlog
@@ -278,6 +293,7 @@ development_status:
   # ===========================================================================
   # Epic 17: 高级数据管理与检索 (V2) - 📋 待开始
   # ===========================================================================
+  epic-17: backlog
   17-1-math-formula-recognition-latex-mathml: backlog
   17-2-image-text-joint-embedding-cross-modal-search: backlog
   17-3-audio-video-transcription: backlog
@@ -288,6 +304,7 @@ development_status:
   # ===========================================================================
   # Epic 18: 高级 Agent 协作 (V2) - 📋 待开始
   # ===========================================================================
+  epic-18: backlog
   18-1-gvisor-sandbox-execution: backlog
   18-2-stress-test-modeling: backlog
   18-3-force-pause-request-user-intervention: backlog
@@ -297,15 +314,16 @@ development_status:
   # ===========================================================================
   # Epic 19: 高级用户体验 (V2) - 📋 待开始
   # ===========================================================================
+  epic-19: backlog
   19-1-decision-impact-analysis-shapley: backlog
   19-2-knowledge-update-push: backlog
   19-3-predictive-strategic-alert-cusum-drift: backlog
   epic-19-retrospective: optional
 
     # ===========================================================================
-  # Epic 20: 重大重构 (epic文档不追踪) - 🔄 进行中
+  # Epic 20: 重大重构 (epic文档不追踪) - ✅ 已完成
   # ===========================================================================
-  epic-20: in-progress
+  epic-20: done
   20-1-sisys-testing-refactor: done
   20-2-event-messaging-refactor: done
   20-3-uni-dual-channel-eventbus: done
@@ -320,25 +338,30 @@ development_status:
 # Summary:
 # =============================================================================
 # Total Epics: 21 (Epic 0-20, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
-# Total Stories (excluding retrospectives): 158
+# Total Stories (excluding retrospectives): 161
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
-#   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 🔄 3 ready-for-dev)
-#   - Epic 1-19: 140 stories (✅ 13 done , 🔄 4 ready-for-dev , 🔄 1 in-progress)
-#   - Epic 20: 8 stories (✅ 7 done, 🔄 1 ready-for-dev)
+#   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 📋 3 ready-for-dev)
+#   - Epic 1: 23 stories (✅ done)
+#   - Epic 2-19: 115 stories (📋 backlog)
+#   - Epic 20: 8 stories (✅ done)
 #
 # Status Summary:
-#   - Done: 32 (包括 Epic 20)
-#   - In Progress: 2
-#   - Ready for Dev: 7
-#   - Backlog: 121
+#   Stories:
+#     - Done: 43
+#     - Ready for Dev: 3 (0-17, 0-18, 0-30)
+#     - In Progress: 0
+#     - Review: 0
+#     - Backlog: 115
+#   Epics:
+#     - Done: 3 (Epic 0, Epic 1, Epic 20)
+#     - In Progress: 0
+#     - Backlog: 18 (Epic 2-19)
+#   Retrospectives:
+#     - Done: 1 (Epic 1)
+#     - Optional: 21
 #
 # Next Steps:
 #   1. Follow SDD+TDD mode for all stories: docs/developer/sdd-tdd-checklist.md
-#   2. Execute Epic 0 Iteration 1 剩余 Stories (0.17/18) - 产品交付系统依赖Epic 1
-#   3. Developping Epic 1
-#
-# Key Changes from Previous Version:
-#   - Updated last_updated date to 2026-05-04
-#   - Story 20-5 (intf-listener-refactor) created → ready-for-dev
-#   - Updated Epic 20 story count and summary counts
+#   2. Option A: Complete Epic 0 Iteration 1 remaining stories (0-17/18/30)
+#   3. Option B: Start Epic 2 — create story file for 2-1-document-upload-17-formats
 # =============================================================================
