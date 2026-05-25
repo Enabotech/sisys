@@ -236,3 +236,43 @@ class TestBusinessMetricsCollectorThreadSafety:
 
         # Hit rate should be approximately 0.5 (100 hits, 100 misses)
         assert abs(collector.hit_rate - 0.5) < 0.01
+
+
+class TestBusinessMetricsCollectorDefaultRegistry:
+    """验证 registry=None 时使用默认 REGISTRY 路径（行 76-78）.
+
+    全局 REGISTRY 禁止重复注册同名指标，因此 registry=None 仅适用于
+    单例模式（DI 容器 SINGLETON 生命周期）。多次实例化会触发
+    Duplicated timeseries 错误，这是正确行为——防止生产环境重复注册。
+    """
+
+    def test_default_registry_full_lifecycle(self) -> None:
+        """registry=None 时指标注册、记录、导出的完整生命周期."""
+        from prometheus_client import REGISTRY, generate_latest
+
+        from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
+
+        collector = BusinessMetricsCollector(registry=None)
+
+        assert collector._registry is REGISTRY
+
+        # sessions 指标
+        collector.record_sessions(3)
+        assert collector.sessions == 3
+
+        # cache 指标
+        collector.record_cache_hit()
+        collector.record_cache_hit()
+        collector.record_cache_miss()
+        assert abs(collector.hit_rate - (2.0 / 3.0)) < 0.01
+
+        # cost 指标
+        collector.record_cost(cost=0.05, model="test-default-reg", route_type="test")
+        assert abs(collector._total_cost_cny - 0.05) < 0.0001
+
+        # token 指标
+        collector.record_token_usage(prompt=100, completion=50, model="test-default-reg", route_type="test")
+
+        # 全局 Registry 输出包含指标
+        output = generate_latest(REGISTRY).decode("utf-8")
+        assert "sisys_agent_sessions_active" in output
