@@ -126,3 +126,103 @@ class TestDataResidencyEnforcerIntegration:
         assert "policy_id" in ctx
         assert "local_only" in ctx
         assert ctx["local_only"] is True
+
+
+class TestDataResidencyEnforcerBranches:
+    """DataResidencyEnforcer 未覆盖分支测试"""
+
+    def test_enforce_residency_moderate_unknown_region(self):
+        """Test MODERATE level allows unknown region."""
+        from src.domain.entities.data_residency_policy import DataResidencyPolicy, EnforcementLevel, Region
+        from src.infrastructure.security.data_residency_enforcer_impl import DataResidencyEnforcerImpl
+
+        enforcer = DataResidencyEnforcerImpl()
+        policy = DataResidencyPolicy(
+            name="Moderate Policy",
+            allowed_regions=(Region.CHINA_DOMESTIC.value,),
+            blocked_regions=(Region.OVERSEAS.value,),
+            enforcement_level=EnforcementLevel.MODERATE,
+        )
+
+        result = enforcer.enforce_residency("data", "UNKNOWN_REGION", policy)
+        assert result is True
+
+    def test_enforce_residency_permissive_unknown_region(self):
+        """Test PERMISSIVE level allows unknown region."""
+        from src.domain.entities.data_residency_policy import DataResidencyPolicy, EnforcementLevel, Region
+        from src.infrastructure.security.data_residency_enforcer_impl import DataResidencyEnforcerImpl
+
+        enforcer = DataResidencyEnforcerImpl()
+        policy = DataResidencyPolicy(
+            name="Permissive Policy",
+            allowed_regions=(Region.CHINA_DOMESTIC.value,),
+            blocked_regions=(),
+            enforcement_level=EnforcementLevel.PERMISSIVE,
+        )
+
+        result = enforcer.enforce_residency("data", "SOME_OTHER_REGION", policy)
+        assert result is True
+
+    def test_check_violation_moderate_blocked_region(self):
+        """Test MODERATE level blocked region returns True."""
+        from src.domain.entities.data_residency_policy import DataResidencyPolicy, EnforcementLevel, Region
+        from src.infrastructure.security.data_residency_enforcer_impl import DataResidencyEnforcerImpl
+
+        enforcer = DataResidencyEnforcerImpl()
+        policy = DataResidencyPolicy(
+            name="Moderate Policy",
+            allowed_regions=(Region.CHINA_DOMESTIC.value,),
+            blocked_regions=(Region.OVERSEAS.value,),
+            enforcement_level=EnforcementLevel.MODERATE,
+        )
+
+        result = enforcer.check_violation(Region.OVERSEAS.value, policy)
+        assert result is True
+
+    def test_check_violation_permissive_blocked_region(self):
+        """Test PERMISSIVE level blocked region returns True."""
+        from src.domain.entities.data_residency_policy import DataResidencyPolicy, EnforcementLevel, Region
+        from src.infrastructure.security.data_residency_enforcer_impl import DataResidencyEnforcerImpl
+
+        enforcer = DataResidencyEnforcerImpl()
+        policy = DataResidencyPolicy(
+            name="Permissive Policy",
+            allowed_regions=(Region.CHINA_DOMESTIC.value,),
+            blocked_regions=(Region.OVERSEAS.value,),
+            enforcement_level=EnforcementLevel.PERMISSIVE,
+        )
+
+        result = enforcer.check_violation(Region.OVERSEAS.value, policy)
+        assert result is True
+
+    def test_check_violation_permissive_unknown_region(self):
+        """Test PERMISSIVE level unknown region returns False (no violation)."""
+        from src.domain.entities.data_residency_policy import DataResidencyPolicy, EnforcementLevel, Region
+        from src.infrastructure.security.data_residency_enforcer_impl import DataResidencyEnforcerImpl
+
+        enforcer = DataResidencyEnforcerImpl()
+        policy = DataResidencyPolicy(
+            name="Permissive Policy",
+            allowed_regions=(Region.CHINA_DOMESTIC.value,),
+            blocked_regions=(),
+            enforcement_level=EnforcementLevel.PERMISSIVE,
+        )
+
+        result = enforcer.check_violation("RANDOM_REGION", policy)
+        assert result is False
+
+    def test_enforce_residency_strict_unknown_region(self):
+        """Test STRICT level unknown region returns False."""
+        from src.domain.entities.data_residency_policy import DataResidencyPolicy, EnforcementLevel, Region
+        from src.infrastructure.security.data_residency_enforcer_impl import DataResidencyEnforcerImpl
+
+        enforcer = DataResidencyEnforcerImpl()
+        policy = DataResidencyPolicy(
+            name="Strict Policy",
+            allowed_regions=(Region.CHINA_DOMESTIC.value,),
+            blocked_regions=(Region.OVERSEAS.value,),
+            enforcement_level=EnforcementLevel.STRICT,
+        )
+
+        result = enforcer.enforce_residency("data", "UNKNOWN_REGION", policy)
+        assert result is False
