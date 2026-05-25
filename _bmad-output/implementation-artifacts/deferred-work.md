@@ -32,3 +32,7 @@
 - aggregate_type 可被覆盖 — `if not self.aggregate_type:` 条件允许调用方传入自定义值。所有事件都有此模式。预存。`src/domain/events/workflow_events.py:35-38`
 - DomainEvent 注册表无隔离 — 测试检查 `_registry["WorkflowSubmitted"]` 但未确保清洁状态。预存模式。`tests/unit/domain/events/test_workflow_events.py:61-67`
 - 不可序列化参数延迟失败 — parameters 包含 Prefect 对象时仅在 `to_dict()` 时报错。预存问题。`src/domain/events/workflow_events.py:31`
+
+## Deferred from: code review of 1-19-cost-metrics-basic (2026-05-25)
+
+- InMemoryRoutingDecisionLogRepository 非线程安全 — dict 在 asyncio 并发 save/query 下可能 RuntimeError: dictionary changed size during iteration。测试用内存实现，生产用 PostgreSQL，非本 Story 修复范围。`src/infrastructure/messaging/inmemory_routing_decision_log_repository.py`

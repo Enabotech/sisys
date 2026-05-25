@@ -38,7 +38,12 @@ class StaticTokenEstimator(TokenEstimatorPort):
 
         Returns:
             (prompt_tokens, completion_tokens) 元组
+
+        Raises:
+            ValueError: route_type 为 None 或空字符串时
         """
+        if not route_type or not route_type.strip():
+            raise ValueError("route_type must not be None or empty")
         if route_type.lower() == "local":
             return self.LOCAL_PROMPT_TOKENS, self.LOCAL_COMPLETION_TOKENS
         # 默认使用云端估算（包括未知路由类型）

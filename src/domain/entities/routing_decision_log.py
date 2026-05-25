@@ -104,3 +104,11 @@ class RoutingDecisionLog:
             raise ValueError(f"completion_tokens must be non-negative. Got: {self.completion_tokens}")
         if self.total_tokens < 0:
             raise ValueError(f"total_tokens must be non-negative. Got: {self.total_tokens}")
+        # 不变量约束：total_tokens 必须等于 prompt + completion（非零时）
+        if self.total_tokens > 0 and self.prompt_tokens + self.completion_tokens > 0:
+            expected = self.prompt_tokens + self.completion_tokens
+            if self.total_tokens != expected:
+                raise ValueError(
+                    f"total_tokens must equal prompt_tokens + completion_tokens. "
+                    f"Got: total={self.total_tokens}, expected={expected}"
+                )

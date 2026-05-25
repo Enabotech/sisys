@@ -1,6 +1,6 @@
 # Story 1.19: 成本度量基础（Token 消耗与成本追踪）
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -830,18 +830,32 @@ export UDMR_CLOUD_1_PRICE_OUTPUT=0.02
 
 ### 完成总结 Completion Summary
 
-1. [ ] All tasks defined 所有任务定义完成
+1. [x] All tasks defined 所有任务定义完成
 2. [x] All acceptance criteria specified 所有验收标准已定义
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
-5. [ ] Sprint status synced to `ready-for-dev`
+5. [x] Sprint status synced to `ready-for-dev`
 
 ### 下一步 Next Steps
 
-- [ ] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
+- [x] Story created with `ready-for-dev` status
+- [x] 运行 `dev-story` 开始实施
+- [x] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
+
+---
+
+### Review Findings 代码审查发现（2026-05-25）
+
+- [x] [Review][Decision] `sisys_cost_by_model_cny` Gauge + `sisys_cost_model_cny_total` Counter 并存 — Gauge 保留单次成本（点查询），Counter 累计按模型成本（趋势聚合）。`business_metrics.py:225`
+- [x] [Review][Decision] Token 逐字段 fallback（event > 0 则用事件值，否则用估算器）— 解决 AND 条件导致部分真实 Token 数据丢失问题。`cost_metrics_handler.py:69-82`
+- [x] [Review][Patch] `UDMRConfig.from_env()` 缓存为 `_make_cost_calculator` 工厂函数内局部变量，仅调用 1 次 [`composition_root.py:1229-1246`]
+- [x] [Review][Patch] `RoutingDecisionLog.total_tokens` 新增 `== prompt_tokens + completion_tokens` 不变量校验 [`routing_decision_log.py:107-113`]
+- [x] [Review][Patch] `CostMetricsListener.on_routing_decided` 添加 try/except 异常保护，记录日志不中断流程 [`cost_metrics_handler.py:63-130`]
+- [x] [Review][Patch] 聚合查询时间范围添加闭区间语义注释（`[start_time, end_time]`，代码逻辑已正确）[`inmemory_routing_decision_log_repository.py:54-56`]
+- [x] [Review][Patch] `StaticTokenEstimator.estimate()` 新增 route_type None/空字符串校验 [`static_token_estimator.py:44`]
+- [x] [Review][Patch] 验收测试 8 个 BDD 占位步骤已实现为完整断言 [`test_acceptance_cost_metrics_basic.py`]
+- [x] [Review][Defer] InMemoryRoutingDecisionLogRepository 非线程安全 [`inmemory_routing_decision_log_repository.py`] — deferred, 测试用内存实现，生产用 PostgreSQL
 
 ---
 

@@ -57,7 +57,8 @@ class CostMetricsListener:
     async def on_routing_decided(self, event: DomainEvent) -> None:
         """处理 RoutingDecided 事件.
 
-        MVP 阶段：Token 为 0 时使用估算器获取估算值，然后计算成本、更新日志、记录指标
+        MVP 阶段：Token 逐字段 fallback（event > 0 则用事件值，否则用估算器）
+        计算成本、更新日志、记录指标，异常时记录日志不中断流程
 
         Args:
             event: 领域事件（期望为 RoutingDecided）
@@ -65,59 +66,72 @@ class CostMetricsListener:
         if not isinstance(event, RoutingDecided):
             return
 
-        # Token 获取：非零直接用事件数据，为零则用估算器（MVP）
-        if event.prompt_tokens > 0 and event.completion_tokens > 0:
-            prompt_tokens = event.prompt_tokens
-            completion_tokens = event.completion_tokens
-        else:
-            prompt_tokens, completion_tokens = await self._token_estimator.estimate(
+        try:
+            # Token 获取：逐字段 fallback（event > 0 则用事件值，否则用估算器）
+            event_prompt = event.prompt_tokens
+            event_completion = event.completion_tokens
+
+            if event_prompt > 0 and event_completion > 0:
+                prompt_tokens = event_prompt
+                completion_tokens = event_completion
+            else:
+                estimated_prompt, estimated_completion = await self._token_estimator.estimate(
+                    event.route_type,
+                    event.selected_model,
+                )
+                # 逐字段 fallback：event > 0 用 event，否则用 estimate
+                prompt_tokens = event_prompt if event_prompt > 0 else estimated_prompt
+                completion_tokens = event_completion if event_completion > 0 else estimated_completion
+
+            consumption = TokenConsumption(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+
+            cost = self._cost_calculator.calculate(
+                consumption,
                 event.route_type,
                 event.selected_model,
             )
 
-        consumption = TokenConsumption(
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-        )
+            # 更新日志（如果存在）
+            log = await self._log_repo.find_by_task_id(str(event.task_id))
+            if log is not None:
+                updated = dataclasses.replace(
+                    log,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=consumption.total_tokens,
+                    cost_actual=cost,
+                )
+                await self._log_repo.save(updated)
 
-        cost = self._cost_calculator.calculate(
-            consumption,
-            event.route_type,
-            event.selected_model,
-        )
-
-        # 更新日志（如果存在）
-        log = await self._log_repo.find_by_task_id(str(event.task_id))
-        if log is not None:
-            updated = dataclasses.replace(
-                log,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=consumption.total_tokens,
-                cost_actual=cost,
+            # 记录 Prometheus 指标
+            self._metrics.record_token_usage(
+                prompt_tokens,
+                completion_tokens,
+                event.selected_model,
+                event.route_type,
             )
-            await self._log_repo.save(updated)
+            self._metrics.record_cost(
+                cost,
+                event.selected_model,
+                event.route_type,
+            )
 
-        # 记录 Prometheus 指标
-        self._metrics.record_token_usage(
-            prompt_tokens,
-            completion_tokens,
-            event.selected_model,
-            event.route_type,
-        )
-        self._metrics.record_cost(
-            cost,
-            event.selected_model,
-            event.route_type,
-        )
-
-        logger.info(
-            "Cost metrics recorded: route_type=%s, model=%s, cost=%.6f, tokens=%d",
-            event.route_type,
-            event.selected_model,
-            cost,
-            consumption.total_tokens,
-        )
+            logger.info(
+                "Cost metrics recorded: route_type=%s, model=%s, cost=%.6f, tokens=%d",
+                event.route_type,
+                event.selected_model,
+                cost,
+                consumption.total_tokens,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to process RoutingDecided event: task_id=%s, route_type=%s",
+                event.task_id,
+                event.route_type,
+            )
 
     async def register(self) -> None:
         """注册事件订阅（subscribe_async RoutingDecided）."""

@@ -52,6 +52,7 @@ class InMemoryRoutingDecisionLogRepository:
         record_count = 0
 
         for log in self._logs.values():
+            # 闭区间查询：[start_time, end_time]，包含边界值
             if log.timestamp < start_time or log.timestamp > end_time:
                 continue
             if route_type is not None and log.route_type != route_type:
