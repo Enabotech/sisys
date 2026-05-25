@@ -149,3 +149,59 @@ class TestEventPublishLogic:
 
         mock_event_publisher.publish.assert_called_once()
         assert result.is_success
+
+
+class TestDocumentProcessingFlowExecution:
+    """DocumentProcessingFlow 执行逻辑测试"""
+
+    async def test_flow_fn_executes_all_tasks(self) -> None:
+        """测试 flow.fn() 执行完整流程"""
+        from src.domain.events.publish_result import ChannelResult, PublishResult
+        from src.infrastructure.workflow.flows.document_processing_flow import (
+            document_processing_flow,
+        )
+
+        document_id = uuid.uuid4()
+        file_path = "/test/document.pdf"
+
+        # Mock event publisher that returns success
+        mock_publisher = AsyncMock()
+        mock_publisher.publish = AsyncMock(
+            return_value=PublishResult(
+                event_id="test-event-id",
+                results=(ChannelResult("realtime", True),),
+            )
+        )
+
+        result = await document_processing_flow.fn(document_id, file_path, mock_publisher)
+
+        assert "parse_result" in result
+        assert "embedding" in result
+        assert "index_result" in result
+        mock_publisher.publish.assert_called_once()
+
+    async def test_flow_handles_publish_failure(self) -> None:
+        """测试 flow 处理事件发布失败"""
+        from src.domain.events.publish_result import ChannelResult, PublishResult
+        from src.infrastructure.workflow.flows.document_processing_flow import (
+            document_processing_flow,
+        )
+
+        document_id = uuid.uuid4()
+        file_path = "/test/document.pdf"
+
+        # Mock event publisher that returns full failure
+        mock_publisher = AsyncMock()
+        mock_publisher.publish = AsyncMock(
+            return_value=PublishResult(
+                event_id="test-event-id",
+                results=(ChannelResult("realtime", False),),
+            )
+        )
+
+        result = await document_processing_flow.fn(document_id, file_path, mock_publisher)
+
+        # Should still return results even if publish fails
+        assert "parse_result" in result
+        assert "embedding" in result
+        assert "index_result" in result
