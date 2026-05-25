@@ -328,7 +328,7 @@ class UDMRService:
     Responsibilities:
         - L1 合规性检查（敏感数据、数据驻留、白名单）
         - L2 任务复杂度评估（语义匹配、历史成功率、成本效率）
-        - L3 路由决策执行（本地优先、云端兜底）
+        - L3 路由决策执行（云端优先、本地兜底）
 
     Dependencies:
         - ComplianceGateway: 合规性网关
@@ -1394,7 +1394,7 @@ class TestStrategicPlanningWorkflow:
         # 测试隔离协议
 
     async def test_udmr_routing_with_local_priority(self):
-        """UDMR 路由：本地优先策略测试"""
+        """UDMR 路由：云端优先策略测试"""
         # 测试路由决策
 ```
 

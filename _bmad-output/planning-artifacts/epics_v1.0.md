@@ -311,7 +311,7 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
   - L5 图存储层（可选）：Neo4j 5.x（知识图谱、实体关系、依赖图，永久）
 
 **2. 关键机制要求：**
-- UDMR 统一动态模型路由：三层决策（L1 合规性过滤→L2 任务复杂度评估→L3 路由决策执行），路由决策延迟 P95<50ms，目标本地路由占比≥80%
+- UDMR 统一动态模型路由：三层决策（L1 合规性过滤→L2 任务复杂度评估→L3 路由决策执行），路由决策延迟 P95<50ms，云端路由占比≥80%，本地兜底
 - EIP 弹性视角隔离协议：四级隔离等级（L4 硬隔离/L3 软隔离/L2 协作态/L1 融合态），基于任务依赖/关键词频率/SYS Agent 命令动态升降级，30 分钟无活动自动恢复至 L4
 - Checkpoint 双模式恢复：Replay 模式（修改点后所有状态重新计算，强一致性）与 Override 模式（仅修改指定状态，需人工确认一致性风险）
 - 修正分级判定体系：L0-L3 四级（L0 拼写/格式/L1 参数/权重自动固化，L2 专家确认，L3 委员会审批），基于五维特征加权算法
@@ -606,7 +606,7 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 |---------|---------|-------|--------|-------|---------|
 | Epic 9 | 完整多 Agent 协作 | P1 | AC-07~14 | 10 | 完整多 Agent 辩论与 SYS Agent 裁决 |
 | Epic 10 | 完整 BLM 六阶段与 Checkpoint 恢复 | P1 | SP-05~10 | 8 | 完整 BLM 流程与双模式恢复能力 |
-| Epic 11 | UDMR 动态模型路由 | P1 | CP-05~10 | 8 | 本地路由≥80%，成本节省≥50% |
+| Epic 11 | UDMR 动态模型路由 | P1 | CP-05~10 | 8 | 云端路由≥80%，本地兜底 |
 | Epic 12 | 知识图谱与 GraphRAG | P1 | SR-09~13 | 6 | GraphRAG 增强检索与实体关联查询 |
 | Epic 13 | 高级系统管理与合规 | P1 | SC-09~12, SA-04~07 | 8 | SOX 合规与时间轴查询 |
 | Epic 14 | 用户体验增强 | P1 | UI-08~12, DM-09~12 | 10 | 决策可视化与分支管理 |
@@ -740,7 +740,7 @@ Story 0.3 (测试框架搭建):
 
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
-| Story 1.17 | **UDMR 基础路由（本地优先静态配置）** | MVP 阶段支持基础成本优化，验证本地路由≥80% | 依赖 Story 1.14b | **P0-17（ARCH UDMR）** |
+| Story 1.17 | **UDMR 基础路由（云端优先静态配置）** | MVP 阶段支持云端优先路由，验证云端路由≥80% | 依赖 Story 1.14b | **P0-17（ARCH UDMR）** |
 | Story 1.18a | **Prefect 工作流引擎集成** | 实现数据管道引擎，支持文档处理/RAG 索引/报告生成 | 依赖 Story 1.1 | **P0-18a（ARCH Prefect）** |
 | Story 1.18b | **LangGraph Agent 编排集成** | 实现 Agent 编排引擎，支持 BLM 规划/Agent 协作 | 依赖 Story 1.1, 1.18a | **P0-18b（ARCH LangGraph）** |
 | Story 1.19 | **成本度量基础（Token 消耗与成本追踪）** | 验证 MVP 成本优化效果并衡量 ROI | 依赖 Story 1.17 | **P0-19（CFO ROI 验证）** |
@@ -760,7 +760,7 @@ Story 0.3 (测试框架搭建):
 - **Story 1.14a/b/c**：覆盖 or.md 系统公理一（自主调用：auto-trigger→auto-route→auto-execute）
 - **Story 1.15a/b**：覆盖 or.md 系统公理二（外部化记忆：LLM 上下文=缓存，磁盘记忆=真相源）
 - **Story 1.16**：集成测试框架，支持所有 Epic 的集成测试和 E2E 测试
-- **Story 1.17**：覆盖 ARCH UDMR 基础路由（本地优先静态配置，成本优化基础）
+- **Story 1.17**：覆盖 ARCH UDMR 基础路由（云端优先静态配置，本地兜底）
 - **Story 1.18a**：覆盖 ARCH Prefect（Prefect 3.6+ 数据管道：文档处理/RAG 索引/报告生成）
 - **Story 1.18b**：覆盖 ARCH LangGraph（LangGraph 1.0+ Agent 编排：BLM 规划/Agent 协作）
 - **Story 1.19**：覆盖 CFO ROI 验证（Token 消耗追踪、成本统计，依赖 Story 1.17 UDMR 路由日志）
@@ -2079,11 +2079,11 @@ So that **可以快速编写和执行集成测试和 E2E 测试**。
 **And** 测试数据管理支持（Fixture、Mock、测试数据库隔离）
 **And** 所有 Epic 的集成测试和 E2E 测试都通过此框架执行
 
-### Story 1.17: UDMR 基础路由（本地优先静态配置）
+### Story 1.17: UDMR 基础路由（云端优先静态配置）
 
 As a **运维工程师**,
-I want **配置本地/云端路由策略（本地优先静态配置）**,
-So that **MVP 阶段支持基础成本优化，验证本地路由占比≥80%**。
+I want **配置云端/本地路由策略（云端优先静态配置）**,
+So that **MVP 阶段支持云端优先路由，本地兜底，验证云端路由占比≥80%**。
 
 **Acceptance Criteria:**
 
@@ -2095,7 +2095,7 @@ So that **MVP 阶段支持基础成本优化，验证本地路由占比≥80%**�
    - [ ] 路由决策日志测试 - 验证日志存储
 
 2. **性能要求**
-   - [ ] 本地路由占比≥80%
+   - [ ] 云端路由占比≥80%
    - [ ] 路由决策延迟 P95<100ms
    - [ ] 故障切换时间<30 秒
 
@@ -2219,7 +2219,7 @@ So that **系统支持认知密集型推理，包括 BLM 规划、Agent 协作�
 
 As a **运维工程师**,
 I want **追踪每个任务的 Token 消耗和成本**,
-So that **验证 MVP 成本优化效果并衡量 ROI，支持"成本节省 50%"目标验证**。
+So that **验证 MVP 路由效果并衡量 ROI，支持云端优先路由目标验证**。
 
 **Acceptance Criteria:**
 
@@ -5341,7 +5341,7 @@ So that **确保 MVP 无高危漏洞**。
 
 | Story 编号 | 名称 | 归属 Epic | 覆盖需求 | 优先级 |
 |-----------|------|----------|---------|-------|
-| Story 1.17 | UDMR 基础路由（本地优先静态配置） | Epic 1 | ARCH UDMR | P0-17 |
+| Story 1.17 | UDMR 基础路由（云端优先静态配置） | Epic 1 | ARCH UDMR | P0-17 |
 | Story 1.18a | Prefect 工作流引擎集成 | Epic 1 | ARCH Prefect | P0-18a |
 | Story 1.18b | LangGraph Agent 编排集成 | Epic 1 | ARCH LangGraph | P0-18b |
 | Story 1.19 | 成本度量基础（Token 消耗与成本追踪） | Epic 1 | CFO ROI 验证 | P0-19 |
@@ -5884,7 +5884,7 @@ Story 1.4 (Redis)
 | **第 2 条：Story 6.5/6.8 优先级优化** | ✅ 已完成 | Story 6.5 拆分为 6.5a/6.5b，Story 6.8 依赖 Story 6.5a |
 | **第 3 条：增加 NFR Story** | ✅ 已完成 | Story 7.5（NFR-ACC-01）、Story 7.6（NFR-INT-05）、Story 1.13（NFR-SCALE-03） |
 | **额外：所有 Epic 价值组和依赖关系验证** | ✅ 已完成 | Epic 1-8 全部添加价值组表格、依赖关系验证、执行优先级 |
-| **Party Mode 第一轮：UDMR 基础路由** | ✅ 已完成 | Story 1.17（本地优先静态配置） |
+| **Party Mode 第一轮：UDMR 基础路由** | ✅ 已完成 | Story 1.17（云端优先静态配置） |
 | **Party Mode 第一轮：工作流引擎集成** | ✅ 已拆分 | Story 1.18a（Prefect）+ Story 1.18b（LangGraph） |
 | **Party Mode 第一轮：成本度量基础** | ✅ 已完成 | Story 1.19（Token 消耗与成本追踪） |
 | **Party Mode 第一轮：白标报告基础** | ✅ 已完成 | Story 6.11（品牌模板配置） |

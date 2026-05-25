@@ -127,7 +127,7 @@ completedAt: '2026-02-26'
 | **事件驱动流转** | 核心业务逻辑通过领域事件触发 | RabbitMQ + Redis 双通道 | 事件溯源 100% 覆盖 |
 | **双核引擎分离** | Prefect 负责确定性数据流，LangGraph 负责认知推理 | 编排服务协调 | 引擎解耦 |
 | **记忆分离** | LLM 上下文=缓存，磁盘记忆=真相源 | 六层存储架构（L0-L5） | 上下文压缩率≥70% |
-| **动态模型路由** | 本地优先 80%，云端兜底，成本优化 50% | UDMR 三层决策 | 路由延迟 P95<50ms |
+| **动态模型路由** | 云端优先 80%，本地兜底，成本优化 50% | UDMR 三层决策 | 路由延迟 P95<50ms |
 | **弹性隔离** | 四级隔离等级动态调整，合规内建 | EIP 协议 | 隔离切换审计 100% |
 | **可追溯决策** | 所有决策可追溯至原始数据和假设 | 事件溯源 + WORM 存储 | 7 年审计追踪 |
 
@@ -171,7 +171,7 @@ completedAt: '2026-02-26'
 | **质量** | 修正分级准确率 | ≥80% | ≥85% | ≥90% | 测试集验证 |
 | | 路由决策准确率 | ≥85% | ≥90% | ≥95% | 回溯分析 |
 | | 幻觉检测准确率 | ≥95% | ≥97% | ≥99% | ShieldCortex |
-| **成本** | 本地模型路由占比 | ≥60% | ≥80% | ≥85% | 路由日志 |
+| **成本** | 云端模型路由占比 | ≥60% | ≥80% | ≥85% | 路由日志 |
 | | Token 成本节省 | ≥30% | ≥50% | ≥60% | 成本分析 |
 | **接口** | CLI 命令响应延迟 P95 | <1s | <500ms | <200ms | OpenTelemetry |
 | | Skills 加载上下文 | <500 tokens | <300 tokens | <200 tokens | 日志分析 |
@@ -560,7 +560,7 @@ class OrchestrationService:
 
 ### 4.1 架构概述
 
-UDMR（Unified Dynamic Model Routing）是实现**本地路由占比 80%、成本节省 50%** 目标的核心机制。采用三层决策架构，路由决策延迟 P95<50ms。
+UDMR（Unified Dynamic Model Routing）是实现**云端路由占比 80%、本地兜底**目标的核心机制。采用三层决策架构，路由决策延迟 P95<50ms。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -611,7 +611,7 @@ UDMR（Unified Dynamic Model Routing）是实现**本地路由占比 80%、成�
 | **无云端模型** | cloud_models 为空 | 选择本地模型 |
 | **本地质量不足** | best_local.score < 0.70 | 选择云端模型 |
 | **云端优势明显** | cloud_score - local_score > 0.15 | 选择云端模型 |
-| **默认** | 其他情况 | 本地优先（成本节省） |
+| **默认** | 其他情况 | 云端优先（本地兜底） |
 
 ### 4.5 路由决策日志字段
 
@@ -2823,7 +2823,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | **SP** 战略规划流程 | 12 | 12 | 100% | BLM/BEM 六阶段状态机，Checkpoint |
 | **UI** 用户交互与报告 | 13 | 13 | 100% | CLI+REST API，PDF/HTML 报告生成 |
 | **SC** 系统管理与合规 | 14 | 14 | 100% | RBAC, WORM 存储，审计日志 |
-| **CP** 成本与性能优化 | 12 | 12 | 100% | UDMR 路由，语义缓存，本地优先 |
+| **CP** 成本与性能优化 | 12 | 12 | 100% | UDMR 路由，语义缓存，云端优先 |
 | **SA** 战略档案库 | 10 | 10 | 100% | 六层存储，长期记忆 |
 | **AR** 架构约束 | 4 | 4 | 100% | 六边形架构，事件驱动，双核引擎 |
 | **合计** | **122** | **122** | **100%** | ✅ 全覆盖 |
@@ -2839,7 +2839,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | FR-AC-11 | 红蓝对抗辩论 | `DebateEvaluator`, `增益率 + 重复率检测` | `src/application/services/debate_evaluator.py` |
 | FR-SP-05 | BLM 六阶段状态机 | `sp_blm_graph.py` | `src/infrastructure/agent_orch/graphs/` (TODO) |
 | FR-SP-07 | Checkpoint 双模式恢复 | `CheckpointRecovery`, `Replay/Override` | `src/application/services/checkpoint_recovery.py` |
-| FR-CP-05 | UDMR 本地优先 80% | `UDMRService`, 三层决策 | `src/domain/services/routing_service.py` |
+| FR-CP-05 | UDMR 云端优先 80%，本地兜底 | `UDMRService`, 三层决策 | `src/domain/services/routing_service.py` |
 | FR-SA-01 | 7 年 WORM 存储 | `MinIO`, Object Lock COMPLIANCE | `src/infrastructure/storage/minio/` |
 
 #### 19.2.2 PRD 非功能需求覆盖
@@ -3219,8 +3219,8 @@ pytest tests/unit/domain/
 
 - **状态：** 已采纳
 - **日期：** 2026-02-25
-- **决策：** 三层决策架构（L1 合规+L2 评估+L3 执行），本地路由占比 80%
-- **理由：** 成本优化 50%，满足数据主权要求
+- **决策：** 三层决策架构（L1 合规+L2 评估+L3 执行），云端路由占比 80%，本地兜底
+- **理由：** 云端模型质量优先，本地模型作为合规/降级兜底
 
 ### ADR-006: EIP 弹性视角隔离协议
 
