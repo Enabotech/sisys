@@ -13,7 +13,9 @@ Copyright:
 from __future__ import annotations
 
 import logging
+import time
 import uuid
+from collections import OrderedDict
 from typing import TYPE_CHECKING, Any
 
 from langgraph.checkpoint.memory import InMemorySaver
@@ -39,11 +41,15 @@ class LangGraphEngine:
         event_publisher: 事件发布端口（通过构造函数注入）
     """
 
+    # 运行记录淘汰策略
+    _MAX_RUNS = 1000
+    _RUNS_TTL_SECONDS = 3600  # 1 小时
+
     def __init__(self, config: LangGraphConfig, event_publisher: EventPublisher) -> None:
         self._config = config
         self._event_publisher = event_publisher
         self._checkpointer = InMemorySaver()
-        self._runs: dict[str, FlowStatus] = {}
+        self._runs: OrderedDict[str, tuple[FlowStatus, float]] = OrderedDict()
 
     async def submit_graph(self, graph_name: str, parameters: dict[str, Any]) -> str:
         """提交 Agent 状态图执行
@@ -75,10 +81,11 @@ class LangGraphEngine:
             compiled_graph = self._build_graph(graph_name, parameters)
             result = await compiled_graph.ainvoke(parameters, config={"configurable": {"thread_id": run_id}})
         except Exception as e:
-            self._runs[run_id] = FlowStatus.FAILED
+            self._runs[run_id] = (FlowStatus.FAILED, time.monotonic())
             raise RuntimeError(f"提交状态图失败 [{graph_name}]: {e}") from e
 
-        self._runs[run_id] = FlowStatus.COMPLETED
+        self._runs[run_id] = (FlowStatus.COMPLETED, time.monotonic())
+        self._cleanup_runs()
 
         # 事件发布独立于图执行状态，失败不回写 FAILED
         try:
@@ -103,7 +110,7 @@ class LangGraphEngine:
         if not graph_run_id:
             raise ValueError("graph_run_id 不能为空")
 
-        return self._runs.get(graph_run_id, FlowStatus.FAILED)
+        return self._runs.get(graph_run_id, (FlowStatus.FAILED, 0.0))[0]
 
     _SUPPORTED_GRAPHS = {"BasicAgent"}
 
@@ -160,3 +167,17 @@ class LangGraphEngine:
                 run_id,
                 publish_result,
             )
+
+    def _cleanup_runs(self) -> None:
+        """淘汰过期和超量的运行记录
+
+        策略：TTL 过期 + FIFO 超量淘汰，保证 _runs 不会无限增长
+        """
+        now = time.monotonic()
+        # TTL 淘汰：移除超过 _RUNS_TTL_SECONDS 的记录
+        expired = [k for k, (_, ts) in self._runs.items() if now - ts > self._RUNS_TTL_SECONDS]
+        for k in expired:
+            del self._runs[k]
+        # FIFO 淘汰：超过 _MAX_RUNS 时移除最早的记录
+        while len(self._runs) > self._MAX_RUNS:
+            self._runs.popitem(last=False)

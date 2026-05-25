@@ -97,6 +97,22 @@ class TestSemanticRouterGetTaskEmbedding:
         mock_model.embed.assert_called_once_with(["test text"])
         assert embedding == expected_embedding
 
+    async def test_get_task_embedding_cache_hit(self) -> None:
+        """缓存命中时应直接返回缓存结果，不调用模型"""
+        mock_model = AsyncMock(spec=EmbeddingModelProtocol)
+        expected = [0.3] * 1024
+        mock_model.embed.return_value = [expected]
+        router = SemanticRouter(embedding_model=mock_model)
+
+        # 第一次调用：模型被调用
+        result1 = await router._get_task_embedding("cached-text")
+        assert mock_model.embed.call_count == 1
+
+        # 第二次调用：应命中缓存
+        result2 = await router._get_task_embedding("cached-text")
+        assert mock_model.embed.call_count == 1  # 不再调用
+        assert result1 == result2
+
 
 class TestSemanticRouterExtractTaskDescription:
     """测试 _extract_task_description 方法"""
@@ -184,6 +200,36 @@ class TestSemanticRouterExtractTaskDescription:
         router = SemanticRouter()
         desc = router._extract_task_description({"description": 123})
         # 123 是 truthy 但不是 str/list/dict，应返回空字符串
+        assert desc == ""
+
+    def test_extract_description_with_list_value(self) -> None:
+        """list 类型值应被转换为字符串"""
+        router = SemanticRouter()
+        desc = router._extract_task_description({"description": ["item1", "item2"]})
+        assert "item1" in desc
+
+    def test_extract_description_with_empty_list(self) -> None:
+        """空列表为 falsy 应被跳过"""
+        router = SemanticRouter()
+        desc = router._extract_task_description({"description": [], "task_type": "fallback"})
+        assert desc == "fallback"
+
+    def test_extract_description_with_empty_dict(self) -> None:
+        """空字典为 falsy 应被跳过"""
+        router = SemanticRouter()
+        desc = router._extract_task_description({"description": {}, "name": "fallback"})
+        assert desc == "fallback"
+
+    def test_extract_description_empty_context(self) -> None:
+        """空上下文应返回空字符串"""
+        router = SemanticRouter()
+        desc = router._extract_task_description({})
+        assert desc == ""
+
+    def test_extract_description_no_known_keys(self) -> None:
+        """无已知键应返回空字符串"""
+        router = SemanticRouter()
+        desc = router._extract_task_description({"unknown_key": "value"})
         assert desc == ""
 
 
@@ -319,6 +365,26 @@ class TestSemanticRouterCosineSimilarity:
         assert score == 0.0
 
     @staticmethod
+    def test_cosine_similarity_first_vector_zero() -> None:
+        """第一个向量为零向量时应返回 0.0"""
+        vec1 = [0.0, 0.0, 0.0]
+        vec2 = [1.0, 2.0, 3.0]
+        score = SemanticRouter._cosine_similarity(vec1, vec2)
+        assert score == 0.0
+
+    @staticmethod
+    def test_cosine_similarity_both_empty() -> None:
+        """两个空向量应返回 0.0"""
+        score = SemanticRouter._cosine_similarity([], [])
+        assert score == 0.0
+
+    @staticmethod
+    def test_cosine_similarity_one_empty_one_nonempty() -> None:
+        """一个空一个非空应返回 0.0"""
+        assert SemanticRouter._cosine_similarity([], [1.0]) == 0.0
+        assert SemanticRouter._cosine_similarity([1.0], []) == 0.0
+
+    @staticmethod
     def test_cosine_similarity_different_lengths() -> None:
         """不同长度的向量应分别计算模值"""
         vec1 = [1.0, 0.0]
@@ -336,6 +402,16 @@ class TestSemanticRouterCosineSimilarity:
         vec2 = [0.5, 0.5, 0.5]
         score = SemanticRouter._cosine_similarity(vec1, vec2)
         assert math.isclose(score, 1.0, rel_tol=1e-9)
+
+    @staticmethod
+    def test_cosine_similarity_orthogonal() -> None:
+        """正交向量应返回 0.0"""
+        import math
+
+        vec1 = [1.0, 0.0]
+        vec2 = [0.0, 1.0]
+        score = SemanticRouter._cosine_similarity(vec1, vec2)
+        assert math.isclose(score, 0.0, abs_tol=1e-9)
 
 
 class TestSemanticRouterCandidateCount:

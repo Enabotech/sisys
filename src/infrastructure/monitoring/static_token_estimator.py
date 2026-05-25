@@ -4,6 +4,8 @@ MVP 阶段使用静态估算策略：
 - 本地模型：prompt=256, completion=512
 - 云端模型：prompt=512, completion=1024
 
+注意：此估算器返回固定值而非实际 LLM API 数据，使用时日志会输出 WARNING
+
 Author:
     agimtech <agimtech@126.com>
 
@@ -14,7 +16,11 @@ Copyright:
 
 from __future__ import annotations
 
+import logging
+
 from src.domain.ports.token_estimator import TokenEstimatorPort
+
+logger = logging.getLogger(__name__)
 
 
 class StaticTokenEstimator(TokenEstimatorPort):
@@ -45,6 +51,16 @@ class StaticTokenEstimator(TokenEstimatorPort):
         if not route_type or not route_type.strip():
             raise ValueError("route_type must not be None or empty")
         if route_type.lower() == "local":
-            return self.LOCAL_PROMPT_TOKENS, self.LOCAL_COMPLETION_TOKENS
-        # 默认使用云端估算（包括未知路由类型）
-        return self.CLOUD_PROMPT_TOKENS, self.CLOUD_COMPLETION_TOKENS
+            prompt, completion = self.LOCAL_PROMPT_TOKENS, self.LOCAL_COMPLETION_TOKENS
+        else:
+            # 默认使用云端估算（包括未知路由类型）
+            prompt, completion = self.CLOUD_PROMPT_TOKENS, self.CLOUD_COMPLETION_TOKENS
+
+        logger.warning(
+            "StaticTokenEstimator 返回估算值而非实际 LLM API 数据: route_type=%s, model=%s, prompt=%d, completion=%d",
+            route_type,
+            model,
+            prompt,
+            completion,
+        )
+        return prompt, completion

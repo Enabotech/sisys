@@ -32,12 +32,7 @@ class TestLifespanStartup:
             with patch("src.domain.ports.resolver.get_resolver") as mock_get_resolver:
                 mock_resolver = MagicMock()
                 mock_poller = MagicMock()
-
-                # Create a mock coroutine for poller.run()
-                async def mock_run():
-                    return None
-
-                mock_poller.run = AsyncMock(return_value=mock_run())
+                mock_poller.run = AsyncMock(return_value=None)
                 mock_resolver.resolve.return_value = mock_poller
                 mock_get_resolver.return_value = mock_resolver
 
@@ -62,11 +57,7 @@ class TestLifespanShutdown:
                 with patch("src.domain.ports.resolver.get_resolver") as mock_get_resolver:
                     mock_resolver = MagicMock()
                     mock_poller = MagicMock()
-
-                    async def mock_run():
-                        return None
-
-                    mock_poller.run = AsyncMock(return_value=mock_run())
+                    mock_poller.run = AsyncMock(return_value=None)
                     mock_poller.stop = MagicMock()
                     mock_resolver.resolve.return_value = mock_poller
                     mock_get_resolver.return_value = mock_resolver
@@ -92,11 +83,7 @@ class TestCreateAppWithTestClient:
                 with patch("src.domain.ports.resolver.get_resolver") as mock_get_resolver:
                     mock_resolver = MagicMock()
                     mock_poller = MagicMock()
-
-                    async def mock_run():
-                        return None
-
-                    mock_poller.run = AsyncMock(return_value=mock_run())
+                    mock_poller.run = AsyncMock(return_value=None)
                     mock_poller.stop = MagicMock()
                     mock_resolver.resolve.return_value = mock_poller
                     mock_get_resolver.return_value = mock_resolver
@@ -140,3 +127,43 @@ class TestLifespanCancelledError:
 
                     # shutdown 仍应被调用
                     mock_shutdown.assert_called_once()
+
+
+class TestLifespanPollerStop:
+    """poller.stop() 调用验证测试"""
+
+    def test_lifespan_calls_poller_stop_on_shutdown(self) -> None:
+        """关闭时应调用 poller.stop()"""
+        with patch("src.composition_root.bootstrap"):
+            with patch("src.composition_root.shutdown"):
+                with patch("src.domain.ports.resolver.get_resolver") as mock_get_resolver:
+                    mock_resolver = MagicMock()
+                    mock_poller = MagicMock()
+                    mock_poller.run = AsyncMock(return_value=None)
+                    mock_poller.stop = MagicMock()
+                    mock_resolver.resolve.return_value = mock_poller
+                    mock_get_resolver.return_value = mock_resolver
+
+                    app = FastAPI()
+
+                    async def run_test():
+                        async with _lifespan(app):
+                            pass
+
+                    asyncio.run(run_test())
+
+                    mock_poller.stop.assert_called_once()
+
+
+class TestCreateAppFactory:
+    """create_app 工厂函数测试"""
+
+    def test_create_app_returns_fastapi_instance(self) -> None:
+        """create_app 应返回 FastAPI 实例"""
+        app = create_app()
+        assert isinstance(app, FastAPI)
+
+    def test_create_app_has_lifespan(self) -> None:
+        """create_app 返回的 app 应有 lifespan 管理"""
+        app = create_app()
+        assert app.router.lifespan_context is not None

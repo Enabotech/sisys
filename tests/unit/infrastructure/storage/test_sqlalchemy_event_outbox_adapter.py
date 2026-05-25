@@ -65,3 +65,33 @@ class TestSQLAlchemyEventOutboxAdapter:
 
         assert restored_event.event_type == original_event.event_type
         assert restored_event.event_id == original_event.event_id
+
+    def test_to_domain_event_unknown_type_raises(self):
+        """未知 event_type 应抛出 ValueError"""
+        model = OutboxModel(
+            event_id=uuid4(),
+            event_type="NonExistentEvent",
+            payload={"event_type": "NonExistentEvent"},
+            created_at=datetime.now(UTC),
+        )
+
+        try:
+            SQLAlchemyEventOutboxAdapter.to_domain_event(model)
+        except ValueError as e:
+            assert "NonExistentEvent" in str(e)
+        else:
+            raise AssertionError("Expected ValueError for unknown event_type")
+
+    def test_from_domain_event_status_is_pending(self):
+        """from_domain_event 应始终设置 status=pending"""
+        event = DomainEvent(
+            event_id=uuid4(),
+            event_type="TestEvent",
+            timestamp=datetime.now(UTC),
+            source="test",
+        )
+        model = SQLAlchemyEventOutboxAdapter.from_domain_event(event)
+        assert model.status == "pending"
+        assert model.event_id == event.event_id
+        assert model.event_type == "TestEvent"
+        assert model.created_at == event.timestamp

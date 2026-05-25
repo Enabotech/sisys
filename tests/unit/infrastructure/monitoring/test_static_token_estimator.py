@@ -17,6 +17,7 @@ Copyright:
 from __future__ import annotations
 
 import asyncio
+import logging
 
 import pytest
 
@@ -89,3 +90,22 @@ class TestStaticTokenEstimatorValidation:
         estimator = StaticTokenEstimator()
         with pytest.raises(ValueError, match="route_type"):
             asyncio.run(estimator.estimate("   ", "qwen2.5:7b"))
+
+
+class TestStaticTokenEstimatorWarningLog:
+    """WARNING 日志标识测试."""
+
+    def test_estimate_logs_warning_for_local(self, caplog: pytest.LogCaptureFixture) -> None:
+        """本地估算应输出 WARNING 日志."""
+        estimator = StaticTokenEstimator()
+        with caplog.at_level(logging.WARNING, logger="src.infrastructure.monitoring.static_token_estimator"):
+            asyncio.run(estimator.estimate("local", "qwen2.5:7b"))
+        assert any("StaticTokenEstimator 返回估算值" in r.message for r in caplog.records)
+
+    def test_estimate_logs_warning_for_cloud(self, caplog: pytest.LogCaptureFixture) -> None:
+        """云端估算应输出 WARNING 日志."""
+        estimator = StaticTokenEstimator()
+        with caplog.at_level(logging.WARNING, logger="src.infrastructure.monitoring.static_token_estimator"):
+            asyncio.run(estimator.estimate("cloud", "MiniMax-M2.7"))
+        assert any("StaticTokenEstimator 返回估算值" in r.message for r in caplog.records)
+        assert any("route_type=cloud" in r.message for r in caplog.records)

@@ -215,11 +215,7 @@ class TestUDMRServiceDecide:
 
         await service.decide(task)
 
-        # _persist_decision_log 使用 asyncio.create_task（fire-and-forget）
-        # 验证 save 被调用（给后台任务执行时间）
-        import asyncio
-
-        await asyncio.sleep(0.05)
+        # _persist_decision_log 现在直接 await，无需 sleep
         mock_log_repo.save.assert_called_once()
         log: RoutingDecisionLog = mock_log_repo.save.call_args[0][0]
         assert log.selected_model == "MiniMax-M2.7"
@@ -238,9 +234,6 @@ class TestUDMRServiceDecide:
 
         await service.decide(task)
 
-        import asyncio
-
-        await asyncio.sleep(0.05)
         log: RoutingDecisionLog = mock_log_repo.save.call_args[0][0]
         assert log.fallback_reason == "unavailable"
         assert log.selected_model == "qwen2.5:7b"
@@ -302,3 +295,112 @@ class TestUDMRServiceOptionalDeps:
         task = _make_task()
         result = await svc.decide(task)
         assert isinstance(result, RoutingDecided)
+
+
+class TestUDMRServiceCostEstimation:
+    """token_estimator + cost_calculator 注入测试."""
+
+    @pytest.fixture
+    def mock_token_estimator(self) -> AsyncMock:
+        """Mock TokenEstimatorPort."""
+        estimator = AsyncMock()
+        estimator.estimate.return_value = (256, 512)
+        return estimator
+
+    @pytest.fixture
+    def mock_cost_calculator(self) -> MagicMock:
+        """Mock CostCalculator."""
+        calc = MagicMock()
+        calc.calculate.return_value = 0.1536
+        return calc
+
+    @pytest.fixture
+    def service_with_cost(
+        self,
+        mock_compliance_gateway: AsyncMock,
+        mock_policy: AsyncMock,
+        mock_health_checker: AsyncMock,
+        mock_log_repo: AsyncMock,
+        mock_publisher: AsyncMock,
+        mock_token_estimator: AsyncMock,
+        mock_cost_calculator: MagicMock,
+    ) -> UDMRService:
+        """构造带 token_estimator + cost_calculator 的 UDMRService."""
+        return UDMRService(
+            compliance_gateway=mock_compliance_gateway,
+            policy=mock_policy,
+            health_checker=mock_health_checker,
+            log_repo=mock_log_repo,
+            publisher=mock_publisher,
+            token_estimator=mock_token_estimator,
+            cost_calculator=mock_cost_calculator,
+        )
+
+    async def test_persist_log_with_estimated_cost(
+        self,
+        service_with_cost: UDMRService,
+        mock_log_repo: AsyncMock,
+        mock_token_estimator: AsyncMock,
+        mock_cost_calculator: MagicMock,
+    ) -> None:
+        """注入 token_estimator + cost_calculator 后 cost_actual > 0."""
+        task = _make_task()
+        await service_with_cost.decide(task)
+
+        mock_token_estimator.estimate.assert_called_once()
+        mock_cost_calculator.calculate.assert_called_once()
+        log: RoutingDecisionLog = mock_log_repo.save.call_args[0][0]
+        assert log.cost_actual > 0.0
+        assert log.prompt_tokens == 256
+        assert log.completion_tokens == 512
+        assert log.total_tokens == 768
+
+    async def test_persist_log_without_estimator_defaults_zero(
+        self,
+        mock_compliance_gateway: AsyncMock,
+        mock_policy: AsyncMock,
+        mock_health_checker: AsyncMock,
+        mock_log_repo: AsyncMock,
+        mock_publisher: AsyncMock,
+    ) -> None:
+        """未注入 estimator 时 cost_actual 回退为 0.0."""
+        svc = UDMRService(
+            compliance_gateway=mock_compliance_gateway,
+            policy=mock_policy,
+            health_checker=mock_health_checker,
+            log_repo=mock_log_repo,
+            publisher=mock_publisher,
+        )
+        task = _make_task()
+        await svc.decide(task)
+
+        log: RoutingDecisionLog = mock_log_repo.save.call_args[0][0]
+        assert log.cost_actual == 0.0
+        assert log.prompt_tokens == 0
+
+    async def test_estimator_exception_fallback(
+        self,
+        mock_compliance_gateway: AsyncMock,
+        mock_policy: AsyncMock,
+        mock_health_checker: AsyncMock,
+        mock_log_repo: AsyncMock,
+        mock_publisher: AsyncMock,
+    ) -> None:
+        """estimator 抛异常时 cost_actual 回退为 0.0."""
+        failing_estimator = AsyncMock()
+        failing_estimator.estimate.side_effect = RuntimeError("estimation failed")
+
+        svc = UDMRService(
+            compliance_gateway=mock_compliance_gateway,
+            policy=mock_policy,
+            health_checker=mock_health_checker,
+            log_repo=mock_log_repo,
+            publisher=mock_publisher,
+            token_estimator=failing_estimator,
+            cost_calculator=MagicMock(),
+        )
+        task = _make_task()
+        await svc.decide(task)
+
+        log: RoutingDecisionLog = mock_log_repo.save.call_args[0][0]
+        assert log.cost_actual == 0.0

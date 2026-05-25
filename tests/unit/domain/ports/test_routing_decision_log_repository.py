@@ -15,6 +15,8 @@ Copyright:
 
 from __future__ import annotations
 
+import asyncio
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -133,3 +135,57 @@ class TestInMemoryRoutingDecisionLogRepositoryAggregation:
             end_time=now + timedelta(hours=1),
         )
         assert summary.record_count == 0
+
+
+class TestInMemoryRoutingDecisionLogRepositoryConcurrency:
+    """asyncio.Lock 并发安全测试."""
+
+    async def test_concurrent_saves(self) -> None:
+        """并发写入不应丢失数据."""
+        repo = InMemoryRoutingDecisionLogRepository()
+        now = datetime.now(UTC)
+
+        await asyncio.gather(*[repo.save(_make_log(task_id=f"t{i}", timestamp=now)) for i in range(50)])
+
+        summary = await repo.query_cost_summary(
+            start_time=now - timedelta(hours=1),
+            end_time=now + timedelta(hours=1),
+        )
+        assert summary.record_count == 50
+
+
+class TestInMemoryRoutingDecisionLogRepositoryEviction:
+    """容量控制和淘汰测试."""
+
+    async def test_max_size_fifo_eviction(self) -> None:
+        """超过 max_size 时 FIFO 淘汰最早记录."""
+        repo = InMemoryRoutingDecisionLogRepository(max_size=3)
+        now = datetime.now(UTC)
+
+        log1 = _make_log(task_id="first", timestamp=now)
+        log2 = _make_log(task_id="second", timestamp=now)
+        log3 = _make_log(task_id="third", timestamp=now)
+        log4 = _make_log(task_id="fourth", timestamp=now)
+
+        await repo.save(log1)
+        await repo.save(log2)
+        await repo.save(log3)
+        # 第 4 条写入后，第 1 条应被淘汰
+        await repo.save(log4)
+
+        assert await repo.find_by_task_id("first") is None
+        assert await repo.find_by_task_id("fourth") is not None
+
+    async def test_ttl_eviction(self) -> None:
+        """过期记录应在下次写入时被淘汰."""
+        repo = InMemoryRoutingDecisionLogRepository(ttl_seconds=0.01)
+        now = datetime.now(UTC)
+
+        await repo.save(_make_log(task_id="expired", timestamp=now))
+        # 等待 TTL 过期
+        time.sleep(0.02)
+        # 写入新记录触发 cleanup
+        await repo.save(_make_log(task_id="fresh", timestamp=now))
+
+        assert await repo.find_by_task_id("expired") is None
+        assert await repo.find_by_task_id("fresh") is not None
