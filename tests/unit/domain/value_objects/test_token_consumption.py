@@ -67,13 +67,13 @@ class TestTokenConsumptionFrozen:
         """frozen dataclass 不可变."""
         tc = TokenConsumption(prompt_tokens=100, completion_tokens=200)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            tc.prompt_tokens = 999  # type: ignore[misc]
+            setattr(tc, "prompt_tokens", 999)
 
     def test_frozen_total_immutable(self) -> None:
         """total_tokens 也不可变."""
         tc = TokenConsumption(prompt_tokens=100, completion_tokens=200)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            tc.total_tokens = 999  # type: ignore[misc]
+            setattr(tc, "total_tokens", 999)
 
 
 class TestTokenConsumptionEquality:

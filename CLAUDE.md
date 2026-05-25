@@ -71,3 +71,4 @@ src/
 - `SISYS_USE_TEST_PORTS=1` 切换到独立测试端口（避免与本地开发服务冲突）
 - impl 为字符串的端口是延迟加载（lazy import），调试时注意模块路径写错不会立即报错
 - 存储层端口命名：`l0_storage`（文件系统）→ `l1_cache`（Redis）→ `l2_rdb`（PostgreSQL）→ `l3_vector`（Qdrant）→ `l4_object`（MinIO）→ `l5_graph`（Neo4j），不是从 1 开始
+- **Agent worktree 清理**：Agent 使用 worktree 隔离开发后，必须彻底清理（`git worktree unlock` → `git worktree remove --force` → `git branch -D` → 验证 `git worktree list` 仅剩 main），残留 worktree 会被意外 `git add -A` 添加为 submodule 污染仓库
