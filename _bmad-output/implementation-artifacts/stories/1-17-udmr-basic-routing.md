@@ -600,7 +600,7 @@
 
 > 以下差异为 MVP 实现与 architecture.md 完整设计蓝图之间的有意偏离，不影响功能正确性：
 
-- [x] [Review][Defer] **L3 默认路由策略差异**: architecture.md §4.4 描述"本地优先"，Story 1.17 实现"云端优先"（`UDMR_LOCAL_FIRST=false`）。MVP 阶段采用云端优先策略，通过健康检查实现自动回退
+- [x] [Review][Defer] **L3 默认路由策略**: architecture.md §4.4 已更新为"云端优先，本地兜底"，与 Story 1.17 实现一致（`UDMR_LOCAL_FIRST=false`）。通过健康检查实现自动回退
 - [x] [Review][Defer] **路由决策延迟指标差异**: architecture.md §4.1 描述 P95<50ms，Story 1.17 AC-5 为 P95<100ms。差异原因：MVP 静态路由无 LLM 调用开销，实际测量值为无负载基准
 - [x] [Review][Defer] **L3 阈值差异**: architecture.md §4.4 描述完整三层动态决策阈值（云模型优势阈值 0.15 / 本地质量阈值 0.70），Story 1.17 MVP 仅实现静态路由，无动态阈值。L2/L3 完整实现由 Epic 11 Story 11.1 完成
 
