@@ -378,3 +378,65 @@ class TestCloudModelConfigPricing:
         with patch.dict(os.environ, env, clear=True):
             with pytest.raises(ValueError, match="PRICE_OUTPUT"):
                 UDMRConfig.from_env()
+
+
+class TestCloudModelConfigParseErrors:
+    """配置解析非法值错误路径测试.
+
+    验证非数字字符串传入时快速失败，错误信息包含具体字段名和值，
+    便于运维排查环境变量配置错误。
+    """
+
+    def test_invalid_max_tokens_raises(self) -> None:
+        """非法 max_tokens 值（非数字）应抛出 ValueError."""
+        env = {
+            "UDMR_CLOUD_0_ENABLED": "true",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_ENDPOINT": "https://example.com",
+            "UDMR_CLOUD_0_API_KEY": "TESTING_DUMMY_KEY",
+            "UDMR_CLOUD_0_MODEL": "test-model",
+            "UDMR_CLOUD_0_MAX_TOKENS": "not_a_number",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(ValueError, match="MAX_TOKENS.*not_a_number"):
+                UDMRConfig.from_env()
+
+    def test_invalid_temperature_raises(self) -> None:
+        """非法 temperature 值（非数字）应抛出 ValueError."""
+        env = {
+            "UDMR_CLOUD_0_ENABLED": "true",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_ENDPOINT": "https://example.com",
+            "UDMR_CLOUD_0_API_KEY": "TESTING_DUMMY_KEY",
+            "UDMR_CLOUD_0_MODEL": "test-model",
+            "UDMR_CLOUD_0_TEMPERATURE": "hot",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(ValueError, match="TEMPERATURE.*hot"):
+                UDMRConfig.from_env()
+
+    def test_invalid_price_input_raises(self) -> None:
+        """非法 price_input 值（非数字）应抛出 ValueError."""
+        env = {
+            "UDMR_CLOUD_0_ENABLED": "true",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_MODEL": "test-model",
+            "UDMR_CLOUD_0_API_KEY": "TESTING_DUMMY_KEY",
+            "UDMR_CLOUD_0_PRICE_INPUT": "free",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(ValueError, match="PRICE_INPUT.*free"):
+                UDMRConfig.from_env()
+
+    def test_invalid_price_output_raises(self) -> None:
+        """非法 price_output 值（非数字）应抛出 ValueError."""
+        env = {
+            "UDMR_CLOUD_0_ENABLED": "true",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_MODEL": "test-model",
+            "UDMR_CLOUD_0_API_KEY": "TESTING_DUMMY_KEY",
+            "UDMR_CLOUD_0_PRICE_OUTPUT": "$0.02",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(ValueError, match="PRICE_OUTPUT"):
+                UDMRConfig.from_env()
