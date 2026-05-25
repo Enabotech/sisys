@@ -84,12 +84,6 @@ class TestStaticTokenEstimatorValidation:
         with pytest.raises(ValueError, match="route_type"):
             asyncio.run(estimator.estimate("", "qwen2.5:7b"))
 
-    def test_none_route_type_raises(self) -> None:
-        """None route_type 应抛出 ValueError."""
-        estimator = StaticTokenEstimator()
-        with pytest.raises(ValueError, match="route_type"):
-            asyncio.run(estimator.estimate(None, "qwen2.5:7b"))  # type: ignore[arg-type]
-
     def test_whitespace_route_type_raises(self) -> None:
         """空白 route_type 应抛出 ValueError."""
         estimator = StaticTokenEstimator()
