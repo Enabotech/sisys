@@ -1,13 +1,6 @@
 """AgentEnginePort 端口契约测试
 
 验证端口注册、元数据完整性、Protocol 兼容性
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

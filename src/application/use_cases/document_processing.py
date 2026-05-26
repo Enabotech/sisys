@@ -4,13 +4,6 @@
 
 这是骨架实现，用于集成测试
 完整实现将在 Story 2.x 中完成
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

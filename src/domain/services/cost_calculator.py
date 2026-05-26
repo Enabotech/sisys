@@ -2,13 +2,6 @@
 
 基于路由类型、模型定价和 Token 消耗计算实际成本
 领域层零外部依赖，注入原始浮点值
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

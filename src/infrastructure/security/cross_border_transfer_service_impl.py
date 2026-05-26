@@ -1,13 +1,6 @@
 """基础设施层跨境数据传输服务模块
 
 基于 CrossBorderTransferServicePort 接口实现跨境数据传输请求的审批流程管理
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

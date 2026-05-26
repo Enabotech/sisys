@@ -2,13 +2,6 @@
 
 使用 DomainEvent 实例，不感知 OutboxEntity
 基础设施层负责 DomainEvent 与 OutboxEntity 转换
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

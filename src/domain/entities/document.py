@@ -1,13 +1,6 @@
 """领域层文档实体模块
 
 定义文档领域实体，包含元数据、版本历史和解析状态管理
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

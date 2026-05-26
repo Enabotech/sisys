@@ -1,13 +1,6 @@
 """领域层端口解析器模块
 
 提供 Resolver 类，从注册中心解析端口实现并管理其生命周期（瞬态、作用域、单例）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

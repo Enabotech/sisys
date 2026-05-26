@@ -2,13 +2,6 @@
 
 基于内存字典和列表实现事件溯源存储，适用于测试和 MVP 阶段，
 生产环境应替换为 PostgreSQL 实现
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

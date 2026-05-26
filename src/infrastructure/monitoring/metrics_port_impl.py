@@ -1,13 +1,6 @@
 """基础设施层指标端口实现模块
 
 实现 MetricsPort 接口，依赖 prometheus_client 和基础设施层组件
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

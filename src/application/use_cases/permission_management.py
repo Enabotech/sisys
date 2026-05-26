@@ -1,13 +1,6 @@
 """应用层权限服务模块
 
 遵循六边形架构：应用层服务，实现 PermissionServicePort 接口
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

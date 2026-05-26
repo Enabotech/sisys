@@ -2,13 +2,6 @@
 
 基于 SQLAlchemy 异步实现 AuditRepositoryPort 接口，提供审计日志的持久化存储和查询
 Session 通过 ContextVar 由 middleware 或 test fixture 提供，无需构造器注入
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

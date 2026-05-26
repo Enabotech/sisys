@@ -1,13 +1,6 @@
 """Port contract tests for UdmrPolicy port.
 
 Tests that StaticUdmrPolicy implementation satisfies the UdmrPolicyPort.
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

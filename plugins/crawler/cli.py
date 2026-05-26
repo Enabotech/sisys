@@ -1,13 +1,6 @@
 """Crawler CLI 入口模块
 
 提供命令行接口：crawl（爬取）和 serve（启动服务）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

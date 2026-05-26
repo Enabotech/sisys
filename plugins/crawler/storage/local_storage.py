@@ -1,13 +1,6 @@
 """本地文件系统存储实现模块
 
 将爬取的文件存储到本地目录
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

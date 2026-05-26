@@ -8,13 +8,6 @@
 - restore_backup(): 恢复备份
 - verify_backup_integrity(): 验证备份完整性
 - get_backup_status(): 查询备份状态
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

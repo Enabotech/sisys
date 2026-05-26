@@ -2,13 +2,6 @@
 
 聚合所有安全服务端口，执行10个安全层面的合规验证并生成综合报告
 用于等保2.0三级等保综合合规验证
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

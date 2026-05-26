@@ -2,13 +2,6 @@
 
 基于 IntrusionDetectionServicePort 接口实现多类型攻击检测、入侵告警和IP阻断
 用于等保2.0三级入侵防范合规
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

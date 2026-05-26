@@ -2,13 +2,6 @@
 
 实现 IndexManagerPort 接口，提供异步索引操作能力。所有方法使用 to_thread
 封装同步 I/O 操作，保留 fcntl.flock 锁语义以保证并发安全
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

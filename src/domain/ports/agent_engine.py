@@ -1,13 +1,6 @@
 """领域层 Agent 引擎端口模块
 
 AgentEnginePort Protocol 定义 Agent 编排引擎抽象，支持 LangGraph/AutoGen 等引擎替换
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

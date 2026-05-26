@@ -1,13 +1,6 @@
 """领域层事件监听器端口模块
 
 定义同步和异步事件监听器 Protocol，由基础设施层实现
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

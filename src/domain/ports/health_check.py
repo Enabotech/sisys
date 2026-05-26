@@ -6,13 +6,6 @@
 - 纯异步接口：async def check() 和 async def close()
 - 领域层零外部依赖（仅用 abc + typing）
 - ABC 父类选择（名义子类型，非结构子类型）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

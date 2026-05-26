@@ -2,13 +2,6 @@
 
 提供事件总线实例的创建、管理和依赖注入，支持 Redis 实时通道和
 RabbitMQ 可靠通道的统一配置与组件复用
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

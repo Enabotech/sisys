@@ -1,13 +1,6 @@
 """基础设施层权限验证中间件模块
 
 提供 FastAPI 依赖注入的权限验证功能，包括用户认证、角色检查和权限控制
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

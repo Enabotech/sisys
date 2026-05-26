@@ -1,13 +1,6 @@
 """压缩包格式处理器模块
 
 使用标准库 zipfile/tarfile 提取内部文件名列表
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

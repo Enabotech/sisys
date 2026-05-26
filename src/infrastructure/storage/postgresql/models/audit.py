@@ -2,13 +2,6 @@
 
 定义审计日志的 SQLAlchemy ORM 模型，对应 audit_log 表
 遵循 FR-SC-02 统一审计日志规范和 FR-SC-04 多维度搜索扩展
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

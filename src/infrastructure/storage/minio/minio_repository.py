@@ -2,13 +2,6 @@
 
 MinIO 对象存储内部实现，被 MinIOAdapter（L4ObjectPort）组合委托，
 方法签名与 L4ObjectPort 匹配
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

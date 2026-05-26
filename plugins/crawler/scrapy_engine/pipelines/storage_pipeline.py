@@ -1,13 +1,6 @@
 """存储 Pipeline 模块
 
 将文件存储到配置的存储后端
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

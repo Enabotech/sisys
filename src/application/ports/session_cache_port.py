@@ -5,13 +5,6 @@
 注意: SemanticCache 的 get(query_embedding, threshold) 签名与
 L1CachePort.get(memory_type, owner_id, name) 不兼容，不能继承
 SemanticCache 作为独立应用端口存在
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

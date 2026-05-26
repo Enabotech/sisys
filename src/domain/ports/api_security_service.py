@@ -12,13 +12,6 @@
 注意：validate_api_auth 和 add_security_headers 方法使用 Any 类型
 避免领域层引入 HTTP 框架依赖（fastapi.Request/Response）
 具体框架类型在 infrastructure 层适配器中处理
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

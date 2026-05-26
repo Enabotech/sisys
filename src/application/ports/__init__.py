@@ -3,13 +3,6 @@
 应用层端口继承领域层基础端口，添加业务语义：
 - 继承或组合注入 L[n][XXX]Port 基础端口
 - 定义应用层特定方法
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from src.application.ports.compressor_service import CompressorService

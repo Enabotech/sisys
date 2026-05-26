@@ -6,13 +6,6 @@
 重构说明：
 - BaseRepository[T] 重命名为 L2RdbPort[T]（sync→async）
 - BaseRepository 保留为 deprecated 别名
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

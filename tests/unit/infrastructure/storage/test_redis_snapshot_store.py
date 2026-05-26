@@ -1,13 +1,6 @@
 """RedisSnapshotStore 单元测试
 
 基于 RedisAdapter mock 验证快照存储的 CRUD 行为
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from unittest.mock import AsyncMock, MagicMock

@@ -1,13 +1,6 @@
 """领域层备份恢复结果值对象
 
 定义备份恢复服务返回的结果类型，用于等保2.0三级备份恢复
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

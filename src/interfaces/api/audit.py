@@ -2,13 +2,6 @@
 
 提供审计日志检索、完整性验证、归档管理的 REST API 端点
 遵循六边形架构：接口层仅依赖应用层用例和领域端口
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

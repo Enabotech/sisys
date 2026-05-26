@@ -2,13 +2,6 @@
 
 应用层仅依赖此接口发布事件，不关心底层传输实现
 对标 NServiceBus 的 IBus.Publish 接口
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

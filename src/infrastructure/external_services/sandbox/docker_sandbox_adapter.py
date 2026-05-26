@@ -1,13 +1,6 @@
 """基础设施层 Docker 沙箱适配器模块
 
 使用 Docker 容器提供沙箱化代码执行能力，支持 CPU/内存/网络/文件系统隔离
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

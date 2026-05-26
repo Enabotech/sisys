@@ -1,13 +1,6 @@
 """基础设施层异常指标实现模块
 
 提供异常监控指标的基础设施层实现，支持 Prometheus 格式导出
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

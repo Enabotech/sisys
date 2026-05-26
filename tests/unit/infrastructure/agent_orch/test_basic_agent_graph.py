@@ -1,13 +1,6 @@
 """BasicAgentGraph 单元测试
 
 验证图定义、节点执行顺序、状态更新
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

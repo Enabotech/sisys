@@ -1,13 +1,6 @@
 """领域层数据驻留策略实体模块
 
 定义数据驻留策略领域实体，遵循六边形架构：领域层零依赖
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

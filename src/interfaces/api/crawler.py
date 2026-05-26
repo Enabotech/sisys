@@ -2,13 +2,6 @@
 
 提供 Crawler 任务管理的 REST API 端点，包括任务提交、状态查询、任务取消、格式列表等
 遵循六边形架构：接口层通过 DI 容器获取 CrawlerClientPort 实例
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

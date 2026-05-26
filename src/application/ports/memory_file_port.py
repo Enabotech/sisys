@@ -1,13 +1,6 @@
 """应用层记忆文件端口模块
 
 继承 L0StoragePort，添加 MEMORY.md 索引管理语义
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

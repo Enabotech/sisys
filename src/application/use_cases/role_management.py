@@ -1,13 +1,6 @@
 """应用层角色管理用例模块
 
 遵循六边形架构：应用层用例，协调领域实体和仓储端口
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

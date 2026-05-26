@@ -2,13 +2,6 @@
 
 委托 FileFormatHandlerRegistry 提取文件元数据
 零外部依赖，仅使用标准库
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

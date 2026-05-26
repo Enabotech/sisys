@@ -2,13 +2,6 @@
 
 不可变值对象，封装 JWT Token 解码后的载荷信息
 遵循六边形架构：领域层零依赖，仅使用标准库
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

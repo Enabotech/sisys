@@ -1,13 +1,6 @@
 """文件下载 Pipeline 模块
 
 验证已下载文件的基本信息
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

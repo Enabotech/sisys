@@ -2,13 +2,6 @@
 
 定义于领域层，由基础设施层实现
 为事件溯源提供持久化抽象
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

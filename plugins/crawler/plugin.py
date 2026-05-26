@@ -1,13 +1,6 @@
 """Crawler 插件主类模块
 
 管理爬虫生命周期：安装、激活、启动、查询、取消
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

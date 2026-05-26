@@ -1,13 +1,6 @@
 """领域层路由决策日志仓储端口模块
 
 定义路由决策日志的持久化接口，供基础设施层实现
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

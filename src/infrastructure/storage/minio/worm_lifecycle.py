@@ -2,13 +2,6 @@
 
 提供 WORM（Write Once Read Many）锁定、对象归档和生命周期配置功能，
 满足 SOX 合规要求
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

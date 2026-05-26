@@ -1,13 +1,6 @@
 """基础设施层外部 API 白名单服务模块
 
 基于 WhitelistServicePort 接口实现外部 API 白名单的管理和验证
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

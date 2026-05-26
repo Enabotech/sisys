@@ -1,13 +1,6 @@
 """领域层工作流状态值对象模块
 
 FlowStatus 枚举定义工作流执行状态，供 WorkflowEnginePort 和 OrchestrationService 跨层共享
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

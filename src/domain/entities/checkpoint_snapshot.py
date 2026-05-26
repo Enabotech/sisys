@@ -2,13 +2,6 @@
 
 定义会话状态快照领域实体，用于中断恢复和时间旅行调试
 遵循系统公理二（外部化记忆）：LLM 上下文 = 缓存，磁盘记忆 = 真相来源
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """基础设施层 PostgreSQL 引擎管理模块
 
 提供异步和同步引擎的懒初始化、健康检查和优雅关闭
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

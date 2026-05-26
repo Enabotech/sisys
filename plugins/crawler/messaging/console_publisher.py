@@ -1,13 +1,6 @@
 """控制台日志事件发布实现模块
 
 开发/调试用，将事件输出到日志
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

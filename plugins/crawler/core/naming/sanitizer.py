@@ -2,13 +2,6 @@
 
 处理文件名中的非法字符、长度限制、Windows 保留名等问题
 零外部依赖，仅使用标准库
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

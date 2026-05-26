@@ -1,13 +1,6 @@
 """领域层数据完整性结果值对象
 
 定义数据完整性服务返回的结果类型，用于等保2.0三级数据完整性验证
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

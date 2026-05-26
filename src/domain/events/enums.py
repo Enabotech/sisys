@@ -1,13 +1,6 @@
 """领域层 事件相关枚举模块
 
 所有枚举均使用Python标准库enum模块（无外部依赖）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

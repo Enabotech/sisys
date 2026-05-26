@@ -2,13 +2,6 @@
 
 基于内存的 RoutingDecisionLogRepository 实现，适用于测试和 MVP 阶段
 内置 asyncio.Lock 保证并发安全，max_size + TTL 防止无界增长
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

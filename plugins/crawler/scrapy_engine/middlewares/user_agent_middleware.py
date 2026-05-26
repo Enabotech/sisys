@@ -1,13 +1,6 @@
 """User-Agent 轮换中间件模块
 
 UA 池随机轮换，避免被目标网站识别为爬虫
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

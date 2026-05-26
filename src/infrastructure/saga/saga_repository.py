@@ -1,13 +1,6 @@
 """基础设施层 Saga 仓储模块
 
 基于 PostgreSQL 持久化 Saga 实例状态
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """基础设施层业务指标收集器模块
 
 提供自定义业务指标的收集和 Prometheus 导出能力
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

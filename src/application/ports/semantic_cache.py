@@ -1,13 +1,6 @@
 """应用层语义缓存端口模块
 
 定义语义缓存的接口，基础设施层通过 Redis 实现此端口
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

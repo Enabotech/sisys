@@ -1,13 +1,6 @@
 """基础设施层 Redis KV 适配器模块
 
 实现 L1CachePort，使用 Redis 字符串操作。所有 Rule 4 组件的 Redis KV 访问入口
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """基础设施层敏感数据检测服务模块
 
 基于 SensitiveDataDetectorPort 接口实现 PII、商业秘密、金融数据等敏感信息的正则表达式检测
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

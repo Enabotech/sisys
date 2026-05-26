@@ -2,13 +2,6 @@
 
 基于 RediSearch FT.SEARCH 向量索引实现语义缓存查找，
 替代 SCAN + Python 余弦相似度方案以提升性能
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

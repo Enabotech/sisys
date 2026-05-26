@@ -1,13 +1,6 @@
 """重试中间件模块
 
 指数退避重试，基于 Scrapy 内置 RetryMiddleware 扩展
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

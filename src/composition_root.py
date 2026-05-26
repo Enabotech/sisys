@@ -2,13 +2,6 @@
 
 所有端口的注册和装配在此完成，是唯一允许注册端口的位置
 遵循六边形架构原则：领域层定义端口，基础设施层实现端口，组合根负责装配
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

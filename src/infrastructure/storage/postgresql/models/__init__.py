@@ -1,13 +1,6 @@
 """基础设施层 PostgreSQL 模型包
 
 定义所有 SQLAlchemy ORM 模型，映射到 PostgreSQL 数据库表
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel

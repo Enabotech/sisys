@@ -1,13 +1,6 @@
 """域名爬虫模块
 
 基于域名列表爬取目标网站，提取文件链接和页面链接
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

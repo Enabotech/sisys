@@ -2,13 +2,6 @@
 
 直接输出 OutboxModel（SQLAlchemy 模型），避免在 OutboxEntity dataclass
 和 OutboxModel 之间反复转换
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

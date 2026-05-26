@@ -1,13 +1,6 @@
 """Crawler FastAPI 应用模块
 
 提供爬虫服务的 REST API
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

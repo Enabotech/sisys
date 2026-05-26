@@ -1,13 +1,6 @@
 """基础设施层 PostgreSQL 配置模块
 
 提供 PostgreSQL 连接池配置，用于 L2 关系存储层
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

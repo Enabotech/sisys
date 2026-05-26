@@ -1,13 +1,6 @@
 """基础设施层 Neo4j 图存储数据模型模块
 
 包含 GraphNode、GraphRelationship 和 RelationshipType 定义，所有模型位于基础设施层
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

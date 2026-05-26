@@ -1,13 +1,6 @@
 """领域事件包
 
 提供领域层事件定义，遵循六边形架构零依赖原则
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from .agent_events import AgentDecided

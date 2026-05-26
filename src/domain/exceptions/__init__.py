@@ -7,13 +7,6 @@
 - ExternalException: 外部服务异常
 
 架构约束：领域层零依赖，仅使用 Python 标准库
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

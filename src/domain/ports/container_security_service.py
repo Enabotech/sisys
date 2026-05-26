@@ -11,13 +11,6 @@
 
 注意：detect_escape_attempts 返回类型使用 list[EscapeAttempt]
 （Python 3.9+ 内置泛型），而非 List[EscapeAttempt]（typing 模块）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

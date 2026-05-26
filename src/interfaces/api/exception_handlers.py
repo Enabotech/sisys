@@ -1,13 +1,6 @@
 """接口层统一异常处理器模块
 
 根据异常类型自动映射到正确的 HTTP 状态码
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

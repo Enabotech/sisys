@@ -9,13 +9,6 @@
 - verify_data_integrity(): 验证数据完整性并发布事件
 
 注意：与 IntegrityPort（文件级完整性）互补，本端口专注于记录级/字段级验证
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

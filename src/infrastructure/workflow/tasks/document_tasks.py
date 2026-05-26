@@ -1,13 +1,6 @@
 """基础设施层文档处理任务模块
 
 定义 parse_document, generate_embedding, index_document Prefect tasks
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

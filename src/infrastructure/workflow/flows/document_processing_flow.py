@@ -1,13 +1,6 @@
 """基础设施层文档处理工作流模块
 
 DocumentProcessingFlow 使用 Prefect @flow 装饰器定义文档处理编排
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

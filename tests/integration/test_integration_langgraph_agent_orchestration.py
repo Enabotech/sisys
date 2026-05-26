@@ -1,13 +1,6 @@
 """Story 1-18b 集成测试
 
 端到端验证 OrchestrationService → LangGraphEngine → EventPublisher 完整链路
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

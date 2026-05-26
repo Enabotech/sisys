@@ -1,13 +1,6 @@
 """基础设施层 Token 黑名单模块
 
 基于 Redis 实现已撤销 JWT token 的黑名单管理，支持与 token 剩余有效期相同的 TTL 自动过期
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

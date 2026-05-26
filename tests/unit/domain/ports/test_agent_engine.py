@@ -1,13 +1,6 @@
 """AgentEnginePort 单元测试
 
 验证 Protocol 签名、runtime_checkable、FlowStatus 返回类型、零外部依赖
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

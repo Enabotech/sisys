@@ -2,13 +2,6 @@
 
 基于 RedisAdapter 实现记忆领域缓存端口，
 支持记忆专用键构建与 TTL 随机化防止缓存雪崩
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

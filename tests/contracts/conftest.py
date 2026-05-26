@@ -5,13 +5,6 @@
 - resolver: 提供已初始化的端口解析器
 
 注意: bootstrap() 由 tests/conftest.py 的 _bootstrap_once 自动调用
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

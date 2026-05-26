@@ -1,13 +1,6 @@
 """领域层容器安全结果值对象
 
 定义容器安全服务返回的结果类型，用于等保2.0三级容器安全
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

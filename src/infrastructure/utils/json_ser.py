@@ -6,13 +6,6 @@
 - Enum → 值
 - bytes → 字符串（UTF-8，回退 latin-1）
 - set → 列表
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 import json

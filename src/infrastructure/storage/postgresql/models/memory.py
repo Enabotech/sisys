@@ -2,13 +2,6 @@
 
 定义记忆相关的 SQLAlchemy ORM 模型，对应 memory_metadata、memory_change_history
 和 memory_group_members 表。DDL 来源: architecture.md 11.2.5
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

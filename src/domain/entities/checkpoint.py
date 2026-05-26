@@ -1,13 +1,6 @@
 """领域层检查点实体模块
 
 定义检查点领域实体，包含阶段标识和恢复能力
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """Port contract tests for TokenEstimatorPort.
 
 Tests that StaticTokenEstimator implementation satisfies the TokenEstimatorPort.
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

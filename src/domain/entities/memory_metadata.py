@@ -1,13 +1,6 @@
 """领域层记忆元数据索引实体模块
 
 定义用户记忆元数据索引实体，架构来源: architecture.md §11.2.5
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

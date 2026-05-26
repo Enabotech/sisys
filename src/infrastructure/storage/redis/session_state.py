@@ -1,13 +1,6 @@
 """SISYS 基础设施层会话状态数据模型模块
 
 定义会话状态缓存数据结构，与发件箱实体保持一致的存储层风格
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

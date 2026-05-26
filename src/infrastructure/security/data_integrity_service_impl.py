@@ -2,13 +2,6 @@
 
 基于 DataIntegrityServicePort 接口实现 SHA256/SHA512/MD5 校验和计算、验证和篡改检测
 用于等保2.0三级数据完整性合规
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

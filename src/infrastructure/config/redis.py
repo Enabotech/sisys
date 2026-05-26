@@ -1,13 +1,6 @@
 """基础设施层 Redis 配置模块
 
 提供 Redis 连接配置，用于 Pub/Sub 实时通知通道和缓存存储
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

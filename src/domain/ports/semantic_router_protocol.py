@@ -2,13 +2,6 @@
 
 定义语义路由适配器的接口协议
 基础设施层实现此协议以完成智能任务路由
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

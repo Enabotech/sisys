@@ -1,13 +1,6 @@
 """基础设施层用户模型模块
 
 定义用户的 SQLAlchemy ORM 模型，对应 users 表
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

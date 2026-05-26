@@ -4,13 +4,6 @@
 
 优先级：YAML 配置 > DEFAULT_MAPPINGS（baseline fallback）
 新增事件必须同时更新两处以保持同步
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -2,13 +2,6 @@
 
 实现 L0StoragePort 接口，提供异步文件操作能力。write/read 使用 aiofiles（I/O 密集型），
 delete/exists/list_memories 使用 asyncio.to_thread()（快速同步操作）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

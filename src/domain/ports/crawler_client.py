@@ -2,13 +2,6 @@
 
 定义 CrawlerClientPort 协议，作为 SISYS 核心侧与 Crawler Service 之间的契约接口。
 遵循六边形架构：领域层零外部依赖，仅使用 typing.Protocol 定义抽象端口。
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """基础设施层 Redis 清理工具模块
 
 提供按命名空间批量清理 Redis 键的工具，使用 SCAN 命令（非 KEYS）避免阻塞 Redis
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """领域层 业务级异常模块
 
 定义业务级异常，用于表示业务规则违反，如验证失败、资源不存在、资源冲突等
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

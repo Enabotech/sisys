@@ -2,13 +2,6 @@
 
 继承 PostgreSQLAdapter[User, UserModel]，实现实体与模型转换
 通过 _to_entity/_to_model 隔离领域层与 ORM 层
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

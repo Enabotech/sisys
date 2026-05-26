@@ -1,13 +1,6 @@
 """基础设施层 MinIO 配置模块
 
 提供 MinIO 对象存储连接配置，用于 L4 对象存储层
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

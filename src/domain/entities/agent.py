@@ -1,13 +1,6 @@
 """领域层智能体实体模块
 
 定义智能体领域实体，包含身份画像、职责边界和状态机转换逻辑
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

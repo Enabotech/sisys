@@ -1,13 +1,6 @@
 """Architecture constraint tests for Cost Metrics (Story 1.19).
 
 验证六边形架构约束：领域层零外部依赖、依赖方向正确、端口实现协议
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

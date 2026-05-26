@@ -10,13 +10,6 @@
 - "别忘了 X" → 提取 X
 - "改成 X" → 提取 X（用于修改操作）
 - "不要记住 X" → 触发删除操作（返回空 content，operation='delete'）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """基础设施层 LangGraph 引擎适配器模块
 
 LangGraphEngine 实现 AgentEnginePort Protocol，封装 LangGraph SDK 调用
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

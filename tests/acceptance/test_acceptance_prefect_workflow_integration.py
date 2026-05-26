@@ -4,13 +4,6 @@
 验收测试禁止使用 mock/fake，全部使用真实实现
 
 Run with: poetry run pytest tests/acceptance/test_acceptance_prefect-workflow-integration.py -v
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

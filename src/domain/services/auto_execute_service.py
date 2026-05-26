@@ -5,13 +5,6 @@ AutoExecuteService 是在隔离会话命名空间中执行任务的领域服务
 创建状态快照用于恢复，并发布 AutoExecuted 事件给下游监听者
 
 架构：领域层（无外部依赖），通过端口/协议实现沙盒执行和快照存储
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -2,13 +2,6 @@
 
 负责生成 Private/Group 记忆的文件路径和索引路径。与 MemoryIndex 分离：
 MemoryRouter 仅处理路径生成，索引操作由 MemoryIndex 负责
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

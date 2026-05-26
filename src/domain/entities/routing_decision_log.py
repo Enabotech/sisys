@@ -2,13 +2,6 @@
 
 定义路由决策日志领域实体，用于审计和成本追踪
 WORM 存储要求（合规要求保留 7 年）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

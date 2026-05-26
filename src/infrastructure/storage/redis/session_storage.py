@@ -1,13 +1,6 @@
 """SISYS 基础设施层 Redis 会话存储模块
 
 基于 Redis Hash 实现会话存储端口，支持自动过期
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

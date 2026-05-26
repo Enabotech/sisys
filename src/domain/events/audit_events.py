@@ -15,13 +15,6 @@ AC-1 标准字段 (FR-SC-02):
     correction_level: 纠正级别（L0-L3），用于追踪相关事件
 
 参考: Story 1.10 SDD规范定义
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

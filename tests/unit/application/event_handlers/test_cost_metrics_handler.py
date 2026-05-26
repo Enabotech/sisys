@@ -6,13 +6,6 @@
 - 调用 CostCalculator 计算成本
 - 更新 RoutingDecisionLog
 - 记录 Prometheus 指标
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

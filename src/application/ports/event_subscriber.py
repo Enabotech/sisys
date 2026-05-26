@@ -1,13 +1,6 @@
 """应用层事件订阅端口模块
 
 对标 NServiceBus 的 IBus.Subscribe 接口
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

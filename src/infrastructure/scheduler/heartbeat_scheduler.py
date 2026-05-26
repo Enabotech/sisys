@@ -1,13 +1,6 @@
 """基础设施层心跳调度器模块
 
 使用 Redis 有序集合实现周期性心跳事件调度，采用纯 asyncio 实现
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """领域层 自动执行事件模块
 
 定义自动执行机制完成任务后触发的事件
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """领域层 Agent事件模块
 
 定义 Agent 决策相关的领域事件
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

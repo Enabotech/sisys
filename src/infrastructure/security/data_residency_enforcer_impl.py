@@ -1,13 +1,6 @@
 """基础设施层数据驻留强制服务模块
 
 基于 DataResidencyEnforcerPort 接口实现数据驻留策略的强制执行和违规检查
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

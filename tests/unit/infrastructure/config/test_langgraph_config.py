@@ -1,13 +1,6 @@
 """LangGraphConfig 配置单元测试
 
 验证 from_env()、默认值、环境变量覆盖、frozen 特性
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

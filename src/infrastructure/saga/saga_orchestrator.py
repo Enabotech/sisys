@@ -10,13 +10,6 @@ SagaOrchestrator 负责：
 - 每个 Saga 实例有独立的 Orchestrator
 - 支持 UoW 模式（通过 SagaRepository 持久化）
 - 补偿失败时标记为 FAILED 而非继续尝试
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

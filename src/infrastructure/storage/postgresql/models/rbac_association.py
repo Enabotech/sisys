@@ -1,13 +1,6 @@
 """基础设施层 RBAC 关联表模块
 
 定义用户-角色和角色-权限的多对多关联表
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

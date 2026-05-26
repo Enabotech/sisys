@@ -5,13 +5,6 @@ AutoRouteService 是处理 AutoTriggered 事件并发出 AutoRouted 事件的领
 和/或语义路由（目标匹配）进行路由决策，并发布 AutoRouted 事件给下游执行阶段
 
 架构：领域层（无外部依赖），通过端口/协议实现路由和事件发布
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

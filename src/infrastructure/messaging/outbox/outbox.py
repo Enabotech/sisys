@@ -2,13 +2,6 @@
 
 定义事务发件箱实体（OutboxEntity），包含状态机管理：
 pending -> published/failed, failed -> pending(重试)/archived(终态)
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

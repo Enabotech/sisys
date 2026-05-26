@@ -1,13 +1,6 @@
 """基础设施层 JWT 令牌服务模块
 
 基于 python-jose 库实现 JWT 令牌的创建、验证和刷新功能
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -2,13 +2,6 @@
 
 定义登录尝试的 SQLAlchemy ORM 模型，对应 login_attempts 表
 用于跟踪用户登录失败尝试，实现账户锁定功能（等保 2.0 合规）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

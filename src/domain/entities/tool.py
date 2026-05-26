@@ -1,13 +1,6 @@
 """领域层工具实体模块
 
 定义工具领域实体，包含唯一标识符、I/O 模式和执行器
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

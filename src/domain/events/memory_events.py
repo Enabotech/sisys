@@ -10,13 +10,6 @@
 1. 写入 memory_metadata（UPSERT，version + 1）
 2. 写入 memory_change_history（append-only）
 3. 失效 L1 Redis 缓存
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

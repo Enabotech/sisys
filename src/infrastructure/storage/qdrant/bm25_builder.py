@@ -1,13 +1,6 @@
 """基础设施层 BM25 稀疏向量构建模块
 
 提供基于 TF-IDF 的稀疏向量构建功能，用于 BM25 稀疏检索
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

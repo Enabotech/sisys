@@ -2,13 +2,6 @@
 
 从领域事件或心跳事件中提取的上下文信息，用于传递给下游自动路由/
 自动执行阶段。遵循六边形架构：值对象，仅包含业务逻辑，无外部依赖
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

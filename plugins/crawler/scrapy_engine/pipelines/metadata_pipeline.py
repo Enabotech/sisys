@@ -1,13 +1,6 @@
 """元数据提取 Pipeline 模块
 
 从文件中提取元数据（标题、作者等）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

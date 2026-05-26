@@ -1,13 +1,6 @@
 """工作流领域事件单元测试
 
 验证 RAGIndexed 和 ReportGenerated 事件定义、序列化、注册
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

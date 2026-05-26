@@ -1,13 +1,6 @@
 """领域层端口契约门控模块
 
 提供端口兼容性检查与契约测试基础类
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

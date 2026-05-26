@@ -1,13 +1,6 @@
 """基础设施层 RabbitMQ 配置模块
 
 提供 RabbitMQ 连接配置，用于可靠事件传输通道
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

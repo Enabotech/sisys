@@ -2,13 +2,6 @@
 
 验证 submit_graph/get_graph_status、状态映射、AgentEnginePort 一致性
 使用 mock LangGraph SDK，不启动真实 server
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

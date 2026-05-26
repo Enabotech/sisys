@@ -1,13 +1,6 @@
 """基础设施层合规性网关模块
 
 UDMR L1 合规性网关实现，协调敏感数据检测、数据驻留强制、白名单验证、PIPL 合规和跨境传输审批
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

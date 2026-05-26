@@ -2,13 +2,6 @@
 
 提供 GET /metrics 端点，返回 Prometheus 文本格式指标，
 支持多进程模式下的动态扩缩容场景
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

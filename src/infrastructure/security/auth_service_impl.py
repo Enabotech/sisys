@@ -1,13 +1,6 @@
 """基础设施层认证服务模块
 
 基于 AuthServicePort 接口实现用户认证、JWT 令牌管理和登录尝试记录功能
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

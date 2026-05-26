@@ -2,13 +2,6 @@
 
 L2RdbPort 领域仓储的泛型基类，使用 SQLAlchemy AsyncSession 实现
 Session 从 ContextVar 读取（非构造器注入），子类只需实现 _to_entity/_to_model
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

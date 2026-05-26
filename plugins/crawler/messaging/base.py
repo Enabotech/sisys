@@ -1,13 +1,6 @@
 """事件发布抽象端口模块
 
 定义 EventPublisher 协议，抽象事件发布行为
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

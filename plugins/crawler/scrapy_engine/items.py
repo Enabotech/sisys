@@ -1,13 +1,6 @@
 """Scrapy Items 定义模块
 
 定义 CrawledFileItem，Pipeline 链逐步填充字段
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

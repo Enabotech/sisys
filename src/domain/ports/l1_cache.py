@@ -2,13 +2,6 @@
 
 技术无关的键值缓存端口，支持 TTL
 零外部依赖（仅使用 typing）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

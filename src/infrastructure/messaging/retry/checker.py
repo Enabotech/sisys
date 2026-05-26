@@ -2,13 +2,6 @@
 
 基于 Redis SET NX 原子操作实现事件处理幂等性保证，
 使用原子方法 try_acquire()，禁止分离 is_processed() + mark_processed()
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

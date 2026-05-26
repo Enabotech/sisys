@@ -2,13 +2,6 @@
 
 实现领域事件的 Redis 发布/订阅通道，用于实时通知型事件的低延迟分发
 允许事件丢失（与业务状态型事件通过 RabbitMQ + Outbox 保证可靠性不同）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -5,13 +5,6 @@
 
 参考: Story 1.14a SDD规范定义
 参考: or.md 系统公理一 (trigger→route→execute)
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -2,13 +2,6 @@
 
 提供安全监控、入侵检测、数据完整性、备份恢复的 REST API 端点
 遵循六边形架构：接口层仅依赖应用层用例和领域端口
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """领域层沙箱异常模块
 
 定义沙箱执行相关的领域异常，包括容器启动失败、代码执行失败、容器停止失败等
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

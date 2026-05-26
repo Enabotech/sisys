@@ -11,13 +11,6 @@ MemoryService 负责接收用户记忆请求、协调压缩（通过协议注入
 - EventPublisherProtocol：事件发布接口（可选）
 
 架构来源: architecture.md §11.2.5
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

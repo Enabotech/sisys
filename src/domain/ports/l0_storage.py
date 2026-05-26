@@ -6,13 +6,6 @@
 - I/O 密集型方法：async + aiofiles
 - 快速同步操作：async + to_thread（避免阻塞事件循环）
 - 领域层零外部依赖（仅用 abc + typing）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

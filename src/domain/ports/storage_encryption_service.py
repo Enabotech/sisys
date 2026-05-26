@@ -8,13 +8,6 @@
 - decrypt_field(): 字段级解密
 - rotate_key(): 密钥轮换
 - verify_encryption(): 加密验证
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

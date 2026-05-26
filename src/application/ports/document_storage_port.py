@@ -1,13 +1,6 @@
 """应用层文档存储端口模块
 
 继承 L4ObjectPort，添加文档业务语义
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -2,13 +2,6 @@
 
 实现完整指数退避策略，配合 jitter 防止惊群效应和最大延迟上限，
 用于消息重试调度
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

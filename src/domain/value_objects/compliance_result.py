@@ -2,13 +2,6 @@
 
 封装合规检查的结果，作为不可变值对象在领域层传递
 遵循六边形架构：值对象，仅包含业务逻辑，无外部依赖
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations
