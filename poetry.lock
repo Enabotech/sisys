@@ -11294,6 +11294,23 @@ url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 reference = "tsinghua"
 
 [[package]]
+name = "types-openpyxl"
+version = "3.1.5.20260518"
+description = "Typing stubs for openpyxl"
+optional = false
+python-versions = ">=3.10"
+groups = ["dev"]
+files = [
+    {file = "types_openpyxl-3.1.5.20260518-py3-none-any.whl", hash = "sha256:e6ca4b116c8b979ed57f3045edcd3d49c25917d6dae99e90358f41322a19d375"},
+    {file = "types_openpyxl-3.1.5.20260518.tar.gz", hash = "sha256:da9cd644e4e80215a3f60a8c2c2c8e980e941a9b581cffa3876285aa791ca5af"},
+]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "tsinghua"
+
+[[package]]
 name = "types-passlib"
 version = "1.7.7.20260211"
 description = "Typing stubs for passlib"
@@ -11417,6 +11434,23 @@ files = [
 [package.dependencies]
 cryptography = ">=35.0.0"
 types-pyOpenSSL = "*"
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "tsinghua"
+
+[[package]]
+name = "types-reportlab"
+version = "4.5.1.20260521"
+description = "Typing stubs for reportlab"
+optional = false
+python-versions = ">=3.10"
+groups = ["dev"]
+files = [
+    {file = "types_reportlab-4.5.1.20260521-py3-none-any.whl", hash = "sha256:b438c76655dbf24e4b4de157611ff137e1fd670e942d039f8a9321b3fe65cba1"},
+    {file = "types_reportlab-4.5.1.20260521.tar.gz", hash = "sha256:072d6d700d42f37bd515a1f92a4298066909d5ada3d40a9f7fd61f414f2691af"},
+]
 
 [package.source]
 type = "legacy"
@@ -12784,4 +12818,4 @@ reference = "tsinghua"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.15"
-content-hash = "bf034b90f8fcf5f5c8b817a4709b2e4e14008a5b3024cdc2976bbe48c396d8c8"
+content-hash = "ce47dcfc7ae7fc8ed20070327ddcd223ecadd1175e62394a112fe209c0211399"

@@ -225,6 +225,7 @@ class TestXlsxContentTitle:
 
         wb = Workbook()
         ws = wb.active
+        assert ws is not None
         ws.title = sheet_name
 
         if a1_value:
