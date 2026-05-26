@@ -58,7 +58,8 @@ class PdfFormatHandler:
             from pypdf import PdfReader
 
             reader = PdfReader(file_path)
-            info = reader.metadata or {}
+            raw_meta = reader.metadata
+            info: dict[str, object] = dict(raw_meta) if raw_meta else {}
 
             title = info.get("/Title", "") or info.get("Title", "")
             author = info.get("/Author", "") or info.get("Author", "")
