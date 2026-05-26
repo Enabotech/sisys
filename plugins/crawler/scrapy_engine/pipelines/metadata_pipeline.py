@@ -53,6 +53,7 @@ class MetadataPipeline:
         metadata = self._extractor.extract(file_path, extension, content_type)
 
         item["metadata_title"] = metadata.title
+        item["metadata_content_title"] = metadata.content_title
         item["metadata_author"] = metadata.author
         item["metadata_created"] = metadata.created
         return item

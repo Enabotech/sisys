@@ -41,7 +41,7 @@ class TextFormatHandler:
         return ext in self.EXTENSIONS or mime_type.lower().startswith("text/")
 
     def extract_metadata(self, file_path: str) -> FileMetadata:
-        """从文本文件提取元数据（首行作为标题）
+        """从文本文件提取元数据（首个非空行作为标题）
 
         Args:
             file_path: 文件路径
@@ -51,12 +51,23 @@ class TextFormatHandler:
         """
         try:
             with open(file_path, encoding="utf-8", errors="ignore") as f:
-                first_line = f.readline().strip()
+                content = f.read()
 
-            if not first_line:
-                return FileMetadata()
+            if content.startswith("﻿"):
+                content = content[1:]
 
-            title = first_line[: self.MAX_TITLE_LENGTH]
-            return FileMetadata(title=title)
+            for line in content.split("\n"):
+                stripped = line.strip()
+                if not stripped:
+                    continue
+
+                if stripped.startswith("#"):
+                    stripped = stripped.lstrip("# ").strip()
+
+                if stripped and len(stripped) > 2:
+                    title = stripped[: self.MAX_TITLE_LENGTH]
+                    return FileMetadata(title=title, content_title=title)
+
+            return FileMetadata()
         except Exception:
             return FileMetadata()

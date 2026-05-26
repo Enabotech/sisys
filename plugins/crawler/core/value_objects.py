@@ -33,7 +33,7 @@ class NamingCandidate:
 
     Attributes:
         filename: 候选文件名（含扩展名）
-        strategy_name: 策略名称（metadata_title / page_title / link_text / url_derived / content_hash）
+        strategy_name: 策略名称（metadata_title / content_title / page_title / link_text / url_derived / content_hash）
         confidence: 置信度 0.0~1.0
         source: 来源描述（调试用）
     """
@@ -50,6 +50,7 @@ class FileMetadata:
 
     Attributes:
         title: 文件标题
+        content_title: 从文档内容推导的标题
         author: 作者
         subject: 主题
         created: 创建日期字符串
@@ -57,6 +58,7 @@ class FileMetadata:
     """
 
     title: str = ""
+    content_title: str = ""
     author: str = ""
     subject: str = ""
     created: str = ""

@@ -48,6 +48,7 @@ class SmartNamingPipeline:
         """
         candidate = self._engine.generate_name(
             metadata_title=item.get("metadata_title", ""),
+            content_title=item.get("metadata_content_title", ""),
             page_title=item.get("page_title", ""),
             link_text=item.get("link_text", ""),
             url=item.get("url", ""),
