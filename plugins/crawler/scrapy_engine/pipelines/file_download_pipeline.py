@@ -26,12 +26,11 @@ class FileDownloadPipeline:
     验证文件已下载到临时目录且大小有效
     """
 
-    def process_item(self, item: CrawledFileItem, spider):
+    def process_item(self, item: CrawledFileItem):
         """处理 Item：验证文件下载
 
         Args:
             item: CrawledFileItem
-            spider: Spider 实例
 
         Returns:
             验证通过的 Item

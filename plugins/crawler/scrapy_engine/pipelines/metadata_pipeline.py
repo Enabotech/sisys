@@ -28,7 +28,7 @@ class MetadataPipeline:
     def __init__(self):
         self._extractor = None
 
-    def open_spider(self, spider):
+    def open_spider(self):
         """Spider 启动时初始化元数据提取器"""
         from plugins.crawler.core.format.registry import FileFormatHandlerRegistry
         from plugins.crawler.core.naming.metadata_extractor import MetadataExtractor
@@ -37,12 +37,11 @@ class MetadataPipeline:
         registry.register_default_handlers()
         self._extractor = MetadataExtractor(registry)
 
-    def process_item(self, item: CrawledFileItem, spider):
+    def process_item(self, item: CrawledFileItem):
         """处理 Item：提取文件元数据
 
         Args:
             item: CrawledFileItem
-            spider: Spider 实例
 
         Returns:
             填充了元数据字段的 Item
