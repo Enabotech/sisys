@@ -314,11 +314,11 @@ def verify_workflow_submitted_reliable() -> None:
     assert mapping.delivery_mode == DeliveryMode.RELIABLE
 
 
-@then("WorkflowSubmitted 应注册到 config/event_channels.yaml")
+@then("WorkflowSubmitted 应注册到 configs/event_channels.yaml")
 def verify_workflow_submitted_in_yaml() -> None:
     import yaml
 
-    with open("config/event_channels.yaml") as f:
+    with open("configs/event_channels.yaml") as f:
         config = yaml.safe_load(f)
 
     channels = config.get("event_channels", {})

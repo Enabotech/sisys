@@ -54,7 +54,7 @@ class ChannelRouter:
 
     # 预定义映射（Story 1.3 规范）
     #
-    # 优先级：config/event_channels.yaml > DEFAULT_MAPPINGS
+    # 优先级：configs/event_channels.yaml > DEFAULT_MAPPINGS
     # - DEFAULT_MAPPINGS: 编译时 baseline，确保 YAML 缺失/不完整时系统可用
     # - event_channels.yaml: 运行时主配置，支持多环境差异化和运维独立调整
     # 新增事件应同时更新两处，保持同步

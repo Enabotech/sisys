@@ -36,7 +36,7 @@ def crawl(
             "BOT_NAME": "sisys_crawler",
             "SPIDER_MODULES": ["plugins.crawler.scrapy_engine.spiders"],
             "NEWSPIDER_MODULE": "plugins.crawler.scrapy_engine.spiders",
-            "ROBOTSTXT_OBEY": True,
+            "ROBOTSTXT_OBEY": False,
             "CONCURRENT_REQUESTS": 8,
             "DOWNLOAD_DELAY": 1.0,
             "DOWNLOAD_TIMEOUT": 30,

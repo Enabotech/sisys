@@ -53,7 +53,7 @@
     假如 RAGIndexed 事件定义于 workflow_events.py
     那么 RAGIndexed 应包含 document_id, index_name, chunk_count 字段
     并且 ReportGenerated 应包含 report_id, report_type, file_path 字段
-    并且 两事件应注册到 config/event_channels.yaml 的 RELIABLE 通道
+    并且 两事件应注册到 configs/event_channels.yaml 的 RELIABLE 通道
 
   # =========================================================================
   # AC-6: PrefectConfig 配置

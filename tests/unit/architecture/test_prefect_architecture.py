@@ -147,13 +147,13 @@ class TestOrchestrationServiceLayerPurity:
 
 
 class TestEventChannelYamlConfig:
-    """验证 RAGIndexed/ReportGenerated 注册于 config/event_channels.yaml"""
+    """验证 RAGIndexed/ReportGenerated 注册于 configs/event_channels.yaml"""
 
     def test_rag_indexed_in_yaml(self) -> None:
         """RAGIndexed 应在 event_channels.yaml 中有 RELIABLE 映射"""
         import yaml
 
-        with open("config/event_channels.yaml") as f:
+        with open("configs/event_channels.yaml") as f:
             config = yaml.safe_load(f)
 
         channels = config["event_channels"]
@@ -164,7 +164,7 @@ class TestEventChannelYamlConfig:
         """ReportGenerated 应在 event_channels.yaml 中有 RELIABLE 映射"""
         import yaml
 
-        with open("config/event_channels.yaml") as f:
+        with open("configs/event_channels.yaml") as f:
             config = yaml.safe_load(f)
 
         channels = config["event_channels"]
