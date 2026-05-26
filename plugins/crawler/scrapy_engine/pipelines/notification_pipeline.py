@@ -12,7 +12,6 @@ Copyright:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from plugins.crawler.scrapy_engine.items import CrawledFileItem
@@ -35,7 +34,7 @@ class NotificationPipeline:
 
         self._publisher = ConsolePublisher()
 
-    def process_item(self, item: CrawledFileItem):
+    async def process_item(self, item: CrawledFileItem):
         """处理 Item：发布文件爬取事件
 
         Args:
@@ -64,9 +63,5 @@ class NotificationPipeline:
             metadata_author=item.get("metadata_author", ""),
         )
 
-        loop = asyncio.new_event_loop()
-        try:
-            loop.run_until_complete(self._publisher.publish_file_crawled(file_info))
-        finally:
-            loop.close()
+        await self._publisher.publish_file_crawled(file_info)
         return item

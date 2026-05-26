@@ -242,12 +242,12 @@ def verify_report_generated_fields() -> None:
     assert hasattr(event, "file_path")
 
 
-@then("两事件应注册到 config/event_channels.yaml 的 RELIABLE 通道")
+@then("两事件应注册到 configs/event_channels.yaml 的 RELIABLE 通道")
 def verify_event_channels_yaml() -> None:
     """验证 YAML 配置包含 RAGIndexed 和 ReportGenerated"""
     import yaml
 
-    with open("config/event_channels.yaml") as f:
+    with open("configs/event_channels.yaml") as f:
         config = yaml.safe_load(f)
 
     channels = config.get("event_channels", {})

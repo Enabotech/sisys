@@ -65,8 +65,8 @@ class DomainSpider(scrapy.Spider):
         self.max_depth = max_depth
         self.follow_subdomains = follow_subdomains
 
-    def start_requests(self):
-        """生成初始请求"""
+    async def start(self):
+        """生成初始请求（Scrapy 2.16+ async start API）"""
         urls = self.seed_urls if self.seed_urls else tuple(f"https://{d}" for d in self.domains)
         for url in urls:
             yield scrapy.Request(

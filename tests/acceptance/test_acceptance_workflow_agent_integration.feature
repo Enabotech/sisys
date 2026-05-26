@@ -67,4 +67,4 @@
     假如 ChannelRouter 初始化完成
     那么 WorkflowSubmitted 应注册到 ChannelRouter 的 DEFAULT_MAPPINGS
     并且 WorkflowSubmitted 的通道策略应为 RELIABLE
-    并且 WorkflowSubmitted 应注册到 config/event_channels.yaml
+    并且 WorkflowSubmitted 应注册到 configs/event_channels.yaml

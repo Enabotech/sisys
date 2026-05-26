@@ -1181,7 +1181,7 @@ async def list_supported_formats():
 
 ### 10.3 事件通道注册
 
-在 `config/event_channels.yaml` 中新增爬虫事件通道：
+在 `configs/event_channels.yaml` 中新增爬虫事件通道：
 
 ```yaml
 # Crawler 事件
@@ -1241,7 +1241,7 @@ SISYS 侧需要修改/新增的文件汇总：
 | 新增 | `src/infrastructure/crawler/http_crawler_client.py` | HTTP 适配器实现 |
 | 新增 | `src/interfaces/api/crawler.py` | API 路由 |
 | 修改 | `src/composition_root.py` | 注册 crawler_client 端口 |
-| 修改 | `config/event_channels.yaml` | 新增 3 个事件通道 |
+| 修改 | `configs/event_channels.yaml` | 新增 3 个事件通道 |
 | 修改 | `src/infrastructure/messaging/channel_router.py` | DEFAULT_MAPPINGS 新增 3 条 |
 | 新增 | `tests/contracts/test_port_contract_crawler.py` | 契约测试 |
 
@@ -1439,5 +1439,5 @@ poetry run pytest tests/ -v --cov=plugins/crawler --cov-report=term-missing
 | HTTP 适配器 | `src/infrastructure/crawler/http_crawler_client.py` | HttpCrawlerClient |
 | API 路由 | `src/interfaces/api/crawler.py` | 对外暴露路由 |
 | 组合根 | `src/composition_root.py` | 端口注册 |
-| 事件通道 | `config/event_channels.yaml` | 事件通道配置 |
+| 事件通道 | `configs/event_channels.yaml` | 事件通道配置 |
 | 通道路由 | `src/infrastructure/messaging/channel_router.py` | DEFAULT_MAPPINGS |

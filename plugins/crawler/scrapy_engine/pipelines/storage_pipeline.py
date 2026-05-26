@@ -12,7 +12,6 @@ Copyright:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from plugins.crawler.scrapy_engine.items import CrawledFileItem
@@ -53,7 +52,7 @@ class StoragePipeline:
         """Spider 启动时初始化存储"""
         self._storage = LocalStorage(output_dir=self._output_dir)
 
-    def process_item(self, item: CrawledFileItem):
+    async def process_item(self, item: CrawledFileItem):
         """处理 Item：存储文件
 
         Args:
@@ -62,17 +61,11 @@ class StoragePipeline:
         Returns:
             存储完成的 Item
         """
-        loop = asyncio.new_event_loop()
-        try:
-            object_path = loop.run_until_complete(
-                self._storage.store_file(
-                    file_name=item.get("smart_name", item.get("file_name", "")),
-                    file_path=item.get("file_path", ""),
-                    content_type=item.get("content_type", ""),
-                    metadata={"task_id": item.get("task_id", "")},
-                ),
-            )
-            logger.info("文件已存储: %s → %s", item.get("smart_name", ""), object_path)
-        finally:
-            loop.close()
+        object_path = await self._storage.store_file(
+            file_name=item.get("smart_name", item.get("file_name", "")),
+            file_path=item.get("file_path", ""),
+            content_type=item.get("content_type", ""),
+            metadata={"task_id": item.get("task_id", "")},
+        )
+        logger.info("文件已存储: %s → %s", item.get("smart_name", ""), object_path)
         return item
