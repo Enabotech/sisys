@@ -125,7 +125,9 @@ class DomainSpider(scrapy.Spider):
         url_filename = self._extract_filename_from_url(response.url)
         extension = os.path.splitext(url_filename)[1].lower().lstrip(".")
 
-        fd, temp_path = tempfile.mkstemp(suffix=f".{extension}" if extension else "")
+        tmp_dir = os.path.join(tempfile.gettempdir(), "crawler")
+        os.makedirs(tmp_dir, exist_ok=True)
+        fd, temp_path = tempfile.mkstemp(suffix=f".{extension}" if extension else "", dir=tmp_dir)
         try:
             with os.fdopen(fd, "wb") as f:
                 f.write(response.body)
