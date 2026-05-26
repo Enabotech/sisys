@@ -73,6 +73,8 @@ openpyxl = "^3.1.2"
 pillow = "^12.1.1"
 scrapy = "^2.11"
 pypdf = "^6.12.1"
+tinytag = "^2.2.1"
+ffmpeg-python = "^0.2.0"
 
 # OCR
 pytesseract = "^0.3.10"

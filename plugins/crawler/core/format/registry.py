@@ -59,6 +59,9 @@ class FileFormatHandlerRegistry:
         from plugins.crawler.core.format.handlers.archive_handler import (
             ArchiveFormatHandler,
         )
+        from plugins.crawler.core.format.handlers.audio_handler import (
+            AudioFormatHandler,
+        )
         from plugins.crawler.core.format.handlers.image_handler import (
             ImageFormatHandler,
         )
@@ -67,12 +70,17 @@ class FileFormatHandlerRegistry:
         )
         from plugins.crawler.core.format.handlers.pdf_handler import PdfFormatHandler
         from plugins.crawler.core.format.handlers.text_handler import TextFormatHandler
+        from plugins.crawler.core.format.handlers.video_handler import (
+            VideoFormatHandler,
+        )
 
         self.register(PdfFormatHandler())
         self.register(OfficeFormatHandler())
         self.register(TextFormatHandler())
         self.register(ImageFormatHandler())
         self.register(ArchiveFormatHandler())
+        self.register(AudioFormatHandler())
+        self.register(VideoFormatHandler())
 
     def clear(self) -> None:
         """清空所有已注册的处理器"""

@@ -15,7 +15,7 @@ def crawl(
     domains: list[str] = typer.Option(..., "--domain", "-d", help="目标域名"),
     output: str = typer.Option("./crawl_output", "--output", "-o", help="输出目录"),
     depth: int = typer.Option(3, "--depth", help="最大爬取深度"),
-    formats: str = typer.Option("pdf,txt,docx,xlsx,pptx", "--formats", help="文件格式（逗号分隔）"),
+    formats: str = typer.Option("pdf,txt,docx,xlsx,pptx,mp4,mp3,wav", "--formats", help="文件格式（逗号分隔）"),
     seed_urls: list[str] = typer.Option([], "--seed-url", "-s", help="种子 URL"),
     follow_subdomains: bool = typer.Option(True, "--follow-subdomains", help="跟踪子域名"),
     obey_robots: bool = typer.Option(True, "--obey-robots / --no-obey-robots", help="遵守 robots.txt"),

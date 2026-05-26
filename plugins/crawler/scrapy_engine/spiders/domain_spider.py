@@ -74,6 +74,9 @@ class DomainSpider(scrapy.Spider):
         Args:
             response: Scrapy 响应对象
         """
+        if not isinstance(response, scrapy.http.TextResponse):
+            return
+
         page_title = response.css("title::text").get("").strip()
         current_depth = response.meta.get("depth", 0)
 
@@ -160,6 +163,57 @@ class DomainSpider(scrapy.Spider):
         ext = path.rsplit(".", 1)[-1] if "." in path else ""
         return ext in self.allowed_extensions
 
+    _NON_PAGE_EXTENSIONS = frozenset(
+        {
+            "mp4",
+            "mp3",
+            "avi",
+            "mov",
+            "wmv",
+            "flv",
+            "mkv",
+            "webm",
+            "m4v",
+            "3gp",
+            "wav",
+            "ogg",
+            "flac",
+            "aac",
+            "wma",
+            "m4a",
+            "pdf",
+            "doc",
+            "docx",
+            "xls",
+            "xlsx",
+            "ppt",
+            "pptx",
+            "zip",
+            "rar",
+            "7z",
+            "tar",
+            "gz",
+            "bz2",
+            "exe",
+            "dmg",
+            "iso",
+            "png",
+            "jpg",
+            "jpeg",
+            "gif",
+            "svg",
+            "webp",
+            "ico",
+            "bmp",
+            "css",
+            "js",
+            "woff",
+            "woff2",
+            "ttf",
+            "eot",
+        }
+    )
+
     def _should_follow(self, url: str, current_depth: int) -> bool:
         """判断是否应该跟踪该 URL
 
@@ -174,6 +228,11 @@ class DomainSpider(scrapy.Spider):
             return False
 
         parsed = urlparse(url)
+        path = parsed.path.lower()
+        ext = path.rsplit(".", 1)[-1] if "." in path else ""
+        if ext in self._NON_PAGE_EXTENSIONS:
+            return False
+
         host = parsed.hostname or ""
 
         if not self.follow_subdomains:
