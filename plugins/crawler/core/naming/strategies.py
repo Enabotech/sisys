@@ -1,7 +1,7 @@
 """命名策略模块
 
-定义 5 个纯函数命名策略，无副作用
-优先级：metadata_title(0.95) > page_title(0.80) > link_text(0.65) > url_derived(0.45) > content_hash(0.10)
+定义 6 个纯函数命名策略，无副作用
+优先级：metadata_title(0.95) > content_title(0.90) > page_title(0.80) > link_text(0.65) > url_derived(0.45) > content_hash(0.10)
 零外部依赖，仅使用标准库
 
 Author:
@@ -44,6 +44,34 @@ def strategy_metadata_title(
         strategy_name="metadata_title",
         confidence=0.95,
         source=f"元数据标题: {title[:50]}",
+    )
+
+
+def strategy_content_title(
+    title: str,
+    extension: str,
+    sanitizer: FilenameSanitizer,
+) -> NamingCandidate | None:
+    """策略 1.5：内容推导标题（置信度 0.90）
+
+    从文件内容中提取的标题（PDF 大纲、DOCX 标题样式、PPTX 幻灯片标题等）
+
+    Args:
+        title: 从文件内容推导的标题
+        extension: 文件扩展名
+        sanitizer: 文件名清洗器
+
+    Returns:
+        命名候选，或 None（标题为空时）
+    """
+    if not title or not title.strip():
+        return None
+    filename = sanitizer.sanitize(title.strip(), extension)
+    return NamingCandidate(
+        filename=filename,
+        strategy_name="content_title",
+        confidence=0.90,
+        source=f"内容推导标题: {title[:50]}",
     )
 
 

@@ -47,6 +47,7 @@ class CrawledFileItem(scrapy.Item):
     file_extension = scrapy.Field()
     detected_format = scrapy.Field()
     metadata_title = scrapy.Field()
+    metadata_content_title = scrapy.Field()
     metadata_author = scrapy.Field()
     metadata_created = scrapy.Field()
     metadata_extra = scrapy.Field()

@@ -19,6 +19,7 @@ import time
 from plugins.crawler.core.naming.sanitizer import FilenameSanitizer
 from plugins.crawler.core.naming.strategies import (
     strategy_content_hash,
+    strategy_content_title,
     strategy_link_text,
     strategy_metadata_title,
     strategy_page_title,
@@ -50,6 +51,7 @@ class SmartNamingEngine:
     def generate_name(
         self,
         metadata_title: str | None = None,
+        content_title: str | None = None,
         page_title: str | None = None,
         link_text: str | None = None,
         url: str | None = None,
@@ -58,10 +60,11 @@ class SmartNamingEngine:
     ) -> NamingCandidate:
         """生成最终文件名
 
-        内部调用 5 个策略生成候选列表，选择置信度最高者，处理冲突
+        内部调用 6 个策略生成候选列表，选择置信度最高者，处理冲突
 
         Args:
             metadata_title: 文件元数据标题
+            content_title: 从文件内容推导的标题
             page_title: HTML 页面标题
             link_text: 链接锚文本
             url: 文件下载 URL
@@ -76,6 +79,7 @@ class SmartNamingEngine:
         """
         candidates = self._generate_candidates(
             metadata_title=metadata_title,
+            content_title=content_title,
             page_title=page_title,
             link_text=link_text,
             url=url,
@@ -102,6 +106,7 @@ class SmartNamingEngine:
     def _generate_candidates(
         self,
         metadata_title: str | None = None,
+        content_title: str | None = None,
         page_title: str | None = None,
         link_text: str | None = None,
         url: str | None = None,
@@ -113,6 +118,11 @@ class SmartNamingEngine:
 
         # 策略 1: 文件元数据标题
         candidate = strategy_metadata_title(metadata_title or "", file_extension, self._sanitizer)
+        if candidate:
+            candidates.append(candidate)
+
+        # 策略 1.5: 内容推导标题
+        candidate = strategy_content_title(content_title or "", file_extension, self._sanitizer)
         if candidate:
             candidates.append(candidate)
 
