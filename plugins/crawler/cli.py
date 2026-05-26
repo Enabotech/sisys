@@ -26,30 +26,46 @@ def crawl(
     seed_urls: list[str] = typer.Option([], "--seed-url", "-s", help="种子 URL"),
     follow_subdomains: bool = typer.Option(True, "--follow-subdomains", help="跟踪子域名"),
 ) -> None:
-    """启动爬取任务"""
-    from plugins.crawler.core.entities import CrawlTask
-    from plugins.crawler.messaging.console_publisher import ConsolePublisher
-    from plugins.crawler.plugin import CrawlerPlugin
-    from plugins.crawler.storage.local_storage import LocalStorage
-
-    plugin = CrawlerPlugin()
-    plugin.install()
-    plugin.activate(
-        storage=LocalStorage(output_dir=output),
-        publisher=ConsolePublisher(),
-    )
+    """启动爬取任务（阻塞直到完成）"""
+    from scrapy.crawler import CrawlerProcess
 
     extensions = tuple(f.strip() for f in formats.split(",") if f.strip())
-    task = CrawlTask(
+
+    process = CrawlerProcess(
+        settings={
+            "BOT_NAME": "sisys_crawler",
+            "SPIDER_MODULES": ["plugins.crawler.scrapy_engine.spiders"],
+            "NEWSPIDER_MODULE": "plugins.crawler.scrapy_engine.spiders",
+            "ROBOTSTXT_OBEY": True,
+            "CONCURRENT_REQUESTS": 8,
+            "DOWNLOAD_DELAY": 1.0,
+            "DOWNLOAD_TIMEOUT": 30,
+            "LOG_LEVEL": "INFO",
+            "CRAWL_OUTPUT_DIR": output,
+            "ITEM_PIPELINES": {
+                "plugins.crawler.scrapy_engine.pipelines.file_download_pipeline.FileDownloadPipeline": 100,
+                "plugins.crawler.scrapy_engine.pipelines.format_detection_pipeline.FormatDetectionPipeline": 200,
+                "plugins.crawler.scrapy_engine.pipelines.metadata_pipeline.MetadataPipeline": 300,
+                "plugins.crawler.scrapy_engine.pipelines.smart_naming_pipeline.SmartNamingPipeline": 400,
+                "plugins.crawler.scrapy_engine.pipelines.storage_pipeline.StoragePipeline": 500,
+                "plugins.crawler.scrapy_engine.pipelines.notification_pipeline.NotificationPipeline": 600,
+            },
+        },
+    )
+
+    process.crawl(
+        "domain",
+        task_id="cli-crawl",
         domains=tuple(domains),
         seed_urls=tuple(seed_urls),
-        max_depth=depth,
         allowed_extensions=extensions,
+        max_depth=depth,
         follow_subdomains=follow_subdomains,
     )
 
-    task_id = plugin.start_crawl(task)
-    typer.echo(f"爬取任务已启动: {task_id}")
+    typer.echo("开始爬取...")
+    process.start()
+    typer.echo(f"爬取完成，输出目录: {output}")
 
 
 @app.command()

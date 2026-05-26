@@ -29,18 +29,17 @@ class NotificationPipeline:
     def __init__(self):
         self._publisher = None
 
-    def open_spider(self, spider):
+    def open_spider(self):
         """Spider 启动时初始化事件发布器"""
         from plugins.crawler.messaging.console_publisher import ConsolePublisher
 
         self._publisher = ConsolePublisher()
 
-    def process_item(self, item: CrawledFileItem, spider):
+    def process_item(self, item: CrawledFileItem):
         """处理 Item：发布文件爬取事件
 
         Args:
             item: CrawledFileItem
-            spider: Spider 实例
 
         Returns:
             发布完成的 Item

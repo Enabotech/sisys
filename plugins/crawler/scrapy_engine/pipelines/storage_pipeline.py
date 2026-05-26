@@ -16,6 +16,7 @@ import asyncio
 import logging
 
 from plugins.crawler.scrapy_engine.items import CrawledFileItem
+from plugins.crawler.storage.local_storage import LocalStorage
 
 logger = logging.getLogger(__name__)
 
@@ -26,23 +27,37 @@ class StoragePipeline:
     将文件推送到配置的存储后端（本地/MinIO）
     """
 
-    def __init__(self):
-        self._storage = None
+    def __init__(self, output_dir: str = "./crawl_output"):
+        """初始化存储 Pipeline
 
-    def open_spider(self, spider):
+        Args:
+            output_dir: 输出目录
+        """
+        self._output_dir = output_dir
+        self._storage = LocalStorage(output_dir=output_dir)
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        """从 Scrapy Crawler 实例创建 Pipeline
+
+        Args:
+            crawler: Scrapy Crawler 实例
+
+        Returns:
+            StoragePipeline 实例
+        """
+        output_dir = crawler.settings.get("CRAWL_OUTPUT_DIR", "./crawl_output")
+        return cls(output_dir=output_dir)
+
+    def open_spider(self):
         """Spider 启动时初始化存储"""
-        from plugins.crawler.config.settings import CrawlerSettings
-        from plugins.crawler.storage.local_storage import LocalStorage
+        self._storage = LocalStorage(output_dir=self._output_dir)
 
-        settings = CrawlerSettings()
-        self._storage = LocalStorage(output_dir=settings.local_output_dir)
-
-    def process_item(self, item: CrawledFileItem, spider):
+    def process_item(self, item: CrawledFileItem):
         """处理 Item：存储文件
 
         Args:
             item: CrawledFileItem
-            spider: Spider 实例
 
         Returns:
             存储完成的 Item

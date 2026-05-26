@@ -28,19 +28,18 @@ class FormatDetectionPipeline:
     def __init__(self):
         self._registry = None
 
-    def open_spider(self, spider):
+    def open_spider(self):
         """Spider 启动时初始化注册表"""
         from plugins.crawler.core.format.registry import FileFormatHandlerRegistry
 
         self._registry = FileFormatHandlerRegistry()
         self._registry.register_default_handlers()
 
-    def process_item(self, item: CrawledFileItem, spider):
+    def process_item(self, item: CrawledFileItem):
         """处理 Item：检测文件格式
 
         Args:
             item: CrawledFileItem
-            spider: Spider 实例
 
         Returns:
             填充了 detected_format 的 Item

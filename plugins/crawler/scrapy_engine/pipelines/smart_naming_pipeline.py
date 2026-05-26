@@ -28,7 +28,7 @@ class SmartNamingPipeline:
     def __init__(self):
         self._engine = None
 
-    def open_spider(self, spider):
+    def open_spider(self):
         """Spider 启动时初始化命名引擎"""
         from plugins.crawler.core.naming.engine import SmartNamingEngine
 
@@ -37,12 +37,11 @@ class SmartNamingPipeline:
             conflict_strategy="append_hash",
         )
 
-    def process_item(self, item: CrawledFileItem, spider):
+    def process_item(self, item: CrawledFileItem):
         """处理 Item：生成智能文件名
 
         Args:
             item: CrawledFileItem
-            spider: Spider 实例
 
         Returns:
             填充了 smart_name 和 naming_strategy_used 的 Item
