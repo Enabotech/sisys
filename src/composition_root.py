@@ -14,6 +14,7 @@ Copyright:
 from __future__ import annotations
 
 import logging
+import os
 
 import redis.asyncio as aioredis
 
@@ -1269,6 +1270,25 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="routing-team",
         tags=("udmr", "cost", "handler", "application"),
+    )
+
+    # === Crawler Ports ===
+    from src.domain.ports.crawler_client import CrawlerClientPort
+
+    register_port(
+        name="crawler_client",
+        version="v1.0.0",
+        interface=CrawlerClientPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.crawler.http_crawler_client",
+            fromlist=["HttpCrawlerClient"],
+        ).HttpCrawlerClient(
+            base_url=os.getenv("CRAWLER_SERVICE_URL", "http://localhost:8900"),
+        ),
+        module="src.infrastructure.crawler.http_crawler_client",
+        lifetime=Lifetime.SINGLETON,
+        owner="crawler-team",
+        tags=("crawler", "client"),
     )
 
     logger.info("Registered %d ports", len(_global_registry.list_all()))

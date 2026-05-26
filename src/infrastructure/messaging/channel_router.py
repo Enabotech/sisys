@@ -218,6 +218,40 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="工作流提交完成",
         ),
+        "BackupCompletedEvent": ChannelMapping(
+            event_type="BackupCompletedEvent",
+            rabbitmq_routing_key="sisys.events.reliable.backup_completed_event",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="备份完成",
+        ),
+        "EncryptionKeyRotatedEvent": ChannelMapping(
+            event_type="EncryptionKeyRotatedEvent",
+            rabbitmq_routing_key="sisys.events.reliable.encryption_key_rotated_event",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="加密密钥轮换完成",
+        ),
+        # Crawler 事件
+        "CrawlCompleted": ChannelMapping(
+            event_type="CrawlCompleted",
+            redis_channel="sisys:rt:crawl_completed",
+            rabbitmq_routing_key="sisys.events.reliable.crawl_completed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="爬取任务完成",
+        ),
+        "CrawlFailed": ChannelMapping(
+            event_type="CrawlFailed",
+            redis_channel="sisys:rt:crawl_failed",
+            rabbitmq_routing_key="sisys.events.reliable.crawl_failed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="爬取任务失败",
+        ),
+        "FileCrawled": ChannelMapping(
+            event_type="FileCrawled",
+            redis_channel="sisys:rt:file_crawled",
+            rabbitmq_routing_key="sisys.events.reliable.file_crawled",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="单文件爬取完成",
+        ),
     }
 
     def __init__(self, load_defaults: bool = True) -> None:

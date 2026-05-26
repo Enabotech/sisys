@@ -1,7 +1,7 @@
 """TokenConsumption 值对象单元测试.
 
 验证 Token 消耗值对象的不变量约束：total_tokens == prompt_tokens + completion_tokens，
-所有字段非负，frozen dataclass 不可变。
+所有字段非负，frozen dataclass 不可变
 
 Author:
     agimtech <agimtech@126.com>

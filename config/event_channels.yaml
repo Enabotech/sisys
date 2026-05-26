@@ -153,3 +153,24 @@ event_channels:
     rabbitmq_routing_key: "sisys.events.reliable.encryption_key_rotated_event"
     delivery_mode: "reliable"
     description: "加密密钥轮换完成"
+
+  # =========================================================================
+  # CRAWLER 事件
+  # =========================================================================
+  CrawlCompleted:
+    redis_channel: "sisys:rt:crawl_completed"
+    rabbitmq_routing_key: "sisys.events.reliable.crawl_completed"
+    delivery_mode: "reliable"
+    description: "爬取任务完成"
+
+  CrawlFailed:
+    redis_channel: "sisys:rt:crawl_failed"
+    rabbitmq_routing_key: "sisys.events.reliable.crawl_failed"
+    delivery_mode: "reliable"
+    description: "爬取任务失败"
+
+  FileCrawled:
+    redis_channel: "sisys:rt:file_crawled"
+    rabbitmq_routing_key: "sisys.events.reliable.file_crawled"
+    delivery_mode: "reliable"
+    description: "单文件爬取完成"

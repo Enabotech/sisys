@@ -457,8 +457,8 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
 def _sync_config_to_environ(config: TestEnvConfig) -> None:
     """将最终测试环境配置同步到 os.environ
 
-    确保生产代码的 Config.from_env()（读 os.getenv）也能拿到与测试环境一致的值。
-    使用 setdefault 而非直接赋值，尊重用户显式设置的环境变量（最高优先级）。
+    确保生产代码的 Config.from_env()（读 os.getenv）也能拿到与测试环境一致的值
+    使用 setdefault 而非直接赋值，尊重用户显式设置的环境变量（最高优先级）
 
     Args:
         config: 计算完成的测试环境配置

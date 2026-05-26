@@ -384,7 +384,7 @@ class TestCloudModelConfigParseErrors:
     """配置解析非法值错误路径测试.
 
     验证非数字字符串传入时快速失败，错误信息包含具体字段名和值，
-    便于运维排查环境变量配置错误。
+    便于运维排查环境变量配置错误
     """
 
     def test_invalid_max_tokens_raises(self) -> None:

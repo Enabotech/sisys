@@ -32,9 +32,9 @@ logger = logging.getLogger(__name__)
 class RedisSnapshotStore(SnapshotRepositoryProtocol):
     """Redis 快照存储，实现 SnapshotRepositoryProtocol
 
-    基于 Redis Hash 实现检查点快照仓储，支持 TTL 过期。
+    基于 Redis Hash 实现检查点快照仓储，支持 TTL 过期
     组合 RedisAdapter（Rule 3），通用操作走 adapter 委托，
-    Hash 操作（hset/hget/expire）走 adapter.raw_client。
+    Hash 操作（hset/hget/expire）走 adapter.raw_client
 
     Attributes:
         _adapter: RedisAdapter 通用 KV 适配器实例
