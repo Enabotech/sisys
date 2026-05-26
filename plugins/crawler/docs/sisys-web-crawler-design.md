@@ -141,7 +141,7 @@ plugins/crawler/
 
   config/
     __init__.py
-    settings.py                            # CrawlerSettings (Pydantic BaseSettings)
+    settings.py                            # CrawlerSettings (@dataclass + from_env())
 
   core/
     __init__.py
@@ -335,11 +335,20 @@ class CrawlerClientPort(Protocol):
     SISYS 通过此端口与 Crawler Service 通信
     """
 
-    async def submit_task(self, spec: CrawlTaskSpec) -> str:
+    async def submit_task(
+        self,
+        domains: list[str],
+        seed_urls: list[str] | None = None,
+        allowed_extensions: list[str] | None = None,
+        max_depth: int = 3,
+        follow_subdomains: bool = True,
+        max_files: int = 1000,
+        download_delay: float = 1.0,
+    ) -> str:
         """提交爬取任务，返回 task_id"""
         ...
 
-    async def get_task_status(self, task_id: str) -> CrawlTaskStatus:
+    async def get_task_status(self, task_id: str) -> dict:
         """查询任务状态"""
         ...
 
@@ -366,15 +375,33 @@ class HttpCrawlerClient:
     def __init__(self, base_url: str, timeout: float = 30.0):
         self._client = httpx.AsyncClient(base_url=base_url, timeout=timeout)
 
-    async def submit_task(self, spec: CrawlTaskSpec) -> str:
-        resp = await self._client.post("/tasks", json=spec.to_dict())
+    async def submit_task(
+        self,
+        domains: list[str],
+        seed_urls: list[str] | None = None,
+        allowed_extensions: list[str] | None = None,
+        max_depth: int = 3,
+        follow_subdomains: bool = True,
+        max_files: int = 1000,
+        download_delay: float = 1.0,
+    ) -> str:
+        payload = {
+            "domains": domains,
+            "seed_urls": seed_urls or [],
+            "allowed_extensions": allowed_extensions or [],
+            "max_depth": max_depth,
+            "follow_subdomains": follow_subdomains,
+            "max_files": max_files,
+            "download_delay": download_delay,
+        }
+        resp = await self._client.post("/tasks", json=payload)
         resp.raise_for_status()
         return resp.json()["task_id"]
 
-    async def get_task_status(self, task_id: str) -> CrawlTaskStatus:
+    async def get_task_status(self, task_id: str) -> dict:
         resp = await self._client.get(f"/tasks/{task_id}")
         resp.raise_for_status()
-        return CrawlTaskStatus(**resp.json())
+        return resp.json()
 
     async def cancel_task(self, task_id: str) -> bool:
         resp = await self._client.delete(f"/tasks/{task_id}")
@@ -385,6 +412,9 @@ class HttpCrawlerClient:
         resp = await self._client.get("/formats")
         resp.raise_for_status()
         return resp.json()["formats"]
+
+    async def close(self) -> None:
+        await self._client.aclose()
 ```
 
 ### 4.4 RabbitMQ 事件契约
@@ -505,27 +535,30 @@ class DomainSpider(scrapy.Spider):
 
     def __init__(
         self,
-        domains: list[str],
-        allowed_extensions: list[str] | None = None,
+        task_id: str = "",
+        domains: tuple[str, ...] = (),
+        seed_urls: tuple[str, ...] = (),
+        allowed_extensions: tuple[str, ...] = (),
         max_depth: int = 3,
         follow_subdomains: bool = True,
-        url_include_patterns: list[str] | None = None,
-        url_exclude_patterns: list[str] | None = None,
-        *args,
-        **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self.allowed_domains = domains
-        self.seed_domains = set(domains)
-        self.allowed_extensions = set(e.lower() for e in (allowed_extensions or []))
+        super().__init__()
+        self.task_id = task_id
+        self.domains = domains
+        self.seed_urls = seed_urls
+        self.allowed_extensions = set(ext.lower().lstrip(".") for ext in allowed_extensions)
         self.max_depth = max_depth
         self.follow_subdomains = follow_subdomains
-        self.url_include = url_include_patterns or []
-        self.url_exclude = url_exclude_patterns or []
 
-    def start_requests(self):
-        for domain in self.allowed_domains:
-            yield scrapy.Request(f"https://{domain}", callback=self.parse)
+    async def start(self):
+        """生成初始请求（Scrapy 2.16+ async start API）"""
+        urls = self.seed_urls if self.seed_urls else tuple(f"https://{d}" for d in self.domains)
+        for url in urls:
+            yield scrapy.Request(
+                url=url,
+                callback=self.parse,
+                meta={"depth": 0, "page_title": "", "parent_url": ""},
+            )
 
     def parse(self, response):
         depth = response.meta.get("depth", 0)
@@ -622,6 +655,9 @@ class CrawledFileItem(scrapy.Item):
 ### 5.3 Pipeline 处理链
 
 CrawledFileItem 按顺序流经 6 个 Pipeline，每个职责单一：
+
+> **Scrapy 2.16 注意**：Pipeline 的 `process_item()` 和 `open_spider()` 不再接收 `spider` 参数。
+> `StoragePipeline` 和 `NotificationPipeline` 的 `process_item()` 为 `async` 方法，直接 `await` 异步存储/事件发布操作，无需 `asyncio.new_event_loop()`。
 
 ```
 CrawledFileItem
@@ -884,7 +920,7 @@ FilenameSanitizer 处理以下场景：
 
 | 策略 | 行为 | 示例 |
 |------|------|------|
-| append_hash（默认） | 追加 8 位短哈希 | `Report.pdf` → `Report_a1b2c3d4.pdf` |
+| append_hash（默认） | 追加 8 位短哈希（SHA-256 前 8 位） | `Report.pdf` → `Report_a1b2c3d4.pdf` |
 | append_counter | 追加递增计数器 | `Report.pdf` → `Report (2).pdf` |
 | overwrite | 覆盖同名文件 | `Report.pdf` → `Report.pdf`（覆盖） |
 
@@ -894,63 +930,64 @@ FilenameSanitizer 处理以下场景：
 
 ### 7.1 CrawlerSettings
 
-Crawler 拥有独立配置，通过 Pydantic BaseSettings 管理，支持环境变量覆盖（前缀 `CRAWLER_`）：
+Crawler 拥有独立配置，使用 `@dataclass` + `from_env()` 类方法管理（不使用 Pydantic BaseSettings，保持 core 层零外部依赖），支持环境变量覆盖（前缀 `CRAWLER_`）：
 
 ```python
-class CrawlerSettings(BaseSettings):
+@dataclass
+class CrawlerSettings:
     """爬虫服务全局配置"""
 
     # ── 服务配置 ──
-    host: str = "0.0.0.0"                         # 监听地址
-    port: int = 8900                               # 监听端口
+    host: str = ""                                  # 监听地址（空字符串等价于 0.0.0.0）
+    port: int = 8900                                # 监听端口
 
     # ── 爬取默认参数 ──
-    max_depth: int = 3                             # 最大递归深度
-    max_concurrent_requests: int = 8               # 并发请求数
-    download_delay: float = 1.0                    # 请求间隔（秒）
-    download_timeout: int = 30                     # 下载超时（秒）
-    max_files_per_task: int = 1000                 # 单任务最大文件数
-    max_file_size_mb: int = 2048                   # 单文件大小上限（MB）
-    respect_robots_txt: bool = True                # 遵守 robots.txt
-    retry_times: int = 3                           # 重试次数
-    retry_http_codes: list[int] = [500, 502, 503, 504, 408, 429]
+    max_depth: int = 3                              # 最大递归深度
+    max_concurrent_requests: int = 8                # 并发请求数
+    download_delay: float = 1.0                     # 请求间隔（秒）
+    download_timeout: int = 30                      # 下载超时（秒）
+    max_files_per_task: int = 1000                  # 单任务最大文件数
+    max_file_size_mb: int = 2048                    # 单文件大小上限（MB）
+    respect_robots_txt: bool = True                 # 遵守 robots.txt
+    retry_times: int = 3                            # 重试次数
+    retry_http_codes: tuple[int, ...] = (500, 502, 503, 504, 408, 429)
 
     # ── 文件格式白名单 ──
-    allowed_extensions: list[str] = [
+    allowed_extensions: tuple[str, ...] = (
         "pdf", "txt", "doc", "docx", "ppt", "pptx",
         "xls", "xlsx", "csv", "jpeg", "jpg", "png", "gif",
         "md", "markdown", "zip", "tar", "gz", "bz2",
-    ]
+    )
 
     # ── 命名配置 ──
-    max_filename_length: int = 200                 # 文件名最大长度
+    max_filename_length: int = 200                  # 文件名最大长度
     filename_conflict_strategy: str = "append_hash"  # 冲突策略
 
     # ── 存储配置 ──
-    storage_backend: str = "minio"                 # minio | local
-    minio_endpoint: str = "localhost:9000"          # MinIO 端点
-    minio_access_key: str = ""                      # MinIO access key
-    minio_secret_key: str = ""                      # MinIO secret key
-    minio_bucket_prefix: str = "sisys"             # bucket 前缀
-    minio_secure: bool = False                      # 是否使用 HTTPS
-    local_output_dir: str = "./crawl_output"        # 本地输出目录
+    storage_backend: str = "minio"                  # minio | local
+    minio_endpoint: str = "localhost:9000"           # MinIO 端点
+    minio_access_key: str = ""                       # MinIO access key
+    minio_secret_key: str = ""                       # MinIO secret key
+    minio_bucket_prefix: str = "sisys"              # bucket 前缀
+    minio_secure: bool = False                       # 是否使用 HTTPS
+    local_output_dir: str = "./crawl_output"         # 本地输出目录
 
     # ── RabbitMQ 配置 ──
-    rabbitmq_url: str = "amqp://localhost:5672"       # RabbitMQ 连接 URL
-    rabbitmq_exchange: str = "sisys.events"         # 事件 exchange
+    rabbitmq_host: str = "localhost"
+    rabbitmq_port: int = 5672
+    rabbitmq_exchange: str = "sisys.events"
 
-    model_config = SettingsConfigDict(
-        env_prefix="CRAWLER_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-    )
+    @classmethod
+    def from_env(cls) -> CrawlerSettings:
+        """从环境变量加载配置（前缀 CRAWLER_）"""
+        ...
 ```
 
 ### 7.2 环境变量示例
 
 ```bash
 # .env.crawler
-CRAWLER_HOST=0.0.0.0
+CRAWLER_HOST=
 CRAWLER_PORT=8900
 CRAWLER_MAX_DEPTH=3
 CRAWLER_MAX_CONCURRENT_REQUESTS=8
@@ -959,7 +996,8 @@ CRAWLER_STORAGE_BACKEND=minio
 CRAWLER_MINIO_ENDPOINT=localhost:9000
 CRAWLER_MINIO_ACCESS_KEY=<your-access-key>
 CRAWLER_MINIO_SECRET_KEY=<your-secret-key>
-CRAWLER_RABBITMQ_URL=amqp://localhost:5672
+CRAWLER_RABBITMQ_HOST=localhost
+CRAWLER_RABBITMQ_PORT=5672
 ```
 
 ### 7.3 任务配置（YAML）
@@ -1034,16 +1072,19 @@ curl -X POST http://localhost:8900/tasks -d @config/tasks/example_task.yaml
 开发调试和一次性爬取的首选方式，零外部依赖（MinIO/RabbitMQ 均可选）：
 
 ```bash
-# 基础用法 — 爬取指定域名，文件存到本地
+# 基础用法 — 爬取指定域名，文件存到本地（默认遵守 robots.txt）
 poetry run crawler crawl -d example.com -o ./crawl_output
 
 # 高级用法 — 指定文件格式、深度、种子 URL
 poetry run crawler crawl \
     -d example.com \
-    --seed-urls "https://example.com/resources" \
+    -s "https://example.com/resources" \
     --formats pdf,docx,xlsx \
     --depth 5 \
     --output ./reports
+
+# 忽略 robots.txt（需显式指定）
+poetry run crawler crawl -d example.com --formats pdf --no-obey-robots
 
 # 从任务配置文件启动
 poetry run crawler crawl --task config/tasks/example_task.yaml
@@ -1335,15 +1376,19 @@ P6 (事件配置)  ──┘
 # 1. 安装依赖
 poetry install
 
-# 2. 本地爬取测试
-poetry run crawler crawl -d example.com -o ./test_output --formats pdf,txt --depth 2
+# 2. 本地爬取测试（已验证：成功爬取 243 个文件，2.9GB）
+poetry run crawler crawl -d www.huawei.com -s https://www.huawei.com/cn/ -o ./test_output --formats pdf,txt --depth 1
 
 # 3. 验证输出
 ls -la ./test_output/
-# 预期：文件已按智能命名规则存储
+# 预期：文件已按智能命名规则存储，中文标题正确提取
 
 # 4. 验证命名策略
 # 预期：优先使用元数据标题，次用页面标题，最后用 URL 推导或哈希
+# 冲突时自动追加 SHA-256 前 8 位：探索智能世界 - 华为_ac4f30cf.pdf
+
+# 5. 忽略 robots.txt（需显式指定）
+poetry run crawler crawl -d example.com --formats pdf --no-obey-robots
 ```
 
 ### 13.2 服务模式验证
