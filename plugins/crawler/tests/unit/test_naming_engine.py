@@ -116,3 +116,35 @@ class TestSmartNamingEngine:
             file_extension="pdf",
         )
         assert "张三" in result.filename
+
+    def test_content_title_below_metadata_title(self) -> None:
+        """content_title 应低于 metadata_title"""
+        result = self.engine.generate_name(
+            metadata_title="元数据标题",
+            content_title="内容标题",
+            url="https://example.com/file.pdf",
+            file_extension="pdf",
+        )
+        assert result.strategy_name == "metadata_title"
+        assert "元数据标题" in result.filename
+
+    def test_content_title_above_page_title(self) -> None:
+        """content_title 应高于 page_title"""
+        result = self.engine.generate_name(
+            content_title="内容标题",
+            page_title="页面标题",
+            url="https://example.com/file.pdf",
+            file_extension="pdf",
+        )
+        assert result.strategy_name == "content_title"
+        assert "内容标题" in result.filename
+
+    def test_content_title_empty_falls_to_page(self) -> None:
+        """content_title 为空时应降级到 page_title"""
+        result = self.engine.generate_name(
+            content_title="",
+            page_title="页面标题",
+            url="https://example.com/file.pdf",
+            file_extension="pdf",
+        )
+        assert result.strategy_name == "page_title"
