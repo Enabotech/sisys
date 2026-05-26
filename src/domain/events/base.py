@@ -2,13 +2,6 @@
 
 领域事件仅使用 Python 标准库类型（dataclasses, uuid, datetime）
 Pydantic 仅在应用层/基础设施层边界用于序列化和验证
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

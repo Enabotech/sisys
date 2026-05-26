@@ -1,13 +1,6 @@
 """RabbitMQ 事件发布实现模块
 
 将爬取事件发布到 RabbitMQ 消息队列
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """领域层审计日志实体模块
 
 定义审计日志领域实体，仅依赖标准库，无外部 ORM 框架
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

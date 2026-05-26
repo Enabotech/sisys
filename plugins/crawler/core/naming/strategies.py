@@ -3,13 +3,6 @@
 定义 6 个纯函数命名策略，无副作用
 优先级：metadata_title(0.95) > content_title(0.90) > page_title(0.80) > link_text(0.65) > url_derived(0.45) > content_hash(0.10)
 零外部依赖，仅使用标准库
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

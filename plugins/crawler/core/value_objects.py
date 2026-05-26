@@ -2,13 +2,6 @@
 
 定义爬虫核心值对象：CrawlStatus（枚举）、NamingCandidate（命名候选）、FileMetadata（文件元数据）
 零外部依赖，仅使用标准库
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

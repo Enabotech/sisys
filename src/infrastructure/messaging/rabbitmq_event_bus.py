@@ -2,13 +2,6 @@
 
 基于 Outbox 模式实现可靠事件传输，事件先持久化到发件箱再异步发布到
 RabbitMQ，保证消息不丢失
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

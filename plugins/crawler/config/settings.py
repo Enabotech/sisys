@@ -1,13 +1,6 @@
 """爬虫服务全局配置模块
 
 使用 dataclass + from_env() 模式，不依赖 Pydantic
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

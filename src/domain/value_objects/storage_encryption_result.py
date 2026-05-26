@@ -1,13 +1,6 @@
 """领域层存储加密结果值对象
 
 定义存储加密服务返回的结果类型，用于等保2.0三级数据保密性
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

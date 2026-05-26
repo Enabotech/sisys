@@ -3,13 +3,6 @@
 验证 PrefectEngine 事件发布补全、双引擎对称性、通道注册等业务价值验收
 
 Run with: poetry run pytest tests/acceptance/test_acceptance_workflow-agent-integration.py -v
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

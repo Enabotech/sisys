@@ -1,12 +1,4 @@
-"""应用层包
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
-"""
+"""应用层包"""
 
 from src.application.use_cases.text_processing.l1_compressor import L1Compressor
 from src.application.use_cases.text_processing.l1_text_extractor import L1TextExtractor

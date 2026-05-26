@@ -1,13 +1,6 @@
 """基础设施层记忆文件存储模块
 
 实现 MemoryFilePort 接口，组合 FileMemoryAdapter 并添加 MEMORY.md 索引管理语义
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

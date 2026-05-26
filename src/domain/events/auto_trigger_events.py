@@ -1,13 +1,6 @@
 """领域层 自动触发事件模块
 
 定义自动触发机制从领域/心跳事件提取上下文后触发的事件
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """基础设施层自动路由配置模块
 
 提供自动路由机制的配置，支持哈希/语义/混合路由策略
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

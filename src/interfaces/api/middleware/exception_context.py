@@ -1,13 +1,6 @@
 """SISYS 接口层请求上下文注入中间件模块
 
 为每个请求注入唯一追踪 ID，便于日志和异常追踪
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

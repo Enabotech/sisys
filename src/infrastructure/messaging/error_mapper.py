@@ -2,13 +2,6 @@
 
 将外部 SDK 错误（MinIO、RabbitMQ、Redis）标准化映射为领域异常，
 优先使用类型匹配（isinstance）和错误码属性直接映射
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

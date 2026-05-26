@@ -6,13 +6,6 @@
 - WARM: 访问频率 10-99/周
 - COLD: 访问频率 1-9/周
 - FROZEN: 访问频率 = 0 或 Checkpoint
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

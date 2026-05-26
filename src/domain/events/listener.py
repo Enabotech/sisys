@@ -2,13 +2,6 @@
 
 协议定义已迁移至 src.domain.ports.event_listener 和 src.domain.ports.dead_letter_queue
 具体实现已迁移至 src.infrastructure.messaging.inmemory_event_listener 和 inmemory_dead_letter_queue
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

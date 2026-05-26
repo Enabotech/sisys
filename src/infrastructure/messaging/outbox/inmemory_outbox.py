@@ -2,13 +2,6 @@
 
 MVP 阶段使用内存列表存储 OutboxEntity，公开方法实现领域层接口（同步、无锁），
 内部异步方法使用 asyncio.Lock 保护。生产环境应替换为 PostgreSQL 实现
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

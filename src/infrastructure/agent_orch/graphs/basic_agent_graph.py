@@ -1,13 +1,6 @@
 """基础设施层 BasicAgent 状态图构建模块
 
 从 schemas 导入状态定义，从 nodes 导入节点函数，构建 StateGraph
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

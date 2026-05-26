@@ -1,13 +1,6 @@
 """基础设施层密码验证服务模块
 
 基于等保 2.0 三级要求实现密码复杂度验证功能
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

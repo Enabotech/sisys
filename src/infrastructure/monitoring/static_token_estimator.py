@@ -5,13 +5,6 @@ MVP 阶段使用静态估算策略：
 - 云端模型：prompt=512, completion=1024
 
 注意：此估算器返回固定值而非实际 LLM API 数据，使用时日志会输出 WARNING
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

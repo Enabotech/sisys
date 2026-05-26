@@ -1,13 +1,6 @@
 """格式检测 Pipeline 模块
 
 基于扩展名和 MIME 类型检测文件格式
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

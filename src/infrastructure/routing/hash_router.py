@@ -1,13 +1,6 @@
 """基础设施层一致性哈希路由模块
 
 基于 FNV-1a 哈希算法实现会话级别的一致性路由，支持虚拟节点和加权分配
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

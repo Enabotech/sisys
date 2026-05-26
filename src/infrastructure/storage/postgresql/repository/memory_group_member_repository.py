@@ -7,13 +7,6 @@ L2 群组成员关系持久化实现，使用 SQLAlchemy AsyncSession
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
 - 无需构造器注入 session 参数
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

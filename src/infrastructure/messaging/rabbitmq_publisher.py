@@ -2,13 +2,6 @@
 
 基于 aio-pika connect_robust 实现自动重连的异步消息发布，
 支持消息持久化和重试计数头信息
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

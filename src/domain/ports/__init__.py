@@ -2,13 +2,6 @@
 
 定义领域层与基础设施层之间的契约接口（Protocol），
 遵循六边形架构：领域层零外部依赖
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 # Deprecated ports - not registered, not for new use

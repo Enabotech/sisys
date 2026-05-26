@@ -2,13 +2,6 @@
 
 基于 BackupRecoveryServicePort 接口实现 PostgreSQL/MinIO/Redis 备份、恢复和完整性验证
 用于等保2.0三级备份恢复合规
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """基础设施层 UDMR 静态路由策略模块
 
 云端优先静态路由策略：合规通过时选择云端，合规不通过或云端不可用时回退本地
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """Integration tests for UDMR basic routing.
 
 端到端验证 UDMR 管线：AutoRouted → UDMRHandler → UDMRService → RoutingDecided
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

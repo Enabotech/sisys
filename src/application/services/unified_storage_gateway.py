@@ -7,13 +7,6 @@
 - 本类是应用层服务
 - 依赖 Domain Port 接口，不直接依赖 Infrastructure
 - 工厂由外部注入，遵循依赖倒置原则
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

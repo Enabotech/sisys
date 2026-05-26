@@ -1,13 +1,6 @@
 """基础设施层指标聚合器模块
 
 统一收集事件指标和业务指标，输出 Prometheus 文本格式
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

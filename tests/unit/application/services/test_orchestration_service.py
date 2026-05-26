@@ -1,13 +1,6 @@
 """OrchestrationService 单元测试
 
 验证路由逻辑、WorkflowEnginePort/AgentEnginePort 委托、WorkflowResult 创建
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

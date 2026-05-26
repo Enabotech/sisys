@@ -1,13 +1,6 @@
 """基础设施层内存死信队列模块
 
 从 domain 层迁移而来的 MVP 实现，仅用于测试和开发
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

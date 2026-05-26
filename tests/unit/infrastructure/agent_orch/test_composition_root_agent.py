@@ -1,13 +1,6 @@
 """Composition Root Agent 引擎注册验证测试
 
 验证 agent_engine 端口注册链路、OrchestrationService 双引擎注入
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

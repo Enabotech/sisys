@@ -1,13 +1,6 @@
 """基础设施层 LangGraph 配置模块
 
 LangGraphConfig 使用 frozen dataclass + from_env() 模式管理 LangGraph 连接参数
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

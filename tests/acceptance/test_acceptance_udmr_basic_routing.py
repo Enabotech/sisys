@@ -3,13 +3,6 @@
 BDD 步骤实现，使用 mock 隔离外部依赖
 
 Run with: poetry run pytest tests/acceptance/test_acceptance_udmr-basic-routing.py -v
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

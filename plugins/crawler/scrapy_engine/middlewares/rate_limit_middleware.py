@@ -1,13 +1,6 @@
 """速率限制中间件模块
 
 域名级别令牌桶限速
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

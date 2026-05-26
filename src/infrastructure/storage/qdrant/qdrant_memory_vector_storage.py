@@ -1,13 +1,6 @@
 """基础设施层 Qdrant 记忆向量存储模块
 
 实现 MemoryVectorPort 接口，组合 QdrantAdapter 并添加记忆向量索引和语义检索语义
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

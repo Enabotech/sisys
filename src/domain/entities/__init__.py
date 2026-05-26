@@ -1,13 +1,6 @@
 """领域实体包
 
 提供领域层核心实体定义，遵循六边形架构零依赖原则
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from .agent import Agent

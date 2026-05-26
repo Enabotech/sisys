@@ -1,13 +1,6 @@
 """基础设施层 Agent 编排 Schema 模块
 
 定义 LangGraph 状态图的状态 TypedDict，供 Engine 和 Graph 共享
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

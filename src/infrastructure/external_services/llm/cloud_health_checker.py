@@ -1,13 +1,6 @@
 """基础设施层云端模型健康检查模块
 
 检查云端 LLM API 可用性，实现 HealthCheckPort
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

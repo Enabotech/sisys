@@ -1,13 +1,6 @@
 """领域层检查点快照仓储协议模块
 
 定义检查点快照存储适配器的接口协议，基础设施层负责持久化实现
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

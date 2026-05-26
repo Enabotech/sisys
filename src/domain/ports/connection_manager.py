@@ -2,13 +2,6 @@
 
 定义所有异步存储连接管理器（PostgreSQL、Qdrant、Neo4j、Redis）
 的统一契约。每个管理器拥有连接池，提供健康检查与优雅关闭
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

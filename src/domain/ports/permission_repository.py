@@ -2,13 +2,6 @@
 
 独立 Protocol（与 UserRepositoryPort、RoleRepositoryPort 模式一致）
 仓储通过 PostgreSQLAdapter 自动实现 L2RdbPort
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """基础设施层 Neo4j 客户端管理模块
 
 提供 Neo4j 异步驱动的构造函数注入、健康检查和优雅关闭功能
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

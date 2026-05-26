@@ -1,13 +1,6 @@
 """基础设施层 Redis 事件订阅模块
 
 用于 Redis Pub/Sub 实时通知通道的订阅端，支持多频道订阅、事件反序列化和优雅关闭
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -5,13 +5,6 @@
 - 云端模型估算: prompt=512, completion=1024
 - 路由类型不区分大小写
 - 未知路由类型默认使用云端估算
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

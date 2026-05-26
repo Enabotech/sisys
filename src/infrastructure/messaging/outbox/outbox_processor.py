@@ -2,13 +2,6 @@
 
 异步协程定期轮询 Outbox，将 pending 状态的事件发布至 RabbitMQ，
 使用 asyncio.Semaphore 控制并发
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

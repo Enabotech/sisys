@@ -2,13 +2,6 @@
 
 定义领域异常层次结构根类 BaseException，仅使用 Python 标准库，
 HTTP 状态码等 Web 层关注点由接口层异常处理器负责映射
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

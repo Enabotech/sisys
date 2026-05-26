@@ -2,13 +2,6 @@
 
 定义爬虫核心实体：CrawlTask（任务）、CrawledFile（爬取文件）、CrawlResult（结果）
 零外部依赖，仅使用标准库
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -2,13 +2,6 @@
 
 包装 MinIORepository，实现 L4ObjectPort 接口。薄适配器层，仅做接口转换，
 所有方法委托给内部仓储实例
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

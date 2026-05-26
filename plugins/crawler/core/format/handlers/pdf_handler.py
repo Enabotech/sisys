@@ -1,13 +1,6 @@
 """PDF 格式处理器模块
 
-使用 pypdf2 提取 PDF 文件元数据
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
+使用 pypdf 提取 PDF 文件元数据
 """
 
 from __future__ import annotations
@@ -16,7 +9,7 @@ from plugins.crawler.core.value_objects import FileMetadata
 
 
 class PdfFormatHandler:
-    """PDF 格式处理器 — 使用 pypdf2 提取元数据"""
+    """PDF 格式处理器 — 使用 pypdf 提取元数据"""
 
     EXTENSIONS: tuple[str, ...] = ("pdf",)
     MIME_TYPES: tuple[str, ...] = ("application/pdf",)

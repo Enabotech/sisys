@@ -4,13 +4,6 @@
 1. P0-29: subscribe() 传递 event_type 而非 Redis channel 名（频道名不匹配）
 2. P0-30: subscribe_async() 调用不存在的方法（AttributeError）
 3. P0-31: handler 收到 dict 而非 DomainEvent（缺少 from_dict 反序列化）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -2,13 +2,6 @@
 
 按优先级链生成多个候选名称，选择置信度最高者，处理冲突
 零外部依赖，仅使用标准库
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

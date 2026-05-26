@@ -1,13 +1,6 @@
 """应用层记忆图端口模块
 
 继承 L5GraphPort，添加记忆关系语义
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

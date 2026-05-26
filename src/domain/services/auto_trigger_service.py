@@ -5,13 +5,6 @@ AutoTriggerService 是处理领域事件/心跳事件并发出 AutoTriggered 事
 提取会话 ID 和任务上下文，发布 AutoTriggered 事件给下游路由阶段
 
 架构：领域层（无外部依赖），通过端口/协议实现事件发布
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

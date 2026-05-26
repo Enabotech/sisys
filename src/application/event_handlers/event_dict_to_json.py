@@ -3,13 +3,6 @@
 使用 Pydantic TypeAdapter 完成 dict ↔ JSON 边界转换
 领域层事件使用 dataclasses.asdict() / DomainEvent.from_dict()，
 本适配器处理应用层边界的 JSON 字符串转换
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

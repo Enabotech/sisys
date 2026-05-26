@@ -1,13 +1,6 @@
 """领域层会话状态存储协议模块
 
 定义会话状态存储的接口，基础设施层负责实现（如 Redis 实现）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

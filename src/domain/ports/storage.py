@@ -2,13 +2,6 @@
 
 已废弃：请使用 L4ObjectPort（src.domain.ports.l4_object）
 本文件仅保留向后兼容
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

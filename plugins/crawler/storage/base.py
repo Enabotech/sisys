@@ -1,13 +1,6 @@
 """存储抽象端口模块
 
 定义 StoragePort 协议，抽象文件存储行为
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

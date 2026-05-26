@@ -1,13 +1,6 @@
 """应用层记忆缓存端口模块
 
 继承 L1CachePort，添加记忆领域特定的语义方法
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

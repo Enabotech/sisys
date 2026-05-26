@@ -1,13 +1,6 @@
 """基础设施层 UDMR 配置模块
 
 提供统一动态模型路由（UDMR）的配置，包括本地模型和多云端模型配置
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -6,13 +6,6 @@
 - src/domain/ports/audit_service.py → AuditError
 - src/domain/ports/password_validation_service.py → PasswordValidationError
 - src/domain/ports/storage.py → ComplianceLockError
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

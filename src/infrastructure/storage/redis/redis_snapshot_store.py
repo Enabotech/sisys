@@ -2,13 +2,6 @@
 
 基于 RedisAdapter 实现检查点快照仓储端口，
 支持 TTL 过期和主从复制
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

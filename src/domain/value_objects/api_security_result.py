@@ -1,13 +1,6 @@
 """领域层 API 安全结果值对象
 
 定义 API 安全服务返回的结果类型，用于等保2.0三级接口安全
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

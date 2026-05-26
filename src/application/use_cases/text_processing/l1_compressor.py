@@ -5,13 +5,6 @@
 - >200 字：LLM 压缩至约 150 字
 
 目标：压缩率≥70%，延迟 P95<20ms
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

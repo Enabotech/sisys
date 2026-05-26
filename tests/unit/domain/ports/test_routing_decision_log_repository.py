@@ -4,13 +4,6 @@
 - 按时间范围查询成本摘要
 - 按 route_type 过滤
 - 空结果返回零值摘要
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

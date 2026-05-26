@@ -1,13 +1,6 @@
 """应用层文本提取服务端口模块
 
 用于依赖倒置：MemoryService 通过此协议注入 L1TextExtractor 实现
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

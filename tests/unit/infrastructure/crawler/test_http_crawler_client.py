@@ -1,13 +1,6 @@
 """单元测试：HTTP Crawler 客户端适配器
 
 测试 HttpCrawlerClient 的各方法，使用 httpx mock 进行 HTTP 请求模拟
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

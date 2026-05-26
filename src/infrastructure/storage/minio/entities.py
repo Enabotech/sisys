@@ -1,13 +1,6 @@
 """基础设施层 MinIO 对象存储实体模块
 
 定义 ObjectMetadata 和 LifecycleRule 等存储结构体，位于基础设施层（非领域层）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

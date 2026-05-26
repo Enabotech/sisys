@@ -1,13 +1,6 @@
 """基础设施层黑板条目数据模型模块
 
 定义公共黑板的存储实体结构
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

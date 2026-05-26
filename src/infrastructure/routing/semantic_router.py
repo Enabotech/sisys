@@ -1,13 +1,6 @@
 """基础设施层语义路由模块
 
 基于 bge-m3 向量嵌入实现语义相似度路由，将任务上下文与候选目标进行最佳匹配
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

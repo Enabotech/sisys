@@ -2,13 +2,6 @@
 
 定义 Token 消耗值对象，用于记录单次 LLM 调用的 Token 消耗量
 不变量：total_tokens == prompt_tokens + completion_tokens
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

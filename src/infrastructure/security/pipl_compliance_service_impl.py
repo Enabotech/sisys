@@ -1,13 +1,6 @@
 """基础设施层 PIPL 合规服务模块
 
 基于 PIPLComplianceServicePort 接口实现个人信息保护法合规记录管理和数据主体权利响应
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

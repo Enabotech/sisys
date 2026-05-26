@@ -2,13 +2,6 @@
 
 验证 Token 消耗值对象的不变量约束：total_tokens == prompt_tokens + completion_tokens，
 所有字段非负，frozen dataclass 不可变
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

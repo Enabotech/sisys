@@ -6,13 +6,6 @@
 - src/domain/services/memory_service.py → MemoryVersionConflictError, MemoryNotFoundError
 - src/infrastructure/storage/minio/bucket_manager.py → BucketNameValidationError
 - src/infrastructure/storage/minio/minio_manager.py → BucketNotFoundError, MinIOConnectionError
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

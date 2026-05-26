@@ -4,13 +4,6 @@
 
 异常来源：
 - src/infrastructure/security/permission_middleware.py → InsufficientTokenError
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

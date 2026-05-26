@@ -2,13 +2,6 @@
 
 包装 QdrantVectorStorage，实现 L3VectorPort 接口。薄适配器层，仅做接口转换，
 points 参数使用 list[dict]，内部转换为 VectorPoint
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

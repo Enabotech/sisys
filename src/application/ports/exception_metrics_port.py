@@ -2,13 +2,6 @@
 
 六边形架构：应用层定义端口，基础设施层实现端口
 接口层通过此端口记录异常指标，不能直接导入 infrastructure
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

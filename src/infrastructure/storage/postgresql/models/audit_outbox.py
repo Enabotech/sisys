@@ -2,13 +2,6 @@
 
 定义审计发件箱的 SQLAlchemy ORM 模型，对应 audit_outbox 表
 遵循事务发件箱模式（ADR-003）实现可靠异步发布
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

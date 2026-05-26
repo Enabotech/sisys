@@ -1,13 +1,6 @@
 """基础设施层会话命名空间管理器模块
 
 管理会话到命名空间的映射和资源限制，确保相同会话的任务在同一命名空间中运行
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

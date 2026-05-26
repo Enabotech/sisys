@@ -6,13 +6,6 @@
 
 注意：使用 str | None 类型定义算法，避免引入 infrastructure 层依赖
 实现内部将字符串转换为 HashAlgorithm enum
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -11,13 +11,6 @@
 - MFAChallengeIssuedEvent: 多因素认证挑战
 - IntrusionDetectedEvent: 安全入侵检测
 - DataIntegrityViolationEvent: 数据完整性违规检测
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

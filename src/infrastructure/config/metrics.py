@@ -1,13 +1,6 @@
 """基础设施层指标端点配置模块
 
 提供 Prometheus /metrics HTTP 端点配置，支持 K8s 动态扩缩容
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

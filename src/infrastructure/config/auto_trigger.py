@@ -1,13 +1,6 @@
 """基础设施层自动触发配置模块
 
 提供自动触发机制的配置，包括心跳间隔和最大重试次数
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

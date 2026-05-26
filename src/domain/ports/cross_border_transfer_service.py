@@ -1,13 +1,6 @@
 """领域层跨境数据传输服务端口模块
 
 定义跨境数据传输服务的端口接口，遵循六边形架构：仅依赖 Protocol 和 Python 标准库
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

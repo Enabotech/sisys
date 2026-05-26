@@ -1,13 +1,6 @@
 """领域层 发布结果类型模块
 
 定义事件发布操作的通道无关结果类型，领域层不感知具体传输技术
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

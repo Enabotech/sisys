@@ -1,13 +1,6 @@
 """领域层 PIPL 合规记录实体模块
 
 定义个人信息保护法合规记录领域实体，遵循六边形架构：领域层零依赖
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

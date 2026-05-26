@@ -2,13 +2,6 @@
 
 实现 MemoryGraphPort 接口，组合 Neo4jAdapter 并添加记忆关系语义：
 实体关系提取和知识图谱查询
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

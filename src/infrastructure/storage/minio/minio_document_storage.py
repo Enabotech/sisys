@@ -2,13 +2,6 @@
 
 实现 DocumentStoragePort 接口，组合 MinIOAdapter 并添加文档业务语义：
 自动路径生成、用户文档列表和元数据管理
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

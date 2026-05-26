@@ -1,13 +1,6 @@
 """领域层 UDMR 三层决策服务模块
 
 执行 UDMR 路由决策：L1 合规检查 → 静态路由策略 → 日志持久化 → 事件发布
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

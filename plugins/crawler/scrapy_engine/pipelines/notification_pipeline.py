@@ -1,13 +1,6 @@
 """通知 Pipeline 模块
 
 发布文件爬取完成事件
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

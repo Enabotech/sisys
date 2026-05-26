@@ -1,13 +1,6 @@
 """基础设施层 Redis 键构建器模块
 
 统一的 Redis 键构建器，确保所有键使用一致的命名空间格式
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

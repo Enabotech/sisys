@@ -2,13 +2,6 @@
 
 基于 RedisAdapter 实现会话缓存端口，
 支持会话专用 HSET/HGET 操作
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

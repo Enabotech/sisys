@@ -2,13 +2,6 @@
 
 基于内存的事件总线实现，支持幂等性去重和异步事件分发，
 适用于测试和 MVP 阶段
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

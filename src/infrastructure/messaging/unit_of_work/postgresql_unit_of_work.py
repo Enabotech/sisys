@@ -3,13 +3,6 @@
 基于 SQLAlchemy AsyncSession 实现工作单元模式，管理事务的生命周期
 Session 通过 ContextVar 由 middleware 或 test fixture 提供，
 无需构造器注入 session 参数
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

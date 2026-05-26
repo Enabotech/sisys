@@ -2,13 +2,6 @@
 
 提供六边形架构下所有端口契约的统一注册管理
 端口注册时附带元数据（名称、版本、接口、实现、模块）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

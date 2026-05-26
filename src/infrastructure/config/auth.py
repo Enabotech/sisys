@@ -1,13 +1,6 @@
 """基础设施层认证配置模块
 
 提供 JWT 认证和授权配置，用于 RBAC 权限管理系统
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

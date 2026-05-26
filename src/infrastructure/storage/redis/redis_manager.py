@@ -2,13 +2,6 @@
 
 集中管理 Redis 异步连接池生命周期，所有 Redis 组件
 应通过此管理器获取客户端而非自建连接池
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

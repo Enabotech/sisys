@@ -1,13 +1,6 @@
 """基础设施层会话中间件模块
 
 提供 ASGI 中间件，在每个请求中管理 AsyncSession 的生命周期
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

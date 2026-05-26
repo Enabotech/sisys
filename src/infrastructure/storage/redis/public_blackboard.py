@@ -2,13 +2,6 @@
 
 实现 PublicBlackboard 接口，使用 Redis Sorted Set 存储黑板内容，按时间戳排序
 支持 MVCC（多版本并发控制），每次写入自动递增版本号
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

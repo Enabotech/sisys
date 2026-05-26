@@ -2,13 +2,6 @@
 
 基于 aio-pika 实现异步事件消费，使用手动 ACK/NACK 策略，
 失败时通过 RedisRetryQueue 进行延迟重试，超过最大重试次数后进入死信队列
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

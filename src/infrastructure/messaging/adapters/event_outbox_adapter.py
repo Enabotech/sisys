@@ -2,13 +2,6 @@
 
 负责领域事件与发件箱实体之间的双向转换
 事件类型注册统一使用 DomainEvent._registry（单一真实来源）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

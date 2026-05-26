@@ -1,13 +1,6 @@
 """Office 文档格式处理器模块
 
 使用 python-docx / python-pptx / openpyxl 提取 DOCX/PPTX/XLSX 元数据
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

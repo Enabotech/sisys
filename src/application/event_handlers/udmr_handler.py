@@ -1,13 +1,6 @@
 """应用层 UDMR 事件处理器模块
 
 处理 AutoRouted 事件，调用 UDMRService.decide() 发布 RoutingDecided 事件
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

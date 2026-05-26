@@ -1,13 +1,6 @@
 """领域层外部服务异常模块
 
 第三方服务错误，如超时、服务不可用等
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

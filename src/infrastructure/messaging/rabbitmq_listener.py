@@ -2,13 +2,6 @@
 
 实现 EventListenerAsync 接口，用于异步消费 RabbitMQ 消息，
 集成幂等性检查、延迟重试队列和死信队列
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

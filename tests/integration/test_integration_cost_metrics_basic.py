@@ -1,13 +1,6 @@
 """Cost Metrics 集成测试.
 
 端到端验证成本度量管线：RoutingDecided → CostMetricsListener → CostCalculator → Prometheus 指标
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

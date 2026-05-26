@@ -1,13 +1,6 @@
 """文本文件格式处理器模块
 
 提取 TXT/CSV/Markdown 首行作为标题
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

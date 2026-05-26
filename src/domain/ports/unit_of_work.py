@@ -2,13 +2,6 @@
 
 用于统一事务边界，保证业务操作与 Outbox 写入原子性
 仅定义抽象接口，无外部依赖
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -2,13 +2,6 @@
 
 包装 Neo4jGraphStorage，实现 L5GraphPort 接口。使用 memory_id 作为实体主键，
 高级语义方法通过 Cypher MERGE 实现
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

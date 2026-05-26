@@ -1,13 +1,6 @@
 """基础设施层事件指标与 OpenTelemetry 跟踪模块
 
 提供事件处理指标收集器和 OpenTelemetry Trace 包装器实现
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -2,13 +2,6 @@
 
 使用 Redis ZSET 实现延迟重试调度，失败事件以重试时间戳为 score 入队，
 轮询器检查到期事件进行重试，避免 nack(requeue=True) 造成的消息饥饿
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

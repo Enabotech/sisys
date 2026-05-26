@@ -1,13 +1,6 @@
 """领域层工作流引擎端口模块
 
 WorkflowEnginePort Protocol 定义工作流执行抽象，支持 Prefect/LangGraph 等引擎替换
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """基础设施层自动执行配置模块
 
 提供自动执行机制的配置，包括沙箱类型、快照 TTL 和资源限制
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

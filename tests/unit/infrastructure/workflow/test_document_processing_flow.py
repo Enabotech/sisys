@@ -3,13 +3,6 @@
 验证 Prefect flow 定义、任务配置、事件发布逻辑
 
 使用 task.fn() 测试任务底层函数，不启动真实 Prefect server
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

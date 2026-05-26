@@ -1,12 +1,4 @@
-"""Unit tests for UDMRService.
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
-"""
+"""Unit tests for UDMRService."""
 
 from __future__ import annotations
 

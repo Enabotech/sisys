@@ -6,13 +6,6 @@
 - append-only（历史记录不可删除/修改）
 - delete 操作本身会作为新条目记录（change_type='delete'）
 - 使用 UUID 外键（memory_id）引用 MemoryMetadata.memory_id
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

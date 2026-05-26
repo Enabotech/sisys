@@ -7,13 +7,6 @@
 - detect_attack(): 检测攻击类型，返回检测结果
 - get_intrusion_stats(): 获取入侵统计数据
 - block_ip(): 封禁恶意 IP
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

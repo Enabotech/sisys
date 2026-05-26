@@ -1,13 +1,6 @@
 """基础设施层 Agent 节点函数模块
 
 纯函数节点实现，不持有状态，不发布事件
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -2,13 +2,6 @@
 
 提供 FastAPI 应用实例创建，包含 lifecycle 管理，
 在 startup/shutdown 事件中管理后台轮询器生命周期
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

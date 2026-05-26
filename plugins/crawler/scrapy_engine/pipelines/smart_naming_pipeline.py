@@ -1,13 +1,6 @@
 """智能命名 Pipeline 模块
 
 使用 SmartNamingEngine 为文件生成智能名称
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

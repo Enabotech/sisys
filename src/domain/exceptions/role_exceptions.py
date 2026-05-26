@@ -1,13 +1,6 @@
 """领域层角色管理异常模块
 
 定义角色管理相关的领域异常，包括角色已存在、角色不存在、不能删除系统保留角色等
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

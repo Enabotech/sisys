@@ -6,13 +6,6 @@ ContextVar 传递规则（详见 docs/developer/session-management.md）：
 - R1: 标准 CRUD 仓储和 UoW 通过 get_session() 获取 session
 - R2: 需要特殊隔离级别时使用构造函数注入 PostgreSQLManager（如 AuditUnitOfWork）
 - R3: 后台任务使用 session_context() 创建独立 scope
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

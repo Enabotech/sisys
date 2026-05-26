@@ -1,13 +1,6 @@
 """Scrapy 引擎默认设置模块
 
 定义 Scrapy 爬虫的默认配置
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

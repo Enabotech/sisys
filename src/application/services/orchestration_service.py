@@ -1,13 +1,6 @@
 """应用层编排服务模块
 
 OrchestrationService 统一编排入口，根据 task_type 路由到不同引擎
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

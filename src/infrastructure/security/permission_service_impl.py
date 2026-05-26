@@ -1,13 +1,6 @@
 """基础设施层权限服务模块
 
 基于 PermissionServicePort 接口实现权限检查、角色分配和权限查询功能
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

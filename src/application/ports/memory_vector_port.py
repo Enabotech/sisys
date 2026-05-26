@@ -1,13 +1,6 @@
 """应用层记忆向量端口模块
 
 继承 L3VectorPort，添加记忆检索语义
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

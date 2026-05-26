@@ -1,13 +1,6 @@
 """领域层沙箱执行端口模块
 
 定义沙箱执行适配器的接口协议，基础设施层负责实现（如 DockerSandboxAdapter）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

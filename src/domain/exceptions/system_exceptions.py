@@ -1,13 +1,6 @@
 """领域层系统异常模块
 
 定义系统级基础设施故障异常，包括配置错误、网络故障、存储服务故障、消息总线故障等
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

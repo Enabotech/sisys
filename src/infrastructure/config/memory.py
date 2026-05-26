@@ -1,13 +1,6 @@
 """基础设施层记忆配置模块
 
 提供记忆系统的文件路径、缓存 TTL 和压缩率配置
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

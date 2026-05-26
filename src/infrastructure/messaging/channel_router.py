@@ -2,13 +2,6 @@
 
 根据事件类型将领域事件路由到对应的传输通道（Redis 实时或 RabbitMQ 可靠），
 领域层通过 EventPublisher 接口发布事件，不感知路由细节
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

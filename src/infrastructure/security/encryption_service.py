@@ -1,13 +1,6 @@
 """基础设施层加密服务模块
 
 基于 passlib + bcrypt 提供密码哈希、验证和防御 timing attack 功能
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

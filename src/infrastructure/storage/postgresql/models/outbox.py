@@ -2,13 +2,6 @@
 
 定义事件发件箱的 SQLAlchemy ORM 模型和声明式基类，对应 event_outbox 表
 实现事件可靠异步发布的发件箱模式
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
 """基础设施层 Neo4j 图存储模块
 
 提供 Cypher 查询执行和图遍历功能
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations

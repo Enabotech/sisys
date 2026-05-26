@@ -1,13 +1,6 @@
 """应用层成本度量事件处理器模块
 
 订阅 RoutingDecided 事件，估算 Token 消耗、计算成本、更新日志、记录 Prometheus 指标
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
-
 """
 
 from __future__ import annotations
