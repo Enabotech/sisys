@@ -49,6 +49,24 @@ class CrawlerSettings:
         "tar",
         "gz",
         "bz2",
+        # 视频
+        "mp4",
+        "avi",
+        "mov",
+        "mkv",
+        "webm",
+        "wmv",
+        "flv",
+        "m4v",
+        "3gp",
+        # 音频
+        "mp3",
+        "wav",
+        "ogg",
+        "flac",
+        "aac",
+        "wma",
+        "m4a",
     )
 
     # ── 命名配置 ──

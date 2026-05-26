@@ -26,7 +26,7 @@
 
 ### 1.1 背景
 
-SISYS 是面向企业高管的 AI 驱动战略规划与决策智能平台。平台需要从外部网站爬取文件（pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/zip/tar）作为战略规划的数据输入源
+SISYS 是面向企业高管的 AI 驱动战略规划与决策智能平台。平台需要从外部网站爬取文件（pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/zip/tar/mp4/avi/mov/mkv/webm/wmv/flv/mp3/wav/flac/ogg）作为战略规划的数据输入源
 
 ### 1.2 设计目标
 
@@ -159,11 +159,13 @@ plugins/crawler/
       base.py                              # FileFormatHandler Protocol
       handlers/
         __init__.py
-        pdf_handler.py                     # pypdf2（已有）
+        pdf_handler.py                     # pypdf（已有）
         office_handler.py                  # python-docx（已有）/ python-pptx（新增）/ openpyxl（已有）
         text_handler.py                    # txt/csv/markdown
         image_handler.py                   # jpeg/png/gif — Pillow（已有）
         archive_handler.py                 # zip/tar
+        audio_handler.py                   # mp3/wav/ogg/flac — tinytag
+        video_handler.py                   # mp4/avi/mov/mkv — ffprobe
 
   scrapy_engine/
     __init__.py
@@ -769,11 +771,13 @@ class FileFormatHandlerRegistry:
 
     def register_default_handlers(self) -> None:
         """注册内置默认处理器"""
-        self.register(PdfFormatHandler())       # pypdf2
+        self.register(PdfFormatHandler())       # pypdf
         self.register(OfficeDocHandler())       # python-docx + python-pptx + openpyxl
         self.register(TextFormatHandler())      # txt, csv, markdown
         self.register(ImageFormatHandler())     # jpeg, png, gif (Pillow)
         self.register(ArchiveFormatHandler())   # zip, tar
+        self.register(AudioFormatHandler())     # tinytag
+        self.register(VideoFormatHandler())     # ffprobe
 ```
 
 **扩展新格式**：
@@ -895,7 +899,7 @@ class SmartNamingEngine:
 
 | 格式 | 依赖库 | 提取字段 | 状态 |
 |------|--------|----------|------|
-| PDF | pypdf2 | /Title, /Author, /Subject, /Creator | 已有依赖 |
+| PDF | pypdf | /Title, /Author, /Subject, /Creator | 已有依赖 |
 | DOCX | python-docx | core_properties.title, author, created | 已有依赖 |
 | PPTX | python-pptx | presentation.title, author, subject | **新增依赖** |
 | XLSX | openpyxl | workbook.properties.title, creator | 已有依赖 |
@@ -904,6 +908,8 @@ class SmartNamingEngine:
 | ZIP | 标准库 zipfile | 内部文件名列表 | 标准库 |
 | TAR | 标准库 tarfile | 内部文件名列表 | 标准库 |
 | GIF | Pillow | 无显著元数据，降级到策略 2-5 | 已有依赖 |
+| Video | ffprobe | title, artist, duration, codec, resolution | **新增依赖** |
+| Audio | tinytag | title, artist, album, duration | **新增依赖** |
 
 ### 6.4 文件名清洗
 
@@ -958,6 +964,10 @@ class CrawlerSettings:
         "pdf", "txt", "doc", "docx", "ppt", "pptx",
         "xls", "xlsx", "csv", "jpeg", "jpg", "png", "gif",
         "md", "markdown", "zip", "tar", "gz", "bz2",
+        # 视频
+        "mp4", "avi", "mov", "mkv", "webm", "wmv", "flv", "m4v", "3gp",
+        # 音频
+        "mp3", "wav", "ogg", "flac", "aac", "wma", "m4a",
     )
 
     # ── 命名配置 ──
@@ -1133,6 +1143,8 @@ SISYS 通过 `CrawlerClientPort`（HTTP 适配器）调用 Crawler Service，无
 | scrapy | ^2.11 | 爬虫引擎 | Crawler 插件 |
 | python-pptx | ^1.0 | PPT/PPTX 元数据提取 | Crawler 插件 |
 | httpx | ^0.27 | SISYS 侧 HTTP 客户端 | SISYS Core |
+| tinytag | ^2.2 | 音频元数据提取 | Crawler 插件 |
+| ffmpeg-python | ^0.2 | 视频元数据提取（ffprobe 封装） | Crawler 插件 |
 
 ### 9.2 已有可复用依赖
 
@@ -1140,7 +1152,7 @@ SISYS 通过 `CrawlerClientPort`（HTTP 适配器）调用 Crawler Service，无
 
 | 依赖 | 用途 |
 |------|------|
-| pypdf2 | PDF 元数据提取 |
+| pypdf | PDF 元数据提取（PyPDF2 后继） |
 | python-docx | DOCX 元数据提取 |
 | openpyxl | XLSX 元数据提取 |
 | pillow | 图片 EXIF 提取 |
