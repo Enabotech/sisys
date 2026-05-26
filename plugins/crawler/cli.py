@@ -25,6 +25,7 @@ def crawl(
     formats: str = typer.Option("pdf,txt,docx,xlsx,pptx", "--formats", help="文件格式（逗号分隔）"),
     seed_urls: list[str] = typer.Option([], "--seed-url", "-s", help="种子 URL"),
     follow_subdomains: bool = typer.Option(True, "--follow-subdomains", help="跟踪子域名"),
+    obey_robots: bool = typer.Option(True, "--obey-robots / --no-obey-robots", help="遵守 robots.txt"),
 ) -> None:
     """启动爬取任务（阻塞直到完成）"""
     from scrapy.crawler import CrawlerProcess
@@ -36,7 +37,7 @@ def crawl(
             "BOT_NAME": "sisys_crawler",
             "SPIDER_MODULES": ["plugins.crawler.scrapy_engine.spiders"],
             "NEWSPIDER_MODULE": "plugins.crawler.scrapy_engine.spiders",
-            "ROBOTSTXT_OBEY": False,
+            "ROBOTSTXT_OBEY": obey_robots,
             "CONCURRENT_REQUESTS": 8,
             "DOWNLOAD_DELAY": 1.0,
             "DOWNLOAD_TIMEOUT": 30,
