@@ -26,7 +26,7 @@
 
 ### 1.1 背景
 
-SISYS 是面向企业高管的 AI 驱动战略规划与决策智能平台。平台需要从外部网站爬取文件（pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/zip/tar）作为战略规划的数据输入源。
+SISYS 是面向企业高管的 AI 驱动战略规划与决策智能平台。平台需要从外部网站爬取文件（pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/zip/tar）作为战略规划的数据输入源
 
 ### 1.2 设计目标
 
@@ -389,7 +389,7 @@ class HttpCrawlerClient:
 
 ### 4.4 RabbitMQ 事件契约
 
-Crawler Service 直接发布到 RabbitMQ exchange `sisys.events`，routing key 遵循 SISYS 命名规范。
+Crawler Service 直接发布到 RabbitMQ exchange `sisys.events`，routing key 遵循 SISYS 命名规范
 
 #### CrawlCompleted 事件
 
@@ -474,7 +474,7 @@ sisys-raw-documents-default/
     crawl_a1b2c3d4e5f67890.txt
 ```
 
-SISYS 侧通过 L4ObjectPort 直接读取这些路径。
+SISYS 侧通过 L4ObjectPort 直接读取这些路径
 
 ---
 
@@ -582,7 +582,7 @@ class DomainSpider(scrapy.Spider):
 
 #### SitemapSpider — 基于 sitemap.xml 的快速发现
 
-适合有 `sitemap.xml` 的结构化站点，直接解析 sitemap 中的 URL 列表，效率高于页面递归。
+适合有 `sitemap.xml` 的结构化站点，直接解析 sitemap 中的 URL 列表，效率高于页面递归
 
 ### 5.2 Item 定义
 
@@ -1067,7 +1067,7 @@ uvicorn plugins.crawler.api:app --host 0.0.0.0 --port 8900 --workers 1
 **存储**：MinIO S3（`MinIOStorage`）
 **事件**：RabbitMQ（`RabbitMQPublisher`）
 
-SISYS 通过 `CrawlerClientPort`（HTTP 适配器）调用 Crawler Service，无需共享进程。
+SISYS 通过 `CrawlerClientPort`（HTTP 适配器）调用 Crawler Service，无需共享进程
 
 ### 8.3 模式对比
 

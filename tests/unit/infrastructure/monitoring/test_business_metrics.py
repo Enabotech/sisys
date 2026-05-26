@@ -243,7 +243,7 @@ class TestBusinessMetricsCollectorDefaultRegistry:
 
     全局 REGISTRY 禁止重复注册同名指标，因此 registry=None 仅适用于
     单例模式（DI 容器 SINGLETON 生命周期）。多次实例化会触发
-    Duplicated timeseries 错误，这是正确行为——防止生产环境重复注册。
+    Duplicated timeseries 错误，这是正确行为——防止生产环境重复注册
     """
 
     def test_default_registry_full_lifecycle(self) -> None:
