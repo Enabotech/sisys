@@ -807,10 +807,11 @@ SmartNamingEngine 按优先级生成多个候选名称，选择置信度最高�
 | 优先级 | 策略名 | 置信度 | 来源 | 示例 |
 |--------|--------|--------|------|------|
 | 1 | metadata_title | 0.95 | 文件内嵌元数据 | PDF /Title → `2024 Annual Report.pdf` |
-| 2 | page_title | 0.80 | HTML `<title>` | `产品中心 - XX公司` → `产品中心 - XX公司.pdf` |
-| 3 | link_text | 0.65 | `<a>` 锚文本 | `下载年度报告` → `下载年度报告.pdf` |
-| 4 | url_derived | 0.45 | URL 路径推导 | `/reports/2024-annual-report.pdf` → `2024 Annual Report.pdf` |
-| 5 | content_hash | 0.10 | URL 内容哈希 | `crawl_a1b2c3d4e5f67890.pdf` |
+| 2 | content_title | 0.90 | 文档内容推导 | PDF 大纲 → `第一章 绪论.pdf`；DOCX Heading → `战略规划报告.pdf` |
+| 3 | page_title | 0.80 | HTML `<title>` | `产品中心 - XX公司` → `产品中心 - XX公司.pdf` |
+| 4 | link_text | 0.65 | `<a>` 锚文本 | `下载年度报告` → `下载年度报告.pdf` |
+| 5 | url_derived | 0.45 | URL 路径推导 | `/reports/2024-annual-report.pdf` → `2024 Annual Report.pdf` |
+| 6 | content_hash | 0.10 | URL 内容哈希 | `crawl_a1b2c3d4e5f67890.pdf` |
 
 ### 6.2 SmartNamingEngine 核心逻辑
 
