@@ -159,14 +159,15 @@ class TestDomainSpiderBrowserMode:
         assert "playwright" not in requests[0].meta
 
     def test_use_browser_true_has_playwright_meta(self) -> None:
-        """use_browser=True 时初始请求应包含 playwright=True"""
+        """use_browser=True 时初始请求应包含 playwright meta 和 domcontentloaded"""
         spider = DomainSpider(domains=("example.com",), use_browser=True)
         requests = _collect_start_requests(spider)
         assert len(requests) == 1
         assert requests[0].meta.get("playwright") is True
+        assert requests[0].meta.get("playwright_page_goto_kwargs") == {"wait_until": "domcontentloaded"}
 
     def test_parse_page_link_browser_mode(self) -> None:
-        """浏览器模式下页面链接应包含 playwright meta"""
+        """浏览器模式下页面链接应包含 playwright meta 和 domcontentloaded"""
         spider = DomainSpider(domains=("example.com",), use_browser=True, max_depth=2)
         html = '<html><head><title>Test</title></head><body><a href="/page">link</a></body></html>'
         response = _make_text_response("https://example.com/", html, meta={"depth": 0})
@@ -174,6 +175,7 @@ class TestDomainSpiderBrowserMode:
         page_requests = [r for r in requests if r.callback.__name__ == "parse"]
         assert len(page_requests) == 1
         assert page_requests[0].meta.get("playwright") is True
+        assert page_requests[0].meta.get("playwright_page_goto_kwargs") == {"wait_until": "domcontentloaded"}
 
     def test_parse_file_link_browser_mode(self) -> None:
         """浏览器模式下文件链接应包含 playwright meta（携带 session cookies 下载）"""
@@ -188,7 +190,7 @@ class TestDomainSpiderBrowserMode:
         file_requests = [r for r in requests if r.callback.__name__ == "parse_file"]
         assert len(file_requests) == 1
         assert file_requests[0].meta.get("playwright") is True
-        assert file_requests[0].meta.get("playwright_goto_kwargs") == {"wait_until": "commit"}
+        assert file_requests[0].meta.get("playwright_page_goto_kwargs") == {"wait_until": "commit"}
 
     def test_parse_file_link_no_browser(self) -> None:
         """非浏览器模式下文件链接不应包含 playwright meta"""
