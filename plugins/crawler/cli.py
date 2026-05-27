@@ -15,10 +15,16 @@ def crawl(
     domains: list[str] = typer.Option(..., "--domain", "-d", help="目标域名"),
     output: str = typer.Option("./crawl_output", "--output", "-o", help="输出目录"),
     depth: int = typer.Option(3, "--depth", help="最大爬取深度"),
-    formats: str = typer.Option("pdf,txt,docx,xlsx,pptx,mp4,mp3,wav", "--formats", help="文件格式（逗号分隔）"),
+    formats: str = typer.Option("pdf,txt,doc,docx,xls,xlsx,ppt,pptx,mp4,mp3,wav", "--formats", help="文件格式（逗号分隔）"),
     seed_urls: list[str] = typer.Option([], "--seed-url", "-s", help="种子 URL"),
     follow_subdomains: bool = typer.Option(True, "--follow-subdomains", help="跟踪子域名"),
     obey_robots: bool = typer.Option(True, "--obey-robots / --no-obey-robots", help="遵守 robots.txt"),
+    user_agent: str = typer.Option(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "--user-agent",
+        "-u",
+        help="User-Agent 字符串",
+    ),
 ) -> None:
     """启动爬取任务（阻塞直到完成）"""
     from scrapy.crawler import CrawlerProcess
@@ -31,6 +37,7 @@ def crawl(
             "SPIDER_MODULES": ["plugins.crawler.scrapy_engine.spiders"],
             "NEWSPIDER_MODULE": "plugins.crawler.scrapy_engine.spiders",
             "ROBOTSTXT_OBEY": obey_robots,
+            "USER_AGENT": user_agent,
             "CONCURRENT_REQUESTS": 8,
             "DOWNLOAD_DELAY": 1.0,
             "DOWNLOAD_TIMEOUT": 30,
