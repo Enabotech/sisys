@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import typer
 
+from plugins.crawler.config.settings import CrawlerSettings
+
 app = typer.Typer(name="crawler", help="SISYS Crawler Plugin CLI")
 
 
@@ -138,34 +140,61 @@ def _auto_login(
     typer.echo(f"登录态已保存: {storage_path}")
 
 
+_defaults = CrawlerSettings()
+_DEFAULT_FORMATS = ",".join(_defaults.allowed_extensions)
+
+
 @app.command()
 def crawl(
+    # ── 目标 ──
     domains: list[str] = typer.Option(..., "--domain", "-d", help="目标域名"),
-    output: str = typer.Option("./crawl_output", "--output", "-o", help="输出目录"),
-    depth: int = typer.Option(3, "--depth", help="最大爬取深度"),
-    formats: str = typer.Option(
-        "pdf,txt,doc,docx,xls,xlsx,ppt,pptx,zip,wmv,mp4,mp3,wav", "--formats", help="文件格式（逗号分隔）"
-    ),
     seed_urls: list[str] = typer.Option([], "--seed-url", "-s", help="种子 URL"),
-    follow_subdomains: bool = typer.Option(True, "--follow-subdomains", help="跟踪子域名"),
-    obey_robots: bool = typer.Option(True, "--obey-robots / --no-obey-robots", help="遵守 robots.txt"),
-    user_agent: str = typer.Option(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "--user-agent",
-        "-u",
-        help="User-Agent 字符串",
+    output: str = typer.Option(_defaults.local_output_dir, "--output", "-o", help="输出目录", rich_help_panel="目标"),
+    # ── 爬取控制 ──
+    max_depth: int = typer.Option(
+        _defaults.max_depth, "--max-depth", "--depth", help="最大爬取深度", rich_help_panel="爬取控制"
     ),
-    browser: bool = typer.Option(False, "--browser / --no-browser", help="启用 Playwright 浏览器模式（绕过 WAF）"),
-    browser_pages: int = typer.Option(4, "--browser-pages", help="浏览器并发页面数"),
-    browser_timeout: int = typer.Option(30, "--browser-timeout", help="浏览器页面加载超时（秒）"),
+    formats: str = typer.Option(_DEFAULT_FORMATS, "--formats", help="文件格式（逗号分隔）", rich_help_panel="爬取控制"),
+    follow_subdomains: bool = typer.Option(True, "--follow-subdomains", help="跟踪子域名", rich_help_panel="爬取控制"),
+    obey_robots: bool = typer.Option(
+        True, "--obey-robots/--no-obey-robots", help="遵守 robots.txt", rich_help_panel="爬取控制"
+    ),
+    download_delay: float = typer.Option(
+        _defaults.download_delay, "--download-delay", help="请求间隔（秒）", rich_help_panel="爬取控制"
+    ),
+    user_agent: str = typer.Option("", "--user-agent", "-u", help="User-Agent（留空则自动轮换）", rich_help_panel="爬取控制"),
+    # ── 浏览器模式 ──
+    browser: bool = typer.Option(
+        False,
+        "--browser/--no-browser",
+        help="启用 Playwright 浏览器模式（绕过 WAF）",
+        rich_help_panel="浏览器模式",
+    ),
+    browser_timeout: int = typer.Option(
+        _defaults.browser_timeout,
+        "--browser-timeout",
+        help="浏览器页面加载超时（秒）",
+        rich_help_panel="浏览器模式",
+    ),
+    browser_headless: bool = typer.Option(
+        True,
+        "--browser-headless/--no-browser-headless",
+        help="浏览器无头模式",
+        rich_help_panel="浏览器模式",
+    ),
+    browser_proxy: str = typer.Option("", "--browser-proxy", help="浏览器代理地址", rich_help_panel="浏览器模式"),
+    # ── 认证 ──
     auth_storage_state: str = typer.Option(
-        "", "--auth-storage-state", help="Playwright storageState JSON 文件路径（需配合 --browser）"
+        "",
+        "--auth-storage-state",
+        help="Playwright storageState JSON（需 --browser）",
+        rich_help_panel="认证",
     ),
-    auth_header: list[str] = typer.Option([], "--auth-header", help="额外请求头（格式: Key=Value，可多次指定）"),
-    auth_basic: str = typer.Option("", "--auth-basic", help="HTTP Basic Auth（格式: user:pass）"),
-    login_url: str = typer.Option("", "--login-url", help="自动登录页面 URL（配合 --login-user 使用）"),
-    login_user: str = typer.Option("", "--login-user", help="登录用户名（自动打开浏览器完成登录）"),
-    login_pass: str = typer.Option("", "--login-pass", help="登录密码"),
+    auth_header: list[str] = typer.Option([], "--auth-header", help="请求头 Key=Value（可多次指定）", rich_help_panel="认证"),
+    auth_basic: str = typer.Option("", "--auth-basic", help="HTTP Basic Auth user:pass", rich_help_panel="认证"),
+    login_url: str = typer.Option("", "--login-url", help="自动登录页面 URL", rich_help_panel="认证"),
+    login_user: str = typer.Option("", "--login-user", help="登录用户名", rich_help_panel="认证"),
+    login_pass: str = typer.Option("", "--login-pass", help="登录密码", rich_help_panel="认证"),
 ) -> None:
     """启动爬取任务（阻塞直到完成）"""
     import base64
@@ -174,6 +203,15 @@ def crawl(
     from scrapy.crawler import CrawlerProcess
 
     from plugins.crawler.config.settings import CrawlerSettings
+
+    # ── 浏览器模式条件校验 ──
+    if not browser:
+        if browser_timeout != _defaults.browser_timeout:
+            typer.echo("警告: --browser-timeout 在非浏览器模式下无效")
+        if browser_proxy:
+            typer.echo("警告: --browser-proxy 在非浏览器模式下无效")
+        if not browser_headless:
+            typer.echo("警告: --no-browser-headless 在非浏览器模式下无效")
 
     extensions = tuple(f.strip() for f in formats.split(",") if f.strip())
 
@@ -218,16 +256,18 @@ def crawl(
 
     settings = CrawlerSettings(
         respect_robots_txt=obey_robots,
-        max_depth=depth,
+        max_depth=max_depth,
         local_output_dir=output,
-        enable_browser=browser,
-        browser_concurrent_pages=browser_pages,
-        browser_navigation_timeout_ms=browser_timeout * 1000,
+        download_delay=download_delay,
+        use_browser=browser,
+        browser_timeout=browser_timeout,
+        browser_headless=browser_headless,
+        browser_proxy=browser_proxy,
         auth_storage_state_path=auth_storage_state,
         auth_headers=auth_headers,
+        user_agent=user_agent,
     )
-    scrapy_settings = settings.to_scrapy_settings(user_agent=user_agent)
-    scrapy_settings["CRAWL_OUTPUT_DIR"] = output
+    scrapy_settings = settings.to_scrapy_settings()
 
     process = CrawlerProcess(settings=scrapy_settings)
 
@@ -237,10 +277,10 @@ def crawl(
         domains=tuple(domains),
         seed_urls=tuple(seed_urls),
         allowed_extensions=extensions,
-        max_depth=depth,
+        max_depth=max_depth,
         follow_subdomains=follow_subdomains,
         use_browser=browser,
-        storage_state_path=auth_storage_state,
+        auth_storage_state_path=auth_storage_state,
     )
 
     typer.echo("开始爬取...")

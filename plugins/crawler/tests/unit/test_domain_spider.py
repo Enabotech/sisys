@@ -234,7 +234,7 @@ class TestDomainSpiderBrowserMode:
                 domains=("example.com",),
                 use_browser=True,
                 allowed_extensions=("pdf",),
-                storage_state_path=path,
+                auth_storage_state_path=path,
             )
             html = '<html><head><title>Test</title></head><body><a href="/doc.pdf">PDF</a></body></html>'
             response = _make_text_response("https://example.com/", html, meta={"depth": 0})

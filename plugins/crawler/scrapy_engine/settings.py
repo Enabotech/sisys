@@ -39,7 +39,7 @@ USER_AGENT = "SISYS Crawler/0.1.0"
 
 LOG_LEVEL = "INFO"
 
-# ── Playwright 浏览器模式配置（仅 enable_browser=True 时生效）──
+# ── Playwright 浏览器模式配置（仅 use_browser=True 时生效）──
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
 DOWNLOAD_HANDLERS = {

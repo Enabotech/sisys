@@ -37,11 +37,11 @@ class CrawlTask:
     max_depth: int = 3
     allowed_extensions: tuple[str, ...] = ()
     follow_subdomains: bool = True
-    max_files: int = 1000
-    max_file_size_mb: int = 2048
+    max_files: int = 1000  # NOTE: 尚未在 spider 中实现
+    max_file_size_mb: int = 2048  # NOTE: 尚未在 spider 中实现
     download_delay: float = 1.0
-    url_include: tuple[str, ...] = ()
-    url_exclude: tuple[str, ...] = ()
+    url_include: tuple[str, ...] = ()  # NOTE: 尚未在 spider 中实现
+    url_exclude: tuple[str, ...] = ()  # NOTE: 尚未在 spider 中实现
     use_browser: bool = False
     auth_storage_state_path: str = ""
     auth_headers: dict[str, str] = field(default_factory=dict)
