@@ -160,7 +160,7 @@ class TestCrawlerSettings:
 
     def test_to_scrapy_settings_output_dir(self) -> None:
         """local_output_dir 应注入为 CRAWL_OUTPUT_DIR"""
-        output_dir = os.path.join(tempfile.gettempdir(), "crawl_test")
+        output_dir = os.path.join(tempfile.gettempdir(), "tmp_crawl")
         settings = CrawlerSettings(local_output_dir=output_dir)
         result = settings.to_scrapy_settings()
         assert result["CRAWL_OUTPUT_DIR"] == output_dir
