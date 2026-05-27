@@ -112,7 +112,7 @@ SISYS 是面向企业高管的 AI 驱动战略规划与决策智能平台。平�
     → CrawlerPlugin.start_crawl(task)
     → Scrapy DomainSpider 爬取网页 → 发现文件链接
     → Pipeline 链：下载 → 格式识别 → 元数据提取 → 智能命名
-    → MinIOStorage.store_file() → S3 API → MinIO (bucket: sisys-crawled)
+    → MinIOStorage.store_file() → S3 API → MinIO (bucket: sisys-raw-documents-{tenant_id})
     → RabbitMQPublisher.publish(CrawlCompleted)
     → SISYS EventSubscriber 收到事件 → 触发下游处理
 ```
@@ -352,6 +352,8 @@ class CrawlerClientPort(Protocol):
         follow_subdomains: bool = True,
         max_files: int = 1000,
         download_delay: float = 1.0,
+        url_patterns: dict | None = None,
+        use_browser: bool = False,
     ) -> str:
         """提交爬取任务，返回 task_id"""
         ...
@@ -360,8 +362,8 @@ class CrawlerClientPort(Protocol):
         """查询任务状态"""
         ...
 
-    async def cancel_task(self, task_id: str) -> bool:
-        """取消任务"""
+    async def cancel_task(self, task_id: str) -> dict:
+        """取消任务，返回 {task_id, status}"""
         ...
 
     async def list_supported_formats(self) -> list[str]:
@@ -392,6 +394,8 @@ class HttpCrawlerClient:
         follow_subdomains: bool = True,
         max_files: int = 1000,
         download_delay: float = 1.0,
+        url_patterns: dict | None = None,
+        use_browser: bool = False,
     ) -> str:
         payload = {
             "domains": domains,
@@ -401,7 +405,10 @@ class HttpCrawlerClient:
             "follow_subdomains": follow_subdomains,
             "max_files": max_files,
             "download_delay": download_delay,
+            "use_browser": use_browser,
         }
+        if url_patterns:
+            payload["url_patterns"] = url_patterns
         resp = await self._client.post("/tasks", json=payload)
         resp.raise_for_status()
         return resp.json()["task_id"]
@@ -411,10 +418,11 @@ class HttpCrawlerClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def cancel_task(self, task_id: str) -> bool:
+    async def cancel_task(self, task_id: str) -> dict:
+        """取消任务，返回 {task_id, status}"""
         resp = await self._client.delete(f"/tasks/{task_id}")
         resp.raise_for_status()
-        return resp.json()["cancelled"]
+        return resp.json()
 
     async def list_supported_formats(self) -> list[str]:
         resp = await self._client.get("/formats")
@@ -625,9 +633,9 @@ class DomainSpider(scrapy.Spider):
         if self.follow_subdomains:
             return any(
                 domain == d or domain.endswith(f".{d}")
-                for d in self.seed_domains
+                for d in self.domains
             )
-        return domain in self.seed_domains
+        return domain in self.domains
 ```
 
 #### SitemapSpider — 基于 sitemap.xml 的快速发现（规划中）
@@ -1299,8 +1307,8 @@ async def get_crawl_status(task_id: str):
 async def cancel_crawl_task(task_id: str):
     """取消爬取任务"""
     client: CrawlerClientPort = get_resolver().resolve("crawler_client")
-    cancelled = await client.cancel_task(task_id)
-    return {"task_id": task_id, "cancelled": cancelled}
+    result = await client.cancel_task(task_id)
+    return result
 
 
 @router.get("/formats")
@@ -1389,9 +1397,9 @@ SISYS 侧需要修改/新增的文件汇总：
 | 单元 | SmartNamingEngine | 同名文件 append_hash/append_counter 冲突处理 | 无 |
 | 单元 | FilenameSanitizer | 超长文件名截断、保留名前缀加下划线、非法字符替换 | 无 |
 | 单元 | FileFormatHandlerRegistry | 注册/查找/自动检测、未知格式返回 None | 无 |
-| 单元 | PdfFormatHandler | 有元数据 PDF 提取 /Title、无元数据 PDF 返回空 | pypdf2 |
-| 单元 | OfficeDocHandler | DOCX/PPTX/XLSX 元数据提取 | python-docx, python-pptx, openpyxl |
-| 单元 | CrawlerSettings | 环境变量覆盖、默认值正确 | pydantic |
+| 单元 | PdfFormatHandler | 有元数据 PDF 提取 /Title、无元数据 PDF 返回空 | pypdf |
+| 单元 | OfficeFormatHandler | DOCX/PPTX/XLSX 元数据提取 | python-docx, python-pptx, openpyxl |
+| 单元 | CrawlerSettings | 环境变量覆盖、默认值正确 | 标准库 |
 | 集成 | Pipeline 全链路 | fake_server fixture 模拟目标站点，验证完整流经 | scrapy, aiohttp |
 | 集成 | MinIOStorage | S3 API 推送文件并验证路径、file_exists 正确判断 | minio |
 | 集成 | RabbitMQPublisher | 事件发布并验证 routing key / payload 结构 | aio-pika |
@@ -1515,7 +1523,7 @@ curl http://localhost:8900/tasks/{task_id}
 # 2. 通过 SISYS API 提交任务
 curl -X POST http://localhost:8000/api/v1/crawler/tasks \
   -H "Content-Type: application/json" \
-  -d '{"domains": ["example.com"], "formats": ["pdf", "docx"]}'
+  -d '{"domains": ["example.com"], "allowed_extensions": ["pdf", "docx"]}'
 
 # 3. 验证文件存储
 # 检查 MinIO bucket: sisys-raw-documents-default
@@ -1719,7 +1727,7 @@ curl -X POST http://localhost:8900/tasks \
 
 ## 15. 登录态爬取（规划中）
 
-> **状态**：本章节为设计方案，尚未实现。代码中 `CrawlerSettings`、`CrawlTask`、`CrawlTaskRequest`、CLI 均不包含 `auth_*` 相关字段。
+> **状态**：本章节为设计方案，尚未实现。以下字段仅在本文档中定义，实际代码中 `CrawlerSettings`、`CrawlTask`、`CrawlTaskRequest`、CLI 均不包含 `auth_*` 相关字段。Section 7.1 中的 `auth_storage_state_path` 和 `auth_headers` 为设计预留字段。
 
 ### 15.1 价值分析
 
