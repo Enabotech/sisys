@@ -791,7 +791,7 @@ class FileFormatHandlerRegistry:
     def register_default_handlers(self) -> None:
         """注册内置默认处理器"""
         self.register(PdfFormatHandler())       # pypdf
-        self.register(OfficeDocHandler())       # python-docx + python-pptx + openpyxl
+        self.register(OfficeFormatHandler())   # python-docx + python-pptx + openpyxl
         self.register(TextFormatHandler())      # txt, csv, markdown
         self.register(ImageFormatHandler())     # jpeg, png, gif (Pillow)
         self.register(ArchiveFormatHandler())   # zip, tar
@@ -862,6 +862,7 @@ class SmartNamingEngine:
     def generate_name(
         self,
         metadata_title: str | None = None,
+        content_title: str | None = None,
         page_title: str | None = None,
         link_text: str | None = None,
         url: str | None = None,
@@ -871,12 +872,17 @@ class SmartNamingEngine:
         """按优先级链生成候选名称，返回最佳候选"""
         candidates = []
 
-        # 策略 1: 文件元数据标题
+        # 策略 1: 文件元数据标题（置信度 0.95）
         if metadata_title and metadata_title.strip():
             name = self._sanitizer.sanitize(metadata_title.strip(), file_extension)
             candidates.append(NamingCandidate(name, "metadata_title", 0.95, ...))
 
-        # 策略 2: 页面标题 + 上下文
+        # 策略 2: 文档内容推导标题（置信度 0.90）
+        if content_title and content_title.strip():
+            name = self._sanitizer.sanitize(content_title.strip(), file_extension)
+            candidates.append(NamingCandidate(name, "content_title", 0.90, ...))
+
+        # 策略 3: 页面标题 + 上下文（置信度 0.80）
         if page_title and page_title.strip():
             base = page_title.strip()
             if author:
@@ -884,18 +890,18 @@ class SmartNamingEngine:
             name = self._sanitizer.sanitize(base, file_extension)
             candidates.append(NamingCandidate(name, "page_title", 0.80, ...))
 
-        # 策略 3: 链接锚文本
+        # 策略 4: 链接锚文本（置信度 0.65）
         if link_text and len(link_text.strip()) > 2:
             name = self._sanitizer.sanitize(link_text.strip(), file_extension)
             candidates.append(NamingCandidate(name, "link_text", 0.65, ...))
 
-        # 策略 4: URL 路径推导
+        # 策略 5: URL 路径推导（置信度 0.45）
         if url:
             derived = self._derive_from_url(url, file_extension)
             if derived:
                 candidates.append(NamingCandidate(derived, "url_derived", 0.45, ...))
 
-        # 策略 5: 内容哈希（兜底）
+        # 策略 6: 内容哈希兜底（置信度 0.10）
         if url:
             hash_name = self._hash_fallback(url, file_extension)
             candidates.append(NamingCandidate(hash_name, "content_hash", 0.10, ...))
@@ -914,17 +920,16 @@ class SmartNamingEngine:
 
 | 格式 | 依赖库 | 提取字段 | 状态 |
 |------|--------|----------|------|
-| PDF | pypdf | /Title, /Author, /Subject, /Creator | 已有依赖 |
+| PDF | pypdf | /Title, /Author, /Subject, /CreationDate | 已有依赖 |
 | DOCX | python-docx | core_properties.title, author, created | 已有依赖 |
-| PPTX | python-pptx | presentation.title, author, subject | **新增依赖** |
+| PPTX | python-pptx | presentation.title, author, subject | 已有依赖 |
 | XLSX | openpyxl | workbook.properties.title, creator | 已有依赖 |
 | TXT/MD/CSV | 标准库 | 首行非空文本截取（最多 100 字符） | 标准库 |
-| JPEG/PNG | Pillow | EXIF ImageDescription, DocumentName | 已有依赖 |
-| ZIP | 标准库 zipfile | 内部文件名列表 | 标准库 |
-| TAR | 标准库 tarfile | 内部文件名列表 | 标准库 |
-| GIF | Pillow | 无显著元数据，降级到策略 2-5 | 已有依赖 |
-| Video | ffprobe | title, artist, duration, codec, resolution | **新增依赖** |
-| Audio | tinytag | title, artist, album, duration | **新增依赖** |
+| JPEG/PNG | Pillow | EXIF ImageDescription | 已有依赖 |
+| ZIP/TAR/GZ/BZ2 | 标准库 | 内部文件名列表 | 标准库 |
+| GIF | Pillow | 无显著元数据，降级到策略 3-6 | 已有依赖 |
+| Video | ffprobe | title, artist | **新增依赖** |
+| Audio | tinytag | title, artist | **新增依赖** |
 
 ### 6.4 文件名清洗
 
@@ -932,8 +937,8 @@ FilenameSanitizer 处理以下场景：
 
 | 场景 | 输入 | 输出 |
 |------|------|------|
-| 非法字符 | `Report: Q3/2024 <Draft>` | `Report_ Q3_2024 _Draft_.pdf` |
-| 连续空格 | `Annual   Report` | `Annual Report.pdf` |
+| 非法字符替换 | `Report: Q3/2024 <Draft>` | `Report Q3 2024 Draft.pdf` |
+| 连续空格合并 | `Annual   Report` | `Annual Report.pdf` |
 | Windows 保留名 | `CON` | `_CON.pdf` |
 | 超长文件名 | 300 字符标题 | 截取前 200 字符（含扩展名） |
 | 首尾空白/点 | ` Report.pdf ` | `Report.pdf` |
@@ -942,7 +947,7 @@ FilenameSanitizer 处理以下场景：
 
 | 策略 | 行为 | 示例 |
 |------|------|------|
-| append_hash（默认） | 追加 8 位短哈希（SHA-256 前 8 位） | `Report.pdf` → `Report_a1b2c3d4.pdf` |
+| append_hash（默认） | 追加 8 位短哈希（SHA-256 含时间戳，取前 8 位） | `Report.pdf` → `Report_a1b2c3d4.pdf` |
 | append_counter | 追加递增计数器 | `Report.pdf` → `Report (2).pdf` |
 | overwrite | 覆盖同名文件 | `Report.pdf` → `Report.pdf`（覆盖） |
 
