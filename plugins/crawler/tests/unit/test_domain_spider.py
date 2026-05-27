@@ -216,10 +216,9 @@ class TestDomainSpiderBrowserMode:
         assert page_requests[0].meta.get("playwright_page_goto_kwargs") == {"wait_until": "domcontentloaded"}
 
     def test_parse_file_link_browser_mode(self) -> None:
-        """浏览器模式下文件链接应走标准 HTTP（无 playwright meta），携带认证 cookies"""
+        """浏览器模式下文件下载应走 Playwright（携带 Referer 和认证 cookies）"""
         import os
 
-        # 创建临时 storageState 文件
         storage_state = {
             "cookies": [
                 {"name": "session", "value": "abc123", "domain": ".example.com"},
@@ -241,15 +240,23 @@ class TestDomainSpiderBrowserMode:
             requests = list(spider.parse(response))
             file_requests = [r for r in requests if r.callback.__name__ == "parse_file"]
             assert len(file_requests) == 1
-            # 文件下载不使用 Playwright（避免二进制文件 page.goto 问题）
-            assert "playwright" not in file_requests[0].meta
+            # 浏览器模式下走 Playwright 绕过 CDN 浏览器指纹检测
+            assert file_requests[0].meta.get("playwright") is True
+            # 需要 playwright_include_page 以便 parse_file 中重下载流式文件
+            assert file_requests[0].meta.get("playwright_include_page") is True
+            goto_kwargs = file_requests[0].meta["playwright_page_goto_kwargs"]
+            assert goto_kwargs["referer"] == "https://example.com/"
+            assert goto_kwargs["timeout"] == 300000
+            assert "wait_until" not in goto_kwargs
+            # Scrapy headers 也应包含 Referer（双保险）
+            assert file_requests[0].headers.get("Referer") == b"https://example.com/"
             # 应携带认证 cookies
             assert file_requests[0].cookies.get("session") == "abc123"
         finally:
             os.unlink(path)
 
     def test_parse_file_link_no_browser(self) -> None:
-        """非浏览器模式下文件链接不应包含 playwright meta，无 cookies"""
+        """非浏览器模式下文件链接不应包含 playwright meta，携带 Referer"""
         spider = DomainSpider(
             domains=("example.com",),
             use_browser=False,
@@ -262,6 +269,8 @@ class TestDomainSpiderBrowserMode:
         assert len(file_requests) == 1
         assert "playwright" not in file_requests[0].meta
         assert len(file_requests[0].cookies) == 0
+        # 非 browser 模式也应携带 Referer（标准 HTTP 行为）
+        assert file_requests[0].headers.get("Referer") == b"https://example.com/"
 
     def test_parse_page_link_no_browser(self) -> None:
         """非浏览器模式下页面链接不应包含 playwright meta"""
@@ -272,6 +281,24 @@ class TestDomainSpiderBrowserMode:
         page_requests = [r for r in requests if r.callback.__name__ == "parse"]
         assert len(page_requests) == 1
         assert "playwright" not in page_requests[0].meta
+
+    def test_parse_file_referer_cross_domain_cdn(self) -> None:
+        """跨域 CDN 文件下载应携带来源页面 Referer（模拟 bcg.com 场景）"""
+        spider = DomainSpider(
+            domains=("bcg.com",),
+            use_browser=True,
+            allowed_extensions=("pdf",),
+            follow_subdomains=True,
+        )
+        html = '<html><body><a href="https://web-assets.bcg.com/report.pdf">PDF</a></body></html>'
+        response = _make_text_response("https://www.bcg.com/publications", html, meta={"depth": 0})
+        requests = list(spider.parse(response))
+        file_requests = [r for r in requests if r.callback.__name__ == "parse_file"]
+        assert len(file_requests) == 1
+        # Referer 应为来源页面 URL，而非文件 URL
+        goto_kwargs = file_requests[0].meta["playwright_page_goto_kwargs"]
+        assert goto_kwargs["referer"] == "https://www.bcg.com/publications"
+        assert file_requests[0].headers.get("Referer") == b"https://www.bcg.com/publications"
 
 
 class TestDomainSpiderCookies:

@@ -112,16 +112,21 @@ class DomainSpider(scrapy.Spider):
                     "page_title": page_title,
                     "link_text": link_text,
                     "depth": current_depth,
+                    "download_timeout": self._FILE_DOWNLOAD_TIMEOUT,
                 }
-                # 文件下载走标准 HTTP（正确处理二进制文件）
-                # 注入 storageState 中的认证 cookies 携带登录态
-                # 文件下载使用独立超时，避免大文件被页面级超时截断
-                file_meta["download_timeout"] = self._FILE_DOWNLOAD_TIMEOUT
+                if self.use_browser:
+                    file_meta["playwright"] = True
+                    file_meta["playwright_include_page"] = True
+                    file_meta["playwright_page_goto_kwargs"] = {
+                        "referer": response.url,
+                        "timeout": self._FILE_DOWNLOAD_TIMEOUT * 1000,
+                    }
                 yield scrapy.Request(
                     url=url,
                     callback=self.parse_file,
                     meta=file_meta,
                     cookies=self._get_cookies_for_url(url),
+                    headers={"Referer": response.url},
                 )
             elif self._should_follow(url, current_depth):
                 meta = {
@@ -138,8 +143,12 @@ class DomainSpider(scrapy.Spider):
                     meta=meta,
                 )
 
-    def parse_file(self, response):
+    async def parse_file(self, response):
         """处理文件下载响应
+
+        浏览器模式下，scrapy-playwright 对非 Content-Disposition 响应使用
+        page.content() 返回 DOM HTML（非原始二进制），需通过 APIRequestContext
+        重下载获取完整文件内容。
 
         Args:
             response: Scrapy 响应对象
@@ -147,7 +156,22 @@ class DomainSpider(scrapy.Spider):
         import os
         import tempfile
 
+        body = response.body
         content_type = response.headers.get("Content-Type", b"").decode("utf-8", errors="replace").split(";")[0].strip()
+        page = response.meta.get("playwright_page")
+
+        if page and body[:1] == b"<":
+            # scrapy-playwright 返回了 DOM HTML（page.content()），非二进制数据
+            # 通过 APIRequestContext 重下载：同 TLS 指纹 + 同 cookies，返回原始二进制
+            api_response = await page.context.request.get(
+                response.url,
+                headers={"Referer": response.meta.get("parent_url", "")},
+            )
+            body = await api_response.body()
+            content_type = api_response.headers.get("content-type", content_type).split(";")[0].strip()
+
+        if page:
+            await page.close()
 
         url_filename = self._extract_filename_from_url(response.url)
         extension = os.path.splitext(url_filename)[1].lower().lstrip(".")
@@ -157,7 +181,7 @@ class DomainSpider(scrapy.Spider):
         fd, temp_path = tempfile.mkstemp(suffix=f".{extension}" if extension else "", dir=tmp_dir)
         try:
             with os.fdopen(fd, "wb") as f:
-                f.write(response.body)
+                f.write(body)
         except Exception:
             os.close(fd)
             raise
@@ -166,7 +190,7 @@ class DomainSpider(scrapy.Spider):
         item["url"] = response.url
         item["file_path"] = temp_path
         item["file_name"] = url_filename
-        item["file_size"] = len(response.body)
+        item["file_size"] = len(body)
         item["content_type"] = content_type
         item["file_extension"] = extension
         item["parent_url"] = response.meta.get("parent_url", "")
