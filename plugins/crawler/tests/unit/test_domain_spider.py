@@ -1,11 +1,13 @@
 """Domain Spider 单元测试
 
-验证 DomainSpider 的链接判断、深度控制和浏览器模式
+验证 DomainSpider 的链接判断、深度控制、浏览器模式和认证 cookies 注入
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
+import tempfile
 
 import scrapy
 
@@ -124,6 +126,42 @@ class TestDomainSpider:
         assert DomainSpider._extract_filename_from_url("https://example.com/file.tar.gz") == "file.tar.gz"
         assert DomainSpider._extract_filename_from_url("https://example.com/") == ""
 
+    def test_parse_skips_non_http_schemes(self) -> None:
+        """应跳过 mailto:、tel:、javascript: 等非 HTTP(S) 协议链接"""
+        spider = DomainSpider(
+            task_id="test",
+            domains=("example.com",),
+            allowed_extensions=("pdf",),
+            max_depth=2,
+        )
+        html = (
+            "<html><body>"
+            '<a href="mailto:test@example.com">email</a>'
+            '<a href="tel:+123456">phone</a>'
+            '<a href="/doc.pdf">file</a>'
+            "</body></html>"
+        )
+        response = _make_text_response("https://example.com/", html, meta={"depth": 0})
+        requests = list(spider.parse(response))
+        urls = [r.url for r in requests]
+        assert "mailto:test@example.com" not in urls
+        assert "tel:+123456" not in urls
+        assert "https://example.com/doc.pdf" in urls
+
+    def test_parse_file_has_download_timeout(self) -> None:
+        """文件下载请求应使用独立的下载超时"""
+        spider = DomainSpider(
+            task_id="test",
+            domains=("example.com",),
+            allowed_extensions=("pdf",),
+        )
+        html = '<html><body><a href="/doc.pdf">PDF</a></body></html>'
+        response = _make_text_response("https://example.com/", html, meta={"depth": 0})
+        requests = list(spider.parse(response))
+        file_requests = [r for r in requests if r.callback.__name__ == "parse_file"]
+        assert len(file_requests) == 1
+        assert file_requests[0].meta.get("download_timeout") == 300
+
 
 def _collect_start_requests(spider: DomainSpider) -> list:
     """收集 async start() 方法的全部请求"""
@@ -178,22 +216,40 @@ class TestDomainSpiderBrowserMode:
         assert page_requests[0].meta.get("playwright_page_goto_kwargs") == {"wait_until": "domcontentloaded"}
 
     def test_parse_file_link_browser_mode(self) -> None:
-        """浏览器模式下文件链接应包含 playwright meta（携带 session cookies 下载）"""
-        spider = DomainSpider(
-            domains=("example.com",),
-            use_browser=True,
-            allowed_extensions=("pdf",),
-        )
-        html = '<html><head><title>Test</title></head><body><a href="/doc.pdf">PDF</a></body></html>'
-        response = _make_text_response("https://example.com/", html, meta={"depth": 0})
-        requests = list(spider.parse(response))
-        file_requests = [r for r in requests if r.callback.__name__ == "parse_file"]
-        assert len(file_requests) == 1
-        assert file_requests[0].meta.get("playwright") is True
-        assert file_requests[0].meta.get("playwright_page_goto_kwargs") == {"wait_until": "commit"}
+        """浏览器模式下文件链接应走标准 HTTP（无 playwright meta），携带认证 cookies"""
+        import os
+
+        # 创建临时 storageState 文件
+        storage_state = {
+            "cookies": [
+                {"name": "session", "value": "abc123", "domain": ".example.com"},
+            ]
+        }
+        fd, path = tempfile.mkstemp(suffix=".json")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(storage_state, f)
+
+            spider = DomainSpider(
+                domains=("example.com",),
+                use_browser=True,
+                allowed_extensions=("pdf",),
+                storage_state_path=path,
+            )
+            html = '<html><head><title>Test</title></head><body><a href="/doc.pdf">PDF</a></body></html>'
+            response = _make_text_response("https://example.com/", html, meta={"depth": 0})
+            requests = list(spider.parse(response))
+            file_requests = [r for r in requests if r.callback.__name__ == "parse_file"]
+            assert len(file_requests) == 1
+            # 文件下载不使用 Playwright（避免二进制文件 page.goto 问题）
+            assert "playwright" not in file_requests[0].meta
+            # 应携带认证 cookies
+            assert file_requests[0].cookies.get("session") == "abc123"
+        finally:
+            os.unlink(path)
 
     def test_parse_file_link_no_browser(self) -> None:
-        """非浏览器模式下文件链接不应包含 playwright meta"""
+        """非浏览器模式下文件链接不应包含 playwright meta，无 cookies"""
         spider = DomainSpider(
             domains=("example.com",),
             use_browser=False,
@@ -205,6 +261,7 @@ class TestDomainSpiderBrowserMode:
         file_requests = [r for r in requests if r.callback.__name__ == "parse_file"]
         assert len(file_requests) == 1
         assert "playwright" not in file_requests[0].meta
+        assert len(file_requests[0].cookies) == 0
 
     def test_parse_page_link_no_browser(self) -> None:
         """非浏览器模式下页面链接不应包含 playwright meta"""
@@ -215,3 +272,59 @@ class TestDomainSpiderBrowserMode:
         page_requests = [r for r in requests if r.callback.__name__ == "parse"]
         assert len(page_requests) == 1
         assert "playwright" not in page_requests[0].meta
+
+
+class TestDomainSpiderCookies:
+    """DomainSpider 认证 cookies 测试"""
+
+    def test_load_cookies_from_storage_state(self) -> None:
+        """应正确从 storageState 文件加载 cookies"""
+        import os
+
+        storage_state = {
+            "cookies": [
+                {"name": "sessionid", "value": "abc123", "domain": ".example.com"},
+                {"name": "token", "value": "xyz789", "domain": "api.example.com"},
+            ]
+        }
+        fd, path = tempfile.mkstemp(suffix=".json")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(storage_state, f)
+
+            cookies_by_domain = DomainSpider._load_cookies(path)
+            assert "example.com" in cookies_by_domain
+            assert cookies_by_domain["example.com"]["sessionid"] == "abc123"
+            assert "api.example.com" in cookies_by_domain
+            assert cookies_by_domain["api.example.com"]["token"] == "xyz789"
+        finally:
+            os.unlink(path)
+
+    def test_get_cookies_for_url_exact_domain(self) -> None:
+        """精确域名匹配应返回对应 cookies"""
+        spider = DomainSpider(domains=("example.com",))
+        spider._cookies_by_domain = {"example.com": {"session": "test123"}}
+
+        cookies = spider._get_cookies_for_url("https://example.com/doc.pdf")
+        assert cookies.get("session") == "test123"
+
+    def test_get_cookies_for_url_subdomain(self) -> None:
+        """子域名应匹配父域名的 cookies"""
+        spider = DomainSpider(domains=("example.com",))
+        spider._cookies_by_domain = {"example.com": {"session": "test123"}}
+
+        cookies = spider._get_cookies_for_url("https://api.example.com/doc.pdf")
+        assert cookies.get("session") == "test123"
+
+    def test_get_cookies_for_url_no_match(self) -> None:
+        """不匹配域名应返回空 cookies"""
+        spider = DomainSpider(domains=("example.com",))
+        spider._cookies_by_domain = {"other.com": {"session": "test123"}}
+
+        cookies = spider._get_cookies_for_url("https://example.com/doc.pdf")
+        assert len(cookies) == 0
+
+    def test_init_without_storage_state_path(self) -> None:
+        """无 storageState 路径时 cookies 应为空"""
+        spider = DomainSpider(domains=("example.com",), use_browser=True)
+        assert spider._cookies_by_domain == {}

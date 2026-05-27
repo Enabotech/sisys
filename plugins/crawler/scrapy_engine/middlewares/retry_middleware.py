@@ -30,13 +30,12 @@ class RetryMiddleware(ScrapyRetryMiddleware):
             settings.getlist("RETRY_HTTP_CODES", [500, 502, 503, 504, 408, 429]),
         )
 
-    def _retry(self, request, reason, spider):
+    def _retry(self, request, reason):
         """重试请求
 
         Args:
             request: 原始请求
             reason: 重试原因
-            spider: Spider 实例
 
         Returns:
             重试请求
@@ -51,7 +50,7 @@ class RetryMiddleware(ScrapyRetryMiddleware):
                 self._max_retry_times,
                 reason,
             )
-            return super()._retry(request, reason, spider)
+            return super()._retry(request, reason)
 
         logger.warning("重试次数已用尽: %s", request.url)
         return None

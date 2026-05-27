@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -85,6 +85,10 @@ class CrawlerSettings:
     browser_navigation_timeout_ms: int = 30000
     browser_headless: bool = True
     browser_proxy: str = ""
+
+    # ── 认证配置 ──
+    auth_storage_state_path: str = ""
+    auth_headers: dict[str, str] = field(default_factory=dict)
 
     # ── 存储配置 ──
     storage_backend: str = "minio"
@@ -166,6 +170,16 @@ class CrawlerSettings:
                 proxy = {"server": self.browser_proxy}
                 settings["PLAYWRIGHT_LAUNCH_OPTIONS"]["proxy"] = proxy
 
+            # storageState 注入（需 enable_browser=True）
+            if self.auth_storage_state_path:
+                settings["PLAYWRIGHT_CONTEXT_ARGS"] = {
+                    "storage_state": self.auth_storage_state_path,
+                }
+
+        # HTTP Header Auth 注入（适用所有模式）
+        if self.auth_headers:
+            settings["DEFAULT_REQUEST_HEADERS"] = dict(self.auth_headers)
+
         return settings
 
     @classmethod
@@ -209,4 +223,6 @@ class CrawlerSettings:
             browser_navigation_timeout_ms=int(os.getenv("CRAWLER_BROWSER_NAVIGATION_TIMEOUT_MS", "30000")),
             browser_headless=os.getenv("CRAWLER_BROWSER_HEADLESS", "true").lower() == "true",
             browser_proxy=os.getenv("CRAWLER_BROWSER_PROXY", ""),
+            # 认证配置
+            auth_storage_state_path=os.getenv("CRAWLER_AUTH_STORAGE_STATE_PATH", ""),
         )

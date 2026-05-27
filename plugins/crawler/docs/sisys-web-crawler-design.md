@@ -1183,6 +1183,14 @@ poetry run crawler crawl -d protected.example.com --formats pdf \
 poetry run crawler crawl -d api.example.com \
     --auth-header "Authorization=Bearer xxx" --formats pdf
 
+# Basic Auth — 便利选项（自动编码为 Authorization 头）
+poetry run crawler crawl -d intranet.example.com \
+    --auth-basic "user:pass" --formats pdf
+
+# 组合使用：浏览器 + storageState + 额外请求头
+poetry run crawler crawl -d protected.example.com --formats pdf \
+    --browser --auth-storage-state ./auth.json --auth-header "X-Custom=value"
+
 # 从任务配置文件启动
 poetry run crawler crawl --task config/tasks/example_task.yaml
 ```
@@ -1474,6 +1482,8 @@ P6 (事件配置)  ──┘
 
 ### 13.1 CLI 独立验证
 
+#### 基础爬取
+
 ```bash
 # 1. 安装依赖
 poetry install
@@ -1491,6 +1501,90 @@ ls -la ./test_output/
 
 # 5. 忽略 robots.txt（需显式指定）
 poetry run crawler crawl -d example.com --formats pdf --no-obey-robots
+```
+
+#### Playwright 浏览器模式
+
+```bash
+# 1. 安装浏览器内核（首次使用）
+poetry run playwright install chromium
+
+# 2. 浏览器模式爬取（绕过 WAF/反爬检测）
+poetry run crawler crawl -d www.tsmc.com --formats pdf --depth 2 \
+    --browser --browser-timeout 60 --no-obey-robots
+
+# 3. 验证输出
+ls -la ./crawl_output/
+# 预期：成功下载 JS 渲染后的页面链接中的文件
+
+# 4. 验证浏览器日志
+# 预期：日志显示 "Playwright browser context created" 和页面加载事件
+
+# 5. 对比测试（同一站点，浏览器 vs 非浏览器）
+# 非浏览器模式可能因 WAF 拦截失败，浏览器模式成功
+```
+
+#### 登录态爬取
+
+```bash
+# 1. 导出 storageState（使用 Playwright 手动登录）
+# 见 Section 15.3 的导出脚本，保存为 auth.json
+
+# 2. 登录态爬取测试
+poetry run crawler crawl -d protected.example.com --formats pdf \
+    --browser --auth-storage-state ./auth.json --depth 2
+
+# 3. 验证输出
+ls -la ./crawl_output/
+# 预期：成功下载需登录才能访问的文件
+
+# 4. 验证认证生效
+# 预期：日志显示 "PLAYWRIGHT_CONTEXT_ARGS = {'storage_state': ...}"
+
+# 5. Header Auth 测试
+poetry run crawler crawl -d api.example.com --formats pdf \
+    --auth-header "Authorization=Bearer xxx"
+
+# 6. Basic Auth 测试
+poetry run crawler crawl -d intranet.example.com --formats pdf \
+    --auth-basic "admin:secret"
+
+# 7. 验证 header 注入
+# 预期：日志显示请求携带 Authorization 头
+
+# 8. 手动登录爬取
+# S1. WSL2 内弹出 Chromium 窗口（显示在 Windows 桌面上）→ 跳转 TI 登录页
+# S2. 自动填写邮箱 → 点击继续 → 自动填写密码 → 点击登录
+# S3. 如有验证码/二次验证，你在 Chromium 窗口中手动处理，完成后回到终端按 Enter
+# S4. 登录态自动保存 → Chromium 关闭 → Scrapy 爬虫自动启动，携带登录态爬取
+poetry run crawler crawl -d ti.com -o /mnt/x/downloads/ti.com-b1 \
+    --formats pdf,doc,docx,ppt,pptx,zip,tar,md,csv,xls,xlsx,txt,mp4,mp3,wmv \
+    --depth 8 --browser --no-obey-robots \
+    --login-url "https://login.ti.com/login" \
+    --login-user "**********" \
+    --login-pass "**********"
+
+```
+
+#### 媒体文件爬取
+
+```bash
+# 1. 视频文件爬取
+poetry run crawler crawl -d video.example.com --formats mp4,avi,mkv --depth 1
+
+# 2. 验证视频元数据提取
+ls -la ./crawl_output/
+# 预期：视频文件已下载，命名包含标题信息（如有）
+
+# 3. 音频文件爬取
+poetry run crawler crawl -d audio.example.com --formats mp3,wav,flac --depth 1
+
+# 4. 验证音频元数据提取
+# 预期：音频文件已下载，命名包含标题/艺术家信息（如有）
+
+# 5. 大文件测试（验证下载超时和重试）
+poetry run crawler crawl -d large-files.example.com --formats mp4 \
+    --browser-timeout 120 --formats mp4 --depth 1
 ```
 
 ### 13.2 服务模式验证
@@ -1516,6 +1610,37 @@ curl -X POST http://localhost:8900/tasks \
 # 5. 查询任务状态
 curl http://localhost:8900/tasks/{task_id}
 # 预期：{"task_id": "...", "status": "running", ...}
+
+# 6. 登录态爬取任务（storageState + browser）
+curl -X POST http://localhost:8900/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["protected.example.com"],
+    "allowed_extensions": ["pdf"],
+    "use_browser": true,
+    "auth_storage_state_path": "/path/to/auth.json"
+  }'
+# 预期：{"task_id": "...", "status": "submitted"}
+
+# 7. Header Auth 任务（不需要 browser）
+curl -X POST http://localhost:8900/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["api.example.com"],
+    "allowed_extensions": ["pdf"],
+    "auth_headers": {"Authorization": "Bearer xxx"}
+  }'
+# 预期：{"task_id": "...", "status": "submitted"}
+
+# 8. 校验：storageState 不带 browser 应返回 422
+curl -X POST http://localhost:8900/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["protected.example.com"],
+    "allowed_extensions": ["pdf"],
+    "auth_storage_state_path": "/path/to/auth.json"
+  }'
+# 预期：422 Validation Error — "auth_storage_state_path 需要 use_browser=true"
 ```
 
 ### 13.3 SISYS 集成验证
@@ -1544,13 +1669,37 @@ poetry run ruff check plugins/crawler/ src/domain/ports/crawler_client.py src/in
 poetry run ruff format plugins/crawler/ src/domain/ports/crawler_client.py src/infrastructure/crawler/
 poetry run mypy plugins/crawler/ src/domain/ports/crawler_client.py src/infrastructure/crawler/
 
-# 测试
+# 单元测试（Crawler 插件）
+poetry run pytest plugins/crawler/tests/unit/ -v
+
+# 认证配置测试
+poetry run pytest plugins/crawler/tests/unit/test_settings.py::TestCrawlerSettings::test_default_auth_fields_empty -v
+poetry run pytest plugins/crawler/tests/unit/test_settings.py::TestCrawlerSettings::test_to_scrapy_settings_storage_state_with_browser -v
+poetry run pytest plugins/crawler/tests/unit/test_entities.py::TestCrawlTask::test_from_dict_with_auth -v
+
+# 浏览器模式测试
+poetry run pytest plugins/crawler/tests/unit/test_domain_spider.py::TestDomainSpiderBrowserMode -v
+
+# 集成测试（全量 + 覆盖率）
 poetry run pytest tests/ -v --cov=plugins/crawler --cov-report=term-missing
 
 # 覆盖率门禁
 # Crawler core ≥90%
 # 整体 ≥80%
 ```
+
+### 13.5 常见问题排查
+
+| 问题 | 掙扎表现 | 诊断 | 解决方案 |
+|------|---------|------|---------|
+| WAF 拦截 | 403 Forbidden，日志显示 Cloudflare/Akamai 错误 | 目标站点启用反爬检测 | 使用 `--browser` 启用 Playwright 浏览器模式 |
+| 页面加载超时 | `waiting until "load"` 超时 30s | 目标站点 JS 渲染慢、资源多 | 使用 `--browser-timeout 60` 增加超时 |
+| 登录态失效 | 文件下载返回 401 Unauthorized | storageState 过期或路径错误 | 重新导出 auth.json，检查 `--auth-storage-state` 参数 |
+| Basic Auth 格式错误 | CLI 报错 "--auth-basic 格式应为 user:pass" | 参数格式不正确 | 使用正确格式 `--auth-basic "username:password"` |
+| Header 格式错误 | CLI 警告 "忽略无效 header 格式" | 参数格式不正确 | 使用正确格式 `--auth-header "Key=Value"` |
+| storageState 需要 browser | CLI 报错 "--auth-storage-state 需要配合 --browser 使用" | storageState 仅在 Playwright 浏览器上下文生效 | 添加 `--browser` 参数 |
+| 视频文件下载失败 | 大文件超时或下载中断 | 文件过大，超时不足 | 使用 `--browser-timeout 120` 或更大值 |
+| 爬虫临时文件残留 | `/tmp/crawler` 目录文件堆积 | 爬虫异常退出未清理 | 手动清理 `rm -rf /tmp/crawler` |
 
 ---
 
@@ -1730,9 +1879,9 @@ curl -X POST http://localhost:8900/tasks \
 
 ---
 
-## 15. 登录态爬取（规划中）
+## 15. 登录态爬取
 
-> **状态**：本章节为设计方案，尚未实现。以下字段仅在本文档中定义，实际代码中 `CrawlerSettings`、`CrawlTask`、`CrawlTaskRequest`、CLI 均不包含 `auth_*` 相关字段。Section 7.1 中的 `auth_storage_state_path` 和 `auth_headers` 为设计预留字段。
+> **状态**：已实现。支持三种认证机制：Playwright storageState（浏览器会话）、HTTP auth headers（通用请求头）、Basic Auth（CLI 便利选项）。
 
 ### 15.1 价值分析
 
@@ -1829,9 +1978,9 @@ if self.enable_browser and self.auth_storage_state_path:
         "storage_state": self.auth_storage_state_path,
     }
 
-# HTTP Header Auth 注入
+# HTTP Header Auth 注入（适用所有模式）
 if self.auth_headers:
-    settings.setdefault("DEFAULT_REQUEST_HEADERS", {}).update(self.auth_headers)
+    settings["DEFAULT_REQUEST_HEADERS"] = dict(self.auth_headers)
 ```
 
 #### 实体扩展
@@ -1847,28 +1996,45 @@ class CrawlTask:
     auth_headers: dict[str, str] = field(default_factory=dict)
 ```
 
-#### CLI 参数（规划中）
+#### CLI 参数
 
 ```bash
-# 登录态爬取（Playwright storageState）
+# 登录态爬取（Playwright storageState，需配合 --browser）
 poetry run crawler crawl -d protected.example.com --formats pdf \
     --browser --auth-storage-state ./auth.json
 
-# Header Auth（API Token）
+# Header Auth（API Token / Bearer，适用所有模式）
 poetry run crawler crawl -d api.example.com \
     --auth-header "Authorization=Bearer xxx" --formats pdf
+
+# Basic Auth 便利选项（自动编码为 Authorization 头）
+poetry run crawler crawl -d intranet.example.com \
+    --auth-basic "user:pass" --formats pdf
+
+# 组合使用：浏览器 + storageState + 额外请求头
+poetry run crawler crawl -d protected.example.com --formats pdf \
+    --browser --auth-storage-state ./auth.json --auth-header "X-Custom=value"
 ```
 
-#### API 请求（规划中）
+| 参数 | 格式 | 说明 |
+|------|------|------|
+| `--auth-storage-state` | 文件路径 | Playwright storageState JSON（需 `--browser`） |
+| `--auth-header` | `Key=Value`（可多次指定） | 自定义请求头，后者覆盖前者同名头 |
+| `--auth-basic` | `user:pass` | HTTP Basic Auth 便利选项，内部编码为 `Authorization: Basic ...` |
+
+#### API 请求
 
 ```json
 {
   "domains": ["protected.example.com"],
   "allowed_extensions": ["pdf"],
   "use_browser": true,
-  "auth_storage_state_path": "/path/to/auth.json"
+  "auth_storage_state_path": "/path/to/auth.json",
+  "auth_headers": {"Authorization": "Bearer xxx"}
 }
 ```
+
+**校验规则**：`auth_storage_state_path` 非空时，`use_browser` 必须为 `true`，否则返回 422。
 
 ### 15.6 安全注意事项
 
