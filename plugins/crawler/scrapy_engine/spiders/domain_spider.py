@@ -68,6 +68,7 @@ class DomainSpider(scrapy.Spider):
             meta = {"depth": 0, "page_title": "", "parent_url": ""}
             if self.use_browser:
                 meta["playwright"] = True
+                meta["playwright_page_goto_kwargs"] = {"wait_until": "domcontentloaded"}
             yield scrapy.Request(
                 url=url,
                 callback=self.parse,
@@ -104,7 +105,7 @@ class DomainSpider(scrapy.Spider):
                 }
                 if self.use_browser:
                     file_meta["playwright"] = True
-                    file_meta["playwright_goto_kwargs"] = {"wait_until": "commit"}
+                    file_meta["playwright_page_goto_kwargs"] = {"wait_until": "commit"}
                 yield scrapy.Request(
                     url=url,
                     callback=self.parse_file,
@@ -118,6 +119,7 @@ class DomainSpider(scrapy.Spider):
                 }
                 if self.use_browser:
                     meta["playwright"] = True
+                    meta["playwright_page_goto_kwargs"] = {"wait_until": "domcontentloaded"}
                 yield scrapy.Request(
                     url=url,
                     callback=self.parse,
