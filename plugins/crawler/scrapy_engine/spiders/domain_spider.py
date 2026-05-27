@@ -96,15 +96,19 @@ class DomainSpider(scrapy.Spider):
             url = response.urljoin(href)
 
             if self._is_target_file(url):
+                file_meta = {
+                    "parent_url": response.url,
+                    "page_title": page_title,
+                    "link_text": link_text,
+                    "depth": current_depth,
+                }
+                if self.use_browser:
+                    file_meta["playwright"] = True
+                    file_meta["playwright_goto_kwargs"] = {"wait_until": "commit"}
                 yield scrapy.Request(
                     url=url,
                     callback=self.parse_file,
-                    meta={
-                        "parent_url": response.url,
-                        "page_title": page_title,
-                        "link_text": link_text,
-                        "depth": current_depth,
-                    },
+                    meta=file_meta,
                 )
             elif self._should_follow(url, current_depth):
                 meta = {

@@ -43,12 +43,11 @@ class UserAgentRotationMiddleware:
         custom_uas = crawler.settings.getlist("USER_AGENT_POOL", None)
         return cls(user_agents=custom_uas if custom_uas else None)
 
-    def process_request(self, request, spider):
+    def process_request(self, request):
         """处理请求：设置随机 UA
 
         Args:
             request: Scrapy Request
-            spider: Spider 实例
         """
         ua_index = secrets.randbelow(len(self._user_agents))
         request.headers["User-Agent"] = self._user_agents[ua_index]
