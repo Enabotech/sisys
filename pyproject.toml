@@ -99,6 +99,9 @@ types-psycopg2 = "^2.9.21.20260422"
 types-aiofiles = "^25.1.0.20250115"
 aiofiles = "^25.1.0"
 
+# Others
+scrapy-playwright = "^0.0.46"
+
 [tool.poetry.group.test.dependencies]
 pytest = "^8.0.0"
 pytest-asyncio = "^0.24.0"

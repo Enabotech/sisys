@@ -85,25 +85,22 @@ class CrawlerPlugin:
 
         extensions = task.allowed_extensions or self._settings.allowed_extensions
 
-        process = CrawlerProcess(
-            settings={
-                "BOT_NAME": "sisys_crawler",
-                "SPIDER_MODULES": ["plugins.crawler.scrapy_engine.spiders"],
-                "NEWSPIDER_MODULE": "plugins.crawler.scrapy_engine.spiders",
-                "ROBOTSTXT_OBEY": self._settings.respect_robots_txt,
-                "CONCURRENT_REQUESTS": self._settings.max_concurrent_requests,
-                "DOWNLOAD_DELAY": self._settings.download_delay,
-                "DOWNLOAD_TIMEOUT": self._settings.download_timeout,
-                "ITEM_PIPELINES": {
-                    "plugins.crawler.scrapy_engine.pipelines.file_download_pipeline.FileDownloadPipeline": 100,
-                    "plugins.crawler.scrapy_engine.pipelines.format_detection_pipeline.FormatDetectionPipeline": 200,
-                    "plugins.crawler.scrapy_engine.pipelines.metadata_pipeline.MetadataPipeline": 300,
-                    "plugins.crawler.scrapy_engine.pipelines.smart_naming_pipeline.SmartNamingPipeline": 400,
-                    "plugins.crawler.scrapy_engine.pipelines.storage_pipeline.StoragePipeline": 500,
-                    "plugins.crawler.scrapy_engine.pipelines.notification_pipeline.NotificationPipeline": 600,
-                },
-            },
+        settings = CrawlerSettings(
+            respect_robots_txt=self._settings.respect_robots_txt,
+            max_concurrent_requests=self._settings.max_concurrent_requests,
+            download_delay=task.download_delay,
+            download_timeout=self._settings.download_timeout,
+            enable_browser=task.use_browser,
+            browser_concurrent_pages=self._settings.browser_concurrent_pages,
+            browser_navigation_timeout_ms=self._settings.browser_navigation_timeout_ms,
+            browser_headless=self._settings.browser_headless,
+            browser_proxy=self._settings.browser_proxy,
+            local_output_dir=self._settings.local_output_dir,
         )
+        scrapy_settings = settings.to_scrapy_settings()
+        scrapy_settings["CRAWL_OUTPUT_DIR"] = self._settings.local_output_dir
+
+        process = CrawlerProcess(settings=scrapy_settings)
 
         process.crawl(
             "domain",
@@ -113,6 +110,7 @@ class CrawlerPlugin:
             allowed_extensions=extensions,
             max_depth=task.max_depth,
             follow_subdomains=task.follow_subdomains,
+            use_browser=task.use_browser,
         )
 
         import threading

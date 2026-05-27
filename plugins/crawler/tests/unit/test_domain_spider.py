@@ -1,10 +1,13 @@
 """Domain Spider 单元测试
 
-验证 DomainSpider 的链接判断和深度控制
-
+验证 DomainSpider 的链接判断、深度控制和浏览器模式
 """
 
 from __future__ import annotations
+
+import asyncio
+
+import scrapy
 
 from plugins.crawler.scrapy_engine.spiders.domain_spider import DomainSpider
 
@@ -21,6 +24,7 @@ class TestDomainSpider:
         assert spider.max_depth == 3
         assert spider.follow_subdomains is True
         assert spider.allowed_extensions == set()
+        assert spider.use_browser is False
 
     def test_init_custom_values(self) -> None:
         """初始化应接受自定义值"""
@@ -30,11 +34,13 @@ class TestDomainSpider:
             max_depth=5,
             follow_subdomains=False,
             allowed_extensions=("pdf", "docx"),
+            use_browser=True,
         )
 
         assert spider.max_depth == 5
         assert spider.follow_subdomains is False
         assert spider.allowed_extensions == {"pdf", "docx"}
+        assert spider.use_browser is True
 
     def test_is_target_file_with_allowed_extension(self) -> None:
         """允许的扩展名应返回 True"""
@@ -117,3 +123,78 @@ class TestDomainSpider:
         assert DomainSpider._extract_filename_from_url("https://example.com/docs/report.pdf") == "report.pdf"
         assert DomainSpider._extract_filename_from_url("https://example.com/file.tar.gz") == "file.tar.gz"
         assert DomainSpider._extract_filename_from_url("https://example.com/") == ""
+
+
+def _collect_start_requests(spider: DomainSpider) -> list:
+    """收集 async start() 方法的全部请求"""
+    return asyncio.get_event_loop().run_until_complete(_alist(spider.start()))
+
+
+async def _alist(async_gen):
+    """将 async generator 转为 list"""
+    result = []
+    async for item in async_gen:
+        result.append(item)
+    return result
+
+
+def _make_text_response(
+    url: str,
+    body: str = "<html><body></body></html>",
+    meta: dict | None = None,
+) -> scrapy.http.TextResponse:
+    """构造 TextResponse 测试对象"""
+    request = scrapy.Request(url=url, meta=meta or {})
+    return scrapy.http.TextResponse(url=url, body=body.encode(), request=request)
+
+
+class TestDomainSpiderBrowserMode:
+    """DomainSpider 浏览器模式测试"""
+
+    def test_use_browser_false_no_playwright_meta(self) -> None:
+        """use_browser=False 时初始请求不应包含 playwright meta"""
+        spider = DomainSpider(domains=("example.com",), use_browser=False)
+        requests = _collect_start_requests(spider)
+        assert len(requests) == 1
+        assert "playwright" not in requests[0].meta
+
+    def test_use_browser_true_has_playwright_meta(self) -> None:
+        """use_browser=True 时初始请求应包含 playwright=True"""
+        spider = DomainSpider(domains=("example.com",), use_browser=True)
+        requests = _collect_start_requests(spider)
+        assert len(requests) == 1
+        assert requests[0].meta.get("playwright") is True
+
+    def test_parse_page_link_browser_mode(self) -> None:
+        """浏览器模式下页面链接应包含 playwright meta"""
+        spider = DomainSpider(domains=("example.com",), use_browser=True, max_depth=2)
+        html = '<html><head><title>Test</title></head><body><a href="/page">link</a></body></html>'
+        response = _make_text_response("https://example.com/", html, meta={"depth": 0})
+        requests = list(spider.parse(response))
+        page_requests = [r for r in requests if r.callback.__name__ == "parse"]
+        assert len(page_requests) == 1
+        assert page_requests[0].meta.get("playwright") is True
+
+    def test_parse_file_link_no_playwright(self) -> None:
+        """文件链接不应使用 Playwright（无论 use_browser 值如何）"""
+        spider = DomainSpider(
+            domains=("example.com",),
+            use_browser=True,
+            allowed_extensions=("pdf",),
+        )
+        html = '<html><head><title>Test</title></head><body><a href="/doc.pdf">PDF</a></body></html>'
+        response = _make_text_response("https://example.com/", html, meta={"depth": 0})
+        requests = list(spider.parse(response))
+        file_requests = [r for r in requests if r.callback.__name__ == "parse_file"]
+        assert len(file_requests) == 1
+        assert "playwright" not in file_requests[0].meta
+
+    def test_parse_page_link_no_browser(self) -> None:
+        """非浏览器模式下页面链接不应包含 playwright meta"""
+        spider = DomainSpider(domains=("example.com",), use_browser=False, max_depth=2)
+        html = '<html><head><title>Test</title></head><body><a href="/page">link</a></body></html>'
+        response = _make_text_response("https://example.com/", html, meta={"depth": 0})
+        requests = list(spider.parse(response))
+        page_requests = [r for r in requests if r.callback.__name__ == "parse"]
+        assert len(page_requests) == 1
+        assert "playwright" not in page_requests[0].meta

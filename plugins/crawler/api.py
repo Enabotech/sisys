@@ -27,6 +27,7 @@ class CrawlTaskRequest(BaseModel):
     url_patterns: dict[str, list[str]] | None = Field(default=None, description="URL 模式")
     max_files: int = Field(default=1000, ge=1, le=10000, description="最大文件数")
     download_delay: float = Field(default=1.0, ge=0.1, le=10.0, description="下载延迟")
+    use_browser: bool = Field(default=False, description="启用 Playwright 浏览器模式（绕过 WAF）")
 
 
 class CrawlTaskResponse(BaseModel):
@@ -102,6 +103,7 @@ def create_app() -> FastAPI:
             url_exclude=url_exclude,
             max_files=request.max_files,
             download_delay=request.download_delay,
+            use_browser=request.use_browser,
         )
         task_id = plugin.start_crawl(task)
         return {"task_id": task_id, "status": "submitted"}

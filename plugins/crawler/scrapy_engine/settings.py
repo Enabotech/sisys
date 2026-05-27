@@ -1,6 +1,7 @@
 """Scrapy 引擎默认设置模块
 
-定义 Scrapy 爬虫的默认配置
+定义 Scrapy 爬虫的默认配置，作为参考文档。
+实际运行时配置由 CrawlerSettings.to_scrapy_settings() 生成。
 """
 
 from __future__ import annotations
@@ -37,3 +38,19 @@ RETRY_HTTP_CODES = [500, 502, 503, 504, 408, 429]
 USER_AGENT = "SISYS Crawler/0.1.0"
 
 LOG_LEVEL = "INFO"
+
+# ── Playwright 浏览器模式配置（仅 enable_browser=True 时生效）──
+TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+
+DOWNLOAD_HANDLERS = {
+    "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+    "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+}
+
+PLAYWRIGHT_LAUNCH_OPTIONS = {
+    "headless": True,
+}
+
+PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = 30000
+
+PLAYWRIGHT_ABORT_REQUEST = "plugins.crawler.scrapy_engine.middlewares.playwright_abort.should_abort_request"

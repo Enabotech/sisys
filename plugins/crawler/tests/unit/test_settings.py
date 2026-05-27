@@ -94,3 +94,65 @@ class TestCrawlerSettings:
             "m4a",
         }
         assert set(settings.allowed_extensions) == expected
+
+    def test_to_scrapy_settings_basic(self) -> None:
+        """to_scrapy_settings 应包含基础配置"""
+        settings = CrawlerSettings()
+        result = settings.to_scrapy_settings()
+        assert result["BOT_NAME"] == "sisys_crawler"
+        assert result["ROBOTSTXT_OBEY"] is True
+        assert result["CONCURRENT_REQUESTS"] == 8
+        assert result["DOWNLOAD_DELAY"] == 1.0
+        assert "ITEM_PIPELINES" in result
+        assert len(result["ITEM_PIPELINES"]) == 6
+
+    def test_to_scrapy_settings_middlewares_activated(self) -> None:
+        """默认应激活三个中间件"""
+        settings = CrawlerSettings()
+        result = settings.to_scrapy_settings()
+        assert "DOWNLOADER_MIDDLEWARES" in result
+        middlewares = result["DOWNLOADER_MIDDLEWARES"]
+        assert len(middlewares) == 3
+        assert "RateLimitMiddleware" in str(middlewares)
+        assert "UserAgentRotationMiddleware" in str(middlewares)
+        assert "RetryMiddleware" in str(middlewares)
+
+    def test_to_scrapy_settings_middlewares_disabled(self) -> None:
+        """中间件开关关闭时不应出现在配置中"""
+        settings = CrawlerSettings(enable_rate_limit=False, enable_ua_rotation=False, enable_retry=False)
+        result = settings.to_scrapy_settings()
+        assert "DOWNLOADER_MIDDLEWARES" not in result
+
+    def test_to_scrapy_settings_browser_disabled_by_default(self) -> None:
+        """默认不应包含 Playwright 配置"""
+        settings = CrawlerSettings()
+        result = settings.to_scrapy_settings()
+        assert "TWISTED_REACTOR" not in result
+        assert "DOWNLOAD_HANDLERS" not in result
+
+    def test_to_scrapy_settings_browser_enabled(self) -> None:
+        """启用浏览器时应包含 Playwright 配置"""
+        settings = CrawlerSettings(enable_browser=True)
+        result = settings.to_scrapy_settings()
+        assert result["TWISTED_REACTOR"] == "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+        assert "ScrapyPlaywrightDownloadHandler" in str(result["DOWNLOAD_HANDLERS"])
+        assert "playwright_abort" in result["PLAYWRIGHT_ABORT_REQUEST"]
+        assert result["PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT"] == 30000
+
+    def test_to_scrapy_settings_browser_proxy(self) -> None:
+        """配置代理时应传入 PLAYWRIGHT_LAUNCH_OPTIONS"""
+        settings = CrawlerSettings(enable_browser=True, browser_proxy="http://proxy:8080")
+        result = settings.to_scrapy_settings()
+        assert result["PLAYWRIGHT_LAUNCH_OPTIONS"]["proxy"]["server"] == "http://proxy:8080"
+
+    def test_to_scrapy_settings_user_agent(self) -> None:
+        """传入 user_agent 时应设置 USER_AGENT"""
+        settings = CrawlerSettings()
+        result = settings.to_scrapy_settings(user_agent="CustomBot/1.0")
+        assert result["USER_AGENT"] == "CustomBot/1.0"
+
+    def test_to_scrapy_settings_no_user_agent(self) -> None:
+        """不传 user_agent 时不应设置 USER_AGENT（交给 UA 轮换中间件）"""
+        settings = CrawlerSettings()
+        result = settings.to_scrapy_settings()
+        assert "USER_AGENT" not in result

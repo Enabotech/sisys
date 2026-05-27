@@ -42,6 +42,7 @@ class CrawlTask:
     download_delay: float = 1.0
     url_include: tuple[str, ...] = ()
     url_exclude: tuple[str, ...] = ()
+    use_browser: bool = False
 
     @classmethod
     def from_dict(cls, data: dict) -> CrawlTask:
@@ -69,6 +70,7 @@ class CrawlTask:
             download_delay=data.get("download_delay", 1.0),
             url_include=url_include,
             url_exclude=url_exclude,
+            use_browser=data.get("use_browser", False),
         )
 
 
