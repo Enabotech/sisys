@@ -177,7 +177,7 @@ plugins/crawler/
     spiders/
       __init__.py
       domain_spider.py                     # DomainSpider — 域名递归爬取
-      sitemap_spider.py                    # SitemapSpider — 基于 sitemap.xml
+      sitemap_spider.py                    # SitemapSpider — 基于 sitemap.xml（规划中）
     pipelines/
       __init__.py
       file_download_pipeline.py            # 文件下载到临时目录
@@ -194,7 +194,7 @@ plugins/crawler/
       playwright_abort.py                 # Playwright 资源过滤（中止图片/字体/CSS/媒体）
     extensions/
       __init__.py
-      stats_extension.py                   # 爬取统计采集
+      stats_extension.py                   # 爬取统计采集（规划中）
 
   storage/
     __init__.py
@@ -241,7 +241,7 @@ Crawler Service 暴露以下 REST API 端点：
 |------|------|------|------|------|
 | POST | `/tasks` | 提交爬取任务 | CrawlTaskRequest | `{ task_id: str }` |
 | GET | `/tasks/{task_id}` | 查询任务状态 | — | CrawlTaskStatus |
-| DELETE | `/tasks/{task_id}` | 取消任务 | — | `{ cancelled: bool }` |
+| DELETE | `/tasks/{task_id}` | 取消任务 | — | `{ task_id: str, status: "cancelled" }` |
 | GET | `/tasks` | 列出任务 | `?status=running` | `list[CrawlTaskStatus]` |
 | GET | `/formats` | 列出支持的文件格式 | — | `{ formats: list[str] }` |
 | GET | `/health` | 健康检查 | — | `{ status: "healthy" }` |
@@ -261,9 +261,7 @@ Crawler Service 暴露以下 REST API 端点：
   },
   "max_files": 500,
   "download_delay": 2.0,
-  "use_browser": false,
-  "auth_storage_state_path": null,
-  "auth_headers": null
+  "use_browser": false
 }
 ```
 
@@ -299,7 +297,7 @@ class StoragePort(Protocol):
         file_name: str,
         file_path: str,
         content_type: str,
-        metadata: dict,
+        metadata: dict[str, str],
     ) -> str:
         """存储文件，返回对象路径"""
         ...
@@ -632,7 +630,7 @@ class DomainSpider(scrapy.Spider):
         return domain in self.seed_domains
 ```
 
-#### SitemapSpider — 基于 sitemap.xml 的快速发现
+#### SitemapSpider — 基于 sitemap.xml 的快速发现（规划中）
 
 适合有 `sitemap.xml` 的结构化站点，直接解析 sitemap 中的 URL 列表，效率高于页面递归
 
@@ -655,6 +653,7 @@ class CrawledFileItem(scrapy.Item):
 
     # 元数据（MetadataPipeline 填充）
     metadata_title = scrapy.Field()         # 文件元数据中的标题
+    metadata_content_title = scrapy.Field() # 文档内容推导标题（如 PDF 大纲、DOCX Heading）
     metadata_author = scrapy.Field()        # 文件元数据中的作者
     metadata_created = scrapy.Field()       # 创建日期
     metadata_extra = scrapy.Field()         # 其他元数据 dict
@@ -684,39 +683,39 @@ CrawledFileItem
     ▼
 ┌─────────────────────────┐
 │ 1. FileDownloadPipeline  │  下载文件到临时目录
-│    (FilesPipeline 扩展)  │  填充: file_path, file_size, content_type
+│    优先级: 100            │  填充: file_path, file_size, content_type
 └─────────┬───────────────┘
           │
           ▼
 ┌─────────────────────────┐
 │ 2. FormatDetectionPipe   │  MIME magic 检测真实格式
-│    (不信任扩展名)         │  填充: detected_format
+│    优先级: 200            │  填充: detected_format
 └─────────┬───────────────┘
           │
           ▼
 ┌─────────────────────────┐
 │ 3. MetadataPipeline      │  通过 FileFormatHandlerRegistry
-│    (元数据提取)           │  提取文件元数据
+│    优先级: 300            │  提取文件元数据
 │                          │  填充: metadata_title, metadata_author, ...
 └─────────┬───────────────┘
           │
           ▼
 ┌─────────────────────────┐
 │ 4. SmartNamingPipeline   │  调用 SmartNamingEngine
-│    (智能命名)             │  按优先级链选择最佳文件名
+│    优先级: 400            │  按优先级链选择最佳文件名
 │                          │  填充: smart_name, naming_strategy_used
 └─────────┬───────────────┘
           │
           ▼
 ┌─────────────────────────┐
 │ 5. StoragePipeline       │  通过 StoragePort 推送文件
-│    (存储推送)             │  MinIO S3 或本地文件系统
+│    优先级: 500            │  MinIO S3 或本地文件系统
 └─────────┬───────────────┘
           │
           ▼
 ┌─────────────────────────┐
 │ 6. NotificationPipeline  │  通过 EventPublisher 发布事件
-│    (事件通知)             │  CrawlCompleted / FileCrawled
+│    优先级: 600            │  CrawlCompleted / FileCrawled
 └─────────────────────────┘
 ```
 
@@ -724,9 +723,9 @@ CrawledFileItem
 
 | Middleware | 职责 | 配置项 | 激活状态 |
 |------------|------|--------|---------|
-| RateLimitMiddleware | 域名级别令牌桶限速，保证请求间隔 | `CRAWLER_DOWNLOAD_DELAY` | 默认激活 |
-| UserAgentRotationMiddleware | UA 池随机轮换，避免被封 | `CRAWLER_USER_AGENT_POOL` | 默认激活 |
-| RetryMiddleware | 指数退避重试（429/5xx） | `CRAWLER_RETRY_TIMES`, `CRAWLER_RETRY_HTTP_CODES` | 默认激活 |
+| RateLimitMiddleware | 域名级别令牌桶限速，保证请求间隔 | `RATE_LIMIT_RPS`（env: `CRAWLER_RATE_LIMIT_RPS`） | 默认激活 |
+| UserAgentRotationMiddleware | UA 池随机轮换，避免被封 | `USER_AGENT_POOL`（env: `CRAWLER_USER_AGENT_POOL`） | 默认激活 |
+| RetryMiddleware | 指数退避重试（429/5xx） | `RETRY_TIMES`, `RETRY_HTTP_CODES` | 默认激活 |
 | Scrapy ROBOTSTXT_OBEY | robots.txt 遵守（内置） | `CRAWLER_RESPECT_ROBOTS_TXT` | 内置 |
 | PlaywrightAbort | 中止无关浏览器子请求（图片/字体/CSS/媒体） | `PLAYWRIGHT_ABORT_REQUEST` | `--browser` 时激活 |
 
@@ -746,12 +745,12 @@ class FileFormatHandler(Protocol):
     """
 
     @property
-    def supported_extensions(self) -> list[str]:
+    def supported_extensions(self) -> tuple[str, ...]:
         """支持的文件扩展名列表"""
         ...
 
     @property
-    def supported_mime_types(self) -> list[str]:
+    def supported_mime_types(self) -> tuple[str, ...]:
         """支持的 MIME 类型列表"""
         ...
 
@@ -868,8 +867,8 @@ class SmartNamingEngine:
         url: str | None = None,
         file_extension: str = "",
         author: str = "",
-    ) -> list[NamingCandidate]:
-        """生成命名候选列表（按优先级排序）"""
+    ) -> NamingCandidate:
+        """按优先级链生成候选名称，返回最佳候选"""
         candidates = []
 
         # 策略 1: 文件元数据标题
@@ -901,13 +900,9 @@ class SmartNamingEngine:
             hash_name = self._hash_fallback(url, file_extension)
             candidates.append(NamingCandidate(hash_name, "content_hash", 0.10, ...))
 
-        return candidates
-
-    def select_best(self, candidates: list[NamingCandidate]) -> NamingCandidate:
-        """选择最佳候选并处理冲突"""
+        # 选择最佳候选并处理冲突（内联 select_best 逻辑）
         if not candidates:
             raise ValueError("无可用命名候选")
-
         chosen = max(candidates, key=lambda c: c.confidence)
         chosen.filename = self._resolve_conflict(chosen.filename)
         return chosen
@@ -1017,7 +1012,7 @@ class CrawlerSettings:
 
     # ── 中间件开关 ──
     enable_rate_limit: bool = True                       # 限速中间件
-    rate_limit_rps: float = 1.0                          # 每秒请求数
+    rate_limit_rps: float = 2.0                          # 每秒请求数
     enable_ua_rotation: bool = True                      # UA 轮换中间件
     enable_retry: bool = True                            # 重试中间件
 
@@ -1619,7 +1614,7 @@ scrapy-playwright 的 `ScrapyPlaywrightDownloadHandler` 继承默认 handler，�
 | 配置项 | 环境变量 | 默认值 | 说明 |
 |--------|---------|--------|------|
 | `enable_browser` | `CRAWLER_ENABLE_BROWSER` | `False` | 启用 Playwright 浏览器模式 |
-| `browser_concurrent_pages` | `CRAWLER_BROWSER_CONCURRENT_PAGES` | `4` | 浏览器并发页面数 |
+| `browser_concurrent_pages` | `CRAWLER_BROWSER_CONCURRENT_PAGES` | `4` | 浏览器并发页面数（预留，当前未注入 Scrapy settings） |
 | `browser_navigation_timeout_ms` | — | `30000` | 页面加载超时（毫秒） |
 | `browser_headless` | `CRAWLER_BROWSER_HEADLESS` | `True` | 无头模式 |
 | `browser_proxy` | `CRAWLER_BROWSER_PROXY` | `""` | 浏览器代理 |
@@ -1717,7 +1712,9 @@ curl -X POST http://localhost:8900/tasks \
 
 ---
 
-## 15. 登录态爬取
+## 15. 登录态爬取（规划中）
+
+> **状态**：本章节为设计方案，尚未实现。代码中 `CrawlerSettings`、`CrawlTask`、`CrawlTaskRequest`、CLI 均不包含 `auth_*` 相关字段。
 
 ### 15.1 价值分析
 
@@ -1832,7 +1829,7 @@ class CrawlTask:
     auth_headers: dict[str, str] = field(default_factory=dict)
 ```
 
-#### CLI 参数
+#### CLI 参数（规划中）
 
 ```bash
 # 登录态爬取（Playwright storageState）
@@ -1844,7 +1841,7 @@ poetry run crawler crawl -d api.example.com \
     --auth-header "Authorization=Bearer xxx" --formats pdf
 ```
 
-#### API 请求
+#### API 请求（规划中）
 
 ```json
 {
