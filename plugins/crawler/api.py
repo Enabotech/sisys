@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from plugins.crawler.core.entities import CrawlTask
 from plugins.crawler.messaging.console_publisher import ConsolePublisher
@@ -28,6 +28,15 @@ class CrawlTaskRequest(BaseModel):
     max_files: int = Field(default=1000, ge=1, le=10000, description="最大文件数")
     download_delay: float = Field(default=1.0, ge=0.1, le=10.0, description="下载延迟")
     use_browser: bool = Field(default=False, description="启用 Playwright 浏览器模式（绕过 WAF）")
+    auth_storage_state_path: str = Field(default="", description="Playwright storageState JSON 文件路径（需启用浏览器模式）")
+    auth_headers: dict[str, str] = Field(default_factory=dict, description="额外请求头（如 Authorization）")
+
+    @model_validator(mode="after")
+    def validate_auth_config(self) -> "CrawlTaskRequest":
+        """校验认证配置合法性"""
+        if self.auth_storage_state_path and not self.use_browser:
+            raise ValueError("auth_storage_state_path 需要 use_browser=true")
+        return self
 
 
 class CrawlTaskResponse(BaseModel):
@@ -104,6 +113,8 @@ def create_app() -> FastAPI:
             max_files=request.max_files,
             download_delay=request.download_delay,
             use_browser=request.use_browser,
+            auth_storage_state_path=request.auth_storage_state_path,
+            auth_headers=request.auth_headers,
         )
         task_id = plugin.start_crawl(task)
         return {"task_id": task_id, "status": "submitted"}

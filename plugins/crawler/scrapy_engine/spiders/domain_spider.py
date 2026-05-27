@@ -40,6 +40,7 @@ class DomainSpider(scrapy.Spider):
         max_depth: int = 3,
         follow_subdomains: bool = True,
         use_browser: bool = False,
+        storage_state_path: str = "",
     ):
         """初始化域名爬虫
 
@@ -51,6 +52,7 @@ class DomainSpider(scrapy.Spider):
             max_depth: 最大爬取深度
             follow_subdomains: 是否跟踪子域名
             use_browser: 是否启用 Playwright 浏览器模式
+            storage_state_path: Playwright storageState JSON 文件路径
         """
         super().__init__()
         self.task_id = task_id
@@ -60,6 +62,9 @@ class DomainSpider(scrapy.Spider):
         self.max_depth = max_depth
         self.follow_subdomains = follow_subdomains
         self.use_browser = use_browser
+        self._cookies_by_domain = self._load_cookies(storage_state_path) if storage_state_path else {}
+
+    _FILE_DOWNLOAD_TIMEOUT = 300  # 文件下载超时（秒），大文件需更长时间
 
     async def start(self):
         """生成初始请求（Scrapy 2.16+ async start API）"""
@@ -96,6 +101,11 @@ class DomainSpider(scrapy.Spider):
 
             url = response.urljoin(href)
 
+            # 跳过非 HTTP(S) 协议（mailto:、tel:、javascript: 等）
+            parsed_href = urlparse(url)
+            if parsed_href.scheme and parsed_href.scheme not in ("http", "https"):
+                continue
+
             if self._is_target_file(url):
                 file_meta = {
                     "parent_url": response.url,
@@ -103,13 +113,15 @@ class DomainSpider(scrapy.Spider):
                     "link_text": link_text,
                     "depth": current_depth,
                 }
-                if self.use_browser:
-                    file_meta["playwright"] = True
-                    file_meta["playwright_page_goto_kwargs"] = {"wait_until": "commit"}
+                # 文件下载走标准 HTTP（正确处理二进制文件）
+                # 注入 storageState 中的认证 cookies 携带登录态
+                # 文件下载使用独立超时，避免大文件被页面级超时截断
+                file_meta["download_timeout"] = self._FILE_DOWNLOAD_TIMEOUT
                 yield scrapy.Request(
                     url=url,
                     callback=self.parse_file,
                     meta=file_meta,
+                    cookies=self._get_cookies_for_url(url),
                 )
             elif self._should_follow(url, current_depth):
                 meta = {
@@ -270,3 +282,42 @@ class DomainSpider(scrapy.Spider):
         """
         path = urlparse(url).path
         return path.rsplit("/", 1)[-1] if "/" in path else path
+
+    @staticmethod
+    def _load_cookies(storage_state_path: str) -> dict[str, dict[str, str]]:
+        """从 Playwright storageState 文件加载 cookies
+
+        Args:
+            storage_state_path: storageState JSON 文件路径
+
+        Returns:
+            域名到 cookie 键值对的映射
+        """
+        import json
+
+        with open(storage_state_path) as f:
+            state = json.load(f)
+
+        cookies_by_domain: dict[str, dict[str, str]] = {}
+        for cookie in state.get("cookies", []):
+            domain = cookie.get("domain", "").lstrip(".")
+            if domain not in cookies_by_domain:
+                cookies_by_domain[domain] = {}
+            cookies_by_domain[domain][cookie["name"]] = cookie["value"]
+        return cookies_by_domain
+
+    def _get_cookies_for_url(self, url: str) -> dict[str, str]:
+        """获取 URL 匹配域名的认证 cookies
+
+        Args:
+            url: 目标 URL
+
+        Returns:
+            cookie 键值对
+        """
+        host = urlparse(url).hostname or ""
+        cookies: dict[str, str] = {}
+        for domain, domain_cookies in self._cookies_by_domain.items():
+            if host == domain or host.endswith(f".{domain}"):
+                cookies.update(domain_cookies)
+        return cookies

@@ -95,6 +95,8 @@ class CrawlerPlugin:
             browser_navigation_timeout_ms=self._settings.browser_navigation_timeout_ms,
             browser_headless=self._settings.browser_headless,
             browser_proxy=self._settings.browser_proxy,
+            auth_storage_state_path=task.auth_storage_state_path,
+            auth_headers=task.auth_headers,
             local_output_dir=self._settings.local_output_dir,
         )
         scrapy_settings = settings.to_scrapy_settings()
@@ -111,6 +113,7 @@ class CrawlerPlugin:
             max_depth=task.max_depth,
             follow_subdomains=task.follow_subdomains,
             use_browser=task.use_browser,
+            storage_state_path=task.auth_storage_state_path,
         )
 
         import threading

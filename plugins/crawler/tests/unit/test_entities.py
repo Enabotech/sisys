@@ -7,6 +7,9 @@ TDD 阶段：绿
 
 from __future__ import annotations
 
+import os
+import tempfile
+
 import pytest
 
 from plugins.crawler.core.entities import CrawledFile, CrawlResult, CrawlTask
@@ -173,3 +176,30 @@ class TestCrawlResult:
         assert d["task_id"] == "t1"
         assert d["status"] == "running"
         assert d["files_crawled"] == 0
+
+    # ── 认证配置测试 ──
+
+    def test_default_auth_fields(self) -> None:
+        """默认认证字段应为空"""
+        task = CrawlTask()
+        assert task.auth_storage_state_path == ""
+        assert task.auth_headers == {}
+
+    def test_from_dict_with_auth(self) -> None:
+        """from_dict 应正确映射认证字段"""
+        auth_path = os.path.join(tempfile.gettempdir(), "auth.json")
+        data = {
+            "domains": ["example.com"],
+            "auth_storage_state_path": auth_path,
+            "auth_headers": {"Authorization": "Bearer token"},
+        }
+        task = CrawlTask.from_dict(data)
+        assert task.auth_storage_state_path == auth_path
+        assert task.auth_headers == {"Authorization": "Bearer token"}
+
+    def test_from_dict_without_auth(self) -> None:
+        """from_dict 不传认证字段应使用默认值"""
+        data = {"domains": ["example.com"]}
+        task = CrawlTask.from_dict(data)
+        assert task.auth_storage_state_path == ""
+        assert task.auth_headers == {}

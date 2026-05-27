@@ -8,6 +8,7 @@ TDD 阶段：绿
 from __future__ import annotations
 
 import os
+import tempfile
 
 from plugins.crawler.config.settings import CrawlerSettings
 
@@ -156,3 +157,66 @@ class TestCrawlerSettings:
         settings = CrawlerSettings()
         result = settings.to_scrapy_settings()
         assert "USER_AGENT" not in result
+
+    # ── 认证配置测试 ──
+
+    def test_default_auth_fields_empty(self) -> None:
+        """默认认证字段应为空"""
+        settings = CrawlerSettings()
+        assert settings.auth_storage_state_path == ""
+        assert settings.auth_headers == {}
+
+    def test_from_env_auth_storage_state_path(self) -> None:
+        """环境变量 CRAWLER_AUTH_STORAGE_STATE_PATH 应正确加载"""
+        auth_path = os.path.join(tempfile.gettempdir(), "auth.json")
+        os.environ["CRAWLER_AUTH_STORAGE_STATE_PATH"] = auth_path
+        try:
+            settings = CrawlerSettings.from_env()
+            assert settings.auth_storage_state_path == auth_path
+        finally:
+            del os.environ["CRAWLER_AUTH_STORAGE_STATE_PATH"]
+
+    def test_to_scrapy_settings_no_auth_by_default(self) -> None:
+        """默认不应包含认证相关配置"""
+        settings = CrawlerSettings()
+        result = settings.to_scrapy_settings()
+        assert "PLAYWRIGHT_CONTEXT_ARGS" not in result
+        assert "DEFAULT_REQUEST_HEADERS" not in result
+
+    def test_to_scrapy_settings_storage_state_with_browser(self) -> None:
+        """enable_browser=True + auth_storage_state_path 应注入 PLAYWRIGHT_CONTEXT_ARGS"""
+        auth_path = os.path.join(tempfile.gettempdir(), "auth.json")
+        settings = CrawlerSettings(enable_browser=True, auth_storage_state_path=auth_path)
+        result = settings.to_scrapy_settings()
+        assert result["PLAYWRIGHT_CONTEXT_ARGS"] == {"storage_state": auth_path}
+
+    def test_to_scrapy_settings_storage_state_without_browser(self) -> None:
+        """enable_browser=False 时 auth_storage_state_path 不应注入 PLAYWRIGHT_CONTEXT_ARGS"""
+        auth_path = os.path.join(tempfile.gettempdir(), "auth.json")
+        settings = CrawlerSettings(enable_browser=False, auth_storage_state_path=auth_path)
+        result = settings.to_scrapy_settings()
+        assert "PLAYWRIGHT_CONTEXT_ARGS" not in result
+
+    def test_to_scrapy_settings_auth_headers(self) -> None:
+        """auth_headers 应注入为 DEFAULT_REQUEST_HEADERS"""
+        settings = CrawlerSettings(auth_headers={"Authorization": "Bearer token"})
+        result = settings.to_scrapy_settings()
+        assert result["DEFAULT_REQUEST_HEADERS"] == {"Authorization": "Bearer token"}
+
+    def test_to_scrapy_settings_auth_headers_with_browser_and_storage(self) -> None:
+        """browser + storageState + headers 应全部注入"""
+        auth_path = os.path.join(tempfile.gettempdir(), "auth.json")
+        settings = CrawlerSettings(
+            enable_browser=True,
+            auth_storage_state_path=auth_path,
+            auth_headers={"X-Custom": "value"},
+        )
+        result = settings.to_scrapy_settings()
+        assert result["PLAYWRIGHT_CONTEXT_ARGS"] == {"storage_state": auth_path}
+        assert result["DEFAULT_REQUEST_HEADERS"] == {"X-Custom": "value"}
+
+    def test_to_scrapy_settings_auth_headers_empty(self) -> None:
+        """空 auth_headers 不应产生 DEFAULT_REQUEST_HEADERS"""
+        settings = CrawlerSettings(auth_headers={})
+        result = settings.to_scrapy_settings()
+        assert "DEFAULT_REQUEST_HEADERS" not in result

@@ -43,6 +43,8 @@ class CrawlTask:
     url_include: tuple[str, ...] = ()
     url_exclude: tuple[str, ...] = ()
     use_browser: bool = False
+    auth_storage_state_path: str = ""
+    auth_headers: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict) -> CrawlTask:
@@ -71,6 +73,8 @@ class CrawlTask:
             url_include=url_include,
             url_exclude=url_exclude,
             use_browser=data.get("use_browser", False),
+            auth_storage_state_path=data.get("auth_storage_state_path", ""),
+            auth_headers=data.get("auth_headers", {}),
         )
 
 
