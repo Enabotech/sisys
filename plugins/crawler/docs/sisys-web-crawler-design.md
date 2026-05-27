@@ -590,16 +590,19 @@ class DomainSpider(scrapy.Spider):
             url = urljoin(response.url, href)
 
             if self._is_target_file(url):
+                file_meta = {
+                    "parent_url": response.url,
+                    "page_title": page_title,
+                    "link_text": link_text,
+                    "depth": depth,
+                }
+                if self.use_browser:
+                    file_meta["playwright"] = True
+                    file_meta["playwright_goto_kwargs"] = {"wait_until": "commit"}
                 yield scrapy.Request(
                     url,
                     callback=self.parse_file,
-                    meta={
-                        "parent_url": response.url,
-                        "page_title": page_title,
-                        "link_text": link_text,
-                        "depth": depth,
-                        "playwright": False,  # 文件下载不走浏览器
-                    },
+                    meta=file_meta,
                     dont_filter=True,
                 )
             elif self._should_follow(url, depth):
@@ -1595,21 +1598,21 @@ poetry run pytest tests/ -v --cov=plugins/crawler --cov-report=term-missing
 
 爬取 TSMC 等部署 WAF（Cloudflare/Akamai）的站点时，Scrapy 纯 HTTP 请求被 403 拒绝。即使设置了 Chrome User-Agent，WAF 仍通过 TLS 指纹和 JS 执行能力检测识别爬虫。
 
-**解决方案**：scrapy-playwright 混合模式 — 页面请求走 Playwright（完整浏览器），文件下载走原生 HTTP（快）。
+**解决方案**：scrapy-playwright 全浏览器模式 — 页面请求和文件下载均走 Playwright 浏览器上下文，携带 session cookies 绕过 CDN/WAF 保护。
 
-### 14.2 混合模式设计
+### 14.2 浏览器模式设计
 
-scrapy-playwright 的 `ScrapyPlaywrightDownloadHandler` 继承默认 handler，只有 `meta["playwright"] = True` 的请求才走浏览器，其余走原生 HTTP：
+当 `use_browser=True` 时，所有请求（页面和文件下载）均通过 Playwright 浏览器上下文，共享同一 session cookies。文件下载使用 `wait_until="commit"` 避免等待二进制内容渲染：
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  DomainSpider                                    │
+│  DomainSpider (use_browser=True)                 │
 │                                                  │
 │  ┌──────────────┐     ┌───────────────────────┐ │
 │  │ 页面链接      │     │ 文件链接               │ │
 │  │ meta:         │     │ meta:                  │ │
-│  │  playwright:  │     │  playwright: False     │ │
-│  │    True/False │     │  (始终原生 HTTP)        │ │
+│  │  playwright:  │     │  playwright: True      │ │
+│  │    True       │     │  wait_until: "commit"  │ │
 │  └──────┬───────┘     └───────────┬───────────┘ │
 │         │                         │              │
 │    ┌────▼─────────────────────────▼────┐         │
@@ -1712,6 +1715,8 @@ curl -X POST http://localhost:8900/tasks \
 | `enable_retry=True` | `RetryMiddleware`（优先级 550） |
 | `enable_browser=True` | `TWISTED_REACTOR`、`DOWNLOAD_HANDLERS`、`PLAYWRIGHT_*` 配置 |
 | `user_agent` 参数 | `USER_AGENT` |
+
+> **浏览器模式下的请求策略**：页面请求使用 `wait_until="load"` 等待完整渲染；文件下载使用 `wait_until="commit"` 仅等待响应头返回，避免等待 PDF 等二进制内容渲染。两种请求共享同一浏览器上下文的 session cookies。
 
 ### 14.8 同步修复：休眠中间件
 
