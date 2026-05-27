@@ -1009,11 +1009,11 @@ class CrawlerSettings:
     rabbitmq_exchange: str = "sisys.events"
 
     # ── Playwright 浏览器模式 ──
-    enable_browser: bool = False                         # 启用 Playwright 浏览器渲染
+    enable_browser: bool = False                          # 启用 Playwright 浏览器渲染
     browser_concurrent_pages: int = 4                    # 浏览器并发页面数
     browser_navigation_timeout_ms: int = 30000           # 页面加载超时（毫秒）
     browser_headless: bool = True                        # 无头模式
-    browser_proxy: str = ""                              # pragma: allowlist secret
+    browser_proxy: str = ""                              # pragma: allowlist secret 浏览器代理（如 http://user:pass@proxy:8080）
 
     # ── 中间件开关 ──
     enable_rate_limit: bool = True                       # 限速中间件
