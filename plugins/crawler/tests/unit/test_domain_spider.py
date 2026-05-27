@@ -175,11 +175,26 @@ class TestDomainSpiderBrowserMode:
         assert len(page_requests) == 1
         assert page_requests[0].meta.get("playwright") is True
 
-    def test_parse_file_link_no_playwright(self) -> None:
-        """文件链接不应使用 Playwright（无论 use_browser 值如何）"""
+    def test_parse_file_link_browser_mode(self) -> None:
+        """浏览器模式下文件链接应包含 playwright meta（携带 session cookies 下载）"""
         spider = DomainSpider(
             domains=("example.com",),
             use_browser=True,
+            allowed_extensions=("pdf",),
+        )
+        html = '<html><head><title>Test</title></head><body><a href="/doc.pdf">PDF</a></body></html>'
+        response = _make_text_response("https://example.com/", html, meta={"depth": 0})
+        requests = list(spider.parse(response))
+        file_requests = [r for r in requests if r.callback.__name__ == "parse_file"]
+        assert len(file_requests) == 1
+        assert file_requests[0].meta.get("playwright") is True
+        assert file_requests[0].meta.get("playwright_goto_kwargs") == {"wait_until": "commit"}
+
+    def test_parse_file_link_no_browser(self) -> None:
+        """非浏览器模式下文件链接不应包含 playwright meta"""
+        spider = DomainSpider(
+            domains=("example.com",),
+            use_browser=False,
             allowed_extensions=("pdf",),
         )
         html = '<html><head><title>Test</title></head><body><a href="/doc.pdf">PDF</a></body></html>'

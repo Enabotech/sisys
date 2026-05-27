@@ -41,15 +41,11 @@ class RateLimitMiddleware:
         max_rps = crawler.settings.getfloat("RATE_LIMIT_RPS", 2.0)
         return cls(max_requests_per_second=max_rps)
 
-    def process_request(self, request, spider):
+    def process_request(self, request):
         """处理请求：检查速率限制
 
         Args:
             request: Scrapy Request
-            spider: Spider 实例
-
-        Returns:
-            None 或 IgnoreRequest
         """
         from urllib.parse import urlparse
 
