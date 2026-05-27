@@ -141,7 +141,6 @@ import-linter = "^2.11"
 asyncpg-stubs = "^0.31.2"
 
 [project.scripts]
-sisys = "src.cli:app"
 crawler = "plugins.crawler.cli:app"
 
 [tool.poetry.scripts]

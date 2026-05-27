@@ -40,7 +40,7 @@ class DomainSpider(scrapy.Spider):
         max_depth: int = 3,
         follow_subdomains: bool = True,
         use_browser: bool = False,
-        storage_state_path: str = "",
+        auth_storage_state_path: str = "",
     ):
         """初始化域名爬虫
 
@@ -52,7 +52,7 @@ class DomainSpider(scrapy.Spider):
             max_depth: 最大爬取深度
             follow_subdomains: 是否跟踪子域名
             use_browser: 是否启用 Playwright 浏览器模式
-            storage_state_path: Playwright storageState JSON 文件路径
+            auth_storage_state_path: Playwright storageState JSON 文件路径
         """
         super().__init__()
         self.task_id = task_id
@@ -62,7 +62,7 @@ class DomainSpider(scrapy.Spider):
         self.max_depth = max_depth
         self.follow_subdomains = follow_subdomains
         self.use_browser = use_browser
-        self._cookies_by_domain = self._load_cookies(storage_state_path) if storage_state_path else {}
+        self._cookies_by_domain = self._load_cookies(auth_storage_state_path) if auth_storage_state_path else {}
 
     _FILE_DOWNLOAD_TIMEOUT = 300  # 文件下载超时（秒），大文件需更长时间
 
@@ -284,18 +284,18 @@ class DomainSpider(scrapy.Spider):
         return path.rsplit("/", 1)[-1] if "/" in path else path
 
     @staticmethod
-    def _load_cookies(storage_state_path: str) -> dict[str, dict[str, str]]:
+    def _load_cookies(auth_storage_state_path: str) -> dict[str, dict[str, str]]:
         """从 Playwright storageState 文件加载 cookies
 
         Args:
-            storage_state_path: storageState JSON 文件路径
+            auth_storage_state_path: storageState JSON 文件路径
 
         Returns:
             域名到 cookie 键值对的映射
         """
         import json
 
-        with open(storage_state_path) as f:
+        with open(auth_storage_state_path) as f:
             state = json.load(f)
 
         cookies_by_domain: dict[str, dict[str, str]] = {}

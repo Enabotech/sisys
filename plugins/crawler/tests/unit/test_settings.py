@@ -133,7 +133,7 @@ class TestCrawlerSettings:
 
     def test_to_scrapy_settings_browser_enabled(self) -> None:
         """启用浏览器时应包含 Playwright 配置"""
-        settings = CrawlerSettings(enable_browser=True)
+        settings = CrawlerSettings(use_browser=True)
         result = settings.to_scrapy_settings()
         assert result["TWISTED_REACTOR"] == "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         assert "ScrapyPlaywrightDownloadHandler" in str(result["DOWNLOAD_HANDLERS"])
@@ -142,21 +142,28 @@ class TestCrawlerSettings:
 
     def test_to_scrapy_settings_browser_proxy(self) -> None:
         """配置代理时应传入 PLAYWRIGHT_LAUNCH_OPTIONS"""
-        settings = CrawlerSettings(enable_browser=True, browser_proxy="http://proxy:8080")
+        settings = CrawlerSettings(use_browser=True, browser_proxy="http://proxy:8080")
         result = settings.to_scrapy_settings()
         assert result["PLAYWRIGHT_LAUNCH_OPTIONS"]["proxy"]["server"] == "http://proxy:8080"
 
     def test_to_scrapy_settings_user_agent(self) -> None:
-        """传入 user_agent 时应设置 USER_AGENT"""
-        settings = CrawlerSettings()
-        result = settings.to_scrapy_settings(user_agent="CustomBot/1.0")
+        """设置 user_agent 时应注入 USER_AGENT"""
+        settings = CrawlerSettings(user_agent="CustomBot/1.0")
+        result = settings.to_scrapy_settings()
         assert result["USER_AGENT"] == "CustomBot/1.0"
 
     def test_to_scrapy_settings_no_user_agent(self) -> None:
-        """不传 user_agent 时不应设置 USER_AGENT（交给 UA 轮换中间件）"""
+        """不设 user_agent 时不应设置 USER_AGENT（交给 UA 轮换中间件）"""
         settings = CrawlerSettings()
         result = settings.to_scrapy_settings()
         assert "USER_AGENT" not in result
+
+    def test_to_scrapy_settings_output_dir(self) -> None:
+        """local_output_dir 应注入为 CRAWL_OUTPUT_DIR"""
+        output_dir = os.path.join(tempfile.gettempdir(), "crawl_test")
+        settings = CrawlerSettings(local_output_dir=output_dir)
+        result = settings.to_scrapy_settings()
+        assert result["CRAWL_OUTPUT_DIR"] == output_dir
 
     # ── 认证配置测试 ──
 
@@ -184,16 +191,16 @@ class TestCrawlerSettings:
         assert "DEFAULT_REQUEST_HEADERS" not in result
 
     def test_to_scrapy_settings_storage_state_with_browser(self) -> None:
-        """enable_browser=True + auth_storage_state_path 应注入 PLAYWRIGHT_CONTEXT_ARGS"""
+        """use_browser=True + auth_storage_state_path 应注入 PLAYWRIGHT_CONTEXT_ARGS"""
         auth_path = os.path.join(tempfile.gettempdir(), "auth.json")
-        settings = CrawlerSettings(enable_browser=True, auth_storage_state_path=auth_path)
+        settings = CrawlerSettings(use_browser=True, auth_storage_state_path=auth_path)
         result = settings.to_scrapy_settings()
         assert result["PLAYWRIGHT_CONTEXT_ARGS"] == {"storage_state": auth_path}
 
     def test_to_scrapy_settings_storage_state_without_browser(self) -> None:
-        """enable_browser=False 时 auth_storage_state_path 不应注入 PLAYWRIGHT_CONTEXT_ARGS"""
+        """use_browser=False 时 auth_storage_state_path 不应注入 PLAYWRIGHT_CONTEXT_ARGS"""
         auth_path = os.path.join(tempfile.gettempdir(), "auth.json")
-        settings = CrawlerSettings(enable_browser=False, auth_storage_state_path=auth_path)
+        settings = CrawlerSettings(use_browser=False, auth_storage_state_path=auth_path)
         result = settings.to_scrapy_settings()
         assert "PLAYWRIGHT_CONTEXT_ARGS" not in result
 
@@ -207,7 +214,7 @@ class TestCrawlerSettings:
         """browser + storageState + headers 应全部注入"""
         auth_path = os.path.join(tempfile.gettempdir(), "auth.json")
         settings = CrawlerSettings(
-            enable_browser=True,
+            use_browser=True,
             auth_storage_state_path=auth_path,
             auth_headers={"X-Custom": "value"},
         )

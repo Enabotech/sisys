@@ -80,11 +80,11 @@ class CrawlerSettings:
     enable_retry: bool = True
 
     # ── Playwright 浏览器模式 ──
-    enable_browser: bool = False
-    browser_concurrent_pages: int = 4
-    browser_navigation_timeout_ms: int = 30000
+    use_browser: bool = False
+    browser_timeout: int = 30
     browser_headless: bool = True
     browser_proxy: str = ""
+    user_agent: str = ""
 
     # ── 认证配置 ──
     auth_storage_state_path: str = ""
@@ -104,14 +104,11 @@ class CrawlerSettings:
     rabbitmq_port: int = 5672
     rabbitmq_exchange: str = "sisys.events"
 
-    def to_scrapy_settings(self, user_agent: str | None = None) -> dict:
+    def to_scrapy_settings(self) -> dict:
         """转换为 Scrapy CrawlerProcess 配置字典
 
         统一 CLI 和 Plugin 的配置来源，激活休眠中间件，
-        仅在 enable_browser=True 时注入 Playwright 配置。
-
-        Args:
-            user_agent: 自定义 User-Agent 字符串，为 None 时使用 UA 轮换池中的随机值
+        仅在 use_browser=True 时注入 Playwright 配置。
 
         Returns:
             Scrapy 兼容的配置字典
@@ -125,6 +122,7 @@ class CrawlerSettings:
             "DOWNLOAD_DELAY": self.download_delay,
             "DOWNLOAD_TIMEOUT": self.download_timeout,
             "LOG_LEVEL": "INFO",
+            "CRAWL_OUTPUT_DIR": self.local_output_dir,
             "ITEM_PIPELINES": {
                 "plugins.crawler.scrapy_engine.pipelines.file_download_pipeline.FileDownloadPipeline": 100,
                 "plugins.crawler.scrapy_engine.pipelines.format_detection_pipeline.FormatDetectionPipeline": 200,
@@ -135,8 +133,8 @@ class CrawlerSettings:
             },
         }
 
-        if user_agent:
-            settings["USER_AGENT"] = user_agent
+        if self.user_agent:
+            settings["USER_AGENT"] = self.user_agent
 
         # ── 中间件（按需激活）──
         middlewares: dict[str, int] = {}
@@ -153,7 +151,7 @@ class CrawlerSettings:
             settings["DOWNLOADER_MIDDLEWARES"] = middlewares
 
         # ── Playwright 浏览器模式 ──
-        if self.enable_browser:
+        if self.use_browser:
             settings["TWISTED_REACTOR"] = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
             settings["DOWNLOAD_HANDLERS"] = {
                 "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
@@ -162,7 +160,7 @@ class CrawlerSettings:
             settings["PLAYWRIGHT_LAUNCH_OPTIONS"] = {
                 "headless": self.browser_headless,
             }
-            settings["PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT"] = self.browser_navigation_timeout_ms
+            settings["PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT"] = self.browser_timeout * 1000
             settings["PLAYWRIGHT_ABORT_REQUEST"] = (
                 "plugins.crawler.scrapy_engine.middlewares.playwright_abort.should_abort_request"
             )
@@ -170,7 +168,7 @@ class CrawlerSettings:
                 proxy = {"server": self.browser_proxy}
                 settings["PLAYWRIGHT_LAUNCH_OPTIONS"]["proxy"] = proxy
 
-            # storageState 注入（需 enable_browser=True）
+            # storageState 注入（需 use_browser=True）
             if self.auth_storage_state_path:
                 settings["PLAYWRIGHT_CONTEXT_ARGS"] = {
                     "storage_state": self.auth_storage_state_path,
@@ -218,9 +216,8 @@ class CrawlerSettings:
             enable_ua_rotation=os.getenv("CRAWLER_ENABLE_UA_ROTATION", "true").lower() == "true",
             enable_retry=os.getenv("CRAWLER_ENABLE_RETRY", "true").lower() == "true",
             # Playwright 浏览器模式
-            enable_browser=os.getenv("CRAWLER_ENABLE_BROWSER", "false").lower() == "true",
-            browser_concurrent_pages=int(os.getenv("CRAWLER_BROWSER_CONCURRENT_PAGES", "4")),
-            browser_navigation_timeout_ms=int(os.getenv("CRAWLER_BROWSER_NAVIGATION_TIMEOUT_MS", "30000")),
+            use_browser=os.getenv("CRAWLER_USE_BROWSER", "false").lower() == "true",
+            browser_timeout=int(os.getenv("CRAWLER_BROWSER_TIMEOUT", "30")),
             browser_headless=os.getenv("CRAWLER_BROWSER_HEADLESS", "true").lower() == "true",
             browser_proxy=os.getenv("CRAWLER_BROWSER_PROXY", ""),
             # 认证配置
