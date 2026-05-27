@@ -39,6 +39,7 @@ class DomainSpider(scrapy.Spider):
         allowed_extensions: tuple[str, ...] = (),
         max_depth: int = 3,
         follow_subdomains: bool = True,
+        use_browser: bool = False,
     ):
         """初始化域名爬虫
 
@@ -49,6 +50,7 @@ class DomainSpider(scrapy.Spider):
             allowed_extensions: 允许的文件扩展名
             max_depth: 最大爬取深度
             follow_subdomains: 是否跟踪子域名
+            use_browser: 是否启用 Playwright 浏览器模式
         """
         super().__init__()
         self.task_id = task_id
@@ -57,15 +59,19 @@ class DomainSpider(scrapy.Spider):
         self.allowed_extensions = set(ext.lower().lstrip(".") for ext in allowed_extensions)
         self.max_depth = max_depth
         self.follow_subdomains = follow_subdomains
+        self.use_browser = use_browser
 
     async def start(self):
         """生成初始请求（Scrapy 2.16+ async start API）"""
         urls = self.seed_urls if self.seed_urls else tuple(f"https://{d}" for d in self.domains)
         for url in urls:
+            meta = {"depth": 0, "page_title": "", "parent_url": ""}
+            if self.use_browser:
+                meta["playwright"] = True
             yield scrapy.Request(
                 url=url,
                 callback=self.parse,
-                meta={"depth": 0, "page_title": "", "parent_url": ""},
+                meta=meta,
             )
 
     def parse(self, response):
@@ -101,14 +107,17 @@ class DomainSpider(scrapy.Spider):
                     },
                 )
             elif self._should_follow(url, current_depth):
+                meta = {
+                    "depth": current_depth + 1,
+                    "page_title": "",
+                    "parent_url": response.url,
+                }
+                if self.use_browser:
+                    meta["playwright"] = True
                 yield scrapy.Request(
                     url=url,
                     callback=self.parse,
-                    meta={
-                        "depth": current_depth + 1,
-                        "page_title": "",
-                        "parent_url": response.url,
-                    },
+                    meta=meta,
                 )
 
     def parse_file(self, response):

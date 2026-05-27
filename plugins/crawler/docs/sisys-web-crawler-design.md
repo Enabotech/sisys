@@ -1,6 +1,6 @@
 # SISYS Web Crawler 详细设计方案
 
-> 版本：1.0 | 日期：2026-05-26 | 作者：agimtech
+> 版本：2.0 | 日期：2026-05-27 | 作者：agimtech
 
 ---
 
@@ -19,6 +19,8 @@
 11. [测试策略](#11-测试策略)
 12. [实施阶段](#12-实施阶段)
 13. [验证方案](#13-验证方案)
+14. [Playwright 浏览器模式](#14-playwright-浏览器模式)
+15. [登录态爬取](#15-登录态爬取)
 
 ---
 
@@ -37,6 +39,8 @@ SISYS 是面向企业高管的 AI 驱动战略规划与决策智能平台。平�
 | 可扩展 | 文件格式处理器可运行时注册，支持自定义扩展 |
 | 智能命名 | 爬取文件根据元数据/标题/内容特征自动命名 |
 | 合规 | 遵守 robots.txt，支持请求限速和 UA 轮换 |
+| 反爬绕过 | Playwright 浏览器模式绕过 WAF/反爬检测（Cloudflare/Akamai） |
+| 登录态支持 | 通过 Playwright storageState 注入登录态，爬取需认证的内容 |
 
 ### 1.3 设计决策
 
@@ -187,6 +191,7 @@ plugins/crawler/
       rate_limit_middleware.py             # 域名级别令牌桶限速
       user_agent_middleware.py             # UA 池随机轮换
       retry_middleware.py                  # 指数退避重试
+      playwright_abort.py                 # Playwright 资源过滤（中止图片/字体/CSS/媒体）
     extensions/
       __init__.py
       stats_extension.py                   # 爬取统计采集
@@ -255,7 +260,10 @@ Crawler Service 暴露以下 REST API 端点：
     "exclude": ["/login", "/admin"]
   },
   "max_files": 500,
-  "download_delay": 2.0
+  "download_delay": 2.0,
+  "use_browser": false,
+  "auth_storage_state_path": null,
+  "auth_headers": null
 }
 ```
 
@@ -543,6 +551,7 @@ class DomainSpider(scrapy.Spider):
         allowed_extensions: tuple[str, ...] = (),
         max_depth: int = 3,
         follow_subdomains: bool = True,
+        use_browser: bool = False,
     ):
         super().__init__()
         self.task_id = task_id
@@ -551,16 +560,16 @@ class DomainSpider(scrapy.Spider):
         self.allowed_extensions = set(ext.lower().lstrip(".") for ext in allowed_extensions)
         self.max_depth = max_depth
         self.follow_subdomains = follow_subdomains
+        self.use_browser = use_browser
 
     async def start(self):
         """生成初始请求（Scrapy 2.16+ async start API）"""
         urls = self.seed_urls if self.seed_urls else tuple(f"https://{d}" for d in self.domains)
         for url in urls:
-            yield scrapy.Request(
-                url=url,
-                callback=self.parse,
-                meta={"depth": 0, "page_title": "", "parent_url": ""},
-            )
+            meta = {"depth": 0, "page_title": "", "parent_url": ""}
+            if self.use_browser:
+                meta["playwright"] = True
+            yield scrapy.Request(url=url, callback=self.parse, meta=meta)
 
     def parse(self, response):
         depth = response.meta.get("depth", 0)
@@ -583,11 +592,19 @@ class DomainSpider(scrapy.Spider):
                         "page_title": page_title,
                         "link_text": link_text,
                         "depth": depth,
+                        "playwright": False,  # 文件下载不走浏览器
                     },
                     dont_filter=True,
                 )
             elif self._should_follow(url, depth):
-                yield scrapy.Request(url, callback=self.parse)
+                meta = {
+                    "depth": depth + 1,
+                    "page_title": page_title,
+                    "parent_url": response.url,
+                }
+                if self.use_browser:
+                    meta["playwright"] = True
+                yield scrapy.Request(url, callback=self.parse, meta=meta)
 
     def parse_file(self, response):
         """处理文件下载响应，生成 CrawledFileItem"""
@@ -705,12 +722,15 @@ CrawledFileItem
 
 ### 5.4 Middleware
 
-| Middleware | 职责 | 配置项 |
-|------------|------|--------|
-| RateLimitMiddleware | 域名级别令牌桶限速，保证请求间隔 | `CRAWLER_DOWNLOAD_DELAY` |
-| UserAgentRotationMiddleware | UA 池随机轮换，避免被封 | `CRAWLER_USER_AGENT_POOL` |
-| RetryMiddleware | 指数退避重试（429/5xx） | `CRAWLER_RETRY_TIMES`, `CRAWLER_RETRY_HTTP_CODES` |
-| Scrapy ROBOTSTXT_OBEY | robots.txt 遵守（内置） | `CRAWLER_RESPECT_ROBOTS_TXT` |
+| Middleware | 职责 | 配置项 | 激活状态 |
+|------------|------|--------|---------|
+| RateLimitMiddleware | 域名级别令牌桶限速，保证请求间隔 | `CRAWLER_DOWNLOAD_DELAY` | 默认激活 |
+| UserAgentRotationMiddleware | UA 池随机轮换，避免被封 | `CRAWLER_USER_AGENT_POOL` | 默认激活 |
+| RetryMiddleware | 指数退避重试（429/5xx） | `CRAWLER_RETRY_TIMES`, `CRAWLER_RETRY_HTTP_CODES` | 默认激活 |
+| Scrapy ROBOTSTXT_OBEY | robots.txt 遵守（内置） | `CRAWLER_RESPECT_ROBOTS_TXT` | 内置 |
+| PlaywrightAbort | 中止无关浏览器子请求（图片/字体/CSS/媒体） | `PLAYWRIGHT_ABORT_REQUEST` | `--browser` 时激活 |
+
+> **中间件激活机制**：`CrawlerSettings.to_scrapy_settings()` 根据 `enable_rate_limit`、`enable_ua_rotation`、`enable_retry` 三个开关动态构建 `DOWNLOADER_MIDDLEWARES` 字典，注入到 Scrapy settings。
 
 ### 5.5 格式处理器注册表
 
@@ -988,9 +1008,43 @@ class CrawlerSettings:
     rabbitmq_port: int = 5672
     rabbitmq_exchange: str = "sisys.events"
 
+    # ── Playwright 浏览器模式 ──
+    enable_browser: bool = False                         # 启用 Playwright 浏览器渲染
+    browser_concurrent_pages: int = 4                    # 浏览器并发页面数
+    browser_navigation_timeout_ms: int = 30000           # 页面加载超时（毫秒）
+    browser_headless: bool = True                        # 无头模式
+    browser_proxy: str = ""                              # pragma: allowlist secret
+
+    # ── 中间件开关 ──
+    enable_rate_limit: bool = True                       # 限速中间件
+    rate_limit_rps: float = 1.0                          # 每秒请求数
+    enable_ua_rotation: bool = True                      # UA 轮换中间件
+    enable_retry: bool = True                            # 重试中间件
+
+    # ── 登录态配置 ──
+    auth_storage_state_path: str = ""                    # Playwright storageState JSON 文件路径
+    auth_headers: dict[str, str] = field(default_factory=dict)  # 额外请求头（如 Authorization）
+
     @classmethod
     def from_env(cls) -> CrawlerSettings:
         """从环境变量加载配置（前缀 CRAWLER_）"""
+        ...
+
+    def to_scrapy_settings(self, user_agent: str | None = None) -> dict:
+        """生成完整 Scrapy settings dict
+
+        根据配置动态注入：
+        - 基础配置（BOT_NAME、SPIDER_MODULES、ITEM_PIPELINES）
+        - DOWNLOADER_MIDDLEWARES（根据开关动态构建）
+        - Playwright 配置（仅 enable_browser=True 时注入）
+        - 登录态配置（auth_storage_state_path / auth_headers）
+
+        Args:
+            user_agent: 自定义 User-Agent，为 None 时不设置（交给 UA 轮换中间件）
+
+        Returns:
+            完整的 Scrapy settings dict，可直接传给 CrawlerProcess
+        """
         ...
 ```
 
@@ -1009,6 +1063,15 @@ CRAWLER_MINIO_ACCESS_KEY=<your-access-key>
 CRAWLER_MINIO_SECRET_KEY=<your-secret-key>
 CRAWLER_RABBITMQ_HOST=localhost
 CRAWLER_RABBITMQ_PORT=5672
+
+# Playwright 浏览器模式
+CRAWLER_ENABLE_BROWSER=false
+CRAWLER_BROWSER_CONCURRENT_PAGES=4
+CRAWLER_BROWSER_HEADLESS=true
+CRAWLER_BROWSER_PROXY=
+
+# 登录态爬取
+CRAWLER_AUTH_STORAGE_STATE_PATH=
 ```
 
 ### 7.3 任务配置（YAML）
@@ -1097,6 +1160,18 @@ poetry run crawler crawl \
 # 忽略 robots.txt（需显式指定）
 poetry run crawler crawl -d example.com --formats pdf --no-obey-robots
 
+# Playwright 浏览器模式 — 绕过 WAF/反爬检测
+poetry run crawler crawl -d www.tsmc.com --formats pdf --depth 2 \
+    --browser --no-obey-robots
+
+# 登录态爬取 — 注入 Playwright storageState
+poetry run crawler crawl -d protected.example.com --formats pdf \
+    --browser --auth-storage-state ./auth.json
+
+# Header Auth — API Token 认证
+poetry run crawler crawl -d api.example.com \
+    --auth-header "Authorization=Bearer xxx" --formats pdf
+
 # 从任务配置文件启动
 poetry run crawler crawl --task config/tasks/example_task.yaml
 ```
@@ -1141,10 +1216,13 @@ SISYS 通过 `CrawlerClientPort`（HTTP 适配器）调用 Crawler Service，无
 | 依赖 | 版本 | 用途 | 归属 |
 |------|------|------|------|
 | scrapy | ^2.11 | 爬虫引擎 | Crawler 插件 |
+| scrapy-playwright | ^0.0.46 | Playwright 浏览器集成（反爬/WAF 绕过） | Crawler 插件 |
 | python-pptx | ^1.0 | PPT/PPTX 元数据提取 | Crawler 插件 |
 | httpx | ^0.27 | SISYS 侧 HTTP 客户端 | SISYS Core |
 | tinytag | ^2.2 | 音频元数据提取 | Crawler 插件 |
 | ffmpeg-python | ^0.2 | 视频元数据提取（ffprobe 封装） | Crawler 插件 |
+
+> **注意**：安装 scrapy-playwright 后需执行 `poetry run playwright install chromium` 安装浏览器内核。
 
 ### 9.2 已有可复用依赖
 
@@ -1486,8 +1564,9 @@ poetry run pytest tests/ -v --cov=plugins/crawler --cov-report=term-missing
 | 本地存储 | `plugins/crawler/storage/local_storage.py` | 本地文件系统实现 |
 | 事件端口 | `plugins/crawler/messaging/base.py` | EventPublisher Protocol |
 | RabbitMQ | `plugins/crawler/messaging/rabbitmq_publisher.py` | RabbitMQ 事件发布 |
-| Spider | `plugins/crawler/scrapy_engine/spiders/domain_spider.py` | 域名递归爬取 |
+| Spider | `plugins/crawler/scrapy_engine/spiders/domain_spider.py` | 域名递归爬取（含混合模式） |
 | Pipeline | `plugins/crawler/scrapy_engine/pipelines/*.py` | 6 个 Pipeline |
+| Playwright 过滤 | `plugins/crawler/scrapy_engine/middlewares/playwright_abort.py` | 浏览器资源过滤 |
 
 ### SISYS 侧
 
@@ -1499,3 +1578,313 @@ poetry run pytest tests/ -v --cov=plugins/crawler --cov-report=term-missing
 | 组合根 | `src/composition_root.py` | 端口注册 |
 | 事件通道 | `configs/event_channels.yaml` | 事件通道配置 |
 | 通道路由 | `src/infrastructure/messaging/channel_router.py` | DEFAULT_MAPPINGS |
+
+---
+
+## 14. Playwright 浏览器模式
+
+### 14.1 背景
+
+爬取 TSMC 等部署 WAF（Cloudflare/Akamai）的站点时，Scrapy 纯 HTTP 请求被 403 拒绝。即使设置了 Chrome User-Agent，WAF 仍通过 TLS 指纹和 JS 执行能力检测识别爬虫。
+
+**解决方案**：scrapy-playwright 混合模式 — 页面请求走 Playwright（完整浏览器），文件下载走原生 HTTP（快）。
+
+### 14.2 混合模式设计
+
+scrapy-playwright 的 `ScrapyPlaywrightDownloadHandler` 继承默认 handler，只有 `meta["playwright"] = True` 的请求才走浏览器，其余走原生 HTTP：
+
+```
+┌─────────────────────────────────────────────────┐
+│  DomainSpider                                    │
+│                                                  │
+│  ┌──────────────┐     ┌───────────────────────┐ │
+│  │ 页面链接      │     │ 文件链接               │ │
+│  │ meta:         │     │ meta:                  │ │
+│  │  playwright:  │     │  playwright: False     │ │
+│  │    True/False │     │  (始终原生 HTTP)        │ │
+│  └──────┬───────┘     └───────────┬───────────┘ │
+│         │                         │              │
+│    ┌────▼─────────────────────────▼────┐         │
+│    │  ScrapyPlaywrightDownloadHandler  │         │
+│    │  (继承默认 handler)                │         │
+│    │                                    │         │
+│    │  playwright=True → 浏览器渲染      │         │
+│    │  其他          → 原生 HTTP 请求    │         │
+│    └────────────────────────────────────┘         │
+└─────────────────────────────────────────────────┘
+```
+
+### 14.3 配置项
+
+| 配置项 | 环境变量 | 默认值 | 说明 |
+|--------|---------|--------|------|
+| `enable_browser` | `CRAWLER_ENABLE_BROWSER` | `False` | 启用 Playwright 浏览器模式 |
+| `browser_concurrent_pages` | `CRAWLER_BROWSER_CONCURRENT_PAGES` | `4` | 浏览器并发页面数 |
+| `browser_navigation_timeout_ms` | — | `30000` | 页面加载超时（毫秒） |
+| `browser_headless` | `CRAWLER_BROWSER_HEADLESS` | `True` | 无头模式 |
+| `browser_proxy` | `CRAWLER_BROWSER_PROXY` | `""` | 浏览器代理 |
+
+### 14.4 资源过滤策略
+
+通过 `PLAYWRIGHT_ABORT_REQUEST` 配置项，中止无关浏览器子请求以加速页面加载：
+
+```python
+# plugins/crawler/scrapy_engine/middlewares/playwright_abort.py
+
+_ABORT_RESOURCE_TYPES = frozenset({
+    "image",      # 图片（jpg/png/gif/svg/webp）
+    "font",       # 字体（woff/woff2/ttf/eot）
+    "stylesheet", # CSS 样式表
+    "media",      # 视频/音频（mp4/mp3/wav）
+})
+
+def should_abort_request(request) -> bool:
+    """中止无关资源请求（图片/字体/CSS/媒体），加速页面加载"""
+    return request.resource_type in _ABORT_RESOURCE_TYPES
+```
+
+### 14.5 Scrapy Settings 注入
+
+`CrawlerSettings.to_scrapy_settings()` 在 `enable_browser=True` 时动态注入以下配置：
+
+```python
+{
+    "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
+    "DOWNLOAD_HANDLERS": {
+        "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+        "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+    },
+    "PLAYWRIGHT_LAUNCH_OPTIONS": {
+        "headless": True,
+    },
+    "PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT": 30000,
+    "PLAYWRIGHT_ABORT_REQUEST": "plugins.crawler.scrapy_engine.middlewares.playwright_abort.should_abort_request",
+}
+```
+
+### 14.6 使用示例
+
+**CLI 方式**：
+
+```bash
+# 浏览器模式爬取 WAF 站点
+poetry run crawler crawl -d www.tsmc.com --formats pdf --depth 2 \
+    --browser --no-obey-robots
+
+# 浏览器模式 + 代理
+poetry run crawler crawl -d example.com --formats pdf \
+    --browser --browser-proxy "http://proxy:8080"
+```
+
+**API 方式**：
+
+```bash
+curl -X POST http://localhost:8900/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domains": ["www.tsmc.com"],
+    "allowed_extensions": ["pdf"],
+    "use_browser": true,
+    "max_depth": 2
+  }'
+```
+
+### 14.7 配置统一：to_scrapy_settings()
+
+`CrawlerSettings.to_scrapy_settings()` 方法统一生成 Scrapy settings dict，消除 `cli.py` 和 `plugin.py` 中各自维护的内联 dict。
+
+**注入逻辑**：
+
+| 配置来源 | 注入内容 |
+|---------|---------|
+| 基础配置 | `BOT_NAME`、`SPIDER_MODULES`、`ROBOTSTXT_OBEY`、`CONCURRENT_REQUESTS`、`DOWNLOAD_DELAY` |
+| ITEM_PIPELINES | 6 个管道（始终注入） |
+| `enable_rate_limit=True` | `RateLimitMiddleware`（优先级 400） |
+| `enable_ua_rotation=True` | `UserAgentRotationMiddleware`（优先级 500） |
+| `enable_retry=True` | `RetryMiddleware`（优先级 550） |
+| `enable_browser=True` | `TWISTED_REACTOR`、`DOWNLOAD_HANDLERS`、`PLAYWRIGHT_*` 配置 |
+| `user_agent` 参数 | `USER_AGENT` |
+
+### 14.8 同步修复：休眠中间件
+
+`cli.py` 和 `plugin.py` 原先使用内联 dict 创建 `CrawlerProcess`，未引用 `scrapy_engine/settings.py` 中定义的 `DOWNLOADER_MIDDLEWARES`，导致以下三个中间件从未生效：
+
+- `RateLimitMiddleware` — 域名级别令牌桶限速
+- `UserAgentRotationMiddleware` — UA 池随机轮换
+- `RetryMiddleware` — 指数退避重试
+
+通过 `to_scrapy_settings()` 统一生成 settings dict，三个中间件已默认激活。
+
+---
+
+## 15. 登录态爬取
+
+### 15.1 价值分析
+
+登录态爬取解锁三类高价值场景：
+
+| 场景 | 典型目标 | 价值 |
+|------|---------|------|
+| 付费墙/订阅内容 | 研报平台（Bloomberg、Gartner）、学术论文（IEEE、ACM）、行业数据库 | 高价值专业内容 |
+| 个性化内容 | 用户偏好定制的新闻流、推荐系统结果、账户专属文档 | 个性化数据源 |
+| 表单后内容 | 需注册才能访问的下载链接、会员专区资源 | 受保护资源 |
+
+> **价值估算**：企业级爬虫场景中，约 30-40% 的高价值目标需要登录态访问。
+
+### 15.2 业界最佳实践对比
+
+| 方案 | 适用场景 | 优点 | 缺点 |
+|------|---------|------|------|
+| **Playwright storageState** | 复杂登录（验证码/2FA/MFA） | 最可靠，支持任意认证流程 | 需手动执行一次登录 |
+| Scrapy FormRequest.from_response() | 简单表单登录 | 自动化程度高 | 不支持 JS 渲染、验证码 |
+| Cookie 注入 | 已有 cookie（浏览器导出） | 最简单 | Cookie 过期需手动更新 |
+| HTTP Header Auth | API Token / Bearer | 标准化，易管理 | 仅适用于 API 端点 |
+
+**推荐方案**：Playwright `storageState` 作为主路径，覆盖 95%+ 场景。
+
+### 15.3 storageState 格式
+
+Playwright `context.storage_state()` 导出的 JSON 包含 cookies + localStorage + IndexedDB：
+
+```json
+{
+  "cookies": [
+    {
+      "name": "sessionid",
+      "value": "abc123",
+      "domain": ".example.com",
+      "path": "/",
+      "expires": 1735689600,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://example.com",
+      "localStorage": [
+        {"name": "auth_token", "value": "eyJhbGciOiJIUzI1NiIs..."}
+      ]
+    }
+  ]
+}
+```
+
+**导出方式**：
+
+1. **Playwright GUI**：在 Playwright Inspector 中登录目标站点后执行 `context.storage_state(path="auth.json")`
+2. **Playwright 脚本**：
+
+```python
+from playwright.sync_api import sync_playwright
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=False)
+    context = browser.new_context()
+    page = context.new_page()
+    page.goto("https://example.com/login")
+    # 手动或自动执行登录操作...
+    page.fill("#username", "user@example.com")
+    page.fill("#password", "password123")
+    page.click("button[type=submit]")
+    page.wait_for_url("**/dashboard")
+    # 导出登录态
+    context.storage_state(path="auth.json")
+    browser.close()
+```
+
+### 15.4 配置项
+
+| 配置项 | 环境变量 | 默认值 | 说明 |
+|--------|---------|--------|------|
+| `auth_storage_state_path` | `CRAWLER_AUTH_STORAGE_STATE_PATH` | `""` | Playwright storageState JSON 文件路径 |
+| `auth_headers` | — | `{}` | 额外请求头（如 `{"Authorization": "Bearer xxx"}`） |
+
+### 15.5 设计实现
+
+#### 配置注入
+
+`CrawlerSettings.to_scrapy_settings()` 根据认证配置动态注入：
+
+```python
+# Playwright storageState 注入（需要 enable_browser=True）
+if self.enable_browser and self.auth_storage_state_path:
+    settings["PLAYWRIGHT_CONTEXT_ARGS"] = {
+        "storage_state": self.auth_storage_state_path,
+    }
+
+# HTTP Header Auth 注入
+if self.auth_headers:
+    settings.setdefault("DEFAULT_REQUEST_HEADERS", {}).update(self.auth_headers)
+```
+
+#### 实体扩展
+
+`CrawlTask` 新增字段：
+
+```python
+@dataclass(frozen=True)
+class CrawlTask:
+    # ... 现有字段 ...
+    use_browser: bool = False
+    auth_storage_state_path: str = ""
+    auth_headers: dict[str, str] = field(default_factory=dict)
+```
+
+#### CLI 参数
+
+```bash
+# 登录态爬取（Playwright storageState）
+poetry run crawler crawl -d protected.example.com --formats pdf \
+    --browser --auth-storage-state ./auth.json
+
+# Header Auth（API Token）
+poetry run crawler crawl -d api.example.com \
+    --auth-header "Authorization=Bearer xxx" --formats pdf
+```
+
+#### API 请求
+
+```json
+{
+  "domains": ["protected.example.com"],
+  "allowed_extensions": ["pdf"],
+  "use_browser": true,
+  "auth_storage_state_path": "/path/to/auth.json"
+}
+```
+
+### 15.6 安全注意事项
+
+| 措施 | 说明 |
+|------|------|
+| **文件权限** | storageState 文件应设置 `chmod 600`（仅所有者可读写） |
+| **日志脱敏** | `auth_storage_state_path` 在日志中仅显示路径；`auth_headers` 中的 `Authorization` 值脱敏显示 |
+| **API 响应过滤** | `CrawlTask` 序列化到响应时，`auth_*` 字段不返回或返回 `***` |
+| **凭证轮换** | 建议 storageState 文件定期更新，避免长期有效凭证暴露 |
+| **`.gitignore`** | 确保 `auth.json`、`*.storage-state.json` 等凭证文件被 gitignore |
+
+### 15.7 数据流
+
+```
+用户提供 auth.json（Playwright storageState）
+    │
+    ▼
+CLI / API 传入 auth_storage_state_path
+    │
+    ▼
+CrawlTask.auth_storage_state_path → CrawlerSettings.auth_storage_state_path
+    │
+    ▼
+to_scrapy_settings() 注入 PLAYWRIGHT_CONTEXT_ARGS
+    │
+    ▼
+scrapy-playwright 创建浏览器上下文时加载 storageState
+    │
+    ▼
+浏览器上下文自动携带 cookies + localStorage → 认证通过
+    │
+    ▼
+DomainSpider 正常爬取受保护页面 → 发现并下载文件
+```
