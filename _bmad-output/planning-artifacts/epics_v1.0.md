@@ -266,7 +266,7 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 | NFR-COMP-04 | 隐私保护（PIPL） | 个人信息脱敏率 100%，删除请求响应<24 小时 | - | - |
 | NFR-COMP-05 | 审计日志完整性 | 100% 完整，日志审计工具验证通过 | - | - |
 | NFR-COMP-06 | SOX 404 条款 | - | 通过第三方审计，内部控制无重大缺陷 | - |
-| NFR-COMP-07 | ISO 27001 | - | 通过认证，ISMS 运行有效 | - |
+| NFR-COMP-07 | ISO 27001 | - | - | 通过认证，ISMS 运行有效 |
 | NFR-COMP-08 | 银保监会规范 | - | - | 1104 报表/EAST 报表生成准确率 100% |
 | NFR-COMP-09 | 完整审计追踪可视化 | - | - | 7 年 WORM+ 区块链哈希链 + 可视化时间线，审计查询<10 秒 |
 
@@ -1246,6 +1246,9 @@ So that **领域逻辑与技术实现隔离，支持独立演进和测试**。
 1. **架构约束测试**
    - [ ] 领域层零依赖测试（FR-AR-01）- 验证领域层仅使用 Python 标准库
    - [ ] 依赖方向测试 - 验证基础设施层→应用层→领域层的依赖方向
+   - [ ] 基础设施层不依赖接口层测试 - 验证 infrastructure 不 import interfaces
+   - [ ] 应用层不依赖基础设施层测试 - 验证 application 不 import infrastructure
+   - [ ] 接口层不依赖基础设施层测试 - 验证 interfaces 不 import infrastructure
    - [ ] 导入检查测试 - 使用 ast 模块扫描导入语句
 
 2. **覆盖率要求**
@@ -1349,6 +1352,8 @@ So that **实时事件低延迟路由，持久化事件可靠传输**。
 **When** 发布领域事件至事件总线
 **Then** 实时通知型事件通过 Redis 发布/订阅通道传输（延迟<50ms）
 **And** 持久化事件通过 PostgreSQL event_outbox 表 + RabbitMQ 传输（100% 可靠）
+**And** 支持 10 种领域事件监听（DocumentProcessed/ToolExecuted/AgentDecided/CheckpointReached/CorrectionApproved/StrategicDeviationWarning/HeartbeatTriggered/IsolationLevelSwitched/CheckpointRecovered/RoutingDecided）
+**And** 事件处理幂等性保证：基于 event_id 的 Redis 缓存检查（TTL 7 天），事件处理成功率 >= 99%
 
 ### Story 1.4: 六层存储架构 - Redis 高速缓存层
 
@@ -1437,6 +1442,8 @@ So that **支持 ACID 事务和外键约束**。
 **When** 创建用户表、角色表、权限表、审计日志表、业务实体表
 **Then** 所有表通过外键约束关联，支持 ACID 事务
 **And** 使用 Alembic 管理数据库迁移
+**And** 支持 Schema per Tenant 多租户隔离（每个租户独立 Schema）
+**And** 业务实体表启用 Row-Level Security（RLS）策略，确保租户间数据隔离（NFR-SCALE-04）
 
 ### Story 1.6: 六层存储架构 - Qdrant 向量存储层
 
