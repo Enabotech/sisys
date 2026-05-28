@@ -264,6 +264,8 @@ class DomainSpider(scrapy.Spider):
             "woff2",
             "ttf",
             "eot",
+            "json",
+            "ipynb",
         }
     )
 
