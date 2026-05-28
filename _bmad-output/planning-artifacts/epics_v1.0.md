@@ -524,8 +524,7 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 | **智能检索与知识发现 (SR) - 2 项** |
 | FR-SR-14 | 引用数据时效性管理 | Epic 17 | Story 17.4 | P2 |
 | FR-SR-15 | 实体关联查询/路径查询/社区发现 | Epic 17 | Story 17.5 | P2 |
-| FR-SR-16 | 高保真溯源 REST API（Bounding Box 坐标级） | Epic 17 | Story 17.6 | P2 |
-| **战略工具箱 (ST) - 2 项** |
+| FR-SR-16 | 高保真溯源 REST API（Bounding Box 坐标级） | Epic 17 | Story 17.6 | P2 || **战略工具箱 (ST) - 2 项** |
 | FR-ST-10 | gVisor 沙箱执行 | Epic 18 | Story 18.1 | P2 |
 | FR-ST-11 | 压力测试建模 | Epic 18 | Story 18.2 | P2 |
 | **Agent 协作 (AC) - 2 项** |
@@ -534,11 +533,11 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 | **战略规划流程 (SP) - 7 项** |
 | FR-SP-11 | BEM 六阶段流程（战略解码） | Epic 15 | Story 15.1 | P2 |
 | FR-SP-12 | SP→BP 结构化映射 | Epic 15 | Story 15.2 | P2 |
-| FR-SP-13 | 财务量化分析 API（NPV/IRR/现金流） | Epic TBD | V2 细化 | P2 |
-| FR-SP-14 | 敏感性分析 API（龙卷风图） | Epic TBD | V2 细化 | P2 |
-| FR-SP-15 | 情景对比 API（3 方案并排） | Epic TBD | V2 细化 | P2 |
-| FR-SP-16 | 白标品牌定制与监管报告导出 API | Epic TBD | V2 细化 | P2 |
-| FR-SP-17 | 风险热力图 API | Epic TBD | V2 细化 | P2 |
+| FR-SP-13 | 财务量化分析 API（NPV/IRR/现金流） | Epic 20 | Story 20.1 | P2 |
+| FR-SP-14 | 敏感性分析 API（龙卷风图） | Epic 20 | Story 20.2 | P2 |
+| FR-SP-15 | 情景对比 API（3 方案并排） | Epic 20 | Story 20.3 | P2 |
+| FR-SP-16 | 白标品牌定制与监管报告导出 API | Epic 20 | Story 20.4 | P2 |
+| FR-SP-17 | 风险热力图 API | Epic 20 | Story 20.5 | P2 |
 | **用户交互与报告 (UI) - 1 项** |
 | FR-UI-13 | 决策影响分析（Shapley 贡献值） | Epic 19 | Story 19.1 | P2 |
 | **系统管理与合规 (SC) - 2 项** |
@@ -642,10 +641,11 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 |---------|---------|-------|--------|-------|---------|
 | Epic 15 | BEM 战略解码 | P2 | SP-11/12 | 6 | SP→BP 结构化映射 |
 | Epic 16 | 高级安全与合规 | P2 | SC-13/14, CP-11/12 | 6 | ISO 27001 与银保监会规范 |
-| Epic 17 | 高级数据管理与检索 | P2 | DM-13~15, SR-14/15 | 6 | 公式识别与跨模态检索 |
+| Epic 17 | 高级数据管理与检索 | P2 | DM-13~15, SR-14~16 | 7 | 公式识别与跨模态检索 |
 | Epic 18 | 高级 Agent 协作 | P2 | AC-15/16, ST-10/11 | 6 | 人机协作与动态扩缩容 |
 | Epic 19 | 高级用户体验 | P2 | UI-13, SA-08/09 | 4 | 决策影响分析与预测性预警 |
-| **总计** | - | - | **18 项 FR** | **28** | - |
+| Epic 20 | 高级战略分析 API | P2 | SP-13~17 | 5 | 财务量化/敏感性/情景对比/白标/风险热力图 |
+| **总计** | - | - | **24 项 FR** | **34** | - |
 
 ---
 
@@ -3641,6 +3641,17 @@ So that **Agent 按照预定义的身份和规则执行任务**。
 **Given** Agent 已实例化
 **When** 加载身份档案
 **Then** 加载 IDENTITY.md（身份）、CODE.md（行为准则）、SOUL.md（价值观）、TOOLS.md（技能）、USER.md（用户偏好）、MEMORY.md（记忆）、HEARTBEAT.md（心跳）
+
+**Skills 三级渐进式加载验收标准（FR-IF-02）：**
+
+**Given** Agent 已实例化并开始加载身份档案
+**When** 执行 Skills 三级渐进式加载
+**Then** 满足以下三级加载约束：
+- L1 元数据：TOOLS.md（23 种工具元数据清单：name + description + when + tags）< 200 tokens，Agent 启动时加载
+- L2 SOP 主体：SKILL.md（任务匹配后的完整 SOP：< 500 行/个），任务执行时按需加载
+- L3 捆绑资源：scripts/ + references/（确定性计算脚本/理论参考），SOP 执行中明确需要时加载
+**And** Agent 启动上下文总大小 < 500 tokens（IDENTITY.md + SOUL.md + TOOLS.md + 核心约束）
+**And** SkillSelector 基于 L1 元数据推荐 Top-K Skills（关键词匹配 40% + 语义相似度 60%）
 **And** 档案内容验证通过
 
 ### Story 5.3: 单 Agent 标准工作流
@@ -4605,6 +4616,18 @@ So that **高效操作系统**。
 **When** 执行命令（如 `sisys upload --file docs.zip`）
 **Then** 命令正确解析并执行
 **And** 输出执行结果和进度反馈
+
+**CLI 七原则合规验收标准（FR-IF-01）：**
+
+**Given** sisys CLI 已安装并配置完成
+**When** 验证 CLI 接口合规性
+**Then** 满足以下验收标准：
+- P1: CLI 是 LLM 母语 — 内部工具 100% 有 CLI 入口，覆盖 document/tool/agent/plan/checkpoint/archive 6 个服务模块
+- P4: MCP 退居生态层 — MVP 阶段 MCP 相关代码量 = 0（无 mcp/ 目录、无 mcp 依赖）
+- P5: Less scaffolding — 工具选择准确率 >= 85%（SkillSelector 推荐 Top-3 命中率）
+- P7: input_examples 驱动 — 工具调用准确率 >= 90%（每个复杂工具提供 1-5 个 input_examples）
+**And** 所有命令支持 Agent 模式参数（--yes / --dry-run / --mock）
+**And** 所有命令支持输出格式参数（--format json/table/pretty）
 
 **TDD 测试要求:**
 
