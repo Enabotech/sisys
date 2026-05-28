@@ -10,9 +10,9 @@ workflowType: 'epics-and-stories'
 projectName: 'sisys'
 userName: 'Agimtech'
 date: '2026-02-28'
-documentStatus: 'step-03-complete'
-lastUpdated: '2026-04-22'
-updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单层 MEMORY.md'
+documentStatus: 'round-1-review-complete'
+lastUpdated: '2026-05-28'
+updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/FR-ST-08优先级矛盾/Story6.11依赖错误/EV与AC分类分离'
 ---
 
 # sisys - Epic Breakdown
@@ -27,9 +27,9 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 
 ### Functional Requirements
 
-**共 122 项功能需求，按优先级划分：**
+**共 124 项功能需求，按优先级划分：**
 
-#### P0 (MVP) - 57 项
+#### P0 (MVP) - 59 项
 
 **文档与数据管理 (DM-01 ~ DM-08) - 8 项：**
 - FR-DM-01: 支持 17 种格式文档上传 (pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/html + zip/tar 压缩包)
@@ -102,13 +102,17 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 - FR-SA-02: 管理事实有效期标签（valid_from/valid_until）
 - FR-SA-03: 执行数据陈旧标记（超 12 个月自动降权）
 
+**Agent 评估与可观测性 (EV-01 ~ EV-02) - 2 项：**
+- FR-EV-01: 实现 Phoenix Evaluation Harness 全链路追踪（Agent 感知→规划→执行→验证→反思各阶段耗时/质量指标自动采集）
+- FR-EV-02: 执行 Agent 输出质量评估（幻觉检测、上下文相关性、置信度校准，五维评分模型）
+
 **架构约束 (AR-01 ~ AR-04) - 4 项：**
 - FR-AR-01: 保证领域层不依赖任何外部框架（仅依赖 Python 标准库与领域模型）
 - FR-AR-02: 发布领域事件至事件总线，支持事件重放与失败重试
 - FR-AR-03: 执行跨存储事务基础（PostgreSQL 事务，MVP 方案），保证最终一致性
 - FR-AR-04: 通过仓储模式向领域层提供统一存储接口（领域层不直接依赖具体存储实现）
 
-#### P1 (V1) - 46 项
+#### P1 (V1) - 48 项
 
 **文档与数据管理 (DM-09 ~ DM-12) - 4 项：**
 - FR-DM-09: 追溯每个解析后的数据切片至导入批次与原始文件版本
@@ -173,6 +177,10 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 - FR-SA-05: 执行心跳机制（周期性自动唤醒，检查待办事项、偏差预警、周期性任务）
 - FR-SA-06: 发布战略偏差预警事件（偏差超阈值 10% 自动触发）
 - FR-SA-07: 管理分支（主线/分支差异对比、分支合并/放弃）
+
+**Agent 评估与可观测性 (EV-03 ~ EV-04) - 2 项：**
+- FR-EV-03: 执行 CUSUM 漂移检测与触发重校准（Agent 输出质量连续降级时自动告警并触发重新校准）
+- FR-EV-04: 实现 CheckpointWithEvaluation 集成（Checkpoint 快照携带评估指标，支持历史质量回溯）
 
 #### P2 (V2) - 18 项
 
@@ -405,10 +413,9 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | FR-AC-04 | EIP 基础 | Epic 5 | Story 5.4 | P0 |
 | FR-AC-05 | 三重硬隔离 | Epic 5 | Story 5.5 | P0 |
 | FR-AC-06 | 隔离切换日志 | Epic 5 | Story 5.6 | P0 |
+| **Agent 评估与可观测性 (EV) - 2 项** |
 | FR-EV-01 | Phoenix Evaluation Harness 全链路追踪 | Epic 5 | Story 5.7 | P0 |
 | FR-EV-02 | Agent 输出质量评估（幻觉检测、上下文相关性、置信度校准） | Epic 5 | Story 5.8 | P0 |
-| FR-EV-03 | CUSUM 漂移检测与触发重校准 | Epic 5 | Story 5.9 | P1 |
-| FR-EV-04 | CheckpointWithEvaluation 集成 | Epic 5 | Story 5.10 | P1 |
 | **战略规划流程 (SP) - 4 项** |
 | FR-SP-01 | BLM 前两阶段 | Epic 6 | Story 6.1 | P0 |
 | FR-SP-02 | 市场洞察六子步骤 | Epic 6 | Story 6.2 | P0 |
@@ -427,8 +434,8 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | FR-SA-02 | 有效期标签 | Epic 3 | Story 3.11 | P0 |
 | FR-SA-03 | 数据陈旧标记 | Epic 3 | Story 3.12 | P0 |
 
-**P0 FR 覆盖统计：57/57 项 ✅**
-- AR: 4/4 | SC: 8/8 | CP: 4/4 | DM: 8/8 | SR: 8/8 | ST: 5/5 | AC: 6/6 | SP: 4/4 | UI: 7/7 | SA: 3/3
+**P0 FR 覆盖统计：59/59 项 ✅**
+- AR: 4/4 | SC: 8/8 | CP: 4/4 | DM: 8/8 | SR: 8/8 | ST: 5/5 | AC: 6/6 | EV: 2/2 | SP: 4/4 | UI: 7/7 | SA: 3/3
 
 ---
 
@@ -450,7 +457,7 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | **战略工具箱 (ST) - 4 项** |
 | FR-ST-06 | 工具版本管理 | Epic 4 | Story 4.6 | P1 |
 | FR-ST-07 | Validation Feedback 闭环 | Epic 4 | Story 4.7 | P1 |
-| FR-ST-08 | SAP 协议支持 | Epic 4 | Story 4.8 | P2 |
+| FR-ST-08 | SAP 协议支持 | Epic 4 | Story 4.8 | P1 |
 | FR-ST-09 | 财务建模与估值基础 | Epic 4 | Story 4.9 | P1 |
 | **Agent 协作 (AC) - 8 项** |
 | FR-AC-07 | 多 Agent 任务分解 | Epic 9 | Story 9.1 | P1 |
@@ -461,6 +468,9 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | FR-AC-12 | SYS Agent 裁决 | Epic 9 | Story 9.6 | P1 |
 | FR-AC-13 | 三套方案生成 | Epic 9 | Story 9.7 | P1 |
 | FR-AC-14 | 深度思考与多路径推演 | Epic 9 | Story 9.8 | P1 |
+| **Agent 评估与可观测性 (EV) - 2 项** |
+| FR-EV-03 | CUSUM 漂移检测与触发重校准 | Epic 5 | Story 5.9 | P1 |
+| FR-EV-04 | CheckpointWithEvaluation 集成 | Epic 5 | Story 5.10 | P1 |
 | **战略规划流程 (SP) - 6 项** |
 | FR-SP-05 | 完整 BLM 六阶段流程 | Epic 10 | Story 10.1 | P1 |
 | FR-SP-06 | Replay 重放模式 | Epic 10 | Story 10.2 | P1 |
@@ -492,8 +502,8 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | FR-SA-06 | 战略偏差预警事件 | Epic 13 | Story 13.7 | P1 |
 | FR-SA-07 | 分支管理（主线/分支对比） | Epic 13 | Story 13.8 | P1 |
 
-**P1 FR 覆盖统计：46/46 项 ✅**
-- DM: 4/4 | SR: 5/5 | ST: 4/4 | AC: 8/8 | SP: 6/6 | UI: 5/5 | SC: 4/4 | CP: 6/6 | SA: 4/4
+**P1 FR 覆盖统计：48/48 项 ✅**
+- DM: 4/4 | SR: 5/5 | ST: 4/4 | AC: 8/8 | EV: 2/2 | SP: 6/6 | UI: 5/5 | SC: 4/4 | CP: 6/6 | SA: 4/4
 
 ---
 
@@ -545,12 +555,13 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | SR（智能检索与知识发现） | 8 | 5 | 2 | 15 | ✅ 15/15 |
 | ST（战略工具箱） | 5 | 4 | 2 | 11 | ✅ 11/11 |
 | AC（Agent 协作） | 6 | 8 | 2 | 16 | ✅ 16/16 |
+| EV（Agent 评估与可观测性） | 2 | 2 | 0 | 4 | ✅ 4/4 |
 | SP（战略规划流程） | 4 | 6 | 2 | 12 | ✅ 12/12 |
 | UI（用户交互与报告） | 7 | 5 | 1 | 13 | ✅ 13/13 |
 | SA（战略档案库） | 3 | 4 | 2 | 9 | ✅ 9/9 |
-| **总计** | **57** | **46** | **18** | **121** | ✅ **121/122** |
+| **总计** | **59** | **48** | **18** | **125** | ✅ **125/126** |
 
-**注：** FR-SA-10（群体智能，P3）为 V3+ 版本功能，暂不纳入本次 Epic 分解
+**注：** FR-SA-10（群体智能，P3）为 V3+ 版本功能，暂不纳入本次 Epic 分解；FR-IF-01~07（接口与协议）详见 PRD 补充说明，部分验收标准已融入对应 UI/ST/AR 系列 Story
 
 ---
 
@@ -594,11 +605,11 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | Epic 2 | 文档与数据管理 | P0 | DM-01~08 | 9 | 用户可以上传和管理 17 种格式文档 |
 | Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 13 | 用户可以检索文档并溯源至原始坐标点 |
 | Epic 4 | 战略工具箱 | P0 | ST-01~05 | 5 | 用户可以执行 23 种战略工具分析 |
-| Epic 5 | Agent 协作系统 | P0 | AC-01~06, EV-01~04 | 10 | 用户可以通过 CEO Agent 执行战略规划 |
+| Epic 5 | Agent 协作系统 | P0 | AC-01~06, EV-01~02 | 10 | 用户可以通过 CEO Agent 执行战略规划 |
 | Epic 6 | 战略规划流程 (BLM 前两阶段) | P0 | SP-01~04, UI-04/05/06/07 | 12 | 用户可以生成战略规划并审批 |
 | Epic 7 | **多触点用户界面与 API 集成** | P0 | UI-01/02/03, CP-03 | 8 | 用户可以通过 CLI/API/仪表盘操作系统 |
 | Epic 8 | **用户权限管理与审计合规** | P0 | SC-04/05/06 | 6 | 管理员可以管理权限和审计日志 |
-| **总计** | - | - | **57 项 FR** | **85** | - |
+| **总计** | - | - | **59 项 FR** | **85** | - |
 
 **V1 (P1) Epic 列表：**
 
@@ -610,7 +621,8 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | Epic 12 | 知识图谱与 GraphRAG | P1 | SR-09~13 | 6 | GraphRAG 增强检索与实体关联查询 |
 | Epic 13 | 高级系统管理与合规 | P1 | SC-09~12, SA-04~07 | 8 | SOX 合规与时间轴查询 |
 | Epic 14 | 用户体验增强 | P1 | UI-08~12, DM-09~12 | 10 | 决策可视化与分支管理 |
-| **总计** | - | - | **46 项 FR** | **50** | - |
+| Epic 5 | Agent 评估增强 | P1 | EV-03~04 | 2 | Agent 质量漂移检测与 Checkpoint 评估集成 |
+| **总计** | - | - | **48 项 FR** | **52** | - |
 
 **V2 (P2) Epic 列表：**
 
@@ -4495,7 +4507,7 @@ So that **可以直接交付客户，验证 MVP 付费意愿**。
 **And** 导出 PDF 报告时品牌元素 100% 准确应用，导出时间<1 分钟
 **And** 品牌配置可保存为模板，支持后续项目复用
 
-**依赖关系：** 依赖 Story 6.5b（PDF 报告生成）
+**依赖关系：** 依赖 Story 6.5a（Markdown 报告生成）
 **执行优先级：** P0-11（MVP，UX 白标报告）
 
 **TDD 测试要求:**
