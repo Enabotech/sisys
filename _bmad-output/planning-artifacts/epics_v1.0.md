@@ -635,7 +635,7 @@ updateReason: 'Story 4.6~4.9完整定义补充 - 工具版本管理/Validation F
 | Epic 12 | 知识图谱与 GraphRAG | P1 | SR-09~13 | 6 | GraphRAG 增强检索与实体关联查询 |
 | Epic 13 | 高级系统管理与合规 | P1 | SC-09~12, SA-04~07 | 8 | SOX 合规与时间轴查询 |
 | Epic 14 | 用户体验增强 | P1 | UI-08~12 | 4 | 决策可视化与分支管理 |
-| **总计** | - | - | **46 项 FR** | **38** | - |
+| **总计** | - | - | **38 项 FR** | **38** | - |
 
 **V2 (P2) Epic 列表：**
 
@@ -5649,7 +5649,7 @@ So that **确保 MVP 无高危漏洞**。
 | Epic | 价值组 | 依赖 Epic 1 | 依赖 Epic 2 | 依赖 Epic 3 | 依赖 Epic 4 | 依赖 Epic 5 | 内部依赖类型 | 可独立交付 | Story 数 |
 |------|--------|-----------|-----------|-----------|-----------|-----------|------------|-----------|---------|
 | **Epic 0: Iteration 0** | 开发环境/CI/CD/测试框架 | - | - | - | - | - | 顺序依赖 | ✅ 是 | 3 |
-| **Epic 0: Iteration 1** | 重构开发环境/CI/CD/测试框架 | - | - | - | - | - | 顺序依赖 | ✅ 是 | 11 |
+| **Epic 0: Iteration 1** | 重构开发环境/CI/CD/测试框架 | - | - | - | - | - | 顺序依赖 | ✅ 是 | 12 |
 | **Epic 1: 企业级架构基础与合规** | 系统稳定性与性能基础<br/>安全与合规基础<br/>or.md 系统公理<br/>测试框架<br/>**MVP 关键机制增强** | - | - | - | - | - | 组内依赖 | ✅ 是 | **23** |
 | **Epic 2: 文档与数据管理** | 文档全生命周期管理 | Story 1.6/1.7 | - | - | - | - | 顺序依赖（流水线） | ✅ 是 | 9 |
 | **Epic 3: 智能检索与知识发现** | 智能检索与溯源 | Story 1.5/1.6/1.7 | **Story 2.3（关键路径）** | - | - | - | 顺序依赖（流水线） | ✅ 是 | 13 |
@@ -5753,10 +5753,10 @@ graph TD
     end
 
     %% ========== Epic 2-8 (待开始) ==========
-    subgraph "Epic 2-8 📋 (待开始 - 82 Stories)"
+    subgraph "Epic 2-8 📋 (待开始 - 67 Stories)"
         E2["Epic 2<br/>文档与数据管理<br/>9 Stories<br/>📋 Backlog"]
         E3["Epic 3<br/>智能检索与发现<br/>13 Stories<br/>📋 Backlog"]
-        E4["Epic 4<br/>战略工具箱<br/>5 Stories<br/>📋 Backlog"]
+        E4["Epic 4<br/>战略工具箱<br/>9 Stories<br/>📋 Backlog"]
         E5["Epic 5<br/>Agent 协作<br/>10 Stories<br/>📋 Backlog"]
         E6["Epic 6<br/>战略规划流程<br/>12 Stories<br/>📋 Backlog"]
         E7["Epic 7<br/>用户界面与 API<br/>8 Stories<br/>📋 Backlog"]
@@ -5850,10 +5850,7 @@ graph TD
 
     class S0_1,S0_3,S0_4,S0_5,S0_6,S0_7,S0_8,S0_9,S0_14,S0_15,S0_16 done;
     class S0_17,S0_18,S0_30 ready;
-    class S1_1,S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_16,S1_17 done;
-    class S1_9,S1_15b inprogress;
-    class S1_18a ready;
-    class S1_10,S1_11,S1_12,S1_18b,S1_19 backlog;
+    class S1_1,S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_9,S1_10,S1_11,S1_12,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_15b,S1_16,S1_17,S1_18a,S1_18b,S1_19 done;
     class E2,E3,E4,E5,E6,E7,E8 backlog;
 ```
 
@@ -5874,13 +5871,13 @@ Story 0.30 (应用启动集成 - ready-for-dev)
 
 ---
 
-**关键路径 2: Epic 1 安全合规 (当前技术风险最高) 🟧**
+**关键路径 2: Epic 1 安全合规 ✅ 已完成**
 
 ```
-Story 1.9 (RBAC 权限 - In-Progress)
-  → Story 1.10 (审计日志)
-  → Story 1.11 (数据主权隔离)
-  → Story 1.12 (等保 2.0 三级)
+Story 1.9 (RBAC 权限 - ✅ Done)
+  → Story 1.10 (审计日志 - ✅ Done)
+  → Story 1.11 (数据主权隔离 - ✅ Done)
+  → Story 1.12 (等保 2.0 三级 - ✅ Done)
 ```
 
 **关键性分析:**
@@ -5894,14 +5891,14 @@ Story 1.9 (RBAC 权限 - In-Progress)
 
 ---
 
-**关键路径 3: Epic 1 外部化记忆与工作流引擎 (核心能力) 🟦**
+**关键路径 3: Epic 1 外部化记忆与工作流引擎 ✅ 已完成**
 
 ```
-Story 1.15b (外部化记忆协同 - In-Progress)
-  → Story 1.18a (Prefect 工作流 - ready-for-dev)
-  → Story 1.19 (成本度量)
-Story 1.3 (事件总线 - completed)
-  → Story 1.18b (LangGraph 编排)
+Story 1.15b (外部化记忆协同 - ✅ Done)
+  → Story 1.18a (Prefect 工作流 - ✅ Done)
+  → Story 1.19 (成本度量 - ✅ Done)
+Story 1.3 (事件总线 - ✅ Done)
+  → Story 1.18b (LangGraph 编排 - ✅ Done)
 ```
 
 **关键性分析:**
@@ -6140,7 +6137,7 @@ Story 1.1 (六边形架构)
 
 | 阶段 | 成功标准 | 验收方式 |
 |------|---------|---------|
-| **阶段 1** (Epic 0 Iteration 1) | 11 个 Story 100% 完成，集成测试通过 | 验收测试报告 |
+| **阶段 1** (Epic 0 Iteration 1) | 12 个 Story 100% 完成，集成测试通过 | 验收测试报告 |
 | **阶段 2** (Epic 1 价值组 2/3) | 11 个 Story 100% 完成，架构评审通过 | 架构评审报告 + 测试报告 |
 | **阶段 3** (Epic 1 价值组 4/5/6) | 12 个 Story 100% 完成，性能基准达标 | 性能基准测试报告 |
 | **阶段 4** (Epic 2-8 MVP) | 59 个 P0 FR 100% 覆盖，MVP 验收通过 | MVP 验收报告 |
