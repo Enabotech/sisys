@@ -61,6 +61,7 @@
 - [ ] 不支持的格式返回 400 + 明确错误信息
 - [ ] 空文件拒绝（file_size_bytes > 0）
 - [ ] 文件名长度限制（≤255 字符）和特殊字符校验
+- [ ] 文件流式处理，禁止全量 bytes 加载到内存（or.md 二.1.[1]："流式处理管道防止内存溢出"）
 
 ### AC-2: 分片上传与断点续传
 
@@ -328,6 +329,8 @@
 - [ ] `poetry run ruff check` 通过
 - [ ] `poetry run mypy` 通过
 
+> **注（epics 上游指标）：** `epics_v1.0.md` Story 2.1 TDD 测试要求包含"上传延迟 P95 < 100ms"和"性能基准测试通过"。本 Story 将 P95 < 100ms 作为**非阻断性软目标**（metadata 处理响应时间，不含文件传输时间），性能基准测试推迟至集成测试阶段验证。原因是：上传延迟主要取决于网络带宽和 MinIO 响应，非应用层可控因素；20GB 文件上传的 P95 < 100ms 不现实。
+
 ---
 
 ## 📊 AC → Task → Subtask 追溯矩阵
@@ -484,7 +487,7 @@
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 3.1: 🔴 红 — 编写 PostgreSQLDocumentRepository 失败测试（save、find_by_id、find_by_tenant）
-- [ ] Subtask 3.2: 🟢 绿 — 实现 PostgreSQLDocumentRepository（继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类，Session 通过 ContextVar 管理；同时新建 `DocumentModel(Base)` SQLAlchemy 声明式映射，位于 `src/infrastructure/storage/postgresql/models/document.py`）
+- [ ] Subtask 3.2: 🟢 绿 — 实现 PostgreSQLDocumentRepository（继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类，构造器传入 `model_class=DocumentModel`；Session 通过 ContextVar 管理；复用基类 `save(entity)` 方法，自定义 `find_by_id(document_id, tenant_id)` 和 `find_by_tenant(tenant_id, ...)` 方法（基类仅有 `get_by_id(id)` 无租户过滤）；实现 `_to_entity(model)` 和 `_to_model(entity)` 抽象方法；同时新建 `DocumentModel(Base)` SQLAlchemy 声明式映射，位于 `src/infrastructure/storage/postgresql/models/document.py`，继承 `Base(DeclarativeBase)`）
 - [ ] Subtask 3.3: 🔄 重构 — 优化 Repository 代码
 - [ ] Subtask 3.4: 创建 Alembic migration（`documents` 表：document_id, tenant_id, filename, mime_type, file_size_bytes, document_type, parse_status, uploaded_by, version, metadata JSONB, created_at, updated_at）
 - [ ] Subtask 3.5: 创建必要索引（`idx_documents_tenant_id` 租户隔离, `idx_documents_tenant_created_at` 时间排序）
@@ -1010,7 +1013,17 @@ tests/
 | 22 | 路由注册模式不准确 — app.py 无路由注册，应用工厂模式 | P1 | Task 7 Subtask 7.4 修正为工厂函数导出模式 |
 | 23 | 端口契约表缺 version 列 | P1 | 添加 version 列 |
 | 24 | 仓储文件路径错误（postgresql/ → postgresql/repository/） | P1 | 修正项目结构和文件清单中的路径 |
-| 25 | 仓储类名 PostgreSQLDocumentRepository → PostgreSQLDocumentRepository | P1 | 全局统一类名 |
+| 25 | 仓储类名 Postgres→PostgreSQL 前缀统一 | P1 | 全局统一为 PostgreSQLDocumentRepository |
+
+> 第7轮审查修订（2026-05-29，第二轮审查第2轮）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 26 | AC-1 缺少流式处理约束（or.md 明确要求"流式处理管道防止内存溢出"） | P1 | AC-1 验证标准新增流式处理 checkbox |
+| 27 | epics 要求 P95<100ms 上传延迟，Story 未提及 | P1 | 添加注释说明软目标理由（20GB 文件传输非应用层可控） |
+| 28 | PostgreSQLAdapter 提供 get_by_id 非 find_by_id，Task 3 未明确自定义方法 | P1 | Subtask 3.2 补充基类方法复用/自定义方法说明 |
+| 29 | PostgreSQLAdapter 构造器需 model_class 参数，Story 未提及 | P1 | Subtask 3.2 补充构造器参数 |
+| 30 | 质量门禁缺少"性能基准测试"（epics 明确要求） | P1 | 添加注释说明推迟至集成测试阶段 |
 
 ### 🔍 代码审查发现 Review Findings
 
@@ -1036,10 +1049,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.0.5
+**故事版本/Story Version:** v0.0.6
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.0.6: 第二轮审查第2轮 — 补充流式处理约束/P95性能指标说明/PostgreSQLAdapter方法关系/构造器参数
 - v0.0.5: 第二轮审查第1轮 — 修复 tenant_id/L1CachePort/PostgreSQL 仓储基类/MinIO MIME 类型/路由注册模式等实现细节，补充 Review Findings/Next Steps 模板 Section
 - v0.0.4: 第5轮终审 — 追溯矩阵补齐Task 0/10行、or.md公理追溯补充rtf说明
 - v0.0.3: 第2轮审查修订 — 修复残留不一致（格式计数/幽灵条目/测试表缺失/CLI残留/content_hash残留）
