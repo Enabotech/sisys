@@ -57,10 +57,14 @@
 
 **验证标准/Validation Criteria:**
 - [ ] 支持 17 种格式（15 种文档格式 + 2 种压缩格式）：pdf, txt, doc, docx, ppt, pptx, xls, xlsx, csv, jpeg, png, gif, markdown（含 .md 扩展名）, html, rtf, zip, tar
-- [ ] MIME 类型与文件扩展名双向校验
+- [ ] MIME 类型与文件扩展名双向校验（两者必须匹配，不匹配则拒绝并返回 400 + 明确错误信息）
+- [ ] 文件扩展名大小写不敏感（`.PDF` / `.Pdf` / `.pdf` 均合法）
+- [ ] jpeg 格式同时接受 `.jpg` 和 `.jpeg` 扩展名（均映射到 `image/jpeg`）
+- [ ] 无扩展名文件拒绝并返回 400 + 明确错误信息
 - [ ] 不支持的格式返回 400 + 明确错误信息
 - [ ] 空文件拒绝（file_size_bytes > 0）
-- [ ] 文件名长度限制（≤255 字符）和特殊字符校验
+- [ ] 文件大小等于 20GB 时接受（`file_size_bytes <= MAX_FILE_SIZE`，含等号）
+- [ ] 文件名长度限制（≤255 字符）和特殊字符校验（拒绝含 `\0`、`/`、`\` 的文件名）
 - [ ] 文件流式处理，禁止全量 bytes 加载到内存（or.md 二.1.[1]："流式处理管道防止内存溢出"）
 
 ### AC-2: 分片上传与断点续传
@@ -73,10 +77,12 @@
 **And** 所有分片上传完成后自动合并
 
 **验证标准/Validation Criteria:**
-- [ ] 分片策略按文档规定四级分片
+- [ ] 分片策略按文档规定四级分片（边界值：100MB 以下含 100MB 不分片，1GB 以下含 1GB 用 10MB 分片，10GB 以下含 10GB 用 50MB 分片，超过 10GB 用 100MB 分片）
 - [ ] Redis 记录 upload_id、已上传分片列表、ETag
 - [ ] 断点续传正确恢复（查询已上传分片，跳过已完成的）
 - [ ] 分片上传超时自动清理（TTL 到期）
+- [ ] upload_id 过期后（TTL 到期）查询/恢复返回 410 Gone（非 404）
+- [ ] 分片乱序到达时拒绝并返回 400（part_number 必须按顺序递增，或服务端自动排序合并）
 
 ### AC-3: 批量上传与并发控制
 
@@ -90,7 +96,8 @@
 **验证标准/Validation Criteria:**
 - [ ] 批量上传支持并发 ≥20
 - [ ] 部分失败不回滚已成功文件
-- [ ] 总大小限制校验（≤20GB）
+- [ ] 总大小限制校验（≤20GB，含等号；等于 20GB 时接受）
+- [ ] 空批量请求（0 个文件）拒绝并返回 400
 - [ ] 批量上传结果包含每个文件的状态
 
 ### AC-4: 压缩包处理
@@ -108,6 +115,7 @@
 - [ ] 嵌套压缩包支持（最多 3 层，超出层数的内部文件跳过并记录警告）
 - [ ] 压缩炸弹防护（解压后总大小 ≤20GB，与批量上传限制一致；或膨胀比超过 10:1 时拒绝）
 - [ ] 路径穿越防护（`../` 检测）
+- [ ] 符号链接（symlink）防护 — 压缩包内含符号链接的内部文件跳过并记录警告（防止通过 symlink 读取服务器任意文件）
 
 ### AC-5: 上传事件发布
 
@@ -122,6 +130,7 @@
 - [ ] 事件通道配置更新至 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`
 - [ ] 事件通过 `DualChannelEventBus` 发布
 - [ ] 事件包含完整的文档元数据
+- [ ] 元数据写入 PostgreSQL 与 Outbox 写入在同一数据库事务内完成（保证原子性：元数据不存则事件不发布，避免孤立事件或丢失事件）
 
 ### AC-6: 上传结果确认
 
@@ -134,6 +143,7 @@
 **验证标准/Validation Criteria:**
 - [ ] `GET /api/v1/documents/{document_id}` 返回文档详情
 - [ ] 不存在的 document_id 返回 404
+- [ ] 无效 UUID 格式的 document_id 返回 422（FastAPI Pydantic 校验自动处理）
 - [ ] 跨租户隔离（tenant_id 过滤）
 
 > **注：** 文档列表查询（分页、过滤、排序）推迟至后续 Story。本 Story 仅实现上传后的单条确认查询。
@@ -379,11 +389,11 @@
 - [ ] Subtask 0.4: 扩展 `Document` 实体字段（tenant_id, uploaded_by）
 - [ ] Subtask 0.5: 定义 `DocumentRepositoryPort` 端口（`src/domain/ports/document_repository.py` 新建，命名与项目 `UserRepositoryPort`/`RoleRepositoryPort` 模式一致）
 - [ ] Subtask 0.6: 更新 `docs/api/openapi.yaml` 文档上传端点定义
-- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_document_upload.feature`
-- [ ] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_document_upload.py`
-- [ ] Subtask 0.9: 编写 API 契约测试 `tests/contracts/test_api_contract_document_upload.py`
-- [ ] Subtask 0.10: 编写端口契约测试 `tests/contracts/test_port_contract_document_upload.py`
-- [ ] Subtask 0.11: 更新 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`（`src/infrastructure/messaging/channel_router.py`）添加 `DocumentUploaded` 事件通道配置（双注册，AC-5 要求）
+- [ ] Subtask 0.7: 更新 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`（`src/infrastructure/messaging/channel_router.py`）添加 `DocumentUploaded` 事件通道配置（双注册，AC-5 要求）— **建议紧接 0.6 之后，因事件通道配置与 API 端点定义同属接口规范层，且后续 Task 2 事件实现和 Task 4 事件发布均依赖此配置**
+- [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_document_upload.feature`
+- [ ] Subtask 0.9: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_document_upload.py`
+- [ ] Subtask 0.10: 编写 API 契约测试 `tests/contracts/test_api_contract_document_upload.py`
+- [ ] Subtask 0.11: 编写端口契约测试 `tests/contracts/test_port_contract_document_upload.py`
 - [ ] Subtask 0.12: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -480,6 +490,7 @@
 ### Task 3: PostgreSQL 文档仓储实现
 
 **关联 AC:** AC-1, AC-6
+**依赖:** blocked_by: [Task 1（Document 实体字段扩展）, Task 2（DocumentRepositoryPort 端口定义）]
 
 #### TDD 循环 A：PostgreSQLDocumentRepository
 
@@ -507,6 +518,7 @@
 ### Task 4: 文档上传服务（应用层编排）
 
 **关联 AC:** AC-1, AC-3, AC-5
+**依赖:** blocked_by: [Task 1（值对象 + 实体扩展）, Task 2（领域事件 + 端口定义）]
 
 #### TDD 循环 A：DocumentUploadService
 
@@ -532,6 +544,7 @@
 ### Task 5: 分片上传管理器（基础设施层）
 
 **关联 AC:** AC-2
+**依赖:** blocked_by: [Task 1（UploadLimits 分片策略常量）] — 弱依赖，可并行开发但测试需 UploadLimits 就绪
 
 #### TDD 循环 A：ChunkedUploadManager
 
@@ -556,6 +569,7 @@
 ### Task 6: 压缩包处理
 
 **关联 AC:** AC-4
+**依赖:** blocked_by: [Task 1（DocumentFormat 格式校验）]
 
 #### TDD 循环 A：ArchiveExtractor
 
@@ -581,6 +595,7 @@
 ### Task 7: API 路由实现
 
 **关联 AC:** AC-1~6
+**依赖:** blocked_by: [Task 4（DocumentUploadService 编排服务）, Task 5（ChunkedUploadManager 分片上传）]
 
 #### TDD 循环 A：文档上传 API 路由
 
@@ -608,6 +623,7 @@
 ### Task 8: 集成测试
 
 **关联 AC:** AC-1~6
+**依赖:** blocked_by: [Task 1~7]（所有实现 Task 完成后方可执行集成测试）
 
 #### 集成测试实现
 
@@ -628,6 +644,7 @@
 ### Task 9: SDD 架构约束验证测试
 
 **关联 AC:** AC-1~6
+**依赖:** blocked_by: [Task 1~7]（所有实现 Task 完成后方可验证架构约束）
 
 > **性质说明：** SDD 规范验证测试（验证架构/约束是否被遵守）。
 
@@ -646,6 +663,7 @@
 ### Task 10: 开发结束验收测试
 
 **关联 AC:** AC-1~6
+**依赖:** blocked_by: [Task 8（集成测试）, Task 9（架构验证测试）]
 
 > **性质说明：** 对 Story 收尾阶段的交付物与完成清单进行最终验收。
 
@@ -1085,6 +1103,19 @@ tests/
 | 45 | CHUNK_SIZES dict 与已有 calculate_part_size() 的关系/去重策略未明确 | P1 | 实现细节补充声明式配置+委托已有函数的关系 |
 | 46 | DocumentUploaded 事件字段默认值策略未明确 | P1 | SDD 事件 Schema 补充默认值策略说明 |
 
+> 第12轮审查修订（2026-05-29，第三轮审查第2轮）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 47 | AC-1 缺少边界条件：jpeg 双扩展名(.jpg/.jpeg)、大小写不敏感、无扩展名文件、MIME/扩展名不匹配策略、特殊字符文件名(`\0`/`/`/`\`)、=20GB 边界 | P0 | AC-1 验证标准补充 6 项边界条件 |
+| 48 | AC-2 缺少边界条件：分片阈值边界值（=100MB/=1GB/=10GB）、upload_id 过期返回 410 Gone、分片乱序到达处理 | P1 | AC-2 验证标准补充边界值定义和异常场景 |
+| 49 | AC-3 缺少边界条件：=20GB 批量边界、空批量请求拒绝 | P1 | AC-3 验证标准补充边界值和空值拒绝 |
+| 50 | AC-4 缺少符号链接（symlink）安全防护 — 压缩包内 symlink 可读取服务器任意文件 | P0 | AC-4 验证标准新增 symlink 检测 |
+| 51 | AC-5 缺少事务原子性要求 — 元数据写入 PG 与 Outbox 写入未声明同一事务保证 | P0 | AC-5 验证标准新增 Outbox+元数据同事务原子性 |
+| 52 | AC-6 缺少无效 UUID 格式的 422 返回说明 | P2 | AC-6 验证标准补充 422 场景（FastAPI 自动处理） |
+| 53 | Task 3~8, 10 缺少显式 blocked_by 依赖声明 | P1 | 各 Task 新增依赖声明，推荐并行阶段：{0} → {1,2} → {3,4,5,6} → {7} → {8,9} → {10} |
+| 54 | Task 0 Subtask 0.11（事件通道配置）位置偏后，应紧接 API 端点定义 | P2 | 重排 Subtask 顺序，事件通道配置移至 0.7（原 0.7→0.8, 0.8→0.9, ...） |
+
 ### 🔍 代码审查发现 Review Findings
 
 > 此 Section 在开发阶段（dev-story）填写，记录代码审查过程中的发现。
@@ -1109,10 +1140,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.1.0
+**故事版本/Story Version:** v0.1.1
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.1.1: 第三轮审查第2轮 — 补充 AC-1~6 边界条件（symlink 防护/事务原子性/jpeg 双扩展名/分片边界值等）、Task 依赖声明、Subtask 顺序重排
 - v0.1.0: 第三轮审查第1轮 — 修复 JSON:API 风格/Document.metadata 类型/路由注册模式/分片上传技术细节/事件默认值策略
 - v0.0.9: 第二轮审查第5轮终审 — 全文一致性验证通过
 - v0.0.8: 第二轮审查第4轮 — 修正Subtask 0.11双注册/学习经验引用/端口名称redis_adapter
