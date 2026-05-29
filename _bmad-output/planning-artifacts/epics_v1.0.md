@@ -11,8 +11,8 @@ projectName: 'sisys'
 userName: 'Agimtech'
 date: '2026-02-28'
 documentStatus: 'round-1-review-complete'
-lastUpdated: '2026-05-28'
-updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/FR-ST-08优先级矛盾/Story6.11依赖错误/EV与AC分类分离'
+lastUpdated: '2026-05-29'
+updateReason: 'R2审查修正 - FR-SR-09~13归属修正Epic3→Epic12/Epic20 Story编号90.x→20.x'
 ---
 
 # sisys - Epic Breakdown
@@ -455,11 +455,11 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 | FR-DM-11 | 经营复盘数据导入 | Epic 2 | Story 2.11 | P1 |
 | FR-DM-12 | 合并单元格语义还原 | Epic 2 | Story 2.12 | P1 |
 | **智能检索与知识发现 (SR) - 5 项** |
-| FR-SR-09 | 实体对齐与消歧 | Epic 3 | Story 3.13 | P1 |
-| FR-SR-10 | 查询路由引擎 | Epic 3 | Story 3.14 | P1 |
-| FR-SR-11 | 摘要质量评估 | Epic 3 | Story 3.15 | P1 |
-| FR-SR-12 | 自动补救机制 | Epic 3 | Story 3.16 | P1 |
-| FR-SR-13 | 知识图谱构建（GraphRAG） | Epic 3 | Story 3.17 | P1 |
+| FR-SR-09 | 实体对齐与消歧 | Epic 12 | Story 12.1 | P1 |
+| FR-SR-10 | 查询路由引擎 | Epic 12 | Story 12.2 | P1 |
+| FR-SR-11 | 摘要质量评估 | Epic 12 | Story 12.3 | P1 |
+| FR-SR-12 | 自动补救机制 | Epic 12 | Story 12.4 | P1 |
+| FR-SR-13 | 知识图谱构建（GraphRAG） | Epic 12 | Story 12.5 | P1 |
 | **战略工具箱 (ST) - 4 项** |
 | FR-ST-06 | 工具版本管理 | Epic 4 | Story 4.6 | P1 |
 | FR-ST-07 | Validation Feedback 闭环 | Epic 4 | Story 4.7 | P1 |
@@ -534,11 +534,11 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 | **战略规划流程 (SP) - 7 项** |
 | FR-SP-11 | BEM 六阶段流程（战略解码） | Epic 15 | Story 15.1 | P2 |
 | FR-SP-12 | SP→BP 结构化映射 | Epic 15 | Story 15.2 | P2 |
-| FR-SP-13 | 财务量化分析 API（NPV/IRR/现金流） | Epic 20 | Story 90.1 | P2 |
-| FR-SP-14 | 敏感性分析 API（龙卷风图） | Epic 20 | Story 90.2 | P2 |
-| FR-SP-15 | 情景对比 API（3 方案并排） | Epic 20 | Story 90.3 | P2 |
-| FR-SP-16 | 白标品牌定制与监管报告导出 API | Epic 20 | Story 90.4 | P2 |
-| FR-SP-17 | 风险热力图 API | Epic 20 | Story 90.5 | P2 |
+| FR-SP-13 | 财务量化分析 API（NPV/IRR/现金流） | Epic 20 | Story 20.1 | P2 |
+| FR-SP-14 | 敏感性分析 API（龙卷风图） | Epic 20 | Story 20.2 | P2 |
+| FR-SP-15 | 情景对比 API（3 方案并排） | Epic 20 | Story 20.3 | P2 |
+| FR-SP-16 | 白标品牌定制与监管报告导出 API | Epic 20 | Story 20.4 | P2 |
+| FR-SP-17 | 风险热力图 API | Epic 20 | Story 20.5 | P2 |
 | **用户交互与报告 (UI) - 1 项** |
 | FR-UI-13 | 决策影响分析（Shapley 贡献值） | Epic 19 | Story 19.1 | P2 |
 | **系统管理与合规 (SC) - 2 项** |
