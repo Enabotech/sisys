@@ -727,9 +727,8 @@ jobs:
         if: >-
           ${{
             (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
-            || ((needs.detect-changes.outputs.l3 == 'true') && (
-                  startsWith(github.ref, 'refs/heads/release') ||
-                  startsWith(github.ref, 'refs/heads/tags')))
+            || startsWith(github.ref, 'refs/tags/')
+            || ((needs.detect-changes.outputs.l3 == 'true') && (startsWith(github.ref, 'refs/heads/release')))
           }}
         id: build-l3-release
         uses: docker/build-push-action@v5
