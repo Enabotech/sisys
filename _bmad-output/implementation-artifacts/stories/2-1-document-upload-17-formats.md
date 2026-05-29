@@ -11,7 +11,8 @@
 > 2. **实体已存在** — `Document` 实体（`src/domain/entities/document.py`）已定义 `document_id`/`filename`/`mime_type`/`file_size_bytes`/`parse_status` 等字段
 > 3. **领域事件已存在** — `DocumentProcessed` 事件（`src/domain/events/document_events.py`）已实现，双通道配置已在 `configs/event_channels.yaml` 注册
 > 4. **MVP 范围** — 本 Story 仅负责文件接收（上传 → 校验 → 存储 → 元数据持久化），不负责文档解析（Story 2.2a 负责）
-> 5. **分片上传** — MinIO 原生支持分片上传，Story 1.7 已在 `MinIORepository` 中实现分片逻辑，本 Story 需在应用层编排分片上传流程
+> 5. **分片上传** — MinIO 原生支持分片上传，Story 1.7 已在 `ObjectOperations`（`src/infrastructure/storage/minio/object_operations.py`）中实现分片逻辑（含 `calculate_part_size()` 四级策略 + `resume_multipart_upload()`），本 Story 需在应用层编排分片上传流程
+> 6. **事件关系** — `DocumentUploaded`（本 Story 新增，上传完成触发）与 `DocumentProcessed`（已有，解析完成触发）是文档生命周期中的两个不同阶段事件，Story 2.2a 将消费 `DocumentUploaded` 并在解析完成后发布 `DocumentProcessed`
 
 ---
 
@@ -55,7 +56,7 @@
 **And** 返回 `document_id` 和上传状态
 
 **验证标准/Validation Criteria:**
-- [ ] 支持 17 种格式：pdf, txt, doc, docx, ppt, pptx, xls, xlsx, csv, jpeg, png, gif, markdown, html, zip, tar, md
+- [ ] 支持 17 种格式（15 种文档格式 + 2 种压缩格式）：pdf, txt, doc, docx, ppt, pptx, xls, xlsx, csv, jpeg, png, gif, markdown（含 .md 扩展名）, html, zip, tar
 - [ ] MIME 类型与文件扩展名双向校验
 - [ ] 不支持的格式返回 400 + 明确错误信息
 - [ ] 空文件拒绝（file_size_bytes > 0）
@@ -65,7 +66,7 @@
 
 **Given** 用户上传大文件（>100MB）
 **When** 系统启动分片上传
-**Then** 分片大小根据文件总大小动态调整（<100MB 不分片, 100MB-1GB 10MB 分片, 1GB-10GB 50MB 分片, >10GB 100MB 分片）
+**Then** 分片大小根据文件总大小动态调整（<100MB 不分片, 100MB-1GB 10MB 分片, 1GB-10GB 50MB 分片, >10GB 100MB 分片），复用 `ObjectOperations.calculate_part_size()` 已有实现
 **And** 分片上传状态持久化至 Redis（TTL 24 小时）
 **And** 网络中断后可通过 `upload_id` 恢复上传
 **And** 所有分片上传完成后自动合并
@@ -103,8 +104,8 @@
 **验证标准/Validation Criteria:**
 - [ ] zip/tar 解压正确
 - [ ] 内部文件格式过滤
-- [ ] 嵌套压缩包支持（最多 3 层）
-- [ ] 压缩炸弹防护（解压后总大小 ≤50GB）
+- [ ] 嵌套压缩包支持（最多 3 层，超出层数的内部文件跳过并记录警告）
+- [ ] 压缩炸弹防护（解压后总大小 ≤20GB，与批量上传限制一致；或膨胀比超过 10:1 时拒绝）
 - [ ] 路径穿越防护（`../` 检测）
 
 ### AC-5: 上传事件发布
@@ -121,19 +122,20 @@
 - [ ] 事件通过 `DualChannelEventBus` 发布
 - [ ] 事件包含完整的文档元数据
 
-### AC-6: 文档元数据查询
+### AC-6: 上传结果确认
 
 **Given** 文档已上传成功
-**When** 用户查询文档详情或列表
+**When** 用户通过 `document_id` 查询上传结果
 **Then** API 返回文档元数据（document_id, filename, mime_type, file_size, parse_status, created_at）
-**And** 支持按 mime_type、上传时间范围过滤
-**And** 支持分页查询（默认 page_size=20）
+**And** 不存在的 document_id 返回 404
+**And** 跨租户隔离（租户 A 看不到租户 B 的文档）
 
 **验证标准/Validation Criteria:**
 - [ ] `GET /api/v1/documents/{document_id}` 返回文档详情
-- [ ] `GET /api/v1/documents` 返回文档列表（支持过滤和分页）
 - [ ] 不存在的 document_id 返回 404
-- [ ] 跨租户隔离（租户 A 看不到租户 B 的文档）
+- [ ] 跨租户隔离（tenant_id 过滤）
+
+> **注：** 文档列表查询（分页、过滤、排序）推迟至后续 Story。本 Story 仅实现上传后的单条确认查询。
 
 ---
 
@@ -157,9 +159,8 @@
 #### 数据模型 (Data Models)
 
 - [ ] `Document` 实体已存在于 `src/domain/entities/document.py`，**本 Story 扩展以下内容**：
-  - 新增 `tenant_id: str` 字段（租户隔离）
-  - 新增 `uploaded_by: str` 字段（上传者）
-  - 新增 `content_hash: str` 字段（秒传去重，SHA-256）
+  - 新增 `tenant_id: str` 字段（租户隔离，默认空字符串，向后兼容）
+  - 新增 `uploaded_by: str` 字段（上传者，默认空字符串，向后兼容）
 - [ ] `SUPPORTED_FORMATS` 常量定义于 `src/domain/value_objects/document_format.py`
   - 17 种格式的 MIME 类型映射（`dict[str, str]`）
   - 文件扩展名与 MIME 类型双向查询方法
@@ -173,21 +174,16 @@
 
 #### 统一端口定义注册与管理 (Port Contract)
 
-- [ ] **新增端口** `document_upload_port` — 定义于 `src/application/ports/document_upload_port.py`
-  - Protocol 接口：`upload(file_path, filename, mime_type, metadata) -> UploadResult`
-  - Protocol 接口：`upload_chunked(file_path, filename, chunk_size, metadata) -> ChunkedUploadSession`
-  - Protocol 接口：`resume_upload(upload_id) -> ChunkedUploadSession | None`
-  - 注册至 `src/domain/ports/registry.py`
 - [ ] **新增端口** `document_repository` — 定义于 `src/domain/ports/document_repository.py`
   - Protocol 接口：`save(document: Document) -> Document`
   - Protocol 接口：`find_by_id(document_id: UUID, tenant_id: str) -> Document | None`
   - Protocol 接口：`find_by_tenant(tenant_id: str, filters, pagination) -> list[Document]`
-  - Protocol 接口：`find_by_content_hash(content_hash: str, tenant_id: str) -> Document | None`（秒传去重）
   - 注册至 `src/domain/ports/registry.py`
 - [ ] **现有端口复用**（不新增）：
   - `document_storage`（`DocumentStoragePort`） — MinIO 文档存储，`resolve("document_storage")`
   - `l1_cache`（`L1CachePort`） — Redis 缓存，用于分片上传状态
-  - `event_publisher`（`EventPublisherPort`） — 事件发布
+  - `event_publisher`（`EventPublisher`） — 事件发布（定义于 `src/domain/ports/event_publisher.py`）
+- [ ] **不新增 DocumentUploadPort** — `DocumentUploadService` 直接作为应用服务（非端口），在 composition_root 中注册为服务
 - [ ] 端口实现仅在 `src/composition_root.py` 统一注册
 - [ ] 端口契约测试位于 `tests/contracts/test_port_contract_document_upload.py`
 - [ ] 端口具备唯一名称、版本、owner、兼容策略
@@ -196,9 +192,12 @@
 
 | 端口名称 | 接口 | 实现类 | 生命周期 | Owner |
 |---------|------|--------|---------|-------|
-| `document_upload_port` | `DocumentUploadPort` (application/ports) | `DocumentUploadService` (application/services) | SCOPED | doc-team |
-| `document_repository` | `DocumentRepository` (domain/ports) | `PostgresDocumentRepository` (infrastructure/storage/postgresql) | SCOPED | doc-team |
+| `document_repository` | `DocumentRepositoryPort` (domain/ports) | `PostgresDocumentRepository` (infrastructure/storage/postgresql) | SCOPED | doc-team |
 | `document_storage` | `DocumentStoragePort` (application/ports) | `MinIODocumentStorage` (infrastructure/storage/minio) — **已注册** | SCOPED | storage-team |
+| `event_publisher` | `EventPublisher` (domain/ports) | `DualChannelEventBus` (infrastructure/messaging) — **已注册** | SINGLETON | messaging-team |
+| `l1_cache` | `L1CachePort` (domain/ports) | `RedisCacheAdapter` (infrastructure/storage/redis) — **已注册** | SCOPED | storage-team |
+
+> **注：** `DocumentUploadService` 是应用服务而非端口，直接在 composition_root 中实例化注册（非端口模式）。`ChunkedUploadManager` 位于 infrastructure 层（`src/infrastructure/storage/redis/chunked_upload_manager.py`），通过 `L1CachePort` 操作 Redis 分片状态。
 
 #### API 契约 (API Contract)
 
@@ -208,8 +207,7 @@
   - `POST /api/v1/documents/chunked/init` — 分片上传初始化
   - `PUT /api/v1/documents/chunked/{upload_id}/parts/{part_number}` — 分片上传
   - `POST /api/v1/documents/chunked/{upload_id}/complete` — 分片上传完成
-  - `GET /api/v1/documents` — 文档列表查询
-  - `GET /api/v1/documents/{document_id}` — 文档详情查询
+  - `GET /api/v1/documents/{document_id}` — 上传结果确认查询
 - [ ] 遵循 JSON:API 风格（data/meta/links 结构）
 - [ ] API 版本管理：`/api/v1/documents`
 - [ ] API 契约测试：`tests/contracts/test_api_contract_document_upload.py`
@@ -279,11 +277,9 @@
 | **TDD 单元测试** | UploadLimits 常量 | 大小限制、分片策略 | `tests/unit/domain/value_objects/test_upload_limits.py` | Task 1 |
 | **TDD 单元测试** | Document 实体扩展 | tenant_id/uploaded_by/content_hash 字段 | `tests/unit/domain/entities/test_document.py` | Task 1 |
 | **TDD 单元测试** | DocumentUploaded 事件 | 事件构造、字段校验 | `tests/unit/domain/events/test_document_uploaded.py` | Task 2 |
-| **TDD 单元测试** | DocumentRepository 接口 | 端口契约签名 | `tests/unit/domain/ports/test_document_repository.py` | Task 2 |
-| **TDD 单元测试** | DocumentUploadPort 接口 | 端口契约签名 | `tests/unit/application/ports/test_document_upload_port.py` | Task 2 |
-| **TDD 单元测试** | PostgresDocumentRepository | CRUD 操作、租户隔离 | `tests/unit/infrastructure/storage/postgresql/test_document_repository.py` | Task 3 |
+| **TDD 单元测试** | DocumentRepositoryPort 接口 | 端口契约签名 | `tests/unit/domain/ports/test_document_repository.py` | Task 2 |
 | **TDD 单元测试** | DocumentUploadService | 上传编排逻辑 | `tests/unit/application/services/test_document_upload_service.py` | Task 4 |
-| **TDD 单元测试** | ChunkedUploadManager | 分片上传状态管理 | `tests/unit/application/services/test_chunked_upload_manager.py` | Task 5 |
+| **TDD 单元测试** | ChunkedUploadManager | 分片上传状态管理 | `tests/unit/infrastructure/storage/redis/test_chunked_upload_manager.py` | Task 5 |
 | **TDD 单元测试** | ArchiveExtractor | 压缩包解压、格式过滤 | `tests/unit/infrastructure/external_services/test_archive_extractor.py` | Task 6 |
 | **TDD 单元测试** | 文档上传 API 路由 | 请求/响应格式、认证、校验 | `tests/unit/interfaces/api/test_document_upload_routes.py` | Task 7 |
 | **TDD 契约测试** | API 契约 | 端点、状态码、请求/响应结构 | `tests/contracts/test_api_contract_document_upload.py` | Task 0 |
@@ -348,8 +344,8 @@
 | AC-4 | 压缩包处理 | Task 6 | ArchiveExtractor | `test_archive_extractor.py` |
 | AC-5 | 上传事件发布 | Task 2 | DocumentUploaded 事件定义 | `test_document_uploaded.py` |
 | AC-5 | 上传事件发布 | Task 4 | 事件发布编排 | `test_document_upload_service.py` |
-| AC-6 | 文档元数据查询 | Task 3 | Repository 查询方法 | `test_document_repository.py` |
-| AC-6 | 文档元数据查询 | Task 7 | 查询 API 端点 | `test_document_upload_routes.py` |
+| AC-6 | 上传结果确认 | Task 3 | Repository 查询方法 | `test_document_repository.py` |
+| AC-6 | 上传结果确认 | Task 7 | 确认 API 端点 | `test_document_upload_routes.py` |
 | AC-1~6 | 完整流程验证 | Task 8 | 集成测试 | `test_document_upload_integration.py` |
 | AC-1~6 | 架构约束验证 | Task 9 | 架构验证测试 | `test_arch_document_upload.py` |
 
@@ -370,16 +366,15 @@
 - [ ] Subtask 0.1: 定义 `DocumentUploaded` 领域事件（`src/domain/events/document_events.py` 新增）
 - [ ] Subtask 0.2: 定义 `SUPPORTED_FORMATS` 常量和 `DocumentFormat` 值对象（`src/domain/value_objects/document_format.py` 新建）
 - [ ] Subtask 0.3: 定义 `UPLOAD_LIMITS` 常量（`src/domain/value_objects/upload_limits.py` 新建）
-- [ ] Subtask 0.4: 扩展 `Document` 实体字段（tenant_id, uploaded_by, content_hash）
-- [ ] Subtask 0.5: 定义 `DocumentRepository` 端口（`src/domain/ports/document_repository.py` 新建）
-- [ ] Subtask 0.6: 定义 `DocumentUploadPort` 端口（`src/application/ports/document_upload_port.py` 新建）
-- [ ] Subtask 0.7: 更新 `docs/api/openapi.yaml` 文档上传端点定义
-- [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_document_upload.feature`
-- [ ] Subtask 0.9: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_document_upload.py`
-- [ ] Subtask 0.10: 编写 API 契约测试 `tests/contracts/test_api_contract_document_upload.py`
-- [ ] Subtask 0.11: 编写端口契约测试 `tests/contracts/test_port_contract_document_upload.py`
-- [ ] Subtask 0.12: 更新 `configs/event_channels.yaml` 添加 `DocumentUploaded` 事件通道配置
-- [ ] Subtask 0.13: 运行验收测试，确认失败（🔴 红阶段验证）
+- [ ] Subtask 0.4: 扩展 `Document` 实体字段（tenant_id, uploaded_by）
+- [ ] Subtask 0.5: 定义 `DocumentRepositoryPort` 端口（`src/domain/ports/document_repository.py` 新建，命名与项目 `UserRepositoryPort`/`RoleRepositoryPort` 模式一致）
+- [ ] Subtask 0.6: 更新 `docs/api/openapi.yaml` 文档上传端点定义
+- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_document_upload.feature`
+- [ ] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_document_upload.py`
+- [ ] Subtask 0.9: 编写 API 契约测试 `tests/contracts/test_api_contract_document_upload.py`
+- [ ] Subtask 0.10: 编写端口契约测试 `tests/contracts/test_port_contract_document_upload.py`
+- [ ] Subtask 0.11: 更新 `configs/event_channels.yaml` 添加 `DocumentUploaded` 事件通道配置
+- [ ] Subtask 0.12: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕
@@ -420,10 +415,10 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 扩展 `tests/unit/domain/entities/test_document.py`（新增字段校验、validate 扩展） |
-| 🟢 绿 | 修改 `src/domain/entities/document.py` 新增 tenant_id/uploaded_by/content_hash 字段 |
+| 🟢 绿 | 修改 `src/domain/entities/document.py` 新增 tenant_id/uploaded_by 字段（默认空字符串，向后兼容） |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.7: 🔴 红 — 编写 Document 扩展字段失败测试
+- [ ] Subtask 1.7: 🔴 红 — 编写 Document 扩展字段失败测试（tenant_id、uploaded_by 字段存在性和默认值）
 - [ ] Subtask 1.8: 🟢 绿 — 扩展 Document 实体
 - [ ] Subtask 1.9: 🔄 重构 — 优化 Document 代码
 
@@ -436,7 +431,7 @@
 
 ---
 
-### Task 2: 领域事件与端口定义
+### Task 2: 领域事件与仓储端口定义
 
 **关联 AC:** AC-1, AC-5
 
@@ -452,34 +447,21 @@
 - [ ] Subtask 2.2: 🟢 绿 — 实现 DocumentUploaded 事件
 - [ ] Subtask 2.3: 🔄 重构 — 优化事件代码
 
-#### TDD 循环 B：DocumentRepository 端口
+#### TDD 循环 B：DocumentRepositoryPort 端口
 
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/domain/ports/test_document_repository.py`（Protocol 签名验证） |
-| 🟢 绿 | 实现 `src/domain/ports/document_repository.py` Protocol 接口 |
+| 🟢 绿 | 实现 `src/domain/ports/document_repository.py` Protocol 接口（命名为 `DocumentRepositoryPort`，与项目 `UserRepositoryPort`/`RoleRepositoryPort` 模式一致） |
 | 🔄 重构 | 优化代码 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写 DocumentRepository 端口签名测试
-- [ ] Subtask 2.5: 🟢 绿 — 实现 DocumentRepository Protocol
+- [ ] Subtask 2.4: 🔴 红 — 编写 DocumentRepositoryPort 端口签名测试
+- [ ] Subtask 2.5: 🟢 绿 — 实现 DocumentRepositoryPort Protocol
 - [ ] Subtask 2.6: 🔄 重构 — 优化端口代码
-
-#### TDD 循环 C：DocumentUploadPort 端口
-
-| 阶段 | 动作 |
-|------|------|
-| 🔴 红 | 编写 `tests/unit/application/ports/test_document_upload_port.py`（Protocol 签名验证） |
-| 🟢 绿 | 实现 `src/application/ports/document_upload_port.py` Protocol 接口 |
-| 🔄 重构 | 优化代码 |
-
-- [ ] Subtask 2.7: 🔴 红 — 编写 DocumentUploadPort 端口签名测试
-- [ ] Subtask 2.8: 🟢 绿 — 实现 DocumentUploadPort Protocol
-- [ ] Subtask 2.9: 🔄 重构 — 优化端口代码
 
 **完成标准/Definition of Done:**
 - [ ] DocumentUploaded 事件实现完成
-- [ ] DocumentRepository 端口实现完成
-- [ ] DocumentUploadPort 端口实现完成
+- [ ] DocumentRepositoryPort 端口实现完成
 - [ ] 所有 TDD 循环测试通过
 - [ ] 端口契约测试通过
 
@@ -497,10 +479,11 @@
 | 🟢 绿 | 实现 `src/infrastructure/storage/postgresql/document_repository.py` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 PostgresDocumentRepository 失败测试（save、find_by_id、find_by_tenant、find_by_content_hash）
+- [ ] Subtask 3.1: 🔴 红 — 编写 PostgresDocumentRepository 失败测试（save、find_by_id、find_by_tenant）
 - [ ] Subtask 3.2: 🟢 绿 — 实现 PostgresDocumentRepository（使用 SQLAlchemy AsyncSession）
 - [ ] Subtask 3.3: 🔄 重构 — 优化 Repository 代码
-- [ ] Subtask 3.4: 创建 Alembic migration（`documents` 表：document_id, tenant_id, filename, mime_type, file_size_bytes, document_type, parse_status, content_hash, uploaded_by, version, metadata JSONB, created_at, updated_at）
+- [ ] Subtask 3.4: 创建 Alembic migration（`documents` 表：document_id, tenant_id, filename, mime_type, file_size_bytes, document_type, parse_status, uploaded_by, version, metadata JSONB, created_at, updated_at）
+- [ ] Subtask 3.5: 创建必要索引（`idx_documents_tenant_id` 租户隔离, `idx_documents_tenant_created_at` 时间排序）
 
 **完成标准/Definition of Done:**
 - [ ] PostgresDocumentRepository CRUD 操作实现完成
@@ -524,9 +507,9 @@
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 4.1: 🔴 红 — 编写 DocumentUploadService 失败测试（upload 单文件、upload_batch 批量、事件发布、格式校验失败、大小超限）
-- [ ] Subtask 4.2: 🟢 绿 — 实现 DocumentUploadService（编排格式校验→Document 实体构造→MinIO 存储→PG 元数据→事件发布）
+- [ ] Subtask 4.2: 🟢 绿 — 实现 DocumentUploadService（编排格式校验→Document 实体构造→MinIO 存储→PG 元数据→事件发布，依赖注入 DocumentRepositoryPort + DocumentStoragePort + EventPublisher）
 - [ ] Subtask 4.3: 🔄 重构 — 优化服务代码
-- [ ] Subtask 4.4: 在 `src/composition_root.py` 注册 `document_upload_port` 和 `document_repository` 端口
+- [ ] Subtask 4.4: 在 `src/composition_root.py` 注册 `document_repository` 端口和 `DocumentUploadService` 服务
 
 **完成标准/Definition of Done:**
 - [ ] DocumentUploadService 编排逻辑实现完成
@@ -536,7 +519,7 @@
 
 ---
 
-### Task 5: 分片上传管理器
+### Task 5: 分片上传管理器（基础设施层）
 
 **关联 AC:** AC-2
 
@@ -544,12 +527,12 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_chunked_upload_manager.py`（分片策略、Redis 状态管理、断点续传） |
-| 🟢 绿 | 实现 `src/application/services/chunked_upload_manager.py` |
+| 🔴 红 | 编写 `tests/unit/infrastructure/storage/redis/test_chunked_upload_manager.py`（分片策略、Redis 状态管理、断点续传） |
+| 🟢 绿 | 实现 `src/infrastructure/storage/redis/chunked_upload_manager.py`（通过 L1CachePort 操作 Redis，复用 ObjectOperations 分片逻辑） |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 5.1: 🔴 红 — 编写 ChunkedUploadManager 失败测试（init_upload、upload_part、complete_upload、resume_upload、TTL 过期）
-- [ ] Subtask 5.2: 🟢 绿 — 实现 ChunkedUploadManager（Redis 存储分片状态、MinIO 分片上传编排）
+- [ ] Subtask 5.2: 🟢 绿 — 实现 ChunkedUploadManager（Redis 存储分片状态，委托 ObjectOperations 执行实际分片上传）
 - [ ] Subtask 5.3: 🔄 重构 — 优化分片管理代码
 
 **完成标准/Definition of Done:**
@@ -585,7 +568,7 @@
 
 ---
 
-### Task 7: API 路由与 CLI 命令
+### Task 7: API 路由实现
 
 **关联 AC:** AC-1~6
 
@@ -593,30 +576,19 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/interfaces/api/test_document_upload_routes.py`（POST 单文件、POST 批量、分片上传端点、GET 查询、认证校验） |
+| 🔴 红 | 编写 `tests/unit/interfaces/api/test_document_upload_routes.py`（POST 单文件、POST 批量、分片上传端点、GET 确认、认证校验） |
 | 🟢 绿 | 实现 `src/interfaces/api/document_upload.py`（FastAPI 路由） |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 7.1: 🔴 红 — 编写 API 路由失败测试（单文件上传、批量上传、分片上传、查询、错误处理）
+- [ ] Subtask 7.1: 🔴 红 — 编写 API 路由失败测试（单文件上传、批量上传、分片上传、确认查询、错误处理）
 - [ ] Subtask 7.2: 🟢 绿 — 实现文档上传 FastAPI 路由（multipart/form-data 处理，依赖注入 DocumentUploadService）
 - [ ] Subtask 7.3: 🔄 重构 — 优化 API 路由代码
 - [ ] Subtask 7.4: 注册路由至 `src/interfaces/api/app.py`
 
-#### TDD 循环 B：文档上传 CLI 命令
-
-| 阶段 | 动作 |
-|------|------|
-| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_document_upload_commands.py`（upload 命令） |
-| 🟢 绿 | 实现 `src/interfaces/cli/document_commands.py`（Typer 命令） |
-| 🔄 重构 | 优化代码 |
-
-- [ ] Subtask 7.5: 🔴 红 — 编写 CLI upload 命令失败测试
-- [ ] Subtask 7.6: 🟢 绿 — 实现 `sisys document upload --file` CLI 命令
-- [ ] Subtask 7.7: 🔄 重构 — 优化 CLI 代码
+> **注：** CLI 上传命令（`sisys document upload --file`）推迟至 Epic 7 Story 7.1（CLI 命令接口），届时调用已实现的 DocumentUploadService。
 
 **完成标准/Definition of Done:**
 - [ ] API 路由实现完成（POST/GET 端点）
-- [ ] CLI upload 命令实现完成
 - [ ] 所有端点通过认证中间件
 - [ ] 所有 TDD 循环测试通过
 - [ ] 接口层覆盖率 ≥85%
@@ -713,19 +685,19 @@
 
 | 组件 | 路径 | 用途 |
 |------|------|------|
-| `Document` 实体 | `src/domain/entities/document.py` | 扩展字段（tenant_id, uploaded_by, content_hash） |
-| `DocumentProcessed` 事件 | `src/domain/events/document_events.py` | 参考，新增 `DocumentUploaded` |
+| `Document` 实体 | `src/domain/entities/document.py` | 扩展字段（tenant_id, uploaded_by） |
+| `DocumentProcessed` 事件 | `src/domain/events/document_events.py` | 参考，新增 `DocumentUploaded`（不同生命周期阶段） |
 | `L4ObjectPort` | `src/domain/ports/l4_object.py` | 底层对象存储接口 |
 | `DocumentStoragePort` | `src/application/ports/document_storage_port.py` | `store_document()` 方法 |
 | `MinIODocumentStorage` | `src/infrastructure/storage/minio/minio_document_storage.py` | MinIO 文档存储实现 |
 | `MinIOAdapter` | `src/infrastructure/storage/minio/minio_adapter.py` | MinIO S3 适配器 |
-| `MinIORepository` | `src/infrastructure/storage/minio/minio_repository.py` | 分片上传实现 |
+| `ObjectOperations` | `src/infrastructure/storage/minio/object_operations.py` | 分片上传逻辑（`calculate_part_size()` + `resume_multipart_upload()`） |
 | `MinIOConfig` | `src/infrastructure/config/minio.py` | MinIO 配置 |
 | `PortSpec` / `PortRegistry` | `src/domain/ports/registry.py` | 端口注册中心 |
 | `DomainEvent` 基类 | `src/domain/events/base.py` | 事件基类（自动注册、序列化） |
+| `EventPublisher` | `src/domain/ports/event_publisher.py` | 事件发布端口 |
 | `DualChannelEventBus` | `src/infrastructure/messaging/` | 双通道事件发布 |
 | `TestTenant` | `tests/isolation.py` | UUID 前缀租户隔离 |
-| `DocumentProcessingUseCase` | `src/application/use_cases/document_processing.py` | 骨架，可扩展或替换 |
 
 ### 项目结构说明 Project Structure
 
@@ -740,20 +712,15 @@ src/
 │   │   ├── registry.py                      # [已有] 注册新端口
 │   │   ├── resolver.py                      # [已有] 解析新端口
 │   │   ├── contract_gate.py                 # [已有] 契约门禁
-│   │   ├── document_repository.py           # [新建] DocumentRepository Protocol
-│   │   └── l4_object.py                     # [已有] 底层对象存储接口
-│   ├── services/
-│   │   └── document_service.py              # [已有，待确认]
+│   │   └── document_repository.py           # [新建] DocumentRepositoryPort Protocol
 │   └── value_objects/
 │       ├── document_format.py               # [新建] 17 种格式 MIME 映射
 │       └── upload_limits.py                 # [新建] 上传限制常量
 ├── application/
 │   ├── ports/
-│   │   ├── document_storage_port.py         # [已有] DocumentStoragePort
-│   │   └── document_upload_port.py          # [新建] DocumentUploadPort Protocol
+│   │   └── document_storage_port.py         # [已有] DocumentStoragePort
 │   ├── services/
-│   │   ├── document_upload_service.py       # [新建] 上传编排服务
-│   │   └── chunked_upload_manager.py        # [新建] 分片上传管理器
+│   │   └── document_upload_service.py       # [新建] 上传编排服务（非端口，直接服务注册）
 │   └── use_cases/
 │       └── document_processing.py           # [已有，骨架] 上传完成后触发解析
 ├── infrastructure/
@@ -761,9 +728,12 @@ src/
 │   │   ├── minio/                           # [已有] MinIO 文档存储
 │   │   │   ├── minio_document_storage.py    # [已有] MinIODocumentStorage
 │   │   │   ├── minio_adapter.py             # [已有] MinIOAdapter
-│   │   │   └── minio_repository.py          # [已有] 分片上传底层实现
-│   │   └── postgresql/
-│   │       └── document_repository.py       # [新建] PostgresDocumentRepository
+│   │   │   ├── object_operations.py         # [已有] 分片上传逻辑（calculate_part_size + resume_multipart_upload）
+│   │   │   └── minio_repository.py          # [已有] MinIO 仓储外观
+│   │   ├── postgresql/
+│   │   │   └── document_repository.py       # [新建] PostgresDocumentRepository
+│   │   └── redis/
+│   │       └── chunked_upload_manager.py    # [新建] 分片上传状态管理（通过 L1CachePort 操作 Redis）
 │   ├── external_services/
 │   │   └── archive_extractor.py             # [新建] 压缩包解压
 │   └── config/
@@ -791,11 +761,12 @@ tests/
 │   │       ├── test_document_upload_service.py # [新建]
 │   │       └── test_chunked_upload_manager.py  # [新建]
 │   ├── infrastructure/
-│   │   ├── storage/postgresql/test_document_repository.py # [新建]
+│   │   ├── storage/
+│   │   │   ├── postgresql/test_document_repository.py # [新建]
+│   │   │   └── redis/test_chunked_upload_manager.py   # [新建]
 │   │   └── external_services/test_archive_extractor.py   # [新建]
 │   ├── interfaces/
-│   │   ├── api/test_document_upload_routes.py  # [新建]
-│   │   └── cli/test_document_upload_commands.py # [新建]
+│   │   └── api/test_document_upload_routes.py  # [新建]
 │   └── architecture/test_arch_document_upload.py # [新建]
 ├── integration/
 │   └── test_document_upload_integration.py     # [新建]
@@ -836,7 +807,7 @@ tests/
 - WORM 存储 Object Lock COMPLIANCE 模式，7 年保留
 
 **应用到本故事/Applied to This Story:**
-- [ ] 复用 `MinIORepository` 分片上传实现，不在应用层重复
+- [ ] 复用 `ObjectOperations` 分片上传实现（`calculate_part_size()` + `resume_multipart_upload()`），不在应用层重复
 - [ ] 断点续传状态存 Redis，TTL 24 小时
 - [ ] 上传文件流式处理，禁止全量 `bytes` 加载
 
@@ -885,27 +856,25 @@ tests/
 领域层（新建）:
 - `src/domain/value_objects/document_format.py` — 17 种格式 MIME 映射
 - `src/domain/value_objects/upload_limits.py` — 上传限制常量
-- `src/domain/ports/document_repository.py` — DocumentRepository Protocol
+- `src/domain/ports/document_repository.py` — DocumentRepositoryPort Protocol
 
 领域层（修改）:
-- `src/domain/entities/document.py` — 扩展 tenant_id/uploaded_by/content_hash
+- `src/domain/entities/document.py` — 扩展 tenant_id/uploaded_by
 - `src/domain/events/document_events.py` — 新增 DocumentUploaded 事件
 
 应用层（新建）:
-- `src/application/ports/document_upload_port.py` — DocumentUploadPort Protocol
-- `src/application/services/document_upload_service.py` — 上传编排服务
-- `src/application/services/chunked_upload_manager.py` — 分片上传管理器
+- `src/application/services/document_upload_service.py` — 上传编排服务（非端口）
 
 基础设施层（新建）:
 - `src/infrastructure/storage/postgresql/document_repository.py` — PostgresDocumentRepository
+- `src/infrastructure/storage/redis/chunked_upload_manager.py` — 分片上传状态管理
 - `src/infrastructure/external_services/archive_extractor.py` — 压缩包解压
 
 接口层（新建）:
 - `src/interfaces/api/document_upload.py` — FastAPI 上传路由
-- `src/interfaces/cli/document_commands.py` — Typer upload 命令
 
 配置（修改）:
-- `src/composition_root.py` — 注册新端口
+- `src/composition_root.py` — 注册新端口和服务
 - `configs/event_channels.yaml` — 新增 DocumentUploaded 事件通道
 - `deploy/postgresql/alembic/versions/` — 新增 documents 表 migration
 
@@ -914,13 +883,11 @@ tests/
 - `tests/unit/domain/value_objects/test_upload_limits.py`
 - `tests/unit/domain/events/test_document_uploaded.py`
 - `tests/unit/domain/ports/test_document_repository.py`
-- `tests/unit/application/ports/test_document_upload_port.py`
 - `tests/unit/application/services/test_document_upload_service.py`
-- `tests/unit/application/services/test_chunked_upload_manager.py`
 - `tests/unit/infrastructure/storage/postgresql/test_document_repository.py`
+- `tests/unit/infrastructure/storage/redis/test_chunked_upload_manager.py`
 - `tests/unit/infrastructure/external_services/test_archive_extractor.py`
 - `tests/unit/interfaces/api/test_document_upload_routes.py`
-- `tests/unit/interfaces/cli/test_document_upload_commands.py`
 - `tests/unit/architecture/test_arch_document_upload.py`
 - `tests/integration/test_document_upload_integration.py`
 - `tests/contracts/test_api_contract_document_upload.py`
@@ -949,12 +916,33 @@ tests/
 2. [x] All acceptance criteria specified 所有验收标准已定义（6 个 AC）
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
-5. [ ] Sprint status synced to `ready-for-dev`
+5. [x] Sprint status synced to `ready-for-dev`
 
 ---
 
-**故事版本/Story Version:** v0.0.1
+### 🔧 文档审查修复 Docs Review Fixes
+
+> 第1轮审查修订（2026-05-29）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | AC-1 验证标准 markdown/md 重复计数 | P0 | 统一为 "markdown（含 .md 扩展名）"，明确 15+2=17 |
+| 2 | content_hash/find_by_content_hash 秒传超出 FR-DM-01 范围 | P0 | 移除秒传功能，从实体/端口/Task 中全面删除 |
+| 3 | DocumentUploadPort 混合业务与技术接口 | P0 | 移除该端口，DocumentUploadService 直接作为服务注册 |
+| 4 | ChunkedUploadManager 放在 application 层违反依赖规则 | P0 | 下移至 infrastructure/storage/redis/ |
+| 5 | EventPublisherPort 命名错误 | P0 | 修正为 EventPublisher |
+| 6 | MinIORepository 分片逻辑引用不准确 | P0 | 修正为 ObjectOperations |
+| 7 | AC-6 查询 API 范围蔓延 | P1 | 精简为仅上传结果确认，列表查询推迟 |
+| 8 | CLI 命令属于 Epic 7 范围 | P1 | 移除 CLI 相关 Subtask，推迟至 Epic 7 |
+| 9 | 压缩炸弹阈值 50GB 无依据 | P1 | 修正为 ≤20GB（与批量上传限制一致）+ 10:1 膨胀比 |
+| 10 | 缺少 PG 索引策略 | P1 | Task 3 增加 Subtask 3.5 索引创建 |
+| 11 | DocumentRepository 命名不一致 | P1 | 统一为 DocumentRepositoryPort |
+
+---
+
+**故事版本/Story Version:** v0.0.2
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.0.2: 第1轮审查修订 — 修复 P0 格式计数/秒传范围蔓延/架构层级违规/命名错误，P1 CLI/查询范围修正/索引策略
 - v0.0.1: 创建故事文件
