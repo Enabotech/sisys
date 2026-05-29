@@ -140,6 +140,11 @@ development_status:
   4-3-tool-io-schema-validation: backlog
   4-4-docker-sandbox-execution: backlog
   4-5-red-blue-debate-basic: backlog
+  # 价值组扩展: V1 P1 工具箱增强
+  4-6-tool-version-management: backlog
+  4-7-validation-feedback-loop: backlog
+  4-8-sap-protocol-support: backlog
+  4-9-financial-modeling-valuation: backlog
   epic-4-retrospective: optional
 
   # ===========================================================================
@@ -164,7 +169,7 @@ development_status:
   epic-6: backlog
   6-1-blm-first-two-phases: backlog
   6-2-market-insight-six-substeps: backlog
-  6-3-checkpoint-snapshot-creation: backlog  # TODO: 实现 1.15b L3(Qdrant)/L4(MinIO) 触发
+  6-3-checkpoint-snapshot-creation: backlog
   6-4-json-chain-of-thought-output: backlog
   6-5a-markdown-report-basic: backlog
   6-5b-pdf-report-citation-index: backlog
@@ -248,7 +253,7 @@ development_status:
   12-2-query-routing-engine: backlog
   12-3-summary-quality-evaluation: backlog
   12-4-auto-remediation-mechanism: backlog
-  12-5-knowledge-graph-construction-graphrag: backlog  # TODO: 基于 1.17 EntityExtractorService 构建知识图谱
+  12-5-knowledge-graph-construction-graphrag: backlog  # 基于 Story 3.2 EntityExtractorService 构建知识图谱
   12-6-entity-relationship-query: backlog
   epic-12-retrospective: optional
 
@@ -303,6 +308,7 @@ development_status:
   17-3-audio-video-transcription: backlog
   17-4-citation-data-timeliness-management: backlog
   17-5-entity-relationship-path-query-community-detection: backlog
+  17-6-high-fidelity-traceability-rest-api: backlog
   epic-17-retrospective: optional
 
   # ===========================================================================
@@ -325,6 +331,17 @@ development_status:
   epic-19-retrospective: optional
 
   # ===========================================================================
+  # Epic 20: 高级战略分析 API (V2) - 📋 待开始
+  # ===========================================================================
+  epic-20: backlog
+  20-1-financial-quantification-api-npv-irr: backlog
+  20-2-sensitivity-analysis-api-tornado-chart: backlog
+  20-3-scenario-comparison-api: backlog
+  20-4-white-label-regulatory-report-api: backlog
+  20-5-risk-heatmap-api: backlog
+  epic-20-retrospective: optional
+
+  # ===========================================================================
   # Epic 90: 重大重构 (epic文档不追踪) - ✅ 已完成
   # ===========================================================================
   epic-90: done
@@ -341,12 +358,21 @@ development_status:
 # =============================================================================
 # Summary:
 # =============================================================================
-# Total Epics: 21 (Epic 0-20, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
-# Total Stories (excluding retrospectives): 165
+# Total Epics: 22 (Epic 0-20 + Epic 90, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
+# Total Stories (excluding retrospectives): 175
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 📋 3 ready-for-dev)
 #   - Epic 1: 23 stories (✅ done)
-#   - Epic 2-19: 119 stories (📋 backlog, 含 Epic 5 新增 4 个 EV 评估 Story)
+#   - Epic 2: 9 stories (📋 backlog)
+#   - Epic 3: 13 stories (📋 backlog)
+#   - Epic 4: 9 stories (📋 backlog, 含 4 个 P1 V1 扩展)
+#   - Epic 5: 10 stories (📋 backlog)
+#   - Epic 6: 11 stories (📋 backlog)
+#   - Epic 7: 8 stories (📋 backlog)
+#   - Epic 8: 6 stories (📋 backlog)
+#   - Epic 9-14: 38 stories (📋 backlog, V1)
+#   - Epic 15-19: 18 stories (📋 backlog, V2)
+#   - Epic 20: 5 stories (📋 backlog, V2)
 #   - Epic 90: 8 stories (✅ done)
 #
 # Status Summary:
@@ -355,14 +381,14 @@ development_status:
 #     - Ready for Dev: 3 (0-17, 0-18, 0-30)
 #     - In Progress: 0
 #     - Review: 0
-#     - Backlog: 119
+#     - Backlog: 129
 #   Epics:
 #     - Done: 2 (Epic 1, Epic 90)
 #     - In Progress: 1 (Epic 0)
-#     - Backlog: 18 (Epic 2-19)
+#     - Backlog: 19 (Epic 2-20)
 #   Retrospectives:
 #     - Done: 1 (Epic 1)
-#     - Optional: 21
+#     - Optional: 23
 #
 # Next Steps:
 #   1. Follow SDD+TDD mode for all stories: docs/developer/sdd-tdd-checklist.md
