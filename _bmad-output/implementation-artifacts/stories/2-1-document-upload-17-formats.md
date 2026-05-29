@@ -484,7 +484,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/infrastructure/storage/postgresql/test_document_repository.py`（CRUD、租户隔离、分页；继承 `PostgreSQLAdapter` 泛型基类） |
-| 🟢 绿 | 实现 `src/infrastructure/storage/postgresql/document_repository.py` |
+| 🟢 绿 | 实现 `src/infrastructure/storage/postgresql/repository/document_repository.py` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 3.1: 🔴 红 — 编写 PostgreSQLDocumentRepository 失败测试（save、get_by_id、list_by_tenant）
@@ -1054,6 +1054,12 @@ tests/
 | 37 | Story 1-7 学习经验仍写"MinIORepository 中实现"（应为 ObjectOperations） | P1 | 修正为 ObjectOperations + 模块级函数/方法 |
 | 38 | 端口契约表 l1_cache 注册名与实际不一致（实际为 redis_adapter） | P1 | 修正端口名称为 redis_adapter |
 
+> 第10轮审查修订（2026-05-29，第二轮审查第5轮终审）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 39 | Task 3 TDD 绿阶段路径缺少 repository/ 子目录 | P1 | 修正为 postgresql/repository/document_repository.py |
+
 ### 🔍 代码审查发现 Review Findings
 
 > 此 Section 在开发阶段（dev-story）填写，记录代码审查过程中的发现。
@@ -1078,10 +1084,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.0.8
+**故事版本/Story Version:** v0.0.9
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.0.9: 第二轮审查第5轮终审 — 全文一致性验证（9项检查8项通过），修正Task 3路径遗漏repository/子目录
 - v0.0.8: 第二轮审查第4轮 — 修正Subtask 0.11双注册/学习经验引用/端口名称redis_adapter
 - v0.0.7: 第二轮审查第3轮 — 方法命名统一(get_by_id/list_by_tenant)、事件__post_init__补充、ChannelMapping双注册结构、tenant_id系统级设计决策
 - v0.0.6: 第二轮审查第2轮 — 补充流式处理约束/P95性能指标说明/PostgreSQLAdapter方法关系/构造器参数
