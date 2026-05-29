@@ -809,6 +809,31 @@ tests/
 - [ ] 断点续传状态存 Redis，TTL 24 小时
 - [ ] 上传文件流式处理，禁止全量 `bytes` 加载
 
+### 实现细节补充 Implementation Details
+
+**FastAPI 配置：**
+- 请求体大小限制：`app.add_middleware(MultipartBodySizeLimit, max_body_size=20*1024*1024*1024)` 或在 nginx/uvicorn 层配置
+- multipart 字段名：单文件 `file: UploadFile`，批量 `files: list[UploadFile]`
+- 分片上传字段名：`part: UploadFile`，分片元数据通过请求体 JSON 传递
+
+**认证与上下文：**
+- API 认证：JWT（OAuth 2.1），通过认证中间件自动注入 `user_id` 和 `tenant_id`
+- 从请求上下文（`request.state.user_id` / `request.state.tenant_id`）获取用户信息
+- 权限检查：RBAC 中间件校验 `document:upload` 权限
+
+**PostgreSQL 租户隔离：**
+- 沿用项目 `Schema per Tenant` 模式（`TestTenant.postgres_schema`），documents 表创建在各租户 schema 下
+- Alembic migration 需支持模板化 schema（参考已有 migration 模式）
+
+**事件发布机制：**
+- 通过 Outbox 模式异步发布（写入 event_outbox 表，由后台 worker 投递至 Redis + RabbitMQ 双通道）
+- DocumentUploadService 调用 `EventPublisher.publish(event)` → 写入 Outbox → 确认事务提交 → 后台投递
+
+**分片上传流程：**
+1. `POST /chunked/init` — 返回 `upload_id` + 推荐分片大小（从 `UploadLimits.get_chunk_size(file_size)` 计算）
+2. `PUT /chunked/{upload_id}/parts/{part_number}` — 上传分片，返回 ETag
+3. `POST /chunked/{upload_id}/complete` — 合并分片，创建 Document 实体，发布事件
+
 ---
 
 ## 🤖 开发代理记录 Dev Agent Record
