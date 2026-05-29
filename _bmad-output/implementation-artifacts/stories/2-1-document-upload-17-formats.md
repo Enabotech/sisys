@@ -39,7 +39,7 @@
 
 **覆盖 FR:** FR-DM-01（用户可以上传 17 种格式的文档）
 
-**or.md 公理追溯:** or.md 二.1.(1) — 支持上传 pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/html + zip/tar 压缩包
+**or.md 公理追溯:** or.md 二.1.(1) — 支持上传 pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/html/rtf + zip/tar 压缩包（rtf 为 Story 级补充，补足 or.md/PRD 计数 17 vs 实列 16 的差异）
 
 ---
 
@@ -350,6 +350,8 @@
 | AC-6 | 上传结果确认 | Task 7 | 确认 API 端点 | `test_document_upload_routes.py` |
 | AC-1~6 | 完整流程验证 | Task 8 | 集成测试 | `test_document_upload_integration.py` |
 | AC-1~6 | 架构约束验证 | Task 9 | 架构验证测试 | `test_arch_document_upload.py` |
+| AC-1~6 | 规范定义前置 | Task 0 | 契约/验收测试编写 | `test_api_contract_*.py` + `test_acceptance_*.feature` |
+| AC-1~6 | 收尾验收 | Task 10 | 完成清单确认 | `test_acceptance_*.feature` + `test_acceptance_*.py` |
 
 ---
 
@@ -974,10 +976,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.0.3
+**故事版本/Story Version:** v0.0.4
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.0.4: 第5轮终审 — 追溯矩阵补齐Task 0/10行、or.md公理追溯补充rtf说明
 - v0.0.3: 第2轮审查修订 — 修复残留不一致（格式计数/幽灵条目/测试表缺失/CLI残留/content_hash残留）
 - v0.0.2: 第1轮审查修订 — 修复 P0 格式计数/秒传范围蔓延/架构层级违规/命名错误，P1 CLI/查询范围修正/索引策略
 - v0.0.1: 创建故事文件
