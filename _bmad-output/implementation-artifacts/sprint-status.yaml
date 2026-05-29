@@ -100,8 +100,8 @@ development_status:
   # ===========================================================================
   # Epic 2: 文档与数据管理 - 📋 待开始
   # ===========================================================================
-  epic-2: backlog
-  2-1-document-upload-17-formats: backlog
+  epic-2: in-progress
+  2-1-document-upload-17-formats: ready-for-dev
   2-2a-document-parsing-basic-formats: backlog
   2-2b-document-parsing-extended-formats: backlog
   2-3-layout-preservation-doclaynet: backlog
@@ -169,7 +169,7 @@ development_status:
   epic-6: backlog
   6-1-blm-first-two-phases: backlog
   6-2-market-insight-six-substeps: backlog
-  6-3-checkpoint-snapshot-creation: backlog
+  6-3-checkpoint-snapshot-creation: backlog  # TODO: 实现 1.15b L3(Qdrant)/L4(MinIO) 触发
   6-4-json-chain-of-thought-output: backlog
   6-5a-markdown-report-basic: backlog
   6-5b-pdf-report-citation-index: backlog
