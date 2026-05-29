@@ -27,7 +27,7 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 
 ### Functional Requirements
 
-**共 132 项功能需求，按优先级划分：**
+**共 131 项功能需求（FR-SA-10 群体智能为 V3+，不纳入本次分解），按优先级划分：**
 
 #### P0 (MVP) - 59 项
 
@@ -405,7 +405,7 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 | FR-SR-05 | 分层检索 | Epic 3 | Story 3.5 | P0 |
 | FR-SR-06 | 契约化摘要 | Epic 3 | Story 3.6 | P0 |
 | FR-SR-07 | 检索相关性评估 | Epic 3 | Story 3.7 | P0 |
-| FR-SR-08 | Bounding Box 溯源 | Epic 6 | Story 3.8 | P0 |
+| FR-SR-08 | Bounding Box 溯源 | Epic 3 | Story 3.8 | P0 |
 | **战略工具箱 (ST) - 5 项** |
 | FR-ST-01 | 23 种工具注册 | Epic 4 | Story 4.1 | P0 |
 | FR-ST-02 | 工具链编排 | Epic 4 | Story 4.2 | P0 |
@@ -521,10 +521,11 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 | FR-DM-13 | 数学公式识别（LaTeX/MathML） | Epic 17 | Story 17.1 | P2 |
 | FR-DM-14 | 图文联合嵌入（跨模态检索） | Epic 17 | Story 17.2 | P2 |
 | FR-DM-15 | 音视频转录文本接入 | Epic 17 | Story 17.3 | P2 |
-| **智能检索与知识发现 (SR) - 2 项** |
+| **智能检索与知识发现 (SR) - 3 项** |
 | FR-SR-14 | 引用数据时效性管理 | Epic 17 | Story 17.4 | P2 |
 | FR-SR-15 | 实体关联查询/路径查询/社区发现 | Epic 17 | Story 17.5 | P2 |
-| FR-SR-16 | 高保真溯源 REST API（Bounding Box 坐标级） | Epic 17 | Story 17.6 | P2 || **战略工具箱 (ST) - 2 项** |
+| FR-SR-16 | 高保真溯源 REST API（Bounding Box 坐标级） | Epic 17 | Story 17.6 | P2 |
+| **战略工具箱 (ST) - 2 项** |
 | FR-ST-10 | gVisor 沙箱执行 | Epic 18 | Story 18.1 | P2 |
 | FR-ST-11 | 压力测试建模 | Epic 18 | Story 18.2 | P2 |
 | **Agent 协作 (AC) - 2 项** |
@@ -631,7 +632,7 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 | Epic 11 | UDMR 动态模型路由 | P1 | CP-05~10 | 8 | 云端路由≥80%，本地兜底 |
 | Epic 12 | 知识图谱与 GraphRAG | P1 | SR-09~13 | 6 | GraphRAG 增强检索与实体关联查询 |
 | Epic 13 | 高级系统管理与合规 | P1 | SC-09~12, SA-04~07 | 8 | SOX 合规与时间轴查询 |
-| Epic 14 | 用户体验增强 | P1 | UI-08~12, DM-09~12 | 10 | 决策可视化与分支管理 |
+| Epic 14 | 用户体验增强 | P1 | UI-08~12 | 10 | 决策可视化与分支管理 |
 | Epic 5 | Agent 评估增强 | P1 | EV-03~04 | 2 | Agent 质量漂移检测与 Checkpoint 评估集成 |
 | **总计** | - | - | **48 项 FR** | **52** | - |
 
@@ -766,7 +767,7 @@ Story 0.3 (测试框架搭建):
 |-------|------|---------|---------|-----------|
 | Story 1.17 | **UDMR 基础路由（云端优先静态配置）** | MVP 阶段支持云端优先路由，验证云端路由≥80% | 依赖 Story 1.14b | **P0-17（ARCH UDMR）** |
 | Story 1.18a | **Prefect 工作流引擎集成** | 实现数据管道引擎，支持文档处理/RAG 索引/报告生成 | 依赖 Story 1.1 | **P0-18a（ARCH Prefect）** |
-| Story 1.18b | **LangGraph Agent 编排集成** | 实现 Agent 编排引擎，支持 BLM 规划/Agent 协作 | 依赖 Story 1.1, 1.18a | **P0-18b（ARCH LangGraph）** |
+| Story 1.18b | **LangGraph Agent 编排集成** | 实现 Agent 编排引擎，支持 BLM 规划/Agent 协作 | 依赖 Story 1.1, 1.3 | **P0-18b（ARCH LangGraph）** |
 | Story 1.19 | **成本度量基础（Token 消耗与成本追踪）** | 验证 MVP 成本优化效果并衡量 ROI | 依赖 Story 1.17 | **P0-19（CFO ROI 验证）** |
 
 **✅ 依赖关系验证：**
@@ -1941,7 +1942,7 @@ So that **用户主动记忆得到持久化，上下文压缩率≥70%**。
 2. **性能要求**
    - [ ] L1 信息压缩率≥70%（信息压缩率 = 1 - 压缩后字符数/原始字符数，即 500 字输入压缩至≤150 字）
    - [ ] 语义保留率≥0.85（通过 LLM-as-Judge 评估压缩前后语义等价性，测试集≥20 条样本覆盖保存/修改/查询操作和 50/200/500 字长度）
-   - [ ] 压缩延迟 P95<20ms（测量方式：LLM 任务中采样 100 次）
+   - [ ] 压缩延迟 P95<3s（LLM 语义压缩，测量方式：20 条样本集覆盖 50/200/500 字长度，P95 采样）
    - [ ] 记忆保存成功率 100%
 
 3. **覆盖率要求**
@@ -2237,14 +2238,14 @@ So that **系统支持认知密集型推理，包括 BLM 规划、Agent 协作�
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
-**Given** 架构骨架已实现（Story 1.1），Prefect 集成完成（Story 1.18a）
+**Given** 架构骨架已实现（Story 1.1），事件总线就绪（Story 1.3）
 **When** 执行 Agent 编排任务（BLM 规划/Agent 协作/多视角分析）
 **Then** LangGraph 1.0+ 执行状态机，支持多 Agent 协作、Checkpoint 机制
 **And** Agent 状态持久化至 Redis（TTL 24h-30d）
 **And** 发布领域事件（AgentDecided/CheckpointReached）
 **And** 与 Prefect 通过编排服务协调（无直接耦合，通过领域事件通信）
 
-**依赖关系：** 依赖 Story 1.1（架构骨架）、Story 1.3（事件总线）、Story 1.18a（Prefect 集成）
+**依赖关系：** 依赖 Story 1.1（架构骨架）、Story 1.3（事件总线）
 **执行优先级：** P0-18b（MVP，ARCH LangGraph）
 
 ### Story 1.19: 成本度量基础（Token 消耗与成本追踪）
@@ -2717,7 +2718,7 @@ So that **检索结果更符合语义完整性**。
 
 **目标：** 实现混合检索（Dense + Sparse + Graph）、分层检索、契约化摘要和高保真溯源。
 
-**包含 FR：** SR-01, SR-02, SR-03, SR-04, SR-05, SR-06, SR-07, SR-08, CP-02, SA-01, SA-02, SA-03
+**包含 FR：** SR-01, SR-02, SR-03, SR-04, SR-05, SR-06, SR-07, SR-08, CP-02, SA-02, SA-03
 
 **📦 价值组：智能检索与溯源**
 > 用户可以检索文档并追溯至原始坐标点
@@ -2806,10 +2807,9 @@ So that **同时支持语义检索和关键词检索，综合提升相关性**�
 1. **架构测试**
    - [ ] BM25 检索测试 - 验证关键词检索
    - [ ] RRF 融合测试 - 验证 Reciprocal Rank Fusion 算法
-   - [ ] ColBERT 重排序测试 - 验证精排
 
 2. **性能要求**
-   - [ ] 检索延迟 P95<800ms（MVP，含重排序）
+   - [ ] 检索延迟 P95<800ms（MVP，含 RRF 融合）
    - [ ] BM25 检索延迟 P95<100ms
    - [ ] RRF 融合延迟 P95<50ms
    - [ ] 并发检索≥50
@@ -2834,8 +2834,7 @@ So that **同时支持语义检索和关键词检索，综合提升相关性**�
 **When** 系统执行混合检索
 **Then** BM25 检索与 Dense 检索（Story 3.1a）并行执行，双路召回
 **And** 使用 RRF（Reciprocal Rank Fusion）融合两路结果
-**And** 集成 ColBERT-v2 重排序器对 Top-K 候选精排
-**And** 检索延迟 P95<800ms（MVP，含重排序）
+**And** 检索延迟 P95<800ms（MVP，含 RRF 融合）
 
 ### Story 3.2: 实体抽取（LLM+ 规则混合）
 
@@ -3061,7 +3060,7 @@ So that **防止基于不足数据生成幻觉内容**。
    - [ ] 多维评估测试 - 验证相关性/完整性/时效性
 
 2. **性能要求**
-   - [ ] 相关性评估延迟 P95<500ms
+   - [ ] 相关性评估延迟 P95<3s（含 LLM-as-Judge 评估，规则预检 P95<100ms）
    - [ ] 评估准确率≥90%
    - [ ] 阻断准确率 100%
 
@@ -3531,7 +3530,7 @@ So that **MVP 阶段支持基础的多视角分析**。
 
 **目标：** 实现单 Agent 执行、EIP 弹性隔离、隔离切换审计、Agent 评估与可观测性。
 
-**包含 FR：** AC-01, AC-02, AC-03, AC-04, AC-05, AC-06
+**包含 FR：** AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, EV-01, EV-02
 
 **新增 FR（评估与可观测性 - EV 系列）：**
 - FR-EV-01: Phoenix Evaluation Harness 全链路追踪
@@ -3675,7 +3674,7 @@ So that **Agent 自主完成任务并输出可验证结果**。
    - [ ] 证据打包测试 - 验证输出可验证
 
 2. **性能要求**
-   - [ ] 工作流执行延迟 P95<5s
+   - [ ] 工作流执行延迟 P95<10s（含 LLM 推理 + 思维链生成 + 证据打包）
    - [ ] 思维链输出完整率 100%
    - [ ] 证据打包成功率 100%
 
@@ -3753,13 +3752,13 @@ So that **防止 Agent 间信息泄露和视角越界**。
 
 1. **架构测试**
    - [ ] 三重硬隔离测试 - 验证 Prompt/工具/数据严格隔离
-   - [ ] 隔离穿透测试 - 验证无信息泄露
+   - [ ] 隔离穿透测试 - 验证 Agent A 无法读取 Agent B 的 Prompt/工具/数据（构造 20 条跨 Agent 数据访问探针，拦截率 100%）
    - [ ] 并发隔离测试 - 验证多 Agent 并行隔离
 
 2. **性能要求**
    - [ ] 隔离检查延迟 P95<50ms
    - [ ] 隔离测试通过率 100%
-   - [ ] 并发 Agent≥10 无泄露
+   - [ ] 并发 Agent≥10 无泄露（每 Agent 发起 50 次跨隔离探针，拦截率 100%）
 
 3. **覆盖率要求**
    - [ ] 架构层覆盖率≥85%
@@ -4411,13 +4410,13 @@ So that **快速理解态势并做出决策**。
 **Given** 高管登录系统
 **When** 查看仪表盘
 **Then** 第一屏仅显示 3 个关键指标，红/黄/绿状态指示器
-**And** 30 秒内理解当前态势（30 秒理解率≥90%）
+**And** 信息密度达标（首屏 3 项关键指标，Lighthouse 信息密度评分≥90）
 
 **TDD 测试要求:**
 
 1. **架构测试**
    - [ ] 仪表盘显示测试 - 验证显示 3 个关键指标和状态指示器
-   - [ ] 30 秒理解率测试 - 验证用户可在 30 秒内理解态势
+   - [ ] 信息密度测试 - 验证首屏 3 项关键指标可见且 Lighthouse 评分≥90
    - [ ] 审批中心测试 - 验证审批功能正确显示
 
 2. **性能要求**
@@ -4576,7 +4575,7 @@ So that **可以直接交付客户，验证 MVP 付费意愿**。
 
 **目标：** 实现 CLI、REST API、API Gateway、健康度仪表盘和无障碍设计。
 
-**包含 FR：** UI-01, UI-02, UI-03, UI-07, UI-11, NFR-INT-05, NFR-ACC-01
+**包含 FR：** UI-01, UI-02, UI-03, CP-03
 
 **📦 价值组：多触点操作与监控能力**
 > 用户可以通过 CLI/API/仪表盘操作系统
@@ -5008,7 +5007,7 @@ So that **减少感知等待时间，提升体验流畅度**。
 
 **目标：** 实现审计日志多维检索、修正分级判定基础、数据主权隔离和安全测试。
 
-**包含 FR：** SC-04, SC-05, SC-06, SC-07, SC-08
+**包含 FR：** SC-04, SC-05, SC-06
 
 **📦 价值组：安全与合规**
 > 管理员可以管理权限和审计日志，确保系统安全合规
@@ -5377,7 +5376,7 @@ So that **确保 MVP 无高危漏洞**。
 
 ### 建议 3：FR 覆盖映射优化（双向追溯矩阵）
 - ✅ 增加 FR 编号、FR 描述、归属 Epic、归属 Story、优先级列
-- ✅ 覆盖 57 项 P0 FR 的双向追溯
+- ✅ 覆盖 59 项 P0 FR 的双向追溯
 
 ### 建议 4：依赖关系验证
 - ✅ Epic 1 内部故事依赖关系已验证
@@ -5572,7 +5571,8 @@ graph TD
     S1_1 --> S1_16
 
     %% Epic 1 内部依赖 (价值组 3: 六层存储)
-    S1_4 --> S1_5
+    S1_1 --> S1_4
+    S1_1 --> S1_5
     S1_5 --> S1_6
     S1_6 --> S1_7
     S1_7 --> S1_8
@@ -5674,26 +5674,26 @@ Story 1.9 (RBAC 权限 - In-Progress)
 ```
 Story 1.15b (外部化记忆协同 - In-Progress)
   → Story 1.18a (Prefect 工作流 - ready-for-dev)
-  → Story 1.18b (LangGraph 编排)
   → Story 1.19 (成本度量)
+Story 1.3 (事件总线 - completed)
+  → Story 1.18b (LangGraph 编排)
 ```
 
 **关键性分析:**
-- Story 1.18a/b 是 Epic 4 (工具箱) 和 Epic 6 (战略规划) 的前置
-- 这两个是系统双核引擎，决定核心能力
+- Story 1.18a（Prefect）和 Story 1.18b（LangGraph）是 Epic 4/6 的前置，但两者无直接耦合，通过领域事件通信
+- 双引擎并行推进，决定系统核心能力
 
 **技术风险:**
 - 六层存储协同 (L0-L5)
 - 双引擎协调 (Prefect + LangGraph)
 
-**关键路径 3: Epic 1 六层存储 (工作量最大) 🟨**
+**关键路径 4: Epic 1 六层存储 (工作量最大) 🟨**
 
 ```
-Story 1.4 (Redis)
-  → Story 1.5 (PostgreSQL)
-  → Story 1.6 (Qdrant)
-  → Story 1.7 (MinIO)
-  → Story 1.8 (Neo4j)
+Story 1.1 (六边形架构)
+  ├→ Story 1.4 (Redis) ─────→ Story 1.7 (MinIO) ──→ Story 1.8 (Neo4j)
+  ├→ Story 1.5 (PostgreSQL) ─→ Story 1.6 (Qdrant) ─┘
+  └→ Story 1.2 (领域事件) → Story 1.3 (事件总线)
 ```
 
 **关键性分析:**
@@ -5743,7 +5743,7 @@ Story 1.4 (Redis)
 | **Agent-02** | Story 1.2 (领域事件) | 3 天 | Story 1.1 | P0 |
 | **Agent-03** | Story 1.3 (事件总线) | 5 天 | Story 1.2 | P0 |
 | **Agent-04** | Story 1.4 (Redis 缓存) | 4 天 | Story 0.9 ✅ | P0 |
-| **Agent-05** | Story 1.5 (PostgreSQL) | 5 天 | Story 1.4 | P0 |
+| **Agent-05** | Story 1.5 (PostgreSQL) | 5 天 | Story 1.1 ✅ | P0 |
 | **Agent-06** | Story 1.6 (Qdrant) | 4 天 | Story 1.5 | P0 |
 | **Agent-07** | Story 1.7 (MinIO) | 3 天 | Story 1.6 | P0 |
 | **Agent-08** | Story 1.8 (Neo4j) | 4 天 | Story 1.7 | P0 |
@@ -5918,14 +5918,14 @@ Story 1.4 (Redis)
 | **阶段 1** (Epic 0 Iteration 1) | 6 个 Story 100% 完成，集成测试通过 | 验收测试报告 |
 | **阶段 2** (Epic 1 价值组 2/3) | 11 个 Story 100% 完成，架构评审通过 | 架构评审报告 + 测试报告 |
 | **阶段 3** (Epic 1 价值组 4/5/6) | 12 个 Story 100% 完成，性能基准达标 | 性能基准测试报告 |
-| **阶段 4** (Epic 2-8 MVP) | 57 个 P0 FR 100% 覆盖，MVP 验收通过 | MVP 验收报告 |
+| **阶段 4** (Epic 2-8 MVP) | 59 个 P0 FR 100% 覆盖，MVP 验收通过 | MVP 验收报告 |
 
 **整体成功标准**
 
 1. **零重大架构缺陷** - 架构评审 100% 通过
 2. **零 P0 Bug** - MVP 验收前 P0 Bug 清零
 3. **性能指标达标** - 检索延迟 P95<800ms，路由延迟 P95<100ms
-4. **FR 覆盖率 100%** - 57 个 P0 FR 完整实现
+4. **FR 覆盖率 100%** - 59 个 P0 FR 完整实现
 5. **NFR 达标率 100%** - 12 项 P0 NFR 全部达标
 
 ---
