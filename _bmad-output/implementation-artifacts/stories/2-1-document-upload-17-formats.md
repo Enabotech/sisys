@@ -157,12 +157,14 @@
   - 使用 `@dataclass(frozen=True)`（非 Pydantic，父类 frozen 要求子类也 frozen）
   - 自动注册到事件注册表（`__init_subclass__`）
   - 实现 `__post_init__`：`aggregate_id = document_id`，`aggregate_type = "Document"`（与 DocumentProcessed 模式一致）
+  - 所有自有字段提供合理默认值（参考 DocumentProcessed 模式：`document_id` 有 `uuid.uuid4` 工厂），确保 frozen dataclass 的安全构造。但语义上核心字段（`filename`, `file_size_bytes`, `tenant_id`, `uploaded_by`）应为构造必填参数，仅 `mime_type` 可有默认空字符串
 
 #### 数据模型 (Data Models)
 
 - [ ] `Document` 实体已存在于 `src/domain/entities/document.py`，**本 Story 扩展以下内容**：
   - 新增 `tenant_id: str` 字段（租户隔离，默认空字符串，向后兼容）
   - 新增 `uploaded_by: str` 字段（上传者，默认空字符串，向后兼容）
+  - **类型修正**：`metadata` 字段类型从 `dict[str, str]` 改为 `dict[str, Any]`（与 `DomainEvent.metadata` 类型一致，支持 PostgreSQL JSONB 异构类型存储）
 - [ ] `SUPPORTED_FORMATS` 常量定义于 `src/domain/value_objects/document_format.py`
   - 17 种格式的 MIME 类型映射（`dict[str, str]`）
   - 文件扩展名与 MIME 类型双向查询方法
@@ -210,7 +212,7 @@
   - `PUT /api/v1/documents/chunked/{upload_id}/parts/{part_number}` — 分片上传
   - `POST /api/v1/documents/chunked/{upload_id}/complete` — 分片上传完成
   - `GET /api/v1/documents/{document_id}` — 上传结果确认查询
-- [ ] 遵循 JSON:API 风格（data/meta/links 结构）
+- [ ] 遵循项目现有扁平 JSON 响应格式（不使用 JSON:API 风格，与 `auth.py`/`crawler.py` 响应模式一致）
 - [ ] API 版本管理：`/api/v1/documents`
 - [ ] API 契约测试：`tests/contracts/test_api_contract_document_upload.py`
 
@@ -865,14 +867,25 @@ tests/
 - 本 Story Task 4 需增强 `store_document()` 调用，传入实际的 `mime_type`（或接受此限制，在元数据中保留 MIME 信息）
 
 **路由注册模式：**
-- 路由通过 `create_document_upload_router(service)` 工厂函数导出，返回 `APIRouter` 实例
-- 工厂函数参数注入服务实例（非 FastAPI Depends），与项目 `create_auth_router` / `create_crawler_router` 模式一致
-- 路由注册：`app.include_router(create_document_upload_router(upload_service), prefix="/api/v1/documents")`
+- 路由通过 `create_document_upload_router(service, auth_service)` 工厂函数导出，返回 `APIRouter` 实例
+- 工厂函数参数注入服务实例（非 FastAPI Depends），与项目 `create_auth_router` 模式一致
+- 认证依赖通过 `get_current_user_dependency(auth_service)` 闭包工厂创建，在路由端点中通过 `Depends(get_current_user)` 获取 `TokenPayload`
+- 路由前缀在工厂函数内部设置（`APIRouter(prefix="/api/v1", tags=["documents"])`），与 auth router 模式一致
 
 **分片上传流程：**
-1. `POST /chunked/init` — 返回 `upload_id` + 推荐分片大小（从 `UploadLimits.get_chunk_size(file_size)` 计算）
-2. `PUT /chunked/{upload_id}/parts/{part_number}` — 上传分片，返回 ETag
-3. `POST /chunked/{upload_id}/complete` — 合并分片，创建 Document 实体，发布事件
+1. `POST /documents/chunked/init` — JSON body 传递 `{filename, file_size}`，返回 `upload_id` + 推荐分片大小
+2. `PUT /documents/chunked/{upload_id}/parts/{part_number}` — 分片数据以 `application/octet-stream` 二进制流上传（`Request.body()` 或 `UploadFile`），返回 ETag
+3. `POST /documents/chunked/{upload_id}/complete` — 合并分片，创建 Document 实体，发布事件
+
+**分片上传与 MinIO 的桥接：**
+- 已有 `ObjectOperations` 的分片方法基于本地文件路径（`fput_object`），API 层收到的是临时文件对象
+- `ChunkedUploadManager` 需将分片数据先写入临时文件，再委托 `ObjectOperations` 执行分片上传
+- 注意：`resume_multipart_upload` 使用了 MinIO SDK 私有 API（`_put_object`），需评估稳定性风险
+
+**UploadLimits 与 calculate_part_size 的关系：**
+- `UPLOAD_LIMITS.CHUNK_SIZES` 作为领域层声明式配置（业务规则），定义四级分片阈值
+- 运行时分片计算委托给 infrastructure 层已有的 `ObjectOperations.calculate_part_size()`，避免重复实现
+- `UploadLimits.get_chunk_size()` 方法可以包装 `calculate_part_size()` 调用，也可以仅做值校验
 
 ---
 
@@ -1060,6 +1073,18 @@ tests/
 |---|------|--------|----------|
 | 39 | Task 3 TDD 绿阶段路径缺少 repository/ 子目录 | P1 | 修正为 postgresql/repository/document_repository.py |
 
+> 第11轮审查修订（2026-05-29，第三轮审查第1轮）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 40 | JSON:API 风格声明与项目现有响应格式不一致（项目全部使用扁平 JSON） | P0 | 移除 JSON:API 声明，改为"遵循项目现有扁平 JSON 响应格式" |
+| 41 | Document.metadata 类型 dict[str, str] 应为 dict[str, Any]（JSONB 异构类型 + 与 DomainEvent.metadata 不一致） | P0 | SDD 数据模型新增 metadata 类型修正 |
+| 42 | 路由前缀注册模式不一致（include_router prefix vs 工厂内部 prefix） | P1 | 修正为工厂内部设 prefix，与 auth router 模式一致 |
+| 43 | 分片上传 PUT 端点请求体格式未明确（binary stream vs form-data） | P1 | 实现细节补充 application/octet-stream 说明 |
+| 44 | 分片上传 init 端点参数传递方式未明确 | P1 | 实现细节补充 JSON body 传递方式 |
+| 45 | CHUNK_SIZES dict 与已有 calculate_part_size() 的关系/去重策略未明确 | P1 | 实现细节补充声明式配置+委托已有函数的关系 |
+| 46 | DocumentUploaded 事件字段默认值策略未明确 | P1 | SDD 事件 Schema 补充默认值策略说明 |
+
 ### 🔍 代码审查发现 Review Findings
 
 > 此 Section 在开发阶段（dev-story）填写，记录代码审查过程中的发现。
@@ -1084,11 +1109,12 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.0.9
+**故事版本/Story Version:** v0.1.0
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
-- v0.0.9: 第二轮审查第5轮终审 — 全文一致性验证（9项检查8项通过），修正Task 3路径遗漏repository/子目录
+- v0.1.0: 第三轮审查第1轮 — 修复 JSON:API 风格/Document.metadata 类型/路由注册模式/分片上传技术细节/事件默认值策略
+- v0.0.9: 第二轮审查第5轮终审 — 全文一致性验证通过
 - v0.0.8: 第二轮审查第4轮 — 修正Subtask 0.11双注册/学习经验引用/端口名称redis_adapter
 - v0.0.7: 第二轮审查第3轮 — 方法命名统一(get_by_id/list_by_tenant)、事件__post_init__补充、ChannelMapping双注册结构、tenant_id系统级设计决策
 - v0.0.6: 第二轮审查第2轮 — 补充流式处理约束/P95性能指标说明/PostgreSQLAdapter方法关系/构造器参数
