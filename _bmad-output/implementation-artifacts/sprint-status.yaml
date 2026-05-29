@@ -143,7 +143,7 @@ development_status:
   epic-4-retrospective: optional
 
   # ===========================================================================
-  # Epic 5: Agent 协作系统 - 📋 待开始
+  # Epic 5: Agent 协作系统（含 EV-01/02 P0 + EV-03/04 P1 扩展）- 📋 待开始
   # ===========================================================================
   epic-5: backlog
   5-1-ceo-agent-instantiation-mvp: backlog
