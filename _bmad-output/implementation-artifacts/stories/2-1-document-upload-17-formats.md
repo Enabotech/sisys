@@ -183,7 +183,7 @@
   - 注册至 `src/domain/ports/registry.py`
 - [ ] **现有端口复用**（不新增）：
   - `document_storage`（`DocumentStoragePort`） — MinIO 文档存储，`resolve("document_storage")`
-  - `l1_cache`（`L1CachePort`） — Redis 缓存，用于分片上传状态
+  - `l1_cache`（`L1CachePort`） — Redis 缓存，注册名 `redis_adapter`（`resolve("redis_adapter")`）
   - `event_publisher`（`EventPublisher`） — 事件发布（定义于 `src/domain/ports/event_publisher.py`）
 - [ ] **不新增 DocumentUploadPort** — `DocumentUploadService` 直接作为应用服务（非端口），在 composition_root 中注册为服务
 - [ ] 端口实现仅在 `src/composition_root.py` 统一注册
@@ -197,7 +197,7 @@
 | `document_repository` | `DocumentRepositoryPort` (domain/ports) | `PostgreSQLDocumentRepository` (infrastructure/storage/postgresql/repository) | SCOPED | doc-team | v1.0.0 |
 | `document_storage` | `DocumentStoragePort` (application/ports) | `MinIODocumentStorage` (infrastructure/storage/minio) — **已注册** | SCOPED | storage-team | v1.0.0 |
 | `event_publisher` | `EventPublisher` (domain/ports) | `DualChannelEventBus` (infrastructure/messaging) — **已注册** | SINGLETON | messaging-team | — |
-| `l1_cache` | `L1CachePort` (domain/ports) | `RedisAdapter` (infrastructure/storage/redis) — **已注册** | SINGLETON | storage-team | — |
+| `redis_adapter` | `L1CachePort` (domain/ports) | `RedisAdapter` (infrastructure/storage/redis) — **已注册** | SINGLETON | storage-team | — |
 
 > **注：** `DocumentUploadService` 是应用服务而非端口，直接在 composition_root 中实例化注册（非端口模式）。`ChunkedUploadManager` 位于 infrastructure 层（`src/infrastructure/storage/redis/chunked_upload_manager.py`），通过 `L1CachePort` 操作 Redis 分片状态。
 
@@ -381,7 +381,7 @@
 - [ ] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_document_upload.py`
 - [ ] Subtask 0.9: 编写 API 契约测试 `tests/contracts/test_api_contract_document_upload.py`
 - [ ] Subtask 0.10: 编写端口契约测试 `tests/contracts/test_port_contract_document_upload.py`
-- [ ] Subtask 0.11: 更新 `configs/event_channels.yaml` 添加 `DocumentUploaded` 事件通道配置
+- [ ] Subtask 0.11: 更新 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`（`src/infrastructure/messaging/channel_router.py`）添加 `DocumentUploaded` 事件通道配置（双注册，AC-5 要求）
 - [ ] Subtask 0.12: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -809,7 +809,7 @@ tests/
 
 **关键学习/Key Learnings:**
 - 流式上传防止 OOM：`upload_object` 接受 `file_path` 或 `AsyncIterator[bytes]`，不接受全量 `bytes`
-- 分片上传逻辑已在 `MinIORepository` 中实现，应用层只需编排
+- 分片上传逻辑已在 `ObjectOperations` 中实现（`calculate_part_size` 模块级函数 + `resume_multipart_upload` 方法），应用层只需编排
 - `BucketManager` 负责桶命名规范验证
 - Redis 断点续传状态 TTL 24 小时
 - WORM 存储 Object Lock COMPLIANCE 模式，7 年保留
@@ -1046,6 +1046,14 @@ tests/
 | 34 | event_channels.yaml + DEFAULT_MAPPINGS 双注册的 ChannelMapping 结构未说明 | P1 | 实现细节补充 ChannelMapping 示例 |
 | 35 | 项目中所有仓储端口均无 tenant_id，本 Story 是多租户隔离设计先行者 | P1 | 认证与上下文节补充系统级设计决策说明 |
 
+> 第9轮审查修订（2026-05-29，第二轮审查第4轮）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 36 | Task 0 Subtask 0.11 仅提及 event_channels.yaml，遗漏 DEFAULT_MAPPINGS | P1 | 补充 ChannelRouter.DEFAULT_MAPPINGS 双注册 |
+| 37 | Story 1-7 学习经验仍写"MinIORepository 中实现"（应为 ObjectOperations） | P1 | 修正为 ObjectOperations + 模块级函数/方法 |
+| 38 | 端口契约表 l1_cache 注册名与实际不一致（实际为 redis_adapter） | P1 | 修正端口名称为 redis_adapter |
+
 ### 🔍 代码审查发现 Review Findings
 
 > 此 Section 在开发阶段（dev-story）填写，记录代码审查过程中的发现。
@@ -1070,10 +1078,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.0.7
+**故事版本/Story Version:** v0.0.8
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.0.8: 第二轮审查第4轮 — 修正Subtask 0.11双注册/学习经验引用/端口名称redis_adapter
 - v0.0.7: 第二轮审查第3轮 — 方法命名统一(get_by_id/list_by_tenant)、事件__post_init__补充、ChannelMapping双注册结构、tenant_id系统级设计决策
 - v0.0.6: 第二轮审查第2轮 — 补充流式处理约束/P95性能指标说明/PostgreSQLAdapter方法关系/构造器参数
 - v0.0.5: 第二轮审查第1轮 — 修复 tenant_id/L1CachePort/PostgreSQL 仓储基类/MinIO MIME 类型/路由注册模式等实现细节，补充 Review Findings/Next Steps 模板 Section
