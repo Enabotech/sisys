@@ -12,7 +12,7 @@ userName: 'Agimtech'
 date: '2026-02-28'
 documentStatus: 'round-5-final-complete'
 lastUpdated: '2026-05-29'
-updateReason: 'R5终审完成 - FR-EV来源说明补充/文档一致性终验通过'
+updateReason: 'Story 4.6~4.9完整定义补充 - 工具版本管理/Validation Feedback/SAP协议/财务建模'
 ---
 
 # sisys - Epic Breakdown
@@ -3330,9 +3330,9 @@ So that **提醒用户注意数据时效性**。
 
 ## Epic 4: 战略工具箱
 
-**目标：** 实现 23 种战略工具的注册、执行、工具链编排和沙箱隔离。
+**目标：** 实现 23 种战略工具的注册、执行、工具链编排、沙箱隔离、版本管理、验证闭环与财务建模基础。
 
-**包含 FR：** ST-01, ST-02, ST-03, ST-04, ST-05
+**包含 FR：** ST-01, ST-02, ST-03, ST-04, ST-05, ST-06, ST-07, ST-08, ST-09
 
 **📦 价值组：战略工具执行能力**
 > 用户可以执行 23 种战略工具分析
@@ -3344,6 +3344,10 @@ So that **提醒用户注意数据时效性**。
 | Story 4.3 | 工具输入/输出 Schema 验证 | 工具输出符合预期格式，防止模型漂移 | 依赖 Story 4.1 | P0-3 |
 | Story 4.4 | Docker 沙箱执行 | 防止代码执行带来的安全风险 | 依赖 Epic 1 Story 1.7（MinIO 存储日志） | P0-4 |
 | Story 4.5 | 红蓝辩论机制基础 | MVP 阶段支持基础的多视角分析 | 依赖 Story 4.1 | P1-5 |
+| Story 4.6 | 工具版本管理（灰度发布与回滚） | 工具可安全迭代，异常版本可快速恢复 | 依赖 Story 4.1, Story 4.3 | P1-6（V1） |
+| Story 4.7 | Validation Feedback 闭环 | 工具执行失败可自动恢复或明确标记 | 依赖 Story 4.3, Story 4.4 | P1-7（V1） |
+| Story 4.8 | SAP 协议支持（内部 Agent 通信） | 多 Agent 协作可通过统一协议通信 | 依赖 Story 1.3（事件总线）, Story 5.3 | P1-8（V1） |
+| Story 4.9 | 财务建模与估值基础 | 战略规划财务量化分析可自动计算 | 依赖 Story 4.1, Story 3.1a | P1-9（V1） |
 
 **✅ 依赖关系验证：**
 - Epic 4 依赖 Epic 1 的架构骨架（Story 1.1）和存储层（Story 1.7）
@@ -3558,6 +3562,183 @@ So that **MVP 阶段支持基础的多视角分析**。
 **When** 执行红蓝辩论（单 Agent 多视角）
 **Then** 生成激进派和保守派两种视角的分析
 **And** 输出包含共识与分歧区域的风险视图
+
+### Story 4.6: 工具版本管理（灰度发布与回滚）
+
+As a **工具运维工程师**,
+I want **系统管理工具版本，支持版本控制、灰度发布与回滚**,
+So that **工具可以安全迭代，异常版本可快速恢复**。
+
+**Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 版本注册测试 - 验证工具多版本并存注册
+   - [ ] 灰度发布测试 - 验证按流量比例分配版本
+   - [ ] 回滚测试 - 验证一键回滚至历史稳定版本
+   - [ ] 版本兼容性测试 - 验证 Schema 变更兼容性校验
+
+2. **性能要求**
+   - [ ] 版本切换延迟 P95<500ms
+   - [ ] 灰度发布成功率≥95%
+   - [ ] 回滚成功率 100%
+
+3. **覆盖率要求**
+   - [ ] 应用层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_tool_version_management.py` - 单元测试
+   - [ ] `tests/integration/test_tool_version_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
+**Given** 工具已注册多个版本
+**When** 执行灰度发布（配置流量比例）
+**Then** 新版本按比例接收流量，旧版本继续服务剩余流量
+**And** 异常时可一键回滚至最近稳定版本（保留最近 10 个版本）
+
+---
+
+### Story 4.7: Validation Feedback 闭环
+
+As a **质量保障工程师**,
+I want **系统执行 Validation Feedback 闭环，最大重试 3 次，失败标记不可行**,
+So that **工具执行失败可自动恢复或明确标记，保证任务可靠完成**。
+
+**Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 重试机制测试 - 验证最大重试次数 3 次
+   - [ ] 失败标记测试 - 验证 3 次失败后标记"不可行"
+   - [ ] 幂等性测试 - 验证重复执行不产生副作用
+   - [ ] STDERR 捕获测试 - 验证错误日志捕获与修复建议生成
+
+2. **性能要求**
+   - [ ] 单次重试延迟 P95<5s
+   - [ ] 重试成功率≥80%
+   - [ ] 不可行标记准确率≥95%
+
+3. **覆盖率要求**
+   - [ ] 应用层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_validation_feedback.py` - 单元测试
+   - [ ] `tests/integration/test_validation_feedback_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
+**Given** 工具执行结果验证失败
+**When** 触发 Validation Feedback 闭环
+**Then** 自动重试（最多 3 次），每次捕获 STDERR 并生成修复建议
+**And** 3 次重试均失败后标记任务为"不可行"并记录演进日志
+
+---
+
+### Story 4.8: SAP 协议支持（内部 Agent 通信）
+
+As a **系统架构师**,
+I want **系统实现 SAP（sisys Agent Protocol）协议，支持 Agent 间标准消息通信**,
+So that **多 Agent 协作可通过统一协议进行辩论、裁决、公共黑板交互**。
+
+**Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] SAP 消息 Schema 测试 - 验证 SAPMessage Pydantic 模型字段完整性
+   - [ ] 消息类型测试 - 验证 REQUEST/RESPONSE/NOTIFICATION/BROADCAST/DEBATE 五种类型
+   - [ ] 优先级测试 - 验证 LOW/NORMAL/HIGH/URGENT 四级优先级
+   - [ ] 隔离等级测试 - 验证 isolation_level 字段（L1-L4）
+
+2. **性能要求**
+   - [ ] SAP 消息传递延迟 P95<200ms（V1 目标）
+   - [ ] 消息序列化/反序列化延迟 P95<50ms
+   - [ ] 并发消息处理≥50
+
+3. **覆盖率要求**
+   - [ ] 应用层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_sap_protocol.py` - 单元测试
+   - [ ] `tests/integration/test_sap_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+参考 `src/interfaces/sap/` 目录结构（接口层骨架已存在）
+
+**Given** 多 Agent 协作场景
+**When** Agent 间需要通信（辩论/裁决/公共黑板）
+**Then** 通过 SAP 协议发送标准消息（包含 message_id/conversation_id/sender_id/receiver_id/message_type/priority/content/correlation_id/isolation_level/blackboard_visible）
+**And** 公共黑板支持 MVCC（多版本并发控制）
+
+---
+
+### Story 4.9: 财务建模与估值基础
+
+As a **财务分析师**,
+I want **系统支持财务建模与估值基础（DCF/可比公司/先例交易三种方法）**,
+So that **战略规划中的财务量化分析可自动计算并验证**。
+
+**Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] DCF 计算测试 - 验证现金流折现模型计算准确率 100%（与 Excel 对齐）
+   - [ ] 可比公司测试 - 验证倍数法估值逻辑
+   - [ ] 先例交易测试 - 验证交易对价参考逻辑
+   - [ ] 输入 Schema 测试 - 验证财务数据输入契约
+
+2. **性能要求**
+   - [ ] 单次估值计算延迟 P95<5s
+   - [ ] 计算准确率≥90%（与专业财务软件对齐）
+   - [ ] 并发估值请求≥10
+
+3. **覆盖率要求**
+   - [ ] 应用层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 数值精度校验（金融计算禁止浮点误差）
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_financial_modeling.py` - 单元测试
+   - [ ] `tests/integration/test_financial_modeling_integration.py` - 集成测试
+   - [ ] `tests/fixtures/financial_test_cases.json` - 财务计算测试用例
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+参考 `src/interfaces/api/v1/schemas/financial_schemas.py`（Schema 骨架已存在）
+
+**Given** 企业财务数据已上传解析
+**When** 执行财务建模分析
+**Then** 输出 DCF/可比公司/先例交易三种估值结果
+**And** 计算准确率 100%（NPV/IRR 与 Excel 公式对齐）
 
 ---
 
