@@ -77,7 +77,7 @@
 **And** 所有分片上传完成后自动合并
 
 **验证标准/Validation Criteria:**
-- [ ] 分片策略按文档规定四级分片（边界值：100MB 以下含 100MB 不分片，1GB 以下含 1GB 用 10MB 分片，10GB 以下含 10GB 用 50MB 分片，超过 10GB 用 100MB 分片）
+- [ ] 分片策略按文档规定四级分片（边界值与 `ObjectOperations.calculate_part_size()` 对齐：`<100MB` 不分片，`<1GB` 用 10MB 分片，`<10GB` 用 50MB 分片，`>=10GB` 用 100MB 分片；代码使用严格小于 `<`，恰好 100MB 进入 10MB 分片路径）
 - [ ] Redis 记录 upload_id、已上传分片列表、ETag
 - [ ] 断点续传正确恢复（查询已上传分片，跳过已完成的）
 - [ ] 分片上传超时自动清理（TTL 到期）
@@ -189,6 +189,7 @@
 #### 统一端口定义注册与管理 (Port Contract)
 
 - [ ] **新增端口** `document_repository` — 定义于 `src/domain/ports/document_repository.py`
+  - 使用 `@runtime_checkable` 装饰器 + `class DocumentRepositoryPort(Protocol)` 声明（与项目 UserRepositoryPort/RoleRepositoryPort 模式一致）
   - Protocol 接口：`save(document: Document) -> Document`
   - Protocol 接口：`get_by_id(document_id: UUID, tenant_id: str) -> Document | None`
   - Protocol 接口：`list_by_tenant(tenant_id: str, filters, pagination) -> list[Document]`
@@ -294,15 +295,15 @@
 | **TDD 单元测试** | DocumentRepositoryPort 接口 | 端口契约签名 | `tests/unit/domain/ports/test_document_repository.py` | Task 2 |
 | **TDD 单元测试** | PostgreSQLDocumentRepository | CRUD 操作、租户隔离 | `tests/unit/infrastructure/storage/postgresql/test_document_repository.py` | Task 3 |
 | **TDD 单元测试** | DocumentUploadService | 上传编排逻辑 | `tests/unit/application/services/test_document_upload_service.py` | Task 4 |
-| **TDD 单元测试** | ChunkedUploadManager | 分片上传状态管理 | `tests/unit/infrastructure/storage/redis/test_chunked_upload_manager.py` | Task 5 |
-| **TDD 单元测试** | ArchiveExtractor | 压缩包解压、格式过滤 | `tests/unit/infrastructure/external_services/test_archive_extractor.py` | Task 6 |
-| **TDD 单元测试** | 文档上传 API 路由 | 请求/响应格式、认证、校验 | `tests/unit/interfaces/api/test_document_upload_routes.py` | Task 7 |
+| **TDD 单元测试** | ChunkedUploadManager | 分片上传状态管理、TTL 过期检测 | `tests/unit/infrastructure/storage/redis/test_chunked_upload_manager.py` | Task 5 |
+| **TDD 单元测试** | ArchiveExtractor | 压缩包解压、格式过滤、嵌套检测、压缩炸弹防护、路径穿越防护、symlink 防护 | `tests/unit/infrastructure/external_services/test_archive_extractor.py` | Task 6 |
+| **TDD 单元测试** | 文档上传 API 路由 | 请求/响应格式、认证、校验、410 Gone 响应 | `tests/unit/interfaces/api/test_document_upload_routes.py` | Task 7 |
 | **TDD 契约测试** | API 契约 | 端点、状态码、请求/响应结构 | `tests/contracts/test_api_contract_document_upload.py` | Task 0 |
 | **TDD 契约测试** | 端口契约 | 端口注册、版本、兼容性 | `tests/contracts/test_port_contract_document_upload.py` | Task 0 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `tests/acceptance/test_acceptance_document_upload.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_document_upload.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | src 与测试完成清单确认 | `tests/acceptance/test_acceptance_document_upload.feature` | Task 10 |
-| **集成测试** | 文档上传完整流程 | API→Service→MinIO→PG→事件 | `tests/integration/test_document_upload_integration.py` | Task 8 |
+| **集成测试** | 文档上传完整流程 | API→Service→MinIO→PG→事件、Outbox+元数据同事务原子性 | `tests/integration/test_document_upload_integration.py` | Task 8 |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖 | `tests/unit/architecture/test_arch_document_upload.py` | Task 9 |
 
 ---
@@ -501,7 +502,7 @@
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 3.1: 🔴 红 — 编写 PostgreSQLDocumentRepository 失败测试（save、get_by_id、list_by_tenant）
-- [ ] Subtask 3.2: 🟢 绿 — 实现 PostgreSQLDocumentRepository（继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类，构造器传入 `model_class=DocumentModel`；Session 通过 ContextVar 管理；复用基类 `save(entity)` 方法，自定义 `get_by_id(document_id, tenant_id)` 和 `list_by_tenant(tenant_id, ...)` 方法（基类仅有 `get_by_id(id)` 无租户过滤，需覆写增加租户隔离）；实现 `_to_entity(model)` 和 `_to_model(entity)` 抽象方法；同时新建 `DocumentModel(Base)` SQLAlchemy 声明式映射，位于 `src/infrastructure/storage/postgresql/models/document.py`，继承 `Base(DeclarativeBase)`）
+- [ ] Subtask 3.2: 🟢 绿 — 实现 PostgreSQLDocumentRepository（继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类，构造器传入 `model_class=DocumentModel`；Session 通过 ContextVar 管理；复用基类 `save(entity)` 方法，自定义 `get_by_id(document_id, tenant_id)` 和 `list_by_tenant(tenant_id, ...)` 方法（基类仅有 `get_by_id(id)` 无租户过滤，需覆写增加租户隔离）；实现 `_to_entity(model)` 和 `_to_model(entity)` 抽象方法；同时新建 `DocumentModel` SQLAlchemy 声明式映射，位于 `src/infrastructure/storage/postgresql/models/document.py`，从 `src/infrastructure/storage/postgresql/models/outbox.py` 导入 `Base`（`from src.infrastructure.storage.postgresql.models.outbox import Base`），使用 `Mapped[type] = mapped_column(...)` 声明式风格）
 - [ ] Subtask 3.3: 🔄 重构 — 优化 Repository 代码
 - [ ] Subtask 3.4: 创建 Alembic migration（`documents` 表：document_id, tenant_id, filename, mime_type, file_size_bytes, document_type, parse_status, uploaded_by, version, metadata JSONB, created_at, updated_at）
 - [ ] Subtask 3.5: 创建必要索引（`idx_documents_tenant_id` 租户隔离, `idx_documents_tenant_created_at` 时间排序）
@@ -579,7 +580,7 @@
 | 🟢 绿 | 实现 `src/infrastructure/external_services/archive_extractor.py` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 6.1: 🔴 红 — 编写 ArchiveExtractor 失败测试（extract_zip、extract_tar、嵌套深度、压缩炸弹、路径穿越 `../`）
+- [ ] Subtask 6.1: 🔴 红 — 编写 ArchiveExtractor 失败测试（extract_zip、extract_tar、嵌套深度、压缩炸弹、路径穿越 `../`、symlink 符号链接检测）
 - [ ] Subtask 6.2: 🟢 绿 — 实现 ArchiveExtractor（使用标准库 zipfile/tarfile）
 - [ ] Subtask 6.3: 🔄 重构 — 优化解压代码
 
@@ -605,10 +606,10 @@
 | 🟢 绿 | 实现 `src/interfaces/api/document_upload.py`（FastAPI 路由） |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 7.1: 🔴 红 — 编写 API 路由失败测试（单文件上传、批量上传、分片上传、确认查询、错误处理）
+- [ ] Subtask 7.1: 🔴 红 — 编写 API 路由失败测试（单文件上传、批量上传、分片上传、确认查询、upload_id 过期 410 Gone、文件名特殊字符拒绝、错误处理）
 - [ ] Subtask 7.2: 🟢 绿 — 实现文档上传 FastAPI 路由（multipart/form-data 处理，依赖注入 DocumentUploadService）
 - [ ] Subtask 7.3: 🔄 重构 — 优化 API 路由代码
-- [ ] Subtask 7.4: 导出 `create_document_upload_router(service)` 工厂函数，供 `app.include_router()` 注册（与项目 `create_auth_router` 模式一致）
+- [ ] Subtask 7.4: 导出 `create_document_upload_router(service: DocumentUploadService, auth_service: AuthServicePort) -> APIRouter` 工厂函数，供 `app.include_router()` 注册（与项目 `create_auth_router` 模式一致）
 
 > **注：** CLI 上传命令（`sisys document upload --file`）推迟至 Epic 7 Story 7.1（CLI 命令接口），届时调用已实现的 DocumentUploadService。
 
@@ -633,6 +634,7 @@
 - [ ] Subtask 8.4: 实现批量上传集成测试（并发上传 → 部分失败处理）
 - [ ] Subtask 8.5: 实现压缩包上传集成测试（zip/tar → 内部文件入库）
 - [ ] Subtask 8.6: 实现跨租户隔离集成测试
+- [ ] Subtask 8.7: 实现事务原子性集成测试（模拟元数据写入 PG 后 Outbox 写入前失败，验证 PG 无孤立记录 + Outbox 无孤立条目；验证 AC-5 的 Outbox+元数据同事务原子性要求）
 
 **完成标准/Definition of Done:**
 - [ ] 所有集成测试通过
@@ -885,7 +887,7 @@ tests/
 - 本 Story Task 4 需增强 `store_document()` 调用，传入实际的 `mime_type`（或接受此限制，在元数据中保留 MIME 信息）
 
 **路由注册模式：**
-- 路由通过 `create_document_upload_router(service, auth_service)` 工厂函数导出，返回 `APIRouter` 实例
+- 路由通过 `create_document_upload_router(service: DocumentUploadService, auth_service: AuthServicePort) -> APIRouter` 工厂函数导出，返回 `APIRouter` 实例
 - 工厂函数参数注入服务实例（非 FastAPI Depends），与项目 `create_auth_router` 模式一致
 - 认证依赖通过 `get_current_user_dependency(auth_service)` 闭包工厂创建，在路由端点中通过 `Depends(get_current_user)` 获取 `TokenPayload`
 - 路由前缀在工厂函数内部设置（`APIRouter(prefix="/api/v1", tags=["documents"])`），与 auth router 模式一致
@@ -1116,6 +1118,18 @@ tests/
 | 53 | Task 3~8, 10 缺少显式 blocked_by 依赖声明 | P1 | 各 Task 新增依赖声明，推荐并行阶段：{0} → {1,2} → {3,4,5,6} → {7} → {8,9} → {10} |
 | 54 | Task 0 Subtask 0.11（事件通道配置）位置偏后，应紧接 API 端点定义 | P2 | 重排 Subtask 顺序，事件通道配置移至 0.7（原 0.7→0.8, 0.8→0.9, ...） |
 
+> 第13轮审查修订（2026-05-29，第三轮审查第3轮）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 55 | AC-2 分片边界值"含 100MB 不分片"与代码 `calculate_part_size()` 的 `<` 严格小于运算符行为不一致 | P1 | 修正为与代码对齐：`<100MB` 不分片，恰好 100MB 进入 10MB 分片路径 |
+| 56 | DocumentRepositoryPort SDD 规范缺少 `@runtime_checkable` + Protocol 继承声明（项目所有端口均有此装饰器） | P1 | SDD 端口定义补充 `@runtime_checkable` 和 `Protocol` 继承要求 |
+| 57 | Task 6 Subtask 6.1 遗漏 symlink 符号链接测试（AC-4 新增的 symlink 防护验证标准） | P1 | Subtask 6.1 补充 symlink 检测测试项 |
+| 58 | Task 8 缺少 Outbox+元数据同事务原子性的集成测试 Subtask（AC-5 验证标准） | P1 | 新增 Subtask 8.7 事务原子性集成测试 |
+| 59 | 测试分类表 ArchiveExtractor/ChunkedUploadManager/API 路由验证内容不完整 | P1 | 补充 symlink 防护/TTL 过期检测/410 Gone 响应描述 |
+| 60 | Task 3 Subtask 3.2 中 Base 导入路径描述不精确（应为从 outbox.py 导入） | P2 | 修正为明确的 `from src.infrastructure.storage.postgresql.models.outbox import Base` 路径 |
+| 61 | Task 7 Subtask 7.4 工厂函数参数缺少类型注解 | P2 | 补充 `service: DocumentUploadService, auth_service: AuthServicePort` 类型注解 |
+
 ### 🔍 代码审查发现 Review Findings
 
 > 此 Section 在开发阶段（dev-story）填写，记录代码审查过程中的发现。
@@ -1140,10 +1154,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.1.1
+**故事版本/Story Version:** v0.1.2
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.1.2: 第三轮审查第3轮 — 分片边界值对齐代码/端口@runtime_checkable/symlink测试/事务原子性Subtask/测试分类表扩充/Base导入路径/工厂函数类型注解
 - v0.1.1: 第三轮审查第2轮 — 补充 AC-1~6 边界条件（symlink 防护/事务原子性/jpeg 双扩展名/分片边界值等）、Task 依赖声明、Subtask 顺序重排
 - v0.1.0: 第三轮审查第1轮 — 修复 JSON:API 风格/Document.metadata 类型/路由注册模式/分片上传技术细节/事件默认值策略
 - v0.0.9: 第二轮审查第5轮终审 — 全文一致性验证通过
