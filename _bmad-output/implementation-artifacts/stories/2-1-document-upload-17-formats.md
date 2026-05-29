@@ -209,7 +209,7 @@
 |---------|------|--------|---------|-------|
 | `document_repository` | `DocumentRepositoryPort` (domain/ports) | `PostgreSQLDocumentRepository` (infrastructure/storage/postgresql/repository) | SCOPED | doc-team | v1.0.0 |
 | `document_storage` | `DocumentStoragePort` (application/ports) | `MinIODocumentStorage` (infrastructure/storage/minio) — **已注册** | SCOPED | storage-team | v1.0.0 |
-| `event_publisher` | `EventPublisher` (domain/ports) | `DualChannelEventBus` (infrastructure/messaging) — **已注册** | SINGLETON | messaging-team | — |
+| `event_publisher` | `EventPublisher` (domain/ports) | `DualChannelEventBus` (infrastructure/messaging) — **已注册** | SINGLETON | messaging-team | v1.0.0 |
 | `redis_adapter` | `L1CachePort` (domain/ports) | `RedisAdapter` (infrastructure/storage/redis) — **已注册** | SINGLETON | storage-team | — |
 
 > **注：** `DocumentUploadService` 是应用服务而非端口，直接在 composition_root 中实例化注册（非端口模式）。`ChunkedUploadManager` 位于 infrastructure 层（`src/infrastructure/storage/redis/chunked_upload_manager.py`），通过 `L1CachePort` 操作 Redis 分片状态。
@@ -502,7 +502,7 @@
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 3.1: 🔴 红 — 编写 PostgreSQLDocumentRepository 失败测试（save、get_by_id、list_by_tenant）
-- [ ] Subtask 3.2: 🟢 绿 — 实现 PostgreSQLDocumentRepository（继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类，构造器传入 `model_class=DocumentModel`；Session 通过 ContextVar 管理；复用基类 `save(entity)` 方法，自定义 `get_by_id(document_id, tenant_id)` 和 `list_by_tenant(tenant_id, ...)` 方法（基类仅有 `get_by_id(id)` 无租户过滤，需覆写增加租户隔离）；实现 `_to_entity(model)` 和 `_to_model(entity)` 抽象方法；同时新建 `DocumentModel` SQLAlchemy 声明式映射，位于 `src/infrastructure/storage/postgresql/models/document.py`，从 `src/infrastructure/storage/postgresql/models/outbox.py` 导入 `Base`（`from src.infrastructure.storage.postgresql.models.outbox import Base`），使用 `Mapped[type] = mapped_column(...)` 声明式风格）
+- [ ] Subtask 3.2: 🟢 绿 — 实现 PostgreSQLDocumentRepository（继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类，构造器传入 `model_class=DocumentModel`；Session 通过 ContextVar 管理；复用基类 `save(entity)` 方法，自定义 `get_by_id(document_id, tenant_id)` 和 `list_by_tenant(tenant_id, ...)` 方法（基类仅有 `get_by_id(id)` 无租户过滤，需覆写增加租户隔离）；实现 `_to_entity(model)` 和 `_to_model(entity)` 抽象方法；同时新建 `DocumentModel` SQLAlchemy 声明式映射，位于 `src/infrastructure/storage/postgresql/models/document.py`，从 `src.infrastructure.storage.postgresql.models` 包导入 `Base`（与项目已有模型导入惯例一致），使用 `Mapped[type] = mapped_column(...)` 声明式风格）
 - [ ] Subtask 3.3: 🔄 重构 — 优化 Repository 代码
 - [ ] Subtask 3.4: 创建 Alembic migration（`documents` 表：document_id, tenant_id, filename, mime_type, file_size_bytes, document_type, parse_status, uploaded_by, version, metadata JSONB, created_at, updated_at）
 - [ ] Subtask 3.5: 创建必要索引（`idx_documents_tenant_id` 租户隔离, `idx_documents_tenant_created_at` 时间排序）
@@ -529,7 +529,7 @@
 | 🟢 绿 | 实现 `src/application/services/document_upload_service.py` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写 DocumentUploadService 失败测试（upload 单文件、upload_batch 批量、事件发布、格式校验失败、大小超限）
+- [ ] Subtask 4.1: 🔴 红 — 编写 DocumentUploadService 失败测试（upload 单文件、upload_batch 批量含空批量拒绝、事件发布、格式校验失败、大小超限）
 - [ ] Subtask 4.2: 🟢 绿 — 实现 DocumentUploadService（编排格式校验→Document 实体构造→MinIO 存储→PG 元数据→事件发布，依赖注入 DocumentRepositoryPort + DocumentStoragePort + EventPublisher）
 - [ ] Subtask 4.3: 🔄 重构 — 优化服务代码
 - [ ] Subtask 4.4: 在 `src/composition_root.py` 注册 `document_repository` 端口和 `DocumentUploadService` 服务
@@ -555,7 +555,7 @@
 | 🟢 绿 | 实现 `src/infrastructure/storage/redis/chunked_upload_manager.py`（通过 L1CachePort 操作 Redis，复用 ObjectOperations 分片逻辑） |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 5.1: 🔴 红 — 编写 ChunkedUploadManager 失败测试（init_upload、upload_part、complete_upload、resume_upload、TTL 过期）
+- [ ] Subtask 5.1: 🔴 红 — 编写 ChunkedUploadManager 失败测试（init_upload、upload_part、complete_upload、resume_upload、TTL 过期、分片乱序到达拒绝）
 - [ ] Subtask 5.2: 🟢 绿 — 实现 ChunkedUploadManager（通过 L1CachePort 操作 Redis，使用 JSON 序列化存储结构化分片状态 `{file_path, part_size, uploaded_parts: [{part_number, etag}]}`，委托 ObjectOperations 执行实际分片上传）
 - [ ] Subtask 5.3: 🔄 重构 — 优化分片管理代码
 
@@ -847,6 +847,9 @@ tests/
 - 请求体大小限制：`app.add_middleware(MultipartBodySizeLimit, max_body_size=20*1024*1024*1024)` 或在 nginx/uvicorn 层配置
 - multipart 字段名：单文件 `file: UploadFile`，批量 `files: list[UploadFile]`
 - 分片上传字段名：`part: UploadFile`，分片元数据通过请求体 JSON 传递
+- **nginx 配置要求**：`client_max_body_size 20G`（默认 1MB，必须显式配置）；`proxy_read_timeout` 需适配大文件传输耗时（20GB @100Mbps ≈ 27 分钟）
+- **uvicorn 配置要求**：`--timeout-keep-alive` 需适配长连接场景
+- **批量上传风险提示**：单次 multipart/form-data 上传 100 文件/20GB 在生产环境极不稳定（任何网络中断导致整个批量失败）。API 提供 `POST /documents/batch` 端点，但推荐客户端使用并发调用 `POST /documents`（单文件端点）+ 后端批量状态汇总模式。批量端点作为便利 API 保留，但实际生产部署建议客户端并行单文件上传
 
 **认证与上下文：**
 - API 认证：JWT（OAuth 2.1），通过 `Depends(get_current_user)` 获取 `TokenPayload` 值对象
@@ -855,8 +858,10 @@ tests/
 - 权限检查：RBAC 中间件校验 `document:upload` 权限（通过 `TokenPayload.roles` 判断）
 
 **PostgreSQL 租户隔离：**
-- 沿用项目 `Schema per Tenant` 模式（`TestTenant.postgres_schema`），documents 表创建在各租户 schema 下
-- Alembic migration 需支持模板化 schema（参考已有 migration 模式）
+- MVP 阶段采用 **Row-Level Isolation**（所有租户共享 `documents` 表，通过 `tenant_id` 列过滤），而非 Schema per Tenant。理由：Schema per Tenant 缺乏基础设施支持（Alembic 不原生支持模板化 schema、新租户需执行全套 migration），且项目中无 Schema per Tenant 的先例可复用
+- Row-Level Isolation 通过 `WHERE tenant_id = :tenant_id` 过滤实现，`DocumentRepositoryPort.get_by_id(document_id, tenant_id)` 和 `list_by_tenant(tenant_id, ...)` 已在端口签名中支持此模式
+- Alembic migration 创建 `documents` 表（在默认 `public` schema 下），包含 `tenant_id` 列和对应索引
+- Schema per Tenant 推迟到生产化阶段（需新建 `TenantSchemaManager` 基础设施组件）
 
 **PostgreSQL 仓储模式：**
 - 继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类（位于 `src/infrastructure/storage/postgresql/repository/postgresql_adapter.py`）
@@ -866,6 +871,7 @@ tests/
 **事件发布机制：**
 - 通过 Outbox 模式异步发布（写入 event_outbox 表，由后台 worker 投递至 Redis + RabbitMQ 双通道）
 - DocumentUploadService 调用 `EventPublisher.publish(event)` → 写入 Outbox → 确认事务提交 → 后台投递
+- **双通道发布限制**：当前 `DualChannelEventBus.publish()` 根据事件的 `delivery_mode` 走单通道（REALTIME→Redis Pub/Sub，RELIABLE→RabbitMQ via Outbox），不支持同一事件同时双通道发布。`DocumentUploaded` 配置为 RELIABLE 模式（走 RabbitMQ via Outbox），MVP 阶段仅保证可靠投递；实时通知（Redis Pub/Sub）推迟至后续增强或由 Outbox poller 在投递后额外触发
 - 新增事件需**双注册**：`configs/event_channels.yaml`（YAML 配置）+ `ChannelRouter.DEFAULT_MAPPINGS`（Python 字典）。路由优先级：yaml > DEFAULT_MAPPINGS。DocumentUploaded 的 ChannelMapping 格式：
   ```python
   "DocumentUploaded": ChannelMapping(
@@ -881,6 +887,7 @@ tests/
 - `L1CachePort` 仅支持 `get(key) -> str | None` 和 `set(key, value: str, ttl)` 的 string→string 操作
 - `ChunkedUploadManager` 通过 JSON 序列化将结构化状态（`{file_path, part_size, uploaded_parts: [{part_number, etag}]}`）编码为 string 后存储到 L1CachePort
 - Redis key 格式：`chunked_upload:{upload_id}`，TTL 24 小时
+- **并发安全**：`get → JSON 修改 → set` 的 read-modify-write 模式存在竞态条件（并发上传不同分片时可能丢失更新）。MVP 阶段使用 `asyncio.Lock`（每个 upload_id 一把锁，声明为类变量）保证同一 upload_id 的分片状态串行更新；多 worker 部署时需升级为 Redis Lua 脚本原子操作
 
 **MinIO 存储注意事项：**
 - 现有 `MinIODocumentStorage.store_document()` 调用 `adapter.store()` 时未传 `content_type` 参数，所有文档以 `application/octet-stream` 存储
@@ -906,6 +913,8 @@ tests/
 - `UPLOAD_LIMITS.CHUNK_SIZES` 作为领域层声明式配置（业务规则），定义四级分片阈值
 - 运行时分片计算委托给 infrastructure 层已有的 `ObjectOperations.calculate_part_size()`，避免重复实现
 - `UploadLimits.get_chunk_size()` 方法可以包装 `calculate_part_size()` 调用，也可以仅做值校验
+
+- **EventPublisher 隐式 session 依赖**：`DualChannelEventBus` 内部通过 `PostgreSQLOutboxRepository` 写入 Outbox，后者通过 `ContextVar` 获取 `AsyncSession`。`DocumentUploadService.upload()` 必须在 `session_context()` 作用域内被调用（由 FastAPI middleware 或路由层管理 session 生命周期），否则 Outbox 写入会因 session 为 None 而失败
 
 ---
 
@@ -973,6 +982,8 @@ tests/
 配置（修改）:
 - `src/composition_root.py` — 注册新端口和服务
 - `configs/event_channels.yaml` — 新增 DocumentUploaded 事件通道
+- `src/infrastructure/messaging/channel_router.py` — 新增 DEFAULT_MAPPINGS 条目
+- `docs/api/openapi.yaml` — 新增文档上传端点定义
 - `deploy/postgresql/alembic/versions/` — 新增 documents 表 migration
 
 测试文件（新建）:
@@ -1130,6 +1141,21 @@ tests/
 | 60 | Task 3 Subtask 3.2 中 Base 导入路径描述不精确（应为从 outbox.py 导入） | P2 | 修正为明确的 `from src.infrastructure.storage.postgresql.models.outbox import Base` 路径 |
 | 61 | Task 7 Subtask 7.4 工厂函数参数缺少类型注解 | P2 | 补充 `service: DocumentUploadService, auth_service: AuthServicePort` 类型注解 |
 
+> 第14轮审查修订（2026-05-29，第三轮审查第4轮）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 62 | Redis 分片状态管理存在 read-modify-write 并发竞态（并发上传不同分片时可能丢失更新） | P0 | 实现细节补充 asyncio.Lock（MVP）+ Redis Lua 脚本（生产化）策略 |
+| 63 | 批量上传单次 multipart 20GB 极不稳定 + nginx 默认 client_max_body_size 仅 1MB | P0 | 实现细节补充 nginx/uvicorn 配置要求 + 批量上传风险提示和推荐模式 |
+| 64 | Schema per Tenant 缺乏基础设施支持（Alembic 不原生支持模板化 schema） | P0 | 实现细节修正为 MVP 用 Row-Level Isolation（tenant_id 列过滤），Schema per Tenant 推迟 |
+| 65 | DualChannelEventBus 仅支持单通道发布，不支持同一事件双通道 | P1 | 实现细节补充双通道限制说明，MVP 仅 RELIABLE（RabbitMQ via Outbox） |
+| 66 | EventPublisher 隐式依赖 session_context，不在作用域内 Outbox 写入失败 | P1 | 实现细节补充 session 依赖约束 |
+| 67 | 端口契约表 event_publisher 版本列为 "--"，实际 composition_root 注册为 v1.0.0 | P1 | 修正为 v1.0.0 |
+| 68 | 文件清单遗漏 docs/api/openapi.yaml 和 channel_router.py 两个修改文件 | P1 | 文件清单补充两个遗漏文件 |
+| 69 | Base 导入路径应为包级导入（与项目惯例一致） | P2 | Subtask 3.2 修正为从 models 包导入 |
+| 70 | Task 5 Subtask 5.1 缺少分片乱序到达测试 | P1 | Subtask 5.1 补充分片乱序拒绝测试项 |
+| 71 | Task 4 Subtask 4.1 缺少空批量拒绝测试 | P1 | Subtask 4.1 补充空批量拒绝测试项 |
+
 ### 🔍 代码审查发现 Review Findings
 
 > 此 Section 在开发阶段（dev-story）填写，记录代码审查过程中的发现。
@@ -1154,10 +1180,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.1.2
+**故事版本/Story Version:** v0.2.0
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.2.0: 第三轮审查第4轮 — 技术可行性风险修正（Redis竞态/批量上传nginx/Row-Level隔离/双通道限制/session依赖/文件清单补全/Subtask补全）
 - v0.1.2: 第三轮审查第3轮 — 分片边界值对齐代码/端口@runtime_checkable/symlink测试/事务原子性Subtask/测试分类表扩充/Base导入路径/工厂函数类型注解
 - v0.1.1: 第三轮审查第2轮 — 补充 AC-1~6 边界条件（symlink 防护/事务原子性/jpeg 双扩展名/分片边界值等）、Task 依赖声明、Subtask 顺序重排
 - v0.1.0: 第三轮审查第1轮 — 修复 JSON:API 风格/Document.metadata 类型/路由注册模式/分片上传技术细节/事件默认值策略
