@@ -190,12 +190,12 @@
 
 #### 端口契约清单执行约束（强制）
 
-| 端口名称 | 接口 | 实现类 | 生命周期 | Owner |
+| 端口名称 | 接口 | 实现类 | 生命周期 | Owner | 版本 |
 |---------|------|--------|---------|-------|
-| `document_repository` | `DocumentRepositoryPort` (domain/ports) | `PostgresDocumentRepository` (infrastructure/storage/postgresql) | SCOPED | doc-team |
-| `document_storage` | `DocumentStoragePort` (application/ports) | `MinIODocumentStorage` (infrastructure/storage/minio) — **已注册** | SCOPED | storage-team |
-| `event_publisher` | `EventPublisher` (domain/ports) | `DualChannelEventBus` (infrastructure/messaging) — **已注册** | SINGLETON | messaging-team |
-| `l1_cache` | `L1CachePort` (domain/ports) | `RedisCacheAdapter` (infrastructure/storage/redis) — **已注册** | SCOPED | storage-team |
+| `document_repository` | `DocumentRepositoryPort` (domain/ports) | `PostgreSQLDocumentRepository` (infrastructure/storage/postgresql/repository) | SCOPED | doc-team | v1.0.0 |
+| `document_storage` | `DocumentStoragePort` (application/ports) | `MinIODocumentStorage` (infrastructure/storage/minio) — **已注册** | SCOPED | storage-team | v1.0.0 |
+| `event_publisher` | `EventPublisher` (domain/ports) | `DualChannelEventBus` (infrastructure/messaging) — **已注册** | SINGLETON | messaging-team | — |
+| `l1_cache` | `L1CachePort` (domain/ports) | `RedisAdapter` (infrastructure/storage/redis) — **已注册** | SINGLETON | storage-team | — |
 
 > **注：** `DocumentUploadService` 是应用服务而非端口，直接在 composition_root 中实例化注册（非端口模式）。`ChunkedUploadManager` 位于 infrastructure 层（`src/infrastructure/storage/redis/chunked_upload_manager.py`），通过 `L1CachePort` 操作 Redis 分片状态。
 
@@ -278,7 +278,7 @@
 | **TDD 单元测试** | Document 实体扩展 | tenant_id/uploaded_by 字段 | `tests/unit/domain/entities/test_document.py` | Task 1 |
 | **TDD 单元测试** | DocumentUploaded 事件 | 事件构造、字段校验 | `tests/unit/domain/events/test_document_uploaded.py` | Task 2 |
 | **TDD 单元测试** | DocumentRepositoryPort 接口 | 端口契约签名 | `tests/unit/domain/ports/test_document_repository.py` | Task 2 |
-| **TDD 单元测试** | PostgresDocumentRepository | CRUD 操作、租户隔离 | `tests/unit/infrastructure/storage/postgresql/test_document_repository.py` | Task 3 |
+| **TDD 单元测试** | PostgreSQLDocumentRepository | CRUD 操作、租户隔离 | `tests/unit/infrastructure/storage/postgresql/test_document_repository.py` | Task 3 |
 | **TDD 单元测试** | DocumentUploadService | 上传编排逻辑 | `tests/unit/application/services/test_document_upload_service.py` | Task 4 |
 | **TDD 单元测试** | ChunkedUploadManager | 分片上传状态管理 | `tests/unit/infrastructure/storage/redis/test_chunked_upload_manager.py` | Task 5 |
 | **TDD 单元测试** | ArchiveExtractor | 压缩包解压、格式过滤 | `tests/unit/infrastructure/external_services/test_archive_extractor.py` | Task 6 |
@@ -336,7 +336,7 @@
 |----|-------------|-----------|-------------|----------|
 | AC-1 | 17 种格式文件上传 | Task 1 | DocumentFormat 值对象 + UploadLimits 常量 | `test_document_format.py` |
 | AC-1 | 17 种格式文件上传 | Task 2 | DocumentUploaded 事件 + 端口定义 | `test_document_uploaded.py` |
-| AC-1 | 17 种格式文件上传 | Task 3 | PostgresDocumentRepository CRUD | `test_document_repository.py` |
+| AC-1 | 17 种格式文件上传 | Task 3 | PostgreSQLDocumentRepository CRUD | `test_document_repository.py` |
 | AC-1 | 17 种格式文件上传 | Task 4 | DocumentUploadService 编排 | `test_document_upload_service.py` |
 | AC-1 | 17 种格式文件上传 | Task 7 | API 路由实现 | `test_document_upload_routes.py` |
 | AC-2 | 分片上传与断点续传 | Task 5 | ChunkedUploadManager | `test_chunked_upload_manager.py` |
@@ -475,22 +475,22 @@
 
 **关联 AC:** AC-1, AC-6
 
-#### TDD 循环 A：PostgresDocumentRepository
+#### TDD 循环 A：PostgreSQLDocumentRepository
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/storage/postgresql/test_document_repository.py`（CRUD、租户隔离、分页） |
+| 🔴 红 | 编写 `tests/unit/infrastructure/storage/postgresql/test_document_repository.py`（CRUD、租户隔离、分页；继承 `PostgreSQLAdapter` 泛型基类） |
 | 🟢 绿 | 实现 `src/infrastructure/storage/postgresql/document_repository.py` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 PostgresDocumentRepository 失败测试（save、find_by_id、find_by_tenant）
-- [ ] Subtask 3.2: 🟢 绿 — 实现 PostgresDocumentRepository（使用 SQLAlchemy AsyncSession）
+- [ ] Subtask 3.1: 🔴 红 — 编写 PostgreSQLDocumentRepository 失败测试（save、find_by_id、find_by_tenant）
+- [ ] Subtask 3.2: 🟢 绿 — 实现 PostgreSQLDocumentRepository（继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类，Session 通过 ContextVar 管理；同时新建 `DocumentModel(Base)` SQLAlchemy 声明式映射，位于 `src/infrastructure/storage/postgresql/models/document.py`）
 - [ ] Subtask 3.3: 🔄 重构 — 优化 Repository 代码
 - [ ] Subtask 3.4: 创建 Alembic migration（`documents` 表：document_id, tenant_id, filename, mime_type, file_size_bytes, document_type, parse_status, uploaded_by, version, metadata JSONB, created_at, updated_at）
 - [ ] Subtask 3.5: 创建必要索引（`idx_documents_tenant_id` 租户隔离, `idx_documents_tenant_created_at` 时间排序）
 
 **完成标准/Definition of Done:**
-- [ ] PostgresDocumentRepository CRUD 操作实现完成
+- [ ] PostgreSQLDocumentRepository CRUD 操作实现完成
 - [ ] 租户隔离正确（tenant_id 过滤）
 - [ ] Alembic migration 创建完成
 - [ ] 所有 TDD 循环测试通过
@@ -536,7 +536,7 @@
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 5.1: 🔴 红 — 编写 ChunkedUploadManager 失败测试（init_upload、upload_part、complete_upload、resume_upload、TTL 过期）
-- [ ] Subtask 5.2: 🟢 绿 — 实现 ChunkedUploadManager（Redis 存储分片状态，委托 ObjectOperations 执行实际分片上传）
+- [ ] Subtask 5.2: 🟢 绿 — 实现 ChunkedUploadManager（通过 L1CachePort 操作 Redis，使用 JSON 序列化存储结构化分片状态 `{file_path, part_size, uploaded_parts: [{part_number, etag}]}`，委托 ObjectOperations 执行实际分片上传）
 - [ ] Subtask 5.3: 🔄 重构 — 优化分片管理代码
 
 **完成标准/Definition of Done:**
@@ -587,7 +587,7 @@
 - [ ] Subtask 7.1: 🔴 红 — 编写 API 路由失败测试（单文件上传、批量上传、分片上传、确认查询、错误处理）
 - [ ] Subtask 7.2: 🟢 绿 — 实现文档上传 FastAPI 路由（multipart/form-data 处理，依赖注入 DocumentUploadService）
 - [ ] Subtask 7.3: 🔄 重构 — 优化 API 路由代码
-- [ ] Subtask 7.4: 注册路由至 `src/interfaces/api/app.py`
+- [ ] Subtask 7.4: 导出 `create_document_upload_router(service)` 工厂函数，供 `app.include_router()` 注册（与项目 `create_auth_router` 模式一致）
 
 > **注：** CLI 上传命令（`sisys document upload --file`）推迟至 Epic 7 Story 7.1（CLI 命令接口），届时调用已实现的 DocumentUploadService。
 
@@ -735,7 +735,10 @@ src/
 │   │   │   ├── object_operations.py         # [已有] 分片上传逻辑（calculate_part_size + resume_multipart_upload）
 │   │   │   └── minio_repository.py          # [已有] MinIO 仓储外观
 │   │   ├── postgresql/
-│   │   │   └── document_repository.py       # [新建] PostgresDocumentRepository
+│   │   │   ├── models/
+│   │   │   │   └── document.py               # [新建] DocumentModel SQLAlchemy 声明式映射
+│   │   │   └── repository/
+│   │   │       └── document_repository.py     # [新建] PostgreSQLDocumentRepository
 │   │   └── redis/
 │   │       └── chunked_upload_manager.py    # [新建] 分片上传状态管理（通过 L1CachePort 操作 Redis）
 │   ├── external_services/
@@ -762,7 +765,8 @@ tests/
 │   │       └── test_document_upload_service.py # [新建]
 │   ├── infrastructure/
 │   │   ├── storage/
-│   │   │   ├── postgresql/test_document_repository.py # [新建]
+│   │   │   ├── postgresql/
+│   │   │   │   └── test_document_repository.py # [新建]
 │   │   │   └── redis/test_chunked_upload_manager.py   # [新建]
 │   │   └── external_services/test_archive_extractor.py   # [新建]
 │   ├── interfaces/
@@ -819,17 +823,37 @@ tests/
 - 分片上传字段名：`part: UploadFile`，分片元数据通过请求体 JSON 传递
 
 **认证与上下文：**
-- API 认证：JWT（OAuth 2.1），通过认证中间件自动注入 `user_id` 和 `tenant_id`
-- 从请求上下文（`request.state.user_id` / `request.state.tenant_id`）获取用户信息
-- 权限检查：RBAC 中间件校验 `document:upload` 权限
+- API 认证：JWT（OAuth 2.1），通过 `Depends(get_current_user)` 获取 `TokenPayload` 值对象
+- `TokenPayload` 字段：`user_id: UUID`, `username: str`, `roles: tuple[str, ...]`, `exp: datetime`, `iat: datetime | None`
+- **tenant_id 获取机制待确定**：当前 `TokenPayload` 不含 `tenant_id` 字段，API 层无 tenant_id 传递机制。实现时需在认证系统中扩展（如：JWT payload 中增加 `tenant_id` claim，或在用户注册表中关联 `tenant_id`）。本 Story 在 API 路由层预留 `tenant_id` 参数传递，具体获取方式依赖认证系统扩展
+- 权限检查：RBAC 中间件校验 `document:upload` 权限（通过 `TokenPayload.roles` 判断）
 
 **PostgreSQL 租户隔离：**
 - 沿用项目 `Schema per Tenant` 模式（`TestTenant.postgres_schema`），documents 表创建在各租户 schema 下
 - Alembic migration 需支持模板化 schema（参考已有 migration 模式）
 
+**PostgreSQL 仓储模式：**
+- 继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类（位于 `src/infrastructure/storage/postgresql/repository/postgresql_adapter.py`）
+- Session 管理：通过 `ContextVar` 传递 `AsyncSession`（非构造器注入），仓储基类 `._session` 属性自动获取
+- 需新建 SQLAlchemy Model：`DocumentModel(Base)` 定义表映射（`src/infrastructure/storage/postgresql/models/document.py`）
+
 **事件发布机制：**
 - 通过 Outbox 模式异步发布（写入 event_outbox 表，由后台 worker 投递至 Redis + RabbitMQ 双通道）
 - DocumentUploadService 调用 `EventPublisher.publish(event)` → 写入 Outbox → 确认事务提交 → 后台投递
+
+**分片上传状态管理：**
+- `L1CachePort` 仅支持 `get(key) -> str | None` 和 `set(key, value: str, ttl)` 的 string→string 操作
+- `ChunkedUploadManager` 通过 JSON 序列化将结构化状态（`{file_path, part_size, uploaded_parts: [{part_number, etag}]}`）编码为 string 后存储到 L1CachePort
+- Redis key 格式：`chunked_upload:{upload_id}`，TTL 24 小时
+
+**MinIO 存储注意事项：**
+- 现有 `MinIODocumentStorage.store_document()` 调用 `adapter.store()` 时未传 `content_type` 参数，所有文档以 `application/octet-stream` 存储
+- 本 Story Task 4 需增强 `store_document()` 调用，传入实际的 `mime_type`（或接受此限制，在元数据中保留 MIME 信息）
+
+**路由注册模式：**
+- 路由通过 `create_document_upload_router(service)` 工厂函数导出，返回 `APIRouter` 实例
+- 工厂函数参数注入服务实例（非 FastAPI Depends），与项目 `create_auth_router` / `create_crawler_router` 模式一致
+- 路由注册：`app.include_router(create_document_upload_router(upload_service), prefix="/api/v1/documents")`
 
 **分片上传流程：**
 1. `POST /chunked/init` — 返回 `upload_id` + 推荐分片大小（从 `UploadLimits.get_chunk_size(file_size)` 计算）
@@ -891,7 +915,8 @@ tests/
 - `src/application/services/document_upload_service.py` — 上传编排服务（非端口）
 
 基础设施层（新建）:
-- `src/infrastructure/storage/postgresql/document_repository.py` — PostgresDocumentRepository
+- `src/infrastructure/storage/postgresql/models/document.py` — DocumentModel SQLAlchemy 声明式映射
+- `src/infrastructure/storage/postgresql/repository/document_repository.py` — PostgreSQLDocumentRepository
 - `src/infrastructure/storage/redis/chunked_upload_manager.py` — 分片上传状态管理
 - `src/infrastructure/external_services/archive_extractor.py` — 压缩包解压
 
@@ -974,12 +999,48 @@ tests/
 | 16 | 测试分类表缺 Task 3 和 Task 10 行 | P1 | 补充缺失行 |
 | 17 | Completion Summary Task 数量错误（10→11） | P1 | 修正为 11 个 Task |
 
+> 第6轮审查修订（2026-05-29，第二轮审查第1轮）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 18 | tenant_id 获取机制不存在 — TokenPayload 无 tenant_id，API 层无传递机制 | P0 | 实现细节重写：说明 TokenPayload 现状，标注 tenant_id 获取待认证系统扩展 |
+| 19 | L1CachePort 仅支持 string→string，无法存储结构化分片状态 | P0 | 新增 JSON 序列化说明，ChunkedUploadManager 通过 JSON 编码结构化数据 |
+| 20 | PostgreSQL 仓储基类模式不匹配 — 现有用 PostgreSQLAdapter 泛型基类+ContextVar | P0 | Task 3 修正为继承 PostgreSQLAdapter[Document, DocumentModel]，修正文件路径至 repository/ 子目录 |
+| 21 | MinIO store_document 丢失 MIME 类型 — 未传 content_type | P0 | 实现细节新增说明，Task 4 需增强 store_document 调用 |
+| 22 | 路由注册模式不准确 — app.py 无路由注册，应用工厂模式 | P1 | Task 7 Subtask 7.4 修正为工厂函数导出模式 |
+| 23 | 端口契约表缺 version 列 | P1 | 添加 version 列 |
+| 24 | 仓储文件路径错误（postgresql/ → postgresql/repository/） | P1 | 修正项目结构和文件清单中的路径 |
+| 25 | 仓储类名 PostgreSQLDocumentRepository → PostgreSQLDocumentRepository | P1 | 全局统一类名 |
+
+### 🔍 代码审查发现 Review Findings
+
+> 此 Section 在开发阶段（dev-story）填写，记录代码审查过程中的发现。
+
+#### 需决策 Decision Needed
+
+- [ ] tenant_id 获取机制：需与认证系统设计协调（JWT payload 扩展 or 用户表关联）
+- [ ] MinIO MIME 类型存储：是否增强 store_document() 接口，或接受 octet-stream 限制
+
+#### 已推迟 Defer
+
+- 无
+
 ---
 
-**故事版本/Story Version:** v0.0.4
+### 下一步 Next Steps
+
+- [x] Story 状态 `ready-for-dev`
+- [ ] 执行 `dev-story` 开发流程
+- [ ] 开发完成后执行 `code-review`（建议使用不同 LLM 上下文）
+- [ ] 自动化测试通过
+
+---
+
+**故事版本/Story Version:** v0.0.5
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.0.5: 第二轮审查第1轮 — 修复 tenant_id/L1CachePort/PostgreSQL 仓储基类/MinIO MIME 类型/路由注册模式等实现细节，补充 Review Findings/Next Steps 模板 Section
 - v0.0.4: 第5轮终审 — 追溯矩阵补齐Task 0/10行、or.md公理追溯补充rtf说明
 - v0.0.3: 第2轮审查修订 — 修复残留不一致（格式计数/幽灵条目/测试表缺失/CLI残留/content_hash残留）
 - v0.0.2: 第1轮审查修订 — 修复 P0 格式计数/秒传范围蔓延/架构层级违规/命名错误，P1 CLI/查询范围修正/索引策略
