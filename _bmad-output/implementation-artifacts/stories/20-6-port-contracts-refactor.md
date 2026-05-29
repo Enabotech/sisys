@@ -1,4 +1,4 @@
-# Story 20-6: 端口契约测试补全
+# Story 90-6: 端口契约测试补全
 
 **Status:** `done`
 
@@ -16,7 +16,7 @@
 
 ### 业务价值
 
-Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异步重构、统一存储架构等重大改造。当前 `composition_root.py` 注册了 **60 个端口**（含基础设施端口如 ConnectionManager x4、EventPublisher x3 等），另有 5 个定义了 Protocol 但未注册的端口需做接口验证。现有仅 3 个端口契约测试。端口契约是六边形架构的核心防线，缺失契约测试意味着：
+Epic 90 前序 Story（90-1 ~ 90-5）完成了测试框架、事件总线、异步重构、统一存储架构等重大改造。当前 `composition_root.py` 注册了 **60 个端口**（含基础设施端口如 ConnectionManager x4、EventPublisher x3 等），另有 5 个定义了 Protocol 但未注册的端口需做接口验证。现有仅 3 个端口契约测试。端口契约是六边形架构的核心防线，缺失契约测试意味着：
 - 端口注册遗漏无法自动发现
 - 接口方法签名变更无法自动检测
 - 实现类与接口不匹配无法自动拦截
@@ -755,7 +755,7 @@ Feature: 端口契约测试补全
 
 ### 关键架构决策
 
-**来源:** Story 20-5（统一存储架构重构）
+**来源:** Story 90-5（统一存储架构重构）
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
@@ -787,7 +787,7 @@ tests/
 
 ### 前一个故事学习经验
 
-**来源:** [Story 20-5 统一存储架构重构](./20-5-uni-storage-refactor.md)
+**来源:** [Story 90-5 统一存储架构重构](./20-5-uni-storage-refactor.md)
 
 **关键学习:**
 - 所有 Port 使用 Protocol（非 ABC），domain/ports 全部标注 @runtime_checkable
@@ -829,7 +829,7 @@ tests/
 
 - [x] 端口清单从 src/domain/ports/ 和 src/application/ports/ 代码提取
 - [x] 架构约束从 architecture.md 和 project-context.md 提取
-- [x] 前一个故事学习经验整合（Story 20-5）
+- [x] 前一个故事学习经验整合（Story 90-5）
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 测试文件结构对齐统一规范
@@ -866,7 +866,7 @@ tests/
 | **Story Key** | 20-6-port-contracts-refactor |
 | **File** | `_bmad-output/implementation-artifacts/stories/20-6-port-contracts-refactor.md` |
 | **Status** | `ready-for-dev` |
-| **Epic** | Epic 20: 重大重构 |
+| **Epic** | Epic 90: 重大重构 |
 | **优先级** | P0 |
 | **覆盖范围** | 60 个已注册端口 + 5 个未注册 Protocol 接口验证 |
 

@@ -2,7 +2,7 @@
 # SISYS 测试环境配置解析
 # =============================================================================
 # 用途：根据不同测试环境（Local/CI/K8s）自动适配服务连接参数
-# Story: 20-1 (sisys-testing-refactor) - Phase 2
+# Story: 90-1 (sisys-testing-refactor) - Phase 2
 # =============================================================================
 
 from __future__ import annotations

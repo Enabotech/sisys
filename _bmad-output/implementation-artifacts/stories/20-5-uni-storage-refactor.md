@@ -1,4 +1,4 @@
-# Story 20-5: 统一存储架构重构（存储端口 ABC 化）
+# Story 90-5: 统一存储架构重构（存储端口 ABC 化）
 
 **Status:** `review`
 
@@ -331,7 +331,7 @@ src/
 | **Story Key** | 20-5-uni-storage-refactor |
 | **File** | `_bmad-output/implementation-artifacts/stories/20-5-uni-storage-refactor.md` |
 | **Status** | `ready-for-dev` |
-| **Epic** | Epic 20: 重大重构 |
+| **Epic** | Epic 90: 重大重构 |
 
 ### 下一步
 

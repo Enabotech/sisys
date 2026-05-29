@@ -1,5 +1,5 @@
 # language: zh-CN
-功能: Story 20.8 - 双核引擎集成验证
+功能: Story 90.8 - 双核引擎集成验证
 
   作为系统架构师
   我想要实现双核引擎（Prefect + LangGraph）端到端集成验证，补全 PrefectEngine 事件发布
@@ -7,7 +7,7 @@
 
   背景:
     假如 Story 1.18a Prefect 工作流集成和 Story 1.18b LangGraph Agent 编排已完成
-    假如 Story 20-1~20-7 重大重构系列已完成
+    假如 Story 90-1~90-7 重大重构系列已完成
 
   # =========================================================================
   # AC-1: PrefectEngine 事件发布补全 + AC-5: 端口签名验证

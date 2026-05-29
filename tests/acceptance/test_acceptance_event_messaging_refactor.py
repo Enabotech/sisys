@@ -1,4 +1,4 @@
-"""Acceptance tests for Story 20.2 - 事件消息体系重构.
+"""Acceptance tests for Story 90.2 - 事件消息体系重构.
 
 Real instance integration tests using actual PostgreSQL and Redis services.
 No mocks - uses real PostgreSQL and Redis instances.
@@ -270,9 +270,9 @@ async def aioredis_client(redis_config: RedisConfig):
 # ===================================================================
 
 
-@given("Story 1.3 事件总线实现和 Story 20-1 测试重构已实现")
+@given("Story 1.3 事件总线实现和 Story 90-1 测试重构已实现")
 def given_story_1_3_and_20_1_completed(context: dict) -> None:
-    """Background: Story 1.3 and 20-1 completed."""
+    """Background: Story 1.3 and 90-1 completed."""
     context["story_1_3_ready"] = True
     context["story_20_1_ready"] = True
 

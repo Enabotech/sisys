@@ -11,7 +11,7 @@ Tests the complete storage flow across L0-L5:
 Uses UUID prefix isolation patterns for test isolation.
 
 Refactored from SixLayerStorageCoordinator to direct port usage
-(Story 20-5 uni-storage-refactor).
+(Story 90-5 uni-storage-refactor).
 """
 
 from __future__ import annotations

@@ -325,9 +325,9 @@ development_status:
   epic-19-retrospective: optional
 
   # ===========================================================================
-  # Epic 20: 重大重构 (epic文档不追踪) - ✅ 已完成
+  # Epic 90: 重大重构 (epic文档不追踪) - ✅ 已完成
   # ===========================================================================
-  epic-20: done
+  epic-90: done
   20-1-sisys-testing-refactor: done
   20-2-event-messaging-refactor: done
   20-3-uni-dual-channel-eventbus: done
@@ -336,7 +336,7 @@ development_status:
   20-6-port-contracts-refactor: done  # 端口契约测试补全
   20-7-transaction-subsystem-refactor: done  # 事务子系统重构（Session/UoW/Outbox/Saga）
   20-8-workflow-agent-integration: done  # 双核引擎集成验证（PrefectEngine事件发布+验收测试）
-  epic-20-retrospective: optional
+  epic-90-retrospective: optional
 
 # =============================================================================
 # Summary:
@@ -347,7 +347,7 @@ development_status:
 #   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 📋 3 ready-for-dev)
 #   - Epic 1: 23 stories (✅ done)
 #   - Epic 2-19: 119 stories (📋 backlog, 含 Epic 5 新增 4 个 EV 评估 Story)
-#   - Epic 20: 8 stories (✅ done)
+#   - Epic 90: 8 stories (✅ done)
 #
 # Status Summary:
 #   Stories:
@@ -357,7 +357,7 @@ development_status:
 #     - Review: 0
 #     - Backlog: 119
 #   Epics:
-#     - Done: 2 (Epic 1, Epic 20)
+#     - Done: 2 (Epic 1, Epic 90)
 #     - In Progress: 1 (Epic 0)
 #     - Backlog: 18 (Epic 2-19)
 #   Retrospectives:

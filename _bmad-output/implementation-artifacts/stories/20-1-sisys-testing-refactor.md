@@ -1,4 +1,4 @@
-# Story 20-1: SISYS 测试工程重构
+# Story 90-1: SISYS 测试工程重构
 
 **Status:** `done` ✅
 
@@ -709,7 +709,7 @@ sisys/
 | **Story ID** | 20-1 |
 | **Story Key** | 20-1-sisys-testing-refactor |
 | **Status** | `in-progress` |
-| **Epic** | Epic 20: 重要重构 |
+| **Epic** | Epic 90: 重要重构 |
 | **优先级** | P0 (紧急 - 阻塞性问题) |
 | **预计工时** | 8-12 天 |
 
@@ -736,4 +736,4 @@ Task 7 (Phase 7) → Task 8 (Phase 8) → Task 9 (Phase 4 最终验证)
 **模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-04-21
 **最后更新/Last Updated:** 2026-04-21
-**更新说明:** Story 20-1 完成状态，本地测试 2071 passed，CI 待验证
+**更新说明:** Story 90-1 完成状态，本地测试 2071 passed，CI 待验证

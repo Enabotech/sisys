@@ -196,7 +196,7 @@ class TestPortRegistryCompleteness:
     """验证端口注册完整性"""
 
     def test_required_ports_registered(self) -> None:
-        """所有 Story 20-7 新增端口应已注册"""
+        """所有 Story 90-7 新增端口应已注册"""
         from src.domain.ports.registry import _global_registry
 
         required_ports = ["uow_factory", "saga_repository"]

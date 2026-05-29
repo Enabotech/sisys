@@ -1,4 +1,4 @@
-# Story 20.2: 事件消息体系重构
+# Story 90.2: 事件消息体系重构
 
 **Status:** `done`
 
@@ -16,7 +16,7 @@
 
 ### 业务价值
 
-本 Story 是 Epic 20（重大重构）的第二个故事，针对现有事件驱动系统进行宗师级重构，解决以下生产级问题：
+本 Story 是 Epic 90（重大重构）的第二个故事，针对现有事件驱动系统进行宗师级重构，解决以下生产级问题：
 
 | 问题 | 现状 | 风险 | 重构方案 |
 |------|------|------|---------|
@@ -537,7 +537,7 @@ src/
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
 
-**来源:** [Story 20-1](./20-1-sisys-testing-refactor.md)
+**来源:** [Story 90-1](./20-1-sisys-testing-refactor.md)
 
 **关键学习/Key Learnings:**
 - TDD 循环必须内化到每个 Task
@@ -569,7 +569,7 @@ src/
 
 ### 与 Story 1.3/1.5 的组件关系
 
-| 组件 | Story 1.3 | Story 20.2 | 关系 |
+| 组件 | Story 1.3 | Story 90.2 | 关系 |
 |------|-----------|-----------|------|
 | `IdempotencyChecker` | Redis SET NX | `DualIdempotencyChecker` | **并存**（Dual 替代 Consumer 使用） |
 | `RabbitMQConsumer` | 基础实现 | 重构 | **重构**（移除 nack requeue） |
@@ -652,7 +652,7 @@ src/
 | **Story Key** | 20-2-event-messaging-refactor |
 | **File** | `src/infrastructure/messaging/20-2-event-messaging-refactor.md` |
 | **Status** | `done` |
-| **Epic** | Epic 20: 重大重构 |
+| **Epic** | Epic 90: 重大重构 |
 | **优先级** | P0 |
 
 ### 完成总结 Completion Summary

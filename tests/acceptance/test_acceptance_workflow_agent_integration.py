@@ -1,4 +1,4 @@
-"""Story 20.8 - 双核引擎集成验收测试步骤实现
+"""Story 90.8 - 双核引擎集成验收测试步骤实现
 
 验证 PrefectEngine 事件发布补全、双引擎对称性、通道注册等业务价值验收
 
@@ -26,7 +26,7 @@ def story_1_18_dependencies_done() -> None:
     pass
 
 
-@given("Story 20-1~20-7 重大重构系列已完成")
+@given("Story 90-1~90-7 重大重构系列已完成")
 def story_20_1_to_20_7_done() -> None:
     pass
 
