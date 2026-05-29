@@ -154,8 +154,9 @@
 - [ ] `DocumentUploaded` 事件定义于 `src/domain/events/document_events.py`
   - 字段：`document_id: uuid.UUID`, `filename: str`, `mime_type: str`, `file_size_bytes: int`, `tenant_id: str`, `uploaded_by: str`
   - 继承 `DomainEvent` 基类，`event_type="DocumentUploaded"`
-  - 使用 `@dataclass(frozen=True)`（非 Pydantic）
+  - 使用 `@dataclass(frozen=True)`（非 Pydantic，父类 frozen 要求子类也 frozen）
   - 自动注册到事件注册表（`__init_subclass__`）
+  - 实现 `__post_init__`：`aggregate_id = document_id`，`aggregate_type = "Document"`（与 DocumentProcessed 模式一致）
 
 #### 数据模型 (Data Models)
 
@@ -177,8 +178,8 @@
 
 - [ ] **新增端口** `document_repository` — 定义于 `src/domain/ports/document_repository.py`
   - Protocol 接口：`save(document: Document) -> Document`
-  - Protocol 接口：`find_by_id(document_id: UUID, tenant_id: str) -> Document | None`
-  - Protocol 接口：`find_by_tenant(tenant_id: str, filters, pagination) -> list[Document]`
+  - Protocol 接口：`get_by_id(document_id: UUID, tenant_id: str) -> Document | None`
+  - Protocol 接口：`list_by_tenant(tenant_id: str, filters, pagination) -> list[Document]`
   - 注册至 `src/domain/ports/registry.py`
 - [ ] **现有端口复用**（不新增）：
   - `document_storage`（`DocumentStoragePort`） — MinIO 文档存储，`resolve("document_storage")`
@@ -486,8 +487,8 @@
 | 🟢 绿 | 实现 `src/infrastructure/storage/postgresql/document_repository.py` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 PostgreSQLDocumentRepository 失败测试（save、find_by_id、find_by_tenant）
-- [ ] Subtask 3.2: 🟢 绿 — 实现 PostgreSQLDocumentRepository（继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类，构造器传入 `model_class=DocumentModel`；Session 通过 ContextVar 管理；复用基类 `save(entity)` 方法，自定义 `find_by_id(document_id, tenant_id)` 和 `find_by_tenant(tenant_id, ...)` 方法（基类仅有 `get_by_id(id)` 无租户过滤）；实现 `_to_entity(model)` 和 `_to_model(entity)` 抽象方法；同时新建 `DocumentModel(Base)` SQLAlchemy 声明式映射，位于 `src/infrastructure/storage/postgresql/models/document.py`，继承 `Base(DeclarativeBase)`）
+- [ ] Subtask 3.1: 🔴 红 — 编写 PostgreSQLDocumentRepository 失败测试（save、get_by_id、list_by_tenant）
+- [ ] Subtask 3.2: 🟢 绿 — 实现 PostgreSQLDocumentRepository（继承 `PostgreSQLAdapter[Document, DocumentModel]` 泛型基类，构造器传入 `model_class=DocumentModel`；Session 通过 ContextVar 管理；复用基类 `save(entity)` 方法，自定义 `get_by_id(document_id, tenant_id)` 和 `list_by_tenant(tenant_id, ...)` 方法（基类仅有 `get_by_id(id)` 无租户过滤，需覆写增加租户隔离）；实现 `_to_entity(model)` 和 `_to_model(entity)` 抽象方法；同时新建 `DocumentModel(Base)` SQLAlchemy 声明式映射，位于 `src/infrastructure/storage/postgresql/models/document.py`，继承 `Base(DeclarativeBase)`）
 - [ ] Subtask 3.3: 🔄 重构 — 优化 Repository 代码
 - [ ] Subtask 3.4: 创建 Alembic migration（`documents` 表：document_id, tenant_id, filename, mime_type, file_size_bytes, document_type, parse_status, uploaded_by, version, metadata JSONB, created_at, updated_at）
 - [ ] Subtask 3.5: 创建必要索引（`idx_documents_tenant_id` 租户隔离, `idx_documents_tenant_created_at` 时间排序）
@@ -828,7 +829,7 @@ tests/
 **认证与上下文：**
 - API 认证：JWT（OAuth 2.1），通过 `Depends(get_current_user)` 获取 `TokenPayload` 值对象
 - `TokenPayload` 字段：`user_id: UUID`, `username: str`, `roles: tuple[str, ...]`, `exp: datetime`, `iat: datetime | None`
-- **tenant_id 获取机制待确定**：当前 `TokenPayload` 不含 `tenant_id` 字段，API 层无 tenant_id 传递机制。实现时需在认证系统中扩展（如：JWT payload 中增加 `tenant_id` claim，或在用户注册表中关联 `tenant_id`）。本 Story 在 API 路由层预留 `tenant_id` 参数传递，具体获取方式依赖认证系统扩展
+- **tenant_id 获取机制待确定**：当前 `TokenPayload` 不含 `tenant_id` 字段，API 层无 tenant_id 传递机制，**且项目中所有现有仓储端口均无 tenant_id 参数**（UserRepositoryPort、RoleRepositoryPort 等均为无租户隔离设计）。本 Story 作为首个引入 tenant_id 的仓储端口，属于**多租户隔离的设计先行者**。实现时需在认证系统中扩展（如：JWT payload 中增加 `tenant_id` claim，或在用户注册表中关联 `tenant_id`）。本 Story 在 API 路由层预留 `tenant_id` 参数传递，具体获取方式依赖认证系统扩展
 - 权限检查：RBAC 中间件校验 `document:upload` 权限（通过 `TokenPayload.roles` 判断）
 
 **PostgreSQL 租户隔离：**
@@ -843,6 +844,16 @@ tests/
 **事件发布机制：**
 - 通过 Outbox 模式异步发布（写入 event_outbox 表，由后台 worker 投递至 Redis + RabbitMQ 双通道）
 - DocumentUploadService 调用 `EventPublisher.publish(event)` → 写入 Outbox → 确认事务提交 → 后台投递
+- 新增事件需**双注册**：`configs/event_channels.yaml`（YAML 配置）+ `ChannelRouter.DEFAULT_MAPPINGS`（Python 字典）。路由优先级：yaml > DEFAULT_MAPPINGS。DocumentUploaded 的 ChannelMapping 格式：
+  ```python
+  "DocumentUploaded": ChannelMapping(
+      event_type="DocumentUploaded",
+      redis_channel="sisys:rt:document_uploaded",
+      rabbitmq_routing_key="sisys.events.reliable.document_uploaded",
+      delivery_mode=DeliveryMode.RELIABLE,
+      description="文档上传完成",
+  )
+  ```
 
 **分片上传状态管理：**
 - `L1CachePort` 仅支持 `get(key) -> str | None` 和 `set(key, value: str, ttl)` 的 string→string 操作
@@ -1025,6 +1036,16 @@ tests/
 | 29 | PostgreSQLAdapter 构造器需 model_class 参数，Story 未提及 | P1 | Subtask 3.2 补充构造器参数 |
 | 30 | 质量门禁缺少"性能基准测试"（epics 明确要求） | P1 | 添加注释说明推迟至集成测试阶段 |
 
+> 第8轮审查修订（2026-05-29，第二轮审查第3轮）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 31 | DocumentRepositoryPort 方法名 find_by_id 不符合项目约定（现有端口用 get_by_id） | P1 | 改为 get_by_id(document_id, tenant_id) |
+| 32 | DocumentRepositoryPort find_by_tenant 不符合项目约定（现有端口用 list_by_*） | P1 | 改为 list_by_tenant(tenant_id, ...) |
+| 33 | DocumentUploaded 事件缺少 __post_init__ 要求 | P1 | SDD 规范新增 __post_init__ 要求 |
+| 34 | event_channels.yaml + DEFAULT_MAPPINGS 双注册的 ChannelMapping 结构未说明 | P1 | 实现细节补充 ChannelMapping 示例 |
+| 35 | 项目中所有仓储端口均无 tenant_id，本 Story 是多租户隔离设计先行者 | P1 | 认证与上下文节补充系统级设计决策说明 |
+
 ### 🔍 代码审查发现 Review Findings
 
 > 此 Section 在开发阶段（dev-story）填写，记录代码审查过程中的发现。
@@ -1049,10 +1070,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.0.6
+**故事版本/Story Version:** v0.0.7
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.0.7: 第二轮审查第3轮 — 方法命名统一(get_by_id/list_by_tenant)、事件__post_init__补充、ChannelMapping双注册结构、tenant_id系统级设计决策
 - v0.0.6: 第二轮审查第2轮 — 补充流式处理约束/P95性能指标说明/PostgreSQLAdapter方法关系/构造器参数
 - v0.0.5: 第二轮审查第1轮 — 修复 tenant_id/L1CachePort/PostgreSQL 仓储基类/MinIO MIME 类型/路由注册模式等实现细节，补充 Review Findings/Next Steps 模板 Section
 - v0.0.4: 第5轮终审 — 追溯矩阵补齐Task 0/10行、or.md公理追溯补充rtf说明
