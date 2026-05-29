@@ -1,4 +1,4 @@
-# Story 20.3: 统一双通道事件总线实现
+# Story 90.3: 统一双通道事件总线实现
 
 **Status:** `done`
 
@@ -509,9 +509,9 @@
 3. **订阅语义**: `subscribe()` 仅支持 REALTIME，RELIABLE 订阅由独立 RabbitMQConsumer 处理
 4. **工厂共享实例**: `RabbitMQPublisher` 在 `__post_init__` 创建，供 `RabbitMQEventBus` 和 `Poller` 共用
 
-### 与 Story 20.2 的关系
+### 与 Story 90.2 的关系
 
-| 组件 | Story 20.2 | Story 20.3 | 关系 |
+| 组件 | Story 90.2 | Story 90.3 | 关系 |
 |------|-------------|------------|------|
 | `EventListenerAsync` | 新增异步接口 | 被 EventSubscriber 替代 | 演进 |
 | `DualIdempotencyChecker` | 新增双写幂等性 | 被 RabbitMQEventBus 集成 | 集成 |
@@ -600,7 +600,7 @@
 | **Story Key** | 20-3-uni-dual-channel-eventbus |
 | **File** | `_bmad-output/implementation-artifacts/stories/20-3-uni-dual-channel-eventbus.md` |
 | **Status** | `ready-for-dev` |
-| **Epic** | Epic 20: 重大重构 |
+| **Epic** | Epic 90: 重大重构 |
 | **优先级** | P0 |
 
 ### 完成总结 Completion Summary

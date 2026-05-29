@@ -1,4 +1,4 @@
-# Story 20-7: 事务子系统重构
+# Story 90-7: 事务子系统重构
 
 **Status:** `done`
 
@@ -16,7 +16,7 @@
 
 ### 业务价值
 
-Epic 20 前序 Story（20-1 ~ 20-6）完成了测试框架、事件总线、异步重构、统一存储架构、端口契约测试等重大改造。当前事务子系统存在 8 个关键问题（P1-P8）：
+Epic 90 前序 Story（90-1 ~ 90-6）完成了测试框架、事件总线、异步重构、统一存储架构、端口契约测试等重大改造。当前事务子系统存在 8 个关键问题（P1-P8）：
 
 | # | 问题 | 严重程度 | 现状 |
 |---|------|---------|------|
@@ -764,7 +764,7 @@ src/
 
 ### 前一个故事学习经验
 
-**来源:** [Story 20-6 端口契约测试补全](./20-6-port-contracts-refactor.md)
+**来源:** [Story 90-6 端口契约测试补全](./20-6-port-contracts-refactor.md)
 
 **关键学习:**
 1. resolver.resolve() 实施风险：对需要外部服务的端口，resolve() 会尝试实例化。契约测试应优先使用 `spec.impl` 类级别检查
@@ -863,7 +863,7 @@ src/
 | **Story Key** | 20-7-transaction-subsystem-refactor |
 | **File** | `_bmad-output/implementation-artifacts/stories/20-7-transaction-subsystem-refactor.md` |
 | **Status** | `ready-for-dev` |
-| **Epic** | Epic 20: 重大重构 |
+| **Epic** | Epic 90: 重大重构 |
 | **优先级** | P0 |
 | **覆盖范围** | 4 Phase / 10 Task / 8 AC |
 

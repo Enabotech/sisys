@@ -1,4 +1,4 @@
-# Story 20-4: 统一异步 Port 适配器重构（集成验证）
+# Story 90-4: 统一异步 Port 适配器重构（集成验证）
 
 **Status:** `review`
 
@@ -673,9 +673,9 @@
 | L0StoragePort.delete/exists/list | to_thread | 快速同步操作，to_thread 避免阻塞 |
 | IndexManagerPort 方法 | 全部 to_thread | fcntl.flock 锁需要原子性保证 |
 
-### 与 Story 20-3 的关系
+### 与 Story 90-3 的关系
 
-| 组件 | Story 20-3 | Story 20-4 | 关系 |
+| 组件 | Story 90-3 | Story 90-4 | 关系 |
 |------|------------|------------|------|
 | EventPublisherPort | 新增 | 被 DualChannelEventBus 使用 | 集成 |
 | EventSubscriberPort | 新增 | 被 RedisEventBus 实现 | 集成 |
@@ -686,7 +686,7 @@
 
 ### 前一个故事学习经验
 
-**来源:** Story 20-3-uni-dual-channel-eventbus
+**来源:** Story 90-3-uni-dual-channel-eventbus
 
 **关键学习/Key Learnings:**
 - EventPublisher/EventSubscriber 接口分离是正确设计
@@ -785,8 +785,8 @@
 | **Story Key** | 20-4-uni-async-refactor |
 | **File** | `_bmad-output/implementation-artifacts/stories/20-4-uni-async-refactor.md` |
 | **Status** | `ready-for-dev` |
-| **Epic** | Epic 20: 重大重构 |
-| **价值组** | Epic 20 重构集成验证 |
+| **Epic** | Epic 90: 重大重构 |
+| **价值组** | Epic 90 重构集成验证 |
 | **优先级** | P0 |
 | **预估工时** | 11.75d（方案B 总工时） |
 | **覆盖 FR** | N/A（非功能性重构） |

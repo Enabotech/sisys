@@ -2,7 +2,7 @@
 # SISYS 测试 fixtures
 # =============================================================================
 # 用途：提供测试资源清理 fixtures，支持租户隔离
-# Story: 20-1 (sisys-testing-refactor) - Phase 3
+# Story: 90-1 (sisys-testing-refactor) - Phase 3
 # =============================================================================
 
 from __future__ import annotations

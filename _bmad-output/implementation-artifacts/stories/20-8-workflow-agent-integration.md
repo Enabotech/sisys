@@ -1,4 +1,4 @@
-# Story 20.8: 双核引擎集成验证
+# Story 90.8: 双核引擎集成验证
 
 **Status:** `done`
 
@@ -16,7 +16,7 @@
 
 ### 业务价值
 
-本 Story 是 Epic 20（重大重构）的收尾 Story。前序 Story（20-1~20-7）完成了测试框架、事件总线、异步重构、统一存储、端口契约、事务子系统。本 Story 在此基础上对双核引擎进行端到端集成验证，对齐设计文档 `docs/architecture/sisys-workflow-agent-integration-design.md` v2.6。
+本 Story 是 Epic 90（重大重构）的收尾 Story。前序 Story（90-1~90-7）完成了测试框架、事件总线、异步重构、统一存储、端口契约、事务子系统。本 Story 在此基础上对双核引擎进行端到端集成验证，对齐设计文档 `docs/architecture/sisys-workflow-agent-integration-design.md` v2.6。
 
 | 差距 | 严重度 | 说明 |
 |------|--------|------|
@@ -35,7 +35,7 @@
 **来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) — ADR-002 双核引擎架构
 **设计文档:** [`sisys-workflow-agent-integration-design.md`](../../docs/architecture/sisys-workflow-agent-integration-design.md) v2.6
 
-**前置依赖:** Story 1.18a（Prefect 工作流集成）、Story 1.18b（LangGraph Agent 编排）、Story 20-1~20-7（重大重构系列）
+**前置依赖:** Story 1.18a（Prefect 工作流集成）、Story 1.18b（LangGraph Agent 编排）、Story 90-1~20-7（重大重构系列）
 
 ---
 
@@ -49,8 +49,8 @@
 | Story 1.3 | DualChannelEventBus + ChannelRouter | 事件发布/路由基础设施 |
 | Story 1.18a | WorkflowEnginePort + PrefectEngine + OrchestrationService | 双核引擎数据管道部分 |
 | Story 1.18b | AgentEnginePort + LangGraphEngine + BasicAgentGraph | 双核引擎认知推理部分 |
-| Story 20-6 | 端口契约测试重构 | 端口注册/解析/契约测试基础设施 |
-| Story 20-7 | 事务子系统重构 | Saga/Outbox 事件发布基础设施 |
+| Story 90-6 | 端口契约测试重构 | 端口注册/解析/契约测试基础设施 |
+| Story 90-7 | 事务子系统重构 | Saga/Outbox 事件发布基础设施 |
 
 ### 现有代码继承（必须复用，禁止重复定义）
 
@@ -158,7 +158,7 @@
 #### 端口契约（已存在，本 Story 不新增端口）
 - [x] `WorkflowEnginePort` — 已在 `src/composition_root.py` bootstrap() 函数中注册（第983-995行）
 - [x] `AgentEnginePort` — 已在 `src/composition_root.py` bootstrap() 函数中注册（第1002-1014行）
-- [x] 端口契约测试已通过（Story 20-6 补全）
+- [x] 端口契约测试已通过（Story 90-6 补全）
 
 #### 六边形架构约束（必须遵守）
 
@@ -477,7 +477,7 @@
 ## 🔍 Review Findings（代码审查发现）
 
 > **审查日期:** 2026-05-23
-> **审查范围:** commit 8b285311 (Story 20.8 实现)
+> **审查范围:** commit 8b285311 (Story 90.8 实现)
 
 ### Decision Needed
 
@@ -581,7 +581,7 @@ async def _publish_agent_decided(self, agent_id, result, run_id):
 
 ### 前一个故事学习经验
 
-**来源:** [Story 20-7](./20-7-transaction-subsystem-refactor.md) + [Story 1-18b](./1-18b-langgraph-agent-orchestration.md)
+**来源:** [Story 90-7](./20-7-transaction-subsystem-refactor.md) + [Story 1-18b](./1-18b-langgraph-agent-orchestration.md)
 
 **关键学习/Key Learnings:**
 - 事件发布异常**必须**独立于引擎执行状态（LangGraphEngine 在 catch 中不覆写 COMPLETED）
@@ -682,7 +682,7 @@ src/
 | **Story Key** | 20-8-workflow-agent-integration |
 | **File** | `_bmad-output/implementation-artifacts/stories/20-8-workflow-agent-integration.md` |
 | **Status** | `ready-for-dev` |
-| **Epic** | Epic 20: 重大重构 |
+| **Epic** | Epic 90: 重大重构 |
 | **优先级** | P1 |
 | **覆盖 FR** | FR-1.18a, FR-1.18b, ADR-002 |
 

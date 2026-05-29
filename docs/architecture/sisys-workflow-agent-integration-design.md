@@ -364,7 +364,7 @@ graph LR
 1. **Deployment 远程提交模式** — 通过 `get_client()` 调用 Prefect API，避免进程内 Flow 耦合
 2. **9→5 状态映射** — Prefect 的 9 种 StateType 映射为 5 种 FlowStatus（`_map_state_type`）
 3. **重试感知** — 通过 `run_count < max_retries` 区分 FAILED 和 RETRYING
-4. **事件发布责任** — Engine 层发布 `WorkflowSubmitted` 领域事件，通过 `_publish_workflow_submitted()` 方法（Story 20-8 更新）
+4. **事件发布责任** — Engine 层发布 `WorkflowSubmitted` 领域事件，通过 `_publish_workflow_submitted()` 方法（Story 90-8 更新）
 
 ```
 PrefectEngine
@@ -424,7 +424,7 @@ class XxxConfig:
 
 ### 5.1 双通道事件发布策略差异
 
-两个引擎的事件发布策略遵循对称模式（Story 20-8 统一）：
+两个引擎的事件发布策略遵循对称模式（Story 90-8 统一）：
 
 | 维度 | Prefect | LangGraph |
 |------|---------|-----------|
@@ -459,7 +459,7 @@ sequenceDiagram
 
 ### 5.3 PublishResult 检查
 
-双引擎的事件发布均遵循相同的 PublishResult 检查模式（Story 20-8 统一）：
+双引擎的事件发布均遵循相同的 PublishResult 检查模式（Story 90-8 统一）：
 
 ```python
 publish_result = await self._event_publisher.publish(event)

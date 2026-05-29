@@ -18,7 +18,7 @@
 
 ### 1.1 当前架构状态
 
-Story 20.2（事件消息体系重构）已完成 AC-1 至 AC-10 的全部验收，但**AC-6（UnitOfWork 统一事务边界）存在重大设计缺失**：
+Story 90.2（事件消息体系重构）已完成 AC-1 至 AC-10 的全部验收，但**AC-6（UnitOfWork 统一事务边界）存在重大设计缺失**：
 
 | 组件 | 实现状态 | 问题 |
 |------|---------|------|
@@ -282,7 +282,7 @@ class DocumentProcessedHandler:
 
 ---
 
-## 4. 与 Story 20.2 的集成
+## 4. 与 Story 90.2 的集成
 
 ### 4.1 AC-6 重定义
 
@@ -546,5 +546,5 @@ async with uow:
 | Eventuate Tram | `EventuateTramOutbox` + JDBC transaction |
 | NServiceBus | `IUnitOfWork` + Outbox（管道自动管理事务边界） |
 | SQLAlchemy 2.0 | AsyncSession as ambient transaction context |
-| Story 20.2 | AC-6 UnitOfWork 统一事务边界 |
+| Story 90.2 | AC-6 UnitOfWork 统一事务边界 |
 | Architecture.md | 第 10 章 事件驱动架构设计 |

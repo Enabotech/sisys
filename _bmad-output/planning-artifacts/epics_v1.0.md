@@ -534,11 +534,11 @@ updateReason: '第1轮审查修正 - 修复FR-EV系列缺失/FR计数不一致/F
 | **战略规划流程 (SP) - 7 项** |
 | FR-SP-11 | BEM 六阶段流程（战略解码） | Epic 15 | Story 15.1 | P2 |
 | FR-SP-12 | SP→BP 结构化映射 | Epic 15 | Story 15.2 | P2 |
-| FR-SP-13 | 财务量化分析 API（NPV/IRR/现金流） | Epic 20 | Story 20.1 | P2 |
-| FR-SP-14 | 敏感性分析 API（龙卷风图） | Epic 20 | Story 20.2 | P2 |
-| FR-SP-15 | 情景对比 API（3 方案并排） | Epic 20 | Story 20.3 | P2 |
-| FR-SP-16 | 白标品牌定制与监管报告导出 API | Epic 20 | Story 20.4 | P2 |
-| FR-SP-17 | 风险热力图 API | Epic 20 | Story 20.5 | P2 |
+| FR-SP-13 | 财务量化分析 API（NPV/IRR/现金流） | Epic 20 | Story 90.1 | P2 |
+| FR-SP-14 | 敏感性分析 API（龙卷风图） | Epic 20 | Story 90.2 | P2 |
+| FR-SP-15 | 情景对比 API（3 方案并排） | Epic 20 | Story 90.3 | P2 |
+| FR-SP-16 | 白标品牌定制与监管报告导出 API | Epic 20 | Story 90.4 | P2 |
+| FR-SP-17 | 风险热力图 API | Epic 20 | Story 90.5 | P2 |
 | **用户交互与报告 (UI) - 1 项** |
 | FR-UI-13 | 决策影响分析（Shapley 贡献值） | Epic 19 | Story 19.1 | P2 |
 | **系统管理与合规 (SC) - 2 项** |

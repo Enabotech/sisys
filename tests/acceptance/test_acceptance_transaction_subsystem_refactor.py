@@ -1,4 +1,4 @@
-"""Acceptance tests for Story 20-7 - 事务子系统重构.
+"""Acceptance tests for Story 90-7 - 事务子系统重构.
 
 BDD step definitions for transaction subsystem refactoring.
 Tests cover Session lifecycle separation, UoW instance isolation,
