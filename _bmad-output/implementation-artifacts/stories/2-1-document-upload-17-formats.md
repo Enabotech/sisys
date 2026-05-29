@@ -707,7 +707,7 @@
 src/
 ├── domain/
 │   ├── entities/
-│   │   └── document.py                      # [已有] 扩展 tenant_id/uploaded_by/content_hash
+│   │   └── document.py                      # [已有] 扩展 tenant_id/uploaded_by
 │   ├── events/
 │   │   └── document_events.py               # [已有] 新增 DocumentUploaded 事件
 │   ├── ports/
