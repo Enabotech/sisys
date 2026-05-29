@@ -12,7 +12,7 @@ userName: 'Agimtech'
 date: '2026-02-28'
 documentStatus: 'round-1-review-complete'
 lastUpdated: '2026-05-29'
-updateReason: 'R2审查修正 - FR-SR-09~13归属修正Epic3→Epic12/Epic20 Story编号90.x→20.x'
+updateReason: 'R3审查修正 - Story0.30定义补全/FR-IF-03 AC补全/NFR验收标准补全'
 ---
 
 # sisys - Epic Breakdown
@@ -1233,6 +1233,34 @@ So that **可以快速编写和执行测试用例**。
 └────────────────────────────────────┘
 ```
 
+### Story 0.30: 应用启动集成
+
+As a **DevOps 工程师**,
+I want **系统启动后所有服务组件可用并可验证**,
+So that **用户可以正常使用系统所有功能**。
+
+**Acceptance Criteria:**
+
+**Given** Epic 0 Iteration 1 所有基础设施组件已部署（K3S/Gitea/Harbor/ArgoCD）
+**When** 执行应用一键启动
+**Then** 所有服务健康检查通过
+**And** 服务间连通性验证通过
+**And** 基础功能端到端可用（CLI 命令执行 / REST API 响应 / 文档上传）
+
+**TDD 测试要求:**
+1. **集成测试**
+   - [ ] 服务健康检查测试 - 验证所有组件可用（K3S/Gitea/Harbor/ArgoCD/PostgreSQL/Redis）
+   - [ ] 服务连通性测试 - 验证组件间网络通信正常
+   - [ ] CLI 端到端测试 - 验证 `sisys system health` 命令正确返回各服务状态
+   - [ ] REST API 端到端测试 - 验证 `/api/v1/health` 返回 200
+
+2. **性能要求**
+   - [ ] 系统启动时间 <5 分钟
+   - [ ] 健康检查响应延迟 P95 < 500ms
+
+3. **覆盖率要求**
+   - 集成测试覆盖率 >= 75%
+
 ### Story 1.1: 六边形架构骨架
 
 As a **系统架构师**,
@@ -1422,6 +1450,9 @@ So that **支持 ACID 事务和外键约束**。
    - [ ] 查询延迟 P95<50ms
    - [ ] 事务提交成功率 100%
    - [ ] 并发连接支持≥100
+   - [ ] 数据备份测试 - 验证每日全量 + 实时增量备份执行
+   - [ ] RPO 测试 - 验证恢复点目标 <1 小时
+   - [ ] RTO 测试 - 验证恢复时间目标 <4 小时
 
 3. **覆盖率要求**
    - [ ] 基础设施层覆盖率≥75%
@@ -1670,6 +1701,8 @@ So that **满足数据安全法和 PIPL 要求**。
    - [ ] 数据境内存储 100%
    - [ ] 跨境传输审批率 100%
    - [ ] PIPL 合规
+   - [ ] 个人信息脱敏率 100%（敏感字段识别 + 脱敏规则执行验证）
+   - [ ] 删除请求响应时间 <24 小时（SLA 监控）
 
 3. **覆盖率要求**
    - [ ] 安全层覆盖率≥85%
@@ -3674,6 +3707,7 @@ So that **Agent 自主完成任务并输出可验证结果**。
    - [ ] Agent 工作流执行测试 - 验证感知→规划→执行→验证→反思→证据打包流程
    - [ ] JSON 思维链输出测试 - 验证思维链格式正确
    - [ ] 证据打包测试 - 验证输出可验证
+   - [ ] SAP 消息 Schema 定义测试 - 验证 SAPMessage Pydantic 模型包含所有必需字段（message_id/conversation_id/sender_id/receiver_id/message_type/priority/content/correlation_id/isolation_level/blackboard_visible）
 
 2. **性能要求**
    - [ ] 工作流执行延迟 P95<10s（含 LLM 推理 + 思维链生成 + 证据打包）
