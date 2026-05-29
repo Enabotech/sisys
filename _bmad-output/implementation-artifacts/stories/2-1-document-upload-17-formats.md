@@ -855,8 +855,10 @@ tests/
 - API 认证：JWT（OAuth 2.1），通过 `Depends(get_current_user)` 获取 `TokenPayload` 值对象
 - `TokenPayload` 字段：`user_id: UUID`, `username: str`, `roles: tuple[str, ...]`, `exp: datetime`, `iat: datetime | None`
 - **tenant_id 获取机制 — 已决策：JWT Payload 扩展（方案 A）**：
-  - 选型理由：(1) `get_current_user` 为每次请求的 hot path，当前不查 PG（仅 Redis 黑名单检查 + JWT 纯解码），保持此性能优势；(2) login 时已有 3+ 次 DB 查询（用户+锁定检查+角色），追加 tenant_id 查询边际成本为零；(3) 当前 RBAC 为全局性设计（角色不与 tenant 关联），tenant_id 对用户是稳定属性，适合放入 JWT
+  - 选型理由（对标业界 B2B SaaS 最佳实践 — Azure AD `tid` claim / OIDC 标准）：(1) `get_current_user` 为每次请求的 hot path，当前不查 PG（仅 Redis 黑名单检查 + JWT 纯解码），保持此性能优势；(2) login 时已有 3+ 次 DB 查询（用户+锁定检查+角色），追加 tenant_id 查询边际成本为零；(3) 当前 RBAC 为全局性设计（角色不与 tenant 关联），tenant_id 对用户是稳定属性，适合放入 JWT
   - 改动范围：(1) `User` 实体 + `UserModel` 新增 `tenant_id` 字段 + Alembic migration；(2) `TokenPayload` 新增 `tenant_id: str` 字段；(3) `JWTService.create_access_token()` 将 `tenant_id` 写入 JWT claims；(4) `AuthService.authenticate()` login 流程中读取 User.tenant_id 并传入 token 签发
+  - **安全约束（防篡改校验）**：`AuthService.authenticate()` 签发 token 时，必须从数据库查询的 `User` 实体读取 `tenant_id`（而非信任客户端传入值），确保 JWT 中的 tenant_id 经过服务端权威验证。这是 JWT Claims 模式的标准安全要求——token 中的 tenant_id 必须由服务端在认证时刻绑定，后续请求仅解码验证，不做二次查询
+  - 租户切换：通过重新 login（或 refresh token）签发含新 tenant_id 的 token，无需热切换机制
   - 本 Story 的 API 路由通过 `Depends(get_current_user)` 获取 `TokenPayload`，从中提取 `token_payload.tenant_id` 传递给 `DocumentUploadService`。认证系统扩展（User/TokenPayload/JWTService/AuthService）作为本 Story 的前置或并行 Task
 - 权限检查：RBAC 中间件校验 `document:upload` 权限（通过 `TokenPayload.roles` 判断）
 
@@ -1166,6 +1168,7 @@ tests/
 | 72 | tenant_id 获取机制决策落地：JWT Payload 扩展（方案 A） | 决策 | TokenPayload 新增 tenant_id，login 时签入 JWT claims，API 层从 token 获取 |
 | 73 | MinIO MIME 类型存储决策落地：增强 store_document() 接口 | 决策 | DocumentStoragePort.store_document() 新增可选 content_type 参数 |
 | 74 | 事件发布模式决策落地：必须可靠 RELIABLE | 决策 | AC-5/实现细节/ChannelMapping 统一为 RELIABLE 模式，移除"双通道"误导描述 |
+| 75 | tenant_id JWT 安全约束缺失 — 未要求服务端权威验证（防篡改校验） | P0 | 补充安全约束：authenticate() 必须从 DB 查询的 User 实体读取 tenant_id 签入 token，禁止信任客户端传入值 |
 
 ### 🔍 代码审查发现 Review Findings
 
@@ -1192,12 +1195,12 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.2.1
+**故事版本/Story Version:** v0.2.2
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.2.2: 补充 tenant_id JWT 安全约束（防篡改校验 — 服务端权威验证 + 禁止信任客户端传入值）
 - v0.2.1: 第三轮审查第5轮终审 — 三项决策落地（tenant_id JWT扩展/MinIO MIME增强/事件RELIABLE模式）
-- v0.2.0: 第三轮审查第4轮 — 技术可行性风险全面修正
 - v0.1.2: 第三轮审查第3轮 — 分片边界值对齐代码/端口@runtime_checkable/symlink测试/事务原子性Subtask/测试分类表扩充/Base导入路径/工厂函数类型注解
 - v0.1.1: 第三轮审查第2轮 — 补充 AC-1~6 边界条件（symlink 防护/事务原子性/jpeg 双扩展名/分片边界值等）、Task 依赖声明、Subtask 顺序重排
 - v0.1.0: 第三轮审查第1轮 — 修复 JSON:API 风格/Document.metadata 类型/路由注册模式/分片上传技术细节/事件默认值策略
