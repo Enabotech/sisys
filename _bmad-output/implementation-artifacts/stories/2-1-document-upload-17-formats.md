@@ -19,7 +19,7 @@
 ## 📖 Story 描述
 
 **As a** 企业战略人员,
-**I want** 上传 17 种格式的文档（pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/html + zip/tar 压缩包）,
+**I want** 上传 17 种格式的文档（pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/html/rtf + zip/tar 压缩包）,
 **So that** 系统可以处理企业现有各类文档。
 
 ### 业务价值
@@ -48,7 +48,7 @@
 ### AC-1: 17 种格式文件上传
 
 **Given** 用户已登录并具有上传权限（RBAC 角色包含 `document:upload` 权限）
-**When** 用户通过 REST API 或 CLI 上传单个文件（支持 17 种格式）
+**When** 用户通过 REST API 上传单个文件（支持 17 种格式）
 **Then** 系统校验文件格式和 MIME 类型，拒绝不支持的格式
 **And** 系统校验文件大小不超过单文件限制（20GB）
 **And** 文件存入 MinIO `raw-documents` bucket，路径 `documents/{user_id}/{doc_type}/{YYYY-MM}/{timestamp}`
@@ -56,7 +56,7 @@
 **And** 返回 `document_id` 和上传状态
 
 **验证标准/Validation Criteria:**
-- [ ] 支持 17 种格式（15 种文档格式 + 2 种压缩格式）：pdf, txt, doc, docx, ppt, pptx, xls, xlsx, csv, jpeg, png, gif, markdown（含 .md 扩展名）, html, zip, tar
+- [ ] 支持 17 种格式（15 种文档格式 + 2 种压缩格式）：pdf, txt, doc, docx, ppt, pptx, xls, xlsx, csv, jpeg, png, gif, markdown（含 .md 扩展名）, html, rtf, zip, tar
 - [ ] MIME 类型与文件扩展名双向校验
 - [ ] 不支持的格式返回 400 + 明确错误信息
 - [ ] 空文件拒绝（file_size_bytes > 0）
@@ -275,9 +275,10 @@
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | DocumentFormat 值对象 | 格式校验、MIME 映射 | `tests/unit/domain/value_objects/test_document_format.py` | Task 1 |
 | **TDD 单元测试** | UploadLimits 常量 | 大小限制、分片策略 | `tests/unit/domain/value_objects/test_upload_limits.py` | Task 1 |
-| **TDD 单元测试** | Document 实体扩展 | tenant_id/uploaded_by/content_hash 字段 | `tests/unit/domain/entities/test_document.py` | Task 1 |
+| **TDD 单元测试** | Document 实体扩展 | tenant_id/uploaded_by 字段 | `tests/unit/domain/entities/test_document.py` | Task 1 |
 | **TDD 单元测试** | DocumentUploaded 事件 | 事件构造、字段校验 | `tests/unit/domain/events/test_document_uploaded.py` | Task 2 |
 | **TDD 单元测试** | DocumentRepositoryPort 接口 | 端口契约签名 | `tests/unit/domain/ports/test_document_repository.py` | Task 2 |
+| **TDD 单元测试** | PostgresDocumentRepository | CRUD 操作、租户隔离 | `tests/unit/infrastructure/storage/postgresql/test_document_repository.py` | Task 3 |
 | **TDD 单元测试** | DocumentUploadService | 上传编排逻辑 | `tests/unit/application/services/test_document_upload_service.py` | Task 4 |
 | **TDD 单元测试** | ChunkedUploadManager | 分片上传状态管理 | `tests/unit/infrastructure/storage/redis/test_chunked_upload_manager.py` | Task 5 |
 | **TDD 单元测试** | ArchiveExtractor | 压缩包解压、格式过滤 | `tests/unit/infrastructure/external_services/test_archive_extractor.py` | Task 6 |
@@ -286,6 +287,7 @@
 | **TDD 契约测试** | 端口契约 | 端口注册、版本、兼容性 | `tests/contracts/test_port_contract_document_upload.py` | Task 0 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `tests/acceptance/test_acceptance_document_upload.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_document_upload.py` | Task 0 |
+| **TDD 验收测试** | 收尾验收场景 | src 与测试完成清单确认 | `tests/acceptance/test_acceptance_document_upload.feature` | Task 10 |
 | **集成测试** | 文档上传完整流程 | API→Service→MinIO→PG→事件 | `tests/integration/test_document_upload_integration.py` | Task 8 |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖 | `tests/unit/architecture/test_arch_document_upload.py` | Task 9 |
 
@@ -624,7 +626,7 @@
 - [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_arch_document_upload.py`
 - [ ] Subtask 9.2: 验证 domain 层零外部依赖（import-linter 规则）
 - [ ] Subtask 9.3: 验证依赖方向正确（interfaces → application → domain, infrastructure → application → domain）
-- [ ] Subtask 9.4: 验证端口注册完整性（registry 中 document_upload_port、document_repository 存在且版本正确）
+- [ ] Subtask 9.4: 验证端口注册完整性（registry 中 document_repository 存在且版本正确）
 - [ ] Subtask 9.5: 运行完整测试套件并生成报告
 
 **完成标准/Definition of Done:**
@@ -739,12 +741,10 @@ src/
 │   └── config/
 │       └── minio.py                         # [已有] MinIOConfig
 ├── interfaces/
-│   ├── api/
-│   │   ├── document_upload.py               # [新建] FastAPI 上传路由
-│   │   └── app.py                           # [已有] 注册新路由
-│   └── cli/
-│       └── document_commands.py             # [新建] Typer upload 命令
-└── composition_root.py                      # [已有] 注册新端口
+│   └── api/
+│       ├── document_upload.py               # [新建] FastAPI 上传路由
+│       └── app.py                           # [已有] 注册新路由
+└── composition_root.py                      # [已有] 注册新端口和服务
 
 tests/
 ├── unit/
@@ -756,10 +756,8 @@ tests/
 │   │       ├── test_document_format.py      # [新建]
 │   │       └── test_upload_limits.py        # [新建]
 │   ├── application/
-│   │   ├── ports/test_document_upload_port.py # [新建]
 │   │   └── services/
-│   │       ├── test_document_upload_service.py # [新建]
-│   │       └── test_chunked_upload_manager.py  # [新建]
+│   │       └── test_document_upload_service.py # [新建]
 │   ├── infrastructure/
 │   │   ├── storage/
 │   │   │   ├── postgresql/test_document_repository.py # [新建]
@@ -912,7 +910,7 @@ tests/
 
 ### 完成总结 Completion Summary
 
-1. [x] All tasks defined 所有任务定义完成（10 个 Task）
+1. [x] All tasks defined 所有任务定义完成（11 个 Task，Task 0-10）
 2. [x] All acceptance criteria specified 所有验收标准已定义（6 个 AC）
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
@@ -938,11 +936,23 @@ tests/
 | 10 | 缺少 PG 索引策略 | P1 | Task 3 增加 Subtask 3.5 索引创建 |
 | 11 | DocumentRepository 命名不一致 | P1 | 统一为 DocumentRepositoryPort |
 
+> 第2轮审查修订（2026-05-29）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 12 | 格式计数14+2=16≠17，缺少1种文档格式 | P0 | 新增 rtf 格式，达到 15+2=17 |
+| 13 | content_hash 残留（测试分类表第278行） | P0 | 修正为 tenant_id/uploaded_by |
+| 14 | document_upload_port 残留（Task 9 Subtask 9.4） | P0 | 移除引用 |
+| 15 | CLI 残留（项目结构、AC-1 When 语句） | P1 | 清除所有 CLI 引用 |
+| 16 | 测试分类表缺 Task 3 和 Task 10 行 | P1 | 补充缺失行 |
+| 17 | Completion Summary Task 数量错误（10→11） | P1 | 修正为 11 个 Task |
+
 ---
 
-**故事版本/Story Version:** v0.0.2
+**故事版本/Story Version:** v0.0.3
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
+- v0.0.3: 第2轮审查修订 — 修复残留不一致（格式计数/幽灵条目/测试表缺失/CLI残留/content_hash残留）
 - v0.0.2: 第1轮审查修订 — 修复 P0 格式计数/秒传范围蔓延/架构层级违规/命名错误，P1 CLI/查询范围修正/索引策略
 - v0.0.1: 创建故事文件
