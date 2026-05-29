@@ -585,6 +585,7 @@ updateReason: 'Story 4.6~4.9完整定义补充 - 工具版本管理/Validation F
 |-------|------|---------|------|
 | Story 0.1-0.3 | Iteration 0（开发环境/CI/CD/测试框架） | 基础设施准备 | 技术使能 Story |
 | Story 0.4-0.9/0.14-0.18 | Iteration 1（重构开发环境/CI/CD/测试框架） | 基础设施准备 | 技术使能 Story |
+| Story 0.30 | 应用启动与系统集成 | 验证完整应用启动流程与各子系统协同 | 技术使能 Story |
 | Story 1.13 | K8s 动态扩缩容 | NFR-SCALE-03（可扩展性） | NFR Story |
 | Story 1.14a/b/c | 自主调用循环（auto-trigger/auto-route/auto-execute） | or.md 系统公理一 | or.md 追溯 |
 | Story 1.15a/b | 外部化记忆（上下文压缩/六层存储协同） | or.md 系统公理二 | or.md 追溯 |
@@ -594,9 +595,10 @@ updateReason: 'Story 4.6~4.9完整定义补充 - 工具版本管理/Validation F
 | Story 7.5 | 无障碍设计 | NFR-ACC-01（可访问性） | NFR Story |
 | Story 7.6 | API 契约测试 | NFR-INT-05（集成性） | NFR Story |
 | Story 7.7 | API E2E 测试 | 端到端测试 | 测试 Story |
+| Story 12.6 | 实体关系查询（Cypher 图遍历） | NFR-PERF-07（图遍历查询延迟 V1 目标）+ or.md 一.5.(4) 架构要求 | NFR/or.md Story |
 
 **NFR 覆盖统计：**
-- NFR-PERF（性能）：Story 3.1/3.5（检索延迟）
+- NFR-PERF（性能）：Story 3.1/3.5（检索延迟），Story 12.6（图遍历查询延迟）
 - NFR-SEC（安全）：Story 8.5/8.6（ShieldCortex/渗透测试）
 - NFR-COMP（合规）：Story 1.12（等保 2.0）
 - NFR-SCALE（可扩展性）：Story 1.13（K8s 扩缩容）✅
@@ -3347,7 +3349,7 @@ So that **提醒用户注意数据时效性**。
 | Story 4.6 | 工具版本管理（灰度发布与回滚） | 工具可安全迭代，异常版本可快速恢复 | 依赖 Story 4.1, Story 4.3 | P1-6（V1） |
 | Story 4.7 | Validation Feedback 闭环 | 工具执行失败可自动恢复或明确标记 | 依赖 Story 4.3, Story 4.4 | P1-7（V1） |
 | Story 4.8 | SAP 协议支持（内部 Agent 通信） | 多 Agent 协作可通过统一协议通信 | 依赖 Story 1.3（事件总线）, Story 5.3 | P1-8（V1） |
-| Story 4.9 | 财务建模与估值基础 | 战略规划财务量化分析可自动计算 | 依赖 Story 4.1, Story 3.1a | P1-9（V1） |
+| Story 4.9 | 财务建模与估值基础 | 战略规划财务量化分析可自动计算 | 依赖 Story 4.1, Story 4.3, Story 3.1a | P1-9（V1） |
 
 **✅ 依赖关系验证：**
 - Epic 4 依赖 Epic 1 的架构骨架（Story 1.1）和存储层（Story 1.7）
