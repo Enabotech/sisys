@@ -10,9 +10,9 @@ workflowType: 'epics-and-stories'
 projectName: 'sisys'
 userName: 'Agimtech'
 date: '2026-02-28'
-documentStatus: 'round-4-verification-complete'
+documentStatus: 'round-5-final-complete'
 lastUpdated: '2026-05-29'
-updateReason: 'R3审查修正 - Story0.30定义补全/FR-IF-03 AC补全/NFR验收标准补全'
+updateReason: 'R5终审完成 - FR-EV来源说明补充/文档一致性终验通过'
 ---
 
 # sisys - Epic Breakdown
@@ -573,7 +573,7 @@ updateReason: 'R3审查修正 - Story0.30定义补全/FR-IF-03 AC补全/NFR验�
 | SA（战略档案库） | 3 | 4 | 2 | 9 | ✅ 9/9 |
 | **总计** | **59** | **48** | **24** | **131** | ✅ **131/131** |
 
-**注：** FR-SA-10（群体智能，P3）为 V3+ 版本功能，暂不纳入本次 Epic 分解；FR-IF-01~07（接口与协议）详见 PRD 补充说明，部分验收标准已融入对应 UI/ST/AR 系列 Story
+**注：** FR-SA-10（群体智能，P3）为 V3+ 版本功能，暂不纳入本次 Epic 分解；FR-IF-01~07（接口与协议）详见 PRD 补充说明，部分验收标准已融入对应 UI/ST/AR 系列 Story；**FR-EV-01~04（Agent 评估与可观测性）源自架构设计文档（sisys-core-domain-design.md 17.3.8），作为 PRD 的技术细化补充**，待后续同步更新至 PRD
 
 ---
 
