@@ -618,7 +618,7 @@ updateReason: 'Story 4.6~4.9完整定义补充 - 工具版本管理/Validation F
 | Epic 1 | **企业级架构基础与合规** | P0 | AR-01~04, SC-01/02/03/07/08, CP-01/04, SA-01 | 23 | 系统稳定性、性能、安全、合规（等保 2.0） |
 | Epic 2 | 文档与数据管理 | P0 | DM-01~08 | 9 | 用户可以上传和管理 17 种格式文档 |
 | Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 13 | 用户可以检索文档并溯源至原始坐标点 |
-| Epic 4 | 战略工具箱 | P0 | ST-01~05 | 5 | 用户可以执行 23 种战略工具分析（含 ST-06~09 P1 V1 扩展） |
+| Epic 4 | 战略工具箱 | P0 | ST-01~05 | 9 | 用户可以执行 23 种战略工具分析（含 ST-06~09 P1 V1 扩展） |
 | Epic 5 | Agent 协作系统 | P0 | AC-01~06, EV-01/02 | 10 | 用户可以通过 CEO Agent 执行战略规划（含 EV-03/04 P1 扩展） |
 | Epic 6 | 战略规划流程 (BLM 前两阶段) | P0 | SP-01~04, UI-04/05/06/07 | 12 | 用户可以生成战略规划并审批 |
 | Epic 7 | **多触点用户界面与 API 集成** | P0 | UI-01/02/03, CP-03 | 8 | 用户可以通过 CLI/API/仪表盘操作系统 |
@@ -3716,7 +3716,7 @@ So that **战略规划中的财务量化分析可自动计算并验证**。
 
 2. **性能要求**
    - [ ] 单次估值计算延迟 P95<5s
-   - [ ] 计算准确率≥90%（与专业财务软件对齐）
+   - [ ] 计算精度与 Excel 基准对齐（误差 < 0.01%）
    - [ ] 并发估值请求≥10
 
 3. **覆盖率要求**
@@ -5718,8 +5718,8 @@ graph TD
         S0_30["Story 0.30<br/>应用启动集成<br/>📋 ready-for-dev"]
     end
 
-    %% ========== Epic 1 (进行中) ==========
-    subgraph "Epic 1 🔄 (进行中 - 13/22 完成)"
+    %% ========== Epic 1 (已完成) ==========
+    subgraph "Epic 1 ✅ (已完成 - 23/23)"
         direction TB
         S1_1["Story 1.1<br/>六边形架构脚手架<br/>✅ Done"]
         S1_2["Story 1.2<br/>领域事件定义<br/>✅ Done"]
@@ -5729,21 +5729,21 @@ graph TD
         S1_6["Story 1.6<br/>Qdrant 向量层<br/>✅ Done"]
         S1_7["Story 1.7<br/>MinIO 对象层<br/>✅ Done"]
         S1_8["Story 1.8<br/>Neo4j 图层<br/>✅ Done"]
-        S1_9["Story 1.9<br/>RBAC 权限管理<br/>🔄 In-Progress"]
-        S1_10["Story 1.10<br/>统一审计日志<br/>📋 Backlog"]
-        S1_11["Story 1.11<br/>数据主权隔离<br/>📋 Backlog"]
-        S1_12["Story 1.12<br/>等保 2.0 三级<br/>📋 Backlog"]
+        S1_9["Story 1.9<br/>RBAC 权限管理<br/>✅ Done"]
+        S1_10["Story 1.10<br/>统一审计日志<br/>✅ Done"]
+        S1_11["Story 1.11<br/>数据主权隔离<br/>✅ Done"]
+        S1_12["Story 1.12<br/>等保 2.0 三级<br/>✅ Done"]
         S1_13["Story 1.13<br/>K8s 动态扩缩容<br/>✅ Done"]
         S1_14a["Story 1.14a<br/>自主调用 trigger<br/>✅ Done"]
         S1_14b["Story 1.14b<br/>自主调用 route<br/>✅ Done"]
         S1_14c["Story 1.14c<br/>自主调用 execute<br/>✅ Done"]
         S1_15a["Story 1.15a<br/>外部化记忆压缩<br/>✅ Done"]
-        S1_15b["Story 1.15b<br/>外部化记忆协同<br/>🔄 In-Progress"]
+        S1_15b["Story 1.15b<br/>外部化记忆协同<br/>✅ Done"]
         S1_16["Story 1.16<br/>集成测试框架<br/>✅ Done"]
         S1_17["Story 1.17<br/>UDMR 基础路由<br/>✅ Done"]
-        S1_18a["Story 1.18a<br/>Prefect 工作流<br/>📋 ready-for-dev"]
-        S1_18b["Story 1.18b<br/>LangGraph 编排<br/>📋 Backlog"]
-        S1_19["Story 1.19<br/>成本度量基础<br/>📋 Backlog"]
+        S1_18a["Story 1.18a<br/>Prefect 工作流<br/>✅ Done"]
+        S1_18b["Story 1.18b<br/>LangGraph 编排<br/>✅ Done"]
+        S1_19["Story 1.19<br/>成本度量基础<br/>✅ Done"]
     end
 
     %% ========== Epic 2-8 (待开始) ==========
