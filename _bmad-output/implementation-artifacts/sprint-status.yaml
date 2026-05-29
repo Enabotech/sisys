@@ -36,7 +36,7 @@ story_location: _bmad-output/implementation-artifacts/stories
 
 development_status:
   # ===========================================================================
-  # Epic 0: Iteration 0 (开发基础设施) - ✅ 已完成
+  # Epic 0: Iteration 0 (开发基础设施) - ✅ 已完成（Epic 0 整体 in-progress）
   # ===========================================================================
   epic-0: in-progress
   0-1-dev-environment-setup: done
@@ -54,7 +54,7 @@ development_status:
   0-7-argocd-continuous-deployment: done
   0-8-gitea-runner-configuration: done
   0-9-ci-cd-pipeline-template: done
-  # 价值组 1.2: SISYS 产品交付系统（面向客户）
+  # 价值组 1.2: SISYS 产品交付系统（面向客户）— 编号 0-10~0-13 未使用
   0-14-windows-installer: done
   0-15-mac-installer: done
   0-16-linux-installer: done
@@ -324,7 +324,7 @@ development_status:
   19-3-predictive-strategic-alert-cusum-drift: backlog
   epic-19-retrospective: optional
 
-    # ===========================================================================
+  # ===========================================================================
   # Epic 20: 重大重构 (epic文档不追踪) - ✅ 已完成
   # ===========================================================================
   epic-20: done
