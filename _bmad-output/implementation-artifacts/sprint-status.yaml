@@ -342,11 +342,11 @@ development_status:
 # Summary:
 # =============================================================================
 # Total Epics: 21 (Epic 0-20, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
-# Total Stories (excluding retrospectives): 161
+# Total Stories (excluding retrospectives): 165
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 📋 3 ready-for-dev)
 #   - Epic 1: 23 stories (✅ done)
-#   - Epic 2-19: 115 stories (📋 backlog)
+#   - Epic 2-19: 119 stories (📋 backlog, 含 Epic 5 新增 4 个 EV 评估 Story)
 #   - Epic 20: 8 stories (✅ done)
 #
 # Status Summary:
@@ -355,10 +355,10 @@ development_status:
 #     - Ready for Dev: 3 (0-17, 0-18, 0-30)
 #     - In Progress: 0
 #     - Review: 0
-#     - Backlog: 115
+#     - Backlog: 119
 #   Epics:
-#     - Done: 3 (Epic 0, Epic 1, Epic 20)
-#     - In Progress: 0
+#     - Done: 2 (Epic 1, Epic 20)
+#     - In Progress: 1 (Epic 0)
 #     - Backlog: 18 (Epic 2-19)
 #   Retrospectives:
 #     - Done: 1 (Epic 1)
