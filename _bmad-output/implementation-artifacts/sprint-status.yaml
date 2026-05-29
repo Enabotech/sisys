@@ -38,7 +38,7 @@ development_status:
   # ===========================================================================
   # Epic 0: Iteration 0 (开发基础设施) - ✅ 已完成
   # ===========================================================================
-  epic-0: done
+  epic-0: in-progress
   0-1-dev-environment-setup: done
   0-2-ci-cd-pipeline: done
   0-3-test-framework-setup: done
@@ -152,6 +152,10 @@ development_status:
   5-4-eip-basic-elastic-isolation: backlog
   5-5-agent-triple-hard-isolation: backlog
   5-6-isolation-switching-log: backlog
+  5-7-phoenix-evaluation-harness: backlog
+  5-8-agent-output-quality-evaluation: backlog
+  5-9-cusum-drift-detection-recalibration: backlog
+  5-10-checkpoint-with-evaluation-integration: backlog
   epic-5-retrospective: optional
 
   # ===========================================================================
