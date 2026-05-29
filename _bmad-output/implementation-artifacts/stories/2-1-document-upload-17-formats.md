@@ -12,7 +12,7 @@
 > 3. **领域事件已存在** — `DocumentProcessed` 事件（`src/domain/events/document_events.py`）已实现，双通道配置已在 `configs/event_channels.yaml` 注册
 > 4. **MVP 范围** — 本 Story 仅负责文件接收（上传 → 校验 → 存储 → 元数据持久化），不负责文档解析（Story 2.2a 负责）
 > 5. **分片上传** — MinIO 原生支持分片上传，Story 1.7 已在 `ObjectOperations`（`src/infrastructure/storage/minio/object_operations.py`）中实现分片逻辑（含 `calculate_part_size()` 四级策略 + `resume_multipart_upload()`），本 Story 需在应用层编排分片上传流程
-> 6. **事件关系** — `DocumentUploaded`（本 Story 新增，上传完成触发）与 `DocumentProcessed`（已有，解析完成触发）是文档生命周期中的两个不同阶段事件，Story 2.2a 将消费 `DocumentUploaded` 并在解析完成后发布 `DocumentProcessed`
+> 6. **事件关系** — `DocumentUploaded`（本 Story 新增，上传完成触发，RELIABLE 模式 via Outbox→RabbitMQ）与 `DocumentProcessed`（已有，解析完成触发）是文档生命周期中的两个不同阶段事件，Story 2.2a 将消费 `DocumentUploaded` 并在解析完成后发布 `DocumentProcessed`
 
 ---
 
@@ -121,14 +121,14 @@
 
 **Given** 文档上传完成并存入 MinIO
 **When** 元数据写入 PostgreSQL 后
-**Then** 发布 `DocumentUploaded` 领域事件（realtime Redis + reliable RabbitMQ 双通道）
+**Then** 发布 `DocumentUploaded` 领域事件（RELIABLE 模式：RabbitMQ via Outbox 可靠投递）
 **And** 事件包含 document_id、filename、mime_type、file_size_bytes、tenant_id、uploaded_by
 **And** 事件触发后续文档解析流水线（Story 2.2a 消费此事件）
 
 **验证标准/Validation Criteria:**
 - [ ] `DocumentUploaded` 事件定义于 `src/domain/events/document_events.py`
-- [ ] 事件通道配置更新至 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`
-- [ ] 事件通过 `DualChannelEventBus` 发布
+- [ ] 事件通道配置更新至 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`（RELIABLE 模式）
+- [ ] 事件通过 `DualChannelEventBus` 发布（RELIABLE → Outbox → RabbitMQ）
 - [ ] 事件包含完整的文档元数据
 - [ ] 元数据写入 PostgreSQL 与 Outbox 写入在同一数据库事务内完成（保证原子性：元数据不存则事件不发布，避免孤立事件或丢失事件）
 
@@ -854,7 +854,10 @@ tests/
 **认证与上下文：**
 - API 认证：JWT（OAuth 2.1），通过 `Depends(get_current_user)` 获取 `TokenPayload` 值对象
 - `TokenPayload` 字段：`user_id: UUID`, `username: str`, `roles: tuple[str, ...]`, `exp: datetime`, `iat: datetime | None`
-- **tenant_id 获取机制待确定**：当前 `TokenPayload` 不含 `tenant_id` 字段，API 层无 tenant_id 传递机制，**且项目中所有现有仓储端口均无 tenant_id 参数**（UserRepositoryPort、RoleRepositoryPort 等均为无租户隔离设计）。本 Story 作为首个引入 tenant_id 的仓储端口，属于**多租户隔离的设计先行者**。实现时需在认证系统中扩展（如：JWT payload 中增加 `tenant_id` claim，或在用户注册表中关联 `tenant_id`）。本 Story 在 API 路由层预留 `tenant_id` 参数传递，具体获取方式依赖认证系统扩展
+- **tenant_id 获取机制 — 已决策：JWT Payload 扩展（方案 A）**：
+  - 选型理由：(1) `get_current_user` 为每次请求的 hot path，当前不查 PG（仅 Redis 黑名单检查 + JWT 纯解码），保持此性能优势；(2) login 时已有 3+ 次 DB 查询（用户+锁定检查+角色），追加 tenant_id 查询边际成本为零；(3) 当前 RBAC 为全局性设计（角色不与 tenant 关联），tenant_id 对用户是稳定属性，适合放入 JWT
+  - 改动范围：(1) `User` 实体 + `UserModel` 新增 `tenant_id` 字段 + Alembic migration；(2) `TokenPayload` 新增 `tenant_id: str` 字段；(3) `JWTService.create_access_token()` 将 `tenant_id` 写入 JWT claims；(4) `AuthService.authenticate()` login 流程中读取 User.tenant_id 并传入 token 签发
+  - 本 Story 的 API 路由通过 `Depends(get_current_user)` 获取 `TokenPayload`，从中提取 `token_payload.tenant_id` 传递给 `DocumentUploadService`。认证系统扩展（User/TokenPayload/JWTService/AuthService）作为本 Story 的前置或并行 Task
 - 权限检查：RBAC 中间件校验 `document:upload` 权限（通过 `TokenPayload.roles` 判断）
 
 **PostgreSQL 租户隔离：**
@@ -869,9 +872,9 @@ tests/
 - 需新建 SQLAlchemy Model：`DocumentModel(Base)` 定义表映射（`src/infrastructure/storage/postgresql/models/document.py`）
 
 **事件发布机制：**
-- 通过 Outbox 模式异步发布（写入 event_outbox 表，由后台 worker 投递至 Redis + RabbitMQ 双通道）
+- 通过 Outbox 模式可靠发布（写入 event_outbox 表，由后台 worker 投递至 RabbitMQ）
 - DocumentUploadService 调用 `EventPublisher.publish(event)` → 写入 Outbox → 确认事务提交 → 后台投递
-- **双通道发布限制**：当前 `DualChannelEventBus.publish()` 根据事件的 `delivery_mode` 走单通道（REALTIME→Redis Pub/Sub，RELIABLE→RabbitMQ via Outbox），不支持同一事件同时双通道发布。`DocumentUploaded` 配置为 RELIABLE 模式（走 RabbitMQ via Outbox），MVP 阶段仅保证可靠投递；实时通知（Redis Pub/Sub）推迟至后续增强或由 Outbox poller 在投递后额外触发
+- **已决策：文件上传事件必须可靠 RELIABLE**。`DocumentUploaded` 配置为 `DeliveryMode.RELIABLE`（RabbitMQ via Outbox），确保事件不丢失。AC-5 中的"双通道"描述修正为：事件通过 Outbox → RabbitMQ 可靠投递，后续可由 Outbox poller 在投递后额外触发 Redis 实时通知（非 MVP 范围）。ChannelMapping 配置保持 `redis_channel` 字段（预留，MVP 不走实时通道）
 - 新增事件需**双注册**：`configs/event_channels.yaml`（YAML 配置）+ `ChannelRouter.DEFAULT_MAPPINGS`（Python 字典）。路由优先级：yaml > DEFAULT_MAPPINGS。DocumentUploaded 的 ChannelMapping 格式：
   ```python
   "DocumentUploaded": ChannelMapping(
@@ -891,7 +894,7 @@ tests/
 
 **MinIO 存储注意事项：**
 - 现有 `MinIODocumentStorage.store_document()` 调用 `adapter.store()` 时未传 `content_type` 参数，所有文档以 `application/octet-stream` 存储
-- 本 Story Task 4 需增强 `store_document()` 调用，传入实际的 `mime_type`（或接受此限制，在元数据中保留 MIME 信息）
+- **已决策：增强 `store_document()` 接口**。Task 4 在 `DocumentStoragePort`（应用层端口）新增可选参数 `content_type: str | None = None`，`MinIODocumentStorage`（基础设施层实现）在调用 `adapter.store()` 时传递此参数。向后兼容：不传 `content_type` 时保持原有行为（`application/octet-stream`）
 
 **路由注册模式：**
 - 路由通过 `create_document_upload_router(service: DocumentUploadService, auth_service: AuthServicePort) -> APIRouter` 工厂函数导出，返回 `APIRouter` 实例
@@ -1156,14 +1159,23 @@ tests/
 | 70 | Task 5 Subtask 5.1 缺少分片乱序到达测试 | P1 | Subtask 5.1 补充分片乱序拒绝测试项 |
 | 71 | Task 4 Subtask 4.1 缺少空批量拒绝测试 | P1 | Subtask 4.1 补充空批量拒绝测试项 |
 
+> 第15轮审查修订（2026-05-29，第三轮审查第5轮终审 — 决策落地）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 72 | tenant_id 获取机制决策落地：JWT Payload 扩展（方案 A） | 决策 | TokenPayload 新增 tenant_id，login 时签入 JWT claims，API 层从 token 获取 |
+| 73 | MinIO MIME 类型存储决策落地：增强 store_document() 接口 | 决策 | DocumentStoragePort.store_document() 新增可选 content_type 参数 |
+| 74 | 事件发布模式决策落地：必须可靠 RELIABLE | 决策 | AC-5/实现细节/ChannelMapping 统一为 RELIABLE 模式，移除"双通道"误导描述 |
+
 ### 🔍 代码审查发现 Review Findings
 
 > 此 Section 在开发阶段（dev-story）填写，记录代码审查过程中的发现。
 
-#### 需决策 Decision Needed
+#### 已决策 Decided
 
-- [ ] tenant_id 获取机制：需与认证系统设计协调（JWT payload 扩展 or 用户表关联）
-- [ ] MinIO MIME 类型存储：是否增强 store_document() 接口，或接受 octet-stream 限制
+- [x] **tenant_id 获取机制**：JWT Payload 扩展 — `TokenPayload` 新增 `tenant_id: str` 字段，login 时从 User 实体读取并签入 JWT claims，API 层通过 `token_payload.tenant_id` 获取。理由：hot path 不查 PG、login 时边际成本为零、tenant_id 对用户是稳定属性
+- [x] **MinIO MIME 类型存储**：增强 `DocumentStoragePort.store_document()` 接口，新增可选参数 `content_type: str | None = None`，`MinIODocumentStorage` 传递给 MinIO SDK。向后兼容（不传时保持 `application/octet-stream`）
+- [x] **事件发布模式**：`DocumentUploaded` 必须可靠 RELIABLE — `DeliveryMode.RELIABLE`（RabbitMQ via Outbox），确保事件不丢失。Redis 实时通知预留通道但 MVP 不激活
 
 #### 已推迟 Defer
 
@@ -1180,11 +1192,12 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.2.0
+**故事版本/Story Version:** v0.2.1
 **创建日期/Created:** 2026-05-29
 **最后更新/Last Updated:** 2026-05-29
 **更新说明/Description:**
-- v0.2.0: 第三轮审查第4轮 — 技术可行性风险修正（Redis竞态/批量上传nginx/Row-Level隔离/双通道限制/session依赖/文件清单补全/Subtask补全）
+- v0.2.1: 第三轮审查第5轮终审 — 三项决策落地（tenant_id JWT扩展/MinIO MIME增强/事件RELIABLE模式）
+- v0.2.0: 第三轮审查第4轮 — 技术可行性风险全面修正
 - v0.1.2: 第三轮审查第3轮 — 分片边界值对齐代码/端口@runtime_checkable/symlink测试/事务原子性Subtask/测试分类表扩充/Base导入路径/工厂函数类型注解
 - v0.1.1: 第三轮审查第2轮 — 补充 AC-1~6 边界条件（symlink 防护/事务原子性/jpeg 双扩展名/分片边界值等）、Task 依赖声明、Subtask 顺序重排
 - v0.1.0: 第三轮审查第1轮 — 修复 JSON:API 风格/Document.metadata 类型/路由注册模式/分片上传技术细节/事件默认值策略
