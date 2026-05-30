@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
-    """PostgreSQL 模型基类。"""
+    """PostgreSQL 模型基类"""
 
     pass
 

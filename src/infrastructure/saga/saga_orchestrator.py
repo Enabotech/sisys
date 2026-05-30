@@ -72,12 +72,12 @@ class SagaOrchestrator:
 
     @property
     def context(self) -> SagaContext:
-        """获取当前执行上下文。"""
+        """获取当前执行上下文"""
         return self._context
 
     @property
     def steps(self) -> Sequence[SagaStep]:
-        """获取步骤列表。"""
+        """获取步骤列表"""
         return self._steps
 
     async def execute(self) -> SagaContext:

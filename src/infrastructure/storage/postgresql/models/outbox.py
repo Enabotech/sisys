@@ -23,7 +23,7 @@ pg_registry = registry()
 
 
 class Base(DeclarativeBase):
-    """所有 PostgreSQL 模型的声明式基类。"""
+    """所有 PostgreSQL 模型的声明式基类"""
 
     registry = pg_registry
 

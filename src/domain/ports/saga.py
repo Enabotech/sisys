@@ -27,32 +27,32 @@ class SagaStep(Protocol):
 
     @property
     def name(self) -> str:
-        """步骤唯一名称。"""
+        """步骤唯一名称"""
         ...
 
     async def execute(self, context: SagaContext) -> SagaContext:
-        """执行正向操作。"""
+        """执行正向操作"""
         ...
 
     async def compensate(self, context: SagaContext) -> SagaContext:
-        """执行补偿操作。"""
+        """执行补偿操作"""
         ...
 
 
 @runtime_checkable
 class SagaRepositoryProtocol(Protocol):
-    """Saga 实例持久化端口。"""
+    """Saga 实例持久化端口"""
 
     async def save(self, context: SagaContext) -> None:
-        """保存 Saga 上下文。"""
+        """保存 Saga 上下文"""
         ...
 
     async def load(self, saga_id: str) -> SagaContext | None:
-        """加载 Saga 上下文。"""
+        """加载 Saga 上下文"""
         ...
 
     async def update_status(self, saga_id: str, status: SagaStatus) -> None:
-        """更新 Saga 状态。"""
+        """更新 Saga 状态"""
         ...
 
 

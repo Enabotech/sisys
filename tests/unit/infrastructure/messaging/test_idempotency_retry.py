@@ -243,6 +243,6 @@ class TestDeadLetterQueue:
         assert error2 == "error2"
 
     def test_protocol_is_runtime_checkable(self):
-        """DeadLetterQueue Protocol 应该是 runtime_checkable 的。"""
+        """DeadLetterQueue Protocol 应该是 runtime_checkable 的"""
         dlq = InMemoryDeadLetterQueue()
         assert isinstance(dlq, DeadLetterQueue)

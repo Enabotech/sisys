@@ -24,7 +24,7 @@ class InMemoryEventStore(EventStore):
     """
 
     def __init__(self) -> None:
-        """初始化空的事件存储。"""
+        """初始化空的事件存储"""
         self._events_by_aggregate: dict[UUID, list[DomainEvent]] = defaultdict(list)
 
     def save_events(self, events: Sequence[DomainEvent]) -> None:
@@ -82,5 +82,5 @@ class InMemoryEventStore(EventStore):
         return list(all_events[start_idx:end_idx])
 
     def clear(self) -> None:
-        """清空所有已存储的事件（用于测试）。"""
+        """清空所有已存储的事件（用于测试）"""
         self._events_by_aggregate.clear()

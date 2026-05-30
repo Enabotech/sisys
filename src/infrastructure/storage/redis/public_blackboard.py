@@ -40,7 +40,7 @@ class RedisPublicBlackboard:
         self._redis = redis_client
 
     def _get_version_key(self, conversation_id: str) -> str:
-        """获取版本键。"""
+        """获取版本键"""
         return build_key(self._NAMESPACE, conversation_id, "version")
 
     async def post(
