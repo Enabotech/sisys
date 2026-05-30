@@ -240,6 +240,36 @@ class TestDocumentUploadServiceUploadBatch:
         assert result["success"] == 1
         assert result["failed"] == 1
 
+    def test_upload_batch_total_size_exceeds_limit_raises(self) -> None:
+        """批量上传总大小超过 20GB 时拒绝"""
+        service = _make_upload_service()
+
+        files = [
+            {"filename": f"big{i}.pdf", "mime_type": "application/pdf", "file_size_bytes": 11 * 1024 * 1024 * 1024}
+            for i in range(2)
+        ]
+
+        with pytest.raises(ValueError, match="总大小超过限制"):
+            asyncio.run(service.upload_batch(files=files, tenant_id="t1", uploaded_by="u1", file_paths=["/tmp/a", "/tmp/b"]))
+
+    def test_upload_batch_total_size_at_limit_accepted(self) -> None:
+        """批量上传总大小恰好等于 20GB 时接受"""
+        repo = AsyncMock(spec=DocumentRepositoryPort)
+        repo.save = AsyncMock(side_effect=lambda d: d)
+        publisher = AsyncMock(spec=EventPublisher)
+        publisher.publish = AsyncMock()
+        service = _make_upload_service(repo_mock=repo, publisher_mock=publisher)
+
+        max_batch = 20 * 1024 * 1024 * 1024
+        files = [
+            {"filename": "exact.pdf", "mime_type": "application/pdf", "file_size_bytes": max_batch},
+        ]
+
+        result = asyncio.run(service.upload_batch(files=files, tenant_id="t1", uploaded_by="u1", file_paths=["/tmp/a"]))
+
+        assert result["total"] == 1
+        assert result["success"] == 1
+
 
 class TestDocumentUploadServiceGetDocument:
     """验证 get_document 查询方法"""

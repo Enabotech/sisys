@@ -192,14 +192,14 @@ class TestChunkedUploadManagerUploadPart:
             await manager.upload_part("bad-id", 1, "etag")
 
     async def test_upload_part_duplicate_raises(self) -> None:
-        """重复分片编号抛出 ValueError"""
+        """重复分片编号抛出 ValueError（由顺序校验拦截）"""
         cache = _make_cache()
         manager = ChunkedUploadManager(cache)
 
         state_json = _make_state_json(uploaded_parts=[{"part_number": 1, "etag": "etag-001"}])
         cache.get = AsyncMock(return_value=state_json)
 
-        with pytest.raises(ValueError, match="已上传"):
+        with pytest.raises(ValueError, match="乱序"):
             await manager.upload_part("abc123", 1, "etag-001-again")
 
     async def test_upload_part_persists_updated_state(self) -> None:
@@ -217,6 +217,30 @@ class TestChunkedUploadManagerUploadPart:
         stored = json.loads(stored_json)
         assert len(stored["uploaded_parts"]) == 1
         assert stored["uploaded_parts"][0]["part_number"] == 1
+
+    async def test_upload_part_out_of_order_raises(self) -> None:
+        """分片乱序到达抛出 ValueError"""
+        cache = _make_cache()
+        manager = ChunkedUploadManager(cache)
+
+        # 已上传 part 1，期望下一个是 part 2
+        state_json = _make_state_json(uploaded_parts=[{"part_number": 1, "etag": "etag-001"}])
+        cache.get = AsyncMock(return_value=state_json)
+
+        with pytest.raises(ValueError, match="乱序"):
+            await manager.upload_part("abc123", 3, "etag-003")
+
+    async def test_upload_part_sequential_order_accepted(self) -> None:
+        """按顺序上传分片正常接受"""
+        cache = _make_cache()
+        manager = ChunkedUploadManager(cache)
+
+        # 已上传 part 1 和 2，期望下一个是 part 3
+        state_json = _make_state_json(uploaded_parts=[{"part_number": 1, "etag": "e1"}, {"part_number": 2, "etag": "e2"}])
+        cache.get = AsyncMock(return_value=state_json)
+
+        result = await manager.upload_part("abc123", 3, "etag-003")
+        assert result["uploaded_parts"] == 3
 
 
 class TestChunkedUploadManagerCompleteUpload:

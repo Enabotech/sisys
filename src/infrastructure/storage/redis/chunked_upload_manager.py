@@ -143,7 +143,7 @@ class ChunkedUploadManager:
             {"uploaded_parts": int}
 
         Raises:
-            ValueError: upload_id 不存在或分片乱序
+            ValueError: upload_id 不存在、分片乱序、或分片重复
         """
         lock = self._get_lock(upload_id)
         async with lock:
@@ -151,9 +151,10 @@ class ChunkedUploadManager:
             if state is None:
                 raise ValueError(f"upload_id {upload_id} 不存在或已过期")
 
-            for part in state.uploaded_parts:
-                if part["part_number"] == part_number:
-                    raise ValueError(f"分片 {part_number} 已上传")
+            # 校验分片顺序：下一个分片编号必须是已上传分片数 + 1
+            expected_next = len(state.uploaded_parts) + 1
+            if part_number != expected_next:
+                raise ValueError(f"分片乱序：期望第 {expected_next} 个分片，实际收到第 {part_number} 个")
 
             state.uploaded_parts.append({"part_number": part_number, "etag": etag})
             await self._cache.set(
