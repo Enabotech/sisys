@@ -25,7 +25,7 @@ class DocumentQuery:
         parse_status: 解析状态过滤
         document_type: 文档类型过滤
         uploaded_by: 上传者过滤
-        skip: 分页偏移量
+        offset: 分页偏移量
         limit: 分页大小
     """
 
@@ -34,7 +34,7 @@ class DocumentQuery:
     parse_status: str | None = None
     document_type: str | None = None
     uploaded_by: str | None = None
-    skip: int = 0
+    offset: int = 0
     limit: int = 100
 
 

@@ -25,6 +25,7 @@ class DocumentStoragePort(L4ObjectPort, Protocol):
         user_id: str,
         doc_type: str,
         file_path: str,
+        content_type: str | None = None,
         metadata: dict | None = None,
     ) -> str:
         """存储文档（自动生成对象路径）

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from unittest.mock import AsyncMock
 
 import pytest
@@ -64,8 +65,17 @@ class TestDocumentUploadServiceUploadSingleFile:
         assert doc.tenant_id == "t1"
         assert doc.uploaded_by == "u1"
         assert doc.parse_status == ParseStatus.PENDING
-        repo.save.assert_called_once()
-        storage.store_document.assert_called_once()
+
+        saved_doc = repo.save.call_args[0][0]
+        assert saved_doc.filename == "test.pdf"
+        assert saved_doc.tenant_id == "t1"
+
+        storage.store_document.assert_called_once_with(
+            user_id="u1",
+            doc_type="other",
+            file_path="/tmp/test.pdf",
+            content_type="application/pdf",
+        )
         publisher.publish.assert_called_once()
 
     def test_upload_unsupported_format_raises(self) -> None:
@@ -229,3 +239,151 @@ class TestDocumentUploadServiceUploadBatch:
         assert result["total"] == 2
         assert result["success"] == 1
         assert result["failed"] == 1
+
+
+class TestDocumentUploadServiceGetDocument:
+    """验证 get_document 查询方法"""
+
+    def test_get_document_found(self) -> None:
+        from src.application.services.document_upload_service import DocumentUploadService
+        from src.domain.entities.document import Document
+
+        doc = Document(
+            document_id=uuid.uuid4(),
+            filename="test.pdf",
+            mime_type="application/pdf",
+            file_size_bytes=1024,
+            tenant_id="t1",
+            uploaded_by="u1",
+        )
+        repo = AsyncMock(spec=DocumentRepositoryPort)
+        repo.find = AsyncMock(return_value=doc)
+        publisher = AsyncMock(spec=EventPublisher)
+        service = DocumentUploadService(
+            document_repository=repo,
+            document_storage=AsyncMock(),
+            event_publisher=publisher,
+        )
+
+        result = asyncio.run(service.get_document(doc.document_id, "t1"))
+
+        assert result is not None
+        assert result.document_id == doc.document_id
+        assert result.tenant_id == "t1"
+        repo.find.assert_called_once()
+
+    def test_get_document_not_found(self) -> None:
+        repo = AsyncMock(spec=DocumentRepositoryPort)
+        repo.find = AsyncMock(return_value=None)
+        service = _make_upload_service(repo_mock=repo)
+
+        result = asyncio.run(service.get_document(uuid.uuid4(), "t1"))
+
+        assert result is None
+
+
+class TestDocumentUploadServiceEdgeCases:
+    """验证边界值和异常路径"""
+
+    def test_upload_empty_filename_raises(self) -> None:
+        service = _make_upload_service()
+        with pytest.raises(ValueError, match="文件名"):
+            asyncio.run(
+                service.upload(
+                    filename="",
+                    mime_type="application/pdf",
+                    file_size_bytes=100,
+                    tenant_id="t1",
+                    uploaded_by="u1",
+                    file_path="/tmp/test.pdf",
+                )
+            )
+
+    def test_upload_whitespace_filename_raises(self) -> None:
+        service = _make_upload_service()
+        with pytest.raises(ValueError, match="文件名"):
+            asyncio.run(
+                service.upload(
+                    filename="   ",
+                    mime_type="application/pdf",
+                    file_size_bytes=100,
+                    tenant_id="t1",
+                    uploaded_by="u1",
+                    file_path="/tmp/test.pdf",
+                )
+            )
+
+    def test_upload_storage_failure_propagates(self) -> None:
+        storage = AsyncMock()
+        storage.store_document = AsyncMock(side_effect=OSError("MinIO 不可用"))
+        repo = AsyncMock(spec=DocumentRepositoryPort)
+        repo.save = AsyncMock(side_effect=lambda d: d)
+
+        service = _make_upload_service(repo_mock=repo, storage_mock=storage)
+
+        with pytest.raises(OSError, match="MinIO"):
+            asyncio.run(
+                service.upload(
+                    filename="test.pdf",
+                    mime_type="application/pdf",
+                    file_size_bytes=100,
+                    tenant_id="t1",
+                    uploaded_by="u1",
+                    file_path="/tmp/test.pdf",
+                )
+            )
+
+    def test_upload_repository_failure_propagates(self) -> None:
+        from src.application.services.document_upload_service import DocumentUploadService
+
+        storage = AsyncMock()
+        storage.store_document = AsyncMock(return_value="path")
+        repo = AsyncMock(spec=DocumentRepositoryPort)
+        repo.save = AsyncMock(side_effect=RuntimeError("PG 连接断开"))
+        publisher = AsyncMock(spec=EventPublisher)
+
+        service = DocumentUploadService(
+            document_repository=repo,
+            document_storage=storage,
+            event_publisher=publisher,
+        )
+
+        with pytest.raises(RuntimeError, match="PG"):
+            asyncio.run(
+                service.upload(
+                    filename="test.pdf",
+                    mime_type="application/pdf",
+                    file_size_bytes=100,
+                    tenant_id="t1",
+                    uploaded_by="u1",
+                    file_path="/tmp/test.pdf",
+                )
+            )
+
+    def test_upload_event_publish_failure_propagates(self) -> None:
+        from src.application.services.document_upload_service import DocumentUploadService
+
+        storage = AsyncMock()
+        storage.store_document = AsyncMock(return_value="path")
+        repo = AsyncMock(spec=DocumentRepositoryPort)
+        repo.save = AsyncMock(side_effect=lambda d: d)
+        publisher = AsyncMock(spec=EventPublisher)
+        publisher.publish = AsyncMock(side_effect=RuntimeError("RabbitMQ 不可用"))
+
+        service = DocumentUploadService(
+            document_repository=repo,
+            document_storage=storage,
+            event_publisher=publisher,
+        )
+
+        with pytest.raises(RuntimeError, match="RabbitMQ"):
+            asyncio.run(
+                service.upload(
+                    filename="test.pdf",
+                    mime_type="application/pdf",
+                    file_size_bytes=100,
+                    tenant_id="t1",
+                    uploaded_by="u1",
+                    file_path="/tmp/test.pdf",
+                )
+            )

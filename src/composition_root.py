@@ -1046,6 +1046,38 @@ def bootstrap() -> None:
         owner="doc-team",
     )
 
+    # DocumentUploadService — 应用层文档上传编排
+    from src.application.services.document_upload_service import DocumentUploadService
+
+    register_port(
+        name="document_upload_service",
+        version="v1.0.0",
+        interface=DocumentUploadService,
+        impl=lambda resolver: DocumentUploadService(
+            document_repository=resolver.resolve("document_repository"),
+            document_storage=resolver.resolve("document_storage"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.services.document_upload_service",
+        lifetime=Lifetime.SCOPED,
+        owner="doc-team",
+    )
+
+    # ChunkedUploadManager — 分片上传状态管理
+    from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadManager
+
+    register_port(
+        name="chunked_upload_manager",
+        version="v1.0.0",
+        interface=ChunkedUploadManager,
+        impl=lambda resolver: ChunkedUploadManager(
+            cache=resolver.resolve("redis_adapter"),
+        ),
+        module="src.infrastructure.storage.redis.chunked_upload_manager",
+        lifetime=Lifetime.SCOPED,
+        owner="doc-team",
+    )
+
     register_port(
         name="memory_graph_storage",
         version="v1.0.0",

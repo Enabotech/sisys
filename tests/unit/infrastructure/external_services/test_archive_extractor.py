@@ -342,6 +342,43 @@ class TestArchiveExtractorNesting:
         assert "outer.pdf" in filenames
         assert "inner.txt" in filenames
 
+    def test_nested_zip_total_size_no_double_count(self) -> None:
+        """嵌套解压 total_extracted_size 不双重计算"""
+        extractor = ArchiveExtractor()
+
+        inner_content = b"hello world"
+        inner_archive = _make_zip_file({"inner.txt": inner_content})
+        outer_content = b"outer content data"
+        outer_files = {"outer.pdf": outer_content, "inner.zip": inner_archive.getvalue()}
+        outer_archive = _make_zip_file(outer_files)
+
+        result = extractor.extract(outer_archive, "outer.zip")
+
+        expected = len(outer_content) + len(inner_content)
+        assert result.total_extracted_size == expected
+
+    def test_nested_tar_total_size_no_double_count(self) -> None:
+        """嵌套 TAR 解压 total_extracted_size 不双重计算"""
+        extractor = ArchiveExtractor()
+
+        inner_buf = io.BytesIO()
+        inner_content = b"hello world"
+        info = tarfile.TarInfo(name="inner.txt")
+        info.size = len(inner_content)
+        tf_inner = tarfile.open(fileobj=inner_buf, mode="w:gz")
+        tf_inner.addfile(info, io.BytesIO(inner_content))
+        tf_inner.close()
+        inner_buf.seek(0)
+
+        outer_content = b"outer content data"
+        outer_files = {"outer.pdf": outer_content, "inner.tar": inner_buf.getvalue()}
+        outer_archive = _make_zip_file(outer_files)
+
+        result = extractor.extract(outer_archive, "outer.zip")
+
+        expected = len(outer_content) + len(inner_content)
+        assert result.total_extracted_size == expected
+
     def test_nested_tar_extracted(self) -> None:
         """嵌套 TAR 被递归解压"""
         extractor = ArchiveExtractor()
