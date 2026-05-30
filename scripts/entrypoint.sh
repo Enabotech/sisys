@@ -42,7 +42,7 @@ main() {
         exec "$@"
     elif [ -d "/app/src/app" ]; then
         # 如果应用代码存在，启动应用
-        log_info "检测到应用程序，启动应用..."
+        log_info "检测到 SISYS 应用程序，启动应用..."
         exec poetry run python -m src.app
     else
         # 开发平台占位模式：启动简易 HTTP 服务器响应探针
