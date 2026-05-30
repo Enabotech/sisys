@@ -20,7 +20,7 @@ from src.domain.ports.saga_status import SagaStatus
 
 @dataclass
 class SagaContext:
-    """Saga 执行上下文。"""
+    """Saga 执行上下文"""
 
     saga_id: uuid.UUID = field(default_factory=uuid.uuid4)
     saga_type: str = ""
@@ -33,12 +33,12 @@ class SagaContext:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """验证初始数据。"""
+        """验证初始数据"""
         if not self.saga_type:
             raise ValueError("saga_type 不能为空")
 
     def update_status(self, new_status: SagaStatus) -> SagaContext:
-        """更新状态，返回新的 SagaContext 实例。"""
+        """更新状态，返回新的 SagaContext 实例"""
         if not self.status.can_transition_to(new_status):
             raise ValueError(f"非法状态转换: {self.status} → {new_status}")
         return SagaContext(
@@ -54,7 +54,7 @@ class SagaContext:
         )
 
     def set_step_data(self, step_name: str, input_data: Any | None, output_data: Any | None) -> SagaContext:
-        """设置步骤执行数据，返回新的 SagaContext 实例。"""
+        """设置步骤执行数据，返回新的 SagaContext 实例"""
         new_steps_data = copy.deepcopy(self.steps_data)
         new_steps_data[step_name] = {"input": input_data, "output": output_data}
         return SagaContext(
@@ -70,12 +70,12 @@ class SagaContext:
         )
 
     def get_step_output(self, step_name: str) -> Any | None:
-        """获取步骤的输出数据。"""
+        """获取步骤的输出数据"""
         step_data = self.steps_data.get(step_name, {})
         return step_data.get("output")
 
     def advance_step(self, total_steps: int) -> SagaContext:
-        """前进到下一个步骤，返回新的 SagaContext 实例。"""
+        """前进到下一个步骤，返回新的 SagaContext 实例"""
         new_index = min(self.current_step_index + 1, total_steps)
         return SagaContext(
             saga_id=self.saga_id,
@@ -90,7 +90,7 @@ class SagaContext:
         )
 
     def add_error(self, step_name: str, error_message: str) -> SagaContext:
-        """添加错误记录，返回新的 SagaContext 实例。"""
+        """添加错误记录，返回新的 SagaContext 实例"""
         new_errors = list(self.errors)
         new_errors.append(
             {
@@ -112,7 +112,7 @@ class SagaContext:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """序列化为字典（用于持久化）。"""
+        """序列化为字典（用于持久化）"""
         return {
             "saga_id": str(self.saga_id),
             "saga_type": self.saga_type,

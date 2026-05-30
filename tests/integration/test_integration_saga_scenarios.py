@@ -15,7 +15,7 @@ from src.infrastructure.saga.saga_status import SagaStatus
 
 
 def _make_mock_repository() -> mock.AsyncMock:
-    """创建 mock SagaRepositoryProtocol。"""
+    """创建 mock SagaRepositoryProtocol"""
     repo = mock.AsyncMock()
     repo.save = mock.AsyncMock(return_value=None)
     repo.load = mock.AsyncMock(return_value=None)
