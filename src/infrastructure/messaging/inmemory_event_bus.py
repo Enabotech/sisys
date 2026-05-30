@@ -68,6 +68,6 @@ class InMemoryEventBus(EventPublisher):
         return list(self._published_events)
 
     def reset(self) -> None:
-        """清空所有已处理事件 ID 和已发布事件列表（用于测试）。"""
+        """清空所有已处理事件 ID 和已发布事件列表（用于测试）"""
         self.processed_event_ids.clear()
         self._published_events.clear()

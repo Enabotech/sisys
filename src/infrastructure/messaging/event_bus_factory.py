@@ -39,7 +39,7 @@ class EventBusConfig:
     _rabbitmq_config: RabbitMQConfig | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
-        """从 URL 创建 RedisConfig 和 RabbitMQConfig 实例。"""
+        """从 URL 创建 RedisConfig 和 RabbitMQConfig 实例"""
         if self._redis_config is None and self.redis_url:
             object.__setattr__(self, "_redis_config", RedisConfig(host=self.redis_url))
         if self._rabbitmq_config is None and self.rabbitmq_url:

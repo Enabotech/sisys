@@ -48,7 +48,7 @@ class SagaStatusChanged(DomainEvent):
     error_message: str | None = None
 
     def __post_init__(self) -> None:
-        """验证事件数据完整性，设置派生字段。"""
+        """验证事件数据完整性，设置派生字段"""
         # 设置 aggregate_id = saga_id（frozen dataclass 需用 object.__setattr__）
         object.__setattr__(self, "aggregate_id", self.saga_id)
 

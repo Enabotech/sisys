@@ -147,7 +147,7 @@ def second_uow_not_affected(context: dict) -> None:
 
 
 def _make_mock_repository() -> AsyncMock:
-    """创建 mock SagaRepositoryProtocol。"""
+    """创建 mock SagaRepositoryProtocol"""
     repo = AsyncMock()
     repo.save = AsyncMock(return_value=None)
     repo.load = AsyncMock(return_value=None)

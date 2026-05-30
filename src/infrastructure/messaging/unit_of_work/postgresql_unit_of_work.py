@@ -30,7 +30,7 @@ class PostgreSQLUnitOfWork(UnitOfWork):
     """
 
     def __init__(self) -> None:
-        """初始化工作单元实例级状态并缓存 session 引用。"""
+        """初始化工作单元实例级状态并缓存 session 引用"""
         self._committed: bool = False
         self._rolled_back: bool = False
         self._session: AsyncSession = get_session()
@@ -47,7 +47,7 @@ class PostgreSQLUnitOfWork(UnitOfWork):
         return self._session
 
     async def begin(self) -> None:
-        """开始事务。"""
+        """开始事务"""
         await self._session.begin()
 
     async def commit(self) -> None:
@@ -90,11 +90,11 @@ class PostgreSQLUnitOfWork(UnitOfWork):
         await self._session.begin_nested()
 
     async def close(self) -> None:
-        """关闭会话。"""
+        """关闭会话"""
         await self._session.close()
 
     async def __aenter__(self) -> Self:
-        """异步上下文管理器入口。"""
+        """异步上下文管理器入口"""
         await self.begin()
         return self
 

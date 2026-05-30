@@ -17,7 +17,7 @@ from src.infrastructure.storage.postgresql.models.outbox import Base
 
 
 def _utc_now() -> datetime:
-    """返回当前 UTC 时间（无时区，用于数据库兼容）。"""
+    """返回当前 UTC 时间（无时区，用于数据库兼容）"""
     return datetime.now(UTC).replace(tzinfo=None)
 
 

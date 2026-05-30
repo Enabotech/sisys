@@ -27,7 +27,7 @@ class PermissionRepository(
         super().__init__(PermissionModel)
 
     def _to_entity(self, model: PermissionModel) -> Permission:
-        """将 ORM 模型转换为领域实体。"""
+        """将 ORM 模型转换为领域实体"""
         return Permission(
             id=model.id,
             name=model.name,
@@ -37,7 +37,7 @@ class PermissionRepository(
         )
 
     def _to_model(self, entity: Permission) -> PermissionModel:
-        """将领域实体转换为 ORM 模型。"""
+        """将领域实体转换为 ORM 模型"""
         return PermissionModel(
             id=entity.id,
             name=entity.name,
