@@ -64,8 +64,17 @@ class TestDocumentUploadServiceUploadSingleFile:
         assert doc.tenant_id == "t1"
         assert doc.uploaded_by == "u1"
         assert doc.parse_status == ParseStatus.PENDING
-        repo.save.assert_called_once()
-        storage.store_document.assert_called_once()
+
+        saved_doc = repo.save.call_args[0][0]
+        assert saved_doc.filename == "test.pdf"
+        assert saved_doc.tenant_id == "t1"
+
+        storage.store_document.assert_called_once_with(
+            user_id="u1",
+            doc_type="other",
+            file_path="/tmp/test.pdf",
+            content_type="application/pdf",
+        )
         publisher.publish.assert_called_once()
 
     def test_upload_unsupported_format_raises(self) -> None:

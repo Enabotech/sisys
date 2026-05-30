@@ -152,6 +152,11 @@ class TestDocumentRepositorySave:
         mock_session.add.assert_called_once()
         mock_session.flush.assert_called_once()
 
+        added_model = mock_session.add.call_args[0][0]
+        assert isinstance(added_model, DocumentModel)
+        assert added_model.tenant_id == doc.tenant_id
+        assert added_model.filename == doc.filename
+
 
 class TestDocumentRepositoryFind:
     """验证 find 操作（带租户隔离）"""
@@ -246,21 +251,31 @@ class TestDocumentRepositoryList:
 
         query = DocumentQuery(tenant_id="t1", parse_status="completed")
         run_async(repo.list(query))
-        mock_session.execute.assert_called_once()
+
+        stmt = mock_session.execute.call_args[0][0]
+        where_str = str(stmt)
+        assert "parse_status" in where_str
 
     def test_list_with_document_type_filter(self, repo, mock_session) -> None:
         mock_session.execute = AsyncMock(return_value=MockResult(scalars_all=[]))
 
         query = DocumentQuery(tenant_id="t1", document_type="strategic_plan")
         run_async(repo.list(query))
-        mock_session.execute.assert_called_once()
+
+        stmt = mock_session.execute.call_args[0][0]
+        where_str = str(stmt)
+        assert "document_type" in where_str
 
     def test_list_with_pagination(self, repo, mock_session) -> None:
         mock_session.execute = AsyncMock(return_value=MockResult(scalars_all=[]))
 
         query = DocumentQuery(tenant_id="t1", offset=10, limit=20)
         run_async(repo.list(query))
-        mock_session.execute.assert_called_once()
+
+        stmt = mock_session.execute.call_args[0][0]
+        where_str = str(stmt)
+        assert "OFFSET" in where_str or "offset" in where_str.lower()
+        assert "LIMIT" in where_str or "limit" in where_str.lower()
 
 
 class TestDocumentRepositoryInheritance:
