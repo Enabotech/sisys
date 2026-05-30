@@ -186,11 +186,17 @@ class TestDocumentRepositoryFind:
         assert result is None
 
     def test_find_tenant_isolation(self, repo, mock_session) -> None:
+        """验证 find 查询包含 tenant_id WHERE 条件"""
         mock_session.execute = AsyncMock(return_value=MockResult(scalar_one_or_none=None))
 
         query = DocumentQuery(tenant_id="other-tenant", document_id=uuid.uuid4())
         result = run_async(repo.find(query))
         assert result is None
+
+        # 验证 SQL 语句包含 tenant_id 过滤条件
+        stmt = mock_session.execute.call_args[0][0]
+        where_str = str(stmt)
+        assert "tenant_id" in where_str
 
 
 class TestDocumentRepositoryList:
@@ -223,6 +229,18 @@ class TestDocumentRepositoryList:
         results = run_async(repo.list(query))
         assert results == []
 
+    def test_list_tenant_isolation_sql_contains_where(self, repo, mock_session) -> None:
+        """验证 list 查询包含 tenant_id WHERE 条件"""
+        mock_session.execute = AsyncMock(return_value=MockResult(scalars_all=[]))
+
+        query = DocumentQuery(tenant_id="t1")
+        run_async(repo.list(query))
+
+        # 验证 SQL 语句包含 tenant_id 过滤条件
+        stmt = mock_session.execute.call_args[0][0]
+        where_str = str(stmt)
+        assert "tenant_id" in where_str
+
     def test_list_with_parse_status_filter(self, repo, mock_session) -> None:
         mock_session.execute = AsyncMock(return_value=MockResult(scalars_all=[]))
 
@@ -240,7 +258,7 @@ class TestDocumentRepositoryList:
     def test_list_with_pagination(self, repo, mock_session) -> None:
         mock_session.execute = AsyncMock(return_value=MockResult(scalars_all=[]))
 
-        query = DocumentQuery(tenant_id="t1", skip=10, limit=20)
+        query = DocumentQuery(tenant_id="t1", offset=10, limit=20)
         run_async(repo.list(query))
         mock_session.execute.assert_called_once()
 
