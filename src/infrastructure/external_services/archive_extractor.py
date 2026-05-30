@@ -103,10 +103,8 @@ class ArchiveExtractor:
                     content = io.BytesIO(zf.read(info.filename))
                     file_size = content.getbuffer().nbytes
 
-                    total_size += file_size
-
                     # 压缩炸弹防护
-                    if total_size > MAX_ARCHIVE_EXTRACTED_SIZE:
+                    if total_size + file_size > MAX_ARCHIVE_EXTRACTED_SIZE:
                         raise ValueError("解压后总大小超过限制（压缩炸弹防护）")
 
                     if current_depth < MAX_NESTING_DEPTH - 1 and inner_ext in ARCHIVE_EXTENSIONS:
@@ -121,6 +119,7 @@ class ArchiveExtractor:
                             result.skipped.append({"filename": info.filename, "reason": "嵌套深度超限"})
                             continue
 
+                        total_size += file_size
                         result.files.append(
                             ExtractedFile(
                                 filename=os.path.basename(info.filename),
@@ -179,9 +178,7 @@ class ArchiveExtractor:
                     content = io.BytesIO(content_bytes)
                     file_size = len(content_bytes)
 
-                    total_size += file_size
-
-                    if total_size > MAX_ARCHIVE_EXTRACTED_SIZE:
+                    if total_size + file_size > MAX_ARCHIVE_EXTRACTED_SIZE:
                         raise ValueError("解压后总大小超过限制（压缩炸弹防护）")
 
                     if current_depth < MAX_NESTING_DEPTH - 1 and inner_ext in ARCHIVE_EXTENSIONS:
@@ -196,6 +193,7 @@ class ArchiveExtractor:
                             result.skipped.append({"filename": member.name, "reason": "嵌套深度超限"})
                             continue
 
+                        total_size += file_size
                         result.files.append(
                             ExtractedFile(
                                 filename=basename,
