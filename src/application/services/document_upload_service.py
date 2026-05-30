@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from typing import Any
+from typing import TypedDict
 
 from src.application.ports.document_storage_port import DocumentStoragePort
 from src.domain.entities.document import Document, DocumentType, ParseStatus
@@ -20,6 +20,35 @@ from src.domain.value_objects.upload_limits import MAX_FILE_SIZE, MAX_FILENAME_L
 
 # 文件名非法字符模式
 _INVALID_FILENAME_PATTERN = re.compile(r"[\x00\\/]")
+
+
+class BatchFileInfo(TypedDict):
+    """批量上传文件信息"""
+
+    filename: str
+    mime_type: str
+    file_size_bytes: int
+
+
+class _BatchDetailRequired(TypedDict):
+    filename: str
+    status: str
+
+
+class BatchUploadDetail(_BatchDetailRequired, total=False):
+    """批量上传单项结果"""
+
+    document_id: str
+    error: str
+
+
+class BatchUploadResult(TypedDict):
+    """批量上传结果汇总"""
+
+    total: int
+    success: int
+    failed: int
+    details: list[BatchUploadDetail]
 
 
 class DocumentUploadService:
@@ -104,11 +133,11 @@ class DocumentUploadService:
 
     async def upload_batch(
         self,
-        files: list[dict[str, Any]],
+        files: list[BatchFileInfo],
         tenant_id: str,
         uploaded_by: str,
         file_paths: list[str],
-    ) -> dict[str, Any]:
+    ) -> BatchUploadResult:
         """批量上传文件
 
         每个文件独立校验、独立存储，部分失败不影响其他文件。
@@ -120,7 +149,7 @@ class DocumentUploadService:
             file_paths: 对应的临时文件路径列表
 
         Returns:
-            批量结果汇总 {total, success, failed, details}
+            批量结果汇总
 
         Raises:
             ValueError: 空批量请求
@@ -128,7 +157,7 @@ class DocumentUploadService:
         if not files:
             raise ValueError("空批量请求，至少需要一个文件")
 
-        results: list[dict[str, Any]] = []
+        results: list[BatchUploadDetail] = []
         success_count = 0
         failed_count = 0
 
@@ -142,10 +171,20 @@ class DocumentUploadService:
                     uploaded_by=uploaded_by,
                     file_path=file_paths[i] if i < len(file_paths) else "",
                 )
-                results.append({"filename": file_info["filename"], "status": "success", "document_id": str(doc.document_id)})
+                detail: BatchUploadDetail = {
+                    "filename": file_info["filename"],
+                    "status": "success",
+                    "document_id": str(doc.document_id),
+                }
+                results.append(detail)
                 success_count += 1
             except (ValueError, Exception) as e:
-                results.append({"filename": file_info["filename"], "status": "failed", "error": str(e)})
+                fail_detail: BatchUploadDetail = {
+                    "filename": file_info["filename"],
+                    "status": "failed",
+                    "error": str(e),
+                }
+                results.append(fail_detail)
                 failed_count += 1
 
         return {
@@ -167,6 +206,61 @@ class DocumentUploadService:
         """
         query = DocumentQuery(tenant_id=tenant_id, document_id=document_id)
         return await self._repository.find(query)
+
+    async def register_document(
+        self,
+        filename: str,
+        mime_type: str,
+        file_size_bytes: int,
+        tenant_id: str,
+        uploaded_by: str,
+        document_type: str = "other",
+    ) -> Document:
+        """注册已上传的文档（分片上传完成后调用）
+
+        仅执行 PG 元数据持久化和事件发布，不调用对象存储。
+        文件数据已通过分片上传存储至 MinIO。
+
+        Args:
+            filename: 文件名
+            mime_type: MIME 类型
+            file_size_bytes: 文件大小
+            tenant_id: 租户标识符
+            uploaded_by: 上传者
+            document_type: 文档类型
+
+        Returns:
+            持久化后的 Document 实体
+
+        Raises:
+            ValueError: 格式校验失败
+        """
+        self._validate_upload(filename, mime_type, file_size_bytes)
+
+        doc = Document(
+            document_id=uuid.uuid4(),
+            filename=filename,
+            mime_type=mime_type,
+            file_size_bytes=file_size_bytes,
+            document_type=DocumentType(document_type),
+            parse_status=ParseStatus.PENDING,
+            tenant_id=tenant_id,
+            uploaded_by=uploaded_by,
+        )
+
+        saved_doc = await self._repository.save(doc)
+
+        event = DocumentUploaded(
+            document_id=saved_doc.document_id,
+            filename=saved_doc.filename,
+            mime_type=saved_doc.mime_type,
+            file_size_bytes=saved_doc.file_size_bytes,
+            tenant_id=saved_doc.tenant_id,
+            uploaded_by=saved_doc.uploaded_by,
+        )
+        await self._publisher.publish(event)
+
+        return saved_doc
 
     def _validate_upload(self, filename: str, mime_type: str, file_size_bytes: int) -> None:
         """校验上传请求的合法性"""

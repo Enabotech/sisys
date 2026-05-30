@@ -441,3 +441,101 @@ class ObjectOperations:
             "uploaded_parts": [],
         }
         await redis_client.set(state_key, json.dumps(state))
+
+    def init_multipart_upload(
+        self,
+        bucket_name: str,
+        object_key: str,
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        """初始化分片上传会话
+
+        Args:
+            bucket_name: Bucket 名称
+            object_key: 对象键
+            content_type: MIME 类型
+
+        Returns:
+            MinIO 分片上传会话 ID
+        """
+        client = self._client.client
+        upload_id = client._create_multipart_upload(
+            bucket_name,
+            object_key,
+            headers={"Content-Type": content_type},
+        )
+        logger.info("Initiated multipart upload: %s/%s (%s)", bucket_name, object_key, upload_id)
+        return upload_id
+
+    def upload_part(
+        self,
+        bucket_name: str,
+        object_key: str,
+        upload_id: str,
+        part_number: int,
+        data: bytes,
+    ) -> str:
+        """上传单个分片
+
+        Args:
+            bucket_name: Bucket 名称
+            object_key: 对象键
+            upload_id: 分片上传会话 ID
+            part_number: 分片编号（从 1 开始）
+            data: 分片数据
+
+        Returns:
+            分片 ETag
+        """
+        client = self._client.client
+        result = cast(Any, client)._put_object(
+            bucket_name,
+            object_key,
+            data,
+            length=len(data),
+            part_number=part_number,
+            upload_id=upload_id,
+        )
+        etag = result.etag if hasattr(result, "etag") else result
+        logger.debug("Uploaded part %d for %s/%s", part_number, bucket_name, object_key)
+        return str(etag)
+
+    def complete_multipart_upload(
+        self,
+        bucket_name: str,
+        object_key: str,
+        upload_id: str,
+        parts: list[dict[str, Any]],
+    ) -> str:
+        """完成分片上传，合并所有分片
+
+        Args:
+            bucket_name: Bucket 名称
+            object_key: 对象键
+            upload_id: 分片上传会话 ID
+            parts: 已上传分片列表 [{"PartNumber": int, "ETag": str}]
+
+        Returns:
+            对象版本 ID
+        """
+        client = self._client.client
+        result = cast(Any, client)._complete_multipart_upload(bucket_name, object_key, upload_id, parts)
+        logger.info("Completed multipart upload: %s/%s (%d parts)", bucket_name, object_key, len(parts))
+        return result.version_id or ""
+
+    def abort_multipart_upload(
+        self,
+        bucket_name: str,
+        object_key: str,
+        upload_id: str,
+    ) -> None:
+        """中止分片上传
+
+        Args:
+            bucket_name: Bucket 名称
+            object_key: 对象键
+            upload_id: 分片上传会话 ID
+        """
+        client = self._client.client
+        client._abort_multipart_upload(bucket_name, object_key, upload_id)
+        logger.info("Aborted multipart upload: %s/%s (%s)", bucket_name, object_key, upload_id)

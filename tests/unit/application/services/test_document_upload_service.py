@@ -387,3 +387,110 @@ class TestDocumentUploadServiceEdgeCases:
                     file_path="/tmp/test.pdf",
                 )
             )
+
+
+class TestDocumentUploadServiceRegisterDocument:
+    """验证 register_document 分片上传完成后的注册"""
+
+    def test_register_document_saves_to_repository(self) -> None:
+        from src.application.services.document_upload_service import DocumentUploadService
+
+        repo = AsyncMock(spec=DocumentRepositoryPort)
+        repo.save = AsyncMock(side_effect=lambda d: d)
+        publisher = AsyncMock(spec=EventPublisher)
+        publisher.publish = AsyncMock()
+        storage = AsyncMock()
+
+        service = DocumentUploadService(
+            document_repository=repo,
+            document_storage=storage,
+            event_publisher=publisher,
+        )
+
+        result = asyncio.run(
+            service.register_document(
+                filename="chunked.pdf",
+                mime_type="application/pdf",
+                file_size_bytes=1024 * 1024 * 100,
+                tenant_id="t1",
+                uploaded_by="u1",
+            )
+        )
+
+        repo.save.assert_called_once()
+        assert result.filename == "chunked.pdf"
+        assert result.tenant_id == "t1"
+
+    def test_register_document_publishes_event(self) -> None:
+        repo = AsyncMock(spec=DocumentRepositoryPort)
+        repo.save = AsyncMock(side_effect=lambda d: d)
+        publisher = AsyncMock(spec=EventPublisher)
+        publisher.publish = AsyncMock()
+
+        service = _make_upload_service(repo_mock=repo, publisher_mock=publisher)
+
+        asyncio.run(
+            service.register_document(
+                filename="chunked.pdf",
+                mime_type="application/pdf",
+                file_size_bytes=1024,
+                tenant_id="t1",
+                uploaded_by="u1",
+            )
+        )
+
+        publisher.publish.assert_called_once()
+        event = publisher.publish.call_args[0][0]
+        assert isinstance(event, DocumentUploaded)
+        assert event.filename == "chunked.pdf"
+
+    def test_register_document_does_not_call_storage(self) -> None:
+        """register_document 不调用对象存储"""
+        storage = AsyncMock()
+        storage.store_document = AsyncMock(return_value="path")
+        repo = AsyncMock(spec=DocumentRepositoryPort)
+        repo.save = AsyncMock(side_effect=lambda d: d)
+
+        service = _make_upload_service(repo_mock=repo, storage_mock=storage)
+
+        asyncio.run(
+            service.register_document(
+                filename="chunked.pdf",
+                mime_type="application/pdf",
+                file_size_bytes=1024,
+                tenant_id="t1",
+                uploaded_by="u1",
+            )
+        )
+
+        storage.store_document.assert_not_called()
+
+    def test_register_document_validates_filename(self) -> None:
+        """register_document 同样校验文件名"""
+        service = _make_upload_service()
+
+        with pytest.raises(ValueError, match="文件名"):
+            asyncio.run(
+                service.register_document(
+                    filename="",
+                    mime_type="application/pdf",
+                    file_size_bytes=1024,
+                    tenant_id="t1",
+                    uploaded_by="u1",
+                )
+            )
+
+    def test_register_document_validates_file_size(self) -> None:
+        """register_document 同样校验文件大小"""
+        service = _make_upload_service()
+
+        with pytest.raises(ValueError, match="空文件"):
+            asyncio.run(
+                service.register_document(
+                    filename="test.pdf",
+                    mime_type="application/pdf",
+                    file_size_bytes=0,
+                    tenant_id="t1",
+                    uploaded_by="u1",
+                )
+            )
