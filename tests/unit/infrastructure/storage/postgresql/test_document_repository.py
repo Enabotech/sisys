@@ -152,6 +152,11 @@ class TestDocumentRepositorySave:
         mock_session.add.assert_called_once()
         mock_session.flush.assert_called_once()
 
+        added_model = mock_session.add.call_args[0][0]
+        assert isinstance(added_model, DocumentModel)
+        assert added_model.tenant_id == doc.tenant_id
+        assert added_model.filename == doc.filename
+
 
 class TestDocumentRepositoryFind:
     """验证 find 操作（带租户隔离）"""
@@ -186,11 +191,17 @@ class TestDocumentRepositoryFind:
         assert result is None
 
     def test_find_tenant_isolation(self, repo, mock_session) -> None:
+        """验证 find 查询包含 tenant_id WHERE 条件"""
         mock_session.execute = AsyncMock(return_value=MockResult(scalar_one_or_none=None))
 
         query = DocumentQuery(tenant_id="other-tenant", document_id=uuid.uuid4())
         result = run_async(repo.find(query))
         assert result is None
+
+        # 验证 SQL 语句包含 tenant_id 过滤条件
+        stmt = mock_session.execute.call_args[0][0]
+        where_str = str(stmt)
+        assert "tenant_id" in where_str
 
 
 class TestDocumentRepositoryList:
@@ -223,26 +234,48 @@ class TestDocumentRepositoryList:
         results = run_async(repo.list(query))
         assert results == []
 
+    def test_list_tenant_isolation_sql_contains_where(self, repo, mock_session) -> None:
+        """验证 list 查询包含 tenant_id WHERE 条件"""
+        mock_session.execute = AsyncMock(return_value=MockResult(scalars_all=[]))
+
+        query = DocumentQuery(tenant_id="t1")
+        run_async(repo.list(query))
+
+        # 验证 SQL 语句包含 tenant_id 过滤条件
+        stmt = mock_session.execute.call_args[0][0]
+        where_str = str(stmt)
+        assert "tenant_id" in where_str
+
     def test_list_with_parse_status_filter(self, repo, mock_session) -> None:
         mock_session.execute = AsyncMock(return_value=MockResult(scalars_all=[]))
 
         query = DocumentQuery(tenant_id="t1", parse_status="completed")
         run_async(repo.list(query))
-        mock_session.execute.assert_called_once()
+
+        stmt = mock_session.execute.call_args[0][0]
+        where_str = str(stmt)
+        assert "parse_status" in where_str
 
     def test_list_with_document_type_filter(self, repo, mock_session) -> None:
         mock_session.execute = AsyncMock(return_value=MockResult(scalars_all=[]))
 
         query = DocumentQuery(tenant_id="t1", document_type="strategic_plan")
         run_async(repo.list(query))
-        mock_session.execute.assert_called_once()
+
+        stmt = mock_session.execute.call_args[0][0]
+        where_str = str(stmt)
+        assert "document_type" in where_str
 
     def test_list_with_pagination(self, repo, mock_session) -> None:
         mock_session.execute = AsyncMock(return_value=MockResult(scalars_all=[]))
 
-        query = DocumentQuery(tenant_id="t1", skip=10, limit=20)
+        query = DocumentQuery(tenant_id="t1", offset=10, limit=20)
         run_async(repo.list(query))
-        mock_session.execute.assert_called_once()
+
+        stmt = mock_session.execute.call_args[0][0]
+        where_str = str(stmt)
+        assert "OFFSET" in where_str or "offset" in where_str.lower()
+        assert "LIMIT" in where_str or "limit" in where_str.lower()
 
 
 class TestDocumentRepositoryInheritance:

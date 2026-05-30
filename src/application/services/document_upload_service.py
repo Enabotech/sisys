@@ -10,6 +10,7 @@ import re
 import uuid
 from typing import Any
 
+from src.application.ports.document_storage_port import DocumentStoragePort
 from src.domain.entities.document import Document, DocumentType, ParseStatus
 from src.domain.events.document_events import DocumentUploaded
 from src.domain.ports.document_repository import DocumentQuery, DocumentRepositoryPort
@@ -31,7 +32,7 @@ class DocumentUploadService:
     def __init__(
         self,
         document_repository: DocumentRepositoryPort,
-        document_storage: Any,
+        document_storage: DocumentStoragePort,
         event_publisher: EventPublisher,
     ) -> None:
         self._repository = document_repository
@@ -154,7 +155,7 @@ class DocumentUploadService:
             "details": results,
         }
 
-    async def get_document(self, document_id: object, tenant_id: str) -> Document | None:
+    async def get_document(self, document_id: uuid.UUID, tenant_id: str) -> Document | None:
         """查询文档
 
         Args:
@@ -164,7 +165,7 @@ class DocumentUploadService:
         Returns:
             Document 实体或 None
         """
-        query = DocumentQuery(tenant_id=tenant_id, document_id=document_id if isinstance(document_id, uuid.UUID) else None)
+        query = DocumentQuery(tenant_id=tenant_id, document_id=document_id)
         return await self._repository.find(query)
 
     def _validate_upload(self, filename: str, mime_type: str, file_size_bytes: int) -> None:

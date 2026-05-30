@@ -153,6 +153,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         user_id: str,
         doc_type: str,
         file_path: str,
+        content_type: str | None = None,
         metadata: dict | None = None,
     ) -> str:
         """存储文档并自动生成对象路径
@@ -163,6 +164,7 @@ class MinIODocumentStorage(DocumentStoragePort):
             user_id: 用户 ID
             doc_type: 文档类型
             file_path: 本地文件路径
+            content_type: 文件 MIME 类型（默认 application/octet-stream）
             metadata: 附加元数据（将作为对象标签存储）
 
         Returns:
@@ -177,7 +179,8 @@ class MinIODocumentStorage(DocumentStoragePort):
             for k, v in metadata.items():
                 tags[f"meta_{k}"] = str(v)
 
-        await self._adapter.store("raw-documents", object_key, file_path, tags=tags)
+        resolved_content_type = content_type or "application/octet-stream"
+        await self._adapter.store("raw-documents", object_key, file_path, content_type=resolved_content_type, tags=tags)
         return object_key
 
     async def list_user_documents(
