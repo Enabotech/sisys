@@ -50,6 +50,11 @@ src/
 - 新事件必须同时更新 `config/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`
 - 测试租户隔离：`TestTenant` 生成 UUID 前缀，覆盖 Redis key / PG schema / Qdrant collection / MinIO bucket / RabbitMQ queue
 - 覆盖率门禁：整体 ≥80%，domain ≥90%，application ≥85%
+- 端口查询参数决策规则（DDD Query Object 模式）：
+  - **多字段组合 + 分页** → `@dataclass(frozen=True)` Query 值对象（如 `DocumentQuery`、`AuditSearchCriteria`），定义在端口文件中
+  - **单字段标识查找** → 直接参数（如 `get_by_id(id)`、`get_by_username(name)`）
+  - **命令型操作** → 直接参数（如 `assign_role(user_id, role_id)`、`record_attempt(username, ...)`)
+  - 不强制全量统一，按查询特征选择模式；新增端口含多字段查询时必须使用 Query Object
 
 ## 5. Hard Constraints
 
