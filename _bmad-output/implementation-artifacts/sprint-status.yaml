@@ -113,10 +113,10 @@ development_status:
   epic-2-retrospective: optional
 
   # ===========================================================================
-  # Epic 3: 智能检索与知识发现 - 📋 待开始
+  # Epic 3: 智能检索与知识发现 - 🔄 进行中
   # ===========================================================================
-  epic-3: backlog
-  3-1a-dense-semantic-search: backlog
+  epic-3: in-progress
+  3-1a-dense-semantic-search: ready-for-dev
   3-1b-bm25-sparse-search-rrf-fusion: backlog
   3-2-entity-extraction-llm-rules: backlog
   3-3-domain-dictionary-management: backlog
