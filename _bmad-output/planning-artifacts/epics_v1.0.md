@@ -1113,7 +1113,7 @@ So that **检索结果更符合语义完整性**。
 **✅ 依赖关系验证：**
 - Epic 3 依赖 Epic 1 的存储层（Story 1.6 Qdrant, Story 1.5 PostgreSQL, Story 1.7 MinIO）
 - Epic 3 依赖 Epic 2 的版面信息保留（Story 2.3）用于 Bounding Box 溯源
-- Epic 3 内部故事���赖均为**顺序依赖**（检索流水线）
+- Epic 3 内部故事依赖均为**顺序依赖**（检索流水线）
 - Epic 3 可独立交付价值（用户检索和溯源）
 - 不依赖 Epic 4-8
 
