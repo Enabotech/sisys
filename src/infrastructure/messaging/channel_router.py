@@ -91,6 +91,13 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="文档处理完成",
         ),
+        "DocumentUploaded": ChannelMapping(
+            event_type="DocumentUploaded",
+            redis_channel="sisys:rt:document_uploaded",
+            rabbitmq_routing_key="sisys.events.reliable.document_uploaded",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="文档上传完成",
+        ),
         "MemoryChanged": ChannelMapping(
             event_type="MemoryChanged",
             rabbitmq_routing_key="sisys.events.reliable.memory_changed",

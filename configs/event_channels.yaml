@@ -44,6 +44,12 @@ event_channels:
     delivery_mode: "reliable"
     description: "文档处理完成"
 
+  DocumentUploaded:
+    redis_channel: "sisys:rt:document_uploaded"
+    rabbitmq_routing_key: "sisys.events.reliable.document_uploaded"
+    delivery_mode: "reliable"
+    description: "文档上传完成"
+
   MemoryChanged:
     rabbitmq_routing_key: "sisys.events.reliable.memory_changed"
     delivery_mode: "reliable"

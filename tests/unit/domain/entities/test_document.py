@@ -124,3 +124,38 @@ class TestDocumentEmbeddingValidation:
         """Document with None embedding passes validation."""
         doc = _make_doc(embedding=None)
         assert doc.validate() is True
+
+
+class TestDocumentTenantFields:
+    """Story 2-1: 验证 Document 实体的 tenant_id 和 uploaded_by 字段"""
+
+    def test_tenant_id_default_empty_string(self):
+        """tenant_id 默认为空字符串（向后兼容）"""
+        doc = _make_doc()
+        assert doc.tenant_id == ""
+
+    def test_uploaded_by_default_empty_string(self):
+        """uploaded_by 默认为空字符串（向后兼容）"""
+        doc = _make_doc()
+        assert doc.uploaded_by == ""
+
+    def test_tenant_id_can_be_set(self):
+        """tenant_id 可以在构造时设置"""
+        doc = _make_doc(tenant_id="tenant-123")
+        assert doc.tenant_id == "tenant-123"
+
+    def test_uploaded_by_can_be_set(self):
+        """uploaded_by 可以在构造时设置"""
+        doc = _make_doc(uploaded_by="user-456")
+        assert doc.uploaded_by == "user-456"
+
+    def test_new_fields_do_not_break_validation(self):
+        """新字段不影响 validate()"""
+        doc = _make_doc(tenant_id="t1", uploaded_by="u1")
+        assert doc.validate() is True
+
+    def test_metadata_accepts_any_value_type(self):
+        """metadata 字典值类型为 Any，支持复杂结构"""
+        doc = _make_doc(metadata={"source": "upload", "size": 1024, "tags": ["a", "b"]})
+        assert doc.metadata["size"] == 1024
+        assert doc.metadata["tags"] == ["a", "b"]

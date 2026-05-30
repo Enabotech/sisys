@@ -1,0 +1,282 @@
+"""Story 2-1: API 契约测试 — 文档上传端点
+
+验证 REST API 端点的存在性、请求格式和响应结构。
+端点定义：
+- POST /api/v1/documents — 单文件上传
+- POST /api/v1/documents/batch — 批量上传
+- POST /api/v1/documents/chunked/init — 分片上传初始化
+- PUT /api/v1/documents/chunked/{upload_id}/parts/{part_number} — 分片上传
+- POST /api/v1/documents/chunked/{upload_id}/complete — 分片上传完成
+- GET /api/v1/documents/{document_id} — 上传结果确认查询
+"""
+
+from __future__ import annotations
+
+import io
+import uuid
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from src.domain.entities.document import Document, DocumentType, ParseStatus
+from src.domain.value_objects.token_payload import TokenPayload
+from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
+from src.interfaces.api.document_upload import create_document_upload_router
+
+
+def _make_token() -> TokenPayload:
+    return TokenPayload(
+        user_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+        username="testuser",
+        roles=("admin",),
+        exp=datetime(2099, 1, 1, tzinfo=UTC),
+    )
+
+
+def _make_doc() -> Document:
+    return Document(
+        document_id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
+        filename="test.pdf",
+        mime_type="application/pdf",
+        file_size_bytes=1024,
+        document_type=DocumentType.OTHER,
+        parse_status=ParseStatus.PENDING,
+        tenant_id="t1",
+        uploaded_by="11111111-1111-1111-1111-111111111111",
+    )
+
+
+def _make_client() -> tuple[TestClient, AsyncMock, AsyncMock]:
+    app = FastAPI()
+    service = AsyncMock()
+    manager = AsyncMock()
+
+    def override():
+        return _make_token()
+
+    router = create_document_upload_router(
+        upload_service=service,
+        chunked_manager=manager,
+        get_current_user_override=override,
+    )
+    app.include_router(router)
+    return TestClient(app), service, manager
+
+
+TENANT = {"X-Tenant-ID": "t1"}
+
+
+class TestDocumentUploadAPIContract:
+    """API 契约测试：验证端点定义和响应格式"""
+
+    def test_single_upload_endpoint_exists(self) -> None:
+        """验证 POST /api/v1/documents 端点存在"""
+        client, service, _ = _make_client()
+        service.upload = AsyncMock(return_value=_make_doc())
+
+        resp = client.post(
+            "/api/v1/documents",
+            files={"file": ("test.pdf", io.BytesIO(b"content"), "application/pdf")},
+            headers=TENANT,
+        )
+        assert resp.status_code == 201
+
+    def test_batch_upload_endpoint_exists(self) -> None:
+        """验证 POST /api/v1/documents/batch 端点存在"""
+        client, service, _ = _make_client()
+        service.upload_batch = AsyncMock(return_value={"total": 1, "success": 1, "failed": 0, "details": []})
+
+        resp = client.post(
+            "/api/v1/documents/batch",
+            files=[("files", ("a.pdf", io.BytesIO(b"x"), "application/pdf"))],
+            headers=TENANT,
+        )
+        assert resp.status_code == 200
+
+    def test_chunked_init_endpoint_exists(self) -> None:
+        """验证 POST /api/v1/documents/chunked/init 端点存在"""
+        client, _, manager = _make_client()
+        manager.init_upload = AsyncMock(return_value={"upload_id": "abc", "chunk_size": 10, "total_parts": 1})
+
+        resp = client.post(
+            "/api/v1/documents/chunked/init",
+            json={"filename": "big.pdf", "file_size": 1000},
+            headers=TENANT,
+        )
+        assert resp.status_code == 200
+
+    def test_chunked_upload_part_endpoint_exists(self) -> None:
+        """验证 PUT /api/v1/documents/chunked/{upload_id}/parts/{part_number} 端点存在"""
+        client, _, manager = _make_client()
+        manager.upload_part = AsyncMock(return_value={"uploaded_parts": 1})
+
+        resp = client.put(
+            "/api/v1/documents/chunked/abc/parts/1",
+            content=b"data",
+            headers={**TENANT, "Content-Type": "application/octet-stream"},
+        )
+        assert resp.status_code == 200
+
+    def test_chunked_complete_endpoint_exists(self) -> None:
+        """验证 POST /api/v1/documents/chunked/{upload_id}/complete 端点存在"""
+        client, service, manager = _make_client()
+        state = ChunkedUploadState("abc", "big.pdf", 1000, 500)
+        manager.complete_upload = AsyncMock(return_value=state)
+        service.upload = AsyncMock(return_value=_make_doc())
+
+        resp = client.post("/api/v1/documents/chunked/abc/complete", headers=TENANT)
+        assert resp.status_code == 200
+
+    def test_document_query_endpoint_exists(self) -> None:
+        """验证 GET /api/v1/documents/{document_id} 端点存在"""
+        client, service, _ = _make_client()
+        service.get_document = AsyncMock(return_value=_make_doc())
+
+        resp = client.get(
+            f"/api/v1/documents/{uuid.uuid4()}",
+            headers=TENANT,
+        )
+        assert resp.status_code == 200
+
+    def test_single_upload_response_format(self) -> None:
+        """验证单文件上传响应格式：扁平 JSON"""
+        client, service, _ = _make_client()
+        service.upload = AsyncMock(return_value=_make_doc())
+
+        resp = client.post(
+            "/api/v1/documents",
+            files={"file": ("test.pdf", io.BytesIO(b"content"), "application/pdf")},
+            headers=TENANT,
+        )
+        data = resp.json()
+        assert isinstance(data["document_id"], str)
+        assert isinstance(data["filename"], str)
+        assert isinstance(data["mime_type"], str)
+        assert isinstance(data["file_size_bytes"], int)
+        assert isinstance(data["parse_status"], str)
+        assert isinstance(data["created_at"], str)
+
+    def test_batch_upload_response_format(self) -> None:
+        """验证批量上传响应格式"""
+        client, service, _ = _make_client()
+        service.upload_batch = AsyncMock(
+            return_value={
+                "total": 1,
+                "success": 1,
+                "failed": 0,
+                "details": [{"filename": "a.pdf", "status": "success"}],
+            }
+        )
+
+        resp = client.post(
+            "/api/v1/documents/batch",
+            files=[("files", ("a.pdf", io.BytesIO(b"x"), "application/pdf"))],
+            headers=TENANT,
+        )
+        data = resp.json()
+        assert isinstance(data["total"], int)
+        assert isinstance(data["success"], int)
+        assert isinstance(data["failed"], int)
+        assert isinstance(data["details"], list)
+
+    def test_chunked_init_response_format(self) -> None:
+        """验证分片上传初始化响应格式"""
+        client, _, manager = _make_client()
+        manager.init_upload = AsyncMock(return_value={"upload_id": "abc", "chunk_size": 10, "total_parts": 5})
+
+        resp = client.post(
+            "/api/v1/documents/chunked/init",
+            json={"filename": "big.pdf", "file_size": 1000},
+            headers=TENANT,
+        )
+        data = resp.json()
+        assert isinstance(data["upload_id"], str)
+        assert isinstance(data["chunk_size"], int)
+        assert isinstance(data["total_parts"], int)
+
+    def test_document_query_response_format(self) -> None:
+        """验证文档查询响应格式"""
+        client, service, _ = _make_client()
+        service.get_document = AsyncMock(return_value=_make_doc())
+
+        resp = client.get(
+            "/api/v1/documents/22222222-2222-2222-2222-222222222222",
+            headers=TENANT,
+        )
+        data = resp.json()
+        assert data["document_id"] == "22222222-2222-2222-2222-222222222222"
+        assert data["filename"] == "test.pdf"
+        assert data["parse_status"] == "pending"
+
+    def test_404_for_nonexistent_document(self) -> None:
+        """验证不存在的 document_id 返回 404"""
+        client, service, _ = _make_client()
+        service.get_document = AsyncMock(return_value=None)
+
+        resp = client.get(
+            f"/api/v1/documents/{uuid.uuid4()}",
+            headers=TENANT,
+        )
+        assert resp.status_code == 404
+
+    def test_422_for_invalid_uuid_format(self) -> None:
+        """验证无效 UUID 格式返回 422（FastAPI 自动处理）"""
+        client, service, _ = _make_client()
+        service.get_document = AsyncMock(return_value=None)
+
+        resp = client.get(
+            "/api/v1/documents/not-a-uuid",
+            headers=TENANT,
+        )
+        assert resp.status_code == 422
+
+    def test_410_for_expired_upload_id(self) -> None:
+        """验证过期 upload_id 返回 410 Gone"""
+        client, _, manager = _make_client()
+        manager.complete_upload = AsyncMock(side_effect=ValueError("upload_id expired 不存在"))
+
+        resp = client.post("/api/v1/documents/chunked/expired/complete", headers=TENANT)
+        assert resp.status_code == 410
+
+    def test_400_for_unsupported_format(self) -> None:
+        """验证不支持格式返回 400"""
+        client, service, _ = _make_client()
+        service.upload = AsyncMock(side_effect=ValueError("不支持的格式"))
+
+        resp = client.post(
+            "/api/v1/documents",
+            files={"file": ("test.exe", io.BytesIO(b"x"), "application/x-msdownload")},
+            headers=TENANT,
+        )
+        assert resp.status_code == 400
+
+    def test_400_for_empty_file(self) -> None:
+        """验证空文件返回 400"""
+        client, service, _ = _make_client()
+        service.upload = AsyncMock(side_effect=ValueError("空文件"))
+
+        resp = client.post(
+            "/api/v1/documents",
+            files={"file": ("empty.pdf", io.BytesIO(b""), "application/pdf")},
+            headers=TENANT,
+        )
+        assert resp.status_code == 400
+
+    def test_auth_required_for_all_endpoints(self) -> None:
+        """验证所有端点需要认证"""
+        app = FastAPI()
+        router = create_document_upload_router(
+            upload_service=AsyncMock(),
+            chunked_manager=AsyncMock(),
+        )
+        app.include_router(router)
+        client = TestClient(app)
+
+        resp = client.post(
+            "/api/v1/documents",
+            files={"file": ("test.pdf", io.BytesIO(b"x"), "application/pdf")},
+            headers=TENANT,
+        )
+        assert resp.status_code == 401

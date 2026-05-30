@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-05-29
+last_updated: 2026-05-30
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -101,7 +101,7 @@ development_status:
   # Epic 2: 文档与数据管理 - 📋 待开始
   # ===========================================================================
   epic-2: in-progress
-  2-1-document-upload-17-formats: ready-for-dev
+  2-1-document-upload-17-formats: done
   2-2a-document-parsing-basic-formats: backlog
   2-2b-document-parsing-extended-formats: backlog
   2-3-layout-preservation-doclaynet: backlog

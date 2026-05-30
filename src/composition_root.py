@@ -1033,6 +1033,19 @@ def bootstrap() -> None:
         owner="storage-team",
     )
 
+    # Document Repository — PostgreSQL 文档元数据持久化
+    from src.domain.ports.document_repository import DocumentRepositoryPort
+
+    register_port(
+        name="document_repository",
+        version="v1.0.0",
+        interface=DocumentRepositoryPort,
+        impl="src.infrastructure.storage.postgresql.repository.document_repository.PostgreSQLDocumentRepository",
+        module="src.infrastructure.storage.postgresql.repository.document_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="doc-team",
+    )
+
     register_port(
         name="memory_graph_storage",
         version="v1.0.0",
