@@ -40,9 +40,9 @@ class TestDocumentRepositoryPortInterface:
         assert "tenant_id" in sig.parameters
 
     def test_document_query_has_pagination(self) -> None:
-        """DocumentQuery 包含 skip/limit 分页参数"""
+        """DocumentQuery 包含 offset/limit 分页参数"""
         sig = inspect.signature(DocumentQuery)
-        assert "skip" in sig.parameters
+        assert "offset" in sig.parameters
         assert "limit" in sig.parameters
 
     def test_save_returns_document(self) -> None:

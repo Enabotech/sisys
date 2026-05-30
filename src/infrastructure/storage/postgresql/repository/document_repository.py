@@ -92,7 +92,7 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
         if query.uploaded_by is not None:
             stmt = stmt.where(DocumentModel.uploaded_by == query.uploaded_by)
 
-        stmt = stmt.order_by(DocumentModel.created_at.desc()).offset(query.skip).limit(query.limit)
+        stmt = stmt.order_by(DocumentModel.created_at.desc()).offset(query.offset).limit(query.limit)
 
         result = await self._session.execute(stmt)
         models = result.scalars().all()
