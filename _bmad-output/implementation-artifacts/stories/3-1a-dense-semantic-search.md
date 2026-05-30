@@ -480,11 +480,16 @@
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
 | **BGEM3EmbeddingService** | 领域层零污染、插拔式嵌入 | 需额外依赖 sentence-transformers | ✅ 9/10 |
-| **架构验证：sentence-transformers 在 FORBIDDEN_DOMAIN_IMPORTS** | 必须！AC-4 架构验证会扫描 `FORBIDDEN_DOMAIN_IMPORTS` 包含 `sentence-transformers` | 禁止领域层直接导入 | 必须遵守 |
-
-**说明：** `sentence-transformers` 虽已存在于 `pyproject.toml`，但属于外部模型库，**禁止**在领域层（`src/domain/`）直接导入。`BGEM3EmbeddingService` 位于 `infrastructure/external_services/embedding/`，在基础设施层可以使用。
 | 本地模型 vs 云端API | 本地：隐私、低延迟 | 本地：GPU资源需求 | - |
 | 异步 vs 同步 | 异步：不阻塞事件循环 | 异步：复杂性增加 | 异步 ✅ |
+
+**架构约束：sentence-transformers 在 FORBIDDEN_DOMAIN_IMPORTS**
+
+`FORBIDDEN_DOMAIN_IMPORTS`（`tests/unit/architecture/test_hexagonal_architecture_constraints.py` 第46-88行）定义了领域层禁止导入的外部框架。当前列表中**不包含** `sentence-transformers`，但项目约束领域层零外部依赖，**禁止**在领域层（`src/domain/`）直接导入任何外部模型库。
+
+- `EmbeddingModelPort` 协议定义在领域层，仅使用 `abc` + `typing`（✅ 符合约束）
+- `BGEM3EmbeddingService` 实现位于 `infrastructure/external_services/embedding/`，可使用 sentence-transformers（✅ 符合约束）
+- Task 5 架构验证需确保领域层无 sentence-transformers 导入
 
 ### ⚠️ 已知实现缺口（Dev 须知）
 
@@ -596,10 +601,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v0.0.3
+**故事版本/Story Version:** v0.0.4
 **创建日期/Created:** 2026-05-30
 **最后更新/Last Updated:** 2026-05-30
 **更新说明/Description:**
-- v0.0.3: [S1-S5 第2轮] 补充架构决策：sentence-transformers 在 FORBIDDEN_DOMAIN_IMPORTS，领域层禁止直接导入；明确 Task 5 架构验证需检测 sentence-transformers 导入
-- v0.0.2: [S1-S5 审查修复] 修正技术栈（FlagEmbedding已存在）、标注已知实现缺口（_deterministic_embed 128维 vs VectorPoint 1024维不匹配）、澄清端口位置（MemoryVectorPort在应用层）
-- v0.0.1: 创建故事文件，基于 epics_v1.0.md Epic 3 Story 3-1a
+- v0.0.4: [S1-S5 第3轮] 修正架构决策表格格式问题；明确 sentence-transformers 不在 FORBIDDEN_DOMAIN_IMPORTS 但领域层零依赖约束仍适用
+- v0.0.3: [S1-S5 第2轮] 补充架构决策：sentence-transformers 在 FORBIDDEN_DOMAIN_IMPORTS
+- v0.0.2: [S1-S5 审查修复] 修正技术栈（FlagEmbedding已存在）、标注已知实现缺口
+- v0.0.1: 创建故事文件
