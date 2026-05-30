@@ -95,7 +95,7 @@ spec:
     - name: SyncPolicy
       value: Manual (requires approval)
     - name: ImageTagPattern
-      value: v{major}.{minor}.{patch}-{sha}
+      value: v-{version}
     - name: UpdateStrategy
       value: latest (by push time)
     - name: Security
