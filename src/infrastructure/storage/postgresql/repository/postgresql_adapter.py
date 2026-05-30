@@ -63,11 +63,11 @@ class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
             ) from None
 
     def _to_entity(self, model: TModel) -> TEntity:
-        """将 ORM 模型转换为领域实体（子类必须覆写）。"""
+        """将 ORM 模型转换为领域实体（子类必须覆写）"""
         raise NotImplementedError
 
     def _to_model(self, entity: TEntity) -> TModel:
-        """将领域实体转换为 ORM 模型（子类必须覆写）。"""
+        """将领域实体转换为 ORM 模型（子类必须覆写）"""
         raise NotImplementedError
 
     async def get_by_id(self, id: UUID) -> TEntity | None:
@@ -134,20 +134,20 @@ class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
         return int(result.scalar() or 0)
 
     async def _do_save(self, model: TModel, entity: TEntity) -> None:
-        """保存钩子 — 默认简单插入，子类可覆写实现 UPSERT。"""
+        """保存钩子 — 默认简单插入，子类可覆写实现 UPSERT"""
         self._session.add(model)
         await self._session.flush()
         await self._session.refresh(model)
 
     def _apply_soft_delete_filter(self, stmt: Any) -> Any:
-        """应用软删除过滤条件。"""
+        """应用软删除过滤条件"""
         if self.soft_delete_column:
             col = cast("Any", self._model_class).__table__.c[self.soft_delete_column]
             return stmt.where(col.is_(None))
         return stmt
 
     async def _soft_delete(self, id: UUID) -> None:
-        """软删除 — 设置 deleted_at 时间戳。"""
+        """软删除 — 设置 deleted_at 时间戳"""
         from datetime import datetime, timezone
 
         col_name = self.soft_delete_column
@@ -163,7 +163,7 @@ class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
         await self._session.flush()
 
     async def _hard_delete(self, id: UUID) -> None:
-        """硬删除 — 物理移除记录。"""
+        """硬删除 — 物理移除记录"""
         stmt = select(self._model_class).where(cast("Any", self._model_class).__table__.c[self.pk_column] == id)
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()

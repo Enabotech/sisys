@@ -128,7 +128,7 @@ class AsyncOutboxPoller:
         await asyncio.gather(*[process_one(e) for e in events])
 
     async def run(self) -> None:
-        """启动轮询循环，按配置间隔持续轮询发件箱。"""
+        """启动轮询循环，按配置间隔持续轮询发件箱"""
         self._running = True
         logger.info(
             "AsyncOutboxPoller started (interval=%.1fs, batch_size=%d)",
@@ -147,6 +147,6 @@ class AsyncOutboxPoller:
             await asyncio.sleep(self._poll_interval)
 
     def stop(self) -> None:
-        """停止轮询循环。"""
+        """停止轮询循环"""
         self._running = False
         logger.info("AsyncOutboxPoller stopping")

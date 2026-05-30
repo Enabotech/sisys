@@ -102,7 +102,7 @@ class ExceptionHandlers:
         self._register_handlers()
 
     def _register_handlers(self) -> None:
-        """注册所有异常处理器到 FastAPI 应用。"""
+        """注册所有异常处理器到 FastAPI 应用"""
         self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)
         self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)
         self._app.add_exception_handler(BaseException, self._handle_exception)

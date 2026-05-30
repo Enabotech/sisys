@@ -27,7 +27,7 @@ class InMemoryOutboxRepository(OutboxRepository):
     """
 
     def __init__(self) -> None:
-        """初始化空的内存发件箱仓储。"""
+        """初始化空的内存发件箱仓储"""
         self._entities: list[OutboxEntity] = []
         self._lock = asyncio.Lock()
 

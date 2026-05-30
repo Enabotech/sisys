@@ -127,7 +127,7 @@ class TestSessionMiddleware:
         assert get_session_optional() is None
 
     def test_uow_managed_skips_commit(self, mock_factory, mock_session):
-        """当 UoW 已管理事务（in_transaction=False）时，Middleware 不应 commit。"""
+        """当 UoW 已管理事务（in_transaction=False）时，Middleware 不应 commit"""
         mock_session.in_transaction.return_value = False
 
         app = _create_app(mock_factory)
@@ -144,7 +144,7 @@ class TestSessionMiddleware:
         mock_session.close.assert_awaited_once()
 
     def test_uow_managed_skips_rollback_on_exception(self, mock_factory, mock_session):
-        """当 UoW 已管理事务（in_transaction=False）且有异常时，Middleware 不应 rollback。"""
+        """当 UoW 已管理事务（in_transaction=False）且有异常时，Middleware 不应 rollback"""
         mock_session.in_transaction.return_value = False
 
         app = _create_app(mock_factory)
@@ -162,7 +162,7 @@ class TestSessionMiddleware:
         mock_session.close.assert_awaited_once()
 
     def test_uow_not_used_commits_normally(self, mock_factory, mock_session):
-        """当 UoW 未使用时（in_transaction=True），Middleware 正常 commit。"""
+        """当 UoW 未使用时（in_transaction=True），Middleware 正常 commit"""
         mock_session.in_transaction.return_value = True
 
         app = _create_app(mock_factory)

@@ -16,7 +16,7 @@ from typing import Any
 
 
 class RedisJSONEncoder(json.JSONEncoder):
-    """自定义 JSON 编码器，处理 datetime、UUID、Enum、bytes 和 set 类型。"""
+    """自定义 JSON 编码器，处理 datetime、UUID、Enum、bytes 和 set 类型"""
 
     def default(self, o: Any) -> Any:
         if isinstance(o, datetime):

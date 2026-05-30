@@ -54,7 +54,7 @@ class TestResolverResolve:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建独立的注册表实例（不污染全局单例）。"""
+        """创建独立的注册表实例（不污染全局单例）"""
         reg = object.__new__(PortRegistry)
         reg._ports = {}
         return reg
@@ -93,7 +93,7 @@ class TestResolverDeprecated:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建独立的注册表实例（不污染全局单例）。"""
+        """创建独立的注册表实例（不污染全局单例）"""
         reg = object.__new__(PortRegistry)
         reg._ports = {}
         return reg
@@ -121,7 +121,7 @@ class TestResolverLifecycle:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建独立的注册表实例（不污染全局单例）。"""
+        """创建独立的注册表实例（不污染全局单例）"""
         reg = object.__new__(PortRegistry)
         reg._ports = {}
         return reg
@@ -219,7 +219,7 @@ class TestResolverResolveByInterface:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建独立的注册表实例（不污染全局单例）。"""
+        """创建独立的注册表实例（不污染全局单例）"""
         reg = object.__new__(PortRegistry)
         reg._ports = {}
         return reg
@@ -261,7 +261,7 @@ class TestResolverAutoInject:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建独立的注册表实例（不污染全局单例）。"""
+        """创建独立的注册表实例（不污染全局单例）"""
         reg = object.__new__(PortRegistry)
         reg._ports = {}
         return reg
@@ -332,7 +332,7 @@ class TestResolverFactoryFunction:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建独立的注册表实例（不污染全局单例）。"""
+        """创建独立的注册表实例（不污染全局单例）"""
         reg = object.__new__(PortRegistry)
         reg._ports = {}
         return reg
@@ -432,7 +432,7 @@ class TestResolveWithTypeSafety:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建独立的注册表实例（不污染全局单例）。"""
+        """创建独立的注册表实例（不污染全局单例）"""
         reg = object.__new__(PortRegistry)
         reg._ports = {}
         return reg
@@ -514,7 +514,7 @@ class TestResolveByInterfaceTypeSafety:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建独立的注册表实例（不污染全局单例）。"""
+        """创建独立的注册表实例（不污染全局单例）"""
         reg = object.__new__(PortRegistry)
         reg._ports = {}
         return reg

@@ -97,7 +97,7 @@ class AuditOutboxModel(Base):
         self.error_message = error_message
 
     def mark_published(self) -> None:
-        """标记此条目为已成功发布。"""
+        """标记此条目为已成功发布"""
         self.status = "published"
         self.processed_at = datetime.now(UTC)
 
