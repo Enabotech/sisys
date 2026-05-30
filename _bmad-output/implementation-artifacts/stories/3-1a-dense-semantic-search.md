@@ -483,13 +483,13 @@
 | 本地模型 vs 云端API | 本地：隐私、低延迟 | 本地：GPU资源需求 | - |
 | 异步 vs 同步 | 异步：不阻塞事件循环 | 异步：复杂性增加 | 异步 ✅ |
 
-**架构约束：sentence-transformers 在 FORBIDDEN_DOMAIN_IMPORTS**
+**架构约束：领域层零外部依赖**
 
-`FORBIDDEN_DOMAIN_IMPORTS`（`tests/unit/architecture/test_hexagonal_architecture_constraints.py` 第46-88行）定义了领域层禁止导入的外部框架。当前列表中**不包含** `sentence-transformers`，但项目约束领域层零外部依赖，**禁止**在领域层（`src/domain/`）直接导入任何外部模型库。
+`FORBIDDEN_DOMAIN_IMPORTS`（`tests/unit/architecture/test_hexagonal_architecture_constraints.py` 第46-88行）定义了领域层禁止导入的外部框架。**当前列表不包含 sentence-transformers**，但项目约束领域层零外部依赖，**禁止**在领域层（`src/domain/`）直接导入任何外部模型库。
 
 - `EmbeddingModelPort` 协议定义在领域层，仅使用 `abc` + `typing`（✅ 符合约束）
 - `BGEM3EmbeddingService` 实现位于 `infrastructure/external_services/embedding/`，可使用 sentence-transformers（✅ 符合约束）
-- Task 5 架构验证需确保领域层无 sentence-transformers 导入
+- Task 5 架构验证需通过 AST 扫描主动检测领域层是否导入 sentence-transformers（不仅仅依赖 FORBIDDEN_DOMAIN_IMPORTS 列表）
 
 ### ⚠️ 已知实现缺口（Dev 须知）
 
