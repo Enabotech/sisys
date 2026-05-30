@@ -10,6 +10,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
 
 
 class DocumentType(str, Enum):
@@ -76,10 +77,12 @@ class Document:
     parse_status: ParseStatus = ParseStatus.PENDING
     version: int = 1
     version_history: list[DocumentVersion] = field(default_factory=list)
-    metadata: dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     embedding: list[float] | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    tenant_id: str = ""
+    uploaded_by: str = ""
 
     def validate(self) -> bool:
         """验证不变量约束

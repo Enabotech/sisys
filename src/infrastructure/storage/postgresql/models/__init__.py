@@ -5,6 +5,7 @@
 
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
 from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel
+from src.infrastructure.storage.postgresql.models.document import DocumentModel
 from src.infrastructure.storage.postgresql.models.login_attempt import LoginAttemptModel
 from src.infrastructure.storage.postgresql.models.memory import (
     MemoryChangeHistoryModel,
@@ -31,6 +32,7 @@ __all__ = [
     "PermissionModel",
     "AuditLogModel",
     "AuditOutboxModel",
+    "DocumentModel",
     "MemoryMetadataModel",
     "MemoryChangeHistoryModel",
     "LoginAttemptModel",
