@@ -69,3 +69,70 @@ class DocumentStoragePort(L4ObjectPort, Protocol):
         Returns:
             文档元数据，不存在返回 None
         """
+
+    async def init_multipart_upload(
+        self,
+        user_id: str,
+        doc_type: str,
+        filename: str,
+        content_type: str = "application/octet-stream",
+    ) -> tuple[str, str]:
+        """初始化分片上传会话，自动生成对象路径
+
+        Args:
+            user_id: 用户 ID（用于路径生成）
+            doc_type: 文档类型（用于路径生成）
+            filename: 文件名
+            content_type: MIME 类型
+
+        Returns:
+            (minio_upload_id, object_key) 元组
+        """
+
+    async def upload_part(
+        self,
+        minio_upload_id: str,
+        object_key: str,
+        part_number: int,
+        data: bytes,
+    ) -> str:
+        """上传单个分片
+
+        Args:
+            minio_upload_id: MinIO 分片上传会话 ID
+            object_key: 对象键
+            part_number: 分片编号
+            data: 分片数据
+
+        Returns:
+            分片 ETag
+        """
+
+    async def complete_multipart_upload(
+        self,
+        minio_upload_id: str,
+        object_key: str,
+        parts: list[dict],
+    ) -> str:
+        """完成分片上传，合并所有分片
+
+        Args:
+            minio_upload_id: MinIO 分片上传会话 ID
+            object_key: 对象键
+            parts: 已上传分片列表 [{"part_number": int, "etag": str}]
+
+        Returns:
+            版本 ID
+        """
+
+    async def abort_multipart_upload(
+        self,
+        minio_upload_id: str,
+        object_key: str,
+    ) -> None:
+        """中止分片上传
+
+        Args:
+            minio_upload_id: MinIO 分片上传会话 ID
+            object_key: 对象键
+        """

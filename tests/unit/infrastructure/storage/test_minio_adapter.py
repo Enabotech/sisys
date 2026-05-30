@@ -177,3 +177,89 @@ class TestMinIOAdapterArchive:
         )
 
         assert result == "etag-xyz"
+
+
+class TestMinIOAdapterMultipart:
+    """multipart 分片上传方法验证"""
+
+    async def test_init_multipart_upload_delegates(self):
+        """验证 init_multipart_upload 委托"""
+        mock_repository = AsyncMock()
+        mock_repository.init_multipart_upload = AsyncMock(return_value="upload-id-123")
+
+        adapter = MinIOAdapter(mock_repository)
+        result = await adapter.init_multipart_upload(
+            bucket_type="raw-documents",
+            object_key="docs/test.pdf",
+            content_type="application/pdf",
+        )
+
+        assert result == "upload-id-123"
+        mock_repository.init_multipart_upload.assert_called_once_with(
+            bucket_type="raw-documents",
+            object_key="docs/test.pdf",
+            content_type="application/pdf",
+        )
+
+    async def test_upload_part_delegates(self):
+        """验证 upload_part 委托"""
+        mock_repository = AsyncMock()
+        mock_repository.upload_part = AsyncMock(return_value="etag-part-1")
+
+        adapter = MinIOAdapter(mock_repository)
+        result = await adapter.upload_part(
+            bucket_type="raw-documents",
+            object_key="docs/test.pdf",
+            upload_id="upload-id-123",
+            part_number=1,
+            data=b"part data",
+        )
+
+        assert result == "etag-part-1"
+        mock_repository.upload_part.assert_called_once_with(
+            bucket_type="raw-documents",
+            object_key="docs/test.pdf",
+            upload_id="upload-id-123",
+            part_number=1,
+            data=b"part data",
+        )
+
+    async def test_complete_multipart_upload_delegates(self):
+        """验证 complete_multipart_upload 委托"""
+        mock_repository = AsyncMock()
+        mock_repository.complete_multipart_upload = AsyncMock(return_value="version-id-1")
+
+        adapter = MinIOAdapter(mock_repository)
+        parts = [{"PartNumber": 1, "ETag": "etag-1"}, {"PartNumber": 2, "ETag": "etag-2"}]
+        result = await adapter.complete_multipart_upload(
+            bucket_type="raw-documents",
+            object_key="docs/test.pdf",
+            upload_id="upload-id-123",
+            parts=parts,
+        )
+
+        assert result == "version-id-1"
+        mock_repository.complete_multipart_upload.assert_called_once_with(
+            bucket_type="raw-documents",
+            object_key="docs/test.pdf",
+            upload_id="upload-id-123",
+            parts=parts,
+        )
+
+    async def test_abort_multipart_upload_delegates(self):
+        """验证 abort_multipart_upload 委托"""
+        mock_repository = AsyncMock()
+        mock_repository.abort_multipart_upload = AsyncMock(return_value=None)
+
+        adapter = MinIOAdapter(mock_repository)
+        await adapter.abort_multipart_upload(
+            bucket_type="raw-documents",
+            object_key="docs/test.pdf",
+            upload_id="upload-id-123",
+        )
+
+        mock_repository.abort_multipart_upload.assert_called_once_with(
+            bucket_type="raw-documents",
+            object_key="docs/test.pdf",
+            upload_id="upload-id-123",
+        )
