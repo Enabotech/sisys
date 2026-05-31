@@ -102,7 +102,7 @@ development_status:
   # ===========================================================================
   epic-2: in-progress
   2-1-document-upload-17-formats: done
-  2-2a-document-parsing-basic-formats: ready-for-dev
+  2-2a-document-parsing-basic-formats: review
   2-2b-document-parsing-extended-formats: backlog
   2-3-layout-preservation-doclaynet: backlog
   2-4-table-semantic-extraction: backlog

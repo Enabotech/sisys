@@ -149,6 +149,9 @@ class TestDocumentProcessingFlowExecution:
 
     async def test_flow_fn_executes_all_tasks(self) -> None:
         """测试 flow.fn() 执行完整流程"""
+        from unittest.mock import MagicMock, patch
+
+        from src.domain.entities.document import Document, ParseStatus
         from src.domain.events.publish_result import ChannelResult, PublishResult
         from src.infrastructure.workflow.tasks.document_tasks import (
             generate_embedding,
@@ -159,7 +162,6 @@ class TestDocumentProcessingFlowExecution:
         document_id = uuid.uuid4()
         file_path = "/test/document.pdf"
 
-        # Mock event publisher that returns success
         mock_publisher = AsyncMock()
         mock_publisher.publish = AsyncMock(
             return_value=PublishResult(
@@ -168,8 +170,23 @@ class TestDocumentProcessingFlowExecution:
             )
         )
 
-        # 使用 .fn() 调用每个 task，避免 Prefect runtime 上下文问题
-        parse_result = await parse_document.fn(document_id, file_path)
+        mock_service = AsyncMock()
+        mock_doc = Document(
+            document_id=document_id,
+            filename="document.pdf",
+            mime_type="application/pdf",
+            tenant_id="t1",
+        )
+        mock_doc.parse_status = ParseStatus.COMPLETED
+        mock_doc.metadata["parse_result"] = {"pages": [{"page_number": 1}]}
+        mock_service.parse_document = AsyncMock(return_value=mock_doc)
+
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.return_value = mock_service
+
+        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
+            parse_result = await parse_document.fn(document_id, file_path)
+
         embedding = await generate_embedding.fn(parse_result)
         index_result = await index_document.fn(embedding)
 
@@ -180,13 +197,16 @@ class TestDocumentProcessingFlowExecution:
         )
         await mock_publisher.publish(event)
 
-        assert parse_result["status"] == "parsed"
+        assert parse_result["status"] == "completed"
         assert isinstance(embedding, list)
         assert "indexed" in index_result
         mock_publisher.publish.assert_called_once()
 
     async def test_flow_handles_publish_failure(self) -> None:
         """测试 flow 处理事件发布失败"""
+        from unittest.mock import MagicMock, patch
+
+        from src.domain.entities.document import Document, ParseStatus
         from src.domain.events.publish_result import ChannelResult, PublishResult
         from src.infrastructure.workflow.tasks.document_tasks import (
             generate_embedding,
@@ -197,7 +217,6 @@ class TestDocumentProcessingFlowExecution:
         document_id = uuid.uuid4()
         file_path = "/test/document.pdf"
 
-        # Mock event publisher that returns full failure
         mock_publisher = AsyncMock()
         mock_publisher.publish = AsyncMock(
             return_value=PublishResult(
@@ -206,8 +225,23 @@ class TestDocumentProcessingFlowExecution:
             )
         )
 
-        # 使用 .fn() 调用每个 task，即使发布失败任务也应完成
-        parse_result = await parse_document.fn(document_id, file_path)
+        mock_service = AsyncMock()
+        mock_doc = Document(
+            document_id=document_id,
+            filename="document.pdf",
+            mime_type="application/pdf",
+            tenant_id="t1",
+        )
+        mock_doc.parse_status = ParseStatus.COMPLETED
+        mock_doc.metadata["parse_result"] = {"pages": [{"page_number": 1}]}
+        mock_service.parse_document = AsyncMock(return_value=mock_doc)
+
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.return_value = mock_service
+
+        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
+            parse_result = await parse_document.fn(document_id, file_path)
+
         embedding = await generate_embedding.fn(parse_result)
         index_result = await index_document.fn(embedding)
 
@@ -218,8 +252,7 @@ class TestDocumentProcessingFlowExecution:
         )
         result = await mock_publisher.publish(event)
 
-        # 任务结果仍然可用，即使发布失败
-        assert parse_result["status"] == "parsed"
+        assert parse_result["status"] == "completed"
         assert isinstance(embedding, list)
         assert "indexed" in index_result
         assert result.is_full_failure
