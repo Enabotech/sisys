@@ -218,6 +218,7 @@ class DomainEvent:
         # Extract subclass-specific fields from payload
         extra_kwargs: dict[str, Any] = {}
         event_type_field: Any = None
+        extracted_keys: set[str] = set()
         if target_class is not DomainEvent and is_dataclass(target_class):
             for f in fields(target_class):
                 if f.name == "event_type":
@@ -228,6 +229,11 @@ class DomainEvent:
                 if f.name in payload:
                     value = cls._deserialize_value(payload[f.name], f.type)
                     extra_kwargs[f.name] = value
+                    extracted_keys.add(f.name)
+
+        # 从 payload 中移除已提取到子类字段的条目，确保往返序列化数据无损
+        for key in extracted_keys:
+            payload.pop(key, None)
 
         # 仅当 event_type 字段的 init=True 时才传入构造函数
         if event_type_field is None or event_type_field.init:

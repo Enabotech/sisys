@@ -113,9 +113,12 @@ class TestFromDictDeserialization:
         assert restored.event_id == original.event_id
         assert restored.event_type == original.event_type
         assert restored.aggregate_id == original.aggregate_id
-        # Subclass-specific fields should be in payload
-        assert "document_id" in restored.payload
-        assert "parse_result" in restored.payload
+        # 往返序列化后 payload 应与原始事件一致
+        assert restored.payload == original.payload
+        # 子类字段应通过属性访问，而非在 payload 中重复
+        assert isinstance(restored, DocumentProcessed)
+        assert str(restored.document_id) == str(original.document_id)
+        assert restored.parse_result == original.parse_result
 
     def test_strategic_deviation_warning_roundtrip(self):
         """StrategicDeviationWarning survives roundtrip."""
