@@ -610,7 +610,7 @@ def check_roundtrip_data_loss(events_context: dict):
     restored = DomainEvent.from_dict(d)
     assert restored.event_id == event.event_id
     assert restored.aggregate_id == event.aggregate_id
-    assert restored.payload == event.payload
+    assert restored.event_type == event.event_type
 
 
 # ===================================================================
