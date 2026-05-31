@@ -125,11 +125,8 @@ class TestPDFParserEmptyDocument:
         path = _create_empty_pdf()
         try:
             result = parser.parse(path, "application/pdf")
-            # 0 页 PDF 可能无法被 pypdf 正确读取，也可能返回 0 页
-            # 两种情况都应该处理
-            assert result.parse_status in ("completed", "failed")
-            if result.parse_status == "failed":
-                assert result.error_message is not None
+            assert result.parse_status == "failed"
+            assert result.error_message is not None
         finally:
             os.unlink(path)
 
