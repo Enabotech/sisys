@@ -270,10 +270,10 @@
 
 | 端口名称 | 接口 | 实现 | 注册位置 | Lifetime | Version | Owner |
 |---------|------|------|----------|----------|---------|-------|
-| `document_parser` | `DocumentParserPort` | `CompositeDocumentParser` | domain/ports/document_parser.py | SCOPED | 1.0.0 | epic-2 |
-| `document_repository` | `DocumentRepositoryPort` | `PostgreSQLDocumentRepository` | domain/ports/document_repository.py | SCOPED | 1.0.0 | epic-2 |
-| `document_storage` | `DocumentStoragePort` | `MinIODocumentStorage` | application/ports/document_storage_port.py | SCOPED | 1.0.0 | epic-1 |
-| `event_publisher` | `EventPublisher` | `DualChannelEventBus` | domain/ports/event_publisher.py | SCOPED | 1.0.0 | epic-1 |
+| `document_parser` | `DocumentParserPort` | `CompositeDocumentParser` | domain/ports/document_parser.py | SCOPED | v1.0.0 | epic-2 |
+| `document_repository` | `DocumentRepositoryPort` | `PostgreSQLDocumentRepository` | domain/ports/document_repository.py | SCOPED | v1.0.0 | epic-2 |
+| `document_storage` | `DocumentStoragePort` | `MinIODocumentStorage` | application/ports/document_storage_port.py | SCOPED | v1.0.0 | epic-1 |
+| `event_publisher` | `EventPublisher` | `DualChannelEventBus` | domain/ports/event_publisher.py | SCOPED | v1.0.0 | epic-1 |
 
 #### API 契约 (API Contract)
 
@@ -877,6 +877,23 @@ def detect_encoding(content: bytes) -> str:
 - `src/domain/ports/registry.py` — 注册 document_parser 端口
 - `src/composition_root.py` — DI 注册
 - `src/infrastructure/workflow/tasks/document_tasks.py` — 替换 mock 实现
+- `src/infrastructure/workflow/flows/document_processing_flow.py` — 移除内部事件发布
+- `src/application/services/document_upload_service.py` — 存储 object_key 到 metadata
+- `src/interfaces/api/document_upload.py` — 传入 object_key 参数
+
+**待创建的测试文件/To Be Created (Tests):**
+- `tests/unit/domain/value_objects/test_parsed_document.py` — 值对象序列化测试（Task 0）
+- `tests/unit/domain/ports/test_document_parser.py` — 端口 Protocol 测试（Task 0）
+- `tests/unit/infrastructure/external_services/document_parsing/test_pdf_parser.py` — PDF 解析器测试（Task 1）
+- `tests/unit/infrastructure/external_services/document_parsing/test_word_parser.py` — Word 解析器测试（Task 2）
+- `tests/unit/infrastructure/external_services/document_parsing/test_text_parser.py` — TXT 解析器测试（Task 3）
+- `tests/unit/infrastructure/external_services/document_parsing/test_composite_parser.py` — 组合解析器测试（Task 4）
+- `tests/unit/application/services/test_document_parsing_service.py` — 解析服务测试（Task 5）
+- `tests/unit/architecture/test_arch_document_parser.py` — 架构约束测试（Task 7）
+- `tests/contracts/test_port_contract_document_parser.py` — 端口契约测试（Task 0）
+- `tests/integration/test_document_parse_integration.py` — 集成测试（Task 8）
+- `tests/acceptance/test_acceptance_document_parse.feature` — Gherkin 验收测试（Task 0/9）
+- `tests/acceptance/test_acceptance_document_parse.py` — BDD 步骤实现（Task 0/9）
 
 ---
 
@@ -912,10 +929,11 @@ def detect_encoding(content: bytes) -> str:
 
 ---
 
-**故事版本/Story Version:** v0.5.0
+**故事版本/Story Version:** v0.6.0
 **创建日期/Created:** 2026-05-31
 **最后更新/Last Updated:** 2026-05-31
 **更新说明/Description:**
+- v0.6.0: Round 5 最终审查 — version格式统一(v1.0.0)、文件清单补全测试文件+待修改文件、技术可行性验证确认
 - v0.5.0: Round 4 审查修订 — 值对象to_dict()新模式说明、Document非frozen说明、ParsedPage.to_dict()补充、CompositeDocumentParser lambda工厂注册样例、Subtask6.3 flow签名修改补充、AC→Task追溯矩阵扩展、event_channels.yaml无需修改说明
 - v0.4.0: Round 3 审查修订 — P0 DocumentParserPort签名(mime_type)、Subtask5.0扩展(register_document路径)、并发解析≥10、事件去重(Subtask6.3)、ParsedDocument顶层值对象、composition_root注册(Subtask4.3)
 - v0.3.0: Round 2 审查修订 — P0 object_key GAP修复(Subtask 5.0)、MinIO bucket_type/retrieve签名精确化
