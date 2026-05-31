@@ -128,7 +128,7 @@
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](../../docs/developer/sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](../../docs/developer/sdd-tdd-checklist.md)。
+> 参考 [`sdd-tdd-fusion-guide.md`](../../../docs/developer/sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](../../../docs/developer/sdd-tdd-checklist.md)。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 
@@ -419,7 +419,7 @@
 
 ### 相关架构模式和约束 Architecture Patterns & Constraints
 
-**来源:** [`architecture.md`](../../docs/architecture/architecture.md)
+**来源:** [`architecture.md`](../../../docs/architecture/architecture.md)
 
 - **六层存储架构:** L3 向量存储层（Qdrant 1.7+）存储嵌入向量、混合检索 payload
 - **向量维度:** 1024 维（bge-m3 嵌入模型），COSINE 相似度度量
@@ -429,7 +429,7 @@
 
 ### 关键架构决策
 
-**来源:** [`architecture.md`](../../docs/architecture/architecture.md) - 决策 4 (ADR-004): 六层存储架构
+**来源:** [`architecture.md`](../../../docs/architecture/architecture.md) - 决策 4 (ADR-004): 六层存储架构
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
@@ -610,17 +610,23 @@ sisys/
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
-> **第一轮审查修复 (2026-05-31)**
+> **第三轮审查修复 (2026-05-31)**
 >
 > 审查发现问题及修正：
-> - **P1** 修正 `architecture.md` 引用路径：`../../_bmad-output/planning-artifacts/architecture.md` → `../../docs/architecture/architecture.md`
-> - **P1** 修正 `sdd-tdd-fusion-guide.md` 引用路径：`./sdd-tdd-fusion-guide.md` → `../../docs/developer/sdd-tdd-fusion-guide.md`
-> - **P2** 修正 `sdd-tdd-checklist.md` 引用路径：`./sdd-tdd-checklist.md` → `../../docs/developer/sdd-tdd-checklist.md`
+> - **P1** 修正 `architecture.md` 引用路径：`../../docs/architecture/architecture.md` → `../../../docs/architecture/architecture.md`（路径深度错误，需4级）
+> - **P1** 修正 `sdd-tdd-fusion-guide.md` 引用路径：`../../docs/developer/sdd-tdd-fusion-guide.md` → `../../../docs/developer/sdd-tdd-fusion-guide.md`（路径深度错误，需4级）
+> - **P1** 修正 `sdd-tdd-checklist.md` 引用路径：`../../docs/developer/sdd-tdd-checklist.md` → `../../../docs/developer/sdd-tdd-checklist.md`（路径深度错误，需4级）
 > - **P2** Story 3.1b 文档标注为待创建状态（文档尚不存在）
 > - **P2** Task 5 补充 TDD 循环表格描述
 > - **P3** 领域事件定义标注为"可选 - 同步检索场景下可跳过"
 > - **P3** 性能指标一致性补充说明（Story 3.1a 范围 vs Epic 3 总预算）
 > - **P3** SearchResult 字段语义补充说明（避免 id 与 document_id 混淆）
+
+> **第一轮审查修复 (2026-05-31)**
+>
+> 审查发现问题及修正：
+> - **P1** 修正 `architecture.md` 引用路径（第一轮未修正正确深度）
+> - **P2** Story 3.1b 文档标注为待创建状态
 
 ---
 
@@ -629,11 +635,11 @@ sisys/
 | 文档 | 说明 |
 |------|------|
 | [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) | Epic 3 Story 3.1a 完整定义 |
-| [`architecture.md`](../../docs/architecture/architecture.md) | 六层存储架构、L3 向量存储层设计 |
+| [`architecture.md`](../../../docs/architecture/architecture.md) | 六层存储架构、L3 向量存储层设计 |
 | [Story 1.6-Qdrant Vector Layer](./1-6-qdrant-vector-layer.md) | Qdrant 向量存储层实现（前置依赖） |
 | [Story 3.1b-BM25 Sparse Search](./3-1b-bm25-sparse-search-rrf-fusion.md) | BM25 稀疏检索 + RRF 融合（后续 Story）⚠️ 待创建 |
-| [`sdd-tdd-fusion-guide.md`](../../docs/developer/sdd-tdd-fusion-guide.md) | SDD+TDD 融合开发模式指南 |
-| [`sdd-tdd-checklist.md`](../../docs/developer/sdd-tdd-checklist.md) | SDD+TDD 实施检查清单 |
+| [`sdd-tdd-fusion-guide.md`](../../../docs/developer/sdd-tdd-fusion-guide.md) | SDD+TDD 融合开发模式指南 |
+| [`sdd-tdd-checklist.md`](../../../docs/developer/sdd-tdd-checklist.md) | SDD+TDD 实施检查清单 |
 
 ---
 
