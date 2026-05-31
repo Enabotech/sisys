@@ -426,6 +426,35 @@
 3. sentence-transformers 库支持本地加载，无 API 依赖
 4. 模型懒加载避免启动时阻塞
 
+### Embedding Model 配置设计
+
+**来源:** `.env.example` + `tests/environments.py`
+
+#### 环境变量配置
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `EMBEDDING_MODEL_NAME` | `BAAI/bge-m3` | 模型名称（HuggingFace 模型 ID） |
+| `EMBEDDING_MODEL_PATH` | `/mnt/x/.cache/BAAI/bge-m3/` | 本地模型缓存路径（可选） |
+| `EMBEDDING_MODEL_DEVICE` | `cuda` | 推理设备（cuda/cpu） |
+
+#### 测试环境配置
+
+`tests/environments.py` 中的 `EmbeddingConfig` dataclass：
+
+```python
+@dataclass
+class EmbeddingConfig:
+    model_name: str = "BAAI/bge-m3"
+    model_path: str = ""
+    device: str = "cuda"
+```
+
+测试环境支持三层配置覆盖：
+1. **Layer 1:** 默认值（`BAAI/bge-m3`, `cuda`）
+2. **Layer 2:** `.env` 文件填充（仅填充空值）
+3. **Layer 3:** `os.environ` 显式设置（最高优先级）
+
 ### 项目结构说明 Project Structure
 
 ```
