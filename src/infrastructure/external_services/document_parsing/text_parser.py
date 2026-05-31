@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime
 
@@ -95,7 +96,5 @@ class TextParser:
 
     def _split_paragraphs(self, text: str) -> list[str]:
         """按连续空行分割段落"""
-        import re
-
         paragraphs = re.split(r"\n\s*\n", text)
         return [p.strip() for p in paragraphs]
