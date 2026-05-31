@@ -136,7 +136,8 @@
 **验证标准/Validation Criteria:**
 - [x] 准确率抽样验证流程定义（验收测试覆盖）
 - [x] 失败样本记录并分析原因
-- [x] P95 解析延迟 <500ms（单文档处理）
+- [x] P95 解析延迟 <500ms（单文档处理，**测量范围：仅 parser.parse() 纯解析时间，不含 MinIO 下载、临时文件 IO、repo.save()**）
+- [x] 并发解析能力 ≥10（Task 8 集成测试验证，使用 asyncio.gather() 并发调用 parse_document）
 
 ---
 
@@ -158,7 +159,31 @@
 
 #### 数据模型 (Data Models)
 
-- [x] `ParsedDocument` 值对象 — 解析结果结构化输出
+- [x] `ParsedDocument` 值对象 — 解析结果顶层容器
+  ```python
+  @dataclass(frozen=True)
+  class ParsedDocument:
+      """解析结果顶层容器"""
+      document_id: str
+      mime_type: str
+      pages: list[ParsedPage]
+      parse_status: Literal["completed", "failed"]
+      error_message: str | None = None
+      parse_timestamp: str = ""  # ISO 8601
+
+      def to_dict(self) -> dict[str, Any]:
+          """序列化为 JSON 可存储字典"""
+          return {
+              "document_id": self.document_id,
+              "mime_type": self.mime_type,
+              "pages": [p.to_dict() for p in self.pages],
+              "parse_status": self.parse_status,
+              "error_message": self.error_message,
+              "parse_timestamp": self.parse_timestamp,
+          }
+  ```
+
+- [x] `ParsedPage`/`ParsedElement`/`ParsedTable`/`BoundingBox` 值对象 — 解析结果结构化组件
   ```python
   @dataclass(frozen=True)
   class ParsedPage:
@@ -217,9 +242,10 @@
 
 - [ ] **新增端口** `document_parser` — 定义于 `src/domain/ports/document_parser.py`
   - 使用 `@runtime_checkable` 装饰器 + `class DocumentParserPort(Protocol)`
-  - Protocol 接口：`parse(file_path: str) -> ParsedDocument`（接收本地文件路径，返回强类型解析结果）
+  - Protocol 接口：`parse(file_path: str, mime_type: str) -> ParsedDocument`（接收本地文件路径 + MIME 类型用于路由，返回强类型解析结果）
   - 注册至 `src/domain/ports/registry.py`，version="1.0.0"，owner="epic-2"
   - 契约测试位于 `tests/contracts/test_port_contract_document_parser.py`
+  - **说明：** `mime_type` 参数用于 CompositeDocumentParser 内部路由决策（选择 PDFParser/WordParser/TextParser），单格式解析器忽略此参数
 - [x] **现有端口复用**：
   - `document_repository`（`DocumentRepositoryPort`） — 使用 `save()` 方法更新 `parse_status` 和 `metadata`（项目仓储端口无 update_* 方法，统一用 `save()` 全量更新，与 Story 2-1 模式一致）
   - `document_storage`（`DocumentStoragePort`） — 通过继承的 `L4ObjectPort.retrieve(bucket_type="raw-documents", object_key=..., version_id=None) -> AsyncIterator[bytes]` 从 MinIO 下载文件
@@ -460,10 +486,12 @@
 
 - [ ] Subtask 4.1: 🔴 红 — 编写 CompositeDocumentParser 失败测试
   - 测试场景：PDF MIME 调用 PDFParser、DOCX MIME 调用 WordParser、TXT MIME 调用 TextParser、未知 MIME 拒绝
-- [ ] Subtask 4.2: 🟢 绿 — 实现 `CompositeDocumentParser.parse(document_id, mime_type, file_path)`
+- [ ] Subtask 4.2: 🟢 绿 — 实现 `CompositeDocumentParser.parse(file_path, mime_type)` — 实现 `DocumentParserPort` 协议
   - MIME 类型映射：`application/pdf → PDFParser`、`application/vnd.openxmlformats-officedocument.wordprocessingml.document → WordParser`、`text/plain → TextParser`
-  - 组合模式：内部持有各格式 Parser 实例
-- [ ] Subtask 4.3: 🔄 重构 — 优化 CompositeDocumentParser 代码
+  - 组合模式：内部持有各格式 Parser 实例，`mime_type` 参数用于路由决策
+  - 未知 MIME 类型抛出 `ValueError`
+- [ ] Subtask 4.3: 在 `src/composition_root.py` 注册 `document_parser` 端口（impl 指向 CompositeDocumentParser，SCOPED lifetime）
+- [ ] Subtask 4.4: 🔄 重构 — 优化 CompositeDocumentParser 代码
 
 **完成标准/Definition of Done:**
 - [ ] CompositeDocumentParser 实现完成
@@ -487,10 +515,12 @@
 | 🟢 绿 | 实现 `DocumentParsingService` 类最小代码 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 5.0: 修复 `DocumentUploadService.upload()` — 捕获 `store_document()` 返回的 `object_key` 并存入 `Document.metadata["storage_object_key"]`
-  - 修改文件：`src/application/services/document_upload_service.py`
-  - 同步修改 `register_document()` 方法（分片上传完成路径也需存储 object_key）
-  - **理由：** 解析服务通过 `repo.find()` 获取 Document，从 `metadata["storage_object_key"]` 读取 MinIO object_key
+- [ ] Subtask 5.0: 修复 `DocumentUploadService` — 存储 MinIO object_key 到 `Document.metadata`
+  - **(a)** 修改 `upload()` 方法：捕获 `store_document()` 返回值，存入 `doc.metadata["storage_object_key"]`（在 `repo.save(doc)` 之前）
+  - **(b)** 修改 `register_document()` 方法：新增参数 `object_key: str`，存入 `doc.metadata["storage_object_key"]`
+  - **(c)** 修改 API 路由 `src/interfaces/api/document_upload.py` 中 `register_document()` 调用处，传入 `object_key`（从 `ChunkedUploadManager.complete_upload()` 返回值获取）
+  - **(d)** 编写测试验证 `upload()` 和 `register_document()` 两条路径均正确存储 `storage_object_key`
+  - **修改文件**：`src/application/services/document_upload_service.py`、`src/interfaces/api/document_upload.py`
 - [ ] Subtask 5.1: 🔴 红 — 编写 DocumentParsingService 失败测试
   - 测试场景：下载文件→写临时文件→解析→更新状态→发布事件→清理临时文件、解析失败状态处理
 - [ ] Subtask 5.2: 🟢 绿 — 实现 `DocumentParsingService.parse_document(document_id: UUID)`
@@ -528,7 +558,8 @@
   - 通过 `get_resolver().resolve("document_parsing_service")` 获取 `DocumentParsingService`
   - 调用 `service.parse_document(document_id)` 执行完整解析流程
   - **注意**：Prefect task 接收的 `file_path` 参数在重构后不再需要（Service 内部从 MinIO 下载），但为保持 API 兼容性保留参数签名
-- [ ] Subtask 6.3: 🔄 重构 — 保持 Prefect @task 装饰器和 retries=2
+- [ ] Subtask 6.3: 🟢 绿 — 修改 `document_processing_flow`：移除内部事件发布逻辑（由 `DocumentParsingService` 统一发布，避免重复发布 `DocumentProcessed`）
+- [ ] Subtask 6.4: 🔄 重构 — 保持 Prefect @task 装饰器和 retries=2
 
 **完成标准/Definition of Done:**
 - [ ] Prefect 任务真实解析逻辑实现
@@ -555,12 +586,13 @@
 
 ### Task 8: 集成测试
 
-**关联 AC:** AC-5
+**关联 AC:** AC-5, AC-6（并发解析）
 
 - [ ] Subtask 8.1: 创建 `tests/integration/test_document_parse_integration.py`
 - [ ] Subtask 8.2: 测试完整解析流水线（上传→解析→状态更新→事件发布）
-- [ ] Subtask 8.3: 测试解析失败场景
-- [ ] Subtask 8.4: 测试事件消费触发解析
+- [ ] Subtask 8.3: 测试解析失败场景（加密 PDF、空文档、未知 MIME）
+- [ ] Subtask 8.4: 测试并发解析 ≥10 文档（使用 `asyncio.gather()` 并发调用 `parse_document`，验证无竞态、无资源泄漏）
+- [ ] Subtask 8.5: 测试临时文件清理（解析完成后 temp 文件已删除）
 
 **完成标准/Definition of Done:**
 - [ ] 集成测试全部通过
@@ -826,10 +858,11 @@ def detect_encoding(content: bytes) -> str:
 
 ---
 
-**故事版本/Story Version:** v0.3.0
+**故事版本/Story Version:** v0.4.0
 **创建日期/Created:** 2026-05-31
 **最后更新/Last Updated:** 2026-05-31
 **更新说明/Description:**
+- v0.4.0: Round 3 审查修订 — P0 DocumentParserPort签名(mime_type)、Subtask5.0扩展(register_document路径)、并发解析≥10、事件去重(Subtask6.3)、ParsedDocument顶层值对象、composition_root注册(Subtask4.3)
 - v0.3.0: Round 2 审查修订 — P0 object_key GAP修复(Subtask 5.0)、MinIO bucket_type/retrieve签名精确化
 - v0.2.0: Round 1 审查修订 — 修复 P0 问题（文件下载桥接/仓储更新/编码依赖/事件消费/序列化路径/Prefect DI）
 - v0.1.0: 创建故事文件
