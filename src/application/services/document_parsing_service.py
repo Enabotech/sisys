@@ -9,6 +9,7 @@ import asyncio
 import os
 import tempfile
 import uuid
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from src.domain.entities.document import Document, ParseStatus
@@ -85,6 +86,9 @@ class DocumentParsingService:
 
             # 解析文档（CPU 密集型，使用线程池避免阻塞事件循环）
             parsed_doc = await asyncio.to_thread(self._parser.parse, temp_path, document.mime_type)
+
+            # 用真实文档 ID 覆盖解析器随机生成的 ID
+            parsed_doc = replace(parsed_doc, document_id=str(document.document_id))
 
             if parsed_doc.parse_status == "failed":
                 document.parse_status = ParseStatus.FAILED
