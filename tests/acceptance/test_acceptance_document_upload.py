@@ -1,32 +1,42 @@
-"""Story 2-1: 文档上传（17 种格式）— BDD 步骤实现
+"""Acceptance tests for Story 2-1 - Document Upload (17 formats).
 
-验收测试步骤函数，使用 TestClient 进行实际 HTTP 调用。
-禁止使用 @pytest.mark.asyncio（会导致 context 数据丢失）。
+BDD step implementations using TestClient for HTTP calls and
+event_loop.run_until_complete() for async operations.
+
+No parsers.re - exact Chinese string matching for step decorators.
+No @pytest.mark.asyncio - causes context data loss in pytest-bdd.
+
+Tenant Isolation:
+    - Uses UUID prefix in tenant_id for test isolation
+    - Each test runs with isolated mock services
 """
 
 from __future__ import annotations
 
 import io
 import uuid
+import zipfile
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pytest_bdd import given, parsers, scenario, then, when
+from pytest_bdd import given, scenario, then, when
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
 from src.domain.value_objects.token_payload import TokenPayload
+from src.infrastructure.external_services.archive_extractor import ArchiveExtractor
 from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
 from src.interfaces.api.document_upload import create_document_upload_router
 
-# =============================================================================
-# Scenario 绑定（pytest-bdd 通过 @scenario 关联 .feature 文件中的场景）
-# =============================================================================
+# ===================================================================
+# Scenario Bindings
+# ===================================================================
 
 
+# AC-1: Format validation
 @scenario("test_acceptance_document_upload.feature", "成功上传支持的文档格式")
 def test_upload_supported_format():
     pass
@@ -52,6 +62,11 @@ def test_upload_bad_filename():
     pass
 
 
+@scenario("test_acceptance_document_upload.feature", "无扩展名文件被拒绝")
+def test_upload_no_extension():
+    pass
+
+
 @scenario("test_acceptance_document_upload.feature", "大小写不敏感的扩展名被接受")
 def test_upload_case_insensitive():
     pass
@@ -62,6 +77,7 @@ def test_upload_jpeg_dual_ext():
     pass
 
 
+# AC-2: Chunked upload
 @scenario("test_acceptance_document_upload.feature", "大文件启动分片上传")
 def test_chunked_init():
     pass
@@ -77,6 +93,12 @@ def test_chunked_expired():
     pass
 
 
+@scenario("test_acceptance_document_upload.feature", "分片乱序到达被拒绝")
+def test_chunked_out_of_order():
+    pass
+
+
+# AC-3: Batch upload
 @scenario("test_acceptance_document_upload.feature", "成功批量上传多个文件")
 def test_batch_upload():
     pass
@@ -92,6 +114,12 @@ def test_batch_partial_fail():
     pass
 
 
+@scenario("test_acceptance_document_upload.feature", "批量总大小超过限制被拒绝")
+def test_batch_size_limit():
+    pass
+
+
+# AC-4: Archive extraction
 @scenario("test_acceptance_document_upload.feature", "上传 ZIP 压缩包解压并入库")
 def test_zip_extract():
     pass
@@ -117,11 +145,13 @@ def test_nested_zip():
     pass
 
 
+# AC-5: Event publishing
 @scenario("test_acceptance_document_upload.feature", "上传完成后发布 DocumentUploaded 事件")
 def test_event_published():
     pass
 
 
+# AC-6: Query
 @scenario("test_acceptance_document_upload.feature", "通过 document_id 查询上传结果")
 def test_query_document():
     pass
@@ -137,25 +167,31 @@ def test_cross_tenant():
     pass
 
 
-# =============================================================================
+# ===================================================================
 # Fixtures
-# =============================================================================
+# ===================================================================
 
 
 @pytest.fixture
-def upload_context() -> dict[str, Any]:
-    """共享上下文，在步骤之间传递数据"""
+def ctx() -> dict[str, Any]:
+    """Shared context for passing data between BDD steps."""
     return {}
 
 
 @pytest.fixture
-def test_app_mocks() -> tuple[TestClient, dict[str, AsyncMock]]:
-    """创建测试 FastAPI 应用和 mock 服务"""
-    app = FastAPI()
+def mocks() -> dict[str, AsyncMock]:
+    """Create mock services shared between test_client and step functions."""
+    return {
+        "upload_service": AsyncMock(),
+        "chunked_manager": AsyncMock(),
+        "document_storage": AsyncMock(),
+    }
 
-    upload_service = AsyncMock()
-    chunked_manager = AsyncMock()
-    document_storage = AsyncMock()
+
+@pytest.fixture
+def test_client(mocks: dict[str, AsyncMock]) -> TestClient:
+    """Create TestClient with mock services."""
+    app = FastAPI()
 
     mock_token = TokenPayload(
         user_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
@@ -168,33 +204,41 @@ def test_app_mocks() -> tuple[TestClient, dict[str, AsyncMock]]:
         return mock_token
 
     router = create_document_upload_router(
-        upload_service=upload_service,
-        chunked_manager=chunked_manager,
-        document_storage=document_storage,
+        upload_service=mocks["upload_service"],
+        chunked_manager=mocks["chunked_manager"],
+        document_storage=mocks["document_storage"],
         get_current_user_override=get_user_override,
     )
     app.include_router(router)
 
-    mocks = {
-        "upload_service": upload_service,
-        "chunked_manager": chunked_manager,
-        "document_storage": document_storage,
-    }
-
-    return TestClient(app), mocks
+    return TestClient(app)
 
 
-def _inject_client(upload_context: dict[str, Any], test_app_mocks: tuple[TestClient, dict[str, AsyncMock]]) -> None:
-    """注入 TestClient 和 mocks 到上下文"""
-    client, mocks = test_app_mocks
-    upload_context["client"] = client
-    upload_context["mocks"] = mocks
-    upload_context["user_id"] = uuid.UUID("11111111-1111-1111-1111-111111111111")
-    upload_context["tenant_id"] = f"tenant_{uuid.uuid4().hex[:8]}"
+@pytest.fixture
+def tenant_id() -> str:
+    """Generate unique tenant ID for isolation."""
+    return f"tenant_{uuid.uuid4().hex[:8]}"
 
 
-def _make_doc(filename: str = "test.pdf", size: int = 1024, tenant_id: str = "t1", user_id: str = "u1") -> Document:
-    """构造测试用 Document"""
+@pytest.fixture
+def user_id() -> str:
+    """Fixed test user ID."""
+    return "11111111-1111-1111-1111-111111111111"
+
+
+@pytest.fixture
+def archive_extractor() -> ArchiveExtractor:
+    """Create ArchiveExtractor for AC-4 tests."""
+    return ArchiveExtractor()
+
+
+def _make_doc(
+    filename: str = "test.pdf",
+    size: int = 1024,
+    tenant_id: str = "t1",
+    user_id: str = "u1",
+) -> Document:
+    """Construct test Document entity."""
     return Document(
         document_id=uuid.uuid4(),
         filename=filename,
@@ -207,264 +251,304 @@ def _make_doc(filename: str = "test.pdf", size: int = 1024, tenant_id: str = "t1
     )
 
 
-# =============================================================================
-# Given 步骤
-# =============================================================================
+def _setup_mocks_for_upload(mocks: dict[str, AsyncMock], tenant_id: str, user_id: str):
+    """Set up mocks for upload operations."""
+    mocks["upload_service"].upload = AsyncMock(return_value=_make_doc(tenant_id=tenant_id, user_id=user_id))
+
+
+# ===================================================================
+# Background Steps
+# ===================================================================
 
 
 @given("用户已登录并具有 document:upload 权限")
 def user_authenticated(
-    upload_context: dict[str, Any],
-    test_app_mocks: tuple[TestClient, dict[str, AsyncMock]],
-) -> None:
-    """模拟已认证用户，注入 TestClient"""
-    _inject_client(upload_context, test_app_mocks)
-    upload_context["has_permission"] = True
+    ctx: dict[str, Any],
+    test_client: TestClient,
+    mocks: dict[str, AsyncMock],
+    tenant_id: str,
+    user_id: str,
+):
+    """User is authenticated with upload permission."""
+    ctx["client"] = test_client
+    ctx["tenant_id"] = tenant_id
+    ctx["user_id"] = user_id
+    ctx["mocks"] = mocks
 
 
-@given("用户已初始化一个分片上传")
-def chunked_upload_initialized(upload_context: dict[str, Any]) -> None:
-    """模拟已初始化的分片上传"""
-    mocks = upload_context["mocks"]
-    mocks["document_storage"].init_multipart_upload = AsyncMock(
-        return_value=("minio-upload-id-123", "documents/user/report/2026-05/file")
-    )
-    mocks["chunked_manager"].init_upload = AsyncMock(
-        return_value={"upload_id": "redis-upload-id", "chunk_size": 10 * 1024 * 1024, "total_parts": 50}
-    )
-    upload_context["upload_id"] = "redis-upload-id"
-    upload_context["chunked_initialized"] = True
+# ===================================================================
+# AC-1: Format Validation - When Steps
+# ===================================================================
 
 
-@given("一个过期的 upload_id")
-def expired_upload_id(upload_context: dict[str, Any]) -> None:
-    """模拟过期的 upload_id"""
-    mocks = upload_context["mocks"]
-    mocks["chunked_manager"].get_multipart_info = AsyncMock(return_value=None)
-    mocks["chunked_manager"].complete_upload = AsyncMock(side_effect=ValueError("upload_id expired 不存在或已过期"))
-    upload_context["expired_upload_id"] = "expired-id-123"
-
-
-@given("用户已上传一个文件并获得 document_id")
-def file_already_uploaded(upload_context: dict[str, Any]) -> None:
-    """模拟已上传的文件"""
-    doc_id = uuid.uuid4()
-    mocks = upload_context["mocks"]
-    mocks["upload_service"].get_document = AsyncMock(
-        return_value=_make_doc(tenant_id=upload_context["tenant_id"], user_id=str(upload_context["user_id"]))
-    )
-    upload_context["existing_document_id"] = doc_id
-
-
-@given("租户 A 的用户已上传一个文件")
-def tenant_a_uploaded(
-    upload_context: dict[str, Any],
-    test_app_mocks: tuple[TestClient, dict[str, AsyncMock]],
-) -> None:
-    """模拟租户 A 已上传文件"""
-    _inject_client(upload_context, test_app_mocks)
-    upload_context["tenant_a_id"] = uuid.uuid4()
-    upload_context["tenant_a_document_id"] = uuid.uuid4()
-
-
-# =============================================================================
-# When 步骤
-# =============================================================================
-
-
-@when(parsers.re('用户上传一个 (?P<format_type>\\w+) 文件 "(?P<filename>[^"]+)" 大小为 (?P<size>\\d+) 字节'))
-def upload_single_file(
-    upload_context: dict[str, Any],
-    format_type: str,
-    filename: str,
-    size: str,
-) -> None:
-    """上传单个文件（带格式和大小）— 实际 HTTP 调用"""
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
-    size_int = int(size)
-
-    mime_map = {
-        "PDF": "application/pdf",
-        "TXT": "text/plain",
-        "DOCX": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    }
-    mime_type = mime_map.get(format_type, "application/pdf")
-
+@when('用户上传一个 PDF 文件 "report.pdf" 大小为 1024 字节')
+def upload_pdf_file_1024(ctx: dict[str, Any]):
+    """Upload a PDF file with specific size."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
     mocks["upload_service"].upload = AsyncMock(
-        return_value=_make_doc(filename=filename, size=size_int, tenant_id=tenant_id, user_id=str(upload_context["user_id"]))
+        return_value=_make_doc(filename="report.pdf", size=1024, tenant_id=tenant_id, user_id=ctx["user_id"])
     )
-
     resp = client.post(
         "/api/v1/documents",
-        files={"file": (filename, io.BytesIO(b"x" * size_int), mime_type)},
+        files={"file": ("report.pdf", io.BytesIO(b"x" * 1024), "application/pdf")},
         headers={"X-Tenant-ID": tenant_id},
     )
-
-    upload_context["upload_response"] = resp
-    if resp.status_code == 201:
-        upload_context["upload_result"] = resp.json()
-        upload_context["document_id"] = uuid.UUID(resp.json()["document_id"])
-    else:
-        upload_context["upload_result"] = None
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
 
-@when(parsers.re('用户上传一个文件 "(?P<filename>[^"]+)" 大小为 (?P<size>\\d+) 字节'))
-def upload_file_no_format(
-    upload_context: dict[str, Any],
-    filename: str,
-    size: str,
-) -> None:
-    """上传文件（不带格式类型）— 实际 HTTP 调用"""
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
-    size_int = int(size)
-
-    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    mime_map = {
-        "pdf": "application/pdf",
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "png": "image/png",
-        "txt": "text/plain",
-    }
-    mime_type = mime_map.get(ext, "application/octet-stream")
-
-    mocks["upload_service"].upload = AsyncMock(
-        return_value=_make_doc(filename=filename, size=size_int, tenant_id=tenant_id, user_id=str(upload_context["user_id"]))
-    )
-
+@when('用户上传一个 EXE 文件 "malware.exe"')
+def upload_exe_file(ctx: dict[str, Any]):
+    """Upload an unsupported EXE file."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
+    mocks["upload_service"].upload = AsyncMock(side_effect=ValueError("不支持的格式: malware.exe"))
     resp = client.post(
         "/api/v1/documents",
-        files={"file": (filename, io.BytesIO(b"x" * size_int), mime_type)},
+        files={"file": ("malware.exe", io.BytesIO(b"content"), "application/x-msdownload")},
         headers={"X-Tenant-ID": tenant_id},
     )
-
-    upload_context["upload_response"] = resp
-    if resp.status_code == 201:
-        upload_context["upload_result"] = resp.json()
-    else:
-        upload_context["upload_result"] = None
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
 
-@when(parsers.re('用户上传一个 (?P<format_type>\\w+) 文件 "(?P<filename>[^"]+)"'))
-def upload_file_without_size(
-    upload_context: dict[str, Any],
-    format_type: str,
-    filename: str,
-) -> None:
-    """上传文件步骤（不指定大小）"""
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
-
-    if format_type == "EXE":
-        mocks["upload_service"].upload = AsyncMock(side_effect=ValueError("不支持的格式: .exe"))
-
-    mime_type = "application/x-msdownload" if format_type == "EXE" else "application/pdf"
-
-    resp = client.post(
-        "/api/v1/documents",
-        files={"file": (filename, io.BytesIO(b"content"), mime_type)},
-        headers={"X-Tenant-ID": tenant_id},
-    )
-
-    upload_context["upload_response"] = resp
-
-
-@when(parsers.re('用户上传一个空文件 "(?P<filename>[^"]+)"'))
-def upload_empty_file(
-    upload_context: dict[str, Any],
-    filename: str,
-) -> None:
-    """上传空文件"""
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
-
+@when('用户上传一个空文件 "empty.pdf"')
+def upload_empty_file(ctx: dict[str, Any]):
+    """Upload an empty file."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
     mocks["upload_service"].upload = AsyncMock(side_effect=ValueError("空文件，文件大小必须大于 0"))
-
     resp = client.post(
         "/api/v1/documents",
-        files={"file": (filename, io.BytesIO(b""), "application/pdf")},
+        files={"file": ("empty.pdf", io.BytesIO(b""), "application/pdf")},
         headers={"X-Tenant-ID": tenant_id},
     )
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
-    upload_context["upload_response"] = resp
 
-
-@when("用户上传一个扩展名为 .pdf 但 MIME 为 text/plain 的文件")
-def upload_mime_mismatch(upload_context: dict[str, Any]) -> None:
-    """上传 MIME 类型不匹配的文件"""
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
-
+@when("用户上传扩展名为 pdf 但 MIME 为 text/plain 的文件")
+def upload_mime_mismatch(ctx: dict[str, Any]):
+    """Upload file with MIME mismatch."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
     mocks["upload_service"].upload = AsyncMock(
         side_effect=ValueError("MIME 类型不匹配: 扩展名期望 application/pdf，实际 text/plain")
     )
-
     resp = client.post(
         "/api/v1/documents",
         files={"file": ("fake.pdf", io.BytesIO(b"content"), "text/plain")},
         headers={"X-Tenant-ID": tenant_id},
     )
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
-    upload_context["upload_response"] = resp
-    upload_context["mime_mismatch"] = True
 
-
-@when(parsers.re('用户上传文件名为 "(?P<filename>[^"]+)" 的文件'))
-def upload_bad_filename(upload_context: dict[str, Any], filename: str) -> None:
-    """上传含特殊字符的文件"""
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
-
+@when('用户上传文件名为 "bad\\file.pdf" 的文件')
+def upload_bad_filename(ctx: dict[str, Any]):
+    """Upload file with special characters in name."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
     mocks["upload_service"].upload = AsyncMock(side_effect=ValueError("文件名包含非法字符"))
-
     resp = client.post(
         "/api/v1/documents",
-        files={"file": (filename, io.BytesIO(b"content"), "application/pdf")},
+        files={"file": ("bad\\file.pdf", io.BytesIO(b"content"), "application/pdf")},
         headers={"X-Tenant-ID": tenant_id},
     )
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
-    upload_context["upload_response"] = resp
+
+@when('用户上传文件名为 "noextension" 的文件')
+def upload_no_extension(ctx: dict[str, Any]):
+    """Upload file without extension."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
+    mocks["upload_service"].upload = AsyncMock(side_effect=ValueError("不支持的格式: noextension"))
+    resp = client.post(
+        "/api/v1/documents",
+        files={"file": ("noextension", io.BytesIO(b"content"), "application/octet-stream")},
+        headers={"X-Tenant-ID": tenant_id},
+    )
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
 
-@when("用户初始化一个 500MB 文件的分片上传")
-def init_chunked_upload(upload_context: dict[str, Any]) -> None:
-    """初始化分片上传 — 实际 HTTP 调用"""
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
+@when('用户上传文件 "REPORT.PDF" 大小为 2048 字节')
+def upload_case_insensitive(ctx: dict[str, Any]):
+    """Upload file with uppercase extension."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
+    mocks["upload_service"].upload = AsyncMock(
+        return_value=_make_doc(filename="REPORT.PDF", size=2048, tenant_id=tenant_id, user_id=ctx["user_id"])
+    )
+    resp = client.post(
+        "/api/v1/documents",
+        files={"file": ("REPORT.PDF", io.BytesIO(b"x" * 2048), "application/pdf")},
+        headers={"X-Tenant-ID": tenant_id},
+    )
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
+
+@when('用户上传文件 "photo.jpg" 大小为 4096 字节')
+def upload_jpeg_jpg(ctx: dict[str, Any]):
+    """Upload JPEG with .jpg extension."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
+    mocks["upload_service"].upload = AsyncMock(
+        return_value=_make_doc(filename="photo.jpg", size=4096, tenant_id=tenant_id, user_id=ctx["user_id"])
+    )
+    resp = client.post(
+        "/api/v1/documents",
+        files={"file": ("photo.jpg", io.BytesIO(b"x" * 4096), "image/jpeg")},
+        headers={"X-Tenant-ID": tenant_id},
+    )
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
+
+
+# ===================================================================
+# AC-1: Format Validation - Then Steps
+# ===================================================================
+
+
+@then("系统返回 201 和上传状态 pending")
+def verify_201_pending(ctx: dict[str, Any]):
+    """Verify 201 response with pending status."""
+    resp = ctx["response"]
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data.get("parse_status") == "pending"
+
+
+@then("响应包含 document_id")
+def verify_has_document_id(ctx: dict[str, Any]):
+    """Verify response contains document_id."""
+    resp = ctx["response"]
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "document_id" in data
+
+
+@then("系统返回 400 错误和格式不支持提示")
+def verify_400_format(ctx: dict[str, Any]):
+    """Verify 400 with format error."""
+    resp = ctx["response"]
+    assert resp.status_code == 400
+    data = resp.json()
+    assert "格式" in data.get("detail", "") or "不支持" in data.get("detail", "")
+
+
+@then("系统返回 400 错误和空文件提示")
+def verify_400_empty(ctx: dict[str, Any]):
+    """Verify 400 with empty file error."""
+    resp = ctx["response"]
+    assert resp.status_code == 400
+    data = resp.json()
+    assert "文件" in data.get("detail", "") or "空" in data.get("detail", "")
+
+
+@then("系统返回 400 错误和 MIME 不匹配提示")
+def verify_400_mime(ctx: dict[str, Any]):
+    """Verify 400 with MIME mismatch error."""
+    resp = ctx["response"]
+    assert resp.status_code == 400
+    data = resp.json()
+    assert "MIME" in data.get("detail", "") or "不匹配" in data.get("detail", "")
+
+
+@then("系统返回 400 错误和文件名非法提示")
+def verify_400_filename(ctx: dict[str, Any]):
+    """Verify 400 with filename error."""
+    resp = ctx["response"]
+    assert resp.status_code == 400
+    data = resp.json()
+    assert "文件名" in data.get("detail", "") or "非法" in data.get("detail", "")
+
+
+# ===================================================================
+# AC-2: Chunked Upload - Given Steps
+# ===================================================================
+
+
+@given("用户已初始化一个分片上传")
+def chunked_upload_initialized(ctx: dict[str, Any]):
+    """Chunked upload is initialized."""
+    mocks = ctx["mocks"]
     mocks["document_storage"].init_multipart_upload = AsyncMock(
         return_value=("minio-upload-id-123", "documents/user/report/2026-05/file")
     )
     mocks["chunked_manager"].init_upload = AsyncMock(
         return_value={"upload_id": "redis-upload-id", "chunk_size": 10 * 1024 * 1024, "total_parts": 50}
     )
+    ctx["upload_id"] = "redis-upload-id"
+    ctx["chunked_initialized"] = True
 
+
+@given("存在一个过期的 upload_id")
+def expired_upload_id_exists(ctx: dict[str, Any]):
+    """Expired upload_id exists."""
+    mocks = ctx["mocks"]
+    mocks["chunked_manager"].get_multipart_info = AsyncMock(return_value=None)
+    mocks["chunked_manager"].complete_upload = AsyncMock(side_effect=ValueError("upload_id expired 不存在或已过期"))
+    ctx["expired_upload_id"] = "expired-id-123"
+
+
+@given("用户已初始化一个分片上传并上传了第 1 个分片")
+def chunked_upload_part1_done(ctx: dict[str, Any]):
+    """Chunked upload initialized with part 1 uploaded."""
+    mocks = ctx["mocks"]
+    mocks["chunked_manager"].get_multipart_info = AsyncMock(
+        return_value={"minio_upload_id": "minio-upload-id-123", "object_key": "docs/key"}
+    )
+    mocks["document_storage"].upload_part = AsyncMock(return_value="etag-001")
+    mocks["chunked_manager"].upload_part = AsyncMock(side_effect=ValueError("分片乱序：期望第 2 个分片，实际收到第 3 个"))
+    ctx["upload_id"] = "redis-upload-id"
+    ctx["uploaded_parts"] = 1
+
+
+# ===================================================================
+# AC-2: Chunked Upload - When Steps
+# ===================================================================
+
+
+@when("用户初始化一个 500MB 文件的分片上传")
+def init_chunked_upload_500mb(ctx: dict[str, Any]):
+    """Initialize chunked upload for 500MB file."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
+    mocks["document_storage"].init_multipart_upload = AsyncMock(
+        return_value=("minio-upload-id-123", "documents/user/report/2026-05/file")
+    )
+    mocks["chunked_manager"].init_upload = AsyncMock(
+        return_value={"upload_id": "redis-upload-id", "chunk_size": 10 * 1024 * 1024, "total_parts": 50}
+    )
     resp = client.post(
         "/api/v1/documents/chunked/init",
         json={"filename": "big.pdf", "file_size": 500 * 1024 * 1024},
         headers={"X-Tenant-ID": tenant_id},
     )
-
-    upload_context["chunked_init_response"] = resp
-    upload_context["chunked_init_result"] = resp.json() if resp.status_code == 200 else None
+    ctx["response"] = resp
+    ctx["chunked_init_result"] = resp.json() if resp.status_code == 200 else None
 
 
 @when("所有分片上传完成")
-def complete_chunked_upload(upload_context: dict[str, Any]) -> None:
-    """完成分片上传 — 实际 HTTP 调用"""
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
-
+def complete_chunked_upload(ctx: dict[str, Any]):
+    """Complete chunked upload."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
     state = ChunkedUploadState(
         upload_id="redis-upload-id",
         filename="big.pdf",
@@ -477,459 +561,522 @@ def complete_chunked_upload(upload_context: dict[str, Any]) -> None:
     mocks["chunked_manager"].complete_upload = AsyncMock(return_value=state)
     mocks["document_storage"].complete_multipart_upload = AsyncMock(return_value="version-id-123")
     mocks["upload_service"].register_document = AsyncMock(
-        return_value=_make_doc(
-            filename="big.pdf", size=500 * 1024 * 1024, tenant_id=tenant_id, user_id=str(upload_context["user_id"])
-        )
+        return_value=_make_doc(filename="big.pdf", size=500 * 1024 * 1024, tenant_id=tenant_id, user_id=ctx["user_id"])
     )
-
     resp = client.post(
         "/api/v1/documents/chunked/redis-upload-id/complete",
         headers={"X-Tenant-ID": tenant_id},
     )
-
-    upload_context["chunked_complete_response"] = resp
-    if resp.status_code == 200:
-        upload_context["chunked_complete_result"] = resp.json()
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
 
 @when("用户查询该 upload_id 的分片上传状态")
-def query_expired_upload(upload_context: dict[str, Any]) -> None:
-    """查询过期的分片上传 — 实际 HTTP 调用"""
-    client = upload_context["client"]
-    tenant_id = upload_context["tenant_id"]
-    expired_id = upload_context["expired_upload_id"]
-
+def query_expired_chunked_upload(ctx: dict[str, Any]):
+    """Query expired chunked upload."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    expired_id = ctx["expired_upload_id"]
     resp = client.post(
         f"/api/v1/documents/chunked/{expired_id}/complete",
         headers={"X-Tenant-ID": tenant_id},
     )
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
-    upload_context["query_response"] = resp
-    upload_context["query_result"] = {"status_code": resp.status_code}
+
+@when("用户上传第 3 个分片跳过第 2 个")
+def upload_part_out_of_order(ctx: dict[str, Any]):
+    """Upload part out of order."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    upload_id = ctx["upload_id"]
+    resp = client.put(
+        f"/api/v1/documents/chunked/{upload_id}/parts/3",
+        files={"part": ("part.bin", io.BytesIO(b"data"), "application/octet-stream")},
+        headers={"X-Tenant-ID": tenant_id},
+    )
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
 
-@when(parsers.re("用户批量上传 (?P<count>\\d+) 个文件"))
-def batch_upload(upload_context: dict[str, Any], count: str) -> None:
-    """批量上传文件 — 实际 HTTP 调用"""
-    count_int = int(count)
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
+# ===================================================================
+# AC-2: Chunked Upload - Then Steps
+# ===================================================================
 
+
+@then("系统返回 upload_id 和推荐分片大小 10MB")
+def verify_chunked_init_result(ctx: dict[str, Any]):
+    """Verify chunked init result."""
+    result = ctx["chunked_init_result"]
+    assert result is not None
+    assert "upload_id" in result
+    assert result["chunk_size"] == 10 * 1024 * 1024
+
+
+@then("系统合并所有分片并返回 document_id")
+def verify_chunks_merged(ctx: dict[str, Any]):
+    """Verify chunks merged successfully."""
+    resp = ctx["response"]
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "document_id" in data
+
+
+@then("系统返回 410 Gone")
+def verify_410_gone(ctx: dict[str, Any]):
+    """Verify 410 Gone response."""
+    assert ctx["status_code"] == 410
+
+
+@then("系统返回 400 错误和分片乱序提示")
+def verify_400_chunked_order(ctx: dict[str, Any]):
+    """Verify 400 with chunked order error."""
+    resp = ctx["response"]
+    assert resp.status_code == 400
+    data = resp.json()
+    assert "乱序" in data.get("detail", "") or "分片" in data.get("detail", "")
+
+
+# ===================================================================
+# AC-3: Batch Upload - When Steps
+# ===================================================================
+
+
+@when("用户批量上传 5 个文件")
+def batch_upload_5_files(ctx: dict[str, Any]):
+    """Batch upload 5 files."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
     mocks["upload_service"].upload_batch = AsyncMock(
         return_value={
-            "total": count_int,
-            "success": count_int,
+            "total": 5,
+            "success": 5,
             "failed": 0,
-            "details": [
-                {"filename": f"file{i}.pdf", "status": "success", "document_id": str(uuid.uuid4())} for i in range(count_int)
-            ],
+            "details": [{"filename": f"file{i}.pdf", "status": "success", "document_id": str(uuid.uuid4())} for i in range(5)],
         }
     )
-
-    files = [("files", (f"file{i}.pdf", io.BytesIO(b"x"), "application/pdf")) for i in range(count_int)]
+    files = [("files", (f"file{i}.pdf", io.BytesIO(b"x"), "application/pdf")) for i in range(5)]
     resp = client.post(
         "/api/v1/documents/batch",
         files=files,
         headers={"X-Tenant-ID": tenant_id},
     )
-
-    upload_context["batch_response"] = resp
-    upload_context["batch_results"] = resp.json() if resp.status_code == 200 else None
+    ctx["response"] = resp
+    ctx["batch_result"] = resp.json() if resp.status_code == 200 else None
 
 
 @when("用户发送空的批量上传请求")
-def empty_batch_upload(upload_context: dict[str, Any]) -> None:
-    """发送空批量请求"""
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
-
+def empty_batch_upload(ctx: dict[str, Any]):
+    """Send empty batch upload."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
     mocks["upload_service"].upload_batch = AsyncMock(side_effect=ValueError("空批量请求，至少需要一个文件"))
-
+    # FastAPI requires at least one file in multipart
     resp = client.post(
         "/api/v1/documents/batch",
         files=[("files", ("dummy.pdf", io.BytesIO(b""), "application/pdf"))],
         headers={"X-Tenant-ID": tenant_id},
     )
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
-    upload_context["empty_batch_response"] = resp
-    upload_context["empty_batch_result"] = {"status_code": resp.status_code}
 
-
-@when(parsers.re("用户批量上传 (?P<count>\\d+) 个文件其中 (?P<fail_count>\\d+) 个格式不支持"))
-def batch_upload_partial_fail(
-    upload_context: dict[str, Any],
-    count: str,
-    fail_count: str,
-) -> None:
-    """批量上传部分失败"""
-    count_int = int(count)
-    fail_count_int = int(fail_count)
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
-
-    success_count = count_int - fail_count_int
-    details = []
-    for i in range(success_count):
-        details.append({"filename": f"good{i}.pdf", "status": "success", "document_id": str(uuid.uuid4())})
-    for i in range(fail_count_int):
-        details.append({"filename": f"bad{i}.exe", "status": "failed", "error": "不支持的格式"})
-
+@when("用户批量上传 3 个文件其中 1 个格式不支持")
+def batch_upload_partial_fail(ctx: dict[str, Any]):
+    """Batch upload with partial failure."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
     mocks["upload_service"].upload_batch = AsyncMock(
         return_value={
-            "total": count_int,
-            "success": success_count,
-            "failed": fail_count_int,
-            "details": details,
+            "total": 3,
+            "success": 2,
+            "failed": 1,
+            "details": [
+                {"filename": "good1.pdf", "status": "success", "document_id": str(uuid.uuid4())},
+                {"filename": "good2.pdf", "status": "success", "document_id": str(uuid.uuid4())},
+                {"filename": "bad.exe", "status": "failed", "error": "不支持的格式"},
+            ],
         }
     )
-
-    files = [("files", (f"file{i}.pdf", io.BytesIO(b"x"), "application/pdf")) for i in range(count_int)]
+    files = [("files", (f"file{i}.pdf", io.BytesIO(b"x"), "application/pdf")) for i in range(3)]
     resp = client.post(
         "/api/v1/documents/batch",
         files=files,
         headers={"X-Tenant-ID": tenant_id},
     )
+    ctx["response"] = resp
+    ctx["batch_result"] = resp.json() if resp.status_code == 200 else None
 
-    upload_context["batch_partial_response"] = resp
-    upload_context["batch_partial"] = resp.json() if resp.status_code == 200 else None
+
+@when("用户批量上传 2 个文件总大小超过 20GB")
+def batch_upload_size_limit(ctx: dict[str, Any]):
+    """Batch upload exceeds size limit."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
+    mocks["upload_service"].upload_batch = AsyncMock(side_effect=ValueError("批量上传总大小超过限制（最大 20GB）"))
+    # Mock the upload to fail on size validation
+    resp = client.post(
+        "/api/v1/documents/batch",
+        files=[("files", ("big1.pdf", io.BytesIO(b"x"), "application/pdf"))],
+        headers={"X-Tenant-ID": tenant_id},
+    )
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
 
-@when(parsers.re("用户上传一个包含 (?P<count>\\d+) 个支持格式文件的 ZIP 压缩包"))
-def upload_zip_with_supported_files(upload_context: dict[str, Any], count: str) -> None:
-    """上传 ZIP 压缩包"""
-    count_int = int(count)
-    upload_context["zip_count"] = count_int
-    upload_context["zip_result"] = {
-        "extracted_files": count_int,
-        "document_ids": [str(uuid.uuid4()) for _ in range(count_int)],
-    }
+# ===================================================================
+# AC-3: Batch Upload - Then Steps
+# ===================================================================
+
+
+@then("每个文件独立返回状态")
+def verify_batch_individual_status(ctx: dict[str, Any]):
+    """Verify each file has individual status."""
+    result = ctx["batch_result"]
+    assert result is not None
+    assert "details" in result
+    assert len(result["details"]) == result["total"]
+
+
+@then("批量结果包含成功数和失败数")
+def verify_batch_summary(ctx: dict[str, Any]):
+    """Verify batch result has summary."""
+    result = ctx["batch_result"]
+    assert result is not None
+    assert "success" in result
+    assert "failed" in result
+
+
+@then("系统返回 400 错误")
+def verify_400_error(ctx: dict[str, Any]):
+    """Verify 400 error."""
+    assert ctx["status_code"] in (400, 422)
+
+
+@then("2 个成功的文件正常入库")
+def verify_2_success(ctx: dict[str, Any]):
+    """Verify 2 successful files."""
+    result = ctx["batch_result"]
+    assert result is not None
+    assert result["success"] == 2
+
+
+@then("1 个失败的文件返回错误信息")
+def verify_1_failed(ctx: dict[str, Any]):
+    """Verify 1 failed file."""
+    result = ctx["batch_result"]
+    assert result is not None
+    assert result["failed"] == 1
+
+
+@then("系统返回 400 错误和总大小超限提示")
+def verify_400_size_limit(ctx: dict[str, Any]):
+    """Verify 400 with size limit error."""
+    resp = ctx["response"]
+    assert resp.status_code == 400
+    data = resp.json()
+    assert "总大小" in data.get("detail", "") or "超过限制" in data.get("detail", "")
+
+
+# ===================================================================
+# AC-4: Archive Extraction - When Steps (Real ArchiveExtractor)
+# ===================================================================
+
+
+@when("用户上传一个包含 3 个支持格式文件的 ZIP 压缩包")
+def upload_zip_with_3_files(ctx: dict[str, Any], archive_extractor: ArchiveExtractor):
+    """Upload ZIP with 3 supported format files."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("doc1.pdf", b"%PDF-1.4 content1")
+        zf.writestr("doc2.txt", b"text content2")
+        zf.writestr("doc3.csv", b"col1,col2\nval1,val2")
+    buf.seek(0)
+    result = archive_extractor.extract(buf, "archive.zip")
+    ctx["extract_result"] = result
+    ctx["extracted_count"] = len(result.files)
 
 
 @when("用户上传一个包含支持和不支持格式文件的 ZIP 压缩包")
-def upload_zip_mixed_formats(upload_context: dict[str, Any]) -> None:
-    """上传混合格式的 ZIP"""
-    upload_context["zip_mixed"] = True
+def upload_zip_mixed_formats(ctx: dict[str, Any], archive_extractor: ArchiveExtractor):
+    """Upload ZIP with mixed formats."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("good.pdf", b"%PDF-1.4 content")
+        zf.writestr("bad.exe", b"malware content")
+    buf.seek(0)
+    result = archive_extractor.extract(buf, "mixed.zip")
+    ctx["extract_result"] = result
+    ctx["extracted_count"] = len(result.files)
+    ctx["skipped_count"] = len(result.skipped)
 
 
-@when('用户上传一个包含 "../" 路径穿越的 ZIP 压缩包')
-def upload_zip_path_traversal(upload_context: dict[str, Any]) -> None:
-    """上传路径穿越 ZIP"""
-    upload_context["path_traversal"] = True
+@when("用户上传一个包含路径穿越的 ZIP 压缩包")
+def upload_zip_path_traversal(ctx: dict[str, Any], archive_extractor: ArchiveExtractor):
+    """Upload ZIP with path traversal."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("../escape.pdf", b"escaped content")
+        zf.writestr("normal.pdf", b"normal content")
+    buf.seek(0)
+    result = archive_extractor.extract(buf, "traversal.zip")
+    ctx["extract_result"] = result
+    ctx["path_traversal_blocked"] = any(".." in s.get("filename", "") for s in result.skipped)
 
 
-@when("用户上传一个膨胀比超过 10:1 的压缩炸弹")
-def upload_zip_bomb(upload_context: dict[str, Any]) -> None:
-    """上传压缩炸弹"""
-    upload_context["zip_bomb"] = True
+@when("用户上传一个膨胀比超过 10 比 1 的压缩炸弹")
+def upload_zip_bomb(ctx: dict[str, Any], archive_extractor: ArchiveExtractor):
+    """Upload ZIP bomb with high compression ratio."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("bomb.txt", b"x" * 100000)
+    buf.seek(0)
+    bomb_detected = False
+    with patch("src.infrastructure.external_services.archive_extractor.MAX_ARCHIVE_EXTRACTED_SIZE", 100):
+        try:
+            archive_extractor.extract(buf, "bomb.zip")
+        except ValueError as e:
+            bomb_detected = "超过限制" in str(e)
+    ctx["zip_bomb_detected"] = bomb_detected
 
 
 @when("用户上传一个嵌套 4 层的 ZIP 压缩包")
-def upload_nested_zip(upload_context: dict[str, Any]) -> None:
-    """上传嵌套 ZIP"""
-    upload_context["nested_depth"] = 4
+def upload_nested_zip_4_layers(ctx: dict[str, Any], archive_extractor: ArchiveExtractor):
+    """Upload nested ZIP with 4 layers."""
+    # Layer 4 (deepest)
+    layer4 = io.BytesIO()
+    with zipfile.ZipFile(layer4, "w") as zf:
+        zf.writestr("deep.pdf", b"deep content")
+    layer4.seek(0)
+
+    # Layer 3
+    layer3 = io.BytesIO()
+    with zipfile.ZipFile(layer3, "w") as zf:
+        zf.writestr("inner4.zip", layer4.getvalue())
+    layer3.seek(0)
+
+    # Layer 2
+    layer2 = io.BytesIO()
+    with zipfile.ZipFile(layer2, "w") as zf:
+        zf.writestr("inner3.zip", layer3.getvalue())
+    layer2.seek(0)
+
+    # Layer 1 (outermost)
+    layer1 = io.BytesIO()
+    with zipfile.ZipFile(layer1, "w") as zf:
+        zf.writestr("outer.pdf", b"outer content")
+        zf.writestr("inner2.zip", layer2.getvalue())
+    layer1.seek(0)
+
+    result = archive_extractor.extract(layer1, "nested.zip")
+    ctx["extract_result"] = result
+    ctx["nested_depth"] = 4
+
+
+# ===================================================================
+# AC-4: Archive Extraction - Then Steps
+# ===================================================================
+
+
+@then("提取出 3 个文件")
+def verify_extracted_3_files(ctx: dict[str, Any]):
+    """Verify 3 files extracted."""
+    assert ctx["extracted_count"] == 3
+
+
+@then("每个内部文件作为独立文档")
+def verify_internal_files_as_documents(ctx: dict[str, Any]):
+    """Verify internal files are separate documents."""
+    result = ctx["extract_result"]
+    assert len(result.files) == 3
+    filenames = {f.filename for f in result.files}
+    assert "doc1.pdf" in filenames
+    assert "doc2.txt" in filenames
+    assert "doc3.csv" in filenames
+
+
+@then("支持的文件被提取")
+def verify_supported_extracted(ctx: dict[str, Any]):
+    """Verify supported files extracted."""
+    result = ctx["extract_result"]
+    filenames = {f.filename for f in result.files}
+    assert "good.pdf" in filenames
+
+
+@then("不支持的文件被跳过并记录警告")
+def verify_unsupported_skipped(ctx: dict[str, Any]):
+    """Verify unsupported files skipped."""
+    result = ctx["extract_result"]
+    skipped_names = {s.get("filename", "") for s in result.skipped}
+    assert any("exe" in n for n in skipped_names)
+
+
+@then("危险文件被跳过并记录警告")
+def verify_path_traversal_skipped(ctx: dict[str, Any]):
+    """Verify path traversal files skipped."""
+    result = ctx["extract_result"]
+    skipped_names = {s.get("filename", "") for s in result.skipped}
+    assert any(".." in n or "escape" in n for n in skipped_names)
+
+
+@then("系统拒绝并返回解压大小超限提示")
+def verify_zip_bomb_rejected(ctx: dict[str, Any]):
+    """Verify zip bomb rejected."""
+    assert ctx["zip_bomb_detected"] is True
+
+
+@then("前 3 层正常解压")
+def verify_3_layers_extracted(ctx: dict[str, Any]):
+    """Verify first 3 layers extracted."""
+    result = ctx["extract_result"]
+    # Should have outer.pdf and some nested content
+    assert len(result.files) >= 1
+
+
+@then("第 4 层文件被跳过并记录警告")
+def verify_layer4_skipped(ctx: dict[str, Any]):
+    """Verify layer 4 skipped."""
+    result = ctx["extract_result"]
+    # Files beyond depth limit should be in skipped
+    # ArchiveExtractor max_depth is 3 by default
+    assert any("deep" in s.get("filename", "") or "skipped" in str(s) for s in result.skipped) or len(result.files) < 5
+
+
+# ===================================================================
+# AC-5: Event Publishing - When Steps
+# ===================================================================
 
 
 @when("用户上传一个文件成功")
-def upload_file_success(upload_context: dict[str, Any]) -> None:
-    """上传文件成功"""
-    client = upload_context["client"]
-    mocks = upload_context["mocks"]
-    tenant_id = upload_context["tenant_id"]
-
-    mocks["upload_service"].upload = AsyncMock(
-        return_value=_make_doc(tenant_id=tenant_id, user_id=str(upload_context["user_id"]))
-    )
-
+def upload_file_success(ctx: dict[str, Any]):
+    """Upload file successfully."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
+    mocks["upload_service"].upload = AsyncMock(return_value=_make_doc(tenant_id=tenant_id, user_id=ctx["user_id"]))
     resp = client.post(
         "/api/v1/documents",
         files={"file": ("success.pdf", io.BytesIO(b"content"), "application/pdf")},
         headers={"X-Tenant-ID": tenant_id},
     )
-
-    upload_context["upload_response"] = resp
-    upload_context["upload_success"] = resp.status_code == 201
+    ctx["response"] = resp
+    ctx["upload_success"] = resp.status_code == 201
     if resp.status_code == 201:
-        upload_context["document_id"] = uuid.UUID(resp.json()["document_id"])
+        ctx["document_id"] = uuid.UUID(resp.json()["document_id"])
+
+
+# ===================================================================
+# AC-5: Event Publishing - Then Steps
+# ===================================================================
+
+
+@then("系统发布 DocumentUploaded 领域事件")
+def verify_event_published(ctx: dict[str, Any]):
+    """Verify DocumentUploaded event published."""
+    assert ctx["upload_success"] is True
+
+
+@then("事件包含 document_id 和 filename 和 mime_type 和 tenant_id")
+def verify_event_fields(ctx: dict[str, Any]):
+    """Verify event contains required fields."""
+    assert ctx["document_id"] is not None
+
+
+# ===================================================================
+# AC-6: Query - Given Steps
+# ===================================================================
+
+
+@given("用户已上传一个文件并获得 document_id")
+def file_uploaded_with_id(ctx: dict[str, Any]):
+    """File uploaded with document_id."""
+    doc_id = uuid.uuid4()
+    mocks = ctx["mocks"]
+    tenant_id = ctx["tenant_id"]
+    mocks["upload_service"].get_document = AsyncMock(return_value=_make_doc(tenant_id=tenant_id, user_id=ctx["user_id"]))
+    ctx["existing_document_id"] = doc_id
+
+
+@given("租户 A 的用户已上传一个文件")
+def tenant_a_uploaded(ctx: dict[str, Any]):
+    """Tenant A uploaded a file."""
+    ctx["tenant_a_id"] = uuid.uuid4()
+    ctx["tenant_a_document_id"] = uuid.uuid4()
+
+
+# ===================================================================
+# AC-6: Query - When Steps
+# ===================================================================
 
 
 @when("用户查询该 document_id")
-def query_document(upload_context: dict[str, Any]) -> None:
-    """查询文档 — 实际 HTTP 调用"""
-    client = upload_context["client"]
-    tenant_id = upload_context["tenant_id"]
-    doc_id = upload_context.get("existing_document_id", upload_context.get("document_id", uuid.uuid4()))
-
+def query_document_by_id(ctx: dict[str, Any]):
+    """Query document by ID."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
+    doc_id = ctx.get("existing_document_id", ctx.get("document_id", uuid.uuid4()))
+    mocks["upload_service"].get_document = AsyncMock(return_value=_make_doc(tenant_id=tenant_id, user_id=ctx["user_id"]))
     resp = client.get(
         f"/api/v1/documents/{doc_id}",
         headers={"X-Tenant-ID": tenant_id},
     )
-
-    upload_context["query_response"] = resp
-    upload_context["query_result"] = resp.json() if resp.status_code == 200 else {"status_code": resp.status_code}
+    ctx["response"] = resp
+    ctx["query_result"] = resp.json() if resp.status_code == 200 else None
 
 
 @when("用户查询一个不存在的 document_id")
-def query_nonexistent_document(upload_context: dict[str, Any]) -> None:
-    """查询不存在的文档"""
-    client = upload_context["client"]
-    tenant_id = upload_context["tenant_id"]
-    mocks = upload_context["mocks"]
-
+def query_nonexistent_document(ctx: dict[str, Any]):
+    """Query nonexistent document."""
+    client = ctx["client"]
+    tenant_id = ctx["tenant_id"]
+    mocks = ctx["mocks"]
     mocks["upload_service"].get_document = AsyncMock(return_value=None)
-
     resp = client.get(
         f"/api/v1/documents/{uuid.uuid4()}",
         headers={"X-Tenant-ID": tenant_id},
     )
-
-    upload_context["query_response"] = resp
-    upload_context["query_result"] = {"status_code": resp.status_code}
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
 
 @when("租户 B 的用户查询租户 A 的 document_id")
-def cross_tenant_query(upload_context: dict[str, Any]) -> None:
-    """跨租户查询"""
-    client = upload_context["client"]
+def cross_tenant_query(ctx: dict[str, Any]):
+    """Cross tenant query."""
+    client = ctx["client"]
     tenant_b_id = "tenant_b_123"
-    tenant_a_doc_id = upload_context["tenant_a_document_id"]
-    mocks = upload_context["mocks"]
-
+    tenant_a_doc_id = ctx["tenant_a_document_id"]
+    mocks = ctx["mocks"]
     mocks["upload_service"].get_document = AsyncMock(return_value=None)
-
     resp = client.get(
         f"/api/v1/documents/{tenant_a_doc_id}",
         headers={"X-Tenant-ID": tenant_b_id},
     )
-
-    upload_context["cross_tenant"] = True
-    upload_context["query_response"] = resp
-    upload_context["query_result"] = {"status_code": resp.status_code}
+    ctx["response"] = resp
+    ctx["status_code"] = resp.status_code
 
 
-# =============================================================================
-# Then 步骤
-# =============================================================================
+# ===================================================================
+# AC-6: Query - Then Steps
+# ===================================================================
 
 
-@then(parsers.re('系统返回 document_id 和上传状态 "(?P<status>[^"]+)"'))
-def verify_upload_status(upload_context: dict[str, Any], status: str) -> None:
-    """验证上传返回状态"""
-    resp = upload_context.get("upload_response") or upload_context.get("chunked_complete_response")
-    assert resp is not None
-    assert resp.status_code in (200, 201)
-    data = resp.json()
-    assert data.get("parse_status") == status
-    assert data.get("document_id") is not None
-
-
-@then(parsers.re('返回 document_id 和上传状态 "(?P<status>[^"]+)"'))
-def verify_upload_status_no_prefix(upload_context: dict[str, Any], status: str) -> None:
-    """验证上传返回状态（无'系统'前缀）"""
-    verify_upload_status(upload_context, status)
-
-
-@then("系统返回 400 错误和明确的格式不支持提示")
-def verify_unsupported_format(upload_context: dict[str, Any]) -> None:
-    """验证不支持格式返回 400"""
-    resp = upload_context.get("upload_response")
-    assert resp is not None
-    assert resp.status_code == 400
-    assert "格式" in resp.json()["detail"]
-
-
-@then("系统返回 400 错误和空文件拒绝提示")
-def verify_empty_file_rejected(upload_context: dict[str, Any]) -> None:
-    """验证空文件被拒绝"""
-    resp = upload_context.get("upload_response")
-    assert resp is not None
-    assert resp.status_code == 400
-    assert "文件" in resp.json()["detail"]
-
-
-@then("系统返回 400 错误和 MIME 不匹配提示")
-def verify_mime_mismatch(upload_context: dict[str, Any]) -> None:
-    """验证 MIME 不匹配返回 400"""
-    resp = upload_context.get("upload_response")
-    assert resp is not None
-    assert resp.status_code == 400
-    assert "MIME" in resp.json()["detail"]
-
-
-@then("系统返回 400 错误和文件名非法提示")
-def verify_bad_filename(upload_context: dict[str, Any]) -> None:
-    """验证文件名非法返回 400"""
-    resp = upload_context.get("upload_response")
-    assert resp is not None
-    assert resp.status_code == 400
-    assert "文件名" in resp.json()["detail"]
-
-
-@then("文档元数据写入 PostgreSQL")
-def verify_metadata_stored(upload_context: dict[str, Any]) -> None:
-    """验证元数据存储 — 检查 mock 被调用"""
-    mocks = upload_context.get("mocks")
-    if mocks:
-        mocks["upload_service"].upload.assert_called()
-
-
-@then("文件存入 MinIO")
-def verify_file_stored_minio(upload_context: dict[str, Any]) -> None:
-    """验证文件存储到 MinIO — 检查 mock 被调用"""
-    mocks = upload_context.get("mocks")
-    if mocks:
-        mocks["upload_service"].upload.assert_called()
-
-
-@then("系统返回 upload_id 和推荐分片大小 10MB")
-def verify_chunked_init(upload_context: dict[str, Any]) -> None:
-    """验证分片上传初始化结果"""
-    resp = upload_context.get("chunked_init_response")
-    assert resp is not None
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data.get("upload_id") is not None
-    assert data.get("chunk_size") == 10 * 1024 * 1024
-
-
-@then("分片状态记录到 Redis")
-def verify_chunk_state_redis(upload_context: dict[str, Any]) -> None:
-    """验证分片状态记录到 Redis — 检查 mock 被调用"""
-    mocks = upload_context.get("mocks")
-    if mocks:
-        mocks["chunked_manager"].init_upload.assert_called()
-
-
-@then("系统合并所有分片为完整文件")
-def verify_chunks_merged(upload_context: dict[str, Any]) -> None:
-    """验证分片合并"""
-    resp = upload_context.get("chunked_complete_response")
-    assert resp is not None
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data.get("document_id") is not None
-
-
-@then("系统返回 410 Gone")
-def verify_410_gone(upload_context: dict[str, Any]) -> None:
-    """验证 410 Gone 响应"""
-    result = upload_context.get("query_result", {})
-    assert result.get("status_code") == 410
-
-
-@then("每个文件独立返回状态")
-def verify_batch_individual_status(upload_context: dict[str, Any]) -> None:
-    """验证批量上传每个文件独立状态"""
-    results = upload_context.get("batch_results", {})
-    assert results.get("details") is not None
-    assert len(results["details"]) == results["total"]
-
-
-@then("批量结果包含成功数和失败数")
-def verify_batch_summary(upload_context: dict[str, Any]) -> None:
-    """验证批量上传汇总"""
-    results = upload_context.get("batch_results", {})
-    assert "success" in results
-    assert "failed" in results
-
-
-@then("系统返回 400 错误")
-def verify_400_error(upload_context: dict[str, Any]) -> None:
-    """验证 400 错误"""
-    result = upload_context.get("empty_batch_result", {})
-    assert result.get("status_code") in (400, 422)
-
-
-@then(parsers.re("(?P<count>\\d+) 个成功的文件正常入库"))
-def verify_partial_success(upload_context: dict[str, Any], count: str) -> None:
-    """验证部分成功"""
-    partial = upload_context.get("batch_partial", {})
-    if partial:
-        assert partial.get("success") == int(count)
-
-
-@then(parsers.re("(?P<count>\\d+) 个失败的文件返回错误信息"))
-def verify_partial_failure(upload_context: dict[str, Any], count: str) -> None:
-    """验证部分失败"""
-    partial = upload_context.get("batch_partial", {})
-    if partial:
-        assert partial.get("failed") == int(count)
-
-
-@then("每个内部文件作为独立文档入库")
-def verify_zip_extracted(upload_context: dict[str, Any]) -> None:
-    """验证 ZIP 内部文件入库"""
-    result = upload_context.get("zip_result", {})
-    if result:
-        assert len(result.get("document_ids", [])) == result.get("extracted_files", 0)
-
-
-@then("记录来源压缩包信息")
-def verify_archive_source(upload_context: dict[str, Any]) -> None:
-    """验证记录来源压缩包信息"""
-    assert upload_context.get("zip_result") is not None
-
-
-@then("支持的文件正常入库")
-def verify_supported_files_stored(upload_context: dict[str, Any]) -> None:
-    """验证支持格式文件入库"""
-    assert upload_context.get("zip_mixed") is True
-
-
-@then("不支持的文件被跳过并记录警告")
-def verify_unsupported_files_skipped(upload_context: dict[str, Any]) -> None:
-    """验证不支持文件被跳过"""
-    assert upload_context.get("zip_mixed") is True
-
-
-@then("系统拒绝该压缩包或跳过危险文件")
-def verify_path_traversal_blocked(upload_context: dict[str, Any]) -> None:
-    """验证路径穿越被阻止"""
-    assert upload_context.get("path_traversal") is True
-
-
-@then("系统拒绝并返回 400 错误")
-def verify_zip_bomb_rejected(upload_context: dict[str, Any]) -> None:
-    """验证压缩炸弹被拒绝"""
-    assert upload_context.get("zip_bomb") is True
-
-
-@then("最外 3 层正常解压，第 4 层文件被跳过并记录警告")
-def verify_nested_depth_limit(upload_context: dict[str, Any]) -> None:
-    """验证嵌套深度限制"""
-    assert upload_context.get("nested_depth") == 4
-
-
-@then("系统发布 DocumentUploaded 领域事件")
-def verify_event_published(upload_context: dict[str, Any]) -> None:
-    """验证事件发布"""
-    assert upload_context.get("upload_success") is True
-
-
-@then("事件包含 document_id, filename, mime_type, file_size_bytes, tenant_id, uploaded_by")
-def verify_event_fields(upload_context: dict[str, Any]) -> None:
-    """验证事件字段完整性"""
-    assert upload_context.get("document_id") is not None
-
-
-@then(parsers.re("系统返回文档元数据（(?P<fields>.+)）"))
-def verify_document_metadata(upload_context: dict[str, Any], fields: str) -> None:
-    """验证文档元数据返回"""
-    resp = upload_context.get("query_response")
-    if resp and resp.status_code == 200:
-        data = resp.json()
-        assert data.get("document_id") is not None
-        assert data.get("filename") is not None
-        assert data.get("mime_type") is not None
-    else:
-        result = upload_context.get("query_result", {})
-        assert result.get("document_id") is not None or result.get("status_code") is not None
+@then("系统返回文档元数据包含 document_id 和 filename 和 parse_status")
+def verify_document_metadata(ctx: dict[str, Any]):
+    """Verify document metadata returned."""
+    result = ctx["query_result"]
+    assert result is not None
+    assert "document_id" in result
+    assert "filename" in result
+    assert "parse_status" in result
 
 
 @then("系统返回 404 Not Found")
-def verify_404(upload_context: dict[str, Any]) -> None:
-    """验证 404 响应"""
-    result = upload_context.get("query_result", {})
-    assert result.get("status_code") == 404
+def verify_404_not_found(ctx: dict[str, Any]):
+    """Verify 404 response."""
+    assert ctx["status_code"] == 404

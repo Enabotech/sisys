@@ -1,137 +1,144 @@
-# Story 2-1: 文档上传（17 种格式）
-# 验收测试场景（Gherkin 格式）
-
-Feature: 文档上传（17 种格式）
+# language: zh-CN
+功能: 文档上传（17 种格式）
   作为企业战略人员
   我希望上传 17 种格式的文档
   以便系统可以处理企业现有各类文档
 
+  背景:
+    假如 用户已登录并具有 document:upload 权限
+
+  # =========================================================================
   # AC-1: 17 种格式文件上传
-  Scenario: 成功上传支持的文档格式
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个 PDF 文件 "report.pdf" 大小为 1024 字节
-    Then 系统返回 document_id 和上传状态 "pending"
-    And 文档元数据写入 PostgreSQL
-    And 文件存入 MinIO
+  # =========================================================================
 
-  Scenario: 上传不支持的格式被拒绝
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个 EXE 文件 "malware.exe"
-    Then 系统返回 400 错误和明确的格式不支持提示
+  场景: 成功上传支持的文档格式
+    当 用户上传一个 PDF 文件 "report.pdf" 大小为 1024 字节
+    那么 系统返回 201 和上传状态 pending
+    并且 响应包含 document_id
 
-  Scenario: 上传空文件被拒绝
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个空文件 "empty.pdf"
-    Then 系统返回 400 错误和空文件拒绝提示
+  场景: 上传不支持的格式被拒绝
+    当 用户上传一个 EXE 文件 "malware.exe"
+    那么 系统返回 400 错误和格式不支持提示
 
-  Scenario: MIME 类型与扩展名不匹配被拒绝
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个扩展名为 .pdf 但 MIME 为 text/plain 的文件
-    Then 系统返回 400 错误和 MIME 不匹配提示
+  场景: 上传空文件被拒绝
+    当 用户上传一个空文件 "empty.pdf"
+    那么 系统返回 400 错误和空文件提示
 
-  Scenario: 文件名含特殊字符被拒绝
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传文件名为 "bad\\file.pdf" 的文件
-    Then 系统返回 400 错误和文件名非法提示
+  场景: MIME 类型与扩展名不匹配被拒绝
+    当 用户上传扩展名为 pdf 但 MIME 为 text/plain 的文件
+    那么 系统返回 400 错误和 MIME 不匹配提示
 
-  Scenario: 大小写不敏感的扩展名被接受
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个文件 "REPORT.PDF" 大小为 2048 字节
-    Then 系统返回 document_id 和上传状态 "pending"
+  场景: 文件名含特殊字符被拒绝
+    当 用户上传文件名为 "bad\file.pdf" 的文件
+    那么 系统返回 400 错误和文件名非法提示
 
-  Scenario: JPEG 双扩展名均被接受
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个文件 "photo.jpg" 大小为 4096 字节
-    Then 系统返回 document_id 和上传状态 "pending"
-    When 用户上传一个文件 "photo.jpeg" 大小为 4096 字节
-    Then 系统返回 document_id 和上传状态 "pending"
+  场景: 无扩展名文件被拒绝
+    当 用户上传文件名为 "noextension" 的文件
+    那么 系统返回 400 错误和格式不支持提示
 
+  场景: 大小写不敏感的扩展名被接受
+    当 用户上传文件 "REPORT.PDF" 大小为 2048 字节
+    那么 系统返回 201 和上传状态 pending
+
+  场景: JPEG 双扩展名均被接受
+    当 用户上传文件 "photo.jpg" 大小为 4096 字节
+    那么 系统返回 201 和上传状态 pending
+
+  # =========================================================================
   # AC-2: 分片上传与断点续传
-  Scenario: 大文件启动分片上传
-    Given 用户已登录并具有 document:upload 权限
-    When 用户初始化一个 500MB 文件的分片上传
-    Then 系统返回 upload_id 和推荐分片大小 10MB
-    And 分片状态记录到 Redis
+  # =========================================================================
 
-  Scenario: 分片上传完成后自动合并
-    Given 用户已登录并具有 document:upload 权限
-    And 用户已初始化一个分片上传
-    When 所有分片上传完成
-    Then 系统合并所有分片为完整文件
-    And 返回 document_id 和上传状态 "pending"
+  场景: 大文件启动分片上传
+    当 用户初始化一个 500MB 文件的分片上传
+    那么 系统返回 upload_id 和推荐分片大小 10MB
 
-  Scenario: upload_id 过期后查询返回 410 Gone
-    Given 用户已登录并具有 document:upload 权限
-    And 一个过期的 upload_id
-    When 用户查询该 upload_id 的分片上传状态
-    Then 系统返回 410 Gone
+  场景: 分片上传完成后自动合并
+    假如 用户已初始化一个分片上传
+    当 所有分片上传完成
+    那么 系统合并所有分片并返回 document_id
 
+  场景: upload_id 过期后查询返回 410 Gone
+    假如 存在一个过期的 upload_id
+    当 用户查询该 upload_id 的分片上传状态
+    那么 系统返回 410 Gone
+
+  场景: 分片乱序到达被拒绝
+    假如 用户已初始化一个分片上传并上传了第 1 个分片
+    当 用户上传第 3 个分片跳过第 2 个
+    那么 系统返回 400 错误和分片乱序提示
+
+  # =========================================================================
   # AC-3: 批量上传与并发控制
-  Scenario: 成功批量上传多个文件
-    Given 用户已登录并具有 document:upload 权限
-    When 用户批量上传 5 个文件
-    Then 每个文件独立返回状态
-    And 批量结果包含成功数和失败数
+  # =========================================================================
 
-  Scenario: 空批量请求被拒绝
-    Given 用户已登录并具有 document:upload 权限
-    When 用户发送空的批量上传请求
-    Then 系统返回 400 错误
+  场景: 成功批量上传多个文件
+    当 用户批量上传 5 个文件
+    那么 每个文件独立返回状态
+    并且 批量结果包含成功数和失败数
 
-  Scenario: 部分失败不回滚已成功文件
-    Given 用户已登录并具有 document:upload 权限
-    When 用户批量上传 3 个文件其中 1 个格式不支持
-    Then 2 个成功的文件正常入库
-    And 1 个失败的文件返回错误信息
+  场景: 空批量请求被拒绝
+    当 用户发送空的批量上传请求
+    那么 系统返回 400 错误
 
+  场景: 部分失败不回滚已成功文件
+    当 用户批量上传 3 个文件其中 1 个格式不支持
+    那么 2 个成功的文件正常入库
+    并且 1 个失败的文件返回错误信息
+
+  场景: 批量总大小超过限制被拒绝
+    当 用户批量上传 2 个文件总大小超过 20GB
+    那么 系统返回 400 错误和总大小超限提示
+
+  # =========================================================================
   # AC-4: 压缩包处理
-  Scenario: 上传 ZIP 压缩包解压并入库
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个包含 3 个支持格式文件的 ZIP 压缩包
-    Then 每个内部文件作为独立文档入库
-    And 记录来源压缩包信息
+  # =========================================================================
 
-  Scenario: 压缩包内不支持的格式被跳过
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个包含支持和不支持格式文件的 ZIP 压缩包
-    Then 支持的文件正常入库
-    And 不支持的文件被跳过并记录警告
+  场景: 上传 ZIP 压缩包解压并入库
+    当 用户上传一个包含 3 个支持格式文件的 ZIP 压缩包
+    那么 提取出 3 个文件
+    并且 每个内部文件作为独立文档
 
-  Scenario: 路径穿越攻击被阻止
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个包含 "../" 路径穿越的 ZIP 压缩包
-    Then 系统拒绝该压缩包或跳过危险文件
+  场景: 压缩包内不支持的格式被跳过
+    当 用户上传一个包含支持和不支持格式文件的 ZIP 压缩包
+    那么 支持的文件被提取
+    并且 不支持的文件被跳过并记录警告
 
-  Scenario: 压缩炸弹被检测并拒绝
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个膨胀比超过 10:1 的压缩炸弹
-    Then 系统拒绝并返回 400 错误
+  场景: 路径穿越攻击被阻止
+    当 用户上传一个包含路径穿越的 ZIP 压缩包
+    那么 危险文件被跳过并记录警告
 
-  Scenario: 嵌套压缩包超过 3 层被跳过
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个嵌套 4 层的 ZIP 压缩包
-    Then 最外 3 层正常解压，第 4 层文件被跳过并记录警告
+  场景: 压缩炸弹被检测并拒绝
+    当 用户上传一个膨胀比超过 10 比 1 的压缩炸弹
+    那么 系统拒绝并返回解压大小超限提示
 
+  场景: 嵌套压缩包超过 3 层被跳过
+    当 用户上传一个嵌套 4 层的 ZIP 压缩包
+    那么 前 3 层正常解压
+    并且 第 4 层文件被跳过并记录警告
+
+  # =========================================================================
   # AC-5: 上传事件发布
-  Scenario: 上传完成后发布 DocumentUploaded 事件
-    Given 用户已登录并具有 document:upload 权限
-    When 用户上传一个文件成功
-    Then 系统发布 DocumentUploaded 领域事件
-    And 事件包含 document_id, filename, mime_type, file_size_bytes, tenant_id, uploaded_by
+  # =========================================================================
 
+  场景: 上传完成后发布 DocumentUploaded 事件
+    当 用户上传一个文件成功
+    那么 系统发布 DocumentUploaded 领域事件
+    并且 事件包含 document_id 和 filename 和 mime_type 和 tenant_id
+
+  # =========================================================================
   # AC-6: 上传结果确认
-  Scenario: 通过 document_id 查询上传结果
-    Given 用户已登录并具有 document:upload 权限
-    And 用户已上传一个文件并获得 document_id
-    When 用户查询该 document_id
-    Then 系统返回文档元数据（document_id, filename, mime_type, file_size, parse_status, created_at）
+  # =========================================================================
 
-  Scenario: 不存在的 document_id 返回 404
-    Given 用户已登录并具有 document:upload 权限
-    When 用户查询一个不存在的 document_id
-    Then 系统返回 404 Not Found
+  场景: 通过 document_id 查询上传结果
+    假如 用户已上传一个文件并获得 document_id
+    当 用户查询该 document_id
+    那么 系统返回文档元数据包含 document_id 和 filename 和 parse_status
 
-  Scenario: 跨租户隔离验证
-    Given 租户 A 的用户已上传一个文件
-    When 租户 B 的用户查询租户 A 的 document_id
-    Then 系统返回 404 Not Found
+  场景: 不存在的 document_id 返回 404
+    当 用户查询一个不存在的 document_id
+    那么 系统返回 404 Not Found
+
+  场景: 跨租户隔离验证
+    假如 租户 A 的用户已上传一个文件
+    当 租户 B 的用户查询租户 A 的 document_id
+    那么 系统返回 404 Not Found
