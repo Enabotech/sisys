@@ -230,3 +230,117 @@ class TestDocumentParsingServiceFailure:
 
         assert result.parse_status == ParseStatus.FAILED
         mock_event_publisher.publish.assert_not_called()
+
+
+class TestDocumentParsingServiceDownloadTemp:
+    """_download_to_temp 防御逻辑测试"""
+
+    @pytest.mark.asyncio
+    async def test_stream_aclose_called_on_success(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
+        """验证正常下载完成后 stream.aclose() 被调用"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import ParsedDocument
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="t.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "key"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        mock_stream = AsyncMock()
+        mock_stream.__aiter__ = MagicMock(return_value=mock_stream)
+        mock_stream.__anext__ = AsyncMock(side_effect=[b"data", StopAsyncIteration])
+        mock_stream.aclose = AsyncMock()
+        mock_storage.retrieve = MagicMock(return_value=mock_stream)
+        mock_parser.parse.return_value = ParsedDocument(document_id=str(doc_id), mime_type="application/pdf")
+
+        service = DocumentParsingService(mock_repo, mock_storage, mock_event_publisher, mock_parser)
+        await service.parse_document(doc_id, "t1")
+
+        mock_stream.aclose.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_stream_aclose_called_on_exception(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
+        """验证下载中断时 stream.aclose() 仍被调用"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="t.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "key"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        mock_stream = AsyncMock()
+        mock_stream.__aiter__ = MagicMock(return_value=mock_stream)
+        mock_stream.__anext__ = AsyncMock(side_effect=RuntimeError("connection lost"))
+        mock_stream.aclose = AsyncMock()
+        mock_storage.retrieve = MagicMock(return_value=mock_stream)
+
+        service = DocumentParsingService(mock_repo, mock_storage, mock_event_publisher, mock_parser)
+        result = await service.parse_document(doc_id, "t1")
+
+        assert result.parse_status == ParseStatus.FAILED
+        mock_stream.aclose.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unknown_suffix_fallback_to_tmp(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
+        """验证非白名单后缀回退到 .tmp"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import ParsedDocument
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="malware.exe", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "path/to/malware.exe"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"data"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+        mock_parser.parse.return_value = ParsedDocument(document_id=str(doc_id), mime_type="application/pdf")
+
+        service = DocumentParsingService(mock_repo, mock_storage, mock_event_publisher, mock_parser)
+        result = await service.parse_document(doc_id, "t1")
+
+        assert result.parse_status == ParseStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_parser_returns_failed_status(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
+        """验证解析器返回 failed 状态时 Service 正确处理"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import ParsedDocument
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="encrypted.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "key"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"encrypted content"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+        mock_parser.parse.return_value = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/pdf",
+            parse_status="failed",
+            error_message="PDF 已加密",
+        )
+
+        service = DocumentParsingService(mock_repo, mock_storage, mock_event_publisher, mock_parser)
+        result = await service.parse_document(doc_id, "t1")
+
+        assert result.parse_status == ParseStatus.FAILED
+        assert "加密" in doc.metadata.get("parse_error", "")
+        mock_event_publisher.publish.assert_not_called()
