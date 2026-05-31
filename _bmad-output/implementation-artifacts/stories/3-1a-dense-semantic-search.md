@@ -51,12 +51,14 @@
 - [ ] EmbeddingServicePort 接口定义（`src/domain/ports/embedding_service.py`）
   - 方法: `encode_text(text: str) -> list[float]`（文本→嵌入向量）
   - 方法: `encode_texts(texts: list[str]) -> list[list[float]]`（批量编码）
-  - **注意:** 当前 `src/infrastructure/external_services/embedding/` 目录为空，bge-m3 实现待新建
+  - **注意:** 当前 `src/infrastructure/external_services/embedding/` 目录仅有 __pycache__，bge-m3 实现待新建
+- [ ] EmbeddingConfig 配置定义（`src/infrastructure/config/embedding.py`）
+  - 使用 `@dataclass(frozen=True)` + `from_env()` 模式
+  - 字段: model_name, model_path, device, dimension=1024
 - [ ] BGE3EmbeddingService 实现（`src/infrastructure/external_services/embedding/bge3_embedding_service.py`）
   - 使用 `sentence-transformers` 库加载 bge-m3 模型
   - 模型加载懒初始化（首次调用时加载）
   - 向量维度固定 1024（bge-m3 规范）
-  - **依赖:** 需在 `pyproject.toml` 添加 `sentence-transformers` 依赖
 - [ ] 嵌入生成单元测试（100 条查询，平均延迟<50ms）
 
 ### AC-2: Dense 语义检索（Qdrant + Cosine Similarity）
@@ -484,8 +486,7 @@ sisys/
 │   │   │   └── value_objects/
 │   │   │       └── test_search_result.py
 │   │   ├── infrastructure/
-│   │   │   ├── test_bge3_embedding_service.py
-│   │   │   └── test_dense_retrieval_service_impl.py
+│   │   │   └── test_bge3_embedding_service.py
 │   │   └── architecture/
 │   │       └── test_arch_dense_search.py
 │   ├── integration/
@@ -558,6 +559,7 @@ sisys/
 - `src/domain/value_objects/search_result.py` - SearchResult 值对象
 - `src/domain/ports/embedding_service.py` - EmbeddingServicePort 接口
 - `src/domain/services/dense_retrieval_service.py` - DenseRetrievalService 服务（领域层）
+- `src/infrastructure/config/embedding.py` - EmbeddingConfig 配置（from_env 模式）
 - `src/infrastructure/external_services/embedding/bge3_embedding_service.py` - BGE3EmbeddingService 实现
 - `tests/unit/domain/ports/test_embedding_service_port.py` - EmbeddingServicePort 契约测试
 - `tests/unit/domain/services/test_dense_retrieval_service.py` - DenseRetrievalService 领域服务测试
@@ -565,8 +567,6 @@ sisys/
 - `tests/unit/infrastructure/test_bge3_embedding_service.py` - BGE3EmbeddingService 实现测试
 - `tests/integration/test_integration_dense_search.py` - 集成测试
 - `tests/unit/architecture/test_arch_dense_search.py` - 架构验证测试
-- `tests/acceptance/test_acceptance_dense_semantic_search.feature` - Gherkin 场景
-- `tests/acceptance/test_acceptance_dense_semantic_search.py` - BDD 步骤实现
 - `tests/acceptance/test_acceptance_dense_semantic_search.feature` - Gherkin 场景
 - `tests/acceptance/test_acceptance_dense_semantic_search.py` - BDD 步骤实现
 
