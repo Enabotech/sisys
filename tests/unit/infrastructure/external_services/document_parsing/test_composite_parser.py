@@ -121,6 +121,34 @@ class TestCompositeParserUnknownMime:
             os.unlink(path)
 
 
+class TestCompositeParserDocRouting:
+    """DOC 格式路由测试 — 验证 AC-2 友好拒绝消息"""
+
+    def test_doc_mime_routes_to_word_parser(self) -> None:
+        """验证 DOC 格式路由到 WordParser，返回友好中文错误消息"""
+        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+
+        parser = CompositeDocumentParser(
+            pdf_parser=PDFParser(),
+            word_parser=WordParser(),
+            text_parser=TextParser(),
+        )
+        # 创建一个非 DOCX 格式文件（模拟 DOC）
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".doc")
+        tmp.write(b"not a valid docx")
+        tmp.close()
+        try:
+            result = parser.parse(tmp.name, "application/msword")
+            assert result.parse_status == "failed"
+            assert result.error_message is not None
+            assert "DOCX" in result.error_message or "DOC" in result.error_message
+        finally:
+            os.unlink(tmp.name)
+
+
 class TestCompositeParserPortContract:
     """验证 CompositeDocumentParser 满足 DocumentParserPort 协议"""
 
