@@ -89,7 +89,7 @@
 **And** 输出结构化 JSON（单页结构，texts 数组）
 
 **验证标准/Validation Criteria:**
-- [x] 编码自动检测（chardet 或内置检测）
+- [x] 编码自动检测（内置方案：依次尝试 UTF-8 → GBK → GB18030，**不引入 chardet 新依赖** — pyproject.toml 中无 chardet）
 - [x] 段落分割逻辑（连续空行分隔）
 - [x] 无扩展名编码错误返回解析失败
 - [x] 超大 TXT（>10MB）分块处理
@@ -120,10 +120,11 @@
 **And** 解析失败时设置 `parse_status=FAILED`，不发布 `DocumentProcessed`
 
 **验证标准/Validation Criteria:**
-- [x] 事件消费通过 RabbitMQ 监听（RELIABLE 模式）
+- [x] 事件消费通过 Prefect 流程触发（`document_processing_flow` 已定义解析编排骨架，消费端由 Prefect 调度器或 RabbitMQ consumer 触发）
 - [x] 状态流转：`PENDING → IN_PROGRESS → COMPLETED/FAILED`
 - [x] `DocumentProcessed.parse_result` 包含完整解析输出
 - [x] 失败场景不发布 `DocumentProcessed`，仅记录错误日志
+- [x] MVP 触发方式：Prefect flow 由调用方主动触发（`document_processing_flow(document_id, file_path, event_publisher)`），RabbitMQ 事件消费者不在本 Story 范围（推迟至 Epic 7 API 集成 Story 7-2 REST API 接口或后续专用事件消费者 Story）
 
 ### AC-6: 解析准确率验证
 
@@ -174,6 +175,10 @@
       bbox: BoundingBox | None = None  # DocLayNet 预留，MVP 填 None
       confidence: float = 1.0  # OCR 场景由 Story 2-5 实现
 
+      def to_dict(self) -> dict[str, Any]:
+          """序列化为 JSON 可存储字典"""
+          return {"content": self.content, "bbox": None, "confidence": self.confidence}
+
   @dataclass(frozen=True)
   class BoundingBox:
       """元素边界框坐标"""
@@ -189,7 +194,14 @@
       rows: list[list[str]]
       bbox: BoundingBox | None = None
       confidence: float = 1.0
+
+      def to_dict(self) -> dict[str, Any]:
+          """序列化为 JSON 可存储字典"""
+          return {"rows": self.rows, "bbox": None, "confidence": self.confidence}
   ```
+
+**序列化路径说明：** `ParsedDocument`（frozen dataclass）→ `to_dict()` → 存入 `DocumentProcessed.parse_result`（`dict[str, Any]`）和 `Document.metadata["parse_result"]`（JSONB）。端口 `DocumentParserPort.parse()` 返回强类型 `ParsedDocument`，应用层 `DocumentParsingService` 调用 `.to_dict()` 转换为 dict 后传给事件和仓储。
+
 - [x] `ParseResult` TypedDict — 存储到 `Document.metadata["parse_result"]` 的 JSON 结构
   ```python
   class ParseResult(TypedDict):
@@ -205,12 +217,12 @@
 
 - [ ] **新增端口** `document_parser` — 定义于 `src/domain/ports/document_parser.py`
   - 使用 `@runtime_checkable` 装饰器 + `class DocumentParserPort(Protocol)`
-  - Protocol 接口：`parse(document_id: UUID, file_path: str) -> ParsedDocument`
+  - Protocol 接口：`parse(file_path: str) -> ParsedDocument`（接收本地文件路径，返回强类型解析结果）
   - 注册至 `src/domain/ports/registry.py`，version="1.0.0"，owner="epic-2"
   - 契约测试位于 `tests/contracts/test_port_contract_document_parser.py`
 - [x] **现有端口复用**：
-  - `document_repository`（`DocumentRepositoryPort`） — 更新 `parse_status` 和 `metadata`
-  - `document_storage`（`DocumentStoragePort`） — 从 MinIO 下载文件
+  - `document_repository`（`DocumentRepositoryPort`） — 使用 `save()` 方法更新 `parse_status` 和 `metadata`（项目仓储端口无 update_* 方法，统一用 `save()` 全量更新，与 Story 2-1 模式一致）
+  - `document_storage`（`DocumentStoragePort`） — 通过继承的 `L4ObjectPort.retrieve(bucket_type="raw-documents", object_key=..., version_id=None) -> AsyncIterator[bytes]` 从 MinIO 下载文件
   - `event_publisher`（`EventPublisher`） — 发布 `DocumentProcessed`
 
 **端口契约清单：**
@@ -473,10 +485,19 @@
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 5.1: 🔴 红 — 编写 DocumentParsingService 失败测试
-  - 测试场景：下载文件→解析→更新状态→发布事件、解析失败状态处理
-- [ ] Subtask 5.2: 🟢 绿 — 实现 `DocumentParsingService.parse_document(document_id)`
-  - 编排流程：`document_storage.retrieve()` → `parser.parse()` → `repo.update_parse_status()` → `event_publisher.publish(DocumentProcessed)`
-  - 事务：状态更新与事件发布在同一事务内
+  - 测试场景：下载文件→写临时文件→解析→更新状态→发布事件→清理临时文件、解析失败状态处理
+- [ ] Subtask 5.2: 🟢 绿 — 实现 `DocumentParsingService.parse_document(document_id: UUID)`
+  - 编排流程：
+    1. `repo.find(query)` 获取 Document 实体（含 `metadata` 中的 MinIO object_key）
+    2. `document_storage.retrieve(bucket_type="raw-documents", object_key=...)` 获取 AsyncIterator[bytes]
+    3. 写入 `tempfile.NamedTemporaryFile(delete=False)` — **桥接逻辑：retrieve() 返回字节流，pypdf/python-docx 需要 file_path**
+    4. `parser.parse(temp_file_path)` 调用解析器
+    5. `parsed_doc.to_dict()` 转换为 dict
+    6. 更新 Document 实体：`parse_status=COMPLETED`，`metadata["parse_result"]=result_dict`
+    7. `repo.save(updated_document)` 全量更新（项目中仓储端口无 update_* 方法）
+    8. `event_publisher.publish(DocumentProcessed(...))` 发布事件
+    9. `os.unlink(temp_file_path)` 清理临时文件（finally 块）
+  - 事务：`repo.save()` 与事件发布在同一 `session_context()` 事务内（架构保证：ContextVar 共享 AsyncSession）
 - [ ] Subtask 5.3: 🔄 重构 — 优化 DocumentParsingService 代码
 
 **完成标准/Definition of Done:**
@@ -491,9 +512,14 @@
 **关联 AC:** AC-5
 
 > **目的：** 将 `document_tasks.py` 的 mock 实现替换为真实解析逻辑
+> **关键约束：** Prefect `@task` 是独立函数，无法通过构造器注入服务。通过 `get_resolver().resolve("document_parsing_service")` 获取服务实例。
 
-- [ ] Subtask 6.1: 🔴 红 — 编写 `parse_document` 任务测试（调用真实 Parser）
-- [ ] Subtask 6.2: 🟢 绿 — 修改 `parse_document` task 调用 `DocumentParsingService`
+- [ ] Subtask 6.1: 🔴 红 — 编写 `parse_document` 任务测试（调用真实 Service）
+- [ ] Subtask 6.2: 🟢 绿 — 修改 `parse_document(document_id: UUID, file_path: str) -> dict[str, Any]`
+  - 当前签名保持不变（`document_id` + `file_path`）
+  - 通过 `get_resolver().resolve("document_parsing_service")` 获取 `DocumentParsingService`
+  - 调用 `service.parse_document(document_id)` 执行完整解析流程
+  - **注意**：Prefect task 接收的 `file_path` 参数在重构后不再需要（Service 内部从 MinIO 下载），但为保持 API 兼容性保留参数签名
 - [ ] Subtask 6.3: 🔄 重构 — 保持 Prefect @task 装饰器和 retries=2
 
 **完成标准/Definition of Done:**
@@ -624,16 +650,48 @@ tests/
 2. **DI 注册延迟加载陷阱** — impl 字符串拼写错误不立即报错，需契约测试覆盖
 3. **事件双注册** — 新增事件需同时更新 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`
 4. **TestTenant 隔离** — 并行测试 UUID 前缀隔离，新端口测试也必须使用
-5. **MinIO 流式处理** — `document_storage.retrieve()` 返回文件流，禁止全量 bytes 加载（防 OOM）
+5. **MinIO 流式处理** — `document_storage.retrieve()` 返回 `AsyncIterator[bytes]`（继承自 `L4ObjectPort.retrieve()`），禁止全量 bytes 加载（防 OOM）
 6. **Prefect 任务 retries** — `parse_document` 已有 `retries=2`，替换实现需保留
 7. **状态流转事务原子性** — `parse_status` 更新与 Outbox 写入需同一事务
+8. **仓储无 update_* 方法** — 项目中所有仓储端口统一使用 `save()` 全量更新，不存在 `update_parse_status()` 等部分更新方法
 
 **应用到本故事/Applied to This Story:**
 - [ ] `DocumentParserPort` impl 字符串拼写纳入契约测试
 - [ ] 解析服务使用 `TestTenant` 进行租户隔离
-- [ ] 文件下载流式处理，不全量加载
+- [ ] 文件下载：`L4ObjectPort.retrieve(bucket_type="raw-documents", object_key=...)` → 写入临时文件 → 解析器读取 file_path → 清理临时文件
 - [ ] Prefect 任务替换保留 `retries=2`
-- [ ] `parse_status` 更新与事件发布同一事务
+- [ ] `parse_status` 更新通过 `repo.save()` 全量更新，与事件发布同一事务
+- [ ] 解析器单元测试使用本地 fixture 文件（非 MinIO 下载），集成测试覆盖完整 retrieve→parse 流程
+
+### 文件下载桥接逻辑（核心技术路径）
+
+**来源:** `src/domain/ports/l4_object.py`（L4ObjectPort）, `src/application/ports/document_storage_port.py`（DocumentStoragePort 继承 L4ObjectPort）
+
+**问题：** `pypdf.PdfReader` 和 `python-docx.Document` 需要 **文件路径**（`str`），但 MinIO 下载 API `L4ObjectPort.retrieve()` 返回 `AsyncIterator[bytes]`。
+
+**桥接方案：**
+```python
+import os
+import tempfile
+
+async def _download_to_temp(self, bucket_type: str, object_key: str) -> str:
+    """从 MinIO 下载文件到临时文件，返回临时文件路径"""
+    stream = self._document_storage.retrieve(bucket_type, object_key)
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".tmp")
+    try:
+        async for chunk in stream:
+            tmp.write(chunk)
+        tmp.close()
+        return tmp.name
+    except Exception:
+        tmp.close()
+        os.unlink(tmp.name)
+        raise
+```
+
+**临时文件清理：** 在 `DocumentParsingService.parse_document()` 的 `finally` 块中调用 `os.unlink(temp_path)`。
+
+**MinIO object_key 获取：** `Document` 实体的 `metadata` 字段（JSONB）存储了上传时的 MinIO object_key，需在 Story 2-1 上传时记录。如果 metadata 中无 object_key，可通过 `document_storage.store_document()` 的返回值（object_key）获取。
 
 ### 解析库技术细节
 
@@ -760,8 +818,9 @@ def detect_encoding(content: bytes) -> str:
 
 ---
 
-**故事版本/Story Version:** v0.1.0
+**故事版本/Story Version:** v0.2.0
 **创建日期/Created:** 2026-05-31
 **最后更新/Last Updated:** 2026-05-31
 **更新说明/Description:**
+- v0.2.0: Round 1 审查修订 — 修复 P0 问题（文件下载桥接/仓储更新/编码依赖/事件消费/序列化路径/Prefect DI）
 - v0.1.0: 创建故事文件
