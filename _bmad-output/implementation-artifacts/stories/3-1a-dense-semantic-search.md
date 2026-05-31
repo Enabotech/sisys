@@ -186,10 +186,10 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | EmbeddingService | 查询嵌入生成、批量编码、延迟 | `tests/unit/infrastructure/test_bge3_embedding_service.py` | Task 1 |
-| **TDD 单元测试** | DenseRetrievalService | 检索编排、结果处理、过滤 | `tests/unit/infrastructure/test_dense_retrieval_service_impl.py` | Task 2 |
+| **TDD 单元测试** | BGE3EmbeddingService | 查询嵌入生成、批量编码、延迟 | `tests/unit/infrastructure/test_bge3_embedding_service.py` | Task 1 |
+| **TDD 单元测试** | DenseRetrievalService | 检索编排、结果处理、过滤 | `tests/unit/domain/services/test_dense_retrieval_service.py` | Task 2 |
 | **TDD 单元测试** | SearchResult | 值对象验证、score 范围 | `tests/unit/domain/value_objects/test_search_result.py` | Task 3 |
-| **端口契约测试** | Port Contracts | EmbeddingServicePort/DenseRetrievalService 接口契约 | `tests/contracts/test_port_contract_embeddingService.py` | Task 0/1 |
+| **端口契约测试** | Port Contracts | EmbeddingServicePort 接口契约 | `tests/unit/domain/ports/test_embedding_service_port.py` | Task 0/1 |
 | **集成测试** | Dense 检索端到端 | 完整检索流程（嵌入→检索→结果） | `tests/integration/test_integration_dense_search.py` | Task 4 |
 | **架构验证测试** | 领域层零依赖 | 领域层无外部嵌入库导入 | `tests/unit/architecture/test_arch_dense_search.py` | Task 5 |
 | **验收测试** | Gherkin 场景 | 业务价值验收 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 0 |
@@ -528,15 +528,16 @@ sisys/
 - `src/domain/events/dense_search_events.py` - DenseSearchInitiated/Completed 事件
 - `src/domain/value_objects/search_result.py` - SearchResult 值对象
 - `src/domain/ports/embedding_service.py` - EmbeddingServicePort 接口
-- `src/domain/services/dense_retrieval_service.py` - DenseRetrievalService 接口
+- `src/domain/services/dense_retrieval_service.py` - DenseRetrievalService 服务（领域层）
 - `src/infrastructure/external_services/embedding/bge3_embedding_service.py` - BGE3EmbeddingService 实现
-- `tests/unit/domain/ports/test_embedding_service_port.py` - 端口契约测试
-- `tests/unit/domain/services/test_dense_retrieval_service.py` - 服务接口测试
-- `tests/unit/domain/value_objects/test_search_result.py` - 值对象测试
-- `tests/unit/infrastructure/test_bge3_embedding_service.py` - 嵌入服务实现测试
-- `tests/unit/infrastructure/test_dense_retrieval_service_impl.py` - 检索服务实现测试
+- `tests/unit/domain/ports/test_embedding_service_port.py` - EmbeddingServicePort 契约测试
+- `tests/unit/domain/services/test_dense_retrieval_service.py` - DenseRetrievalService 领域服务测试
+- `tests/unit/domain/value_objects/test_search_result.py` - SearchResult 值对象测试
+- `tests/unit/infrastructure/test_bge3_embedding_service.py` - BGE3EmbeddingService 实现测试
 - `tests/integration/test_integration_dense_search.py` - 集成测试
 - `tests/unit/architecture/test_arch_dense_search.py` - 架构验证测试
+- `tests/acceptance/test_acceptance_dense_semantic_search.feature` - Gherkin 场景
+- `tests/acceptance/test_acceptance_dense_semantic_search.py` - BDD 步骤实现
 - `tests/acceptance/test_acceptance_dense_semantic_search.feature` - Gherkin 场景
 - `tests/acceptance/test_acceptance_dense_semantic_search.py` - BDD 步骤实现
 
