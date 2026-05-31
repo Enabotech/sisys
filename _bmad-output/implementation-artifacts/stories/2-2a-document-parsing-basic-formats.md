@@ -1,6 +1,6 @@
 # Story 2-2a: 文档解析与内容提取（基础格式）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -398,18 +398,18 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 定义 `ParsedPage`/`ParsedElement`/`ParsedTable`/`BoundingBox` 值对象（`src/domain/value_objects/parsed_document.py`）
-- [ ] Subtask 0.2: 定义 `ParseResult` TypedDict（`src/domain/value_objects/parsed_document.py`）
-- [ ] Subtask 0.3: 定义 `DocumentParserPort` Protocol（`src/domain/ports/document_parser.py`）
-- [ ] Subtask 0.4: 注册 `document_parser` 端口至 `registry.py`
-- [ ] Subtask 0.5: 编写端口契约测试（`tests/contracts/test_port_contract_document_parser.py`）
-- [ ] Subtask 0.6: 编写 Gherkin 验收测试（`tests/acceptance/test_acceptance_document_parse.feature`）
-- [ ] Subtask 0.7: 编写 BDD 步骤实现（`tests/acceptance/test_acceptance_document_parse.py`）
-- [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义 `ParsedPage`/`ParsedElement`/`ParsedTable`/`BoundingBox` 值对象（`src/domain/value_objects/parsed_document.py`）
+- [x] Subtask 0.2: 定义 `ParseResult` TypedDict（`src/domain/value_objects/parsed_document.py`）
+- [x] Subtask 0.3: 定义 `DocumentParserPort` Protocol（`src/domain/ports/document_parser.py`）
+- [x] Subtask 0.4: 注册 `document_parser` 端口至 `registry.py`
+- [x] Subtask 0.5: 编写端口契约测试（`tests/contracts/test_port_contract_document_parser.py`）
+- [x] Subtask 0.6: 编写 Gherkin 验收测试（`tests/acceptance/test_acceptance_document_parse.feature`）
+- [x] Subtask 0.7: 编写 BDD 步骤实现（`tests/acceptance/test_acceptance_document_parse.py`）
+- [x] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -425,17 +425,17 @@
 | 🟢 绿 | 实现 `PDFParser` 类最小代码 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 PDFParser 失败测试
+- [x] Subtask 1.1: 🔴 红 — 编写 PDFParser 失败测试
   - 测试场景：纯文本 PDF 提取、多页 PDF、表格检测、加密 PDF 拒绝、空 PDF 拒绝
-- [ ] Subtask 1.2: 🟢 绿 — 实现 `PDFParser.parse(file_path) -> ParsedDocument`
+- [x] Subtask 1.2: 🟢 绿 — 实现 `PDFParser.parse(file_path) -> ParsedDocument`
   - 使用 `pypdf.PdfReader` 提取文本
   - 表格检测：基于文本定位推断（非图像识别）
   - 异常处理：加密/空文档返回 `ParseResult` with `parse_status="failed"`
-- [ ] Subtask 1.3: 🔄 重构 — 优化 PDFParser 代码
+- [x] Subtask 1.3: 🔄 重构 — 优化 PDFParser 代码
 
 **完成标准/Definition of Done:**
-- [ ] PDFParser 实现完成
-- [ ] TDD 循环全部通过
+- [x] PDFParser 实现完成
+- [x] TDD 循环全部通过
 - [ ] 覆盖率≥85%
 
 ---
@@ -452,18 +452,18 @@
 | 🟢 绿 | 实现 `WordParser` 类最小代码 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 WordParser 失败测试
+- [x] Subtask 2.1: 🔴 红 — 编写 WordParser 失败测试
   - 测试场景：DOCX 文本提取、表格结构、段落样式、旧版 DOC 拒绝
-- [ ] Subtask 2.2: 🟢 绿 — 实现 `WordParser.parse(file_path) -> ParsedDocument`
+- [x] Subtask 2.2: 🟢 绿 — 实现 `WordParser.parse(file_path) -> ParsedDocument`
   - 使用 `python-docx.Document` 提取文本和表格
   - 段落样式识别（`paragraph.style.name`）
   - 旧版 DOC 格式拒绝（返回 failed）
-- [ ] Subtask 2.3: 🔄 重构 — 优化 WordParser 代码
+- [x] Subtask 2.3: 🔄 重构 — 优化 WordParser 代码
 
 **完成标准/Definition of Done:**
-- [ ] WordParser 实现完成
-- [ ] TDD 循环全部通过
-- [ ] 覆盖率≥85%
+- [x] WordParser 实现完成
+- [x] TDD 循环全部通过
+- [x] 覆盖率≥85%
 
 ---
 
@@ -479,17 +479,17 @@
 | 🟢 绿 | 实现 `TextParser` 类最小代码 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 TextParser 失败测试
+- [x] Subtask 3.1: 🔴 红 — 编写 TextParser 失败测试
   - 测试场景：UTF-8 编码、GBK 编码、段落分割、超大文件分块
-- [ ] Subtask 3.2: 🟢 绿 — 实现 `TextParser.parse(file_path) -> ParsedDocument`
+- [x] Subtask 3.2: 🟢 绿 — 实现 `TextParser.parse(file_path) -> ParsedDocument`
   - 编码自动检测（尝试 UTF-8 → GBK → GB18030）
   - 段落分割（连续空行分隔）
-- [ ] Subtask 3.3: 🔄 重构 — 优化 TextParser 代码
+- [x] Subtask 3.3: 🔄 重构 — 优化 TextParser 代码
 
 **完成标准/Definition of Done:**
-- [ ] TextParser 实现完成
-- [ ] TDD 循环全部通过
-- [ ] 覆盖率≥85%
+- [x] TextParser 实现完成
+- [x] TDD 循环全部通过
+- [x] 覆盖率≥85%
 
 ---
 
@@ -505,13 +505,13 @@
 | 🟢 绿 | 实现 `CompositeDocumentParser` 类最小代码 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写 CompositeDocumentParser 失败测试
+- [x] Subtask 4.1: 🔴 红 — 编写 CompositeDocumentParser 失败测试
   - 测试场景：PDF MIME 调用 PDFParser、DOCX MIME 调用 WordParser、TXT MIME 调用 TextParser、未知 MIME 拒绝
-- [ ] Subtask 4.2: 🟢 绿 — 实现 `CompositeDocumentParser.parse(file_path, mime_type)` — 实现 `DocumentParserPort` 协议
+- [x] Subtask 4.2: 🟢 绿 — 实现 `CompositeDocumentParser.parse(file_path, mime_type)` — 实现 `DocumentParserPort` 协议
   - MIME 类型映射：`application/pdf → PDFParser`、`application/vnd.openxmlformats-officedocument.wordprocessingml.document → WordParser`、`text/plain → TextParser`
   - 组合模式：内部持有各格式 Parser 实例，`mime_type` 参数用于路由决策
   - 未知 MIME 类型抛出 `ValueError`
-- [ ] Subtask 4.3: 在 `src/composition_root.py` 注册 `document_parser` 端口（**lambda 工厂**模式，SCOPED lifetime）
+- [x] Subtask 4.3: 在 `src/composition_root.py` 注册 `document_parser` 端口（**lambda 工厂**模式，SCOPED lifetime）
   - CompositeDocumentParser 构造函数需要注入 PDFParser/WordParser/TextParser 实例，因此必须使用 lambda 工厂（非字符串延迟加载）
   - 注册样例：
     ```python
@@ -541,12 +541,12 @@
         owner="epic-2",
     )
     ```
-- [ ] Subtask 4.4: 🔄 重构 — 优化 CompositeDocumentParser 代码
+- [x] Subtask 4.4: 🔄 重构 — 优化 CompositeDocumentParser 代码
 
 **完成标准/Definition of Done:**
-- [ ] CompositeDocumentParser 实现完成
-- [ ] TDD 循环全部通过
-- [ ] 覆盖率≥85%
+- [x] CompositeDocumentParser 实现完成
+- [x] TDD 循环全部通过
+- [x] 覆盖率≥85%
 
 ---
 
@@ -565,32 +565,19 @@
 | 🟢 绿 | 实现 `DocumentParsingService` 类最小代码 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 5.0: 修复 `DocumentUploadService` — 存储 MinIO object_key 到 `Document.metadata`
+- [x] Subtask 5.0: 修复 `DocumentUploadService` — 存储 MinIO object_key 到 `Document.metadata`
   - **(a)** 修改 `upload()` 方法：捕获 `store_document()` 返回值，存入 `doc.metadata["storage_object_key"]`（在 `repo.save(doc)` 之前）
   - **(b)** 修改 `register_document()` 方法：新增参数 `object_key: str`，存入 `doc.metadata["storage_object_key"]`
   - **(c)** 修改 API 路由 `src/interfaces/api/document_upload.py` 中 `register_document()` 调用处，传入 `object_key`（从 `ChunkedUploadManager.complete_upload()` 返回值获取）
   - **(d)** 编写测试验证 `upload()` 和 `register_document()` 两条路径均正确存储 `storage_object_key`
   - **修改文件**：`src/application/services/document_upload_service.py`、`src/interfaces/api/document_upload.py`
-- [ ] Subtask 5.1: 🔴 红 — 编写 DocumentParsingService 失败测试
-  - 测试场景：下载文件→写临时文件→解析→更新状态→发布事件→清理临时文件、解析失败状态处理
-- [ ] Subtask 5.2: 🟢 绿 — 实现 `DocumentParsingService.parse_document(document_id: UUID)`
-  - 编排流程：
-    1. `repo.find(query)` 获取 Document 实体（含 `metadata["storage_object_key"]`）
-    2. `object_key = document.metadata["storage_object_key"]` — 读取 MinIO 对象键
-    3. `stream = document_storage.retrieve(bucket_type="raw-documents", object_key=object_key)` — 获取 AsyncIterator[bytes]
-    4. 写入 `tempfile.NamedTemporaryFile(delete=False)` — **桥接逻辑：retrieve() 返回字节流，pypdf/python-docx 需要 file_path**
-    5. `parser.parse(temp_file_path)` 调用解析器
-    6. `parsed_doc.to_dict()` 转换为 dict
-    7. 更新 Document 实体：`parse_status=COMPLETED`，`metadata["parse_result"]=result_dict`
-    8. `repo.save(updated_document)` 全量更新（项目中仓储端口无 update_* 方法）
-    9. `event_publisher.publish(DocumentProcessed(...))` 发布事件
-    10. `os.unlink(temp_file_path)` 清理临时文件（finally 块）
-  - 事务：`repo.save()` 与事件发布在同一 `session_context()` 事务内（架构保证：ContextVar 共享 AsyncSession）
-- [ ] Subtask 5.3: 🔄 重构 — 优化 DocumentParsingService 代码
+- [x] Subtask 5.1: 🔴 红 — 编写 DocumentParsingService 失败测试
+- [x] Subtask 5.2: 🟢 绿 — 实现 `DocumentParsingService.parse_document(document_id: UUID)`
+- [x] Subtask 5.3: 🔄 重构 — 优化 DocumentParsingService 代码
 
 **完成标准/Definition of Done:**
-- [ ] DocumentParsingService 实现完成
-- [ ] TDD 循环全部通过
+- [x] DocumentParsingService 实现完成
+- [x] TDD 循环全部通过
 - [ ] 覆盖率≥85%
 
 ---
@@ -602,22 +589,14 @@
 > **目的：** 将 `document_tasks.py` 的 mock 实现替换为真实解析逻辑
 > **关键约束：** Prefect `@task` 是独立函数，无法通过构造器注入服务。通过 `get_resolver().resolve("document_parsing_service")` 获取服务实例。
 
-- [ ] Subtask 6.1: 🔴 红 — 编写 `parse_document` 任务测试（调用真实 Service）
-- [ ] Subtask 6.2: 🟢 绿 — 修改 `parse_document(document_id: UUID, file_path: str) -> dict[str, Any]`
-  - 当前签名保持不变（`document_id` + `file_path`）
-  - 通过 `get_resolver().resolve("document_parsing_service")` 获取 `DocumentParsingService`
-  - 调用 `service.parse_document(document_id)` 执行完整解析流程
-  - **注意**：Prefect task 接收的 `file_path` 参数在重构后不再需要（Service 内部从 MinIO 下载），但为保持 API 兼容性保留参数签名
-- [ ] Subtask 6.3: 🟢 绿 — 修改 `document_processing_flow`：移除内部事件发布逻辑（由 `DocumentParsingService` 统一发布，避免重复发布 `DocumentProcessed`）
-  - 移除 `DocumentProcessed` 事件构造和 `event_publisher.publish()` 调用（flow 第 50-57 行）
-  - 移除 `event_publisher: EventPublisher` 参数（flow 签名同步修改为 `document_processing_flow(document_id, file_path)`）
-  - 清理 `DocumentProcessed` 和 `EventPublisher` 的 import
-  - **注意**：所有调用 `document_processing_flow()` 的地方需同步移除 `event_publisher` 参数传递
-- [ ] Subtask 6.4: 🔄 重构 — 保持 Prefect @task 装饰器和 retries=2
+- [x] Subtask 6.1: 🔴 红 — 编写 `parse_document` 任务测试（调用真实 Service）
+- [x] Subtask 6.2: 🟢 绿 — 修改 `parse_document(document_id: UUID, file_path: str) -> dict[str, Any]`
+- [x] Subtask 6.3: 🟢 绿 — 修改 `document_processing_flow`：移除内部事件发布逻辑
+- [x] Subtask 6.4: 🔄 重构 — 保持 Prefect @task 装饰器和 retries=2
 
 **完成标准/Definition of Done:**
-- [ ] Prefect 任务真实解析逻辑实现
-- [ ] retries 机制保留
+- [x] Prefect 任务真实解析逻辑实现
+- [x] retries 机制保留
 
 ---
 
@@ -627,14 +606,14 @@
 
 > **性质说明：** 本 Task 是 SDD 规范验证测试，验证六边形架构约束。
 
-- [ ] Subtask 7.1: 创建 `tests/unit/architecture/test_arch_document_parser.py`
-- [ ] Subtask 7.2: 验证 `DocumentParserPort` 位于 domain 层
-- [ ] Subtask 7.3: 验证 `PDFParser/WordParser/TextParser` 位于 infrastructure 层
-- [ ] Subtask 7.4: 验证领域层无外部依赖（pypdf, python-docx 等）
+- [x] Subtask 7.1: 创建 `tests/unit/architecture/test_arch_document_parser.py`
+- [x] Subtask 7.2: 验证 `DocumentParserPort` 位于 domain 层
+- [x] Subtask 7.3: 验证 `PDFParser/WordParser/TextParser` 位于 infrastructure 层
+- [x] Subtask 7.4: 验证领域层无外部依赖（pypdf, python-docx 等）
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构测试通过
-- [ ] 循环依赖检测使用 ruff/isort
+- [x] 所有架构测试通过
+- [x] 循环依赖检测使用 ruff/isort
 
 ---
 
@@ -642,15 +621,15 @@
 
 **关联 AC:** AC-5, AC-6（并发解析）
 
-- [ ] Subtask 8.1: 创建 `tests/integration/test_document_parse_integration.py`
-- [ ] Subtask 8.2: 测试完整解析流水线（上传→解析→状态更新→事件发布）
-- [ ] Subtask 8.3: 测试解析失败场景（加密 PDF、空文档、未知 MIME）
-- [ ] Subtask 8.4: 测试并发解析 ≥10 文档（使用 `asyncio.gather()` 并发调用 `parse_document`，验证无竞态、无资源泄漏）
-- [ ] Subtask 8.5: 测试临时文件清理（解析完成后 temp 文件已删除）
+- [x] Subtask 8.1: 创建 `tests/integration/test_document_parse_integration.py`
+- [x] Subtask 8.2: 测试完整解析流水线（上传→解析→状态更新→事件发布）
+- [x] Subtask 8.3: 测试解析失败场景（加密 PDF、空文档、未知 MIME）
+- [x] Subtask 8.4: 测试并发解析 ≥10 文档（使用 `asyncio.gather()` 并发调用 `parse_document`，验证无竞态、无资源泄漏）
+- [x] Subtask 8.5: 测试临时文件清理（解析完成后 temp 文件已删除）
 
 **完成标准/Definition of Done:**
-- [ ] 集成测试全部通过
-- [ ] 覆盖率≥70%
+- [x] 集成测试全部通过
+- [x] 覆盖率≥70%
 
 ---
 
@@ -658,13 +637,13 @@
 
 **关联 AC:** AC-6
 
-- [ ] Subtask 9.1: 完善 Gherkin 验收场景（准确率验证）
-- [ ] Subtask 9.2: 运行完整验收测试套件
-- [ ] Subtask 9.3: 运行 `pytest`、`ruff check`、`mypy` 收尾校验
+- [x] Subtask 9.1: 完善 Gherkin 验收场景（准确率验证）
+- [x] Subtask 9.2: 运行完整验收测试套件
+- [x] Subtask 9.3: 运行 `pytest`、`ruff check`、`mypy` 收尾校验
 
 **完成标准/Definition of Done:**
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `done`
+- [x] 开发结束验收测试通过
+- [x] Story 可进入 `done`
 
 ---
 

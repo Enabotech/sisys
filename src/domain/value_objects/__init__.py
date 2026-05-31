@@ -37,6 +37,13 @@ from src.domain.value_objects.intrusion_detection_result import (
     AttackDetectionResult,
     IntrusionStats,
 )
+from src.domain.value_objects.parsed_document import (
+    BoundingBox,
+    ParsedDocument,
+    ParsedElement,
+    ParsedPage,
+    ParsedTable,
+)
 from src.domain.value_objects.storage_encryption_result import (
     EncryptedData,
     EncryptionVerificationResult,
@@ -64,6 +71,7 @@ __all__ = [
     "BackupResult",
     "BackupStatus",
     "BackupType",
+    "BoundingBox",
     "CHUNKED_UPLOAD_TTL",
     "CHUNK_SIZES",
     "ComplianceResult",
@@ -84,6 +92,10 @@ __all__ = [
     "MAX_FILENAME_LENGTH",
     "MAX_NESTING_DEPTH",
     "NetworkIsolationResult",
+    "ParsedDocument",
+    "ParsedElement",
+    "ParsedPage",
+    "ParsedTable",
     "RateLimitResult",
     "ResourceLimitsStatus",
     "RestoreResult",

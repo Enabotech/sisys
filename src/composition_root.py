@@ -1063,6 +1063,53 @@ def bootstrap() -> None:
         owner="doc-team",
     )
 
+    # DocumentParser — 文档解析（MIME 路由组合模式）
+    from src.domain.ports.document_parser import DocumentParserPort
+
+    register_port(
+        name="document_parser",
+        version="v1.0.0",
+        interface=DocumentParserPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.document_parsing.composite_parser",
+            fromlist=["CompositeDocumentParser"],
+        ).CompositeDocumentParser(
+            pdf_parser=__import__(
+                "src.infrastructure.external_services.document_parsing.pdf_parser",
+                fromlist=["PDFParser"],
+            ).PDFParser(),
+            word_parser=__import__(
+                "src.infrastructure.external_services.document_parsing.word_parser",
+                fromlist=["WordParser"],
+            ).WordParser(),
+            text_parser=__import__(
+                "src.infrastructure.external_services.document_parsing.text_parser",
+                fromlist=["TextParser"],
+            ).TextParser(),
+        ),
+        module="src.infrastructure.external_services.document_parsing.composite_parser",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+    )
+
+    # DocumentParsingService — 应用层文档解析编排
+    from src.application.services.document_parsing_service import DocumentParsingService
+
+    register_port(
+        name="document_parsing_service",
+        version="v1.0.0",
+        interface=DocumentParsingService,
+        impl=lambda resolver: DocumentParsingService(
+            document_repository=resolver.resolve("document_repository"),
+            document_storage=resolver.resolve("document_storage"),
+            event_publisher=resolver.resolve("event_publisher"),
+            document_parser=resolver.resolve("document_parser"),
+        ),
+        module="src.application.services.document_parsing_service",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+    )
+
     # ChunkedUploadManager — 分片上传状态管理
     from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadManager
 

@@ -114,12 +114,13 @@ class DocumentUploadService:
             uploaded_by=uploaded_by,
         )
 
-        await self._storage.store_document(
+        object_key = await self._storage.store_document(
             user_id=uploaded_by,
             doc_type=document_type,
             file_path=file_path,
             content_type=mime_type,
         )
+        doc.metadata["storage_object_key"] = object_key
 
         saved_doc = await self._repository.save(doc)
 
@@ -229,6 +230,7 @@ class DocumentUploadService:
         tenant_id: str,
         uploaded_by: str,
         document_type: str = "other",
+        object_key: str = "",
     ) -> Document:
         """注册已上传的文档（分片上传完成后调用）
 
@@ -242,6 +244,7 @@ class DocumentUploadService:
             tenant_id: 租户标识符
             uploaded_by: 上传者
             document_type: 文档类型
+            object_key: MinIO 对象键（分片上传完成后获取）
 
         Returns:
             持久化后的 Document 实体
@@ -261,6 +264,9 @@ class DocumentUploadService:
             tenant_id=tenant_id,
             uploaded_by=uploaded_by,
         )
+
+        if object_key:
+            doc.metadata["storage_object_key"] = object_key
 
         saved_doc = await self._repository.save(doc)
 

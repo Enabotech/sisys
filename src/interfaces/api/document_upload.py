@@ -389,6 +389,7 @@ def create_document_upload_router(
             file_size_bytes=state.file_size,
             tenant_id=x_tenant_id,
             uploaded_by=str(current_user.user_id),
+            object_key=state.object_key,
         )
         return DocumentResponse(
             document_id=str(doc.document_id),
