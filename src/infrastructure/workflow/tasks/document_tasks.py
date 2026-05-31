@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @task(retries=2)
-async def parse_document(document_id: uuid.UUID, file_path: str) -> dict[str, Any]:
+async def parse_document(document_id: uuid.UUID, file_path: str, tenant_id: str = "") -> dict[str, Any]:
     """解析文档任务
 
     通过 DI 容器获取 DocumentParsingService 执行真实解析。
@@ -25,11 +25,16 @@ async def parse_document(document_id: uuid.UUID, file_path: str) -> dict[str, An
     Args:
         document_id: 文档 UUID
         file_path: 文件路径（保留参数，Service 内部不使用）
+        tenant_id: 租户标识符（必填，空值将导致查询失败）
 
     Returns:
         解析结果字典
     """
     from src.domain.ports.resolver import get_resolver
+
+    if not tenant_id:
+        logger.error("parse_document 调用缺少 tenant_id, document_id=%s", document_id)
+        return {"status": "failed", "document_id": str(document_id), "error": "tenant_id is required"}
 
     try:
         service = get_resolver().resolve("document_parsing_service")
@@ -38,9 +43,7 @@ async def parse_document(document_id: uuid.UUID, file_path: str) -> dict[str, An
         return {"status": "failed", "document_id": str(document_id), "error": str(e)}
 
     try:
-        # 从 document_id 关联的 metadata 中获取 tenant_id
-        # MVP 阶段使用空 tenant_id 占位，实际由上层传入
-        doc = await service.parse_document(document_id, tenant_id="")
+        doc = await service.parse_document(document_id, tenant_id=tenant_id)
         result_dict = {
             "status": doc.parse_status.value,
             "document_id": str(doc.document_id),

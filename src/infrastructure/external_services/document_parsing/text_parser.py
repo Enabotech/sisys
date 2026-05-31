@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import uuid
 from datetime import UTC, datetime
@@ -14,6 +15,8 @@ from src.domain.value_objects.parsed_document import (
     ParsedElement,
     ParsedPage,
 )
+
+_MAX_TXT_SIZE = 10 * 1024 * 1024  # 10MB，超过此限制当前版本不支持分块处理
 
 
 class TextParser:
@@ -38,6 +41,17 @@ class TextParser:
         timestamp = datetime.now(UTC).isoformat()
 
         try:
+            file_size = os.path.getsize(file_path)
+            if file_size > _MAX_TXT_SIZE:
+                size_mb = file_size // (1024 * 1024)
+                limit_mb = _MAX_TXT_SIZE // (1024 * 1024)
+                return ParsedDocument(
+                    document_id=doc_id,
+                    mime_type=mime_type,
+                    parse_status="failed",
+                    error_message=(f"TXT 文件大小 {size_mb}MB 超过 {limit_mb}MB 限制，当前版本不支持分块处理"),
+                    parse_timestamp=timestamp,
+                )
             with open(file_path, "rb") as f:
                 raw_bytes = f.read()
         except Exception as e:

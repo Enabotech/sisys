@@ -91,12 +91,28 @@ class TestDocumentTasksFn:
     """测试任务底层函数（通过 .fn() 绕过 Prefect 运行时）"""
 
     async def test_parse_document_fn_returns_dict(self) -> None:
-        """parse_document.fn() 应返回 dict"""
+        """parse_document.fn() 缺少 tenant_id 应返回 failed"""
         from src.infrastructure.workflow.tasks.document_tasks import parse_document
 
         result = await parse_document.fn(uuid.uuid4(), "/test.pdf")
         assert isinstance(result, dict)
-        assert "status" in result
+        assert result["status"] == "failed"
+        assert "tenant_id" in result["error"]
+
+    async def test_parse_document_fn_with_tenant_id(self) -> None:
+        """parse_document.fn() 有 tenant_id 但 resolver 失败时返回 failed"""
+        from unittest.mock import MagicMock, patch
+
+        from src.infrastructure.workflow.tasks.document_tasks import parse_document
+
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.side_effect = Exception("resolver not ready")
+
+        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
+            result = await parse_document.fn(uuid.uuid4(), "/test.pdf", "tenant-1")
+
+        assert isinstance(result, dict)
+        assert result["status"] == "failed"
 
     async def test_generate_embedding_fn_returns_list(self) -> None:
         """generate_embedding.fn() 应返回 list"""
@@ -185,7 +201,7 @@ class TestDocumentProcessingFlowExecution:
         mock_resolver.resolve.return_value = mock_service
 
         with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            parse_result = await parse_document.fn(document_id, file_path)
+            parse_result = await parse_document.fn(document_id, file_path, "tenant-1")
 
         embedding = await generate_embedding.fn(parse_result)
         index_result = await index_document.fn(embedding)
@@ -240,7 +256,7 @@ class TestDocumentProcessingFlowExecution:
         mock_resolver.resolve.return_value = mock_service
 
         with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            parse_result = await parse_document.fn(document_id, file_path)
+            parse_result = await parse_document.fn(document_id, file_path, "tenant-1")
 
         embedding = await generate_embedding.fn(parse_result)
         index_result = await index_document.fn(embedding)

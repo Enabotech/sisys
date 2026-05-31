@@ -143,3 +143,24 @@ class TestTextParserEdgeCases:
             assert result.pages[0].page_number == 1
         finally:
             os.unlink(path)
+
+    def test_oversized_file_returns_failed(self) -> None:
+        """超过 10MB 的 TXT 文件应返回 failed 状态"""
+        from unittest.mock import patch
+
+        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+
+        parser = TextParser()
+        path = _create_txt(b"small")
+        try:
+            # Mock os.path.getsize 返回超大文件尺寸
+            with patch(
+                "src.infrastructure.external_services.document_parsing.text_parser.os.path.getsize",
+                return_value=11 * 1024 * 1024,
+            ):
+                result = parser.parse(path, "text/plain")
+            assert result.parse_status == "failed"
+            assert result.error_message is not None
+            assert "10MB" in result.error_message
+        finally:
+            os.unlink(path)
