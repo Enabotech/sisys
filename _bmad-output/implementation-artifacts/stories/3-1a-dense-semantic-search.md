@@ -51,7 +51,7 @@
 - [ ] EmbeddingServicePort 接口定义（`src/domain/ports/embedding_service.py`）
   - 方法: `encode_text(text: str) -> list[float]`（文本→嵌入向量）
   - 方法: `encode_texts(texts: list[str]) -> list[list[float]]`（批量编码）
-  - **注意:** 当前 `src/infrastructure/external_services/embedding/` 目录仅有 __pycache__，bge-m3 实现待新建
+  - **注意:** 当前 `src/infrastructure/external_services/embedding/` 目录 bge-m3 实现待新建
 - [ ] EmbeddingConfig 配置定义（`src/infrastructure/config/embedding.py`）
   - 使用 `@dataclass(frozen=True)` + `from_env()` 模式
   - 字段: model_name, model_path, device, dimension=1024
@@ -128,7 +128,7 @@
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](./sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md)。
+> 参考 [`sdd-tdd-fusion-guide.md`](../../docs/developer/sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](../../docs/developer/sdd-tdd-checklist.md)。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 
