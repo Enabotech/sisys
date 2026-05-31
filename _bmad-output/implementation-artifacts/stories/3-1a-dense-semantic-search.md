@@ -135,15 +135,22 @@
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 #### 领域事件 Schema (Domain Events)
-- [ ] DenseSearchInitiated 事件定义（`src/domain/events/dense_search_events.py`）
-  - **说明:** 如果检索是同步响应型操作（非异步长流程），此事件可能冗余。检查是否有异步监听器需要
-- [ ] DenseSearchCompleted 事件定义
+- [ ] DenseSearchInitiated 事件定义（`src/domain/events/dense_search_events.py`）⭐ 可选
+  - **适用场景:** 异步检索流程、需要异步监听器的事件驱动场景
+  - **跳过条件:** 同步检索（直接返回结果）场景下可跳过
+- [ ] DenseSearchCompleted 事件定义⭐ 可选
+  - **跳过条件:** 同步检索场景下可跳过
 - [ ] 事件使用标准库实现（dataclass + Enum），禁止在领域层依赖 Pydantic
-- [ ] **决策点:** 如果使用同步检索（直接返回结果），建议删除此事件定义，简化架构
+- [ ] **决策流程:** 检查是否有异步监听器需要此事件 → 有则创建，无则跳过
 
 #### 数据模型 (Data Models)
 - [ ] SearchResult 值对象定义（`src/domain/value_objects/search_result.py`）
-  - 字段: id, score, payload, document_id, chunk_id
+  - 字段语义说明:
+    - `id`: Qdrant point ID（全局唯一标识符）
+    - `score`: 余弦相似度分数，范围 [0.0, 1.0]
+    - `payload`: Qdrant 存储的完整负载数据
+    - `document_id`: 业务文档 ID（从 payload.document_id 提取）
+    - `chunk_id`: 文档分块 ID（从 payload.chunk_id 提取）
   - frozen=True, 字段验证
 - [ ] EmbeddingRequest/EmbeddingResponse 定义（如需要）
 
@@ -386,6 +393,14 @@
 
 > **性质说明：** 本 Task 验证 Dense 语义检索实现是否符合六边形架构约束。
 
+#### TDD 循环：架构约束验证
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写架构约束测试（扫描 domain 层无 sentence-transformers 导入、依赖方向正确） |
+| 🟢 绿 | 验证所有架构约束测试通过（Ruff 0 错误、MyPy 0 问题、import-linter 通过） |
+| 🔄 重构 | 优化架构验证测试代码，添加更精确的扫描规则 |
+
 #### 架构验证测试实现
 
 - [ ] Subtask: 创建 `tests/unit/architecture/test_arch_dense_search.py`
@@ -404,17 +419,17 @@
 
 ### 相关架构模式和约束 Architecture Patterns & Constraints
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
+**来源:** [`architecture.md`](../../docs/architecture/architecture.md)
 
 - **六层存储架构:** L3 向量存储层（Qdrant 1.7+）存储嵌入向量、混合检索 payload
 - **向量维度:** 1024 维（bge-m3 嵌入模型），COSINE 相似度度量
-- **检索延迟预算:** P95<200ms（初检）+ P95<250ms（精排）+ P95<50ms（融合）= P95<500ms 总预算
-- **延迟预算分解:** 嵌入生成<50ms + Qdrant 检索<200ms = 总计<250ms
+- **检索延迟预算（Epic 3 混合检索总预算）:** P95<200ms（初检）+ P95<250ms（精排）+ P95<50ms（融合）= P95<500ms 总预算
+- **Story 3.1a 延迟预算分解:** 嵌入生成 P95<50ms + Qdrant 检索 P95<200ms = Dense 单路总计 P95<250ms
 - **领域层零依赖:** 领域层仅定义接口，不依赖任何 bge-m3/sentence-transformers 实现细节
 
 ### 关键架构决策
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 六层存储架构
+**来源:** [`architecture.md`](../../docs/architecture/architecture.md) - 决策 4 (ADR-004): 六层存储架构
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
@@ -595,7 +610,17 @@ sisys/
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
-> 本 Story 为新建，暂无审查修复记录
+> **第一轮审查修复 (2026-05-31)**
+>
+> 审查发现问题及修正：
+> - **P1** 修正 `architecture.md` 引用路径：`../../_bmad-output/planning-artifacts/architecture.md` → `../../docs/architecture/architecture.md`
+> - **P1** 修正 `sdd-tdd-fusion-guide.md` 引用路径：`./sdd-tdd-fusion-guide.md` → `../../docs/developer/sdd-tdd-fusion-guide.md`
+> - **P2** 修正 `sdd-tdd-checklist.md` 引用路径：`./sdd-tdd-checklist.md` → `../../docs/developer/sdd-tdd-checklist.md`
+> - **P2** Story 3.1b 文档标注为待创建状态（文档尚不存在）
+> - **P2** Task 5 补充 TDD 循环表格描述
+> - **P3** 领域事件定义标注为"可选 - 同步检索场景下可跳过"
+> - **P3** 性能指标一致性补充说明（Story 3.1a 范围 vs Epic 3 总预算）
+> - **P3** SearchResult 字段语义补充说明（避免 id 与 document_id 混淆）
 
 ---
 
@@ -604,16 +629,17 @@ sisys/
 | 文档 | 说明 |
 |------|------|
 | [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) | Epic 3 Story 3.1a 完整定义 |
-| [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) | 六层存储架构、L3 向量存储层设计 |
+| [`architecture.md`](../../docs/architecture/architecture.md) | 六层存储架构、L3 向量存储层设计 |
 | [Story 1.6-Qdrant Vector Layer](./1-6-qdrant-vector-layer.md) | Qdrant 向量存储层实现（前置依赖） |
-| [Story 3.1b-BM25 Sparse Search](./3-1b-bm25-sparse-search-rrf-fusion.md) | BM25 稀疏检索 + RRF 融合（后续 Story） |
-| [`sdd-tdd-fusion-guide.md`](./sdd-tdd-fusion-guide.md) | SDD+TDD 融合开发模式指南 |
-| [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md) | SDD+TDD 实施检查清单 |
+| [Story 3.1b-BM25 Sparse Search](./3-1b-bm25-sparse-search-rrf-fusion.md) | BM25 稀疏检索 + RRF 融合（后续 Story）⚠️ 待创建 |
+| [`sdd-tdd-fusion-guide.md`](../../docs/developer/sdd-tdd-fusion-guide.md) | SDD+TDD 融合开发模式指南 |
+| [`sdd-tdd-checklist.md`](../../docs/developer/sdd-tdd-checklist.md) | SDD+TDD 实施检查清单 |
 
 ---
 
-**故事版本/Story Version:** v0.0.0
+**故事版本/Story Version:** v0.1.0
 **创建日期/Created:** 2026-05-31
 **最后更新/Last Updated:** 2026-05-31
 **更新说明/Description:**
+- v0.1.0: 第一轮审查修复：修正文档路径引用、补充 TDD 表格、澄清领域事件适用范围、补充性能指标说明、澄清 SearchResult 字段语义
 - v0.0.0: 创建故事文件
