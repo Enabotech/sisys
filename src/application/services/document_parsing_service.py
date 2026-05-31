@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import tempfile
 import uuid
@@ -21,6 +22,10 @@ if TYPE_CHECKING:
     from src.domain.ports.document_parser import DocumentParserPort
     from src.domain.ports.document_repository import DocumentRepositoryPort
     from src.domain.ports.event_publisher import EventPublisher
+
+logger = logging.getLogger(__name__)
+
+_ALLOWED_TEMP_SUFFIXES = frozenset({".pdf", ".docx", ".txt", ".tmp"})
 
 
 class DocumentParsingService:
@@ -73,6 +78,7 @@ class DocumentParsingService:
         if not object_key:
             document.parse_status = ParseStatus.FAILED
             document.metadata["parse_error"] = "文档缺少 storage_object_key"
+            await self._repository.save(document)  # 持久化失败状态，避免文档永久 PENDING
             return document
 
         # 更新状态为 IN_PROGRESS
@@ -118,8 +124,12 @@ class DocumentParsingService:
             return document
 
         finally:
-            if temp_path and os.path.exists(temp_path):
-                os.unlink(temp_path)
+            if temp_path:
+                try:
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                except OSError as e:
+                    logger.warning("临时文件清理失败: %s - %s", temp_path, e)
 
     async def _download_to_temp(self, bucket_type: str, object_key: str) -> str:
         """从 MinIO 下载文件到临时文件
@@ -131,16 +141,27 @@ class DocumentParsingService:
         Returns:
             临时文件路径
         """
-        ext = os.path.splitext(object_key)[1] or ".tmp"
+        # 后缀白名单校验（防止恶意文件类型）
+        ext = os.path.splitext(object_key)[1].lower() or ".tmp"
+        if ext not in _ALLOWED_TEMP_SUFFIXES:
+            ext = ".tmp"
         stream = self._storage.retrieve(bucket_type, object_key)
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+        os.chmod(tmp.name, 0o600)  # 仅所有者可读写，防止多租户数据泄露
         try:
-            async for chunk in stream:
-                tmp.write(chunk)
+            try:
+                async for chunk in stream:
+                    tmp.write(chunk)
+            finally:
+                if hasattr(stream, "aclose"):
+                    await stream.aclose()  # 显式关闭流，防止 MinIO 连接泄漏
             tmp.close()
             return tmp.name
         except Exception:
             tmp.close()
             if os.path.exists(tmp.name):
-                os.unlink(tmp.name)
+                try:
+                    os.unlink(tmp.name)
+                except OSError:
+                    pass  # 清理失败时静默处理，正要抛出原异常
             raise

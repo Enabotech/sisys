@@ -174,6 +174,8 @@ class TestDocumentParsingServiceFailure:
         # 缺少 object_key 应返回 failed
         assert result.parse_status == ParseStatus.FAILED
         mock_event_publisher.publish.assert_not_called()
+        # 验证失败状态被持久化
+        mock_repo.save.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_parse_document_not_found(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
