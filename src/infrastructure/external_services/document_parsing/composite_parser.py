@@ -14,6 +14,7 @@ from src.infrastructure.external_services.document_parsing.word_parser import Wo
 # MIME 类型 → 解析器映射
 _MIME_PDF = "application/pdf"
 _MIME_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+_MIME_DOC = "application/msword"
 _MIME_TXT = "text/plain"
 
 
@@ -33,6 +34,7 @@ class CompositeDocumentParser:
         self._parsers: dict[str, DocumentParserPort] = {
             _MIME_PDF: pdf_parser,
             _MIME_DOCX: word_parser,
+            _MIME_DOC: word_parser,  # DOC 格式由 WordParser 返回友好拒绝消息
             _MIME_TXT: text_parser,
         }
 
