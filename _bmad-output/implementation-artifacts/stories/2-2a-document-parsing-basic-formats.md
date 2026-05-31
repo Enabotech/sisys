@@ -476,6 +476,9 @@
 
 **关联 AC:** AC-5
 
+> **前置修复：** Story 2-1 的 `DocumentUploadService.upload()` 调用 `store_document()` 后未将返回的 `object_key` 存入 `Document.metadata`。
+> 本 Task 的 Subtask 5.0 必须先修复此 GAP，否则解析服务无法获取文件位置。
+
 #### TDD 循环 A：DocumentParsingService
 
 | 阶段 | 动作 |
@@ -484,19 +487,24 @@
 | 🟢 绿 | 实现 `DocumentParsingService` 类最小代码 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
+- [ ] Subtask 5.0: 修复 `DocumentUploadService.upload()` — 捕获 `store_document()` 返回的 `object_key` 并存入 `Document.metadata["storage_object_key"]`
+  - 修改文件：`src/application/services/document_upload_service.py`
+  - 同步修改 `register_document()` 方法（分片上传完成路径也需存储 object_key）
+  - **理由：** 解析服务通过 `repo.find()` 获取 Document，从 `metadata["storage_object_key"]` 读取 MinIO object_key
 - [ ] Subtask 5.1: 🔴 红 — 编写 DocumentParsingService 失败测试
   - 测试场景：下载文件→写临时文件→解析→更新状态→发布事件→清理临时文件、解析失败状态处理
 - [ ] Subtask 5.2: 🟢 绿 — 实现 `DocumentParsingService.parse_document(document_id: UUID)`
   - 编排流程：
-    1. `repo.find(query)` 获取 Document 实体（含 `metadata` 中的 MinIO object_key）
-    2. `document_storage.retrieve(bucket_type="raw-documents", object_key=...)` 获取 AsyncIterator[bytes]
-    3. 写入 `tempfile.NamedTemporaryFile(delete=False)` — **桥接逻辑：retrieve() 返回字节流，pypdf/python-docx 需要 file_path**
-    4. `parser.parse(temp_file_path)` 调用解析器
-    5. `parsed_doc.to_dict()` 转换为 dict
-    6. 更新 Document 实体：`parse_status=COMPLETED`，`metadata["parse_result"]=result_dict`
-    7. `repo.save(updated_document)` 全量更新（项目中仓储端口无 update_* 方法）
-    8. `event_publisher.publish(DocumentProcessed(...))` 发布事件
-    9. `os.unlink(temp_file_path)` 清理临时文件（finally 块）
+    1. `repo.find(query)` 获取 Document 实体（含 `metadata["storage_object_key"]`）
+    2. `object_key = document.metadata["storage_object_key"]` — 读取 MinIO 对象键
+    3. `stream = document_storage.retrieve(bucket_type="raw-documents", object_key=object_key)` — 获取 AsyncIterator[bytes]
+    4. 写入 `tempfile.NamedTemporaryFile(delete=False)` — **桥接逻辑：retrieve() 返回字节流，pypdf/python-docx 需要 file_path**
+    5. `parser.parse(temp_file_path)` 调用解析器
+    6. `parsed_doc.to_dict()` 转换为 dict
+    7. 更新 Document 实体：`parse_status=COMPLETED`，`metadata["parse_result"]=result_dict`
+    8. `repo.save(updated_document)` 全量更新（项目中仓储端口无 update_* 方法）
+    9. `event_publisher.publish(DocumentProcessed(...))` 发布事件
+    10. `os.unlink(temp_file_path)` 清理临时文件（finally 块）
   - 事务：`repo.save()` 与事件发布在同一 `session_context()` 事务内（架构保证：ContextVar 共享 AsyncSession）
 - [ ] Subtask 5.3: 🔄 重构 — 优化 DocumentParsingService 代码
 
@@ -691,7 +699,7 @@ async def _download_to_temp(self, bucket_type: str, object_key: str) -> str:
 
 **临时文件清理：** 在 `DocumentParsingService.parse_document()` 的 `finally` 块中调用 `os.unlink(temp_path)`。
 
-**MinIO object_key 获取：** `Document` 实体的 `metadata` 字段（JSONB）存储了上传时的 MinIO object_key，需在 Story 2-1 上传时记录。如果 metadata 中无 object_key，可通过 `document_storage.store_document()` 的返回值（object_key）获取。
+**MinIO object_key 获取：** Story 2-1 存在 GAP — `DocumentUploadService.upload()` 调用 `store_document()` 后未捕获返回值。本 Story Task 5 Subtask 5.0 需修复：将 `object_key` 存入 `Document.metadata["storage_object_key"]`。解析服务通过 `repo.find()` 获取 Document 后读取此字段。`register_document()` 方法（分片上传路径）也需同步修复。
 
 ### 解析库技术细节
 
@@ -818,9 +826,10 @@ def detect_encoding(content: bytes) -> str:
 
 ---
 
-**故事版本/Story Version:** v0.2.0
+**故事版本/Story Version:** v0.3.0
 **创建日期/Created:** 2026-05-31
 **最后更新/Last Updated:** 2026-05-31
 **更新说明/Description:**
+- v0.3.0: Round 2 审查修订 — P0 object_key GAP修复(Subtask 5.0)、MinIO bucket_type/retrieve签名精确化
 - v0.2.0: Round 1 审查修订 — 修复 P0 问题（文件下载桥接/仓储更新/编码依赖/事件消费/序列化路径/Prefect DI）
 - v0.1.0: 创建故事文件
