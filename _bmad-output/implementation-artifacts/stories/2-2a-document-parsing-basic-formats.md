@@ -193,6 +193,15 @@
       tables: list[ParsedTable]
       images: list[ParsedElement]  # MVP 仅记录存在，不提取内容
 
+      def to_dict(self) -> dict[str, Any]:
+          """序列化为 JSON 可存储字典"""
+          return {
+              "page_number": self.page_number,
+              "texts": [t.to_dict() for t in self.texts],
+              "tables": [t.to_dict() for t in self.tables],
+              "images": [i.to_dict() for i in self.images],
+          }
+
   @dataclass(frozen=True)
   class ParsedElement:
       """解析元素（文本/图像）"""
@@ -226,6 +235,12 @@
   ```
 
 **序列化路径说明：** `ParsedDocument`（frozen dataclass）→ `to_dict()` → 存入 `DocumentProcessed.parse_result`（`dict[str, Any]`）和 `Document.metadata["parse_result"]`（JSONB）。端口 `DocumentParserPort.parse()` 返回强类型 `ParsedDocument`，应用层 `DocumentParsingService` 调用 `.to_dict()` 转换为 dict 后传给事件和仓储。
+
+> **设计决策：** `to_dict()` 方法是值对象层的新序列化模式（项目中现有值对象均无序列化方法）。引入原因是 `ParsedDocument` 需要序列化到两个目标：`Document.metadata`（PostgreSQL JSONB）和 `DocumentProcessed.parse_result`（dict）。`parse_status: Literal["completed", "failed"]` 也是值对象层首次使用 `Literal` 类型（项目中 `Literal` 仅用于领域事件/端口），这里选择 `Literal` 是因为 `parse_status` 的值域有限且需要编译时类型安全。
+>
+> 同理，`ParsedPage` 需要补充 `to_dict()` 方法以支持 `ParsedDocument.to_dict()` 的递归序列化。
+
+> **Document 实体说明：** `Document` 是**非 frozen** dataclass（`@dataclass`，无 `frozen=True`），字段可直接赋值。`DocumentParsingService` 更新状态的方式是直接修改后 `save()`：`document.parse_status = ParseStatus.COMPLETED` → `document.metadata["parse_result"] = result_dict` → `repo.save(document)`。无需使用 `dataclasses.replace()`。
 
 - [x] `ParseResult` TypedDict — 存储到 `Document.metadata["parse_result"]` 的 JSON 结构
   ```python
@@ -362,8 +377,14 @@
 | AC-2 | Word 文档解析 | Task 2 | WordParser 实现 | `test_word_parser.py` |
 | AC-3 | TXT 文档解析 | Task 3 | TextParser 实现 | `test_text_parser.py` |
 | AC-4 | 解析结果结构化输出 | Task 0 | ParsedDocument Schema | 契约测试 |
-| AC-5 | 解析事件触发与状态流转 | Task 5 | DocumentParsingService | `test_document_parsing_service.py` |
+| AC-5 | 解析事件触发与状态流转 | Task 5 + Task 6 | DocumentParsingService + Prefect 替换 | `test_document_parsing_service.py` |
+| AC-5 | 状态流转事务原子性 | Task 5 | Subtask 5.2（repo.save+事件同一事务） | `test_document_parsing_service.py` |
+| AC-5 | Prefect task 真实解析 | Task 6 | Subtask 6.2（resolve DI） | `test_document_tasks.py` |
+| AC-5 | 事件去重 | Task 6 | Subtask 6.3（移除 flow 内部发布） | `test_document_tasks.py` |
 | AC-6 | 解析准确率验证 | Task 9 | 验收测试抽样验证 | `test_acceptance_document_parse.feature` |
+| AC-6 | P95 延迟 <500ms | Task 1/2/3 | 各 Parser 性能测试 | `test_pdf_parser.py` 等 |
+| AC-6 | 并发解析 ≥10 | Task 8 | Subtask 8.4（asyncio.gather） | `test_document_parse_integration.py` |
+| 所有 | 架构约束验证 | Task 7 | 六边形依赖方向检查 | `test_arch_document_parser.py` |
 
 ---
 
@@ -490,7 +511,36 @@
   - MIME 类型映射：`application/pdf → PDFParser`、`application/vnd.openxmlformats-officedocument.wordprocessingml.document → WordParser`、`text/plain → TextParser`
   - 组合模式：内部持有各格式 Parser 实例，`mime_type` 参数用于路由决策
   - 未知 MIME 类型抛出 `ValueError`
-- [ ] Subtask 4.3: 在 `src/composition_root.py` 注册 `document_parser` 端口（impl 指向 CompositeDocumentParser，SCOPED lifetime）
+- [ ] Subtask 4.3: 在 `src/composition_root.py` 注册 `document_parser` 端口（**lambda 工厂**模式，SCOPED lifetime）
+  - CompositeDocumentParser 构造函数需要注入 PDFParser/WordParser/TextParser 实例，因此必须使用 lambda 工厂（非字符串延迟加载）
+  - 注册样例：
+    ```python
+    register_port(
+        name="document_parser",
+        version="v1.0.0",
+        interface=DocumentParserPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.document_parsing.composite_parser",
+            fromlist=["CompositeDocumentParser"],
+        ).CompositeDocumentParser(
+            pdf_parser=__import__(
+                "src.infrastructure.external_services.document_parsing.pdf_parser",
+                fromlist=["PDFParser"],
+            ).PDFParser(),
+            word_parser=__import__(
+                "src.infrastructure.external_services.document_parsing.word_parser",
+                fromlist=["WordParser"],
+            ).WordParser(),
+            text_parser=__import__(
+                "src.infrastructure.external_services.document_parsing.text_parser",
+                fromlist=["TextParser"],
+            ).TextParser(),
+        ),
+        module="src.infrastructure.external_services.document_parsing.composite_parser",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+    )
+    ```
 - [ ] Subtask 4.4: 🔄 重构 — 优化 CompositeDocumentParser 代码
 
 **完成标准/Definition of Done:**
@@ -559,6 +609,10 @@
   - 调用 `service.parse_document(document_id)` 执行完整解析流程
   - **注意**：Prefect task 接收的 `file_path` 参数在重构后不再需要（Service 内部从 MinIO 下载），但为保持 API 兼容性保留参数签名
 - [ ] Subtask 6.3: 🟢 绿 — 修改 `document_processing_flow`：移除内部事件发布逻辑（由 `DocumentParsingService` 统一发布，避免重复发布 `DocumentProcessed`）
+  - 移除 `DocumentProcessed` 事件构造和 `event_publisher.publish()` 调用（flow 第 50-57 行）
+  - 移除 `event_publisher: EventPublisher` 参数（flow 签名同步修改为 `document_processing_flow(document_id, file_path)`）
+  - 清理 `DocumentProcessed` 和 `EventPublisher` 的 import
+  - **注意**：所有调用 `document_processing_flow()` 的地方需同步移除 `event_publisher` 参数传递
 - [ ] Subtask 6.4: 🔄 重构 — 保持 Prefect @task 装饰器和 retries=2
 
 **完成标准/Definition of Done:**
@@ -688,7 +742,7 @@ tests/
 **关键学习/Key Learnings:**
 1. **事件扩展向后兼容** — `DocumentProcessed` 已存在，扩展 `parse_result` Schema 不影响事件构造
 2. **DI 注册延迟加载陷阱** — impl 字符串拼写错误不立即报错，需契约测试覆盖
-3. **事件双注册** — 新增事件需同时更新 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`
+3. **事件双注册** — 新增事件需同时更新 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`。**本 Story 不新增事件**（`DocumentProcessed` 已存在），因此无需修改 `event_channels.yaml`
 4. **TestTenant 隔离** — 并行测试 UUID 前缀隔离，新端口测试也必须使用
 5. **MinIO 流式处理** — `document_storage.retrieve()` 返回 `AsyncIterator[bytes]`（继承自 `L4ObjectPort.retrieve()`），禁止全量 bytes 加载（防 OOM）
 6. **Prefect 任务 retries** — `parse_document` 已有 `retries=2`，替换实现需保留
@@ -858,10 +912,11 @@ def detect_encoding(content: bytes) -> str:
 
 ---
 
-**故事版本/Story Version:** v0.4.0
+**故事版本/Story Version:** v0.5.0
 **创建日期/Created:** 2026-05-31
 **最后更新/Last Updated:** 2026-05-31
 **更新说明/Description:**
+- v0.5.0: Round 4 审查修订 — 值对象to_dict()新模式说明、Document非frozen说明、ParsedPage.to_dict()补充、CompositeDocumentParser lambda工厂注册样例、Subtask6.3 flow签名修改补充、AC→Task追溯矩阵扩展、event_channels.yaml无需修改说明
 - v0.4.0: Round 3 审查修订 — P0 DocumentParserPort签名(mime_type)、Subtask5.0扩展(register_document路径)、并发解析≥10、事件去重(Subtask6.3)、ParsedDocument顶层值对象、composition_root注册(Subtask4.3)
 - v0.3.0: Round 2 审查修订 — P0 object_key GAP修复(Subtask 5.0)、MinIO bucket_type/retrieve签名精确化
 - v0.2.0: Round 1 审查修订 — 修复 P0 问题（文件下载桥接/仓储更新/编码依赖/事件消费/序列化路径/Prefect DI）
