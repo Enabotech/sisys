@@ -131,8 +131,9 @@ class DocumentParsingService:
         Returns:
             临时文件路径
         """
+        ext = os.path.splitext(object_key)[1] or ".tmp"
         stream = self._storage.retrieve(bucket_type, object_key)
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".tmp")
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
         try:
             async for chunk in stream:
                 tmp.write(chunk)
