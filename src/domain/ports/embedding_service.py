@@ -34,6 +34,9 @@ class EmbeddingServicePort(Protocol):
 
         Returns:
             浮点向量（经 L2 归一化）
+
+        Raises:
+            ValueError: 文本为空时
         """
         ...
 
@@ -45,5 +48,8 @@ class EmbeddingServicePort(Protocol):
 
         Returns:
             浮点向量列表（经 L2 归一化）
+
+        Raises:
+            ValueError: 列表中包含空文本时
         """
         ...

@@ -76,13 +76,13 @@ class BGE3EmbeddingService:
         """批量文本编码
 
         Args:
-            texts: 待编码文本列表
+            texts: 待编码文本列表（空列表返回空结果）
 
         Returns:
             经 L2 归一化的浮点向量列表
 
         Raises:
-            ValueError: 列表为空或包含空文本时
+            ValueError: 列表中包含空文本时
         """
         if not texts:
             return []
