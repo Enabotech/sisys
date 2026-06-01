@@ -475,7 +475,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
   - ⚠️ **数据断裂问题**：`parse_document` task 返回精简 dict `{status, document_id, pages(数量)}`，不含文本内容
   - 需通过 `resolver.resolve("document_repository")` 获取完整文档，从 `doc.metadata["parse_result"]["pages"]` 提取文本
   - 截断至 8192 字符（bge-m3 安全上限）
-  - `await asyncio.to_thread(service.encode_text, text)`
+  - `await asyncio.to_thread(service.encode_text, text[:8192])`（截断至 8192 字符）
   - 异常时返回 `[]`（保持向后兼容）
 - [ ] Subtask 4.6: 🔄 重构 — 运行 `ruff check` + `mypy`
 
@@ -683,15 +683,19 @@ tests/
 │   └── test_port_contract_embedding_service.py  # [新建] 端口契约测试
 ├── unit/
 │   ├── infrastructure/
-│   │   └── test_bge3_embedding_service.py        # [新建] 嵌入服务单元测试
+│   │   ├── test_bge3_embedding_service.py        # [新建] 嵌入服务单元测试
+│   │   └── test_generate_embedding.py            # [新建] generate_embedding 单元测试
 │   └── application/
 │       └── test_dense_search_service.py          # [新建] 检索服务单元测试
 ├── integration/
 │   └── test_embedding_qdrant_dense_search.py     # [新建] 端到端集成测试
-└── acceptance/
-    ├── test_acceptance_dense_semantic_search.feature  # [新建] Gherkin 场景
-    └── test_acceptance_dense_semantic_search.py       # [新建] BDD 步骤定义
+├── acceptance/
+│   ├── test_acceptance_dense_semantic_search.feature  # [新建] Gherkin 场景
+│   └── test_acceptance_dense_semantic_search.py       # [新建] BDD 步骤定义
+└── environments.py                               # [修改] EmbeddingConfig 添加 dimension 字段
 ```
+
+> **额外修改文件**（项目根目录）：`.env.example` — 添加 EMBEDDING_MODEL_DIMENSION=1024
 
 ### BDD 测试参考模式
 
