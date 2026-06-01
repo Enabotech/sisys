@@ -17,12 +17,10 @@ class SentenceTransformer:
         device: str | None = None,
         **kwargs: Any,
     ) -> None: ...
-
     def encode(
         self,
         sentences: str | list[str],
         normalize_embeddings: bool = False,
         **kwargs: Any,
     ) -> NDArray[np.float32]: ...
-
     def get_sentence_embedding_dimension(self) -> int: ...
