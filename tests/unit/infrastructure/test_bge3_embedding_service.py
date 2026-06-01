@@ -162,6 +162,48 @@ class TestBGE3EmbeddingServiceEncode:
         with pytest.raises(ValueError, match="文本不能为空"):
             svc.encode_text("")
 
+    @patch("src.infrastructure.external_services.embedding.bge3_embedding_service.SentenceTransformer")
+    def test_encode_texts_raises_on_empty_string_in_list(self, mock_st_cls) -> None:
+        """批量编码中包含空文本时抛出 ValueError"""
+        mock_model = _make_mock_model()
+        mock_st_cls.return_value = mock_model
+
+        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
+            BGE3EmbeddingService,
+        )
+
+        svc = BGE3EmbeddingService(EmbeddingConfig(device="cpu"))
+        with pytest.raises(ValueError, match="批量编码中包含空文本"):
+            svc.encode_texts(["有效文本", "", "另一个有效文本"])
+
+    @patch("src.infrastructure.external_services.embedding.bge3_embedding_service.SentenceTransformer")
+    def test_encode_texts_raises_on_whitespace_only(self, mock_st_cls) -> None:
+        """批量编码中包含纯空白字符串时抛出 ValueError"""
+        mock_model = _make_mock_model()
+        mock_st_cls.return_value = mock_model
+
+        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
+            BGE3EmbeddingService,
+        )
+
+        svc = BGE3EmbeddingService(EmbeddingConfig(device="cpu"))
+        with pytest.raises(ValueError, match="批量编码中包含空文本"):
+            svc.encode_texts(["有效文本", "   ", "另一个有效文本"])
+
+    @patch("src.infrastructure.external_services.embedding.bge3_embedding_service.SentenceTransformer")
+    def test_dimension_mismatch_raises(self, mock_st_cls) -> None:
+        """配置维度与模型实际维度不一致时抛出 ValueError"""
+        mock_model = MagicMock()
+        mock_model.get_sentence_embedding_dimension.return_value = 768
+        mock_st_cls.return_value = mock_model
+
+        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
+            BGE3EmbeddingService,
+        )
+
+        with pytest.raises(ValueError, match="配置维度.*与模型实际维度.*不一致"):
+            BGE3EmbeddingService(EmbeddingConfig(dimension=1024, device="cpu"))
+
 
 class TestEmbeddingConfigFromEnv:
     """EmbeddingConfig.from_env() 配置解析"""

@@ -132,3 +132,33 @@ class TestDenseSearchServiceTenantFilter:
         await service.search("test_collection", "查询文本", limit=3)
         call_args = vector_storage.search.call_args
         assert call_args[1]["limit"] == 3
+
+    @pytest.mark.asyncio
+    async def test_tenant_id_overrides_filter_payload_tenant_id(self) -> None:
+        """tenant_id 参数应覆盖 filter_payload 中已有的 tenant_id"""
+        service, _, vector_storage = _make_search_service()
+        await service.search(
+            "test_collection",
+            "查询文本",
+            tenant_id="tenant-override",
+            filter_payload={"tenant_id": "tenant-original", "business_domain": "finance"},
+        )
+        call_args = vector_storage.search.call_args
+        filter_payload = call_args[1]["filter_payload"]
+        assert filter_payload["tenant_id"] == "tenant-override"
+        assert filter_payload["business_domain"] == "finance"
+
+    @pytest.mark.asyncio
+    async def test_filter_payload_tenant_id_stripped_when_no_tenant_id(self) -> None:
+        """当 tenant_id 参数为 None 时，filter_payload 中的 tenant_id 应被剥离"""
+        service, _, vector_storage = _make_search_service()
+        await service.search(
+            "test_collection",
+            "查询文本",
+            tenant_id=None,
+            filter_payload={"tenant_id": "malicious-tenant", "business_domain": "finance"},
+        )
+        call_args = vector_storage.search.call_args
+        filter_payload = call_args[1]["filter_payload"]
+        assert "tenant_id" not in filter_payload
+        assert filter_payload["business_domain"] == "finance"

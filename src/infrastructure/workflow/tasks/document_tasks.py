@@ -6,9 +6,10 @@ parse_document 已替换为真实解析逻辑（Story 2-2a）。
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from prefect import task
 
@@ -87,9 +88,6 @@ async def generate_embedding(parse_result: dict[str, Any]) -> list[float]:
 
         if not text.strip():
             return []
-
-        import asyncio
-        from typing import cast
 
         embedding = await asyncio.to_thread(service.encode_text, text[:8192])
         return cast(list[float], embedding)

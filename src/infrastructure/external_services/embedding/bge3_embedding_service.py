@@ -42,6 +42,10 @@ class BGE3EmbeddingService:
             logger.info("从 HuggingFace Hub 加载嵌入模型: %s", config.model_name)
             self._model = SentenceTransformer(config.model_name, device=config.device)
 
+        actual_dim = int(self._model.get_sentence_embedding_dimension())
+        if actual_dim != config.dimension:
+            raise ValueError(f"配置维度 ({config.dimension}) 与模型实际维度 ({actual_dim}) 不一致")
+
     @property
     def dimension(self) -> int:
         """嵌入向量维度
@@ -76,8 +80,14 @@ class BGE3EmbeddingService:
 
         Returns:
             经 L2 归一化的浮点向量列表
+
+        Raises:
+            ValueError: 列表为空或包含空文本时
         """
         if not texts:
             return []
+        for i, t in enumerate(texts):
+            if not t or not t.strip():
+                raise ValueError(f"批量编码中包含空文本: 索引 {i}")
         embeddings = self._model.encode(texts, normalize_embeddings=True)
         return cast(list[list[float]], cast(np.ndarray, embeddings).tolist())
