@@ -84,14 +84,7 @@ def embedding_service():
     try:
         from src.infrastructure.external_services.embedding.bge3_embedding_service import BGE3EmbeddingService
 
-        config = EmbeddingConfig(
-            model_name="BAAI/bge-m3",
-            model_path="/mnt/x/.cache/BAAI/bge-m3/models--BAAI--bge-m3",
-            device="cuda",
-            dimension=1024,
-        )
-
-        return BGE3EmbeddingService(config)
+        return BGE3EmbeddingService(EmbeddingConfig.from_env())
     except Exception as e:
         pytest.skip(f"bge-m3 模型不可用: {e}")
 
