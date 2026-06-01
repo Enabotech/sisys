@@ -8,6 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from src.domain.ports.document_parser import DocumentParserPort
 from src.domain.value_objects.parsed_document import (
     ParsedDocument,
     ParsedElement,
@@ -16,7 +17,7 @@ from src.domain.value_objects.parsed_document import (
 )
 
 
-class WordParser:
+class WordParser(DocumentParserPort):
     """Word 文档解析器
 
     使用 python-docx.Document 提取文本和表格内容，支持：

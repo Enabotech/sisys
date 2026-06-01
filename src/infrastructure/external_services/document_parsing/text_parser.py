@@ -10,6 +10,7 @@ import re
 import uuid
 from datetime import UTC, datetime
 
+from src.domain.ports.document_parser import DocumentParserPort
 from src.domain.value_objects.parsed_document import (
     ParsedDocument,
     ParsedElement,
@@ -19,11 +20,11 @@ from src.domain.value_objects.parsed_document import (
 _MAX_TXT_SIZE = 10 * 1024 * 1024  # 10MB，超过此限制当前版本不支持分块处理
 
 
-class TextParser:
+class TextParser(DocumentParserPort):
     """TXT 文档解析器
 
     支持特性：
-    - 编码自动检测（UTF-8 → GBK → GB18030）
+    - 编码自动检测（UTF-8 → GB18030 → GBK）
     - 段落分割（连续空行分隔）
     """
 
@@ -72,7 +73,7 @@ class TextParser:
                 parse_timestamp=timestamp,
             )
 
-        # 编码检测：UTF-8 → GBK → GB18030
+        # 编码检测：UTF-8 → GB18030 → GBK
         text = self._detect_and_decode(raw_bytes)
 
         # 段落分割
@@ -98,9 +99,9 @@ class TextParser:
     def _detect_and_decode(self, raw_bytes: bytes) -> str:
         """编码自动检测
 
-        依次尝试 UTF-8 → GBK → GB18030，不引入 chardet 依赖。
+        依次尝试 UTF-8 → GB18030 → GBK，不引入 chardet 依赖。
         """
-        for encoding in ["utf-8", "gbk", "gb18030"]:
+        for encoding in ["utf-8", "gb18030", "gbk"]:
             try:
                 return raw_bytes.decode(encoding)
             except (UnicodeDecodeError, LookupError):

@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 from pypdf import PdfReader
 
+from src.domain.ports.document_parser import DocumentParserPort
 from src.domain.value_objects.parsed_document import (
     ParsedDocument,
     ParsedElement,
@@ -17,7 +18,7 @@ from src.domain.value_objects.parsed_document import (
 )
 
 
-class PDFParser:
+class PDFParser(DocumentParserPort):
     """PDF 文档解析器
 
     使用 pypdf.PdfReader 提取文本内容，支持：
