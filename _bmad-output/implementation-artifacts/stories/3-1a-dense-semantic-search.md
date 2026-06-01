@@ -175,7 +175,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_dense_semantic_search.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | src 与测试目录完成清单最终确认 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 6 |
-| **集成测试** | Embedding + Qdrant 端到端 | 真实 bge-m3 + 真实 Qdrant | `tests/integration/test_embedding_qdrant_dense_search.py` | Task 5 |
+| **集成测试** | Embedding + Qdrant 端到端 | 真实 bge-m3 + 真实 Qdrant | `tests/integration/test_integration_embedding_qdrant_dense_search.py` | Task 5 |
 | **SDD 架构验证** | 领域零依赖 | domain/ 无 sentence_transformers 导入 | 包含在验收测试 AC-6 中 | Task 6 |
 
 ---
@@ -221,10 +221,10 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | AC-1 | 端口注册 + DI 装配 | Task 4 | Composition Root 注册 | `test_port_contract_embedding_service.py` |
 | AC-1 | generate_embedding 替换 | Task 4 | Prefect task 接入 | `test_generate_embedding.py` |
 | AC-2 | 余弦相似度检索 | Task 3 | DenseSemanticSearchService | `test_dense_search_service.py` |
-| AC-2 | 端到端检索验证 | Task 5 | 集成测试 | `test_embedding_qdrant_dense_search.py` |
-| AC-3 | 检索延迟 P95<200ms | Task 5 | 性能基准测试 | `test_embedding_qdrant_dense_search.py` |
+| AC-2 | 端到端检索验证 | Task 5 | 集成测试 | `test_integration_embedding_qdrant_dense_search.py` |
+| AC-3 | 检索延迟 P95<200ms | Task 5 | 性能基准测试 | `test_integration_embedding_qdrant_dense_search.py` |
 | AC-4 | Payload 过滤 | Task 3 | tenant_id + filter 注入 | `test_dense_search_service.py` |
-| AC-4 | 真实 Payload 过滤 | Task 5 | 集成测试 | `test_embedding_qdrant_dense_search.py` |
+| AC-4 | 真实 Payload 过滤 | Task 5 | 集成测试 | `test_integration_embedding_qdrant_dense_search.py` |
 | 全部 | BDD 验收 | Task 0 | Gherkin 场景 | `test_acceptance_dense_semantic_search.*` |
 | 全部 | 收尾验收 | Task 6 | 完成清单确认 | `test_acceptance_dense_semantic_search.*` |
 
@@ -688,7 +688,7 @@ tests/
 │   └── application/
 │       └── test_dense_search_service.py          # [新建] 检索服务单元测试
 ├── integration/
-│   └── test_embedding_qdrant_dense_search.py     # [新建] 端到端集成测试
+│   └── test_integration_embedding_qdrant_dense_search.py     # [新建] 端到端集成测试
 ├── acceptance/
 │   ├── test_acceptance_dense_semantic_search.feature  # [新建] Gherkin 场景
 │   └── test_acceptance_dense_semantic_search.py       # [新建] BDD 步骤定义

@@ -5,9 +5,12 @@
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
 
 
 class TestGenerateEmbedding:
@@ -16,8 +19,6 @@ class TestGenerateEmbedding:
     @pytest.mark.asyncio
     async def test_returns_embedding_on_success(self) -> None:
         """成功时返回嵌入向量"""
-        import uuid
-
         doc_id = str(uuid.uuid4())
         mock_embedding_svc = MagicMock()
         mock_embedding_svc.encode_text.return_value = [0.1] * 1024
@@ -40,9 +41,7 @@ class TestGenerateEmbedding:
         }[name]
 
         with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-            result = await generate_embedding({"status": "completed", "document_id": doc_id, "pages": 1})
+            result = await generate_embedding.fn({"status": "completed", "document_id": doc_id, "pages": 1})
             assert len(result) == 1024
 
     @pytest.mark.asyncio
@@ -52,18 +51,18 @@ class TestGenerateEmbedding:
         mock_resolver.resolve.side_effect = RuntimeError("端口不可用")
 
         with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-            result = await generate_embedding(
-                {"status": "failed", "document_id": "00000000-0000-0000-0000-000000000000", "error": "解析失败"}
+            result = await generate_embedding.fn(
+                {
+                    "status": "failed",
+                    "document_id": "00000000-0000-0000-0000-000000000000",
+                    "error": "解析失败",
+                }
             )
             assert result == []
 
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_text(self) -> None:
         """无文本内容时返回空列表"""
-        import uuid
-
         doc_id = str(uuid.uuid4())
         mock_embedding_svc = MagicMock()
         mock_repo = AsyncMock()
@@ -78,16 +77,12 @@ class TestGenerateEmbedding:
         }[name]
 
         with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-            result = await generate_embedding({"status": "completed", "document_id": doc_id, "pages": 0})
+            result = await generate_embedding.fn({"status": "completed", "document_id": doc_id, "pages": 0})
             assert result == []
 
     @pytest.mark.asyncio
     async def test_returns_empty_when_doc_not_found(self) -> None:
         """文档不存在时返回空列表"""
-        import uuid
-
         doc_id = str(uuid.uuid4())
         mock_embedding_svc = MagicMock()
         mock_repo = AsyncMock()
@@ -100,7 +95,5 @@ class TestGenerateEmbedding:
         }[name]
 
         with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-            result = await generate_embedding({"status": "completed", "document_id": doc_id, "pages": 1})
+            result = await generate_embedding.fn({"status": "completed", "document_id": doc_id, "pages": 1})
             assert result == []
