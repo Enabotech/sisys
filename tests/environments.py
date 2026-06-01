@@ -144,6 +144,7 @@ class EmbeddingConfig:
     model_name: str = "BAAI/bge-m3"
     model_path: str = ""
     device: str = "cuda"
+    dimension: int = 1024
 
 
 @dataclass
