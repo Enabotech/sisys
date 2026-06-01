@@ -66,6 +66,9 @@ class DenseSemanticSearchService:
 
         Returns:
             检索结果列表，按相似度降序排列
+
+        Raises:
+            ValueError: 查询文本为空时
         """
         query_vector = await asyncio.to_thread(self._embedding.encode_text, query_text)
 
@@ -77,7 +80,7 @@ class DenseSemanticSearchService:
             limit=limit,
             filter_payload=combined_filter,
         )
-        return [DenseSearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {})) for r in raw_results]
+        return [DenseSearchResult(id=r["id"], score=r["score"], payload=r["payload"]) for r in raw_results]
 
     def _build_filter(
         self,

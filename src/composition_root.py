@@ -343,13 +343,21 @@ def bootstrap() -> None:
     from src.domain.ports.l3_vector import L3VectorPort
     from src.domain.ports.l4_object import L4ObjectPort
     from src.domain.ports.l5_graph import L5GraphPort
+    from src.infrastructure.storage.qdrant.collection_manager import (
+        QdrantCollectionManager,
+    )
+    from src.infrastructure.storage.qdrant.qdrant_adapter import QdrantAdapter
+    from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 
     register_port(
         name="l3_vector",
         version="v1.0.0",
         interface=L3VectorPort,
-        impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantAdapter",
-        module="src.infrastructure.storage.qdrant.qdrant_vector_adapter",
+        impl=lambda resolver: QdrantAdapter(
+            storage=QdrantVectorStorage(resolver.resolve("qdrant_client")),
+            collection_manager=QdrantCollectionManager(resolver.resolve("qdrant_client")),
+        ),
+        module="src.infrastructure.storage.qdrant.qdrant_adapter",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
     )
