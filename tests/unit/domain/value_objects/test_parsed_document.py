@@ -30,7 +30,7 @@ class TestBoundingBox:
     def test_frozen_immutable(self) -> None:
         bbox = BoundingBox(x=0.0, y=0.0, width=100.0, height=100.0, page=0)
         with pytest.raises(AttributeError):
-            bbox.x = 99.0  # type: ignore[misc]
+            setattr(bbox, "x", 99.0)
 
 
 class TestParsedElement:
@@ -151,4 +151,4 @@ class TestParsedDocument:
     def test_frozen_immutable(self) -> None:
         doc = ParsedDocument(document_id="x", mime_type="text/plain")
         with pytest.raises(AttributeError):
-            doc.document_id = "y"  # type: ignore[misc]
+            setattr(doc, "document_id", "y")
