@@ -81,6 +81,7 @@ def vector_storage(qdrant_client: QdrantManager) -> QdrantVectorStorage:
 @pytest.fixture(scope="session")
 def embedding_service():
     """bge-m3 嵌入服务实例（会话级共享，避免重复加载模型）"""
+    get_test_env()  # 确保测试环境配置已同步到 os.environ（含 device/路径）
     try:
         from src.infrastructure.external_services.embedding.bge3_embedding_service import BGE3EmbeddingService
 

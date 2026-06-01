@@ -412,6 +412,9 @@ def _apply_dotenv_if_empty(config: TestEnvConfig, env_values) -> None:
     if not config.embedding.device or config.embedding.device == "cuda":
         if device := env_values.get("EMBEDDING_MODEL_DEVICE"):
             config.embedding.device = device
+    if config.embedding.dimension in (1024, 0) or not config.embedding.dimension:
+        if dim := env_values.get("EMBEDDING_MODEL_DIMENSION"):
+            config.embedding.dimension = int(dim)
 
 
 def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
@@ -480,6 +483,8 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
         config.embedding.model_path = embedding_path
     if embedding_device := os.getenv("EMBEDDING_MODEL_DEVICE"):
         config.embedding.device = embedding_device
+    if embedding_dim := os.getenv("EMBEDDING_MODEL_DIMENSION"):
+        config.embedding.dimension = int(embedding_dim)
 
     return config
 
@@ -540,6 +545,7 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
     if config.embedding.model_path:
         os.environ.setdefault("EMBEDDING_MODEL_PATH", config.embedding.model_path)
     os.environ.setdefault("EMBEDDING_MODEL_DEVICE", config.embedding.device)
+    os.environ.setdefault("EMBEDDING_MODEL_DIMENSION", str(config.embedding.dimension))
 
 
 def reset_test_env() -> None:

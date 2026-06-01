@@ -45,6 +45,7 @@ def collection_name() -> str:
 @pytest.fixture
 def embedding_service():
     """加载 bge-m3 模型，不可用时 skip"""
+    get_test_env()  # 确保测试环境配置已同步到 os.environ（含 device/路径）
     try:
         from src.infrastructure.external_services.embedding.bge3_embedding_service import (
             BGE3EmbeddingService,
