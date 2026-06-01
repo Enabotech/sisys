@@ -38,7 +38,6 @@ class WordParser:
         doc_id = str(uuid.uuid4())
         timestamp = datetime.now(UTC).isoformat()
 
-        # 旧版 DOC 格式拒绝
         if mime_type == "application/msword":
             return ParsedDocument(
                 document_id=doc_id,
@@ -51,7 +50,39 @@ class WordParser:
         try:
             from docx import Document
 
-            doc = Document(file_path)
+            with open(file_path, "rb") as f:
+                doc = Document(f)
+
+                texts: list[ParsedElement] = []
+                for paragraph in doc.paragraphs:
+                    text = paragraph.text.strip()
+                    if text:
+                        style_name = paragraph.style.name if paragraph.style else ""
+                        texts.append(ParsedElement(content=text, metadata={"style": style_name}))
+
+                tables: list[ParsedTable] = []
+                for table in doc.tables:
+                    rows = []
+                    for row in table.rows:
+                        row_data = [cell.text for cell in row.cells]
+                        rows.append(row_data)
+                    if rows:
+                        tables.append(ParsedTable(rows=rows))
+
+                page = ParsedPage(
+                    page_number=1,
+                    texts=texts,
+                    tables=tables,
+                    images=[],
+                )
+
+                return ParsedDocument(
+                    document_id=doc_id,
+                    mime_type=mime_type,
+                    pages=[page],
+                    parse_status="completed",
+                    parse_timestamp=timestamp,
+                )
         except Exception as e:
             error_msg = str(e)
             if "docx" in error_msg.lower() or "zip" in error_msg.lower():
@@ -63,38 +94,3 @@ class WordParser:
                 error_message=error_msg,
                 parse_timestamp=timestamp,
             )
-
-        texts: list[ParsedElement] = []
-        tables: list[ParsedTable] = []
-
-        # 提取段落文本（保留段落样式信息）
-        for paragraph in doc.paragraphs:
-            text = paragraph.text.strip()
-            if text:
-                style_name = paragraph.style.name if paragraph.style else ""
-                texts.append(ParsedElement(content=text, metadata={"style": style_name}))
-
-        # 提取表格
-        for table in doc.tables:
-            rows = []
-            for row in table.rows:
-                row_data = [cell.text for cell in row.cells]
-                rows.append(row_data)
-            if rows:
-                tables.append(ParsedTable(rows=rows))
-
-        # DOCX 无分页概念，作为单页处理
-        page = ParsedPage(
-            page_number=1,
-            texts=texts,
-            tables=tables,
-            images=[],
-        )
-
-        return ParsedDocument(
-            document_id=doc_id,
-            mime_type=mime_type,
-            pages=[page],
-            parse_status="completed",
-            parse_timestamp=timestamp,
-        )

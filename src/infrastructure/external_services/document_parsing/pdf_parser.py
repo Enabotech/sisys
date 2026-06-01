@@ -41,7 +41,51 @@ class PDFParser:
         timestamp = datetime.now(UTC).isoformat()
 
         try:
-            reader = PdfReader(file_path)
+            with open(file_path, "rb") as f:
+                reader = PdfReader(f)
+
+                if reader.is_encrypted:
+                    return ParsedDocument(
+                        document_id=doc_id,
+                        mime_type=mime_type,
+                        parse_status="failed",
+                        error_message="PDF 文档已加密，无法解析",
+                        parse_timestamp=timestamp,
+                    )
+
+                num_pages = len(reader.pages)
+                if num_pages == 0:
+                    return ParsedDocument(
+                        document_id=doc_id,
+                        mime_type=mime_type,
+                        parse_status="failed",
+                        error_message="PDF 文档为空，包含 0 页",
+                        parse_timestamp=timestamp,
+                    )
+
+                pages: list[ParsedPage] = []
+                for i, page in enumerate(reader.pages):
+                    text = page.extract_text() or ""
+                    if text.strip():
+                        texts = [ParsedElement(content=text.strip())]
+                    else:
+                        texts = []
+                    pages.append(
+                        ParsedPage(
+                            page_number=i + 1,
+                            texts=texts,
+                            tables=[],
+                            images=[],
+                        )
+                    )
+
+                return ParsedDocument(
+                    document_id=doc_id,
+                    mime_type=mime_type,
+                    pages=pages,
+                    parse_status="completed",
+                    parse_timestamp=timestamp,
+                )
         except Exception as e:
             return ParsedDocument(
                 document_id=doc_id,
@@ -50,49 +94,3 @@ class PDFParser:
                 error_message=f"PDF 文件读取失败: {e}",
                 parse_timestamp=timestamp,
             )
-
-        # 加密检测
-        if reader.is_encrypted:
-            return ParsedDocument(
-                document_id=doc_id,
-                mime_type=mime_type,
-                parse_status="failed",
-                error_message="PDF 文档已加密，无法解析",
-                parse_timestamp=timestamp,
-            )
-
-        # 空文档检测
-        num_pages = len(reader.pages)
-        if num_pages == 0:
-            return ParsedDocument(
-                document_id=doc_id,
-                mime_type=mime_type,
-                parse_status="failed",
-                error_message="PDF 文档为空，包含 0 页",
-                parse_timestamp=timestamp,
-            )
-
-        # 逐页提取文本
-        pages: list[ParsedPage] = []
-        for i, page in enumerate(reader.pages):
-            text = page.extract_text() or ""
-            texts: list[ParsedElement] = []
-            if text.strip():
-                texts.append(ParsedElement(content=text.strip()))
-
-            pages.append(
-                ParsedPage(
-                    page_number=i + 1,
-                    texts=texts,
-                    tables=[],
-                    images=[],
-                )
-            )
-
-        return ParsedDocument(
-            document_id=doc_id,
-            mime_type=mime_type,
-            pages=pages,
-            parse_status="completed",
-            parse_timestamp=timestamp,
-        )
