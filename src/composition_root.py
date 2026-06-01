@@ -343,13 +343,21 @@ def bootstrap() -> None:
     from src.domain.ports.l3_vector import L3VectorPort
     from src.domain.ports.l4_object import L4ObjectPort
     from src.domain.ports.l5_graph import L5GraphPort
+    from src.infrastructure.storage.qdrant.collection_manager import (
+        QdrantCollectionManager,
+    )
+    from src.infrastructure.storage.qdrant.qdrant_adapter import QdrantAdapter
+    from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 
     register_port(
         name="l3_vector",
         version="v1.0.0",
         interface=L3VectorPort,
-        impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantAdapter",
-        module="src.infrastructure.storage.qdrant.qdrant_vector_adapter",
+        impl=lambda resolver: QdrantAdapter(
+            storage=QdrantVectorStorage(resolver.resolve("qdrant_client")),
+            collection_manager=QdrantCollectionManager(resolver.resolve("qdrant_client")),
+        ),
+        module="src.infrastructure.storage.qdrant.qdrant_adapter",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
     )
@@ -1357,9 +1365,41 @@ def bootstrap() -> None:
         tags=("udmr", "cost", "handler", "application"),
     )
 
-    # === Crawler Ports ===
+    # === Search Ports (Epic 3) ===
+    from src.application.services.dense_search_service import DenseSemanticSearchService
     from src.domain.ports.crawler_client import CrawlerClientPort
+    from src.domain.ports.embedding_service import EmbeddingServicePort
+    from src.infrastructure.config.embedding import EmbeddingConfig
+    from src.infrastructure.external_services.embedding.bge3_embedding_service import (
+        BGE3EmbeddingService,
+    )
 
+    register_port(
+        name="embedding_service",
+        version="v1.0.0",
+        interface=EmbeddingServicePort,
+        impl=lambda resolver: BGE3EmbeddingService(EmbeddingConfig.from_env()),
+        module="src.infrastructure.external_services.embedding.bge3_embedding_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="search-team",
+        tags=("embedding", "search"),
+    )
+
+    register_port(
+        name="dense_search_service",
+        version="v1.0.0",
+        interface=DenseSemanticSearchService,
+        impl=lambda resolver: DenseSemanticSearchService(
+            embedding_service=resolver.resolve("embedding_service"),
+            vector_storage=resolver.resolve("l3_vector"),
+        ),
+        module="src.application.services.dense_search_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "dense"),
+    )
+
+    # === Crawler Ports ===
     register_port(
         name="crawler_client",
         version="v1.0.0",
