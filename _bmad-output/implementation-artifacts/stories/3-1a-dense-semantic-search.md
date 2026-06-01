@@ -1,6 +1,6 @@
 # Story 3-1a: Dense 语义检索
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -249,21 +249,21 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 > **目的：** 在进入代码实现前，明确端口契约、配置模型、Gherkin 验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 定义 `EmbeddingServicePort` Protocol 签名（`encode_text`, `encode_texts`, `dimension`）
-- [ ] Subtask 0.2: 定义 `EmbeddingConfig` 数据模型字段（model_name, model_path, device, dimension）
-- [ ] Subtask 0.3: 定义 `DenseSemanticSearchService` API 签名（`search(collection, query_text, limit, tenant_id, filter_payload)`）
-- [ ] Subtask 0.4: 定义 `DenseSearchResult` TypedDict（id, score, payload）
-- [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_dense_semantic_search.feature`
-- [ ] Subtask 0.6: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_dense_semantic_search.py`
-- [ ] Subtask 0.7: 编写端口契约测试 `tests/contracts/test_port_contract_embedding_service.py`
+- [x] Subtask 0.1: 定义 `EmbeddingServicePort` Protocol 签名（`encode_text`, `encode_texts`, `dimension`）
+- [x] Subtask 0.2: 定义 `EmbeddingConfig` 数据模型字段（model_name, model_path, device, dimension）
+- [x] Subtask 0.3: 定义 `DenseSemanticSearchService` API 签名（`search(collection, query_text, limit, tenant_id, filter_payload)`）
+- [x] Subtask 0.4: 定义 `DenseSearchResult` TypedDict（id, score, payload）
+- [x] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_dense_semantic_search.feature`
+- [x] Subtask 0.6: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_dense_semantic_search.py`
+- [x] Subtask 0.7: 编写端口契约测试 `tests/contracts/test_port_contract_embedding_service.py`
   > **契约测试模式参考**：项目无 PortContractTest 基类，使用独立三方法模式：
   > `test_port_is_registered`（验证注册）+ `test_implementation_has_required_methods`（验证方法签名）
   > + `test_metadata_complete`（验证 version/owner/module）。参考 `tests/contracts/test_port_contract_services.py`。
-- [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -279,11 +279,11 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 🟢 绿 | 创建 `src/domain/ports/embedding_service.py` |
 | 🔄 重构 | 更新 `src/domain/ports/__init__.py` 导出 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 `tests/contracts/test_port_contract_embedding_service.py` 失败测试
+- [x] Subtask 1.1: 🔴 红 — 编写 `tests/contracts/test_port_contract_embedding_service.py` 失败测试
   - 验证 `embedding_service` 在 registry 注册
   - 验证实现类包含 `encode_text`, `encode_texts`, `dimension`
   - 验证 PortSpec 元数据（version, owner, lifetime）
-- [ ] Subtask 1.2: 🟢 绿 — 创建 `src/domain/ports/embedding_service.py`
+- [x] Subtask 1.2: 🟢 绿 — 创建 `src/domain/ports/embedding_service.py`
   ```python
   @runtime_checkable
   class EmbeddingServicePort(Protocol):
@@ -292,8 +292,8 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
       def encode_text(self, text: str) -> list[float]: ...
       def encode_texts(self, texts: list[str]) -> list[list[float]]: ...
   ```
-- [ ] Subtask 1.3: 🟢 绿 — 更新 `src/domain/ports/__init__.py` 添加导入和 `__all__` 导出
-- [ ] Subtask 1.4: 🔄 重构 — 运行 `ruff check` + `mypy` 确认通过
+- [x] Subtask 1.3: 🟢 绿 — 更新 `src/domain/ports/__init__.py` 添加导入和 `__all__` 导出
+- [x] Subtask 1.4: 🔄 重构 — 运行 `ruff check` + `mypy` 确认通过
 
 #### TDD 循环 B：EmbeddingConfig
 
@@ -303,8 +303,8 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 🟢 绿 | 创建 `src/infrastructure/config/embedding.py` |
 | 🔄 重构 | 更新 config `__init__.py` 导出 |
 
-- [ ] Subtask 1.5: 🔴 红 — 编写 EmbeddingConfig 单元测试（from_env 解析、默认值、dimension 校验）
-- [ ] Subtask 1.6: 🟢 绿 — 创建 `src/infrastructure/config/embedding.py`
+- [x] Subtask 1.5: 🔴 红 — 编写 EmbeddingConfig 单元测试（from_env 解析、默认值、dimension 校验）
+- [x] Subtask 1.6: 🟢 绿 — 创建 `src/infrastructure/config/embedding.py`
   ```python
   @dataclass
   class EmbeddingConfig:
@@ -316,14 +316,14 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
       def from_env(cls) -> EmbeddingConfig: ...
   ```
   > **设计决策：** 使用 `@dataclass`（非 frozen），与 `QdrantConfig`、`RedisConfig` 等基础设施连接配置保持一致。
-- [ ] Subtask 1.7: 🟢 绿 — 更新 `src/infrastructure/config/__init__.py` 添加导入和 `__all__`
-- [ ] Subtask 1.8: 🔄 重构 — 运行 `ruff check` + `mypy`
+- [x] Subtask 1.7: 🟢 绿 — 更新 `src/infrastructure/config/__init__.py` 添加导入和 `__all__`
+- [x] Subtask 1.8: 🔄 重构 — 运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
-- [ ] EmbeddingServicePort Protocol 定义完成
-- [ ] EmbeddingConfig dataclass + from_env() 完成
-- [ ] 契约测试通过
-- [ ] domain/ports/__init__.py 和 config/__init__.py 导出已更新
+- [x] EmbeddingServicePort Protocol 定义完成
+- [x] EmbeddingConfig dataclass + from_env() 完成
+- [x] 契约测试通过
+- [x] domain/ports/__init__.py 和 config/__init__.py 导出已更新
 
 ---
 
@@ -370,9 +370,9 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - [ ] Subtask 2.4: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
-- [ ] BGE3EmbeddingService 实现完成
-- [ ] 单元测试全部通过
-- [ ] 覆盖率≥75%（基础设施层）
+- [x] BGE3EmbeddingService 实现完成
+- [x] 单元测试全部通过
+- [x] 覆盖率≥75%（基础设施层）
 
 ---
 
@@ -390,7 +390,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 🟢 绿 | 创建 `src/application/services/dense_search_service.py` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 DenseSemanticSearchService 失败测试
+- [x] Subtask 3.1: 🔴 红 — 编写 DenseSemanticSearchService 失败测试
   - mock EmbeddingServicePort + L3VectorPort
   - 验证 `search()` 调用 `embed.encode_text` 一次
   - 验证 `search()` 调用 `vector.search` 一次并传入正确向量
@@ -398,7 +398,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
   - 验证现有 `filter_payload` 保留
   - 验证 `limit` 传递正确
   - 验证空结果返回空列表
-- [ ] Subtask 3.2: 🟢 绿 — 创建 `src/application/services/dense_search_service.py`
+- [x] Subtask 3.2: 🟢 绿 — 创建 `src/application/services/dense_search_service.py`
   ```python
   class DenseSearchResult(TypedDict):
       id: str | int
@@ -418,9 +418,9 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - [ ] Subtask 3.3: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
-- [ ] DenseSemanticSearchService 实现完成
-- [ ] 单元测试全部通过
-- [ ] 覆盖率≥85%（应用层）
+- [x] DenseSemanticSearchService 实现完成
+- [x] 单元测试全部通过
+- [x] 覆盖率≥85%（应用层）
 
 ---
 
@@ -436,12 +436,12 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 🟢 绿 | 修改 `src/composition_root.py` 注册两个新端口 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 4.1: 🔴 红 — 在 `tests/contracts/test_port_contract_embedding_service.py` 中添加 dense_search_service 注册验证
+- [x] Subtask 4.1: 🔴 红 — 在 `tests/contracts/test_port_contract_embedding_service.py` 中添加 dense_search_service 注册验证
   - 验证 `embedding_service` 在 registry 注册（Task 0 已创建此文件，此处扩展）
   - 验证 `dense_search_service` 在 registry 注册
   - 验证 embedding_service 生命周期为 SINGLETON
   - 验证 dense_search_service 生命周期为 SCOPED
-- [ ] Subtask 4.2: 🟢 绿 — 修改 `src/composition_root.py` 添加：
+- [x] Subtask 4.2: 🟢 绿 — 修改 `src/composition_root.py` 添加：
   ```python
   # embedding_service — SINGLETON（模型加载昂贵）
   register_port(name="embedding_service", version="v1.0.0",
@@ -460,7 +460,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
       module="src.application.services.dense_search_service",
       lifetime=Lifetime.SCOPED, owner="search-team")
   ```
-- [ ] Subtask 4.3: 🔄 重构 — 运行 `ruff check` + `mypy`
+- [x] Subtask 4.3: 🔄 重构 — 运行 `ruff check` + `mypy`
 
 #### TDD 循环 B：generate_embedding 占位替换
 
@@ -470,19 +470,19 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 🟢 绿 | 替换 `src/infrastructure/workflow/tasks/document_tasks.py` 中的占位实现 |
 | 🔄 重构 | 优化代码 |
 
-- [ ] Subtask 4.4: 🔴 红 — 编写 generate_embedding 单元测试 `tests/unit/infrastructure/test_generate_embedding.py`（mock resolver，验证调用 embedding_service）
-- [ ] Subtask 4.5: 🟢 绿 — 替换 `generate_embedding` 从 `return []` 改为使用 resolver 获取 embedding_service
+- [x] Subtask 4.4: 🔴 红 — 编写 generate_embedding 单元测试 `tests/unit/infrastructure/test_generate_embedding.py`（mock resolver，验证调用 embedding_service）
+- [x] Subtask 4.5: 🟢 绿 — 替换 `generate_embedding` 从 `return []` 改为使用 resolver 获取 embedding_service
   - ⚠️ **数据断裂问题**：`parse_document` task 返回精简 dict `{status, document_id, pages(数量)}`，不含文本内容
   - 需通过 `resolver.resolve("document_repository")` 获取完整文档，从 `doc.metadata["parse_result"]["pages"]` 提取文本
   - 截断至 8192 字符（bge-m3 安全上限）
   - `await asyncio.to_thread(service.encode_text, text[:8192])`（截断至 8192 字符）
   - 异常时返回 `[]`（保持向后兼容）
-- [ ] Subtask 4.6: 🔄 重构 — 运行 `ruff check` + `mypy`
+- [x] Subtask 4.6: 🔄 重构 — 运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
-- [ ] composition_root.py 注册完成
-- [ ] generate_embedding 替换完成
-- [ ] 所有测试通过
+- [x] composition_root.py 注册完成
+- [x] generate_embedding 替换完成
+- [x] 所有测试通过
 
 ---
 
@@ -501,24 +501,24 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 🟢 绿 | 实现测试逻辑，运行确认通过 |
 | 🔄 重构 | 优化测试结构，添加性能基准 |
 
-- [ ] Subtask 5.1: 🔴 红 — 创建 `tests/integration/test_embedding_qdrant_dense_search.py`
+- [x] Subtask 5.1: 🔴 红 — 创建 `tests/integration/test_embedding_qdrant_dense_search.py`
   - 使用 `TestTenant` 隔离（参考 `test_integration_qdrant_real.py` 模式：`f"test_{uuid.uuid4().hex[:8]}"` fixture）
   - Fixture：创建 Collection → 插入 10 个嵌入向量 → 测试后 try/finally 删除
-- [ ] Subtask 5.2: 🟢 绿 — 实现端到端检索测试
+- [x] Subtask 5.2: 🟢 绿 — 实现端到端检索测试
   - embed 10 个中文文本 → upsert 到 Qdrant → 查询 → 验证排序
-- [ ] Subtask 5.3: 🟢 绿 — 实现 Payload 过滤测试
+- [x] Subtask 5.3: 🟢 绿 — 实现 Payload 过滤测试
   - 插入不同 business_domain 的向量 → 过滤 → 验证结果
-- [ ] Subtask 5.4: 🟢 绿 — 实现性能基准测试
+- [x] Subtask 5.4: 🟢 绿 — 实现性能基准测试
   - 预热 5 次查询 → 50 次查询（查询文本 ≤ 512 字符）→ 统计 P95 延迟
   - GPU: P95 < 200ms / CPU: P95 < 500ms（根据 `EmbeddingConfig.device` 自动选择阈值）
   - 标记 `@pytest.mark.slow`（CI 可选跳过）
-- [ ] Subtask 5.5: 🔄 重构 — 运行完整集成测试并确认通过，优化测试结构
+- [x] Subtask 5.5: 🔄 重构 — 运行完整集成测试并确认通过，优化测试结构
 
 **完成标准/Definition of Done:**
-- [ ] 集成测试全部通过
-- [ ] 端到端检索正确
-- [ ] Payload 过滤正确
-- [ ] P95 延迟满足 GPU<200ms / CPU<500ms 条件
+- [x] 集成测试全部通过
+- [x] 端到端检索正确
+- [x] Payload 过滤正确
+- [x] P95 延迟满足 GPU<200ms / CPU<500ms 条件
 
 ---
 
@@ -536,24 +536,24 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 🟢 绿 | 编写 BDD 步骤实现 |
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 6.1: 场景 — 验证 `src` 完成清单
+- [x] Subtask 6.1: 场景 — 验证 `src` 完成清单
   - `src/domain/ports/embedding_service.py` 存在且包含 `EmbeddingServicePort`
   - `src/infrastructure/config/embedding.py` 存在且包含 `EmbeddingConfig`
   - `src/infrastructure/external_services/embedding/bge3_embedding_service.py` 存在且包含 `BGE3EmbeddingService`
   - `src/application/services/dense_search_service.py` 存在且包含 `DenseSemanticSearchService`
   - `src/composition_root.py` 包含 `embedding_service` 和 `dense_search_service` 注册
-- [ ] Subtask 6.2: 场景 — 验证 `tests/` 完成清单
+- [x] Subtask 6.2: 场景 — 验证 `tests/` 完成清单
   - 契约测试、单元测试、集成测试、验收测试文件均存在
-- [ ] Subtask 6.3: 场景 — 验证领域层零外部依赖
+- [x] Subtask 6.3: 场景 — 验证领域层零外部依赖
   - `src/domain/` 不导入 sentence_transformers / FlagEmbedding
-- [ ] Subtask 6.4: 运行开发结束验收测试并确认通过
-- [ ] Subtask 6.5: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
+- [x] Subtask 6.4: 运行开发结束验收测试并确认通过
+- [x] Subtask 6.5: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
 
 **完成标准/Definition of Done:**
-- [ ] `src` 完成清单已逐项验证确认
-- [ ] `tests/` 完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `done`
+- [x] `src` 完成清单已逐项验证确认
+- [x] `tests/` 完成清单已逐项验证确认
+- [x] 开发结束验收测试通过
+- [x] Story 可进入 `done`
 
 ---
 

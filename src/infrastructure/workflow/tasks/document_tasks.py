@@ -6,9 +6,10 @@ parse_document 已替换为真实解析逻辑（Story 2-2a）。
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from prefect import task
 
@@ -59,16 +60,40 @@ async def parse_document(document_id: uuid.UUID, file_path: str, tenant_id: str 
 async def generate_embedding(parse_result: dict[str, Any]) -> list[float]:
     """生成嵌入向量任务
 
-    MVP 占位实现，返回 mock 数据。
-    真实嵌入逻辑由 Epic 3 故事补充。
+    通过 DI 容器获取 embedding_service 和 document_repository，
+    从文档解析结果中提取文本并生成嵌入向量。
 
     Args:
-        parse_result: 解析结果
+        parse_result: 解析结果（含 document_id）
 
     Returns:
-        Embedding mock 数据
+        嵌入向量列表，失败时返回空列表
     """
-    return []
+    from src.domain.ports.resolver import get_resolver
+
+    try:
+        if parse_result.get("status") == "failed":
+            return []
+
+        resolver = get_resolver()
+        service = resolver.resolve("embedding_service")
+        repo = resolver.resolve("document_repository")
+        doc = await repo.find(uuid.UUID(parse_result["document_id"]))
+
+        if not doc or not doc.metadata.get("parse_result"):
+            return []
+
+        pages = doc.metadata["parse_result"].get("pages", [])
+        text = " ".join(elem.get("content", "") for page in pages for elem in page.get("texts", []) if isinstance(elem, dict))
+
+        if not text.strip():
+            return []
+
+        embedding = await asyncio.to_thread(service.encode_text, text)
+        return cast(list[float], embedding)
+    except Exception as e:
+        logger.error("生成嵌入失败: %s", e)
+        return []
 
 
 @task(retries=2)

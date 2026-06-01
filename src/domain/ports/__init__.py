@@ -12,6 +12,7 @@ from src.domain.ports.agent_engine import AgentEnginePort
 from src.domain.ports.connection_manager import ConnectionManager
 from src.domain.ports.crawler_client import CrawlerClientPort
 from src.domain.ports.dead_letter_queue import DeadLetterQueue
+from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.event_listener import EventListener, EventListenerAsync
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
 from src.domain.ports.index_manager import IndexManagerPort
@@ -46,6 +47,7 @@ __all__ = [
     "DataAccessPattern",
     "BaseRepository",
     "DeadLetterQueue",
+    "EmbeddingServicePort",
     "EventListener",
     "EventListenerAsync",
     "HashRouterProtocol",
