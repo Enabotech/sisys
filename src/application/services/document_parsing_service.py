@@ -130,8 +130,9 @@ class DocumentParsingService:
         finally:
             if temp_path:
                 try:
-                    if os.path.exists(temp_path):
-                        os.unlink(temp_path)
+                    os.unlink(temp_path)
+                except FileNotFoundError:
+                    pass  # 文件不存在，清理成功
                 except OSError as e:
                     logger.warning("临时文件清理失败: %s - %s", temp_path, e)
 
