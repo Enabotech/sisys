@@ -393,7 +393,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
           return await self._vector.search(...)
   ```
   - 使用 `asyncio.to_thread()` 包装同步 embed 调用
-  - 自动将 `tenant_id` 注入 `filter_payload`
+  - ⚠️ **tenant_id 过滤注意**：当前 Qdrant upsert payload 中不含 `tenant_id` 字段。`DenseSemanticSearchService` 的 tenant_id 过滤逻辑需与后续 Story 的 index_document 实现对齐（确保 upsert 时写入 tenant_id）。本 Story 中 tenant_id 注入仅作为接口预留，过滤效果取决于 payload 中是否包含该字段。
 - [ ] Subtask 3.3: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
@@ -451,7 +451,8 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 
 - [ ] Subtask 4.4: 🔴 红 — 编写 generate_embedding 单元测试（mock resolver，验证调用 embedding_service）
 - [ ] Subtask 4.5: 🟢 绿 — 替换 `generate_embedding` 从 `return []` 改为使用 resolver 获取 embedding_service
-  - 从 parse_result 提取文本
+  - ⚠️ **数据断裂问题**：`parse_document` task 返回精简 dict `{status, document_id, pages(数量)}`，不含文本内容
+  - 需通过 `resolver.resolve("document_repository")` 获取完整文档，从 `doc.metadata["parse_result"]["pages"]` 提取文本
   - 截断至 8192 字符（bge-m3 安全上限）
   - `await asyncio.to_thread(service.encode_text, text)`
   - 异常时返回 `[]`（保持向后兼容）
@@ -594,9 +595,25 @@ async def generate_embedding(parse_result) -> list[float]:
     return []
 
 # 替换后：通过 resolver 获取真实 EmbeddingService
+# 注意：parse_document task 返回精简 dict {status, document_id, pages(数量)}，
+# 不含文本内容。需通过 DocumentRepository 获取完整文档的 metadata["parse_result"]。
 async def generate_embedding(parse_result) -> list[float]:
+    from src.domain.ports.resolver import get_resolver
     service = get_resolver().resolve("embedding_service")
-    text = extract_text_from_parse_result(parse_result)
+    repo = get_resolver().resolve("document_repository")
+    doc = await repo.find(uuid.UUID(parse_result["document_id"]))
+    if not doc or not doc.metadata.get("parse_result"):
+        return []
+    # 从完整解析结果中提取文本
+    pages = doc.metadata["parse_result"].get("pages", [])
+    text = " ".join(
+        elem.get("content", "")
+        for page in pages
+        for elem in page.get("texts", [])
+        if isinstance(elem, dict)
+    )
+    if not text.strip():
+        return []
     embedding = await asyncio.to_thread(service.encode_text, text[:8192])
     return embedding
 ```
@@ -665,16 +682,33 @@ def context() -> dict[str, Any]:
 
 @pytest.fixture
 def embedding_service():
+    """尝试加载 bge-m3 模型，不可用时 pytest.skip"""
     config = EmbeddingConfig(model_name="BAAI/bge-m3", device="cpu")
-    return BGE3EmbeddingService(config)
+    try:
+        return BGE3EmbeddingService(config)
+    except Exception as e:
+        pytest.skip(f"bge-m3 模型不可用: {e}")
 
+# AC-1: 同步方法在 BDD 步骤中直接调用（无需 asyncio.to_thread 包装）
 @when("我使用 EmbeddingService 编码文本")
-def encode_text(context, embedding_service, event_loop):
-    result = event_loop.run_until_complete(
-        asyncio.to_thread(embedding_service.encode_text, "测试文本")
-    )
+def encode_text(context, embedding_service):
+    result = embedding_service.encode_text("测试文本")  # 同步方法，直接调用
     context["embedding"] = result
+
+# AC-2: async 检索操作使用 event_loop.run_until_complete
+@when("我执行 Dense 语义检索")
+def perform_dense_search(context, dense_search_service, event_loop):
+    async def _search():
+        return await dense_search_service.search(collection, "企业战略规划", limit=5)
+    results = event_loop.run_until_complete(_search())
+    context["search_results"] = results
 ```
+
+> **关键设计点：**
+> - `encode_text` 是同步方法，在 BDD 同步步骤函数中直接调用，无需 `asyncio.to_thread` 包装
+> - `DenseSemanticSearchService.search()` 是 async 方法，通过 `event_loop.run_until_complete()` 调用
+> - 遵循项目现有模式：模型/服务不可用时 `pytest.skip()`
+> - P95 延迟测试放在验收测试中符合项目既定规范（至少 6 个现有 Story 采用）
 
 ### 前一个故事学习经验
 
