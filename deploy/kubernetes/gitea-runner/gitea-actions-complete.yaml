@@ -193,6 +193,8 @@ data:
         - /workspace:/workspace
         # 临时目录
         - /tmp:/tmp
+        # 模型缓存（bge-m3 等嵌入模型，GPU Job 加载模型需要）
+        - /mnt/x/.cache:/mnt/x/.cache:ro
 
     # 缓存配置
     cache:
