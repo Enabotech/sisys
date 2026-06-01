@@ -23,7 +23,7 @@ from qdrant_client.models import (
 )
 
 from src.domain.ports.l3_vector import L3VectorPort
-from src.infrastructure.storage.qdrant.models import VectorPoint
+from src.infrastructure.storage.qdrant.models import SparseVector, VectorPoint
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +156,7 @@ class QdrantVectorStorage(L3VectorPort):
     async def search_sparse(
         self,
         collection: str,
-        sparse_vector: dict,
+        sparse_vector: SparseVector | dict,
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
@@ -164,7 +164,7 @@ class QdrantVectorStorage(L3VectorPort):
 
         Args:
             collection: Collection 名称
-            sparse_vector: 稀疏向量
+            sparse_vector: 稀疏向量（接受 SparseVector dataclass 或 dict）
             limit: 返回结果数量限制
             filter_payload: Payload 过滤条件
 
@@ -180,9 +180,16 @@ class QdrantVectorStorage(L3VectorPort):
                 query_filter = Filter(must=conditions)
 
         try:
+            if isinstance(sparse_vector, SparseVector):
+                indices = sparse_vector.indices
+                values = sparse_vector.values
+            else:
+                indices = sparse_vector["indices"]
+                values = sparse_vector["values"]
+
             qdrant_sparse = QdrantSparseVector(
-                indices=sparse_vector["indices"],
-                values=sparse_vector["values"],
+                indices=indices,
+                values=values,
             )
             named_sparse = NamedSparseVector(name="sparse", vector=qdrant_sparse)
             response = await self._client.search(
