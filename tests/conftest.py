@@ -86,3 +86,21 @@ async def pg_session_context():
     mock = _create_mock_session()
     async with with_session(mock):
         yield mock
+
+
+# =============================================================================
+# Session Context 安全网 — 防止 mock session 跨测试泄漏
+# =============================================================================
+
+
+@pytest.fixture(autouse=True)
+def _reset_session_ctx():
+    """确保每个测试结束后 PostgreSQL session ContextVar 恢复为 None
+
+    防止单元测试中的 mock session 通过 ContextVar 泄漏到验收测试，
+    导致 OutboxRepository.save() 等方法在 AsyncMock 上触发 RuntimeWarning。
+    """
+    from src.infrastructure.storage.postgresql.session_context import _session_ctx
+
+    yield
+    _session_ctx.set(None)

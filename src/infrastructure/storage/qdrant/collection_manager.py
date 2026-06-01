@@ -70,6 +70,7 @@ class QdrantCollectionManager:
             shard_number=kwargs.get("shard_number", 1),
             replication_factor=kwargs.get("replication_factor", 1),
             on_disk_payload=kwargs.get("on_disk", False),
+            **({} if (svc := kwargs.get("sparse_vectors_config")) is None else {"sparse_vectors_config": svc}),
         )
         return True
 

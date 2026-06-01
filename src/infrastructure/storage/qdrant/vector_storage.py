@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, cast
 
 from qdrant_client import AsyncQdrantClient
@@ -22,6 +23,8 @@ from qdrant_client.models import (
 )
 
 from src.infrastructure.storage.qdrant.models import SparseVector, VectorPoint
+
+logger = logging.getLogger(__name__)
 
 
 class QdrantVectorStorage:
@@ -184,7 +187,8 @@ class QdrantVectorStorage:
                 }
                 for point in response
             ]
-        except Exception:
+        except Exception as e:
+            logger.error("稀疏检索失败: collection=%s, error=%s", collection, e)
             return []
 
     async def delete_points(self, collection: str, point_ids: list[str]) -> bool:
