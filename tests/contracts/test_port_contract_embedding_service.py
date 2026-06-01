@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from src.domain.ports.registry import PortRegistry
 
 
@@ -34,8 +36,8 @@ class TestEmbeddingServicePortContract:
         try:
             resolver = Resolver()
             impl = resolver.resolve(self.PORT_NAME)
-        except Exception:
-            return  # 实例化可能需要模型，跳过方法检查
+        except Exception as e:
+            pytest.skip(f"实现类实例化失败（可能缺少模型）: {e}")
 
         for method in self.REQUIRED_METHODS:
             assert hasattr(impl, method), f"缺少方法: {method}"
@@ -82,8 +84,8 @@ class TestDenseSearchServicePortContract:
         try:
             resolver = Resolver()
             impl = resolver.resolve(self.PORT_NAME)
-        except Exception:
-            return
+        except Exception as e:
+            pytest.skip(f"实现类实例化失败（可能缺少模型）: {e}")
 
         for method in self.REQUIRED_METHODS:
             assert hasattr(impl, method), f"缺少方法: {method}"
