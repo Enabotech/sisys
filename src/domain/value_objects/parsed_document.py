@@ -28,6 +28,16 @@ class BoundingBox:
     height: float
     page: int
 
+    def to_dict(self) -> dict[str, Any]:
+        """序列化为 JSON 可存储字典"""
+        return {
+            "x": self.x,
+            "y": self.y,
+            "width": self.width,
+            "height": self.height,
+            "page": self.page,
+        }
+
 
 @dataclass(frozen=True)
 class ParsedElement:
@@ -49,7 +59,7 @@ class ParsedElement:
         """序列化为 JSON 可存储字典"""
         return {
             "content": self.content,
-            "bbox": None,
+            "bbox": self.bbox.to_dict() if self.bbox else None,
             "confidence": self.confidence,
             "metadata": self.metadata,
         }
@@ -73,7 +83,7 @@ class ParsedTable:
         """序列化为 JSON 可存储字典"""
         return {
             "rows": self.rows,
-            "bbox": None,
+            "bbox": self.bbox.to_dict() if self.bbox else None,
             "confidence": self.confidence,
         }
 

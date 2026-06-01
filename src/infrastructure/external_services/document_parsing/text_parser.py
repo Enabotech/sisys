@@ -67,8 +67,8 @@ class TextParser:
             return ParsedDocument(
                 document_id=doc_id,
                 mime_type=mime_type,
-                parse_status="completed",
-                pages=[ParsedPage(page_number=1)],
+                parse_status="failed",
+                error_message="TXT 文件为空",
                 parse_timestamp=timestamp,
             )
 
