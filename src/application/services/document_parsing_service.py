@@ -81,7 +81,11 @@ class DocumentParsingService:
             await self._repository.save(document)  # 持久化失败状态，避免文档永久 PENDING
             return document
 
-        # 更新状态为 IN_PROGRESS
+        # 乐观锁：仅当状态为 PENDING 时才更新为 IN_PROGRESS
+        if document.parse_status != ParseStatus.PENDING:
+            # 已被其他调用处理，跳过
+            return document
+
         document.parse_status = ParseStatus.IN_PROGRESS
         await self._repository.save(document)
 
