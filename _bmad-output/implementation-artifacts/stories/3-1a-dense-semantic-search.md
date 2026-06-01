@@ -55,11 +55,13 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 
 **Given** Collection 包含 100 个文档向量
 **When** 执行 50 次 Dense 语义检索（不含模型首次加载）
-**Then** P95 延迟 < 200ms（嵌入生成 + Qdrant 检索）
+**Then** P95 延迟 < 200ms（嵌入生成 + Qdrant 检索，查询文本 ≤ 512 字符，GPU 模式）
 
 **验证标准/Validation Criteria:**
-- [ ] 50 次查询 P95 < 200ms
+- [ ] 50 次查询 P95 < 200ms（GPU 模式，查询文本 ≤ 512 字符）
+- [ ] CPU 模式下放宽至 P95 < 500ms（CI 环境回退）
 - [ ] 排除首次模型加载时间（SINGLETON 懒加载）
+- [ ] 集成测试(Subtask 5.4)使用短文本（≤ 512 字符）进行性能测量
 
 ### AC-4: Payload 过滤
 
@@ -226,6 +228,17 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | 全部 | BDD 验收 | Task 0 | Gherkin 场景 | `test_acceptance_dense_semantic_search.*` |
 | 全部 | 收尾验收 | Task 6 | 完成清单确认 | `test_acceptance_dense_semantic_search.*` |
 
+**Task 间执行依赖：**
+```
+Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实现）
+                                         ↘ Task 3（Search 服务）→ Task 4（注册装配）→ Task 5（集成测试）→ Task 6（收尾）
+```
+- Task 0 必须最先完成
+- Task 1 完成后，Task 2 和 Task 3 可并行（Task 3 单元测试 mock EmbeddingServicePort）
+- Task 4 依赖 Task 1+2+3 全部完成
+- Task 5 依赖 Task 4 完成
+- Task 6 依赖 Task 5 完成
+
 ---
 
 ## 📋 Tasks / Subtasks 任务分解
@@ -346,9 +359,14 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
       def encode_text(self, text: str) -> list[float]: ...
       def encode_texts(self, texts: list[str]) -> list[list[float]]: ...
   ```
-  - `SentenceTransformer(model_name_or_path, device=device, cache_folder=model_path)`
+  - **模型加载逻辑**：`model_path` 非空时直接从本地路径加载，否则从 HuggingFace Hub 下载：
+    ```python
+    if config.model_path and os.path.isdir(config.model_path):
+        model = SentenceTransformer(config.model_path, device=config.device)
+    else:
+        model = SentenceTransformer(config.model_name, device=config.device)
+    ```
   - `model.encode(text, normalize_embeddings=True)` 返回 numpy ndarray，需 `.tolist()` 转为 `list[float]`
-  - `model_path` 非空时直接从本地路径加载（`model_path` 指向包含 `config.json` 和 `pytorch_model.bin` 的目录）
 - [ ] Subtask 2.4: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
@@ -473,26 +491,34 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 **关联 AC:** AC-2, AC-3, AC-4
 
 > **性质说明：** 端到端集成测试，验证 Embedding + Qdrant 在真实环境下的协作。
+> **依赖：** Task 4 完成（所有端口注册就绪）。
 
-#### 集成测试实现
+#### TDD 循环 A：集成测试
 
-- [ ] Subtask 5.1: 创建 `tests/integration/test_embedding_qdrant_dense_search.py`
-  - 使用 `TestTenant` 隔离
-  - Fixture：创建 Collection → 插入 10 个嵌入向量 → 测试后删除
-- [ ] Subtask 5.2: 实现端到端检索测试
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写集成测试（预期因服务未连接或数据不存在而失败） |
+| 🟢 绿 | 实现测试逻辑，运行确认通过 |
+| 🔄 重构 | 优化测试结构，添加性能基准 |
+
+- [ ] Subtask 5.1: 🔴 红 — 创建 `tests/integration/test_embedding_qdrant_dense_search.py`
+  - 使用 `TestTenant` 隔离（参考 `test_integration_qdrant_real.py` 模式：`f"test_{uuid.uuid4().hex[:8]}"` fixture）
+  - Fixture：创建 Collection → 插入 10 个嵌入向量 → 测试后 try/finally 删除
+- [ ] Subtask 5.2: 🟢 绿 — 实现端到端检索测试
   - embed 10 个中文文本 → upsert 到 Qdrant → 查询 → 验证排序
-- [ ] Subtask 5.3: 实现 Payload 过滤测试
+- [ ] Subtask 5.3: 🟢 绿 — 实现 Payload 过滤测试
   - 插入不同 business_domain 的向量 → 过滤 → 验证结果
-- [ ] Subtask 5.4: 实现性能基准测试
-  - 预热 5 次查询 → 50 次查询 → 统计 P95 延迟 → 断言 < 200ms
+- [ ] Subtask 5.4: 🟢 绿 — 实现性能基准测试
+  - 预热 5 次查询 → 50 次查询（查询文本 ≤ 512 字符）→ 统计 P95 延迟
+  - GPU: P95 < 200ms / CPU: P95 < 500ms（根据 `EmbeddingConfig.device` 自动选择阈值）
   - 标记 `@pytest.mark.slow`（CI 可选跳过）
-- [ ] Subtask 5.5: 运行完整集成测试并确认通过
+- [ ] Subtask 5.5: 🔄 重构 — 运行完整集成测试并确认通过，优化测试结构
 
 **完成标准/Definition of Done:**
 - [ ] 集成测试全部通过
 - [ ] 端到端检索正确
 - [ ] Payload 过滤正确
-- [ ] P95 延迟 < 200ms
+- [ ] P95 延迟满足 GPU<200ms / CPU<500ms 条件
 
 ---
 
