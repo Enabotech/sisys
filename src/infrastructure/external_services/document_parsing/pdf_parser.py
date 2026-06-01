@@ -17,6 +17,8 @@ from src.domain.value_objects.parsed_document import (
     ParsedPage,
 )
 
+_MAX_PDF_PAGES = 500  # AC-1: 超大 PDF（>500 页）降级处理
+
 
 class PDFParser(DocumentParserPort):
     """PDF 文档解析器
@@ -26,6 +28,7 @@ class PDFParser(DocumentParserPort):
     - 多页文档处理
     - 加密 PDF 检测与拒绝
     - 空文档检测
+    - 超大文档保护（>500 页返回失败）
     """
 
     def parse(self, file_path: str, mime_type: str) -> ParsedDocument:
@@ -61,6 +64,15 @@ class PDFParser(DocumentParserPort):
                         mime_type=mime_type,
                         parse_status="failed",
                         error_message="PDF 文档为空，包含 0 页",
+                        parse_timestamp=timestamp,
+                    )
+
+                if num_pages > _MAX_PDF_PAGES:
+                    return ParsedDocument(
+                        document_id=doc_id,
+                        mime_type=mime_type,
+                        parse_status="failed",
+                        error_message=f"PDF 文档页数({num_pages})超过限制({_MAX_PDF_PAGES})，请分段处理",
                         parse_timestamp=timestamp,
                     )
 
