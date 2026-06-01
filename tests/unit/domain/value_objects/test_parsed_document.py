@@ -32,6 +32,11 @@ class TestBoundingBox:
         with pytest.raises(AttributeError):
             setattr(bbox, "x", 99.0)
 
+    def test_to_dict(self) -> None:
+        bbox = BoundingBox(x=1.0, y=2.0, width=3.0, height=4.0, page=0)
+        d = bbox.to_dict()
+        assert d == {"x": 1.0, "y": 2.0, "width": 3.0, "height": 4.0, "page": 0}
+
 
 class TestParsedElement:
     """ParsedElement 值对象测试"""
@@ -47,11 +52,12 @@ class TestParsedElement:
         d = elem.to_dict()
         assert d == {"content": "文本内容", "bbox": None, "confidence": 0.95, "metadata": {}}
 
-    def test_to_dict_with_bbox_always_null(self) -> None:
+    def test_to_dict_with_bbox_serialized(self) -> None:
         bbox = BoundingBox(x=1.0, y=2.0, width=3.0, height=4.0, page=0)
         elem = ParsedElement(content="test", bbox=bbox)
         d = elem.to_dict()
-        assert d["bbox"] is None  # MVP 阶段 bbox 始终序列化为 None
+        # bbox 应正确序列化为字典
+        assert d["bbox"] == {"x": 1.0, "y": 2.0, "width": 3.0, "height": 4.0, "page": 0}
 
 
 class TestParsedTable:
