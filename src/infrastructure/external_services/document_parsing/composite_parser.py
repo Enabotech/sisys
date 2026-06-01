@@ -18,7 +18,7 @@ _MIME_DOC = "application/msword"
 _MIME_TXT = "text/plain"
 
 
-class CompositeDocumentParser:
+class CompositeDocumentParser(DocumentParserPort):
     """组合文档解析器 — 按 MIME 类型路由
 
     内部持有 PDFParser、WordParser、TextParser 实例，
