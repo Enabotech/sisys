@@ -101,7 +101,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | 端口名称 | 版本 | 接口 | 实现模块 | 生命周期 | Owner |
 |---------|------|------|---------|---------|-------|
 | `embedding_service` | v1.0.0 | `EmbeddingServicePort` | `src.infrastructure.external_services.embedding.bge3_embedding_service.BGE3EmbeddingService` | SINGLETON | search-team |
-| `dense_search_service` | v1.0.0 | 无独立接口（应用服务） | `src.application.services.dense_search_service.DenseSemanticSearchService` | SCOPED | search-team |
+| `dense_search_service` | v1.0.0 | `DenseSemanticSearchService`（服务类自身，参考 document_upload_service 模式） | `src.application.services.dense_search_service.DenseSemanticSearchService` | SCOPED | search-team |
 
 **已有端口（复用，不修改）：**
 
@@ -240,6 +240,9 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_dense_semantic_search.feature`
 - [ ] Subtask 0.6: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_dense_semantic_search.py`
 - [ ] Subtask 0.7: 编写端口契约测试 `tests/contracts/test_port_contract_embedding_service.py`
+  > **契约测试模式参考**：项目无 PortContractTest 基类，使用独立三方法模式：
+  > `test_port_is_registered`（验证注册）+ `test_implementation_has_required_methods`（验证方法签名）
+  > + `test_metadata_complete`（验证 version/owner/module）。参考 `tests/contracts/test_port_contract_services.py`。
 - [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -287,7 +290,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 - [ ] Subtask 1.5: 🔴 红 — 编写 EmbeddingConfig 单元测试（from_env 解析、默认值、dimension 校验）
 - [ ] Subtask 1.6: 🟢 绿 — 创建 `src/infrastructure/config/embedding.py`
   ```python
-  @dataclass(frozen=True)
+  @dataclass
   class EmbeddingConfig:
       model_name: str = "BAAI/bge-m3"
       model_path: str = ""
@@ -296,6 +299,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
       @classmethod
       def from_env(cls) -> EmbeddingConfig: ...
   ```
+  > **设计决策：** 使用 `@dataclass`（非 frozen），与 `QdrantConfig`、`RedisConfig` 等基础设施连接配置保持一致。
 - [ ] Subtask 1.7: 🟢 绿 — 更新 `src/infrastructure/config/__init__.py` 添加导入和 `__all__`
 - [ ] Subtask 1.8: 🔄 重构 — 运行 `ruff check` + `mypy`
 
@@ -340,7 +344,8 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
       def encode_texts(self, texts: list[str]) -> list[list[float]]: ...
   ```
   - `SentenceTransformer(model_name_or_path, device=device, cache_folder=model_path)`
-  - `model.encode(text, normalize_embeddings=True)`
+  - `model.encode(text, normalize_embeddings=True)` 返回 numpy ndarray，需 `.tolist()` 转为 `list[float]`
+  - `model_path` 非空时直接从本地路径加载（`model_path` 指向包含 `config.json` 和 `pytorch_model.bin` 的目录）
 - [ ] Subtask 2.4: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
@@ -421,13 +426,17 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
   register_port(name="embedding_service", version="v1.0.0",
       interface=EmbeddingServicePort,
       impl=lambda r: BGE3EmbeddingService(EmbeddingConfig.from_env()),
+      module="src.infrastructure.external_services.embedding.bge3_embedding_service",
       lifetime=Lifetime.SINGLETON, owner="search-team")
 
   # dense_search_service — SCOPED（轻量编排）
+  # 注意：应用服务使用服务类自身作为 interface（参考 document_upload_service 模式）
   register_port(name="dense_search_service", version="v1.0.0",
+      interface=DenseSemanticSearchService,
       impl=lambda r: DenseSemanticSearchService(
           embedding_service=r.resolve("embedding_service"),
           vector_storage=r.resolve("l3_vector")),
+      module="src.application.services.dense_search_service",
       lifetime=Lifetime.SCOPED, owner="search-team")
   ```
 - [ ] Subtask 4.3: 🔄 重构 — 运行 `ruff check` + `mypy`
@@ -560,7 +569,8 @@ EMBEDDING_MODEL_DIMENSION=1024
 
 - `EMBEDDING_MODEL_NAME/PATH/DEVICE` 已在 `.env.example` 第 82-84 行存在
 - `EMBEDDING_MODEL_DIMENSION` 为新增项
-- `EMBEDDING_MODEL_PATH` 非空时优先从本地路径加载，避免每次下载
+- `EMBEDDING_MODEL_PATH` 指向包含 `config.json` 和 `pytorch_model.bin` 的模型目录（本地 git clone 结构）
+- **需同步更新** `tests/environments.py` 中 `EmbeddingConfig` 添加 `dimension: int = 1024` 字段（当前只有 model_name/model_path/device）
 
 ### 已有组件复用说明
 
@@ -754,6 +764,7 @@ def encode_text(context, embedding_service, event_loop):
 - `src/composition_root.py` — 注册 embedding_service + dense_search_service
 - `src/infrastructure/workflow/tasks/document_tasks.py` — 替换 generate_embedding 占位
 - `.env.example` — 添加 EMBEDDING_MODEL_DIMENSION=1024
+- `tests/environments.py` — EmbeddingConfig 添加 dimension: int = 1024 字段
 
 ---
 
