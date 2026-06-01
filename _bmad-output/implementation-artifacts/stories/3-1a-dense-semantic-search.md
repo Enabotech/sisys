@@ -169,9 +169,9 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
 | **TDD 契约测试** | EmbeddingServicePort | 端口注册、方法签名、元数据 | `tests/contracts/test_port_contract_embedding_service.py` | Task 0 + Task 4 |
-| **TDD 单元测试** | BGE3EmbeddingService | 编码维度、归一化、配置解析 | `tests/unit/infrastructure/test_bge3_embedding_service.py` | Task 2 |
+| **TDD 单元测试** | BGE3EmbeddingService | 编码维度、归一化、配置解析 | `tests/unit/infrastructure/external_services/embedding/test_bge3_embedding_service.py` | Task 2 |
 | **TDD 单元测试** | DenseSemanticSearchService | embed→search 编排、tenant_id 注入 | `tests/unit/application/test_dense_search_service.py` | Task 3 |
-| **TDD 单元测试** | generate_embedding task | Prefect task 接入 embedding_service | `tests/unit/infrastructure/test_generate_embedding.py` | Task 4 |
+| **TDD 单元测试** | generate_embedding task | Prefect task 接入 embedding_service | `tests/unit/infrastructure/external_services/embedding/test_generate_embedding.py` | Task 4 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_dense_semantic_search.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | src 与测试目录完成清单最终确认 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 6 |
@@ -337,7 +337,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/test_bge3_embedding_service.py` |
+| 🔴 红 | 编写 `tests/unit/infrastructure/external_services/embedding/test_bge3_embedding_service.py` |
 | 🟢 绿 | 创建 `src/infrastructure/external_services/embedding/bge3_embedding_service.py` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
@@ -470,7 +470,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 🟢 绿 | 替换 `src/infrastructure/workflow/tasks/document_tasks.py` 中的占位实现 |
 | 🔄 重构 | 优化代码 |
 
-- [x] Subtask 4.4: 🔴 红 — 编写 generate_embedding 单元测试 `tests/unit/infrastructure/test_generate_embedding.py`（mock resolver，验证调用 embedding_service）
+- [x] Subtask 4.4: 🔴 红 — 编写 generate_embedding 单元测试 `tests/unit/infrastructure/external_services/embedding/test_generate_embedding.py`（mock resolver，验证调用 embedding_service）
 - [x] Subtask 4.5: 🟢 绿 — 替换 `generate_embedding` 从 `return []` 改为使用 resolver 获取 embedding_service
   - ⚠️ **数据断裂问题**：`parse_document` task 返回精简 dict `{status, document_id, pages(数量)}`，不含文本内容
   - 需通过 `resolver.resolve("document_repository")` 获取完整文档，从 `doc.metadata["parse_result"]["pages"]` 提取文本
@@ -819,9 +819,9 @@ def perform_dense_search(context, dense_search_service, event_loop):
 | `src/infrastructure/external_services/embedding/bge3_embedding_service.py` | 嵌入服务实现 | Task 2 |
 | `src/application/services/dense_search_service.py` | 应用层服务 | Task 3 |
 | `tests/contracts/test_port_contract_embedding_service.py` | 契约测试 | Task 0 |
-| `tests/unit/infrastructure/test_bge3_embedding_service.py` | 单元测试 | Task 2 |
+| `tests/unit/infrastructure/external_services/embedding/test_bge3_embedding_service.py` | 单元测试 | Task 2 |
 | `tests/unit/application/test_dense_search_service.py` | 单元测试 | Task 3 |
-| `tests/unit/infrastructure/test_generate_embedding.py` | 单元测试 | Task 4 |
+| `tests/unit/infrastructure/external_services/embedding/test_generate_embedding.py` | 单元测试 | Task 4 |
 | `tests/integration/test_embedding_qdrant_dense_search.py` | 集成测试 | Task 5 |
 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Gherkin 场景 | Task 0 |
 | `tests/acceptance/test_acceptance_dense_semantic_search.py` | BDD 步骤 | Task 0 |
