@@ -166,9 +166,10 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 契约测试** | EmbeddingServicePort | 端口注册、方法签名、元数据 | `tests/contracts/test_port_contract_embedding_service.py` | Task 0 |
+| **TDD 契约测试** | EmbeddingServicePort | 端口注册、方法签名、元数据 | `tests/contracts/test_port_contract_embedding_service.py` | Task 0 + Task 4 |
 | **TDD 单元测试** | BGE3EmbeddingService | 编码维度、归一化、配置解析 | `tests/unit/infrastructure/test_bge3_embedding_service.py` | Task 2 |
 | **TDD 单元测试** | DenseSemanticSearchService | embed→search 编排、tenant_id 注入 | `tests/unit/application/test_dense_search_service.py` | Task 3 |
+| **TDD 单元测试** | generate_embedding task | Prefect task 接入 embedding_service | `tests/unit/infrastructure/test_generate_embedding.py` | Task 4 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_dense_semantic_search.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | src 与测试目录完成清单最终确认 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 6 |
@@ -215,6 +216,8 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 |----|-------------|-----------|-------------|----------|
 | AC-1 | bge-m3 嵌入生成 | Task 1 | EmbeddingServicePort 定义 | `test_port_contract_embedding_service.py` |
 | AC-1 | 编码维度与归一化 | Task 2 | BGE3EmbeddingService 实现 | `test_bge3_embedding_service.py` |
+| AC-1 | 端口注册 + DI 装配 | Task 4 | Composition Root 注册 | `test_port_contract_embedding_service.py` |
+| AC-1 | generate_embedding 替换 | Task 4 | Prefect task 接入 | `test_generate_embedding.py` |
 | AC-2 | 余弦相似度检索 | Task 3 | DenseSemanticSearchService | `test_dense_search_service.py` |
 | AC-2 | 端到端检索验证 | Task 5 | 集成测试 | `test_embedding_qdrant_dense_search.py` |
 | AC-3 | 检索延迟 P95<200ms | Task 5 | 性能基准测试 | `test_embedding_qdrant_dense_search.py` |
@@ -415,8 +418,8 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | 🟢 绿 | 修改 `src/composition_root.py` 注册两个新端口 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写注册验证测试
-  - 验证 `embedding_service` 在 registry 注册
+- [ ] Subtask 4.1: 🔴 红 — 在 `tests/contracts/test_port_contract_embedding_service.py` 中添加 dense_search_service 注册验证
+  - 验证 `embedding_service` 在 registry 注册（Task 0 已创建此文件，此处扩展）
   - 验证 `dense_search_service` 在 registry 注册
   - 验证 embedding_service 生命周期为 SINGLETON
   - 验证 dense_search_service 生命周期为 SCOPED
@@ -449,7 +452,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | 🟢 绿 | 替换 `src/infrastructure/workflow/tasks/document_tasks.py` 中的占位实现 |
 | 🔄 重构 | 优化代码 |
 
-- [ ] Subtask 4.4: 🔴 红 — 编写 generate_embedding 单元测试（mock resolver，验证调用 embedding_service）
+- [ ] Subtask 4.4: 🔴 红 — 编写 generate_embedding 单元测试 `tests/unit/infrastructure/test_generate_embedding.py`（mock resolver，验证调用 embedding_service）
 - [ ] Subtask 4.5: 🟢 绿 — 替换 `generate_embedding` 从 `return []` 改为使用 resolver 获取 embedding_service
   - ⚠️ **数据断裂问题**：`parse_document` task 返回精简 dict `{status, document_id, pages(数量)}`，不含文本内容
   - 需通过 `resolver.resolve("document_repository")` 获取完整文档，从 `doc.metadata["parse_result"]["pages"]` 提取文本
@@ -788,6 +791,7 @@ def perform_dense_search(context, dense_search_service, event_loop):
 | `tests/contracts/test_port_contract_embedding_service.py` | 契约测试 | Task 0 |
 | `tests/unit/infrastructure/test_bge3_embedding_service.py` | 单元测试 | Task 2 |
 | `tests/unit/application/test_dense_search_service.py` | 单元测试 | Task 3 |
+| `tests/unit/infrastructure/test_generate_embedding.py` | 单元测试 | Task 4 |
 | `tests/integration/test_embedding_qdrant_dense_search.py` | 集成测试 | Task 5 |
 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Gherkin 场景 | Task 0 |
 | `tests/acceptance/test_acceptance_dense_semantic_search.py` | BDD 步骤 | Task 0 |
@@ -823,7 +827,7 @@ def perform_dense_search(context, dense_search_service, event_loop):
 2. [x] All acceptance criteria specified 所有验收标准已定义
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
-5. [ ] Sprint status synced to `ready-for-dev`
+5. [x] Sprint status synced to `ready-for-dev`
 
 ### 下一步 Next Steps
 
