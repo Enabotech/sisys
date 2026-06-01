@@ -75,6 +75,20 @@ class TestDenseSearchServiceBasic:
         actual = await service.search("test_collection", "查询文本")
         assert actual == []
 
+    @pytest.mark.asyncio
+    async def test_search_raises_on_empty_query(self) -> None:
+        """空查询文本应抛出 ValueError"""
+        service, _, _ = _make_search_service()
+        with pytest.raises(ValueError, match="查询文本不能为空"):
+            await service.search("test_collection", "")
+
+    @pytest.mark.asyncio
+    async def test_search_raises_on_whitespace_query(self) -> None:
+        """纯空白查询文本应抛出 ValueError"""
+        service, _, _ = _make_search_service()
+        with pytest.raises(ValueError, match="查询文本不能为空"):
+            await service.search("test_collection", "   ")
+
 
 class TestDenseSearchServiceTenantFilter:
     """tenant_id 自动注入到 filter_payload"""
