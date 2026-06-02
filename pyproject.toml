@@ -231,18 +231,10 @@ exclude = [
 # 设计理由：
 #   - 全局 --ignore-missing-imports 会同时隐藏"合法第三方无 stubs 库"和"拼写错误的 import"
 #   - 用 module-specific overrides 做精准豁免，CI 能捕获真正的 import 错误
-#   - defusedxml 与 sentence_transformers 均通过 try/except ImportError 守卫，安全豁免
+#   - 无类型桩的第三方库统一豁免，安全且可审计
 # ---------------------------------------------------------------------------
 [[tool.mypy.overrides]]
-module = "defusedxml.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "pytesseract.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "striprtf.*"
+module = ["defusedxml.*", "FlagEmbedding.*", "pytesseract.*", "striprtf.*"]
 ignore_missing_imports = true
 
 # Pytest Configuration

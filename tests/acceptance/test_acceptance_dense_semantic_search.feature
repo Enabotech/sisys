@@ -58,9 +58,32 @@
     那么 所有结果的 payload 中 business_domain 为 "finance"
 
   # ============================================================================
-  # AC-6: 领域层零外部依赖
+  # AC-encode_sparse: Sparse 稀疏嵌入生成（Story 3-1a 重构新增能力）
+  # ============================================================================
+
+  场景: AC-encode_sparse - 稀疏嵌入生成
+    当 我使用 EmbeddingService 稀疏编码文本 "企业战略规划报告"
+    那么 返回的稀疏向量包含 indices 和 values 字段
+    并且 indices 和 values 长度一致且非空
+    并且 indices 按升序排列
+    并且 所有 values 为正浮点数
+
+  场景: AC-encode_sparse - 中文文本稀疏编码
+    当 我使用 EmbeddingService 稀疏编码文本 "人工智能与数字化转型战略"
+    那么 返回的稀疏向量至少包含 3 个词元
+
+  场景: AC-encode_sparse - 空文本拒绝
+    当 我使用 EmbeddingService 稀疏编码空文本
+    那么 抛出 ValueError 异常
+
+  # ============================================================================
+  # AC-6: 领域层与共享层零外部依赖
   # ============================================================================
 
   场景: AC-6 - 领域层零外部依赖
     当 我扫描 src/domain/ 目录
     那么 不应该导入 sentence_transformers 或 torch
+
+  场景: AC-6b - 共享层零外部依赖
+    当 我扫描 src/shared/ 目录
+    那么 不应该导入 qdrant_client 或 torch 或 FlagEmbedding 或 sentence_transformers
