@@ -303,7 +303,7 @@
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `tests/acceptance/test_acceptance_document_upload.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_document_upload.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | src 与测试完成清单确认 | `tests/acceptance/test_acceptance_document_upload.feature` | Task 10 |
-| **集成测试** | 文档上传完整流程 | API→Service→MinIO→PG→事件、Outbox+元数据同事务原子性 | `tests/integration/test_document_upload_integration.py` | Task 8 |
+| **集成测试** | 文档上传完整流程 | API→Service→MinIO→PG→事件、Outbox+元数据同事务原子性 | `tests/integration/test_integration_document_upload.py` | Task 8 |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖 | `tests/unit/architecture/test_arch_document_upload.py` | Task 9 |
 
 ---
@@ -365,7 +365,7 @@
 | AC-5 | 上传事件发布 | Task 4 | 事件发布编排 | `test_document_upload_service.py` |
 | AC-6 | 上传结果确认 | Task 3 | Repository 查询方法 | `test_document_repository.py` |
 | AC-6 | 上传结果确认 | Task 7 | 确认 API 端点 | `test_document_upload_routes.py` |
-| AC-1~6 | 完整流程验证 | Task 8 | 集成测试 | `test_document_upload_integration.py` |
+| AC-1~6 | 完整流程验证 | Task 8 | 集成测试 | `test_integration_document_upload.py` |
 | AC-1~6 | 架构约束验证 | Task 9 | 架构验证测试 | `test_arch_document_upload.py` |
 | AC-1~6 | 规范定义前置 | Task 0 | 契约/验收测试编写 | `test_api_contract_*.py` + `test_acceptance_*.feature` |
 | AC-1~6 | 收尾验收 | Task 10 | 完成清单确认 | `test_acceptance_*.feature` + `test_acceptance_*.py` |
@@ -628,7 +628,7 @@
 
 #### 集成测试实现
 
-- [x] Subtask 8.1: 创建 `tests/integration/test_document_upload_integration.py`
+- [x] Subtask 8.1: 创建 `tests/integration/test_integration_document_upload.py`
 - [x] Subtask 8.2: 实现完整上传流程集成测试（API → Service → MinIO → PG → 事件发布）
 - [x] Subtask 8.3: 实现分片上传集成测试（大文件分片 → 断点续传 → 合并）
 - [x] Subtask 8.4: 实现批量上传集成测试（并发上传 → 部分失败处理）
@@ -799,7 +799,7 @@ tests/
 │   │   └── api/test_document_upload_routes.py  # [新建]
 │   └── architecture/test_arch_document_upload.py # [新建]
 ├── integration/
-│   └── test_document_upload_integration.py     # [新建]
+│   └── test_integration_document_upload.py     # [新建]
 ├── contracts/
 │   ├── test_api_contract_document_upload.py    # [新建]
 │   └── test_port_contract_document_upload.py   # [新建]
@@ -1002,7 +1002,7 @@ tests/
 - `tests/unit/infrastructure/external_services/test_archive_extractor.py`
 - `tests/unit/interfaces/api/test_document_upload_routes.py`
 - `tests/unit/architecture/test_arch_document_upload.py`
-- `tests/integration/test_document_upload_integration.py`
+- `tests/integration/test_integration_document_upload.py`
 - `tests/contracts/test_api_contract_document_upload.py`
 - `tests/contracts/test_port_contract_document_upload.py`
 - `tests/acceptance/test_acceptance_document_upload.feature`

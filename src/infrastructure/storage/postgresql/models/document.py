@@ -45,8 +45,8 @@ class DocumentModel(Base):
     uploaded_by: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True, default=dict)
-    created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     def __init__(
         self,

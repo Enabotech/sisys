@@ -342,7 +342,7 @@
 | **TDD 单元测试** | DocumentParsingService | 编排流程/状态更新 | `test_document_parsing_service.py` | Task 5 |
 | **TDD 契约测试** | DocumentParserPort | 端口注册/版本/方法 | `test_port_contract_document_parser.py` | Task 0 |
 | **SDD 架构验证** | 六边形架构 | 依赖方向/零依赖 | `test_arch_document_parser.py` | Task 7 |
-| **集成测试** | 解析流水线 | 上传→解析→事件发布 | `test_document_parse_integration.py` | Task 8 |
+| **集成测试** | 解析流水线 | 上传→解析→事件发布 | `test_integration_document_parse.py` | Task 8 |
 | **验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_document_parse.feature` | Task 0 |
 
 ---
@@ -386,7 +386,7 @@
 | AC-5 | 事件去重 | Task 6 | Subtask 6.3（移除 flow 内部发布） | `test_document_tasks.py` |
 | AC-6 | 解析准确率验证 | Task 9 | 验收测试抽样验证 | `test_acceptance_document_parse.feature` |
 | AC-6 | P95 延迟 <500ms | Task 1/2/3 | 各 Parser 性能测试 | `test_pdf_parser.py` 等 |
-| AC-6 | 并发解析 ≥10 | Task 8 | Subtask 8.4（asyncio.gather） | `test_document_parse_integration.py` |
+| AC-6 | 并发解析 ≥10 | Task 8 | Subtask 8.4（asyncio.gather） | `test_integration_document_parse.py` |
 | 所有 | 架构约束验证 | Task 7 | 六边形依赖方向检查 | `test_arch_document_parser.py` |
 
 ---
@@ -624,7 +624,7 @@
 
 **关联 AC:** AC-5, AC-6（并发解析）
 
-- [x] Subtask 8.1: 创建 `tests/integration/test_document_parse_integration.py`
+- [x] Subtask 8.1: 创建 `tests/integration/test_integration_document_parse.py`
 - [x] Subtask 8.2: 测试完整解析流水线（上传→解析→状态更新→事件发布）
 - [x] Subtask 8.3: 测试解析失败场景（加密 PDF、空文档、未知 MIME）
 - [x] Subtask 8.4: 测试并发解析 ≥10 文档（使用 `asyncio.gather()` 并发调用 `parse_document`，验证无竞态、无资源泄漏）
@@ -707,7 +707,7 @@ tests/
 │   └── architecture/test_arch_document_parser.py
 │
 ├── integration/
-│   └── test_document_parse_integration.py
+│   └── test_integration_document_parse.py
 │
 ├── contracts/
 │   └── test_port_contract_document_parser.py
@@ -873,7 +873,7 @@ def detect_encoding(content: bytes) -> str:
 - `tests/unit/application/services/test_document_parsing_service.py` — 解析服务测试（Task 5）
 - `tests/unit/architecture/test_arch_document_parser.py` — 架构约束测试（Task 7）
 - `tests/contracts/test_port_contract_document_parser.py` — 端口契约测试（Task 0）
-- `tests/integration/test_document_parse_integration.py` — 集成测试（Task 8）
+- `tests/integration/test_integration_document_parse.py` — 集成测试（Task 8）
 - `tests/acceptance/test_acceptance_document_parse.feature` — Gherkin 验收测试（Task 0/9）
 - `tests/acceptance/test_acceptance_document_parse.py` — BDD 步骤实现（Task 0/9）
 

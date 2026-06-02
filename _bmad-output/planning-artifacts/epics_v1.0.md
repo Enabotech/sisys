@@ -731,7 +731,7 @@ So that **系统可以处理企业现有各类文档**。
 
 5. **测试文件**
    - [ ] `tests/unit/infrastructure/test_document_upload.py` - 单元测试
-   - [ ] `tests/integration/test_document_upload_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_document_upload.py` - 集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
@@ -772,7 +772,7 @@ So that **MVP 核心格式支持，非结构化文档转化为结构化知识资
 
 5. **测试文件**
    - [ ] `tests/unit/infrastructure/test_document_parse.py` - 单元测试
-   - [ ] `tests/integration/test_document_parse_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_document_parse.py` - 集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
