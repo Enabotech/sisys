@@ -72,6 +72,7 @@ class AutoExecuteCompletedHandler:
         domain_event = DocumentProcessed(
             document_id=event.task_context.get("document_id", ""),
             parse_result=event.execution_result,
+            tenant_id=event.task_context.get("tenant_id", ""),
         )
 
         await self._publish(domain_event)

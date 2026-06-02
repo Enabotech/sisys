@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.domain.ports.document_repository import DocumentQuery
 from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
 
 
@@ -41,8 +42,22 @@ class TestGenerateEmbedding:
         }[name]
 
         with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            result = await generate_embedding.fn({"status": "completed", "document_id": doc_id, "pages": 1})
+            result = await generate_embedding.fn(
+                {
+                    "status": "completed",
+                    "document_id": doc_id,
+                    "tenant_id": "tenant-1",
+                    "pages": 1,
+                }
+            )
             assert len(result) == 1024
+
+        # 验证 repo.find 接收到正确的 DocumentQuery 参数
+        mock_repo.find.assert_awaited_once()
+        call_arg = mock_repo.find.call_args.args[0]
+        assert isinstance(call_arg, DocumentQuery)
+        assert call_arg.tenant_id == "tenant-1"
+        assert str(call_arg.document_id) == doc_id
 
     @pytest.mark.asyncio
     async def test_returns_empty_on_failure(self) -> None:
@@ -77,7 +92,14 @@ class TestGenerateEmbedding:
         }[name]
 
         with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            result = await generate_embedding.fn({"status": "completed", "document_id": doc_id, "pages": 0})
+            result = await generate_embedding.fn(
+                {
+                    "status": "completed",
+                    "document_id": doc_id,
+                    "tenant_id": "tenant-1",
+                    "pages": 0,
+                }
+            )
             assert result == []
 
     @pytest.mark.asyncio
@@ -95,5 +117,26 @@ class TestGenerateEmbedding:
         }[name]
 
         with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            result = await generate_embedding.fn({"status": "completed", "document_id": doc_id, "pages": 1})
+            result = await generate_embedding.fn(
+                {
+                    "status": "completed",
+                    "document_id": doc_id,
+                    "tenant_id": "tenant-1",
+                    "pages": 1,
+                }
+            )
+            assert result == []
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_tenant_id_missing(self) -> None:
+        """tenant_id 缺失时返回空列表"""
+        doc_id = str(uuid.uuid4())
+        with patch("src.domain.ports.resolver.get_resolver"):
+            result = await generate_embedding.fn(
+                {
+                    "status": "completed",
+                    "document_id": doc_id,
+                    "pages": 1,
+                }
+            )
             assert result == []

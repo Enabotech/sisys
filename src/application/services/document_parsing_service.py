@@ -138,6 +138,7 @@ class DocumentParsingService:
             event = DocumentProcessed(
                 document_id=saved_doc.document_id,
                 parse_result=result_dict,
+                tenant_id=tenant_id,
             )
             await self._publisher.publish(event)
 
