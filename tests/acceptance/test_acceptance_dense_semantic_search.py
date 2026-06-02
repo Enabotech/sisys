@@ -455,3 +455,141 @@ def verify_no_forbidden_imports():
                 if node.module:
                     root_module = node.module.split(".")[0]
                     assert root_module not in forbidden_imports, f"{py_file} 导入了禁止的依赖: {node.module}"
+
+
+# ===================================================================
+# AC-encode_sparse: Sparse 稀疏嵌入生成
+# ===================================================================
+
+
+@scenario("test_acceptance_dense_semantic_search.feature", "AC-encode_sparse - 稀疏嵌入生成")
+def test_ac_encode_sparse():
+    """测试 BGE-M3 稀疏嵌入生成"""
+    pass
+
+
+@scenario("test_acceptance_dense_semantic_search.feature", "AC-encode_sparse - 中文文本稀疏编码")
+def test_ac_encode_sparse_chinese():
+    """测试中文文本稀疏编码"""
+    pass
+
+
+@scenario("test_acceptance_dense_semantic_search.feature", "AC-encode_sparse - 空文本拒绝")
+def test_ac_encode_sparse_empty_rejected():
+    """测试空文本抛出异常"""
+    pass
+
+
+@when('我使用 EmbeddingService 稀疏编码文本 "企业战略规划报告"')
+def encode_sparse_single_text(context: dict[str, Any], embedding_service):
+    """稀疏编码单条文本"""
+    context["sparse_result"] = embedding_service.encode_sparse("企业战略规划报告")
+
+
+@then("返回的稀疏向量包含 indices 和 values 字段")
+def sparse_result_has_indices_and_values(context: dict[str, Any]):
+    """验证稀疏向量结构"""
+    result = context["sparse_result"]
+    assert "indices" in result, "缺失 indices 字段"
+    assert "values" in result, "缺失 values 字段"
+    assert isinstance(result["indices"], list)
+    assert isinstance(result["values"], list)
+
+
+@then("indices 和 values 长度一致且非空")
+def sparse_indices_values_match_and_nonempty(context: dict[str, Any]):
+    """验证 indices/values 一致性"""
+    result = context["sparse_result"]
+    assert len(result["indices"]) > 0, "Sparse 向量不应为空"
+    assert len(result["indices"]) == len(result["values"]), (
+        f"indices({len(result['indices'])}) 和 values({len(result['values'])}) 长度不一致"
+    )
+
+
+@then("indices 按升序排列")
+def sparse_indices_sorted(context: dict[str, Any]):
+    """验证 indices 升序"""
+    result = context["sparse_result"]
+    assert result["indices"] == sorted(result["indices"]), "indices 应升序排列"
+
+
+@then("所有 values 为正浮点数")
+def sparse_values_all_positive(context: dict[str, Any]):
+    """验证权重为正"""
+    for i, v in enumerate(context["sparse_result"]["values"]):
+        assert isinstance(v, float), f"values[{i}] 不是 float: {type(v)}"
+        assert v > 0, f"values[{i}] 不是正数: {v}"
+
+
+@when('我使用 EmbeddingService 稀疏编码文本 "人工智能与数字化转型战略"')
+def encode_sparse_chinese_text(context: dict[str, Any], embedding_service):
+    """稀疏编码中文文本"""
+    context["sparse_result"] = embedding_service.encode_sparse("人工智能与数字化转型战略")
+
+
+@then("返回的稀疏向量至少包含 3 个词元")
+def sparse_minimum_tokens(context: dict[str, Any]):
+    """验证中文文本至少 3 个 token"""
+    result = context["sparse_result"]
+    assert len(result["indices"]) >= 3, f"中文文本应至少包含 3 个词元权重，实际 {len(result['indices'])}"
+
+
+@when("我使用 EmbeddingService 稀疏编码空文本")
+def encode_sparse_empty_text(context: dict[str, Any], embedding_service):
+    """尝试编码空文本（预期失败）"""
+    context["sparse_error"] = None
+    try:
+        embedding_service.encode_sparse("")
+    except ValueError as e:
+        context["sparse_error"] = e
+
+
+@then("抛出 ValueError 异常")
+def verify_value_error_raised(context: dict[str, Any]):
+    """验证 ValueError 被抛出"""
+    assert context["sparse_error"] is not None, "应抛出 ValueError 但未抛出"
+    assert isinstance(context["sparse_error"], ValueError)
+
+
+# ===================================================================
+# AC-6b: 共享层零外部依赖
+# ===================================================================
+
+
+@scenario("test_acceptance_dense_semantic_search.feature", "AC-6b - 共享层零外部依赖")
+def test_ac6b_shared_zero_external_dependency():
+    """验证 src/shared/ 目录不包含禁止的外部依赖"""
+    pass
+
+
+SHARED_DIR = SRC_DIR / "shared"
+
+
+@when("我扫描 src/shared/ 目录")
+def scan_shared_directory(context: dict[str, Any]):
+    """扫描 src/shared/ 目录"""
+    context["shared_scanned"] = True
+
+
+@then("不应该导入 qdrant_client 或 torch 或 FlagEmbedding 或 sentence_transformers")
+def verify_shared_no_forbidden_imports():
+    """验证 shared 层零外部依赖"""
+    # shared/ 目录可能不存在（Story 3-1b 创建），跳过
+    if not SHARED_DIR.exists():
+        return
+    forbidden_imports = {"qdrant_client", "torch", "FlagEmbedding", "sentence_transformers"}
+    for py_file in SHARED_DIR.rglob("*.py"):
+        source = py_file.read_text()
+        try:
+            tree = ast.parse(source)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    root_module = alias.name.split(".")[0]
+                    assert root_module not in forbidden_imports, f"{py_file} 导入了禁止的依赖: {alias.name}"
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    root_module = node.module.split(".")[0]
+                    assert root_module not in forbidden_imports, f"{py_file} 导入了禁止的依赖: {node.module}"

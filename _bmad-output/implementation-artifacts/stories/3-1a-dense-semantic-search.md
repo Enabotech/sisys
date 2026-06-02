@@ -566,7 +566,13 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - **架构模式:** 六边形架构（Ports & Adapters），CQRS（查询端）
 - **设计约束:** 领域层零外部依赖，依赖方向 domain←application←infrastructure
 - **接口治理:** 统一端口注册、PortSpec 元数据、Registry/Resolver/ContractGate、Composition Root 装配
-- **技术栈:** Python 3.11+, sentence-transformers ^2.2.2, FlagEmbedding ^1.2.8, qdrant-client 1.7.1, torch 2.7.1
+- **技术栈:** Python 3.11+, FlagEmbedding ^1.2.8 (BGEM3FlagModel), qdrant-client 1.7.1, torch 2.7.1
+
+> **迁移记录（2026-06-02）：** Story 3-1a 初始实现使用 `SentenceTransformers` 加载 BGE-M3 模型。
+> 经对标业界最佳实践分析（BGE-M3 是 BAAI 发布的模型，FlagEmbedding 是 BAAI 官方第一方库），
+> 在 Story 3-1b 启动前完成重构，迁移至 `FlagEmbedding`（BGEM3FlagModel）。
+> 同时新增 `encode_sparse()` 方法，为 Story 3-1b BM25 稀疏检索提供原生 Sparse 嵌入能力。
+> 详见 Story 3-1b Dev Notes。
 
 ### 关键架构决策
 
@@ -578,11 +584,20 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | Milvus | 功能全面 | Java 依赖重，部署复杂 | 7/10 |
 | Weaviate | GraphQL API | 扩展性一般 | 6/10 |
 
+### 嵌入库选型决策：FlagEmbedding vs SentenceTransformers
+
+| 方案 | 优点 | 缺点 | 决策 |
+|------|------|------|------|
+| **FlagEmbedding / BGEM3FlagModel（选中）** | BAAI 第一方库，一次推理同时产出 Dense+Sparse+ColBERT；原生多语言 tokenizer | 锁定 BGE 系列模型 | ✅ 采用 |
+| SentenceTransformers（初始方案） | 模型无关，支持 500+ 模型，生态成熟 | 仅支持 Dense；无法产出 Sparse/ColBERT | 已迁移 |
+
+**原因：** SISYS 架构中 BGE-M3 是硬编码默认模型，短期内不会切换。FlagEmbedding 在中文分词、Sparse 嵌入质量、架构简洁性上均占优势。
+
 ### EmbeddingServicePort 方法设计：同步 vs 异步
 
 | 方案 | 优点 | 缺点 | 决策 |
 |------|------|------|------|
-| **同步方法 + asyncio.to_thread**（选中） | SentenceTransformer.encode() 本身同步；接口简洁 | 调用者需包装 | ✅ 采用 |
+| **同步方法 + asyncio.to_thread**（选中） | BGEM3FlagModel.encode() 本身同步；接口简洁 | 调用者需包装 | ✅ 采用 |
 | 异步方法 | 调用者无需包装 | 需要额外 async 封装层，增加复杂度 | 不采用 |
 
 **原因：** 项目中 `DocumentParsingService` 已使用 `asyncio.to_thread()` 包装同步解析器调用（Story 2-2a 模式），保持一致。
