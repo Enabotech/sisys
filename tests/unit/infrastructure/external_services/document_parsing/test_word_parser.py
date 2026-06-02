@@ -182,3 +182,42 @@ class TestWordParserEdgeCases:
             assert len(json_str) > 0
         finally:
             os.unlink(path)
+
+
+class TestWordParserSizeLimit:
+    """DOCX 文件大小上限保护测试（防御内嵌 OOXML 解压炸弹）"""
+
+    def test_oversized_docx_returns_failed(self, monkeypatch) -> None:
+        """超过 MAX_DOCX_BYTES 应返回 failed"""
+        from src.infrastructure.external_services.document_parsing import _limits
+        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+
+        monkeypatch.setattr(
+            "os.path.getsize",
+            lambda _path: _limits.MAX_DOCX_BYTES + 1,
+        )
+        parser = WordParser()
+        result = parser.parse("/tmp/whatever.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        assert result.is_failed()
+        assert "50MB" in (result.error_message or "")
+
+
+class TestWordParserExceptionSanitization:
+    """DOCX 异常信息脱敏测试"""
+
+    def test_corrupt_docx_returns_failed_without_leaking_path(self) -> None:
+        """损坏 DOCX 应返回 failed 且 error_message 不含路径"""
+        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+
+        parser = WordParser()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as f:
+            f.write(b"this is not a real docx zip content")
+            path = f.name
+        try:
+            result = parser.parse(path, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            assert result.is_failed()
+            assert result.error_message is not None
+            assert path not in result.error_message
+            assert "this is not a real docx" not in result.error_message
+        finally:
+            os.unlink(path)

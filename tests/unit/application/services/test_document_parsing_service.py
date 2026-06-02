@@ -121,6 +121,14 @@ class TestDocumentParsingServiceSuccess:
 
         mock_repo.find.return_value = doc
         mock_repo.save.return_value = doc
+        # 使用 side_effect 捕获每次 save 时的 parse_status 快照
+        capture: dict[str, list] = {"statuses": []}
+
+        async def capture_save(d):
+            capture["statuses"].append(d.parse_status)
+            return d
+
+        mock_repo.save.side_effect = capture_save
 
         def mock_retrieve(*args, **kwargs):
             async def _stream():
@@ -140,8 +148,15 @@ class TestDocumentParsingServiceSuccess:
 
         await service.parse_document(doc_id, "tenant-1")
 
-        # 验证 save 被调用（IN_PROGRESS + COMPLETED 两次 save）
-        assert mock_repo.save.call_count == 2
+        # 验证 save 调用顺序：PENDING → IN_PROGRESS → COMPLETED
+        # 实际只显式 2 次 save（IN_PROGRESS + COMPLETED），PENDING 是初始状态
+        # 使用 side_effect 捕获每次 save 时的 parse_status 快照（避免 mutable doc 引用问题）
+        captured_statuses = capture["statuses"]
+        assert len(captured_statuses) == 2
+        # 第一次 save 应是 IN_PROGRESS
+        assert captured_statuses[0] == ParseStatus.IN_PROGRESS
+        # 第二次 save 应是 COMPLETED
+        assert captured_statuses[1] == ParseStatus.COMPLETED
 
 
 class TestDocumentParsingServiceFailure:

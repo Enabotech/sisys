@@ -100,7 +100,7 @@ class DocumentParsingService:
             # 用真实文档 ID 覆盖解析器随机生成的 ID
             parsed_doc = replace(parsed_doc, document_id=str(document.document_id))
 
-            if parsed_doc.parse_status == "failed":
+            if parsed_doc.is_failed():
                 document.parse_status = ParseStatus.FAILED
                 document.metadata["parse_error"] = parsed_doc.error_message or "解析失败"
                 await self._repository.save(document)
@@ -152,7 +152,7 @@ class DocumentParsingService:
             ext = ".tmp"
         stream = self._storage.retrieve(bucket_type, object_key)
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-        os.chmod(tmp.name, 0o600)  # 仅所有者可读写，防止多租户数据泄露
+        os.fchmod(tmp.fileno(), 0o600)  # 文件描述符级权限设置，消除 chmod TOCTOU 窗口
         try:
             try:
                 async for chunk in stream:
