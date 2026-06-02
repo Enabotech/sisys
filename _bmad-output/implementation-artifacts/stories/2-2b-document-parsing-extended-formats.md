@@ -150,7 +150,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](./sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md)。
+> 参考 [`sdd-tdd-fusion-guide.md`](../../../docs/developer/sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](../../../docs/developer/sdd-tdd-checklist.md)。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 
@@ -268,7 +268,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 | **TDD 验收测试** | 收尾验收场景 | src 与测试目录完成清单最终确认 | `test_acceptance_document_parse_extended.feature` | Task 10 |
 | **TDD 验收测试** | 收尾 BDD 步骤实现 | 完成清单断言与步骤函数 | `test_acceptance_document_parse_extended.py` | Task 10 |
 | **TDD 契约测试** | 端口契约 | 端口注册/版本/兼容性 | `test_port_contract_document_parser.py` | Task 0 |
-| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖 | `test_arch_document_parser_extended.py` | Task 9 |
+| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖 | `test_arch_document_parser.py` | Task 9 |
 | **集成测试** | 完整解析流程 | MinIO→解析→事件发布 | `test_document_parse_extended_integration.py` | Task 8 |
 
 ---
@@ -280,6 +280,8 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 根据 epics_v1.0.md CI/CD 质量门禁和 prd.md NFR 测试覆盖计划：
 
 - [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
+- [ ] **领域层覆盖率 ≥90%**（`pytest --cov=src/domain`）- **P0 阻断门禁**（来源：CLAUDE.md + prd.md）
+- [ ] **应用层覆盖率 ≥85%**（`pytest --cov=src/application`）- **P0 阻断门禁**（来源：CLAUDE.md + prd.md）
 - [ ] **基础设施层覆盖率 ≥75%**（`pytest --cov=src/infrastructure`）- **P1 阻断门禁**
 - [ ] **集成测试覆盖率 ≥70%** — 被测代码位于 `src/infrastructure/` 和 `src/application/`
 - [ ] **端口契约测试覆盖率 100%**（`DocumentParserPort` + `CompositeDocumentParser` MIME 路由全量覆盖）
@@ -335,7 +337,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 | AC-6 | Markdown 解析 | Task 6 | MarkdownParser 实现 | `test_markdown_parser.py` |
 | AC-7 | RTF 解析 | Task 7 | RTFParser 实现 | `test_rtf_parser.py` |
 | AC-8 | 组合解析器扩展 | Task 8 | CompositeParser 扩展 | `test_composite_parser.py` |
-| AC-1~8 | 架构约束验证 | Task 9 | SDD 架构测试 | `test_arch_document_parser_extended.py` |
+| AC-1~8 | 架构约束验证 | Task 9 | SDD 架构测试 | `test_arch_document_parser.py` |
 | AC-1~8 | 最终验收 | Task 10 | 验收测试 | `test_acceptance_document_parse_extended.*` |
 
 ---
@@ -358,6 +360,11 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 - [ ] Subtask 0.2: 确认复用 `ParsedDocument` 值对象 Schema（pages/texts/tables/images/bbox/confidence）
 - [ ] Subtask 0.3: 确认复用 `DocumentProcessed` 事件（不新增事件）
 - [ ] Subtask 0.4: 确认复用 `DocumentParsingService` 编排流程（不修改应用层代码，仅扩展 `_ALLOWED_TEMP_SUFFIXES`）
+- [ ] **Subtask 0.4a: 修改 `ParsedTable` 值对象** — 新增 `metadata: dict[str, Any] = field(default_factory=dict)` 字段
+  - 参照 `ParsedElement.metadata` 已有模式，`ParsedTable` 当前无 metadata 字段
+  - 同步更新 `ParsedTable.to_dict()` 方法，增加 `"metadata"` 键
+  - 向后兼容：`field(default_factory=dict)` 确保现有代码无需修改
+  - ⚠️ **必须在 Task 2 (ExcelParser) 开始前完成**，因 ExcelParser 依赖此字段存储 sheet_name
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_document_parse_extended.feature`
   - Gherkin 行为文档，描述 AC-1~AC-8 的给定/当/则场景
   - 注：本 Story 沿用 Story 2-2a 的纯 pytest 验收测试风格，`.feature` 文件为行为文档，实际断言逻辑在 `.py` 中用纯 pytest 测试类实现
@@ -457,6 +464,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
   - **重构 TextParser 的编码检测为共享工具：** 将 `TextParser._detect_and_decode`（私有方法）提取为 `_limits.py` 或新文件 `_encoding.py` 中的模块级函数 `detect_and_decode(raw_bytes) -> str`，CSVParser 和 TextParser 均通过 import 复用（避免违反私有方法调用惯例）
   - 使用 `csv.Sniffer` 自动检测分隔符
   - 输出单页结构，包含一个 ParsedTable
+  - **超大文件分块：** 文件 >50MB 时按 10MB 增量逐块读取，每块生成独立 `ParsedTable`（共享同一 `ParsedPage`），使用 `csv.reader` 的 `line_num` 跟踪行偏移，块边界处理不完整行（缓冲至下一块）
 - [ ] Subtask 3.3: 🔄 重构 — 优化 CSVParser 代码
 
 **完成标准/Definition of Done:**
@@ -819,7 +827,7 @@ src/
     ├── integration/
     │   └── test_document_parse_extended_integration.py  # ★ 新增
     ├── unit/architecture/
-    │   └── test_arch_document_parser_extended.py        # ★ 新增
+    │   └── test_arch_document_parser.py        # 扩展（原有 2-2a 文件，新增 7 个解析器验证方法）
     ├── contracts/
     │   └── test_port_contract_document_parser.py        # 扩展
     ├── acceptance/
@@ -865,6 +873,12 @@ src/
 - 推荐 OCR 前预处理：灰度化（`img.convert('L')`）
 - `pytesseract.image_to_data()` 返回置信度信息，可用于填充 `confidence` 字段
 - **Tesseract 未安装时优雅降级**：catch `TesseractNotFoundError`，记录警告日志，返回元数据但 OCR 文本为空
+
+### 合规性与安全性注意事项
+
+- **临时文件清理：** 生产环境中临时文件清理由 `DocumentParsingService.parse_document()` 的 `finally` 块保障（`os.unlink(temp_path)`），不依赖测试代码的 `try/finally`。本 Story 新增解析器不改变此清理逻辑。
+- **敏感数据处理：** 本 Story 仅实现文档解析与内容提取，不涉及 PII 脱敏或内容扫描。解析结果存入 `Document.metadata["parse_result"]` JSONB 字段，下游消费者负责访问控制与数据保护。
+- **无新增事件/合规审计点：** 本 Story 不新增领域事件，沿用 2-2a 已有的 `DocumentProcessed` 事件和审计追踪机制。
 
 ### 第三方依赖状态
 
@@ -933,7 +947,7 @@ src/
 - `tests/unit/infrastructure/external_services/document_parsing/test_html_parser.py` — HTML 单元测试
 - `tests/unit/infrastructure/external_services/document_parsing/test_markdown_parser.py` — Markdown 单元测试
 - `tests/unit/infrastructure/external_services/document_parsing/test_rtf_parser.py` — RTF 单元测试
-- `tests/unit/architecture/test_arch_document_parser_extended.py` — 架构约束测试
+- `tests/unit/architecture/test_arch_document_parser.py` — 架构约束测试（扩展，非新建）
 - `tests/integration/test_document_parse_extended_integration.py` — 集成测试
 - `tests/acceptance/test_acceptance_document_parse_extended.feature` — Gherkin 验收测试
 - `tests/acceptance/test_acceptance_document_parse_extended.py` — BDD 步骤实现
@@ -1034,8 +1048,9 @@ src/
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-06-01
-**最后更新/Last Updated:** 2026-06-01
+**最后更新/Last Updated:** 2026-06-02
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 Story 2-2a 架构基础，7 个新解析器 + 组合解析器扩展）
+- v1.1.0: 三轮文档审查修复（R1 17项 + R2 11项 + R3-5 10项：覆盖率目标补全、BDD术语清理、架构测试统一、ParsedTable metadata、SDD引用修正、合规性说明）
