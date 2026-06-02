@@ -21,7 +21,22 @@ class TestDomainLayerPurity:
             attr = getattr(mod, attr_name)
             if hasattr(attr, "__module__") and attr.__module__:
                 assert not attr.__module__.startswith(
-                    ("pypdf", "docx", "openpyxl", "pytesseract", "pillow", "prefect", "fastapi", "pydantic", "sqlalchemy")
+                    (
+                        "pypdf",
+                        "docx",
+                        "openpyxl",
+                        "pytesseract",
+                        "pillow",
+                        "prefect",
+                        "fastapi",
+                        "pydantic",
+                        "sqlalchemy",
+                        "pptx",
+                        "bs4",
+                        "lxml",
+                        "striprtf",
+                        "PIL",
+                    )
                 ), f"domain 层禁止依赖 {attr.__module__}"
 
     def test_document_parser_port_is_protocol(self) -> None:
@@ -60,6 +75,41 @@ class TestInfrastructureLayerPlacement:
 
         assert "infrastructure" in CompositeDocumentParser.__module__
 
+    def test_pptx_parser_in_infrastructure(self) -> None:
+        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+
+        assert "infrastructure" in PptxParser.__module__
+
+    def test_excel_parser_in_infrastructure(self) -> None:
+        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+
+        assert "infrastructure" in ExcelParser.__module__
+
+    def test_csv_parser_in_infrastructure(self) -> None:
+        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+
+        assert "infrastructure" in CSVParser.__module__
+
+    def test_image_parser_in_infrastructure(self) -> None:
+        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
+
+        assert "infrastructure" in ImageParser.__module__
+
+    def test_html_parser_in_infrastructure(self) -> None:
+        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+
+        assert "infrastructure" in HTMLParser.__module__
+
+    def test_markdown_parser_in_infrastructure(self) -> None:
+        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+
+        assert "infrastructure" in MarkdownParser.__module__
+
+    def test_rtf_parser_in_infrastructure(self) -> None:
+        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+
+        assert "infrastructure" in RTFParser.__module__
+
 
 class TestDependencyDirection:
     """验证依赖方向正确"""
@@ -89,7 +139,6 @@ class TestDependencyDirection:
         from src.infrastructure.external_services.document_parsing.text_parser import TextParser
         from src.infrastructure.external_services.document_parsing.word_parser import WordParser
 
-        # OCP 风格：MIME → 解析器映射通过 dict 注入，新增格式无需修改 CompositeDocumentParser
         parser = CompositeDocumentParser(
             parsers={
                 "application/pdf": PDFParser(),
@@ -99,3 +148,22 @@ class TestDependencyDirection:
             },
         )
         assert isinstance(parser, DocumentParserPort)
+
+    def test_all_extended_parsers_satisfy_protocol(self) -> None:
+        """Story 2-2b 所有新解析器满足 DocumentParserPort 协议"""
+        from src.domain.ports.document_parser import DocumentParserPort
+        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
+        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+
+        assert isinstance(PptxParser(), DocumentParserPort)
+        assert isinstance(ExcelParser(), DocumentParserPort)
+        assert isinstance(CSVParser(), DocumentParserPort)
+        assert isinstance(ImageParser(), DocumentParserPort)
+        assert isinstance(HTMLParser(), DocumentParserPort)
+        assert isinstance(MarkdownParser(), DocumentParserPort)
+        assert isinstance(RTFParser(), DocumentParserPort)

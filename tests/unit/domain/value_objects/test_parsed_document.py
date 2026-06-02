@@ -72,7 +72,7 @@ class TestParsedTable:
     def test_to_dict(self) -> None:
         table = ParsedTable(rows=[["A", "B"], ["1", "2"]])
         d = table.to_dict()
-        assert d == {"rows": [["A", "B"], ["1", "2"]], "bbox": None, "confidence": 1.0}
+        assert d == {"rows": [["A", "B"], ["1", "2"]], "bbox": None, "confidence": 1.0, "metadata": {}}
 
 
 class TestParsedPage:
@@ -96,7 +96,7 @@ class TestParsedPage:
         assert len(d["texts"]) == 1
         assert d["texts"][0] == {"content": "hello", "bbox": None, "confidence": 1.0, "metadata": {}}
         assert len(d["tables"]) == 1
-        assert d["tables"][0] == {"rows": [["A"]], "bbox": None, "confidence": 1.0}
+        assert d["tables"][0] == {"rows": [["A"]], "bbox": None, "confidence": 1.0, "metadata": {}}
         assert d["images"] == []
 
 

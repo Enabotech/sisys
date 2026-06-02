@@ -24,11 +24,11 @@ class TestDocumentParserPortContract:
         assert spec is not None
         assert spec.interface is DocumentParserPort
 
-    def test_port_version_is_v1(self) -> None:
-        """验证端口版本为 v1.0.0"""
+    def test_port_version_is_v1_1(self) -> None:
+        """验证端口版本为 v1.1.0（扩展格式解析器注册后升级）"""
         spec = _global_registry.get("document_parser")
         assert spec is not None
-        assert spec.version == "v1.0.0"
+        assert spec.version == "v1.1.0"
 
     def test_port_lifetime_is_scoped(self) -> None:
         """验证端口生命周期为 SCOPED"""
@@ -63,6 +63,56 @@ class TestDocumentParserPortContract:
         from src.domain.ports.document_parser import DocumentParserPort
 
         assert hasattr(DocumentParserPort, "__protocol_attrs__") or hasattr(DocumentParserPort, "_is_protocol")
+
+
+class TestExtendedFormatMIMERouting:
+    """验证扩展格式 MIME 类型已注册"""
+
+    def test_all_15_mime_types_in_routing_table(self) -> None:
+        """验证 CompositeDocumentParser 包含所有 15 种格式 MIME 映射"""
+        from unittest.mock import MagicMock
+
+        spec = _global_registry.get("document_parser")
+        assert spec is not None
+        assert callable(spec.impl)
+        parser = spec.impl(MagicMock())
+        mime_types = set(parser._parsers.keys())
+
+        expected = {
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/msword",
+            "text/plain",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel",
+            "text/csv",
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "text/html",
+            "text/markdown",
+            "text/rtf",
+        }
+        missing = expected - mime_types
+        assert not missing, f"CompositeDocumentParser 缺少 MIME 路由: {missing}"
+
+    def test_unsupported_mime_returns_failed_not_exception(self) -> None:
+        """验证不支持的 MIME 返回 ParsedDocument(parse_status=failed)，不抛异常"""
+        from unittest.mock import MagicMock
+
+        spec = _global_registry.get("document_parser")
+        assert spec is not None
+        assert callable(spec.impl)
+        parser = spec.impl(MagicMock())
+
+        result = parser.parse("/dev/null", "application/x-unknown-format")
+        from src.domain.value_objects.parsed_document import ParsedDocument
+
+        assert isinstance(result, ParsedDocument)
+        assert result.parse_status == "failed"
+        assert result.error_message is not None
 
 
 class TestExistingDocumentPortsStillWork:

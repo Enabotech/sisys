@@ -127,7 +127,7 @@ detect-secrets = "^1.5.0"
 pbr = "^7.0.3"
 freezegun = "^1.5.1"
 
-# SDD 工具链（Story 0.1 验收标准）
+# SDD 工具链
 schemathesis = "^3.19.0"  # API 契约测试
 openapi-spec-validator = "^0.7.2"  # OpenAPI 验证
 jsonschema = "^4.19.0"  # JSON Schema 验证
@@ -141,6 +141,7 @@ types-openpyxl = "^3.1.5.20260518"
 types-defusedxml = "^0.7.0"
 import-linter = "^2.11"
 asyncpg-stubs = "^0.31.2"
+striprtf = "^0.0.32"
 
 [project.scripts]
 crawler = "plugins.crawler.cli:app"
@@ -234,6 +235,14 @@ exclude = [
 # ---------------------------------------------------------------------------
 [[tool.mypy.overrides]]
 module = "defusedxml.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pytesseract.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "striprtf.*"
 ignore_missing_imports = true
 
 # Pytest Configuration

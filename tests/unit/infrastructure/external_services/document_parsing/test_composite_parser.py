@@ -145,3 +145,126 @@ class TestCompositeParserPortContract:
 
         parser = _build_composite()
         assert isinstance(parser, DocumentParserPort)
+
+
+class TestExtendedFormatRouting:
+    """Story 2-2b 扩展格式 MIME 路由测试"""
+
+    def test_pptx_mime_routes_to_pptx_parser(self) -> None:
+        """PPtX MIME 类型路由到 PptxParser"""
+        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+
+        pptx = _create_minimal_pptx()
+        try:
+            parser = PptxParser()
+            result = parser.parse(pptx, "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+            assert result.is_completed()
+        finally:
+            os.unlink(pptx)
+
+    def test_xlsx_mime_routes_to_excel_parser(self) -> None:
+        """XLSX MIME 类型路由到 ExcelParser"""
+        xlsx = _create_minimal_xlsx()
+        try:
+            from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+
+            parser = ExcelParser()
+            result = parser.parse(xlsx, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            assert result.is_completed()
+        finally:
+            os.unlink(xlsx)
+
+    def test_csv_mime_routes_to_csv_parser(self) -> None:
+        """CSV MIME 类型路由到 CSVParser"""
+        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+
+        path = _create_minimal_txt()
+        try:
+            parser = CSVParser()
+            result = parser.parse(path, "text/csv")
+            assert result.is_completed()
+        finally:
+            os.unlink(path)
+
+    def test_html_mime_routes_to_html_parser(self) -> None:
+        """HTML MIME 类型路由到 HTMLParser"""
+        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+
+        html_path = _create_minimal_html()
+        try:
+            parser = HTMLParser()
+            result = parser.parse(html_path, "text/html")
+            assert result.is_completed()
+        finally:
+            os.unlink(html_path)
+
+    def test_markdown_mime_routes_to_markdown_parser(self) -> None:
+        """Markdown MIME 类型路由到 MarkdownParser"""
+        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+
+        md_path = _create_minimal_md()
+        try:
+            parser = MarkdownParser()
+            result = parser.parse(md_path, "text/markdown")
+            assert result.is_completed()
+        finally:
+            os.unlink(md_path)
+
+    def test_rtf_mime_routes_to_rtf_parser(self) -> None:
+        """RTF MIME 类型路由到 RTFParser"""
+        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+
+        rtf_path = _create_minimal_rtf()
+        try:
+            parser = RTFParser()
+            result = parser.parse(rtf_path, "text/rtf")
+            assert result.is_completed()
+        finally:
+            os.unlink(rtf_path)
+
+
+def _create_minimal_pptx() -> str:
+    from pptx import Presentation
+
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[0])
+    slide.shapes.title.text = "test"
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pptx")
+    prs.save(tmp.name)
+    tmp.close()
+    return tmp.name
+
+
+def _create_minimal_xlsx() -> str:
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = "Sheet1"
+    ws["A1"] = "test"
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    wb.save(tmp.name)
+    tmp.close()
+    return tmp.name
+
+
+def _create_minimal_html() -> str:
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
+    tmp.write(b"<html><body><p>test</p></body></html>")
+    tmp.close()
+    return tmp.name
+
+
+def _create_minimal_md() -> str:
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".md")
+    tmp.write(b"# Test\n\ntest content\n")
+    tmp.close()
+    return tmp.name
+
+
+def _create_minimal_rtf() -> str:
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".rtf")
+    tmp.write(r"{\rtf1\ansi\deff0 {\fonttbl {\f0 Times New Roman;}} \f0\fs24 RTF test}".encode("utf-8"))
+    tmp.close()
+    return tmp.name
