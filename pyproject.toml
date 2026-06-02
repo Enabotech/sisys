@@ -213,7 +213,6 @@ warn_unused_configs = true
 disallow_untyped_defs = false
 mypy_path = "stubs"
 
-# 排除外部目录和生成文件
 exclude = [
     '^\.claude/',
     '^\.qwen/',
@@ -224,6 +223,21 @@ exclude = [
     '^\.venv/',
     '^venv/',
 ]
+
+# ---------------------------------------------------------------------------
+# 第三方库精准豁免（业界最佳实践：用 overrides 替代全局 --ignore-missing-imports）
+#
+# 设计理由：
+#   - 全局 --ignore-missing-imports 会同时隐藏"合法第三方无 stubs 库"和"拼写错误的 import"
+#   - 用 module-specific overrides 做精准豁免，CI 能捕获真正的 import 错误
+#   - defusedxml 与 sentence_transformers 均通过 try/except ImportError 守卫，安全豁免
+# ---------------------------------------------------------------------------
+[[tool.mypy.overrides]]
+module = [
+    "defusedxml.*",
+    "sentence_transformers.*",
+]
+ignore_missing_imports = true
 
 # Pytest Configuration
 [tool.pytest.ini_options]
