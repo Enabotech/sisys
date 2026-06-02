@@ -18,6 +18,7 @@ from src.domain.value_objects.parsed_document import (
     ParsedPage,
     ParsedTable,
 )
+from src.infrastructure.external_services.document_parsing._encoding import detect_and_decode
 from src.infrastructure.external_services.document_parsing._limits import MAX_MD_BYTES
 
 logger = logging.getLogger(__name__)
@@ -82,8 +83,9 @@ class MarkdownParser(DocumentParserPort):
             )
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                text = f.read()
+            with open(file_path, "rb") as f:
+                raw = f.read()
+            text, _encoding = detect_and_decode(raw)
 
             if not text.strip():
                 return ParsedDocument(

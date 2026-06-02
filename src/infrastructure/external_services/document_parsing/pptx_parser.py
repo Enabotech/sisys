@@ -92,8 +92,7 @@ class PptxParser(DocumentParserPort):
 
             with open(file_path, "rb") as f:
                 prs = Presentation(f)
-
-            slides = list(prs.slides)
+                slides = list(prs.slides)
             if len(slides) == 0:
                 return ParsedDocument(
                     document_id=doc_id,
