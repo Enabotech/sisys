@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 
 from src.domain.events.agent_events import AgentDecided
 from src.domain.events.auto_execute_events import AutoExecuted
@@ -70,7 +71,7 @@ class AutoExecuteCompletedHandler:
     async def _publish_document_processed(self, event: AutoExecuted) -> None:
         """发布 DocumentProcessed 领域事件"""
         domain_event = DocumentProcessed(
-            document_id=event.task_context.get("document_id", ""),
+            document_id=self._safe_uuid(event.task_context.get("document_id")),
             parse_result=event.execution_result,
             tenant_id=event.task_context.get("tenant_id", ""),
         )
@@ -81,7 +82,7 @@ class AutoExecuteCompletedHandler:
     async def _publish_tool_executed(self, event: AutoExecuted) -> None:
         """发布 ToolExecuted 领域事件"""
         domain_event = ToolExecuted(
-            tool_id=event.task_context.get("tool_id", ""),
+            tool_id=self._safe_uuid(event.task_context.get("tool_id")),
             execution_result=event.execution_result,
             cost_audit={"estimated": event.cost_estimate},
         )
@@ -92,13 +93,34 @@ class AutoExecuteCompletedHandler:
     async def _publish_agent_decided(self, event: AutoExecuted) -> None:
         """发布 AgentDecided 领域事件"""
         domain_event = AgentDecided(
-            agent_id=event.task_context.get("agent_id", ""),
+            agent_id=self._safe_uuid(event.task_context.get("agent_id")),
             decision_result=event.execution_result,
             confidence=event.route_score,
         )
 
         await self._publish(domain_event)
         logger.info("Published AgentDecided: agent_id=%s", domain_event.agent_id)
+
+    @staticmethod
+    def _safe_uuid(raw: str | None) -> uuid.UUID:
+        """将 task_context 中的字符串安全转为 UUID
+
+        task_context 经 JSON 序列化/反序列化后，UUID 字段变为 str，
+        需在构造领域事件前还原为 uuid.UUID 类型。
+
+        Args:
+            raw: 原始字符串值（可能为 None 或非法 UUID 格式）
+
+        Returns:
+            解析后的 uuid.UUID，解析失败时返回随机 UUID 并记录警告
+        """
+        if not raw:
+            return uuid.uuid4()
+        try:
+            return uuid.UUID(raw)
+        except (ValueError, AttributeError):
+            logger.warning("无效的 UUID 值: %s，使用随机 UUID 替代", raw)
+            return uuid.uuid4()
 
     async def _publish(self, event: DomainEvent) -> None:
         """通过配置的发布器发布领域事件
