@@ -479,7 +479,7 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试）→ Task 2（SparseSearc
           limit: 返回结果数量限制
 
       Returns:
-          融合排序后的结果列表
+          融合排序后的结果列表，每个元素为 {"id": str|int, "score": float, "payload": dict}
       """
   ```
   - RRF 公式：`score(d) = Σ 1/(k + rank_i(d))`
@@ -536,6 +536,7 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试）→ Task 2（SparseSearc
           tenant_id: str | None = None, filter_payload: dict | None = None,
       ) -> list[HybridSearchResult]: ...
   ```
+  - 空查询校验：`if not query_text or not query_text.strip(): raise ValueError("查询文本不能为空")`（与 Dense/Sparse 一致）
   - 使用 `asyncio.gather(..., return_exceptions=True)` 并行调用两路检索
   - 过滤异常结果，保留正常返回的检索结果
   - 调用 `rrf_fusion()` 进行融合
@@ -656,8 +657,16 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试）→ Task 2（SparseSearc
     ```
 - [ ] Subtask 5.2: 🟢 绿 — 实现 BM25 稀疏检索端到端测试
   - 构建稀疏向量 → upsert 到 Qdrant（含 sparse_vectors）→ 查询 → 验证排序
-  - ⚠️ **upsert 时需同时写入 Dense 和 Sparse 向量**（Qdrant NamedVectors）
+  - ⚠️ **upsert 时需同时写入 Dense 和 Sparse 向量**（Qdrant NamedVectors），vector 字段格式：
+    ```python
+    # Dense + Sparse 双向量 upsert 格式
+    vector = {
+        "": dense_vector_list,  # 默认 Dense 向量（空字符串键名）
+        "sparse": models.SparseVector(indices=sv.indices, values=sv.values),
+    }
+    ```
   - 插入不同 business_domain 的数据 → 过滤 → 验证结果
+  - 设计测试数据使部分文档同时在 Dense 和 Sparse 检索中出现（验证 RRF 重叠加权）
 - [ ] Subtask 5.3: 🟢 绿 — 实现 Hybrid 混合检索端到端测试
   - 插入 10 个文档（Dense + Sparse 向量均写入）
   - 执行 Hybrid 检索 → 验证返回结果包含 Dense 和 Sparse 来源
@@ -695,9 +704,11 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试）→ Task 2（SparseSearc
   - `src/shared/rrf_fusion.py` 不导入任何基础设施层模块
 - [ ] Subtask 6.2: 验证六边形架构依赖方向
   - application → domain（允许）
+  - application → shared（允许，但 shared 必须零外部依赖）
   - infrastructure → domain（允许）
   - application → infrastructure（禁止，HybridSearchService 不直接导入 BM25Builder）
-  - domain → application/infrastructure/interfaces（禁止）
+  - domain → application/infrastructure/interfaces/shared（禁止）
+  - shared → domain/application/infrastructure（禁止，仅 Python 标准库）
 - [ ] Subtask 6.3: 验证端口注册完整性
   - bm25_builder, sparse_search_service, hybrid_search_service 均在 registry 中
   - 实现模块路径正确可导入
