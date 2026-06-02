@@ -1118,6 +1118,7 @@ def bootstrap() -> None:
             document_storage=resolver.resolve("document_storage"),
             event_publisher=resolver.resolve("event_publisher"),
             document_parser=resolver.resolve("document_parser"),
+            redis_client=resolver.resolve("redis_client"),
         ),
         module="src.application.services.document_parsing_service",
         lifetime=Lifetime.SCOPED,
