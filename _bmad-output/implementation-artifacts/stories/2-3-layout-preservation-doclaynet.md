@@ -140,11 +140,11 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
   - `@runtime_checkable` + `Protocol`
   - `detect(image_bytes: bytes, page_number: int) -> list[BoundingBoxResult]`
 - [ ] **更新** `DocumentParserPort` 版本说明（接口签名不变，但输出包含 bbox 数据）
-- [ ] **端口注册中心更新**（`src/domain/ports/registry.py`）：新曾 `layout_detector` PortSpec
+- [ ] **端口注册** — 在 `src/composition_root.py` 中调用 `register_port()` 注册 `layout_detector` 端口
 - [ ] **端口契约门禁**（`src/domain/ports/contract_gate.py`）：LayoutDetector 端口变更通过兼容性检查
 - [ ] **端口契约测试**（`tests/contracts/test_port_contract_layout_detector.py`）
 - [ ] 接口命名符合单一职责，禁止同义接口重复定义
-- [ ] 端口具备唯一名称 `layout_detector`、版本 `v1.0.0`、owner `epic-2`、兼容策略 `FORWARD`
+- [ ] 端口具备唯一名称 `layout_detector`、版本 `v1.0.0`、owner `epic-2`
 
 **端口契约清单：**
 
@@ -268,7 +268,7 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | LayoutDetector 端口定义 + BoundingBoxResult 值对象 | Task 2 | 2a: BoundingBoxResult 值对象; 2b: LayoutDetector Protocol | `test_parsed_document.py`; `test_layout_detector_port.py` |
+| AC-1 | LayoutDetector 端口定义 + BoundingBoxResult 值对象 | Task 1 + Task 2 | Task 1: BoundingBoxResult 值对象; Task 2: LayoutDetector Protocol | `test_parsed_document.py`; `test_layout_detector_port.py` |
 | AC-2 | ONNX 版面检测实现 | Task 3 | 3a: OnnxLayoutDetector 实现 | `test_onnx_layout_detector.py` |
 | AC-3 | 解析管线集成 | Task 4 | 4a: 版面检测整合服务; 4b: bbox 匹配算法 | `test_layout_matching.py`; `test_document_parsing_service.py` |
 | AC-4 | Composition Root 注册 | Task 4 | 4c: 端口注册 + 版本升级 | `test_port_contract_layout_detector.py` |
@@ -415,7 +415,7 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 创建 `tests/contracts/test_port_contract_layout_detector.py`（验证 layout_detector 端口注册/版本 v1.0.0/SINGLETON lifetime/接口类型）+ 更新 `tests/contracts/test_port_contract_document_parser.py`（验证 document_parsing_service 注入 layout_detector 后端口仍正常注册） |
+| 🔴 红 | 创建 `tests/contracts/test_port_contract_layout_detector.py`（验证 layout_detector 端口注册/版本 v1.0.0/SINGLETON lifetime/接口类型）；确认 `tests/contracts/test_port_contract_document_parser.py` 仍通过（回归验证） |
 | 🟢 绿 | 在 `src/composition_root.py` 注册 layout_detector；升级 document_parsing_service 版本至 v1.1.0；composition_root lambda 工厂传入 `layout_detector=resolver.resolve("layout_detector")` |
 | 🔄 重构 | 验证完整端口链：layout_detector → document_parsing_service → document_parser |
 
@@ -741,10 +741,11 @@ Pillow = ">=10.0"                    # 已有依赖（Story 2-2b ImageParser 引
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-06-02
 **最后更新/Last Updated:** 2026-06-02
 **更新说明/Description:**
-- v1.2.0: Round 2 审查修订 — 7项P1问题修正（拼写修正/pypdf→pypdfium2残留清理/契约测试归属明确/xyxy→xywh转换测试补充/IoU边界行为明确/文件清单路径冲突修复）
+- v1.3.0: Round 3-5 审查修订 — 5项P1修正（registry.py描述/FORWARD兼容策略移除/契约测试引用/追溯矩阵Task编号）
+- v1.2.0: Round 2 审查修订 — 7项P1问题修正
 - v1.1.0: Round 1 审查修订 — 10项P0/P1问题系统修正
 - v1.0.0: 创建故事文件
