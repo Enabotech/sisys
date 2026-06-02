@@ -46,15 +46,15 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 **Given** 用户上传的 XLSX 文档已存入 MinIO
 **When** 系统触发解析流程
 **Then** 使用 `openpyxl` 解析 XLSX，提取各 Sheet 的表格内容
-**And** 每个 Sheet 作为一个 `ParsedTable`，包含 sheet 名称元数据
-**And** 旧版 XLS 格式使用 `xlrd` 解析（或返回友好拒绝消息）
+**And** 每个 Sheet 作为一个 `ParsedTable`，通过 `ParsedPage.metadata["sheet_name"]` 存储 sheet 名称（因 `ParsedTable` 当前无独立 metadata 字段，sheet 名称跟随所在 ParsedPage 元数据）
+**And** 旧版 XLS 格式返回友好拒绝消息，建议转换为 XLSX（与 PPT→PPTX 处理策略一致）
 
 **验证标准/Validation Criteria:**
 - [ ] 多 Sheet 文档每个 Sheet 独立输出为 ParsedTable
 - [ ] `read_only=True` 模式降低大文件内存占用
 - [ ] `data_only=True` 返回计算后的值而非公式
 - [ ] 空 Sheet 跳过（不生成空表格）
-- [ ] 旧版 XLS 格式有明确处理策略
+- [ ] 旧版 XLS 格式返回友好拒绝消息，建议转换为 XLSX（与 PPT→PPTX 处理策略一致）
 
 ### AC-3: CSV 文档解析
 
@@ -67,7 +67,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 - [ ] 编码自动检测（UTF-8 → GB18030 → GBK，复用 TextParser 策略）
 - [ ] 分隔符自动检测（`csv.Sniffer`）
 - [ ] 空文件返回解析失败
-- [ ] 超大 CSV（>50MB）分块处理
+- [ ] 超大 CSV（>50MB）分块处理（与 TXT 解析器直接拒绝不同，CSV 行级结构天然支持分块；分块阈值 50MB，每块 10MB）
 
 ### AC-4: 图像文档解析（JPEG/PNG/GIF）
 
@@ -132,15 +132,15 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 **Given** 所有扩展格式解析器已实现
 **When** `CompositeDocumentParser` 初始化
 **Then** 新增 MIME 类型映射覆盖所有扩展格式
-**And** 未注册的 MIME 类型返回 `ValueError`
+**And** 未注册的 MIME 类型返回 `parse_status=failed` 的 `ParsedDocument`（不抛异常）
 **And** `_ALLOWED_TEMP_SUFFIXES` 扩展覆盖新格式后缀
 
 **验证标准/Validation Criteria:**
 - [ ] MIME 路由表包含所有 17 种格式映射
-- [ ] 不支持的格式返回明确错误
+- [ ] 不支持的格式返回 `parse_status=failed` + 明确错误消息（不抛异常，与 2-2a CompositeDocumentParser 行为一致）
 - [ ] 临时文件后缀白名单已扩展
 - [ ] Composition Root 注册所有新解析器
-- [ ] 解析性能：单文档 P95 < 500ms（纯解析时间，不含 IO）
+- [ ] 解析性能：非 OCR 格式 P95 < 500ms（纯解析时间，不含 IO）；图像 OCR 格式 P95 < 5s（含 OCR 处理时间）
 
 ---
 
@@ -173,12 +173,12 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 
 | 端口名称 | 接口 | 实现 | 注册位置 | Lifetime | Version | Owner |
 |---------|------|------|----------|----------|---------|-------|
-| `document_parser` | `DocumentParserPort` | `CompositeDocumentParser` | domain/ports/document_parser.py | SCOPED | v1.1.0 | epic-2 |
+| `document_parser` | `DocumentParserPort` | `CompositeDocumentParser` | domain/ports/document_parser.py | SCOPED | v1.0.0→v1.1.0 | epic-2 |
 | `document_repository` | `DocumentRepositoryPort` | `PostgreSQLDocumentRepository` | domain/ports/document_repository.py | SCOPED | v1.0.0 | epic-2 |
 | `document_storage` | `DocumentStoragePort` | `MinIODocumentStorage` | application/ports/document_storage_port.py | SCOPED | v1.0.0 | epic-1 |
 | `event_publisher` | `EventPublisher` | `DualChannelEventBus` | domain/ports/event_publisher.py | SCOPED | v1.0.0 | epic-1 |
 
-> **版本升级说明：** `document_parser` 从 v1.0.0 升级至 v1.1.0（新增扩展格式解析器注册），接口签名不变，向后兼容。
+> **版本升级说明：** `document_parser` 从 v1.0.0 升级至 v1.1.0（新增扩展格式解析器注册），接口签名不变，向后兼容。需同步更新 `composition_root.py` 中的 `version="v1.0.0"` → `"v1.1.0"` 和 `tests/contracts/test_port_contract_document_parser.py` 中的 `spec.version == "v1.0.0"` 断言。
 
 #### API 契约 (API Contract)
 - [x] 复用 `POST /api/v1/documents` 上传端点（Story 2-1 已定义）
@@ -274,8 +274,8 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 
 - [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
 - [ ] **基础设施层覆盖率 ≥75%**（`pytest --cov=src/infrastructure`）- **P1 阻断门禁**
-- [ ] **集成测试覆盖率 ≥70%**（`pytest --cov=tests/integration`）
-- [ ] **关键路径覆盖率 100%**（所有分支覆盖）
+- [ ] **集成测试覆盖率 ≥70%** — 被测代码位于 `src/infrastructure/` 和 `src/application/`
+- [ ] **端口契约测试覆盖率 100%**（`DocumentParserPort` + `CompositeDocumentParser` MIME 路由全量覆盖）
 
 #### 代码质量门禁
 - [ ] **Ruff 检查通过**（`ruff check src/`）
@@ -297,7 +297,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 | **并行隔离** | 并行测试使用 UUID 前缀隔离资源 | 资源冲突导致并行失败 |
 | **BDD async 配合** | BDD 步骤函数不用 @pytest.mark.asyncio | 直接用会导致 BDD context 数据丢失 |
 | **asyncio.run 使用** | pytest-xdist 并行测试中 BDD 步骤函数用 event_loop fixture | asyncio.run() 创建新循环，并行测试时可能关闭错误循环 |
-| **Fixture 文件** | 测试 fixture 文件存于 `tests/fixtures/documents/` | 路径不一致 |
+| **编程式 Fixture** | 测试文件内定义 `_create_*()` 工厂函数生成临时文件 | 静态文件难维护，编程式可自文档化 |
 
 **禁止行为：**
 - ❌ 集成测试手动 `delete`/`truncate`（应用 transaction rollback）
@@ -352,7 +352,11 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 - [ ] Subtask 0.3: 确认复用 `DocumentProcessed` 事件（不新增事件）
 - [ ] Subtask 0.4: 确认复用 `DocumentParsingService` 编排流程（不修改应用层代码，仅扩展 `_ALLOWED_TEMP_SUFFIXES`）
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_document_parse_extended.feature`
-- [ ] Subtask 0.6: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_document_parse_extended.py`
+  - Gherkin 行为文档，描述 AC-1~AC-8 的给定/当/则场景
+  - 注：本 Story 沿用 Story 2-2a 的纯 pytest 验收测试风格，`.feature` 文件为行为文档，实际断言逻辑在 `.py` 中用纯 pytest 测试类实现
+- [ ] Subtask 0.6: 编写验收测试实现 `tests/acceptance/test_acceptance_document_parse_extended.py`
+  - 按 AC 分组（TestAC1PPTX ~ TestAC8Composite），每个测试类包含多个 `test_*` 方法
+  - 注：不使用 `@pytest.mark.asyncio`，不使用 `pytest-bdd` 装饰器，参考 2-2a `test_acceptance_document_parse.py` 模式
 - [ ] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）
 - [ ] Subtask 0.8: 扩展端口契约测试 `tests/contracts/test_port_contract_document_parser.py` 覆盖新解析器
 
@@ -569,6 +573,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
   - 测试 `striprtf` 不可用时优雅降级（mock ImportError）
   - 测试空 RTF 返回 failed
 - [ ] Subtask 7.2: 🟢 绿 — 实现 RTFParser
+  - **前置步骤：** `poetry add striprtf` 安装 RTF 解析库
   - `try: from striprtf.striprtf import rtf_to_text` 提取纯文本
   - `except ImportError:` 返回 failed（建议转换为 DOCX）
 - [ ] Subtask 7.3: 🔄 重构 — 优化 RTFParser 代码
@@ -598,27 +603,50 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
   - 测试所有新 MIME 类型路由正确
   - 测试不支持的 MIME 返回 ValueError
   - 测试注册到 Composition Root 后 DI 解析正确
-- [ ] Subtask 8.2: 🟢 绿 — 扩展 CompositeDocumentParser
+- [ ] Subtask 8.2: 🟢 绿 — 扩展 CompositeDocumentParser 和相关基础设施
   - 新增 MIME 类型常量（PPTX/PPT/XLSX/XLS/CSV/JPEG/PNG/GIF/HTML/MD/RTF）
   - 构造函数注入新解析器
   - 更新 `composition_root.py` 的 `document_parser` 注册工厂 lambda
-  - 扩展 `document_parsing_service.py` 的 `_ALLOWED_TEMP_SUFFIXES`
+  - **扩展 `_limits.py`：** 为每个新格式添加文件大小限制常量
+    ```python
+    MAX_PPTX_BYTES: int = 100 * 1024 * 1024   # PPTX 100MB
+    MAX_XLSX_BYTES: int = 50 * 1024 * 1024    # XLSX 50MB
+    MAX_CSV_BYTES: int = 100 * 1024 * 1024    # CSV 100MB（含 50MB 分块阈值）
+    MAX_IMAGE_BYTES: int = 50 * 1024 * 1024   # 图像 50MB
+    MAX_HTML_BYTES: int = 10 * 1024 * 1024    # HTML 10MB
+    MAX_MD_BYTES: int = 10 * 1024 * 1024      # Markdown 10MB
+    MAX_RTF_BYTES: int = 50 * 1024 * 1024     # RTF 50MB
+    ```
+  - **扩展 `_ALLOWED_TEMP_SUFFIXES`：** 将 `document_parsing_service.py` 中的后缀白名单从
+    ```python
+    frozenset({".pdf", ".docx", ".txt", ".tmp"})
+    ```
+    扩展为：
+    ```python
+    frozenset({".pdf", ".docx", ".txt", ".tmp",
+               ".pptx", ".ppt", ".xlsx", ".xls", ".csv",
+               ".jpg", ".jpeg", ".png", ".gif",
+               ".html", ".htm", ".md", ".rtf"})
+    ```
 - [ ] Subtask 8.3: 🔄 重构 — 优化组合解析器代码
 
-#### TDD 循环 B：集成测试
+#### 验证阶段：集成测试确认（非 TDD 循环）
+
+> ⚠️ **说明：** 集成测试验证 Task 1-7 已完成实现的解析器的端到端流程。此时所有解析器代码已实现完毕，不遵循 TDD 红→绿→重构循环（被测试实现已存在）。集成测试遵循真实基础设施验证模式：编写测试 → 运行验证 → 修复集成问题 → 确认通过。
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_document_parse_extended_integration.py`（MinIO→解析→事件） |
-| 🟢 绿 | 确认集成测试通过（复用 2-2a 集成测试基础设施） |
-| 🔄 重构 | 优化集成测试代码 |
+| 编写 | 编写 `test_document_parse_extended_integration.py`（MinIO→解析→事件） |
+| 验证 | 运行集成测试，标记集成问题 |
+| 修复 | 修复解析器间接口不匹配或路由错误 |
+| 确认 | 确认所有集成测试通过 |
 
 - [ ] Subtask 8.4: 🔴 红 — 编写集成测试
   - 测试 PPTX 完整解析流程（MinIO retrieve → parse → save → event）
   - 测试 XLSX 完整解析流程
   - 测试图像 OCR 完整解析流程
   - 测试并发解析 ≥10（`asyncio.gather()` 并发调用 `parse_document`）
-  - 测试解析性能 P95 < 500ms
+  - 测试非 OCR 格式解析性能 P95 < 500ms（OCR 格式 P95 < 5s，见 AC-8）
 - [ ] Subtask 8.5: 🟢 绿 — 确认集成测试通过
 - [ ] Subtask 8.6: 🔄 重构 — 优化集成测试代码
 
@@ -627,7 +655,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 - [ ] 所有 MIME 路由正确
 - [ ] 集成测试全部通过
 - [ ] 并发解析 ≥10
-- [ ] P95 < 500ms
+- [ ] 非 OCR 格式 P95 < 500ms，OCR 格式 P95 < 5s
 
 ---
 
@@ -640,7 +668,10 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 
 #### 架构验证测试实现
 
-- [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_arch_document_parser_extended.py`
+- [ ] Subtask 9.1: 扩展 `tests/unit/architecture/test_arch_document_parser.py`
+  - 在 `TestInfrastructureLayerPlacement` 中为 7 个新解析器各添加 `test_*_parser_in_infrastructure` 方法
+  - 在 `TestDependencyDirection` 中添加新解析器协议满足性验证
+  - 避免创建新文件（现有 102 行架构测试可扩展），仅当文件过大时才拆分为 `extended` 文件
 - [ ] Subtask 9.2: 验证所有新解析器位于 `src/infrastructure/` 而非 `src/domain/`
 - [ ] Subtask 9.3: 验证新解析器实现 `DocumentParserPort` 协议（`isinstance` 检查）
 - [ ] Subtask 9.4: 验证领域层无新增外部依赖（import-linter 校验）
@@ -668,19 +699,20 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 | 🟢 绿 | 编写 `test_acceptance_document_parse_extended.py` 的 BDD 步骤实现 |
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 10.1: 场景 1 — 验证 `src` 完成清单的逐项确认
-  - 7 个新解析器文件存在
-  - composite_parser.py 已扩展
-  - composition_root.py 已更新
-  - _ALLOWED_TEMP_SUFFIXES 已扩展
-- [ ] Subtask 10.2: 场景 2 — 验证测试目录完成清单
+- [ ] Subtask 10.1: 人工确认 `src` 交付物完成清单（非 pytest，为 Checklist）
+  - 7 个新解析器文件存在且代码可用
+  - composite_parser.py 已扩展 MIME 路由
+  - composition_root.py 已更新 document_parser 注册工厂
+  - _ALLOWED_TEMP_SUFFIXES 已扩展（含所有新格式后缀）
+  - **_limits.py 已扩展**（含所有新格式大小限制常量）
+- [ ] Subtask 10.2: 人工确认测试交付物完成清单（非 pytest，为 Checklist）
   - 7 个解析器单元测试文件存在
-  - 组合解析器扩展测试存在
-  - 集成测试存在
-  - 架构约束测试存在
-  - 验收测试存在
-- [ ] Subtask 10.3: 运行开发结束验收测试并确认通过
-- [ ] Subtask 10.4: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
+  - 组合解析器扩展测试覆盖新 MIME 路由
+  - 集成测试验证完整端到端流程
+  - 架构约束测试覆盖所有 11 个解析器（4 个原有 + 7 个新增）
+  - 验收测试覆盖所有 AC 场景
+- [ ] Subtask 10.3: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
+  - 文件存在性由编译/导入隐式验证（`import xxx_parser` 失败即文件缺失）
 
 **完成标准/Definition of Done:**
 - [ ] `src` 完成清单已逐项验证确认
@@ -694,7 +726,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 
 ### 相关架构模式和约束 Architecture Patterns & Constraints
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
+**来源:** [`architecture.md`](../../../docs/architecture/architecture.md)
 
 - **架构模式:** 六边形架构（Ports & Adapters），组合模式（CompositeDocumentParser MIME 路由）
 - **设计约束:** 领域层零依赖、依赖方向严格、端口统一注册、Composition Root 装配
@@ -718,7 +750,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 | PPTX | `python-pptx` | 已安装，纯 Python，支持幻灯片/表格/备注 |
 | PPT | 返回不支持 | 旧格式，需 LibreOffice 转换，MVP 不引入 |
 | XLSX | `openpyxl` (read_only=True) | 已安装，内存友好，支持公式计算值 |
-| XLS | 返回不支持或 `xlrd` | xlrd 2.0+ 仅支持 XLS，可按需新增 |
+| XLS | 返回不支持 | 旧格式，xlrd 需额外依赖且处于维护模式，与 PPT→PPTX 策略一致 |
 | CSV | 标准库 `csv` + `csv.Sniffer` | 零依赖，功能足够 |
 | 图像 | `Pillow` + `pytesseract` | 已安装，元数据+OCR 双能力 |
 | HTML | `BeautifulSoup` + `lxml` | 间接已安装，性能最佳组合 |
@@ -780,14 +812,13 @@ src/
     ├── acceptance/
     │   ├── test_acceptance_document_parse_extended.feature  # ★ 新增
     │   └── test_acceptance_document_parse_extended.py       # ★ 新增
-    └── fixtures/documents/
-        ├── sample.pptx                  # ★ 新增测试 fixture
-        ├── sample.xlsx                  # ★ 新增测试 fixture
-        ├── sample.csv                   # ★ 新增测试 fixture
-        ├── sample.png                   # ★ 新增测试 fixture
-        ├── sample.html                  # ★ 新增测试 fixture
-        ├── sample.md                    # ★ 新增测试 fixture
-        └── sample.rtf                   # ★ 新增测试 fixture
+```
+
+> **Fixture 策略说明：** 本 Story 沿用 Story 2-2a 的编程式 fixture 生成模式，不使用静态 fixture 文件。
+> 测试文件内定义 `_create_*()` 工厂函数，通过 `tempfile.NamedTemporaryFile`
+> 即时生成所需格式的临时文件，使用 `try/finally: os.unlink()` 清理。
+> 各格式生成方式：PPTX→`python-pptx.Presentation()` / XLSX→`openpyxl.Workbook()` / CSV→`tempfile`+文本写入 /
+> PNG→`PIL.Image.new()` / HTML/MD/RTF→`tempfile`+文本写入。
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
@@ -830,8 +861,8 @@ src/
 | openpyxl | ^3.1.2 | 已安装 | XLSX 解析 |
 | Pillow | ^12.1.1 | 已安装 | 图像处理 |
 | pytesseract | ^0.3.10 | 已安装 | OCR |
-| beautifulsoup4 | 间接依赖 | 已安装 | HTML 解析 |
-| lxml | 间接依赖 | 已安装 | HTML/XML 解析 |
+| beautifulsoup4 | ^4.12 | **间接依赖（已安装，建议提升为直接依赖）** | HTML 解析 |
+| lxml | ^6.0 | **间接依赖（已安装，建议提升为直接依赖）** | HTML/XML 解析 |
 | pandas | ^2.1.3 | 已安装（可选使用） | CSV/Excel 数据处理 |
 | striprtf | — | **未安装** | RTF 解析（需新增 `poetry add striprtf`） |
 
@@ -892,16 +923,10 @@ src/
 - `tests/unit/architecture/test_arch_document_parser_extended.py` — 架构约束测试
 - `tests/integration/test_document_parse_extended_integration.py` — 集成测试
 - `tests/acceptance/test_acceptance_document_parse_extended.feature` — Gherkin 验收测试
-- `tests/acceptance/test_acceptance_document_parse_extended.py` — BDD 步骤实现
-- `tests/fixtures/documents/sample.pptx` — PPTX 测试 fixture
-- `tests/fixtures/documents/sample.xlsx` — XLSX 测试 fixture
-- `tests/fixtures/documents/sample.csv` — CSV 测试 fixture
-- `tests/fixtures/documents/sample.png` — PNG 测试 fixture
-- `tests/fixtures/documents/sample.html` — HTML 测试 fixture
-- `tests/fixtures/documents/sample.md` — Markdown 测试 fixture
-- `tests/fixtures/documents/sample.rtf` — RTF 测试 fixture
+- `tests/acceptance/test_acceptance_document_parse_extended.py` — 验收测试实现（按 AC 分组纯 pytest 测试类）
 
 **待修改的文件/To Be Modified:**
+- `src/infrastructure/external_services/document_parsing/_limits.py` — 扩展新格式文件大小限制常量
 - `src/infrastructure/external_services/document_parsing/composite_parser.py` — 扩展 MIME 路由映射
 - `src/composition_root.py` — 扩展 document_parser 注册工厂 lambda
 - `src/application/services/document_parsing_service.py` — 扩展 `_ALLOWED_TEMP_SUFFIXES`
@@ -937,7 +962,23 @@ src/
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| — | — | — | — |
+| 1 | AC-8 未注册 MIME 类型返回 `ValueError` — 与实际 CompositeDocumentParser 行为矛盾（实际返回 `ParsedDocument(parse_status=failed)`） | P0 | 修正 AC-8 和 Subtask 8.1，改为 "返回 `parse_status=failed` 的 `ParsedDocument`（不抛异常）" |
+| 2 | AC-8 解析性能 P95 < 500ms 与 OCR（pytesseract 2-5s）不可调和 | P0 | 分拆为非 OCR 格式 P95 < 500ms + OCR 格式 P95 < 5s |
+| 3 | XLS 格式处理策略模糊（"用 xlrd 或返回拒绝"），xlrd 不在依赖中 | P0 | 确定为 "返回友好拒绝消息，建议转换 XLSX"（与 PPT→PPTX 策略一致） |
+| 4 | beautifulsoup4/lxml 标注为 "间接依赖已安装"，但非直接依赖存在移除风险 | P0 | 更新状态为 "间接依赖（建议提升为直接依赖）"，标注版本号 |
+| 5 | striprtf 缺失 `poetry add` 步骤 — Task 7 无依赖安装前置 | P0 | Subtask 7.2 新增前置步骤 `poetry add striprtf` |
+| 6 | 架构文档引用路径不存在（`../../_bmad-output/planning-artifacts/architecture.md`） | P0 | 修正为 `../../../docs/architecture/architecture.md` |
+| 7 | "关键路径覆盖率 100%" 无 PRD/Epic 源头文档依据 | P0 | 替换为 "端口契约测试覆盖率 100%"（PRD 有依据） |
+| 8 | 7 个静态 fixture 文件策略与 2-2a 编程式生成模式不一致，`tests/fixtures/documents/` 目录不存在 | P0 | 删除所有静态 fixture 引用，替换为编程式 `_create_*()` 工厂函数说明 |
+| 9 | `_limits.py` 和 `_ALLOWED_TEMP_SUFFIXES` 扩展无具体内容 | P0 | Subtask 8.2 新增完整的大小限制常量和后缀白名单列表 |
+| 10 | 验收测试 BDD 风格不明确（pytest-bdd vs 纯 pytest）— 与 2-2a 实际实现矛盾 | P0 | 明确采用纯 pytest 测试类风格，`.feature` 为行为文档，注释说明 |
+| 11 | Task 8 集成测试错误标记为 "TDD 循环"（被测试实现已存在，无 "绿阶段" 代码可写） | P0 | 重命名为 "验证阶段：集成测试确认（非 TDD 循环）"，调整阶段描述 |
+| 12 | Task 9 新建架构测试文件 vs 扩展现有文件歧义 | P0 | 改为 "扩展 `test_arch_document_parser.py`"，明确添加新解析器验证方法 |
+| 13 | Task 10 文件存在性验证放入 pytest 验收测试不合适（2-2a 无此模式） | P0 | 改为人工 Checklist，文件存在性由编译/导入隐式验证 |
+| 14 | `_limits.py` 和 `_ALLOWED_TEMP_SUFFIXES` 扩展分散在多处但无专属 Task/Subtask | P0 | 集中于 Subtask 8.2，显式列出所有新增常量和后缀 |
+| 15 | 端口版本 `v1.0.0` vs `v1.1.0` 文档/代码/测试三方不一致 | P1 | 文档标注 `v1.0.0→v1.1.0`，明确需同步更新 composition_root.py 和 contract test |
+| 16 | ParsedTable 无 sheet_name 字段 — AC-2 要求存储 sheet 名称 | P1 | 通过 `ParsedPage.metadata["sheet_name"]` 存储（因 ParsedTable 无独立 metadata 字段） |
+| 17 | CSV 超大文件分块与 TXT 直接拒绝策略不一致 | P1 | 添加注释说明 "CSV 行级结构天然支持分块，与 TXT 纯文本不同" |
 
 ---
 
