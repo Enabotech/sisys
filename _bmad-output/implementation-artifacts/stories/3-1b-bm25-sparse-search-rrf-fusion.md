@@ -37,7 +37,7 @@ Story 3-1b 是 Epic 3（智能检索与知识发现）关键路径的第 2 个�
 
 **验证标准/Validation Criteria:**
 - [ ] SparseVector.indices 和 values 长度一致
-- [ ] TF-IDF 权重计算正确（含 IDF 平滑：1.0 + log(1+N/(1+df))）
+- [ ] TF-IDF 权重计算正确（实际公式：`tf * (1.0 + log(1 + total_terms/(1 + freq)))`，其中 tf=freq/total_terms，total_terms 为当前文档词元数，freq 为词频——单文档内近似 IDF，非标准跨文档 IDF）
 - [ ] 英文停用词正确过滤
 - [ ] 空文本边界处理
 - [ ] 词汇哈希映射稳定性（hash(term) % 1000000）
@@ -54,7 +54,7 @@ Story 3-1b 是 Epic 3（智能检索与知识发现）关键路径的第 2 个�
 - [ ] 端到端：text → sparse_vector → search_sparse → ranked results
 - [ ] 结果包含 id, score, payload 字段
 - [ ] 结果按 score 降序排列
-- [ ] 空查询文本返回空列表
+- [ ] 空查询文本抛出 ValueError（与 DenseSemanticSearchService 一致）
 - [ ] Payload 过滤正确传递（tenant_id, filter_payload）
 
 ### AC-3: Dense + Sparse 并行双路召回
@@ -120,16 +120,25 @@ Story 3-1b 是 Epic 3（智能检索与知识发现）关键路径的第 2 个�
 - [ ] 复用已有 `DenseSearchResult` TypedDict（`src/application/services/dense_search_service.py`）
 
 #### 统一端口定义注册与管理 (Port Contract)
-- [ ] `bm25_builder` — 将已有 `BM25Builder` 注册为端口（领域层无抽象 Protocol，基础设施直接注册）
-  - 端口名称：`bm25_builder`，生命周期：SCOPED，Owner：search-team
+
+> ⚠️ **架构约束：** 应用层（application）禁止导入基础设施层（infrastructure），由 import-linter `application-no-infrastructure` 规则强制校验。
+> 因此 SparseSearchService 不能直接引用 BM25Builder 类型，必须在 domain 层定义 BM25BuilderPort Protocol。
+> 这与 DenseSemanticSearchService 注入 EmbeddingServicePort（domain Protocol）的模式完全一致。
+
+- [ ] `bm25_builder_port` — 新增领域层 Protocol
+  - 端口名称：`bm25_builder`，接口：`BM25BuilderPort`（domain 层 Protocol），生命周期：SCOPED，Owner：search-team
+  - 文件：`src/domain/ports/bm25_builder.py`
+  - 方法签名：`build_sparse_vector(self, text: str) -> Any`（返回含 indices/values 属性的对象，运行时为 SparseVector）
+  - 设计决策：返回类型使用 `Any` 而非 `SparseVector`（SparseVector 在 infrastructure 层，domain 层不能引用）
 - [ ] `sparse_search_service` — 新增应用服务端口
   - 端口名称：`sparse_search_service`，接口：`SparseSearchService`（服务类自身作为 interface）
   - 生命周期：SCOPED，Owner：search-team
+  - 构造函数注入 `BM25BuilderPort`（domain Protocol）和 `L3VectorPort`（domain Protocol）
 - [ ] `hybrid_search_service` — 新增应用服务端口
   - 端口名称：`hybrid_search_service`，接口：`HybridSearchService`（服务类自身作为 interface）
   - 生命周期：SCOPED，Owner：search-team
-- [ ] `rrf_fusion` — RRF 融合算法（领域服务，纯函数，可独立注册或内嵌于 HybridSearchService）
-- [ ] 端口注册中心 `src/domain/ports/registry.py` 中登记新端口
+- [ ] `rrf_fusion` — RRF 融合算法（`src/shared/rrf_fusion.py` 纯函数，无端口注册）
+- [ ] 端口注册中心 `src/domain/ports/registry.py` 中登记新端口（无需修改，自动通过 register_port 注册）
 - [ ] 端口实现 `src/composition_root.py` 统一注册
 - [ ] 端口契约测试通过（`tests/contracts/test_port_contract_sparse_hybrid_search.py`）
 
@@ -137,9 +146,15 @@ Story 3-1b 是 Epic 3（智能检索与知识发现）关键路径的第 2 个�
 
 | 端口名称 | 版本 | 接口 | 实现模块 | 生命周期 | Owner |
 |---------|------|------|---------|---------|-------|
-| `bm25_builder` | v1.0.0 | `BM25Builder`（服务类自身作为 interface） | `src.infrastructure.storage.qdrant.bm25_builder.BM25Builder` | SCOPED | search-team |
+| `bm25_builder` | v1.0.0 | `BM25BuilderPort`（domain Protocol） | `src.infrastructure.storage.qdrant.bm25_builder.BM25Builder` | SCOPED | search-team |
 | `sparse_search_service` | v1.0.0 | `SparseSearchService`（服务类自身作为 interface） | `src.application.services.sparse_search_service.SparseSearchService` | SCOPED | search-team |
 | `hybrid_search_service` | v1.0.0 | `HybridSearchService`（服务类自身作为 interface） | `src.application.services.hybrid_search_service.HybridSearchService` | SCOPED | search-team |
+
+**新增领域端口（本 Story 新建）：**
+
+| 文件 | Protocol | 方法 | 说明 |
+|------|----------|------|------|
+| `src/domain/ports/bm25_builder.py` | `BM25BuilderPort` | `build_sparse_vector(text: str) -> Any` | BM25 稀疏向量构建抽象 |
 
 **已有端口（复用，不修改）：**
 
@@ -158,18 +173,23 @@ Story 3-1b 是 Epic 3（智能检索与知识发现）关键路径的第 2 个�
 **四层架构定义**
 | 层次 | 目录 | 职责 |
 |------|------|------|
-| domain | `src/domain/` | 本 Story 不新增领域端口（复用已有 L3VectorPort, EmbeddingServicePort） |
+| domain | `src/domain/` | 新增 BM25BuilderPort Protocol（`src/domain/ports/bm25_builder.py`） |
 | application | `src/application/` | SparseSearchService + HybridSearchService + RRF 融合纯函数 |
 | interfaces | `src/interfaces/` | 本 Story 不涉及 |
-| infrastructure | `src/infrastructure/` | BM25Builder 注册（已有，仅注册） |
+| infrastructure | `src/infrastructure/` | BM25Builder 实现 BM25BuilderPort（已有，无需修改） |
+| shared | `src/shared/` | rrf_fusion.py 纯函数（零外部依赖） |
 
 **依赖方向矩阵**
-| 起点 \ 终点 | domain | application | interfaces | infrastructure |
-|---|---|---|---|---|
-| **domain** | — | ✗ | ✗ | ✗ |
-| **application** (`sparse_search_service.py`) | ✓ 导入 L3VectorPort | — | ✗ | ✗ |
-| **application** (`hybrid_search_service.py`) | ✓ 导入 L3VectorPort | ✓ 导入 DenseSemanticSearchService + SparseSearchService | ✗ | ✗ |
-| **infrastructure** (`bm25_builder.py`) | ✗（已有，纯 TF-IDF 计算） | ✗ | ✗ | — |
+| 起点 \ 终点 | domain | application | interfaces | infrastructure | shared |
+|---|---|---|---|---|---|
+| **domain** | — | ✗ | ✗ | ✗ | ✗ |
+| **application** (`sparse_search_service.py`) | ✓ 导入 BM25BuilderPort + L3VectorPort | — | ✗ | ✗ | ✗ |
+| **application** (`hybrid_search_service.py`) | ✓ 导入 L3VectorPort | ✓ 导入 DenseSemanticSearchService + SparseSearchService | ✗ | ✗ | ✓ 导入 rrf_fusion |
+| **shared** (`rrf_fusion.py`) | ✗ | ✗ | ✗ | ✗ | —（纯 Python 标准库） |
+| **infrastructure** (`bm25_builder.py`) | ✗（已有，纯 TF-IDF 计算） | ✗ | ✗ | — | ✗ |
+
+> **注意：** application 导入 shared 在当前 import-linter 配置中不受约束（shared 不在任何 defined layer 中），
+> 但架构上应确保 shared 模块仅使用 Python 标准库，零外部依赖。
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_acceptance_sparse_hybrid_search.feature`
@@ -302,18 +322,20 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
 
 > **目的：** 在进入代码实现前，明确数据模型、端口契约、API 签名、Gherkin 验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 定义 `SparseSearchResult` TypedDict（id, score, payload）— 与 DenseSearchResult 结构对称
-- [ ] Subtask 0.2: 定义 `HybridSearchResult` TypedDict（id, score, payload, source）
-- [ ] Subtask 0.3: 定义 `SparseSearchService` API 签名（`search(collection, query_text, limit, tenant_id, filter_payload)`）
-- [ ] Subtask 0.4: 定义 `HybridSearchService` API 签名（`search(collection, query_text, limit, rrf_k, tenant_id, filter_payload)`）
-- [ ] Subtask 0.5: 定义 RRF 融合纯函数签名（`rrf_fusion(result_lists, k=60) -> list[dict]`）
-- [ ] Subtask 0.6: 编写端口契约测试 `tests/contracts/test_port_contract_sparse_hybrid_search.py`
+- [ ] Subtask 0.1: 新增 `src/domain/ports/bm25_builder.py` — 定义 BM25BuilderPort Protocol（方法：`build_sparse_vector(text: str) -> Any`）
+- [ ] Subtask 0.2: 定义 `SparseSearchResult` TypedDict（id, score, payload）— 与 DenseSearchResult 结构对称
+- [ ] Subtask 0.3: 定义 `HybridSearchResult` TypedDict（id, score, payload, source）
+- [ ] Subtask 0.4: 定义 `SparseSearchService` API 签名（`search(collection, query_text, limit, tenant_id, filter_payload)`）— 构造函数注入 BM25BuilderPort + L3VectorPort
+- [ ] Subtask 0.5: 定义 `HybridSearchService` API 签名（`search(collection, query_text, limit, rrf_k, tenant_id, filter_payload)`）
+- [ ] Subtask 0.6: 定义 RRF 融合纯函数签名（`rrf_fusion(result_lists, k=60) -> list[dict]`）
+- [ ] Subtask 0.7: 编写端口契约测试 `tests/contracts/test_port_contract_sparse_hybrid_search.py`
   > **契约测试模式参考**：项目无 PortContractTest 基类，使用独立三方法模式：
   > `test_port_is_registered`（验证注册）+ `test_implementation_has_required_methods`（验证方法签名）
   > + `test_metadata_complete`（验证 version/owner/module）。参考 `tests/contracts/test_port_contract_embedding_service.py`（Story 3-1a）。
-- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_sparse_hybrid_search.feature`
-- [ ] Subtask 0.8: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_sparse_hybrid_search.py`
-- [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
+  > **注意：** bm25_builder 端口的 interface 为 BM25BuilderPort（domain Protocol），REQUIRED_METHODS 包含 build_sparse_vector。
+- [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_sparse_hybrid_search.feature`
+- [ ] Subtask 0.9: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_sparse_hybrid_search.py`
+- [ ] Subtask 0.10: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕
@@ -377,10 +399,13 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
   - 验证 `tenant_id` 自动注入到 `filter_payload`
   - 验证现有 `filter_payload` 保留（与 tenant_id 合并）
   - 验证 `limit` 传递正确
-  - 验证空查询文本返回空列表
+  - 验证空查询文本抛出 ValueError("查询文本不能为空")（与 DenseSemanticSearchService 行为一致）
   - 验证 search_sparse 异常时返回空列表（异常隔离）
 - [ ] Subtask 2.2: 🟢 绿 — 创建 `src/application/services/sparse_search_service.py`
   ```python
+  from src.domain.ports.bm25_builder import BM25BuilderPort
+  from src.domain.ports.l3_vector import L3VectorPort
+
   class SparseSearchResult(TypedDict):
       id: str | int
       score: float
@@ -389,9 +414,9 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
   class SparseSearchService:
       """BM25 稀疏检索应用服务
 
-      编排流程：text → BM25Builder.build_sparse_vector → L3VectorPort.search_sparse
+      编排流程：text → BM25BuilderPort.build_sparse_vector → L3VectorPort.search_sparse
       """
-      def __init__(self, bm25_builder: BM25Builder, vector_storage: L3VectorPort): ...
+      def __init__(self, bm25_builder: BM25BuilderPort, vector_storage: L3VectorPort): ...
 
       async def search(
           self, collection: str, query_text: str, limit: int = 10,
@@ -399,8 +424,10 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
       ) -> list[SparseSearchResult]: ...
   ```
   - 使用 `asyncio.to_thread()` 包装同步 `build_sparse_vector()` 调用（BM25Builder 为同步方法）
-  - SparseVector 转换为 dict `{"indices": [...], "values": [...]}` 传递给 L3VectorPort.search_sparse()
+  - BM25Builder 返回 SparseVector（infrastructure 层 dataclass），SparseSearchService 将其转为 dict `{"indices": [...], "values": [...]}` 传递给 L3VectorPort.search_sparse()
+  - L3VectorPort.search_sparse() 接受 `sparse_vector: dict`（QdrantAdapter 内部再转为 SparseVector）
   - tenant_id 注入逻辑与 DenseSemanticSearchService 保持一致
+  - 空查询抛出 ValueError("查询文本不能为空")（与 DenseSemanticSearchService 行为一致）
 - [ ] Subtask 2.3: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
@@ -432,7 +459,7 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
   - 测试空输入（两路均为空返回空列表）
   - 测试单路为空（仅 Dense 有结果或仅 Sparse 有结果）
   - 测试 limit 参数截断
-  - 测试 rank 从 0 开始还是从 1 开始的一致性（参考学术论文，rank 从 0 开始：`1/(k + rank)`）
+  - 测试 rank 从 0 开始的一致性（项目决策：使用 Python 0-indexed 惯例，`rank_i(d)` 为文档 d 在第 i 路结果列表中的索引位置，即第一个文档 rank=0）
 - [ ] Subtask 3.2: 🟢 绿 — 实现 RRF 融合纯函数
   - 位置：`src/shared/rrf_fusion.py`（纯函数，无外部依赖）
     > **设计决策：** RRF 作为纯函数放在 `src/shared/` 而非 `src/domain/`。符合 RRF 作为通用算法（非领域概念）的定位。
@@ -538,11 +565,12 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
 - [ ] Subtask 4.2: 🟢 绿 — 修改 `src/composition_root.py`，在 "Search Ports (Epic 3)" 区块添加：
   ```python
   # bm25_builder — SCOPED（轻量无状态，每次调用独立）
+  from src.domain.ports.bm25_builder import BM25BuilderPort
   from src.infrastructure.storage.qdrant.bm25_builder import BM25Builder
   register_port(
       name="bm25_builder",
       version="v1.0.0",
-      interface=BM25Builder,
+      interface=BM25BuilderPort,
       impl=lambda resolver: BM25Builder(),
       module="src.infrastructure.storage.qdrant.bm25_builder",
       lifetime=Lifetime.SCOPED,
@@ -550,7 +578,7 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
       tags=("search", "sparse", "bm25"),
   )
 
-  # sparse_search_service — SCOPED（编排 BM25Builder + L3VectorPort）
+  # sparse_search_service — SCOPED（编排 BM25BuilderPort + L3VectorPort）
   from src.application.services.sparse_search_service import SparseSearchService
   register_port(
       name="sparse_search_service",
@@ -745,7 +773,9 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
 | 线性加权融合 | 权重可调 | 分数尺度不一致问题严重（Dense cosine vs BM25 分数分布差异大） | 不采用 |
 | 学习排序（LTR） | 理论最优 | 需要标注数据，MVP 不可行 | V2 考虑 |
 
-**RRF 公式：** `score(d) = Σ 1/(k + rank_i(d))`，其中 k=60，rank 从 0 开始
+**RRF 公式：** `score(d) = Σ 1/(k + rank_i(d))`，其中 k=60，rank 从 0 开始（Python 0-indexed 惯例）
+
+**rank 起始值说明：** 学术论文 Cormack et al. (2009) 使用 1-based rank，本项目采用 0-based（与 Python enumerate 惯例一致）。两种方式的排序等价，仅绝对分值有微小差异（0-based 首位 1/60 vs 1-based 首位 1/61）。
 
 **设计原因：**
 - RRF 是 rank-based 融合，不依赖原始分数的绝对值，天然处理 Dense（cosine 0-1）和 Sparse（BM25 0-N）分数尺度差异
@@ -756,11 +786,11 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
 
 | 组件 | 路径 | 复用方式 |
 |------|------|---------|
-| `L3VectorPort.search_sparse()` | `src/domain/ports/l3_vector.py` | SparseSearchService 直接调用 |
-| `QdrantAdapter.search_sparse()` | `src/infrastructure/storage/qdrant/qdrant_adapter.py` | l3_vector 端口实现（已有） |
-| `QdrantVectorStorage.search_sparse()` | `src/infrastructure/storage/qdrant/vector_storage.py` | 已有稀疏检索实现（NamedSparseVector） |
-| `BM25Builder` | `src/infrastructure/storage/qdrant/bm25_builder.py` | SparseSearchService 注入（需注册为端口） |
-| `SparseVector` dataclass | `src/infrastructure/storage/qdrant/models.py` | BM25Builder 输出类型 |
+| `L3VectorPort.search_sparse()` | `src/domain/ports/l3_vector.py` | SparseSearchService 直接调用（接受 `sparse_vector: dict`） |
+| `QdrantAdapter.search_sparse()` | `src/infrastructure/storage/qdrant/qdrant_adapter.py` | l3_vector 端口实现（已有），内部 dict→SparseVector 转换 |
+| `QdrantVectorStorage.search_sparse()` | `src/infrastructure/storage/qdrant/vector_storage.py` | 已有稀疏检索实现（NamedSparseVector，异常时返回空列表） |
+| `BM25Builder` | `src/infrastructure/storage/qdrant/bm25_builder.py` | SparseSearchService 通过 BM25BuilderPort（domain Protocol）注入 |
+| `SparseVector` dataclass | `src/infrastructure/storage/qdrant/models.py` | BM25Builder 输出类型（application 层不直接引用，转为 dict 传递） |
 | `EmbeddingServicePort` | `src/domain/ports/embedding_service.py` | HybridSearchService 通过 dense_search_service 间接使用 |
 | `DenseSemanticSearchService` | `src/application/services/dense_search_service.py` | HybridSearchService 注入 |
 | `DenseSearchResult` TypedDict | `src/application/services/dense_search_service.py` | 结果结构参考 |
@@ -798,6 +828,9 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
 
 ```
 src/
+├── domain/
+│   └── ports/
+│       └── bm25_builder.py           # [NEW] BM25BuilderPort Protocol
 ├── shared/
 │   └── rrf_fusion.py                # [NEW] RRF 融合纯函数
 ├── application/
@@ -808,12 +841,12 @@ src/
 ├── infrastructure/
 │   └── storage/
 │       └── qdrant/
-│           ├── bm25_builder.py        # [已有] BM25 稀疏向量构建
+│           ├── bm25_builder.py        # [已有] BM25 稀疏向量构建（实现 BM25BuilderPort）
 │           ├── vector_storage.py      # [已有] search_sparse() 实现
-│           ├── qdrant_adapter.py      # [已有] search_sparse() 适配
+│           ├── qdrant_adapter.py      # [已有] search_sparse() 适配（dict→SparseVector）
 │           ├── models.py             # [已有] SparseVector, VectorPoint
 │           └── collection_manager.py  # [已有] sparse_vectors_config 支持
-└── composition_root.py               # [MODIFY] 新增 3 个端口注册
+└── composition_root.py               # [MODIFY] 新增 3 个端口注册（bm25_builder 用 BM25BuilderPort 接口）
 
 tests/
 ├── unit/
@@ -907,6 +940,7 @@ tests/
 - `_bmad-output/implementation-artifacts/stories/3-1b-bm25-sparse-search-rrf-fusion.md`
 
 **待创建的文件/To Be Created (Dev Story 实施):**
+- `src/domain/ports/bm25_builder.py` — BM25BuilderPort Protocol（domain 层抽象）
 - `src/shared/rrf_fusion.py` — RRF 融合纯函数
 - `src/application/services/sparse_search_service.py` — BM25 稀疏检索服务
 - `src/application/services/hybrid_search_service.py` — 混合检索 + RRF 融合服务
@@ -923,10 +957,10 @@ tests/
 - `src/composition_root.py` — 新增 bm25_builder, sparse_search_service, hybrid_search_service 注册
 
 **已有文件（复用，不修改）：**
-- `src/domain/ports/l3_vector.py` — L3VectorPort.search_sparse() 已有
-- `src/infrastructure/storage/qdrant/bm25_builder.py` — BM25Builder 已有
-- `src/infrastructure/storage/qdrant/qdrant_adapter.py` — search_sparse 适配已有
-- `src/infrastructure/storage/qdrant/vector_storage.py` — NamedSparseVector 检索已有
+- `src/domain/ports/l3_vector.py` — L3VectorPort.search_sparse() 已有（接受 dict 参数）
+- `src/infrastructure/storage/qdrant/bm25_builder.py` — BM25Builder 已有（实现 BM25BuilderPort via duck typing）
+- `src/infrastructure/storage/qdrant/qdrant_adapter.py` — search_sparse 适配已有（dict→SparseVector 内部转换）
+- `src/infrastructure/storage/qdrant/vector_storage.py` — NamedSparseVector 检索已有（异常返回空列表）
 - `src/infrastructure/storage/qdrant/models.py` — SparseVector 已有
 - `src/domain/ports/embedding_service.py` — EmbeddingServicePort 已有
 - `src/application/services/dense_search_service.py` — DenseSemanticSearchService 已有
