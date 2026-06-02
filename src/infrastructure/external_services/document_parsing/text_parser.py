@@ -81,7 +81,7 @@ class TextParser(DocumentParserPort):
 
         try:
             # 编码检测：UTF-8 → GBK → GB18030（GB18030 是 GBK 超集，作为兜底）
-            text = detect_and_decode(raw_bytes)
+            text, _encoding = detect_and_decode(raw_bytes)
 
             # 段落分割
             paragraphs = self._split_paragraphs(text)

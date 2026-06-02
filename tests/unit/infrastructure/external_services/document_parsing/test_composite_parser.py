@@ -15,6 +15,18 @@ MIME_PDF = "application/pdf"
 MIME_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 MIME_DOC = "application/msword"
 MIME_TXT = "text/plain"
+# Story 2-2b 扩展格式 MIME 常量
+MIME_PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+MIME_PPT = "application/vnd.ms-powerpoint"
+MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+MIME_XLS = "application/vnd.ms-excel"
+MIME_CSV = "text/csv"
+MIME_JPEG = "image/jpeg"
+MIME_PNG = "image/png"
+MIME_GIF = "image/gif"
+MIME_HTML = "text/html"
+MIME_MARKDOWN = "text/markdown"
+MIME_RTF = "application/rtf"
 
 
 def _create_minimal_pdf() -> str:
@@ -45,12 +57,33 @@ def _create_minimal_txt() -> str:
 
 
 def _build_composite():
-    """构造使用 dict 注入的 CompositeDocumentParser（与 composition_root 一致）"""
+    """构造使用 dict 注入的 CompositeDocumentParser（与 composition_root 一致，包含全部 15 种 MIME 映射）"""
     from src.infrastructure.external_services.document_parsing.composite_parser import (
         CompositeDocumentParser,
     )
+    from src.infrastructure.external_services.document_parsing.csv_parser import (
+        CSVParser,
+    )
+    from src.infrastructure.external_services.document_parsing.excel_parser import (
+        ExcelParser,
+    )
+    from src.infrastructure.external_services.document_parsing.html_parser import (
+        HTMLParser,
+    )
+    from src.infrastructure.external_services.document_parsing.image_parser import (
+        ImageParser,
+    )
+    from src.infrastructure.external_services.document_parsing.markdown_parser import (
+        MarkdownParser,
+    )
     from src.infrastructure.external_services.document_parsing.pdf_parser import (
         PDFParser,
+    )
+    from src.infrastructure.external_services.document_parsing.pptx_parser import (
+        PptxParser,
+    )
+    from src.infrastructure.external_services.document_parsing.rtf_parser import (
+        RTFParser,
     )
     from src.infrastructure.external_services.document_parsing.text_parser import (
         TextParser,
@@ -63,8 +96,20 @@ def _build_composite():
         parsers={
             MIME_PDF: PDFParser(),
             MIME_DOCX: WordParser(),
-            MIME_DOC: WordParser(),  # DOC 格式由 WordParser 返回友好拒绝消息
+            MIME_DOC: WordParser(),
             MIME_TXT: TextParser(),
+            # Story 2-2b 扩展格式
+            MIME_PPTX: PptxParser(),
+            MIME_PPT: PptxParser(),
+            MIME_XLSX: ExcelParser(),
+            MIME_XLS: ExcelParser(),
+            MIME_CSV: CSVParser(),
+            MIME_JPEG: ImageParser(),
+            MIME_PNG: ImageParser(),
+            MIME_GIF: ImageParser(),
+            MIME_HTML: HTMLParser(),
+            MIME_MARKDOWN: MarkdownParser(),
+            MIME_RTF: RTFParser(),
         },
     )
 
@@ -148,76 +193,64 @@ class TestCompositeParserPortContract:
 
 
 class TestExtendedFormatRouting:
-    """Story 2-2b 扩展格式 MIME 路由测试"""
+    """Story 2-2b 扩展格式 MIME 路由测试 — 通过 CompositeDocumentParser 路由"""
 
     def test_pptx_mime_routes_to_pptx_parser(self) -> None:
-        """PPtX MIME 类型路由到 PptxParser"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
-
+        """PPTX MIME 类型路由到 PptxParser"""
+        parser = _build_composite()
         pptx = _create_minimal_pptx()
         try:
-            parser = PptxParser()
-            result = parser.parse(pptx, "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+            result = parser.parse(pptx, MIME_PPTX)
             assert result.is_completed()
         finally:
             os.unlink(pptx)
 
     def test_xlsx_mime_routes_to_excel_parser(self) -> None:
         """XLSX MIME 类型路由到 ExcelParser"""
+        parser = _build_composite()
         xlsx = _create_minimal_xlsx()
         try:
-            from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
-
-            parser = ExcelParser()
-            result = parser.parse(xlsx, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            result = parser.parse(xlsx, MIME_XLSX)
             assert result.is_completed()
         finally:
             os.unlink(xlsx)
 
     def test_csv_mime_routes_to_csv_parser(self) -> None:
         """CSV MIME 类型路由到 CSVParser"""
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
-
+        parser = _build_composite()
         path = _create_minimal_txt()
         try:
-            parser = CSVParser()
-            result = parser.parse(path, "text/csv")
+            result = parser.parse(path, MIME_CSV)
             assert result.is_completed()
         finally:
             os.unlink(path)
 
     def test_html_mime_routes_to_html_parser(self) -> None:
         """HTML MIME 类型路由到 HTMLParser"""
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
-
+        parser = _build_composite()
         html_path = _create_minimal_html()
         try:
-            parser = HTMLParser()
-            result = parser.parse(html_path, "text/html")
+            result = parser.parse(html_path, MIME_HTML)
             assert result.is_completed()
         finally:
             os.unlink(html_path)
 
     def test_markdown_mime_routes_to_markdown_parser(self) -> None:
         """Markdown MIME 类型路由到 MarkdownParser"""
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
-
+        parser = _build_composite()
         md_path = _create_minimal_md()
         try:
-            parser = MarkdownParser()
-            result = parser.parse(md_path, "text/markdown")
+            result = parser.parse(md_path, MIME_MARKDOWN)
             assert result.is_completed()
         finally:
             os.unlink(md_path)
 
     def test_rtf_mime_routes_to_rtf_parser(self) -> None:
         """RTF MIME 类型路由到 RTFParser"""
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
-
+        parser = _build_composite()
         rtf_path = _create_minimal_rtf()
         try:
-            parser = RTFParser()
-            result = parser.parse(rtf_path, "text/rtf")
+            result = parser.parse(rtf_path, MIME_RTF)
             assert result.is_completed()
         finally:
             os.unlink(rtf_path)

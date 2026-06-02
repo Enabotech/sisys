@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Any
+from typing import Any, Generator
 
 import pytest
 from pytest_bdd import given, scenario, scenarios, then, when
@@ -24,9 +24,11 @@ scenarios("test_acceptance_document_parse_extended.feature")
 
 
 @pytest.fixture
-def context() -> dict[str, Any]:
-    """BDD 步骤间共享状态."""
-    return {}
+def context() -> Generator[dict[str, Any], None, None]:
+    """BDD 步骤间共享状态，teardown 时自动清理临时文件"""
+    ctx: dict[str, Any] = {}
+    yield ctx
+    _cleanup(ctx.get("temp_path", ""))
 
 
 # ===================================================================
@@ -608,7 +610,7 @@ def given_rtf_with_text(context: dict) -> None:
     tmp.write(rtf.encode("utf-8"))
     tmp.close()
     context["temp_path"] = tmp.name
-    context["mime_type"] = "text/rtf"
+    context["mime_type"] = "application/rtf"
 
 
 @given("有一个仅含 RTF 头部的空 RTF 文件")
@@ -617,7 +619,7 @@ def given_empty_rtf(context: dict) -> None:
     tmp.write(r"{\rtf1\ansi}".encode("utf-8"))
     tmp.close()
     context["temp_path"] = tmp.name
-    context["mime_type"] = "text/rtf"
+    context["mime_type"] = "application/rtf"
 
 
 @when("系统使用 RTFParser 解析该文件")
@@ -684,7 +686,7 @@ def then_mime_table_has_15_types(context: dict) -> None:
         "image/gif",
         "text/html",
         "text/markdown",
-        "text/rtf",
+        "application/rtf",
     }
     missing = expected - mime_types
     assert not missing, f"CompositeDocumentParser 缺少 MIME 路由: {missing}"

@@ -84,12 +84,14 @@ class HTMLParser(DocumentParserPort):
             texts: list[ParsedElement] = []
 
             # 提取标题元素（h1-h6），保留层级
-            for tag in body.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]):
+            heading_tags = body.find_all(["h1", "h2", "h3", "h4", "h5", "h6"])
+            for tag in heading_tags:
                 content = tag.get_text(separator=" ", strip=True)
                 if content:
                     texts.append(ParsedElement(content=content, metadata={"style": tag.name}))
+                tag.decompose()
 
-            # 提取正文段落
+            # 提取正文段落（标题已从 DOM 中移除，不会重复）
             main_text = body.get_text(separator="\n", strip=True)
             if main_text:
                 texts.append(ParsedElement(content=main_text, metadata={"style": "body"}))
