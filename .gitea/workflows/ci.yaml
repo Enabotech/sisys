@@ -186,7 +186,7 @@ jobs:
       - name: 类型检查 ( MyPy )
         run: |
           mkdir -p reports/mypy
-          poetry run mypy src/ tests/ --txt-report reports/mypy/mypy-report.txt
+          poetry run mypy src/ tests/ --pretty --show-error-codes --txt-report reports/mypy/mypy-report.txt
 
       - name: 上传质量报告
         if: always()
