@@ -1,16 +1,36 @@
 """Story 2-2a 验收测试 — 文档解析与内容提取（基础格式）
 
-按 AC（验收标准）组织，每个 AC 对应一个测试类。
+BDD 验收测试，使用 pytest-bdd 绑定 Gherkin 场景。
 测试使用真实解析器和临时 fixture 文件，验证端到端解析正确性。
+
+Run with: poetry run pytest tests/acceptance/test_acceptance_document_parse.py -v
 """
 
 from __future__ import annotations
 
 import os
 import tempfile
+from typing import Any
+
+import pytest
+from pytest_bdd import given, scenarios, then, when
+
+scenarios("test_acceptance_document_parse.feature")
+
 
 # ===================================================================
-# 内部 helpers
+# Fixtures
+# ===================================================================
+
+
+@pytest.fixture
+def context() -> dict[str, Any]:
+    """共享 BDD 步骤间状态"""
+    return {}
+
+
+# ===================================================================
+# Helpers
 # ===================================================================
 
 
@@ -96,84 +116,124 @@ def _cleanup(path: str) -> None:
 
 
 # ===================================================================
+# Background
+# ===================================================================
+
+
+@given("文档解析器已就绪")
+def given_parsers_ready(context: dict[str, Any]) -> None:
+    """初始化所有解析器实例"""
+    from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+    from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+    from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+
+    context["pdf_parser"] = PDFParser()
+    context["word_parser"] = WordParser()
+    context["text_parser"] = TextParser()
+    context["temp_files"] = []
+
+
+# ===================================================================
 # AC-1: PDF 文档解析
 # ===================================================================
 
 
-class TestAC1PDFDocumentParsing:
-    """AC-1: PDF 文档解析
+@given("一个包含文本内容的 PDF 文件")
+def given_pdf_with_text(context: dict[str, Any]) -> None:
+    """创建包含文本内容的 PDF fixture"""
+    sample_text = "Strategic Planning Report 2026"
+    path = _create_reportlab_pdf(sample_text)
+    context["fixture_path"] = path
+    context["sample_text"] = sample_text
+    context["temp_files"].append(path)
 
-    系统应支持解析 PDF 格式文档，提取文本内容，
-    每页包含 texts/tables/images 数组，bbox 字段为 null。
-    """
 
-    def test_parse_pdf_success(self) -> None:
-        """成功解析纯文本 PDF 文档"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+@given("一个加密的 PDF 文件")
+def given_encrypted_pdf(context: dict[str, Any]) -> None:
+    """创建加密 PDF fixture"""
+    path = _create_encrypted_pdf()
+    context["fixture_path"] = path
+    context["temp_files"].append(path)
 
-        sample_text = "Strategic Planning Report 2026"
-        path = _create_reportlab_pdf(sample_text)
-        try:
-            parser = PDFParser()
-            result = parser.parse(path, "application/pdf")
 
-            # 解析状态验证
-            assert result.is_completed(), f"PDF 解析应成功，实际: {result.error_message}"
-            assert result.parse_status == "completed"
-            assert len(result.pages) >= 1, "PDF 至少包含 1 页"
+@given("一个空 PDF 文件（0 页）")
+def given_empty_pdf(context: dict[str, Any]) -> None:
+    """创建空 PDF fixture"""
+    path = _create_empty_pdf()
+    context["fixture_path"] = path
+    context["temp_files"].append(path)
 
-            # 文本准确性验证（关键词匹配）
-            all_text = " ".join(t.content for p in result.pages for t in p.texts)
-            for word in sample_text.split():
-                assert word in all_text, f"关键词 '{word}' 未在提取文本中找到"
 
-            # 结构验证：每页包含 texts、tables、images 数组
-            for page in result.pages:
-                d = page.to_dict()
-                assert isinstance(d["texts"], list)
-                assert isinstance(d["tables"], list)
-                assert isinstance(d["images"], list)
+@when("系统解析该 PDF 文件")
+def when_parse_pdf(context: dict[str, Any]) -> None:
+    """执行 PDF 解析"""
+    parser = context["pdf_parser"]
+    result = parser.parse(context["fixture_path"], "application/pdf")
+    context["parse_result"] = result
 
-            # bbox 字段为 null
-            for page in result.pages:
-                for elem in page.texts:
-                    assert elem.to_dict()["bbox"] is None
-                for table in page.tables:
-                    assert table.to_dict()["bbox"] is None
-        finally:
-            _cleanup(path)
 
-    def test_parse_encrypted_pdf_fails(self) -> None:
-        """解析加密 PDF 文档失败"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+@then("提取的文本应包含原文关键词")
+def then_pdf_text_contains_keywords(context: dict[str, Any]) -> None:
+    """验证提取文本包含原文关键词"""
+    result = context["parse_result"]
+    sample_text = context.get("sample_text", "")
+    all_text = " ".join(t.content for p in result.pages for t in p.texts)
+    for word in sample_text.split():
+        assert word in all_text, f"关键词 '{word}' 未在提取文本中找到"
 
-        path = _create_encrypted_pdf()
-        try:
-            parser = PDFParser()
-            result = parser.parse(path, "application/pdf")
 
-            assert result.parse_status == "failed"
-            assert result.is_failed()
-            assert result.error_message is not None, "失败场景必须有 error_message"
-        finally:
-            _cleanup(path)
+@then("每页包含 texts、tables、images 数组")
+def then_page_structure(context: dict[str, Any]) -> None:
+    """验证每页结构"""
+    result = context["parse_result"]
+    for page in result.pages:
+        d = page.to_dict()
+        assert isinstance(d["texts"], list)
+        assert isinstance(d["tables"], list)
+        assert isinstance(d["images"], list)
 
-    def test_parse_empty_pdf_fails(self) -> None:
-        """解析空 PDF 文档（0 页）失败"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
 
-        path = _create_empty_pdf()
-        try:
-            parser = PDFParser()
-            result = parser.parse(path, "application/pdf")
+@then("每个元素的 bbox 字段值为 null")
+def then_bbox_is_null(context: dict[str, Any]) -> None:
+    """验证 bbox 字段为 null"""
+    result = context["parse_result"]
+    for page in result.pages:
+        for elem in page.texts:
+            assert elem.to_dict()["bbox"] is None
+        for table in page.tables:
+            assert table.to_dict()["bbox"] is None
 
-            assert result.parse_status == "failed"
-            assert result.error_message is not None
-            assert "空" in result.error_message or "0 页" in result.error_message, (
-                f"错误信息应说明文档为空，实际: {result.error_message}"
-            )
-        finally:
-            _cleanup(path)
+
+@then("解析状态为 completed")
+def then_status_completed(context: dict[str, Any]) -> None:
+    """验证解析状态为 completed"""
+    result = context["parse_result"]
+    assert result.is_completed(), f"解析应成功，实际: {result.error_message}"
+
+
+@then("解析状态为 failed")
+def then_status_failed(context: dict[str, Any]) -> None:
+    """验证解析状态为 failed"""
+    result = context["parse_result"]
+    assert result.is_failed(), f"解析应失败，实际状态: {result.parse_status}"
+
+
+@then("错误信息说明文档已加密")
+def then_error_encrypted(context: dict[str, Any]) -> None:
+    """验证错误信息提及加密"""
+    result = context["parse_result"]
+    assert result.error_message is not None
+    assert "加密" in result.error_message, f"错误信息应提及加密，实际: {result.error_message}"
+
+
+@then("错误信息说明文档为空")
+def then_error_empty(context: dict[str, Any]) -> None:
+    """验证错误信息提及空文档"""
+    result = context["parse_result"]
+    assert result.error_message is not None
+    assert "空" in result.error_message or "0 页" in result.error_message, (
+        f"错误信息应说明文档为空，实际: {result.error_message}"
+    )
 
 
 # ===================================================================
@@ -181,67 +241,82 @@ class TestAC1PDFDocumentParsing:
 # ===================================================================
 
 
-class TestAC2WordDocumentParsing:
-    """AC-2: Word 文档解析
+@given("一个包含标题段落和表格的 DOCX 文件")
+def given_docx_with_content(context: dict[str, Any]) -> None:
+    """创建含标题和表格的 DOCX fixture"""
+    path = _create_docx_with_heading_and_table()
+    context["fixture_path"] = path
+    context["temp_files"].append(path)
 
-    系统应支持解析 DOCX 格式文档，提取文本和表格内容，
-    识别段落样式（标题/正文/列表），拒绝旧版 DOC 格式。
-    """
 
-    def test_parse_docx_success(self) -> None:
-        """成功解析 DOCX 文档，提取文本和表格"""
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+@given("一个旧版 DOC 格式文件")
+def given_legacy_doc(context: dict[str, Any]) -> None:
+    """创建旧版 DOC fixture"""
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".doc")
+    tmp.write(b"not a valid docx")
+    tmp.close()
+    context["fixture_path"] = tmp.name
+    context["temp_files"].append(tmp.name)
 
-        path = _create_docx_with_heading_and_table()
-        mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        try:
-            parser = WordParser()
-            result = parser.parse(path, mime)
 
-            assert result.is_completed(), f"DOCX 解析应成功，实际: {result.error_message}"
+@when("系统解析该 DOCX 文件")
+def when_parse_docx(context: dict[str, Any]) -> None:
+    """执行 DOCX 解析"""
+    parser = context["word_parser"]
+    mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    result = parser.parse(context["fixture_path"], mime)
+    context["parse_result"] = result
 
-            # 文本提取验证
-            all_text = " ".join(t.content for p in result.pages for t in p.texts)
-            assert "战略规划" in all_text, f"应提取到标题文本，实际: {all_text}"
-            assert "2026年度" in all_text, f"应提取到正文内容，实际: {all_text}"
 
-            # 段落样式验证
-            styles_found = []
-            for page in result.pages:
-                for elem in page.texts:
-                    style = elem.metadata.get("style", "")
-                    if style:
-                        styles_found.append(style)
-            assert len(styles_found) > 0, "应识别到至少一个段落样式"
-            heading_styles = [s for s in styles_found if "Heading" in s or "heading" in s.lower()]
-            assert len(heading_styles) > 0, f"应识别到标题样式，实际样式列表: {styles_found}"
+@when("系统解析该 DOC 文件")
+def when_parse_doc(context: dict[str, Any]) -> None:
+    """执行 DOC 解析（应失败）"""
+    parser = context["word_parser"]
+    result = parser.parse(context["fixture_path"], "application/msword")
+    context["parse_result"] = result
 
-            # 表格结构验证
-            all_tables = [t for p in result.pages for t in p.tables]
-            assert len(all_tables) >= 1, "应至少提取到 1 个表格"
 
-            table = all_tables[0]
-            assert len(table.rows) >= 2, f"表格应至少有 2 行（表头+数据），实际: {len(table.rows)}"
-            assert len(table.rows[0]) >= 2, f"表格应至少有 2 列，实际: {len(table.rows[0])}"
-        finally:
-            _cleanup(path)
+@then("提取文本应包含标题和正文内容")
+def then_docx_text_extracted(context: dict[str, Any]) -> None:
+    """验证 DOCX 文本提取"""
+    result = context["parse_result"]
+    all_text = " ".join(t.content for p in result.pages for t in p.texts)
+    assert "战略规划" in all_text, f"应提取到标题文本，实际: {all_text}"
+    assert "2026年度" in all_text, f"应提取到正文内容，实际: {all_text}"
 
-    def test_parse_doc_legacy_fails(self) -> None:
-        """解析旧版 DOC 格式失败，建议转换为 DOCX"""
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
 
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".doc")
-        tmp.write(b"not a valid docx")
-        tmp.close()
-        try:
-            parser = WordParser()
-            result = parser.parse(tmp.name, "application/msword")
+@then("应识别到段落样式")
+def then_styles_recognized(context: dict[str, Any]) -> None:
+    """验证段落样式识别"""
+    result = context["parse_result"]
+    styles_found = []
+    for page in result.pages:
+        for elem in page.texts:
+            style = elem.metadata.get("style", "")
+            if style:
+                styles_found.append(style)
+    assert len(styles_found) > 0, "应识别到至少一个段落样式"
+    heading_styles = [s for s in styles_found if "Heading" in s or "heading" in s.lower()]
+    assert len(heading_styles) > 0, f"应识别到标题样式，实际样式列表: {styles_found}"
 
-            assert result.parse_status == "failed"
-            assert result.error_message is not None
-            assert "DOCX" in result.error_message, f"错误信息应建议转换为 DOCX，实际: {result.error_message}"
-        finally:
-            _cleanup(tmp.name)
+
+@then("表格包含行列结构")
+def then_table_structure(context: dict[str, Any]) -> None:
+    """验证表格结构"""
+    result = context["parse_result"]
+    all_tables = [t for p in result.pages for t in p.tables]
+    assert len(all_tables) >= 1, "应至少提取到 1 个表格"
+    table = all_tables[0]
+    assert len(table.rows) >= 2, f"表格应至少有 2 行，实际: {len(table.rows)}"
+    assert len(table.rows[0]) >= 2, f"表格应至少有 2 列，实际: {len(table.rows[0])}"
+
+
+@then("错误信息建议转换为 DOCX")
+def then_error_suggest_docx(context: dict[str, Any]) -> None:
+    """验证错误信息建议转换为 DOCX"""
+    result = context["parse_result"]
+    assert result.error_message is not None
+    assert "DOCX" in result.error_message, f"错误信息应建议转换为 DOCX，实际: {result.error_message}"
 
 
 # ===================================================================
@@ -249,60 +324,68 @@ class TestAC2WordDocumentParsing:
 # ===================================================================
 
 
-class TestAC3TXTDocumentParsing:
-    """AC-3: TXT 文档解析
+@given("一个 UTF-8 编码的 TXT 文件，包含多个段落")
+def given_utf8_txt(context: dict[str, Any]) -> None:
+    """创建 UTF-8 编码 TXT fixture"""
+    content = "第一部分：项目概述\n\n第二部分：实施计划\n\n第三部分：风险评估"
+    path = _create_txt_file(content, "utf-8")
+    context["fixture_path"] = path
+    context["expected_content"] = content
+    context["temp_files"].append(path)
 
-    系统应支持解析 TXT 格式文档，自动识别 UTF-8/GBK 编码，
-    按空行分割段落，正确提取中文内容。
-    """
 
-    def test_parse_txt_utf8_success(self) -> None:
-        """成功解析 UTF-8 编码 TXT 文档，按段落分割"""
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+@given("一个 GBK 编码的 TXT 文件")
+def given_gbk_txt(context: dict[str, Any]) -> None:
+    """创建 GBK 编码 TXT fixture"""
+    content = "战略规划报告摘要\n\n市场分析显示增长潜力显著\n\n技术路线图已制定"
+    path = _create_txt_file(content, "gbk")
+    context["fixture_path"] = path
+    context["expected_content"] = content
+    context["temp_files"].append(path)
 
-        content = "第一部分：项目概述\n\n第二部分：实施计划\n\n第三部分：风险评估"
-        path = _create_txt_file(content, "utf-8")
-        try:
-            parser = TextParser()
-            result = parser.parse(path, "text/plain")
 
-            assert result.is_completed(), f"UTF-8 TXT 解析应成功，实际: {result.error_message}"
+@when("系统解析该 TXT 文件")
+def when_parse_txt(context: dict[str, Any]) -> None:
+    """执行 TXT 解析"""
+    parser = context["text_parser"]
+    result = parser.parse(context["fixture_path"], "text/plain")
+    context["parse_result"] = result
 
-            # 按段落分割验证
-            texts = [t.content for p in result.pages for t in p.texts]
-            assert len(texts) >= 3, f"应按空行分割为至少 3 个段落，实际: {len(texts)} 段: {texts}"
-            assert any("第一部分" in t for t in texts), f"应包含第一段，实际: {texts}"
-            assert any("第三部分" in t for t in texts), f"应包含第三段，实际: {texts}"
 
-            # UTF-8 编码正确识别
-            all_text = " ".join(t.content for p in result.pages for t in p.texts)
-            assert "项目概述" in all_text, f"UTF-8 中文应正确提取，实际: {all_text}"
-            assert "风险评估" in all_text, f"UTF-8 中文应完整提取，实际: {all_text}"
-        finally:
-            _cleanup(path)
+@then("应按空行分割为多个段落")
+def then_paragraphs_split(context: dict[str, Any]) -> None:
+    """验证段落分割"""
+    result = context["parse_result"]
+    texts = [t.content for p in result.pages for t in p.texts]
+    assert len(texts) >= 3, f"应按空行分割为至少 3 个段落，实际: {len(texts)} 段: {texts}"
+    assert any("第一部分" in t for t in texts), f"应包含第一段，实际: {texts}"
+    assert any("第三部分" in t for t in texts), f"应包含第三段，实际: {texts}"
 
-    def test_parse_txt_gbk_success(self) -> None:
-        """成功解析 GBK 编码 TXT 文档，中文内容正确提取"""
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
 
-        content = "战略规划报告摘要\n\n市场分析显示增长潜力显著\n\n技术路线图已制定"
-        path = _create_txt_file(content, "gbk")
-        try:
-            parser = TextParser()
-            result = parser.parse(path, "text/plain")
+@then("中文内容应正确提取")
+def then_chinese_extracted(context: dict[str, Any]) -> None:
+    """验证中文内容提取"""
+    result = context["parse_result"]
+    all_text = " ".join(t.content for p in result.pages for t in p.texts)
+    assert "项目概述" in all_text, f"中文应正确提取，实际: {all_text}"
+    assert "风险评估" in all_text, f"中文应完整提取，实际: {all_text}"
 
-            assert result.is_completed(), f"GBK TXT 解析应成功，实际: {result.error_message}"
 
-            # GBK 编码正确识别
-            all_text = " ".join(t.content for p in result.pages for t in p.texts)
-            assert "战略规划" in all_text, f"GBK 中文应正确提取，实际: {all_text}"
+@then("GBK 编码应正确识别")
+def then_gbk_encoding_detected(context: dict[str, Any]) -> None:
+    """验证 GBK 编码识别"""
+    result = context["parse_result"]
+    assert result.is_completed(), f"GBK TXT 解析应成功，实际: {result.error_message}"
 
-            # 中文内容完整提取
-            chinese_keywords = ["战略规划", "市场分析", "技术路线图"]
-            for kw in chinese_keywords:
-                assert kw in all_text, f"中文关键词 '{kw}' 未在提取文本中找到"
-        finally:
-            _cleanup(path)
+
+@then("中文内容应完整提取")
+def then_gbk_chinese_extracted(context: dict[str, Any]) -> None:
+    """验证 GBK 中文内容完整提取"""
+    result = context["parse_result"]
+    all_text = " ".join(t.content for p in result.pages for t in p.texts)
+    chinese_keywords = ["战略规划", "市场分析", "技术路线图"]
+    for kw in chinese_keywords:
+        assert kw in all_text, f"中文关键词 '{kw}' 未在提取文本中找到"
 
 
 # ===================================================================
@@ -310,69 +393,69 @@ class TestAC3TXTDocumentParsing:
 # ===================================================================
 
 
-class TestAC4ParsedResultJSONSchema:
-    """AC-4: 解析结果遵循统一 JSON Schema
+@given("一个成功解析的文档结果")
+def given_parsed_result(context: dict[str, Any]) -> None:
+    """构造成功解析的文档结果"""
+    from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage
 
-    输出包含 document_id、mime_type、pages 数组，
-    每页包含 page_number、texts、tables、images，
-    bbox 字段为 null（DocLayNet 预留），confidence 默认值为 1.0。
-    """
+    parsed = ParsedDocument(
+        document_id="test-doc-id",
+        mime_type="application/pdf",
+        pages=[
+            ParsedPage(
+                page_number=1,
+                texts=[ParsedElement(content="示例文本")],
+            ),
+        ],
+        parse_timestamp="2026-06-01T00:00:00Z",
+    )
+    context["parsed_document"] = parsed
+    context["serialized"] = parsed.to_dict()
 
-    def test_json_schema_top_level(self) -> None:
-        """输出包含 document_id、mime_type、pages 数组"""
-        from src.domain.value_objects.parsed_document import ParsedDocument
 
-        doc = ParsedDocument(document_id="test-id", mime_type="text/plain")
-        d = doc.to_dict()
-        assert "document_id" in d
-        assert d["document_id"] == "test-id"
-        assert "mime_type" in d
-        assert d["mime_type"] == "text/plain"
-        assert "pages" in d
-        assert isinstance(d["pages"], list)
+@then("输出应包含 document_id、mime_type、pages 数组")
+def then_top_level_fields(context: dict[str, Any]) -> None:
+    """验证顶层字段"""
+    d = context["serialized"]
+    assert "document_id" in d
+    assert d["document_id"] == "test-doc-id"
+    assert "mime_type" in d
+    assert d["mime_type"] == "application/pdf"
+    assert "pages" in d
+    assert isinstance(d["pages"], list)
 
-    def test_json_schema_page_level(self) -> None:
-        """每页包含 page_number、texts、tables、images"""
-        from src.domain.value_objects.parsed_document import ParsedPage
 
-        page = ParsedPage(page_number=1)
-        d = page.to_dict()
-        assert d["page_number"] == 1
-        assert isinstance(d["texts"], list)
-        assert isinstance(d["tables"], list)
-        assert isinstance(d["images"], list)
+@then("每页应包含 page_number、texts、tables、images")
+def then_page_level_fields(context: dict[str, Any]) -> None:
+    """验证页面级字段"""
+    d = context["serialized"]
+    for page in d["pages"]:
+        assert "page_number" in page
+        assert isinstance(page["texts"], list)
+        assert isinstance(page["tables"], list)
+        assert isinstance(page["images"], list)
 
-    def test_bbox_null_for_doclaynet_reserve(self) -> None:
-        """bbox 字段结构为 null（DocLayNet 预留）"""
-        from src.domain.value_objects.parsed_document import ParsedElement, ParsedTable
 
-        elem = ParsedElement(content="x")
-        assert elem.to_dict()["bbox"] is None
-        table = ParsedTable()
-        assert table.to_dict()["bbox"] is None
+@then("bbox 字段值为 null（DocLayNet 预留）")
+def then_bbox_null(context: dict[str, Any]) -> None:
+    """验证 bbox 为 null"""
+    from src.domain.value_objects.parsed_document import ParsedElement, ParsedTable
 
-    def test_confidence_default_value(self) -> None:
-        """confidence 默认值为 1.0"""
-        from src.domain.value_objects.parsed_document import ParsedElement, ParsedTable
+    elem = ParsedElement(content="x")
+    assert elem.to_dict()["bbox"] is None
+    table = ParsedTable()
+    assert table.to_dict()["bbox"] is None
 
-        elem = ParsedElement(content="x")
-        assert elem.confidence == 1.0
-        table = ParsedTable()
-        assert table.confidence == 1.0
 
-    def test_document_processed_event_schema(self) -> None:
-        """DocumentProcessed.parse_result 包含完整解析输出"""
-        from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage
+@then("confidence 默认值为 1.0")
+def then_confidence_default(context: dict[str, Any]) -> None:
+    """验证 confidence 默认值"""
+    from src.domain.value_objects.parsed_document import ParsedElement, ParsedTable
 
-        doc = ParsedDocument(
-            document_id="test",
-            mime_type="application/pdf",
-            pages=[ParsedPage(page_number=1)],
-        )
-        d = doc.to_dict()
-        required_fields = {"document_id", "mime_type", "pages", "parse_status", "error_message", "parse_timestamp"}
-        missing = required_fields - set(d.keys())
-        assert not missing, f"事件 parse_result 缺少字段: {missing}"
+    elem = ParsedElement(content="x")
+    assert elem.confidence == 1.0
+    table = ParsedTable()
+    assert table.confidence == 1.0
 
 
 # ===================================================================
@@ -380,24 +463,51 @@ class TestAC4ParsedResultJSONSchema:
 # ===================================================================
 
 
-class TestAC5EventTriggerAndStatusFlow:
-    """AC-5: 事件触发与状态流转
+@given("ParseStatus 枚举已定义")
+def given_parse_status_enum(context: dict[str, Any]) -> None:
+    """加载 ParseStatus 枚举"""
+    from src.domain.entities.document import ParseStatus
 
-    验证解析状态机的正确性：
-    - 成功路径: pending -> in_progress -> completed，发布 DocumentProcessed 事件
-    - 失败路径: pending -> in_progress -> failed，不发布事件
-    """
+    context["parse_status"] = ParseStatus
 
-    def test_success_status_flow(self) -> None:
-        """解析成功完整状态流转：pending -> in_progress -> completed"""
-        from src.domain.entities.document import ParseStatus
 
-        assert ParseStatus.PENDING.value == "pending"
-        assert ParseStatus.IN_PROGRESS.value == "in_progress"
-        assert ParseStatus.COMPLETED.value == "completed"
+@then("状态流转路径应为 pending -> in_progress -> completed")
+def then_success_status_flow(context: dict[str, Any]) -> None:
+    """验证成功状态流转路径"""
+    ps = context["parse_status"]
+    assert ps.PENDING.value == "pending"
+    assert ps.IN_PROGRESS.value == "in_progress"
+    assert ps.COMPLETED.value == "completed"
 
-    def test_failure_status_flow(self) -> None:
-        """解析失败状态流转：pending -> in_progress -> failed"""
-        from src.domain.entities.document import ParseStatus
 
-        assert ParseStatus.FAILED.value == "failed"
+@then("DocumentProcessed 事件应包含完整 parse_result")
+def then_event_contains_result(context: dict[str, Any]) -> None:
+    """验证 DocumentProcessed 事件 parse_result Schema"""
+    from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage
+
+    doc = ParsedDocument(
+        document_id="test",
+        mime_type="application/pdf",
+        pages=[ParsedPage(page_number=1)],
+    )
+    d = doc.to_dict()
+    required_fields = {"document_id", "mime_type", "pages", "parse_status", "error_message", "parse_timestamp"}
+    missing = required_fields - set(d.keys())
+    assert not missing, f"事件 parse_result 缺少字段: {missing}"
+
+
+@then("状态流转路径应为 pending -> in_progress -> failed")
+def then_failure_status_flow(context: dict[str, Any]) -> None:
+    """验证失败状态流转路径"""
+    ps = context["parse_status"]
+    assert ps.FAILED.value == "failed"
+
+
+@then("不应发布 DocumentProcessed 事件")
+def then_no_event_published(context: dict[str, Any]) -> None:
+    """验证失败场景不发布事件 — 此为设计约束，由单元测试覆盖"""
+    # AC-5 要求：解析失败时不发布 DocumentProcessed 事件
+    # 行为验证已在 test_document_parsing_service.py 的 test_parser_returns_failed_status 中覆盖
+    # 验收层确认状态枚举存在 FAILED 值即可
+    ps = context["parse_status"]
+    assert hasattr(ps, "FAILED")
