@@ -83,7 +83,7 @@ class TestDocumentParsingServiceSuccess:
         mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
 
         parsed_doc = ParsedDocument(
-            document_id=str(doc_id),
+            document_id="random-parser-uuid",
             mime_type="application/pdf",
             pages=[ParsedPage(page_number=1)],
             parse_timestamp="2026-05-31T00:00:00Z",
@@ -103,6 +103,9 @@ class TestDocumentParsingServiceSuccess:
         mock_event_publisher.publish.assert_called_once()
         call_args = mock_event_publisher.publish.call_args[0][0]
         assert isinstance(call_args, DocumentProcessed)
+        assert call_args.document_id == doc_id
+        assert call_args.tenant_id == "tenant-1"
+        assert call_args.parse_result["document_id"] == str(doc_id)
 
     @pytest.mark.asyncio
     async def test_parse_document_updates_status(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
@@ -359,3 +362,122 @@ class TestDocumentParsingServiceDownloadTemp:
         assert result.parse_status == ParseStatus.FAILED
         assert "加密" in doc.metadata.get("parse_error", "")
         mock_event_publisher.publish.assert_not_called()
+
+
+class TestDocumentParsingServiceStatusGuard:
+    """乐观锁与状态守卫测试"""
+
+    @pytest.mark.asyncio
+    async def test_non_pending_status_skips_processing(
+        self, mock_repo, mock_storage, mock_event_publisher, mock_parser
+    ) -> None:
+        """非 PENDING 状态的文档应直接跳过处理"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="done.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.parse_status = ParseStatus.COMPLETED
+        doc.metadata["storage_object_key"] = "key"
+
+        mock_repo.find.return_value = doc
+
+        service = DocumentParsingService(mock_repo, mock_storage, mock_event_publisher, mock_parser)
+        result = await service.parse_document(doc_id, "t1")
+
+        assert result.parse_status == ParseStatus.COMPLETED
+        mock_repo.save.assert_not_called()
+        mock_event_publisher.publish.assert_not_called()
+
+
+class TestDocumentParsingServiceDistributedLock:
+    """Redis 分布式锁测试"""
+
+    @pytest.mark.asyncio
+    async def test_lock_acquired_processes_document(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
+        """获取锁成功时正常处理文档"""
+        import asyncio
+        from unittest.mock import patch
+
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import ParsedDocument
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="t.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "key"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"data"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+        mock_parser.parse.return_value = ParsedDocument(document_id=str(doc_id), mime_type="application/pdf")
+
+        mock_redis = AsyncMock()
+        mock_redis.set = AsyncMock(return_value=True)
+
+        with patch("src.application.services.document_parsing_service.asyncio") as mock_asyncio:
+            mock_asyncio.wait_for = asyncio.wait_for
+            mock_asyncio.to_thread = asyncio.to_thread
+            mock_asyncio.TimeoutError = asyncio.TimeoutError
+
+            service = DocumentParsingService(mock_repo, mock_storage, mock_event_publisher, mock_parser, mock_redis)
+            result = await service.parse_document(doc_id, "t1")
+
+        assert result.parse_status == ParseStatus.COMPLETED
+        mock_redis.set.assert_called_once()
+        mock_redis.delete.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_lock_not_acquired_skips_processing(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
+        """锁获取失败时跳过处理"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="t.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "key"
+
+        mock_repo.find.return_value = doc
+
+        mock_redis = AsyncMock()
+        mock_redis.set = AsyncMock(return_value=None)
+
+        service = DocumentParsingService(mock_repo, mock_storage, mock_event_publisher, mock_parser, mock_redis)
+        await service.parse_document(doc_id, "t1")
+
+        mock_repo.save.assert_not_called()
+        mock_redis.delete.assert_not_called()
+
+
+class TestDocumentParsingServiceTimeout:
+    """超时场景测试"""
+
+    @pytest.mark.asyncio
+    async def test_download_timeout_returns_failed(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
+        """下载超时时文档状态设为 FAILED"""
+        import asyncio
+
+        from src.application.services.document_parsing_service import DocumentParsingService
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="big.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "key"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        service = DocumentParsingService(mock_repo, mock_storage, mock_event_publisher, mock_parser)
+
+        from unittest.mock import patch
+
+        with patch.object(service, "_download_to_temp", AsyncMock(side_effect=asyncio.TimeoutError())):
+            result = await service.parse_document(doc_id, "t1")
+
+        assert result.parse_status == ParseStatus.FAILED
+        assert "超时" in doc.metadata.get("parse_error", "")
+        mock_event_publisher.publish.assert_not_called()
+        mock_repo.save.assert_called()

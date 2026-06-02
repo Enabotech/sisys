@@ -318,3 +318,25 @@ class TestPDFParserTextExtraction:
             assert similarity >= 0.5, f"提取相似度过低: {similarity:.2%} 提取='{extracted}' 原文='{sample_text}'"
         finally:
             os.unlink(path)
+
+
+class TestPDFParserMaxPages:
+    """PDF 页数上限测试"""
+
+    def test_exceeds_max_pages_returns_failed(self) -> None:
+        """超过 MAX_PDF_PAGES 限制时返回 failed"""
+        from unittest.mock import patch
+
+        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+
+        path = _create_text_pdf("test", num_pages=3)
+        try:
+            with patch("src.infrastructure.external_services.document_parsing.pdf_parser.MAX_PDF_PAGES", 2):
+                parser = PDFParser()
+                result = parser.parse(path, "application/pdf")
+                assert result.is_failed()
+                assert result.error_message is not None
+                assert "页数" in result.error_message
+                assert "超过限制" in result.error_message
+        finally:
+            os.unlink(path)
