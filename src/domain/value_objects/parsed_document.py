@@ -73,11 +73,13 @@ class ParsedTable:
         rows: 二维字符串数组，每行每列的单元格文本
         bbox: 边界框坐标（DocLayNet 预留，MVP 填 None）
         confidence: 解析置信度
+        metadata: 附加元数据（如 sheet_name、编码信息等）
     """
 
     rows: list[list[str]] = field(default_factory=list)
     bbox: BoundingBox | None = None
     confidence: float = 1.0
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典"""
@@ -85,6 +87,7 @@ class ParsedTable:
             "rows": self.rows,
             "bbox": self.bbox.to_dict() if self.bbox else None,
             "confidence": self.confidence,
+            "metadata": self.metadata,
         }
 
 

@@ -27,7 +27,28 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_ALLOWED_TEMP_SUFFIXES = frozenset({".pdf", ".docx", ".txt", ".tmp"})
+_ALLOWED_TEMP_SUFFIXES = frozenset(
+    {
+        ".pdf",
+        ".docx",
+        ".txt",
+        ".tmp",
+        ".pptx",
+        ".xlsx",
+        ".csv",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".bmp",
+        ".tiff",
+        ".tif",
+        ".html",
+        ".htm",
+        ".md",
+        ".rtf",
+    }
+)
 
 
 class DocumentParsingService:
