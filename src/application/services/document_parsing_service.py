@@ -18,6 +18,8 @@ from src.domain.events.document_events import DocumentProcessed
 from src.domain.ports.document_repository import DocumentQuery
 
 if TYPE_CHECKING:
+    import redis.asyncio as aioredis
+
     from src.application.ports.document_storage_port import DocumentStoragePort
     from src.domain.ports.document_parser import DocumentParserPort
     from src.domain.ports.document_repository import DocumentRepositoryPort
@@ -40,17 +42,21 @@ class DocumentParsingService:
     6. 清理临时文件
     """
 
+    _LOCK_TTL = 600  # 分布式锁 TTL（秒）= 解析 300s + 下载 120s + 缓冲 180s
+
     def __init__(
         self,
         document_repository: DocumentRepositoryPort,
         document_storage: DocumentStoragePort,
         event_publisher: EventPublisher,
         document_parser: DocumentParserPort,
+        redis_client: "aioredis.Redis | None" = None,
     ) -> None:
         self._repository = document_repository
         self._storage = document_storage
         self._publisher = event_publisher
         self._parser = document_parser
+        self._redis = redis_client
 
     async def parse_document(self, document_id: uuid.UUID, tenant_id: str) -> Document:
         """解析文档
@@ -81,16 +87,26 @@ class DocumentParsingService:
             await self._repository.save(document)  # 持久化失败状态，避免文档永久 PENDING
             return document
 
-        # 乐观锁：仅当状态为 PENDING 时才更新为 IN_PROGRESS
-        if document.parse_status != ParseStatus.PENDING:
-            # 已被其他调用处理，跳过
-            return document
-
-        document.parse_status = ParseStatus.IN_PROGRESS
-        await self._repository.save(document)
-
+        # 分布式锁：防止多实例并发处理同一文档（Redis SET NX，对标 DualIdempotencyChecker 模式）
+        lock_acquired = False
+        lock_key = f"docparse:lock:{document_id}"
         temp_path = ""
+
         try:
+            if self._redis is not None:
+                lock_acquired = (await self._redis.set(lock_key, "1", nx=True, ex=self._LOCK_TTL)) or False
+                if not lock_acquired:
+                    logger.info("文档 %s 正在被其他实例处理，跳过", document_id)
+                    return document
+
+            # 乐观锁：仅当状态为 PENDING 时才更新为 IN_PROGRESS
+            if document.parse_status != ParseStatus.PENDING:
+                # 已被其他调用处理，跳过
+                return document
+
+            document.parse_status = ParseStatus.IN_PROGRESS
+            await self._repository.save(document)
+
             # 下载文件到临时文件（120 秒超时，覆盖慢速 MinIO 连接）
             temp_path = await asyncio.wait_for(
                 self._download_to_temp("raw-documents", object_key),
@@ -142,6 +158,8 @@ class DocumentParsingService:
             return document
 
         finally:
+            if lock_acquired and self._redis is not None:
+                await self._redis.delete(lock_key)
             if temp_path:
                 try:
                     os.unlink(temp_path)
