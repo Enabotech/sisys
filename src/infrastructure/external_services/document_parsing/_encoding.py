@@ -1,6 +1,6 @@
 """文档解析器共享编码检测工具
 
-提供字节内容 → 文本的编码自动检测功能，供 TextParser 和 CSVParser 共享复用。
+提供字节内容 → 文本的编码自动检测功能，供需要编码自动检测的解析器共享复用。
 """
 
 from __future__ import annotations

@@ -63,6 +63,15 @@ class MarkdownParser(DocumentParserPort):
                 parse_timestamp=timestamp,
             )
 
+        if file_size == 0:
+            return ParsedDocument(
+                document_id=doc_id,
+                mime_type=mime_type,
+                parse_status="failed",
+                error_message="Markdown 文档为空",
+                parse_timestamp=timestamp,
+            )
+
         if file_size > MAX_MD_BYTES:
             return ParsedDocument(
                 document_id=doc_id,

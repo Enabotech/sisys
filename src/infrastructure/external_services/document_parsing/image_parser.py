@@ -57,6 +57,15 @@ class ImageParser(DocumentParserPort):
                 parse_timestamp=timestamp,
             )
 
+        if file_size == 0:
+            return ParsedDocument(
+                document_id=doc_id,
+                mime_type=mime_type,
+                parse_status="failed",
+                error_message="图像文件为空",
+                parse_timestamp=timestamp,
+            )
+
         if file_size > MAX_IMAGE_BYTES:
             return ParsedDocument(
                 document_id=doc_id,

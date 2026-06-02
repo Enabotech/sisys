@@ -40,7 +40,7 @@ class TestMarkdownParserHeadings:
     """标题层级测试"""
 
     def test_parse_headings(self) -> None:
-        """识别 # → h1，## → h2 标题层级"""
+        """识别 # → h1，## → h2 标题层级，验证 metadata.style 映射"""
         from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
 
         path = _create_md_file("# 一级标题\n\n## 二级标题\n\n### 三级标题\n")
@@ -53,6 +53,12 @@ class TestMarkdownParserHeadings:
             assert "一级标题" in all_text
             assert "二级标题" in all_text
             assert "三级标题" in all_text
+            # 验证 metadata.style 层级映射
+            heading_elements = [t for p in result.pages for t in p.texts if "style" in t.metadata]
+            styles = {t.metadata["style"] for t in heading_elements}
+            assert "h1" in styles, f"应包含 h1 层级，实际 styles: {styles}"
+            assert "h2" in styles, f"应包含 h2 层级，实际 styles: {styles}"
+            assert "h3" in styles, f"应包含 h3 层级，实际 styles: {styles}"
         finally:
             os.unlink(path)
 
@@ -81,7 +87,7 @@ class TestMarkdownParserTable:
     """Markdown 表格测试"""
 
     def test_parse_markdown_table(self) -> None:
-        """识别 | col | col | 格式表格，过滤分隔符行"""
+        """识别 | col | col | 格式表格，过滤分隔符行，验证单元格数据"""
         from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
 
         path = _create_md_file("| A | B |\n|---|---|\n| 1 | 2 |\n")
@@ -94,6 +100,9 @@ class TestMarkdownParserTable:
             assert len(all_tables) >= 1, "应提取到 1 个表格"
             # 分隔符行应被过滤，仅 2 行数据
             assert len(all_tables[0].rows) == 2, f"应 2 行，实际: {len(all_tables[0].rows)}"
+            # 验证单元格数据正确性
+            assert all_tables[0].rows[0] == ["A", "B"], f"表头应为 ['A', 'B']，实际: {all_tables[0].rows[0]}"
+            assert all_tables[0].rows[1] == ["1", "2"], f"数据行应为 ['1', '2']，实际: {all_tables[0].rows[1]}"
         finally:
             os.unlink(path)
 
