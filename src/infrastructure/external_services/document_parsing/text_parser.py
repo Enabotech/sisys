@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import uuid
@@ -16,16 +17,18 @@ from src.domain.value_objects.parsed_document import (
     ParsedElement,
     ParsedPage,
 )
+from src.infrastructure.external_services.document_parsing._limits import MAX_TXT_BYTES
 
-_MAX_TXT_SIZE = 10 * 1024 * 1024  # 10MB，超过此限制当前版本不支持分块处理
+logger = logging.getLogger(__name__)
 
 
 class TextParser(DocumentParserPort):
     """TXT 文档解析器
 
     支持特性：
-    - 编码自动检测（UTF-8 → GB18030 → GBK）
+    - 编码自动检测（UTF-8 → GBK → GB18030，窄集优先超集兜底）
     - 段落分割（连续空行分隔）
+    - 文件大小上限保护
     """
 
     def parse(self, file_path: str, mime_type: str) -> ParsedDocument:
@@ -43,9 +46,9 @@ class TextParser(DocumentParserPort):
 
         try:
             file_size = os.path.getsize(file_path)
-            if file_size > _MAX_TXT_SIZE:
+            if file_size > MAX_TXT_BYTES:
                 size_mb = file_size // (1024 * 1024)
-                limit_mb = _MAX_TXT_SIZE // (1024 * 1024)
+                limit_mb = MAX_TXT_BYTES // (1024 * 1024)
                 return ParsedDocument(
                     document_id=doc_id,
                     mime_type=mime_type,
@@ -55,12 +58,14 @@ class TextParser(DocumentParserPort):
                 )
             with open(file_path, "rb") as f:
                 raw_bytes = f.read()
-        except Exception as e:
+        except OSError:
+            # 安全：原始异常可能含文件路径，详细 traceback 记录到日志
+            logger.exception("TXT 文件读取失败")
             return ParsedDocument(
                 document_id=doc_id,
                 mime_type=mime_type,
                 parse_status="failed",
-                error_message=f"文件读取失败: {e}",
+                error_message="无法访问文件，请检查文件路径或权限",
                 parse_timestamp=timestamp,
             )
 
@@ -73,7 +78,7 @@ class TextParser(DocumentParserPort):
                 parse_timestamp=timestamp,
             )
 
-        # 编码检测：UTF-8 → GB18030 → GBK
+        # 编码检测：UTF-8 → GBK → GB18030（GB18030 是 GBK 超集，作为兜底）
         text = self._detect_and_decode(raw_bytes)
 
         # 段落分割
@@ -99,9 +104,10 @@ class TextParser(DocumentParserPort):
     def _detect_and_decode(self, raw_bytes: bytes) -> str:
         """编码自动检测
 
-        依次尝试 UTF-8 → GB18030 → GBK，不引入 chardet 依赖。
+        依次尝试 UTF-8 → GBK → GB18030（GB18030 是 GBK 超集，兜底），
+        不引入 chardet 依赖。
         """
-        for encoding in ["utf-8", "gb18030", "gbk"]:
+        for encoding in ["utf-8", "gbk", "gb18030"]:
             try:
                 return raw_bytes.decode(encoding)
             except (UnicodeDecodeError, LookupError):

@@ -12,6 +12,9 @@ import numpy as np
 import pytest
 
 from src.infrastructure.config.embedding import EmbeddingConfig
+from src.infrastructure.external_services.embedding.bge3_embedding_service import (
+    BGE3EmbeddingService,
+)
 
 
 def _make_mock_model(dimension: int = 1024) -> MagicMock:
@@ -47,10 +50,6 @@ class TestBGE3EmbeddingServiceInit:
         config = EmbeddingConfig(model_path="/fake/path", device="cpu")
         mock_st_cls.return_value = _make_mock_model()
 
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
-
         BGE3EmbeddingService(config)
         mock_st_cls.assert_called_once_with("/fake/path", device="cpu")
 
@@ -60,10 +59,6 @@ class TestBGE3EmbeddingServiceInit:
         config = EmbeddingConfig(model_path="", device="cuda")
         mock_st_cls.return_value = _make_mock_model()
 
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
-
         BGE3EmbeddingService(config)
         mock_st_cls.assert_called_once_with("BAAI/bge-m3", device="cuda")
 
@@ -71,10 +66,6 @@ class TestBGE3EmbeddingServiceInit:
     def test_init_default_config(self, mock_st_cls) -> None:
         """默认配置初始化"""
         mock_st_cls.return_value = _make_mock_model()
-
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
 
         svc = BGE3EmbeddingService()
         assert svc is not None
@@ -89,10 +80,6 @@ class TestBGE3EmbeddingServiceEncode:
         mock_model = _make_mock_model()
         mock_st_cls.return_value = mock_model
 
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
-
         svc = BGE3EmbeddingService(EmbeddingConfig(device="cpu"))
         result = svc.encode_text("测试文本")
         assert isinstance(result, list)
@@ -105,27 +92,15 @@ class TestBGE3EmbeddingServiceEncode:
         mock_model = _make_mock_model()
         mock_st_cls.return_value = mock_model
 
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
-
         svc = BGE3EmbeddingService(EmbeddingConfig(device="cpu"))
         svc.encode_text("测试文本")
-        mock_model.encode.assert_called_once()
-        call_kwargs = mock_model.encode.call_args
-        assert call_kwargs[1].get("normalize_embeddings") is True or (
-            len(call_kwargs[0]) > 1 and call_kwargs[0][1] if len(call_kwargs[0]) > 1 else False
-        )
+        mock_model.encode.assert_called_once_with("测试文本", normalize_embeddings=True)
 
     @patch("src.infrastructure.external_services.embedding.bge3_embedding_service.SentenceTransformer")
     def test_encode_texts_batch(self, mock_st_cls) -> None:
         """批量编码返回正确数量"""
         mock_model = _make_mock_model()
         mock_st_cls.return_value = mock_model
-
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
 
         svc = BGE3EmbeddingService(EmbeddingConfig(device="cpu"))
         texts = ["文本一", "文本二", "文本三"]
@@ -141,10 +116,6 @@ class TestBGE3EmbeddingServiceEncode:
         mock_model = _make_mock_model(1024)
         mock_st_cls.return_value = mock_model
 
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
-
         svc = BGE3EmbeddingService(EmbeddingConfig(device="cpu"))
         assert svc.dimension == 1024
 
@@ -153,10 +124,6 @@ class TestBGE3EmbeddingServiceEncode:
         """空文本抛出 ValueError"""
         mock_model = _make_mock_model()
         mock_st_cls.return_value = mock_model
-
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
 
         svc = BGE3EmbeddingService(EmbeddingConfig(device="cpu"))
         with pytest.raises(ValueError, match="文本不能为空"):
@@ -168,10 +135,6 @@ class TestBGE3EmbeddingServiceEncode:
         mock_model = _make_mock_model()
         mock_st_cls.return_value = mock_model
 
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
-
         svc = BGE3EmbeddingService(EmbeddingConfig(device="cpu"))
         with pytest.raises(ValueError, match="批量编码中包含空文本"):
             svc.encode_texts(["有效文本", "", "另一个有效文本"])
@@ -181,10 +144,6 @@ class TestBGE3EmbeddingServiceEncode:
         """批量编码中包含纯空白字符串时抛出 ValueError"""
         mock_model = _make_mock_model()
         mock_st_cls.return_value = mock_model
-
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
 
         svc = BGE3EmbeddingService(EmbeddingConfig(device="cpu"))
         with pytest.raises(ValueError, match="批量编码中包含空文本"):
@@ -196,10 +155,6 @@ class TestBGE3EmbeddingServiceEncode:
         mock_model = MagicMock()
         mock_model.get_sentence_embedding_dimension.return_value = 768
         mock_st_cls.return_value = mock_model
-
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
-        )
 
         with pytest.raises(ValueError, match="配置维度.*与模型实际维度.*不一致"):
             BGE3EmbeddingService(EmbeddingConfig(dimension=1024, device="cpu"))

@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -20,17 +20,18 @@ def _make_search_service(
     embedding_result: list[float] | None = None,
     search_result: list[dict[str, Any]] | None = None,
 ) -> tuple[DenseSemanticSearchService, MagicMock, AsyncMock]:
-    """构造测试用 DenseSemanticSearchService 及其 mock 依赖"""
-    embedding_svc = MagicMock()
+    """构造测试用 DenseSemanticSearchService 及其 mock 依赖
+
+    使用 spec=Protocol 约束 mock 行为契约，仅暴露端口声明的方法
+    防止 mock 因属性拼写错误"假绿"通过
+    """
+    embedding_svc = MagicMock(spec=EmbeddingServicePort)
     embedding_svc.encode_text.return_value = embedding_result or [0.1] * 1024
 
-    vector_storage = AsyncMock()
+    vector_storage = AsyncMock(spec=L3VectorPort)
     vector_storage.search.return_value = search_result or []
 
-    service = DenseSemanticSearchService(
-        cast(EmbeddingServicePort, embedding_svc),
-        cast(L3VectorPort, vector_storage),
-    )
+    service = DenseSemanticSearchService(embedding_svc, vector_storage)
     return service, embedding_svc, vector_storage
 
 
