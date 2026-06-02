@@ -1,42 +1,30 @@
 """组合文档解析器
 
 按 MIME 类型路由到具体解析器（PDF/Word/TXT）的组合模式实现。
+通过 dict[str, DocumentParserPort] 注入实现 OCP 扩展（新增格式仅需在
+composition_root 注册路由，无需修改本类）。
 """
 
 from __future__ import annotations
 
 from src.domain.ports.document_parser import DocumentParserPort
 from src.domain.value_objects.parsed_document import ParsedDocument
-from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
-from src.infrastructure.external_services.document_parsing.text_parser import TextParser
-from src.infrastructure.external_services.document_parsing.word_parser import WordParser
-
-# MIME 类型 → 解析器映射
-_MIME_PDF = "application/pdf"
-_MIME_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-_MIME_DOC = "application/msword"
-_MIME_TXT = "text/plain"
 
 
 class CompositeDocumentParser(DocumentParserPort):
     """组合文档解析器 — 按 MIME 类型路由
 
-    内部持有 PDFParser、WordParser、TextParser 实例，
-    根据 mime_type 参数路由到对应解析器。
+    通过 parsers 字典接收 MIME → 解析器映射，新增格式无需修改本类
+    （仅在 composition_root 注册新映射即可），符合 OCP。
     """
 
-    def __init__(
-        self,
-        pdf_parser: PDFParser,
-        word_parser: WordParser,
-        text_parser: TextParser,
-    ) -> None:
-        self._parsers: dict[str, DocumentParserPort] = {
-            _MIME_PDF: pdf_parser,
-            _MIME_DOCX: word_parser,
-            _MIME_DOC: word_parser,  # DOC 格式由 WordParser 返回友好拒绝消息
-            _MIME_TXT: text_parser,
-        }
+    def __init__(self, parsers: dict[str, DocumentParserPort]) -> None:
+        """初始化组合解析器
+
+        Args:
+            parsers: MIME 类型 → 解析器实例的映射字典
+        """
+        self._parsers = dict(parsers)
 
     def parse(self, file_path: str, mime_type: str) -> ParsedDocument:
         """按 MIME 类型路由解析

@@ -105,13 +105,17 @@ class TestTextParserEdgeCases:
     """边界场景测试"""
 
     def test_empty_file(self) -> None:
+        """空 TXT 文件应返回 failed 状态（AC-3 严格验证）"""
         from src.infrastructure.external_services.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_txt(b"")
         try:
             result = parser.parse(path, "text/plain")
-            assert result.parse_status in ("completed", "failed")
+            assert result.is_failed()
+            assert result.error_message is not None
+            assert "TXT 文件为空" in result.error_message
+            assert len(result.pages) == 0
         finally:
             os.unlink(path)
 

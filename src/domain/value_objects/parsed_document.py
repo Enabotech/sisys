@@ -134,6 +134,24 @@ class ParsedDocument:
     error_message: str | None = None
     parse_timestamp: str = ""
 
+    def is_failed(self) -> bool:
+        """判断解析是否失败
+
+        封装裸字符串字面量比较，避免调用方直接比对魔术字符串。
+
+        Returns:
+            True 当 parse_status == "failed"
+        """
+        return self.parse_status == "failed"
+
+    def is_completed(self) -> bool:
+        """判断解析是否成功
+
+        Returns:
+            True 当 parse_status == "completed"
+        """
+        return self.parse_status == "completed"
+
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典"""
         return {
