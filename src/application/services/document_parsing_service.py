@@ -91,11 +91,17 @@ class DocumentParsingService:
 
         temp_path = ""
         try:
-            # 下载文件到临时文件
-            temp_path = await self._download_to_temp("raw-documents", object_key)
+            # 下载文件到临时文件（120 秒超时，覆盖慢速 MinIO 连接）
+            temp_path = await asyncio.wait_for(
+                self._download_to_temp("raw-documents", object_key),
+                timeout=120.0,
+            )
 
-            # 解析文档（CPU 密集型，使用线程池避免阻塞事件循环）
-            parsed_doc = await asyncio.to_thread(self._parser.parse, temp_path, document.mime_type)
+            # 解析文档（CPU 密集型，使用线程池避免阻塞事件循环，300 秒超时）
+            parsed_doc = await asyncio.wait_for(
+                asyncio.to_thread(self._parser.parse, temp_path, document.mime_type),
+                timeout=300.0,
+            )
 
             # 用真实文档 ID 覆盖解析器随机生成的 ID
             parsed_doc = replace(parsed_doc, document_id=str(document.document_id))
@@ -121,10 +127,18 @@ class DocumentParsingService:
 
             return saved_doc
 
-        except Exception as e:
+        except asyncio.TimeoutError:
             document.parse_status = ParseStatus.FAILED
-            document.metadata["parse_error"] = str(e)
+            document.metadata["parse_error"] = "文档解析超时，请重试"
             await self._repository.save(document)
+            logger.warning("文档解析超时 (document_id=%s, tenant=%s)", document_id, tenant_id)
+            return document
+
+        except Exception:
+            document.parse_status = ParseStatus.FAILED
+            document.metadata["parse_error"] = "文档解析失败，请检查文件是否损坏或重试"
+            await self._repository.save(document)
+            logger.exception("文档解析异常 (document_id=%s, tenant=%s)", document_id, tenant_id)
             return document
 
         finally:
@@ -152,15 +166,21 @@ class DocumentParsingService:
             ext = ".tmp"
         stream = self._storage.retrieve(bucket_type, object_key)
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-        os.fchmod(tmp.fileno(), 0o600)  # 文件描述符级权限设置，消除 chmod TOCTOU 窗口
         try:
+            os.fchmod(tmp.fileno(), 0o600)  # 文件描述符级权限设置，消除 chmod TOCTOU 窗口（移入 try 防止 FD 泄漏）
+            buffer = bytearray()
             try:
                 async for chunk in stream:
-                    tmp.write(chunk)
+                    buffer.extend(chunk)
+                    if len(buffer) >= 65536:  # 64KB 刷新阈值，减少线程池调用频率
+                        await asyncio.to_thread(tmp.write, bytes(buffer))
+                        buffer.clear()
+                if buffer:  # 剩余字节
+                    await asyncio.to_thread(tmp.write, bytes(buffer))
             finally:
                 if hasattr(stream, "aclose"):
                     await stream.aclose()  # 显式关闭流，防止 MinIO 连接泄漏
-            tmp.close()
+            await asyncio.to_thread(tmp.close)
             return tmp.name
         except Exception:
             tmp.close()

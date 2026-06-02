@@ -78,28 +78,47 @@ class TextParser(DocumentParserPort):
                 parse_timestamp=timestamp,
             )
 
-        # 编码检测：UTF-8 → GBK → GB18030（GB18030 是 GBK 超集，作为兜底）
-        text = self._detect_and_decode(raw_bytes)
+        try:
+            # 编码检测：UTF-8 → GBK → GB18030（GB18030 是 GBK 超集，作为兜底）
+            text = self._detect_and_decode(raw_bytes)
 
-        # 段落分割
-        paragraphs = self._split_paragraphs(text)
+            # 段落分割
+            paragraphs = self._split_paragraphs(text)
 
-        texts = [ParsedElement(content=p) for p in paragraphs if p.strip()]
+            texts = [ParsedElement(content=p) for p in paragraphs if p.strip()]
 
-        page = ParsedPage(
-            page_number=1,
-            texts=texts,
-            tables=[],
-            images=[],
-        )
+            page = ParsedPage(
+                page_number=1,
+                texts=texts,
+                tables=[],
+                images=[],
+            )
 
-        return ParsedDocument(
-            document_id=doc_id,
-            mime_type=mime_type,
-            pages=[page],
-            parse_status="completed",
-            parse_timestamp=timestamp,
-        )
+            return ParsedDocument(
+                document_id=doc_id,
+                mime_type=mime_type,
+                pages=[page],
+                parse_status="completed",
+                parse_timestamp=timestamp,
+            )
+        except ValueError as e:
+            # 编码检测失败（_detect_and_decode 抛出 ValueError）
+            return ParsedDocument(
+                document_id=doc_id,
+                mime_type=mime_type,
+                parse_status="failed",
+                error_message=str(e),
+                parse_timestamp=timestamp,
+            )
+        except Exception:
+            logger.exception("TXT 文件解析失败")
+            return ParsedDocument(
+                document_id=doc_id,
+                mime_type=mime_type,
+                parse_status="failed",
+                error_message="TXT 解析失败，请检查文件是否损坏或重试",
+                parse_timestamp=timestamp,
+            )
 
     def _detect_and_decode(self, raw_bytes: bytes) -> str:
         """编码自动检测
@@ -112,8 +131,8 @@ class TextParser(DocumentParserPort):
                 return raw_bytes.decode(encoding)
             except (UnicodeDecodeError, LookupError):
                 continue
-        # 全部失败，使用 UTF-8 + replace
-        return raw_bytes.decode("utf-8", errors="replace")
+        # 全部失败，无法识别编码
+        raise ValueError("无法识别文件编码：尝试了 UTF-8/GBK/GB18030 均失败，请确保文件为上述编码格式")
 
     def _split_paragraphs(self, text: str) -> list[str]:
         """按连续空行分割段落"""
