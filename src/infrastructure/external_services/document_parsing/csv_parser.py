@@ -80,7 +80,7 @@ class CSVParser(DocumentParserPort):
                     parse_timestamp=timestamp,
                 )
 
-            text = detect_and_decode(raw)
+            text, detected_encoding = detect_and_decode(raw)
             lines = text.splitlines()
             if not lines:
                 return ParsedDocument(
@@ -115,7 +115,10 @@ class CSVParser(DocumentParserPort):
 
             table = ParsedTable(
                 rows=rows_data,
-                metadata={"encoding": "utf-8", "delimiter": dialect.delimiter if hasattr(dialect, "delimiter") else ","},
+                metadata={
+                    "encoding": detected_encoding,
+                    "delimiter": dialect.delimiter if hasattr(dialect, "delimiter") else ",",
+                },
             )
             page = ParsedPage(page_number=1, tables=[table])
 

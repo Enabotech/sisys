@@ -102,7 +102,7 @@ development_status:
   # ===========================================================================
   epic-2: in-progress
   2-1-document-upload-17-formats: done
-  2-2a-document-parsing-basic-formats: review
+  2-2a-document-parsing-basic-formats: done
   2-2b-document-parsing-extended-formats: done
   2-3-layout-preservation-doclaynet: ready-for-dev
   2-4-table-semantic-extraction: backlog
@@ -376,15 +376,15 @@ development_status:
 #
 # Status Summary:
 #   Stories:
-#     - Done: 43
+#     - Done: 47
 #     - Ready for Dev: 3 (0-17, 0-18, 0-30)
 #     - In Progress: 0
 #     - Review: 0
-#     - Backlog: 129
+#     - Backlog: 140
 #   Epics:
 #     - Done: 2 (Epic 1, Epic 90)
-#     - In Progress: 1 (Epic 0)
-#     - Backlog: 19 (Epic 2-20)
+#     - In Progress: 3 (Epic 0, Epic 2, Epic 3)
+#     - Backlog: 17 (Epic 4-20)
 #   Retrospectives:
 #     - Done: 1 (Epic 1)
 #     - Optional: 23
