@@ -1,6 +1,6 @@
 # Story 3-1b: BM25 稀疏检索 + RRF 融合
 
-**Status:** `backlog`
+**Status:** `ready-for-dev`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -184,7 +184,7 @@ Story 3-1b 是 Epic 3（智能检索与知识发现）关键路径的第 2 个�
 |---|---|---|---|---|---|
 | **domain** | — | ✗ | ✗ | ✗ | ✗ |
 | **application** (`sparse_search_service.py`) | ✓ 导入 BM25BuilderPort + L3VectorPort | — | ✗ | ✗ | ✗ |
-| **application** (`hybrid_search_service.py`) | ✓ 导入 L3VectorPort | ✓ 导入 DenseSemanticSearchService + SparseSearchService | ✗ | ✗ | ✓ 导入 rrf_fusion |
+| **application** (`hybrid_search_service.py`) | ✗（通过注入 SparseSearchService 间接使用） | ✓ 导入 DenseSemanticSearchService + SparseSearchService | ✗ | ✗ | ✓ 导入 rrf_fusion |
 | **shared** (`rrf_fusion.py`) | ✗ | ✗ | ✗ | ✗ | —（纯 Python 标准库） |
 | **infrastructure** (`bm25_builder.py`) | ✗（已有，纯 TF-IDF 计算） | ✗ | ✗ | — | ✗ |
 
@@ -1016,8 +1016,13 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-06-02
 **最后更新/Last Updated:** 2026-06-02
 **更新说明/Description:**
 - v1.0.0: 创建故事文件，基于 6 Agent 并行全量调研
+- v1.1.0: 第1轮审查 - 7项P0架构/一致性修正（BM25BuilderPort Protocol、IDF公式、空查询行为、RRF rank、依赖方向矩阵）
+- v1.2.0: 第2轮审查 - 6项P0正确性修正（类名命名、停用词范围、Collection API、mock spec）
+- v1.3.0: 第3轮审查 - 4项P0可行性修正（Task依赖图、代码模板导入、追溯矩阵）
+- v1.4.0: 第4轮审查 - 4项P0细节修正（NamedVectors格式、空查询校验、rrf_fusion返回类型、shared约束）
+- v1.5.0: 第5轮审查 - 最终一致性扫描修正（依赖方向矩阵P1、Status就绪）
