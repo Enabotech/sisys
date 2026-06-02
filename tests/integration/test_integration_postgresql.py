@@ -172,7 +172,7 @@ class TestOutboxEventLifecycle:
         repo = PostgreSQLOutboxRepository()
         await repo.save(event)
 
-        mock_session.merge.assert_called_once()
+        mock_session.add.assert_called_once()
 
     async def test_get_unpublished_events(self, mock_session):
         """获取未发布事件列表"""
@@ -370,7 +370,7 @@ class TestTransactionRollback:
         await repo.save(event)
 
         # save 应调用 add 但不应调用 commit
-        mock_session.merge.assert_called_once()
+        mock_session.add.assert_called_once()
 
 
 @pytest.fixture
