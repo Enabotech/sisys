@@ -229,27 +229,6 @@ jobs:
         run: |
           poetry install --no-interaction || echo "依赖更新完成"
 
-      - name: 验证 GPU 可用性
-        if: ${{ vars.GPU_ENABLED == 'true' }}
-        run: |
-          poetry run python -c "
-          import sys
-          import torch
-
-          is_cuda = torch.cuda.is_available()
-          version = torch.__version__
-
-          print(f'CUDA  : {is_cuda}')
-          print(f'Torch : {version}')
-
-          if not is_cuda:
-              print('❌ 错误: GPU_ENABLED 为 true，但 CUDA 不可用！')
-              print('💡 请检查 Runner 是否配置了 --gpus all 及 NVIDIA 驱动。')
-              sys.exit(1)
-
-          print('✅ GPU 验证通过')
-          "
-
       - name: 运行单元测试
         run: |
           mkdir -p reports/coverage reports/pytest
@@ -347,7 +326,28 @@ jobs:
         run: |
           poetry install --no-interaction || echo "依赖更新完成"
 
-      - name: 检测嵌入模型路径
+      - name: 检测 GPU
+        if: ${{ vars.GPU_ENABLED == 'true' }}
+        run: |
+          poetry run python -c "
+          import sys
+          import torch
+
+          is_cuda = torch.cuda.is_available()
+          version = torch.__version__
+
+          print(f'CUDA  : {is_cuda}')
+          print(f'Torch : {version}')
+
+          if not is_cuda:
+              print('❌ 错误: GPU_ENABLED 为 true，但 CUDA 不可用！')
+              print('💡 请检查 Runner 是否配置了 --gpus all 及 NVIDIA 驱动。')
+              sys.exit(1)
+
+          print('✅ GPU 验证通过')
+          "
+
+      - name: 检测模型
         run: |
           MODEL_PATH="/mnt/x/.cache/BAAI/bge-m3/models--BAAI--bge-m3"
           if [ -d "$MODEL_PATH" ]; then
