@@ -58,6 +58,15 @@ class CSVParser(DocumentParserPort):
                 parse_timestamp=timestamp,
             )
 
+        if file_size == 0:
+            return ParsedDocument(
+                document_id=doc_id,
+                mime_type=mime_type,
+                parse_status="failed",
+                error_message="CSV 文档为空",
+                parse_timestamp=timestamp,
+            )
+
         if file_size > MAX_CSV_BYTES:
             return ParsedDocument(
                 document_id=doc_id,
@@ -70,15 +79,6 @@ class CSVParser(DocumentParserPort):
         try:
             with open(file_path, "rb") as f:
                 raw = f.read()
-
-            if len(raw) == 0:
-                return ParsedDocument(
-                    document_id=doc_id,
-                    mime_type=mime_type,
-                    parse_status="failed",
-                    error_message="CSV 文档为空",
-                    parse_timestamp=timestamp,
-                )
 
             text, detected_encoding = detect_and_decode(raw)
             lines = text.splitlines()
