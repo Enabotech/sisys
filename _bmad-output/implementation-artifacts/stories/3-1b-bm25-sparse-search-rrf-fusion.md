@@ -32,7 +32,7 @@ Story 3-1b 是 Epic 3（智能检索与知识发现）关键路径的第 2 个�
 **When** 调用 `build_sparse_vector("企业战略规划报告")`
 **Then** 返回 SparseVector 实例
 **And** indices 和 values 长度一致且非空
-**And** 停用词（如 "的"/"the"/"is"）被过滤
+**And** 英文停用词（如 "the"/"is"）被过滤（注：当前仅支持英文停用词，中文停用词待 Story 3-3 补充）
 **And** 空文本返回空稀疏向量（indices=[], values=[]）
 
 **验证标准/Validation Criteria:**
@@ -59,7 +59,7 @@ Story 3-1b 是 Epic 3（智能检索与知识发现）关键路径的第 2 个�
 
 ### AC-3: Dense + Sparse 并行双路召回
 
-**Given** DenseSemanticSearchService（Story 3-1a）和 BM25SparseSearchService 均已注册
+**Given** DenseSemanticSearchService（Story 3-1a）和 SparseSearchService 均已注册
 **When** 执行混合检索（query_text, limit=10）
 **Then** Dense 检索与 Sparse 检索并行执行（asyncio.gather）
 **And** 两路结果独立返回，互不影响
@@ -393,9 +393,9 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 2.1: 🔴 红 — 编写 SparseSearchService 失败测试
-  - mock BM25Builder + L3VectorPort
+  - mock BM25BuilderPort（domain Protocol，使用 `MagicMock(spec=BM25BuilderPort)`）+ L3VectorPort（`AsyncMock(spec=L3VectorPort)`）
   - 验证 `search()` 调用 `bm25_builder.build_sparse_vector(query_text)` 一次
-  - 验证 `search()` 调用 `vector.search_sparse()` 一次并传入正确的 SparseVector
+  - 验证 `search()` 调用 `vector_storage.search_sparse()` 一次并传入正确的 dict（含 indices/values）
   - 验证 `tenant_id` 自动注入到 `filter_payload`
   - 验证现有 `filter_payload` 保留（与 tenant_id 合并）
   - 验证 `limit` 传递正确
@@ -641,12 +641,12 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
   - Fixture：创建 Collection → 插入测试数据（Dense + Sparse 向量）→ 测试后 try/finally 删除
   - Collection 需同时支持 Dense 和 Sparse 向量：
     ```python
-    sparse_vectors_config = {"sparse": SparseVectorParams()}
+    from qdrant_client.models import SparseVectorParams
     await collection_manager.create_collection(
         name=collection,
         vector_size=1024,
-        vector_params={"distance": "Cosine"},
-        sparse_vectors_config=sparse_vectors_config,
+        distance="Cosine",
+        sparse_vectors_config={"sparse": SparseVectorParams()},
     )
     ```
 - [ ] Subtask 5.2: 🟢 绿 — 实现 BM25 稀疏检索端到端测试
@@ -659,7 +659,7 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
   - 验证 RRF 融合排序正确（重叠文档排名高于单路文档）
 - [ ] Subtask 5.4: 🟢 绿 — 实现异常隔离测试
   - 验证 Dense/Sparse 单路失败不影响另一路
-  - 验证空查询文本返回空列表
+  - 验证空查询文本抛出 ValueError（与 DenseSemanticSearchService 一致）
 - [ ] Subtask 5.5: 🟢 绿 — 实现性能基准测试
   - 预热 5 次查询 → 50 次查询（查询文本 ≤ 512 字符）→ 统计 P95 延迟
   - GPU: P95 < 800ms / CPU: P95 < 1500ms（根据 EmbeddingConfig.device 自动选择阈值）
@@ -809,6 +809,7 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
   await collection_manager.create_collection(
       name=collection,
       vector_size=1024,
+      distance="Cosine",
       sparse_vectors_config={"sparse": SparseVectorParams()},
   )
   ```
