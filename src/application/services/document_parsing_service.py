@@ -151,6 +151,16 @@ class DocumentParsingService:
             logger.warning("文档解析超时 (document_id=%s, tenant=%s)", document_id, tenant_id)
             return document
 
+        except asyncio.CancelledError:
+            document.parse_status = ParseStatus.FAILED
+            document.metadata["parse_error"] = "文档解析被取消"
+            try:
+                await self._repository.save(document)
+            except Exception:
+                logger.warning("取消路径中状态持久化失败: %s", document_id, exc_info=True)
+            logger.warning("文档解析被取消 (document_id=%s, tenant=%s)", document_id, tenant_id)
+            raise
+
         except Exception:
             document.parse_status = ParseStatus.FAILED
             document.metadata["parse_error"] = "文档解析失败，请检查文件是否损坏或重试"
@@ -160,7 +170,10 @@ class DocumentParsingService:
 
         finally:
             if lock_acquired and self._redis is not None:
-                await self._redis.delete(lock_key)
+                try:
+                    await self._redis.delete(lock_key)
+                except Exception:
+                    logger.warning("分布式锁释放失败: %s", lock_key, exc_info=True)
             if temp_path:
                 try:
                     os.unlink(temp_path)
@@ -201,7 +214,7 @@ class DocumentParsingService:
                     await stream.aclose()  # 显式关闭流，防止 MinIO 连接泄漏
             await asyncio.to_thread(tmp.close)
             return tmp.name
-        except Exception:
+        except (Exception, asyncio.CancelledError):
             tmp.close()
             if os.path.exists(tmp.name):
                 try:

@@ -481,3 +481,32 @@ class TestDocumentParsingServiceTimeout:
         assert "超时" in doc.metadata.get("parse_error", "")
         mock_event_publisher.publish.assert_not_called()
         mock_repo.save.assert_called()
+
+
+class TestDocumentParsingServiceCancellation:
+    """CancelledError 场景测试"""
+
+    @pytest.mark.asyncio
+    async def test_cancelled_sets_failed_and_persists(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
+        """CancelledError 传播前持久化 FAILED 状态"""
+        import asyncio
+        from unittest.mock import patch
+
+        from src.application.services.document_parsing_service import DocumentParsingService
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="t.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "key"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        service = DocumentParsingService(mock_repo, mock_storage, mock_event_publisher, mock_parser)
+
+        with patch.object(service, "_download_to_temp", AsyncMock(side_effect=asyncio.CancelledError())):
+            with pytest.raises(asyncio.CancelledError):
+                await service.parse_document(doc_id, "t1")
+
+        assert doc.parse_status == ParseStatus.FAILED
+        assert "取消" in doc.metadata.get("parse_error", "")
+        mock_event_publisher.publish.assert_not_called()
