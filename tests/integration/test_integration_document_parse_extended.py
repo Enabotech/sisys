@@ -43,7 +43,7 @@ MIME_JPEG = "image/jpeg"
 MIME_PNG = "image/png"
 MIME_HTML = "text/html"
 MIME_MARKDOWN = "text/markdown"
-MIME_RTF = "text/rtf"
+MIME_RTF = "application/rtf"
 
 # ===================================================================
 # 工厂函数
@@ -352,7 +352,7 @@ class TestParsePipelinePPTX:
         finally:
             os.unlink(path)
 
-    def test_parse_pptx_empty(self) -> None:
+    def test_parse_pptx_basic_structure(self) -> None:
         from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
 
         parser = PptxParser()

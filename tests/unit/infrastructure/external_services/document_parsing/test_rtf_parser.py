@@ -18,7 +18,7 @@ def _create_rtf_file(content: str) -> str:
     return tmp.name
 
 
-MIME_RTF = "text/rtf"
+MIME_RTF = "application/rtf"
 
 
 class TestRTFParserCreation:

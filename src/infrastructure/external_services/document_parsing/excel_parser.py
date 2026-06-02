@@ -83,23 +83,23 @@ class ExcelParser(DocumentParserPort):
             wb = load_workbook(file_path, read_only=True, data_only=True)
 
             tables: list[ParsedTable] = []
-            for sheet_name in wb.sheetnames:
-                ws = wb[sheet_name]
-                rows_data: list[list[str]] = []
-                for row in ws.iter_rows(values_only=True):
-                    # None 转为空字符串
-                    row_data = [str(cell) if cell is not None else "" for cell in row]
-                    rows_data.append(row_data)
+            try:
+                for sheet_name in wb.sheetnames:
+                    ws = wb[sheet_name]
+                    rows_data: list[list[str]] = []
+                    for row in ws.iter_rows(values_only=True):
+                        row_data = [str(cell) if cell is not None else "" for cell in row]
+                        rows_data.append(row_data)
 
-                if rows_data:
-                    tables.append(
-                        ParsedTable(
-                            rows=rows_data,
-                            metadata={"sheet_name": sheet_name},
+                    if rows_data:
+                        tables.append(
+                            ParsedTable(
+                                rows=rows_data,
+                                metadata={"sheet_name": sheet_name},
+                            )
                         )
-                    )
-
-            wb.close()
+            finally:
+                wb.close()
 
             if not tables:
                 return ParsedDocument(

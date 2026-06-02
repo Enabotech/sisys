@@ -1140,7 +1140,7 @@ def bootstrap() -> None:
                     "src.infrastructure.external_services.document_parsing.markdown_parser",
                     fromlist=["MarkdownParser"],
                 ).MarkdownParser(),
-                "text/rtf": __import__(
+                "application/rtf": __import__(
                     "src.infrastructure.external_services.document_parsing.rtf_parser",
                     fromlist=["RTFParser"],
                 ).RTFParser(),

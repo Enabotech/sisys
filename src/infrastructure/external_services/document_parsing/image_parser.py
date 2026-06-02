@@ -95,9 +95,9 @@ class ImageParser(DocumentParserPort):
                         try:
                             data = pytesseract.image_to_data(img, lang="chi_sim+eng", output_type=pytesseract.Output.DICT)
                             confidences = [int(c) for c in data.get("conf", []) if c != "-1"]
-                            avg_confidence = sum(confidences) / len(confidences) / 100.0 if confidences else 1.0
+                            avg_confidence = sum(confidences) / len(confidences) / 100.0 if confidences else 0.5
                         except Exception:
-                            avg_confidence = 1.0
+                            avg_confidence = 0.5
 
                         texts.append(
                             ParsedElement(
