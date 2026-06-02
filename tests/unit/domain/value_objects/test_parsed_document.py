@@ -158,3 +158,19 @@ class TestParsedDocument:
         doc = ParsedDocument(document_id="x", mime_type="text/plain")
         with pytest.raises(AttributeError):
             setattr(doc, "document_id", "y")
+
+    def test_is_failed_returns_true_for_failed_status(self) -> None:
+        doc = ParsedDocument(document_id="x", mime_type="text/plain", parse_status="failed", error_message="err")
+        assert doc.is_failed() is True
+
+    def test_is_failed_returns_false_for_completed_status(self) -> None:
+        doc = ParsedDocument(document_id="x", mime_type="text/plain")
+        assert doc.is_failed() is False
+
+    def test_is_completed_returns_true_for_completed_status(self) -> None:
+        doc = ParsedDocument(document_id="x", mime_type="text/plain")
+        assert doc.is_completed() is True
+
+    def test_is_completed_returns_false_for_failed_status(self) -> None:
+        doc = ParsedDocument(document_id="x", mime_type="text/plain", parse_status="failed", error_message="err")
+        assert doc.is_completed() is False
