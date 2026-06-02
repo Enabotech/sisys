@@ -85,15 +85,17 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 **When** 在 `src/composition_root.py` 注册新端口
 **Then** `layout_detector` 端口注册为 `LayoutDetector` 接口
 **And** 生命周期为 `SINGLETON`（ONNX 模型会话可复用，避免重复加载）
-**And** `document_parser` 端口版本从 v1.1.0 升级至 v1.2.0（新增版面检测能力，接口签名不变）
-**And** `document_parsing_service` 注入 `layout_detector` 依赖
-**And** `_ALLOWED_TEMP_SUFFIXES` 扩展覆盖 .onnx 后缀（如需临时文件处理）
+**And** `document_parsing_service` 注入 `layout_detector` 依赖（新增可选构造函数参数 `layout_detector: LayoutDetector | None = None`，支持优雅降级）
+**And** `document_parsing_service` 版本从 v1.0.0 升级至 v1.1.0（编排逻辑新增版面检测步骤）
+**And** `document_parser`（`CompositeDocumentParser`）版本保持 v1.1.0 不变（版面检测是新端口职责，不在 DocumentParserPort 调用链内）
 
 **验证标准/Validation Criteria:**
-- [ ] `layout_detector` 端口在 Composition Root 中注册
-- [ ] `document_parser` 版本号更新至 v1.2.0
+- [ ] `layout_detector` 端口在 Composition Root 中注册（SINGLETON lifetime）
+- [ ] `DocumentParsingService.__init__` 新增 `layout_detector: LayoutDetector | None = None` 可选参数
+- [ ] Composition Root lambda 工厂传入 `layout_detector=resolver.resolve("layout_detector")`
+- [ ] `document_parsing_service` 版本号更新至 v1.1.0
 - [ ] 端口合约测试同步更新版本断言
-- [ ] 已有 166 个测试保持通过（无回归）
+- [ ] 已有测试全部保持通过（无回归）
 
 ### AC-5: Bounding Box 级溯源数据可用性
 
@@ -149,12 +151,12 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | 端口名称 | 接口 | 实现 | 注册位置 | Lifetime | Version | Owner |
 |---------|------|------|----------|----------|---------|-------|
 | `layout_detector` | `LayoutDetector` | `OnnxLayoutDetector` | domain/ports/layout_detector.py | SINGLETON | v1.0.0 | epic-2 |
-| `document_parser` | `DocumentParserPort` | `CompositeDocumentParser` | domain/ports/document_parser.py | SCOPED | v1.1.0→v1.2.0 | epic-2 |
+| `document_parser` | `DocumentParserPort` | `CompositeDocumentParser` | domain/ports/document_parser.py | SCOPED | v1.1.0（不变） | epic-2 |
 | `document_parsing_service` | `DocumentParsingService` | — | application/services/ | SCOPED | v1.0.0→v1.1.0 | epic-2 |
 
 > **版本升级说明：**
-> - `document_parser` v1.2.0：新增版面检测能力的流水线后处理步骤，接口签名不变，向后兼容。
-> - `document_parsing_service` v1.1.0：注入 `layout_detector` 依赖，编排逻辑增加版面检测步骤。
+> - `document_parsing_service` v1.1.0：构造函数新增可选参数 `layout_detector: LayoutDetector | None = None`，编排逻辑增加版面检测步骤。向后兼容（可选参数，默认 `None` 时跳过版面检测）。
+> - `document_parser`（`CompositeDocumentParser`）版本保持 v1.1.0 不变 — 版面检测是 `LayoutDetector` 独立端口的职责，不在 `DocumentParserPort` 的调用链内。
 
 #### API 契约 (API Contract)
 - [x] 复用 `POST /api/v1/documents` 上传端点（不变）
@@ -221,7 +223,7 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | **TDD 单元测试** | BoundingBoxResult 值对象 | 创建/序列化/to_dict() | `test_parsed_document.py`（扩展） | Task 2 |
 | **TDD 单元测试** | LayoutDetector 端口 | Protocol 合规/类型检查 | `test_layout_detector_port.py` | Task 2 |
 | **TDD 单元测试** | OnnxLayoutDetector | ONNX 推理/bbox 检测/mock | `test_onnx_layout_detector.py` | Task 3 |
-| **TDD 单元测试** | 版面检测整合 | bbox 匹配/合并逻辑 | `test_layout_integration.py` | Task 4 |
+| **TDD 单元测试** | 版面检测整合 | bbox 匹配/合并逻辑 | `test_layout_matching.py` | Task 4 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_document_layout.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_document_layout.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | `test_acceptance_document_layout.feature` | Task 5 |
@@ -268,7 +270,7 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 |----|-------------|-----------|-------------|----------|
 | AC-1 | LayoutDetector 端口定义 + BoundingBoxResult 值对象 | Task 2 | 2a: BoundingBoxResult 值对象; 2b: LayoutDetector Protocol | `test_parsed_document.py`; `test_layout_detector_port.py` |
 | AC-2 | ONNX 版面检测实现 | Task 3 | 3a: OnnxLayoutDetector 实现 | `test_onnx_layout_detector.py` |
-| AC-3 | 解析管线集成 | Task 4 | 4a: 版面检测整合服务; 4b: bbox 匹配算法 | `test_layout_integration.py` |
+| AC-3 | 解析管线集成 | Task 4 | 4a: 版面检测整合服务; 4b: bbox 匹配算法 | `test_layout_matching.py`; `test_document_parsing_service.py` |
 | AC-4 | Composition Root 注册 | Task 4 | 4c: 端口注册 + 版本升级 | `test_port_contract_layout_detector.py` |
 | AC-5 | Bounding Box 溯源数据可用性 | Task 5 | 5a: 验收场景验证 | `test_acceptance_document_layout.feature` |
 
@@ -389,8 +391,8 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/external_services/document_parsing/test_layout_integration.py`（单元素匹配/多元素匹配/IoU 阈值边界/无重叠返回 None/表格式匹配/不同页面隔离/空检测结果/空元素列表） |
-| 🟢 绿 | 实现 `_match_elements_to_layout()` 辅助函数（空间 IoU 计算/贪心匹配/阈值过滤 IoU > 0.3） |
+| 🔴 红 | 编写 `tests/unit/application/services/test_layout_matching.py`（单元素匹配/多元素匹配/IoU 阈值边界/无重叠返回 None/表格式匹配/不同页面隔离/空检测结果/空元素列表） |
+| 🟢 绿 | 实现 `src/application/services/_layout_matching.py` 辅助函数（空间 IoU 计算/贪心匹配/阈值过滤 IoU > 0.3，纯领域逻辑不依赖第三方库） |
 | 🔄 重构 | 提取 IoU 计算逻辑；添加边界 case 防护；完善类型注解 |
 
 - [ ] Subtask 4.1: 🔴 红 — 编写 `TestBboxMatching`（IoU 计算/单元素匹配/多元素贪心匹配/IoU < 0.3 不匹配/不同 page_number 不匹配/空输入处理/表格 bbox 匹配）
@@ -403,7 +405,7 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 |------|------|
 | 🔴 红 | 扩展 `tests/unit/application/services/test_document_parsing_service.py`（验证 layout_detector 注入/PDF 解析后 bbox 不为 None/非 PDF 格式 bbox 保持 None/layout_detector 缺失时降级处理） |
 | 🟢 绿 | 扩展 `DocumentParsingService`（注入 layout_detector、编排逻辑增加版面检测步骤、PDF 页面渲染为图像、调用 detect()、调用 bbox 匹配） |
-| 🔄 重构 | 提取 `_apply_layout_detection()` 私有方法；添加 PDF 页面渲染逻辑（使用 pypdf + Pillow）；添加 layout_detector=None 优雅降级 |
+| 🔄 重构 | 提取 `_apply_layout_detection()` 私有方法；PDF 页面渲染逻辑封装在 `src/infrastructure/external_services/document_parsing/pdf_page_renderer.py`（pypdf + Pillow，不污染应用层）；添加 layout_detector=None 优雅降级 |
 
 - [ ] Subtask 4.4: 🔴 红 — 编写 Service 编排扩展测试（layout_detector 注入/pdf 版面检测/非 pdf 跳过/layout_detector 缺失时降级）
 - [ ] Subtask 4.5: 🟢 绿 — 扩展 `DocumentParsingService` 编排逻辑（注入 layout_detector，PDF 格式触发版面检测，合并 bbox）
@@ -413,9 +415,9 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 更新 `tests/contracts/test_port_contract_document_parser.py`（验证 layout_detector 端口注册/版本 v1.0.0/document_parser 版本升级至 v1.2.0/document_parsing_service 注入 layout_detector） |
-| 🟢 绿 | 在 `src/composition_root.py` 注册 layout_detector；升级 document_parser 版本至 v1.2.0；document_parsing_service 注入新依赖 |
-| 🔄 重构 | 验证 `_ALLOWED_TEMP_SUFFIXES` 覆盖 .onnx 后缀（如需）；验证端口注册元数据完整 |
+| 🔴 红 | 更新 `tests/contracts/test_port_contract_layout_detector.py`（验证 layout_detector 端口注册/版本 v1.0.0/SINGLETON lifetime/接口类型）+ 更新 `tests/contracts/test_port_contract_document_parser.py`（验证 document_parsing_service 版本升级至 v1.1.0/layout_detector 注入） |
+| 🟢 绿 | 在 `src/composition_root.py` 注册 layout_detector；升级 document_parsing_service 版本至 v1.1.0；composition_root lambda 工厂传入 `layout_detector=resolver.resolve("layout_detector")` |
+| 🔄 重构 | 验证完整端口链：layout_detector → document_parsing_service → document_parser |
 
 - [ ] Subtask 4.7: 🔴 红 — 扩展契约测试（layout_detector 端口注册/版本/接口类型/生命周期为 SINGLETON）
 - [ ] Subtask 4.8: 🟢 绿 — Composition Root 注册 layout_detector + 版本升级
@@ -426,7 +428,7 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 - [ ] DocumentParsingService 编排扩展完成
 - [ ] Composition Root 注册完成
 - [ ] 端口契约测试通过
-- [ ] 已有 166 测试保持通过（无回归）
+- [ ] 已有测试全部保持通过（无回归）
 - [ ] 应用层覆盖率 ≥ 85%
 
 ---
@@ -485,7 +487,7 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 - **架构模式:** 六边形架构（Ports & Adapters）+ CQRS + 事件驱动
 - **设计约束:** 领域层零外部依赖、依赖方向自上而下、端口通过 Composition Root 统一注册
 - **接口治理:** 统一端口注册（PortSpec）、Registry/Resolver/ContractGate、契约优先、版本化兼容
-- **技术栈:** Python 3.11+、onnxruntime 1.17+、pypdf 4.x、Pillow 10.x
+- **技术栈:** Python 3.11+、onnxruntime 1.17+、pypdf 4.x、Pillow 10.x、pypdfium2（PDF 页面光栅化）
 
 ### 关键架构决策
 
@@ -533,13 +535,14 @@ src/
 │
 ├── application/
 │   └── services/
-│       └── document_parsing_service.py  # [修改] 注入 layout_detector，编排增加版面检测步骤
+│       ├── document_parsing_service.py  # [修改] 注入 layout_detector，编排增加版面检测步骤
+│       └── _layout_matching.py          # [新增] bbox 匹配辅助函数（IoU 计算/贪心匹配，纯领域逻辑）
 │
 ├── infrastructure/
 │   └── external_services/
 │       └── document_parsing/
 │           ├── onnx_layout_detector.py   # [新增] OnnxLayoutDetector 实现
-│           └── _layout_matching.py       # [新增] bbox 匹配辅助函数（IoU 计算/贪心匹配）
+│           └── pdf_page_renderer.py      # [新增] PDF 页面渲染为图像（pypdf + Pillow）
 │
 └── composition_root.py              # [修改] 注册 layout_detector + 版本升级
 
@@ -550,9 +553,12 @@ tests/
 │   │   │   └── test_parsed_document.py      # [扩展] 新增 TestBoundingBoxResult
 │   │   └── ports/
 │   │       └── test_layout_detector_port.py  # [新增] Protocol 合规测试
+│   ├── application/services/
+│   │   ├── test_layout_matching.py              # [新增] IoU 计算/bbox 匹配单元测试
+│   │   └── test_document_parsing_service.py     # [扩展] layout_detector 注入测试
 │   ├── infrastructure/external_services/document_parsing/
 │   │   ├── test_onnx_layout_detector.py      # [新增] OnnxLayoutDetector 单元测试
-│   │   └── test_layout_integration.py        # [新增] bbox 匹配/整合测试
+│   │   └── test_pdf_page_renderer.py          # [新增] PDF 页面渲染单元测试
 │   └── architecture/
 │       └── test_arch_document_layout.py      # [新增] SDD 架构约束验证
 │
@@ -589,7 +595,7 @@ tests/
 - [x] 不新增领域事件，复用 `DocumentProcessed`
 - [x] ONNX 模型 mock 测试策略与 OCR mock 策略一致
 - [x] 版本升级三处同步更新（PortSpec/Composition Root/契约测试）
-- [x] 已有 166 测试必须保持通过（无回归）
+- [x] 已有测试全部保持通过（无回归）
 
 ### Git 情报 Git Intelligence Summary
 
@@ -618,7 +624,7 @@ tests/
 - **输出：** bounding boxes `[N, 4]`（xyxy 格式）+ class labels `[N]` + confidence scores `[N]`
 - **推理速度：** CPU ~100-200ms/页，GPU ~20-30ms/页
 - **Python 依赖：** `onnxruntime >= 1.17.0`（CPU）/ `onnxruntime-gpu >= 1.17.0`（GPU）+ `numpy >= 1.24`
-- **预处理依赖：** `Pillow >= 10.0`（图像 resize/normalize）+ `pypdf >= 4.0`（PDF 页面渲染为图像）
+- **预处理依赖：** `pypdfium2 >= 1.0.0`（PDF 页面光栅化为 PNG，pypdf 本身不支持渲染为光栅图像）+ `Pillow >= 10.0`（图像 resize/normalize）
 
 **依赖版本约束（与本项目技术栈对齐）：**
 ```toml
@@ -626,6 +632,7 @@ tests/
 numpy = "^1.24"
 onnxruntime = ">=1.17.0,<2.0"     # CPU 版本（默认）
 # onnxruntime-gpu 作为可选依赖（extra: gpu）
+pypdfium2 = ">=1.0.0"               # PDF 页面光栅化（pypdf 不支持渲染为光栅图像）
 Pillow = ">=10.0"                    # 已有依赖（Story 2-2b ImageParser 引入）
 ```
 
@@ -686,11 +693,14 @@ Pillow = ">=10.0"                    # 已有依赖（Story 2-2b ImageParser 引
 - `src/domain/value_objects/parsed_document.py` — [修改] 新增 BoundingBoxResult 值对象
 - `src/infrastructure/external_services/document_parsing/onnx_layout_detector.py` — OnnxLayoutDetector 实现
 - `src/infrastructure/external_services/document_parsing/_layout_matching.py` — bbox 匹配辅助函数
+- `src/application/services/_layout_matching.py` — [新增] bbox 匹配辅助函数（纯领域逻辑，IoU 计算/贪心匹配）
 - `src/application/services/document_parsing_service.py` — [修改] 编排逻辑增加版面检测步骤
+- `src/infrastructure/external_services/document_parsing/pdf_page_renderer.py` — [新增] PDF 页面渲染为图像（pypdfium2 + Pillow）
 - `src/composition_root.py` — [修改] 注册 layout_detector + 版本升级
 - `tests/unit/domain/ports/test_layout_detector_port.py` — Protocol 合规测试
+- `tests/unit/application/services/test_layout_matching.py` — IoU 计算/bbox 匹配单元测试
 - `tests/unit/infrastructure/external_services/document_parsing/test_onnx_layout_detector.py` — OnnxLayoutDetector 单元测试
-- `tests/unit/infrastructure/external_services/document_parsing/test_layout_integration.py` — bbox 匹配/整合单元测试
+- `tests/unit/infrastructure/external_services/document_parsing/test_pdf_page_renderer.py` — PDF 页面渲染单元测试
 - `tests/unit/architecture/test_arch_document_layout.py` — SDD 架构约束验证
 - `tests/contracts/test_port_contract_layout_detector.py` — 端口契约测试
 - `tests/integration/test_integration_document_layout.py` — 端到端集成测试
@@ -732,8 +742,9 @@ Pillow = ">=10.0"                    # 已有依赖（Story 2-2b ImageParser 引
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-06-02
 **最后更新/Last Updated:** 2026-06-02
 **更新说明/Description:**
+- v1.1.0: Round 1 审查修订 — 修复 P0 layout_detector 注入方式未明确/166测试过时；修复 P1 document_parser 版本升级不当/_layout_matching 层级违反依赖方向/PDF 渲染方案技术可行性/pypdfium2 替代 pypdf 渲染/移除 .onnx 后缀要求
 - v1.0.0: 创建故事文件 — 基于 Epic 2 Story 2.3 需求 + DocLayNet 技术调研 + Story 2-2b 学习经验整合
