@@ -50,19 +50,20 @@
 **Given** 用户上传的 PDF 文档已存入 MinIO（`parse_status=PENDING`）
 **When** 系统收到 `DocumentUploaded` 事件并触发解析流程
 **Then** 使用 `pypdf` 解析 PDF，提取文本内容
-**And** 检测并提取表格（基于文本定位推断）
+**And** 预留表格结构（`tables=[]`，MVP 仅契约预留，真实检测推迟至 Story 2-4 语义表格提取）
 **And** 输出结构化 JSON（包含 pages、texts、tables、images 字段）
 **And** 更新 `parse_status=COMPLETED`，发布 `DocumentProcessed` 事件
 **And** 解析失败时设置 `parse_status=FAILED` 并记录错误信息
 
 **验证标准/Validation Criteria:**
 - [x] PDF 文本提取准确率 ≥95%（抽样验证，纯文本 PDF）
-- [x] 表格检测基于文本定位推断（非图像识别，Story 2-4 语义提取增强）
+- [x] 表格结构契约预留（MVP 输出 `tables=[]`，真实检测推迟至 Story 2-4 语义提取）
 - [x] 输出 JSON 包含 `pages` 数组（每页 texts/tables/images）
 - [x] 每个元素预留 `bbox` 字段（DocLayNet 预留，MVP 填 null）
 - [x] 加密 PDF 返回解析失败（`parse_status=FAILED`，错误信息明确）
 - [x] 空 PDF（0 页）返回解析失败
 - [x] 超大 PDF（>500 页）解析超时保护（P95<500ms 单页处理，整体超限降级处理）
+- [x] 超大 PDF（>100MB 文件大小）返回解析失败（防御解压炸弹，OWASP A04:2021 Insecure Design）
 
 ### AC-2: Word 文档解析
 
@@ -76,9 +77,10 @@
 **验证标准/Validation Criteria:**
 - [x] DOCX 文本提取准确率 ≥95%（抽样验证）
 - [x] 表格提取包含行列结构
-- [x] 段落样式识别（paragraph.style.name → heading/body/list）
+- [x] 段落样式识别（paragraph.style.name → heading/body/list，存于 `metadata["style"]`）
 - [x] 旧版 DOC 格式不支持（返回 `parse_status=FAILED`，错误信息明确建议转换为 DOCX）
 - [x] 空 DOCX（无内容）返回解析失败
+- [x] 超大 DOCX（>50MB 文件大小）返回解析失败（防御 OOXML 解压炸弹）
 
 ### AC-3: TXT 文档解析
 
@@ -120,11 +122,12 @@
 **And** 解析失败时设置 `parse_status=FAILED`，不发布 `DocumentProcessed`
 
 **验证标准/Validation Criteria:**
-- [x] 事件消费通过 Prefect 流程触发（`document_processing_flow` 已定义解析编排骨架，消费端由 Prefect 调度器或 RabbitMQ consumer 触发）
+- [x] 事件消费由调用方在 Story 7-2 或后续专用消费者 Story 中实现，本 Story 仅定义事件契约与主动触发入口
 - [x] 状态流转：`PENDING → IN_PROGRESS → COMPLETED/FAILED`
 - [x] `DocumentProcessed.parse_result` 包含完整解析输出
 - [x] 失败场景不发布 `DocumentProcessed`，仅记录错误日志
 - [x] MVP 触发方式：Prefect flow 由调用方主动触发（`document_processing_flow(document_id, file_path, event_publisher)`），RabbitMQ 事件消费者不在本 Story 范围（推迟至 Epic 7 API 集成 Story 7-2 REST API 接口或后续专用事件消费者 Story）
+- [x] 乐观锁旁路检查（Service 入口处 PENDING 状态判断，避免重复处理；CAS 在仓储层实现推迟至独立 Story）
 
 ### AC-6: 解析准确率验证
 
@@ -908,10 +911,30 @@ def detect_encoding(content: bytes) -> str:
 
 ---
 
-**故事版本/Story Version:** v0.6.0
+### 已知边界与推迟事项 Deferred Work
+
+> **本节登记 5 轮代码审查中识别的非阻塞性 P0/P1 问题，明确归属后续 Story**
+
+| 项 | 描述 | 归属 | 优先级 |
+|---|---|---|---|
+| 1 | 文档表格检测（基于文本坐标推断） | Story 2-4 语义表格提取 | P1 |
+| 2 | DocumentUploaded 事件消费者 | Story 7-2 REST API / 专用消费者 Story | P1 |
+| 3 | 仓储层乐观锁 CAS（`WHERE id=? AND version=?`） | 独立 Story：聚合一致性基础设施 | P0 |
+| 4 | 状态保存 + 事件发布原子性（Transactional Outbox） | 独立 Story：可靠事件投递 | P0 |
+| 5 | IN_PROGRESS 心跳 + Sweeper 重置 | 独立 Story：后台任务基础设施 | P0 |
+| 6 | FAILED 文档重试入口（CAS 解决后自动支持） | 同 Story 3 | P0 |
+| 7 | AC-6 性能基准测试（P95 <500ms / 并发 10） | 性能 Story 或下个 Sprint | P1 |
+| 8 | AC-6 准确率 ≥95% 真实样本验证（≥10 份 fixture） | 性能 Story 或下个 Sprint | P1 |
+
+**判断标准**：「是否仅影响 Document 聚合」？是 → Story 2-2a 必做；否（横切基础设施/全应用/后台任务） → 推迟为独立 Story。当前 Service 入口已有 PENDING 状态乐观锁旁路检查（`document_parsing_service.py:85-87`），作为 MVP 防护；完整 CAS 待 Story 3 落地。
+
+---
+
+**故事版本/Story Version:** v0.7.0
 **创建日期/Created:** 2026-05-31
-**最后更新/Last Updated:** 2026-05-31
+**最后更新/Last Updated:** 2026-06-01
 **更新说明/Description:**
+- v0.7.0: Round 5 5轮代码审查 — 文档修订（AC-1表格推迟、AC-2大小上限、AC-5消费者推迟、AC乐观锁旁路）、新增 Deferred Work 表（8 项 P0/P1 推迟）
 - v0.6.0: Round 5 最终审查 — version格式统一(v1.0.0)、文件清单补全测试文件+待修改文件、技术可行性验证确认
 - v0.5.0: Round 4 审查修订 — 值对象to_dict()新模式说明、Document非frozen说明、ParsedPage.to_dict()补充、CompositeDocumentParser lambda工厂注册样例、Subtask6.3 flow签名修改补充、AC→Task追溯矩阵扩展、event_channels.yaml无需修改说明
 - v0.4.0: Round 3 审查修订 — P0 DocumentParserPort签名(mime_type)、Subtask5.0扩展(register_document路径)、并发解析≥10、事件去重(Subtask6.3)、ParsedDocument顶层值对象、composition_root注册(Subtask4.3)

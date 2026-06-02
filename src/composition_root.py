@@ -1082,18 +1082,24 @@ def bootstrap() -> None:
             "src.infrastructure.external_services.document_parsing.composite_parser",
             fromlist=["CompositeDocumentParser"],
         ).CompositeDocumentParser(
-            pdf_parser=__import__(
-                "src.infrastructure.external_services.document_parsing.pdf_parser",
-                fromlist=["PDFParser"],
-            ).PDFParser(),
-            word_parser=__import__(
-                "src.infrastructure.external_services.document_parsing.word_parser",
-                fromlist=["WordParser"],
-            ).WordParser(),
-            text_parser=__import__(
-                "src.infrastructure.external_services.document_parsing.text_parser",
-                fromlist=["TextParser"],
-            ).TextParser(),
+            parsers={
+                "application/pdf": __import__(
+                    "src.infrastructure.external_services.document_parsing.pdf_parser",
+                    fromlist=["PDFParser"],
+                ).PDFParser(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": __import__(
+                    "src.infrastructure.external_services.document_parsing.word_parser",
+                    fromlist=["WordParser"],
+                ).WordParser(),
+                "application/msword": __import__(  # DOC 格式由 WordParser 返回友好拒绝消息
+                    "src.infrastructure.external_services.document_parsing.word_parser",
+                    fromlist=["WordParser"],
+                ).WordParser(),
+                "text/plain": __import__(
+                    "src.infrastructure.external_services.document_parsing.text_parser",
+                    fromlist=["TextParser"],
+                ).TextParser(),
+            },
         ),
         module="src.infrastructure.external_services.document_parsing.composite_parser",
         lifetime=Lifetime.SCOPED,

@@ -138,7 +138,13 @@ class TestCompositeRouting:
         from src.infrastructure.external_services.document_parsing.text_parser import TextParser
         from src.infrastructure.external_services.document_parsing.word_parser import WordParser
 
-        parser = CompositeDocumentParser(PDFParser(), WordParser(), TextParser())
+        parser = CompositeDocumentParser(
+            parsers={
+                "application/pdf": PDFParser(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": WordParser(),
+                "text/plain": TextParser(),
+            },
+        )
         path = _create_test_pdf()
         try:
             result = parser.parse(path, "application/pdf")
@@ -152,7 +158,13 @@ class TestCompositeRouting:
         from src.infrastructure.external_services.document_parsing.text_parser import TextParser
         from src.infrastructure.external_services.document_parsing.word_parser import WordParser
 
-        parser = CompositeDocumentParser(PDFParser(), WordParser(), TextParser())
+        parser = CompositeDocumentParser(
+            parsers={
+                "application/pdf": PDFParser(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": WordParser(),
+                "text/plain": TextParser(),
+            },
+        )
         path = _create_test_txt()
         try:
             result = parser.parse(path, "text/plain")
@@ -166,7 +178,13 @@ class TestCompositeRouting:
         from src.infrastructure.external_services.document_parsing.text_parser import TextParser
         from src.infrastructure.external_services.document_parsing.word_parser import WordParser
 
-        parser = CompositeDocumentParser(PDFParser(), WordParser(), TextParser())
+        parser = CompositeDocumentParser(
+            parsers={
+                "application/pdf": PDFParser(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": WordParser(),
+                "text/plain": TextParser(),
+            },
+        )
         path = _create_test_txt()
         try:
             with pytest.raises(ValueError, match="不支持的 MIME"):
@@ -210,11 +228,22 @@ class TestTempFileCleanup:
     """临时文件清理测试"""
 
     @pytest.mark.asyncio
-    async def test_temp_file_cleaned_after_parse(self) -> None:
-        """验证解析完成后临时文件已删除"""
+    async def test_temp_file_cleaned_after_parse(self, monkeypatch) -> None:
+        """验证解析完成后临时文件已删除（spy os.unlink 验证清理路径）"""
+        import os
         from unittest.mock import AsyncMock, MagicMock
 
         from src.application.services.document_parsing_service import DocumentParsingService
+
+        unlinked_paths: list[str] = []
+
+        real_unlink = os.unlink
+
+        def spy_unlink(path):
+            unlinked_paths.append(path)
+            return real_unlink(path)
+
+        monkeypatch.setattr("os.unlink", spy_unlink)
 
         mock_repo = AsyncMock()
         mock_storage = AsyncMock()
@@ -240,6 +269,7 @@ class TestTempFileCleanup:
         service = DocumentParsingService(mock_repo, mock_storage, mock_publisher, mock_parser)
         await service.parse_document(doc_id, "t1")
 
-        # 验证临时文件已被清理（_download_to_temp 创建的文件应被 os.unlink）
-        # 无法直接验证，但通过 finally 块保证
-        assert True  # 如果测试通过则说明无异常
+        # 验证至少有一次 unlink 调用针对 /tmp 路径
+        assert any("/tmp" in p or "tmp" in p for p in unlinked_paths), (
+            f"临时文件应被清理，但未观察到对 /tmp 路径的 unlink 调用: {unlinked_paths}"
+        )

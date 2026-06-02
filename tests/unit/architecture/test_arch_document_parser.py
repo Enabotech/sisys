@@ -89,9 +89,13 @@ class TestDependencyDirection:
         from src.infrastructure.external_services.document_parsing.text_parser import TextParser
         from src.infrastructure.external_services.document_parsing.word_parser import WordParser
 
+        # OCP 风格：MIME → 解析器映射通过 dict 注入，新增格式无需修改 CompositeDocumentParser
         parser = CompositeDocumentParser(
-            pdf_parser=PDFParser(),
-            word_parser=WordParser(),
-            text_parser=TextParser(),
+            parsers={
+                "application/pdf": PDFParser(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": WordParser(),
+                "application/msword": WordParser(),
+                "text/plain": TextParser(),
+            },
         )
         assert isinstance(parser, DocumentParserPort)
