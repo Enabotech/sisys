@@ -58,6 +58,15 @@ class HTMLParser(DocumentParserPort):
                 parse_timestamp=timestamp,
             )
 
+        if file_size == 0:
+            return ParsedDocument(
+                document_id=doc_id,
+                mime_type=mime_type,
+                parse_status="failed",
+                error_message="HTML 文档为空",
+                parse_timestamp=timestamp,
+            )
+
         if file_size > MAX_HTML_BYTES:
             return ParsedDocument(
                 document_id=doc_id,
@@ -83,9 +92,11 @@ class HTMLParser(DocumentParserPort):
 
             texts: list[ParsedElement] = []
 
-            # 提取标题元素（h1-h6），保留层级
+            # 提取标题元素（h1-h6），保留层级（跳过表格内的标题）
             heading_tags = body.find_all(["h1", "h2", "h3", "h4", "h5", "h6"])
             for tag in heading_tags:
+                if tag.find_parent("table"):
+                    continue
                 content = tag.get_text(separator=" ", strip=True)
                 if content:
                     texts.append(ParsedElement(content=content, metadata={"style": tag.name}))

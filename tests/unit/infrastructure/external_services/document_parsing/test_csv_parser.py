@@ -70,6 +70,7 @@ class TestCSVParserBasic:
             tables = result.pages[0].tables
             assert len(tables[0].rows) >= 2
             assert len(tables[0].rows[0]) == 3, f"应为 3 列，实际: {len(tables[0].rows[0])}"
+            assert tables[0].rows[0][0] == "姓名", f"首列首行应为 '姓名'，实际: {tables[0].rows[0][0]}"
         finally:
             os.unlink(path)
 
