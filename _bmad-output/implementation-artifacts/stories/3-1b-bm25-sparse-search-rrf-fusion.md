@@ -285,6 +285,7 @@ Story 3-1b 是 Epic 3（智能检索与知识发现）关键路径的第 2 个�
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
+| AC-1 | BM25BuilderPort Protocol 定义 | Task 0 | Subtask 0.1 新增领域端口 | `test_port_contract_sparse_hybrid_search.py` |
 | AC-1 | BM25 稀疏向量构建 | Task 1 | BM25Builder 单元测试 | `test_bm25_builder.py` |
 | AC-1 | BM25 端口注册 | Task 4 | Composition Root 注册 | `test_port_contract_sparse_hybrid_search.py` |
 | AC-2 | BM25 稀疏检索 | Task 2 | SparseSearchService | `test_sparse_search_service.py` |
@@ -298,13 +299,13 @@ Story 3-1b 是 Epic 3（智能检索与知识发现）关键路径的第 2 个�
 
 **Task 间执行依赖：**
 ```
-Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（SparseSearchService）
-                                                            ↘ Task 3（RRF + HybridSearchService）→ Task 4（注册装配）→ Task 5（集成测试）→ Task 6（架构验证）→ Task 7（收尾）
+Task 0（SDD 规范）→ Task 1（BM25Builder 测试）→ Task 2（SparseSearchService）→ Task 3（RRF + HybridSearchService）→ Task 4（注册装配）→ Task 5（集成测试）→ Task 6（架构验证）→ Task 7（收尾）
 ```
-- Task 0 必须最先完成
-- Task 1 完成后，Task 2 和 Task 3 可并行（Task 3 单元测试 mock SparseSearchService）
-- Task 4 依赖 Task 1+2+3 全部完成
-- Task 5 依赖 Task 4 完成
+- Task 0 必须最先完成（定义所有 Protocol 和 TypedDict）
+- Task 1 完成后，Task 2 可开始（依赖 BM25Builder 已测试验证）
+- Task 2 完成后，Task 3 可开始（HybridSearchService 需导入 SparseSearchService）
+- Task 4 依赖 Task 1+2+3 全部完成（所有实现类已创建）
+- Task 5 依赖 Task 4 完成（端口注册就绪）
 - Task 6 依赖 Task 5 完成（在真实代码上验证架构约束）
 - Task 7 依赖 Task 6 完成
 
@@ -367,7 +368,7 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
   - 测试纯空格文本返回空稀疏向量
   - 测试词汇哈希稳定性（同一 term 多次调用返回相同 hash index）
   - 测试 indices 和 values 长度一致性
-  - 测试中英文混合文本
+  - 测试中英文混合文本（如 "AI 人工智能 strategy 战略"，验证英文 token 经停用词过滤、中文 token 作为整体保留且权重 > 0）
 - [ ] Subtask 1.2: 🟢 绿 — 确认已有 `src/infrastructure/storage/qdrant/bm25_builder.py` 通过测试
 - [ ] Subtask 1.3: 🔄 重构 — 如有必要优化已有代码，运行 `ruff check` + `mypy`
 
@@ -505,6 +506,10 @@ Task 0（SDD 规范）→ Task 1（BM25Builder 测试/注册）→ Task 2（Spar
   - 验证两路均为空返回空列表
 - [ ] Subtask 3.5: 🟢 绿 — 创建 `src/application/services/hybrid_search_service.py`
   ```python
+  from src.application.services.dense_search_service import DenseSemanticSearchService
+  from src.application.services.sparse_search_service import SparseSearchService
+  from src.shared.rrf_fusion import rrf_fusion
+
   class HybridSearchResult(TypedDict):
       id: str | int
       score: float
