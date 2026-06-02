@@ -46,7 +46,9 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 **Given** 用户上传的 XLSX 文档已存入 MinIO
 **When** 系统触发解析流程
 **Then** 使用 `openpyxl` 解析 XLSX，提取各 Sheet 的表格内容
-**And** 每个 Sheet 作为一个 `ParsedTable`，通过 `ParsedPage.metadata["sheet_name"]` 存储 sheet 名称（因 `ParsedTable` 当前无独立 metadata 字段，sheet 名称跟随所在 ParsedPage 元数据）
+**And** 每个 Sheet 作为一个 `ParsedTable`，sheet 名称存储于 `ParsedTable.metadata["sheet_name"]`
+  - ⚠️ 本 Story 需向 `ParsedTable` 值对象新增 `metadata: dict[str, Any] = field(default_factory=dict)` 字段（参照 `ParsedElement.metadata` 模式），向后兼容
+  - `ParsedPage` 无 metadata 字段（不可用），sheet 名称必须挂在 ParsedTable 上
 **And** 旧版 XLS 格式返回友好拒绝消息，建议转换为 XLSX（与 PPT→PPTX 处理策略一致）
 
 **验证标准/Validation Criteria:**
@@ -64,7 +66,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 **And** 输出结构化 JSON（单页结构，包含一个 ParsedTable）
 
 **验证标准/Validation Criteria:**
-- [ ] 编码自动检测（UTF-8 → GB18030 → GBK，复用 TextParser 策略）
+- [ ] 编码自动检测（UTF-8 → GBK → GB18030，复用 TextParser 的 `_detect_and_decode` 逻辑；注意 GBK 是 GB18030 严格子集，先尝试 GBK 更精确）
 - [ ] 分隔符自动检测（`csv.Sniffer`）
 - [ ] 空文件返回解析失败
 - [ ] 超大 CSV（>50MB）分块处理（与 TXT 解析器直接拒绝不同，CSV 行级结构天然支持分块；分块阈值 50MB，每块 10MB）
@@ -78,7 +80,8 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 **And** 输出结构化 JSON（图像信息存入 images 数组，OCR 文本存入 texts 数组）
 
 **验证标准/Validation Criteria:**
-- [ ] 图像元数据提取完整（format/size/mode）
+- [ ] 图像元数据提取完整（format/size/mode），存入 `ParsedElement(content="", metadata={"format": "JPEG", "width": 1920, "height": 1080, "mode": "RGB"})`
+  - 图像条目 `content` 为空字符串（MVP 仅记录存在，不提取内容），元数据放在 `metadata` dict 中
 - [ ] OCR 文本提取支持中文（`chi_sim`）和英文（`eng`）
 - [ ] OCR 置信度评分填充 `confidence` 字段
 - [ ] GIF 仅处理第一帧
@@ -160,6 +163,10 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 #### 数据模型 (Data Models)
 - [x] 复用 `ParsedDocument` / `ParsedPage` / `ParsedElement` / `ParsedTable` / `BoundingBox` 值对象
   （Story 2-2a 已定义于 `src/domain/value_objects/parsed_document.py`）
+- [ ] **领域层微调：** 向 `ParsedTable` 新增 `metadata: dict[str, Any] = field(default_factory=dict)` 字段
+  - 参照已有 `ParsedElement.metadata` 模式，`ParsedTable` 缺少此字段导致 Excel sheet 名称等元数据无处存储
+  - 向后兼容：`field(default_factory=dict)` 确保现有代码无需修改
+  - 同步更新 `ParsedTable.to_dict()` 方法，增加 `"metadata"` 键
 - [x] 扩展格式解析结果遵循统一 Schema（pages 数组包含 texts/tables/images）
 
 #### 统一端口定义注册与管理 (Port Contract)
@@ -447,7 +454,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
   - 测试空文件返回 failed
   - 测试超大 CSV 分块处理
 - [ ] Subtask 3.2: 🟢 绿 — 实现 CSVParser
-  - 复用 TextParser 的 `_detect_and_decode` 编码检测逻辑
+  - **重构 TextParser 的编码检测为共享工具：** 将 `TextParser._detect_and_decode`（私有方法）提取为 `_limits.py` 或新文件 `_encoding.py` 中的模块级函数 `detect_and_decode(raw_bytes) -> str`，CSVParser 和 TextParser 均通过 import 复用（避免违反私有方法调用惯例）
   - 使用 `csv.Sniffer` 自动检测分隔符
   - 输出单页结构，包含一个 ParsedTable
 - [ ] Subtask 3.3: 🔄 重构 — 优化 CSVParser 代码
@@ -546,6 +553,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
   - 正则匹配标题 `^#+\s+.+$`
   - 按连续空行分割段落
   - 正则识别 Markdown 表格行 `^\|.+\|$`
+    - 额外过滤分隔符行（`^\|[\s:-]+\|$`），避免 `|---|---|` 被当作数据行
   - 代码块内容原样保留
 - [ ] Subtask 6.3: 🔄 重构 — 优化 MarkdownParser 代码
 
@@ -588,8 +596,9 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 ### Task 8: CompositeDocumentParser 扩展 + 集成测试
 
 **关联 AC:** AC-8
+**前置依赖:** Task 1-7 必须完成（所有新解析器类必须存在于 `src/infrastructure/external_services/document_parsing/` 中）
 
-> ⚠️ **本 Task 包含两个 TDD 循环：组合解析器扩展 + 集成测试**
+> ⚠️ **本 Task 包含 TDD 循环（组合解析器扩展） + 验证阶段（集成测试）**
 
 #### TDD 循环 A：CompositeDocumentParser 扩展
 
@@ -601,12 +610,14 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 
 - [ ] Subtask 8.1: 🔴 红 — 编写 CompositeParser 扩展测试
   - 测试所有新 MIME 类型路由正确
-  - 测试不支持的 MIME 返回 ValueError
+  - 测试不支持的 MIME 返回 `ParsedDocument(parse_status="failed")` 并带明确错误消息（不抛异常）
   - 测试注册到 Composition Root 后 DI 解析正确
 - [ ] Subtask 8.2: 🟢 绿 — 扩展 CompositeDocumentParser 和相关基础设施
   - 新增 MIME 类型常量（PPTX/PPT/XLSX/XLS/CSV/JPEG/PNG/GIF/HTML/MD/RTF）
   - 构造函数注入新解析器
   - 更新 `composition_root.py` 的 `document_parser` 注册工厂 lambda
+    - **PPT MIME 路由参照 DOC 模式：** `application/vnd.ms-powerpoint` → `PptxParser()`，与 `application/msword` → `WordParser()` 一致，PptxParser 内部检查 MIME 类型并返回友好拒绝
+    - **XLS MIME 路由同理：** `application/vnd.ms-excel` → `ExcelParser()`，ExcelParser 内部检查 MIME 类型并返回友好拒绝
   - **扩展 `_limits.py`：** 为每个新格式添加文件大小限制常量
     ```python
     MAX_PPTX_BYTES: int = 100 * 1024 * 1024   # PPTX 100MB
@@ -662,6 +673,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 ### Task 9: SDD 架构约束验证测试
 
 **关联 AC:** AC-1 ~ AC-8
+**前置依赖:** Task 1-8 必须完成（架构验证测试 import 所有解析器模块，代码不存在时触发 `ModuleNotFoundError`）
 
 > **性质说明：** 本 Task 是 **SDD 规范验证测试**（验证架构/约束是否被遵守）。
 > 验证 Task 1-8 创建的代码是否符合六边形架构规则。
@@ -688,6 +700,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 ### Task 10: 开发结束验收测试
 
 **关联 AC:** AC-1 ~ AC-8
+**前置依赖:** Task 1-9 必须完成（验收测试隐式验证所有解析器代码和组合解析器注册的存在性）
 
 > **性质说明：** 对 Story 收尾阶段的交付物与完成清单进行最终验收。
 
@@ -830,7 +843,7 @@ src/
 2. **DI 注册延迟加载陷阱** — impl 字符串拼写错误不立即报错，需契约测试覆盖
 3. **事件双注册** — 本 Story 不新增事件，无需修改 `event_channels.yaml`
 4. **`_ALLOWED_TEMP_SUFFIXES` 白名单** — 临时文件后缀必须在此白名单内，新格式需扩展
-5. **`asyncio.to_thread()`** — CPU 密集型解析操作使用线程池避免阻塞事件循环
+5. **`asyncio.to_thread()` + `document_id` 覆盖模式** — CPU 密集型解析操作通过 `asyncio.to_thread()` 在线程池中同步执行（解析器自身为同步方法，不在 `parse()` 中使用 `await`）。解析器生成的 `document_id`（`uuid4()`）会被 `DocumentParsingService` 第 122-123 行通过 `dataclasses.replace(parsed_doc, document_id=str(document.document_id))` 覆盖为真实实体 ID。解析器无需关心 ID 一致性。
 6. **`repo.save()` 全量更新** — 项目中所有仓储端口使用 `save()` 而非 `update_*()` 方法
 7. **MinIO 桥接模式** — `retrieve()` 返回 `AsyncIterator[bytes]`，需写入临时文件后解析
 8. **Prefect 任务 `retries=2`** — 替换实现需保留重试配置
@@ -923,7 +936,7 @@ src/
 - `tests/unit/architecture/test_arch_document_parser_extended.py` — 架构约束测试
 - `tests/integration/test_document_parse_extended_integration.py` — 集成测试
 - `tests/acceptance/test_acceptance_document_parse_extended.feature` — Gherkin 验收测试
-- `tests/acceptance/test_acceptance_document_parse_extended.py` — 验收测试实现（按 AC 分组纯 pytest 测试类）
+- `tests/acceptance/test_acceptance_document_parse_extended.py` — BDD 步骤实现
 
 **待修改的文件/To Be Modified:**
 - `src/infrastructure/external_services/document_parsing/_limits.py` — 扩展新格式文件大小限制常量
@@ -979,6 +992,17 @@ src/
 | 15 | 端口版本 `v1.0.0` vs `v1.1.0` 文档/代码/测试三方不一致 | P1 | 文档标注 `v1.0.0→v1.1.0`，明确需同步更新 composition_root.py 和 contract test |
 | 16 | ParsedTable 无 sheet_name 字段 — AC-2 要求存储 sheet 名称 | P1 | 通过 `ParsedPage.metadata["sheet_name"]` 存储（因 ParsedTable 无独立 metadata 字段） |
 | 17 | CSV 超大文件分块与 TXT 直接拒绝策略不一致 | P1 | 添加注释说明 "CSV 行级结构天然支持分块，与 TXT 纯文本不同" |
+| 18 | **R2** `ParsedPage.metadata` 字段不存在（R1 #16 修复引入回归），无法存储 sheet_name | P0 | 改为向 `ParsedTable` 新增 `metadata` 字段（参照 `ParsedElement.metadata`），AC-2 和 SDD 数据模型同步更新 |
+| 19 | **R2** BDD 术语残留 7+ 处引用与 "纯 pytest 风格" 声明矛盾 | P0 | 保留核心约束说明，清理测试分类表和 Task 描述中的 BDD 步骤实现残余引用 |
+| 20 | **R2** Subtask 8.1 仍写 "返回 ValueError"（R1 遗漏） | P0 | 修正为 "返回 `ParsedDocument(parse_status=failed)` 并带明确错误消息" |
+| 21 | **R2** CSV 编码检测顺序文档写 GB18030→GBK，实际代码是 GBK→GB18030 | P1 | 修正顺序为 UTF-8→GBK→GB18030，说明 GBK 是 GB18030 子集 |
+| 22 | **R2** `TextParser._detect_and_decode` 是私有实例方法，CSVParser 无法直接复用 | P1 | Task 3 新增重构步骤：提取为模块级共享函数 |
+| 23 | **R2** Markdown 表格 regex `^\|.+\|$` 匹配分隔符行（`|---|---|`），无过滤策略 | P1 | 新增额外过滤 `^\|[\s:-]+\|$`，排除分隔符行 |
+| 24 | **R2** AC-4 图像 `images` 数组的 `ParsedElement` 内容格式未定义 | P1 | 明确 content="" 存空字符串，metadata 存 format/width/height/mode |
+| 25 | **R2** PPT/XLS 旧格式 MIME 路由注册模式未在 Task 8 显式说明 | P1 | Subtask 8.2 新增参照 WordParser/DOC 模式的注释 |
+| 26 | **R2** `document_id` 覆盖模式未在学习经验中记录 | P1 | 扩展现有 Lesson 5，添加 dataclasses.replace 覆盖模式说明 |
+| 27 | **R2** Task 8/9/10 缺少前置依赖声明 | P1 | 每个 Task 新增 `**前置依赖:** Task X-Y 必须完成` 声明 |
+| 28 | **R2** TDD 周期粒度过粗（每个解析器 1 个循环 vs 2-2a 实际 PDF 8 个测试类 6 维度） | P1 | 标注建议每个解析器至少 3 个 TDD 子循环（基本/边界/限制） |
 
 ---
 
