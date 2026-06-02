@@ -7,6 +7,8 @@ composition_root 注册路由，无需修改本类）。
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from src.domain.ports.document_parser import DocumentParserPort
 from src.domain.value_objects.parsed_document import ParsedDocument
 
@@ -34,12 +36,15 @@ class CompositeDocumentParser(DocumentParserPort):
             mime_type: MIME 类型（用于路由决策）
 
         Returns:
-            结构化解析结果
-
-        Raises:
-            ValueError: 不支持的 MIME 类型
+            结构化解析结果（不支持的 MIME 类型返回 failed 状态）
         """
         parser = self._parsers.get(mime_type)
         if parser is None:
-            raise ValueError(f"不支持的 MIME 类型: {mime_type}")
+            return ParsedDocument(
+                document_id="",
+                mime_type=mime_type,
+                parse_status="failed",
+                error_message=f"不支持的 MIME 类型: {mime_type}",
+                parse_timestamp=datetime.now(UTC).isoformat(),
+            )
         return parser.parse(file_path, mime_type)

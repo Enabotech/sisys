@@ -41,6 +41,8 @@ async def document_processing_flow(
         各任务执行结果
     """
     parse_result = await parse_document(document_id, file_path, tenant_id)
+    if parse_result.get("status") == "failed":
+        return {"parse_result": parse_result, "embedding": [], "index_result": {"indexed": False}}
     embedding = await generate_embedding(parse_result)
     index_result = await index_document(embedding)
 

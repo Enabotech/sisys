@@ -8,7 +8,6 @@ from __future__ import annotations
 import os
 import tempfile
 
-import pytest
 from pypdf import PdfWriter
 
 # MIME 类型常量（与 composition_root 保持一致）
@@ -106,12 +105,15 @@ class TestCompositeParserRouting:
 class TestCompositeParserUnknownMime:
     """未知 MIME 类型拒绝测试"""
 
-    def test_unknown_mime_raises_value_error(self) -> None:
+    def test_unknown_mime_returns_failed(self) -> None:
+        """不支持的 MIME 类型返回 failed 状态（与其他解析器错误处理策略一致）"""
         parser = _build_composite()
         path = _create_minimal_txt()
         try:
-            with pytest.raises(ValueError, match="不支持的 MIME"):
-                parser.parse(path, "application/unknown")
+            result = parser.parse(path, "application/unknown")
+            assert result.parse_status == "failed"
+            assert result.error_message is not None
+            assert "不支持的 MIME 类型" in result.error_message
         finally:
             os.unlink(path)
 

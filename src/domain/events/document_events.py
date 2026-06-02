@@ -21,12 +21,14 @@ class DocumentProcessed(DomainEvent):
         event_type: 事件类型，固定为"DocumentProcessed"
         parse_result: 解析结果字典
         embedding: 文档嵌入向量（可选）
+        tenant_id: 租户标识符（空字符串仅用于向后兼容，新代码必须传递）
     """
 
     document_id: uuid.UUID = field(default_factory=uuid.uuid4)
     event_type: str = field(default="DocumentProcessed", init=False)
     parse_result: dict[str, Any] = field(default_factory=dict)
     embedding: list[float] | None = None
+    tenant_id: str = ""
 
     def __post_init__(self) -> None:
         """设置aggregate_id和aggregate_type"""

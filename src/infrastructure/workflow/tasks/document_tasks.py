@@ -48,6 +48,7 @@ async def parse_document(document_id: uuid.UUID, file_path: str, tenant_id: str 
         result_dict = {
             "status": doc.parse_status.value,
             "document_id": str(doc.document_id),
+            "tenant_id": tenant_id,
             "pages": len(doc.metadata.get("parse_result", {}).get("pages", [])),
         }
         return result_dict
@@ -64,21 +65,32 @@ async def generate_embedding(parse_result: dict[str, Any]) -> list[float]:
     从文档解析结果中提取文本并生成嵌入向量。
 
     Args:
-        parse_result: 解析结果（含 document_id）
+        parse_result: 解析结果（含 document_id, tenant_id）
 
     Returns:
         嵌入向量列表，失败时返回空列表
     """
+    from src.domain.ports.document_repository import DocumentQuery
     from src.domain.ports.resolver import get_resolver
 
     try:
         if parse_result.get("status") == "failed":
             return []
 
+        tenant_id = parse_result.get("tenant_id", "")
+        if not tenant_id:
+            logger.error("generate_embedding 缺少 tenant_id, document_id=%s", parse_result.get("document_id"))
+            return []
+
         resolver = get_resolver()
         service = resolver.resolve("embedding_service")
         repo = resolver.resolve("document_repository")
-        doc = await repo.find(uuid.UUID(parse_result["document_id"]))
+        doc = await repo.find(
+            DocumentQuery(
+                tenant_id=tenant_id,
+                document_id=uuid.UUID(parse_result["document_id"]),
+            )
+        )
 
         if not doc or not doc.metadata.get("parse_result"):
             return []
