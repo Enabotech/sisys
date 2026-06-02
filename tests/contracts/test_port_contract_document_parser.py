@@ -93,7 +93,7 @@ class TestExtendedFormatMIMERouting:
             "image/gif",
             "text/html",
             "text/markdown",
-            "text/rtf",
+            "application/rtf",
         }
         missing = expected - mime_types
         assert not missing, f"CompositeDocumentParser 缺少 MIME 路由: {missing}"

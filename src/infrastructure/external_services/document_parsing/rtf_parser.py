@@ -77,8 +77,8 @@ class RTFParser(DocumentParserPort):
                     parse_timestamp=timestamp,
                 )
 
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                rtf_content = f.read()
+            with open(file_path, "rb") as f:
+                rtf_content = f.read().decode("latin-1")
 
             text = rtf_to_text(rtf_content).strip()
             if not text:

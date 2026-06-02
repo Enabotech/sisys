@@ -953,20 +953,33 @@ src/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** —
-**审查模式:** —
+**审查日期:** 2026-06-02
+**审查模式:** 多Agent并行审查（架构/代码质量/测试/AC一致性 4视角）
 
 #### 需决策 Decision Needed
 
-- — （待代码审查）
+- — （无）
 
 #### 已修复 Patch
 
-- — （待代码审查）
+| # | 级别 | 问题 | 修复方案 | 文件 |
+|---|------|------|----------|------|
+| 1 | P0 | RTF MIME 类型不匹配（composition_root 注册 `"text/rtf"`，领域层定义 `"application/rtf"`） | 全量修正为 `"application/rtf"`（7 处） | composition_root.py, 5 个测试文件 |
+| 2 | P0 | TestExtendedFormatRouting 直接实例化子解析器，不测路由 | 重构为通过 _build_composite() 路由，扩展至 15 种 MIME | test_composite_parser.py |
+| 3 | P0 | 验收测试临时文件泄漏（_cleanup 定义但未调用） | context fixture 改为 yield teardown 模式 | test_acceptance...extended.py |
+| 4 | P0 | test_parse_pptx_empty 名实不符（实际测正常 PPTX） | 重命名为 test_parse_pptx_basic_structure | test_integration...extended.py |
+| 5 | P1 | ExcelParser wb.close() 不在 finally 中，异常时资源泄漏 | 改为 try/finally 模式 | excel_parser.py |
+| 6 | P1 | CSVParser 编码元数据硬编码 "utf-8" | detect_and_decode 返回 tuple[str, str]，调用方使用实际编码 | _encoding.py, csv_parser.py, text_parser.py |
+| 7 | P1 | HTMLParser 标题重复提取（单独提取 + body.get_text 包含标题） | heading decompose 后再 body.get_text() | html_parser.py |
+| 8 | P1 | ImageParser OCR 置信度失败时默认 1.0（100%） | 改为保守值 0.5 | image_parser.py |
+| 9 | P1 | RTFParser 以 UTF-8+errors="replace" 读取，非英文内容损坏 | 改为二进制读取 + latin-1 解码 | rtf_parser.py |
 
 #### 已推迟 Defer
 
-- — （待代码审查）
+- P2: PPTX/XLSX 缺少 XXE 防护（与 WordParser 不一致）— 建议后续统一处理
+- P2: MIME 类型应收敛为集中常量管理 — 建议重构时统一
+- P2: ImageParser OCR 执行两次（image_to_string + image_to_data）— 性能优化
+- P2: MarkdownParser 代码块未独立识别 — 功能增强
 
 ---
 
