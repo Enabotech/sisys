@@ -1,13 +1,16 @@
 """Word 文档解析器
 
 使用 python-docx 提取 DOCX 文本和表格的解析器实现。
+包含 XXE 防护（defusedxml 预校验 DOCX 内 XML 文件）。
 """
 
 from __future__ import annotations
 
+import io
 import logging
 import os
 import uuid
+import zipfile
 from datetime import UTC, datetime
 
 from src.domain.ports.document_parser import DocumentParserPort
@@ -18,6 +21,13 @@ from src.domain.value_objects.parsed_document import (
     ParsedTable,
 )
 from src.infrastructure.external_services.document_parsing._limits import MAX_DOCX_BYTES
+
+try:
+    from defusedxml.ElementTree import parse as safe_xml_parse
+
+    HAS_DEFUSEDXML = True
+except ImportError:
+    HAS_DEFUSEDXML = False
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +90,35 @@ class WordParser(DocumentParserPort):
         try:
             from docx import Document
 
+            # XXE 防护：在 python-docx 解析前，用 defusedxml 预校验 DOCX 内所有 XML
+            if HAS_DEFUSEDXML:
+                try:
+                    with zipfile.ZipFile(file_path, "r") as z:
+                        for name in z.namelist():
+                            if name.endswith(".xml"):
+                                safe_xml_parse(io.BytesIO(z.read(name)))
+                except Exception:
+                    logger.exception("DOCX 包含不安全的 XML 内容")
+                    return ParsedDocument(
+                        document_id=doc_id,
+                        mime_type=mime_type,
+                        parse_status="failed",
+                        error_message="DOCX 包含不安全的 XML 内容，解析已拒绝",
+                        parse_timestamp=timestamp,
+                    )
+
             with open(file_path, "rb") as f:
                 doc = Document(f)
+
+                # 空文档检测（AC-2 要求空 DOCX 返回解析失败）
+                if len(doc.paragraphs) == 0 and len(doc.tables) == 0:
+                    return ParsedDocument(
+                        document_id=doc_id,
+                        mime_type=mime_type,
+                        parse_status="failed",
+                        error_message="DOCX 文档为空，未包含任何段落或表格",
+                        parse_timestamp=timestamp,
+                    )
 
                 texts: list[ParsedElement] = []
                 for paragraph in doc.paragraphs:

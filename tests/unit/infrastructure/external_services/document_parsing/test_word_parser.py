@@ -141,13 +141,16 @@ class TestWordParserEdgeCases:
     """边界场景测试"""
 
     def test_empty_docx(self) -> None:
+        """空 DOCX（无段落无表格）应返回 failed（AC-2 要求）"""
         from src.infrastructure.external_services.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         path = _create_empty_docx()
         try:
             result = parser.parse(path, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            assert result.parse_status == "completed"
+            assert result.is_failed()
+            assert result.error_message is not None
+            assert "空" in result.error_message
         finally:
             os.unlink(path)
 
@@ -200,6 +203,17 @@ class TestWordParserSizeLimit:
         result = parser.parse("/tmp/whatever.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         assert result.is_failed()
         assert "50MB" in (result.error_message or "")
+
+    def test_getsize_oserror_returns_failed(self, monkeypatch) -> None:
+        """os.path.getsize 抛出 OSError 时应返回 failed 而非异常穿透"""
+        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+
+        monkeypatch.setattr("os.path.getsize", lambda _: (_ for _ in ()).throw(OSError("Permission denied")))
+        parser = WordParser()
+        mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        result = parser.parse("/inaccessible/file.docx", mime)
+        assert result.is_failed()
+        assert "权限" in (result.error_message or "")
 
 
 class TestWordParserExceptionSanitization:

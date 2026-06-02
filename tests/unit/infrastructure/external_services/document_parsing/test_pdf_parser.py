@@ -225,6 +225,16 @@ class TestPDFParserSizeLimit:
         finally:
             os.unlink(path)
 
+    def test_getsize_oserror_returns_failed(self, monkeypatch) -> None:
+        """os.path.getsize 抛出 OSError 时应返回 failed 而非异常穿透"""
+        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+
+        monkeypatch.setattr("os.path.getsize", lambda _: (_ for _ in ()).throw(OSError("Permission denied")))
+        parser = PDFParser()
+        result = parser.parse("/inaccessible/file.pdf", "application/pdf")
+        assert result.is_failed()
+        assert "权限" in (result.error_message or "")
+
 
 class TestPDFParserExceptionSanitization:
     """异常信息脱敏测试（防止路径泄漏）"""

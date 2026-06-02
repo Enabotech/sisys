@@ -168,3 +168,13 @@ class TestTextParserEdgeCases:
             assert "10MB" in result.error_message
         finally:
             os.unlink(path)
+
+    def test_getsize_oserror_returns_failed(self, monkeypatch) -> None:
+        """os.path.getsize 抛出 OSError 时应返回 failed 而非异常穿透"""
+        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+
+        monkeypatch.setattr("os.path.getsize", lambda _: (_ for _ in ()).throw(OSError("Permission denied")))
+        parser = TextParser()
+        result = parser.parse("/inaccessible/file.txt", "text/plain")
+        assert result.is_failed()
+        assert "权限" in (result.error_message or "")
