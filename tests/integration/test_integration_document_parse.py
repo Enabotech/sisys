@@ -448,7 +448,7 @@ class TestCompositeRouting:
         finally:
             os.unlink(path)
 
-    def test_route_unknown_raises(self) -> None:
+    def test_route_unknown_returns_failed(self) -> None:
         from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
         from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
         from src.infrastructure.external_services.document_parsing.text_parser import TextParser
@@ -463,8 +463,10 @@ class TestCompositeRouting:
         )
         path = _create_test_txt()
         try:
-            with pytest.raises(ValueError, match="不支持的 MIME"):
-                parser.parse(path, "application/unknown")
+            result = parser.parse(path, "application/unknown")
+            assert result.parse_status == "failed"
+            assert result.error_message is not None
+            assert "不支持的 MIME" in result.error_message
         finally:
             os.unlink(path)
 

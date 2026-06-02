@@ -233,10 +233,7 @@ exclude = [
 #   - defusedxml 与 sentence_transformers 均通过 try/except ImportError 守卫，安全豁免
 # ---------------------------------------------------------------------------
 [[tool.mypy.overrides]]
-module = [
-    "defusedxml.*",
-    "sentence_transformers.*",
-]
+module = "defusedxml.*"
 ignore_missing_imports = true
 
 # Pytest Configuration
