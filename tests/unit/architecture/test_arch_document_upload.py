@@ -72,7 +72,7 @@ class TestDependencyDirection:
 
     def test_infrastructure_can_import_domain(self) -> None:
         """基础设施层可以导入 domain 层"""
-        from src.infrastructure.external_services.archive_extractor import ArchiveExtractor
+        from src.infrastructure.document_parsing.archive_extractor import ArchiveExtractor
         from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadManager
 
         assert ArchiveExtractor is not None

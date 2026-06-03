@@ -121,6 +121,7 @@ class TestPostgreSQLOutboxStateTransition:
         )
 
         mock_session = mock.AsyncMock()
+        mock_session.add = mock.Mock()  # AsyncSession.add() 是同步方法
         token = set_session(mock_session)
 
         try:
@@ -156,6 +157,7 @@ class TestPostgreSQLOutboxStateTransition:
         )
 
         mock_session = mock.AsyncMock()
+        mock_session.add = mock.Mock()  # AsyncSession.add() 是同步方法
         token = set_session(mock_session)
 
         try:

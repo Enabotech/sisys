@@ -220,3 +220,101 @@ class MinIODocumentStorage(DocumentStoragePort):
             return await self._adapter.get_metadata("raw-documents", document_id)
         except Exception:
             return None
+
+    # -- Multipart upload methods --
+
+    async def init_multipart_upload(
+        self,
+        user_id: str,
+        doc_type: str,
+        filename: str,
+        content_type: str = "application/octet-stream",
+    ) -> tuple[str, str]:
+        """初始化分片上传，自动生成对象路径
+
+        Args:
+            user_id: 用户 ID
+            doc_type: 文档类型
+            filename: 文件名
+            content_type: MIME 类型
+
+        Returns:
+            (minio_upload_id, object_key) 元组
+        """
+        now = datetime.now(UTC)
+        month_key = now.strftime("%Y-%m")
+        object_key = f"documents/{user_id}/{doc_type}/{month_key}/{now.strftime('%Y%m%d%H%M%S')}"
+
+        minio_upload_id = await self._adapter.init_multipart_upload(
+            "raw-documents",
+            object_key,
+            content_type=content_type,
+        )
+        return (minio_upload_id, object_key)
+
+    async def upload_part(
+        self,
+        minio_upload_id: str,
+        object_key: str,
+        part_number: int,
+        data: bytes,
+    ) -> str:
+        """上传单个分片
+
+        Args:
+            minio_upload_id: MinIO 分片上传会话 ID
+            object_key: 对象键
+            part_number: 分片编号
+            data: 分片数据
+
+        Returns:
+            分片 ETag
+        """
+        return await self._adapter.upload_part(
+            "raw-documents",
+            object_key,
+            minio_upload_id,
+            part_number,
+            data,
+        )
+
+    async def complete_multipart_upload(
+        self,
+        minio_upload_id: str,
+        object_key: str,
+        parts: list[dict],
+    ) -> str:
+        """完成分片上传，合并所有分片
+
+        Args:
+            minio_upload_id: MinIO 分片上传会话 ID
+            object_key: 对象键
+            parts: 已上传分片列表 [{"part_number": int, "etag": str}]
+
+        Returns:
+            版本 ID
+        """
+        minio_parts = [{"PartNumber": p["part_number"], "ETag": p["etag"]} for p in parts]
+        return await self._adapter.complete_multipart_upload(
+            "raw-documents",
+            object_key,
+            minio_upload_id,
+            minio_parts,
+        )
+
+    async def abort_multipart_upload(
+        self,
+        minio_upload_id: str,
+        object_key: str,
+    ) -> None:
+        """中止分片上传
+
+        Args:
+            minio_upload_id: MinIO 分片上传会话 ID
+            object_key: 对象键
+        """
+        await self._adapter.abort_multipart_upload(
+            "raw-documents",
+            object_key,
+            minio_upload_id,
+        )

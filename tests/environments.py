@@ -138,6 +138,16 @@ class AppConfig:
 
 
 @dataclass
+class EmbeddingConfig:
+    """Embedding 模型配置"""
+
+    model_name: str = "BAAI/bge-m3"
+    model_path: str = ""
+    device: str = "cuda"
+    dimension: int = 1024
+
+
+@dataclass
 class TestEnvConfig:
     """测试环境完整配置"""
 
@@ -149,6 +159,7 @@ class TestEnvConfig:
     neo4j: Neo4jConfig = field(default_factory=Neo4jConfig)
     rabbitmq: RabbitMQConfig = field(default_factory=RabbitMQConfig)
     app: AppConfig = field(default_factory=AppConfig)
+    embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
 
 
 # =============================================================================
@@ -391,6 +402,20 @@ def _apply_dotenv_if_empty(config: TestEnvConfig, env_values) -> None:
         if alg := env_values.get("ALGORITHM"):
             config.app.algorithm = alg
 
+    # Embedding 配置
+    if not config.embedding.model_name or config.embedding.model_name == "BAAI/bge-m3":
+        if name := env_values.get("EMBEDDING_MODEL_NAME"):
+            config.embedding.model_name = name
+    if not config.embedding.model_path:
+        if path := env_values.get("EMBEDDING_MODEL_PATH"):
+            config.embedding.model_path = path
+    if not config.embedding.device or config.embedding.device == "cuda":
+        if device := env_values.get("EMBEDDING_MODEL_DEVICE"):
+            config.embedding.device = device
+    if config.embedding.dimension in (1024, 0) or not config.embedding.dimension:
+        if dim := env_values.get("EMBEDDING_MODEL_DIMENSION"):
+            config.embedding.dimension = int(dim)
+
 
 def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
     """从环境变量覆盖配置"""
@@ -451,6 +476,16 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
     if secret_key := os.getenv("SECRET_KEY"):
         config.app.secret_key = secret_key
 
+    # Embedding 配置
+    if embedding_model := os.getenv("EMBEDDING_MODEL_NAME"):
+        config.embedding.model_name = embedding_model
+    if embedding_path := os.getenv("EMBEDDING_MODEL_PATH"):
+        config.embedding.model_path = embedding_path
+    if embedding_device := os.getenv("EMBEDDING_MODEL_DEVICE"):
+        config.embedding.device = embedding_device
+    if embedding_dim := os.getenv("EMBEDDING_MODEL_DIMENSION"):
+        config.embedding.dimension = int(embedding_dim)
+
     return config
 
 
@@ -504,6 +539,13 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
         os.environ.setdefault("JWT_SECRET_KEY", config.app.jwt_secret_key)
     if config.app.secret_key:
         os.environ.setdefault("SECRET_KEY", config.app.secret_key)
+
+    # Embedding 配置
+    os.environ.setdefault("EMBEDDING_MODEL_NAME", config.embedding.model_name)
+    if config.embedding.model_path:
+        os.environ.setdefault("EMBEDDING_MODEL_PATH", config.embedding.model_path)
+    os.environ.setdefault("EMBEDDING_MODEL_DEVICE", config.embedding.device)
+    os.environ.setdefault("EMBEDDING_MODEL_DIMENSION", str(config.embedding.dimension))
 
 
 def reset_test_env() -> None:

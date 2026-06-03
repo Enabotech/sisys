@@ -244,7 +244,7 @@ class TestUserCRUD:
 
         result = await repo.save(user)
 
-        mock_session.add.assert_called_once()
+        mock_session.merge.assert_called_once()
         assert isinstance(result, User)
 
     async def test_get_user_by_username(self, mock_session):

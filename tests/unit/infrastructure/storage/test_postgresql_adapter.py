@@ -71,14 +71,14 @@ class TestPostgreSQLAdapter:
         assert result is None
 
     async def test_save_insert(self, repository, mock_session):
-        """测试保存实体（_do_save 默认插入）"""
+        """测试保存实体（_do_save 使用 merge 实现 INSERT-or-UPDATE）"""
         user = mock.Mock()
         mock_session.flush = mock.AsyncMock()
         mock_session.refresh = mock.AsyncMock()
 
         await repository.save(user)
 
-        mock_session.add.assert_called_once_with(user)
+        mock_session.merge.assert_called_once_with(user)
         mock_session.flush.assert_called_once()
 
     async def test_delete_hard(self, repository, mock_session):

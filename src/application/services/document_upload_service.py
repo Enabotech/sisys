@@ -6,9 +6,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 import uuid
-from typing import Any
+from typing import TypedDict
 
 from src.application.ports.document_storage_port import DocumentStoragePort
 from src.domain.entities.document import Document, DocumentType, ParseStatus
@@ -16,10 +17,42 @@ from src.domain.events.document_events import DocumentUploaded
 from src.domain.ports.document_repository import DocumentQuery, DocumentRepositoryPort
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.value_objects.document_format import get_mime_type, is_supported
-from src.domain.value_objects.upload_limits import MAX_FILE_SIZE, MAX_FILENAME_LENGTH
+from src.domain.value_objects.upload_limits import MAX_BATCH_SIZE, MAX_FILE_SIZE, MAX_FILENAME_LENGTH
 
 # 文件名非法字符模式
 _INVALID_FILENAME_PATTERN = re.compile(r"[\x00\\/]")
+
+# 批量上传并发数
+_BATCH_CONCURRENCY = 20
+
+
+class BatchFileInfo(TypedDict):
+    """批量上传文件信息"""
+
+    filename: str
+    mime_type: str
+    file_size_bytes: int
+
+
+class _BatchDetailRequired(TypedDict):
+    filename: str
+    status: str
+
+
+class BatchUploadDetail(_BatchDetailRequired, total=False):
+    """批量上传单项结果"""
+
+    document_id: str
+    error: str
+
+
+class BatchUploadResult(TypedDict):
+    """批量上传结果汇总"""
+
+    total: int
+    success: int
+    failed: int
+    details: list[BatchUploadDetail]
 
 
 class DocumentUploadService:
@@ -81,12 +114,13 @@ class DocumentUploadService:
             uploaded_by=uploaded_by,
         )
 
-        await self._storage.store_document(
+        object_key = await self._storage.store_document(
             user_id=uploaded_by,
             doc_type=document_type,
             file_path=file_path,
             content_type=mime_type,
         )
+        doc.metadata["storage_object_key"] = object_key
 
         saved_doc = await self._repository.save(doc)
 
@@ -104,14 +138,15 @@ class DocumentUploadService:
 
     async def upload_batch(
         self,
-        files: list[dict[str, Any]],
+        files: list[BatchFileInfo],
         tenant_id: str,
         uploaded_by: str,
         file_paths: list[str],
-    ) -> dict[str, Any]:
+    ) -> BatchUploadResult:
         """批量上传文件
 
         每个文件独立校验、独立存储，部分失败不影响其他文件。
+        使用 asyncio.Semaphore 控制并发数（≥20）。
 
         Args:
             files: 文件信息列表，每个 dict 包含 filename/mime_type/file_size_bytes
@@ -120,33 +155,52 @@ class DocumentUploadService:
             file_paths: 对应的临时文件路径列表
 
         Returns:
-            批量结果汇总 {total, success, failed, details}
+            批量结果汇总
 
         Raises:
-            ValueError: 空批量请求
+            ValueError: 空批量请求、总大小超限
         """
         if not files:
             raise ValueError("空批量请求，至少需要一个文件")
 
-        results: list[dict[str, Any]] = []
-        success_count = 0
-        failed_count = 0
+        # 校验总大小限制
+        total_size = sum(f["file_size_bytes"] for f in files)
+        if total_size > MAX_BATCH_SIZE:
+            raise ValueError(f"批量上传总大小超过限制（最大 {MAX_BATCH_SIZE // (1024**3)}GB）")
 
-        for i, file_info in enumerate(files):
-            try:
-                doc = await self.upload(
-                    filename=file_info["filename"],
-                    mime_type=file_info["mime_type"],
-                    file_size_bytes=file_info["file_size_bytes"],
-                    tenant_id=tenant_id,
-                    uploaded_by=uploaded_by,
-                    file_path=file_paths[i] if i < len(file_paths) else "",
-                )
-                results.append({"filename": file_info["filename"], "status": "success", "document_id": str(doc.document_id)})
-                success_count += 1
-            except (ValueError, Exception) as e:
-                results.append({"filename": file_info["filename"], "status": "failed", "error": str(e)})
-                failed_count += 1
+        # 使用 Semaphore 控制并发
+        semaphore = asyncio.Semaphore(_BATCH_CONCURRENCY)
+
+        async def upload_with_semaphore(index: int, file_info: BatchFileInfo) -> BatchUploadDetail:
+            """带并发控制的单文件上传"""
+            async with semaphore:
+                try:
+                    doc = await self.upload(
+                        filename=file_info["filename"],
+                        mime_type=file_info["mime_type"],
+                        file_size_bytes=file_info["file_size_bytes"],
+                        tenant_id=tenant_id,
+                        uploaded_by=uploaded_by,
+                        file_path=file_paths[index] if index < len(file_paths) else "",
+                    )
+                    return {
+                        "filename": file_info["filename"],
+                        "status": "success",
+                        "document_id": str(doc.document_id),
+                    }
+                except (ValueError, Exception) as e:
+                    return {
+                        "filename": file_info["filename"],
+                        "status": "failed",
+                        "error": str(e),
+                    }
+
+        # 并发执行所有上传任务
+        tasks = [upload_with_semaphore(i, f) for i, f in enumerate(files)]
+        results: list[BatchUploadDetail] = await asyncio.gather(*tasks)
+
+        success_count = sum(1 for r in results if r["status"] == "success")
+        failed_count = len(results) - success_count
 
         return {
             "total": len(files),
@@ -167,6 +221,66 @@ class DocumentUploadService:
         """
         query = DocumentQuery(tenant_id=tenant_id, document_id=document_id)
         return await self._repository.find(query)
+
+    async def register_document(
+        self,
+        filename: str,
+        mime_type: str,
+        file_size_bytes: int,
+        tenant_id: str,
+        uploaded_by: str,
+        document_type: str = "other",
+        object_key: str = "",
+    ) -> Document:
+        """注册已上传的文档（分片上传完成后调用）
+
+        仅执行 PG 元数据持久化和事件发布，不调用对象存储。
+        文件数据已通过分片上传存储至 MinIO。
+
+        Args:
+            filename: 文件名
+            mime_type: MIME 类型
+            file_size_bytes: 文件大小
+            tenant_id: 租户标识符
+            uploaded_by: 上传者
+            document_type: 文档类型
+            object_key: MinIO 对象键（分片上传完成后获取）
+
+        Returns:
+            持久化后的 Document 实体
+
+        Raises:
+            ValueError: 格式校验失败
+        """
+        self._validate_upload(filename, mime_type, file_size_bytes)
+
+        doc = Document(
+            document_id=uuid.uuid4(),
+            filename=filename,
+            mime_type=mime_type,
+            file_size_bytes=file_size_bytes,
+            document_type=DocumentType(document_type),
+            parse_status=ParseStatus.PENDING,
+            tenant_id=tenant_id,
+            uploaded_by=uploaded_by,
+        )
+
+        if object_key:
+            doc.metadata["storage_object_key"] = object_key
+
+        saved_doc = await self._repository.save(doc)
+
+        event = DocumentUploaded(
+            document_id=saved_doc.document_id,
+            filename=saved_doc.filename,
+            mime_type=saved_doc.mime_type,
+            file_size_bytes=saved_doc.file_size_bytes,
+            tenant_id=saved_doc.tenant_id,
+            uploaded_by=saved_doc.uploaded_by,
+        )
+        await self._publisher.publish(event)
+
+        return saved_doc
 
     def _validate_upload(self, filename: str, mime_type: str, file_size_bytes: int) -> None:
         """校验上传请求的合法性"""

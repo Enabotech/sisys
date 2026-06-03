@@ -1,21 +1,21 @@
-"""Acceptance tests for Story 1.6 - Qdrant Vector Storage Layer.
+"""Qdrant 向量存储层验收测试
 
-Real instance integration tests using actual Qdrant service.
-No mocks - uses real Qdrant instance.
+使用真实 Qdrant 服务实例的集成测试，无 mock。
 
-Run with: poetry run pytest tests/acceptance/test_acceptance_qdrant-vector-layer.py -v
+运行: poetry run pytest tests/acceptance/test_acceptance_qdrant_vector_layer.py -v
 
-Prerequisites:
-    - Qdrant service running at localhost:6333 (or set QDRANT_* env vars)
+前置条件:
+    - Qdrant 服务运行在 localhost:6333（或设置 QDRANT_* 环境变量）
 """
 
 from __future__ import annotations
 
 import uuid
 from pathlib import Path
+from typing import Any
 
 import pytest
-from pytest_bdd import given, scenario, then, when
+from pytest_bdd import given, scenario, scenarios, then, when
 
 from src.infrastructure.storage.qdrant.bm25_builder import BM25Builder
 from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
@@ -24,21 +24,16 @@ from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
 from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 from tests.environments import get_test_env
 
-# Import reset_test_environment for test isolation (AC-4 A8)
+scenarios("test_acceptance_qdrant_vector_layer.feature")
 
 # ===================================================================
-# Paths & Constants
+# 常量
 # ===================================================================
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = ROOT / "src"
 DOMAIN_DIR = SRC_DIR / "domain"
 
-# Module-level test state for UUID isolation
-_test_collection_names: dict[str, str | None] = {
-    "finance": None,
-    "hr": None,
-}
 
 # ===================================================================
 # Fixtures
@@ -46,34 +41,14 @@ _test_collection_names: dict[str, str | None] = {
 
 
 @pytest.fixture
-def test_tenant_id() -> str:
-    """Generate unique tenant ID for test isolation."""
-    return f"test_{uuid.uuid4().hex[:8]}"
-
-
-@pytest.fixture(autouse=True)
-async def init_test_collection_names(qdrant_client: QdrantManager):
-    """Initialize unique collection names for each test with async cleanup."""
-    for key in _test_collection_names:
-        _test_collection_names[key] = f"sisys_documents_{key}_{uuid.uuid4().hex[:8]}"
-    yield
-    # Cleanup after test - delete all created collections
-    from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
-
-    manager = QdrantCollectionManager(qdrant_client.get_client())
-    for key in _test_collection_names:
-        name = _test_collection_names[key]
-        if name:
-            try:
-                await manager.delete_collection(name)
-            except Exception:
-                pass  # Ignore errors during cleanup
-            _test_collection_names[key] = None
+def context() -> dict[str, Any]:
+    """BDD 步骤间共享状态"""
+    return {}
 
 
 @pytest.fixture
 def qdrant_client() -> QdrantManager:
-    """Real Qdrant client wrapper instance."""
+    """真实 Qdrant 客户端实例"""
     env = get_test_env()
     from src.infrastructure.config.qdrant import QdrantConfig
 
@@ -90,30 +65,54 @@ def qdrant_client() -> QdrantManager:
 
 @pytest.fixture
 def collection_manager(qdrant_client: QdrantManager) -> QdrantCollectionManager:
-    """Real Qdrant collection manager instance."""
+    """真实 Qdrant Collection 管理器"""
     return QdrantCollectionManager(qdrant_client.get_client())
 
 
 @pytest.fixture
 def vector_storage(qdrant_client: QdrantManager) -> QdrantVectorStorage:
-    """Real Qdrant vector storage instance."""
+    """真实 Qdrant 向量存储实例"""
     return QdrantVectorStorage(qdrant_client.get_client())
 
 
 @pytest.fixture
 def bm25_builder() -> BM25Builder:
-    """BM25 builder instance."""
+    """BM25 构建器实例"""
     return BM25Builder()
 
 
+@pytest.fixture(autouse=True)
+def cleanup_collections(
+    context: dict[str, Any],
+    collection_manager: QdrantCollectionManager,
+    event_loop,
+):
+    """每个测试结束后清理创建的 Collection"""
+    yield
+    for name in list(context.get("created_collections", [])):
+        try:
+            event_loop.run_until_complete(collection_manager.delete_collection(name))
+        except Exception:
+            pass
+
+
+def _ensure_finance_collection(context: dict[str, Any]) -> str:
+    """确保 context 中存在 finance_collection 名称"""
+    if "finance_collection" not in context:
+        name = f"sisys_documents_finance_{uuid.uuid4().hex[:8]}"
+        context["finance_collection"] = name
+        context.setdefault("created_collections", []).append(name)
+    return str(context["finance_collection"])
+
+
 # ===================================================================
-# Background Steps (shared across all scenarios)
+# Background Steps
 # ===================================================================
 
 
 @given("Qdrant 服务可用")
 def qdrant_service_available(qdrant_client: QdrantManager, event_loop):
-    """Verify Qdrant service is available."""
+    """验证 Qdrant 服务可用"""
 
     async def _check():
         try:
@@ -124,114 +123,121 @@ def qdrant_service_available(qdrant_client: QdrantManager, event_loop):
 
     is_available = event_loop.run_until_complete(_check())
     if not is_available:
-        pytest.skip("Qdrant service is not available")
+        pytest.skip("Qdrant 服务不可用")
 
 
 @given('Collection 命名规范为 "sisys:{collection_type}:{namespace}"')
-def collection_naming_convention():
-    """Define collection naming convention."""
-    pass
+def collection_naming_convention(context: dict[str, Any]):
+    """定义 Collection 命名规范"""
+    context["naming_convention"] = "sisys:{collection_type}:{namespace}"
 
 
 # ===================================================================
-# AC-1/AC-2: Collection Management Tests
+# AC-1: Collection 创建与删除
 # ===================================================================
 
 
-@scenario(
-    "test_acceptance_qdrant_vector_layer.feature",
-    "Collection 创建与删除",
-)
-def test_collection_create_and_delete(collection_manager: QdrantCollectionManager, event_loop):
-    """Test collection creation and deletion."""
+@scenario("test_acceptance_qdrant_vector_layer.feature", "AC-1 - Collection 创建与删除")
+def test_ac1_collection_create_and_delete():
+    """测试 Collection 创建与删除"""
     pass
 
 
 @when('我创建 Collection "sisys:documents:finance" 向量维度 1024')
-def create_collection(collection_manager: QdrantCollectionManager, event_loop):
-    """Create collection with vector size 1024."""
+def create_finance_collection(
+    context: dict[str, Any],
+    collection_manager: QdrantCollectionManager,
+    event_loop,
+):
+    """创建 finance Collection"""
+    name = _ensure_finance_collection(context)
 
     async def _create():
-        await collection_manager.create_collection(
-            name=_test_collection_names["finance"],
-            vector_size=1024,
-            distance="Cosine",
-        )
+        await collection_manager.create_collection(name=name, vector_size=1024, distance="Cosine")
 
     event_loop.run_until_complete(_create())
 
 
 @then("Collection 应该存在")
-def verify_collection_exists(collection_manager: QdrantCollectionManager, event_loop):
-    """Verify collection exists."""
+def verify_collection_exists(
+    context: dict[str, Any],
+    collection_manager: QdrantCollectionManager,
+    event_loop,
+):
+    """验证 Collection 存在"""
 
     async def _check():
-        exists = await collection_manager.collection_exists(_test_collection_names["finance"])
-        assert exists, "Collection sisys_documents_finance should exist"
+        name = context["finance_collection"]
+        exists = await collection_manager.collection_exists(name)
+        assert exists, f"Collection {name} 应该存在"
 
     event_loop.run_until_complete(_check())
 
 
 @when('我删除 Collection "sisys:documents:finance"')
-def delete_collection(collection_manager: QdrantCollectionManager, event_loop):
-    """Delete collection."""
+def delete_finance_collection(
+    context: dict[str, Any],
+    collection_manager: QdrantCollectionManager,
+    event_loop,
+):
+    """删除 finance Collection"""
 
     async def _delete():
-        await collection_manager.delete_collection(_test_collection_names["finance"])
+        await collection_manager.delete_collection(context["finance_collection"])
 
     event_loop.run_until_complete(_delete())
 
 
 @then("Collection 应该不存在")
-def verify_collection_not_exists(collection_manager: QdrantCollectionManager, event_loop):
-    """Verify collection does not exist."""
+def verify_collection_not_exists(
+    context: dict[str, Any],
+    collection_manager: QdrantCollectionManager,
+    event_loop,
+):
+    """验证 Collection 不存在"""
 
     async def _check():
-        exists = await collection_manager.collection_exists(_test_collection_names["finance"])
-        assert not exists, "Collection should not exist after deletion"
+        name = context["finance_collection"]
+        exists = await collection_manager.collection_exists(name)
+        assert not exists, f"Collection {name} 不应该存在"
 
     event_loop.run_until_complete(_check())
 
 
 # ===================================================================
-# AC-3: Vector Point Insertion and Query
+# AC-2: 向量点插入与查询
 # ===================================================================
 
 
-@scenario(
-    "test_acceptance_qdrant_vector_layer.feature",
-    "向量点插入与查询",
-)
-def test_vector_point_insert_and_query(
-    collection_manager: QdrantCollectionManager,
-    vector_storage: QdrantVectorStorage,
-    event_loop,
-):
-    """Test vector point insertion and query."""
+@scenario("test_acceptance_qdrant_vector_layer.feature", "AC-2 - 向量点插入与查询")
+def test_ac2_vector_point_insert_and_query():
+    """测试向量点插入与查询"""
     pass
 
 
 @given('Collection "sisys:documents:finance" 已存在')
-def collection_exists(collection_manager: QdrantCollectionManager, event_loop):
-    """Collection already exists."""
+def ensure_finance_collection_exists(
+    context: dict[str, Any],
+    collection_manager: QdrantCollectionManager,
+    event_loop,
+):
+    """确保 finance Collection 已存在"""
+    name = _ensure_finance_collection(context)
 
     async def _create():
-        await collection_manager.create_collection(
-            name=_test_collection_names["finance"],
-            vector_size=1024,
-            distance="Cosine",
-        )
+        await collection_manager.create_collection(name=name, vector_size=1024, distance="Cosine")
 
     event_loop.run_until_complete(_create())
 
 
 @when("我插入 10 个向量点（带 payload 元数据）")
 def insert_ten_vectors(
-    collection_manager: QdrantCollectionManager,
+    context: dict[str, Any],
     vector_storage: QdrantVectorStorage,
     event_loop,
 ):
-    """Insert 10 vector points with payload metadata."""
+    """插入 10 个带 payload 元数据的向量点"""
+    collection = context["finance_collection"]
 
     async def _insert():
         points = []
@@ -247,166 +253,141 @@ def insert_ten_vectors(
                     },
                 )
             )
-        await vector_storage.upsert_points(_test_collection_names["finance"], points)
+        await vector_storage.upsert_points(collection, points)
 
     event_loop.run_until_complete(_insert())
+    context["insert_success"] = True
 
 
 @then("插入应该成功")
-def verify_insert_success():
-    """Verify insertion succeeds."""
-    # If no exception, insertion was successful
-    pass
+def verify_insert_success(context: dict[str, Any]):
+    """验证向量点插入成功"""
+    assert context.get("insert_success"), "向量点插入应该成功"
 
 
 @when('我查询向量点 "point-1"')
-def query_point_vector_storage(
+def query_point_by_id(
+    context: dict[str, Any],
     vector_storage: QdrantVectorStorage,
     event_loop,
 ):
-    """Query vector point by ID."""
-    result = None
+    """查询 ID 为 1 的向量点"""
+    collection = context["finance_collection"]
 
     async def _query():
-        nonlocal result
-        result = await vector_storage.get_point(_test_collection_names["finance"], "1")
+        return await vector_storage.get_point(collection, "1")
 
-    event_loop.run_until_complete(_query())
-    return result
+    result = event_loop.run_until_complete(_query())
+    context["query_result"] = result
 
 
 @then("应该返回对应的向量点数据")
-def verify_point_returned():
-    """Verify returned point data matches."""
-    pass
+def verify_point_returned(context: dict[str, Any]):
+    """验证返回的向量点数据"""
+    result = context.get("query_result")
+    assert result is not None, "应该返回 ID 为 1 的向量点数据"
 
 
 # ===================================================================
-# AC-4: Dense Semantic Retrieval
+# AC-3: Dense 语义检索
 # ===================================================================
 
 
-@scenario(
-    "test_acceptance_qdrant_vector_layer.feature",
-    "Dense 语义检索",
-)
-def test_dense_semantic_retrieval(
-    collection_manager: QdrantCollectionManager,
-    vector_storage: QdrantVectorStorage,
-    event_loop,
-):
-    """Test dense semantic retrieval."""
+@scenario("test_acceptance_qdrant_vector_layer.feature", "AC-3 - Dense 语义检索")
+def test_ac3_dense_semantic_retrieval():
+    """测试 Dense 语义检索"""
     pass
 
 
 @given('Collection "sisys:documents:finance" 包含 100 个向量点')
 def collection_contains_100_vectors(
+    context: dict[str, Any],
     collection_manager: QdrantCollectionManager,
     vector_storage: QdrantVectorStorage,
     event_loop,
 ):
-    """Collection contains 100 vector points."""
+    """Collection 包含 100 个向量点"""
+    collection = _ensure_finance_collection(context)
 
-    async def _insert():
-        # Create collection if not exists
-        try:
-            await collection_manager.create_collection(
-                name=_test_collection_names["finance"],
-                vector_size=1024,
-                distance="Cosine",
-            )
-        except Exception:
-            pass  # Collection may already exist
+    async def _setup():
+        await collection_manager.create_collection(name=collection, vector_size=1024, distance="Cosine")
 
-        # Insert 100 vectors
         points = []
         for i in range(100):
             points.append(
                 VectorPoint(
                     id=str(i + 1),
                     vector=[0.01 * i] * 1024,
-                    payload={
-                        "document_id": f"doc-{i + 1}",
-                        "index": i,
-                    },
+                    payload={"document_id": f"doc-{i + 1}", "index": i},
                 )
             )
-        await vector_storage.upsert_points(_test_collection_names["finance"], points)
+        await vector_storage.upsert_points(collection, points)
 
-    event_loop.run_until_complete(_insert())
+    event_loop.run_until_complete(_setup())
 
 
 @when("我执行 Dense 检索（查询向量 1024 维，limit=10）")
 def perform_dense_search(
+    context: dict[str, Any],
     vector_storage: QdrantVectorStorage,
     event_loop,
 ):
-    """Perform dense search with 1024-dim vector."""
-    results = None
+    """执行 Dense 语义检索"""
+    collection = context["finance_collection"]
 
     async def _search():
-        nonlocal results
         query_vector = [0.05] * 1024
-        results = await vector_storage.search(
-            _test_collection_names["finance"],
-            query_vector,
-            limit=10,
-        )
+        return await vector_storage.search(collection, query_vector, limit=10)
 
-    event_loop.run_until_complete(_search())
-    return results
+    results = event_loop.run_until_complete(_search())
+    context["search_results"] = results
 
 
 @then("应该返回最多 10 个结果")
-def verify_max_10_results():
-    """Verify at most 10 results are returned."""
-    pass
+def verify_max_10_results(context: dict[str, Any]):
+    """验证返回最多 10 个结果"""
+    results = context.get("search_results")
+    assert results is not None, "应该返回检索结果"
+    assert len(results) <= 10, f"应该返回最多 10 个结果，实际返回 {len(results)} 个"
 
 
 @then("结果按相似度降序排列")
-def verify_results_sorted_by_score():
-    """Verify results are sorted by score descending."""
-    pass
+def verify_results_sorted_by_score(context: dict[str, Any]):
+    """验证结果按相似度降序排列"""
+    results = context.get("search_results")
+    assert results is not None, "应该有检索结果"
+    if len(results) > 1:
+        scores = [r["score"] for r in results]
+        for i in range(len(scores) - 1):
+            assert scores[i] >= scores[i + 1], (
+                f"结果应该按相似度降序排列，但 score[{i}]={scores[i]} < score[{i + 1}]={scores[i + 1]}"
+            )
 
 
 # ===================================================================
-# AC-5: Dense Retrieval Payload Filtering
+# AC-4: Dense 检索 payload 过滤
 # ===================================================================
 
 
-@scenario(
-    "test_acceptance_qdrant_vector_layer.feature",
-    "Dense 检索 payload 过滤",
-)
-def test_dense_search_with_filter(
-    collection_manager: QdrantCollectionManager,
-    vector_storage: QdrantVectorStorage,
-    event_loop,
-):
-    """Test dense search with payload filtering."""
+@scenario("test_acceptance_qdrant_vector_layer.feature", "AC-4 - Dense 检索 payload 过滤")
+def test_ac4_dense_search_with_filter():
+    """测试 Dense 检索 payload 过滤"""
     pass
 
 
 @given('Collection "sisys:documents:finance" 包含不同业务域的向量点')
 def collection_has_different_domains(
+    context: dict[str, Any],
     collection_manager: QdrantCollectionManager,
     vector_storage: QdrantVectorStorage,
     event_loop,
 ):
-    """Collection contains vectors with different business domains."""
+    """Collection 包含不同业务域的向量点"""
+    collection = _ensure_finance_collection(context)
 
     async def _setup():
-        # P2 Fix: Create collection before inserting points
-        try:
-            await collection_manager.create_collection(
-                name=_test_collection_names["finance"],
-                vector_size=1024,
-                distance="Cosine",
-            )
-        except Exception:
-            pass  # Ignore if already exists
+        await collection_manager.create_collection(name=collection, vector_size=1024, distance="Cosine")
 
-        # Insert vectors with different business_domain values
         for domain in ["report", "analysis", "summary"]:
             for i in range(10):
                 points = [
@@ -419,75 +400,77 @@ def collection_has_different_domains(
                         },
                     )
                 ]
-                await vector_storage.upsert_points(_test_collection_names["finance"], points)
+                await vector_storage.upsert_points(collection, points)
 
     event_loop.run_until_complete(_setup())
 
 
 @when('我执行 Dense 检索并过滤 business_domain="report"')
 def perform_filtered_search(
+    context: dict[str, Any],
     vector_storage: QdrantVectorStorage,
     event_loop,
 ):
-    """Perform dense search with business_domain filter."""
-    results = None
+    """执行带 payload 过滤的 Dense 检索"""
+    collection = context["finance_collection"]
 
     async def _search():
-        nonlocal results
         query_vector = [0.1] * 1024
-        results = await vector_storage.search(
-            _test_collection_names["finance"],
+        return await vector_storage.search(
+            collection,
             query_vector,
             limit=10,
             filter_payload={"business_domain": "report"},
         )
 
-    event_loop.run_until_complete(_search())
-    return results
+    results = event_loop.run_until_complete(_search())
+    context["filtered_results"] = results
 
 
 @then('所有结果的 business_domain 应该为 "report"')
-def verify_all_results_have_domain():
-    """Verify all results have business_domain='report'."""
-    pass
+def verify_all_results_have_report_domain(context: dict[str, Any]):
+    """验证所有结果的 business_domain 为 report"""
+    results = context.get("filtered_results")
+    assert results is not None, "应该返回过滤后的检索结果"
+    for r in results:
+        domain = r["payload"].get("business_domain", "")
+        assert domain == "report", f"所有结果的 business_domain 应该为 report，但发现 {domain}"
 
 
 # ===================================================================
-# AC-6: BM25 Sparse Retrieval
+# AC-5: BM25 稀疏检索
 # ===================================================================
 
 
-@scenario(
-    "test_acceptance_qdrant_vector_layer.feature",
-    "BM25 稀疏检索",
-)
-def test_bm25_sparse_retrieval(
-    collection_manager: QdrantCollectionManager,
-    vector_storage: QdrantVectorStorage,
-    bm25_builder: BM25Builder,
-    event_loop,
-):
-    """Test BM25 sparse retrieval."""
+@scenario("test_acceptance_qdrant_vector_layer.feature", "AC-5 - BM25 稀疏检索")
+def test_ac5_bm25_sparse_retrieval():
+    """测试 BM25 稀疏检索"""
     pass
 
 
 @given('Collection "sisys:documents:finance" 包含文本向量点')
 def collection_has_text_vectors(
+    context: dict[str, Any],
     collection_manager: QdrantCollectionManager,
-    vector_storage: QdrantVectorStorage,
+    qdrant_client: QdrantManager,
+    bm25_builder: BM25Builder,
     event_loop,
 ):
-    """Collection contains text vector points."""
+    """Collection 包含文本向量点（含稀疏向量索引和数据）"""
+    collection = _ensure_finance_collection(context)
+    raw_client = qdrant_client.get_client()
 
-    async def _insert():
-        try:
-            await collection_manager.create_collection(
-                name=_test_collection_names["finance"],
-                vector_size=1024,
-                distance="Cosine",
-            )
-        except Exception:
-            pass
+    async def _setup():
+        from qdrant_client.models import PointStruct, SparseVectorParams
+        from qdrant_client.models import SparseVector as QdrantSparseVector
+
+        sparse_config = {"sparse": SparseVectorParams()}
+        await collection_manager.create_collection(
+            name=collection,
+            vector_size=1024,
+            distance="Cosine",
+            sparse_vectors_config=sparse_config,
+        )
 
         texts = [
             "financial report analysis",
@@ -496,102 +479,91 @@ def collection_has_text_vectors(
             "market trend analysis",
             "investment portfolio summary",
         ]
-        for i, text in enumerate(texts):
-            points = [
-                VectorPoint(
-                    id=str(i + 1),
-                    vector=[0.1] * 1024,
-                    payload={
-                        "document_id": f"doc-{i + 1}",
-                        "text": text,
-                    },
-                )
-            ]
-            await vector_storage.upsert_points(_test_collection_names["finance"], points)
 
-    event_loop.run_until_complete(_insert())
+        points = []
+        for i, text in enumerate(texts):
+            sparse_vec = bm25_builder.build_sparse_vector(text)
+            points.append(
+                PointStruct(
+                    id=i + 1,
+                    vector={
+                        "": [0.1] * 1024,
+                        "sparse": QdrantSparseVector(indices=sparse_vec.indices, values=sparse_vec.values),
+                    },
+                    payload={"document_id": f"doc-{i + 1}", "text": text},
+                )
+            )
+
+        await raw_client.upsert(collection_name=collection, points=points)
+
+    event_loop.run_until_complete(_setup())
 
 
 @when("我执行 BM25 稀疏检索（稀疏向量从文本构建）")
 def perform_bm25_search(
+    context: dict[str, Any],
     vector_storage: QdrantVectorStorage,
     bm25_builder: BM25Builder,
     event_loop,
 ):
-    """Perform BM25 sparse search."""
-    results = None
+    """执行 BM25 稀疏检索"""
+    collection = context["finance_collection"]
 
     async def _search():
-        nonlocal results
         sparse_vector = bm25_builder.build_sparse_vector("financial report analysis")
-        results = await vector_storage.search_sparse(
-            _test_collection_names["finance"],
-            sparse_vector,
-        )
+        return await vector_storage.search_sparse(collection, sparse_vector)
 
-    event_loop.run_until_complete(_search())
-    return results
+    results = event_loop.run_until_complete(_search())
+    context["bm25_results"] = results
 
 
 @then("应该返回关键词匹配的结果")
-def verify_keyword_matched_results():
-    """Verify results match keywords."""
-    pass
+def verify_keyword_matched_results(context: dict[str, Any]):
+    """验证返回关键词匹配的结果"""
+    results = context.get("bm25_results")
+    assert results is not None, "应该返回 BM25 检索结果"
+    assert len(results) > 0, "应该返回至少一条关键词匹配结果"
 
 
 # ===================================================================
-# AC-7: Multi-Tenant Isolation
+# AC-6: 多租户隔离
 # ===================================================================
 
 
-@scenario(
-    "test_acceptance_qdrant_vector_layer.feature",
-    "多租户隔离",
-)
-def test_multi_tenant_isolation(
-    collection_manager: QdrantCollectionManager,
-    vector_storage: QdrantVectorStorage,
-    event_loop,
-):
-    """Test multi-tenant isolation."""
+@scenario("test_acceptance_qdrant_vector_layer.feature", "AC-6 - 多租户隔离")
+def test_ac6_multi_tenant_isolation():
+    """测试多租户隔离"""
     pass
 
 
 @given('Collection "sisys:documents:finance" 和 "sisys:documents:hr" 存在')
 def both_collections_exist(
+    context: dict[str, Any],
     collection_manager: QdrantCollectionManager,
-    vector_storage: QdrantVectorStorage,
     event_loop,
 ):
-    """Both finance and HR collections exist."""
+    """finance 和 hr Collection 均存在"""
+    finance = _ensure_finance_collection(context)
+
+    hr_name = f"sisys_documents_hr_{uuid.uuid4().hex[:8]}"
+    context["hr_collection"] = hr_name
+    context.setdefault("created_collections", []).append(hr_name)
 
     async def _create():
-        try:
-            await collection_manager.create_collection(
-                name=_test_collection_names["finance"],
-                vector_size=1024,
-                distance="Cosine",
-            )
-        except Exception:
-            pass
-        try:
-            await collection_manager.create_collection(
-                name=_test_collection_names["hr"],
-                vector_size=1024,
-                distance="Cosine",
-            )
-        except Exception:
-            pass
+        await collection_manager.create_collection(name=finance, vector_size=1024, distance="Cosine")
+        await collection_manager.create_collection(name=hr_name, vector_size=1024, distance="Cosine")
 
     event_loop.run_until_complete(_create())
 
 
 @when('我向 "sisys:documents:finance" 插入向量点')
 def insert_to_finance_collection(
+    context: dict[str, Any],
     vector_storage: QdrantVectorStorage,
     event_loop,
 ):
-    """Insert vectors to finance collection."""
+    """向 finance Collection 插入向量点"""
+    collection = context["finance_collection"]
 
     async def _insert():
         points = [
@@ -601,48 +573,47 @@ def insert_to_finance_collection(
                 payload={"document_id": "finance-doc-1"},
             )
         ]
-        await vector_storage.upsert_points(_test_collection_names["finance"], points)
+        await vector_storage.upsert_points(collection, points)
 
     event_loop.run_until_complete(_insert())
 
 
 @then('"sisys:documents:hr" 不应该包含这些向量点')
 def verify_hr_collection_isolated(
+    context: dict[str, Any],
     vector_storage: QdrantVectorStorage,
     event_loop,
 ):
-    """Verify HR collection does not contain finance vectors."""
+    """验证 hr Collection 不包含 finance 向量点"""
+    hr_collection = context["hr_collection"]
 
     async def _check():
-        point = await vector_storage.get_point(_test_collection_names["hr"], "1")
-        assert point is None, "HR collection should not contain finance vectors"
+        return await vector_storage.get_point(hr_collection, "1")
 
-    event_loop.run_until_complete(_check())
+    point = event_loop.run_until_complete(_check())
+    assert point is None, "hr Collection 不应该包含 finance 的向量点"
 
 
 # ===================================================================
-# AC-8: Domain Layer Zero Qdrant Dependency
+# AC-7: 领域层零 Qdrant 依赖
 # ===================================================================
 
 
-@scenario(
-    "test_acceptance_qdrant_vector_layer.feature",
-    "领域层零 Qdrant 依赖",
-)
-def test_domain_layer_zero_qdrant_dependency():
-    """Test domain layer has zero Qdrant dependency."""
+@scenario("test_acceptance_qdrant_vector_layer.feature", "AC-7 - 领域层零 Qdrant 依赖")
+def test_ac7_domain_zero_qdrant_dependency():
+    """测试领域层零 Qdrant 依赖"""
     pass
 
 
 @when("我扫描 src/domain/ 目录")
-def scan_domain_directory():
-    """Scan src/domain/ directory."""
-    pass
+def scan_domain_directory(context: dict[str, Any]):
+    """扫描 src/domain/ 目录"""
+    context["domain_scanned"] = True
 
 
 @then("不应该有任何 qdrant_client 导入")
 def verify_no_qdrant_import():
-    """Verify no qdrant_client import in domain layer."""
+    """验证领域层没有 qdrant 导入"""
     import ast
 
     qdrant_imports = []
@@ -661,34 +632,4 @@ def verify_no_qdrant_import():
         except SyntaxError:
             pass
 
-    assert len(qdrant_imports) == 0, f"Qdrant imports found in domain layer: {qdrant_imports}"
-
-
-# ===================================================================
-# Shared Fixtures
-# ===================================================================
-
-
-@pytest.fixture
-def collection_name():
-    """Generate unique collection name for tests."""
-    return f"test_collection_{uuid.uuid4().hex[:8]}"
-
-
-@pytest.fixture
-def sample_vector():
-    """Provide sample 1024-dim vector for tests."""
-    return [0.1] * 1024
-
-
-@pytest.fixture
-def sample_points():
-    """Provide sample vector points for tests."""
-    return [
-        VectorPoint(
-            id=str(i + 1),
-            vector=[0.1 * (i + 1)] * 1024,
-            payload={"document_id": f"doc-{i + 1}"},
-        )
-        for i in range(10)
-    ]
+    assert len(qdrant_imports) == 0, f"领域层发现 Qdrant 导入: {qdrant_imports}"

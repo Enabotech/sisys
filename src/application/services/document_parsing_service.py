@@ -1,0 +1,338 @@
+"""应用层文档解析服务
+
+编排文档解析流程：获取文档 → MinIO 下载 → 临时文件桥接 → 解析 → 版面检测（可选）→ 状态更新 → 事件发布。
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import tempfile
+import uuid
+from dataclasses import replace
+from typing import TYPE_CHECKING
+
+from src.domain.entities.document import Document, ParseStatus
+from src.domain.events.document_events import DocumentProcessed
+from src.domain.ports.document_repository import DocumentQuery
+from src.domain.value_objects.parsed_document import ParsedDocument
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis
+
+    from src.application.ports.document_storage_port import DocumentStoragePort
+    from src.domain.ports.document_parser import DocumentParserPort
+    from src.domain.ports.document_repository import DocumentRepositoryPort
+    from src.domain.ports.event_publisher import EventPublisher
+    from src.domain.ports.layout_detector import LayoutDetector
+    from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
+
+logger = logging.getLogger(__name__)
+
+_ALLOWED_TEMP_SUFFIXES = frozenset(
+    {
+        ".pdf",
+        ".docx",
+        ".txt",
+        ".tmp",
+        ".pptx",
+        ".xlsx",
+        ".csv",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".bmp",
+        ".tiff",
+        ".tif",
+        ".html",
+        ".htm",
+        ".md",
+        ".rtf",
+    }
+)
+
+
+class DocumentParsingService:
+    """文档解析编排服务
+
+    编排完整的文档解析流程：
+    1. 从仓储获取 Document 实体
+    2. 从 MinIO 下载文件到临时文件（桥接 AsyncIterator → file_path）
+    3. 调用解析器获取 ParsedDocument
+    4. 更新 Document 状态和元数据
+    5. 发布 DocumentProcessed 事件
+    6. 清理临时文件
+    """
+
+    _LOCK_TTL = 600  # 分布式锁 TTL（秒）= 解析 300s + 下载 120s + 缓冲 180s
+
+    def __init__(
+        self,
+        document_repository: DocumentRepositoryPort,
+        document_storage: DocumentStoragePort,
+        event_publisher: EventPublisher,
+        document_parser: DocumentParserPort,
+        redis_client: "aioredis.Redis | None" = None,
+        layout_detector: "LayoutDetector | None" = None,
+        pdf_page_renderer: "PdfPageRendererPort | None" = None,
+    ) -> None:
+        self._repository = document_repository
+        self._storage = document_storage
+        self._publisher = event_publisher
+        self._parser = document_parser
+        self._redis = redis_client
+        self._layout_detector = layout_detector
+        self._pdf_page_renderer = pdf_page_renderer
+
+    async def parse_document(self, document_id: uuid.UUID, tenant_id: str) -> Document:
+        """解析文档
+
+        Args:
+            document_id: 文档 ID
+            tenant_id: 租户标识符
+
+        Returns:
+            更新后的 Document 实体
+        """
+        query = DocumentQuery(tenant_id=tenant_id, document_id=document_id)
+        document = await self._repository.find(query)
+
+        if document is None:
+            return Document(
+                document_id=document_id,
+                filename="",
+                parse_status=ParseStatus.FAILED,
+                metadata={"error": "文档不存在"},
+            )
+
+        # 检查 storage_object_key
+        object_key = document.metadata.get("storage_object_key")
+        if not object_key:
+            document.parse_status = ParseStatus.FAILED
+            document.metadata["parse_error"] = "文档缺少 storage_object_key"
+            await self._repository.save(document)  # 持久化失败状态，避免文档永久 PENDING
+            return document
+
+        # 分布式锁：防止多实例并发处理同一文档（Redis SET NX，对标 DualIdempotencyChecker 模式）
+        lock_acquired = False
+        lock_key = f"docparse:lock:{document_id}"
+        temp_path = ""
+
+        try:
+            if self._redis is not None:
+                lock_acquired = (await self._redis.set(lock_key, "1", nx=True, ex=self._LOCK_TTL)) or False
+                if not lock_acquired:
+                    logger.info("文档 %s 正在被其他实例处理，跳过", document_id)
+                    return document
+
+            # 乐观锁：仅当状态为 PENDING 时才更新为 IN_PROGRESS
+            if document.parse_status != ParseStatus.PENDING:
+                # 已被其他调用处理，跳过
+                return document
+
+            document.parse_status = ParseStatus.IN_PROGRESS
+            await self._repository.save(document)
+
+            # 下载文件到临时文件（120 秒超时，覆盖慢速 MinIO 连接）
+            temp_path = await asyncio.wait_for(
+                self._download_to_temp("raw-documents", object_key),
+                timeout=120.0,
+            )
+
+            # 解析文档（CPU 密集型，使用线程池避免阻塞事件循环，300 秒超时）
+            parsed_doc = await asyncio.wait_for(
+                asyncio.to_thread(self._parser.parse, temp_path, document.mime_type),
+                timeout=300.0,
+            )
+
+            # 用真实文档 ID 覆盖解析器随机生成的 ID
+            parsed_doc = replace(parsed_doc, document_id=str(document.document_id))
+
+            if parsed_doc.is_failed():
+                document.parse_status = ParseStatus.FAILED
+                document.metadata["parse_error"] = parsed_doc.error_message or "解析失败"
+                await self._repository.save(document)
+                return document
+
+            # 版面检测增强（仅 PDF + layout_detector 注入时触发，运行时错误不阻断解析）
+            parsed_doc = await self._apply_layout_detection(parsed_doc, temp_path, document.mime_type)
+
+            # 更新状态和元数据
+            document.parse_status = ParseStatus.COMPLETED
+            result_dict = parsed_doc.to_dict()
+            document.metadata["parse_result"] = result_dict
+            saved_doc = await self._repository.save(document)
+
+            # 发布事件
+            event = DocumentProcessed(
+                document_id=saved_doc.document_id,
+                parse_result=result_dict,
+                tenant_id=tenant_id,
+            )
+            await self._publisher.publish(event)
+
+            return saved_doc
+
+        except asyncio.TimeoutError:
+            document.parse_status = ParseStatus.FAILED
+            document.metadata["parse_error"] = "文档解析超时，请重试"
+            await self._repository.save(document)
+            logger.warning("文档解析超时 (document_id=%s, tenant=%s)", document_id, tenant_id)
+            return document
+
+        except asyncio.CancelledError:
+            document.parse_status = ParseStatus.FAILED
+            document.metadata["parse_error"] = "文档解析被取消"
+            try:
+                await self._repository.save(document)
+            except Exception:
+                logger.warning("取消路径中状态持久化失败: %s", document_id, exc_info=True)
+            logger.warning("文档解析被取消 (document_id=%s, tenant=%s)", document_id, tenant_id)
+            raise
+
+        except Exception:
+            document.parse_status = ParseStatus.FAILED
+            document.metadata["parse_error"] = "文档解析失败，请检查文件是否损坏或重试"
+            await self._repository.save(document)
+            logger.exception("文档解析异常 (document_id=%s, tenant=%s)", document_id, tenant_id)
+            return document
+
+        finally:
+            if lock_acquired and self._redis is not None:
+                try:
+                    await self._redis.delete(lock_key)
+                except Exception:
+                    logger.warning("分布式锁释放失败: %s", lock_key, exc_info=True)
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except FileNotFoundError:
+                    pass  # 文件不存在，清理成功
+                except OSError as e:
+                    logger.warning("临时文件清理失败: %s - %s", temp_path, e)
+
+    async def _download_to_temp(self, bucket_type: str, object_key: str) -> str:
+        """从 MinIO 下载文件到临时文件
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+
+        Returns:
+            临时文件路径
+        """
+        # 后缀白名单校验（防止恶意文件类型）
+        ext = os.path.splitext(object_key)[1].lower() or ".tmp"
+        if ext not in _ALLOWED_TEMP_SUFFIXES:
+            ext = ".tmp"
+        stream = self._storage.retrieve(bucket_type, object_key)
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+        try:
+            os.fchmod(tmp.fileno(), 0o600)  # 文件描述符级权限设置，消除 chmod TOCTOU 窗口（移入 try 防止 FD 泄漏）
+            buffer = bytearray()
+            try:
+                async for chunk in stream:
+                    buffer.extend(chunk)
+                    if len(buffer) >= 65536:  # 64KB 刷新阈值，减少线程池调用频率
+                        await asyncio.to_thread(tmp.write, bytes(buffer))
+                        buffer.clear()
+                if buffer:  # 剩余字节
+                    await asyncio.to_thread(tmp.write, bytes(buffer))
+            finally:
+                if hasattr(stream, "aclose"):
+                    await stream.aclose()  # 显式关闭流，防止 MinIO 连接泄漏
+            await asyncio.to_thread(tmp.close)
+            return tmp.name
+        except (Exception, asyncio.CancelledError):
+            tmp.close()
+            if os.path.exists(tmp.name):
+                try:
+                    os.unlink(tmp.name)
+                except OSError:
+                    pass  # 清理失败时静默处理，正要抛出原异常
+            raise
+
+    async def _apply_layout_detection(
+        self,
+        parsed_doc: ParsedDocument,
+        file_path: str,
+        mime_type: str,
+    ) -> ParsedDocument:
+        """对已解析文档应用版面检测增强（仅 PDF 格式，优雅降级）
+
+        算法流程：
+        1. 检查 layout_detector 和 pdf_page_renderer 是否已注入
+        2. 仅 PDF 格式触发检测，其他格式跳过
+        3. 逐页渲染 PDF 页面为 PNG → 调用 detect() → 顺序匹配 → 填充 bbox
+        4. 运行时错误不阻断解析流程（记录日志并返回原文档）
+
+        Args:
+            parsed_doc: 已完成文本解析的 ParsedDocument
+            file_path: PDF 文件临时路径
+            mime_type: 文件 MIME 类型
+
+        Returns:
+            增强后的 ParsedDocument（bbox 字段已填充）或原文档（降级时）
+        """
+        # 降级条件：layout_detector 或 pdf_page_renderer 未注入
+        if self._layout_detector is None or self._pdf_page_renderer is None:
+            return parsed_doc
+
+        # 降级条件：非 PDF 格式
+        if mime_type != "application/pdf":
+            return parsed_doc
+
+        try:
+            from src.domain.value_objects.parsed_document import ParsedElement, ParsedPage
+
+            enhanced_pages: list[ParsedPage] = []
+            for page in parsed_doc.pages:
+                # 渲染 PDF 页面为 PNG 图像
+                image_bytes = await asyncio.to_thread(self._pdf_page_renderer.render_page, file_path, page.page_number)
+
+                # 版面检测
+                detections = await asyncio.to_thread(self._layout_detector.detect, image_bytes, page.page_number)
+
+                # 收集当前页所有文本元素
+                page_elements = page.texts
+
+                if not page_elements or not detections:
+                    # 无元素或无检测结果，保持原页不变
+                    enhanced_pages.append(page)
+                    continue
+
+                # 当前 PDFParser 不输出 bbox（均为 None），无法做 IoU 空间匹配
+                # 降级策略：按顺序一一对应检测结果与文本元素
+                enhanced_texts: list[ParsedElement] = []
+                for idx, elem in enumerate(page_elements):
+                    if idx < len(detections) and elem.bbox is None:
+                        det = detections[idx]
+                        enhanced_texts.append(
+                            ParsedElement(
+                                content=elem.content,
+                                bbox=det.bbox,
+                                confidence=elem.confidence,
+                                metadata={
+                                    **elem.metadata,
+                                    "layout_confidence": det.confidence,
+                                },
+                            )
+                        )
+                    else:
+                        enhanced_texts.append(elem)
+
+                enhanced_pages.append(
+                    ParsedPage(
+                        page_number=page.page_number,
+                        texts=enhanced_texts,
+                        tables=page.tables,
+                    )
+                )
+
+            return replace(parsed_doc, pages=enhanced_pages)
+
+        except Exception:
+            logger.warning("版面检测失败，跳过增强步骤", exc_info=True)
+            return parsed_doc

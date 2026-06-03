@@ -134,10 +134,13 @@ class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
         return int(result.scalar() or 0)
 
     async def _do_save(self, model: TModel, entity: TEntity) -> None:
-        """保存钩子 — 默认简单插入，子类可覆写实现 UPSERT"""
-        self._session.add(model)
+        """保存钩子 — 使用 merge 实现 INSERT-or-UPDATE 语义"""
+        merged = await self._session.merge(model)
         await self._session.flush()
-        await self._session.refresh(model)
+        await self._session.refresh(merged)
+        for k, v in merged.__dict__.items():
+            if not k.startswith("_"):
+                setattr(model, k, v)
 
     def _apply_soft_delete_filter(self, stmt: Any) -> Any:
         """应用软删除过滤条件"""

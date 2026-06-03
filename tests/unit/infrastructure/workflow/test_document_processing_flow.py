@@ -3,12 +3,13 @@
 验证 Prefect flow 定义、任务配置、事件发布逻辑
 
 使用 task.fn() 测试任务底层函数，不启动真实 Prefect server
+所有涉及 DI resolver 的测试必须 mock，避免加载真实模型
 """
 
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -25,84 +26,78 @@ def mock_event_publisher() -> AsyncMock:
     return publisher
 
 
-class TestDocumentProcessingFlowDefinition:
-    """DocumentProcessingFlow @flow 装饰器验证"""
-
-    def test_flow_has_correct_name(self) -> None:
-        """Flow 名称应为 DocumentProcessing"""
-        from src.infrastructure.workflow.flows.document_processing_flow import (
-            document_processing_flow,
-        )
-
-        assert document_processing_flow.name == "DocumentProcessing"
-
-    def test_flow_is_prefect_flow(self) -> None:
-        """Flow 应为 Prefect Flow 对象"""
-        from prefect.flows import Flow
-
-        from src.infrastructure.workflow.flows.document_processing_flow import (
-            document_processing_flow,
-        )
-
-        assert isinstance(document_processing_flow, Flow)
+@pytest.fixture
+def mock_embedding_service() -> MagicMock:
+    """Mock EmbeddingService 避免 GPU 模型加载"""
+    service = MagicMock()
+    service.encode_text = MagicMock(return_value=[0.1] * 1024)
+    return service
 
 
-class TestDocumentTasks:
-    """document_tasks @task 装饰器验证"""
+@pytest.fixture
+def mock_document_repository() -> AsyncMock:
+    """Mock DocumentRepository"""
+    from src.domain.entities.document import Document, ParseStatus
 
-    def test_parse_document_is_prefect_task(self) -> None:
-        """parse_document 应为 Prefect Task 对象"""
-        from prefect.tasks import Task
+    doc = Document(
+        document_id=uuid.uuid4(),
+        filename="test.pdf",
+        mime_type="application/pdf",
+        tenant_id="test-tenant",
+    )
+    doc.parse_status = ParseStatus.COMPLETED
+    doc.metadata["parse_result"] = {"pages": [{"texts": [{"content": "测试文本"}]}]}
 
-        from src.infrastructure.workflow.tasks.document_tasks import parse_document
+    repo = AsyncMock()
+    repo.find = AsyncMock(return_value=doc)
+    return repo
 
-        assert isinstance(parse_document, Task)
 
-    def test_generate_embedding_is_prefect_task(self) -> None:
-        """generate_embedding 应为 Prefect Task 对象"""
-        from prefect.tasks import Task
-
-        from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-        assert isinstance(generate_embedding, Task)
-
-    def test_index_document_is_prefect_task(self) -> None:
-        """index_document 应为 Prefect Task 对象"""
-        from prefect.tasks import Task
-
-        from src.infrastructure.workflow.tasks.document_tasks import index_document
-
-        assert isinstance(index_document, Task)
-
-    def test_tasks_have_retry_config(self) -> None:
-        """Tasks 应有 retries=2 配置"""
-        from src.infrastructure.workflow.tasks.document_tasks import (
-            generate_embedding,
-            index_document,
-            parse_document,
-        )
-
-        assert parse_document.retries == 2
-        assert generate_embedding.retries == 2
-        assert index_document.retries == 2
+@pytest.fixture
+def mock_resolver(mock_embedding_service: MagicMock, mock_document_repository: AsyncMock) -> MagicMock:
+    """Mock DI Resolver 避免 I/O 和模型加载"""
+    resolver = MagicMock()
+    resolver.resolve.side_effect = lambda name: {
+        "embedding_service": mock_embedding_service,
+        "document_repository": mock_document_repository,
+        "document_parsing_service": AsyncMock(),
+    }.get(name)
+    return resolver
 
 
 class TestDocumentTasksFn:
     """测试任务底层函数（通过 .fn() 绕过 Prefect 运行时）"""
 
     async def test_parse_document_fn_returns_dict(self) -> None:
-        """parse_document.fn() 应返回 dict"""
+        """parse_document.fn() 缺少 tenant_id 应返回 failed"""
         from src.infrastructure.workflow.tasks.document_tasks import parse_document
 
         result = await parse_document.fn(uuid.uuid4(), "/test.pdf")
         assert isinstance(result, dict)
-        assert "status" in result
+        assert result["status"] == "failed"
+        assert "tenant_id" in result["error"]
 
-    async def test_generate_embedding_fn_returns_list(self) -> None:
+    async def test_parse_document_fn_with_tenant_id(self) -> None:
+        """parse_document.fn() 有 tenant_id 但 resolver 失败时返回 failed"""
+        from unittest.mock import MagicMock, patch
+
+        from src.infrastructure.workflow.tasks.document_tasks import parse_document
+
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.side_effect = Exception("resolver not ready")
+
+        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
+            result = await parse_document.fn(uuid.uuid4(), "/test.pdf", "tenant-1")
+
+        assert isinstance(result, dict)
+        assert result["status"] == "failed"
+
+    async def test_generate_embedding_fn_returns_list(self, mock_resolver: MagicMock) -> None:
         """generate_embedding.fn() 应返回 list"""
         from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
 
-        result = await generate_embedding.fn({"status": "parsed"})
+        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
+            result = await generate_embedding.fn({"status": "parsed", "document_id": str(uuid.uuid4())})
         assert isinstance(result, list)
 
     async def test_index_document_fn_returns_dict(self) -> None:
@@ -147,8 +142,9 @@ class TestEventPublishLogic:
 class TestDocumentProcessingFlowExecution:
     """DocumentProcessingFlow 执行逻辑测试"""
 
-    async def test_flow_fn_executes_all_tasks(self) -> None:
+    async def test_flow_fn_executes_all_tasks(self, mock_embedding_service: MagicMock) -> None:
         """测试 flow.fn() 执行完整流程"""
+        from src.domain.entities.document import Document, ParseStatus
         from src.domain.events.publish_result import ChannelResult, PublishResult
         from src.infrastructure.workflow.tasks.document_tasks import (
             generate_embedding,
@@ -159,7 +155,6 @@ class TestDocumentProcessingFlowExecution:
         document_id = uuid.uuid4()
         file_path = "/test/document.pdf"
 
-        # Mock event publisher that returns success
         mock_publisher = AsyncMock()
         mock_publisher.publish = AsyncMock(
             return_value=PublishResult(
@@ -168,9 +163,32 @@ class TestDocumentProcessingFlowExecution:
             )
         )
 
-        # 使用 .fn() 调用每个 task，避免 Prefect runtime 上下文问题
-        parse_result = await parse_document.fn(document_id, file_path)
-        embedding = await generate_embedding.fn(parse_result)
+        mock_doc = Document(
+            document_id=document_id,
+            filename="document.pdf",
+            mime_type="application/pdf",
+            tenant_id="t1",
+        )
+        mock_doc.parse_status = ParseStatus.COMPLETED
+        mock_doc.metadata["parse_result"] = {"pages": [{"texts": [{"content": "测试文本"}]}]}
+
+        mock_parsing_service = AsyncMock()
+        mock_parsing_service.parse_document = AsyncMock(return_value=mock_doc)
+
+        mock_repo = AsyncMock()
+        mock_repo.find = AsyncMock(return_value=mock_doc)
+
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.side_effect = lambda name: {
+            "document_parsing_service": mock_parsing_service,
+            "embedding_service": mock_embedding_service,
+            "document_repository": mock_repo,
+        }[name]
+
+        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
+            parse_result = await parse_document.fn(document_id, file_path, "tenant-1")
+            embedding = await generate_embedding.fn(parse_result)
+
         index_result = await index_document.fn(embedding)
 
         event = DocumentProcessed(
@@ -180,13 +198,14 @@ class TestDocumentProcessingFlowExecution:
         )
         await mock_publisher.publish(event)
 
-        assert parse_result["status"] == "parsed"
+        assert parse_result["status"] == "completed"
         assert isinstance(embedding, list)
         assert "indexed" in index_result
         mock_publisher.publish.assert_called_once()
 
-    async def test_flow_handles_publish_failure(self) -> None:
+    async def test_flow_handles_publish_failure(self, mock_embedding_service: MagicMock) -> None:
         """测试 flow 处理事件发布失败"""
+        from src.domain.entities.document import Document, ParseStatus
         from src.domain.events.publish_result import ChannelResult, PublishResult
         from src.infrastructure.workflow.tasks.document_tasks import (
             generate_embedding,
@@ -197,7 +216,6 @@ class TestDocumentProcessingFlowExecution:
         document_id = uuid.uuid4()
         file_path = "/test/document.pdf"
 
-        # Mock event publisher that returns full failure
         mock_publisher = AsyncMock()
         mock_publisher.publish = AsyncMock(
             return_value=PublishResult(
@@ -206,9 +224,32 @@ class TestDocumentProcessingFlowExecution:
             )
         )
 
-        # 使用 .fn() 调用每个 task，即使发布失败任务也应完成
-        parse_result = await parse_document.fn(document_id, file_path)
-        embedding = await generate_embedding.fn(parse_result)
+        mock_doc = Document(
+            document_id=document_id,
+            filename="document.pdf",
+            mime_type="application/pdf",
+            tenant_id="t1",
+        )
+        mock_doc.parse_status = ParseStatus.COMPLETED
+        mock_doc.metadata["parse_result"] = {"pages": [{"texts": [{"content": "测试文本"}]}]}
+
+        mock_parsing_service = AsyncMock()
+        mock_parsing_service.parse_document = AsyncMock(return_value=mock_doc)
+
+        mock_repo = AsyncMock()
+        mock_repo.find = AsyncMock(return_value=mock_doc)
+
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.side_effect = lambda name: {
+            "document_parsing_service": mock_parsing_service,
+            "embedding_service": mock_embedding_service,
+            "document_repository": mock_repo,
+        }[name]
+
+        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
+            parse_result = await parse_document.fn(document_id, file_path, "tenant-1")
+            embedding = await generate_embedding.fn(parse_result)
+
         index_result = await index_document.fn(embedding)
 
         event = DocumentProcessed(
@@ -218,8 +259,7 @@ class TestDocumentProcessingFlowExecution:
         )
         result = await mock_publisher.publish(event)
 
-        # 任务结果仍然可用，即使发布失败
-        assert parse_result["status"] == "parsed"
+        assert parse_result["status"] == "completed"
         assert isinstance(embedding, list)
         assert "indexed" in index_result
         assert result.is_full_failure

@@ -44,7 +44,7 @@ class TestDocumentUploadedCreation:
     def test_frozen_immutability(self) -> None:
         event = DocumentUploaded(filename="test.pdf")
         with pytest.raises(AttributeError):
-            event.filename = "changed.pdf"  # type: ignore[misc]
+            setattr(event, "filename", "changed.pdf")
 
 
 class TestDocumentUploadedRegistration:

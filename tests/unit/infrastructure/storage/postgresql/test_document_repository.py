@@ -146,16 +146,17 @@ class TestDocumentRepositorySave:
         yield repo
         reset_session(token)
 
-    def test_save_calls_session_add(self, repo, mock_session) -> None:
+    def test_save_calls_session_merge(self, repo, mock_session) -> None:
         doc = _make_doc()
         run_async(repo.save(doc))
-        mock_session.add.assert_called_once()
+        mock_session.merge.assert_called_once()
         mock_session.flush.assert_called_once()
+        mock_session.refresh.assert_called_once()
 
-        added_model = mock_session.add.call_args[0][0]
-        assert isinstance(added_model, DocumentModel)
-        assert added_model.tenant_id == doc.tenant_id
-        assert added_model.filename == doc.filename
+        merged_model = mock_session.merge.call_args[0][0]
+        assert isinstance(merged_model, DocumentModel)
+        assert merged_model.tenant_id == doc.tenant_id
+        assert merged_model.filename == doc.filename
 
 
 class TestDocumentRepositoryFind:

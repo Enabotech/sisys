@@ -170,3 +170,97 @@ class MinIOAdapter(L4ObjectPort):
             prefix=prefix,
             recursive=recursive,
         )
+
+    async def init_multipart_upload(
+        self,
+        bucket_type: str,
+        object_key: str,
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        """初始化分片上传会话
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            content_type: MIME 类型
+
+        Returns:
+            MinIO 分片上传会话 ID
+        """
+        return await self._repository.init_multipart_upload(
+            bucket_type=bucket_type,
+            object_key=object_key,
+            content_type=content_type,
+        )
+
+    async def upload_part(
+        self,
+        bucket_type: str,
+        object_key: str,
+        upload_id: str,
+        part_number: int,
+        data: bytes,
+    ) -> str:
+        """上传单个分片
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            upload_id: 分片上传会话 ID
+            part_number: 分片编号
+            data: 分片数据
+
+        Returns:
+            分片 ETag
+        """
+        return await self._repository.upload_part(
+            bucket_type=bucket_type,
+            object_key=object_key,
+            upload_id=upload_id,
+            part_number=part_number,
+            data=data,
+        )
+
+    async def complete_multipart_upload(
+        self,
+        bucket_type: str,
+        object_key: str,
+        upload_id: str,
+        parts: list[dict],
+    ) -> str:
+        """完成分片上传
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            upload_id: 分片上传会话 ID
+            parts: 已上传分片列表
+
+        Returns:
+            版本 ID
+        """
+        return await self._repository.complete_multipart_upload(
+            bucket_type=bucket_type,
+            object_key=object_key,
+            upload_id=upload_id,
+            parts=parts,
+        )
+
+    async def abort_multipart_upload(
+        self,
+        bucket_type: str,
+        object_key: str,
+        upload_id: str,
+    ) -> None:
+        """中止分片上传
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            upload_id: 分片上传会话 ID
+        """
+        await self._repository.abort_multipart_upload(
+            bucket_type=bucket_type,
+            object_key=object_key,
+            upload_id=upload_id,
+        )

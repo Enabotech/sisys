@@ -17,7 +17,7 @@ from src.domain.entities.document import Document, DocumentType, ParseStatus
 from src.domain.events.document_events import DocumentUploaded
 from src.domain.ports.document_repository import DocumentRepositoryPort
 from src.domain.ports.event_publisher import EventPublisher
-from src.infrastructure.external_services.archive_extractor import ArchiveExtractor
+from src.infrastructure.document_parsing.archive_extractor import ArchiveExtractor
 from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadManager
 
 
@@ -97,7 +97,9 @@ class TestFullUploadFlow:
         """批量上传部分失败不影响成功文件"""
         service = _make_upload_service()
 
-        files = [
+        from src.application.services.document_upload_service import BatchFileInfo
+
+        files: list[BatchFileInfo] = [
             {"filename": "good.pdf", "mime_type": "application/pdf", "file_size_bytes": 100},
             {"filename": "bad.exe", "mime_type": "application/x-msdownload", "file_size_bytes": 100},
             {"filename": "also_good.txt", "mime_type": "text/plain", "file_size_bytes": 50},

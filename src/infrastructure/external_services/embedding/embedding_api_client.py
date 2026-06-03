@@ -1,0 +1,133 @@
+"""基础设施层 Embedding API 客户端
+
+通过 HTTP 调用独立部署的 BGE-M3 嵌入服务，实现 EmbeddingServicePort 协议。
+与 BGE3EmbeddingService（进程内加载）功能等价，部署形态互补。
+
+架构参考: architecture.md §4.3 嵌入模型配置 — 双策略 Local/API 模式
+依赖: httpx
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, cast
+
+import httpx
+
+from src.infrastructure.config.embedding import EmbeddingConfig
+
+logger = logging.getLogger(__name__)
+
+
+class EmbeddingAPIClient:
+    """BGE-M3 嵌入 API 客户端
+
+    实现 EmbeddingServicePort，通过 HTTP POST /v1/embeddings 调用独立 API 服务。
+    方法签名使用同步（def），内部通过 asyncio 调用 httpx，与 EmbeddingServicePort 同步签名兼容。
+    """
+
+    def __init__(self, config: EmbeddingConfig | None = None) -> None:
+        """初始化 API 客户端
+
+        Args:
+            config: 嵌入模型配置，需设置 api_url 字段
+
+        Raises:
+            ValueError: api_url 为空时
+        """
+        if config is None:
+            config = EmbeddingConfig()
+        if not config.api_url:
+            raise ValueError("EMBEDDING_API_URL 未配置，API 模式需要指定嵌入服务地址")
+        self._config = config
+        self._client = httpx.Client(
+            base_url=config.api_url,
+            timeout=config.api_timeout,
+        )
+
+    @property
+    def dimension(self) -> int:
+        """嵌入向量维度
+
+        Returns:
+            向量维度（bge-m3 为 1024）
+        """
+        return self._config.dimension
+
+    def encode_text(self, text: str) -> list[float]:
+        """单文本 Dense 编码
+
+        Args:
+            text: 待编码文本
+
+        Returns:
+            经 L2 归一化的 1024 维浮点向量
+
+        Raises:
+            ValueError: 文本为空时
+        """
+        if not text or not text.strip():
+            raise ValueError("文本不能为空")
+        result = self._encode([text], return_sparse=False)
+        return cast(list[float], result["dense"][0])
+
+    def encode_texts(self, texts: list[str]) -> list[list[float]]:
+        """批量文本 Dense 编码
+
+        Args:
+            texts: 待编码文本列表（空列表返回空结果）
+
+        Returns:
+            浮点向量列表
+
+        Raises:
+            ValueError: 列表中包含空文本时
+        """
+        if not texts:
+            return []
+        result = self._encode(texts, return_sparse=False)
+        return cast(list[list[float]], result["dense"])
+
+    def encode_sparse(self, text: str) -> dict[str, list[Any]]:
+        """单文本 Sparse 编码
+
+        Args:
+            text: 待编码文本
+
+        Returns:
+            {"indices": list[int], "values": list[float]}
+
+        Raises:
+            ValueError: 文本为空时
+        """
+        if not text or not text.strip():
+            raise ValueError("文本不能为空")
+        result = self._encode([text], return_sparse=True)
+        sparse_list = cast(list[dict[str, Any]], result.get("sparse", []))
+        if not sparse_list:
+            return {"indices": [], "values": []}
+        return sparse_list[0]
+
+    def _encode(self, texts: list[str], *, return_sparse: bool) -> dict[str, Any]:
+        """统一请求 /v1/embeddings
+
+        Args:
+            texts: 文本列表
+            return_sparse: 是否返回 Sparse 向量
+
+        Returns:
+            API 响应 dict
+
+        Raises:
+            httpx.HTTPStatusError: HTTP 错误时
+        """
+        resp = self._client.post(
+            "/v1/embeddings",
+            json={"texts": texts, "return_sparse": return_sparse},
+        )
+        resp.raise_for_status()
+        return cast(dict[str, Any], resp.json())
+
+    def close(self) -> None:
+        """关闭 HTTP 客户端"""
+        self._client.close()
