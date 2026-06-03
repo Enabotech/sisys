@@ -24,7 +24,7 @@ class TestEmbeddingServicePortContract:
     """EmbeddingServicePort 端口契约"""
 
     PORT_NAME = "embedding_service"
-    IMPL_CLS_NAME = "BGE3EmbeddingService"
+    IMPL_CLS_NAME = "EmbeddingAPIClient"
     REQUIRED_METHODS = ["encode_text", "encode_texts", "encode_sparse"]
     REQUIRED_PROPERTIES = ["dimension"]
 

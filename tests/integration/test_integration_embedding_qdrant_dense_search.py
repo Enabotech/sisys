@@ -50,16 +50,16 @@ def collection_name() -> str:
 
 @pytest.fixture(scope="session")
 def embedding_service():
-    """加载 bge-m3 模型，不可用时 skip（session 级共享，避免重复加载）"""
+    """embedding-api 客户端，服务不可用时 skip"""
     get_test_env()
     try:
-        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-            BGE3EmbeddingService,
+        from src.infrastructure.external_services.embedding.embedding_api_client import (
+            EmbeddingAPIClient,
         )
 
-        return BGE3EmbeddingService(EmbeddingConfig.from_env())
+        return EmbeddingAPIClient(EmbeddingConfig.from_env())
     except Exception as e:
-        pytest.skip(f"bge-m3 模型不可用: {e}")
+        pytest.skip(f"embedding-api 不可用: {e}")
 
 
 class TestDenseSearchEndToEnd:
@@ -164,8 +164,7 @@ class TestDenseSearchEndToEnd:
 
             latencies.sort()
             p95 = latencies[int(len(latencies) * 0.95)]
-            config = EmbeddingConfig.from_env()
-            threshold = 200 if config.device == "cuda" else 500
+            threshold = 500  # API 模式含 HTTP 开销
             assert p95 < threshold, f"P95={p95:.1f}ms 超过阈值 {threshold}ms"
         finally:
             await cm.delete_collection(collection_name)

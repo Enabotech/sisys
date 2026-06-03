@@ -1,9 +1,8 @@
 """基础设施层 Embedding API 客户端
 
 通过 HTTP 调用独立部署的 BGE-M3 嵌入服务，实现 EmbeddingServicePort 协议。
-与 BGE3EmbeddingService（进程内加载）功能等价，部署形态互补。
 
-架构参考: architecture.md §4.3 嵌入模型配置 — 双策略 Local/API 模式
+架构参考: architecture.md §4.3 嵌入模型配置
 依赖: httpx
 """
 
@@ -50,9 +49,9 @@ class EmbeddingAPIClient:
         """嵌入向量维度
 
         Returns:
-            向量维度（bge-m3 为 1024）
+            向量维度（bge-m3 固定为 1024）
         """
-        return self._config.dimension
+        return 1024
 
     def encode_text(self, text: str) -> list[float]:
         """单文本 Dense 编码
