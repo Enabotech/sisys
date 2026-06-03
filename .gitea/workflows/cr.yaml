@@ -72,6 +72,9 @@ on:
 # 环境变量配置
 # ===========================================================================
 env:
+  # 应用配置
+  EMBEDDING_API_URL: http://host.docker.internal:8001
+
   # Harbor 配置
   HARBOR_REGISTRY: harbor.sisys.local
   HARBOR_PROJECT: sisys
