@@ -24,11 +24,11 @@ class EmbedRequest(BaseModel):
     """嵌入请求模型
 
     Attributes:
-        texts: 待编码文本列表（1-64 条）
+        texts: 待编码文本列表（至少 1 条，无上限，由 GPU 内存自然约束）
         return_sparse: 是否返回稀疏词汇权重
     """
 
-    texts: list[str] = Field(..., min_length=1, max_length=64, description="待编码文本列表")
+    texts: list[str] = Field(..., min_length=1, description="待编码文本列表")
     return_sparse: bool = Field(False, description="是否返回稀疏词汇权重")
 
 

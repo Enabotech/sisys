@@ -137,10 +137,7 @@ class TestDenseSearchEndToEnd:
         try:
             storage = QdrantVectorStorage(qdrant_client)
             texts = [f"测试文档内容编号{i}" for i in range(100)]
-            # API 模式 max_length=64，分批编码
-            vectors = []
-            for i in range(0, len(texts), 64):
-                vectors.extend(embedding_service.encode_texts(texts[i : i + 64]))
+            vectors = embedding_service.encode_texts(texts)
             points = [
                 VectorPoint(
                     id=f"doc_{i}",
