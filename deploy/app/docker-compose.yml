@@ -222,6 +222,7 @@ services:
   embedding-api:
     image: ${APP_IMAGE:-harbor.sisys.local/sisys/app:latest}
     container_name: sisys-embedding-api
+    user: "1000:1000"
     restart: unless-stopped
     ports:
       - "${EMBEDDING_API_PORT:-8001}:8000"
