@@ -77,9 +77,14 @@ class TestDenseSearchServicePortContract:
     REQUIRED_METHODS = ["search"]
 
     def test_port_is_registered(self, registry: PortRegistry) -> None:
-        """端口必须在全局注册中心注册"""
+        """端口必须在全局注册中心注册，接口类型为 DenseSemanticSearchService"""
         spec = registry.get(self.PORT_NAME)
         assert spec is not None, f"端口 {self.PORT_NAME} 未注册"
+        from src.application.services.dense_search_service import DenseSemanticSearchService
+
+        assert spec.interface is DenseSemanticSearchService, (
+            f"端口 {self.PORT_NAME} 接口应为 DenseSemanticSearchService，实际为 {spec.interface}"
+        )
 
     def test_implementation_has_required_methods(self, registry: PortRegistry) -> None:
         """实现类必须包含 search 方法（通过模块导入检查，不实例化）"""
