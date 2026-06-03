@@ -1428,7 +1428,7 @@ def bootstrap() -> None:
 
     register_port(
         name="embedding_service",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=EmbeddingServicePort,
         impl=lambda resolver: BGE3EmbeddingService(EmbeddingConfig.from_env()),
         module="src.infrastructure.external_services.embedding.bge3_embedding_service",
