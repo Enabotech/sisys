@@ -1,6 +1,6 @@
 # Story 3-1a: Dense 语义检索
 
-**Status:** `in-progress`
+**Status:** `ready-for-dev`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -34,7 +34,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 **验证标准/Validation Criteria:**
 - [ ] 单文本编码返回 1024 维向量
 - [ ] 批量编码返回正确数量的 1024 维向量
-- [ ] 向量 L2 范数 ≈ 1.0（归一化验证）
+- [ ] 向量 L2 范数 ≈ 1.0（BGE-M3 Dense 输出经模型架构保证归一化）
 - [ ] 空文本返回零向量或抛出 ValueError
 
 ### AC-2: 余弦相似度检索
@@ -74,6 +74,20 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 - [ ] 支持 tenant_id 自动注入到 filter
 - [ ] 现有 filter_payload 保留，tenant_id 追加
 
+### AC-encode_sparse: Sparse 嵌入生成（v1.1.0 FlagEmbedding 迁移新增）
+
+**Given** EmbeddingService 已加载 bge-m3 模型
+**When** 调用 `encode_sparse("企业战略规划报告")`
+**Then** 返回 `{"indices": list[int], "values": list[float]}` 格式的稀疏向量
+**And** indices 为排序后的词汇 token ID
+**And** values 为对应的词汇权重
+
+**验证标准/Validation Criteria:**
+- [ ] `encode_sparse()` 返回 `{"indices": list[int], "values": list[float]}`
+- [ ] indices 列表按升序排列
+- [ ] 所有 values > 0
+- [ ] 空文本返回 `{"indices": [], "values": []}` 或抛出 ValueError
+
 ---
 
 ## 🏗️ SDD+TDD 融合开发
@@ -85,24 +99,25 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 #### 数据模型 (Data Models)
-- [ ] `EmbeddingConfig` — 嵌入模型配置 dataclass（frozen）：model_name, model_path, device, dimension
-- [ ] `DenseSearchResult` — 检索结果 TypedDict：id, score, payload
-- [ ] 无新领域实体（本 Story 不涉及持久化实体）
+- [x] `EmbeddingConfig` — 嵌入模型配置 dataclass：model_name, model_path, device, dimension
+- [x] `DenseSearchResult` — 检索结果 TypedDict：id, score, payload
+- [x] 无新领域实体（本 Story 不涉及持久化实体）
 
 #### 统一端口定义注册与管理 (Port Contract)
-- [ ] `EmbeddingServicePort` — 领域端口 Protocol（`src/domain/ports/embedding_service.py`）
-  - `encode_text(text: str) -> list[float]` — 单文本编码
-  - `encode_texts(texts: list[str]) -> list[list[float]]` — 批量编码
+- [x] `EmbeddingServicePort` — 领域端口 Protocol（`src/domain/ports/embedding_service.py`）
+  - `encode_text(text: str) -> list[float]` — 单文本 Dense 编码
+  - `encode_texts(texts: list[str]) -> list[list[float]]` — 批量 Dense 编码
+  - `encode_sparse(text: str) -> dict` — 单文本 Sparse 编码（v1.1.0 FlagEmbedding 迁移新增）
   - `dimension: int` — 嵌入维度属性（1024）
-- [ ] 端口注册中心 `src/domain/ports/registry.py` 中登记 `embedding_service` PortSpec
-- [ ] 端口实现 `src/composition_root.py` 统一注册
-- [ ] 端口契约测试通过（`tests/contracts/test_port_contract_embedding_service.py`）
+- [x] 端口注册中心 `src/domain/ports/registry.py` 中登记 `embedding_service` PortSpec
+- [x] 端口实现 `src/composition_root.py` 统一注册
+- [x] 端口契约测试通过（`tests/contracts/test_port_contract_embedding_service.py`）
 
 **端口契约清单：**
 
 | 端口名称 | 版本 | 接口 | 实现模块 | 生命周期 | Owner |
 |---------|------|------|---------|---------|-------|
-| `embedding_service` | v1.0.0 | `EmbeddingServicePort` | `src.infrastructure.external_services.embedding.bge3_embedding_service.BGE3EmbeddingService` | SINGLETON | search-team |
+| `embedding_service` | v1.1.0 | `EmbeddingServicePort` | `src.infrastructure.external_services.embedding.bge3_embedding_service.BGE3EmbeddingService` | SINGLETON | search-team |
 | `dense_search_service` | v1.0.0 | `DenseSemanticSearchService`（服务类自身，参考 document_upload_service 模式） | `src.application.services.dense_search_service.DenseSemanticSearchService` | SCOPED | search-team |
 
 **已有端口（复用，不修改）：**
@@ -113,7 +128,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | `qdrant_connection_manager` | v1.0.0 | `ConnectionManager` | Qdrant 连接管理 |
 
 #### API 契约 (API Contract)
-- [ ] 本 Story 不涉及 REST API 路由（纯应用层服务，API 路由由 Epic 7 提供）
+- [x] 本 Story 不涉及 REST API 路由（纯应用层服务，API 路由由 Epic 7 提供）
 
 #### 六边形架构约束（必须遵守）
 
@@ -123,27 +138,27 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | domain | `src/domain/` | EmbeddingServicePort Protocol（零外部依赖） |
 | application | `src/application/` | DenseSemanticSearchService（编排 embed + search） |
 | interfaces | `src/interfaces/` | 本 Story 不涉及 |
-| infrastructure | `src/infrastructure/` | EmbeddingConfig + BGE3EmbeddingService（SentenceTransformer 实现） |
+| infrastructure | `src/infrastructure/` | EmbeddingConfig + BGE3EmbeddingService（FlagEmbedding BGEM3FlagModel 实现） |
 
 **依赖方向矩阵**
 | 起点 \ 终点 | domain | application | interfaces | infrastructure |
 |---|---|---|---|---|
 | **domain** (`embedding_service.py`) | — | ✗ | ✗ | ✗ |
 | **application** (`dense_search_service.py`) | ✓ 导入 EmbeddingServicePort + L3VectorPort | — | ✗ | ✗ |
-| **infrastructure** (`bge3_embedding_service.py`) | ✓ 实现 EmbeddingServicePort | ✗ | ✗ | — |
+| **infrastructure** (`bge3_embedding_service.py`) | ✓ 实现 EmbeddingServicePort（含 encode_sparse） | ✗ | ✗ | — |
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_dense_semantic_search.feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_dense_semantic_search.py`
-- [ ] 所有场景覆盖（AC-1 至 AC-4 + 领域零依赖验证）
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_dense_semantic_search.feature`
+- [x] 步骤实现文件：`tests/acceptance/test_acceptance_dense_semantic_search.py`
+- [x] 所有场景覆盖（AC-1 至 AC-4 + AC-encode_sparse + 领域零依赖验证）
 
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试
 - 不使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
 
 **Task 0 完成标志：**
-- [ ] 上述规范项全部定义完毕
-- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
+- [x] 上述规范项全部定义完毕
+- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
 
 ---
 
@@ -176,7 +191,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_dense_semantic_search.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | src 与测试目录完成清单最终确认 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 6 |
 | **集成测试** | Embedding + Qdrant 端到端 | 真实 bge-m3 + 真实 Qdrant | `tests/integration/test_integration_embedding_qdrant_dense_search.py` | Task 5 |
-| **SDD 架构验证** | 领域零依赖 | domain/ 无 sentence_transformers 导入 | 包含在验收测试 AC-6 中 | Task 6 |
+| **SDD 架构验证** | 领域零依赖 | domain/ 无 FlagEmbedding 导入 | 包含在验收测试 Subtask 6.3 中 | Task 6 |
 | **TDD 单元测试** | EmbeddingAPIClient | HTTP 请求/响应、错误处理、空值验证 | `tests/unit/infrastructure/external_services/embedding/test_embedding_api_client.py` | Task 7 |
 | **TDD 单元测试** | Embedding API Server | FastAPI TestClient、Health check、编码端点 | `tests/unit/infrastructure/external_services/embedding/test_embedding_api_server.py` | Task 8 |
 | **TDD 契约测试** | 双策略 DI | Local/API 模式 implementation 解析验证 | `tests/contracts/test_port_contract_embedding_service.py` | Task 9 |
@@ -230,7 +245,8 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | AC-3 | 检索延迟 P95<200ms | Task 5 | 性能基准测试 | `test_integration_embedding_qdrant_dense_search.py` |
 | AC-4 | Payload 过滤 | Task 3 | tenant_id + filter 注入 | `test_dense_search_service.py` |
 | AC-4 | 真实 Payload 过滤 | Task 5 | 集成测试 | `test_integration_embedding_qdrant_dense_search.py` |
-| AC-encode_sparse | Sparse 嵌入生成 | Task 7 | EmbeddingAPIClient | `test_embedding_api_client.py` |
+| AC-encode_sparse | Sparse 嵌入生成（进程内） | Task 2 | BGE3EmbeddingService.encode_sparse() | `test_bge3_embedding_service.py` + `test_acceptance_dense_semantic_search.py` |
+| AC-encode_sparse | Sparse 嵌入生成（API） | Task 7 | EmbeddingAPIClient | `test_embedding_api_client.py` |
 | AC-encode_sparse | Sparse API 服务 | Task 8 | Embedding API Server | `test_embedding_api_server.py` |
 | AC-1 | 双策略 DI（API/Local） | Task 9 | Composition Root 分支注册 | `test_port_contract_embedding_service.py` |
 | 全部 | API 模式 BDD 验收 | Task 10 | Gherkin 场景 | `test_acceptance_dense_semantic_search.*` |
@@ -239,13 +255,13 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 **Task 间执行依赖：**
 ```
 Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实现）
-                                         ↘ Task 3（Search 服务）→ Task 4（注册装配）→ Task 5（集成测试）→ Task 6（收尾）→ Task 8（API Client）→ Task 9（API Server）→ Task 9（双策略DI）→ Task 11（验收）
+                                         ↘ Task 3（Search 服务）→ Task 4（注册装配）→ Task 5（集成测试）→ Task 6（收尾）→ Task 7（API Client）→ Task 8（API Server）→ Task 9（双策略DI）→ Task 10（验收）
 ```
 - Task 0-6 为阶段一（MVP 进程内嵌入），已完成
-- Task 8-11 为阶段二（API 化扩展），Task 8 依赖 Task 6 完成
-- Task 8 和 Task 9 可并行
-- Task 10 依赖 Task 8+9 全部完成
-- Task 11 依赖 Task 10 完成
+- Task 7-10 为阶段二（API 化扩展），Task 7 依赖 Task 6 完成
+- Task 7 和 Task 8 可并行
+- Task 9 依赖 Task 7+8 全部完成
+- Task 10 依赖 Task 9 完成
 
 ---
 
@@ -299,6 +315,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
       def dimension(self) -> int: ...
       def encode_text(self, text: str) -> list[float]: ...
       def encode_texts(self, texts: list[str]) -> list[list[float]]: ...
+      def encode_sparse(self, text: str) -> dict: ...
   ```
 - [x] Subtask 1.3: 🟢 绿 — 更新 `src/domain/ports/__init__.py` 添加导入和 `__all__` 导出
 - [x] Subtask 1.4: 🔄 重构 — 运行 `ruff check` + `mypy` 确认通过
@@ -337,7 +354,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 ### Task 2: BGE3EmbeddingService 实现
 
-**关联 AC:** AC-1
+**关联 AC:** AC-1, AC-encode_sparse
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
 
@@ -349,33 +366,34 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 🟢 绿 | 创建 `src/infrastructure/external_services/embedding/bge3_embedding_service.py` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 BGE3EmbeddingService 失败测试
-  - mock SentenceTransformer 实例
+- [x] Subtask 2.1: 🔴 红 — 编写 BGE3EmbeddingService 失败测试
+  - mock BGEM3FlagModel 实例
   - 验证 `encode_text` 返回 1024 维 float list
   - 验证 `encode_texts` 批量返回
   - 验证 `dimension` 属性
-  - 验证 `normalize_embeddings=True` 传递
+  - 验证 `encode_text` 调用 `model.encode(text, return_dense=True)`
   - 验证空文本处理
-- [ ] Subtask 2.2: 🟢 绿 — 创建 `src/infrastructure/external_services/embedding/__init__.py`
-- [ ] Subtask 2.3: 🟢 绿 — 创建 `src/infrastructure/external_services/embedding/bge3_embedding_service.py`
+- [x] Subtask 2.2: 🟢 绿 — 创建 `src/infrastructure/external_services/embedding/__init__.py`
+- [x] Subtask 2.3: 🟢 绿 — 创建 `src/infrastructure/external_services/embedding/bge3_embedding_service.py`
   ```python
   class BGE3EmbeddingService:
       """BGE-M3 嵌入服务实现"""
       def __init__(self, config: EmbeddingConfig | None = None): ...
       @property
-      def dimension(self) -> int: return self._model.get_sentence_embedding_dimension()
+      def dimension(self) -> int: return self._config.dimension
       def encode_text(self, text: str) -> list[float]: ...
       def encode_texts(self, texts: list[str]) -> list[list[float]]: ...
+      def encode_sparse(self, text: str) -> dict[str, list[Any]]: ...
   ```
   - **模型加载逻辑**：`model_path` 非空时直接从本地路径加载，否则从 HuggingFace Hub 下载：
     ```python
-    if config.model_path and os.path.isdir(config.model_path):
-        model = SentenceTransformer(config.model_path, device=config.device)
-    else:
-        model = SentenceTransformer(config.model_name, device=config.device)
+    model_path = config.model_path if config.model_path and os.path.isdir(config.model_path) else config.model_name
+    use_fp16 = config.device == "cuda"
+    model = BGEM3FlagModel(model_path, use_fp16=use_fp16)
     ```
-  - `model.encode(text, normalize_embeddings=True)` 返回 numpy ndarray，需 `.tolist()` 转为 `list[float]`
-- [ ] Subtask 2.4: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
+  - `model.encode(text, return_dense=True)` 返回 dict，取 `result["dense_vecs"]` 转为 `list[float]`
+  - BGE-M3 Dense 输出经模型架构保证 L2 归一化，无需显式 `normalize_embeddings` 参数
+- [x] Subtask 2.4: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
 - [x] BGE3EmbeddingService 实现完成
@@ -423,7 +441,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
   ```
   - 使用 `asyncio.to_thread()` 包装同步 embed 调用
   - ⚠️ **tenant_id 过滤注意**：当前 Qdrant upsert payload 中不含 `tenant_id` 字段。`DenseSemanticSearchService` 的 tenant_id 过滤逻辑需与后续 Story 的 index_document 实现对齐（确保 upsert 时写入 tenant_id）。本 Story 中 tenant_id 注入仅作为接口预留，过滤效果取决于 payload 中是否包含该字段。
-- [ ] Subtask 3.3: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
+- [x] Subtask 3.3: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
 - [x] DenseSemanticSearchService 实现完成
@@ -452,11 +470,12 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - [x] Subtask 4.2: 🟢 绿 — 修改 `src/composition_root.py` 添加：
   ```python
   # embedding_service — SINGLETON（模型加载昂贵）
-  register_port(name="embedding_service", version="v1.0.0",
+  register_port(name="embedding_service", version="v1.1.0",
       interface=EmbeddingServicePort,
       impl=lambda r: BGE3EmbeddingService(EmbeddingConfig.from_env()),
       module="src.infrastructure.external_services.embedding.bge3_embedding_service",
-      lifetime=Lifetime.SINGLETON, owner="search-team")
+      lifetime=Lifetime.SINGLETON, owner="search-team",
+      tags=("embedding", "search"))
 
   # dense_search_service — SCOPED（轻量编排）
   # 注意：应用服务使用服务类自身作为 interface（参考 document_upload_service 模式）
@@ -466,7 +485,8 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
           embedding_service=r.resolve("embedding_service"),
           vector_storage=r.resolve("l3_vector")),
       module="src.application.services.dense_search_service",
-      lifetime=Lifetime.SCOPED, owner="search-team")
+      lifetime=Lifetime.SCOPED, owner="search-team",
+      tags=("search", "dense"))
   ```
 - [x] Subtask 4.3: 🔄 重构 — 运行 `ruff check` + `mypy`
 
@@ -480,10 +500,10 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 - [x] Subtask 4.4: 🔴 红 — 编写 generate_embedding 单元测试 `tests/unit/infrastructure/external_services/embedding/test_generate_embedding.py`（mock resolver，验证调用 embedding_service）
 - [x] Subtask 4.5: 🟢 绿 — 替换 `generate_embedding` 从 `return []` 改为使用 resolver 获取 embedding_service
-  - ⚠️ **数据断裂问题**：`parse_document` task 返回精简 dict `{status, document_id, pages(数量)}`，不含文本内容
-  - 需通过 `resolver.resolve("document_repository")` 获取完整文档，从 `doc.metadata["parse_result"]["pages"]` 提取文本
-  - 截断至 8192 字符（bge-m3 安全上限）
-  - `await asyncio.to_thread(service.encode_text, text[:8192])`（截断至 8192 字符）
+  - ⚠️ **数据断裂问题**：`parse_document` task 返回精简 dict `{status, document_id, tenant_id, pages(数量)}`，不含文本内容
+  - 需通过 `resolver.resolve("document_repository")` 获取完整文档，使用 `DocumentQuery(tenant_id=..., document_id=...)` 查询
+  - 从 `doc.metadata["parse_result"]["pages"]` 提取文本
+  - `await asyncio.to_thread(service.encode_text, text)`（BGE-M3 支持长文本，无需显式截断）
   - 异常时返回 `[]`（保持向后兼容）
 - [x] Subtask 4.6: 🔄 重构 — 运行 `ruff check` + `mypy`
 
@@ -509,7 +529,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 🟢 绿 | 实现测试逻辑，运行确认通过 |
 | 🔄 重构 | 优化测试结构，添加性能基准 |
 
-- [x] Subtask 5.1: 🔴 红 — 创建 `tests/integration/test_embedding_qdrant_dense_search.py`
+- [x] Subtask 5.1: 🔴 红 — 创建 `tests/integration/test_integration_embedding_qdrant_dense_search.py`
   - 使用 `TestTenant` 隔离（参考 `test_integration_qdrant_real.py` 模式：`f"test_{uuid.uuid4().hex[:8]}"` fixture）
   - Fixture：创建 Collection → 插入 10 个嵌入向量 → 测试后 try/finally 删除
 - [x] Subtask 5.2: 🟢 绿 — 实现端到端检索测试
@@ -553,7 +573,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - [x] Subtask 6.2: 场景 — 验证 `tests/` 完成清单
   - 契约测试、单元测试、集成测试、验收测试文件均存在
 - [x] Subtask 6.3: 场景 — 验证领域层零外部依赖
-  - `src/domain/` 不导入 sentence_transformers / FlagEmbedding
+  - `src/domain/` 不导入 FlagEmbedding / sentence_transformers
 - [x] Subtask 6.4: 运行开发结束验收测试并确认通过
 - [x] Subtask 6.5: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
 
@@ -733,7 +753,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
           BGE3EmbeddingService,
       )
       register_port(
-          name="embedding_service", version="v1.0.0",
+          name="embedding_service", version="v1.1.0",
           interface=EmbeddingServicePort,
           impl=lambda resolver: BGE3EmbeddingService(EmbeddingConfig.from_env()),
           module="src.infrastructure.external_services.embedding.bge3_embedding_service",
@@ -872,10 +892,14 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 | 方案 | 优点 | 缺点 | 决策 |
 |------|------|------|------|
-| **同步方法 + asyncio.to_thread**（选中） | BGEM3FlagModel.encode() 本身同步；接口简洁 | 调用者需包装 | ✅ 采用 |
-| 异步方法 | 调用者无需包装 | 需要额外 async 封装层，增加复杂度 | 不采用 |
+| **同步方法 + asyncio.to_thread**（本地模式） | BGEM3FlagModel.encode() 本身同步；接口简洁 | 调用者需包装 | ✅ 阶段一采用 |
+| **异步方法**（API 模式） | 适合 HTTP 客户端非阻塞调用 | 与同步端口签名不一致 | ✅ 阶段二 API 模式采用 |
 
-**原因：** 项目中 `DocumentParsingService` 已使用 `asyncio.to_thread()` 包装同步解析器调用（Story 2-2a 模式），保持一致。
+**设计说明：**
+- **阶段一（Task 0-6）**：`BGE3EmbeddingService` 使用同步方法，通过 `asyncio.to_thread()` 包装，端口 Protocol 定义同步签名
+- **阶段二（Task 7-10）**：`EmbeddingAPIClient` 使用异步方法（`async def`），因为 HTTP 调用天然异步
+- **兼容策略**：`EmbeddingAPIClient` 需同时实现同步方法（内部使用 `asyncio.run()` 或 `loop.run_until_complete()`）以满足 `EmbeddingServicePort` 的同步签名约束；或在 Task 9 双策略注册时通过适配器包装
+- **调用者透明**：`DenseSemanticSearchService.search()` 通过 `asyncio.to_thread()` 调用同步方法，API 模式下需调整调用方式
 
 ### .env 配置设计
 
@@ -909,31 +933,33 @@ EMBEDDING_MODEL_DIMENSION=1024
 **文件：** `src/infrastructure/workflow/tasks/document_tasks.py` 第 58-71 行
 
 ```python
-# 当前：MVP 占位
-async def generate_embedding(parse_result) -> list[float]:
-    return []
-
 # 替换后：通过 resolver 获取真实 EmbeddingService
-# 注意：parse_document task 返回精简 dict {status, document_id, pages(数量)}，
-# 不含文本内容。需通过 DocumentRepository 获取完整文档的 metadata["parse_result"]。
-async def generate_embedding(parse_result) -> list[float]:
+# 注意：parse_document task 返回精简 dict {status, document_id, tenant_id, pages(数量)}，
+# 不含文本内容。需通过 DocumentRepository + DocumentQuery 获取完整文档的 metadata["parse_result"]。
+async def generate_embedding(parse_result: dict[str, Any]) -> list[float]:
+    from src.domain.ports.document_repository import DocumentQuery
     from src.domain.ports.resolver import get_resolver
-    service = get_resolver().resolve("embedding_service")
-    repo = get_resolver().resolve("document_repository")
-    doc = await repo.find(uuid.UUID(parse_result["document_id"]))
+    if parse_result.get("status") == "failed":
+        return []
+    tenant_id = parse_result.get("tenant_id", "")
+    if not tenant_id:
+        return []
+    resolver = get_resolver()
+    service = resolver.resolve("embedding_service")
+    repo = resolver.resolve("document_repository")
+    doc = await repo.find(
+        DocumentQuery(
+            tenant_id=tenant_id,
+            document_id=uuid.UUID(parse_result["document_id"]),
+        )
+    )
     if not doc or not doc.metadata.get("parse_result"):
         return []
-    # 从完整解析结果中提取文本
     pages = doc.metadata["parse_result"].get("pages", [])
-    text = " ".join(
-        elem.get("content", "")
-        for page in pages
-        for elem in page.get("texts", [])
-        if isinstance(elem, dict)
-    )
+    text = " ".join(elem.get("content", "") for page in pages for elem in page.get("texts", []) if isinstance(elem, dict))
     if not text.strip():
         return []
-    embedding = await asyncio.to_thread(service.encode_text, text[:8192])
+    embedding = await asyncio.to_thread(service.encode_text, text)
     return embedding
 ```
 
@@ -975,8 +1001,9 @@ tests/
 │   └── test_port_contract_embedding_service.py  # [新建] 端口契约测试
 ├── unit/
 │   ├── infrastructure/
-│   │   ├── test_bge3_embedding_service.py        # [新建] 嵌入服务单元测试
-│   │   └── test_generate_embedding.py            # [新建] generate_embedding 单元测试
+│   │   └── external_services/embedding/
+│   │       ├── test_bge3_embedding_service.py   # [新建] 嵌入服务单元测试
+│   │       └── test_generate_embedding.py       # [新建] generate_embedding 单元测试
 │   └── application/
 │       └── test_dense_search_service.py          # [新建] 检索服务单元测试
 ├── integration/
@@ -1054,11 +1081,11 @@ def perform_dense_search(context, dense_search_service, event_loop):
 4. **懒初始化连接池** — 首次调用时创建客户端
 
 **应用到本故事/Applied to This Story:**
-- [ ] embedding_service impl 字符串拼写纳入契约测试
-- [ ] BGE3EmbeddingService SINGLETON 生命周期（模型加载昂贵）
-- [ ] 测试使用 TestTenant 进行租户隔离
-- [ ] EmbeddingConfig 遵循 `from_env()` 模式（参考 QdrantConfig）
-- [ ] 向量维度固定 1024，Collection 使用 Cosine 距离
+- [x] embedding_service impl 字符串拼写纳入契约测试
+- [x] BGE3EmbeddingService SINGLETON 生命周期（模型加载昂贵）
+- [x] 测试使用 TestTenant 进行租户隔离
+- [x] EmbeddingConfig 遵循 `from_env()` 模式（参考 QdrantConfig）
+- [x] 向量维度固定 1024，Collection 使用 Cosine 距离
 
 ---
 
@@ -1103,35 +1130,40 @@ def perform_dense_search(context, dense_search_service, event_loop):
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 
-| 文件 | 类型 | Task |
-|------|------|------|
-| `src/domain/ports/embedding_service.py` | 领域端口 Protocol | Task 1 |
-| `src/infrastructure/config/embedding.py` | 基础设施配置 | Task 1 |
-| `src/infrastructure/external_services/embedding/__init__.py` | 包初始化 | Task 2 |
-| `src/infrastructure/external_services/embedding/bge3_embedding_service.py` | 嵌入服务实现 | Task 2 |
-| `src/application/services/dense_search_service.py` | 应用层服务 | Task 3 |
-| `tests/contracts/test_port_contract_embedding_service.py` | 契约测试 | Task 0 |
-| `tests/unit/infrastructure/external_services/embedding/test_bge3_embedding_service.py` | 单元测试 | Task 2 |
-| `tests/unit/application/test_dense_search_service.py` | 单元测试 | Task 3 |
-| `tests/unit/infrastructure/external_services/embedding/test_generate_embedding.py` | 单元测试 | Task 4 |
-| `tests/integration/test_embedding_qdrant_dense_search.py` | 集成测试 | Task 5 |
-| `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Gherkin 场景 | Task 0 |
-| `tests/acceptance/test_acceptance_dense_semantic_search.py` | BDD 步骤 | Task 0 |
-| `src/infrastructure/external_services/embedding/embedding_api_client.py` | API 客户端 | Task 7 |
-| `src/infrastructure/external_services/embedding/embedding_api_server.py` | API 服务端 | Task 8 |
-| `tests/unit/infrastructure/external_services/embedding/test_embedding_api_client.py` | 单元测试 | Task 7 |
-| `tests/unit/infrastructure/external_services/embedding/test_embedding_api_server.py` | 单元测试 | Task 8 |
-| `deploy/docker-compose.embedding.yml` | Docker Compose 部署 | Task 9 |
-| `deploy/Dockerfile.embedding` | Docker 镜像 | Task 9 |
+> **阶段一（Task 0-6）文件已创建 ✅，阶段二（Task 7-10）文件待创建。**
+
+| 文件 | 类型 | Task | 状态 |
+|------|------|------|------|
+| `src/domain/ports/embedding_service.py` | 领域端口 Protocol | Task 1 | ✅ 已创建 |
+| `src/infrastructure/config/embedding.py` | 基础设施配置 | Task 1 | ✅ 已创建 |
+| `src/infrastructure/external_services/embedding/__init__.py` | 包初始化 | Task 2 | ✅ 已创建 |
+| `src/infrastructure/external_services/embedding/bge3_embedding_service.py` | 嵌入服务实现 | Task 2 | ✅ 已创建 |
+| `src/application/services/dense_search_service.py` | 应用层服务 | Task 3 | ✅ 已创建 |
+| `tests/contracts/test_port_contract_embedding_service.py` | 契约测试 | Task 0 | ✅ 已创建 |
+| `tests/unit/infrastructure/external_services/embedding/test_bge3_embedding_service.py` | 单元测试 | Task 2 | ✅ 已创建 |
+| `tests/unit/application/test_dense_search_service.py` | 单元测试 | Task 3 | ✅ 已创建 |
+| `tests/unit/infrastructure/external_services/embedding/test_generate_embedding.py` | 单元测试 | Task 4 | ✅ 已创建 |
+| `tests/integration/test_integration_embedding_qdrant_dense_search.py` | 集成测试 | Task 5 | ✅ 已创建 |
+| `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Gherkin 场景 | Task 0 | ✅ 已创建 |
+| `tests/acceptance/test_acceptance_dense_semantic_search.py` | BDD 步骤 | Task 0 | ✅ 已创建 |
+| `src/infrastructure/external_services/embedding/embedding_api_client.py` | API 客户端 | Task 7 | 待创建 |
+| `src/infrastructure/external_services/embedding/embedding_api_server.py` | API 服务端 | Task 8 | 待创建 |
+| `tests/unit/infrastructure/external_services/embedding/test_embedding_api_client.py` | 单元测试 | Task 7 | 待创建 |
+| `tests/unit/infrastructure/external_services/embedding/test_embedding_api_server.py` | 单元测试 | Task 8 | 待创建 |
+| `deploy/docker-compose.embedding.yml` | Docker Compose 部署 | Task 9 | 待创建 |
+| `deploy/Dockerfile.embedding` | Docker 镜像 | Task 9 | 待创建 |
 
 **待修改的文件/To Be Modified:**
-- `src/domain/ports/__init__.py` — 添加 EmbeddingServicePort 导出
-- `src/infrastructure/config/__init__.py` — 添加 EmbeddingConfig 导出
-- `src/infrastructure/config/embedding.py` — 新增 `api_url`、`api_timeout` 字段
-- `src/composition_root.py` — 注册 embedding_service + dense_search_service（后扩展为双策略分支）
-- `src/infrastructure/workflow/tasks/document_tasks.py` — 替换 generate_embedding 占位
-- `.env.example` — 添加 EMBEDDING_MODEL_DIMENSION=1024 / EMBEDDING_API_URL / EMBEDDING_API_TIMEOUT
-- `tests/environments.py` — EmbeddingConfig 添加 dimension: int = 1024 字段
+
+> **阶段一修改已完成 ✅，阶段二修改（api_url/api_timeout 字段、双策略 DI 分支）待 Task 7-9 实施。**
+
+- `src/domain/ports/__init__.py` — 添加 EmbeddingServicePort 导出 ✅
+- `src/infrastructure/config/__init__.py` — 添加 EmbeddingConfig 导出 ✅
+- `src/infrastructure/config/embedding.py` — 新增 `api_url`、`api_timeout` 字段（待 Task 7）
+- `src/composition_root.py` — 注册 embedding_service + dense_search_service ✅（双策略分支待 Task 9）
+- `src/infrastructure/workflow/tasks/document_tasks.py` — 替换 generate_embedding 占位 ✅
+- `.env.example` — 添加 EMBEDDING_MODEL_DIMENSION=1024 ✅（EMBEDDING_API_URL/TIMEOUT 待 Task 7）
+- `tests/environments.py` — EmbeddingConfig 添加 dimension: int = 1024 字段 ✅
 
 ---
 
@@ -1142,7 +1174,7 @@ def perform_dense_search(context, dense_search_service, event_loop):
 | **Story ID** | 3.1a |
 | **Story Key** | 3-1a-dense-semantic-search |
 | **File** | `_bmad-output/implementation-artifacts/stories/3-1a-dense-semantic-search.md` |
-| **Status** | `backlog` → `ready-for-dev` |
+| **Status** | `ready-for-dev` |
 | **Epic** | Epic 3: 智能检索与知识发现 |
 | **价值组** | 智能检索与溯源 |
 | **优先级** | P0-1a（关键路径） |
@@ -1170,6 +1202,6 @@ def perform_dense_search(context, dense_search_service, event_loop):
 **创建日期/Created:** 2026-06-01
 **最后更新/Last Updated:** 2026-06-02
 **更新说明/Description:**
-- v1.2.0: 嵌入模型 API 化扩展 — 新增 Task 8-11（EmbeddingAPIClient + API Server + 双策略 DI + Docker Compose），EmbeddingConfig 扩展 api_url/api_timeout 字段
+- v1.2.0: 嵌入模型 API 化扩展 — 新增 Task 7-10（EmbeddingAPIClient + API Server + 双策略 DI + Docker Compose），EmbeddingConfig 扩展 api_url/api_timeout 字段
 - v1.1.0: FlagEmbedding 迁移 — SentenceTransformers→BGEM3FlagModel（BAAI 官方第一方库），新增 encode_sparse() 方法，集成/验收测试补充
 - v1.0.0: 创建故事文件（初始 SentenceTransformers 实现）
