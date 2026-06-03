@@ -118,7 +118,7 @@ class TestEmbeddingAPIValidation:
         resp = client.post("/v1/embeddings", json={"return_sparse": False})
         assert resp.status_code == 422
 
-    def test_texts_exceeds_max_batch_size_returns_422(self, client: TestClient) -> None:
-        """texts 超过 64 条返回 422"""
-        resp = client.post("/v1/embeddings", json={"texts": ["x"] * 65, "return_sparse": False})
-        assert resp.status_code == 422
+    def test_large_batch_accepted(self, client: TestClient) -> None:
+        """大批量请求正常处理（无上限限制）"""
+        resp = client.post("/v1/embeddings", json={"texts": ["x"] * 100, "return_sparse": False})
+        assert resp.status_code == 200
