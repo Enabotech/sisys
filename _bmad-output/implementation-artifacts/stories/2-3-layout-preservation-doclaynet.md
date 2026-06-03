@@ -1,6 +1,6 @@
 # Story 2-3: 文档版面信息保留（DocLayNet 标准）
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -301,18 +301,18 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 
 > **目的：** 在进入代码实现前，明确 Schema、端口契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 定义 `BoundingBoxResult` 值对象 Schema（`label`/`bbox`/`confidence`/`to_dict()`），更新 `__init__.py` 导出
-- [ ] Subtask 0.2: 定义 `LayoutDetector` 端口契约（`src/domain/ports/layout_detector.py`）—— `@runtime_checkable` Protocol
-- [ ] Subtask 0.2a: 定义 `PdfPageRendererPort` 端口契约（`src/domain/ports/pdf_page_renderer.py`）—— `@runtime_checkable` Protocol，`render_page(file_path, page_number) -> bytes`
-- [ ] Subtask 0.3: 更新端口注册中心（`registry.py`）与端口契约门禁（`contract_gate.py`）
-- [ ] Subtask 0.4: 编写端口契约测试 `tests/contracts/test_port_contract_layout_detector.py`
-- [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_document_layout.feature`
-- [ ] Subtask 0.6: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_document_layout.py`
-- [ ] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义 `BoundingBoxResult` 值对象 Schema（`label`/`bbox`/`confidence`/`to_dict()`），更新 `__init__.py` 导出
+- [x] Subtask 0.2: 定义 `LayoutDetector` 端口契约（`src/domain/ports/layout_detector.py`）—— `@runtime_checkable` Protocol
+- [x] Subtask 0.2a: 定义 `PdfPageRendererPort` 端口契约（`src/domain/ports/pdf_page_renderer.py`）—— `@runtime_checkable` Protocol，`render_page(file_path, page_number) -> bytes`
+- [x] Subtask 0.3: 更新端口注册中心（`registry.py`）与端口契约门禁（`contract_gate.py`）
+- [x] Subtask 0.4: 编写端口契约测试 `tests/contracts/test_port_contract_layout_detector.py`
+- [x] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_document_layout.feature`
+- [x] Subtask 0.6: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_document_layout.py`
+- [x] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -331,9 +331,9 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | 🟢 绿 | 在 `src/domain/value_objects/parsed_document.py` 实现 `BoundingBoxResult` 数据类（`@dataclass(frozen=True)`，含 `label`/`bbox`/`confidence`/`to_dict()`） |
 | 🔄 重构 | 更新 `src/domain/value_objects/__init__.py` 导出；验证 `ParsedElement.to_dict()` 与 `BoundingBoxResult.to_dict()` 输出一致性 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 `TestBoundingBoxResult` 测试类（值对象创建/字段验证/to_dict 序列化/不可变性/边缘 case）
-- [ ] Subtask 1.2: 🟢 绿 — 实现 `BoundingBoxResult` 值对象最小代码
-- [ ] Subtask 1.3: 🔄 重构 — 完善 docstring、添加 Google 中文注释、更新 `__init__.py` 导出
+- [x] Subtask 1.1: 🔴 红 — 编写 `TestBoundingBoxResult` 测试类（值对象创建/字段验证/to_dict 序列化/不可变性/边缘 case）
+- [x] Subtask 1.2: 🟢 绿 — 实现 `BoundingBoxResult` 值对象最小代码
+- [x] Subtask 1.3: 🔄 重构 — 完善 docstring、添加 Google 中文注释、更新 `__init__.py` 导出
 
 **完成标准/Definition of Done:**
 - [ ] `BoundingBoxResult` 值对象实现完成
@@ -354,9 +354,9 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | 🟢 绿 | 在 `src/domain/ports/layout_detector.py` 实现 `LayoutDetector` Protocol（`detect(image_bytes, page_number) -> list[BoundingBoxResult]`） |
 | 🔄 重构 | 完善 docstring、更新端口注册清单 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 `TestLayoutDetectorPort`（Protocol 合规检查/实现类 isinstance 验证/签名约束）
-- [ ] Subtask 2.2: 🟢 绿 — 实现 `LayoutDetector` Protocol 最小代码
-- [ ] Subtask 2.3: 🔄 重构 — Google 中文注释、端口文档完善
+- [x] Subtask 2.1: 🔴 红 — 编写 `TestLayoutDetectorPort`（Protocol 合规检查/实现类 isinstance 验证/签名约束）
+- [x] Subtask 2.2: 🟢 绿 — 实现 `LayoutDetector` Protocol 最小代码（已在 Task 0 Subtask 0.2 完成）
+- [x] Subtask 2.3: 🔄 重构 — Google 中文注释、端口文档完善（已在 Task 0 完成）
 
 **完成标准/Definition of Done:**
 - [ ] `LayoutDetector` Protocol 定义完成
@@ -380,9 +380,9 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | 🟢 绿 | 实现 `src/infrastructure/document_parsing/onnx_layout_detector.py`（`__init__` 加载模型/`detect` 推理/输出后处理/错误处理） |
 | 🔄 重构 | 提取 `_preprocess`/`_postprocess` 私有方法；添加性能日志；错误信息本地化 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 `TestOnnxLayoutDetector` 测试（mock onnxruntime 全场景：初始化/CPU/GPU/模型缺失/推理失败/空图像返回空列表/多元素检测/confidence 范围 [0,1]/**xyxy→xywh 坐标转换验证**：ONNX 输出 `[x1,y1,x2,y2]` 正确转换为 `BoundingBox(x=x1, y=y1, width=x2-x1, height=y2-y1)`/后处理 mock）
-- [ ] Subtask 3.2: 🟢 绿 — 实现 `OnnxLayoutDetector` 类（`onnxruntime.InferenceSession` 封装/预处理占位/后处理占位/Provider 选择）
-- [ ] Subtask 3.3: 🔄 重构 — 提取预处理/后处理逻辑；完善 docstring（含模型加载说明和依赖安装指引）；添加日志
+- [x] Subtask 3.1: 🔴 红 — 编写 `TestOnnxLayoutDetector` 测试（mock onnxruntime 全场景：初始化/CPU/GPU/模型缺失/推理失败/空图像返回空列表/多元素检测/confidence 范围 [0,1]/xyxy→xywh 坐标转换验证）
+- [x] Subtask 3.2: 🟢 绿 — 实现 `OnnxLayoutDetector` 类（onnxruntime.InferenceSession 封装/预处理占位/后处理占位/Provider 选择）
+- [x] Subtask 3.3: 🔄 重构 — 提取预处理/后处理逻辑；完善 docstring；添加日志
 
 **完成标准/Definition of Done:**
 - [ ] `OnnxLayoutDetector` 实现完成
@@ -409,9 +409,9 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | 🟢 绿 | 实现 `src/domain/services/layout_matching.py` 辅助函数（空间 IoU 计算/贪心匹配/阈值过滤 IoU > 0.3，纯领域逻辑零外部依赖，与 `cost_calculator.py` 等领域服务共处） |
 | 🔄 重构 | 提取 IoU 计算逻辑；添加边界 case 防护；完善类型注解 |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写 `TestBboxMatching`（IoU 计算/单元素匹配/多元素贪心匹配/**IoU 边界：恰好 0.3 不匹配 / 0.3001 匹配 / 1.0 完全重叠**/不同 page_number 不匹配/空输入处理/表格 bbox 匹配/负坐标防御）
-- [ ] Subtask 4.2: 🟢 绿 — 实现 bbox 匹配逻辑最小代码（位于 `src/domain/services/layout_matching.py`）
-- [ ] Subtask 4.3: 🔄 重构 — 添加 docstring/性能注释/类型注解
+- [x] Subtask 4.1: 🔴 红 — 编写 `TestBboxMatching`（IoU 计算/单元素匹配/多元素贪心匹配/**IoU 边界：恰好 0.3 不匹配 / 0.3001 匹配 / 1.0 完全重叠**/不同 page_number 不匹配/空输入处理/表格 bbox 匹配/负坐标防御）
+- [x] Subtask 4.2: 🟢 绿 — 实现 bbox 匹配逻辑最小代码（位于 `src/domain/services/layout_matching.py`）
+- [x] Subtask 4.3: 🔄 重构 — 添加 docstring/性能注释/类型注解
 
 #### TDD 循环 B：DocumentParsingService 编排扩展
 
@@ -435,9 +435,9 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 > 实现位于 `src/infrastructure/document_parsing/pdf_page_renderer.py`（pypdfium2 + Pillow），
 > 在 Composition Root 注册为 SCOPED 生命周期，通过构造函数注入到 `DocumentParsingService`。
 
-- [ ] Subtask 4.4: 🔴 红 — 编写 Service 编排扩展测试（layout_detector 注入/pdf 版面检测/非 pdf 跳过/layout_detector 缺失时降级）
-- [ ] Subtask 4.5: 🟢 绿 — 扩展 `DocumentParsingService` 编排逻辑（注入 layout_detector + pdf_page_renderer，PDF 格式触发版面检测，合并 bbox）
-- [ ] Subtask 4.6: 🔄 重构 — 提取私有方法；完善日志；确保无回归（已有 166 测试通过）
+- [x] Subtask 4.4: 🔴 红 — 编写 Service 编排扩展测试（layout_detector 注入/pdf 版面检测/非 pdf 跳过/layout_detector 缺失时降级）
+- [x] Subtask 4.5: 🟢 绿 — 扩展 `DocumentParsingService` 编排逻辑（注入 layout_detector + pdf_page_renderer，PDF 格式触发版面检测，合并 bbox）
+- [x] Subtask 4.6: 🔄 重构 — 提取私有方法；完善日志；确保无回归（已有 166 测试通过）
 
 #### TDD 循环 C：Composition Root 注册
 
@@ -447,17 +447,17 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | 🟢 绿 | 在 `src/composition_root.py` 注册 `layout_detector` + `pdf_page_renderer`；升级 document_parsing_service 版本至 v1.1.0；composition_root lambda 工厂传入两个依赖 |
 | 🔄 重构 | 验证完整端口链：layout_detector → document_parsing_service → document_parser |
 
-- [ ] Subtask 4.7: 🔴 红 — 扩展契约测试（layout_detector 端口注册/版本/接口类型/生命周期为 SINGLETON）
-- [ ] Subtask 4.8: 🟢 绿 — Composition Root 注册 `layout_detector` + `pdf_page_renderer` + 版本升级
-- [ ] Subtask 4.9: 🔄 重构 — 验证完整端口链：layout_detector → document_parsing_service → document_parser
+- [x] Subtask 4.7: 🔴 红 — 扩展契约测试（layout_detector 端口注册/版本/接口类型/生命周期为 SINGLETON）
+- [x] Subtask 4.8: 🟢 绿 — Composition Root 注册 `layout_detector` + `pdf_page_renderer` + 版本升级
+- [x] Subtask 4.9: 🔄 重构 — 验证完整端口链：layout_detector → document_parsing_service → document_parser
 
 **完成标准/Definition of Done:**
-- [ ] bbox 匹配算法实现完成
-- [ ] DocumentParsingService 编排扩展完成
-- [ ] Composition Root 注册完成
-- [ ] 端口契约测试通过
-- [ ] 已有测试全部保持通过（无回归）
-- [ ] 应用层覆盖率 ≥ 85%
+- [x] bbox 匹配算法实现完成
+- [x] DocumentParsingService 编排扩展完成
+- [x] Composition Root 注册完成
+- [x] 端口契约测试通过
+- [x] 已有测试全部保持通过（无回归）
+- [x] 应用层覆盖率 ≥ 85%
 
 ---
 
@@ -469,14 +469,14 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 
 #### 架构验证测试实现
 
-- [ ] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_document_layout.py`
+- [x] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_document_layout.py`
   - 验证 `OnnxLayoutDetector` 位于 `infrastructure` 层（不污染 domain/application）
   - 验证 `LayoutDetector` Protocol 位于 `domain` 层（零 onnxruntime/numpy 依赖）
   - 验证 `BoundingBoxResult`/`BoundingBox` 位于 `domain` 层（仅标准库依赖）
   - 验证基础设施层实现 `LayoutDetector` Protocol（`isinstance` 检查）
   - 验证依赖方向合规（domain → application → infrastructure → interfaces 各层约束）
 
-- [ ] Subtask 5.2: 创建 `tests/integration/test_integration_document_layout.py`
+- [x] Subtask 5.2: 创建 `tests/integration/test_integration_document_layout.py`
   - 端到端版面检测流程：MinIO 下载 PDF → 文本解析 → PDF 页面渲染（PdfPageRendererPort）→ 版面检测 → bbox 合并 → `DocumentProcessed` 事件发布
   - 使用真实 pypdfium2 库渲染页面图像（小 PDF，1-2 页）
   - mock ONNX 推理（避免真实模型依赖）
@@ -490,19 +490,19 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | 🟢 绿 | 编写 `tests/acceptance/test_acceptance_document_layout.py` 的 BDD 步骤实现 |
 | 🔄 重构 | 收敛场景命名、统一断言表达、保持步骤函数可维护性 |
 
-- [ ] Subtask 5.3: 场景 1 — 验证 `src` 完成清单的逐项确认（BoundingBoxResult 值对象/LayoutDetector 端口/OnnxLayoutDetector 实现/排版编排整合/Composition Root 注册）
-- [ ] Subtask 5.4: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
-- [ ] Subtask 5.5: 运行开发结束验收测试并确认通过
-- [ ] Subtask 5.6: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
+- [x] Subtask 5.3: 场景 1 — 验证 `src` 完成清单的逐项确认（BoundingBoxResult 值对象/LayoutDetector 端口/OnnxLayoutDetector 实现/排版编排整合/Composition Root 注册）
+- [x] Subtask 5.4: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
+- [x] Subtask 5.5: 运行开发结束验收测试并确认通过
+- [x] Subtask 5.6: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构/约束测试通过
-- [ ] 测试输出清晰的合规报告
-- [ ] 任何违规都会导致测试失败
-- [ ] `src` 完成清单已逐项验证确认
-- [ ] `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `done`
+- [x] 所有架构/约束测试通过
+- [x] 测试输出清晰的合规报告
+- [x] 任何违规都会导致测试失败
+- [x] `src` 完成清单已逐项验证确认
+- [x] `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单已逐项验证确认
+- [x] 开发结束验收测试通过
+- [x] Story 可进入 `done`
 
 ---
 

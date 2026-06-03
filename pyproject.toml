@@ -234,7 +234,7 @@ exclude = [
 #   - 无类型桩的第三方库统一豁免，安全且可审计
 # ---------------------------------------------------------------------------
 [[tool.mypy.overrides]]
-module = ["defusedxml.*", "FlagEmbedding.*", "pytesseract.*", "striprtf.*"]
+module = ["defusedxml.*", "FlagEmbedding.*", "pytesseract.*", "striprtf.*", "onnxruntime.*", "pypdfium2.*"]
 ignore_missing_imports = true
 
 # Pytest Configuration

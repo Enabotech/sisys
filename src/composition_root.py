@@ -1151,12 +1151,49 @@ def bootstrap() -> None:
         owner="epic-2",
     )
 
+    # === Layout Detection Ports (Story 2-3) ===
+    from src.domain.ports.layout_detector import LayoutDetector
+    from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
+
+    register_port(
+        name="layout_detector",
+        version="v1.0.0",
+        interface=LayoutDetector,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.document_parsing.onnx_layout_detector",
+            fromlist=["OnnxLayoutDetector"],
+        ).OnnxLayoutDetector(
+            model_path=os.getenv(
+                "SISYS_LAYOUT_MODEL_PATH",
+                os.path.expanduser("~/models/docling-layout-heron.onnx"),
+            ),
+        ),
+        module="src.infrastructure.document_parsing.onnx_layout_detector",
+        lifetime=Lifetime.SINGLETON,
+        owner="epic-2",
+        tags=("layout", "onnx", "document"),
+    )
+
+    register_port(
+        name="pdf_page_renderer",
+        version="v1.0.0",
+        interface=PdfPageRendererPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.document_parsing.pdf_page_renderer",
+            fromlist=["PdfPageRenderer"],
+        ).PdfPageRenderer(),
+        module="src.infrastructure.document_parsing.pdf_page_renderer",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+        tags=("layout", "pdf", "document"),
+    )
+
     # DocumentParsingService — 应用层文档解析编排
     from src.application.services.document_parsing_service import DocumentParsingService
 
     register_port(
         name="document_parsing_service",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=DocumentParsingService,
         impl=lambda resolver: DocumentParsingService(
             document_repository=resolver.resolve("document_repository"),
@@ -1164,6 +1201,8 @@ def bootstrap() -> None:
             event_publisher=resolver.resolve("event_publisher"),
             document_parser=resolver.resolve("document_parser"),
             redis_client=resolver.resolve("redis_client"),
+            layout_detector=resolver.resolve("layout_detector"),
+            pdf_page_renderer=resolver.resolve("pdf_page_renderer"),
         ),
         module="src.application.services.document_parsing_service",
         lifetime=Lifetime.SCOPED,

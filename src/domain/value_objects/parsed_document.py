@@ -1,6 +1,6 @@
 """文档解析结果值对象
 
-定义解析结果的结构化数据模型，包含 ParsedDocument/ParsedPage/ParsedElement/ParsedTable/BoundingBox。
+定义解析结果的结构化数据模型，包含 ParsedDocument/ParsedPage/ParsedElement/ParsedTable/BoundingBox/BoundingBoxResult。
 所有值对象均为 frozen dataclass（不可变），通过 to_dict() 方法支持 JSON 序列化。
 """
 
@@ -36,6 +36,33 @@ class BoundingBox:
             "width": self.width,
             "height": self.height,
             "page": self.page,
+        }
+
+
+@dataclass(frozen=True)
+class BoundingBoxResult:
+    """版面检测结果值对象（DocLayNet 标准）
+
+    表示版面检测模型输出的单个检测结果，包含元素类型标签、
+    边界框坐标和检测置信度。页码信息由 bbox.page 承载。
+
+    Attributes:
+        label: DocLayNet 11 类标签（Caption/Footnote/Formula/List-item/
+            Page-footer/Page-header/Picture/Section-header/Table/Text/Title）
+        bbox: 边界框坐标（含页码信息）
+        confidence: 检测置信度（0.0~1.0）
+    """
+
+    label: str
+    bbox: BoundingBox
+    confidence: float
+
+    def to_dict(self) -> dict[str, Any]:
+        """序列化为 JSON 可存储字典"""
+        return {
+            "label": self.label,
+            "bbox": self.bbox.to_dict(),
+            "confidence": self.confidence,
         }
 
 

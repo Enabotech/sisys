@@ -39,6 +39,7 @@ from src.domain.value_objects.intrusion_detection_result import (
 )
 from src.domain.value_objects.parsed_document import (
     BoundingBox,
+    BoundingBoxResult,
     ParsedDocument,
     ParsedElement,
     ParsedPage,
@@ -72,6 +73,7 @@ __all__ = [
     "BackupStatus",
     "BackupType",
     "BoundingBox",
+    "BoundingBoxResult",
     "CHUNKED_UPLOAD_TTL",
     "CHUNK_SIZES",
     "ComplianceResult",
