@@ -129,9 +129,9 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | `qdrant_connection_manager` | v1.0.0 | `ConnectionManager` | Qdrant 连接管理 |
 
 #### API 契约 (API Contract)
-- [x] `embedding_api_server.py` FastAPI 自动生成 OpenAPI schema（`/openapi.json` + `/docs`）
-- [x] `EmbedRequest` / `EmbedResponse` / `HealthResponse` Pydantic 模型即为 API 契约
-- [x] 内部服务，无需独立 `docs/api/openapi.yaml`（Epic 7 面向外部用户的 API 路由才需要）
+- [x] OpenAPI 3.1 契约定义位于 `docs/api/openapi.yaml`（`/health` + `/v1/embeddings` + schemas）
+- [x] API 契约测试通过 `tests/contracts/test_api_contract_embedding.py`（9 tests, 验证契约语法/路径/schema/实现一致性）
+- [x] API 版本管理：`/v1/embeddings`
 
 #### 六边形架构约束（必须遵守）
 
@@ -200,6 +200,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | **TDD 契约测试** | 双策略 DI | Local/API 模式 implementation 解析验证 | `tests/contracts/test_port_contract_embedding_service.py` | Task 9 |
 | **TDD 验收测试** | API 模式 Gherkin | 嵌入 API 服务端到端验证 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 10 |
 | **TDD 验收测试** | 收尾验收场景 | src 与 tests 完成清单最终确认 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 10 |
+| **TDD 契约测试** | API 契约 | OpenAPI 3.1 规范校验 + 路径/schema/实现一致性 | `tests/contracts/test_api_contract_embedding.py` | Task 9 |
 
 ---
 
