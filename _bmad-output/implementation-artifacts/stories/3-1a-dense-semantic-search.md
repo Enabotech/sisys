@@ -1,6 +1,6 @@
 # Story 3-1a: Dense 语义检索
 
-**Status:** `review`
+**Status:** `in-progress`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -177,6 +177,11 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | **TDD 验收测试** | 收尾验收场景 | src 与测试目录完成清单最终确认 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 6 |
 | **集成测试** | Embedding + Qdrant 端到端 | 真实 bge-m3 + 真实 Qdrant | `tests/integration/test_integration_embedding_qdrant_dense_search.py` | Task 5 |
 | **SDD 架构验证** | 领域零依赖 | domain/ 无 sentence_transformers 导入 | 包含在验收测试 AC-6 中 | Task 6 |
+| **TDD 单元测试** | EmbeddingAPIClient | HTTP 请求/响应、错误处理、空值验证 | `tests/unit/infrastructure/external_services/embedding/test_embedding_api_client.py` | Task 7 |
+| **TDD 单元测试** | Embedding API Server | FastAPI TestClient、Health check、编码端点 | `tests/unit/infrastructure/external_services/embedding/test_embedding_api_server.py` | Task 8 |
+| **TDD 契约测试** | 双策略 DI | Local/API 模式 implementation 解析验证 | `tests/contracts/test_port_contract_embedding_service.py` | Task 9 |
+| **TDD 验收测试** | API 模式 Gherkin | 嵌入 API 服务端到端验证 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 10 |
+| **TDD 验收测试** | 收尾验收场景 | src 与 tests 完成清单最终确认 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 10 |
 
 ---
 
@@ -225,19 +230,22 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | AC-3 | 检索延迟 P95<200ms | Task 5 | 性能基准测试 | `test_integration_embedding_qdrant_dense_search.py` |
 | AC-4 | Payload 过滤 | Task 3 | tenant_id + filter 注入 | `test_dense_search_service.py` |
 | AC-4 | 真实 Payload 过滤 | Task 5 | 集成测试 | `test_integration_embedding_qdrant_dense_search.py` |
-| 全部 | BDD 验收 | Task 0 | Gherkin 场景 | `test_acceptance_dense_semantic_search.*` |
-| 全部 | 收尾验收 | Task 6 | 完成清单确认 | `test_acceptance_dense_semantic_search.*` |
+| AC-encode_sparse | Sparse 嵌入生成 | Task 7 | EmbeddingAPIClient | `test_embedding_api_client.py` |
+| AC-encode_sparse | Sparse API 服务 | Task 8 | Embedding API Server | `test_embedding_api_server.py` |
+| AC-1 | 双策略 DI（API/Local） | Task 9 | Composition Root 分支注册 | `test_port_contract_embedding_service.py` |
+| 全部 | API 模式 BDD 验收 | Task 10 | Gherkin 场景 | `test_acceptance_dense_semantic_search.*` |
+| 全部 | 收尾验收 | Task 10 | 完成清单确认 | `test_acceptance_dense_semantic_search.*` |
 
 **Task 间执行依赖：**
 ```
 Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实现）
-                                         ↘ Task 3（Search 服务）→ Task 4（注册装配）→ Task 5（集成测试）→ Task 6（收尾）
+                                         ↘ Task 3（Search 服务）→ Task 4（注册装配）→ Task 5（集成测试）→ Task 6（收尾）→ Task 8（API Client）→ Task 9（API Server）→ Task 9（双策略DI）→ Task 11（验收）
 ```
-- Task 0 必须最先完成
-- Task 1 完成后，Task 2 和 Task 3 可并行（Task 3 单元测试 mock EmbeddingServicePort）
-- Task 4 依赖 Task 1+2+3 全部完成
-- Task 5 依赖 Task 4 完成
-- Task 6 依赖 Task 5 完成
+- Task 0-6 为阶段一（MVP 进程内嵌入），已完成
+- Task 8-11 为阶段二（API 化扩展），Task 8 依赖 Task 6 完成
+- Task 8 和 Task 9 可并行
+- Task 10 依赖 Task 8+9 全部完成
+- Task 11 依赖 Task 10 完成
 
 ---
 
@@ -557,6 +565,273 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 ---
 
+### Task 7: EmbeddingAPIClient 实现
+
+**关联 AC:** AC-1, AC-encode_sparse
+
+> ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
+
+#### TDD 循环 A：EmbeddingAPIClient
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/infrastructure/external_services/embedding/test_embedding_api_client.py` |
+| 🟢 绿 | 创建 `src/infrastructure/external_services/embedding/embedding_api_client.py` |
+| 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
+
+- [ ] Subtask 7.1: 🔴 红 — 编写 EmbeddingAPIClient 失败测试
+  - mock httpx.AsyncClient，验证 `encode_text()` 发送 `POST /v1/embeddings` 并返回 1024-dim
+  - 验证 `encode_texts()` 批量编码返回正确数量
+  - 验证 `encode_sparse()` 返回 `{"indices": [...], "values": [...]}`
+  - 验证空文本抛出 `ValueError`（不发送 HTTP 请求）
+  - 验证 HTTP 4xx/5xx 异常传播
+  - 验证 `api_url` 为空时构造抛出 `ValueError`
+  - 验证 `dimension` 属性返回 `config.dimension`
+- [ ] Subtask 7.2: 🟢 绿 — 创建 `src/infrastructure/external_services/embedding/embedding_api_client.py`
+  ```python
+  class EmbeddingAPIClient:
+      """BGE-M3 嵌入 API 客户端
+
+      实现 EmbeddingServicePort，通过 HTTP POST /v1/embeddings 调用独立 API 服务。
+      """
+      def __init__(self, config: EmbeddingConfig | None = None): ...
+      @property
+      def dimension(self) -> int: return self._config.dimension
+      async def encode_text(self, text: str) -> list[float]: ...
+      async def encode_texts(self, texts: list[str]) -> list[list[float]]: ...
+      async def encode_sparse(self, text: str) -> dict: ...
+      async def _encode(self, texts: list[str], *, return_sparse: bool) -> dict: ...
+      async def close(self) -> None: ...
+  ```
+  - 使用 `httpx.AsyncClient` 异步 HTTP 调用，方法签名使用 `async def`（不同于 BGE3EmbeddingService 的同步方法）
+  - `_encode()` 私有方法统一处理 Dense/Sparse，避免重复 HTTP 逻辑
+- [ ] Subtask 7.3: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
+
+#### TDD 循环 B：EmbeddingConfig 扩展
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 补充 `EmbeddingConfig.from_env()` 测试（验证 `api_url`/`api_timeout` 环境变量解析） |
+| 🟢 绿 | 修改 `src/infrastructure/config/embedding.py` |
+| 🔄 重构 | 更新 `.env.example`，运行 `ruff` + `mypy` |
+
+- [ ] Subtask 7.4: 🔴 红 — 补充 `test_from_env_defaults` 验证 `api_url=""`、`api_timeout=30.0`
+- [ ] Subtask 7.5: 🔴 红 — 补充 `test_from_env_custom` 验证环境变量 `EMBEDDING_API_URL`、`EMBEDDING_API_TIMEOUT` 覆盖
+- [ ] Subtask 7.6: 🟢 绿 — `EmbeddingConfig` dataclass 新增 `api_url: str = ""`、`api_timeout: float = 30.0`
+- [ ] Subtask 7.7: 🟢 绿 — `.env.example` 新增 `EMBEDDING_API_URL`、`EMBEDDING_API_TIMEOUT` 注释项
+- [ ] Subtask 7.8: 🔄 重构 — 运行 `ruff check` + `mypy`
+
+**完成标准/Definition of Done:**
+- [ ] EmbeddingAPIClient 实现完成
+- [ ] EmbeddingConfig 扩展完成（`api_url`、`api_timeout`）
+- [ ] 单元测试 7 个场景全部通过
+- [ ] 覆盖率≥75%（基础设施层）
+
+---
+
+### Task 8: Embedding API Server 实现
+
+**关联 AC:** AC-1, AC-encode_sparse
+
+> ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
+
+#### TDD 循环 A：Embedding API Server
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/infrastructure/external_services/embedding/test_embedding_api_server.py` |
+| 🟢 绿 | 创建 `src/infrastructure/external_services/embedding/embedding_api_server.py` |
+| 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
+
+- [ ] Subtask 8.1: 🔴 红 — 编写 Embedding API Server 失败测试（FastAPI `TestClient`）
+  - 验证 `GET /health` 返回 `{"status": "ok", "model": "BAAI/bge-m3"}`
+  - 验证 `POST /v1/embeddings`（`return_sparse=false`）返回 `{"dense": [[...], ...]}`，维度 1024
+  - 验证 `POST /v1/embeddings`（`return_sparse=true`）同时返回 `dense` 和 `sparse`
+  - 验证 `sparse` 各元素含 `indices` 和 `values` 字段
+  - 验证空 `texts` 列表返回 422（Pydantic `min_length=1` 校验）
+  - 验证 `texts` 超过 64 条返回 422（Pydantic `max_length=64` 校验）
+- [ ] Subtask 8.2: 🟢 绿 — 创建 `src/infrastructure/external_services/embedding/embedding_api_server.py`
+  ```python
+  """BGE-M3 嵌入 API 服务端
+
+  通过 FastAPI + FlagEmbedding 将 BGE-M3 封装为独立 HTTP 服务，Docker Compose 独立部署。
+  """
+
+  from fastapi import FastAPI
+  from pydantic import BaseModel, Field
+  from FlagEmbedding import BGEM3FlagModel
+
+  app = FastAPI(title="SISYS Embedding API", version="1.0.0")
+
+  class EmbedRequest(BaseModel):
+      texts: list[str] = Field(..., min_length=1, max_length=64)
+      return_sparse: bool = False
+
+  class EmbedResponse(BaseModel):
+      dense: list[list[float]]
+      sparse: list[dict] | None = None
+
+  @app.on_event("startup")
+  async def load_model(): ...
+
+  @app.get("/health")
+  async def health(): ...
+
+  @app.post("/v1/embeddings", response_model=EmbedResponse)
+  async def embed(req: EmbedRequest): ...
+  ```
+  - 模型在 `@app.on_event("startup")` 中懒加载，请求间复用
+  - Pydantic V2 自动校验请求体，非法输入返回 422
+  - `response_model=EmbedResponse` 强制输出 schema 校验
+- [ ] Subtask 8.3: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
+
+**完成标准/Definition of Done:**
+- [ ] Embedding API Server 暴露 `GET /health` 和 `POST /v1/embeddings`
+- [ ] FastAPI `TestClient` 测试 6 个场景全部通过
+- [ ] Pydantic 请求校验自动拒绝非法输入
+- [ ] 覆盖率≥75%（基础设施层）
+
+---
+
+### Task 9: 双策略 DI 注册 + Docker Compose 部署
+
+**关联 AC:** AC-1, AC-2
+
+> ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
+
+#### TDD 循环 A：双策略 DI 注册
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 在 `tests/contracts/test_port_contract_embedding_service.py` 中补充 API 模式注册验证 |
+| 🟢 绿 | 修改 `src/composition_root.py` 双策略注册 |
+| 🔄 重构 | 运行 `ruff` + `mypy` |
+
+- [ ] Subtask 9.1: 🔴 红 — 补充契约测试验证双策略
+  - 验证 `EMBEDDING_API_URL` 为空时 `embedding_service` 解析为 `BGE3EmbeddingService`
+  - 验证 `EMBEDDING_API_URL` 非空时 `embedding_service` 解析为 `EmbeddingAPIClient`
+  - 验证两种实现的 `interface` 均为 `EmbeddingServicePort`
+- [ ] Subtask 9.2: 🟢 绿 — 修改 `src/composition_root.py`
+  ```python
+  # === Search Ports (Epic 3) ===
+  EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "")
+
+  if EMBEDDING_API_URL:
+      from src.infrastructure.external_services.embedding.embedding_api_client import (
+          EmbeddingAPIClient,
+      )
+      register_port(
+          name="embedding_service", version="v1.1.0",
+          interface=EmbeddingServicePort,
+          impl=lambda resolver: EmbeddingAPIClient(EmbeddingConfig.from_env()),
+          module="src.infrastructure.external_services.embedding.embedding_api_client",
+          lifetime=Lifetime.SINGLETON, owner="search-team",
+          tags=("embedding", "search", "api"),
+      )
+  else:
+      from src.infrastructure.external_services.embedding.bge3_embedding_service import (
+          BGE3EmbeddingService,
+      )
+      register_port(
+          name="embedding_service", version="v1.0.0",
+          interface=EmbeddingServicePort,
+          impl=lambda resolver: BGE3EmbeddingService(EmbeddingConfig.from_env()),
+          module="src.infrastructure.external_services.embedding.bge3_embedding_service",
+          lifetime=Lifetime.SINGLETON, owner="search-team",
+          tags=("embedding", "search", "local"),
+      )
+  ```
+  - 双策略在 `composition_root.py` 中通过环境变量分支实现，不引入额外抽象层
+  - `DenseSemanticSearchService` 仍通过 `resolver.resolve("embedding_service")` 获取，对两种实现透明
+- [ ] Subtask 9.3: 🔄 重构 — 运行 `ruff check` + `mypy`
+
+#### TDD 循环 B：Docker Compose 部署配置
+
+| 阶段 | 动作 |
+|------|------|
+| 🟢 绿 | 创建 `deploy/docker-compose.embedding.yml` 和 `deploy/Dockerfile.embedding` |
+| 🔄 重构 | 更新 `.env.example` 集成说明 |
+
+- [ ] Subtask 9.4: 🟢 绿 — 创建 `deploy/docker-compose.embedding.yml`
+  ```yaml
+  services:
+    embedding-api:
+      build:
+        context: ..
+        dockerfile: deploy/Dockerfile.embedding
+      ports: ["8001:8000"]
+      environment:
+        - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-BAAI/bge-m3}
+        - EMBEDDING_MODEL_PATH=${EMBEDDING_MODEL_PATH:-}
+      deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu]
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+        interval: 30s
+        retries: 3
+  ```
+- [ ] Subtask 9.5: 🟢 绿 — 创建 `deploy/Dockerfile.embedding`
+  ```dockerfile
+  FROM python:3.11-slim
+  WORKDIR /app
+  RUN pip install fastapi uvicorn FlagEmbedding
+  COPY src/infrastructure/external_services/embedding/embedding_api_server.py /app/
+  CMD ["uvicorn", "embedding_api_server:app", "--host", "0.0.0.0", "--port", "8000"]
+  ```
+  > **设计决策：** Dockerfile 独立于主项目 Dockerfile，仅含 FlagEmbedding + FastAPI 最小依赖。不依赖 `src/domain/` 或 `src/composition_root.py`，保持 API 服务完全自包含。
+- [ ] Subtask 9.6: 🔄 重构 — 更新 `.env.example` 新增 `EMBEDDING_API_URL=http://embedding-api:8000` 注释说明
+
+**完成标准/Definition of Done:**
+- [ ] `composition_root.py` 双策略注册完成（按 `EMBEDDING_API_URL` 切换）
+- [ ] 契约测试验证两种模式均正确注册
+- [ ] `docker compose -f deploy/docker-compose.embedding.yml config` 语法通过
+- [ ] ruff + mypy 通过
+
+---
+
+### Task 10: 开发结束验收测试
+
+**关联 AC:** 全部 AC
+
+> **性质说明：** 本 Task 不是功能实现，是对 Story 收尾阶段的交付物与完成清单进行最终验收。
+
+#### 开发结束验收测试实现
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 在 `tests/acceptance/test_acceptance_dense_semantic_search.feature` 中新增 API 模式验收场景 |
+| 🟢 绿 | 编写 BDD 步骤实现 |
+| 🔄 重构 | 收敛场景命名、统一断言表达 |
+
+- [ ] Subtask 10.1: 🔴 红 — 新增 Gherkin 场景：AC-api — 嵌入 API 服务健康检查
+- [ ] Subtask 10.2: 🔴 红 — 新增 Gherkin 场景：AC-api — 嵌入 API 服务 Dense 编码
+- [ ] Subtask 10.3: 🔴 红 — 新增 Gherkin 场景：AC-api — 嵌入 API 服务 Sparse 编码
+- [ ] Subtask 10.4: 🟢 绿 — 编写 BDD 步骤实现（FastAPI `TestClient` 启动 embedding_api_server.app）
+- [ ] Subtask 10.5: 🔄 重构 — 运行验收测试并确认通过
+
+- [ ] Subtask 10.6: 场景 — 验证 `src` 完成清单
+  - `src/infrastructure/external_services/embedding/embedding_api_client.py` 存在且包含 `EmbeddingAPIClient`
+  - `src/infrastructure/external_services/embedding/embedding_api_server.py` 存在且包含 FastAPI `app`
+  - `src/infrastructure/config/embedding.py` 包含 `api_url`、`api_timeout` 字段
+  - `src/composition_root.py` 包含双策略注册（`EMBEDDING_API_URL` 分支）
+- [ ] Subtask 10.7: 场景 — 验证 `tests/` 和部署完成清单
+  - `test_embedding_api_client.py` 和 `test_embedding_api_server.py` 存在
+  - `test_acceptance_dense_semantic_search.feature` 含 API 模式场景
+  - `deploy/docker-compose.embedding.yml` 和 `deploy/Dockerfile.embedding` 存在
+- [ ] Subtask 10.8: 运行 `poetry run pytest`、`poetry run ruff check src/`、`poetry run mypy src/` 收尾校验
+
+**完成标准/Definition of Done:**
+- [ ] `src` 和 `tests` 完成清单已逐项验证确认
+- [ ] 开发结束验收测试通过
+- [ ] Story 可进入 `done`
+
+---
+
 ## 📝 Dev Notes 开发笔记
 
 ### 相关架构模式和约束
@@ -682,8 +957,10 @@ src/
 │   │   ├── __init__.py               # [修改] 添加 EmbeddingConfig 导出
 │   │   └── qdrant.py                 # [已有] 参考模式
 │   ├── external_services/embedding/
-│   │   ├── __init__.py               # [新建] 包初始化
-│   │   └── bge3_embedding_service.py # [新建] BGE3EmbeddingService
+│   │   ├── __init__.py                  # [新建] 包初始化
+│   │   ├── bge3_embedding_service.py    # [新建] BGE3EmbeddingService (FlagEmbedding 进程内)
+│   │   ├── embedding_api_client.py      # [新建] EmbeddingAPIClient (HTTP API 客户端)
+│   │   └── embedding_api_server.py      # [新建] FastAPI 嵌入服务 (独立部署)
 │   ├── storage/qdrant/
 │   │   ├── vector_storage.py         # [已有] Dense search 实现复用
 │   │   ├── qdrant_adapter.py         # [已有] l3_vector 适配器复用
@@ -691,7 +968,7 @@ src/
 │   │   └── models.py                 # [已有] VectorPoint/CollectionConfig 复用
 │   └── workflow/tasks/
 │       └── document_tasks.py         # [修改] 替换 generate_embedding 占位
-└── composition_root.py               # [修改] 注册 2 个新端口
+└── composition_root.py               # [修改] 注册 embedding 端口（后扩展为双策略分支）
 
 tests/
 ├── contracts/
@@ -840,13 +1117,20 @@ def perform_dense_search(context, dense_search_service, event_loop):
 | `tests/integration/test_embedding_qdrant_dense_search.py` | 集成测试 | Task 5 |
 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Gherkin 场景 | Task 0 |
 | `tests/acceptance/test_acceptance_dense_semantic_search.py` | BDD 步骤 | Task 0 |
+| `src/infrastructure/external_services/embedding/embedding_api_client.py` | API 客户端 | Task 7 |
+| `src/infrastructure/external_services/embedding/embedding_api_server.py` | API 服务端 | Task 8 |
+| `tests/unit/infrastructure/external_services/embedding/test_embedding_api_client.py` | 单元测试 | Task 7 |
+| `tests/unit/infrastructure/external_services/embedding/test_embedding_api_server.py` | 单元测试 | Task 8 |
+| `deploy/docker-compose.embedding.yml` | Docker Compose 部署 | Task 9 |
+| `deploy/Dockerfile.embedding` | Docker 镜像 | Task 9 |
 
 **待修改的文件/To Be Modified:**
 - `src/domain/ports/__init__.py` — 添加 EmbeddingServicePort 导出
 - `src/infrastructure/config/__init__.py` — 添加 EmbeddingConfig 导出
-- `src/composition_root.py` — 注册 embedding_service + dense_search_service
+- `src/infrastructure/config/embedding.py` — 新增 `api_url`、`api_timeout` 字段
+- `src/composition_root.py` — 注册 embedding_service + dense_search_service（后扩展为双策略分支）
 - `src/infrastructure/workflow/tasks/document_tasks.py` — 替换 generate_embedding 占位
-- `.env.example` — 添加 EMBEDDING_MODEL_DIMENSION=1024
+- `.env.example` — 添加 EMBEDDING_MODEL_DIMENSION=1024 / EMBEDDING_API_URL / EMBEDDING_API_TIMEOUT
 - `tests/environments.py` — EmbeddingConfig 添加 dimension: int = 1024 字段
 
 ---
@@ -882,8 +1166,10 @@ def perform_dense_search(context, dense_search_service, event_loop):
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-06-01
-**最后更新/Last Updated:** 2026-06-01
+**最后更新/Last Updated:** 2026-06-02
 **更新说明/Description:**
-- v1.0.0: 创建故事文件
+- v1.2.0: 嵌入模型 API 化扩展 — 新增 Task 8-11（EmbeddingAPIClient + API Server + 双策略 DI + Docker Compose），EmbeddingConfig 扩展 api_url/api_timeout 字段
+- v1.1.0: FlagEmbedding 迁移 — SentenceTransformers→BGEM3FlagModel（BAAI 官方第一方库），新增 encode_sparse() 方法，集成/验收测试补充
+- v1.0.0: 创建故事文件（初始 SentenceTransformers 实现）
