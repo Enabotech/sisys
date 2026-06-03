@@ -222,7 +222,7 @@ services:
   embedding-api:
     image: ${APP_IMAGE:-harbor.sisys.local/sisys/app:latest}
     container_name: sisys-embedding-api
-    user: "1000:1000"
+    user: ${APP_UID:-1000}:${APP_GID:-1000}
     restart: unless-stopped
     ports:
       - "${EMBEDDING_API_PORT:-8001}:8000"
@@ -236,7 +236,7 @@ services:
       - EMBEDDING_MODEL_PATH
       - EMBEDDING_MODEL_DEVICE
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; r = urllib.request.urlopen('http://localhost:8000/health'); import json; d = json.loads(r.read()); exit(0 if d['status'] == 'ok' else 1)"]
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; from json import loads; exit(0 if loads(urlopen('http://localhost:8000/health').read())['status'] == 'ok' else 1)"]
       interval: 30s
       timeout: 10s
       retries: 5
