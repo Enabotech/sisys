@@ -311,3 +311,138 @@ class TestGetDocumentMetadata:
         result = await storage.get_document_metadata(user_id="user-789", document_id="some-key")
 
         assert result is None
+
+
+class TestInitMultipartUpload:
+    """init_multipart_upload 方法验证"""
+
+    async def test_auto_generates_object_path(self):
+        """验证自动生成对象路径"""
+        mock_adapter = AsyncMock()
+        mock_adapter.init_multipart_upload = AsyncMock(return_value="minio-upload-123")
+
+        storage = MinIODocumentStorage(mock_adapter)
+        minio_upload_id, object_key = await storage.init_multipart_upload(
+            user_id="user-123",
+            doc_type="report",
+            filename="big.pdf",
+            content_type="application/pdf",
+        )
+
+        assert minio_upload_id == "minio-upload-123"
+        assert object_key.startswith("documents/user-123/report/")
+        parts = object_key.split("/")
+        assert len(parts) == 5
+
+    async def test_calls_adapter_init_multipart(self):
+        """验证委托给适配器的 init_multipart_upload"""
+        mock_adapter = AsyncMock()
+        mock_adapter.init_multipart_upload = AsyncMock(return_value="minio-upload-456")
+
+        storage = MinIODocumentStorage(mock_adapter)
+        await storage.init_multipart_upload(
+            user_id="user-456",
+            doc_type="invoice",
+            filename="invoice.pdf",
+        )
+
+        mock_adapter.init_multipart_upload.assert_called_once()
+        call_args = mock_adapter.init_multipart_upload.call_args
+        assert call_args[0][0] == "raw-documents"
+        assert "documents/user-456/invoice/" in call_args[0][1]
+
+    async def test_returns_tuple_of_two_strings(self):
+        """验证返回 (minio_upload_id, object_key) 元组"""
+        mock_adapter = AsyncMock()
+        mock_adapter.init_multipart_upload = AsyncMock(return_value="upload-id")
+
+        storage = MinIODocumentStorage(mock_adapter)
+        result = await storage.init_multipart_upload(
+            user_id="u1",
+            doc_type="d1",
+            filename="f.pdf",
+        )
+
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert isinstance(result[0], str)
+        assert isinstance(result[1], str)
+
+
+class TestUploadPart:
+    """upload_part 方法验证"""
+
+    async def test_delegates_to_adapter(self):
+        """验证委托给适配器"""
+        mock_adapter = AsyncMock()
+        mock_adapter.upload_part = AsyncMock(return_value="etag-p1")
+
+        storage = MinIODocumentStorage(mock_adapter)
+        result = await storage.upload_part(
+            minio_upload_id="upload-123",
+            object_key="docs/file.pdf",
+            part_number=1,
+            data=b"part-1-data",
+        )
+
+        assert result == "etag-p1"
+        mock_adapter.upload_part.assert_called_once_with(
+            "raw-documents",
+            "docs/file.pdf",
+            "upload-123",
+            1,
+            b"part-1-data",
+        )
+
+
+class TestCompleteMultipartUpload:
+    """complete_multipart_upload 方法验证"""
+
+    async def test_converts_parts_format_and_delegates(self):
+        """验证将 snake_case 分片转换为 PascalCase 后委托"""
+        mock_adapter = AsyncMock()
+        mock_adapter.complete_multipart_upload = AsyncMock(return_value="version-abc")
+
+        storage = MinIODocumentStorage(mock_adapter)
+        parts = [
+            {"part_number": 1, "etag": "etag-1"},
+            {"part_number": 2, "etag": "etag-2"},
+        ]
+        result = await storage.complete_multipart_upload(
+            minio_upload_id="upload-123",
+            object_key="docs/file.pdf",
+            parts=parts,
+        )
+
+        assert result == "version-abc"
+        expected_minio_parts = [
+            {"PartNumber": 1, "ETag": "etag-1"},
+            {"PartNumber": 2, "ETag": "etag-2"},
+        ]
+        mock_adapter.complete_multipart_upload.assert_called_once_with(
+            "raw-documents",
+            "docs/file.pdf",
+            "upload-123",
+            expected_minio_parts,
+        )
+
+
+class TestAbortMultipartUpload:
+    """abort_multipart_upload 方法验证"""
+
+    async def test_delegates_to_adapter(self):
+        """验证委托给适配器"""
+        mock_adapter = AsyncMock()
+        mock_adapter.abort_multipart_upload = AsyncMock(return_value=None)
+
+        storage = MinIODocumentStorage(mock_adapter)
+        await storage.abort_multipart_upload(
+            minio_upload_id="upload-123",
+            object_key="docs/file.pdf",
+        )
+
+        mock_adapter.abort_multipart_upload.assert_called_once_with(
+            "raw-documents",
+            "docs/file.pdf",
+            "upload-123",
+        )

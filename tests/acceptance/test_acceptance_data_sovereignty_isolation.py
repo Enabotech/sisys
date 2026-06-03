@@ -1,8 +1,8 @@
-"""Acceptance tests for Story 1.11 - Data Sovereignty Isolation.
+"""Story 1.11 - 数据主权隔离验收测试。
 
 验收测试：从业务角度验证功能满足需求规格（AC）
 
-Run with: poetry run pytest tests/acceptance/test_acceptance_data-sovereignty-isolation.py -v
+运行: poetry run pytest tests/acceptance/test_acceptance_data_sovereignty_isolation.py -v
 """
 
 from __future__ import annotations
@@ -43,43 +43,43 @@ scenarios("test_acceptance_data_sovereignty_isolation.feature")
 
 @pytest.fixture
 def context() -> dict[str, Any]:
-    """Share state between BDD steps."""
+    """BDD 步骤间共享状态。"""
     return {}
 
 
 @pytest.fixture
 def sensitive_data_detector(resolver: Resolver):
-    """Real sensitive data detector service."""
+    """敏感数据检测服务。"""
     return resolver.resolve("sensitive_data_detector")
 
 
 @pytest.fixture
 def data_residency_enforcer(resolver: Resolver):
-    """Real data residency enforcer service."""
+    """数据驻留策略执行服务。"""
     return resolver.resolve("data_residency_enforcer")
 
 
 @pytest.fixture
 def whitelist_service(resolver: Resolver):
-    """Real whitelist service."""
+    """白名单服务。"""
     return resolver.resolve("whitelist_service")
 
 
 @pytest.fixture
 def cross_border_service(resolver: Resolver):
-    """Real cross-border transfer service."""
+    """跨境数据传输服务。"""
     return resolver.resolve("cross_border_transfer")
 
 
 @pytest.fixture
 def pipl_service(resolver: Resolver):
-    """Real PIPL compliance service."""
+    """PIPL 合规服务。"""
     return resolver.resolve("pipl_compliance")
 
 
 @pytest.fixture
 def compliance_gateway(resolver: Resolver) -> ComplianceGatewayImpl:
-    """Real compliance gateway from composition root."""
+    """合规性网关实例。"""
     return resolver.resolve("compliance_gateway", ComplianceGatewayImpl)
 
 
@@ -89,84 +89,84 @@ def compliance_gateway(resolver: Resolver) -> ComplianceGatewayImpl:
 
 
 @given("系统已初始化完成")
-def system_initialized(context):
-    """System is initialized."""
+def system_initialized(context: dict[str, Any]) -> None:
+    """系统已初始化完成。"""
     context["initialized"] = True
 
 
 @given("领域实体已正确定义")
-def domain_entities_defined(context):
-    """Domain entities are properly defined."""
+def domain_entities_defined(context: dict[str, Any]) -> None:
+    """领域实体已正确定义。"""
     context["entities_defined"] = True
 
 
 # ===================================================================
-# AC-1: Sensitive Data Detection Given Steps
+# AC-1: 敏感数据检测 Given 步骤
 # ===================================================================
 
 
 @given("待检测内容包含身份证号")
-def content_has_id_card(context):
-    """Content contains Chinese ID card number."""
+def content_has_id_card(context: dict[str, Any]) -> None:
+    """待检测内容包含身份证号。"""
     context["content"] = "张三的身份证号是110101199001011234"
 
 
 @given("待检测内容包含关键词")
-def content_has_keyword(context):
-    """Content contains trade secret keyword."""
+def content_has_keyword(context: dict[str, Any]) -> None:
+    """待检测内容包含商业秘密关键词。"""
     context["content"] = "公司核心技术配方保密"
 
 
 @given("待检测内容包含银行账号")
-def content_has_bank_account(context):
-    """Content contains bank account number."""
+def content_has_bank_account(context: dict[str, Any]) -> None:
+    """待检测内容包含银行账号。"""
     context["content"] = "银行账号6222021234567890123"
 
 
 @given("内容设置为张三的身份证号110101199001011234")
-def content_set_id_card(context):
-    """Content is set to ID card number."""
+def content_set_id_card(context: dict[str, Any]):
+    """设置内容为身份证号。"""
     context["content"] = "张三的身份证号110101199001011234"
 
 
 @given("内容设置为公司核心技术配方保密")
-def content_set_secret(context):
-    """Content is set to trade secret keyword."""
+def content_set_secret(context: dict[str, Any]):
+    """设置内容为商业秘密关键词。"""
     context["content"] = "公司核心技术配方保密"
 
 
 @given("内容设置为银行账号6222021234567890123")
-def content_set_bank_account(context):
-    """Content is set to bank account."""
+def content_set_bank_account(context: dict[str, Any]):
+    """设置内容为银行账号。"""
     context["content"] = "银行账号6222021234567890123"
 
 
 # ===================================================================
-# AC-2: Data Residency Given Steps
+# AC-2: 数据驻留策略 Given 步骤
 # ===================================================================
 
 
 @given("数据驻留策略允许区域为 CHINA_DOMESTIC")
-def policy_allows_china(context):
-    """Policy allows China domestic region."""
+def policy_allows_china(context: dict[str, Any]):
+    """策略允许中国境内区域。"""
     context["allowed_region"] = Region.CHINA_DOMESTIC
 
 
 @given("禁止区域为 OVERSEAS")
-def policy_forbids_overseas(context):
-    """Policy forbids overseas region."""
+def policy_forbids_overseas(context: dict[str, Any]):
+    """策略禁止海外区域。"""
     context["forbidden_region"] = Region.OVERSEAS
 
 
 @given("强制级别为 STRICT")
-def policy_strict_level(context):
-    """Policy has strict enforcement level."""
+def policy_strict_level(context: dict[str, Any]):
+    """策略强制级别为严格。"""
     context["enforcement_level"] = EnforcementLevel.STRICT
 
 
 @given("数据驻留策略 enforcement_level 为 STRICT")
-def policy_enforcement_strict(context):
-    """Policy enforcement level is STRICT."""
+def policy_enforcement_strict(context: dict[str, Any]):
+    """策略执行级别为严格。"""
     context["policy"] = DataResidencyPolicy(
         allowed_regions=(Region.CHINA_DOMESTIC,),
         blocked_regions=(Region.OVERSEAS,),
@@ -175,8 +175,8 @@ def policy_enforcement_strict(context):
 
 
 @given("有效的数据驻留策略")
-def valid_residency_policy(context):
-    """Valid data residency policy."""
+def valid_residency_policy(context: dict[str, Any]):
+    """有效的数据驻留策略。"""
     context["policy"] = DataResidencyPolicy(
         allowed_regions=(Region.CHINA_DOMESTIC,),
         blocked_regions=(Region.OVERSEAS,),
@@ -185,59 +185,59 @@ def valid_residency_policy(context):
 
 
 # ===================================================================
-# AC-3: Whitelist Given Steps
+# AC-3: 白名单 Given 步骤
 # ===================================================================
 
 
 @given('白名单条目 endpoint="https://api.domestic.cn" is_verified=True')
-def verified_whitelist_entry(context):
-    """Verified whitelist entry."""
+def verified_whitelist_entry(context: dict[str, Any]):
+    """已验证的白名单条目。"""
     context["endpoint"] = "https://api.domestic.cn"
     context["is_verified"] = True
     context["valid_until"] = datetime(2099, 12, 31, tzinfo=UTC)
 
 
 @given("白名单条目 is_verified=False")
-def unverified_whitelist_entry(context):
-    """Unverified whitelist entry."""
+def unverified_whitelist_entry(context: dict[str, Any]):
+    """未验证的白名单条目。"""
     context["is_verified"] = False
     context["endpoint"] = "https://api.unverified.cn"
     context["valid_until"] = datetime(2099, 12, 31, tzinfo=UTC)
 
 
 @given("白名单条目 valid_until 为 2099-12-31")
-def valid_until_future(context):
-    """Whitelist entry valid until future date."""
+def valid_until_future(context: dict[str, Any]):
+    """白名单条目有效期至未来日期。"""
     context["valid_until"] = datetime(2099, 12, 31, tzinfo=UTC)
 
 
 @given("白名单条目 valid_until 为 2020-01-01")
-def valid_until_past(context):
-    """Whitelist entry valid until past date."""
+def valid_until_past(context: dict[str, Any]):
+    """白名单条目有效期已过期。"""
     context["valid_until"] = datetime(2020, 1, 1, tzinfo=UTC)
 
 
 @given("白名单条目 risk_level=HIGH")
-def high_risk_whitelist_entry(context):
-    """High risk whitelist entry."""
+def high_risk_whitelist_entry(context: dict[str, Any]):
+    """高风险白名单条目。"""
     context["risk_level"] = RiskLevel.HIGH
     context["valid_until"] = datetime(2099, 12, 31, tzinfo=UTC)
 
 
 @given("白名单条目 valid_until 为 10 天后")
-def valid_until_10_days(context):
-    """Whitelist entry valid until 10 days from now."""
+def valid_until_10_days(context: dict[str, Any]):
+    """白名单条目有效期为 10 天后。"""
     context["valid_until"] = datetime.now(UTC) + timedelta(days=10)
 
 
 # ===================================================================
-# AC-4: Cross-Border Transfer Given Steps
+# AC-4: 跨境传输 Given 步骤
 # ===================================================================
 
 
 @given('跨境传输请求 data_id="data-123" destination="US"')
-def cross_border_request(context):
-    """Cross-border transfer request."""
+def cross_border_request(context: dict[str, Any]):
+    """跨境传输请求。"""
     context["request"] = CrossBorderTransferRequest(
         data_id="data-123",
         destination="US",
@@ -248,8 +248,8 @@ def cross_border_request(context):
 
 
 @given("跨境传输请求状态为 pending")
-def request_pending(context):
-    """Transfer request is pending."""
+def request_pending(context: dict[str, Any]):
+    """传输请求状态为待处理。"""
     if "request" not in context:
         context["request"] = CrossBorderTransferRequest(
             data_id="data-123",
@@ -261,8 +261,8 @@ def request_pending(context):
 
 
 @given("跨境传输请求已审批通过")
-def request_approved(context, cross_border_service):
-    """Transfer request is approved."""
+def request_approved(context: dict[str, Any], cross_border_service):
+    """传输请求已审批通过。"""
     request = CrossBorderTransferRequest(
         data_id="data-123",
         destination="US",
@@ -276,8 +276,8 @@ def request_approved(context, cross_border_service):
 
 
 @given("跨境传输请求 legal_basis_type=security_assessment")
-def request_security_assessment(context):
-    """Transfer request with security assessment legal basis."""
+def request_security_assessment(context: dict[str, Any]):
+    """跨境传输请求使用安全评估作为法律依据。"""
     context["request"] = CrossBorderTransferRequest(
         data_id="data-123",
         destination="US",
@@ -288,13 +288,13 @@ def request_security_assessment(context):
 
 
 # ===================================================================
-# AC-5: PIPL Compliance Given Steps
+# AC-5: PIPL 合规 Given 步骤
 # ===================================================================
 
 
 @given("PIPL 合规记录 legal_basis=consent consent_status=given")
-def pipl_consent_given(context):
-    """PIPL record with consent given."""
+def pipl_consent_given(context: dict[str, Any]):
+    """PIPL 记录已获得同意。"""
     context["record"] = PIPLComplianceRecord(
         personal_data_id="pd-123",
         purpose="Analytics",
@@ -306,8 +306,8 @@ def pipl_consent_given(context):
 
 
 @given("PIPL 合规记录 consent_status=withdrawn")
-def pipl_consent_withdrawn(context):
-    """PIPL record with consent withdrawn."""
+def pipl_consent_withdrawn(context: dict[str, Any]):
+    """PIPL 记录同意已撤回。"""
     context["record"] = PIPLComplianceRecord(
         personal_data_id="pd-123",
         purpose="Analytics",
@@ -319,8 +319,8 @@ def pipl_consent_withdrawn(context):
 
 
 @given("PIPL 合规记录 legal_basis=legal_obligation")
-def pipl_legal_obligation(context):
-    """PIPL record with legal obligation basis."""
+def pipl_legal_obligation(context: dict[str, Any]):
+    """PIPL 记录基于法律义务。"""
     context["record"] = PIPLComplianceRecord(
         personal_data_id="pd-123",
         purpose="Legal Compliance",
@@ -331,8 +331,8 @@ def pipl_legal_obligation(context):
 
 
 @given("PIPL 合规记录 is_minor=True guardian_consent_obtained=True consent_status=given")
-def pipl_minor_with_guardian(context):
-    """PIPL record for minor with guardian consent."""
+def pipl_minor_with_guardian(context: dict[str, Any]):
+    """PIPL 记录为未成年人且已获得监护人同意。"""
     context["record"] = PIPLComplianceRecord(
         personal_data_id="pd-minor",
         purpose="Education Service",
@@ -346,8 +346,8 @@ def pipl_minor_with_guardian(context):
 
 
 @given("PIPL 合规记录 is_minor=True guardian_consent_obtained=False")
-def pipl_minor_without_guardian(context):
-    """PIPL record for minor without guardian consent."""
+def pipl_minor_without_guardian(context: dict[str, Any]):
+    """PIPL 记录为未成年人但未获得监护人同意。"""
     context["record"] = PIPLComplianceRecord(
         personal_data_id="pd-minor",
         purpose="Education Service",
@@ -361,13 +361,13 @@ def pipl_minor_without_guardian(context):
 
 
 # ===================================================================
-# AC-6: Compliance Gateway Given Steps
+# AC-6: 合规网关 Given 步骤
 # ===================================================================
 
 
 @given("任务数据驻留要求为 CHINA_DOMESTIC")
-def task_china_domestic(context):
-    """Task with China domestic data residency requirement."""
+def task_china_domestic(context: dict[str, Any]):
+    """任务要求数据驻留在中国境内。"""
     context["task"] = UDMRTask(
         input="测试文本包含身份证号110101199001011234",
         data_residency="CHINA_DOMESTIC",
@@ -376,8 +376,8 @@ def task_china_domestic(context):
 
 
 @given("任务数据驻留要求为 OVERSEAS")
-def task_overseas(context):
-    """Task with overseas data residency requirement."""
+def task_overseas(context: dict[str, Any]):
+    """任务要求数据驻留在海外。"""
     context["task"] = UDMRTask(
         input="Test text",
         data_residency="OVERSEAS",
@@ -386,8 +386,8 @@ def task_overseas(context):
 
 
 @given("无敏感数据检测结果")
-def no_sensitive_data(context):
-    """No sensitive data detected."""
+def no_sensitive_data(context: dict[str, Any]):
+    """无敏感数据检测。"""
     context["task"] = UDMRTask(
         input="普通文本内容",
         data_residency="OVERSEAS",
@@ -396,8 +396,8 @@ def no_sensitive_data(context):
 
 
 @given("合规结果 allowed=True")
-def result_allowed(context):
-    """Compliance result allowed."""
+def result_allowed(context: dict[str, Any]):
+    """合规结果允许。"""
     context["result"] = ComplianceResult(
         allowed=True,
         reason="Compliant",
@@ -405,8 +405,8 @@ def result_allowed(context):
 
 
 @given('合规结果 violation_type="unauthorized_transfer"')
-def result_violation(context):
-    """Compliance result with violation."""
+def result_violation(context: dict[str, Any]):
+    """合规结果存在违规。"""
     context["result"] = ComplianceResult(
         allowed=False,
         reason="Unauthorized transfer",
@@ -415,13 +415,13 @@ def result_violation(context):
 
 
 # ===================================================================
-# Architecture Given Steps
+# 架构 Given 步骤
 # ===================================================================
 
 
 @given("高置信度检测结果 confidence=0.95")
-def high_confidence_detection(context):
-    """High confidence detection result."""
+def high_confidence_detection(context: dict[str, Any]):
+    """高置信度检测结果。"""
     context["detection_result"] = SensitiveDataResult(
         sensitive_types=(SensitiveType.PII,),
         confidence=0.95,
@@ -429,8 +429,8 @@ def high_confidence_detection(context):
 
 
 @given("两个检测结果分别包含 PII 和 FINANCIAL")
-def two_detection_results(context):
-    """Two detection results with different types."""
+def two_detection_results(context: dict[str, Any]):
+    """两个不同类型的检测结果。"""
     result1 = SensitiveDataResult(
         sensitive_types=(SensitiveType.PII,),
         confidence=0.9,
@@ -444,8 +444,8 @@ def two_detection_results(context):
 
 
 @given("领域实体已创建")
-def domain_entity_created(context):
-    """Domain entity has been created."""
+def domain_entity_created(context: dict[str, Any]):
+    """领域实体已创建。"""
     context["entity"] = SensitiveDataResult(
         sensitive_types=(SensitiveType.PII,),
         confidence=0.9,
@@ -453,21 +453,21 @@ def domain_entity_created(context):
 
 
 # ===================================================================
-# When Steps
+# When 步骤
 # ===================================================================
 
 
 @when("执行敏感数据检测")
-def detect_sensitive_data(context, sensitive_data_detector):
-    """Execute sensitive data detection."""
+def detect_sensitive_data(context: dict[str, Any], sensitive_data_detector):
+    """执行敏感数据检测。"""
     content = context.get("content", "")
     result = sensitive_data_detector.detect_sensitive_data(content)
     context["detection_result"] = result
 
 
 @when("尝试将数据发送到 OVERSEAS 区域")
-def try_send_overseas(context, data_residency_enforcer):
-    """Try to send data to overseas region."""
+def try_send_overseas(context: dict[str, Any], data_residency_enforcer):
+    """尝试将数据发送到海外区域。"""
     policy = context.get("policy") or DataResidencyPolicy(
         allowed_regions=(Region.CHINA_DOMESTIC,),
         blocked_regions=(Region.OVERSEAS,),
@@ -482,24 +482,24 @@ def try_send_overseas(context, data_residency_enforcer):
 
 
 @when("调用 requires_local_processing()")
-def call_requires_local_processing(context):
-    """Call requires_local_processing method."""
+def call_requires_local_processing(context: dict[str, Any]):
+    """调用 requires_local_processing 方法。"""
     policy = context.get("policy")
     if policy:
         context["requires_local_result"] = policy.requires_local_processing()
 
 
 @when("调用 get_policy_context()")
-def call_get_policy_context(context):
-    """Call get_policy_context method."""
+def call_get_policy_context(context: dict[str, Any]):
+    """调用 get_policy_context 方法。"""
     policy = context.get("policy")
     if policy:
         context["policy_context_result"] = policy.get_policy_context()
 
 
 @when('调用 is_allowed("https://api.domestic.cn")')
-def call_is_allowed_with_endpoint(context, whitelist_service):
-    """Call is_allowed method with endpoint."""
+def call_is_allowed_with_endpoint(context: dict[str, Any], whitelist_service):
+    """调用 is_allowed 方法并传入端点。"""
     endpoint = context.get("endpoint", "https://api.domestic.cn")
     is_verified = context.get("is_verified", True)
     valid_until = context.get("valid_until", datetime(2099, 12, 31, tzinfo=UTC))
@@ -518,8 +518,8 @@ def call_is_allowed_with_endpoint(context, whitelist_service):
 
 
 @when("调用 is_allowed()")
-def call_is_allowed_without_param(context, whitelist_service):
-    """Call is_allowed without parameter."""
+def call_is_allowed_without_param(context: dict[str, Any], whitelist_service):
+    """调用 is_allowed 方法（无参数）。"""
     endpoint = context.get("endpoint", "https://api.unverified.cn")
     is_verified = context.get("is_verified", False)
     valid_until = context.get("valid_until", datetime(2099, 12, 31, tzinfo=UTC))
@@ -536,8 +536,8 @@ def call_is_allowed_without_param(context, whitelist_service):
 
 
 @when("调用 is_valid()")
-def call_is_valid(context):
-    """Call is_valid method."""
+def call_is_valid(context: dict[str, Any]):
+    """调用 is_valid 方法。"""
     valid_until = context.get("valid_until", datetime(2020, 1, 1, tzinfo=UTC))
     entry = ExternalAPIWhitelist(
         endpoint="https://api.test.cn",
@@ -549,8 +549,8 @@ def call_is_valid(context):
 
 
 @when("调用 requires_dpo_approval()")
-def call_requires_dpo_approval(context):
-    """Call requires_dpo_approval method."""
+def call_requires_dpo_approval(context: dict[str, Any]):
+    """调用 requires_dpo_approval 方法。"""
     risk_level = context.get("risk_level", RiskLevel.HIGH)
     entry = ExternalAPIWhitelist(
         endpoint="https://api.risky.cn",
@@ -562,8 +562,8 @@ def call_requires_dpo_approval(context):
 
 
 @when("调用 is_high_risk()")
-def call_is_high_risk(context):
-    """Call is_high_risk method."""
+def call_is_high_risk(context: dict[str, Any]):
+    """调用 is_high_risk 方法。"""
     risk_level = context.get("risk_level", RiskLevel.HIGH)
     entry = ExternalAPIWhitelist(
         endpoint="https://api.risky.cn",
@@ -575,8 +575,8 @@ def call_is_high_risk(context):
 
 
 @when("调用 days_until_expiry()")
-def call_days_until_expiry(context):
-    """Call days_until_expiry method."""
+def call_days_until_expiry(context: dict[str, Any]):
+    """调用 days_until_expiry 方法。"""
     valid_until = context.get("valid_until")
     if valid_until:
         entry = ExternalAPIWhitelist(
@@ -589,15 +589,15 @@ def call_days_until_expiry(context):
 
 
 @when("请求状态为 pending")
-def request_status_pending(context):
-    """Request status is pending."""
+def request_status_pending(context: dict[str, Any]):
+    """请求状态为待处理。"""
     if "request" in context:
         context["request_status"] = context["request"].status
 
 
 @when('调用 approve(approver="admin-001")')
-def call_approve(context, cross_border_service):
-    """Call approve method."""
+def call_approve(context: dict[str, Any], cross_border_service):
+    """调用 approve 方法。"""
     request = context.get("request")
     if request:
         cross_border_service.request_transfer(request)
@@ -606,8 +606,8 @@ def call_approve(context, cross_border_service):
 
 
 @when('调用 reject(approver="admin-001")')
-def call_reject(context, cross_border_service):
-    """Call reject method."""
+def call_reject(context: dict[str, Any], cross_border_service):
+    """调用 reject 方法。"""
     request = context.get("request")
     if request:
         cross_border_service.request_transfer(request)
@@ -616,8 +616,8 @@ def call_reject(context, cross_border_service):
 
 
 @when("调用 execute()")
-def call_execute(context, cross_border_service):
-    """Call execute method."""
+def call_execute(context: dict[str, Any], cross_border_service):
+    """调用 execute 方法。"""
     request = context.get("request")
     if request:
         cross_border_service.execute(str(request.request_id))
@@ -625,8 +625,8 @@ def call_execute(context, cross_border_service):
 
 
 @when("调用 block()")
-def call_block(context, cross_border_service):
-    """Call block method."""
+def call_block(context: dict[str, Any], cross_border_service):
+    """调用 block 方法。"""
     request = context.get("request")
     if request:
         cross_border_service.request_transfer(request)
@@ -635,15 +635,15 @@ def call_block(context, cross_border_service):
 
 
 @when("调用 is_pending()")
-def call_is_pending(context):
-    """Call is_pending method."""
+def call_is_pending(context: dict[str, Any]):
+    """调用 is_pending 方法。"""
     request = context.get("request")
     context["is_pending_result"] = request.is_pending() if request else False
 
 
 @when("验证法律依据有效性")
-def validate_legal_basis(context):
-    """Validate legal basis."""
+def validate_legal_basis(context: dict[str, Any]):
+    """验证法律依据有效性。"""
     request = context.get("request")
     if request:
         context["legal_basis_valid"] = request.legal_basis_type in [
@@ -654,58 +654,58 @@ def validate_legal_basis(context):
 
 
 @when("调用 validate_consent()")
-def call_validate_consent(context):
-    """Call validate_consent method."""
+def call_validate_consent(context: dict[str, Any]):
+    """调用 validate_consent 方法。"""
     record = context.get("record")
     context["validate_consent_result"] = record.validate_consent() if record else False
 
 
 @when("调用 is_compliant()")
-def call_is_compliant(context):
-    """Call is_compliant method."""
+def call_is_compliant(context: dict[str, Any]):
+    """调用 is_compliant 方法。"""
     record = context.get("record")
     context["is_compliant_result"] = record.is_compliant() if record else False
 
 
 @when("调用 validate_minor_consent()")
-def call_validate_minor_consent(context):
-    """Call validate_minor_consent method."""
+def call_validate_minor_consent(context: dict[str, Any]):
+    """调用 validate_minor_consent 方法。"""
     record = context.get("record")
     context["validate_minor_consent_result"] = record.validate_minor_consent() if record else False
 
 
 @when("调用 ComplianceGateway.check(task)")
-def call_compliance_gateway_check(context, compliance_gateway):
-    """Call ComplianceGateway.check method."""
+def call_compliance_gateway_check(context: dict[str, Any], compliance_gateway):
+    """调用 ComplianceGateway.check 方法。"""
     task = context.get("task")
     if task:
         context["gateway_result"] = asyncio.run(compliance_gateway.check(task))
 
 
 @when("调用 is_allowed()")
-def call_is_allowed_on_result(context):
-    """Call is_allowed on compliance result."""
+def call_is_allowed_on_result(context: dict[str, Any]):
+    """调用合规结果的 is_allowed 方法。"""
     result = context.get("result")
     context["is_allowed_result"] = result.is_allowed() if result else False
 
 
 @when("调用 is_violation()")
-def call_is_violation_on_result(context):
-    """Call is_violation on compliance result."""
+def call_is_violation_on_result(context: dict[str, Any]):
+    """调用合规结果的 is_violation 方法。"""
     result = context.get("result")
     context["is_violation_result"] = result.is_violation() if result else False
 
 
 @when("调用 is_high_confidence() 方法")
-def call_is_high_confidence(context):
-    """Call is_high_confidence method."""
+def call_is_high_confidence(context: dict[str, Any]):
+    """调用 is_high_confidence 方法。"""
     result = context.get("detection_result")
     context["is_high_confidence_result"] = result.is_high_confidence() if result else False
 
 
 @when("调用 merge_with() 方法合并")
-def call_merge_with(context):
-    """Call merge_with method."""
+def call_merge_with(context: dict[str, Any]):
+    """调用 merge_with 方法。"""
     result1 = context.get("detection_result1")
     result2 = context.get("detection_result2")
     if result1 and result2:
@@ -713,8 +713,8 @@ def call_merge_with(context):
 
 
 @when("尝试修改属性")
-def try_modify_attribute(context):
-    """Try to modify entity attribute."""
+def try_modify_attribute(context: dict[str, Any]):
+    """尝试修改实体属性。"""
     entity = context.get("entity")
     if entity:
         try:
@@ -725,59 +725,59 @@ def try_modify_attribute(context):
 
 
 # ===================================================================
-# Then Steps - AC-1
+# Then 步骤 - AC-1
 # ===================================================================
 
 
 @then("系统识别出 PII 类型数据")
-def assert_pii_detected(context):
-    """Assert PII type is detected."""
+def assert_pii_detected(context: dict[str, Any]):
+    """验证 PII 类型被检测。"""
     result = context.get("detection_result")
     assert result is not None
     assert SensitiveType.PII in result.sensitive_types
 
 
 @then("检测置信度大于 0.8")
-def assert_confidence_gt_08(context):
-    """Assert detection confidence > 0.8."""
+def assert_confidence_gt_08(context: dict[str, Any]):
+    """验证检测置信度大于 0.8。"""
     result = context.get("detection_result")
     assert result is not None
     assert result.confidence > 0.8
 
 
 @then("触发 SensitiveDataDetected 事件")
-def assert_sensitive_detected_event(context):
-    """Assert SensitiveDataDetected event was triggered."""
+def assert_sensitive_detected_event(context: dict[str, Any]):
+    """验证触发敏感数据检测事件。"""
     result = context.get("detection_result")
     assert result is not None
     assert len(result.sensitive_types) > 0
 
 
 @then("系统识别出 TRADE_SECRET 类型数据")
-def assert_trade_secret_detected(context):
-    """Assert trade secret type is detected."""
+def assert_trade_secret_detected(context: dict[str, Any]):
+    """验证商业秘密类型被检测。"""
     result = context.get("detection_result")
     assert result is not None
     assert SensitiveType.TRADE_SECRET in result.sensitive_types
 
 
 @then("系统识别出 FINANCIAL 类型数据")
-def assert_financial_detected(context):
-    """Assert financial type is detected."""
+def assert_financial_detected(context: dict[str, Any]):
+    """验证金融类型被检测。"""
     result = context.get("detection_result")
     assert result is not None
     assert SensitiveType.FINANCIAL in result.sensitive_types
 
 
 @then("返回 True")
-def assert_returns_true(context):
-    """Assert method returns True."""
+def assert_returns_true(context: dict[str, Any]):
+    """验证方法返回 True。"""
     assert context.get("is_high_confidence_result") is True
 
 
 @then("合并结果包含两种敏感类型")
-def assert_merged_contains_both_types(context):
-    """Assert merged result contains both sensitive types."""
+def assert_merged_contains_both_types(context: dict[str, Any]):
+    """验证合并结果包含两种敏感类型。"""
     merged = context.get("merged_result")
     assert merged is not None
     assert SensitiveType.PII in merged.sensitive_types
@@ -785,33 +785,33 @@ def assert_merged_contains_both_types(context):
 
 
 # ===================================================================
-# Then Steps - AC-2
+# Then 步骤 - AC-2
 # ===================================================================
 
 
 @then("系统阻止操作")
-def assert_operation_blocked(context):
-    """Assert operation was blocked."""
+def assert_operation_blocked(context: dict[str, Any]):
+    """验证操作被阻止。"""
     result = context.get("enforce_result")
     assert result is False
 
 
 @then("触发 DataSovereigntyViolation 事件")
-def assert_sovereignty_violation_event(context):
-    """Assert DataSovereigntyViolation event was triggered."""
+def assert_sovereignty_violation_event(context: dict[str, Any]):
+    """验证触发数据主权违规事件。"""
     result = context.get("enforce_result")
     assert result is False
 
 
 @then("调用 requires_local_processing() 返回 True")
-def assert_requires_local_true(context):
-    """Assert requires_local_processing returns True."""
+def assert_requires_local_true(context: dict[str, Any]):
+    """验证 requires_local_processing 返回 True。"""
     assert context.get("requires_local_result") is True
 
 
 @then("调用 get_policy_context() 返回包含 policy_id、name、allowed_regions 的字典")
-def assert_policy_context_contains_fields(context):
-    """Assert policy context contains required fields."""
+def assert_policy_context_contains_fields(context: dict[str, Any]):
+    """验证策略上下文包含必要字段。"""
     policy_context = context.get("policy_context_result")
     assert policy_context is not None
     assert "policy_id" in policy_context
@@ -820,141 +820,141 @@ def assert_policy_context_contains_fields(context):
 
 
 # ===================================================================
-# Then Steps - AC-3
+# Then 步骤 - AC-3
 # ===================================================================
 
 
 @then("调用 is_allowed 返回 True")
-def assert_is_allowed_true(context):
-    """Assert is_allowed returns True."""
+def assert_is_allowed_true(context: dict[str, Any]):
+    """验证 is_allowed 返回 True。"""
     assert context.get("is_allowed_result") is True
 
 
 @then("调用 is_allowed 返回 False")
-def assert_is_allowed_false(context):
-    """Assert is_allowed returns False."""
+def assert_is_allowed_false(context: dict[str, Any]):
+    """验证 is_allowed 返回 False。"""
     assert context.get("is_allowed_result") is False
 
 
 @then("调用 is_valid 返回 False")
-def assert_is_valid_false(context):
-    """Assert is_valid returns False."""
+def assert_is_valid_false(context: dict[str, Any]):
+    """验证 is_valid 返回 False。"""
     assert context.get("is_valid_result") is False
 
 
 @then("调用 requires_dpo_approval 返回 True")
-def assert_requires_dpo_true(context):
-    """Assert requires_dpo_approval returns True."""
+def assert_requires_dpo_true(context: dict[str, Any]):
+    """验证 requires_dpo_approval 返回 True。"""
     assert context.get("requires_dpo_result") is True
 
 
 @then("调用 is_high_risk 返回 True")
-def assert_is_high_risk_true(context):
-    """Assert is_high_risk returns True."""
+def assert_is_high_risk_true(context: dict[str, Any]):
+    """验证 is_high_risk 返回 True。"""
     assert context.get("is_high_risk_result") is True
 
 
 @then("调用 days_until_expiry 返回值大于等于 9")
-def assert_days_until_expiry(context):
-    """Assert days_until_expiry returns value >= 9."""
+def assert_days_until_expiry(context: dict[str, Any]):
+    """验证 days_until_expiry 返回值大于等于 9。"""
     days = context.get("days_until_expiry_result")
     assert days is not None
     assert days >= 9
 
 
 # ===================================================================
-# Then Steps - AC-4
+# Then 步骤 - AC-4
 # ===================================================================
 
 
 @then("request_transfer() 方法可用")
-def assert_request_transfer_available(context):
-    """Assert request_transfer method is available."""
+def assert_request_transfer_available(context: dict[str, Any]):
+    """验证 request_transfer 方法可用。"""
     request = context.get("request")
     assert request is not None
     assert request.status == TransferStatus.PENDING
 
 
 @then("新状态为 APPROVED")
-def assert_status_approved(context):
-    """Assert new status is APPROVED."""
+def assert_status_approved(context: dict[str, Any]):
+    """验证新状态为已审批。"""
     request = context.get("request")
     assert request is not None
     assert request.status == TransferStatus.APPROVED
 
 
 @then('approver 为 "admin-001"')
-def assert_approver(context):
-    """Assert approver is admin-001."""
+def assert_approver(context: dict[str, Any]):
+    """验证审批人为 admin-001。"""
     request = context.get("request")
     assert request is not None
     assert request.approver == "admin-001"
 
 
 @then("approval_timestamp 已记录")
-def assert_approval_timestamp(context):
-    """Assert approval_timestamp is recorded."""
+def assert_approval_timestamp(context: dict[str, Any]):
+    """验证审批时间戳已记录。"""
     request = context.get("request")
     assert request is not None
     assert request.approval_timestamp is not None
 
 
 @then("新状态为 REJECTED")
-def assert_status_rejected(context):
-    """Assert new status is REJECTED."""
+def assert_status_rejected(context: dict[str, Any]):
+    """验证新状态为已拒绝。"""
     request = context.get("request")
     assert request is not None
     assert request.status == TransferStatus.REJECTED
 
 
 @then("新状态为 EXECUTED")
-def assert_status_executed(context):
-    """Assert new status is EXECUTED."""
+def assert_status_executed(context: dict[str, Any]):
+    """验证新状态为已执行。"""
     request = context.get("request")
     assert request is not None
     assert request.status == TransferStatus.EXECUTED
 
 
 @then("新状态为 BLOCKED")
-def assert_status_blocked(context):
-    """Assert new status is BLOCKED."""
+def assert_status_blocked(context: dict[str, Any]):
+    """验证新状态为已阻止。"""
     request = context.get("request")
     assert request is not None
     assert request.status == TransferStatus.BLOCKED
 
 
 @then("调用 is_pending 返回 True")
-def assert_is_pending_true(context):
-    """Assert is_pending returns True."""
+def assert_is_pending_true(context: dict[str, Any]):
+    """验证 is_pending 返回 True。"""
     assert context.get("is_pending_result") is True
 
 
 @then("验证法律依据有效性返回 True")
-def assert_legal_basis_valid(context):
-    """Assert legal basis is valid."""
+def assert_legal_basis_valid(context: dict[str, Any]):
+    """验证法律依据有效。"""
     assert context.get("legal_basis_valid") is True
 
 
 # ===================================================================
-# Then Steps - AC-5
+# Then 步骤 - AC-5
 # ===================================================================
 
 
 @then("调用 validate_consent 返回 True")
-def assert_validate_consent_true(context):
-    """Assert validate_consent returns True."""
+def assert_validate_consent_true(context: dict[str, Any]):
+    """验证 validate_consent 返回 True。"""
     assert context.get("validate_consent_result") is True
 
 
 @then("调用 validate_consent 返回 False")
-def assert_validate_consent_false(context):
-    """Assert validate_consent returns False."""
+def assert_validate_consent_false(context: dict[str, Any]):
+    """验证 validate_consent 返回 False。"""
     assert context.get("validate_consent_result") is False
 
 
 @then("调用 is_compliant() 返回 True")
-def assert_is_compliant_true(context):
-    """Assert is_compliant returns True."""
+def assert_is_compliant_true(context: dict[str, Any]):
+    """验证 is_compliant 返回 True。"""
     record = context.get("record")
     if record:
         context["is_compliant_result"] = record.is_compliant()
@@ -962,58 +962,58 @@ def assert_is_compliant_true(context):
 
 
 @then("调用 validate_minor_consent 返回 True")
-def assert_validate_minor_consent_true(context):
-    """Assert validate_minor_consent returns True."""
+def assert_validate_minor_consent_true(context: dict[str, Any]):
+    """验证 validate_minor_consent 返回 True。"""
     assert context.get("validate_minor_consent_result") is True
 
 
 @then("调用 validate_minor_consent 返回 False")
-def assert_validate_minor_consent_false(context):
-    """Assert validate_minor_consent returns False."""
+def assert_validate_minor_consent_false(context: dict[str, Any]):
+    """验证 validate_minor_consent 返回 False。"""
     assert context.get("validate_minor_consent_result") is False
 
 
 # ===================================================================
-# Then Steps - AC-6
+# Then 步骤 - AC-6
 # ===================================================================
 
 
 @then("返回结果 allowed=True")
-def assert_gateway_allowed(context):
-    """Assert gateway result allowed is True."""
+def assert_gateway_allowed(context: dict[str, Any]):
+    """验证网关结果允许。"""
     result = context.get("gateway_result")
     assert result is not None
     assert result.allowed is True
 
 
 @then("返回结果 forced_local=True")
-def assert_gateway_forced_local(context):
-    """Assert gateway result forced_local is True."""
+def assert_gateway_forced_local(context: dict[str, Any]):
+    """验证网关结果强制本地处理。"""
     result = context.get("gateway_result")
     assert result is not None
     assert result.forced_local is True
 
 
 @then("调用 is_allowed 返回 True")
-def assert_is_allowed_on_result_true(context):
-    """Assert is_allowed on result returns True."""
+def assert_is_allowed_on_result_true(context: dict[str, Any]):
+    """验证合规结果的 is_allowed 返回 True。"""
     assert context.get("is_allowed_result") is True
 
 
 @then("调用 is_violation 返回 True")
-def assert_is_violation_true(context):
-    """Assert is_violation on result returns True."""
+def assert_is_violation_true(context: dict[str, Any]):
+    """验证合规结果的 is_violation 返回 True。"""
     assert context.get("is_violation_result") is True
 
 
 # ===================================================================
-# Then Steps - Architecture
+# Then 步骤 - 架构
 # ===================================================================
 
 
 @then("抛出 AttributeError")
-def assert_attribute_error(context):
-    """Assert AttributeError is raised."""
+def assert_attribute_error(context: dict[str, Any]):
+    """验证抛出 AttributeError。"""
     error = context.get("modification_error")
     assert error is not None
     assert isinstance(error, AttributeError)

@@ -259,3 +259,77 @@ class MinIORepository:
         prefix = self._bucket_manager.bucket_prefix
         tenant_id = self._tenant_id if self._tenant_id else "default"
         return f"{prefix}-{bucket_type}-{tenant_id}"
+
+    async def init_multipart_upload(
+        self,
+        bucket_type: str,
+        object_key: str,
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        """初始化分片上传会话"""
+        import asyncio
+
+        bucket_name = self._resolve_bucket_name(bucket_type)
+        return await asyncio.to_thread(
+            self._object_operations.init_multipart_upload,
+            bucket_name,
+            object_key,
+            content_type,
+        )
+
+    async def upload_part(
+        self,
+        bucket_type: str,
+        object_key: str,
+        upload_id: str,
+        part_number: int,
+        data: bytes,
+    ) -> str:
+        """上传单个分片"""
+        import asyncio
+
+        bucket_name = self._resolve_bucket_name(bucket_type)
+        return await asyncio.to_thread(
+            self._object_operations.upload_part,
+            bucket_name,
+            object_key,
+            upload_id,
+            part_number,
+            data,
+        )
+
+    async def complete_multipart_upload(
+        self,
+        bucket_type: str,
+        object_key: str,
+        upload_id: str,
+        parts: list[dict],
+    ) -> str:
+        """完成分片上传"""
+        import asyncio
+
+        bucket_name = self._resolve_bucket_name(bucket_type)
+        return await asyncio.to_thread(
+            self._object_operations.complete_multipart_upload,
+            bucket_name,
+            object_key,
+            upload_id,
+            parts,
+        )
+
+    async def abort_multipart_upload(
+        self,
+        bucket_type: str,
+        object_key: str,
+        upload_id: str,
+    ) -> None:
+        """中止分片上传"""
+        import asyncio
+
+        bucket_name = self._resolve_bucket_name(bucket_type)
+        await asyncio.to_thread(
+            self._object_operations.abort_multipart_upload,
+            bucket_name,
+            object_key,
+            upload_id,
+        )

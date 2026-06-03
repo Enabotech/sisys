@@ -68,6 +68,7 @@ rank-bm25 = "^0.2.2"
 
 # Document Processing
 python-docx = "^1.1.0"
+defusedxml = "^0.7.0"
 python-pptx = "^1.0"
 openpyxl = "^3.1.2"
 pillow = "^12.1.1"
@@ -78,6 +79,8 @@ ffmpeg-python = "^0.2.0"
 
 # OCR
 pytesseract = "^0.3.10"
+onnxruntime = "^1.26.0"
+pypdfium2 = "^5.9.0"
 
 # Message Queue
 aio-pika = "^9.3.0"
@@ -126,7 +129,7 @@ detect-secrets = "^1.5.0"
 pbr = "^7.0.3"
 freezegun = "^1.5.1"
 
-# SDD 工具链（Story 0.1 验收标准）
+# SDD 工具链
 schemathesis = "^3.19.0"  # API 契约测试
 openapi-spec-validator = "^0.7.2"  # OpenAPI 验证
 jsonschema = "^4.19.0"  # JSON Schema 验证
@@ -137,8 +140,10 @@ types-passlib = "^1.7.7"
 types-python-jose = "^3.5.0"
 types-reportlab = "^4.5.1.20260521"
 types-openpyxl = "^3.1.5.20260518"
+types-defusedxml = "^0.7.0"
 import-linter = "^2.11"
 asyncpg-stubs = "^0.31.2"
+striprtf = "^0.0.32"
 
 [project.scripts]
 crawler = "plugins.crawler.cli:app"
@@ -209,8 +214,8 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+mypy_path = "stubs"
 
-# 排除外部目录和生成文件
 exclude = [
     '^\.claude/',
     '^\.qwen/',
@@ -221,6 +226,18 @@ exclude = [
     '^\.venv/',
     '^venv/',
 ]
+
+# ---------------------------------------------------------------------------
+# 第三方库精准豁免（业界最佳实践：用 overrides 替代全局 --ignore-missing-imports）
+#
+# 设计理由：
+#   - 全局 --ignore-missing-imports 会同时隐藏"合法第三方无 stubs 库"和"拼写错误的 import"
+#   - 用 module-specific overrides 做精准豁免，CI 能捕获真正的 import 错误
+#   - 无类型桩的第三方库统一豁免，安全且可审计
+# ---------------------------------------------------------------------------
+[[tool.mypy.overrides]]
+module = ["defusedxml.*", "FlagEmbedding.*", "pytesseract.*", "striprtf.*", "onnxruntime.*", "pypdfium2.*"]
+ignore_missing_imports = true
 
 # Pytest Configuration
 [tool.pytest.ini_options]

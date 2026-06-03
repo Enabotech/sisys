@@ -30,6 +30,8 @@ def _make_state_json(
     file_size: int = 500 * 1024 * 1024,
     chunk_size: int = MEDIUM_PART_SIZE,
     uploaded_parts: list[dict] | None = None,
+    minio_upload_id: str | None = None,
+    object_key: str | None = None,
 ) -> str:
     """构造 ChunkedUploadState JSON"""
     return json.dumps(
@@ -39,6 +41,8 @@ def _make_state_json(
             "file_size": file_size,
             "chunk_size": chunk_size,
             "uploaded_parts": uploaded_parts or [],
+            "minio_upload_id": minio_upload_id,
+            "object_key": object_key,
         }
     )
 
@@ -54,6 +58,8 @@ class TestChunkedUploadState:
             file_size=1024,
             chunk_size=512,
             uploaded_parts=[{"part_number": 1, "etag": "abc"}],
+            minio_upload_id="minio-123",
+            object_key="docs/user/file.pdf",
         )
         restored = ChunkedUploadState.from_json(state.to_json())
         assert restored.upload_id == "u1"
@@ -62,6 +68,8 @@ class TestChunkedUploadState:
         assert restored.chunk_size == 512
         assert len(restored.uploaded_parts) == 1
         assert restored.uploaded_parts[0]["part_number"] == 1
+        assert restored.minio_upload_id == "minio-123"
+        assert restored.object_key == "docs/user/file.pdf"
 
     def test_from_json_missing_uploaded_parts_defaults_empty(self) -> None:
         """uploaded_parts 缺失时默认空列表"""
@@ -75,6 +83,20 @@ class TestChunkedUploadState:
         )
         state = ChunkedUploadState.from_json(data)
         assert state.uploaded_parts == []
+        assert state.minio_upload_id is None
+        assert state.object_key is None
+
+    def test_to_json_roundtrip_without_minio_fields(self) -> None:
+        """minio 字段为 None 时序列化/反序列化正确"""
+        state = ChunkedUploadState(
+            upload_id="u3",
+            filename="doc.pdf",
+            file_size=1024,
+            chunk_size=512,
+        )
+        restored = ChunkedUploadState.from_json(state.to_json())
+        assert restored.minio_upload_id is None
+        assert restored.object_key is None
 
 
 class TestChunkedUploadManagerInitUpload:
@@ -118,6 +140,22 @@ class TestChunkedUploadManagerInitUpload:
         r2 = await manager.init_upload("b.pdf", 200 * 1024 * 1024)
         assert r1["upload_id"] != r2["upload_id"]
 
+    async def test_init_with_minio_context_stores_in_state(self) -> None:
+        """初始化时传递 minio_upload_id 和 object_key 存入状态"""
+        cache = _make_cache()
+        manager = ChunkedUploadManager(cache)
+        await manager.init_upload(
+            "test.pdf",
+            200 * 1024 * 1024,
+            minio_upload_id="minio-upload-123",
+            object_key="docs/user/file.pdf",
+        )
+        cache.set.assert_called_once()
+        stored_json = cache.set.call_args[0][1]
+        stored = json.loads(stored_json)
+        assert stored["minio_upload_id"] == "minio-upload-123"
+        assert stored["object_key"] == "docs/user/file.pdf"
+
 
 class TestChunkedUploadManagerUploadPart:
     """验证 upload_part 记录已上传分片"""
@@ -154,14 +192,14 @@ class TestChunkedUploadManagerUploadPart:
             await manager.upload_part("bad-id", 1, "etag")
 
     async def test_upload_part_duplicate_raises(self) -> None:
-        """重复分片编号抛出 ValueError"""
+        """重复分片编号抛出 ValueError（由顺序校验拦截）"""
         cache = _make_cache()
         manager = ChunkedUploadManager(cache)
 
         state_json = _make_state_json(uploaded_parts=[{"part_number": 1, "etag": "etag-001"}])
         cache.get = AsyncMock(return_value=state_json)
 
-        with pytest.raises(ValueError, match="已上传"):
+        with pytest.raises(ValueError, match="乱序"):
             await manager.upload_part("abc123", 1, "etag-001-again")
 
     async def test_upload_part_persists_updated_state(self) -> None:
@@ -179,6 +217,30 @@ class TestChunkedUploadManagerUploadPart:
         stored = json.loads(stored_json)
         assert len(stored["uploaded_parts"]) == 1
         assert stored["uploaded_parts"][0]["part_number"] == 1
+
+    async def test_upload_part_out_of_order_raises(self) -> None:
+        """分片乱序到达抛出 ValueError"""
+        cache = _make_cache()
+        manager = ChunkedUploadManager(cache)
+
+        # 已上传 part 1，期望下一个是 part 2
+        state_json = _make_state_json(uploaded_parts=[{"part_number": 1, "etag": "etag-001"}])
+        cache.get = AsyncMock(return_value=state_json)
+
+        with pytest.raises(ValueError, match="乱序"):
+            await manager.upload_part("abc123", 3, "etag-003")
+
+    async def test_upload_part_sequential_order_accepted(self) -> None:
+        """按顺序上传分片正常接受"""
+        cache = _make_cache()
+        manager = ChunkedUploadManager(cache)
+
+        # 已上传 part 1 和 2，期望下一个是 part 3
+        state_json = _make_state_json(uploaded_parts=[{"part_number": 1, "etag": "e1"}, {"part_number": 2, "etag": "e2"}])
+        cache.get = AsyncMock(return_value=state_json)
+
+        result = await manager.upload_part("abc123", 3, "etag-003")
+        assert result["uploaded_parts"] == 3
 
 
 class TestChunkedUploadManagerCompleteUpload:
@@ -293,3 +355,45 @@ class TestChunkedUploadManagerConcurrency:
         lock1 = manager._get_lock("id-1")
         lock2 = manager._get_lock("id-1")
         assert lock1 is lock2
+
+
+class TestChunkedUploadManagerGetMultipartInfo:
+    """验证 get_multipart_info 获取 MinIO 分片上下文"""
+
+    async def test_returns_minio_upload_id_and_object_key(self) -> None:
+        """返回 minio_upload_id 和 object_key"""
+        cache = _make_cache()
+        manager = ChunkedUploadManager(cache)
+
+        state_json = _make_state_json(
+            minio_upload_id="minio-123",
+            object_key="docs/user/file.pdf",
+        )
+        cache.get = AsyncMock(return_value=state_json)
+
+        result = await manager.get_multipart_info("abc123")
+        assert result is not None
+        assert result["minio_upload_id"] == "minio-123"
+        assert result["object_key"] == "docs/user/file.pdf"
+
+    async def test_returns_none_when_state_not_found(self) -> None:
+        """upload_id 不存在返回 None"""
+        cache = _make_cache()
+        manager = ChunkedUploadManager(cache)
+        cache.get = AsyncMock(return_value=None)
+
+        result = await manager.get_multipart_info("bad-id")
+        assert result is None
+
+    async def test_returns_none_values_when_minio_fields_not_set(self) -> None:
+        """minio 字段未设置时返回 None 值"""
+        cache = _make_cache()
+        manager = ChunkedUploadManager(cache)
+
+        state_json = _make_state_json(minio_upload_id=None, object_key=None)
+        cache.get = AsyncMock(return_value=state_json)
+
+        result = await manager.get_multipart_info("abc123")
+        assert result is not None
+        assert result["minio_upload_id"] is None
+        assert result["object_key"] is None

@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-05-30
+last_updated: 2026-06-02
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -102,9 +102,9 @@ development_status:
   # ===========================================================================
   epic-2: in-progress
   2-1-document-upload-17-formats: done
-  2-2a-document-parsing-basic-formats: backlog
-  2-2b-document-parsing-extended-formats: backlog
-  2-3-layout-preservation-doclaynet: backlog
+  2-2a-document-parsing-basic-formats: done
+  2-2b-document-parsing-extended-formats: done
+  2-3-layout-preservation-doclaynet: done
   2-4-table-semantic-extraction: backlog
   2-5-ocr-parsing-scanned-documents: backlog
   2-6-document-version-snapshot: backlog
@@ -116,7 +116,7 @@ development_status:
   # Epic 3: 智能检索与知识发现 - 🔄 进行中
   # ===========================================================================
   epic-3: in-progress
-  3-1a-dense-semantic-search: ready-for-dev
+  3-1a-dense-semantic-search: done
   3-1b-bm25-sparse-search-rrf-fusion: backlog
   3-2-entity-extraction-llm-rules: backlog
   3-3-domain-dictionary-management: backlog
@@ -376,15 +376,15 @@ development_status:
 #
 # Status Summary:
 #   Stories:
-#     - Done: 43
+#     - Done: 47
 #     - Ready for Dev: 3 (0-17, 0-18, 0-30)
 #     - In Progress: 0
 #     - Review: 0
-#     - Backlog: 129
+#     - Backlog: 140
 #   Epics:
 #     - Done: 2 (Epic 1, Epic 90)
-#     - In Progress: 1 (Epic 0)
-#     - Backlog: 19 (Epic 2-20)
+#     - In Progress: 3 (Epic 0, Epic 2, Epic 3)
+#     - Backlog: 17 (Epic 4-20)
 #   Retrospectives:
 #     - Done: 1 (Epic 1)
 #     - Optional: 23

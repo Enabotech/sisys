@@ -12,6 +12,7 @@ from src.domain.ports.agent_engine import AgentEnginePort
 from src.domain.ports.connection_manager import ConnectionManager
 from src.domain.ports.crawler_client import CrawlerClientPort
 from src.domain.ports.dead_letter_queue import DeadLetterQueue
+from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.event_listener import EventListener, EventListenerAsync
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
 from src.domain.ports.index_manager import IndexManagerPort
@@ -21,12 +22,14 @@ from src.domain.ports.l2_rdb import BaseRepository, L2RdbPort
 from src.domain.ports.l3_vector import L3VectorPort
 from src.domain.ports.l4_object import L4ObjectPort
 from src.domain.ports.l5_graph import L5GraphPort
+from src.domain.ports.layout_detector import LayoutDetector
 from src.domain.ports.memory_repository import (
     L2ChangeHistoryRepositoryPort,
     L2GroupMemberRepositoryPort,
     L2MetadataRepositoryPort,
 )
 from src.domain.ports.outbox import OutboxRepository
+from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
 from src.domain.ports.permission_repository import PermissionRepositoryPort
 from src.domain.ports.saga import SagaRepositoryProtocol, SagaStep
 from src.domain.ports.sandbox_executor import SandboxExecutor
@@ -46,6 +49,7 @@ __all__ = [
     "DataAccessPattern",
     "BaseRepository",
     "DeadLetterQueue",
+    "EmbeddingServicePort",
     "EventListener",
     "EventListenerAsync",
     "HashRouterProtocol",
@@ -59,7 +63,9 @@ __all__ = [
     "L3VectorPort",
     "L4ObjectPort",
     "L5GraphPort",
+    "LayoutDetector",
     "OutboxRepository",
+    "PdfPageRendererPort",
     "PermissionRepositoryPort",
     "SagaRepositoryProtocol",
     "SagaStep",

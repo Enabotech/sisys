@@ -343,13 +343,21 @@ def bootstrap() -> None:
     from src.domain.ports.l3_vector import L3VectorPort
     from src.domain.ports.l4_object import L4ObjectPort
     from src.domain.ports.l5_graph import L5GraphPort
+    from src.infrastructure.storage.qdrant.collection_manager import (
+        QdrantCollectionManager,
+    )
+    from src.infrastructure.storage.qdrant.qdrant_adapter import QdrantAdapter
+    from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 
     register_port(
         name="l3_vector",
         version="v1.0.0",
         interface=L3VectorPort,
-        impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantAdapter",
-        module="src.infrastructure.storage.qdrant.qdrant_vector_adapter",
+        impl=lambda resolver: QdrantAdapter(
+            storage=QdrantVectorStorage(resolver.resolve("qdrant_client")),
+            collection_manager=QdrantCollectionManager(resolver.resolve("qdrant_client")),
+        ),
+        module="src.infrastructure.storage.qdrant.qdrant_adapter",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
     )
@@ -1063,6 +1071,144 @@ def bootstrap() -> None:
         owner="doc-team",
     )
 
+    # DocumentParser — 文档解析（MIME 路由组合模式）
+    from src.domain.ports.document_parser import DocumentParserPort
+
+    register_port(
+        name="document_parser",
+        version="v1.1.0",
+        interface=DocumentParserPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.document_parsing.composite_parser",
+            fromlist=["CompositeDocumentParser"],
+        ).CompositeDocumentParser(
+            parsers={
+                "application/pdf": __import__(
+                    "src.infrastructure.document_parsing.pdf_parser",
+                    fromlist=["PDFParser"],
+                ).PDFParser(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": __import__(
+                    "src.infrastructure.document_parsing.word_parser",
+                    fromlist=["WordParser"],
+                ).WordParser(),
+                "application/msword": __import__(  # DOC 格式由 WordParser 返回友好拒绝消息
+                    "src.infrastructure.document_parsing.word_parser",
+                    fromlist=["WordParser"],
+                ).WordParser(),
+                "text/plain": __import__(
+                    "src.infrastructure.document_parsing.text_parser",
+                    fromlist=["TextParser"],
+                ).TextParser(),
+                # --- Story 2-2b 扩展格式 ---
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation": __import__(
+                    "src.infrastructure.document_parsing.pptx_parser",
+                    fromlist=["PptxParser"],
+                ).PptxParser(),
+                "application/vnd.ms-powerpoint": __import__(  # PPT 格式由 PptxParser 返回友好拒绝消息
+                    "src.infrastructure.document_parsing.pptx_parser",
+                    fromlist=["PptxParser"],
+                ).PptxParser(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": __import__(
+                    "src.infrastructure.document_parsing.excel_parser",
+                    fromlist=["ExcelParser"],
+                ).ExcelParser(),
+                "application/vnd.ms-excel": __import__(  # XLS 格式由 ExcelParser 返回友好拒绝消息
+                    "src.infrastructure.document_parsing.excel_parser",
+                    fromlist=["ExcelParser"],
+                ).ExcelParser(),
+                "text/csv": __import__(
+                    "src.infrastructure.document_parsing.csv_parser",
+                    fromlist=["CSVParser"],
+                ).CSVParser(),
+                "image/jpeg": __import__(
+                    "src.infrastructure.document_parsing.image_parser",
+                    fromlist=["ImageParser"],
+                ).ImageParser(),
+                "image/png": __import__(
+                    "src.infrastructure.document_parsing.image_parser",
+                    fromlist=["ImageParser"],
+                ).ImageParser(),
+                "image/gif": __import__(
+                    "src.infrastructure.document_parsing.image_parser",
+                    fromlist=["ImageParser"],
+                ).ImageParser(),
+                "text/html": __import__(
+                    "src.infrastructure.document_parsing.html_parser",
+                    fromlist=["HTMLParser"],
+                ).HTMLParser(),
+                "text/markdown": __import__(
+                    "src.infrastructure.document_parsing.markdown_parser",
+                    fromlist=["MarkdownParser"],
+                ).MarkdownParser(),
+                "application/rtf": __import__(
+                    "src.infrastructure.document_parsing.rtf_parser",
+                    fromlist=["RTFParser"],
+                ).RTFParser(),
+            },
+        ),
+        module="src.infrastructure.document_parsing.composite_parser",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+    )
+
+    # === Layout Detection Ports (Story 2-3) ===
+    from src.domain.ports.layout_detector import LayoutDetector
+    from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
+
+    register_port(
+        name="layout_detector",
+        version="v1.0.0",
+        interface=LayoutDetector,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.document_parsing.onnx_layout_detector",
+            fromlist=["OnnxLayoutDetector"],
+        ).OnnxLayoutDetector(
+            model_path=os.getenv(
+                "SISYS_LAYOUT_MODEL_PATH",
+                os.path.expanduser("~/models/docling-layout-heron.onnx"),
+            ),
+        ),
+        module="src.infrastructure.document_parsing.onnx_layout_detector",
+        lifetime=Lifetime.SINGLETON,
+        owner="epic-2",
+        tags=("layout", "onnx", "document"),
+    )
+
+    register_port(
+        name="pdf_page_renderer",
+        version="v1.0.0",
+        interface=PdfPageRendererPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.document_parsing.pdf_page_renderer",
+            fromlist=["PdfPageRenderer"],
+        ).PdfPageRenderer(),
+        module="src.infrastructure.document_parsing.pdf_page_renderer",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+        tags=("layout", "pdf", "document"),
+    )
+
+    # DocumentParsingService — 应用层文档解析编排
+    from src.application.services.document_parsing_service import DocumentParsingService
+
+    register_port(
+        name="document_parsing_service",
+        version="v1.1.0",
+        interface=DocumentParsingService,
+        impl=lambda resolver: DocumentParsingService(
+            document_repository=resolver.resolve("document_repository"),
+            document_storage=resolver.resolve("document_storage"),
+            event_publisher=resolver.resolve("event_publisher"),
+            document_parser=resolver.resolve("document_parser"),
+            redis_client=resolver.resolve("redis_client"),
+            layout_detector=resolver.resolve("layout_detector"),
+            pdf_page_renderer=resolver.resolve("pdf_page_renderer"),
+        ),
+        module="src.application.services.document_parsing_service",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+    )
+
     # ChunkedUploadManager — 分片上传状态管理
     from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadManager
 
@@ -1310,9 +1456,60 @@ def bootstrap() -> None:
         tags=("udmr", "cost", "handler", "application"),
     )
 
-    # === Crawler Ports ===
+    # === Search Ports (Epic 3) ===
+    from src.application.services.dense_search_service import DenseSemanticSearchService
     from src.domain.ports.crawler_client import CrawlerClientPort
+    from src.domain.ports.embedding_service import EmbeddingServicePort
+    from src.infrastructure.config.embedding import EmbeddingConfig
 
+    embedding_api_url = os.getenv("EMBEDDING_API_URL", "")
+
+    if embedding_api_url:
+        from src.infrastructure.external_services.embedding.embedding_api_client import (
+            EmbeddingAPIClient,
+        )
+
+        register_port(
+            name="embedding_service",
+            version="v1.1.0",
+            interface=EmbeddingServicePort,
+            impl=lambda resolver: EmbeddingAPIClient(EmbeddingConfig.from_env()),
+            module="src.infrastructure.external_services.embedding.embedding_api_client",
+            lifetime=Lifetime.SINGLETON,
+            owner="search-team",
+            tags=("embedding", "search", "api"),
+        )
+    else:
+        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
+            BGE3EmbeddingService,
+        )
+
+        register_port(
+            name="embedding_service",
+            version="v1.1.0",
+            interface=EmbeddingServicePort,
+            impl=lambda resolver: BGE3EmbeddingService(EmbeddingConfig.from_env()),
+            module="src.infrastructure.external_services.embedding.bge3_embedding_service",
+            lifetime=Lifetime.SINGLETON,
+            owner="search-team",
+            tags=("embedding", "search", "local"),
+        )
+
+    register_port(
+        name="dense_search_service",
+        version="v1.0.0",
+        interface=DenseSemanticSearchService,
+        impl=lambda resolver: DenseSemanticSearchService(
+            embedding_service=resolver.resolve("embedding_service"),
+            vector_storage=resolver.resolve("l3_vector"),
+        ),
+        module="src.application.services.dense_search_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "dense"),
+    )
+
+    # === Crawler Ports ===
     register_port(
         name="crawler_client",
         version="v1.0.0",

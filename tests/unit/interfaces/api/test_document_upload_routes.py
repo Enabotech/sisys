@@ -45,7 +45,7 @@ def _make_doc(
     )
 
 
-def _make_app() -> tuple[TestClient, AsyncMock, AsyncMock]:
+def _make_app() -> tuple[TestClient, AsyncMock, AsyncMock, AsyncMock]:
     """创建带文档上传路由的测试 FastAPI 应用"""
     from src.interfaces.api.document_upload import create_document_upload_router
 
@@ -53,6 +53,7 @@ def _make_app() -> tuple[TestClient, AsyncMock, AsyncMock]:
 
     upload_service = AsyncMock()
     chunked_manager = AsyncMock()
+    document_storage = AsyncMock()
 
     mock_user = _make_token()
 
@@ -62,11 +63,12 @@ def _make_app() -> tuple[TestClient, AsyncMock, AsyncMock]:
     router = create_document_upload_router(
         upload_service=upload_service,
         chunked_manager=chunked_manager,
+        document_storage=document_storage,
         get_current_user_override=get_user_override,
     )
     app.include_router(router)
 
-    return TestClient(app), upload_service, chunked_manager
+    return TestClient(app), upload_service, chunked_manager, document_storage
 
 
 class TestSingleUpload:
@@ -74,7 +76,7 @@ class TestSingleUpload:
 
     def test_upload_success(self) -> None:
         """正常上传返回 201"""
-        client, service, _ = _make_app()
+        client, service, _, _ = _make_app()
         service.upload = AsyncMock(return_value=_make_doc())
 
         resp = client.post(
@@ -90,7 +92,7 @@ class TestSingleUpload:
 
     def test_upload_response_has_required_fields(self) -> None:
         """响应包含所有必需字段"""
-        client, service, _ = _make_app()
+        client, service, _, _ = _make_app()
         service.upload = AsyncMock(return_value=_make_doc())
 
         resp = client.post(
@@ -105,7 +107,7 @@ class TestSingleUpload:
 
     def test_upload_unsupported_format_returns_400(self) -> None:
         """不支持格式返回 400"""
-        client, service, _ = _make_app()
+        client, service, _, _ = _make_app()
         service.upload = AsyncMock(side_effect=ValueError("不支持的格式: test.exe"))
 
         resp = client.post(
@@ -118,7 +120,7 @@ class TestSingleUpload:
 
     def test_upload_empty_file_returns_400(self) -> None:
         """空文件返回 400"""
-        client, service, _ = _make_app()
+        client, service, _, _ = _make_app()
         service.upload = AsyncMock(side_effect=ValueError("空文件"))
 
         resp = client.post(
@@ -131,7 +133,7 @@ class TestSingleUpload:
 
     def test_upload_missing_tenant_header(self) -> None:
         """缺少 X-Tenant-ID 头返回 422"""
-        client, service, _ = _make_app()
+        client, service, _, _ = _make_app()
         service.upload = AsyncMock(return_value=_make_doc())
 
         resp = client.post(
@@ -147,7 +149,7 @@ class TestBatchUpload:
 
     def test_batch_upload_success(self) -> None:
         """批量上传返回 200"""
-        client, service, _ = _make_app()
+        client, service, _, _ = _make_app()
         service.upload_batch = AsyncMock(
             return_value={
                 "total": 2,
@@ -173,7 +175,7 @@ class TestBatchUpload:
 
     def test_batch_upload_response_format(self) -> None:
         """响应包含 total/success/failed/details"""
-        client, service, _ = _make_app()
+        client, service, _, _ = _make_app()
         service.upload_batch = AsyncMock(
             return_value={
                 "total": 1,
@@ -199,7 +201,8 @@ class TestChunkedUpload:
 
     def test_chunked_init_success(self) -> None:
         """初始化分片上传返回 200"""
-        client, _, manager = _make_app()
+        client, _, manager, storage = _make_app()
+        storage.init_multipart_upload = AsyncMock(return_value=("minio-id-123", "documents/user-123/other/2026-05/xxx"))
         manager.init_upload = AsyncMock(
             return_value={
                 "upload_id": "abc123",
@@ -222,13 +225,15 @@ class TestChunkedUpload:
 
     def test_chunked_upload_part_success(self) -> None:
         """上传分片返回 200"""
-        client, _, manager = _make_app()
+        client, _, manager, storage = _make_app()
+        manager.get_multipart_info = AsyncMock(return_value={"minio_upload_id": "minio-123", "object_key": "docs/key"})
+        storage.upload_part = AsyncMock(return_value="etag-001")
         manager.upload_part = AsyncMock(return_value={"uploaded_parts": 1})
 
         resp = client.put(
             "/api/v1/documents/chunked/abc123/parts/1",
-            content=b"binary data",
-            headers={"Content-Type": "application/octet-stream", "X-Tenant-ID": "t1"},
+            files={"part": ("part.bin", io.BytesIO(b"binary data"), "application/octet-stream")},
+            headers={"X-Tenant-ID": "t1"},
         )
 
         assert resp.status_code == 200
@@ -236,7 +241,7 @@ class TestChunkedUpload:
 
     def test_chunked_complete_success(self) -> None:
         """完成分片上传返回 200"""
-        client, service, manager = _make_app()
+        client, service, manager, storage = _make_app()
         from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
 
         state = ChunkedUploadState(
@@ -245,9 +250,12 @@ class TestChunkedUpload:
             file_size=500 * 1024 * 1024,
             chunk_size=10 * 1024 * 1024,
             uploaded_parts=[{"part_number": 1, "etag": "e1"}],
+            minio_upload_id="minio-123",
+            object_key="docs/key",
         )
         manager.complete_upload = AsyncMock(return_value=state)
-        service.upload = AsyncMock(return_value=_make_doc())
+        storage.complete_multipart_upload = AsyncMock(return_value="version-1")
+        service.register_document = AsyncMock(return_value=_make_doc())
 
         resp = client.post(
             "/api/v1/documents/chunked/abc123/complete",
@@ -258,7 +266,7 @@ class TestChunkedUpload:
 
     def test_chunked_expired_upload_id_returns_410(self) -> None:
         """过期 upload_id 返回 410 Gone"""
-        client, _, manager = _make_app()
+        client, _, manager, _ = _make_app()
         manager.complete_upload = AsyncMock(side_effect=ValueError("upload_id abc123 不存在"))
 
         resp = client.post(
@@ -270,13 +278,13 @@ class TestChunkedUpload:
 
     def test_chunked_expired_part_returns_410(self) -> None:
         """过期分片上传返回 410 Gone"""
-        client, _, manager = _make_app()
-        manager.upload_part = AsyncMock(side_effect=ValueError("upload_id expired 不存在"))
+        client, _, manager, _ = _make_app()
+        manager.get_multipart_info = AsyncMock(return_value=None)
 
         resp = client.put(
             "/api/v1/documents/chunked/expired/parts/1",
-            content=b"data",
-            headers={"Content-Type": "application/octet-stream", "X-Tenant-ID": "t1"},
+            files={"part": ("part.bin", io.BytesIO(b"data"), "application/octet-stream")},
+            headers={"X-Tenant-ID": "t1"},
         )
 
         assert resp.status_code == 410
@@ -287,7 +295,7 @@ class TestDocumentQuery:
 
     def test_query_success(self) -> None:
         """查询存在的文档返回 200"""
-        client, service, _ = _make_app()
+        client, service, _, _ = _make_app()
         service.get_document = AsyncMock(return_value=_make_doc())
 
         doc_id = "22222222-2222-2222-2222-222222222222"
@@ -302,7 +310,7 @@ class TestDocumentQuery:
 
     def test_query_not_found_returns_404(self) -> None:
         """不存在的文档返回 404"""
-        client, service, _ = _make_app()
+        client, service, _, _ = _make_app()
         service.get_document = AsyncMock(return_value=None)
 
         resp = client.get(

@@ -28,12 +28,16 @@ class ChunkedUploadState:
         file_size: int,
         chunk_size: int,
         uploaded_parts: list[dict[str, Any]] | None = None,
+        minio_upload_id: str | None = None,
+        object_key: str | None = None,
     ) -> None:
         self.upload_id = upload_id
         self.filename = filename
         self.file_size = file_size
         self.chunk_size = chunk_size
         self.uploaded_parts = uploaded_parts or []
+        self.minio_upload_id = minio_upload_id
+        self.object_key = object_key
 
     def to_json(self) -> str:
         return json.dumps(
@@ -43,6 +47,8 @@ class ChunkedUploadState:
                 "file_size": self.file_size,
                 "chunk_size": self.chunk_size,
                 "uploaded_parts": self.uploaded_parts,
+                "minio_upload_id": self.minio_upload_id,
+                "object_key": self.object_key,
             }
         )
 
@@ -55,6 +61,8 @@ class ChunkedUploadState:
             file_size=obj["file_size"],
             chunk_size=obj["chunk_size"],
             uploaded_parts=obj.get("uploaded_parts", []),
+            minio_upload_id=obj.get("minio_upload_id"),
+            object_key=obj.get("object_key"),
         )
 
 
@@ -78,12 +86,20 @@ class ChunkedUploadManager:
     def _redis_key(self, upload_id: str) -> str:
         return f"{_CHUNKED_UPLOAD_PREFIX}{upload_id}"
 
-    async def init_upload(self, filename: str, file_size: int) -> dict[str, Any]:
+    async def init_upload(
+        self,
+        filename: str,
+        file_size: int,
+        minio_upload_id: str | None = None,
+        object_key: str | None = None,
+    ) -> dict[str, Any]:
         """初始化分片上传
 
         Args:
             filename: 文件名
             file_size: 文件总大小（字节）
+            minio_upload_id: MinIO 分片上传会话 ID
+            object_key: MinIO 对象键
 
         Returns:
             {"upload_id": str, "chunk_size": int, "total_parts": int}
@@ -98,6 +114,8 @@ class ChunkedUploadManager:
             filename=filename,
             file_size=file_size,
             chunk_size=chunk_size,
+            minio_upload_id=minio_upload_id,
+            object_key=object_key,
         )
 
         await self._cache.set(
@@ -125,7 +143,7 @@ class ChunkedUploadManager:
             {"uploaded_parts": int}
 
         Raises:
-            ValueError: upload_id 不存在或分片乱序
+            ValueError: upload_id 不存在、分片乱序、或分片重复
         """
         lock = self._get_lock(upload_id)
         async with lock:
@@ -133,9 +151,10 @@ class ChunkedUploadManager:
             if state is None:
                 raise ValueError(f"upload_id {upload_id} 不存在或已过期")
 
-            for part in state.uploaded_parts:
-                if part["part_number"] == part_number:
-                    raise ValueError(f"分片 {part_number} 已上传")
+            # 校验分片顺序：下一个分片编号必须是已上传分片数 + 1
+            expected_next = len(state.uploaded_parts) + 1
+            if part_number != expected_next:
+                raise ValueError(f"分片乱序：期望第 {expected_next} 个分片，实际收到第 {part_number} 个")
 
             state.uploaded_parts.append({"part_number": part_number, "etag": etag})
             await self._cache.set(
@@ -184,6 +203,23 @@ class ChunkedUploadManager:
             "chunk_size": state.chunk_size,
             "uploaded_parts": state.uploaded_parts,
             "remaining_parts": self._remaining_parts(state),
+        }
+
+    async def get_multipart_info(self, upload_id: str) -> dict[str, str | None] | None:
+        """获取 MinIO 分片上传上下文信息
+
+        Args:
+            upload_id: 上传会话 ID
+
+        Returns:
+            {"minio_upload_id": str, "object_key": str} 或 None
+        """
+        state = await self._get_state(upload_id)
+        if state is None:
+            return None
+        return {
+            "minio_upload_id": state.minio_upload_id,
+            "object_key": state.object_key,
         }
 
     async def _get_state(self, upload_id: str) -> ChunkedUploadState | None:

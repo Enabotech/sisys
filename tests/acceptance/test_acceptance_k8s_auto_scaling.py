@@ -1,13 +1,12 @@
-"""Acceptance tests for Story 1.13 - K8s 动态扩缩容.
+"""Story 1.13 - K8s 动态扩缩容验收测试。
 
-Real instance integration tests using actual Prometheus metrics.
-Tests the /metrics endpoint, BusinessMetricsCollector, and MetricsAggregator.
+真实实例集成测试，验证 Prometheus 指标暴露、BusinessMetricsCollector 和 MetricsAggregator。
 
-Run with: poetry run pytest tests/acceptance/test_acceptance_k8s-auto-scaling.py -v
+运行: poetry run pytest tests/acceptance/test_acceptance_k8s_auto_scaling.py -v
 
-Prerequisites:
-    - Prometheus metrics components implemented (Story 1.13)
-    - Redis service running at localhost:6379 (for event metrics if needed)
+前置条件:
+    - Prometheus 指标组件已实现（Story 1.13）
+    - Redis 服务运行在 localhost:6379
 """
 
 from __future__ import annotations
@@ -37,7 +36,7 @@ def context() -> dict[str, Any]:
 
 @pytest.fixture
 def shared_registry():
-    """Create shared registry for all collectors."""
+    """创建共享的 Prometheus CollectorRegistry。"""
     from prometheus_client import CollectorRegistry
 
     return CollectorRegistry()
@@ -45,13 +44,13 @@ def shared_registry():
 
 @pytest.fixture
 def event_metrics_collector() -> EventMetricsCollector:
-    """EventMetricsCollector instance (Story 1.3)."""
+    """EventMetricsCollector 实例（Story 1.3）。"""
     return EventMetricsCollector()
 
 
 @pytest.fixture
 def business_metrics_collector(shared_registry) -> BusinessMetricsCollector:
-    """BusinessMetricsCollector instance."""
+    """BusinessMetricsCollector 实例。"""
     return BusinessMetricsCollector(registry=shared_registry)
 
 
@@ -61,7 +60,7 @@ def metrics_aggregator(
     business_metrics_collector: BusinessMetricsCollector,
     shared_registry,
 ) -> MetricsAggregator:
-    """MetricsAggregator instance."""
+    """MetricsAggregator 实例。"""
     return MetricsAggregator(
         event_metrics_collector=event_metrics_collector,
         business_metrics_collector=business_metrics_collector,
@@ -74,24 +73,6 @@ def metrics_aggregator(
 # ===================================================================
 
 
-@given("EventMetricsCollector 已实现（Story 1.3）")
-def given_event_metrics_collector_implemented(context: dict) -> None:
-    """Background: EventMetricsCollector implemented in Story 1.3."""
-    context["event_metrics_available"] = True
-
-
-@given("BusinessMetricsCollector 已实现")
-def given_business_metrics_collector_implemented(context: dict) -> None:
-    """Background: BusinessMetricsCollector implemented."""
-    context["business_metrics_available"] = True
-
-
-@given("MetricsAggregator 已实现")
-def given_metrics_aggregator_implemented(context: dict) -> None:
-    """Background: MetricsAggregator implemented."""
-    context["aggregator_available"] = True
-
-
 # ===================================================================
 # AC-1: Prometheus /metrics HTTP 端点返回 Prometheus 格式
 # ===================================================================
@@ -99,7 +80,7 @@ def given_metrics_aggregator_implemented(context: dict) -> None:
 
 @scenario("test_acceptance_k8s_auto_scaling.feature", "AC-1 - Prometheus /metrics HTTP 端点返回 Prometheus 格式")
 def test_ac1_metrics_endpoint_returns_prometheus_format():
-    """Test /metrics endpoint returns Prometheus text format."""
+    """测试 /metrics 端点返回 Prometheus 文本格式。"""
     pass
 
 
@@ -108,7 +89,7 @@ def given_event_metrics_collector_ready(
     context: dict,
     event_metrics_collector: EventMetricsCollector,
 ) -> None:
-    """EventMetricsCollector is available."""
+    """EventMetricsCollector 已实现（Story 1.3）。"""
     context["event_metrics_collector"] = event_metrics_collector
 
 
@@ -117,7 +98,7 @@ def given_business_metrics_collector_ready(
     context: dict,
     business_metrics_collector: BusinessMetricsCollector,
 ) -> None:
-    """BusinessMetricsCollector is available."""
+    """BusinessMetricsCollector 已实现。"""
     context["business_metrics_collector"] = business_metrics_collector
 
 
@@ -126,7 +107,7 @@ def given_metrics_aggregator_ready(
     context: dict,
     metrics_aggregator: MetricsAggregator,
 ) -> None:
-    """MetricsAggregator is available."""
+    """MetricsAggregator 已实现。"""
     context["metrics_aggregator"] = metrics_aggregator
 
 
@@ -177,7 +158,7 @@ def then_aggregates_business_metrics(context: dict) -> None:
 
 @scenario("test_acceptance_k8s_auto_scaling.feature", "AC-1 - Prometheus 格式兼容（指标类型支持）")
 def test_ac1_prometheus_format_compatibility():
-    """Test Prometheus format compatibility with different metric types."""
+    """测试 Prometheus 格式兼容不同指标类型。"""
     pass
 
 
@@ -186,8 +167,7 @@ def given_business_metrics_registered_gauge(
     context: dict,
     business_metrics_collector: BusinessMetricsCollector,
 ) -> None:
-    """BusinessMetricsCollector has Gauge metrics registered."""
-    # BusinessMetricsCollector uses Gauge for all metrics
+    """BusinessMetricsCollector 已注册 Gauge 指标。"""
     business_metrics_collector.record_sessions(10)
     context["business_metrics_collector"] = business_metrics_collector
 
@@ -245,7 +225,7 @@ def then_supports_summary_type(context: dict) -> None:
 
 @scenario("test_acceptance_k8s_auto_scaling.feature", "AC-2 - 自定义业务指标暴露")
 def test_ac2_custom_business_metrics_exposed():
-    """Test custom business metrics are exposed."""
+    """测试自定义业务指标暴露。"""
     pass
 
 
@@ -254,7 +234,7 @@ def given_prometheus_endpoint_implemented(
     context: dict,
     metrics_aggregator: MetricsAggregator,
 ) -> None:
-    """Prometheus endpoint is implemented."""
+    """Prometheus 端点已实现。"""
     context["metrics_aggregator"] = metrics_aggregator
 
 
@@ -303,7 +283,7 @@ def then_exposes_cache_hit_rate(context: dict) -> None:
 
 @scenario("test_acceptance_k8s_auto_scaling.feature", "AC-3 - K8s HPA 基于自定义指标扩缩容")
 def test_ac3_k8s_hpa_based_on_custom_metrics():
-    """Test K8s HPA can scale based on custom metrics."""
+    """测试 K8s HPA 可基于自定义指标扩缩容。"""
     pass
 
 
@@ -312,8 +292,7 @@ def given_prometheus_exposes_custom_metrics(
     context: dict,
     business_metrics_collector: BusinessMetricsCollector,
 ) -> None:
-    """Prometheus endpoint exposes custom business metrics."""
-    # Record some metrics
+    """Prometheus 端点暴露自定义业务指标。"""
     business_metrics_collector.record_sessions(50)
     business_metrics_collector.record_queue_length(100)
     context["business_metrics_collector"] = business_metrics_collector
@@ -321,11 +300,7 @@ def given_prometheus_exposes_custom_metrics(
 
 @given("Prometheus Adapter 已部署（将 Prometheus 指标转换为 External Metrics）")
 def given_prometheus_adapter_deployed(context: dict) -> None:
-    """Prometheus Adapter is deployed.
-
-    Note: This is a K8s infrastructure requirement outside the application scope.
-    In unit tests, we verify the metrics are exposed correctly.
-    """
+    """Prometheus Adapter 已部署（基础设施要求，验收测试验证指标暴露正确）。"""
     context["prometheus_adapter_available"] = True
 
 
@@ -339,22 +314,18 @@ def when_hpa_configured_with_custom_metrics(context: dict) -> None:
 
 @then("HPA 应能够根据 sisys_agent_sessions_active 进行扩缩容决策")
 def then_hpa_can_scale_on_agent_sessions(context: dict) -> None:
-    """Verify HPA can make scaling decisions based on sisys_agent_sessions_active."""
-    # Verify the metric is available for HPA consumption
+    """验证 HPA 可基于 sisys_agent_sessions_active 扩缩容。"""
     business_metrics = context.get("business_metrics_collector")
     assert business_metrics is not None
     assert business_metrics.sessions >= 0
-    assert "sisys_agent_sessions_active" is not None  # noqa: F632
 
 
 @then("HPA 应能够根据 sisys_task_queue_length 进行扩缩容决策")
 def then_hpa_can_scale_on_task_queue(context: dict) -> None:
-    """Verify HPA can make scaling decisions based on sisys_task_queue_length."""
-    # Verify the metric is available for HPA consumption
+    """验证 HPA 可基于 sisys_task_queue_length 扩缩容。"""
     business_metrics = context.get("business_metrics_collector")
     assert business_metrics is not None
     assert business_metrics.queue_length >= 0
-    assert "sisys_task_queue_length" is not None  # noqa: F632
 
 
 # ===================================================================
@@ -364,20 +335,19 @@ def then_hpa_can_scale_on_task_queue(context: dict) -> None:
 
 @scenario("test_acceptance_k8s_auto_scaling.feature", "AC-4 - 扩缩容响应时间<5 分钟")
 def test_ac4_scaling_response_time():
-    """Test scaling response time is under 5 minutes."""
+    """测试扩缩容响应时间 < 5 分钟。"""
     pass
 
 
 @given("K8s HPA 已配置")
 def given_hpa_configured(context: dict) -> None:
-    """K8s HPA is configured."""
+    """K8s HPA 已配置。"""
     context["hpa_configured"] = True
 
 
 @when("系统负载变化触发扩缩容")
 def when_load_change_triggers_scaling(context: dict) -> None:
-    """System load change triggers scaling."""
-    # Record metrics to simulate load change
+    """系统负载变化触发扩缩容。"""
     business_metrics = context.get("business_metrics_collector")
     if business_metrics:
         business_metrics.record_sessions(100)
@@ -387,35 +357,20 @@ def when_load_change_triggers_scaling(context: dict) -> None:
 
 @then("扩缩容完成时间应小于 5 分钟")
 def then_scaling_complete_under_5_minutes(context: dict) -> None:
-    """Verify scaling completes in less than 5 minutes.
-
-    Note: This is an infrastructure requirement. Application-level tests verify
-    that metrics are exposed correctly with proper granularity.
-    """
-    # This AC is primarily validated at infrastructure/integration level
-    # Application code exposes metrics correctly; infrastructure ensures timing
+    """验证扩缩容完成时间 < 5 分钟（基础设施级别验证，应用层保证指标暴露正确）。"""
     assert context.get("hpa_configured") is True
 
 
 @then("Prometheus 指标采集间隔应 ≤15 秒")
 def then_prometheus_scrape_interval_under_15s(context: dict) -> None:
-    """Verify Prometheus scrape interval is ≤15 seconds.
-
-    This is a K8s/Prometheus configuration requirement, not application code.
-    """
-    # Prometheus configuration: scrape_interval is set in prometheus.yml
-    # Default is 15s, can be configured lower
-    assert True  # Configuration requirement, verified at infra level
+    """验证 Prometheus 指标采集间隔 ≤15 秒（Prometheus 配置要求）。"""
+    assert True
 
 
 @then("HPA 检查周期应 ≤60 秒")
 def then_hpa_check_interval_under_60s(context: dict) -> None:
-    """Verify HPA check interval is ≤60 seconds.
-
-    This is a K8s HPA configuration requirement.
-    """
-    # HPA default sync period is 15 seconds, configurable
-    assert True  # Configuration requirement, verified at infra level
+    """验证 HPA 检查周期 ≤60 秒（K8s HPA 配置要求）。"""
+    assert True
 
 
 # ===================================================================
@@ -425,7 +380,7 @@ def then_hpa_check_interval_under_60s(context: dict) -> None:
 
 @scenario("test_acceptance_k8s_auto_scaling.feature", "AC-5 - Grafana 可观测性")
 def test_ac5_grafana_observability():
-    """Test Grafana dashboard displays key metrics."""
+    """测试 Grafana 可观测性面板。"""
     pass
 
 
@@ -434,8 +389,7 @@ def given_all_metrics_exposed(
     context: dict,
     business_metrics_collector: BusinessMetricsCollector,
 ) -> None:
-    """All metrics are exposed."""
-    # Record metrics
+    """所有指标已暴露。"""
     business_metrics_collector.record_sessions(10)
     business_metrics_collector.record_queue_length(5)
     business_metrics_collector.record_cache_hit()
@@ -445,21 +399,19 @@ def given_all_metrics_exposed(
 
 @given("Grafana Dashboard 已配置")
 def given_grafana_dashboard_configured(context: dict) -> None:
-    """Grafana Dashboard is configured."""
+    """Grafana Dashboard 已配置。"""
     context["grafana_configured"] = True
 
 
 @when("监控面板需要展示系统状态")
 def when_dashboard_needs_to_display_status(context: dict) -> None:
-    """Dashboard needs to display system status."""
-    # Verify metrics are available for dashboard
+    """监控面板需要展示系统状态。"""
     context["metrics_available"] = True
 
 
 @then("Grafana 应展示 Agent 会话数面板")
 def then_grafana_shows_agent_sessions_panel(context: dict) -> None:
-    """Verify Grafana can show Agent sessions panel."""
-    # Verify metric exists
+    """验证 Grafana 可展示 Agent 会话数面板。"""
     business_metrics = context.get("business_metrics_collector")
     assert business_metrics is not None
     assert hasattr(business_metrics, "sessions")
@@ -467,8 +419,7 @@ def then_grafana_shows_agent_sessions_panel(context: dict) -> None:
 
 @then("Grafana 应展示任务队列长度面板")
 def then_grafana_shows_task_queue_panel(context: dict) -> None:
-    """Verify Grafana can show task queue panel."""
-    # Verify metric exists
+    """验证 Grafana 可展示任务队列长度面板。"""
     business_metrics = context.get("business_metrics_collector")
     assert business_metrics is not None
     assert hasattr(business_metrics, "queue_length")
@@ -476,11 +427,9 @@ def then_grafana_shows_task_queue_panel(context: dict) -> None:
 
 @then("Grafana 应展示事件处理速率面板")
 def then_grafana_shows_events_processing_rate_panel(context: dict) -> None:
-    """Verify Grafana can show events processing rate panel."""
-    # Verify metric exists
+    """验证 Grafana 可展示事件处理速率面板。"""
     business_metrics = context.get("business_metrics_collector")
     assert business_metrics is not None
-    # Processing rate is updated via update_processing_rate()
     business_metrics.record_event_processed()
     business_metrics.record_event_processed()
     business_metrics.update_processing_rate()
@@ -489,8 +438,7 @@ def then_grafana_shows_events_processing_rate_panel(context: dict) -> None:
 
 @then("Grafana 应展示缓存命中率面板")
 def then_grafana_shows_cache_hit_rate_panel(context: dict) -> None:
-    """Verify Grafana can show cache hit rate panel."""
-    # Verify metric exists
+    """验证 Grafana 可展示缓存命中率面板。"""
     business_metrics = context.get("business_metrics_collector")
     assert business_metrics is not None
     assert hasattr(business_metrics, "hit_rate")

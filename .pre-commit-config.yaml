@@ -70,6 +70,13 @@ repos:
 
   # =========================================
   # MyPy - Type checking (使用本地安装)
+  #
+  # 配置策略（业界最佳实践）：
+  #   - pyproject.toml [tool.mypy] 是唯一真相来源（严格度、exclude、overrides）
+  #   - pre-commit 不重复携带业务参数，只附加：
+  #     --pretty: 终端可读输出
+  #     --show-error-codes: 方便 IDE 跳转
+  #   - 第三方库豁免用 [[tool.mypy.overrides]] 精准控制，不用全局 --ignore-missing-imports
   # =========================================
   - repo: local
     hooks:
@@ -80,8 +87,7 @@ repos:
         types: [python]
         verbose: true
         require_serial: true
-        # 强制类型注解检查，提高代码可靠性
-        args: [--ignore-missing-imports, --warn-return-any, --warn-unused-configs, --pretty]
+        args: [--pretty, --show-error-codes]
 
   # =========================================
   # Security - Bandit (使用本地安装)
