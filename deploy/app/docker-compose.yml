@@ -227,15 +227,15 @@ services:
       - "${EMBEDDING_API_PORT:-8001}:8000"
     volumes:
       - ../../src/infrastructure/external_services/embedding/embedding_api_server.py:/app/embedding_api_server.py:ro
-      - ${EMBEDDING_MODEL_PATH:-/mnt/x/.cache/BAAI/bge-m3/models--BAAI--bge-m3/}:${EMBEDDING_MODEL_PATH:-/mnt/x/.cache/BAAI/bge-m3/models--BAAI--bge-m3/}:ro
+      - ${EMBEDDING_MODEL_PATH}:${EMBEDDING_MODEL_PATH}:ro
       - embedding_cache:/root/.cache/huggingface
     working_dir: /app
     command: >
       poetry run uvicorn embedding_api_server:app --host 0.0.0.0 --port 8000
     environment:
-      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-BAAI/bge-m3}
-      - EMBEDDING_MODEL_PATH=${EMBEDDING_MODEL_PATH:-/mnt/x/.cache/BAAI/bge-m3/models--BAAI--bge-m3/}
-      - EMBEDDING_MODEL_DEVICE=${EMBEDDING_MODEL_DEVICE:-cpu}
+      - EMBEDDING_MODEL_NAME
+      - EMBEDDING_MODEL_PATH
+      - EMBEDDING_MODEL_DEVICE
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
