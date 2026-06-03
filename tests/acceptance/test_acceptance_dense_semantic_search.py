@@ -458,23 +458,23 @@ def verify_no_forbidden_imports():
 
 
 # ===================================================================
-# AC-encode_sparse: Sparse 稀疏嵌入生成
+# AC-5: Sparse 稀疏嵌入生成
 # ===================================================================
 
 
-@scenario("test_acceptance_dense_semantic_search.feature", "AC-encode_sparse - 稀疏嵌入生成")
+@scenario("test_acceptance_dense_semantic_search.feature", "AC-5 - 稀疏嵌入生成")
 def test_ac_encode_sparse():
     """测试 BGE-M3 稀疏嵌入生成"""
     pass
 
 
-@scenario("test_acceptance_dense_semantic_search.feature", "AC-encode_sparse - 中文文本稀疏编码")
+@scenario("test_acceptance_dense_semantic_search.feature", "AC-5 - 中文文本稀疏编码")
 def test_ac_encode_sparse_chinese():
     """测试中文文本稀疏编码"""
     pass
 
 
-@scenario("test_acceptance_dense_semantic_search.feature", "AC-encode_sparse - 空文本拒绝")
+@scenario("test_acceptance_dense_semantic_search.feature", "AC-5 - 空文本拒绝")
 def test_ac_encode_sparse_empty_rejected():
     """测试空文本抛出异常"""
     pass
