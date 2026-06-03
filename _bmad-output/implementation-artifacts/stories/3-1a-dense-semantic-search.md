@@ -191,7 +191,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_dense_semantic_search.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | src 与测试目录完成清单最终确认 | `tests/acceptance/test_acceptance_dense_semantic_search.feature` | Task 6 |
-| **集成测试** | Embedding + Qdrant 端到端 | 真实 bge-m3 + 真实 Qdrant | `tests/integration/test_integration_embedding_qdrant_dense_search.py` | Task 5 |
+| **集成测试** | Embedding + Qdrant 端到端 + AC-3 性能基准 | 真实 bge-m3 + 真实 Qdrant + 性能测量 | `tests/integration/test_integration_embedding_qdrant_dense_search.py` | Task 5 |
 | **SDD 架构验证** | 领域零依赖 | domain/ 无 FlagEmbedding 导入 | 包含在验收测试 Subtask 6.3 中 | Task 6 |
 | **TDD 单元测试** | EmbeddingAPIClient | HTTP 请求/响应、错误处理、空值验证 | `tests/unit/infrastructure/external_services/embedding/test_embedding_api_client.py` | Task 7 |
 | **TDD 单元测试** | Embedding API Server | FastAPI TestClient、Health check、编码端点 | `tests/unit/infrastructure/external_services/embedding/test_embedding_api_server.py` | Task 8 |
@@ -271,7 +271,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 ### Task 0: SDD 规范定义（必选前置）
 
-**关联 AC:** AC-1, AC-2, AC-3, AC-4
+**关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-encode_sparse
 
 > **目的：** 在进入代码实现前，明确端口契约、配置模型、Gherkin 验收标准与六边形架构边界。
 
@@ -295,7 +295,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 ### Task 1: EmbeddingServicePort + EmbeddingConfig 实现
 
-**关联 AC:** AC-1
+**关联 AC:** AC-1, AC-encode_sparse
 
 #### TDD 循环 A：EmbeddingServicePort Protocol
 
@@ -867,6 +867,12 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - **设计约束:** 领域层零外部依赖，依赖方向 domain←application←infrastructure
 - **接口治理:** 统一端口注册、PortSpec 元数据、Registry/Resolver/ContractGate、Composition Root 装配
 - **技术栈:** Python 3.11+, FlagEmbedding ^1.2.8 (BGEM3FlagModel), qdrant-client 1.7.1, torch 2.7.1
+- **统一错误处理策略:**
+  - 空/空白文本输入 → `ValueError`（嵌入层统一快速失败，避免零向量触发检索未定义行为）
+  - 基础设施异常 → `return []`（如 `generate_embedding` 保持向后兼容，避免中断 Prefect 流）
+  - HTTP 错误 → 异常传播（未来 `EmbeddingAPIClient` 中由 `httpx` 原生抛出）
+  - 请求校验失败 → Pydantic 422（未来 `Embedding API Server` 中 `min_length=1`/`max_length=64` 自动校验）
+  - 模型加载失败 → 构造时 `ValueError`（维度不匹配 / 路径不可达 / GPU 能力不足）
 
 > **迁移记录（2026-06-02）：** Story 3-1a 初始实现使用 `SentenceTransformers` 加载 BGE-M3 模型。
 > 经对标业界最佳实践分析（BGE-M3 是 BAAI 发布的模型，FlagEmbedding 是 BAAI 官方第一方库），
@@ -1219,12 +1225,13 @@ def perform_dense_search(context, dense_search_service, event_loop):
 
 ---
 
-**故事版本/Story Version:** v1.2.2
+**故事版本/Story Version:** v1.2.3
 **创建日期/Created:** 2026-06-01
 **最后更新/Last Updated:** 2026-06-03
 **更新说明/Description:**
+- v1.2.3: 5轮审查修订第3轮 — 修复 Task 0/1 AC-encode_sparse 关联缺失、集成测试分类表补充 AC-3、Feature 文件 Gherkin 场景与步骤代码一致（AC-6 补充 FlagEmbedding 校验）、新增统一错误处理策略章节；第4轮对抗性审查无新发现；第5轮最终精修通过
 - v1.2.2: 5轮审查修订第2轮 — 代码：FP16 GPU 计算能力检测（Pascal 架构安全降级）、generate_embedding 补充表格文本提取、BGE3EmbeddingService 显式实现 EmbeddingServicePort、契约测试补充 dense_search_service 接口类型验证；文档：search_sparse filter 不对称说明、EmbeddingConfig 双定义同步风险、性能基准统计局限性
 - v1.2.1: 5轮审查修订第1轮 — 修正 L2 归一化科学描述、空文本处理规范（统一 ValueError）、SentenceTransformers 选型描述、Task 依赖图矛盾；代码修复 composition_root 版本号 v1.0.0→v1.1.0、契约测试补充 encode_sparse、清理孤儿 pyc；新增 sync/async 兼容策略分析、batch_size 说明、表格忽略限制、依赖残留说明
-- v1.2.0: 嵌入模型 API 化扩展 — 新增 Task 7-10（EmbeddingAPIClient + API Server + 双策略 DI + Docker Compose），EmbeddingConfig 扩展 api_url/api_timeout 字段
-- v1.1.0: FlagEmbedding 迁移 — SentenceTransformers→BGEM3FlagModel（BAAI 官方第一方库），新增 encode_sparse() 方法，集成/验收测试补充
+- v1.2.0: 嵌入模型 API 化扩展 — 新增 Task 7-10
+- v1.1.0: FlagEmbedding 迁移 — SentenceTransformers→BGEM3FlagModel，新增 encode_sparse()
 - v1.0.0: 创建故事文件（初始 SentenceTransformers 实现）
