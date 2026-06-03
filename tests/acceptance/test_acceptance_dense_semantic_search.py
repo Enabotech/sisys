@@ -636,7 +636,7 @@ def api_client():
         if return_dense:
             result["dense_vecs"] = np.random.randn(n, 1024).astype(np.float32)
         if return_sparse:
-            result["lexical_weights"] = [{100: 0.5, 200: 0.3} for _ in range(n)]
+            result["lexical_weights"] = [{"100": 0.5, "200": 0.3} for _ in range(n)]  # FlagEmbedding str keys
         return result
 
     model.encode.side_effect = mock_encode

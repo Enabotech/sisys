@@ -35,7 +35,7 @@ def _make_mock_model(dimension: int = 1024) -> MagicMock:
         return_sparse: bool = False,
         **kwargs: object,
     ) -> dict:
-        result: dict[str, np.ndarray | list[dict[int, float]]] = {}
+        result: dict[str, np.ndarray | list[dict[str, float]]] = {}
         if isinstance(texts, str):
             texts = [texts]
 
@@ -51,7 +51,7 @@ def _make_mock_model(dimension: int = 1024) -> MagicMock:
             # 模拟 BGE-M3 lexical_weights: 每个文本返回 Dict[int, float]
             lexical_list = []
             for _ in texts:
-                lexical_list.append({100: 0.5, 200: 0.8, 300: 0.3})
+                lexical_list.append({"100": 0.5, "200": 0.8, "300": 0.3})  # FlagEmbedding returns str keys
             result["lexical_weights"] = lexical_list
 
         return result

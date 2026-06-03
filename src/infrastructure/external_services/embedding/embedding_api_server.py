@@ -87,7 +87,8 @@ async def embed(req: EmbedRequest) -> dict:
     if req.return_sparse:
         lexical_weights = result["lexical_weights"]
         response["sparse"] = [
-            {"indices": [int(k) for k in w.keys()], "values": [float(v) for v in w.values()]} for w in lexical_weights
+            {"indices": sorted(int(k) for k in w.keys()), "values": [float(w[k]) for k in sorted(w.keys(), key=int)]}
+            for w in lexical_weights
         ]
     else:
         response["sparse"] = None
