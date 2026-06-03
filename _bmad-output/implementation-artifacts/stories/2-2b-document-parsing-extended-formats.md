@@ -562,7 +562,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 ### Task 8: CompositeDocumentParser 扩展 + 集成测试
 
 **关联 AC:** AC-8
-**前置依赖:** Task 1-7 必须完成（所有新解析器类必须存在于 `src/infrastructure/external_services/document_parsing/` 中）
+**前置依赖:** Task 1-7 必须完成（所有新解析器类必须存在于 `src/infrastructure/document_parsing/` 中）
 
 > ⚠️ **本 Task 包含 TDD 循环（组合解析器扩展） + 验证阶段（集成测试）**
 
@@ -733,7 +733,7 @@ src/
 ├── composition_root.py                  # 修改：扩展 document_parser 注册工厂
 │
 └── tests/
-    ├── unit/infrastructure/external_services/document_parsing/
+    ├── unit/infrastructure/document_parsing/
     │   ├── test_pptx_parser.py          # ★ 新增
     │   ├── test_excel_parser.py         # ★ 新增
     │   ├── test_csv_parser.py           # ★ 新增
@@ -868,26 +868,26 @@ src/
 - `tests/contracts/test_port_contract_document_parser.py` — 版本 v1.1.0 + 新增 `TestExtendedFormatMIMERouting`
 
 **已创建/修改的文件（Task 1-10 全部完成）:**
-- `src/infrastructure/external_services/document_parsing/pptx_parser.py` — PPTX 解析器 ✅
-- `src/infrastructure/external_services/document_parsing/excel_parser.py` — Excel 解析器 ✅
-- `src/infrastructure/external_services/document_parsing/csv_parser.py` — CSV 解析器 ✅
-- `src/infrastructure/external_services/document_parsing/image_parser.py` — 图像+OCR 解析器 ✅
-- `src/infrastructure/external_services/document_parsing/html_parser.py` — HTML 解析器 ✅
-- `src/infrastructure/external_services/document_parsing/markdown_parser.py` — Markdown 解析器 ✅
-- `src/infrastructure/external_services/document_parsing/rtf_parser.py` — RTF 解析器 ✅
-- `src/infrastructure/external_services/document_parsing/_encoding.py` — 共享编码检测模块 ✅
-- `tests/unit/infrastructure/external_services/document_parsing/test_pptx_parser.py` — PPTX 单元测试 ✅
-- `tests/unit/infrastructure/external_services/document_parsing/test_excel_parser.py` — Excel 单元测试 ✅
-- `tests/unit/infrastructure/external_services/document_parsing/test_csv_parser.py` — CSV 单元测试 ✅
-- `tests/unit/infrastructure/external_services/document_parsing/test_image_parser.py` — Image 单元测试 ✅
-- `tests/unit/infrastructure/external_services/document_parsing/test_html_parser.py` — HTML 单元测试 ✅
-- `tests/unit/infrastructure/external_services/document_parsing/test_markdown_parser.py` — Markdown 单元测试 ✅
-- `tests/unit/infrastructure/external_services/document_parsing/test_rtf_parser.py` — RTF 单元测试 ✅
-- `src/infrastructure/external_services/document_parsing/_limits.py` — 扩展 ✅
-- `src/infrastructure/external_services/document_parsing/text_parser.py` — 重构使用 _encoding ✅
+- `src/infrastructure/document_parsing/pptx_parser.py` — PPTX 解析器 ✅
+- `src/infrastructure/document_parsing/excel_parser.py` — Excel 解析器 ✅
+- `src/infrastructure/document_parsing/csv_parser.py` — CSV 解析器 ✅
+- `src/infrastructure/document_parsing/image_parser.py` — 图像+OCR 解析器 ✅
+- `src/infrastructure/document_parsing/html_parser.py` — HTML 解析器 ✅
+- `src/infrastructure/document_parsing/markdown_parser.py` — Markdown 解析器 ✅
+- `src/infrastructure/document_parsing/rtf_parser.py` — RTF 解析器 ✅
+- `src/infrastructure/document_parsing/_encoding.py` — 共享编码检测模块 ✅
+- `tests/unit/infrastructure/document_parsing/test_pptx_parser.py` — PPTX 单元测试 ✅
+- `tests/unit/infrastructure/document_parsing/test_excel_parser.py` — Excel 单元测试 ✅
+- `tests/unit/infrastructure/document_parsing/test_csv_parser.py` — CSV 单元测试 ✅
+- `tests/unit/infrastructure/document_parsing/test_image_parser.py` — Image 单元测试 ✅
+- `tests/unit/infrastructure/document_parsing/test_html_parser.py` — HTML 单元测试 ✅
+- `tests/unit/infrastructure/document_parsing/test_markdown_parser.py` — Markdown 单元测试 ✅
+- `tests/unit/infrastructure/document_parsing/test_rtf_parser.py` — RTF 单元测试 ✅
+- `src/infrastructure/document_parsing/_limits.py` — 扩展 ✅
+- `src/infrastructure/document_parsing/text_parser.py` — 重构使用 _encoding ✅
 - `src/composition_root.py` — v1.1.0 + 11 MIME 映射 ✅
 - `src/application/services/document_parsing_service.py` — _ALLOWED_TEMP_SUFFIXES 扩展 ✅
-- `tests/unit/infrastructure/external_services/document_parsing/test_composite_parser.py` — 扩展 ✅
+- `tests/unit/infrastructure/document_parsing/test_composite_parser.py` — 扩展 ✅
 - `tests/unit/architecture/test_arch_document_parser.py` — 扩展 ✅
 - `pyproject.toml` — striprtf 依赖 + mypy overrides ✅
 

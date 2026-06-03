@@ -75,7 +75,7 @@ class TestExcelParserCreation:
 
     def test_create_parser(self) -> None:
         """验证 ExcelParser 可以正常实例化"""
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         parser = ExcelParser()
         assert parser is not None
@@ -83,7 +83,7 @@ class TestExcelParserCreation:
     def test_parser_implements_document_parser_port(self) -> None:
         """验证 ExcelParser 满足 DocumentParserPort 协议"""
         from src.domain.ports.document_parser import DocumentParserPort
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         parser = ExcelParser()
         assert isinstance(parser, DocumentParserPort)
@@ -94,7 +94,7 @@ class TestExcelParserMultiSheet:
 
     def test_parse_multi_sheet_xlsx(self) -> None:
         """多 Sheet XLSX 每个 Sheet 独立输出为 ParsedTable"""
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         sheets = {
             "市场分析": [["维度", "目标"], ["市场", "增长20%"]],
@@ -121,7 +121,7 @@ class TestExcelParserMultiSheet:
 
     def test_empty_sheet_skipped(self) -> None:
         """空 Sheet 应跳过，不生成空表格"""
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         path = _create_xlsx_with_empty_sheet()
         try:
@@ -142,7 +142,7 @@ class TestExcelParserDataExtraction:
 
     def test_parse_single_sheet_xlsx(self) -> None:
         """单 Sheet XLSX 正确提取数据"""
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         sheets = {"Sheet1": [["姓名", "部门"], ["张三", "技术部"]]}
         path = _create_xlsx_with_sheets(sheets)
@@ -166,7 +166,7 @@ class TestExcelParserEmptyDocument:
 
     def test_empty_xlsx_returns_failed(self) -> None:
         """空 XLSX 返回 failed"""
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         path = _create_empty_xlsx()
         try:
@@ -184,7 +184,7 @@ class TestExcelParserLegacyFormatRejection:
 
     def test_xls_mime_returns_failed(self) -> None:
         """旧版 XLS MIME 返回 failed 并建议转换"""
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xls")
         tmp.write(b"not a valid xlsx")
@@ -201,7 +201,7 @@ class TestExcelParserLegacyFormatRejection:
 
     def test_corrupt_xlsx_returns_failed(self) -> None:
         """损坏 XLSX 返回 failed"""
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         tmp.write(b"this is not a valid xlsx zip file")

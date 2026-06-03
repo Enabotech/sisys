@@ -59,7 +59,7 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 - [ ] 坐标准确率 ≥ 95%（检测到的 bbox 与实际版面元素位置匹配，使用 DocLayNet 验证集评估）
 - [ ] 模型文件缺失时抛出明确 `FileNotFoundError`（含模型下载指引）
 - [ ] `onnxruntime` 库缺失时抛出 `ImportError`（含安装指引 `pip install onnxruntime`）
-- [ ] 实现位于 `src/infrastructure/external_services/document_parsing/onnx_layout_detector.py`
+- [ ] 实现位于 `src/infrastructure/document_parsing/onnx_layout_detector.py`
 - [ ] 支持 `__init__(model_path: str, device: str = "cpu")` 构造函数
 
 ### AC-3: 解析管线集成（应用层编排）
@@ -362,8 +362,8 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/external_services/document_parsing/test_onnx_layout_detector.py`（mock onnxruntime.InferenceSession：初始化验证/CPU 提供者/detect 调用模型/模型文件缺失/空图像/单元素检测/多元素检测/GPU 提供者参数） |
-| 🟢 绿 | 实现 `src/infrastructure/external_services/document_parsing/onnx_layout_detector.py`（`__init__` 加载模型/`detect` 推理/输出后处理/错误处理） |
+| 🔴 红 | 编写 `tests/unit/infrastructure/document_parsing/test_onnx_layout_detector.py`（mock onnxruntime.InferenceSession：初始化验证/CPU 提供者/detect 调用模型/模型文件缺失/空图像/单元素检测/多元素检测/GPU 提供者参数） |
+| 🟢 绿 | 实现 `src/infrastructure/document_parsing/onnx_layout_detector.py`（`__init__` 加载模型/`detect` 推理/输出后处理/错误处理） |
 | 🔄 重构 | 提取 `_preprocess`/`_postprocess` 私有方法；添加性能日志；错误信息本地化 |
 
 - [ ] Subtask 3.1: 🔴 红 — 编写 `TestOnnxLayoutDetector` 测试（mock onnxruntime 全场景：初始化/CPU/GPU/模型缺失/推理失败/空图像返回空列表/多元素检测/confidence 范围 [0,1]/**xyxy→xywh 坐标转换验证**：ONNX 输出 `[x1,y1,x2,y2]` 正确转换为 `BoundingBox(x=x1, y=y1, width=x2-x1, height=y2-y1)`/后处理 mock）
@@ -405,7 +405,7 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 |------|------|
 | 🔴 红 | 扩展 `tests/unit/application/services/test_document_parsing_service.py`（验证 layout_detector 注入/PDF 解析后 bbox 不为 None/非 PDF 格式 bbox 保持 None/layout_detector 缺失时降级处理） |
 | 🟢 绿 | 扩展 `DocumentParsingService`（注入 layout_detector、编排逻辑增加版面检测步骤、PDF 页面渲染为图像、调用 detect()、调用 bbox 匹配） |
-| 🔄 重构 | 提取 `_apply_layout_detection()` 私有方法；PDF 页面渲染逻辑封装在 `src/infrastructure/external_services/document_parsing/pdf_page_renderer.py`（pypdfium2 + Pillow，不污染应用层）；添加 layout_detector=None 优雅降级 |
+| 🔄 重构 | 提取 `_apply_layout_detection()` 私有方法；PDF 页面渲染逻辑封装在 `src/infrastructure/document_parsing/pdf_page_renderer.py`（pypdfium2 + Pillow，不污染应用层）；添加 layout_detector=None 优雅降级 |
 
 - [ ] Subtask 4.4: 🔴 红 — 编写 Service 编排扩展测试（layout_detector 注入/pdf 版面检测/非 pdf 跳过/layout_detector 缺失时降级）
 - [ ] Subtask 4.5: 🟢 绿 — 扩展 `DocumentParsingService` 编排逻辑（注入 layout_detector，PDF 格式触发版面检测，合并 bbox）
@@ -556,7 +556,7 @@ tests/
 │   ├── application/services/
 │   │   ├── test_layout_matching.py              # [新增] IoU 计算/bbox 匹配单元测试
 │   │   └── test_document_parsing_service.py     # [扩展] layout_detector 注入测试
-│   ├── infrastructure/external_services/document_parsing/
+│   ├── infrastructure/document_parsing/
 │   │   ├── test_onnx_layout_detector.py      # [新增] OnnxLayoutDetector 单元测试
 │   │   └── test_pdf_page_renderer.py          # [新增] PDF 页面渲染单元测试
 │   └── architecture/
@@ -691,15 +691,15 @@ Pillow = ">=10.0"                    # 已有依赖（Story 2-2b ImageParser 引
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/domain/ports/layout_detector.py` — LayoutDetector Protocol 端口定义
 - `src/domain/value_objects/parsed_document.py` — [修改] 新增 BoundingBoxResult 值对象
-- `src/infrastructure/external_services/document_parsing/onnx_layout_detector.py` — OnnxLayoutDetector 实现
+- `src/infrastructure/document_parsing/onnx_layout_detector.py` — OnnxLayoutDetector 实现
 - `src/application/services/_layout_matching.py` — [新增] bbox 匹配辅助函数（纯领域逻辑，IoU 计算/贪心匹配）
 - `src/application/services/document_parsing_service.py` — [修改] 编排逻辑增加版面检测步骤
-- `src/infrastructure/external_services/document_parsing/pdf_page_renderer.py` — [新增] PDF 页面渲染为图像（pypdfium2 + Pillow）
+- `src/infrastructure/document_parsing/pdf_page_renderer.py` — [新增] PDF 页面渲染为图像（pypdfium2 + Pillow）
 - `src/composition_root.py` — [修改] 注册 layout_detector + 版本升级
 - `tests/unit/domain/ports/test_layout_detector_port.py` — Protocol 合规测试
 - `tests/unit/application/services/test_layout_matching.py` — IoU 计算/bbox 匹配单元测试
-- `tests/unit/infrastructure/external_services/document_parsing/test_onnx_layout_detector.py` — OnnxLayoutDetector 单元测试
-- `tests/unit/infrastructure/external_services/document_parsing/test_pdf_page_renderer.py` — PDF 页面渲染单元测试
+- `tests/unit/infrastructure/document_parsing/test_onnx_layout_detector.py` — OnnxLayoutDetector 单元测试
+- `tests/unit/infrastructure/document_parsing/test_pdf_page_renderer.py` — PDF 页面渲染单元测试
 - `tests/unit/architecture/test_arch_document_layout.py` — SDD 架构约束验证
 - `tests/contracts/test_port_contract_layout_detector.py` — 端口契约测试
 - `tests/integration/test_integration_document_layout.py` — 端到端集成测试

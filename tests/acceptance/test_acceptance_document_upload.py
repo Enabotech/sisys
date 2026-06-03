@@ -27,7 +27,7 @@ from pytest_bdd import given, scenario, then, when
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
 from src.domain.value_objects.token_payload import TokenPayload
-from src.infrastructure.external_services.archive_extractor import ArchiveExtractor
+from src.infrastructure.document_parsing.archive_extractor import ArchiveExtractor
 from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
 from src.interfaces.api.document_upload import create_document_upload_router
 
@@ -888,7 +888,7 @@ def upload_zip_bomb(upload_response: dict[str, Any], archive_extractor: ArchiveE
         zf.writestr("bomb.txt", b"x" * 100000)
     buf.seek(0)
     bomb_detected = False
-    with patch("src.infrastructure.external_services.archive_extractor.MAX_ARCHIVE_EXTRACTED_SIZE", 100):
+    with patch("src.infrastructure.document_parsing.archive_extractor.MAX_ARCHIVE_EXTRACTED_SIZE", 100):
         try:
             archive_extractor.extract(buf, "bomb.zip")
         except ValueError as e:

@@ -25,13 +25,13 @@ class TestHTMLParserCreation:
     """HTMLParser 构造和基本功能测试"""
 
     def test_create_parser(self) -> None:
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
 
         assert HTMLParser() is not None
 
     def test_parser_implements_document_parser_port(self) -> None:
         from src.domain.ports.document_parser import DocumentParserPort
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
 
         assert isinstance(HTMLParser(), DocumentParserPort)
 
@@ -41,7 +41,7 @@ class TestHTMLParserTextExtraction:
 
     def test_parse_basic_html(self) -> None:
         """解析基本 HTML，提取文本内容"""
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
 
         path = _create_html_file("<html><body><h1>标题</h1><p>段落内容</p></body></html>")
         try:
@@ -57,7 +57,7 @@ class TestHTMLParserTextExtraction:
 
     def test_parse_html_heading_styles(self) -> None:
         """HTML 标题层级映射到 metadata.style"""
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
 
         path = _create_html_file("<html><body><h1>一级</h1><h2>二级</h2><h3>三级</h3></body></html>")
         try:
@@ -78,7 +78,7 @@ class TestHTMLParserTableExtraction:
 
     def test_parse_html_table(self) -> None:
         """提取 HTML 表格为 ParsedTable"""
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
 
         html_content = "<html><body><table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table></body></html>"
         path = _create_html_file(html_content)
@@ -99,7 +99,7 @@ class TestHTMLParserEmptyDocument:
 
     def test_empty_html_returns_failed(self) -> None:
         """空 body HTML 返回 failed"""
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
 
         path = _create_html_file("<html><body></body></html>")
         try:

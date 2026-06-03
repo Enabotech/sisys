@@ -95,7 +95,7 @@ class TestPptxParserCreation:
 
     def test_create_parser(self) -> None:
         """验证 PptxParser 可以正常实例化"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         parser = PptxParser()
         assert parser is not None
@@ -103,7 +103,7 @@ class TestPptxParserCreation:
     def test_parser_implements_document_parser_port(self) -> None:
         """验证 PptxParser 满足 DocumentParserPort 协议"""
         from src.domain.ports.document_parser import DocumentParserPort
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         parser = PptxParser()
         assert isinstance(parser, DocumentParserPort)
@@ -114,7 +114,7 @@ class TestPptxParserTextExtraction:
 
     def test_parse_single_slide_pptx(self) -> None:
         """解析单幻灯片 PPTX，提取文本"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         path = _create_pptx_with_text(["战略规划概述"])
         try:
@@ -131,7 +131,7 @@ class TestPptxParserTextExtraction:
 
     def test_parse_multi_slide_pptx(self) -> None:
         """解析多幻灯片 PPTX，验证页数和页码"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         path = _create_pptx_with_text(["第一页", "第二页", "第三页"])
         try:
@@ -153,7 +153,7 @@ class TestPptxParserTextExtraction:
 
     def test_shapes_metadata_includes_shape_type(self) -> None:
         """文本元素 metadata 包含形状类型"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         path = _create_pptx_with_shapes()
         try:
@@ -174,7 +174,7 @@ class TestPptxParserTableExtraction:
 
     def test_parse_pptx_with_table(self) -> None:
         """提取幻灯片内嵌表格为 ParsedTable"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         path = _create_pptx_with_table(rows=3, cols=3)
         try:
@@ -199,7 +199,7 @@ class TestPptxParserNotesExtraction:
 
     def test_parse_pptx_with_notes(self) -> None:
         """提取幻灯片备注内容"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         path = _create_pptx_with_text(["战略规划"], include_notes=True)
         try:
@@ -214,7 +214,7 @@ class TestPptxParserNotesExtraction:
 
     def test_pptx_without_notes(self) -> None:
         """无备注的 PPTX 正常解析"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         path = _create_pptx_with_text(["无备注页"])
         try:
@@ -231,7 +231,7 @@ class TestPptxParserEmptyDocument:
 
     def test_empty_pptx_returns_failed(self) -> None:
         """无幻灯片的空 PPTX 返回 failed"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         path = _create_empty_pptx()
         try:
@@ -249,7 +249,7 @@ class TestPptxParserLegacyFormatRejection:
 
     def test_ppt_mime_returns_failed(self) -> None:
         """旧版 PPT MIME 返回 failed 并建议转换"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".ppt")
         tmp.write(b"not a valid pptx")
@@ -266,7 +266,7 @@ class TestPptxParserLegacyFormatRejection:
 
     def test_corrupt_file_returns_failed(self) -> None:
         """损坏文件返回 failed"""
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pptx")
         tmp.write(b"this is not a valid pptx zip file")

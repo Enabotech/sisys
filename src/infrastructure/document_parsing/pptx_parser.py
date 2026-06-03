@@ -17,7 +17,7 @@ from src.domain.value_objects.parsed_document import (
     ParsedPage,
     ParsedTable,
 )
-from src.infrastructure.external_services.document_parsing._limits import MAX_PPTX_BYTES
+from src.infrastructure.document_parsing._limits import MAX_PPTX_BYTES
 
 logger = logging.getLogger(__name__)
 

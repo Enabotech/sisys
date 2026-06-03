@@ -123,9 +123,9 @@ def _cleanup(path: str) -> None:
 @given("文档解析器已就绪")
 def given_parsers_ready(context: dict[str, Any]) -> None:
     """初始化所有解析器实例"""
-    from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
-    from src.infrastructure.external_services.document_parsing.text_parser import TextParser
-    from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+    from src.infrastructure.document_parsing.pdf_parser import PDFParser
+    from src.infrastructure.document_parsing.text_parser import TextParser
+    from src.infrastructure.document_parsing.word_parser import WordParser
 
     context["pdf_parser"] = PDFParser()
     context["word_parser"] = WordParser()

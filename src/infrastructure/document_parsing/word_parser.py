@@ -20,7 +20,7 @@ from src.domain.value_objects.parsed_document import (
     ParsedPage,
     ParsedTable,
 )
-from src.infrastructure.external_services.document_parsing._limits import MAX_DOCX_BYTES
+from src.infrastructure.document_parsing._limits import MAX_DOCX_BYTES
 
 try:
     from defusedxml.ElementTree import parse as safe_xml_parse

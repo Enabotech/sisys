@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from src.domain.value_objects.upload_limits import MAX_NESTING_DEPTH
-from src.infrastructure.external_services.archive_extractor import (
+from src.infrastructure.document_parsing.archive_extractor import (
     ArchiveExtractor,
 )
 
@@ -287,7 +287,7 @@ class TestArchiveExtractorSymlink:
 class TestArchiveExtractorCompressionBomb:
     """验证压缩炸弹防护"""
 
-    @patch("src.infrastructure.external_services.archive_extractor.MAX_ARCHIVE_EXTRACTED_SIZE", 1024)
+    @patch("src.infrastructure.document_parsing.archive_extractor.MAX_ARCHIVE_EXTRACTED_SIZE", 1024)
     def test_zip_bomb_detected(self) -> None:
         """ZIP 压缩炸弹触发大小限制"""
         extractor = ArchiveExtractor()
@@ -300,7 +300,7 @@ class TestArchiveExtractorCompressionBomb:
         with pytest.raises(ValueError, match="压缩炸弹"):
             extractor.extract(buf, "bomb.zip")
 
-    @patch("src.infrastructure.external_services.archive_extractor.MAX_ARCHIVE_EXTRACTED_SIZE", 1024)
+    @patch("src.infrastructure.document_parsing.archive_extractor.MAX_ARCHIVE_EXTRACTED_SIZE", 1024)
     def test_tar_bomb_detected(self) -> None:
         """TAR 压缩炸弹触发大小限制"""
         extractor = ArchiveExtractor()

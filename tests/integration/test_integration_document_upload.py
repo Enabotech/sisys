@@ -17,7 +17,7 @@ from src.domain.entities.document import Document, DocumentType, ParseStatus
 from src.domain.events.document_events import DocumentUploaded
 from src.domain.ports.document_repository import DocumentRepositoryPort
 from src.domain.ports.event_publisher import EventPublisher
-from src.infrastructure.external_services.archive_extractor import ArchiveExtractor
+from src.infrastructure.document_parsing.archive_extractor import ArchiveExtractor
 from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadManager
 
 

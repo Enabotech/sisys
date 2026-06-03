@@ -577,7 +577,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/infrastructure/external_services/test_archive_extractor.py`（zip/tar 解压、格式过滤、嵌套检测、压缩炸弹防护、路径穿越防护） |
-| 🟢 绿 | 实现 `src/infrastructure/external_services/archive_extractor.py` |
+| 🟢 绿 | 实现 `src/infrastructure/document_parsing/archive_extractor.py` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [x] Subtask 6.1: 🔴 红 — 编写 ArchiveExtractor 失败测试（extract_zip、extract_tar、嵌套深度、压缩炸弹、路径穿越 `../`、symlink 符号链接检测）
@@ -979,7 +979,7 @@ tests/
 - `src/infrastructure/storage/postgresql/models/document.py` — DocumentModel SQLAlchemy 声明式映射
 - `src/infrastructure/storage/postgresql/repository/document_repository.py` — PostgreSQLDocumentRepository
 - `src/infrastructure/storage/redis/chunked_upload_manager.py` — 分片上传状态管理
-- `src/infrastructure/external_services/archive_extractor.py` — 压缩包解压
+- `src/infrastructure/document_parsing/archive_extractor.py` — 压缩包解压
 
 接口层（新建）✅:
 - `src/interfaces/api/document_upload.py` — FastAPI 上传路由

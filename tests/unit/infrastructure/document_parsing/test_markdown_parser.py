@@ -25,13 +25,13 @@ class TestMarkdownParserCreation:
     """MarkdownParser 构造和基本功能测试"""
 
     def test_create_parser(self) -> None:
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
         assert MarkdownParser() is not None
 
     def test_parser_implements_document_parser_port(self) -> None:
         from src.domain.ports.document_parser import DocumentParserPort
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
         assert isinstance(MarkdownParser(), DocumentParserPort)
 
@@ -41,7 +41,7 @@ class TestMarkdownParserHeadings:
 
     def test_parse_headings(self) -> None:
         """识别 # → h1，## → h2 标题层级，验证 metadata.style 映射"""
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
         path = _create_md_file("# 一级标题\n\n## 二级标题\n\n### 三级标题\n")
         try:
@@ -68,7 +68,7 @@ class TestMarkdownParserParagraphs:
 
     def test_paragraph_split_by_blank_lines(self) -> None:
         """按连续空行分割段落"""
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
         path = _create_md_file("第一段内容\n\n第二段内容\n\n第三段内容\n")
         try:
@@ -88,7 +88,7 @@ class TestMarkdownParserTable:
 
     def test_parse_markdown_table(self) -> None:
         """识别 | col | col | 格式表格，过滤分隔符行，验证单元格数据"""
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
         path = _create_md_file("| A | B |\n|---|---|\n| 1 | 2 |\n")
         try:
@@ -112,7 +112,7 @@ class TestMarkdownParserCodeBlocks:
 
     def test_code_block_preserved(self) -> None:
         """代码块内容保留"""
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
         path = _create_md_file("```python\nprint('hello')\n```\n")
         try:
@@ -131,7 +131,7 @@ class TestMarkdownParserEmptyDocument:
 
     def test_empty_markdown_returns_failed(self) -> None:
         """空 Markdown 返回 failed"""
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
         path = _create_md_file("")
         try:

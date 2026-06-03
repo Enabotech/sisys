@@ -18,7 +18,7 @@ from src.domain.value_objects.parsed_document import (
     ParsedElement,
     ParsedPage,
 )
-from src.infrastructure.external_services.document_parsing._limits import (
+from src.infrastructure.document_parsing._limits import (
     MAX_PDF_BYTES,
     MAX_PDF_PAGES,
 )
