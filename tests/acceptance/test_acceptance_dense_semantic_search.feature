@@ -87,3 +87,25 @@
   场景: AC-6b - 共享层零外部依赖
     当 我扫描 src/shared/ 目录
     那么 不应该导入 qdrant_client 或 torch 或 FlagEmbedding 或 sentence_transformers
+
+  # ============================================================================
+  # Task 10: API 模式验收（Story 3-1a 阶段二）
+  # ============================================================================
+
+  场景: AC-api - 嵌入 API 服务健康检查
+    假如 嵌入 API 服务已启动
+    当 我请求 GET /health
+    那么 返回状态码 200
+    并且 响应 JSON 包含 status 为 "ok"
+
+  场景: AC-api - 嵌入 API 服务 Dense 编码
+    假如 嵌入 API 服务已启动
+    当 我 POST /v1/embeddings 发送单条文本
+    那么 返回状态码 200
+    并且 响应包含 1024 维 Dense 向量
+
+  场景: AC-api - 嵌入 API 服务 Sparse 编码
+    假如 嵌入 API 服务已启动
+    当 我 POST /v1/embeddings 发送单条文本并请求 Sparse
+    那么 返回状态码 200
+    并且 响应同时包含 Dense 和 Sparse 字段

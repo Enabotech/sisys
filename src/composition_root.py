@@ -1422,20 +1422,39 @@ def bootstrap() -> None:
     from src.domain.ports.crawler_client import CrawlerClientPort
     from src.domain.ports.embedding_service import EmbeddingServicePort
     from src.infrastructure.config.embedding import EmbeddingConfig
-    from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-        BGE3EmbeddingService,
-    )
 
-    register_port(
-        name="embedding_service",
-        version="v1.1.0",
-        interface=EmbeddingServicePort,
-        impl=lambda resolver: BGE3EmbeddingService(EmbeddingConfig.from_env()),
-        module="src.infrastructure.external_services.embedding.bge3_embedding_service",
-        lifetime=Lifetime.SINGLETON,
-        owner="search-team",
-        tags=("embedding", "search"),
-    )
+    embedding_api_url = os.getenv("EMBEDDING_API_URL", "")
+
+    if embedding_api_url:
+        from src.infrastructure.external_services.embedding.embedding_api_client import (
+            EmbeddingAPIClient,
+        )
+
+        register_port(
+            name="embedding_service",
+            version="v1.1.0",
+            interface=EmbeddingServicePort,
+            impl=lambda resolver: EmbeddingAPIClient(EmbeddingConfig.from_env()),
+            module="src.infrastructure.external_services.embedding.embedding_api_client",
+            lifetime=Lifetime.SINGLETON,
+            owner="search-team",
+            tags=("embedding", "search", "api"),
+        )
+    else:
+        from src.infrastructure.external_services.embedding.bge3_embedding_service import (
+            BGE3EmbeddingService,
+        )
+
+        register_port(
+            name="embedding_service",
+            version="v1.1.0",
+            interface=EmbeddingServicePort,
+            impl=lambda resolver: BGE3EmbeddingService(EmbeddingConfig.from_env()),
+            module="src.infrastructure.external_services.embedding.bge3_embedding_service",
+            lifetime=Lifetime.SINGLETON,
+            owner="search-team",
+            tags=("embedding", "search", "local"),
+        )
 
     register_port(
         name="dense_search_service",

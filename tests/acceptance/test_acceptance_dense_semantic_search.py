@@ -593,3 +593,112 @@ def verify_shared_no_forbidden_imports():
                 if node.module:
                     root_module = node.module.split(".")[0]
                     assert root_module not in forbidden_imports, f"{py_file} 导入了禁止的依赖: {node.module}"
+
+
+# ===================================================================
+# Task 10: API 模式验收
+# ===================================================================
+
+
+@scenario("test_acceptance_dense_semantic_search.feature", "AC-api - 嵌入 API 服务健康检查")
+def test_ac_api_health_check():
+    """测试嵌入 API 服务健康检查"""
+    pass
+
+
+@scenario("test_acceptance_dense_semantic_search.feature", "AC-api - 嵌入 API 服务 Dense 编码")
+def test_ac_api_dense_encoding():
+    """测试嵌入 API 服务 Dense 编码"""
+    pass
+
+
+@scenario("test_acceptance_dense_semantic_search.feature", "AC-api - 嵌入 API 服务 Sparse 编码")
+def test_ac_api_sparse_encoding():
+    """测试嵌入 API 服务 Sparse 编码"""
+    pass
+
+
+@pytest.fixture
+def api_client():
+    """创建 FastAPI TestClient 并注入 mock 模型"""
+    from unittest.mock import MagicMock
+
+    import numpy as np
+    from fastapi.testclient import TestClient
+
+    from src.infrastructure.external_services.embedding.embedding_api_server import app
+
+    model = MagicMock()
+
+    def mock_encode(texts, return_dense=False, return_sparse=False, **kwargs):
+        result: dict = {}
+        n = len(texts) if isinstance(texts, list) else 1
+        if return_dense:
+            result["dense_vecs"] = np.random.randn(n, 1024).astype(np.float32)
+        if return_sparse:
+            result["lexical_weights"] = [{100: 0.5, 200: 0.3} for _ in range(n)]
+        return result
+
+    model.encode.side_effect = mock_encode
+    app.state.model = model
+    return TestClient(app)
+
+
+@given("嵌入 API 服务已启动")
+def api_service_started(api_client, context: dict[str, Any]):
+    """记录 API 客户端到上下文"""
+    context["api_client"] = api_client
+
+
+@when("我请求 GET /health")
+def request_health_check(context: dict[str, Any]):
+    """请求健康检查"""
+    client = context["api_client"]
+    resp = client.get("/health")
+    context["api_response"] = resp
+
+
+@when("我 POST /v1/embeddings 发送单条文本")
+def request_dense_encoding(context: dict[str, Any]):
+    """请求 Dense 编码"""
+    client = context["api_client"]
+    resp = client.post("/v1/embeddings", json={"texts": ["企业战略规划"], "return_sparse": False})
+    context["api_response"] = resp
+
+
+@when("我 POST /v1/embeddings 发送单条文本并请求 Sparse")
+def request_sparse_encoding(context: dict[str, Any]):
+    """请求 Dense + Sparse 编码"""
+    client = context["api_client"]
+    resp = client.post("/v1/embeddings", json={"texts": ["企业战略规划"], "return_sparse": True})
+    context["api_response"] = resp
+
+
+@then("返回状态码 200")
+def verify_status_200(context: dict[str, Any]):
+    """验证状态码"""
+    assert context["api_response"].status_code == 200
+
+
+@then('响应 JSON 包含 status 为 "ok"')
+def verify_health_status(context: dict[str, Any]):
+    """验证健康检查响应"""
+    data = context["api_response"].json()
+    assert data["status"] == "ok"
+
+
+@then("响应包含 1024 维 Dense 向量")
+def verify_dense_1024_dim(context: dict[str, Any]):
+    """验证 Dense 维度"""
+    data = context["api_response"].json()
+    assert len(data["dense"]) == 1
+    assert len(data["dense"][0]) == 1024
+
+
+@then("响应同时包含 Dense 和 Sparse 字段")
+def verify_both_dense_and_sparse(context: dict[str, Any]):
+    """验证同时返回 Dense 和 Sparse"""
+    data = context["api_response"].json()
+    assert "dense" in data
+    assert "sparse" in data
+    assert data["sparse"] is not None

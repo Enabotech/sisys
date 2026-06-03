@@ -1,0 +1,33 @@
+# SISYS Embedding API — Docker Compose 部署配置
+# 独立于主 docker-compose.yml，按需启动
+#
+# 使用方式:
+#   docker compose -f deploy/docker-compose.embedding.yml up -d
+#   docker compose -f deploy/docker-compose.embedding.yml down
+#
+# 服务启动后，在 .env 中设置 EMBEDDING_API_URL=http://localhost:8001 启用 API 模式
+
+services:
+  embedding-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.embedding
+    ports:
+      - "${EMBEDDING_API_PORT:-8001}:8000"
+    environment:
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-BAAI/bge-m3}
+      - EMBEDDING_MODEL_PATH=${EMBEDDING_MODEL_PATH:-}
+      - EMBEDDING_MODEL_DEVICE=${EMBEDDING_MODEL_DEVICE:-cpu}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
