@@ -153,6 +153,9 @@ async def health() -> dict:
 
     Returns:
         服务状态、模型名称、设备、错误信息（若有）
+
+    Raises:
+        HTTPException 503: 模型未加载
     """
     if app.state.model is not None:
         return {
@@ -161,13 +164,18 @@ async def health() -> dict:
             "device": app.state.device,
             "error": None,
         }
-    else:
-        return {
+
+    from fastapi import HTTPException
+
+    raise HTTPException(
+        status_code=503,
+        detail={
             "status": "unavailable",
             "model": app.state.model_name,
             "device": app.state.device,
             "error": app.state.load_error or "Model not loaded",
-        }
+        },
+    )
 
 
 @app.post("/v1/embeddings", response_model=EmbedResponse)
