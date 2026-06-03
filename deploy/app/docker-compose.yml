@@ -217,21 +217,19 @@ services:
 
   # ===========================================================================
   # Embedding API — BGE-M3 嵌入服务 (Story 3-1a)
-  # 复用 L2 依赖镜像（已含 FlagEmbedding/torch/fastapi），volume 挂载源码
+  # 使用应用镜像（已含 src/ 全量源码），仅挂载模型缓存
   # ===========================================================================
   embedding-api:
-    image: ${EMBEDDING_IMAGE:-harbor.sisys.local/sisys/dependency:l2-latest}
+    image: ${APP_IMAGE:-harbor.sisys.local/sisys/app:latest}
     container_name: sisys-embedding-api
     restart: unless-stopped
     ports:
       - "${EMBEDDING_API_PORT:-8001}:8000"
     volumes:
-      - ../../src/infrastructure/external_services/embedding/embedding_api_server.py:/app/embedding_api_server.py:ro
       - ${EMBEDDING_MODEL_PATH:-/dev/null}:${EMBEDDING_MODEL_PATH:-/dev/null}:ro
       - embedding_cache:/root/.cache/huggingface
     working_dir: /app
-    command: >
-      poetry run uvicorn embedding_api_server:app --host 0.0.0.0 --port 8000
+    command: ["python", "-m", "uvicorn", "src.infrastructure.external_services.embedding.embedding_api_server:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       - EMBEDDING_MODEL_NAME
       - EMBEDDING_MODEL_PATH
