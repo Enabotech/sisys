@@ -118,7 +118,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 
 | 端口名称 | 版本 | 接口 | 实现模块 | 生命周期 | Owner |
 |---------|------|------|---------|---------|-------|
-| `embedding_service` | v1.1.0 | `EmbeddingServicePort` | `src.infrastructure.external_services.embedding.bge3_embedding_service.BGE3EmbeddingService` | SINGLETON | search-team |
+| `embedding_service` | v1.1.0 | `EmbeddingServicePort` | `src.infrastructure.external_services.embedding.embedding_api_client.EmbeddingAPIClient` | SINGLETON | search-team |
 | `dense_search_service` | v1.0.0 | `DenseSemanticSearchService`（服务类自身，参考 document_upload_service 模式） | `src.application.services.dense_search_service.DenseSemanticSearchService` | SCOPED | search-team |
 
 **已有端口（复用，不修改）：**
@@ -718,64 +718,31 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 ---
 
-### Task 9: 双策略 DI 注册 + Docker Compose 部署
+### Task 9: DI 注册 + Docker Compose 部署（v2.0.0 已简化为单一路径）
 
 **关联 AC:** AC-1, AC-2
 
-> ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
+> **v2.0.0 变更：** 移除 BGE3EmbeddingService 和双策略分支。`EmbeddingAPIClient` 为唯一实现，`EMBEDDING_API_URL` 默认 `embedding-api:8000`。
 
-#### TDD 循环 A：双策略 DI 注册
-
-| 阶段 | 动作 |
-|------|------|
-| 🔴 红 | 在 `tests/contracts/test_port_contract_embedding_service.py` 中补充 API 模式注册验证 |
-| 🟢 绿 | 修改 `src/composition_root.py` 双策略注册 |
-| 🔄 重构 | 运行 `ruff` + `mypy` |
-
-- [ ] Subtask 9.1: 🔴 红 — 补充契约测试验证双策略
-  - 验证 `EMBEDDING_API_URL` 为空时 `embedding_service` 解析为 `BGE3EmbeddingService`
-  - 验证 `EMBEDDING_API_URL` 非空时 `embedding_service` 解析为 `EmbeddingAPIClient`
-  - 验证两种实现的 `interface` 均为 `EmbeddingServicePort`
-- [ ] Subtask 9.2: 🟢 绿 — 修改 `src/composition_root.py`
+- [x] Subtask 9.1: 🟢 绿 — 修改 `src/composition_root.py` 单次注册
   ```python
-  # === Search Ports (Epic 3) ===
-  EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "")
-
-  if EMBEDDING_API_URL:
-      from src.infrastructure.external_services.embedding.embedding_api_client import (
-          EmbeddingAPIClient,
-      )
-      register_port(
-          name="embedding_service", version="v1.1.0",
-          interface=EmbeddingServicePort,
-          impl=lambda resolver: EmbeddingAPIClient(EmbeddingConfig.from_env()),
-          module="src.infrastructure.external_services.embedding.embedding_api_client",
-          lifetime=Lifetime.SINGLETON, owner="search-team",
-          tags=("embedding", "search", "api"),
-      )
-  else:
-      from src.infrastructure.external_services.embedding.bge3_embedding_service import (
-          BGE3EmbeddingService,
-      )
-      register_port(
-          name="embedding_service", version="v1.1.0",
-          interface=EmbeddingServicePort,
-          impl=lambda resolver: BGE3EmbeddingService(EmbeddingConfig.from_env()),
-          module="src.infrastructure.external_services.embedding.bge3_embedding_service",
-          lifetime=Lifetime.SINGLETON, owner="search-team",
-          tags=("embedding", "search", "local"),
-      )
+  register_port(
+      name="embedding_service", version="v1.1.0",
+      interface=EmbeddingServicePort,
+      impl=lambda resolver: EmbeddingAPIClient(EmbeddingConfig.from_env()),
+      module="src.infrastructure.external_services.embedding.embedding_api_client",
+      lifetime=Lifetime.SINGLETON, owner="search-team",
+      tags=("embedding", "search"),
+  )
   ```
-  - 双策略在 `composition_root.py` 中通过环境变量分支实现，不引入额外抽象层
-  - `DenseSemanticSearchService` 仍通过 `resolver.resolve("embedding_service")` 获取，对两种实现透明
-- [ ] Subtask 9.3: 🔄 重构 — 运行 `ruff check` + `mypy`
+- [x] Subtask 9.2: 🟢 绿 — Docker Compose 部署整合入 `deploy/app/docker-compose.yml`（复用 L2 镜像 + volume 挂载源码）
+- [x] Subtask 9.3: 🟢 绿 — `.env.example` 简化为 `EMBEDDING_API_URL=http://embedding-api:8000`
+- [x] Subtask 9.4: 🟢 绿 — CI 集成：integration/acceptance job 添加 `EMBEDDING_API_URL=http://host.docker.internal:8001`
 
-#### TDD 循环 B：Docker Compose 部署配置
-
-| 阶段 | 动作 |
-|------|------|
-| 🟢 绿 | 创建 `deploy/docker-compose.embedding.yml` 和 `deploy/Dockerfile.embedding` |
-| 🔄 重构 | 更新 `.env.example` 集成说明 |
+**完成标准/Definition of Done:**
+- [x] DI 单次注册，无分支
+- [x] `docker compose up -d` 默认启动 embedding-api
+- [x] CI 通过 (7/7 healthy)
 
 - [ ] Subtask 9.4: 🟢 绿 — 创建 `deploy/docker-compose.embedding.yml`
   ```yaml
@@ -1225,10 +1192,11 @@ def perform_dense_search(context, dense_search_service, event_loop):
 
 ---
 
-**故事版本/Story Version:** v1.2.3
+**故事版本/Story Version:** v2.0.0
 **创建日期/Created:** 2026-06-01
 **最后更新/Last Updated:** 2026-06-03
 **更新说明/Description:**
+- v2.0.0: 统一单一路径 — 移除BGE3EmbeddingService进程内加载(删3文件,-734行)；EmbeddingAPIClient为唯一Port实现；双策略→单次DI注册；EmbeddingConfig精简为2字段(api_url+api_timeout)；docker-compose默认部署embedding-api；CI集成(2 job添加EMBEDDING_API_URL)；EmbedRequest.max_length=64无据限制移除
 - v1.2.3: 5轮审查修订第3-5轮 — AC-encode_sparse→AC-5 命名规范化（统一数字序列 AC-1~AC-5）；Task 0/1 补充 AC-5 关联；新增统一错误处理策略；Feature 文件 Gherkin 场景与步骤代码对齐；对抗性审查无新发现
 - v1.2.2: 5轮审查修订第2轮 — 代码：FP16 GPU 计算能力检测（Pascal 架构安全降级）、generate_embedding 补充表格文本提取、BGE3EmbeddingService 显式实现 EmbeddingServicePort、契约测试补充 dense_search_service 接口类型验证；文档：search_sparse filter 不对称说明、EmbeddingConfig 双定义同步风险、性能基准统计局限性
 - v1.2.1: 5轮审查修订第1轮 — 修正 L2 归一化科学描述、空文本处理规范（统一 ValueError）、SentenceTransformers 选型描述、Task 依赖图矛盾；代码修复 composition_root 版本号 v1.0.0→v1.1.0、契约测试补充 encode_sparse、清理孤儿 pyc；新增 sync/async 兼容策略分析、batch_size 说明、表格忽略限制、依赖残留说明
