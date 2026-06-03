@@ -96,7 +96,18 @@ async def generate_embedding(parse_result: dict[str, Any]) -> list[float]:
             return []
 
         pages = doc.metadata["parse_result"].get("pages", [])
-        text = " ".join(elem.get("content", "") for page in pages for elem in page.get("texts", []) if isinstance(elem, dict))
+        # 提取 texts 中的文本
+        text_parts: list[str] = [
+            elem.get("content", "") for page in pages for elem in page.get("texts", []) if isinstance(elem, dict)
+        ]
+        # 提取 tables 中的文本（表格行展平为 "cell1 cell2 ..." 格式）
+        for page in pages:
+            for table in page.get("tables", []):
+                if isinstance(table, dict):
+                    for row in table.get("rows", []):
+                        if isinstance(row, list):
+                            text_parts.append(" ".join(str(cell) for cell in row if cell))
+        text = " ".join(text_parts)
 
         if not text.strip():
             return []

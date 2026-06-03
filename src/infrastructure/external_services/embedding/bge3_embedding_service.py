@@ -20,12 +20,13 @@ from typing import Any, cast
 import numpy as np
 from FlagEmbedding import BGEM3FlagModel
 
+from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.infrastructure.config.embedding import EmbeddingConfig
 
 logger = logging.getLogger(__name__)
 
 
-class BGE3EmbeddingService:
+class BGE3EmbeddingService(EmbeddingServicePort):
     """BGE-M3 嵌入服务实现
 
     实现 EmbeddingServicePort 接口，提供 Dense（语义向量）和 Sparse（词汇权重）编码功能。
@@ -46,7 +47,18 @@ class BGE3EmbeddingService:
         self._config = config
 
         model_path = config.model_path if config.model_path and os.path.isdir(config.model_path) else config.model_name
-        use_fp16 = config.device == "cuda"
+        # FP16 需要 Compute Capability ≥ 7.0（Volta+），Pascal 架构（6.x）不支持 FP16 张量核心
+        use_fp16 = False
+        if config.device == "cuda":
+            try:
+                import torch
+
+                capability = torch.cuda.get_device_capability(0)
+                use_fp16 = capability[0] >= 7
+                if not use_fp16:
+                    logger.warning("GPU Compute Capability %s < 7.0，FP16 不可用，降级为 FP32", capability)
+            except Exception:
+                use_fp16 = False
 
         if config.model_path and os.path.isdir(config.model_path):
             logger.info("从本地路径加载嵌入模型: %s (use_fp16=%s)", model_path, use_fp16)

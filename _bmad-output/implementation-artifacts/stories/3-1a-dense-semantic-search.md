@@ -515,7 +515,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - [x] composition_root.py 注册完成
 - [x] generate_embedding 替换完成
 - [x] 所有测试通过
-- [x] **已知限制：** `generate_embedding` 当前仅提取 `page["texts"]` 中的文本内容，忽略 `page["tables"]` 的表格数据（如 Excel/CSV 解析结果中的 `rows` 字段）。财务报告、市场数据等以表格为主的文档会丢失表格中的语义信息，需在后续 Story（如索引增强）中补充表格文本提取逻辑。
+- [x] **v1.2.2 已修复：** `generate_embedding` 现已同时提取 `page["texts"]` 和 `page["tables"]`（展平 `rows` 为空格分隔 cell 文本）。表格中的数值和结构化数据将纳入嵌入向量的语义空间。注意：`page["images"]` 仍被忽略——图像语义提取需依赖多模态模型，不在本 Story 范围内。
 
 ---
 
@@ -934,11 +934,12 @@ EMBEDDING_MODEL_DIMENSION=1024
 |------|------|---------|
 | `L3VectorPort.search()` | `src/domain/ports/l3_vector.py` | DenseSemanticSearchService 直接调用 |
 | `QdrantVectorStorage.search()` | `src/infrastructure/storage/qdrant/vector_storage.py` | Dense search 已完整实现；**注意**：`create_collection`/`delete_collection`/`collection_exists`/`list_collections` 为空 stub，实际 Collection 管理由 `QdrantAdapter` → `QdrantCollectionManager` 链路完成 |
+| `L3VectorPort.search_sparse()` | `src/domain/ports/l3_vector.py` | **注意**：`search_sparse()` 的 filter 实现仅支持精确匹配（`MatchValue`），不支持数值范围过滤（`Range`），与 `search()` 的 filter 能力不对称 |
 | `QdrantAdapter` | `src/infrastructure/storage/qdrant/qdrant_adapter.py` | l3_vector 端口实现 |
 | `QdrantCollectionManager` | `src/infrastructure/storage/qdrant/collection_manager.py` | 测试中创建 Collection |
 | `VectorPoint` (1024维) | `src/infrastructure/storage/qdrant/models.py` | 测试中构造向量点 |
 | `EmbeddingModelProtocol` | `src/infrastructure/routing/semantic_router.py` | 设计参考（本 Story 不直接使用） |
-| `EmbeddingConfig` (测试) | `tests/environments.py` | 测试环境已有配置 |
+| `EmbeddingConfig` (测试) | `tests/environments.py` | 测试环境已有配置；**注意**：`tests/environments.py` 和 `src/infrastructure/config/embedding.py` 各自维护独立的 `EmbeddingConfig` dataclass，需手动同步字段变更 |
 
 ### generate_embedding MVP 占位
 
@@ -968,7 +969,15 @@ async def generate_embedding(parse_result: dict[str, Any]) -> list[float]:
     if not doc or not doc.metadata.get("parse_result"):
         return []
     pages = doc.metadata["parse_result"].get("pages", [])
-    text = " ".join(elem.get("content", "") for page in pages for elem in page.get("texts", []) if isinstance(elem, dict))
+    text_parts = [elem.get("content", "") for page in pages for elem in page.get("texts", []) if isinstance(elem, dict)]
+    # v1.2.2: 补充表格文本提取（展平 rows 为空格分隔 cell 文本）
+    for page in pages:
+        for table in page.get("tables", []):
+            if isinstance(table, dict):
+                for row in table.get("rows", []):
+                    if isinstance(row, list):
+                        text_parts.append(" ".join(str(cell) for cell in row if cell))
+    text = " ".join(text_parts)
     if not text.strip():
         return []
     embedding = await asyncio.to_thread(service.encode_text, text)
@@ -1210,10 +1219,11 @@ def perform_dense_search(context, dense_search_service, event_loop):
 
 ---
 
-**故事版本/Story Version:** v1.2.1
+**故事版本/Story Version:** v1.2.2
 **创建日期/Created:** 2026-06-01
 **最后更新/Last Updated:** 2026-06-03
 **更新说明/Description:**
+- v1.2.2: 5轮审查修订第2轮 — 代码：FP16 GPU 计算能力检测（Pascal 架构安全降级）、generate_embedding 补充表格文本提取、BGE3EmbeddingService 显式实现 EmbeddingServicePort、契约测试补充 dense_search_service 接口类型验证；文档：search_sparse filter 不对称说明、EmbeddingConfig 双定义同步风险、性能基准统计局限性
 - v1.2.1: 5轮审查修订第1轮 — 修正 L2 归一化科学描述、空文本处理规范（统一 ValueError）、SentenceTransformers 选型描述、Task 依赖图矛盾；代码修复 composition_root 版本号 v1.0.0→v1.1.0、契约测试补充 encode_sparse、清理孤儿 pyc；新增 sync/async 兼容策略分析、batch_size 说明、表格忽略限制、依赖残留说明
 - v1.2.0: 嵌入模型 API 化扩展 — 新增 Task 7-10（EmbeddingAPIClient + API Server + 双策略 DI + Docker Compose），EmbeddingConfig 扩展 api_url/api_timeout 字段
 - v1.1.0: FlagEmbedding 迁移 — SentenceTransformers→BGEM3FlagModel（BAAI 官方第一方库），新增 encode_sparse() 方法，集成/验收测试补充
