@@ -129,7 +129,9 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | `qdrant_connection_manager` | v1.0.0 | `ConnectionManager` | Qdrant 连接管理 |
 
 #### API 契约 (API Contract)
-- [x] 本 Story 不涉及 REST API 路由（纯应用层服务，API 路由由 Epic 7 提供）
+- [x] `embedding_api_server.py` FastAPI 自动生成 OpenAPI schema（`/openapi.json` + `/docs`）
+- [x] `EmbedRequest` / `EmbedResponse` / `HealthResponse` Pydantic 模型即为 API 契约
+- [x] 内部服务，无需独立 `docs/api/openapi.yaml`（Epic 7 面向外部用户的 API 路由才需要）
 
 #### 六边形架构约束（必须遵守）
 
