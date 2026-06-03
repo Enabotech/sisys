@@ -3,18 +3,18 @@
 #
 # 使用方式:
 #   无本地模型（自动从 HuggingFace 拉取）:
-#     docker compose -f deploy/docker-compose.embedding.yml up -d
+#     docker compose -f deploy/docker/docker-compose.embedding.yml up -d
 #
 #   有本地模型（优先加载本地，避免下载）:
-#     EMBEDDING_MODEL_PATH=/mnt/x/.cache/BAAI/bge-m3 docker compose -f deploy/docker-compose.embedding.yml up -d
+#     EMBEDDING_MODEL_PATH=/mnt/x/.cache/BAAI/bge-m3 docker compose -f deploy/docker/docker-compose.embedding.yml up -d
 #
 # 服务启动后，在 .env 中设置 EMBEDDING_API_URL=http://localhost:8001 启用 API 模式
 
 services:
   embedding-api:
     build:
-      context: ..
-      dockerfile: deploy/Dockerfile.embedding
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.embedding
     ports:
       - "${EMBEDDING_API_PORT:-8001}:8000"
     environment:
