@@ -34,8 +34,8 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 **验证标准/Validation Criteria:**
 - [ ] 单文本编码返回 1024 维向量
 - [ ] 批量编码返回正确数量的 1024 维向量
-- [ ] 向量 L2 范数 ≈ 1.0（BGE-M3 Dense 输出经模型架构保证归一化）
-- [ ] 空文本返回零向量或抛出 ValueError
+- [ ] 向量 L2 范数 ≈ 1.0（BGE-M3 经对比学习训练，Dense 输出近似 L2 归一化，容差约 1%；Qdrant 内部使用 Cosine 距离自动处理余量）
+- [ ] 空文本抛出 ValueError（零向量在余弦相似度检索中会触发未定义行为，快速失败是更安全的策略）
 
 ### AC-2: 余弦相似度检索
 
@@ -62,6 +62,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 - [ ] CPU 模式下放宽至 P95 < 500ms（CI 环境回退）
 - [ ] 排除首次模型加载时间（SINGLETON 懒加载）
 - [ ] 集成测试(Subtask 5.4)使用短文本（≤ 512 字符）进行性能测量
+- [ ] **注意：** AC-3 为非功能性需求，无对应 Gherkin 场景，仅通过集成测试中的 `test_search_latency` 验证；50 次采样为 CI 快速验证基线，生产环境需 ≥500 次采样以获取统计可靠 P95
 
 ### AC-4: Payload 过滤
 
@@ -86,7 +87,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 - [ ] `encode_sparse()` 返回 `{"indices": list[int], "values": list[float]}`
 - [ ] indices 列表按升序排列
 - [ ] 所有 values > 0
-- [ ] 空文本返回 `{"indices": [], "values": []}` 或抛出 ValueError
+- [ ] 空文本抛出 ValueError（与 Dense 编码保持一致）
 
 ---
 
@@ -255,7 +256,8 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 **Task 间执行依赖：**
 ```
 Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实现）
-                                         ↘ Task 3（Search 服务）→ Task 4（注册装配）→ Task 5（集成测试）→ Task 6（收尾）→ Task 7（API Client）→ Task 8（API Server）→ Task 9（双策略DI）→ Task 10（验收）
+                                         ↘ Task 3（Search 服务）→ Task 4（注册装配）→ Task 5（集成测试）→ Task 6（收尾）→ Task 7（API Client）↘ Task 9（双策略DI）→ Task 10（验收）
+                                                                                                                          Task 8（API Server）↗
 ```
 - Task 0-6 为阶段一（MVP 进程内嵌入），已完成
 - Task 7-10 为阶段二（API 化扩展），Task 7 依赖 Task 6 完成
@@ -392,7 +394,8 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
     model = BGEM3FlagModel(model_path, use_fp16=use_fp16)
     ```
   - `model.encode(text, return_dense=True)` 返回 dict，取 `result["dense_vecs"]` 转为 `list[float]`
-  - BGE-M3 Dense 输出经模型架构保证 L2 归一化，无需显式 `normalize_embeddings` 参数
+  - `encode_texts()` 使用 `batch_size=12`（GPU 显存效率与吞吐量的平衡值；`encode_text` 单文本使用 FlagEmbedding 默认值，不设 batch_size）
+  - BGE-M3 Dense 输出经对比学习训练自然近似 L2 归一化（||v||₂ ≈ 1.0，容差 < 1%），无需显式 normalize_embeddings 参数；Qdrant 的 Cosine 距离内部归一化提供额外容错
 - [x] Subtask 2.4: 🔄 重构 — 优化代码，运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
@@ -447,6 +450,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - [x] DenseSemanticSearchService 实现完成
 - [x] 单元测试全部通过
 - [x] 覆盖率≥85%（应用层）
+- [x] `DenseSearchResult` TypedDict 定义在 `dense_search_service.py` 内部（当前未通过 `__init__.py` 导出，因其仅作为 `search()` 返回类型注解使用，外部调用者通过 `list[dict]` 兼容即可）
 
 ---
 
@@ -511,6 +515,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - [x] composition_root.py 注册完成
 - [x] generate_embedding 替换完成
 - [x] 所有测试通过
+- [x] **已知限制：** `generate_embedding` 当前仅提取 `page["texts"]` 中的文本内容，忽略 `page["tables"]` 的表格数据（如 Excel/CSV 解析结果中的 `rows` 字段）。财务报告、市场数据等以表格为主的文档会丢失表格中的语义信息，需在后续 Story（如索引增强）中补充表格文本提取逻辑。
 
 ---
 
@@ -531,9 +536,9 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 - [x] Subtask 5.1: 🔴 红 — 创建 `tests/integration/test_integration_embedding_qdrant_dense_search.py`
   - 使用 `TestTenant` 隔离（参考 `test_integration_qdrant_real.py` 模式：`f"test_{uuid.uuid4().hex[:8]}"` fixture）
-  - Fixture：创建 Collection → 插入 10 个嵌入向量 → 测试后 try/finally 删除
+  - Fixture：创建 Collection → 插入 5 个嵌入向量（覆盖不同业务域）→ 测试后 try/finally 删除
 - [x] Subtask 5.2: 🟢 绿 — 实现端到端检索测试
-  - embed 10 个中文文本 → upsert 到 Qdrant → 查询 → 验证排序
+  - embed 5 个中文文本（覆盖多业务域）→ upsert 到 Qdrant → 查询 → 验证排序
 - [x] Subtask 5.3: 🟢 绿 — 实现 Payload 过滤测试
   - 插入不同 business_domain 的向量 → 过滤 → 验证结果
 - [x] Subtask 5.4: 🟢 绿 — 实现性能基准测试
@@ -868,6 +873,10 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 > 在 Story 3-1b 启动前完成重构，迁移至 `FlagEmbedding`（BGEM3FlagModel）。
 > 同时新增 `encode_sparse()` 方法，为 Story 3-1b BM25 稀疏检索提供原生 Sparse 嵌入能力。
 > 详见 Story 3-1b Dev Notes。
+>
+> **⚠️ 依赖残留说明：** 当前 `pyproject.toml` 同时保留 `sentence-transformers = "^2.2.2"` 和 `FlagEmbedding = "^1.2.8"`。
+> `sentence-transformers` 可能被其他 Story（如 ST-1.17 语义路由）使用，需在相应 Story 迁移后移除。
+> 项目约定：禁止新增 `sentence_transformers` 导入，所有新代码统一使用 `FlagEmbedding`。
 
 ### 关键架构决策
 
@@ -884,7 +893,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 | 方案 | 优点 | 缺点 | 决策 |
 |------|------|------|------|
 | **FlagEmbedding / BGEM3FlagModel（选中）** | BAAI 第一方库，一次推理同时产出 Dense+Sparse+ColBERT；原生多语言 tokenizer | 锁定 BGE 系列模型 | ✅ 采用 |
-| SentenceTransformers（初始方案） | 模型无关，支持 500+ 模型，生态成熟 | 仅支持 Dense；无法产出 Sparse/ColBERT | 已迁移 |
+| SentenceTransformers（初始方案） | 模型无关，支持 500+ 模型，生态成熟 | Sparse/ColBERT 支持不如 FlagEmbedding 原生；需额外代码实现 | 已迁移 |
 
 **原因：** SISYS 架构中 BGE-M3 是硬编码默认模型，短期内不会切换。FlagEmbedding 在中文分词、Sparse 嵌入质量、架构简洁性上均占优势。
 
@@ -898,8 +907,11 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 **设计说明：**
 - **阶段一（Task 0-6）**：`BGE3EmbeddingService` 使用同步方法，通过 `asyncio.to_thread()` 包装，端口 Protocol 定义同步签名
 - **阶段二（Task 7-10）**：`EmbeddingAPIClient` 使用异步方法（`async def`），因为 HTTP 调用天然异步
-- **兼容策略**：`EmbeddingAPIClient` 需同时实现同步方法（内部使用 `asyncio.run()` 或 `loop.run_until_complete()`）以满足 `EmbeddingServicePort` 的同步签名约束；或在 Task 9 双策略注册时通过适配器包装
-- **调用者透明**：`DenseSemanticSearchService.search()` 通过 `asyncio.to_thread()` 调用同步方法，API 模式下需调整调用方式
+- **⚠️ 兼容策略（Task 9 待解决）**：Python Protocol 不能同时兼容 `def` 和 `async def` 签名。当前方案选项：
+  1. **适配器包装（推荐）**：`EmbeddingAPIClient` 暴露异步方法，注册端口的 lambda 中包装一个同步适配器（内部使用 `asyncio.run()` 或持有 event loop 引用）。由于 `asyncio.to_thread()` 在独立线程中执行，可在该线程内创建临时 event loop。
+  2. **统一 async Protocol**：将 `EmbeddingServicePort` 方法改为 `async def`，本地模式在实现层内部用 `asyncio.to_thread` 包装。需要同步所有调用者。
+  3. **`inspect.iscoroutinefunction()` 动态判断**：`DenseSemanticSearchService` 在运行时检测 `encode_text` 是否为协程，选择合适的调用方式。增加运行时开销但保持最大兼容性。
+  **决策待 Task 9 实施时根据性能基准和复杂度最终确定。**
 
 ### .env 配置设计
 
@@ -921,7 +933,7 @@ EMBEDDING_MODEL_DIMENSION=1024
 | 组件 | 路径 | 复用方式 |
 |------|------|---------|
 | `L3VectorPort.search()` | `src/domain/ports/l3_vector.py` | DenseSemanticSearchService 直接调用 |
-| `QdrantVectorStorage.search()` | `src/infrastructure/storage/qdrant/vector_storage.py` | Dense search 已完整实现 |
+| `QdrantVectorStorage.search()` | `src/infrastructure/storage/qdrant/vector_storage.py` | Dense search 已完整实现；**注意**：`create_collection`/`delete_collection`/`collection_exists`/`list_collections` 为空 stub，实际 Collection 管理由 `QdrantAdapter` → `QdrantCollectionManager` 链路完成 |
 | `QdrantAdapter` | `src/infrastructure/storage/qdrant/qdrant_adapter.py` | l3_vector 端口实现 |
 | `QdrantCollectionManager` | `src/infrastructure/storage/qdrant/collection_manager.py` | 测试中创建 Collection |
 | `VectorPoint` (1024维) | `src/infrastructure/storage/qdrant/models.py` | 测试中构造向量点 |
@@ -1198,10 +1210,11 @@ def perform_dense_search(context, dense_search_service, event_loop):
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.2.1
 **创建日期/Created:** 2026-06-01
-**最后更新/Last Updated:** 2026-06-02
+**最后更新/Last Updated:** 2026-06-03
 **更新说明/Description:**
+- v1.2.1: 5轮审查修订第1轮 — 修正 L2 归一化科学描述、空文本处理规范（统一 ValueError）、SentenceTransformers 选型描述、Task 依赖图矛盾；代码修复 composition_root 版本号 v1.0.0→v1.1.0、契约测试补充 encode_sparse、清理孤儿 pyc；新增 sync/async 兼容策略分析、batch_size 说明、表格忽略限制、依赖残留说明
 - v1.2.0: 嵌入模型 API 化扩展 — 新增 Task 7-10（EmbeddingAPIClient + API Server + 双策略 DI + Docker Compose），EmbeddingConfig 扩展 api_url/api_timeout 字段
 - v1.1.0: FlagEmbedding 迁移 — SentenceTransformers→BGEM3FlagModel（BAAI 官方第一方库），新增 encode_sparse() 方法，集成/验收测试补充
 - v1.0.0: 创建故事文件（初始 SentenceTransformers 实现）
