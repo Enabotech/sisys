@@ -720,6 +720,11 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.image_tag_l3 }}
+            ${{
+              startsWith(github.ref, 'refs/tags/') &&
+              format('{0}/{1}/app:latest', vars.HARBOR_REGISTRY, vars.HARBOR_PROJECT) ||
+              ''
+            }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}

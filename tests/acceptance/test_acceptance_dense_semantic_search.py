@@ -641,6 +641,9 @@ def api_client():
 
     model.encode.side_effect = mock_encode
     app.state.model = model
+    app.state.model_name = "BAAI/bge-m3"
+    app.state.device = "cpu"
+    app.state.load_error = None
     return TestClient(app)
 
 
