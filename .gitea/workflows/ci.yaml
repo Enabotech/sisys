@@ -756,7 +756,7 @@ jobs:
             ${{ steps.meta.outputs.image_tag_l3 }}
             ${{ steps.meta.outputs.image_tag_test }}
             ${{
-              startsWith(github.ref, 'refs/tags/') &&
+              (startsWith(github.ref, 'refs/tags/') || startsWith(github.ref, 'refs/heads/release')) &&
               format('{0}/{1}/app:latest', vars.HARBOR_REGISTRY, vars.HARBOR_PROJECT) ||
               ''
             }}
