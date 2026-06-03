@@ -37,6 +37,9 @@ def client(mock_model: MagicMock) -> TestClient:
     from src.infrastructure.external_services.embedding.embedding_api_server import app
 
     app.state.model = mock_model
+    app.state.model_name = "BAAI/bge-m3"
+    app.state.device = "cpu"
+    app.state.load_error = None
     return TestClient(app)
 
 
