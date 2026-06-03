@@ -60,7 +60,7 @@ class TestWordParserCreation:
     """WordParser 构造测试"""
 
     def test_create_parser(self) -> None:
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         assert parser is not None
@@ -70,7 +70,7 @@ class TestWordParserTextExtraction:
     """文本提取测试"""
 
     def test_extract_single_paragraph(self) -> None:
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         path = _create_docx_with_paragraphs(["Hello World"])
@@ -84,7 +84,7 @@ class TestWordParserTextExtraction:
             os.unlink(path)
 
     def test_extract_multiple_paragraphs(self) -> None:
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         path = _create_docx_with_paragraphs(["第一段", "第二段", "第三段"])
@@ -102,7 +102,7 @@ class TestWordParserTableExtraction:
     """表格提取测试"""
 
     def test_extract_table(self) -> None:
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         path = _create_docx_with_table([["Name", "Age"], ["Alice", "30"]])
@@ -123,7 +123,7 @@ class TestWordParserHeading:
     """标题样式测试"""
 
     def test_heading_extracted(self) -> None:
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         path = _create_docx_with_heading("战略规划", "这是正文内容")
@@ -142,7 +142,7 @@ class TestWordParserEdgeCases:
 
     def test_empty_docx(self) -> None:
         """空 DOCX（无段落无表格）应返回 failed（AC-2 要求）"""
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         path = _create_empty_docx()
@@ -156,7 +156,7 @@ class TestWordParserEdgeCases:
 
     def test_doc_format_rejected(self) -> None:
         """验证旧版 DOC 格式返回 failed"""
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         # 创建一个非 DOCX 格式的文件（模拟 DOC）
@@ -174,7 +174,7 @@ class TestWordParserEdgeCases:
     def test_output_to_dict_json_serializable(self) -> None:
         import json
 
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         path = _create_docx_with_paragraphs(["test"])
@@ -192,8 +192,8 @@ class TestWordParserSizeLimit:
 
     def test_oversized_docx_returns_failed(self, monkeypatch) -> None:
         """超过 MAX_DOCX_BYTES 应返回 failed"""
-        from src.infrastructure.external_services.document_parsing import _limits
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing import _limits
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         monkeypatch.setattr(
             "os.path.getsize",
@@ -206,7 +206,7 @@ class TestWordParserSizeLimit:
 
     def test_getsize_oserror_returns_failed(self, monkeypatch) -> None:
         """os.path.getsize 抛出 OSError 时应返回 failed 而非异常穿透"""
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         monkeypatch.setattr("os.path.getsize", lambda _: (_ for _ in ()).throw(OSError("Permission denied")))
         parser = WordParser()
@@ -221,7 +221,7 @@ class TestWordParserExceptionSanitization:
 
     def test_corrupt_docx_returns_failed_without_leaking_path(self) -> None:
         """损坏 DOCX 应返回 failed 且 error_message 不含路径"""
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as f:

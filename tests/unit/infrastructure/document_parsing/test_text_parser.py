@@ -21,7 +21,7 @@ class TestTextParserCreation:
     """TextParser 构造测试"""
 
     def test_create_parser(self) -> None:
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         assert parser is not None
@@ -31,7 +31,7 @@ class TestTextParserEncoding:
     """编码检测测试"""
 
     def test_utf8_encoding(self) -> None:
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_txt("Hello World\n这是中文".encode("utf-8"))
@@ -45,7 +45,7 @@ class TestTextParserEncoding:
             os.unlink(path)
 
     def test_gbk_encoding(self) -> None:
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_txt("中文测试内容".encode("gbk"))
@@ -58,7 +58,7 @@ class TestTextParserEncoding:
             os.unlink(path)
 
     def test_gb18030_encoding(self) -> None:
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_txt("测试内容".encode("gb18030"))
@@ -73,7 +73,7 @@ class TestTextParserParagraphSplit:
     """段落分割测试"""
 
     def test_split_by_blank_lines(self) -> None:
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         content = "第一段\n\n第二段\n\n第三段"
@@ -88,7 +88,7 @@ class TestTextParserParagraphSplit:
             os.unlink(path)
 
     def test_single_paragraph(self) -> None:
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_txt("只有一段文字没有空行".encode("utf-8"))
@@ -106,7 +106,7 @@ class TestTextParserEdgeCases:
 
     def test_empty_file(self) -> None:
         """空 TXT 文件应返回 failed 状态（AC-3 严格验证）"""
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_txt(b"")
@@ -122,7 +122,7 @@ class TestTextParserEdgeCases:
     def test_output_structure(self) -> None:
         import json
 
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_txt("test content".encode("utf-8"))
@@ -137,7 +137,7 @@ class TestTextParserEdgeCases:
 
     def test_single_page_structure(self) -> None:
         """TXT 文件应作为单页处理"""
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_txt("content".encode("utf-8"))
@@ -152,14 +152,14 @@ class TestTextParserEdgeCases:
         """超过 10MB 的 TXT 文件应返回 failed 状态"""
         from unittest.mock import patch
 
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_txt(b"small")
         try:
             # Mock os.path.getsize 返回超大文件尺寸
             with patch(
-                "src.infrastructure.external_services.document_parsing.text_parser.os.path.getsize",
+                "src.infrastructure.document_parsing.text_parser.os.path.getsize",
                 return_value=11 * 1024 * 1024,
             ):
                 result = parser.parse(path, "text/plain")
@@ -171,7 +171,7 @@ class TestTextParserEdgeCases:
 
     def test_getsize_oserror_returns_failed(self, monkeypatch) -> None:
         """os.path.getsize 抛出 OSError 时应返回 failed 而非异常穿透"""
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         monkeypatch.setattr("os.path.getsize", lambda _: (_ for _ in ()).throw(OSError("Permission denied")))
         parser = TextParser()

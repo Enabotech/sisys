@@ -25,14 +25,14 @@ class TestCSVParserCreation:
     """CSVParser 构造和基本功能测试"""
 
     def test_create_parser(self) -> None:
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
 
         parser = CSVParser()
         assert parser is not None
 
     def test_parser_implements_document_parser_port(self) -> None:
         from src.domain.ports.document_parser import DocumentParserPort
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
 
         assert isinstance(CSVParser(), DocumentParserPort)
 
@@ -42,7 +42,7 @@ class TestCSVParserBasic:
 
     def test_parse_standard_csv(self) -> None:
         """解析标准逗号分隔 CSV"""
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
 
         path = _create_csv_content("姓名,部门,职级\n张三,技术部,P7\n李四,市场部,P6\n")
         try:
@@ -59,7 +59,7 @@ class TestCSVParserBasic:
 
     def test_parse_semicolon_delimited_csv(self) -> None:
         """解析分号分隔 CSV（Sniffer 自动检测）"""
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
 
         path = _create_csv_content("姓名;部门;职级\n张三;技术部;P7\n")
         try:
@@ -80,7 +80,7 @@ class TestCSVParserEncoding:
 
     def test_parse_gbk_encoded_csv(self) -> None:
         """解析 GBK 编码 CSV"""
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
 
         content = "姓名,部门\n张三,技术部\n"
         path = _create_csv_content(content, encoding="gbk")
@@ -100,7 +100,7 @@ class TestCSVParserEmptyDocument:
 
     def test_empty_csv_returns_failed(self) -> None:
         """空 CSV 返回 failed"""
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
 
         path = _create_csv_content("")
         try:

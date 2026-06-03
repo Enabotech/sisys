@@ -228,8 +228,9 @@ class TestLangGraphEngineRunsEviction:
     async def test_cleanup_evicts_expired_entries(self, engine: LangGraphEngine) -> None:
         """TTL 过期的记录应被淘汰"""
         run_id = str(uuid.uuid4())
-        # 插入一条 timestamp=0 的过期记录（epoch 起点，远超 TTL）
-        engine._runs[run_id] = (FlowStatus.COMPLETED, 0.0)
+        # 插入一条基于 monotonic 时钟的过期记录（确保 now - ts > TTL）
+        expired_ts = time.monotonic() - engine._RUNS_TTL_SECONDS - 1
+        engine._runs[run_id] = (FlowStatus.COMPLETED, expired_ts)
 
         # 触发一次 submit_graph 以执行 _cleanup_runs
         mock_compiled = AsyncMock()

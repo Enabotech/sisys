@@ -327,7 +327,7 @@ class TestParsePipelinePDF:
     """PDF 解析流水线"""
 
     def test_parse_pdf_success(self) -> None:
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         path = _create_test_pdf(2)
@@ -345,7 +345,7 @@ class TestParsePipelinePDF:
             os.unlink(path)
 
     def test_parse_pdf_single_page(self) -> None:
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         path = _create_test_pdf(1)
@@ -362,7 +362,7 @@ class TestParsePipelineDOCX:
     """DOCX 解析流水线"""
 
     def test_parse_docx_with_text(self) -> None:
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = WordParser()
         path = _create_test_docx()
@@ -380,7 +380,7 @@ class TestParsePipelineTXT:
     """TXT 解析流水线"""
 
     def test_parse_txt_utf8(self) -> None:
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_test_txt("utf-8")
@@ -392,7 +392,7 @@ class TestParsePipelineTXT:
             os.unlink(path)
 
     def test_parse_txt_gbk(self) -> None:
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = TextParser()
         path = _create_test_txt("gbk", "GBK编码测试")
@@ -409,10 +409,10 @@ class TestCompositeRouting:
     """组合路由集成测试"""
 
     def test_route_pdf(self) -> None:
-        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = CompositeDocumentParser(
             parsers={
@@ -429,10 +429,10 @@ class TestCompositeRouting:
             os.unlink(path)
 
     def test_route_txt(self) -> None:
-        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = CompositeDocumentParser(
             parsers={
@@ -449,10 +449,10 @@ class TestCompositeRouting:
             os.unlink(path)
 
     def test_route_unknown_returns_failed(self) -> None:
-        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = CompositeDocumentParser(
             parsers={
@@ -484,10 +484,10 @@ class TestDocumentParsingServicePipeline:
     """
 
     def _make_composite_parser(self):
-        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         return CompositeDocumentParser(
             parsers={
@@ -756,7 +756,7 @@ class TestConcurrentParsing:
     """并发解析测试"""
 
     def test_concurrent_parse_10_documents(self) -> None:
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         paths = [_create_test_pdf() for _ in range(10)]

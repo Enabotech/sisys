@@ -1079,74 +1079,74 @@ def bootstrap() -> None:
         version="v1.1.0",
         interface=DocumentParserPort,
         impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.document_parsing.composite_parser",
+            "src.infrastructure.document_parsing.composite_parser",
             fromlist=["CompositeDocumentParser"],
         ).CompositeDocumentParser(
             parsers={
                 "application/pdf": __import__(
-                    "src.infrastructure.external_services.document_parsing.pdf_parser",
+                    "src.infrastructure.document_parsing.pdf_parser",
                     fromlist=["PDFParser"],
                 ).PDFParser(),
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document": __import__(
-                    "src.infrastructure.external_services.document_parsing.word_parser",
+                    "src.infrastructure.document_parsing.word_parser",
                     fromlist=["WordParser"],
                 ).WordParser(),
                 "application/msword": __import__(  # DOC 格式由 WordParser 返回友好拒绝消息
-                    "src.infrastructure.external_services.document_parsing.word_parser",
+                    "src.infrastructure.document_parsing.word_parser",
                     fromlist=["WordParser"],
                 ).WordParser(),
                 "text/plain": __import__(
-                    "src.infrastructure.external_services.document_parsing.text_parser",
+                    "src.infrastructure.document_parsing.text_parser",
                     fromlist=["TextParser"],
                 ).TextParser(),
                 # --- Story 2-2b 扩展格式 ---
                 "application/vnd.openxmlformats-officedocument.presentationml.presentation": __import__(
-                    "src.infrastructure.external_services.document_parsing.pptx_parser",
+                    "src.infrastructure.document_parsing.pptx_parser",
                     fromlist=["PptxParser"],
                 ).PptxParser(),
                 "application/vnd.ms-powerpoint": __import__(  # PPT 格式由 PptxParser 返回友好拒绝消息
-                    "src.infrastructure.external_services.document_parsing.pptx_parser",
+                    "src.infrastructure.document_parsing.pptx_parser",
                     fromlist=["PptxParser"],
                 ).PptxParser(),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": __import__(
-                    "src.infrastructure.external_services.document_parsing.excel_parser",
+                    "src.infrastructure.document_parsing.excel_parser",
                     fromlist=["ExcelParser"],
                 ).ExcelParser(),
                 "application/vnd.ms-excel": __import__(  # XLS 格式由 ExcelParser 返回友好拒绝消息
-                    "src.infrastructure.external_services.document_parsing.excel_parser",
+                    "src.infrastructure.document_parsing.excel_parser",
                     fromlist=["ExcelParser"],
                 ).ExcelParser(),
                 "text/csv": __import__(
-                    "src.infrastructure.external_services.document_parsing.csv_parser",
+                    "src.infrastructure.document_parsing.csv_parser",
                     fromlist=["CSVParser"],
                 ).CSVParser(),
                 "image/jpeg": __import__(
-                    "src.infrastructure.external_services.document_parsing.image_parser",
+                    "src.infrastructure.document_parsing.image_parser",
                     fromlist=["ImageParser"],
                 ).ImageParser(),
                 "image/png": __import__(
-                    "src.infrastructure.external_services.document_parsing.image_parser",
+                    "src.infrastructure.document_parsing.image_parser",
                     fromlist=["ImageParser"],
                 ).ImageParser(),
                 "image/gif": __import__(
-                    "src.infrastructure.external_services.document_parsing.image_parser",
+                    "src.infrastructure.document_parsing.image_parser",
                     fromlist=["ImageParser"],
                 ).ImageParser(),
                 "text/html": __import__(
-                    "src.infrastructure.external_services.document_parsing.html_parser",
+                    "src.infrastructure.document_parsing.html_parser",
                     fromlist=["HTMLParser"],
                 ).HTMLParser(),
                 "text/markdown": __import__(
-                    "src.infrastructure.external_services.document_parsing.markdown_parser",
+                    "src.infrastructure.document_parsing.markdown_parser",
                     fromlist=["MarkdownParser"],
                 ).MarkdownParser(),
                 "application/rtf": __import__(
-                    "src.infrastructure.external_services.document_parsing.rtf_parser",
+                    "src.infrastructure.document_parsing.rtf_parser",
                     fromlist=["RTFParser"],
                 ).RTFParser(),
             },
         ),
-        module="src.infrastructure.external_services.document_parsing.composite_parser",
+        module="src.infrastructure.document_parsing.composite_parser",
         lifetime=Lifetime.SCOPED,
         owner="epic-2",
     )

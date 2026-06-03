@@ -56,57 +56,57 @@ class TestInfrastructureLayerPlacement:
     """验证解析器位于 infrastructure 层"""
 
     def test_pdf_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         assert "infrastructure" in PDFParser.__module__
 
     def test_word_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         assert "infrastructure" in WordParser.__module__
 
     def test_text_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         assert "infrastructure" in TextParser.__module__
 
     def test_composite_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.document_parsing.composite_parser import CompositeDocumentParser
 
         assert "infrastructure" in CompositeDocumentParser.__module__
 
     def test_pptx_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         assert "infrastructure" in PptxParser.__module__
 
     def test_excel_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         assert "infrastructure" in ExcelParser.__module__
 
     def test_csv_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
 
         assert "infrastructure" in CSVParser.__module__
 
     def test_image_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
+        from src.infrastructure.document_parsing.image_parser import ImageParser
 
         assert "infrastructure" in ImageParser.__module__
 
     def test_html_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
 
         assert "infrastructure" in HTMLParser.__module__
 
     def test_markdown_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
         assert "infrastructure" in MarkdownParser.__module__
 
     def test_rtf_parser_in_infrastructure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+        from src.infrastructure.document_parsing.rtf_parser import RTFParser
 
         assert "infrastructure" in RTFParser.__module__
 
@@ -118,7 +118,7 @@ class TestDependencyDirection:
         """infrastructure 层可以导入 domain 层"""
         from src.domain.ports.document_parser import DocumentParserPort
         from src.domain.value_objects.parsed_document import ParsedDocument
-        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.document_parsing.composite_parser import CompositeDocumentParser
 
         # infrastructure 层引用了 domain 层的类型
         assert CompositeDocumentParser is not None
@@ -134,10 +134,10 @@ class TestDependencyDirection:
     def test_composite_parser_satisfies_protocol(self) -> None:
         """CompositeDocumentParser 满足 DocumentParserPort 协议"""
         from src.domain.ports.document_parser import DocumentParserPort
-        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         parser = CompositeDocumentParser(
             parsers={
@@ -152,13 +152,13 @@ class TestDependencyDirection:
     def test_all_extended_parsers_satisfy_protocol(self) -> None:
         """Story 2-2b 所有新解析器满足 DocumentParserPort 协议"""
         from src.domain.ports.document_parser import DocumentParserPort
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
-        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.image_parser import ImageParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.rtf_parser import RTFParser
 
         assert isinstance(PptxParser(), DocumentParserPort)
         assert isinstance(ExcelParser(), DocumentParserPort)

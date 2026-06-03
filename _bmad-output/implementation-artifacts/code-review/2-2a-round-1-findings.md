@@ -11,7 +11,7 @@
 ### F1: 空 DOCX 返回 completed 而非 failed（违反 AC-2）
 
 - **来源**: Acceptance Auditor
-- **文件**: `src/infrastructure/external_services/document_parsing/word_parser.py:115`
+- **文件**: `src/infrastructure/document_parsing/word_parser.py:115`
 - **描述**: WordParser.parse() 对无段落、无表格的 DOCX 文件仍返回 parse_status="completed"
 - **AC 引用**: AC-2 "空 DOCX（无内容）返回解析失败"
 - **修复方向**: 建议在 DocumentParsingService 层做统一空内容检查（覆盖所有解析器类型），而非仅在 WordParser 内部
@@ -19,7 +19,7 @@
 ### F2: 编码检测失败静默降级而非 failed（违反 AC-3）
 
 - **来源**: Acceptance Auditor + Edge Case Hunter（去重合并）
-- **文件**: `src/infrastructure/external_services/document_parsing/text_parser.py:116`
+- **文件**: `src/infrastructure/document_parsing/text_parser.py:116`
 - **描述**: _detect_and_decode() 在所有编码失败后使用 errors="replace" 静默产生损坏文本，仍返回 completed
 - **AC 引用**: AC-3 "无扩展名编码错误返回解析失败"
 - **修复方向**: 使用自定义异常 `EncodingDetectionError` 替代 tuple 返回，保持方法签名简洁

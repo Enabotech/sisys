@@ -11,7 +11,7 @@
 ### F11: python-docx XXE 外部实体注入 (CWE-611)
 
 - **来源**: Security Specialist
-- **文件**: `src/infrastructure/external_services/document_parsing/word_parser.py:83-84`
+- **文件**: `src/infrastructure/document_parsing/word_parser.py:83-84`
 - **攻击场景**: 攻击者上传特制 DOCX，内嵌恶意 DTD 引用读取 /etc/passwd 或请求云元数据端点 (169.254.169.254)。python-docx < 1.1.2 默认不禁用外部实体解析。
 - **修复建议**: 升级 python-docx >= 1.1.2，或使用 defusedxml 包装解析
 

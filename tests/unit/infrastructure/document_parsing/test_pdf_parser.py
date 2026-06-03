@@ -53,14 +53,14 @@ class TestPDFParserCreation:
 
     def test_create_parser(self) -> None:
         """验证 PDFParser 可以正常实例化"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         assert parser is not None
 
     def test_parse_blank_pdf_returns_completed(self) -> None:
         """验证解析空白 PDF 返回 completed 状态（含空页面）"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         path = _create_multi_page_pdf(1)
@@ -73,7 +73,7 @@ class TestPDFParserCreation:
 
     def test_parse_multi_page_pdf(self) -> None:
         """验证多页 PDF 解析返回正确页数"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         path = _create_multi_page_pdf(3)
@@ -90,14 +90,14 @@ class TestPDFParserEncryption:
 
     def test_encrypted_pdf_returns_failed(self) -> None:
         """验证加密 PDF 返回 failed 状态"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         # 创建加密 PDF
         writer = PdfWriter()
         writer.add_blank_page(width=612, height=792)
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
         writer.write(tmp.name)
-        writer.encrypt(user_password="test", owner_password="test")
+        writer.encrypt(user_password="test", owner_password="test")  # pragma: allowlist secret
         encrypted_tmp = tempfile.NamedTemporaryFile(delete=False, suffix="_enc.pdf")
         writer.write(encrypted_tmp.name)
         encrypted_tmp.close()
@@ -119,7 +119,7 @@ class TestPDFParserEmptyDocument:
 
     def test_zero_page_pdf_returns_failed(self) -> None:
         """验证 0 页 PDF 返回 failed 状态"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         path = _create_empty_pdf()
@@ -136,7 +136,7 @@ class TestPDFParserOutputStructure:
 
     def test_output_has_correct_mime_type(self) -> None:
         """验证输出 mime_type 正确"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         path = _create_multi_page_pdf(1)
@@ -148,7 +148,7 @@ class TestPDFParserOutputStructure:
 
     def test_output_has_document_id(self) -> None:
         """验证输出包含 document_id"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         path = _create_multi_page_pdf(1)
@@ -162,7 +162,7 @@ class TestPDFParserOutputStructure:
         """验证 to_dict() 输出可以 JSON 序列化"""
         import json
 
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         path = _create_multi_page_pdf(1)
@@ -176,7 +176,7 @@ class TestPDFParserOutputStructure:
 
     def test_pages_have_page_number(self) -> None:
         """验证每页包含 page_number"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         path = _create_multi_page_pdf(2)
@@ -193,8 +193,8 @@ class TestPDFParserSizeLimit:
 
     def test_oversized_pdf_returns_failed(self, monkeypatch) -> None:
         """超过 MAX_PDF_BYTES 应返回 failed"""
-        from src.infrastructure.external_services.document_parsing import _limits
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing import _limits
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         # monkeypatch 让 getsize 始终返回 100MB+1
         monkeypatch.setattr(
@@ -208,8 +208,8 @@ class TestPDFParserSizeLimit:
 
     def test_undersized_pdf_passes_size_check(self, monkeypatch) -> None:
         """未超过 MAX_PDF_BYTES 应通过大小校验（不返回 size-failed）"""
-        from src.infrastructure.external_services.document_parsing import _limits
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing import _limits
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         # 实际无文本的小 PDF，monkeypatch 报告为合理大小
         monkeypatch.setattr(
@@ -227,7 +227,7 @@ class TestPDFParserSizeLimit:
 
     def test_getsize_oserror_returns_failed(self, monkeypatch) -> None:
         """os.path.getsize 抛出 OSError 时应返回 failed 而非异常穿透"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         monkeypatch.setattr("os.path.getsize", lambda _: (_ for _ in ()).throw(OSError("Permission denied")))
         parser = PDFParser()
@@ -241,7 +241,7 @@ class TestPDFParserExceptionSanitization:
 
     def test_corrupt_pdf_returns_failed_without_leaking_path(self) -> None:
         """损坏 PDF 应返回 failed 且 error_message 不含原始异常内容"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         parser = PDFParser()
         # 写一个非 PDF 内容
@@ -282,7 +282,7 @@ class TestPDFParserTextExtraction:
 
     def test_extracts_english_text(self) -> None:
         """验证能提取英文文本（AC-1 准确率基准）"""
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         sample_text = "Strategic Planning Report"
         path = self._create_text_pdf_with_reportlab(sample_text)
@@ -304,7 +304,7 @@ class TestPDFParserTextExtraction:
         """验证多词文本提取相似度（AC-1 ≥95% 准确率基准）"""
         from difflib import SequenceMatcher
 
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         sample_text = "Annual Business Review and Strategic Plan 2026"
         path = self._create_text_pdf_with_reportlab(sample_text)
@@ -327,11 +327,11 @@ class TestPDFParserMaxPages:
         """超过 MAX_PDF_PAGES 限制时返回 failed"""
         from unittest.mock import patch
 
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
 
         path = _create_text_pdf("test", num_pages=3)
         try:
-            with patch("src.infrastructure.external_services.document_parsing.pdf_parser.MAX_PDF_PAGES", 2):
+            with patch("src.infrastructure.document_parsing.pdf_parser.MAX_PDF_PAGES", 2):
                 parser = PDFParser()
                 result = parser.parse(path, "application/pdf")
                 assert result.is_failed()

@@ -25,13 +25,13 @@ class TestRTFParserCreation:
     """RTFParser 构造和基本功能测试"""
 
     def test_create_parser(self) -> None:
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+        from src.infrastructure.document_parsing.rtf_parser import RTFParser
 
         assert RTFParser() is not None
 
     def test_parser_implements_document_parser_port(self) -> None:
         from src.domain.ports.document_parser import DocumentParserPort
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+        from src.infrastructure.document_parsing.rtf_parser import RTFParser
 
         assert isinstance(RTFParser(), DocumentParserPort)
 
@@ -41,7 +41,7 @@ class TestRTFParserBasic:
 
     def test_parse_rtf_text(self) -> None:
         """提取 RTF 纯文本内容"""
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+        from src.infrastructure.document_parsing.rtf_parser import RTFParser
 
         rtf = r"{\rtf1\ansi\deff0 {\fonttbl {\f0 Times New Roman;}} \f0\fs24 RTF 测试文档内容}"
         path = _create_rtf_file(rtf)
@@ -64,7 +64,7 @@ class TestRTFParserFallback:
         import builtins
         from unittest import mock
 
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+        from src.infrastructure.document_parsing.rtf_parser import RTFParser
 
         rtf = r"{\rtf1\ansi 内容}"
         path = _create_rtf_file(rtf)
@@ -94,7 +94,7 @@ class TestRTFParserEmptyDocument:
 
     def test_empty_rtf_returns_failed(self) -> None:
         """空 RTF 返回 failed"""
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+        from src.infrastructure.document_parsing.rtf_parser import RTFParser
 
         path = _create_rtf_file(r"{\rtf1\ansi}")
         try:

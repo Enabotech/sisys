@@ -58,37 +58,37 @@ def _create_minimal_txt() -> str:
 
 def _build_composite():
     """构造使用 dict 注入的 CompositeDocumentParser（与 composition_root 一致，包含全部 15 种 MIME 映射）"""
-    from src.infrastructure.external_services.document_parsing.composite_parser import (
+    from src.infrastructure.document_parsing.composite_parser import (
         CompositeDocumentParser,
     )
-    from src.infrastructure.external_services.document_parsing.csv_parser import (
+    from src.infrastructure.document_parsing.csv_parser import (
         CSVParser,
     )
-    from src.infrastructure.external_services.document_parsing.excel_parser import (
+    from src.infrastructure.document_parsing.excel_parser import (
         ExcelParser,
     )
-    from src.infrastructure.external_services.document_parsing.html_parser import (
+    from src.infrastructure.document_parsing.html_parser import (
         HTMLParser,
     )
-    from src.infrastructure.external_services.document_parsing.image_parser import (
+    from src.infrastructure.document_parsing.image_parser import (
         ImageParser,
     )
-    from src.infrastructure.external_services.document_parsing.markdown_parser import (
+    from src.infrastructure.document_parsing.markdown_parser import (
         MarkdownParser,
     )
-    from src.infrastructure.external_services.document_parsing.pdf_parser import (
+    from src.infrastructure.document_parsing.pdf_parser import (
         PDFParser,
     )
-    from src.infrastructure.external_services.document_parsing.pptx_parser import (
+    from src.infrastructure.document_parsing.pptx_parser import (
         PptxParser,
     )
-    from src.infrastructure.external_services.document_parsing.rtf_parser import (
+    from src.infrastructure.document_parsing.rtf_parser import (
         RTFParser,
     )
-    from src.infrastructure.external_services.document_parsing.text_parser import (
+    from src.infrastructure.document_parsing.text_parser import (
         TextParser,
     )
-    from src.infrastructure.external_services.document_parsing.word_parser import (
+    from src.infrastructure.document_parsing.word_parser import (
         WordParser,
     )
 

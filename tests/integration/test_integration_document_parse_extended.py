@@ -332,7 +332,7 @@ class TestParsePipelinePPTX:
     """PPTX 解析流水线"""
 
     def test_parse_pptx_success(self) -> None:
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         parser = PptxParser()
         path = _create_test_pptx()
@@ -353,7 +353,7 @@ class TestParsePipelinePPTX:
             os.unlink(path)
 
     def test_parse_pptx_basic_structure(self) -> None:
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
         parser = PptxParser()
         path = _create_test_pptx()
@@ -375,7 +375,7 @@ class TestParsePipelineXLSX:
     """XLSX 解析流水线"""
 
     def test_parse_xlsx_success(self) -> None:
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         parser = ExcelParser()
         path = _create_test_xlsx()
@@ -397,7 +397,7 @@ class TestParsePipelineXLSX:
             os.unlink(path)
 
     def test_parse_xlsx_extracts_tables(self) -> None:
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
         parser = ExcelParser()
         path = _create_test_xlsx()
@@ -420,7 +420,7 @@ class TestParsePipelineCSV:
     """CSV 解析流水线"""
 
     def test_parse_csv_success(self) -> None:
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
 
         parser = CSVParser()
         path = _create_test_csv()
@@ -442,7 +442,7 @@ class TestParsePipelineCSV:
             os.unlink(path)
 
     def test_parse_csv_extracts_table(self) -> None:
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
 
         parser = CSVParser()
         path = _create_test_csv()
@@ -466,7 +466,7 @@ class TestParsePipelineHTML:
     """HTML 解析流水线"""
 
     def test_parse_html_success(self) -> None:
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
 
         parser = HTMLParser()
         path = _create_test_html()
@@ -482,7 +482,7 @@ class TestParsePipelineHTML:
             os.unlink(path)
 
     def test_parse_html_extracts_text_content(self) -> None:
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
 
         parser = HTMLParser()
         path = _create_test_html()
@@ -504,7 +504,7 @@ class TestParsePipelineMarkdown:
     """Markdown 解析流水线"""
 
     def test_parse_markdown_success(self) -> None:
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
         parser = MarkdownParser()
         path = _create_test_md()
@@ -520,7 +520,7 @@ class TestParsePipelineMarkdown:
             os.unlink(path)
 
     def test_parse_markdown_extracts_table(self) -> None:
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
         parser = MarkdownParser()
         path = _create_test_md()
@@ -543,7 +543,7 @@ class TestParsePipelineRTF:
     """RTF 解析流水线"""
 
     def test_parse_rtf_success(self) -> None:
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+        from src.infrastructure.document_parsing.rtf_parser import RTFParser
 
         parser = RTFParser()
         path = _create_test_rtf()
@@ -570,17 +570,17 @@ class TestCompositeRoutingExtended:
     @staticmethod
     def _build_full_composite():
         """构建包含所有 15 种 MIME 类型的 CompositeDocumentParser"""
-        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
-        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.image_parser import ImageParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.rtf_parser import RTFParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         return CompositeDocumentParser(
             parsers={
@@ -682,16 +682,16 @@ class TestDocumentParsingServiceExtendedPipeline:
 
     @staticmethod
     def _make_extended_composite_parser():
-        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
-        from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
-        from src.infrastructure.external_services.document_parsing.word_parser import WordParser
+        from src.infrastructure.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.rtf_parser import RTFParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.word_parser import WordParser
 
         return CompositeDocumentParser(
             parsers={
@@ -1036,14 +1036,14 @@ class TestConcurrentParsingExtended:
 
     def test_concurrent_parse_extended_formats(self) -> None:
         """至少 10 个文档并发解析，混合多种扩展格式"""
-        from src.infrastructure.external_services.document_parsing.composite_parser import CompositeDocumentParser
-        from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
-        from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
-        from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
-        from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
-        from src.infrastructure.external_services.document_parsing.pdf_parser import PDFParser
-        from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
-        from src.infrastructure.external_services.document_parsing.text_parser import TextParser
+        from src.infrastructure.document_parsing.composite_parser import CompositeDocumentParser
+        from src.infrastructure.document_parsing.csv_parser import CSVParser
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
+        from src.infrastructure.document_parsing.html_parser import HTMLParser
+        from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
+        from src.infrastructure.document_parsing.pdf_parser import PDFParser
+        from src.infrastructure.document_parsing.pptx_parser import PptxParser
+        from src.infrastructure.document_parsing.text_parser import TextParser
 
         parser = CompositeDocumentParser(
             parsers={

@@ -148,7 +148,7 @@ def given_legacy_ppt(context: dict) -> None:
 
 @when("系统使用 PptxParser 解析该文件")
 def when_parse_with_pptx_parser(context: dict) -> None:
-    from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+    from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
     parser = PptxParser()
     context["result"] = parser.parse(context["temp_path"], context["mime_type"])
@@ -156,7 +156,7 @@ def when_parse_with_pptx_parser(context: dict) -> None:
 
 @when("系统使用 PptxParser 解析 MIME 类型为 application/vnd.ms-powerpoint 的文件")
 def when_parse_ppt_mime_with_pptx_parser(context: dict) -> None:
-    from src.infrastructure.external_services.document_parsing.pptx_parser import PptxParser
+    from src.infrastructure.document_parsing.pptx_parser import PptxParser
 
     parser = PptxParser()
     context["result"] = parser.parse(context["temp_path"], "application/vnd.ms-powerpoint")
@@ -275,7 +275,7 @@ def given_legacy_xls(context: dict) -> None:
 
 @when("系统使用 ExcelParser 解析该文件")
 def when_parse_with_excel_parser(context: dict) -> None:
-    from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+    from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
     parser = ExcelParser()
     context["result"] = parser.parse(context["temp_path"], context["mime_type"])
@@ -283,7 +283,7 @@ def when_parse_with_excel_parser(context: dict) -> None:
 
 @when("系统使用 ExcelParser 解析 MIME 类型为 application/vnd.ms-excel 的文件")
 def when_parse_xls_mime_with_excel_parser(context: dict) -> None:
-    from src.infrastructure.external_services.document_parsing.excel_parser import ExcelParser
+    from src.infrastructure.document_parsing.excel_parser import ExcelParser
 
     parser = ExcelParser()
     context["result"] = parser.parse(context["temp_path"], "application/vnd.ms-excel")
@@ -343,7 +343,7 @@ def given_empty_csv(context: dict) -> None:
 
 @when("系统使用 CSVParser 解析该文件")
 def when_parse_with_csv_parser(context: dict) -> None:
-    from src.infrastructure.external_services.document_parsing.csv_parser import CSVParser
+    from src.infrastructure.document_parsing.csv_parser import CSVParser
 
     parser = CSVParser()
     context["result"] = parser.parse(context["temp_path"], context["mime_type"])
@@ -410,7 +410,7 @@ def given_gif_image(context: dict) -> None:
 
 @when("系统使用 ImageParser 解析该文件")
 def when_parse_with_image_parser(context: dict) -> None:
-    from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
+    from src.infrastructure.document_parsing.image_parser import ImageParser
 
     parser = ImageParser()
     context["result"] = parser.parse(context["temp_path"], context["mime_type"])
@@ -484,7 +484,7 @@ def given_empty_html(context: dict) -> None:
 
 @when("系统使用 HTMLParser 解析该文件")
 def when_parse_with_html_parser(context: dict) -> None:
-    from src.infrastructure.external_services.document_parsing.html_parser import HTMLParser
+    from src.infrastructure.document_parsing.html_parser import HTMLParser
 
     parser = HTMLParser()
     context["result"] = parser.parse(context["temp_path"], context["mime_type"])
@@ -551,7 +551,7 @@ def given_empty_markdown(context: dict) -> None:
 
 @when("系统使用 MarkdownParser 解析该文件")
 def when_parse_with_markdown_parser(context: dict) -> None:
-    from src.infrastructure.external_services.document_parsing.markdown_parser import MarkdownParser
+    from src.infrastructure.document_parsing.markdown_parser import MarkdownParser
 
     parser = MarkdownParser()
     context["result"] = parser.parse(context["temp_path"], context["mime_type"])
@@ -624,7 +624,7 @@ def given_empty_rtf(context: dict) -> None:
 
 @when("系统使用 RTFParser 解析该文件")
 def when_parse_with_rtf_parser(context: dict) -> None:
-    from src.infrastructure.external_services.document_parsing.rtf_parser import RTFParser
+    from src.infrastructure.document_parsing.rtf_parser import RTFParser
 
     parser = RTFParser()
     context["result"] = parser.parse(context["temp_path"], context["mime_type"])

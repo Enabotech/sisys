@@ -521,23 +521,23 @@
         version="v1.0.0",
         interface=DocumentParserPort,
         impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.document_parsing.composite_parser",
+            "src.infrastructure.document_parsing.composite_parser",
             fromlist=["CompositeDocumentParser"],
         ).CompositeDocumentParser(
             pdf_parser=__import__(
-                "src.infrastructure.external_services.document_parsing.pdf_parser",
+                "src.infrastructure.document_parsing.pdf_parser",
                 fromlist=["PDFParser"],
             ).PDFParser(),
             word_parser=__import__(
-                "src.infrastructure.external_services.document_parsing.word_parser",
+                "src.infrastructure.document_parsing.word_parser",
                 fromlist=["WordParser"],
             ).WordParser(),
             text_parser=__import__(
-                "src.infrastructure.external_services.document_parsing.text_parser",
+                "src.infrastructure.document_parsing.text_parser",
                 fromlist=["TextParser"],
             ).TextParser(),
         ),
-        module="src.infrastructure.external_services.document_parsing.composite_parser",
+        module="src.infrastructure.document_parsing.composite_parser",
         lifetime=Lifetime.SCOPED,
         owner="epic-2",
     )
@@ -692,7 +692,7 @@ tests/
 ├── unit/
 │   ├── domain/value_objects/test_parsed_document.py
 │   ├── domain/ports/test_document_parser.py
-│   ├── infrastructure/external_services/document_parsing/
+│   ├── infrastructure/document_parsing/
 │   │   ├── test_pdf_parser.py
 │   │   ├── test_word_parser.py
 │   │   ├── test_text_parser.py
@@ -844,11 +844,11 @@ def detect_encoding(content: bytes) -> str:
 - `src/domain/value_objects/parsed_document.py` — 解析结果值对象
 - `src/domain/ports/document_parser.py` — DocumentParserPort Protocol
 - `src/application/services/document_parsing_service.py` — 解析编排服务
-- `src/infrastructure/external_services/document_parsing/pdf_parser.py` — PDF 解析器
-- `src/infrastructure/external_services/document_parsing/word_parser.py` — Word 解析器
-- `src/infrastructure/external_services/document_parsing/text_parser.py` — TXT 解析器
-- `src/infrastructure/external_services/document_parsing/composite_parser.py` — 组合解析器
-- `src/infrastructure/external_services/document_parsing/_limits.py` — 解析阈值常量
+- `src/infrastructure/document_parsing/pdf_parser.py` — PDF 解析器
+- `src/infrastructure/document_parsing/word_parser.py` — Word 解析器
+- `src/infrastructure/document_parsing/text_parser.py` — TXT 解析器
+- `src/infrastructure/document_parsing/composite_parser.py` — 组合解析器
+- `src/infrastructure/document_parsing/_limits.py` — 解析阈值常量
 
 **已修改的文件/Modified:**
 - `src/domain/ports/registry.py` — 注册 document_parser 端口
@@ -860,10 +860,10 @@ def detect_encoding(content: bytes) -> str:
 
 **已创建的测试文件/Created Tests:**
 - `tests/unit/domain/value_objects/test_parsed_document.py` — 值对象序列化测试（Task 0）
-- `tests/unit/infrastructure/external_services/document_parsing/test_pdf_parser.py` — PDF 解析器测试（Task 1）
-- `tests/unit/infrastructure/external_services/document_parsing/test_word_parser.py` — Word 解析器测试（Task 2）
-- `tests/unit/infrastructure/external_services/document_parsing/test_text_parser.py` — TXT 解析器测试（Task 3）
-- `tests/unit/infrastructure/external_services/document_parsing/test_composite_parser.py` — 组合解析器测试（Task 4）
+- `tests/unit/infrastructure/document_parsing/test_pdf_parser.py` — PDF 解析器测试（Task 1）
+- `tests/unit/infrastructure/document_parsing/test_word_parser.py` — Word 解析器测试（Task 2）
+- `tests/unit/infrastructure/document_parsing/test_text_parser.py` — TXT 解析器测试（Task 3）
+- `tests/unit/infrastructure/document_parsing/test_composite_parser.py` — 组合解析器测试（Task 4）
 - `tests/unit/application/services/test_document_parsing_service.py` — 解析服务测试（Task 5）
 - `tests/unit/architecture/test_arch_document_parser.py` — 架构约束测试（Task 7）
 - `tests/contracts/test_port_contract_document_parser.py` — 端口契约测试（Task 0）

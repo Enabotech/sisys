@@ -38,13 +38,13 @@ class TestImageParserCreation:
     """ImageParser 构造和基本功能测试"""
 
     def test_create_parser(self) -> None:
-        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
+        from src.infrastructure.document_parsing.image_parser import ImageParser
 
         assert ImageParser() is not None
 
     def test_parser_implements_document_parser_port(self) -> None:
         from src.domain.ports.document_parser import DocumentParserPort
-        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
+        from src.infrastructure.document_parsing.image_parser import ImageParser
 
         assert isinstance(ImageParser(), DocumentParserPort)
 
@@ -54,7 +54,7 @@ class TestImageParserMetadata:
 
     def test_parse_jpeg_metadata(self) -> None:
         """JPEG 元数据提取（format/size/mode）"""
-        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
+        from src.infrastructure.document_parsing.image_parser import ImageParser
 
         path = _create_image_file("JPEG", (200, 150))
         try:
@@ -76,7 +76,7 @@ class TestImageParserMetadata:
 
     def test_parse_png_metadata(self) -> None:
         """PNG 元数据提取"""
-        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
+        from src.infrastructure.document_parsing.image_parser import ImageParser
 
         path = _create_image_file("PNG")
         try:
@@ -96,7 +96,7 @@ class TestImageParserGif:
 
     def test_gif_first_frame_only(self) -> None:
         """GIF 仅处理第一帧"""
-        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
+        from src.infrastructure.document_parsing.image_parser import ImageParser
 
         path = _create_gif_file()
         try:
@@ -117,7 +117,7 @@ class TestImageParserTesseractFallback:
         """Tesseract 不可用时优雅降级，仅返回元数据"""
         from unittest import mock
 
-        from src.infrastructure.external_services.document_parsing.image_parser import ImageParser
+        from src.infrastructure.document_parsing.image_parser import ImageParser
 
         path = _create_image_file("PNG")
         try:
