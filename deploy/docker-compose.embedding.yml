@@ -2,8 +2,11 @@
 # 独立于主 docker-compose.yml，按需启动
 #
 # 使用方式:
-#   docker compose -f deploy/docker-compose.embedding.yml up -d
-#   docker compose -f deploy/docker-compose.embedding.yml down
+#   无本地模型（自动从 HuggingFace 拉取）:
+#     docker compose -f deploy/docker-compose.embedding.yml up -d
+#
+#   有本地模型（优先加载本地，避免下载）:
+#     EMBEDDING_MODEL_PATH=/mnt/x/.cache/BAAI/bge-m3 docker compose -f deploy/docker-compose.embedding.yml up -d
 #
 # 服务启动后，在 .env 中设置 EMBEDDING_API_URL=http://localhost:8001 启用 API 模式
 
@@ -18,6 +21,12 @@ services:
       - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-BAAI/bge-m3}
       - EMBEDDING_MODEL_PATH=${EMBEDDING_MODEL_PATH:-}
       - EMBEDDING_MODEL_DEVICE=${EMBEDDING_MODEL_DEVICE:-cpu}
+    volumes:
+      # 模型文件（可选）：设 EMBEDDING_MODEL_PATH 时自动挂载
+      - ${EMBEDDING_MODEL_PATH:-/dev/null}:${EMBEDDING_MODEL_PATH:-/dev/null}:ro
+      # HuggingFace 缓存（模型下载后持久化，避免重启重下）
+      - embedding-cache:/root/.cache/huggingface
+    restart: unless-stopped
     deploy:
       resources:
         reservations:
@@ -31,3 +40,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 120s
+
+volumes:
+  embedding-cache:
