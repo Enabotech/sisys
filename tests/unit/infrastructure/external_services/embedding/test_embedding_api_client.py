@@ -42,7 +42,7 @@ def _make_mock_response(json_body: dict) -> MagicMock:
 @pytest.fixture
 def api_config() -> EmbeddingConfig:
     """API 模式 EmbeddingConfig"""
-    return EmbeddingConfig(api_url="http://localhost:8000", device="cpu")
+    return EmbeddingConfig(api_url="http://localhost:8000")
 
 
 class TestEmbeddingAPIClientInit:
