@@ -140,15 +140,16 @@ class BGE3EmbeddingService(EmbeddingServicePort):
         result = self._model.encode(text, return_sparse=True)
         lexical_raw = result["lexical_weights"]
 
-        # FlagEmbedding API: 单文本返回 List[Dict[int, float]]，取第一项
+        # FlagEmbedding API: 单文本返回 List[defaultdict]，取第一项
+        # 注意: keys 实际为 str 类型，需显式 int() 转换
         if isinstance(lexical_raw, list):
             if not lexical_raw:
                 return {"indices": [], "values": []}
-            lexical_weights: dict[int, float] = lexical_raw[0]
+            lexical_weights = lexical_raw[0]
         else:
             lexical_weights = lexical_raw
 
-        indices = sorted(lexical_weights.keys())
-        values = [float(lexical_weights[i]) for i in indices]
+        indices = sorted(int(k) for k in lexical_weights.keys())
+        values = [float(lexical_weights[str(i)]) for i in indices]
 
         return {"indices": indices, "values": values}
