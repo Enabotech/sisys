@@ -436,7 +436,7 @@ def scan_domain_directory(context: dict[str, Any]):
     context["domain_scanned"] = True
 
 
-@then("不应该导入 sentence_transformers 或 torch")
+@then("不应该导入 sentence_transformers 或 torch 或 FlagEmbedding")
 def verify_no_forbidden_imports():
     """验证领域层没有禁止的依赖导入"""
     forbidden_imports = {"sentence_transformers", "torch", "FlagEmbedding"}
