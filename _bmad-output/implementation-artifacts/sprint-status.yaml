@@ -104,7 +104,7 @@ development_status:
   2-1-document-upload-17-formats: done
   2-2a-document-parsing-basic-formats: done
   2-2b-document-parsing-extended-formats: done
-  2-3-layout-preservation-doclaynet: ready-for-dev
+  2-3-layout-preservation-doclaynet: done
   2-4-table-semantic-extraction: backlog
   2-5-ocr-parsing-scanned-documents: backlog
   2-6-document-version-snapshot: backlog

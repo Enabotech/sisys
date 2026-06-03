@@ -1,6 +1,6 @@
 """应用层文档解析服务
 
-编排文档解析流程：获取文档 → MinIO 下载 → 临时文件桥接 → 解析 → 状态更新 → 事件发布。
+编排文档解析流程：获取文档 → MinIO 下载 → 临时文件桥接 → 解析 → 版面检测（可选）→ 状态更新 → 事件发布。
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 from src.domain.entities.document import Document, ParseStatus
 from src.domain.events.document_events import DocumentProcessed
 from src.domain.ports.document_repository import DocumentQuery
+from src.domain.value_objects.parsed_document import ParsedDocument
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
     from src.domain.ports.document_parser import DocumentParserPort
     from src.domain.ports.document_repository import DocumentRepositoryPort
     from src.domain.ports.event_publisher import EventPublisher
+    from src.domain.ports.layout_detector import LayoutDetector
+    from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +75,16 @@ class DocumentParsingService:
         event_publisher: EventPublisher,
         document_parser: DocumentParserPort,
         redis_client: "aioredis.Redis | None" = None,
+        layout_detector: "LayoutDetector | None" = None,
+        pdf_page_renderer: "PdfPageRendererPort | None" = None,
     ) -> None:
         self._repository = document_repository
         self._storage = document_storage
         self._publisher = event_publisher
         self._parser = document_parser
         self._redis = redis_client
+        self._layout_detector = layout_detector
+        self._pdf_page_renderer = pdf_page_renderer
 
     async def parse_document(self, document_id: uuid.UUID, tenant_id: str) -> Document:
         """解析文档
@@ -148,6 +155,9 @@ class DocumentParsingService:
                 document.metadata["parse_error"] = parsed_doc.error_message or "解析失败"
                 await self._repository.save(document)
                 return document
+
+            # 版面检测增强（仅 PDF + layout_detector 注入时触发，运行时错误不阻断解析）
+            parsed_doc = await self._apply_layout_detection(parsed_doc, temp_path, document.mime_type)
 
             # 更新状态和元数据
             document.parse_status = ParseStatus.COMPLETED
@@ -243,3 +253,86 @@ class DocumentParsingService:
                 except OSError:
                     pass  # 清理失败时静默处理，正要抛出原异常
             raise
+
+    async def _apply_layout_detection(
+        self,
+        parsed_doc: ParsedDocument,
+        file_path: str,
+        mime_type: str,
+    ) -> ParsedDocument:
+        """对已解析文档应用版面检测增强（仅 PDF 格式，优雅降级）
+
+        算法流程：
+        1. 检查 layout_detector 和 pdf_page_renderer 是否已注入
+        2. 仅 PDF 格式触发检测，其他格式跳过
+        3. 逐页渲染 PDF 页面为 PNG → 调用 detect() → 顺序匹配 → 填充 bbox
+        4. 运行时错误不阻断解析流程（记录日志并返回原文档）
+
+        Args:
+            parsed_doc: 已完成文本解析的 ParsedDocument
+            file_path: PDF 文件临时路径
+            mime_type: 文件 MIME 类型
+
+        Returns:
+            增强后的 ParsedDocument（bbox 字段已填充）或原文档（降级时）
+        """
+        # 降级条件：layout_detector 或 pdf_page_renderer 未注入
+        if self._layout_detector is None or self._pdf_page_renderer is None:
+            return parsed_doc
+
+        # 降级条件：非 PDF 格式
+        if mime_type != "application/pdf":
+            return parsed_doc
+
+        try:
+            from src.domain.value_objects.parsed_document import ParsedElement, ParsedPage
+
+            enhanced_pages: list[ParsedPage] = []
+            for page in parsed_doc.pages:
+                # 渲染 PDF 页面为 PNG 图像
+                image_bytes = await asyncio.to_thread(self._pdf_page_renderer.render_page, file_path, page.page_number)
+
+                # 版面检测
+                detections = await asyncio.to_thread(self._layout_detector.detect, image_bytes, page.page_number)
+
+                # 收集当前页所有文本元素
+                page_elements = page.texts
+
+                if not page_elements or not detections:
+                    # 无元素或无检测结果，保持原页不变
+                    enhanced_pages.append(page)
+                    continue
+
+                # 当前 PDFParser 不输出 bbox（均为 None），无法做 IoU 空间匹配
+                # 降级策略：按顺序一一对应检测结果与文本元素
+                enhanced_texts: list[ParsedElement] = []
+                for idx, elem in enumerate(page_elements):
+                    if idx < len(detections) and elem.bbox is None:
+                        det = detections[idx]
+                        enhanced_texts.append(
+                            ParsedElement(
+                                content=elem.content,
+                                bbox=det.bbox,
+                                confidence=elem.confidence,
+                                metadata={
+                                    **elem.metadata,
+                                    "layout_confidence": det.confidence,
+                                },
+                            )
+                        )
+                    else:
+                        enhanced_texts.append(elem)
+
+                enhanced_pages.append(
+                    ParsedPage(
+                        page_number=page.page_number,
+                        texts=enhanced_texts,
+                        tables=page.tables,
+                    )
+                )
+
+            return replace(parsed_doc, pages=enhanced_pages)
+
+        except Exception:
+            logger.warning("版面检测失败，跳过增强步骤", exc_info=True)
+            return parsed_doc

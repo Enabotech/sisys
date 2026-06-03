@@ -9,6 +9,7 @@ import pytest
 
 from src.domain.value_objects.parsed_document import (
     BoundingBox,
+    BoundingBoxResult,
     ParsedDocument,
     ParsedElement,
     ParsedPage,
@@ -36,6 +37,75 @@ class TestBoundingBox:
         bbox = BoundingBox(x=1.0, y=2.0, width=3.0, height=4.0, page=0)
         d = bbox.to_dict()
         assert d == {"x": 1.0, "y": 2.0, "width": 3.0, "height": 4.0, "page": 0}
+
+
+class TestBoundingBoxResult:
+    """BoundingBoxResult 值对象测试（DocLayNet 版面检测结果）"""
+
+    def test_create_with_valid_values(self) -> None:
+        """验证正常创建"""
+        bbox = BoundingBox(x=10.0, y=20.0, width=100.0, height=50.0, page=1)
+        result = BoundingBoxResult(label="Text", bbox=bbox, confidence=0.95)
+        assert result.label == "Text"
+        assert result.bbox == bbox
+        assert result.confidence == 0.95
+
+    def test_label_is_doclaynet_category(self) -> None:
+        """验证 label 接受所有 DocLayNet 11 类标签"""
+        bbox = BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0, page=1)
+        doclaynet_labels = [
+            "Caption",
+            "Footnote",
+            "Formula",
+            "List-item",
+            "Page-footer",
+            "Page-header",
+            "Picture",
+            "Section-header",
+            "Table",
+            "Text",
+            "Title",
+        ]
+        for label in doclaynet_labels:
+            result = BoundingBoxResult(label=label, bbox=bbox, confidence=0.9)
+            assert result.label == label
+
+    def test_to_dict_serialization(self) -> None:
+        """验证 to_dict() 输出完整字典"""
+        bbox = BoundingBox(x=10.0, y=20.0, width=100.0, height=50.0, page=1)
+        result = BoundingBoxResult(label="Title", bbox=bbox, confidence=0.88)
+        d = result.to_dict()
+        assert d == {
+            "label": "Title",
+            "bbox": {"x": 10.0, "y": 20.0, "width": 100.0, "height": 50.0, "page": 1},
+            "confidence": 0.88,
+        }
+
+    def test_frozen_immutable(self) -> None:
+        """验证不可变性"""
+        bbox = BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0, page=1)
+        result = BoundingBoxResult(label="Text", bbox=bbox, confidence=0.9)
+        with pytest.raises(AttributeError):
+            setattr(result, "label", "modified")  # type: ignore[misc]
+
+    def test_confidence_boundary_values(self) -> None:
+        """验证 confidence 边界值"""
+        bbox = BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0, page=1)
+        # 最小值
+        r_min = BoundingBoxResult(label="Text", bbox=bbox, confidence=0.0)
+        assert r_min.confidence == 0.0
+        # 最大值
+        r_max = BoundingBoxResult(label="Text", bbox=bbox, confidence=1.0)
+        assert r_max.confidence == 1.0
+
+    def test_page_info_carried_by_bbox_page(self) -> None:
+        """验证页码信息由 bbox.page 承载（无冗余 page_number 字段）"""
+        bbox = BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0, page=3)
+        result = BoundingBoxResult(label="Text", bbox=bbox, confidence=0.9)
+        # 页码通过 bbox.page 获取
+        assert result.bbox.page == 3
+        # 不存在独立的 page_number 字段
+        assert not hasattr(result, "page_number")
 
 
 class TestParsedElement:
