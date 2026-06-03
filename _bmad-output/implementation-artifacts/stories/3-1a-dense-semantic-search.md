@@ -75,7 +75,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 - [ ] 支持 tenant_id 自动注入到 filter
 - [ ] 现有 filter_payload 保留，tenant_id 追加
 
-### AC-encode_sparse: Sparse 嵌入生成（v1.1.0 FlagEmbedding 迁移新增）
+### AC-5: Sparse 嵌入生成（v1.1.0 FlagEmbedding 迁移新增）
 
 **Given** EmbeddingService 已加载 bge-m3 模型
 **When** 调用 `encode_sparse("企业战略规划报告")`
@@ -151,7 +151,7 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 #### 验收标准 Gherkin (Acceptance Tests)
 - [x] 功能测试文件：`tests/acceptance/test_acceptance_dense_semantic_search.feature`
 - [x] 步骤实现文件：`tests/acceptance/test_acceptance_dense_semantic_search.py`
-- [x] 所有场景覆盖（AC-1 至 AC-4 + AC-encode_sparse + 领域零依赖验证）
+- [x] 所有场景覆盖（AC-1 至 AC-4 + AC-5 + 领域零依赖验证）
 
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试
@@ -246,9 +246,9 @@ Story 3-1a 是 Epic 3（智能检索与知识发现）的关键路径首个故�
 | AC-3 | 检索延迟 P95<200ms | Task 5 | 性能基准测试 | `test_integration_embedding_qdrant_dense_search.py` |
 | AC-4 | Payload 过滤 | Task 3 | tenant_id + filter 注入 | `test_dense_search_service.py` |
 | AC-4 | 真实 Payload 过滤 | Task 5 | 集成测试 | `test_integration_embedding_qdrant_dense_search.py` |
-| AC-encode_sparse | Sparse 嵌入生成（进程内） | Task 2 | BGE3EmbeddingService.encode_sparse() | `test_bge3_embedding_service.py` + `test_acceptance_dense_semantic_search.py` |
-| AC-encode_sparse | Sparse 嵌入生成（API） | Task 7 | EmbeddingAPIClient | `test_embedding_api_client.py` |
-| AC-encode_sparse | Sparse API 服务 | Task 8 | Embedding API Server | `test_embedding_api_server.py` |
+| AC-5 | Sparse 嵌入生成（进程内） | Task 2 | BGE3EmbeddingService.encode_sparse() | `test_bge3_embedding_service.py` + `test_acceptance_dense_semantic_search.py` |
+| AC-5 | Sparse 嵌入生成（API） | Task 7 | EmbeddingAPIClient | `test_embedding_api_client.py` |
+| AC-5 | Sparse API 服务 | Task 8 | Embedding API Server | `test_embedding_api_server.py` |
 | AC-1 | 双策略 DI（API/Local） | Task 9 | Composition Root 分支注册 | `test_port_contract_embedding_service.py` |
 | 全部 | API 模式 BDD 验收 | Task 10 | Gherkin 场景 | `test_acceptance_dense_semantic_search.*` |
 | 全部 | 收尾验收 | Task 10 | 完成清单确认 | `test_acceptance_dense_semantic_search.*` |
@@ -271,7 +271,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 ### Task 0: SDD 规范定义（必选前置）
 
-**关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-encode_sparse
+**关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-5
 
 > **目的：** 在进入代码实现前，明确端口契约、配置模型、Gherkin 验收标准与六边形架构边界。
 
@@ -295,7 +295,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 ### Task 1: EmbeddingServicePort + EmbeddingConfig 实现
 
-**关联 AC:** AC-1, AC-encode_sparse
+**关联 AC:** AC-1, AC-5
 
 #### TDD 循环 A：EmbeddingServicePort Protocol
 
@@ -356,7 +356,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 ### Task 2: BGE3EmbeddingService 实现
 
-**关联 AC:** AC-1, AC-encode_sparse
+**关联 AC:** AC-1, AC-5
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
 
@@ -592,7 +592,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 ### Task 7: EmbeddingAPIClient 实现
 
-**关联 AC:** AC-1, AC-encode_sparse
+**关联 AC:** AC-1, AC-5
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
 
@@ -656,7 +656,7 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 
 ### Task 8: Embedding API Server 实现
 
-**关联 AC:** AC-1, AC-encode_sparse
+**关联 AC:** AC-1, AC-5
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
 
@@ -1229,7 +1229,7 @@ def perform_dense_search(context, dense_search_service, event_loop):
 **创建日期/Created:** 2026-06-01
 **最后更新/Last Updated:** 2026-06-03
 **更新说明/Description:**
-- v1.2.3: 5轮审查修订第3轮 — 修复 Task 0/1 AC-encode_sparse 关联缺失、集成测试分类表补充 AC-3、Feature 文件 Gherkin 场景与步骤代码一致（AC-6 补充 FlagEmbedding 校验）、新增统一错误处理策略章节；第4轮对抗性审查无新发现；第5轮最终精修通过
+- v1.2.3: 5轮审查修订第3-5轮 — AC-encode_sparse→AC-5 命名规范化（统一数字序列 AC-1~AC-5）；Task 0/1 补充 AC-5 关联；新增统一错误处理策略；Feature 文件 Gherkin 场景与步骤代码对齐；对抗性审查无新发现
 - v1.2.2: 5轮审查修订第2轮 — 代码：FP16 GPU 计算能力检测（Pascal 架构安全降级）、generate_embedding 补充表格文本提取、BGE3EmbeddingService 显式实现 EmbeddingServicePort、契约测试补充 dense_search_service 接口类型验证；文档：search_sparse filter 不对称说明、EmbeddingConfig 双定义同步风险、性能基准统计局限性
 - v1.2.1: 5轮审查修订第1轮 — 修正 L2 归一化科学描述、空文本处理规范（统一 ValueError）、SentenceTransformers 选型描述、Task 依赖图矛盾；代码修复 composition_root 版本号 v1.0.0→v1.1.0、契约测试补充 encode_sparse、清理孤儿 pyc；新增 sync/async 兼容策略分析、batch_size 说明、表格忽略限制、依赖残留说明
 - v1.2.0: 嵌入模型 API 化扩展 — 新增 Task 7-10

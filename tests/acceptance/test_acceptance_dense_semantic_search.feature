@@ -58,21 +58,21 @@
     那么 所有结果的 payload 中 business_domain 为 "finance"
 
   # ============================================================================
-  # AC-encode_sparse: Sparse 稀疏嵌入生成（Story 3-1a 重构新增能力）
+  # AC-5: Sparse 稀疏嵌入生成（Story 3-1a 重构新增能力）
   # ============================================================================
 
-  场景: AC-encode_sparse - 稀疏嵌入生成
+  场景: AC-5 - 稀疏嵌入生成
     当 我使用 EmbeddingService 稀疏编码文本 "企业战略规划报告"
     那么 返回的稀疏向量包含 indices 和 values 字段
     并且 indices 和 values 长度一致且非空
     并且 indices 按升序排列
     并且 所有 values 为正浮点数
 
-  场景: AC-encode_sparse - 中文文本稀疏编码
+  场景: AC-5 - 中文文本稀疏编码
     当 我使用 EmbeddingService 稀疏编码文本 "人工智能与数字化转型战略"
     那么 返回的稀疏向量至少包含 3 个词元
 
-  场景: AC-encode_sparse - 空文本拒绝
+  场景: AC-5 - 空文本拒绝
     当 我使用 EmbeddingService 稀疏编码空文本
     那么 抛出 ValueError 异常
 
