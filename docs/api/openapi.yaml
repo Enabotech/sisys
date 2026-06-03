@@ -917,6 +917,53 @@ paths:
         "403":
           description: 权限不足
 
+  # ============================================================================
+  # Embedding API — BGE-M3 嵌入服务 (Story 3-1a, 内部服务)
+  # ============================================================================
+  /health:
+    get:
+      tags:
+        - embedding
+      summary: 健康检查
+      description: 返回模型加载状态和设备信息
+      responses:
+        "200":
+          description: 模型正常
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmbeddingHealthResponse"
+        "503":
+          description: 模型未加载
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmbeddingHealthResponse"
+
+  /v1/embeddings:
+    post:
+      tags:
+        - embedding
+      summary: 文本嵌入编码
+      description: Dense 编码（1024维） + Sparse 编码（词汇权重）按需返回
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmbedRequest"
+      responses:
+        "200":
+          description: 编码成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmbedResponse"
+        "422":
+          description: 请求参数校验失败
+        "503":
+          description: 模型未加载
+
 components:
   schemas:
     # --------------------------------------------------------------------------
@@ -1497,6 +1544,71 @@ components:
         detail:
           type: string
           description: 错误详情
+
+    # --------------------------------------------------------------------------
+    # Embedding API schemas (Story 3-1a)
+    # --------------------------------------------------------------------------
+    EmbedRequest:
+      type: object
+      required:
+        - texts
+      properties:
+        texts:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: 待编码文本列表
+        return_sparse:
+          type: boolean
+          default: false
+          description: 是否返回稀疏词汇权重
+
+    EmbedResponse:
+      type: object
+      required:
+        - dense
+      properties:
+        dense:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+          description: Dense 向量列表（每项 1024 维 float）
+        sparse:
+          type: array
+          nullable: true
+          items:
+            type: object
+            properties:
+              indices:
+                type: array
+                items:
+                  type: integer
+              values:
+                type: array
+                items:
+                  type: number
+          description: Sparse 向量列表（仅 return_sparse=true 时有值）
+
+    EmbeddingHealthResponse:
+      type: object
+      required:
+        - status
+        - model
+        - device
+      properties:
+        status:
+          type: string
+          enum: [ok, loading, unavailable]
+        model:
+          type: string
+        device:
+          type: string
+        error:
+          type: string
+          nullable: true
 
   securitySchemes:
     OAuth2:
