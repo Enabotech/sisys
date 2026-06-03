@@ -82,7 +82,7 @@
 
   场景: AC-6 - 领域层零外部依赖
     当 我扫描 src/domain/ 目录
-    那么 不应该导入 sentence_transformers 或 torch
+    那么 不应该导入 sentence_transformers 或 torch 或 FlagEmbedding
 
   场景: AC-6b - 共享层零外部依赖
     当 我扫描 src/shared/ 目录
