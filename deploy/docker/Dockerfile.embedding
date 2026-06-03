@@ -1,10 +1,12 @@
 # SISYS Embedding API — Docker 镜像
 # 基于 FlagEmbedding + FastAPI 的最小化镜像，仅含 BGE-M3 模型推理依赖
-FROM python:3.11-slim
+FROM docker.1ms.run/library/python:3.11.15-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir fastapi uvicorn FlagEmbedding
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple fastapi uvicorn FlagEmbedding
 
 COPY src/infrastructure/external_services/embedding/embedding_api_server.py /app/
 
