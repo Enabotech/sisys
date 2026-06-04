@@ -29,7 +29,6 @@ class PdfDocument:
         exc_tb: TracebackType | None,
     ) -> None: ...
 
-
 class PdfPage:
     """PDF 页面 — 提供页面渲染能力
 
@@ -37,7 +36,6 @@ class PdfPage:
     """
 
     def render(self, scale: float = ...) -> "PdfBitmap": ...
-
 
 class PdfBitmap:
     """PDF 位图 — 页面渲染结果
