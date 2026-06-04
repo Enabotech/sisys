@@ -1,8 +1,8 @@
 """Story 3-1a 端到端集成测试
 
 验证 EmbeddingAPIClient (FlagEmbedding API) + Qdrant 在真实环境下的协作：
-- Dense 语义检索（encode_text → search）
-- Sparse 稀疏检索（encode_sparse → search_sparse）
+- Dense 语义检索（embed_query → search）
+- Sparse 稀疏检索（embed_sparse → search_sparse）
 - 嵌入质量验证（L2 归一化、维度、Sparse 格式）
 
 依赖：真实 BGE-M3 模型 + 真实 Qdrant 服务
@@ -73,7 +73,7 @@ class TestDenseSearchEndToEnd:
         try:
             storage = QdrantVectorStorage(qdrant_client)
             texts = ["企业战略规划报告", "财务分析总结", "市场调研数据", "技术架构文档", "人力资源计划"]
-            vectors = embedding_service.encode_texts(texts)
+            vectors = embedding_service.embed_documents(texts)
             points = [
                 VectorPoint(
                     id=f"doc_{i}",
@@ -85,7 +85,7 @@ class TestDenseSearchEndToEnd:
             ]
             await storage.upsert_points(collection_name, points)
 
-            query_vector = embedding_service.encode_text("战略规划")
+            query_vector = embedding_service.embed_query("战略规划")
             results = await storage.search(collection_name, query_vector, limit=3)
 
             assert len(results) > 0
@@ -105,7 +105,7 @@ class TestDenseSearchEndToEnd:
             storage = QdrantVectorStorage(qdrant_client)
             texts = ["财务审计报告", "投资风险评估", "技术架构设计", "财务预算分析", "产品技术方案"]
             domains = ["finance", "finance", "technology", "finance", "technology"]
-            vectors = embedding_service.encode_texts(texts)
+            vectors = embedding_service.embed_documents(texts)
             points = [
                 VectorPoint(
                     id=f"doc_{i}",
@@ -117,7 +117,7 @@ class TestDenseSearchEndToEnd:
             ]
             await storage.upsert_points(collection_name, points)
 
-            query_vector = embedding_service.encode_text("财务")
+            query_vector = embedding_service.embed_query("财务")
             results = await storage.search(
                 collection_name, query_vector, limit=10, filter_payload={"business_domain": "finance"}
             )
@@ -137,7 +137,7 @@ class TestDenseSearchEndToEnd:
         try:
             storage = QdrantVectorStorage(qdrant_client)
             texts = [f"测试文档内容编号{i}" for i in range(100)]
-            vectors = embedding_service.encode_texts(texts)
+            vectors = embedding_service.embed_documents(texts)
             points = [
                 VectorPoint(
                     id=f"doc_{i}",
@@ -151,14 +151,14 @@ class TestDenseSearchEndToEnd:
 
             # 预热
             for _ in range(5):
-                qv = embedding_service.encode_text("预热查询")
+                qv = embedding_service.embed_query("预热查询")
                 await storage.search(collection_name, qv, limit=5)
 
             # 50 次查询
             latencies = []
             for _ in range(50):
                 start = time.perf_counter()
-                qv = embedding_service.encode_text("性能测试查询文本"[:512])
+                qv = embedding_service.embed_query("性能测试查询文本"[:512])
                 await storage.search(collection_name, qv, limit=5)
                 latencies.append((time.perf_counter() - start) * 1000)
 
@@ -175,53 +175,59 @@ class TestEmbeddingNormalization:
 
     def test_l2_norm_approx_one(self, embedding_service) -> None:
         """bge-m3 输出向量 L2 范数 ≈ 1.0"""
-        vector = embedding_service.encode_text("测试归一化")
+        vector = embedding_service.embed_query("测试归一化")
         norm = math.sqrt(sum(x * x for x in vector))
         assert abs(norm - 1.0) < 0.01, f"L2 范数 {norm} 不接近 1.0"
 
     def test_dimension_is_1024(self, embedding_service) -> None:
         """bge-m3 输出维度为 1024"""
-        vector = embedding_service.encode_text("测试维度")
+        vector = embedding_service.embed_query("测试维度")
         assert len(vector) == 1024
 
-    def test_encode_sparse_format(self, embedding_service) -> None:
-        """encode_sparse 返回正确的 indices/values 格式"""
-        result = embedding_service.encode_sparse("企业战略规划")
-        assert isinstance(result, dict)
-        assert "indices" in result
-        assert "values" in result
-        assert isinstance(result["indices"], list)
-        assert isinstance(result["values"], list)
-        assert len(result["indices"]) > 0, "Sparse 向量不应为空"
-        assert len(result["indices"]) == len(result["values"])
+    def test_embed_sparse_format(self, embedding_service) -> None:
+        """embed_sparse 返回 list[SparseEmbedding]"""
+        result = embedding_service.embed_sparse(["企业战略规划"])
+        assert isinstance(result, list)
+        assert len(result) == 1
+        r0 = result[0]
+        assert isinstance(r0, dict)
+        assert "indices" in r0
+        assert "values" in r0
+        assert isinstance(r0["indices"], list)
+        assert isinstance(r0["values"], list)
+        assert len(r0["indices"]) > 0, "Sparse 向量不应为空"
+        assert len(r0["indices"]) == len(r0["values"])
 
-    def test_encode_sparse_chinese_text(self, embedding_service) -> None:
-        """中文文本 encode_sparse 质量验证"""
-        result = embedding_service.encode_sparse("企业战略规划与市场分析")
+    def test_embed_sparse_chinese_text(self, embedding_service) -> None:
+        """中文文本 embed_sparse 质量验证"""
+        result = embedding_service.embed_sparse(["企业战略规划与市场分析"])
+        r0 = result[0]
 
         # 中文文本应产生有意义的稀疏向量
-        assert len(result["indices"]) >= 2, f"中文文本应产生至少 2 个 token 权重，实际 {len(result['indices'])}"
+        assert len(r0["indices"]) >= 2, f"中文文本应产生至少 2 个 token 权重，实际 {len(r0['indices'])}"
 
         # 验证 indices 按升序排列
-        assert result["indices"] == sorted(result["indices"]), "indices 应升序排列"
+        assert r0["indices"] == sorted(r0["indices"]), "indices 应升序排列"
 
         # 验证所有 values 为正浮点数
-        for v in result["values"]:
+        for v in r0["values"]:
             assert isinstance(v, float)
             assert v > 0, f"Sparse 权重应为正数，实际 {v}"
 
-    def test_encode_sparse_values_sum_positive(self, embedding_service) -> None:
-        """encode_sparse 权重总和为正（BGE-M3 词汇权重特性）"""
-        result = embedding_service.encode_sparse("人工智能与机器学习")
-        total_weight = sum(result["values"])
+    def test_embed_sparse_values_sum_positive(self, embedding_service) -> None:
+        """embed_sparse 权重总和为正（BGE-M3 词汇权重特性）"""
+        result = embedding_service.embed_sparse(["人工智能与机器学习"])
+        r0 = result[0]
+        total_weight = sum(r0["values"])
         assert total_weight > 0, f"Sparse 权重总和应为正，实际 {total_weight}"
 
     def test_dense_and_sparse_from_same_model(self, embedding_service) -> None:
         """同一模型产出的 Dense 和 Sparse 嵌入应一致（共用同一模型权重）"""
         text = "企业数字化转型战略"
 
-        dense = embedding_service.encode_text(text)
-        sparse = embedding_service.encode_sparse(text)
+        dense = embedding_service.embed_query(text)
+        sparse_result = embedding_service.embed_sparse([text])
+        sparse = sparse_result[0]
 
         assert len(dense) == 1024
         assert len(sparse["indices"]) > 0
@@ -229,15 +235,15 @@ class TestEmbeddingNormalization:
         norm = math.sqrt(sum(x * x for x in dense))
         assert abs(norm - 1.0) < 0.01
 
-    def test_encode_sparse_empty_text_raises(self, embedding_service) -> None:
-        """空文本时 encode_sparse 抛出 ValueError（纯同步，无需 Qdrant）"""
-        with pytest.raises(ValueError, match="文本不能为空"):
-            embedding_service.encode_sparse("")
+    def test_embed_sparse_empty_text_raises(self, embedding_service) -> None:
+        """空文本时 embed_sparse 抛出 ValueError（纯同步，无需 Qdrant）"""
+        with pytest.raises(ValueError, match="文本列表"):
+            embedding_service.embed_sparse([""])
 
-    def test_encode_sparse_whitespace_raises(self, embedding_service) -> None:
-        """纯空白文本时 encode_sparse 抛出 ValueError"""
-        with pytest.raises(ValueError, match="文本不能为空"):
-            embedding_service.encode_sparse("   ")
+    def test_embed_sparse_whitespace_raises(self, embedding_service) -> None:
+        """纯空白文本时 embed_sparse 抛出 ValueError"""
+        with pytest.raises(ValueError, match="文本列表"):
+            embedding_service.embed_sparse(["   "])
 
 
 class TestSparseSearchEndToEnd:
@@ -253,7 +259,7 @@ class TestSparseSearchEndToEnd:
 
     @pytest.mark.asyncio
     async def test_sparse_search_e2e(self, qdrant_client, sparse_collection_name, embedding_service) -> None:
-        """端到端：空查询→encode_sparse→upsert→search_sparse→排序→无匹配"""
+        """端到端：空查询→embed_sparse→upsert→search_sparse→排序→无匹配"""
         cm = QdrantCollectionManager(qdrant_client)
         await cm.create_collection(
             name=sparse_collection_name,
@@ -265,15 +271,16 @@ class TestSparseSearchEndToEnd:
             storage = QdrantVectorStorage(qdrant_client)
 
             # 子测试 1: 空集合无匹配
-            query_sparse = embedding_service.encode_sparse("完全不相关的查询文本")
+            query_sparse = embedding_service.embed_sparse(["完全不相关的查询文本"])[0]
             results = await storage.search_sparse(sparse_collection_name, query_sparse, limit=5)
             assert results == [], "空 Collection 应返回空列表"
 
-            # 子测试 2: 写入 Sparse 向量后检索
+            # 子测试 2: 写入 Sparse 向量后检索（批量嵌入一次性完成）
             texts = ["企业战略规划", "财务分析报告", "市场调研数据", "技术架构文档", "人力资源计划"]
+            sparse_vectors = embedding_service.embed_sparse(texts)
             points = []
             for i, text in enumerate(texts):
-                sr = embedding_service.encode_sparse(text)
+                sr = sparse_vectors[i]
                 points.append(
                     PointStruct(
                         id=i + 1,
@@ -288,7 +295,7 @@ class TestSparseSearchEndToEnd:
                 )
             await qdrant_client.upsert(collection_name=sparse_collection_name, points=points)
 
-            query_sparse = embedding_service.encode_sparse("战略规划")
+            query_sparse = embedding_service.embed_sparse(["战略规划"])[0]
             results = await storage.search_sparse(sparse_collection_name, query_sparse, limit=3)
 
             assert len(results) > 0

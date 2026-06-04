@@ -154,7 +154,7 @@ def test_ac1_embedding_generation():
 @when('我使用 EmbeddingService 编码文本 "企业战略规划报告"')
 def encode_single_text(context: dict[str, Any], embedding_service):
     """编码单条文本"""
-    context["embedding"] = embedding_service.encode_text("企业战略规划报告")
+    context["embedding"] = embedding_service.embed_query("企业战略规划报告")
 
 
 @then("返回的嵌入向量维度为 1024")
@@ -185,7 +185,7 @@ def test_ac1b_batch_embedding_generation():
 def encode_batch_texts(context: dict[str, Any], embedding_service):
     """编码批量文本"""
     texts = ["企业战略规划报告", "财务分析总结", "市场调研数据"]
-    context["embeddings"] = embedding_service.encode_texts(texts)
+    context["embeddings"] = embedding_service.embed_documents(texts)
     context["input_count"] = len(texts)
 
 
@@ -227,7 +227,7 @@ def collection_has_document_vectors(
 
     async def _setup():
         await collection_manager.create_collection(name=collection, vector_size=1024, distance="Cosine")
-        vectors = embedding_service.encode_texts(texts)
+        vectors = embedding_service.embed_documents(texts)
         points = [
             VectorPoint(
                 id=f"doc_{i}",
@@ -370,7 +370,7 @@ def collection_has_multi_domain_vectors(
 
     async def _setup():
         await collection_manager.create_collection(name=collection, vector_size=1024, distance="Cosine")
-        vectors = embedding_service.encode_texts(texts)
+        vectors = embedding_service.embed_documents(texts)
         points = [
             VectorPoint(
                 id=f"doc_{i}",
@@ -463,27 +463,27 @@ def verify_no_forbidden_imports():
 
 
 @scenario("test_acceptance_dense_semantic_search.feature", "AC-5 - 稀疏嵌入生成")
-def test_ac_encode_sparse():
+def test_ac_embed_sparse():
     """测试 BGE-M3 稀疏嵌入生成"""
     pass
 
 
 @scenario("test_acceptance_dense_semantic_search.feature", "AC-5 - 中文文本稀疏编码")
-def test_ac_encode_sparse_chinese():
+def test_ac_embed_sparse_chinese():
     """测试中文文本稀疏编码"""
     pass
 
 
 @scenario("test_acceptance_dense_semantic_search.feature", "AC-5 - 空文本拒绝")
-def test_ac_encode_sparse_empty_rejected():
+def test_ac_embed_sparse_empty_rejected():
     """测试空文本抛出异常"""
     pass
 
 
 @when('我使用 EmbeddingService 稀疏编码文本 "企业战略规划报告"')
-def encode_sparse_single_text(context: dict[str, Any], embedding_service):
+def embed_sparse_single_text(context: dict[str, Any], embedding_service):
     """稀疏编码单条文本"""
-    context["sparse_result"] = embedding_service.encode_sparse("企业战略规划报告")
+    context["sparse_result"] = embedding_service.embed_sparse(["企业战略规划报告"])[0]
 
 
 @then("返回的稀疏向量包含 indices 和 values 字段")
@@ -522,9 +522,9 @@ def sparse_values_all_positive(context: dict[str, Any]):
 
 
 @when('我使用 EmbeddingService 稀疏编码文本 "人工智能与数字化转型战略"')
-def encode_sparse_chinese_text(context: dict[str, Any], embedding_service):
+def embed_sparse_chinese_text(context: dict[str, Any], embedding_service):
     """稀疏编码中文文本"""
-    context["sparse_result"] = embedding_service.encode_sparse("人工智能与数字化转型战略")
+    context["sparse_result"] = embedding_service.embed_sparse(["人工智能与数字化转型战略"])[0]
 
 
 @then("返回的稀疏向量至少包含 3 个词元")
@@ -535,11 +535,11 @@ def sparse_minimum_tokens(context: dict[str, Any]):
 
 
 @when("我使用 EmbeddingService 稀疏编码空文本")
-def encode_sparse_empty_text(context: dict[str, Any], embedding_service):
+def embed_sparse_empty_text(context: dict[str, Any], embedding_service):
     """尝试编码空文本（预期失败）"""
     context["sparse_error"] = None
     try:
-        embedding_service.encode_sparse("")
+        embedding_service.embed_sparse([""])
     except ValueError as e:
         context["sparse_error"] = e
 

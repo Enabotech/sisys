@@ -112,8 +112,8 @@ async def generate_embedding(parse_result: dict[str, Any]) -> list[float]:
         if not text.strip():
             return []
 
-        embedding = await asyncio.to_thread(service.encode_text, text)
-        return cast(list[float], embedding)
+        embeddings = await asyncio.to_thread(service.embed_documents, [text])
+        return cast(list[float], embeddings[0])
     except Exception as e:
         logger.error("生成嵌入失败: %s", e)
         return []

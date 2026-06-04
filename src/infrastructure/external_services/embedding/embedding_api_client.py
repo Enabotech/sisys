@@ -13,7 +13,7 @@ from typing import Any, cast
 
 import httpx
 
-from src.domain.ports.embedding_service import EmbeddingServicePort
+from src.domain.ports.embedding_service import EmbeddingServicePort, SparseEmbedding
 from src.infrastructure.config.embedding import EmbeddingConfig
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             EmbeddingServiceError: 客户端已关闭时
         """
         if self._closed:
-            raise EmbeddingServiceError("EmbeddingAPIClient 已关闭，无法执行编码操作")
+            raise EmbeddingServiceError("EmbeddingAPIClient 已关闭，无法执行嵌入操作")
 
     @property
     def dimension(self) -> int:
@@ -81,11 +81,14 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         """
         return 1024
 
-    def encode_text(self, text: str) -> list[float]:
-        """单文本 Dense 编码
+    def embed_query(self, text: str) -> list[float]:
+        """查询文本 Dense 嵌入
+
+        对标 LangChain Embeddings.embed_query()。
+        将单条查询文本编码为语义向量。
 
         Args:
-            text: 待编码文本
+            text: 查询文本
 
         Returns:
             经 L2 归一化的 1024 维浮点向量
@@ -98,11 +101,14 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         result = self._encode([text], return_sparse=False)
         return cast(list[float], result["dense"][0])
 
-    def encode_texts(self, texts: list[str]) -> list[list[float]]:
-        """批量文本 Dense 编码
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """文档批量 Dense 嵌入
+
+        对标 LangChain Embeddings.embed_documents()。
+        将文档文本批量编码为语义向量。
 
         Args:
-            texts: 待编码文本列表（空列表返回空结果）
+            texts: 待编码文档文本列表（空列表返回空结果）
 
         Returns:
             浮点向量列表
@@ -118,25 +124,30 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         result = self._encode(texts, return_sparse=False)
         return cast(list[list[float]], result["dense"])
 
-    def encode_sparse(self, text: str) -> dict[str, list[Any]]:
-        """单文本 Sparse 编码
+    def embed_sparse(self, texts: list[str]) -> list[SparseEmbedding]:
+        """文档 Sparse 嵌入（批量）
+
+        将文档文本批量编码为稀疏词汇权重向量。
 
         Args:
-            text: 待编码文本
+            texts: 待编码文本列表（空列表返回空结果）
 
         Returns:
-            {"indices": list[int], "values": list[float]}
+            SparseEmbedding 列表
 
         Raises:
-            ValueError: 文本为空时
+            ValueError: 列表中包含空文本时
         """
-        if not text or not text.strip():
-            raise ValueError("文本不能为空")
-        result = self._encode([text], return_sparse=True)
+        if not texts:
+            return []
+        for i, t in enumerate(texts):
+            if not t or not t.strip():
+                raise ValueError(f"文本列表第 {i} 项不能为空")
+        result = self._encode(texts, return_sparse=True)
         sparse_list = cast(list[dict[str, Any]], result.get("sparse", []))
         if not sparse_list:
-            return {"indices": [], "values": []}
-        return sparse_list[0]
+            return [SparseEmbedding(indices=[], values=[]) for _ in texts]
+        return [SparseEmbedding(indices=s["indices"], values=s["values"]) for s in sparse_list]
 
     def _encode(self, texts: list[str], *, return_sparse: bool) -> dict[str, Any]:
         """统一请求 /v1/embeddings
@@ -171,7 +182,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
     def close(self) -> None:
         """关闭 HTTP 客户端，释放连接池资源
 
-        关闭后实例不可再使用，再次调用 encode_* 方法将抛出 EmbeddingServiceError。
+        关闭后实例不可再使用，再次调用 embed_* 方法将抛出 EmbeddingServiceError。
         重复调用 close() 是安全的（幂等）。
         """
         if not self._closed:
