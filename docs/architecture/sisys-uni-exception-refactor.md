@@ -1,6 +1,6 @@
 # 统一异常处理重构详细设计
 
-**状态：** 待实施
+**状态：** 已实施（2026-06-04 第五轮审查修订）
 **创建日期：** 2026-06-04
 **作者：** Agimtech
 **前置文档：** [统一异常处理设计方案（第二轮评审修订）](./sisys-uni-exception-design.md)
@@ -49,8 +49,8 @@ Phase 1（基础）         Phase 2（接线）          Phase 3（迁移）
 
 ### 2.1 删除 5 个死代码类
 
-- [ ] 从 `src/domain/exceptions/service_exceptions.py` 删除以下 5 个类（L66-124）
-- [ ] 更新同文件 `__all__` 列表，移除 5 个类名
+- [x] 从 `src/domain/exceptions/service_exceptions.py` 删除以下 5 个类（L66-124）
+- [x] 更新同文件 `__all__` 列表，移除 5 个类名
 
 **删除清单**（全局搜索确认零引用）：
 
@@ -73,7 +73,7 @@ __all__ = [
 
 ### 2.2 沙箱异常重编码
 
-- [ ] 修改 `src/domain/exceptions/sandbox_exceptions.py` 4 个编码
+- [x] 修改 `src/domain/exceptions/sandbox_exceptions.py` 4 个编码
 
 | 类名 | 旧编码 | 新编码 |
 |------|--------|--------|
@@ -112,7 +112,7 @@ class ContainerStopError(SandboxError):
 
 ### 2.3 存储异常重编码
 
-- [ ] 修改 `src/domain/exceptions/storage_exceptions.py` 6 个编码
+- [x] 修改 `src/domain/exceptions/storage_exceptions.py` 6 个编码
 
 | 类名 | 旧编码 | 新编码 |
 |------|--------|--------|
@@ -125,19 +125,20 @@ class ContainerStopError(SandboxError):
 
 ### 2.4 角色异常重编码
 
-- [ ] 修改 `src/domain/exceptions/role_exceptions.py` 3 个编码
+- [x] 修改 `src/domain/exceptions/role_exceptions.py` 3 个编码
 
 | 类名 | 旧编码 | 新编码 |
 |------|--------|--------|
 | `RoleNotFoundError` | EXCEPTION_202 | EXCEPTION_221 |
 | `RoleAlreadyExistsError` | EXCEPTION_203 | EXCEPTION_222 |
 | `CannotDeleteRoleWithUsersError` | EXCEPTION_203 | EXCEPTION_223 |
+| `CannotDeleteSystemRoleError` | EXCEPTION_207 | EXCEPTION_224 |
 
-> `CannotDeleteSystemRoleError`（EXCEPTION_207）仅与 `BusinessRuleViolationError` 共享父类编码，语义一致（业务规则违反），保持不变。
+> 注：`CannotDeleteSystemRoleError` 语义为"业务规则违反"（继承 `BusinessRuleViolationError`），但已分配独立编码 224 以确保全局唯一。
 
 ### 2.5 服务异常重编码
 
-- [ ] 修改 `src/domain/exceptions/service_exceptions.py` 2 个编码
+- [x] 修改 `src/domain/exceptions/service_exceptions.py` 2 个编码
 
 | 类名 | 旧编码 | 新编码 |
 |------|--------|--------|
@@ -146,12 +147,12 @@ class ContainerStopError(SandboxError):
 
 ### 2.6 权限/事件异常重编码
 
-- [ ] 修改 `src/domain/exceptions/permission_exceptions.py`：`InsufficientTokenError` 204→241
-- [ ] 修改 `src/domain/exceptions/event_exceptions.py`：`VersionError` 203→251
+- [x] 修改 `src/domain/exceptions/permission_exceptions.py`：`InsufficientTokenError` 204→241
+- [x] 修改 `src/domain/exceptions/event_exceptions.py`：`VersionError` 203→251
 
 ### 2.7 更新 EXCEPTION_HTTP_MAP
 
-- [ ] 在 `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 中添加以下条目
+- [x] 在 `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 中添加以下条目
 
 ```python
 # 添加到 EXCEPTION_HTTP_MAP
@@ -178,7 +179,7 @@ VersionError: status.HTTP_409_CONFLICT,                  # 251
 
 ### 2.8 编写错误码唯一性测试
 
-- [ ] 创建 `tests/unit/domain/exceptions/test_error_code_uniqueness.py`
+- [x] 创建 `tests/unit/domain/exceptions/test_error_code_uniqueness.py`
 
 ```python
 """验证所有领域异常编码全局唯一"""
@@ -240,10 +241,13 @@ def test_all_codes_match_pattern():
 | EXCEPTION_221 | RoleNotFoundError | NotFoundError | 404 |
 | EXCEPTION_222 | RoleAlreadyExistsError | ConflictError | 409 |
 | EXCEPTION_223 | CannotDeleteRoleWithUsersError | ConflictError | 409 |
+| EXCEPTION_224 | CannotDeleteSystemRoleError | BusinessRuleViolationError | 422 |
 | EXCEPTION_231 | PasswordValidationError | ValidationError | 400 |
 | EXCEPTION_232 | ComplianceLockError | InvalidStateError | 409 |
 | EXCEPTION_241 | InsufficientTokenError | PermissionDeniedError | 403 |
 | EXCEPTION_251 | VersionError | ConflictError | 409 |
+| EXCEPTION_261 | TransferNotFoundError | NotFoundError | 404 |
+| EXCEPTION_262 | TransferNotApprovedError | InvalidStateError | 409 |
 | EXCEPTION_3XX | ExternalException | BaseException | 502 |
 | EXCEPTION_301 | ThirdPartyError | ExternalException | 502 |
 | EXCEPTION_302 | TimeoutError | ExternalException | 504 |
@@ -263,7 +267,7 @@ def test_all_codes_match_pattern():
 
 ### 3.1 创建 ExceptionMetricsAdapter
 
-- [ ] 新建 `src/infrastructure/monitoring/exception_metrics_adapter.py`
+- [x] 新建 `src/infrastructure/monitoring/exception_metrics_adapter.py`
 
 ```python
 """基础设施层异常指标适配器模块
@@ -301,7 +305,7 @@ class ExceptionMetricsAdapter(ExceptionMetricsPort):
 
 ### 3.2 修复 composition_root 注册路径
 
-- [ ] 修改 `src/composition_root.py` L794 的 impl 路径
+- [x] 修改 `src/composition_root.py` L794 的 impl 路径
 
 ```python
 # 修改前（路径不存在）：
@@ -324,7 +328,7 @@ register_port(
 
 ### 3.3 ExceptionHandlers 集成 ExceptionMetricsPort
 
-- [ ] 修改 `src/interfaces/api/exception_handlers.py`：添加 `_record()` 方法，`__init__` 接受可选 metrics 参数
+- [x] 修改 `src/interfaces/api/exception_handlers.py`：添加 `_record()` 方法，`__init__` 接受可选 metrics 参数
 
 ```python
 # 修改 ExceptionHandlers 类
@@ -380,7 +384,7 @@ def register_exception_handlers(
 
 ### 3.4 app.py 注册处理器与中间件
 
-- [ ] 修改 `src/interfaces/api/app.py`：注册 ExceptionHandlers + ExceptionContextMiddleware
+- [x] 修改 `src/interfaces/api/app.py`：注册 ExceptionHandlers + ExceptionContextMiddleware
 
 ```python
 # src/interfaces/api/app.py — 修改后
@@ -402,7 +406,7 @@ def create_app() -> FastAPI:
 
 ### 3.5 创建共享 ErrorResponse 模型
 
-- [ ] 新建 `src/interfaces/api/shared_models.py`
+- [x] 新建 `src/interfaces/api/shared_models.py`
 
 ```python
 """接口层共享响应模型模块
@@ -426,7 +430,7 @@ class ErrorResponse(BaseModel):
     detail: str
 ```
 
-- [ ] 替换 5 处重复定义，改为 `from src.interfaces.api.shared_models import ErrorResponse`
+- [x] 替换 5 处重复定义，改为 `from src.interfaces.api.shared_models import ErrorResponse`
 
 | 文件 | 删除行 | 操作 |
 |------|--------|------|
@@ -438,7 +442,7 @@ class ErrorResponse(BaseModel):
 
 ### 3.6 创建共享 get_current_user 依赖
 
-- [ ] 在 `src/interfaces/api/shared_models.py` 中添加共享的 OAuth2 认证依赖
+- [x] 在 `src/interfaces/api/shared_models.py` 中添加共享的 OAuth2 认证依赖
 
 ```python
 # 添加到 src/interfaces/api/shared_models.py
@@ -501,11 +505,11 @@ def create_get_current_user(auth_service: AuthServicePort):
 
 #### 4.1.1 移除 7 处冗余 catch+rethrow
 
-- [ ] `login()`（L272-282）：移除 `except AuthenticationError` 块，让异常自然上浮
-- [ ] `refresh_token()`（L316-320）：同上
-- [ ] `create_role()`（L413-417）：移除 `except RoleAlreadyExistsError` 块
-- [ ] `update_role()`（L540-549）：移除 `except RoleNotFoundError` 和 `except RoleAlreadyExistsError` 块
-- [ ] `delete_role()`（L583-597）：移除 `except RoleNotFoundError`、`except CannotDeleteSystemRoleError`、`except CannotDeleteRoleWithUsersError` 块
+- [x] `login()`（L272-282）：移除 `except AuthenticationError` 块，让异常自然上浮
+- [x] `refresh_token()`（L316-320）：同上
+- [x] `create_role()`（L413-417）：移除 `except RoleAlreadyExistsError` 块
+- [x] `update_role()`（L540-549）：移除 `except RoleNotFoundError` 和 `except RoleAlreadyExistsError` 块
+- [x] `delete_role()`（L583-597）：移除 `except RoleNotFoundError`、`except CannotDeleteSystemRoleError`、`except CannotDeleteRoleWithUsersError` 块
 
 ```python
 # 迁移前：
@@ -522,7 +526,7 @@ return RoleResponse(...)
 
 #### 4.1.2 替换 5 处 admin 角色检查
 
-- [ ] L391-395, L515-519, L574-578, L626-630, L688-691：改用 `PermissionDeniedError`
+- [x] L391-395, L515-519, L574-578, L626-630, L688-691：改用 `PermissionDeniedError`
 
 ```python
 # 迁移前：
@@ -536,7 +540,7 @@ if not current_user.has_any_role("admin"):
 
 #### 4.1.3 替换 5 处 null 检查
 
-- [ ] L472-476, L540-544, L584-587, L634-638, L695-699：改用 `NotFoundError`
+- [x] L472-476, L540-544, L584-587, L634-638, L695-699：改用 `NotFoundError`
 
 ```python
 # 迁移前：
@@ -552,7 +556,7 @@ if not role:
 
 #### 4.1.4 保留 2 处 OAuth2 HTTPException
 
-- [ ] `get_current_user_dependency`（L191-204）：保持不变（OAuth2 WWW-Authenticate 要求）
+- [x] `get_current_user_dependency`（L191-204）：保持不变（OAuth2 WWW-Authenticate 要求）
 
 ### 4.2 document_upload.py 迁移（12→4 处 HTTPException）
 
@@ -653,7 +657,7 @@ async def get_current_user(authorization: str | None = None) -> TokenPayload:
 
 ### 5.1 创建 Transfer 相关领域异常
 
-- [ ] 新建 `src/domain/exceptions/transfer_exceptions.py`
+- [x] 新建 `src/domain/exceptions/transfer_exceptions.py`
 
 ```python
 """领域层跨境传输异常模块
@@ -730,7 +734,7 @@ __all__ = [
 
 ### 5.3 添加 ValueError 兜底处理器
 
-- [ ] 在 `src/interfaces/api/exception_handlers.py` 添加 ValueError 处理器（临时方案，直到实体层迁移完成）
+- [x] 在 `src/interfaces/api/exception_handlers.py` 添加 ValueError 处理器（临时方案，直到实体层迁移完成）
 
 ```python
 # 在 ExceptionHandlers._register_handlers 中添加
@@ -838,7 +842,7 @@ grep -rn "IntrusionDetectionError\|DataIntegrityError\|BackupError\|EncryptionEr
 
 ---
 
-## 8. 重构后预期统计
+## 8. 重构后实际统计（验证通过）
 
 | 指标 | 重构前 | 重构后 |
 |------|--------|--------|

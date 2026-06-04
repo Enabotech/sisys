@@ -208,9 +208,15 @@ class ExceptionHandlers:
 
         try:
             error_dict = exc.to_dict()
-        except Exception:
+        except Exception as to_dict_err:
+            logger.warning(
+                "to_dict() failed for %s: %s, falling back to manual serialization",
+                type(exc).__name__,
+                to_dict_err,
+            )
+            code_raw = getattr(exc, "code", None)
             error_dict = {
-                "code": getattr(exc, "code", None) or "EXCEPTION_999",
+                "code": code_raw if code_raw else "EXCEPTION_999",
                 "message": str(exc)[:500],
                 "context": getattr(exc, "context", None) or {},
             }
@@ -285,6 +291,7 @@ class ExceptionHandlers:
         if not isinstance(exc, PydanticValidationError):
             raise TypeError(f"Expected PydanticValidationError, got {type(exc).__name__}")
         request_id = getattr(request.state, "request_id", None) or "unknown"
+        self._record(exc)
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={

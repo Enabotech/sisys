@@ -1,6 +1,6 @@
 # 统一异常处理设计方案
 
-**状态：** 已实现（第二轮评审修订）
+**状态：** 已实现（第五轮审查修订）
 **创建日期：** 2026-05-10
 **最后评审日期：** 2026-06-04
 **作者：** Agimtech
@@ -22,15 +22,15 @@
 | **日志不规范** | catch-and-log 模式各异，错误级别不统一 | 日志分析困难 |
 | **API 转换重复** | 每个 API 端点重复编写 try/except HTTP 转换 | 代码冗余 |
 
-### 1.2 迁移后残留问题
+### 1.2 迁移后残留问题（已解决）
 
-| 问题 | 描述 | 影响范围 |
-|------|------|----------|
-| **双重处理模式** | `auth.py` 等 5 个接口文件仍手动 `raise HTTPException`，绕过统一 `ExceptionHandlers` | 丢失错误码/上下文/结构化日志 |
-| **重复 ErrorResponse 模型** | 5 个文件各自定义 `ErrorResponse(BaseModel)`，未合并到共享模块 | API 响应格式不一致 |
-| **越界异常** | `TransferNotFoundError`、`TransferNotApprovedError` 继承 Python 内置 `Exception` 而非领域 `BaseException` | 绕过集中处理器，仅被兜底捕获返回 500 |
-| **错误码碰撞** | EXCEPTION_301 被 6 个类共享，EXCEPTION_302/303 各被 2 个类共享 | 违反唯一编码原则，监控告警无法精确定位 |
-| **指标集成缺口** | `ExceptionMetricsPort` 已定义但未集成到 `ExceptionHandlers`；composition_root 注册路径错误 | 异常指标采集不可用 |
+| 问题 | 描述 | 影响范围 | 状态 |
+|------|------|----------|------|
+| **双重处理模式** | `auth.py` 等 5 个接口文件仍手动 `raise HTTPException`，绕过统一 `ExceptionHandlers` | 丢失错误码/上下文/结构化日志 | ✅ 已修复（仅 OAuth2 WWW-Authenticate 合法保留） |
+| **重复 ErrorResponse 模型** | 5 个文件各自定义 `ErrorResponse(BaseModel)`，未合并到共享模块 | API 响应格式不一致 | ✅ 已合并到 `shared_models.py` |
+| **越界异常** | `TransferNotFoundError`、`TransferNotApprovedError` 继承 Python 内置 `Exception` 而非领域 `BaseException` | 绕过集中处理器，仅被兜底捕获返回 500 | ✅ 已迁移到 `transfer_exceptions.py` |
+| **错误码碰撞** | EXCEPTION_301 被 6 个类共享，EXCEPTION_302/303 各被 2 个类共享 | 违反唯一编码原则，监控告警无法精确定位 | ✅ 已全部分配独立编码 |
+| **指标集成缺口** | `ExceptionMetricsPort` 已定义但未集成到 `ExceptionHandlers`；composition_root 注册路径错误 | 异常指标采集不可用 | ✅ 已集成并修复注册路径 |
 
 ### 1.3 异常分布
 
@@ -54,12 +54,14 @@ src/domain/exceptions/              # 统一管理（12 个模块）
 └── event_exceptions.py             # VersionError
 ```
 
-#### 残留散落位置
+#### 残留散落位置（已清理）
 
 ```
-# 仍在领域异常体系之外：
-src/infrastructure/security/cross_border_transfer_service_impl.py  # TransferNotFoundError, TransferNotApprovedError
-src/infrastructure/security/permission_middleware.py               # raw HTTPException（11 处）
+# 已纳入领域异常体系（Phase 4 完成）：
+# - TransferNotFoundError/TransferNotApprovedError → src/domain/exceptions/transfer_exceptions.py
+# - permission_middleware.py → 仅 OAuth2 WWW-Authenticate 合法保留（4 处）
+
+# 待后续迭代处理（非本次范围）：
 src/domain/entities/checkpoint.py                                 # ValueError（6 处）
 src/domain/entities/agent.py                                      # ValueError（6 处）
 ```
@@ -1137,16 +1139,16 @@ register_port(
 - [x] 编写回归测试确保无破坏性变更 - 2348 tests passed
 - [x] 统一 ErrorMapper 与现有 _map_error 方法 - minio_manager.py 委托给 ErrorMapper
 
-### 4.4 阶段四：残留清理（待实施）
+### 4.4 阶段四：残留清理（已完成）
 
-- [ ] 解决错误码碰撞（§3.7 碰撞解决计划）
-- [ ] 合并 5 处重复 `ErrorResponse(BaseModel)` 到 `src/interfaces/api/schemas.py`
-- [ ] 迁移 `auth.py` 中非 OAuth2 场景的手动 HTTPException 到集中处理器
-- [ ] 迁移 `permission_middleware.py` 从 raw HTTPException 到领域异常
-- [ ] 迁移 `TransferNotFoundError`/`TransferNotApprovedError` 到领域异常层次
-- [ ] 修复 `composition_root.py` 中 exception_metrics 注册路径
-- [ ] 在 `ExceptionHandlers` 中集成 `ExceptionMetricsPort`
-- [ ] 评估领域实体 `ValueError` → 领域异常的迁移可行性
+- [x] 解决错误码碰撞（§3.7 碰撞解决计划）
+- [x] 合并 5 处重复 `ErrorResponse(BaseModel)` 到 `src/interfaces/api/shared_models.py`
+- [x] 迁移 `auth.py` 中非 OAuth2 场景的手动 HTTPException 到集中处理器
+- [x] 迁移 `permission_middleware.py` 从 raw HTTPException 到领域异常（仅 OAuth2 合法保留）
+- [x] 迁移 `TransferNotFoundError`/`TransferNotApprovedError` 到领域异常层次
+- [x] 修复 `composition_root.py` 中 exception_metrics 注册路径
+- [x] 在 `ExceptionHandlers` 中集成 `ExceptionMetricsPort`
+- [ ] 评估领域实体 `ValueError` → 领域异常的迁移可行性（独立迭代）
 
 ---
 
@@ -1234,16 +1236,16 @@ register_port(
 |------|------|----------|
 | **集中管理** | 所有异常定义在 `src/domain/exceptions/` 下 | ✅ 已达标 |
 | **层次清晰** | 三层异常体系（System/Business/External） | ✅ 已达标 |
-| **错误码唯一** | 每个异常有唯一错误码，无碰撞 | ⚠️ 存在碰撞（见 §3.7），待阶段四修复 |
+| **错误码唯一** | 每个异常有唯一错误码，无碰撞 | ✅ 已达标（45 个编码全部唯一） |
 | **HTTP 映射** | API 层自动根据异常类型返回正确 HTTP 状态码 | ✅ 已达标 |
 | **日志规范** | 异常日志包含错误码、上下文、追踪ID | ✅ 已达标 |
 | **向后兼容** | 遗留异常引用保持正常工作 | ✅ 已达标 |
 | **SDK 映射** | MinIO、RabbitMQ、Redis 错误统一映射 | ✅ 已达标 |
 | **覆盖率** | 异常处理分支覆盖率 ≥90% | ✅ 已达标 |
-| **指标集成** | ExceptionHandlers 调用 record_exception() 记录异常指标 | ❌ 未集成，待阶段四修复 |
-| **接口层一致性** | 所有 API 端点使用统一异常处理器，无手动 HTTPException（OAuth2 除外） | ❌ 5 个文件残留，待阶段四修复 |
-| **共享响应模型** | 错误响应模型统一到 `src/interfaces/api/schemas.py` | ❌ 5 处重复定义，待阶段四合并 |
-| **无越界异常** | 所有异常继承自领域 BaseException，无直接继承 Exception 的情况 | ❌ 2 处越界，待阶段四迁移 |
+| **指标集成** | ExceptionHandlers 调用 record_exception() 记录异常指标 | ✅ 已达标 |
+| **接口层一致性** | 所有 API 端点使用统一异常处理器，无手动 HTTPException（OAuth2 除外） | ✅ 已达标（仅 8 处 OAuth2 合法保留） |
+| **共享响应模型** | 错误响应模型统一到 `src/interfaces/api/shared_models.py` | ✅ 已达标 |
+| **无越界异常** | 所有异常继承自领域根类，无直接继承 Python 内置 Exception 的情况 | ✅ 已达标 |
 
 ---
 

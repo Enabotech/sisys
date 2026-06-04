@@ -1,7 +1,7 @@
 """领域层异常模块
 
 领域异常层次结构：
-- BaseException: 异常层次结构根类
+- DomainError: 异常层次结构根类
 - SystemException: 系统级异常（基础设施故障）
 - BusinessException: 业务级异常（业务规则违反）
 - ExternalException: 外部服务异常
@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from src.domain.exceptions.base_exceptions import BaseException
+from src.domain.exceptions.base_exceptions import BaseException, DomainError  # BaseException 是向后兼容别名
 from src.domain.exceptions.business_exceptions import (
     AuthenticationError,
     BusinessException,
@@ -76,7 +76,8 @@ from src.domain.exceptions.transfer_exceptions import (
 
 __all__ = [
     # 抽象根类
-    "BaseException",
+    "DomainError",
+    "BaseException",  # 向后兼容别名
     # 系统级异常
     "SystemException",
     "ConfigurationError",

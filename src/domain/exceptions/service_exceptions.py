@@ -47,7 +47,6 @@ class PasswordValidationError(ValidationError):
             message: 异常消息
             code: 异常编码，为 None 时使用类默认编码
         """
-        self.message = message
         self.code = code or self.__class__.code
         super().__init__(message)
 
