@@ -333,6 +333,7 @@ class DocumentParsingService:
                         page_number=page.page_number,
                         texts=enhanced_texts,
                         tables=page.tables,
+                        images=page.images,
                     )
                 )
 

@@ -246,3 +246,28 @@ class TestOnnxLayoutDetectorDetect:
 
         with pytest.raises(RuntimeError, match="版面检测推理失败"):
             detector.detect(b"corrupt_image", page_number=1)
+
+    def test_detect_outputs_less_than_3_returns_empty(self) -> None:
+        """验证 ONNX 输出张量不足 3 个时返回空列表（防御性处理）"""
+        detector, mock_session = self._create_detector_with_mock()
+        mock_session.run.return_value = [
+            [[10.0, 20.0, 110.0, 70.0]],  # 仅有 boxes
+            [10],  # 仅有 labels（缺少 scores）
+        ]
+
+        results = detector.detect(b"image", page_number=1)
+        assert results == []
+
+    def test_detect_unknown_label_index_generates_unknown_label(self) -> None:
+        """验证不在 _label_map 中的 label index 生成 'Unknown-X' 标签"""
+        detector, mock_session = self._create_detector_with_mock()
+        mock_session.run.return_value = [
+            [[10.0, 20.0, 110.0, 70.0]],
+            [99],  # label index 99 不在 _label_map 中
+            [0.95],
+        ]
+
+        results = detector.detect(b"image", page_number=1)
+        assert len(results) == 1
+        assert results[0].label == "Unknown-99"
+        assert results[0].confidence == 0.95

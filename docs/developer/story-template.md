@@ -76,12 +76,17 @@
 #### 领域异常契约 (Domain Exception Contract)
 
 > **原则**：异常是领域契约的一部分。本 Story 新增/修改的领域异常必须在 Task 0 中完成设计，禁止在实现 Task 中临时定义。
-
 > **适用范围：** 本清单仅针对定义在 `src/domain/exceptions/` 下、继承自 `DomainError`（别名 `BaseException`）的**领域异常**。
-> **不在本清单范围：** FastAPI/Pydantic 框架原生异常、第三方 SDK 原始异常（由 `ErrorMapper` 映射）、实体构造器 `ValueError`（已知技术债务，独立迭代迁移）。
+> **不在本清单范围：** FastAPI/Pydantic 框架原生异常、第三方 SDK 原始异常（由 `ErrorMapper` 映射）。
+> **禁止 `raise ValueError`：** 所有验证失败（实体不变量、状态转换守卫、业务约束、配置参数、输入校验）均使用领域异常，详见 [`sisys-value-error-refactor.md`](../architecture/sisys-value-error-refactor.md)。
 > 完整检查清单与全量异常分类详见 [`docs/architecture/sisys-uni-exception-design.md §3.12`](../architecture/sisys-uni-exception-design.md#312-异常注册检查清单)。
 
-- [ ] 归属模块与基类 — 确定异常归属的领域异常模块（`system`/`business`/`external`/`storage`/`role`/...），选择正确基类（`SystemException` / `BusinessException` / `ExternalException`）
+- [ ] 归属模块与基类 — 确定异常归属的领域异常模块（`system`/`business`/`external`/`storage`/`role`/...），选择正确基类（`SystemException` / `BusinessException` / `ExternalException`）。实体验证按场景选择：
+    - 不变量验证（UUID/非空/枚举/数值范围）→ `EntityValidationError`（EXCEPTION_242）
+    - 状态转换守卫（状态机方法）→ `EntityStateTransitionError`（EXCEPTION_243）
+    - 跨字段业务约束 → `EntityBusinessRuleError`（EXCEPTION_244）
+    - 配置参数验证 → `ConfigurationError`（EXCEPTION_101）
+    - 应用层输入校验 → `ValidationError`（EXCEPTION_201）
 - [ ] 唯一编码分配 — 从对应范围选取（系统 101-199、业务 201-299、外部 301-399），`grep` 验证无碰撞
 - [ ] 构造器参数设计 — 携带领域上下文（`transfer_id`、`role_id` 等），通过 `context` 字典暴露
 - [ ] 消息安全性审查 — 错误消息面向调用方可理解，不泄露 SQL/堆栈等内部实现细节
