@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from types import ModuleType
 from typing import Any
 
 from src.domain.value_objects.parsed_document import BoundingBox, BoundingBoxResult
@@ -16,10 +17,13 @@ logger = logging.getLogger(__name__)
 
 # 延迟导入 onnxruntime（仅在 __init__ 时检查可用性）
 # 测试通过 patch 此属性模拟 onnxruntime 行为
+_ort: ModuleType | None = None
 try:
-    import onnxruntime as _ort
+    import onnxruntime as _ort_impl
+
+    _ort = _ort_impl
 except ImportError:
-    _ort = None  # type: ignore[assignment]
+    pass
 
 # DocLayNet 11 类标签映射（index → label）
 _DOCLAYNET_LABELS: dict[int, str] = {

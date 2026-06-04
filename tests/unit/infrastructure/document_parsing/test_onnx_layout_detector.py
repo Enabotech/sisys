@@ -112,7 +112,12 @@ class TestOnnxLayoutDetectorDetect:
         }
         detector._confidence_threshold = 0.5
         # mock _preprocess 返回合法 numpy array，避免 PIL 解码失败
-        detector._preprocess = MagicMock(return_value=np.zeros((1, 3, 640, 640), dtype=np.float32))  # type: ignore[assignment]
+        # 通过 object.__setattr__ 设置 mock，绕过类型检查器对方法签名的严格校验
+        object.__setattr__(
+            detector,
+            "_preprocess",
+            MagicMock(return_value=np.zeros((1, 3, 640, 640), dtype=np.float32)),
+        )
         return detector, mock_session
 
     def test_detect_single_element(self) -> None:

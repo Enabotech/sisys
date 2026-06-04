@@ -213,7 +213,10 @@ class TestLayoutDetectionIntegration:
     async def test_real_pypdfium2_render_and_mock_detect(self) -> None:
         """使用真实 pypdfium2 渲染 + mock ONNX 推理的端到端验证"""
         try:
-            import pypdfium2  # noqa: F401
+            import importlib.util
+
+            if not importlib.util.find_spec("pypdfium2"):
+                pytest.skip("pypdfium2 未安装，跳过真实渲染测试")
         except ImportError:
             pytest.skip("pypdfium2 未安装，跳过真实渲染测试")
 
