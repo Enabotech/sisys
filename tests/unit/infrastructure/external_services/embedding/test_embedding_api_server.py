@@ -122,3 +122,32 @@ class TestEmbeddingAPIValidation:
         """大批量请求正常处理（无上限限制）"""
         resp = client.post("/v1/embeddings", json={"texts": ["x"] * 100, "return_sparse": False})
         assert resp.status_code == 200
+
+
+@pytest.fixture
+def client_no_model() -> TestClient:
+    """创建 TestClient，模型未加载（模拟启动失败场景）"""
+    from src.infrastructure.external_services.embedding.embedding_api_server import app
+
+    app.state.model = None
+    app.state.model_name = "BAAI/bge-m3"
+    app.state.device = "cpu"
+    app.state.load_error = "Model download failed"
+    return TestClient(app)
+
+
+class TestEmbeddingAPI503Unavailable:
+    """模型未加载时的 503 降级行为"""
+
+    def test_health_returns_503_when_model_unavailable(self, client_no_model: TestClient) -> None:
+        """模型未加载时 GET /health 返回 503"""
+        resp = client_no_model.get("/health")
+        assert resp.status_code == 503
+        data = resp.json()
+        assert data["detail"]["status"] == "unavailable"
+        assert "error" in data["detail"]
+
+    def test_embed_returns_503_when_model_unavailable(self, client_no_model: TestClient) -> None:
+        """模型未加载时 POST /v1/embeddings 返回 503"""
+        resp = client_no_model.post("/v1/embeddings", json={"texts": ["test"]})
+        assert resp.status_code == 503

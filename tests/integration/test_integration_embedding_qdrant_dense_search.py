@@ -1,6 +1,6 @@
 """Story 3-1a 端到端集成测试
 
-验证 BGE3EmbeddingService (FlagEmbedding) + Qdrant 在真实环境下的协作：
+验证 EmbeddingAPIClient (FlagEmbedding API) + Qdrant 在真实环境下的协作：
 - Dense 语义检索（encode_text → search）
 - Sparse 稀疏检索（encode_sparse → search_sparse）
 - 嵌入质量验证（L2 归一化、维度、Sparse 格式）

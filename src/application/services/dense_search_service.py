@@ -72,6 +72,10 @@ class DenseSemanticSearchService:
         """
         if not query_text or not query_text.strip():
             raise ValueError("查询文本不能为空")
+        if not collection or not collection.strip():
+            raise ValueError("Collection 名称不能为空")
+        if limit < 1:
+            raise ValueError(f"limit 必须为正整数，当前值: {limit}")
 
         query_vector = await asyncio.to_thread(self._embedding.encode_text, query_text)
 
@@ -107,5 +111,7 @@ class DenseSemanticSearchService:
             safe_payload = {k: v for k, v in filter_payload.items() if k != "tenant_id"}
             combined.update(safe_payload)
         if tenant_id is not None:
-            combined["tenant_id"] = tenant_id
+            safe_tid = tenant_id.strip()
+            if safe_tid:
+                combined["tenant_id"] = safe_tid
         return combined if combined else None

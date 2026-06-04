@@ -73,10 +73,7 @@ def _validate_model_path(path: str) -> bool:
         return False
     # 检查是否存在模型配置文件和权重文件
     has_config = os.path.isfile(os.path.join(path, "config.json"))
-    has_weights = any(
-        os.path.isfile(os.path.join(path, f))
-        for f in ["pytorch_model.bin", "model.safetensors", "pytorch_model.bin.index.json"]
-    )
+    has_weights = any(os.path.isfile(os.path.join(path, f)) for f in ["pytorch_model.bin", "model.safetensors"])
     return has_config and has_weights
 
 
@@ -141,7 +138,7 @@ def load_model() -> None:
         app.state.model = BGEM3FlagModel(load_path, use_fp16=use_fp16)
         logger.info("模型加载成功: %s", load_path)
 
-    except Exception as e:
+    except (ImportError, OSError, RuntimeError, ValueError) as e:
         logger.error("模型加载失败: %s", e)
         app.state.load_error = str(e)
         # 不抛出异常，让服务继续运行（healthcheck 会反映状态）
@@ -178,9 +175,37 @@ async def health() -> dict:
     )
 
 
+def _parse_sparse_weights(lexical_weights: list[dict]) -> list[dict]:
+    """解析 FlagEmbedding 稀疏词汇权重为 API 响应格式
+
+    Args:
+        lexical_weights: FlagEmbedding 返回的词汇权重列表（键为 token ID 字符串）
+
+    Returns:
+        格式化的稀疏向量列表 [{"indices": [...], "values": [...]}, ...]
+    """
+    sparse_list: list[dict] = []
+    for w in lexical_weights:
+        sorted_items = sorted(
+            ((int(k), float(v)) for k, v in w.items() if k.lstrip("-").isdigit()),
+            key=lambda x: x[0],
+        )
+        if sorted_items:
+            sparse_list.append(
+                {
+                    "indices": [idx for idx, _ in sorted_items],
+                    "values": [val for _, val in sorted_items],
+                }
+            )
+    return sparse_list
+
+
 @app.post("/v1/embeddings", response_model=EmbedResponse)
-async def embed(req: EmbedRequest) -> dict:
+def embed(req: EmbedRequest) -> dict:
     """嵌入编码端点
+
+    使用同步 def（非 async），FastAPI 自动在线程池中执行，
+    避免 BGEM3FlagModel.encode() 的同步阻塞推理阻塞事件循环。
 
     Args:
         req: 嵌入请求
@@ -209,11 +234,7 @@ async def embed(req: EmbedRequest) -> dict:
     response: dict = {"dense": result["dense_vecs"].tolist()}
 
     if req.return_sparse:
-        lexical_weights = result["lexical_weights"]
-        response["sparse"] = [
-            {"indices": sorted(int(k) for k in w.keys()), "values": [float(w[k]) for k in sorted(w.keys(), key=int)]}
-            for w in lexical_weights
-        ]
+        response["sparse"] = _parse_sparse_weights(result["lexical_weights"])
     else:
         response["sparse"] = None
 
