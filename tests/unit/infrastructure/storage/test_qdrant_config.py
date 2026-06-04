@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.domain.exceptions import ConfigurationError, ValidationError
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.config.qdrant import QdrantConfig
 
 
@@ -94,19 +94,19 @@ class TestQdrantConfig:
     @patch.dict(os.environ, {"QDRANT_PORT": "invalid"}, clear=True)
     def test_from_env_invalid_port(self):
         """测试无效端口应抛出 ValueError"""
-        with pytest.raises(ValidationError, match="QDRANT_PORT"):
+        with pytest.raises(ConfigurationError, match="QDRANT_PORT"):
             QdrantConfig.from_env()
 
     @patch.dict(os.environ, {"QDRANT_GRPC_PORT": "invalid"}, clear=True)
     def test_from_env_invalid_grpc_port(self):
         """测试无效 gRPC 端口应抛出 ValueError"""
-        with pytest.raises(ValidationError, match="QDRANT_GRPC_PORT"):
+        with pytest.raises(ConfigurationError, match="QDRANT_GRPC_PORT"):
             QdrantConfig.from_env()
 
     @patch.dict(os.environ, {"QDRANT_TIMEOUT": "invalid"}, clear=True)
     def test_from_env_invalid_timeout(self):
         """测试无效超时应抛出 ValueError"""
-        with pytest.raises(ValidationError, match="QDRANT_TIMEOUT"):
+        with pytest.raises(ConfigurationError, match="QDRANT_TIMEOUT"):
             QdrantConfig.from_env()
 
     @patch.dict(os.environ, {"QDRANT_MAX_RETRIES": "invalid"}, clear=True)

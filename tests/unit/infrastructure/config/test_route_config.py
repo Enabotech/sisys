@@ -106,13 +106,13 @@ class TestAutoRouteConfig:
     def test_from_env_semantic_threshold_invalid_range(self) -> None:
         """Should raise on SEMANTIC_THRESHOLD out of range."""
         with patch.dict(os.environ, {"SEMANTIC_THRESHOLD": "1.5"}):
-            with pytest.raises(ConfigurationError, match="Invalid SEMANTIC_THRESHOLD value"):
+            with pytest.raises(ConfigurationError, match="SEMANTIC_THRESHOLD must be between"):
                 AutoRouteConfig.from_env()
 
     def test_from_env_semantic_threshold_negative(self) -> None:
         """Should raise on negative SEMANTIC_THRESHOLD."""
         with patch.dict(os.environ, {"SEMANTIC_THRESHOLD": "-0.1"}):
-            with pytest.raises(ConfigurationError, match="Invalid SEMANTIC_THRESHOLD value"):
+            with pytest.raises(ConfigurationError, match="SEMANTIC_THRESHOLD must be between"):
                 AutoRouteConfig.from_env()
 
     def test_from_env_semantic_threshold_not_number(self) -> None:
@@ -142,7 +142,7 @@ class TestAutoRouteConfig:
     def test_from_env_hash_ring_size_not_number(self) -> None:
         """Should raise on non-numeric HASH_RING_SIZE."""
         with patch.dict(os.environ, {"HASH_RING_SIZE": "abc"}):
-            with pytest.raises(ConfigurationError, match="HASH_RING_SIZE must be positive"):
+            with pytest.raises(ConfigurationError, match="Invalid HASH_RING_SIZE value"):
                 AutoRouteConfig.from_env()
 
     def test_from_env_all_params(self) -> None:

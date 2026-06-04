@@ -21,6 +21,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
+from src.domain.exceptions import NotFoundError
 from src.domain.value_objects.token_payload import TokenPayload
 from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
 from src.interfaces.api.document_upload import create_document_upload_router
@@ -253,7 +254,7 @@ class TestDocumentUploadAPIContract:
     def test_404_for_expired_upload_id(self) -> None:
         """验证过期 upload_id 返回 404"""
         client, _, manager, _ = _make_client()
-        manager.complete_upload = AsyncMock(side_effect=ValueError("upload_id expired 不存在"))
+        manager.complete_upload = AsyncMock(side_effect=NotFoundError(message="upload_id expired 不存在或已过期"))
 
         resp = client.post("/api/v1/documents/chunked/expired/complete", headers=TENANT)
         assert resp.status_code == 404
