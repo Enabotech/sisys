@@ -29,7 +29,6 @@ class BGEM3FlagModel:
         devices: str | list[str] | None = None,
         **kwargs: Any,
     ) -> None: ...
-
     @overload
     def encode(
         self,
@@ -40,7 +39,6 @@ class BGEM3FlagModel:
         batch_size: int = 256,
         max_length: int = 8192,
     ) -> dict[str, NDArray[np.float32] | list[dict[str, Any]] | None]: ...
-
     @overload
     def encode(
         self,
@@ -52,5 +50,4 @@ class BGEM3FlagModel:
         batch_size: int = 256,
         max_length: int = 8192,
     ) -> dict[str, NDArray[np.float32] | list[dict[str, Any]] | None]: ...
-
     def __repr__(self) -> str: ...

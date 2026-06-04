@@ -21,7 +21,6 @@ class NodeArg:
     type: str | None
     shape: list[int | str] | None
 
-
 class InferenceSession:
     """ONNX 推理会话 — 加载模型并执行推理
 
@@ -35,10 +34,8 @@ class InferenceSession:
         providers: list[str] | None = None,
         sess_options: Any = None,
     ) -> None: ...
-
     def get_inputs(self) -> list[NodeArg]: ...
     def get_outputs(self) -> list[NodeArg]: ...
-
     def run(
         self,
         output_names: list[str] | None,

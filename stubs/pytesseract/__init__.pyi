@@ -6,7 +6,6 @@ pytesseract 是 Google Tesseract OCR 引擎的 Python 包装器。
 来源: src/infrastructure/document_parsing/image_parser.py
 """
 
-
 import PIL.Image
 
 class Output:
@@ -21,7 +20,6 @@ class Output:
     INT: int
     DATAFRAME: int
 
-
 def image_to_string(
     image: PIL.Image.Image | str,
     lang: str = "eng",
@@ -30,8 +28,6 @@ def image_to_string(
     output_type: int = Output.STRING,
     timeout: float = 0,
 ) -> str: ...
-
-
 def image_to_data(
     image: PIL.Image.Image | str,
     lang: str = "eng",
