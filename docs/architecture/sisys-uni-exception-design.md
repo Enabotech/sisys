@@ -1084,7 +1084,27 @@ register_port(
 
 ### 3.12 异常注册检查清单
 
-新增异常类时必须按三阶段依次完成。每阶段包含强制项（🔴）和建议项（🟡）。
+> **适用范围：** 本清单针对「领域异常」—— 即定义在 `src/domain/exceptions/` 下、继承自 `DomainError`（别名 `BaseException`）的异常类。这类异常由 `ExceptionHandlers` 自动映射为 HTTP 响应，携带错误码（`EXCEPTION_NNN`）、上下文（`context`）和追踪 ID（`request_id`）。
+
+#### 异常分类与处理策略（SISYS 全量）
+
+| 类别 | 定义位置 | 根类型 | 处理方式 | 需遵循本清单？ |
+|------|---------|--------|---------|:---:|
+| **领域异常** | `src/domain/exceptions/` | `DomainError` | `ExceptionHandlers` 自动映射 HTTP + 记录指标 | ✅ 是 |
+| **Python 内置异常** | 实体构造器（`ValueError`）等 | `Exception` | `_handle_value_error` 临时兜底 → 400（待迁移至领域异常） | 🟡 迁移时是 |
+| **FastAPI 异常** | `interfaces/api/` | `RequestValidationError` | `_handle_validation_error` → 400 | ❌ 否（框架原生） |
+| **Pydantic 异常** | `interfaces/api/` | `PydanticValidationError` | `_handle_pydantic_error` → 422 | ❌ 否（框架原生） |
+| **第三方 SDK 异常** | 外部库（`S3Error` 等） | 各 SDK 定义 | `ErrorMapper.map_*()` 映射为领域异常 | 🟡 仅映射规则 |
+| **基础设施内部异常** | `infrastructure/` | `RuntimeError` 等 | 由调用方捕获后转为领域异常或记录日志 | 🟡 转为领域异常时是 |
+
+> **关键决策规则：** 任何需要向 API 消费者传达的**业务/系统/外部错误**，必须定义为领域异常（遵循本清单）。仅在以下场景使用其他异常：
+> - **OAuth2 Bearer token 提取**：必须用 `HTTPException(401, headers={"WWW-Authenticate": "Bearer"})`（FastAPI 安全机制要求）
+> - **实体构造器守卫**：当前临时使用 `ValueError`（已知技术债务，独立迭代迁移）
+> - **第三方 SDK 调用**：原始异常由 `ErrorMapper` 包装为领域异常后重新抛出
+
+---
+
+新增领域异常类时必须按三阶段依次完成。每阶段包含强制项（🔴）和建议项（🟡）。
 
 ---
 
