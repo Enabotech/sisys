@@ -11,7 +11,6 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-
 class NodeArg:
     """ONNX 模型节点参数 — 描述输入/输出张量的元信息
 
