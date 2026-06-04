@@ -21,25 +21,16 @@ from src.domain.exceptions.business_exceptions import (
 from src.domain.exceptions.system_exceptions import NetworkError
 
 
-class MemoryVersionConflictError(ConflictError):
-    """记忆版本冲突异常
+class MinIOConnectionError(NetworkError):
+    """MinIO 连接错误
 
     Attributes:
         code: 异常编码
-        memory_id: 冲突的记忆标识
+        message: 异常消息
     """
 
-    code = "EXCEPTION_213"
-
-    def __init__(self, memory_id: UUID, message: str = "版本冲突") -> None:
-        """初始化记忆版本冲突异常
-
-        Args:
-            memory_id: 冲突的记忆标识
-            message: 异常消息，默认为"版本冲突"
-        """
-        self.memory_id = memory_id
-        super().__init__(f"{message}: memory_id={memory_id}")
+    code = "EXCEPTION_106"
+    message = "MinIO connection error"
 
 
 class MemoryNotFoundError(NotFoundError):
@@ -75,16 +66,25 @@ class BucketNotFoundError(NotFoundError):
     message = "Bucket not found"
 
 
-class MinIOConnectionError(NetworkError):
-    """MinIO 连接错误
+class MemoryVersionConflictError(ConflictError):
+    """记忆版本冲突异常
 
     Attributes:
         code: 异常编码
-        message: 异常消息
+        memory_id: 冲突的记忆标识
     """
 
-    code = "EXCEPTION_106"
-    message = "MinIO connection error"
+    code = "EXCEPTION_213"
+
+    def __init__(self, memory_id: UUID, message: str = "版本冲突") -> None:
+        """初始化记忆版本冲突异常
+
+        Args:
+            memory_id: 冲突的记忆标识
+            message: 异常消息，默认为"版本冲突"
+        """
+        self.memory_id = memory_id
+        super().__init__(f"{message}: memory_id={memory_id}")
 
 
 class BucketNameValidationError(ValidationError):
