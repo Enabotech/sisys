@@ -69,6 +69,10 @@ from src.domain.exceptions.system_exceptions import (
     StorageError,
     SystemException,
 )
+from src.domain.exceptions.transfer_exceptions import (
+    TransferNotApprovedError,
+    TransferNotFoundError,
+)
 
 __all__ = [
     # 抽象根类
@@ -124,4 +128,7 @@ __all__ = [
     "InsufficientTokenError",
     # 事件异常
     "VersionError",
+    # 跨境传输异常
+    "TransferNotFoundError",
+    "TransferNotApprovedError",
 ]

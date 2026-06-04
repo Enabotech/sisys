@@ -1,6 +1,7 @@
 """领域层服务异常模块
 
-定义审计服务、密码验证、存储端口相关异常
+定义审计服务、密码验证、存储端口相关异常。
+死代码清理：已删除 IntrusionDetectionError/DataIntegrityError/BackupError/EncryptionError/ContainerSecurityError（零引用）。
 
 异常来源：
 - src/domain/ports/audit_service.py → AuditError
@@ -37,7 +38,7 @@ class PasswordValidationError(ValidationError):
         message: 异常消息
     """
 
-    code = "EXCEPTION_201"
+    code = "EXCEPTION_231"
 
     def __init__(self, message: str, code: str | None = None) -> None:
         """初始化密码验证失败异常
@@ -59,77 +60,12 @@ class ComplianceLockError(InvalidStateError):
         message: 异常消息
     """
 
-    code = "EXCEPTION_206"
+    code = "EXCEPTION_232"
     message = "Compliance lock violation"
-
-
-class IntrusionDetectionError(SystemException):
-    """入侵检测异常
-
-    Attributes:
-        code: 异常编码
-        message: 异常消息
-    """
-
-    code = "EXCEPTION_301"
-    message = "Intrusion detection failed"
-
-
-class DataIntegrityError(SystemException):
-    """数据完整性验证异常
-
-    Attributes:
-        code: 异常编码
-        message: 异常消息
-    """
-
-    code = "EXCEPTION_302"
-    message = "Data integrity verification failed"
-
-
-class BackupError(SystemException):
-    """备份操作异常
-
-    Attributes:
-        code: 异常编码
-        message: 异常消息
-    """
-
-    code = "EXCEPTION_303"
-    message = "Backup operation failed"
-
-
-class EncryptionError(SystemException):
-    """加密操作异常
-
-    Attributes:
-        code: 异常编码
-        message: 异常消息
-    """
-
-    code = "EXCEPTION_304"
-    message = "Encryption operation failed"
-
-
-class ContainerSecurityError(SystemException):
-    """容器安全检查异常
-
-    Attributes:
-        code: 异常编码
-        message: 异常消息
-    """
-
-    code = "EXCEPTION_305"
-    message = "Container security check failed"
 
 
 __all__ = [
     "AuditError",
     "PasswordValidationError",
     "ComplianceLockError",
-    "IntrusionDetectionError",
-    "DataIntegrityError",
-    "BackupError",
-    "EncryptionError",
-    "ContainerSecurityError",
 ]

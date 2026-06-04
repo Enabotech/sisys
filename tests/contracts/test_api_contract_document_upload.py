@@ -24,6 +24,8 @@ from src.domain.entities.document import Document, DocumentType, ParseStatus
 from src.domain.value_objects.token_payload import TokenPayload
 from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
 from src.interfaces.api.document_upload import create_document_upload_router
+from src.interfaces.api.exception_handlers import register_exception_handlers
+from src.interfaces.api.middleware.exception_context import ExceptionContextMiddleware
 
 
 def _make_token() -> TokenPayload:
@@ -50,6 +52,8 @@ def _make_doc() -> Document:
 
 def _make_client() -> tuple[TestClient, AsyncMock, AsyncMock, AsyncMock]:
     app = FastAPI()
+    app.add_middleware(ExceptionContextMiddleware)
+    register_exception_handlers(app)
     service = AsyncMock()
     manager = AsyncMock()
     storage = AsyncMock()
@@ -235,8 +239,8 @@ class TestDocumentUploadAPIContract:
         )
         assert resp.status_code == 404
 
-    def test_422_for_invalid_uuid_format(self) -> None:
-        """验证无效 UUID 格式返回 422（FastAPI 自动处理）"""
+    def test_400_for_invalid_uuid_format(self) -> None:
+        """验证无效 UUID 格式返回 400（统一异常处理器处理）"""
         client, service, _, _ = _make_client()
         service.get_document = AsyncMock(return_value=None)
 
@@ -244,15 +248,15 @@ class TestDocumentUploadAPIContract:
             "/api/v1/documents/not-a-uuid",
             headers=TENANT,
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
-    def test_410_for_expired_upload_id(self) -> None:
-        """验证过期 upload_id 返回 410 Gone"""
+    def test_404_for_expired_upload_id(self) -> None:
+        """验证过期 upload_id 返回 404"""
         client, _, manager, _ = _make_client()
         manager.complete_upload = AsyncMock(side_effect=ValueError("upload_id expired 不存在"))
 
         resp = client.post("/api/v1/documents/chunked/expired/complete", headers=TENANT)
-        assert resp.status_code == 410
+        assert resp.status_code == 404
 
     def test_400_for_unsupported_format(self) -> None:
         """验证不支持格式返回 400"""
@@ -281,6 +285,8 @@ class TestDocumentUploadAPIContract:
     def test_auth_required_for_all_endpoints(self) -> None:
         """验证所有端点需要认证"""
         app = FastAPI()
+        app.add_middleware(ExceptionContextMiddleware)
+        register_exception_handlers(app)
         router = create_document_upload_router(
             upload_service=AsyncMock(),
             chunked_manager=AsyncMock(),

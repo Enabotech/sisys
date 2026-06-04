@@ -11,18 +11,14 @@ from src.domain.entities.cross_border_transfer import (
     CrossBorderTransferRequest,
     TransferStatus,
 )
+from src.domain.exceptions.transfer_exceptions import (
+    TransferNotApprovedError,
+    TransferNotFoundError,
+)
 from src.domain.ports.cross_border_transfer_service import CrossBorderTransferServicePort
 
 if TYPE_CHECKING:
     pass
-
-
-class TransferNotFoundError(Exception):
-    """跨境传输请求未找到时抛出"""
-
-
-class TransferNotApprovedError(Exception):
-    """跨境传输请求未审批通过时执行操作抛出"""
 
 
 class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):

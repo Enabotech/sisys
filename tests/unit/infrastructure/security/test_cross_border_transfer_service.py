@@ -72,9 +72,9 @@ class TestCrossBorderTransferServiceApprove:
 
     def test_approve_nonexistent_request(self):
         """Test approving a nonexistent request raises error."""
+        from src.domain.exceptions.transfer_exceptions import TransferNotFoundError
         from src.infrastructure.security.cross_border_transfer_service_impl import (
             CrossBorderTransferServiceImpl,
-            TransferNotFoundError,
         )
 
         service = CrossBorderTransferServiceImpl()
@@ -149,9 +149,9 @@ class TestCrossBorderTransferServiceExecute:
             CrossBorderTransferRequest,
             LegalBasisType,
         )
+        from src.domain.exceptions.transfer_exceptions import TransferNotApprovedError
         from src.infrastructure.security.cross_border_transfer_service_impl import (
             CrossBorderTransferServiceImpl,
-            TransferNotApprovedError,
         )
 
         service = CrossBorderTransferServiceImpl()

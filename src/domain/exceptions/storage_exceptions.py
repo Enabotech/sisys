@@ -29,7 +29,7 @@ class MemoryVersionConflictError(ConflictError):
         memory_id: 冲突的记忆标识
     """
 
-    code = "EXCEPTION_203"
+    code = "EXCEPTION_213"
 
     def __init__(self, memory_id: UUID, message: str = "版本冲突") -> None:
         """初始化记忆版本冲突异常
@@ -50,7 +50,7 @@ class MemoryNotFoundError(NotFoundError):
         memory_id: 未找到的记忆标识
     """
 
-    code = "EXCEPTION_202"
+    code = "EXCEPTION_211"
 
     def __init__(self, memory_id: UUID, message: str = "记忆不存在") -> None:
         """初始化记忆不存在异常
@@ -71,7 +71,7 @@ class BucketNotFoundError(NotFoundError):
         message: 异常消息
     """
 
-    code = "EXCEPTION_202"
+    code = "EXCEPTION_212"
     message = "Bucket not found"
 
 
@@ -83,7 +83,7 @@ class MinIOConnectionError(NetworkError):
         message: 异常消息
     """
 
-    code = "EXCEPTION_102"
+    code = "EXCEPTION_106"
     message = "MinIO connection error"
 
 
@@ -95,7 +95,7 @@ class BucketNameValidationError(ValidationError):
         message: 异常消息
     """
 
-    code = "EXCEPTION_201"
+    code = "EXCEPTION_214"
     message = "Bucket name validation failed"
 
 
@@ -107,7 +107,7 @@ class MemoryAccessDeniedError(PermissionDeniedError):
         message: 异常消息
     """
 
-    code = "EXCEPTION_204"
+    code = "EXCEPTION_215"
     message = "Memory access denied"
 
 
