@@ -50,7 +50,7 @@ class TestPdfPageRendererRenderPage:
         renderer._dpi = 150
         # _pypdfium2 在 __init__ 中设置，mock 构建需手动注入
         # render_page 使用 self._pypdfium2.PdfDocument() 调用
-        renderer._pypdfium2 = None  # 由各测试通过 patch.dict 注入 mock
+        renderer._pypdfium2 = MagicMock()  # 由各测试通过 patch.dict 注入 mock
         return renderer, {}
 
     def test_render_page_returns_png_bytes(self) -> None:

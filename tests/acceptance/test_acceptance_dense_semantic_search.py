@@ -630,8 +630,13 @@ def api_client():
 
     model = MagicMock()
 
-    def mock_encode(texts, return_dense=False, return_sparse=False, **kwargs):
-        result: dict = {}
+    def mock_encode(
+        texts: str | list[str],
+        return_dense: bool = False,
+        return_sparse: bool = False,
+        **kwargs: object,
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {}
         n = len(texts) if isinstance(texts, list) else 1
         if return_dense:
             result["dense_vecs"] = np.random.randn(n, 1024).astype(np.float32)

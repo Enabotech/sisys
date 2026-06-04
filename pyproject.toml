@@ -227,18 +227,6 @@ exclude = [
     '^venv/',
 ]
 
-# ---------------------------------------------------------------------------
-# 第三方库精准豁免（业界最佳实践：用 overrides 替代全局 --ignore-missing-imports）
-#
-# 设计理由：
-#   - 全局 --ignore-missing-imports 会同时隐藏"合法第三方无 stubs 库"和"拼写错误的 import"
-#   - 用 module-specific overrides 做精准豁免，CI 能捕获真正的 import 错误
-#   - 无类型桩的第三方库统一豁免，安全且可审计
-# ---------------------------------------------------------------------------
-[[tool.mypy.overrides]]
-module = ["defusedxml.*", "FlagEmbedding.*", "pytesseract.*", "striprtf.*", "onnxruntime.*", "pypdfium2.*"]
-ignore_missing_imports = true
-
 # Pytest Configuration
 [tool.pytest.ini_options]
 # 测试发现
