@@ -12,16 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
-from src.application.use_cases.role_management import (
-    CannotDeleteRoleWithUsersError,
-    CannotDeleteSystemRoleError,
-    RoleAlreadyExistsError,
-    RoleNotFoundError,
-    RoleService,
-)
+from src.application.use_cases.role_management import RoleService
+from src.domain.exceptions import NotFoundError, PermissionDeniedError
 from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
 from src.domain.ports.permission_service import PermissionServicePort
 from src.domain.value_objects.token_payload import TokenPayload
+from src.interfaces.api.shared_models import ErrorResponse
 
 
 # Request/Response Models
@@ -147,16 +143,6 @@ class AssignPermissionRequest(BaseModel):
     permissions: list[str]
 
 
-class ErrorResponse(BaseModel):
-    """错误响应模型
-
-    Attributes:
-        detail: 错误详情
-    """
-
-    detail: str
-
-
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
@@ -248,38 +234,25 @@ def create_auth_router(
             Token 响应（access_token, refresh_token, token_type, expires_in, user）
 
         Raises:
-            HTTPException 401: 无效凭证
-            HTTPException 423: 账户已锁定
+            AuthenticationError: 无效凭证（由统一异常处理器映射为 401/423）
         """
-        try:
-            tokens = await auth_service.authenticate(
-                request.username,
-                request.password,
-            )
-            # Verify token to get user info
-            payload = await auth_service.verify_token(tokens.access_token)
-            return TokenResponse(
-                access_token=tokens.access_token,
-                refresh_token=tokens.refresh_token,
-                token_type="bearer",
-                expires_in=86400,  # 24 hours
-                user=UserResponse(
-                    id=str(payload.user_id),
-                    username=payload.username,
-                    roles=list(payload.roles),
-                ),
-            )
-        except AuthenticationError as e:
-            error_msg = str(e)
-            if "locked" in error_msg.lower():
-                raise HTTPException(
-                    status_code=status.HTTP_423_LOCKED,
-                    detail=error_msg,
-                )
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=error_msg,
-            )
+        tokens = await auth_service.authenticate(
+            request.username,
+            request.password,
+        )
+        # Verify token to get user info
+        payload = await auth_service.verify_token(tokens.access_token)
+        return TokenResponse(
+            access_token=tokens.access_token,
+            refresh_token=tokens.refresh_token,
+            token_type="bearer",
+            expires_in=86400,  # 24 hours
+            user=UserResponse(
+                id=str(payload.user_id),
+                username=payload.username,
+                roles=list(payload.roles),
+            ),
+        )
 
     @router.post(
         "/auth/refresh",
@@ -298,26 +271,20 @@ def create_auth_router(
             新的 Token 响应
 
         Raises:
-            HTTPException 401: 刷新令牌无效
+            AuthenticationError: 刷新令牌无效（由统一异常处理器映射为 401）
         """
-        try:
-            access_token = await auth_service.refresh_token(request.refresh_token)
-            payload = await auth_service.verify_token(access_token)
-            return TokenResponse(
-                access_token=access_token,
-                token_type="bearer",
-                expires_in=86400,
-                user=UserResponse(
-                    id=str(payload.user_id),
-                    username=payload.username,
-                    roles=list(payload.roles),
-                ),
-            )
-        except AuthenticationError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired refresh token",
-            )
+        access_token = await auth_service.refresh_token(request.refresh_token)
+        payload = await auth_service.verify_token(access_token)
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=86400,
+            user=UserResponse(
+                id=str(payload.user_id),
+                username=payload.username,
+                roles=list(payload.roles),
+            ),
+        )
 
     @router.post(
         "/auth/logout",
@@ -385,36 +352,28 @@ def create_auth_router(
             创建的角色
 
         Raises:
-            HTTPException 409: 角色名已存在
+            PermissionDeniedError: 非 admin 角色
+            RoleAlreadyExistsError: 角色名已存在（由统一异常处理器映射为 409）
         """
-        # Check admin role
         if not current_user.has_any_role("admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin role required",
-            )
-        try:
-            role = await role_service.create_role(
-                name=request.name,
-                permissions=request.permissions,
-                description=request.description,
-                is_system_reserved=request.is_system_reserved,
-            )
-            return RoleResponse(
-                id=str(role.id) if role.id else "",
-                name=role.name,
-                description=role.description,
-                permissions=list(role.permissions),
-                is_system_reserved=role.is_system_reserved,
-                is_active=role.is_active,
-                created_at=role.created_at.isoformat() if role.created_at else None,
-                updated_at=role.updated_at.isoformat() if role.updated_at else None,
-            )
-        except RoleAlreadyExistsError:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Role '{request.name}' already exists",
-            )
+            raise PermissionDeniedError("Admin role required")
+
+        role = await role_service.create_role(
+            name=request.name,
+            permissions=request.permissions,
+            description=request.description,
+            is_system_reserved=request.is_system_reserved,
+        )
+        return RoleResponse(
+            id=str(role.id) if role.id else "",
+            name=role.name,
+            description=role.description,
+            permissions=list(role.permissions),
+            is_system_reserved=role.is_system_reserved,
+            is_active=role.is_active,
+            created_at=role.created_at.isoformat() if role.created_at else None,
+            updated_at=role.updated_at.isoformat() if role.updated_at else None,
+        )
 
     @router.get("/roles", response_model=list[RoleResponse])
     async def list_roles(
@@ -464,15 +423,15 @@ def create_auth_router(
             角色详情
 
         Raises:
-            HTTPException 404: 角色不存在
+            NotFoundError: 角色不存在
         """
         from uuid import UUID
 
         role = await role_service.get_role(UUID(role_id))
         if not role:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Role '{role_id}' not found",
+            raise NotFoundError(
+                f"Role '{role_id}' not found",
+                context={"role_id": role_id},
             )
         return RoleResponse(
             id=str(role.id) if role.id else "",
@@ -509,44 +468,31 @@ def create_auth_router(
             更新后的角色
 
         Raises:
-            HTTPException 404: 角色不存在
-            HTTPException 403: Admin role required
+            PermissionDeniedError: 非 admin 角色
+            RoleNotFoundError: 角色不存在（由统一异常处理器映射为 404）
+            RoleAlreadyExistsError: 角色名冲突（由统一异常处理器映射为 409）
         """
         if not current_user.has_any_role("admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin role required",
-            )
+            raise PermissionDeniedError("Admin role required")
         from uuid import UUID
 
-        try:
-            role = await role_service.update_role(
-                UUID(role_id),
-                name=request.name,
-                description=request.description,
-                permissions=request.permissions,
-                is_active=request.is_active,
-            )
-            return RoleResponse(
-                id=str(role.id) if role.id else "",
-                name=role.name,
-                description=role.description,
-                permissions=list(role.permissions),
-                is_system_reserved=role.is_system_reserved,
-                is_active=role.is_active,
-                created_at=role.created_at.isoformat() if role.created_at else None,
-                updated_at=role.updated_at.isoformat() if role.updated_at else None,
-            )
-        except RoleNotFoundError:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Role '{role_id}' not found",
-            )
-        except RoleAlreadyExistsError:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Role name '{request.name}' already exists",
-            )
+        role = await role_service.update_role(
+            UUID(role_id),
+            name=request.name,
+            description=request.description,
+            permissions=request.permissions,
+            is_active=request.is_active,
+        )
+        return RoleResponse(
+            id=str(role.id) if role.id else "",
+            name=role.name,
+            description=role.description,
+            permissions=list(role.permissions),
+            is_system_reserved=role.is_system_reserved,
+            is_active=role.is_active,
+            created_at=role.created_at.isoformat() if role.created_at else None,
+            updated_at=role.updated_at.isoformat() if role.updated_at else None,
+        )
 
     @router.delete(
         "/roles/{role_id}",
@@ -568,33 +514,16 @@ def create_auth_router(
             current_user: 当前认证用户
 
         Raises:
-            HTTPException 404: 角色不存在
-            HTTPException 403: Admin role required
+            PermissionDeniedError: 非 admin 角色
+            RoleNotFoundError: 角色不存在（由统一异常处理器映射为 404）
+            CannotDeleteSystemRoleError: 系统保留角色（由统一异常处理器映射为 422）
+            CannotDeleteRoleWithUsersError: 角色关联用户（由统一异常处理器映射为 409）
         """
         if not current_user.has_any_role("admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin role required",
-            )
+            raise PermissionDeniedError("Admin role required")
         from uuid import UUID
 
-        try:
-            await role_service.delete_role(UUID(role_id))
-        except RoleNotFoundError:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Role '{role_id}' not found",
-            )
-        except CannotDeleteSystemRoleError:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Cannot delete system-reserved role",
-            )
-        except CannotDeleteRoleWithUsersError as e:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Cannot delete role - {e.user_count} users are assigned to this role",
-            )
+        await role_service.delete_role(UUID(role_id))
 
     # Permission endpoints
     @router.post(
@@ -620,21 +549,18 @@ def create_auth_router(
             更新后的角色
 
         Raises:
-            HTTPException 404: 角色不存在
-            HTTPException 403: Admin role required
+            PermissionDeniedError: 非 admin 角色
+            NotFoundError: 角色不存在
         """
         if not current_user.has_any_role("admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin role required",
-            )
+            raise PermissionDeniedError("Admin role required")
         from uuid import UUID
 
         role = await role_service.get_role(UUID(role_id))
         if not role:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Role '{role_id}' not found",
+            raise NotFoundError(
+                f"Role '{role_id}' not found",
+                context={"role_id": role_id},
             )
 
         # Add new permissions
@@ -681,21 +607,18 @@ def create_auth_router(
             更新后的角色
 
         Raises:
-            HTTPException 404: 角色不存在
-            HTTPException 403: Admin role required
+            PermissionDeniedError: 非 admin 角色
+            NotFoundError: 角色不存在
         """
         if not current_user.has_any_role("admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin role required",
-            )
+            raise PermissionDeniedError("Admin role required")
         from uuid import UUID
 
         role = await role_service.get_role(UUID(role_id))
         if not role:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Role '{role_id}' not found",
+            raise NotFoundError(
+                f"Role '{role_id}' not found",
+                context={"role_id": role_id},
             )
 
         # Remove permission

@@ -13,6 +13,8 @@ from fastapi.testclient import TestClient
 from src.domain.ports.audit_repository import AuditSearchCriteria, AuditSearchResult
 from src.domain.ports.audit_service import AuditRecord
 from src.interfaces.api.audit import create_audit_router
+from src.interfaces.api.exception_handlers import register_exception_handlers
+from src.interfaces.api.middleware.exception_context import ExceptionContextMiddleware
 
 
 class FakeAuditRepository:
@@ -174,6 +176,8 @@ def fake_service(fake_repo: FakeAuditRepository) -> FakeAuditService:
 @pytest.fixture
 def app(fake_repo: FakeAuditRepository, fake_service: FakeAuditService) -> FastAPI:
     application = FastAPI()
+    application.add_middleware(ExceptionContextMiddleware)
+    register_exception_handlers(application)
     application.include_router(
         create_audit_router(
             get_audit_service=lambda: fake_service,
@@ -353,14 +357,16 @@ class TestGetAuditLog:
         response = client.get("/audit/logs/not-a-uuid")
 
         assert response.status_code == 400
-        assert "Invalid log_id format" in response.json()["detail"]
+        data = response.json()
+        assert "Invalid log_id format" in data["error"]["message"]
 
     def test_get_log_not_found(self, client: TestClient) -> None:
         """Test get log not found returns 404."""
         response = client.get(f"/audit/logs/{uuid4()}")
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        data = response.json()
+        assert "not found" in data["error"]["message"].lower()
 
 
 class TestVerifyIntegrity:
@@ -436,7 +442,7 @@ class TestVerifyIntegrity:
         response = client.post("/audit/verify", json={"log_ids": ["not-a-uuid"]})
 
         assert response.status_code == 400
-        assert "Invalid log_id format" in response.json()["detail"]
+        assert "Invalid log_id format" in response.json()["error"]["message"]
 
 
 class TestGetArchiveStatus:
@@ -473,7 +479,7 @@ class TestGetArchiveStatus:
         response = client.get("/audit/archive/status", params={"log_id": "invalid"})
 
         assert response.status_code == 400
-        assert "Invalid log_id format" in response.json()["detail"]
+        assert "Invalid log_id format" in response.json()["error"]["message"]
 
     def test_get_archive_status_not_found(self, client: TestClient) -> None:
         """Test get archive status not found returns 404."""
