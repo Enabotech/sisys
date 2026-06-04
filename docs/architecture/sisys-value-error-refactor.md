@@ -6,13 +6,20 @@
 **父文档：** [sisys-uni-exception-design.md](sisys-uni-exception-design.md)（§4.4 阶段四遗留任务）
 **评审状态：** 待评审
 
+### 修订历史
+
+| 日期 | 版本 | 变更说明 | 作者 |
+|------|------|---------|------|
+| 2026-06-04 | v1.0 | 初始版本 | Agimtech |
+| 2026-06-04 | v1.1 | 文档审查修订：修正 agent.py(8)/strategic_plan.py(10)/应用层(22) 数量；新增 §2.4.2 except ValueError 捕获站点分析；新增 §4.5.3 配置层异常链策略；新增 ADR-001 设计决策；新增 §4.6.3 validate() 返回类型差异表；增强 §6.1 监控告警风险、§6.2 回滚策略 | Agimtech |
+
 ---
 
 ## 1. 背景与动机
 
 ### 1.1 问题描述
 
-当前系统中存在 **186 处 `raise ValueError`**（分布在 56 个源文件中），与已建立的领域异常体系并存。这导致：
+当前系统中存在 **186 处 `raise ValueError`**（分布在 57 个源文件中），与已建立的领域异常体系并存。这导致：
 
 | 问题 | 影响 | 严重度 |
 |------|------|--------|
@@ -25,7 +32,7 @@
 
 ### 1.2 当前临时方案
 
-`exception_handlers.py` 中已注册 `_handle_value_error` 兜底处理器（第 307-334 行），将所有 ValueError 统一映射为 HTTP 400 + `EXCEPTION_201`。这是过渡方案，迁移完成后应移除。
+`exception_handlers.py` 中已注册 `_handle_value_error` 兜底处理器，将所有 ValueError 统一映射为 HTTP 400 + `EXCEPTION_201`。这是过渡方案，迁移完成后应移除。
 
 ### 1.3 设计目标
 
@@ -45,18 +52,18 @@
 
 ```
 src/ 目录 ValueError 分布（186 处）— 全部迁移
-├── domain/entities/         ~55 处（9 个文件）    ← 批次 1-3：EntityValidationError / EntityStateTransitionError / EntityBusinessRuleError
+├── domain/entities/         ~51 处（9 个文件）    ← 批次 1-3：EntityValidationError / EntityStateTransitionError / EntityBusinessRuleError
 ├── domain/value_objects/      7 处（2 个文件）    ← 批次 4：EntityValidationError
 ├── domain/events/            15 处（3 个文件）    ← 批次 5：EntityValidationError
 ├── domain/ports/              1 处（1 个文件）    ← 批次 6：ConflictError
-├── application/              20 处（6 个文件）    ← 批次 7：ValidationError
-├── infrastructure/config/    36 处（9 个文件）    ← 批次 10：ConfigurationError
-├── infrastructure/storage/   16 处（6 个文件）    ← 批次 8：ValidationError / ConfigurationError
+├── application/              22 处（6 个文件）    ← 批次 7：ValidationError
+├── infrastructure/config/    36 处（9 个文件）    ← 批次 9：ConfigurationError
+├── infrastructure/storage/   18 处（9 个文件）    ← 批次 8/9：ValidationError / ConfigurationError
 ├── infrastructure/messaging/  8 处（6 个文件）    ← 批次 8：ValidationError / ConfigurationError / InvalidStateError
 ├── infrastructure/saga/       5 处（3 个文件）    ← 批次 8：InvalidStateTransitionError / ValidationError / NotFoundError
-├── infrastructure/其他       15 处（8 个文件）    ← 批次 8/10：ValidationError / ConfigurationError / EmbeddingAPIError
+├── infrastructure/其他       23 处（9 个文件）    ← 批次 8/9：ValidationError / ConfigurationError / EmbeddingAPIError
 
-tests/ 目录（~240 处 pytest.raises(ValueError)，~58 个文件）— 全部同步更新
+tests/ 目录（194 处 pytest.raises(ValueError)，50 个文件）— 全部同步更新
 ```
 
 ### 2.2 ValueError 语义分类
@@ -82,6 +89,8 @@ tests/ 目录（~240 处 pytest.raises(ValueError)，~58 个文件）— 全部�
 
 ### 2.4 调用方影响分析
 
+#### 2.4.1 异常抛出侧（raise ValueError → 领域异常）
+
 | 调用方层级 | 是否捕获实体 ValueError | 影响 |
 |-----------|----------------------|------|
 | `src/domain/entities/` | ❌ 不存在 `except ValueError` | 无影响，异常自然上浮 |
@@ -90,7 +99,21 @@ tests/ 目录（~240 处 pytest.raises(ValueError)，~58 个文件）— 全部�
 | `src/interfaces/api/` | ✅ 兜底处理器 `_handle_value_error` | 迁移后移除兜底 |
 | `tests/` | ✅ 194 处 `pytest.raises(ValueError)` | **需全部同步修改** |
 
-**关键结论**：生产代码中实体 ValueError 无任何显式 catch，仅被接口层兜底处理器拦截。迁移的破坏面集中在测试代码。
+#### 2.4.2 异常捕获侧（except ValueError 站点）
+
+全系统共 **37 处 `except ValueError`**，按迁移行为分为三类：
+
+| 类别 | 数量 | 代表文件 | 迁移行为 |
+|------|------|---------|---------|
+| **A. 捕获 Python 内置 ValueError**（int/float/UUID 解析） | ~27 | `config/udmr.py`, `config/qdrant.py`, `config/neo4j.py`, `config/redis.py`, `config/auto_route.py`, `config/auto_trigger.py`, `config/minio.py`, `config/langgraph.py`, `token_payload.py` | ✅ **保留** `except ValueError`，仅修改内部的 `raise` 为 `ConfigurationError` |
+| **B. 捕获被迁移的项目 ValueError**（service 调用） | ~7 | `interfaces/api/document_upload.py`（4处）, `interfaces/api/audit.py`（3处） | ⚠️ **移除整个 try/except 块**，因为 service 已直接 raise 领域异常（无需二次包装） |
+| **C. 捕获外部库/混合模式 ValueError** | ~3 | `prefect_engine.py`（2处）, `monitoring/aggregator.py`, `messaging/redis_subscriber.py`, `storage/qdrant/vector_storage.py`, `document_parsing/text_parser.py`, `embedding_api_client.py` | ✅ **保留** `except ValueError`，仅修改 re-raise（如有） |
+
+> **关键风险点**：`document_upload.py` 中 4 处 `except ValueError as e: raise ValidationError(...)` 模式——迁移后 `document_upload_service.py` 直接 raise `ValidationError`，不再经过 ValueError 通道，原有捕获代码将**静默失效**（`ValidationError` 不继承 `ValueError`）。批次 7 必须同步移除这些 try/except 块。
+
+#### 2.4.3 总结
+
+**关键结论**：生产代码中实体 ValueError 无任何显式 catch，仅被接口层兜底处理器拦截。迁移的破坏面集中在测试代码（194 处 `pytest.raises`）和少量 `except ValueError` 捕获站点（需分类处理）。
 
 ---
 
@@ -158,6 +181,17 @@ storage/minio 4 个、security 2 个、embedding 1 个），证明此模式已�
 
 ### 4.2 新增实体验证异常
 
+> **设计决策 ADR-001**：为何新增三个实体专用异常子类，而非直接用 `ValidationError` + context 区分？
+>
+> **背景**：`ValidationError`（EXCEPTION_201）和 `BusinessRuleViolationError`（EXCEPTION_207）已能通过 `context` dict 携带 `{"entity": "Agent", "field": "agent_id"}` 信息区分失败模式。
+>
+> **决策**：新增 `EntityValidationError`（242）、`EntityStateTransitionError`（243）、`EntityBusinessRuleError`（244）三个子类。
+>
+> **理由**：
+> 1. **监控告警按错误码路由**：Grafana/Prometheus 告警规则通常按 `X-Error-Code` header（即 exception code）配置，而非 context 字段。EXCEPTION_201 涵盖 FastAPI 请求验证 + 实体不变量验证 + 应用层参数验证三种完全不同的问题域，无法按 code 区分告警。拆分后 EXCEPTION_242 专用于实体验证失败，告警可精确路由。
+> 2. **EntityStateTransitionError 有独立结构价值**：继承父类 `InvalidStateTransitionError` 的 `from_status`/`to_status` 属性，提供强类型的状态信息（非通用 context dict）。
+> 3. **与现有体系一致**：项目已有 `PasswordValidationError`（231）继承 `ValidationError`（201）、`BucketNameValidationError`（214）继承 `ValidationError`（201）的先例——为特定领域子域创建专用验证异常是既有模式。
+
 #### 4.2.1 异常类设计
 
 在 `src/domain/exceptions/business_exceptions.py` 中新增三类实体专用异常：
@@ -204,6 +238,9 @@ class EntityStateTransitionError(InvalidStateTransitionError):
         self.from_status = from_status
         self.to_status = to_status
         super().__init__(from_status, to_status, message)
+```
+
+> **注意**：父类 `InvalidStateTransitionError.__init__` 会自动生成 `"Invalid state transition: {from} -> {to}: {message}"` 格式的完整消息。当 `from_status == to_status` 时（如 "Checkpoint is already completed" → "Invalid state transition: completed -> completed: Checkpoint is already completed"），前缀信息冗余。这是当前 ValueError 消息的固有特征，子类保持兼容不引入额外转换逻辑。
 
 
 class EntityBusinessRuleError(BusinessRuleViolationError):
@@ -244,13 +281,15 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
 }
 ```
 
-> **说明**：这三个映射实际上可通过 MRO 回退到基类获得正确状态码。显式声明是为了性能优化（精确匹配优先）和文档清晰。
+> **说明**：这三个映射实际上可通过 MRO 回退到基类获得正确状态码。显式声明是为了语义明确（精确映射表述了子类特化的业务含义）和文档清晰（`EXCEPTION_HTTP_MAP` 作为异常→HTTP 的完整参考）。`_get_http_status()` 的实现中精确类型匹配（`type(exc) is exc_type`）优先于 `isinstance` 回退，显式注册确保新类被优先匹配。
 
 ### 4.3 迁移映射规则
 
 #### 4.3.1 ValueError 消息 → 领域异常映射表
 
 每个 ValueError 按其语义映射到相应的领域异常：
+
+> **异常消息语言策略**：当前系统存在中英文混用（领域实体层使用英文如 `"must be a valid UUID"`，配置层使用中文如 `"格式无效"`）。迁移时**保持各文件现有消息文本不变**（仅替换异常类型），避免因消息文本变化导致客户端匹配失效。统一语言为后续独立优化项。
 
 | ValueError 消息模式 | 目标异常 | 上下文字段 |
 |---------------------|---------|-----------|
@@ -270,14 +309,14 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
 
 #### 4.3.2 按文件分类的迁移方案
 
-##### 领域实体（9 个文件，~55 处）
+##### 领域实体（9 个文件，~51 处）
 
 | 文件 | ValueError 数 | EntityValidationError | EntityStateTransitionError | EntityBusinessRuleError |
 |------|-------------:|----------------------:|--------------------------:|-----------------------:|
-| `agent.py` | 7 | 3（validate） | 4（start/complete/fail/restart/wait） | 0 |
+| `agent.py` | 8 | 3（validate） | 5（start/complete/fail/restart/wait） | 0 |
 | `checkpoint.py` | 5 | 3（validate） | 2（complete/recover） | 0 |
-| `strategic_plan.py` | 9 | 5（validate） | 2（advance_phase/complete_phase） | 2（phase_invariant） |
-| `routing_decision_log.py` | 13 | 13（validate） | 0 | 0 |
+| `strategic_plan.py` | 10 | 5（validate） | 3（advance_phase/complete_phase） | 2（phase_invariant） |
+| `routing_decision_log.py` | 13 | 13（validate，返回 None） | 0 | 0 |
 | `document.py` | 7 | 7（validate + validate_metadata） | 0 | 0 |
 | `tool.py` | 4 | 4（validate） | 0 | 0 |
 | `audit_log.py` | 2 | 2（__post_init__） | 0 | 0 |
@@ -305,7 +344,7 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
 |------|-------------:|---------|
 | `ports/registry.py` | 1 | → `ConflictError`（端口重复注册） |
 
-##### 应用层（4 个文件，20 处）
+##### 应用层（6 个文件，22 处）
 
 | 文件 | ValueError 数 | 迁移方案 |
 |------|-------------:|---------|
@@ -348,7 +387,6 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
 | `storage/redis/redis_snapshot_store.py` | 1 | → `ValidationError` |
 | `storage/redis/semantic_cache.py` | 1 | → `ValidationError` |
 | `storage/redis/cleanup.py` | 1 | → `ValidationError` |
-| `storage/postgresql/postgresql_manager.py` | 1 | → `ConfigurationError` |
 | `messaging/dual_channel_event_bus.py` | 2 | → `InvalidStateError` |
 | `messaging/inmemory_event_store.py` | 2 | → `ValidationError` |
 | `messaging/inmemory_event_bus.py` | 1 | → `ValidationError` |
@@ -358,7 +396,7 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
 | `saga/saga_context.py` | 3 | → `InvalidStateTransitionError` / `ValidationError` |
 | `saga/saga_orchestrator.py` | 1 | → `ValidationError` |
 | `saga/saga_repository.py` | 1 | → `NotFoundError` |
-| `document_parsing/archive_extractor.py` | 4 | → `ValidationError` / `StorageError` |
+| `document_parsing/archive_extractor.py` | 4 | → `ValidationError` / `StorageError`（注：其中 2 处为包装外部异常模式：`except zipfile.BadZipFile as e: raise ValueError(...) from e`，迁移后直接 raise `StorageError`） |
 | `document_parsing/pdf_page_renderer.py` | 1 | → `ValidationError` |
 | `document_parsing/_encoding.py` | 1 | → `ValidationError` |
 | `agent_orch/langgraph_engine.py` | 3 | → `ValidationError` |
@@ -467,12 +505,14 @@ def start(self) -> None:
 迁移完成后，从 `exception_handlers.py` 中移除：
 
 ```python
-# 删除注册（第 163 行）
-# self._app.add_exception_handler(ValueError, self._handle_value_error)  # 已移除
+# 删除注册行（含 # type: ignore[arg-type] 注释）
+# self._app.add_exception_handler(ValueError, self._handle_value_error)  # type: ignore[arg-type]
 
-# 删除处理器方法（第 307-334 行）
+# 删除处理器方法
 # async def _handle_value_error(self, request, exc): ...  # 已移除
 ```
+
+> **关于 `# type: ignore[arg-type]`**：FastAPI 的 `add_exception_handler` 类型签名期望 `type[Exception]`，`ValueError` 作为 Python 内置异常类在某些 mypy 版本中触发类型检查误报。此注释仅服务于 ValueError 注册行——移除注册行后该注释自然消失，无需单独处理。
 
 #### 4.5.2 配置层迁移说明
 
@@ -488,6 +528,18 @@ def start(self) -> None:
 > **结论**：配置层 ValueError 迁移为 ConfigurationError 是纯收益变更——即使进程启动崩溃，
 > 运维也能从日志中精确识别哪个配置项、什么原因失败，而非在一大段 traceback 中搜索。
 
+#### 4.5.3 配置层异常链统一策略
+
+配置解析代码中 `raise ValueError(...) from e` 与 `raise ValueError(...) from None` 用法不一致。迁移时统一策略：
+
+| 场景 | 推荐 | 理由 |
+|------|------|------|
+| 类型转换失败（`int()`/`float()` 解析环境变量） | `from None` | 底层 `ValueError("invalid literal for int()")` 对运维无意义，切断链可避免噪音 |
+| 第三方库校验失败（如 pydantic 验证） | `from e` | 保留第三方库的错误上下文，便于排查 |
+| 业务范围校验失败（如 timeout > 0） | 不包装（直接 raise ConfigurationError） | 无需异常链 |
+
+迁移时统一应用此策略，消除 `udmr.py`、`embedding.py`、`langgraph.py` 等文件中 `from e`/`from None` 的用法不一致。
+
 ### 4.6 测试迁移方案
 
 #### 4.6.1 测试文件修改量估算
@@ -497,9 +549,26 @@ def start(self) -> None:
 | 领域实体测试 | 9 | ~55 | `pytest.raises(ValueError)` → `pytest.raises(EntityValidationError)` 等 |
 | 领域值对象测试 | 2 | ~7 | 同上 |
 | 领域事件测试 | 5 | ~16 | 同上 |
-| 应用层测试 | 5 | ~20 | `pytest.raises(ValueError)` → `pytest.raises(ValidationError)` |
-| 基础设施测试 | 29 | ~96 | 仅迁移文件对应的测试需修改 |
+| 应用层测试 | 5 | ~22 | `pytest.raises(ValueError)` → `pytest.raises(ValidationError)` |
+| 基础设施测试 | 29 | ~94 | 仅迁移文件对应的测试需修改 |
 | **总计** | **50** | **~194** | - |
+
+> **注意**：另有 ~12 个测试文件包含 `isinstance(x, ValueError)` 或 `except ValueError` 模式（如 `test_hexagonal_architecture_constraints.py`、`test_audit_endpoint.py`），这些文件不在此次 `pytest.raises` 迁移范围内，但需在批次 10 清理阶段逐文件审查。
+
+#### 4.6.3 validate() 方法返回类型差异
+
+当前实体 `validate()` 方法存在返回类型差异：
+
+| 实体 | validate() 返回类型 | 说明 |
+|------|-------------------|------|
+| `agent.py` | `-> bool` | 返回 `True` |
+| `checkpoint.py` | `-> bool` | 返回 `True` |
+| `strategic_plan.py` | `-> bool` | 返回 `True` |
+| `document.py` | `-> bool` | 返回 `True` |
+| `tool.py` | `-> bool` | 返回 `True` |
+| `routing_decision_log.py` | `-> None` | **不返回值** |
+
+迁移时**保持各文件现有签名不变**，仅替换异常类型。`routing_decision_log.validate()` 迁移后仍返回 `None`（不添加 `return True`）。
 
 #### 4.6.2 测试迁移模板
 
@@ -576,7 +645,7 @@ def test_token_sum_invariant():
     ↓
 批次 6: 领域端口（registry）— 1 处
     ↓
-批次 7: 应用层（document_upload, dense_search, orchestration, text_processing）— 20 处
+批次 7: 应用层（document_upload, dense_search, orchestration, text_processing）— 22 处
     ↓
 批次 8: 基础设施层-运行时（storage, messaging, saga, document_parsing, 其他）— ~40 处
     ↓
@@ -617,12 +686,12 @@ def test_token_sum_invariant():
 
 #### 批次 3：复杂实体迁移
 
-- [ ] **3.1** 迁移 `src/domain/entities/agent.py`（7 处：3 EntityValidationError + 4 EntityStateTransitionError）
-- [ ] **3.2** 迁移 `src/domain/entities/strategic_plan.py`（9 处：5 EntityValidationError + 2 EntityStateTransitionError + 2 EntityBusinessRuleError）
-- [ ] **3.3** 迁移 `src/domain/entities/routing_decision_log.py`（13 处 EntityValidationError）
-- [ ] **3.4** 更新 `test_agent.py`（9 处 pytest.raises 修改 + from_status/to_status 断言增强）
-- [ ] **3.5** 更新 `test_strategic_plan.py`（13 处 pytest.raises 修改）
-- [ ] **3.6** 更新 `test_routing_decision_log.py`（16 处 pytest.raises 修改）
+- [ ] **3.1** 迁移 `src/domain/entities/agent.py`（8 处：3 EntityValidationError + 5 EntityStateTransitionError）
+- [ ] **3.2** 迁移 `src/domain/entities/strategic_plan.py`（10 处：5 EntityValidationError + 3 EntityStateTransitionError + 2 EntityBusinessRuleError）
+- [ ] **3.3** 迁移 `src/domain/entities/routing_decision_log.py`（13 处 EntityValidationError，注意：validate() 返回 None 非 bool，迁移后保持签名不变）
+- [ ] **3.4** 更新 `test_agent.py`（10 处 pytest.raises 修改 + from_status/to_status 断言增强）
+- [ ] **3.5** 更新 `test_strategic_plan.py`（15 处 pytest.raises 修改）
+- [ ] **3.6** 更新 `test_routing_decision_log.py`（18 处 pytest.raises 修改）
 - [ ] **3.7** 运行 `poetry run pytest tests/unit/domain/entities/ -v`
 - [ ] **3.8** 运行全量测试确认无回归
 
@@ -663,9 +732,10 @@ def test_token_sum_invariant():
 - [ ] **7.5** 迁移 `src/application/use_cases/text_processing/l1_compressor.py`（1 处 ValueError → ValidationError）
 - [ ] **7.6** 迁移 `src/application/event_handlers/event_dict_to_json.py`（2 处 ValueError → ValidationError）
 - [ ] **7.7** 更新对应测试文件（~22 处 pytest.raises 修改）
-- [ ] **7.8** 同时更新 `src/interfaces/api/document_upload.py` 中 `except ValueError: raise ValidationError(...)` 的间接捕获代码
-- [ ] **7.9** 运行 `poetry run pytest tests/unit/application/ -v`
-- [ ] **7.10** 运行全量测试确认无回归
+- [ ] **7.8** **移除** `src/interfaces/api/document_upload.py` 中 4 处 `except ValueError as e: raise ValidationError(...)` 的间接捕获块——迁移后 service 直接 raise `ValidationError`（不经过 ValueError 通道），原有捕获代码静默失效，整个 try/except 块应删除
+- [ ] **7.9** 检查 `src/interfaces/api/audit.py` 中 3 处 `except ValueError`（行200/234/259），确认迁移后是否需要修改（审计端点捕获的是 Python 内置 ValueError，不涉及此次迁移的异常类型）
+- [ ] **7.10** 运行 `poetry run pytest tests/unit/application/ -v`
+- [ ] **7.11** 运行全量测试确认无回归
 
 #### 批次 8：基础设施层-运行时迁移
 
@@ -727,8 +797,9 @@ def test_token_sum_invariant():
 - [ ] **10.6** 运行覆盖率检查：`poetry run pytest --cov=src tests/`
 - [ ] **10.7** 运行 import-linter 检查：`poetry run lint-imports`
 - [ ] **10.8** 更新 `sisys-uni-exception-design.md`：更新 §3.1 层次图、§3.7 编码注册表、§4.4 阶段四任务状态
-- [ ] **10.9** 运行全量测试最终确认：`poetry run pytest tests/`
-- [ ] **10.10** 更新本设计文档状态为"已完成"
+- [ ] **10.9** 更新监控告警规则：实体状态转换告警从匹配 `EXCEPTION_208` 扩展为匹配 `EXCEPTION_208,EXCEPTION_243`（或使用编码前缀 `EXCEPTION_24*`）
+- [ ] **10.10** 运行全量测试最终确认：`poetry run pytest tests/`
+- [ ] **10.11** 更新本设计文档状态为"已完成"
 
 ---
 
@@ -743,6 +814,7 @@ def test_token_sum_invariant():
 | 错误码碰撞 | 🟢 低 | 🟡 中 | 批次 0 预先验证 + 唯一性测试 |
 | 配置层迁移引入启动时崩溃格式变化 | 🟢 低 | 🟡 中 | ConfigurationError 继承 Exception，traceback 格式不变；仅增加 code/context 元数据 |
 | 并行开发冲突 | 🟡 中 | 🟡 中 | 每批独立 PR，顺序合入 |
+| 监控告警规则未同步更新（EXCEPTION_243 替换 208） | 🟡 中 | 🟡 中 | 批次 0 发布时通知运维更新告警规则：实体状态转换告警从匹配 `EXCEPTION_208` 改为匹配 `EXCEPTION_243`（或同时匹配两者）；如使用编码前缀匹配（`EXCEPTION_24*`），验证 243-244 已被纳入 |
 
 ### 6.2 回滚策略
 
@@ -752,7 +824,15 @@ def test_token_sum_invariant():
 git revert <commit-hash>  # 回滚特定批次
 ```
 
-批次 0 的异常类新增是后续批次的前置依赖，如需回滚批次 0 需先回滚所有后续批次。
+**依赖约束**：
+- 批次 0 的异常类新增是后续批次的前置依赖，如需回滚批次 0 需先回滚所有后续批次
+- 批次 1-9 之间无硬依赖，可独立回滚
+
+**部分回滚场景**：
+- 如批次 N 被回滚但批次 N+1 已合入：先回滚 N+1，再回滚 N，然后修复 N 后重新提交 N+1（可能需要 rebase）
+- 推荐在批次 N 全量测试通过且部署验证 24 小时后再合入批次 N+1，降低连锁回滚风险
+
+**merge conflict 预处理**：每批次基于上一批次的 HEAD 提交（而非 main），通过 rebase 保持线性历史，减少跨批次冲突。
 
 ---
 
@@ -770,6 +850,7 @@ git revert <commit-hash>  # 回滚特定批次
 | AC-8 | import-linter 通过 | `poetry run lint-imports` 无违规 |
 | AC-9 | 异常处理器集成测试通过 | ValueError 不再返回结构化响应；领域异常返回正确 HTTP 状态码 + 错误码 |
 | AC-10 | 设计文档更新完成 | `sisys-uni-exception-design.md` §3.1/§3.7/§4.4 已同步更新 |
+| AC-11 | 监控告警规则已同步 | 实体状态转换告警已更新为匹配 EXCEPTION_243（含 208 兼容） |
 
 ---
 
@@ -800,8 +881,8 @@ git revert <commit-hash>  # 回滚特定批次
 | `src/domain/entities/memory_change_history.py` | 修改 | 1 处 |
 | `src/domain/entities/checkpoint.py` | 修改 | 5 处 |
 | `src/domain/entities/document.py` | 修改 | 7 处 |
-| `src/domain/entities/agent.py` | 修改 | 7 处 |
-| `src/domain/entities/strategic_plan.py` | 修改 | 9 处 |
+| `src/domain/entities/agent.py` | 修改 | 8 处 |
+| `src/domain/entities/strategic_plan.py` | 修改 | 10 处 |
 | `src/domain/entities/routing_decision_log.py` | 修改 | 13 处 |
 | 对应 9 个测试文件 | 修改 | ~55 处 pytest.raises 修改 |
 
@@ -833,7 +914,7 @@ git revert <commit-hash>  # 回滚特定批次
 | `src/application/use_cases/text_processing/l1_text_extractor.py` | 修改 | 2 处 |
 | `src/application/use_cases/text_processing/l1_compressor.py` | 修改 | 1 处 |
 | `src/application/event_handlers/event_dict_to_json.py` | 修改 | 2 处 |
-| `src/interfaces/api/document_upload.py` | 修改 | 移除 `except ValueError` 间接捕获 |
+| `src/interfaces/api/document_upload.py` | 修改 | 移除 4 处 `except ValueError` 间接捕获块 |
 | 对应测试文件 | 修改 | ~22 处 |
 
 #### 批次 8（基础设施层-运行时）
