@@ -112,6 +112,7 @@ class DenseSemanticSearchService:
             combined.update(safe_payload)
         if tenant_id is not None:
             safe_tid = tenant_id.strip()
-            if safe_tid:
-                combined["tenant_id"] = safe_tid
+            if not safe_tid:
+                raise ValueError("tenant_id 不能为空或仅含空白字符")
+            combined["tenant_id"] = safe_tid
         return combined if combined else None
