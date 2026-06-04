@@ -18,11 +18,20 @@ from src.infrastructure.config.embedding import EmbeddingConfig
 logger = logging.getLogger(__name__)
 
 
+class EmbeddingServiceError(RuntimeError):
+    """嵌入服务调用异常
+
+    包装 HTTP 客户端层异常（连接、超时、非预期响应），
+    避免原始 httpx 异常泄露到应用层。
+    """
+
+
 class EmbeddingAPIClient:
     """BGE-M3 嵌入 API 客户端
 
     实现 EmbeddingServicePort，通过 HTTP POST /v1/embeddings 调用独立 API 服务。
-    方法签名使用同步（def），内部通过 asyncio 调用 httpx，与 EmbeddingServicePort 同步签名兼容。
+    方法签名使用同步 def，内部使用 httpx.Client（同步），
+    调用方通过 asyncio.to_thread 包装以避免阻塞事件循环。
     """
 
     def __init__(self, config: EmbeddingConfig | None = None) -> None:
@@ -84,6 +93,9 @@ class EmbeddingAPIClient:
         """
         if not texts:
             return []
+        for i, t in enumerate(texts):
+            if not t or not t.strip():
+                raise ValueError(f"文本列表第 {i} 项不能为空")
         result = self._encode(texts, return_sparse=False)
         return cast(list[list[float]], result["dense"])
 
@@ -118,14 +130,23 @@ class EmbeddingAPIClient:
             API 响应 dict
 
         Raises:
-            httpx.HTTPStatusError: HTTP 错误时
+            EmbeddingServiceError: 网络错误、超时或非预期响应时
         """
-        resp = self._client.post(
-            "/v1/embeddings",
-            json={"texts": texts, "return_sparse": return_sparse},
-        )
-        resp.raise_for_status()
-        return cast(dict[str, Any], resp.json())
+        try:
+            resp = self._client.post(
+                "/v1/embeddings",
+                json={"texts": texts, "return_sparse": return_sparse},
+            )
+            resp.raise_for_status()
+            return cast(dict[str, Any], resp.json())
+        except httpx.TimeoutException as e:
+            raise EmbeddingServiceError(f"嵌入 API 请求超时: {e}") from e
+        except httpx.NetworkError as e:
+            raise EmbeddingServiceError(f"嵌入 API 网络错误: {e}") from e
+        except httpx.HTTPStatusError:
+            raise
+        except (ValueError, KeyError) as e:
+            raise EmbeddingServiceError(f"嵌入 API 响应格式异常: {e}") from e
 
     def close(self) -> None:
         """关闭 HTTP 客户端"""

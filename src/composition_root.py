@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 
@@ -1537,6 +1538,15 @@ async def shutdown() -> None:
             logger.info("Closed %s", name)
         except Exception as e:
             logger.warning("Failed to close %s: %s", name, e)
+
+    # 关闭 embedding_service HTTP 客户端连接池
+    try:
+        embedding = resolver.resolve("embedding_service")
+        if embedding is not None:
+            await asyncio.to_thread(embedding.close)
+            logger.info("Closed embedding_service")
+    except Exception as e:
+        logger.warning("Failed to close embedding_service: %s", e)
 
 
 __all__ = ["bootstrap", "shutdown", "_global_registry"]
