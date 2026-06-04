@@ -14,6 +14,7 @@ from typing import Any, cast
 import redis.asyncio as aioredis
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import DomainError
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.utils import json_loads
 
@@ -152,7 +153,7 @@ class RedisEventSubscriber:
         # 反序列化为 DomainEvent
         try:
             event = DomainEvent.from_dict(event_dict)
-        except ValueError as e:
+        except (ValueError, DomainError) as e:
             logger.warning(
                 "Failed to deserialize DomainEvent from channel %s: %s",
                 channel,

@@ -20,6 +20,7 @@ from src.domain.exceptions import (
     NetworkError,
     ServiceUnavailableError,
     TimeoutError,
+    ValidationError,
 )
 from src.domain.ports.embedding_service import EmbeddingServicePort, SparseEmbedding
 from src.infrastructure.config.embedding import EmbeddingConfig
@@ -54,7 +55,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         if config is None:
             config = EmbeddingConfig()
         if not config.api_url:
-            raise ValueError("EMBEDDING_API_URL 未配置，API 模式需要指定嵌入服务地址")
+            raise ValidationError(message="EMBEDDING_API_URL 未配置，API 模式需要指定嵌入服务地址")
         self._config = config
         self._client = httpx.Client(
             base_url=config.api_url,
@@ -104,7 +105,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             ValueError: 文本为空时
         """
         if not text or not text.strip():
-            raise ValueError("文本不能为空")
+            raise ValidationError(message="文本不能为空")
         result = self._encode([text], return_sparse=False)
         return cast(list[float], result["dense"][0])
 
@@ -127,7 +128,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             return []
         for i, t in enumerate(texts):
             if not t or not t.strip():
-                raise ValueError(f"文本列表第 {i} 项不能为空")
+                raise ValidationError(message=f"文本列表第 {i} 项不能为空")
         result = self._encode(texts, return_sparse=False)
         return cast(list[list[float]], result["dense"])
 
@@ -149,7 +150,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             return []
         for i, t in enumerate(texts):
             if not t or not t.strip():
-                raise ValueError(f"文本列表第 {i} 项不能为空")
+                raise ValidationError(message=f"文本列表第 {i} 项不能为空")
         result = self._encode(texts, return_sparse=True)
         sparse_list = cast(list[dict[str, Any]], result.get("sparse", []))
         if not sparse_list:

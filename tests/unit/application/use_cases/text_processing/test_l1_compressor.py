@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 
 from src.application.use_cases.text_processing.l1_compressor import L1Compressor
+from src.domain.exceptions import ValidationError
 
 
 class TestL1CompressorCompression:
@@ -56,7 +57,7 @@ class TestL1CompressorLimits:
         """验证超过 500 字限制抛出异常"""
         compressor = L1Compressor()
         text = "A" * 501  # 超过限制
-        with pytest.raises(ValueError, match="内容超过限制"):
+        with pytest.raises(ValidationError, match="内容超过限制"):
             compressor.compress(text)
 
     def test_supports_method(self):

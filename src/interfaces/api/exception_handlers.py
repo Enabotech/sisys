@@ -28,6 +28,9 @@ from src.domain.exceptions import (
     ConflictError,
     ContainerStartError,
     ContainerStopError,
+    EntityBusinessRuleError,
+    EntityStateTransitionError,
+    EntityValidationError,
     ExecutionError,
     ExternalException,
     InsufficientTokenError,
@@ -81,6 +84,10 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     InvalidStateError: status.HTTP_409_CONFLICT,
     InvalidStateTransitionError: status.HTTP_409_CONFLICT,
     BusinessRuleViolationError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    # 实体验证异常
+    EntityValidationError: status.HTTP_400_BAD_REQUEST,
+    EntityStateTransitionError: status.HTTP_409_CONFLICT,
+    EntityBusinessRuleError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     # 存储子域异常
     MemoryNotFoundError: status.HTTP_404_NOT_FOUND,  # 211
     BucketNotFoundError: status.HTTP_404_NOT_FOUND,  # 212

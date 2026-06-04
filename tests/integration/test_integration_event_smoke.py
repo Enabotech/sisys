@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
 from src.infrastructure.messaging.retry.checker import IdempotencyChecker
 from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
@@ -59,7 +60,7 @@ class TestEventRegistry:
         unknown_entity.event_type = "UnknownEventType"
         unknown_entity.payload = {"some": "data"}
 
-        with pytest.raises(ValueError, match="Unknown event_type"):
+        with pytest.raises(ConfigurationError, match="Unknown event_type"):
             EventOutboxAdapter.to_domain_event(unknown_entity)
 
     def test_registry_contains_known_types(self) -> None:

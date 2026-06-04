@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 
+from src.domain.exceptions import EntityBusinessRuleError, EntityStateTransitionError, EntityValidationError
+
 
 class BLMPhase(str, Enum):
     """BLM（商业领导力模型）阶段枚举"""
@@ -58,20 +60,36 @@ class StrategicPlan:
             所有不变量满足时返回 True
 
         Raises:
-            ValueError: 任何不变量违反时抛出
+            EntityValidationError: 不变量验证失败时抛出
+            EntityBusinessRuleError: 业务规则违反时抛出
         """
         if not isinstance(self.plan_id, uuid.UUID):
-            raise ValueError("plan_id must be a valid UUID")
+            raise EntityValidationError(
+                message="plan_id must be a valid UUID",
+                context={"entity": "StrategicPlan", "field": "plan_id"},
+            )
         if not self.name or not self.name.strip():
-            raise ValueError("name must not be empty")
+            raise EntityValidationError(
+                message="name must not be empty",
+                context={"entity": "StrategicPlan", "field": "name"},
+            )
         if not isinstance(self.current_phase, BLMPhase):
-            raise ValueError("current_phase must be a valid BLMPhase")
+            raise EntityValidationError(
+                message="current_phase must be a valid BLMPhase",
+                context={"entity": "StrategicPlan", "field": "current_phase", "expected_type": "BLMPhase"},
+            )
         # P2-05 Fix: created_at/updated_at have default_factory, never None
         if self.created_at > self.updated_at:
-            raise ValueError("created_at must be before or equal to updated_at")
+            raise EntityBusinessRuleError(
+                message="created_at must be before or equal to updated_at",
+                context={"entity": "StrategicPlan", "rule": "timestamp_ordering"},
+            )
         # P1-01 Fix: Validate completed_phases consistency
         if self.current_phase in self.completed_phases:
-            raise ValueError("current_phase must not be in completed_phases")
+            raise EntityBusinessRuleError(
+                message="current_phase must not be in completed_phases",
+                context={"entity": "StrategicPlan", "rule": "phase_not_in_completed"},
+            )
         return True
 
     def advance_phase(self, next_phase: BLMPhase) -> None:
@@ -81,15 +99,23 @@ class StrategicPlan:
             next_phase: 要推进到的下一个 BLM 阶段
 
         Raises:
-            ValueError: 阶段转换无效或规划已归档/审批通过时抛出
+            EntityStateTransitionError: 阶段转换无效或规划已归档/审批通过时抛出
         """
         # P0-03: Status guard — cannot advance archived or approved plans
         if self.status in (PlanStatus.ARCHIVED, PlanStatus.APPROVED):
-            raise ValueError(f"Cannot advance phase when plan is {self.status.value}")
+            raise EntityStateTransitionError(
+                from_status=self.status.value,
+                to_status="advancing",
+                message=f"Cannot advance phase when plan is {self.status.value}",
+            )
 
         # P0-01 Fix: Guard against advancing past the final phase
         if self.current_phase == BLMPhase.EXECUTION_MONITORING:
-            raise ValueError("Plan has reached the final phase (EXECUTION_MONITORING), no further phase advancement possible")
+            raise EntityStateTransitionError(
+                from_status=self.current_phase.value,
+                to_status="past_final",
+                message="Plan has reached the final phase (EXECUTION_MONITORING), no further phase advancement possible",
+            )
 
         phase_order = list(BLMPhase)
         current_idx = phase_order.index(self.current_phase)
@@ -97,7 +123,11 @@ class StrategicPlan:
 
         # P0-02: Must advance to immediately next phase (no skipping)
         if next_idx != current_idx + 1:
-            raise ValueError("Can only advance to the immediately next phase")
+            raise EntityStateTransitionError(
+                from_status=self.current_phase.value,
+                to_status=next_phase.value,
+                message="Can only advance to the immediately next phase",
+            )
 
         # P1-01 Fix: Prevent duplicate entries in completed_phases
         if self.current_phase not in self.completed_phases:
@@ -109,15 +139,23 @@ class StrategicPlan:
         """标记当前阶段为已完成并自动推进
 
         Raises:
-            ValueError: 规划已归档/审批通过或已处于最终阶段时抛出
+            EntityStateTransitionError: 规划已归档/审批通过或已处于最终阶段时抛出
         """
         # Status guard — cannot complete archived or approved plans
         if self.status in (PlanStatus.ARCHIVED, PlanStatus.APPROVED):
-            raise ValueError(f"Cannot complete phase when plan is {self.status.value}")
+            raise EntityStateTransitionError(
+                from_status=self.status.value,
+                to_status="completing",
+                message=f"Cannot complete phase when plan is {self.status.value}",
+            )
 
         # Final phase guard — cannot complete past the final phase
         if self.current_phase == BLMPhase.EXECUTION_MONITORING:
-            raise ValueError("Plan has reached the final phase (EXECUTION_MONITORING), no further phase advancement possible")
+            raise EntityStateTransitionError(
+                from_status=self.current_phase.value,
+                to_status="past_final",
+                message="Plan has reached the final phase (EXECUTION_MONITORING), no further phase advancement possible",
+            )
 
         # P1-01 Fix: Prevent duplicate entries in completed_phases
         if self.current_phase not in self.completed_phases:

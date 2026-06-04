@@ -12,6 +12,8 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+from src.domain.exceptions import EntityValidationError
+
 
 class DocumentType(str, Enum):
     """支持的文档类型枚举"""
@@ -91,23 +93,41 @@ class Document:
             所有不变量满足时返回 True
 
         Raises:
-            ValueError: 任何不变量违反时抛出
+            EntityValidationError: 任何不变量违反时抛出
         """
         if not isinstance(self.document_id, uuid.UUID):
-            raise ValueError("document_id must be a valid UUID")
+            raise EntityValidationError(
+                message="document_id must be a valid UUID",
+                context={"entity": "Document", "field": "document_id"},
+            )
         if not self.filename or not self.filename.strip():
-            raise ValueError("filename must not be empty")
+            raise EntityValidationError(
+                message="filename must not be empty",
+                context={"entity": "Document", "field": "filename"},
+            )
         if self.version < 1:
-            raise ValueError("version must be >= 1")
+            raise EntityValidationError(
+                message="version must be >= 1",
+                context={"entity": "Document", "field": "version", "constraint": ">=1"},
+            )
         if self.file_size_bytes < 0:
-            raise ValueError("file_size_bytes must be non-negative")
+            raise EntityValidationError(
+                message="file_size_bytes must be non-negative",
+                context={"entity": "Document", "field": "file_size_bytes"},
+            )
         # P1-03 Fix: Validate embedding for NaN/Inf values
         if self.embedding is not None:
             for i, val in enumerate(self.embedding):
                 if not isinstance(val, int | float):
-                    raise ValueError(f"embedding[{i}] must be a number")
+                    raise EntityValidationError(
+                        message=f"embedding[{i}] must be a number",
+                        context={"entity": "Document", "field": f"embedding[{i}]"},
+                    )
                 if math.isnan(val) or math.isinf(val):
-                    raise ValueError(f"embedding[{i}] contains NaN/Inf")
+                    raise EntityValidationError(
+                        message=f"embedding[{i}] contains NaN/Inf",
+                        context={"entity": "Document", "field": f"embedding[{i}]"},
+                    )
         return True
 
     def validate_metadata(self, required_fields: list[str] | None = None) -> bool:
@@ -120,13 +140,16 @@ class Document:
             所有必需字段都存在时返回 True
 
         Raises:
-            ValueError: 任何必需字段缺失时抛出
+            EntityValidationError: 任何必需字段缺失时抛出
         """
         if required_fields is None:
             required_fields = []
         missing = [f for f in required_fields if f not in self.metadata]
         if missing:
-            raise ValueError(f"Missing required metadata fields: {missing}")
+            raise EntityValidationError(
+                message=f"Missing required metadata fields: {missing}",
+                context={"entity": "Document", "field": "metadata", "missing": missing},
+            )
         return True
 
     def bump_version(self, change_description: str, created_by: str = "") -> int:

@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.config.auto_trigger import AutoTriggerConfig
 
 
@@ -74,21 +75,21 @@ class TestAutoTriggerConfigFromEnv:
         """Should raise ValueError for invalid HEARTBEAT_INTERVAL_SECONDS."""
         env = {"HEARTBEAT_INTERVAL_SECONDS": "not_a_number"}
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="Invalid HEARTBEAT_INTERVAL_SECONDS"):
+            with pytest.raises(ConfigurationError, match="HEARTBEAT_INTERVAL_SECONDS"):
                 AutoTriggerConfig.from_env()
 
     def test_from_env_zero_heartbeat_interval_raises(self) -> None:
         """Should raise ValueError when HEARTBEAT_INTERVAL_SECONDS is zero."""
         env = {"HEARTBEAT_INTERVAL_SECONDS": "0"}
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="Invalid HEARTBEAT_INTERVAL_SECONDS"):
+            with pytest.raises(ConfigurationError, match="HEARTBEAT_INTERVAL_SECONDS"):
                 AutoTriggerConfig.from_env()
 
     def test_from_env_negative_heartbeat_interval_raises(self) -> None:
         """Should raise ValueError when HEARTBEAT_INTERVAL_SECONDS is negative."""
         env = {"HEARTBEAT_INTERVAL_SECONDS": "-10"}
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="Invalid HEARTBEAT_INTERVAL_SECONDS"):
+            with pytest.raises(ConfigurationError, match="HEARTBEAT_INTERVAL_SECONDS"):
                 AutoTriggerConfig.from_env()
 
     def test_from_env_custom_max_retries(self) -> None:
@@ -109,14 +110,14 @@ class TestAutoTriggerConfigFromEnv:
         """Should raise ValueError when TRIGGER_MAX_RETRIES is negative."""
         env = {"TRIGGER_MAX_RETRIES": "-1"}
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="Invalid TRIGGER_MAX_RETRIES"):
+            with pytest.raises(ConfigurationError, match="TRIGGER_MAX_RETRIES"):
                 AutoTriggerConfig.from_env()
 
     def test_from_env_invalid_max_retries_raises(self) -> None:
         """Should raise ValueError for invalid TRIGGER_MAX_RETRIES."""
         env = {"TRIGGER_MAX_RETRIES": "not_a_number"}
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="Invalid TRIGGER_MAX_RETRIES"):
+            with pytest.raises(ConfigurationError, match="TRIGGER_MAX_RETRIES"):
                 AutoTriggerConfig.from_env()
 
     def test_config_is_frozen(self) -> None:

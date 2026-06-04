@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
+from src.domain.exceptions import ValidationError
 from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
 from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.utils import json_dumps, json_loads
@@ -95,7 +96,7 @@ class RedisSnapshotStore(SnapshotRepositoryProtocol):
             ValueError: TTL 超出允许范围
         """
         if ttl_seconds < 60 or ttl_seconds > 2592000:
-            raise ValueError("TTL must be between 60 seconds and 30 days")
+            raise ValidationError(message="TTL must be between 60 seconds and 30 days")
         self._ttl_seconds = ttl_seconds
 
     async def save(self, snapshot: CheckpointSnapshot) -> None:

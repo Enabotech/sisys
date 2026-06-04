@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
 
+from src.domain.exceptions import ValidationError
 from src.domain.value_objects.flow_status import FlowStatus
 
 if TYPE_CHECKING:
@@ -63,9 +64,9 @@ class OrchestrationService:
             ValueError: task 参数无效或未知 task_type
         """
         if not task.flow_name:
-            raise ValueError("flow_name 不能为空")
+            raise ValidationError(message="flow_name 不能为空")
         if not task.parameters and task.task_type == "data_pipeline":
-            raise ValueError("data_pipeline 任务必须提供 parameters")
+            raise ValidationError(message="data_pipeline 任务必须提供 parameters")
 
         if task.task_type == "data_pipeline":
             flow_run_id = await self._workflow_engine.submit_flow(task.flow_name, task.parameters)
@@ -78,7 +79,7 @@ class OrchestrationService:
         if task.task_type == "agent_reasoning":
             graph_name = task.parameters.get("graph_name")
             if not graph_name:
-                raise ValueError("agent_reasoning 任务必须在 parameters 中提供 graph_name")
+                raise ValidationError(message="agent_reasoning 任务必须在 parameters 中提供 graph_name")
             graph_run_id = await self._agent_engine.submit_graph(graph_name, task.parameters)
             status = await self._agent_engine.get_graph_status(graph_run_id)
             return WorkflowResult(
@@ -86,4 +87,4 @@ class OrchestrationService:
                 status=status,
                 submitted_at=datetime.now(timezone.utc),
             )
-        raise ValueError(f"未知的 task_type: {task.task_type}")
+        raise ValidationError(message=f"未知的 task_type: {task.task_type}")

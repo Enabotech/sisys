@@ -92,6 +92,64 @@ class InvalidStateTransitionError(InvalidStateError):
             )
 
 
+class EntityValidationError(ValidationError):
+    """实体不变量验证失败.
+
+    用于实体 validate() 方法和 __post_init__() 中的构造器守卫。
+    携带具体的字段名和实体类型上下文。
+
+    Attributes:
+        code: 错误码 EXCEPTION_242
+        message: 默认消息
+    """
+
+    code = "EXCEPTION_242"
+    message = "Entity validation failed"
+
+
+class EntityStateTransitionError(InvalidStateTransitionError):
+    """实体状态转换守卫失败.
+
+    用于实体状态机方法（start/complete/fail/restart/wait/recover 等）。
+    携带 from_status、to_status 和实体类型上下文。
+
+    继承自 InvalidStateTransitionError（EXCEPTION_208），
+    保持与 Outbox 状态机异常的一致性。
+
+    Attributes:
+        code: 错误码 EXCEPTION_243
+        message: 默认消息
+    """
+
+    code = "EXCEPTION_243"
+    message = "Entity state transition failed"
+
+    def __init__(
+        self,
+        from_status: str,
+        to_status: str,
+        message: str | None = None,
+    ) -> None:
+        self.from_status = from_status
+        self.to_status = to_status
+        super().__init__(from_status, to_status, message)
+
+
+class EntityBusinessRuleError(BusinessRuleViolationError):
+    """实体业务规则违反.
+
+    用于实体内部跨字段约束验证（如 total_tokens = prompt + completion）。
+    携带违反的具体规则和实体上下文。
+
+    Attributes:
+        code: 错误码 EXCEPTION_244
+        message: 默认消息
+    """
+
+    code = "EXCEPTION_244"
+    message = "Entity business rule violation"
+
+
 __all__ = [
     "BusinessException",
     "ValidationError",
@@ -102,4 +160,7 @@ __all__ = [
     "InvalidStateError",
     "BusinessRuleViolationError",
     "InvalidStateTransitionError",
+    "EntityValidationError",
+    "EntityStateTransitionError",
+    "EntityBusinessRuleError",
 ]

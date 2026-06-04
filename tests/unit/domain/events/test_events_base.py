@@ -6,6 +6,7 @@ from datetime import datetime
 import pytest
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import EntityValidationError
 
 
 class TestDomainEventCreation:
@@ -111,7 +112,7 @@ class TestDomainEventSerialization:
             event_type="TestEvent",
             payload={"bad_key": set()},  # set is not JSON serializable
         )
-        with pytest.raises(ValueError, match="not JSON serializable"):
+        with pytest.raises(EntityValidationError, match="not JSON serializable"):
             event.to_dict()
 
     def test_payload_json_serializable_passes(self):
@@ -126,22 +127,22 @@ class TestDomainEventSerialization:
 
     def test_from_dict_missing_event_id_raises(self):
         """Missing event_id raises ValueError."""
-        with pytest.raises(ValueError, match="Missing required field: event_id"):
+        with pytest.raises(EntityValidationError, match="Missing required field: event_id"):
             DomainEvent.from_dict({"event_type": "Test", "timestamp": "2026-01-01T00:00:00+00:00"})
 
     def test_from_dict_missing_event_type_raises(self):
         """Missing event_type raises ValueError."""
-        with pytest.raises(ValueError, match="Missing required field: event_type"):
+        with pytest.raises(EntityValidationError, match="Missing required field: event_type"):
             DomainEvent.from_dict({"event_id": str(uuid.uuid4()), "timestamp": "2026-01-01T00:00:00+00:00"})
 
     def test_from_dict_missing_timestamp_raises(self):
         """Missing timestamp raises ValueError."""
-        with pytest.raises(ValueError, match="Missing required field: timestamp"):
+        with pytest.raises(EntityValidationError, match="Missing required field: timestamp"):
             DomainEvent.from_dict({"event_id": str(uuid.uuid4()), "event_type": "Test"})
 
     def test_from_dict_invalid_uuid_raises(self):
         """Invalid UUID raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid event_id"):
+        with pytest.raises(EntityValidationError, match="Invalid event_id"):
             DomainEvent.from_dict(
                 {
                     "event_id": "not-a-uuid",
@@ -152,7 +153,7 @@ class TestDomainEventSerialization:
 
     def test_from_dict_invalid_timestamp_raises(self):
         """Invalid timestamp raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid timestamp"):
+        with pytest.raises(EntityValidationError, match="Invalid timestamp"):
             DomainEvent.from_dict(
                 {
                     "event_id": str(uuid.uuid4()),
@@ -167,12 +168,12 @@ class TestDomainEventSerialization:
             aggregate_id=uuid.uuid4(),
             event_type="",
         )
-        with pytest.raises(ValueError, match="event_type must not be empty"):
+        with pytest.raises(EntityValidationError, match="event_type must not be empty"):
             event.to_dict()
 
     def test_from_dict_invalid_event_id_raises(self):
         """P0-01 Fix: Invalid event_id raises ValueError with context."""
-        with pytest.raises(ValueError, match="Invalid event_id"):
+        with pytest.raises(EntityValidationError, match="Invalid event_id"):
             DomainEvent.from_dict(
                 {
                     "event_id": "not-a-uuid",
@@ -184,7 +185,7 @@ class TestDomainEventSerialization:
 
     def test_from_dict_invalid_aggregate_id_raises(self):
         """P0-01 Fix: Invalid aggregate_id raises ValueError with context."""
-        with pytest.raises(ValueError, match="Invalid aggregate_id"):
+        with pytest.raises(EntityValidationError, match="Invalid aggregate_id"):
             DomainEvent.from_dict(
                 {
                     "event_id": str(uuid.uuid4()),

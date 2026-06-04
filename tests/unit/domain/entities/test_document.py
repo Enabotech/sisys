@@ -8,6 +8,7 @@ from src.domain.entities.document import (
     Document,
     ParseStatus,
 )
+from src.domain.exceptions import EntityValidationError
 
 
 def _make_doc(**kwargs) -> Document:
@@ -48,20 +49,20 @@ class TestDocumentValidation:
     def test_empty_filename_fails(self):
         """Document with empty filename fails validation."""
         doc = _make_doc(filename="")
-        with pytest.raises(ValueError, match="filename must not be empty"):
+        with pytest.raises(EntityValidationError, match="filename must not be empty"):
             doc.validate()
 
     def test_negative_file_size_fails(self):
         """Document with negative file size fails validation."""
         doc = _make_doc(file_size_bytes=-1)
-        with pytest.raises(ValueError, match="file_size_bytes must be non-negative"):
+        with pytest.raises(EntityValidationError, match="file_size_bytes must be non-negative"):
             doc.validate()
 
     def test_zero_version_fails(self):
         """Document with version < 1 fails validation."""
         doc = _make_doc()
         doc.version = 0
-        with pytest.raises(ValueError, match="version must be >= 1"):
+        with pytest.raises(EntityValidationError, match="version must be >= 1"):
             doc.validate()
 
     def test_metadata_validation_passes(self):
@@ -72,7 +73,7 @@ class TestDocumentValidation:
     def test_metadata_validation_fails(self):
         """Document missing required metadata fails."""
         doc = _make_doc(metadata={"author": "test"})
-        with pytest.raises(ValueError, match="Missing required metadata"):
+        with pytest.raises(EntityValidationError, match="Missing required metadata"):
             doc.validate_metadata(["author", "source"])
 
 
@@ -111,13 +112,13 @@ class TestDocumentEmbeddingValidation:
     def test_nan_embedding_fails(self):
         """Document with NaN in embedding fails validation."""
         doc = _make_doc(embedding=[0.1, float("nan"), 0.3])
-        with pytest.raises(ValueError, match="contains NaN"):
+        with pytest.raises(EntityValidationError, match="contains NaN"):
             doc.validate()
 
     def test_inf_embedding_fails(self):
         """Document with Inf in embedding fails validation."""
         doc = _make_doc(embedding=[0.1, float("inf"), 0.3])
-        with pytest.raises(ValueError, match="contains NaN"):
+        with pytest.raises(EntityValidationError, match="contains NaN"):
             doc.validate()
 
     def test_none_embedding_passes(self):

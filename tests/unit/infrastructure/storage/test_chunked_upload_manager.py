@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from src.domain.exceptions import ConflictError, NotFoundError
 from src.domain.value_objects.upload_limits import CHUNKED_UPLOAD_TTL, MEDIUM_PART_SIZE
 from src.infrastructure.storage.redis.chunked_upload_manager import (
     _CHUNKED_UPLOAD_PREFIX,
@@ -188,7 +189,7 @@ class TestChunkedUploadManagerUploadPart:
         manager = ChunkedUploadManager(cache)
         cache.get = AsyncMock(return_value=None)
 
-        with pytest.raises(ValueError, match="不存在"):
+        with pytest.raises(NotFoundError, match="不存在或已过期"):
             await manager.upload_part("bad-id", 1, "etag")
 
     async def test_upload_part_duplicate_raises(self) -> None:
@@ -199,7 +200,7 @@ class TestChunkedUploadManagerUploadPart:
         state_json = _make_state_json(uploaded_parts=[{"part_number": 1, "etag": "etag-001"}])
         cache.get = AsyncMock(return_value=state_json)
 
-        with pytest.raises(ValueError, match="乱序"):
+        with pytest.raises(ConflictError, match="分片乱序"):
             await manager.upload_part("abc123", 1, "etag-001-again")
 
     async def test_upload_part_persists_updated_state(self) -> None:
@@ -227,7 +228,7 @@ class TestChunkedUploadManagerUploadPart:
         state_json = _make_state_json(uploaded_parts=[{"part_number": 1, "etag": "etag-001"}])
         cache.get = AsyncMock(return_value=state_json)
 
-        with pytest.raises(ValueError, match="乱序"):
+        with pytest.raises(ConflictError, match="分片乱序"):
             await manager.upload_part("abc123", 3, "etag-003")
 
     async def test_upload_part_sequential_order_accepted(self) -> None:
@@ -276,7 +277,7 @@ class TestChunkedUploadManagerCompleteUpload:
         manager = ChunkedUploadManager(cache)
         cache.get = AsyncMock(return_value=None)
 
-        with pytest.raises(ValueError, match="不存在"):
+        with pytest.raises(NotFoundError, match="不存在或已过期"):
             await manager.complete_upload("bad-id")
 
 

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from src.domain.exceptions import InvalidStateTransitionError, ValidationError
 from src.domain.ports.saga_status import SagaStatus
 
 
@@ -35,12 +36,14 @@ class SagaContext:
     def __post_init__(self) -> None:
         """验证初始数据"""
         if not self.saga_type:
-            raise ValueError("saga_type 不能为空")
+            raise ValidationError(message="saga_type 不能为空")
 
     def update_status(self, new_status: SagaStatus) -> SagaContext:
         """更新状态，返回新的 SagaContext 实例"""
         if not self.status.can_transition_to(new_status):
-            raise ValueError(f"非法状态转换: {self.status} → {new_status}")
+            raise InvalidStateTransitionError(
+                from_status=self.status, to_status=new_status, message=f"非法状态转换: {self.status} → {new_status}"
+            )
         return SagaContext(
             saga_id=self.saga_id,
             saga_type=self.saga_type,
@@ -141,7 +144,7 @@ class SagaContext:
         required_fields = ["saga_id", "saga_type", "status", "created_at", "updated_at"]
         for field_name in required_fields:
             if field_name not in data:
-                raise ValueError(f"from_dict 缺少必要字段: {field_name}")
+                raise ValidationError(message=f"from_dict 缺少必要字段: {field_name}")
 
         return cls(
             saga_id=uuid.UUID(data["saga_id"]),

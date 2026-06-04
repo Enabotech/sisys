@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.config.langgraph import LangGraphConfig
 
 
@@ -87,7 +88,7 @@ class TestLangGraphConfigEmptyEnv:
     @patch.dict(os.environ, {"LANGGRAPH_RETRY_MAX_ATTEMPTS": "abc"})
     def test_from_env_invalid_int_raises_value_error(self) -> None:
         """非数字字符串应抛出包含键名的 ValueError"""
-        with pytest.raises(ValueError, match="LANGGRAPH_RETRY_MAX_ATTEMPTS"):
+        with pytest.raises(ConfigurationError, match="LANGGRAPH_RETRY_MAX_ATTEMPTS"):
             LangGraphConfig.from_env()
 
     @patch.dict(os.environ, {"LANGGRAPH_API_URL": ""})

@@ -11,6 +11,7 @@ import uuid
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import ChannelResult, PublishResult
+from src.domain.exceptions import ValidationError
 from src.domain.ports.event_publisher import EventPublisher
 from src.infrastructure.messaging.inmemory_event_listener import InMemoryEventListener
 
@@ -46,7 +47,7 @@ class InMemoryEventBus(EventPublisher):
             PublishResult: 发布结果
         """
         if event is None:
-            raise ValueError("event must not be None")
+            raise ValidationError(message="event must not be None")
 
         async with self._lock:
             if event.event_id in self.processed_event_ids:

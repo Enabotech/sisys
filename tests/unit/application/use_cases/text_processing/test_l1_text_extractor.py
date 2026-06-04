@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 
 from src.application.use_cases.text_processing.l1_text_extractor import L1ExtractionResult, L1TextExtractor
+from src.domain.exceptions import ValidationError
 
 
 class TestL1TextExtractorPatterns:
@@ -77,19 +78,19 @@ class TestL1TextExtractorEdgeCases:
     def test_empty_input_raises(self):
         """验证空输入抛出异常"""
         extractor = L1TextExtractor()
-        with pytest.raises(ValueError, match="输入不能为空"):
+        with pytest.raises(ValidationError, match="输入不能为空"):
             extractor.extract("")
 
     def test_whitespace_only_raises(self):
         """验证空白输入抛出异常"""
         extractor = L1TextExtractor()
-        with pytest.raises(ValueError, match="输入不能为空"):
+        with pytest.raises(ValidationError, match="输入不能为空"):
             extractor.extract("   ")
 
     def test_unsupported_pattern_raises(self):
         """验证不支持的模式抛出异常"""
         extractor = L1TextExtractor()
-        with pytest.raises(ValueError, match="无法识别输入模式"):
+        with pytest.raises(ValidationError, match="无法识别输入模式"):
             extractor.extract("hello world")
 
 

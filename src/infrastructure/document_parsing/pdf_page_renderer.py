@@ -8,6 +8,8 @@ from __future__ import annotations
 import io
 import logging
 
+from src.domain.exceptions import ValidationError
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,7 +64,7 @@ class PdfPageRenderer:
             # pypdfium2 页码为 0-indexed
             page_idx = page_number - 1
             if page_idx < 0 or page_idx >= len(pdf):
-                raise ValueError(f"页码超出范围: {page_number}（总页数: {len(pdf)}）")
+                raise ValidationError(message=f"页码超出范围: {page_number}（总页数: {len(pdf)}）")
 
             page = pdf[page_idx]
             bitmap = page.render(scale=self._dpi / 72)

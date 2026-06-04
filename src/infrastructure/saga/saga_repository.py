@@ -12,6 +12,7 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.exceptions import NotFoundError
 from src.domain.ports.saga import SagaRepositoryProtocol
 from src.domain.ports.saga_context import SagaContext
 from src.infrastructure.saga.saga_context import SagaContext as ConcreteSagaContext
@@ -113,7 +114,7 @@ class PostgreSQLSagaRepository(SagaRepositoryProtocol):
             {"saga_id": str(saga_id)},
         )
         if existing.scalar_one_or_none() is None:
-            raise ValueError(f"update_status 未找到 saga_id={saga_id} 的 Saga 实例")
+            raise NotFoundError(message=f"update_status 未找到 saga_id={saga_id} 的 Saga 实例")
 
         await self._session.execute(
             text("UPDATE saga_instance SET status = :status, updated_at = :updated_at WHERE saga_id = :saga_id"),

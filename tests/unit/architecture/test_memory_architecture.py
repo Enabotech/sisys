@@ -11,6 +11,7 @@ import pytest
 
 from src.application.use_cases.text_processing.l1_compressor import L1Compressor
 from src.application.use_cases.text_processing.l1_text_extractor import L1TextExtractor
+from src.domain.exceptions import ValidationError
 from src.domain.ports.memory_repository import (
     L2ChangeHistoryRepositoryPort,
     L2MetadataRepositoryPort,
@@ -65,7 +66,7 @@ class TestL1L3Separation:
 
         # 超过 500 字应该抛出异常
         large_content = "记住，以后用 bun 而不是 npm，" * 100  # 约 600+ 字
-        with pytest.raises(ValueError, match="内容超过限制"):
+        with pytest.raises(ValidationError, match="内容超过限制"):
             compressor.compress(large_content)
 
     def test_l1_text_extractor_no_persistent_note_dependency(self):

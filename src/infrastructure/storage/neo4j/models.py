@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 
+from src.domain.exceptions import ValidationError
+
 
 class RelationshipType(StrEnum):
     """Neo4j 关系类型枚举
@@ -49,14 +51,14 @@ class GraphNode:
             ValueError: ID 为空、labels 为空或缺少必需属性时抛出
         """
         if not self.id or not self.id.strip():
-            raise ValueError("Node id must be a non-empty string")
+            raise ValidationError(message="Node id must be a non-empty string")
         if not self.labels:
-            raise ValueError("Node must have at least one label")
+            raise ValidationError(message="Node must have at least one label")
         # 验证 properties 包含必需字段
         required_props = {"business_domain", "entity_type", "content_hash"}
         missing = required_props - set(self.properties.keys())
         if missing:
-            raise ValueError(f"Node properties must include: {missing}")
+            raise ValidationError(message=f"Node properties must include: {missing}")
 
 
 @dataclass
@@ -86,8 +88,8 @@ class GraphRelationship:
             ValueError: 起始/结束节点 ID 为空或关系类型未指定时抛出
         """
         if not self.start_node_id or not self.start_node_id.strip():
-            raise ValueError("start_node_id must be a non-empty string")
+            raise ValidationError(message="start_node_id must be a non-empty string")
         if not self.end_node_id or not self.end_node_id.strip():
-            raise ValueError("end_node_id must be a non-empty string")
+            raise ValidationError(message="end_node_id must be a non-empty string")
         if not self.relationship_type:
-            raise ValueError("relationship_type must be specified")
+            raise ValidationError(message="relationship_type must be specified")

@@ -25,6 +25,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import EntityValidationError
 
 
 class AuditActionType(str, Enum):
@@ -104,13 +105,26 @@ class AuditEvent(DomainEvent):
     correction_level: int | None = None
 
     def __post_init__(self) -> None:
-        """初始化后验证必填字段"""
+        """初始化后验证必填字段
+
+        Raises:
+            EntityValidationError: 必填字段缺失或格式错误时抛出
+        """
         if not self.actor:
-            raise ValueError("actor is required for AuditEvent")
+            raise EntityValidationError(
+                message="actor is required for AuditEvent",
+                context={"entity": "AuditEvent", "field": "actor"},
+            )
         if not self.action_type:
-            raise ValueError("action_type is required for AuditEvent")
+            raise EntityValidationError(
+                message="action_type is required for AuditEvent",
+                context={"entity": "AuditEvent", "field": "action_type"},
+            )
         if self.correction_level is not None and not (0 <= self.correction_level <= 3):
-            raise ValueError("correction_level must be 0-3 or None")
+            raise EntityValidationError(
+                message="correction_level must be 0-3 or None",
+                context={"entity": "AuditEvent", "field": "correction_level", "constraint": "range(0, 3)"},
+            )
 
     def to_audit_dict(self) -> dict[str, Any]:
         """序列化为审计专用字典格式

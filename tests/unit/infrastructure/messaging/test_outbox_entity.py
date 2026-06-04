@@ -10,6 +10,7 @@ import pytest
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
 from src.infrastructure.messaging.outbox.outbox import InvalidStateTransitionError, OutboxEntity
 
@@ -173,7 +174,7 @@ class TestEventOutboxAdapter:
         entity.event_type = "UnknownEvent"
         entity.payload = {}
 
-        with pytest.raises(ValueError, match="Unknown event_type"):
+        with pytest.raises(ConfigurationError, match="Unknown event_type"):
             EventOutboxAdapter.to_domain_event(entity)
 
     def test_registry_manual_register(self) -> None:

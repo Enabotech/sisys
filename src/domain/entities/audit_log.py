@@ -12,6 +12,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from src.domain.exceptions import EntityValidationError
+
 
 @dataclass(frozen=True)
 class AuditLog:
@@ -35,11 +37,21 @@ class AuditLog:
     created_at: datetime | None = None
 
     def __post_init__(self) -> None:
-        """Validate required fields after initialization."""
+        """Validate required fields after initialization.
+
+        Raises:
+            EntityValidationError: If required fields are missing.
+        """
         if not self.actor:
-            raise ValueError("actor is required for AuditLog")
+            raise EntityValidationError(
+                message="actor is required for AuditLog",
+                context={"entity": "AuditLog", "field": "actor"},
+            )
         if not self.action_type:
-            raise ValueError("action_type is required for AuditLog")
+            raise EntityValidationError(
+                message="action_type is required for AuditLog",
+                context={"entity": "AuditLog", "field": "action_type"},
+            )
 
     @classmethod
     def create(

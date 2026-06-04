@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.config.udmr import CloudModelConfig, UDMRConfig
 
 # ===================================================================
@@ -139,19 +140,19 @@ class TestUDMRConfig:
     def test_from_env_invalid_timeout_raises(self) -> None:
         """无效 UDMR_LLM_TIMEOUT 应抛异常."""
         with patch.dict(os.environ, {"UDMR_LLM_TIMEOUT": "abc"}, clear=True):
-            with pytest.raises(ValueError, match="UDMR_LLM_TIMEOUT"):
+            with pytest.raises(ConfigurationError, match="UDMR_LLM_TIMEOUT"):
                 UDMRConfig.from_env()
 
     def test_from_env_zero_timeout_raises(self) -> None:
         """零超时应抛异常."""
         with patch.dict(os.environ, {"UDMR_LLM_TIMEOUT": "0"}, clear=True):
-            with pytest.raises(ValueError, match="UDMR_LLM_TIMEOUT"):
+            with pytest.raises(ConfigurationError, match="UDMR_LLM_TIMEOUT"):
                 UDMRConfig.from_env()
 
     def test_from_env_negative_timeout_raises(self) -> None:
         """负超时应抛异常."""
         with patch.dict(os.environ, {"UDMR_LLM_TIMEOUT": "-1"}, clear=True):
-            with pytest.raises(ValueError, match="UDMR_LLM_TIMEOUT"):
+            with pytest.raises(ConfigurationError, match="UDMR_LLM_TIMEOUT"):
                 UDMRConfig.from_env()
 
     def test_from_env_custom_healthcheck(self) -> None:
@@ -163,13 +164,13 @@ class TestUDMRConfig:
     def test_from_env_invalid_healthcheck_raises(self) -> None:
         """无效健康检查间隔应抛异常."""
         with patch.dict(os.environ, {"UDMR_HEALTHCHECK_INTERVAL": "abc"}, clear=True):
-            with pytest.raises(ValueError, match="UDMR_HEALTHCHECK_INTERVAL"):
+            with pytest.raises(ConfigurationError, match="UDMR_HEALTHCHECK_INTERVAL"):
                 UDMRConfig.from_env()
 
     def test_from_env_zero_healthcheck_raises(self) -> None:
         """零健康检查间隔应抛异常."""
         with patch.dict(os.environ, {"UDMR_HEALTHCHECK_INTERVAL": "0"}, clear=True):
-            with pytest.raises(ValueError, match="UDMR_HEALTHCHECK_INTERVAL"):
+            with pytest.raises(ConfigurationError, match="UDMR_HEALTHCHECK_INTERVAL"):
                 UDMRConfig.from_env()
 
     def test_from_env_single_cloud_model(self) -> None:
@@ -224,7 +225,7 @@ class TestUDMRConfig:
             "UDMR_CLOUD_0_MODEL": "MiniMax-M2.7",
         }
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="MAX_TOKENS"):
+            with pytest.raises(ConfigurationError, match="MAX_TOKENS"):
                 UDMRConfig.from_env()
 
     def test_from_env_openai_without_max_tokens_ok(self) -> None:
@@ -251,7 +252,7 @@ class TestUDMRConfig:
             "UDMR_CLOUD_0_MODEL": "test-model",
         }
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="API_TYPE"):
+            with pytest.raises(ConfigurationError, match="API_TYPE"):
                 UDMRConfig.from_env()
 
     def test_from_env_skip_disabled_cloud(self) -> None:
@@ -355,7 +356,7 @@ class TestCloudModelConfigPricing:
             "UDMR_CLOUD_0_PRICE_INPUT": "-0.01",
         }
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="PRICE_INPUT"):
+            with pytest.raises(ConfigurationError, match="PRICE_INPUT"):
                 UDMRConfig.from_env()
 
     def test_pricing_output_negative_raises(self) -> None:
@@ -368,7 +369,7 @@ class TestCloudModelConfigPricing:
             "UDMR_CLOUD_0_PRICE_OUTPUT": "-0.01",
         }
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="PRICE_OUTPUT"):
+            with pytest.raises(ConfigurationError, match="PRICE_OUTPUT"):
                 UDMRConfig.from_env()
 
 
@@ -390,7 +391,7 @@ class TestCloudModelConfigParseErrors:
             "UDMR_CLOUD_0_MAX_TOKENS": "not_a_number",
         }
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="MAX_TOKENS.*not_a_number"):
+            with pytest.raises(ConfigurationError, match="MAX_TOKENS.*not_a_number"):
                 UDMRConfig.from_env()
 
     def test_invalid_temperature_raises(self) -> None:
@@ -404,7 +405,7 @@ class TestCloudModelConfigParseErrors:
             "UDMR_CLOUD_0_TEMPERATURE": "hot",
         }
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="TEMPERATURE.*hot"):
+            with pytest.raises(ConfigurationError, match="TEMPERATURE.*hot"):
                 UDMRConfig.from_env()
 
     def test_invalid_price_input_raises(self) -> None:
@@ -417,7 +418,7 @@ class TestCloudModelConfigParseErrors:
             "UDMR_CLOUD_0_PRICE_INPUT": "free",
         }
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="PRICE_INPUT.*free"):
+            with pytest.raises(ConfigurationError, match="PRICE_INPUT.*free"):
                 UDMRConfig.from_env()
 
     def test_invalid_price_output_raises(self) -> None:
@@ -430,5 +431,5 @@ class TestCloudModelConfigParseErrors:
             "UDMR_CLOUD_0_PRICE_OUTPUT": "$0.02",
         }
         with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="PRICE_OUTPUT"):
+            with pytest.raises(ConfigurationError, match="PRICE_OUTPUT"):
                 UDMRConfig.from_env()

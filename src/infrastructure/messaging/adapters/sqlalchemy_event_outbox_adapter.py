@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.storage.postgresql.models import OutboxModel
 
 
@@ -49,6 +50,6 @@ class SQLAlchemyEventOutboxAdapter:
         """
         # 使用 DomainEvent._registry 验证 event_type（单一真实来源）
         if model.event_type not in DomainEvent._registry:
-            raise ValueError(f"Unknown event_type: {model.event_type}")
+            raise ConfigurationError(message=f"Unknown event_type: {model.event_type}")
         # 使用 DomainEvent.from_dict 正确处理 event_type
         return DomainEvent.from_dict(model.payload)

@@ -9,6 +9,8 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from src.domain.exceptions import EntityValidationError
+
 
 @dataclass
 class MemoryMetadata:
@@ -32,10 +34,17 @@ class MemoryMetadata:
     deleted_at: datetime | None = None  # 软删除标记
 
     def __post_init__(self) -> None:
-        """验证类型字段"""
+        """验证类型字段
+
+        Raises:
+            EntityValidationError: 类型不在允许值集合中时抛出
+        """
         valid_types = {"user", "feedback", "project", "reference"}
         if self.type not in valid_types:
-            raise ValueError(f"type must be one of {valid_types}, got '{self.type}'")
+            raise EntityValidationError(
+                message=f"type must be one of {valid_types}, got '{self.type}'",
+                context={"entity": "MemoryMetadata", "field": "type", "valid_types": sorted(valid_types)},
+            )
 
     def bump_version(self) -> None:
         """递增版本号（乐观锁）"""

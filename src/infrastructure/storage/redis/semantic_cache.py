@@ -14,6 +14,7 @@ import struct
 
 import redis.asyncio as aioredis
 
+from src.domain.exceptions import ValidationError
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.utils import json_dumps, json_loads
@@ -34,7 +35,7 @@ def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
         Cosine similarity (-1.0 to 1.0), 0.0 for empty/zero vectors.
     """
     if len(vec1) != len(vec2):
-        raise ValueError(f"Vector dimensions must match: {len(vec1)} != {len(vec2)}")
+        raise ValidationError(message=f"Vector dimensions must match: {len(vec1)} != {len(vec2)}")
     if not vec1:
         return 0.0
 

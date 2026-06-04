@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.config.minio import MinIOConfig
 
 
@@ -109,5 +110,5 @@ class TestMinIOConfigFromEnv:
     def test_from_env_invalid_timeout(self):
         """无效超时值应抛出异常"""
         with patch.dict(os.environ, {"MINIO_CONNECT_TIMEOUT": "not-a-number"}):
-            with pytest.raises(ValueError, match="MINIO_CONNECT_TIMEOUT"):
+            with pytest.raises(ConfigurationError, match="MINIO_CONNECT_TIMEOUT"):
                 MinIOConfig.from_env()

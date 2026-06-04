@@ -7,6 +7,7 @@ from typing import cast
 import pytest
 
 from src.domain.entities.strategic_plan import BLMPhase, PlanStatus, StrategicPlan
+from src.domain.exceptions import EntityBusinessRuleError, EntityStateTransitionError, EntityValidationError
 
 
 def _make_plan(**kwargs) -> StrategicPlan:
@@ -53,20 +54,20 @@ class TestStrategicPlanValidation:
     def test_plan_with_empty_name_fails(self):
         """Plan with empty name fails validation."""
         plan = _make_plan(name="")
-        with pytest.raises(ValueError, match="name must not be empty"):
+        with pytest.raises(EntityValidationError, match="name must not be empty"):
             plan.validate()
 
     def test_plan_with_whitespace_name_fails(self):
         """Plan with whitespace-only name fails validation."""
         plan = _make_plan(name="   ")
-        with pytest.raises(ValueError, match="name must not be empty"):
+        with pytest.raises(EntityValidationError, match="name must not be empty"):
             plan.validate()
 
     def test_plan_with_invalid_id_fails(self):
         """Plan with non-UUID id fails validation."""
         plan = _make_plan()
         object.__setattr__(plan, "plan_id", cast(uuid.UUID, "not-a-uuid"))
-        with pytest.raises(ValueError, match="plan_id must be a valid UUID"):
+        with pytest.raises(EntityValidationError, match="plan_id must be a valid UUID"):
             plan.validate()
 
     def test_plan_timestamps_valid(self):
@@ -74,7 +75,7 @@ class TestStrategicPlanValidation:
         plan = _make_plan()
         object.__setattr__(plan, "created_at", datetime.now(UTC) + timedelta(days=1))
         object.__setattr__(plan, "updated_at", datetime.now(UTC))
-        with pytest.raises(ValueError, match="created_at must be before"):
+        with pytest.raises(EntityBusinessRuleError, match="created_at must be before"):
             plan.validate()
 
 
@@ -92,25 +93,25 @@ class TestStrategicPlanPhaseTransition:
         """Cannot advance to an earlier phase."""
         plan = _make_plan()
         plan.advance_phase(BLMPhase.MARKET_INSIGHT)
-        with pytest.raises(ValueError, match="Can only advance"):
+        with pytest.raises(EntityStateTransitionError, match="Can only advance"):
             plan.advance_phase(BLMPhase.STRATEGIC_INTENT)
 
     def test_cannot_skip_phases(self):
         """P0-02 Fix: Cannot skip intermediate phases."""
         plan = _make_plan()
-        with pytest.raises(ValueError, match="immediately next phase"):
+        with pytest.raises(EntityStateTransitionError, match="immediately next phase"):
             plan.advance_phase(BLMPhase.EXECUTION_MONITORING)
 
     def test_cannot_advance_archived_plan(self):
         """P0-03 Fix: Cannot advance archived plan."""
         plan = _make_plan(status=PlanStatus.ARCHIVED)
-        with pytest.raises(ValueError, match="Cannot advance phase"):
+        with pytest.raises(EntityStateTransitionError, match="Cannot advance phase"):
             plan.advance_phase(BLMPhase.MARKET_INSIGHT)
 
     def test_cannot_advance_approved_plan(self):
         """P0-03 Fix: Cannot advance approved plan."""
         plan = _make_plan(status=PlanStatus.APPROVED)
-        with pytest.raises(ValueError, match="Cannot advance phase"):
+        with pytest.raises(EntityStateTransitionError, match="Cannot advance phase"):
             plan.advance_phase(BLMPhase.MARKET_INSIGHT)
 
     def test_complete_current_phase(self):
@@ -141,7 +142,7 @@ class TestStrategicPlanPhaseTransition:
             plan.advance_phase(phase)
         assert plan.current_phase == BLMPhase.EXECUTION_MONITORING
         # Now attempting to advance again should fail with clear message
-        with pytest.raises(ValueError, match="has reached the final phase"):
+        with pytest.raises(EntityStateTransitionError, match="has reached the final phase"):
             plan.advance_phase(BLMPhase.EXECUTION_MONITORING)
 
     def test_completed_phases_consistency_validation(self):
@@ -151,7 +152,7 @@ class TestStrategicPlanPhaseTransition:
         assert BLMPhase.STRATEGIC_INTENT in plan.completed_phases
         # Corrupt the state by adding current_phase to completed_phases
         plan.completed_phases.append(BLMPhase.MARKET_INSIGHT)
-        with pytest.raises(ValueError, match="current_phase must not be in completed_phases"):
+        with pytest.raises(EntityBusinessRuleError, match="current_phase must not be in completed_phases"):
             plan.validate()
 
     def test_completed_phases_no_duplicates(self):
@@ -176,17 +177,17 @@ class TestStrategicPlanPhaseTransition:
             BLMPhase.EXECUTION_MONITORING,
         ]:
             plan.advance_phase(phase)
-        with pytest.raises(ValueError, match="has reached the final phase"):
+        with pytest.raises(EntityStateTransitionError, match="has reached the final phase"):
             plan.complete_phase()
 
     def test_cannot_complete_archived_plan(self):
         """Re-review Fix: complete_phase() has status guard."""
         plan = _make_plan(status=PlanStatus.ARCHIVED)
-        with pytest.raises(ValueError, match="Cannot complete phase"):
+        with pytest.raises(EntityStateTransitionError, match="Cannot complete phase"):
             plan.complete_phase()
 
     def test_cannot_complete_approved_plan(self):
         """Re-review Fix: complete_phase() has status guard."""
         plan = _make_plan(status=PlanStatus.APPROVED)
-        with pytest.raises(ValueError, match="Cannot complete phase"):
+        with pytest.raises(EntityStateTransitionError, match="Cannot complete phase"):
             plan.complete_phase()

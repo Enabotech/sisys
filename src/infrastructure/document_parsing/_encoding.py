@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from src.domain.exceptions import ValidationError
+
 
 def detect_and_decode(raw_bytes: bytes) -> tuple[str, str]:
     """编码自动检测
@@ -26,4 +28,4 @@ def detect_and_decode(raw_bytes: bytes) -> tuple[str, str]:
             return raw_bytes.decode(encoding), encoding
         except (UnicodeDecodeError, LookupError):
             continue
-    raise ValueError("无法识别文件编码：尝试了 UTF-8/GBK/GB18030 均失败，请确保文件为上述编码格式")
+    raise ValidationError(message="无法识别文件编码：尝试了 UTF-8/GBK/GB18030 均失败，请确保文件为上述编码格式")

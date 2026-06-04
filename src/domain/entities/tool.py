@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 
+from src.domain.exceptions import EntityValidationError
+
 
 class ToolStatus(str, Enum):
     """工具生命周期状态枚举"""
@@ -58,14 +60,26 @@ class Tool:
             所有不变量满足时返回 True
 
         Raises:
-            ValueError: 任何不变量违反时抛出
+            EntityValidationError: 任何不变量违反时抛出
         """
         if not isinstance(self.tool_id, uuid.UUID):
-            raise ValueError("tool_id must be a valid UUID")
+            raise EntityValidationError(
+                message="tool_id must be a valid UUID",
+                context={"entity": "Tool", "field": "tool_id"},
+            )
         if not self.name or not self.name.strip():
-            raise ValueError("name must not be empty")
+            raise EntityValidationError(
+                message="name must not be empty",
+                context={"entity": "Tool", "field": "name"},
+            )
         if not isinstance(self.input_schema, dict):
-            raise ValueError("input_schema must be a dict")
+            raise EntityValidationError(
+                message="input_schema must be a dict",
+                context={"entity": "Tool", "field": "input_schema"},
+            )
         if not isinstance(self.output_schema, dict):
-            raise ValueError("output_schema must be a dict")
+            raise EntityValidationError(
+                message="output_schema must be a dict",
+                context={"entity": "Tool", "field": "output_schema"},
+            )
         return True

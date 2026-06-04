@@ -11,6 +11,7 @@ import json
 import uuid
 from typing import Any
 
+from src.domain.exceptions import ConflictError, NotFoundError
 from src.domain.ports.l1_cache import L1CachePort
 from src.domain.value_objects.upload_limits import CHUNKED_UPLOAD_TTL, get_chunk_size
 
@@ -149,12 +150,12 @@ class ChunkedUploadManager:
         async with lock:
             state = await self._get_state(upload_id)
             if state is None:
-                raise ValueError(f"upload_id {upload_id} 不存在或已过期")
+                raise NotFoundError(message=f"upload_id {upload_id} 不存在或已过期")
 
             # 校验分片顺序：下一个分片编号必须是已上传分片数 + 1
             expected_next = len(state.uploaded_parts) + 1
             if part_number != expected_next:
-                raise ValueError(f"分片乱序：期望第 {expected_next} 个分片，实际收到第 {part_number} 个")
+                raise ConflictError(message=f"分片乱序：期望第 {expected_next} 个分片，实际收到第 {part_number} 个")
 
             state.uploaded_parts.append({"part_number": part_number, "etag": etag})
             await self._cache.set(
@@ -179,7 +180,7 @@ class ChunkedUploadManager:
         """
         state = await self._get_state(upload_id)
         if state is None:
-            raise ValueError(f"upload_id {upload_id} 不存在或已过期")
+            raise NotFoundError(message=f"upload_id {upload_id} 不存在或已过期")
 
         await self._cache.delete(self._redis_key(upload_id))
         return state

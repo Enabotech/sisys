@@ -10,6 +10,8 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from src.domain.exceptions import EntityBusinessRuleError, EntityValidationError
+
 
 @dataclass(frozen=True)
 class RoutingDecisionLog:
@@ -64,44 +66,90 @@ class RoutingDecisionLog:
         """验证不变量约束
 
         Raises:
-            ValueError: 任何不变量违反时抛出
+            EntityValidationError: 不变量验证失败时抛出
+            EntityBusinessRuleError: 业务规则违反时抛出
         """
         if not isinstance(self.log_id, uuid.UUID):
-            raise ValueError("log_id must be a valid UUID")
+            raise EntityValidationError(
+                message="log_id must be a valid UUID",
+                context={"entity": "RoutingDecisionLog", "field": "log_id"},
+            )
         if not self.task_id or not self.task_id.strip():
-            raise ValueError("task_id must not be empty")
+            raise EntityValidationError(
+                message="task_id must not be empty",
+                context={"entity": "RoutingDecisionLog", "field": "task_id"},
+            )
         if not self.session_id or not self.session_id.strip():
-            raise ValueError("session_id must not be empty")
+            raise EntityValidationError(
+                message="session_id must not be empty",
+                context={"entity": "RoutingDecisionLog", "field": "session_id"},
+            )
         if self.route_type not in ("hash", "semantic", "mixed", "local", "cloud"):
-            raise ValueError(f"route_type must be one of: hash, semantic, mixed, local, cloud. Got: {self.route_type}")
+            raise EntityValidationError(
+                message=f"route_type must be one of: hash, semantic, mixed, local, cloud. Got: {self.route_type}",
+                context={
+                    "entity": "RoutingDecisionLog",
+                    "field": "route_type",
+                    "valid_values": ["hash", "semantic", "mixed", "local", "cloud"],
+                },
+            )
         if not (0.0 <= self.route_score <= 1.0):
-            raise ValueError(f"route_score must be between 0.0 and 1.0. Got: {self.route_score}")
+            raise EntityValidationError(
+                message=f"route_score must be between 0.0 and 1.0. Got: {self.route_score}",
+                context={"entity": "RoutingDecisionLog", "field": "route_score", "constraint": "range(0.0, 1.0)"},
+            )
         if self.cost_estimate < 0:
-            raise ValueError(f"cost_estimate must be non-negative. Got: {self.cost_estimate}")
+            raise EntityValidationError(
+                message=f"cost_estimate must be non-negative. Got: {self.cost_estimate}",
+                context={"entity": "RoutingDecisionLog", "field": "cost_estimate"},
+            )
         if self.cost_actual < 0:
-            raise ValueError(f"cost_actual must be non-negative. Got: {self.cost_actual}")
+            raise EntityValidationError(
+                message=f"cost_actual must be non-negative. Got: {self.cost_actual}",
+                context={"entity": "RoutingDecisionLog", "field": "cost_actual"},
+            )
         if self.latency_ms < 0:
-            raise ValueError(f"latency_ms must be non-negative. Got: {self.latency_ms}")
+            raise EntityValidationError(
+                message=f"latency_ms must be non-negative. Got: {self.latency_ms}",
+                context={"entity": "RoutingDecisionLog", "field": "latency_ms"},
+            )
         if self.fallback_reason is not None and self.fallback_reason not in (
             "timeout",
             "unavailable",
             "health_check_failed",
         ):
-            raise ValueError(
-                f"fallback_reason must be one of: timeout, unavailable, health_check_failed. Got: {self.fallback_reason}"
+            raise EntityValidationError(
+                message=(
+                    f"fallback_reason must be one of: timeout, unavailable, health_check_failed. Got: {self.fallback_reason}"
+                ),
+                context={
+                    "entity": "RoutingDecisionLog",
+                    "field": "fallback_reason",
+                    "valid_values": ["timeout", "unavailable", "health_check_failed"],
+                },
             )
         # Token fields validation (Story 1.19)
         if self.prompt_tokens < 0:
-            raise ValueError(f"prompt_tokens must be non-negative. Got: {self.prompt_tokens}")
+            raise EntityValidationError(
+                message=f"prompt_tokens must be non-negative. Got: {self.prompt_tokens}",
+                context={"entity": "RoutingDecisionLog", "field": "prompt_tokens"},
+            )
         if self.completion_tokens < 0:
-            raise ValueError(f"completion_tokens must be non-negative. Got: {self.completion_tokens}")
+            raise EntityValidationError(
+                message=f"completion_tokens must be non-negative. Got: {self.completion_tokens}",
+                context={"entity": "RoutingDecisionLog", "field": "completion_tokens"},
+            )
         if self.total_tokens < 0:
-            raise ValueError(f"total_tokens must be non-negative. Got: {self.total_tokens}")
+            raise EntityValidationError(
+                message=f"total_tokens must be non-negative. Got: {self.total_tokens}",
+                context={"entity": "RoutingDecisionLog", "field": "total_tokens"},
+            )
         # 不变量约束：total_tokens 必须等于 prompt + completion（非零时）
         if self.total_tokens > 0 and self.prompt_tokens + self.completion_tokens > 0:
             expected = self.prompt_tokens + self.completion_tokens
             if self.total_tokens != expected:
-                raise ValueError(
-                    f"total_tokens must equal prompt_tokens + completion_tokens. "
-                    f"Got: total={self.total_tokens}, expected={expected}"
+                raise EntityBusinessRuleError(
+                    message=f"total_tokens must equal prompt_tokens + completion_tokens. "
+                    f"Got: total={self.total_tokens}, expected={expected}",
+                    context={"entity": "RoutingDecisionLog", "rule": "token_sum_invariant"},
                 )
