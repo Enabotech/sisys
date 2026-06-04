@@ -114,7 +114,6 @@
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](./sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md)。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 
@@ -201,7 +200,6 @@
 #### 测试隔离约束（必须遵守）
 
 > ⚠️ **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
-> 参考 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md) §5.5 测试隔离约束。
 
 **约束规则：**
 
@@ -356,7 +354,6 @@
 - [ ] Subtask 2.8: 🟢 绿 — 实现语义路由缓存逻辑
 - [ ] Subtask 2.9: 🔄 重构 — 验证缓存失效策略
 
-> **测试隔离约束：** SemanticRouter 缓存测试使用 `pytest-mock` 或 `fakeredis` 模拟 Redis，遵循 sdd-tdd-checklist.md 外部服务隔离规则
 
 **完成标准/Definition of Done:**
 - [ ] SemanticRouter 实现完成（bge-m3 语义嵌入 + 余弦相似度）
@@ -636,7 +633,6 @@ sisys/
 | **架构原则** | 六边形架构，领域层零依赖 | architecture.md §3.1 |
 | **系统公理一** | trigger→route→execute 自主调用循环 | architecture.md §3.2 |
 | **事件驱动** | 事务发件箱模式，事件处理幂等性 | architecture.md §3.3 |
-| **测试覆盖率** | 架构层≥85%，集成测试≥75% | sdd-tdd-checklist.md §5 |
 | **路由性能** | 路由决策延迟 P95<50ms | epics_v1.0.md Story 1.14b |
 
 ### 关键路径依赖
@@ -715,7 +711,6 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 | 文档 | 说明 |
 |------|------|
 | [SDD+TDD 融合开发模式指南](./sdd-tdd-fusion-guide.md) | 开发模式详细说明与各层测试模板 |
-| [SDD+TDD 实施检查清单](./sdd-tdd-checklist.md) | 实施步骤检查 |
 | [or.md 系统公理一](../planning-artifacts/or.md) | 系统公理定义 |
 | [Story 1.14a: 自主调用循环 - trigger](./1-14a-autonomous-invocation-trigger.md) | 前置 Story |
 | Story 1.14c: 自主调用循环 - execute | 后续 Story（待创建） |

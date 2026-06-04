@@ -11,7 +11,6 @@ source_documents:
   - architecture.md (架构设计文档)
   - interface-design.md (接口设计规范)
   - story-template.md (故事模板)
-  - sdd-tdd-checklist.md (SDD+TDD 融合模式检查清单)
   - epics_v1.0.md (Epic 和用户故事分解)
   - sprint-status.yaml (Sprint 状态追踪)
 ---
@@ -712,7 +711,6 @@ bandit -r src/                           # 安全扫描
 | UX 设计规格 | `_bmad-output/planning-artifacts/ux-design-specification.md` |
 | Epic 分解 | `_bmad-output/planning-artifacts/epics_v1.0.md` |
 | Sprint 状态 | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
-| SDD+TDD 检查清单 | `docs/developer/sdd-tdd-checklist.md` |
 
 ---
 
@@ -1091,5 +1089,4 @@ await redis.set(f"processed_event:{event_id}", "1", ex=7*24*3600)
 **维护者：** Agimtech
 **更新频率：** 每个 Epic 完成后复审更新
 **更新记录：**
-- v1.0.0: 初始版本，基于 or.md/prd.md/ux-design-specification.md/architecture.md/sdd-tdd-checklist.md/sprint-status.yaml/epics_v1.0.md
 - v1.1.0: 新增 interface-design.md 整合 - 接口分层架构、CLI 命令结构、Skills 三级加载、四层映射架构、SAP 协议、REST API 端点、事件监听适配器、安全分层、监控指标

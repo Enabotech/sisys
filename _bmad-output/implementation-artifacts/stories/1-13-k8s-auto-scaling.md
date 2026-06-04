@@ -134,7 +134,6 @@
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](./sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md)。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 
@@ -640,7 +639,6 @@ sisys/
 | **架构原则** | 六边形架构，领域层零依赖 | architecture.md §3.1 |
 | **事件驱动** | 事务发件箱模式，事件处理幂等性 | architecture.md §3.3 |
 | **CLI+Skills** | CLI 是 LLM 母语，Skills 渐进式披露 | architecture.md §3.4 |
-| **测试覆盖率** | 整体≥80%，基础设施层≥75% | sdd-tdd-checklist.md §5 |
 | **K8s 部署** | K3S v1.34.5，ArgoCD 持续部署 | project-context.md §2.7 |
 
 ### 关键路径依赖
@@ -718,7 +716,6 @@ Story 0.4 (K3S 集群) → Story 1.13 (K8s 扩缩容)
 | 文档 | 说明 |
 |------|------|
 | [SDD+TDD 融合开发模式指南](./sdd-tdd-fusion-guide.md) | 开发模式详细说明与各层测试模板 |
-| [SDD+TDD 实施检查清单](./sdd-tdd-checklist.md) | 实施步骤检查 |
 | [K8s HPA 官方文档](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/) | HPA 配置参考 |
 | [Prometheus 指标类型](https://prometheus.io/docs/concepts/metric_types/) | Counter/Gauge/Histogram/Summary |
 | [prometheus_client 库](https://github.com/prometheus/client_python) | Python Prometheus 客户端 |

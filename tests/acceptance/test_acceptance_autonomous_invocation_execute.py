@@ -9,7 +9,7 @@ Prerequisites:
     - Redis service running at localhost:6379 (or set REDIS_HOST, REDIS_PORT)
     - Docker service available for sandbox (or will use mock mode)
 
-Test Isolation (per sdd-tdd-checklist.md §5.5):
+Test Isolation:
     - Uses unique session IDs with UUID suffix for isolation
     - Redis keys use UUID prefix for isolation
     - Sandbox uses session-scoped state with cleanup

@@ -229,7 +229,6 @@ DualChannelEventBus → Outbox/RabbitMQ
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 `docs/developer/sdd-tdd-checklist.md` 和 `docs/developer/sdd-tdd-fusion-guide.md`（项目全局文档）。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 

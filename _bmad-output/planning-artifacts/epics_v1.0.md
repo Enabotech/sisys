@@ -734,7 +734,6 @@ So that **系统可以处理企业现有各类文档**。
    - [ ] `tests/integration/test_integration_document_upload.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 用户已登录并具有上传权限
 **When** 拖拽或选择文件上传（支持批量，总大小≤20GB）
@@ -775,7 +774,6 @@ So that **MVP 核心格式支持，非结构化文档转化为结构化知识资
    - [ ] `tests/integration/test_integration_document_parse.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档已上传完成（PDF/Word/TXT 格式）
 **When** 系统执行文档解析
@@ -820,7 +818,6 @@ So that **支持 17 种格式完整解析，企业现有各类文档都可处理
    - [ ] `tests/integration/test_document_parse_extended_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档已上传完成（PPT/PPTX/XLS/XLSX/CSV/JPEG/PNG/GIF/HTML 等扩展格式）
 **When** 系统执行文档解析
@@ -866,7 +863,6 @@ So that **支持高保真溯源至原始文档坐标点**。
    - [ ] `tests/integration/test_document_layout_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档解析完成
 **When** 记录文档元素坐标信息
@@ -909,7 +905,6 @@ So that **财务数据不失真，支持后续分析**。
    - [ ] `tests/integration/test_table_extraction_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档包含表格（xls/xlsx/csv/PDF 表格）
 **When** 系统执行表格解析
@@ -952,7 +947,6 @@ So that **历史纸质文档和扫描件可被系统处理**。
    - [ ] `tests/integration/test_ocr_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 上传的文档是扫描件或图像 PDF
 **When** 系统执行 OCR 解析
@@ -995,7 +989,6 @@ So that **支持版本追溯和回滚**。
    - [ ] `tests/integration/test_document_version_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档已存在于系统
 **When** 用户上传新版本或修改文档
@@ -1034,7 +1027,6 @@ So that **确保文档元数据完整性和可追溯性**。
    - [ ] `tests/integration/test_metadata_validation_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档解析完成准备入库
 **When** 系统校验元数据
@@ -1076,7 +1068,6 @@ So that **检索结果更符合语义完整性**。
    - [ ] `tests/integration/test_semantic_chunking_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档解析完成
 **When** 系统执行语义分块

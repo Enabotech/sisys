@@ -390,7 +390,6 @@ development_status:
 #     - Optional: 23
 #
 # Next Steps:
-#   1. Follow SDD+TDD mode for all stories: docs/developer/sdd-tdd-checklist.md
 #   2. Option A: Complete Epic 0 Iteration 1 remaining stories (0-17/18/30)
 #   3. Option B: Start Epic 2 — create story file for 2-1-document-upload-17-formats
 # =============================================================================

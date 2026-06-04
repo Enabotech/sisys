@@ -239,7 +239,6 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](./sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md)。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 
@@ -1004,7 +1003,6 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 文档 | 说明 |
 |------|------|
 | [SDD+TDD 融合开发模式指南](./sdd-tdd-fusion-guide.md) | 开发模式详细说明与各层测试模板 |
-| [SDD+TDD 实施检查清单](./sdd-tdd-checklist.md) | 实施步骤检查 |
 | [ADR-002 双核引擎架构](../../_bmad-output/planning-artifacts/architecture.md) | architecture.md §3.2 |
 | [事件总线设计文档](../../docs/architecture/sisys-event-bus-design.md) | 双通道事件总线详细设计 |
 | [Story 1.17: UDMR 基础路由](./1-17-udmr-basic-routing.md) | 前一个 Story |

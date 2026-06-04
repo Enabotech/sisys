@@ -117,7 +117,6 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 ```
 
 **相关文档：**
-- `docs/developer/sdd-tdd-checklist.md` - 实施检查清单
 - `docs/developer/sdd-tdd-fusion-guide.md` - 融合模式指南
 
 ## Dev Notes

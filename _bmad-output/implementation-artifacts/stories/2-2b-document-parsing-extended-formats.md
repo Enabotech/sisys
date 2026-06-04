@@ -149,7 +149,6 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](../../../docs/developer/sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](../../../docs/developer/sdd-tdd-checklist.md)。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 

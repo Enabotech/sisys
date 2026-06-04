@@ -122,7 +122,6 @@
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](./sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md)。
 
 ### 测试隔离约束
 
@@ -759,7 +758,6 @@ AutoTriggerService (监听)
 | **架构原则** | 六边形架构，领域层零依赖 | architecture.md §3.1 |
 | **系统公理一** | trigger→route→execute 自主调用循环 | architecture.md §3.2 |
 | **事件驱动** | 事务发件箱模式，事件处理幂等性 | architecture.md §3.3 |
-| **测试覆盖率** | 架构层≥85%，集成测试≥75% | sdd-tdd-checklist.md §5 |
 | **触发器性能** | 触发延迟 P95<10ms | epics_v1.0.md Story 1.14a |
 
 ### 关键路径依赖
@@ -841,7 +839,6 @@ Story 1.2 (领域事件定义) → Story 1.3 (事件总线实现) → Story 1.14
 | 文档 | 说明 |
 |------|------|
 | [SDD+TDD 融合开发模式指南](./sdd-tdd-fusion-guide.md) | 开发模式详细说明与各层测试模板 |
-| [SDD+TDD 实施检查清单](./sdd-tdd-checklist.md) | 实施步骤检查 |
 | [or.md 系统公理一](../planning-artifacts/or.md) | 系统公理定义 |
 | [Story 1.14b: 自主调用循环 - route](./1-14b-autonomous-invocation-route.md) | 后续 Story（待创建） |
 | [Story 1.14c: 自主调用循环 - execute](./1-14c-autonomous-invocation-execute.md) | 后续 Story（待创建） |
