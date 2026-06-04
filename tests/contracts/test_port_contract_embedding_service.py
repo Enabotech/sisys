@@ -25,7 +25,7 @@ class TestEmbeddingServicePortContract:
 
     PORT_NAME = "embedding_service"
     IMPL_CLS_NAME = "EmbeddingAPIClient"
-    REQUIRED_METHODS = ["encode_text", "encode_texts", "encode_sparse"]
+    REQUIRED_METHODS = ["encode_text", "encode_texts", "encode_sparse", "close"]
     REQUIRED_PROPERTIES = ["dimension"]
 
     def test_port_is_registered(self, registry: PortRegistry) -> None:

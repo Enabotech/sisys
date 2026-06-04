@@ -155,7 +155,7 @@ def load_model() -> None:
         app.state.load_error = str(e)
         # 不抛出异常，让服务继续运行（healthcheck 会反映状态）
     except Exception as e:
-        logger.error("模型加载失败 (未预期异常): %s", type(e).__name__, e)
+        logger.exception("模型加载失败 (未预期异常: %s)", type(e).__name__)
         app.state.load_error = str(e)
 
 
