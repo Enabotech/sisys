@@ -13,6 +13,7 @@ from typing import Any, cast
 
 import httpx
 
+from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.infrastructure.config.embedding import EmbeddingConfig
 
 logger = logging.getLogger(__name__)
@@ -26,10 +27,10 @@ class EmbeddingServiceError(RuntimeError):
     """
 
 
-class EmbeddingAPIClient:
+class EmbeddingAPIClient(EmbeddingServicePort):
     """BGE-M3 嵌入 API 客户端
 
-    实现 EmbeddingServicePort，通过 HTTP POST /v1/embeddings 调用独立 API 服务。
+    通过 HTTP POST /v1/embeddings 调用独立 API 服务，实现 EmbeddingServicePort 协议。
     方法签名使用同步 def，内部使用 httpx.Client（同步），
     调用方通过 asyncio.to_thread 包装以避免阻塞事件循环。
     """

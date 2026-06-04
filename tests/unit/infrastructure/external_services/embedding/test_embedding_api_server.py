@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -32,15 +33,27 @@ def mock_model() -> MagicMock:
 
 
 @pytest.fixture
-def client(mock_model: MagicMock) -> TestClient:
+def client(mock_model: MagicMock) -> Generator[TestClient, None, None]:
     """创建 TestClient 并注入 mock 模型"""
     from src.infrastructure.external_services.embedding.embedding_api_server import app
 
+    # 保存旧状态以便测试后恢复，避免全局状态泄漏
+    old_state = {
+        "model": getattr(app.state, "model", None),
+        "model_name": getattr(app.state, "model_name", None),
+        "device": getattr(app.state, "device", None),
+        "load_error": getattr(app.state, "load_error", None),
+    }
     app.state.model = mock_model
     app.state.model_name = "BAAI/bge-m3"
     app.state.device = "cpu"
     app.state.load_error = None
-    return TestClient(app)
+    yield TestClient(app)
+    # 恢复旧状态
+    app.state.model = old_state["model"]
+    app.state.model_name = old_state["model_name"]
+    app.state.device = old_state["device"]
+    app.state.load_error = old_state["load_error"]
 
 
 class TestEmbeddingAPIHealthCheck:
@@ -125,15 +138,27 @@ class TestEmbeddingAPIValidation:
 
 
 @pytest.fixture
-def client_no_model() -> TestClient:
+def client_no_model() -> Generator[TestClient, None, None]:
     """创建 TestClient，模型未加载（模拟启动失败场景）"""
     from src.infrastructure.external_services.embedding.embedding_api_server import app
 
+    # 保存旧状态以便测试后恢复
+    old_state = {
+        "model": getattr(app.state, "model", None),
+        "model_name": getattr(app.state, "model_name", None),
+        "device": getattr(app.state, "device", None),
+        "load_error": getattr(app.state, "load_error", None),
+    }
     app.state.model = None
     app.state.model_name = "BAAI/bge-m3"
     app.state.device = "cpu"
     app.state.load_error = "Model download failed"
-    return TestClient(app)
+    yield TestClient(app)
+    # 恢复旧状态
+    app.state.model = old_state["model"]
+    app.state.model_name = old_state["model_name"]
+    app.state.device = old_state["device"]
+    app.state.load_error = old_state["load_error"]
 
 
 class TestEmbeddingAPI503Unavailable:
