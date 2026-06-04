@@ -47,6 +47,6 @@ class EmbeddingConfig:
         if timeout <= 0:
             raise ValueError(f"EMBEDDING_API_TIMEOUT 必须为正数，当前值: {timeout}")
         return cls(
-            api_url=api_url or "http://embedding-api:8000",
+            api_url=api_url,
             api_timeout=timeout,
         )
