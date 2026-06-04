@@ -137,7 +137,7 @@ class BatchExportConfig:
         """验证配置合法性
 
         Raises:
-            ValueError: 配置不合法时抛出
+            ConfigurationError: 配置不合法时抛出
         """
         if self.max_queue_size <= 0:
             raise ConfigurationError(message=f"max_queue_size must be positive, got {self.max_queue_size}")

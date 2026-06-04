@@ -144,7 +144,7 @@ def _validate_rel_type(rel_type: str) -> None:
         rel_type: 关系类型字符串
 
     Raises:
-        ValueError: 关系类型不符合命名规范时抛出
+        ValidationError: 关系类型不符合命名规范时抛出
     """
     if not _REL_TYPE_RE.match(rel_type):
         raise ValidationError(message=f"Invalid relationship type: {rel_type!r}. Must match [A-Za-z_][A-Za-z0-9_]*")

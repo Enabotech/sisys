@@ -75,7 +75,7 @@ class PortRegistry:
             spec: 待注册的端口规格
 
         Raises:
-            ValueError: 端口名称已存在且规格不同时抛出
+            ConflictError: 端口名称已存在且规格不同时抛出
         """
         if spec.name in self._ports:
             existing = self._ports[spec.name]

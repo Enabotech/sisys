@@ -65,7 +65,7 @@ class EmbeddingServicePort(Protocol):
             经 L2 归一化的 1024 维浮点向量
 
         Raises:
-            ValueError: 文本为空时
+            ValidationError: 文本为空时
         """
         ...
 
@@ -82,7 +82,7 @@ class EmbeddingServicePort(Protocol):
             浮点向量列表（每项经 L2 归一化，1024 维）
 
         Raises:
-            ValueError: 列表中包含空文本时
+            ValidationError: 列表中包含空文本时
         """
         ...
 
@@ -100,7 +100,7 @@ class EmbeddingServicePort(Protocol):
             SparseEmbedding 列表（每项含 indices 和 values）
 
         Raises:
-            ValueError: 列表中包含空文本时
+            ValidationError: 列表中包含空文本时
         """
         ...
 

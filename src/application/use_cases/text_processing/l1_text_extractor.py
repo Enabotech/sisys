@@ -68,7 +68,7 @@ class L1TextExtractor(TextExtractorService):
             L1ExtractionResult，包含提取后的内容、操作类型和匹配模式
 
         Raises:
-            ValueError: 如果输入无法提取
+            ValidationError: 如果输入无法提取
         """
         if not user_input or not user_input.strip():
             raise ValidationError(message="输入不能为空")

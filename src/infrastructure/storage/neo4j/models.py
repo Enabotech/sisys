@@ -48,7 +48,7 @@ class GraphNode:
         """验证节点数据是否有效
 
         Raises:
-            ValueError: ID 为空、labels 为空或缺少必需属性时抛出
+            ValidationError: ID 为空、labels 为空或缺少必需属性时抛出
         """
         if not self.id or not self.id.strip():
             raise ValidationError(message="Node id must be a non-empty string")
@@ -85,7 +85,7 @@ class GraphRelationship:
         """验证关系数据是否有效
 
         Raises:
-            ValueError: 起始/结束节点 ID 为空或关系类型未指定时抛出
+            ValidationError: 起始/结束节点 ID 为空或关系类型未指定时抛出
         """
         if not self.start_node_id or not self.start_node_id.strip():
             raise ValidationError(message="start_node_id must be a non-empty string")

@@ -139,7 +139,7 @@ class SagaContext:
             反序列化后的 SagaContext 实例
 
         Raises:
-            ValueError: 缺少必要字段时抛出
+            ValidationError: 缺少必要字段时抛出
         """
         required_fields = ["saga_id", "saga_type", "status", "created_at", "updated_at"]
         for field_name in required_fields:

@@ -52,7 +52,7 @@ class PrefectEngine:
             flow_run_id 字符串
 
         Raises:
-            ValueError: flow_name 为空或格式无效
+            ValidationError: flow_name 为空或格式无效
             RuntimeError: Prefect server 连接或 API 调用失败
         """
         if not flow_name or "/" not in flow_name:
@@ -89,7 +89,7 @@ class PrefectEngine:
             FlowStatus 枚举值
 
         Raises:
-            ValueError: flow_run_id 不是有效的 UUID 格式
+            ValidationError: flow_run_id 不是有效的 UUID 格式
             RuntimeError: Prefect server 连接或 API 调用失败
         """
         try:

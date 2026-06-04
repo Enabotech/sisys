@@ -46,7 +46,7 @@ class QdrantConfig:
             QdrantConfig 实例
 
         Raises:
-            ValueError: 当环境变量值无法解析为正确类型时
+            ConfigurationError: 当环境变量值无法解析为正确类型时
         """
         https_env = os.getenv("QDRANT_HTTPS", "false").lower()
 

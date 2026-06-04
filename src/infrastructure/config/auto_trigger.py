@@ -38,7 +38,7 @@ class AutoTriggerConfig:
             AutoTriggerConfig 实例
 
         Raises:
-            ValueError: 环境变量值不合法时抛出
+            ConfigurationError: 环境变量值不合法时抛出
         """
         enabled_str = os.getenv("TRIGGER_ENABLED", "true").lower()
         interval_str = os.getenv("HEARTBEAT_INTERVAL_SECONDS", "60")

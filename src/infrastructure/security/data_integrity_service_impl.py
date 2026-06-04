@@ -50,7 +50,7 @@ class DataIntegrityServiceImpl(DataIntegrityServicePort):
             十六进制编码的校验和字符串（小写）
 
         Raises:
-            ValueError: 不支持的算法
+            ConfigurationError: 不支持的算法
         """
         hash_func = _ALGORITHMS.get(algorithm)
         if hash_func is None:

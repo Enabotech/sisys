@@ -160,7 +160,7 @@ class PostgreSQLManager(ConnectionManager):
             AsyncSession 实例
 
         Raises:
-            ValueError: 隔离级别不支持
+            ConfigurationError: 隔离级别不支持
         """
         if isolation_level.upper() not in _ISOLATION_LEVELS:
             raise ConfigurationError(

@@ -50,7 +50,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             config: 嵌入模型配置，需设置 api_url 字段
 
         Raises:
-            ValueError: api_url 为空时
+            ValidationError: api_url 为空时
         """
         if config is None:
             config = EmbeddingConfig()
@@ -102,7 +102,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             经 L2 归一化的 1024 维浮点向量
 
         Raises:
-            ValueError: 文本为空时
+            ValidationError: 文本为空时
         """
         if not text or not text.strip():
             raise ValidationError(message="文本不能为空")
@@ -122,7 +122,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             浮点向量列表
 
         Raises:
-            ValueError: 列表中包含空文本时
+            ValidationError: 列表中包含空文本时
         """
         if not texts:
             return []
@@ -144,7 +144,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             SparseEmbedding 列表
 
         Raises:
-            ValueError: 列表中包含空文本时
+            ValidationError: 列表中包含空文本时
         """
         if not texts:
             return []

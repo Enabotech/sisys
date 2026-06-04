@@ -46,7 +46,7 @@ class RedisCleanup:
             删除的键数量
 
         Raises:
-            ValueError: namespace 为空时抛出
+            ValidationError: namespace 为空时抛出
         """
         if not namespace:
             raise ValidationError(message="namespace cannot be empty")

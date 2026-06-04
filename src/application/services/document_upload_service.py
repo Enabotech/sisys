@@ -100,7 +100,7 @@ class DocumentUploadService:
             持久化后的 Document 实体
 
         Raises:
-            ValueError: 格式不支持、文件大小超限、文件名非法等
+            ValidationError: 格式不支持、文件大小超限、文件名非法等
         """
         self._validate_upload(filename, mime_type, file_size_bytes)
 
@@ -159,7 +159,7 @@ class DocumentUploadService:
             批量结果汇总
 
         Raises:
-            ValueError: 空批量请求、总大小超限
+            ValidationError: 空批量请求、总大小超限
         """
         if not files:
             raise ValidationError(message="空批量请求，至少需要一个文件")
@@ -251,7 +251,7 @@ class DocumentUploadService:
             持久化后的 Document 实体
 
         Raises:
-            ValueError: 格式校验失败
+            ValidationError: 格式校验失败
         """
         self._validate_upload(filename, mime_type, file_size_bytes)
 

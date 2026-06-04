@@ -61,7 +61,7 @@ class OrchestrationService:
             工作流执行结果
 
         Raises:
-            ValueError: task 参数无效或未知 task_type
+            ValidationError: task 参数无效或未知 task_type
         """
         if not task.flow_name:
             raise ValidationError(message="flow_name 不能为空")

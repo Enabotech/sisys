@@ -115,7 +115,7 @@ class L1Compressor(CompressorService):
             L1CompressionResult，包含压缩后内容和统计信息
 
         Raises:
-            ValueError: 如果内容超过限制
+            ValidationError: 如果内容超过限制
         """
         if not content:
             return L1CompressionResult(

@@ -40,7 +40,7 @@ class AutoRouteConfig:
             AutoRouteConfig 实例
 
         Raises:
-            ValueError: 环境变量值不合法时抛出
+            ConfigurationError: 环境变量值不合法时抛出
         """
         enabled_str = os.getenv("ROUTE_ENABLED", "true").lower()
         route_type_str = os.getenv("ROUTE_TYPE", "mixed").lower()

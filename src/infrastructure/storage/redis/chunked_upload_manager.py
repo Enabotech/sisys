@@ -144,7 +144,7 @@ class ChunkedUploadManager:
             {"uploaded_parts": int}
 
         Raises:
-            ValueError: upload_id 不存在、分片乱序、或分片重复
+            NotFoundError: upload_id 不存在、分片乱序、或分片重复
         """
         lock = self._get_lock(upload_id)
         async with lock:
@@ -176,7 +176,7 @@ class ChunkedUploadManager:
             ChunkedUploadState 完整状态
 
         Raises:
-            ValueError: upload_id 不存在
+            NotFoundError: upload_id 不存在
         """
         state = await self._get_state(upload_id)
         if state is None:

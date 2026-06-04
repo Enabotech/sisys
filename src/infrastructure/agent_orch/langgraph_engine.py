@@ -60,7 +60,7 @@ class LangGraphEngine:
             graph_run_id: 状态图运行标识符
 
         Raises:
-            ValueError: graph_name 为空或 parameters 为空
+            ValidationError: graph_name 为空或 parameters 为空
             RuntimeError: LangGraph SDK 调用失败
         """
         if not graph_name:
@@ -99,7 +99,7 @@ class LangGraphEngine:
             FlowStatus 枚举值
 
         Raises:
-            ValueError: graph_run_id 为空
+            ValidationError: graph_run_id 为空
         """
         if not graph_run_id:
             raise ValidationError(message="graph_run_id 不能为空")
