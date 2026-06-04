@@ -90,6 +90,34 @@ class TestDenseSearchServiceBasic:
         with pytest.raises(ValueError, match="查询文本不能为空"):
             await service.search("test_collection", "   ")
 
+    @pytest.mark.asyncio
+    async def test_search_raises_on_empty_collection(self) -> None:
+        """空 collection 名称应抛出 ValueError"""
+        service, _, _ = _make_search_service()
+        with pytest.raises(ValueError, match="Collection 名称不能为空"):
+            await service.search("", "查询文本")
+
+    @pytest.mark.asyncio
+    async def test_search_raises_on_whitespace_collection(self) -> None:
+        """纯空白 collection 名称应抛出 ValueError"""
+        service, _, _ = _make_search_service()
+        with pytest.raises(ValueError, match="Collection 名称不能为空"):
+            await service.search("   ", "查询文本")
+
+    @pytest.mark.asyncio
+    async def test_search_raises_on_zero_limit(self) -> None:
+        """limit=0 应抛出 ValueError"""
+        service, _, _ = _make_search_service()
+        with pytest.raises(ValueError, match="limit 必须为正整数"):
+            await service.search("test_collection", "查询文本", limit=0)
+
+    @pytest.mark.asyncio
+    async def test_search_raises_on_negative_limit(self) -> None:
+        """负数 limit 应抛出 ValueError"""
+        service, _, _ = _make_search_service()
+        with pytest.raises(ValueError, match="limit 必须为正整数"):
+            await service.search("test_collection", "查询文本", limit=-1)
+
 
 class TestDenseSearchServiceTenantFilter:
     """tenant_id 自动注入到 filter_payload"""
@@ -177,3 +205,22 @@ class TestDenseSearchServiceTenantFilter:
         filter_payload = call_args[1]["filter_payload"]
         assert "tenant_id" not in filter_payload
         assert filter_payload["business_domain"] == "finance"
+
+    @pytest.mark.asyncio
+    async def test_empty_tenant_id_filtered_out(self) -> None:
+        """空字符串 tenant_id 不应注入到 filter"""
+        service, _, vector_storage = _make_search_service()
+        await service.search("test_collection", "查询文本", tenant_id="")
+        call_args = vector_storage.search.call_args
+        filter_payload = call_args[1]["filter_payload"]
+        # 空字符串 tenant_id 应被过滤，filter_payload 为 None
+        assert filter_payload is None
+
+    @pytest.mark.asyncio
+    async def test_whitespace_tenant_id_filtered_out(self) -> None:
+        """纯空白 tenant_id 不应注入到 filter"""
+        service, _, vector_storage = _make_search_service()
+        await service.search("test_collection", "查询文本", tenant_id="   ")
+        call_args = vector_storage.search.call_args
+        filter_payload = call_args[1]["filter_payload"]
+        assert filter_payload is None

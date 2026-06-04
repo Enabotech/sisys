@@ -73,3 +73,11 @@ class EmbeddingServicePort(Protocol):
             ValueError: 文本为空时
         """
         ...
+
+    def close(self) -> None:
+        """释放嵌入服务持有的资源
+
+        关闭 HTTP 连接池或其他网络资源。调用后实例不可再使用。
+        由 Composition Root 的 shutdown() 在应用退出时调用。
+        """
+        ...

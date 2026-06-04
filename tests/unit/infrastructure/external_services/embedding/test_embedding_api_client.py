@@ -117,6 +117,22 @@ class TestEmbeddingAPIClientEncodeDense:
             assert result == []
             mock_post.assert_not_called()
 
+    def test_encode_texts_mixed_invalid_raises(self, api_config: EmbeddingConfig) -> None:
+        """批量中包含空文本时抛出 ValueError"""
+        with patch("httpx.Client.post") as mock_post:
+            client = EmbeddingAPIClient(api_config)
+            with pytest.raises(ValueError, match="文本列表"):
+                client.encode_texts(["有效文本", "", "另一个有效文本"])
+            mock_post.assert_not_called()
+
+    def test_encode_texts_whitespace_item_raises(self, api_config: EmbeddingConfig) -> None:
+        """批量中包含纯空白项时抛出 ValueError"""
+        with patch("httpx.Client.post") as mock_post:
+            client = EmbeddingAPIClient(api_config)
+            with pytest.raises(ValueError, match="文本列表"):
+                client.encode_texts(["有效文本", "   "])
+            mock_post.assert_not_called()
+
 
 class TestEmbeddingAPIClientEncodeSparse:
     """EmbeddingAPIClient Sparse 编码"""
@@ -196,4 +212,36 @@ class TestEmbeddingAPIClientErrorHandling:
         with patch("httpx.Client.post", return_value=mock_resp):
             client = EmbeddingAPIClient(api_config)
             with pytest.raises(httpx.HTTPStatusError):
+                client.encode_text("测试文本")
+
+    def test_timeout_wraps_to_embedding_service_error(self, api_config: EmbeddingConfig) -> None:
+        """httpx.TimeoutException 包装为 EmbeddingServiceError"""
+        from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingServiceError
+
+        with patch("httpx.Client.post", side_effect=httpx.TimeoutException("timeout")):
+            client = EmbeddingAPIClient(api_config)
+            with pytest.raises(EmbeddingServiceError, match="超时"):
+                client.encode_text("测试文本")
+
+    def test_network_error_wraps_to_embedding_service_error(self, api_config: EmbeddingConfig) -> None:
+        """httpx.NetworkError 包装为 EmbeddingServiceError"""
+        from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingServiceError
+
+        with patch("httpx.Client.post", side_effect=httpx.NetworkError("connection refused")):
+            client = EmbeddingAPIClient(api_config)
+            with pytest.raises(EmbeddingServiceError, match="网络错误"):
+                client.encode_text("测试文本")
+
+    def test_invalid_json_wraps_to_embedding_service_error(self, api_config: EmbeddingConfig) -> None:
+        """响应 JSON 解析失败包装为 EmbeddingServiceError"""
+        from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingServiceError
+
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.side_effect = ValueError("Invalid JSON")
+
+        with patch("httpx.Client.post", return_value=mock_resp):
+            client = EmbeddingAPIClient(api_config)
+            with pytest.raises(EmbeddingServiceError, match="响应格式异常"):
                 client.encode_text("测试文本")
