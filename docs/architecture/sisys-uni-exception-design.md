@@ -1084,18 +1084,63 @@ register_port(
 
 ### 3.12 异常注册检查清单
 
-新增异常类时必须完成以下步骤：
+新增异常类时必须按三阶段依次完成。每阶段包含强制项（🔴）和建议项（🟡）。
 
-1. ☐ 在 `src/domain/exceptions/` 适当模块中定义类
-2. ☐ 继承正确的基类（SystemException / BusinessException / ExternalException）
-3. ☐ 分配唯一编码（从对应范围 1XX/2XX/3XX 中选取）
-4. ☐ 验证编码无碰撞：`grep -r "EXCEPTION_XXX" src/domain/exceptions/`
-5. ☐ 在模块 `__all__` 中导出
-6. ☐ 在 `src/domain/exceptions/__init__.py` 中导入并加入 `__all__`
-7. ☐ 如需非默认 HTTP 映射，在 `EXCEPTION_HTTP_MAP` 中添加条目
-8. ☐ 如包装外部 SDK 错误，在 `ErrorMapper` 中添加映射
-9. ☐ 更新本文档 §3.7 错误码注册表
-10. ☐ 添加测试覆盖：构造、`to_dict()`、HTTP 映射、编码唯一性
+---
+
+#### 阶段 A：设计阶段（Task 0 — 规范先行）
+
+> **原则**：异常是领域契约的一部分，须在 SDD 规范定义阶段完成设计，禁止在实现 Task 中临时拼凑。
+
+| # | 强制 | 检查项 | 说明 |
+|---|------|--------|------|
+| A1 | 🔴 | **确定归属模块** | 按职责归入 `src/domain/exceptions/` 下适当模块（`system`/`business`/`external`/`storage`/`role`/`service`/`sandbox`/`embedding`/`permission`/`event`/`transfer`）．若现有模块均不匹配，评估是否新建模块 |
+| A2 | 🔴 | **选择正确基类** | `SystemException`（1XX）用于基础设施故障；`BusinessException`（2XX）用于业务规则违反；`ExternalException`（3XX）用于外部服务错误．禁止直接继承 Python 内置 `Exception` |
+| A3 | 🔴 | **分配唯一编码** | 从对应范围选取：系统 101-199、业务 201-299、外部 301-399．运行 `grep -r "EXCEPTION_NNN" src/domain/exceptions/` 验证无碰撞 |
+| A4 | 🔴 | **设计构造器参数** | 携带领域上下文（如 `transfer_id`、`role_id`、`user_count`），避免仅含字符串消息．参数通过 `context` 字典暴露给 API 响应和结构化日志 |
+| A5 | 🔴 | **设计错误消息** | 面向调用方（API 消费者/运维），包含资源标识但不泄露内部实现细节（如 SQL 语句、堆栈路径） |
+| A6 | 🟡 | **评估二级编码** | 同一领域内多种失败模式时使用二级编码（参考 Google `domain+reason`、嵌入服务 306-308 模式），如 `EmbeddingAPIError(306)` / `EmbeddingResponseError(307)` |
+
+#### 阶段 B：实现阶段（编码 Task）
+
+| # | 强制 | 检查项 | 说明 |
+|---|------|--------|------|
+| B1 | 🔴 | **模块级导出** | 在所在模块的 `__all__` 列表中注册类名 |
+| B2 | 🔴 | **包级重导出** | 在 `src/domain/exceptions/__init__.py` 中：添加 `from` 导入 → 加入 `__all__` → 按注释分组正确归类 |
+| B3 | 🔴 | **Google 风格 docstring** | 包含 `Attributes:` 段（code/message/自定义属性），中文注释 |
+| B4 | 🔴 | **EXCEPTION_HTTP_MAP 映射** | 在 `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 中添加条目，即使 MRO 回退可正确映射也应显式声明（优化精确匹配性能 + 文档清晰） |
+| B5 | 🟡 | **ErrorMapper 映射** | 如异常包装外部 SDK 错误（MinIO/RabbitMQ/Redis），在 `src/infrastructure/messaging/error_mapper.py` 的相应 `*_ERROR_MAP` 字典中添加条目 |
+| B6 | 🟡 | **事件通道配置** | 如异常触发死信队列（DLQ）重试/入队，在 `config/event_channels.yaml` 中配置对应通道 |
+| B7 | 🔴 | **禁止抑制注释** | 不得在异常定义中添加 `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释．如 Ruff/MyPy 报错，必须通过代码修改解决根因 |
+
+#### 阶段 C：验证阶段（质量门禁）
+
+| # | 强制 | 检查项 | 说明 |
+|---|------|--------|------|
+| C1 | 🔴 | **编码唯一性测试** | 运行 `pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v`，确认新增编码未被任何已有类使用 |
+| C2 | 🔴 | **构造与 to_dict() 测试** | 在 `tests/unit/domain/exceptions/` 添加或更新测试：默认消息、自定义消息、`to_dict()` 输出结构、`cause` 链正确性 |
+| C3 | 🔴 | **HTTP 映射测试** | 在 `tests/unit/interfaces/api/test_exception_handlers.py` 中：验证 `EXCEPTION_HTTP_MAP` 包含新异常类型、`_get_http_status` 返回正确状态码、HTTP 集成测试返回正确 JSON 结构 |
+| C4 | 🔴 | **更新设计文档** | 更新本文档 §3.7 错误码注册表（编码/类名/继承/HTTP），更新层次图（§3.1）如新增模块 |
+| C5 | 🔴 | **更新 story-template.md** | 如新增异常模块或编码范围，同步更新故事模板中的领域异常清单（确保后续 Story 的 Task 0 规范定义包含新模块） |
+| C6 | 🟡 | **BDD 验收场景** | 在 Story 的 Gherkin feature 文件中添加异常路径场景（如 `Scenario: 资源不存在返回 404`），确保异常传播的端到端行为被验收 |
+| C7 | 🟡 | **指标告警阈值** | 如新异常代表关键故障模式，在 `src/infrastructure/logging/exception_metrics_impl.py` 中评估是否需要添加告警规则 |
+
+---
+
+#### 快速自检脚本
+
+```bash
+# 阶段 A: 编码碰撞检查
+grep -r "EXCEPTION_XXX" src/domain/exceptions/  # 替换 XXX 为目标编码
+
+# 阶段 B: 导出完整性检查
+python -c "from src.domain.exceptions import NewErrorName; print('✅ 导入成功')"
+
+# 阶段 C: 测试验证
+poetry run pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v
+poetry run pytest tests/unit/interfaces/api/test_exception_handlers.py -v -k "NewErrorName"
+poetry run ruff check src/domain/exceptions/ src/interfaces/api/exception_handlers.py
+```
 
 ---
 
