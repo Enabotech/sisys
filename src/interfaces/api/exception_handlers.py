@@ -167,7 +167,6 @@ class ExceptionHandlers:
         self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)
         self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)
         self._app.add_exception_handler(BaseException, self._handle_exception)
-        self._app.add_exception_handler(ValueError, self._handle_value_error)  # type: ignore[arg-type]
         self._app.add_exception_handler(Exception, self._handle_unexpected_error)
 
     def _record(self, exc: Exception) -> None:
@@ -309,35 +308,6 @@ class ExceptionHandlers:
                 },
                 "request_id": request_id,
             },
-        )
-
-    async def _handle_value_error(self, request: Request, exc: ValueError) -> JSONResponse:
-        """处理领域实体验证异常（临时方案）
-
-        领域实体（checkpoint, agent 等）使用 ValueError 做构造器守卫。
-        此处理器确保 ValueError 返回 400 而非 500。
-        实体层迁移到 ValidationError 后可移除此处理器。
-
-        Args:
-            request: 当前 HTTP 请求
-            exc: ValueError 实例
-
-        Returns:
-            JSON 格式的 400 错误响应
-        """
-        self._record(exc)
-        request_id = getattr(request.state, "request_id", None) or "unknown"
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={
-                "error": {
-                    "code": "EXCEPTION_201",
-                    "message": str(exc),
-                    "context": {},
-                },
-                "request_id": request_id,
-            },
-            headers={"X-Error-Code": "EXCEPTION_201"},
         )
 
     async def _handle_unexpected_error(self, request: Request, exc: Exception) -> JSONResponse:
