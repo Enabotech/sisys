@@ -76,10 +76,9 @@
 #### 领域异常契约 (Domain Exception Contract)
 
 > **原则**：异常是领域契约的一部分。本 Story 新增/修改的领域异常必须在 Task 0 中完成设计，禁止在实现 Task 中临时定义。
-
 > **适用范围：** 本清单仅针对定义在 `src/domain/exceptions/` 下、继承自 `DomainError`（别名 `BaseException`）的**领域异常**。
 > **不在本清单范围：** FastAPI/Pydantic 框架原生异常、第三方 SDK 原始异常（由 `ErrorMapper` 映射）、实体构造器 `ValueError`（已知技术债务，独立迭代迁移）。
-> 完整检查清单与全量异常分类详见 [`docs/architecture/sisys-uni-exception-design.md §3.12`](../architecture/sisys-uni-exception-design.md#312-异常注册检查清单)。
+> 异常检查清单分类详见 [`docs/architecture/sisys-uni-exception-design.md §3.12`](../architecture/sisys-uni-exception-design.md#312-异常注册检查清单)。
 
 - [ ] 归属模块与基类 — 确定异常归属的领域异常模块（`system`/`business`/`external`/`storage`/`role`/...），选择正确基类（`SystemException` / `BusinessException` / `ExternalException`）
 - [ ] 唯一编码分配 — 从对应范围选取（系统 101-199、业务 201-299、外部 301-399），`grep` 验证无碰撞
