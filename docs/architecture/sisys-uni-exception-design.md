@@ -1,10 +1,10 @@
 # 统一异常处理设计方案
 
-**状态：** 已实现（第五轮审查修订）
+**状态：** 已实现
 **创建日期：** 2026-05-10
-**最后评审日期：** 2026-06-04
+**最后修订日期：** 2026-06-04
 **作者：** Agimtech
-**评审状态：** 评审中
+**评审状态：** 已评审
 
 ---
 
@@ -31,6 +31,7 @@
 | **越界异常** | `TransferNotFoundError`、`TransferNotApprovedError` 继承 Python 内置 `Exception` 而非领域 `BaseException` | 绕过集中处理器，仅被兜底捕获返回 500 | ✅ 已迁移到 `transfer_exceptions.py` |
 | **错误码碰撞** | EXCEPTION_301 被 6 个类共享，EXCEPTION_302/303 各被 2 个类共享 | 违反唯一编码原则，监控告警无法精确定位 | ✅ 已全部分配独立编码 |
 | **指标集成缺口** | `ExceptionMetricsPort` 已定义但未集成到 `ExceptionHandlers`；composition_root 注册路径错误 | 异常指标采集不可用 | ✅ 已集成并修复注册路径 |
+| **ValueError 语义模糊** | 全系统 186 处 `raise ValueError` 与领域异常体系并存，语义模糊、错误码丢失 | 监控告警粗粒度、调用方无法精确处理 | ✅ 已全量迁移为领域异常（详见 `sisys-value-error-refactor.md`） |
 
 ### 1.3 异常分布
 
@@ -38,7 +39,7 @@
 
 ```
 src/domain/exceptions/              # 统一管理（12 个模块）
-├── __init__.py                     # 统一导出（127 行，42 个符号）
+├── __init__.py                     # 统一导出（42 个符号）
 ├── base_exceptions.py              # BaseException 根类
 ├── system_exceptions.py            # SystemException + 4 个具体类
 ├── business_exceptions.py          # BusinessException + 8 个具体类
@@ -57,12 +58,11 @@ src/domain/exceptions/              # 统一管理（12 个模块）
 #### 残留散落位置（已清理）
 
 ```
-# 已纳入领域异常体系（Phase 4 完成）：
+# 已纳入领域异常体系（Phase 4 + ValueError 迁移完成）：
 # - TransferNotFoundError/TransferNotApprovedError → src/domain/exceptions/transfer_exceptions.py
 # - permission_middleware.py → 仅 OAuth2 WWW-Authenticate 合法保留（4 处）
-
-# ValueError → 领域异常全量迁移（已设计，待实施）：
-# 详见 docs/architecture/sisys-value-error-refactor.md（11 批次，186 处，110 checkbox）
+# - ValueError → 领域异常全量迁移（186 处，116 文件变更）
+#   详见 docs/architecture/sisys-value-error-refactor.md
 ```
 
 ### 1.4 违反的架构原则
@@ -364,7 +364,7 @@ BaseException (EXCEPTION_000) — 抽象根，领域层
 
 ```
 src/domain/exceptions/
-├── __init__.py              # 统一导出（127 行，45 个符号）
+├── __init__.py              # 统一导出（42 个符号）
 ├── base_exceptions.py       # BaseException, SystemException, BusinessException, ExternalException
 ├── system_exceptions.py     # ConfigurationError, NetworkError, StorageError, MessageBusError
 ├── business_exceptions.py   # ValidationError, NotFoundError, ConflictError, PermissionDeniedError, ...
@@ -1021,29 +1021,7 @@ class ExceptionMetricsImpl(ExceptionMetricsPort):
 
 全局单例通过 `get_exception_metrics()` 获取。
 
-#### 已知缺陷
-
-**缺陷 1：composition_root 注册路径错误**
-
-```python
-# 当前（错误）：
-register_port(
-    name="exception_metrics",
-    impl="src.infrastructure.monitoring.exception_metrics_adapter.ExceptionMetricsAdapter",  # 文件不存在
-    ...
-)
-
-# 应改为：
-register_port(
-    name="exception_metrics",
-    impl="src.infrastructure.logging.exception_metrics_impl.ExceptionMetricsImpl",  # 实际路径
-    ...
-)
-```
-
-**缺陷 2：ExceptionHandlers 未调用 record_exception()**
-
-`ExceptionHandlers._handle_exception()` 和 `_handle_unexpected_error()` 中应注入 `ExceptionMetricsPort` 并调用 `record_exception(type(exc).__name__, exc.code)`。
+`ExceptionHandlers` 通过 `ExceptionMetricsPort` 在 `_handle_exception()` 和 `_handle_unexpected_error()` 中调用 `record_exception(type(exc).__name__, exc.code)` 完成指标采集。
 
 ### 3.10 事件处理器错误模式
 
@@ -1067,13 +1045,9 @@ register_port(
 
 事件处理器中的异常应使用领域异常，确保 DLQ 元数据包含完整错误码和上下文信息。
 
-### 3.11 领域实体验证异常指南
+### 3.11 领域实体验证异常
 
-#### 现状（已设计，待实施）
-
-> 详细迁移设计见 [`sisys-value-error-refactor.md`](sisys-value-error-refactor.md)（11 批次，186 处 ValueError，110 checkbox）。
-
-系统中 **186 处 `raise ValueError`** 将全量迁移为领域异常。新增三类实体专用异常：
+系统中 **186 处 `raise ValueError`** 已全量迁移为领域异常。新增三类实体专用异常：
 
 #### 推荐模式
 
@@ -1173,56 +1147,28 @@ poetry run ruff check src/domain/exceptions/ src/interfaces/api/exception_handle
 
 ---
 
-## 4. 迁移策略
+## 4. 实施阶段
 
-### 4.1 阶段一：建立基础设施
+### 4.1 阶段一：基础设施
 
-- [x] 创建 `src/domain/exceptions/__init__.py` - 异常根类与三层异常体系
-- [x] 创建模块化异常文件（12 个文件替代 legacy.py）
-- [x] 创建 `src/interfaces/api/exception_handlers.py` - FastAPI 统一异常处理器
-- [x] 创建 `src/interfaces/api/middleware/exception_context.py` - 异常上下文中间件
-- [x] 创建 `src/infrastructure/messaging/error_mapper.py` - SDK 错误映射器
-- [x] 创建 `src/infrastructure/logging/exception_logger.py` - 结构化日志格式化器
+建立异常根类、三层体系、模块化文件、统一处理器、SDK 映射器、结构化日志。
 
-### 4.2 阶段二：全面迁移
+### 4.2 阶段二：API/应用/基础设施层迁移
 
-#### 第一批：高优先级（API 层）
-
-- [x] `src/domain/ports/audit_service.py` - AuditError → SystemException
-- [x] `src/domain/ports/auth_service.py` - AuthenticationError → BusinessException
-- [x] `src/infrastructure/security/permission_middleware.py` - PermissionDeniedError, InsufficientTokenError
-
-#### 第二批：中优先级（应用层）
-
-- [x] `src/application/use_cases/role_management.py` - RoleAlreadyExistsError 等（4个）
-- [x] `src/domain/ports/sandbox_executor.py` - SandboxError 等（4个）
-- [x] `src/domain/services/memory_service.py` - MemoryVersionConflictError, MemoryNotFoundError
-
-#### 第三批：低优先级（基础设施层）
-
-- [x] `src/infrastructure/storage/minio/minio_manager.py` - 使用 ErrorMapper.map_s3_error
-- [x] `src/infrastructure/messaging/outbox/outbox.py` - InvalidStateTransitionError → InvalidStateError
-- [x] `src/infrastructure/messaging/event_store.py` - VersionError → ConflictError
-- [x] `src/domain/ports/password_validation_service.py` - PasswordValidationError → ValidationError
-- [x] `src/domain/ports/storage.py` - ComplianceLockError → BusinessException
+- 领域端口异常归类至新体系
+- 应用层用例异常迁移
+- 基础设施 SDK 错误统一映射
 
 ### 4.3 阶段三：完善与优化
 
-- [x] 实现结构化日志集成 - `src/infrastructure/logging/exception_logger.py`
-- [x] 实现异常监控指标 - `src/infrastructure/logging/exception_metrics_impl.py`
-- [x] 编写回归测试确保无破坏性变更 - 2348 tests passed
-- [x] 统一 ErrorMapper 与现有 _map_error 方法 - minio_manager.py 委托给 ErrorMapper
+结构化日志集成、异常监控指标实现、回归测试。
 
-### 4.4 阶段四：残留清理（已完成）
+### 4.4 阶段四：残留清理与 ValueError 全量迁移（已完成）
 
-- [x] 解决错误码碰撞（§3.7 碰撞解决计划）
-- [x] 合并 5 处重复 `ErrorResponse(BaseModel)` 到 `src/interfaces/api/shared_models.py`
-- [x] 迁移 `auth.py` 中非 OAuth2 场景的手动 HTTPException 到集中处理器
-- [x] 迁移 `permission_middleware.py` 从 raw HTTPException 到领域异常（仅 OAuth2 合法保留）
-- [x] 迁移 `TransferNotFoundError`/`TransferNotApprovedError` 到领域异常层次
-- [x] 修复 `composition_root.py` 中 exception_metrics 注册路径
-- [x] 在 `ExceptionHandlers` 中集成 `ExceptionMetricsPort`
-- [x] 评估领域实体 `ValueError` → 领域异常的迁移可行性（独立迭代）→ 已完成设计，详见 [`sisys-value-error-refactor.md`](sisys-value-error-refactor.md)
+- 错误码碰撞解决、共享 ErrorResponse 模型
+- 手动 HTTPException → 领域异常（OAuth2 合法保留）
+- ValueError → 领域异常全量迁移（186 处，116 文件变更，详见 [`sisys-value-error-refactor.md`](sisys-value-error-refactor.md)）
+- 移除 `_handle_value_error` 兜底处理器
 
 ---
 
@@ -1286,7 +1232,7 @@ poetry run ruff check src/domain/exceptions/ src/interfaces/api/exception_handle
 | `src/domain/ports/password_validation_service.py` | 修改 | PasswordValidationError → ValidationError |
 | `src/domain/ports/storage.py` | 修改 | ComplianceLockError → BusinessException |
 
-#### P3 - 残留清理（待实施）
+#### P3 - 残留清理（已完成）
 
 | 文件 | 操作 | 描述 |
 |------|------|------|
@@ -1299,7 +1245,7 @@ poetry run ruff check src/domain/exceptions/ src/interfaces/api/exception_handle
 | `src/interfaces/api/equilibrium_security.py` | 修改 | 移除手动 HTTPException |
 | `src/interfaces/api/schemas.py` | 新建 | 共享 ErrorResponse 模型（替代 5 处重复定义） |
 | `src/composition_root.py` | 修改 | 修复 exception_metrics 注册路径 |
-| `src/interfaces/api/exception_handlers.py` | 修改 | 集成 ExceptionMetricsPort |
+| `src/interfaces/api/exception_handlers.py` | 修改 | 集成 ExceptionMetricsPort、移除 ValueError 兜底处理器 |
 | `src/domain/exceptions/service_exceptions.py` | 修改 | 解决 5 个类的层次违规/编码碰撞 |
 
 ---
@@ -1320,7 +1266,7 @@ poetry run ruff check src/domain/exceptions/ src/interfaces/api/exception_handle
 | **接口层一致性** | 所有 API 端点使用统一异常处理器，无手动 HTTPException（OAuth2 除外） | ✅ 已达标（仅 8 处 OAuth2 合法保留） |
 | **共享响应模型** | 错误响应模型统一到 `src/interfaces/api/shared_models.py` | ✅ 已达标 |
 | **无越界异常** | 所有异常继承自领域根类，无直接继承 Python 内置 Exception 的情况 | ✅ 已达标 |
-| **ValueError 清零** | 全系统零 `raise ValueError`，所有验证使用领域异常 | 🟡 已设计待实施（详见 [`sisys-value-error-refactor.md`](sisys-value-error-refactor.md)） |
+| **ValueError 清零** | 全系统零 `raise ValueError`，所有验证使用领域异常（186 处全量迁移） | ✅ 已达标 |
 
 ---
 
