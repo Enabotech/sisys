@@ -61,6 +61,7 @@ src/
 - **domain 层禁止任何外部依赖**（import-linter 强制校验，包括 pydantic/sqlalchemy/redis 等），违反则 CI 失败
 - **禁止** `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释，**禁止**修改阈值/规则消除告警——必须修复根因
   - **唯一例外**：`# type: ignore[type-abstract]` — mypy 无法区分"用于实例化"和"用于查找"两种语义，Protocol 类作为 DI 容器查找键时触发误报（业界 DI 框架 Spring/punq 均支持此模式）
+  - **`import-untyped` 修复**：第三方库缺少类型注解（无 `py.typed`、无 types-* 包）时，**禁止**用 `ignore_missing_imports=true` 豁免。必须在 `stubs/<package>/__init__.pyi` 创建 PEP 561 类型存根，仅覆盖项目实际使用的 API 面
 - **禁止** 绕过 pre-commit hooks（`--no-verify`），提交必须通过预提交钩子检查
 - **禁止** git commit 信息中包含任何 AI 辅助署名（如 `Co-Authored-By: Claude`、`anthropic.com` 等），提交信息保持纯净
 - **禁止** 修改 `.importlinter` 中已合入的架构依赖规则

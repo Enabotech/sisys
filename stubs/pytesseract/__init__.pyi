@@ -6,10 +6,8 @@ pytesseract 是 Google Tesseract OCR 引擎的 Python 包装器。
 来源: src/infrastructure/document_parsing/image_parser.py
 """
 
-from typing import Any
 
 import PIL.Image
-
 
 class Output:
     """Tesseract 输出格式常量

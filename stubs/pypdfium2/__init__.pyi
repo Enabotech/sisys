@@ -7,10 +7,8 @@ pypdfium2 是 PDFium 的 Python 绑定，核心类为 PdfDocument/PdfPage/PdfBit
 """
 
 from types import TracebackType
-from typing import Any
 
 import PIL.Image
-
 
 class PdfDocument:
     """PDF 文档 — 封装 PDF 文件的打开、页面访问与资源管理
