@@ -61,9 +61,8 @@ src/domain/exceptions/              # 统一管理（12 个模块）
 # - TransferNotFoundError/TransferNotApprovedError → src/domain/exceptions/transfer_exceptions.py
 # - permission_middleware.py → 仅 OAuth2 WWW-Authenticate 合法保留（4 处）
 
-# 待后续迭代处理（非本次范围）：
-src/domain/entities/checkpoint.py                                 # ValueError（6 处）
-src/domain/entities/agent.py                                      # ValueError（6 处）
+# ValueError → 领域异常全量迁移（已设计，待实施）：
+# 详见 docs/architecture/sisys-value-error-refactor.md（11 批次，186 处，110 checkbox）
 ```
 
 ### 1.4 违反的架构原则
@@ -308,6 +307,7 @@ BaseException (EXCEPTION_000) — 抽象根，领域层
 │   ├── ValidationError (201)
 │   │   └── [service] PasswordValidationError (201)
 │   │   └── [storage] BucketNameValidationError (201)
+│   │   └── [entity] EntityValidationError (242) ← 实体不变量验证
 │   ├── NotFoundError (202)
 │   │   └── [storage] MemoryNotFoundError (202)
 │   │   └── [storage] BucketNotFoundError (202)
@@ -324,8 +324,10 @@ BaseException (EXCEPTION_000) — 抽象根，领域层
 │   ├── InvalidStateError (206)
 │   │   └── [service] ComplianceLockError (206)
 │   │   └── InvalidStateTransitionError (208)
+│   │       └── [entity] EntityStateTransitionError (243) ← 实体状态转换守卫
 │   └── BusinessRuleViolationError (207)
 │       └── [role] CannotDeleteSystemRoleError (207)
+│       └── [entity] EntityBusinessRuleError (244) ← 实体跨字段业务约束
 └── ExternalException (EXCEPTION_3XX) — 外部服务错误
     ├── ThirdPartyError (301)
     │   └── [embedding] EmbeddingAPIError (306)
@@ -362,10 +364,11 @@ BaseException (EXCEPTION_000) — 抽象根，领域层
 
 ```
 src/domain/exceptions/
-├── __init__.py              # 统一导出（127 行，42 个符号）
+├── __init__.py              # 统一导出（127 行，45 个符号）
 ├── base_exceptions.py       # BaseException, SystemException, BusinessException, ExternalException
 ├── system_exceptions.py     # ConfigurationError, NetworkError, StorageError, MessageBusError
 ├── business_exceptions.py   # ValidationError, NotFoundError, ConflictError, PermissionDeniedError, ...
+│                            # + EntityValidationError(242), EntityStateTransitionError(243), EntityBusinessRuleError(244)
 ├── external_exceptions.py   # ThirdPartyError, TimeoutError, ServiceUnavailableError, UnknownError
 ├── service_exceptions.py    # AuditError(105), PasswordValidationError(201), ComplianceLockError(206)
 │                            # + IntrusionDetectionError(301)⚠️, DataIntegrityError(302)⚠️,
@@ -382,7 +385,7 @@ src/domain/exceptions/
 统一导出（`from src.domain.exceptions import *`，共 42 个符号）：
 - 抽象根类：`BaseException`
 - 系统级：`SystemException`, `ConfigurationError`, `NetworkError`, `StorageError`, `MessageBusError`
-- 业务级：`BusinessException`, `ValidationError`, `NotFoundError`, `ConflictError`, `PermissionDeniedError`, `AuthenticationError`, `InvalidStateError`, `InvalidStateTransitionError`, `BusinessRuleViolationError`
+- 业务级：`BusinessException`, `ValidationError`, `NotFoundError`, `ConflictError`, `PermissionDeniedError`, `AuthenticationError`, `InvalidStateError`, `InvalidStateTransitionError`, `BusinessRuleViolationError`, `EntityValidationError`, `EntityStateTransitionError`, `EntityBusinessRuleError`
 - 外部服务：`ExternalException`, `ThirdPartyError`, `TimeoutError`, `ServiceUnavailableError`, `UnknownError`
 - 服务异常：`AuditError`, `PasswordValidationError`, `ComplianceLockError`
 - 存储异常：`MemoryVersionConflictError`, `MemoryNotFoundError`, `BucketNotFoundError`, `MinIOConnectionError`, `BucketNameValidationError`, `MemoryAccessDeniedError`
@@ -925,7 +928,7 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 |------|------|-----------|------|
 | 000 | BaseException | 000（根类默认） | 正常 |
 | 1XX | SystemException | 101 ConfigurationError, 102 NetworkError/MinIOConnectionError, 103 StorageError, 104 MessageBusError, 105 AuditError | 正常 |
-| 2XX | BusinessException | 201 ValidationError/PasswordValidationError/BucketNameValidationError, 202 NotFoundError/MemoryNotFoundError/BucketNotFoundError/RoleNotFoundError, 203 ConflictError/MemoryVersionConflictError/RoleAlreadyExistsError/CannotDeleteRoleWithUsersError/VersionError, 204 PermissionDeniedError/MemoryAccessDeniedError/InsufficientTokenError, 205 AuthenticationError, 206 InvalidStateError/ComplianceLockError, 207 BusinessRuleViolationError/CannotDeleteSystemRoleError, 208 InvalidStateTransitionError | 正常（同编码类语义一致） |
+| 2XX | BusinessException | 201 ValidationError/PasswordValidationError/BucketNameValidationError/EntityValidationError, 202 NotFoundError/MemoryNotFoundError/BucketNotFoundError/RoleNotFoundError, 203 ConflictError/MemoryVersionConflictError/RoleAlreadyExistsError/CannotDeleteRoleWithUsersError/VersionError, 204 PermissionDeniedError/MemoryAccessDeniedError/InsufficientTokenError, 205 AuthenticationError, 206 InvalidStateError/ComplianceLockError, 207 BusinessRuleViolationError/CannotDeleteSystemRoleError/EntityBusinessRuleError, 208 InvalidStateTransitionError/EntityStateTransitionError | 正常（同编码类语义一致；242-244 为实体专用子类） |
 | 3XX | ExternalException | 301 ThirdPartyError/EmbeddingAPIError/EmbeddingResponseError/SandboxError/ContainerStartError/ExecutionError/ContainerStopError ⚠️碰撞, 302 TimeoutError/DataIntegrityError ⚠️碰撞, 303 ServiceUnavailableError/BackupError ⚠️碰撞, 304 EncryptionError ⚠️违规, 305 ContainerSecurityError ⚠️违规, 306 EmbeddingAPIError, 307 EmbeddingResponseError, 308 EmbeddingModelError | 存在碰撞和层次违规 |
 | 999 | UnknownError | 兜底 | 正常 |
 
@@ -1066,21 +1069,27 @@ register_port(
 
 ### 3.11 领域实体验证异常指南
 
-#### 现状（已知偏差）
+#### 现状（已设计，待实施）
 
-领域实体 `checkpoint.py`（~6 处）和 `agent.py`（~6 处）使用 Python 内置 `ValueError` 进行不变量验证，而非领域异常。
+> 详细迁移设计见 [`sisys-value-error-refactor.md`](sisys-value-error-refactor.md)（11 批次，186 处 ValueError，110 checkbox）。
+
+系统中 **186 处 `raise ValueError`** 将全量迁移为领域异常。新增三类实体专用异常：
 
 #### 推荐模式
 
-| 场景 | 推荐异常 | 编码 |
-|------|---------|------|
-| 构造器参数验证 | `ValidationError` | EXCEPTION_201 |
-| 状态转换守卫 | `InvalidStateError` / `InvalidStateTransitionError` | EXCEPTION_206/208 |
-| 不变量违反 | `BusinessRuleViolationError` | EXCEPTION_207 |
+| 场景 | 推荐异常 | 编码 | HTTP | 适用位置 |
+|------|---------|------|------|---------|
+| 实体不变量验证（UUID/非空/枚举/数值范围） | `EntityValidationError` | EXCEPTION_242 | 400 | `validate()` / `__post_init__()` |
+| 实体状态转换守卫（状态机方法） | `EntityStateTransitionError` | EXCEPTION_243 | 409 | `start()` / `complete()` / `fail()` / `recover()` 等 |
+| 实体跨字段业务约束 | `EntityBusinessRuleError` | EXCEPTION_244 | 422 | `validate()` 中的跨字段约束 |
+| 配置参数验证 | `ConfigurationError` | EXCEPTION_101 | 500 | `*.from_env()` / `validate()` |
+| 应用层输入校验 | `ValidationError` | EXCEPTION_201 | 400 | 用例/服务输入验证 |
 
-#### 迁移注意事项
+#### 迁移原则
 
-将 `ValueError` 改为领域异常需要更新所有 `except ValueError` 的调用方。当前测试文件中大量 `pytest.raises(ValueError)` 断言需同步修改。建议分阶段迁移，每个实体一个独立 PR。
+- **禁止 `raise ValueError`**：所有验证失败使用领域异常
+- **消息文本不变**：迁移仅改变异常类型和上下文，错误消息保持向后兼容
+- **分批实施**：每个批次独立 PR，每批全量测试验证无回归
 
 ### 3.12 异常注册检查清单
 
@@ -1091,7 +1100,7 @@ register_port(
 | 类别 | 定义位置 | 根类型 | 处理方式 | 需遵循本清单？ |
 |------|---------|--------|---------|:---:|
 | **领域异常** | `src/domain/exceptions/` | `DomainError` | `ExceptionHandlers` 自动映射 HTTP + 记录指标 | ✅ 是 |
-| **Python 内置异常** | 实体构造器（`ValueError`）等 | `Exception` | `_handle_value_error` 临时兜底 → 400（待迁移至领域异常） | 🟡 迁移时是 |
+| **Python 内置异常** | 全系统禁止主动 `raise ValueError` | `Exception` | 不应出现（如出现则落入 `_handle_unexpected_error` → 500） | 🔴 禁止新增 |
 | **FastAPI 异常** | `interfaces/api/` | `RequestValidationError` | `_handle_validation_error` → 400 | ❌ 否（框架原生） |
 | **Pydantic 异常** | `interfaces/api/` | `PydanticValidationError` | `_handle_pydantic_error` → 422 | ❌ 否（框架原生） |
 | **第三方 SDK 异常** | 外部库（`S3Error` 等） | 各 SDK 定义 | `ErrorMapper.map_*()` 映射为领域异常 | 🟡 仅映射规则 |
@@ -1099,8 +1108,8 @@ register_port(
 
 > **关键决策规则：** 任何需要向 API 消费者传达的**业务/系统/外部错误**，必须定义为领域异常（遵循本清单）。仅在以下场景使用其他异常：
 > - **OAuth2 Bearer token 提取**：必须用 `HTTPException(401, headers={"WWW-Authenticate": "Bearer"})`（FastAPI 安全机制要求）
-> - **实体构造器守卫**：当前临时使用 `ValueError`（已知技术债务，独立迭代迁移）
 > - **第三方 SDK 调用**：原始异常由 `ErrorMapper` 包装为领域异常后重新抛出
+> - **禁止 `raise ValueError`**：所有验证失败使用领域异常（详见 [`sisys-value-error-refactor.md`](sisys-value-error-refactor.md)）
 
 ---
 
@@ -1213,7 +1222,7 @@ poetry run ruff check src/domain/exceptions/ src/interfaces/api/exception_handle
 - [x] 迁移 `TransferNotFoundError`/`TransferNotApprovedError` 到领域异常层次
 - [x] 修复 `composition_root.py` 中 exception_metrics 注册路径
 - [x] 在 `ExceptionHandlers` 中集成 `ExceptionMetricsPort`
-- [ ] 评估领域实体 `ValueError` → 领域异常的迁移可行性（独立迭代）
+- [x] 评估领域实体 `ValueError` → 领域异常的迁移可行性（独立迭代）→ 已完成设计，详见 [`sisys-value-error-refactor.md`](sisys-value-error-refactor.md)
 
 ---
 
@@ -1301,7 +1310,7 @@ poetry run ruff check src/domain/exceptions/ src/interfaces/api/exception_handle
 |------|------|----------|
 | **集中管理** | 所有异常定义在 `src/domain/exceptions/` 下 | ✅ 已达标 |
 | **层次清晰** | 三层异常体系（System/Business/External） | ✅ 已达标 |
-| **错误码唯一** | 每个异常有唯一错误码，无碰撞 | ✅ 已达标（45 个编码全部唯一） |
+| **错误码唯一** | 每个异常有唯一错误码，无碰撞 | ✅ 已达标（48 个编码全部唯一） |
 | **HTTP 映射** | API 层自动根据异常类型返回正确 HTTP 状态码 | ✅ 已达标 |
 | **日志规范** | 异常日志包含错误码、上下文、追踪ID | ✅ 已达标 |
 | **向后兼容** | 遗留异常引用保持正常工作 | ✅ 已达标 |
@@ -1311,6 +1320,7 @@ poetry run ruff check src/domain/exceptions/ src/interfaces/api/exception_handle
 | **接口层一致性** | 所有 API 端点使用统一异常处理器，无手动 HTTPException（OAuth2 除外） | ✅ 已达标（仅 8 处 OAuth2 合法保留） |
 | **共享响应模型** | 错误响应模型统一到 `src/interfaces/api/shared_models.py` | ✅ 已达标 |
 | **无越界异常** | 所有异常继承自领域根类，无直接继承 Python 内置 Exception 的情况 | ✅ 已达标 |
+| **ValueError 清零** | 全系统零 `raise ValueError`，所有验证使用领域异常 | 🟡 已设计待实施（详见 [`sisys-value-error-refactor.md`](sisys-value-error-refactor.md)） |
 
 ---
 

@@ -850,3 +850,244 @@ class TestDocumentParsingServiceLayoutDetection:
         page2_texts = parse_result["pages"][1]["texts"]
         assert page2_texts[0]["bbox"] is not None
         assert page2_texts[0]["bbox"]["page"] == 2
+
+    @pytest.mark.asyncio
+    async def test_layout_detection_page_with_no_texts(
+        self, mock_repo, mock_storage, mock_event_publisher, mock_parser
+    ) -> None:
+        """验证空 texts 页面直接跳过增强（continue 分支）"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import (
+            BoundingBox,
+            BoundingBoxResult,
+            ParsedDocument,
+            ParsedPage,
+        )
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="empty.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "path/to/empty.pdf"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"pdf"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+
+        # 构造空 texts 的 ParsedDocument
+        mock_parser.parse.return_value = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/pdf",
+            pages=[ParsedPage(page_number=1, texts=[])],
+        )
+
+        mock_layout_detector = MagicMock()
+        mock_layout_detector.detect.return_value = [
+            BoundingBoxResult(
+                label="Text",
+                bbox=BoundingBox(x=0.0, y=0.0, width=100.0, height=50.0, page=1),
+                confidence=0.9,
+            ),
+        ]
+        mock_pdf_renderer = MagicMock()
+        mock_pdf_renderer.render_page.return_value = b"\x89PNG_fake"
+
+        service = DocumentParsingService(
+            document_repository=mock_repo,
+            document_storage=mock_storage,
+            event_publisher=mock_event_publisher,
+            document_parser=mock_parser,
+            layout_detector=mock_layout_detector,
+            pdf_page_renderer=mock_pdf_renderer,
+        )
+
+        result = await service.parse_document(doc_id, "t1")
+        assert result.parse_status == ParseStatus.COMPLETED
+        # 空 texts 页面保持不变
+        assert result.metadata["parse_result"]["pages"][0]["texts"] == []
+
+    @pytest.mark.asyncio
+    async def test_layout_detection_empty_detections_preserves_page(
+        self, mock_repo, mock_storage, mock_event_publisher, mock_parser
+    ) -> None:
+        """验证 detect 返回空列表时保持原页面不变（continue 分支）"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="blank.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "path/to/blank.pdf"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"pdf"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+
+        element = ParsedElement(content="无版面检测文本", bbox=None)
+        mock_parser.parse.return_value = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/pdf",
+            pages=[ParsedPage(page_number=1, texts=[element])],
+        )
+
+        # detect 返回空列表
+        mock_layout_detector = MagicMock()
+        mock_layout_detector.detect.return_value = []
+        mock_pdf_renderer = MagicMock()
+        mock_pdf_renderer.render_page.return_value = b"\x89PNG_fake"
+
+        service = DocumentParsingService(
+            document_repository=mock_repo,
+            document_storage=mock_storage,
+            event_publisher=mock_event_publisher,
+            document_parser=mock_parser,
+            layout_detector=mock_layout_detector,
+            pdf_page_renderer=mock_pdf_renderer,
+        )
+
+        result = await service.parse_document(doc_id, "t1")
+        assert result.parse_status == ParseStatus.COMPLETED
+        # 空检测结果 → bbox 保持 None
+        page_texts = result.metadata["parse_result"]["pages"][0]["texts"]
+        assert page_texts[0]["bbox"] is None
+
+    @pytest.mark.asyncio
+    async def test_layout_detection_preserves_images_field(
+        self, mock_repo, mock_storage, mock_event_publisher, mock_parser
+    ) -> None:
+        """验证版面检测增强后 images 字段不丢失"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import (
+            BoundingBox,
+            BoundingBoxResult,
+            ParsedDocument,
+            ParsedElement,
+            ParsedPage,
+        )
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="img.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "path/to/img.pdf"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"pdf"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+
+        image_element = ParsedElement(content="", metadata={"format": "PNG", "width": 800, "height": 600})
+        text_element = ParsedElement(content="图片说明", bbox=None)
+        mock_parser.parse.return_value = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/pdf",
+            pages=[ParsedPage(page_number=1, texts=[text_element], images=[image_element])],
+        )
+
+        mock_layout_detector = MagicMock()
+        mock_layout_detector.detect.return_value = [
+            BoundingBoxResult(
+                label="Caption",
+                bbox=BoundingBox(x=10.0, y=500.0, width=200.0, height=20.0, page=1),
+                confidence=0.88,
+            ),
+        ]
+        mock_pdf_renderer = MagicMock()
+        mock_pdf_renderer.render_page.return_value = b"\x89PNG_fake"
+
+        service = DocumentParsingService(
+            document_repository=mock_repo,
+            document_storage=mock_storage,
+            event_publisher=mock_event_publisher,
+            document_parser=mock_parser,
+            layout_detector=mock_layout_detector,
+            pdf_page_renderer=mock_pdf_renderer,
+        )
+
+        result = await service.parse_document(doc_id, "t1")
+        assert result.parse_status == ParseStatus.COMPLETED
+        page_data = result.metadata["parse_result"]["pages"][0]
+        # images 字段应保留（修复前的 bug 会丢失 images）
+        assert len(page_data["images"]) == 1
+        assert page_data["images"][0]["metadata"]["format"] == "PNG"
+
+    @pytest.mark.asyncio
+    async def test_layout_detection_element_with_existing_bbox_not_overwritten(
+        self, mock_repo, mock_storage, mock_event_publisher, mock_parser
+    ) -> None:
+        """验证已有 bbox 的元素不被版面检测结果覆盖（else 分支）"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import (
+            BoundingBox,
+            BoundingBoxResult,
+            ParsedDocument,
+            ParsedElement,
+            ParsedPage,
+        )
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="bbox.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "path/to/bbox.pdf"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"pdf"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+
+        # 构造已有 bbox 的元素（bbox 非 None）
+        existing_bbox = BoundingBox(x=50.0, y=50.0, width=200.0, height=30.0, page=1)
+        element_with_bbox = ParsedElement(content="已有bbox文本", bbox=existing_bbox, confidence=0.99)
+        mock_parser.parse.return_value = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/pdf",
+            pages=[ParsedPage(page_number=1, texts=[element_with_bbox])],
+        )
+
+        mock_layout_detector = MagicMock()
+        mock_layout_detector.detect.return_value = [
+            BoundingBoxResult(
+                label="Text",
+                bbox=BoundingBox(x=0.0, y=0.0, width=100.0, height=100.0, page=1),
+                confidence=0.7,
+            ),
+        ]
+        mock_pdf_renderer = MagicMock()
+        mock_pdf_renderer.render_page.return_value = b"\x89PNG_fake"
+
+        service = DocumentParsingService(
+            document_repository=mock_repo,
+            document_storage=mock_storage,
+            event_publisher=mock_event_publisher,
+            document_parser=mock_parser,
+            layout_detector=mock_layout_detector,
+            pdf_page_renderer=mock_pdf_renderer,
+        )
+
+        result = await service.parse_document(doc_id, "t1")
+        assert result.parse_status == ParseStatus.COMPLETED
+        page_texts = result.metadata["parse_result"]["pages"][0]["texts"]
+        # 已有 bbox 的元素不应被覆盖
+        assert page_texts[0]["bbox"]["x"] == 50.0
+        assert page_texts[0]["bbox"]["width"] == 200.0
+        assert page_texts[0]["confidence"] == 0.99

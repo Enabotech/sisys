@@ -196,7 +196,7 @@ jobs:
     runs-on: gpu
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
-      options: --user root --add-host=host.docker.internal:host-gateway
+      options: --user root --gpus all --add-host=host.docker.internal:host-gateway
     needs: [setup]
     timeout-minutes: 720
 
