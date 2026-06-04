@@ -975,7 +975,7 @@ git revert <commit-hash>  # 回滚特定批次
 |------|------|---------|
 | `src/interfaces/api/exception_handlers.py` | 修改 | 移除 _handle_value_error + 注册 |
 | `docs/architecture/sisys-uni-exception-design.md` | 修改 | 更新 §3.1/§3.7/§4.4 |
-| `docs/architecture/sisys-value-error-refactor.md` | 修改 | 状态改为"已完成" |
+| `sisys-value-error-refactor.md` | 修改 | 状态改为"已完成" |
 
 ---
 

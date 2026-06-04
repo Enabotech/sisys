@@ -14,6 +14,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
+from src.domain.exceptions import ConfigurationError
+
 scenarios("test_acceptance_udmr_basic_routing.feature")
 
 
@@ -85,7 +87,7 @@ def call_from_env(context: dict[str, Any]) -> None:
         try:
             context["config"] = UDMRConfig.from_env()
             context["error"] = None
-        except ValueError as e:
+        except ConfigurationError as e:
             context["error"] = e
 
 
@@ -144,10 +146,10 @@ def unset_cloud_0_max_tokens(context: dict[str, Any]) -> None:
     context["env"].pop("UDMR_CLOUD_0_MAX_TOKENS", None)
 
 
-@then("应该抛出 ValueError 异常")
+@then("应该抛出 ConfigurationError 异常")
 def verify_value_error(context: dict[str, Any]) -> None:
     assert context["error"] is not None
-    assert isinstance(context["error"], ValueError)
+    assert isinstance(context["error"], ConfigurationError)
 
 
 # ===================================================================

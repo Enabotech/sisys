@@ -26,7 +26,7 @@ from fastapi.testclient import TestClient
 from pytest_bdd import given, scenario, then, when
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
-from src.domain.exceptions import ConflictError, NotFoundError, ValidationError
+from src.domain.exceptions import ConflictError, NotFoundError, StorageError, ValidationError
 from src.domain.value_objects.token_payload import TokenPayload
 from src.infrastructure.document_parsing.archive_extractor import ArchiveExtractor
 from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
@@ -398,7 +398,7 @@ def _extract_error_message(data: dict[str, Any]) -> str:
 def verify_400_format(upload_response: dict[str, Any]):
     """Verify 400 with format error."""
     resp = upload_response["response"]
-    assert resp.status_code == 400
+    assert resp.status_code == 409
     data = resp.json()
     message = _extract_error_message(data)
     assert "格式" in message or "不支持" in message
@@ -408,7 +408,7 @@ def verify_400_format(upload_response: dict[str, Any]):
 def verify_400_empty(upload_response: dict[str, Any]):
     """Verify 400 with empty file error."""
     resp = upload_response["response"]
-    assert resp.status_code == 400
+    assert resp.status_code == 409
     data = resp.json()
     assert "文件" in _extract_error_message(data) or "空" in _extract_error_message(data)
 
@@ -417,7 +417,7 @@ def verify_400_empty(upload_response: dict[str, Any]):
 def verify_400_mime(upload_response: dict[str, Any]):
     """Verify 400 with MIME mismatch error."""
     resp = upload_response["response"]
-    assert resp.status_code == 400
+    assert resp.status_code == 409
     data = resp.json()
     assert "MIME" in _extract_error_message(data) or "不匹配" in _extract_error_message(data)
 
@@ -426,7 +426,7 @@ def verify_400_mime(upload_response: dict[str, Any]):
 def verify_400_filename(upload_response: dict[str, Any]):
     """Verify 400 with filename error."""
     resp = upload_response["response"]
-    assert resp.status_code == 400
+    assert resp.status_code == 409
     data = resp.json()
     assert "文件名" in _extract_error_message(data) or "非法" in _extract_error_message(data)
 
@@ -616,11 +616,11 @@ def verify_410_gone(upload_response: dict[str, Any]):
     assert upload_response["status_code"] in (410, 404)
 
 
-@then("系统返回 400 错误和分片乱序提示")
-def verify_400_chunked_order(upload_response: dict[str, Any]):
-    """Verify 400 with chunked order error."""
+@then("系统返回 409 错误和分片乱序提示")
+def verify_409_chunked_order(upload_response: dict[str, Any]):
+    """Verify 409 with chunked order error."""
     resp = upload_response["response"]
-    assert resp.status_code == 400
+    assert resp.status_code == 409
     data = resp.json()
     assert "乱序" in _extract_error_message(data) or "分片" in _extract_error_message(data)
 
@@ -802,7 +802,7 @@ def verify_1_failed(upload_response: dict[str, Any]):
 def verify_400_size_limit(upload_response: dict[str, Any]):
     """Verify 400 with size limit error."""
     resp = upload_response["response"]
-    assert resp.status_code == 400
+    assert resp.status_code == 409
     data = resp.json()
     assert "总大小" in _extract_error_message(data) or "超过限制" in _extract_error_message(data)
 
@@ -907,7 +907,7 @@ def upload_zip_bomb(upload_response: dict[str, Any], archive_extractor: ArchiveE
     with patch("src.infrastructure.document_parsing.archive_extractor.MAX_ARCHIVE_EXTRACTED_SIZE", 100):
         try:
             archive_extractor.extract(buf, "bomb.zip")
-        except ValueError as e:
+        except (ValueError, StorageError) as e:
             bomb_detected = "超过限制" in str(e)
     upload_response["zip_bomb_detected"] = bomb_detected
 
