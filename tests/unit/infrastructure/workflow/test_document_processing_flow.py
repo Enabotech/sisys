@@ -30,7 +30,7 @@ def mock_event_publisher() -> AsyncMock:
 def mock_embedding_service() -> MagicMock:
     """Mock EmbeddingService 避免 GPU 模型加载"""
     service = MagicMock()
-    service.encode_text = MagicMock(return_value=[0.1] * 1024)
+    service.embed_documents = MagicMock(return_value=[[0.1] * 1024])
     return service
 
 

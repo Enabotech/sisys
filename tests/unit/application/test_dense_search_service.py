@@ -26,7 +26,7 @@ def _make_search_service(
     防止 mock 因属性拼写错误"假绿"通过
     """
     embedding_svc = MagicMock(spec=EmbeddingServicePort)
-    embedding_svc.encode_text.return_value = embedding_result or [0.1] * 1024
+    embedding_svc.embed_query.return_value = embedding_result or [0.1] * 1024
 
     vector_storage = AsyncMock(spec=L3VectorPort)
     vector_storage.search.return_value = search_result or []
@@ -39,11 +39,11 @@ class TestDenseSearchServiceBasic:
     """DenseSemanticSearchService 基本检索"""
 
     @pytest.mark.asyncio
-    async def test_search_calls_encode_text(self) -> None:
-        """search() 应调用 embedding_service.encode_text 一次"""
+    async def test_search_calls_embed_query(self) -> None:
+        """search() 应调用 embedding_service.embed_query 一次"""
         service, embedding_svc, _ = _make_search_service()
         await service.search("test_collection", "查询文本", limit=5)
-        embedding_svc.encode_text.assert_called_once_with("查询文本")
+        embedding_svc.embed_query.assert_called_once_with("查询文本")
 
     @pytest.mark.asyncio
     async def test_search_calls_vector_search(self) -> None:

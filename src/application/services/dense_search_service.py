@@ -77,7 +77,7 @@ class DenseSemanticSearchService:
         if limit < 1:
             raise ValueError(f"limit 必须为正整数，当前值: {limit}")
 
-        query_vector = await asyncio.to_thread(self._embedding.encode_text, query_text)
+        query_vector = await asyncio.to_thread(self._embedding.embed_query, query_text)
 
         combined_filter = self._build_filter(tenant_id, filter_payload)
 
