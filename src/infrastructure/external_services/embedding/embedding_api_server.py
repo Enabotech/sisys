@@ -11,13 +11,26 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="SISYS Embedding API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI lifespan 上下文管理器
+
+    替代已弃用的 @app.on_event("startup")，管理模型加载生命周期。
+    """
+    load_model()
+    yield
+    # shutdown 逻辑（如需）在此处添加
+
+
+app = FastAPI(title="SISYS Embedding API", version="1.0.0", lifespan=lifespan)
 
 
 class EmbedRequest(BaseModel):
@@ -103,6 +116,11 @@ def _detect_device() -> tuple[str, bool]:
 
 
 @app.on_event("startup")
+def _load_model_deprecated() -> None:
+    """（已弃用）保留向后兼容，实际模型加载由 lifespan 处理"""
+    pass
+
+
 def load_model() -> None:
     """服务启动时加载 BGE-M3 模型，请求间复用
 
@@ -225,11 +243,15 @@ def embed(req: EmbedRequest) -> dict:
         )
 
     model = app.state.model
-    result = model.encode(
-        req.texts,
-        return_dense=True,
-        return_sparse=req.return_sparse,
-    )
+    try:
+        result = model.encode(
+            req.texts,
+            return_dense=True,
+            return_sparse=req.return_sparse,
+        )
+    except Exception:
+        logger.exception("模型推理失败 (texts=%d, return_sparse=%s)", len(req.texts), req.return_sparse)
+        raise HTTPException(status_code=500, detail="Embedding inference failed")
 
     response: dict = {"dense": result["dense_vecs"].tolist()}
 

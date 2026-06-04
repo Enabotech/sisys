@@ -1537,7 +1537,7 @@ async def shutdown() -> None:
             await manager.close()
             logger.info("Closed %s", name)
         except Exception as e:
-            logger.warning("Failed to close %s: %s", name, e)
+            logger.error("Failed to close %s: %s", name, e)
 
     # 关闭 embedding_service HTTP 客户端连接池
     try:
@@ -1546,7 +1546,7 @@ async def shutdown() -> None:
             await asyncio.to_thread(embedding.close)
             logger.info("Closed embedding_service")
     except Exception as e:
-        logger.warning("Failed to close embedding_service: %s", e)
+        logger.error("Failed to close embedding_service: %s", e)
 
 
 __all__ = ["bootstrap", "shutdown", "_global_registry"]

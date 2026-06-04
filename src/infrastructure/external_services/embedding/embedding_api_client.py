@@ -53,6 +53,24 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             base_url=config.api_url,
             timeout=config.api_timeout,
         )
+        self._closed = False
+
+    def __enter__(self) -> EmbeddingAPIClient:
+        """支持 with 语句，确保资源正确释放"""
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        """退出 with 块时自动关闭"""
+        self.close()
+
+    def _check_closed(self) -> None:
+        """检查客户端是否已关闭
+
+        Raises:
+            EmbeddingServiceError: 客户端已关闭时
+        """
+        if self._closed:
+            raise EmbeddingServiceError("EmbeddingAPIClient 已关闭，无法执行编码操作")
 
     @property
     def dimension(self) -> int:
@@ -131,8 +149,9 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             API 响应 dict
 
         Raises:
-            EmbeddingServiceError: 网络错误、超时或非预期响应时
+            EmbeddingServiceError: 网络错误、超时、HTTP 错误或非预期响应时
         """
+        self._check_closed()
         try:
             resp = self._client.post(
                 "/v1/embeddings",
@@ -144,11 +163,17 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             raise EmbeddingServiceError(f"嵌入 API 请求超时: {e}") from e
         except httpx.NetworkError as e:
             raise EmbeddingServiceError(f"嵌入 API 网络错误: {e}") from e
-        except httpx.HTTPStatusError:
-            raise
+        except httpx.HTTPStatusError as e:
+            raise EmbeddingServiceError(f"嵌入 API 返回 HTTP {e.response.status_code}") from e
         except (ValueError, KeyError) as e:
             raise EmbeddingServiceError(f"嵌入 API 响应格式异常: {e}") from e
 
     def close(self) -> None:
-        """关闭 HTTP 客户端"""
-        self._client.close()
+        """关闭 HTTP 客户端，释放连接池资源
+
+        关闭后实例不可再使用，再次调用 encode_* 方法将抛出 EmbeddingServiceError。
+        重复调用 close() 是安全的（幂等）。
+        """
+        if not self._closed:
+            self._client.close()
+            self._closed = True
