@@ -23,6 +23,11 @@ from src.domain.exceptions.business_exceptions import (
     PermissionDeniedError,
     ValidationError,
 )
+from src.domain.exceptions.embedding_exceptions import (
+    EmbeddingAPIError,
+    EmbeddingModelError,
+    EmbeddingResponseError,
+)
 from src.domain.exceptions.event_exceptions import VersionError
 from src.domain.exceptions.external_exceptions import (
     ExternalException,
@@ -111,6 +116,10 @@ __all__ = [
     "ContainerStartError",
     "ExecutionError",
     "ContainerStopError",
+    # 嵌入服务异常
+    "EmbeddingAPIError",
+    "EmbeddingResponseError",
+    "EmbeddingModelError",
     # 权限异常
     "InsufficientTokenError",
     # 事件异常
