@@ -1005,10 +1005,10 @@ class TestHandleUnexpectedError:
         assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def test_value_error_returns_500(self):
-        """验证 ValueError 返回 400（ValueError 兜底处理器）."""
+        """验证 ValueError 返回 500（兜底处理器已移除，归入通用异常处理）."""
         client = self._make_unexpected_error_app(ValueError("bad value"))
         resp = client.get("/test")
-        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     @mock.patch("src.interfaces.api.exception_handlers.logger")
     def test_unexpected_error_logs_exception(self, mock_logger):
