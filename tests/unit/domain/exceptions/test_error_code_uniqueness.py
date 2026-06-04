@@ -11,27 +11,20 @@ import src.domain.exceptions as exc_module
 
 
 def test_all_error_codes_unique() -> None:
-    """验证所有领域异常编码全局唯一"""
+    """验证所有领域异常编码全局唯一
+
+    注意：__all__ 中可能包含向后兼容别名（如 BaseException 是 DomainError 的别名），
+    按类对象 id() 去重以排除同一类的多个引用名。
+    """
     classes: list[type] = []
+    seen_ids: set[int] = set()
     for name in exc_module.__all__:
         cls = getattr(exc_module, name)
         if isinstance(cls, type) and issubclass(cls, Exception):
-            classes.append(cls)
+            if id(cls) not in seen_ids:
+                seen_ids.add(id(cls))
+                classes.append(cls)
 
-    codes: list[str] = []
-    for cls in classes:
-        code = getattr(cls, "code", None)
-        if code is not None:
-            codes.append(code)
-
-    seen: dict[str, str] = {}
-    duplicates: list[str] = []
-    for code in codes:
-        if code in seen:
-            duplicates.append(f"{code} (used by {seen[code]} and another class)")
-        seen[code] = code
-
-    # 重新检查：收集重复编码及其类名
     code_to_classes: dict[str, list[str]] = {}
     for cls in classes:
         code = getattr(cls, "code", None)

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
+from src.domain.exceptions import ConfigurationError
 from src.domain.ports.auth_service import AuthServicePort
 from src.domain.ports.backup_recovery_service import BackupRecoveryServicePort
 from src.domain.ports.data_integrity_service import DataIntegrityServicePort
@@ -197,10 +198,7 @@ def create_security_router(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         if auth_service is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Auth service not configured",
-            )
+            raise ConfigurationError("Auth service not configured")
         return await auth_service.verify_token(token)
 
     current_user = get_current_user_override or get_current_user
