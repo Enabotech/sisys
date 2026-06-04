@@ -260,13 +260,18 @@ class DocumentParsingService:
         file_path: str,
         mime_type: str,
     ) -> ParsedDocument:
-        """对已解析文档应用版面检测增强（仅 PDF 格式，优雅降级）
+        """对已解析文档应用版面检测增强（仅 PDF 格式，逐页独立降级）
 
         算法流程：
         1. 检查 layout_detector 和 pdf_page_renderer 是否已注入
         2. 仅 PDF 格式触发检测，其他格式跳过
         3. 逐页渲染 PDF 页面为 PNG → 调用 detect() → 顺序匹配 → 填充 bbox
-        4. 运行时错误不阻断解析流程（记录日志并返回原文档）
+        4. 单页检测失败不影响其他页面（逐页独立 try/except）
+        5. 运行时错误不阻断解析流程（记录日志并返回原文档）
+
+        注意：当前使用顺序匹配而非 IoU 空间匹配，因为 PDFParser 不输出 bbox（均为 None）。
+        当 PDFParser 未来输出非 None bbox 时，应替换为 layout_matching.match_detections()。
+        TODO: Table 标签检测结果应映射到 ParsedTable.bbox，作为后续 Story 实现。
 
         Args:
             parsed_doc: 已完成文本解析的 ParsedDocument
@@ -284,11 +289,11 @@ class DocumentParsingService:
         if mime_type != "application/pdf":
             return parsed_doc
 
-        try:
-            from src.domain.value_objects.parsed_document import ParsedElement, ParsedPage
+        from src.domain.value_objects.parsed_document import ParsedElement, ParsedPage
 
-            enhanced_pages: list[ParsedPage] = []
-            for page in parsed_doc.pages:
+        enhanced_pages: list[ParsedPage] = []
+        for page in parsed_doc.pages:
+            try:
                 # 渲染 PDF 页面为 PNG 图像
                 image_bytes = await asyncio.to_thread(self._pdf_page_renderer.render_page, file_path, page.page_number)
 
@@ -331,8 +336,9 @@ class DocumentParsingService:
                     )
                 )
 
-            return replace(parsed_doc, pages=enhanced_pages)
+            except Exception:
+                # 单页检测失败不影响其他页面，保留原始页面继续处理
+                logger.warning("第 %d 页版面检测失败，跳过该页增强", page.page_number, exc_info=True)
+                enhanced_pages.append(page)
 
-        except Exception:
-            logger.warning("版面检测失败，跳过增强步骤", exc_info=True)
-            return parsed_doc
+        return replace(parsed_doc, pages=enhanced_pages)

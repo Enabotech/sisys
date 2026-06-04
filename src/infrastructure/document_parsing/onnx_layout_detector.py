@@ -93,6 +93,15 @@ class OnnxLayoutDetector:
         self._label_map = _DOCLAYNET_LABELS
         self._confidence_threshold = confidence_threshold
 
+        # 动态发现输入/输出张量名称，避免硬编码不匹配真实模型
+        self._input_name: str = self._session.get_inputs()[0].name
+        self._output_names: list[str] = [o.name for o in self._session.get_outputs()]
+        logger.info(
+            "ONNX 模型输入: %s, 输出: %s",
+            self._input_name,
+            self._output_names,
+        )
+
     def detect(self, image_bytes: bytes, page_number: int) -> list[BoundingBoxResult]:
         """检测页面图像中的版面元素
 
@@ -110,7 +119,7 @@ class OnnxLayoutDetector:
         try:
             # 预处理：将图像字节转为 numpy array
             input_array = self._preprocess(image_bytes)
-            outputs = self._session.run(None, {"images": input_array})
+            outputs = self._session.run(None, {self._input_name: input_array})
         except Exception as e:
             raise RuntimeError(f"版面检测推理失败: {e}") from e
 

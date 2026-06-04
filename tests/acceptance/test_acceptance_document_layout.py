@@ -168,6 +168,8 @@ def call_detect_method(context: dict[str, Any]) -> None:
 
     detector = OnnxLayoutDetector.__new__(OnnxLayoutDetector)
     detector._session = mock_session
+    detector._input_name = "images"
+    detector._output_names = ["boxes", "labels", "scores"]
     detector._label_map = {
         1: "Caption",
         2: "Footnote",
