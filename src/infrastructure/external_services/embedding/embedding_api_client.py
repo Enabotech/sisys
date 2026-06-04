@@ -161,11 +161,11 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             return cast(dict[str, Any], resp.json())
         except httpx.TimeoutException as e:
             raise EmbeddingServiceError(f"嵌入 API 请求超时: {e}") from e
-        except httpx.NetworkError as e:
+        except httpx.TransportError as e:
             raise EmbeddingServiceError(f"嵌入 API 网络错误: {e}") from e
         except httpx.HTTPStatusError as e:
             raise EmbeddingServiceError(f"嵌入 API 返回 HTTP {e.response.status_code}") from e
-        except (ValueError, KeyError) as e:
+        except ValueError as e:
             raise EmbeddingServiceError(f"嵌入 API 响应格式异常: {e}") from e
 
     def close(self) -> None:

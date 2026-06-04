@@ -115,12 +115,6 @@ def _detect_device() -> tuple[str, bool]:
     return requested_device, False
 
 
-@app.on_event("startup")
-def _load_model_deprecated() -> None:
-    """（已弃用）保留向后兼容，实际模型加载由 lifespan 处理"""
-    pass
-
-
 def load_model() -> None:
     """服务启动时加载 BGE-M3 模型，请求间复用
 
@@ -160,6 +154,9 @@ def load_model() -> None:
         logger.error("模型加载失败: %s", e)
         app.state.load_error = str(e)
         # 不抛出异常，让服务继续运行（healthcheck 会反映状态）
+    except Exception as e:
+        logger.error("模型加载失败 (未预期异常): %s", type(e).__name__, e)
+        app.state.load_error = str(e)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -204,10 +201,13 @@ def _parse_sparse_weights(lexical_weights: list[dict]) -> list[dict]:
     """
     sparse_list: list[dict] = []
     for w in lexical_weights:
-        sorted_items = sorted(
-            ((int(k), float(v)) for k, v in w.items() if k.lstrip("-").isdigit()),
-            key=lambda x: x[0],
-        )
+        sorted_items: list[tuple[int, float]] = []
+        for k, v in w.items():
+            try:
+                sorted_items.append((int(k), float(v)))
+            except (ValueError, TypeError):
+                logger.debug("跳过非法 token ID: %s", k)
+        sorted_items.sort(key=lambda x: x[0])
         if sorted_items:
             sparse_list.append(
                 {
