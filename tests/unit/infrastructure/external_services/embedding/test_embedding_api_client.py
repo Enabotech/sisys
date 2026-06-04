@@ -204,14 +204,16 @@ class TestEmbeddingAPIClientErrorHandling:
     """EmbeddingAPIClient 错误处理"""
 
     def test_http_error_propagates(self, api_config: EmbeddingConfig) -> None:
-        """HTTP 5xx 异常传播"""
+        """HTTP 5xx 包装为 EmbeddingServiceError"""
+        from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingServiceError
+
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.status_code = 500
         mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError("Server Error", request=MagicMock(), response=mock_resp)
 
         with patch("httpx.Client.post", return_value=mock_resp):
             client = EmbeddingAPIClient(api_config)
-            with pytest.raises(httpx.HTTPStatusError):
+            with pytest.raises(EmbeddingServiceError, match="HTTP 500"):
                 client.encode_text("测试文本")
 
     def test_timeout_wraps_to_embedding_service_error(self, api_config: EmbeddingConfig) -> None:
