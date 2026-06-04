@@ -73,32 +73,32 @@
 - [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
 - [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
-#### 领域异常清单 (Domain Exception Registry)
+#### 领域异常契约 (Domain Exception Contract)
 
-> **原则**：异常是领域契约的一部分。本 Story 新增/修改的异常必须在 Task 0 中完成设计，禁止在实现 Task 中临时定义。
-> 完整检查清单详见 [`docs/architecture/sisys-uni-exception-design.md §3.12`](../architecture/sisys-uni-exception-design.md#312-异常注册检查清单)。
+> **原则**：异常是领域契约的一部分。本 Story 新增/修改的领域异常必须在 Task 0 中完成设计，禁止在实现 Task 中临时定义。
 
-**设计阶段（本 Story 定义）：**
+> **适用范围：** 本清单仅针对定义在 `src/domain/exceptions/` 下、继承自 `DomainError`（别名 `BaseException`）的**领域异常**。
+> **不在本清单范围：** FastAPI/Pydantic 框架原生异常、第三方 SDK 原始异常（由 `ErrorMapper` 映射）、实体构造器 `ValueError`（已知技术债务，独立迭代迁移）。
+> 完整检查清单与全量异常分类详见 [`docs/architecture/sisys-uni-exception-design.md §3.12`](../architecture/sisys-uni-exception-design.md#312-异常注册检查清单)。
 
-- [ ] **归属模块与基类** — 确定异常归属的领域异常模块（`system`/`business`/`external`/`storage`/`role`/...），选择正确基类（`SystemException` / `BusinessException` / `ExternalException`）
-- [ ] **唯一编码分配** — 从对应范围选取（系统 101-199、业务 201-299、外部 301-399），`grep` 验证无碰撞
-- [ ] **构造器参数设计** — 携带领域上下文（`transfer_id`、`role_id` 等），通过 `context` 字典暴露
-- [ ] **消息安全性审查** — 错误消息面向调用方可理解，不泄露 SQL/堆栈等内部实现细节
-- [ ] **编码注册表更新** — 更新 `sisys-uni-exception-design.md` §3.7 错误码注册表
+- [ ] 归属模块与基类 — 确定异常归属的领域异常模块（`system`/`business`/`external`/`storage`/`role`/...），选择正确基类（`SystemException` / `BusinessException` / `ExternalException`）
+- [ ] 唯一编码分配 — 从对应范围选取（系统 101-199、业务 201-299、外部 301-399），`grep` 验证无碰撞
+- [ ] 构造器参数设计 — 携带领域上下文（`transfer_id`、`role_id` 等），通过 `context` 字典暴露
+- [ ] 消息安全性审查 — 错误消息面向调用方可理解，不泄露 SQL/堆栈等内部实现细节
+- [ ] 编码注册表更新 — 更新 `sisys-uni-exception-design.md` §3.7 错误码注册表
+- [ ] 导出完整性 — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
+- [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射测试 + 编码唯一性测试通过
+- [ ] 无抑制注释 — `# noqa` / `# type: ignore` 零容忍（仅 `type-abstract` 例外）
+- [ ] BDD 验收场景 — 异常路径的 Gherkin 场景（如 `Scenario: 资源不存在返回 404`）
 
-**验证阶段（质量门禁 Task 中验证）：**
+**不在本清单范围的异常处理速查：**
 
-- [ ] **导出完整性** — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
-- [ ] **测试覆盖** — 构造/`to_dict()`/HTTP 映射测试 + 编码唯一性测试通过
-- [ ] **无抑制注释** — `# noqa` / `# type: ignore` 零容忍（仅 `type-abstract` 例外）
-- [ ] **BDD 验收场景** — 异常路径的 Gherkin 场景（如 `Scenario: 资源不存在返回 404`）
-
-**快速自检：**
-```bash
-grep -r "EXCEPTION_NNN" src/domain/exceptions/      # 编码碰撞检查
-poetry run pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v
-poetry run ruff check src/domain/exceptions/
-```
+| 场景 | 正确做法 | 错误做法 |
+|------|---------|---------|
+| OAuth2 token 缺失/无效 | `raise HTTPException(401, headers={"WWW-Authenticate": "Bearer"})` | 定义新领域异常（FastAPI 安全机制不识别） |
+| 第三方 SDK 报错（MinIO S3Error 等） | `ErrorMapper.map_s3_error(e.code, e.message)` → 自动转为领域异常 | 直接 `raise` 原始 SDK 异常 |
+| 实体构造器参数无效 | 当前：`raise ValueError(...)` → `_handle_value_error` 兜底；未来：迁移至 `ValidationError` | 定义新的实体级异常类 |
+| 纯技术/内部错误不暴露给 API | `raise RuntimeError(...)` + 内部日志 | 定义为领域异常（会造成 API 信息泄露）
 
 #### API 契约 (API Contract)
 - [ ] 遵循 OpenAPI 标准的 API 契约定义位于 `docs/api/openapi.yaml`
