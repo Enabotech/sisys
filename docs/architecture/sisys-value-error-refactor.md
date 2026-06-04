@@ -12,6 +12,7 @@
 |------|------|---------|------|
 | 2026-06-04 | v1.0 | 初始版本 | Agimtech |
 | 2026-06-04 | v1.1 | 文档审查修订：修正 agent.py(8)/strategic_plan.py(10)/应用层(22) 数量；新增 §2.4.2 except ValueError 捕获站点分析；新增 §4.5.3 配置层异常链策略；新增 ADR-001 设计决策；新增 §4.6.3 validate() 返回类型差异表；增强 §6.1 监控告警风险、§6.2 回滚策略 | Agimtech |
+| 2026-06-04 | v1.2 | 第二轮审查修订：修正源文件总数 57→58；修正 audit.py 分类 B→A；新增 §2.4.2 D 类（redis_subscriber 需修改 catch 类型）；修正 except ValueError 分类计数；修正值对象测试文件数 7→2；批次 8 新增 redis_subscriber.py 处理步骤；增强步骤 10.2 人工审查说明 | Agimtech |
 
 ---
 
@@ -19,7 +20,7 @@
 
 ### 1.1 问题描述
 
-当前系统中存在 **186 处 `raise ValueError`**（分布在 57 个源文件中），与已建立的领域异常体系并存。这导致：
+当前系统中存在 **186 处 `raise ValueError`**（分布在 58 个源文件中），与已建立的领域异常体系并存。这导致：
 
 | 问题 | 影响 | 严重度 |
 |------|------|--------|
@@ -61,7 +62,7 @@ src/ 目录 ValueError 分布（186 处）— 全部迁移
 ├── infrastructure/storage/   18 处（9 个文件）    ← 批次 8/9：ValidationError / ConfigurationError
 ├── infrastructure/messaging/  8 处（6 个文件）    ← 批次 8：ValidationError / ConfigurationError / InvalidStateError
 ├── infrastructure/saga/       5 处（3 个文件）    ← 批次 8：InvalidStateTransitionError / ValidationError / NotFoundError
-├── infrastructure/其他       23 处（9 个文件）    ← 批次 8/9：ValidationError / ConfigurationError / EmbeddingAPIError
+├── infrastructure/其他       23 处（10 个文件）   ← 批次 8/9：ValidationError / ConfigurationError / EmbeddingAPIError
 
 tests/ 目录（194 处 pytest.raises(ValueError)，50 个文件）— 全部同步更新
 ```
@@ -105,9 +106,10 @@ tests/ 目录（194 处 pytest.raises(ValueError)，50 个文件）— 全部同
 
 | 类别 | 数量 | 代表文件 | 迁移行为 |
 |------|------|---------|---------|
-| **A. 捕获 Python 内置 ValueError**（int/float/UUID 解析） | ~27 | `config/udmr.py`, `config/qdrant.py`, `config/neo4j.py`, `config/redis.py`, `config/auto_route.py`, `config/auto_trigger.py`, `config/minio.py`, `config/langgraph.py`, `token_payload.py` | ✅ **保留** `except ValueError`，仅修改内部的 `raise` 为 `ConfigurationError` |
-| **B. 捕获被迁移的项目 ValueError**（service 调用） | ~7 | `interfaces/api/document_upload.py`（4处）, `interfaces/api/audit.py`（3处） | ⚠️ **移除整个 try/except 块**，因为 service 已直接 raise 领域异常（无需二次包装） |
-| **C. 捕获外部库/混合模式 ValueError** | ~3 | `prefect_engine.py`（2处）, `monitoring/aggregator.py`, `messaging/redis_subscriber.py`, `storage/qdrant/vector_storage.py`, `document_parsing/text_parser.py`, `embedding_api_client.py` | ✅ **保留** `except ValueError`，仅修改 re-raise（如有） |
+| **A. 捕获 Python 内置 ValueError**（int/float/UUID 解析） | ~28 | `config/udmr.py`, `config/qdrant.py`, `config/neo4j.py`, `config/redis.py`, `config/auto_route.py`, `config/auto_trigger.py`, `config/minio.py`, `config/langgraph.py`, `token_payload.py`, `interfaces/api/audit.py`（3处）, `monitoring/aggregator.py`, `storage/qdrant/vector_storage.py` | ✅ **保留** `except ValueError`，仅修改内部的 `raise` 为 `ConfigurationError` 等 |
+| **B. 捕获被迁移的项目 ValueError**（service 调用） | ~4 | `interfaces/api/document_upload.py`（4处） | ⚠️ **移除整个 try/except 块**，因为 service 已直接 raise 领域异常（无需二次包装） |
+| **C. 捕获外部库/混合模式 ValueError** | ~4 | `prefect_engine.py`（2处）, `document_parsing/text_parser.py`, `embedding_api_client.py` | ✅ **保留** `except ValueError`，仅修改 re-raise（如有） |
+| **D. 需修改异常捕获类型**（迁移后原 catch 失效） | ~1 | `messaging/redis_subscriber.py`（1处） | ⚠️ **修改为 `except DomainError`**：`DomainEvent.from_dict()` 迁移后抛出 `EntityValidationError`（不继承 ValueError），原 `except ValueError` 静默失效 |
 
 > **关键风险点**：`document_upload.py` 中 4 处 `except ValueError as e: raise ValidationError(...)` 模式——迁移后 `document_upload_service.py` 直接 raise `ValidationError`，不再经过 ValueError 通道，原有捕获代码将**静默失效**（`ValidationError` 不继承 `ValueError`）。批次 7 必须同步移除这些 try/except 块。
 
@@ -733,9 +735,8 @@ def test_token_sum_invariant():
 - [ ] **7.6** 迁移 `src/application/event_handlers/event_dict_to_json.py`（2 处 ValueError → ValidationError）
 - [ ] **7.7** 更新对应测试文件（~22 处 pytest.raises 修改）
 - [ ] **7.8** **移除** `src/interfaces/api/document_upload.py` 中 4 处 `except ValueError as e: raise ValidationError(...)` 的间接捕获块——迁移后 service 直接 raise `ValidationError`（不经过 ValueError 通道），原有捕获代码静默失效，整个 try/except 块应删除
-- [ ] **7.9** 检查 `src/interfaces/api/audit.py` 中 3 处 `except ValueError`（行200/234/259），确认迁移后是否需要修改（审计端点捕获的是 Python 内置 ValueError，不涉及此次迁移的异常类型）
-- [ ] **7.10** 运行 `poetry run pytest tests/unit/application/ -v`
-- [ ] **7.11** 运行全量测试确认无回归
+- [ ] **7.9** 运行 `poetry run pytest tests/unit/application/ -v`
+- [ ] **7.10** 运行全量测试确认无回归
 
 #### 批次 8：基础设施层-运行时迁移
 
@@ -759,9 +760,10 @@ def test_token_sum_invariant():
 - [ ] **8.18** 迁移 `src/infrastructure/workflow/prefect_engine.py`（2 处 → ValidationError）
 - [ ] **8.19** 迁移 `src/infrastructure/security/data_integrity_service_impl.py`（1 处 → ConfigurationError）
 - [ ] **8.20** 迁移 `src/infrastructure/external_services/embedding/embedding_api_client.py`（4 处 → ValidationError / EmbeddingAPIError）
-- [ ] **8.21** 更新对应测试文件（~60 处 pytest.raises 修改）
-- [ ] **8.22** 运行 `poetry run pytest tests/unit/infrastructure/ -v`
-- [ ] **8.23** 运行全量测试确认无回归
+- [ ] **8.21** 修改 `src/infrastructure/messaging/redis_subscriber.py` 中 `except ValueError`（~155行）为 `except DomainError`——`DomainEvent.from_dict()` 迁移后抛出 `EntityValidationError`（不继承 ValueError），原捕获静默失效
+- [ ] **8.22** 更新对应测试文件（~60 处 pytest.raises 修改）
+- [ ] **8.23** 运行 `poetry run pytest tests/unit/infrastructure/ -v`
+- [ ] **8.24** 运行全量测试确认无回归
 
 #### 批次 9：配置层与监控层迁移
 
@@ -790,7 +792,7 @@ def test_token_sum_invariant():
 #### 批次 10：清理与收尾
 
 - [ ] **10.1** 确认全系统零 ValueError：`grep -r "raise ValueError" src/` 返回空
-- [ ] **10.2** 确认测试零 ValueError 断言：`grep -r "pytest.raises(ValueError)" tests/` 返回空
+- [ ] **10.2** 确认测试零 ValueError 断言：`grep -r "pytest.raises(ValueError)" tests/` 返回空（或仅包含合法残留：Python 内置行为测试如 `uuid.UUID("invalid")`、`int("abc")` 等——此类需人工审查确认后加入白名单）
 - [ ] **10.3** 从 `exception_handlers.py` 移除 `_handle_value_error` 方法和注册
 - [ ] **10.4** 移除 `# type: ignore[arg-type]` 注释（如注册行已删除）
 - [ ] **10.5** 运行错误码唯一性测试：`poetry run pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v`
@@ -892,7 +894,7 @@ git revert <commit-hash>  # 回滚特定批次
 |------|------|------|
 | `src/domain/value_objects/token_consumption.py` | 修改 | 2 处 |
 | `src/domain/value_objects/token_payload.py` | 修改 | 5 处 |
-| 对应测试文件 | 修改 | 7 处 |
+| 对应测试文件 | 修改 | 2 处 |
 
 #### 批次 5（领域事件）
 
