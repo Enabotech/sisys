@@ -26,6 +26,7 @@ from fastapi.testclient import TestClient
 from pytest_bdd import given, scenario, then, when
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
+from src.domain.exceptions import ConflictError, NotFoundError, ValidationError
 from src.domain.value_objects.token_payload import TokenPayload
 from src.infrastructure.document_parsing.archive_extractor import ArchiveExtractor
 from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
@@ -242,7 +243,7 @@ def upload_exe_file(
     upload_response: dict[str, Any],
 ):
     """Upload an unsupported EXE file."""
-    mocks["upload_service"].upload = AsyncMock(side_effect=ValueError("不支持的格式: malware.exe"))
+    mocks["upload_service"].upload = AsyncMock(side_effect=ValidationError(message="不支持的格式: malware.exe"))
     resp = test_client.post(
         "/api/v1/documents",
         files={"file": ("malware.exe", io.BytesIO(b"content"), "application/x-msdownload")},
@@ -260,7 +261,7 @@ def upload_empty_file(
     upload_response: dict[str, Any],
 ):
     """Upload an empty file."""
-    mocks["upload_service"].upload = AsyncMock(side_effect=ValueError("空文件，文件大小必须大于 0"))
+    mocks["upload_service"].upload = AsyncMock(side_effect=ValidationError(message="空文件，文件大小必须大于 0"))
     resp = test_client.post(
         "/api/v1/documents",
         files={"file": ("empty.pdf", io.BytesIO(b""), "application/pdf")},
@@ -279,7 +280,7 @@ def upload_mime_mismatch(
 ):
     """Upload file with MIME mismatch."""
     mocks["upload_service"].upload = AsyncMock(
-        side_effect=ValueError("MIME 类型不匹配: 扩展名期望 application/pdf，实际 text/plain")
+        side_effect=ValidationError(message="MIME 类型不匹配: 扩展名期望 application/pdf，实际 text/plain")
     )
     resp = test_client.post(
         "/api/v1/documents",
@@ -298,7 +299,7 @@ def upload_bad_filename(
     upload_response: dict[str, Any],
 ):
     """Upload file with special characters in name."""
-    mocks["upload_service"].upload = AsyncMock(side_effect=ValueError("文件名包含非法字符"))
+    mocks["upload_service"].upload = AsyncMock(side_effect=ValidationError(message="文件名包含非法字符"))
     resp = test_client.post(
         "/api/v1/documents",
         files={"file": ("bad\\file.pdf", io.BytesIO(b"content"), "application/pdf")},
@@ -316,7 +317,7 @@ def upload_no_extension(
     upload_response: dict[str, Any],
 ):
     """Upload file without extension."""
-    mocks["upload_service"].upload = AsyncMock(side_effect=ValueError("不支持的格式: noextension"))
+    mocks["upload_service"].upload = AsyncMock(side_effect=ValidationError(message="不支持的格式: noextension"))
     resp = test_client.post(
         "/api/v1/documents",
         files={"file": ("noextension", io.BytesIO(b"content"), "application/octet-stream")},
@@ -487,7 +488,7 @@ def chunked_upload_initialized(mocks: dict[str, AsyncMock], upload_response: dic
 def expired_upload_id_exists(mocks: dict[str, AsyncMock], upload_response: dict[str, Any]):
     """Expired upload_id exists."""
     mocks["chunked_manager"].get_multipart_info = AsyncMock(return_value=None)
-    mocks["chunked_manager"].complete_upload = AsyncMock(side_effect=ValueError("upload_id expired 不存在或已过期"))
+    mocks["chunked_manager"].complete_upload = AsyncMock(side_effect=NotFoundError(message="upload_id expired 不存在或已过期"))
     upload_response["expired_upload_id"] = "expired-id-123"
 
 
@@ -498,7 +499,9 @@ def chunked_upload_part1_done(mocks: dict[str, AsyncMock], upload_response: dict
         return_value={"minio_upload_id": "minio-upload-id-123", "object_key": "docs/key"}
     )
     mocks["document_storage"].upload_part = AsyncMock(return_value="etag-001")
-    mocks["chunked_manager"].upload_part = AsyncMock(side_effect=ValueError("分片乱序：期望第 2 个分片，实际收到第 3 个"))
+    mocks["chunked_manager"].upload_part = AsyncMock(
+        side_effect=ConflictError(message="分片乱序：期望第 2 个分片，实际收到第 3 个")
+    )
     upload_response["upload_id"] = "redis-upload-id"
 
 
@@ -697,7 +700,7 @@ def empty_batch_upload(
     upload_response: dict[str, Any],
 ):
     """Send empty batch upload."""
-    mocks["upload_service"].upload_batch = AsyncMock(side_effect=ValueError("空批量请求，至少需要一个文件"))
+    mocks["upload_service"].upload_batch = AsyncMock(side_effect=ValidationError(message="空批量请求，至少需要一个文件"))
     resp = test_client.post(
         "/api/v1/documents/batch",
         files=[("files", ("dummy.pdf", io.BytesIO(b""), "application/pdf"))],
@@ -745,7 +748,7 @@ def batch_upload_size_limit(
     upload_response: dict[str, Any],
 ):
     """Batch upload exceeds size limit."""
-    mocks["upload_service"].upload_batch = AsyncMock(side_effect=ValueError("批量上传总大小超过限制（最大 20GB）"))
+    mocks["upload_service"].upload_batch = AsyncMock(side_effect=ValidationError(message="批量上传总大小超过限制（最大 20GB）"))
     resp = test_client.post(
         "/api/v1/documents/batch",
         files=[("files", ("big1.pdf", io.BytesIO(b"x"), "application/pdf"))],
