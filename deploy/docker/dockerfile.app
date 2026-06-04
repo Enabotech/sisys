@@ -34,7 +34,6 @@ COPY tests/ ./tests/
 COPY configs/ ./configs/
 
 # 复制配置文件
-COPY .env.example .env
 COPY pyproject.toml poetry.lock ./
 
 # 安装开发依赖 (用于测试)
