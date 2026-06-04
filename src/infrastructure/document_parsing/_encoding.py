@@ -21,7 +21,7 @@ def detect_and_decode(raw_bytes: bytes) -> tuple[str, str]:
         (解码后的文本字符串, 使用的编码名称)
 
     Raises:
-        ValueError: 所有编码均解码失败
+        ValidationError: 所有编码均解码失败
     """
     for encoding in ["utf-8", "gbk", "gb18030"]:
         try:

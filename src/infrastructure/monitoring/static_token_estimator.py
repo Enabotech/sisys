@@ -40,7 +40,7 @@ class StaticTokenEstimator(TokenEstimatorPort):
             (prompt_tokens, completion_tokens) 元组
 
         Raises:
-            ValueError: route_type 为 None 或空字符串时
+            ValidationError: route_type 为 None 或空字符串时
         """
         if not route_type or not route_type.strip():
             raise ValidationError(message="route_type must not be None or empty")

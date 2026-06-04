@@ -300,7 +300,7 @@ def _validate_rel_type(rel_type: str) -> None:
         rel_type: 关系类型字符串
 
     Raises:
-        ValueError: 关系类型不符合 [A-Z_][A-Z0-9_]* 模式时抛出
+        ValidationError: 关系类型不符合 [A-Z_][A-Z0-9_]* 模式时抛出
     """
     if not _REL_TYPE_RE.match(rel_type):
         raise ValidationError(message=f"Invalid relationship type: {rel_type!r}. Must match [A-Z_][A-Z0-9_]*")
@@ -316,7 +316,7 @@ def _sanitize_property_keys(props: dict) -> dict:
         清洗后的属性字典
 
     Raises:
-        ValueError: 属性键名不符合 [a-zA-Z_][a-zA-Z0-9_]* 模式时抛出
+        ValidationError: 属性键名不符合 [a-zA-Z_][a-zA-Z0-9_]* 模式时抛出
     """
     safe = {}
     for k, v in props.items():

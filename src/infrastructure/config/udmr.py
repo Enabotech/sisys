@@ -74,7 +74,7 @@ class UDMRConfig:
             UDMRConfig 实例
 
         Raises:
-            ValueError: 环境变量值不合法时抛出
+            ConfigurationError: 环境变量值不合法时抛出
         """
         enabled_str = os.getenv("UDMR_ENABLED", "true").lower()
         local_first_str = os.getenv("UDMR_LOCAL_FIRST", "false").lower()
@@ -125,7 +125,7 @@ def _parse_cloud_config(index: int) -> CloudModelConfig | None:
         CloudModelConfig 实例，或 None（未配置/禁用/无效）
 
     Raises:
-        ValueError: api_type 无效或 Anthropic 缺少 max_tokens 或定价为负
+        ConfigurationError: api_type 无效或 Anthropic 缺少 max_tokens 或定价为负
     """
     prefix = f"UDMR_CLOUD_{index}_"
     enabled_str = os.getenv(prefix + "ENABLED", "true").lower()

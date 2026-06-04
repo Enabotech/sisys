@@ -60,7 +60,7 @@ class TokenPayload:
             TokenPayload 实例
 
         Raises:
-            ValueError: claims 缺少必需字段或格式错误
+            EntityValidationError: claims 缺少必需字段或格式错误
         """
         # 解析 user_id
         sub = claims.get("sub")

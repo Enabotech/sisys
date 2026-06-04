@@ -64,7 +64,7 @@ class VectorPoint:
         """验证向量维度是否正确
 
         Raises:
-            ValueError: 向量维度不为 1024 时抛出
+            ValidationError: 向量维度不为 1024 时抛出
         """
         if len(self.vector) != 1024:
             raise ValidationError(message=f"Vector dimension must be 1024, got {len(self.vector)}")
@@ -86,7 +86,7 @@ class SparseVector:
         """验证 indices 和 values 长度是否匹配
 
         Raises:
-            ValueError: indices 和 values 长度不一致时抛出
+            ValidationError: indices 和 values 长度不一致时抛出
         """
         if len(self.indices) != len(self.values):
             raise ValidationError(

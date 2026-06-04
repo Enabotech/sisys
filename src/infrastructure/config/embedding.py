@@ -33,7 +33,7 @@ class EmbeddingConfig:
             嵌入 API 配置实例
 
         Raises:
-            ValueError: EMBEDDING_API_URL 格式无效或 EMBEDDING_API_TIMEOUT 值非法时
+            ConfigurationError: EMBEDDING_API_URL 格式无效或 EMBEDDING_API_TIMEOUT 值非法时
         """
         api_url = os.getenv("EMBEDDING_API_URL", "").rstrip("/")
         if api_url:

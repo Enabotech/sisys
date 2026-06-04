@@ -52,7 +52,7 @@ class PdfPageRenderer:
 
         Raises:
             FileNotFoundError: PDF 文件不存在
-            ValueError: 页码超出范围
+            ValidationError: 页码超出范围
             RuntimeError: 渲染失败
         """
         try:

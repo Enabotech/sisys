@@ -76,7 +76,7 @@ class DualChannelEventBus(EventPublisher):
             handler: 事件处理器
 
         Raises:
-            ValueError: 当事件类型为 RELIABLE 模式时
+            InvalidStateError: 当事件类型为 RELIABLE 模式时
         """
         mode = self._router.get_delivery_mode(event_type)
         if mode == DeliveryMode.RELIABLE:
@@ -95,7 +95,7 @@ class DualChannelEventBus(EventPublisher):
             handler: 异步事件处理器
 
         Raises:
-            ValueError: 当事件类型为 RELIABLE 模式时
+            InvalidStateError: 当事件类型为 RELIABLE 模式时
         """
         mode = self._router.get_delivery_mode(event_type)
         if mode == DeliveryMode.RELIABLE:

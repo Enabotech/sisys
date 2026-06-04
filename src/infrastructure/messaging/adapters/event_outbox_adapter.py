@@ -47,7 +47,7 @@ class EventOutboxAdapter:
             对应的领域事件实例
 
         Raises:
-            ValueError: 如果 event_type 未注册
+            ConfigurationError: 如果 event_type 未注册
         """
         # 使用 DomainEvent._registry 验证 event_type（单一真实来源）
         if entity.event_type not in DomainEvent._registry:

@@ -93,7 +93,7 @@ class RedisSnapshotStore(SnapshotRepositoryProtocol):
             ttl_seconds: TTL 秒数（60 ~ 2592000）
 
         Raises:
-            ValueError: TTL 超出允许范围
+            ValidationError: TTL 超出允许范围
         """
         if ttl_seconds < 60 or ttl_seconds > 2592000:
             raise ValidationError(message="TTL must be between 60 seconds and 30 days")

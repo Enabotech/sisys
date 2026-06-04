@@ -46,7 +46,7 @@ class CompressorService(Protocol):
             CompressionResult，包含压缩后内容和统计信息
 
         Raises:
-            ValueError: 如果内容超过限制
+            ValidationError: 如果内容超过限制
         """
 
     def supports(self, content: str) -> bool:

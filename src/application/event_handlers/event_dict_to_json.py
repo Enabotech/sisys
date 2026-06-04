@@ -28,7 +28,7 @@ def event_dict_to_json(event_dict: dict[str, Any]) -> str:
         JSON 字符串表示
 
     Raises:
-        ValueError: 字典无法序列化为 JSON 时抛出
+        ValidationError: 字典无法序列化为 JSON 时抛出
     """
     try:
         return dict_adapter.dump_json(event_dict).decode("utf-8")
@@ -46,7 +46,7 @@ def json_to_event_dict(json_str: str) -> dict[str, Any]:
         适用于 DomainEvent.from_dict() 的字典
 
     Raises:
-        ValueError: JSON 字符串无效时抛出
+        ValidationError: JSON 字符串无效时抛出
     """
     try:
         data = json.loads(json_str)

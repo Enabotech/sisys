@@ -70,7 +70,7 @@ class InMemoryEventStore(EventStore):
             版本范围内的领域事件列表
 
         Raises:
-            ValueError: 当 from_version > to_version 或版本号为负时
+            ValidationError: 当 from_version > to_version 或版本号为负时
         """
         if from_version < 1 or to_version < 1:
             raise ValidationError(message="Version numbers must be >= 1")

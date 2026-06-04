@@ -107,7 +107,7 @@ class PostgreSQLSagaRepository(SagaRepositoryProtocol):
             status: 新状态
 
         Raises:
-            ValueError: 未找到对应 Saga 实例时抛出
+            NotFoundError: 未找到对应 Saga 实例时抛出
         """
         existing = await self._session.execute(
             text("SELECT 1 FROM saga_instance WHERE saga_id = :saga_id"),

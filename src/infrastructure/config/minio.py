@@ -57,7 +57,7 @@ class MinIOConfig:
             MinIOConfig 实例
 
         Raises:
-            ValueError: 当环境变量值无法解析为正确类型时
+            ConfigurationError: 当环境变量值无法解析为正确类型时
         """
         connect_timeout_str = os.getenv("MINIO_CONNECT_TIMEOUT", "5.0")
         try:

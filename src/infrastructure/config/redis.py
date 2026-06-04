@@ -48,7 +48,7 @@ class RedisConfig:
             RedisConfig 实例
 
         Raises:
-            ValueError: 当环境变量值无法解析为正确类型时
+            ConfigurationError: 当环境变量值无法解析为正确类型时
         """
         retry_on_timeout_env = os.getenv("REDIS_RETRY_ON_TIMEOUT", "true").lower()
 

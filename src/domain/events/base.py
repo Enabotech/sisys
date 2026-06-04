@@ -110,7 +110,7 @@ class DomainEvent:
             事件的字典表示
 
         Raises:
-            ValueError: event_type 为空或 payload 不可 JSON 序列化
+            EntityValidationError: event_type 为空或 payload 不可 JSON 序列化
         """
         if not self.event_type:
             raise EntityValidationError(
@@ -185,7 +185,7 @@ class DomainEvent:
             重建的 DomainEvent 实例（可能是子类）
 
         Raises:
-            ValueError: 必需字段缺失或格式错误
+            EntityValidationError: 必需字段缺失或格式错误
         """
         if "event_id" not in data:
             raise EntityValidationError(

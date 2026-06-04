@@ -57,7 +57,7 @@ class SagaOrchestrator:
             repository: Saga 持久化仓储
 
         Raises:
-            ValueError: steps 为空列表时抛出
+            ValidationError: steps 为空列表时抛出
         """
         if not steps:
             raise ValidationError(message="steps 不能为空列表")

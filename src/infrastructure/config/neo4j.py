@@ -57,7 +57,7 @@ class Neo4jConfig:
             Neo4jConfig 实例
 
         Raises:
-            ValueError: 当环境变量值无法解析为正确类型时
+            ConfigurationError: 当环境变量值无法解析为正确类型时
         """
         max_pool_size_str = os.getenv("NEO4J_MAX_POOL_SIZE", "50")
         try:

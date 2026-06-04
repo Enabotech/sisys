@@ -69,7 +69,7 @@ class DenseSemanticSearchService:
             检索结果列表，按相似度降序排列
 
         Raises:
-            ValueError: 查询文本为空时
+            ValidationError: 查询文本为空时
         """
         if not query_text or not query_text.strip():
             raise ValidationError(message="查询文本不能为空")
