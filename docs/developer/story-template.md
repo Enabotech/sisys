@@ -73,6 +73,33 @@
 - [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
 - [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
+#### 领域异常清单 (Domain Exception Registry)
+
+> **原则**：异常是领域契约的一部分。本 Story 新增/修改的异常必须在 Task 0 中完成设计，禁止在实现 Task 中临时定义。
+> 完整检查清单详见 [`docs/architecture/sisys-uni-exception-design.md §3.12`](../architecture/sisys-uni-exception-design.md#312-异常注册检查清单)。
+
+**设计阶段（本 Story 定义）：**
+
+- [ ] **归属模块与基类** — 确定异常归属的领域异常模块（`system`/`business`/`external`/`storage`/`role`/...），选择正确基类（`SystemException` / `BusinessException` / `ExternalException`）
+- [ ] **唯一编码分配** — 从对应范围选取（系统 101-199、业务 201-299、外部 301-399），`grep` 验证无碰撞
+- [ ] **构造器参数设计** — 携带领域上下文（`transfer_id`、`role_id` 等），通过 `context` 字典暴露
+- [ ] **消息安全性审查** — 错误消息面向调用方可理解，不泄露 SQL/堆栈等内部实现细节
+- [ ] **编码注册表更新** — 更新 `sisys-uni-exception-design.md` §3.7 错误码注册表
+
+**验证阶段（质量门禁 Task 中验证）：**
+
+- [ ] **导出完整性** — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
+- [ ] **测试覆盖** — 构造/`to_dict()`/HTTP 映射测试 + 编码唯一性测试通过
+- [ ] **无抑制注释** — `# noqa` / `# type: ignore` 零容忍（仅 `type-abstract` 例外）
+- [ ] **BDD 验收场景** — 异常路径的 Gherkin 场景（如 `Scenario: 资源不存在返回 404`）
+
+**快速自检：**
+```bash
+grep -r "EXCEPTION_NNN" src/domain/exceptions/      # 编码碰撞检查
+poetry run pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v
+poetry run ruff check src/domain/exceptions/
+```
+
 #### API 契约 (API Contract)
 - [ ] 遵循 OpenAPI 标准的 API 契约定义位于 `docs/api/openapi.yaml`
 - [ ] API 契约测试通过（`tests/contracts/test_api_contract_[feature name].py`）
@@ -672,10 +699,11 @@
 - v[0.0.0]: 创建故事文件
 
 <!-- 仅用作跟踪故事文件模板修订记录，故事开发时[务必删除]此段
-**模板版本/Template Version:** 2.7.0
+**模板版本/Template Version:** 2.8.0
 **创建日期/Created:** 2026-03-04
-**最后更新/Last Updated:** 2026-05-12
+**最后更新/Last Updated:** 2026-06-04
 **更新说明/Description:**
+- v2.8.0: 新增「领域异常清单 (Domain Exception Registry)」子节于 Task 0 SDD 规范定义（异常 5 轮审查实战经验）：(1) 异常是领域契约，必须在 Task 0 完成设计；(2) 三阶段清单（设计/实现/验证）；(3) 引用完整检查清单 `sisys-uni-exception-design.md §3.12`；(4) 禁止抑制注释
 - v2.7.0: 对齐 domain/ports/contract 契约层、Registry/Resolver/ContractGate、Composition Root 与接口清单强约束
 - v2.5.0: 新增 BDD 步骤实现文件 `test_acceptance_[feature name].py` 编写要求（Story 1.15b 实战经验）
 - v2.4.0: 补充 asyncio.run() 使用场景说明（Story 1.4 实战经验）：(1) 独立脚本用 asyncio.run()，pytest-xdist 并行测试 BDD 步骤用 event_loop fixture；(2) 根据场景选择正确的并发测试手段；(3) asyncio.gather() 用于真正的并发测试
