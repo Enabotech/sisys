@@ -398,7 +398,7 @@ def _extract_error_message(data: dict[str, Any]) -> str:
 def verify_400_format(upload_response: dict[str, Any]):
     """Verify 400 with format error."""
     resp = upload_response["response"]
-    assert resp.status_code == 409
+    assert resp.status_code == 400
     data = resp.json()
     message = _extract_error_message(data)
     assert "格式" in message or "不支持" in message
@@ -408,7 +408,7 @@ def verify_400_format(upload_response: dict[str, Any]):
 def verify_400_empty(upload_response: dict[str, Any]):
     """Verify 400 with empty file error."""
     resp = upload_response["response"]
-    assert resp.status_code == 409
+    assert resp.status_code == 400
     data = resp.json()
     assert "文件" in _extract_error_message(data) or "空" in _extract_error_message(data)
 
@@ -417,7 +417,7 @@ def verify_400_empty(upload_response: dict[str, Any]):
 def verify_400_mime(upload_response: dict[str, Any]):
     """Verify 400 with MIME mismatch error."""
     resp = upload_response["response"]
-    assert resp.status_code == 409
+    assert resp.status_code == 400
     data = resp.json()
     assert "MIME" in _extract_error_message(data) or "不匹配" in _extract_error_message(data)
 
@@ -426,7 +426,7 @@ def verify_400_mime(upload_response: dict[str, Any]):
 def verify_400_filename(upload_response: dict[str, Any]):
     """Verify 400 with filename error."""
     resp = upload_response["response"]
-    assert resp.status_code == 409
+    assert resp.status_code == 400
     data = resp.json()
     assert "文件名" in _extract_error_message(data) or "非法" in _extract_error_message(data)
 
@@ -802,7 +802,7 @@ def verify_1_failed(upload_response: dict[str, Any]):
 def verify_400_size_limit(upload_response: dict[str, Any]):
     """Verify 400 with size limit error."""
     resp = upload_response["response"]
-    assert resp.status_code == 409
+    assert resp.status_code == 400
     data = resp.json()
     assert "总大小" in _extract_error_message(data) or "超过限制" in _extract_error_message(data)
 
