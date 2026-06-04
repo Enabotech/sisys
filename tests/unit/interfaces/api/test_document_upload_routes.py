@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
-from src.domain.exceptions import NotFoundError
+from src.domain.exceptions import NotFoundError, ValidationError
 from src.domain.value_objects.token_payload import TokenPayload
 from src.interfaces.api.exception_handlers import register_exception_handlers
 from src.interfaces.api.middleware.exception_context import ExceptionContextMiddleware
@@ -113,7 +113,7 @@ class TestSingleUpload:
     def test_upload_unsupported_format_returns_400(self) -> None:
         """不支持格式返回 400"""
         client, service, _, _ = _make_app()
-        service.upload = AsyncMock(side_effect=ValueError("不支持的格式: test.exe"))
+        service.upload = AsyncMock(side_effect=ValidationError(message="不支持的格式: test.exe"))
 
         resp = client.post(
             "/api/v1/documents",
@@ -126,7 +126,7 @@ class TestSingleUpload:
     def test_upload_empty_file_returns_400(self) -> None:
         """空文件返回 400"""
         client, service, _, _ = _make_app()
-        service.upload = AsyncMock(side_effect=ValueError("空文件"))
+        service.upload = AsyncMock(side_effect=ValidationError(message="空文件"))
 
         resp = client.post(
             "/api/v1/documents",

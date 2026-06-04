@@ -21,7 +21,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
-from src.domain.exceptions import NotFoundError
+from src.domain.exceptions import NotFoundError, ValidationError
 from src.domain.value_objects.token_payload import TokenPayload
 from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
 from src.interfaces.api.document_upload import create_document_upload_router
@@ -262,7 +262,7 @@ class TestDocumentUploadAPIContract:
     def test_400_for_unsupported_format(self) -> None:
         """验证不支持格式返回 400"""
         client, service, _, _ = _make_client()
-        service.upload = AsyncMock(side_effect=ValueError("不支持的格式"))
+        service.upload = AsyncMock(side_effect=ValidationError(message="不支持的格式"))
 
         resp = client.post(
             "/api/v1/documents",
@@ -274,7 +274,7 @@ class TestDocumentUploadAPIContract:
     def test_400_for_empty_file(self) -> None:
         """验证空文件返回 400"""
         client, service, _, _ = _make_client()
-        service.upload = AsyncMock(side_effect=ValueError("空文件"))
+        service.upload = AsyncMock(side_effect=ValidationError(message="空文件"))
 
         resp = client.post(
             "/api/v1/documents",
