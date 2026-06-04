@@ -19,7 +19,7 @@ class BoundingBox:
         y: 左上角 y 坐标
         width: 宽度
         height: 高度
-        page: 所在页码（0-indexed）
+        page: 所在页码（1-indexed，与 ParsedPage.page_number 一致）
     """
 
     x: float

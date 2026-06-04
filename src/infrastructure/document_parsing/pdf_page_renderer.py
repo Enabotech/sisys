@@ -31,7 +31,9 @@ class PdfPageRenderer:
             dpi: 渲染分辨率
         """
         try:
-            import pypdfium2  # noqa: F401
+            import pypdfium2 as _pypdfium2
+
+            self._pypdfium2 = _pypdfium2
         except ImportError as e:
             raise ImportError("pypdfium2 未安装。请执行: pip install pypdfium2") from e
         self._dpi = dpi
@@ -51,10 +53,8 @@ class PdfPageRenderer:
             ValueError: 页码超出范围
             RuntimeError: 渲染失败
         """
-        import pypdfium2
-
         try:
-            pdf = pypdfium2.PdfDocument(file_path)
+            pdf = self._pypdfium2.PdfDocument(file_path)
         except Exception as e:
             raise FileNotFoundError(f"无法打开 PDF 文件: {file_path}") from e
 

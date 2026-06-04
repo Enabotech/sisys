@@ -104,9 +104,11 @@ def bbox_result_to_dict_outputs_complete_dict(context: dict[str, Any]) -> None:
 def bbox_result_is_frozen(context: dict[str, Any]) -> None:
     from dataclasses import FrozenInstanceError
 
-    result = context["detection_result"]
+    from src.domain.value_objects.parsed_document import BoundingBoxResult
+
+    result: BoundingBoxResult = context["detection_result"]
     with pytest.raises(FrozenInstanceError):
-        result.label = "modified"  # type: ignore[misc]
+        type(result).__setattr__(result, "label", "modified")
 
 
 @given("LayoutDetector Protocol 已定义")
@@ -180,7 +182,12 @@ def call_detect_method(context: dict[str, Any]) -> None:
         11: "Title",
     }
     detector._confidence_threshold = 0.5
-    detector._preprocess = MagicMock(return_value=np.zeros((1, 3, 640, 640), dtype=np.float32))  # type: ignore[assignment]
+    # 通过 object.__setattr__ 设置 mock，绕过类型检查器对方法签名的严格校验
+    object.__setattr__(
+        detector,
+        "_preprocess",
+        MagicMock(return_value=np.zeros((1, 3, 640, 640), dtype=np.float32)),
+    )
     context["detect_results"] = detector.detect(b"fake_image_bytes", page_number=1)
 
 
@@ -343,7 +350,10 @@ def matched_elements_bbox_not_null(context: dict[str, Any]) -> None:
 def bbox_has_five_fields(context: dict[str, Any]) -> None:
     doc = context["parsed_document"]
     matched = [e for e in doc.pages[0].texts if e.bbox is not None]
-    bbox_dict = matched[0].bbox.to_dict()  # type: ignore[union-attr]
+    assert matched, "应有至少一个匹配的元素 bbox 不为 null"
+    bbox = matched[0].bbox
+    assert bbox is not None
+    bbox_dict = bbox.to_dict()
     assert {"x", "y", "width", "height", "page"} == set(bbox_dict.keys())
 
 

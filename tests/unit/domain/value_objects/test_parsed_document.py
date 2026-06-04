@@ -86,7 +86,7 @@ class TestBoundingBoxResult:
         bbox = BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0, page=1)
         result = BoundingBoxResult(label="Text", bbox=bbox, confidence=0.9)
         with pytest.raises(AttributeError):
-            setattr(result, "label", "modified")  # type: ignore[misc]
+            type(result).__setattr__(result, "label", "modified")
 
     def test_confidence_boundary_values(self) -> None:
         """验证 confidence 边界值"""
