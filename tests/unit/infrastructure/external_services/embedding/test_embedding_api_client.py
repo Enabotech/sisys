@@ -258,3 +258,100 @@ class TestEmbeddingAPIClientErrorHandling:
         client.close()
         with pytest.raises(ServiceUnavailableError, match="已关闭"):
             client.embed_query("测试文本")
+
+    def test_close_idempotent(self, api_config: EmbeddingConfig) -> None:
+        """重复调用 close() 不抛异常（幂等）"""
+        client = EmbeddingAPIClient(api_config)
+        client.close()
+        client.close()  # 第二次调用不抛异常
+        assert client._closed is True
+
+    def test_close_sets_closed_on_client_error(self, api_config: EmbeddingConfig) -> None:
+        """httpx.Client.close() 抛异常时 _closed 仍为 True"""
+        client = EmbeddingAPIClient(api_config)
+        with patch.object(client._client, "close", side_effect=RuntimeError("socket error")):
+            client.close()
+        assert client._closed is True
+
+
+class TestEmbeddingAPIClientResponseValidation:
+    """EmbeddingAPIClient 响应结构校验 — _encode 防御性检查"""
+
+    def test_missing_dense_key_raises_response_error(self, api_config: EmbeddingConfig) -> None:
+        """API 响应缺少 'dense' 字段抛出 EmbeddingResponseError"""
+        mock_resp = _make_mock_response({"sparse": None})
+
+        with patch("httpx.Client.post", return_value=mock_resp):
+            client = EmbeddingAPIClient(api_config)
+            with pytest.raises(EmbeddingResponseError, match="缺少 'dense' 字段"):
+                client.embed_query("测试文本")
+
+    def test_dense_not_list_raises_response_error(self, api_config: EmbeddingConfig) -> None:
+        """API 响应 'dense' 字段非列表抛出 EmbeddingResponseError"""
+        mock_resp = _make_mock_response({"dense": "not_a_list", "sparse": None})
+
+        with patch("httpx.Client.post", return_value=mock_resp):
+            client = EmbeddingAPIClient(api_config)
+            with pytest.raises(EmbeddingResponseError, match="非列表"):
+                client.embed_query("测试文本")
+
+    def test_dense_count_mismatch_raises_response_error(self, api_config: EmbeddingConfig) -> None:
+        """API 返回向量数与输入文本数不匹配抛出 EmbeddingResponseError"""
+        mock_resp = _make_mock_response({"dense": [[0.1] * 1024], "sparse": None})
+
+        with patch("httpx.Client.post", return_value=mock_resp):
+            client = EmbeddingAPIClient(api_config)
+            with pytest.raises(EmbeddingResponseError, match="向量数.*不匹配"):
+                client.embed_documents(["文本一", "文本二", "文本三"])
+
+    def test_response_not_dict_raises_response_error(self, api_config: EmbeddingConfig) -> None:
+        """API 响应体非 dict 抛出 EmbeddingResponseError"""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = "not_a_dict"
+
+        with patch("httpx.Client.post", return_value=mock_resp):
+            client = EmbeddingAPIClient(api_config)
+            with pytest.raises(EmbeddingResponseError, match="缺少 'dense' 字段"):
+                client.embed_query("测试文本")
+
+
+class TestEmbeddingExceptionCodes:
+    """异常编码验证 — 确保监控告警依赖的编码不被意外修改"""
+
+    def test_embedding_api_error_code(self) -> None:
+        """EmbeddingAPIError.code == EXCEPTION_306"""
+        from src.domain.exceptions import EmbeddingAPIError
+
+        assert EmbeddingAPIError.code == "EXCEPTION_306"
+        exc = EmbeddingAPIError("test")
+        assert exc.code == "EXCEPTION_306"
+
+    def test_embedding_response_error_code(self) -> None:
+        """EmbeddingResponseError.code == EXCEPTION_307"""
+        from src.domain.exceptions import EmbeddingResponseError
+
+        assert EmbeddingResponseError.code == "EXCEPTION_307"
+        exc = EmbeddingResponseError("test")
+        assert exc.code == "EXCEPTION_307"
+
+    def test_embedding_model_error_code(self) -> None:
+        """EmbeddingModelError.code == EXCEPTION_308"""
+        from src.domain.exceptions import EmbeddingModelError
+
+        assert EmbeddingModelError.code == "EXCEPTION_308"
+        exc = EmbeddingModelError("test")
+        assert exc.code == "EXCEPTION_308"
+
+    def test_timeout_error_code(self) -> None:
+        """TimeoutError.code == EXCEPTION_302"""
+        assert TimeoutError.code == "EXCEPTION_302"
+
+    def test_network_error_code(self) -> None:
+        """NetworkError.code == EXCEPTION_102"""
+        assert NetworkError.code == "EXCEPTION_102"
+
+    def test_service_unavailable_error_code(self) -> None:
+        """ServiceUnavailableError.code == EXCEPTION_303"""
+        assert ServiceUnavailableError.code == "EXCEPTION_303"
