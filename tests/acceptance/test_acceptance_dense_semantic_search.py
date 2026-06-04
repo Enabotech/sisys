@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 from pytest_bdd import given, scenario, scenarios, then, when
 
+from src.domain.exceptions import ValidationError
 from src.infrastructure.config.embedding import EmbeddingConfig
 from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 from src.infrastructure.storage.qdrant.models import VectorPoint
@@ -540,15 +541,15 @@ def embed_sparse_empty_text(context: dict[str, Any], embedding_service):
     context["sparse_error"] = None
     try:
         embedding_service.embed_sparse([""])
-    except ValueError as e:
+    except ValidationError as e:
         context["sparse_error"] = e
 
 
-@then("抛出 ValueError 异常")
+@then("抛出 ValidationError 异常")
 def verify_value_error_raised(context: dict[str, Any]):
     """验证 ValueError 被抛出"""
-    assert context["sparse_error"] is not None, "应抛出 ValueError 但未抛出"
-    assert isinstance(context["sparse_error"], ValueError)
+    assert context["sparse_error"] is not None, "应抛出 ValidationError 但未抛出"
+    assert isinstance(context["sparse_error"], ValidationError)
 
 
 # ===================================================================

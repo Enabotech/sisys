@@ -62,7 +62,7 @@ src/domain/exceptions/              # 统一管理（12 个模块）
 # - TransferNotFoundError/TransferNotApprovedError → src/domain/exceptions/transfer_exceptions.py
 # - permission_middleware.py → 仅 OAuth2 WWW-Authenticate 合法保留（4 处）
 # - ValueError → 领域异常全量迁移（186 处，116 文件变更）
-#   详见 docs/architecture/sisys-value-error-refactor.md
+#   详见 sisys-value-error-refactor.md
 ```
 
 ### 1.4 违反的架构原则
