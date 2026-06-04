@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.config.neo4j import Neo4jConfig
 
 
@@ -95,17 +96,17 @@ class TestNeo4jConfig:
     @patch.dict(os.environ, {"NEO4J_MAX_POOL_SIZE": "invalid"}, clear=True)
     def test_from_env_invalid_pool_size(self):
         """测试无效连接池大小应抛出 ValueError"""
-        with pytest.raises(ValueError, match="Invalid NEO4J_MAX_POOL_SIZE"):
+        with pytest.raises(ConfigurationError, match="NEO4J_MAX_POOL_SIZE"):
             Neo4jConfig.from_env()
 
     @patch.dict(os.environ, {"NEO4J_CONNECT_TIMEOUT": "invalid"}, clear=True)
     def test_from_env_invalid_timeout(self):
         """测试无效超时应抛出 ValueError"""
-        with pytest.raises(ValueError, match="Invalid NEO4J_CONNECT_TIMEOUT"):
+        with pytest.raises(ConfigurationError, match="NEO4J_CONNECT_TIMEOUT"):
             Neo4jConfig.from_env()
 
     @patch.dict(os.environ, {"NEO4J_MAX_RETRY_TIME": "invalid"}, clear=True)
     def test_from_env_invalid_retry_time(self):
         """测试无效重试时间应抛出 ValueError"""
-        with pytest.raises(ValueError, match="Invalid NEO4J_MAX_RETRY_TIME"):
+        with pytest.raises(ConfigurationError, match="NEO4J_MAX_RETRY_TIME"):
             Neo4jConfig.from_env()

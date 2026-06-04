@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.domain.exceptions import StorageError, ValidationError
 from src.domain.value_objects.upload_limits import MAX_NESTING_DEPTH
 from src.infrastructure.document_parsing.archive_extractor import (
     ArchiveExtractor,
@@ -111,7 +112,7 @@ class TestArchiveExtractorZip:
         extractor = ArchiveExtractor()
         bad_data = io.BytesIO(b"not a zip file at all")
 
-        with pytest.raises(ValueError, match="无效的 ZIP"):
+        with pytest.raises(ValidationError, match="无效的 ZIP"):
             extractor.extract(bad_data, "bad.zip")
 
 
@@ -166,7 +167,7 @@ class TestArchiveExtractorTar:
         extractor = ArchiveExtractor()
         bad_data = io.BytesIO(b"not a tar file at all")
 
-        with pytest.raises(ValueError, match="无效的 TAR"):
+        with pytest.raises(ValidationError, match="无效的 TAR"):
             extractor.extract(bad_data, "bad.tar")
 
 
@@ -297,7 +298,7 @@ class TestArchiveExtractorCompressionBomb:
             zf.writestr("huge.pdf", "x" * 2048)
         buf.seek(0)
 
-        with pytest.raises(ValueError, match="压缩炸弹"):
+        with pytest.raises(StorageError, match="解压后总大小超过限制"):
             extractor.extract(buf, "bomb.zip")
 
     @patch("src.infrastructure.document_parsing.archive_extractor.MAX_ARCHIVE_EXTRACTED_SIZE", 1024)
@@ -312,7 +313,7 @@ class TestArchiveExtractorCompressionBomb:
             tf.addfile(info, io.BytesIO(b"x" * 2048))
         buf.seek(0)
 
-        with pytest.raises(ValueError, match="压缩炸弹"):
+        with pytest.raises(StorageError, match="解压后总大小超过限制"):
             extractor.extract(buf, "bomb.tar")
 
     def test_zip_normal_size_within_limit(self) -> None:

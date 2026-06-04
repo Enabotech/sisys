@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.config.redis import RedisConfig
 
 
@@ -82,7 +83,7 @@ class TestRedisConfigExtension:
             {"REDIS_SOCKET_TIMEOUT": "not_a_number"},
             clear=False,
         ):
-            with pytest.raises(ValueError, match="Invalid REDIS_SOCKET_TIMEOUT"):
+            with pytest.raises(ConfigurationError, match="Invalid REDIS_SOCKET_TIMEOUT"):
                 RedisConfig.from_env()
 
     def test_from_env_invalid_default_ttl(self) -> None:
@@ -92,7 +93,7 @@ class TestRedisConfigExtension:
             {"REDIS_DEFAULT_TTL": "not_an_integer"},
             clear=False,
         ):
-            with pytest.raises(ValueError, match="Invalid REDIS_DEFAULT_TTL"):
+            with pytest.raises(ConfigurationError, match="Invalid REDIS_DEFAULT_TTL"):
                 RedisConfig.from_env()
 
     def test_from_env_password_none(self) -> None:

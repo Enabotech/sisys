@@ -10,6 +10,7 @@ import pytest
 
 from src.domain.entities.document import ParseStatus
 from src.domain.events.document_events import DocumentUploaded
+from src.domain.exceptions import ValidationError
 from src.domain.ports.document_repository import DocumentRepositoryPort
 from src.domain.ports.event_publisher import EventPublisher
 
@@ -80,7 +81,7 @@ class TestDocumentUploadServiceUploadSingleFile:
 
     def test_upload_unsupported_format_raises(self) -> None:
         service = _make_upload_service()
-        with pytest.raises(ValueError, match="不支持的格式"):
+        with pytest.raises(ValidationError, match="不支持的格式"):
             asyncio.run(
                 service.upload(
                     filename="malware.exe",
@@ -94,7 +95,7 @@ class TestDocumentUploadServiceUploadSingleFile:
 
     def test_upload_mime_mismatch_raises(self) -> None:
         service = _make_upload_service()
-        with pytest.raises(ValueError, match="MIME"):
+        with pytest.raises(ValidationError, match="MIME"):
             asyncio.run(
                 service.upload(
                     filename="test.pdf",
@@ -108,7 +109,7 @@ class TestDocumentUploadServiceUploadSingleFile:
 
     def test_upload_empty_file_raises(self) -> None:
         service = _make_upload_service()
-        with pytest.raises(ValueError, match="空文件"):
+        with pytest.raises(ValidationError, match="空文件"):
             asyncio.run(
                 service.upload(
                     filename="empty.pdf",
@@ -122,7 +123,7 @@ class TestDocumentUploadServiceUploadSingleFile:
 
     def test_upload_file_too_large_raises(self) -> None:
         service = _make_upload_service()
-        with pytest.raises(ValueError, match="超过"):
+        with pytest.raises(ValidationError, match="超过"):
             asyncio.run(
                 service.upload(
                     filename="huge.pdf",
@@ -136,7 +137,7 @@ class TestDocumentUploadServiceUploadSingleFile:
 
     def test_upload_filename_too_long_raises(self) -> None:
         service = _make_upload_service()
-        with pytest.raises(ValueError, match="文件名"):
+        with pytest.raises(ValidationError, match="文件名"):
             asyncio.run(
                 service.upload(
                     filename="a" * 256 + ".pdf",
@@ -151,7 +152,7 @@ class TestDocumentUploadServiceUploadSingleFile:
     def test_upload_invalid_filename_chars_raises(self) -> None:
         service = _make_upload_service()
         for bad_name in ["bad\\file.pdf", "bad/file.pdf", "bad\x00file.pdf"]:
-            with pytest.raises(ValueError, match="文件名"):
+            with pytest.raises(ValidationError, match="文件名"):
                 asyncio.run(
                     service.upload(
                         filename=bad_name,
@@ -216,7 +217,7 @@ class TestDocumentUploadServiceUploadBatch:
 
     def test_upload_batch_empty_raises(self) -> None:
         service = _make_upload_service()
-        with pytest.raises(ValueError, match="空批量"):
+        with pytest.raises(ValidationError, match="空批量"):
             asyncio.run(service.upload_batch(files=[], tenant_id="t1", uploaded_by="u1", file_paths=[]))
 
     def test_upload_batch_partial_failure(self) -> None:
@@ -249,7 +250,7 @@ class TestDocumentUploadServiceUploadBatch:
             for i in range(2)
         ]
 
-        with pytest.raises(ValueError, match="总大小超过限制"):
+        with pytest.raises(ValidationError, match="总大小超过限制"):
             asyncio.run(service.upload_batch(files=files, tenant_id="t1", uploaded_by="u1", file_paths=["/tmp/a", "/tmp/b"]))
 
     def test_upload_batch_total_size_at_limit_accepted(self) -> None:
@@ -317,7 +318,7 @@ class TestDocumentUploadServiceEdgeCases:
 
     def test_upload_empty_filename_raises(self) -> None:
         service = _make_upload_service()
-        with pytest.raises(ValueError, match="文件名"):
+        with pytest.raises(ValidationError, match="文件名"):
             asyncio.run(
                 service.upload(
                     filename="",
@@ -331,7 +332,7 @@ class TestDocumentUploadServiceEdgeCases:
 
     def test_upload_whitespace_filename_raises(self) -> None:
         service = _make_upload_service()
-        with pytest.raises(ValueError, match="文件名"):
+        with pytest.raises(ValidationError, match="文件名"):
             asyncio.run(
                 service.upload(
                     filename="   ",
@@ -499,7 +500,7 @@ class TestDocumentUploadServiceRegisterDocument:
         """register_document 同样校验文件名"""
         service = _make_upload_service()
 
-        with pytest.raises(ValueError, match="文件名"):
+        with pytest.raises(ValidationError, match="文件名"):
             asyncio.run(
                 service.register_document(
                     filename="",
@@ -514,7 +515,7 @@ class TestDocumentUploadServiceRegisterDocument:
         """register_document 同样校验文件大小"""
         service = _make_upload_service()
 
-        with pytest.raises(ValueError, match="空文件"):
+        with pytest.raises(ValidationError, match="空文件"):
             asyncio.run(
                 service.register_document(
                     filename="test.pdf",

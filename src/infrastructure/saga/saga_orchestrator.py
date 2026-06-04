@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING, Sequence
 from uuid import UUID
 
+from src.domain.exceptions import ValidationError
 from src.domain.ports.saga_context import SagaContext
 from src.infrastructure.saga.saga_context import SagaContext as ConcreteSagaContext
 from src.infrastructure.saga.saga_status import SagaStatus
@@ -59,7 +60,7 @@ class SagaOrchestrator:
             ValueError: steps 为空列表时抛出
         """
         if not steps:
-            raise ValueError("steps 不能为空列表")
+            raise ValidationError(message="steps 不能为空列表")
         self.saga_id = saga_id
         self.saga_type = saga_type
         self._steps = steps

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, TypedDict
 
+from src.domain.exceptions import ValidationError
 from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.l3_vector import L3VectorPort
 
@@ -71,11 +72,11 @@ class DenseSemanticSearchService:
             ValueError: 查询文本为空时
         """
         if not query_text or not query_text.strip():
-            raise ValueError("查询文本不能为空")
+            raise ValidationError(message="查询文本不能为空")
         if not collection or not collection.strip():
-            raise ValueError("Collection 名称不能为空")
+            raise ValidationError(message="Collection 名称不能为空")
         if limit < 1:
-            raise ValueError(f"limit 必须为正整数，当前值: {limit}")
+            raise ValidationError(message=f"limit 必须为正整数，当前值: {limit}")
 
         query_vector = await asyncio.to_thread(self._embedding.embed_query, query_text)
 
@@ -113,6 +114,6 @@ class DenseSemanticSearchService:
         if tenant_id is not None:
             safe_tid = tenant_id.strip()
             if not safe_tid:
-                raise ValueError("tenant_id 不能为空或仅含空白字符")
+                raise ValidationError(message="tenant_id 不能为空或仅含空白字符")
             combined["tenant_id"] = safe_tid
         return combined if combined else None

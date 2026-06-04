@@ -8,6 +8,7 @@ import pytest
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import ChannelResult, PublishResult
+from src.domain.exceptions import InvalidStateError
 from src.infrastructure.messaging.channel_router import ChannelRouter
 from src.infrastructure.messaging.dual_channel_event_bus import DualChannelEventBus
 from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
@@ -89,7 +90,7 @@ class TestDualChannelEventBusSubscribe:
 
         handler = MagicMock()
 
-        with pytest.raises(ValueError, match="RELIABLE mode.*subscribe"):
+        with pytest.raises(InvalidStateError, match="RELIABLE mode.*subscribe"):
             await bus.subscribe("DocumentProcessed", handler)
 
     async def test_subscribe_delegates_to_redis_for_realtime(self) -> None:

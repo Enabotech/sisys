@@ -17,6 +17,7 @@ import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractIncomingMessage, AbstractQueue
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import ConfigurationError
 from src.domain.ports.dead_letter_queue import DeadLetterQueue
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
 from src.infrastructure.messaging.retry.redis_retry_queue import RedisRetryQueue
@@ -141,7 +142,7 @@ class RabbitMQConsumer:
             event_type = event_dict.get("event_type")
             # 验证 event_type 已注册
             if event_type not in DomainEvent._registry:
-                raise ValueError(f"Unknown event_type: {event_type}")
+                raise ConfigurationError(message=f"Unknown event_type: {event_type}")
             # 使用 DomainEvent.from_dict 正确处理 event_type
             # (subclass.from_dict fails because subclasses have event_type as init=False)
             event = DomainEvent.from_dict(event_dict)

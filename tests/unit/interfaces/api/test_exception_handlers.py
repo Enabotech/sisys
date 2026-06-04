@@ -34,6 +34,9 @@ from src.domain.exceptions import (
     ConflictError,
     ContainerStartError,
     ContainerStopError,
+    EntityBusinessRuleError,
+    EntityStateTransitionError,
+    EntityValidationError,
     ExecutionError,
     ExternalException,
     InsufficientTokenError,
@@ -152,6 +155,10 @@ class TestExceptionHttpMap:
             InvalidStateError,
             InvalidStateTransitionError,
             BusinessRuleViolationError,
+            # 实体验证异常
+            EntityValidationError,
+            EntityStateTransitionError,
+            EntityBusinessRuleError,
             # 存储子域异常
             MemoryNotFoundError,
             BucketNotFoundError,
@@ -405,6 +412,46 @@ class TestDomainExceptionHttpIntegration:
         client = self._make_app_with_exc(BusinessRuleViolationError("rule broken"))
         resp = client.get("/test")
         assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_entity_validation_error_returns_400(self):
+        """验证 EntityValidationError 返回 400."""
+        client = self._make_app_with_exc(
+            EntityValidationError(
+                message="agent_id must be a valid UUID",
+                context={"entity": "Agent", "field": "agent_id"},
+            )
+        )
+        resp = client.get("/test")
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        data = resp.json()
+        assert data["error"]["code"] == "EXCEPTION_242"
+
+    def test_entity_state_transition_error_returns_409(self):
+        """验证 EntityStateTransitionError 返回 409."""
+        client = self._make_app_with_exc(
+            EntityStateTransitionError(
+                from_status="running",
+                to_status="running",
+                message="Agent is already running",
+            )
+        )
+        resp = client.get("/test")
+        assert resp.status_code == status.HTTP_409_CONFLICT
+        data = resp.json()
+        assert data["error"]["code"] == "EXCEPTION_243"
+
+    def test_entity_business_rule_error_returns_422(self):
+        """验证 EntityBusinessRuleError 返回 422."""
+        client = self._make_app_with_exc(
+            EntityBusinessRuleError(
+                message="total_tokens must equal prompt + completion",
+                context={"rule": "token_sum_invariant"},
+            )
+        )
+        resp = client.get("/test")
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        data = resp.json()
+        assert data["error"]["code"] == "EXCEPTION_244"
 
     def test_third_party_returns_502(self):
         """验证 ThirdPartyError 返回 502."""

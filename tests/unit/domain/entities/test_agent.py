@@ -6,6 +6,7 @@ from typing import cast
 import pytest
 
 from src.domain.entities.agent import Agent, AgentRole, AgentStatus
+from src.domain.exceptions import EntityStateTransitionError, EntityValidationError
 
 
 def _make_agent(**kwargs) -> Agent:
@@ -48,20 +49,20 @@ class TestAgentValidation:
         """Agent with non-UUID id fails validation."""
         agent = _make_agent()
         object.__setattr__(agent, "agent_id", cast(uuid.UUID, "not-a-uuid"))
-        with pytest.raises(ValueError, match="agent_id must be a valid UUID"):
+        with pytest.raises(EntityValidationError, match="agent_id must be a valid UUID"):
             agent.validate()
 
     def test_empty_name_fails(self):
         """Agent with empty name fails validation."""
         agent = _make_agent(name="")
-        with pytest.raises(ValueError, match="name must not be empty"):
+        with pytest.raises(EntityValidationError, match="name must not be empty"):
             agent.validate()
 
     def test_invalid_role_fails(self):
         """Agent with non-AgentRole role fails validation."""
         agent = _make_agent()
         object.__setattr__(agent, "role", cast(AgentRole, "invalid_role"))
-        with pytest.raises(ValueError, match="role must be a valid AgentRole"):
+        with pytest.raises(EntityValidationError, match="role must be a valid AgentRole"):
             agent.validate()
 
 
@@ -78,7 +79,7 @@ class TestAgentStateTransitions:
         """Cannot start agent that is already running."""
         agent = _make_agent()
         agent.start()
-        with pytest.raises(ValueError, match="Can only start from IDLE"):
+        with pytest.raises(EntityStateTransitionError, match="Can only start from IDLE"):
             agent.start()
 
     def test_complete_from_running(self):
@@ -91,7 +92,7 @@ class TestAgentStateTransitions:
     def test_cannot_complete_from_idle(self):
         """Cannot complete agent from IDLE state."""
         agent = _make_agent()
-        with pytest.raises(ValueError, match="Can only complete from RUNNING"):
+        with pytest.raises(EntityStateTransitionError, match="Can only complete from RUNNING"):
             agent.complete()
 
     def test_fail_from_any_state(self):
@@ -109,7 +110,7 @@ class TestAgentStateTransitions:
         """P1-03 Fix: Cannot fail an already failed agent."""
         agent = _make_agent()
         agent.fail("first reason")
-        with pytest.raises(ValueError, match="Agent is already failed"):
+        with pytest.raises(EntityStateTransitionError, match="Agent is already failed"):
             agent.fail("second reason")
         # Original reason preserved
         assert agent.failure_reason == "first reason"
@@ -126,7 +127,7 @@ class TestAgentStateTransitions:
     def test_cannot_restart_from_idle(self):
         """P0-03 Fix: Cannot restart agent from IDLE state."""
         agent = _make_agent()
-        with pytest.raises(ValueError, match="Can only restart from FAILED or COMPLETED"):
+        with pytest.raises(EntityStateTransitionError, match="Can only restart from FAILED or COMPLETED"):
             agent.restart()
 
     def test_wait_from_running(self):
@@ -161,12 +162,12 @@ class TestAgentStateTransitions:
     def test_cannot_restart_from_non_failed_state(self):
         """P1-03 Fix: Cannot restart agent from IDLE state."""
         agent = _make_agent()
-        with pytest.raises(ValueError, match="Can only restart from FAILED"):
+        with pytest.raises(EntityStateTransitionError, match="Can only restart from FAILED"):
             agent.restart()
 
     def test_cannot_restart_from_running(self):
         """P1-03 Fix: Cannot restart agent from RUNNING state."""
         agent = _make_agent()
         agent.start()
-        with pytest.raises(ValueError, match="Can only restart from FAILED"):
+        with pytest.raises(EntityStateTransitionError, match="Can only restart from FAILED"):
             agent.restart()

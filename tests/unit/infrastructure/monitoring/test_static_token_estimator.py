@@ -14,6 +14,7 @@ import logging
 
 import pytest
 
+from src.domain.exceptions import ValidationError
 from src.domain.ports.token_estimator import TokenEstimatorPort
 from src.infrastructure.monitoring.static_token_estimator import StaticTokenEstimator
 
@@ -75,13 +76,13 @@ class TestStaticTokenEstimatorValidation:
     def test_empty_route_type_raises(self) -> None:
         """空 route_type 应抛出 ValueError."""
         estimator = StaticTokenEstimator()
-        with pytest.raises(ValueError, match="route_type"):
+        with pytest.raises(ValidationError, match="route_type must not be None or empty"):
             asyncio.run(estimator.estimate("", "qwen2.5:7b"))
 
     def test_whitespace_route_type_raises(self) -> None:
         """空白 route_type 应抛出 ValueError."""
         estimator = StaticTokenEstimator()
-        with pytest.raises(ValueError, match="route_type"):
+        with pytest.raises(ValidationError, match="route_type must not be None or empty"):
             asyncio.run(estimator.estimate("   ", "qwen2.5:7b"))
 
 

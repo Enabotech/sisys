@@ -10,6 +10,8 @@ from typing import Any, cast
 
 from neo4j import AsyncDriver
 
+from src.domain.exceptions import ValidationError
+
 
 class Neo4jGraphStorage:
     """Neo4j 图存储实现
@@ -145,4 +147,4 @@ def _validate_rel_type(rel_type: str) -> None:
         ValueError: 关系类型不符合命名规范时抛出
     """
     if not _REL_TYPE_RE.match(rel_type):
-        raise ValueError(f"Invalid relationship type: {rel_type!r}. Must match [A-Za-z_][A-Za-z0-9_]*")
+        raise ValidationError(message=f"Invalid relationship type: {rel_type!r}. Must match [A-Za-z_][A-Za-z0-9_]*")

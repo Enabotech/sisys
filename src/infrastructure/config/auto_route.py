@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass(frozen=True)
 class AutoRouteConfig:
@@ -47,21 +49,21 @@ class AutoRouteConfig:
 
         # Validate route_type
         if route_type_str not in ("hash", "semantic", "mixed"):
-            raise ValueError(f"ROUTE_TYPE must be one of: hash, semantic, mixed. Got: {route_type_str}")
+            raise ConfigurationError(message=f"ROUTE_TYPE must be one of: hash, semantic, mixed. Got: {route_type_str}")
 
         try:
             semantic_threshold = float(semantic_threshold_str)
             if not (0.0 <= semantic_threshold <= 1.0):
-                raise ValueError(f"SEMANTIC_THRESHOLD must be between 0.0 and 1.0: {semantic_threshold}")
+                raise ConfigurationError(message=f"SEMANTIC_THRESHOLD must be between 0.0 and 1.0: {semantic_threshold}")
         except ValueError as e:
-            raise ValueError(f"Invalid SEMANTIC_THRESHOLD value: {semantic_threshold_str}") from e
+            raise ConfigurationError(message=f"Invalid SEMANTIC_THRESHOLD value: {semantic_threshold_str}") from e
 
         try:
             hash_ring_size = int(hash_ring_size_str)
             if hash_ring_size <= 0:
-                raise ValueError(f"HASH_RING_SIZE must be positive: {hash_ring_size}")
+                raise ConfigurationError(message=f"HASH_RING_SIZE must be positive: {hash_ring_size}")
         except ValueError as e:
-            raise ValueError(f"Invalid HASH_RING_SIZE value: {hash_ring_size_str}") from e
+            raise ConfigurationError(message=f"Invalid HASH_RING_SIZE value: {hash_ring_size_str}") from e
 
         return cls(
             route_enabled=enabled_str in ("true", "1", "yes", "on"),

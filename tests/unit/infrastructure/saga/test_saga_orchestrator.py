@@ -13,6 +13,7 @@ from uuid import uuid4
 import pytest
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import ValidationError
 from src.infrastructure.saga.saga_status import SagaStatus
 
 
@@ -165,7 +166,7 @@ class TestSagaOrchestrator:
 
         repo = _make_mock_repository()
 
-        with pytest.raises(ValueError, match="steps 不能为空列表"):
+        with pytest.raises(ValidationError, match="steps 不能为空列表"):
             SagaOrchestrator(
                 saga_id=uuid4(),
                 saga_type="test_saga",

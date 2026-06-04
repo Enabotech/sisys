@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any, cast
 
+from src.domain.exceptions import ValidationError
 from src.domain.ports.l5_graph import L5GraphPort
 
 if TYPE_CHECKING:
@@ -302,7 +303,7 @@ def _validate_rel_type(rel_type: str) -> None:
         ValueError: 关系类型不符合 [A-Z_][A-Z0-9_]* 模式时抛出
     """
     if not _REL_TYPE_RE.match(rel_type):
-        raise ValueError(f"Invalid relationship type: {rel_type!r}. Must match [A-Z_][A-Z0-9_]*")
+        raise ValidationError(message=f"Invalid relationship type: {rel_type!r}. Must match [A-Z_][A-Z0-9_]*")
 
 
 def _sanitize_property_keys(props: dict) -> dict:
@@ -320,6 +321,6 @@ def _sanitize_property_keys(props: dict) -> dict:
     safe = {}
     for k, v in props.items():
         if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k):
-            raise ValueError(f"Invalid property key: {k!r}")
+            raise ValidationError(message=f"Invalid property key: {k!r}")
         safe[k] = v
     return safe

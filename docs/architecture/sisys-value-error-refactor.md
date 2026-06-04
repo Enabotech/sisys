@@ -1,10 +1,10 @@
 # ValueError → 领域异常迁移重构详细设计
 
-**状态：** 待实施
+**状态：** 实施中（批次0/1）
 **创建日期：** 2026-06-04
 **作者：** Agimtech
 **父文档：** [sisys-uni-exception-design.md](sisys-uni-exception-design.md)（§4.4 阶段四遗留任务）
-**评审状态：** 待评审
+**评审状态：** 已评审
 
 ### 修订历史
 
@@ -13,6 +13,7 @@
 | 2026-06-04 | v1.0 | 初始版本 | Agimtech |
 | 2026-06-04 | v1.1 | 文档审查修订：修正 agent.py(8)/strategic_plan.py(10)/应用层(22) 数量；新增 §2.4.2 except ValueError 捕获站点分析；新增 §4.5.3 配置层异常链策略；新增 ADR-001 设计决策；新增 §4.6.3 validate() 返回类型差异表；增强 §6.1 监控告警风险、§6.2 回滚策略 | Agimtech |
 | 2026-06-04 | v1.2 | 第二轮审查修订：修正源文件总数 57→58；修正 audit.py 分类 B→A；新增 §2.4.2 D 类（redis_subscriber 需修改 catch 类型）；修正 except ValueError 分类计数；修正值对象测试文件数 7→2；批次 8 新增 redis_subscriber.py 处理步骤；增强步骤 10.2 人工审查说明 | Agimtech |
+| 2026-06-04 | v1.3 | 开始实施：批次 0 基础设施准备（新增 3 个实体异常类 + 映射表 + 测试用例）+ 批次 1 最小实体迁移（tool/audit_log/memory_*/checkpoint 13 处 ValueError 迁移） | Agimtech |
 
 ---
 
@@ -635,9 +636,9 @@ def test_token_sum_invariant():
 ```
 批次 0: 基础设施准备（新增异常类 + 映射表 + 测试工具）
     ↓
-批次 1: 最小实体（tool, audit_log, memory_*）— 8 处，影响面最小
+批次 1: 最小实体（tool, audit_log, memory_*, checkpoint）— 13 处，影响面最小
     ↓
-批次 2: 中等实体（checkpoint, document）— 12 处
+批次 2: 中等实体（document）— 7 处
     ↓
 批次 3: 复杂实体（agent, strategic_plan, routing_decision_log）— 30 处
     ↓
@@ -660,9 +661,9 @@ def test_token_sum_invariant():
 
 #### 批次 0：基础设施准备
 
-- [ ] **0.1** 在 `src/domain/exceptions/business_exceptions.py` 中新增 `EntityValidationError`（EXCEPTION_242）、`EntityStateTransitionError`（EXCEPTION_243）、`EntityBusinessRuleError`（EXCEPTION_244）
-- [ ] **0.2** 在 `src/domain/exceptions/__init__.py` 中添加新类的导出和 `__all__` 注册
-- [ ] **0.3** 在 `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 中添加三个新映射条目
+- [x] **0.1** 在 `src/domain/exceptions/business_exceptions.py` 中新增 `EntityValidationError`（EXCEPTION_242）、`EntityStateTransitionError`（EXCEPTION_243）、`EntityBusinessRuleError`（EXCEPTION_244）
+- [x] **0.2** 在 `src/domain/exceptions/__init__.py` 中添加新类的导出和 `__all__` 注册
+- [x] **0.3** 在 `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 中添加三个新映射条目
 - [ ] **0.4** 在 `tests/unit/domain/exceptions/` 中添加新异常类的单元测试（构造、to_dict、错误码唯一性）
 - [ ] **0.5** 在 `tests/unit/interfaces/api/test_exception_handlers.py` 中添加 HTTP 映射测试
 - [ ] **0.6** 运行全量测试确认无回归：`poetry run pytest tests/`

@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.domain.exceptions import ValidationError
 from src.domain.value_objects.flow_status import FlowStatus
 from src.infrastructure.config.prefect import PrefectConfig
 from src.infrastructure.workflow.prefect_engine import PrefectEngine
@@ -148,22 +149,22 @@ class TestPrefectEngineInputValidation:
 
     async def test_submit_flow_rejects_empty_flow_name(self, engine: PrefectEngine) -> None:
         """空 flow_name 应抛出 ValueError"""
-        with pytest.raises(ValueError, match="flow_name 格式无效"):
+        with pytest.raises(ValidationError, match="flow_name 格式无效"):
             await engine.submit_flow("", {})
 
     async def test_submit_flow_rejects_flow_name_without_slash(self, engine: PrefectEngine) -> None:
         """无斜杠的 flow_name 应抛出 ValueError"""
-        with pytest.raises(ValueError, match="flow_name 格式无效"):
+        with pytest.raises(ValidationError, match="flow_name 格式无效"):
             await engine.submit_flow("NoSlashHere", {})
 
     async def test_get_flow_status_rejects_invalid_uuid(self, engine: PrefectEngine) -> None:
         """无效 UUID 格式应抛出 ValueError"""
-        with pytest.raises(ValueError, match="flow_run_id 格式无效"):
+        with pytest.raises(ValidationError, match="flow_run_id 格式无效"):
             await engine.get_flow_status("not-a-uuid")
 
     async def test_get_flow_status_rejects_empty_string(self, engine: PrefectEngine) -> None:
         """空字符串应抛出 ValueError"""
-        with pytest.raises(ValueError, match="flow_run_id 格式无效"):
+        with pytest.raises(ValidationError, match="flow_run_id 格式无效"):
             await engine.get_flow_status("")
 
 

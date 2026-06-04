@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.application.services.dense_search_service import DenseSemanticSearchService
+from src.domain.exceptions import ValidationError
 from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.l3_vector import L3VectorPort
 
@@ -80,42 +81,42 @@ class TestDenseSearchServiceBasic:
     async def test_search_raises_on_empty_query(self) -> None:
         """空查询文本应抛出 ValueError"""
         service, _, _ = _make_search_service()
-        with pytest.raises(ValueError, match="查询文本不能为空"):
+        with pytest.raises(ValidationError, match="查询文本不能为空"):
             await service.search("test_collection", "")
 
     @pytest.mark.asyncio
     async def test_search_raises_on_whitespace_query(self) -> None:
         """纯空白查询文本应抛出 ValueError"""
         service, _, _ = _make_search_service()
-        with pytest.raises(ValueError, match="查询文本不能为空"):
+        with pytest.raises(ValidationError, match="查询文本不能为空"):
             await service.search("test_collection", "   ")
 
     @pytest.mark.asyncio
     async def test_search_raises_on_empty_collection(self) -> None:
         """空 collection 名称应抛出 ValueError"""
         service, _, _ = _make_search_service()
-        with pytest.raises(ValueError, match="Collection 名称不能为空"):
+        with pytest.raises(ValidationError, match="Collection 名称不能为空"):
             await service.search("", "查询文本")
 
     @pytest.mark.asyncio
     async def test_search_raises_on_whitespace_collection(self) -> None:
         """纯空白 collection 名称应抛出 ValueError"""
         service, _, _ = _make_search_service()
-        with pytest.raises(ValueError, match="Collection 名称不能为空"):
+        with pytest.raises(ValidationError, match="Collection 名称不能为空"):
             await service.search("   ", "查询文本")
 
     @pytest.mark.asyncio
     async def test_search_raises_on_zero_limit(self) -> None:
         """limit=0 应抛出 ValueError"""
         service, _, _ = _make_search_service()
-        with pytest.raises(ValueError, match="limit 必须为正整数"):
+        with pytest.raises(ValidationError, match="limit 必须为正整数"):
             await service.search("test_collection", "查询文本", limit=0)
 
     @pytest.mark.asyncio
     async def test_search_raises_on_negative_limit(self) -> None:
         """负数 limit 应抛出 ValueError"""
         service, _, _ = _make_search_service()
-        with pytest.raises(ValueError, match="limit 必须为正整数"):
+        with pytest.raises(ValidationError, match="limit 必须为正整数"):
             await service.search("test_collection", "查询文本", limit=-1)
 
 
@@ -210,12 +211,12 @@ class TestDenseSearchServiceTenantFilter:
     async def test_empty_tenant_id_raises(self) -> None:
         """空字符串 tenant_id 应抛出 ValueError"""
         service, _, _ = _make_search_service()
-        with pytest.raises(ValueError, match="tenant_id 不能为空"):
+        with pytest.raises(ValidationError, match="tenant_id 不能为空"):
             await service.search("test_collection", "查询文本", tenant_id="")
 
     @pytest.mark.asyncio
     async def test_whitespace_tenant_id_raises(self) -> None:
         """纯空白 tenant_id 应抛出 ValueError"""
         service, _, _ = _make_search_service()
-        with pytest.raises(ValueError, match="tenant_id 不能为空"):
+        with pytest.raises(ValidationError, match="tenant_id 不能为空"):
             await service.search("test_collection", "查询文本", tenant_id="   ")

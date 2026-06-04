@@ -10,6 +10,8 @@ import os
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass
 class EmbeddingConfig:
@@ -37,15 +39,17 @@ class EmbeddingConfig:
         if api_url:
             parsed = urlparse(api_url)
             if not parsed.scheme or not parsed.netloc:
-                raise ValueError(f"EMBEDDING_API_URL 格式无效: {api_url!r}（需要完整 URL，如 http://host:port）")
+                raise ConfigurationError(
+                    message=f"EMBEDDING_API_URL 格式无效: {api_url!r}（需要完整 URL，如 http://host:port）"
+                )
 
         timeout_raw = os.getenv("EMBEDDING_API_TIMEOUT", "30.0")
         try:
             timeout = float(timeout_raw)
         except (ValueError, TypeError):
-            raise ValueError(f"EMBEDDING_API_TIMEOUT 值非法: {timeout_raw!r}（需要数值）") from None
+            raise ConfigurationError(message=f"EMBEDDING_API_TIMEOUT 值非法: {timeout_raw!r}（需要数值）") from None
         if timeout <= 0:
-            raise ValueError(f"EMBEDDING_API_TIMEOUT 必须为正数，当前值: {timeout}")
+            raise ConfigurationError(message=f"EMBEDDING_API_TIMEOUT 必须为正数，当前值: {timeout}")
         return cls(
             api_url=api_url,
             api_timeout=timeout,

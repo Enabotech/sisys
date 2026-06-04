@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 
+from src.domain.exceptions import EntityStateTransitionError, EntityValidationError
+
 
 @dataclass
 class CorrectionRecord:
@@ -74,14 +76,23 @@ class Checkpoint:
             所有不变量满足时返回 True
 
         Raises:
-            ValueError: 任何不变量违反时抛出
+            EntityValidationError: 任何不变量违反时抛出
         """
         if not isinstance(self.checkpoint_id, uuid.UUID):
-            raise ValueError("checkpoint_id must be a valid UUID")
+            raise EntityValidationError(
+                message="checkpoint_id must be a valid UUID",
+                context={"entity": "Checkpoint", "field": "checkpoint_id"},
+            )
         if not self.phase_identifier or not self.phase_identifier.strip():
-            raise ValueError("phase_identifier must not be empty")
+            raise EntityValidationError(
+                message="phase_identifier must not be empty",
+                context={"entity": "Checkpoint", "field": "phase_identifier"},
+            )
         if not isinstance(self.status, CheckpointStatus):
-            raise ValueError("status must be a valid CheckpointStatus")
+            raise EntityValidationError(
+                message="status must be a valid CheckpointStatus",
+                context={"entity": "Checkpoint", "field": "status", "expected_type": "CheckpointStatus"},
+            )
         return True
 
     def complete(self) -> None:
@@ -90,11 +101,15 @@ class Checkpoint:
         有效转换: PENDING -> COMPLETED, IN_PROGRESS -> COMPLETED, RECOVERED -> COMPLETED
 
         Raises:
-            ValueError: 检查点已完成时抛出
+            EntityStateTransitionError: 检查点已完成时抛出
         """
         # P1-01 Fix: Add state guard
         if self.status == CheckpointStatus.COMPLETED:
-            raise ValueError("Checkpoint is already completed")
+            raise EntityStateTransitionError(
+                from_status=self.status.value,
+                to_status="completed",
+                message="Checkpoint is already completed",
+            )
         self.status = CheckpointStatus.COMPLETED
         self.completed_at = datetime.now(UTC)
         self.updated_at = self.completed_at
@@ -109,11 +124,15 @@ class Checkpoint:
             mode: 恢复模式（REPLAY 或 OVERRIDE）
 
         Raises:
-            ValueError: 检查点已完成时抛出
+            EntityStateTransitionError: 检查点已完成时抛出
         """
         # P1-02 Fix: Add state guard
         if self.status == CheckpointStatus.COMPLETED:
-            raise ValueError("Cannot recover a completed checkpoint")
+            raise EntityStateTransitionError(
+                from_status=self.status.value,
+                to_status="recovered",
+                message="Cannot recover a completed checkpoint",
+            )
         self.recovery_mode = mode
         self.status = CheckpointStatus.RECOVERED
         self.updated_at = datetime.now(UTC)

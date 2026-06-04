@@ -6,6 +6,7 @@
 - 嵌入质量验证（L2 归一化、维度、Sparse 格式）
 
 依赖：真实 BGE-M3 模型 + 真实 Qdrant 服务
+from src.domain.exceptions import ValidationError
 """
 
 from __future__ import annotations
@@ -20,6 +21,9 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import PointStruct, SparseVectorParams
 from qdrant_client.models import SparseVector as QdrantSparseVector
 
+from src.domain.exceptions import (
+    ValidationError,
+)
 from src.infrastructure.config.embedding import EmbeddingConfig
 from src.infrastructure.storage.qdrant.collection_manager import (
     QdrantCollectionManager,
@@ -237,12 +241,12 @@ class TestEmbeddingNormalization:
 
     def test_embed_sparse_empty_text_raises(self, embedding_service) -> None:
         """空文本时 embed_sparse 抛出 ValueError（纯同步，无需 Qdrant）"""
-        with pytest.raises(ValueError, match="文本列表"):
+        with pytest.raises(ValidationError, match="文本列表"):
             embedding_service.embed_sparse([""])
 
     def test_embed_sparse_whitespace_raises(self, embedding_service) -> None:
         """纯空白文本时 embed_sparse 抛出 ValueError"""
-        with pytest.raises(ValueError, match="文本列表"):
+        with pytest.raises(ValidationError, match="文本列表"):
             embedding_service.embed_sparse(["   "])
 
 

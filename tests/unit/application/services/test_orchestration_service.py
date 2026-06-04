@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from src.domain.exceptions import ValidationError
 from src.domain.value_objects.flow_status import FlowStatus
 
 
@@ -183,7 +184,7 @@ class TestOrchestrationServiceValidation:
         service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
         task = WorkflowTask(flow_name="", parameters={}, task_type="data_pipeline")
 
-        with pytest.raises(ValueError, match="flow_name 不能为空"):
+        with pytest.raises(ValidationError, match="flow_name 不能为空"):
             await service.execute(task)
 
     async def test_execute_rejects_empty_parameters_for_data_pipeline(
@@ -198,7 +199,7 @@ class TestOrchestrationServiceValidation:
         service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
         task = WorkflowTask(flow_name="test/default", parameters={}, task_type="data_pipeline")
 
-        with pytest.raises(ValueError, match="parameters"):
+        with pytest.raises(ValidationError, match="parameters"):
             await service.execute(task)
 
     async def test_execute_rejects_missing_graph_name_for_agent_reasoning(
@@ -217,5 +218,5 @@ class TestOrchestrationServiceValidation:
             task_type="agent_reasoning",
         )
 
-        with pytest.raises(ValueError, match="graph_name"):
+        with pytest.raises(ValidationError, match="graph_name"):
             await service.execute(task)

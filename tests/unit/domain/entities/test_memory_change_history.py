@@ -10,6 +10,7 @@ import uuid
 import pytest
 
 from src.domain.entities.memory_change_history import MemoryChangeHistory
+from src.domain.exceptions import EntityValidationError
 
 
 class TestMemoryChangeHistorySchema:
@@ -42,7 +43,7 @@ class TestMemoryChangeHistorySchema:
 
     def test_invalid_change_type_raises(self):
         """验证无效 change_type 抛出异常"""
-        with pytest.raises(ValueError, match="change_type must be one of"):
+        with pytest.raises(EntityValidationError, match="change_type must be one of"):
             MemoryChangeHistory.create(
                 memory_id=uuid.uuid4(),
                 version=1,

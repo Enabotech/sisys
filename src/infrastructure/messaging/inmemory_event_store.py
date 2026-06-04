@@ -12,6 +12,7 @@ from uuid import UUID
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.event_store import EventStore
+from src.domain.exceptions import ValidationError
 
 
 class InMemoryEventStore(EventStore):
@@ -72,9 +73,9 @@ class InMemoryEventStore(EventStore):
             ValueError: 当 from_version > to_version 或版本号为负时
         """
         if from_version < 1 or to_version < 1:
-            raise ValueError("Version numbers must be >= 1")
+            raise ValidationError(message="Version numbers must be >= 1")
         if from_version > to_version:
-            raise ValueError(f"from_version ({from_version}) must be <= to_version ({to_version})")
+            raise ValidationError(message=f"from_version ({from_version}) must be <= to_version ({to_version})")
         all_events = self._events_by_aggregate.get(aggregate_id, [])
         # 将 1-based 版本号转换为 0-based 索引
         start_idx = max(0, from_version - 1)

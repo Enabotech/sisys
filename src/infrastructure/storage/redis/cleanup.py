@@ -9,6 +9,7 @@ import logging
 
 import redis.asyncio as aioredis
 
+from src.domain.exceptions import ValidationError
 from src.infrastructure.storage.redis.key_builder import build_key
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ class RedisCleanup:
             ValueError: namespace 为空时抛出
         """
         if not namespace:
-            raise ValueError("namespace cannot be empty")
+            raise ValidationError(message="namespace cannot be empty")
 
         pattern = build_key(namespace, "*")
         deleted_count = 0
