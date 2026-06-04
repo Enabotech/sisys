@@ -3,6 +3,7 @@
 通过 HTTP 调用独立部署的 BGE-M3 嵌入服务，实现 EmbeddingServicePort 协议。
 
 架构参考: architecture.md §4.3 嵌入模型配置
+异常规范: sisys-uni-exception-design.md — 使用统一异常层次结构
 依赖: httpx
 """
 
@@ -13,18 +14,17 @@ from typing import Any, cast
 
 import httpx
 
+from src.domain.exceptions import (
+    EmbeddingAPIError,
+    EmbeddingResponseError,
+    NetworkError,
+    ServiceUnavailableError,
+    TimeoutError,
+)
 from src.domain.ports.embedding_service import EmbeddingServicePort, SparseEmbedding
 from src.infrastructure.config.embedding import EmbeddingConfig
 
 logger = logging.getLogger(__name__)
-
-
-class EmbeddingServiceError(RuntimeError):
-    """嵌入服务调用异常
-
-    包装 HTTP 客户端层异常（连接、超时、非预期响应），
-    避免原始 httpx 异常泄露到应用层。
-    """
 
 
 class EmbeddingAPIClient(EmbeddingServicePort):
@@ -33,6 +33,13 @@ class EmbeddingAPIClient(EmbeddingServicePort):
     通过 HTTP POST /v1/embeddings 调用独立 API 服务，实现 EmbeddingServicePort 协议。
     方法签名使用同步 def，内部使用 httpx.Client（同步），
     调用方通过 asyncio.to_thread 包装以避免阻塞事件循环。
+
+    异常策略：
+    - 超时 → TimeoutError (EXCEPTION_302)
+    - 网络故障 → NetworkError (EXCEPTION_102)
+    - HTTP 传输层错误 → EmbeddingAPIError (EXCEPTION_306)
+    - 响应格式/结构异常 → EmbeddingResponseError (EXCEPTION_307)
+    - 客户端已关闭 → ServiceUnavailableError (EXCEPTION_303)
     """
 
     def __init__(self, config: EmbeddingConfig | None = None) -> None:
@@ -67,10 +74,10 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         """检查客户端是否已关闭
 
         Raises:
-            EmbeddingServiceError: 客户端已关闭时
+            ServiceUnavailableError: 客户端已关闭时
         """
         if self._closed:
-            raise EmbeddingServiceError("EmbeddingAPIClient 已关闭，无法执行嵌入操作")
+            raise ServiceUnavailableError("EmbeddingAPIClient 已关闭，无法执行嵌入操作")
 
     @property
     def dimension(self) -> int:
@@ -147,6 +154,9 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         sparse_list = cast(list[dict[str, Any]], result.get("sparse", []))
         if not sparse_list:
             return [SparseEmbedding(indices=[], values=[]) for _ in texts]
+        # 长度一致性校验：防止服务端返回的 sparse 列表长度与输入不匹配
+        if len(sparse_list) != len(texts):
+            raise EmbeddingResponseError(f"Sparse 结果数({len(sparse_list)})与输入数({len(texts)})不匹配")
         return [SparseEmbedding(indices=s["indices"], values=s["values"]) for s in sparse_list]
 
     def _encode(self, texts: list[str], *, return_sparse: bool) -> dict[str, Any]:
@@ -157,10 +167,13 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             return_sparse: 是否返回 Sparse 向量
 
         Returns:
-            API 响应 dict
+            API 响应 dict（包含 dense 键，可选 sparse 键）
 
         Raises:
-            EmbeddingServiceError: 网络错误、超时、HTTP 错误或非预期响应时
+            TimeoutError: 请求超时时
+            NetworkError: 网络故障时
+            EmbeddingAPIError: HTTP 传输层错误时
+            EmbeddingResponseError: 响应结构异常时
         """
         self._check_closed()
         try:
@@ -169,22 +182,36 @@ class EmbeddingAPIClient(EmbeddingServicePort):
                 json={"texts": texts, "return_sparse": return_sparse},
             )
             resp.raise_for_status()
-            return cast(dict[str, Any], resp.json())
+            data = resp.json()
         except httpx.TimeoutException as e:
-            raise EmbeddingServiceError(f"嵌入 API 请求超时: {e}") from e
+            raise TimeoutError(f"嵌入 API 请求超时: {e}", cause=e) from e
         except httpx.TransportError as e:
-            raise EmbeddingServiceError(f"嵌入 API 网络错误: {e}") from e
+            raise NetworkError(f"嵌入 API 网络错误: {e}", cause=e) from e
         except httpx.HTTPStatusError as e:
-            raise EmbeddingServiceError(f"嵌入 API 返回 HTTP {e.response.status_code}") from e
+            raise EmbeddingAPIError(f"嵌入 API 返回 HTTP {e.response.status_code}", cause=e) from e
         except ValueError as e:
-            raise EmbeddingServiceError(f"嵌入 API 响应格式异常: {e}") from e
+            raise EmbeddingResponseError(f"嵌入 API 响应格式异常: {e}", cause=e) from e
+
+        # 响应结构校验：防止 API 返回异常格式导致 KeyError/IndexError 绕过异常包装
+        if not isinstance(data, dict) or "dense" not in data:
+            keys = list(data.keys()) if isinstance(data, dict) else type(data).__name__
+            raise EmbeddingResponseError(f"嵌入 API 响应缺少 'dense' 字段: {keys}")
+        if not isinstance(data["dense"], list):
+            raise EmbeddingResponseError(f"嵌入 API 响应 'dense' 字段非列表: {type(data['dense']).__name__}")
+        if len(data["dense"]) != len(texts):
+            raise EmbeddingResponseError(f"嵌入 API 返回向量数({len(data['dense'])})与输入数({len(texts)})不匹配")
+
+        return data
 
     def close(self) -> None:
         """关闭 HTTP 客户端，释放连接池资源
 
-        关闭后实例不可再使用，再次调用 embed_* 方法将抛出 EmbeddingServiceError。
+        关闭后实例不可再使用，再次调用 embed_* 方法将抛出 ServiceUnavailableError。
         重复调用 close() 是安全的（幂等）。
         """
         if not self._closed:
-            self._client.close()
             self._closed = True
+            try:
+                self._client.close()
+            except Exception:
+                logger.debug("httpx.Client.close() 异常（可忽略）", exc_info=True)

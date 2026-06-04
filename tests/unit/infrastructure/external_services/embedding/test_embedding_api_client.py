@@ -3,6 +3,7 @@
 验证 HTTP API 客户端的嵌入功能、错误处理和参数校验。
 使用 mock httpx.Client 避免真实网络调用。
 EmbeddingAPIClient 方法签名使用同步 def，测试无需 asyncio。
+异常规范: sisys-uni-exception-design.md — 使用统一异常层次结构
 """
 
 from __future__ import annotations
@@ -12,6 +13,13 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
+from src.domain.exceptions import (
+    EmbeddingAPIError,
+    EmbeddingResponseError,
+    NetworkError,
+    ServiceUnavailableError,
+    TimeoutError,
+)
 from src.infrastructure.config.embedding import EmbeddingConfig
 from src.infrastructure.external_services.embedding.embedding_api_client import (
     EmbeddingAPIClient,
@@ -205,43 +213,35 @@ class TestEmbeddingAPIClientValidation:
 
 
 class TestEmbeddingAPIClientErrorHandling:
-    """EmbeddingAPIClient 错误处理"""
+    """EmbeddingAPIClient 错误处理 — 统一异常体系"""
 
-    def test_http_error_propagates(self, api_config: EmbeddingConfig) -> None:
-        """HTTP 5xx 包装为 EmbeddingServiceError"""
-        from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingServiceError
-
+    def test_http_error_raises_embedding_api_error(self, api_config: EmbeddingConfig) -> None:
+        """HTTP 5xx 包装为 EmbeddingAPIError (EXCEPTION_306)"""
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.status_code = 500
         mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError("Server Error", request=MagicMock(), response=mock_resp)
 
         with patch("httpx.Client.post", return_value=mock_resp):
             client = EmbeddingAPIClient(api_config)
-            with pytest.raises(EmbeddingServiceError, match="HTTP 500"):
+            with pytest.raises(EmbeddingAPIError, match="HTTP 500"):
                 client.embed_query("测试文本")
 
-    def test_timeout_wraps_to_embedding_service_error(self, api_config: EmbeddingConfig) -> None:
-        """httpx.TimeoutException 包装为 EmbeddingServiceError"""
-        from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingServiceError
-
+    def test_timeout_raises_timeout_error(self, api_config: EmbeddingConfig) -> None:
+        """httpx.TimeoutException 包装为 TimeoutError (EXCEPTION_302)"""
         with patch("httpx.Client.post", side_effect=httpx.TimeoutException("timeout")):
             client = EmbeddingAPIClient(api_config)
-            with pytest.raises(EmbeddingServiceError, match="超时"):
+            with pytest.raises(TimeoutError, match="超时"):
                 client.embed_query("测试文本")
 
-    def test_network_error_wraps_to_embedding_service_error(self, api_config: EmbeddingConfig) -> None:
-        """httpx.NetworkError 包装为 EmbeddingServiceError"""
-        from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingServiceError
-
+    def test_network_error_raises_network_error(self, api_config: EmbeddingConfig) -> None:
+        """httpx.NetworkError 包装为 NetworkError (EXCEPTION_102)"""
         with patch("httpx.Client.post", side_effect=httpx.NetworkError("connection refused")):
             client = EmbeddingAPIClient(api_config)
-            with pytest.raises(EmbeddingServiceError, match="网络错误"):
+            with pytest.raises(NetworkError, match="网络错误"):
                 client.embed_query("测试文本")
 
-    def test_invalid_json_wraps_to_embedding_service_error(self, api_config: EmbeddingConfig) -> None:
-        """响应 JSON 解析失败包装为 EmbeddingServiceError"""
-        from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingServiceError
-
+    def test_invalid_json_raises_embedding_response_error(self, api_config: EmbeddingConfig) -> None:
+        """响应 JSON 解析失败包装为 EmbeddingResponseError (EXCEPTION_307)"""
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.status_code = 200
         mock_resp.raise_for_status.return_value = None
@@ -249,5 +249,12 @@ class TestEmbeddingAPIClientErrorHandling:
 
         with patch("httpx.Client.post", return_value=mock_resp):
             client = EmbeddingAPIClient(api_config)
-            with pytest.raises(EmbeddingServiceError, match="响应格式异常"):
+            with pytest.raises(EmbeddingResponseError, match="响应格式异常"):
                 client.embed_query("测试文本")
+
+    def test_closed_client_raises_service_unavailable(self, api_config: EmbeddingConfig) -> None:
+        """已关闭客户端调用抛出 ServiceUnavailableError (EXCEPTION_303)"""
+        client = EmbeddingAPIClient(api_config)
+        client.close()
+        with pytest.raises(ServiceUnavailableError, match="已关闭"):
+            client.embed_query("测试文本")

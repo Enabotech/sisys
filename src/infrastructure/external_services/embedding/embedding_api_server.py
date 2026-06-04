@@ -23,11 +23,22 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """FastAPI lifespan 上下文管理器
 
-    替代已弃用的 @app.on_event("startup")，管理模型加载生命周期。
+    替代已弃用的 @app.on_event("startup")，管理模型加载/卸载生命周期。
     """
     load_model()
     yield
-    # shutdown 逻辑（如需）在此处添加
+    # Shutdown: 释放模型和 GPU 资源
+    if getattr(app.state, "model", None) is not None:
+        del app.state.model
+        app.state.model = None
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
+        logger.info("模型资源已释放")
 
 
 app = FastAPI(title="SISYS Embedding API", version="1.0.0", lifespan=lifespan)
@@ -193,6 +204,9 @@ async def health() -> dict:
 def _parse_sparse_weights(lexical_weights: list[dict]) -> list[dict]:
     """解析 FlagEmbedding 稀疏词汇权重为 API 响应格式
 
+    保证返回列表长度与输入 lexical_weights 长度一致，
+    即使某条文本的所有 token ID 解析失败，也会返回空 indices/values。
+
     Args:
         lexical_weights: FlagEmbedding 返回的词汇权重列表（键为 token ID 字符串）
 
@@ -206,15 +220,15 @@ def _parse_sparse_weights(lexical_weights: list[dict]) -> list[dict]:
             try:
                 sorted_items.append((int(k), float(v)))
             except (ValueError, TypeError):
-                logger.debug("跳过非法 token ID: %s", k)
+                logger.warning("跳过非法 token ID: %s", k)
         sorted_items.sort(key=lambda x: x[0])
-        if sorted_items:
-            sparse_list.append(
-                {
-                    "indices": [idx for idx, _ in sorted_items],
-                    "values": [val for _, val in sorted_items],
-                }
-            )
+        # 即使 sorted_items 为空也必须 append，保证输出长度与输入一致
+        sparse_list.append(
+            {
+                "indices": [idx for idx, _ in sorted_items],
+                "values": [val for _, val in sorted_items],
+            }
+        )
     return sparse_list
 
 
@@ -253,9 +267,22 @@ def embed(req: EmbedRequest) -> dict:
         logger.exception("模型推理失败 (texts=%d, return_sparse=%s)", len(req.texts), req.return_sparse)
         raise HTTPException(status_code=500, detail="Embedding inference failed")
 
-    response: dict = {"dense": result["dense_vecs"].tolist()}
+    # 校验模型输出结构：防止 FlagEmbedding 版本变更导致键名变化时产生无信息量的 500 错误
+    if "dense_vecs" not in result:
+        logger.error("模型输出缺少 'dense_vecs' 键，实际键: %s", list(result.keys()))
+        raise HTTPException(status_code=500, detail="Model output missing 'dense_vecs'")
+
+    dense_vecs = result["dense_vecs"]
+    if len(dense_vecs) != len(req.texts):
+        logger.error("模型输出向量数(%d)与请求数(%d)不匹配", len(dense_vecs), len(req.texts))
+        raise HTTPException(status_code=500, detail=f"Vector count mismatch: {len(dense_vecs)} != {len(req.texts)}")
+
+    response: dict = {"dense": dense_vecs.tolist()}
 
     if req.return_sparse:
+        if "lexical_weights" not in result:
+            logger.error("模型输出缺少 'lexical_weights' 键（return_sparse=True）")
+            raise HTTPException(status_code=500, detail="Model output missing 'lexical_weights'")
         response["sparse"] = _parse_sparse_weights(result["lexical_weights"])
     else:
         response["sparse"] = None
