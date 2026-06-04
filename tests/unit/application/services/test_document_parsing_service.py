@@ -724,3 +724,129 @@ class TestDocumentParsingServiceLayoutDetection:
 
         # 版面检测失败不应导致解析失败
         assert result.parse_status == ParseStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_pdf_page_renderer_none_graceful_degradation(
+        self, mock_repo, mock_storage, mock_event_publisher, mock_parser
+    ) -> None:
+        """验证 pdf_page_renderer=None（layout_detector 非 None）时正常解析（降级策略）"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="test.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "path/to/test.pdf"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"pdf content"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+
+        element = ParsedElement(content="文本", bbox=None)
+        mock_parser.parse.return_value = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/pdf",
+            pages=[ParsedPage(page_number=1, texts=[element])],
+        )
+
+        # layout_detector 非 None 但 pdf_page_renderer=None
+        mock_layout_detector = MagicMock()
+        service = DocumentParsingService(
+            document_repository=mock_repo,
+            document_storage=mock_storage,
+            event_publisher=mock_event_publisher,
+            document_parser=mock_parser,
+            layout_detector=mock_layout_detector,
+            # pdf_page_renderer=None（未注入）
+        )
+
+        result = await service.parse_document(doc_id, "t1")
+
+        assert result.parse_status == ParseStatus.COMPLETED
+        # 降级条件下不应调用 detect
+        mock_layout_detector.detect.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_per_page_independent_failure(self, mock_repo, mock_storage, mock_event_publisher, mock_parser) -> None:
+        """验证逐页独立降级：某页检测失败不影响其他页"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import (
+            BoundingBox,
+            BoundingBoxResult,
+            ParsedDocument,
+            ParsedElement,
+            ParsedPage,
+        )
+
+        doc_id = uuid.uuid4()
+        doc = Document(document_id=doc_id, filename="multi.pdf", mime_type="application/pdf", tenant_id="t1")
+        doc.metadata["storage_object_key"] = "path/to/multi.pdf"
+
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"pdf data"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+
+        # 构造 2 页 ParsedDocument
+        elem1 = ParsedElement(content="第一页文本", bbox=None)
+        elem2 = ParsedElement(content="第二页文本", bbox=None)
+        mock_parser.parse.return_value = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/pdf",
+            pages=[
+                ParsedPage(page_number=1, texts=[elem1]),
+                ParsedPage(page_number=2, texts=[elem2]),
+            ],
+        )
+
+        # mock renderer 正常返回
+        mock_pdf_renderer = MagicMock()
+        mock_pdf_renderer.render_page.return_value = b"\x89PNG_fake"
+
+        # mock detector: 第 1 页抛异常，第 2 页正常返回
+        mock_layout_detector = MagicMock()
+        detection_result = BoundingBoxResult(
+            label="Text",
+            bbox=BoundingBox(x=10.0, y=20.0, width=100.0, height=50.0, page=2),
+            confidence=0.95,
+        )
+        mock_layout_detector.detect.side_effect = [
+            RuntimeError("第 1 页推理失败"),  # 第 1 页抛异常
+            [detection_result],  # 第 2 页正常返回
+        ]
+
+        service = DocumentParsingService(
+            document_repository=mock_repo,
+            document_storage=mock_storage,
+            event_publisher=mock_event_publisher,
+            document_parser=mock_parser,
+            layout_detector=mock_layout_detector,
+            pdf_page_renderer=mock_pdf_renderer,
+        )
+
+        result = await service.parse_document(doc_id, "t1")
+
+        # 整体解析成功
+        assert result.parse_status == ParseStatus.COMPLETED
+        parse_result = result.metadata["parse_result"]
+
+        # 第 1 页：检测失败，bbox 保持 None
+        page1_texts = parse_result["pages"][0]["texts"]
+        assert page1_texts[0]["bbox"] is None
+
+        # 第 2 页：检测成功，bbox 已填充
+        page2_texts = parse_result["pages"][1]["texts"]
+        assert page2_texts[0]["bbox"] is not None
+        assert page2_texts[0]["bbox"]["page"] == 2
