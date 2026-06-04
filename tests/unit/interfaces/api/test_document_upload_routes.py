@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
+from src.domain.exceptions import NotFoundError
 from src.domain.value_objects.token_payload import TokenPayload
 from src.interfaces.api.exception_handlers import register_exception_handlers
 from src.interfaces.api.middleware.exception_context import ExceptionContextMiddleware
@@ -271,7 +272,7 @@ class TestChunkedUpload:
     def test_chunked_expired_upload_id_returns_404(self) -> None:
         """过期 upload_id 返回 404"""
         client, _, manager, _ = _make_app()
-        manager.complete_upload = AsyncMock(side_effect=ValueError("upload_id abc123 不存在"))
+        manager.complete_upload = AsyncMock(side_effect=NotFoundError(message="upload_id abc123 不存在或已过期"))
 
         resp = client.post(
             "/api/v1/documents/chunked/abc123/complete",

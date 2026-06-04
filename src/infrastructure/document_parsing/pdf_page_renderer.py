@@ -73,7 +73,7 @@ class PdfPageRenderer:
             buf = io.BytesIO()
             pil_image.save(buf, format="PNG")
             return buf.getvalue()
-        except (ValueError, FileNotFoundError):
+        except (ValueError, FileNotFoundError, ValidationError):
             raise
         except Exception as e:
             raise RuntimeError(f"渲染 PDF 页面失败: {e}") from e
