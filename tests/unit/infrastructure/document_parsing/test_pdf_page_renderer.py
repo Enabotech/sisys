@@ -48,6 +48,9 @@ class TestPdfPageRendererRenderPage:
 
         renderer = PdfPageRenderer.__new__(PdfPageRenderer)
         renderer._dpi = 150
+        # _pypdfium2 在 __init__ 中设置，mock 构建需手动注入
+        # render_page 使用 self._pypdfium2.PdfDocument() 调用
+        renderer._pypdfium2 = None  # 由各测试通过 patch.dict 注入 mock
         return renderer, {}
 
     def test_render_page_returns_png_bytes(self) -> None:
@@ -73,11 +76,11 @@ class TestPdfPageRendererRenderPage:
         mock_pypdfium2 = MagicMock()
         mock_pypdfium2.PdfDocument.return_value = mock_pdf
 
-        with patch("src.infrastructure.document_parsing.pdf_page_renderer.pypdfium2", mock_pypdfium2, create=True):
-            with patch("src.infrastructure.document_parsing.pdf_page_renderer.Image", create=True):
-                # 直接 patch render_page 中的 import
-                with patch.dict("sys.modules", {"pypdfium2": mock_pypdfium2}):
-                    result = renderer.render_page("/path/to/doc.pdf", page_number=1)
+        # 直接注入 mock pypdfium2（__init__ 中存储为 self._pypdfium2）
+        renderer._pypdfium2 = mock_pypdfium2
+
+        with patch("src.infrastructure.document_parsing.pdf_page_renderer.Image", create=True):
+            result = renderer.render_page("/path/to/doc.pdf", page_number=1)
 
         assert isinstance(result, bytes)
         assert result.startswith(b"\x89PNG")
@@ -89,9 +92,10 @@ class TestPdfPageRendererRenderPage:
         mock_pypdfium2 = MagicMock()
         mock_pypdfium2.PdfDocument.side_effect = Exception("无法打开文件")
 
-        with patch.dict("sys.modules", {"pypdfium2": mock_pypdfium2}):
-            with pytest.raises(FileNotFoundError, match="无法打开 PDF 文件"):
-                renderer.render_page("/nonexistent/doc.pdf", page_number=1)
+        renderer._pypdfium2 = mock_pypdfium2
+
+        with pytest.raises(FileNotFoundError, match="无法打开 PDF 文件"):
+            renderer.render_page("/nonexistent/doc.pdf", page_number=1)
 
     def test_render_page_number_out_of_range(self) -> None:
         """验证页码超出范围时抛出 ValueError"""
@@ -103,9 +107,10 @@ class TestPdfPageRendererRenderPage:
         mock_pypdfium2 = MagicMock()
         mock_pypdfium2.PdfDocument.return_value = mock_pdf
 
-        with patch.dict("sys.modules", {"pypdfium2": mock_pypdfium2}):
-            with pytest.raises(ValueError, match="页码超出范围"):
-                renderer.render_page("/path/to/doc.pdf", page_number=10)
+        renderer._pypdfium2 = mock_pypdfium2
+
+        with pytest.raises(ValueError, match="页码超出范围"):
+            renderer.render_page("/path/to/doc.pdf", page_number=10)
 
     def test_render_page_negative_page_number(self) -> None:
         """验证负页码抛出 ValueError"""
@@ -117,9 +122,10 @@ class TestPdfPageRendererRenderPage:
         mock_pypdfium2 = MagicMock()
         mock_pypdfium2.PdfDocument.return_value = mock_pdf
 
-        with patch.dict("sys.modules", {"pypdfium2": mock_pypdfium2}):
-            with pytest.raises(ValueError, match="页码超出范围"):
-                renderer.render_page("/path/to/doc.pdf", page_number=0)
+        renderer._pypdfium2 = mock_pypdfium2
+
+        with pytest.raises(ValueError, match="页码超出范围"):
+            renderer.render_page("/path/to/doc.pdf", page_number=0)
 
     def test_render_page_scale_calculation(self) -> None:
         """验证 DPI→scale 换算：scale = dpi / 72"""
@@ -144,8 +150,9 @@ class TestPdfPageRendererRenderPage:
         mock_pypdfium2 = MagicMock()
         mock_pypdfium2.PdfDocument.return_value = mock_pdf
 
-        with patch.dict("sys.modules", {"pypdfium2": mock_pypdfium2}):
-            renderer.render_page("/path/to/doc.pdf", page_number=1)
+        renderer._pypdfium2 = mock_pypdfium2
+
+        renderer.render_page("/path/to/doc.pdf", page_number=1)
 
         # 验证 scale 参数：300 / 72 ≈ 4.167
         mock_page.render.assert_called_once()
@@ -166,9 +173,10 @@ class TestPdfPageRendererRenderPage:
         mock_pypdfium2 = MagicMock()
         mock_pypdfium2.PdfDocument.return_value = mock_pdf
 
-        with patch.dict("sys.modules", {"pypdfium2": mock_pypdfium2}):
-            with pytest.raises(RuntimeError, match="渲染 PDF 页面失败"):
-                renderer.render_page("/path/to/doc.pdf", page_number=1)
+        renderer._pypdfium2 = mock_pypdfium2
+
+        with pytest.raises(RuntimeError, match="渲染 PDF 页面失败"):
+            renderer.render_page("/path/to/doc.pdf", page_number=1)
 
     def test_render_page_closes_pdf_on_success(self) -> None:
         """验证成功渲染后关闭 PDF 文档"""
@@ -192,8 +200,9 @@ class TestPdfPageRendererRenderPage:
         mock_pypdfium2 = MagicMock()
         mock_pypdfium2.PdfDocument.return_value = mock_pdf
 
-        with patch.dict("sys.modules", {"pypdfium2": mock_pypdfium2}):
-            renderer.render_page("/path/to/doc.pdf", page_number=1)
+        renderer._pypdfium2 = mock_pypdfium2
+
+        renderer.render_page("/path/to/doc.pdf", page_number=1)
 
         mock_pdf.close.assert_called_once()
 
@@ -211,8 +220,9 @@ class TestPdfPageRendererRenderPage:
         mock_pypdfium2 = MagicMock()
         mock_pypdfium2.PdfDocument.return_value = mock_pdf
 
-        with patch.dict("sys.modules", {"pypdfium2": mock_pypdfium2}):
-            with pytest.raises(RuntimeError):
-                renderer.render_page("/path/to/doc.pdf", page_number=1)
+        renderer._pypdfium2 = mock_pypdfium2
+
+        with pytest.raises(RuntimeError):
+            renderer.render_page("/path/to/doc.pdf", page_number=1)
 
         mock_pdf.close.assert_called_once()
