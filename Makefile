@@ -962,6 +962,5 @@ help:
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "📝 相关文档："
 	@echo "  - docs/developer/sdd-tdd-fusion-guide.md (融合模式指南)"
-	@echo "  - docs/developer/sdd-tdd-checklist.md (实施检查清单)"
 	@echo "  - docs/developer/epic1-story1.1-pilot-plan.md (试点计划)"
 	@echo "═══════════════════════════════════════════════════════════"

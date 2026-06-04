@@ -384,7 +384,6 @@ make sdd-tdd-cycle STORY=1.1
 
 **相关文档：**
 - `docs/developer/sdd-tdd-fusion-guide.md` - 融合模式完整指南
-- `docs/developer/sdd-tdd-checklist.md` - 实施检查清单
 - `docs/developer/epic1-story1.1-pilot-plan.md` - 试点实施计划
 
 

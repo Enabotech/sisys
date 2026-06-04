@@ -5,7 +5,7 @@ No mocks - uses real PostgreSQL and Redis instances.
 
 Run with: poetry run pytest tests/acceptance/test_acceptance_externalized-memory-context-compression.py -v
 
-Test Isolation (per sdd-tdd-checklist.md §5.5):
+Test Isolation:
     - Uses begin_nested() savepoint for transactional isolation
     - Each test runs in isolated transaction that rolls back after test
     - Test schema uses UUID suffix for isolation

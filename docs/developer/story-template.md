@@ -39,7 +39,6 @@
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](./sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md)。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 
@@ -661,7 +660,6 @@
 | 文档 | 说明 |
 |------|------|
 | [SDD+TDD 融合开发模式指南](./sdd-tdd-fusion-guide.md) | 开发模式详细说明与各层测试模板 |
-| [SDD+TDD 实施检查清单](./sdd-tdd-checklist.md) | 实施步骤检查 |
 | [预提交 Hooks 规范](./pre-commit-hooks.md) | 代码质量保障 |
 | [架构设计文档](../../_bmad-output/planning-artifacts/architecture.md) | 六边形架构详细说明 |
 

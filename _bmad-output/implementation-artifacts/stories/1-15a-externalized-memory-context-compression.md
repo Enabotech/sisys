@@ -169,7 +169,6 @@
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](./sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md)。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 
@@ -314,7 +313,6 @@
 #### 测试隔离约束（必须遵守）
 
 > ⚠️ **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
-> 参考 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md) §5.5 测试隔离约束。
 
 **约束规则：**
 
@@ -868,7 +866,6 @@ sisys/
 | **系统公理二** | 外部化记忆（LLM 上下文=缓存，磁盘记忆=真相源） | architecture.md §3.2 |
 | **三层触发机制** | L1 用户主动/L2 系统建议/L3 Checkpoint 自动 | architecture.md §3.2 |
 | **事件驱动** | 事务发件箱模式，事件处理幂等性 | architecture.md §3.3 |
-| **测试覆盖率** | 架构层≥85%，集成测试≥75% | sdd-tdd-checklist.md §5 |
 | **压缩延迟** | P95<20ms | epics_v1.0.md Story 1.15a |
 | **压缩率** | ≥70%（允许误差 -5%） | epics_v1.0.md Story 1.15a |
 
@@ -970,7 +967,6 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 | 文档 | 说明 |
 |------|------|
 | [SDD+TDD 融合开发模式指南](./sdd-tdd-fusion-guide.md) | 开发模式详细说明与各层测试模板 |
-| [SDD+TDD 实施检查清单](./sdd-tdd-checklist.md) | 实施步骤检查 |
 | [or.md 系统公理二](../planning-artifacts/or.md) | 系统公理定义 |
 | [Story 1.14c: 自主调用循环 - execute](./1-14c-autonomous-invocation-execute.md) | 前置 Story |
 | [Story 1.15b: 外部化记忆 - L0 入口](./1-15b-externalized-memory-six-layer-storage.md) | 后续 Story（待创建） |

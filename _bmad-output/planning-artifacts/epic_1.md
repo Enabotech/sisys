@@ -643,7 +643,6 @@ So that **领域逻辑与技术实现隔离，支持独立演进和测试**。
    - [ ] `tests/unit/domain/test_strategic_plan.py` - 领域实体测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - TDD 红 - 绿 - 重构循环
 
 **Given** 项目初始化完成
 **When** 创建领域层、应用层、接口层、基础设施层目录结构
@@ -724,7 +723,6 @@ So that **实时事件低延迟路由，持久化事件可靠传输**。
    - [ ] `tests/integration/test_integration_event_bus.py` - 事件总线集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 集成测试要求
 
 **Given** 领域事件已定义
 **When** 发布领域事件至事件总线
@@ -773,7 +771,6 @@ So that **支持低延迟会话管理和语义缓存**。
    - [ ] `tests/integration/test_integration_redis.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** Redis 7.0+ 已部署
 **When** 存储会话状态快照至 Redis Hash
@@ -817,7 +814,6 @@ So that **支持 ACID 事务和外键约束**。
    - [ ] `tests/integration/test_integration_postgresql.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** PostgreSQL 15+ 已部署
 **When** 创建用户表、角色表、权限表、审计日志表、业务实体表
@@ -860,7 +856,6 @@ So that **支持混合检索（Dense + Sparse + Payload 过滤）**。
    - [ ] `tests/integration/test_integration_qdrant.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** Qdrant 1.7+ 已部署
 **When** 存储 bge-m3 嵌入向量（维度 1024）至 Collection
@@ -901,7 +896,6 @@ So that **支持版本控制和 WORM 存储**。
    - [ ] `tests/integration/test_minio_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** MinIO 已部署
 **When** 上传文档至 Bucket
@@ -942,7 +936,6 @@ So that **支持 GraphRAG 增强检索和实体关联查询**。
    - [ ] `tests/integration/test_integration_neo4j.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** Neo4j 5.x 已部署
 **When** 创建实体节点和关系边
@@ -983,7 +976,6 @@ So that **系统支持细粒度访问控制**。
    - [ ] `tests/integration/test_security_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 安全测试要求
 
 **Given** PostgreSQL 用户表已创建
 **When** 用户登录并获取 JWT 令牌
@@ -1024,7 +1016,6 @@ So that **满足等保 2.0 和 SOX 合规要求**。
    - [ ] `tests/integration/test_audit_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 安全测试要求
 
 **Given** 审计日志表已创建
 **When** 记录用户操作至审计日志
@@ -1067,7 +1058,6 @@ So that **满足数据安全法和 PIPL 要求**。
    - [ ] `tests/integration/test_data_sovereignty_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 安全测试要求
 
 **Given** 敏感数据标签已定义
 **When** 处理敏感数据或发起外部网络调用
@@ -1109,7 +1099,6 @@ So that **通过公安部指定测评机构测评**。
    - [ ] `tests/integration/test_security_compliance.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 安全测试要求
 
 **Given** 所有安全控制已实现
 **When** 执行等保 2.0 测评
@@ -1150,7 +1139,6 @@ So that **系统可以应对流量高峰并优化资源成本**。
    - [ ] `tests/integration/test_k8s_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 系统部署在 K8s 集群
 **When** 负载增加（CPU>70% 或 请求队列>100）
@@ -1486,7 +1474,6 @@ So that **可以快速编写和执行集成测试和 E2E 测试**。
    - [ ] `tests/e2e/test_e2e_framework.py` - E2E 框架测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-checklist.md` - 集成测试要求
 
 **Given** 测试框架搭建完成（Story 0.3）
 **When** 运行集成测试或 E2E 测试
