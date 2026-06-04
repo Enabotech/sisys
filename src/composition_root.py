@@ -1191,20 +1191,38 @@ def bootstrap() -> None:
 
     # DocumentParsingService — 应用层文档解析编排
     from src.application.services.document_parsing_service import DocumentParsingService
+    from src.domain.ports.resolver import Resolver
 
-    register_port(
-        name="document_parsing_service",
-        version="v1.1.0",
-        interface=DocumentParsingService,
-        impl=lambda resolver: DocumentParsingService(
+    def _create_parsing_service(resolver: Resolver) -> DocumentParsingService:
+        """创建文档解析服务，版面检测端口可选注入
+
+        当 ONNX 模型文件不存在或 onnxruntime 未安装时，
+        layout_detector 和 pdf_page_renderer 降级为 None，
+        文档解析以无版面检测模式运行（所有 bbox=None）。
+        """
+        _layout_detector = None
+        _pdf_page_renderer = None
+        try:
+            _layout_detector = resolver.resolve("layout_detector")
+            _pdf_page_renderer = resolver.resolve("pdf_page_renderer")
+        except Exception:
+            logger.warning("版面检测端口初始化失败，文档解析将以无版面检测模式运行", exc_info=True)
+
+        return DocumentParsingService(
             document_repository=resolver.resolve("document_repository"),
             document_storage=resolver.resolve("document_storage"),
             event_publisher=resolver.resolve("event_publisher"),
             document_parser=resolver.resolve("document_parser"),
             redis_client=resolver.resolve("redis_client"),
-            layout_detector=resolver.resolve("layout_detector"),
-            pdf_page_renderer=resolver.resolve("pdf_page_renderer"),
-        ),
+            layout_detector=_layout_detector,
+            pdf_page_renderer=_pdf_page_renderer,
+        )
+
+    register_port(
+        name="document_parsing_service",
+        version="v1.1.0",
+        interface=DocumentParsingService,
+        impl=_create_parsing_service,
         module="src.application.services.document_parsing_service",
         lifetime=Lifetime.SCOPED,
         owner="epic-2",

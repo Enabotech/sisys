@@ -95,8 +95,22 @@ class TestOnnxLayoutDetectorDetect:
         from src.infrastructure.document_parsing.onnx_layout_detector import OnnxLayoutDetector
 
         mock_session = MagicMock()
+        # mock get_inputs/get_outputs 返回值，支持动态输入/输出名发现
+        mock_input = MagicMock()
+        mock_input.name = "images"  # 模拟 docling-layout-heron-onnx 输入名
+        mock_session.get_inputs.return_value = [mock_input]
+        mock_output_box = MagicMock()
+        mock_output_box.name = "boxes"
+        mock_output_label = MagicMock()
+        mock_output_label.name = "labels"
+        mock_output_score = MagicMock()
+        mock_output_score.name = "scores"
+        mock_session.get_outputs.return_value = [mock_output_box, mock_output_label, mock_output_score]
+
         detector = OnnxLayoutDetector.__new__(OnnxLayoutDetector)
         detector._session = mock_session
+        detector._input_name = "images"  # 动态发现的输入名
+        detector._output_names = ["boxes", "labels", "scores"]  # 动态发现的输出名
         detector._label_map = {
             1: "Caption",
             2: "Footnote",
