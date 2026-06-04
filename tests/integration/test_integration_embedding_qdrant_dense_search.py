@@ -254,9 +254,6 @@ class TestSparseSearchEndToEnd:
     @pytest.mark.asyncio
     async def test_sparse_search_e2e(self, qdrant_client, sparse_collection_name, embedding_service) -> None:
         """端到端：空查询→encode_sparse→upsert→search_sparse→排序→无匹配"""
-        from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
-        from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
-
         cm = QdrantCollectionManager(qdrant_client)
         await cm.create_collection(
             name=sparse_collection_name,
