@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.security.data_integrity_service_impl import (
     DataIntegrityServiceImpl,
 )
@@ -229,3 +230,86 @@ class TestIntegrityResultStructure:
         assert hasattr(result, "actual_hash")
         assert hasattr(result, "algorithm")
         assert hasattr(result, "error_message")
+
+
+class TestUnsupportedAlgorithm:
+    """不支持的算法异常处理"""
+
+    async def test_unsupported_algorithm_raises_configuration_error(
+        self,
+        integrity_service: DataIntegrityServiceImpl,
+    ) -> None:
+        """不支持的哈希算法应抛出 ConfigurationError"""
+        with pytest.raises(ConfigurationError, match="Unsupported algorithm"):
+            await integrity_service.calculate_checksum("test", algorithm="sha1")
+
+    async def test_verify_checksum_with_unsupported_algorithm_raises(
+        self,
+        integrity_service: DataIntegrityServiceImpl,
+    ) -> None:
+        """verify_checksum 使用不支持的算法也应抛出 ConfigurationError"""
+        with pytest.raises(ConfigurationError, match="Unsupported algorithm"):
+            await integrity_service.verify_checksum("test", "abc", algorithm="invalid")
+
+    async def test_verify_data_integrity_with_unsupported_algorithm_raises(
+        self,
+        integrity_service: DataIntegrityServiceImpl,
+    ) -> None:
+        """verify_data_integrity 使用不支持的算法应抛出 ConfigurationError"""
+        with pytest.raises(ConfigurationError, match="Unsupported algorithm"):
+            await integrity_service.verify_data_integrity("id-1", "test", "abc", algorithm="unknown")
+
+
+class TestPublishIntegrityViolation:
+    """完整性违规事件发布行为"""
+
+    async def test_publisher_exception_suppressed(
+        self,
+    ) -> None:
+        """事件发布器抛异常时不应传播，验证结果仍正确返回"""
+        failing_publisher = AsyncMock()
+        failing_publisher.publish = AsyncMock(side_effect=RuntimeError("网络故障"))
+
+        service = DataIntegrityServiceImpl(event_publisher=failing_publisher)
+
+        result = await service.verify_data_integrity(
+            data_id="record-suppress",
+            data="tampered data",
+            stored_hash="0000000000000000000000000000000000000000000000000000000000000000",
+            algorithm="sha256",
+        )
+
+        # 验证结果正常返回（异常被静默捕获）
+        assert result.valid is False
+        assert result.data_id == "record-suppress"
+        assert result.error_message != ""
+
+    async def test_verify_data_integrity_without_publisher(
+        self,
+    ) -> None:
+        """无事件发布器时应正常验证，不尝试发布"""
+        service = DataIntegrityServiceImpl(event_publisher=None)
+
+        data = "test without publisher"
+        checksum = await service.calculate_checksum(data, "sha256")
+
+        result = await service.verify_data_integrity("no-pub", data, checksum, "sha256")
+
+        assert result.valid is True
+        assert result.data_id == "no-pub"
+
+    async def test_verify_data_integrity_valid_without_publisher(
+        self,
+    ) -> None:
+        """无发布器且校验失败时也应正常返回"""
+        service = DataIntegrityServiceImpl(event_publisher=None)
+
+        result = await service.verify_data_integrity(
+            data_id="no-pub-fail",
+            data="some data",
+            stored_hash="wrong_hash",
+            algorithm="sha256",
+        )
+
+        assert result.valid is False
+        assert result.error_message != ""
