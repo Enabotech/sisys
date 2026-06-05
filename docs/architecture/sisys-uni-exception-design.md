@@ -625,7 +625,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     ExceptionHandlers(app)
 ```
 
-#### §3.3.1 双重处理模式（已知偏差）
+#### 3.3.1 双重处理模式（已知偏差）
 
 尽管集中式 `ExceptionHandlers` 已注册，以下接口文件仍手动捕获领域异常并 re-raise 为 `HTTPException`：
 
@@ -645,6 +645,55 @@ def register_exception_handlers(app: FastAPI) -> None:
 - 响应格式不一致 — 手动 HTTPException 使用 `{"detail": "..."}` 而非标准 `{"error": {...}, "request_id": "..."}` 格式
 
 **修复建议**：见 §3.8 决策指南。`auth.py` 中的 OAuth2 Bearer token 提取属于可接受的例外（需要 `WWW-Authenticate` header），其余均应迁移到集中处理器。
+
+#### 3.3.2 完整编码分配表
+
+| 编码 | 类名 | 继承 | HTTP |
+|------|------|------|------|
+| EXCEPTION_000 | BaseException | Exception | 500 |
+| EXCEPTION_1XX | SystemException | BaseException | 500 |
+| EXCEPTION_101 | ConfigurationError | SystemException | 500 |
+| EXCEPTION_102 | NetworkError | SystemException | 500 |
+| EXCEPTION_103 | StorageError | SystemException | 500 |
+| EXCEPTION_104 | MessageBusError | SystemException | 500 |
+| EXCEPTION_105 | AuditError | SystemException | 500 |
+| EXCEPTION_106 | MinIOConnectionError | NetworkError | 500 |
+| EXCEPTION_2XX | BusinessException | BaseException | 400 |
+| EXCEPTION_201 | ValidationError | BusinessException | 400 |
+| EXCEPTION_202 | NotFoundError | BusinessException | 404 |
+| EXCEPTION_203 | ConflictError | BusinessException | 409 |
+| EXCEPTION_204 | PermissionDeniedError | BusinessException | 403 |
+| EXCEPTION_205 | AuthenticationError | BusinessException | 401 |
+| EXCEPTION_206 | InvalidStateError | BusinessException | 409 |
+| EXCEPTION_207 | BusinessRuleViolationError | BusinessException | 422 |
+| EXCEPTION_208 | InvalidStateTransitionError | InvalidStateError | 409 |
+| EXCEPTION_211 | MemoryNotFoundError | NotFoundError | 404 |
+| EXCEPTION_212 | BucketNotFoundError | NotFoundError | 404 |
+| EXCEPTION_213 | MemoryVersionConflictError | ConflictError | 409 |
+| EXCEPTION_214 | BucketNameValidationError | ValidationError | 400 |
+| EXCEPTION_215 | MemoryAccessDeniedError | PermissionDeniedError | 403 |
+| EXCEPTION_221 | RoleNotFoundError | NotFoundError | 404 |
+| EXCEPTION_222 | RoleAlreadyExistsError | ConflictError | 409 |
+| EXCEPTION_223 | CannotDeleteRoleWithUsersError | ConflictError | 409 |
+| EXCEPTION_224 | CannotDeleteSystemRoleError | BusinessRuleViolationError | 422 |
+| EXCEPTION_231 | PasswordValidationError | ValidationError | 400 |
+| EXCEPTION_232 | ComplianceLockError | InvalidStateError | 409 |
+| EXCEPTION_241 | InsufficientTokenError | PermissionDeniedError | 403 |
+| EXCEPTION_251 | VersionError | ConflictError | 409 |
+| EXCEPTION_261 | TransferNotFoundError | NotFoundError | 404 |
+| EXCEPTION_262 | TransferNotApprovedError | InvalidStateError | 409 |
+| EXCEPTION_3XX | ExternalException | BaseException | 502 |
+| EXCEPTION_301 | ThirdPartyError | ExternalException | 502 |
+| EXCEPTION_302 | TimeoutError | ExternalException | 504 |
+| EXCEPTION_303 | ServiceUnavailableError | ExternalException | 503 |
+| EXCEPTION_306 | EmbeddingAPIError | ThirdPartyError | 502 |
+| EXCEPTION_307 | EmbeddingResponseError | ThirdPartyError | 502 |
+| EXCEPTION_308 | EmbeddingModelError | ExternalException | 502 |
+| EXCEPTION_309 | SandboxError | ExternalException | 502 |
+| EXCEPTION_310 | ContainerStartError | SandboxError | 502 |
+| EXCEPTION_311 | ExecutionError | SandboxError | 502 |
+| EXCEPTION_312 | ContainerStopError | SandboxError | 502 |
+| EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 ### 3.4 外部 SDK 错误映射器
 
