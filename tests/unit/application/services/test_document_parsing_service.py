@@ -1091,3 +1091,227 @@ class TestDocumentParsingServiceLayoutDetection:
         assert page_texts[0]["bbox"]["x"] == 50.0
         assert page_texts[0]["bbox"]["width"] == 200.0
         assert page_texts[0]["confidence"] == 0.99
+
+
+class TestDocumentParsingServiceTableExtraction:
+    """表格语义提取集成测试
+
+    测试 DocumentParsingService 的 table_extractor 可选注入和 _apply_table_extraction 编排。
+    """
+
+    @pytest.mark.asyncio
+    async def test_table_extractor_injected_enhances_tables(self) -> None:
+        """table_extractor 注入时触发语义增强"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage, ParsedTable
+
+        doc_id = uuid.uuid4()
+        doc = Document(
+            document_id=doc_id,
+            filename="test.xlsx",
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            tenant_id="t1",
+            parse_status=ParseStatus.PENDING,
+            metadata={"storage_object_key": "raw-documents/test.xlsx"},
+        )
+
+        mock_repo = AsyncMock()
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        mock_storage = AsyncMock()
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"fake xlsx content"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+
+        mock_parser = MagicMock()
+        parsed = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            pages=[ParsedPage(page_number=1, tables=[ParsedTable(rows=[["姓名", "年龄"], ["张三", "30"]])])],
+            parse_status="completed",
+        )
+        mock_parser.parse.return_value = parsed
+
+        # mock table_extractor
+        mock_table_extractor = MagicMock()
+        enhanced_table = ParsedTable(
+            rows=[["姓名", "年龄"], ["张三", "30"]],
+            header=["姓名", "年龄"],
+            semantic_confidence=0.85,
+        )
+        mock_table_extractor.extract.return_value = [enhanced_table]
+
+        service = DocumentParsingService(
+            document_repository=mock_repo,
+            document_storage=mock_storage,
+            event_publisher=AsyncMock(),
+            document_parser=mock_parser,
+            table_extractor=mock_table_extractor,
+        )
+
+        result = await service.parse_document(doc_id, "t1")
+        assert result.parse_status == ParseStatus.COMPLETED
+        mock_table_extractor.extract.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_table_extractor_none_skips_enhancement(self) -> None:
+        """table_extractor=None 时跳过语义增强"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage, ParsedTable
+
+        doc_id = uuid.uuid4()
+        doc = Document(
+            document_id=doc_id,
+            filename="test.xlsx",
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            tenant_id="t1",
+            parse_status=ParseStatus.PENDING,
+            metadata={"storage_object_key": "raw-documents/test.xlsx"},
+        )
+
+        mock_repo = AsyncMock()
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        mock_storage = AsyncMock()
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"fake xlsx content"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+
+        mock_parser = MagicMock()
+        parsed = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            pages=[ParsedPage(page_number=1, tables=[ParsedTable(rows=[["A", "B"]])])],
+            parse_status="completed",
+        )
+        mock_parser.parse.return_value = parsed
+
+        service = DocumentParsingService(
+            document_repository=mock_repo,
+            document_storage=mock_storage,
+            event_publisher=AsyncMock(),
+            document_parser=mock_parser,
+            table_extractor=None,
+        )
+
+        result = await service.parse_document(doc_id, "t1")
+        assert result.parse_status == ParseStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_table_extractor_failure_degrades(self) -> None:
+        """table_extractor 运行时异常降级（WARNING + 原始 tables）"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage, ParsedTable
+
+        doc_id = uuid.uuid4()
+        doc = Document(
+            document_id=doc_id,
+            filename="test.xlsx",
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            tenant_id="t1",
+            parse_status=ParseStatus.PENDING,
+            metadata={"storage_object_key": "raw-documents/test.xlsx"},
+        )
+
+        mock_repo = AsyncMock()
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        mock_storage = AsyncMock()
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"fake xlsx content"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+
+        mock_parser = MagicMock()
+        parsed = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            pages=[ParsedPage(page_number=1, tables=[ParsedTable(rows=[["A"]])])],
+            parse_status="completed",
+        )
+        mock_parser.parse.return_value = parsed
+
+        mock_table_extractor = MagicMock()
+        mock_table_extractor.extract.side_effect = RuntimeError("表格语义提取失败")
+
+        service = DocumentParsingService(
+            document_repository=mock_repo,
+            document_storage=mock_storage,
+            event_publisher=AsyncMock(),
+            document_parser=mock_parser,
+            table_extractor=mock_table_extractor,
+        )
+
+        result = await service.parse_document(doc_id, "t1")
+        # 降级后解析状态仍为 COMPLETED
+        assert result.parse_status == ParseStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_table_extraction_preserves_parse_status(self) -> None:
+        """表格提取失败不影响解析状态"""
+        from src.application.services.document_parsing_service import DocumentParsingService
+        from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage
+
+        doc_id = uuid.uuid4()
+        doc = Document(
+            document_id=doc_id,
+            filename="test.pdf",
+            mime_type="application/pdf",
+            tenant_id="t1",
+            parse_status=ParseStatus.PENDING,
+            metadata={"storage_object_key": "raw-documents/test.pdf"},
+        )
+
+        mock_repo = AsyncMock()
+        mock_repo.find.return_value = doc
+        mock_repo.save.return_value = doc
+
+        mock_storage = AsyncMock()
+
+        def mock_retrieve(*args, **kwargs):
+            async def _stream():
+                yield b"fake pdf content"
+
+            return _stream()
+
+        mock_storage.retrieve = MagicMock(side_effect=mock_retrieve)
+
+        mock_parser = MagicMock()
+        parsed = ParsedDocument(
+            document_id=str(doc_id),
+            mime_type="application/pdf",
+            pages=[ParsedPage(page_number=1)],
+            parse_status="completed",
+        )
+        mock_parser.parse.return_value = parsed
+
+        mock_table_extractor = MagicMock()
+        mock_table_extractor.extract.side_effect = RuntimeError("提取失败")
+
+        service = DocumentParsingService(
+            document_repository=mock_repo,
+            document_storage=mock_storage,
+            event_publisher=AsyncMock(),
+            document_parser=mock_parser,
+            table_extractor=mock_table_extractor,
+        )
+
+        result = await service.parse_document(doc_id, "t1")
+        assert result.parse_status == ParseStatus.COMPLETED
