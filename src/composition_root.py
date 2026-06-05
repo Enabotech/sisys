@@ -1189,16 +1189,48 @@ def bootstrap() -> None:
         tags=("layout", "pdf", "document"),
     )
 
+    # === Table Extraction Ports (Story 2-4) ===
+    from src.domain.ports.table_extractor import TableExtractorPort
+
+    register_port(
+        name="table_extractor",
+        version="v1.0.0",
+        interface=TableExtractorPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.document_parsing.table_semantic_extractor",
+            fromlist=["TableSemanticExtractor"],
+        ).TableSemanticExtractor(),
+        module="src.infrastructure.document_parsing.table_semantic_extractor",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+        tags=("table", "semantic", "document"),
+    )
+
+    register_port(
+        name="pdf_table_extractor",
+        version="v1.0.0",
+        interface=TableExtractorPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.document_parsing.pdf_table_extractor",
+            fromlist=["PdfTableExtractor"],
+        ).PdfTableExtractor(),
+        module="src.infrastructure.document_parsing.pdf_table_extractor",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+        tags=("table", "pdf", "document"),
+    )
+
     # DocumentParsingService — 应用层文档解析编排
     from src.application.services.document_parsing_service import DocumentParsingService
     from src.domain.ports.resolver import Resolver
 
     def _create_parsing_service(resolver: Resolver) -> DocumentParsingService:
-        """创建文档解析服务，版面检测端口可选注入
+        """创建文档解析服务，版面检测和表格提取端口可选注入
 
         当 ONNX 模型文件不存在或 onnxruntime 未安装时，
         layout_detector 和 pdf_page_renderer 降级为 None，
         文档解析以无版面检测模式运行（所有 bbox=None）。
+        当 table_extractor 初始化失败时降级为 None（无表格语义增强）。
         """
         _layout_detector = None
         _pdf_page_renderer = None
@@ -1212,6 +1244,15 @@ def bootstrap() -> None:
             # 端口注册配置错误应向上传播，避免掩盖启动时配置问题
             raise RuntimeError(f"版面检测端口注册配置错误: {e}") from e
 
+        _table_extractor = None
+        try:
+            _table_extractor = resolver.resolve("table_extractor")
+        except (ImportError, RuntimeError) as e:
+            # pdfplumber 等依赖未安装时降级
+            logger.warning("表格提取端口初始化失败，文档解析将以无表格语义增强模式运行: %s", e)
+        except (KeyError, TypeError) as e:
+            raise RuntimeError(f"表格提取端口注册配置错误: {e}") from e
+
         return DocumentParsingService(
             document_repository=resolver.resolve("document_repository"),
             document_storage=resolver.resolve("document_storage"),
@@ -1220,11 +1261,12 @@ def bootstrap() -> None:
             redis_client=resolver.resolve("redis_client"),
             layout_detector=_layout_detector,
             pdf_page_renderer=_pdf_page_renderer,
+            table_extractor=_table_extractor,
         )
 
     register_port(
         name="document_parsing_service",
-        version="v1.1.0",
+        version="v1.2.0",
         interface=DocumentParsingService,
         impl=_create_parsing_service,
         module="src.application.services.document_parsing_service",

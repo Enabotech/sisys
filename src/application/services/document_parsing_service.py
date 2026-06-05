@@ -1,6 +1,6 @@
 """应用层文档解析服务
 
-编排文档解析流程：获取文档 → MinIO 下载 → 临时文件桥接 → 解析 → 版面检测（可选）→ 状态更新 → 事件发布。
+编排文档解析流程：获取文档 → MinIO 下载 → 临时文件桥接 → 解析 → 版面检测（可选）→ 表格语义提取（可选）→ 状态更新 → 事件发布。
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from src.domain.ports.event_publisher import EventPublisher
     from src.domain.ports.layout_detector import LayoutDetector
     from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
+    from src.domain.ports.table_extractor import TableExtractorPort
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ class DocumentParsingService:
         redis_client: "aioredis.Redis | None" = None,
         layout_detector: "LayoutDetector | None" = None,
         pdf_page_renderer: "PdfPageRendererPort | None" = None,
+        table_extractor: "TableExtractorPort | None" = None,
     ) -> None:
         self._repository = document_repository
         self._storage = document_storage
@@ -85,6 +87,7 @@ class DocumentParsingService:
         self._redis = redis_client
         self._layout_detector = layout_detector
         self._pdf_page_renderer = pdf_page_renderer
+        self._table_extractor = table_extractor
 
     async def parse_document(self, document_id: uuid.UUID, tenant_id: str) -> Document:
         """解析文档
@@ -160,6 +163,9 @@ class DocumentParsingService:
 
             # 版面检测增强（仅 PDF + layout_detector 注入时触发，运行时错误不阻断解析）
             parsed_doc = await self._apply_layout_detection(parsed_doc, temp_path, document.mime_type)
+
+            # 表格语义提取增强（table_extractor 注入时触发，运行时错误不阻断解析）
+            parsed_doc = await self._apply_table_extraction(parsed_doc, temp_path, document.mime_type)
 
             # 更新状态和元数据
             document.parse_status = ParseStatus.COMPLETED
@@ -332,6 +338,75 @@ class DocumentParsingService:
                 enhanced_pages.append(page)
 
         return replace(parsed_doc, pages=enhanced_pages)
+
+    async def _apply_table_extraction(
+        self,
+        parsed_doc: ParsedDocument,
+        file_path: str,
+        mime_type: str,
+    ) -> ParsedDocument:
+        """对已解析文档应用表格语义提取增强
+
+        降级策略（与 _apply_layout_detection 对齐）：
+        1. table_extractor 未注入（None）→ 跳过增强，保留原始 tables
+        2. 运行时异常 → WARNING 日志 + 返回原文档（解析状态不受影响）
+        3. 初始化失败（ImportError）→ 由 composition_root 处理，此处不涉及
+
+        Args:
+            parsed_doc: 已完成解析的 ParsedDocument
+            file_path: 文档临时文件路径
+            mime_type: 文档 MIME 类型
+
+        Returns:
+            增强后的 ParsedDocument 或原文档（降级时）
+        """
+        # 降级条件：table_extractor 未注入
+        if self._table_extractor is None:
+            return parsed_doc
+
+        # 收集所有页面中的表格
+        all_tables: list[ParsedTable] = []
+        for page in parsed_doc.pages:
+            all_tables.extend(page.tables)
+
+        if not all_tables:
+            return parsed_doc
+
+        try:
+            # 调用 table_extractor 进行语义增强
+            enhanced_tables = await asyncio.to_thread(
+                self._table_extractor.extract,
+                file_path,
+                mime_type,
+                all_tables,
+            )
+
+            # 将增强后的表格重新分配到各页面
+            enhanced_pages: list[ParsedPage] = []
+            table_idx = 0
+            for page in parsed_doc.pages:
+                original_count = len(page.tables)
+                page_tables = enhanced_tables[table_idx : table_idx + original_count]
+                table_idx += original_count
+                enhanced_pages.append(
+                    ParsedPage(
+                        page_number=page.page_number,
+                        texts=page.texts,
+                        tables=page_tables if page_tables else page.tables,
+                        images=page.images,
+                    )
+                )
+
+            return replace(parsed_doc, pages=enhanced_pages)
+
+        except Exception:
+            # 运行时异常降级：WARNING 日志 + 返回原文档
+            logger.warning(
+                "表格语义提取失败，降级保留原始表格（文档 MIME=%s）",
+                mime_type,
+                exc_info=True,
+            )
+            return parsed_doc
 
     @staticmethod
     def _apply_text_detections(
