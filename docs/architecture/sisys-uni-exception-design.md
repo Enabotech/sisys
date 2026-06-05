@@ -679,6 +679,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_231 | PasswordValidationError | ValidationError | 400 |
 | EXCEPTION_232 | ComplianceLockError | InvalidStateError | 409 |
 | EXCEPTION_241 | InsufficientTokenError | PermissionDeniedError | 403 |
+| EXCEPTION_242 | EntityValidationError | ValidationError | 400 |
+| EXCEPTION_243 | EntityStateTransitionError | InvalidStateTransitionError | 409 |
+| EXCEPTION_244 | EntityBusinessRuleError | BusinessRuleViolationError | 422 |
 | EXCEPTION_251 | VersionError | ConflictError | 409 |
 | EXCEPTION_261 | TransferNotFoundError | NotFoundError | 404 |
 | EXCEPTION_262 | TransferNotApprovedError | InvalidStateError | 409 |
@@ -694,6 +697,75 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_311 | ExecutionError | SandboxError | 502 |
 | EXCEPTION_312 | ContainerStopError | SandboxError | 502 |
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
+
+### 3.3 编码分配策略：人工编码 + CI 自动校验
+
+#### 3.3.1 设计原则
+
+借鉴 Google Error Model（`domain + reason`）、Stripe（`type + code` 前缀命名空间）、Kubernetes（`StatusReason` 字符串常量）等五大业界的共同实践，本系统采用 **"人工分配编码 + CI 自动校验边界"** 的策略：
+
+| 维度 | 人工决策（开发者责任） | CI 自动校验（机器责任） |
+|------|----------------------|----------------------|
+| **编码选择** | 按子域范围选取未占用的连续编号 | 编码唯一性 + 子域范围边界校验 |
+| **继承设计** | 子类编码放在专属子域（如 entity 242-249），继承 business 基类 | 继承链编码一致性校验（仅允许合法跨子域继承） |
+| **子域扩展** | 新增子域时在 `_code_ranges.py` 注册范围 | 子域范围不重叠校验（允许嵌套子域） |
+| **文档同步** | 更新 §3.3.2 编码分配表 | 编码集合与 `__all__` 一致性校验 |
+
+> **为什么不用自动编码生成？** 编码是 API 契约——一旦分配，监控告警规则、历史日志解析、运维脚本均依赖其稳定性。自动生成（如 `hash(module+class)`）在重构时破坏编码，导致运维灾难。Google/Stripe/Kubernetes 无一采用自动编码生成。
+
+#### 3.3.2 子域编码范围约束
+
+定义在 `src/domain/exceptions/_code_ranges.py`（CI 专用，非运行时），作为所有校验的唯一权威输入：
+
+| 子域 | 编码范围 | 说明 |
+|------|---------|------|
+| `system` | 101–109 | ConfigurationError, NetworkError, StorageError, MessageBusError, AuditError, MinIOConnectionError |
+| `business` | 201–208 | 业务级基类（ValidationError, NotFoundError, ConflictError 等） |
+| `storage` | 211–219 | MemoryNotFoundError, BucketNotFoundError 等 |
+| `role` | 221–229 | RoleNotFoundError, RoleAlreadyExistsError 等 |
+| `service` | 231–239 | PasswordValidationError, ComplianceLockError |
+| `permission` | 241 | InsufficientTokenError |
+| `entity` | 242–249 | EntityValidationError, EntityStateTransitionError, EntityBusinessRuleError |
+| `event` | 251–259 | VersionError |
+| `transfer` | 261–269 | TransferNotFoundError, TransferNotApprovedError |
+| `external` | 301–399 | ThirdPartyError, TimeoutError, ServiceUnavailableError（父域） |
+| `embedding` | 306–308 | EmbeddingAPIError 等（嵌套在 external 内） |
+| `sandbox` | 309–319 | SandboxError 等（嵌套在 external 内） |
+| `fallback` | 999 | UnknownError（兜底，独立于所有子域） |
+
+#### 3.3.3 CI 校验规则
+
+`tests/unit/domain/exceptions/test_code_ranges.py` 包含 5 项自动校验：
+
+| # | 规则 | 说明 |
+|---|------|------|
+| R1 | **子域范围** | 每个异常类的数值编码落在其声明子域的 `[start, end]` 范围内 |
+| R2 | **继承链一致性** | 子域专用类继承 business/external 基类 → 允许；非法跨子域继承（如 entity 继承 storage）→ 拒绝 |
+| R3 | **预留保护** | 禁止具体异常类使用 `000`, `1XX`, `2XX`, `3XX` 占位符编码 |
+| R4 | **注册覆盖** | `_CLASS_TO_SUBDOMAIN` 覆盖所有 `__all__` 导出的具体异常类 |
+| R5 | **范围有效性** | 子域 start ≤ end，同级子域范围不重叠，嵌套子域必须完全在父域范围内 |
+
+#### 3.3.4 新增异常编码的标准流程
+
+```
+1. 确定子域归属（参考 §3.3.2 子域范围表）
+   存储相关 → storage(211-219)；实体相关 → entity(242-249) 等
+   无适配子域 → 在 _code_ranges.py 中新增子域范围
+
+2. 在子域范围内选取未占用编码
+   grep -r "EXCEPTION_NNN" src/domain/exceptions/
+
+3. 编码实现
+   类属性 code = "EXCEPTION_NNN"
+   更新业务模块的 __all__ + __init__.py 导入和 __all__
+
+4. CI 自动校验
+   pytest tests/unit/domain/exceptions/ → 5 项规则全绿
+
+5. 文档同步
+   更新 §3.3.2 编码分配表；
+   如新增子域，同时更新 _code_ranges.py 和本节的子域范围表
+```
 
 ### 3.4 外部 SDK 错误映射器
 
