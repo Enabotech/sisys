@@ -3,6 +3,17 @@
 TDD Red Phase: These tests define expected PIPL compliance behavior.
 """
 
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from src.domain.entities.pipl_compliance_record import (
+    ConsentStatus,
+    LegalBasis,
+    PIPLComplianceRecord,
+)
+from src.infrastructure.security.pipl_compliance_service_impl import PIPLComplianceServiceImpl
+
 
 class TestPIPLComplianceServiceRecordAccess:
     """Test record_access functionality."""
@@ -246,3 +257,147 @@ class TestPIPLComplianceServiceMinorConsent:
         stored = service.get_record("pd-minor")
         assert stored is not None
         assert stored.validate_minor_consent() is False
+
+
+class TestPIPLComplianceServiceDataSubjectRightsWithData:
+    """数据主体权利响应 — 含实际存储记录"""
+
+    def _make_record(
+        self,
+        personal_data_id: str = "pd-test",
+        data_subject_id: str = "user-ds-001",
+        legal_basis: str | None = None,
+        consent_status: ConsentStatus | None = None,
+        accessed_at: datetime | None = None,
+    ) -> PIPLComplianceRecord:
+        """构造 PIPLComplianceRecord 辅助函数"""
+        from src.domain.entities.pipl_compliance_record import LegalBasis
+
+        return PIPLComplianceRecord(
+            personal_data_id=personal_data_id,
+            purpose="数据分析",
+            legal_basis=legal_basis or LegalBasis.CONSENT.value,
+            consent_status=consent_status if consent_status is not None else ConsentStatus.GIVEN,
+            accessor="system",
+            data_subject_id=data_subject_id,
+            accessed_at=accessed_at if accessed_at is not None else datetime.now(tz=timezone.utc),
+        )
+
+    def test_access_request_returns_stored_records_with_timestamps(self) -> None:
+        """访问请求应返回含 ISO 时间戳的完整记录"""
+        service = PIPLComplianceServiceImpl()
+        now = datetime.now(tz=timezone.utc)
+        service.record_access(self._make_record("pd-a1", "user-ds-001", accessed_at=now))
+        service.record_access(self._make_record("pd-a2", "user-ds-001", accessed_at=now))
+
+        response = service.respond_to_access_request("user-ds-001")
+
+        assert response["status"] == "available"
+        assert len(response["records"]) == 2
+        record_data = response["records"][0]
+        assert "personal_data_id" in record_data
+        assert "purpose" in record_data
+        assert "legal_basis" in record_data
+        assert record_data["accessed_at"] == now.isoformat()
+
+    def test_access_request_filters_by_data_subject_id(self) -> None:
+        """访问请求应仅返回匹配 data_subject_id 的记录"""
+        service = PIPLComplianceServiceImpl()
+        service.record_access(self._make_record("pd-b1", "user-ds-001"))
+        service.record_access(self._make_record("pd-b2", "user-ds-002"))
+
+        response = service.respond_to_access_request("user-ds-001")
+
+        assert len(response["records"]) == 1
+        assert response["records"][0]["personal_data_id"] == "pd-b1"
+
+    def test_access_request_no_matching_records(self) -> None:
+        """无匹配记录时应返回空列表"""
+        service = PIPLComplianceServiceImpl()
+
+        response = service.respond_to_access_request("unknown-user")
+
+        assert response["status"] == "available"
+        assert response["records"] == []
+
+    def test_deletion_request_removes_records(self) -> None:
+        """删除请求应实际移除匹配的记录"""
+        service = PIPLComplianceServiceImpl()
+        service.record_access(self._make_record("pd-d1", "user-ds-del"))
+        service.record_access(self._make_record("pd-d2", "user-ds-del"))
+        service.record_access(self._make_record("pd-d3", "user-ds-other"))
+
+        response = service.respond_to_deletion_request("user-ds-del")
+
+        assert response["status"] == "deleted"
+        assert service.get_record("pd-d1") is None
+        assert service.get_record("pd-d2") is None
+        # 其他用户记录不受影响
+        assert service.get_record("pd-d3") is not None
+
+    def test_portability_request_returns_data_fields(self) -> None:
+        """可携带权请求应返回 personal_data_id/purpose/legal_basis"""
+        service = PIPLComplianceServiceImpl()
+        service.record_access(self._make_record("pd-p1", "user-ds-port"))
+
+        response = service.respond_to_portability_request("user-ds-port")
+
+        assert response["status"] == "available"
+        assert len(response["data"]) == 1
+        data_item = response["data"][0]
+        assert data_item["personal_data_id"] == "pd-p1"
+        assert data_item["purpose"] == "数据分析"
+        assert data_item["legal_basis"] is not None
+
+    def test_portability_request_no_data(self) -> None:
+        """无可携带数据时应返回空列表"""
+        service = PIPLComplianceServiceImpl()
+
+        response = service.respond_to_portability_request("no-such-user")
+
+        assert response["data"] == []
+
+
+class TestPIPLComplianceServiceEdgeCases:
+    """PIPL 合规服务边界情况"""
+
+    def test_get_record_not_found(self) -> None:
+        """未记录的 ID 应返回 None"""
+        service = PIPLComplianceServiceImpl()
+        assert service.get_record("nonexistent-id") is None
+
+    def test_validate_legal_basis_unknown_data_id(self) -> None:
+        """未知的 data_id 应返回 False"""
+        service = PIPLComplianceServiceImpl()
+        result = service.validate_legal_basis("unknown-data-id", "consent")
+        assert result is False
+
+    def test_record_access_overwrites_existing(self) -> None:
+        """相同 personal_data_id 再次记录应覆盖"""
+        service = PIPLComplianceServiceImpl()
+        record1 = self._make_record("pd-ov", "user-1", consent_status=ConsentStatus.GIVEN)
+        record2 = self._make_record("pd-ov", "user-2", consent_status=ConsentStatus.WITHDRAWN)
+
+        service.record_access(record1)
+        service.record_access(record2)
+
+        stored = service.get_record("pd-ov")
+        assert stored is not None
+        assert stored.data_subject_id == "user-2"
+        assert stored.consent_status == ConsentStatus.WITHDRAWN
+
+    def _make_record(
+        self,
+        personal_data_id: str,
+        data_subject_id: str,
+        consent_status: ConsentStatus = ConsentStatus.GIVEN,
+    ) -> PIPLComplianceRecord:
+        """构造 PIPLComplianceRecord 辅助函数"""
+        return PIPLComplianceRecord(
+            personal_data_id=personal_data_id,
+            purpose="测试用途",
+            legal_basis=LegalBasis.CONSENT.value,
+            consent_status=consent_status,
+            accessor="system",
+            data_subject_id=data_subject_id,
+        )
