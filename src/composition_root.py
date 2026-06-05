@@ -1513,6 +1513,40 @@ def bootstrap() -> None:
         tags=("search", "dense"),
     )
 
+    # === Story 3-1b: Sparse Search + Hybrid Search Ports ===
+    from src.application.services.hybrid_search_service import HybridSearchService
+    from src.application.services.sparse_search_service import Bm25SparseSearchService
+    from src.domain.services.rrf_fusion import fuse
+
+    register_port(
+        name="sparse_search_service",
+        version="v1.0.0",
+        interface=Bm25SparseSearchService,
+        impl=lambda resolver: Bm25SparseSearchService(
+            embedding_service=resolver.resolve("embedding_service"),
+            vector_storage=resolver.resolve("l3_vector"),
+        ),
+        module="src.application.services.sparse_search_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "sparse", "bm25"),
+    )
+
+    register_port(
+        name="hybrid_search_service",
+        version="v1.0.0",
+        interface=HybridSearchService,
+        impl=lambda resolver: HybridSearchService(
+            dense_search=resolver.resolve("dense_search_service"),
+            sparse_search=resolver.resolve("sparse_search_service"),
+            fuse=fuse,
+        ),
+        module="src.application.services.hybrid_search_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "hybrid", "rrf"),
+    )
+
     # === Crawler Ports ===
     register_port(
         name="crawler_client",
