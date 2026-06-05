@@ -191,3 +191,23 @@ class TestStrategicPlanPhaseTransition:
         plan = _make_plan(status=PlanStatus.APPROVED)
         with pytest.raises(EntityStateTransitionError, match="Cannot complete phase"):
             plan.complete_phase()
+
+    def test_invalid_current_phase_validation(self):
+        """current_phase 不是 BLMPhase 实例时验证失败"""
+        plan = _make_plan()
+        object.__setattr__(plan, "current_phase", cast(BLMPhase, "not-a-phase"))
+        with pytest.raises(EntityValidationError, match="current_phase must be a valid BLMPhase"):
+            plan.validate()
+
+    def test_complete_phase_updated_at_changes(self):
+        """complete_phase 应更新 updated_at"""
+        plan = _make_plan()
+        old_time = plan.updated_at
+        plan.complete_phase()
+        assert plan.updated_at >= old_time
+
+    def test_advance_to_same_phase_fails(self):
+        """推进到当前相同阶段应失败（非下一阶段）"""
+        plan = _make_plan()
+        with pytest.raises(EntityStateTransitionError, match="immediately next phase"):
+            plan.advance_phase(BLMPhase.STRATEGIC_INTENT)

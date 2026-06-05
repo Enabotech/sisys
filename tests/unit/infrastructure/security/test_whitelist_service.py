@@ -183,3 +183,105 @@ class TestWhitelistServiceHighRisk:
 
         result = service.is_allowed("https://api.medium.com")
         assert result is True
+
+
+class TestWhitelistServiceGetEntry:
+    """Test get_whitelist_entry."""
+
+    def test_get_existing_entry(self):
+        """获取已存在的白名单条目."""
+        from datetime import datetime
+
+        from src.domain.entities.external_api_whitelist import ExternalAPIWhitelist, RiskLevel
+        from src.infrastructure.security.whitelist_service_impl import WhitelistServiceImpl
+
+        service = WhitelistServiceImpl()
+        entry = ExternalAPIWhitelist(
+            endpoint="https://api.test.com",
+            is_verified=True,
+            risk_level=RiskLevel.LOW,
+            valid_until=datetime.now(UTC) + timedelta(days=30),
+        )
+        service.add_to_whitelist(entry)
+
+        result = service.get_whitelist_entry("https://api.test.com")
+        assert result is not None
+        assert result.endpoint == "https://api.test.com"
+
+    def test_get_nonexistent_entry_returns_none(self):
+        """获取不存在的条目应返回 None."""
+        from src.infrastructure.security.whitelist_service_impl import WhitelistServiceImpl
+
+        service = WhitelistServiceImpl()
+        result = service.get_whitelist_entry("https://api.nonexistent.com")
+        assert result is None
+
+
+class TestWhitelistServiceRemove:
+    """Test remove_from_whitelist."""
+
+    def test_remove_existing_entry(self):
+        """移除已存在的条目应返回 True."""
+        from datetime import datetime
+
+        from src.domain.entities.external_api_whitelist import ExternalAPIWhitelist, RiskLevel
+        from src.infrastructure.security.whitelist_service_impl import WhitelistServiceImpl
+
+        service = WhitelistServiceImpl()
+        entry = ExternalAPIWhitelist(
+            endpoint="https://api.to-remove.com",
+            is_verified=True,
+            risk_level=RiskLevel.LOW,
+            valid_until=datetime.now(UTC) + timedelta(days=30),
+        )
+        service.add_to_whitelist(entry)
+
+        result = service.remove_from_whitelist("https://api.to-remove.com")
+        assert result is True
+        assert service.is_allowed("https://api.to-remove.com") is False
+
+    def test_remove_nonexistent_entry_returns_false(self):
+        """移除不存在的条目应返回 False."""
+        from src.infrastructure.security.whitelist_service_impl import WhitelistServiceImpl
+
+        service = WhitelistServiceImpl()
+        result = service.remove_from_whitelist("https://api.nonexistent.com")
+        assert result is False
+
+
+class TestWhitelistServiceListEndpoints:
+    """Test list_all_endpoints."""
+
+    def test_list_empty(self):
+        """空白名单应返回空列表."""
+        from src.infrastructure.security.whitelist_service_impl import WhitelistServiceImpl
+
+        service = WhitelistServiceImpl()
+        result = service.list_all_endpoints()
+        assert result == []
+
+    def test_list_all_endpoints(self):
+        """应返回所有已添加的端点."""
+        from datetime import datetime
+
+        from src.domain.entities.external_api_whitelist import ExternalAPIWhitelist, RiskLevel
+        from src.infrastructure.security.whitelist_service_impl import WhitelistServiceImpl
+
+        service = WhitelistServiceImpl()
+        entry1 = ExternalAPIWhitelist(
+            endpoint="https://api.one.com",
+            is_verified=True,
+            risk_level=RiskLevel.LOW,
+            valid_until=datetime.now(UTC) + timedelta(days=30),
+        )
+        entry2 = ExternalAPIWhitelist(
+            endpoint="https://api.two.com",
+            is_verified=True,
+            risk_level=RiskLevel.MEDIUM,
+            valid_until=datetime.now(UTC) + timedelta(days=30),
+        )
+        service.add_to_whitelist(entry1)
+        service.add_to_whitelist(entry2)
+
+        endpoints = service.list_all_endpoints()
+        assert sorted(endpoints) == sorted(["https://api.one.com", "https://api.two.com"])

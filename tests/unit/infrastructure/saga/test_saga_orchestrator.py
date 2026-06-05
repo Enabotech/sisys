@@ -161,7 +161,7 @@ class TestSagaOrchestrator:
         assert "step2" in result.steps_data
 
     async def test_orchestrator_empty_steps_raises(self) -> None:
-        """空步骤列表应抛出 ValueError"""
+        """空步骤列表应抛出 ValidationError"""
         from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
 
         repo = _make_mock_repository()
@@ -173,6 +173,30 @@ class TestSagaOrchestrator:
                 steps=[],
                 repository=repo,
             )
+
+    async def test_orchestrator_properties(self) -> None:
+        """context 和 steps 属性应返回正确的值"""
+        from src.domain.ports.saga import SagaStep
+        from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
+
+        repo = _make_mock_repository()
+        step1 = mock.AsyncMock(spec=SagaStep)
+        step1.name = "step1"
+
+        orchestrator = SagaOrchestrator(
+            saga_id=uuid4(),
+            saga_type="test_saga",
+            steps=[step1],
+            repository=repo,
+        )
+
+        # context 属性应返回 SagaContext 实例
+        assert orchestrator.context is not None
+        assert orchestrator.context.status == SagaStatus.PENDING
+
+        # steps 属性应返回步骤列表
+        assert len(orchestrator.steps) == 1
+        assert orchestrator.steps[0] is step1
 
     async def test_orchestrator_first_step_failure_goes_failed(self) -> None:
         """第一步失败时没有可补偿步骤，直接标记为 FAILED"""

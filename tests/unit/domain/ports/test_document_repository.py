@@ -60,3 +60,54 @@ class TestDocumentRepositoryPortInterface:
             if not name.startswith("_") and callable(getattr(DocumentRepositoryPort, name))
         }
         assert required.issubset(actual)
+
+    def test_protocol_is_runtime_checkable(self) -> None:
+        """Protocol 应支持运行时检查"""
+        assert hasattr(DocumentRepositoryPort, "_is_runtime_protocol")
+
+
+class TestDocumentQuery:
+    """DocumentQuery 值对象测试"""
+
+    def test_minimal_query(self) -> None:
+        """最小查询仅需 tenant_id"""
+        q = DocumentQuery(tenant_id="tenant-1")
+        assert q.tenant_id == "tenant-1"
+        assert q.document_id is None
+        assert q.offset == 0
+        assert q.limit == 100
+
+    def test_full_query(self) -> None:
+        """完整查询包含所有过滤条件"""
+        import uuid
+
+        doc_id = uuid.uuid4()
+        q = DocumentQuery(
+            tenant_id="tenant-1",
+            document_id=doc_id,
+            parse_status="completed",
+            document_type="pdf",
+            uploaded_by="user-1",
+            offset=10,
+            limit=50,
+        )
+        assert q.document_id == doc_id
+        assert q.parse_status == "completed"
+        assert q.document_type == "pdf"
+        assert q.uploaded_by == "user-1"
+        assert q.offset == 10
+        assert q.limit == 50
+
+    def test_document_query_is_frozen(self) -> None:
+        """DocumentQuery 是不可变数据类"""
+        import pytest
+
+        q = DocumentQuery(tenant_id="tenant-1")
+        with pytest.raises(Exception):
+            object.__setattr__(q, "tenant_id", "other-tenant")
+
+    def test_document_query_default_pagination(self) -> None:
+        """默认分页参数正确"""
+        q = DocumentQuery(tenant_id="t")
+        assert q.offset == 0
+        assert q.limit == 100
