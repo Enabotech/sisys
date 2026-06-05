@@ -134,7 +134,7 @@ class TestExistingDocumentPortsStillWork:
     def test_document_parsing_service_still_registered(self) -> None:
         spec = _global_registry.get("document_parsing_service")
         assert spec is not None
-        assert spec.version == "v1.1.0", "document_parsing_service 版本应为 v1.1.0（含 layout 可选注入）"
+        assert spec.version == "v1.2.0", "document_parsing_service 版本应为 v1.2.0（含 layout + table_extractor 可选注入）"
 
     def test_document_repository_still_registered(self) -> None:
         spec = _global_registry.get("document_repository")
