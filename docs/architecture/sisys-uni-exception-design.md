@@ -2,7 +2,7 @@
 
 **状态：** 已实现
 **创建日期：** 2026-05-10
-**最后修订日期：** 2026-06-04
+**最后修订日期：** 2026-06-05
 **作者：** Agimtech
 **评审状态：** 已评审
 
@@ -335,10 +335,10 @@ BaseException (EXCEPTION_000) — 抽象根，领域层
     ├── [embedding] EmbeddingModelError (308) — 直接继承 ExternalException
     ├── TimeoutError (302)
     ├── ServiceUnavailableError (303)
-    ├── [sandbox] SandboxError (301) ⚠️ 编码碰撞
-    │   ├── ContainerStartError (301)
-    │   ├── ExecutionError (301)
-    │   └── ContainerStopError (301)
+    ├── [sandbox] SandboxError (309)
+    │   ├── ContainerStartError (310)
+    │   ├── ExecutionError (311)
+    │   └── ContainerStopError (312)
     └── UnknownError (999)
 ```
 
@@ -348,15 +348,15 @@ BaseException (EXCEPTION_000) — 抽象根，领域层
 >
 > | 编码 | 碰撞类 | 根因 |
 > |------|--------|------|
-> | EXCEPTION_301 | ThirdPartyError, SandboxError, ContainerStartError, ExecutionError, ContainerStopError, IntrusionDetectionError | 沙箱异常复用父类编码；IntrusionDetectionError 层次违规 |
+> | EXCEPTION_301 | ThirdPartyError, EmbeddingAPIError, EmbeddingResponseError, IntrusionDetectionError | IntrusionDetectionError 层次违规 |
 > | EXCEPTION_302 | TimeoutError, DataIntegrityError | DataIntegrityError 层次违规 |
 > | EXCEPTION_303 | ServiceUnavailableError, BackupError | BackupError 层次违规 |
 > | EXCEPTION_304 | EncryptionError | 层次违规：继承 SystemException 但使用 3XX 编码 |
 > | EXCEPTION_305 | ContainerSecurityError | 层次违规：继承 SystemException 但使用 3XX 编码 |
 >
-> **推荐修复方案**：
-> 1. 沙箱异常分配独立编码 309-312
-> 2. 安全服务异常（IntrusionDetectionError~ContainerSecurityError）重新编码为 106-110，匹配其 SystemException 父类所属的 1XX 范围
+> **已解决**：沙箱异常已分配独立编码 309-312（✅）。
+>
+> **待解决**：安全服务异常（IntrusionDetectionError~ContainerSecurityError 5 个类）重新编码为 106-110，匹配其 SystemException 父类所属的 1XX 范围。
 
 ### 3.2 实际实现：模块化异常结构
 
@@ -1053,10 +1053,12 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 | 3XX | ExternalException | 301 ThirdPartyError/EmbeddingAPIError/EmbeddingResponseError/SandboxError/ContainerStartError/ExecutionError/ContainerStopError ⚠️碰撞, 302 TimeoutError/DataIntegrityError ⚠️碰撞, 303 ServiceUnavailableError/BackupError ⚠️碰撞, 304 EncryptionError ⚠️违规, 305 ContainerSecurityError ⚠️违规, 306 EmbeddingAPIError, 307 EmbeddingResponseError, 308 EmbeddingModelError | 存在碰撞和层次违规 |
 | 999 | UnknownError | 兜底 | 正常 |
 
-**碰撞解决计划**（待实施）：
+**碰撞解决状态**：
 
-1. **沙箱异常**（SandboxError 301, ContainerStartError 301, ExecutionError 301, ContainerStopError 301）→ 分配独立编码 309-312
-2. **安全服务异常**（IntrusionDetectionError 301, DataIntegrityError 302, BackupError 303, EncryptionError 304, ContainerSecurityError 305）→ 重新编码为 106-110（匹配 SystemException 的 1XX 范围），或重分类至 ExternalException（如语义为外部安全服务调用失败）
+1. **沙箱异常**（SandboxError/ContainerStartError/ExecutionError/ContainerStopError）→ ✅ 已分配独立编码 309-312
+2. **安全服务异常**（IntrusionDetectionError~ContainerSecurityError 5 个类）→ 待解决：重新编码为 106-110（匹配 SystemException 的 1XX 范围），或重分类至 ExternalException
+
+> **编码碰撞自动检测**：新增的 `test_code_ranges.py`（§3.3.3）在 CI 阶段自动检测编码碰撞、子域范围违规和非法跨子域继承，降低人工分配出错概率。
 
 ### 3.8 异常处理决策指南
 
@@ -1241,10 +1243,10 @@ class ExceptionMetricsImpl(ExceptionMetricsPort):
 
 | # | 强制 | 检查项 | 说明 |
 |---|------|--------|------|
-| C1 | 🔴 | **编码唯一性测试** | 运行 `pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v`，确认新增编码未被任何已有类使用 |
+| C1 | 🔴 | **编码唯一性 + 子域范围测试** | 运行 `pytest tests/unit/domain/exceptions/ -v`（含 `test_error_code_uniqueness.py` + `test_code_ranges.py`），确认编码唯一、子域范围正确、继承链合规 |
 | C2 | 🔴 | **构造与 to_dict() 测试** | 在 `tests/unit/domain/exceptions/` 添加或更新测试：默认消息、自定义消息、`to_dict()` 输出结构、`cause` 链正确性 |
 | C3 | 🔴 | **HTTP 映射测试** | 在 `tests/unit/interfaces/api/test_exception_handlers.py` 中：验证 `EXCEPTION_HTTP_MAP` 包含新异常类型、`_get_http_status` 返回正确状态码、HTTP 集成测试返回正确 JSON 结构 |
-| C4 | 🔴 | **更新设计文档** | 更新本文档 §3.7 错误码注册表（编码/类名/继承/HTTP），更新层次图（§3.1）如新增模块 |
+| C4 | 🔴 | **更新设计文档 + 编码注册** | 更新 §3.3.2 编码分配表、§3.7 错误码注册表、`_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 字典和 `CODE_RANGES` 表（如新增子域） |
 | C5 | 🔴 | **更新 story-template.md** | 如新增异常模块或编码范围，同步更新故事模板中的领域异常清单（确保后续 Story 的 Task 0 规范定义包含新模块） |
 | C6 | 🟡 | **BDD 验收场景** | 在 Story 的 Gherkin feature 文件中添加异常路径场景（如 `Scenario: 资源不存在返回 404`），确保异常传播的端到端行为被验收 |
 | C7 | 🟡 | **指标告警阈值** | 如新异常代表关键故障模式，在 `src/infrastructure/logging/exception_metrics_impl.py` 中评估是否需要添加告警规则 |
@@ -1254,14 +1256,15 @@ class ExceptionMetricsImpl(ExceptionMetricsPort):
 #### 快速自检脚本
 
 ```bash
-# 阶段 A: 编码碰撞检查
+# 阶段 A: 编码碰撞 + 子域范围检查
 grep -r "EXCEPTION_XXX" src/domain/exceptions/  # 替换 XXX 为目标编码
+# 确认编码落在 _code_ranges.py 的子域范围内
 
 # 阶段 B: 导出完整性检查
 python -c "from src.domain.exceptions import NewErrorName; print('✅ 导入成功')"
 
-# 阶段 C: 测试验证
-poetry run pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v
+# 阶段 C: 测试验证（编码唯一性 + 子域范围 + HTTP 映射）
+poetry run pytest tests/unit/domain/exceptions/ -v
 poetry run pytest tests/unit/interfaces/api/test_exception_handlers.py -v -k "NewErrorName"
 poetry run ruff check src/domain/exceptions/ src/interfaces/api/exception_handlers.py
 ```
