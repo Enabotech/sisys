@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import fakeredis.aioredis
+import pytest
 
+from src.domain.exceptions import ValidationError
 from src.infrastructure.storage.redis.cleanup import RedisCleanup
 
 
@@ -63,3 +65,29 @@ class TestRedisCleanup:
 
         async with cleanup:
             pass
+
+    async def test_empty_namespace_raises_validation_error(self) -> None:
+        """空命名空间字符串应抛出 ValidationError"""
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+        cleanup = _create_cleanup(fake_redis)
+
+        with pytest.raises(ValidationError, match="namespace cannot be empty"):
+            await cleanup.cleanup_namespace("")
+
+    async def test_connection_error_propagates(self) -> None:
+        """Redis 连接错误应向上传播"""
+        import redis.asyncio as aioredis
+
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+        cleanup = _create_cleanup(fake_redis)
+
+        # 模拟 scan 抛出 ConnectionError
+        async def failing_scan(*args, **kwargs):
+            raise aioredis.ConnectionError("connection lost")
+
+        setattr(fake_redis, "scan", failing_scan)
+        try:
+            with pytest.raises(aioredis.ConnectionError):
+                await cleanup.cleanup_namespace("session")
+        finally:
+            delattr(fake_redis, "scan")

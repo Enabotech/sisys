@@ -112,3 +112,34 @@ class TestMinIOConfigFromEnv:
         with patch.dict(os.environ, {"MINIO_CONNECT_TIMEOUT": "not-a-number"}):
             with pytest.raises(ConfigurationError, match="MINIO_CONNECT_TIMEOUT"):
                 MinIOConfig.from_env()
+
+    def test_from_env_invalid_read_timeout(self):
+        """无效 read_timeout 值应抛出 ConfigurationError"""
+        with patch.dict(os.environ, {"MINIO_READ_TIMEOUT": "invalid-float"}):
+            with pytest.raises(ConfigurationError, match="MINIO_READ_TIMEOUT"):
+                MinIOConfig.from_env()
+
+    def test_from_env_secure_flag_variants(self):
+        """secure 标志支持 true/1/yes 变体"""
+        for val in ("true", "1", "yes"):
+            with patch.dict(os.environ, {"MINIO_SECURE": val}, clear=True):
+                config = MinIOConfig.from_env()
+                assert config.secure is True, f"值 '{val}' 应解析为 True"
+
+        for val in ("false", "0", "no"):
+            with patch.dict(os.environ, {"MINIO_SECURE": val}, clear=True):
+                config = MinIOConfig.from_env()
+                assert config.secure is False, f"值 '{val}' 应解析为 False"
+
+    def test_from_env_bucket_prefix_custom(self):
+        """自定义 bucket_prefix 环境变量"""
+        with patch.dict(os.environ, {"MINIO_BUCKET_PREFIX": "custom-prefix"}, clear=True):
+            config = MinIOConfig.from_env()
+            assert config.bucket_prefix == "custom-prefix"
+
+    def test_from_env_port_custom(self):
+        """自定义端口环境变量"""
+        with patch.dict(os.environ, {"MINIO_API_PORT": "19000"}, clear=True):
+            config = MinIOConfig.from_env()
+            assert config.port == 19000
+            assert config.endpoint == "localhost:19000"
