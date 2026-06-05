@@ -57,6 +57,11 @@ class BoundingBoxResult:
     bbox: BoundingBox
     confidence: float
 
+    def __post_init__(self) -> None:
+        """校验 confidence 值域范围 [0.0, 1.0]"""
+        if not (0.0 <= self.confidence <= 1.0):
+            raise ValueError(f"confidence 必须在 [0.0, 1.0] 范围内，实际值: {self.confidence}")
+
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典"""
         return {
