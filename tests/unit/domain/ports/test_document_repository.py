@@ -99,12 +99,11 @@ class TestDocumentQuery:
         assert q.limit == 50
 
     def test_document_query_is_frozen(self) -> None:
-        """DocumentQuery 是不可变数据类"""
-        import pytest
-
-        q = DocumentQuery(tenant_id="tenant-1")
-        with pytest.raises(Exception):
-            object.__setattr__(q, "tenant_id", "other-tenant")
+        """DocumentQuery 是不可变数据类（可哈希）"""
+        q1 = DocumentQuery(tenant_id="tenant-1")
+        q2 = DocumentQuery(tenant_id="tenant-1")
+        # frozen 数据类可哈希且同值同哈希
+        assert hash(q1) == hash(q2)
 
     def test_document_query_default_pagination(self) -> None:
         """默认分页参数正确"""

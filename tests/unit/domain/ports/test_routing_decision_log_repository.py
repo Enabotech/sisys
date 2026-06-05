@@ -188,12 +188,12 @@ class TestCostSummaryImmutability:
     """CostSummary 不可变性测试."""
 
     def test_cost_summary_is_frozen(self) -> None:
-        """CostSummary 是不可变数据类."""
+        """CostSummary 是不可变数据类（可哈希）"""
         from src.domain.ports.routing_decision_log_repository import CostSummary
 
-        summary = CostSummary(total_cost=1.0)
-        with pytest.raises(Exception):
-            object.__setattr__(summary, "total_cost", 2.0)
+        s1 = CostSummary(total_cost=1.0, record_count=5)
+        s2 = CostSummary(total_cost=1.0, record_count=5)
+        assert hash(s1) == hash(s2)
 
 
 class TestRoutingDecisionLogRepositoryProtocol:
