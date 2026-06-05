@@ -102,6 +102,17 @@ class OnnxLayoutDetector:
             self._output_names,
         )
 
+    def close(self) -> None:
+        """释放 ONNX InferenceSession 资源
+
+        在 composition_root shutdown 时调用，显式释放模型权重和推理引擎资源。
+        onnxruntime InferenceSession 没有标准 close() 方法，
+        但通过删除引用允许 GC 回收内存。
+        """
+        if hasattr(self, "_session") and self._session is not None:
+            logger.info("释放 ONNX 版面检测模型资源")
+            self._session = None
+
     def detect(self, image_bytes: bytes, page_number: int) -> list[BoundingBoxResult]:
         """检测页面图像中的版面元素
 
@@ -113,13 +124,20 @@ class OnnxLayoutDetector:
             检测到的版面元素列表（经过置信度过滤和坐标转换）
 
         Raises:
+            ValueError: page_number 不合法（< 1）或 image_bytes 为空
             RuntimeError: ONNX 推理失败
         """
+        if page_number < 1:
+            raise ValueError(f"页码必须为正整数（1-indexed），实际值: {page_number}")
+        if not image_bytes:
+            raise ValueError("image_bytes 不能为空")
 
         try:
             # 预处理：将图像字节转为 numpy array
             input_array = self._preprocess(image_bytes)
             outputs = self._session.run(None, {self._input_name: input_array})
+        except ValueError:
+            raise
         except Exception as e:
             raise RuntimeError(f"版面检测推理失败: {e}") from e
 
@@ -172,7 +190,17 @@ class OnnxLayoutDetector:
         labels = outputs[1]
         scores = outputs[2]
 
-        for i in range(len(scores)):
+        # 防御性校验：确保三个输出数组长度一致
+        n = min(len(boxes), len(labels), len(scores))
+        if n != len(scores) and len(scores) > 0:
+            logger.warning(
+                "ONNX 输出数组长度不一致: boxes=%d, labels=%d, scores=%d，按最短数组截断",
+                len(boxes),
+                len(labels),
+                len(scores),
+            )
+
+        for i in range(n):
             score = float(scores[i])
             if score < self._confidence_threshold:
                 continue
@@ -180,12 +208,18 @@ class OnnxLayoutDetector:
             box = boxes[i]
             x1, y1, x2, y2 = float(box[0]), float(box[1]), float(box[2]), float(box[3])
 
-            # xyxy → xywh 转换
+            # xyxy → xywh 转换，防御性 clamp 防止负值
+            width = max(0.0, x2 - x1)
+            height = max(0.0, y2 - y1)
+            if width == 0.0 or height == 0.0:
+                logger.warning("检测坐标异常 (x1=%.2f, y1=%.2f, x2=%.2f, y2=%.2f)，跳过", x1, y1, x2, y2)
+                continue
+
             bbox = BoundingBox(
                 x=x1,
                 y=y1,
-                width=x2 - x1,
-                height=y2 - y1,
+                width=width,
+                height=height,
                 page=page_number,
             )
 

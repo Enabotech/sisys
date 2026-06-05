@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from src.domain.entities.document import Document, ParseStatus
 from src.domain.events.document_events import DocumentProcessed
 from src.domain.ports.document_repository import DocumentQuery
-from src.domain.value_objects.parsed_document import ParsedDocument
+from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage, ParsedTable
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
@@ -100,16 +100,18 @@ class DocumentParsingService:
         document = await self._repository.find(query)
 
         if document is None:
+            logger.warning("文档不存在 (document_id=%s, tenant=%s)", document_id, tenant_id)
             return Document(
                 document_id=document_id,
                 filename="",
                 parse_status=ParseStatus.FAILED,
-                metadata={"error": "文档不存在"},
+                metadata={"parse_error": "文档不存在"},
             )
 
         # 检查 storage_object_key
         object_key = document.metadata.get("storage_object_key")
         if not object_key:
+            logger.warning("文档缺少 storage_object_key (document_id=%s)", document_id)
             document.parse_status = ParseStatus.FAILED
             document.metadata["parse_error"] = "文档缺少 storage_object_key"
             await self._repository.save(document)  # 持久化失败状态，避免文档永久 PENDING
@@ -269,9 +271,11 @@ class DocumentParsingService:
         4. 单页检测失败不影响其他页面（逐页独立 try/except）
         5. 运行时错误不阻断解析流程（记录日志并返回原文档）
 
-        注意：当前使用顺序匹配而非 IoU 空间匹配，因为 PDFParser 不输出 bbox（均为 None）。
-        当 PDFParser 未来输出非 None bbox 时，应替换为 layout_matching.match_detections()。
-        TODO: Table 标签检测结果应映射到 ParsedTable.bbox，作为后续 Story 实现。
+        MVP 匹配策略：
+        - 当前 PDFParser 不输出 bbox（均为 None），无法做 IoU 空间匹配
+        - 降级为按顺序一一对应检测结果与文本/表格元素
+        - 当 PDFParser 未来输出非 None bbox 时，应替换为 layout_matching.match_detections()
+        - Table 标签检测结果按顺序映射到 ParsedTable.bbox
 
         Args:
             parsed_doc: 已完成文本解析的 ParsedDocument
@@ -289,8 +293,6 @@ class DocumentParsingService:
         if mime_type != "application/pdf":
             return parsed_doc
 
-        from src.domain.value_objects.parsed_document import ParsedElement, ParsedPage
-
         enhanced_pages: list[ParsedPage] = []
         for page in parsed_doc.pages:
             try:
@@ -300,39 +302,26 @@ class DocumentParsingService:
                 # 版面检测
                 detections = await asyncio.to_thread(self._layout_detector.detect, image_bytes, page.page_number)
 
-                # 收集当前页所有文本元素
-                page_elements = page.texts
-
-                if not page_elements or not detections:
-                    # 无元素或无检测结果，保持原页不变
+                if not detections:
+                    # 无检测结果，保持原页不变
                     enhanced_pages.append(page)
                     continue
 
-                # 当前 PDFParser 不输出 bbox（均为 None），无法做 IoU 空间匹配
-                # 降级策略：按顺序一一对应检测结果与文本元素
-                enhanced_texts: list[ParsedElement] = []
-                for idx, elem in enumerate(page_elements):
-                    if idx < len(detections) and elem.bbox is None:
-                        det = detections[idx]
-                        enhanced_texts.append(
-                            ParsedElement(
-                                content=elem.content,
-                                bbox=det.bbox,
-                                confidence=elem.confidence,
-                                metadata={
-                                    **elem.metadata,
-                                    "layout_confidence": det.confidence,
-                                },
-                            )
-                        )
-                    else:
-                        enhanced_texts.append(elem)
+                # 筛选 Table 和非 Table 检测结果，分别处理
+                table_detections = [d for d in detections if d.label == "Table"]
+                text_detections = [d for d in detections if d.label != "Table"]
+
+                # 处理文本元素 bbox 填充
+                enhanced_texts = self._apply_text_detections(page.texts, text_detections)
+
+                # 处理表格元素 bbox 填充
+                enhanced_tables = self._apply_table_detections(page.tables, table_detections)
 
                 enhanced_pages.append(
                     ParsedPage(
                         page_number=page.page_number,
                         texts=enhanced_texts,
-                        tables=page.tables,
+                        tables=enhanced_tables,
                         images=page.images,
                     )
                 )
@@ -343,3 +332,81 @@ class DocumentParsingService:
                 enhanced_pages.append(page)
 
         return replace(parsed_doc, pages=enhanced_pages)
+
+    @staticmethod
+    def _apply_text_detections(
+        elements: list[ParsedElement],
+        detections: list,
+    ) -> list[ParsedElement]:
+        """将非 Table 检测结果按顺序映射到文本元素的 bbox
+
+        MVP 降级策略：由于 PDFParser 当前不输出 bbox（均为 None），
+        无法使用 IoU 空间匹配，采用顺序索引一一对应。
+
+        Args:
+            elements: 文本元素列表
+            detections: 非 Table 类型的检测结果列表
+
+        Returns:
+            增强后的文本元素列表
+        """
+        if not elements:
+            return elements
+
+        enhanced: list[ParsedElement] = []
+        for idx, elem in enumerate(elements):
+            if idx < len(detections) and elem.bbox is None:
+                det = detections[idx]
+                enhanced.append(
+                    ParsedElement(
+                        content=elem.content,
+                        bbox=det.bbox,
+                        confidence=elem.confidence,
+                        metadata={
+                            **elem.metadata,
+                            "layout_confidence": det.confidence,
+                        },
+                    )
+                )
+            else:
+                enhanced.append(elem)
+        return enhanced
+
+    @staticmethod
+    def _apply_table_detections(
+        tables: list[ParsedTable],
+        table_detections: list,
+    ) -> list[ParsedTable]:
+        """将 Table 标签检测结果按顺序映射到 ParsedTable 的 bbox
+
+        DocLayNet 映射：label='Table' 的检测结果映射到 ParsedTable.bbox。
+        MVP 降级策略：顺序索引一一对应。
+
+        Args:
+            tables: 表格元素列表
+            table_detections: label='Table' 的检测结果列表
+
+        Returns:
+            增强后的表格元素列表
+        """
+        if not tables or not table_detections:
+            return tables
+
+        enhanced: list[ParsedTable] = []
+        for idx, table in enumerate(tables):
+            if idx < len(table_detections) and table.bbox is None:
+                det = table_detections[idx]
+                enhanced.append(
+                    ParsedTable(
+                        rows=table.rows,
+                        bbox=det.bbox,
+                        confidence=table.confidence,
+                        metadata={
+                            **table.metadata,
+                            "layout_confidence": det.confidence,
+                        },
+                    )
+                )
+            else:
+                enhanced.append(table)
+        return enhanced

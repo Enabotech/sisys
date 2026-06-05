@@ -1205,8 +1205,12 @@ def bootstrap() -> None:
         try:
             _layout_detector = resolver.resolve("layout_detector")
             _pdf_page_renderer = resolver.resolve("pdf_page_renderer")
-        except Exception:
+        except (FileNotFoundError, ImportError, RuntimeError, OSError):
+            # 预期的运行环境缺失：模型文件不存在/onnxruntime 未安装/依赖异常
             logger.warning("版面检测端口初始化失败，文档解析将以无版面检测模式运行", exc_info=True)
+        except (KeyError, TypeError) as e:
+            # 端口注册配置错误应向上传播，避免掩盖启动时配置问题
+            raise RuntimeError(f"版面检测端口注册配置错误: {e}") from e
 
         return DocumentParsingService(
             document_repository=resolver.resolve("document_repository"),
@@ -1565,6 +1569,17 @@ async def shutdown() -> None:
             logger.info("Closed embedding_service")
     except Exception as e:
         logger.error("Failed to close embedding_service: %s", e)
+
+    # 关闭 ONNX 版面检测模型会话（释放 GPU/CPU 推理资源）
+    try:
+        layout_detector = resolver.resolve("layout_detector")
+        if layout_detector is not None and hasattr(layout_detector, "close"):
+            layout_detector.close()
+            logger.info("Closed layout_detector ONNX session")
+    except (FileNotFoundError, ImportError, RuntimeError, OSError, KeyError):
+        pass  # 端口未注册或初始化失败，无需清理
+    except Exception as e:
+        logger.error("Failed to close layout_detector: %s", e)
 
 
 __all__ = ["bootstrap", "shutdown", "_global_registry"]

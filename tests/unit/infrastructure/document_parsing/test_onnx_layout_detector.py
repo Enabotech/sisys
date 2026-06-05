@@ -271,3 +271,59 @@ class TestOnnxLayoutDetectorDetect:
         assert len(results) == 1
         assert results[0].label == "Unknown-99"
         assert results[0].confidence == 0.95
+
+    def test_detect_page_number_zero_raises_value_error(self) -> None:
+        """验证页码为 0 时抛出 ValueError（1-indexed 约束）"""
+        detector, _ = self._create_detector_with_mock()
+        with pytest.raises(ValueError, match="页码必须为正整数"):
+            detector.detect(b"fake_image", page_number=0)
+
+    def test_detect_negative_page_number_raises_value_error(self) -> None:
+        """验证负页码时抛出 ValueError"""
+        detector, _ = self._create_detector_with_mock()
+        with pytest.raises(ValueError, match="页码必须为正整数"):
+            detector.detect(b"fake_image", page_number=-1)
+
+    def test_detect_empty_image_bytes_raises_value_error(self) -> None:
+        """验证空图像字节时抛出 ValueError"""
+        detector, _ = self._create_detector_with_mock()
+        with pytest.raises(ValueError, match="image_bytes 不能为空"):
+            detector.detect(b"", page_number=1)
+
+    def test_detect_mismatched_output_lengths_truncates(self) -> None:
+        """验证 ONNX 输出数组长度不一致时按最短截断（防御性校验）"""
+        detector, mock_session = self._create_detector_with_mock()
+        mock_session.run.return_value = [
+            [[10.0, 20.0, 110.0, 70.0]],  # boxes: 1 个
+            [10, 11],  # labels: 2 个（不一致）
+            [0.95, 0.8],  # scores: 2 个（不一致）
+        ]
+
+        results = detector.detect(b"image", page_number=1)
+        # min(1, 2, 2) = 1，只迭代第一个
+        assert len(results) == 1
+        assert results[0].label == "Text"
+
+    def test_detect_inverted_coordinates_skipped(self) -> None:
+        """验证 xyxy 坐标反转（x2<x1）时跳过该检测（防御性 clamp）"""
+        detector, mock_session = self._create_detector_with_mock()
+        mock_session.run.return_value = [
+            [
+                [100.0, 200.0, 50.0, 150.0],  # x2<x1, y2<y1 → width=0, height=0
+                [10.0, 20.0, 110.0, 70.0],  # 正常坐标
+            ],
+            [10, 10],
+            [0.95, 0.8],
+        ]
+
+        results = detector.detect(b"image", page_number=1)
+        # 第一个因 width=0 被跳过，只保留第二个
+        assert len(results) == 1
+        assert results[0].bbox.x == 10.0
+
+    def test_close_releases_session(self) -> None:
+        """验证 close() 释放 ONNX session 资源"""
+        detector, mock_session = self._create_detector_with_mock()
+        assert detector._session is not None
+        detector.close()
+        assert detector._session is None
