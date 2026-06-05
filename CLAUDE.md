@@ -68,6 +68,7 @@ src/
 - 已合入的 alembic migration 禁止修改，只允许新增
 - 所有 API 路由必须过认证中间件
 - BDD 步骤中**禁止**使用 `@pytest.mark.asyncio`（会导致 context data 丢失，用 `event_loop.run_until_complete()`）
+- **Mock/Fake/Real 三层策略** 单元测试 Mock 端口，禁止真实服务；集成测试真实服务优先，自包含（创建→执行→清理），Mock 仅例外；验收测试：强制真实服务，自包含（创建→执行→清理），禁止 mock，`pytest.skip()` 动态跳过，禁止 `@pytest.mark.skip` 写死。[详情翻阅记忆]
 
 ## 6. Gotchas
 

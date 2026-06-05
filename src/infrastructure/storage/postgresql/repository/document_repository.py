@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from sqlalchemy import select
 
@@ -60,6 +61,24 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )
+
+    async def delete(self, id: UUID) -> None:
+        """覆写父类硬删除 — 文档删除尚未得到领域支持
+
+        父类 PostgreSQLAdapter 继承的硬删除方法在端口层面不可见，
+        但可被绕过端口契约直接调用，存在安全隐患。
+        显式覆写为 NotImplementedError 消除此风险。
+
+        未来有文档删除用例时：
+        1. DocumentModel 添加 deleted_at 列
+        2. 设置 self.soft_delete_column = "deleted_at"
+        3. 在 DocumentRepositoryPort 中添加 delete 方法
+        4. 删除此覆写
+
+        Raises:
+            NotImplementedError: 总是抛出
+        """
+        raise NotImplementedError("Document 删除尚未得到领域支持")
 
     async def find(self, query: DocumentQuery) -> Document | None:
         """按条件查询单个文档

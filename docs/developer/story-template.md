@@ -78,7 +78,7 @@
 > **原则**：异常是领域契约的一部分。本 Story 新增/修改的领域异常必须在 Task 0 中完成设计，禁止在实现 Task 中临时定义。
 > **适用范围：** 本清单仅针对定义在 `src/domain/exceptions/` 下、继承自 `DomainError`（别名 `BaseException`）的**领域异常**。
 > **不在本清单范围：** FastAPI/Pydantic 框架原生异常、第三方 SDK 原始异常（由 `ErrorMapper` 映射）。
-> **禁止 `raise ValueError`：** 全系统 ValueError → 领域异常迁移已完成（186 处清零）。所有验证失败均使用领域异常体系。
+> **禁止 `raise ValueError`：** 所有验证失败（例如：实体不变量、状态转换守卫、业务约束、配置参数、输入校验）均使用领域异常体系。
 > 完整检查清单与全量异常分类详见 [`sisys-uni-exception-design.md §3.12`](../architecture/sisys-uni-exception-design.md#312-异常注册检查清单)。
 > 编码分配策略（人工编码 + CI 自动校验）详见 [`sisys-uni-exception-design.md §3.3`](../architecture/sisys-uni-exception-design.md#33-编码分配策略人工编码--ci-自动校验)。
 
@@ -94,8 +94,8 @@
 - [ ] 编码注册 — 新增异常类后在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 字典中注册子域归属；更新 [`sisys-uni-exception-design.md §3.3.2`](../architecture/sisys-uni-exception-design.md#332-完整编码分配表) 编码分配表
 - [ ] 导出完整性 — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
 - [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过：
-	    - `pytest tests/unit/domain/exceptions/ -v`（含 `test_error_code_uniqueness.py` + `test_code_ranges.py` 共 8 项）
-	    - `pytest tests/unit/interfaces/api/test_exception_handlers.py -v`
+	    - `poetry run pytest tests/unit/domain/exceptions/ -v`（含 `test_error_code_uniqueness.py` + `test_code_ranges.py` 共 8 项）
+	    - `poetry run pytest tests/unit/interfaces/api/test_exception_handlers.py -v`
 - [ ] BDD 验收场景 — 异常路径的 Gherkin 场景纳入 Edge Cases（见下方「验收标准 Gherkin」）
 
 #### API 契约 (API Contract)
@@ -128,7 +128,7 @@
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_acceptance_[feature name].feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_[feature name].py`（BDD 步骤实现）
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_[feature name].py`（参考test_acceptance_event_messaging_refactor.py）
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）
 
