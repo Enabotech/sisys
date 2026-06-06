@@ -34,11 +34,11 @@ documentStatus: 'complete'
   - 4.7 张经理（分析师） - 信贷风险评估旅程
 
 ### 第三部分：领域与创新
-- [5. Domain Requirements](#domain-requirements) - 领域特定需求（合规/安全/集成）
-- [6. Innovation Patterns](#innovation-patterns) - 创新焦点与护城河策略
+- [5. Domain Requirements](#Domain-Specific-Requirements) - 领域特定需求（合规/安全/集成）
+- [6. Innovation Patterns](#Innovation-Novel-Patterns) - 创新焦点与护城河策略
 
 ### 第四部分：项目特定需求
-- [7. Project-Type Requirements](#project-type-requirements) - SaaS B2B 特定需求
+- [7. Project-Type Requirements](#Project-Type-Specific-Requirements) - SaaS B2B 特定需求
   - 7.1 多租户架构
   - 7.2 订阅模式
   - 7.3 RBAC 权限矩阵
@@ -108,6 +108,23 @@ documentStatus: 'complete'
 
 ---
 
+### SP 与 BP 协同：战略到执行的闭环价值
+
+> **SP 把控方向与节奏，BP 落实推进业务执行** — 这是 sisys 在战略管理中不可替代的独特价值，也是企业从“规划”走向“作战”的核心枢纽。
+
+sisys 将企业战略规划（SP）与年度业务计划（BP）深度咬合，形成 **“方向—节奏—解码—执行—反馈”** 的完整闭环：
+
+| 价值维度 | SP（战略规划） | BP（业务计划） |
+|---------|---------------|---------------|
+| **核心使命** | 做正确的事：定义企业未来 3-5 年的方向、战略控制点和里程碑节奏 | 正确地做事：将 SP 转化为可衡量、可追踪的年度作战任务与资源分配 |
+| **关键产出** | 市场洞察、战略意图、业务设计、创新焦点、风险全景视图 | 年度必赢之战、KPI 与目标责任书、预算与人力部署、执行里程碑 |
+| **sisys 如何实现** | BLM 六阶段流程 + 多 Agent 辩论，精准锁定方向与阶段节奏 | BEM 战略解码引擎，自动将 SP 输出映射为结构化的 BP 框架与追踪指标 |
+| **协同机制** | SP 为 BP 提供输入：今年的 BP 正是 SP 的第一年落地 | BP 向 SP 反馈执行数据，驱动 SP 滚动刷新，保证方向与节奏动态最优 |
+
+**sisys 的独特优势：** 战略与执行之间不再有鸿沟。从 SP 的战略控制点识别，到 BP 的年度硬仗分解，再到执行偏差的预警与复盘，全部在统一平台内完成，确保企业方向不偏、节奏不乱、执行不落空。
+
+---
+
 ### What Makes This Special
 
 **碾压性优势：**
@@ -123,7 +140,7 @@ documentStatus: 'complete'
 
 1. **多 Agent 协作** - 模拟高管团队的多视角辩论，通过红蓝对抗机制输出风险全景视图
 2. **数据驱动决策** - RAG+ 知识图谱确保决策基于事实，支持高保真视觉级溯源（Bounding Box 跳转至原始文档坐标点）
-3. **全流程闭环** - 从 SP 到 BP 到执行设计的完整链路，内置 BLM/BEM 模型不变性保证
+3. **全流程闭环** - 从 SP 到 BP 到执行设计的完整链路，内置 BLM/BEM 模型不变性保证，SP 掌控方向与节奏，BP 保障落地推进
 4. **合规内建** - 7 年 WORM 存储、审计追踪、数据主权隔离，满足 SOX/ISO27001 合规要求
 5. **三视图设计** - 高管视图 (简化决策)、分析师视图 (专业工具)、企业战略与市场人员视图 (流程标准化)
 
@@ -1098,7 +1115,7 @@ sisys 自动解析所有文档，构建向量索引和知识图谱。
 
 ---
 
-## Innovation & Novel Patterns
+## Innovation Novel Patterns
 
 ###  detected Innovation Areas
 
@@ -1807,6 +1824,8 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 ---
 
 ### 5. 战略规划流程（SP - Strategic Planning）[or.md 五.1-五.10]
+
+**模块核心使命：** 战略规划流程模块承载 sisys 从 SP 到 BP 的完整闭环。**SP 负责精准把控企业方向与节奏**，通过 BLM 六阶段、多 Agent 辩论和情景规划，确保企业做正确的事；**BP 则通过 BEM 战略解码将方向转化为可落地的年度作战计划**，实现真正的业务执行与推进。所有功能需求均围绕这一主线设计，确保战略不悬空，执行不跑偏。
 
 **P0 (MVP) - 4 项：** BLM 前两阶段基础，支持 Checkpoint 快照和 JSON 思维链输出
 
