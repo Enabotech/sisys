@@ -57,7 +57,7 @@ class VideoFormatHandler:
             文件元数据
         """
         try:
-            import ffmpeg  # type: ignore[import-untyped]
+            import ffmpeg
 
             probe = ffmpeg.probe(file_path)
             format_info: dict[str, Any] = probe.get("format", {})

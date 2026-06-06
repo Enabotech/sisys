@@ -795,7 +795,6 @@ def test_token_sum_invariant():
 - [ ] **10.1** 确认全系统零 ValueError：`grep -r "raise ValueError" src/` 返回空
 - [ ] **10.2** 确认测试零 ValueError 断言：`grep -r "pytest.raises(ValueError)" tests/` 返回空（或仅包含合法残留：Python 内置行为测试如 `uuid.UUID("invalid")`、`int("abc")` 等——此类需人工审查确认后加入白名单）
 - [ ] **10.3** 从 `exception_handlers.py` 移除 `_handle_value_error` 方法和注册
-- [ ] **10.4** 移除 `# type: ignore[arg-type]` 注释（如注册行已删除）
 - [ ] **10.5** 运行错误码唯一性测试：`poetry run pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v`
 - [ ] **10.6** 运行覆盖率检查：`poetry run pytest --cov=src tests/`
 - [ ] **10.7** 运行 import-linter 检查：`poetry run lint-imports`
