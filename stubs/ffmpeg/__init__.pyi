@@ -5,7 +5,6 @@
 """
 from typing import Any
 
-
 def probe(filename: str, **kwargs: Any) -> dict[str, Any]:
     """探测媒体文件元数据
 
