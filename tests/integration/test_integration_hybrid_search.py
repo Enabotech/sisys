@@ -134,6 +134,15 @@ class TestHybridSearchCompositionValidation:
             assert spec.owner == "search-team", f"{name} owner={spec.owner}"
 
 
+def _run_async(coro):
+    """跨环境安全的事件循环包装——避免 Docker/CI 中 get_event_loop() 报错"""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
 class TestHybridSearchEndToEnd:
     """端到端混合检索：embed → Dense + Sparse → RRF fusion
 
@@ -179,7 +188,7 @@ class TestHybridSearchEndToEnd:
             points = [VectorPoint(id=f"doc_{i}", vector=dense[i], payload={"text": texts[i]}) for i in range(len(texts))]
             await storage.upsert_points(name, points)
 
-        asyncio.get_event_loop().run_until_complete(_setup())
+        _run_async(_setup())
         context["_cleanup"] = name
         return name
 
@@ -204,7 +213,7 @@ class TestHybridSearchEndToEnd:
         async def _clean():
             await collection_mgr.delete_collection(name)
 
-        asyncio.get_event_loop().run_until_complete(_clean())
+        _run_async(_clean())
 
     def test_full_hybrid_search_pipeline(self) -> None:
         """完整端到端链路：embed → Dense + Sparse → RRF fusion → 结果验证"""
@@ -244,7 +253,7 @@ class TestHybridSearchEndToEnd:
                 return await hybrid_svc.search(collection, "企业战略", limit=5)
 
             t0 = time.perf_counter()
-            results = asyncio.get_event_loop().run_until_complete(_run())
+            results = _run_async(_run())
             elapsed_ms = (time.perf_counter() - t0) * 1000
 
             # 4. 验证结果
