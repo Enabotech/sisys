@@ -315,14 +315,18 @@ def when_hybrid_search(
         dense_svc = DenseSemanticSearchService(embedding_service, vector_storage)
         sparse_svc = Bm25SparseSearchService(embedding_service, vector_storage)
 
-        async def _fail_dense(_coll, _q, **_kw):
+        async def _fail_dense(
+            _coll: str, _q: str, _limit: int = 10, _tenant_id: str | None = None, _filter_payload: dict | None = None
+        ) -> list[SearchResult]:
             raise RuntimeError("Dense 不可用")
 
-        async def _fail_sparse(_coll, _q, **_kw):
+        async def _fail_sparse(
+            _coll: str, _q: str, _limit: int = 10, _tenant_id: str | None = None, _filter_payload: dict | None = None
+        ) -> list[SearchResult]:
             raise RuntimeError("Sparse 不可用")
 
-        dense_svc.search = _fail_dense  # type: ignore[assignment]
-        sparse_svc.search = _fail_sparse  # type: ignore[assignment]
+        setattr(dense_svc, "search", _fail_dense)
+        setattr(sparse_svc, "search", _fail_sparse)
 
         try:
             event_loop.run_until_complete(_run(dense_svc, sparse_svc))
@@ -337,10 +341,12 @@ def when_hybrid_search(
         dense_svc = DenseSemanticSearchService(embedding_service, vector_storage)
         sparse_svc = Bm25SparseSearchService(embedding_service, vector_storage)
 
-        async def _fail_sparse(_coll, _q, **_kw):
+        async def _fail_sparse(
+            _coll: str, _q: str, _limit: int = 10, _tenant_id: str | None = None, _filter_payload: dict | None = None
+        ) -> list[SearchResult]:
             raise asyncio.TimeoutError("Sparse 嵌入超时")
 
-        sparse_svc.search = _fail_sparse  # type: ignore[assignment]
+        setattr(sparse_svc, "search", _fail_sparse)
         context["search_results"] = event_loop.run_until_complete(_run(dense_svc, sparse_svc))
         return
 
