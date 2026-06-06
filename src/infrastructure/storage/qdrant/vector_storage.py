@@ -78,40 +78,32 @@ class QdrantVectorStorage(L3VectorPort):
         for point in points:
             if isinstance(point, VectorPoint):
                 pid = self._normalize_point_id(point.id)
-                dense_vec = point.vector
                 payload = {**point.payload, "created_at": point.created_at.isoformat()}
+                vec: Any = point.vector
                 if point.sparse_vector is not None:
-                    named_sparse = NamedSparseVector(
-                        name="sparse",
-                        vector=QdrantSparseVector(
+                    vec = {
+                        "": point.vector,
+                        "sparse": QdrantSparseVector(
                             indices=point.sparse_vector["indices"],
                             values=point.sparse_vector["values"],
                         ),
-                    )
-                    vec: Any = {"": dense_vec, "sparse": named_sparse}
-                else:
-                    vec = dense_vec
+                    }
             else:
                 pid = self._normalize_point_id(point["id"])
-                dense_vec = point["vector"]
                 payload = dict(point.get("payload", {}))
-                # 仅当顶层有 datetime 类型 created_at 时才注入（避免空串覆盖 payload 中有效值）
                 top_created = point.get("created_at")
                 if top_created is not None and hasattr(top_created, "isoformat"):
                     payload["created_at"] = top_created.isoformat()
-                # 稀疏向量 → NamedSparseVector 写入 Qdrant（Story 3-1b）
+                vec = point["vector"]
                 sparse_data = point.get("sparse_vector")
                 if sparse_data is not None:
-                    named_sparse = NamedSparseVector(
-                        name="sparse",
-                        vector=QdrantSparseVector(
+                    vec = {
+                        "": point["vector"],
+                        "sparse": QdrantSparseVector(
                             indices=sparse_data["indices"],
                             values=sparse_data["values"],
                         ),
-                    )
-                    vec = {"": dense_vec, "sparse": named_sparse}
-                else:
-                    vec = dense_vec
+                    }
             point_structs.append(
                 PointStruct(
                     id=pid,
