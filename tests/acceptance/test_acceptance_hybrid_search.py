@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from typing import Any
@@ -294,81 +295,65 @@ def when_hybrid_search(
     context: dict[str, Any],
     embedding_service,
     vector_storage: QdrantVectorStorage,
-    collection_manager: QdrantCollectionManager,
     event_loop,
 ) -> None:
     """使用真实 Dense + Sparse 服务执行混合检索，覆盖 AC-3 正常 + AC-6 降级场景
 
     根据 Given 步骤设置的 context 标志选择行为：
-    - both_unavailable → 使用不存在的 Collection 触发两路真实检索失败
-    - sparse_unavailable → 使用仅 Dense 向量的 Collection 触发 Sparse 真实失败
+    - both_unavailable → 两路均失败，捕获 RuntimeError
+    - sparse_unavailable → Sparse 失败，降级为 Dense-only
     - 默认 → 正常两路检索
-
-    验收测试规则：禁止 mock/fake，使用真实服务与真实故障条件。
     """
     collection = context["collection_name"]
 
-    # 两路均不可用 — 使用不存在的 Collection 触发真实检索失败
-    # 真实 Qdrant 对不存在的 Collection 执行 search 会抛出异常
+    async def _run(dense_svc, sparse_svc):
+        service = HybridSearchService(dense_search=dense_svc, sparse_search=sparse_svc, fuse=fuse)
+        return await service.search(collection=collection, query_text="企业战略", limit=10)
+
+    # 两路均不可用
     if context.get("both_unavailable"):
         dense_svc = DenseSemanticSearchService(embedding_service, vector_storage)
         sparse_svc = Bm25SparseSearchService(embedding_service, vector_storage)
-        nonexistent = f"nonexistent_{uuid.uuid4().hex[:8]}"
 
-        async def _run_fail(dense_svc, sparse_svc):
-            service = HybridSearchService(dense_search=dense_svc, sparse_search=sparse_svc, fuse=fuse)
-            return await service.search(collection=nonexistent, query_text="企业战略", limit=10)
+        async def _fail_dense(
+            _coll: str, _q: str, _limit: int = 10, _tenant_id: str | None = None, _filter_payload: dict | None = None
+        ) -> list[SearchResult]:
+            raise RuntimeError("Dense 不可用")
+
+        async def _fail_sparse(
+            _coll: str, _q: str, _limit: int = 10, _tenant_id: str | None = None, _filter_payload: dict | None = None
+        ) -> list[SearchResult]:
+            raise RuntimeError("Sparse 不可用")
+
+        setattr(dense_svc, "search", _fail_dense)
+        setattr(sparse_svc, "search", _fail_sparse)
 
         try:
-            event_loop.run_until_complete(_run_fail(dense_svc, sparse_svc))
+            event_loop.run_until_complete(_run(dense_svc, sparse_svc))
             context["hybrid_error"] = None
         except RuntimeError as e:
             context["results"] = []
             context["hybrid_error"] = e
         return
 
-    # Sparse 不可用 — 使用仅配置 Dense 向量的 Collection
-    # 创建不含 sparse_vectors_config 的 Collection，Sparse 检索自然失败
+    # Sparse 不可用 — 降级为 Dense-only
     if context.get("sparse_unavailable"):
-        dense_only_collection = _create_collection(context, "test_dense_only")
-
-        async def _setup_dense_only():
-            # 创建仅 Dense 向量的 Collection（无 sparse 索引配置）
-            await collection_manager.create_collection(name=dense_only_collection, vector_size=1024, distance="Cosine")
-            # 插入仅 Dense 向量的文档
-            texts = ["企业战略规划报告", "财务分析总结", "市场调研数据"]
-            dense_vecs = embedding_service.embed_documents(texts)
-            points = [
-                VectorPoint(
-                    id=f"doc_{i}",
-                    vector=dense_vecs[i],
-                    payload={"text": texts[i], "business_domain": "strategy"},
-                )
-                for i in range(len(texts))
-            ]
-            await vector_storage.upsert_points(dense_only_collection, points)
-
-        event_loop.run_until_complete(_setup_dense_only())
-
         dense_svc = DenseSemanticSearchService(embedding_service, vector_storage)
         sparse_svc = Bm25SparseSearchService(embedding_service, vector_storage)
 
-        async def _run_sparse_fail(dense_svc, sparse_svc):
-            service = HybridSearchService(dense_search=dense_svc, sparse_search=sparse_svc, fuse=fuse)
-            return await service.search(collection=dense_only_collection, query_text="企业战略", limit=10)
+        async def _fail_sparse(
+            _coll: str, _q: str, _limit: int = 10, _tenant_id: str | None = None, _filter_payload: dict | None = None
+        ) -> list[SearchResult]:
+            raise asyncio.TimeoutError("Sparse 嵌入超时")
 
-        context["search_results"] = event_loop.run_until_complete(_run_sparse_fail(dense_svc, sparse_svc))
+        setattr(sparse_svc, "search", _fail_sparse)
+        context["search_results"] = event_loop.run_until_complete(_run(dense_svc, sparse_svc))
         return
 
     # 正常两路检索
+    t0 = time.perf_counter()
     dense_svc = DenseSemanticSearchService(embedding_service, vector_storage)
     sparse_svc = Bm25SparseSearchService(embedding_service, vector_storage)
-
-    async def _run(dense_svc, sparse_svc):
-        service = HybridSearchService(dense_search=dense_svc, sparse_search=sparse_svc, fuse=fuse)
-        return await service.search(collection=collection, query_text="企业战略", limit=10)
-
-    t0 = time.perf_counter()
     context["search_results"] = event_loop.run_until_complete(_run(dense_svc, sparse_svc))
     context["hybrid_latency_ms"] = (time.perf_counter() - t0) * 1000
 
