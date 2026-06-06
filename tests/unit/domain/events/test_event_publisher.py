@@ -7,6 +7,7 @@ import pytest
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import ValidationError
 from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 from src.infrastructure.messaging.inmemory_event_listener import InMemoryEventListener
 
@@ -45,7 +46,7 @@ class TestInMemoryEventBusPublish:
     async def test_publish_none_raises(self):
         """Publishing None raises ValueError."""
         bus = InMemoryEventBus()
-        with pytest.raises(ValueError, match="event must not be None"):
+        with pytest.raises(ValidationError, match="event must not be None"):
             await bus.publish(cast(DomainEvent, None))
 
 

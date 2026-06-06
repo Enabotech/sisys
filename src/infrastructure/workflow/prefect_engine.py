@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from prefect.client.orchestration import get_client
 from prefect.states import StateType
 
+from src.domain.exceptions import ValidationError
 from src.domain.value_objects.flow_status import FlowStatus
 from src.infrastructure.config.prefect import PrefectConfig
 
@@ -51,11 +52,11 @@ class PrefectEngine:
             flow_run_id 字符串
 
         Raises:
-            ValueError: flow_name 为空或格式无效
+            ValidationError: flow_name 为空或格式无效
             RuntimeError: Prefect server 连接或 API 调用失败
         """
         if not flow_name or "/" not in flow_name:
-            raise ValueError(f"flow_name 格式无效: '{flow_name}'，期望 '<FLOW_NAME>/<DEPLOYMENT_NAME>'")
+            raise ValidationError(message=f"flow_name 格式无效: '{flow_name}'，期望 '<FLOW_NAME>/<DEPLOYMENT_NAME>'")
 
         try:
             async with get_client() as client:
@@ -88,13 +89,13 @@ class PrefectEngine:
             FlowStatus 枚举值
 
         Raises:
-            ValueError: flow_run_id 不是有效的 UUID 格式
+            ValidationError: flow_run_id 不是有效的 UUID 格式
             RuntimeError: Prefect server 连接或 API 调用失败
         """
         try:
             run_uuid = uuid.UUID(flow_run_id)
         except ValueError:
-            raise ValueError(f"flow_run_id 格式无效: '{flow_run_id}'，期望 UUID 格式") from None
+            raise ValidationError(message=f"flow_run_id 格式无效: '{flow_run_id}'，期望 UUID 格式") from None
 
         try:
             async with get_client() as client:

@@ -19,6 +19,7 @@ from src.domain.exceptions import (
     NetworkError,
     ServiceUnavailableError,
     TimeoutError,
+    ValidationError,
 )
 from src.infrastructure.config.embedding import EmbeddingConfig
 from src.infrastructure.external_services.embedding.embedding_api_client import (
@@ -59,7 +60,7 @@ class TestEmbeddingAPIClientInit:
     def test_api_url_empty_raises(self) -> None:
         """api_url 为空时构造抛出 ValueError"""
         config = EmbeddingConfig(api_url="")
-        with pytest.raises(ValueError, match="API 模式"):
+        with pytest.raises(ValidationError, match="API 模式"):
             EmbeddingAPIClient(config)
 
     def test_init_with_api_url(self, api_config: EmbeddingConfig) -> None:
@@ -133,7 +134,7 @@ class TestEmbeddingAPIClientEmbedDocuments:
         """批量中包含空文本时抛出 ValueError"""
         with patch("httpx.Client.post") as mock_post:
             client = EmbeddingAPIClient(api_config)
-            with pytest.raises(ValueError, match="文本列表"):
+            with pytest.raises(ValidationError, match="文本列表"):
                 client.embed_documents(["有效文本", "", "另一个有效文本"])
             mock_post.assert_not_called()
 
@@ -141,7 +142,7 @@ class TestEmbeddingAPIClientEmbedDocuments:
         """批量中包含纯空白项时抛出 ValueError"""
         with patch("httpx.Client.post") as mock_post:
             client = EmbeddingAPIClient(api_config)
-            with pytest.raises(ValueError, match="文本列表"):
+            with pytest.raises(ValidationError, match="文本列表"):
                 client.embed_documents(["有效文本", "   "])
             mock_post.assert_not_called()
 
@@ -191,7 +192,7 @@ class TestEmbeddingAPIClientValidation:
         """空文本 embed_query 抛出 ValueError（不发送 HTTP）"""
         with patch("httpx.Client.post") as mock_post:
             client = EmbeddingAPIClient(api_config)
-            with pytest.raises(ValueError, match="文本不能为空"):
+            with pytest.raises(ValidationError, match="文本不能为空"):
                 client.embed_query("")
             mock_post.assert_not_called()
 
@@ -199,7 +200,7 @@ class TestEmbeddingAPIClientValidation:
         """纯空白文本 embed_query 抛出 ValueError"""
         with patch("httpx.Client.post") as mock_post:
             client = EmbeddingAPIClient(api_config)
-            with pytest.raises(ValueError, match="文本不能为空"):
+            with pytest.raises(ValidationError, match="文本不能为空"):
                 client.embed_query("   ")
             mock_post.assert_not_called()
 
@@ -207,7 +208,7 @@ class TestEmbeddingAPIClientValidation:
         """空文本 embed_sparse 抛出 ValueError"""
         with patch("httpx.Client.post") as mock_post:
             client = EmbeddingAPIClient(api_config)
-            with pytest.raises(ValueError, match="文本列表"):
+            with pytest.raises(ValidationError, match="文本列表"):
                 client.embed_sparse([""])
             mock_post.assert_not_called()
 

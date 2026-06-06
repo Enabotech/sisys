@@ -10,6 +10,7 @@ import uuid
 import pytest
 
 from src.domain.entities.memory_metadata import MemoryMetadata
+from src.domain.exceptions import EntityValidationError
 
 
 class TestMemoryMetadataSchema:
@@ -48,7 +49,7 @@ class TestMemoryMetadataSchema:
 
     def test_invalid_type_raises(self):
         """验证无效 type 抛出异常"""
-        with pytest.raises(ValueError, match="type must be one of"):
+        with pytest.raises(EntityValidationError, match="type must be one of"):
             MemoryMetadata.create(
                 name="test",
                 memory_type="invalid",

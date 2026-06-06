@@ -7,6 +7,8 @@ from collections import deque
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
+
 # ============================================================================
 # TDD Cycle A: EventMetrics
 # ============================================================================
@@ -119,9 +121,9 @@ class TestEventMetricsCollector:
         """max_processing_samples must be positive."""
         from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ConfigurationError, match="must be positive"):
             EventMetricsCollector(max_processing_samples=0)
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ConfigurationError, match="must be positive"):
             EventMetricsCollector(max_processing_samples=-1)
 
     def test_duration_is_deque_not_list(self):
@@ -305,7 +307,7 @@ class TestBatchExportConfig:
         from src.infrastructure.monitoring.otel_config import BatchExportConfig
 
         config = BatchExportConfig(max_queue_size=100, max_export_batch_size=200)
-        with pytest.raises(ValueError, match="must be <= max_queue_size"):
+        with pytest.raises(ConfigurationError, match="must be <= max_queue_size"):
             config.validate()
 
     def test_validate_negative_queue_size_raises(self):
@@ -313,7 +315,7 @@ class TestBatchExportConfig:
         from src.infrastructure.monitoring.otel_config import BatchExportConfig
 
         config = BatchExportConfig(max_queue_size=-1)
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ConfigurationError, match="must be positive"):
             config.validate()
 
     def test_validate_zero_batch_size_raises(self):
@@ -321,7 +323,7 @@ class TestBatchExportConfig:
         from src.infrastructure.monitoring.otel_config import BatchExportConfig
 
         config = BatchExportConfig(max_export_batch_size=0)
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ConfigurationError, match="must be positive"):
             config.validate()
 
     def test_validate_negative_schedule_delay_raises(self):
@@ -329,7 +331,7 @@ class TestBatchExportConfig:
         from src.infrastructure.monitoring.otel_config import BatchExportConfig
 
         config = BatchExportConfig(schedule_delay_millis=-100)
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ConfigurationError, match="must be positive"):
             config.validate()
 
     def test_validate_negative_timeout_raises(self):
@@ -337,7 +339,7 @@ class TestBatchExportConfig:
         from src.infrastructure.monitoring.otel_config import BatchExportConfig
 
         config = BatchExportConfig(export_timeout_millis=-1000)
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ConfigurationError, match="must be positive"):
             config.validate()
 
 

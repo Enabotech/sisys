@@ -11,7 +11,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
+from src.domain.exceptions import NotFoundError, ValidationError
 from src.domain.value_objects.token_payload import TokenPayload
+from src.interfaces.api.exception_handlers import register_exception_handlers
+from src.interfaces.api.middleware.exception_context import ExceptionContextMiddleware
 
 
 def _make_token(
@@ -50,6 +53,8 @@ def _make_app() -> tuple[TestClient, AsyncMock, AsyncMock, AsyncMock]:
     from src.interfaces.api.document_upload import create_document_upload_router
 
     app = FastAPI()
+    app.add_middleware(ExceptionContextMiddleware)
+    register_exception_handlers(app)
 
     upload_service = AsyncMock()
     chunked_manager = AsyncMock()
@@ -108,7 +113,7 @@ class TestSingleUpload:
     def test_upload_unsupported_format_returns_400(self) -> None:
         """不支持格式返回 400"""
         client, service, _, _ = _make_app()
-        service.upload = AsyncMock(side_effect=ValueError("不支持的格式: test.exe"))
+        service.upload = AsyncMock(side_effect=ValidationError(message="不支持的格式: test.exe"))
 
         resp = client.post(
             "/api/v1/documents",
@@ -121,7 +126,7 @@ class TestSingleUpload:
     def test_upload_empty_file_returns_400(self) -> None:
         """空文件返回 400"""
         client, service, _, _ = _make_app()
-        service.upload = AsyncMock(side_effect=ValueError("空文件"))
+        service.upload = AsyncMock(side_effect=ValidationError(message="空文件"))
 
         resp = client.post(
             "/api/v1/documents",
@@ -132,7 +137,7 @@ class TestSingleUpload:
         assert resp.status_code == 400
 
     def test_upload_missing_tenant_header(self) -> None:
-        """缺少 X-Tenant-ID 头返回 422"""
+        """缺少 X-Tenant-ID 头返回 400"""
         client, service, _, _ = _make_app()
         service.upload = AsyncMock(return_value=_make_doc())
 
@@ -141,7 +146,7 @@ class TestSingleUpload:
             files={"file": ("test.pdf", io.BytesIO(b"content"), "application/pdf")},
         )
 
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
 
 class TestBatchUpload:
@@ -264,20 +269,20 @@ class TestChunkedUpload:
 
         assert resp.status_code == 200
 
-    def test_chunked_expired_upload_id_returns_410(self) -> None:
-        """过期 upload_id 返回 410 Gone"""
+    def test_chunked_expired_upload_id_returns_404(self) -> None:
+        """过期 upload_id 返回 404"""
         client, _, manager, _ = _make_app()
-        manager.complete_upload = AsyncMock(side_effect=ValueError("upload_id abc123 不存在"))
+        manager.complete_upload = AsyncMock(side_effect=NotFoundError(message="upload_id abc123 不存在或已过期"))
 
         resp = client.post(
             "/api/v1/documents/chunked/abc123/complete",
             headers={"X-Tenant-ID": "t1"},
         )
 
-        assert resp.status_code == 410
+        assert resp.status_code == 404
 
-    def test_chunked_expired_part_returns_410(self) -> None:
-        """过期分片上传返回 410 Gone"""
+    def test_chunked_expired_part_returns_404(self) -> None:
+        """过期分片上传返回 404"""
         client, _, manager, _ = _make_app()
         manager.get_multipart_info = AsyncMock(return_value=None)
 
@@ -287,7 +292,7 @@ class TestChunkedUpload:
             headers={"X-Tenant-ID": "t1"},
         )
 
-        assert resp.status_code == 410
+        assert resp.status_code == 404
 
 
 class TestDocumentQuery:
@@ -329,6 +334,8 @@ class TestAuthRequired:
         from src.interfaces.api.document_upload import create_document_upload_router
 
         app = FastAPI()
+        app.add_middleware(ExceptionContextMiddleware)
+        register_exception_handlers(app)
         router = create_document_upload_router(
             upload_service=AsyncMock(),
             chunked_manager=AsyncMock(),

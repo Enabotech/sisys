@@ -8,6 +8,7 @@ import pytest
 from src.application.event_handlers.event_dict_to_json import event_dict_to_json, json_to_event_dict
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import ValidationError
 
 
 class TestEventDictToJson:
@@ -44,7 +45,7 @@ class TestJsonToEventDict:
 
     def test_invalid_json_raises(self):
         """Invalid JSON raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid JSON string"):
+        with pytest.raises(ValidationError, match="Invalid JSON string"):
             json_to_event_dict("not valid json{{{")
 
     def test_roundtrip_via_adapters(self):
@@ -63,5 +64,5 @@ class TestJsonToEventDict:
         """dict_adapter.dump_json raises ValueError on failure."""
         # Create a dict that can't be serialized
         bad_dict = {"unserializable": object()}
-        with pytest.raises(ValueError, match="Failed to serialize"):
+        with pytest.raises(ValidationError, match="Failed to serialize"):
             event_dict_to_json(bad_dict)

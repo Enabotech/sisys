@@ -19,7 +19,7 @@ class InsufficientTokenError(PermissionDeniedError):
         message: 异常消息
     """
 
-    code = "EXCEPTION_204"
+    code = "EXCEPTION_241"
     message = "Insufficient token"
 
 

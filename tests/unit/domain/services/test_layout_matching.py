@@ -61,6 +61,22 @@ class TestIoUCalculation:
         # 交集=2500, 并集=10000
         assert _compute_iou(a, b) == pytest.approx(2500 / 10000)
 
+    def test_zero_width_bbox_iou_is_zero(self) -> None:
+        """零面积 bbox（width=0）的 IoU 为 0.0"""
+        from src.domain.services.layout_matching import _compute_iou
+
+        a = _bbox(0, 0, 0, 100)  # 零宽度
+        b = _bbox(0, 0, 100, 100)
+        assert _compute_iou(a, b) == 0.0
+
+    def test_zero_height_bbox_iou_is_zero(self) -> None:
+        """零面积 bbox（height=0）的 IoU 为 0.0"""
+        from src.domain.services.layout_matching import _compute_iou
+
+        a = _bbox(0, 0, 100, 0)  # 零高度
+        b = _bbox(0, 0, 100, 100)
+        assert _compute_iou(a, b) == 0.0
+
 
 class TestBboxMatching:
     """bbox 贪心匹配测试"""

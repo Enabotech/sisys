@@ -13,6 +13,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
+from src.domain.exceptions import ConfigurationError
+
 from .otel_config import OtelConfig, init
 
 logger = logging.getLogger(__name__)
@@ -67,10 +69,10 @@ class EventMetricsCollector:
             max_processing_samples: 处理耗时采样队列的最大长度，达到上限后自动淘汰最旧样本
 
         Raises:
-            ValueError: max_processing_samples 不是正整数时抛出
+            ConfigurationError: max_processing_samples 不是正整数时抛出
         """
         if max_processing_samples <= 0:
-            raise ValueError(f"max_processing_samples must be positive, got {max_processing_samples}")
+            raise ConfigurationError(message=f"max_processing_samples must be positive, got {max_processing_samples}")
         self.metrics = EventMetrics(
             event_processing_duration_seconds=deque(maxlen=max_processing_samples),
         )

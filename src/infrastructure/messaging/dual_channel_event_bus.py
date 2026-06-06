@@ -10,6 +10,7 @@ from typing import Any
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import PublishResult
+from src.domain.exceptions import InvalidStateError
 from src.domain.ports.event_publisher import EventPublisher
 from src.infrastructure.messaging.channel_router import ChannelRouter, DeliveryMode
 from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
@@ -75,11 +76,11 @@ class DualChannelEventBus(EventPublisher):
             handler: 事件处理器
 
         Raises:
-            ValueError: 当事件类型为 RELIABLE 模式时
+            InvalidStateError: 当事件类型为 RELIABLE 模式时
         """
         mode = self._router.get_delivery_mode(event_type)
         if mode == DeliveryMode.RELIABLE:
-            raise ValueError(f"RELIABLE mode does not support subscribe: {event_type}")
+            raise InvalidStateError(message=f"RELIABLE mode does not support subscribe: {event_type}")
         await self._redis_bus.subscribe(event_type, handler)
 
     async def subscribe_async(
@@ -94,11 +95,11 @@ class DualChannelEventBus(EventPublisher):
             handler: 异步事件处理器
 
         Raises:
-            ValueError: 当事件类型为 RELIABLE 模式时
+            InvalidStateError: 当事件类型为 RELIABLE 模式时
         """
         mode = self._router.get_delivery_mode(event_type)
         if mode == DeliveryMode.RELIABLE:
-            raise ValueError(f"RELIABLE mode does not support subscribe: {event_type}")
+            raise InvalidStateError(message=f"RELIABLE mode does not support subscribe: {event_type}")
         await self._redis_bus.subscribe_async(event_type, handler)
 
     async def start(self) -> None:

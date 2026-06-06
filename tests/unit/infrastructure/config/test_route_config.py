@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.config.auto_route import AutoRouteConfig
 
 
@@ -81,7 +82,7 @@ class TestAutoRouteConfig:
     def test_from_env_route_type_invalid(self) -> None:
         """Should raise on invalid ROUTE_TYPE."""
         with patch.dict(os.environ, {"ROUTE_TYPE": "invalid"}):
-            with pytest.raises(ValueError, match="ROUTE_TYPE must be one of"):
+            with pytest.raises(ConfigurationError, match="ROUTE_TYPE must be one of"):
                 AutoRouteConfig.from_env()
 
     def test_from_env_semantic_threshold(self) -> None:
@@ -105,19 +106,19 @@ class TestAutoRouteConfig:
     def test_from_env_semantic_threshold_invalid_range(self) -> None:
         """Should raise on SEMANTIC_THRESHOLD out of range."""
         with patch.dict(os.environ, {"SEMANTIC_THRESHOLD": "1.5"}):
-            with pytest.raises(ValueError, match="Invalid SEMANTIC_THRESHOLD value"):
+            with pytest.raises(ConfigurationError, match="SEMANTIC_THRESHOLD must be between"):
                 AutoRouteConfig.from_env()
 
     def test_from_env_semantic_threshold_negative(self) -> None:
         """Should raise on negative SEMANTIC_THRESHOLD."""
         with patch.dict(os.environ, {"SEMANTIC_THRESHOLD": "-0.1"}):
-            with pytest.raises(ValueError, match="Invalid SEMANTIC_THRESHOLD value"):
+            with pytest.raises(ConfigurationError, match="SEMANTIC_THRESHOLD must be between"):
                 AutoRouteConfig.from_env()
 
     def test_from_env_semantic_threshold_not_number(self) -> None:
         """Should raise on non-numeric SEMANTIC_THRESHOLD."""
         with patch.dict(os.environ, {"SEMANTIC_THRESHOLD": "abc"}):
-            with pytest.raises(ValueError, match="Invalid SEMANTIC_THRESHOLD value"):
+            with pytest.raises(ConfigurationError, match="Invalid SEMANTIC_THRESHOLD value"):
                 AutoRouteConfig.from_env()
 
     def test_from_env_hash_ring_size(self) -> None:
@@ -129,19 +130,19 @@ class TestAutoRouteConfig:
     def test_from_env_hash_ring_size_zero(self) -> None:
         """Should raise on HASH_RING_SIZE=0."""
         with patch.dict(os.environ, {"HASH_RING_SIZE": "0"}):
-            with pytest.raises(ValueError, match="Invalid HASH_RING_SIZE value"):
+            with pytest.raises(ConfigurationError, match="HASH_RING_SIZE must be positive"):
                 AutoRouteConfig.from_env()
 
     def test_from_env_hash_ring_size_negative(self) -> None:
         """Should raise on negative HASH_RING_SIZE."""
         with patch.dict(os.environ, {"HASH_RING_SIZE": "-1"}):
-            with pytest.raises(ValueError, match="Invalid HASH_RING_SIZE value"):
+            with pytest.raises(ConfigurationError, match="HASH_RING_SIZE must be positive"):
                 AutoRouteConfig.from_env()
 
     def test_from_env_hash_ring_size_not_number(self) -> None:
         """Should raise on non-numeric HASH_RING_SIZE."""
         with patch.dict(os.environ, {"HASH_RING_SIZE": "abc"}):
-            with pytest.raises(ValueError, match="Invalid HASH_RING_SIZE value"):
+            with pytest.raises(ConfigurationError, match="Invalid HASH_RING_SIZE value"):
                 AutoRouteConfig.from_env()
 
     def test_from_env_all_params(self) -> None:

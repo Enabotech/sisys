@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from sqlalchemy import Engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
+from src.domain.exceptions import ConfigurationError
 from src.domain.ports.connection_manager import ConnectionManager
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 
@@ -159,10 +160,12 @@ class PostgreSQLManager(ConnectionManager):
             AsyncSession 实例
 
         Raises:
-            ValueError: 隔离级别不支持
+            ConfigurationError: 隔离级别不支持
         """
         if isolation_level.upper() not in _ISOLATION_LEVELS:
-            raise ValueError(f"Unsupported isolation level: {isolation_level}. Must be one of {_ISOLATION_LEVELS}")
+            raise ConfigurationError(
+                message=f"Unsupported isolation level: {isolation_level}. Must be one of {_ISOLATION_LEVELS}"
+            )
 
         maker = async_sessionmaker(
             bind=self.get_async_engine(),

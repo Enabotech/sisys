@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 
 import pytest
 
+from src.domain.exceptions import EntityValidationError
+
 
 class TestAuditEventCreation:
     """Test AuditEvent creation."""
@@ -76,7 +78,7 @@ class TestAuditEventCreation:
         """AuditEvent requires non-empty actor."""
         from src.domain.events.audit_events import AuditEvent
 
-        with pytest.raises(ValueError, match="actor is required"):
+        with pytest.raises(EntityValidationError, match="actor is required"):
             AuditEvent(
                 log_id=uuid.uuid4(),
                 timestamp=datetime.now(UTC),
@@ -89,7 +91,7 @@ class TestAuditEventCreation:
         """AuditEvent requires non-empty action_type."""
         from src.domain.events.audit_events import AuditEvent
 
-        with pytest.raises(ValueError, match="action_type is required"):
+        with pytest.raises(EntityValidationError, match="action_type is required"):
             AuditEvent(
                 log_id=uuid.uuid4(),
                 timestamp=datetime.now(UTC),

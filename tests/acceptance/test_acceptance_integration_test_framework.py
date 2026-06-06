@@ -6,6 +6,7 @@
 详见 SDD 规范。
 
 运行方式: poetry run pytest tests/acceptance/test_acceptance_integration_test_framework.py -v
+from src.domain.exceptions import ConfigurationError
 """
 
 from __future__ import annotations

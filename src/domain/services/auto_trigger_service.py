@@ -119,7 +119,7 @@ class AutoTriggerService:
             AutoTriggerContext with extracted fields
 
         Raises:
-            ValueError: If event_type is unknown
+            BusinessRuleViolationError: If event_type is unknown
         """
         if event.event_type == "HeartbeatTriggered":
             heartbeat_id = str(getattr(event, "heartbeat_id", "unknown"))

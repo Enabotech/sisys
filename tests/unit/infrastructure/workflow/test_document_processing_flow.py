@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -92,19 +93,28 @@ class TestDocumentTasksFn:
         assert isinstance(result, dict)
         assert result["status"] == "failed"
 
-    async def test_generate_embedding_fn_returns_list(self, mock_resolver: MagicMock) -> None:
-        """generate_embedding.fn() 应返回 list"""
+    async def test_generate_embedding_fn_returns_embedding_result(self, mock_resolver: MagicMock) -> None:
+        """generate_embedding.fn() 应返回 EmbeddingResult TypedDict"""
         from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
 
         with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            result = await generate_embedding.fn({"status": "parsed", "document_id": str(uuid.uuid4())})
-        assert isinstance(result, list)
+            result = await generate_embedding.fn(
+                {
+                    "status": "completed",
+                    "document_id": str(uuid.uuid4()),
+                    "tenant_id": "test-tenant",
+                }
+            )
+        assert isinstance(result, dict)
+        assert "dense_vectors" in result
+        assert "sparse_vectors" in result
 
-    async def test_index_document_fn_returns_dict(self) -> None:
-        """index_document.fn() 应返回 dict"""
-        from src.infrastructure.workflow.tasks.document_tasks import index_document
+    async def test_index_document_fn_accepts_embedding_result(self) -> None:
+        """index_document.fn() 应接受 EmbeddingResult 并返回 dict"""
+        from src.infrastructure.workflow.tasks.document_tasks import EmbeddingResult, index_document
 
-        result = await index_document.fn([])
+        embedding_result: EmbeddingResult = {"dense_vectors": [], "sparse_vectors": []}
+        result = await index_document.fn(embedding_result)
         assert isinstance(result, dict)
         assert "indexed" in result
 
@@ -194,12 +204,13 @@ class TestDocumentProcessingFlowExecution:
         event = DocumentProcessed(
             document_id=document_id,
             parse_result=parse_result,
-            embedding=embedding,
+            embedding=cast(list[float], embedding),  # flow 升级为 EmbeddingResult，event 暂未适配
         )
         await mock_publisher.publish(event)
 
         assert parse_result["status"] == "completed"
-        assert isinstance(embedding, list)
+        assert isinstance(embedding, dict)
+        assert "dense_vectors" in embedding
         assert "indexed" in index_result
         mock_publisher.publish.assert_called_once()
 
@@ -255,11 +266,80 @@ class TestDocumentProcessingFlowExecution:
         event = DocumentProcessed(
             document_id=document_id,
             parse_result=parse_result,
-            embedding=embedding,
+            embedding=cast(list[float], embedding),  # flow 升级为 EmbeddingResult，event 暂未适配
         )
         result = await mock_publisher.publish(event)
 
         assert parse_result["status"] == "completed"
-        assert isinstance(embedding, list)
+        assert isinstance(embedding, dict)
+        assert "dense_vectors" in embedding
         assert "indexed" in index_result
         assert result.is_full_failure
+
+
+class TestDocumentProcessingFlowFn:
+    """document_processing_flow.fn() 直接调用测试"""
+
+    async def test_flow_fn_failed_parse_short_circuit(self) -> None:
+        """parse 返回 failed 时应短路返回空 embedding + indexed: False"""
+        from src.infrastructure.workflow.flows.document_processing_flow import (
+            document_processing_flow,
+        )
+        from src.infrastructure.workflow.tasks.document_tasks import (
+            parse_document,
+        )
+
+        doc_id = uuid.uuid4()
+        failed_parse_result = {"status": "failed", "error": "parse error"}
+
+        with patch.object(parse_document, "fn", return_value=failed_parse_result):
+            result = await document_processing_flow.fn(doc_id, "/test.pdf", "tenant-1")
+
+        assert result["parse_result"]["status"] == "failed"
+        assert result["embedding"] == []
+        assert result["index_result"]["indexed"] is False
+
+    async def test_flow_fn_happy_path(self) -> None:
+        """parse 成功时应依次调用 generate_embedding 和 index_document"""
+        from src.infrastructure.workflow.flows.document_processing_flow import (
+            document_processing_flow,
+        )
+        from src.infrastructure.workflow.tasks.document_tasks import (
+            generate_embedding,
+            index_document,
+            parse_document,
+        )
+
+        doc_id = uuid.uuid4()
+        parse_result = {"status": "completed", "document_id": str(doc_id), "pages": []}
+        embedding_result = {"dense_vectors": [[0.1, 0.2, 0.3]], "sparse_vectors": []}
+        index_result = {"indexed": True, "chunk_count": 1}
+
+        with (
+            patch.object(parse_document, "fn", return_value=parse_result),
+            patch.object(generate_embedding, "fn", return_value=embedding_result) as mock_embed,
+            patch.object(index_document, "fn", return_value=index_result) as mock_index,
+        ):
+            result = await document_processing_flow.fn(doc_id, "/test.pdf", "tenant-1")
+
+        assert result["parse_result"]["status"] == "completed"
+        assert result["embedding"] == embedding_result
+        assert result["index_result"]["indexed"] is True
+        mock_embed.assert_called_once_with(parse_result)
+        mock_index.assert_called_once_with(embedding_result)
+
+    async def test_flow_fn_passes_tenant_id_to_parse(self) -> None:
+        """flow 应将 tenant_id 传递给 parse_document"""
+        from src.infrastructure.workflow.flows.document_processing_flow import (
+            document_processing_flow,
+        )
+        from src.infrastructure.workflow.tasks.document_tasks import parse_document
+
+        doc_id = uuid.uuid4()
+
+        with (
+            patch.object(parse_document, "fn", return_value={"status": "failed", "error": "test"}) as mock_parse,
+        ):
+            await document_processing_flow.fn(doc_id, "/test.pdf", "tenant-x")
+
+        mock_parse.assert_called_once_with(doc_id, "/test.pdf", "tenant-x")

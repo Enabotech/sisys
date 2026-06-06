@@ -1189,24 +1189,69 @@ def bootstrap() -> None:
         tags=("layout", "pdf", "document"),
     )
 
+    # === Table Extraction Ports (Story 2-4) ===
+    from src.domain.ports.table_extractor import TableExtractorPort
+
+    register_port(
+        name="table_extractor",
+        version="v1.0.0",
+        interface=TableExtractorPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.document_parsing.table_semantic_extractor",
+            fromlist=["TableSemanticExtractor"],
+        ).TableSemanticExtractor(),
+        module="src.infrastructure.document_parsing.table_semantic_extractor",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+        tags=("table", "semantic", "document"),
+    )
+
+    register_port(
+        name="pdf_table_extractor",
+        version="v1.0.0",
+        interface=TableExtractorPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.document_parsing.pdf_table_extractor",
+            fromlist=["PdfTableExtractor"],
+        ).PdfTableExtractor(),
+        module="src.infrastructure.document_parsing.pdf_table_extractor",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+        tags=("table", "pdf", "document"),
+    )
+
     # DocumentParsingService — 应用层文档解析编排
     from src.application.services.document_parsing_service import DocumentParsingService
     from src.domain.ports.resolver import Resolver
 
     def _create_parsing_service(resolver: Resolver) -> DocumentParsingService:
-        """创建文档解析服务，版面检测端口可选注入
+        """创建文档解析服务，版面检测和表格提取端口可选注入
 
         当 ONNX 模型文件不存在或 onnxruntime 未安装时，
         layout_detector 和 pdf_page_renderer 降级为 None，
         文档解析以无版面检测模式运行（所有 bbox=None）。
+        当 table_extractor 初始化失败时降级为 None（无表格语义增强）。
         """
         _layout_detector = None
         _pdf_page_renderer = None
         try:
             _layout_detector = resolver.resolve("layout_detector")
             _pdf_page_renderer = resolver.resolve("pdf_page_renderer")
-        except Exception:
+        except (FileNotFoundError, ImportError, RuntimeError, OSError):
+            # 预期的运行环境缺失：模型文件不存在/onnxruntime 未安装/依赖异常
             logger.warning("版面检测端口初始化失败，文档解析将以无版面检测模式运行", exc_info=True)
+        except (KeyError, TypeError) as e:
+            # 端口注册配置错误应向上传播，避免掩盖启动时配置问题
+            raise RuntimeError(f"版面检测端口注册配置错误: {e}") from e
+
+        _table_extractor = None
+        try:
+            _table_extractor = resolver.resolve("table_extractor")
+        except (ImportError, RuntimeError) as e:
+            # pdfplumber 等依赖未安装时降级
+            logger.warning("表格提取端口初始化失败，文档解析将以无表格语义增强模式运行: %s", e)
+        except (KeyError, TypeError) as e:
+            raise RuntimeError(f"表格提取端口注册配置错误: {e}") from e
 
         return DocumentParsingService(
             document_repository=resolver.resolve("document_repository"),
@@ -1216,11 +1261,12 @@ def bootstrap() -> None:
             redis_client=resolver.resolve("redis_client"),
             layout_detector=_layout_detector,
             pdf_page_renderer=_pdf_page_renderer,
+            table_extractor=_table_extractor,
         )
 
     register_port(
         name="document_parsing_service",
-        version="v1.1.0",
+        version="v1.2.0",
         interface=DocumentParsingService,
         impl=_create_parsing_service,
         module="src.application.services.document_parsing_service",
@@ -1509,6 +1555,40 @@ def bootstrap() -> None:
         tags=("search", "dense"),
     )
 
+    # === Story 3-1b: Sparse Search + Hybrid Search Ports ===
+    from src.application.services.hybrid_search_service import HybridSearchService
+    from src.application.services.sparse_search_service import Bm25SparseSearchService
+    from src.domain.services.rrf_fusion import fuse
+
+    register_port(
+        name="sparse_search_service",
+        version="v1.0.0",
+        interface=Bm25SparseSearchService,
+        impl=lambda resolver: Bm25SparseSearchService(
+            embedding_service=resolver.resolve("embedding_service"),
+            vector_storage=resolver.resolve("l3_vector"),
+        ),
+        module="src.application.services.sparse_search_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "sparse", "bm25"),
+    )
+
+    register_port(
+        name="hybrid_search_service",
+        version="v1.0.0",
+        interface=HybridSearchService,
+        impl=lambda resolver: HybridSearchService(
+            dense_search=resolver.resolve("dense_search_service"),
+            sparse_search=resolver.resolve("sparse_search_service"),
+            fuse=fuse,
+        ),
+        module="src.application.services.hybrid_search_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "hybrid", "rrf"),
+    )
+
     # === Crawler Ports ===
     register_port(
         name="crawler_client",
@@ -1565,6 +1645,17 @@ async def shutdown() -> None:
             logger.info("Closed embedding_service")
     except Exception as e:
         logger.error("Failed to close embedding_service: %s", e)
+
+    # 关闭 ONNX 版面检测模型会话（释放 GPU/CPU 推理资源）
+    try:
+        layout_detector = resolver.resolve("layout_detector")
+        if layout_detector is not None and hasattr(layout_detector, "close"):
+            layout_detector.close()
+            logger.info("Closed layout_detector ONNX session")
+    except (FileNotFoundError, ImportError, RuntimeError, OSError, KeyError):
+        pass  # 端口未注册或初始化失败，无需清理
+    except Exception as e:
+        logger.error("Failed to close layout_detector: %s", e)
 
 
 __all__ = ["bootstrap", "shutdown", "_global_registry"]

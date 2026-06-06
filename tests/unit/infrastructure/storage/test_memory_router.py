@@ -160,3 +160,23 @@ class TestMemoryRouterResolve:
 
         base = tmp_path / "group" / "user" / f"{memory_id}.md"
         assert full_path == base
+
+
+class TestMemoryRouterResolveIndexPath:
+    """MemoryRouter 索引路径完整解析验证"""
+
+    def test_resolve_private_index_path(self, tmp_path):
+        """解析 Private 索引完整路径"""
+        config = MemoryConfig(memory_l0_path=str(tmp_path))
+        router = MemoryRouter(config)
+
+        full_path = router.resolve_index_path(is_group=False)
+        assert full_path == tmp_path / "MEMORY.md"
+
+    def test_resolve_group_index_path(self, tmp_path):
+        """解析 Group 索引完整路径"""
+        config = MemoryConfig(memory_l0_path=str(tmp_path))
+        router = MemoryRouter(config)
+
+        full_path = router.resolve_index_path(is_group=True)
+        assert full_path == tmp_path / "group" / "MEMORY.md"

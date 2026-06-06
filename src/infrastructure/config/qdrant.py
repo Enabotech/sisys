@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass
 class QdrantConfig:
@@ -44,7 +46,7 @@ class QdrantConfig:
             QdrantConfig 实例
 
         Raises:
-            ValueError: 当环境变量值无法解析为正确类型时
+            ConfigurationError: 当环境变量值无法解析为正确类型时
         """
         https_env = os.getenv("QDRANT_HTTPS", "false").lower()
 
@@ -52,25 +54,25 @@ class QdrantConfig:
         try:
             port = int(port_str)
         except ValueError as e:
-            raise ValueError(f"Invalid QDRANT_PORT value: {port_str}") from e
+            raise ConfigurationError(message=f"Invalid QDRANT_PORT value: {port_str}") from e
 
         grpc_port_str = os.getenv("QDRANT_GRPC_PORT", "6334")
         try:
             grpc_port = int(grpc_port_str)
         except ValueError as e:
-            raise ValueError(f"Invalid QDRANT_GRPC_PORT value: {grpc_port_str}") from e
+            raise ConfigurationError(message=f"Invalid QDRANT_GRPC_PORT value: {grpc_port_str}") from e
 
         timeout_str = os.getenv("QDRANT_TIMEOUT", "30.0")
         try:
             timeout = float(timeout_str)
         except ValueError as e:
-            raise ValueError(f"Invalid QDRANT_TIMEOUT value: {timeout_str}") from e
+            raise ConfigurationError(message=f"Invalid QDRANT_TIMEOUT value: {timeout_str}") from e
 
         max_retries_str = os.getenv("QDRANT_MAX_RETRIES", "3")
         try:
             max_retries = int(max_retries_str)
         except ValueError as e:
-            raise ValueError(f"Invalid QDRANT_MAX_RETRIES value: {max_retries_str}") from e
+            raise ConfigurationError(message=f"Invalid QDRANT_MAX_RETRIES value: {max_retries_str}") from e
 
         return cls(
             host=os.getenv("QDRANT_HOST", "localhost"),

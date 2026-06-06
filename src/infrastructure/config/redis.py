@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass
 class RedisConfig:
@@ -46,7 +48,7 @@ class RedisConfig:
             RedisConfig 实例
 
         Raises:
-            ValueError: 当环境变量值无法解析为正确类型时
+            ConfigurationError: 当环境变量值无法解析为正确类型时
         """
         retry_on_timeout_env = os.getenv("REDIS_RETRY_ON_TIMEOUT", "true").lower()
 
@@ -54,13 +56,13 @@ class RedisConfig:
         try:
             socket_timeout = float(socket_timeout_str)
         except ValueError as e:
-            raise ValueError(f"Invalid REDIS_SOCKET_TIMEOUT value: {socket_timeout_str}") from e
+            raise ConfigurationError(message=f"Invalid REDIS_SOCKET_TIMEOUT value: {socket_timeout_str}") from e
 
         default_ttl_str = os.getenv("REDIS_DEFAULT_TTL", "86400")
         try:
             default_ttl = int(default_ttl_str)
         except ValueError as e:
-            raise ValueError(f"Invalid REDIS_DEFAULT_TTL value: {default_ttl_str}") from e
+            raise ConfigurationError(message=f"Invalid REDIS_DEFAULT_TTL value: {default_ttl_str}") from e
 
         return cls(
             host=os.getenv("REDIS_HOST", "localhost"),

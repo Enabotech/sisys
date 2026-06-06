@@ -9,9 +9,10 @@ from __future__ import annotations
 import logging
 from typing import Any, cast
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 
+from src.domain.exceptions import ServiceUnavailableError
 from src.domain.ports.crawler_client import CrawlerClientPort
 from src.domain.ports.resolver import get_resolver
 
@@ -99,16 +100,6 @@ class SupportedFormatsResponse(BaseModel):
     formats: list[str]
 
 
-class ErrorResponse(BaseModel):
-    """错误响应
-
-    Attributes:
-        detail: 错误详情
-    """
-
-    detail: str
-
-
 # =============================================================================
 # Router Factory
 # =============================================================================
@@ -151,7 +142,7 @@ def create_crawler_router(
             包含任务 ID 的响应
 
         Raises:
-            HTTPException: Crawler Service 请求失败时抛出
+            ServiceUnavailableError: Crawler Service 不可用
         """
         client = _get_client()
         try:
@@ -167,10 +158,10 @@ def create_crawler_router(
             return SubmitTaskResponse(task_id=task_id)
         except Exception as e:
             logger.error("Failed to submit crawler task: %s", e)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Crawler service unavailable: {e}",
-            )
+            raise ServiceUnavailableError(
+                f"Crawler service unavailable: {e}",
+                cause=e,
+            ) from e
 
     @router.get(
         "/tasks/{task_id}",
@@ -188,7 +179,7 @@ def create_crawler_router(
             任务状态信息
 
         Raises:
-            HTTPException: 任务不存在或 Crawler Service 请求失败时抛出
+            ServiceUnavailableError: Crawler Service 不可用
         """
         client = _get_client()
         try:
@@ -204,10 +195,10 @@ def create_crawler_router(
             )
         except Exception as e:
             logger.error("Failed to get task status: %s", e)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Crawler service unavailable: {e}",
-            )
+            raise ServiceUnavailableError(
+                f"Crawler service unavailable: {e}",
+                cause=e,
+            ) from e
 
     @router.delete(
         "/tasks/{task_id}",
@@ -225,7 +216,7 @@ def create_crawler_router(
             取消结果
 
         Raises:
-            HTTPException: Crawler Service 请求失败时抛出
+            ServiceUnavailableError: Crawler Service 不可用
         """
         client = _get_client()
         try:
@@ -233,10 +224,10 @@ def create_crawler_router(
             return CancelTaskResponse(task_id=task_id, cancelled=cancelled)
         except Exception as e:
             logger.error("Failed to cancel task: %s", e)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Crawler service unavailable: {e}",
-            )
+            raise ServiceUnavailableError(
+                f"Crawler service unavailable: {e}",
+                cause=e,
+            ) from e
 
     @router.get(
         "/formats",
@@ -251,7 +242,7 @@ def create_crawler_router(
             支持的文件格式列表
 
         Raises:
-            HTTPException: Crawler Service 请求失败时抛出
+            ServiceUnavailableError: Crawler Service 不可用
         """
         client = _get_client()
         try:
@@ -259,10 +250,10 @@ def create_crawler_router(
             return SupportedFormatsResponse(formats=formats)
         except Exception as e:
             logger.error("Failed to list supported formats: %s", e)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Crawler service unavailable: {e}",
-            )
+            raise ServiceUnavailableError(
+                f"Crawler service unavailable: {e}",
+                cause=e,
+            ) from e
 
     return router
 

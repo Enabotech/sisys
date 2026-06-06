@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.document_events import DocumentProcessed
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.messaging.adapters.sqlalchemy_event_outbox_adapter import SQLAlchemyEventOutboxAdapter
 from src.infrastructure.storage.postgresql.models import OutboxModel
 
@@ -77,10 +78,10 @@ class TestSQLAlchemyEventOutboxAdapter:
 
         try:
             SQLAlchemyEventOutboxAdapter.to_domain_event(model)
-        except ValueError as e:
+        except ConfigurationError as e:
             assert "NonExistentEvent" in str(e)
         else:
-            raise AssertionError("Expected ValueError for unknown event_type")
+            raise AssertionError("Expected ConfigurationError for unknown event_type")
 
     def test_from_domain_event_status_is_pending(self):
         """from_domain_event 应始终设置 status=pending"""

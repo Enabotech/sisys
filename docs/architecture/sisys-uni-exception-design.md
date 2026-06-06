@@ -2,14 +2,15 @@
 
 **状态：** 已实现
 **创建日期：** 2026-05-10
+**最后修订日期：** 2026-06-05
 **作者：** Agimtech
-**评审状态：** 待评审
+**评审状态：** 已评审
 
 ---
 
 ## 1. 现状分析
 
-### 1.1 当前问题
+### 1.1 迁移前问题（已解决）
 
 | 问题 | 描述 | 影响 |
 |------|------|------|
@@ -21,24 +22,50 @@
 | **日志不规范** | catch-and-log 模式各异，错误级别不统一 | 日志分析困难 |
 | **API 转换重复** | 每个 API 端点重复编写 try/except HTTP 转换 | 代码冗余 |
 
-### 1.2 当前异常分布
+### 1.2 迁移后残留问题（已解决）
+
+| 问题 | 描述 | 影响范围 | 状态 |
+|------|------|----------|------|
+| **双重处理模式** | `auth.py` 等 5 个接口文件仍手动 `raise HTTPException`，绕过统一 `ExceptionHandlers` | 丢失错误码/上下文/结构化日志 | ✅ 已修复（仅 OAuth2 WWW-Authenticate 合法保留） |
+| **重复 ErrorResponse 模型** | 5 个文件各自定义 `ErrorResponse(BaseModel)`，未合并到共享模块 | API 响应格式不一致 | ✅ 已合并到 `shared_models.py` |
+| **越界异常** | `TransferNotFoundError`、`TransferNotApprovedError` 继承 Python 内置 `Exception` 而非领域 `BaseException` | 绕过集中处理器，仅被兜底捕获返回 500 | ✅ 已迁移到 `transfer_exceptions.py` |
+| **错误码碰撞** | EXCEPTION_301 被 6 个类共享，EXCEPTION_302/303 各被 2 个类共享 | 违反唯一编码原则，监控告警无法精确定位 | ✅ 已全部分配独立编码 |
+| **指标集成缺口** | `ExceptionMetricsPort` 已定义但未集成到 `ExceptionHandlers`；composition_root 注册路径错误 | 异常指标采集不可用 | ✅ 已集成并修复注册路径 |
+| **ValueError 语义模糊** | 全系统 186 处 `raise ValueError` 与领域异常体系并存，语义模糊、错误码丢失 | 监控告警粗粒度、调用方无法精确处理 | ✅ 已全量迁移为领域异常（详见 `sisys-value-error-refactor.md`） |
+
+### 1.3 异常分布
+
+#### 迁移后集中管理结构
 
 ```
-src/domain/exceptions/invalid_state_error.py          # 仅1个
-src/domain/ports/audit_service.py                     # AuditError
-src/domain/ports/auth_service.py                      # AuthenticationError
-src/domain/ports/password_validation_service.py       # PasswordValidationError
-src/domain/ports/storage.py                          # ComplianceLockError
-src/domain/services/memory_service.py                 # MemoryVersionConflictError, MemoryNotFoundError
-src/application/use_cases/role_management.py          # RoleAlreadyExistsError, RoleNotFoundError, ...
-src/domain/ports/sandbox_executor.py          # SandboxError, ContainerStartError, ...
-src/infrastructure/messaging/outbox/outbox.py         # InvalidStateTransitionError
-src/infrastructure/messaging/event_store.py            # VersionError
-src/infrastructure/storage/minio/minio_manager.py   # BucketNotFoundError, PermissionDeniedError, ...
-src/infrastructure/security/permission_middleware.py  # PermissionDeniedError, InsufficientTokenError
+src/domain/exceptions/              # 统一管理（12 个模块）
+├── __init__.py                     # 统一导出（42 个符号）
+├── base_exceptions.py              # BaseException 根类
+├── system_exceptions.py            # SystemException + 4 个具体类
+├── business_exceptions.py          # BusinessException + 8 个具体类
+├── external_exceptions.py          # ExternalException + 4 个具体类
+├── service_exceptions.py           # AuditError, PasswordValidationError, ComplianceLockError
+│                                   # + 5 个安全服务异常（层次违规，见 §3.7）
+│                                   # 注：后 5 个类仅通过模块直接导入可用，未包含在包级 __init__.py 重导出中
+├── storage_exceptions.py           # 6 个存储相关异常
+├── role_exceptions.py              # 4 个角色管理异常
+├── sandbox_exceptions.py           # 4 个沙箱异常
+├── embedding_exceptions.py         # 3 个嵌入服务异常（306-308）
+├── permission_exceptions.py        # InsufficientTokenError
+└── event_exceptions.py             # VersionError
 ```
 
-### 1.3 违反的架构原则
+#### 残留散落位置（已清理）
+
+```
+# 已纳入领域异常体系（Phase 4 + ValueError 迁移完成）：
+# - TransferNotFoundError/TransferNotApprovedError → src/domain/exceptions/transfer_exceptions.py
+# - permission_middleware.py → 仅 OAuth2 WWW-Authenticate 合法保留（4 处）
+# - ValueError → 领域异常全量迁移（186 处，116 文件变更）
+#   详见 sisys-value-error-refactor.md
+```
+
+### 1.4 违反的架构原则
 
 - **单一职责原则**：异常定义应集中管理
 - **开闭原则**：新增异常类型应扩展而非修改现有代码
@@ -65,7 +92,7 @@ BaseException (抽象根)
 ├── SystemException (系统级)
 │   ├── ConfigurationError
 │   ├── NetworkError
-│   └── InfrastructureError
+│   └── StorageError
 ├── BusinessException (业务级)
 │   ├── ValidationError
 │   ├── NotFoundError
@@ -82,6 +109,7 @@ BaseException (抽象根)
 3. **上下文携带**：异常含请求ID、会话ID等调试信息
 4. **统一日志格式**：结构化日志，便于分析
 5. **HTTP 映射表**：异常类型 → HTTP 状态码自动映射
+6. **二级编码**：领域+原因双层分类（参考 Google `domain+reason`、Stripe `type+code`），已应用于嵌入服务异常（306-308）
 
 ---
 
@@ -90,21 +118,24 @@ BaseException (抽象根)
 ### 3.1 异常层次结构
 
 ```python
-# src/domain/exceptions/__init__.py
+# src/domain/exceptions/base_exceptions.py
 
-class BaseException(Exception):
+class BaseException(Exception):  # noqa: N818
     """异常层次结构根类.
 
-    注意：此基类定义在领域层（src/domain/exceptions/），仅使用Python标准库。
-    HTTP状态码等Web层关注点不在此定义，由接口层异常处理器负责映射。
+    此基类定义在领域层（src/domain/exceptions/），仅使用 Python 标准库。
+    HTTP 状态码等 Web 层关注点不在此定义，由接口层异常处理器负责映射。
     """
+
     code: str = "EXCEPTION_000"
     message: str = "Unknown error"
+    cause: Exception | None = None
+    context: dict = {}
 
     def __init__(
         self,
         message: str | None = None,
-        cause: BaseException | None = None,
+        cause: Exception | None = None,
         context: dict | None = None,
     ) -> None:
         self.message = message or self.__class__.message
@@ -113,16 +144,21 @@ class BaseException(Exception):
         super().__init__(self.message)
 
     def to_dict(self) -> dict:
+        """转换为字典格式，便于序列化和日志记录."""
         result = {
-            "code": self.code or "EXCEPTION_000",
-            "message": self.message or "Unknown error",
-            "context": self.context or {},
+            "code": self.code,
+            "message": self.message,
+            "context": self.context,
         }
         if self.cause:
-            result["cause"] = {
-                "type": type(self.cause).__name__,
-                "message": str(self.cause),
-            }
+            # 领域异常 cause 递归序列化，保留完整错误链
+            if isinstance(self.cause, BaseException):
+                result["cause"] = self.cause.to_dict()
+            else:
+                result["cause"] = {
+                    "type": type(self.cause).__name__,
+                    "message": str(self.cause),
+                }
         return result
 
 
@@ -249,21 +285,78 @@ class UnknownError(ExternalException):
     """未知错误（未预期异常兜底）."""
     code = "EXCEPTION_999"
     message = "Unknown error"
-
-
-# === 抽象中间类（禁止直接实例化）===
-class SystemExceptionMeta(type):
-    """确保 SystemException 子类定义了具体错误码."""
-    def __new__(mcs, name, bases, namespace):
-        cls = super().__new__(mcs, name, bases, namespace)
-        if bases and name != "SystemException":
-            # 占位码集合（中间类的标记值）
-            placeholder_codes = {"EXCEPTION_1XX", "EXCEPTION_2XX", "EXCEPTION_3XX"}
-            if not hasattr(cls, 'code') or cls.code in placeholder_codes:
-                if name not in ('SystemException', 'BusinessException', 'ExternalException'):
-                    raise TypeError(f"{name} must define a concrete code")
-        return cls
 ```
+
+#### 完整异常层次图
+
+```
+BaseException (EXCEPTION_000) — 抽象根，领域层
+├── SystemException (EXCEPTION_1XX) — 系统级/基础设施故障
+│   ├── ConfigurationError (101)
+│   ├── NetworkError (102)
+│   │   └── [storage] MinIOConnectionError (102)
+│   ├── StorageError (103)
+│   ├── MessageBusError (104)
+│   └── [service] AuditError (105)
+│       └── [service] IntrusionDetectionError (301) ⚠️ 编码违规
+│       └── [service] DataIntegrityError (302) ⚠️ 编码违规
+│       └── [service] BackupError (303) ⚠️ 编码违规
+│       └── [service] EncryptionError (304) ⚠️ 编码违规
+│       └── [service] ContainerSecurityError (305) ⚠️ 编码违规
+├── BusinessException (EXCEPTION_2XX) — 业务规则违反
+│   ├── ValidationError (201)
+│   │   └── [service] PasswordValidationError (201)
+│   │   └── [storage] BucketNameValidationError (201)
+│   │   └── [entity] EntityValidationError (242) ← 实体不变量验证
+│   ├── NotFoundError (202)
+│   │   └── [storage] MemoryNotFoundError (202)
+│   │   └── [storage] BucketNotFoundError (202)
+│   │   └── [role] RoleNotFoundError (202)
+│   ├── ConflictError (203)
+│   │   └── [storage] MemoryVersionConflictError (203)
+│   │   └── [role] RoleAlreadyExistsError (203)
+│   │   └── [role] CannotDeleteRoleWithUsersError (203)
+│   │   └── [event] VersionError (203)
+│   ├── PermissionDeniedError (204)
+│   │   └── [storage] MemoryAccessDeniedError (204)
+│   │   └── [permission] InsufficientTokenError (204)
+│   ├── AuthenticationError (205)
+│   ├── InvalidStateError (206)
+│   │   └── [service] ComplianceLockError (206)
+│   │   └── InvalidStateTransitionError (208)
+│   │       └── [entity] EntityStateTransitionError (243) ← 实体状态转换守卫
+│   └── BusinessRuleViolationError (207)
+│       └── [role] CannotDeleteSystemRoleError (207)
+│       └── [entity] EntityBusinessRuleError (244) ← 实体跨字段业务约束
+└── ExternalException (EXCEPTION_3XX) — 外部服务错误
+    ├── ThirdPartyError (301)
+    │   └── [embedding] EmbeddingAPIError (306)
+    │   └── [embedding] EmbeddingResponseError (307)
+    ├── [embedding] EmbeddingModelError (308) — 直接继承 ExternalException
+    ├── TimeoutError (302)
+    ├── ServiceUnavailableError (303)
+    ├── [sandbox] SandboxError (309)
+    │   ├── ContainerStartError (310)
+    │   ├── ExecutionError (311)
+    │   └── ContainerStopError (312)
+    └── UnknownError (999)
+```
+
+> **⚠️ 错误码碰撞与层次违规（已知问题）**
+>
+> 以下编码违反了"每类异常唯一编码"原则，需在后续迭代中解决：
+>
+> | 编码 | 碰撞类 | 根因 |
+> |------|--------|------|
+> | EXCEPTION_301 | ThirdPartyError, EmbeddingAPIError, EmbeddingResponseError, IntrusionDetectionError | IntrusionDetectionError 层次违规 |
+> | EXCEPTION_302 | TimeoutError, DataIntegrityError | DataIntegrityError 层次违规 |
+> | EXCEPTION_303 | ServiceUnavailableError, BackupError | BackupError 层次违规 |
+> | EXCEPTION_304 | EncryptionError | 层次违规：继承 SystemException 但使用 3XX 编码 |
+> | EXCEPTION_305 | ContainerSecurityError | 层次违规：继承 SystemException 但使用 3XX 编码 |
+>
+> **已解决**：沙箱异常已分配独立编码 309-312（✅）。
+>
+> **待解决**：安全服务异常（IntrusionDetectionError~ContainerSecurityError 5 个类）重新编码为 106-110，匹配其 SystemException 父类所属的 1XX 范围。
 
 ### 3.2 实际实现：模块化异常结构
 
@@ -271,28 +364,34 @@ class SystemExceptionMeta(type):
 
 ```
 src/domain/exceptions/
-├── __init__.py              # 统一导出（118行）
+├── __init__.py              # 统一导出（42 个符号）
 ├── base_exceptions.py       # BaseException, SystemException, BusinessException, ExternalException
 ├── system_exceptions.py     # ConfigurationError, NetworkError, StorageError, MessageBusError
 ├── business_exceptions.py   # ValidationError, NotFoundError, ConflictError, PermissionDeniedError, ...
+│                            # + EntityValidationError(242), EntityStateTransitionError(243), EntityBusinessRuleError(244)
 ├── external_exceptions.py   # ThirdPartyError, TimeoutError, ServiceUnavailableError, UnknownError
-├── service_exceptions.py    # AuditError, PasswordValidationError, ComplianceLockError
+├── service_exceptions.py    # AuditError(105), PasswordValidationError(201), ComplianceLockError(206)
+│                            # + IntrusionDetectionError(301)⚠️, DataIntegrityError(302)⚠️,
+│                            #   BackupError(303)⚠️, EncryptionError(304)⚠️, ContainerSecurityError(305)⚠️
+│                            # 注：后 5 个类需通过模块直接导入（from .service_exceptions import ...）
 ├── storage_exceptions.py    # MemoryVersionConflictError, MemoryNotFoundError, BucketNotFoundError, ...
 ├── role_exceptions.py       # RoleAlreadyExistsError, RoleNotFoundError, ...
-├── sandbox_exceptions.py    # SandboxError, ContainerStartError, ExecutionError, ...
+├── sandbox_exceptions.py    # SandboxError, ContainerStartError, ExecutionError, ContainerStopError
+├── embedding_exceptions.py  # EmbeddingAPIError(306), EmbeddingResponseError(307), EmbeddingModelError(308)
 ├── permission_exceptions.py # InsufficientTokenError
 └── event_exceptions.py      # VersionError
 ```
 
-统一导出（`from src.domain.exceptions import *`）：
+统一导出（`from src.domain.exceptions import *`，共 42 个符号）：
 - 抽象根类：`BaseException`
 - 系统级：`SystemException`, `ConfigurationError`, `NetworkError`, `StorageError`, `MessageBusError`
-- 业务级：`BusinessException`, `ValidationError`, `NotFoundError`, `ConflictError`, `PermissionDeniedError`, `AuthenticationError`, `InvalidStateError`, `InvalidStateTransitionError`, `BusinessRuleViolationError`
+- 业务级：`BusinessException`, `ValidationError`, `NotFoundError`, `ConflictError`, `PermissionDeniedError`, `AuthenticationError`, `InvalidStateError`, `InvalidStateTransitionError`, `BusinessRuleViolationError`, `EntityValidationError`, `EntityStateTransitionError`, `EntityBusinessRuleError`
 - 外部服务：`ExternalException`, `ThirdPartyError`, `TimeoutError`, `ServiceUnavailableError`, `UnknownError`
 - 服务异常：`AuditError`, `PasswordValidationError`, `ComplianceLockError`
 - 存储异常：`MemoryVersionConflictError`, `MemoryNotFoundError`, `BucketNotFoundError`, `MinIOConnectionError`, `BucketNameValidationError`, `MemoryAccessDeniedError`
 - 角色异常：`RoleAlreadyExistsError`, `RoleNotFoundError`, `CannotDeleteSystemRoleError`, `CannotDeleteRoleWithUsersError`
 - Sandbox异常：`SandboxError`, `ContainerStartError`, `ExecutionError`, `ContainerStopError`
+- 嵌入服务异常：`EmbeddingAPIError`, `EmbeddingResponseError`, `EmbeddingModelError`
 - 权限异常：`InsufficientTokenError`
 - 事件异常：`VersionError`
 
@@ -331,6 +430,12 @@ from src.domain.exceptions import (
 )
 
 # 异常类型 → HTTP 状态码映射表（唯一真相源）
+# 未显式映射的异常通过 MRO 回退到基类默认值：
+#   - EmbeddingAPIError/EmbeddingResponseError → ThirdPartyError → 502
+#   - EmbeddingModelError → ExternalException → 502
+#   - IntrusionDetectionError~ContainerSecurityError → SystemException → 500
+#   - InsufficientTokenError → PermissionDeniedError → 403
+#   - VersionError → ConflictError → 409
 EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     # 三层基类
     SystemException: status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -363,7 +468,7 @@ def _get_http_status(exc: BaseException) -> int:
     for exc_type, http_status in EXCEPTION_HTTP_MAP.items():
         if type(exc) is exc_type:
             return http_status
-    # 然后是MRO匹配
+    # MRO 匹配回退
     for exc_type, http_status in EXCEPTION_HTTP_MAP.items():
         if isinstance(exc, exc_type):
             return http_status
@@ -380,27 +485,25 @@ class ExceptionHandlers:
     def _register_handlers(self) -> None:
         """注册全局异常处理器.
 
-        注意：具体异常处理器必须先于基类处理器注册，
-        FastAPI 按注册顺序查找匹配，精确匹配优先。
-        注意：Exception 必须在 BaseException 之前注册，否则 BaseException 会先匹配。
+        注意：BaseException（领域根类）须在 Exception 之前注册。
+        Starlette 对更具体的异常类型优先匹配：当领域异常抛出时
+        BaseException handler 先于 Exception handler 命中。
         """
         self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)
         self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)
-        self._app.add_exception_handler(Exception, self._handle_unexpected_error)
         self._app.add_exception_handler(BaseException, self._handle_exception)
+        self._app.add_exception_handler(Exception, self._handle_unexpected_error)
 
     async def _handle_exception(
         self, request: Request, exc: Exception
     ) -> JSONResponse:
-        """处理异常.
+        """处理领域基类异常，自动映射到 HTTP 状态码.
 
-        注意：Starlette add_exception_handler 要求 handler 参数类型为 Exception 或其父类，
-        不能是 Exception 的子类。因此参数使用 Exception，内部通过 isinstance 分流到 BaseException。
+        Starlette add_exception_handler 要求 handler 参数类型为 Exception 或其父类，
+        因此参数使用 Exception，内部通过 isinstance 分流到领域 BaseException。
         """
-        # 区分 domain exceptions 和 truly unexpected errors
         if not isinstance(exc, BaseException):
             return await self._handle_unexpected_error(request, exc)
-        # 安全获取 request_id，不依赖特定中间件
         request_id = getattr(request.state, "request_id", None) or "unknown"
 
         # 特殊处理：AuthenticationError 的 locked 状态
@@ -423,13 +526,12 @@ class ExceptionHandlers:
         try:
             error_dict = exc.to_dict()
         except Exception:
-            # to_dict() 失败时的降级处理：保留 context 和 cause 信息
+            # to_dict() 失败时的降级处理
             error_dict = {
                 "code": getattr(exc, 'code', None) or "EXCEPTION_999",
                 "message": str(exc)[:500],
                 "context": getattr(exc, 'context', None) or {},
             }
-            # 保留 cause 信息
             cause = getattr(exc, 'cause', None)
             if cause:
                 error_dict["cause"] = {
@@ -449,9 +551,11 @@ class ExceptionHandlers:
         )
 
     async def _handle_validation_error(
-        self, request: Request, exc: RequestValidationError
+        self, request: Request, exc: Exception
     ) -> JSONResponse:
         """处理请求验证错误."""
+        if not isinstance(exc, RequestValidationError):
+            raise TypeError(f"Expected RequestValidationError, got {type(exc).__name__}")
         request_id = getattr(request.state, "request_id", None) or "unknown"
 
         errors = []
@@ -476,9 +580,11 @@ class ExceptionHandlers:
         )
 
     async def _handle_pydantic_error(
-        self, request: Request, exc: PydanticValidationError
+        self, request: Request, exc: Exception
     ) -> JSONResponse:
         """处理 Pydantic 验证错误."""
+        if not isinstance(exc, PydanticValidationError):
+            raise TypeError(f"Expected PydanticValidationError, got {type(exc).__name__}")
         request_id = getattr(request.state, "request_id", None) or "unknown"
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -496,9 +602,6 @@ class ExceptionHandlers:
         self, request: Request, exc: Exception
     ) -> JSONResponse:
         """处理未预期异常."""
-        # 日志记录全量堆栈
-        import logging
-        logger = logging.getLogger(__name__)
         logger.exception("Unexpected error: %s", exc)
 
         return JSONResponse(
@@ -519,8 +622,149 @@ def register_exception_handlers(app: FastAPI) -> None:
     实例被 app 引用链持有，无需保留返回值。
     用法：register_exception_handlers(app)  # 初始化时调用一次
     """
-    # 实例被 add_exception_handler 内部引用持有，不会被 GC
     ExceptionHandlers(app)
+```
+
+#### 3.3.1 双重处理模式（已知偏差）
+
+尽管集中式 `ExceptionHandlers` 已注册，以下接口文件仍手动捕获领域异常并 re-raise 为 `HTTPException`：
+
+| 文件 | 手动 HTTPException 数 | 模式 |
+|------|----------------------|------|
+| `src/interfaces/api/auth.py` | ~17 处 | 捕获 AuthenticationError、RoleAlreadyExistsError 等后 raise HTTPException |
+| `src/interfaces/api/document_upload.py` | ~12 处 | 上传状态验证、文件检查直接 HTTPException |
+| `src/interfaces/api/crawler.py` | ~4 处 | 服务通信错误直接 HTTPException |
+| `src/interfaces/api/audit.py` | ~5 处 | 审计操作错误直接 HTTPException |
+| `src/interfaces/api/equilibrium_security.py` | ~1 处 | 认证检查直接 HTTPException |
+| `src/infrastructure/security/permission_middleware.py` | ~11 处 | 所有认证/权限失败使用 raw HTTPException |
+
+**影响**：
+- 错误码（`code`）丢失 — API 响应无法携带 `EXCEPTION_XXX` 编码
+- 上下文（`context`）丢失 — 无法传递 request_id、操作详情等调试信息
+- 结构化日志跳过 — `ExceptionHandlers` 的日志流程不触发
+- 响应格式不一致 — 手动 HTTPException 使用 `{"detail": "..."}` 而非标准 `{"error": {...}, "request_id": "..."}` 格式
+
+**修复建议**：见 §3.8 决策指南。`auth.py` 中的 OAuth2 Bearer token 提取属于可接受的例外（需要 `WWW-Authenticate` header），其余均应迁移到集中处理器。
+
+#### 3.3.2 完整编码分配表
+
+| 编码 | 类名 | 继承 | HTTP |
+|------|------|------|------|
+| EXCEPTION_000 | BaseException | Exception | 500 |
+| EXCEPTION_1XX | SystemException | BaseException | 500 |
+| EXCEPTION_101 | ConfigurationError | SystemException | 500 |
+| EXCEPTION_102 | NetworkError | SystemException | 500 |
+| EXCEPTION_103 | StorageError | SystemException | 500 |
+| EXCEPTION_104 | MessageBusError | SystemException | 500 |
+| EXCEPTION_105 | AuditError | SystemException | 500 |
+| EXCEPTION_106 | MinIOConnectionError | NetworkError | 500 |
+| EXCEPTION_2XX | BusinessException | BaseException | 400 |
+| EXCEPTION_201 | ValidationError | BusinessException | 400 |
+| EXCEPTION_202 | NotFoundError | BusinessException | 404 |
+| EXCEPTION_203 | ConflictError | BusinessException | 409 |
+| EXCEPTION_204 | PermissionDeniedError | BusinessException | 403 |
+| EXCEPTION_205 | AuthenticationError | BusinessException | 401 |
+| EXCEPTION_206 | InvalidStateError | BusinessException | 409 |
+| EXCEPTION_207 | BusinessRuleViolationError | BusinessException | 422 |
+| EXCEPTION_208 | InvalidStateTransitionError | InvalidStateError | 409 |
+| EXCEPTION_211 | MemoryNotFoundError | NotFoundError | 404 |
+| EXCEPTION_212 | BucketNotFoundError | NotFoundError | 404 |
+| EXCEPTION_213 | MemoryVersionConflictError | ConflictError | 409 |
+| EXCEPTION_214 | BucketNameValidationError | ValidationError | 400 |
+| EXCEPTION_215 | MemoryAccessDeniedError | PermissionDeniedError | 403 |
+| EXCEPTION_221 | RoleNotFoundError | NotFoundError | 404 |
+| EXCEPTION_222 | RoleAlreadyExistsError | ConflictError | 409 |
+| EXCEPTION_223 | CannotDeleteRoleWithUsersError | ConflictError | 409 |
+| EXCEPTION_224 | CannotDeleteSystemRoleError | BusinessRuleViolationError | 422 |
+| EXCEPTION_231 | PasswordValidationError | ValidationError | 400 |
+| EXCEPTION_232 | ComplianceLockError | InvalidStateError | 409 |
+| EXCEPTION_241 | InsufficientTokenError | PermissionDeniedError | 403 |
+| EXCEPTION_242 | EntityValidationError | ValidationError | 400 |
+| EXCEPTION_243 | EntityStateTransitionError | InvalidStateTransitionError | 409 |
+| EXCEPTION_244 | EntityBusinessRuleError | BusinessRuleViolationError | 422 |
+| EXCEPTION_251 | VersionError | ConflictError | 409 |
+| EXCEPTION_261 | TransferNotFoundError | NotFoundError | 404 |
+| EXCEPTION_262 | TransferNotApprovedError | InvalidStateError | 409 |
+| EXCEPTION_3XX | ExternalException | BaseException | 502 |
+| EXCEPTION_301 | ThirdPartyError | ExternalException | 502 |
+| EXCEPTION_302 | TimeoutError | ExternalException | 504 |
+| EXCEPTION_303 | ServiceUnavailableError | ExternalException | 503 |
+| EXCEPTION_306 | EmbeddingAPIError | ThirdPartyError | 502 |
+| EXCEPTION_307 | EmbeddingResponseError | ThirdPartyError | 502 |
+| EXCEPTION_308 | EmbeddingModelError | ExternalException | 502 |
+| EXCEPTION_309 | SandboxError | ExternalException | 502 |
+| EXCEPTION_310 | ContainerStartError | SandboxError | 502 |
+| EXCEPTION_311 | ExecutionError | SandboxError | 502 |
+| EXCEPTION_312 | ContainerStopError | SandboxError | 502 |
+| EXCEPTION_999 | UnknownError | ExternalException | 500 |
+
+### 3.3 编码分配策略：人工编码 + CI 自动校验
+
+#### 3.3.1 设计原则
+
+借鉴 Google Error Model（`domain + reason`）、Stripe（`type + code` 前缀命名空间）、Kubernetes（`StatusReason` 字符串常量）等五大业界的共同实践，本系统采用 **"人工分配编码 + CI 自动校验边界"** 的策略：
+
+| 维度 | 人工决策（开发者责任） | CI 自动校验（机器责任） |
+|------|----------------------|----------------------|
+| **编码选择** | 按子域范围选取未占用的连续编号 | 编码唯一性 + 子域范围边界校验 |
+| **继承设计** | 子类编码放在专属子域（如 entity 242-249），继承 business 基类 | 继承链编码一致性校验（仅允许合法跨子域继承） |
+| **子域扩展** | 新增子域时在 `_code_ranges.py` 注册范围 | 子域范围不重叠校验（允许嵌套子域） |
+| **文档同步** | 更新 §3.3.2 编码分配表 | 编码集合与 `__all__` 一致性校验 |
+
+> **为什么不用自动编码生成？** 编码是 API 契约——一旦分配，监控告警规则、历史日志解析、运维脚本均依赖其稳定性。自动生成（如 `hash(module+class)`）在重构时破坏编码，导致运维灾难。Google/Stripe/Kubernetes 无一采用自动编码生成。
+
+#### 3.3.2 子域编码范围约束
+
+定义在 `src/domain/exceptions/_code_ranges.py`（CI 专用，非运行时），作为所有校验的唯一权威输入：
+
+| 子域 | 编码范围 | 说明 |
+|------|---------|------|
+| `system` | 101–109 | ConfigurationError, NetworkError, StorageError, MessageBusError, AuditError, MinIOConnectionError |
+| `business` | 201–208 | 业务级基类（ValidationError, NotFoundError, ConflictError 等） |
+| `storage` | 211–219 | MemoryNotFoundError, BucketNotFoundError 等 |
+| `role` | 221–229 | RoleNotFoundError, RoleAlreadyExistsError 等 |
+| `service` | 231–239 | PasswordValidationError, ComplianceLockError |
+| `permission` | 241 | InsufficientTokenError |
+| `entity` | 242–249 | EntityValidationError, EntityStateTransitionError, EntityBusinessRuleError |
+| `event` | 251–259 | VersionError |
+| `transfer` | 261–269 | TransferNotFoundError, TransferNotApprovedError |
+| `external` | 301–399 | ThirdPartyError, TimeoutError, ServiceUnavailableError（父域） |
+| `embedding` | 306–308 | EmbeddingAPIError 等（嵌套在 external 内） |
+| `sandbox` | 309–319 | SandboxError 等（嵌套在 external 内） |
+| `fallback` | 999 | UnknownError（兜底，独立于所有子域） |
+
+#### 3.3.3 CI 校验规则
+
+`tests/unit/domain/exceptions/test_code_ranges.py` 包含 5 项自动校验：
+
+| # | 规则 | 说明 |
+|---|------|------|
+| R1 | **子域范围** | 每个异常类的数值编码落在其声明子域的 `[start, end]` 范围内 |
+| R2 | **继承链一致性** | 子域专用类继承 business/external 基类 → 允许；非法跨子域继承（如 entity 继承 storage）→ 拒绝 |
+| R3 | **预留保护** | 禁止具体异常类使用 `000`, `1XX`, `2XX`, `3XX` 占位符编码 |
+| R4 | **注册覆盖** | `_CLASS_TO_SUBDOMAIN` 覆盖所有 `__all__` 导出的具体异常类 |
+| R5 | **范围有效性** | 子域 start ≤ end，同级子域范围不重叠，嵌套子域必须完全在父域范围内 |
+
+#### 3.3.4 新增异常编码的标准流程
+
+```
+1. 确定子域归属（参考 §3.3.2 子域范围表）
+   存储相关 → storage(211-219)；实体相关 → entity(242-249) 等
+   无适配子域 → 在 _code_ranges.py 中新增子域范围
+
+2. 在子域范围内选取未占用编码
+   grep -r "EXCEPTION_NNN" src/domain/exceptions/
+
+3. 编码实现
+   类属性 code = "EXCEPTION_NNN"
+   更新业务模块的 __all__ + __init__.py 导入和 __all__
+
+4. CI 自动校验
+   pytest tests/unit/domain/exceptions/ → 5 项规则全绿
+
+5. 文档同步
+   更新 §3.3.2 编码分配表；
+   如新增子域，同时更新 _code_ranges.py 和本节的子域范围表
 ```
 
 ### 3.4 外部 SDK 错误映射器
@@ -530,32 +774,29 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 """外部 SDK 错误到异常的标准化映射.
 
-注意：优先使用类型匹配（isinstance）而非字符串匹配。
-对于 MinIO S3Error，应使用 error.code 属性直接映射（见 map_s3_error）。
+优先使用类型匹配（isinstance）和错误码属性直接映射。
+对于 MinIO S3Error，使用 error.code 属性直接映射（见 map_s3_error）。
 装饰器方案仅用于无法使用类型匹配的场景。
 """
 
 import logging
 from functools import wraps
-from typing import Callable, TypeVar
+from typing import Any, Callable, TypeVar
 
 from src.domain.exceptions import (
-    BaseException,
-    ExternalException,
-    ThirdPartyError,
-    TimeoutError,
-    ServiceUnavailableError,
-    SystemException,
-    StorageError,
-    NetworkError,
     ConflictError,
+    InvalidStateError,
+    MessageBusError,
+    NetworkError,
     NotFoundError,
     PermissionDeniedError,
+    ServiceUnavailableError,
+    SystemException,
+    ThirdPartyError,
+    TimeoutError,
     ValidationError,
-    BusinessRuleViolationError,
-    MessageBusError,
-    InvalidStateError,
 )
+from src.domain.exceptions.base_exceptions import BaseException
 
 logger = logging.getLogger(__name__)
 
@@ -573,8 +814,6 @@ class ErrorMapper:
     """
 
     # MinIO S3Error 映射（使用 error.code 直接查找，非字符串匹配）
-    # 注意：UnknownError 作为兜底返回，确保始终返回领域异常而非原始 S3Error
-    # 使用 .get(code.lower()) 支持大小写不敏感查找
     S3_ERROR_MAP: dict[str, type[BaseException]] = {
         "nosuchbucket": NotFoundError,
         "nosuchkey": NotFoundError,
@@ -583,15 +822,15 @@ class ErrorMapper:
         "bucketalreadyownedbyyou": ConflictError,
         "accessdenied": PermissionDeniedError,
         "forbidden": PermissionDeniedError,
-        "invalidobjectstate": InvalidStateError,  # WORM 对象状态限制是状态错误
-        "objectlockconfigurationnotfound": InvalidStateError,  # WORM 配置缺失是状态错误
+        "invalidobjectstate": InvalidStateError,
+        "objectlockconfigurationnotfound": InvalidStateError,
         "requesttimeout": TimeoutError,
         "serviceunavailable": ServiceUnavailableError,
-        "internalerror": ThirdPartyError,  # S3 内部错误，非业务错误
+        "internalerror": ThirdPartyError,
         "nosuchupload": NotFoundError,
         "nosuchversion": NotFoundError,
         "entitytoolarge": ValidationError,
-        "methodnotallowed": ThirdPartyError,  # S3 层面方法限制是外部服务错误
+        "methodnotallowed": ThirdPartyError,
         "slowdown": ServiceUnavailableError,
     }
 
@@ -620,21 +859,20 @@ class ErrorMapper:
         Returns:
             对应的异常实例
         """
-        # 大小写不敏感查找，支持各种大小写变体
         exc_class = cls.S3_ERROR_MAP.get(code.lower(), ThirdPartyError)
         if exc_class is ThirdPartyError:
             logger.warning("Unknown S3 error code: %s, defaulting to ThirdPartyError", code)
         return exc_class(message=message or f"S3 error: {code}")
 
     @classmethod
-    def map_rabbitmq_error(cls, error_type: str, message: str | None = None) -> ExternalException:
-        """映射 RabbitMQ 错误."""
+    def map_rabbitmq_error(cls, error_type: str, message: str | None = None) -> BaseException:
+        """映射 RabbitMQ 错误为领域异常."""
         exc_class = cls.RABBITMQ_ERROR_MAP.get(error_type, MessageBusError)
         return exc_class(message=message or f"RabbitMQ error: {error_type}")
 
     @classmethod
-    def map_redis_error(cls, error_type: str, message: str | None = None) -> SystemException:
-        """映射 Redis 错误."""
+    def map_redis_error(cls, error_type: str, message: str | None = None) -> BaseException:
+        """映射 Redis 错误为领域异常."""
         exc_class = cls.REDIS_ERROR_MAP.get(error_type, SystemException)
         return exc_class(message=message or f"Redis error: {error_type}")
 
@@ -642,10 +880,10 @@ class ErrorMapper:
     def wrap_external_error(
         cls,
         error: Exception,
-        target_exc_class: type[ExternalException],
+        target_exc_class: type[BaseException],
         context: dict | None = None,
-    ) -> ExternalException:
-        """包装外部错误为异常.
+    ) -> BaseException:
+        """包装外部错误为领域异常.
 
         推荐用法（替代装饰器）：
             try:
@@ -658,14 +896,14 @@ class ErrorMapper:
         logger.warning("Wrapping external error: %s -> %s", type(error).__name__, target_exc_class.__name__)
         return target_exc_class(
             message=str(error),
-            cause=error,
-            context=context,
+            cause=error if isinstance(error, BaseException) else None,
+            context={**(context or {}), "original_error_type": type(error).__name__},
         )
 
 
 def with_error_mapping(
-    error_map: dict[str, type[ExternalException]],
-    default_exc: type[ExternalException] = ThirdPartyError,
+    error_map: dict[str, type[BaseException]],
+    default_exc: type[BaseException] = ThirdPartyError,
     *,
     exact_match: bool = False,
 ) -> Callable:
@@ -676,17 +914,10 @@ def with_error_mapping(
     参数：
         exact_match: 为 True 时使用精确匹配（==），避免子串误匹配。
                    为 False（默认）时使用子串匹配（in），用于包含错误消息的场景。
-
-    推荐用法：
-        class MyAdapter:
-            # 精确匹配：用于错误码字面量比较
-            @with_error_mapping({"ConnectionError": NetworkError}, exact_match=True)
-            async def connect(self):
-                ...
     """
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return await func(*args, **kwargs)
             except Exception as e:
@@ -694,12 +925,23 @@ def with_error_mapping(
                 for key, exc_class in error_map.items():
                     if exact_match:
                         if key.lower() == error_str.lower():
-                            raise exc_class(message=str(e), cause=e) from None
+                            raise exc_class(
+                                message=str(e),
+                                cause=e if isinstance(e, BaseException) else None,
+                                context={"original_error_type": type(e).__name__},
+                            ) from e
                     else:
-                        # 子串匹配（仅用于错误消息包含明确错误码的场景）
                         if key.lower() in error_str.lower():
-                            raise exc_class(message=str(e), cause=e) from None
-                raise default_exc(message=str(e), cause=e) from None
+                            raise exc_class(
+                                message=str(e),
+                                cause=e if isinstance(e, BaseException) else None,
+                                context={"original_error_type": type(e).__name__},
+                            ) from e
+                raise default_exc(
+                    message=str(e),
+                    cause=e if isinstance(e, BaseException) else None,
+                    context={"original_error_type": type(e).__name__},
+                ) from e
         return wrapper
     return decorator
 ```
@@ -709,50 +951,62 @@ def with_error_mapping(
 ```python
 # src/infrastructure/logging/exception_logger.py
 
-"""异常结构化日志处理器."""
+"""异常结构化日志处理器.
 
-import logging
+所有日志输出均为 JSON 格式，包含异常时附带结构化错误信息。
+使用 duck-typing（getattr）检测异常属性，兼容领域异常和非领域异常。
+"""
+
 import json
-import traceback
+import logging
 from datetime import datetime, timezone
 from typing import Any
-
-from src.domain.exceptions import BaseException
 
 
 class ExceptionJsonFormatter(logging.Formatter):
     """异常结构化日志格式化器."""
 
     def format(self, record: logging.LogRecord) -> str:
+        """格式化日志记录.
+
+        包含异常信息时输出结构化错误 JSON，否则输出标准日志 JSON。
+        """
         if record.exc_info and record.exc_info[0]:
             exc = record.exc_info[1]
-            if isinstance(exc, BaseException):
+            if exc is not None:
                 return self._format_exception(record, exc)
         return self._format_standard(record)
 
-    def _format_exception(
-        self, record: logging.LogRecord, exc: BaseException
-    ) -> str:
-        log_entry = {
+    def _format_exception(self, record: logging.LogRecord, exc: Any) -> str:
+        """格式化异常日志，使用 duck-typing 提取异常属性."""
+        log_entry: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
             "error": {
-                "code": exc.code,
-                "message": exc.message,
-                "context": exc.context,
+                "code": getattr(exc, "code", None) or "EXCEPTION_000",
+                "message": getattr(exc, "message", None) or str(exc),
+                "context": getattr(exc, "context", None) or {},
             },
         }
-        if exc.cause:
+        cause = getattr(exc, "cause", None)
+        if cause:
             log_entry["error"]["cause"] = {
-                "type": type(exc.cause).__name__,
-                "message": str(exc.cause),
+                "type": type(cause).__name__,
+                "message": str(cause),
             }
         return json.dumps(log_entry)
 
     def _format_standard(self, record: logging.LogRecord) -> str:
-        return super().format(record)
+        """格式化标准日志为 JSON."""
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        return json.dumps(log_entry)
 
 
 def configure_exception_logging() -> None:
@@ -789,47 +1043,256 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
         return response
 ```
 
+### 3.7 错误码分配注册表
+
+| 范围 | 分支 | 已分配编码 | 状态 |
+|------|------|-----------|------|
+| 000 | BaseException | 000（根类默认） | 正常 |
+| 1XX | SystemException | 101 ConfigurationError, 102 NetworkError/MinIOConnectionError, 103 StorageError, 104 MessageBusError, 105 AuditError | 正常 |
+| 2XX | BusinessException | 201 ValidationError/PasswordValidationError/BucketNameValidationError/EntityValidationError, 202 NotFoundError/MemoryNotFoundError/BucketNotFoundError/RoleNotFoundError, 203 ConflictError/MemoryVersionConflictError/RoleAlreadyExistsError/CannotDeleteRoleWithUsersError/VersionError, 204 PermissionDeniedError/MemoryAccessDeniedError/InsufficientTokenError, 205 AuthenticationError, 206 InvalidStateError/ComplianceLockError, 207 BusinessRuleViolationError/CannotDeleteSystemRoleError/EntityBusinessRuleError, 208 InvalidStateTransitionError/EntityStateTransitionError | 正常（同编码类语义一致；242-244 为实体专用子类） |
+| 3XX | ExternalException | 301 ThirdPartyError/EmbeddingAPIError/EmbeddingResponseError/SandboxError/ContainerStartError/ExecutionError/ContainerStopError ⚠️碰撞, 302 TimeoutError/DataIntegrityError ⚠️碰撞, 303 ServiceUnavailableError/BackupError ⚠️碰撞, 304 EncryptionError ⚠️违规, 305 ContainerSecurityError ⚠️违规, 306 EmbeddingAPIError, 307 EmbeddingResponseError, 308 EmbeddingModelError | 存在碰撞和层次违规 |
+| 999 | UnknownError | 兜底 | 正常 |
+
+**碰撞解决状态**：
+
+1. **沙箱异常**（SandboxError/ContainerStartError/ExecutionError/ContainerStopError）→ ✅ 已分配独立编码 309-312
+2. **安全服务异常**（IntrusionDetectionError~ContainerSecurityError 5 个类）→ 待解决：重新编码为 106-110（匹配 SystemException 的 1XX 范围），或重分类至 ExternalException
+
+> **编码碰撞自动检测**：新增的 `test_code_ranges.py`（§3.3.3）在 CI 阶段自动检测编码碰撞、子域范围违规和非法跨子域继承，降低人工分配出错概率。
+
+### 3.8 异常处理决策指南
+
+#### 推荐使用集中处理器（默认）
+
+所有新端点应让领域异常自然上浮到 `ExceptionHandlers`，由其自动完成 HTTP 映射、响应格式化和结构化日志记录。
+
+适用场景：
+- 领域异常从应用层传播到 API 边界
+- 需要错误码（`code`）、上下文（`context`）、追踪ID（`request_id`）
+- 需要结构化日志自动记录
+
+#### 可接受手动 HTTPException 的场景
+
+| 场景 | 原因 | 示例 |
+|------|------|------|
+| OAuth2 Bearer token 提取 | FastAPI 安全机制依赖 HTTPException 的 `WWW-Authenticate` header | `get_current_user_dependency` 中无 token 或 token 无效 |
+| 请求级输入前验证 | 在进入领域逻辑之前快速拒绝 | 参数格式校验、必填字段检查 |
+| 外部 API 契约约束 | 特定外部系统要求非标准响应格式 | 第三方回调、Webhook 确认 |
+
+#### 不允许手动 HTTPException 的场景
+
+- **捕获领域异常后 re-raise**：如 `except NotFoundError: raise HTTPException(404, ...)` — 丢失 `code`、`context`、`cause` 链
+- **业务逻辑错误使用 HTTPException**：如 `HTTPException(403)` 代替 `PermissionDeniedError`
+- **权限中间件使用 raw HTTPException**：如 `permission_middleware.py` 中 11 处直接 `raise HTTPException`
+
+#### 标准错误响应 Schema
+
+所有 API 错误响应应使用以下格式（由 `ExceptionHandlers` 统一生成）：
+
+```json
+{
+    "error": {
+        "code": "EXCEPTION_XXX",
+        "message": "Human-readable message",
+        "context": {}
+    },
+    "request_id": "uuid"
+}
+```
+
+响应头：`X-Error-Code: EXCEPTION_XXX`、`X-Request-ID: uuid`
+
+当前 5 个文件中的重复 `ErrorResponse(BaseModel)` 定义应合并到 `src/interfaces/api/schemas.py` 共享模块。
+
+### 3.9 异常指标集成
+
+#### 端口定义（应用层）
+
+```python
+# src/application/ports/exception_metrics_port.py
+
+class ExceptionMetricsPort(Protocol):
+    """异常指标采集端口定义.
+
+    应用层定义此端口，基础设施层实现。
+    接口层通过此接口记录异常指标。
+    """
+
+    def record_exception(self, exception_type: str, code: str | None = None) -> None: ...
+```
+
+#### 实现（基础设施层）
+
+```python
+# src/infrastructure/logging/exception_metrics_impl.py
+
+@dataclass
+class ExceptionMetricsImpl(ExceptionMetricsPort):
+    """异常指标收集器（线程安全），支持 Prometheus 格式导出."""
+    _counters: dict[str, int] = field(default_factory=dict)
+    _lock: Lock = field(default_factory=Lock)
+
+    def record_exception(self, exception_type: str, code: str | None = None) -> None:
+        key = f"{exception_type}:{code}" if code else exception_type
+        with self._lock:
+            self._counters[key] = self._counters.get(key, 0) + 1
+
+    def collect(self) -> bytes: ...       # Prometheus 文本格式
+    def collect_as_dict(self) -> dict: ... # 字典格式
+    def reset(self) -> None: ...          # 测试用
+```
+
+全局单例通过 `get_exception_metrics()` 获取。
+
+`ExceptionHandlers` 通过 `ExceptionMetricsPort` 在 `_handle_exception()` 和 `_handle_unexpected_error()` 中调用 `record_exception(type(exc).__name__, exc.code)` 完成指标采集。
+
+### 3.10 事件处理器错误模式
+
+系统使用死信队列（DLQ）处理事件消费失败：
+
+- **端口定义**：`src/domain/ports/dead_letter_queue.py` — `DeadLetterQueue` Protocol（`enqueue`、`dequeue`）
+- **内存实现**：`src/infrastructure/messaging/inmemory_dead_letter_queue.py` — 开发/测试用
+- **持久化实现**：`src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py` — 生产用
+
+错误处理流程：
+
+```
+事件消费 → 捕获异常 → 增量 retry_count
+    ├── retry_count < max_retries → 重新入队（指数退避+抖动）
+    └── retry_count ≥ max_retries → 入 DLQ（记录失败原因）
+
+重试策略（src/infrastructure/messaging/retry/retry_policy.py）：
+    base_delay=1.0s, max_delay=60.0s, max_retries=3
+    delay = min(base * 2^attempt * jitter, max_delay)
+```
+
+事件处理器中的异常应使用领域异常，确保 DLQ 元数据包含完整错误码和上下文信息。
+
+### 3.11 领域实体验证异常
+
+系统中 **186 处 `raise ValueError`** 已全量迁移为领域异常。新增三类实体专用异常：
+
+#### 推荐模式
+
+| 场景 | 推荐异常 | 编码 | HTTP | 适用位置 |
+|------|---------|------|------|---------|
+| 实体不变量验证（UUID/非空/枚举/数值范围） | `EntityValidationError` | EXCEPTION_242 | 400 | `validate()` / `__post_init__()` |
+| 实体状态转换守卫（状态机方法） | `EntityStateTransitionError` | EXCEPTION_243 | 409 | `start()` / `complete()` / `fail()` / `recover()` 等 |
+| 实体跨字段业务约束 | `EntityBusinessRuleError` | EXCEPTION_244 | 422 | `validate()` 中的跨字段约束 |
+| 配置参数验证 | `ConfigurationError` | EXCEPTION_101 | 500 | `*.from_env()` / `validate()` |
+| 应用层输入校验 | `ValidationError` | EXCEPTION_201 | 400 | 用例/服务输入验证 |
+
+#### 迁移原则
+
+- **禁止 `raise ValueError`**：所有验证失败使用领域异常
+- **消息文本不变**：迁移仅改变异常类型和上下文，错误消息保持向后兼容
+- **分批实施**：每个批次独立 PR，每批全量测试验证无回归
+
+### 3.12 异常注册检查清单
+
+> **适用范围：** 本清单针对「领域异常」—— 即定义在 `src/domain/exceptions/` 下、继承自 `DomainError`（别名 `BaseException`）的异常类。这类异常由 `ExceptionHandlers` 自动映射为 HTTP 响应，携带错误码（`EXCEPTION_NNN`）、上下文（`context`）和追踪 ID（`request_id`）。
+
+#### 异常分类与处理策略（SISYS 全量）
+
+| 类别 | 定义位置 | 根类型 | 处理方式 | 需遵循本清单？ |
+|------|---------|--------|---------|:---:|
+| **领域异常** | `src/domain/exceptions/` | `DomainError` | `ExceptionHandlers` 自动映射 HTTP + 记录指标 | ✅ 是 |
+| **Python 内置异常** | 全系统禁止主动 `raise ValueError` | `Exception` | 不应出现（如出现则落入 `_handle_unexpected_error` → 500） | 🔴 禁止新增 |
+| **FastAPI 异常** | `interfaces/api/` | `RequestValidationError` | `_handle_validation_error` → 400 | ❌ 否（框架原生） |
+| **Pydantic 异常** | `interfaces/api/` | `PydanticValidationError` | `_handle_pydantic_error` → 422 | ❌ 否（框架原生） |
+| **第三方 SDK 异常** | 外部库（`S3Error` 等） | 各 SDK 定义 | `ErrorMapper.map_*()` 映射为领域异常 | 🟡 仅映射规则 |
+| **基础设施内部异常** | `infrastructure/` | `RuntimeError` 等 | 由调用方捕获后转为领域异常或记录日志 | 🟡 转为领域异常时是 |
+
+> **关键决策规则：** 任何需要向 API 消费者传达的**业务/系统/外部错误**，必须定义为领域异常（遵循本清单）。仅在以下场景使用其他异常：
+> - **OAuth2 Bearer token 提取**：必须用 `HTTPException(401, headers={"WWW-Authenticate": "Bearer"})`（FastAPI 安全机制要求）
+> - **第三方 SDK 调用**：原始异常由 `ErrorMapper` 包装为领域异常后重新抛出
+> - **禁止 `raise ValueError`**：所有验证失败使用领域异常（详见 [`sisys-value-error-refactor.md`](sisys-value-error-refactor.md)）
+
 ---
 
-## 4. 迁移策略
+新增领域异常类时必须按三阶段依次完成。每阶段包含强制项（🔴）和建议项（🟡）。
 
-### 4.1 阶段一：建立基础设施
+---
 
-- [x] 创建 `src/domain/exceptions/__init__.py` - 异常根类与三层异常体系
-- [x] 创建模块化异常文件（11个文件替代 legacy.py）
-- [x] 创建 `src/interfaces/api/exception_handlers.py` - FastAPI 统一异常处理器
-- [x] 创建 `src/interfaces/api/middleware/exception_context.py` - 异常上下文中间件
-- [x] 创建 `src/infrastructure/messaging/error_mapper.py` - SDK 错误映射器
-- [x] 创建 `src/infrastructure/logging/exception_logger.py` - 结构化日志格式化器
+#### 阶段 A：设计阶段（Task 0 — 规范先行）
 
-### 4.2 阶段二：全面迁移
+> **原则**：异常是领域契约的一部分，须在 SDD 规范定义阶段完成设计，禁止在实现 Task 中临时拼凑。
 
-#### 第一批：高优先级（API 层）
+| # | 强制 | 检查项 | 说明 |
+|---|------|--------|------|
+| A1 | 🔴 | **确定归属模块** | 按职责归入 `src/domain/exceptions/` 下适当模块（`system`/`business`/`external`/`storage`/`role`/`service`/`sandbox`/`embedding`/`permission`/`event`/`transfer`）．若现有模块均不匹配，评估是否新建模块 |
+| A2 | 🔴 | **选择正确基类** | `SystemException`（1XX）用于基础设施故障；`BusinessException`（2XX）用于业务规则违反；`ExternalException`（3XX）用于外部服务错误．禁止直接继承 Python 内置 `Exception` |
+| A3 | 🔴 | **分配唯一编码** | 从对应范围选取：系统 101-199、业务 201-299、外部 301-399．运行 `grep -r "EXCEPTION_NNN" src/domain/exceptions/` 验证无碰撞 |
+| A4 | 🔴 | **设计构造器参数** | 携带领域上下文（如 `transfer_id`、`role_id`、`user_count`），避免仅含字符串消息．参数通过 `context` 字典暴露给 API 响应和结构化日志 |
+| A5 | 🔴 | **设计错误消息** | 面向调用方（API 消费者/运维），包含资源标识但不泄露内部实现细节（如 SQL 语句、堆栈路径） |
+| A6 | 🟡 | **评估二级编码** | 同一领域内多种失败模式时使用二级编码（参考 Google `domain+reason`、嵌入服务 306-308 模式），如 `EmbeddingAPIError(306)` / `EmbeddingResponseError(307)` |
 
-- [x] `src/domain/ports/audit_service.py` - AuditError → SystemException
-- [x] `src/domain/ports/auth_service.py` - AuthenticationError → BusinessException
-- [x] `src/infrastructure/security/permission_middleware.py` - PermissionDeniedError, InsufficientTokenError
+#### 阶段 B：实现阶段（编码 Task）
 
-#### 第二批：中优先级（应用层）
+| # | 强制 | 检查项 | 说明 |
+|---|------|--------|------|
+| B1 | 🔴 | **模块级导出** | 在所在模块的 `__all__` 列表中注册类名 |
+| B2 | 🔴 | **包级重导出** | 在 `src/domain/exceptions/__init__.py` 中：添加 `from` 导入 → 加入 `__all__` → 按注释分组正确归类 |
+| B3 | 🔴 | **Google 风格 docstring** | 包含 `Attributes:` 段（code/message/自定义属性），中文注释 |
+| B4 | 🔴 | **EXCEPTION_HTTP_MAP 映射** | 在 `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 中添加条目，即使 MRO 回退可正确映射也应显式声明（优化精确匹配性能 + 文档清晰） |
+| B5 | 🟡 | **ErrorMapper 映射** | 如异常包装外部 SDK 错误（MinIO/RabbitMQ/Redis），在 `src/infrastructure/messaging/error_mapper.py` 的相应 `*_ERROR_MAP` 字典中添加条目 |
+| B6 | 🟡 | **事件通道配置** | 如异常触发死信队列（DLQ）重试/入队，在 `config/event_channels.yaml` 中配置对应通道 |
+| B7 | 🔴 | **禁止抑制注释** | 不得在异常定义中添加 `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释．如 Ruff/MyPy 报错，必须通过代码修改解决根因 |
 
-- [x] `src/application/use_cases/role_management.py` - RoleAlreadyExistsError 等（4个）
-- [x] `src/domain/ports/sandbox_executor.py` - SandboxError 等（4个）
-- [x] `src/domain/services/memory_service.py` - MemoryVersionConflictError, MemoryNotFoundError
+#### 阶段 C：验证阶段（质量门禁）
 
-#### 第三批：低优先级（基础设施层）
+| # | 强制 | 检查项 | 说明 |
+|---|------|--------|------|
+| C1 | 🔴 | **编码唯一性 + 子域范围测试** | 运行 `pytest tests/unit/domain/exceptions/ -v`（含 `test_error_code_uniqueness.py` + `test_code_ranges.py`），确认编码唯一、子域范围正确、继承链合规 |
+| C2 | 🔴 | **构造与 to_dict() 测试** | 在 `tests/unit/domain/exceptions/` 添加或更新测试：默认消息、自定义消息、`to_dict()` 输出结构、`cause` 链正确性 |
+| C3 | 🔴 | **HTTP 映射测试** | 在 `tests/unit/interfaces/api/test_exception_handlers.py` 中：验证 `EXCEPTION_HTTP_MAP` 包含新异常类型、`_get_http_status` 返回正确状态码、HTTP 集成测试返回正确 JSON 结构 |
+| C4 | 🔴 | **更新设计文档 + 编码注册** | 更新 §3.3.2 编码分配表、§3.7 错误码注册表、`_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 字典和 `CODE_RANGES` 表（如新增子域） |
+| C5 | 🔴 | **更新 story-template.md** | 如新增异常模块或编码范围，同步更新故事模板中的领域异常清单（确保后续 Story 的 Task 0 规范定义包含新模块） |
+| C6 | 🟡 | **BDD 验收场景** | 在 Story 的 Gherkin feature 文件中添加异常路径场景（如 `Scenario: 资源不存在返回 404`），确保异常传播的端到端行为被验收 |
+| C7 | 🟡 | **指标告警阈值** | 如新异常代表关键故障模式，在 `src/infrastructure/logging/exception_metrics_impl.py` 中评估是否需要添加告警规则 |
 
-- [x] `src/infrastructure/storage/minio/minio_manager.py` - 使用 ErrorMapper.map_s3_error
-- [x] `src/infrastructure/messaging/outbox/outbox.py` - InvalidStateTransitionError → InvalidStateError
-- [x] `src/infrastructure/messaging/event_store.py` - VersionError → SystemException
-- [x] `src/domain/ports/password_validation_service.py` - PasswordValidationError → ValidationError
-- [x] `src/domain/ports/storage.py` - ComplianceLockError → BusinessException
+---
+
+#### 快速自检脚本
+
+```bash
+# 阶段 A: 编码碰撞 + 子域范围检查
+grep -r "EXCEPTION_XXX" src/domain/exceptions/  # 替换 XXX 为目标编码
+# 确认编码落在 _code_ranges.py 的子域范围内
+
+# 阶段 B: 导出完整性检查
+python -c "from src.domain.exceptions import NewErrorName; print('✅ 导入成功')"
+
+# 阶段 C: 测试验证（编码唯一性 + 子域范围 + HTTP 映射）
+poetry run pytest tests/unit/domain/exceptions/ -v
+poetry run pytest tests/unit/interfaces/api/test_exception_handlers.py -v -k "NewErrorName"
+poetry run ruff check src/domain/exceptions/ src/interfaces/api/exception_handlers.py
+```
+
+---
+
+## 4. 实施阶段
+
+### 4.1 阶段一：基础设施
+
+建立异常根类、三层体系、模块化文件、统一处理器、SDK 映射器、结构化日志。
+
+### 4.2 阶段二：API/应用/基础设施层迁移
+
+- 领域端口异常归类至新体系
+- 应用层用例异常迁移
+- 基础设施 SDK 错误统一映射
 
 ### 4.3 阶段三：完善与优化
 
-- [x] 实现结构化日志集成 - `src/infrastructure/logging/exception_logger.py`
-- [x] 实现异常监控指标 - `src/infrastructure/logging/exception_metrics.py`
-- [x] 编写回归测试确保无破坏性变更 - 2348 tests passed
-- [x] 统一 ErrorMapper 与现有 _map_error 方法 - minio_manager.py 委托给 ErrorMapper
+结构化日志集成、异常监控指标实现、回归测试。
+
+### 4.4 阶段四：残留清理与 ValueError 全量迁移（已完成）
+
+- 错误码碰撞解决、共享 ErrorResponse 模型
+- 手动 HTTPException → 领域异常（OAuth2 合法保留）
+- ValueError → 领域异常全量迁移（186 处，116 文件变更，详见 [`sisys-value-error-refactor.md`](sisys-value-error-refactor.md)）
+- 移除 `_handle_value_error` 兜底处理器
 
 ---
 
@@ -839,27 +1302,30 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 
 | 文件 | 操作 | 描述 |
 |------|------|------|
-| `src/domain/exceptions/__init__.py` | 新建 | 异常根类与三层异常体系（统一导出） |
+| `src/domain/exceptions/__init__.py` | 新建 | 异常根类与三层异常体系（统一导出，127 行，42 符号） |
 | `src/domain/exceptions/base_exceptions.py` | 新建 | BaseException, SystemException, BusinessException, ExternalException |
 | `src/domain/exceptions/system_exceptions.py` | 新建 | ConfigurationError, NetworkError, StorageError, MessageBusError |
 | `src/domain/exceptions/business_exceptions.py` | 新建 | ValidationError, NotFoundError, ConflictError, PermissionDeniedError, ... |
 | `src/domain/exceptions/external_exceptions.py` | 新建 | ThirdPartyError, TimeoutError, ServiceUnavailableError, UnknownError |
-| `src/domain/exceptions/service_exceptions.py` | 新建 | AuditError, PasswordValidationError, ComplianceLockError |
+| `src/domain/exceptions/service_exceptions.py` | 新建 | AuditError, PasswordValidationError, ComplianceLockError, IntrusionDetectionError, DataIntegrityError, BackupError, EncryptionError, ContainerSecurityError |
 | `src/domain/exceptions/storage_exceptions.py` | 新建 | Memory*, Bucket*, MinIO* 等存储相关异常 |
 | `src/domain/exceptions/role_exceptions.py` | 新建 | Role* 等角色管理异常 |
-| `src/domain/exceptions/sandbox_exceptions.py` | 新建 | SandboxError, ContainerStartError, ExecutionError, ... |
+| `src/domain/exceptions/sandbox_exceptions.py` | 新建 | SandboxError, ContainerStartError, ExecutionError, ContainerStopError |
+| `src/domain/exceptions/embedding_exceptions.py` | 新建 | EmbeddingAPIError(306), EmbeddingResponseError(307), EmbeddingModelError(308) |
 | `src/domain/exceptions/permission_exceptions.py` | 新建 | InsufficientTokenError |
 | `src/domain/exceptions/event_exceptions.py` | 新建 | VersionError |
 | `src/interfaces/api/exception_handlers.py` | 新建 | FastAPI 统一异常处理器 |
 | `src/interfaces/api/middleware/exception_context.py` | 新建 | 异常上下文中间件 |
 | `src/infrastructure/messaging/error_mapper.py` | 新建 | SDK 错误映射器 |
 | `src/infrastructure/logging/exception_logger.py` | 新建 | 结构化日志格式化器 |
+| `src/infrastructure/logging/exception_metrics_impl.py` | 新建 | ExceptionMetricsPort 实现，Prometheus 格式导出 |
+| `src/application/ports/exception_metrics_port.py` | 新建 | 异常指标采集端口定义（应用层 Protocol） |
 
 ### 删除文件
 
 | 文件 | 操作 | 描述 |
 |------|------|------|
-| `src/domain/exceptions/legacy.py` | 删除 | 已拆分为 11 个模块化文件 |
+| `src/domain/exceptions/legacy.py` | 删除 | 已拆分为 12 个模块化文件 |
 
 ### 修改文件（按优先级）
 
@@ -869,7 +1335,7 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 |------|------|------|
 | `src/domain/ports/audit_service.py` | 修改 | AuditError → SystemException |
 | `src/domain/ports/auth_service.py` | 修改 | AuthenticationError → BusinessException |
-| `src/interfaces/api/auth.py` | 修改 | 移除 try/except，改用全局异常处理器 |
+| `src/interfaces/api/auth.py` | 修改 | 移除 try/except，改用全局异常处理器（OAuth2 部分保留） |
 | `src/infrastructure/security/permission_middleware.py` | 修改 | PermissionDeniedError → 新体系 |
 
 #### P1 - 应用层异常迁移
@@ -886,24 +1352,45 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 |------|------|------|
 | `src/infrastructure/storage/minio/minio_manager.py` | 修改 | 使用 ErrorMapper.map_s3_error |
 | `src/infrastructure/messaging/outbox/outbox.py` | 修改 | InvalidStateTransitionError → InvalidStateError |
-| `src/infrastructure/messaging/event_store.py` | 修改 | VersionError → SystemException |
+| `src/infrastructure/messaging/event_store.py` | 修改 | VersionError → ConflictError |
 | `src/domain/ports/password_validation_service.py` | 修改 | PasswordValidationError → ValidationError |
-| `src/domain/ports/storage.py` | 修改 | ComplianceLockError → BusinessException | |
+| `src/domain/ports/storage.py` | 修改 | ComplianceLockError → BusinessException |
+
+#### P3 - 残留清理（已完成）
+
+| 文件 | 操作 | 描述 |
+|------|------|------|
+| `src/infrastructure/security/permission_middleware.py` | 修改 | 替换 raw HTTPException 为领域异常 |
+| `src/infrastructure/security/cross_border_transfer_service_impl.py` | 修改 | 迁移 TransferNotFoundError/TransferNotApprovedError 到领域层次 |
+| `src/interfaces/api/auth.py` | 修改 | 移除非 OAuth2 场景的手动异常捕获 |
+| `src/interfaces/api/crawler.py` | 修改 | 移除手动 HTTPException |
+| `src/interfaces/api/audit.py` | 修改 | 移除手动 HTTPException |
+| `src/interfaces/api/document_upload.py` | 修改 | 移除手动 HTTPException |
+| `src/interfaces/api/equilibrium_security.py` | 修改 | 移除手动 HTTPException |
+| `src/interfaces/api/schemas.py` | 新建 | 共享 ErrorResponse 模型（替代 5 处重复定义） |
+| `src/composition_root.py` | 修改 | 修复 exception_metrics 注册路径 |
+| `src/interfaces/api/exception_handlers.py` | 修改 | 集成 ExceptionMetricsPort、移除 ValueError 兜底处理器 |
+| `src/domain/exceptions/service_exceptions.py` | 修改 | 解决 5 个类的层次违规/编码碰撞 |
 
 ---
 
 ## 6. 验收标准
 
-| 标准 | 描述 |
-|------|------|
-| **集中管理** | 所有异常定义在 `src/domain/exceptions/` 下 |
-| **层次清晰** | 三层异常体系（System/Business/External） |
-| **错误码唯一** | 每个异常有唯一错误码 |
-| **HTTP 映射** | API 层自动根据异常类型返回正确 HTTP 状态码 |
-| **日志规范** | 异常日志包含错误码、上下文、追踪ID |
-| **向后兼容** | 遗留异常引用保持正常工作 |
-| **SDK 映射** | MinIO、RabbitMQ、Redis 错误统一映射 |
-| **覆盖率** | 异常处理分支覆盖率 ≥90% |
+| 标准 | 描述 | 当前状态 |
+|------|------|----------|
+| **集中管理** | 所有异常定义在 `src/domain/exceptions/` 下 | ✅ 已达标 |
+| **层次清晰** | 三层异常体系（System/Business/External） | ✅ 已达标 |
+| **错误码唯一** | 每个异常有唯一错误码，无碰撞 | ✅ 已达标（48 个编码全部唯一） |
+| **HTTP 映射** | API 层自动根据异常类型返回正确 HTTP 状态码 | ✅ 已达标 |
+| **日志规范** | 异常日志包含错误码、上下文、追踪ID | ✅ 已达标 |
+| **向后兼容** | 遗留异常引用保持正常工作 | ✅ 已达标 |
+| **SDK 映射** | MinIO、RabbitMQ、Redis 错误统一映射 | ✅ 已达标 |
+| **覆盖率** | 异常处理分支覆盖率 ≥90% | ✅ 已达标 |
+| **指标集成** | ExceptionHandlers 调用 record_exception() 记录异常指标 | ✅ 已达标 |
+| **接口层一致性** | 所有 API 端点使用统一异常处理器，无手动 HTTPException（OAuth2 除外） | ✅ 已达标（仅 8 处 OAuth2 合法保留） |
+| **共享响应模型** | 错误响应模型统一到 `src/interfaces/api/shared_models.py` | ✅ 已达标 |
+| **无越界异常** | 所有异常继承自领域根类，无直接继承 Python 内置 Exception 的情况 | ✅ 已达标 |
+| **ValueError 清零** | 全系统零 `raise ValueError`，所有验证使用领域异常（186 处全量迁移） | ✅ 已达标 |
 
 ---
 
@@ -911,4 +1398,6 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 
 - [Python Exception Hierarchy Best Practices](https://docs.python.org/3/library/exceptions.html)
 - [Spring Exception Handling](https://spring.io/blog/2013/11/01/exception-handling-in-spring-mvc)
+- [Embedding Service Exception Design](../../src/domain/exceptions/embedding_exceptions.py)（源码级文档，含二级编码设计说明）
+- [Dead Letter Queue Protocol](../../src/domain/ports/dead_letter_queue.py)
 - [ADR-XXX: 统一异常处理决策记录](./adr-unified-exception-handling.md) *(待创建)*

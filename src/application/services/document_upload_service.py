@@ -14,6 +14,7 @@ from typing import TypedDict
 from src.application.ports.document_storage_port import DocumentStoragePort
 from src.domain.entities.document import Document, DocumentType, ParseStatus
 from src.domain.events.document_events import DocumentUploaded
+from src.domain.exceptions import ValidationError
 from src.domain.ports.document_repository import DocumentQuery, DocumentRepositoryPort
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.value_objects.document_format import get_mime_type, is_supported
@@ -99,7 +100,7 @@ class DocumentUploadService:
             持久化后的 Document 实体
 
         Raises:
-            ValueError: 格式不支持、文件大小超限、文件名非法等
+            ValidationError: 格式不支持、文件大小超限、文件名非法等
         """
         self._validate_upload(filename, mime_type, file_size_bytes)
 
@@ -158,15 +159,15 @@ class DocumentUploadService:
             批量结果汇总
 
         Raises:
-            ValueError: 空批量请求、总大小超限
+            ValidationError: 空批量请求、总大小超限
         """
         if not files:
-            raise ValueError("空批量请求，至少需要一个文件")
+            raise ValidationError(message="空批量请求，至少需要一个文件")
 
         # 校验总大小限制
         total_size = sum(f["file_size_bytes"] for f in files)
         if total_size > MAX_BATCH_SIZE:
-            raise ValueError(f"批量上传总大小超过限制（最大 {MAX_BATCH_SIZE // (1024**3)}GB）")
+            raise ValidationError(message=f"批量上传总大小超过限制（最大 {MAX_BATCH_SIZE // (1024**3)}GB）")
 
         # 使用 Semaphore 控制并发
         semaphore = asyncio.Semaphore(_BATCH_CONCURRENCY)
@@ -250,7 +251,7 @@ class DocumentUploadService:
             持久化后的 Document 实体
 
         Raises:
-            ValueError: 格式校验失败
+            ValidationError: 格式校验失败
         """
         self._validate_upload(filename, mime_type, file_size_bytes)
 
@@ -285,22 +286,22 @@ class DocumentUploadService:
     def _validate_upload(self, filename: str, mime_type: str, file_size_bytes: int) -> None:
         """校验上传请求的合法性"""
         if not filename or not filename.strip():
-            raise ValueError("文件名不能为空")
+            raise ValidationError(message="文件名不能为空")
 
         if len(filename) > MAX_FILENAME_LENGTH:
-            raise ValueError(f"文件名长度超过限制（最大 {MAX_FILENAME_LENGTH} 字符）")
+            raise ValidationError(message=f"文件名长度超过限制（最大 {MAX_FILENAME_LENGTH} 字符）")
 
         if _INVALID_FILENAME_PATTERN.search(filename):
-            raise ValueError("文件名包含非法字符")
+            raise ValidationError(message="文件名包含非法字符")
 
         if not is_supported(filename, mime_type):
             expected = get_mime_type(filename)
             if expected is None:
-                raise ValueError(f"不支持的格式: {filename}")
-            raise ValueError(f"MIME 类型不匹配: 扩展名期望 {expected}，实际 {mime_type}")
+                raise ValidationError(message=f"不支持的格式: {filename}")
+            raise ValidationError(message=f"MIME 类型不匹配: 扩展名期望 {expected}，实际 {mime_type}")
 
         if file_size_bytes <= 0:
-            raise ValueError("空文件，文件大小必须大于 0")
+            raise ValidationError(message="空文件，文件大小必须大于 0")
 
         if file_size_bytes > MAX_FILE_SIZE:
-            raise ValueError(f"文件大小超过限制（最大 {MAX_FILE_SIZE // (1024**3)}GB）")
+            raise ValidationError(message=f"文件大小超过限制（最大 {MAX_FILE_SIZE // (1024**3)}GB）")

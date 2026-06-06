@@ -182,3 +182,52 @@ class TestInMemoryRoutingDecisionLogRepositoryEviction:
 
         assert await repo.find_by_task_id("expired") is None
         assert await repo.find_by_task_id("fresh") is not None
+
+
+class TestCostSummaryImmutability:
+    """CostSummary 不可变性测试."""
+
+    def test_cost_summary_is_frozen(self) -> None:
+        """CostSummary 是不可变数据类（可哈希）"""
+        from src.domain.ports.routing_decision_log_repository import CostSummary
+
+        s1 = CostSummary(total_cost=1.0, record_count=5)
+        s2 = CostSummary(total_cost=1.0, record_count=5)
+        assert hash(s1) == hash(s2)
+
+
+class TestRoutingDecisionLogRepositoryProtocol:
+    """Protocol 端口契约测试."""
+
+    def test_protocol_is_runtime_checkable(self) -> None:
+        """Protocol 应支持运行时检查."""
+        from src.domain.ports.routing_decision_log_repository import RoutingDecisionLogRepository
+
+        assert hasattr(RoutingDecisionLogRepository, "_is_runtime_protocol")
+
+    def test_implementation_passes_isinstance(self) -> None:
+        """符合协议的实现应通过 isinstance 检查."""
+        from src.domain.ports.routing_decision_log_repository import RoutingDecisionLogRepository
+        from src.infrastructure.messaging.inmemory_routing_decision_log_repository import (
+            InMemoryRoutingDecisionLogRepository,
+        )
+
+        repo = InMemoryRoutingDecisionLogRepository()
+        assert isinstance(repo, RoutingDecisionLogRepository)
+
+    def test_non_conforming_class_fails_isinstance(self) -> None:
+        """不符合协议的类应无法通过 isinstance 检查."""
+        from src.domain.ports.routing_decision_log_repository import RoutingDecisionLogRepository
+
+        class NonConforming:
+            pass
+
+        assert not isinstance(NonConforming(), RoutingDecisionLogRepository)
+
+    def test_protocol_methods_exist(self) -> None:
+        """协议应定义 save、find_by_task_id、query_cost_summary 方法."""
+        from src.domain.ports.routing_decision_log_repository import RoutingDecisionLogRepository
+
+        assert hasattr(RoutingDecisionLogRepository, "save")
+        assert hasattr(RoutingDecisionLogRepository, "find_by_task_id")
+        assert hasattr(RoutingDecisionLogRepository, "query_cost_summary")

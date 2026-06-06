@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
+from src.domain.exceptions import ValidationError
 from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
 from src.infrastructure.storage.redis.redis_snapshot_store import RedisSnapshotStore
 
@@ -103,12 +104,12 @@ class TestRedisSnapshotStore:
         """set_ttl 应拒绝超出范围的 TTL"""
         store = RedisSnapshotStore(adapter=mock_adapter)
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValidationError) as exc_info:
             store.set_ttl(30)
 
         assert "TTL must be between" in str(exc_info.value)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             store.set_ttl(3000000)
 
     def test_set_ttl_accepts_valid_ttl(self, mock_adapter: MagicMock) -> None:

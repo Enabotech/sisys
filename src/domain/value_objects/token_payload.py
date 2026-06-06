@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+from src.domain.exceptions import EntityValidationError
+
 
 @dataclass(frozen=True)
 class TokenPayload:
@@ -58,21 +60,30 @@ class TokenPayload:
             TokenPayload 实例
 
         Raises:
-            ValueError: claims 缺少必需字段或格式错误
+            EntityValidationError: claims 缺少必需字段或格式错误
         """
         # 解析 user_id
         sub = claims.get("sub")
         if not sub:
-            raise ValueError("Missing required claim: sub")
+            raise EntityValidationError(
+                message="Missing required claim: sub",
+                context={"entity": "TokenPayload", "field": "sub"},
+            )
         try:
             user_id = UUID(str(sub))
         except ValueError:
-            raise ValueError(f"Invalid user_id format: {sub}")
+            raise EntityValidationError(
+                message=f"Invalid user_id format: {sub}",
+                context={"entity": "TokenPayload", "field": "sub"},
+            )
 
         # 解析 username
         username = claims.get("username")
         if not username:
-            raise ValueError("Missing required claim: username")
+            raise EntityValidationError(
+                message="Missing required claim: username",
+                context={"entity": "TokenPayload", "field": "username"},
+            )
 
         # 解析 roles
         roles_raw = claims.get("roles", [])
@@ -83,11 +94,17 @@ class TokenPayload:
         # 解析 exp
         exp_timestamp = claims.get("exp")
         if not exp_timestamp:
-            raise ValueError("Missing required claim: exp")
+            raise EntityValidationError(
+                message="Missing required claim: exp",
+                context={"entity": "TokenPayload", "field": "exp"},
+            )
         try:
             exp = datetime.fromtimestamp(exp_timestamp, tz=UTC)
         except (TypeError, ValueError):
-            raise ValueError(f"Invalid exp format: {exp_timestamp}")
+            raise EntityValidationError(
+                message=f"Invalid exp format: {exp_timestamp}",
+                context={"entity": "TokenPayload", "field": "exp"},
+            )
 
         # 解析 iat（可选）
         iat_timestamp = claims.get("iat")

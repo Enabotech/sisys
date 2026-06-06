@@ -6,6 +6,7 @@ from typing import cast
 import pytest
 
 from src.domain.entities.checkpoint import Checkpoint, CheckpointStatus, RecoveryMode
+from src.domain.exceptions import EntityStateTransitionError, EntityValidationError
 
 
 def _make_checkpoint(**kwargs) -> Checkpoint:
@@ -47,20 +48,20 @@ class TestCheckpointValidation:
         """Checkpoint with non-UUID id fails validation."""
         cp = _make_checkpoint()
         object.__setattr__(cp, "checkpoint_id", cast(uuid.UUID, "not-a-uuid"))
-        with pytest.raises(ValueError, match="checkpoint_id must be a valid UUID"):
+        with pytest.raises(EntityValidationError, match="checkpoint_id must be a valid UUID"):
             cp.validate()
 
     def test_empty_phase_identifier_fails(self):
         """Checkpoint with empty phase_identifier fails validation."""
         cp = _make_checkpoint(phase_identifier="")
-        with pytest.raises(ValueError, match="phase_identifier must not be empty"):
+        with pytest.raises(EntityValidationError, match="phase_identifier must not be empty"):
             cp.validate()
 
     def test_invalid_status_fails(self):
         """Checkpoint with invalid status fails validation."""
         cp = _make_checkpoint()
         object.__setattr__(cp, "status", cast(CheckpointStatus, "invalid_status"))
-        with pytest.raises(ValueError, match="status must be a valid CheckpointStatus"):
+        with pytest.raises(EntityValidationError, match="status must be a valid CheckpointStatus"):
             cp.validate()
 
 
@@ -92,12 +93,12 @@ class TestCheckpointTransitions:
         """P1-01 Fix: Cannot complete an already completed checkpoint."""
         cp = _make_checkpoint()
         cp.complete()
-        with pytest.raises(ValueError, match="already completed"):
+        with pytest.raises(EntityStateTransitionError, match="already completed"):
             cp.complete()
 
     def test_cannot_recover_completed_checkpoint(self):
         """P1-02 Fix: Cannot recover a completed checkpoint."""
         cp = _make_checkpoint()
         cp.complete()
-        with pytest.raises(ValueError, match="Cannot recover"):
+        with pytest.raises(EntityStateTransitionError, match="Cannot recover"):
             cp.recover(RecoveryMode.REPLAY)

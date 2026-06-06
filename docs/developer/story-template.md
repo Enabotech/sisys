@@ -73,6 +73,31 @@
 - [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
 - [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
+#### 领域异常契约 (Domain Exception Contract)
+
+> **原则**：异常是领域契约的一部分。本 Story 新增/修改的领域异常必须在 Task 0 中完成设计，禁止在实现 Task 中临时定义。
+> **适用范围：** 本清单仅针对定义在 `src/domain/exceptions/` 下、继承自 `DomainError`（别名 `BaseException`）的**领域异常**。
+> **不在本清单范围：** FastAPI/Pydantic 框架原生异常、第三方 SDK 原始异常（由 `ErrorMapper` 映射）。
+> **禁止 `raise ValueError`：** 所有验证失败（例如：实体不变量、状态转换守卫、业务约束、配置参数、输入校验）均使用领域异常体系。
+> 完整检查清单与全量异常分类详见 [`sisys-uni-exception-design.md §3.12`](../architecture/sisys-uni-exception-design.md#312-异常注册检查清单)。
+> 编码分配策略（人工编码 + CI 自动校验）详见 [`sisys-uni-exception-design.md §3.3`](../architecture/sisys-uni-exception-design.md#33-编码分配策略人工编码--ci-自动校验)。
+
+- [ ] 归属模块与基类 — 确定异常归属的领域异常模块（`system`/`business`/`external`/`storage`/`role`/...），选择正确基类（`SystemException` / `BusinessException` / `ExternalException`）。实体验证按场景选择：
+    - 不变量验证（UUID/非空/枚举/数值范围）→ `EntityValidationError`（EXCEPTION_242）
+    - 状态转换守卫（状态机方法）→ `EntityStateTransitionError`（EXCEPTION_243）
+    - 跨字段业务约束 → `EntityBusinessRuleError`（EXCEPTION_244）
+    - 配置参数验证 → `ConfigurationError`（EXCEPTION_101）
+    - 应用层输入校验 → `ValidationError`（EXCEPTION_201）
+- [ ] 唯一编码分配 — 从子域编码范围选取（参考 `src/domain/exceptions/_code_ranges.py` 的 `CODE_RANGES` 表和 [`sisys-uni-exception-design.md §3.3.2`](../architecture/sisys-uni-exception-design.md#332-子域编码范围约束)），运行 `grep -r "EXCEPTION_NNN" src/domain/exceptions/` 验证无碰撞
+- [ ] 构造器参数设计 — 携带领域上下文（`transfer_id`、`role_id` 等），通过 `context` 字典暴露
+- [ ] 消息安全性审查 — 错误消息面向调用方可理解，不泄露 SQL/堆栈等内部实现细节
+- [ ] 编码注册 — 新增异常类后在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 字典中注册子域归属；更新 [`sisys-uni-exception-design.md §3.3.2`](../architecture/sisys-uni-exception-design.md#332-完整编码分配表) 编码分配表
+- [ ] 导出完整性 — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
+- [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过：
+	    - `poetry run pytest tests/unit/domain/exceptions/ -v`（含 `test_error_code_uniqueness.py` + `test_code_ranges.py` 共 8 项）
+	    - `poetry run pytest tests/unit/interfaces/api/test_exception_handlers.py -v`
+- [ ] BDD 验收场景 — 异常路径的 Gherkin 场景纳入 Edge Cases（见下方「验收标准 Gherkin」）
+
 #### API 契约 (API Contract)
 - [ ] 遵循 OpenAPI 标准的 API 契约定义位于 `docs/api/openapi.yaml`
 - [ ] API 契约测试通过（`tests/contracts/test_api_contract_[feature name].py`）
@@ -103,7 +128,7 @@
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_acceptance_[feature name].feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_[feature name].py`（BDD 步骤实现）
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_[feature name].py`（参考test_acceptance_event_messaging_refactor.py）
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）
 
@@ -111,6 +136,7 @@
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试
 - 同一中文文本可能需要同时支持 given/when 装饰器
 - 不要使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
+- **Edge Cases 必须包含异常路径** — 每个资源端点的 Gherkin 场景至少覆盖：资源不存在（404）、权限不足（403）、资源冲突（409），响应体验证 `error.code` + `error.message` + `request_id`
 
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
@@ -150,6 +176,10 @@
 | **TDD 验收测试** | 收尾 BDD 步骤实现 | 完成清单断言与步骤函数 | `test_acceptance_[feature name].py` | Task [N] |
 | **TDD 契约测试** | API 契约 / openapi 接口 | 请求/响应结构、状态码、Header、字段类型 |`test_api_contract_[feature name].py` | Task 0 |
 | **TDD 契约测试** | 端口契约 / 接口抽象 / registry / resolver / contract gate | 端口注册、版本、兼容性、实现解析、重复接口检测 | `test_port_contract_[feature name].py` | Task 0 |
+| **TDD 领域异常测试** | `src/domain/exceptions/` | 构造/属性/`to_dict()` 序列化/cause 链 | `tests/unit/domain/exceptions/test_[module].py` | Task [N] |
+| **TDD 领域异常测试** | `src/interfaces/api/exception_handlers.py` | HTTP 映射/状态码/响应结构/响应头 | `tests/unit/interfaces/api/test_exception_handlers.py` | Task [N] |
+| **TDD 领域异常测试** | 编码唯一性 | 所有异常类 `code` 无碰撞（自动反射扫描） | `tests/unit/domain/exceptions/test_error_code_uniqueness.py` | Task [N] |
+| **TDD 领域异常测试** | 编码子域范围 | 子域范围/继承链一致性/预留保护/注册覆盖 | `tests/unit/domain/exceptions/test_code_ranges.py` | Task [N] |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `test_arch_[component].py` | Task [N] |
 | **集成测试** | [层间协作] | [协作描述] | `test_integration_[feature name].py` | Task [N] |
 
@@ -672,10 +702,12 @@
 - v[0.0.0]: 创建故事文件
 
 <!-- 仅用作跟踪故事文件模板修订记录，故事开发时[务必删除]此段
-**模板版本/Template Version:** 2.7.0
+**模板版本/Template Version:** 2.9.0
 **创建日期/Created:** 2026-03-04
-**最后更新/Last Updated:** 2026-05-12
+**最后更新/Last Updated:** 2026-06-05
 **更新说明/Description:**
+- v2.9.0: 更新「领域异常契约」节（ValueError 迁移完成 + 人工编码 CI 校验）：(1) ValueError 迁移完成，移除"待实施"引用；(2) 新增编码子域范围引用（`_code_ranges.py` + `§3.3.2`）；(3) 测试覆盖加入 `test_code_ranges.py`；(4) TDD 表新增编码子域范围行
+- v2.8.0: 新增「领域异常清单 (Domain Exception Registry)」子节于 Task 0 SDD 规范定义（异常 5 轮审查实战经验）：(1) 异常是领域契约，必须在 Task 0 完成设计；(2) 三阶段清单（设计/实现/验证）；(3) 引用完整检查清单 `sisys-uni-exception-design.md §3.12`；(4) 禁止抑制注释
 - v2.7.0: 对齐 domain/ports/contract 契约层、Registry/Resolver/ContractGate、Composition Root 与接口清单强约束
 - v2.5.0: 新增 BDD 步骤实现文件 `test_acceptance_[feature name].py` 编写要求（Story 1.15b 实战经验）
 - v2.4.0: 补充 asyncio.run() 使用场景说明（Story 1.4 实战经验）：(1) 独立脚本用 asyncio.run()，pytest-xdist 并行测试 BDD 步骤用 event_loop fixture；(2) 根据场景选择正确的并发测试手段；(3) asyncio.gather() 用于真正的并发测试

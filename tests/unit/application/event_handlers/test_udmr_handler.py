@@ -143,6 +143,42 @@ class TestUDMRHandlerOnRouted:
 # ===================================================================
 
 
+class TestUDMRHandlerOnRoutedError:
+    """on_routed 异常处理测试."""
+
+    async def test_on_routed_decide_exception_returns_none(
+        self,
+        handler: UDMRHandler,
+        mock_udmr_service: AsyncMock,
+    ) -> None:
+        """UDMRService.decide() 抛出异常时应返回 None"""
+        mock_udmr_service.decide.side_effect = RuntimeError("decision failed")
+
+        event = AutoRouted(
+            session_id="session-123",
+            task_context={"input": "test"},
+            route_type="hash",
+        )
+        result = await handler.on_routed(event)
+        assert result is None
+
+    async def test_on_routed_empty_task_context_uses_defaults(
+        self,
+        handler: UDMRHandler,
+        mock_udmr_service: AsyncMock,
+    ) -> None:
+        """空 task_context 时应使用默认值"""
+        event = AutoRouted(
+            session_id="session-123",
+            task_context={},
+            route_type="hash",
+        )
+        await handler.on_routed(event)
+        task_arg = mock_udmr_service.decide.call_args[0][0]
+        assert task_arg.input == ""
+        assert task_arg.data_residency == "CHINA_DOMESTIC"
+
+
 class TestUDMRHandlerRegister:
     """register() 测试."""
 
@@ -154,3 +190,13 @@ class TestUDMRHandlerRegister:
         """register() 应调用 subscribe_async."""
         await handler.register()
         mock_event_bus.subscribe_async.assert_called_once_with("AutoRouted", handler.on_routed)
+
+    async def test_register_disabled_skips_subscribe(
+        self,
+        mock_udmr_service: AsyncMock,
+        mock_event_bus: AsyncMock,
+    ) -> None:
+        """disabled 时 register 不应调用 subscribe_async"""
+        h = UDMRHandler(mock_udmr_service, mock_event_bus, enabled=False)
+        await h.register()
+        mock_event_bus.subscribe_async.assert_not_called()

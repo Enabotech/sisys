@@ -40,7 +40,7 @@ class TextExtractorService(Protocol):
             ExtractionResult，包含提取后的内容和原始输入
 
         Raises:
-            ValueError: 如果输入无法提取
+            ValidationError: 如果输入无法提取
         """
 
     def supports(self, user_input: str) -> bool:

@@ -214,3 +214,56 @@ class TestExcelParserLegacyFormatRejection:
             assert result.error_message is not None
         finally:
             os.unlink(tmp.name)
+
+
+class TestExcelParserFileSizeErrors:
+    """文件大小和访问错误测试"""
+
+    def test_zero_byte_file_returns_failed(self) -> None:
+        """零字节文件应返回 failed"""
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        tmp.close()  # 空文件，0 字节
+        try:
+            parser = ExcelParser()
+            result = parser.parse(tmp.name, MIME_XLSX)
+
+            assert result.parse_status == "failed"
+            assert result.error_message is not None
+            assert "空" in result.error_message
+        finally:
+            os.unlink(tmp.name)
+
+    def test_nonexistent_file_returns_failed(self) -> None:
+        """不存在的文件应返回 failed（OSError 路径）"""
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
+
+        parser = ExcelParser()
+        result = parser.parse("/tmp/nonexistent_file_xyz.xlsx", MIME_XLSX)
+
+        assert result.parse_status == "failed"
+        assert result.error_message is not None
+
+    def test_oversized_file_returns_failed(self) -> None:
+        """超大文件应返回 failed"""
+        from unittest import mock
+
+        from src.infrastructure.document_parsing import _limits
+        from src.infrastructure.document_parsing.excel_parser import ExcelParser
+
+        max_bytes = _limits.MAX_XLSX_BYTES
+        max_mb = max_bytes // (1024 * 1024)
+
+        sheets = {"Sheet1": [["A", "B"]]}
+        path = _create_xlsx_with_sheets(sheets)
+        try:
+            parser = ExcelParser()
+            with mock.patch("os.path.getsize", return_value=max_bytes + 1):
+                result = parser.parse(path, MIME_XLSX)
+
+            assert result.parse_status == "failed"
+            assert result.error_message is not None
+            assert f"{max_mb}MB" in result.error_message
+        finally:
+            os.unlink(path)

@@ -12,6 +12,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from src.interfaces.api.exception_handlers import register_exception_handlers
+from src.interfaces.api.middleware.exception_context import ExceptionContextMiddleware
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,4 +48,9 @@ def create_app() -> FastAPI:
     Returns:
         带 lifespan 管理的 FastAPI 实例
     """
-    return FastAPI(lifespan=_lifespan)
+    app = FastAPI(lifespan=_lifespan)
+    # 注册中间件（顺序：先添加的后执行，ExceptionContextMiddleware 需在最外层）
+    app.add_middleware(ExceptionContextMiddleware)
+    # 注册统一异常处理器
+    register_exception_handlers(app)
+    return app

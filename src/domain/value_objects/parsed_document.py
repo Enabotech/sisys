@@ -1,13 +1,103 @@
 """文档解析结果值对象
 
-定义解析结果的结构化数据模型，包含 ParsedDocument/ParsedPage/ParsedElement/ParsedTable/BoundingBox/BoundingBoxResult。
+定义解析结果的结构化数据模型，包含 ParsedDocument/ParsedPage/ParsedElement/ParsedTable/
+BoundingBox/BoundingBoxResult/ColumnType/ColumnInfo/MergedCell。
 所有值对象均为 frozen dataclass（不可变），通过 to_dict() 方法支持 JSON 序列化。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Literal
+
+
+class ColumnType(Enum):
+    """表格列数据类型枚举
+
+    用于推断表格列的数据类型，支持 7 种标准类型。
+    UNKNOWN 用于无法识别或空列的降级场景。
+
+    Values:
+        STRING: 文本字符串
+        NUMBER: 数字（整数/浮点数）
+        DATE: 日期（各种日期格式）
+        CURRENCY: 货币金额（含货币符号）
+        PERCENTAGE: 百分比（含 % 符号）
+        BOOLEAN: 布尔值（true/false/是/否等）
+        UNKNOWN: 未知类型（无法识别或空列）
+    """
+
+    STRING = "STRING"
+    NUMBER = "NUMBER"
+    DATE = "DATE"
+    CURRENCY = "CURRENCY"
+    PERCENTAGE = "PERCENTAGE"
+    BOOLEAN = "BOOLEAN"
+    UNKNOWN = "UNKNOWN"
+
+
+@dataclass(frozen=True)
+class ColumnInfo:
+    """表格列类型信息值对象
+
+    描述表格中单列的类型推断结果，包含列名、推断类型、
+    置信度、空值比率和采样值。
+
+    Attributes:
+        name: 列名（来自表头或自动生成的列标识）
+        col_type: 推断的列数据类型
+        confidence: 类型推断置信度（0.0~1.0）
+        nullable_ratio: 空值占比（0.0~1.0，空单元格数/总行数）
+        sample_values: 采样值列表（前 N 行 + 随机采样的原始字符串值）
+    """
+
+    name: str
+    col_type: ColumnType = ColumnType.UNKNOWN
+    confidence: float = 1.0
+    nullable_ratio: float = 0.0
+    sample_values: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """序列化为 JSON 可存储字典"""
+        return {
+            "name": self.name,
+            "col_type": self.col_type.value,
+            "confidence": self.confidence,
+            "nullable_ratio": self.nullable_ratio,
+            "sample_values": self.sample_values,
+        }
+
+
+@dataclass(frozen=True)
+class MergedCell:
+    """合并单元格值对象（V1）
+
+    描述表格中跨行/跨列的合并单元格区域。由表格合并单元格还原服务生成。
+
+    Attributes:
+        row_start: 合并区域起始行索引（0-indexed）
+        row_end: 合并区域结束行索引（0-indexed，包含）
+        col_start: 合并区域起始列索引（0-indexed）
+        col_end: 合并区域结束列索引（0-indexed，包含）
+        value: 合并单元格的值（覆盖区域内所有位置共享此值）
+    """
+
+    row_start: int
+    row_end: int
+    col_start: int
+    col_end: int
+    value: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """序列化为 JSON 可存储字典"""
+        return {
+            "row_start": self.row_start,
+            "row_end": self.row_end,
+            "col_start": self.col_start,
+            "col_end": self.col_end,
+            "value": self.value,
+        }
 
 
 @dataclass(frozen=True)
@@ -57,6 +147,11 @@ class BoundingBoxResult:
     bbox: BoundingBox
     confidence: float
 
+    def __post_init__(self) -> None:
+        """校验 confidence 值域范围 [0.0, 1.0]"""
+        if not (0.0 <= self.confidence <= 1.0):
+            raise ValueError(f"confidence 必须在 [0.0, 1.0] 范围内，实际值: {self.confidence}")
+
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典"""
         return {
@@ -101,12 +196,22 @@ class ParsedTable:
         bbox: 边界框坐标（DocLayNet 预留，MVP 填 None）
         confidence: 解析置信度
         metadata: 附加元数据（如 sheet_name、编码信息等）
+        header: 列名列表（表头识别结果，无表头时为 None）
+        column_types: 列类型信息列表（列类型推断结果，未推断时为 None）
+        merged_cells: 合并单元格映射列表（V1，仅 xlsx 格式支持，其他为 None）
+        semantic_confidence: 语义提取综合置信度（0.0~1.0，未提取时为 None）
+        table_caption: 表格标题/说明文本（无标题时为 None）
     """
 
     rows: list[list[str]] = field(default_factory=list)
     bbox: BoundingBox | None = None
     confidence: float = 1.0
     metadata: dict[str, Any] = field(default_factory=dict)
+    header: list[str] | None = None
+    column_types: list[ColumnInfo] | None = None
+    merged_cells: list[MergedCell] | None = None
+    semantic_confidence: float | None = None
+    table_caption: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典"""
@@ -115,6 +220,11 @@ class ParsedTable:
             "bbox": self.bbox.to_dict() if self.bbox else None,
             "confidence": self.confidence,
             "metadata": self.metadata,
+            "header": self.header,
+            "column_types": [ct.to_dict() for ct in self.column_types] if self.column_types else None,
+            "merged_cells": [mc.to_dict() for mc in self.merged_cells] if self.merged_cells else None,
+            "semantic_confidence": self.semantic_confidence,
+            "table_caption": self.table_caption,
         }
 
 

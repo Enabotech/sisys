@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 
 from src.application.ports.compressor_service import CompressionResult, CompressorService
+from src.domain.exceptions import ValidationError
 
 # 停用词列表（用于规则压缩）
 STOP_WORDS = {
@@ -114,7 +115,7 @@ class L1Compressor(CompressorService):
             L1CompressionResult，包含压缩后内容和统计信息
 
         Raises:
-            ValueError: 如果内容超过限制
+            ValidationError: 如果内容超过限制
         """
         if not content:
             return L1CompressionResult(
@@ -128,7 +129,7 @@ class L1Compressor(CompressorService):
         original_length = len(content)
 
         if original_length > 500:
-            raise ValueError(f"内容超过限制（500 字），实际: {original_length} 字")
+            raise ValidationError(message=f"内容超过限制（500 字），实际: {original_length} 字")
 
         # 混合压缩策略
         if original_length <= self.LLM_THRESHOLD:

@@ -16,6 +16,8 @@ from fastapi.testclient import TestClient
 from src.application.use_cases.role_management import RoleService
 from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
 from src.domain.value_objects.token_payload import TokenPayload
+from src.interfaces.api.exception_handlers import register_exception_handlers
+from src.interfaces.api.middleware.exception_context import ExceptionContextMiddleware
 
 
 def create_test_app(
@@ -34,6 +36,8 @@ def create_test_app(
     from src.interfaces.api.auth import create_auth_router
 
     app = FastAPI()
+    app.add_middleware(ExceptionContextMiddleware)
+    register_exception_handlers(app)
 
     # Create mock role_service if not provided
     if role_service is None:
@@ -88,7 +92,7 @@ class TestLoginEndpointExceptions:
     def test_login_account_locked_returns_423(self):
         """Locked account should return 423."""
         mock_service = MagicMock(spec=AuthServicePort)
-        mock_service.authenticate = AsyncMock(side_effect=AuthenticationError("Account is locked"))
+        mock_service.authenticate = AsyncMock(side_effect=AuthenticationError("Account is locked", context={"locked": True}))
 
         app, client = create_test_app(mock_service)
 

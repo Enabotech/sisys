@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from src.domain.exceptions import ValidationError
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from src.infrastructure.storage.redis.semantic_cache import (
     RedisSemanticCache,
@@ -59,7 +60,7 @@ class TestCosineSimilarity:
         assert sim == pytest.approx(0.7071067811865475, rel=1e-5)
 
     def test_dimension_mismatch_raises(self) -> None:
-        with pytest.raises(ValueError, match="dimensions must match"):
+        with pytest.raises(ValidationError, match="dimensions must match"):
             cosine_similarity([1.0, 2.0], [1.0])
 
     def test_empty_vectors(self) -> None:

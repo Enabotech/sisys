@@ -13,6 +13,8 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, ClassVar, get_args, get_origin
 
+from src.domain.exceptions import EntityValidationError
+
 # Core field names that are part of the DomainEvent standard schema (AC-1).
 # These are serialized at the top level of to_dict(), not in payload.
 _CORE_FIELD_NAMES = frozenset(
@@ -108,10 +110,12 @@ class DomainEvent:
             事件的字典表示
 
         Raises:
-            ValueError: event_type 为空或 payload 不可 JSON 序列化
+            EntityValidationError: event_type 为空或 payload 不可 JSON 序列化
         """
         if not self.event_type:
-            raise ValueError("event_type must not be empty")
+            raise EntityValidationError(
+                message="event_type must not be empty", context={"entity": "DomainEvent", "field": "event_type"}
+            )
 
         # Collect subclass-specific fields into extra payload
         extra_payload: dict[str, Any] = {}
@@ -148,7 +152,9 @@ class DomainEvent:
         try:
             json.dumps(merged_payload)
         except (TypeError, ValueError) as e:
-            raise ValueError(f"payload is not JSON serializable: {e}") from e
+            raise EntityValidationError(
+                message=f"payload is not JSON serializable: {e}", context={"entity": "DomainEvent", "field": "payload"}
+            )
         return result
 
     @staticmethod
@@ -179,33 +185,47 @@ class DomainEvent:
             重建的 DomainEvent 实例（可能是子类）
 
         Raises:
-            ValueError: 必需字段缺失或格式错误
+            EntityValidationError: 必需字段缺失或格式错误
         """
         if "event_id" not in data:
-            raise ValueError("Missing required field: event_id")
+            raise EntityValidationError(
+                message="Missing required field: event_id", context={"entity": "DomainEvent", "field": "event_id"}
+            )
         if "event_type" not in data:
-            raise ValueError("Missing required field: event_type")
+            raise EntityValidationError(
+                message="Missing required field: event_type", context={"entity": "DomainEvent", "field": "event_type"}
+            )
         # Support both "timestamp" and backward-compat "occurred_on"
         ts_raw = data.get("timestamp") or data.get("occurred_on")
         if ts_raw is None:
-            raise ValueError("Missing required field: timestamp")
+            raise EntityValidationError(
+                message="Missing required field: timestamp", context={"entity": "DomainEvent", "field": "timestamp"}
+            )
 
         try:
             eid = uuid.UUID(data["event_id"])
-        except (ValueError, AttributeError) as e:
-            raise ValueError(f"Invalid event_id: {data.get('event_id', 'missing')}") from e
+        except (ValueError, AttributeError):
+            raise EntityValidationError(
+                message=f"Invalid event_id: {data.get('event_id', 'missing')}",
+                context={"entity": "DomainEvent", "field": "event_id"},
+            )
 
         try:
             ts = datetime.fromisoformat(ts_raw)
-        except (ValueError, AttributeError, TypeError) as e:
-            raise ValueError(f"Invalid timestamp: {ts_raw!r}") from e
+        except (ValueError, AttributeError, TypeError):
+            raise EntityValidationError(
+                message=f"Invalid timestamp: {ts_raw!r}", context={"entity": "DomainEvent", "field": "timestamp"}
+            )
 
         agg_id: uuid.UUID | None = None
         if data.get("aggregate_id") is not None:
             try:
                 agg_id = uuid.UUID(data["aggregate_id"])
-            except (ValueError, AttributeError) as e:
-                raise ValueError(f"Invalid aggregate_id: {data.get('aggregate_id', 'missing')}") from e
+            except (ValueError, AttributeError):
+                raise EntityValidationError(
+                    message=f"Invalid aggregate_id: {data.get('aggregate_id', 'missing')}",
+                    context={"entity": "DomainEvent", "field": "aggregate_id"},
+                )
 
         event_type = data["event_type"]
         payload = data.get("payload", {}).copy()

@@ -10,8 +10,10 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
+
+from src.domain.exceptions import NotFoundError, ValidationError
 
 # =============================================================================
 # Request/Response Models
@@ -114,12 +116,6 @@ class ArchiveResponse(BaseModel):
     archived_count: int
 
 
-class ErrorResponse(BaseModel):
-    """错误响应."""
-
-    detail: str
-
-
 # =============================================================================
 # Router Factory
 # =============================================================================
@@ -202,17 +198,11 @@ def create_audit_router(
         try:
             log_uuid = UUID(log_id)
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid log_id format",
-            )
+            raise ValidationError("Invalid log_id format")
 
         result = await audit_repository.get_by_id(log_uuid)
         if not result:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Audit log not found",
-            )
+            raise NotFoundError("Audit log not found")
 
         return AuditLogResponse(
             log_id=result["log_id"],
@@ -242,10 +232,7 @@ def create_audit_router(
             try:
                 log_ids = [UUID(lid) for lid in request.log_ids]
             except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid log_id format",
-                )
+                raise ValidationError("Invalid log_id format")
 
         result = await audit_service.verify_batch(log_ids)
 
@@ -270,17 +257,11 @@ def create_audit_router(
         try:
             log_uuid = UUID(log_id)
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid log_id format",
-            )
+            raise ValidationError("Invalid log_id format")
 
         result = await audit_repository.get_archive_status(log_uuid)
         if not result:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Audit log not found",
-            )
+            raise NotFoundError("Audit log not found")
 
         return ArchiveStatusResponse(
             log_id=result["log_id"],

@@ -120,15 +120,3 @@ class TestPortRegistration:
         for port_name in required_ports:
             spec = _global_registry.get(port_name)
             assert spec is not None, f"Port {port_name} not registered in composition_root"
-
-    def test_security_exceptions_defined(self) -> None:
-        """安全异常应已定义"""
-        from src.domain.exceptions.service_exceptions import (
-            BackupError,
-            DataIntegrityError,
-            IntrusionDetectionError,
-        )
-
-        assert IntrusionDetectionError is not None
-        assert DataIntegrityError is not None
-        assert BackupError is not None

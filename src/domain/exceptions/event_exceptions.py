@@ -11,7 +11,7 @@ from src.domain.exceptions.business_exceptions import ConflictError
 class VersionError(ConflictError):
     """乐观锁冲突异常"""
 
-    code = "EXCEPTION_203"
+    code = "EXCEPTION_251"
     message = "Version conflict"
 
 

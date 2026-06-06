@@ -10,6 +10,7 @@ import dataclasses
 
 import pytest
 
+from src.domain.exceptions import EntityValidationError
 from src.domain.value_objects.token_consumption import TokenConsumption
 
 
@@ -44,12 +45,12 @@ class TestTokenConsumptionInvariant:
 
     def test_negative_prompt_tokens_raises(self) -> None:
         """负数 prompt_tokens 必须抛出 ValueError."""
-        with pytest.raises(ValueError, match="prompt_tokens"):
+        with pytest.raises(EntityValidationError, match="prompt_tokens"):
             TokenConsumption(prompt_tokens=-1, completion_tokens=100)
 
     def test_negative_completion_tokens_raises(self) -> None:
         """负数 completion_tokens 必须抛出 ValueError."""
-        with pytest.raises(ValueError, match="completion_tokens"):
+        with pytest.raises(EntityValidationError, match="completion_tokens"):
             TokenConsumption(prompt_tokens=100, completion_tokens=-1)
 
 
