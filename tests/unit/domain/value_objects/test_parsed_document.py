@@ -226,7 +226,7 @@ class TestColumnInfo:
         """frozen=True 不可变"""
         info = ColumnInfo(name="col")
         with pytest.raises(AttributeError):
-            info.name = "other"  # type: ignore[misc]
+            setattr(info, "name", "other")
 
     def test_confidence_boundary_values(self) -> None:
         """confidence 边界值：0.0 和 1.0 均有效"""
@@ -283,7 +283,7 @@ class TestMergedCell:
         """frozen=True 不可变"""
         cell = MergedCell(row_start=0, row_end=0, col_start=0, col_end=0, value="x")
         with pytest.raises(AttributeError):
-            cell.value = "y"  # type: ignore[misc]
+            setattr(cell, "value", "y")
 
     def test_row_start_le_row_end(self) -> None:
         """row_start 应 ≤ row_end（语义约定，非强制校验）"""
