@@ -61,13 +61,17 @@ def fuse(
     参考:
         Cormack et al. SIGIR 2009: https://doi.org/10.1145/1571941.1572114
     """
-    # 无输入 — 返回空列表
+    # 参数校验（纯函数参数契约）
+    if k < 0:
+        raise ValueError(f"k 必须为非负数，当前值: {k}")
     if not result_lists:
         return []
 
-    # 权重校验（纯函数参数契约，非业务验证）
+    # 权重校验
     if weights is not None and len(weights) != len(result_lists):
         raise ValueError(f"weights 长度({len(weights)})与 result_lists 长度({len(result_lists)})不匹配")
+    if weights is not None and any(w < 0 for w in weights):
+        raise ValueError(f"weights 元素必须为非负数，当前值: {weights}")
 
     # 单路直通 — 跳过融合（无需计算 RRF）
     if len(result_lists) == 1:

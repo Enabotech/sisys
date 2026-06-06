@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from qdrant_client import AsyncQdrantClient
-from qdrant_client.models import Distance, VectorParams
+from qdrant_client.models import Distance, SparseVectorParams, VectorParams
 
 
 class QdrantCollectionManager:
@@ -28,6 +28,7 @@ class QdrantCollectionManager:
         name: str,
         vector_size: int = 1024,
         distance: str = "Cosine",
+        sparse_vectors_config: dict | None = None,
         **kwargs,
     ) -> bool:
         """创建 Collection
@@ -36,6 +37,7 @@ class QdrantCollectionManager:
             name: Collection 名称
             vector_size: 向量维度
             distance: 相似度度量方式
+            sparse_vectors_config: 稀疏向量配置，默认 {"sparse": SparseVectorParams()}
             **kwargs: 其他配置参数
 
         Returns:
@@ -43,6 +45,10 @@ class QdrantCollectionManager:
         """
         if await self.collection_exists(name):
             return False
+
+        # 默认自动配置稀疏向量索引（Story 3-1b: AC-4 要求）
+        if sparse_vectors_config is None:
+            sparse_vectors_config = {"sparse": SparseVectorParams()}
 
         distance_map = {
             "Cosine": Distance.COSINE,
@@ -70,7 +76,7 @@ class QdrantCollectionManager:
             shard_number=kwargs.get("shard_number", 1),
             replication_factor=kwargs.get("replication_factor", 1),
             on_disk_payload=kwargs.get("on_disk", False),
-            **({} if (svc := kwargs.get("sparse_vectors_config")) is None else {"sparse_vectors_config": svc}),
+            sparse_vectors_config=sparse_vectors_config,
         )
         return True
 
