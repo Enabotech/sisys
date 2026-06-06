@@ -134,9 +134,7 @@ async def generate_embedding(parse_result: dict[str, Any]) -> EmbeddingResult:
         if not text.strip():
             return empty
 
-        # 并行生成 Dense 和 Sparse 嵌入
-        dense_task = asyncio.to_thread(service.embed_documents, [text])
-
+        # 并行生成 Dense 和 Sparse 嵌入（asyncio.gather 确保 task 生命周期安全）
         async def _safe_sparse() -> list[SparseEmbedding]:
             try:
                 return await asyncio.to_thread(service.embed_sparse, [text])
@@ -148,14 +146,21 @@ async def generate_embedding(parse_result: dict[str, Any]) -> EmbeddingResult:
                 )
                 return []
 
-        sparse_task = asyncio.create_task(_safe_sparse())
+        dense_raw: Any
+        sparse_raw: Any
+        dense_raw, sparse_raw = await asyncio.gather(
+            asyncio.to_thread(service.embed_documents, [text]),
+            _safe_sparse(),
+            return_exceptions=True,
+        )
 
-        dense_vectors = await dense_task
-        sparse_vectors = await sparse_task
+        # dense 失败 → 整体失败
+        if isinstance(dense_raw, BaseException):
+            raise dense_raw
 
         return EmbeddingResult(
-            dense_vectors=cast(list[list[float]], dense_vectors),
-            sparse_vectors=sparse_vectors,
+            dense_vectors=cast(list[list[float]], dense_raw),
+            sparse_vectors=sparse_raw if not isinstance(sparse_raw, BaseException) else [],
         )
     except Exception as e:
         logger.error("生成嵌入失败: %s", e)

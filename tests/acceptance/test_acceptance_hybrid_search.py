@@ -635,9 +635,15 @@ def then_dense_only(context: dict[str, Any]) -> None:
 
 
 @then("日志记录降级原因")
-def then_degradation_logged(context: dict[str, Any]) -> None:
-    """HybridSearchService 降级时输出 WARNING 日志 — 由 caplog 验证"""
-    pass
+def then_degradation_logged(context: dict[str, Any], caplog) -> None:
+    """HybridSearchService 降级时输出 WARNING 日志"""
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        pass  # 日志已在 When 步骤中产生
+    # 验证有降级相关的 WARNING
+    degradation_logs = [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert len(degradation_logs) > 0, "降级应产生 WARNING 日志"
 
 
 @then("抛出 RuntimeError 异常")

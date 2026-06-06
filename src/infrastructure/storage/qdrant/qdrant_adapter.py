@@ -58,6 +58,7 @@ class QdrantAdapter(L3VectorPort):
                     id=point["id"],
                     vector=point["vector"],
                     payload=point.get("payload", {}),
+                    sparse_vector=point.get("sparse_vector"),
                     created_at=datetime.now(),
                 )
             )
@@ -142,6 +143,12 @@ class QdrantAdapter(L3VectorPort):
             检索结果列表 [{id, score, payload}, ...]
         """
         from src.infrastructure.storage.qdrant.models import SparseVector
+
+        # 校验 sparse_vector 结构（防御格式错误的输入）
+        if "indices" not in sparse_vector or "values" not in sparse_vector:
+            from src.domain.exceptions import ValidationError
+
+            raise ValidationError(message=f"sparse_vector 缺少必需字段 (indices/values): keys={list(sparse_vector.keys())}")
 
         # 将 dict 转换为 SparseVector
         sv = SparseVector(
