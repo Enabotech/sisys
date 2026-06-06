@@ -3,6 +3,7 @@
 仅覆盖 SISYS 项目实际使用的 API 面：
 - ffmpeg.probe(filename) — 探测媒体文件元数据
 """
+
 from typing import Any
 
 def probe(filename: str, **kwargs: Any) -> dict[str, Any]:
