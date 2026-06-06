@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pytest
 
+from src.domain.exceptions import EntityValidationError
 from src.domain.value_objects.parsed_document import (
     BoundingBox,
     BoundingBoxResult,
@@ -110,16 +111,16 @@ class TestBoundingBoxResult:
         # 不存在独立的 page_number 字段
         assert not hasattr(result, "page_number")
 
-    def test_confidence_negative_raises_value_error(self) -> None:
-        """验证负数 confidence 抛出 ValueError（值域 [0.0, 1.0]）"""
+    def test_confidence_negative_raises_entity_validation_error(self) -> None:
+        """验证负数 confidence 抛出 EntityValidationError（值域 [0.0, 1.0]）"""
         bbox = BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0, page=1)
-        with pytest.raises(ValueError, match="confidence 必须在"):
+        with pytest.raises(EntityValidationError, match="confidence 必须在"):
             BoundingBoxResult(label="Text", bbox=bbox, confidence=-0.1)
 
-    def test_confidence_above_one_raises_value_error(self) -> None:
-        """验证超过 1.0 的 confidence 抛出 ValueError"""
+    def test_confidence_above_one_raises_entity_validation_error(self) -> None:
+        """验证超过 1.0 的 confidence 抛出 EntityValidationError"""
         bbox = BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0, page=1)
-        with pytest.raises(ValueError, match="confidence 必须在"):
+        with pytest.raises(EntityValidationError, match="confidence 必须在"):
             BoundingBoxResult(label="Text", bbox=bbox, confidence=1.5)
 
 
