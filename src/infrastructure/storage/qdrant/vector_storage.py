@@ -94,12 +94,11 @@ class QdrantVectorStorage(L3VectorPort):
             else:
                 pid = self._normalize_point_id(point["id"])
                 dense_vec = point["vector"]
-                payload = {
-                    **point.get("payload", {}),
-                    "created_at": point.get("created_at", "").isoformat()
-                    if hasattr(point.get("created_at", ""), "isoformat")
-                    else str(point.get("created_at", "")),
-                }
+                payload = dict(point.get("payload", {}))
+                # 仅当顶层有 datetime 类型 created_at 时才注入（避免空串覆盖 payload 中有效值）
+                top_created = point.get("created_at")
+                if top_created is not None and hasattr(top_created, "isoformat"):
+                    payload["created_at"] = top_created.isoformat()
                 # 稀疏向量 → NamedSparseVector 写入 Qdrant（Story 3-1b）
                 sparse_data = point.get("sparse_vector")
                 if sparse_data is not None:
