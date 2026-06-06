@@ -14,6 +14,8 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from src.domain.exceptions import EntityValidationError
+
 
 @dataclass
 class MemoryChangeHistory:
@@ -33,10 +35,17 @@ class MemoryChangeHistory:
     archived_ref: str = ""
 
     def __post_init__(self) -> None:
-        """验证 change_type 字段"""
+        """验证 change_type 字段
+
+        Raises:
+            EntityValidationError: change_type 不在允许值集合中时抛出
+        """
         valid_types = {"create", "update", "delete"}
         if self.change_type not in valid_types:
-            raise ValueError(f"change_type must be one of {valid_types}, got '{self.change_type}'")
+            raise EntityValidationError(
+                message=f"change_type must be one of {valid_types}, got '{self.change_type}'",
+                context={"entity": "MemoryChangeHistory", "field": "change_type", "valid_types": sorted(valid_types)},
+            )
 
     @classmethod
     def create(

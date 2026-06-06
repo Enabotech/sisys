@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass(frozen=True)
 class LangGraphConfig:
@@ -41,7 +43,7 @@ class LangGraphConfig:
             try:
                 return int(value)
             except ValueError:
-                raise ValueError(f"环境变量 {key} 的值 '{value}' 不是有效整数，期望数字") from None
+                raise ConfigurationError(message=f"环境变量 {key} 的值 '{value}' 不是有效整数，期望数字") from None
 
         return cls(
             api_url=os.getenv("LANGGRAPH_API_URL", "http://localhost:8000") or "http://localhost:8000",

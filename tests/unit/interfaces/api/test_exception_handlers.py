@@ -23,25 +23,47 @@ from pydantic import ValidationError as PydanticValidationError
 from src.domain.exceptions import (
     AuthenticationError,
     BaseException,
+    BucketNameValidationError,
+    BucketNotFoundError,
     BusinessException,
     BusinessRuleViolationError,
+    CannotDeleteRoleWithUsersError,
+    CannotDeleteSystemRoleError,
+    ComplianceLockError,
     ConfigurationError,
     ConflictError,
+    ContainerStartError,
+    ContainerStopError,
+    EntityBusinessRuleError,
+    EntityStateTransitionError,
+    EntityValidationError,
+    ExecutionError,
     ExternalException,
+    InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
+    MemoryAccessDeniedError,
+    MemoryNotFoundError,
+    MemoryVersionConflictError,
     MessageBusError,
+    MinIOConnectionError,
     NetworkError,
     NotFoundError,
+    PasswordValidationError,
     PermissionDeniedError,
+    RoleAlreadyExistsError,
+    RoleNotFoundError,
     SandboxError,
     ServiceUnavailableError,
     StorageError,
     SystemException,
     ThirdPartyError,
     TimeoutError,
+    TransferNotApprovedError,
+    TransferNotFoundError,
     UnknownError,
     ValidationError,
+    VersionError,
 )
 from src.interfaces.api.exception_handlers import (
     EXCEPTION_HTTP_MAP,
@@ -114,9 +136,17 @@ class TestExceptionHttpMap:
     def test_map_contains_all_expected_exception_types(self):
         """验证映射表包含所有关键异常类型."""
         expected_types = {
+            # 三层基类
             SystemException,
             BusinessException,
             ExternalException,
+            # 系统级具体异常
+            ConfigurationError,
+            NetworkError,
+            StorageError,
+            MessageBusError,
+            MinIOConnectionError,
+            # 业务级具体异常
             NotFoundError,
             PermissionDeniedError,
             AuthenticationError,
@@ -125,14 +155,39 @@ class TestExceptionHttpMap:
             InvalidStateError,
             InvalidStateTransitionError,
             BusinessRuleViolationError,
+            # 实体验证异常
+            EntityValidationError,
+            EntityStateTransitionError,
+            EntityBusinessRuleError,
+            # 存储子域异常
+            MemoryNotFoundError,
+            BucketNotFoundError,
+            MemoryVersionConflictError,
+            BucketNameValidationError,
+            MemoryAccessDeniedError,
+            # 角色子域异常
+            RoleNotFoundError,
+            RoleAlreadyExistsError,
+            CannotDeleteRoleWithUsersError,
+            CannotDeleteSystemRoleError,
+            # 服务子域异常
+            PasswordValidationError,
+            ComplianceLockError,
+            # 权限子域异常
+            InsufficientTokenError,
+            # 事件子域异常
+            VersionError,
+            # 跨境传输子域异常
+            TransferNotFoundError,
+            TransferNotApprovedError,
+            # 外部服务异常
             ThirdPartyError,
-            NetworkError,
-            StorageError,
-            MessageBusError,
-            ConfigurationError,
-            SandboxError,
             TimeoutError,
             ServiceUnavailableError,
+            SandboxError,
+            ContainerStartError,
+            ExecutionError,
+            ContainerStopError,
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types
@@ -357,6 +412,46 @@ class TestDomainExceptionHttpIntegration:
         client = self._make_app_with_exc(BusinessRuleViolationError("rule broken"))
         resp = client.get("/test")
         assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_entity_validation_error_returns_400(self):
+        """验证 EntityValidationError 返回 400."""
+        client = self._make_app_with_exc(
+            EntityValidationError(
+                message="agent_id must be a valid UUID",
+                context={"entity": "Agent", "field": "agent_id"},
+            )
+        )
+        resp = client.get("/test")
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        data = resp.json()
+        assert data["error"]["code"] == "EXCEPTION_242"
+
+    def test_entity_state_transition_error_returns_409(self):
+        """验证 EntityStateTransitionError 返回 409."""
+        client = self._make_app_with_exc(
+            EntityStateTransitionError(
+                from_status="running",
+                to_status="running",
+                message="Agent is already running",
+            )
+        )
+        resp = client.get("/test")
+        assert resp.status_code == status.HTTP_409_CONFLICT
+        data = resp.json()
+        assert data["error"]["code"] == "EXCEPTION_243"
+
+    def test_entity_business_rule_error_returns_422(self):
+        """验证 EntityBusinessRuleError 返回 422."""
+        client = self._make_app_with_exc(
+            EntityBusinessRuleError(
+                message="total_tokens must equal prompt + completion",
+                context={"rule": "token_sum_invariant"},
+            )
+        )
+        resp = client.get("/test")
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        data = resp.json()
+        assert data["error"]["code"] == "EXCEPTION_244"
 
     def test_third_party_returns_502(self):
         """验证 ThirdPartyError 返回 502."""
@@ -910,7 +1005,7 @@ class TestHandleUnexpectedError:
         assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def test_value_error_returns_500(self):
-        """验证 ValueError 返回 500."""
+        """验证 ValueError 返回 500（兜底处理器已移除，归入通用异常处理）."""
         client = self._make_unexpected_error_app(ValueError("bad value"))
         resp = client.get("/test")
         assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -997,17 +1092,16 @@ class TestSubclassMapping:
         assert resp.status_code == status.HTTP_502_BAD_GATEWAY
 
     def test_role_not_found_matches_business_exception(self):
-        """验证 RoleNotFoundError 通过 isinstance 匹配 BusinessException（400）.
+        """验证 RoleNotFoundError 精确映射到 404.
 
-        因为 EXCEPTION_HTTP_MAP 中 BusinessException 在 NotFoundError 之前，
-        isinstance 回退首先命中 BusinessException
+        EXCEPTION_HTTP_MAP 中 RoleNotFoundError 有精确映射（404），
+        精确匹配优先于 isinstance 回退到 BusinessException（400）
         """
         from src.domain.exceptions.role_exceptions import RoleNotFoundError
 
         client = self._make_app_with_exc(RoleNotFoundError(uuid4()))
         resp = client.get("/test")
-        # isinstance 回退按映射表顺序迭代，BusinessException 在 NotFoundError 之前
-        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
 
     def test_audit_error_returns_500(self):
         """验证 AuditError（SystemException 子类）通过 isinstance 匹配 500."""
@@ -1026,27 +1120,25 @@ class TestSubclassMapping:
         assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def test_insufficient_token_error_matches_business_exception(self):
-        """验证 InsufficientTokenError 通过 isinstance 匹配 BusinessException（400）.
+        """验证 InsufficientTokenError 精确映射到 403.
 
-        因为 EXCEPTION_HTTP_MAP 中 BusinessException 在 PermissionDeniedError 之前，
-        isinstance 回退首先命中 BusinessException
+        EXCEPTION_HTTP_MAP 中 InsufficientTokenError 有精确映射（403），
+        精确匹配优先于 isinstance 回退到 BusinessException（400）
         """
         from src.domain.exceptions.permission_exceptions import InsufficientTokenError
 
         client = self._make_app_with_exc(InsufficientTokenError("token expired"))
         resp = client.get("/test")
-        # isinstance 回退按映射表顺序迭代，BusinessException 在 PermissionDeniedError 之前
-        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_version_error_matches_business_exception(self):
-        """验证 VersionError 通过 isinstance 匹配 BusinessException（400）.
+        """验证 VersionError 精确映射到 409.
 
-        因为 EXCEPTION_HTTP_MAP 中 BusinessException 在 ConflictError 之前，
-        isinstance 回退首先命中 BusinessException
+        EXCEPTION_HTTP_MAP 中 VersionError 有精确映射（409），
+        精确匹配优先于 isinstance 回退到 BusinessException（400）
         """
         from src.domain.exceptions.event_exceptions import VersionError
 
         client = self._make_app_with_exc(VersionError("version conflict"))
         resp = client.get("/test")
-        # isinstance 回退按映射表顺序迭代，BusinessException 在 ConflictError 之前
-        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.status_code == status.HTTP_409_CONFLICT

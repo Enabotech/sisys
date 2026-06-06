@@ -18,6 +18,7 @@ import re
 from dataclasses import dataclass
 
 from src.application.ports.text_extractor_service import ExtractionResult, TextExtractorService
+from src.domain.exceptions import ValidationError
 
 
 @dataclass
@@ -67,10 +68,10 @@ class L1TextExtractor(TextExtractorService):
             L1ExtractionResult，包含提取后的内容、操作类型和匹配模式
 
         Raises:
-            ValueError: 如果输入无法提取
+            ValidationError: 如果输入无法提取
         """
         if not user_input or not user_input.strip():
-            raise ValueError("输入不能为空")
+            raise ValidationError(message="输入不能为空")
 
         user_input = user_input.strip()
 
@@ -86,7 +87,7 @@ class L1TextExtractor(TextExtractorService):
                 )
 
         # 无法匹配模式
-        raise ValueError(f"无法识别输入模式: {user_input}")
+        raise ValidationError(message=f"无法识别输入模式: {user_input}")
 
     def supports(self, user_input: str) -> bool:
         """判断此提取器是否支持处理给定输入

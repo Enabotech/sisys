@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile, statu
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
+from src.domain.exceptions import NotFoundError
 from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
 from src.domain.value_objects.token_payload import TokenPayload
 
@@ -95,16 +96,6 @@ class BatchUploadResponse(BaseModel):
     success: int
     failed: int
     details: list[dict[str, Any]]
-
-
-class ErrorResponse(BaseModel):
-    """错误响应
-
-    Attributes:
-        detail: 错误详情
-    """
-
-    detail: str
 
 
 def get_current_user_dependency(
@@ -230,25 +221,22 @@ def create_document_upload_router(
             tmp.write(content)
             tmp_path = tmp.name
 
-        try:
-            doc = await svc.upload(
-                filename=file.filename or "unknown",
-                mime_type=file.content_type or "application/octet-stream",
-                file_size_bytes=file_size,
-                tenant_id=x_tenant_id,
-                uploaded_by=str(current_user.user_id),
-                file_path=tmp_path,
-            )
-            return DocumentResponse(
-                document_id=str(doc.document_id),
-                filename=doc.filename,
-                mime_type=doc.mime_type,
-                file_size_bytes=doc.file_size_bytes,
-                parse_status=doc.parse_status.value,
-                created_at=doc.created_at.isoformat(),
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        doc = await svc.upload(
+            filename=file.filename or "unknown",
+            mime_type=file.content_type or "application/octet-stream",
+            file_size_bytes=file_size,
+            tenant_id=x_tenant_id,
+            uploaded_by=str(current_user.user_id),
+            file_path=tmp_path,
+        )
+        return DocumentResponse(
+            document_id=str(doc.document_id),
+            filename=doc.filename,
+            mime_type=doc.mime_type,
+            file_size_bytes=doc.file_size_bytes,
+            parse_status=doc.parse_status.value,
+            created_at=doc.created_at.isoformat(),
+        )
 
     @router.post(
         "/batch",
@@ -280,16 +268,13 @@ def create_document_upload_router(
             tmp.close()
             file_paths.append(tmp.name)
 
-        try:
-            result = await svc.upload_batch(
-                files=file_infos,
-                tenant_id=x_tenant_id,
-                uploaded_by=str(current_user.user_id),
-                file_paths=file_paths,
-            )
-            return BatchUploadResponse(**result)
-        except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        result = await svc.upload_batch(
+            files=file_infos,
+            tenant_id=x_tenant_id,
+            uploaded_by=str(current_user.user_id),
+            file_paths=file_paths,
+        )
+        return BatchUploadResponse(**result)
 
     @router.post(
         "/chunked/init",
@@ -337,7 +322,10 @@ def create_document_upload_router(
 
         info = await mgr.get_multipart_info(upload_id)
         if info is None:
-            raise HTTPException(status_code=status.HTTP_410_GONE, detail="upload_id 不存在或已过期")
+            raise NotFoundError(
+                "Upload session expired",
+                context={"upload_id": upload_id},
+            )
 
         data = await part.read()
         etag = await storage.upload_part(
@@ -347,13 +335,8 @@ def create_document_upload_router(
             data=data,
         )
 
-        try:
-            result = await mgr.upload_part(upload_id, part_number, etag)
-            return ChunkedPartResponse(**result)
-        except ValueError as e:
-            if "不存在" in str(e):
-                raise HTTPException(status_code=status.HTTP_410_GONE, detail=str(e))
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        result = await mgr.upload_part(upload_id, part_number, etag)
+        return ChunkedPartResponse(**result)
 
     @router.post(
         "/chunked/{upload_id}/complete",
@@ -369,12 +352,7 @@ def create_document_upload_router(
         mgr = _get_chunked_manager()
         svc = _get_service()
         storage = _get_storage()
-        try:
-            state = await mgr.complete_upload(upload_id)
-        except ValueError as e:
-            if "不存在" in str(e):
-                raise HTTPException(status_code=status.HTTP_410_GONE, detail=str(e))
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        state = await mgr.complete_upload(upload_id)
 
         if state.minio_upload_id and state.object_key:
             await storage.complete_multipart_upload(
@@ -414,7 +392,10 @@ def create_document_upload_router(
         svc = _get_service()
         doc = await svc.get_document(document_id, x_tenant_id)
         if doc is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档不存在")
+            raise NotFoundError(
+                "文档不存在",
+                context={"document_id": str(document_id)},
+            )
         return DocumentResponse(
             document_id=str(doc.document_id),
             filename=doc.filename,

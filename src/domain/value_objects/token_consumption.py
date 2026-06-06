@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.domain.exceptions import EntityValidationError
+
 
 @dataclass(frozen=True)
 class TokenConsumption:
@@ -33,8 +35,14 @@ class TokenConsumption:
     def __post_init__(self) -> None:
         """验证不变量约束并自动计算 total_tokens."""
         if self.prompt_tokens < 0:
-            raise ValueError(f"prompt_tokens must be non-negative. Got: {self.prompt_tokens}")
+            raise EntityValidationError(
+                message=f"prompt_tokens must be non-negative. Got: {self.prompt_tokens}",
+                context={"entity": "TokenConsumption", "field": "prompt_tokens"},
+            )
         if self.completion_tokens < 0:
-            raise ValueError(f"completion_tokens must be non-negative. Got: {self.completion_tokens}")
+            raise EntityValidationError(
+                message=f"completion_tokens must be non-negative. Got: {self.completion_tokens}",
+                context={"entity": "TokenConsumption", "field": "completion_tokens"},
+            )
         computed = self.prompt_tokens + self.completion_tokens
         object.__setattr__(self, "total_tokens", computed)

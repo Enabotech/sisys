@@ -9,6 +9,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Literal
 
+from src.domain.exceptions import ConfigurationError
+
 _VALID_API_TYPES = ("openai", "anthropic", "openai_responses")
 _API_TYPE_MAP: dict[str, Literal["openai", "anthropic", "openai_responses"]] = {
     "openai": "openai",
@@ -72,7 +74,7 @@ class UDMRConfig:
             UDMRConfig 实例
 
         Raises:
-            ValueError: 环境变量值不合法时抛出
+            ConfigurationError: 环境变量值不合法时抛出
         """
         enabled_str = os.getenv("UDMR_ENABLED", "true").lower()
         local_first_str = os.getenv("UDMR_LOCAL_FIRST", "false").lower()
@@ -84,17 +86,17 @@ class UDMRConfig:
         try:
             timeout = int(timeout_str)
             if timeout <= 0:
-                raise ValueError(f"UDMR_LLM_TIMEOUT must be positive: {timeout}")
+                raise ConfigurationError(message=f"UDMR_LLM_TIMEOUT must be positive: {timeout}")
         except ValueError as e:
-            raise ValueError(f"Invalid UDMR_LLM_TIMEOUT value: {timeout_str}") from e
+            raise ConfigurationError(message=f"Invalid UDMR_LLM_TIMEOUT value: {timeout_str}") from e
 
         # 解析健康检查间隔
         try:
             healthcheck = int(healthcheck_str)
             if healthcheck <= 0:
-                raise ValueError(f"UDMR_HEALTHCHECK_INTERVAL must be positive: {healthcheck}")
+                raise ConfigurationError(message=f"UDMR_HEALTHCHECK_INTERVAL must be positive: {healthcheck}")
         except ValueError as e:
-            raise ValueError(f"Invalid UDMR_HEALTHCHECK_INTERVAL value: {healthcheck_str}") from e
+            raise ConfigurationError(message=f"Invalid UDMR_HEALTHCHECK_INTERVAL value: {healthcheck_str}") from e
 
         # 循环解析云端模型配置（UDMR_CLOUD_0_* 到 UDMR_CLOUD_9_*）
         cloud_configs: list[CloudModelConfig] = []
@@ -123,7 +125,7 @@ def _parse_cloud_config(index: int) -> CloudModelConfig | None:
         CloudModelConfig 实例，或 None（未配置/禁用/无效）
 
     Raises:
-        ValueError: api_type 无效或 Anthropic 缺少 max_tokens 或定价为负
+        ConfigurationError: api_type 无效或 Anthropic 缺少 max_tokens 或定价为负
     """
     prefix = f"UDMR_CLOUD_{index}_"
     enabled_str = os.getenv(prefix + "ENABLED", "true").lower()
@@ -140,7 +142,9 @@ def _parse_cloud_config(index: int) -> CloudModelConfig | None:
     api_type_raw = os.getenv(prefix + "API_TYPE", "openai").lower()
     api_type = _API_TYPE_MAP.get(api_type_raw)
     if api_type is None:
-        raise ValueError(f"Invalid UDMR_CLOUD_{index}_API_TYPE: {api_type_raw}. Must be one of: {', '.join(_VALID_API_TYPES)}")
+        raise ConfigurationError(
+            message=f"Invalid UDMR_CLOUD_{index}_API_TYPE: {api_type_raw}. Must be one of: {', '.join(_VALID_API_TYPES)}"
+        )
 
     endpoint = os.getenv(prefix + "ENDPOINT", "")
     api_key = os.getenv(prefix + "API_KEY", "")
@@ -152,35 +156,35 @@ def _parse_cloud_config(index: int) -> CloudModelConfig | None:
         try:
             max_tokens = int(max_tokens_str)
         except ValueError:
-            raise ValueError(f"Invalid UDMR_CLOUD_{index}_MAX_TOKENS: {max_tokens_str}") from None
+            raise ConfigurationError(message=f"Invalid UDMR_CLOUD_{index}_MAX_TOKENS: {max_tokens_str}") from None
 
     # Anthropic 必须提供 max_tokens
     if api_type == "anthropic" and max_tokens is None:
-        raise ValueError(f"UDMR_CLOUD_{index}_MAX_TOKENS is required when API_TYPE=anthropic")
+        raise ConfigurationError(message=f"UDMR_CLOUD_{index}_MAX_TOKENS is required when API_TYPE=anthropic")
 
     # temperature 解析
     temperature_str = os.getenv(prefix + "TEMPERATURE", "0.7")
     try:
         temperature = float(temperature_str)
     except ValueError:
-        raise ValueError(f"Invalid UDMR_CLOUD_{index}_TEMPERATURE: {temperature_str}") from None
+        raise ConfigurationError(message=f"Invalid UDMR_CLOUD_{index}_TEMPERATURE: {temperature_str}") from None
 
     # 定价解析（Story 1.19）
     price_input_str = os.getenv(prefix + "PRICE_INPUT", "0.02")
     try:
         price_input = float(price_input_str)
     except ValueError:
-        raise ValueError(f"Invalid UDMR_CLOUD_{index}_PRICE_INPUT: {price_input_str}") from None
+        raise ConfigurationError(message=f"Invalid UDMR_CLOUD_{index}_PRICE_INPUT: {price_input_str}") from None
     if price_input < 0:
-        raise ValueError(f"UDMR_CLOUD_{index}_PRICE_INPUT must be non-negative. Got: {price_input}")
+        raise ConfigurationError(message=f"UDMR_CLOUD_{index}_PRICE_INPUT must be non-negative. Got: {price_input}")
 
     price_output_str = os.getenv(prefix + "PRICE_OUTPUT", "0.02")
     try:
         price_output = float(price_output_str)
     except ValueError:
-        raise ValueError(f"Invalid UDMR_CLOUD_{index}_PRICE_OUTPUT: {price_output_str}") from None
+        raise ConfigurationError(message=f"Invalid UDMR_CLOUD_{index}_PRICE_OUTPUT: {price_output_str}") from None
     if price_output < 0:
-        raise ValueError(f"UDMR_CLOUD_{index}_PRICE_OUTPUT must be non-negative. Got: {price_output}")
+        raise ConfigurationError(message=f"UDMR_CLOUD_{index}_PRICE_OUTPUT must be non-negative. Got: {price_output}")
 
     return CloudModelConfig(
         api_type=api_type,

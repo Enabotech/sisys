@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from src.domain.exceptions import ValidationError
 from src.domain.value_objects.flow_status import FlowStatus
 from src.infrastructure.agent_orch.langgraph_engine import LangGraphEngine
 from src.infrastructure.config.langgraph import LangGraphConfig
@@ -71,12 +72,12 @@ class TestLangGraphEngineSubmitGraph:
 
     async def test_submit_graph_rejects_empty_graph_name(self, engine: LangGraphEngine) -> None:
         """空 graph_name 应抛出 ValueError"""
-        with pytest.raises(ValueError, match="graph_name"):
+        with pytest.raises(ValidationError, match="graph_name"):
             await engine.submit_graph("", {})
 
     async def test_submit_graph_rejects_empty_parameters(self, engine: LangGraphEngine) -> None:
         """空 parameters 应抛出 ValueError"""
-        with pytest.raises(ValueError, match="parameters"):
+        with pytest.raises(ValidationError, match="parameters"):
             await engine.submit_graph("BasicAgent", {})
 
     async def test_submit_graph_runtime_error_on_exception(self, engine: LangGraphEngine) -> None:
@@ -213,7 +214,7 @@ class TestLangGraphEngineGetGraphStatus:
 
     async def test_get_graph_status_rejects_empty_id(self, engine: LangGraphEngine) -> None:
         """空 graph_run_id 应抛出 ValueError"""
-        with pytest.raises(ValueError, match="graph_run_id"):
+        with pytest.raises(ValidationError, match="graph_run_id"):
             await engine.get_graph_status("")
 
     async def test_get_graph_status_unknown_id_returns_failed(self, engine: LangGraphEngine) -> None:

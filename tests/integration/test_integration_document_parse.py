@@ -683,7 +683,7 @@ class TestDocumentParsingServicePipeline:
         result = await service.parse_document(uuid.uuid4(), "nonexistent")
 
         assert result.parse_status == ParseStatus.FAILED
-        assert result.metadata.get("error") == "文档不存在"
+        assert result.metadata.get("parse_error") == "文档不存在"
 
         # 验证未写入 Outbox
         outbox_result = await pg_session.execute(sa_select(OutboxModel).where(OutboxModel.event_type == "DocumentProcessed"))

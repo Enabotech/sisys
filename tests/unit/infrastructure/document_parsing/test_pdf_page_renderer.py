@@ -10,6 +10,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.domain.exceptions import ValidationError
+
 
 class TestPdfPageRendererInit:
     """PdfPageRenderer 初始化测试"""
@@ -109,7 +111,7 @@ class TestPdfPageRendererRenderPage:
 
         renderer._pypdfium2 = mock_pypdfium2
 
-        with pytest.raises(ValueError, match="页码超出范围"):
+        with pytest.raises(ValidationError, match="页码超出范围"):
             renderer.render_page("/path/to/doc.pdf", page_number=10)
 
     def test_render_page_negative_page_number(self) -> None:
@@ -124,7 +126,7 @@ class TestPdfPageRendererRenderPage:
 
         renderer._pypdfium2 = mock_pypdfium2
 
-        with pytest.raises(ValueError, match="页码超出范围"):
+        with pytest.raises(ValidationError, match="页码超出范围"):
             renderer.render_page("/path/to/doc.pdf", page_number=0)
 
     def test_render_page_scale_calculation(self) -> None:

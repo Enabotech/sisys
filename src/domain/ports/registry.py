@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Type
 
+from src.domain.exceptions import ConflictError
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,12 +75,14 @@ class PortRegistry:
             spec: 待注册的端口规格
 
         Raises:
-            ValueError: 端口名称已存在且规格不同时抛出
+            ConflictError: 端口名称已存在且规格不同时抛出
         """
         if spec.name in self._ports:
             existing = self._ports[spec.name]
             if existing != spec:
-                raise ValueError(f"Port already registered with different spec: {spec.name}")
+                raise ConflictError(
+                    message=f"Port already registered with different spec: {spec.name}", context={"port_name": spec.name}
+                )
             # Same spec already registered - idempotent, skip
             return
         logger.info("Registering port: %s (%s)", spec.name, spec.version)

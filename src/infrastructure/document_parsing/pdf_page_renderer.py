@@ -8,6 +8,8 @@ from __future__ import annotations
 import io
 import logging
 
+from src.domain.exceptions import ValidationError
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,19 +52,21 @@ class PdfPageRenderer:
 
         Raises:
             FileNotFoundError: PDF 文件不存在
-            ValueError: 页码超出范围
+            ValidationError: 页码超出范围
             RuntimeError: 渲染失败
         """
         try:
             pdf = self._pypdfium2.PdfDocument(file_path)
         except Exception as e:
+            logger.warning("无法打开 PDF 文件: %s", file_path, exc_info=True)
             raise FileNotFoundError(f"无法打开 PDF 文件: {file_path}") from e
 
         try:
             # pypdfium2 页码为 0-indexed
             page_idx = page_number - 1
             if page_idx < 0 or page_idx >= len(pdf):
-                raise ValueError(f"页码超出范围: {page_number}（总页数: {len(pdf)}）")
+                logger.warning("页码超出范围: %d（总页数: %d）", page_number, len(pdf))
+                raise ValidationError(message=f"页码超出范围: {page_number}（总页数: {len(pdf)}）")
 
             page = pdf[page_idx]
             bitmap = page.render(scale=self._dpi / 72)
@@ -71,9 +75,10 @@ class PdfPageRenderer:
             buf = io.BytesIO()
             pil_image.save(buf, format="PNG")
             return buf.getvalue()
-        except (ValueError, FileNotFoundError):
+        except (ValueError, FileNotFoundError, ValidationError):
             raise
         except Exception as e:
+            logger.exception("渲染 PDF 页面失败 (file=%s, page=%d)", file_path, page_number)
             raise RuntimeError(f"渲染 PDF 页面失败: {e}") from e
         finally:
             pdf.close()

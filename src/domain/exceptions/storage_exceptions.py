@@ -21,25 +21,16 @@ from src.domain.exceptions.business_exceptions import (
 from src.domain.exceptions.system_exceptions import NetworkError
 
 
-class MemoryVersionConflictError(ConflictError):
-    """记忆版本冲突异常
+class MinIOConnectionError(NetworkError):
+    """MinIO 连接错误
 
     Attributes:
         code: 异常编码
-        memory_id: 冲突的记忆标识
+        message: 异常消息
     """
 
-    code = "EXCEPTION_203"
-
-    def __init__(self, memory_id: UUID, message: str = "版本冲突") -> None:
-        """初始化记忆版本冲突异常
-
-        Args:
-            memory_id: 冲突的记忆标识
-            message: 异常消息，默认为"版本冲突"
-        """
-        self.memory_id = memory_id
-        super().__init__(f"{message}: memory_id={memory_id}")
+    code = "EXCEPTION_106"
+    message = "MinIO connection error"
 
 
 class MemoryNotFoundError(NotFoundError):
@@ -50,7 +41,7 @@ class MemoryNotFoundError(NotFoundError):
         memory_id: 未找到的记忆标识
     """
 
-    code = "EXCEPTION_202"
+    code = "EXCEPTION_211"
 
     def __init__(self, memory_id: UUID, message: str = "记忆不存在") -> None:
         """初始化记忆不存在异常
@@ -71,20 +62,29 @@ class BucketNotFoundError(NotFoundError):
         message: 异常消息
     """
 
-    code = "EXCEPTION_202"
+    code = "EXCEPTION_212"
     message = "Bucket not found"
 
 
-class MinIOConnectionError(NetworkError):
-    """MinIO 连接错误
+class MemoryVersionConflictError(ConflictError):
+    """记忆版本冲突异常
 
     Attributes:
         code: 异常编码
-        message: 异常消息
+        memory_id: 冲突的记忆标识
     """
 
-    code = "EXCEPTION_102"
-    message = "MinIO connection error"
+    code = "EXCEPTION_213"
+
+    def __init__(self, memory_id: UUID, message: str = "版本冲突") -> None:
+        """初始化记忆版本冲突异常
+
+        Args:
+            memory_id: 冲突的记忆标识
+            message: 异常消息，默认为"版本冲突"
+        """
+        self.memory_id = memory_id
+        super().__init__(f"{message}: memory_id={memory_id}")
 
 
 class BucketNameValidationError(ValidationError):
@@ -95,7 +95,7 @@ class BucketNameValidationError(ValidationError):
         message: 异常消息
     """
 
-    code = "EXCEPTION_201"
+    code = "EXCEPTION_214"
     message = "Bucket name validation failed"
 
 
@@ -107,7 +107,7 @@ class MemoryAccessDeniedError(PermissionDeniedError):
         message: 异常消息
     """
 
-    code = "EXCEPTION_204"
+    code = "EXCEPTION_215"
     message = "Memory access denied"
 
 

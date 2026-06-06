@@ -7,6 +7,7 @@ import uuid
 import pytest
 
 from src.domain.events.saga_events import SagaStatusChanged
+from src.domain.exceptions import EntityValidationError
 
 
 class TestSagaStatusChanged:
@@ -70,7 +71,7 @@ class TestSagaStatusChanged:
 
     def test_invalid_empty_saga_type_raises(self) -> None:
         """测试空的 saga_type 抛出 ValueError"""
-        with pytest.raises(ValueError, match="saga_type 不能为空"):
+        with pytest.raises(EntityValidationError, match="saga_type 不能为空"):
             SagaStatusChanged(
                 saga_type="",
                 new_status="PENDING",
@@ -78,7 +79,7 @@ class TestSagaStatusChanged:
 
     def test_invalid_empty_new_status_raises(self) -> None:
         """测试空的 new_status 抛出 ValueError"""
-        with pytest.raises(ValueError, match="new_status 不能为空"):
+        with pytest.raises(EntityValidationError, match="new_status 不能为空"):
             SagaStatusChanged(
                 saga_type="Test",
                 new_status="",
@@ -86,7 +87,7 @@ class TestSagaStatusChanged:
 
     def test_invalid_new_status_raises(self) -> None:
         """测试无效的 new_status 抛出 ValueError"""
-        with pytest.raises(ValueError, match="new_status 必须是有效状态"):
+        with pytest.raises(EntityValidationError, match="new_status 必须是有效状态"):
             SagaStatusChanged(
                 saga_type="Test",
                 new_status="INVALID_STATUS",
@@ -94,7 +95,7 @@ class TestSagaStatusChanged:
 
     def test_invalid_old_status_raises(self) -> None:
         """测试无效的 old_status 抛出 ValueError"""
-        with pytest.raises(ValueError, match="old_status 必须是有效状态"):
+        with pytest.raises(EntityValidationError, match="old_status 必须是有效状态"):
             SagaStatusChanged(
                 saga_type="Test",
                 old_status="INVALID_STATUS",

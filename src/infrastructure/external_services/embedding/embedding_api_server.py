@@ -159,6 +159,15 @@ def load_model() -> None:
         from FlagEmbedding import BGEM3FlagModel
 
         app.state.model = BGEM3FlagModel(load_path, use_fp16=use_fp16)
+
+        # 启动时一次性 fp16 转换，阻止 encode_single_device() 每次请求重复调用 model.half()
+        # 根因: RTX 5090 上请求并发时 model.to(device) + model.half() + model.eval() 非原子操作
+        #       导致模型精度状态在请求间被部分重置，引发 Float/Half 冲突或 NaN 输出
+        # 修复: 加载后立即转换一次，然后标记 use_fp16=False 阻止后续重复转换
+        if use_fp16 and hasattr(app.state.model, "model"):
+            app.state.model.model.half()
+            app.state.model.use_fp16 = False
+
         logger.info("模型加载成功: %s", load_path)
 
     except (ImportError, OSError, RuntimeError, ValueError) as e:

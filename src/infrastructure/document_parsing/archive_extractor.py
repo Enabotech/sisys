@@ -13,6 +13,7 @@ import zipfile
 from dataclasses import dataclass, field
 from typing import BinaryIO
 
+from src.domain.exceptions import StorageError, ValidationError
 from src.domain.value_objects.document_format import ARCHIVE_EXTENSIONS, SUPPORTED_FORMATS, _extract_extension
 from src.domain.value_objects.upload_limits import MAX_ARCHIVE_EXTRACTED_SIZE, MAX_NESTING_DEPTH
 
@@ -105,7 +106,7 @@ class ArchiveExtractor:
 
                     # 压缩炸弹防护
                     if total_size + file_size > MAX_ARCHIVE_EXTRACTED_SIZE:
-                        raise ValueError("解压后总大小超过限制（压缩炸弹防护）")
+                        raise StorageError(message="解压后总大小超过限制（压缩炸弹防护）")
 
                     if current_depth < MAX_NESTING_DEPTH - 1 and inner_ext in ARCHIVE_EXTENSIONS:
                         nested_result = self.extract(content, os.path.basename(info.filename), current_depth + 1)
@@ -134,7 +135,7 @@ class ArchiveExtractor:
                 result.total_extracted_size = total_size
 
         except zipfile.BadZipFile as e:
-            raise ValueError(f"无效的 ZIP 文件: {e}") from e
+            raise ValidationError(message=f"无效的 ZIP 文件: {e}") from e
 
         return result
 
@@ -179,7 +180,7 @@ class ArchiveExtractor:
                     file_size = len(content_bytes)
 
                     if total_size + file_size > MAX_ARCHIVE_EXTRACTED_SIZE:
-                        raise ValueError("解压后总大小超过限制（压缩炸弹防护）")
+                        raise StorageError(message="解压后总大小超过限制（压缩炸弹防护）")
 
                     if current_depth < MAX_NESTING_DEPTH - 1 and inner_ext in ARCHIVE_EXTENSIONS:
                         nested_result = self.extract(content, basename, current_depth + 1)
@@ -208,7 +209,7 @@ class ArchiveExtractor:
                 result.total_extracted_size = total_size
 
         except tarfile.TarError as e:
-            raise ValueError(f"无效的 TAR 文件: {e}") from e
+            raise ValidationError(message=f"无效的 TAR 文件: {e}") from e
 
         return result
 

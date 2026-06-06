@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
+from src.domain.exceptions import ConfigurationError
 from src.domain.ports.data_integrity_service import DataIntegrityServicePort
 from src.domain.value_objects.data_integrity_result import IntegrityResult
 
@@ -49,11 +50,11 @@ class DataIntegrityServiceImpl(DataIntegrityServicePort):
             十六进制编码的校验和字符串（小写）
 
         Raises:
-            ValueError: 不支持的算法
+            ConfigurationError: 不支持的算法
         """
         hash_func = _ALGORITHMS.get(algorithm)
         if hash_func is None:
-            raise ValueError(f"Unsupported algorithm: {algorithm}")
+            raise ConfigurationError(message=f"Unsupported algorithm: {algorithm}")
 
         if isinstance(data, str):
             data = data.encode("utf-8")

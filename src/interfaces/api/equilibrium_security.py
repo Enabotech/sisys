@@ -7,18 +7,21 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from typing import Any, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
+from src.domain.exceptions import ConfigurationError
+from src.domain.ports.auth_service import AuthServicePort
 from src.domain.ports.backup_recovery_service import BackupRecoveryServicePort
 from src.domain.ports.data_integrity_service import DataIntegrityServicePort
 from src.domain.ports.intrusion_detection_service import IntrusionDetectionServicePort
 from src.domain.value_objects.backup_result import BackupType
 from src.domain.value_objects.token_payload import TokenPayload
+from src.interfaces.api.shared_models import ErrorResponse
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
@@ -148,12 +151,6 @@ class ComplianceReportResponse(BaseModel):
     details: dict[str, Any]
 
 
-class ErrorResponse(BaseModel):
-    """错误响应模型"""
-
-    detail: str
-
-
 # ===================================================================
 # Router Factory
 # ===================================================================
@@ -163,6 +160,7 @@ def create_security_router(
     intrusion_service: IntrusionDetectionServicePort,
     data_integrity_service: DataIntegrityServicePort,
     backup_service: BackupRecoveryServicePort,
+    auth_service: AuthServicePort | None = None,
     get_current_user_override: Callable | None = None,
 ) -> APIRouter:
     """创建安全监控路由
@@ -171,6 +169,7 @@ def create_security_router(
         intrusion_service: 入侵检测服务
         data_integrity_service: 数据完整性服务
         backup_service: 备份恢复服务
+        auth_service: 认证服务（用于真实 JWT 验证）
         get_current_user_override: 可选的 get_current_user 依赖覆盖（用于测试）
 
     Returns:
@@ -181,21 +180,26 @@ def create_security_router(
     async def get_current_user(
         token: str = Depends(oauth2_scheme),
     ) -> TokenPayload:
-        """获取当前用户（简化版本，实际应调用认证服务）"""
+        """获取当前认证用户（使用真实 JWT 验证）
+
+        Args:
+            token: OAuth2 Bearer token
+
+        Returns:
+            TokenPayload 领域值对象
+
+        Raises:
+            HTTPException: 用户未认证（OAuth2 需要 WWW-Authenticate header）
+        """
         if not token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Not authenticated",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        # 注意：这里应该调用认证服务验证token
-        # 简化版本仅检查token存在性
-        return TokenPayload(
-            user_id=uuid.uuid4(),
-            username="admin",
-            roles=("admin",),
-            exp=datetime.now(UTC) + timedelta(hours=1),
-        )
+        if auth_service is None:
+            raise ConfigurationError("Auth service not configured")
+        return await auth_service.verify_token(token)
 
     current_user = get_current_user_override or get_current_user
 

@@ -44,12 +44,13 @@ class TestGetCurrentUser:
         assert "Invalid authorization header format" in str(exc_info.value.detail)
 
     def test_missing_jwt_service(self):
-        """Missing jwt_service raises 500."""
-        with pytest.raises(HTTPException) as exc_info:
+        """Missing jwt_service raises ConfigurationError."""
+        from src.domain.exceptions import ConfigurationError
+
+        with pytest.raises(ConfigurationError) as exc_info:
             get_current_user(authorization="Bearer sometoken", jwt_service=None)
 
-        assert exc_info.value.status_code == 500
-        assert "JWT service not configured" in str(exc_info.value.detail)
+        assert "JWT service not configured" in str(exc_info.value.message)
 
     def test_empty_string_authorization_header(self):
         """Empty string authorization header raises 401."""
@@ -189,7 +190,9 @@ class TestPermissionContext:
         await ctx.require("document", "read")
 
     async def test_require_no_permission_raises_403(self):
-        """require() raises 403 when user lacks permission."""
+        """require() raises PermissionDeniedError when user lacks permission."""
+        from src.domain.exceptions import PermissionDeniedError
+
         mock_user = MagicMock(spec=TokenPayload)
         mock_user.user_id = uuid4()
 
@@ -198,11 +201,10 @@ class TestPermissionContext:
 
         ctx = PermissionContext(mock_user, mock_perm_service)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(PermissionDeniedError) as exc_info:
             await ctx.require("document", "delete")
 
-        assert exc_info.value.status_code == 403
-        assert "Permission denied" in str(exc_info.value.detail)
+        assert "Permission denied" in exc_info.value.message
 
     async def test_require_uses_resource_id(self):
         """require() passes resource_id to permission service."""

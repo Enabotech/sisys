@@ -1,7 +1,7 @@
 """领域层异常模块
 
 领域异常层次结构：
-- BaseException: 异常层次结构根类
+- DomainError: 异常层次结构根类
 - SystemException: 系统级异常（基础设施故障）
 - BusinessException: 业务级异常（业务规则违反）
 - ExternalException: 外部服务异常
@@ -11,12 +11,15 @@
 
 from __future__ import annotations
 
-from src.domain.exceptions.base_exceptions import BaseException
+from src.domain.exceptions.base_exceptions import BaseException, DomainError  # BaseException 是向后兼容别名
 from src.domain.exceptions.business_exceptions import (
     AuthenticationError,
     BusinessException,
     BusinessRuleViolationError,
     ConflictError,
+    EntityBusinessRuleError,
+    EntityStateTransitionError,
+    EntityValidationError,
     InvalidStateError,
     InvalidStateTransitionError,
     NotFoundError,
@@ -69,10 +72,15 @@ from src.domain.exceptions.system_exceptions import (
     StorageError,
     SystemException,
 )
+from src.domain.exceptions.transfer_exceptions import (
+    TransferNotApprovedError,
+    TransferNotFoundError,
+)
 
 __all__ = [
     # 抽象根类
-    "BaseException",
+    "DomainError",
+    "BaseException",  # 向后兼容别名
     # 系统级异常
     "SystemException",
     "ConfigurationError",
@@ -89,6 +97,9 @@ __all__ = [
     "InvalidStateError",
     "InvalidStateTransitionError",
     "BusinessRuleViolationError",
+    "EntityValidationError",
+    "EntityStateTransitionError",
+    "EntityBusinessRuleError",
     # 外部服务异常
     "ExternalException",
     "ThirdPartyError",
@@ -124,4 +135,7 @@ __all__ = [
     "InsufficientTokenError",
     # 事件异常
     "VersionError",
+    # 跨境传输异常
+    "TransferNotFoundError",
+    "TransferNotApprovedError",
 ]

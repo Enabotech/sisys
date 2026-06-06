@@ -10,6 +10,9 @@ import pytest
 from src.domain.value_objects.parsed_document import (
     BoundingBox,
     BoundingBoxResult,
+    ColumnInfo,
+    ColumnType,
+    MergedCell,
     ParsedDocument,
     ParsedElement,
     ParsedPage,
@@ -107,6 +110,18 @@ class TestBoundingBoxResult:
         # 不存在独立的 page_number 字段
         assert not hasattr(result, "page_number")
 
+    def test_confidence_negative_raises_value_error(self) -> None:
+        """验证负数 confidence 抛出 ValueError（值域 [0.0, 1.0]）"""
+        bbox = BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0, page=1)
+        with pytest.raises(ValueError, match="confidence 必须在"):
+            BoundingBoxResult(label="Text", bbox=bbox, confidence=-0.1)
+
+    def test_confidence_above_one_raises_value_error(self) -> None:
+        """验证超过 1.0 的 confidence 抛出 ValueError"""
+        bbox = BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0, page=1)
+        with pytest.raises(ValueError, match="confidence 必须在"):
+            BoundingBoxResult(label="Text", bbox=bbox, confidence=1.5)
+
 
 class TestParsedElement:
     """ParsedElement 值对象测试"""
@@ -130,6 +145,167 @@ class TestParsedElement:
         assert d["bbox"] == {"x": 1.0, "y": 2.0, "width": 3.0, "height": 4.0, "page": 0}
 
 
+class TestColumnType:
+    """ColumnType 枚举值对象测试"""
+
+    def test_all_enum_values_defined(self) -> None:
+        """验证 7 种列类型枚举值全部定义"""
+        expected = {"STRING", "NUMBER", "DATE", "CURRENCY", "PERCENTAGE", "BOOLEAN", "UNKNOWN"}
+        actual = {ct.name for ct in ColumnType}
+        assert actual == expected
+
+    def test_enum_value_strings(self) -> None:
+        """验证枚举的 value 属性与名称一致"""
+        assert ColumnType.STRING.value == "STRING"
+        assert ColumnType.NUMBER.value == "NUMBER"
+        assert ColumnType.DATE.value == "DATE"
+        assert ColumnType.CURRENCY.value == "CURRENCY"
+        assert ColumnType.PERCENTAGE.value == "PERCENTAGE"
+        assert ColumnType.BOOLEAN.value == "BOOLEAN"
+        assert ColumnType.UNKNOWN.value == "UNKNOWN"
+
+    def test_enum_from_string(self) -> None:
+        """验证可通过字符串构造枚举"""
+        assert ColumnType("NUMBER") == ColumnType.NUMBER
+        assert ColumnType("DATE") == ColumnType.DATE
+
+
+class TestColumnInfo:
+    """ColumnInfo 值对象测试"""
+
+    def test_create_with_defaults(self) -> None:
+        """默认值构造：col_type=UNKNOWN, confidence=1.0, nullable_ratio=0.0"""
+        info = ColumnInfo(name="col_0")
+        assert info.name == "col_0"
+        assert info.col_type == ColumnType.UNKNOWN
+        assert info.confidence == 1.0
+        assert info.nullable_ratio == 0.0
+        assert info.sample_values == []
+
+    def test_create_with_all_fields(self) -> None:
+        """全字段构造"""
+        info = ColumnInfo(
+            name="金额",
+            col_type=ColumnType.CURRENCY,
+            confidence=0.95,
+            nullable_ratio=0.1,
+            sample_values=["¥50,000", "¥80,000"],
+        )
+        assert info.name == "金额"
+        assert info.col_type == ColumnType.CURRENCY
+        assert info.confidence == 0.95
+        assert info.nullable_ratio == 0.1
+        assert info.sample_values == ["¥50,000", "¥80,000"]
+
+    def test_to_dict_serialization(self) -> None:
+        """to_dict() 完整序列化"""
+        info = ColumnInfo(
+            name="数量",
+            col_type=ColumnType.NUMBER,
+            confidence=0.9,
+            nullable_ratio=0.05,
+            sample_values=["100", "200"],
+        )
+        d = info.to_dict()
+        assert d == {
+            "name": "数量",
+            "col_type": "NUMBER",
+            "confidence": 0.9,
+            "nullable_ratio": 0.05,
+            "sample_values": ["100", "200"],
+        }
+
+    def test_to_dict_col_type_is_string_value(self) -> None:
+        """to_dict() 中 col_type 应为字符串值而非枚举名"""
+        info = ColumnInfo(name="日期", col_type=ColumnType.DATE)
+        d = info.to_dict()
+        assert isinstance(d["col_type"], str)
+        assert d["col_type"] == "DATE"
+
+    def test_frozen_immutability(self) -> None:
+        """frozen=True 不可变"""
+        info = ColumnInfo(name="col")
+        with pytest.raises(AttributeError):
+            info.name = "other"  # type: ignore[misc]
+
+    def test_confidence_boundary_values(self) -> None:
+        """confidence 边界值：0.0 和 1.0 均有效"""
+        info_low = ColumnInfo(name="c", confidence=0.0)
+        assert info_low.confidence == 0.0
+        info_high = ColumnInfo(name="c", confidence=1.0)
+        assert info_high.confidence == 1.0
+
+    def test_nullable_ratio_boundary_values(self) -> None:
+        """nullable_ratio 边界值：0.0 和 1.0 均有效"""
+        info_zero = ColumnInfo(name="c", nullable_ratio=0.0)
+        assert info_zero.nullable_ratio == 0.0
+        info_full = ColumnInfo(name="c", nullable_ratio=1.0)
+        assert info_full.nullable_ratio == 1.0
+
+    def test_sample_values_default_empty_list(self) -> None:
+        """sample_values 默认为空列表"""
+        info = ColumnInfo(name="col")
+        assert info.sample_values == []
+        assert isinstance(info.sample_values, list)
+
+
+class TestMergedCell:
+    """MergedCell 值对象测试（V1）"""
+
+    def test_create_with_valid_coordinates(self) -> None:
+        """有效坐标构造"""
+        cell = MergedCell(row_start=0, row_end=1, col_start=0, col_end=2, value="合并标题")
+        assert cell.row_start == 0
+        assert cell.row_end == 1
+        assert cell.col_start == 0
+        assert cell.col_end == 2
+        assert cell.value == "合并标题"
+
+    def test_single_cell_merge(self) -> None:
+        """单行单列合并（1×1 区域）"""
+        cell = MergedCell(row_start=0, row_end=0, col_start=0, col_end=0, value="单值")
+        assert cell.row_start == cell.row_end
+        assert cell.col_start == cell.col_end
+
+    def test_to_dict_serialization(self) -> None:
+        """to_dict() 完整序列化"""
+        cell = MergedCell(row_start=0, row_end=2, col_start=1, col_end=3, value="数据")
+        d = cell.to_dict()
+        assert d == {
+            "row_start": 0,
+            "row_end": 2,
+            "col_start": 1,
+            "col_end": 3,
+            "value": "数据",
+        }
+
+    def test_frozen_immutability(self) -> None:
+        """frozen=True 不可变"""
+        cell = MergedCell(row_start=0, row_end=0, col_start=0, col_end=0, value="x")
+        with pytest.raises(AttributeError):
+            cell.value = "y"  # type: ignore[misc]
+
+    def test_row_start_le_row_end(self) -> None:
+        """row_start 应 ≤ row_end（语义约定，非强制校验）"""
+        cell = MergedCell(row_start=1, row_end=3, col_start=0, col_end=0, value="v")
+        assert cell.row_start <= cell.row_end
+
+    def test_col_start_le_col_end(self) -> None:
+        """col_start 应 ≤ col_end（语义约定，非强制校验）"""
+        cell = MergedCell(row_start=0, row_end=0, col_start=1, col_end=2, value="v")
+        assert cell.col_start <= cell.col_end
+
+    def test_empty_string_value(self) -> None:
+        """空字符串值有效"""
+        cell = MergedCell(row_start=0, row_end=0, col_start=0, col_end=0, value="")
+        assert cell.value == ""
+
+    def test_large_merge_range(self) -> None:
+        """大范围合并区域有效"""
+        cell = MergedCell(row_start=0, row_end=99, col_start=0, col_end=19, value="大范围")
+        assert (cell.row_end - cell.row_start + 1) * (cell.col_end - cell.col_start + 1) == 2000
+
+
 class TestParsedTable:
     """ParsedTable 值对象测试"""
 
@@ -138,11 +314,26 @@ class TestParsedTable:
         assert table.rows == []
         assert table.bbox is None
         assert table.confidence == 1.0
+        assert table.header is None
+        assert table.column_types is None
+        assert table.merged_cells is None
+        assert table.semantic_confidence is None
+        assert table.table_caption is None
 
     def test_to_dict(self) -> None:
         table = ParsedTable(rows=[["A", "B"], ["1", "2"]])
         d = table.to_dict()
-        assert d == {"rows": [["A", "B"], ["1", "2"]], "bbox": None, "confidence": 1.0, "metadata": {}}
+        assert d == {
+            "rows": [["A", "B"], ["1", "2"]],
+            "bbox": None,
+            "confidence": 1.0,
+            "metadata": {},
+            "header": None,
+            "column_types": None,
+            "merged_cells": None,
+            "semantic_confidence": None,
+            "table_caption": None,
+        }
 
 
 class TestParsedPage:
@@ -166,7 +357,17 @@ class TestParsedPage:
         assert len(d["texts"]) == 1
         assert d["texts"][0] == {"content": "hello", "bbox": None, "confidence": 1.0, "metadata": {}}
         assert len(d["tables"]) == 1
-        assert d["tables"][0] == {"rows": [["A"]], "bbox": None, "confidence": 1.0, "metadata": {}}
+        assert d["tables"][0] == {
+            "rows": [["A"]],
+            "bbox": None,
+            "confidence": 1.0,
+            "metadata": {},
+            "header": None,
+            "column_types": None,
+            "merged_cells": None,
+            "semantic_confidence": None,
+            "table_caption": None,
+        }
         assert d["images"] == []
 
 

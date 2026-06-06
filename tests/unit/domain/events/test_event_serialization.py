@@ -15,6 +15,7 @@ from src.domain.events.isolation_events import (
 )
 from src.domain.events.planning_events import StrategicDeviationWarning
 from src.domain.events.routing_events import RoutingDecided
+from src.domain.exceptions import EntityValidationError
 
 
 class TestToDictSerialization:
@@ -258,18 +259,18 @@ class TestDeserializationErrors:
     """Test deserialization error handling."""
 
     def test_from_dict_missing_event_id_raises(self):
-        """Missing event_id raises ValueError."""
-        with pytest.raises((KeyError, ValueError)):
+        """Missing event_id raises EntityValidationError."""
+        with pytest.raises((KeyError, EntityValidationError)):
             DomainEvent.from_dict({"event_type": "Test"})
 
     def test_from_dict_missing_event_type_raises(self):
-        """Missing event_type raises ValueError."""
-        with pytest.raises((KeyError, ValueError)):
+        """Missing event_type raises EntityValidationError."""
+        with pytest.raises((KeyError, EntityValidationError)):
             DomainEvent.from_dict({"event_id": str(uuid.uuid4())})
 
     def test_from_dict_invalid_uuid_raises(self):
         """Invalid UUID raises ValueError."""
-        with pytest.raises(ValueError):
+        with pytest.raises(EntityValidationError):
             DomainEvent.from_dict(
                 {
                     "event_id": "not-a-uuid",
@@ -280,7 +281,7 @@ class TestDeserializationErrors:
 
     def test_from_dict_invalid_datetime_raises(self):
         """Invalid datetime raises ValueError."""
-        with pytest.raises(ValueError):
+        with pytest.raises(EntityValidationError):
             DomainEvent.from_dict(
                 {
                     "event_id": str(uuid.uuid4()),

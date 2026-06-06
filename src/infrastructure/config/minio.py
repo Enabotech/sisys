@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass
 class MinIOConfig:
@@ -55,19 +57,19 @@ class MinIOConfig:
             MinIOConfig 实例
 
         Raises:
-            ValueError: 当环境变量值无法解析为正确类型时
+            ConfigurationError: 当环境变量值无法解析为正确类型时
         """
         connect_timeout_str = os.getenv("MINIO_CONNECT_TIMEOUT", "5.0")
         try:
             connect_timeout = float(connect_timeout_str)
         except ValueError as e:
-            raise ValueError(f"Invalid MINIO_CONNECT_TIMEOUT value: {connect_timeout_str}") from e
+            raise ConfigurationError(message=f"Invalid MINIO_CONNECT_TIMEOUT value: {connect_timeout_str}") from e
 
         read_timeout_str = os.getenv("MINIO_READ_TIMEOUT", "30.0")
         try:
             read_timeout = float(read_timeout_str)
         except ValueError as e:
-            raise ValueError(f"Invalid MINIO_READ_TIMEOUT value: {read_timeout_str}") from e
+            raise ConfigurationError(message=f"Invalid MINIO_READ_TIMEOUT value: {read_timeout_str}") from e
 
         return cls(
             host=os.getenv("MINIO_HOST", "localhost"),

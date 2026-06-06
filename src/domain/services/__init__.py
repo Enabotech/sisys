@@ -8,10 +8,13 @@ from src.domain.services.auto_execute_service import AutoExecuteService
 from src.domain.services.auto_route_service import AutoRouteService
 from src.domain.services.auto_trigger_service import AutoTriggerService
 from src.domain.services.memory_service import MemoryService
+from src.domain.services.rrf_fusion import RRF_K_DEFAULT, fuse
 
 __all__ = [
     "AutoExecuteService",
     "AutoRouteService",
     "AutoTriggerService",
     "MemoryService",
+    "fuse",
+    "RRF_K_DEFAULT",
 ]

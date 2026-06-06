@@ -19,6 +19,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import EntityValidationError
 
 
 @dataclass(frozen=True)
@@ -54,14 +55,26 @@ class SagaStatusChanged(DomainEvent):
 
         # 验证
         if not self.saga_type:
-            raise ValueError("saga_type 不能为空")
+            raise EntityValidationError(
+                message="saga_type 不能为空",
+                context={"entity": "SagaStatusChanged", "field": "saga_type"},
+            )
         if not self.new_status:
-            raise ValueError("new_status 不能为空")
+            raise EntityValidationError(
+                message="new_status 不能为空",
+                context={"entity": "SagaStatusChanged", "field": "new_status"},
+            )
         valid_statuses = ("PENDING", "RUNNING", "COMPLETED", "COMPENSATING", "COMPENSATED", "FAILED")
         if self.new_status not in valid_statuses:
-            raise ValueError(f"new_status 必须是有效状态: {valid_statuses}")
+            raise EntityValidationError(
+                message=f"new_status 必须是有效状态: {valid_statuses}",
+                context={"entity": "SagaStatusChanged", "field": "new_status", "valid_statuses": list(valid_statuses)},
+            )
         if self.old_status is not None and self.old_status not in valid_statuses:
-            raise ValueError(f"old_status 必须是有效状态: {valid_statuses}")
+            raise EntityValidationError(
+                message=f"old_status 必须是有效状态: {valid_statuses}",
+                context={"entity": "SagaStatusChanged", "field": "old_status", "valid_statuses": list(valid_statuses)},
+            )
 
 
 __all__ = ["SagaStatusChanged"]

@@ -14,6 +14,8 @@ from unittest.mock import patch
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from src.domain.exceptions import ConfigurationError
+
 scenarios("test_acceptance_cost_metrics_basic.feature")
 
 # parsers.re 用于参数化 BDD 步骤
@@ -111,7 +113,7 @@ def parse_cloud_config_pricing(context: dict[str, Any]) -> None:
         try:
             context["cloud_config"] = _parse_cloud_config(0)
             context["error"] = None
-        except ValueError as e:
+        except ConfigurationError as e:
             context["error"] = e
 
 

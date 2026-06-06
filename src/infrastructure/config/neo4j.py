@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass
 class Neo4jConfig:
@@ -55,25 +57,25 @@ class Neo4jConfig:
             Neo4jConfig 实例
 
         Raises:
-            ValueError: 当环境变量值无法解析为正确类型时
+            ConfigurationError: 当环境变量值无法解析为正确类型时
         """
         max_pool_size_str = os.getenv("NEO4J_MAX_POOL_SIZE", "50")
         try:
             max_connection_pool_size = int(max_pool_size_str)
         except ValueError as e:
-            raise ValueError(f"Invalid NEO4J_MAX_POOL_SIZE value: {max_pool_size_str}") from e
+            raise ConfigurationError(message=f"Invalid NEO4J_MAX_POOL_SIZE value: {max_pool_size_str}") from e
 
         connection_timeout_str = os.getenv("NEO4J_CONNECT_TIMEOUT", "30.0")
         try:
             connection_timeout = float(connection_timeout_str)
         except ValueError as e:
-            raise ValueError(f"Invalid NEO4J_CONNECT_TIMEOUT value: {connection_timeout_str}") from e
+            raise ConfigurationError(message=f"Invalid NEO4J_CONNECT_TIMEOUT value: {connection_timeout_str}") from e
 
         max_retry_time_str = os.getenv("NEO4J_MAX_RETRY_TIME", "30.0")
         try:
             max_retry_time = float(max_retry_time_str)
         except ValueError as e:
-            raise ValueError(f"Invalid NEO4J_MAX_RETRY_TIME value: {max_retry_time_str}") from e
+            raise ConfigurationError(message=f"Invalid NEO4J_MAX_RETRY_TIME value: {max_retry_time_str}") from e
 
         return cls(
             host=os.getenv("NEO4J_HOST", "localhost"),

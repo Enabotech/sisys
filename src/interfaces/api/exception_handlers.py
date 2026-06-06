@@ -1,6 +1,6 @@
 """接口层统一异常处理器模块
 
-根据异常类型自动映射到正确的 HTTP 状态码
+根据异常类型自动映射到正确的 HTTP 状态码，集成异常指标采集
 """
 
 from __future__ import annotations
@@ -13,28 +13,51 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
 
+from src.application.ports.exception_metrics_port import ExceptionMetricsPort
 from src.domain.exceptions import (
     AuthenticationError,
     BaseException,
+    BucketNameValidationError,
+    BucketNotFoundError,
     BusinessException,
     BusinessRuleViolationError,
+    CannotDeleteRoleWithUsersError,
+    CannotDeleteSystemRoleError,
+    ComplianceLockError,
     ConfigurationError,
     ConflictError,
+    ContainerStartError,
+    ContainerStopError,
+    EntityBusinessRuleError,
+    EntityStateTransitionError,
+    EntityValidationError,
+    ExecutionError,
     ExternalException,
+    InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
+    MemoryAccessDeniedError,
+    MemoryNotFoundError,
+    MemoryVersionConflictError,
     MessageBusError,
+    MinIOConnectionError,
     NetworkError,
     NotFoundError,
+    PasswordValidationError,
     PermissionDeniedError,
+    RoleAlreadyExistsError,
+    RoleNotFoundError,
     SandboxError,
     ServiceUnavailableError,
     StorageError,
     SystemException,
     ThirdPartyError,
     TimeoutError,
+    TransferNotApprovedError,
+    TransferNotFoundError,
     UnknownError,
     ValidationError,
+    VersionError,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,23 +69,54 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     SystemException: status.HTTP_500_INTERNAL_SERVER_ERROR,
     BusinessException: status.HTTP_400_BAD_REQUEST,
     ExternalException: status.HTTP_502_BAD_GATEWAY,
-    # 具体异常
-    NotFoundError: status.HTTP_404_NOT_FOUND,
-    PermissionDeniedError: status.HTTP_403_FORBIDDEN,
-    AuthenticationError: status.HTTP_401_UNAUTHORIZED,
-    ConflictError: status.HTTP_409_CONFLICT,
-    ValidationError: status.HTTP_400_BAD_REQUEST,
-    InvalidStateError: status.HTTP_409_CONFLICT,
-    InvalidStateTransitionError: status.HTTP_409_CONFLICT,
-    BusinessRuleViolationError: status.HTTP_422_UNPROCESSABLE_ENTITY,
-    ThirdPartyError: status.HTTP_502_BAD_GATEWAY,
+    # 系统级具体异常
+    ConfigurationError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     NetworkError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     StorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     MessageBusError: status.HTTP_500_INTERNAL_SERVER_ERROR,
-    ConfigurationError: status.HTTP_500_INTERNAL_SERVER_ERROR,
-    SandboxError: status.HTTP_502_BAD_GATEWAY,
+    MinIOConnectionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 106
+    # 业务级具体异常
+    ValidationError: status.HTTP_400_BAD_REQUEST,
+    NotFoundError: status.HTTP_404_NOT_FOUND,
+    ConflictError: status.HTTP_409_CONFLICT,
+    PermissionDeniedError: status.HTTP_403_FORBIDDEN,
+    AuthenticationError: status.HTTP_401_UNAUTHORIZED,
+    InvalidStateError: status.HTTP_409_CONFLICT,
+    InvalidStateTransitionError: status.HTTP_409_CONFLICT,
+    BusinessRuleViolationError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    # 实体验证异常
+    EntityValidationError: status.HTTP_400_BAD_REQUEST,
+    EntityStateTransitionError: status.HTTP_409_CONFLICT,
+    EntityBusinessRuleError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    # 存储子域异常
+    MemoryNotFoundError: status.HTTP_404_NOT_FOUND,  # 211
+    BucketNotFoundError: status.HTTP_404_NOT_FOUND,  # 212
+    MemoryVersionConflictError: status.HTTP_409_CONFLICT,  # 213
+    BucketNameValidationError: status.HTTP_400_BAD_REQUEST,  # 214
+    MemoryAccessDeniedError: status.HTTP_403_FORBIDDEN,  # 215
+    # 角色子域异常
+    RoleNotFoundError: status.HTTP_404_NOT_FOUND,  # 221
+    RoleAlreadyExistsError: status.HTTP_409_CONFLICT,  # 222
+    CannotDeleteRoleWithUsersError: status.HTTP_409_CONFLICT,  # 223
+    CannotDeleteSystemRoleError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 224
+    # 服务子域异常
+    PasswordValidationError: status.HTTP_400_BAD_REQUEST,  # 231
+    ComplianceLockError: status.HTTP_409_CONFLICT,  # 232
+    # 权限子域异常
+    InsufficientTokenError: status.HTTP_403_FORBIDDEN,  # 241
+    # 事件子域异常
+    VersionError: status.HTTP_409_CONFLICT,  # 251
+    # 跨境传输子域异常
+    TransferNotFoundError: status.HTTP_404_NOT_FOUND,  # 261
+    TransferNotApprovedError: status.HTTP_409_CONFLICT,  # 262
+    # 外部服务异常
+    ThirdPartyError: status.HTTP_502_BAD_GATEWAY,
     TimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,
     ServiceUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
+    SandboxError: status.HTTP_502_BAD_GATEWAY,  # 309
+    ContainerStartError: status.HTTP_502_BAD_GATEWAY,  # 310
+    ExecutionError: status.HTTP_502_BAD_GATEWAY,  # 311
+    ContainerStopError: status.HTTP_502_BAD_GATEWAY,  # 312
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
@@ -90,15 +144,22 @@ class ExceptionHandlers:
 
     Attributes:
         _app: FastAPI 应用实例
+        _metrics: 可选的异常指标采集端口
     """
 
-    def __init__(self, app: FastAPI) -> None:
+    def __init__(
+        self,
+        app: FastAPI,
+        metrics: ExceptionMetricsPort | None = None,
+    ) -> None:
         """初始化异常处理器
 
         Args:
             app: FastAPI 应用实例
+            metrics: 可选的异常指标采集端口
         """
         self._app = app
+        self._metrics = metrics
         self._register_handlers()
 
     def _register_handlers(self) -> None:
@@ -107,6 +168,17 @@ class ExceptionHandlers:
         self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)
         self._app.add_exception_handler(BaseException, self._handle_exception)
         self._app.add_exception_handler(Exception, self._handle_unexpected_error)
+
+    def _record(self, exc: Exception) -> None:
+        """记录异常指标
+
+        Args:
+            exc: 捕获的异常实例
+        """
+        if self._metrics is None:
+            return
+        code = getattr(exc, "code", None) if isinstance(exc, BaseException) else None
+        self._metrics.record_exception(type(exc).__name__, code)
 
     async def _handle_exception(self, request: Request, exc: Exception) -> JSONResponse:
         """处理领域基类异常，自动映射到 HTTP 状态码
@@ -126,6 +198,7 @@ class ExceptionHandlers:
         if isinstance(exc, AuthenticationError):
             context: dict[str, Any] = getattr(exc, "context", {}) or {}
             if context.get("locked"):
+                self._record(exc)
                 return JSONResponse(
                     status_code=status.HTTP_423_LOCKED,
                     content={
@@ -141,9 +214,15 @@ class ExceptionHandlers:
 
         try:
             error_dict = exc.to_dict()
-        except Exception:
+        except Exception as to_dict_err:
+            logger.warning(
+                "to_dict() failed for %s: %s, falling back to manual serialization",
+                type(exc).__name__,
+                to_dict_err,
+            )
+            code_raw = getattr(exc, "code", None)
             error_dict = {
-                "code": getattr(exc, "code", None) or "EXCEPTION_999",
+                "code": code_raw if code_raw else "EXCEPTION_999",
                 "message": str(exc)[:500],
                 "context": getattr(exc, "context", None) or {},
             }
@@ -158,6 +237,8 @@ class ExceptionHandlers:
             "error": error_dict,
             "request_id": request_id,
         }
+
+        self._record(exc)
 
         return JSONResponse(
             status_code=_get_http_status(exc),
@@ -188,6 +269,8 @@ class ExceptionHandlers:
                 }
             )
 
+        self._record(exc)
+
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={
@@ -214,6 +297,7 @@ class ExceptionHandlers:
         if not isinstance(exc, PydanticValidationError):
             raise TypeError(f"Expected PydanticValidationError, got {type(exc).__name__}")
         request_id = getattr(request.state, "request_id", None) or "unknown"
+        self._record(exc)
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
@@ -237,6 +321,7 @@ class ExceptionHandlers:
             JSON 格式的 500 错误响应
         """
         logger.exception("Unexpected error: %s", exc)
+        self._record(exc)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
@@ -249,12 +334,16 @@ class ExceptionHandlers:
         )
 
 
-def register_exception_handlers(app: FastAPI) -> None:
+def register_exception_handlers(
+    app: FastAPI,
+    metrics: ExceptionMetricsPort | None = None,
+) -> None:
     """注册异常处理器到 FastAPI 应用
 
     用法：register_exception_handlers(app)  # 初始化时调用一次
 
     Args:
         app: FastAPI 应用实例
+        metrics: 可选的异常指标采集端口
     """
-    ExceptionHandlers(app)
+    ExceptionHandlers(app, metrics)

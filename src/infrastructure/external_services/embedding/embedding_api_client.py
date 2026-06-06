@@ -20,6 +20,7 @@ from src.domain.exceptions import (
     NetworkError,
     ServiceUnavailableError,
     TimeoutError,
+    ValidationError,
 )
 from src.domain.ports.embedding_service import EmbeddingServicePort, SparseEmbedding
 from src.infrastructure.config.embedding import EmbeddingConfig
@@ -49,12 +50,12 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             config: 嵌入模型配置，需设置 api_url 字段
 
         Raises:
-            ValueError: api_url 为空时
+            ValidationError: api_url 为空时
         """
         if config is None:
             config = EmbeddingConfig()
         if not config.api_url:
-            raise ValueError("EMBEDDING_API_URL 未配置，API 模式需要指定嵌入服务地址")
+            raise ValidationError(message="EMBEDDING_API_URL 未配置，API 模式需要指定嵌入服务地址")
         self._config = config
         self._client = httpx.Client(
             base_url=config.api_url,
@@ -101,10 +102,10 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             经 L2 归一化的 1024 维浮点向量
 
         Raises:
-            ValueError: 文本为空时
+            ValidationError: 文本为空时
         """
         if not text or not text.strip():
-            raise ValueError("文本不能为空")
+            raise ValidationError(message="文本不能为空")
         result = self._encode([text], return_sparse=False)
         return cast(list[float], result["dense"][0])
 
@@ -121,13 +122,13 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             浮点向量列表
 
         Raises:
-            ValueError: 列表中包含空文本时
+            ValidationError: 列表中包含空文本时
         """
         if not texts:
             return []
         for i, t in enumerate(texts):
             if not t or not t.strip():
-                raise ValueError(f"文本列表第 {i} 项不能为空")
+                raise ValidationError(message=f"文本列表第 {i} 项不能为空")
         result = self._encode(texts, return_sparse=False)
         return cast(list[list[float]], result["dense"])
 
@@ -143,13 +144,13 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             SparseEmbedding 列表
 
         Raises:
-            ValueError: 列表中包含空文本时
+            ValidationError: 列表中包含空文本时
         """
         if not texts:
             return []
         for i, t in enumerate(texts):
             if not t or not t.strip():
-                raise ValueError(f"文本列表第 {i} 项不能为空")
+                raise ValidationError(message=f"文本列表第 {i} 项不能为空")
         result = self._encode(texts, return_sparse=True)
         sparse_list = cast(list[dict[str, Any]], result.get("sparse", []))
         if not sparse_list:

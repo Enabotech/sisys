@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 
+from src.domain.exceptions import EntityStateTransitionError, EntityValidationError
+
 
 class AgentRole(str, Enum):
     """智能体角色枚举"""
@@ -74,14 +76,23 @@ class Agent:
             所有不变量满足时返回 True
 
         Raises:
-            ValueError: 任何不变量违反时抛出
+            EntityValidationError: 任何不变量违反时抛出
         """
         if not isinstance(self.agent_id, uuid.UUID):
-            raise ValueError("agent_id must be a valid UUID")
+            raise EntityValidationError(
+                message="agent_id must be a valid UUID",
+                context={"entity": "Agent", "field": "agent_id"},
+            )
         if not isinstance(self.role, AgentRole):
-            raise ValueError("role must be a valid AgentRole")
+            raise EntityValidationError(
+                message="role must be a valid AgentRole",
+                context={"entity": "Agent", "field": "role", "expected_type": "AgentRole"},
+            )
         if not self.name or not self.name.strip():
-            raise ValueError("name must not be empty")
+            raise EntityValidationError(
+                message="name must not be empty",
+                context={"entity": "Agent", "field": "name"},
+            )
         return True
 
     # P1-05 Fix: Add state transition methods
@@ -89,10 +100,14 @@ class Agent:
         """将智能体从 IDLE 转换为 RUNNING
 
         Raises:
-            ValueError: 智能体不处于 IDLE 状态时抛出
+            EntityStateTransitionError: 智能体不处于 IDLE 状态时抛出
         """
         if self.status != AgentStatus.IDLE:
-            raise ValueError(f"Can only start from IDLE, current: {self.status.value}")
+            raise EntityStateTransitionError(
+                from_status=self.status.value,
+                to_status=AgentStatus.RUNNING.value,
+                message=f"Can only start from IDLE, current: {self.status.value}",
+            )
         self.status = AgentStatus.RUNNING
         self.updated_at = datetime.now(UTC)
 
@@ -100,10 +115,14 @@ class Agent:
         """将智能体从 RUNNING 转换为 COMPLETED
 
         Raises:
-            ValueError: 智能体不处于 RUNNING 状态时抛出
+            EntityStateTransitionError: 智能体不处于 RUNNING 状态时抛出
         """
         if self.status != AgentStatus.RUNNING:
-            raise ValueError(f"Can only complete from RUNNING, current: {self.status.value}")
+            raise EntityStateTransitionError(
+                from_status=self.status.value,
+                to_status=AgentStatus.COMPLETED.value,
+                message=f"Can only complete from RUNNING, current: {self.status.value}",
+            )
         self.status = AgentStatus.COMPLETED
         self.updated_at = datetime.now(UTC)
 
@@ -114,11 +133,15 @@ class Agent:
             reason: 可选的失败原因，用于诊断
 
         Raises:
-            ValueError: 智能体已处于 FAILED 状态时抛出
+            EntityStateTransitionError: 智能体已处于 FAILED 状态时抛出
         """
         # P1-03 Fix: Reject re-failing an already failed agent
         if self.status == AgentStatus.FAILED:
-            raise ValueError(f"Agent is already failed (reason: {self.failure_reason!r})")
+            raise EntityStateTransitionError(
+                from_status=self.status.value,
+                to_status="failed",
+                message=f"Agent is already failed (reason: {self.failure_reason!r})",
+            )
         self.failure_reason = reason
         self.status = AgentStatus.FAILED
         self.updated_at = datetime.now(UTC)
@@ -127,10 +150,14 @@ class Agent:
         """将失败或已完成的智能体重置为 IDLE
 
         Raises:
-            ValueError: 智能体不处于 FAILED 或 COMPLETED 状态时抛出
+            EntityStateTransitionError: 智能体不处于 FAILED 或 COMPLETED 状态时抛出
         """
         if self.status not in (AgentStatus.FAILED, AgentStatus.COMPLETED):
-            raise ValueError(f"Can only restart from FAILED or COMPLETED, current: {self.status.value}")
+            raise EntityStateTransitionError(
+                from_status=self.status.value,
+                to_status=AgentStatus.IDLE.value,
+                message=f"Can only restart from FAILED or COMPLETED, current: {self.status.value}",
+            )
         self.failure_reason = ""
         self.status = AgentStatus.IDLE
         self.updated_at = datetime.now(UTC)
@@ -138,6 +165,10 @@ class Agent:
     def wait(self) -> None:
         """将智能体转换为 WAITING 状态"""
         if self.status not in (AgentStatus.RUNNING, AgentStatus.WAITING):
-            raise ValueError(f"Can only wait from RUNNING or WAITING, current: {self.status.value}")
+            raise EntityStateTransitionError(
+                from_status=self.status.value,
+                to_status=AgentStatus.WAITING.value,
+                message=f"Can only wait from RUNNING or WAITING, current: {self.status.value}",
+            )
         self.status = AgentStatus.WAITING
         self.updated_at = datetime.now(UTC)

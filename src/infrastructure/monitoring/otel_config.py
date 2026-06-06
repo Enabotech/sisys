@@ -12,6 +12,8 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
+from src.domain.exceptions import ConfigurationError
+
 logger = logging.getLogger(__name__)
 
 # 协议类型
@@ -135,20 +137,21 @@ class BatchExportConfig:
         """验证配置合法性
 
         Raises:
-            ValueError: 配置不合法时抛出
+            ConfigurationError: 配置不合法时抛出
         """
         if self.max_queue_size <= 0:
-            raise ValueError(f"max_queue_size must be positive, got {self.max_queue_size}")
+            raise ConfigurationError(message=f"max_queue_size must be positive, got {self.max_queue_size}")
         if self.max_export_batch_size <= 0:
-            raise ValueError(f"max_export_batch_size must be positive, got {self.max_export_batch_size}")
+            raise ConfigurationError(message=f"max_export_batch_size must be positive, got {self.max_export_batch_size}")
         if self.max_export_batch_size > self.max_queue_size:
-            raise ValueError(
-                f"max_export_batch_size ({self.max_export_batch_size}) must be <= max_queue_size ({self.max_queue_size})"
+            raise ConfigurationError(
+                message=f"max_export_batch_size ({self.max_export_batch_size}) must be <= "
+                f"max_queue_size ({self.max_queue_size})"
             )
         if self.schedule_delay_millis <= 0:
-            raise ValueError(f"schedule_delay_millis must be positive, got {self.schedule_delay_millis}")
+            raise ConfigurationError(message=f"schedule_delay_millis must be positive, got {self.schedule_delay_millis}")
         if self.export_timeout_millis <= 0:
-            raise ValueError(f"export_timeout_millis must be positive, got {self.export_timeout_millis}")
+            raise ConfigurationError(message=f"export_timeout_millis must be positive, got {self.export_timeout_millis}")
 
 
 # ============================================================================

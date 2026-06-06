@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 
+from src.domain.exceptions import ValidationError
 from src.domain.ports.token_estimator import TokenEstimatorPort
 
 logger = logging.getLogger(__name__)
@@ -39,10 +40,10 @@ class StaticTokenEstimator(TokenEstimatorPort):
             (prompt_tokens, completion_tokens) 元组
 
         Raises:
-            ValueError: route_type 为 None 或空字符串时
+            ValidationError: route_type 为 None 或空字符串时
         """
         if not route_type or not route_type.strip():
-            raise ValueError("route_type must not be None or empty")
+            raise ValidationError(message="route_type must not be None or empty")
         if route_type.lower() == "local":
             prompt, completion = self.LOCAL_PROMPT_TOKENS, self.LOCAL_COMPLETION_TOKENS
         else:

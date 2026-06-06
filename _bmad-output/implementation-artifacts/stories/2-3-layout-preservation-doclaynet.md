@@ -562,6 +562,14 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | 匹配策略 | 一一对应 | 检测区域被匹配后不再参与后续匹配；元素被匹配后不再参与后续匹配 |
 | 页面隔离 | 必须同页 | `bbox.page` 相同才能匹配 |
 
+> **MVP 降级说明（v1.4.0 审查修订）：**
+> `layout_matching.py` 中 `match_detections()` 已正确实现 IoU 空间匹配算法并通过完整测试。
+> 但当前 `PDFParser` 不输出 bbox（所有 `ParsedElement.bbox=None`），IoU 匹配无法工作（两个 None bbox 无法计算 IoU）。
+> 因此 `_apply_layout_detection()` 采用**顺序索引匹配**作为 MVP 临时方案：
+> - Table 标签检测结果（`label='Table'`）按顺序映射到 `ParsedTable.bbox`
+> - 非 Table 检测结果按顺序映射到 `ParsedElement.bbox`
+> - 当 `PDFParser` 未来输出真实坐标时，需切换为 `match_detections()` IoU 算法
+
 **边缘情况处理：**
 - 多检测区域覆盖同一元素：首个匹配的检测区域（最高 IoU）"消费"该元素，后续检测区域无法再匹配
 - 单检测区域覆盖多元素：仅最高 IoU 的元素获得该 bbox，其余元素 bbox 保持 None
@@ -575,10 +583,12 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | 场景 | 触发条件 | 处理策略 | 结果 |
 |------|----------|----------|------|
 | 端口未注入 | `layout_detector=None` 或 `pdf_page_renderer=None` | 跳过版面检测步骤 | 所有 `ParsedElement.bbox=None` |
-| 模型加载失败 | `OnnxLayoutDetector.__init__` 抛出 `FileNotFoundError`/`ImportError` | 抛出异常到调用方（非运行时降级） | 文档解析失败，抛出 RuntimeError |
+| 模型加载失败 | `OnnxLayoutDetector.__init__` 抛出 `FileNotFoundError`/`ImportError` | Composition Root 捕获并降级为 None | 文档解析以无版面检测模式运行 |
 | 推理运行时错误 | `detect()` 抛出异常（OOM/内部错误） | 捕获异常，日志 WARNING，该页跳过检测 | 该页所有元素 bbox=None，其他页正常 |
 | 渲染失败 | `render_page()` 抛出异常（pypdfium2 错误） | 捕获异常，日志 WARNING，该页跳过检测 | 该页所有元素 bbox=None，其他页正常 |
 | 检测返回空列表 | `detect()` 返回 `[]` | 正常情况，无 bbox 匹配 | 该页所有元素 bbox=None |
+| 非法页码 | `page_number < 1` | `detect()` 抛出 `ValueError` | 该页跳过检测 |
+| 空图像输入 | `image_bytes` 为空 | `detect()` 抛出 `ValueError` | 该页跳过检测 |
 
 **关键原则：** 版面检测是增强功能，运行时失败不应阻断文档解析主流程（文本解析已完成）。仅初始化失败（配置错误）才抛出异常阻断流程。
 
@@ -803,10 +813,11 @@ Pillow = ">=10.0"                    # 已有依赖（Story 2-2b ImageParser 引
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-06-02
-**最后更新/Last Updated:** 2026-06-03
+**最后更新/Last Updated:** 2026-06-05
 **更新说明/Description:**
+- v1.5.0: 代码审查修订（15 Agent 5轮审查）— 防御性校验增强（page_number/image_bytes/数组长度一致性/xyxy→xywh clamp）/BoundingBoxResult confidence 值域约束 [0.0,1.0]/metadata error 键名统一为 parse_error/Table 标签检测结果映射到 ParsedTable.bbox/Composition Root 异常捕获缩窄/ONNX session close()资源释放/shutdown 清理钩子/pdf_page_renderer 日志补全/MVP 降级策略文档化/降级场景表扩展
 - v1.4.0: 5轮审查修订（第6-10轮）— PdfPageRendererPort端口体系补充/架构集成路径明确化/降级策略规格化/匹配算法规格化/BoundingBoxResult冗余字段移除/layout_matching归属domain层/项目结构路径修正/覆盖率门禁精确化/ONNX输入格式验证提示/置信度处理规则/追溯矩阵同步/测试分类表补全/Subtask编号同步
 - v1.3.0: Round 3-5 审查修订 — 5项P1修正（registry.py描述/FORWARD兼容策略移除/契约测试引用/追溯矩阵Task编号）
 - v1.2.0: Round 2 审查修订 — 7项P1问题修正

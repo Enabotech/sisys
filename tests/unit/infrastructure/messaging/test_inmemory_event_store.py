@@ -10,6 +10,7 @@ import uuid
 import pytest
 
 from src.domain.events import DocumentProcessed
+from src.domain.exceptions import ValidationError
 from src.infrastructure.messaging.inmemory_event_store import InMemoryEventStore
 
 
@@ -90,13 +91,13 @@ class TestInMemoryEventStore:
     def test_get_events_by_version_invalid_range_raises(self, store: InMemoryEventStore) -> None:
         """from_version > to_version 应抛出 ValueError"""
         agg_id = uuid.uuid4()
-        with pytest.raises(ValueError, match="from_version .* must be <= to_version"):
+        with pytest.raises(ValidationError, match="from_version .* must be <= to_version"):
             store.get_events_by_version(agg_id, from_version=5, to_version=2)
 
     def test_get_events_by_version_negative_version_raises(self, store: InMemoryEventStore) -> None:
         """负版本号应抛出 ValueError"""
         agg_id = uuid.uuid4()
-        with pytest.raises(ValueError, match="Version numbers must be >= 1"):
+        with pytest.raises(ValidationError, match="Version numbers must be >= 1"):
             store.get_events_by_version(agg_id, from_version=-1, to_version=5)
 
     def test_clear_removes_all_events(self, store: InMemoryEventStore) -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from src.domain.exceptions import ValidationError
 from src.infrastructure.storage.qdrant.bm25_builder import BM25Builder
 from src.infrastructure.storage.qdrant.models import SparseVector
 
@@ -89,5 +90,5 @@ class TestBM25Builder:
 
     def test_sparse_vector_validation(self):
         """测试 SparseVector 模型验证"""
-        with pytest.raises(ValueError, match="must have same length"):
+        with pytest.raises(ValidationError, match="must have same length"):
             SparseVector(indices=[1, 2], values=[0.5])

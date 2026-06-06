@@ -22,7 +22,24 @@
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, TypedDict, runtime_checkable
+
+
+class SearchResult(TypedDict):
+    """统一检索结果 TypedDict
+
+    跨 Dense/Sparse/Hybrid 三通道的标准化检索结果结构。
+    与 Qdrant ScoredPoint.id 对齐（str | int），与 DenseSearchResult 接口兼容。
+
+    Attributes:
+        id: 向量点标识（Qdrant ScoredPoint 返回 str 或 int）
+        score: 相似度/相关性得分
+        payload: 元数据字典
+    """
+
+    id: str | int
+    score: float
+    payload: dict[str, Any]
 
 
 @runtime_checkable
@@ -102,7 +119,7 @@ class L3VectorPort(Protocol):
     async def search_sparse(
         self,
         collection: str,
-        sparse_vector: dict,
+        sparse_vector: dict[str, Any],
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
@@ -112,8 +129,8 @@ class L3VectorPort(Protocol):
 
         Args:
             collection: Collection 名称
-            sparse_vector: 稀疏向量 dict，需包含 indices 和 values 字段
-                          示例: {"indices": [0, 5, 10], "values": [1.0, 0.5, 0.8]}
+            sparse_vector: 稀疏向量，可为 SparseEmbedding TypedDict 或普通 dict
+                          需包含 indices 和 values 字段
             limit: 返回结果数量限制
             filter_payload: Payload 过滤条件
 

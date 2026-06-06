@@ -6,6 +6,7 @@ from typing import cast
 import pytest
 
 from src.domain.entities.tool import Tool, ToolStatus
+from src.domain.exceptions import EntityValidationError
 
 
 def _make_tool(**kwargs) -> Tool:
@@ -43,25 +44,25 @@ class TestToolValidation:
         """Tool with non-UUID id fails validation."""
         tool = _make_tool()
         object.__setattr__(tool, "tool_id", cast(uuid.UUID, "not-a-uuid"))
-        with pytest.raises(ValueError, match="tool_id must be a valid UUID"):
+        with pytest.raises(EntityValidationError, match="tool_id must be a valid UUID"):
             tool.validate()
 
     def test_empty_name_fails(self):
         """Tool with empty name fails validation."""
         tool = _make_tool(name="")
-        with pytest.raises(ValueError, match="name must not be empty"):
+        with pytest.raises(EntityValidationError, match="name must not be empty"):
             tool.validate()
 
     def test_invalid_input_schema_fails(self):
         """Tool with non-dict input_schema fails validation."""
         tool = _make_tool()
         object.__setattr__(tool, "input_schema", cast(dict, "not a dict"))
-        with pytest.raises(ValueError, match="input_schema must be a dict"):
+        with pytest.raises(EntityValidationError, match="input_schema must be a dict"):
             tool.validate()
 
     def test_invalid_output_schema_fails(self):
         """Tool with non-dict output_schema fails validation."""
         tool = _make_tool()
         object.__setattr__(tool, "output_schema", cast(dict, "not a dict"))
-        with pytest.raises(ValueError, match="output_schema must be a dict"):
+        with pytest.raises(EntityValidationError, match="output_schema must be a dict"):
             tool.validate()

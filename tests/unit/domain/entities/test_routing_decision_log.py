@@ -9,6 +9,7 @@ from typing import cast
 import pytest
 
 from src.domain.entities.routing_decision_log import RoutingDecisionLog
+from src.domain.exceptions import EntityBusinessRuleError, EntityValidationError
 
 
 class TestRoutingDecisionLog:
@@ -36,7 +37,7 @@ class TestRoutingDecisionLog:
             route_target="cfo-agent",
             route_score=0.95,
         )
-        with pytest.raises(ValueError, match="log_id must be a valid UUID"):
+        with pytest.raises(EntityValidationError, match="log_id must be a valid UUID"):
             log.validate()
 
     def test_validate_task_id_empty(self) -> None:
@@ -49,7 +50,7 @@ class TestRoutingDecisionLog:
             route_target="cfo-agent",
             route_score=0.95,
         )
-        with pytest.raises(ValueError, match="task_id must not be empty"):
+        with pytest.raises(EntityValidationError, match="task_id must not be empty"):
             log.validate()
 
     def test_validate_session_id_empty(self) -> None:
@@ -62,7 +63,7 @@ class TestRoutingDecisionLog:
             route_target="cfo-agent",
             route_score=0.95,
         )
-        with pytest.raises(ValueError, match="session_id must not be empty"):
+        with pytest.raises(EntityValidationError, match="session_id must not be empty"):
             log.validate()
 
     def test_validate_route_type_invalid(self) -> None:
@@ -75,7 +76,7 @@ class TestRoutingDecisionLog:
             route_target="cfo-agent",
             route_score=0.95,
         )
-        with pytest.raises(ValueError, match="route_type must be one of"):
+        with pytest.raises(EntityValidationError, match="route_type must be one of"):
             log.validate()
 
     def test_validate_score_below_zero(self) -> None:
@@ -88,7 +89,7 @@ class TestRoutingDecisionLog:
             route_target="cfo-agent",
             route_score=-0.1,
         )
-        with pytest.raises(ValueError, match="route_score must be between 0.0 and 1.0"):
+        with pytest.raises(EntityValidationError, match="route_score must be between 0.0 and 1.0"):
             log.validate()
 
     def test_validate_cost_estimate_negative(self) -> None:
@@ -102,7 +103,7 @@ class TestRoutingDecisionLog:
             route_score=0.95,
             cost_estimate=-1.0,
         )
-        with pytest.raises(ValueError, match="cost_estimate must be non-negative"):
+        with pytest.raises(EntityValidationError, match="cost_estimate must be non-negative"):
             log.validate()
 
     def test_validate_latency_ms_negative(self) -> None:
@@ -116,7 +117,7 @@ class TestRoutingDecisionLog:
             route_score=0.95,
             latency_ms=-1.0,
         )
-        with pytest.raises(ValueError, match="latency_ms must be non-negative"):
+        with pytest.raises(EntityValidationError, match="latency_ms must be non-negative"):
             log.validate()
 
     def test_default_values(self) -> None:
@@ -210,7 +211,7 @@ class TestRoutingDecisionLog:
             route_score=1.0,
             fallback_reason="invalid_reason",
         )
-        with pytest.raises(ValueError, match="fallback_reason must be one of"):
+        with pytest.raises(EntityValidationError, match="fallback_reason must be one of"):
             log.validate()
 
 
@@ -251,7 +252,7 @@ class TestRoutingDecisionLogBoundaryValues:
             route_target="node-A",
             route_score=1.1,
         )
-        with pytest.raises(ValueError, match="route_score"):
+        with pytest.raises(EntityValidationError, match="route_score"):
             log.validate()
 
     def test_task_id_whitespace_only(self) -> None:
@@ -264,7 +265,7 @@ class TestRoutingDecisionLogBoundaryValues:
             route_target="node-A",
             route_score=0.5,
         )
-        with pytest.raises(ValueError, match="task_id must not be empty"):
+        with pytest.raises(EntityValidationError, match="task_id must not be empty"):
             log.validate()
 
     def test_session_id_whitespace_only(self) -> None:
@@ -277,7 +278,7 @@ class TestRoutingDecisionLogBoundaryValues:
             route_target="node-A",
             route_score=0.5,
         )
-        with pytest.raises(ValueError, match="session_id must not be empty"):
+        with pytest.raises(EntityValidationError, match="session_id must not be empty"):
             log.validate()
 
     def test_cost_actual_negative(self) -> None:
@@ -291,7 +292,7 @@ class TestRoutingDecisionLogBoundaryValues:
             route_score=0.8,
             cost_actual=-0.01,
         )
-        with pytest.raises(ValueError, match="cost_actual must be non-negative"):
+        with pytest.raises(EntityValidationError, match="cost_actual must be non-negative"):
             log.validate()
 
     def test_cost_actual_zero(self) -> None:
@@ -405,7 +406,7 @@ class TestRoutingDecisionLogTokenFields:
             route_score=1.0,
             prompt_tokens=-1,
         )
-        with pytest.raises(ValueError, match="prompt_tokens must be non-negative"):
+        with pytest.raises(EntityValidationError, match="prompt_tokens must be non-negative"):
             log.validate()
 
     def test_validate_completion_tokens_negative(self) -> None:
@@ -419,7 +420,7 @@ class TestRoutingDecisionLogTokenFields:
             route_score=1.0,
             completion_tokens=-1,
         )
-        with pytest.raises(ValueError, match="completion_tokens must be non-negative"):
+        with pytest.raises(EntityValidationError, match="completion_tokens must be non-negative"):
             log.validate()
 
     def test_validate_total_tokens_negative(self) -> None:
@@ -433,7 +434,7 @@ class TestRoutingDecisionLogTokenFields:
             route_score=1.0,
             total_tokens=-1,
         )
-        with pytest.raises(ValueError, match="total_tokens must be non-negative"):
+        with pytest.raises(EntityValidationError, match="total_tokens must be non-negative"):
             log.validate()
 
     def test_validate_total_tokens_invariant_mismatch(self) -> None:
@@ -449,7 +450,7 @@ class TestRoutingDecisionLogTokenFields:
             completion_tokens=200,
             total_tokens=999,
         )
-        with pytest.raises(ValueError, match="total_tokens must equal prompt_tokens"):
+        with pytest.raises(EntityBusinessRuleError, match="total_tokens must equal prompt_tokens"):
             log.validate()
 
     def test_validate_total_tokens_invariant_correct(self) -> None:

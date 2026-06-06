@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph
 
+from src.domain.exceptions import ValidationError
 from src.domain.value_objects.flow_status import FlowStatus
 from src.infrastructure.config.langgraph import LangGraphConfig
 
@@ -59,13 +60,13 @@ class LangGraphEngine:
             graph_run_id: 状态图运行标识符
 
         Raises:
-            ValueError: graph_name 为空或 parameters 为空
+            ValidationError: graph_name 为空或 parameters 为空
             RuntimeError: LangGraph SDK 调用失败
         """
         if not graph_name:
-            raise ValueError("graph_name 不能为空")
+            raise ValidationError(message="graph_name 不能为空")
         if not parameters:
-            raise ValueError("parameters 不能为空")
+            raise ValidationError(message="parameters 不能为空")
 
         run_id = str(uuid.uuid4())
         agent_id = uuid.uuid4()
@@ -98,10 +99,10 @@ class LangGraphEngine:
             FlowStatus 枚举值
 
         Raises:
-            ValueError: graph_run_id 为空
+            ValidationError: graph_run_id 为空
         """
         if not graph_run_id:
-            raise ValueError("graph_run_id 不能为空")
+            raise ValidationError(message="graph_run_id 不能为空")
 
         return self._runs.get(graph_run_id, (FlowStatus.FAILED, 0.0))[0]
 

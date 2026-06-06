@@ -11,6 +11,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from typing_extensions import Annotated
 
+from src.domain.exceptions import ConfigurationError, PermissionDeniedError
 from src.domain.ports.permission_service import PermissionServicePort
 from src.domain.value_objects.token_payload import TokenPayload
 from src.infrastructure.security.jwt_service import JWTService
@@ -57,10 +58,7 @@ def get_current_user(
 
     token = parts[1]
     if not jwt_service:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="JWT service not configured",
-        )
+        raise ConfigurationError("JWT service not configured")
 
     try:
         payload: TokenPayload = jwt_service.verify_token(token)
@@ -107,10 +105,7 @@ def require_permission(
     ) -> TokenPayload:
         """权限检查依赖函数."""
         if permission_service is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Permission service not configured",
-            )
+            raise ConfigurationError("Permission service not configured")
 
         has_permission = await permission_service.check_permission(
             user_id=current_user.user_id,
@@ -119,10 +114,7 @@ def require_permission(
         )
 
         if not has_permission:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: {resource}:{action}",
-            )
+            raise PermissionDeniedError(f"Permission denied: {resource}:{action}")
 
         return current_user
 
@@ -155,10 +147,7 @@ def require_any_role(
     ) -> TokenPayload:
         """角色检查依赖函数."""
         if not current_user.has_any_role(*roles):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Required role: one of {roles}",
-            )
+            raise PermissionDeniedError(f"Required role: one of {roles}")
         return current_user
 
     return role_check
@@ -185,10 +174,7 @@ def require_all_roles(*roles: str) -> Callable:
         """角色检查依赖函数."""
         missing_roles = [r for r in roles if not current_user.has_role(r)]
         if missing_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Missing required roles: {missing_roles}",
-            )
+            raise PermissionDeniedError(f"Missing required roles: {missing_roles}")
         return current_user
 
     return role_check
@@ -292,10 +278,7 @@ class PermissionContext:
             action: 操作类型
 
         Raises:
-            HTTPException: 权限不足
+            PermissionDeniedError: 权限不足
         """
         if not await self.check(resource, action):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: {resource}:{action}",
-            )
+            raise PermissionDeniedError(f"Permission denied: {resource}:{action}")

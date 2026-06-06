@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass(frozen=True)
 class AutoTriggerConfig:
@@ -36,7 +38,7 @@ class AutoTriggerConfig:
             AutoTriggerConfig 实例
 
         Raises:
-            ValueError: 环境变量值不合法时抛出
+            ConfigurationError: 环境变量值不合法时抛出
         """
         enabled_str = os.getenv("TRIGGER_ENABLED", "true").lower()
         interval_str = os.getenv("HEARTBEAT_INTERVAL_SECONDS", "60")
@@ -45,16 +47,16 @@ class AutoTriggerConfig:
         try:
             interval = int(interval_str)
             if interval <= 0:
-                raise ValueError(f"HEARTBEAT_INTERVAL_SECONDS must be positive: {interval}")
+                raise ConfigurationError(message=f"HEARTBEAT_INTERVAL_SECONDS must be positive: {interval}")
         except ValueError as e:
-            raise ValueError(f"Invalid HEARTBEAT_INTERVAL_SECONDS value: {interval_str}") from e
+            raise ConfigurationError(message=f"Invalid HEARTBEAT_INTERVAL_SECONDS value: {interval_str}") from e
 
         try:
             max_retries = int(retries_str)
             if max_retries < 0:
-                raise ValueError(f"TRIGGER_MAX_RETRIES must be non-negative: {max_retries}")
+                raise ConfigurationError(message=f"TRIGGER_MAX_RETRIES must be non-negative: {max_retries}")
         except ValueError as e:
-            raise ValueError(f"Invalid TRIGGER_MAX_RETRIES value: {retries_str}") from e
+            raise ConfigurationError(message=f"Invalid TRIGGER_MAX_RETRIES value: {retries_str}") from e
 
         return cls(
             trigger_enabled=enabled_str in ("true", "1", "yes", "on"),

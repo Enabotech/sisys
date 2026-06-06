@@ -21,7 +21,7 @@ class RoleAlreadyExistsError(ConflictError):
         name: 重复的角色名称
     """
 
-    code = "EXCEPTION_203"
+    code = "EXCEPTION_222"
 
     def __init__(self, name: str) -> None:
         """初始化角色已存在异常
@@ -40,7 +40,7 @@ class RoleNotFoundError(NotFoundError):
         role_id: 不存在的角色 UUID
     """
 
-    code = "EXCEPTION_202"
+    code = "EXCEPTION_221"
 
     def __init__(self, role_id: UUID) -> None:
         """初始化角色不存在异常
@@ -59,7 +59,7 @@ class CannotDeleteSystemRoleError(BusinessRuleViolationError):
         role_id: 系统保留角色的 UUID
     """
 
-    code = "EXCEPTION_207"
+    code = "EXCEPTION_224"
 
     def __init__(self, role_id: UUID) -> None:
         """初始化不能删除系统保留角色异常
@@ -79,7 +79,7 @@ class CannotDeleteRoleWithUsersError(ConflictError):
         user_count: 关联用户数量
     """
 
-    code = "EXCEPTION_203"
+    code = "EXCEPTION_223"
 
     def __init__(self, role_id: UUID, user_count: int) -> None:
         """初始化不能删除有关联用户的角色异常

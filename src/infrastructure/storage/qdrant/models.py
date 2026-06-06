@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from src.domain.exceptions import ValidationError
+
 
 @dataclass
 class CollectionConfig:
@@ -56,16 +58,17 @@ class VectorPoint:
     id: str
     vector: list[float]
     payload: dict = field(default_factory=dict)
+    sparse_vector: dict | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
         """验证向量维度是否正确
 
         Raises:
-            ValueError: 向量维度不为 1024 时抛出
+            ValidationError: 向量维度不为 1024 时抛出
         """
         if len(self.vector) != 1024:
-            raise ValueError(f"Vector dimension must be 1024, got {len(self.vector)}")
+            raise ValidationError(message=f"Vector dimension must be 1024, got {len(self.vector)}")
 
 
 @dataclass
@@ -84,9 +87,10 @@ class SparseVector:
         """验证 indices 和 values 长度是否匹配
 
         Raises:
-            ValueError: indices 和 values 长度不一致时抛出
+            ValidationError: indices 和 values 长度不一致时抛出
         """
         if len(self.indices) != len(self.values):
-            raise ValueError(
-                f"indices and values must have same length, got {len(self.indices)} indices and {len(self.values)} values"
+            raise ValidationError(
+                message=f"indices and values must have same length, "
+                f"got {len(self.indices)} indices and {len(self.values)} values"
             )

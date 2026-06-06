@@ -36,7 +36,7 @@
     并且 设置环境变量 UDMR_CLOUD_0_MODEL=MiniMax-M2.7
     并且 未设置 UDMR_CLOUD_0_MAX_TOKENS
     当 调用 UDMRConfig.from_env()
-    那么 应该抛出 ValueError 异常
+    那么 应该抛出 ConfigurationError 异常
 
   # =========================================================================
   # AC-2: UDMR 静态路由决策
