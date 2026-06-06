@@ -58,6 +58,7 @@ class VectorPoint:
     id: str
     vector: list[float]
     payload: dict = field(default_factory=dict)
+    sparse_vector: dict | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
