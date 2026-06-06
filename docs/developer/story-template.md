@@ -127,8 +127,8 @@
 | **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_[feature name].feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_[feature name].py`（参考test_acceptance_event_messaging_refactor.py）
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_[feature name].feature`（示例：`test_acceptance_hybrid_search.feature`）
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_[feature name].py`（示例：`test_acceptance_hybrid_search.py`）
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）
 
