@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.domain.exceptions import ValidationError
 from src.domain.value_objects.parsed_document import BoundingBoxResult
 
 
@@ -272,22 +273,22 @@ class TestOnnxLayoutDetectorDetect:
         assert results[0].label == "Unknown-99"
         assert results[0].confidence == 0.95
 
-    def test_detect_page_number_zero_raises_value_error(self) -> None:
-        """验证页码为 0 时抛出 ValueError（1-indexed 约束）"""
+    def test_detect_page_number_zero_raises_validation_error(self) -> None:
+        """验证页码为 0 时抛出 ValidationError（1-indexed 约束）"""
         detector, _ = self._create_detector_with_mock()
-        with pytest.raises(ValueError, match="页码必须为正整数"):
+        with pytest.raises(ValidationError, match="页码必须为正整数"):
             detector.detect(b"fake_image", page_number=0)
 
-    def test_detect_negative_page_number_raises_value_error(self) -> None:
-        """验证负页码时抛出 ValueError"""
+    def test_detect_negative_page_number_raises_validation_error(self) -> None:
+        """验证负页码时抛出 ValidationError"""
         detector, _ = self._create_detector_with_mock()
-        with pytest.raises(ValueError, match="页码必须为正整数"):
+        with pytest.raises(ValidationError, match="页码必须为正整数"):
             detector.detect(b"fake_image", page_number=-1)
 
-    def test_detect_empty_image_bytes_raises_value_error(self) -> None:
-        """验证空图像字节时抛出 ValueError"""
+    def test_detect_empty_image_bytes_raises_validation_error(self) -> None:
+        """验证空图像字节时抛出 ValidationError"""
         detector, _ = self._create_detector_with_mock()
-        with pytest.raises(ValueError, match="image_bytes 不能为空"):
+        with pytest.raises(ValidationError, match="image_bytes 不能为空"):
             detector.detect(b"", page_number=1)
 
     def test_detect_mismatched_output_lengths_truncates(self) -> None:

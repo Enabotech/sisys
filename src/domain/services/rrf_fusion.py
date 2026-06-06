@@ -18,6 +18,7 @@ Elasticsearch（rank_constant 社区实践设为 60）、PyTerrier、Pyserini �
 
 from __future__ import annotations
 
+from src.domain.exceptions import ValidationError
 from src.domain.ports.l3_vector import SearchResult
 
 #: RRF 平滑常数默认值（Cormack et al. SIGIR 2009 经验值）
@@ -49,7 +50,7 @@ def fuse(
         按 RRF 分数降序排列的合并去重结果列表
 
     Raises:
-        ValueError: weights 非 None 且长度与 result_lists 不一致时（纯函数参数校验）
+        ValidationError: weights 非 None 且长度与 result_lists 不一致，或 k/weights 包含负值
 
     Example:
         MVP（对称融合）:
@@ -63,15 +64,15 @@ def fuse(
     """
     # 参数校验（纯函数参数契约）
     if k < 0:
-        raise ValueError(f"k 必须为非负数，当前值: {k}")
+        raise ValidationError(f"k 必须为非负数，当前值: {k}")
     if not result_lists:
         return []
 
     # 权重校验
     if weights is not None and len(weights) != len(result_lists):
-        raise ValueError(f"weights 长度({len(weights)})与 result_lists 长度({len(result_lists)})不匹配")
+        raise ValidationError(f"weights 长度({len(weights)})与 result_lists 长度({len(result_lists)})不匹配")
     if weights is not None and any(w < 0 for w in weights):
-        raise ValueError(f"weights 元素必须为非负数，当前值: {weights}")
+        raise ValidationError(f"weights 元素必须为非负数，当前值: {weights}")
 
     # 单路直通 — 跳过融合（无需计算 RRF）
     if len(result_lists) == 1:

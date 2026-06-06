@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Literal
 
+from src.domain.exceptions import EntityValidationError
+
 
 class ColumnType(Enum):
     """表格列数据类型枚举
@@ -150,7 +152,7 @@ class BoundingBoxResult:
     def __post_init__(self) -> None:
         """校验 confidence 值域范围 [0.0, 1.0]"""
         if not (0.0 <= self.confidence <= 1.0):
-            raise ValueError(f"confidence 必须在 [0.0, 1.0] 范围内，实际值: {self.confidence}")
+            raise EntityValidationError(f"confidence 必须在 [0.0, 1.0] 范围内，实际值: {self.confidence}")
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典"""
