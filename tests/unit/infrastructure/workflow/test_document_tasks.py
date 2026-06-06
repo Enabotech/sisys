@@ -193,6 +193,31 @@ class TestIndexDocumentReal:
         mock_vector.upsert_points.assert_called()
 
     @pytest.mark.asyncio
+    async def test_index_document_passes_sparse_vector_to_upsert(self) -> None:
+        """index_document 应在 upsert 的点中包含 sparse_vector 字段"""
+        from src.infrastructure.workflow.tasks.document_tasks import index_document
+
+        mock_vector = self._make_mock_l3_vector()
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.return_value = mock_vector
+
+        embedding_result: EmbeddingResult = {
+            "dense_vectors": [[0.1] * 1024],
+            "sparse_vectors": [SparseEmbedding(indices=[0, 5], values=[1.0, 0.5])],
+        }
+
+        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
+            await index_document.fn(embedding_result)
+
+        # 验证传给 upsert_points 的点包含 sparse_vector
+        call_args = mock_vector.upsert_points.call_args
+        points = call_args[0][1]  # 第二个位置参数
+        assert len(points) == 1
+        assert "sparse_vector" in points[0], f"point 缺少 sparse_vector: {points[0].keys()}"
+        assert points[0]["sparse_vector"]["indices"] == [0, 5]
+        assert points[0]["sparse_vector"]["values"] == [1.0, 0.5]
+
+    @pytest.mark.asyncio
     async def test_index_document_empty_vectors_returns_false(self) -> None:
         """空向量列表时返回 indexed=False"""
         from src.infrastructure.workflow.tasks.document_tasks import index_document
