@@ -1,6 +1,6 @@
 # Story 3-1b: BM25 稀疏检索 + RRF 融合
 
-**Status:** `done`
+**Status:** `done` (code-review complete, 7 patches fixed, 5 deferred, 2 dismissed)
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -973,20 +973,13 @@ tests/
 
 #### Patch（待修复）
 
-- [ ] **[Review][Patch] P1: 协程泄漏 — generate_embedding 中 sparse_task 在 dense 异常时未 cancel** [P0] [document_tasks.py:148-160]
-  `dense_task` 抛异常时 `sparse_task`（`asyncio.create_task` 创建的 task）仍在后台运行从未 await/cancel，事件循环关闭时泄漏。修复: 异常分支中 `sparse_task.cancel()` + `try/except asyncio.CancelledError`。
-- [ ] **[Review][Patch] P2: QdrantAdapter.upsert_points() 丢弃 dict 输入的 sparse_vector** [P0] [qdrant_adapter.py:54-63]
-  `vector_storage.py` 已修复支持 NamedSparseVector，但 `QdrantAdapter` 将 dict → VectorPoint 时只提取 `id/vector/payload`，未传递 `sparse_vector`。索引管线通过 DI 走 Adapter 路径，sparse 数据在此丢失。修复: `VectorPoint(sparse_vector=point.get("sparse_vector"))`。
-- [ ] **[Review][Patch] P3: AC-1 验收测试 Collection 创建未配置 sparse_vectors_config** [P0] [test_acceptance_hybrid_search.py:156-157]
-  `given_collection_with_sparse_vectors` 创建 Collection 时未传 `sparse_vectors_config`，BM25 检索在无稀疏索引的 Collection 上真空通过。修复: 添加 `sparse_vectors_config={"sparse": SparseVectorParams()}`。
-- [ ] **[Review][Patch] P4: 验收测试"日志记录降级原因"步骤体为空 pass** [P1] [test_acceptance_hybrid_search.py]
-  `then_degradation_logged` 函数体为 `pass`，无 caplog fixture，降级日志回归无法被捕获。
-- [ ] **[Review][Patch] P5: fuse() 函数 k<0 + weights 非负校验缺失** [P2] [rrf_fusion.py:27-31]
-  k<0 导致 ZeroDivisionError，负权重颠倒排序。修复: 添加 `k >= 0` 和 `all(w >= 0 for w in weights)` 校验。
-- [ ] **[Review][Patch] P6: QdrantAdapter.search_sparse() 无保护 dict 键访问** [P2] [qdrant_adapter.py:147-149]
-  `sparse_vector["indices"]` 和 `sparse_vector["values"]` 无 `.get()` 或键存在检查，格式错误时抛出 raw KeyError。
-- [ ] **[Review][Patch] P7: Collection 创建未自动配置 sparse_vectors_config** [P0] [collection_manager.py:73]
-  `sparse_vectors_config` 仅通过 kwargs 透传，生产管线中无调用方传入。需索引管线创建 Collection 时自动配置。AC-4 明确要求。
+- [x] **[Review][Patch] P1: 协程泄漏 — generate_embedding 中 sparse_task 在 dense 异常时未 cancel** [P0] [document_tasks.py:148-160] — 已修复: asyncio.gather(return_exceptions=True)
+- [x] **[Review][Patch] P2: QdrantAdapter.upsert_points() 丢弃 dict 输入的 sparse_vector** [P0] [qdrant_adapter.py:54-63] — 已修复: VectorPoint(sparse_vector=point.get("sparse_vector"))
+- [x] **[Review][Patch] P3: AC-1 验收测试 Collection 创建未配置 sparse_vectors_config** [P0] — 改为 P7 自动配置修复
+- [x] **[Review][Patch] P4: 验收测试"日志记录降级原因"步骤体为空 pass** [P1] [test_acceptance_hybrid_search.py] — 已修复: caplog 断言
+- [x] **[Review][Patch] P5: fuse() 函数 k<0 + weights 非负校验缺失** [P2] [rrf_fusion.py:27-31] — 已修复: k>=0 + all(w>=0 for w in weights)
+- [x] **[Review][Patch] P6: QdrantAdapter.search_sparse() 无保护 dict 键访问** [P2] [qdrant_adapter.py:147-149] — 已修复: ValidationError 替代 raw KeyError
+- [x] **[Review][Patch] P7: Collection 创建未自动配置 sparse_vectors_config** [P0] [collection_manager.py:73] — 已修复: create_collection 默认 SparseVectorParams()
 
 #### Defer（已知设计 / 非本 Story 引入）
 
