@@ -11,6 +11,7 @@ import os
 from types import ModuleType
 from typing import Any
 
+from src.domain.exceptions import ValidationError
 from src.domain.value_objects.parsed_document import BoundingBox, BoundingBoxResult
 
 logger = logging.getLogger(__name__)
@@ -124,13 +125,13 @@ class OnnxLayoutDetector:
             检测到的版面元素列表（经过置信度过滤和坐标转换）
 
         Raises:
-            ValueError: page_number 不合法（< 1）或 image_bytes 为空
+            ValidationError: page_number 不合法（< 1）或 image_bytes 为空
             RuntimeError: ONNX 推理失败
         """
         if page_number < 1:
-            raise ValueError(f"页码必须为正整数（1-indexed），实际值: {page_number}")
+            raise ValidationError(f"页码必须为正整数（1-indexed），实际值: {page_number}")
         if not image_bytes:
-            raise ValueError("image_bytes 不能为空")
+            raise ValidationError("image_bytes 不能为空")
 
         try:
             # 预处理：将图像字节转为 numpy array

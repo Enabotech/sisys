@@ -13,6 +13,7 @@ import time
 
 import pytest
 
+from src.domain.exceptions import ValidationError
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.services.rrf_fusion import RRF_K_DEFAULT, fuse
 
@@ -168,12 +169,12 @@ class TestRrfFusionWeighted:
         doc_b = next(r for r in result if r["id"] == "doc_b")
         assert math.isclose(doc_b["score"], 0.3 / 61, rel_tol=1e-9)
 
-    def test_weights_length_mismatch_raises_value_error(self) -> None:
-        """weights 长度不匹配时抛出 ValueError"""
+    def test_weights_length_mismatch_raises_validation_error(self) -> None:
+        """weights 长度不匹配时抛出 ValidationError"""
         dense = [_make_result("doc1", 0.9)]
         sparse = [_make_result("doc2", 5.0)]
 
-        with pytest.raises(ValueError, match="weights 长度"):
+        with pytest.raises(ValidationError, match="weights 长度"):
             fuse(dense, sparse, weights=[0.5])  # 2 路但 weights 只有 1 个
 
     def test_all_zero_weights(self) -> None:
