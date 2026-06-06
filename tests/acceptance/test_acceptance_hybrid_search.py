@@ -16,6 +16,7 @@ import asyncio
 import time
 import uuid
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
@@ -312,17 +313,10 @@ def when_hybrid_search(
 
     # 两路均不可用
     if context.get("both_unavailable"):
-        dense_svc = DenseSemanticSearchService(embedding_service, vector_storage)
-        sparse_svc = Bm25SparseSearchService(embedding_service, vector_storage)
-
-        async def _fail_dense(_coll, _q, **_kw):
-            raise RuntimeError("Dense 不可用")
-
-        async def _fail_sparse(_coll, _q, **_kw):
-            raise RuntimeError("Sparse 不可用")
-
-        dense_svc.search = _fail_dense  # type: ignore[assignment]
-        sparse_svc.search = _fail_sparse  # type: ignore[assignment]
+        dense_svc: Any = MagicMock()
+        sparse_svc: Any = MagicMock()
+        dense_svc.search = AsyncMock(side_effect=RuntimeError("Dense 不可用"))
+        sparse_svc.search = AsyncMock(side_effect=RuntimeError("Sparse 不可用"))
 
         try:
             event_loop.run_until_complete(_run(dense_svc, sparse_svc))
@@ -335,12 +329,8 @@ def when_hybrid_search(
     # Sparse 不可用 — 降级为 Dense-only
     if context.get("sparse_unavailable"):
         dense_svc = DenseSemanticSearchService(embedding_service, vector_storage)
-        sparse_svc = Bm25SparseSearchService(embedding_service, vector_storage)
-
-        async def _fail_sparse(_coll, _q, **_kw):
-            raise asyncio.TimeoutError("Sparse 嵌入超时")
-
-        sparse_svc.search = _fail_sparse  # type: ignore[assignment]
+        sparse_svc = MagicMock()
+        sparse_svc.search = AsyncMock(side_effect=asyncio.TimeoutError("Sparse 嵌入超时"))
         context["search_results"] = event_loop.run_until_complete(_run(dense_svc, sparse_svc))
         return
 

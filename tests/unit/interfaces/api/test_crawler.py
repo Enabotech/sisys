@@ -40,7 +40,7 @@ class TestSubmitTaskRequest:
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            SubmitTaskRequest()  # type: ignore[call-arg]
+            SubmitTaskRequest.model_validate({})
 
     def test_domains_must_not_be_empty(self) -> None:
         """domains 列表不能为空（min_length=1）"""
