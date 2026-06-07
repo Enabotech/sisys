@@ -942,6 +942,800 @@
        保留原有样式
        ======================================== */
 
+    /* ========================================
+       🎮 战略沙盘专属样式 (v2.0 Sandbox)
+       ======================================== */
+
+    /* GPU 状态徽章 */
+    .badge-gpu {
+      background: rgba(82, 196, 26, 0.2);
+      border: 1px solid var(--color-success);
+      color: #73d13d;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .badge-gpu.computing {
+      animation: pulseGreen 1s infinite;
+    }
+
+    @keyframes pulseGreen {
+      0% { box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.4); }
+      70% { box-shadow: 0 0 0 6px rgba(82, 196, 26, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(82, 196, 26, 0); }
+    }
+
+    /* 沙盘面板容器 */
+    .sandbox-panel {
+      background: var(--color-white);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-lg);
+      box-shadow: var(--shadow-md);
+      border-top: 4px solid var(--color-primary);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .sandbox-panel.sandbox-hero {
+      border-top: 4px solid #722ed1;
+      background: linear-gradient(180deg, #f9f0ff 0%, var(--color-white) 40px);
+    }
+
+    /* Plan 选择器 */
+    .plan-selector {
+      display: flex;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+    .plan-btn {
+      flex: 1;
+      padding: var(--spacing-md);
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-bg-primary);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+      font-family: var(--font-family-base);
+    }
+    .plan-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .plan-btn.active {
+      background: #f6ffed;
+      border-color: var(--color-success);
+      box-shadow: var(--shadow-sm);
+    }
+    .plan-btn.warning {
+      border-color: var(--color-warning);
+      background: #fffbe6;
+    }
+    .plan-btn.danger {
+      border-color: var(--color-danger);
+      background: #fff1f0;
+    }
+    .plan-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .plan-desc {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+    }
+
+    /* 滑块系统 */
+    .slider-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--spacing-xl);
+    }
+    .slider-group {
+      margin-bottom: var(--spacing-md);
+    }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-xs);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--color-danger) 0%, var(--color-warning) 30%, var(--color-success) 50%, var(--color-success) 100%);
+    }
+    input[type=range].reverse-track::-webkit-slider-runnable-track {
+      background: linear-gradient(90deg, var(--color-success) 0%, var(--color-warning) 70%, var(--color-danger) 100%);
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 22px;
+      width: 22px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid var(--color-primary);
+      margin-top: -7px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      transition: transform 0.1s;
+      cursor: grab;
+    }
+    input[type=range]::-webkit-slider-thumb:active {
+      cursor: grabbing;
+      transform: scale(1.3);
+      border-color: #722ed1;
+    }
+
+    /* 涟漪反馈层 */
+    .ripple-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--spacing-lg);
+      margin-bottom: var(--spacing-lg);
+    }
+    .trust-card.ripple {
+      background: var(--color-white);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-lg);
+      box-shadow: var(--shadow-md);
+      border-left: 4px solid var(--color-success);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .trust-card.ripple.status-warning {
+      border-left-color: var(--color-warning);
+      background: #fffbe6;
+      transform: translateY(2px);
+    }
+    .trust-card.ripple.status-danger {
+      border-left-color: var(--color-danger);
+      background: #fff1f0;
+      transform: translateY(4px);
+      animation: shakeCard 0.4s ease-out;
+    }
+
+    @keyframes shakeCard {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    .trust-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--spacing-md);
+    }
+    .trust-icon {
+      font-size: 24px;
+    }
+    .trust-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    .trust-score {
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--color-success);
+      transition: color 0.3s;
+    }
+    .status-warning .trust-score { color: var(--color-warning); }
+    .status-danger .trust-score { color: var(--color-danger); }
+
+    .agent-chat {
+      background: rgba(0,0,0,0.02);
+      padding: var(--spacing-sm);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      margin-top: var(--spacing-sm);
+      border: 1px solid var(--color-border);
+    }
+    .agent-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    /* 连线效果 */
+    .mapping-line {
+      height: 4px;
+      background: var(--color-success);
+      border-radius: 2px;
+      margin: 8px 0;
+      transition: all 0.3s;
+    }
+    .status-warning .mapping-line {
+      height: 2px;
+      background: var(--color-warning);
+      width: 80%;
+    }
+    .status-danger .mapping-line {
+      background: repeating-linear-gradient(45deg, var(--color-danger), var(--color-danger) 5px, transparent 5px, transparent 10px);
+    }
+
+    /* 决策层网格 */
+    .decision-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--spacing-lg);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    /* 龙卷风图 */
+    .tornado-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: var(--spacing-md);
+    }
+    .tornado-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+    .tornado-label {
+      font-size: 12px;
+      text-align: right;
+      color: var(--color-text-secondary);
+    }
+    .tornado-bars {
+      display: flex;
+      align-items: center;
+      height: 18px;
+      position: relative;
+    }
+    .tornado-axis {
+      position: absolute;
+      left: 50%;
+      top: -4px;
+      bottom: -4px;
+      width: 1px;
+      background: var(--color-border);
+      z-index: 1;
+    }
+    .bar-neg {
+      background: var(--color-danger);
+      height: 100%;
+      position: absolute;
+      right: 50%;
+      border-radius: 4px 0 0 4px;
+      transition: width 0.4s;
+      opacity: 0.8;
+    }
+    .bar-pos {
+      background: var(--color-success);
+      height: 100%;
+      position: absolute;
+      left: 50%;
+      border-radius: 0 4px 4px 0;
+      transition: width 0.4s;
+      opacity: 0.8;
+    }
+
+    /* AI 代偿锦囊 */
+    .ai-magic-box {
+      border: 1px solid #b37feb;
+      background: #f9f0ff;
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+      position: relative;
+      overflow: hidden;
+    }
+    .ai-magic-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px;
+      height: 100%;
+      background: #722ed1;
+    }
+    .ai-title {
+      color: #722ed1;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: var(--spacing-md);
+    }
+    .strategy-item {
+      background: white;
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--spacing-sm);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow-sm);
+    }
+    .strategy-text {
+      font-size: 13px;
+      flex: 1;
+    }
+    .btn-apply {
+      background: #722ed1;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: var(--font-family-base);
+      transition: background 0.2s;
+      white-space: nowrap;
+      margin-left: var(--spacing-sm);
+    }
+    .btn-apply:hover {
+      background: #531dab;
+    }
+    .btn-apply.applied {
+      background: var(--color-success);
+      cursor: default;
+    }
+
+    /* 终端/运行时面板 */
+    .runtime-panel {
+      background: #1f1f1f;
+      color: #d9d9d9;
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-lg);
+      box-shadow: var(--shadow-md);
+      position: relative;
+      margin-bottom: var(--spacing-lg);
+    }
+    .runtime-dots {
+      display: flex;
+      gap: 7px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .runtime-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .runtime-dot.red { background: #ff5f56; }
+    .runtime-dot.yellow { background: #ffbd2e; }
+    .runtime-dot.green { background: #27c93f; }
+
+    .log-container {
+      max-height: 142px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+      padding-right: 6px;
+      font-family: Consolas, 'SF Mono', 'Fira Code', monospace;
+    }
+    .log-container::-webkit-scrollbar {
+      width: 5px;
+    }
+    .log-container::-webkit-scrollbar-track {
+      background: transparent;
+      border-radius: 3px;
+    }
+    .log-container::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 3px;
+    }
+    .log-container::-webkit-scrollbar-thumb:hover {
+      background: #666;
+    }
+    .log-container {
+      scrollbar-width: thin;
+      scrollbar-color: #444 transparent;
+    }
+
+    .log-line {
+      font-size: 13px;
+      margin-bottom: 6px;
+      display: flex;
+      gap: 12px;
+      line-height: 1.55;
+      white-space: nowrap;
+      transition: opacity 0.3s ease;
+      font-family: Consolas, 'SF Mono', 'Fira Code', monospace;
+    }
+    .log-line:last-child { margin-bottom: 0; }
+    .log-line.just-added {
+      animation: fadeInLog 0.35s ease-out;
+    }
+    @keyframes fadeInLog {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .log-time {
+      color: #8c8c8c;
+      flex-shrink: 0;
+    }
+    .log-success { color: #73d13d; }
+    .log-warn { color: #faad14; }
+    .log-error { color: #ff4d4f; }
+
+    .log-scroll-indicator {
+      position: absolute;
+      bottom: 8px;
+      right: 28px;
+      font-size: 10px;
+      color: #555;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-family: var(--font-family-base);
+    }
+    .log-scroll-indicator.visible {
+      opacity: 0.7;
+      animation: bounceHint 1.5s ease-in-out;
+    }
+    @keyframes bounceHint {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    /* 沙盘响应式 */
+    @media (max-width: 768px) {
+      .slider-grid { grid-template-columns: 1fr; }
+      .ripple-grid { grid-template-columns: 1fr; }
+      .decision-grid { grid-template-columns: 1fr; }
+      .plan-selector { flex-direction: column; }
+    }
+
+    /* ========================================
+       🆕 战略沙盘 v3.0 增强样式
+       ======================================== */
+
+    /* DSTE 时间轴 */
+    .dste-timeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: var(--spacing-lg);
+      padding: var(--spacing-md);
+      background: linear-gradient(135deg, #f0f5ff 0%, #f9f0ff 100%);
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+    }
+    .dste-phase {
+      flex: 1;
+      min-width: 120px;
+      text-align: center;
+      padding: var(--spacing-sm) var(--spacing-md);
+      cursor: pointer;
+      border-radius: var(--radius-md);
+      transition: all 0.3s;
+      position: relative;
+      font-size: 13px;
+    }
+    .dste-phase:hover {
+      background: rgba(24, 144, 255, 0.1);
+    }
+    .dste-phase.active {
+      background: var(--color-primary);
+      color: white;
+      font-weight: 600;
+      box-shadow: var(--shadow-md);
+    }
+    .dste-phase .phase-icon {
+      font-size: 20px;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .dste-phase .phase-label {
+      font-size: 12px;
+      opacity: 0.85;
+    }
+    .dste-phase .phase-date {
+      font-size: 10px;
+      opacity: 0.7;
+    }
+    .dste-arrow {
+      font-size: 16px;
+      color: var(--color-primary);
+      flex-shrink: 0;
+    }
+
+    /* 快照管理系统 */
+    .snapshot-bar {
+      display: flex;
+      gap: var(--spacing-sm);
+      align-items: center;
+      margin-bottom: var(--spacing-lg);
+      flex-wrap: wrap;
+    }
+    .snapshot-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: 16px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .snapshot-chip:hover {
+      border-color: var(--color-primary);
+      background: var(--color-primary-bg);
+    }
+    .snapshot-chip.active {
+      border-color: var(--color-primary);
+      background: var(--color-primary-bg);
+      font-weight: 600;
+    }
+    .snapshot-chip .snap-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .snapshot-chip .snap-dot.green { background: var(--color-success); }
+    .snapshot-chip .snap-dot.yellow { background: var(--color-warning); }
+    .snapshot-chip .snap-dot.red { background: var(--color-danger); }
+    .snapshot-compare {
+      margin-top: var(--spacing-md);
+      display: none;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--spacing-md);
+    }
+    .snapshot-compare.show {
+      display: grid;
+    }
+    .snapshot-compare-card {
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+      font-size: 13px;
+    }
+    .snapshot-compare-card .snap-name {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: var(--spacing-xs);
+    }
+    .snapshot-compare-card .snap-meta {
+      font-size: 11px;
+      color: var(--color-text-tertiary);
+      margin-bottom: var(--spacing-sm);
+    }
+
+    /* BSC 四视角标签 */
+    .bsc-tags {
+      display: flex;
+      gap: var(--spacing-xs);
+      margin-top: var(--spacing-xs);
+      flex-wrap: wrap;
+    }
+    .bsc-tag {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-weight: 500;
+    }
+    .bsc-tag.financial { background: #e6f7ff; color: #1890ff; }
+    .bsc-tag.customer { background: #f6ffed; color: #52c41a; }
+    .bsc-tag.process { background: #fff7e6; color: #fa8c16; }
+    .bsc-tag.learning { background: #f9f0ff; color: #722ed1; }
+
+    /* BEM 解码面板 */
+    .bem-steps {
+      display: flex;
+      gap: 0;
+      margin-bottom: var(--spacing-lg);
+      overflow-x: auto;
+    }
+    .bem-step {
+      flex: 1;
+      min-width: 80px;
+      text-align: center;
+      padding: var(--spacing-sm);
+      cursor: pointer;
+      border-bottom: 3px solid var(--color-border);
+      transition: all 0.2s;
+      font-size: 12px;
+    }
+    .bem-step:hover {
+      border-bottom-color: var(--color-primary);
+    }
+    .bem-step.active {
+      border-bottom-color: var(--color-primary);
+      background: var(--color-primary-bg);
+      font-weight: 600;
+    }
+    .bem-step .step-num {
+      display: block;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--color-text-tertiary);
+    }
+    .bem-step.active .step-num { color: var(--color-primary); }
+    .bem-detail {
+      display: none;
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-lg);
+    }
+    .bem-detail.show {
+      display: block;
+    }
+
+    /* X-Matrix 四象限 */
+    .xmatrix {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      grid-template-rows: auto auto;
+      gap: 1px;
+      background: var(--color-border);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .xmatrix-cell {
+      background: var(--color-white);
+      padding: var(--spacing-sm);
+      font-size: 11px;
+      min-height: 60px;
+    }
+    .xmatrix-cell.header {
+      background: var(--color-bg-primary);
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .xmatrix-cell .corr {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      line-height: 24px;
+      text-align: center;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 700;
+      margin: 2px;
+    }
+    .corr.strong { background: #f6ffed; color: var(--color-success); }
+    .corr.medium { background: #fffbe6; color: var(--color-warning); }
+    .corr.weak { background: var(--color-bg-primary); color: var(--color-text-tertiary); }
+
+    /* 审批流转 */
+    .approval-flow {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-md);
+      font-size: 12px;
+    }
+    .approval-step {
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: var(--color-bg-primary);
+      color: var(--color-text-tertiary);
+    }
+    .approval-step.done {
+      background: #f6ffed;
+      color: var(--color-success);
+      font-weight: 600;
+    }
+    .approval-step.current {
+      background: var(--color-primary-bg);
+      color: var(--color-primary);
+      font-weight: 600;
+      animation: pulseBlue 1.5s infinite;
+    }
+    @keyframes pulseBlue {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(24,144,255,0.4); }
+      50% { box-shadow: 0 0 0 4px rgba(24,144,255,0); }
+    }
+    .approval-arrow {
+      color: var(--color-text-disabled);
+      font-size: 10px;
+    }
+
+    /* 经营分析会看板 */
+    .ops-review-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+    .ops-review-col {
+      background: var(--color-white);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+      box-shadow: var(--shadow-sm);
+    }
+    .ops-review-col h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: var(--spacing-sm);
+      padding-bottom: var(--spacing-sm);
+      border-bottom: 2px solid;
+    }
+    .ops-review-col.gap h4 { border-bottom-color: var(--color-danger); color: var(--color-danger); }
+    .ops-review-col.root h4 { border-bottom-color: var(--color-warning); color: #d48806; }
+    .ops-review-col.opportunity h4 { border-bottom-color: var(--color-success); color: var(--color-success); }
+    .ops-item {
+      font-size: 12px;
+      padding: var(--spacing-xs) 0;
+      border-bottom: 1px solid var(--color-bg-primary);
+      line-height: 1.5;
+    }
+    .ops-item:last-child { border-bottom: none; }
+
+    /* 计划vs实际对比 */
+    .plan-vs-actual {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .plan-vs-actual th {
+      background: var(--color-bg-primary);
+      padding: var(--spacing-sm);
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .plan-vs-actual td {
+      padding: var(--spacing-sm);
+      border-bottom: 1px solid var(--color-bg-primary);
+    }
+    .deviation-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .deviation-badge.green { background: #f6ffed; color: var(--color-success); }
+    .deviation-badge.yellow { background: #fffbe6; color: var(--color-warning); }
+    .deviation-badge.red { background: #fff1f0; color: var(--color-danger); }
+
+    /* 决策审计日志 */
+    .audit-log {
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 12px;
+      margin-top: var(--spacing-md);
+    }
+    .audit-entry {
+      display: flex;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-xs) 0;
+      border-bottom: 1px solid var(--color-bg-primary);
+    }
+    .audit-time {
+      color: var(--color-text-tertiary);
+      flex-shrink: 0;
+      font-family: var(--font-family-code);
+    }
+    .audit-action {
+      font-weight: 600;
+    }
+    .audit-action.commit { color: var(--color-primary); }
+    .audit-action.approve { color: var(--color-success); }
+    .audit-action.reject { color: var(--color-danger); }
+
+    /* 响应式补充 */
+    @media (max-width: 768px) {
+      .ops-review-grid { grid-template-columns: 1fr; }
+      .snapshot-compare { grid-template-columns: 1fr; }
+      .dste-timeline { flex-wrap: wrap; }
+      .dste-arrow { display: none; }
+    }
+
     /* 覆盖层 */
     .overlay {
       display: none;
@@ -965,6 +1759,7 @@
     <h1>🎨 sisys - UX 设计方向样机 v2.0（三重信任）</h1>
     <div class="nav-links">
       <a href="#directions">设计方向</a>
+      <a href="#sandbox" style="color: #722ed1; font-weight: 600;">🎮 战略沙盘</a>
       <a href="#dashboard">高管仪表盘</a>
       <a href="#evidence">五看面板</a>
       <a href="#mapping">映射追溯</a>
@@ -1136,6 +1931,548 @@
             </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- 🎮 战略沙盘指挥中心 -->
+    <section id="sandbox" class="section">
+      <h2 class="section-title" style="border-left-color: #722ed1;">🎮 动态战略沙盘 — 情景推演指挥中心</h2>
+      <p class="section-desc">
+        <strong>面向投资人路演 & 意向客户体验：</strong>拖动滑块改变宏观变量与资源约束，实时观察三重信任状态的连锁反应。
+        多 Agent 自动重新辩论，AI 代偿引擎生成最优修复方案，闭环执行层记录全流程日志。
+      </p>
+
+      <!-- Layer 1: 情景控制台 -->
+      <div class="sandbox-panel sandbox-hero">
+        <div class="section-title" style="margin-bottom: var(--spacing-md);">
+          🗂️ 顶层：战略指挥中心 (Strategic Command Center)
+          <span class="badge-gpu" id="gpuStatus" style="margin-left: auto;">
+            <span style="font-size: 10px;">🟢</span> 算力引擎: 本地私有化集群 Idle
+          </span>
+        </div>
+
+        <!-- DSTE 时间轴 -->
+        <div style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: var(--spacing-sm);">
+          📅 DSTE 战略管理运行日历 — 当前所处阶段决定可操作的变量类型
+        </div>
+        <div class="dste-timeline" id="dsteTimeline">
+          <div class="dste-phase active" onclick="switchDSTEPhase(0)" id="dstePhase0">
+            <span class="phase-icon">🔭</span>
+            <span class="phase-label">SP 战略制定期</span>
+            <span class="phase-date">4月 — 9月</span>
+          </div>
+          <span class="dste-arrow">→</span>
+          <div class="dste-phase" onclick="switchDSTEPhase(1)" id="dstePhase1">
+            <span class="phase-icon">🔧</span>
+            <span class="phase-label">BP 战略解码期</span>
+            <span class="phase-date">10月 — 12月</span>
+          </div>
+          <span class="dste-arrow">→</span>
+          <div class="dste-phase" onclick="switchDSTEPhase(2)" id="dstePhase2">
+            <span class="phase-icon">📡</span>
+            <span class="phase-label">执行监控期</span>
+            <span class="phase-date">1月 — 3月</span>
+          </div>
+          <span class="dste-arrow">→</span>
+          <div class="dste-phase" onclick="switchDSTEPhase(3)" id="dstePhase3">
+            <span class="phase-icon">🔄</span>
+            <span class="phase-label">评估复盘期</span>
+            <span class="phase-date">3月 — 4月</span>
+          </div>
+        </div>
+
+        <!-- 快照管理系统 -->
+        <div style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: var(--spacing-sm);">
+          📸 情景快照 — 保存当前推演状态，对比不同情景，锁定为 BP 基线
+        </div>
+        <div class="snapshot-bar" id="snapshotBar">
+          <span style="font-size: 12px; color: var(--color-text-tertiary);">当前：</span>
+          <span class="snapshot-chip active" id="chipCurrent">
+            <span class="snap-dot green"></span> 实时推演
+          </span>
+          <button class="stat-btn" style="font-size: 12px; padding: 4px 10px;" onclick="saveSnapshot()">📸 保存快照</button>
+          <button class="stat-btn" style="font-size: 12px; padding: 4px 10px; background: #722ed1;" onclick="lockAsBaseline()">🔒 锁定为 BP 基线</button>
+          <button class="stat-btn" style="font-size: 12px; padding: 4px 10px; background: var(--color-bg-primary); color: var(--color-text-primary);" id="btnCompare" onclick="toggleCompare()">📊 对比快照</button>
+        </div>
+        <div class="snapshot-compare" id="snapshotCompare"></div>
+
+        <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg); margin-top: var(--spacing-md);">
+          拖动滑块改变宏观变量与资源约束，实时观察三重信任状态的连锁反应。每个变量标注所属 BSC 视角。
+        </p>
+
+        <div class="plan-selector">
+          <button class="plan-btn active" id="btn-plan-a" onclick="resetSandbox()">
+            <div class="plan-title">🟢 Plan A (基准战略) ✓</div>
+            <div class="plan-desc">当前执行路线，资源充沛，按部就班</div>
+          </button>
+          <button class="plan-btn" id="btn-plan-b">
+            <div class="plan-title">🟡 Plan B (资源紧缩)</div>
+            <div class="plan-desc">应对资本寒冬，保核心弃边缘</div>
+          </button>
+          <button class="plan-btn" id="btn-plan-c">
+            <div class="plan-title">🔴 Plan C (激进突围)</div>
+            <div class="plan-desc">高风险高投入，抢占窗口期</div>
+          </button>
+        </div>
+
+        <div class="slider-grid">
+          <div>
+            <div style="font-size: 14px; font-weight: bold; color: var(--color-text-secondary); margin-bottom: var(--spacing-md);">🌍 宏观 / 五看变量</div>
+
+            <div class="slider-group">
+              <div class="slider-header" style="align-items: center;">
+                <span>📈 市场增量预期 (CAGR)</span>
+                <span style="display: flex; gap: 4px; align-items: center;">
+                  <span class="bsc-tag customer">客户</span>
+                  <span class="bsc-tag financial">财务</span>
+                  <span id="val-cagr" style="color: var(--color-success); font-weight: bold; margin-left: 4px;">15%</span>
+                </span>
+              </div>
+              <input type="range" id="slide-cagr" min="0" max="30" value="15" step="1" oninput="runSimulation()">
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header" style="align-items: center;">
+                <span>🏢 竞品发布周期 (提前量)</span>
+                <span style="display: flex; gap: 4px; align-items: center;">
+                  <span class="bsc-tag customer">客户</span>
+                  <span class="bsc-tag process">流程</span>
+                  <span id="val-comp" style="font-weight: bold; margin-left: 4px;">正常</span>
+                </span>
+              </div>
+              <input type="range" class="reverse-track" id="slide-comp" min="0" max="6" value="0" step="1" oninput="runSimulation()">
+              <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--color-text-tertiary); margin-top:4px;">
+                <span>0 个月</span><span>提前 6 个月</span>
+              </div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header" style="align-items: center;">
+                <span>💰 客户预算缩减</span>
+                <span style="display: flex; gap: 4px; align-items: center;">
+                  <span class="bsc-tag financial">财务</span>
+                  <span id="val-client" style="color: var(--color-success); font-weight: bold; margin-left: 4px;">0%</span>
+                </span>
+              </div>
+              <input type="range" class="reverse-track" id="slide-client" min="0" max="30" value="0" step="5" oninput="runSimulation()">
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size: 14px; font-weight: bold; color: var(--color-text-secondary); margin-bottom: var(--spacing-md);">📦 约束 / 资源变量</div>
+
+            <div class="slider-group">
+              <div class="slider-header" style="align-items: center;">
+                <span>🔬 年度研发预算</span>
+                <span style="display: flex; gap: 4px; align-items: center;">
+                  <span class="bsc-tag financial">财务</span>
+                  <span class="bsc-tag learning">学习</span>
+                  <span id="val-budget" style="color: var(--color-success); font-weight: bold; margin-left: 4px;">¥ 2.0 亿</span>
+                </span>
+              </div>
+              <input type="range" id="slide-budget" min="0.5" max="3.0" value="2.0" step="0.1" oninput="runSimulation()">
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header" style="align-items: center;">
+                <span>👥 核心 HC (人才缺口)</span>
+                <span style="display: flex; gap: 4px; align-items: center;">
+                  <span class="bsc-tag learning">学习</span>
+                  <span class="bsc-tag process">流程</span>
+                  <span id="val-hc" style="font-weight: bold; margin-left: 4px;">已补齐 0 人</span>
+                </span>
+              </div>
+              <input type="range" class="reverse-track" id="slide-hc" min="0" max="50" value="0" step="5" oninput="runSimulation()">
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header" style="align-items: center;">
+                <span>📋 合规审批延期</span>
+                <span style="display: flex; gap: 4px; align-items: center;">
+                  <span class="bsc-tag process">流程</span>
+                  <span id="val-compliance" style="color: var(--color-success); font-weight: bold; margin-left: 4px;">无延期</span>
+                </span>
+              </div>
+              <input type="range" class="reverse-track" id="slide-compliance" min="0" max="6" value="0" step="1" oninput="runSimulation()">
+              <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--color-text-tertiary); margin-top:4px;">
+                <span>0 个月</span><span>延期 6 个月</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layer 2: 涟漪反馈层 -->
+      <div>
+        <div class="section-title">🌊 二层：涟漪反馈层 (The Trust Ripple Engine) — 实时震荡</div>
+        <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg);">
+          交互核心：三重信任状态随滑块拖动的实时视觉震荡。卡片由绿变黄变红、连线粗细变化、权重自动转移。
+        </p>
+        <div class="ripple-grid">
+
+          <div class="trust-card ripple" id="card-direction">
+            <div class="trust-header">
+              <div>
+                <div class="trust-icon">🎯</div>
+                <div class="trust-title">方向可信受击</div>
+              </div>
+              <div class="trust-score" id="score-direction">0.92</div>
+            </div>
+            <div style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: var(--spacing-sm);">
+              共识度：<span id="consensus-text">极高 (5/5 Agent 支持)</span>
+            </div>
+            <div class="agent-chat" id="agent-chat-box">
+              <div class="agent-row"><span>🧑‍💼 CMO:</span> <span style="color:var(--color-success)">✅ 全力支持，窗口期极佳</span></div>
+              <div class="agent-row"><span>👨‍💼 CFO:</span> <span id="cfo-status" style="color:var(--color-success)">✅ 预算健康，ROI 达标</span></div>
+              <div class="agent-row"><span>👷 CTO:</span> <span id="cto-status" style="color:var(--color-success)">✅ 技术路线可行</span></div>
+            </div>
+          </div>
+
+          <div class="trust-card ripple" id="card-decode">
+            <div class="trust-header">
+              <div>
+                <div class="trust-icon">🔗</div>
+                <div class="trust-title">解码可信重构</div>
+              </div>
+              <div class="trust-score" id="score-decode">100%</div>
+            </div>
+            <div style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: var(--spacing-sm);">
+              SP→BP 映射链路动态调整：
+            </div>
+            <div style="margin-top: 12px;">
+              <div style="font-size: 12px; display: flex; justify-content: space-between;">
+                <span>KPI: 核心技术突破</span> <span id="weight-1" style="font-weight: 600;">权重 0.5</span>
+              </div>
+              <div class="mapping-line" id="line-1"></div>
+              <div style="font-size: 12px; display: flex; justify-content: space-between; margin-top: 8px;">
+                <span>KPI: 边缘产品线迭代</span> <span id="weight-2" style="font-weight: 600;">权重 0.5</span>
+              </div>
+              <div class="mapping-line" id="line-2"></div>
+            </div>
+          </div>
+
+          <div class="trust-card ripple" id="card-execute">
+            <div class="trust-header">
+              <div>
+                <div class="trust-icon">✅</div>
+                <div class="trust-title">执行可信预警</div>
+              </div>
+              <div class="trust-score" id="score-execute">95/100</div>
+            </div>
+            <div style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: var(--spacing-sm);">
+              资源约束校验 & 里程碑状态：
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; justify-content: space-between; font-size: 13px; background: var(--color-bg-primary); padding: 4px 8px; border-radius: 4px;">
+                <span>M1: 架构设计</span> <span style="color:var(--color-success)">🟢 按期</span>
+              </div>
+              <div id="m2-status-box" style="display: flex; justify-content: space-between; font-size: 13px; background: var(--color-bg-primary); padding: 4px 8px; border-radius: 4px; transition: all 0.3s;">
+                <span>M2: 核心样机交付</span> <span id="m2-status-text" style="color:var(--color-success)">🟢 Q3 可行</span>
+              </div>
+              <div id="resource-alert" style="display: none; font-size: 12px; color: var(--color-danger); margin-top: 4px; padding: 4px 8px; background: #fff1f0; border-radius: 4px;">
+                ⚠️ 熔断：资源约束击穿底线！
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- BEM 战略解码面板 (Layer 2 增强) -->
+      <div style="margin-top: var(--spacing-lg);">
+        <div class="section-title">🔧 BEM 战略解码过程可视化 — 六步法 + X-Matrix + catchball</div>
+        <div class="bem-steps" id="bemSteps">
+          <div class="bem-step active" onclick="switchBEMStep(0)"><span class="step-num">①</span>CSF 导出</div>
+          <div class="bem-step" onclick="switchBEMStep(1)"><span class="step-num">②</span>KPI 筛选</div>
+          <div class="bem-step" onclick="switchBEMStep(2)"><span class="step-num">③</span>CTQ-Y 分解</div>
+          <div class="bem-step" onclick="switchBEMStep(3)"><span class="step-num">④</span>TOPN 确定</div>
+          <div class="bem-step" onclick="switchBEMStep(4)"><span class="step-num">⑤</span>PBC 签署</div>
+          <div class="bem-step" onclick="switchBEMStep(5)"><span class="step-num">⑥</span>运营监控</div>
+        </div>
+
+        <div class="bem-detail show" id="bemDetail0">
+          <strong>① CSF（关键成功因素）导出</strong> — 从 SP 战略控制点推导中长期关键成功因素
+          <div style="margin-top: var(--spacing-sm); font-size: 13px; color: var(--color-text-secondary);">
+            <strong>输入</strong>：SP 战略控制点 SC-1（高端医疗设备市场领先）<br>
+            <strong>输出</strong>：CSF-1 技术壁垒建立 | CSF-2 人才密度提升 | CSF-3 市场覆盖面扩大<br>
+            <strong>方法</strong>：BLM 业务设计→CSF 推导矩阵，多 Agent 交叉验证
+          </div>
+          <details style="margin-top: var(--spacing-sm);"><summary style="cursor:pointer; font-size:12px; color:var(--color-primary);">catchball 协商记录</summary>
+            <div class="agent-chat" style="margin-top: 8px;">
+              <div class="agent-row"><span>🧑‍💼 CMO 提议：</span><span style="color:var(--color-success)">建议 CSF-3 权重提升至 0.4</span></div>
+              <div class="agent-row"><span>👨‍💼 CFO 反馈：</span><span style="color:var(--color-warning)">担忧资源投入产出比，要求先验证 ROI</span></div>
+              <div class="agent-row"><span>👤 SYS 裁决：</span><span style="color:var(--color-primary)">采纳 CFO 建议，CSF-3 先以 0.3 权重试运行一季</span></div>
+            </div>
+          </details>
+        </div>
+        <div class="bem-detail" id="bemDetail1">
+          <strong>② KPI 筛选</strong> — 为每个 CSF 匹配可量化度量指标
+          <div style="margin-top: var(--spacing-sm); font-size: 13px; color: var(--color-text-secondary);">
+            CSF-3（市场覆盖面）→ KPI-3.1（三甲覆盖率 ≥30%）| KPI-3.2（渠道签约数 ≥30 家）<br>
+            筛选标准：可量化 + 可对比（行业基准）+ 数据可获取 + 责任人明确
+          </div>
+        </div>
+        <div class="bem-detail" id="bemDetail2">
+          <strong>③ CTQ-Y 分解</strong> — 将 KPI 分解为可操作的关键质量特性
+          <div style="margin-top: var(--spacing-sm); font-size: 13px; color: var(--color-text-secondary);">
+            KPI-3.1（三甲覆盖率 ≥30%）→ CTQ-Y1：三甲医院拜访覆盖 ≥80 家 | CTQ-Y2：试用装机 ≥15 台<br>
+            KPI-3.2（渠道签约 ≥30 家）→ CTQ-Y3：渠道经理人均签约 3-4 家
+          </div>
+        </div>
+        <div class="bem-detail" id="bemDetail3">
+          <strong>④ TOPN 确定</strong> — 确定年度重点工作（必赢之战），资源配置
+          <div style="margin-top: var(--spacing-sm); font-size: 13px; color: var(--color-text-secondary);">
+            TOP1：核心样机 Q2 交付（研发投入 ¥2 亿，CTO 主责）<br>
+            TOP2：30 家三甲渠道签约（9 名渠道经理，COO 主责）<br>
+            TOP3：5 名学科带头人引进（HR 主责，预算 ¥0.3 亿）
+          </div>
+        </div>
+        <div class="bem-detail" id="bemDetail4">
+          <strong>⑤ PBC 签署</strong> — 将 TOPN 分解到个人绩效承诺
+          <div style="margin-top: var(--spacing-sm); font-size: 13px; color: var(--color-text-secondary);">
+            管理层 PBC = Win 目标（70%）+ Execute 措施（20%）+ Team 协作（10%）<br>
+            签约状态：CTO ✅ 已签 | COO ✅ 已签 | HR ⚠️ 待签署（对 HC 目标有保留）
+          </div>
+        </div>
+        <div class="bem-detail" id="bemDetail5">
+          <strong>⑥ 运营监控</strong> — 月度经营分析会 + 季度战略健康度审视
+          <div style="margin-top: var(--spacing-sm); font-size: 13px; color: var(--color-text-secondary);">
+            双周：KPI 偏差检测自动扫描<br>
+            月度：经营分析会（三聚焦：目标差距→问题根因→机会清单）<br>
+            季度：战略健康度审视 + 滚动刷新建议
+          </div>
+        </div>
+
+        <!-- X-Matrix 四象限 -->
+        <details style="margin-top: var(--spacing-md);">
+          <summary style="cursor: pointer; font-weight: 600; font-size: 13px; color: var(--color-text-secondary);">
+            📐 Hoshin Kanri X-Matrix — 战略目标→年度目标→改进项→KPI 交叉权重矩阵
+          </summary>
+          <div class="xmatrix" style="margin-top: var(--spacing-sm);">
+            <div class="xmatrix-cell header"></div>
+            <div class="xmatrix-cell header">年度目标：三甲覆盖 ≥30%</div>
+            <div class="xmatrix-cell header">战略目标：高端医疗市场领先</div>
+            <div class="xmatrix-cell">
+              <span class="corr strong">●</span> CSF-1 技术壁垒<br>
+              <span class="corr strong">●</span> CSF-2 人才密度<br>
+              <span class="corr medium">○</span> CSF-3 市场覆盖
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Layer 3: 智能决策层 -->
+      <div style="margin-top: var(--spacing-lg);">
+        <div class="section-title">💡 三层：智能决策输出层 (Decision & Auto-Correction)</div>
+        <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg);">
+          交互核心：从"被动报警"到"主动提供最优解"。敏感性分析揭示最大软肋，AI 代偿引擎生成修复策略。
+        </p>
+        <div class="decision-grid">
+
+          <div class="panel-card" style="background: var(--color-white); border-radius: var(--radius-lg); padding: var(--spacing-lg); box-shadow: var(--shadow-sm);">
+            <div style="font-weight: 600; margin-bottom: 8px;">📊 敏感性分析 (Tornado Chart)</div>
+            <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 16px;">
+              揭示对战略执行影响最大的变量——当前最大软肋一目了然
+            </div>
+            <div class="tornado-chart">
+              <div class="tornado-row">
+                <div class="tornado-label">人力 HC 缺口</div>
+                <div class="tornado-bars">
+                  <div class="tornado-axis"></div>
+                  <div class="bar-neg" id="tor-hc-neg" style="width: 10%"></div>
+                </div>
+              </div>
+              <div class="tornado-row">
+                <div class="tornado-label">研发预算增减</div>
+                <div class="tornado-bars">
+                  <div class="tornado-axis"></div>
+                  <div class="bar-neg" id="tor-bg-neg" style="width: 15%"></div>
+                  <div class="bar-pos" id="tor-bg-pos" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="tornado-row">
+                <div class="tornado-label">竞品提前发布</div>
+                <div class="tornado-bars">
+                  <div class="tornado-axis"></div>
+                  <div class="bar-neg" id="tor-cp-neg" style="width: 5%"></div>
+                </div>
+              </div>
+              <div class="tornado-row">
+                <div class="tornado-label">客户预算缩减</div>
+                <div class="tornado-bars">
+                  <div class="tornado-axis"></div>
+                  <div class="bar-neg" id="tor-cl-neg" style="width: 8%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ai-magic-box">
+            <div class="ai-title">🪄 AI 智能代偿方案 (Auto-Correction)</div>
+            <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 12px;">
+              当执行分数低于 75 或方向得分低于 0.70 时，多 Agent 自动生成最优修复建议。
+            </div>
+
+            <!-- 审批流转指示器 -->
+            <div class="approval-flow" id="approvalFlow" style="margin-bottom: var(--spacing-md);">
+              <span style="font-size: 11px; color: var(--color-text-tertiary);">策略状态：</span>
+              <span class="approval-step" id="apDraft">📝 草稿</span>
+              <span class="approval-arrow">→</span>
+              <span class="approval-step" id="apPending">⏳ 待审批</span>
+              <span class="approval-arrow">→</span>
+              <span class="approval-step" id="apApproved">✅ 已批准</span>
+              <span class="approval-arrow">→</span>
+              <span class="approval-step" id="apExecuted">🚀 已执行</span>
+            </div>
+
+            <div id="ai-strategies" style="opacity: 0.4; pointer-events: none;">
+              <div class="strategy-item">
+                <div class="strategy-text">
+                  <strong>推荐策略 1：弃卒保车</strong><br>
+                  <span style="font-size: 12px; color: var(--color-text-secondary);">砍掉非核心业务线 B，释放 20% 预算保全核心 KPI。</span>
+                </div>
+                <div>
+                  <button class="btn-apply" onclick="submitApproval(this, 1)">提交审批</button>
+                </div>
+              </div>
+              <div class="strategy-item">
+                <div class="strategy-text">
+                  <strong>推荐策略 2：以时间换空间</strong><br>
+                  <span style="font-size: 12px; color: var(--color-text-secondary);">接受 M2 里程碑延期 45 天，无需额外增加预算与人力。</span>
+                </div>
+                <div>
+                  <button class="btn-apply" onclick="submitApproval(this, 2)">提交审批</button>
+                </div>
+              </div>
+              <div class="strategy-item">
+                <div class="strategy-text">
+                  <strong>推荐策略 3：资源重配</strong><br>
+                  <span style="font-size: 12px; color: var(--color-text-secondary);">将 HC 从边缘业务转岗至核心项目，缓解 30% 人才缺口。</span>
+                </div>
+                <div>
+                  <button class="btn-apply" onclick="submitApproval(this, 3)">提交审批</button>
+                </div>
+              </div>
+            </div>
+            <div id="ai-mask" style="position: absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background: rgba(249,240,255,0.85); backdrop-filter: blur(2px); border-radius: var(--radius-md);">
+              <span style="color: #722ed1; font-weight: 500;">🟢 当前战略健康，AI 未触发干预</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Layer 4: 闭环执行层 -->
+      <div style="margin-top: var(--spacing-lg);">
+        <div class="section-title">🔄 四层：闭环执行与监控层 (Runtime & Closed-Loop)</div>
+        <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg);">
+          交互核心：让战略设计与底层业务执行接轨。上承 SP/BP 规划输出，下接经营分析会三聚焦看板，形成 "test→learn→adapt" 闭环。
+        </p>
+
+        <!-- 经营分析会看板 -->
+        <div style="margin-bottom: var(--spacing-lg);">
+          <div style="font-size: 14px; font-weight: 600; margin-bottom: var(--spacing-sm);">📋 月度经营分析会看板（三聚焦）</div>
+          <div class="ops-review-grid">
+            <div class="ops-review-col gap">
+              <h4>🔴 目标差距 (GAP)</h4>
+              <div class="ops-item">▪ Q1 研发投入进度 78% vs 计划 100%<br><span style="color:var(--color-danger); font-size:11px;">偏差 -22%，需启动根因分析</span></div>
+              <div class="ops-item">▪ 渠道签约 12 家 vs 目标 15 家<br><span style="color:var(--color-warning); font-size:11px;">偏差 -20%，追踪 3 家推进中</span></div>
+            </div>
+            <div class="ops-review-col root">
+              <h4>🟡 问题根因 (ROOT CAUSE)</h4>
+              <div class="ops-item">▪ 研发进度滞后→ 2 名核心工程师离职<br><span style="font-size:11px;">建议：启动紧急招聘 + 外部顾问</span></div>
+              <div class="ops-item">▪ 渠道签约放缓→ 竞品降价冲击<br><span style="font-size:11px;">建议：差异化学术营销策略</span></div>
+            </div>
+            <div class="ops-review-col opportunity">
+              <h4>🟢 机会清单 (OPPORTUNITY)</h4>
+              <div class="ops-item">▪ 新获批 5 个省份集采资格<br><span style="font-size:11px;">追加配备 3 名渠道经理提前布局</span></div>
+              <div class="ops-item">▪ 竞品 M 公司出现质量事故<br><span style="font-size:11px;">加速临床推广，抢占窗口期</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 计划 vs 实际对比 -->
+        <div style="margin-bottom: var(--spacing-lg);">
+          <details>
+            <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--color-text-secondary); margin-bottom: var(--spacing-sm);">
+              📊 KPI 计划 vs 实际对比表（BSC 四视角）
+            </summary>
+            <div style="overflow-x: auto; margin-top: var(--spacing-sm);">
+              <table class="plan-vs-actual">
+                <thead>
+                  <tr><th>视角</th><th>KPI</th><th>计划值</th><th>实际值</th><th>偏差</th><th>状态</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="bsc-tag financial">财务</span></td>
+                    <td>研发投入效率</td><td>¥2.0 亿</td><td>¥1.56 亿</td><td>-22%</td>
+                    <td><span class="deviation-badge yellow">⚠️ 关注</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="bsc-tag customer">客户</span></td>
+                    <td>三甲签约数</td><td>15 家</td><td>12 家</td><td>-20%</td>
+                    <td><span class="deviation-badge yellow">⚠️ 关注</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="bsc-tag process">流程</span></td>
+                    <td>样机交付周期</td><td>Q2</td><td>Q2</td><td>0</td>
+                    <td><span class="deviation-badge green">✅ 正常</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="bsc-tag learning">学习</span></td>
+                    <td>专利产出数</td><td>3 项</td><td>4 项</td><td>+33%</td>
+                    <td><span class="deviation-badge green">✅ 超前</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="bsc-tag learning">学习</span></td>
+                    <td>人才引进</td><td>5 名</td><td>1 名</td><td>-80%</td>
+                    <td><span class="deviation-badge red">🔴 严重</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="margin-top: var(--spacing-sm); font-size: 12px; color: var(--color-text-secondary);">
+              💡 <strong>滚动刷新建议</strong>：人才 KPI 持续 2 期大幅落后于计划，建议触发情景切换 → Plan B（资源紧缩），或重新评估 HC 假设前提。上一次数据同步：<span style="color: var(--color-success);">30 秒前</span>（模拟 Webhook 接入 CI/CD + 财务 + HR 系统）
+            </div>
+          </details>
+        </div>
+        <div class="runtime-panel">
+          <div class="runtime-dots">
+            <span class="runtime-dot red"></span>
+            <span class="runtime-dot yellow"></span>
+            <span class="runtime-dot green"></span>
+          </div>
+          <div class="log-container" id="terminal-log">
+            <div class="log-line"><span class="log-time">[10:00:01]</span> <span class="log-success">SYS_INFO: 🎮 战略沙盘已就绪，Webhook 监听 ERP & Gitea & 财务系统...</span></div>
+            <div class="log-line"><span class="log-time">[10:00:05]</span> <span class="log-success">DATA_SYNC: 财务流水同步完成，当前预算消耗处于绿色阈值。</span></div>
+            <div class="log-line"><span class="log-time">[10:00:12]</span> <span class="log-success">MONITOR: 战略偏差检测守护进程运行中，预警阈值已加载。</span></div>
+          </div>
+          <span class="log-scroll-indicator" id="scrollHint">▼ 更多日志</span>
+        </div>
+
+        <!-- 决策审计日志 -->
+        <details style="margin-top: var(--spacing-lg);">
+          <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--color-text-secondary);">
+            📜 决策审计日志 (Audit Trail) — 所有参数变更、策略采纳与审批记录
+          </summary>
+          <div class="audit-log" id="auditLog" style="margin-top: var(--spacing-sm);">
+            <div class="audit-entry">
+              <span class="audit-time">2026-01-15 14:30</span>
+              <span class="audit-action commit">📌 锁定基线</span>
+              <span>BP 2026 基线版本 v1.0 已创建，基于 Plan A 快照</span>
+            </div>
+            <div class="audit-entry">
+              <span class="audit-time">2026-01-15 14:22</span>
+              <span class="audit-action approve">✅ 审批通过</span>
+              <span>CEO 张总批准"弃卒保车"策略，释放 20% 预算</span>
+            </div>
+            <div class="audit-entry">
+              <span class="audit-time">2026-01-15 14:18</span>
+              <span class="audit-action">📝 提交审批</span>
+              <span>李经理提交策略 1 至审批流程</span>
+            </div>
+          </div>
+        </details>
       </div>
     </section>
 
@@ -1785,6 +3122,10 @@
   </main>
 
   <script>
+    // ========================================
+    // 基础交互函数
+    // ========================================
+
     function toggleSourceCard() {
       var card = document.getElementById('sourceCard');
       var overlay = document.getElementById('overlay');
@@ -1794,57 +3135,510 @@
 
     // 五看证据面板 Tab 切换
     function switchEvidenceTab(index) {
-      // 更新 Tab 按钮
       var tabs = document.querySelectorAll('#evidenceTabs .evidence-tab');
       tabs.forEach(function(tab, i) {
-        if (i === index) {
-          tab.classList.add('active');
-        } else {
-          tab.classList.remove('active');
-        }
+        tab.classList.toggle('active', i === index);
       });
-
-      // 更新内容面板
       for (var i = 0; i < 5; i++) {
         var panel = document.getElementById('evidenceContent' + i);
-        if (panel) {
-          if (i === index) {
-            panel.classList.add('active');
-          } else {
-            panel.classList.remove('active');
-          }
-        }
+        if (panel) panel.classList.toggle('active', i === index);
       }
     }
 
     // SP→BP 映射详情展开
     function showMappingDetail(bpId) {
-      // 更新选中样式
       var items = document.querySelectorAll('.mapping-bp-item');
-      items.forEach(function(item) {
-        item.classList.remove('selected');
-      });
+      items.forEach(function(item) { item.classList.remove('selected'); });
       var selected = document.getElementById(bpId);
       if (selected) selected.classList.add('selected');
 
-      // 更新详情面板内容
       var detailPanel = document.getElementById('mappingDetail');
       var detailName = document.getElementById('detailKpiName');
-
       var detailMap = {
         'bp1': 'KPI：研发投入完成率 100% — 锚点链：CSF-1（技术壁垒建立）→ KPI-1.1（专利产出）→ 目标值 3 项',
         'bp2': 'KPI：三甲医院签约数 ≥30 — 锚点链：CSF-3（提升市场覆盖面）→ KPI-3.1（三甲覆盖率）→ 目标值 30 家',
         'bp3': 'KPI：学科带头人引进 5 名 — 锚点链：CSF-2（人才密度提升）→ KPI-2.1（高端人才占比）→ 目标值 5 名'
       };
+      if (detailName && detailMap[bpId]) detailName.textContent = detailMap[bpId];
+      if (detailPanel) detailPanel.classList.add('show');
+    }
 
-      if (detailName && detailMap[bpId]) {
-        detailName.textContent = detailMap[bpId];
+    // ========================================
+    // 🎮 战略沙盘推演引擎
+    // ========================================
+
+    function runSimulation() {
+      // 读取所有滑块值
+      var cagr = parseFloat(document.getElementById('slide-cagr').value);
+      var comp = parseFloat(document.getElementById('slide-comp').value);
+      var client = parseFloat(document.getElementById('slide-client').value);
+      var budget = parseFloat(document.getElementById('slide-budget').value);
+      var hc = parseFloat(document.getElementById('slide-hc').value);
+      var compliance = parseFloat(document.getElementById('slide-compliance').value);
+
+      // 更新滑块显示文本
+      updateSliderLabels(cagr, comp, client, budget, hc, compliance);
+
+      // 算力引擎闪烁
+      var gpu = document.getElementById('gpuStatus');
+      gpu.classList.add('computing');
+      gpu.innerHTML = '<span style="font-size: 10px;">⚡</span> 算力引擎: Agent 并发重算中...';
+
+      setTimeout(function() {
+        gpu.classList.remove('computing');
+        gpu.innerHTML = '<span style="font-size: 10px;">🟢</span> 算力引擎: 本地私有化集群 Idle';
+        calculateImpact(cagr, comp, client, budget, hc, compliance);
+      }, 350);
+    }
+
+    function updateSliderLabels(cagr, comp, client, budget, hc, compliance) {
+      var valCagr = document.getElementById('val-cagr');
+      valCagr.innerText = cagr + '%';
+      valCagr.style.color = cagr < 10 ? 'var(--color-danger)' : cagr > 20 ? 'var(--color-success)' : 'inherit';
+
+      var valComp = document.getElementById('val-comp');
+      valComp.innerText = comp === 0 ? '正常' : '提前 ' + comp + ' 个月';
+      valComp.style.color = comp > 3 ? 'var(--color-danger)' : comp > 1 ? 'var(--color-warning)' : 'inherit';
+
+      var valClient = document.getElementById('val-client');
+      valClient.innerText = client + '%';
+      valClient.style.color = client > 15 ? 'var(--color-danger)' : client > 5 ? 'var(--color-warning)' : 'var(--color-success)';
+
+      var valBudget = document.getElementById('val-budget');
+      valBudget.innerText = '¥ ' + budget.toFixed(1) + ' 亿';
+      valBudget.style.color = budget < 1.2 ? 'var(--color-danger)' : budget < 1.8 ? 'var(--color-warning)' : 'var(--color-success)';
+
+      var valHc = document.getElementById('val-hc');
+      valHc.innerText = hc === 0 ? '已补齐 0 人' : '缺口 ' + hc + ' 人';
+      valHc.style.color = hc > 20 ? 'var(--color-danger)' : hc > 10 ? 'var(--color-warning)' : 'inherit';
+
+      var valCompliance = document.getElementById('val-compliance');
+      valCompliance.innerText = compliance === 0 ? '无延期' : '延期 ' + compliance + ' 个月';
+      valCompliance.style.color = compliance > 3 ? 'var(--color-danger)' : compliance > 1 ? 'var(--color-warning)' : 'var(--color-success)';
+    }
+
+    function calculateImpact(cagr, comp, client, budget, hc, compliance) {
+      var isWarning = false;
+      var isDanger = false;
+
+      // === 方向可信 ===
+      var dirScore = 0.92 - ((15 - cagr) * 0.025) - (comp * 0.05) - (client * 0.008);
+      var cardDir = document.getElementById('card-direction');
+      var cfoText = document.getElementById('cfo-status');
+      var ctoText = document.getElementById('cto-status');
+
+      if (dirScore < 0.55) {
+        cardDir.className = 'trust-card ripple status-danger';
+        cfoText.innerHTML = '🔴 强烈反对！ROI 模型彻底崩溃';
+        cfoText.style.color = 'var(--color-danger)';
+        ctoText.innerHTML = '🔴 窗口期已关闭，技术路线不可行';
+        ctoText.style.color = 'var(--color-danger)';
+        document.getElementById('consensus-text').innerText = '破裂 (2/5 支持)';
+        isDanger = true;
+      } else if (dirScore < 0.75) {
+        cardDir.className = 'trust-card ripple status-warning';
+        cfoText.innerHTML = '⚠️ 警告：投资回收期将延长 2 年';
+        cfoText.style.color = 'var(--color-warning)';
+        ctoText.innerHTML = '⚠️ 技术方案需要重新评估';
+        ctoText.style.color = 'var(--color-warning)';
+        document.getElementById('consensus-text').innerText = '动摇 (3/5 支持)';
+        isWarning = true;
+      } else {
+        cardDir.className = 'trust-card ripple';
+        cfoText.innerHTML = '✅ 预算健康，ROI 达标';
+        cfoText.style.color = 'var(--color-success)';
+        ctoText.innerHTML = '✅ 技术路线可行';
+        ctoText.style.color = 'var(--color-success)';
+        document.getElementById('consensus-text').innerText = '极高 (5/5 支持)';
+      }
+      document.getElementById('score-direction').innerText = Math.max(0, dirScore).toFixed(2);
+
+      // === 解码可信 (权重转移) ===
+      var cardDec = document.getElementById('card-decode');
+      if (budget < 1.5 || hc > 15) {
+        cardDec.className = 'trust-card ripple status-warning';
+        document.getElementById('weight-1').innerText = '权重 0.80 (保底)';
+        document.getElementById('weight-2').innerText = '权重 0.20 (收缩)';
+        document.getElementById('score-decode').innerText = '重分配中';
+        document.getElementById('score-decode').style.color = 'var(--color-warning)';
+        isWarning = true;
+      } else if (budget < 1.0 || hc > 30) {
+        cardDec.className = 'trust-card ripple status-danger';
+        document.getElementById('weight-1').innerText = '权重 1.00 (孤注)';
+        document.getElementById('weight-2').innerText = '权重 0.00 (砍掉)';
+        document.getElementById('score-decode').innerText = '结构崩塌';
+        document.getElementById('score-decode').style.color = 'var(--color-danger)';
+        isDanger = true;
+      } else {
+        cardDec.className = 'trust-card ripple';
+        document.getElementById('weight-1').innerText = '权重 0.50';
+        document.getElementById('weight-2').innerText = '权重 0.50';
+        document.getElementById('score-decode').innerText = '100%';
+        document.getElementById('score-decode').style.color = 'var(--color-success)';
       }
 
-      if (detailPanel) {
-        detailPanel.classList.add('show');
+      // === 执行可信 ===
+      var execScore = 95 - ((2.0 - budget) * 35) - (hc * 0.9) - (compliance * 5);
+      var cardExec = document.getElementById('card-execute');
+      var m2Box = document.getElementById('m2-status-box');
+      var m2Text = document.getElementById('m2-status-text');
+      var alertBox = document.getElementById('resource-alert');
+
+      if (execScore < 50) {
+        cardExec.className = 'trust-card ripple status-danger';
+        m2Box.style.background = '#fff1f0';
+        m2Box.style.border = '1px solid var(--color-danger)';
+        m2Text.innerHTML = '❌ 严重延期 (无法交付)';
+        m2Text.style.color = 'var(--color-danger)';
+        alertBox.style.display = 'block';
+        alertBox.innerText = budget < 1.0 ? '⚠️ 熔断：研发预算击穿底线！' : hc > 30 ? '⚠️ 熔断：核心人才断层超过警戒线！' : '⚠️ 熔断：合规审批严重滞后！';
+        isDanger = true;
+      } else if (execScore < 75) {
+        cardExec.className = 'trust-card ripple status-warning';
+        m2Box.style.background = '#fffbe6';
+        m2Box.style.border = '1px solid var(--color-warning)';
+        m2Text.innerHTML = '⚠️ 延期风险 (预计推迟至 Q4)';
+        m2Text.style.color = 'var(--color-warning)';
+        alertBox.style.display = 'none';
+        isWarning = true;
+      } else {
+        cardExec.className = 'trust-card ripple';
+        m2Box.style.background = 'var(--color-bg-primary)';
+        m2Box.style.border = 'none';
+        m2Text.innerHTML = '🟢 Q3 可行';
+        m2Text.style.color = 'var(--color-success)';
+        alertBox.style.display = 'none';
+      }
+      document.getElementById('score-execute').innerText = Math.max(0, Math.min(100, execScore)).toFixed(0) + '/100';
+
+      // === 龙卷风图更新 ===
+      document.getElementById('tor-hc-neg').style.width = Math.min(50, hc * 1.5) + '%';
+      document.getElementById('tor-cp-neg').style.width = Math.min(50, comp * 10) + '%';
+      document.getElementById('tor-cl-neg').style.width = Math.min(50, client * 1.5) + '%';
+      var bgDiff = budget - 2.0;
+      if (bgDiff < 0) {
+        document.getElementById('tor-bg-neg').style.width = Math.min(50, Math.abs(bgDiff) * 50) + '%';
+        document.getElementById('tor-bg-pos').style.width = '0%';
+      } else {
+        document.getElementById('tor-bg-neg').style.width = '0%';
+        document.getElementById('tor-bg-pos').style.width = Math.min(50, bgDiff * 50) + '%';
+      }
+
+      // === AI 代偿触发 ===
+      var aiMask = document.getElementById('ai-mask');
+      var aiContent = document.getElementById('ai-strategies');
+      if (execScore < 75 || dirScore < 0.70) {
+        aiMask.style.display = 'none';
+        aiContent.style.opacity = '1';
+        aiContent.style.pointerEvents = 'auto';
+        addLog('WARN: 执行分数 ' + execScore.toFixed(0) + '/100，方向得分 ' + dirScore.toFixed(2) + '，触发 Auto-Correction 寻优引擎。', 'warn');
+        highlightPlanBtn(isDanger ? 'btn-plan-c' : 'btn-plan-b');
+      } else {
+        aiMask.style.display = 'flex';
+        aiContent.style.opacity = '0.4';
+        aiContent.style.pointerEvents = 'none';
+        document.querySelectorAll('.btn-apply').forEach(function(btn) {
+          btn.innerText = '采纳重算';
+          btn.classList.remove('applied');
+        });
+        highlightPlanBtn('btn-plan-a');
       }
     }
+
+    // AI 策略采纳
+    function applyStrategy(btn, type) {
+      if (btn.classList.contains('applied')) return;
+      btn.innerText = '✅ 已生效';
+      btn.classList.add('applied');
+
+      var strategyNames = {1: '弃卒保车', 2: '以时间换空间', 3: '资源重配'};
+      addLog('ACTION: 高管采纳策略【' + strategyNames[type] + '】，下发重算指令，生成新版 SP-BP 映射。', 'success');
+
+      if (type === 1) {
+        document.getElementById('slide-budget').value = 1.5;
+      } else if (type === 2) {
+        document.getElementById('slide-hc').value = 0;
+        document.getElementById('slide-compliance').value = 2;
+      } else {
+        document.getElementById('slide-hc').value = Math.max(0, parseFloat(document.getElementById('slide-hc').value) - 15);
+      }
+      runSimulation();
+    }
+
+    // Plan 按钮高亮
+    function highlightPlanBtn(id) {
+      document.querySelectorAll('.plan-btn').forEach(function(b) { b.classList.remove('active', 'warning', 'danger'); });
+      var btn = document.getElementById(id);
+      if (id === 'btn-plan-b') btn.classList.add('warning');
+      else if (id === 'btn-plan-c') btn.classList.add('danger');
+      else btn.classList.add('active');
+    }
+
+    // 重置沙盘到 Plan A
+    function resetSandbox() {
+      document.getElementById('slide-cagr').value = 15;
+      document.getElementById('slide-comp').value = 0;
+      document.getElementById('slide-client').value = 0;
+      document.getElementById('slide-budget').value = 2.0;
+      document.getElementById('slide-hc').value = 0;
+      document.getElementById('slide-compliance').value = 0;
+      runSimulation();
+      addLog('SYS_INFO: 已重置回 Plan A 基准环境。所有变量恢复默认值。', 'success');
+    }
+
+    // === 终端日志系统 ===
+    function addLog(text, type) {
+      var term = document.getElementById('terminal-log');
+      var now = new Date();
+      var timeStr = '[' + String(now.getHours()).padStart(2, '0') + ':' +
+                    String(now.getMinutes()).padStart(2, '0') + ':' +
+                    String(now.getSeconds()).padStart(2, '0') + ']';
+      var colorClass = type === 'warn' ? 'log-warn' : type === 'error' ? 'log-error' : 'log-success';
+
+      var el = document.createElement('div');
+      el.className = 'log-line just-added';
+      el.innerHTML = '<span class="log-time">' + timeStr + '</span> <span class="' + colorClass + '">' + text + '</span>';
+      term.appendChild(el);
+
+      // 最多保留 20 行，超出移除旧行
+      var lines = term.querySelectorAll('.log-line');
+      if (lines.length > 20) {
+        lines[0].remove();
+      }
+
+      term.scrollTop = term.scrollHeight;
+
+      setTimeout(function() { el.classList.remove('just-added'); }, 400);
+      updateScrollHint();
+    }
+
+    function updateScrollHint() {
+      var term = document.getElementById('terminal-log');
+      var hint = document.getElementById('scrollHint');
+      var lineCount = term.querySelectorAll('.log-line').length;
+      if (lineCount > 5 && term.scrollTop + term.clientHeight < term.scrollHeight - 10) {
+        hint.classList.add('visible');
+        setTimeout(function() { hint.classList.remove('visible'); }, 2000);
+      } else {
+        hint.classList.remove('visible');
+      }
+    }
+
+    // ========================================
+    // 🆕 DSTE 时间轴 + 快照 + BEM + 审批 (v3.0)
+    // ========================================
+
+    var currentDSTEPhase = 0;
+    var snapshots = [];
+    var snapshotCounter = 0;
+
+    // DSTE 阶段切换
+    function switchDSTEPhase(index) {
+      currentDSTEPhase = index;
+      var phases = document.querySelectorAll('.dste-phase');
+      phases.forEach(function(p, i) { p.classList.toggle('active', i === index); });
+
+      // 不同阶段配置
+      var sliders = ['slide-cagr', 'slide-comp', 'slide-client', 'slide-budget', 'slide-hc', 'slide-compliance'];
+      if (index === 0) {
+        // SP 制定期：所有滑块可用
+        sliders.forEach(function(id) { document.getElementById(id).disabled = false; });
+        addLog('PHASE: 进入 SP 战略制定期（4月-9月），宏观变量 & 资源约束滑块可用。', 'success');
+      } else if (index === 1) {
+        // BP 解码期：五看变量锁��，解锁解码参数
+        ['slide-cagr', 'slide-comp', 'slide-client'].forEach(function(id) { document.getElementById(id).disabled = true; });
+        ['slide-budget', 'slide-hc', 'slide-compliance'].forEach(function(id) { document.getElementById(id).disabled = false; });
+        addLog('PHASE: 进入 BP 战略解码期（10月-12月），五看变量已锁定，资源约束可调整。', 'success');
+      } else if (index === 2) {
+        // 执行监控期：所有滑块锁��，显示实际vs计划
+        sliders.forEach(function(id) { document.getElementById(id).disabled = true; });
+        addLog('PHASE: 进入执行监控期（1月-3月），所有变量已锁定，经营分析会看板激活。', 'success');
+      } else {
+        // 评估复盘期
+        sliders.forEach(function(id) { document.getElementById(id).disabled = false; });
+        addLog('PHASE: 进入评估复盘期（3月-4月），变量解锁，复盘报告生成中。', 'success');
+      }
+    }
+
+    // 快照保存
+    function saveSnapshot() {
+      snapshotCounter++;
+      var snap = {
+        id: snapshotCounter,
+        name: '快照 #' + snapshotCounter,
+        time: new Date().toLocaleTimeString(),
+        params: {
+          cagr: document.getElementById('slide-cagr').value,
+          comp: document.getElementById('slide-comp').value,
+          client: document.getElementById('slide-client').value,
+          budget: document.getElementById('slide-budget').value,
+          hc: document.getElementById('slide-hc').value,
+          compliance: document.getElementById('slide-compliance').value
+        },
+        scores: {
+          direction: document.getElementById('score-direction').innerText,
+          decode: document.getElementById('score-decode').innerText,
+          execute: document.getElementById('score-execute').innerText
+        }
+      };
+      snapshots.push(snap);
+      renderSnapshots();
+      addLog('SNAPSHOT: ' + snap.name + ' 已保存（方向=' + snap.scores.direction + ' 执行=' + snap.scores.execute + '）。', 'success');
+    }
+
+    // 渲染快照列表
+    function renderSnapshots() {
+      var bar = document.getElementById('snapshotBar');
+      // 清除旧快照标签
+      var oldChips = bar.querySelectorAll('.snapshot-chip:not(#chipCurrent)');
+      oldChips.forEach(function(c) { c.remove(); });
+
+      snapshots.forEach(function(snap, idx) {
+        var score = snap.scores.execute;
+        var dotClass = parseInt(score) >= 85 ? 'green' : parseInt(score) >= 70 ? 'yellow' : 'red';
+        var chip = document.createElement('span');
+        chip.className = 'snapshot-chip';
+        chip.innerHTML = '<span class="snap-dot ' + dotClass + '"></span>' + snap.name;
+        chip.onclick = (function(s, i) { return function() { restoreSnapshot(i); }; })(snap, idx);
+        bar.insertBefore(chip, document.getElementById('chipCurrent').nextSibling);
+      });
+
+      updateCompareView();
+    }
+
+    // 恢复快照
+    function restoreSnapshot(index) {
+      var snap = snapshots[index];
+      document.getElementById('slide-cagr').value = snap.params.cagr;
+      document.getElementById('slide-comp').value = snap.params.comp;
+      document.getElementById('slide-client').value = snap.params.client;
+      document.getElementById('slide-budget').value = snap.params.budget;
+      document.getElementById('slide-hc').value = snap.params.hc;
+      document.getElementById('slide-compliance').value = snap.params.compliance;
+      runSimulation();
+      addLog('RESTORE: ' + snap.name + ' 已恢复。', 'success');
+    }
+
+    // 锁定为 BP 基线
+    function lockAsBaseline() {
+      if (snapshots.length === 0) {
+        saveSnapshot();
+      }
+      addLog('BASELINE: BP 2026 基线版本 v1.0 已锁定，提交至审批流程。', 'success');
+      // 更新审批流
+      document.getElementById('apPending').className = 'approval-step current';
+      document.getElementById('apDraft').className = 'approval-step done';
+      // 添加审计日志
+      addAuditEntry('📌 锁定基线', 'commit', 'BP 2026 基线版本 v1.0 已创建，基于最新快照');
+    }
+
+    // 快照对比
+    function toggleCompare() {
+      var compare = document.getElementById('snapshotCompare');
+      compare.classList.toggle('show');
+      updateCompareView();
+    }
+
+    function updateCompareView() {
+      var compare = document.getElementById('snapshotCompare');
+      if (!compare.classList.contains('show')) return;
+      if (snapshots.length === 0) {
+        compare.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary);padding:var(--spacing-sm);">暂无快照。请先保存快照后对比。</div>';
+        return;
+      }
+      compare.innerHTML = '';
+      snapshots.forEach(function(snap) {
+        var card = document.createElement('div');
+        card.className = 'snapshot-compare-card';
+        card.innerHTML = '<div class="snap-name">' + snap.name + '</div>' +
+          '<div class="snap-meta">' + snap.time + '</div>' +
+          '<div>🎯 方向: ' + snap.scores.direction + '</div>' +
+          '<div>🔗 解码: ' + snap.scores.decode + '</div>' +
+          '<div>✅ 执行: ' + snap.scores.execute + '</div>' +
+          '<div style="margin-top:4px;"><a href="javascript:void(0)" onclick="restoreSnapshot(' + (snap.id - 1) + ')" style="color:var(--color-primary);font-size:12px;">恢复此快照</a></div>';
+        compare.appendChild(card);
+      });
+    }
+
+    // BEM 解码步骤切换
+    function switchBEMStep(index) {
+      var steps = document.querySelectorAll('#bemSteps .bem-step');
+      steps.forEach(function(s, i) { s.classList.toggle('active', i === index); });
+      for (var i = 0; i < 6; i++) {
+        var panel = document.getElementById('bemDetail' + i);
+        if (panel) panel.classList.toggle('show', i === index);
+      }
+    }
+
+    // 提交审批
+    function submitApproval(btn, strategyNum) {
+      if (btn.classList.contains('applied')) return;
+      btn.innerText = '已提交';
+      btn.classList.add('applied');
+      btn.style.background = 'var(--color-warning)';
+
+      // 审批流转
+      document.getElementById('apDraft').className = 'approval-step done';
+      document.getElementById('apPending').className = 'approval-step current';
+
+      var strategyNames = {1: '弃卒保车', 2: '以时间换空间', 3: '资源重配'};
+      addLog('APPROVAL: 策略【' + strategyNames[strategyNum] + '】已提交审批，等待 CEO 审批。', 'warn');
+      addAuditEntry('📝 提交审批', '', '李经理提交策略 ' + strategyNum + '【' + strategyNames[strategyNum] + '】至审批流程');
+
+      // 模拟 1.5 秒后自动批准
+      setTimeout(function() {
+        document.getElementById('apPending').className = 'approval-step done';
+        document.getElementById('apApproved').className = 'approval-step current';
+        btn.innerText = '✅ 已批准';
+        btn.style.background = 'var(--color-success)';
+        addLog('APPROVAL: CEO 张总已批准策略【' + strategyNames[strategyNum] + '】，下发重算指令。', 'success');
+        addAuditEntry('✅ 审批通过', 'approve', 'CEO 张总批准策略 ' + strategyNum + '【' + strategyNames[strategyNum] + '】');
+
+        // 自动应用策略
+        setTimeout(function() {
+          document.getElementById('apApproved').className = 'approval-step done';
+          document.getElementById('apExecuted').className = 'approval-step current';
+          applyStrategy(btn, strategyNum);
+        }, 600);
+      }, 1500);
+    }
+
+    // 审计日志（在 JS 中追加）
+    function addAuditEntry(action, cls, detail) {
+      var auditLog = document.getElementById('auditLog');
+      var now = new Date();
+      var timeStr = now.getFullYear() + '-' +
+        String(now.getMonth()+1).padStart(2,'0') + '-' +
+        String(now.getDate()).padStart(2,'0') + ' ' +
+        String(now.getHours()).padStart(2,'0') + ':' +
+        String(now.getMinutes()).padStart(2,'0');
+      var entry = document.createElement('div');
+      entry.className = 'audit-entry';
+      entry.innerHTML = '<span class="audit-time">' + timeStr + '</span>' +
+        '<span class="audit-action ' + cls + '">' + action + '</span>' +
+        '<span>' + detail + '</span>';
+      auditLog.insertBefore(entry, auditLog.firstChild);
+    }
+
+    // === 初始化 ===
+    document.addEventListener('DOMContentLoaded', function() {
+      // 初始化日志容器
+      var term = document.getElementById('terminal-log');
+      if (term) {
+        term.scrollTop = term.scrollHeight;
+        updateScrollHint();
+      }
+
+      // 点击滚动提示跳到底部
+      var hint = document.getElementById('scrollHint');
+      if (hint && term) {
+        hint.addEventListener('click', function() {
+          term.scrollTo({ top: term.scrollHeight, behavior: 'smooth' });
+          hint.classList.remove('visible');
+        });
+        term.addEventListener('scroll', updateScrollHint);
+      }
+    });
   </script>
 </body>
 </html>
