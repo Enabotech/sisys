@@ -560,24 +560,387 @@
       margin-bottom: var(--spacing-sm);
     }
 
-    /* 响应式 */
+    /* ========================================
+       新增：三重信任相关样式 (v2.0)
+       ======================================== */
+
+    /* 三重信任概览网格 */
+    .trust-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--spacing-lg);
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .trust-card {
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-lg);
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .trust-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .trust-card.trust-green { border-left: 4px solid var(--color-success); }
+    .trust-card.trust-yellow { border-left: 4px solid var(--color-warning); }
+    .trust-card.trust-green-all { border-left: 4px solid var(--color-success); background: #f6ffed; }
+
+    .trust-card-icon {
+      font-size: 28px;
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .trust-card-status {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .trust-card-detail {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      margin-bottom: var(--spacing-md);
+      line-height: 1.5;
+    }
+
+    .trust-card-link {
+      display: inline-block;
+      padding: var(--spacing-xs) var(--spacing-md);
+      background: var(--color-primary);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+
+    .trust-card-link:hover {
+      background: var(--color-primary-hover);
+    }
+
+    .trust-card-link.outline {
+      background: transparent;
+      color: var(--color-primary);
+      border: 1px solid var(--color-primary);
+    }
+
+    .trust-card-link.outline:hover {
+      background: var(--color-primary-bg);
+    }
+
+    /* 五看证据面板 Tab 样式 */
+    .evidence-tabs {
+      display: flex;
+      gap: var(--spacing-xs);
+      margin-bottom: var(--spacing-lg);
+      border-bottom: 2px solid var(--color-border);
+    }
+
+    .evidence-tab {
+      padding: var(--spacing-sm) var(--spacing-lg);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+
+    .evidence-tab:hover {
+      color: var(--color-primary);
+    }
+
+    .evidence-tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+
+    .evidence-content {
+      display: none;
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-lg);
+    }
+
+    .evidence-content.active {
+      display: block;
+    }
+
+    .evidence-metric {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing-sm) 0;
+      border-bottom: 1px solid var(--color-bg-primary);
+    }
+
+    .evidence-metric:last-child {
+      border-bottom: none;
+    }
+
+    .evidence-metric-label {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+    }
+
+    .evidence-metric-value {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* SP→BP 映射追溯视图 */
+    .mapping-container {
+      display: grid;
+      grid-template-columns: 1fr 80px 1fr;
+      gap: var(--spacing-md);
+      align-items: start;
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .mapping-sp-box {
+      background: var(--color-primary-bg);
+      border: 2px solid var(--color-primary);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-lg);
+    }
+
+    .mapping-sp-box h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-primary);
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .mapping-bp-box {
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+
+    .mapping-bp-item {
+      padding: var(--spacing-md);
+      border-bottom: 1px solid var(--color-bg-primary);
+      cursor: pointer;
+      transition: background 0.2s;
+      position: relative;
+    }
+
+    .mapping-bp-item:last-child {
+      border-bottom: none;
+    }
+
+    .mapping-bp-item:hover {
+      background: #f6ffed;
+    }
+
+    .mapping-bp-item.selected {
+      background: #f6ffed;
+      border-left: 3px solid var(--color-success);
+    }
+
+    .mapping-bp-item .bp-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .mapping-bp-item .bp-meta {
+      font-size: 12px;
+      color: var(--color-text-tertiary);
+    }
+
+    .mapping-bp-item .bp-weight {
+      float: right;
+      font-size: 12px;
+      background: var(--color-primary-bg);
+      color: var(--color-primary);
+      padding: 2px 8px;
+      border-radius: var(--radius-full, 12px);
+    }
+
+    .mapping-arrows {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      align-items: center;
+      padding-top: var(--spacing-3xl);
+    }
+
+    .mapping-arrow {
+      font-size: 20px;
+      color: var(--color-primary);
+      font-weight: bold;
+    }
+
+    .mapping-arrow-label {
+      font-size: 11px;
+      color: var(--color-text-tertiary);
+      text-align: center;
+      margin-top: 2px;
+    }
+
+    /* KPI 锚点链详情面板 */
+    .mapping-detail-panel {
+      display: none;
+      background: var(--color-bg-primary);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-lg);
+      margin-top: var(--spacing-lg);
+    }
+
+    .mapping-detail-panel.show {
+      display: block;
+    }
+
+    .anchor-chain {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-md);
+      font-size: 13px;
+    }
+
+    .anchor-step {
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      font-weight: 500;
+    }
+
+    .anchor-arrow {
+      color: var(--color-primary);
+    }
+
+    .anchor-basis {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      line-height: 1.6;
+    }
+
+    /* 资源约束仪表盘 */
+    .constraint-score {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .constraint-score.yellow { color: var(--color-warning); }
+
+    .constraint-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .constraint-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      padding: var(--spacing-md);
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+    }
+
+    .constraint-item .c-status {
+      font-size: 18px;
+    }
+
+    .constraint-item .c-label {
+      font-weight: 600;
+      font-size: 14px;
+      min-width: 80px;
+    }
+
+    .constraint-item .c-detail {
+      flex: 1;
+      font-size: 13px;
+      color: var(--color-text-secondary);
+    }
+
+    .constraint-item .c-badge {
+      font-size: 12px;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .c-badge.green { background: #f6ffed; color: var(--color-success); }
+    .c-badge.yellow { background: #fffbe6; color: var(--color-warning); }
+
+    /* 里程碑时间线 */
+    .milestone-timeline {
+      display: flex;
+      gap: var(--spacing-md);
+      margin-top: var(--spacing-lg);
+    }
+
+    .milestone-item {
+      flex: 1;
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+      text-align: center;
+    }
+
+    .milestone-item .m-quarter {
+      font-size: 12px;
+      color: var(--color-text-tertiary);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .milestone-item .m-name {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .milestone-item .m-check {
+      font-size: 12px;
+    }
+
+    .m-check.ok { color: var(--color-success); }
+    .m-check.warn { color: var(--color-warning); }
+
+    /* 响应式：三重信任 */
     @media (max-width: 768px) {
-      .dashboard-grid {
+      .trust-grid {
         grid-template-columns: 1fr;
       }
 
-      .brand-config-grid {
+      .mapping-container {
         grid-template-columns: 1fr;
       }
 
-      .direction-grid {
-        grid-template-columns: 1fr;
+      .mapping-arrows {
+        flex-direction: row;
+        padding-top: 0;
+        padding: var(--spacing-sm) 0;
       }
 
-      .main {
-        padding: var(--spacing-md);
+      .milestone-timeline {
+        flex-wrap: wrap;
       }
     }
+
+    /* ========================================
+       保留原有样式
+       ======================================== */
 
     /* 覆盖层 */
     .overlay {
@@ -599,10 +962,13 @@
 <body>
   <!-- 导航 -->
   <nav class="nav">
-    <h1>🎨 sisys - UX 设计方向样机</h1>
+    <h1>🎨 sisys - UX 设计方向样机 v2.0（三重信任）</h1>
     <div class="nav-links">
       <a href="#directions">设计方向</a>
       <a href="#dashboard">高管仪表盘</a>
+      <a href="#evidence">五看面板</a>
+      <a href="#mapping">映射追溯</a>
+      <a href="#constraints">资源约束</a>
       <a href="#source-tracing">高保真溯源</a>
       <a href="#brand-config">品牌配置</a>
       <a href="#white-label">白标报告</a>
@@ -720,17 +1086,53 @@
         <div class="direction-card">
           <div class="direction-header">
             <h3>方向 6: 流程透明</h3>
-            <p>Process Transparent - BLM 可视化</p>
+            <p>Process Transparent - BLM/BEM 全流程可视化</p>
           </div>
           <div class="direction-body">
-            <div class="direction-feature">BLM 六阶段进度条</div>
+            <div class="direction-feature">BLM→BEM 十阶段进度</div>
             <div class="direction-feature">Checkpoint 审批状态</div>
             <div class="direction-feature">任务依赖关系图</div>
             <div class="direction-feature">执行偏差预警</div>
             <div style="margin-top: var(--spacing-md);">
               <span class="direction-tag">安心感</span>
               <span class="direction-tag">流程</span>
-              <span class="direction-tag">战略人员视图</span>
+              <span class="direction-tag">执行可信</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 方向 7 -->
+        <div class="direction-card" style="grid-column: 1 / -1; border: 2px solid var(--color-primary);">
+          <div class="direction-header" style="background: linear-gradient(135deg, #096dd9, #003eb3);">
+            <h3>⭐ 方向 7: SP↔BP 信任闭环</h3>
+            <p>Trust Loop — 三重信任可视化 · DSTE 方法论透明化</p>
+          </div>
+          <div class="direction-body">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--spacing-lg);">
+              <div>
+                <div style="font-weight: 600; font-size: 16px; color: var(--color-primary); margin-bottom: var(--spacing-sm);">🎯 方向可信</div>
+                <div class="direction-feature">五看证据面板</div>
+                <div class="direction-feature">多 Agent 辩论可视化</div>
+                <div class="direction-feature">被否决替代方案可见</div>
+              </div>
+              <div>
+                <div style="font-weight: 600; font-size: 16px; color: var(--color-primary); margin-bottom: var(--spacing-sm);">🔗 解码可信</div>
+                <div class="direction-feature">SP→BP 映射追溯视图</div>
+                <div class="direction-feature">KPI 锚点链追溯</div>
+                <div class="direction-feature">三次解码层级透视图</div>
+              </div>
+              <div>
+                <div style="font-weight: 600; font-size: 16px; color: var(--color-primary); margin-bottom: var(--spacing-sm);">✅ 执行可信</div>
+                <div class="direction-feature">资源约束仪表盘</div>
+                <div class="direction-feature">里程碑合理性校验</div>
+                <div class="direction-feature">偏差预警机制</div>
+              </div>
+            </div>
+            <div style="margin-top: var(--spacing-lg);">
+              <span class="direction-tag" style="background: #f6ffed; color: var(--color-success);">P0 核心定义性体验</span>
+              <span class="direction-tag" style="background: #fffbe6; color: var(--color-warning);">信任感+掌控感</span>
+              <span class="direction-tag">华为 DSTE 验证</span>
+              <span class="direction-tag">SP→BP 全链路</span>
             </div>
           </div>
         </div>
@@ -739,89 +1141,462 @@
 
     <!-- 高管仪表盘样机 -->
     <section id="dashboard" class="section">
-      <h2 class="section-title">高管仪表盘样机（方向 1: 高管优先）</h2>
+      <h2 class="section-title">高管仪表盘样机（方向 1 + 方向 7: 三重信任态势一览）</h2>
       <p class="section-desc">
-        第一屏仅显示 3 个关键指标，5 秒内理解态势，30 秒内做出决策。
+        30 秒内理解三重信任态势——方向是否可信、解码是否准确、执行能否落地。点击任意节点展开证据链。
       </p>
 
       <div class="mockup-container">
         <div class="mockup-header">
-          <h3>📊 战略决策仪表盘</h3>
+          <h3>📊 战略决策仪表盘 — 三重信任态势</h3>
           <div>
-            <span style="font-size: 14px; color: var(--color-text-secondary);">👤 张总</span>
-            <span style="margin-left: var(--spacing-md);">🔔</span>
+            <span style="font-size: 14px; color: var(--color-text-secondary);">👤 张总 (CEO)</span>
+            <span style="margin-left: var(--spacing-md);">🔔 待审批 2</span>
           </div>
         </div>
         <div class="mockup-body">
-          <!-- 战略进度概览 -->
-          <div class="progress-section">
-            <div class="progress-title">BLM 六阶段进度</div>
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: 67%;"></div>
+          <!-- 三重信任卡片 -->
+          <div class="trust-grid">
+            <!-- 方向可信 -->
+            <div class="trust-card trust-green">
+              <div class="trust-card-icon">🎯</div>
+              <div class="trust-card-status" style="color: var(--color-success);">方向可信 · 已确认</div>
+              <div class="trust-card-detail">
+                战略控制点：聚焦高端医疗设备市场<br>
+                共识度：85%（4/5 Agent 支持）<br>
+                五看分析完成 · 辩论 5 轮
+              </div>
+              <div style="display: flex; gap: var(--spacing-sm);">
+                <a href="#evidence" class="trust-card-link">展开证据链</a>
+                <button class="trust-card-link outline" onclick="document.getElementById('evidence').scrollIntoView()">查看辩论</button>
+              </div>
             </div>
-            <div class="progress-stages">
-              <div class="stage">
-                <span class="stage-icon done">✓</span>
-                <span>业绩差距</span>
+
+            <!-- 解码可信 -->
+            <div class="trust-card trust-green">
+              <div class="trust-card-icon">🔗</div>
+              <div class="trust-card-status" style="color: var(--color-success);">解码可信 · 映射完成</div>
+              <div class="trust-card-detail">
+                SP→BP 覆盖率 100%（3/3 控制点已解码）<br>
+                6 项年度必赢之战已生成<br>
+                KPI 全部可追溯至 CSF
               </div>
-              <div class="stage">
-                <span class="stage-icon done">✓</span>
-                <span>市场洞察</span>
+              <div style="display: flex; gap: var(--spacing-sm);">
+                <a href="#mapping" class="trust-card-link">追溯映射</a>
+                <button class="trust-card-link outline" onclick="document.getElementById('mapping').scrollIntoView()">解码详情</button>
               </div>
-              <div class="stage">
-                <span class="stage-icon active">●</span>
-                <span>战略意图</span>
+            </div>
+
+            <!-- 执行可信 -->
+            <div class="trust-card trust-yellow">
+              <div class="trust-card-icon">✅</div>
+              <div class="trust-card-status" style="color: var(--color-warning);">执行可信 · 基本可行</div>
+              <div class="trust-card-detail">
+                可行性评分 82/100<br>
+                预算🟢 人力🟡 时间🟡 供应商🟢 合规🟢<br>
+                里程碑 2 建议提前启动
               </div>
-              <div class="stage">
-                <span class="stage-icon pending">○</span>
-                <span>创新焦点</span>
-              </div>
-              <div class="stage">
-                <span class="stage-icon pending">○</span>
-                <span>业务设计</span>
-              </div>
-              <div class="stage">
-                <span class="stage-icon pending">○</span>
-                <span>执行设计</span>
+              <div style="display: flex; gap: var(--spacing-sm);">
+                <a href="#constraints" class="trust-card-link">查看校验</a>
+                <button class="trust-card-link outline" onclick="document.getElementById('constraints').scrollIntoView()">调整参数</button>
               </div>
             </div>
           </div>
 
-          <!-- 3 个关键指标卡片 -->
-          <div class="dashboard-grid">
-            <div class="stat-card success">
-              <div class="stat-icon">📊</div>
-              <div class="stat-value" style="color: var(--color-success);">正常</div>
-              <div class="stat-label">战略进度</div>
-              <div style="font-size: 14px; margin-bottom: var(--spacing-md);">4/6 阶段完成</div>
-              <button class="stat-btn">查看详情</button>
+          <!-- SP→BP 全流程进度 -->
+          <div class="progress-section">
+            <div class="progress-title">SP→BP 全流程进度（BLM + BEM 十阶段）</div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 55%;"></div>
             </div>
+            <div class="progress-stages">
+              <div class="stage">
+                <span class="stage-icon done">✓</span><span>差距分析</span>
+              </div>
+              <div class="stage">
+                <span class="stage-icon done">✓</span><span>市场洞察</span>
+              </div>
+              <div class="stage">
+                <span class="stage-icon done">✓</span><span>战略意图</span>
+              </div>
+              <div class="stage">
+                <span class="stage-icon done">✓</span><span>创新焦点</span>
+              </div>
+              <div class="stage">
+                <span class="stage-icon done">✓</span><span>业务设计</span>
+              </div>
+              <div class="stage">
+                <span class="stage-icon active">●</span><span>SP 方向确认</span>
+              </div>
+              <div class="stage">
+                <span class="stage-icon active">●</span><span>BP 战略解码</span>
+              </div>
+              <div class="stage">
+                <span class="stage-icon pending">○</span><span>解码追溯验证</span>
+              </div>
+              <div class="stage">
+                <span class="stage-icon pending">○</span><span>执行计划校验</span>
+              </div>
+              <div class="stage">
+                <span class="stage-icon pending">○</span><span>偏差预警设置</span>
+              </div>
+            </div>
+          </div>
 
-            <div class="stat-card warning">
+          <!-- 待审批区域 -->
+          <div style="display: flex; gap: var(--spacing-lg);">
+            <div class="stat-card warning" style="flex: 1;">
               <div class="stat-icon">⚠️</div>
-              <div class="stat-value" style="color: var(--color-warning);">3 项</div>
+              <div class="stat-value" style="color: var(--color-warning);">2 项</div>
               <div class="stat-label">待审批决策</div>
-              <div style="font-size: 14px; margin-bottom: var(--spacing-md);">需 48 小时内处理</div>
+              <div style="font-size: 14px; margin-bottom: var(--spacing-md);">SP 方向确认 · Checkpoint 审批</div>
               <button class="stat-btn">立即审批</button>
             </div>
 
-            <div class="stat-card danger">
-              <div class="stat-icon">🔴</div>
-              <div class="stat-value" style="color: var(--color-danger);">2 项</div>
-              <div class="stat-label">高风险预警</div>
-              <div style="font-size: 14px; margin-bottom: var(--spacing-md);">需立即关注</div>
-              <button class="stat-btn">查看风险</button>
+            <div class="stat-card success" style="flex: 1;">
+              <div class="stat-icon">📋</div>
+              <div class="stat-value" style="color: var(--color-success);">0 项</div>
+              <div class="stat-label">偏差预警（需要关注）</div>
+              <div style="font-size: 14px; margin-bottom: var(--spacing-md);">所有 KPI 在阈值范围内</div>
+              <button class="stat-btn" style="background: var(--color-text-tertiary);">查看详情</button>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 高保真溯源样机 -->
-    <section id="source-tracing" class="section">
-      <h2 class="section-title">高保真溯源样机（方向 3: 溯源信任）</h2>
+    <!-- 五看证据面板 -->
+    <section id="evidence" class="section">
+      <h2 class="section-title">五看证据面板（方向 7: SP↔BP 信任闭环 — 方向可信）</h2>
       <p class="section-desc">
-        点击结论文字 → 弹出溯源卡片 → 跳转 PDF 高亮，30 秒内完成溯源验证。
+        每个战略方向必须经过五维分析验证。点击每个数据点可溯源至原始文档。可展开查看被否决的替代方案。
+      </p>
+
+      <div class="mockup-container">
+        <div class="mockup-header">
+          <h3>🎯 战略控制点：聚焦高端医疗设备市场</h3>
+          <div>
+            <span class="confidence-badge">🟢 置信度 0.91</span>
+            <span style="margin-left: var(--spacing-sm); font-size: 13px; color: var(--color-text-secondary);">共识度 85%</span>
+          </div>
+        </div>
+        <div class="mockup-body">
+          <!-- Tab 切换 -->
+          <div class="evidence-tabs" id="evidenceTabs">
+            <button class="evidence-tab active" onclick="switchEvidenceTab(0)">📊 看市场</button>
+            <button class="evidence-tab" onclick="switchEvidenceTab(1)">👥 看客户</button>
+            <button class="evidence-tab" onclick="switchEvidenceTab(2)">🏢 看竞争</button>
+            <button class="evidence-tab" onclick="switchEvidenceTab(3)">🔬 看技术</button>
+            <button class="evidence-tab" onclick="switchEvidenceTab(4)">🏗️ 看自身</button>
+          </div>
+
+          <!-- Tab 内容 -->
+          <div class="evidence-content active" id="evidenceContent0">
+            <h4 style="margin-bottom: var(--spacing-md);">看市场 — 市场规模与趋势</h4>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">市场规模</span>
+              <span class="evidence-metric-value">¥500 亿</span>
+            </div>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">CAGR</span>
+              <span class="evidence-metric-value">15%</span>
+            </div>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">增长动力</span>
+              <span class="evidence-metric-value">数字化转型 + 消费升级 + 政策支持</span>
+            </div>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">窗口期</span>
+              <span class="evidence-metric-value" style="color: var(--color-warning);">2-3 年 ⚠️</span>
+            </div>
+            <div style="margin-top: var(--spacing-md); text-align: right;">
+              <span class="source-link" onclick="toggleSourceCard()">溯源至原始数据 →</span>
+            </div>
+          </div>
+
+          <div class="evidence-content" id="evidenceContent1">
+            <h4 style="margin-bottom: var(--spacing-md);">看客户 — 需求与痛点</h4>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">核心痛点</span>
+              <span class="evidence-metric-value">检测精度不足 · 误诊率高</span>
+            </div>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">支付意愿</span>
+              <span class="evidence-metric-value">高（三甲医院预算充足）</span>
+            </div>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">未被满足需求</span>
+              <span class="evidence-metric-value">国产替代 · 临床数据打通</span>
+            </div>
+            <div style="margin-top: var(--spacing-md); text-align: right;">
+              <span class="source-link" onclick="toggleSourceCard()">溯源至原始数据 →</span>
+            </div>
+          </div>
+
+          <div class="evidence-content" id="evidenceContent2">
+            <h4 style="margin-bottom: var(--spacing-md);">看竞争 — 竞争格局分析</h4>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">市场格局</span>
+              <span class="evidence-metric-value">Top3 无明显领导者</span>
+            </div>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">竞品对标</span>
+              <span class="evidence-metric-value">迈瑞 25 家 · 联影 20 家三甲</span>
+            </div>
+            <div style="margin-top: var(--spacing-md); text-align: right;">
+              <span class="source-link" onclick="toggleSourceCard()">溯源至原始数据 →</span>
+            </div>
+          </div>
+
+          <div class="evidence-content" id="evidenceContent3">
+            <h4 style="margin-bottom: var(--spacing-md);">看技术 — 技术趋势与可行性</h4>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">关键技术</span>
+              <span class="evidence-metric-value">AI 影像识别 · 国产替代</span>
+            </div>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">就绪度</span>
+              <span class="evidence-metric-value" style="color: var(--color-success);">核心模块已验证 ✅</span>
+            </div>
+          </div>
+
+          <div class="evidence-content" id="evidenceContent4">
+            <h4 style="margin-bottom: var(--spacing-md);">看自身 — 组织能力与资源</h4>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">渠道优势</span>
+              <span class="evidence-metric-value">临床关系网络覆盖 50+ 医院</span>
+            </div>
+            <div class="evidence-metric">
+              <span class="evidence-metric-label">人才储备</span>
+              <span class="evidence-metric-value" style="color: var(--color-warning);">需新招 5 名学科带头人 ⚠️</span>
+            </div>
+          </div>
+
+          <!-- 多Agent 辩论摘要 -->
+          <div class="progress-section" style="margin-top: var(--spacing-lg);">
+            <div class="progress-title">💬 多 Agent 辩论摘要（5 轮）</div>
+            <div style="font-size: 13px; line-height: 1.8;">
+              <span style="color: var(--color-success);">CMO ✅ 支持</span> — "市场规模大，品牌缺口明显" |
+              <span style="color: var(--color-warning);">CTO ⚠️ 有条件</span> — "核心模块需验证" |
+              <span style="color: var(--color-danger);">CFO 🔴 反对</span> — "回收期偏长" |
+              <span style="color: var(--color-success);">CEO ✅</span> + <span style="color: var(--color-success);">COO ✅</span> 支持<br>
+              最终：方案 A（集中投入）通过，CFO 保留意见已记录
+            </div>
+          </div>
+
+          <!-- 被否决的替代方案 -->
+          <details style="margin-top: var(--spacing-lg);">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--color-text-secondary);">
+              📂 被否决的替代方案（点击展开）
+            </summary>
+            <div style="margin-top: var(--spacing-md); padding: var(--spacing-md); background: #fff7e6; border-radius: var(--radius-sm); border-left: 3px solid var(--color-warning);">
+              <strong>方案 B：渐进式市场渗透</strong>（被否决）<br>
+              <span style="font-size: 13px;">否决原因：窗口期估算仅 2-3 年，渐进策略将永久失去先发优势。该方案的风险已纳入 Plan A 的监控指标。</span>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- SP→BP 映射追溯视图 -->
+    <section id="mapping" class="section">
+      <h2 class="section-title">SP→BP 映射追溯视图（方向 7: SP↔BP 信任闭环 — 解码可信）</h2>
+      <p class="section-desc">
+        点击任意 BP 举措，追溯上游 SP 战略控制点和解码依据。每个 KPI 可追溯至 CSF 锚点。
+      </p>
+
+      <div class="mockup-container">
+        <div class="mockup-header">
+          <h3>🔗 SP→BP 战略解码映射</h3>
+          <div>
+            <span class="confidence-badge">覆盖率 100%</span>
+          </div>
+        </div>
+        <div class="mockup-body">
+          <div class="mapping-container">
+            <!-- SP 侧 -->
+            <div class="mapping-sp-box">
+              <h4>SP 战略控制点</h4>
+              <div style="font-size: 14px; line-height: 1.8;">
+                <strong>SC-1：</strong>高端医疗设备市场领先<br>
+                <span style="font-size: 12px; color: var(--color-text-tertiary);">3 年目标：三甲覆盖率 ≥30%</span>
+              </div>
+            </div>
+
+            <!-- 连线区域 -->
+            <div class="mapping-arrows">
+              <div style="text-align: center;">
+                <div class="mapping-arrow">→</div>
+                <div class="mapping-arrow-label">权重 0.4</div>
+              </div>
+              <div style="text-align: center;">
+                <div class="mapping-arrow">→</div>
+                <div class="mapping-arrow-label">权重 0.3</div>
+              </div>
+              <div style="text-align: center;">
+                <div class="mapping-arrow">→</div>
+                <div class="mapping-arrow-label">权重 0.3</div>
+              </div>
+            </div>
+
+            <!-- BP 侧 -->
+            <div class="mapping-bp-box">
+              <div class="mapping-bp-item" onclick="showMappingDetail('bp1')" id="bp1" style="border-left: 3px solid var(--color-success);">
+                <span class="bp-weight">0.4</span>
+                <div class="bp-title">📦 举措 1.1：研发投入</div>
+                <div class="bp-meta">预算 ¥2亿 · 专利 3 项 · 里程碑 Q2 样机</div>
+              </div>
+              <div class="mapping-bp-item" onclick="showMappingDetail('bp2')" id="bp2">
+                <span class="bp-weight">0.3</span>
+                <div class="bp-title">🏥 举措 1.2：渠道建设</div>
+                <div class="bp-meta">目标 30 家三甲 · 9 名渠道经理</div>
+              </div>
+              <div class="mapping-bp-item" onclick="showMappingDetail('bp3')" id="bp3">
+                <span class="bp-weight">0.3</span>
+                <div class="bp-title">🎓 举措 1.3：人才引进</div>
+                <div class="bp-meta">目标 5 名学科带头人</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 锚点链详情面板 -->
+          <div class="mapping-detail-panel show" id="mappingDetail">
+            <div style="font-weight: 600; margin-bottom: var(--spacing-md); font-size: 15px;">
+              📊 <span id="detailKpiName">KPI：三甲医院签约数 ≥30</span>
+            </div>
+            <div class="anchor-chain">
+              <span style="font-size: 13px; color: var(--color-text-tertiary);">锚点链：</span>
+              <span class="anchor-step">CSF-3（提升市场覆盖面）</span>
+              <span class="anchor-arrow">→</span>
+              <span class="anchor-step">KPI-3.1（三甲覆盖率）</span>
+              <span class="anchor-arrow">→</span>
+              <span class="anchor-step">目标值 30 家</span>
+            </div>
+            <div class="anchor-basis">
+              <strong>设定依据：</strong><br>
+              • 历史基准：2024 年渠道拓展速度 2 家/月<br>
+              • 行业对标：迈瑞同期 25 家，联影 20 家<br>
+              • 资源配置：9 名渠道经理，人均负责 3-4 家
+            </div>
+            <div style="margin-top: var(--spacing-md);">
+              <span class="source-link" onclick="toggleSourceCard()">溯源至原始分析数据 →</span>
+            </div>
+          </div>
+
+          <!-- 三次解码层级示例 -->
+          <details style="margin-top: var(--spacing-lg);">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--color-text-secondary);">
+              📐 展开三次解码层级透视图
+            </summary>
+            <div style="display: flex; gap: var(--spacing-md); margin-top: var(--spacing-md); align-items: center; justify-content: center; flex-wrap: wrap;">
+              <div style="background: var(--color-primary-bg); padding: var(--spacing-lg); border-radius: var(--radius-md); text-align: center; min-width: 100px;">
+                <strong>SP</strong><br>5 年方向<br>3 个控制点
+              </div>
+              <span style="font-size: 24px; color: var(--color-primary);">→</span>
+              <div style="background: var(--color-white); border: 1px solid var(--color-border); padding: var(--spacing-lg); border-radius: var(--radius-md); text-align: center; min-width: 100px;">
+                <strong>公司 BP</strong><br>年度目标<br>6 项必赢之战
+              </div>
+              <span style="font-size: 24px; color: var(--color-primary);">→</span>
+              <div style="background: var(--color-white); border: 1px solid var(--color-border); padding: var(--spacing-lg); border-radius: var(--radius-md); text-align: center; min-width: 100px;">
+                <strong>部门 KPI</strong><br>18 项 KPI<br>按职能分解
+              </div>
+              <span style="font-size: 24px; color: var(--color-primary);">→</span>
+              <div style="background: var(--color-white); border: 1px solid var(--color-border); padding: var(--spacing-lg); border-radius: var(--radius-md); text-align: center; min-width: 100px;">
+                <strong>岗位 PBC</strong><br>54 项目标<br>个人承诺
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- 资源约束仪表盘 -->
+    <section id="constraints" class="section">
+      <h2 class="section-title">资源约束仪表盘（方向 7: SP↔BP 信任闭环 — 执行可信）</h2>
+      <p class="section-desc">
+        五维约束自动校验——预算、人力、时间、供应商、合规。里程碑与行业基准自动对比。
+      </p>
+
+      <div class="mockup-container">
+        <div class="mockup-header">
+          <h3>📋 执行可行性评估</h3>
+          <div>
+            <span class="constraint-score yellow" style="font-size: 16px;">🟡 可行性评分 82/100（基本可行）</span>
+          </div>
+        </div>
+        <div class="mockup-body">
+          <!-- 五维约束 -->
+          <div class="constraint-list">
+            <div class="constraint-item">
+              <span class="c-status">🟢</span>
+              <span class="c-label">预算</span>
+              <span class="c-detail">¥8.2 亿 / ¥10 亿预算内（使用率 82%）</span>
+              <span class="c-badge green">正常</span>
+            </div>
+            <div class="constraint-item">
+              <span class="c-status">🟡</span>
+              <span class="c-label">人力</span>
+              <span class="c-detail">需求 120 人 / 现有 98 人（缺口 22 人，建议启动招聘）</span>
+              <span class="c-badge yellow">关注</span>
+            </div>
+            <div class="constraint-item">
+              <span class="c-status">🟡</span>
+              <span class="c-label">时间</span>
+              <span class="c-detail">里程碑 M2 与 M1 间隔 8 周（行业基准 4-6 周，建议提前 2 周启动）</span>
+              <span class="c-badge yellow">关注</span>
+            </div>
+            <div class="constraint-item">
+              <span class="c-status">🟢</span>
+              <span class="c-label">供应商</span>
+              <span class="c-detail">3 家核心供应商已锁定 · 备选 2 家</span>
+              <span class="c-badge green">正常</span>
+            </div>
+            <div class="constraint-item">
+              <span class="c-status">🟢</span>
+              <span class="c-label">合规</span>
+              <span class="c-detail">医疗器械注册时间已纳入计划 · 临床伦理审批预留 3 个月</span>
+              <span class="c-badge green">正常</span>
+            </div>
+          </div>
+
+          <!-- 里程碑合理性校验 -->
+          <div class="progress-section">
+            <div class="progress-title">📅 里程碑合理性校验</div>
+            <div class="milestone-timeline">
+              <div class="milestone-item">
+                <div class="m-quarter">Q1</div>
+                <div class="m-name">M1: 样机</div>
+                <div class="m-check ok">✅ 合理（同行 3-4 月）</div>
+              </div>
+              <div class="milestone-item" style="border-color: var(--color-warning); background: #fffbe6;">
+                <div class="m-quarter">Q2</div>
+                <div class="m-name">M2: 注册</div>
+                <div class="m-check warn">⚠️ 紧张（建议提前 2 周）</div>
+              </div>
+              <div class="milestone-item">
+                <div class="m-quarter">Q3</div>
+                <div class="m-name">M3: 量产</div>
+                <div class="m-check ok">✅ 合理（同行 2-3 月）</div>
+              </div>
+              <div class="milestone-item">
+                <div class="m-quarter">Q4</div>
+                <div class="m-name">M4: 上市</div>
+                <div class="m-check ok">✅ 合理（同行 1-2 月）</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 偏差预警视觉占位 -->
+          <div style="font-size: 13px; color: var(--color-text-tertiary); text-align: center; margin-top: var(--spacing-md);">
+            🔔 偏差预警将在执行阶段激活（<30 天提前期 · 阈值可自定义 · 自动告警）
+          </div>
+        </div>
+      </div>
+    </section>
+    <section id="source-tracing" class="section">
+      <h2 class="section-title">高保真溯源样机（信任基础设施 · 服务三重信任）</h2>
+      <p class="section-desc">
+        每个数据点可验证是三重信任的基础。点击结论文字 → 弹出溯源卡片 → 跳转 PDF 高亮，30 秒内完成溯源验证。
         <strong>（点击下划线文字体验溯源交互）</strong>
       </p>
 
@@ -1011,10 +1786,64 @@
 
   <script>
     function toggleSourceCard() {
-      const card = document.getElementById('sourceCard');
-      const overlay = document.getElementById('overlay');
+      var card = document.getElementById('sourceCard');
+      var overlay = document.getElementById('overlay');
       card.classList.toggle('show');
       overlay.classList.toggle('show');
+    }
+
+    // 五看证据面板 Tab 切换
+    function switchEvidenceTab(index) {
+      // 更新 Tab 按钮
+      var tabs = document.querySelectorAll('#evidenceTabs .evidence-tab');
+      tabs.forEach(function(tab, i) {
+        if (i === index) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+
+      // 更新内容面板
+      for (var i = 0; i < 5; i++) {
+        var panel = document.getElementById('evidenceContent' + i);
+        if (panel) {
+          if (i === index) {
+            panel.classList.add('active');
+          } else {
+            panel.classList.remove('active');
+          }
+        }
+      }
+    }
+
+    // SP→BP 映射详情展开
+    function showMappingDetail(bpId) {
+      // 更新选中样式
+      var items = document.querySelectorAll('.mapping-bp-item');
+      items.forEach(function(item) {
+        item.classList.remove('selected');
+      });
+      var selected = document.getElementById(bpId);
+      if (selected) selected.classList.add('selected');
+
+      // 更新详情面板内容
+      var detailPanel = document.getElementById('mappingDetail');
+      var detailName = document.getElementById('detailKpiName');
+
+      var detailMap = {
+        'bp1': 'KPI：研发投入完成率 100% — 锚点链：CSF-1（技术壁垒建立）→ KPI-1.1（专利产出）→ 目标值 3 项',
+        'bp2': 'KPI：三甲医院签约数 ≥30 — 锚点链：CSF-3（提升市场覆盖面）→ KPI-3.1（三甲覆盖率）→ 目标值 30 家',
+        'bp3': 'KPI：学科带头人引进 5 名 — 锚点链：CSF-2（人才密度提升）→ KPI-2.1（高端人才占比）→ 目标值 5 名'
+      };
+
+      if (detailName && detailMap[bpId]) {
+        detailName.textContent = detailMap[bpId];
+      }
+
+      if (detailPanel) {
+        detailPanel.classList.add('show');
+      }
     }
   </script>
 </body>
