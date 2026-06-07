@@ -635,7 +635,7 @@
       background: var(--color-primary-bg);
     }
 
-    /* 五看证据面板 Tab 样式 */
+    /* 市场洞察证据面板 Tab 样式 */
     .evidence-tabs {
       display: flex;
       gap: var(--spacing-xs);
@@ -1756,12 +1756,12 @@
 <body>
   <!-- 导航 -->
   <nav class="nav">
-    <h1>🎨 sisys - UX 设计方向样机 v2.0（三重信任）</h1>
+    <h1>🎨 sisys - UX 设计方向样机 v3.0（三重信任）</h1>
     <div class="nav-links">
       <a href="#directions">设计方向</a>
       <a href="#sandbox" style="color: #722ed1; font-weight: 600;">🎮 战略沙盘</a>
       <a href="#dashboard">高管仪表盘</a>
-      <a href="#evidence">五看面板</a>
+      <a href="#evidence">市场洞察面板</a>
       <a href="#mapping">映射追溯</a>
       <a href="#constraints">资源约束</a>
       <a href="#source-tracing">高保真溯源</a>
@@ -1884,7 +1884,7 @@
             <p>Process Transparent - BLM/BEM 全流程可视化</p>
           </div>
           <div class="direction-body">
-            <div class="direction-feature">BLM→BEM 十阶段进度</div>
+            <div class="direction-feature">BLM→BEM 各阶段进度</div>
             <div class="direction-feature">Checkpoint 审批状态</div>
             <div class="direction-feature">任务依赖关系图</div>
             <div class="direction-feature">执行偏差预警</div>
@@ -1906,7 +1906,7 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--spacing-lg);">
               <div>
                 <div style="font-weight: 600; font-size: 16px; color: var(--color-primary); margin-bottom: var(--spacing-sm);">🎯 方向可信</div>
-                <div class="direction-feature">五看证据面板</div>
+                <div class="direction-feature">市场洞察证据面板</div>
                 <div class="direction-feature">多 Agent 辩论可视化</div>
                 <div class="direction-feature">被否决替代方案可见</div>
               </div>
@@ -1938,7 +1938,7 @@
     <section id="sandbox" class="section">
       <h2 class="section-title" style="border-left-color: #722ed1;">🎮 动态战略沙盘 — 情景推演指挥中心</h2>
       <p class="section-desc">
-        <strong>面向投资人路演 & 意向客户体验：</strong>拖动滑块改变宏观变量与资源约束，实时观察三重信任状态的连锁反应。
+        拖动滑块改变宏观变量与资源约束，实时观察三重信任状态的连锁反应。
         多 Agent 自动重新辩论，AI 代偿引擎生成最优修复方案，闭环执行层记录全流程日志。
       </p>
 
@@ -2017,7 +2017,7 @@
 
         <div class="slider-grid">
           <div>
-            <div style="font-size: 14px; font-weight: bold; color: var(--color-text-secondary); margin-bottom: var(--spacing-md);">🌍 宏观 / 五看变量</div>
+            <div style="font-size: 14px; font-weight: bold; color: var(--color-text-secondary); margin-bottom: var(--spacing-md);">🌍 宏观 / 市场洞察变量</div>
 
             <div class="slider-group">
               <div class="slider-header" style="align-items: center;">
@@ -2501,7 +2501,7 @@
               <div class="trust-card-detail">
                 战略控制点：聚焦高端医疗设备市场<br>
                 共识度：85%（4/5 Agent 支持）<br>
-                五看分析完成 · 辩论 5 轮
+                市场洞察分析完成 · 辩论 5 轮
               </div>
               <div style="display: flex; gap: var(--spacing-sm);">
                 <a href="#evidence" class="trust-card-link">展开证据链</a>
@@ -2542,7 +2542,7 @@
 
           <!-- SP→BP 全流程进度 -->
           <div class="progress-section">
-            <div class="progress-title">SP→BP 全流程进度（BLM + BEM 十阶段）</div>
+            <div class="progress-title">SP→BP 全流程进度（BLM + BEM 各阶段）</div>
             <div class="progress-bar">
               <div class="progress-fill" style="width: 55%;"></div>
             </div>
@@ -2602,9 +2602,9 @@
       </div>
     </section>
 
-    <!-- 五看证据面板 -->
+    <!-- 市场洞察证据面板 -->
     <section id="evidence" class="section">
-      <h2 class="section-title">五看证据面板（方向 7: SP↔BP 信任闭环 — 方向可信）</h2>
+      <h2 class="section-title">市场洞察证据面板（方向 7: SP↔BP 信任闭环 — 方向可信）</h2>
       <p class="section-desc">
         每个战略方向必须经过五维分析验证。点击每个数据点可溯源至原始文档。可展开查看被否决的替代方案。
       </p>
@@ -3133,7 +3133,7 @@
       overlay.classList.toggle('show');
     }
 
-    // 五看证据面板 Tab 切换
+    // 市场洞察证据面板 Tab 切换
     function switchEvidenceTab(index) {
       var tabs = document.querySelectorAll('#evidenceTabs .evidence-tab');
       tabs.forEach(function(tab, i) {
@@ -3445,12 +3445,12 @@
         sliders.forEach(function(id) { document.getElementById(id).disabled = false; });
         addLog('PHASE: 进入 SP 战略制定期（4月-9月），宏观变量 & 资源约束滑块可用。', 'success');
       } else if (index === 1) {
-        // BP 解码期：五看变量锁��，解锁解码参数
+        // BP 解码期：市场洞察变量锁定，解锁解码参数
         ['slide-cagr', 'slide-comp', 'slide-client'].forEach(function(id) { document.getElementById(id).disabled = true; });
         ['slide-budget', 'slide-hc', 'slide-compliance'].forEach(function(id) { document.getElementById(id).disabled = false; });
-        addLog('PHASE: 进入 BP 战略解码期（10月-12月），五看变量已锁定，资源约束可调整。', 'success');
+        addLog('PHASE: 进入 BP 战略解码期（10月-12月），市场洞察变量已锁定，资源约束可调整。', 'success');
       } else if (index === 2) {
-        // 执行监控期：所有滑块锁��，显示实际vs计划
+        // 执行监控期：所有滑块锁定，显示实际vs计划
         sliders.forEach(function(id) { document.getElementById(id).disabled = true; });
         addLog('PHASE: 进入执行监控期（1月-3月），所有变量已锁定，经营分析会看板激活。', 'success');
       } else {
