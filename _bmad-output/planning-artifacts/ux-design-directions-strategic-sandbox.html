@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>sisys - 动态战略沙盘指挥中心</title>
+    <style>
+        /* Design Tokens - sisys 核心设计系统复用 */
+        :root {
+            --color-primary: #1890ff;
+            --color-primary-hover: #096dd9;
+            --color-primary-bg: #e6f7ff;
+            --color-success: #52c41a;
+            --color-warning: #faad14;
+            --color-danger: #ff4d4f;
+            --color-text-primary: #262626;
+            --color-text-secondary: #595959;
+            --color-text-tertiary: #8c8c8c;
+            --color-bg-primary: #f0f2f5;
+            --color-bg-card: #ffffff;
+            --color-border: #e8e8e8;
+            --font-family-base: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+            --spacing-xl: 32px;
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: var(--font-family-base);
+            background: var(--color-bg-primary);
+            color: var(--color-text-primary);
+            line-height: 1.6;
+            padding-bottom: 60px;
+        }
+
+        /* 页面头部 */
+        .header {
+            background: #001529;
+            color: white;
+            padding: var(--spacing-md) var(--spacing-xl);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .badge-gpu {
+            background: rgba(82, 196, 26, 0.2);
+            border: 1px solid var(--color-success);
+            color: #73d13d;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .badge-gpu.computing {
+            animation: pulseGreen 1s infinite;
+        }
+
+        @keyframes pulseGreen {
+            0% {
+                box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 6px rgba(82, 196, 26, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(82, 196, 26, 0);
+            }
+        }
+
+        .main-container {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-lg);
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--color-text-secondary);
+        }
+
+        /* =========================================================
+           Layer 1: Sandbox Console (情景控制台)
+           ========================================================= */
+        .sandbox-panel {
+            background: var(--color-bg-card);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-md);
+            border-top: 4px solid var(--color-primary);
+        }
+
+        .plan-selector {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+        }
+        .plan-btn {
+            flex: 1;
+            padding: var(--spacing-md);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            background: var(--color-bg-primary);
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s;
+        }
+        .plan-btn.active {
+            background: #f6ffed;
+            border-color: var(--color-success);
+            box-shadow: var(--shadow-sm);
+        }
+        .plan-btn.warning {
+            border-color: var(--color-warning);
+            background: #fffbe6;
+        }
+        .plan-btn.danger {
+            border-color: var(--color-danger);
+            background: #fff1f0;
+        }
+        .plan-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .plan-desc {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+        }
+
+        .slider-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-xl);
+        }
+        .slider-group {
+            margin-bottom: var(--spacing-md);
+        }
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: var(--spacing-sm);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* 自定义滑块 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--color-danger) 0%, var(--color-warning) 30%, var(--color-success) 50%, var(--color-success) 100%);
+        }
+        /* 反向滑块（越低越好） */
+        input[type=range].reverse-track::-webkit-slider-runnable-track {
+            background: linear-gradient(90deg, var(--color-success) 0%, var(--color-warning) 70%, var(--color-danger) 100%);
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid var(--color-primary);
+            margin-top: -6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* =========================================================
+           Layer 2: Trust Ripple Engine (涟漪反馈层)
+           ========================================================= */
+        .ripple-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--spacing-lg);
+        }
+        .trust-card {
+            background: var(--color-bg-card);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-md);
+            border-left: 4px solid var(--color-success);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .trust-card.status-warning {
+            border-left-color: var(--color-warning);
+            background: #fffbe6;
+            transform: translateY(2px);
+        }
+        .trust-card.status-danger {
+            border-left-color: var(--color-danger);
+            background: #fff1f0;
+            transform: translateY(4px);
+        }
+
+        .trust-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: var(--spacing-md);
+        }
+        .trust-icon {
+            font-size: 24px;
+        }
+        .trust-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .trust-score {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--color-success);
+            transition: color 0.3s;
+        }
+        .status-warning .trust-score {
+            color: var(--color-warning);
+        }
+        .status-danger .trust-score {
+            color: var(--color-danger);
+        }
+
+        .agent-chat {
+            background: rgba(0, 0, 0, 0.02);
+            padding: var(--spacing-sm);
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            margin-top: var(--spacing-sm);
+            border: 1px solid var(--color-border);
+        }
+        .agent-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        /* 动态连线效果模拟 */
+        .mapping-line {
+            height: 4px;
+            background: var(--color-success);
+            border-radius: 2px;
+            margin: 8px 0;
+            transition: all 0.3s;
+        }
+        .status-warning .mapping-line {
+            height: 2px;
+            background: var(--color-warning);
+            width: 80%;
+        }
+        .status-danger .mapping-line {
+            background: repeating-linear-gradient(45deg, var(--color-danger), var(--color-danger) 5px, transparent 5px, transparent 10px);
+        }
+
+        /* =========================================================
+           Layer 3: Decision & Auto-Correction (智能决策层)
+           ========================================================= */
+        .decision-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-lg);
+        }
+        .panel-card {
+            background: var(--color-bg-card);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* 龙卷风图 (Tornado Chart) */
+        .tornado-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: var(--spacing-md);
+        }
+        .tornado-row {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+        .tornado-label {
+            font-size: 12px;
+            text-align: right;
+            color: var(--color-text-secondary);
+        }
+        .tornado-bars {
+            display: flex;
+            align-items: center;
+            height: 16px;
+            position: relative;
+        }
+        .tornado-axis {
+            position: absolute;
+            left: 50%;
+            top: -4px;
+            bottom: -4px;
+            width: 1px;
+            background: var(--color-border);
+            z-index: 1;
+        }
+        .bar-neg {
+            background: var(--color-danger);
+            height: 100%;
+            position: absolute;
+            right: 50%;
+            border-radius: 4px 0 0 4px;
+            transition: width 0.3s;
+            opacity: 0.8;
+        }
+        .bar-pos {
+            background: var(--color-success);
+            height: 100%;
+            position: absolute;
+            left: 50%;
+            border-radius: 0 4px 4px 0;
+            transition: width 0.3s;
+            opacity: 0.8;
+        }
+
+        /* AI 代偿锦囊 */
+        .ai-magic-box {
+            border: 1px solid #b37feb;
+            background: #f9f0ff;
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            position: relative;
+            overflow: hidden;
+        }
+        .ai-magic-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: #722ed1;
+        }
+        .ai-title {
+            color: #722ed1;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .strategy-item {
+            background: white;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--spacing-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+        }
+        .strategy-text {
+            font-size: 13px;
+            flex: 1;
+        }
+        .btn-apply {
+            background: #722ed1;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+        .btn-apply:hover {
+            background: #531dab;
+        }
+        .btn-apply.applied {
+            background: var(--color-success);
+            cursor: default;
+        }
+
+        /* =========================================================
+           Layer 4: Runtime & Closed-Loop (闭环执行与监控)
+           ========================================================= */
+        .runtime-panel {
+            background: #1f1f1f;
+            color: #d9d9d9;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            font-family: Consolas, 'SF Mono', 'Fira Code', monospace;
+            box-shadow: var(--shadow-md);
+            position: relative;
+        }
+
+        /* 终端窗口装饰 - macOS 风格圆点 */
+        .runtime-panel::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: 18px;
+            display: flex;
+            gap: 6px;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .runtime-dots {
+            display: flex;
+            gap: 7px;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .runtime-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .runtime-dot.red {
+            background: #ff5f56;
+        }
+        .runtime-dot.yellow {
+            background: #ffbd2e;
+        }
+        .runtime-dot.green {
+            background: #27c93f;
+        }
+
+        /* 日志滚动容器 - 五行可见窗口 */
+        .log-container {
+            max-height: 142px;
+            /* 精确容纳5行日志 (每行约27-28px) */
+            overflow-y: auto;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+            padding-right: 6px;
+            /* 给滚动条留呼吸空间 */
+        }
+
+        /* 暗色终端滚动条定制 */
+        .log-container::-webkit-scrollbar {
+            width: 5px;
+        }
+        .log-container::-webkit-scrollbar-track {
+            background: transparent;
+            border-radius: 3px;
+        }
+        .log-container::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 3px;
+            transition: background 0.2s;
+        }
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+
+        /* Firefox 滚动条 */
+        .log-container {
+            scrollbar-width: thin;
+            scrollbar-color: #444 transparent;
+        }
+
+        .log-line {
+            font-size: 13px;
+            margin-bottom: 6px;
+            display: flex;
+            gap: 12px;
+            line-height: 1.55;
+            white-space: nowrap;
+            transition: opacity 0.3s ease;
+        }
+        .log-line:last-child {
+            margin-bottom: 0;
+        }
+        /* 新日志淡入效果 */
+        .log-line.just-added {
+            animation: fadeInLog 0.35s ease-out;
+        }
+        @keyframes fadeInLog {
+            from {
+                opacity: 0;
+                transform: translateY(-6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .log-time {
+            color: #8c8c8c;
+            flex-shrink: 0;
+        }
+        .log-success {
+            color: #73d13d;
+        }
+        .log-warn {
+            color: #faad14;
+        }
+        .log-error {
+            color: #ff4d4f;
+        }
+
+        /* 日志容器空状态或滚动提示 */
+        .log-scroll-indicator {
+            position: absolute;
+            bottom: 8px;
+            right: 28px;
+            font-size: 10px;
+            color: #555;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-family: var(--font-family-base);
+        }
+        .log-scroll-indicator.visible {
+            opacity: 0.7;
+            animation: bounceHint 1.5s ease-in-out;
+        }
+        @keyframes bounceHint {
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-4px);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1><span style="font-size: 24px;">🎮</span> sisys - 动态战略沙盘指挥中心</h1>
+        <div class="badge-gpu" id="gpuStatus">
+            <span style="font-size: 10px;">🟢</span> 算力引擎: 本地私有化集群 Idle
+        </div>
+    </header>
+
+    <main class="main-container">
+
+        <section class="sandbox-panel">
+            <div class="section-title">🗂️ 1. 情景控制台 (The Sandbox Console) - 全局推演</div>
+
+            <div class="plan-selector">
+                <div class="plan-btn active" id="btn-plan-a" onclick="resetSandbox()">
+                    <div class="plan-title">🟢 Plan A (基准战略) ✓</div>
+                    <div class="plan-desc">当前执行路线，资源充沛，按部就班</div>
+                </div>
+                <div class="plan-btn" id="btn-plan-b">
+                    <div class="plan-title">🟡 Plan B (资源紧缩)</div>
+                    <div class="plan-desc">应对资本寒冬，保核心弃边缘</div>
+                </div>
+                <div class="plan-btn" id="btn-plan-c">
+                    <div class="plan-title">🔴 Plan C (激进突围)</div>
+                    <div class="plan-desc">高风险高投入，抢占窗口期</div>
+                </div>
+            </div>
+
+            <div class="slider-grid">
+                <div>
+                    <div style="font-size: 14px; font-weight: bold; color: var(--color-text-secondary); margin-bottom: var(--spacing-md);">🌍 宏观/五看变量</div>
+
+                    <div class="slider-group">
+                        <div class="slider-header">
+                            <span>市场增量预期 (CAGR)</span>
+                            <span id="val-cagr" style="color: var(--color-success); font-weight: bold;">15%</span>
+                        </div>
+                        <input type="range" id="slide-cagr" min="0" max="30" value="15" step="1" oninput="runSimulation()">
+                    </div>
+
+                    <div class="slider-group">
+                        <div class="slider-header">
+                            <span>竞品发布周期 (提前量)</span>
+                            <span id="val-comp" style="color: var(--color-text-primary); font-weight: bold;">正常</span>
+                        </div>
+                        <input type="range" class="reverse-track" id="slide-comp" min="0" max="6" value="0" step="1" oninput="runSimulation()">
+                        <div style="display:flex; justify-content:space-between; font-size:10px; color:#8c8c8c; margin-top:4px;">
+                            <span>0个月</span><span>提前6个月</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="font-size: 14px; font-weight: bold; color: var(--color-text-secondary); margin-bottom: var(--spacing-md);">📦 约束/资源变量</div>
+
+                    <div class="slider-group">
+                        <div class="slider-header">
+                            <span>年度研发预算</span>
+                            <span id="val-budget" style="color: var(--color-success); font-weight: bold;">¥ 2.0 亿</span>
+                        </div>
+                        <input type="range" id="slide-budget" min="0.5" max="3.0" value="2.0" step="0.1" oninput="runSimulation()">
+                    </div>
+
+                    <div class="slider-group">
+                        <div class="slider-header">
+                            <span>核心 HC (人才缺口)</span>
+                            <span id="val-hc" style="color: var(--color-text-primary); font-weight: bold;">已补齐 0 人</span>
+                        </div>
+                        <input type="range" class="reverse-track" id="slide-hc" min="0" max="50" value="0" step="5" oninput="runSimulation()">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div>
+            <div class="section-title">🌊 2. 涟漪反馈层 (The Trust Ripple Engine) - 实时震荡</div>
+            <div class="ripple-grid">
+
+                <div class="trust-card" id="card-direction">
+                    <div class="trust-header">
+                        <div>
+                            <div class="trust-icon">🎯</div>
+                            <div class="trust-title">方向可信</div>
+                        </div>
+                        <div class="trust-score" id="score-direction">0.92</div>
+                    </div>
+                    <div style="font-size: 13px; color: var(--color-text-secondary);">共识度：<span id="consensus-text">极高 (5/5 Agent 支持)</span></div>
+                    <div class="agent-chat" id="agent-chat-box">
+                        <div class="agent-row"><span>🧑‍💼 CMO:</span> <span style="color:var(--color-success)">✅ 全力支持，窗口期极佳</span></div>
+                        <div class="agent-row"><span>👨‍💼 CFO:</span> <span style="color:var(--color-success)" id="cfo-status">✅ 预算健康，ROI 达标</span></div>
+                    </div>
+                </div>
+
+                <div class="trust-card" id="card-decode">
+                    <div class="trust-header">
+                        <div>
+                            <div class="trust-icon">🔗</div>
+                            <div class="trust-title">解码可信</div>
+                        </div>
+                        <div class="trust-score" id="score-decode">100%</div>
+                    </div>
+                    <div style="font-size: 13px; color: var(--color-text-secondary);">SP→BP 映射链路状态：</div>
+                    <div style="margin-top: 12px;">
+                        <div style="font-size: 12px; display: flex; justify-content: space-between;"><span>KPI: 核心技术突破</span> <span id="weight-1">权重 0.5</span></div>
+                        <div class="mapping-line" id="line-1"></div>
+                        <div style="font-size: 12px; display: flex; justify-content: space-between;"><span>KPI: 边缘产品线迭代</span> <span id="weight-2">权重 0.5</span></div>
+                        <div class="mapping-line" id="line-2"></div>
+                    </div>
+                </div>
+
+                <div class="trust-card" id="card-execute">
+                    <div class="trust-header">
+                        <div>
+                            <div class="trust-icon">✅</div>
+                            <div class="trust-title">执行可信</div>
+                        </div>
+                        <div class="trust-score" id="score-execute">95/100</div>
+                    </div>
+                    <div style="font-size: 13px; color: var(--color-text-secondary);">里程碑约束校验：</div>
+                    <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 13px; background: var(--color-bg-primary); padding: 4px 8px; border-radius: 4px;">
+                            <span>M1: 架构设计</span> <span style="color:var(--color-success)">🟢 按期</span>
+                        </div>
+                        <div id="m2-status-box" style="display: flex; justify-content: space-between; font-size: 13px; background: var(--color-bg-primary); padding: 4px 8px; border-radius: 4px; transition: all 0.3s;">
+                            <span>M2: 核心样机交付</span> <span id="m2-status-text" style="color:var(--color-success)">🟢 Q3 可行</span>
+                        </div>
+                        <div id="resource-alert" style="display: none; font-size: 12px; color: var(--color-danger); margin-top: 4px;">
+                            ⚠️ 熔断：研发预算击穿底线！
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div>
+            <div class="section-title">💡 3. 智能决策输出层 (Decision & Auto-Correction)</div>
+            <div class="decision-grid">
+
+                <div class="panel-card">
+                    <div style="font-weight: 600; margin-bottom: 8px;">📊 敏感性分析 (Tornado Chart)</div>
+                    <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 16px;">揭示对战略执行影响最大的变量（正负向方差）</div>
+                    <div class="tornado-chart">
+                        <div class="tornado-row">
+                            <div class="tornado-label">人力 HC 缺口</div>
+                            <div class="tornado-bars">
+                                <div class="tornado-axis"></div>
+                                <div class="bar-neg" id="tor-hc-neg" style="width: 10%"></div>
+                            </div>
+                        </div>
+                        <div class="tornado-row">
+                            <div class="tornado-label">研发预算增减</div>
+                            <div class="tornado-bars">
+                                <div class="tornado-axis"></div>
+                                <div class="bar-neg" id="tor-bg-neg" style="width: 15%"></div>
+                                <div class="bar-pos" id="tor-bg-pos" style="width: 45%"></div>
+                            </div>
+                        </div>
+                        <div class="tornado-row">
+                            <div class="tornado-label">竞品提前发布</div>
+                            <div class="tornado-bars">
+                                <div class="tornado-axis"></div>
+                                <div class="bar-neg" id="tor-cp-neg" style="width: 5%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ai-magic-box">
+                    <div class="ai-title">🪄 AI 智能代偿方案 (Auto-Correction)</div>
+                    <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 12px;">当执行分数低于 80 分时，系统多 Agent 将自动生成最优修复建议。</div>
+
+                    <div id="ai-strategies" style="opacity: 0.4; pointer-events: none;">
+                        <div class="strategy-item">
+                            <div class="strategy-text">
+                                <strong>推荐策略 1：弃卒保车</strong><br>
+                                砍掉边缘产品线 B，释放 30% 预算死保"核心样机" KPI。
+                            </div>
+                            <button class="btn-apply" onclick="applyStrategy(this, 1)">采纳重算</button>
+                        </div>
+                        <div class="strategy-item">
+                            <div class="strategy-text">
+                                <strong>推荐策略 2：以时间换空间</strong><br>
+                                接受 M2 里程碑整体延期 45 天，无需增加额外预算与人力。
+                            </div>
+                            <button class="btn-apply" onclick="applyStrategy(this, 2)">采纳重算</button>
+                        </div>
+                    </div>
+                    <div id="ai-mask" style="position: absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background: rgba(249, 240, 255, 0.8); backdrop-filter: blur(2px);">
+                        <span style="color: #722ed1; font-weight: 500;">🟢 当前战略健康，无需干预</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div>
+            <div class="section-title">🔄 4. 闭环执行与监控层 (Runtime & Closed-Loop) <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400;margin-left:4px;">— 五行实时窗口</span></div>
+            <div class="runtime-panel">
+                <!-- macOS 风格终端装饰圆点 -->
+                <div class="runtime-dots">
+                    <span class="runtime-dot red"></span>
+                    <span class="runtime-dot yellow"></span>
+                    <span class="runtime-dot green"></span>
+                </div>
+                <!-- 五行滚动日志容器 -->
+                <div class="log-container" id="terminal-log">
+                    <div class="log-line"><span class="log-time">[10:00:01]</span> <span class="log-success">SYS_INFO: Webhook 监听已启动，已接入 ERP & Gitea...</span></div>
+                    <div class="log-line"><span class="log-time">[10:00:05]</span> <span class="log-success">DATA_SYNC: 财务流水拉取成功，当前预算消耗处于绿色阈值。</span></div>
+                    <div class="log-line"><span class="log-time">[10:00:12]</span> <span class="log-success">MONITOR: 战略偏差检测守护进程运行中...</span></div>
+                </div>
+                <!-- 滚动提示小箭头 -->
+                <span class="log-scroll-indicator" id="scrollHint">▼ 更多日志</span>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // 模拟推演核心逻辑 (供路演演示使用)
+        function runSimulation() {
+            // 1. 获取滑块值
+            const cagr = parseFloat(document.getElementById('slide-cagr').value);
+            const comp = parseFloat(document.getElementById('slide-comp').value);
+            const budget = parseFloat(document.getElementById('slide-budget').value);
+            const hc = parseFloat(document.getElementById('slide-hc').value);
+
+            // 更新界面文本
+            document.getElementById('val-cagr').innerText = cagr + '%';
+            document.getElementById('val-cagr').style.color = cagr < 10 ? 'var(--color-danger)' : 'var(--color-success)';
+
+            document.getElementById('val-comp').innerText = comp === 0 ? '正常' : `提前 ${comp} 个月`;
+            document.getElementById('val-comp').style.color = comp > 3 ? 'var(--color-danger)' : 'inherit';
+
+            document.getElementById('val-budget').innerText = `¥ ${budget.toFixed(1)} 亿`;
+            document.getElementById('val-budget').style.color = budget < 1.2 ? 'var(--color-danger)' : 'var(--color-success)';
+
+            document.getElementById('val-hc').innerText = hc === 0 ? '无缺口' : `缺口 ${hc} 人`;
+            document.getElementById('val-hc').style.color = hc > 20 ? 'var(--color-danger)' : 'inherit';
+
+            // UI 算力引擎闪烁模拟
+            const gpu = document.getElementById('gpuStatus');
+            gpu.classList.add('computing');
+            gpu.innerHTML = '<span style="font-size: 10px;">⚡</span> 算力引擎: Agent 并发重算中...';
+
+            // 模拟计算延迟
+            setTimeout(() => {
+                gpu.classList.remove('computing');
+                gpu.innerHTML = '<span style="font-size: 10px;">🟢</span> 算力引擎: 本地私有化集群 Idle';
+
+                calculateImpact(cagr, comp, budget, hc);
+            }, 400); // 400ms 营造计算感
+        }
+
+        function calculateImpact(cagr, comp, budget, hc) {
+            // === 核心逻辑演算 ===
+            let isWarning = false;
+            let isDanger = false;
+
+            // 评估方向可信 (受市场和竞品影响)
+            let dirScore = 0.92 - ((15 - cagr) * 0.02) - (comp * 0.05);
+            const cardDir = document.getElementById('card-direction');
+            const cfoText = document.getElementById('cfo-status');
+
+            if (dirScore < 0.6) {
+                cardDir.className = 'trust-card status-danger';
+                cfoText.innerHTML = '🔴 强烈反对！ROI 模型已彻底崩溃';
+                cfoText.style.color = 'var(--color-danger)';
+                document.getElementById('consensus-text').innerText = '破裂 (2/5 支持)';
+                isDanger = true;
+            } else if (dirScore < 0.8) {
+                cardDir.className = 'trust-card status-warning';
+                cfoText.innerHTML = '⚠️ 提出警告：投资回收期将延长';
+                cfoText.style.color = 'var(--color-warning)';
+                document.getElementById('consensus-text').innerText = '动摇 (3/5 支持)';
+                isWarning = true;
+            } else {
+                cardDir.className = 'trust-card';
+                cfoText.innerHTML = '✅ 预算健康，ROI 达标';
+                cfoText.style.color = 'var(--color-success)';
+                document.getElementById('consensus-text').innerText = '极高 (5/5 支持)';
+            }
+            document.getElementById('score-direction').innerText = Math.max(0, dirScore).toFixed(2);
+
+            // 评估执行可信 (受预算和 HC 影响)
+            let execScore = 95 - ((2.0 - budget) * 30) - (hc * 0.8);
+            const cardExec = document.getElementById('card-execute');
+            const m2Box = document.getElementById('m2-status-box');
+            const m2Text = document.getElementById('m2-status-text');
+            const alertBox = document.getElementById('resource-alert');
+
+            if (execScore < 60) {
+                cardExec.className = 'trust-card status-danger';
+                m2Box.style.background = '#fff1f0';
+                m2Box.style.border = '1px solid var(--color-danger)';
+                m2Text.innerHTML = '❌ 严重延期 (无法交付)';
+                m2Text.style.color = 'var(--color-danger)';
+                alertBox.style.display = 'block';
+                alertBox.innerText = budget < 1.0 ? '⚠️ 熔断：研发预算击穿底线！' : '⚠️ 熔断：核心人才断层！';
+                isDanger = true;
+            } else if (execScore < 80) {
+                cardExec.className = 'trust-card status-warning';
+                m2Box.style.background = '#fffbe6';
+                m2Box.style.border = '1px solid var(--color-warning)';
+                m2Text.innerHTML = '⚠️ 延期风险 (预计推迟至 Q4)';
+                m2Text.style.color = 'var(--color-warning)';
+                alertBox.style.display = 'none';
+                isWarning = true;
+            } else {
+                cardExec.className = 'trust-card';
+                m2Box.style.background = 'var(--color-bg-primary)';
+                m2Box.style.border = 'none';
+                m2Text.innerHTML = '🟢 Q3 可行';
+                m2Text.style.color = 'var(--color-success)';
+                alertBox.style.display = 'none';
+            }
+            document.getElementById('score-execute').innerText = Math.max(0, execScore).toFixed(0) + '/100';
+
+            // 评估解码可信 (权重转移视觉表现)
+            const cardDec = document.getElementById('card-decode');
+            if (budget < 1.5) {
+                cardDec.className = 'trust-card status-warning';
+                document.getElementById('weight-1').innerText = '权重 0.8 (保底)';
+                document.getElementById('weight-2').innerText = '权重 0.2 (收缩)';
+                document.getElementById('score-decode').innerText = '变更中';
+            } else {
+                cardDec.className = 'trust-card';
+                document.getElementById('weight-1').innerText = '权重 0.5';
+                document.getElementById('weight-2').innerText = '权重 0.5';
+                document.getElementById('score-decode').innerText = '100%';
+            }
+
+            // 更新龙卷风图 (视觉放大)
+            document.getElementById('tor-hc-neg').style.width = (hc * 1.5) + '%';
+            document.getElementById('tor-cp-neg').style.width = (comp * 10) + '%';
+            let bgDiff = budget - 2.0;
+            if (bgDiff < 0) {
+                document.getElementById('tor-bg-neg').style.width = (Math.abs(bgDiff) * 50) + '%';
+                document.getElementById('tor-bg-pos').style.width = '0%';
+            } else {
+                document.getElementById('tor-bg-neg').style.width = '0%';
+                document.getElementById('tor-bg-pos').style.width = (bgDiff * 50) + '%';
+            }
+
+            // AI 代偿触发逻辑
+            const aiMask = document.getElementById('ai-mask');
+            const aiContent = document.getElementById('ai-strategies');
+            if (execScore < 80 || dirScore < 0.7) {
+                aiMask.style.display = 'none';
+                aiContent.style.opacity = '1';
+                aiContent.style.pointerEvents = 'auto';
+
+                // 切面日志
+                addLog(`WARN: 执行分数暴跌至 ${execScore.toFixed(0)}，触发 Auto-Correction 寻优。`, 'warn');
+                highlightPlanBtn('btn-plan-b');
+            } else {
+                aiMask.style.display = 'flex';
+                aiContent.style.opacity = '0.4';
+                aiContent.style.pointerEvents = 'none';
+
+                // 恢复应用按钮
+                document.querySelectorAll('.btn-apply').forEach(btn => {
+                    btn.innerText = '采纳重算';
+                    btn.classList.remove('applied');
+                });
+                highlightPlanBtn('btn-plan-a');
+            }
+
+            if (isDanger) highlightPlanBtn('btn-plan-c');
+
+            // 检查是否需要显示滚动提示
+            updateScrollHint();
+        }
+
+        // AI 策略点击交互
+        function applyStrategy(btn, type) {
+            if (btn.classList.contains('applied')) return;
+            btn.innerText = '✅ 已生效';
+            btn.classList.add('applied');
+
+            addLog(`ACTION: 高管采纳策略 ${type}，下发重算指令，生成新版 SP-BP 映射。`, 'success');
+
+            // 模拟参数被 AI 自动纠正
+            if (type === 1) {
+                document.getElementById('slide-budget').value = 1.5; // 释放预算
+            } else {
+                document.getElementById('slide-hc').value = 0; // 延期换空间，假装 HC 压力缓解
+            }
+            runSimulation();
+        }
+
+        // 终端日志打字机效果（追加到五行滚动窗口）
+        function addLog(text, type) {
+            const term = document.getElementById('terminal-log');
+            const now = new Date();
+            const timeStr = `[${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}]`;
+            const colorClass = type === 'warn' ? 'log-warn' : type === 'error' ? 'log-error' : 'log-success';
+
+            const el = document.createElement('div');
+            el.className = 'log-line just-added';
+            el.innerHTML = `<span class="log-time">${timeStr}</span> <span class="${colorClass}">${text}</span>`;
+            term.appendChild(el);
+
+            // 自动滚动到最新日志（始终显示最新5行）
+            term.scrollTop = term.scrollHeight;
+
+            // 移除淡入动画类（以便下次重新触发）
+            setTimeout(() => {
+                el.classList.remove('just-added');
+            }, 400);
+
+            // 更新滚动提示
+            updateScrollHint();
+        }
+
+        // 检查日志是否超出5行，显示滚动提示
+        function updateScrollHint() {
+            const term = document.getElementById('terminal-log');
+            const hint = document.getElementById('scrollHint');
+            const logLines = term.querySelectorAll('.log-line');
+            const lineCount = logLines.length;
+
+            // 超过5行且用户未滚动到底部时显示提示
+            if (lineCount > 5 && term.scrollTop + term.clientHeight < term.scrollHeight - 10) {
+                hint.classList.add('visible');
+                setTimeout(() => hint.classList.remove('visible'), 2000);
+            } else {
+                hint.classList.remove('visible');
+            }
+        }
+
+        // 监听用户手动滚动（点击滚动提示可快速跳到底部）
+        document.addEventListener('DOMContentLoaded', function() {
+            const term = document.getElementById('terminal-log');
+            const hint = document.getElementById('scrollHint');
+
+            // 点击提示滚动到底部
+            hint.addEventListener('click', function() {
+                term.scrollTo({ top: term.scrollHeight, behavior: 'smooth' });
+                hint.classList.remove('visible');
+            });
+
+            // 用户手动滚动时更新提示状态
+            term.addEventListener('scroll', function() {
+                updateScrollHint();
+            });
+
+            // 初始检查
+            updateScrollHint();
+        });
+
+        // 平行宇宙按钮高亮控制
+        function highlightPlanBtn(id) {
+            document.querySelectorAll('.plan-btn').forEach(b => b.classList.remove('active', 'warning', 'danger'));
+            const btn = document.getElementById(id);
+            if (id === 'btn-plan-b') btn.classList.add('warning');
+            else if (id === 'btn-plan-c') btn.classList.add('danger');
+            else btn.classList.add('active');
+        }
+
+        // 重置沙盘
+        function resetSandbox() {
+            document.getElementById('slide-cagr').value = 15;
+            document.getElementById('slide-comp').value = 0;
+            document.getElementById('slide-budget').value = 2.0;
+            document.getElementById('slide-hc').value = 0;
+            runSimulation();
+            addLog('SYS_INFO: 已重置回 Plan A 基准环境。', 'success');
+        }
+
+        // 页面初始化：确保日志容器正确设置
+        (function initLogContainer() {
+            const term = document.getElementById('terminal-log');
+            // 初始滚动到底部
+            term.scrollTop = term.scrollHeight;
+            updateScrollHint();
+        })();
+    </script>
+</body>
+</html>
