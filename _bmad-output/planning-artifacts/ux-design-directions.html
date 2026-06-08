@@ -5,356 +5,315 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>sisys MVP — 战略方向 · 战略解码 · 业务执行</title>
   <style>
-    /* =========================================================
-       Design Tokens — sisys 设计系统
-       ========================================================= */
     :root {
-      --color-primary: #1890ff; --color-primary-hover: #096dd9; --color-primary-active: #40a9ff; --color-primary-bg: #e6f7ff;
-      --color-success: #52c41a; --color-warning: #faad14; --color-danger: #ff4d4f;
-      --color-purple: #722ed1; --color-purple-bg: #f9f0ff;
-      --color-text-primary: #262626; --color-text-secondary: #595959; --color-text-tertiary: #8c8c8c; --color-text-disabled: #bfbfbf;
-      --color-bg-primary: #f5f5f5; --color-bg-card: #ffffff; --color-border: #e8e8e8; --color-white: #ffffff;
-      --font-family-base: 'PingFang SC', 'Microsoft YaHei', sans-serif; --font-family-code: 'Consolas', 'Monaco', monospace;
-      --spacing-xs: 4px; --spacing-sm: 8px; --spacing-md: 16px; --spacing-lg: 24px; --spacing-xl: 32px; --spacing-2xl: 48px; --spacing-3xl: 64px;
-      --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
-      --shadow-sm: 0 1px 2px rgba(0,0,0,0.1); --shadow-md: 0 4px 12px rgba(0,0,0,0.08); --shadow-lg: 0 8px 24px rgba(0,0,0,0.12); --shadow-xl: 0 12px 32px rgba(0,0,0,0.18);
+      --color-primary:#1890ff;--color-primary-hover:#096dd9;--color-primary-active:#40a9ff;--color-primary-bg:#e6f7ff;
+      --color-success:#52c41a;--color-warning:#faad14;--color-danger:#ff4d4f;
+      --color-purple:#722ed1;--color-purple-bg:#f9f0ff;
+      --color-text-primary:#262626;--color-text-secondary:#595959;--color-text-tertiary:#8c8c8c;--color-text-disabled:#bfbfbf;
+      --color-bg-primary:#f5f5f5;--color-bg-card:#fff;--color-border:#e8e8e8;--color-white:#fff;
+      --font-family-base:'PingFang SC','Microsoft YaHei',sans-serif;--font-family-code:'Consolas','Monaco',monospace;
+      --spacing-xs:4px;--spacing-sm:8px;--spacing-md:16px;--spacing-lg:24px;--spacing-xl:32px;--spacing-2xl:48px;--spacing-3xl:64px;
+      --radius-sm:4px;--radius-md:8px;--radius-lg:12px;--radius-xl:16px;
+      --shadow-sm:0 1px 2px rgba(0,0,0,.1);--shadow-md:0 4px 12px rgba(0,0,0,.08);--shadow-lg:0 8px 24px rgba(0,0,0,.12);--shadow-xl:0 12px 32px rgba(0,0,0,.18);
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: var(--font-family-base); background: var(--color-bg-primary); color: var(--color-text-primary); line-height: 1.6; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:var(--font-family-base);background:var(--color-bg-primary);color:var(--color-text-primary);line-height:1.6}
+    /* 导航 */
+    .nav{background:#001529;color:white;padding:0 var(--spacing-xl);display:flex;justify-content:space-between;align-items:center;height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+    .nav-brand{font-size:18px;font-weight:600;display:flex;align-items:center;gap:10px}
+    .nav-tabs{display:flex;align-items:center;height:100%}
+    .nav-tab{padding:0 24px;height:100%;display:flex;align-items:center;color:rgba(255,255,255,.65);cursor:pointer;font-size:14px;font-weight:500;border:none;border-bottom:2px solid transparent;background:none;font-family:var(--font-family-base);transition:all .2s}
+    .nav-tab:hover{color:white;background:rgba(255,255,255,.08)}
+    .nav-tab.active{color:white;border-bottom-color:var(--color-primary)}
+    .nav-right{display:flex;gap:12px;align-items:center}
+    .nav-search{width:220px;padding:6px 12px;border-radius:16px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:white;font-size:13px;font-family:var(--font-family-base);outline:none}
+    .nav-search:focus{border-color:var(--color-primary);background:rgba(255,255,255,.15)}
+    .nav-search::placeholder{color:rgba(255,255,255,.4)}
+    .nav-project{padding:4px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:transparent;color:white;font-size:12px;font-family:var(--font-family-base);cursor:pointer;max-width:180px}
+    .nav-user{font-size:13px;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:6px}
+    .main{max-width:1400px;margin:0 auto;padding:var(--spacing-2xl)}
+    .page{display:none}.page.active{display:block}
+    .section-title{font-size:28px;font-weight:600;margin-bottom:var(--spacing-xs)}
+    .section-desc{font-size:14px;color:var(--color-text-secondary);margin-bottom:var(--spacing-xl)}
+    .section-meta{font-size:12px;color:var(--color-text-tertiary);margin-bottom:var(--spacing-lg)}
 
-    /* =========================================================
-       导航栏
-       ========================================================= */
-    .nav { background: #001529; color: white; padding: 0 var(--spacing-xl); display: flex; justify-content: space-between; align-items: center; height: 56px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-    .nav-brand { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
-    .nav-tabs { display: flex; align-items: center; height: 100%; }
-    .nav-tab { padding: 0 24px; height: 100%; display: flex; align-items: center; color: rgba(255,255,255,0.65); cursor: pointer; font-size: 14px; font-weight: 500; border: none; border-bottom: 2px solid transparent; background: none; font-family: var(--font-family-base); transition: all 0.2s; }
-    .nav-tab:hover { color: white; background: rgba(255,255,255,0.08); }
-    .nav-tab.active { color: white; border-bottom-color: var(--color-primary); }
-    .nav-right { display: flex; gap: 12px; align-items: center; }
-    .nav-search { width: 220px; padding: 6px 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; font-size: 13px; font-family: var(--font-family-base); outline: none; }
-    .nav-search:focus { border-color: var(--color-primary); background: rgba(255,255,255,0.15); }
-    .nav-search::placeholder { color: rgba(255,255,255,0.4); }
-    .nav-project { padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: white; font-size: 12px; font-family: var(--font-family-base); cursor: pointer; max-width: 180px; }
-    .nav-user { font-size: 13px; color: rgba(255,255,255,0.8); display: flex; align-items: center; gap: 6px; }
+    /* 总览卡片 */
+    .trust-overview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--spacing-lg);margin-bottom:var(--spacing-lg)}
+    .trust-overview-card{background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);cursor:pointer;overflow:hidden;text-decoration:none;color:inherit;display:block;transition:transform .2s ease-out,box-shadow .2s ease-out}
+    .trust-overview-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-xl)}
+    .card-status-bar{height:4px;width:100%}.card-status-bar.green{background:var(--color-success)}.card-status-bar.yellow{background:var(--color-warning)}.card-status-bar.red{background:var(--color-danger)}
+    .card-body{padding:var(--spacing-lg)}
+    .card-header{display:flex;align-items:center;gap:var(--spacing-sm);margin-bottom:var(--spacing-md)}
+    .card-icon{font-size:24px;line-height:1}.card-title{font-size:18px;font-weight:600}
+    .card-metrics{display:flex;flex-direction:column;gap:var(--spacing-sm);margin-bottom:var(--spacing-md)}
+    .metric{display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:var(--spacing-xs) var(--spacing-sm);border-radius:var(--radius-sm)}
+    .metric-label{color:var(--color-text-secondary)}.metric-value{font-weight:600;display:flex;align-items:center;gap:4px}
+    .metric.alert{background:#fffbe6;border-left:2px solid var(--color-warning)}.metric.alert .metric-label{color:#d48806}
+    .trend{font-size:12px;font-weight:700}.trend.up{color:var(--color-success)}.trend.down{color:var(--color-danger)}.trend.flat{color:var(--color-text-tertiary)}
+    .metric-baseline{font-size:11px;color:var(--color-text-tertiary);display:block;margin-top:1px}
+    .card-action{display:flex;align-items:center;gap:4px;font-size:14px;color:var(--color-primary);font-weight:500;transition:transform .2s ease-out}
+    .trust-overview-card:hover .card-action{transform:translateX(4px)}
+    .risk-summary-bar{display:flex;gap:var(--spacing-sm);flex-wrap:wrap;align-items:center;padding:var(--spacing-md);background:var(--color-bg-card);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);margin-bottom:var(--spacing-xl);font-size:13px}
+    .risk-summary-bar .risk-label{font-weight:600;color:var(--color-text-secondary);margin-right:var(--spacing-sm)}
+    .risk-item{padding:4px 10px;border-radius:12px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:background .2s}
+    .risk-item.yellow{background:#fffbe6;color:#d48806}.risk-item.yellow:hover{background:#fff1b8}
+    .risk-item.red{background:#fff1f0;color:var(--color-danger)}.risk-item.red:hover{background:#ffd8d2}
+    .risk-item.green{background:#f6ffed;color:var(--color-success)}
 
-    .main { max-width: 1400px; margin: 0 auto; padding: var(--spacing-2xl); }
-    .page { display: none; } .page.active { display: block; }
-    .section-title { font-size: 28px; font-weight: 600; margin-bottom: var(--spacing-xs); }
-    .section-desc { font-size: 14px; color: var(--color-text-secondary); margin-bottom: var(--spacing-xl); }
-    .section-meta { font-size: 12px; color: var(--color-text-tertiary); margin-bottom: var(--spacing-lg); }
+    /* ===== 追溯页工具栏 ===== */
+    .trace-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--spacing-sm);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-md) var(--spacing-lg);margin-bottom:var(--spacing-lg)}
+    .toolbar-left{display:flex;align-items:center;gap:var(--spacing-md)}
+    .toolbar-right{display:flex;align-items:center;gap:var(--spacing-sm)}
+    .back-link{color:var(--color-primary);text-decoration:none;font-size:14px;cursor:pointer;font-weight:500}.back-link:hover{text-decoration:underline}
+    .toolbar-title{font-size:16px;font-weight:600}
+    /* 视图切换器 */
+    .view-switcher{display:flex;gap:0;border:1px solid var(--color-border);border-radius:var(--radius-sm);overflow:hidden}
+    .view-btn{padding:5px 16px;border:none;background:var(--color-bg-card);cursor:pointer;font-size:13px;font-family:var(--font-family-base);transition:all .15s;border-right:1px solid var(--color-border)}
+    .view-btn:last-child{border-right:none}
+    .view-btn:hover{background:var(--color-bg-primary);color:var(--color-primary)}
+    .view-btn.active{background:var(--color-primary);color:white;border-color:var(--color-primary)}
+    .toolbar-search{width:200px;padding:4px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:13px;font-family:var(--font-family-base);outline:none}
+    .toolbar-search:focus{border-color:var(--color-primary)}
+    .verify-progress{font-size:12px;color:var(--color-text-secondary)}
 
-    /* =========================================================
-       Page 1: 三重信任总览
-       ========================================================= */
-    .trust-overview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-lg); margin-bottom: var(--spacing-lg); }
-    .trust-overview-card { background: var(--color-bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); cursor: pointer; overflow: hidden; text-decoration: none; color: inherit; display: block; transition: transform 0.2s ease-out, box-shadow 0.2s ease-out; }
-    .trust-overview-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-xl); }
-    .card-status-bar { height: 4px; width: 100%; }
-    .card-status-bar.green { background: var(--color-success); } .card-status-bar.yellow { background: var(--color-warning); } .card-status-bar.red { background: var(--color-danger); }
-    .card-body { padding: var(--spacing-lg); }
-    .card-header { display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-md); }
-    .card-icon { font-size: 24px; line-height: 1; } .card-title { font-size: 18px; font-weight: 600; }
-    .card-metrics { display: flex; flex-direction: column; gap: var(--spacing-sm); margin-bottom: var(--spacing-md); }
-    .metric { display: flex; justify-content: space-between; align-items: center; font-size: 14px; padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--radius-sm); }
-    .metric-label { color: var(--color-text-secondary); }
-    .metric-value { font-weight: 600; display: flex; align-items: center; gap: 4px; }
-    .metric.alert { background: #fffbe6; border-left: 2px solid var(--color-warning); }
-    .metric.alert .metric-label { color: #d48806; }
-    .trend { font-size: 12px; font-weight: 700; }
-    .trend.up { color: var(--color-success); } .trend.down { color: var(--color-danger); } .trend.flat { color: var(--color-text-tertiary); }
-    .metric-baseline { font-size: 11px; color: var(--color-text-tertiary); display: block; margin-top: 1px; }
-    .card-action { display: flex; align-items: center; gap: 4px; font-size: 14px; color: var(--color-primary); font-weight: 500; transition: transform 0.2s ease-out; }
-    .trust-overview-card:hover .card-action { transform: translateX(4px); }
+    /* ===== 三个视图容器 ===== */
+    .trace-view{display:none;margin-bottom:var(--spacing-lg)}.trace-view.active{display:block}
 
-    .risk-summary-bar { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; align-items: center; padding: var(--spacing-md); background: var(--color-bg-card); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); margin-bottom: var(--spacing-xl); font-size: 13px; }
-    .risk-summary-bar .risk-label { font-weight: 600; color: var(--color-text-secondary); margin-right: var(--spacing-sm); }
-    .risk-item { padding: 4px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: background 0.2s; }
-    .risk-item.yellow { background: #fffbe6; color: #d48806; } .risk-item.yellow:hover { background: #fff1b8; }
-    .risk-item.red { background: #fff1f0; color: var(--color-danger); } .risk-item.red:hover { background: #ffd8d2; }
-    .risk-item.green { background: #f6ffed; color: var(--color-success); }
+    /* 视图1: 方向 — 证据阅读大卡片 */
+    .evidence-cards{display:flex;flex-direction:column;gap:var(--spacing-lg)}
+    .evidence-sp-card{background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;transition:box-shadow .2s}
+    .evidence-sp-card:hover{box-shadow:var(--shadow-lg)}
+    .evidence-sp-card.disputed{border:2px solid var(--color-warning);box-shadow:0 0 0 4px rgba(250,173,20,.12)}
+    .evidence-sp-header{padding:var(--spacing-lg) var(--spacing-lg) 0;display:flex;align-items:center;gap:var(--spacing-sm)}
+    .evidence-sp-header .sp-icon{font-size:18px;flex-shrink:0}
+    .evidence-sp-header .sp-title{font-size:17px;font-weight:600;flex:1}
+    .evidence-sp-header .sp-consensus{font-size:12px;padding:2px 8px;border-radius:10px;font-weight:600;flex-shrink:0}
+    .sp-consensus.green{background:#f6ffed;color:var(--color-success)}.sp-consensus.yellow{background:#fffbe6;color:#d48806}
+    .evidence-sp-body{padding:var(--spacing-lg)}
+    .evidence-block{display:flex;flex-wrap:wrap;gap:var(--spacing-sm) var(--spacing-xl);font-size:13px;padding:var(--spacing-sm) 0;border-bottom:1px solid var(--color-bg-primary)}
+    .evidence-block:last-child{border-bottom:none}
+    .evidence-label{font-weight:600;min-width:80px;color:var(--color-text-secondary);flex-shrink:0}
+    .evidence-data{flex:1;min-width:200px}
+    .evidence-meta{display:flex;gap:var(--spacing-sm);align-items:center;flex-wrap:wrap;margin-top:var(--spacing-xs)}
+    .freshness{font-size:11px;padding:1px 6px;border-radius:8px;white-space:nowrap}
+    .freshness.fresh{background:#f6ffed;color:var(--color-success)}.freshness.usable{background:#fffbe6;color:#d48806}.freshness.stale{background:#fff1f0;color:var(--color-danger)}
+    .confidence-tag{font-size:11px;color:var(--color-text-tertiary);white-space:nowrap}
+    .trace-link{color:var(--color-primary);font-size:12px;cursor:pointer;font-weight:500;white-space:nowrap}.trace-link:hover{text-decoration:underline}
+    /* 角色意见区 */
+    .opinion-section{margin-top:var(--spacing-md);padding:var(--spacing-md);background:var(--color-bg-primary);border-radius:var(--radius-md)}
+    .opinion-section h4{font-size:13px;font-weight:600;margin-bottom:var(--spacing-sm)}
+    .opinion-list{display:flex;flex-direction:column;gap:var(--spacing-xs);font-size:12px}
+    .opinion-item{display:flex;gap:var(--spacing-sm);align-items:flex-start}
+    .opinion-agent{font-weight:600;flex-shrink:0;min-width:40px}
+    /* 关联BP mini行 */
+    .related-bp-bar{margin-top:var(--spacing-md);padding-top:var(--spacing-sm);border-top:1px solid var(--color-border)}
+    .related-bp-bar h4{font-size:12px;color:var(--color-text-tertiary);margin-bottom:var(--spacing-sm)}
+    .related-bp-tag{display:inline-block;padding:2px 10px;background:var(--color-bg-primary);border-radius:10px;font-size:12px;margin-right:var(--spacing-sm);margin-bottom:var(--spacing-xs);color:var(--color-text-secondary)}
+    /* 被否决方案 */
+    .rejected-options{margin-top:var(--spacing-sm)}
+    .rejected-toggle{font-size:12px;color:var(--color-text-tertiary);cursor:pointer}.rejected-toggle:hover{color:var(--color-primary)}
+    .rejected-content{display:none;margin-top:var(--spacing-sm);padding:var(--spacing-sm);background:var(--color-bg-primary);border-radius:var(--radius-sm);font-size:13px}
+    .rejected-content.open{display:block}
+    .rejected-item strong{display:block;margin-bottom:2px}
+    .rejected-item p{color:var(--color-text-secondary);margin-bottom:2px;font-size:12px}
 
-    /* =========================================================
-       Page 2: 追溯验证工作台
-       ========================================================= */
-    .trace-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--spacing-sm); background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-md) var(--spacing-lg); margin-bottom: var(--spacing-lg); }
-    .toolbar-left { display: flex; align-items: center; gap: var(--spacing-md); }
-    .toolbar-right { display: flex; align-items: center; gap: var(--spacing-sm); }
-    .back-link { color: var(--color-primary); text-decoration: none; font-size: 14px; cursor: pointer; font-weight: 500; }
-    .back-link:hover { text-decoration: underline; }
-    .toolbar-title { font-size: 16px; font-weight: 600; }
-    .filter-badge { font-size: 12px; color: var(--color-text-tertiary); background: var(--color-bg-primary); padding: 2px 8px; border-radius: 10px; }
-    .mode-switch { padding: 4px 12px; border: 1px solid var(--color-border); background: var(--color-bg-card); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; font-family: var(--font-family-base); transition: all 0.15s; }
-    .mode-switch.active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
-    .mode-switch:hover:not(.active) { border-color: var(--color-primary); color: var(--color-primary); }
-    .toolbar-search { width: 200px; padding: 4px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 13px; font-family: var(--font-family-base); outline: none; }
-    .toolbar-search:focus { border-color: var(--color-primary); }
-    .role-filter { padding: 4px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 12px; font-family: var(--font-family-base); background: var(--color-bg-card); cursor: pointer; }
-    .verify-progress { font-size: 12px; color: var(--color-text-secondary); }
-
-    .trace-container { display: grid; gap: var(--spacing-lg); margin-bottom: var(--spacing-lg); }
-    .trace-container.detail-mode { grid-template-columns: 1fr 2fr; }
-    .trace-container.list-mode { display: block; }
-
-    /* SP 面板 */
-    .sp-panel { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-md); max-height: calc(100vh - 180px); overflow-y: auto; }
-    .bp-panel { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-md); max-height: calc(100vh - 180px); overflow-y: auto; }
-    .sp-panel h3 { font-size: 15px; font-weight: 600; margin-bottom: var(--spacing-md); }
-    .sp-item { border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: var(--spacing-sm); overflow: hidden; }
-    .sp-item.selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-bg); }
-    .sp-header { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-md); cursor: pointer; font-size: 14px; transition: background 0.15s; }
-    .sp-header:hover { background: var(--color-bg-primary); }
-    .sp-icon { font-size: 16px; flex-shrink: 0; } .sp-title { font-weight: 600; flex: 1; }
-    .sp-consensus { font-size: 12px; padding: 2px 6px; border-radius: 8px; flex-shrink: 0; }
-    .sp-consensus.green { background: #f6ffed; color: var(--color-success); } .sp-consensus.yellow { background: #fffbe6; color: #d48806; }
-    .sp-expand { font-size: 12px; color: var(--color-text-tertiary); transition: transform 0.2s; flex-shrink: 0; }
-    .sp-item.expanded .sp-expand { transform: rotate(180deg); }
-    .sp-evidence { display: none; padding: 0 var(--spacing-md) var(--spacing-md); border-top: 1px solid var(--color-bg-primary); }
-    .sp-item.expanded .sp-evidence { display: block; animation: slideDown 0.2s ease-out; }
-    .evidence-item { padding: var(--spacing-sm) 0; border-bottom: 1px solid var(--color-bg-primary); font-size: 13px; }
-    .evidence-item:last-child { border-bottom: none; }
-    .evidence-label { font-weight: 600; display: block; margin-bottom: 2px; }
-    .freshness { font-size: 11px; margin-left: var(--spacing-sm); padding: 1px 6px; border-radius: 8px; }
-    .freshness.fresh { background: #f6ffed; color: var(--color-success); } .freshness.usable { background: #fffbe6; color: #d48806; } .freshness.stale { background: #fff1f0; color: var(--color-danger); }
-    .confidence { font-size: 11px; color: var(--color-text-tertiary); margin-left: var(--spacing-sm); }
-    .trace-link { color: var(--color-primary); font-size: 12px; cursor: pointer; font-weight: 500; margin-left: var(--spacing-sm); } .trace-link:hover { text-decoration: underline; }
-    .rejected-options { margin-top: var(--spacing-sm); }
-    .rejected-toggle { font-size: 12px; color: var(--color-text-tertiary); cursor: pointer; } .rejected-toggle:hover { color: var(--color-primary); }
-    .rejected-content { margin-top: var(--spacing-sm); padding: var(--spacing-sm); background: var(--color-bg-primary); border-radius: var(--radius-sm); font-size: 13px; }
-    .rejected-item strong { display: block; margin-bottom: 2px; }
-    .rejected-item p { color: var(--color-text-secondary); margin-bottom: 2px; font-size: 12px; }
-
-    /* BP 面板 */
-    .bp-panel { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-md); max-height: calc(100vh - 180px); overflow-y: auto; }
-    .bp-panel h3 { font-size: 15px; font-weight: 600; margin-bottom: var(--spacing-md); }
-    .bp-panel h3 .count { font-weight: 400; color: var(--color-text-tertiary); font-size: 13px; }
-    .bp-item { border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: var(--spacing-sm); overflow: hidden; }
-    .bp-item.warning { border-left: 3px solid var(--color-warning); } .bp-item.danger { border-left: 3px solid var(--color-danger); }
-    .bp-header { display: flex; justify-content: space-between; align-items: center; padding: var(--spacing-md); cursor: pointer; font-size: 14px; gap: var(--spacing-sm); flex-wrap: wrap; }
-    .bp-header:hover { background: var(--color-bg-primary); }
-    .bp-left { display: flex; align-items: center; gap: var(--spacing-sm); flex: 1; min-width: 0; }
-    .bp-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .bp-right { display: flex; align-items: center; gap: var(--spacing-sm); flex-shrink: 0; }
-    .verify-badge { font-size: 16px; flex-shrink: 0; }
-    .verify-badge.confirmed { color: var(--color-success); } .verify-badge.doubtful { color: var(--color-warning); } .verify-badge.redo { color: var(--color-danger); }
-    .audit-seal { font-size: 12px; flex-shrink: 0; cursor: help; color: var(--color-text-tertiary); } .audit-seal:hover { color: var(--color-primary); }
-
-    /* 双层状态灯 */
-    .status-lights { display: flex; gap: var(--spacing-xs); }
-    .status-light { position: relative; width: 28px; height: 28px; cursor: pointer; flex-shrink: 0; }
-    .light-outer { position: absolute; top: 0; left: 0; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--color-border); transition: border-color 0.2s; }
-    .light-outer.green { border-color: var(--color-success); } .light-outer.yellow { border-color: var(--color-warning); } .light-outer.red { border-color: var(--color-danger); }
-    .light-inner { position: absolute; top: 6px; left: 6px; width: 12px; height: 12px; border-radius: 50%; transition: background 0.2s; }
-    .light-inner.green { background: var(--color-success); } .light-inner.yellow { background: var(--color-warning); } .light-inner.red { background: var(--color-danger); }
-    .light-label { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--color-text-tertiary); white-space: nowrap; }
-    .status-light:hover .light-outer { box-shadow: 0 0 6px rgba(24,144,255,0.25); }
-
-    .bp-detail { display: none; padding: 0 var(--spacing-md) var(--spacing-md); border-top: 1px solid var(--color-bg-primary); }
-    .bp-item.expanded .bp-detail { display: block; animation: slideDown 0.2s ease-out; }
-    .decode-anchor { font-size: 13px; padding: var(--spacing-sm) 0; color: var(--color-text-secondary); }
-    .decode-anchor .anchor-sp { color: var(--color-primary); font-weight: 500; }
-    .decode-anchor .anchor-weight { margin-left: var(--spacing-sm); padding: 1px 6px; background: var(--color-primary-bg); color: var(--color-primary); border-radius: 8px; font-size: 12px; }
-    .anchor-chain { display: block; margin-top: var(--spacing-xs); color: var(--color-text-tertiary); font-size: 12px; }
-    .change-summary { margin-top: var(--spacing-sm); padding: var(--spacing-sm); background: #fffbe6; border-radius: var(--radius-sm); font-size: 12px; color: #d48806; }
-    .change-summary a { color: var(--color-primary); cursor: pointer; }
-
-    .verify-actions { display: flex; align-items: center; gap: var(--spacing-sm); margin-top: var(--spacing-md); font-size: 13px; flex-wrap: wrap; }
-    .verify-label { color: var(--color-text-secondary); font-size: 12px; }
-    .verify-btn { padding: 4px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-card); cursor: pointer; font-size: 12px; font-family: var(--font-family-base); transition: all 0.15s; }
-    .verify-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
-    .verify-btn.active.confirm { background: #f6ffed; border-color: var(--color-success); color: var(--color-success); font-weight: 600; }
-    .verify-btn.active.doubt { background: #fffbe6; border-color: var(--color-warning); color: #d48806; font-weight: 600; }
-    .verify-btn.active.redo { background: #fff1f0; border-color: var(--color-danger); color: var(--color-danger); font-weight: 600; }
-    .verify-note { padding: 4px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 12px; font-family: var(--font-family-base); width: 180px; outline: none; }
-    .verify-note:focus { border-color: var(--color-primary); }
-
-    .impact-panel { display: none; margin-top: var(--spacing-sm); padding: var(--spacing-md); background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 13px; animation: popIn 0.2s ease-out; transform-origin: top center; }
-    .impact-panel.show { display: block; }
-    .impact-row { display: flex; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); align-items: flex-start; }
-    .impact-row:last-child { margin-bottom: 0; }
-    .impact-label { font-weight: 600; color: var(--color-text-secondary); min-width: 70px; flex-shrink: 0; font-size: 12px; }
-    .impact-value { color: var(--color-text-primary); font-size: 12px; line-height: 1.5; }
-    .impact-actions { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); }
-
+    /* 视图2: 解码 — 双栏对照 */
+    .decode-container{display:grid;grid-template-columns:1fr 2fr;gap:var(--spacing-lg)}
+    .sp-panel,.bp-panel{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-md);max-height:calc(100vh - 200px);overflow-y:auto}
+    .sp-panel h3,.bp-panel h3{font-size:15px;font-weight:600;margin-bottom:var(--spacing-md)}
+    .bp-panel h3 .count{font-weight:400;color:var(--color-text-tertiary);font-size:13px}
+    .sp-item{border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-bottom:var(--spacing-sm);overflow:hidden}
+    .sp-item.selected{border-color:var(--color-primary);box-shadow:0 0 0 2px var(--color-primary-bg)}
+    .sp-header{display:flex;align-items:center;gap:var(--spacing-sm);padding:var(--spacing-md);cursor:pointer;font-size:14px;transition:background .15s}
+    .sp-header:hover{background:var(--color-bg-primary)}
+    .sp-expand{font-size:12px;color:var(--color-text-tertiary);transition:transform .2s;flex-shrink:0}
+    .sp-item.expanded .sp-expand{transform:rotate(180deg)}
+    .sp-evidence{display:none;padding:0 var(--spacing-md) var(--spacing-md);border-top:1px solid var(--color-bg-primary);font-size:13px}
+    .sp-item.expanded .sp-evidence{display:block;animation:slideDown .2s ease-out}
+    /* BP 举措 */
+    .bp-item{border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-bottom:var(--spacing-sm);overflow:hidden}
+    .bp-item.warning{border-left:3px solid var(--color-warning)}.bp-item.danger{border-left:3px solid var(--color-danger)}
+    .bp-header{display:flex;justify-content:space-between;align-items:center;padding:var(--spacing-md);cursor:pointer;font-size:14px;gap:var(--spacing-sm);flex-wrap:wrap}
+    .bp-header:hover{background:var(--color-bg-primary)}
+    .bp-left{display:flex;align-items:center;gap:var(--spacing-sm);flex:1;min-width:0}
+    .bp-title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bp-right{display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0}
+    .verify-badge{font-size:16px;flex-shrink:0}
+    .verify-badge.confirmed{color:var(--color-success)}.verify-badge.doubtful{color:var(--color-warning)}.verify-badge.redo{color:var(--color-danger)}
+    .audit-seal{font-size:12px;flex-shrink:0;cursor:help;color:var(--color-text-tertiary)}.audit-seal:hover{color:var(--color-primary)}
+    /* 状态灯 */
+    .status-lights{display:flex;gap:var(--spacing-xs)}
+    .status-light{position:relative;width:28px;height:28px;cursor:pointer;flex-shrink:0}
+    .light-outer{position:absolute;top:0;left:0;width:28px;height:28px;border-radius:50%;border:2px solid var(--color-border);transition:border-color .2s}
+    .light-outer.green{border-color:var(--color-success)}.light-outer.yellow{border-color:var(--color-warning)}.light-outer.red{border-color:var(--color-danger)}
+    .light-inner{position:absolute;top:6px;left:6px;width:12px;height:12px;border-radius:50%;transition:background .2s}
+    .light-inner.green{background:var(--color-success)}.light-inner.yellow{background:var(--color-warning)}.light-inner.red{background:var(--color-danger)}
+    .light-label{position:absolute;top:30px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--color-text-tertiary);white-space:nowrap}
+    .status-light:hover .light-outer{box-shadow:0 0 6px rgba(24,144,255,.25)}
+    /* BP 详情 */
+    .bp-detail{display:none;padding:0 var(--spacing-md) var(--spacing-md);border-top:1px solid var(--color-bg-primary)}
+    .bp-item.expanded .bp-detail{display:block;animation:slideDown .2s ease-out}
+    .decode-anchor{font-size:13px;padding:var(--spacing-sm) 0;color:var(--color-text-secondary)}
+    .decode-anchor .anchor-sp{color:var(--color-primary);font-weight:500}
+    .decode-anchor .anchor-weight{margin-left:var(--spacing-sm);padding:1px 6px;background:var(--color-primary-bg);color:var(--color-primary);border-radius:8px;font-size:12px}
+    .anchor-chain{display:block;margin-top:var(--spacing-xs);color:var(--color-text-tertiary);font-size:12px}
+    .change-summary{margin-top:var(--spacing-sm);padding:var(--spacing-sm);background:#fffbe6;border-radius:var(--radius-sm);font-size:12px;color:#d48806}
+    .change-summary a{color:var(--color-primary);cursor:pointer}
+    .verify-actions{display:flex;align-items:center;gap:var(--spacing-sm);margin-top:var(--spacing-md);font-size:13px;flex-wrap:wrap}
+    .verify-label{color:var(--color-text-secondary);font-size:12px}
+    .verify-btn{padding:4px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-card);cursor:pointer;font-size:12px;font-family:var(--font-family-base);transition:all .15s}
+    .verify-btn:hover{border-color:var(--color-primary);color:var(--color-primary)}
+    .verify-btn.active.confirm{background:#f6ffed;border-color:var(--color-success);color:var(--color-success);font-weight:600}
+    .verify-btn.active.doubt{background:#fffbe6;border-color:var(--color-warning);color:#d48806;font-weight:600}
+    .verify-btn.active.redo{background:#fff1f0;border-color:var(--color-danger);color:var(--color-danger);font-weight:600}
+    .verify-note{padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:12px;font-family:var(--font-family-base);width:180px;outline:none}.verify-note:focus{border-color:var(--color-primary)}
+    /* 影响面板 */
+    .impact-panel{display:none;margin-top:var(--spacing-sm);padding:var(--spacing-md);background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:13px;animation:popIn .2s ease-out;transform-origin:top center}
+    .impact-panel.show{display:block}
+    .impact-row{display:flex;gap:var(--spacing-sm);margin-bottom:var(--spacing-sm);align-items:flex-start}.impact-row:last-child{margin-bottom:0}
+    .impact-label{font-weight:600;color:var(--color-text-secondary);min-width:70px;flex-shrink:0;font-size:12px}
+    .impact-value{color:var(--color-text-primary);font-size:12px;line-height:1.5}
+    .impact-actions{display:flex;gap:var(--spacing-sm);margin-top:var(--spacing-sm)}
     /* 列表模式 */
-    .bp-list-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .bp-list-table th { background: var(--color-bg-primary); padding: var(--spacing-sm); text-align: left; font-weight: 600; font-size: 12px; border-bottom: 2px solid var(--color-border); cursor: pointer; white-space: nowrap; }
-    .bp-list-table th:hover { color: var(--color-primary); }
-    .bp-list-table td { padding: var(--spacing-sm); border-bottom: 1px solid var(--color-bg-primary); font-size: 12px; }
-    .bp-list-table tr { cursor: pointer; transition: background 0.15s; }
-    .bp-list-table tr:hover { background: var(--color-primary-bg); }
-    .bp-list-table tr.row-warning { background: #fffbe6; } .bp-list-table tr.row-danger { background: #fff1f0; }
-    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-    .status-dot.green { background: var(--color-success); } .status-dot.yellow { background: var(--color-warning); } .status-dot.red { background: var(--color-danger); }
-    .list-verify select { padding: 2px 4px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 11px; font-family: var(--font-family-base); cursor: pointer; background: var(--color-bg-card); }
-    .list-verify select:focus { border-color: var(--color-primary); }
+    .decode-container.list-active .sp-panel{display:none}
+    .decode-container.list-active{display:block}
+    .decode-container.list-active .bp-panel{max-height:none}
+    .bp-list-table{width:100%;border-collapse:collapse;font-size:13px}
+    .bp-list-table th{background:var(--color-bg-primary);padding:var(--spacing-sm);text-align:left;font-weight:600;font-size:12px;border-bottom:2px solid var(--color-border);cursor:pointer;white-space:nowrap}
+    .bp-list-table th:hover{color:var(--color-primary)}
+    .bp-list-table td{padding:var(--spacing-sm);border-bottom:1px solid var(--color-bg-primary);font-size:12px}
+    .bp-list-table tr{cursor:pointer;transition:background .15s}.bp-list-table tr:hover{background:var(--color-primary-bg)}
+    .bp-list-table tr.row-warning{background:#fffbe6}.bp-list-table tr.row-danger{background:#fff1f0}
+    .status-dot{display:inline-block;width:10px;height:10px;border-radius:50%}
+    .status-dot.green{background:var(--color-success)}.status-dot.yellow{background:var(--color-warning)}.status-dot.red{background:var(--color-danger)}
+    .list-verify select{padding:2px 4px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:11px;font-family:var(--font-family-base);cursor:pointer;background:var(--color-bg-card)}
+    .list-verify select:focus{border-color:var(--color-primary)}
+    .btn-sm{padding:4px 12px;background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);font-size:12px;cursor:pointer;font-family:var(--font-family-base)}.btn-sm:hover{background:var(--color-primary-hover)}
+    .btn-sm.ghost{background:transparent;color:var(--color-text-secondary);border:1px solid var(--color-border)}.btn-sm.ghost:hover{border-color:var(--color-primary);color:var(--color-primary)}
+    .mode-toggle-btn{padding:4px 12px;border:1px solid var(--color-border);background:var(--color-bg-card);border-radius:var(--radius-sm);font-size:12px;cursor:pointer;font-family:var(--font-family-base);transition:all .15s}
+    .mode-toggle-btn:hover{border-color:var(--color-primary);color:var(--color-primary)}.mode-toggle-btn.active{background:var(--color-primary);color:white;border-color:var(--color-primary)}
 
-    /* =========================================================
-       溯源弹窗
-       ========================================================= */
-    .overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; }
-    .overlay.show { display: block; }
-    .source-card { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--color-bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); border: 2px solid var(--color-primary); z-index: 1000; max-width: 560px; width: 90%; max-height: 80vh; overflow-y: auto; }
-    .source-card.show { display: block; animation: fadeIn 0.2s ease-out; }
-    .source-card-header { background: var(--color-bg-primary); border-bottom: 1px solid var(--color-border); padding: var(--spacing-md) var(--spacing-lg); display: flex; justify-content: space-between; align-items: center; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
-    .source-card-title { font-size: 16px; font-weight: 600; }
-    .source-card-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--color-text-tertiary); padding: var(--spacing-xs); }
-    .source-card-close:hover { color: var(--color-text-primary); }
-    .source-card-body { padding: var(--spacing-lg); }
-    .source-breadcrumb { font-size: 12px; color: var(--color-text-tertiary); margin-bottom: var(--spacing-md); padding-bottom: var(--spacing-sm); border-bottom: 1px solid var(--color-bg-primary); }
-    .source-info { margin-bottom: var(--spacing-md); }
-    .source-info-label { font-size: 12px; color: var(--color-text-tertiary); margin-bottom: var(--spacing-xs); }
-    .source-info-value { font-size: 14px; font-weight: 500; }
-    .source-info-meta { display: flex; flex-wrap: wrap; gap: var(--spacing-sm); margin-top: var(--spacing-sm); font-size: 11px; }
-    .source-type { padding: 2px 6px; background: var(--color-primary-bg); color: var(--color-primary); border-radius: 4px; }
-    .source-sample, .source-date { color: var(--color-text-tertiary); }
-    .confidence-section { display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-md); }
-    .confidence-badge { display: inline-flex; align-items: center; gap: var(--spacing-xs); padding: 2px 10px; background: #f6ffed; border: 1px solid #b7eb8f; border-radius: var(--radius-sm); font-size: 12px; color: var(--color-success); font-weight: 500; }
-    .confidence-badge.medium { background: #fffbe6; border-color: #ffe58f; color: #d48806; }
-    .confidence-badge.low { background: #fff1f0; border-color: #ffa39e; color: var(--color-danger); }
-    .confidence-explain { font-size: 11px; color: var(--color-text-tertiary); }
-    .source-quote { background: var(--color-bg-primary); padding: var(--spacing-md); border-radius: var(--radius-sm); font-size: 14px; line-height: 1.6; margin-bottom: var(--spacing-lg); border-left: 3px solid var(--color-primary); }
-    .source-actions { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
-    .source-btn { padding: var(--spacing-sm) var(--spacing-md); border: none; border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; font-family: var(--font-family-base); transition: all 0.2s; }
-    .source-btn-primary { background: var(--color-primary); color: white; } .source-btn-primary:hover { background: var(--color-primary-hover); }
-    .source-btn-secondary { background: var(--color-bg-primary); color: var(--color-text-primary); border: 1px solid var(--color-border); } .source-btn-secondary:hover { background: var(--color-border); }
+    /* 视图3: 执行 — 监控扫描 */
+    .execution-container{display:flex;flex-direction:column;gap:var(--spacing-lg)}
+    .exec-score-bar{display:flex;align-items:center;gap:var(--spacing-lg);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-lg)}
+    .exec-score-big{font-size:36px;font-weight:700}.exec-score-big .trend{font-size:16px;margin-left:var(--spacing-sm)}
+    .exec-score-meta{font-size:12px;color:var(--color-text-tertiary)}
+    .exec-item{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden}
+    .exec-item.warning{border-color:var(--color-warning)}.exec-item.danger{border-color:var(--color-danger)}
+    .exec-item-header{padding:var(--spacing-md);display:flex;justify-content:space-between;align-items:center;gap:var(--spacing-sm);flex-wrap:wrap;cursor:pointer}
+    .exec-item-header:hover{background:var(--color-bg-primary)}
+    .exec-item-left{display:flex;align-items:center;gap:var(--spacing-sm);flex:1;min-width:0}
+    .exec-item-right{display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0}
+    .exec-item-title{font-weight:600;font-size:14px}
+    .exec-item-badge{font-size:11px;padding:1px 8px;background:var(--color-primary-bg);color:var(--color-primary);border-radius:8px;white-space:nowrap}
+    .exec-item-body{padding:0 var(--spacing-md) var(--spacing-md);display:none}
+    .exec-item.expanded .exec-item-body{display:block;animation:slideDown .2s ease-out}
+    .exec-item.expanded .exec-item-header{border-bottom:1px solid var(--color-bg-primary)}
+    .exec-normal-list{margin-top:var(--spacing-md)}
+    .exec-normal-toggle{font-size:12px;color:var(--color-text-tertiary);cursor:pointer;padding:var(--spacing-sm);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-sm);text-align:center}.exec-normal-toggle:hover{color:var(--color-primary)}
 
-    /* =========================================================
-       Page 3: 品牌配置
-       ========================================================= */
-    .brand-layout { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-xl); margin-bottom: var(--spacing-xl); }
-    .brand-section { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-lg); }
-    .brand-section h3 { font-size: 15px; font-weight: 600; margin-bottom: var(--spacing-md); padding-bottom: var(--spacing-sm); border-bottom: 1px solid var(--color-bg-primary); }
-    .form-group { margin-bottom: var(--spacing-md); }
-    .form-label { font-size: 13px; font-weight: 600; margin-bottom: var(--spacing-xs); display: block; color: var(--color-text-secondary); }
-    .logo-dropzone { border: 2px dashed var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-xl); text-align: center; cursor: pointer; transition: all 0.2s; }
-    .logo-dropzone:hover { border-color: var(--color-primary); background: var(--color-primary-bg); }
-    .logo-dropzone .dz-icon { font-size: 28px; margin-bottom: var(--spacing-sm); }
-    .logo-dropzone .dz-text { font-size: 13px; color: var(--color-text-secondary); }
-    .logo-dropzone .dz-hint { font-size: 11px; color: var(--color-text-tertiary); margin-top: var(--spacing-xs); }
-    .logo-preview-img { max-width: 200px; max-height: 60px; margin-top: var(--spacing-sm); display: none; }
-    .logo-preview-img.show { display: block; }
-    .color-presets { display: flex; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); }
-    .color-swatch { width: 36px; height: 36px; border-radius: var(--radius-sm); border: 2px solid transparent; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
-    .color-swatch:hover { transform: scale(1.1); }
-    .color-swatch.selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-bg); }
-    .color-input { width: 100%; padding: var(--spacing-sm); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 14px; font-family: var(--font-family-code); outline: none; }
-    .color-input:focus { border-color: var(--color-primary); }
-    .form-select { width: 100%; padding: var(--spacing-sm); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 13px; font-family: var(--font-family-base); background: var(--color-bg-card); cursor: pointer; }
-    .preview-area { background: var(--color-bg-primary); border-radius: var(--radius-md); padding: var(--spacing-xl); text-align: center; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing-md); }
-    .preview-logo-text { font-size: 24px; font-weight: 600; }
-    .preview-title { font-size: 16px; }
-    .preview-btn { padding: 8px 20px; border: none; border-radius: var(--radius-sm); color: white; font-size: 13px; font-family: var(--font-family-base); cursor: default; }
-    .compliance-checklist { margin-top: var(--spacing-lg); }
-    .compliance-checklist h4 { font-size: 14px; font-weight: 600; margin-bottom: var(--spacing-sm); }
-    .check-item { font-size: 13px; padding: var(--spacing-xs) 0; display: flex; gap: var(--spacing-sm); align-items: center; }
-    .check-item.ok { color: var(--color-text-primary); } .check-item.warn { color: #d48806; }
-    .check-item .fix-link { color: var(--color-primary); font-size: 12px; cursor: pointer; margin-left: auto; } .check-item .fix-link:hover { text-decoration: underline; }
-    .export-section { margin-top: var(--spacing-lg); }
-    .export-btn { padding: 10px 24px; background: var(--color-primary); color: white; border: none; border-radius: var(--radius-sm); font-size: 14px; cursor: pointer; font-family: var(--font-family-base); font-weight: 500; display: inline-flex; align-items: center; gap: var(--spacing-sm); transition: background 0.2s; }
-    .export-btn:hover { background: var(--color-primary-hover); } .export-btn:disabled { background: var(--color-text-disabled); cursor: not-allowed; }
-    .export-estimate { font-size: 12px; color: var(--color-text-tertiary); margin-left: var(--spacing-sm); }
-    .project-selector { display: flex; align-items: center; gap: var(--spacing-md); margin-bottom: var(--spacing-xl); padding: var(--spacing-md); background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
-    .project-selector label { font-size: 13px; font-weight: 600; }
-    .project-selector select { padding: var(--spacing-sm); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-family: var(--font-family-base); font-size: 13px; }
-    .project-tenant-badge { font-size: 11px; color: var(--color-success); background: #f6ffed; padding: 2px 8px; border-radius: 10px; }
-    .audit-export { margin-top: var(--spacing-xl); padding-top: var(--spacing-lg); border-top: 1px solid var(--color-border); }
-    .audit-export h3 { font-size: 15px; font-weight: 600; margin-bottom: var(--spacing-xs); }
-    .audit-export p { font-size: 13px; color: var(--color-text-secondary); margin-bottom: var(--spacing-md); }
-    .audit-export-controls { display: flex; gap: var(--spacing-sm); align-items: center; flex-wrap: wrap; }
-    .audit-export-controls input[type="date"] { padding: var(--spacing-xs) var(--spacing-sm); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-family: var(--font-family-base); font-size: 13px; }
+    /* ===== 溯源弹窗 ===== */
+    .overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999}.overlay.show{display:block}
+    .source-card{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);border:2px solid var(--color-primary);z-index:1000;max-width:560px;width:90%;max-height:80vh;overflow-y:auto}
+    .source-card.show{display:block;animation:fadeIn .2s ease-out}
+    .source-card-header{background:var(--color-bg-primary);border-bottom:1px solid var(--color-border);padding:var(--spacing-md) var(--spacing-lg);display:flex;justify-content:space-between;align-items:center;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+    .source-card-title{font-size:16px;font-weight:600}
+    .source-card-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--color-text-tertiary);padding:var(--spacing-xs)}.source-card-close:hover{color:var(--color-text-primary)}
+    .source-card-body{padding:var(--spacing-lg)}
+    .source-breadcrumb{font-size:12px;color:var(--color-text-tertiary);margin-bottom:var(--spacing-md);padding-bottom:var(--spacing-sm);border-bottom:1px solid var(--color-bg-primary)}
+    .source-info{margin-bottom:var(--spacing-md)}.source-info-label{font-size:12px;color:var(--color-text-tertiary);margin-bottom:var(--spacing-xs)}
+    .source-info-value{font-size:14px;font-weight:500}
+    .source-info-meta{display:flex;flex-wrap:wrap;gap:var(--spacing-sm);margin-top:var(--spacing-sm);font-size:11px}
+    .source-type{padding:2px 6px;background:var(--color-primary-bg);color:var(--color-primary);border-radius:4px}.source-sample,.source-date{color:var(--color-text-tertiary)}
+    .confidence-section{display:flex;align-items:center;gap:var(--spacing-sm);margin-bottom:var(--spacing-md)}
+    .confidence-badge{display:inline-flex;align-items:center;gap:var(--spacing-xs);padding:2px 10px;background:#f6ffed;border:1px solid #b7eb8f;border-radius:var(--radius-sm);font-size:12px;color:var(--color-success);font-weight:500}
+    .confidence-badge.medium{background:#fffbe6;border-color:#ffe58f;color:#d48806}.confidence-badge.low{background:#fff1f0;border-color:#ffa39e;color:var(--color-danger)}
+    .confidence-explain{font-size:11px;color:var(--color-text-tertiary)}
+    .source-quote{background:var(--color-bg-primary);padding:var(--spacing-md);border-radius:var(--radius-sm);font-size:14px;line-height:1.6;margin-bottom:var(--spacing-lg);border-left:3px solid var(--color-primary)}
+    .source-actions{display:flex;gap:var(--spacing-sm);flex-wrap:wrap}
+    .source-btn{padding:var(--spacing-sm) var(--spacing-md);border:none;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;font-family:var(--font-family-base);transition:all .2s}
+    .source-btn-primary{background:var(--color-primary);color:white}.source-btn-primary:hover{background:var(--color-primary-hover)}
+    .source-btn-secondary{background:var(--color-bg-primary);color:var(--color-text-primary);border:1px solid var(--color-border)}.source-btn-secondary:hover{background:var(--color-border)}
 
-    /* =========================================================
-       公共组件: WORM / Onboarding / 空状态 / 骨架屏 / Toast
-       ========================================================= */
-    .compliance-watermark { position: sticky; bottom: 0; background: rgba(0,0,0,0.03); border-top: 1px solid var(--color-border); padding: 6px var(--spacing-md); font-size: 11px; color: var(--color-text-tertiary); text-align: center; z-index: 10; }
+    /* ===== 品牌配置 ===== */
+    .brand-layout{display:grid;grid-template-columns:1fr 1fr;gap:var(--spacing-xl);margin-bottom:var(--spacing-xl)}
+    .brand-section{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-lg)}
+    .brand-section h3{font-size:15px;font-weight:600;margin-bottom:var(--spacing-md);padding-bottom:var(--spacing-sm);border-bottom:1px solid var(--color-bg-primary)}
+    .form-group{margin-bottom:var(--spacing-md)}.form-label{font-size:13px;font-weight:600;margin-bottom:var(--spacing-xs);display:block;color:var(--color-text-secondary)}
+    .logo-dropzone{border:2px dashed var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-xl);text-align:center;cursor:pointer;transition:all .2s}
+    .logo-dropzone:hover{border-color:var(--color-primary);background:var(--color-primary-bg)}
+    .logo-dropzone .dz-icon{font-size:28px;margin-bottom:var(--spacing-sm)}.logo-dropzone .dz-text{font-size:13px;color:var(--color-text-secondary)}.logo-dropzone .dz-hint{font-size:11px;color:var(--color-text-tertiary);margin-top:var(--spacing-xs)}
+    .logo-preview-img{max-width:200px;max-height:60px;margin-top:var(--spacing-sm);display:none}.logo-preview-img.show{display:block}
+    .color-presets{display:flex;gap:var(--spacing-sm);margin-bottom:var(--spacing-sm)}
+    .color-swatch{width:36px;height:36px;border-radius:var(--radius-sm);border:2px solid transparent;cursor:pointer;transition:all .15s;flex-shrink:0}
+    .color-swatch:hover{transform:scale(1.1)}.color-swatch.selected{border-color:var(--color-primary);box-shadow:0 0 0 3px var(--color-primary-bg)}
+    .color-input{width:100%;padding:var(--spacing-sm);border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:var(--font-family-code);outline:none}.color-input:focus{border-color:var(--color-primary)}
+    .form-select{width:100%;padding:var(--spacing-sm);border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:13px;font-family:var(--font-family-base);background:var(--color-bg-card);cursor:pointer}
+    .preview-area{background:var(--color-bg-primary);border-radius:var(--radius-md);padding:var(--spacing-xl);text-align:center;min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--spacing-md)}
+    .preview-logo-text{font-size:24px;font-weight:600}.preview-title{font-size:16px}
+    .preview-btn{padding:8px 20px;border:none;border-radius:var(--radius-sm);color:white;font-size:13px;font-family:var(--font-family-base);cursor:default}
+    .compliance-checklist{margin-top:var(--spacing-lg)}.compliance-checklist h4{font-size:14px;font-weight:600;margin-bottom:var(--spacing-sm)}
+    .check-item{font-size:13px;padding:var(--spacing-xs) 0;display:flex;gap:var(--spacing-sm);align-items:center}.check-item.ok{color:var(--color-text-primary)}.check-item.warn{color:#d48806}
+    .check-item .fix-link{color:var(--color-primary);font-size:12px;cursor:pointer;margin-left:auto}.check-item .fix-link:hover{text-decoration:underline}
+    .export-section{margin-top:var(--spacing-lg)}
+    .export-btn{padding:10px 24px;background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);font-size:14px;cursor:pointer;font-family:var(--font-family-base);font-weight:500;display:inline-flex;align-items:center;gap:var(--spacing-sm);transition:background .2s}
+    .export-btn:hover{background:var(--color-primary-hover)}.export-btn:disabled{background:var(--color-text-disabled);cursor:not-allowed}
+    .export-estimate{font-size:12px;color:var(--color-text-tertiary);margin-left:var(--spacing-sm)}
+    .project-selector{display:flex;align-items:center;gap:var(--spacing-md);margin-bottom:var(--spacing-xl);padding:var(--spacing-md);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md)}
+    .project-selector label{font-size:13px;font-weight:600}.project-selector select{padding:var(--spacing-sm);border:1px solid var(--color-border);border-radius:var(--radius-sm);font-family:var(--font-family-base);font-size:13px}
+    .project-tenant-badge{font-size:11px;color:var(--color-success);background:#f6ffed;padding:2px 8px;border-radius:10px}
+    .audit-export{margin-top:var(--spacing-xl);padding-top:var(--spacing-lg);border-top:1px solid var(--color-border)}
+    .audit-export h3{font-size:15px;font-weight:600;margin-bottom:var(--spacing-xs)}.audit-export p{font-size:13px;color:var(--color-text-secondary);margin-bottom:var(--spacing-md)}
+    .audit-export-controls{display:flex;gap:var(--spacing-sm);align-items:center;flex-wrap:wrap}
+    .audit-export-controls input[type="date"]{padding:var(--spacing-xs) var(--spacing-sm);border:1px solid var(--color-border);border-radius:var(--radius-sm);font-family:var(--font-family-base);font-size:13px}
 
-    .onboarding-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center; }
-    .onboarding-overlay.show { display: flex; }
-    .onboarding-card { background: var(--color-bg-card); border-radius: var(--radius-xl); padding: var(--spacing-3xl); max-width: 480px; width: 90%; text-align: center; box-shadow: var(--shadow-xl); animation: fadeInCard 0.3s ease-out; }
-    .onboarding-step { display: none; } .onboarding-step.active { display: block; }
-    .onboard-icon { font-size: 48px; margin-bottom: var(--spacing-lg); }
-    .onboarding-card h2 { font-size: 22px; font-weight: 600; margin-bottom: var(--spacing-md); }
-    .onboarding-card p { font-size: 14px; color: var(--color-text-secondary); margin-bottom: var(--spacing-xl); }
-    .onboard-actions { display: flex; gap: var(--spacing-sm); justify-content: center; }
-    .upload-zone { border: 2px dashed var(--color-border); border-radius: var(--radius-lg); padding: var(--spacing-2xl); margin-bottom: var(--spacing-lg); cursor: pointer; transition: all 0.2s; }
-    .upload-zone:hover { border-color: var(--color-primary); background: var(--color-primary-bg); }
-    .upload-icon { font-size: 36px; display: block; margin-bottom: var(--spacing-sm); }
-    .upload-formats { font-size: 11px; color: var(--color-text-tertiary); display: block; margin-top: var(--spacing-sm); }
+    /* ===== 公共组件 ===== */
+    .compliance-watermark{position:sticky;bottom:0;background:rgba(0,0,0,.03);border-top:1px solid var(--color-border);padding:6px var(--spacing-md);font-size:11px;color:var(--color-text-tertiary);text-align:center;z-index:10}
+    .onboarding-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:2000;justify-content:center;align-items:center}.onboarding-overlay.show{display:flex}
+    .onboarding-card{background:var(--color-bg-card);border-radius:var(--radius-xl);padding:var(--spacing-3xl);max-width:480px;width:90%;text-align:center;box-shadow:var(--shadow-xl);animation:fadeInCard .3s ease-out}
+    .onboarding-step{display:none}.onboarding-step.active{display:block}
+    .onboard-icon{font-size:48px;margin-bottom:var(--spacing-lg)}
+    .onboarding-card h2{font-size:22px;font-weight:600;margin-bottom:var(--spacing-md)}.onboarding-card p{font-size:14px;color:var(--color-text-secondary);margin-bottom:var(--spacing-xl)}
+    .onboard-actions{display:flex;gap:var(--spacing-sm);justify-content:center}
+    .upload-zone{border:2px dashed var(--color-border);border-radius:var(--radius-lg);padding:var(--spacing-2xl);margin-bottom:var(--spacing-lg);cursor:pointer;transition:all .2s}
+    .upload-zone:hover{border-color:var(--color-primary);background:var(--color-primary-bg)}
+    .upload-icon{font-size:36px;display:block;margin-bottom:var(--spacing-sm)}.upload-formats{font-size:11px;color:var(--color-text-tertiary);display:block;margin-top:var(--spacing-sm)}
+    .btn-primary{padding:10px 24px;background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);font-size:14px;cursor:pointer;font-family:var(--font-family-base);font-weight:500;transition:background .2s}.btn-primary:hover{background:var(--color-primary-hover)}
+    .btn-ghost{padding:10px 24px;background:transparent;color:var(--color-text-secondary);border:none;border-radius:var(--radius-sm);font-size:14px;cursor:pointer;font-family:var(--font-family-base)}.btn-ghost:hover{color:var(--color-primary)}
+    .empty-state{display:none;text-align:center;padding:var(--spacing-3xl) var(--spacing-xl);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md)}.empty-state.show{display:block}
+    .empty-icon{font-size:48px;margin-bottom:var(--spacing-md);animation:floatIcon 2s ease-in-out infinite}
+    .empty-state h3{font-size:18px;font-weight:600;margin-bottom:var(--spacing-sm)}.empty-state p{font-size:14px;color:var(--color-text-secondary);margin-bottom:var(--spacing-lg)}
+    .empty-actions{display:flex;gap:var(--spacing-sm);justify-content:center}
+    .error-state{display:none;text-align:center;padding:var(--spacing-2xl);background:var(--color-bg-card);border:1px solid #ffa39e;border-radius:var(--radius-md)}.error-state.show{display:block}
+    .error-icon{font-size:48px;margin-bottom:var(--spacing-md)}.error-state h3{font-size:18px;font-weight:600;margin-bottom:var(--spacing-sm);color:var(--color-danger)}.error-state p{font-size:14px;color:var(--color-text-secondary);margin-bottom:var(--spacing-lg)}
+    .error-actions{display:flex;gap:var(--spacing-sm);justify-content:center;flex-wrap:wrap}
+    .skeleton-overview{display:none;grid-template-columns:repeat(3,1fr);gap:var(--spacing-lg);margin-bottom:var(--spacing-lg)}.skeleton-overview.show{display:grid}
+    .skeleton-card{background:var(--color-bg-card);border-radius:var(--radius-lg);padding:var(--spacing-lg);box-shadow:var(--shadow-sm)}
+    .skeleton-bar{height:14px;background:linear-gradient(90deg,#f0f0f0 25%,#e8e8e8 50%,#f0f0f0 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:var(--radius-sm);margin-bottom:var(--spacing-sm)}
+    .skeleton-bar.w-60{width:60%}.skeleton-bar.w-80{width:80%}.skeleton-bar.w-40{width:40%}
+    .toast-container{position:fixed;top:68px;right:var(--spacing-lg);z-index:3000;display:flex;flex-direction:column;gap:var(--spacing-sm)}
+    .toast{padding:10px 16px;border-radius:var(--radius-sm);font-size:13px;box-shadow:var(--shadow-lg);animation:toastIn .3s ease-out;display:flex;align-items:center;gap:var(--spacing-sm);max-width:360px}
+    .toast.success{background:#f6ffed;border:1px solid #b7eb8f;color:#135200}.toast.warning{background:#fffbe6;border:1px solid #ffe58f;color:#874d00}.toast.error{background:#fff1f0;border:1px solid #ffa39e;color:#820014}.toast.info{background:var(--color-primary-bg);border:1px solid #91d5ff;color:#003a8c}
 
-    .btn-primary { padding: 10px 24px; background: var(--color-primary); color: white; border: none; border-radius: var(--radius-sm); font-size: 14px; cursor: pointer; font-family: var(--font-family-base); font-weight: 500; transition: background 0.2s; }
-    .btn-primary:hover { background: var(--color-primary-hover); }
-    .btn-ghost { padding: 10px 24px; background: transparent; color: var(--color-text-secondary); border: none; border-radius: var(--radius-sm); font-size: 14px; cursor: pointer; font-family: var(--font-family-base); }
-    .btn-ghost:hover { color: var(--color-primary); }
-    .btn-sm { padding: 4px 12px; background: var(--color-primary); color: white; border: none; border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; font-family: var(--font-family-base); }
-    .btn-sm:hover { background: var(--color-primary-hover); }
-    .btn-sm.ghost { background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); } .btn-sm.ghost:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    @keyframes fadeIn{from{opacity:0;transform:translate(-50%,-45%)}to{opacity:1;transform:translate(-50%,-50%)}}
+    @keyframes fadeInCard{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+    @keyframes slideDown{from{opacity:0;max-height:0}to{opacity:1;max-height:600px}}
+    @keyframes popIn{from{opacity:0;transform:scale(.9,0)}to{opacity:1;transform:scale(1,1)}}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    @keyframes floatIcon{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes toastIn{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
 
-    .empty-state { display: none; text-align: center; padding: var(--spacing-3xl) var(--spacing-xl); background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
-    .empty-state.show { display: block; }
-    .empty-icon { font-size: 48px; margin-bottom: var(--spacing-md); animation: floatIcon 2s ease-in-out infinite; }
-    .empty-state h3 { font-size: 18px; font-weight: 600; margin-bottom: var(--spacing-sm); }
-    .empty-state p { font-size: 14px; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg); }
-    .empty-actions { display: flex; gap: var(--spacing-sm); justify-content: center; }
-
-    .error-state { display: none; text-align: center; padding: var(--spacing-2xl); background: var(--color-bg-card); border: 1px solid #ffa39e; border-radius: var(--radius-md); }
-    .error-state.show { display: block; }
-    .error-icon { font-size: 48px; margin-bottom: var(--spacing-md); }
-    .error-state h3 { font-size: 18px; font-weight: 600; margin-bottom: var(--spacing-sm); color: var(--color-danger); }
-    .error-state p { font-size: 14px; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg); }
-    .error-actions { display: flex; gap: var(--spacing-sm); justify-content: center; flex-wrap: wrap; }
-
-    .skeleton-overview { display: none; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-lg); margin-bottom: var(--spacing-lg); }
-    .skeleton-overview.show { display: grid; }
-    .skeleton-card { background: var(--color-bg-card); border-radius: var(--radius-lg); padding: var(--spacing-lg); box-shadow: var(--shadow-sm); }
-    .skeleton-bar { height: 14px; background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: var(--radius-sm); margin-bottom: var(--spacing-sm); }
-    .skeleton-bar.w-60 { width: 60%; } .skeleton-bar.w-80 { width: 80%; } .skeleton-bar.w-40 { width: 40%; }
-
-    .toast-container { position: fixed; top: 68px; right: var(--spacing-lg); z-index: 3000; display: flex; flex-direction: column; gap: var(--spacing-sm); }
-    .toast { padding: 10px 16px; border-radius: var(--radius-sm); font-size: 13px; box-shadow: var(--shadow-lg); animation: toastIn 0.3s ease-out; display: flex; align-items: center; gap: var(--spacing-sm); max-width: 360px; }
-    .toast.success { background: #f6ffed; border: 1px solid #b7eb8f; color: #135200; }
-    .toast.warning { background: #fffbe6; border: 1px solid #ffe58f; color: #874d00; }
-    .toast.error { background: #fff1f0; border: 1px solid #ffa39e; color: #820014; }
-    .toast.info { background: var(--color-primary-bg); border: 1px solid #91d5ff; color: #003a8c; }
-
-    /* 动画 */
-    @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -45%); } to { opacity: 1; transform: translate(-50%, -50%); } }
-    @keyframes fadeInCard { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-    @keyframes slideDown { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 600px; } }
-    @keyframes popIn { from { opacity: 0; transform: scale(0.9, 0); } to { opacity: 1; transform: scale(1, 1); } }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    @keyframes floatIcon { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-    @keyframes toastIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
-
-    /* 响应式 */
-    @media (max-width: 1200px) { .trust-overview-grid { grid-template-columns: repeat(2, 1fr); } .brand-layout, .skeleton-overview { grid-template-columns: 1fr; } }
-    @media (max-width: 768px) { .trust-overview-grid, .trace-container.detail-mode { grid-template-columns: 1fr; } .skeleton-overview { grid-template-columns: 1fr; } .nav { flex-wrap: wrap; height: auto; padding: var(--spacing-sm); } .nav-tabs { order: 3; width: 100%; justify-content: center; } .nav-tab { padding: 0 12px; height: 40px; font-size: 13px; } .nav-search { width: 140px; } .trace-toolbar { flex-direction: column; align-items: flex-start; } .toolbar-right { width: 100%; } .toolbar-search { width: 100%; } .bp-header { flex-direction: column; align-items: flex-start; } }
+    @media(max-width:1200px){.trust-overview-grid{grid-template-columns:repeat(2,1fr)}.brand-layout,.skeleton-overview{grid-template-columns:1fr}}
+    @media(max-width:768px){.trust-overview-grid{grid-template-columns:1fr}.decode-container{grid-template-columns:1fr}.skeleton-overview{grid-template-columns:1fr}.nav{flex-wrap:wrap;height:auto;padding:var(--spacing-sm)}.nav-tabs{order:3;width:100%;justify-content:center}.nav-tab{padding:0 12px;height:40px;font-size:13px}.nav-search{width:140px}.trace-toolbar{flex-direction:column;align-items:flex-start}.toolbar-right{width:100%}.toolbar-search{width:100%}.bp-header{flex-direction:column;align-items:flex-start}}
   </style>
 </head>
 <body>
-  <!-- N1: Onboarding -->
-  <div class="onboarding-overlay show" id="onboarding">
-    <div class="onboarding-card">
-      <div class="onboarding-step active" id="onboardStep1">
-        <div class="onboard-icon">🎯</div><h2>让战略规划的每一步都有据可查</h2>
-        <p>SISYS 帮你从 SP 到 BP 建立完整信任闭环<br>方向有据、解码可溯、执行可控</p>
-        <div class="onboard-actions"><button class="btn-primary" onclick="nextOnboardStep(2)">开始</button><button class="btn-ghost" onclick="skipOnboarding()">跳过引导</button></div>
-      </div>
-      <div class="onboarding-step" id="onboardStep2">
-        <div class="onboard-icon">📤</div><h2>上传你的战略文档</h2><p>支持 PDF / Word / Excel / PPT 等 17 种格式</p>
-        <div class="upload-zone" onclick="nextOnboardStep(3)"><span class="upload-icon">⬆️</span><span>拖拽文件到此处，或点击选择</span><span class="upload-formats">支持：.pdf .docx .xlsx .pptx .csv .txt ...</span></div>
-        <button class="btn-ghost" onclick="nextOnboardStep(3)">跳过，稍后上传 →</button>
-      </div>
-      <div class="onboarding-step" id="onboardStep3">
-        <div class="onboard-icon">🔍</div><h2>正在分析你的数据...</h2>
-        <div class="skeleton-overview" style="display:grid;"><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div></div>
-        <p style="color:var(--color-text-tertiary);font-size:13px;">多 Agent 正在协作分析中，预计 2 分钟...</p>
-        <button class="btn-primary" onclick="skipOnboarding()" style="margin-top:var(--spacing-md);">进入系统</button>
-      </div>
-    </div>
-  </div>
+  <div class="onboarding-overlay show" id="onboarding"><div class="onboarding-card">
+    <div class="onboarding-step active" id="onboardStep1"><div class="onboard-icon">🎯</div><h2>让战略规划的每一步都有据可查</h2><p>SISYS 帮你从 SP 到 BP 建立完整信任闭环</p><div class="onboard-actions"><button class="btn-primary" onclick="nextOnboardStep(2)">开始</button><button class="btn-ghost" onclick="skipOnboarding()">跳过引导</button></div></div>
+    <div class="onboarding-step" id="onboardStep2"><div class="onboard-icon">📤</div><h2>上传你的战略文档</h2><p>支持 PDF / Word / Excel / PPT 等 17 种格式</p><div class="upload-zone" onclick="nextOnboardStep(3)"><span class="upload-icon">⬆️</span><span>拖拽文件到此处，或点击选择</span><span class="upload-formats">支持：.pdf .docx .xlsx .pptx .csv .txt ...</span></div><button class="btn-ghost" onclick="nextOnboardStep(3)">跳过，稍后上传 →</button></div>
+    <div class="onboarding-step" id="onboardStep3"><div class="onboard-icon">🔍</div><h2>正在分析你的数据...</h2><div class="skeleton-overview" style="display:grid;"><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div></div><p style="color:var(--color-text-tertiary);font-size:13px;">多 Agent 正在协作分析中，预计 2 分钟...</p><button class="btn-primary" onclick="skipOnboarding()" style="margin-top:var(--spacing-md);">进入系统</button></div>
+  </div></div>
 
-  <!-- M1: 导航栏 -->
   <nav class="nav">
     <div class="nav-brand">🎯 sisys</div>
     <div class="nav-tabs">
@@ -363,280 +322,301 @@
       <button class="nav-tab" data-page="settings" onclick="switchPage('settings')">生成与导出</button>
     </div>
     <div class="nav-right">
-      <select class="nav-project" onchange="switchProject(this.value)"><option value="xx">XX公司 2026 SP-BP</option><option value="yy">YY医疗 2025 战略复盘</option><option value="zz">ZZ集团 2026 市场进入</option></select>
+      <select class="nav-project" onchange="switchProject(this.value)"><option>XX公司 2026 SP-BP</option><option>YY医疗 2025 战略复盘</option><option>ZZ集团 2026 市场进入</option></select>
       <input type="search" class="nav-search" placeholder="🔍 搜索..." id="globalSearch" onkeydown="if(event.key==='Enter')handleGlobalSearch()">
       <span class="nav-user">👤 张总</span>
     </div>
   </nav>
 
   <main class="main">
-    <!-- ===== Page 1: 三重信任总览 (M2) ===== -->
+    <!-- ===== Page 1: 总览 ===== -->
     <div class="page active" id="page-overview">
       <h1 class="section-title">战略态势总览</h1>
       <p class="section-desc">2026 SP→BP 闭环 — 战略方向 · 战略解码 · 业务执行</p>
       <p class="section-meta">最后更新：2026-06-07 14:32 · <span style="cursor:pointer;color:var(--color-primary);" onclick="showToast('数据已刷新','info')">🔄 点击刷新</span></p>
-
       <div class="skeleton-overview" id="skeletonOverview"><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div></div>
-
       <div class="trust-overview-grid" id="trustCards">
-        <a class="trust-overview-card" href="#trace" onclick="return navigateToTrace('direction','disputed')">
-          <div class="card-status-bar green"></div><div class="card-body">
-            <div class="card-header"><span class="card-icon">🎯</span><span class="card-title">战略方向</span></div>
-            <div class="card-metrics">
-              <div class="metric"><span class="metric-label">共识度</span><span class="metric-value">85% <span class="trend up">↑3%</span></span><span class="metric-baseline">vs 上次审批 82%</span></div>
-              <div class="metric"><span class="metric-label">支持分布</span><span class="metric-value">5/6 角色支持</span></div>
-              <div class="metric alert"><span class="metric-label">⚠️ 争议项</span><span class="metric-value">SC-4 市场进入策略</span></div>
-            </div><div class="card-action">核验方向依据 →</div>
-          </div></a>
-        <a class="trust-overview-card" href="#trace" onclick="return navigateToTrace('decode','unverified')">
-          <div class="card-status-bar green"></div><div class="card-body">
-            <div class="card-header"><span class="card-icon">🔗</span><span class="card-title">战略解码</span></div>
-            <div class="card-metrics">
-              <div class="metric"><span class="metric-label">映射覆盖率</span><span class="metric-value">100% <span class="trend flat">→</span></span><span class="metric-baseline">18/18 项完成映射</span></div>
-              <div class="metric"><span class="metric-label">待验证举措</span><span class="metric-value">5 项</span></div>
-              <div class="metric"><span class="metric-label">最近变更</span><span class="metric-value">2h前 举措1.1权重调整</span></div>
-            </div><div class="card-action">进入验证工作台 →</div>
-          </div></a>
-        <a class="trust-overview-card" href="#trace" onclick="return navigateToTrace('execution','warning')">
-          <div class="card-status-bar yellow"></div><div class="card-body">
-            <div class="card-header"><span class="card-icon">✅</span><span class="card-title">业务执行</span></div>
-            <div class="card-metrics">
-              <div class="metric"><span class="metric-label">可行性评分</span><span class="metric-value">82/100 <span class="trend down">↓3</span></span><span class="metric-baseline">vs 行业 Top 25%：85 分</span></div>
-              <div class="metric"><span class="metric-label">约束状态</span><span class="metric-value">🟢3 🟡2 🔴0</span></div>
-              <div class="metric alert"><span class="metric-label">⚠️ 关注项</span><span class="metric-value">人力缺口 · 里程碑</span></div>
-            </div><div class="card-action">查看约束详情 →</div>
-          </div></a>
+        <a class="trust-overview-card" href="#trace" onclick="return navigateToView('direction')"><div class="card-status-bar green"></div><div class="card-body"><div class="card-header"><span class="card-icon">🎯</span><span class="card-title">战略方向</span></div><div class="card-metrics"><div class="metric"><span class="metric-label">共识度</span><span class="metric-value">85% <span class="trend up">↑3%</span></span><span class="metric-baseline">vs 上次审批 82%</span></div><div class="metric"><span class="metric-label">支持分布</span><span class="metric-value">5/6 角色支持</span></div><div class="metric alert"><span class="metric-label">⚠️ 争议项</span><span class="metric-value">SC-4 市场进入策略</span></div></div><div class="card-action">核验方向依据 →</div></div></a>
+        <a class="trust-overview-card" href="#trace" onclick="return navigateToView('decode')"><div class="card-status-bar green"></div><div class="card-body"><div class="card-header"><span class="card-icon">🔗</span><span class="card-title">战略解码</span></div><div class="card-metrics"><div class="metric"><span class="metric-label">映射覆盖率</span><span class="metric-value">100% <span class="trend flat">→</span></span><span class="metric-baseline">18/18 项完成映射</span></div><div class="metric"><span class="metric-label">待验证举措</span><span class="metric-value">5 项</span></div><div class="metric"><span class="metric-label">最近变更</span><span class="metric-value">2h前 举措1.1权重调整</span></div></div><div class="card-action">进入验证工作台 →</div></div></a>
+        <a class="trust-overview-card" href="#trace" onclick="return navigateToView('execution')"><div class="card-status-bar yellow"></div><div class="card-body"><div class="card-header"><span class="card-icon">✅</span><span class="card-title">业务执行</span></div><div class="card-metrics"><div class="metric"><span class="metric-label">可行性评分</span><span class="metric-value">82/100 <span class="trend down">↓3</span></span><span class="metric-baseline">vs 行业 Top 25%：85 分</span></div><div class="metric"><span class="metric-label">约束状态</span><span class="metric-value">🟢3 🟡2 🔴0</span></div><div class="metric alert"><span class="metric-label">⚠️ 关注项</span><span class="metric-value">人力缺口 · 里程碑</span></div></div><div class="card-action">监控执行风险 →</div></div></a>
       </div>
-
-      <div class="risk-summary-bar" id="riskBar">
-        <span class="risk-label">⚠️ 关键风险</span>
-        <span class="risk-item yellow" onclick="navigateToTrace('execution','manpower')">🟡 人力缺口 22 人（含 5 名架构师）</span>
-        <span class="risk-item yellow" onclick="navigateToTrace('execution','milestone')">🟡 M2 间隔 8 周（基准 4-6 周）</span>
-        <span class="risk-item green">🟢 预算 ¥8.2亿/¥10亿</span>
-        <span class="risk-item green">🟢 合规无违规</span>
-      </div>
-
+      <div class="risk-summary-bar" id="riskBar"><span class="risk-label">⚠️ 关键风险</span><span class="risk-item yellow" onclick="navigateToView('execution','manpower')">🟡 人力缺口 22 人</span><span class="risk-item yellow" onclick="navigateToView('execution','milestone')">🟡 M2 间隔 8 周</span><span class="risk-item green">🟢 预算 ¥8.2亿/¥10亿</span><span class="risk-item green">🟢 合规无违规</span></div>
       <div class="empty-state" id="emptyOverview"><div class="empty-icon">📋</div><h3>还没有战略规划项目</h3><p>创建你的第一个项目，或上传现有 SP/BP 文档开始分析</p><div class="empty-actions"><button class="btn-primary">创建项目</button><button class="btn-sm ghost">上传文档</button></div></div>
     </div>
 
-    <!-- ===== Page 2: 统一验证工作台 (M3) ===== -->
+    <!-- ===== Page 2: 追溯 ===== -->
     <div class="page" id="page-trace">
       <div class="trace-toolbar">
         <div class="toolbar-left">
           <span class="back-link" onclick="switchPage('overview')">← 返回总览</span>
-          <span class="toolbar-title">SP→BP 追溯验证</span>
-          <span class="filter-badge" id="activeFilter">当前过滤：<strong>全部</strong></span>
+          <span class="toolbar-title" id="traceTitle">战略方向 · 核验依据</span>
         </div>
         <div class="toolbar-right">
-          <select class="role-filter" id="roleFilter" onchange="applyRoleFilter()"><option value="planner">规划师视图</option><option value="ceo">CEO 视图</option><option value="all">全部展开</option></select>
-          <button class="mode-switch active" id="btnDetail" onclick="switchMode('detail')">详情模式</button>
-          <button class="mode-switch" id="btnList" onclick="switchMode('list')">列表模式</button>
-          <input type="search" class="toolbar-search" placeholder="🔍 搜索举措..." id="traceSearch" oninput="filterBPItems()">
-          <span class="verify-progress" id="verifyProgress">验证进度：3/4</span>
+          <div class="view-switcher" id="viewSwitcher">
+            <button class="view-btn active" data-view="direction" onclick="switchTraceView('direction')">方向</button>
+            <button class="view-btn" data-view="decode" onclick="switchTraceView('decode')">解码</button>
+            <button class="view-btn" data-view="execution" onclick="switchTraceView('execution')">执行</button>
+          </div>
+          <button class="mode-toggle-btn" id="btnListToggle" onclick="toggleListMode()" title="列表模式" style="display:none;">☰ 列表</button>
+          <input type="search" class="toolbar-search" placeholder="🔍 搜索..." id="traceSearch" oninput="filterBPItems()">
         </div>
       </div>
 
-      <div class="trace-container detail-mode" id="detailMode">
-        <div class="sp-panel">
-          <h3>SP 战略控制点</h3>
-          <div class="sp-item" id="sp-sc1">
-            <div class="sp-header" onclick="toggleSP('sp-sc1')"><span class="sp-icon">🎯</span><span class="sp-title">SC-1：高端医疗设备市场领先</span><span class="sp-consensus green">5/6</span><span class="sp-expand">▾</span></div>
-            <div class="sp-evidence">
-              <div class="evidence-item"><span class="evidence-label">市场规模</span><span class="evidence-value">¥520 亿，CAGR 15%</span><span class="freshness fresh">🟢 新鲜</span><span class="confidence">置信度 🟢 高</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div>
-              <div class="evidence-item"><span class="evidence-label">竞争格局</span><span class="evidence-value">Top3 品牌份额 62%，无明确领导者</span><span class="freshness usable">🟡 可用</span><span class="confidence">置信度 🟡 中</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div>
-              <div class="evidence-item"><span class="evidence-label">技术趋势</span><span class="evidence-value">AI+国产替代双驱动</span><span class="freshness stale">🔴 需更新</span><span class="confidence">置信度 🔴 低</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div>
-              <div class="rejected-options"><span class="rejected-toggle" onclick="toggleRejected(event, 'sp-sc1')">📋 被否决方案（1 项）▸</span><div class="rejected-content" style="display:none;" id="rejected-sp-sc1"><div class="rejected-item"><strong>方案 B：基层医疗设备市场</strong><p>否决：市场增速仅 8%，窗口期已过</p><p>已纳入监控：支付能力风险指标</p></div></div></div>
+      <!-- ===== 视图1: 方向 — 证据阅读布局 ===== -->
+      <div class="trace-view active" id="view-direction">
+        <div class="evidence-cards">
+          <!-- SP-1 -->
+          <div class="evidence-sp-card">
+            <div class="evidence-sp-header"><span class="sp-icon">🎯</span><span class="sp-title">SC-1：高端医疗设备市场领先</span><span class="sp-consensus green">5/6 共识</span></div>
+            <div class="evidence-sp-body">
+              <div class="evidence-block">
+                <span class="evidence-label">📊 市场规模</span>
+                <div class="evidence-data"><div>¥520 亿，CAGR 15%</div>
+                  <div class="evidence-meta"><span class="freshness fresh">🟢 新鲜（2026Q1）</span><span class="confidence-tag">Frost & Sullivan · 置信度 🟢 高 · 一手调研</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div></div>
+              </div>
+              <div class="evidence-block">
+                <span class="evidence-label">📊 竞争格局</span>
+                <div class="evidence-data"><div>Top3 品牌份额 62%，无明确领导者</div>
+                  <div class="evidence-meta"><span class="freshness usable">🟡 可用（2025Q4）</span><span class="confidence-tag">券商研报 · 置信度 🟡 中 · 二手数据</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div></div>
+              </div>
+              <div class="evidence-block">
+                <span class="evidence-label">📊 技术趋势</span>
+                <div class="evidence-data"><div>AI+国产替代双驱动</div>
+                  <div class="evidence-meta"><span class="freshness stale">🔴 需更新（2024Q2）</span><span class="confidence-tag">行业白皮书 · 置信度 🔴 低 · 数据过期</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div></div>
+              </div>
+              <div class="rejected-options"><span class="rejected-toggle" onclick="toggleRejected(event,'sc1')">📋 被否决方案（1 项）▸</span><div class="rejected-content" id="rejected-sc1"><div class="rejected-item"><strong>方案 B：基层医疗设备市场</strong><p>否决：市场增速仅 8%，窗口期已过</p><p>已纳入监控：支付能力风险指标</p></div></div></div>
+              <div class="related-bp-bar"><h4>← 关联 BP 举措</h4><span class="related-bp-tag">举措 1.1 研发投入 ¥2亿</span><span class="related-bp-tag">举措 1.2 渠道建设</span><span class="related-bp-tag">举措 1.3 人才引进</span></div>
             </div>
           </div>
-          <div class="sp-item" id="sp-sc4">
-            <div class="sp-header" onclick="toggleSP('sp-sc4')"><span class="sp-icon">🌍</span><span class="sp-title">SC-4：市场进入策略</span><span class="sp-consensus yellow">3/6 ⚠️</span><span class="sp-expand">▾</span></div>
-            <div class="sp-evidence">
-              <div class="evidence-item"><span class="evidence-label">进入方式</span><span class="evidence-value">自建渠道 vs 并购 vs 合资</span><span class="freshness usable">🟡 可用</span><span class="confidence">置信度 🟡 中</span></div>
-              <div class="evidence-item"><span class="evidence-label">💬 角色意见摘要</span><span class="evidence-value"><div style="margin-top:4px;font-size:12px;"><div>✅ CMO：窗口期极佳，建议激进进入</div><div>⚠️ CTO：核心技术模块需先验证</div><div>🔴 CFO：投资回收期 5 年偏长</div><div>✅ CEO：长期战略价值优先</div><div>✅ COO：供应链可复用现有体系</div><div>⚠️ CHO：需要引进外部人才</div></div></span></div>
+          <!-- SP-4 (争议项) -->
+          <div class="evidence-sp-card disputed">
+            <div class="evidence-sp-header"><span class="sp-icon">🌍</span><span class="sp-title">SC-4：市场进入策略</span><span class="sp-consensus yellow">3/6 ⚠️ 争议</span></div>
+            <div class="evidence-sp-body">
+              <div class="evidence-block">
+                <span class="evidence-label">📊 进入方式</span>
+                <div class="evidence-data"><div>自建渠道 vs 并购 vs 合资</div>
+                  <div class="evidence-meta"><span class="freshness usable">🟡 可用</span><span class="confidence-tag">置信度 🟡 中</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div></div>
+              </div>
+              <div class="opinion-section">
+                <h4>💬 角色意见分歧</h4>
+                <div class="opinion-list">
+                  <div class="opinion-item"><span class="opinion-agent">✅ CMO：</span>窗口期极佳，建议激进进入</div>
+                  <div class="opinion-item"><span class="opinion-agent">⚠️ CTO：</span>核心技术模块需先验证</div>
+                  <div class="opinion-item"><span class="opinion-agent">🔴 CFO：</span>投资回收期 5 年偏长</div>
+                  <div class="opinion-item"><span class="opinion-agent">✅ CEO：</span>长期战略价值优先</div>
+                  <div class="opinion-item"><span class="opinion-agent">✅ COO：</span>供应链可复用现有体系</div>
+                  <div class="opinion-item"><span class="opinion-agent">⚠️ CHO：</span>需要引进外部人才</div>
+                </div>
+              </div>
+              <div class="related-bp-bar"><h4>← 关联 BP 举措</h4><span class="related-bp-tag">举措 1.1 研发投入 ¥2亿</span><span class="related-bp-tag">举措 1.2 渠道建设</span></div>
+            </div>
+          </div>
+          <!-- SP-2 -->
+          <div class="evidence-sp-card">
+            <div class="evidence-sp-header"><span class="sp-icon">🏥</span><span class="sp-title">SC-2：三级医院渠道全覆盖</span><span class="sp-consensus green">6/6 共识</span></div>
+            <div class="evidence-sp-body">
+              <div class="evidence-block">
+                <span class="evidence-label">📊 渠道覆盖</span>
+                <div class="evidence-data"><div>当前 45%，目标 80%</div>
+                  <div class="evidence-meta"><span class="freshness fresh">🟢 新鲜（2026Q1）</span><span class="confidence-tag">内部数据 · 置信度 🟢 高</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div></div>
+              </div>
+              <div class="evidence-block">
+                <span class="evidence-label">📊 关键客户</span>
+                <div class="evidence-data"><div>28 家三甲医院已有合作基础</div>
+                  <div class="evidence-meta"><span class="freshness usable">🟡 可用</span><span class="confidence-tag">客户关系库 · 置信度 🟡 中</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div></div>
+              </div>
+              <div class="related-bp-bar"><h4>← 关联 BP 举措</h4><span class="related-bp-tag">举措 2.1 新产品 NMPA 注册</span></div>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="bp-panel">
-          <h3>BP 年度举措 <span class="count">4 项示例</span></h3>
-          <!-- 举措 1.1 -->
-          <div class="bp-item expanded" id="bp-1-1" data-status="verified" data-sp="sc1" data-warning="manpower">
-            <div class="bp-header" onclick="toggleBP('bp-1-1')">
-              <div class="bp-left"><span class="verify-badge confirmed">✅</span><span class="audit-seal" title="最后验证：李经理 2026-06-07 14:32">🔒</span><span class="bp-title">举措 1.1：研发投入 ¥2 亿，专利 3 项，样机 Q2</span></div>
-              <div class="bp-right"><div class="status-lights">
-                <div class="status-light" onclick="openImpactPanel(event, 'bp-1-1', 'manpower')" title="人力：已批准 · 执行偏离"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">人力</div></div>
-                <div class="status-light" title="预算：正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div>
-                <div class="status-light" title="时间：正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">时间</div></div>
-                <div class="status-light" title="供应商：正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应商</div></div>
-                <div class="status-light" title="合规：正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div>
-              </div></div>
+      <!-- ===== 视图2: 解码 — 对照审核布局 ===== -->
+      <div class="trace-view" id="view-decode">
+        <div class="verify-progress" style="margin-bottom:var(--spacing-md);display:flex;align-items:center;gap:var(--spacing-sm);">
+          <span id="verifyProgress">验证进度：3/4</span>
+          <div style="flex:1;height:6px;background:var(--color-bg-primary);border-radius:3px;overflow:hidden;"><div style="width:75%;height:100%;background:var(--color-primary);border-radius:3px;"></div></div>
+        </div>
+        <div class="decode-container" id="decodeContainer">
+          <div class="sp-panel">
+            <h3>SP 战略控制点</h3>
+            <div class="sp-item" id="sp-sc1"><div class="sp-header" onclick="toggleSP('sp-sc1')"><span class="sp-icon">🎯</span><span class="sp-title">SC-1：高端医疗设备市场领先</span><span class="sp-consensus green">5/6</span><span class="sp-expand">▾</span></div><div class="sp-evidence"><div class="evidence-item" style="font-size:13px;padding:var(--spacing-xs) 0;"><span style="font-weight:600">市场规模</span> ¥520亿 CAGR 15% <span class="freshness fresh">🟢</span><span class="trace-link" onclick="openSourceTrace(event)">溯源→</span></div><div class="evidence-item" style="font-size:13px;padding:var(--spacing-xs) 0;"><span style="font-weight:600">竞争</span> Top3 62% <span class="freshness usable">🟡</span><span class="trace-link" onclick="openSourceTrace(event)">溯源→</span></div><div class="rejected-options"><span class="rejected-toggle" onclick="toggleRejected(event,'decode-sc1')">📋 被否决方案 ▸</span><div class="rejected-content" id="rejected-decode-sc1"><div class="rejected-item"><strong>方案 B：基层医疗设备市场</strong><p>否决：市场增速仅 8%</p></div></div></div></div></div>
+            <div class="sp-item" id="sp-sc4"><div class="sp-header" onclick="toggleSP('sp-sc4')"><span class="sp-icon">🌍</span><span class="sp-title">SC-4：市场进入策略</span><span class="sp-consensus yellow">3/6 ⚠️</span><span class="sp-expand">▾</span></div><div class="sp-evidence"><div class="evidence-item" style="font-size:13px;padding:var(--spacing-xs) 0;"><span style="font-weight:600">进入方式</span> 自建 vs 并购 vs 合资 <span class="freshness usable">🟡</span></div><div class="opinion-item" style="font-size:12px;padding:2px 0;">💬 ✅ CMO: 窗口期极佳 · ⚠️ CTO: 技术需验证 · 🔴 CFO: 回收期偏长</div></div></div>
+          </div>
+          <div class="bp-panel">
+            <h3>BP 年度举措 <span class="count">4 项示例</span></h3>
+            <div class="bp-item expanded" id="bp-1-1" data-status="verified" data-sp="sc1" data-warning="manpower"><div class="bp-header" onclick="toggleBP('bp-1-1')"><div class="bp-left"><span class="verify-badge confirmed">✅</span><span class="audit-seal" title="李经理 2026-06-07 14:32">🔒</span><span class="bp-title">举措 1.1：研发投入 ¥2 亿，专利 3 项，样机 Q2</span></div><div class="bp-right"><div class="status-lights"><div class="status-light" onclick="openImpactPanel(event,'bp-1-1','manpower')"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div></div></div></div><div class="bp-detail"><div class="decode-anchor"><span class="anchor-sp">← SC-1：高端医疗设备市场领先</span><span class="anchor-weight">权重 0.4</span><span class="anchor-chain">CSF-3（市场覆盖面）→ KPI-3.1（三甲覆盖率）→ 目标 30 家</span></div><div class="change-summary">🔄 2h 前调整：权重 0.3→0.4 · 锚点 CSF-2→CSF-3 · <a href="#">查看</a></div><div class="verify-actions"><span class="verify-label">验证：</span><button class="verify-btn active confirm" onclick="verifyBP(event,'bp-1-1','confirmed')">✅ 确认</button><button class="verify-btn" onclick="verifyBP(event,'bp-1-1','doubtful')">⚠️ 存疑</button><button class="verify-btn" onclick="verifyBP(event,'bp-1-1','redo')">🔴 需重做</button></div><div class="impact-panel" id="impact-bp-1-1-manpower"><div class="impact-row"><span class="impact-label">当前状态</span><span class="impact-value">🟡 需求 120 人 / 现有 98 人（缺口 22 人含 5 名资深架构师）</span></div><div class="impact-row"><span class="impact-label">影响范围</span><span class="impact-value">影响 3 个下游举措：1.3（样机）、2.1（培训）、3.2（售后）</span></div><div class="impact-row"><span class="impact-label">建议措施</span><span class="impact-value">启动紧急招聘 · 评估模块外包可行性</span></div><div class="impact-actions"><button class="btn-sm" onclick="showToast('已定位到下游举措','info')">定位下游</button><button class="btn-sm ghost" onclick="this.closest('.impact-panel').classList.remove('show');showToast('已标记已关注','success')">标记已关注</button></div></div></div></div>
+            <div class="bp-item" id="bp-1-2" data-status="doubtful" data-sp="sc1"><div class="bp-header" onclick="toggleBP('bp-1-2')"><div class="bp-left"><span class="verify-badge doubtful">⚠️</span><span class="bp-title">举措 1.2：渠道建设 30 家三甲医院</span></div><div class="bp-right"><div class="status-lights"><div class="status-light" onclick="openImpactPanel(event,'bp-1-2','milestone')"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div></div></div></div><div class="bp-detail"><div class="decode-anchor"><span class="anchor-sp">← SC-1</span><span class="anchor-weight">权重 0.3</span><span class="anchor-chain">CSF-3 → KPI-3.2 → 签约 30 家三甲</span></div><div class="verify-actions"><span class="verify-label">验证：</span><button class="verify-btn" onclick="verifyBP(event,'bp-1-2','confirmed')">✅ 确认</button><button class="verify-btn active doubt" onclick="verifyBP(event,'bp-1-2','doubtful')">⚠️ 存疑</button><button class="verify-btn" onclick="verifyBP(event,'bp-1-2','redo')">🔴 需重做</button></div><div class="impact-panel" id="impact-bp-1-2-milestone"><div class="impact-row"><span class="impact-label">当前状态</span><span class="impact-value">🟡 M2 间隔 8 周（基准 4-6 周）</span></div><div class="impact-row"><span class="impact-label">影响范围</span><span class="impact-value">可能影响 Q3 上市</span></div><div class="impact-row"><span class="impact-label">建议措施</span><span class="impact-value">M2 前置 2 周或压缩缓冲期</span></div></div></div></div>
+            <div class="bp-item warning" id="bp-1-3" data-status="redo" data-sp="sc1" data-warning="milestone"><div class="bp-header" onclick="toggleBP('bp-1-3')"><div class="bp-left"><span class="verify-badge redo">🔴</span><span class="bp-title">举措 1.3：人才引进 5 名学科带头人</span></div><div class="bp-right"><div class="status-lights"><div class="status-light" onclick="openImpactPanel(event,'bp-1-3','manpower')"><div class="light-outer yellow"></div><div class="light-inner red"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div></div></div></div><div class="bp-detail"><div class="decode-anchor"><span class="anchor-sp">← SC-1</span><span class="anchor-weight">权重 0.3</span><span class="anchor-chain">CSF-4 → KPI-4.1 → 5 名学科带头人</span></div><div class="verify-actions"><span class="verify-label">验证：</span><button class="verify-btn" onclick="verifyBP(event,'bp-1-3','confirmed')">✅ 确认</button><button class="verify-btn" onclick="verifyBP(event,'bp-1-3','doubtful')">⚠️ 存疑</button><button class="verify-btn active redo" onclick="verifyBP(event,'bp-1-3','redo')">🔴 需重做</button><input type="text" class="verify-note" style="display:block;" id="note-bp-1-3" value="JD需重新定义"></div><div class="impact-panel" id="impact-bp-1-3-manpower"><div class="impact-row"><span class="impact-label">当前状态</span><span class="impact-value">🔴 启动 2 个月 0 候选人进入终面</span></div><div class="impact-row"><span class="impact-label">影响范围</span><span class="impact-value">直接影响举措 1.1（研发）和 2.1（培训）</span></div><div class="impact-row"><span class="impact-label">建议措施</span><span class="impact-value">重新评估薪酬策略，考虑校企联合引进</span></div></div></div></div>
+            <div class="bp-item" id="bp-2-1" data-status="verified" data-sp="sc2"><div class="bp-header" onclick="toggleBP('bp-2-1')"><div class="bp-left"><span class="verify-badge confirmed">✅</span><span class="audit-seal" title="李经理 2026-06-06 10:15">🔒</span><span class="bp-title">举措 2.1：新产品 NMPA 注册认证</span></div><div class="bp-right"><div class="status-lights"><div class="status-light"><div class="light-outer yellow"></div><div class="light-inner green"></div><div class="light-label">合规</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div></div></div></div><div class="bp-detail"><div class="decode-anchor"><span class="anchor-sp">← SC-2：三级医院渠道全覆盖</span><span class="anchor-weight">权重 0.5</span><span class="anchor-chain">CSF-1（产品注册）→ KPI-1.1 → NMPA 三类证</span></div><div class="verify-actions"><span class="verify-label">验证：</span><button class="verify-btn active confirm" onclick="verifyBP(event,'bp-2-1','confirmed')">✅ 确认</button><button class="verify-btn" onclick="verifyBP(event,'bp-2-1','doubtful')">⚠️ 存疑</button><button class="verify-btn" onclick="verifyBP(event,'bp-2-1','redo')">🔴 需重做</button></div></div></div>
+          </div>
+        </div>
+        <!-- 列表模式 -->
+        <div id="decodeListMode" style="display:none;"><div class="bp-panel" style="max-height:none;"><table class="bp-list-table"><thead><tr><th>验证</th><th>BP 举措</th><th>SP锚点</th><th>权重</th><th>预算</th><th>人力</th><th>时间</th><th>供应商</th><th>合规</th><th>溯源</th><th>操作</th></tr></thead><tbody><tr id="row-bp-1-1"><td>✅🔒</td><td>1.1 研发投入 ¥2亿</td><td>SC-1</td><td>0.4</td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-1','row-bp-1-1')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr><tr id="row-bp-1-2"><td>⚠️</td><td>1.2 渠道建设</td><td>SC-1</td><td>0.3</td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-2','row-bp-1-2')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr><tr id="row-bp-1-3" class="row-warning"><td>🔴</td><td>1.3 人才引进</td><td>SC-1</td><td>0.3</td><td><span class="status-dot green"></span></td><td><span class="status-dot red"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-3','row-bp-1-3')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr><tr id="row-bp-2-1"><td>✅🔒</td><td>2.1 NMPA注册</td><td>SC-2</td><td>0.5</td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-2-1','row-bp-2-1')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr></tbody></table><div style="margin-top:var(--spacing-md);font-size:12px;">验证进度：2/4 · <a href="#" style="color:var(--color-primary);" onclick="showToast('列表已导出','success');return false;">导出 CSV</a></div></div></div>
+      </div>
+
+      <!-- ===== 视图3: 执行 — 监控扫描布局 ===== -->
+      <div class="trace-view" id="view-execution">
+        <div class="execution-container">
+          <div class="exec-score-bar">
+            <div>
+              <div class="exec-score-big">82<span class="trend down">↓3</span></div>
+              <div class="exec-score-meta">可行性评分 /100 · vs 行业 Top 25%：85 分</div>
             </div>
-            <div class="bp-detail">
-              <div class="decode-anchor"><span class="anchor-sp">← SC-1：高端医疗设备市场领先</span><span class="anchor-weight">权重 0.4</span><span class="anchor-chain">CSF-3（提升市场覆盖面）→ KPI-3.1（三甲覆盖率）→ 目标 30 家</span></div>
-              <div class="change-summary">🔄 2h 前调整：权重 0.3→0.4 · 锚点 CSF-2→CSF-3 · <a href="#">查看变更详情</a></div>
-              <div class="verify-actions"><span class="verify-label">验证状态：</span><button class="verify-btn active confirm" onclick="verifyBP(event,'bp-1-1','confirmed')">✅ 确认</button><button class="verify-btn" onclick="verifyBP(event,'bp-1-1','doubtful')">⚠️ 存疑</button><button class="verify-btn" onclick="verifyBP(event,'bp-1-1','redo')">🔴 需重做</button></div>
-              <div class="impact-panel" id="impact-bp-1-1-manpower">
-                <div class="impact-row"><span class="impact-label">当前状态</span><span class="impact-value">🟡 需求 120 人 / 现有 98 人（缺口 22 人，含 5 名资深架构师）</span></div>
-                <div class="impact-row"><span class="impact-label">影响范围</span><span class="impact-value">影响 3 个下游举措：1.3（样机）、2.1（培训）、3.2（售后）</span></div>
-                <div class="impact-row"><span class="impact-label">建议措施</span><span class="impact-value">启动紧急招聘 · 评估模块外包可行性</span></div>
-                <div class="impact-actions"><button class="btn-sm" onclick="showToast('已定位到下游举措','info')">定位下游</button><button class="btn-sm ghost" onclick="this.closest('.impact-panel').classList.remove('show');showToast('已标记为已关注','success')">标记已关注</button></div>
+            <div style="display:flex;gap:var(--spacing-md);flex:1;justify-content:flex-end;font-size:12px;">
+              <span>🟢3 🟡2 🔴0</span>
+            </div>
+          </div>
+
+          <!-- 🔴 异常项 -->
+          <div class="exec-item danger expanded">
+            <div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')">
+              <div class="exec-item-left"><span class="verify-badge redo">🔴</span><span class="exec-item-title">举措 1.3：人才引进 5 名学科带头人</span><span class="exec-item-badge">← SC-1</span></div>
+              <div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer yellow"></div><div class="light-inner red"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div></div></div>
+            </div>
+            <div class="exec-item-body">
+              <div class="impact-panel show" style="margin:0;border:none;background:transparent;padding:var(--spacing-sm) 0;">
+                <div class="impact-row"><span class="impact-label">当前状态</span><span class="impact-value">🔴 招聘启动 2 个月，0 位候选人进入终面</span></div>
+                <div class="impact-row"><span class="impact-label">影响范围</span><span class="impact-value">直接影响举措 1.1（研发）和 2.1（培训）</span></div>
+                <div class="impact-row"><span class="impact-label">建议措施</span><span class="impact-value">重新评估薪酬策略，考虑与高校/医院联合引进</span></div>
+                <div class="impact-actions"><button class="btn-sm" onclick="showToast('已定位下游','info')">定位下游</button><button class="btn-sm ghost" onclick="showToast('已标记已关注','success')">标记已关注</button></div>
               </div>
             </div>
           </div>
-          <!-- 举措 1.2 -->
-          <div class="bp-item" id="bp-1-2" data-status="doubtful" data-sp="sc1">
-            <div class="bp-header" onclick="toggleBP('bp-1-2')">
-              <div class="bp-left"><span class="verify-badge doubtful">⚠️</span><span class="bp-title">举措 1.2：渠道建设 30 家三甲医院</span></div>
-              <div class="bp-right"><div class="status-lights">
-                <div class="status-light" onclick="openImpactPanel(event, 'bp-1-2', 'milestone')" title="时间：已批准 · 执行偏离"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">时间</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应商</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div>
-              </div></div>
+
+          <!-- 🟡 异常项 -->
+          <div class="exec-item warning expanded">
+            <div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')">
+              <div class="exec-item-left"><span class="verify-badge confirmed">✅</span><span class="exec-item-title">举措 1.1：研发投入 ¥2 亿，样机 Q2</span><span class="exec-item-badge">← SC-1</span></div>
+              <div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div></div></div>
             </div>
-            <div class="bp-detail">
-              <div class="decode-anchor"><span class="anchor-sp">← SC-1</span><span class="anchor-weight">权重 0.3</span><span class="anchor-chain">CSF-3 → KPI-3.2 → 签约 30 家三甲</span></div>
-              <div class="verify-actions"><span class="verify-label">验证状态：</span><button class="verify-btn" onclick="verifyBP(event,'bp-1-2','confirmed')">✅ 确认</button><button class="verify-btn active doubt" onclick="verifyBP(event,'bp-1-2','doubtful')">⚠️ 存疑</button><button class="verify-btn" onclick="verifyBP(event,'bp-1-2','redo')">🔴 需重做</button></div>
-              <div class="impact-panel" id="impact-bp-1-2-milestone"><div class="impact-row"><span class="impact-label">当前状态</span><span class="impact-value">🟡 里程碑 M2 间隔 8 周（行业基准 4-6 周）</span></div><div class="impact-row"><span class="impact-label">影响范围</span><span class="impact-value">可能影响 Q3 上市</span></div><div class="impact-row"><span class="impact-label">建议措施</span><span class="impact-value">建议 M2 前置 2 周或压缩缓冲期</span></div></div>
+            <div class="exec-item-body">
+              <div class="impact-panel show" style="margin:0;border:none;background:transparent;padding:var(--spacing-sm) 0;">
+                <div class="impact-row"><span class="impact-label">当前状态</span><span class="impact-value">🟡 人力缺口 22 人（含 5 名资深架构师）</span></div>
+                <div class="impact-row"><span class="impact-label">影响范围</span><span class="impact-value">影响 3 个下游举措：1.3（样机）、2.1（培训）、3.2（售后）</span></div>
+                <div class="impact-row"><span class="impact-label">建议措施</span><span class="impact-value">启动紧急招聘 · 评估模块外包可行性</span></div>
+                <div class="impact-actions"><button class="btn-sm" onclick="showToast('已定位下游','info')">定位下游</button><button class="btn-sm ghost" onclick="showToast('已标记已关注','success')">标记已关注</button></div>
+              </div>
             </div>
           </div>
-          <!-- 举措 1.3 -->
-          <div class="bp-item warning" id="bp-1-3" data-status="redo" data-sp="sc1" data-warning="milestone">
-            <div class="bp-header" onclick="toggleBP('bp-1-3')">
-              <div class="bp-left"><span class="verify-badge redo">🔴</span><span class="bp-title">举措 1.3：人才引进 5 名学科带头人</span></div>
-              <div class="bp-right"><div class="status-lights">
-                <div class="status-light" onclick="openImpactPanel(event, 'bp-1-3', 'manpower')" title="人力：待审批 · 严重偏离"><div class="light-outer yellow"></div><div class="light-inner red"></div><div class="light-label">人力</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div>
-                <div class="status-light" title="时间：执行偏离"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">时间</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应商</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div>
-              </div></div>
+
+          <!-- 🟢 正常项折叠 -->
+          <div class="exec-normal-list">
+            <div class="exec-normal-toggle" onclick="var l=document.getElementById('execNormalList');l.style.display=l.style.display==='none'?'block':'none';this.querySelector('span').textContent=l.style.display==='none'?'展开全部 2 项 ▾':'收起正常项 ▴';">
+              <span>展开全部 2 项 ▾</span>
             </div>
-            <div class="bp-detail">
-              <div class="decode-anchor"><span class="anchor-sp">← SC-1</span><span class="anchor-weight">权重 0.3</span><span class="anchor-chain">CSF-4 → KPI-4.1 → 5 名学科带头人</span></div>
-              <div class="verify-actions"><span class="verify-label">验证状态：</span><button class="verify-btn" onclick="verifyBP(event,'bp-1-3','confirmed')">✅ 确认</button><button class="verify-btn" onclick="verifyBP(event,'bp-1-3','doubtful')">⚠️ 存疑</button><button class="verify-btn active redo" onclick="verifyBP(event,'bp-1-3','redo')">🔴 需重做</button><input type="text" class="verify-note" placeholder="重做原因（必填）..." style="display:block;" id="note-bp-1-3" value="JD需重新定义，无法吸引目标人才"></div>
-              <div class="impact-panel" id="impact-bp-1-3-manpower"><div class="impact-row"><span class="impact-label">当前状态</span><span class="impact-value">🔴 启动 2 个月，0 位候选人进入终面</span></div><div class="impact-row"><span class="impact-label">影响范围</span><span class="impact-value">直接影响举措 1.1（研发）和 2.1（培训）</span></div><div class="impact-row"><span class="impact-label">建议措施</span><span class="impact-value">重新评估薪酬策略，考虑校企联合引进</span></div></div>
-            </div>
-          </div>
-          <!-- 举措 2.1 -->
-          <div class="bp-item" id="bp-2-1" data-status="verified" data-sp="sc2">
-            <div class="bp-header" onclick="toggleBP('bp-2-1')">
-              <div class="bp-left"><span class="verify-badge confirmed">✅</span><span class="audit-seal" title="李经理 2026-06-06 10:15">🔒</span><span class="bp-title">举措 2.1：新产品 NMPA 注册认证</span></div>
-              <div class="bp-right"><div class="status-lights">
-                <div class="status-light" title="合规：待审批"><div class="light-outer yellow"></div><div class="light-inner green"></div><div class="light-label">合规</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">时间</div></div>
-                <div class="status-light" title="正常"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应商</div></div>
-              </div></div>
-            </div>
-            <div class="bp-detail">
-              <div class="decode-anchor"><span class="anchor-sp">← SC-2：三级医院渠道全覆盖</span><span class="anchor-weight">权重 0.5</span><span class="anchor-chain">CSF-1（产品注册）→ KPI-1.1 → NMPA 三类证</span></div>
-              <div class="verify-actions"><span class="verify-label">验证状态：</span><button class="verify-btn active confirm" onclick="verifyBP(event,'bp-2-1','confirmed')">✅ 确认</button><button class="verify-btn" onclick="verifyBP(event,'bp-2-1','doubtful')">⚠️ 存疑</button><button class="verify-btn" onclick="verifyBP(event,'bp-2-1','redo')">🔴 需重做</button></div>
+            <div id="execNormalList" style="display:none;margin-top:var(--spacing-sm);display:flex;flex-direction:column;gap:var(--spacing-sm);">
+              <div class="exec-item"><div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')"><div class="exec-item-left"><span class="verify-badge doubtful">⚠️</span><span class="exec-item-title">举措 1.2：渠道建设 30 家三甲医院</span><span class="exec-item-badge">← SC-1</span></div><div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div></div></div><div class="exec-item-body"><div style="padding:var(--spacing-sm) 0;font-size:13px;">🟡 M2 间隔 8 周（基准 4-6 周），可能影响 Q3 上市</div></div></div></div>
+              <div class="exec-item"><div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')"><div class="exec-item-left"><span class="verify-badge confirmed">✅</span><span class="exec-item-title">举措 2.1：新产品 NMPA 注册认证</span><span class="exec-item-badge">← SC-2</span></div><div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer yellow"></div><div class="light-inner green"></div><div class="light-label">合规</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div></div></div></div><div class="exec-item-body"><div style="padding:var(--spacing-sm) 0;font-size:13px;color:var(--color-text-secondary);">🟢 正常推进，合规审批中</div></div></div></div>
             </div>
           </div>
         </div>
       </div>
-
-      <!-- 列表模式 -->
-      <div class="trace-container list-mode" id="listMode" style="display:none;"><div class="bp-panel" style="max-height:none;"><table class="bp-list-table"><thead><tr><th>验证</th><th>BP 举措</th><th>SP锚点</th><th>权重</th><th>预算</th><th>人力</th><th>时间</th><th>供应商</th><th>合规</th><th>溯源</th><th>操作</th></tr></thead><tbody>
-              <tr id="row-bp-1-1"><td>✅🔒</td><td>1.1 研发投入 ¥2亿</td><td>SC-1</td><td>0.4</td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-1','row-bp-1-1')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr>
-              <tr id="row-bp-1-2"><td>⚠️</td><td>1.2 渠道建设 30家</td><td>SC-1</td><td>0.3</td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-2','row-bp-1-2')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr>
-              <tr id="row-bp-1-3" class="row-warning"><td>🔴</td><td>1.3 人才引进 5名</td><td>SC-1</td><td>0.3</td><td><span class="status-dot green"></span></td><td><span class="status-dot red"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-3','row-bp-1-3')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr>
-              <tr id="row-bp-2-1"><td>✅🔒</td><td>2.1 NMPA注册</td><td>SC-2</td><td>0.5</td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-4','row-bp-2-1')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr></tbody></table><div class="verify-progress" style="margin-top:var(--spacing-md);">验证进度：2/4 · <a href="#" style="color:var(--color-primary);font-size:12px;" onclick="showToast('列表已导出','success');return false;">导出 CSV</a></div></div></div>
 
       <div class="empty-state" id="emptyTrace"><div class="empty-icon">📝</div><h3>BP 草案尚未生成</h3><p>请在 SP 控制点确认后启动战略解码</p><button class="btn-primary">启动战略解码</button></div>
       <div class="compliance-watermark">🔒 本页面所有验证记录均受 WORM 保护 · 保留至 2033-06-07 · 不可篡改 · 操作全量留痕 · 审计 ID: SESSION-AUD-20260607-001</div>
     </div>
 
-    <!-- ===== Page 3: 品牌配置与导出 (M5) ===== -->
+    <!-- ===== Page 3: 生成与导出 ===== -->
     <div class="page" id="page-settings">
       <h1 class="section-title">生成与导出</h1><p class="section-desc">配置客户品牌方案，一键导出白标报告</p>
-      <div class="project-selector"><label>当前项目：</label><select onchange="switchProject(this.value)"><option value="xx" selected>XX公司 2026 SP-BP</option><option value="yy">YY医疗 2025 战略复盘</option><option value="zz">ZZ集团 2026 市场进入</option></select><span class="project-tenant-badge">🔒 数据隔离已启用</span></div>
+      <div class="project-selector"><label>当前项目：</label><select onchange="switchProject(this.value)"><option>XX公司 2026 SP-BP</option><option>YY医疗 2025 战略复盘</option><option>ZZ集团 2026 市场进入</option></select><span class="project-tenant-badge">🔒 数据隔离已启用</span></div>
       <div class="brand-layout">
-        <div class="brand-section">
-          <h3>品牌配置</h3>
-          <div class="form-group"><span class="form-label">Logo</span><div class="logo-dropzone" onclick="handleLogoUpload()"><div class="dz-icon">🖼️</div><div class="dz-text">点击或拖拽上传 Logo</div><div class="dz-hint">PNG/SVG/JPG · 最大 5MB · 自动适配横版/竖版</div></div><img class="logo-preview-img show" id="logoPreview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='48'%3E%3Crect fill='%23f5f5f5' width='200' height='48' rx='4'/%3E%3Ctext x='100' y='22' text-anchor='middle' fill='%23262626' font-family='PingFang SC,Microsoft YaHei,sans-serif' font-weight='600' font-size='15'%3E宏大医疗器械%3C/text%3E%3Ctext x='100' y='39' text-anchor='middle' fill='%238c8c8c' font-family='sans-serif' font-size='9'%3EHONGDA MEDICAL%3C/text%3E%3C/svg%3E" alt="客户 Logo"></div>
+        <div class="brand-section"><h3>品牌配置</h3>
+          <div class="form-group"><span class="form-label">Logo</span><div class="logo-dropzone" onclick="handleLogoUpload()"><div class="dz-icon">🖼️</div><div class="dz-text">点击或拖拽上传 Logo</div><div class="dz-hint">PNG/SVG/JPG · 最大 5MB · 自动适配横版/竖版</div></div><img class="logo-preview-img show" id="logoPreview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='48'%3E%3Crect fill='%23f5f5f5' width='200' height='48' rx='4'/%3E%3Ctext x='100' y='22' text-anchor='middle' fill='%23262626' font-family='PingFang SC,Microsoft YaHei,sans-serif' font-weight='600' font-size='15'%3E宏大医疗器械%3C/text%3E%3Ctext x='100' y='39' text-anchor='middle' fill='%238c8c8c' font-family='sans-serif' font-size='9'%3EHONGDA MEDICAL%3C/text%3E%3C/svg%3E" alt="Logo"></div>
           <div class="form-group"><span class="form-label">品牌主色</span><div class="color-presets"><div class="color-swatch selected" style="background:#1890ff;" data-color="#1890ff" onclick="selectColor('#1890ff',this)"></div><div class="color-swatch" style="background:#52c41a;" data-color="#52c41a" onclick="selectColor('#52c41a',this)"></div><div class="color-swatch" style="background:#722ed1;" data-color="#722ed1" onclick="selectColor('#722ed1',this)"></div><div class="color-swatch" style="background:#fa8c16;" data-color="#fa8c16" onclick="selectColor('#fa8c16',this)"></div><div class="color-swatch" style="background:#eb2f96;" data-color="#eb2f96" onclick="selectColor('#eb2f96',this)"></div><div class="color-swatch" style="background:#262626;" data-color="#262626" onclick="selectColor('#262626',this)"></div></div><input type="text" class="color-input" id="customColor" value="#1890ff" oninput="applyCustomColor()"></div>
-          <div class="form-group"><span class="form-label">品牌字体</span><select class="form-select" id="fontSelect" onchange="updatePreview()"><option value="business">商务风格 — 思源黑体 + Helvetica</option><option value="tech">科技风格 — PingFang SC + SF Mono</option><option value="classic">经典风格 — 宋体 + Georgia</option></select></div>
+          <div class="form-group"><span class="form-label">品牌字体</span><select class="form-select" id="fontSelect" onchange="updatePreview()"><option>商务风格 — 思源黑体 + Helvetica</option><option>科技风格 — PingFang SC + SF Mono</option><option>经典风格 — 宋体 + Georgia</option></select></div>
         </div>
-        <div class="brand-section"><h3>实时预览</h3><div class="preview-area"><span class="preview-logo-text">宏大医疗器械</span><span style="font-size:11px;color:var(--color-text-tertiary);">HONGDA MEDICAL</span><span class="preview-title" id="previewTitle" style="color:#1890ff;">2026 年度战略规划报告</span><span style="font-size:13px;color:var(--color-text-secondary);">报告正文预览 — 品牌色已应用于标题与图表</span><span class="preview-btn" id="previewBtn" style="background:#1890ff;">按钮样式预览</span></div></div>
+        <div class="brand-section"><h3>实时预览</h3><div class="preview-area"><span class="preview-logo-text">宏大医疗器械</span><span style="font-size:11px;color:var(--color-text-tertiary);">HONGDA MEDICAL</span><span class="preview-title" id="previewTitle" style="color:#1890ff;">2026 年度战略规划报告</span><span style="font-size:13px;color:var(--color-text-secondary);">品牌色已应用于标题与图表</span><span class="preview-btn" id="previewBtn" style="background:#1890ff;">按钮样式预览</span></div></div>
       </div>
       <div class="brand-section" style="margin-bottom:var(--spacing-lg);"><div class="compliance-checklist"><h4>导出前检查</h4><div class="check-item ok">✅ Logo 尺寸符合封面页布局</div><div class="check-item ok">✅ 品牌色已应用于表头和图表</div><div class="check-item warn">⚠️ 页脚版权年份未更新（当前：2025）<span class="fix-link" onclick="autoFix('copyright')">一键修正</span></div><div class="check-item ok">✅ 无数据隔离泄露风险</div></div><div class="export-section"><button class="export-btn" id="exportBtn" onclick="exportPDF()">📄 导出 PDF</button><span class="export-estimate">预计 &lt;1 分钟</span></div></div>
-      <div class="audit-export"><h3>审计日志导出</h3><p>导出指定时间范围内的决策验证记录</p><div class="audit-export-controls"><input type="date" id="auditStart" value="2026-01-01"><span>至</span><input type="date" id="auditEnd" value="2026-06-07"><button class="btn-sm" onclick="showToast('审计日志已导出：sisys-audit-XX公司-2026.csv','success')">导出 CSV</button></div></div>
-      <div class="error-state" id="errorDataSource" style="margin-top:var(--spacing-xl);"><div class="error-icon">🔌</div><h3>无法获取最新数据</h3><p>市场数据源的连接暂时中断（Frost & Sullivan API 无响应）<br>当前显示的是上次同步的数据（2026-06-06 09:00）</p><div class="error-actions"><button class="btn-primary">重试连接</button><button class="btn-sm ghost" onclick="this.closest('.error-state').style.display='none'">使用缓存数据继续</button></div></div>
+      <div class="audit-export"><h3>审计日志导出</h3><p>导出指定时间范围内的决策验证记录</p><div class="audit-export-controls"><input type="date" id="auditStart" value="2026-01-01"><span>至</span><input type="date" id="auditEnd" value="2026-06-07"><button class="btn-sm" onclick="showToast('审计日志已导出','success')">导出 CSV</button></div></div>
+      <div class="error-state" id="errorDataSource" style="margin-top:var(--spacing-xl);"><div class="error-icon">🔌</div><h3>无法获取最新数据</h3><p>市场数据源的连接暂时中断<br>当前显示的是上次同步的数据（2026-06-06 09:00）</p><div class="error-actions"><button class="btn-primary">重试连接</button><button class="btn-sm ghost" onclick="this.closest('.error-state').style.display='none'">使用缓存数据继续</button></div></div>
     </div>
   </main>
 
-  <!-- M4: 溯源弹窗 -->
+  <!-- 溯源弹窗 -->
   <div class="overlay" id="sourceOverlay" onclick="closeSourceTrace()"></div>
   <div class="source-card" id="sourceCard"><div class="source-card-header"><span class="source-card-title">📄 数据溯源</span><button class="source-card-close" onclick="closeSourceTrace()">✕</button></div><div class="source-card-body"><div class="source-breadcrumb">BP 举措 1.1 → KPI-3.1 → 2024年渠道分析报告.pdf</div><div class="source-info"><span class="source-info-label">数据来源</span><div class="source-info-value">2024年渠道分析报告.pdf · 第 23 页</div><div class="source-info-meta"><span class="source-type">📊 一手数据（内部销售系统导出）</span><span class="source-sample">样本：28 家医院调研 · 9 名渠道经理</span><span class="source-date">采集时间：2024 年 Q4</span><span class="freshness usable">🟡 可用（18 个月前）</span></div></div><div class="confidence-section"><span class="confidence-badge">🟢 置信度：高</span><span class="confidence-explain">一手数据 + 大样本 + 来源可信</span></div><div class="source-quote">"...基于现有渠道团队 9 人，人均覆盖 3-4 家三甲医院，维持 80% 以上覆盖率的前提下，年度新增签约上限约为 28-32 家..."</div><div class="source-actions"><button class="source-btn-primary" onclick="jumpToPDF()">📍 跳转到原始 PDF（坐标 P23, 156, 342）</button><button class="source-btn-secondary" onclick="copyCitation()">📋 复制引用</button><button class="source-btn-secondary" onclick="reportSourceIssue()">⚠️ 数据存疑</button></div></div></div>
   <div class="toast-container" id="toastContainer"></div>
 
   <script>
-    var currentPage='overview',traceFilter=null,traceFocus=null;
+    var currentPage='overview',currentView='direction';
     function switchPage(p){
       document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
       document.querySelectorAll('.nav-tab').forEach(x=>x.classList.remove('active'));
       document.getElementById('page-'+p).classList.add('active');
       document.querySelector('.nav-tab[data-page="'+p+'"]').classList.add('active');
       currentPage=p;window.location.hash=p;
-      if(p==='overview'){traceFilter=null;traceFocus=null;resetTraceFilters();}
-      document.getElementById('globalSearch').placeholder=p==='trace'?'🔍 搜索举措/KPI/控制点...':'🔍 搜索（跳转至追溯页）...';
+      document.getElementById('globalSearch').placeholder=p==='trace'?'🔍 搜索...':'🔍 搜索（跳转至追溯页）...';
     }
-    function navigateToTrace(f,fc){traceFilter=f;traceFocus=fc;switchPage('trace');setTimeout(applyTraceFilter,100);return false;}
-    function applyTraceFilter(){
-      document.querySelectorAll('.bp-item').forEach(i=>{i.style.display='';i.classList.remove('expanded');});
-      document.querySelectorAll('.sp-item').forEach(i=>i.classList.remove('expanded'));
-      if(!traceFilter&&!traceFocus){updateFilterBadge();return;}
-      if(traceFilter==='execution'){document.querySelectorAll('.bp-item').forEach(i=>{if(!i.dataset.warning)i.style.display='none';});
-        if(traceFocus==='manpower'){var t=document.querySelector('.bp-item[data-warning="manpower"]');if(t){t.classList.add('expanded');t.scrollIntoView({behavior:'smooth',block:'start'});}}
-        else if(traceFocus==='milestone'){var t=document.querySelector('.bp-item[data-warning="milestone"]');if(t){t.classList.add('expanded');t.scrollIntoView({behavior:'smooth',block:'start'});}}}
-      else if(traceFilter==='direction'){var s=document.getElementById('sp-sc4');s.classList.add('expanded');s.scrollIntoView({behavior:'smooth',block:'start'});}
-      else if(traceFilter==='decode'){document.querySelectorAll('.bp-item').forEach(i=>{if(i.dataset.status==='verified')i.style.display='none';});
-        var f=[...document.querySelectorAll('.bp-item')].find(i=>i.dataset.status!=='verified');if(f)f.classList.add('expanded');}
-      updateFilterBadge();
+    function navigateToView(v,focus){
+      switchPage('trace');
+      setTimeout(function(){switchTraceView(v,focus);},100);
+      return false;
     }
-    function updateFilterBadge(){var b=document.getElementById('activeFilter');
-      if(traceFilter==='execution')b.innerHTML='当前过滤：<strong>🟡 异常项</strong>';
-      else if(traceFilter==='direction')b.innerHTML='当前过滤：<strong>⚠️ 争议 SP</strong>';
-      else if(traceFilter==='decode')b.innerHTML='当前过滤：<strong>待验证项</strong>';
-      else b.innerHTML='当前过滤：<strong>全部</strong>';}
-    function resetTraceFilters(){traceFilter=null;traceFocus=null;document.querySelectorAll('.bp-item').forEach(i=>i.style.display='');document.querySelectorAll('.sp-item').forEach(i=>i.classList.remove('expanded'));updateFilterBadge();}
-    function toggleSP(id){var e=document.getElementById(id);e.classList.toggle('expanded');document.querySelectorAll('.sp-item').forEach(s=>s.classList.remove('selected'));if(e.classList.contains('expanded'))e.classList.add('selected');}
+    function switchTraceView(v,focus){
+      currentView=v;
+      // 视图按钮
+      document.querySelectorAll('.view-btn').forEach(function(b){b.classList.remove('active');if(b.dataset.view===v)b.classList.add('active');});
+      // 视图容器
+      document.querySelectorAll('.trace-view').forEach(function(t){t.classList.remove('active');});
+      document.getElementById('view-'+v).classList.add('active');
+      // 列表按钮仅解码可见
+      document.getElementById('btnListToggle').style.display=v==='decode'?'':'none';
+      // 标题
+      var titles={direction:'战略方向 · 核验依据',decode:'战略解码 · 映射验证',execution:'业务执行 · 风险监控'};
+      document.getElementById('traceTitle').textContent=titles[v]||'';
+      // 视图特定行为
+      if(v==='direction'){
+        // 展开所有 evidence card 中的争议项
+        var disputed=document.querySelector('.evidence-sp-card.disputed');
+        if(disputed)disputed.scrollIntoView({behavior:'smooth',block:'start'});
+      }else if(v==='decode'){
+        // 待验证置顶
+        var items=document.querySelectorAll('#view-decode .bp-item');
+        var container=document.querySelector('#view-decode .bp-panel');
+        var sorted=Array.from(items).sort(function(a,b){var o={redo:0,doubtful:1,'':2,verified:3};return(o[a.dataset.status]??2)-(o[b.dataset.status]??2);});
+        sorted.forEach(function(i){container.appendChild(i);});
+        var first=sorted.find(function(i){return i.dataset.status!=='verified';});
+        if(first)setTimeout(function(){first.classList.add('expanded');},200);
+      }else if(v==='execution'){
+        // 异常项默认已展开（HTML中预设expanded class），滚动到第一个
+        var firstAbnormal=document.querySelector('#view-execution .exec-item.danger');
+        if(firstAbnormal)setTimeout(function(){firstAbnormal.scrollIntoView({behavior:'smooth',block:'start'});},200);
+      }
+    }
+    // 解码列表模式切换
+    function toggleListMode(){
+      var dc=document.getElementById('decodeContainer'),dl=document.getElementById('decodeListMode'),btn=document.getElementById('btnListToggle');
+      if(dl.style.display==='none'){dc.style.display='none';dl.style.display='block';btn.classList.add('active');btn.textContent='☰ 详情';}
+      else{dl.style.display='none';dc.style.display='';btn.classList.remove('active');btn.textContent='☰ 列表';}
+    }
+    function toggleSP(id){document.getElementById(id).classList.toggle('expanded');}
     function toggleBP(id){document.getElementById(id).classList.toggle('expanded');}
-    function verifyBP(ev,id,st){ev.stopPropagation();
-      var it=document.getElementById(id),bd=it.querySelector('.verify-badge'),bt=it.querySelectorAll('.verify-btn'),nt=document.getElementById('note-'+id);
-      bt.forEach(b=>b.classList.remove('active'));var m={confirmed:'confirm',doubtful:'doubt',redo:'redo'};var ab=it.querySelector('.verify-btn.'+m[st]);if(ab)ab.classList.add('active');
-      var bm={confirmed:['✅','confirmed'],doubtful:['⚠️','doubtful'],redo:['🔴','redo']};bd.textContent=bm[st][0];bd.className='verify-badge '+bm[st][1];it.dataset.status=st;
-      if(st==='redo'&&nt){nt.style.display='block';nt.placeholder='重做原因（必填）...';nt.focus();}else if(st==='doubtful'&&nt){nt.style.display='block';nt.placeholder='存疑原因（可选）...';}else if(nt)nt.style.display='none';
-      if(st==='confirmed'&&!it.querySelector('.audit-seal')){var sl=document.createElement('span');sl.className='audit-seal';sl.title='最后验证：李经理 '+new Date().toLocaleString();sl.textContent='🔒';it.querySelector('.bp-left').appendChild(sl);}
-      var ms={confirmed:'已验证通过 ✅',doubtful:'已标记存疑 ⚠️',redo:'已标记需重做 🔴'},ts={confirmed:'success',doubtful:'warning',redo:'error'};showToast(ms[st],ts[st]);updateVerifyProgress();}
-    function updateVerifyProgress(){var t=document.querySelectorAll('#detailMode .bp-item').length,v=document.querySelectorAll('#detailMode .bp-item[data-status="verified"]').length;document.getElementById('verifyProgress').textContent='验证进度：'+v+'/'+t;}
-    function openImpactPanel(ev,id,dim){ev.stopPropagation();var p=document.getElementById('impact-'+id+'-'+dim);if(!p)return;document.querySelectorAll('.impact-panel.show').forEach(x=>{if(x.id!==p.id)x.classList.remove('show');});p.classList.toggle('show');}
-    function switchMode(m){var dm=document.getElementById('detailMode'),lm=document.getElementById('listMode'),bd=document.getElementById('btnDetail'),bl=document.getElementById('btnList');if(m==='detail'){dm.style.display='';lm.style.display='none';bd.classList.add('active');bl.classList.remove('active');}else{dm.style.display='none';lm.style.display='block';bl.classList.add('active');bd.classList.remove('active');}}
-    function applyRoleFilter(){var r=document.getElementById('roleFilter').value,items=document.querySelectorAll('#detailMode .bp-item');items.forEach(i=>{i.style.display='';i.classList.remove('expanded');});if(r==='ceo'){items.forEach(i=>{if(i.dataset.status==='verified'&&!i.dataset.warning)i.style.display='none';});document.getElementById('activeFilter').innerHTML='当前过滤：<strong>CEO 视图</strong>';}else if(r==='planner'){var c=document.querySelector('#detailMode .bp-panel');[...items].sort((a,b)=>{var o={redo:0,doubtful:1,'':2,verified:3};return(o[a.dataset.status]??2)-(o[b.dataset.status]??2);}).forEach(i=>c.appendChild(i));var f=[...items].find(i=>i.dataset.status!=='verified');if(f)f.classList.add('expanded');document.getElementById('activeFilter').innerHTML='当前过滤：<strong>规划师视图</strong>';}else{document.getElementById('activeFilter').innerHTML='当前过滤：<strong>全部展开</strong>';}}
-    function filterBPItems(){var q=document.getElementById('traceSearch').value.toLowerCase();document.querySelectorAll('.bp-item').forEach(i=>{i.style.display=q&&!i.textContent.toLowerCase().includes(q)?'none':'';});document.querySelectorAll('#listMode .bp-list-table tbody tr').forEach(r=>{r.style.display=q&&!r.textContent.toLowerCase().includes(q)?'none':'';});}
+    function toggleRejected(ev,id){ev.stopPropagation();var c=document.getElementById('rejected-'+id);if(c){c.classList.toggle('open');var t=ev.target;t.textContent=c.classList.contains('open')?t.textContent.replace('▸','▾'):t.textContent.replace('▾','▸');}}
+    function openImpactPanel(ev,id,dim){ev.stopPropagation();var p=document.getElementById('impact-'+id+'-'+dim);if(!p)return;document.querySelectorAll('.impact-panel.show').forEach(function(x){if(x.id!==p.id)x.classList.remove('show');});p.classList.toggle('show');}
+    function verifyBP(ev,id,st){ev.stopPropagation();var it=document.getElementById(id),bd=it.querySelector('.verify-badge'),bt=it.querySelectorAll('.verify-btn'),nt=document.getElementById('note-'+id);bt.forEach(function(b){b.classList.remove('active');});var m={confirmed:'confirm',doubtful:'doubt',redo:'redo'};var ab=it.querySelector('.verify-btn.'+m[st]);if(ab)ab.classList.add('active');var bm={confirmed:['✅','confirmed'],doubtful:['⚠️','doubtful'],redo:['🔴','redo']};bd.textContent=bm[st][0];bd.className='verify-badge '+bm[st][1];it.dataset.status=st;if(st==='redo'&&nt){nt.style.display='block';nt.placeholder='重做原因（必填）...';nt.focus();}else if(st==='doubtful'&&nt){nt.style.display='block';nt.placeholder='存疑原因（可选）...';}else if(nt)nt.style.display='none';if(st==='confirmed'&&!it.querySelector('.audit-seal')){var sl=document.createElement('span');sl.className='audit-seal';sl.title='最后验证：李经理 '+new Date().toLocaleString();sl.textContent='🔒';it.querySelector('.bp-left').appendChild(sl);}var ms={confirmed:'已验证通过 ✅',doubtful:'已标记存疑 ⚠️',redo:'已标记需重做 🔴'},ts={confirmed:'success',doubtful:'warning',redo:'error'};showToast(ms[st],ts[st]);updateVerifyProgress();}
+    function updateVerifyProgress(){var el=document.getElementById('verifyProgress');if(!el)return;var t=document.querySelectorAll('#view-decode .bp-item').length,v=document.querySelectorAll('#view-decode .bp-item[data-status="verified"]').length;el.textContent='验证进度：'+v+'/'+t;}
+    function listVerifyBP(sel,bpId,rowId){var st=sel.value;if(st==='操作')return;var item=document.getElementById(bpId),row=document.getElementById(rowId);if(!item){showToast('列表验证已记录：'+st,'success');sel.selectedIndex=0;return;}var badge=item.querySelector('.verify-badge'),bt=item.querySelectorAll('.verify-btn');bt.forEach(function(b){b.classList.remove('active');});var m={confirmed:'confirm',doubtful:'doubt',redo:'redo'};var ab=item.querySelector('.verify-btn.'+m[st]);if(ab)ab.classList.add('active');var bm={confirmed:['✅','confirmed'],doubtful:['⚠️','doubtful'],redo:['🔴','redo']};if(badge){badge.textContent=bm[st][0];badge.className='verify-badge '+bm[st][1];item.dataset.status=st;}row.classList.remove('row-warning','row-danger');if(st==='doubtful')row.classList.add('row-warning');if(st==='redo')row.classList.add('row-danger');var td=row.querySelector('td:first-child');var icon=bm[st][0];if(st==='confirmed'){if(!item.querySelector('.audit-seal')){var sl=document.createElement('span');sl.className='audit-seal';sl.title='最后验证：李经理 '+new Date().toLocaleString();sl.textContent='🔒';item.querySelector('.bp-left').appendChild(sl);}icon=bm[st][0]+'🔒';}if(td)td.textContent=icon;showToast({confirmed:'已验证通过 ✅',doubtful:'已标记存疑 ⚠️',redo:'已标记需重做 🔴'}[st],{confirmed:'success',doubtful:'warning',redo:'error'}[st]);updateVerifyProgress();sel.selectedIndex=0;}
+    function filterBPItems(){var q=document.getElementById('traceSearch').value.toLowerCase();document.querySelectorAll('.bp-item,#decodeListMode tbody tr').forEach(function(r){r.style.display=q&&!r.textContent.toLowerCase().includes(q)?'none':'';});}
     function handleGlobalSearch(){var q=document.getElementById('globalSearch').value.trim();if(!q)return;if(currentPage!=='trace')switchPage('trace');document.getElementById('traceSearch').value=q;setTimeout(filterBPItems,150);}
     function openSourceTrace(ev){if(ev)ev.stopPropagation();document.getElementById('sourceOverlay').classList.add('show');document.getElementById('sourceCard').classList.add('show');}
     function closeSourceTrace(){document.getElementById('sourceOverlay').classList.remove('show');document.getElementById('sourceCard').classList.remove('show');}
     function jumpToPDF(){showToast('正在打开 PDF：page=23&x=156&y=342','info');closeSourceTrace();}
-    function copyCitation(){navigator.clipboard.writeText('"...基于现有渠道团队9人..." — 2024年渠道分析报告.pdf, P23').then(()=>showToast('引用已复制 📋','info')).catch(()=>showToast('复制失败','warning'));}
+    function copyCitation(){navigator.clipboard.writeText('"...基于现有渠道团队9人..." — 2024年渠道分析报告.pdf, P23').then(function(){showToast('引用已复制 📋','info');}).catch(function(){showToast('复制失败','warning');});}
     function reportSourceIssue(){closeSourceTrace();showToast('已记录数据存疑反馈','warning');}
-    function nextOnboardStep(s){document.querySelectorAll('.onboarding-step').forEach(x=>x.classList.remove('active'));document.getElementById('onboardStep'+s).classList.add('active');}
+    function nextOnboardStep(s){document.querySelectorAll('.onboarding-step').forEach(function(x){x.classList.remove('active');});document.getElementById('onboardStep'+s).classList.add('active');}
     function skipOnboarding(){document.getElementById('onboarding').classList.remove('show');}
-    function selectColor(c,el){document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('selected'));el.classList.add('selected');document.getElementById('customColor').value=c;updatePreview();}
+    function selectColor(c,el){document.querySelectorAll('.color-swatch').forEach(function(s){s.classList.remove('selected');});el.classList.add('selected');document.getElementById('customColor').value=c;updatePreview();}
     function applyCustomColor(){if(/^#[0-9A-Fa-f]{6}$/.test(document.getElementById('customColor').value))updatePreview();}
     function updatePreview(){var c=document.getElementById('customColor').value||'#1890ff';document.getElementById('previewTitle').style.color=c;document.getElementById('previewBtn').style.background=c;}
     function handleLogoUpload(){showToast('模拟 Logo 上传成功','success');}
     function autoFix(item){if(item==='copyright'){var ci=document.querySelector('.check-item.warn');if(ci){ci.className='check-item ok';ci.innerHTML='✅ 页脚版权年份已更新（2026）';}showToast('版权年份已修正 ✅','success');}}
     function exportPDF(){var b=document.getElementById('exportBtn'),o=b.textContent;b.disabled=true;b.textContent='⏳ 正在生成...';var steps=[15,30,45,58,70,78,85,90,93,95,97,99,100];var i=0,iv=setInterval(function(){if(i>=steps.length){clearInterval(iv);b.textContent='✅ 导出完成';b.style.background='var(--color-success)';showToast('报告已生成 ✅','success');setTimeout(function(){b.textContent=o;b.disabled=false;b.style.background='';},3000);}else{var p=steps[i];b.textContent='⏳ 生成中... '+p+'%';if(p>=85&&p<99)b.textContent='⏳ 应用品牌元素... '+p+'%';if(p>=99)b.textContent='⏳ 打包文档... '+p+'%';i++;}},200+Math.random()*200);}
-    function listVerifyBP(sel,bpId,rowId){var st=sel.value;if(st==='操作')return;var item=document.getElementById(bpId);var row=document.getElementById(rowId);if(!item){showToast('列表验证已记录：'+st,'success');sel.selectedIndex=0;return;}var badge=item.querySelector('.verify-badge');var btns=item.querySelectorAll('.verify-btn');btns.forEach(b=>b.classList.remove('active'));var m={confirmed:'confirm',doubtful:'doubt',redo:'redo'};var ab=item.querySelector('.verify-btn.'+m[st]);if(ab)ab.classList.add('active');var bm={confirmed:['✅','confirmed'],doubtful:['⚠️','doubtful'],redo:['🔴','redo']};if(badge){badge.textContent=bm[st][0];badge.className='verify-badge '+bm[st][1];item.dataset.status=st;}row.classList.remove('row-warning','row-danger');if(st==='doubtful')row.classList.add('row-warning');if(st==='redo')row.classList.add('row-danger');var td=row.querySelector('td:first-child');var iconText=bm[st][0];if(st==='confirmed'&&!item.querySelector('.audit-seal')){var sl=document.createElement('span');sl.className='audit-seal';sl.title='最后验证：李经理 '+new Date().toLocaleString();sl.textContent='🔒';item.querySelector('.bp-left').appendChild(sl);iconText=bm[st][0]+'🔒';}if(st==='confirmed'&&item.querySelector('.audit-seal'))iconText=bm[st][0]+'🔒';if(td)td.textContent=iconText;var ms={confirmed:'已验证通过 ✅',doubtful:'已标记存疑 ⚠️',redo:'已标记需重做 🔴'},ts={confirmed:'success',doubtful:'warning',redo:'error'};showToast(ms[st],ts[st]);updateVerifyProgress();sel.selectedIndex=0;}
-    function switchProject(pid){var n={xx:'XX公司 2026 SP-BP',yy:'YY医疗 2025 战略复盘',zz:'ZZ集团 2026 市场进入'};showToast('已切换到：'+n[pid],'info');}
-    function toggleRejected(ev,spId){ev.stopPropagation();var c=document.getElementById('rejected-'+spId),t=ev.target;if(!c.style.display||c.style.display==='none'){c.style.display='block';t.textContent=t.textContent.replace('▸','▾');}else{c.style.display='none';t.textContent=t.textContent.replace('▾','▸');}}
+    function switchProject(pid){var n={xx:'XX公司',yy:'YY医疗',zz:'ZZ集团'};showToast('已切换到：'+(n[pid]||pid),'info');}
     function showToast(m,t){var ct=document.getElementById('toastContainer'),to=document.createElement('div');to.className='toast '+(t||'info');to.textContent=m;ct.appendChild(to);setTimeout(function(){to.style.opacity='0';to.style.transition='opacity 0.3s';setTimeout(function(){to.remove();},300);},t==='error'?5000:3000);}
-    document.addEventListener('keydown',function(e){var m=e.metaKey||e.ctrlKey;if(m&&e.key==='k'){e.preventDefault();(currentPage==='trace'?document.getElementById('traceSearch'):document.getElementById('globalSearch')).focus();}if(m&&e.key==='1'){e.preventDefault();switchPage('overview');}if(m&&e.key==='2'){e.preventDefault();switchPage('trace');}if(m&&e.key==='3'){e.preventDefault();switchPage('settings');}if(e.key==='Escape'){closeSourceTrace();document.querySelectorAll('.impact-panel.show').forEach(p=>p.classList.remove('show'));}});
+    document.addEventListener('keydown',function(e){var m=e.metaKey||e.ctrlKey;if(m&&e.key==='k'){e.preventDefault();(currentPage==='trace'?document.getElementById('traceSearch'):document.getElementById('globalSearch')).focus();}if(m&&e.key==='1'){e.preventDefault();switchPage('overview');}if(m&&e.key==='2'){e.preventDefault();switchPage('trace');}if(m&&e.key==='3'){e.preventDefault();switchPage('settings');}if(e.key==='Escape'){closeSourceTrace();document.querySelectorAll('.impact-panel.show').forEach(function(p){p.classList.remove('show');});}});
     window.addEventListener('hashchange',function(){var h=window.location.hash.replace('#','');if(h==='trace')switchPage('trace');else if(h==='settings')switchPage('settings');else if(h==='overview')switchPage('overview');});
     document.addEventListener('DOMContentLoaded',function(){var h=window.location.hash.replace('#','');if(h==='trace')switchPage('trace');else if(h==='settings')switchPage('settings');else switchPage('overview');updateVerifyProgress();});
   </script>
