@@ -63,6 +63,7 @@
     .metric.alert .metric-label { color: #d48806; }
     .trend { font-size: 12px; font-weight: 700; }
     .trend.up { color: var(--color-success); } .trend.down { color: var(--color-danger); } .trend.flat { color: var(--color-text-tertiary); }
+    .metric-baseline { font-size: 11px; color: var(--color-text-tertiary); display: block; margin-top: 1px; }
     .card-action { display: flex; align-items: center; gap: 4px; font-size: 14px; color: var(--color-primary); font-weight: 500; transition: transform 0.2s ease-out; }
     .trust-overview-card:hover .card-action { transform: translateX(4px); }
 
@@ -96,7 +97,8 @@
     .trace-container.list-mode { display: block; }
 
     /* SP 面板 */
-    .sp-panel { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-md); max-height: calc(100vh - 240px); overflow-y: auto; }
+    .sp-panel { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-md); max-height: calc(100vh - 180px); overflow-y: auto; }
+    .bp-panel { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-md); max-height: calc(100vh - 180px); overflow-y: auto; }
     .sp-panel h3 { font-size: 15px; font-weight: 600; margin-bottom: var(--spacing-md); }
     .sp-item { border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: var(--spacing-sm); overflow: hidden; }
     .sp-item.selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-bg); }
@@ -123,7 +125,7 @@
     .rejected-item p { color: var(--color-text-secondary); margin-bottom: 2px; font-size: 12px; }
 
     /* BP 面板 */
-    .bp-panel { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-md); max-height: calc(100vh - 240px); overflow-y: auto; }
+    .bp-panel { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-md); max-height: calc(100vh - 180px); overflow-y: auto; }
     .bp-panel h3 { font-size: 15px; font-weight: 600; margin-bottom: var(--spacing-md); }
     .bp-panel h3 .count { font-weight: 400; color: var(--color-text-tertiary); font-size: 13px; }
     .bp-item { border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: var(--spacing-sm); overflow: hidden; }
@@ -184,6 +186,8 @@
     .bp-list-table tr.row-warning { background: #fffbe6; } .bp-list-table tr.row-danger { background: #fff1f0; }
     .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
     .status-dot.green { background: var(--color-success); } .status-dot.yellow { background: var(--color-warning); } .status-dot.red { background: var(--color-danger); }
+    .list-verify select { padding: 2px 4px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 11px; font-family: var(--font-family-base); cursor: pointer; background: var(--color-bg-card); }
+    .list-verify select:focus { border-color: var(--color-primary); }
 
     /* =========================================================
        溯源弹窗
@@ -379,7 +383,7 @@
           <div class="card-status-bar green"></div><div class="card-body">
             <div class="card-header"><span class="card-icon">🎯</span><span class="card-title">方向可信</span></div>
             <div class="card-metrics">
-              <div class="metric"><span class="metric-label">共识度</span><span class="metric-value">85% <span class="trend up">↑3%</span></span></div>
+              <div class="metric"><span class="metric-label">共识度</span><span class="metric-value">85% <span class="trend up">↑3%</span></span><span class="metric-baseline">vs 上次审批 82%</span></div>
               <div class="metric"><span class="metric-label">支持分布</span><span class="metric-value">5/6 角色支持</span></div>
               <div class="metric alert"><span class="metric-label">⚠️ 争议项</span><span class="metric-value">SC-4 市场进入策略</span></div>
             </div><div class="card-action">查看方向依据 →</div>
@@ -388,7 +392,7 @@
           <div class="card-status-bar green"></div><div class="card-body">
             <div class="card-header"><span class="card-icon">🔗</span><span class="card-title">解码可信</span></div>
             <div class="card-metrics">
-              <div class="metric"><span class="metric-label">映射覆盖率</span><span class="metric-value">100% <span class="trend flat">→</span></span></div>
+              <div class="metric"><span class="metric-label">映射覆盖率</span><span class="metric-value">100% <span class="trend flat">→</span></span><span class="metric-baseline">18/18 项完成映射</span></div>
               <div class="metric"><span class="metric-label">待验证举措</span><span class="metric-value">5 项</span></div>
               <div class="metric"><span class="metric-label">最近变更</span><span class="metric-value">2h前 举措1.1权重调整</span></div>
             </div><div class="card-action">进入验证工作台 →</div>
@@ -397,7 +401,7 @@
           <div class="card-status-bar yellow"></div><div class="card-body">
             <div class="card-header"><span class="card-icon">✅</span><span class="card-title">执行可信</span></div>
             <div class="card-metrics">
-              <div class="metric"><span class="metric-label">可行性评分</span><span class="metric-value">82/100 <span class="trend down">↓3</span></span></div>
+              <div class="metric"><span class="metric-label">可行性评分</span><span class="metric-value">82/100 <span class="trend down">↓3</span></span><span class="metric-baseline">vs 行业 Top 25%：85 分</span></div>
               <div class="metric"><span class="metric-label">约束状态</span><span class="metric-value">🟢3 🟡2 🔴0</span></div>
               <div class="metric alert"><span class="metric-label">⚠️ 关注项</span><span class="metric-value">人力缺口 · 里程碑</span></div>
             </div><div class="card-action">查看约束详情 →</div>
@@ -536,7 +540,11 @@
       </div>
 
       <!-- 列表模式 -->
-      <div class="trace-container list-mode" id="listMode" style="display:none;"><div class="bp-panel" style="max-height:none;"><table class="bp-list-table"><thead><tr><th>验证</th><th>BP 举措</th><th>SP锚点</th><th>权重</th><th>预算</th><th>人力</th><th>时间</th><th>供应商</th><th>合规</th><th>溯源</th></tr></thead><tbody><tr id="row-bp-1-1"><td>✅🔒</td><td>1.1 研发投入 ¥2亿</td><td>SC-1</td><td>0.4</td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td></tr><tr id="row-bp-1-2"><td>⚠️</td><td>1.2 渠道建设 30家</td><td>SC-1</td><td>0.3</td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td></tr><tr id="row-bp-1-3" class="row-warning"><td>🔴</td><td>1.3 人才引进 5名</td><td>SC-1</td><td>0.3</td><td><span class="status-dot green"></span></td><td><span class="status-dot red"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td></tr><tr id="row-bp-2-1"><td>✅🔒</td><td>2.1 NMPA注册</td><td>SC-2</td><td>0.5</td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td></tr></tbody></table><div class="verify-progress" style="margin-top:var(--spacing-md);">验证进度：2/4 · <a href="#" style="color:var(--color-primary);font-size:12px;" onclick="showToast('列表已导出','success');return false;">导出 CSV</a></div></div></div>
+      <div class="trace-container list-mode" id="listMode" style="display:none;"><div class="bp-panel" style="max-height:none;"><table class="bp-list-table"><thead><tr><th>验证</th><th>BP 举措</th><th>SP锚点</th><th>权重</th><th>预算</th><th>人力</th><th>时间</th><th>供应商</th><th>合规</th><th>溯源</th><th>操作</th></tr></thead><tbody>
+              <tr id="row-bp-1-1"><td>✅🔒</td><td>1.1 研发投入 ¥2亿</td><td>SC-1</td><td>0.4</td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-1','row-bp-1-1')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr>
+              <tr id="row-bp-1-2"><td>⚠️</td><td>1.2 渠道建设 30家</td><td>SC-1</td><td>0.3</td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-2','row-bp-1-2')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr>
+              <tr id="row-bp-1-3" class="row-warning"><td>🔴</td><td>1.3 人才引进 5名</td><td>SC-1</td><td>0.3</td><td><span class="status-dot green"></span></td><td><span class="status-dot red"></span></td><td><span class="status-dot yellow"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-3','row-bp-1-3')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr>
+              <tr id="row-bp-2-1"><td>✅🔒</td><td>2.1 NMPA注册</td><td>SC-2</td><td>0.5</td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot green"></span></td><td><span class="status-dot yellow"></span></td><td><span class="trace-link" onclick="openSourceTrace(event)">查看</span></td><td class="list-verify"><select onchange="listVerifyBP(this,'bp-1-4','row-bp-2-1')"><option>操作</option><option value="confirmed">✅ 确认</option><option value="doubtful">⚠️ 存疑</option><option value="redo">🔴 需重做</option></select></td></tr></tbody></table><div class="verify-progress" style="margin-top:var(--spacing-md);">验证进度：2/4 · <a href="#" style="color:var(--color-primary);font-size:12px;" onclick="showToast('列表已导出','success');return false;">导出 CSV</a></div></div></div>
 
       <div class="empty-state" id="emptyTrace"><div class="empty-icon">📝</div><h3>BP 草案尚未生成</h3><p>请在 SP 控制点确认后启动战略解码</p><button class="btn-primary">启动战略解码</button></div>
       <div class="compliance-watermark">🔒 本页面所有验证记录均受 WORM 保护 · 保留至 2033-06-07 · 不可篡改 · 操作全量留痕 · 审计 ID: SESSION-AUD-20260607-001</div>
@@ -549,11 +557,11 @@
       <div class="brand-layout">
         <div class="brand-section">
           <h3>品牌配置</h3>
-          <div class="form-group"><span class="form-label">Logo</span><div class="logo-dropzone" onclick="handleLogoUpload()"><div class="dz-icon">🖼️</div><div class="dz-text">点击或拖拽上传 Logo</div><div class="dz-hint">PNG/SVG/JPG · 最大 5MB · 自动适配横版/竖版</div></div><img class="logo-preview-img show" id="logoPreview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='40'%3E%3Crect fill='%231890ff' width='200' height='40' rx='4'/%3E%3Ctext x='100' y='27' text-anchor='middle' fill='white' font-family='sans-serif' font-size='16'%3EXX公司 Logo%3C/text%3E%3C/svg%3E" alt="Logo"></div>
+          <div class="form-group"><span class="form-label">Logo</span><div class="logo-dropzone" onclick="handleLogoUpload()"><div class="dz-icon">🖼️</div><div class="dz-text">点击或拖拽上传 Logo</div><div class="dz-hint">PNG/SVG/JPG · 最大 5MB · 自动适配横版/竖版</div></div><img class="logo-preview-img show" id="logoPreview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='48'%3E%3Crect fill='%23f5f5f5' width='200' height='48' rx='4'/%3E%3Ctext x='100' y='22' text-anchor='middle' fill='%23262626' font-family='PingFang SC,Microsoft YaHei,sans-serif' font-weight='600' font-size='15'%3E宏大医疗器械%3C/text%3E%3Ctext x='100' y='39' text-anchor='middle' fill='%238c8c8c' font-family='sans-serif' font-size='9'%3EHONGDA MEDICAL%3C/text%3E%3C/svg%3E" alt="客户 Logo"></div>
           <div class="form-group"><span class="form-label">品牌主色</span><div class="color-presets"><div class="color-swatch selected" style="background:#1890ff;" data-color="#1890ff" onclick="selectColor('#1890ff',this)"></div><div class="color-swatch" style="background:#52c41a;" data-color="#52c41a" onclick="selectColor('#52c41a',this)"></div><div class="color-swatch" style="background:#722ed1;" data-color="#722ed1" onclick="selectColor('#722ed1',this)"></div><div class="color-swatch" style="background:#fa8c16;" data-color="#fa8c16" onclick="selectColor('#fa8c16',this)"></div><div class="color-swatch" style="background:#eb2f96;" data-color="#eb2f96" onclick="selectColor('#eb2f96',this)"></div><div class="color-swatch" style="background:#262626;" data-color="#262626" onclick="selectColor('#262626',this)"></div></div><input type="text" class="color-input" id="customColor" value="#1890ff" oninput="applyCustomColor()"></div>
           <div class="form-group"><span class="form-label">品牌字体</span><select class="form-select" id="fontSelect" onchange="updatePreview()"><option value="business">商务风格 — 思源黑体 + Helvetica</option><option value="tech">科技风格 — PingFang SC + SF Mono</option><option value="classic">经典风格 — 宋体 + Georgia</option></select></div>
         </div>
-        <div class="brand-section"><h3>实时预览</h3><div class="preview-area"><span class="preview-logo-text">[客户 Logo]</span><span class="preview-title" id="previewTitle" style="color:#1890ff;">2026 年度战略规划报告</span><span style="font-size:13px;color:var(--color-text-secondary);">报告正文预览...</span><span class="preview-btn" id="previewBtn" style="background:#1890ff;">按钮样式预览</span></div></div>
+        <div class="brand-section"><h3>实时预览</h3><div class="preview-area"><span class="preview-logo-text">宏大医疗器械</span><span style="font-size:11px;color:var(--color-text-tertiary);">HONGDA MEDICAL</span><span class="preview-title" id="previewTitle" style="color:#1890ff;">2026 年度战略规划报告</span><span style="font-size:13px;color:var(--color-text-secondary);">报告正文预览 — 品牌色已应用于标题与图表</span><span class="preview-btn" id="previewBtn" style="background:#1890ff;">按钮样式预览</span></div></div>
       </div>
       <div class="brand-section" style="margin-bottom:var(--spacing-lg);"><div class="compliance-checklist"><h4>导出前检查</h4><div class="check-item ok">✅ Logo 尺寸符合封面页布局</div><div class="check-item ok">✅ 品牌色已应用于表头和图表</div><div class="check-item warn">⚠️ 页脚版权年份未更新（当前：2025）<span class="fix-link" onclick="autoFix('copyright')">一键修正</span></div><div class="check-item ok">✅ 无数据隔离泄露风险</div></div><div class="export-section"><button class="export-btn" id="exportBtn" onclick="exportPDF()">📄 导出 PDF</button><span class="export-estimate">预计 &lt;1 分钟</span></div></div>
       <div class="audit-export"><h3>审计日志导出</h3><p>导出指定时间范围内的决策验证记录</p><div class="audit-export-controls"><input type="date" id="auditStart" value="2026-01-01"><span>至</span><input type="date" id="auditEnd" value="2026-06-07"><button class="btn-sm" onclick="showToast('审计日志已导出：sisys-audit-XX公司-2026.csv','success')">导出 CSV</button></div></div>
@@ -623,11 +631,13 @@
     function updatePreview(){var c=document.getElementById('customColor').value||'#1890ff';document.getElementById('previewTitle').style.color=c;document.getElementById('previewBtn').style.background=c;}
     function handleLogoUpload(){showToast('模拟 Logo 上传成功','success');}
     function autoFix(item){if(item==='copyright'){var ci=document.querySelector('.check-item.warn');if(ci){ci.className='check-item ok';ci.innerHTML='✅ 页脚版权年份已更新（2026）';}showToast('版权年份已修正 ✅','success');}}
-    function exportPDF(){var b=document.getElementById('exportBtn'),o=b.textContent;b.disabled=true;b.textContent='⏳ 正在生成...';var p=0,iv=setInterval(function(){p+=Math.random()*30;if(p>=100){p=100;clearInterval(iv);b.textContent='✅ 导出完成';b.style.background='var(--color-success)';showToast('报告已生成 ✅','success');setTimeout(function(){b.textContent=o;b.disabled=false;b.style.background='';},3000);}else b.textContent='⏳ 生成中... '+Math.round(p)+'%';},300);}
+    function exportPDF(){var b=document.getElementById('exportBtn'),o=b.textContent;b.disabled=true;b.textContent='⏳ 正在生成...';var steps=[15,30,45,58,70,78,85,90,93,95,97,99,100];var i=0,iv=setInterval(function(){if(i>=steps.length){clearInterval(iv);b.textContent='✅ 导出完成';b.style.background='var(--color-success)';showToast('报告已生成 ✅','success');setTimeout(function(){b.textContent=o;b.disabled=false;b.style.background='';},3000);}else{var p=steps[i];b.textContent='⏳ 生成中... '+p+'%';if(p>=85&&p<99)b.textContent='⏳ 应用品牌元素... '+p+'%';if(p>=99)b.textContent='⏳ 打包文档... '+p+'%';i++;}},200+Math.random()*200);}
+    function listVerifyBP(sel,bpId,rowId){var st=sel.value;if(st==='操作')return;var item=document.getElementById(bpId);var row=document.getElementById(rowId);if(!item){showToast('列表验证已记录：'+st,'success');sel.selectedIndex=0;return;}var badge=item.querySelector('.verify-badge');var btns=item.querySelectorAll('.verify-btn');btns.forEach(b=>b.classList.remove('active'));var m={confirmed:'confirm',doubtful:'doubt',redo:'redo'};var ab=item.querySelector('.verify-btn.'+m[st]);if(ab)ab.classList.add('active');var bm={confirmed:['✅','confirmed'],doubtful:['⚠️','doubtful'],redo:['🔴','redo']};if(badge){badge.textContent=bm[st][0];badge.className='verify-badge '+bm[st][1];item.dataset.status=st;}var td=row.querySelector('td:first-child');if(td)td.textContent=bm[st][0];if(st==='confirmed'&&!item.querySelector('.audit-seal')){var sl=document.createElement('span');sl.className='audit-seal';sl.title='最后验证：李经理 '+new Date().toLocaleString();sl.textContent='🔒';item.querySelector('.bp-left').appendChild(sl);}var td2=row.querySelector('td:first-child');if(td2&&st==='confirmed')td2.textContent=bm[st][0]+'🔒';var ms={confirmed:'已验证通过 ✅',doubtful:'已标记存疑 ⚠️',redo:'已标记需重做 🔴'},ts={confirmed:'success',doubtful:'warning',redo:'error'};showToast(ms[st],ts[st]);updateVerifyProgress();sel.selectedIndex=0;}
     function switchProject(pid){var n={xx:'XX公司 2026 SP-BP',yy:'YY医疗 2025 战略复盘',zz:'ZZ集团 2026 市场进入'};showToast('已切换到：'+n[pid],'info');}
     function toggleRejected(ev,spId){ev.stopPropagation();var c=document.getElementById('rejected-'+spId),t=ev.target;if(!c.style.display||c.style.display==='none'){c.style.display='block';t.textContent=t.textContent.replace('▸','▾');}else{c.style.display='none';t.textContent=t.textContent.replace('▾','▸');}}
     function showToast(m,t){var ct=document.getElementById('toastContainer'),to=document.createElement('div');to.className='toast '+(t||'info');to.textContent=m;ct.appendChild(to);setTimeout(function(){to.style.opacity='0';to.style.transition='opacity 0.3s';setTimeout(function(){to.remove();},300);},t==='error'?5000:3000);}
     document.addEventListener('keydown',function(e){var m=e.metaKey||e.ctrlKey;if(m&&e.key==='k'){e.preventDefault();(currentPage==='trace'?document.getElementById('traceSearch'):document.getElementById('globalSearch')).focus();}if(m&&e.key==='1'){e.preventDefault();switchPage('overview');}if(m&&e.key==='2'){e.preventDefault();switchPage('trace');}if(m&&e.key==='3'){e.preventDefault();switchPage('settings');}if(e.key==='Escape'){closeSourceTrace();document.querySelectorAll('.impact-panel.show').forEach(p=>p.classList.remove('show'));}});
+    window.addEventListener('hashchange',function(){var h=window.location.hash.replace('#','');if(h==='trace')switchPage('trace');else if(h==='settings')switchPage('settings');else if(h==='overview')switchPage('overview');});
     document.addEventListener('DOMContentLoaded',function(){var h=window.location.hash.replace('#','');if(h==='trace')switchPage('trace');else if(h==='settings')switchPage('settings');else switchPage('overview');updateVerifyProgress();});
   </script>
 </body>
