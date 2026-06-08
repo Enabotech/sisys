@@ -414,7 +414,77 @@
     @keyframes toastIn{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
 
     @media(max-width:1200px){.trust-overview-grid{grid-template-columns:repeat(2,1fr)}.brand-layout,.skeleton-overview{grid-template-columns:1fr}}
-    @media(max-width:768px){.trust-overview-grid{grid-template-columns:1fr}.decode-container{grid-template-columns:1fr}.skeleton-overview{grid-template-columns:1fr}.nav{flex-wrap:wrap;height:auto;padding:var(--spacing-sm)}.nav-tabs{order:3;width:100%;justify-content:center}.nav-tab{padding:0 12px;height:40px;font-size:13px}.nav-search{width:140px}.trace-toolbar{flex-direction:column;align-items:flex-start}.toolbar-right{width:100%}.toolbar-search{width:100%}.bp-header{flex-direction:column;align-items:flex-start}}
+    /* ===== 决策卡片动作按钮 ===== */
+    .decision-actions{display:flex;gap:var(--spacing-sm);margin-bottom:var(--spacing-sm)}
+    .decision-action-btn{padding:4px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-card);cursor:pointer;font-size:12px;font-family:var(--font-family-base);color:var(--color-text-secondary);transition:all var(--transition-fast)}
+    .decision-action-btn:hover{border-color:var(--color-primary);color:var(--color-primary)}
+
+    /* ===== 沙盘推演弹窗 ===== */
+    .sb-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999}.sb-overlay.show{display:block}
+    .sb-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);border:2px solid var(--color-primary);z-index:1000;max-width:860px;width:92%;max-height:85vh;overflow-y:auto}
+    .sb-modal.show{display:block;animation:fadeIn .2s ease-out}
+    .sb-modal-header{background:var(--color-bg-primary);border-bottom:1px solid var(--color-border);padding:var(--spacing-md) var(--spacing-lg);display:flex;justify-content:space-between;align-items:center;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+    .sb-modal-title{font-size:16px;font-weight:600}
+    .sb-modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--color-text-tertiary);padding:var(--spacing-xs)}.sb-modal-close:hover{color:var(--color-text-primary)}
+    .sb-modal-body{padding:var(--spacing-lg)}
+    .sb-tabs{display:flex;gap:var(--spacing-sm);margin-bottom:var(--spacing-lg);border-bottom:1px solid var(--color-border);padding-bottom:var(--spacing-sm)}
+    .sb-tab{padding:var(--spacing-xs) var(--spacing-md);border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-card);cursor:pointer;font-size:13px;font-family:var(--font-family-base);transition:all var(--transition-fast)}
+    .sb-tab:hover{border-color:var(--color-primary);color:var(--color-primary)}
+    .sb-tab.active{background:var(--color-primary);border-color:var(--color-primary);color:white}
+    .sb-tab-content{display:none}.sb-tab-content.active{display:block}
+
+    /* 数据对比表 */
+    .sb-compare-table{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:var(--spacing-md)}
+    .sb-compare-table th{background:var(--color-bg-primary);padding:var(--spacing-sm) var(--spacing-md);text-align:center;font-weight:600;font-size:13px;border-bottom:2px solid var(--color-border)}
+    .sb-compare-table td{padding:var(--spacing-sm) var(--spacing-md);border-bottom:1px solid var(--color-bg-primary);text-align:center}
+    .sb-compare-table td:first-child{text-align:left;font-weight:600;color:var(--color-text-secondary);background:var(--color-bg-primary);white-space:nowrap;width:120px}
+    .sb-compare-table .sb-compare-ai{background:var(--color-primary-bg);color:var(--color-primary)}
+    .sb-compare-table .sb-compare-highlight{background:var(--color-signal-ok-bg)}
+
+    /* 推演滑块 */
+    .sb-slider-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--spacing-lg)}
+    .sb-slider-group{margin-bottom:var(--spacing-md)}
+    .sb-slider-header{display:flex;justify-content:space-between;margin-bottom:var(--spacing-sm);font-size:14px;font-weight:500}
+    .sb-modal input[type=range]{-webkit-appearance:none;width:100%;background:transparent;cursor:pointer}
+    .sb-modal input[type=range]::-webkit-slider-runnable-track{width:100%;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--color-danger) 0%,var(--color-warning) 30%,var(--color-success) 50%,var(--color-success) 100%)}
+    .sb-modal input[type=range].reverse-track::-webkit-slider-runnable-track{background:linear-gradient(90deg,var(--color-success) 0%,var(--color-warning) 70%,var(--color-danger) 100%)}
+    .sb-modal input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;height:20px;width:20px;border-radius:50%;background:#fff;border:2px solid var(--color-primary);margin-top:-6px;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:transform .1s}
+    .sb-modal input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2)}
+    .sb-gpu-badge{font-size:11px;color:var(--color-text-tertiary);text-align:right;margin-bottom:var(--spacing-sm)}
+    .sb-gpu-badge.computing{color:var(--color-primary);animation:sbPulseBlue .8s infinite}
+    @keyframes sbPulseBlue{0%,100%{opacity:1}50%{opacity:.5}}
+
+    /* 迷你信任卡片（纵向堆叠） */
+    .sb-trust-stack{display:flex;flex-direction:column;gap:var(--spacing-sm)}
+    .sb-trust-card{display:flex;align-items:center;gap:var(--spacing-sm);background:var(--color-bg-card);border:1px solid var(--color-border);border-left:4px solid var(--color-success);border-radius:var(--radius-md);padding:var(--spacing-sm) var(--spacing-md);font-size:13px;transition:all .3s}
+    .sb-trust-card.sb-status-warning{border-left-color:var(--color-warning);background:#fffbe6}
+    .sb-trust-card.sb-status-danger{border-left-color:var(--color-danger);background:#fff1f0}
+    .sb-trust-score{font-weight:700;color:var(--color-success);transition:color .3s}
+    .sb-status-warning .sb-trust-score{color:var(--color-warning)}
+    .sb-status-danger .sb-trust-score{color:var(--color-danger)}
+
+    /* 龙卷风图 */
+    .sb-tornado-chart{display:flex;flex-direction:column;gap:8px;margin-top:var(--spacing-sm)}
+    .sb-tornado-row{display:grid;grid-template-columns:80px 1fr;align-items:center;gap:var(--spacing-sm)}
+    .sb-tornado-label{font-size:12px;text-align:right;color:var(--color-text-secondary)}
+    .sb-tornado-bars{display:flex;align-items:center;height:16px;position:relative}
+    .sb-tornado-axis{position:absolute;left:50%;top:-4px;bottom:-4px;width:1px;background:var(--color-border);z-index:1}
+    .sb-bar-neg{background:var(--color-danger);height:100%;position:absolute;right:50%;border-radius:4px 0 0 4px;transition:width .3s;opacity:.8}
+    .sb-bar-pos{background:var(--color-success);height:100%;position:absolute;left:50%;border-radius:0 4px 4px 0;transition:width .3s;opacity:.8}
+
+    /* AI 代偿 */
+    .sb-ai-box{border:1px solid #b37feb;background:#f9f0ff;border-radius:var(--radius-md);padding:var(--spacing-md);position:relative;overflow:hidden}
+    .sb-ai-box::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:#722ed1}
+    .sb-ai-title{color:#722ed1;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:var(--spacing-sm);font-size:13px}
+    .sb-strategy-item{background:white;padding:var(--spacing-sm) var(--spacing-md);border-radius:var(--radius-sm);margin-bottom:var(--spacing-sm);display:flex;justify-content:space-between;align-items:center;box-shadow:var(--shadow-sm);font-size:12px}
+    .sb-strategy-text{flex:1}
+    .sb-btn-apply{background:#722ed1;color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-family:var(--font-family-base);transition:background .2s}
+    .sb-btn-apply:hover{background:#531dab}
+    .sb-btn-apply.applied{background:var(--color-success);cursor:default}
+    .sb-reset-btn{padding:6px 16px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-card);cursor:pointer;font-size:12px;font-family:var(--font-family-base);color:var(--color-text-secondary);transition:all .15s}
+    .sb-reset-btn:hover{border-color:var(--color-primary);color:var(--color-primary)}
+
+    @media(max-width:768px){.sb-slider-grid{grid-template-columns:1fr}.trust-overview-grid{grid-template-columns:1fr}.decode-container{grid-template-columns:1fr}.skeleton-overview{grid-template-columns:1fr}.nav{flex-wrap:wrap;height:auto;padding:var(--spacing-sm)}.nav-tabs{order:3;width:100%;justify-content:center}.nav-tab{padding:0 12px;height:40px;font-size:13px}.nav-search{width:140px}.trace-toolbar{flex-direction:column;align-items:flex-start}.toolbar-right{width:100%}.toolbar-search{width:100%}.bp-header{flex-direction:column;align-items:flex-start}}
   </style>
 </head>
 <body>
@@ -464,6 +534,10 @@
             <div class="decision-options">
               <button class="decision-option-btn" onclick="selectDecision('dc-sc4',0)">激进进入</button>
               <button class="decision-option-btn ai-recommended" onclick="selectDecision('dc-sc4',1)">💡 合资探索</button>
+            </div>
+            <div class="decision-actions">
+              <button class="decision-action-btn" onclick="SandboxEngine.open('dc-sc4','data')">📊 数据对比</button>
+              <button class="decision-action-btn" onclick="SandboxEngine.open('dc-sc4','sim')">🎮 推演练练</button>
             </div>
             <div class="decision-reason-toggle" onclick="expandDecisionReason('dc-sc4')">AI 推荐理由 →</div>
             <div class="decision-reason" id="reason-dc-sc4">
@@ -820,6 +894,93 @@
       <div class="source-actions" style="margin-top:var(--spacing-lg)"><button class="source-btn-secondary" onclick="showToast('已跳转到完整辩论记录','info');closeSourceTrace();navigateToView('direction');">💬 查看完整辩论记录</button></div>
     </div>
   </div></div>
+  <!-- ===== 推演弹窗 ===== -->
+  <div class="sb-overlay" id="sbOverlay" onclick="SandboxEngine.close()"></div>
+  <div class="sb-modal" id="sbModal">
+    <div class="sb-modal-header">
+      <span class="sb-modal-title" id="sbModalTitle">📊 SC-4 市场进入策略 · 决策推演</span>
+      <button class="sb-modal-close" onclick="SandboxEngine.close()">✕</button>
+    </div>
+    <div class="sb-modal-body">
+      <div class="sb-tabs">
+        <button class="sb-tab" onclick="SandboxEngine.switchTab('data')">📊 数据对比</button>
+        <button class="sb-tab" onclick="SandboxEngine.switchTab('sim')">🎮 推演沙盘</button>
+      </div>
+      <!-- Tab 1: 数据对比 -->
+      <div class="sb-tab-content" id="sb-tab-data">
+        <table class="sb-compare-table">
+          <thead><tr><th>维度</th><th>激进进入</th><th class="sb-compare-ai">💡 合资探索</th></tr></thead>
+          <tbody>
+            <tr><td>初始投资额</td><td>¥3.2 亿</td><td class="sb-compare-highlight">¥1.8 亿</td></tr>
+            <tr><td>年运营成本</td><td>¥0.8 亿/年</td><td class="sb-compare-highlight">¥0.5 亿/年</td></tr>
+            <tr><td>投资回收期</td><td style="color:var(--color-danger)">5 年 🔴</td><td class="sb-compare-highlight">3.5 年 ✅</td></tr>
+            <tr><td>风险等级</td><td style="color:var(--color-danger)">高</td><td style="color:var(--color-warning)">中</td></tr>
+            <tr><td>窗口期覆盖</td><td>18 个月全覆盖</td><td>18 个月占 60%</td></tr>
+            <tr><td>AI 综合评分</td><td>72/100</td><td class="sb-compare-highlight">85/100</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Tab 2: 推演沙盘 -->
+      <div class="sb-tab-content" id="sb-tab-sim">
+        <div class="sb-gpu-badge" id="sbGpuStatus"><span>🟢</span> 推演引擎就绪</div>
+        <!-- 滑块区 -->
+        <div class="sb-slider-grid">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:var(--spacing-sm)">🌍 宏观变量</div>
+            <div class="sb-slider-group">
+              <div class="sb-slider-header"><span>市场增量 (CAGR)</span><span id="sb-val-cagr" style="color:var(--color-success);font-weight:600">15%</span></div>
+              <input type="range" id="sb-slide-cagr" min="0" max="30" value="15" step="1" oninput="SandboxEngine.runSimulation()">
+            </div>
+            <div class="sb-slider-group">
+              <div class="sb-slider-header"><span>竞品提前量</span><span id="sb-val-comp" style="font-weight:600">正常</span></div>
+              <input type="range" class="reverse-track" id="sb-slide-comp" min="0" max="6" value="0" step="1" oninput="SandboxEngine.runSimulation()">
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--color-text-tertiary);margin-top:4px"><span>0 个月</span><span>提前 6 个月</span></div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:var(--spacing-sm)">📦 资源约束</div>
+            <div class="sb-slider-group">
+              <div class="sb-slider-header"><span>研发预算</span><span id="sb-val-budget" style="color:var(--color-success);font-weight:600">¥2.0 亿</span></div>
+              <input type="range" id="sb-slide-budget" min="0.5" max="3.0" value="2.0" step="0.1" oninput="SandboxEngine.runSimulation()">
+            </div>
+            <div class="sb-slider-group">
+              <div class="sb-slider-header"><span>HC 缺口</span><span id="sb-val-hc" style="font-weight:600">无缺口</span></div>
+              <input type="range" class="reverse-track" id="sb-slide-hc" min="0" max="50" value="0" step="5" oninput="SandboxEngine.runSimulation()">
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--color-text-tertiary);margin-top:4px"><span>无缺口</span><span>缺口 50 人</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- 三重信任态势 -->
+        <div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-top:var(--spacing-md);margin-bottom:var(--spacing-sm)">三重信任态势</div>
+        <div class="sb-trust-stack">
+          <div class="sb-trust-card" id="sb-card-direction"><span>🎯</span><span>方向可信</span><span class="sb-trust-score" id="sb-score-direction" style="margin-left:auto">0.92</span><span id="sb-consensus-text" style="font-size:11px;color:var(--color-text-tertiary);margin-left:var(--spacing-sm)">5/5 Agent</span></div>
+          <div class="sb-trust-card" id="sb-card-decode"><span>🔗</span><span>解码可信</span><span class="sb-trust-score" id="sb-score-decode" style="margin-left:auto">100%</span></div>
+          <div class="sb-trust-card" id="sb-card-execute"><span>✅</span><span>执行可信</span><span class="sb-trust-score" id="sb-score-execute" style="margin-left:auto">95/100</span></div>
+        </div>
+        <!-- 龙卷风图 + AI 代偿 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--spacing-md);margin-top:var(--spacing-md)">
+          <div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:var(--spacing-sm)">📊 敏感性分析</div>
+            <div class="sb-tornado-chart">
+              <div class="sb-tornado-row"><div class="sb-tornado-label">HC 缺口</div><div class="sb-tornado-bars"><div class="sb-tornado-axis"></div><div class="sb-bar-neg" id="sb-tor-hc-neg" style="width:0%"></div></div></div>
+              <div class="sb-tornado-row"><div class="sb-tornado-label">研发预算</div><div class="sb-tornado-bars"><div class="sb-tornado-axis"></div><div class="sb-bar-neg" id="sb-tor-bg-neg" style="width:0%"></div><div class="sb-bar-pos" id="sb-tor-bg-pos" style="width:0%"></div></div></div>
+              <div class="sb-tornado-row"><div class="sb-tornado-label">竞品提前</div><div class="sb-tornado-bars"><div class="sb-tornado-axis"></div><div class="sb-bar-neg" id="sb-tor-cp-neg" style="width:0%"></div></div></div>
+            </div>
+          </div>
+          <div class="sb-ai-box">
+            <div class="sb-ai-title">🪄 AI 代偿方案</div>
+            <div id="sb-ai-strategies" style="display:none">
+              <div class="sb-strategy-item"><div class="sb-strategy-text"><strong>弃卒保车</strong>：砍掉边缘产品线，释放 30% 预算</div><button class="sb-btn-apply" onclick="SandboxEngine.applyStrategy(this,1)">采纳重算</button></div>
+              <div class="sb-strategy-item"><div class="sb-strategy-text"><strong>以时间换空间</strong>：接受 M2 延期 45 天</div><button class="sb-btn-apply" onclick="SandboxEngine.applyStrategy(this,2)">采纳重算</button></div>
+            </div>
+            <div id="sb-ai-status" style="font-size:12px;color:var(--color-text-tertiary);text-align:center;padding:var(--spacing-sm)">🟢 当前战略健康，无需干预</div>
+          </div>
+        </div>
+        <!-- 重置按钮 -->
+        <div style="text-align:right;margin-top:var(--spacing-md)"><button class="sb-reset-btn" onclick="SandboxEngine.reset()">🔄 重置推演</button></div>
+      </div>
+    </div>
+  </div>
   <div class="toast-container" id="toastContainer"></div>
 
   <script>
@@ -929,7 +1090,110 @@
     }
     function switchProject(pid){var n={xx:'XX公司',yy:'YY医疗',zz:'ZZ集团'};showToast('已切换到：'+(n[pid]||pid),'info');}
     function showToast(m,t){var ct=document.getElementById('toastContainer'),to=document.createElement('div');to.className='toast '+(t||'info');to.textContent=m;ct.appendChild(to);setTimeout(function(){to.style.opacity='0';to.style.transition='opacity 0.3s';setTimeout(function(){to.remove();},300);},t==='error'?5000:3000);}
-    document.addEventListener('keydown',function(e){var m=e.metaKey||e.ctrlKey;if(m&&e.key==='k'){e.preventDefault();(currentPage==='trace'?document.getElementById('traceSearch'):document.getElementById('globalSearch')).focus();}if(m&&e.key==='1'){e.preventDefault();switchPage('overview');}if(m&&e.key==='2'){e.preventDefault();switchPage('trace');}if(m&&e.key==='3'){e.preventDefault();switchPage('settings');}if(e.key==='Escape'){closeSourceTrace();closeBrandConfig();document.querySelectorAll('.impact-panel.show').forEach(function(p){p.classList.remove('show');});}});
+    // ===== 沙盘推演引擎 =====
+    var SandboxEngine=(function(){
+      var _defaults={cagr:15,comp:0,budget:2.0,hc:0};
+      function _open(cardId,tab){
+        var titleMap={'dc-sc4':'SC-4 市场进入策略','dc-bp13':'举措 1.3 人才引进'};
+        var t=document.getElementById('sbModalTitle');
+        if(t)t.textContent='📊 '+(titleMap[cardId]||cardId)+' · 决策推演';
+        document.getElementById('sbOverlay').classList.add('show');
+        document.getElementById('sbModal').classList.add('show');
+        _switchTab(tab||'data');
+      }
+      function _close(){
+        document.getElementById('sbOverlay').classList.remove('show');
+        document.getElementById('sbModal').classList.remove('show');
+      }
+      function _switchTab(tabName){
+        document.querySelectorAll('.sb-tab').forEach(function(b){b.classList.remove('active');});
+        document.querySelectorAll('.sb-tab-content').forEach(function(c){c.classList.remove('active');});
+        var idx=tabName==='data'?0:1;
+        document.querySelectorAll('.sb-tab')[idx].classList.add('active');
+        var c=document.getElementById('sb-tab-'+tabName);
+        if(c)c.classList.add('active');
+      }
+      function _runSimulation(){
+        var cagr=parseFloat(document.getElementById('sb-slide-cagr').value);
+        var comp=parseFloat(document.getElementById('sb-slide-comp').value);
+        var budget=parseFloat(document.getElementById('sb-slide-budget').value);
+        var hc=parseFloat(document.getElementById('sb-slide-hc').value);
+        // 更新值显示
+        document.getElementById('sb-val-cagr').innerText=cagr+'%';
+        document.getElementById('sb-val-cagr').style.color=cagr<10?'var(--color-danger)':'var(--color-success)';
+        document.getElementById('sb-val-comp').innerText=comp===0?'正常':('提前 '+comp+' 个月');
+        document.getElementById('sb-val-comp').style.color=comp>3?'var(--color-danger)':'var(--color-text-primary)';
+        document.getElementById('sb-val-budget').innerText='¥ '+budget.toFixed(1)+' 亿';
+        document.getElementById('sb-val-budget').style.color=budget<1.2?'var(--color-danger)':'var(--color-success)';
+        document.getElementById('sb-val-hc').innerText=hc===0?'无缺口':('缺口 '+hc+' 人');
+        document.getElementById('sb-val-hc').style.color=hc>20?'var(--color-danger)':'var(--color-text-primary)';
+        // GPU 闪烁
+        var gpu=document.getElementById('sbGpuStatus');
+        gpu.classList.add('computing');
+        gpu.innerHTML='<span>⚡</span> 推演引擎计算中...';
+        setTimeout(function(){
+          gpu.classList.remove('computing');
+          gpu.innerHTML='<span>🟢</span> 推演引擎就绪';
+          _calculateImpact(cagr,comp,budget,hc);
+        },400);
+      }
+      function _calculateImpact(cagr,comp,budget,hc){
+        // 方向分
+        var dirScore=0.92-((15-cagr)*0.02)-(comp*0.05);
+        var cardDir=document.getElementById('sb-card-direction');
+        var consensus=document.getElementById('sb-consensus-text');
+        if(dirScore<0.6){cardDir.className='sb-trust-card sb-status-danger';if(consensus)consensus.innerText='破裂 (2/5)';}
+        else if(dirScore<0.8){cardDir.className='sb-trust-card sb-status-warning';if(consensus)consensus.innerText='动摇 (3/5)';}
+        else{cardDir.className='sb-trust-card';if(consensus)consensus.innerText='5/5 Agent';}
+        document.getElementById('sb-score-direction').innerText=Math.max(0,dirScore).toFixed(2);
+        // 执行分
+        var execScore=95-((2.0-budget)*30)-(hc*0.8);
+        var cardExec=document.getElementById('sb-card-execute');
+        if(execScore<60){cardExec.className='sb-trust-card sb-status-danger';}
+        else if(execScore<80){cardExec.className='sb-trust-card sb-status-warning';}
+        else{cardExec.className='sb-trust-card';}
+        document.getElementById('sb-score-execute').innerText=Math.max(0,execScore).toFixed(0)+'/100';
+        // 解码分
+        var cardDec=document.getElementById('sb-card-decode');
+        if(budget<1.5){cardDec.className='sb-trust-card sb-status-warning';document.getElementById('sb-score-decode').innerText='变更中';}
+        else{cardDec.className='sb-trust-card';document.getElementById('sb-score-decode').innerText='100%';}
+        // 龙卷风图
+        document.getElementById('sb-tor-hc-neg').style.width=(hc*1.5)+'%';
+        document.getElementById('sb-tor-cp-neg').style.width=(comp*10)+'%';
+        var bgDiff=budget-2.0;
+        if(bgDiff<0){document.getElementById('sb-tor-bg-neg').style.width=(Math.abs(bgDiff)*50)+'%';document.getElementById('sb-tor-bg-pos').style.width='0%';}
+        else{document.getElementById('sb-tor-bg-neg').style.width='0%';document.getElementById('sb-tor-bg-pos').style.width=(bgDiff*50)+'%';}
+        // AI 代偿
+        var aiStrat=document.getElementById('sb-ai-strategies');
+        var aiStatus=document.getElementById('sb-ai-status');
+        if(execScore<80||dirScore<0.7){
+          aiStrat.style.display='block';
+          aiStatus.style.display='none';
+        }else{
+          aiStrat.style.display='none';
+          aiStatus.style.display='block';
+        }
+      }
+      function _applyStrategy(btn,type){
+        if(btn.classList.contains('applied'))return;
+        btn.innerText='✅ 已生效';
+        btn.classList.add('applied');
+        if(type===1){document.getElementById('sb-slide-budget').value=1.5;}
+        else{document.getElementById('sb-slide-hc').value=0;}
+        _runSimulation();
+        showToast('策略已采纳，正在重算...','success');
+      }
+      function _reset(){
+        document.getElementById('sb-slide-cagr').value=_defaults.cagr;
+        document.getElementById('sb-slide-comp').value=_defaults.comp;
+        document.getElementById('sb-slide-budget').value=_defaults.budget;
+        document.getElementById('sb-slide-hc').value=_defaults.hc;
+        document.querySelectorAll('.sb-btn-apply').forEach(function(b){b.innerText='采纳重算';b.classList.remove('applied');});
+        _runSimulation();
+      }
+      return{open:_open,close:_close,switchTab:_switchTab,runSimulation:_runSimulation,applyStrategy:_applyStrategy,reset:_reset};
+    })();
+    document.addEventListener('keydown',function(e){var m=e.metaKey||e.ctrlKey;if(m&&e.key==='k'){e.preventDefault();(currentPage==='trace'?document.getElementById('traceSearch'):document.getElementById('globalSearch')).focus();}if(m&&e.key==='1'){e.preventDefault();switchPage('overview');}if(m&&e.key==='2'){e.preventDefault();switchPage('trace');}if(m&&e.key==='3'){e.preventDefault();switchPage('settings');}if(e.key==='Escape'){closeSourceTrace();closeBrandConfig();if(typeof SandboxEngine!=='undefined')SandboxEngine.close();document.querySelectorAll('.impact-panel.show').forEach(function(p){p.classList.remove('show');});}});
     window.addEventListener('hashchange',function(){var h=window.location.hash.replace('#','');if(h==='trace')switchPage('trace');else if(h==='settings')switchPage('settings');else if(h==='overview')switchPage('overview');});
     document.addEventListener('DOMContentLoaded',function(){var h=window.location.hash.replace('#','');if(h==='trace')switchPage('trace');else if(h==='settings')switchPage('settings');else switchPage('overview');updateVerifyProgress();});
   </script>
