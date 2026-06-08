@@ -3,18 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>sisys MVP — 战略规划 · 战略解码 · 业务执行</title>
+  <title>sisys — 战略决策中心</title>
   <style>
     :root {
       --color-primary:#1890ff;--color-primary-hover:#096dd9;--color-primary-active:#40a9ff;--color-primary-bg:#e6f7ff;
-      --color-success:#52c41a;--color-warning:#faad14;--color-danger:#ff4d4f;
-      --color-purple:#722ed1;--color-purple-bg:#f9f0ff;
+      --color-success:#00875A;--color-warning:#B86E00;--color-danger:#C53030;
+      --color-signal-ok-bg:#E6F7F1;--color-signal-warn-bg:#FFF8E6;--color-signal-danger-bg:#FFF1F0;
       --color-text-primary:#262626;--color-text-secondary:#595959;--color-text-tertiary:#8c8c8c;--color-text-disabled:#bfbfbf;
       --color-bg-primary:#f5f5f5;--color-bg-card:#fff;--color-border:#e8e8e8;--color-white:#fff;
       --font-family-base:'PingFang SC','Microsoft YaHei',sans-serif;--font-family-code:'Consolas','Monaco',monospace;
       --spacing-xs:4px;--spacing-sm:8px;--spacing-md:16px;--spacing-lg:24px;--spacing-xl:32px;--spacing-2xl:48px;--spacing-3xl:64px;
       --radius-sm:4px;--radius-md:8px;--radius-lg:12px;--radius-xl:16px;
       --shadow-sm:0 1px 2px rgba(0,0,0,.1);--shadow-md:0 4px 12px rgba(0,0,0,.08);--shadow-lg:0 8px 24px rgba(0,0,0,.12);--shadow-xl:0 12px 32px rgba(0,0,0,.18);
+      --z-index-modal:1000;--z-index-dropdown:200;--transition-fast:.15s;--transition-normal:.2s;
+      --surface-focus:0 0 0 3px rgba(24,144,255,.15);
     }
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:var(--font-family-base);background:var(--color-bg-primary);color:var(--color-text-primary);line-height:1.6}
@@ -53,12 +55,97 @@
     .metric-baseline{font-size:11px;color:var(--color-text-tertiary);display:block;margin-top:1px}
     .card-action{display:flex;align-items:center;gap:4px;font-size:14px;color:var(--color-primary);font-weight:500;transition:transform .2s ease-out}
     .trust-overview-card:hover .card-action{transform:translateX(4px)}
-    .risk-summary-bar{display:flex;gap:var(--spacing-sm);flex-wrap:wrap;align-items:center;padding:var(--spacing-md);background:var(--color-bg-card);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);margin-bottom:var(--spacing-xl);font-size:13px}
-    .risk-summary-bar .risk-label{font-weight:600;color:var(--color-text-secondary);margin-right:var(--spacing-sm)}
-    .risk-item{padding:4px 10px;border-radius:12px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:background .2s}
-    .risk-item.yellow{background:#fffbe6;color:#d48806}.risk-item.yellow:hover{background:#fff1b8}
-    .risk-item.red{background:#fff1f0;color:var(--color-danger)}.risk-item.red:hover{background:#ffd8d2}
-    .risk-item.green{background:#f6ffed;color:var(--color-success)}
+    /* ===== 决策中心 ===== */
+    .ai-insight-bar{display:flex;align-items:center;gap:var(--spacing-md);background:linear-gradient(135deg,var(--color-primary-bg),#f0f8ff);border:1px solid #91d5ff;border-left:4px solid var(--color-primary);border-radius:var(--radius-lg);padding:var(--spacing-md) var(--spacing-lg);margin-bottom:var(--spacing-lg);box-shadow:var(--shadow-sm)}
+    .ai-insight-icon{font-size:28px;flex-shrink:0}
+    .ai-insight-content{flex:1;font-size:15px;line-height:1.6;color:var(--color-text-primary)}
+    .ai-insight-content strong{color:var(--color-primary);margin-right:var(--spacing-xs)}
+    .ai-insight-time{font-size:11px;color:var(--color-text-tertiary);flex-shrink:0;white-space:nowrap}
+    .trust-indicators{display:flex;gap:var(--spacing-md);margin-bottom:var(--spacing-lg)}
+    .trust-indicator{flex:1;display:flex;align-items:center;gap:var(--spacing-sm);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-sm) var(--spacing-md);transition:all var(--transition-normal)}
+    .trust-indicator:hover{box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+    .trust-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .trust-dot.green{background:var(--color-success)}.trust-dot.yellow{background:var(--color-warning)}.trust-dot.red{background:var(--color-danger)}
+    .trust-label{font-size:13px;color:var(--color-text-secondary)}
+    .trust-value{font-size:14px;font-weight:600;margin-left:auto}
+    .decision-section-header{display:flex;align-items:center;gap:var(--spacing-sm);margin-bottom:var(--spacing-md);margin-top:var(--spacing-lg)}
+    .decision-section-header h2{font-size:18px;font-weight:600;color:var(--color-text-primary)}
+    .decision-section-header .decision-count{font-size:13px;color:var(--color-text-tertiary);font-weight:400}
+    .decision-section-header.done h2{color:var(--color-text-tertiary)}
+    .decision-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--spacing-lg);margin-bottom:var(--spacing-md)}
+    .decision-card{background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;transition:transform var(--transition-normal),box-shadow var(--transition-normal);position:relative}
+    .decision-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-xl)}
+    .decision-card[data-status="urgent"]{box-shadow:var(--shadow-md),0 0 0 1px rgba(250,173,20,.3)}
+    .decision-status-bar{height:4px;width:100%}
+    .decision-status-bar.urgent{background:var(--color-warning)}.decision-status-bar.pending{background:var(--color-primary)}
+    .decision-card-body{padding:var(--spacing-lg)}
+    .decision-header{display:flex;align-items:center;gap:var(--spacing-sm);margin-bottom:var(--spacing-sm)}
+    .decision-urgency{font-size:12px;font-weight:600;color:var(--color-warning);background:var(--color-signal-warn-bg);padding:2px 8px;border-radius:10px}
+    .decision-urgency:has(+ .decision-title){white-space:nowrap}
+    .decision-title{font-size:17px;font-weight:600;color:var(--color-text-primary)}
+    .decision-summary{font-size:14px;color:var(--color-text-secondary);margin-bottom:var(--spacing-sm)}
+    .decision-highlight{font-size:13px;color:#d48806;background:var(--color-signal-warn-bg);padding:var(--spacing-xs) var(--spacing-sm);border-radius:var(--radius-sm);margin-bottom:var(--spacing-md)}
+    .decision-options{display:flex;gap:var(--spacing-sm);margin-bottom:var(--spacing-sm)}
+    .decision-option-btn{flex:1;padding:var(--spacing-sm) var(--spacing-md);border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-card);cursor:pointer;font-size:13px;font-weight:500;font-family:var(--font-family-base);transition:all var(--transition-fast)}
+    .decision-option-btn:hover{border-color:var(--color-primary);color:var(--color-primary)}
+    .decision-option-btn.selected{background:var(--color-primary);border-color:var(--color-primary);color:white;box-shadow:var(--surface-focus)}
+    .decision-option-btn.ai-recommended{border-color:var(--color-primary);color:var(--color-primary)}
+    .decision-option-btn.ai-recommended.selected{background:var(--color-primary);color:white}
+    .decision-reason-toggle{font-size:13px;color:var(--color-primary);cursor:pointer;font-weight:500;display:inline-block}
+    .decision-reason-toggle:hover{text-decoration:underline}
+    .decision-reason{display:none;margin-top:var(--spacing-md);padding:var(--spacing-md);background:var(--color-bg-primary);border-radius:var(--radius-md);font-size:13px;border-top:1px solid var(--color-border)}
+    .decision-reason.open{display:block;animation:slideDown .2s ease-out}
+    .decision-reason-item{padding:2px 0;color:var(--color-text-secondary)}
+    .reason-agent{font-weight:600}
+    .decision-reason-note{margin-top:var(--spacing-sm);padding:var(--spacing-sm);background:var(--color-primary-bg);border-radius:var(--radius-sm);color:var(--color-primary);font-size:12px}
+    .decision-done-list{display:flex;flex-direction:column;gap:var(--spacing-sm);margin-bottom:var(--spacing-md)}
+    .decision-done-item{display:flex;align-items:center;gap:var(--spacing-sm);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-md);font-size:13px;opacity:.75}
+    .done-check{font-size:16px;flex-shrink:0}
+    .done-title{font-weight:600}
+    .done-choice{color:var(--color-text-secondary)}
+    .done-meta{margin-left:auto;font-size:12px;color:var(--color-text-tertiary);white-space:nowrap}
+    .debate-panel{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);padding:var(--spacing-lg);margin-bottom:var(--spacing-md)}
+    .debate-header{margin-bottom:var(--spacing-md)}
+    .debate-topic{font-size:15px;font-weight:600;color:var(--color-text-primary)}
+    .debate-columns{display:grid;grid-template-columns:1fr 1fr;gap:var(--spacing-lg)}
+    .debate-column{padding:var(--spacing-md);border-radius:var(--radius-md)}
+    .debate-column.pro{background:var(--color-signal-ok-bg)}.debate-column.con{background:var(--color-signal-danger-bg)}
+    .debate-col-header{font-size:13px;font-weight:600;margin-bottom:var(--spacing-sm);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px}
+    .debate-item{display:flex;align-items:center;gap:var(--spacing-sm);padding:var(--spacing-xs) 0;font-size:13px}
+    .debate-agent{font-weight:600;min-width:40px;color:var(--color-text-primary)}
+    .debate-stance.yes{color:var(--color-success)}.debate-stance.warn{color:var(--color-warning)}.debate-stance.no{color:var(--color-danger)}
+    .debate-text{color:var(--color-text-secondary);flex:1}
+    .debate-footer{display:flex;align-items:center;gap:var(--spacing-md);margin-top:var(--spacing-md);padding-top:var(--spacing-md);border-top:1px solid var(--color-border);font-size:13px;flex-wrap:wrap}
+    .debate-core-issue{color:var(--color-text-secondary);flex:1}
+    .debate-link{color:var(--color-primary);text-decoration:none;font-weight:500;cursor:pointer}
+    .debate-link:hover{text-decoration:underline}
+    .debate-v1-note{font-size:11px;color:var(--color-text-tertiary);margin-top:var(--spacing-sm);padding-top:var(--spacing-sm);border-top:1px dashed var(--color-border)}
+    .alert-list{display:flex;flex-direction:column;gap:var(--spacing-sm)}
+    .alert-item{display:flex;align-items:center;gap:var(--spacing-sm);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-md);font-size:13px;transition:all var(--transition-normal)}
+    .alert-item:hover{box-shadow:var(--shadow-sm);transform:translateX(2px)}
+    .alert-item.danger{border-left:3px solid var(--color-danger)}
+    .alert-item.warning{border-left:3px solid var(--color-warning)}
+    .alert-dot{flex-shrink:0}
+    .alert-text{font-weight:600}
+    .alert-impact{color:var(--color-text-secondary)}
+    .alert-action{margin-left:auto;color:var(--color-primary);font-weight:500;flex-shrink:0}
+    @media(max-width:768px){.decision-grid{grid-template-columns:1fr}.trust-indicators{flex-direction:column}.debate-columns{grid-template-columns:1fr}}
+
+    /* ===== 故事线进度条 ===== */
+    .storyline{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--spacing-lg);margin-bottom:var(--spacing-lg);box-shadow:var(--shadow-sm)}
+    .storyline-track{display:flex;align-items:flex-start;gap:0}
+    .storyline-node{flex:0 0 auto;text-align:center;cursor:pointer;padding:var(--spacing-sm) var(--spacing-md);border-radius:var(--radius-md);transition:all var(--transition-normal);min-width:120px}
+    .storyline-node:hover{background:var(--color-primary-bg)}
+    .storyline-node.active{background:var(--color-primary-bg)}
+    .node-dot{width:16px;height:16px;border-radius:50%;background:var(--color-border);margin:0 auto var(--spacing-sm);transition:background var(--transition-normal)}
+    .storyline-node.active .node-dot{background:var(--color-primary);box-shadow:0 0 0 4px var(--color-primary-bg)}
+    .storyline-node.visited .node-dot{background:var(--color-success)}
+    .node-label{font-size:13px;font-weight:600;color:var(--color-text-primary);margin-bottom:2px}
+    .node-question{font-size:11px;color:var(--color-text-tertiary);font-style:italic}
+    .node-metric{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+    .storyline-connector{flex:1;height:2px;background:var(--color-border);margin-top:calc(var(--spacing-sm) + 8px);transition:background var(--transition-normal)}
+    .storyline-connector.visited{background:var(--color-success)}
+    @media(max-width:768px){.storyline-track{flex-direction:column;align-items:stretch}.storyline-connector{height:20px;width:2px;margin:0 auto}.storyline-node{min-width:auto}}
 
     /* ===== 追溯页工具栏 ===== */
     .trace-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--spacing-sm);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-md) var(--spacing-lg);margin-bottom:var(--spacing-lg)}
@@ -84,6 +171,10 @@
     .evidence-sp-card{background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;transition:box-shadow .2s}
     .evidence-sp-card:hover{box-shadow:var(--shadow-lg)}
     .evidence-sp-card.disputed{border:2px solid var(--color-warning);box-shadow:0 0 0 4px rgba(250,173,20,.12)}
+    .sp-one-liner{padding:var(--spacing-sm) var(--spacing-lg);font-size:14px;font-weight:600;border-bottom:1px solid var(--color-bg-primary)}
+    .sp-one-liner.green{background:var(--color-signal-ok-bg);color:var(--color-success)}
+    .sp-one-liner.yellow{background:var(--color-signal-warn-bg);color:#d48806}
+    .sp-one-liner.red{background:var(--color-signal-danger-bg);color:var(--color-danger)}
     .evidence-sp-header{padding:var(--spacing-lg) var(--spacing-lg) 0;display:flex;align-items:center;gap:var(--spacing-sm)}
     .evidence-sp-header .sp-icon{font-size:18px;flex-shrink:0}
     .evidence-sp-header .sp-title{font-size:17px;font-weight:600;flex:1}
@@ -200,6 +291,9 @@
     .exec-score-meta{font-size:12px;color:var(--color-text-tertiary)}
     .exec-item{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden}
     .exec-item.warning{border-color:var(--color-warning)}.exec-item.danger{border-color:var(--color-danger)}
+    .exec-normal-counter{display:flex;align-items:center;gap:var(--spacing-sm);padding:var(--spacing-md);background:var(--color-signal-ok-bg);border-radius:var(--radius-md);font-size:13px;color:var(--color-success);margin-top:var(--spacing-md)}
+    .exec-counter-dot.green{color:var(--color-success);font-size:10px}
+    .exec-counter-text{color:var(--color-text-secondary)}.exec-counter-text strong{color:var(--color-success)}
     .exec-item-header{padding:var(--spacing-md);display:flex;justify-content:space-between;align-items:center;gap:var(--spacing-sm);flex-wrap:wrap;cursor:pointer}
     .exec-item-header:hover{background:var(--color-bg-primary)}
     .exec-item-left{display:flex;align-items:center;gap:var(--spacing-sm);flex:1;min-width:0}
@@ -209,9 +303,6 @@
     .exec-item-body{padding:0 var(--spacing-md) var(--spacing-md);display:none}
     .exec-item.expanded .exec-item-body{display:block;animation:slideDown .2s ease-out}
     .exec-item.expanded .exec-item-header{border-bottom:1px solid var(--color-bg-primary)}
-    .exec-normal-list{margin-top:var(--spacing-md)}
-    .exec-normal-toggle{font-size:12px;color:var(--color-text-tertiary);cursor:pointer;padding:var(--spacing-sm);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-sm);text-align:center}.exec-normal-toggle:hover{color:var(--color-primary)}
-
     /* ===== 溯源弹窗 ===== */
     .overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999}.overlay.show{display:block}
     .source-card{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);border:2px solid var(--color-primary);z-index:1000;max-width:560px;width:90%;max-height:80vh;overflow-y:auto}
@@ -220,6 +311,16 @@
     .source-card-title{font-size:16px;font-weight:600}
     .source-card-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--color-text-tertiary);padding:var(--spacing-xs)}.source-card-close:hover{color:var(--color-text-primary)}
     .source-card-body{padding:var(--spacing-lg)}
+    .source-tabs{display:flex;gap:var(--spacing-sm);margin-bottom:var(--spacing-md);border-bottom:1px solid var(--color-border);padding-bottom:var(--spacing-sm)}
+    .source-tab{padding:var(--spacing-xs) var(--spacing-md);border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-card);cursor:pointer;font-size:13px;font-family:var(--font-family-base);transition:all var(--transition-fast)}
+    .source-tab:hover{border-color:var(--color-primary);color:var(--color-primary)}
+    .source-tab.active{background:var(--color-primary);border-color:var(--color-primary);color:white}
+    .alt-item{background:var(--color-bg-primary);padding:var(--spacing-md);border-radius:var(--radius-md);margin-top:var(--spacing-md)}
+    .alt-title{font-size:15px;font-weight:600;margin-bottom:var(--spacing-sm)}
+    .alt-reason{font-size:13px;color:var(--color-danger);margin-bottom:var(--spacing-sm)}
+    .alt-meta{font-size:12px;color:var(--color-text-tertiary);display:flex;gap:var(--spacing-md);flex-wrap:wrap}
+    .alt-agent{font-weight:500}.alt-time{}
+    .alt-monitor{font-size:12px;color:var(--color-success);margin-top:var(--spacing-sm);padding-top:var(--spacing-sm);border-top:1px dashed var(--color-border)}
     .source-breadcrumb{font-size:12px;color:var(--color-text-tertiary);margin-bottom:var(--spacing-md);padding-bottom:var(--spacing-sm);border-bottom:1px solid var(--color-bg-primary)}
     .source-info{margin-bottom:var(--spacing-md)}.source-info-label{font-size:12px;color:var(--color-text-tertiary);margin-bottom:var(--spacing-xs)}
     .source-info-value{font-size:14px;font-weight:500}
@@ -236,6 +337,26 @@
     .source-btn-secondary{background:var(--color-bg-primary);color:var(--color-text-primary);border:1px solid var(--color-border)}.source-btn-secondary:hover{background:var(--color-border)}
 
     /* ===== 品牌配置 ===== */
+    /* ===== 品牌配置 ===== */
+    .brand-config-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);border:2px solid var(--color-primary);z-index:var(--z-index-modal);max-width:680px;width:90%;max-height:85vh;overflow-y:auto}
+    .brand-config-modal.show{display:block;animation:fadeIn .2s ease-out}
+    /* ===== 工作台 ===== */
+    .workbench-section{margin-bottom:var(--spacing-lg)}
+    .workbench-section h3{font-size:16px;font-weight:600;margin-bottom:var(--spacing-md);padding-bottom:var(--spacing-sm);border-bottom:1px solid var(--color-bg-primary)}
+    .workbench-todo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--spacing-md)}
+    .todo-card{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-lg);text-align:center;transition:all var(--transition-normal)}
+    .todo-card:hover{box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+    .todo-value{font-size:28px;font-weight:700;color:var(--color-primary)}
+    .todo-label{font-size:13px;color:var(--color-text-secondary);margin-top:var(--spacing-xs)}
+    .todo-detail{font-size:11px;color:var(--color-text-tertiary);margin-top:var(--spacing-xs)}
+    .quick-action-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--spacing-md)}
+    .quick-action-card{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-md);text-align:center;cursor:pointer;transition:all var(--transition-normal)}
+    .quick-action-card:hover{box-shadow:var(--shadow-sm);transform:translateY(-1px);border-color:var(--color-primary)}
+    .qa-icon{font-size:24px;margin-bottom:var(--spacing-sm)}
+    .qa-title{font-size:13px;font-weight:600;margin-bottom:var(--spacing-xs)}
+    .qa-desc{font-size:11px;color:var(--color-text-tertiary)}
+    @media(max-width:768px){.workbench-todo-grid{grid-template-columns:1fr}.quick-action-grid{grid-template-columns:repeat(2,1fr)}}
+
     .brand-layout{display:grid;grid-template-columns:1fr 1fr;gap:var(--spacing-xl);margin-bottom:var(--spacing-xl)}
     .brand-section{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-lg)}
     .brand-section h3{font-size:15px;font-weight:600;margin-bottom:var(--spacing-md);padding-bottom:var(--spacing-sm);border-bottom:1px solid var(--color-bg-primary)}
@@ -269,17 +390,7 @@
 
     /* ===== 公共组件 ===== */
     .compliance-watermark{position:sticky;bottom:0;background:rgba(0,0,0,.03);border-top:1px solid var(--color-border);padding:6px var(--spacing-md);font-size:11px;color:var(--color-text-tertiary);text-align:center;z-index:10}
-    .onboarding-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:2000;justify-content:center;align-items:center}.onboarding-overlay.show{display:flex}
-    .onboarding-card{background:var(--color-bg-card);border-radius:var(--radius-xl);padding:var(--spacing-3xl);max-width:480px;width:90%;text-align:center;box-shadow:var(--shadow-xl);animation:fadeInCard .3s ease-out}
-    .onboarding-step{display:none}.onboarding-step.active{display:block}
-    .onboard-icon{font-size:48px;margin-bottom:var(--spacing-lg)}
-    .onboarding-card h2{font-size:22px;font-weight:600;margin-bottom:var(--spacing-md)}.onboarding-card p{font-size:14px;color:var(--color-text-secondary);margin-bottom:var(--spacing-xl)}
-    .onboard-actions{display:flex;gap:var(--spacing-sm);justify-content:center}
-    .upload-zone{border:2px dashed var(--color-border);border-radius:var(--radius-lg);padding:var(--spacing-2xl);margin-bottom:var(--spacing-lg);cursor:pointer;transition:all .2s}
-    .upload-zone:hover{border-color:var(--color-primary);background:var(--color-primary-bg)}
-    .upload-icon{font-size:36px;display:block;margin-bottom:var(--spacing-sm)}.upload-formats{font-size:11px;color:var(--color-text-tertiary);display:block;margin-top:var(--spacing-sm)}
     .btn-primary{padding:10px 24px;background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);font-size:14px;cursor:pointer;font-family:var(--font-family-base);font-weight:500;transition:background .2s}.btn-primary:hover{background:var(--color-primary-hover)}
-    .btn-ghost{padding:10px 24px;background:transparent;color:var(--color-text-secondary);border:none;border-radius:var(--radius-sm);font-size:14px;cursor:pointer;font-family:var(--font-family-base)}.btn-ghost:hover{color:var(--color-primary)}
     .empty-state{display:none;text-align:center;padding:var(--spacing-3xl) var(--spacing-xl);background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md)}.empty-state.show{display:block}
     .empty-icon{font-size:48px;margin-bottom:var(--spacing-md);animation:floatIcon 2s ease-in-out infinite}
     .empty-state h3{font-size:18px;font-weight:600;margin-bottom:var(--spacing-sm)}.empty-state p{font-size:14px;color:var(--color-text-secondary);margin-bottom:var(--spacing-lg)}
@@ -296,7 +407,6 @@
     .toast.success{background:#f6ffed;border:1px solid #b7eb8f;color:#135200}.toast.warning{background:#fffbe6;border:1px solid #ffe58f;color:#874d00}.toast.error{background:#fff1f0;border:1px solid #ffa39e;color:#820014}.toast.info{background:var(--color-primary-bg);border:1px solid #91d5ff;color:#003a8c}
 
     @keyframes fadeIn{from{opacity:0;transform:translate(-50%,-45%)}to{opacity:1;transform:translate(-50%,-50%)}}
-    @keyframes fadeInCard{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
     @keyframes slideDown{from{opacity:0;max-height:0}to{opacity:1;max-height:600px}}
     @keyframes popIn{from{opacity:0;transform:scale(.9,0)}to{opacity:1;transform:scale(1,1)}}
     @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -308,18 +418,13 @@
   </style>
 </head>
 <body>
-  <div class="onboarding-overlay show" id="onboarding"><div class="onboarding-card">
-    <div class="onboarding-step active" id="onboardStep1"><div class="onboard-icon">🎯</div><h2>让战略规划的每一步都有据可查</h2><p>SISYS 帮你从 SP 到 BP 建立完整信任闭环</p><div class="onboard-actions"><button class="btn-primary" onclick="nextOnboardStep(2)">开始</button><button class="btn-ghost" onclick="skipOnboarding()">跳过引导</button></div></div>
-    <div class="onboarding-step" id="onboardStep2"><div class="onboard-icon">📤</div><h2>上传你的战略文档</h2><p>支持 PDF / Word / Excel / PPT 等 17 种格式</p><div class="upload-zone" onclick="nextOnboardStep(3)"><span class="upload-icon">⬆️</span><span>拖拽文件到此处，或点击选择</span><span class="upload-formats">支持：.pdf .docx .xlsx .pptx .csv .txt ...</span></div><button class="btn-ghost" onclick="nextOnboardStep(3)">跳过，稍后上传 →</button></div>
-    <div class="onboarding-step" id="onboardStep3"><div class="onboard-icon">🔍</div><h2>正在分析你的数据...</h2><div class="skeleton-overview" style="display:grid;"><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div></div><p style="color:var(--color-text-tertiary);font-size:13px;">多 Agent 正在协作分析中，预计 2 分钟...</p><button class="btn-primary" onclick="skipOnboarding()" style="margin-top:var(--spacing-md);">进入系统</button></div>
-  </div></div>
 
   <nav class="nav">
     <div class="nav-brand">🎯 sisys</div>
     <div class="nav-tabs">
-      <button class="nav-tab active" data-page="overview" onclick="switchPage('overview')">总览</button>
-      <button class="nav-tab" data-page="trace" onclick="switchPage('trace')">追溯验证</button>
-      <button class="nav-tab" data-page="settings" onclick="switchPage('settings')">生成与导出</button>
+      <button class="nav-tab active" data-page="overview" onclick="switchPage('overview')">决策中心</button>
+      <button class="nav-tab" data-page="trace" onclick="switchPage('trace')">战略全景</button>
+      <button class="nav-tab" data-page="settings" onclick="switchPage('settings')">工作台</button>
     </div>
     <div class="nav-right">
       <select class="nav-project" onchange="switchProject(this.value)"><option>XX公司 2026 SP-BP</option><option>YY医疗 2025 战略复盘</option><option>ZZ集团 2026 市场进入</option></select>
@@ -331,16 +436,98 @@
   <main class="main">
     <!-- ===== Page 1: 总览 ===== -->
     <div class="page active" id="page-overview">
-      <h1 class="section-title">战略态势总览</h1>
-      <p class="section-desc">2026 SP→BP 闭环 — 战略规划 · 战略解码 · 业务执行</p>
+      <h1 class="section-title">战略决策中心</h1>
+      <p class="section-desc">2026 SP→BP 闭环 · AI 高管团帮你决策</p>
       <p class="section-meta">最后更新：2026-06-07 14:32 · <span style="cursor:pointer;color:var(--color-primary);" onclick="showToast('数据已刷新','info')">🔄 点击刷新</span></p>
       <div class="skeleton-overview" id="skeletonOverview"><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div><div class="skeleton-card"><div class="skeleton-bar w-60"></div><div class="skeleton-bar w-80"></div><div class="skeleton-bar w-40"></div></div></div>
-      <div class="trust-overview-grid" id="trustCards">
-        <a class="trust-overview-card" href="#trace" onclick="return navigateToView('direction')"><div class="card-status-bar green"></div><div class="card-body"><div class="card-header"><span class="card-icon">🎯</span><span class="card-title">战略规划</span></div><div class="card-metrics"><div class="metric"><span class="metric-label">共识度</span><span class="metric-value">85% <span class="trend up">↑3%</span></span><span class="metric-baseline">vs 上次审批 82%</span></div><div class="metric"><span class="metric-label">支持分布</span><span class="metric-value">5/6 角色支持</span></div><div class="metric alert"><span class="metric-label">⚠️ 争议项</span><span class="metric-value">SC-4 市场进入策略</span></div></div><div class="card-action">核验规划依据 →</div></div></a>
-        <a class="trust-overview-card" href="#trace" onclick="return navigateToView('decode')"><div class="card-status-bar green"></div><div class="card-body"><div class="card-header"><span class="card-icon">🔗</span><span class="card-title">战略解码</span></div><div class="card-metrics"><div class="metric"><span class="metric-label">映射覆盖率</span><span class="metric-value">100% <span class="trend flat">→</span></span><span class="metric-baseline">18/18 项完成映射</span></div><div class="metric"><span class="metric-label">待验证举措</span><span class="metric-value">5 项</span></div><div class="metric"><span class="metric-label">最近变更</span><span class="metric-value">2h前 举措1.1权重调整</span></div></div><div class="card-action">进入验证工作台 →</div></div></a>
-        <a class="trust-overview-card" href="#trace" onclick="return navigateToView('execution')"><div class="card-status-bar yellow"></div><div class="card-body"><div class="card-header"><span class="card-icon">✅</span><span class="card-title">业务执行</span></div><div class="card-metrics"><div class="metric"><span class="metric-label">可行性评分</span><span class="metric-value">82/100 <span class="trend down">↓3</span></span><span class="metric-baseline">vs 行业 Top 25%：85 分</span></div><div class="metric"><span class="metric-label">约束状态</span><span class="metric-value">🟢3 🟡2 🔴0</span></div><div class="metric alert"><span class="metric-label">⚠️ 关注项</span><span class="metric-value">人力缺口 · 里程碑</span></div></div><div class="card-action">监控执行风险 →</div></div></a>
+      <!-- AI 洞察一句话 -->
+      <div class="ai-insight-bar" id="aiInsight">
+        <div class="ai-insight-icon">💡</div>
+        <div class="ai-insight-content"><strong>AI 洞察</strong> — SC-4 市场进入策略存在严重分歧，6 个 AI 角色中 3 个反对，核心争议是投资回收期。人力资源缺口 22 人已影响 3 个下游举措。</div>
+        <div class="ai-insight-time">1 分钟前更新</div>
       </div>
-      <div class="risk-summary-bar" id="riskBar"><span class="risk-label">⚠️ 关键风险</span><span class="risk-item yellow" onclick="navigateToView('execution','manpower')">🟡 人力缺口 22 人</span><span class="risk-item yellow" onclick="navigateToView('execution','milestone')">🟡 M2 间隔 8 周</span><span class="risk-item green">🟢 预算 ¥8.2亿/¥10亿</span><span class="risk-item green">🟢 合规无违规</span></div>
+      <!-- 三重信任态势 -->
+      <div class="trust-indicators">
+        <div class="trust-indicator" onclick="navigateToView('direction')" style="cursor:pointer"><span class="trust-dot green"></span><span class="trust-label">方向可信</span><span class="trust-value">85% 共识</span></div>
+        <div class="trust-indicator" onclick="navigateToView('decode')" style="cursor:pointer"><span class="trust-dot green"></span><span class="trust-label">解码可信</span><span class="trust-value">100% 映射</span></div>
+        <div class="trust-indicator" onclick="navigateToView('execution')" style="cursor:pointer"><span class="trust-dot yellow"></span><span class="trust-label">执行可信</span><span class="trust-value">82 分</span></div>
+      </div>
+      <!-- 今日待决策 -->
+      <div class="decision-section-header"><h2>今日待决策</h2><span class="decision-count">2/3</span></div>
+      <div class="decision-grid" id="decisionGrid">
+        <div class="decision-card" id="dc-sc4" data-status="urgent">
+          <div class="decision-status-bar urgent"></div>
+          <div class="decision-card-body">
+            <div class="decision-header"><span class="decision-urgency">⚡ 紧急</span><span class="decision-title">SC-4 市场进入策略</span></div>
+            <div class="decision-summary">进入方式：自建渠道 vs 合资探索</div>
+            <div class="decision-highlight">🔥 3/6 反对（核心争议：投资回收期 5 年）</div>
+            <div class="decision-options">
+              <button class="decision-option-btn" onclick="selectDecision('dc-sc4',0)">激进进入</button>
+              <button class="decision-option-btn ai-recommended" onclick="selectDecision('dc-sc4',1)">💡 合资探索</button>
+            </div>
+            <div class="decision-reason-toggle" onclick="expandDecisionReason('dc-sc4')">AI 推荐理由 →</div>
+            <div class="decision-reason" id="reason-dc-sc4">
+              <div class="decision-reason-item"><span class="reason-agent">✅ CMO：</span>窗口期极佳，建议激进进入</div>
+              <div class="decision-reason-item"><span class="reason-agent">⚠️ CTO：</span>核心技术模块需先验证</div>
+              <div class="decision-reason-item"><span class="reason-agent">🔴 CFO：</span>投资回收期 5 年偏长</div>
+              <div class="decision-reason-item"><span class="reason-agent">✅ CEO：</span>长期战略价值优先</div>
+              <div class="decision-reason-item"><span class="reason-agent">✅ COO：</span>供应链可复用现有体系</div>
+              <div class="decision-reason-item"><span class="reason-agent">⚠️ CHO：</span>需要引进外部人才</div>
+              <div class="decision-reason-note">💡 AI 综合：回收期风险可通过合资分担，窗口期仅 18 个月，建议先合资试水</div>
+            </div>
+          </div>
+        </div>
+        <div class="decision-card" id="dc-bp13" data-status="pending">
+          <div class="decision-status-bar pending"></div>
+          <div class="decision-card-body">
+            <div class="decision-header"><span class="decision-urgency">📋 待定</span><span class="decision-title">举措 1.3 人才引进</span></div>
+            <div class="decision-summary">是否调整 JD 重新招聘？</div>
+            <div class="decision-highlight">🔴 招聘启动 2 个月，0 位候选人进入终面 · 影响 1.1/2.1/3.2</div>
+            <div class="decision-options">
+              <button class="decision-option-btn" onclick="selectDecision('dc-bp13',0)">重新定义 JD</button>
+              <button class="decision-option-btn ai-recommended" onclick="selectDecision('dc-bp13',1)">💡 校企联合</button>
+            </div>
+            <div class="decision-reason-toggle" onclick="expandDecisionReason('dc-bp13')">AI 推荐理由 →</div>
+            <div class="decision-reason" id="reason-dc-bp13">
+              <div class="decision-reason-item">薪资竞争力不足：当前 JD 薪资区间低于市场 15%</div>
+              <div class="decision-reason-item">学科带头人更看重平台价值而非纯薪酬</div>
+              <div class="decision-reason-note">💡 AI 建议：校企联合引进可降低 40% 成本，3 个月内可到位</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 已完成本周 -->
+      <div class="decision-section-header done"><h2>已完成本周</h2><span class="decision-count">1/3</span></div>
+      <div class="decision-done-list">
+        <div class="decision-done-item"><span class="done-check">✅</span><span class="done-title">SC-1 高端医疗设备市场领先</span><span class="done-choice">你选择了"按原计划推进"</span><span class="done-meta">6/6 共识 · 6月5日 14:30 决策</span></div>
+      </div>
+      <!-- 辩论速览 -->
+      <div class="decision-section-header"><h2>角色辩论速览</h2></div>
+      <div class="debate-panel">
+        <div class="debate-header"><span class="debate-topic">SC-4 市场进入策略（3 赞成 vs 3 反对）</span></div>
+        <div class="debate-columns">
+          <div class="debate-column pro">
+            <div class="debate-col-header">赞成</div>
+            <div class="debate-item"><span class="debate-agent">CMO</span><span class="debate-stance yes">✅</span><span class="debate-text">窗口期极佳</span></div>
+            <div class="debate-item"><span class="debate-agent">CEO</span><span class="debate-stance yes">✅</span><span class="debate-text">长期战略价值优先</span></div>
+            <div class="debate-item"><span class="debate-agent">COO</span><span class="debate-stance yes">✅</span><span class="debate-text">供应链可复用</span></div>
+          </div>
+          <div class="debate-column con">
+            <div class="debate-col-header">反对</div>
+            <div class="debate-item"><span class="debate-agent">CTO</span><span class="debate-stance warn">⚠️</span><span class="debate-text">技术模块未验证</span></div>
+            <div class="debate-item"><span class="debate-agent">CFO</span><span class="debate-stance no">🔴</span><span class="debate-text">回收期 5 年偏长</span></div>
+            <div class="debate-item"><span class="debate-agent">CHO</span><span class="debate-stance warn">⚠️</span><span class="debate-text">需引进外部人才</span></div>
+          </div>
+        </div>
+        <div class="debate-footer"><span class="debate-core-issue">核心争议：投资回收期 5 年 vs 市场窗口 18 个月</span><a class="debate-link" href="#trace" onclick="return navigateToView('direction')">展开完整辩论记录 →</a></div>
+        <div class="debate-v1-note">💡 完整多 Agent 辩论为 V1 功能，MVP 阶段以单 Agent 分析呈现</div>
+      </div>
+      <!-- 执行异常速览 -->
+      <div class="decision-section-header"><h2>执行异常</h2><span class="decision-count">2 项</span></div>
+      <div class="alert-list">
+        <div class="alert-item danger" onclick="navigateToView('execution','manpower')" style="cursor:pointer"><span class="alert-dot">🔴</span><span class="alert-text">人力缺口 22 人</span><span class="alert-impact">→ 影响 3 个举措</span><span class="alert-action">点击查看</span></div>
+        <div class="alert-item warning" onclick="navigateToView('execution','milestone')" style="cursor:pointer"><span class="alert-dot">🟡</span><span class="alert-text">M2 间隔 8 周</span><span class="alert-impact">→ 可能影响 Q3 上市</span><span class="alert-action">点击查看</span></div>
+      </div>
       <div class="empty-state" id="emptyOverview"><div class="empty-icon">📋</div><h3>还没有战略规划项目</h3><p>创建你的第一个项目，或上传现有 SP/BP 文档开始分析</p><div class="empty-actions"><button class="btn-primary">创建项目</button><button class="btn-sm ghost">上传文档</button></div></div>
     </div>
 
@@ -348,17 +535,43 @@
     <div class="page" id="page-trace">
       <div class="trace-toolbar">
         <div class="toolbar-left">
-          <span class="back-link" onclick="switchPage('overview')">← 返回总览</span>
-          <span class="toolbar-title" id="traceTitle">战略规划 · 核验依据</span>
+          <span class="back-link" onclick="switchPage('overview')">← 返回决策中心</span>
+          <span class="toolbar-title" id="traceTitle">战略假设 · 我们对吗？</span>
         </div>
         <div class="toolbar-right">
           <div class="view-switcher" id="viewSwitcher">
-            <button class="view-btn active" data-view="direction" onclick="switchTraceView('direction')">规划</button>
+            <button class="view-btn active" data-view="direction" onclick="switchTraceView('direction')">假设</button>
             <button class="view-btn" data-view="decode" onclick="switchTraceView('decode')">解码</button>
-            <button class="view-btn" data-view="execution" onclick="switchTraceView('execution')">执行</button>
+            <button class="view-btn" data-view="execution" onclick="switchTraceView('execution')">落地</button>
           </div>
           <button class="mode-toggle-btn" id="btnListToggle" onclick="toggleListMode()" title="列表模式" style="display:none;">☰ 列表</button>
           <input type="search" class="toolbar-search" placeholder="🔍 搜索..." id="traceSearch" oninput="filterBPItems()">
+        </div>
+      </div>
+
+      <!-- 故事线进度条 -->
+      <div class="storyline" id="storyline">
+        <div class="storyline-track">
+          <div class="storyline-node active" data-view="direction" onclick="switchTraceView('direction')">
+            <div class="node-dot"></div>
+            <div class="node-label">战略假设</div>
+            <div class="node-question">"我们对吗？"</div>
+            <div class="node-metric">85% 共识</div>
+          </div>
+          <div class="storyline-connector"></div>
+          <div class="storyline-node" data-view="decode" onclick="switchTraceView('decode')">
+            <div class="node-dot"></div>
+            <div class="node-label">解码验证</div>
+            <div class="node-question">"落得了吗？"</div>
+            <div class="node-metric">5 项待验证</div>
+          </div>
+          <div class="storyline-connector"></div>
+          <div class="storyline-node" data-view="execution" onclick="switchTraceView('execution')">
+            <div class="node-dot"></div>
+            <div class="node-label">执行落地</div>
+            <div class="node-question">"做得怎样？"</div>
+            <div class="node-metric">82 分可行性</div>
+          </div>
         </div>
       </div>
 
@@ -368,6 +581,7 @@
           <!-- SP-1 -->
           <div class="evidence-sp-card">
             <div class="evidence-sp-header"><span class="sp-icon">🎯</span><span class="sp-title">SC-1：高端医疗设备市场领先</span><span class="sp-consensus green">5/6 共识</span></div>
+            <div class="sp-one-liner green">✅ 市场前景确认，建议按原计划推进</div>
             <div class="evidence-sp-body">
               <div class="evidence-block">
                 <span class="evidence-label">📊 市场规模</span>
@@ -391,6 +605,7 @@
           <!-- SP-4 (争议项) -->
           <div class="evidence-sp-card disputed">
             <div class="evidence-sp-header"><span class="sp-icon">🌍</span><span class="sp-title">SC-4：市场进入策略</span><span class="sp-consensus yellow">3/6 ⚠️ 争议</span></div>
+            <div class="sp-one-liner yellow">⚠️ 严重分歧，AI 建议先合资试水，回收期风险需对冲</div>
             <div class="evidence-sp-body">
               <div class="evidence-block">
                 <span class="evidence-label">📊 进入方式</span>
@@ -414,6 +629,7 @@
           <!-- SP-2 -->
           <div class="evidence-sp-card">
             <div class="evidence-sp-header"><span class="sp-icon">🏥</span><span class="sp-title">SC-2：三级医院渠道全覆盖</span><span class="sp-consensus green">6/6 共识</span></div>
+            <div class="sp-one-liner green">✅ 渠道目标可达成，现有合作基础扎实</div>
             <div class="evidence-sp-body">
               <div class="evidence-block">
                 <span class="evidence-label">📊 渠道覆盖</span>
@@ -510,14 +726,10 @@
             </div>
             <div class="exec-item-body"><div style="padding:var(--spacing-sm) 0;font-size:13px;">🟡 M2 间隔 8 周（基准 4-6 周），可能影响 Q3 上市</div></div>
           </div>
-
-          <div class="exec-normal-list">
-            <div class="exec-normal-toggle" onclick="var l=document.getElementById('execNormalList');l.style.display=l.style.display==='none'?'block':'none';this.querySelector('span').textContent=l.style.display==='none'?'展开全部 1 项 ▾':'收起正常项 ▴';">
-              <span>展开全部 1 项 ▾</span>
-            </div>
-            <div id="execNormalList" style="display:none;margin-top:var(--spacing-sm);display:flex;flex-direction:column;gap:var(--spacing-sm);">
-              <div class="exec-item"><div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')"><div class="exec-item-left"><span class="verify-badge confirmed">✅</span><span class="exec-item-title">举措 2.1：新产品 NMPA 注册认证</span><span class="exec-item-badge" style="cursor:pointer;" onclick="jumpToDecode('sc2')">← SC-2 跳转解码</span></div><div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer yellow"></div><div class="light-inner green"></div><div class="light-label">合规</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div></div></div></div><div class="exec-item-body"><div style="padding:var(--spacing-sm) 0;font-size:13px;color:var(--color-text-secondary);">🟢 正常推进，合规审批中</div></div></div></div>
-            </div>
+          <!-- 正常项计数器 -->
+          <div class="exec-normal-counter">
+            <span class="exec-counter-dot green">●</span>
+            <span class="exec-counter-text">其余 <strong>1 项</strong> 正常运行（举措 2.1 NMPA 注册 · 合规审批中）</span>
           </div>
         </div>
       </div>
@@ -526,27 +738,88 @@
       <div class="compliance-watermark">🔒 本页面所有验证记录均受 WORM 保护 · 保留至 2033-06-07 · 不可篡改 · 操作全量留痕 · 审计 ID: SESSION-AUD-20260607-001</div>
     </div>
 
-    <!-- ===== Page 3: 生成与导出 ===== -->
+    <!-- ===== Page 3: 工作台 ===== -->
     <div class="page" id="page-settings">
-      <h1 class="section-title">生成与导出</h1><p class="section-desc">配置客户品牌方案，一键导出白标报告</p>
+      <h1 class="section-title">工作台</h1><p class="section-desc">个人工作空间 · 待办 · 导出 · 配置</p>
       <div class="project-selector"><label>当前项目：</label><select onchange="switchProject(this.value)"><option>XX公司 2026 SP-BP</option><option>YY医疗 2025 战略复盘</option><option>ZZ集团 2026 市场进入</option></select><span class="project-tenant-badge">🔒 数据隔离已启用</span></div>
-      <div class="brand-layout">
-        <div class="brand-section"><h3>品牌配置</h3>
-          <div class="form-group"><span class="form-label">Logo</span><div class="logo-dropzone" onclick="handleLogoUpload()"><div class="dz-icon">🖼️</div><div class="dz-text">点击或拖拽上传 Logo</div><div class="dz-hint">PNG/SVG/JPG · 最大 5MB · 自动适配横版/竖版</div></div><img class="logo-preview-img show" id="logoPreview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='48'%3E%3Crect fill='%23f5f5f5' width='200' height='48' rx='4'/%3E%3Ctext x='100' y='22' text-anchor='middle' fill='%23262626' font-family='PingFang SC,Microsoft YaHei,sans-serif' font-weight='600' font-size='15'%3E宏大医疗器械%3C/text%3E%3Ctext x='100' y='39' text-anchor='middle' fill='%238c8c8c' font-family='sans-serif' font-size='9'%3EHONGDA MEDICAL%3C/text%3E%3C/svg%3E" alt="Logo"></div>
-          <div class="form-group"><span class="form-label">品牌主色</span><div class="color-presets"><div class="color-swatch selected" style="background:#1890ff;" data-color="#1890ff" onclick="selectColor('#1890ff',this)"></div><div class="color-swatch" style="background:#52c41a;" data-color="#52c41a" onclick="selectColor('#52c41a',this)"></div><div class="color-swatch" style="background:#722ed1;" data-color="#722ed1" onclick="selectColor('#722ed1',this)"></div><div class="color-swatch" style="background:#fa8c16;" data-color="#fa8c16" onclick="selectColor('#fa8c16',this)"></div><div class="color-swatch" style="background:#eb2f96;" data-color="#eb2f96" onclick="selectColor('#eb2f96',this)"></div><div class="color-swatch" style="background:#262626;" data-color="#262626" onclick="selectColor('#262626',this)"></div></div><input type="text" class="color-input" id="customColor" value="#1890ff" oninput="applyCustomColor()"></div>
-          <div class="form-group"><span class="form-label">品牌字体</span><select class="form-select" id="fontSelect" onchange="updatePreview()"><option>商务风格 — 思源黑体 + Helvetica</option><option>科技风格 — PingFang SC + SF Mono</option><option>经典风格 — 宋体 + Georgia</option></select></div>
+
+      <!-- 待办摘要 -->
+      <div class="workbench-section">
+        <h3>📋 我的待办</h3>
+        <div class="workbench-todo-grid">
+          <div class="todo-card" onclick="navigateToView('decode')" style="cursor:pointer"><div class="todo-value">5</div><div class="todo-label">待验证举措</div><div class="todo-detail">含 1 项需重做</div></div>
+          <div class="todo-card"><div class="todo-value">2</div><div class="todo-label">待处理文档</div><div class="todo-detail">含 1 项解析中</div></div>
+          <div class="todo-card"><div class="todo-value">3</div><div class="todo-label">本周截止</div><div class="todo-detail">含 1 项今日截止</div></div>
         </div>
-        <div class="brand-section"><h3>实时预览</h3><div class="preview-area"><span class="preview-logo-text">宏大医疗器械</span><span style="font-size:11px;color:var(--color-text-tertiary);">HONGDA MEDICAL</span><span class="preview-title" id="previewTitle" style="color:#1890ff;">2026 年度战略规划报告</span><span style="font-size:13px;color:var(--color-text-secondary);">品牌色已应用于标题与图表</span><span class="preview-btn" id="previewBtn" style="background:#1890ff;">按钮样式预览</span></div></div>
       </div>
-      <div class="brand-section" style="margin-bottom:var(--spacing-lg);"><div class="compliance-checklist"><h4>导出前检查</h4><div class="check-item ok">✅ Logo 尺寸符合封面页布局</div><div class="check-item ok">✅ 品牌色已应用于表头和图表</div><div class="check-item warn">⚠️ 页脚版权年份未更新（当前：2025）<span class="fix-link" onclick="autoFix('copyright')">一键修正</span></div><div class="check-item ok">✅ 无数据隔离泄露风险</div></div><div class="export-section"><button class="export-btn" id="exportBtn" onclick="exportPDF()">📄 导出 PDF</button><span class="export-estimate">预计 &lt;1 分钟</span></div></div>
+
+      <!-- 快捷操作 -->
+      <div class="workbench-section">
+        <h3>⚡ 快捷操作</h3>
+        <div class="quick-action-grid">
+          <div class="quick-action-card" onclick="showToast('文档上传入口已打开','info')"><div class="qa-icon">📤</div><div class="qa-title">上传文档</div><div class="qa-desc">PDF/Word/Excel 等 17 种格式</div></div>
+          <div class="quick-action-card" onclick="navigateToView('decode')" style="cursor:pointer"><div class="qa-icon">🔗</div><div class="qa-title">验证工作台</div><div class="qa-desc">解码映射验证</div></div>
+          <div class="quick-action-card" onclick="openBrandConfig()"><div class="qa-icon">🎨</div><div class="qa-title">品牌配置</div><div class="qa-desc">Logo/配色/字体</div></div>
+          <div class="quick-action-card" onclick="exportPDF()"><div class="qa-icon">📄</div><div class="qa-title">导出报告</div><div class="qa-desc">白标 PDF 报告</div></div>
+          <div class="quick-action-card" onclick="showToast('审计日志已导出','success')"><div class="qa-icon">📜</div><div class="qa-title">审计日志</div><div class="qa-desc">决策验证记录</div></div>
+        </div>
+      </div>
+
+      <!-- 执行监控速览 -->
+      <div class="workbench-section">
+        <h3>📊 执行监控</h3>
+        <div class="exec-score-bar" style="margin-bottom:var(--spacing-md)">
+          <div>
+            <div class="exec-score-big">82<span class="trend down">↓3</span></div>
+            <div class="exec-score-meta">可行性评分 /100 · vs 行业 Top 25%：85 分</div>
+          </div>
+          <div style="display:flex;gap:var(--spacing-md);flex:1;justify-content:flex-end;font-size:12px;">
+            <span>🟢3 🟡2 🔴0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 审计日志导出 -->
       <div class="audit-export"><h3>审计日志导出</h3><p>导出指定时间范围内的决策验证记录</p><div class="audit-export-controls"><input type="date" id="auditStart" value="2026-01-01"><span>至</span><input type="date" id="auditEnd" value="2026-06-07"><button class="btn-sm" onclick="showToast('审计日志已导出','success')">导出 CSV</button></div></div>
-      <div class="error-state" id="errorDataSource" style="margin-top:var(--spacing-xl);"><div class="error-icon">🔌</div><h3>无法获取最新数据</h3><p>市场数据源的连接暂时中断<br>当前显示的是上次同步的数据（2026-06-06 09:00）</p><div class="error-actions"><button class="btn-primary">重试连接</button><button class="btn-sm ghost" onclick="this.closest('.error-state').style.display='none'">使用缓存数据继续</button></div></div>
+      <div class="compliance-watermark" style="margin-top:var(--spacing-xl)">🔒 本页面操作均受 WORM 保护 · 保留至 2033-06-07 · 不可篡改 · 操作全量留痕</div>
     </div>
   </main>
 
+  <!-- 品牌配置弹窗 -->
+  <div class="overlay" id="brandOverlay" onclick="closeBrandConfig()"></div>
+  <div class="brand-config-modal" id="brandModal">
+    <div class="source-card-header"><span class="source-card-title">🎨 品牌配置</span><button class="source-card-close" onclick="closeBrandConfig()">✕</button></div>
+    <div class="brand-layout">
+      <div class="brand-section"><h3>配置</h3>
+        <div class="form-group"><span class="form-label">Logo</span><div class="logo-dropzone" onclick="handleLogoUpload()"><div class="dz-icon">🖼️</div><div class="dz-text">点击或拖拽上传 Logo</div><div class="dz-hint">PNG/SVG/JPG · 最大 5MB · 自动适配横版/竖版</div></div><img class="logo-preview-img show" id="logoPreview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='48'%3E%3Crect fill='%23f5f5f5' width='200' height='48' rx='4'/%3E%3Ctext x='100' y='22' text-anchor='middle' fill='%23262626' font-family='PingFang SC,Microsoft YaHei,sans-serif' font-weight='600' font-size='15'%3E宏大医疗器械%3C/text%3E%3Ctext x='100' y='39' text-anchor='middle' fill='%238c8c8c' font-family='sans-serif' font-size='9'%3EHONGDA MEDICAL%3C/text%3E%3C/svg%3E" alt="Logo"></div>
+        <div class="form-group"><span class="form-label">品牌主色</span><div class="color-presets"><div class="color-swatch selected" style="background:#1890ff;" data-color="#1890ff" onclick="selectColor('#1890ff',this)"></div><div class="color-swatch" style="background:#00875A;" data-color="#00875A" onclick="selectColor('#00875A',this)"></div><div class="color-swatch" style="background:#B86E00;" data-color="#B86E00" onclick="selectColor('#B86E00',this)"></div><div class="color-swatch" style="background:#C53030;" data-color="#C53030" onclick="selectColor('#C53030',this)"></div><div class="color-swatch" style="background:#722ed1;" data-color="#722ed1" onclick="selectColor('#722ed1',this)"></div><div class="color-swatch" style="background:#262626;" data-color="#262626" onclick="selectColor('#262626',this)"></div></div><input type="text" class="color-input" id="customColor" value="#1890ff" oninput="applyCustomColor()"></div>
+        <div class="form-group"><span class="form-label">品牌字体</span><select class="form-select" id="fontSelect" onchange="updatePreview()"><option>商务风格 — 思源黑体 + Helvetica</option><option>科技风格 — PingFang SC + SF Mono</option><option>经典风格 — 宋体 + Georgia</option></select></div>
+      </div>
+      <div class="brand-section"><h3>实时预览</h3><div class="preview-area"><span class="preview-logo-text">宏大医疗器械</span><span style="font-size:11px;color:var(--color-text-tertiary);">HONGDA MEDICAL</span><span class="preview-title" id="previewTitle" style="color:#1890ff;">2026 年度战略规划报告</span><span style="font-size:13px;color:var(--color-text-secondary);">品牌色已应用于标题与图表</span><span class="preview-btn" id="previewBtn" style="background:#1890ff;">按钮样式预览</span></div></div>
+    </div>
+    <div class="brand-section" style="margin-bottom:0;border-radius:0"><div class="compliance-checklist"><h4>导出前检查</h4><div class="check-item ok">✅ Logo 尺寸符合封面页布局</div><div class="check-item ok">✅ 品牌色已应用于表头和图表</div><div class="check-item warn">⚠️ 页脚版权年份未更新（当前：2025）<span class="fix-link" onclick="autoFix('copyright')">一键修正</span></div><div class="check-item ok">✅ 无数据隔离泄露风险</div></div><div class="export-section"><button class="export-btn" id="exportBtn" onclick="exportPDF()">📄 导出 PDF</button><span class="export-estimate">预计 &lt;1 分钟</span></div></div>
+  </div>
+
   <!-- 溯源弹窗 -->
   <div class="overlay" id="sourceOverlay" onclick="closeSourceTrace()"></div>
-  <div class="source-card" id="sourceCard"><div class="source-card-header"><span class="source-card-title">📄 数据溯源</span><button class="source-card-close" onclick="closeSourceTrace()">✕</button></div><div class="source-card-body"><div class="source-breadcrumb">BP 举措 1.1 → KPI-3.1 → 2024年渠道分析报告.pdf</div><div class="source-info"><span class="source-info-label">数据来源</span><div class="source-info-value">2024年渠道分析报告.pdf · 第 23 页</div><div class="source-info-meta"><span class="source-type">📊 一手数据（内部销售系统导出）</span><span class="source-sample">样本：28 家医院调研 · 9 名渠道经理</span><span class="source-date">采集时间：2024 年 Q4</span><span class="freshness usable">🟡 可用（18 个月前）</span></div></div><div class="confidence-section"><span class="confidence-badge">🟢 置信度：高</span><span class="confidence-explain">一手数据 + 大样本 + 来源可信</span></div><div class="source-quote">"...基于现有渠道团队 9 人，人均覆盖 3-4 家三甲医院，维持 80% 以上覆盖率的前提下，年度新增签约上限约为 28-32 家..."</div><div class="source-actions"><button class="source-btn-primary" onclick="jumpToPDF()">📍 跳转到原始 PDF（坐标 P23, 156, 342）</button><button class="source-btn-secondary" onclick="copyCitation()">📋 复制引用</button><button class="source-btn-secondary" onclick="reportSourceIssue()">⚠️ 数据存疑</button></div></div></div>
+  <div class="source-card" id="sourceCard"><div class="source-card-header"><span class="source-card-title">📄 数据溯源</span><button class="source-card-close" onclick="closeSourceTrace()">✕</button></div><div class="source-card-body">
+    <!-- 溯源 tab 切换 -->
+    <div class="source-tabs"><button class="source-tab active" onclick="switchSourceTab('trace')">数据溯源</button><button class="source-tab" onclick="switchSourceTab('alternatives')">替代方案</button></div>
+    <!-- Tab 1: 数据溯源 -->
+    <div class="source-tab-content" id="tabContent-trace">
+      <div class="source-breadcrumb">BP 举措 1.1 → KPI-3.1 → 2024年渠道分析报告.pdf</div>
+      <div class="source-info"><span class="source-info-label">数据来源</span><div class="source-info-value">2024年渠道分析报告.pdf · 第 23 页</div><div class="source-info-meta"><span class="source-type">📊 一手数据（内部销售系统导出）</span><span class="source-sample">样本：28 家医院调研 · 9 名渠道经理</span><span class="source-date">采集时间：2024 年 Q4</span><span class="freshness usable">🟡 可用（18 个月前）</span></div></div>
+      <div class="confidence-section"><span class="confidence-badge">🟢 置信度：高</span><span class="confidence-explain">一手数据 + 大样本 + 来源可信</span></div>
+      <div class="source-quote">"...基于现有渠道团队 9 人，人均覆盖 3-4 家三甲医院，维持 80% 以上覆盖率的前提下，年度新增签约上限约为 28-32 家..."</div>
+      <div class="source-actions"><button class="source-btn-primary" onclick="jumpToPDF()">📍 跳转到原始 PDF（坐标 P23, 156, 342）</button><button class="source-btn-secondary" onclick="copyCitation()">📋 复制引用</button><button class="source-btn-secondary" onclick="reportSourceIssue()">⚠️ 数据存疑</button></div>
+    </div>
+    <!-- Tab 2: 替代方案 -->
+    <div class="source-tab-content" id="tabContent-alternatives" style="display:none">
+      <div class="source-breadcrumb">SC-1 高端医疗设备市场领先 → 被否决方案</div>
+      <div class="alt-item"><div class="alt-title">方案 B：基层医疗设备市场</div><div class="alt-reason">否决原因：市场增速仅 8%，窗口期已过</div><div class="alt-meta"><span class="alt-agent">主否决：CFO（财务回报不达标）</span><span class="alt-time">否决时间：2026-05-20</span></div><div class="alt-monitor">已纳入监控：支付能力风险指标</div></div>
+      <div class="source-actions" style="margin-top:var(--spacing-lg)"><button class="source-btn-secondary" onclick="showToast('已跳转到完整辩论记录','info');closeSourceTrace();navigateToView('direction');">💬 查看完整辩论记录</button></div>
+    </div>
+  </div></div>
   <div class="toast-container" id="toastContainer"></div>
 
   <script>
@@ -557,7 +830,7 @@
       document.getElementById('page-'+p).classList.add('active');
       document.querySelector('.nav-tab[data-page="'+p+'"]').classList.add('active');
       currentPage=p;window.location.hash=p;
-      document.getElementById('globalSearch').placeholder=p==='trace'?'🔍 搜索...':'🔍 搜索（跳转至追溯页）...';
+      document.getElementById('globalSearch').placeholder=p==='trace'?'🔍 搜索战略全景...':'🔍 搜索（跳转至战略全景）...';
     }
     function navigateToView(v,focus){
       switchPage('trace');
@@ -573,12 +846,23 @@
       document.getElementById('view-'+v).classList.add('active');
       // 列表按钮仅解码可见
       document.getElementById('btnListToggle').style.display=v==='decode'?'':'none';
-      // 标题
-      var titles={direction:'战略规划 · 核验依据',decode:'战略解码 · 映射验证',execution:'业务执行 · 风险监控'};
+      // 标题（叙事化）
+      var titles={direction:'战略假设 · 我们对吗？',decode:'解码验证 · 落得了吗？',execution:'执行落地 · 做得怎样？'};
       document.getElementById('traceTitle').textContent=titles[v]||'';
+      // 故事线节点联动
+      var order=['direction','decode','execution'];
+      var curIdx=order.indexOf(v);
+      document.querySelectorAll('.storyline-node').forEach(function(n){
+        var nIdx=order.indexOf(n.dataset.view);
+        n.classList.remove('active','visited');
+        if(nIdx===curIdx){n.classList.add('active');}
+        else if(nIdx<curIdx){n.classList.add('visited');}
+      });
+      document.querySelectorAll('.storyline-connector').forEach(function(c,idx){
+        c.classList.toggle('visited',idx<curIdx);
+      });
       // 视图特定行为
       if(v==='direction'){
-        // 展开所有 evidence card 中的争议项
         var disputed=document.querySelector('.evidence-sp-card.disputed');
         if(disputed)disputed.scrollIntoView({behavior:'smooth',block:'start'});
       }else if(v==='decode'){
@@ -616,17 +900,36 @@
     function jumpToPDF(){showToast('正在打开 PDF：page=23&x=156&y=342','info');closeSourceTrace();}
     function copyCitation(){navigator.clipboard.writeText('"...基于现有渠道团队9人..." — 2024年渠道分析报告.pdf, P23').then(function(){showToast('引用已复制 📋','info');}).catch(function(){showToast('复制失败','warning');});}
     function reportSourceIssue(){closeSourceTrace();showToast('已记录数据存疑反馈','warning');}
-    function nextOnboardStep(s){document.querySelectorAll('.onboarding-step').forEach(function(x){x.classList.remove('active');});document.getElementById('onboardStep'+s).classList.add('active');}
-    function skipOnboarding(){document.getElementById('onboarding').classList.remove('show');}
+    function openBrandConfig(){document.getElementById('brandOverlay').classList.add('show');document.getElementById('brandModal').classList.add('show');}
+    function closeBrandConfig(){document.getElementById('brandOverlay').classList.remove('show');document.getElementById('brandModal').classList.remove('show');}
+    function switchSourceTab(tabName){
+      document.querySelectorAll('.source-tab').forEach(function(t){t.classList.remove('active');});
+      document.querySelectorAll('.source-tab-content').forEach(function(c){c.style.display='none';});
+      document.querySelector('.source-tab:nth-child('+({trace:1,alternatives:2}[tabName])+')').classList.add('active');
+      var el=document.getElementById('tabContent-'+tabName);if(el)el.style.display='block';
+    }
     function selectColor(c,el){document.querySelectorAll('.color-swatch').forEach(function(s){s.classList.remove('selected');});el.classList.add('selected');document.getElementById('customColor').value=c;updatePreview();}
     function applyCustomColor(){if(/^#[0-9A-Fa-f]{6}$/.test(document.getElementById('customColor').value))updatePreview();}
     function updatePreview(){var c=document.getElementById('customColor').value||'#1890ff';document.getElementById('previewTitle').style.color=c;document.getElementById('previewBtn').style.background=c;}
     function handleLogoUpload(){showToast('模拟 Logo 上传成功','success');}
     function autoFix(item){if(item==='copyright'){var ci=document.querySelector('.check-item.warn');if(ci){ci.className='check-item ok';ci.innerHTML='✅ 页脚版权年份已更新（2026）';}showToast('版权年份已修正 ✅','success');}}
     function exportPDF(){var b=document.getElementById('exportBtn'),o=b.textContent;b.disabled=true;b.textContent='⏳ 正在生成...';var steps=[15,30,45,58,70,78,85,90,93,95,97,99,100];var i=0,iv=setInterval(function(){if(i>=steps.length){clearInterval(iv);b.textContent='✅ 导出完成';b.style.background='var(--color-success)';showToast('报告已生成 ✅','success');setTimeout(function(){b.textContent=o;b.disabled=false;b.style.background='';},3000);}else{var p=steps[i];b.textContent='⏳ 生成中... '+p+'%';if(p>=85&&p<99)b.textContent='⏳ 应用品牌元素... '+p+'%';if(p>=99)b.textContent='⏳ 打包文档... '+p+'%';i++;}},200+Math.random()*200);}
+    function selectDecision(cardId,optionIndex){
+      var card=document.getElementById(cardId);if(!card)return;
+      var btns=card.querySelectorAll('.decision-option-btn');
+      btns.forEach(function(b){b.classList.remove('selected');});
+      btns[optionIndex].classList.add('selected');
+      var title=card.querySelector('.decision-title').textContent;
+      var choice=btns[optionIndex].textContent.replace('💡 ','');
+      showToast('已决策：'+title+' → '+choice,'success');
+    }
+    function expandDecisionReason(cardId){
+      var panel=document.getElementById('reason-'+cardId);if(!panel)return;
+      panel.classList.toggle('open');
+    }
     function switchProject(pid){var n={xx:'XX公司',yy:'YY医疗',zz:'ZZ集团'};showToast('已切换到：'+(n[pid]||pid),'info');}
     function showToast(m,t){var ct=document.getElementById('toastContainer'),to=document.createElement('div');to.className='toast '+(t||'info');to.textContent=m;ct.appendChild(to);setTimeout(function(){to.style.opacity='0';to.style.transition='opacity 0.3s';setTimeout(function(){to.remove();},300);},t==='error'?5000:3000);}
-    document.addEventListener('keydown',function(e){var m=e.metaKey||e.ctrlKey;if(m&&e.key==='k'){e.preventDefault();(currentPage==='trace'?document.getElementById('traceSearch'):document.getElementById('globalSearch')).focus();}if(m&&e.key==='1'){e.preventDefault();switchPage('overview');}if(m&&e.key==='2'){e.preventDefault();switchPage('trace');}if(m&&e.key==='3'){e.preventDefault();switchPage('settings');}if(e.key==='Escape'){closeSourceTrace();document.querySelectorAll('.impact-panel.show').forEach(function(p){p.classList.remove('show');});}});
+    document.addEventListener('keydown',function(e){var m=e.metaKey||e.ctrlKey;if(m&&e.key==='k'){e.preventDefault();(currentPage==='trace'?document.getElementById('traceSearch'):document.getElementById('globalSearch')).focus();}if(m&&e.key==='1'){e.preventDefault();switchPage('overview');}if(m&&e.key==='2'){e.preventDefault();switchPage('trace');}if(m&&e.key==='3'){e.preventDefault();switchPage('settings');}if(e.key==='Escape'){closeSourceTrace();closeBrandConfig();document.querySelectorAll('.impact-panel.show').forEach(function(p){p.classList.remove('show');});}});
     window.addEventListener('hashchange',function(){var h=window.location.hash.replace('#','');if(h==='trace')switchPage('trace');else if(h==='settings')switchPage('settings');else if(h==='overview')switchPage('overview');});
     document.addEventListener('DOMContentLoaded',function(){var h=window.location.hash.replace('#','');if(h==='trace')switchPage('trace');else if(h==='settings')switchPage('settings');else switchPage('overview');updateVerifyProgress();});
   </script>
