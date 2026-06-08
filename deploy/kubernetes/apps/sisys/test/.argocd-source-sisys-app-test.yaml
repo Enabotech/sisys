@@ -1,3 +1,3 @@
 kustomize:
   images:
-  - harbor.sisys.local/sisys/app:test-v0.0.6-eedb166
+  - harbor.sisys.local/sisys/app:test-v0.0.6-906c35b
