@@ -353,7 +353,7 @@
         </div>
         <div class="toolbar-right">
           <div class="view-switcher" id="viewSwitcher">
-            <button class="view-btn active" data-view="direction" onclick="switchTraceView('direction')">方向</button>
+            <button class="view-btn active" data-view="direction" onclick="switchTraceView('direction')">规划</button>
             <button class="view-btn" data-view="decode" onclick="switchTraceView('decode')">解码</button>
             <button class="view-btn" data-view="execution" onclick="switchTraceView('execution')">执行</button>
           </div>
@@ -385,7 +385,7 @@
                   <div class="evidence-meta"><span class="freshness stale">🔴 需更新（2024Q2）</span><span class="confidence-tag">行业白皮书 · 置信度 🔴 低 · 数据过期</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div></div>
               </div>
               <div class="rejected-options"><span class="rejected-toggle" onclick="toggleRejected(event,'sc1')">📋 被否决方案（1 项）▸</span><div class="rejected-content" id="rejected-sc1"><div class="rejected-item"><strong>方案 B：基层医疗设备市场</strong><p>否决：市场增速仅 8%，窗口期已过</p><p>已纳入监控：支付能力风险指标</p></div></div></div>
-              <div class="related-bp-bar"><h4>← 关联 BP 举措</h4><span class="related-bp-tag">举措 1.1 研发投入 ¥2亿</span><span class="related-bp-tag">举措 1.2 渠道建设</span><span class="related-bp-tag">举措 1.3 人才引进</span></div>
+              <div class="related-bp-bar"><h4>← 关联 BP 举措（点击跳转解码）</h4><span class="related-bp-tag" style="cursor:pointer;" onclick="jumpToDecode('sc1')">举措 1.1 研发投入 ¥2亿</span><span class="related-bp-tag" style="cursor:pointer;" onclick="jumpToDecode('sc1')">举措 1.2 渠道建设</span><span class="related-bp-tag" style="cursor:pointer;" onclick="jumpToDecode('sc1')">举措 1.3 人才引进</span></div>
             </div>
           </div>
           <!-- SP-4 (争议项) -->
@@ -408,7 +408,7 @@
                   <div class="opinion-item"><span class="opinion-agent">⚠️ CHO：</span>需要引进外部人才</div>
                 </div>
               </div>
-              <div class="related-bp-bar"><h4>← 关联 BP 举措</h4><span class="related-bp-tag">举措 1.1 研发投入 ¥2亿</span><span class="related-bp-tag">举措 1.2 渠道建设</span></div>
+              <div class="related-bp-bar"><h4>← 关联 BP 举措（点击跳转解码）</h4><span class="related-bp-tag" style="cursor:pointer;" onclick="jumpToDecode('sc1')">举措 1.1 研发投入 ¥2亿</span><span class="related-bp-tag" style="cursor:pointer;" onclick="jumpToDecode('sc1')">举措 1.2 渠道建设</span></div>
             </div>
           </div>
           <!-- SP-2 -->
@@ -425,7 +425,7 @@
                 <div class="evidence-data"><div>28 家三甲医院已有合作基础</div>
                   <div class="evidence-meta"><span class="freshness usable">🟡 可用</span><span class="confidence-tag">客户关系库 · 置信度 🟡 中</span><span class="trace-link" onclick="openSourceTrace(event)">溯源 →</span></div></div>
               </div>
-              <div class="related-bp-bar"><h4>← 关联 BP 举措</h4><span class="related-bp-tag">举措 2.1 新产品 NMPA 注册</span></div>
+              <div class="related-bp-bar"><h4>← 关联 BP 举措（点击跳转解码）</h4><span class="related-bp-tag" style="cursor:pointer;" onclick="jumpToDecode('sc2')">举措 2.1 新产品 NMPA 注册</span></div>
             </div>
           </div>
         </div>
@@ -442,6 +442,7 @@
             <h3>SP 战略控制点</h3>
             <div class="sp-item" id="sp-sc1"><div class="sp-header" onclick="toggleSP('sp-sc1')"><span class="sp-icon">🎯</span><span class="sp-title">SC-1：高端医疗设备市场领先</span><span class="sp-consensus green">5/6</span><span class="sp-expand">▾</span></div><div class="sp-evidence"><div class="evidence-item" style="font-size:13px;padding:var(--spacing-xs) 0;"><span style="font-weight:600">市场规模</span> ¥520亿 CAGR 15% <span class="freshness fresh">🟢</span><span class="trace-link" onclick="openSourceTrace(event)">溯源→</span></div><div class="evidence-item" style="font-size:13px;padding:var(--spacing-xs) 0;"><span style="font-weight:600">竞争</span> Top3 62% <span class="freshness usable">🟡</span><span class="trace-link" onclick="openSourceTrace(event)">溯源→</span></div><div class="rejected-options"><span class="rejected-toggle" onclick="toggleRejected(event,'decode-sc1')">📋 被否决方案 ▸</span><div class="rejected-content" id="rejected-decode-sc1"><div class="rejected-item"><strong>方案 B：基层医疗设备市场</strong><p>否决：市场增速仅 8%</p></div></div></div></div></div>
             <div class="sp-item" id="sp-sc4"><div class="sp-header" onclick="toggleSP('sp-sc4')"><span class="sp-icon">🌍</span><span class="sp-title">SC-4：市场进入策略</span><span class="sp-consensus yellow">3/6 ⚠️</span><span class="sp-expand">▾</span></div><div class="sp-evidence"><div class="evidence-item" style="font-size:13px;padding:var(--spacing-xs) 0;"><span style="font-weight:600">进入方式</span> 自建 vs 并购 vs 合资 <span class="freshness usable">🟡</span></div><div class="opinion-item" style="font-size:12px;padding:2px 0;">💬 ✅ CMO: 窗口期极佳 · ⚠️ CTO: 技术需验证 · 🔴 CFO: 回收期偏长</div></div></div>
+            <div class="sp-item" id="sp-sc2"><div class="sp-header" onclick="toggleSP('sp-sc2')"><span class="sp-icon">🏥</span><span class="sp-title">SC-2：三级医院渠道全覆盖</span><span class="sp-consensus green">6/6</span><span class="sp-expand">▾</span></div><div class="sp-evidence"><div class="evidence-item" style="font-size:13px;padding:var(--spacing-xs) 0;"><span style="font-weight:600">渠道覆盖</span> 当前 45% 目标 80% <span class="freshness fresh">🟢</span></div><div class="evidence-item" style="font-size:13px;padding:var(--spacing-xs) 0;"><span style="font-weight:600">关键客户</span> 28 家三甲合作基础 <span class="freshness usable">🟡</span></div></div></div>
           </div>
           <div class="bp-panel">
             <h3>BP 年度举措 <span class="count">4 项示例</span></h3>
@@ -471,7 +472,7 @@
           <!-- 🔴 异常项 -->
           <div class="exec-item danger expanded">
             <div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')">
-              <div class="exec-item-left"><span class="verify-badge redo">🔴</span><span class="exec-item-title">举措 1.3：人才引进 5 名学科带头人</span><span class="exec-item-badge">← SC-1</span></div>
+              <div class="exec-item-left"><span class="verify-badge redo">🔴</span><span class="exec-item-title">举措 1.3：人才引进 5 名学科带头人</span><span class="exec-item-badge" style="cursor:pointer;" onclick="jumpToDecode('sc1')">← SC-1 跳转解码</span></div>
               <div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer yellow"></div><div class="light-inner red"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div></div></div>
             </div>
             <div class="exec-item-body">
@@ -487,7 +488,7 @@
           <!-- 🟡 异常项 -->
           <div class="exec-item warning expanded">
             <div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')">
-              <div class="exec-item-left"><span class="verify-badge confirmed">✅</span><span class="exec-item-title">举措 1.1：研发投入 ¥2 亿，样机 Q2</span><span class="exec-item-badge">← SC-1</span></div>
+              <div class="exec-item-left"><span class="verify-badge confirmed">✅</span><span class="exec-item-title">举措 1.1：研发投入 ¥2 亿，样机 Q2</span><span class="exec-item-badge" style="cursor:pointer;" onclick="jumpToDecode('sc1')">← SC-1 跳转解码</span></div>
               <div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div></div></div>
             </div>
             <div class="exec-item-body">
@@ -501,13 +502,21 @@
           </div>
 
           <!-- 🟢 正常项折叠 -->
+          <!-- 🟡 举措 1.2（时间风险，移出折叠区） -->
+          <div class="exec-item warning">
+            <div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')">
+              <div class="exec-item-left"><span class="verify-badge doubtful">⚠️</span><span class="exec-item-title">举措 1.2：渠道建设 30 家三甲医院</span><span class="exec-item-badge" style="cursor:pointer;" onclick="jumpToDecode('sc1')">← SC-1 跳转解码</span></div>
+              <div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div></div></div>
+            </div>
+            <div class="exec-item-body"><div style="padding:var(--spacing-sm) 0;font-size:13px;">🟡 M2 间隔 8 周（基准 4-6 周），可能影响 Q3 上市</div></div>
+          </div>
+
           <div class="exec-normal-list">
-            <div class="exec-normal-toggle" onclick="var l=document.getElementById('execNormalList');l.style.display=l.style.display==='none'?'block':'none';this.querySelector('span').textContent=l.style.display==='none'?'展开全部 2 项 ▾':'收起正常项 ▴';">
-              <span>展开全部 2 项 ▾</span>
+            <div class="exec-normal-toggle" onclick="var l=document.getElementById('execNormalList');l.style.display=l.style.display==='none'?'block':'none';this.querySelector('span').textContent=l.style.display==='none'?'展开全部 1 项 ▾':'收起正常项 ▴';">
+              <span>展开全部 1 项 ▾</span>
             </div>
             <div id="execNormalList" style="display:none;margin-top:var(--spacing-sm);display:flex;flex-direction:column;gap:var(--spacing-sm);">
-              <div class="exec-item"><div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')"><div class="exec-item-left"><span class="verify-badge doubtful">⚠️</span><span class="exec-item-title">举措 1.2：渠道建设 30 家三甲医院</span><span class="exec-item-badge">← SC-1</span></div><div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer green"></div><div class="light-inner yellow"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">合规</div></div></div></div><div class="exec-item-body"><div style="padding:var(--spacing-sm) 0;font-size:13px;">🟡 M2 间隔 8 周（基准 4-6 周），可能影响 Q3 上市</div></div></div></div>
-              <div class="exec-item"><div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')"><div class="exec-item-left"><span class="verify-badge confirmed">✅</span><span class="exec-item-title">举措 2.1：新产品 NMPA 注册认证</span><span class="exec-item-badge">← SC-2</span></div><div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer yellow"></div><div class="light-inner green"></div><div class="light-label">合规</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div></div></div></div><div class="exec-item-body"><div style="padding:var(--spacing-sm) 0;font-size:13px;color:var(--color-text-secondary);">🟢 正常推进，合规审批中</div></div></div></div>
+              <div class="exec-item"><div class="exec-item-header" onclick="this.parentElement.classList.toggle('expanded')"><div class="exec-item-left"><span class="verify-badge confirmed">✅</span><span class="exec-item-title">举措 2.1：新产品 NMPA 注册认证</span><span class="exec-item-badge" style="cursor:pointer;" onclick="jumpToDecode('sc2')">← SC-2 跳转解码</span></div><div class="exec-item-right"><div class="status-lights"><div class="status-light"><div class="light-outer yellow"></div><div class="light-inner green"></div><div class="light-label">合规</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">预算</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">人力</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">时间</div></div><div class="status-light"><div class="light-outer green"></div><div class="light-inner green"></div><div class="light-label">供应</div></div></div></div></div><div class="exec-item-body"><div style="padding:var(--spacing-sm) 0;font-size:13px;color:var(--color-text-secondary);">🟢 正常推进，合规审批中</div></div></div></div>
             </div>
           </div>
         </div>
@@ -592,6 +601,7 @@
       if(dl.style.display==='none'){dc.style.display='none';dl.style.display='block';btn.classList.add('active');btn.textContent='☰ 详情';}
       else{dl.style.display='none';dc.style.display='';btn.classList.remove('active');btn.textContent='☰ 列表';}
     }
+    function jumpToDecode(spKey){switchTraceView('decode');var spId='sp-'+spKey;var spEl=document.getElementById(spId);if(spEl){spEl.classList.add('expanded','selected');document.querySelectorAll('#view-decode .bp-item').forEach(function(i){i.style.display=i.dataset.sp===spKey?'':'none';});document.querySelectorAll('#decodeListMode tbody tr').forEach(function(r){r.style.display=r.dataset.sp===spKey?'':'none';});}showToast('已跳转到解码视图，过滤 SC-'+spKey.replace('sc','').toUpperCase(),'info');}
     function toggleSP(id){var el=document.getElementById(id);var isSelected=el.classList.contains('selected');el.classList.toggle('expanded');document.querySelectorAll('.sp-item').forEach(function(s){s.classList.remove('selected');});if(!isSelected){el.classList.add('selected');var spKey=id.replace('sp-','');document.querySelectorAll('#view-decode .bp-item').forEach(function(i){i.style.display=i.dataset.sp===spKey?'':'none';});document.querySelectorAll('#decodeListMode tbody tr').forEach(function(r){r.style.display=r.dataset.sp===spKey?'':'none';});}else{document.querySelectorAll('#view-decode .bp-item').forEach(function(i){i.style.display='';});document.querySelectorAll('#decodeListMode tbody tr').forEach(function(r){r.style.display='';});}}
     function toggleBP(id){document.getElementById(id).classList.toggle('expanded');}
     function toggleRejected(ev,id){ev.stopPropagation();var c=document.getElementById('rejected-'+id);if(c){c.classList.toggle('open');var t=ev.target;t.textContent=c.classList.contains('open')?t.textContent.replace('▸','▾'):t.textContent.replace('▾','▸');}}
