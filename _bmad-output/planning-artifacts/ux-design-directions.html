@@ -100,23 +100,22 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .card-title-text{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card-summary{font-size:13px;color:var(--color-text-secondary);padding:0 var(--spacing-lg);margin-bottom:var(--spacing-sm)}
 .card-header-right{display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0}
-.card-decision-select{font-size:12px;padding:4px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-card);cursor:pointer;font-family:var(--font-family-base)}.card-decision-select:focus{border-color:var(--color-primary)}
 
 /* 折叠卡片缩微信任条 — Steve的"心跳信号" */
 .card-folded-trusts{display:flex;align-items:center;gap:4px;flex-shrink:0;padding:0 4px}
 .card-folded-trust-conn{width:1px;height:14px;border-radius:1px;background:var(--color-trust-green);transition:background .6s ease;flex-shrink:0}
 .card-folded-trust-mini{width:36px;height:4px;border-radius:2px;background:linear-gradient(to right,#C53030,#D48806,#00875A);background-size:300% 100%;transition:background-position .6s ease;flex-shrink:0}
+.mini-nav-hint{font-size:11px;font-weight:500;flex-shrink:0;white-space:nowrap;margin-left:4px}
 /* 折叠卡片左边竖线脉冲 — Steve的"余光感知" */
 @keyframes cardPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(212,139,6,.4)}}
 .decision-card.card-pulse{animation:cardPulse .4s ease-out}
-/* 卡片自适应展开级 */
+/* 卡片自适应展开级 — 仅折叠/全开两态 */
 .card-folded .card-body{display:none}
-.card-folded .card-summary{display:none}
-.card-half .card-body-ai{display:none}
-.card-half .card-body-ops{grid-template-columns:1fr}
+.card-folded .card-summary{display:block}
 .card-expand-btn{background:none;border:none;font-size:18px;cursor:pointer;color:var(--color-text-tertiary);padding:2px 6px;transition:transform .2s;line-height:1;flex-shrink:0}
 .card-expand-btn:hover{color:var(--color-primary)}
-.card-folded .card-expand-btn,.card-half .card-expand-btn{transform:rotate(-90deg)}
+/* 折叠态: ▸ 朝右 = "展开"；全开态: ▸ 旋转90°朝下 = "收起" */
+.card-full .card-expand-btn{transform:rotate(90deg)}
 /* SP-BP解码追溯带 */
 .decode-ribbon{display:flex;align-items:center;gap:4px;padding:0 var(--spacing-lg);margin-bottom:var(--spacing-xs);font-size:11px;flex-wrap:wrap}
 .decode-ribbon-label{color:var(--color-text-tertiary);flex-shrink:0;font-weight:500}
@@ -330,7 +329,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
   .decision-grid{gap:var(--spacing-md)}
   /* 移动端: 所有卡片默认为折叠风险速览 */
   .decision-card{transition:all .3s}
-  .decision-card:not(.card-full):not(.card-half){cursor:pointer}
+  .decision-card:not(.card-full){cursor:pointer}
   .card-folded .card-body{display:none}
   .card-folded .card-summary{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
   /* 移动端全屏展开 */
@@ -797,7 +796,7 @@ class TornadoMini {
 // ============================================================
 const DECISION_DEFS = [
   {
-    id:'sc4', urgency:'urgent', icon:'⚡', tag:'紧急', title:'SC-4 市场进入策略',
+    id:'sc4', urgency:'urgent', icon:'⏰', tag:'紧急 · 窗口期60天', title:'SC-4 市场进入策略',
     summary:'进入方式：自建渠道 vs 合资探索 · CEO/CFO/CTO严重分歧',
     spBpMapping:[
       {bpId:'bp11',csf:'CSF-3 市场覆盖面',kpi:'KPI-3.1 三甲覆盖率',target:'30家',weight:0.4},
@@ -823,7 +822,7 @@ const DECISION_DEFS = [
     tornadoItems:function(sliders){return[{label:'人才缺口',value:-sliders.hc*1.5},{label:'研发预算',value:(sliders.budget-2.0)*25},{label:'竞品提前',value:-sliders.comp*8}]}
   },
   {
-    id:'bp13', urgency:'pending', icon:'📋', tag:'待定', title:'举措 1.3 人才引进',
+    id:'bp13', urgency:'pending', icon:'📅', tag:'待定 · Q3前须决', title:'举措 1.3 人才引进',
     summary:'招聘启动2个月，0位候选人进入终面 · 影响举措1.1/2.1/3.2',
     spAnchor:{spId:'sc4',spTitle:'SC-4 市场进入策略',csf:'CSF-4 人才保障',kpi:'KPI-4.1 学科带头人数',target:'5名',weight:0.3},
     staleData:[{label:'人才市场薪资基准',freshness:'过期6个月',desc:'行业薪资调研报告（2025Q4）'}],
@@ -844,7 +843,7 @@ const DECISION_DEFS = [
     tornadoItems:function(sliders){return[{label:'薪资调整',value:sliders.salary*1.2},{label:'人才池',value:(sliders.talent_pool-60)*0.8},{label:'培养周期',value:(9-sliders.train_time)*3}]}
   },
   {
-    id:'sc1', urgency:'stable', icon:'🎯', tag:'稳定', title:'SC-1 高端医疗设备市场领先',
+    id:'sc1', urgency:'stable', icon:'📌', tag:'稳定 · 可后续推进', title:'SC-1 高端医疗设备市场领先',
     summary:'全票通过 · 市场前景确认 · 按原计划推进',
     spBpMapping:[
       {bpId:'bp11',csf:'CSF-1 产品竞争力',kpi:'KPI-1.1 专利数',target:'3项',weight:0.4},
@@ -877,7 +876,7 @@ function buildCockpit(){
   const grid=document.getElementById('decisionGrid');
   grid.innerHTML=DECISION_DEFS.map(d=>{
     const bs=d.baseTrusts; const mt=d.maxTrusts;
-    const expandLevel=d.urgency==='urgent'?'card-full':d.urgency==='pending'?'card-half':'card-folded';
+    const expandLevel='card-folded';
     return '<div class="decision-card '+expandLevel+'" data-urgency="'+d.urgency+'" id="card-'+d.id+'">'+
       '<div class="card-status-strip '+d.urgency+'"></div>'+
       '<div class="card-header">'+
@@ -886,13 +885,13 @@ function buildCockpit(){
           '<span class="card-title-text">'+d.title+'</span>'+
         '</div>'+
         '<div class="card-header-right">'+
-          '<div class="card-folded-trusts" id="mini-trusts-'+d.id+'" style="'+(expandLevel==='card-full'?'display:none':'')+'">'+
-            '<div class="card-folded-trust-conn" id="mini-conn-'+d.id+'"></div>'+
-            '<div class="card-folded-trust-mini" id="mini-dir-'+d.id+'"></div>'+
-            '<div class="card-folded-trust-mini" id="mini-dec-'+d.id+'"></div>'+
-            '<div class="card-folded-trust-mini" id="mini-exe-'+d.id+'"></div>'+
+          '<span class="mini-nav-hint" id="mini-hint-'+d.id+'"></span>'+
+          '<div class="card-folded-trusts" id="mini-trusts-'+d.id+'">'+
+            '<div class="card-folded-trust-conn" id="mini-conn-'+d.id+'" style="background:'+(function(){var w=Math.min(bs.direction,bs.decode,bs.execution/d.maxTrusts.execution);return w<0.4?'var(--color-trust-red)':w<0.6?'var(--color-trust-yellow)':w<0.75?'var(--color-trust-amber)':'var(--color-trust-green)'})()+'"></div>'+
+            '<div class="card-folded-trust-mini" id="mini-dir-'+d.id+'" style="background-position:'+(bs.direction*100).toFixed(0)+'% center"></div>'+
+            '<div class="card-folded-trust-mini" id="mini-dec-'+d.id+'" style="background-position:'+(bs.decode*100).toFixed(0)+'% center"></div>'+
+            '<div class="card-folded-trust-mini" id="mini-exe-'+d.id+'" style="background-position:'+bs.execution.toFixed(0)+'% center"></div>'+
           '</div>'+
-          '<select class="card-decision-select" id="decision-'+d.id+'" onchange="onDecisionSelect(\''+d.id+'\')">'+d.options.map((o,i)=>'<option value="'+i+'"'+(i===1?' selected':'')+'>'+o+'</option>').join('')+'</select>'+
           '<button class="card-expand-btn" onclick="toggleCardExpand(\''+d.id+'\')" title="展开/折叠">▸</button>'+
         '</div>'+
       '</div>'+
@@ -995,6 +994,8 @@ function buildCockpit(){
     // 初始评估AI代偿
     aiComp.evaluate(initSt);
     updateWeakest();
+    updateMiniTrusts(d.id);
+    updateMiniHint(d.id);
   });
 }
 
@@ -1027,7 +1028,7 @@ function onSliderChange(cardId){
   Object.keys(cardInstances).forEach(cid=>{
     updateMiniTrusts(cid);
     const card=document.getElementById('card-'+cid);if(!card)return;
-    if((card.classList.contains('card-folded')||card.classList.contains('card-half'))&&cid!==cardId){
+    if(card.classList.contains('card-folded')&&cid!==cardId){
       const prevScores=card.dataset.prevScores?JSON.parse(card.dataset.prevScores):{};
       const instC=cardInstances[cid];if(!instC)return;
       const curScores={direction:instC.trustBars.direction.getScore(),decode:instC.trustBars.decode.getScore(),execution:instC.trustBars.execution.getScore()};
@@ -1042,43 +1043,44 @@ function onSliderRelease(cardId){
   document.getElementById('cockpitStatus').textContent='情景已更新 — 信任分重新计算完成 · 查看AI代偿建议';
 }
 
-function onDecisionSelect(cardId){
-  const sel=document.getElementById('decision-'+cardId);const choice=sel.options[sel.selectedIndex].text;
-  const inst=cardInstances[cardId];if(!inst)return;
-  showToast('已选择：'+inst.def.title+' → '+choice,'success');
-}
 function updateMiniTrusts(cardId){
   const inst=cardInstances[cardId];if(!inst)return;
   const scores={direction:inst.trustBars.direction.getScore(),decode:inst.trustBars.decode.getScore(),execution:inst.trustBars.execution.getScore()/100};
   ['direction','decode','execution'].forEach((k,i)=>{
     const el=document.getElementById('mini-'+(i===0?'dir':i===1?'dec':'exe')+'-'+cardId);
-    if(el){const pct=scores[k]*100;el.style.backgroundPosition=(100-pct)+'% center'}
+    if(el){const pct=scores[k]*100;el.style.backgroundPosition=pct+'% center'}
   });
   const worst=Math.min(scores.direction,scores.decode,scores.execution);
   const conn=document.getElementById('mini-conn-'+cardId);
   if(conn){conn.style.background=worst<0.4?'var(--color-trust-red)':worst<0.6?'var(--color-trust-yellow)':worst<0.75?'var(--color-trust-amber)':'var(--color-trust-green)'}
+  updateMiniHint(cardId);
+}
+function updateMiniHint(cardId){
+  const inst=cardInstances[cardId];if(!inst)return;
+  const scores={direction:inst.trustBars.direction.getScore(),decode:inst.trustBars.decode.getScore(),execution:inst.trustBars.execution.getScore()/100};
+  const labels={direction:'SP方向分',decode:'BP解码分',execution:'BE执行分'};
+  const worstKey=Object.keys(scores).reduce((a,b)=>scores[a]<scores[b]?a:b);
+  const worst=scores[worstKey];const label=labels[worstKey];
+  const el=document.getElementById('mini-hint-'+cardId);if(!el)return;
+  if(worst<0.4){el.textContent='🔴 '+label+'危险 立即干预';el.style.color='var(--color-trust-red)'}
+  else if(worst<0.6){el.textContent='⚠️ '+label+'偏弱 需评估';el.style.color='var(--color-trust-amber)'}
+  else if(worst<0.75){el.textContent='⚡ '+label+'偏低 建议关注';el.style.color='var(--color-trust-yellow)'}
+  else{el.textContent='✅ 状态健康';el.style.color='var(--color-trust-green)'}
 }
 function toggleCardExpand(cardId){
   const card=document.getElementById('card-'+cardId);if(!card)return;
-  if(window.innerWidth<=768){
-    // 移动端仅两态: 折叠 ↔ 全屏
-    if(card.classList.contains('card-full')){card.classList.remove('card-full');card.classList.add('card-folded')}
-    else{card.classList.remove('card-folded','card-half');card.classList.add('card-full')}
-    return;
-  }
-  const levels=['card-folded','card-half','card-full'];const cur=levels.find(l=>card.classList.contains(l));
-  const idx=levels.indexOf(cur);const next=levels[(idx+1)%levels.length];
-  card.classList.remove(cur);card.classList.add(next);
+  const isFull=card.classList.contains('card-full');
+  if(isFull){card.classList.remove('card-full');card.classList.add('card-folded')}
+  else{card.classList.remove('card-folded');card.classList.add('card-full')}
   // 切换缩微信任条可见性
-  const mini=document.getElementById('mini-trusts-'+cardId);if(mini)mini.style.display=next==='card-full'?'none':'';
-  if(next!=='card-full')updateMiniTrusts(cardId);
+  const mini=document.getElementById('mini-trusts-'+cardId);if(mini)mini.style.display=isFull?'':'none';
+  if(!isFull)updateMiniTrusts(cardId);
 }
 function jumpToCard(targetId){
   // 查找对应的真实卡片ID（bp11→无，bp12→无，bp13→bp13, sc4→sc4等）
   const card=document.getElementById('card-'+targetId);if(!card)return;
   // 如果是折叠状态，展开
   if(card.classList.contains('card-folded')){card.classList.remove('card-folded');card.classList.add('card-full')}
-  if(card.classList.contains('card-half')){card.classList.remove('card-half');card.classList.add('card-full')}
   // 显示折叠信任条（全开后隐藏）
   const mini=document.getElementById('mini-trusts-'+targetId);if(mini)mini.style.display='none';
   card.scrollIntoView({behavior:'smooth',block:'center'});
@@ -1420,13 +1422,17 @@ document.addEventListener('DOMContentLoaded',function(){
   switchPage('cockpit');
 });
 
-// 移动端卡片点击展开
+// 卡片点击展开/折叠（桌面+移动端统一）
 document.addEventListener('click',function(e){
-  if(window.innerWidth>768)return;
   const card=e.target.closest('.decision-card');if(!card)return;
-  if(e.target.closest('.card-expand-btn')||e.target.closest('.custom-slider')||e.target.closest('button')||e.target.closest('select'))return;
-  document.querySelectorAll('.decision-card.mobile-expanded').forEach(c=>{if(c!==card)c.classList.remove('mobile-expanded')});
-  card.classList.toggle('mobile-expanded');
+  if(e.target.closest('.card-expand-btn')||e.target.closest('.custom-slider')||e.target.closest('button')||e.target.closest('select')||e.target.closest('input')||e.target.closest('textarea'))return;
+  const cardId=card.id.replace('card-','');
+  if(window.innerWidth<=768){
+    document.querySelectorAll('.decision-card.mobile-expanded').forEach(c=>{if(c!==card)c.classList.remove('mobile-expanded')});
+    card.classList.toggle('mobile-expanded');
+  }else{
+    toggleCardExpand(cardId);
+  }
 });
 
 // 窗口resize时刷新滑块位置
