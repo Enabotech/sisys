@@ -133,21 +133,18 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .card-body-ai{display:flex;flex-direction:column;gap:var(--spacing-sm)}
 
 /* ============================================================
-   三重信任条 — Steve的"信任在流动"
+   三重置信度 — SP/BP/BE 一行三段，绿高橙低
    ============================================================ */
-.trust-bars-stack{display:flex;flex-direction:column;gap:12px;position:relative;padding-left:14px}
-.trust-bars-stack::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:2px;background:var(--color-trust-green);transition:background .6s ease}
-.trust-bars-stack[data-weakest="danger"]::before{background:var(--color-trust-red)}
-.trust-bars-stack[data-weakest="warning"]::before{background:var(--color-trust-yellow)}
-.trust-bars-stack[data-weakest="caution"]::before{background:var(--color-trust-amber)}
-.trust-bars-stack[data-weakest="ok"]::before{background:var(--color-trust-green)}
+.trust-bars-stack{display:flex;flex-direction:row;gap:12px;align-items:center}
+.trust-bars-stack[data-weakest="danger"] .trust-bar-outer{box-shadow:inset 0 0 0 1px rgba(197,48,48,.2)}
+.trust-bars-stack[data-weakest="warning"] .trust-bar-outer{box-shadow:inset 0 0 0 1px rgba(212,139,6,.2)}
 
-.trust-bar-row{display:flex;align-items:center;gap:var(--spacing-sm)}
-.trust-bar-label{font-size:12px;color:var(--color-text-secondary);width:52px;flex-shrink:0;text-align:right}
+.trust-bar-row{display:flex;align-items:center;gap:4px;flex:1;min-width:0}
+.trust-bar-label{font-size:11px;font-weight:600;color:var(--color-text-secondary);flex-shrink:0}
 .trust-bar-outer{flex:1;height:var(--trust-bar-h);background:#f0f0f0;border-radius:var(--trust-bar-radius);position:relative;overflow:hidden}
 .trust-bar-fill{position:absolute;top:0;left:0;height:100%;border-radius:var(--trust-bar-radius);
-  background:linear-gradient(to right,#C53030 0%,#D46B08 25%,#D48806 50%,#7CB305 75%,#00875A 100%);
-  background-size:400% 100%;
+  background:linear-gradient(to right,#B86E00 0%,#00875A 100%);
+  background-size:200% 100%;
   transition:width var(--trust-transition-dur) var(--spring-settle), background-position var(--trust-transition-dur) var(--spring-settle);
 }
 .trust-bar-fill.glow{animation:trustGlow 2s ease-out}
@@ -155,11 +152,12 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .trust-bar-shimmer{position:absolute;top:0;left:-100%;width:3px;height:100%;background:rgba(255,255,255,.7);border-radius:2px;pointer-events:none;opacity:0}
 .trust-bar-shimmer.active{animation:trustShimmerSweep var(--trust-shimmer-dur) ease-in forwards}
 .trust-bar-ghost{position:absolute;top:0;left:0;height:100%;border-radius:var(--trust-bar-radius);
-  background:linear-gradient(to right,#C53030 0%,#D46B08 25%,#D48806 50%,#7CB305 75%,#00875A 100%);
-  background-size:400% 100%;opacity:0;pointer-events:none;
+  background:linear-gradient(to right,#B86E00 0%,#00875A 100%);
+  background-size:200% 100%;opacity:0;pointer-events:none;
   transition:width var(--trust-transition-dur) var(--spring-settle), background-position var(--trust-transition-dur) var(--spring-settle), opacity .2s ease}
 .trust-bar-ghost.visible{opacity:.35}
-.trust-bar-value{font-size:15px;font-weight:700;width:48px;text-align:right;flex-shrink:0;font-family:var(--font-family-code);transition:color 0.3s}
+.trust-bar-value{font-size:13px;font-weight:700;min-width:42px;text-align:right;flex-shrink:0;font-family:var(--font-family-code);transition:color 0.3s}
+.trust-bar-value.high{color:var(--color-success)}.trust-bar-value.low{color:var(--color-warning)}
 .trust-bar-delta{font-size:11px;width:36px;text-align:left;flex-shrink:0;font-weight:600}
 .trust-bar-delta.up{color:var(--color-success)}.trust-bar-delta.down{color:var(--color-danger)}.trust-bar-delta.flat{color:var(--color-text-tertiary)}
 .trust-bar-row.breathe .trust-bar-fill{animation:trustBreathe 6s ease-in-out infinite}
@@ -249,28 +247,38 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .workbench-panel h3{font-size:15px;font-weight:600;margin-bottom:var(--spacing-md);padding-bottom:var(--spacing-sm);border-bottom:1px solid var(--color-bg-primary)}
 .back-link{color:var(--color-primary);text-decoration:none;font-size:14px;cursor:pointer;font-weight:500;display:inline-block;margin-bottom:var(--spacing-md)}.back-link:hover{text-decoration:underline}
 
-/* 证据链树 */
-.evidence-tree{padding-left:0}
-.evidence-tree-item{position:relative;margin-bottom:1px}
-.evidence-tree-item .evidence-header{display:flex;align-items:center;gap:var(--spacing-sm);padding:var(--spacing-sm) 8px;cursor:pointer;font-size:13px;transition:background .15s;border-radius:var(--radius-sm)}
-.evidence-tree-item .evidence-header:hover{background:var(--color-bg-primary)}
-.evidence-tree-children{padding-left:20px;position:relative}
-.evidence-tree-children::before{content:'';position:absolute;left:6px;top:0;bottom:0;width:1px;background:var(--color-border)}
-.evidence-tree-item:last-child>.evidence-tree-children::before{height:12px}
-.evidence-freshness{font-size:10px;padding:1px 6px;border-radius:8px;flex-shrink:0}
+/* ===== 七步层次证据树 ===== */
+.evidence-tree{font-size:12px}
+/* 阶段组 */
+.wb-phase-group{margin-bottom:2px}
+.wb-phase-group .wb-phase-header{display:flex;align-items:center;gap:6px;padding:5px 8px;cursor:pointer;border-radius:6px;font-size:12px;transition:background .15s;user-select:none}
+.wb-phase-group .wb-phase-header:hover{background:#f0f5ff}
+.wb-phase-group .wb-phase-items{display:none;padding:2px 0 4px 12px;border-left:2px solid #e8e8e8;margin-left:8px}
+.wb-phase-group.open>.wb-phase-items{display:block}
+.wb-phase-group.open>.wb-phase-header .wb-phase-arrow{transform:rotate(90deg)}
+.wb-phase-arrow.rotated{transform:rotate(90deg)}
+.wb-phase-arrow{font-size:8px;color:var(--color-text-tertiary);transition:transform .15s;flex-shrink:0;width:10px;text-align:center}
+.wb-phase-badge{font-size:9px;padding:1px 6px;border-radius:8px;flex-shrink:0;font-weight:500;letter-spacing:.5px}
+.wb-phase-badge.good{background:#f6ffed;color:var(--color-success)}
+.wb-phase-badge.warn{background:#fffbe6;color:#d48806}
+.wb-phase-badge.empty{background:#f5f5f5;color:var(--color-text-disabled)}
+/* 子步骤 */
+.wb-phase-group .wb-phase-group .wb-phase-header{font-size:11px;padding:3px 6px}
+.wb-phase-group .wb-phase-group .wb-phase-items{padding:1px 0 2px 10px;margin-left:6px}
+/* 证据行 */
+.wb-evidence-row{display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;font-size:11px;transition:background .12s}
+.wb-evidence-row:hover{background:#fafafa}
+/* 新鲜度 */
+.evidence-freshness{font-size:9px;padding:1px 5px;border-radius:8px;flex-shrink:0;font-weight:500}
 .evidence-freshness.fresh{background:#f6ffed;color:var(--color-success)}.evidence-freshness.usable{background:#fffbe6;color:#d48806}.evidence-freshness.stale{background:#fff1f0;color:var(--color-danger)}
-.evidence-expand{font-size:10px;color:var(--color-text-tertiary);margin-left:auto;transition:transform .2s;flex-shrink:0}
-.evidence-tree-item.open>.evidence-header .evidence-expand{transform:rotate(180deg)}
-.evidence-source{display:none;padding:var(--spacing-sm) 8px;font-size:12px;background:var(--color-bg-primary);border-radius:var(--radius-sm);margin-top:2px;margin-left:8px}
-.evidence-tree-item.open>.evidence-source{display:block;animation:slideDown .2s ease-out}
-.evidence-tree-item>.evidence-tree-children{display:none}
-.evidence-tree-item.open>.evidence-tree-children{display:block}
-.evidence-tree-item>.evidence-source{display:none}
-.evidence-tree-item.open>.evidence-source{display:block}
 .source-path{color:var(--color-text-tertiary);margin-bottom:4px}
 .source-quote-text{color:var(--color-text-secondary);font-style:italic;padding:var(--spacing-sm);background:var(--color-bg-card);border-radius:var(--radius-sm);border-left:3px solid var(--color-primary);margin-bottom:var(--spacing-sm)}
 .source-actions-row{display:flex;gap:var(--spacing-sm)}
 .source-btn-sm{padding:2px 8px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-bg-card);cursor:pointer;font-size:11px;font-family:var(--font-family-base);color:var(--color-primary);transition:all .15s}.source-btn-sm:hover{border-color:var(--color-primary);background:var(--color-primary-bg)}
+#wb-sliders-container::-webkit-scrollbar{width:4px}
+#wb-sliders-container::-webkit-scrollbar-track{background:transparent}
+#wb-sliders-container::-webkit-scrollbar-thumb{background:var(--color-border);border-radius:2px}
+#wb-sliders-container::-webkit-scrollbar-thumb:hover{background:var(--color-text-tertiary)}
 
 /* 辩论室 */
 .debate-thread{display:flex;flex-direction:column;gap:var(--spacing-sm)}
@@ -629,9 +637,12 @@ class TrustBar {
     // 阶段2b: 上升绿光 / 下降震动
     if(diff>0.5){this.fill.classList.remove('glow','shake');void this.fill.offsetWidth;this.fill.classList.add('glow')}
     if(diff<-0.5){this.fill.classList.remove('glow','shake');void this.fill.offsetWidth;this.fill.classList.add('shake')}
-    // 阶段3: 数字平滑计数
+    // 阶段3: 数字平滑计数 + 色标阈值
+    const threshold=this.maxValue*0.8;
     if(animate&&Math.abs(diff)>0.2)this._animateCount(oldVal,newVal);
     else this.valueEl.textContent=this._fmt(newVal);
+    this.valueEl.classList.remove('high','low');
+    this.valueEl.classList.add(newVal>=threshold?'high':'low');
     // Delta
     if(Math.abs(diff)<0.2){this.deltaEl.textContent='--';this.deltaEl.className='trust-bar-delta flat'}
     else if(diff>0){this.deltaEl.textContent='+'+diff.toFixed(2);this.deltaEl.className='trust-bar-delta up'}
@@ -644,7 +655,7 @@ class TrustBar {
     const dur=1200,start=performance.now();
     const step=()=>{
       const elapsed=performance.now()-start;
-      if(elapsed>=dur){this.valueEl.textContent=this._fmt(to);return}
+      if(elapsed>=dur){this.valueEl.textContent=this._fmt(to);this.valueEl.classList.remove('high','low');this.valueEl.classList.add(to>=this.maxValue*0.8?'high':'low');return}
       const progress=elapsed/dur;
       // 分段速度: 前400ms 70%, 后800ms 30%
       let eased;
@@ -923,9 +934,9 @@ function buildCockpit(){
 
     // 创建信任条
     const trustBars={
-      direction:new TrustBar(createTrustRow(trustContainer,'方向可信'),{label:'方向可信',value:d.baseTrusts.direction,max:d.maxTrusts.direction,isPercent:true}),
-      decode:new TrustBar(createTrustRow(trustContainer,'解码可信'),{label:'解码可信',value:d.baseTrusts.decode,max:d.maxTrusts.decode,isPercent:true}),
-      execution:new TrustBar(createTrustRow(trustContainer,'执行可信'),{label:'执行可信',value:d.baseTrusts.execution,max:d.maxTrusts.execution,isPercent:false})
+      direction:new TrustBar(createTrustRow(trustContainer,'SP'),{label:'SP',value:d.baseTrusts.direction,max:d.maxTrusts.direction,isPercent:true}),
+      decode:new TrustBar(createTrustRow(trustContainer,'BP'),{label:'BP',value:d.baseTrusts.decode,max:d.maxTrusts.decode,isPercent:true}),
+      execution:new TrustBar(createTrustRow(trustContainer,'BE'),{label:'BE',value:d.baseTrusts.execution,max:d.maxTrusts.execution,isPercent:false})
     };
 
     // 更新连接线颜色
@@ -1101,12 +1112,22 @@ const DEBATE_CHAINS={
     {delay:0,agent:'CHO',stance:'con',text:'人才缺口已经影响下游3个举措。招聘启动2个月0位候选人进入终面的现实说明：现有JD和薪资策略需要根本性调整。'},
     {delay:1200,agent:'CEO',stance:'pro',text:'这不是招聘的问题——这是人才策略的问题。如果自有人才不够，我建议考虑并购小型技术团队。一次性解决经验和数量问题，比逐个招聘快得多。'},
     {delay:2400,agent:'CFO',stance:'neutral',text:'并购方案的财务模型我马上做。初步估算：并购一个15-20人的AI团队大约需要¥3000-5000万——相当于2年自建团队的人力成本。但时间节省约12个月。'}
-  ]
+  ],
+  // PARAM_REGISTRY 键的辩论链
+  mkt_growth:[{delay:0,agent:'CMO',stance:'pro',text:'市场增速调整了——我需要重新评估窗口期。如果增速持续走低，我们的先发优势策略需要调整为防御型布局。'}],
+  comp_lead:[{delay:0,agent:'CEO',stance:'con',text:'竞品先发优势的变化直接影响我们的时间窗口。每增加一个月的领先，我们的获客成本预计上升8-12%。'}],
+  hc_gap:[{delay:0,agent:'CHO',stance:'con',text:'人才缺口数据更新了——这会影响至少3个下游举措的交付时间。我建议立即启动应急招聘方案。'}],
+  rd_budget:[{delay:0,agent:'CFO',stance:'neutral',text:'研发预算的调整会触发全局资源重分配。我需要重新计算各举措的ROI优先级。'}],
+  talent_pool:[{delay:0,agent:'CHO',stance:'neutral',text:'人才市场热度的变化会影响我们的招聘周期和薪资策略。热度下降意味着我们可以考虑更灵活的地域策略。'}],
+  train_cycle:[{delay:0,agent:'COO',stance:'con',text:'培养周期的延长意味着Q3交付节点面临风险。我需要和各部门确认是否可以通过内部导师制度压缩周期。'}],
+  salary_comp:[{delay:0,agent:'CFO',stance:'neutral',text:'薪资竞争力的调整会直接影响利润率。我建议在核心岗位和非核心岗位之间做差异化调整。'}],
+  localization:[{delay:0,agent:'CTO',stance:'pro',text:'国产替代率的变化反映了政策+技术的双重驱动。加速国产替代可以显著提升我们的竞争壁垒。'}],
+  launch_cycle:[{delay:0,agent:'COO',stance:'con',text:'产品上市周期的延长会让我们错失关键窗口。我建议评估并行开发策略来压缩整体周期。'}]
 };
 function refreshDebateRoom(layout, sliderKey, newValue){
-  const thread=layout.querySelector('.debate-thread');if(!thread)return;
-  const chain=DEBATE_CHAINS[sliderKey];if(!chain)return;
-  // 辩论链：按延迟依次追加消息，模拟真实辩论节奏
+  const thread=document.getElementById('wb-debate-thread');if(!thread)return;
+  let chain=DEBATE_CHAINS[sliderKey];
+  if(!chain){var reg=PARAM_REGISTRY[sliderKey];var name=reg?reg.name:sliderKey;chain=[{delay:0,agent:'AUD',stance:'neutral',text:'参数 ['+name+'] 已更新——正在评估此变化对整体战略一致性的影响。'}]}
   chain.forEach(r=>{
     setTimeout(()=>{
       const msg=document.createElement('div');
@@ -1136,8 +1157,8 @@ window._rebuildSliders=function(activeParamKeys,aggregatedParams){
       const w=document.createElement('div');w.style.marginBottom='6px';
       const step=reg.unit==='%'?1:reg.unit==='¥亿'?0.1:reg.unit==='人'?5:reg.unit==='分'?5:reg.unit==='月'?1:1;
       const mn=k==='talent_pool'||k==='localization'?0:k==='salary_comp'?-30:k==='hc_gap'?0:0;
-      const mx=k==='talent_pool'||k==='localization'?100:k==='salary_comp'?20:k==='hc_gap'?50:k==='mkt_growth'?30:k==='comp_lead'?6:3;
-      const sp=new SliderPhysics(w,{label:reg.name+(v.isDefault?' (默认)':''),min:mn,max:mx,value:v.value,step:step,formatValue:x=>x+reg.unit,valueSuffix:'',notches:[],warnBelow:undefined,dangerBelow:undefined,onChange:val=>{window._wbSliders[k].value=val;if(window._updateWB)window._updateWB()},onRelease:val=>{}});
+      const mx=k==='talent_pool'||k==='localization'?100:k==='salary_comp'?20:k==='hc_gap'?50:k==='mkt_growth'?30:k==='comp_lead'?6:k==='train_cycle'||k==='launch_cycle'||k==='training_cycle_months'?24:3;
+      const sp=new SliderPhysics(w,{label:reg.name+(v.isDefault?' (默认)':''),min:mn,max:mx,value:v.value,step:step,formatValue:x=>x+reg.unit,valueSuffix:'',notches:[],warnBelow:undefined,dangerBelow:undefined,onChange:val=>{window._wbSliders[k].value=val;if(window._updateWB)window._updateWB()},onRelease:val=>{refreshDebateRoom(null,k,val)}});
       window._wbSliders[k]=sp;window._wbActiveParams[k]=true;container.appendChild(w);
       const sl=document.createElement('div');sl.style.cssText='font-size:9px;color:'+(v.isDefault?'#999':'var(--color-text-tertiary)')+';margin-top:-4px;padding-left:56px';sl.textContent=v.isDefault?'← 默认值':'← '+(v.sources?.length||0)+'条证据';container.appendChild(sl);
     });
@@ -1147,42 +1168,121 @@ window._rebuildSliders=function(activeParamKeys,aggregatedParams){
 window._wbReset=function(){if(window.onEvidenceChange)window.onEvidenceChange()};
 function buildWorkbench(){
   const layout=document.getElementById('workbenchLayout');if(!layout)return;
-  // 左栏：证据链（树状组织）
-  const evidenceTree=[
-    {label:'🎯 SC-4 市场进入策略',freshness:'usable',children:[
-      {label:'市场规模 ¥520亿 CAGR 15%',freshness:'fresh',params:{mkt_growth:15,comp_lead:0},confidence:0.95,scId:'sc4',source:'Frost & Sullivan · 2026Q1',quote:'"...中国高端医疗设备市场在AI+国产替代双驱动下，预计2026年市场规模将突破520亿元人民币..."'},
-      {label:'竞争格局 Top3品牌份额62%',freshness:'usable',params:{comp_lead:1},confidence:0.80,scId:'sc4',source:'券商研报 · 2025Q4',quote:'"...目前行业前三品牌合计市场份额62%，无单一品牌超过25%，格局分散..."'},
-      {label:'进入方式 自建vs并购vs合资',freshness:'usable',params:{mkt_growth:15,rd_budget:2.0},confidence:0.85,scId:'sc4',source:'内部战略分析 · 2026Q1',quote:'"...三种进入模式的投资回报率差异显著，需根据目标市场特征选择..."'}
-    ]},
-    {label:'🏥 SC-2 三级医院渠道覆盖',freshness:'fresh',children:[
-      {label:'渠道覆盖 当前45% 目标80%',freshness:'fresh',params:{hc_gap:0},confidence:0.95,scId:'sc2',source:'内部数据 · 2026Q1',quote:'"...基于现有渠道团队9人，人均覆盖3-4家三甲医院，年度新增签约上限约28-32家..."'},
-      {label:'关键客户 28家三甲合作基础',freshness:'usable',params:{rd_budget:2.0},confidence:0.75,scId:'sc2',source:'客户关系库 · 2025Q4',quote:'"...28家已签约三甲医院中，18家为深度合作（年均采购>¥500万），10家为常规合作..."'}
-    ]},
-    {label:'📋 举措1.3 人才引进',freshness:'fresh',children:[
-      {label:'人力缺口 22人含5名资深架构师',freshness:'fresh',params:{hc_gap:22,talent_pool:60,train_cycle:9},confidence:0.95,scId:'bp13',source:'内部HR系统 · 2026Q1',quote:'"...当前研发团队98人，按项目计划需120人，缺口集中在AI算法和系统架构方向..."'},
-      {label:'人才市场薪资基准',freshness:'stale',params:{salary_comp:-15,talent_pool:40},confidence:0.60,scId:'bp13',source:'行业薪资调研报告 · 2025Q4',quote:'"...AI架构师市场薪资中位数¥85万/年，同比上涨18%..."'}
-    ]},
-    {label:'🔬 SC-1 技术趋势',freshness:'stale',params:{mkt_growth:12,localization:55},confidence:0.40,scId:'sc1',source:'行业白皮书 · 2024Q2',quote:'"...人工智能辅助诊断设备将在未来3-5年内成为影像科标配..."'}
+  // === 证据数据：扁平数组 ===
+  const allEvidence=[
+    // SP[1] 业绩差距
+    {label:'收入差距率 12%',freshness:'fresh',params:{mkt_growth:10,rd_budget:1.8},confidence:0.90,source:'财务报表 · 2025Q4',phase:'SP[1]'},
+    {label:'利润差距率 8%',freshness:'usable',params:{rd_budget:1.8},confidence:0.85,source:'财务报表 · 2025Q4',phase:'SP[1]'},
+    // SP[2] 市场洞察
+    {label:'总可用市场 ¥520亿',freshness:'fresh',params:{mkt_growth:15,comp_lead:0},confidence:0.95,source:'Frost & Sullivan · 2026Q1',phase:'SP[2]',substep:'(1)看趋势'},
+    {label:'政策支持度 中',freshness:'usable',params:{mkt_growth:12},confidence:0.70,source:'十四五规划 · 2025',phase:'SP[2]',substep:'(1)看趋势'},
+    {label:'客户需求清晰度 4/5',freshness:'fresh',params:{mkt_growth:15},confidence:0.90,source:'APPEALS分析 · 2026Q1',phase:'SP[2]',substep:'(2)看市场与客户'},
+    {label:'市场集中度 62%',freshness:'usable',params:{comp_lead:1},confidence:0.80,source:'券商研报 · 2025Q4',phase:'SP[2]',substep:'(3)看竞争'},
+    {label:'竞品先发优势 6个月',freshness:'fresh',params:{comp_lead:6},confidence:0.85,source:'竞品调研 · 2026Q1',phase:'SP[2]',substep:'(3)看竞争'},
+    {label:'内部流程效率 78%',freshness:'usable',params:{talent_pool:55},confidence:0.75,source:'运营数据 · 2025Q4',phase:'SP[2]',substep:'(4)看自己'},
+    {label:'增长路径可行性 4/5',freshness:'fresh',params:{mkt_growth:15,comp_lead:1},confidence:0.85,source:'安索夫分析 · 2026Q1',phase:'SP[2]',substep:'(5)看机会'},
+    {label:'能力-机会匹配度 3/5',freshness:'usable',params:{talent_pool:55,rd_budget:1.8},confidence:0.70,source:'GE-麦肯锡 · 2025Q4',phase:'SP[2]',substep:'(6)机会差距'},
+    // SP[3] 战略意图 (解码标注集中于此)
+    {label:'三年营收目标 ¥50亿',freshness:'fresh',params:{mkt_growth:15},confidence:0.95,source:'董事会决议 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2, 举措1.3'},
+    {label:'市场份额目标 25%',freshness:'fresh',params:{mkt_growth:15},confidence:0.90,source:'SP文档 · 2026',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2'},
+    {label:'毛利率目标 60%',freshness:'usable',params:{rd_budget:2.0},confidence:0.85,source:'财务规划 · 2026',phase:'SP[3]',decodesTo:'举措1.3'},
+    // SP[4-6]
+    {label:'技术创新度 3/5',freshness:'usable',params:{mkt_growth:12},confidence:0.75,source:'技术评估 · 2025Q4',phase:'SP[4]'},
+    {label:'价值主张清晰度 4/5',freshness:'fresh',params:{comp_lead:1},confidence:0.90,source:'战略工作坊 · 2026Q1',phase:'SP[5]'},
+    {label:'战略控制点强度 3/5',freshness:'usable',params:{rd_budget:2.0},confidence:0.80,source:'战略评估 · 2025Q4',phase:'SP[5]'},
+    {label:'关键任务就绪度 3/5',freshness:'fresh',params:{hc_gap:22,train_cycle:9},confidence:0.90,source:'项目管理 · 2026Q1',phase:'SP[6]'},
+    {label:'组织能力差距 中等',freshness:'usable',params:{talent_pool:60},confidence:0.75,source:'HR评估 · 2025Q4',phase:'SP[6]'},
+    // BP
+    {label:'渠道覆盖 45%→80%',freshness:'fresh',params:{hc_gap:0},confidence:0.95,source:'内部数据 · 2026Q1',phase:'BP'},
+    {label:'人力缺口 22人',freshness:'fresh',params:{hc_gap:22,talent_pool:60,train_cycle:9},confidence:0.95,source:'HR系统 · 2026Q1',phase:'BP'},
+    {label:'人才薪资基准 -15%',freshness:'stale',params:{salary_comp:-15,talent_pool:40},confidence:0.60,source:'薪资调研 · 2025Q4',phase:'BP'},
+    {label:'技术趋势 AI+国产替代',freshness:'stale',params:{mkt_growth:12,localization:55},confidence:0.40,source:'行业白皮书 · 2024Q2',phase:'BP'}
   ];
-  function renderEvidenceTree(nodes,depth){
-    let h='';
-    nodes.forEach((n,i)=>{
-      const isParent=n.children&&n.children.length>0;
-      const id='evt-'+depth+'-'+i+'-'+Date.now();
-      h+='<div class="evidence-tree-item'+(depth===0?' open':'')+'" id="'+id+'" style="padding-left:'+(depth>0?0:0)+'px">';
-      h+='<div class="evidence-header" onclick="var el=document.getElementById(\''+id+'\');el.classList.toggle(\'open\')">';
-      if(n.source&&!n.children)h+='<input type="checkbox" class="ev-check" data-freshness="'+(n.freshness||'')+'" onchange="window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" onclick="event.stopPropagation()">';
-      if(n.freshness)h+='<span class="evidence-freshness '+n.freshness+'">'+(n.freshness==='fresh'?'🟢':n.freshness==='usable'?'🟡':'🔴')+'</span>';
-      h+='<span class="ev-label" style="flex:1;font-size:'+(depth===0?'13px;font-weight:600':'12px')+'">'+n.label+'</span>';
-      if(isParent||n.source)h+='<span class="evidence-expand">▾</span>';
-      h+='</div>';
-      if(isParent){h+='<div class="evidence-tree-children">'+renderEvidenceTree(n.children,depth+1)+'</div>'}
-      if(n.source&&!isParent){h+='<div class="evidence-source"><div style="font-size:10px;color:var(--color-text-tertiary);margin-bottom:2px;">📄 '+n.source+'</div>'+(n.quote?'<div class="source-quote-text">'+n.quote+'</div>':'')+'<div class="source-actions-row"><button class="source-btn-sm">📍 跳转原始文档</button><button class="source-btn-sm">📋 复制引用</button></div></div>'}
-      h+='</div>';
-    });
+  // === 七步层次树渲染 ===
+  const phaseGroups=[
+    {tag:'SP',label:'战略规划 (BLM)',color:'#1890ff',phases:[
+      {step:'[1]',label:'业绩差距分析',keys:['收入差距率 12%','利润差距率 8%']},
+      {step:'[2]',label:'市场洞察',subs:[
+        {sub:'(1)看趋势',keys:['总可用市场 ¥520亿','政策支持度 中']},
+        {sub:'(2)看市场与客户',keys:['客户需求清晰度 4/5']},
+        {sub:'(3)看竞争',keys:['市场集中度 62%','竞品先发优势 6个月']},
+        {sub:'(4)看自己',keys:['内部流程效率 78%']},
+        {sub:'(5)看机会',keys:['增长路径可行性 4/5']},
+        {sub:'(6)机会差距',keys:['能力-机会匹配度 3/5']}
+      ]},
+      {step:'[3]',label:'战略意图',keys:['三年营收目标 ¥50亿','市场份额目标 25%','毛利率目标 60%']},
+      {step:'[4]',label:'创新焦点',keys:['技术创新度 3/5']},
+      {step:'[5]',label:'业务设计',keys:['价值主张清晰度 4/5','战略控制点强度 3/5']},
+      {step:'[6]',label:'执行设计',keys:['关键任务就绪度 3/5','组织能力差距 中等']}
+    ]},
+    {tag:'BP',label:'年度业务计划 (BEM)',color:'#00875A',phases:[
+      {step:'BP[1]',label:'澄清战略方向',keys:[]},
+      {step:'BP[2]',label:'导出战略举措',keys:[]},
+      {step:'BP[3]',label:'导出衡量指标',keys:[]},
+      {step:'BP[4]',label:'确定措施目标',keys:['渠道覆盖 45%→80%','人力缺口 22人']},
+      {step:'BP[5]',label:'分解措施目标',keys:['人才薪资基准 -15%']},
+      {step:'BP[6]',label:'导出工作计划',keys:[]}
+    ]},
+    {tag:'RT',label:'运行时监控',color:'#B86E00',phases:[
+      {step:'RT[1]',label:'执行进度监控',keys:[]},
+      {step:'RT[2]',label:'资源效率',keys:[]},
+      {step:'RT[3]',label:'结果评价',keys:[]},
+      {step:'RT[4]',label:'Checkpoint审计',keys:['技术趋势 AI+国产替代']}
+    ]}
+  ];
+  function renderPhaseTree(){
+    let h='';const byLabel={};allEvidence.forEach(e=>{byLabel[e.label]=e});
+    phaseGroups.forEach((g,gi)=>{
+      const gid='grp-'+gi+'-'+Math.random().toString(36).slice(2,5);
+      h+='<div class="wb-phase-group open" id="'+gid+'">';
+      h+='<div class="wb-phase-header" style="font-weight:700;font-size:13px;padding:7px 10px;border-left:3px solid '+g.color+';background:#fafafa;cursor:pointer" onclick="document.getElementById(\''+gid+'\').classList.toggle(\'open\');var ar=this.querySelector(\'.wb-phase-arrow\');if(ar)ar.classList.toggle(\'rotated\')"><input type="checkbox" class="ev-check-group" onclick="event.stopPropagation();var grp=document.getElementById(\''+gid+'\');var cbs=grp.querySelectorAll(\'.ev-check\');var all=Array.from(cbs).every(function(c){return c.checked});cbs.forEach(function(c){c.checked=!all});window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" title="全选/取消本组"><span class="wb-phase-arrow">▶</span> '+g.label+'</div>';
+      h+='<div class="wb-phase-items">';
+      g.phases.forEach((p,pi)=>{
+      const allKeys=(p.keys||[]).concat(p.subs?p.subs.flatMap(s=>s.keys):[]);
+      const items=allKeys.map(k=>byLabel[k]).filter(Boolean);
+      const f=items.filter(e=>e.freshness==='fresh').length;
+      const u=items.filter(e=>e.freshness==='usable').length;
+      const s=items.filter(e=>e.freshness==='stale').length;
+      const total=allKeys.length||1;
+      const badge=f>=total*0.6?'good':f>0||u>0?'warn':'empty';
+      const id='ph-'+pi+'-'+Math.random().toString(36).slice(2,5);
+      h+='<div class="wb-phase-group'+(pi<=1?' open':'')+'" id="'+id+'">';
+      h+='<div class="wb-phase-header" onclick="document.getElementById(\''+id+'\').classList.toggle(\'open\')"><input type="checkbox" class="ev-check-group" onclick="event.stopPropagation();var grp=document.getElementById(\''+id+'\');var cbs=grp.querySelectorAll(\'.ev-check\');var all=Array.from(cbs).every(function(c){return c.checked});cbs.forEach(function(c){c.checked=!all});window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" title="全选/取消本阶段"><span class="wb-phase-arrow">▶</span><strong>'+p.step+' '+p.label+'</strong><span class="wb-phase-badge '+badge+'">🟢'+f+' 🟡'+u+' 🔴'+s+'</span></div>';
+      h+='<div class="wb-phase-items">';
+      if(p.subs){
+        p.subs.forEach((ss,ssi)=>{
+          const sItems=ss.keys.map(k=>byLabel[k]).filter(Boolean);
+          const sid='sub-'+pi+'-'+ssi+'-'+Math.random().toString(36).slice(2,5);
+          h+='<div class="wb-phase-group'+(sItems.length>0?' open':'')+'" id="'+sid+'">';
+          const sf=sItems.filter(e=>e.freshness==='fresh').length;const su=sItems.filter(e=>e.freshness==='usable').length;const ss2=sItems.filter(e=>e.freshness==='stale').length;const sbadge=sf>=sItems.length*0.6?'good':sf>0||su>0?'warn':'empty';
+          h+='<div class="wb-phase-header" style="font-weight:400" onclick="document.getElementById(\''+sid+'\').classList.toggle(\'open\')"><span class="wb-phase-arrow">▶</span>'+ss.sub+' <span class="wb-phase-badge '+sbadge+'">🟢'+sf+' 🟡'+su+' 🔴'+ss2+'</span></div>';
+          h+='<div class="wb-phase-items">';
+          if(sItems.length===0)h+='<div style="font-size:10px;color:var(--color-text-disabled);padding:4px 0;font-style:italic">📌 待补充证据</div>';
+          sItems.forEach(e=>{h+=renderEvidenceRow(e)});
+          h+='</div></div>';
+        });
+      }else{
+        if(items.length===0)h+='<div style="font-size:10px;color:var(--color-text-disabled);padding:4px 0;font-style:italic">📌 待补充证据</div>';
+        items.forEach(e=>{h+=renderEvidenceRow(e)});
+      }
+      h+='</div></div>';
+    }); // close phases.forEach
+    h+='</div></div>'; // close group items + group
+    }); // close phaseGroups.forEach
     return h;
   }
-  // === 证据引擎：aggregateParams → 参数从证据来 ===
+  function renderEvidenceRow(e){
+    let h='<div class="wb-evidence-row">';
+    h+='<input type="checkbox" class="ev-check" data-freshness="'+(e.freshness||'')+'" onchange="window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" onclick="event.stopPropagation()">';
+    h+='<span class="evidence-freshness '+e.freshness+'">'+(e.freshness==='fresh'?'🟢':e.freshness==='usable'?'🟡':'🔴')+'</span>';
+    h+='<span class="ev-label" style="flex:1;font-size:11px">'+e.label+'</span>';
+    if(e.params){const pnames=Object.keys(e.params).map(k=>PARAM_REGISTRY[k]?.name||k).join(', ');h+='<span style="font-size:8px;color:var(--color-text-tertiary);flex-shrink:0" title="影响参数: '+pnames+'">→ '+pnames+'</span>';}
+    if(e.decodesTo)h+='<span style="font-size:8px;color:var(--color-primary);flex-shrink:0;cursor:pointer;margin-left:2px" onclick="event.stopPropagation();var cid=\'bp13\';if(window.jumpToCard)jumpToCard(cid)" title="解码到: '+e.decodesTo+'">🔗 '+e.decodesTo+'</span>';
+    if(e.source)h+='<span style="font-size:9px;color:var(--color-text-tertiary);flex-shrink:0;margin-left:2px;cursor:help" title="'+e.source+'">📄</span>';
+    h+='</div>';
+    return h;
+  }
+  // === 证据引擎 ===
   function aggregateParams(checkedEvidence){
     const weights={fresh:1.0,usable:0.9,stale:0.75};
     const acc={};
@@ -1201,64 +1301,45 @@ function buildWorkbench(){
   }
   function onEvidenceChange(){
     const checks=document.querySelectorAll('.ev-check:checked');
-    // 收集选中证据
+    const byLabel={};allEvidence.forEach(e=>{byLabel[e.label]=e});
     const selected=[];checks.forEach(cb=>{
-      const item=cb.closest('.evidence-tree-item');if(!item)return;
-      const label=item.querySelector('.ev-label')?.textContent;
-      const ev=findEvidenceByLabel(evidenceTree,label);if(ev)selected.push(ev);
+      const row=cb.closest('.wb-evidence-row');if(!row)return;
+      const label=row.querySelector('.ev-label')?.textContent;
+      if(label&&byLabel[label])selected.push(byLabel[label]);
     });
-    // 聚合参数并更新工作台
     const params=aggregateParams(selected);
     window._aggregatedParams=params;
-    // 更新工作台滑块
     syncWorkbenchSliders(params);
-    // 更新标签
-    updateParamSourceLabel(params,selected.length);
-  }
-  function findEvidenceByLabel(nodes,label){
-    for(const n of nodes){
-      if(n.label===label&&n.params)return n;
-      if(n.children){const r=findEvidenceByLabel(n.children,label);if(r)return r}
-    }
-    return null;
+    updateBadge(params,selected.length);
   }
   function syncWorkbenchSliders(params){
     const activeKeys=Object.keys(params).filter(k=>!params[k].isDefault||params[k].sources.length>0);
     if(window._rebuildSliders)window._rebuildSliders(activeKeys,params);
   }
-  function updateParamSourceLabel(params,count){
+  function updateBadge(params,count){
     const badge=document.getElementById('evidence-discount-badge');
-    if(badge&&count>0){
-      const lines=Object.entries(params).filter(([k,v])=>!v.isDefault||v.sources.length>0).slice(0,6).map(([k,v])=>{
-        const reg=PARAM_REGISTRY[k];const name=reg?reg.name:k;
-        const src=v.sources.length?v.sources.length+'条证据':'默认值';
-        const color=v.isDefault?'color:#999':v.sources.length>1?'color:#d48806':'';
-        return '<span style="'+color+';font-size:10px">'+name+' '+v.value+(reg?reg.unit:'')+' ('+src+')</span>';
-      }).join(' · ');
-      badge.style.display='block';badge.innerHTML='📏 参数来源：'+lines;
-    }else if(badge){badge.style.display='none'}
-    const wbBadge=document.getElementById('wb-evidence-discount');
-    if(wbBadge&&count>0){wbBadge.style.display='block';wbBadge.textContent='📏 参数由'+count+'条证据聚合推导 · 滑块已同步为证据值'}
-    else if(wbBadge){wbBadge.style.display='none'}
+    if(badge&&count>0){badge.style.display='block';badge.textContent='📏 '+count+'条证据聚合 · 覆盖'+Object.values(params).filter(v=>!v.isDefault).length+'参数'}
+    else if(badge){badge.style.display='none'}
+    const wb=document.getElementById('wb-evidence-discount');
+    if(wb&&count>0){wb.textContent='📏 '+count+'条证据聚合 → '+Object.values(params).filter(v=>!v.isDefault).length+'个活跃参数'}
+    else if(wb){wb.textContent='📏 勾选左侧证据 → 参数自动聚合'}
   }
-  // 情景切换
   function scenarioApply(type){
     const allCbs=document.querySelectorAll('.ev-check');
     allCbs.forEach(cb=>{if(type==='optimistic')cb.checked=cb.dataset.freshness==='fresh';else if(type==='conservative')cb.checked=true});
     onEvidenceChange();
-    window._wbLastScenario=type;
     showToast(type==='optimistic'?'🟢 乐观情景：仅采纳新鲜数据':type==='conservative'?'🔴 保守情景：全部证据纳入推演':'✋ 自定义：手动勾选证据','info');
   }
   window.scenarioApply=scenarioApply;
   window.onEvidenceChange=onEvidenceChange;
-  window.recalcEvidenceDiscount=onEvidenceChange; // 兼容旧引用
-  let evidenceHTML='<div class="workbench-panel"><h3>📊 证据链</h3><div style="display:flex;gap:6px;margin-bottom:var(--spacing-sm)"><button onclick="scenarioApply(\'optimistic\')" style="flex:1;padding:4px 8px;border:1px solid var(--color-success);border-radius:4px;background:#f6ffed;cursor:pointer;font-size:11px;font-family:var(--font-family-base);color:var(--color-success);font-weight:500">🟢 乐观</button><button onclick="scenarioApply(\'conservative\')" style="flex:1;padding:4px 8px;border:1px solid var(--color-danger);border-radius:4px;background:#fff1f0;cursor:pointer;font-size:11px;font-family:var(--font-family-base);color:var(--color-danger);font-weight:500">🔴 保守</button><button onclick="scenarioApply(\'custom\')" style="flex:1;padding:4px 8px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-bg-card);cursor:pointer;font-size:11px;font-family:var(--font-family-base);color:var(--color-text-secondary)">✋ 自定义</button></div><p style="font-size:10px;color:var(--color-text-tertiary);margin-bottom:var(--spacing-sm)">勾选证据 → 参数由选中证据聚合推导 → 滑块自动同步</p><div class="evidence-tree">'+renderEvidenceTree(evidenceTree,0)+'</div><div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div></div>';
+  window.recalcEvidenceDiscount=onEvidenceChange;
+  let evidenceHTML='<div class="workbench-panel"><h3>📊 战略证据链</h3><div style="display:flex;gap:4px;margin-bottom:var(--spacing-sm)"><button onclick="scenarioApply(\'optimistic\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-success);border-radius:3px;background:#f6ffed;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-success);font-weight:500">🟢乐观</button><button onclick="scenarioApply(\'conservative\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-danger);border-radius:3px;background:#fff1f0;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-danger);font-weight:500">🔴保守</button><button onclick="scenarioApply(\'custom\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-border);border-radius:3px;background:var(--color-bg-card);cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-text-secondary)">✋自定义</button></div><div class="evidence-tree">'+renderPhaseTree()+'</div><div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div></div>';
 
   // 中栏：动态推演沙盘 — 参数体系由选中证据决定
   let sandboxHTML='<div class="workbench-panel"><h3>🎮 推演沙盘</h3>'+
-    '<div id="wb-evidence-discount" style="display:none;margin-bottom:4px;padding:3px 6px;background:#f0f8ff;border-radius:3px;font-size:10px;color:var(--color-primary)"></div>'+
+    '<div id="wb-evidence-discount" style="margin-bottom:4px;padding:3px 8px;background:#f0f8ff;border-radius:3px;font-size:10px;color:var(--color-primary)">📏 勾选左侧证据 → 参数自动聚合</div>'+
     '<div class="trust-bars-stack" id="wb-trusts" style="margin-bottom:var(--spacing-md)"></div>'+
-    '<div id="wb-sliders-container"></div>'+
+    '<div id="wb-sliders-container" style="max-height:320px;overflow-y:auto"></div>'+
     '<div style="margin-top:var(--spacing-sm);font-size:10px;color:var(--color-text-tertiary);line-height:1.5" id="wb-param-detail"></div>'+
     '<div style="margin-top:var(--spacing-sm);display:flex;gap:6px">'+
       '<button onclick="window._wbReset()" style="padding:3px 10px;border:1px solid var(--color-border);border-radius:3px;background:var(--color-bg-card);cursor:pointer;font-size:11px;font-family:var(--font-family-base)">↻ 重置为证据值</button>'+
@@ -1273,7 +1354,7 @@ function buildWorkbench(){
     {agent:'CEO',stance:'pro',text:'这是长期战略价值的赌注。5年回收期看着长，但高端医疗设备的客户生命周期价值是20年+。我支持CMO的判断，但CFO的财务风险必须被对冲——合资是折中方案。'},
     {agent:'CHO',stance:'neutral',text:'自建模式需要6个月内到位22名核心人才——在当前人才市场，这个目标极其激进。我已经和3所高校谈过联合培养方案，但最快见效也要9个月。这是执行维度的最大风险。'}
   ];
-  let debateHTML='<div class="workbench-panel"><h3>💬 辩论室 <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400;">— 6/7角色已发言</span></h3><div class="debate-thread">';
+  let debateHTML='<div class="workbench-panel"><h3>💬 辩论室 <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400;">— 6/7角色已发言</span></h3><div class="debate-thread" id="wb-debate-thread">';
   debateMsgs.forEach(dm=>{
     debateHTML+='<div class="debate-msg '+dm.stance+'"><span class="debate-agent-avatar">'+dm.agent+'</span><span class="debate-msg-text">'+dm.text+'</span></div>';
   });
@@ -1286,9 +1367,9 @@ function buildWorkbench(){
     const wbTrustContainer=document.getElementById('wb-trusts');
     if(!wbTrustContainer)return;
     const wbTrustBars={
-      direction:new TrustBar(createTrustRow(wbTrustContainer,'方向可信'),{label:'方向可信',value:0.85,max:1,isPercent:true}),
-      decode:new TrustBar(createTrustRow(wbTrustContainer,'解码可信'),{label:'解码可信',value:1.0,max:1,isPercent:true}),
-      execution:new TrustBar(createTrustRow(wbTrustContainer,'执行可信'),{label:'执行可信',value:82,max:100,isPercent:false})
+      direction:new TrustBar(createTrustRow(wbTrustContainer,'SP'),{label:'SP',value:0.85,max:1,isPercent:true}),
+      decode:new TrustBar(createTrustRow(wbTrustContainer,'BP'),{label:'BP',value:1.0,max:1,isPercent:true}),
+      execution:new TrustBar(createTrustRow(wbTrustContainer,'BE'),{label:'BE',value:82,max:100,isPercent:false})
     };
     function calcTrustsGeneric(params){
       const p=k=>params[k]||PARAM_REGISTRY[k]?.default||0;
