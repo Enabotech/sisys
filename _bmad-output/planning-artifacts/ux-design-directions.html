@@ -780,7 +780,7 @@ class AICompensation {
       else if(cur.rd_invest!==undefined&&cur.rd_invest<1.2){narr.significance='🔴 研发投入严重不足。低于技术护城河维持线（¥1.5亿）——CTO评估18个月内领先优势将丧失。';narr.margin='建议优先砍掉边缘产品线，集中预算保核心技术。'}
       else if(cur.rd_invest!==undefined&&cur.rd_invest<1.8){narr.significance='🟡 研发投入处于警戒区间。维持现有技术优势勉强够用，但不足以应对竞品加速。';narr.margin='若市场增速同步放缓，建议适当追加研发预算。'}
       else{narr.significance='🟢 战略配置稳健。市场增速、国产替代、研发投入形成正向循环。';narr.margin=''}
-    }else{
+    }
     return narr;
   }
   _render(){
