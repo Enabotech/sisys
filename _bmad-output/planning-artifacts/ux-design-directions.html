@@ -453,7 +453,7 @@ function buildTrendCell(container,prefix,key,title,color,val,mxVal){
     [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'be',mx:100,v:scores.execution}].forEach(function(s){
       var ip=prefix+s.k;var cv=document.getElementById('c'+ip);if(cv)tDraw(cv,s.k,s.mx);
       var ve=document.getElementById('v'+ip);if(ve)ve.textContent=s.k==='be'?Math.round(s.v):s.v.toFixed(2);
-      var de=document.getElementById('d'+ip);if(de){var h=window._th;if(h.length>1){var pv=h[h.length-2][s.k];var d=s.v-pv;de.textContent=d>0?'\\u2191 +'+(s.k==='be'?Math.round(d):d.toFixed(2)):d<0?'\\u2193 '+(s.k==='be'?Math.round(d):d.toFixed(2)):'\\u2192';de.style.color=d>0?'var(--color-success)':d<0?'var(--color-danger)':'var(--color-text-tertiary)'}}
+      var de=document.getElementById('d'+ip);if(de){var h=window._th;if(h.length>1){var pv=h[h.length-2][s.k];var d=s.v-pv;de.textContent=d>0?'↑ +'+(s.k==='be'?Math.round(d):d.toFixed(2)):d<0?'↓ '+(s.k==='be'?Math.round(d):d.toFixed(2)):'→';de.style.color=d>0?'var(--color-success)':d<0?'var(--color-danger)':'var(--color-text-tertiary)'}}
     });
   };
 }
@@ -1374,17 +1374,10 @@ function buildWorkbench(){
       var exec=clamp(88-(2.0-p('rd_budget'))*25-(p('hc_gap'))*0.7+(p('train_cycle')<6?5:0)-(p('launch_cycle')>12?3:0),0,100);
       return{direction:dir,decode:dec,execution:exec};
     }
-    function updateTrends(scores){
-      [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'be',mx:100,v:scores.execution}].forEach(function(s){
-        var cv=document.getElementById('tw'+s.k);if(cv)tDraw(cv,s.k,s.mx);
-        var ve=document.getElementById('tv'+s.k);if(ve)ve.textContent=s.k==='be'?Math.round(s.v):s.v.toFixed(2);
-        var de=document.getElementById('td'+s.k);if(de){var h=window._th;if(h.length>1){var pv=h[h.length-2][s.k];var d=s.v-pv;de.textContent=d>0?'↑ +'+(s.k==='be'?Math.round(d):d.toFixed(2)):d<0?'↓ '+(s.k==='be'?Math.round(d):d.toFixed(2)):'→';de.style.color=d>0?'var(--color-success)':d<0?'var(--color-danger)':'var(--color-text-tertiary)'}}
-      });
-    }
     window._updateWB=function(){
       var st={};if(window._wbSliders)Object.keys(window._wbSliders).forEach(function(k){st[k]=window._wbSliders[k].value});
       var trusts=calcTrustsGeneric(st);
-      updateTrends(trusts);window._lastWBTrusts=trusts; // ← push history HERE, not in onRelease
+      wbUpdateTrends(trusts);window._lastWBTrusts=trusts;
     };
     wbUpdateTrends({direction:0.85,decode:1.0,execution:82});
     setTimeout(()=>{if(window.scenarioApply)window.scenarioApply('optimistic')},200);
