@@ -98,7 +98,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .card-urgency-tag.pending{color:var(--color-primary);background:var(--color-primary-bg)}
 .card-urgency-tag.stable{color:var(--color-success);background:#f6ffed}
 .card-title-text{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card-summary{font-size:13px;color:var(--color-text-secondary);padding:0 var(--spacing-lg);margin-bottom:var(--spacing-sm)}
+.card-summary{font-size:12px;color:var(--color-text-secondary);margin-top:2px}
 .card-header-right{display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0}
 
 /* 折叠卡片缩微信任条 — Steve的"心跳信号" */
@@ -902,7 +902,10 @@ function buildCockpit(){
       '<div class="card-header">'+
         '<div class="card-header-left">'+
           '<span class="card-urgency-tag '+d.urgency+'">'+d.icon+' '+d.tag+'</span>'+
-          '<span class="card-title-text">'+d.title+'</span>'+
+          '<div><span class="card-title-text">'+d.title+'</span>'+
+          '<div class="card-summary">'+d.summary+'</div>'+
+          (d.spBpMapping?'<div class="decode-ribbon"><span class="decode-ribbon-label">解码到 →</span>'+d.spBpMapping.map(m=>'<span class="decode-ribbon-tag bp-tag" onclick="event.stopPropagation();jumpToCard(\''+m.bpId+'\')" title="'+m.csf+' → '+m.kpi+' → '+m.target+' (权重:'+m.weight+')">📋 '+m.bpId.replace('bp','举措')+'</span>').join('')+'</div>':'')+
+          '</div>'+
         '</div>'+
         '<div class="card-header-mid"><span class="mini-nav-hint" id="mini-hint-'+d.id+'"></span>'+
           '<div class="card-folded-trusts" id="mini-trusts-'+d.id+'">'+
@@ -915,8 +918,6 @@ function buildCockpit(){
           '<button class="card-expand-btn" onclick="toggleCardExpand(\''+d.id+'\')" title="展开/折叠">▸</button>'+
         '</div>'+
       '</div>'+
-      '<div class="card-summary">'+d.summary+'</div>'+
-      (d.spBpMapping?'<div class="decode-ribbon"><span class="decode-ribbon-label">解码到 →</span>'+d.spBpMapping.map(m=>'<span class="decode-ribbon-tag bp-tag" onclick="event.stopPropagation();jumpToCard(\''+m.bpId+'\')" title="'+m.csf+' → '+m.kpi+' → '+m.target+' (权重:'+m.weight+')">📋 '+m.bpId.replace('bp','举措')+'</span>').join('')+'</div>':'')+
       (d.spAnchor?'<div class="decode-ribbon"><span class="decode-ribbon-label">锚定 ←</span><span class="decode-ribbon-tag sp-tag" onclick="event.stopPropagation();jumpToCard(\''+d.spAnchor.spId+'\')" title="'+d.spAnchor.csf+' → '+d.spAnchor.kpi+' → '+d.spAnchor.target+' (权重:'+d.spAnchor.weight+')">'+d.spAnchor.spTitle+'</span></div>':'')+
       '<div class="card-body">'+
         '<div class="trust-bars-stack" id="trusts-'+d.id+'"></div>'+
