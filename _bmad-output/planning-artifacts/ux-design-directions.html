@@ -880,6 +880,11 @@ const DECISION_DEFS = [
   {
     id:'sc3', urgency:'urgent', icon:'🔴', tag:'紧急', title:'SC-3 现金流与投资回报危机',
     summary:'现金流压力极高 · 回收期5.8年 · ROI持续恶化',
+    spBpMapping:[
+      {bpId:'bp12',csf:'CSF-1 财务健康',kpi:'KPI-1.1 现金流安全垫',target:'≥3个月',weight:0.5},
+      {bpId:'bp14',csf:'CSF-6 运营效率',kpi:'KPI-6.2 成本优化率',target:'降本30%',weight:0.3},
+      {bpId:'bp11',csf:'CSF-2 产品竞争力',kpi:'KPI-2.2 研发ROI',target:'≥2.5',weight:0.2}
+    ],
     staleData:[{label:'现金流预测报告',freshness:'过期12个月',desc:'2025Q1现金流模型'}],
     options:['紧急融资','💡 砍边缘业务保核心（AI推荐）'],
     baseTrusts:{direction:0.35, decode:0.42, execution:28},
@@ -892,7 +897,8 @@ const DECISION_DEFS = [
     ],
     calcTrusts:function(sliders){
       const dir=clamp(0.32+(15-sliders.mkt_growth)*0.02+(5-sliders.cashflow)*0.03,0,1);
-      const dec=clamp(0.40+(sliders.rd_budget>1.2?0.1:0)+(sliders.cashflow<3?0.08:0)-(sliders.payback>5?0.06:0),0,1);
+      // decode升降梯: 研发充足+0.15, 现金流低压+0.12, 回收期超标-0.08 → 最优0.77 最差0.42
+      const dec=clamp(0.50+(sliders.rd_budget>1.5?0.15:0)+(sliders.cashflow<2?0.12:0)-(sliders.payback>5?0.08:0),0,1);
       const exec=clamp(25+(sliders.rd_budget-0.8)*20+(5-sliders.cashflow)*8+(7-sliders.payback)*6+(sliders.mkt_growth-6)*1.5,0,100);
       return{direction:dir,decode:dec,execution:exec};
     },
