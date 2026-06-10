@@ -442,10 +442,21 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 // ============================================================
 // 置信度趋势
 // ============================================================
-window._th=[];(function sd(){var b={sp:0.85,bp:1.0,be:82};for(var i=0;i<10;i++){var j=Math.sin(i*1.2)*0.03;window._th.push({sp:b.sp+j,bp:b.bp+Math.sin(i)*0.02,be:b.be+Math.sin(i*0.8)*3,ts:Date.now()-(10-i)*30000})}})();
+window._th=[];(function sd(){var b={sp:0.85,bp:1.0,be:82};for(var i=0;i<10;i++){var j=Math.sin(i*1.2)*0.09;window._th.push({sp:b.sp+j,bp:b.bp+Math.sin(i)*0.02,be:b.be+Math.sin(i*0.8)*3,ts:Date.now()-(10-i)*30000})}})();
 function tPush(sp,bp,be){window._th.push({sp:sp,bp:bp,be:be,ts:Date.now()});if(window._th.length>100)window._th.shift()}
 function tDraw(cv,key,mx){var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;var hist=window._th.map(function(p){return p[key]});if(hist.length<2)return;ctx.clearRect(0,0,w,h);var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0,0.5,1].forEach(function(p){var y=h-8-p*(h-16);ctx.beginPath();ctx.moveTo(2,y);ctx.lineTo(w-2,y);ctx.stroke()});var lv=hist[hist.length-1];var cs={sp:'#1890ff',bp:'#00875A',be:'#B86E00'};ctx.strokeStyle=cs[key]||'#888';ctx.lineWidth=2;ctx.beginPath();hist.forEach(function(v,i){var x=2+i/Math.max(hist.length-1,1)*(w-4);var y=h-8-(v-mn)/r*(h-16);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.arc(2+(hist.length-1)/Math.max(hist.length-1,1)*(w-4),h-8-(lv-mn)/r*(h-16),3,0,Math.PI*2);ctx.fill()}
 function tModal(key){key=key||'sp';var ns={sp:'SP 战略规划',bp:'BP 业务计划',be:'BE 业务执行'};var cl={sp:'#1890ff',bp:'#00875A',be:'#B86E00'};var mx={sp:1,bp:1,be:100};var m=document.getElementById('tM'),o=document.getElementById('tO');if(!m){o=document.createElement('div');o.id='tO';o.className='overlay';o.onclick=function(){o.classList.remove('show');m.classList.remove('show')};document.body.appendChild(o);m=document.createElement('div');m.id='tM';m.className='modal';m.style.cssText='max-width:500px';m.innerHTML='<div class="modal-header"><span class="modal-title" id="tT"></span><button class="modal-close" onclick="document.getElementById(\'tO\').classList.remove(\'show\');document.getElementById(\'tM\').classList.remove(\'show\')">X</button></div><div class="modal-body"><canvas id="tC" width="460" height="200" style="width:100%;height:auto"></canvas><div style="margin-top:8px;font-size:13px;text-align:center;font-weight:700" id="tV"></div></div>';document.body.appendChild(m)}o.classList.add('show');m.classList.add('show');document.getElementById('tT').textContent='📈 '+ns[key]+' 置信度走势（最近'+window._th.length+'次）';setTimeout(function(){var c=document.getElementById('tC');if(!c)return;var ctx=c.getContext('2d'),w=c.width,h=c.height;var hist=window._th.map(function(p){return p[key]});var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0.25,0.5,0.75].forEach(function(p){var y=h-20-p*(h-30);ctx.beginPath();ctx.moveTo(10,y);ctx.lineTo(w-10,y);ctx.stroke()});ctx.strokeStyle=cl[key];ctx.lineWidth=2.5;ctx.beginPath();hist.forEach(function(v,i){var x=10+i/Math.max(hist.length-1,1)*(w-20);var y=h-20-(v-mn)/r*(h-30);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();var lv=hist[hist.length-1],pv=hist[hist.length-2],d=pv?lv-pv:0;document.getElementById('tV').innerHTML='<span style="color:'+cl[key]+'">'+(key==='be'?Math.round(lv):lv.toFixed(2))+'</span> <span style="font-size:12px;color:'+(d>=0?'var(--color-success)':'var(--color-danger)')+'">'+(d>0?'↑+':d<0?'↓':'→')+(key==='be'?Math.round(Math.abs(d)):Math.abs(d).toFixed(2))+'</span>'},100)}
+function buildTrendCell(container,prefix,key,title,color,val,mxVal){
+  var pid=prefix+key;var d=document.createElement('div');d.style.cssText='text-align:center;cursor:pointer';d.onclick=function(){tModal(key)};
+  d.innerHTML='<div style=\"font-size:12px;font-weight:700;color:'+color+'\">'+title+'</div><canvas id=\"c'+pid+'\" width=\"130\" height=\"70\" style=\"width:100%\"></canvas><div style=\"font-size:14px;font-weight:700;margin-top:2px\" id=\"v'+pid+'\">'+(key==='be'?Math.round(val):val.toFixed(2))+'</div><div style=\"font-size:10px;color:var(--color-text-tertiary)\" id=\"d'+pid+'\"></div>';
+  container.appendChild(d);return function(scores){
+    [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'be',mx:100,v:scores.execution}].forEach(function(s){
+      var ip=prefix+s.k;var cv=document.getElementById('c'+ip);if(cv)tDraw(cv,s.k,s.mx);
+      var ve=document.getElementById('v'+ip);if(ve)ve.textContent=s.k==='be'?Math.round(s.v):s.v.toFixed(2);
+      var de=document.getElementById('d'+ip);if(de){var h=window._th;if(h.length>1){var pv=h[h.length-2][s.k];var d=s.v-pv;de.textContent=d>0?'\\u2191 +'+(s.k==='be'?Math.round(d):d.toFixed(2)):d<0?'\\u2193 '+(s.k==='be'?Math.round(d):d.toFixed(2)):'\\u2192';de.style.color=d>0?'var(--color-success)':d<0?'var(--color-danger)':'var(--color-text-tertiary)'}}}
+    });
+  };
+}
 // PARAM_REGISTRY — 组织级统一参数定义
 // ============================================================
 const PARAM_REGISTRY={
@@ -896,9 +907,9 @@ function buildCockpit(){
           '<span class="mini-nav-hint" id="mini-hint-'+d.id+'"></span>'+
           '<div class="card-folded-trusts" id="mini-trusts-'+d.id+'">'+
             '<div class="card-folded-trust-conn" id="mini-conn-'+d.id+'" style="background:'+(function(){var w=Math.min(bs.direction,bs.decode,bs.execution/d.maxTrusts.execution);return w<0.4?'var(--color-trust-red)':w<0.6?'var(--color-trust-yellow)':w<0.75?'var(--color-trust-amber)':'var(--color-trust-green)'})()+'"></div>'+
-            '<div class="card-folded-trust-mini" id="mini-dir-'+d.id+'" style="background-position:'+(bs.direction*100).toFixed(0)+'% center"></div>'+
-            '<div class="card-folded-trust-mini" id="mini-dec-'+d.id+'" style="background-position:'+(bs.decode*100).toFixed(0)+'% center"></div>'+
-            '<div class="card-folded-trust-mini" id="mini-exe-'+d.id+'" style="background-position:'+bs.execution.toFixed(0)+'% center"></div>'+
+            '<canvas class="card-folded-trust-mini" id="mini-spark-dir-'+d.id+'" width="28" height="8"></canvas>'+
+            '<canvas class="card-folded-trust-mini" id="mini-spark-dec-'+d.id+'" width="28" height="8"></canvas>'+
+            '<canvas class="card-folded-trust-mini" id="mini-spark-exe-'+d.id+'" width="28" height="8"></canvas>'+
           '</div>'+
           '<button class="card-expand-btn" onclick="toggleCardExpand(\''+d.id+'\')" title="展开/折叠">▸</button>'+
         '</div>'+
@@ -939,20 +950,11 @@ function buildCockpit(){
       sliderContainer.appendChild(wrapper);
     });
 
-    // 创建信任条
-    const trustBars={
-      direction:new TrustBar(createTrustRow(trustContainer,'SP'),{label:'SP',value:d.baseTrusts.direction,max:d.maxTrusts.direction,isPercent:true}),
-      decode:new TrustBar(createTrustRow(trustContainer,'BP'),{label:'BP',value:d.baseTrusts.decode,max:d.maxTrusts.decode,isPercent:true}),
-      execution:new TrustBar(createTrustRow(trustContainer,'BE'),{label:'BE',value:d.baseTrusts.execution,max:d.maxTrusts.execution,isPercent:false})
-    };
-
-    // 更新连接线颜色
-    function updateWeakest(){
-      const scores={direction:trustBars.direction.getScore(),decode:trustBars.decode.getScore(),execution:trustBars.execution.getScore()/100};
-      const worst=Math.min(scores.direction,scores.decode,scores.execution);
-      let level='ok';if(worst<0.4)level='danger';else if(worst<0.6)level='warning';else if(worst<0.75)level='caution';
-      trustContainer.setAttribute('data-weakest',level);
-    }
+    // 统一趋势图（与工作台一致）
+    trustContainer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
+    var pre=d.id+'-';var updateTrends=buildTrendCell(trustContainer,pre,'sp','SP','#1890ff',d.baseTrusts.direction,1);
+    buildTrendCell(trustContainer,pre,'bp','BP','#00875A',d.baseTrusts.decode,1);
+    buildTrendCell(trustContainer,pre,'be','BE','#B86E00',d.baseTrusts.execution,100);
 
     // 创建AI代偿
     const aiComp=new AICompensation(aiContainer,{cardId:d.id,baseTrusts:d.baseTrusts,staleData:d.staleData||[]});
@@ -966,29 +968,15 @@ function buildCockpit(){
       }
       // 双轨预览: 计算预测信任分, 显示幽灵条
       const st=getSliderState(d.id);const trusts=d.calcTrusts(st);
-      Object.keys(trustBars).forEach(k=>trustBars[k].setGhost(k==='execution'?trusts[k]:trusts[k]));
-      const tn=new TornadoMini(document.getElementById('tornado-'+d.id));
-      tn.update(d.tornadoItems(st));
-      showToast('双轨预览中：半透明条=预测值 · 实体条=当前值 · 可继续调滑块','info');
+      updateTrends(trusts);showToast('预览中','info');
     };
     aiComp.onConfirm=function(s){
       const st=getSliderState(d.id);const trusts=d.calcTrusts(st);
-      Object.keys(trustBars).forEach(k=>{trustBars[k].setValue(k==='execution'?trusts[k]:trusts[k],true);trustBars[k].clearGhost()});
-      updateWeakest();
-      showToast('策略已采纳 ✅','success');
-      document.getElementById('cockpitStatus').textContent='策略已应用：'+s.name+' · 可继续调整或撤销';
+      updateTrends(trusts);showToast('策略已采纳 ✅','success');document.getElementById('cockpitStatus').textContent='策略已应用：'+s.name;
     };
     aiComp.onUndo=function(){
       // 清除幽灵条, 恢复滑块和信任条到基础值
-      Object.keys(trustBars).forEach(k=>trustBars[k].clearGhost());
-      d.sliders.forEach(sdef=>{sliders[sdef.key].setValue(sdef.value,true)});
-      const st0={};d.sliders.forEach(sdef=>{st0[sdef.key]=sdef.value});
-      const trusts0=d.calcTrusts(st0);
-      Object.keys(trustBars).forEach(k=>trustBars[k].setValue(k==='execution'?trusts0[k]:trusts0[k],true));
-      updateWeakest();
-      const tn=new TornadoMini(document.getElementById('tornado-'+d.id));
-      tn.update(d.tornadoItems(st0));
-      document.getElementById('cockpitStatus').textContent='系统就绪 — 已撤销策略，恢复默认参数';
+      d.sliders.forEach(sdef=>{sliders[sdef.key].setValue(sdef.value,true)});var st0={};d.sliders.forEach(sdef=>{st0[sdef.key]=sdef.value});updateTrends(d.calcTrusts(st0));document.getElementById('cockpitStatus').textContent='系统就绪';
     };
 
     // 创建龙卷风图
@@ -997,11 +985,10 @@ function buildCockpit(){
     tornado.update(d.tornadoItems(initSt));
 
     // 存储实例
-    cardInstances[d.id]={def:d,sliders,trustBars,aiComp,tornado,updateWeakest};
+    cardInstances[d.id]={def:d,sliders,aiComp,tornado,updateTrends};
 
     // 初始评估AI代偿
     aiComp.evaluate(initSt);
-    updateWeakest();
     updateMiniTrusts(d.id);
     updateMiniHint(d.id);
   });
@@ -1023,8 +1010,7 @@ function onSliderChange(cardId){
   const inst=cardInstances[cardId];if(!inst)return;
   const st=getSliderState(cardId);
   const trusts=inst.def.calcTrusts(st);
-  Object.keys(inst.trustBars).forEach(k=>inst.trustBars[k].setValue(k==='execution'?trusts[k]:trusts[k],true));
-  inst.updateWeakest();
+  inst.updateTrends(trusts);
   // 更新AI代偿
   inst.aiComp.evaluate(st);
   // 更新龙卷风图
@@ -1039,7 +1025,7 @@ function onSliderChange(cardId){
     if(card.classList.contains('card-folded')&&cid!==cardId){
       const prevScores=card.dataset.prevScores?JSON.parse(card.dataset.prevScores):{};
       const instC=cardInstances[cid];if(!instC)return;
-      const curScores={direction:instC.trustBars.direction.getScore(),decode:instC.trustBars.decode.getScore(),execution:instC.trustBars.execution.getScore()};
+      var cst2={};Object.keys(instC.sliders).forEach(function(k){cst2[k]=instC.sliders[k].value});var curScores=instC.def.calcTrusts(cst2);curScores.execution=curScores.execution/100;
       const changed=Object.keys(curScores).some(k=>Math.abs(curScores[k]-(prevScores[k]||0))>0.03);
       if(changed){card.classList.add('card-pulse');setTimeout(()=>card.classList.remove('card-pulse'),400)}
       card.dataset.prevScores=JSON.stringify(curScores);
@@ -1048,24 +1034,25 @@ function onSliderChange(cardId){
 }
 
 function onSliderRelease(cardId){
-  document.getElementById('cockpitStatus').textContent='情景已更新 — 信任分重新计算完成 · 查看AI代偿建议';
+  var s2=inst.def.calcTrusts(getSliderState(cardId));tPush(s2.direction,s2.decode,s2.execution);document.getElementById('cockpitStatus').textContent='情景已更新 — 信任分重新计算完成 · 查看AI代偿建议';
 }
 
 function updateMiniTrusts(cardId){
-  const inst=cardInstances[cardId];if(!inst)return;
-  const scores={direction:inst.trustBars.direction.getScore(),decode:inst.trustBars.decode.getScore(),execution:inst.trustBars.execution.getScore()/100};
-  ['direction','decode','execution'].forEach((k,i)=>{
-    const el=document.getElementById('mini-'+(i===0?'dir':i===1?'dec':'exe')+'-'+cardId);
-    if(el){const pct=scores[k]*100;el.style.backgroundPosition=pct+'% center'}
+  var inst=cardInstances[cardId];if(!inst)return;
+  var st={};Object.keys(inst.sliders).forEach(function(k){st[k]=inst.sliders[k].value});
+  var scores=inst.def.calcTrusts(st);
+  // 画三条裸折线 (28×8 canvas, 无文字)
+  [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'be',mx:100,v:scores.execution}].forEach(function(s,i){
+    var cv=document.getElementById('mini-spark-'+(i===0?'dir':i===1?'dec':'exe')+'-'+cardId);if(cv)tDraw(cv,s.k,s.mx);
   });
-  const worst=Math.min(scores.direction,scores.decode,scores.execution);
-  const conn=document.getElementById('mini-conn-'+cardId);
+  var worst=Math.min(scores.direction,scores.decode,scores.execution/100);
+  var conn=document.getElementById('mini-conn-'+cardId);
   if(conn){conn.style.background=worst<0.4?'var(--color-trust-red)':worst<0.6?'var(--color-trust-yellow)':worst<0.75?'var(--color-trust-amber)':'var(--color-trust-green)'}
   updateMiniHint(cardId);
 }
 function updateMiniHint(cardId){
   const inst=cardInstances[cardId];if(!inst)return;
-  const scores={direction:inst.trustBars.direction.getScore(),decode:inst.trustBars.decode.getScore(),execution:inst.trustBars.execution.getScore()/100};
+  var st2={};Object.keys(inst.sliders).forEach(function(k){st2[k]=inst.sliders[k].value});var t2=inst.def.calcTrusts(st2);var scores={direction:t2.direction,decode:t2.decode,execution:t2.execution/100};
   const labels={direction:'SP方向分',decode:'BP解码分',execution:'BE执行分'};
   const worstKey=Object.keys(scores).reduce((a,b)=>scores[a]<scores[b]?a:b);
   const worst=scores[worstKey];const label=labels[worstKey];
@@ -1168,7 +1155,7 @@ window._rebuildSliders=function(activeParamKeys,aggregatedParams){
       const step=reg.unit==='%'?1:reg.unit==='¥亿'?0.1:reg.unit==='人'?5:reg.unit==='分'?5:reg.unit==='月'?1:1;
       const mn=k==='talent_pool'||k==='localization'?0:k==='salary_comp'?-30:k==='hc_gap'?0:0;
       const mx=k==='talent_pool'||k==='localization'?100:k==='salary_comp'?20:k==='hc_gap'?50:k==='mkt_growth'?30:k==='comp_lead'?6:k==='train_cycle'||k==='launch_cycle'||k==='training_cycle_months'?24:3;
-      const sp=new SliderPhysics(w,{label:reg.name+(v.isDefault?' (默认)':''),min:mn,max:mx,value:v.value,step:step,formatValue:x=>x+reg.unit,valueSuffix:'',notches:[],warnBelow:undefined,dangerBelow:undefined,onChange:val=>{window._wbSliders[k].value=val;if(window._updateWB)window._updateWB()},onRelease:val=>{refreshDebateRoom(null,k,val)}});
+      const sp=new SliderPhysics(w,{label:reg.name+(v.isDefault?' (默认)':''),min:mn,max:mx,value:v.value,step:step,formatValue:x=>x+reg.unit,valueSuffix:'',notches:[],warnBelow:undefined,dangerBelow:undefined,onChange:val=>{window._wbSliders[k].value=val;if(window._updateWB)window._updateWB()},onRelease:val=>{if(window._lastWBTrusts)tPush(window._lastWBTrusts.direction,window._lastWBTrusts.decode,window._lastWBTrusts.execution);refreshDebateRoom(null,k,val)}});
       window._wbSliders[k]=sp;window._wbActiveParams[k]=true;container.appendChild(w);
       const sl=document.createElement('div');sl.style.cssText='font-size:9px;color:'+(v.isDefault?'#999':'var(--color-text-tertiary)')+';margin-top:-4px;padding-left:56px';sl.textContent=v.isDefault?'← 默认值':'← '+(v.sources?.length||0)+'条证据';container.appendChild(sl);
     });
@@ -1377,12 +1364,9 @@ function buildWorkbench(){
     const wbTrustContainer=document.getElementById('wb-trusts');
     if(!wbTrustContainer)return;
     wbTrustContainer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
-    function buildTCell(key,title,color,val,mxVal){
-      var d=document.createElement('div');d.style.cssText='text-align:center;cursor:pointer';d.onclick=function(){tModal(key)};
-      d.innerHTML='<div style="font-size:12px;font-weight:700;color:'+color+'">'+title+'</div><canvas id="tw'+key+'" width="130" height="55" style="width:100%"></canvas><div style="font-size:14px;font-weight:700;margin-top:1px" id="tv'+key+'">'+(key==='be'?Math.round(val):val.toFixed(2))+'</div><div style="font-size:10px;color:var(--color-text-tertiary)" id="td'+key+'"></div>';
-      wbTrustContainer.appendChild(d);
-    }
-    [{k:'sp',t:'SP',c:'#1890ff',v:0.85},{k:'bp',t:'BP',c:'#00875A',v:1.0},{k:'be',t:'BE',c:'#B86E00',v:82}].forEach(function(s){buildTCell(s.k,s.t,s.c,s.v,s.k==='be'?100:1)});
+    buildTrendCell(wbTrustContainer,'wb-','sp','SP','#1890ff',0.85,1);
+    buildTrendCell(wbTrustContainer,'wb-','bp','BP','#00875A',1.0,1);
+    var wbUpdateTrends=buildTrendCell(wbTrustContainer,'wb-','be','BE','#B86E00',82,100);
     function calcTrustsGeneric(params){
       var p=function(k){return params[k]||(PARAM_REGISTRY[k]?PARAM_REGISTRY[k].default:0)};
       var dir=clamp(0.92-(15-p('mkt_growth'))*0.018-(p('comp_lead'))*0.045+(p('localization')-55)*0.001,0,1);
@@ -1400,10 +1384,9 @@ function buildWorkbench(){
     window._updateWB=function(){
       var st={};if(window._wbSliders)Object.keys(window._wbSliders).forEach(function(k){st[k]=window._wbSliders[k].value});
       var trusts=calcTrustsGeneric(st);
-      updateTrends(trusts);
-      tPush(trusts.direction,trusts.decode,trusts.execution); // ← push history HERE, not in onRelease
+      updateTrends(trusts);window._lastWBTrusts=trusts; // ← push history HERE, not in onRelease
     };
-    updateTrends({direction:0.85,decode:1.0,execution:82});
+    wbUpdateTrends({direction:0.85,decode:1.0,execution:82});
     setTimeout(()=>{if(window.scenarioApply)window.scenarioApply('optimistic')},200);
   },100);
 
