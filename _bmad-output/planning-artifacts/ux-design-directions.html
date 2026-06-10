@@ -1038,7 +1038,7 @@ function buildCockpit(){
           '<canvas class="folded-spark" id="folded-spark-'+d.id+'-be" width="120" height="56"></canvas>'+
         '</div>'+
         '<div class="card-header-right">'+
-          '<button class="card-expand-btn" onclick="toggleCardExpand(\''+d.id+'\')" title="展开/折叠">▸</button>'+
+          '<button class="card-expand-btn" onclick="toggleCardExpand(\''+d.id+'\')" title="展开查看 · 展开后点击确认完成">▸</button>'+
         '</div>'+
       '</div>'+
       '<div class="card-body">'+
@@ -1236,14 +1236,32 @@ function updateFoldedCard(cardId){
   else if(worst<0.75){el.textContent='⚡ '+label+'偏低 建议关注';el.style.color='var(--color-trust-yellow)'}
   else{el.textContent='✅ 状态健康';el.style.color='var(--color-trust-green)'}
 }
+function resolveCard(cardId){
+  const card=document.getElementById('card-'+cardId);if(!card)return;
+  const inst=cardInstances[cardId];if(!inst)return;
+  // 帧1: tag瞬间变色 (0ms)
+  card.dataset.urgency='stable';
+  const tag=card.querySelector('.card-urgency-tag');
+  if(tag){tag.className='card-urgency-tag stable';tag.innerHTML='✅ 已处理'}
+  const strip=card.querySelector('.card-status-strip');
+  if(strip){strip.className='card-status-strip stable'}
+  // 帧2: 弹簧收起 (400ms)
+  setTimeout(()=>{
+    card.classList.add('card-folded');card.classList.remove('card-full');
+    const mid=card.querySelector('.card-header-mid');if(mid)mid.style.display='flex';
+    updateFoldedCard(cardId);resortCards();
+  },400);
+  showToast(inst.def.title+' 已处理 ✅','success');
+}
 function toggleCardExpand(cardId){
   const card=document.getElementById('card-'+cardId);if(!card)return;
   const isFull=card.classList.contains('card-full');
-  if(isFull){card.classList.remove('card-full');card.classList.add('card-folded')}
-  else{card.classList.remove('card-folded');card.classList.add('card-full')}
-  // 展开态隐藏折叠态趋势线，折叠态显示
-  const mid=card.querySelector('.card-header-mid');if(mid)mid.style.display=isFull?'flex':'none';
-  if(!isFull)updateFoldedCard(cardId);
+  // 展开态: ▸已旋转为▾，点击=处理完毕
+  if(isFull){resolveCard(cardId);return}
+  // 折叠态: 展开
+  card.classList.remove('card-folded');card.classList.add('card-full');
+  const mid=card.querySelector('.card-header-mid');if(mid)mid.style.display='none';
+  updateFoldedCard(cardId);
 }
 function jumpToCard(targetId){
   // 查找对应的真实卡片ID（bp11→无，bp12→无，bp13→bp13, sc4→sc4等）
