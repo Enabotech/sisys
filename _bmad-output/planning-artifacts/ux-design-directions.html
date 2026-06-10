@@ -216,7 +216,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .preview-btn,.confirm-btn,.undo-btn{padding:3px 12px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--font-family-base);border:1px solid var(--color-border);background:var(--color-bg-card);color:var(--color-text-secondary);transition:all .15s}
 .preview-btn:hover{border-color:var(--color-primary);color:var(--color-primary);background:var(--color-primary-bg)}
 .confirm-btn{background:var(--color-primary);color:white;border-color:var(--color-primary)}.confirm-btn:hover{background:var(--color-primary-hover)}
-.scenario-btn{transition:all .15s}.scenario-btn.active{opacity:1!important;border-width:2px;border-style:solid}
+.scenario-btn{transition:all .15s}.scenario-btn.active{opacity:1!important;border-width:2px;border-style:solid;font-weight:700!important}
 .undo-btn{color:var(--color-text-tertiary)}.undo-btn:hover{color:var(--color-danger);border-color:var(--color-danger)}
 .preview-applied .ai-strategy-card:not(.active){opacity:.4;pointer-events:none}
 .ai-strategy-card.active{border-color:var(--color-primary);box-shadow:0 0 8px rgba(24,144,255,.15)}
@@ -1584,6 +1584,13 @@ function buildWorkbench(){
     window._aggregatedParams=params;
     syncWorkbenchSliders(params);
     updateBadge(params,selected.length);
+    // 手动勾选→自动切自定义（非scenarioApply触发的变更）
+    if(!window._scenarioChanging){
+      window._currentScenario='custom';
+      document.querySelectorAll('.scenario-btn').forEach(function(b){b.classList.remove('active')});
+      var cb=document.querySelector('.scenario-btn[data-scenario="custom"]');
+      if(cb)cb.classList.add('active');
+    }
   }
   function syncWorkbenchSliders(params){
     const activeKeys=Object.keys(params).filter(k=>!params[k].isDefault||params[k].sources.length>0);
@@ -1601,7 +1608,7 @@ function buildWorkbench(){
     const allCbs=document.querySelectorAll('.ev-check');
     if(type==='optimistic')allCbs.forEach(cb=>{cb.checked=cb.dataset.freshness==='fresh'});
     else if(type==='conservative')allCbs.forEach(cb=>{cb.checked=true});
-    onEvidenceChange();
+    window._scenarioChanging=true;onEvidenceChange();window._scenarioChanging=false;
     window._currentScenario=type;
     // 按钮激活态
     document.querySelectorAll('.scenario-btn').forEach(b=>b.classList.remove('active'));
