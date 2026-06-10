@@ -1708,8 +1708,7 @@ function toggleDecisionEvidence(){
   var allChecked=Array.from(decChecks).every(function(c){return c.checked});
   decChecks.forEach(function(c){c.checked=!allChecked});
   window.recalcEvidenceDiscount();
-  window._currentScenario=allChecked?null:'decision';
-  document.querySelectorAll('.scenario-btn').forEach(function(b){b.classList.remove('active')});
+  // 决策是独立开关，不影响场景按钮激活态
   var btn=document.querySelector('.scenario-btn[data-scenario="decision"]');
   if(btn)btn.classList.toggle('active',!allChecked);
   showToast(allChecked?'已取消全部决策证据':'已勾选全部决策证据','info');
