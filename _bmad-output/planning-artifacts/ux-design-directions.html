@@ -1034,7 +1034,8 @@ function onSliderChange(cardId){
 }
 
 function onSliderRelease(cardId){
-  var s2=inst.def.calcTrusts(getSliderState(cardId));tPush(s2.direction,s2.decode,s2.execution);document.getElementById('cockpitStatus').textContent='情景已更新 — 信任分重新计算完成 · 查看AI代偿建议';
+  var i=cardInstances[cardId];if(i){var s2=i.def.calcTrusts(getSliderState(cardId));tPush(s2.direction,s2.decode,s2.execution)}
+  document.getElementById('cockpitStatus').textContent='情景已更新';
 }
 
 function updateMiniTrusts(cardId){
