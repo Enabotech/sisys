@@ -222,17 +222,6 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .ai-strategy-card.active{border-color:var(--color-primary);box-shadow:0 0 8px rgba(24,144,255,.15)}
 
 /* ============================================================
-   微型龙卷风图
-   ============================================================ */
-.tornado-mini{display:flex;flex-direction:column;gap:6px}
-.tornado-row{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:var(--spacing-sm)}
-.tornado-label{font-size:10px;text-align:right;color:var(--color-text-tertiary);line-height:1.2}
-.tornado-bars{display:flex;align-items:center;height:12px;position:relative}
-.tornado-axis{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--color-border);z-index:1}
-.tornado-bar-neg{background:var(--color-danger);height:100%;position:absolute;right:50%;border-radius:3px 0 0 3px;transition:width .4s var(--spring-settle);opacity:.75;max-width:45%}
-.tornado-bar-pos{background:var(--color-success);height:100%;position:absolute;left:50%;border-radius:0 3px 3px 0;transition:width .4s var(--spring-settle);opacity:.75;max-width:45%}
-
-/* ============================================================
    GPU状态指示器
    ============================================================ */
 .gpu-indicator{font-size:10px;color:var(--color-text-tertiary);text-align:right;margin-bottom:2px}
@@ -856,24 +845,6 @@ class AICompensation {
 // ============================================================
 // 微型龙卷风图
 // ============================================================
-class TornadoMini {
-  constructor(container){this.container=container;this._build()}
-  _build(){this.container.innerHTML='<div class="tornado-mini"></div>';this.body=this.container.querySelector('.tornado-mini')}
-  update(items){
-    const maxAbs=Math.max(...items.map(i=>Math.abs(i.value)),1);
-    this.body.innerHTML=items.map(i=>{
-      const pct=(Math.abs(i.value)/maxAbs)*78; // 归一化，78%留余量防越界
-      const neg=i.value<0;const pos=i.value>=0;
-      return '<div class="tornado-row"><div class="tornado-label">'+i.label+'</div>'+
-        '<div class="tornado-bars"><div class="tornado-axis"></div>'+
-        (neg?'<div class="tornado-bar-neg" style="width:'+pct+'%"></div>':'')+
-        (pos?'<div class="tornado-bar-pos" style="width:'+pct+'%"></div>':'')+
-        '</div></div>';
-    }).join('');
-  }
-}
-
-// ============================================================
 // 决策卡片数据定义
 // ============================================================
 const DECISION_DEFS = [
@@ -904,7 +875,6 @@ const DECISION_DEFS = [
       const exec=clamp(25+(sliders.rd_budget-0.8)*20+(5-sliders.cashflow)*8+(7-sliders.payback)*6+(sliders.mkt_growth-6)*1.5,0,100);
       return{direction:dir,decode:dec,execution:exec};
     },
-    tornadoItems:function(sliders){return[{label:'现金流压力',value:(4-sliders.cashflow)*15},{label:'回收期',value:(5.8-sliders.payback)*10},{label:'市场增速',value:(sliders.mkt_growth-6)*3}]}
   },
   // #2 SC-4 市场进入策略 — SP琥珀, 其余绿
   {
@@ -932,7 +902,6 @@ const DECISION_DEFS = [
       const exec=clamp(95-(2.0-sliders.budget)*28-(sliders.hc*0.75),0,100);
       return{direction:dir,decode:dec,execution:exec};
     },
-    tornadoItems:function(sliders){return[{label:'人才缺口',value:-sliders.hc*1.5},{label:'研发预算',value:(sliders.budget-2.0)*25},{label:'竞品提前',value:-sliders.comp*8}]}
   },
   // #3 BP14 供应链中断风险 — BE红色, 其余绿
   {
@@ -954,7 +923,6 @@ const DECISION_DEFS = [
       const exec=clamp(32+(3.0-sliders.supply)*30+(24-sliders.launch)*4+(sliders.localization-30)*0.6,0,100);
       return{direction:dir,decode:dec,execution:exec};
     },
-    tornadoItems:function(sliders){return[{label:'供应链成本',value:(2.5-sliders.supply)*25},{label:'上市周期',value:(18-sliders.launch)*4},{label:'国产替代',value:(sliders.localization-30)*0.8}]}
   },
   // #4 BP12 数字化渠道建设 — BP琥珀, 其余绿
   {
@@ -978,7 +946,6 @@ const DECISION_DEFS = [
       const exec=clamp(80+(sliders.channel_cov-45)*0.4+(sliders.budget2-1.0)*20-(sliders.hc*0.5),0,100);
       return{direction:dir,decode:dec,execution:exec};
     },
-    tornadoItems:function(sliders){return[{label:'渠道覆盖',value:(sliders.channel_cov-45)*0.6},{label:'数字化预算',value:(sliders.budget2-1.0)*15},{label:'人才缺口',value:-sliders.hc*0.8}]}
   },
   {
     id:'sc1', urgency:'stable', icon:'📌', tag:'稳定', title:'SC-1 高端医疗设备市场领先',
@@ -1003,7 +970,6 @@ const DECISION_DEFS = [
       const exec=clamp(88+(sliders.mkt_growth-15)*1.2+(sliders.localization-55)*0.3+(sliders.rd_invest-2.0)*15,0,100);
       return{direction:dir,decode:dec,execution:exec};
     },
-    tornadoItems:function(sliders){return[{label:'市场增速',value:(sliders.mkt_growth-15)*3},{label:'国产替代',value:(sliders.localization-55)*1.2},{label:'研发投入',value:(sliders.rd_invest-2.0)*20}]}
   }
 ];
 
@@ -1047,7 +1013,6 @@ function buildCockpit(){
         '<div class="card-body-ops">'+
           '<div class="card-body-sliders">'+
             '<div id="sliders-'+d.id+'"></div>'+
-            // V2砍掉: tornado chart 和 GPU indicator — 敏感性分析内嵌到AI建议，引擎状态不需要展示
           '</div>'+
           '<div class="card-body-ai">'+
             '<div id="ai-'+d.id+'"></div>'+
@@ -1062,8 +1027,6 @@ function buildCockpit(){
     const sliderContainer=document.getElementById('sliders-'+d.id);
     const trustContainer=document.getElementById('trusts-'+d.id);
     const aiContainer=document.getElementById('ai-'+d.id);
-    // V2砍掉: tornado chart — 敏感性分析内嵌到AI建议
-    // const tornadoContainer=document.getElementById('tornado-'+d.id);
 
     // 创建滑块
     const sliders={};
@@ -1107,7 +1070,6 @@ function buildCockpit(){
       d.sliders.forEach(sdef=>{sliders[sdef.key].setValue(sdef.value,true)});var st0={};d.sliders.forEach(sdef=>{st0[sdef.key]=sdef.value});updateTrends(d.calcTrusts(st0));document.getElementById('cockpitStatus').textContent='系统就绪';resortCards();
     };
 
-    // V2砍掉: tornado chart — 保留 TornadoMini 类定义以备后续复用
 
     // 存储实例
     const initSt={};d.sliders.forEach(sdef=>{initSt[sdef.key]=sdef.value});
