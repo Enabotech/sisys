@@ -896,9 +896,10 @@ const DECISION_DEFS = [
       {key:'rd_budget',paramKey:'rd_budget',label:'研发\n预算',min:0.5,max:3.0,value:0.8,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.2}],warnBelow:1.2,dangerBelow:0.8}
     ],
     calcTrusts:function(sliders){
-      const dir=clamp(0.32+(15-sliders.mkt_growth)*0.02+(5-sliders.cashflow)*0.03,0,1);
-      // decode升降梯: 研发充足+0.15, 现金流低压+0.12, 回收期超标-0.08 → 最优0.77 最差0.42
-      const dec=clamp(0.50+(sliders.rd_budget>1.5?0.15:0)+(sliders.cashflow<2?0.12:0)-(sliders.payback>5?0.08:0),0,1);
+      // direction: 市场增速↑好, 现金流低压↑好, 回收期短↑好 → 默认0.40 最优0.92
+      const dir=clamp(0.30+(sliders.mkt_growth-6)*0.015+(5-sliders.cashflow)*0.08+(7-sliders.payback)*0.02,0,1);
+      // decode: 研发>1.5+0.15, 现金流<2+0.12, 回收期<4+0.10 → 最优0.87 最差0.42
+      const dec=clamp(0.50+(sliders.rd_budget>1.5?0.15:0)+(sliders.cashflow<2?0.12:0)+(sliders.payback<4?0.10:0),0,1);
       const exec=clamp(25+(sliders.rd_budget-0.8)*20+(5-sliders.cashflow)*8+(7-sliders.payback)*6+(sliders.mkt_growth-6)*1.5,0,100);
       return{direction:dir,decode:dec,execution:exec};
     },
@@ -971,7 +972,8 @@ const DECISION_DEFS = [
     ],
     calcTrusts:function(sliders){
       const dir=clamp(0.90+(sliders.mkt_growth2-14)*0.015,0,1);
-      const dec=clamp(0.48+(sliders.channel_cov>60?0.12:0)+(sliders.budget2>1.5?0.08:0)+(sliders.channel_cov>40?0.06:0),0,1);
+      // decode: 渠道>60+0.12, >80+0.08, 预算>1.5+0.08, >2.0+0.06 → 最优0.89 最差0.55
+      const dec=clamp(0.55+(sliders.channel_cov>60?0.12:0)+(sliders.channel_cov>80?0.08:0)+(sliders.budget2>1.5?0.08:0)+(sliders.budget2>2.0?0.06:0),0,1);
       const exec=clamp(80+(sliders.channel_cov-45)*0.4+(sliders.budget2-1.0)*20-(sliders.hc*0.5),0,100);
       return{direction:dir,decode:dec,execution:exec};
     },
