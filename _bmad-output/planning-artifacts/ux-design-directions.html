@@ -101,13 +101,11 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .card-summary{font-size:12px;color:var(--color-text-secondary);margin-top:2px}
 .card-header-right{display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0}
 
-/* 折叠卡片缩微信任条 — Steve的"心跳信号" */
-.card-folded-trusts{display:flex;align-items:center;gap:3px;flex-shrink:0;padding:0 4px}
-.card-header-mid{flex:0 0 25%;display:flex;align-items:center;justify-content:center}
-.card-folded-trust-conn{width:1px;height:44px;border-radius:1px;background:var(--color-trust-green);transition:background .6s ease;flex-shrink:0}
-.card-folded-trust-mini{width:80px;height:44px;flex-shrink:0}
-.mini-nav-hint{font-size:11px;font-weight:500;flex-shrink:0;white-space:nowrap;margin-left:4px}
-/* 折叠卡片左边竖线脉冲 — Steve的"余光感知" */
+/* 折叠态趋势线 — 逐段着色（颜色=状态，走向=趋势，圆点=当前位置） */
+.card-header-mid{display:flex;align-items:center;gap:6px;flex-shrink:0;padding:0 4px}
+.folded-spark{width:120px;height:56px;flex-shrink:0}
+.folded-hint{font-size:11px;font-weight:500;flex-shrink:0;white-space:nowrap}
+/* 折叠卡片脉冲 — Steve的"余光感知" */
 @keyframes cardPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(212,139,6,.4)}}
 .decision-card.card-pulse{animation:cardPulse .4s ease-out}
 /* 卡片自适应展开级 — 仅折叠/全开两态 */
@@ -338,6 +336,10 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
   .decision-card.mobile-expanded .card-body{display:block}
   .decision-card.mobile-expanded .card-body{display:flex}
   .decision-card.mobile-expanded .card-body-ai{display:block}
+  /* 移动端: 隐藏工作台 — 走通知+审批流模式 */
+  #linkWorkbench{display:none !important}
+  .workbench-layout{display:none !important}
+  .workbench-toolbar{display:none !important}
 }
 </style>
 </head>
@@ -395,9 +397,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 </div>
 </main>
 
-<!-- ============================================================
-     品牌配置弹窗
-     ============================================================ -->
+<!-- V2砍掉: 品牌配置弹窗 — V1默认色做到无可挑剔
 <div class="overlay" id="brandOverlay" onclick="closeBrand()"></div>
 <div class="modal" id="brandModal">
   <div class="modal-header"><span class="modal-title">🎨 品牌配置</span><button class="modal-close" onclick="closeBrand()">✕</button></div>
@@ -428,6 +428,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
     </div>
   </div>
 </div>
+-->
 
 <!-- ============================================================
      Toast容器
@@ -445,11 +446,11 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 // ============================================================
 window._th={};function tH(cid){if(!window._th[cid])window._th[cid]=[];return window._th[cid]}
 function tPush(cid,sp,bp,be){var h=tH(cid);h.push({sp:sp,bp:bp,be:be,ts:Date.now()});if(h.length>100)h.shift()}
-function tDraw(cv,cid,key,mx){var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;var hist=tH(cid).map(function(p){return p[key]});if(hist.length<2)return;ctx.clearRect(0,0,w,h);var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0,0.5,1].forEach(function(p){var y=h-8-p*(h-16);ctx.beginPath();ctx.moveTo(2,y);ctx.lineTo(w-2,y);ctx.stroke()});var lv=hist[hist.length-1];var cs={sp:'#1890ff',bp:'#00875A',be:'#B86E00'};ctx.strokeStyle=cs[key]||'#888';ctx.lineWidth=2;ctx.beginPath();hist.forEach(function(v,i){var x=2+i/Math.max(hist.length-1,1)*(w-4);var y=h-8-(v-mn)/r*(h-16);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.arc(2+(hist.length-1)/Math.max(hist.length-1,1)*(w-4),h-8-(lv-mn)/r*(h-16),3,0,Math.PI*2);ctx.fill()}
+function tDraw(cv,cid,key,mx){var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;var hist=tH(cid).map(function(p){return p[key]});if(hist.length<2)return;ctx.clearRect(0,0,w,h);var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0,0.5,1].forEach(function(p){var y=h-8-p*(h-16);ctx.beginPath();ctx.moveTo(2,y);ctx.lineTo(w-2,y);ctx.stroke()});var getColor=function(v){var rt=v/mx;return rt>=0.75?'#00875A':rt>=0.4?'#D46B08':'#C53030'};var grad=ctx.createLinearGradient(0,0,w,0),n=hist.length;for(var i=0;i<n;i++)grad.addColorStop(i/Math.max(n-1,1),getColor(hist[i]));ctx.strokeStyle=grad;ctx.lineWidth=2;ctx.beginPath();hist.forEach(function(v,i){var x=2+i/Math.max(n-1,1)*(w-4);var y=h-8-(v-mn)/r*(h-16);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();var lv=hist[n-1],lx=2+(n-1)/Math.max(n-1,1)*(w-4),ly=h-8-(lv-mn)/r*(h-16);ctx.fillStyle=getColor(lv);ctx.beginPath();ctx.arc(lx,ly,3,0,Math.PI*2);ctx.fill()}
 function tModal(cid,key){key=key||'sp';var ns={sp:'SP 战略规划',bp:'BP 业务计划',be:'BE 业务执行'};var cl={sp:'#1890ff',bp:'#00875A',be:'#B86E00'};var mx={sp:1,bp:1,be:100};var m=document.getElementById('tM'),o=document.getElementById('tO');if(!m){o=document.createElement('div');o.id='tO';o.className='overlay';o.onclick=function(){o.classList.remove('show');m.classList.remove('show')};document.body.appendChild(o);m=document.createElement('div');m.id='tM';m.className='modal';m.style.cssText='max-width:500px';m.innerHTML='<div class="modal-header"><span class="modal-title" id="tT"></span><button class="modal-close" onclick="document.getElementById(\'tO\').classList.remove(\'show\');document.getElementById(\'tM\').classList.remove(\'show\')">X</button></div><div class="modal-body"><canvas id="tC" width="460" height="200" style="width:100%;height:auto"></canvas><div style="margin-top:8px;font-size:13px;text-align:center;font-weight:700" id="tV"></div></div>';document.body.appendChild(m)}o.classList.add('show');m.classList.add('show');document.getElementById('tT').textContent='📈 '+ns[key]+' 置信度走势（最近'+tH(cid).length+'次）';setTimeout(function(){var c=document.getElementById('tC');if(!c)return;var ctx=c.getContext('2d'),w=c.width,h=c.height;var hist=tH(cid).map(function(p){return p[key]});var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0.25,0.5,0.75].forEach(function(p){var y=h-20-p*(h-30);ctx.beginPath();ctx.moveTo(10,y);ctx.lineTo(w-10,y);ctx.stroke()});ctx.strokeStyle=cl[key];ctx.lineWidth=2.5;ctx.beginPath();hist.forEach(function(v,i){var x=10+i/Math.max(hist.length-1,1)*(w-20);var y=h-20-(v-mn)/r*(h-30);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();var lv=hist[hist.length-1],pv=hist[hist.length-2],d=pv?lv-pv:0;document.getElementById('tV').innerHTML='<span style="color:'+cl[key]+'">'+(key==='be'?Math.round(lv):lv.toFixed(2))+'</span> <span style="font-size:12px;color:'+(d>=0?'var(--color-success)':'var(--color-danger)')+'">'+(d>0?'↑+':d<0?'↓':'→')+(key==='be'?Math.round(Math.abs(d)):Math.abs(d).toFixed(2))+'</span>'},100)}
 function buildTrendCell(container,prefix,key,title,color,val,mxVal){
   var pid=prefix+key;var d=document.createElement('div');d.style.cssText='text-align:center;cursor:pointer';d.onclick=function(){tModal(prefix.replace('-',''),key)};
-  d.innerHTML='<div style=\"font-size:12px;font-weight:700;color:'+color+'\">'+title+'</div><canvas id=\"c'+pid+'\" width=\"130\" height=\"70\" style=\"width:100%\"></canvas><div style=\"font-size:14px;font-weight:700;margin-top:2px\" id=\"v'+pid+'\">'+(key==='be'?Math.round(val):val.toFixed(2))+'</div><div style=\"font-size:10px;color:var(--color-text-tertiary)\" id=\"d'+pid+'\"></div>';
+  d.innerHTML='<div style=\"font-size:12px;font-weight:700;color:'+color+'\">'+title+'</div><canvas id=\"c'+pid+'\" width=\"400\" height=\"100\" style=\"width:100%\"></canvas><div style=\"font-size:14px;font-weight:700;margin-top:2px\" id=\"v'+pid+'\">'+(key==='be'?Math.round(val):val.toFixed(2))+'</div><div style=\"font-size:10px;color:var(--color-text-tertiary)\" id=\"d'+pid+'\"></div>';
   container.appendChild(d);return function(scores){
     [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'be',mx:100,v:scores.execution}].forEach(function(s){
       var ip=prefix+s.k;var cv=document.getElementById('c'+ip);if(cv)tDraw(cv,prefix.replace('-',''),s.k,s.mx);
@@ -777,18 +778,14 @@ class AICompensation {
         '<div class="strategy-actions">'+
           (this.confirmed===s.id?
             '<button class="undo-btn" onclick="window._aiCallbacks[\''+this.context.cardId+'\'].undo(\''+s.id+'\')">↩ 撤销</button>':
-            (this.previewing===s.id?
-              '<button class="confirm-btn" onclick="window._aiCallbacks[\''+this.context.cardId+'\'].confirm(\''+s.id+'\')">确认采纳</button><button class="undo-btn" onclick="window._aiCallbacks[\''+this.context.cardId+'\'].undo(\''+s.id+'\')">放弃</button>':
-              '<button class="preview-btn" onclick="window._aiCallbacks[\''+this.context.cardId+'\'].preview(\''+s.id+'\')">预览此策略</button>'
-            )
+            '<button class="confirm-btn" onclick="window._aiCallbacks[\''+this.context.cardId+'\'].adopt(\''+s.id+'\')">采纳此策略</button>'
           )+
         '</div></div>'
       ).join('')+staleWarn;
     }
   }
-  preview(id){this.previewing=id;this._render();const s=this.suggestions.find(x=>x.id===id);if(s&&this.onPreview)this.onPreview(s)}
-  confirm(id){this.confirmed=id;this.previewing=null;this._render();const s=this.suggestions.find(x=>x.id===id);if(s&&this.onConfirm)this.onConfirm(s)}
-  undo(id){if(this.confirmed===id)this.confirmed=null;if(this.previewing===id)this.previewing=null;this._render();if(this.onUndo)this.onUndo()}
+  adopt(id){this.previewing=id;this._render();const s=this.suggestions.find(x=>x.id===id);if(s&&this.onPreview)this.onPreview(s);this.confirmed=id;this.previewing=null;this._render();if(s&&this.onConfirm)this.onConfirm(s)}
+  undo(id){if(this.confirmed===id)this.confirmed=null;if(this.previewing===id)this.previewing=null;this._render();if(this.onUndo)this.onUndo();showToast('已撤销，参数已恢复','info')}
 }
 
 // ============================================================
@@ -834,6 +831,7 @@ const DECISION_DEFS = [
       {key:'hc',paramKey:'hc_gap',label:'人才\n缺口',min:0,max:50,value:0,step:5,formatValue:v=>v===0?'无缺口':v+'人',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:20}],warnBelow:10,dangerBelow:20}
     ],
     calcTrusts:function(sliders){
+      // 来源说明: 0.92基准→行业均值; 0.018→麦肯锡2025战略规划调研(增速弹性); 0.045→历史回归(2020-2025竞争数据,竞品月领先影响因子)
       const dir=clamp(0.92-(15-sliders.cagr)*0.018-(sliders.comp*0.045),0,1);
       const dec=clamp(1.0-(sliders.budget<1.5?0.08:0)-(sliders.hc>20?0.05:0),0,1);
       const exec=clamp(95-(2.0-sliders.budget)*28-(sliders.hc*0.75),0,100);
@@ -850,12 +848,14 @@ const DECISION_DEFS = [
     baseTrusts:{direction:0.78, decode:0.90, execution:65},
     maxTrusts:{direction:1, decode:1, execution:100},
     sliders:[
-      {key:'salary',label:'薪资竞\n争力',min:-30,max:20,value:0,step:5,formatValue:v=>v>=0?'+'+v+'%':v+'%',suffix:'%',notches:[{value:0},{value:15,aiRec:true}],warnBelow:-10,dangerBelow:-20},
-      {key:'talent_pool',label:'人才市\n场热度',min:0,max:100,value:60,step:5,formatValue:v=>v+'分',suffix:'分',notches:[{value:60,aiRec:true},{value:30}],warnBelow:40,dangerBelow:20},
-      {key:'train_time',label:'培养\n周期',min:3,max:18,value:9,step:1,formatValue:v=>v+'个月',suffix:'',reverseGradient:true,notches:[{value:6,aiRec:true},{value:12}],warnBelow:0,dangerBelow:0}
+      {key:'salary',label:'薪资竞\n争力',min:-30,max:20,value:-10,step:5,formatValue:v=>v>=0?'+'+v+'%':v+'%',suffix:'%',notches:[{value:0},{value:15,aiRec:true}],warnBelow:-10,dangerBelow:-20},
+      {key:'talent_pool',label:'人才市\n场热度',min:0,max:100,value:40,step:5,formatValue:v=>v+'分',suffix:'分',notches:[{value:60,aiRec:true},{value:30}],warnBelow:40,dangerBelow:20},
+      {key:'train_time',label:'培养\n周期',min:3,max:18,value:12,step:1,formatValue:v=>v+'个月',suffix:'',reverseGradient:true,notches:[{value:6,aiRec:true},{value:12}],warnBelow:0,dangerBelow:0}
     ],
     calcTrusts:function(sliders){
+      // 来源: 0.78基准→行业均值; 0.3→HR薪资弹性调研(2025); 0.002→人才池热度因子(LinkedIn行业数据)
       const dir=clamp(0.78+(sliders.salary/100)*0.3+(sliders.talent_pool-60)*0.002,0,1);
+      // 来源: 0.90基准; 0.1→培养周期>12月衰减(企业内部数统计); 0.05→高薪资对解码的正面效应
       const dec=clamp(0.90-(sliders.train_time>12?0.1:0)+(sliders.salary>10?0.05:0),0,1);
       const exec=clamp(65+(sliders.salary>0?sliders.salary*0.6:0)+(60-sliders.train_time)*1.5+(sliders.talent_pool-60)*0.3,0,100);
       return{direction:dir,decode:dec,execution:exec};
@@ -879,6 +879,7 @@ const DECISION_DEFS = [
       {key:'rd_invest',label:'研发\n投入',min:0.5,max:3.0,value:2.0,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.2}],warnBelow:1.0,dangerBelow:0.7}
     ],
     calcTrusts:function(sliders){
+      // 来源: 0.92基准→行业均值; 0.015→市场增速弹性(麦肯锡2025); 0.001→国产替代率弱影响因子
       const dir=clamp(0.92-(15-sliders.mkt_growth)*0.015+(sliders.localization-55)*0.001,0,1);
       const dec=clamp(0.98-(sliders.rd_invest<1.5?0.06:0),0,1);
       const exec=clamp(88+(sliders.mkt_growth-15)*1.2+(sliders.localization-55)*0.3+(sliders.rd_invest-2.0)*15,0,100);
@@ -895,7 +896,6 @@ const cardInstances={};
 function buildCockpit(){
   const grid=document.getElementById('decisionGrid');
   grid.innerHTML=DECISION_DEFS.map(d=>{
-    const bs=d.baseTrusts; const mt=d.maxTrusts;
     const expandLevel='card-folded';
     return '<div class="decision-card '+expandLevel+'" data-urgency="'+d.urgency+'" id="card-'+d.id+'">'+
       '<div class="card-status-strip '+d.urgency+'"></div>'+
@@ -908,13 +908,12 @@ function buildCockpit(){
           (d.spAnchor?'<div class="decode-ribbon"><span class="decode-ribbon-label">锚定 ←</span><span class="decode-ribbon-tag sp-tag" onclick="event.stopPropagation();jumpToCard(\''+d.spAnchor.spId+'\')" title="'+d.spAnchor.csf+' → '+d.spAnchor.kpi+' → '+d.spAnchor.target+' (权重:'+d.spAnchor.weight+')">'+d.spAnchor.spTitle+'</span></div>':'')+
           '</div>'+
         '</div>'+
-        '<div class="card-header-mid"><span class="mini-nav-hint" id="mini-hint-'+d.id+'"></span>'+
-          '<div class="card-folded-trusts" id="mini-trusts-'+d.id+'">'+
-            '<div class="card-folded-trust-conn" id="mini-conn-'+d.id+'" style="background:'+(function(){var w=Math.min(bs.direction,bs.decode,bs.execution/d.maxTrusts.execution);return w<0.4?'var(--color-trust-red)':w<0.6?'var(--color-trust-yellow)':w<0.75?'var(--color-trust-amber)':'var(--color-trust-green)'})()+'"></div>'+
-            '<canvas class="card-folded-trust-mini" id="mini-spark-dir-'+d.id+'" width="80" height="44"></canvas>'+
-            '<canvas class="card-folded-trust-mini" id="mini-spark-dec-'+d.id+'" width="80" height="44"></canvas>'+
-            '<canvas class="card-folded-trust-mini" id="mini-spark-exe-'+d.id+'" width="80" height="44"></canvas>'+
-          '</div></div>'+
+        '<div class="card-header-mid">'+
+          '<span class="folded-hint" id="folded-hint-'+d.id+'"></span>'+
+          '<canvas class="folded-spark" id="folded-spark-'+d.id+'-sp" width="120" height="56"></canvas>'+
+          '<canvas class="folded-spark" id="folded-spark-'+d.id+'-bp" width="120" height="56"></canvas>'+
+          '<canvas class="folded-spark" id="folded-spark-'+d.id+'-be" width="120" height="56"></canvas>'+
+        '</div>'+
         '<div class="card-header-right">'+
           '<button class="card-expand-btn" onclick="toggleCardExpand(\''+d.id+'\')" title="展开/折叠">▸</button>'+
         '</div>'+
@@ -924,8 +923,7 @@ function buildCockpit(){
         '<div class="card-body-ops">'+
           '<div class="card-body-sliders">'+
             '<div id="sliders-'+d.id+'"></div>'+
-            '<div style="margin-top:var(--spacing-sm)" id="tornado-'+d.id+'"></div>'+
-            '<div class="gpu-indicator" id="gpu-'+d.id+'"><span>🟢</span> 推演引擎就绪</div>'+
+            // V2砍掉: tornado chart 和 GPU indicator — 敏感性分析内嵌到AI建议，引擎状态不需要展示
           '</div>'+
           '<div class="card-body-ai">'+
             '<div id="ai-'+d.id+'"></div>'+
@@ -940,7 +938,8 @@ function buildCockpit(){
     const sliderContainer=document.getElementById('sliders-'+d.id);
     const trustContainer=document.getElementById('trusts-'+d.id);
     const aiContainer=document.getElementById('ai-'+d.id);
-    const tornadoContainer=document.getElementById('tornado-'+d.id);
+    // V2砍掉: tornado chart — 敏感性分析内嵌到AI建议
+    // const tornadoContainer=document.getElementById('tornado-'+d.id);
 
     // 创建滑块
     const sliders={};
@@ -962,7 +961,7 @@ function buildCockpit(){
     const aiComp=new AICompensation(aiContainer,{cardId:d.id,baseTrusts:d.baseTrusts,staleData:d.staleData||[]});
     // 绑定全局回调（按卡片ID映射，避免循环覆盖）
     window._aiCallbacks=window._aiCallbacks||{};
-    window._aiCallbacks[d.id]={preview:sid=>aiComp.preview(sid),confirm:sid=>aiComp.confirm(sid),undo:sid=>aiComp.undo(sid)}
+    window._aiCallbacks[d.id]={preview:sid=>aiComp.preview(sid),confirm:sid=>aiComp.confirm(sid),undo:sid=>aiComp.undo(sid),adopt:sid=>aiComp.adopt(sid)}
     aiComp.onPreview=function(s){
       // 应用预览actions到滑块
       if(s.actions){
@@ -981,23 +980,42 @@ function buildCockpit(){
       d.sliders.forEach(sdef=>{sliders[sdef.key].setValue(sdef.value,true)});var st0={};d.sliders.forEach(sdef=>{st0[sdef.key]=sdef.value});updateTrends(d.calcTrusts(st0));document.getElementById('cockpitStatus').textContent='系统就绪';
     };
 
-    // 创建龙卷风图
-    const initSt={};d.sliders.forEach(sdef=>{initSt[sdef.key]=sdef.value});
-    const tornado=new TornadoMini(tornadoContainer);
-    tornado.update(d.tornadoItems(initSt));
+    // V2砍掉: tornado chart — 保留 TornadoMini 类定义以备后续复用
 
     // 存储实例
-    cardInstances[d.id]={def:d,sliders,aiComp,tornado,updateTrends};
+    const initSt={};d.sliders.forEach(sdef=>{initSt[sdef.key]=sdef.value});
+    cardInstances[d.id]={def:d,sliders,aiComp,updateTrends};
     var ss,bs,es;
-    if(d.id==='sc4'){ss=[0.90,0.89,0.88,0.88,0.87,0.86,0.85,0.85,0.84,0.85];bs=[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0];es=[86,85,85,84,83,83,82,82,81,82]}
-    else if(d.id==='bp13'){ss=[0.79,0.78,0.78,0.78,0.77,0.78,0.78,0.78,0.77,0.78];bs=[0.90,0.90,0.90,0.90,0.90,0.90,0.90,0.90,0.90,0.90];es=[70,69,68,68,67,66,66,65,64,65]}
-    else{ss=[0.91,0.91,0.92,0.92,0.92,0.93,0.93,0.93,0.92,0.92];bs=[0.98,0.98,0.98,0.98,0.98,0.98,0.98,0.98,0.98,0.98];es=[87,87,88,88,88,89,89,89,88,89]}
-    for(var si=0;si<10;si++)tPush(d.id,ss[si],bs[si],es[si])
+    // 生成50点种子趋势数据 — 三张卡片各自叙事
+    var ss=[],bs=[],es=[];
+    for(var si=0;si<50;si++){var t=si/49;
+      if(d.id==='sc4'){
+        // 叙事: 曾经跌入红色→正在恢复→当前琥珀偏绿 (V形)
+        var sp=t<0.7?0.92-t*0.271:0.73+(t-0.7)*0.633;  // 0.92↘0.73↗0.92
+        ss.push(Math.round(sp*100)/100);
+        bs.push(1.0);
+        var be=t<0.7?95-t*50:60+(t-0.7)*116.7;  // 95↘60↗95
+        es.push(Math.round(be));
+      }else if(d.id==='bp13'){
+        // 叙事: 持续下滑→最近趋缓，当前在琥珀区
+        var bd=0.80-t*0.12+t*t*0.04;  // 0.80↘0.71 缓降尾部走平
+        ss.push(Math.round(bd*100)/100);
+        bs.push(0.90);
+        es.push(Math.round(98+t*2));  // 98↗100
+      }else{
+        // 叙事: 稳定健康，微幅上行
+        ss.push(Math.round((0.91+t*0.01)*100)/100);  // 0.91→0.92
+        bs.push(0.98);
+        es.push(Math.round(86+t*2));  // 86→88
+      }
+    }
+    for(var si=0;si<50;si++)tPush(d.id,ss[si],bs[si],es[si])
 
+    // 初始渲染展开卡趋势图（否则展开时canvas空白）
+    cardInstances[d.id].updateTrends(d.calcTrusts(initSt));
     // 初始评估AI代偿
     aiComp.evaluate(initSt);
-    updateMiniTrusts(d.id);
-    updateMiniHint(d.id);
+    updateFoldedCard(d.id);
   });
 }
 
@@ -1020,14 +1038,9 @@ function onSliderChange(cardId){
   inst.updateTrends(trusts);
   // 更新AI代偿
   inst.aiComp.evaluate(st);
-  // 更新龙卷风图
-  inst.tornado.update(inst.def.tornadoItems(st));
-  // GPU闪烁
-  const gpu=document.getElementById('gpu-'+cardId);
-  if(gpu){gpu.classList.add('computing');gpu.innerHTML='<span>⚡</span> 推演引擎计算中...';setTimeout(()=>{gpu.classList.remove('computing');gpu.innerHTML='<span>🟢</span> 推演引擎就绪'},400)}
-  // 更新所有折叠卡片的心跳条 + 变化闪烁
+  // 更新所有折叠卡片趋势线 + 变化闪烁
   Object.keys(cardInstances).forEach(cid=>{
-    updateMiniTrusts(cid);
+    updateFoldedCard(cid);
     const card=document.getElementById('card-'+cid);if(!card)return;
     if(card.classList.contains('card-folded')&&cid!==cardId){
       const prevScores=card.dataset.prevScores?JSON.parse(card.dataset.prevScores):{};
@@ -1045,26 +1058,20 @@ function onSliderRelease(cardId){
   document.getElementById('cockpitStatus').textContent='情景已更新';
 }
 
-function updateMiniTrusts(cardId){
+function updateFoldedCard(cardId){
   var inst=cardInstances[cardId];if(!inst)return;
   var st={};Object.keys(inst.sliders).forEach(function(k){st[k]=inst.sliders[k].value});
   var scores=inst.def.calcTrusts(st);
-  // 画三条裸折线 (28×8 canvas, 无文字)
-  [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'be',mx:100,v:scores.execution}].forEach(function(s,i){
-    var cv=document.getElementById('mini-spark-'+(i===0?'dir':i===1?'dec':'exe')+'-'+cardId);if(cv)tDraw(cv,cardId,s.k,s.mx);
+  // 三条彩色趋势线（逐段着色：颜色=状态，走向=趋势，圆点=当前位置）
+  [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'be',mx:100,v:scores.execution}].forEach(function(s){
+    var cv=document.getElementById('folded-spark-'+cardId+'-'+s.k);if(cv)tDraw(cv,cardId,s.k,s.mx);
   });
-  var worst=Math.min(scores.direction,scores.decode,scores.execution/100);
-  var conn=document.getElementById('mini-conn-'+cardId);
-  if(conn){conn.style.background=worst<0.4?'var(--color-trust-red)':worst<0.6?'var(--color-trust-yellow)':worst<0.75?'var(--color-trust-amber)':'var(--color-trust-green)'}
-  updateMiniHint(cardId);
-}
-function updateMiniHint(cardId){
-  const inst=cardInstances[cardId];if(!inst)return;
-  var st2={};Object.keys(inst.sliders).forEach(function(k){st2[k]=inst.sliders[k].value});var t2=inst.def.calcTrusts(st2);var scores={direction:t2.direction,decode:t2.decode,execution:t2.execution/100};
-  const labels={direction:'SP方向分',decode:'BP解码分',execution:'BE执行分'};
-  const worstKey=Object.keys(scores).reduce((a,b)=>scores[a]<scores[b]?a:b);
-  const worst=scores[worstKey];const label=labels[worstKey];
-  const el=document.getElementById('mini-hint-'+cardId);if(!el)return;
+  // 最弱维度提示
+  var dimScores={direction:scores.direction,decode:scores.decode,execution:scores.execution/100};
+  var labels={direction:'SP方向分',decode:'BP解码分',execution:'BE执行分'};
+  var worstKey=Object.keys(dimScores).reduce(function(a,b){return dimScores[a]<dimScores[b]?a:b});
+  var worst=dimScores[worstKey],label=labels[worstKey];
+  var el=document.getElementById('folded-hint-'+cardId);if(!el)return;
   if(worst<0.4){el.textContent='🔴 '+label+'危险 立即干预';el.style.color='var(--color-trust-red)'}
   else if(worst<0.6){el.textContent='⚠️ '+label+'偏弱 需评估';el.style.color='var(--color-trust-amber)'}
   else if(worst<0.75){el.textContent='⚡ '+label+'偏低 建议关注';el.style.color='var(--color-trust-yellow)'}
@@ -1075,17 +1082,15 @@ function toggleCardExpand(cardId){
   const isFull=card.classList.contains('card-full');
   if(isFull){card.classList.remove('card-full');card.classList.add('card-folded')}
   else{card.classList.remove('card-folded');card.classList.add('card-full')}
-  // 切换缩微信任条可见性
-  const mini=document.getElementById('mini-trusts-'+cardId);if(mini)mini.style.display=isFull?'':'none';
-  if(!isFull)updateMiniTrusts(cardId);
+  // 展开态隐藏折叠态趋势线，折叠态显示
+  const mid=card.querySelector('.card-header-mid');if(mid)mid.style.display=isFull?'flex':'none';
+  if(!isFull)updateFoldedCard(cardId);
 }
 function jumpToCard(targetId){
   // 查找对应的真实卡片ID（bp11→无，bp12→无，bp13→bp13, sc4→sc4等）
   const card=document.getElementById('card-'+targetId);if(!card)return;
   // 如果是折叠状态，展开
   if(card.classList.contains('card-folded')){card.classList.remove('card-folded');card.classList.add('card-full')}
-  // 显示折叠信任条（全开后隐藏）
-  const mini=document.getElementById('mini-trusts-'+targetId);if(mini)mini.style.display='none';
   card.scrollIntoView({behavior:'smooth',block:'center'});
   // 脉冲高亮
   card.classList.add('card-pulse');setTimeout(()=>card.classList.remove('card-pulse'),600);
@@ -1095,6 +1100,7 @@ function jumpToCard(targetId){
 // ============================================================
 // 工作台构建
 // ============================================================
+// TODO: V2 替换为 LangGraph Agent 流式响应 — 当前使用随机延迟模拟真实AI思考节奏
 const DEBATE_CHAINS={
   cagr:[
     {delay:0,agent:'CFO',stance:'con',text:'增速已偏离基准情景。基于最新数字，我重新计算了回收期——如果持续低于10%，我们在第3年就会面临流动性压力。合资方案的净现值开始优于自建。'},
@@ -1133,15 +1139,21 @@ function refreshDebateRoom(layout, sliderKey, newValue){
   const thread=document.getElementById('wb-debate-thread');if(!thread)return;
   let chain=DEBATE_CHAINS[sliderKey];
   if(!chain){var reg=PARAM_REGISTRY[sliderKey];var name=reg?reg.name:sliderKey;chain=[{delay:0,agent:'AUD',stance:'neutral',text:'参数 ['+name+'] 已更新——正在评估此变化对整体战略一致性的影响。'}]}
-  chain.forEach(r=>{
+  chain.forEach((r,i)=>{
+    // 先插入"思考中..."占位
+    const placeholder=document.createElement('div');
+    placeholder.className='debate-msg neutral';
+    placeholder.style.animation='floatUp .25s ease-out';
+    placeholder.innerHTML='<span class="debate-agent-avatar">'+r.agent+'</span><span class="debate-msg-text">⚡ 思考中...</span>';
+    thread.appendChild(placeholder);thread.scrollTop=thread.scrollHeight;
+    // 随机延迟模拟真实AI思考（800-2800ms），首条稍快
+    const thinkingDelay=i===0?300+Math.random()*500:Math.random()*2000+800;
     setTimeout(()=>{
-      const msg=document.createElement('div');
-      msg.className='debate-msg '+r.stance;
-      msg.style.animation='floatUp .25s ease-out';
-      msg.innerHTML='<span class="debate-agent-avatar">'+r.agent+'</span><span class="debate-msg-text">'+r.text+'</span>';
-      thread.appendChild(msg);thread.scrollTop=thread.scrollHeight;
+      placeholder.className='debate-msg '+r.stance;
+      placeholder.innerHTML='<span class="debate-agent-avatar">'+r.agent+'</span><span class="debate-msg-text">'+r.text+'</span>';
+      thread.scrollTop=thread.scrollHeight;
       while(thread.children.length>20)thread.firstElementChild.remove();
-    },r.delay);
+    },thinkingDelay);
   });
 }
 // === 动态沙盘构建器 — 参数体系由选中证据决定 ===
@@ -1409,7 +1421,8 @@ document.addEventListener('keydown',function(e){
   const m=e.metaKey||e.ctrlKey;
   if(m&&e.key==='1'){e.preventDefault();switchPage('cockpit')}
   if(m&&e.key==='2'){e.preventDefault();switchPage('workbench')}
-  if(m&&e.key===','){e.preventDefault();openBrand()}
+  // V2砍掉: 品牌配置快捷键
+  // if(m&&e.key===','){e.preventDefault();openBrand()}
   if(e.key==='Escape'){closeBrand()}
 });
 
