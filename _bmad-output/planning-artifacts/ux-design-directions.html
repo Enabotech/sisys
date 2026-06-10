@@ -11,7 +11,7 @@
 :root {
   --color-primary:#1890ff; --color-primary-hover:#096dd9; --color-primary-active:#40a9ff; --color-primary-bg:#e6f7ff;
   --color-success:#00875A; --color-warning:#B86E00; --color-danger:#C53030;
-  --color-trust-red:#C53030; --color-trust-amber:#D46B08; --color-trust-yellow:#D48806; --color-trust-olive:#7CB305; --color-trust-green:#00875A;
+  --color-score-red:#C53030; --color-score-amber:#D46B08; --color-score-yellow:#D48806; --color-score-olive:#7CB305; --color-score-green:#00875A;
   --color-signal-ok-bg:#E6F7F1; --color-signal-warn-bg:#FFF8E6; --color-signal-danger-bg:#FFF1F0;
   --color-text-primary:#262626; --color-text-secondary:#595959; --color-text-tertiary:#8c8c8c; --color-text-disabled:#bfbfbf;
   --color-bg-primary:#f5f5f5; --color-bg-card:#fff; --color-border:#e8e8e8; --color-white:#fff;
@@ -24,8 +24,8 @@
   --slider-track-h:8px; --slider-touch-h:20px; --slider-thumb-size:28px;
   --spring-bounce:cubic-bezier(0.34,1.56,0.64,1);
   --spring-settle:cubic-bezier(0.25,0.1,0.25,1);
-  --trust-bar-h:14px; --trust-bar-radius:7px;
-  --trust-shimmer-dur:0.3s; --trust-transition-dur:0.8s; --trust-count-dur:1.2s; --ripple-dur:0.6s;
+  --score-bar-h:14px; --score-bar-radius:7px;
+  --score-shimmer-dur:0.3s; --score-transition-dur:0.8s; --score-count-dur:1.2s; --ripple-dur:0.6s;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--font-family-base);background:var(--color-bg-primary);color:var(--color-text-primary);line-height:1.6;overflow-x:hidden}
@@ -39,10 +39,10 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 @keyframes toastIn{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
 @keyframes rippleOut{0%{transform:translate(-50%,-50%) scale(0);opacity:.4}100%{transform:translate(-50%,-50%) scale(3.5);opacity:0}}
-@keyframes trustShimmerSweep{0%{left:-100%;opacity:.35}60%{opacity:.08}100%{left:100%;opacity:0}}
-@keyframes trustGlow{0%{box-shadow:inset 0 0 12px rgba(0,135,90,.4)}100%{box-shadow:inset 0 0 0 rgba(0,135,90,0)}}
-@keyframes trustShake{0%,100%{transform:translateX(0)}15%{transform:translateX(-4px)}30%{transform:translateX(4px)}45%{transform:translateX(-3px)}60%{transform:translateX(3px)}75%{transform:translateX(-1px)}90%{transform:translateX(1px)}}
-@keyframes trustBreathe{0%,100%{opacity:1}50%{opacity:.96}}
+@keyframes scoreShimmerSweep{0%{left:-100%;opacity:.35}60%{opacity:.08}100%{left:100%;opacity:0}}
+@keyframes scoreGlow{0%{box-shadow:inset 0 0 12px rgba(0,135,90,.4)}100%{box-shadow:inset 0 0 0 rgba(0,135,90,0)}}
+@keyframes scoreShake{0%,100%{transform:translateX(0)}15%{transform:translateX(-4px)}30%{transform:translateX(4px)}45%{transform:translateX(-3px)}60%{transform:translateX(3px)}75%{transform:translateX(-1px)}90%{transform:translateX(1px)}}
+@keyframes scoreBreathe{0%,100%{opacity:1}50%{opacity:.96}}
 @keyframes thumbPulseNotch{0%{transform:translate(-50%,-50%) scale(1.3)}50%{transform:translate(-50%,-50%) scale(1.22)}100%{transform:translate(-50%,-50%) scale(1.3)}}
 @keyframes goldPulse{0%,100%{border-color:rgba(212,139,6,.3);box-shadow:0 0 0 rgba(212,139,6,0)}50%{border-color:rgba(212,139,6,.6);box-shadow:0 0 8px rgba(212,139,6,.15)}}
 @keyframes floatUp{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
@@ -123,7 +123,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .decode-ribbon-tag.bp-tag{background:var(--color-bg-primary);color:var(--color-text-secondary);border:1px solid var(--color-border)}
 .decode-ribbon-tag.bp-tag:hover{border-color:var(--color-primary);color:var(--color-primary);background:var(--color-primary-bg)}
 .decode-ribbon-tag.sp-tag:hover{background:var(--color-primary);color:white}
-/* 卡片主体 — 信任条(全宽顶部) + 操作行(滑块左|AI右) + 龙卷风(底部) */
+/* 卡片主体 — 评分条(全宽顶部) + 操作行(滑块左|AI右) + 龙卷风(底部) */
 .card-body{padding:0 var(--spacing-lg) var(--spacing-lg);display:flex;flex-direction:column;gap:var(--spacing-md)}
 .card-body-grid{display:flex;flex-direction:column;gap:var(--spacing-md)}
 .card-body-ops{display:grid;grid-template-columns:1fr 1fr;gap:var(--spacing-lg)}
@@ -133,32 +133,32 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 /* ============================================================
    三重置信度 — SP/BP/EM 一行三段，绿高橙低
    ============================================================ */
-.trust-bars-stack{display:flex;flex-direction:row;gap:12px;align-items:center}
-.trust-bars-stack[data-weakest="danger"] .trust-bar-outer{box-shadow:inset 0 0 0 1px rgba(197,48,48,.2)}
-.trust-bars-stack[data-weakest="warning"] .trust-bar-outer{box-shadow:inset 0 0 0 1px rgba(212,139,6,.2)}
+.score-bars-stack{display:flex;flex-direction:row;gap:12px;align-items:center}
+.score-bars-stack[data-weakest="danger"] .score-bar-outer{box-shadow:inset 0 0 0 1px rgba(197,48,48,.2)}
+.score-bars-stack[data-weakest="warning"] .score-bar-outer{box-shadow:inset 0 0 0 1px rgba(212,139,6,.2)}
 
-.trust-bar-row{display:flex;align-items:center;gap:4px;flex:1;min-width:0}
-.trust-bar-label{font-size:11px;font-weight:600;color:var(--color-text-secondary);flex-shrink:0}
-.trust-bar-outer{flex:1;height:var(--trust-bar-h);background:#f0f0f0;border-radius:var(--trust-bar-radius);position:relative;overflow:hidden}
-.trust-bar-fill{position:absolute;top:0;left:0;height:100%;border-radius:var(--trust-bar-radius);
+.score-bar-row{display:flex;align-items:center;gap:4px;flex:1;min-width:0}
+.score-bar-label{font-size:11px;font-weight:600;color:var(--color-text-secondary);flex-shrink:0}
+.score-bar-outer{flex:1;height:var(--score-bar-h);background:#f0f0f0;border-radius:var(--score-bar-radius);position:relative;overflow:hidden}
+.score-bar-fill{position:absolute;top:0;left:0;height:100%;border-radius:var(--score-bar-radius);
   background:linear-gradient(to right,#B86E00 0%,#00875A 100%);
   background-size:200% 100%;
-  transition:width var(--trust-transition-dur) var(--spring-settle), background-position var(--trust-transition-dur) var(--spring-settle);
+  transition:width var(--score-transition-dur) var(--spring-settle), background-position var(--score-transition-dur) var(--spring-settle);
 }
-.trust-bar-fill.glow{animation:trustGlow 2s ease-out}
-.trust-bar-fill.shake{animation:trustShake .35s ease-out}
-.trust-bar-shimmer{position:absolute;top:0;left:-100%;width:3px;height:100%;background:rgba(255,255,255,.7);border-radius:2px;pointer-events:none;opacity:0}
-.trust-bar-shimmer.active{animation:trustShimmerSweep var(--trust-shimmer-dur) ease-in forwards}
-.trust-bar-ghost{position:absolute;top:0;left:0;height:100%;border-radius:var(--trust-bar-radius);
+.score-bar-fill.glow{animation:scoreGlow 2s ease-out}
+.score-bar-fill.shake{animation:scoreShake .35s ease-out}
+.score-bar-shimmer{position:absolute;top:0;left:-100%;width:3px;height:100%;background:rgba(255,255,255,.7);border-radius:2px;pointer-events:none;opacity:0}
+.score-bar-shimmer.active{animation:scoreShimmerSweep var(--score-shimmer-dur) ease-in forwards}
+.score-bar-ghost{position:absolute;top:0;left:0;height:100%;border-radius:var(--score-bar-radius);
   background:linear-gradient(to right,#B86E00 0%,#00875A 100%);
   background-size:200% 100%;opacity:0;pointer-events:none;
-  transition:width var(--trust-transition-dur) var(--spring-settle), background-position var(--trust-transition-dur) var(--spring-settle), opacity .2s ease}
-.trust-bar-ghost.visible{opacity:.35}
-.trust-bar-value{font-size:13px;font-weight:700;min-width:42px;text-align:right;flex-shrink:0;font-family:var(--font-family-code);transition:color 0.3s}
-.trust-bar-value.high{color:var(--color-success)}.trust-bar-value.low{color:var(--color-warning)}
-.trust-bar-delta{font-size:11px;width:36px;text-align:left;flex-shrink:0;font-weight:600}
-.trust-bar-delta.up{color:var(--color-success)}.trust-bar-delta.down{color:var(--color-danger)}.trust-bar-delta.flat{color:var(--color-text-tertiary)}
-.trust-bar-row.breathe .trust-bar-fill{animation:trustBreathe 6s ease-in-out infinite}
+  transition:width var(--score-transition-dur) var(--spring-settle), background-position var(--score-transition-dur) var(--spring-settle), opacity .2s ease}
+.score-bar-ghost.visible{opacity:.35}
+.score-bar-value{font-size:13px;font-weight:700;min-width:42px;text-align:right;flex-shrink:0;font-family:var(--font-family-code);transition:color 0.3s}
+.score-bar-value.high{color:var(--color-success)}.score-bar-value.low{color:var(--color-warning)}
+.score-bar-delta{font-size:11px;width:36px;text-align:left;flex-shrink:0;font-weight:600}
+.score-bar-delta.up{color:var(--color-success)}.score-bar-delta.down{color:var(--color-danger)}.score-bar-delta.flat{color:var(--color-text-tertiary)}
+.score-bar-row.breathe .score-bar-fill{animation:scoreBreathe 6s ease-in-out infinite}
 
 /* ============================================================
    自定义滑块 — Steve的五层触觉
@@ -615,9 +615,9 @@ class SliderPhysics {
 }
 
 // ============================================================
-// 核心类: TrustBar — 四阶段动画交响乐
+// 核心类: ScoreBar — 四阶段动画交响乐
 // ============================================================
-class TrustBar {
+class ScoreBar {
   constructor(container, opts){
     this.container=container; this.label=opts.label; this.value=opts.value??0; this.maxValue=opts.max??100;
     this.prevValue=this.value; this.isPercent=opts.isPercent||false;
@@ -625,15 +625,15 @@ class TrustBar {
   }
   _build(){
     this.container.innerHTML=
-      '<span class="trust-bar-label">'+this.label+'</span>'+
-      '<div class="trust-bar-outer"><div class="trust-bar-fill"></div><div class="trust-bar-ghost"></div><div class="trust-bar-shimmer"></div></div>'+
-      '<span class="trust-bar-value">'+this._fmt(this.value)+'</span>'+
-      '<span class="trust-bar-delta flat">--</span>';
-    this.fill=this.container.querySelector('.trust-bar-fill');
-    this.ghost=this.container.querySelector('.trust-bar-ghost');
-    this.shimmer=this.container.querySelector('.trust-bar-shimmer');
-    this.valueEl=this.container.querySelector('.trust-bar-value');
-    this.deltaEl=this.container.querySelector('.trust-bar-delta');
+      '<span class="score-bar-label">'+this.label+'</span>'+
+      '<div class="score-bar-outer"><div class="score-bar-fill"></div><div class="score-bar-ghost"></div><div class="score-bar-shimmer"></div></div>'+
+      '<span class="score-bar-value">'+this._fmt(this.value)+'</span>'+
+      '<span class="score-bar-delta flat">--</span>';
+    this.fill=this.container.querySelector('.score-bar-fill');
+    this.ghost=this.container.querySelector('.score-bar-ghost');
+    this.shimmer=this.container.querySelector('.score-bar-shimmer');
+    this.valueEl=this.container.querySelector('.score-bar-value');
+    this.deltaEl=this.container.querySelector('.score-bar-delta');
     this._setFillInstant(this.value);
   }
   _fmt(v){return this.isPercent?v.toFixed(2):Math.round(v)}
@@ -665,9 +665,9 @@ class TrustBar {
     this.valueEl.classList.remove('high','low');
     this.valueEl.classList.add(newVal>=threshold?'high':'low');
     // Delta
-    if(Math.abs(diff)<0.2){this.deltaEl.textContent='--';this.deltaEl.className='trust-bar-delta flat'}
-    else if(diff>0){this.deltaEl.textContent='+'+diff.toFixed(2);this.deltaEl.className='trust-bar-delta up'}
-    else{this.deltaEl.textContent=diff.toFixed(2);this.deltaEl.className='trust-bar-delta down'}
+    if(Math.abs(diff)<0.2){this.deltaEl.textContent='--';this.deltaEl.className='score-bar-delta flat'}
+    else if(diff>0){this.deltaEl.textContent='+'+diff.toFixed(2);this.deltaEl.className='score-bar-delta up'}
+    else{this.deltaEl.textContent=diff.toFixed(2);this.deltaEl.className='score-bar-delta down'}
     // 阶段4: 持续微呼吸（稳定时）
     if(Math.abs(diff)<0.1)this.container.classList.add('breathe');
     else this.container.classList.remove('breathe');
@@ -706,7 +706,7 @@ class TrustBar {
     this.ghost.style.transition='width .08s ease-out, background-position .08s ease-out';
     this.ghost.style.width=(pct*1.15)+'%';this.ghost.style.backgroundPosition=(100-pct*1.15)+'% center';
     setTimeout(()=>{
-      this.ghost.style.transition='width var(--trust-transition-dur) var(--spring-settle), background-position var(--trust-transition-dur) var(--spring-settle)';
+      this.ghost.style.transition='width var(--score-transition-dur) var(--spring-settle), background-position var(--score-transition-dur) var(--spring-settle)';
       this.ghost.style.width=pct+'%';this.ghost.style.backgroundPosition=(100-pct)+'% center';
     },80);
   }
@@ -718,7 +718,7 @@ class TrustBar {
 // ============================================================
 class AICompensation {
   constructor(container, context){
-    this.container=container; this.context=context; // {cardId, baseTrusts: {direction, decode, execution}}
+    this.container=container; this.context=context; // {cardId, baseScores: {direction, decode, execution}}
     this.suggestions=[]; this.previewing=null; this.confirmed=null;
     this.onPreview=null; this.onConfirm=null; this.onUndo=null;
     this._build();
@@ -859,15 +859,15 @@ const DECISION_DEFS = [
     ],
     staleData:[{label:'现金流预测报告',freshness:'过期12个月',desc:'2025Q1现金流模型'}],
     options:['紧急融资','💡 砍边缘业务保核心（AI推荐）'],
-    baseTrusts:{direction:0.35, decode:0.42, execution:28},
-    maxTrusts:{direction:1, decode:1, execution:100},
+    baseScores:{direction:0.35, decode:0.42, execution:28},
+    maxScores:{direction:1, decode:1, execution:100},
     sliders:[
       {key:'cashflow',paramKey:'cashflow_risk',label:'现金流\n压力',min:1,max:5,value:4,step:1,formatValue:v=>({1:'极低',2:'低',3:'中',4:'高',5:'极高'})[v],suffix:'',reverseGradient:true,notches:[{value:2,aiRec:true},{value:4}],warnBelow:0,dangerBelow:0},
       {key:'payback',paramKey:'payback_years',label:'投资回\n收期',min:1,max:7,value:5.8,step:0.1,formatValue:v=>v.toFixed(1)+'年',suffix:'',reverseGradient:true,notches:[{value:3.5,aiRec:true},{value:5}],warnBelow:4,dangerBelow:5},
       {key:'mkt_growth',label:'市场\n增速',min:0,max:25,value:6,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
       {key:'rd_budget',paramKey:'rd_budget',label:'研发\n预算',min:0.5,max:3.0,value:0.8,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.2}],warnBelow:1.2,dangerBelow:0.8}
     ],
-    calcTrusts:function(sliders){
+    calcScores:function(sliders){
       // direction: 市场增速↑好, 现金流低压↑好, 回收期短↑好 → 默认0.40 最优0.92
       const dir=clamp(0.30+(sliders.mkt_growth-6)*0.015+(5-sliders.cashflow)*0.08+(7-sliders.payback)*0.02,0,1);
       // decode: 研发>1.5+0.15, 现金流<2+0.12, 回收期<4+0.10 → 最优0.87 最差0.42
@@ -887,15 +887,15 @@ const DECISION_DEFS = [
     ],
     staleData:[{label:'技术趋势报告',freshness:'过期18个月',desc:'AI+国产替代双驱动（2024Q2行业白皮书）'}],
     options:['激进进入','💡 合资探索（AI推荐）'],
-    baseTrusts:{direction:0.52, decode:0.95, execution:85},
-    maxTrusts:{direction:1, decode:1, execution:100},
+    baseScores:{direction:0.52, decode:0.95, execution:85},
+    maxScores:{direction:1, decode:1, execution:100},
     sliders:[
       {key:'cagr',paramKey:'mkt_growth',label:'年复合\n增长率',min:0,max:30,value:10,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
       {key:'comp',paramKey:'comp_lead',label:'竞品提\n前时间',min:0,max:6,value:2,step:1,formatValue:v=>v===0?'正常':v+'个月',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:3}],warnBelow:0,dangerBelow:0},
       {key:'budget',paramKey:'rd_budget',label:'研发\n预算',min:0.5,max:3.0,value:2.0,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.5}],warnBelow:1.2,dangerBelow:0.8},
       {key:'hc',paramKey:'hc_gap',label:'人才\n缺口',min:0,max:50,value:0,step:5,formatValue:v=>v===0?'无缺口':v+'人',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:20}],warnBelow:10,dangerBelow:20}
     ],
-    calcTrusts:function(sliders){
+    calcScores:function(sliders){
       // 来源说明: 0.92基准→行业均值; 0.018→麦肯锡2025战略规划调研(增速弹性); 0.045→历史回归(2020-2025竞争数据,竞品月领先影响因子)
       const dir=clamp(0.92-(15-sliders.cagr)*0.018-(sliders.comp*0.045),0,1);
       const dec=clamp(1.0-(sliders.budget<1.5?0.08:0)-(sliders.hc>20?0.05:0),0,1);
@@ -910,14 +910,14 @@ const DECISION_DEFS = [
     spAnchor:{spId:'sc4',spTitle:'SC-4 市场进入策略',csf:'CSF-6 运营效率',kpi:'KPI-6.1 供应链成本指数',target:'<¥1.5亿',weight:0.4},
     staleData:[{label:'供应商成本基准',freshness:'过期9个月',desc:'2025供应链审计报告'}],
     options:['维持现状','💡 竞价谈判+国产替代（AI推荐）'],
-    baseTrusts:{direction:0.88, decode:0.80, execution:32},
-    maxTrusts:{direction:1, decode:1, execution:100},
+    baseScores:{direction:0.88, decode:0.80, execution:32},
+    maxScores:{direction:1, decode:1, execution:100},
     sliders:[
       {key:'supply',paramKey:'supply_cost',label:'供应链\n成本',min:0.5,max:3.0,value:2.5,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',reverseGradient:true,notches:[{value:1.2,aiRec:true},{value:2.0}],warnBelow:0,dangerBelow:0},
       {key:'launch',paramKey:'launch_cycle',label:'上市\n周期',min:6,max:24,value:18,step:1,formatValue:v=>v+'个月',suffix:'',reverseGradient:true,notches:[{value:12,aiRec:true},{value:18}],warnBelow:0,dangerBelow:0},
       {key:'localization',label:'国产替\n代率',min:0,max:100,value:30,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:60,aiRec:true},{value:40}],warnBelow:35,dangerBelow:20}
     ],
-    calcTrusts:function(sliders){
+    calcScores:function(sliders){
       const dir=clamp(0.88+(sliders.localization-30)*0.002,0,1);
       const dec=clamp(0.80+(sliders.supply<1.5?0.1:0)+(sliders.launch<12?0.05:0),0,1);
       const exec=clamp(32+(3.0-sliders.supply)*30+(24-sliders.launch)*4+(sliders.localization-30)*0.6,0,100);
@@ -931,15 +931,15 @@ const DECISION_DEFS = [
     spAnchor:{spId:'sc1',spTitle:'SC-1 高端医疗设备市场领先',csf:'CSF-3 市场覆盖面',kpi:'KPI-3.2 签约数',target:'28家',weight:0.3},
     staleData:[{label:'数字化营销ROI基准',freshness:'过期6个月',desc:'2025Q4营销效率报告'}],
     options:['逐步推进','💡 渠道闪电战+SaaS工具（AI推荐）'],
-    baseTrusts:{direction:0.90, decode:0.48, execution:80},
-    maxTrusts:{direction:1, decode:1, execution:100},
+    baseScores:{direction:0.90, decode:0.48, execution:80},
+    maxScores:{direction:1, decode:1, execution:100},
     sliders:[
       {key:'channel_cov',label:'渠道覆\n盖率',min:0,max:100,value:45,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:80,aiRec:true},{value:50}],warnBelow:50,dangerBelow:30},
       {key:'mkt_growth2',paramKey:'mkt_growth',label:'市场\n增速',min:0,max:25,value:14,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
       {key:'budget2',paramKey:'rd_budget',label:'数字化\n预算',min:0.5,max:3.0,value:1.0,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.2}],warnBelow:1.2,dangerBelow:0.8},
       {key:'hc',paramKey:'hc_gap',label:'人才\n缺口',min:0,max:50,value:15,step:5,formatValue:v=>v===0?'无缺口':v+'人',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:20}],warnBelow:10,dangerBelow:20}
     ],
-    calcTrusts:function(sliders){
+    calcScores:function(sliders){
       const dir=clamp(0.90+(sliders.mkt_growth2-14)*0.015,0,1);
       // decode: 渠道>60+0.12, >80+0.08, 预算>1.5+0.08, >2.0+0.06 → 最优0.89 最差0.55
       const dec=clamp(0.55+(sliders.channel_cov>60?0.12:0)+(sliders.channel_cov>80?0.08:0)+(sliders.budget2>1.5?0.08:0)+(sliders.budget2>2.0?0.06:0),0,1);
@@ -956,14 +956,14 @@ const DECISION_DEFS = [
       {bpId:'bp13',csf:'CSF-4 人才保障',kpi:'KPI-4.1 学科带头人数',target:'5名',weight:0.3}
     ],
     options:['按原计划推进','微调资源配置'],
-    baseTrusts:{direction:0.92, decode:0.98, execution:88},
-    maxTrusts:{direction:1, decode:1, execution:100},
+    baseScores:{direction:0.92, decode:0.98, execution:88},
+    maxScores:{direction:1, decode:1, execution:100},
     sliders:[
       {key:'mkt_growth',label:'市场\n增速',min:0,max:25,value:15,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:10}],warnBelow:10,dangerBelow:5},
       {key:'localization',label:'国产替\n代率',min:0,max:100,value:55,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:60,aiRec:true},{value:40}],warnBelow:35,dangerBelow:20},
       {key:'rd_invest',label:'研发\n投入',min:0.5,max:3.0,value:2.0,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.2}],warnBelow:1.0,dangerBelow:0.7}
     ],
-    calcTrusts:function(sliders){
+    calcScores:function(sliders){
       // 来源: 0.92基准→行业均值; 0.015→市场增速弹性(麦肯锡2025); 0.001→国产替代率弱影响因子
       const dir=clamp(0.92-(15-sliders.mkt_growth)*0.015+(sliders.localization-55)*0.001,0,1);
       const dec=clamp(0.98-(sliders.rd_invest<1.5?0.06:0),0,1);
@@ -979,10 +979,10 @@ const DECISION_DEFS = [
 const cardInstances={};
 function buildCockpit(){
   const grid=document.getElementById('decisionGrid');
-  // 按综合严重度排序：最弱信任分升序（最危险的在前）
+  // 按综合严重度排序：最弱评分升序（最危险的在前）
   DECISION_DEFS.sort((a,b)=>{
-    var wa=Math.min(a.baseTrusts.direction,a.baseTrusts.decode,a.baseTrusts.execution/a.maxTrusts.execution);
-    var wb=Math.min(b.baseTrusts.direction,b.baseTrusts.decode,b.baseTrusts.execution/b.maxTrusts.execution);
+    var wa=Math.min(a.baseScores.direction,a.baseScores.decode,a.baseScores.execution/a.maxScores.execution);
+    var wb=Math.min(b.baseScores.direction,b.baseScores.decode,b.baseScores.execution/b.maxScores.execution);
     return wa-wb;
   });
   grid.innerHTML=DECISION_DEFS.map(d=>{
@@ -1009,7 +1009,7 @@ function buildCockpit(){
         '</div>'+
       '</div>'+
       '<div class="card-body">'+
-        '<div class="trust-bars-stack" id="trusts-'+d.id+'"></div>'+
+        '<div class="score-bars-stack" id="scores-'+d.id+'"></div>'+
         '<div class="card-body-ops">'+
           '<div class="card-body-sliders">'+
             '<div id="sliders-'+d.id+'"></div>'+
@@ -1025,7 +1025,7 @@ function buildCockpit(){
   // 初始化每张卡片
   DECISION_DEFS.forEach(d=>{
     const sliderContainer=document.getElementById('sliders-'+d.id);
-    const trustContainer=document.getElementById('trusts-'+d.id);
+    const scoreContainer=document.getElementById('scores-'+d.id);
     const aiContainer=document.getElementById('ai-'+d.id);
 
     // 创建滑块
@@ -1039,13 +1039,13 @@ function buildCockpit(){
     });
 
     // 统一趋势图（与工作台一致）
-    trustContainer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
-    var pre=d.id+'-';var updateTrends=buildTrendCell(trustContainer,pre,'sp','SP','#1890ff',d.baseTrusts.direction,1);
-    buildTrendCell(trustContainer,pre,'bp','BP','#00875A',d.baseTrusts.decode,1);
-    buildTrendCell(trustContainer,pre,'em','EM','#B86E00',d.baseTrusts.execution,100);
+    scoreContainer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
+    var pre=d.id+'-';var updateTrends=buildTrendCell(scoreContainer,pre,'sp','SP','#1890ff',d.baseScores.direction,1);
+    buildTrendCell(scoreContainer,pre,'bp','BP','#00875A',d.baseScores.decode,1);
+    buildTrendCell(scoreContainer,pre,'em','EM','#B86E00',d.baseScores.execution,100);
 
     // 创建AI代偿
-    const aiComp=new AICompensation(aiContainer,{cardId:d.id,baseTrusts:d.baseTrusts,staleData:d.staleData||[]});
+    const aiComp=new AICompensation(aiContainer,{cardId:d.id,baseScores:d.baseScores,staleData:d.staleData||[]});
     // 绑定全局回调（按卡片ID映射，避免循环覆盖）
     window._aiCallbacks=window._aiCallbacks||{};
     window._aiCallbacks[d.id]={preview:sid=>aiComp.preview(sid),confirm:sid=>aiComp.confirm(sid),undo:sid=>aiComp.undo(sid),adopt:sid=>aiComp.adopt(sid)}
@@ -1054,20 +1054,20 @@ function buildCockpit(){
       if(s.actions){
         Object.keys(s.actions).forEach(k=>{if(sliders[k])sliders[k].setValue(s.actions[k],true)});
       }
-      // 双轨预览: 计算预测信任分, 显示幽灵条
-      const st=getSliderState(d.id);const trusts=d.calcTrusts(st);
-      updateTrends(trusts);showToast('预览中','info');
+      // 双轨预览: 计算预测评分, 显示幽灵条
+      const st=getSliderState(d.id);const scores=d.calcScores(st);
+      updateTrends(scores);showToast('预览中','info');
     };
     aiComp.onConfirm=function(s){
-      const st=getSliderState(d.id);const trusts=d.calcTrusts(st);
-      updateTrends(trusts);showToast('策略已采纳 ✅','success');
+      const st=getSliderState(d.id);const scores=d.calcScores(st);
+      updateTrends(scores);showToast('策略已采纳 ✅','success');
       // 采纳后标记卡片为已处理，重排
-      var w=Math.min(trusts.direction,trusts.decode,trusts.execution/100);
+      var w=Math.min(scores.direction,scores.decode,scores.execution/100);
       if(w>=0.75){d.urgency='stable';d.tag='稳定';var card=document.getElementById('card-'+d.id);if(card){card.dataset.urgency='stable';var tag=card.querySelector('.card-urgency-tag');if(tag){tag.className='card-urgency-tag stable';tag.innerHTML=d.icon+' 稳定'}}}
       resortCards();
     };
     aiComp.onUndo=function(){
-      d.sliders.forEach(sdef=>{sliders[sdef.key].setValue(sdef.value,true)});var st0={};d.sliders.forEach(sdef=>{st0[sdef.key]=sdef.value});updateTrends(d.calcTrusts(st0));document.getElementById('cockpitStatus').textContent='系统就绪';resortCards();
+      d.sliders.forEach(sdef=>{sliders[sdef.key].setValue(sdef.value,true)});var st0={};d.sliders.forEach(sdef=>{st0[sdef.key]=sdef.value});updateTrends(d.calcScores(st0));document.getElementById('cockpitStatus').textContent='系统就绪';resortCards();
     };
 
 
@@ -1112,7 +1112,7 @@ function buildCockpit(){
     for(var si=0;si<50;si++)tPush(d.id,ss[si],bs[si],es[si])
 
     // 初始渲染展开卡趋势图（否则展开时canvas空白）
-    cardInstances[d.id].updateTrends(d.calcTrusts(initSt));
+    cardInstances[d.id].updateTrends(d.calcScores(initSt));
     // 初始评估AI代偿
     aiComp.evaluate(initSt);
     updateFoldedCard(d.id);
@@ -1122,14 +1122,14 @@ function buildCockpit(){
 function resortCards(){
   var grid=document.getElementById('decisionGrid');if(!grid)return;
   var cards=Array.from(grid.querySelectorAll('.decision-card'));
-  // 按当前最弱信任分升序排列
+  // 按当前最弱评分升序排列
   cards.sort((a,b)=>{
     var ai=cardInstances[a.id.replace('card-','')];
     var bi=cardInstances[b.id.replace('card-','')];
     if(!ai||!bi)return 0;
     var stA={};Object.keys(ai.sliders).forEach(k=>{stA[k]=ai.sliders[k].value});
     var stB={};Object.keys(bi.sliders).forEach(k=>{stB[k]=bi.sliders[k].value});
-    var tA=ai.def.calcTrusts(stA),tB=bi.def.calcTrusts(stB);
+    var tA=ai.def.calcScores(stA),tB=bi.def.calcScores(stB);
     var wA=Math.min(tA.direction,tA.decode,tA.execution/100);
     var wB=Math.min(tB.direction,tB.decode,tB.execution/100);
     return wA-wB;
@@ -1141,9 +1141,9 @@ function resortCards(){
   document.getElementById('cockpitStatus').textContent=urgent===0?'✅ 全部战略决策已处理 — 系统就绪':urgent+'项战略决策待关注。拖动任一滑块开始探索。';
 }
 
-function createTrustRow(container,label){
+function createScoreRow(container,label){
   const row=document.createElement('div');
-  row.className='trust-bar-row';
+  row.className='score-bar-row';
   container.appendChild(row);
   return row;
 }
@@ -1156,8 +1156,8 @@ function getSliderState(cardId){
 function onSliderChange(cardId){
   const inst=cardInstances[cardId];if(!inst)return;
   const st=getSliderState(cardId);
-  const trusts=inst.def.calcTrusts(st);
-  inst.updateTrends(trusts);
+  const scores=inst.def.calcScores(st);
+  inst.updateTrends(scores);
   // 更新AI代偿
   inst.aiComp.evaluate(st);
   // 更新所有折叠卡片趋势线 + 变化闪烁
@@ -1167,7 +1167,7 @@ function onSliderChange(cardId){
     if(card.classList.contains('card-folded')&&cid!==cardId){
       const prevScores=card.dataset.prevScores?JSON.parse(card.dataset.prevScores):{};
       const instC=cardInstances[cid];if(!instC)return;
-      var cst2={};Object.keys(instC.sliders).forEach(function(k){cst2[k]=instC.sliders[k].value});var curScores=instC.def.calcTrusts(cst2);curScores.execution=curScores.execution/100;
+      var cst2={};Object.keys(instC.sliders).forEach(function(k){cst2[k]=instC.sliders[k].value});var curScores=instC.def.calcScores(cst2);curScores.execution=curScores.execution/100;
       const changed=Object.keys(curScores).some(k=>Math.abs(curScores[k]-(prevScores[k]||0))>0.03);
       if(changed){card.classList.add('card-pulse');setTimeout(()=>card.classList.remove('card-pulse'),400)}
       card.dataset.prevScores=JSON.stringify(curScores);
@@ -1176,14 +1176,14 @@ function onSliderChange(cardId){
 }
 
 function onSliderRelease(cardId){
-  var i=cardInstances[cardId];if(i){var s2=i.def.calcTrusts(getSliderState(cardId));tPush(cardId,s2.direction,s2.decode,s2.execution)}
+  var i=cardInstances[cardId];if(i){var s2=i.def.calcScores(getSliderState(cardId));tPush(cardId,s2.direction,s2.decode,s2.execution)}
   document.getElementById('cockpitStatus').textContent='情景已更新';
 }
 
 function updateFoldedCard(cardId){
   var inst=cardInstances[cardId];if(!inst)return;
   var st={};Object.keys(inst.sliders).forEach(function(k){st[k]=inst.sliders[k].value});
-  var scores=inst.def.calcTrusts(st);
+  var scores=inst.def.calcScores(st);
   // 三条彩色趋势线（逐段着色：颜色=状态，走向=趋势，圆点=当前位置）
   [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'em',mx:100,v:scores.execution}].forEach(function(s){
     var cv=document.getElementById('folded-spark-'+cardId+'-'+s.k);if(cv)tDraw(cv,cardId,s.k,s.mx);
@@ -1194,10 +1194,10 @@ function updateFoldedCard(cardId){
   var worstKey=Object.keys(dimScores).reduce(function(a,b){return dimScores[a]<dimScores[b]?a:b});
   var worst=dimScores[worstKey],label=labels[worstKey];
   var el=document.getElementById('folded-hint-'+cardId);if(!el)return;
-  if(worst<0.4){el.textContent='🔴 '+label+'危险 立即干预';el.style.color='var(--color-trust-red)'}
-  else if(worst<0.6){el.textContent='⚠️ '+label+'偏弱 需评估';el.style.color='var(--color-trust-amber)'}
-  else if(worst<0.75){el.textContent='⚡ '+label+'偏低 建议关注';el.style.color='var(--color-trust-yellow)'}
-  else{el.textContent='✅ 状态健康';el.style.color='var(--color-trust-green)'}
+  if(worst<0.4){el.textContent='🔴 '+label+'危险 立即干预';el.style.color='var(--color-score-red)'}
+  else if(worst<0.6){el.textContent='⚠️ '+label+'偏弱 需评估';el.style.color='var(--color-score-amber)'}
+  else if(worst<0.75){el.textContent='⚡ '+label+'偏低 建议关注';el.style.color='var(--color-score-yellow)'}
+  else{el.textContent='✅ 状态健康';el.style.color='var(--color-score-green)'}
 }
 function resolveCard(cardId){
   const card=document.getElementById('card-'+cardId);if(!card)return;
@@ -1348,7 +1348,7 @@ window._rebuildSliders=function(activeParamKeys,aggregatedParams){
       if(k==='mkt_growth')mx=30;
       if(k==='comp_lead')mx=6;
       if(k==='train_cycle'||k==='launch_cycle')mx=24;
-      const sp=new SliderPhysics(w,{label:reg.name+(v.isDefault?' (默认)':''),min:mn,max:mx,value:v.value,step:step,formatValue:x=>x+reg.unit,valueSuffix:'',notches:[],warnBelow:undefined,dangerBelow:undefined,onChange:val=>{window._wbSliders[k].value=val;if(window._updateWB)window._updateWB()},onRelease:val=>{if(window._lastWBTrusts)tPush('wb',window._lastWBTrusts.direction,window._lastWBTrusts.decode,window._lastWBTrusts.execution);refreshDebateRoom(null,k,val)}});
+      const sp=new SliderPhysics(w,{label:reg.name+(v.isDefault?' (默认)':''),min:mn,max:mx,value:v.value,step:step,formatValue:x=>x+reg.unit,valueSuffix:'',notches:[],warnBelow:undefined,dangerBelow:undefined,onChange:val=>{window._wbSliders[k].value=val;if(window._updateWB)window._updateWB()},onRelease:val=>{if(window._lastWBScores)tPush('wb',window._lastWBScores.direction,window._lastWBScores.decode,window._lastWBScores.execution);refreshDebateRoom(null,k,val)}});
       window._wbSliders[k]=sp;window._wbActiveParams[k]=true;container.appendChild(w);
       const sl=document.createElement('div');sl.style.cssText='font-size:9px;color:'+(v.isDefault?'#999':'var(--color-text-tertiary)')+';margin-top:-4px;padding-left:56px';sl.textContent=v.isDefault?'← 默认值':'← '+(v.sources?.length||0)+'条证据';container.appendChild(sl);
     });
@@ -1609,7 +1609,7 @@ function buildWorkbench(){
   // 中栏：动态推演沙盘 — 参数体系由选中证据决定
   let sandboxHTML='<div class="workbench-panel"><h3>🎮 推演沙盘</h3>'+
     '<div id="wb-evidence-discount" style="margin-bottom:4px;padding:3px 8px;background:#f0f8ff;border-radius:3px;font-size:10px;color:var(--color-primary)">📏 勾选左侧证据 → 参数自动聚合</div>'+
-    '<div class="trust-bars-stack" id="wb-trusts" style="margin-bottom:4px"></div>'+
+    '<div class="score-bars-stack" id="wb-scores" style="margin-bottom:4px"></div>'+
     '<div style="font-size:9px;color:var(--color-text-tertiary);text-align:center;margin-bottom:var(--spacing-md)">全证据聚合 · 含SP+BP+RT参数加权</div>'+
     '<div id="wb-sliders-container"></div>'+
     '<div style="margin-top:var(--spacing-sm);font-size:10px;color:var(--color-text-tertiary);line-height:1.5" id="wb-param-detail"></div>'+
@@ -1634,15 +1634,15 @@ function buildWorkbench(){
 
   layout.innerHTML=evidenceHTML+sandboxHTML+debateHTML;
 
-  // 中栏：动态沙盘 — 信任条 + 动态参数面板
+  // 中栏：动态沙盘 — 评分条 + 动态参数面板
   setTimeout(()=>{
-    const wbTrustContainer=document.getElementById('wb-trusts');
-    if(!wbTrustContainer)return;
-    wbTrustContainer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
-    buildTrendCell(wbTrustContainer,'wb-','sp','SP','#1890ff',0.85,1);
-    buildTrendCell(wbTrustContainer,'wb-','bp','BP','#00875A',1.0,1);
-    var wbUpdateTrends=buildTrendCell(wbTrustContainer,'wb-','em','EM','#B86E00',82,100);
-    function calcTrustsGeneric(params){
+    const wbScoreContainer=document.getElementById('wb-scores');
+    if(!wbScoreContainer)return;
+    wbScoreContainer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
+    buildTrendCell(wbScoreContainer,'wb-','sp','SP','#1890ff',0.85,1);
+    buildTrendCell(wbScoreContainer,'wb-','bp','BP','#00875A',1.0,1);
+    var wbUpdateTrends=buildTrendCell(wbScoreContainer,'wb-','em','EM','#B86E00',82,100);
+    function calcScoresGeneric(params){
       var p=function(k){return params[k]||(PARAM_REGISTRY[k]?PARAM_REGISTRY[k].default:0)};
       var dir=clamp(0.92-(15-p('mkt_growth'))*0.018-(p('comp_lead'))*0.045+(p('localization')-55)*0.001+(p('mkt_share')-18)*0.003+(p('patent_count')-3)*0.015+(p('channel_cov')-75)*0.002,0,1);
       // decode: SP→BP翻译质量 — BP[1-3]参数加权
@@ -1653,8 +1653,8 @@ function buildWorkbench(){
     }
     window._updateWB=function(){
       var st={};if(window._wbSliders)Object.keys(window._wbSliders).forEach(function(k){st[k]=window._wbSliders[k].value});
-      var trusts=calcTrustsGeneric(st);
-      wbUpdateTrends(trusts);window._lastWBTrusts=trusts;
+      var scores=calcScoresGeneric(st);
+      wbUpdateTrends(scores);window._lastWBScores=scores;
     };
     wbUpdateTrends({direction:0.85,decode:1.0,execution:82});
     var wss=[0.87,0.87,0.86,0.81,0.79,0.80,0.83,0.85,0.85,0.85];var wbs=[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0];var wes=[86,85,84,78,75,77,80,83,83,83];for(var si=0;si<10;si++)tPush('wb',wss[si],wbs[si],wes[si]);setTimeout(function(){if(window.scenarioApply)window.scenarioApply('optimistic')},200);
