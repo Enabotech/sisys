@@ -842,7 +842,7 @@ const DECISION_DEFS = [
     tornadoItems:function(sliders){return[{label:'人才缺口',value:-sliders.hc*1.5},{label:'研发预算',value:(sliders.budget-2.0)*25},{label:'竞品提前',value:-sliders.comp*8}]}
   },
   {
-    id:'bp13', urgency:'pending', icon:'📅', tag:'待定 · Q3前须决', title:'举措 1.3 人才引进',
+    id:'bp13', urgency:'pending', icon:'📅', tag:'待定', title:'举措 1.3 人才引进',
     summary:'招聘启动2个月，0位候选人进入终面 · 影响举措1.1/2.1/3.2',
     spAnchor:{spId:'sc4',spTitle:'SC-4 市场进入策略',csf:'CSF-4 人才保障',kpi:'KPI-4.1 学科带头人数',target:'5名',weight:0.3},
     staleData:[{label:'人才市场薪资基准',freshness:'过期6个月',desc:'行业薪资调研报告（2025Q4）'}],
@@ -863,7 +863,7 @@ const DECISION_DEFS = [
     tornadoItems:function(sliders){return[{label:'薪资调整',value:sliders.salary*1.2},{label:'人才池',value:(sliders.talent_pool-60)*0.8},{label:'培养周期',value:(9-sliders.train_time)*3}]}
   },
   {
-    id:'sc1', urgency:'stable', icon:'📌', tag:'稳定 · 可后续推进', title:'SC-1 高端医疗设备市场领先',
+    id:'sc1', urgency:'stable', icon:'📌', tag:'稳定', title:'SC-1 高端医疗设备市场领先',
     summary:'全票通过 · 市场前景确认 · 按原计划推进',
     spBpMapping:[
       {bpId:'bp11',csf:'CSF-1 产品竞争力',kpi:'KPI-1.1 专利数',target:'3项',weight:0.4},
