@@ -1544,6 +1544,7 @@ function buildWorkbench(){
     return h;
   }
   function renderEvidenceRow(e){
+    window._renderEvidenceRow=renderEvidenceRow;
     var h='<div class="wb-evidence-row">';
     h+='<input type="checkbox" class="ev-check" data-freshness="'+(e.freshness||'')+'"'+(e.isDecision?' data-is-decision="true"':'')+' onchange="window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" onclick="event.stopPropagation()">';
     // 决策型: ✅图标+深蓝色文字, 研究型: 🟢🟡🔴
