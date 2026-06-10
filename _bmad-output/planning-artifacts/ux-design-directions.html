@@ -1238,13 +1238,14 @@ function buildWorkbench(){
     {label:'增长路径可行性 4/5',freshness:'fresh',params:{mkt_growth:15,comp_lead:1},confidence:0.85,source:'安索夫分析 · 2026Q1',phase:'SP[2]',substep:'(5)看机会'},
     {label:'能力-机会匹配度 3/5',freshness:'usable',params:{talent_pool:55,rd_budget:1.8},confidence:0.70,source:'GE-麦肯锡 · 2025Q4',phase:'SP[2]',substep:'(6)机会差距'},
     // SP[3] 战略意图
-    {label:'三年营收目标 ¥50亿',freshness:'fresh',params:{mkt_growth:15},confidence:0.95,source:'董事会决议 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2, 举措1.3'},
-    {label:'市场份额目标 25%',freshness:'fresh',params:{mkt_growth:15},confidence:0.90,source:'SP文档 · 2026',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2'},
-    {label:'毛利率目标 60%',freshness:'usable',params:{rd_budget:2.0},confidence:0.85,source:'财务规划 · 2026',phase:'SP[3]',decodesTo:'举措1.3'},
+    {label:'三年营收目标 ¥50亿',freshness:'fresh',params:{mkt_growth:15,channel_cov:75},confidence:0.95,source:'董事会决议 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2, 举措1.3'},
+    {label:'市场份额目标 25%',freshness:'fresh',params:{mkt_share:25,mkt_growth:15},confidence:0.90,source:'SP文档 · 2026',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2'},
+    {label:'专利布局目标 3项',freshness:'fresh',params:{patent_count:3,mkt_growth:14},confidence:0.88,source:'技术战略 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.1'},
+    {label:'毛利率目标 60%',freshness:'usable',params:{rd_budget:2.0,mkt_share:22},confidence:0.85,source:'财务规划 · 2026',phase:'SP[3]',decodesTo:'举措1.3'},
     // SP[4-6]
-    {label:'技术创新度 3/5',freshness:'usable',params:{mkt_growth:12},confidence:0.75,source:'技术评估 · 2025Q4',phase:'SP[4]'},
-    {label:'价值主张清晰度 4/5',freshness:'fresh',params:{comp_lead:1},confidence:0.90,source:'战略工作坊 · 2026Q1',phase:'SP[5]'},
-    {label:'战略控制点强度 3/5',freshness:'usable',params:{rd_budget:2.0},confidence:0.80,source:'战略评估 · 2025Q4',phase:'SP[5]'},
+    {label:'技术创新度 3/5',freshness:'usable',params:{patent_count:2,mkt_growth:12},confidence:0.75,source:'技术评估 · 2025Q4',phase:'SP[4]'},
+    {label:'价值主张清晰度 4/5',freshness:'fresh',params:{comp_lead:1,mkt_share:20},confidence:0.90,source:'战略工作坊 · 2026Q1',phase:'SP[5]'},
+    {label:'战略控制点强度 3/5',freshness:'usable',params:{rd_budget:2.0,patent_count:3},confidence:0.80,source:'战略评估 · 2025Q4',phase:'SP[5]'},
     {label:'关键任务就绪度 3/5',freshness:'fresh',params:{hc_gap:22,train_cycle:9},confidence:0.90,source:'项目管理 · 2026Q1',phase:'SP[6]'},
     {label:'组织能力差距 中等',freshness:'usable',params:{talent_pool:60},confidence:0.75,source:'HR评估 · 2025Q4',phase:'SP[6]'},
     // BP[1] 澄清战略方向
@@ -1260,7 +1261,7 @@ function buildWorkbench(){
     {label:'指标目标挑战度 4/5',freshness:'fresh',params:{mkt_growth:13},confidence:0.85,source:'行业对标 · 2026Q1',phase:'BP[3]'},
     {label:'先导/滞后指标比 0.8',freshness:'usable',params:{metric_coverage:80},confidence:0.70,source:'指标库统计 · 2025Q4',phase:'BP[3]'},
     // BP[4] 确定措施目标
-    {label:'渠道覆盖 45%→80%',freshness:'fresh',params:{hc_gap:0},confidence:0.95,source:'内部数据 · 2026Q1',phase:'BP[4]'},
+    {label:'渠道覆盖 45%→80%',freshness:'fresh',params:{hc_gap:0,channel_cov:80},confidence:0.95,source:'内部数据 · 2026Q1',phase:'BP[4]'},
     {label:'人力缺口 22人',freshness:'fresh',params:{hc_gap:22,talent_pool:60,train_cycle:9},confidence:0.95,source:'HR系统 · 2026Q1',phase:'BP[4]'},
     {label:'预算-措施匹配度 82%',freshness:'fresh',params:{budget_measure_match:82,rd_budget:1.9},confidence:0.90,source:'财务审核 · 2026Q1',phase:'BP[4]'},
     {label:'措施SMART具体度 4/5',freshness:'fresh',params:{rd_budget:2.1},confidence:0.85,source:'COO评审 · 2026Q1',phase:'BP[4]'},
@@ -1300,7 +1301,7 @@ function buildWorkbench(){
         {sub:'(5)看机会',keys:['增长路径可行性 4/5']},
         {sub:'(6)机会差距',keys:['能力-机会匹配度 3/5']}
       ]},
-      {step:'[3]',label:'战略意图',keys:['三年营收目标 ¥50亿','市场份额目标 25%','毛利率目标 60%']},
+      {step:'[3]',label:'战略意图',keys:['三年营收目标 ¥50亿','市场份额目标 25%','专利布局目标 3项','毛利率目标 60%']},
       {step:'[4]',label:'创新焦点',keys:['技术创新度 3/5']},
       {step:'[5]',label:'业务设计',keys:['价值主张清晰度 4/5','战略控制点强度 3/5']},
       {step:'[6]',label:'执行设计',keys:['关键任务就绪度 3/5','组织能力差距 中等']}
@@ -1461,7 +1462,7 @@ function buildWorkbench(){
     var wbUpdateTrends=buildTrendCell(wbTrustContainer,'wb-','be','BE','#B86E00',82,100);
     function calcTrustsGeneric(params){
       var p=function(k){return params[k]||(PARAM_REGISTRY[k]?PARAM_REGISTRY[k].default:0)};
-      var dir=clamp(0.92-(15-p('mkt_growth'))*0.018-(p('comp_lead'))*0.045+(p('localization')-55)*0.001,0,1);
+      var dir=clamp(0.92-(15-p('mkt_growth'))*0.018-(p('comp_lead'))*0.045+(p('localization')-55)*0.001+(p('mkt_share')-18)*0.003+(p('patent_count')-3)*0.015+(p('channel_cov')-75)*0.002,0,1);
       // decode: SP→BP翻译质量 — BP[1-3]参数加权
       var dec=clamp(1.0-(p('rd_budget')<1.5?0.08:0)-(p('hc_gap')>20?0.05:0)+(p('talent_pool')>50?0.03:0)+(p('sp_bp_alignment')-85)*0.003+(p('initiative_coverage')-90)*0.002+(p('metric_coverage')-88)*0.002,0,1);
       // execution: BP[4-6]+RT参数加权
