@@ -480,16 +480,16 @@ const PARAM_REGISTRY={
   payback_years:{name:'投资回收期',unit:'年',tier:'风险',default:3.5},
   cashflow_risk:{name:'现金流压力',unit:'等级',tier:'风险',default:'中'},
   compliance:{name:'合规风险等级',unit:'等级',tier:'风险',default:'低'},
-  // BP 解码参数
-  sp_bp_alignment:{name:'SP-BP映射完整度',unit:'%',tier:'执行',default:85},
-  initiative_coverage:{name:'举措覆盖完整度',unit:'%',tier:'执行',default:90},
-  metric_coverage:{name:'指标覆盖率',unit:'%',tier:'执行',default:88},
-  // BP 执行参数
+  // BP 解码参数 (BP[1-3])
+  sp_bp_alignment:{name:'SP-BP映射完整度',unit:'%',tier:'解码',default:85},
+  initiative_coverage:{name:'举措覆盖完整度',unit:'%',tier:'解码',default:90},
+  metric_coverage:{name:'指标覆盖率',unit:'%',tier:'解码',default:88},
+  // BP 执行参数 (BP[4-6])
   budget_measure_match:{name:'预算-措施匹配度',unit:'%',tier:'执行',default:82},
   owner_accountability:{name:'责任人明确度',unit:'%',tier:'执行',default:95},
   // RT 监控参数
-  milestone_achieve:{name:'里程碑达成率',unit:'%',tier:'风险',default:72},
-  talent_retention:{name:'关键人才留存率',unit:'%',tier:'风险',default:88},
+  milestone_achieve:{name:'里程碑达成率',unit:'%',tier:'监控',default:72},
+  talent_retention:{name:'关键人才留存率',unit:'%',tier:'监控',default:88},
   risk_mitigation_cov:{name:'风险缓解覆盖率',unit:'%',tier:'风险',default:65}
 };
 // ============================================================
@@ -1197,7 +1197,7 @@ window._rebuildSliders=function(activeParamKeys,aggregatedParams){
   const same=Object.keys(window._wbActiveParams).length===activeParamKeys.length&&Object.keys(window._wbActiveParams).every(k=>activeParamKeys.includes(k));
   if(same){Object.entries(aggregatedParams).forEach(([k,v])=>{if(window._wbSliders[k])window._wbSliders[k].setValue(v.value,true)});if(window._updateWB)window._updateWB();return}
   container.innerHTML='';window._wbSliders={};window._wbActiveParams={};
-  const tiers={环境:[],战略:[],执行:[],风险:[]};
+  const tiers={环境:[],战略:[],解码:[],执行:[],监控:[],风险:[]};
   activeParamKeys.forEach(k=>{const reg=PARAM_REGISTRY[k];if(reg&&tiers[reg.tier])tiers[reg.tier].push(k)});
   Object.entries(tiers).forEach(([tierName,keys])=>{
     if(keys.length===0)return;
@@ -1207,8 +1207,12 @@ window._rebuildSliders=function(activeParamKeys,aggregatedParams){
       const v=aggregatedParams[k]||{value:reg.default,isDefault:true,sources:[]};
       const w=document.createElement('div');w.style.marginBottom='6px';
       const step=reg.unit==='%'?1:reg.unit==='¥亿'?0.1:reg.unit==='人'?5:reg.unit==='分'?5:reg.unit==='月'?1:1;
-      const mn=k==='talent_pool'||k==='localization'?0:k==='salary_comp'?-30:k==='hc_gap'?0:0;
-      const mx=k==='talent_pool'||k==='localization'?100:k==='salary_comp'?20:k==='hc_gap'?50:k==='mkt_growth'?30:k==='comp_lead'?6:k==='train_cycle'||k==='launch_cycle'||k==='training_cycle_months'?24:3;
+      // 范围由 unit 驱动，特殊键硬编码覆盖
+      var mn=0,mx=reg.unit==='%'?100:reg.unit==='¥亿'?3:reg.unit==='人'?50:reg.unit==='分'?100:reg.unit==='月'?24:reg.unit==='年'?10:reg.unit==='比率'?5:3;
+      if(k==='salary_comp'){mn=-30;mx=20}
+      if(k==='mkt_growth')mx=30;
+      if(k==='comp_lead')mx=6;
+      if(k==='train_cycle'||k==='launch_cycle')mx=24;
       const sp=new SliderPhysics(w,{label:reg.name+(v.isDefault?' (默认)':''),min:mn,max:mx,value:v.value,step:step,formatValue:x=>x+reg.unit,valueSuffix:'',notches:[],warnBelow:undefined,dangerBelow:undefined,onChange:val=>{window._wbSliders[k].value=val;if(window._updateWB)window._updateWB()},onRelease:val=>{if(window._lastWBTrusts)tPush('wb',window._lastWBTrusts.direction,window._lastWBTrusts.decode,window._lastWBTrusts.execution);refreshDebateRoom(null,k,val)}});
       window._wbSliders[k]=sp;window._wbActiveParams[k]=true;container.appendChild(w);
       const sl=document.createElement('div');sl.style.cssText='font-size:9px;color:'+(v.isDefault?'#999':'var(--color-text-tertiary)')+';margin-top:-4px;padding-left:56px';sl.textContent=v.isDefault?'← 默认值':'← '+(v.sources?.length||0)+'条证据';container.appendChild(sl);
