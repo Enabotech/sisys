@@ -104,8 +104,8 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 /* 折叠卡片缩微信任条 — Steve的"心跳信号" */
 .card-folded-trusts{display:flex;align-items:center;gap:3px;flex-shrink:0;padding:0 4px}
 .card-header-mid{flex:0 0 25%;display:flex;align-items:center;justify-content:center}
-.card-folded-trust-conn{width:1px;height:36px;border-radius:1px;background:var(--color-trust-green);transition:background .6s ease;flex-shrink:0}
-.card-folded-trust-mini{flex:1 1 auto;min-width:0;max-height:100%;object-fit:contain}
+.card-folded-trust-conn{width:1px;height:44px;border-radius:1px;background:var(--color-trust-green);transition:background .6s ease;flex-shrink:0}
+.card-folded-trust-mini{width:80px;height:44px;flex-shrink:0}
 .mini-nav-hint{font-size:11px;font-weight:500;flex-shrink:0;white-space:nowrap;margin-left:4px}
 /* 折叠卡片左边竖线脉冲 — Steve的"余光感知" */
 @keyframes cardPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(212,139,6,.4)}}
@@ -907,9 +907,9 @@ function buildCockpit(){
         '<div class="card-header-mid"><span class="mini-nav-hint" id="mini-hint-'+d.id+'"></span>'+
           '<div class="card-folded-trusts" id="mini-trusts-'+d.id+'">'+
             '<div class="card-folded-trust-conn" id="mini-conn-'+d.id+'" style="background:'+(function(){var w=Math.min(bs.direction,bs.decode,bs.execution/d.maxTrusts.execution);return w<0.4?'var(--color-trust-red)':w<0.6?'var(--color-trust-yellow)':w<0.75?'var(--color-trust-amber)':'var(--color-trust-green)'})()+'"></div>'+
-            '<canvas class="card-folded-trust-mini" id="mini-spark-dir-'+d.id+'" width="80" height="36"></canvas>'+
-            '<canvas class="card-folded-trust-mini" id="mini-spark-dec-'+d.id+'" width="80" height="36"></canvas>'+
-            '<canvas class="card-folded-trust-mini" id="mini-spark-exe-'+d.id+'" width="80" height="36"></canvas>'+
+            '<canvas class="card-folded-trust-mini" id="mini-spark-dir-'+d.id+'" width="80" height="44"></canvas>'+
+            '<canvas class="card-folded-trust-mini" id="mini-spark-dec-'+d.id+'" width="80" height="44"></canvas>'+
+            '<canvas class="card-folded-trust-mini" id="mini-spark-exe-'+d.id+'" width="80" height="44"></canvas>'+
           '</div></div>'+
         '<div class="card-header-right">'+
           '<button class="card-expand-btn" onclick="toggleCardExpand(\''+d.id+'\')" title="展开/折叠">▸</button>'+
