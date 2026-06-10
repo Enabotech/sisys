@@ -105,7 +105,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .card-folded-trusts{display:flex;align-items:center;gap:3px;flex-shrink:0;padding:0 4px}
 .card-header-mid{flex:0 0 25%;display:flex;align-items:center;justify-content:center}
 .card-folded-trust-conn{width:1px;height:36px;border-radius:1px;background:var(--color-trust-green);transition:background .6s ease;flex-shrink:0}
-.card-folded-trust-mini{width:80px;height:36px;border-radius:2px;flex-shrink:0}
+.card-folded-trust-mini{flex:1 1 auto;min-width:0;max-height:100%;object-fit:contain}
 .mini-nav-hint{font-size:11px;font-weight:500;flex-shrink:0;white-space:nowrap;margin-left:4px}
 /* 折叠卡片左边竖线脉冲 — Steve的"余光感知" */
 @keyframes cardPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(212,139,6,.4)}}
