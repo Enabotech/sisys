@@ -216,6 +216,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .preview-btn,.confirm-btn,.undo-btn{padding:3px 12px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--font-family-base);border:1px solid var(--color-border);background:var(--color-bg-card);color:var(--color-text-secondary);transition:all .15s}
 .preview-btn:hover{border-color:var(--color-primary);color:var(--color-primary);background:var(--color-primary-bg)}
 .confirm-btn{background:var(--color-primary);color:white;border-color:var(--color-primary)}.confirm-btn:hover{background:var(--color-primary-hover)}
+.scenario-btn{transition:all .15s}.scenario-btn.active{opacity:1!important;border-width:2px;border-style:solid}
 .undo-btn{color:var(--color-text-tertiary)}.undo-btn:hover{color:var(--color-danger);border-color:var(--color-danger)}
 .preview-applied .ai-strategy-card:not(.active){opacity:.4;pointer-events:none}
 .ai-strategy-card.active{border-color:var(--color-primary);box-shadow:0 0 8px rgba(24,144,255,.15)}
@@ -1598,14 +1599,19 @@ function buildWorkbench(){
   }
   function scenarioApply(type){
     const allCbs=document.querySelectorAll('.ev-check');
-    allCbs.forEach(cb=>{if(type==='optimistic')cb.checked=cb.dataset.freshness==='fresh';else if(type==='conservative')cb.checked=true});
+    if(type==='optimistic')allCbs.forEach(cb=>{cb.checked=cb.dataset.freshness==='fresh'});
+    else if(type==='conservative')allCbs.forEach(cb=>{cb.checked=true});
     onEvidenceChange();
+    // 按钮激活态
+    document.querySelectorAll('.scenario-btn').forEach(b=>b.classList.remove('active'));
+    var activeBtn=document.querySelector('.scenario-btn[data-scenario="'+type+'"]');
+    if(activeBtn)activeBtn.classList.add('active');
     showToast(type==='optimistic'?'🟢 乐观情景：仅采纳新鲜数据':type==='conservative'?'🔴 保守情景：全部证据纳入推演':'✋ 自定义：手动勾选证据','info');
   }
   window.scenarioApply=scenarioApply;
   window.onEvidenceChange=onEvidenceChange;
   window.recalcEvidenceDiscount=onEvidenceChange;
-  let evidenceHTML='<div class="workbench-panel"><h3>📊 战略证据链</h3><div style="display:flex;gap:4px;margin-bottom:var(--spacing-sm)"><button onclick="scenarioApply(\'optimistic\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-success);border-radius:3px;background:#f6ffed;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-success);font-weight:500">🟢乐观</button><button onclick="scenarioApply(\'conservative\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-danger);border-radius:3px;background:#fff1f0;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-danger);font-weight:500">🔴保守</button><button onclick="scenarioApply(\'custom\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-border);border-radius:3px;background:var(--color-bg-card);cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-text-secondary)">✋自定义</button><button onclick="toggleDecisionEvidence()" style="flex:1;padding:3px 6px;border:1px solid #1d3a5c;border-radius:3px;background:#f0f5ff;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:#1d3a5c;font-weight:500">✅决策</button></div><div class="evidence-tree">'+renderPhaseTree()+'</div><div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div></div>';
+  let evidenceHTML='<div class="workbench-panel"><h3>📊 战略证据链</h3><div style="display:flex;gap:4px;margin-bottom:var(--spacing-sm)"><button class="scenario-btn active" data-scenario="optimistic" onclick="scenarioApply(\'optimistic\')" style="flex:1;padding:3px 6px;border:2px solid var(--color-success);border-radius:3px;background:#f6ffed;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-success);font-weight:500">🟢乐观</button><button class="scenario-btn" data-scenario="conservative" onclick="scenarioApply(\'conservative\')" style="flex:1;padding:3px 6px;border:2px solid transparent;border-radius:3px;background:#fff1f0;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-danger);font-weight:500;opacity:.6">🔴保守</button><button class="scenario-btn" data-scenario="custom" onclick="scenarioApply(\'custom\')" style="flex:1;padding:3px 6px;border:2px solid transparent;border-radius:3px;background:var(--color-bg-card);cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-text-secondary);opacity:.6">✋自定义</button><button class="scenario-btn" data-scenario="decision" onclick="toggleDecisionEvidence()" style="flex:1;padding:3px 6px;border:2px solid transparent;border-radius:3px;background:#f0f5ff;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:#1d3a5c;font-weight:500;opacity:.6">✅决策</button></div><div class="evidence-tree">'+renderPhaseTree()+'</div><div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div></div>';
 
   // 中栏：动态推演沙盘 — 参数体系由选中证据决定
   let sandboxHTML='<div class="workbench-panel"><h3>🎮 推演沙盘</h3>'+
@@ -1675,10 +1681,10 @@ function rebuildWorkbench(){
   var panel=layout.querySelector('.workbench-panel');if(!panel)return;
   var treeHTML='<h3>📊 战略证据链</h3>'+
     '<div style="display:flex;gap:4px;margin-bottom:var(--spacing-sm)">'+
-    '<button onclick="scenarioApply(\'optimistic\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-success);border-radius:3px;background:#f6ffed;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-success);font-weight:500">🟢乐观</button>'+
-    '<button onclick="scenarioApply(\'conservative\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-danger);border-radius:3px;background:#fff1f0;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-danger);font-weight:500">🔴保守</button>'+
-    '<button onclick="scenarioApply(\'custom\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-border);border-radius:3px;background:var(--color-bg-card);cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-text-secondary)">✋自定义</button>'+
-    '<button onclick="toggleDecisionEvidence()" style="flex:1;padding:3px 6px;border:1px solid #1d3a5c;border-radius:3px;background:#f0f5ff;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:#1d3a5c;font-weight:500">✅决策</button>'+
+    '<button class="scenario-btn active" data-scenario="optimistic" onclick="scenarioApply(\'optimistic\')" style="flex:1;padding:3px 6px;border:2px solid var(--color-success);border-radius:3px;background:#f6ffed;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-success);font-weight:500">🟢乐观</button>'+
+    '<button class="scenario-btn" data-scenario="conservative" onclick="scenarioApply(\'conservative\')" style="flex:1;padding:3px 6px;border:2px solid transparent;border-radius:3px;background:#fff1f0;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-danger);font-weight:500;opacity:.6">🔴保守</button>'+
+    '<button class="scenario-btn" data-scenario="custom" onclick="scenarioApply(\'custom\')" style="flex:1;padding:3px 6px;border:2px solid transparent;border-radius:3px;background:var(--color-bg-card);cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-text-secondary);opacity:.6">✋自定义</button>'+
+    '<button class="scenario-btn" data-scenario="decision" onclick="toggleDecisionEvidence()" style="flex:1;padding:3px 6px;border:2px solid transparent;border-radius:3px;background:#f0f5ff;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:#1d3a5c;font-weight:500;opacity:.6">✅决策</button>'+
     '</div><div class="evidence-tree">'+renderPhaseTree()+'</div>'+
     '<div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div>';
   panel.innerHTML=treeHTML;
@@ -1689,6 +1695,8 @@ function toggleDecisionEvidence(){
   var allChecked=Array.from(decChecks).every(function(c){return c.checked});
   decChecks.forEach(function(c){c.checked=!allChecked});
   window.recalcEvidenceDiscount();
+  var btn=document.querySelector('.scenario-btn[data-scenario="decision"]');
+  if(btn)btn.classList.toggle('active',!allChecked);
   showToast(allChecked?'已取消全部决策证据':'已勾选全部决策证据','info');
 }
 
