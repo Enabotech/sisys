@@ -438,6 +438,14 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
      ============================================================ -->
 <script>
 // ============================================================
+
+// ============================================================
+// 置信度趋势
+// ============================================================
+window._th=[];(function sd(){var b={sp:0.85,bp:1.0,be:82};for(var i=0;i<10;i++){var j=Math.sin(i*1.2)*0.03;window._th.push({sp:b.sp+j,bp:b.bp+Math.sin(i)*0.02,be:b.be+Math.sin(i*0.8)*3,ts:Date.now()-(10-i)*30000})}})();
+function tPush(sp,bp,be){window._th.push({sp:sp,bp:bp,be:be,ts:Date.now()});if(window._th.length>100)window._th.shift()}
+function tDraw(cv,key,mx){var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;var hist=window._th.map(function(p){return p[key]});if(hist.length<2)return;ctx.clearRect(0,0,w,h);var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0,0.5,1].forEach(function(p){var y=h-8-p*(h-16);ctx.beginPath();ctx.moveTo(2,y);ctx.lineTo(w-2,y);ctx.stroke()});var lv=hist[hist.length-1];var cs={sp:'#1890ff',bp:'#00875A',be:'#B86E00'};ctx.strokeStyle=cs[key]||'#888';ctx.lineWidth=2;ctx.beginPath();hist.forEach(function(v,i){var x=2+i/Math.max(hist.length-1,1)*(w-4);var y=h-8-(v-mn)/r*(h-16);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.arc(2+(hist.length-1)/Math.max(hist.length-1,1)*(w-4),h-8-(lv-mn)/r*(h-16),3,0,Math.PI*2);ctx.fill()}
+function tModal(key){key=key||'sp';var ns={sp:'SP 战略规划',bp:'BP 业务计划',be:'BE 业务执行'};var cl={sp:'#1890ff',bp:'#00875A',be:'#B86E00'};var mx={sp:1,bp:1,be:100};var m=document.getElementById('tM'),o=document.getElementById('tO');if(!m){o=document.createElement('div');o.id='tO';o.className='overlay';o.onclick=function(){o.classList.remove('show');m.classList.remove('show')};document.body.appendChild(o);m=document.createElement('div');m.id='tM';m.className='modal';m.style.cssText='max-width:500px';m.innerHTML='<div class="modal-header"><span class="modal-title" id="tT"></span><button class="modal-close" onclick="document.getElementById(\'tO\').classList.remove(\'show\');document.getElementById(\'tM\').classList.remove(\'show\')">X</button></div><div class="modal-body"><canvas id="tC" width="460" height="200" style="width:100%;height:auto"></canvas><div style="margin-top:8px;font-size:13px;text-align:center;font-weight:700" id="tV"></div></div>';document.body.appendChild(m)}o.classList.add('show');m.classList.add('show');document.getElementById('tT').textContent='📈 '+ns[key]+' 置信度走势（最近'+window._th.length+'次）';setTimeout(function(){var c=document.getElementById('tC');if(!c)return;var ctx=c.getContext('2d'),w=c.width,h=c.height;var hist=window._th.map(function(p){return p[key]});var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0.25,0.5,0.75].forEach(function(p){var y=h-20-p*(h-30);ctx.beginPath();ctx.moveTo(10,y);ctx.lineTo(w-10,y);ctx.stroke()});ctx.strokeStyle=cl[key];ctx.lineWidth=2.5;ctx.beginPath();hist.forEach(function(v,i){var x=10+i/Math.max(hist.length-1,1)*(w-20);var y=h-20-(v-mn)/r*(h-30);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();var lv=hist[hist.length-1],pv=hist[hist.length-2],d=pv?lv-pv:0;document.getElementById('tV').innerHTML='<span style="color:'+cl[key]+'">'+(key==='be'?Math.round(lv):lv.toFixed(2))+'</span> <span style="font-size:12px;color:'+(d>=0?'var(--color-success)':'var(--color-danger)')+'">'+(d>0?'↑+':d<0?'↓':'→')+(key==='be'?Math.round(Math.abs(d)):Math.abs(d).toFixed(2))+'</span>'},100)}
 // PARAM_REGISTRY — 组织级统一参数定义
 // ============================================================
 const PARAM_REGISTRY={
@@ -1368,27 +1376,34 @@ function buildWorkbench(){
   setTimeout(()=>{
     const wbTrustContainer=document.getElementById('wb-trusts');
     if(!wbTrustContainer)return;
-    const wbTrustBars={
-      direction:new TrustBar(createTrustRow(wbTrustContainer,'SP'),{label:'SP',value:0.85,max:1,isPercent:true}),
-      decode:new TrustBar(createTrustRow(wbTrustContainer,'BP'),{label:'BP',value:1.0,max:1,isPercent:true}),
-      execution:new TrustBar(createTrustRow(wbTrustContainer,'BE'),{label:'BE',value:82,max:100,isPercent:false})
-    };
+    wbTrustContainer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
+    function buildTCell(key,title,color,val,mxVal){
+      var d=document.createElement('div');d.style.cssText='text-align:center;cursor:pointer';d.onclick=function(){tModal(key)};
+      d.innerHTML='<div style="font-size:12px;font-weight:700;color:'+color+'">'+title+'</div><canvas id="tw'+key+'" width="130" height="55" style="width:100%"></canvas><div style="font-size:14px;font-weight:700;margin-top:1px" id="tv'+key+'">'+(key==='be'?Math.round(val):val.toFixed(2))+'</div><div style="font-size:10px;color:var(--color-text-tertiary)" id="td'+key+'"></div>';
+      wbTrustContainer.appendChild(d);
+    }
+    [{k:'sp',t:'SP',c:'#1890ff',v:0.85},{k:'bp',t:'BP',c:'#00875A',v:1.0},{k:'be',t:'BE',c:'#B86E00',v:82}].forEach(function(s){buildTCell(s.k,s.t,s.c,s.v,s.k==='be'?100:1)});
     function calcTrustsGeneric(params){
-      const p=k=>params[k]||PARAM_REGISTRY[k]?.default||0;
-      const dir=clamp(0.92-(15-p('mkt_growth'))*0.018-(p('comp_lead'))*0.045+(p('localization')-55)*0.001,0,1);
-      const dec=clamp(1.0-(p('rd_budget')<1.5?0.08:0)-(p('hc_gap')>20?0.05:0)+(p('talent_pool')>50?0.03:0),0,1);
-      const exec=clamp(88-(2.0-p('rd_budget'))*25-(p('hc_gap'))*0.7+(p('train_cycle')<6?5:0)-(p('launch_cycle')>12?3:0),0,100);
+      var p=function(k){return params[k]||(PARAM_REGISTRY[k]?PARAM_REGISTRY[k].default:0)};
+      var dir=clamp(0.92-(15-p('mkt_growth'))*0.018-(p('comp_lead'))*0.045+(p('localization')-55)*0.001,0,1);
+      var dec=clamp(1.0-(p('rd_budget')<1.5?0.08:0)-(p('hc_gap')>20?0.05:0)+(p('talent_pool')>50?0.03:0),0,1);
+      var exec=clamp(88-(2.0-p('rd_budget'))*25-(p('hc_gap'))*0.7+(p('train_cycle')<6?5:0)-(p('launch_cycle')>12?3:0),0,100);
       return{direction:dir,decode:dec,execution:exec};
     }
+    function updateTrends(scores){
+      [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'be',mx:100,v:scores.execution}].forEach(function(s){
+        var cv=document.getElementById('tw'+s.k);if(cv)tDraw(cv,s.k,s.mx);
+        var ve=document.getElementById('tv'+s.k);if(ve)ve.textContent=s.k==='be'?Math.round(s.v):s.v.toFixed(2);
+        var de=document.getElementById('td'+s.k);if(de){var h=window._th;if(h.length>1){var pv=h[h.length-2][s.k];var d=s.v-pv;de.textContent=d>0?'↑ +'+(s.k==='be'?Math.round(d):d.toFixed(2)):d<0?'↓ '+(s.k==='be'?Math.round(d):d.toFixed(2)):'→';de.style.color=d>0?'var(--color-success)':d<0?'var(--color-danger)':'var(--color-text-tertiary)'}}}
+      });
+    }
     window._updateWB=function(){
-      const st={};if(window._wbSliders)Object.keys(window._wbSliders).forEach(k=>{st[k]=window._wbSliders[k].value});
-      const trusts=calcTrustsGeneric(st);
-      wbTrustBars.direction.setValue(trusts.direction,true);
-      wbTrustBars.decode.setValue(trusts.decode,true);
-      wbTrustBars.execution.setValue(trusts.execution,true);
-      const w=Math.min(trusts.direction,trusts.decode,trusts.execution/100);
-      wbTrustContainer.setAttribute('data-weakest',w<0.4?'danger':w<0.6?'warning':w<0.75?'caution':'ok');
+      var st={};if(window._wbSliders)Object.keys(window._wbSliders).forEach(function(k){st[k]=window._wbSliders[k].value});
+      var trusts=calcTrustsGeneric(st);
+      updateTrends(trusts);
+      tPush(trusts.direction,trusts.decode,trusts.execution); // ← push history HERE, not in onRelease
     };
+    updateTrends({direction:0.85,decode:1.0,execution:82});
     setTimeout(()=>{if(window.scenarioApply)window.scenarioApply('optimistic')},200);
   },100);
 
