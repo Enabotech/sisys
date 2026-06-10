@@ -442,18 +442,18 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 // ============================================================
 // 置信度趋势
 // ============================================================
-window._th=[];(function sd(){var b={sp:0.85,bp:1.0,be:82};for(var i=0;i<10;i++){var j=Math.sin(i*1.2)*0.09;window._th.push({sp:b.sp+j,bp:b.bp+Math.sin(i)*0.02,be:b.be+Math.sin(i*0.8)*3,ts:Date.now()-(10-i)*30000})}})();
-function tPush(sp,bp,be){window._th.push({sp:sp,bp:bp,be:be,ts:Date.now()});if(window._th.length>100)window._th.shift()}
-function tDraw(cv,key,mx){var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;var hist=window._th.map(function(p){return p[key]});if(hist.length<2)return;ctx.clearRect(0,0,w,h);var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0,0.5,1].forEach(function(p){var y=h-8-p*(h-16);ctx.beginPath();ctx.moveTo(2,y);ctx.lineTo(w-2,y);ctx.stroke()});var lv=hist[hist.length-1];var cs={sp:'#1890ff',bp:'#00875A',be:'#B86E00'};ctx.strokeStyle=cs[key]||'#888';ctx.lineWidth=2;ctx.beginPath();hist.forEach(function(v,i){var x=2+i/Math.max(hist.length-1,1)*(w-4);var y=h-8-(v-mn)/r*(h-16);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.arc(2+(hist.length-1)/Math.max(hist.length-1,1)*(w-4),h-8-(lv-mn)/r*(h-16),3,0,Math.PI*2);ctx.fill()}
-function tModal(key){key=key||'sp';var ns={sp:'SP 战略规划',bp:'BP 业务计划',be:'BE 业务执行'};var cl={sp:'#1890ff',bp:'#00875A',be:'#B86E00'};var mx={sp:1,bp:1,be:100};var m=document.getElementById('tM'),o=document.getElementById('tO');if(!m){o=document.createElement('div');o.id='tO';o.className='overlay';o.onclick=function(){o.classList.remove('show');m.classList.remove('show')};document.body.appendChild(o);m=document.createElement('div');m.id='tM';m.className='modal';m.style.cssText='max-width:500px';m.innerHTML='<div class="modal-header"><span class="modal-title" id="tT"></span><button class="modal-close" onclick="document.getElementById(\'tO\').classList.remove(\'show\');document.getElementById(\'tM\').classList.remove(\'show\')">X</button></div><div class="modal-body"><canvas id="tC" width="460" height="200" style="width:100%;height:auto"></canvas><div style="margin-top:8px;font-size:13px;text-align:center;font-weight:700" id="tV"></div></div>';document.body.appendChild(m)}o.classList.add('show');m.classList.add('show');document.getElementById('tT').textContent='📈 '+ns[key]+' 置信度走势（最近'+window._th.length+'次）';setTimeout(function(){var c=document.getElementById('tC');if(!c)return;var ctx=c.getContext('2d'),w=c.width,h=c.height;var hist=window._th.map(function(p){return p[key]});var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0.25,0.5,0.75].forEach(function(p){var y=h-20-p*(h-30);ctx.beginPath();ctx.moveTo(10,y);ctx.lineTo(w-10,y);ctx.stroke()});ctx.strokeStyle=cl[key];ctx.lineWidth=2.5;ctx.beginPath();hist.forEach(function(v,i){var x=10+i/Math.max(hist.length-1,1)*(w-20);var y=h-20-(v-mn)/r*(h-30);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();var lv=hist[hist.length-1],pv=hist[hist.length-2],d=pv?lv-pv:0;document.getElementById('tV').innerHTML='<span style="color:'+cl[key]+'">'+(key==='be'?Math.round(lv):lv.toFixed(2))+'</span> <span style="font-size:12px;color:'+(d>=0?'var(--color-success)':'var(--color-danger)')+'">'+(d>0?'↑+':d<0?'↓':'→')+(key==='be'?Math.round(Math.abs(d)):Math.abs(d).toFixed(2))+'</span>'},100)}
+window._th={};function tH(cid){if(!window._th[cid])window._th[cid]=[];return window._th[cid]}
+function tPush(cid,sp,bp,be){var h=tH(cid);h.push({sp:sp,bp:bp,be:be,ts:Date.now()});if(h.length>100)h.shift()}
+function tDraw(cv,cid,key,mx){var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;var hist=tH(cid).map(function(p){return p[key]});if(hist.length<2)return;ctx.clearRect(0,0,w,h);var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0,0.5,1].forEach(function(p){var y=h-8-p*(h-16);ctx.beginPath();ctx.moveTo(2,y);ctx.lineTo(w-2,y);ctx.stroke()});var lv=hist[hist.length-1];var cs={sp:'#1890ff',bp:'#00875A',be:'#B86E00'};ctx.strokeStyle=cs[key]||'#888';ctx.lineWidth=2;ctx.beginPath();hist.forEach(function(v,i){var x=2+i/Math.max(hist.length-1,1)*(w-4);var y=h-8-(v-mn)/r*(h-16);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.arc(2+(hist.length-1)/Math.max(hist.length-1,1)*(w-4),h-8-(lv-mn)/r*(h-16),3,0,Math.PI*2);ctx.fill()}
+function tModal(cid,key){key=key||'sp';var ns={sp:'SP 战略规划',bp:'BP 业务计划',be:'BE 业务执行'};var cl={sp:'#1890ff',bp:'#00875A',be:'#B86E00'};var mx={sp:1,bp:1,be:100};var m=document.getElementById('tM'),o=document.getElementById('tO');if(!m){o=document.createElement('div');o.id='tO';o.className='overlay';o.onclick=function(){o.classList.remove('show');m.classList.remove('show')};document.body.appendChild(o);m=document.createElement('div');m.id='tM';m.className='modal';m.style.cssText='max-width:500px';m.innerHTML='<div class="modal-header"><span class="modal-title" id="tT"></span><button class="modal-close" onclick="document.getElementById(\'tO\').classList.remove(\'show\');document.getElementById(\'tM\').classList.remove(\'show\')">X</button></div><div class="modal-body"><canvas id="tC" width="460" height="200" style="width:100%;height:auto"></canvas><div style="margin-top:8px;font-size:13px;text-align:center;font-weight:700" id="tV"></div></div>';document.body.appendChild(m)}o.classList.add('show');m.classList.add('show');document.getElementById('tT').textContent='📈 '+ns[key]+' 置信度走势（最近'+tH(cid).length+'次）';setTimeout(function(){var c=document.getElementById('tC');if(!c)return;var ctx=c.getContext('2d'),w=c.width,h=c.height;var hist=tH(cid).map(function(p){return p[key]});var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0.25,0.5,0.75].forEach(function(p){var y=h-20-p*(h-30);ctx.beginPath();ctx.moveTo(10,y);ctx.lineTo(w-10,y);ctx.stroke()});ctx.strokeStyle=cl[key];ctx.lineWidth=2.5;ctx.beginPath();hist.forEach(function(v,i){var x=10+i/Math.max(hist.length-1,1)*(w-20);var y=h-20-(v-mn)/r*(h-30);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();var lv=hist[hist.length-1],pv=hist[hist.length-2],d=pv?lv-pv:0;document.getElementById('tV').innerHTML='<span style="color:'+cl[key]+'">'+(key==='be'?Math.round(lv):lv.toFixed(2))+'</span> <span style="font-size:12px;color:'+(d>=0?'var(--color-success)':'var(--color-danger)')+'">'+(d>0?'↑+':d<0?'↓':'→')+(key==='be'?Math.round(Math.abs(d)):Math.abs(d).toFixed(2))+'</span>'},100)}
 function buildTrendCell(container,prefix,key,title,color,val,mxVal){
-  var pid=prefix+key;var d=document.createElement('div');d.style.cssText='text-align:center;cursor:pointer';d.onclick=function(){tModal(key)};
+  var pid=prefix+key;var d=document.createElement('div');d.style.cssText='text-align:center;cursor:pointer';d.onclick=function(){tModal(prefix.replace('-',''),key)};
   d.innerHTML='<div style=\"font-size:12px;font-weight:700;color:'+color+'\">'+title+'</div><canvas id=\"c'+pid+'\" width=\"130\" height=\"70\" style=\"width:100%\"></canvas><div style=\"font-size:14px;font-weight:700;margin-top:2px\" id=\"v'+pid+'\">'+(key==='be'?Math.round(val):val.toFixed(2))+'</div><div style=\"font-size:10px;color:var(--color-text-tertiary)\" id=\"d'+pid+'\"></div>';
   container.appendChild(d);return function(scores){
     [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'be',mx:100,v:scores.execution}].forEach(function(s){
-      var ip=prefix+s.k;var cv=document.getElementById('c'+ip);if(cv)tDraw(cv,s.k,s.mx);
+      var ip=prefix+s.k;var cv=document.getElementById('c'+ip);if(cv)tDraw(cv,prefix.replace('-',''),s.k,s.mx);
       var ve=document.getElementById('v'+ip);if(ve)ve.textContent=s.k==='be'?Math.round(s.v):s.v.toFixed(2);
-      var de=document.getElementById('d'+ip);if(de){var h=window._th;if(h.length>1){var pv=h[h.length-2][s.k];var d=s.v-pv;de.textContent=d>0?'↑ +'+(s.k==='be'?Math.round(d):d.toFixed(2)):d<0?'↓ '+(s.k==='be'?Math.round(d):d.toFixed(2)):'→';de.style.color=d>0?'var(--color-success)':d<0?'var(--color-danger)':'var(--color-text-tertiary)'}}
+      var de=document.getElementById('d'+ip);if(de){var hh=tH(prefix.replace('-',''));if(hh.length>1){var pv=hh[hh.length-2][s.k];var d=s.v-pv;de.textContent=d>0?'↑ +'+(s.k==='be'?Math.round(d):d.toFixed(2)):d<0?'↓ '+(s.k==='be'?Math.round(d):d.toFixed(2)):'→';de.style.color=d>0?'var(--color-success)':d<0?'var(--color-danger)':'var(--color-text-tertiary)'}}
     });
   };
 }
@@ -986,6 +986,7 @@ function buildCockpit(){
 
     // 存储实例
     cardInstances[d.id]={def:d,sliders,aiComp,tornado,updateTrends};
+    for(var si=0;si<10;si++){var bj=Math.sin(si*1.2)*0.09;tPush(d.id,d.baseTrusts.direction+bj,d.baseTrusts.decode+Math.sin(si)*0.02,d.baseTrusts.execution+Math.sin(si*0.8)*3)}
 
     // 初始评估AI代偿
     aiComp.evaluate(initSt);
@@ -1034,7 +1035,7 @@ function onSliderChange(cardId){
 }
 
 function onSliderRelease(cardId){
-  var i=cardInstances[cardId];if(i){var s2=i.def.calcTrusts(getSliderState(cardId));tPush(s2.direction,s2.decode,s2.execution)}
+  var i=cardInstances[cardId];if(i){var s2=i.def.calcTrusts(getSliderState(cardId));tPush(cardId,s2.direction,s2.decode,s2.execution)}
   document.getElementById('cockpitStatus').textContent='情景已更新';
 }
 
@@ -1044,7 +1045,7 @@ function updateMiniTrusts(cardId){
   var scores=inst.def.calcTrusts(st);
   // 画三条裸折线 (28×8 canvas, 无文字)
   [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'be',mx:100,v:scores.execution}].forEach(function(s,i){
-    var cv=document.getElementById('mini-spark-'+(i===0?'dir':i===1?'dec':'exe')+'-'+cardId);if(cv)tDraw(cv,s.k,s.mx);
+    var cv=document.getElementById('mini-spark-'+(i===0?'dir':i===1?'dec':'exe')+'-'+cardId);if(cv)tDraw(cv,cardId,s.k,s.mx);
   });
   var worst=Math.min(scores.direction,scores.decode,scores.execution/100);
   var conn=document.getElementById('mini-conn-'+cardId);
@@ -1156,7 +1157,7 @@ window._rebuildSliders=function(activeParamKeys,aggregatedParams){
       const step=reg.unit==='%'?1:reg.unit==='¥亿'?0.1:reg.unit==='人'?5:reg.unit==='分'?5:reg.unit==='月'?1:1;
       const mn=k==='talent_pool'||k==='localization'?0:k==='salary_comp'?-30:k==='hc_gap'?0:0;
       const mx=k==='talent_pool'||k==='localization'?100:k==='salary_comp'?20:k==='hc_gap'?50:k==='mkt_growth'?30:k==='comp_lead'?6:k==='train_cycle'||k==='launch_cycle'||k==='training_cycle_months'?24:3;
-      const sp=new SliderPhysics(w,{label:reg.name+(v.isDefault?' (默认)':''),min:mn,max:mx,value:v.value,step:step,formatValue:x=>x+reg.unit,valueSuffix:'',notches:[],warnBelow:undefined,dangerBelow:undefined,onChange:val=>{window._wbSliders[k].value=val;if(window._updateWB)window._updateWB()},onRelease:val=>{if(window._lastWBTrusts)tPush(window._lastWBTrusts.direction,window._lastWBTrusts.decode,window._lastWBTrusts.execution);refreshDebateRoom(null,k,val)}});
+      const sp=new SliderPhysics(w,{label:reg.name+(v.isDefault?' (默认)':''),min:mn,max:mx,value:v.value,step:step,formatValue:x=>x+reg.unit,valueSuffix:'',notches:[],warnBelow:undefined,dangerBelow:undefined,onChange:val=>{window._wbSliders[k].value=val;if(window._updateWB)window._updateWB()},onRelease:val=>{if(window._lastWBTrusts)tPush('wb',window._lastWBTrusts.direction,window._lastWBTrusts.decode,window._lastWBTrusts.execution);refreshDebateRoom(null,k,val)}});
       window._wbSliders[k]=sp;window._wbActiveParams[k]=true;container.appendChild(w);
       const sl=document.createElement('div');sl.style.cssText='font-size:9px;color:'+(v.isDefault?'#999':'var(--color-text-tertiary)')+';margin-top:-4px;padding-left:56px';sl.textContent=v.isDefault?'← 默认值':'← '+(v.sources?.length||0)+'条证据';container.appendChild(sl);
     });
@@ -1381,7 +1382,7 @@ function buildWorkbench(){
       wbUpdateTrends(trusts);window._lastWBTrusts=trusts;
     };
     wbUpdateTrends({direction:0.85,decode:1.0,execution:82});
-    setTimeout(()=>{if(window.scenarioApply)window.scenarioApply('optimistic')},200);
+    for(var si=0;si<10;si++){var bj=Math.sin(si*1.2)*0.09;tPush('wb',0.85+bj,1.0+Math.sin(si)*0.02,82+Math.sin(si*0.8)*3)}setTimeout(()=>{if(window.scenarioApply)window.scenarioApply('optimistic')},200);
   },100);
 
   // 辩论室交互
