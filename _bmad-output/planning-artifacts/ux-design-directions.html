@@ -1245,13 +1245,33 @@ function resolveCard(cardId){
   if(tag){tag.className='card-urgency-tag stable';tag.innerHTML='✅ 已处理'}
   const strip=card.querySelector('.card-status-strip');
   if(strip){strip.className='card-status-strip stable'}
+  // 生成决策结果型证据（参数变化达阈值时）
+  var st=getSliderState(cardId);var evParams={};var hasChange=false;
+  inst.def.sliders.forEach(function(sdef){
+    var newVal=st[sdef.key],oldVal=sdef.value;
+    var pKey=sdef.paramKey||sdef.key;
+    var unit=(PARAM_REGISTRY[pKey]||{}).unit||'';
+    var threshold=unit==='%'?3:unit==='¥亿'?0.3:unit==='月'?2:unit==='人'?10:unit==='等级'?1:999;
+    if(Math.abs(newVal-oldVal)>=threshold){evParams[pKey]=newVal;hasChange=true}
+  });
+  if(hasChange){
+    allEvidence=allEvidence.filter(function(e){return!(e.isDecision&&e.decisionCard===cardId)});
+    allEvidence.push({label:inst.def.title+' · 决策确认',freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 张总 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId});
+    if(document.getElementById('workbenchLayout').innerHTML)rebuildWorkbench();
+  }
   // 帧2: 弹簧收起 (400ms)
   setTimeout(()=>{
     card.classList.add('card-folded');card.classList.remove('card-full');
     const mid=card.querySelector('.card-header-mid');if(mid)mid.style.display='flex';
     updateFoldedCard(cardId);resortCards();
   },400);
-  showToast(inst.def.title+' 已处理 ✅','success');
+  showToast(inst.def.title+' 已处理'+(hasChange?' · 已同步至证据链 📊':'')+' ✅','success');
+}
+function resolveDecisionPhase(def){
+  if(def.spBpMapping&&def.spBpMapping.length>0)return'SP[3]';
+  if(def.spAnchor)return'BP[4]';
+  if(def.id.indexOf('bp')===0)return'BP[4]';
+  return'RT[3]';
 }
 function toggleCardExpand(cardId){
   const card=document.getElementById('card-'+cardId);if(!card)return;
@@ -1367,7 +1387,7 @@ window._wbReset=function(){if(window.onEvidenceChange)window.onEvidenceChange()}
 function buildWorkbench(){
   const layout=document.getElementById('workbenchLayout');if(!layout)return;
   // === 证据数据：扁平数组（40条，覆盖SP/BP/RT全阶段） ===
-  const allEvidence=[
+  var allEvidence=[
     // SP[1] 业绩差距
     {label:'收入差距率 12%',freshness:'fresh',params:{mkt_growth:10,rd_budget:1.8},confidence:0.90,source:'财务报表 · 2025Q4',phase:'SP[1]'},
     {label:'利润差距率 8%',freshness:'usable',params:{rd_budget:1.8},confidence:0.85,source:'财务报表 · 2025Q4',phase:'SP[1]'},
@@ -1449,7 +1469,7 @@ function buildWorkbench(){
       {step:'[5]',label:'业务设计',keys:['价值主张清晰度 4/5','战略控制点强度 3/5']},
       {step:'[6]',label:'执行设计',keys:['关键任务就绪度 3/5','组织能力差距 中等']}
     ]},
-    {tag:'BP',label:'年度业务计划 (BEM)',color:'#00875A',phases:[
+    {tag:'BP',label:'业务计划 (BEM)',color:'#00875A',phases:[
       {step:'BP[1]',label:'澄清战略方向',keys:['SP-BP映射完整度 85%','战略主题清晰度 4/5','年度主题穿透率 70%']},
       {step:'BP[2]',label:'导出战略举措',keys:['举措覆盖完整度 90%','优先级共识度 3/5','跨举措协同度 4/5']},
       {step:'BP[3]',label:'导出衡量指标',keys:['指标覆盖率 88%','指标目标挑战度 4/5','先导/滞后指标比 0.8']},
@@ -1457,7 +1477,7 @@ function buildWorkbench(){
       {step:'BP[5]',label:'分解措施目标',keys:['责任人明确度 95%','部门承诺率 80%','分解一致性 4/5','人才薪资基准 -15%']},
       {step:'BP[6]',label:'导出工作计划',keys:['三维规划完整度 78%','资源承诺率 85%','风险缓解覆盖率 65%']}
     ]},
-    {tag:'RT',label:'运行时监控',color:'#B86E00',phases:[
+    {tag:'RT',label:'执行管理',color:'#B86E00',phases:[
       {step:'RT[1]',label:'执行进度监控',keys:['里程碑达成率 72%','预算执行率 95%','任务完成速度 8项/月']},
       {step:'RT[2]',label:'资源效率',keys:['研发投入产出比 2.5','关键人才留存率 88%','销售费用率 22%']},
       {step:'RT[3]',label:'结果评价',keys:['实际投资回收期 4.2年','NPV偏差率 -8%','战略弹性得分 4/5','技术趋势 AI+国产替代']}
@@ -1505,13 +1525,16 @@ function buildWorkbench(){
     return h;
   }
   function renderEvidenceRow(e){
-    let h='<div class="wb-evidence-row">';
-    h+='<input type="checkbox" class="ev-check" data-freshness="'+(e.freshness||'')+'" onchange="window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" onclick="event.stopPropagation()">';
-    h+='<span class="evidence-freshness '+e.freshness+'">'+(e.freshness==='fresh'?'🟢':e.freshness==='usable'?'🟡':'🔴')+'</span>';
-    h+='<span class="ev-label" style="flex:1;font-size:11px">'+e.label+'</span>';
-    if(e.params){const pnames=Object.keys(e.params).map(k=>PARAM_REGISTRY[k]?.name||k).join(', ');h+='<span style="font-size:8px;color:var(--color-text-tertiary);flex-shrink:0" title="影响参数: '+pnames+'">→ '+pnames+'</span>';}
+    var h='<div class="wb-evidence-row">';
+    h+='<input type="checkbox" class="ev-check" data-freshness="'+(e.freshness||'')+'"'+(e.isDecision?' data-is-decision="true"':'')+' onchange="window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" onclick="event.stopPropagation()">';
+    // 决策型: ✅图标+深蓝色文字, 研究型: 🟢🟡🔴
+    if(e.isDecision){h+='<span style="font-size:11px;flex-shrink:0">✅</span>'}
+    else{h+='<span class="evidence-freshness '+e.freshness+'">'+(e.freshness==='fresh'?'🟢':e.freshness==='usable'?'🟡':'🔴')+'</span>'}
+    h+='<span class="ev-label" style="flex:1;font-size:11px'+(e.isDecision?' color:#1d3a5c;font-weight:500':'')+'">'+e.label+'</span>';
+    if(e.isDecision&&e.source){h+='<span style="font-size:9px;color:#1d3a5c;flex-shrink:0;margin-left:2px">'+e.source+'</span>'}
+    if(e.params&&!e.isDecision){var pnames=Object.keys(e.params).map(function(k){return(PARAM_REGISTRY[k]||{}).name||k}).join(', ');h+='<span style="font-size:8px;color:var(--color-text-tertiary);flex-shrink:0" title="影响参数: '+pnames+'">→ '+pnames+'</span>'}
     if(e.decodesTo)h+='<span style="font-size:8px;color:var(--color-primary);flex-shrink:0;cursor:pointer;margin-left:2px" onclick="event.stopPropagation();var cid=\'bp13\';if(window.jumpToCard)jumpToCard(cid)" title="解码到: '+e.decodesTo+'">🔗 '+e.decodesTo+'</span>';
-    if(e.source)h+='<span style="font-size:9px;color:var(--color-text-tertiary);flex-shrink:0;margin-left:2px;cursor:help" title="'+e.source+'">📄</span>';
+    if(e.source&&!e.isDecision)h+='<span style="font-size:9px;color:var(--color-text-tertiary);flex-shrink:0;margin-left:2px;cursor:help" title="'+e.source+'">📄</span>';
     h+='</div>';
     return h;
   }
@@ -1566,7 +1589,7 @@ function buildWorkbench(){
   window.scenarioApply=scenarioApply;
   window.onEvidenceChange=onEvidenceChange;
   window.recalcEvidenceDiscount=onEvidenceChange;
-  let evidenceHTML='<div class="workbench-panel"><h3>📊 战略证据链</h3><div style="display:flex;gap:4px;margin-bottom:var(--spacing-sm)"><button onclick="scenarioApply(\'optimistic\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-success);border-radius:3px;background:#f6ffed;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-success);font-weight:500">🟢乐观</button><button onclick="scenarioApply(\'conservative\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-danger);border-radius:3px;background:#fff1f0;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-danger);font-weight:500">🔴保守</button><button onclick="scenarioApply(\'custom\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-border);border-radius:3px;background:var(--color-bg-card);cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-text-secondary)">✋自定义</button></div><div class="evidence-tree">'+renderPhaseTree()+'</div><div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div></div>';
+  let evidenceHTML='<div class="workbench-panel"><h3>📊 战略证据链</h3><div style="display:flex;gap:4px;margin-bottom:var(--spacing-sm)"><button onclick="scenarioApply(\'optimistic\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-success);border-radius:3px;background:#f6ffed;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-success);font-weight:500">🟢乐观</button><button onclick="scenarioApply(\'conservative\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-danger);border-radius:3px;background:#fff1f0;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-danger);font-weight:500">🔴保守</button><button onclick="scenarioApply(\'custom\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-border);border-radius:3px;background:var(--color-bg-card);cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-text-secondary)">✋自定义</button><button onclick="toggleDecisionEvidence()" style="flex:1;padding:3px 6px;border:1px solid #1d3a5c;border-radius:3px;background:#f0f5ff;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:#1d3a5c;font-weight:500">✅决策</button></div><div class="evidence-tree">'+renderPhaseTree()+'</div><div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div></div>';
 
   // 中栏：动态推演沙盘 — 参数体系由选中证据决定
   let sandboxHTML='<div class="workbench-panel"><h3>🎮 推演沙盘</h3>'+
@@ -1630,6 +1653,26 @@ function buildWorkbench(){
       input.onkeydown=e=>{if(e.key==='Enter')sendBtn.click()};
     }
   },200);
+}
+function rebuildWorkbench(){
+  var layout=document.getElementById('workbenchLayout');if(!layout||!layout.innerHTML)return;
+  var panel=layout.querySelector('.workbench-panel');if(!panel)return;
+  var treeHTML='<h3>📊 战略证据链</h3>'+
+    '<div style="display:flex;gap:4px;margin-bottom:var(--spacing-sm)">'+
+    '<button onclick="scenarioApply(\'optimistic\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-success);border-radius:3px;background:#f6ffed;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-success);font-weight:500">🟢乐观</button>'+
+    '<button onclick="scenarioApply(\'conservative\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-danger);border-radius:3px;background:#fff1f0;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-danger);font-weight:500">🔴保守</button>'+
+    '<button onclick="scenarioApply(\'custom\')" style="flex:1;padding:3px 6px;border:1px solid var(--color-border);border-radius:3px;background:var(--color-bg-card);cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:var(--color-text-secondary)">✋自定义</button>'+
+    '<button onclick="toggleDecisionEvidence()" style="flex:1;padding:3px 6px;border:1px solid #1d3a5c;border-radius:3px;background:#f0f5ff;cursor:pointer;font-size:10px;font-family:var(--font-family-base);color:#1d3a5c;font-weight:500">✅决策</button>'+
+    '</div><div class="evidence-tree">'+renderPhaseTree()+'</div>'+
+    '<div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div>';
+  panel.innerHTML=treeHTML;
+}
+function toggleDecisionEvidence(){
+  var decChecks=document.querySelectorAll('.ev-check[data-is-decision="true"]');
+  if(!decChecks.length)return;
+  var allChecked=Array.from(decChecks).every(function(c){return c.checked});
+  decChecks.forEach(function(c){c.checked=!allChecked});
+  window.recalcEvidenceDiscount();
 }
 
 // ============================================================
