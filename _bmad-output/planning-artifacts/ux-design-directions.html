@@ -92,7 +92,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 
 /* 卡片头部 */
 .card-header{padding:var(--spacing-md) var(--spacing-lg);display:flex;justify-content:space-between;align-items:center;gap:var(--spacing-md);flex-wrap:wrap}
-.card-header-left{display:flex;align-items:center;gap:var(--spacing-sm);flex:1;min-width:0}
+.card-header-left{display:flex;align-items:center;gap:var(--spacing-sm);flex:1;min-width:0;text-align:left}
 .card-urgency-tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0}
 .card-urgency-tag.urgent{color:var(--color-warning);background:#fffbe6}
 .card-urgency-tag.pending{color:var(--color-primary);background:var(--color-primary-bg)}
@@ -816,7 +816,7 @@ class TornadoMini {
 // ============================================================
 const DECISION_DEFS = [
   {
-    id:'sc4', urgency:'urgent', icon:'⏰', tag:'紧急 · 窗口期60天', title:'SC-4 市场进入策略',
+    id:'sc4', urgency:'urgent', icon:'⏰', tag:'紧急', title:'SC-4 市场进入策略',
     summary:'进入方式：自建渠道 vs 合资探索 · CEO/CFO/CTO严重分歧',
     spBpMapping:[
       {bpId:'bp11',csf:'CSF-3 市场覆盖面',kpi:'KPI-3.1 三甲覆盖率',target:'30家',weight:0.4},
