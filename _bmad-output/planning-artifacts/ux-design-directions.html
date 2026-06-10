@@ -753,6 +753,18 @@ class AICompensation {
     if(s.localization!==undefined&&s.localization<35) sug.push({id:'localize-push',name:'加速国产供应链替代计划',logic:'国产替代率仅'+s.localization+'%，面临政策合规风险+进口成本上升双重压力',impacts:[{label:'方向分',delta:+0.04,name:'direction'},{label:'解码分',delta:-0.05,name:'decode'},{label:'执行分',delta:+8,name:'execution'}],actions:{localization:50}});
     if(s.rd_invest!==undefined&&s.rd_invest<1.2) sug.push({id:'rd-rescue',name:'紧急追加研发预算，防止技术断档',logic:'研发投入仅¥'+s.rd_invest.toFixed(1)+'亿，低于技术护城河维持线（¥1.5亿），领先优势将在18个月内丧失',impacts:[{label:'方向分',delta:+0.03,name:'direction'},{label:'解码分',delta:-0.04,name:'decode'},{label:'执行分',delta:+5,name:'execution'}],actions:{rd_invest:1.5}});
     if(s.rd_invest!==undefined&&s.rd_invest>2.5) sug.push({id:'tech-leap',name:'将富余研发预算投入技术并购，拉大护城河',logic:'研发预算充裕（¥'+s.rd_invest.toFixed(1)+'亿），技术并购可缩短产品上市周期12-18个月',impacts:[{label:'方向分',delta:+0.06,name:'direction'},{label:'执行分',delta:+3,name:'execution'}],actions:{rd_invest:2.8}});
+    // === SC-3 现金流危机 ===
+    if(s.cashflow!==undefined&&s.cashflow>=4) sug.push({id:'cash-rescue',name:'启动紧急融资+砍非核心支出',logic:'现金流压力等级为'+s.cashflow+'级（最高5级），放任将触发流动性危机',impacts:[{label:'方向分',delta:+0.05,name:'direction'},{label:'执行分',delta:+15,name:'execution'}],actions:{cashflow:Math.max(1,s.cashflow-2)}});
+    if(s.payback!==undefined&&s.payback>5) sug.push({id:'accelerate-payback',name:'加速回款+缩短账期至90天',logic:'投资回收期'+s.payback.toFixed(1)+'年远超行业基准3.5年，现金流持续承压',impacts:[{label:'方向分',delta:-0.02,name:'direction'},{label:'执行分',delta:+10,name:'execution'}],actions:{payback:Math.max(1,s.payback-2)}});
+    if(s.cashflow!==undefined&&s.cashflow>=3&&s.payback!==undefined&&s.payback>4) sug.push({id:'survival-mode',name:'进入生存模式：只保留最核心产品线',logic:'现金流与回收期双红灯——砍掉所有ROI<1.5的项目，集中资源保核心',impacts:[{label:'方向分',delta:+0.03,name:'direction'},{label:'解码分',delta:-0.06,name:'decode'},{label:'执行分',delta:+12,name:'execution'}],actions:{cashflow:2,payback:3.5}});
+    // === BP14 供应链 ===
+    if(s.supply!==undefined&&s.supply>2.0) sug.push({id:'supply-opt',name:'启动供应商竞价谈判+目标降本30%',logic:'供应链成本¥'+s.supply.toFixed(1)+'亿，远超行业基准¥1.2亿，每个百分点的成本下降都将显著改善执行分',impacts:[{label:'解码分',delta:-0.02,name:'decode'},{label:'执行分',delta:+15,name:'execution'}],actions:{supply:Math.max(0.5,s.supply-0.8)}});
+    if(s.launch!==undefined&&s.launch>18) sug.push({id:'fast-track-launch',name:'并行开发+简化审批，压缩上市周期',logic:'上市周期'+s.launch+'个月，每延迟1个月≈¥0.15亿机会成本损失',impacts:[{label:'解码分',delta:-0.01,name:'decode'},{label:'执行分',delta:+10,name:'execution'}],actions:{launch:Math.max(6,s.launch-6)}});
+    if(s.supply!==undefined&&s.supply>2.0&&s.localization!==undefined&&s.localization<35) sug.push({id:'reshore-supply',name:'加速国产替代+本地化供应链',logic:'高进口依赖（国产替代率仅'+s.localization+'%）+高成本（¥'+s.supply.toFixed(1)+'亿）双杀——本地化是唯一出路',impacts:[{label:'方向分',delta:+0.04,name:'direction'},{label:'解码分',delta:-0.03,name:'decode'},{label:'执行分',delta:+8,name:'execution'}],actions:{supply:1.5,localization:50}});
+    // === BP12 数字化渠道 ===
+    if(s.channel_cov!==undefined&&s.channel_cov<50) sug.push({id:'channel-blitz',name:'启动渠道闪电战，3个月覆盖翻倍',logic:'渠道覆盖率仅'+s.channel_cov+'%，目标80%——差距35个百分点的市场空白=竞品的窗口',impacts:[{label:'解码分',delta:-0.03,name:'decode'},{label:'执行分',delta:+12,name:'execution'}],actions:{channel_cov:Math.min(100,s.channel_cov+35)}});
+    if(s.budget2!==undefined&&s.budget2<1.2) sug.push({id:'digital-lean',name:'用SaaS工具替代自建，降低数字化门槛',logic:'预算¥'+s.budget2.toFixed(1)+'亿不足以支撑自建团队——SaaS方案可节省60%前期投入',impacts:[{label:'解码分',delta:-0.01,name:'decode'},{label:'执行分',delta:+8,name:'execution'}],actions:{budget2:Math.min(3.0,s.budget2+0.5)}});
+    if(s.hc!==undefined&&s.hc>15&&s.channel_cov!==undefined&&s.channel_cov<60) sug.push({id:'outsource-digital',name:'数字化团队外包+快速组建',logic:'人才缺口'+s.hc+'人+渠道覆盖不足——外包团队可在30天内就位，比自建快6倍',impacts:[{label:'解码分',delta:-0.02,name:'decode'},{label:'执行分',delta:+10,name:'execution'}],actions:{hc:Math.max(0,s.hc-12)}});
     this.suggestions=sug.length?this._rank(sug):[];
     this._render();
   }
@@ -791,6 +803,24 @@ class AICompensation {
       else if(cur.rd_invest!==undefined&&cur.rd_invest<1.2){narr.significance='🔴 研发投入严重不足。低于技术护城河维持线（¥1.5亿）——CTO评估18个月内领先优势将丧失。';narr.margin='建议优先砍掉边缘产品线，集中预算保核心技术。'}
       else if(cur.rd_invest!==undefined&&cur.rd_invest<1.8){narr.significance='🟡 研发投入处于警戒区间。维持现有技术优势勉强够用，但不足以应对竞品加速。';narr.margin='若市场增速同步放缓，建议适当追加研发预算。'}
       else{narr.significance='🟢 战略配置稳健。市场增速、国产替代、研发投入形成正向循环。';narr.margin=''}
+    }else if(cur.cashflow!==undefined||cur.payback!==undefined){
+      // SC-3 现金流参数风险梯度
+      if(cur.cashflow!==undefined&&cur.cashflow>=4){narr.significance='🔴 现金流压力进入危险区（'+cur.cashflow+'级/5级）。经营现金流不足以覆盖未来3个月运营支出——CFO评估触发流动性预警。';narr.margin='建议立即启动融资预案+砍掉非核心支出。'}
+      else if(cur.payback!==undefined&&cur.payback>5){narr.significance='🔴 投资回收期严重超标（'+cur.payback.toFixed(1)+'年 vs 行业3.5年）。每延长1年≈ROI下降8~12%。';narr.margin='若现金流同步承压，将形成现金流-回收期负反馈循环。'}
+      else if(cur.cashflow!==undefined&&cur.cashflow>=3){narr.significance='🟡 现金流压力中等。当前可维持运营但无安全垫——需高度关注。';narr.margin='建议开始筹备融资选项。'}
+      else{narr.significance='🟢 财务指标在安全区间。现金流与回收期均处于可控范围。';narr.margin=''}
+    }else if(cur.supply!==undefined||cur.launch!==undefined){
+      // BP14 供应链参数风险梯度
+      if(cur.supply!==undefined&&cur.supply>2.0){narr.significance='🔴 供应链成本严重超标（¥'+cur.supply.toFixed(1)+'亿 vs 基准¥1.2亿）。主要原因是进口依赖度过高+供应商议价能力弱。';narr.margin='建议立即启动竞价谈判+国产替代双线并行。'}
+      else if(cur.launch!==undefined&&cur.launch>18){narr.significance='🔴 上市周期严重过长（'+cur.launch+'个月）。每延迟1个月≈¥0.15亿机会成本——竞品窗口期正在缩短。';narr.margin='并行开发+简化审批可压缩至12个月。'}
+      else if(cur.supply!==undefined&&cur.supply>1.5){narr.significance='🟡 供应链成本偏高。建议定期审查供应商合同+探索替代方案。';narr.margin=''}
+      else{narr.significance='🟢 供应链指标在安全区间。成本与周期均处于行业基准以内。';narr.margin=''}
+    }else if(cur.channel_cov!==undefined||cur.budget2!==undefined){
+      // BP12 数字化渠道参数风险梯度
+      if(cur.channel_cov!==undefined&&cur.channel_cov<40){narr.significance='🔴 渠道覆盖率严重不足（'+cur.channel_cov+'%）。目标80%——近一半市场处于未覆盖状态，竞品可趁虚而入。';narr.margin='建议启动渠道闪电战+SaaS工具快速铺开。'}
+      else if(cur.channel_cov!==undefined&&cur.channel_cov<60){narr.significance='🟡 渠道覆盖率偏低。核心城市已覆盖但二三线城市空白较大——需要分阶段拓展计划。';narr.margin='若预算同步不足，建议优先外包非核心渠道。'}
+      else if(cur.budget2!==undefined&&cur.budget2<1.2){narr.significance='🟡 数字化预算不足（¥'+cur.budget2.toFixed(1)+'亿）。自建团队成本过高——SaaS方案可节省60%前期投入。';narr.margin=''}
+      else{narr.significance='🟢 数字化渠道建设在合理轨道上。';narr.margin=''}
     }
     return narr;
   }
@@ -846,8 +876,31 @@ class TornadoMini {
 // 决策卡片数据定义
 // ============================================================
 const DECISION_DEFS = [
+  // #1 SC-3 现金流危机 — SP↓ BP↓ BE↓ 全部红色
   {
-    id:'sc4', urgency:'urgent', icon:'⏰', tag:'紧急', title:'SC-4 市场进入策略',
+    id:'sc3', urgency:'urgent', icon:'🔴', tag:'紧急', title:'SC-3 现金流与投资回报危机',
+    summary:'现金流压力极高 · 回收期5.8年 · ROI持续恶化',
+    staleData:[{label:'现金流预测报告',freshness:'过期12个月',desc:'2025Q1现金流模型'}],
+    options:['紧急融资','💡 砍边缘业务保核心（AI推荐）'],
+    baseTrusts:{direction:0.35, decode:0.42, execution:28},
+    maxTrusts:{direction:1, decode:1, execution:100},
+    sliders:[
+      {key:'cashflow',paramKey:'cashflow_risk',label:'现金流\n压力',min:1,max:5,value:4,step:1,formatValue:v=>({1:'极低',2:'低',3:'中',4:'高',5:'极高'})[v],suffix:'',reverseGradient:true,notches:[{value:2,aiRec:true},{value:4}],warnBelow:0,dangerBelow:0},
+      {key:'payback',paramKey:'payback_years',label:'投资回\n收期',min:1,max:7,value:5.8,step:0.1,formatValue:v=>v.toFixed(1)+'年',suffix:'',reverseGradient:true,notches:[{value:3.5,aiRec:true},{value:5}],warnBelow:4,dangerBelow:5},
+      {key:'mkt_growth',label:'市场\n增速',min:0,max:25,value:6,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
+      {key:'rd_budget',paramKey:'rd_budget',label:'研发\n预算',min:0.5,max:3.0,value:0.8,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.2}],warnBelow:1.2,dangerBelow:0.8}
+    ],
+    calcTrusts:function(sliders){
+      const dir=clamp(0.32+(15-sliders.mkt_growth)*0.02+(5-sliders.cashflow)*0.03,0,1);
+      const dec=clamp(0.40+(sliders.rd_budget>1.2?0.1:0)+(sliders.cashflow<3?0.08:0)-(sliders.payback>5?0.06:0),0,1);
+      const exec=clamp(25+(sliders.rd_budget-0.8)*20+(5-sliders.cashflow)*8+(7-sliders.payback)*6+(sliders.mkt_growth-6)*1.5,0,100);
+      return{direction:dir,decode:dec,execution:exec};
+    },
+    tornadoItems:function(sliders){return[{label:'现金流压力',value:(4-sliders.cashflow)*15},{label:'回收期',value:(5.8-sliders.payback)*10},{label:'市场增速',value:(sliders.mkt_growth-6)*3}]}
+  },
+  // #2 SC-4 市场进入策略 — SP琥珀, 其余绿
+  {
+    id:'sc4', urgency:'urgent', icon:'🟠', tag:'紧急', title:'SC-4 市场进入策略',
     summary:'进入方式：自建渠道 vs 合资探索 · CEO/CFO/CTO严重分歧',
     spBpMapping:[
       {bpId:'bp11',csf:'CSF-3 市场覆盖面',kpi:'KPI-3.1 三甲覆盖率',target:'30家',weight:0.4},
@@ -856,11 +909,11 @@ const DECISION_DEFS = [
     ],
     staleData:[{label:'技术趋势报告',freshness:'过期18个月',desc:'AI+国产替代双驱动（2024Q2行业白皮书）'}],
     options:['激进进入','💡 合资探索（AI推荐）'],
-    baseTrusts:{direction:0.85, decode:1.00, execution:82},
+    baseTrusts:{direction:0.52, decode:0.95, execution:85},
     maxTrusts:{direction:1, decode:1, execution:100},
     sliders:[
-      {key:'cagr',paramKey:'mkt_growth',label:'年复合\n增长率',min:0,max:30,value:15,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
-      {key:'comp',paramKey:'comp_lead',label:'竞品提\n前时间',min:0,max:6,value:0,step:1,formatValue:v=>v===0?'正常':v+'个月',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:3}],warnBelow:0,dangerBelow:0},
+      {key:'cagr',paramKey:'mkt_growth',label:'年复合\n增长率',min:0,max:30,value:10,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
+      {key:'comp',paramKey:'comp_lead',label:'竞品提\n前时间',min:0,max:6,value:2,step:1,formatValue:v=>v===0?'正常':v+'个月',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:3}],warnBelow:0,dangerBelow:0},
       {key:'budget',paramKey:'rd_budget',label:'研发\n预算',min:0.5,max:3.0,value:2.0,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.5}],warnBelow:1.2,dangerBelow:0.8},
       {key:'hc',paramKey:'hc_gap',label:'人才\n缺口',min:0,max:50,value:0,step:5,formatValue:v=>v===0?'无缺口':v+'人',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:20}],warnBelow:10,dangerBelow:20}
     ],
@@ -873,28 +926,50 @@ const DECISION_DEFS = [
     },
     tornadoItems:function(sliders){return[{label:'人才缺口',value:-sliders.hc*1.5},{label:'研发预算',value:(sliders.budget-2.0)*25},{label:'竞品提前',value:-sliders.comp*8}]}
   },
+  // #3 BP14 供应链中断风险 — BE红色, 其余绿
   {
-    id:'bp13', urgency:'pending', icon:'📅', tag:'待定', title:'举措 1.3 人才引进',
-    summary:'招聘启动2个月，0位候选人进入终面 · 影响举措1.1/2.1/3.2',
-    spAnchor:{spId:'sc4',spTitle:'SC-4 市场进入策略',csf:'CSF-4 人才保障',kpi:'KPI-4.1 学科带头人数',target:'5名',weight:0.3},
-    staleData:[{label:'人才市场薪资基准',freshness:'过期6个月',desc:'行业薪资调研报告（2025Q4）'}],
-    options:['重新定义JD','💡 校企联合（AI推荐）'],
-    baseTrusts:{direction:0.78, decode:0.90, execution:65},
+    id:'bp14', urgency:'urgent', icon:'🚨', tag:'紧急', title:'举措 1.4 供应链韧性',
+    summary:'供应链成本失控 · 上市周期18个月 · 国产替代不足',
+    spAnchor:{spId:'sc4',spTitle:'SC-4 市场进入策略',csf:'CSF-6 运营效率',kpi:'KPI-6.1 供应链成本指数',target:'<¥1.5亿',weight:0.4},
+    staleData:[{label:'供应商成本基准',freshness:'过期9个月',desc:'2025供应链审计报告'}],
+    options:['维持现状','💡 竞价谈判+国产替代（AI推荐）'],
+    baseTrusts:{direction:0.88, decode:0.80, execution:32},
     maxTrusts:{direction:1, decode:1, execution:100},
     sliders:[
-      {key:'salary',label:'薪资竞\n争力',min:-30,max:20,value:-10,step:5,formatValue:v=>v>=0?'+'+v+'%':v+'%',suffix:'%',notches:[{value:0},{value:15,aiRec:true}],warnBelow:-10,dangerBelow:-20},
-      {key:'talent_pool',label:'人才市\n场热度',min:0,max:100,value:40,step:5,formatValue:v=>v+'分',suffix:'分',notches:[{value:60,aiRec:true},{value:30}],warnBelow:40,dangerBelow:20},
-      {key:'train_time',label:'培养\n周期',min:3,max:18,value:12,step:1,formatValue:v=>v+'个月',suffix:'',reverseGradient:true,notches:[{value:6,aiRec:true},{value:12}],warnBelow:0,dangerBelow:0}
+      {key:'supply',paramKey:'supply_cost',label:'供应链\n成本',min:0.5,max:3.0,value:2.5,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',reverseGradient:true,notches:[{value:1.2,aiRec:true},{value:2.0}],warnBelow:0,dangerBelow:0},
+      {key:'launch',paramKey:'launch_cycle',label:'上市\n周期',min:6,max:24,value:18,step:1,formatValue:v=>v+'个月',suffix:'',reverseGradient:true,notches:[{value:12,aiRec:true},{value:18}],warnBelow:0,dangerBelow:0},
+      {key:'localization',label:'国产替\n代率',min:0,max:100,value:30,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:60,aiRec:true},{value:40}],warnBelow:35,dangerBelow:20}
     ],
     calcTrusts:function(sliders){
-      // 来源: 0.78基准→行业均值; 0.3→HR薪资弹性调研(2025); 0.002→人才池热度因子(LinkedIn行业数据)
-      const dir=clamp(0.78+(sliders.salary/100)*0.3+(sliders.talent_pool-60)*0.002,0,1);
-      // 来源: 0.90基准; 0.1→培养周期>12月衰减(企业内部数统计); 0.05→高薪资对解码的正面效应
-      const dec=clamp(0.90-(sliders.train_time>12?0.1:0)+(sliders.salary>10?0.05:0),0,1);
-      const exec=clamp(65+(sliders.salary>0?sliders.salary*0.6:0)+(60-sliders.train_time)*1.5+(sliders.talent_pool-60)*0.3,0,100);
+      const dir=clamp(0.88+(sliders.localization-30)*0.002,0,1);
+      const dec=clamp(0.80+(sliders.supply<1.5?0.1:0)+(sliders.launch<12?0.05:0),0,1);
+      const exec=clamp(32+(3.0-sliders.supply)*30+(24-sliders.launch)*4+(sliders.localization-30)*0.6,0,100);
       return{direction:dir,decode:dec,execution:exec};
     },
-    tornadoItems:function(sliders){return[{label:'薪资调整',value:sliders.salary*1.2},{label:'人才池',value:(sliders.talent_pool-60)*0.8},{label:'培养周期',value:(9-sliders.train_time)*3}]}
+    tornadoItems:function(sliders){return[{label:'供应链成本',value:(2.5-sliders.supply)*25},{label:'上市周期',value:(18-sliders.launch)*4},{label:'国产替代',value:(sliders.localization-30)*0.8}]}
+  },
+  // #4 BP12 数字化渠道建设 — BP琥珀, 其余绿
+  {
+    id:'bp12', urgency:'pending', icon:'📡', tag:'待定', title:'举措 1.2 数字化渠道建设',
+    summary:'渠道覆盖率仅45% · 预算不足 · 数字化团队缺口15人',
+    spAnchor:{spId:'sc1',spTitle:'SC-1 高端医疗设备市场领先',csf:'CSF-3 市场覆盖面',kpi:'KPI-3.2 签约数',target:'28家',weight:0.3},
+    staleData:[{label:'数字化营销ROI基准',freshness:'过期6个月',desc:'2025Q4营销效率报告'}],
+    options:['逐步推进','💡 渠道闪电战+SaaS工具（AI推荐）'],
+    baseTrusts:{direction:0.90, decode:0.48, execution:80},
+    maxTrusts:{direction:1, decode:1, execution:100},
+    sliders:[
+      {key:'channel_cov',label:'渠道覆\n盖率',min:0,max:100,value:45,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:80,aiRec:true},{value:50}],warnBelow:50,dangerBelow:30},
+      {key:'mkt_growth2',paramKey:'mkt_growth',label:'市场\n增速',min:0,max:25,value:14,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
+      {key:'budget2',paramKey:'rd_budget',label:'数字化\n预算',min:0.5,max:3.0,value:1.0,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.2}],warnBelow:1.2,dangerBelow:0.8},
+      {key:'hc',paramKey:'hc_gap',label:'人才\n缺口',min:0,max:50,value:15,step:5,formatValue:v=>v===0?'无缺口':v+'人',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:20}],warnBelow:10,dangerBelow:20}
+    ],
+    calcTrusts:function(sliders){
+      const dir=clamp(0.90+(sliders.mkt_growth2-14)*0.015,0,1);
+      const dec=clamp(0.48+(sliders.channel_cov>60?0.12:0)+(sliders.budget2>1.5?0.08:0)+(sliders.channel_cov>40?0.06:0),0,1);
+      const exec=clamp(80+(sliders.channel_cov-45)*0.4+(sliders.budget2-1.0)*20-(sliders.hc*0.5),0,100);
+      return{direction:dir,decode:dec,execution:exec};
+    },
+    tornadoItems:function(sliders){return[{label:'渠道覆盖',value:(sliders.channel_cov-45)*0.6},{label:'数字化预算',value:(sliders.budget2-1.0)*15},{label:'人才缺口',value:-sliders.hc*0.8}]}
   },
   {
     id:'sc1', urgency:'stable', icon:'📌', tag:'稳定', title:'SC-1 高端医疗设备市场领先',
@@ -929,6 +1004,12 @@ const DECISION_DEFS = [
 const cardInstances={};
 function buildCockpit(){
   const grid=document.getElementById('decisionGrid');
+  // 按综合严重度排序：最弱信任分升序（最危险的在前）
+  DECISION_DEFS.sort((a,b)=>{
+    var wa=Math.min(a.baseTrusts.direction,a.baseTrusts.decode,a.baseTrusts.execution/a.maxTrusts.execution);
+    var wb=Math.min(b.baseTrusts.direction,b.baseTrusts.decode,b.baseTrusts.execution/b.maxTrusts.execution);
+    return wa-wb;
+  });
   grid.innerHTML=DECISION_DEFS.map(d=>{
     const expandLevel='card-folded';
     return '<div class="decision-card '+expandLevel+'" data-urgency="'+d.urgency+'" id="card-'+d.id+'">'+
@@ -1007,11 +1088,14 @@ function buildCockpit(){
     };
     aiComp.onConfirm=function(s){
       const st=getSliderState(d.id);const trusts=d.calcTrusts(st);
-      updateTrends(trusts);showToast('策略已采纳 ✅','success');document.getElementById('cockpitStatus').textContent='策略已应用：'+s.name;
+      updateTrends(trusts);showToast('策略已采纳 ✅','success');
+      // 采纳后标记卡片为已处理，重排
+      var w=Math.min(trusts.direction,trusts.decode,trusts.execution/100);
+      if(w>=0.75){d.urgency='stable';d.tag='稳定';var card=document.getElementById('card-'+d.id);if(card){card.dataset.urgency='stable';var tag=card.querySelector('.card-urgency-tag');if(tag){tag.className='card-urgency-tag stable';tag.innerHTML=d.icon+' 稳定'}}}
+      resortCards();
     };
     aiComp.onUndo=function(){
-      // 清除幽灵条, 恢复滑块和信任条到基础值
-      d.sliders.forEach(sdef=>{sliders[sdef.key].setValue(sdef.value,true)});var st0={};d.sliders.forEach(sdef=>{st0[sdef.key]=sdef.value});updateTrends(d.calcTrusts(st0));document.getElementById('cockpitStatus').textContent='系统就绪';
+      d.sliders.forEach(sdef=>{sliders[sdef.key].setValue(sdef.value,true)});var st0={};d.sliders.forEach(sdef=>{st0[sdef.key]=sdef.value});updateTrends(d.calcTrusts(st0));document.getElementById('cockpitStatus').textContent='系统就绪';resortCards();
     };
 
     // V2砍掉: tornado chart — 保留 TornadoMini 类定义以备后续复用
@@ -1020,27 +1104,38 @@ function buildCockpit(){
     const initSt={};d.sliders.forEach(sdef=>{initSt[sdef.key]=sdef.value});
     cardInstances[d.id]={def:d,sliders,aiComp,updateTrends};
     var ss,bs,es;
-    // 生成50点种子趋势数据 — 三张卡片各自叙事
+    // 生成50点种子趋势数据 — 五张卡片各自叙事
     var ss=[],bs=[],es=[];
     for(var si=0;si<50;si++){var t=si/49;
-      if(d.id==='sc4'){
-        // 叙事: 曾经跌入红色→正在恢复→当前琥珀偏绿 (V形)
-        var sp=t<0.7?0.92-t*0.271:0.73+(t-0.7)*0.633;  // 0.92↘0.73↗0.92
+      if(d.id==='sc3'){
+        // 叙事: 持续恶化→全线红色 (L形探底)
+        ss.push(Math.round((0.45-t*0.2)*100)/100);
+        bs.push(Math.round((0.52-t*0.18)*100)/100);
+        es.push(Math.round(40-t*25));
+      }else if(d.id==='sc4'){
+        // 叙事: 曾经绿色→跌入琥珀→当前缓慢恢复
+        var sp=t<0.7?0.65-t*0.2:0.51+(t-0.7)*0.03;
         ss.push(Math.round(sp*100)/100);
         bs.push(1.0);
-        var be=t<0.7?95-t*50:60+(t-0.7)*116.7;  // 95↘60↗95
+        var be=t<0.7?95-t*15:84.5+(t-0.7)*1.7;
         es.push(Math.round(be));
-      }else if(d.id==='bp13'){
-        // 叙事: 持续下滑→最近趋缓，当前在琥珀区
-        var bd=0.80-t*0.12+t*t*0.04;  // 0.80↘0.71 缓降尾部走平
+      }else if(d.id==='bp14'){
+        // 叙事: 成本陡升→执行分崩溃→最近触底
+        var bd=0.92-t*0.13;
         ss.push(Math.round(bd*100)/100);
-        bs.push(0.90);
-        es.push(Math.round(98+t*2));  // 98↗100
+        bs.push(Math.round((0.88-t*0.1)*100)/100);
+        var bed=t<0.85?40-t*10:31.5+(t-0.85)*3.3;
+        es.push(Math.round(bed));
+      }else if(d.id==='bp12'){
+        // 叙事: 渠道缓慢爬升→解码分低迷→最近改善
+        ss.push(Math.round((0.88+t*0.02)*100)/100);
+        bs.push(Math.round((0.40+t*0.12+t*t*0.06)*100)/100);
+        es.push(Math.round(78+t*4));
       }else{
-        // 叙事: 稳定健康，微幅上行
-        ss.push(Math.round((0.91+t*0.01)*100)/100);  // 0.91→0.92
+        // SC-1 叙事: 稳定健康，微幅上行
+        ss.push(Math.round((0.91+t*0.01)*100)/100);
         bs.push(0.98);
-        es.push(Math.round(86+t*2));  // 86→88
+        es.push(Math.round(86+t*2));
       }
     }
     for(var si=0;si<50;si++)tPush(d.id,ss[si],bs[si],es[si])
@@ -1051,6 +1146,28 @@ function buildCockpit(){
     aiComp.evaluate(initSt);
     updateFoldedCard(d.id);
   });
+}
+
+function resortCards(){
+  var grid=document.getElementById('decisionGrid');if(!grid)return;
+  var cards=Array.from(grid.querySelectorAll('.decision-card'));
+  // 按当前最弱信任分升序排列
+  cards.sort((a,b)=>{
+    var ai=cardInstances[a.id.replace('card-','')];
+    var bi=cardInstances[b.id.replace('card-','')];
+    if(!ai||!bi)return 0;
+    var stA={};Object.keys(ai.sliders).forEach(k=>{stA[k]=ai.sliders[k].value});
+    var stB={};Object.keys(bi.sliders).forEach(k=>{stB[k]=bi.sliders[k].value});
+    var tA=ai.def.calcTrusts(stA),tB=bi.def.calcTrusts(stB);
+    var wA=Math.min(tA.direction,tA.decode,tA.execution/100);
+    var wB=Math.min(tB.direction,tB.decode,tB.execution/100);
+    return wA-wB;
+  });
+  // 重新插入排序后的卡片
+  cards.forEach(c=>grid.appendChild(c));
+  // 更新状态栏
+  var urgent=cards.filter(c=>c.dataset.urgency!=='stable').length;
+  document.getElementById('cockpitStatus').textContent=urgent===0?'✅ 全部战略决策已处理 — 系统就绪':urgent+'项战略决策待关注。拖动任一滑块开始探索。';
 }
 
 function createTrustRow(container,label){
