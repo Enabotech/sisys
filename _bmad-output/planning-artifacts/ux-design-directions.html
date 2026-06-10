@@ -1255,8 +1255,14 @@ function resolveCard(cardId){
     if(Math.abs(newVal-oldVal)>=threshold){evParams[pKey]=newVal;hasChange=true}
   });
   if(hasChange){
+    // 去重: 移除同一卡片之前的决策证据
     allEvidence=allEvidence.filter(function(e){return!(e.isDecision&&e.decisionCard===cardId)});
-    allEvidence.push({label:inst.def.title+' · 决策确认',freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 张总 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId});
+    if(window._pendingDecisions)window._pendingDecisions=window._pendingDecisions.filter(function(e){return e.decisionCard!==cardId});
+    var decEntry={label:inst.def.title+' · 决策确认',freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 张总 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId};
+    allEvidence.push(decEntry);
+    // buffer: buildWorkbench首次渲染时合并，防止allEvidence被覆盖
+    if(!window._pendingDecisions)window._pendingDecisions=[];
+    window._pendingDecisions.push(decEntry);
     if(document.getElementById('workbenchLayout').innerHTML)rebuildWorkbench();
   }
   // 帧2: 弹簧收起 (400ms)
@@ -1383,13 +1389,13 @@ window._rebuildSliders=function(activeParamKeys,aggregatedParams){
   });
   if(window._updateWB)window._updateWB();
 };
+// === 证据数据：全局共享 — 决策舱resolveCard可追加决策结果型证据 ===
+// === 证据数据：全局数组 — 决策舱resolveCard可追加决策结果型证据 ===
+var allEvidence=[];
 window._wbReset=function(){if(window.onEvidenceChange)window.onEvidenceChange()};
 function buildWorkbench(){
   const layout=document.getElementById('workbenchLayout');if(!layout)return;
-  // === 证据数据：扁平数组（40条，覆盖SP/BP/RT全阶段） ===
-  var allEvidence=[
-    // SP[1] 业绩差距
-    {label:'收入差距率 12%',freshness:'fresh',params:{mkt_growth:10,rd_budget:1.8},confidence:0.90,source:'财务报表 · 2025Q4',phase:'SP[1]'},
+    allEvidence=[
     {label:'利润差距率 8%',freshness:'usable',params:{rd_budget:1.8},confidence:0.85,source:'财务报表 · 2025Q4',phase:'SP[1]'},
     // SP[2] 市场洞察
     {label:'总可用市场 ¥520亿',freshness:'fresh',params:{mkt_growth:15,comp_lead:0},confidence:0.95,source:'Frost & Sullivan · 2026Q1',phase:'SP[2]',substep:'(1)看趋势'},
@@ -1452,6 +1458,8 @@ function buildWorkbench(){
     // 跨阶段参考证据
     {label:'技术趋势 AI+国产替代',freshness:'stale',params:{mkt_growth:12,localization:55},confidence:0.40,source:'行业白皮书 · 2024Q2',phase:'RT[3]'}
   ];
+  // 恢复resolveCard提前注入的决策证据
+  if(window._pendingDecisions){window._pendingDecisions.forEach(function(e){allEvidence.push(e)});window._pendingDecisions=[]}
   // === 七步层次树渲染 ===
   const phaseGroups=[
     {tag:'SP',label:'战略规划 (BLM)',color:'#1890ff',phases:[
