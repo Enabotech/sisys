@@ -479,7 +479,18 @@ const PARAM_REGISTRY={
   launch_cycle:{name:'产品上市周期',unit:'月',tier:'执行',default:12},
   payback_years:{name:'投资回收期',unit:'年',tier:'风险',default:3.5},
   cashflow_risk:{name:'现金流压力',unit:'等级',tier:'风险',default:'中'},
-  compliance:{name:'合规风险等级',unit:'等级',tier:'风险',default:'低'}
+  compliance:{name:'合规风险等级',unit:'等级',tier:'风险',default:'低'},
+  // BP 解码参数
+  sp_bp_alignment:{name:'SP-BP映射完整度',unit:'%',tier:'执行',default:85},
+  initiative_coverage:{name:'举措覆盖完整度',unit:'%',tier:'执行',default:90},
+  metric_coverage:{name:'指标覆盖率',unit:'%',tier:'执行',default:88},
+  // BP 执行参数
+  budget_measure_match:{name:'预算-措施匹配度',unit:'%',tier:'执行',default:82},
+  owner_accountability:{name:'责任人明确度',unit:'%',tier:'执行',default:95},
+  // RT 监控参数
+  milestone_achieve:{name:'里程碑达成率',unit:'%',tier:'风险',default:72},
+  talent_retention:{name:'关键人才留存率',unit:'%',tier:'风险',default:88},
+  risk_mitigation_cov:{name:'风险缓解覆盖率',unit:'%',tier:'风险',default:65}
 };
 // ============================================================
 // 工具函数
@@ -1208,7 +1219,7 @@ window._rebuildSliders=function(activeParamKeys,aggregatedParams){
 window._wbReset=function(){if(window.onEvidenceChange)window.onEvidenceChange()};
 function buildWorkbench(){
   const layout=document.getElementById('workbenchLayout');if(!layout)return;
-  // === 证据数据：扁平数组 ===
+  // === 证据数据：扁平数组（40条，覆盖SP/BP/RT全阶段） ===
   const allEvidence=[
     // SP[1] 业绩差距
     {label:'收入差距率 12%',freshness:'fresh',params:{mkt_growth:10,rd_budget:1.8},confidence:0.90,source:'财务报表 · 2025Q4',phase:'SP[1]'},
@@ -1222,7 +1233,7 @@ function buildWorkbench(){
     {label:'内部流程效率 78%',freshness:'usable',params:{talent_pool:55},confidence:0.75,source:'运营数据 · 2025Q4',phase:'SP[2]',substep:'(4)看自己'},
     {label:'增长路径可行性 4/5',freshness:'fresh',params:{mkt_growth:15,comp_lead:1},confidence:0.85,source:'安索夫分析 · 2026Q1',phase:'SP[2]',substep:'(5)看机会'},
     {label:'能力-机会匹配度 3/5',freshness:'usable',params:{talent_pool:55,rd_budget:1.8},confidence:0.70,source:'GE-麦肯锡 · 2025Q4',phase:'SP[2]',substep:'(6)机会差距'},
-    // SP[3] 战略意图 (解码标注集中于此)
+    // SP[3] 战略意图
     {label:'三年营收目标 ¥50亿',freshness:'fresh',params:{mkt_growth:15},confidence:0.95,source:'董事会决议 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2, 举措1.3'},
     {label:'市场份额目标 25%',freshness:'fresh',params:{mkt_growth:15},confidence:0.90,source:'SP文档 · 2026',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2'},
     {label:'毛利率目标 60%',freshness:'usable',params:{rd_budget:2.0},confidence:0.85,source:'财务规划 · 2026',phase:'SP[3]',decodesTo:'举措1.3'},
@@ -1232,11 +1243,46 @@ function buildWorkbench(){
     {label:'战略控制点强度 3/5',freshness:'usable',params:{rd_budget:2.0},confidence:0.80,source:'战略评估 · 2025Q4',phase:'SP[5]'},
     {label:'关键任务就绪度 3/5',freshness:'fresh',params:{hc_gap:22,train_cycle:9},confidence:0.90,source:'项目管理 · 2026Q1',phase:'SP[6]'},
     {label:'组织能力差距 中等',freshness:'usable',params:{talent_pool:60},confidence:0.75,source:'HR评估 · 2025Q4',phase:'SP[6]'},
-    // BP
-    {label:'渠道覆盖 45%→80%',freshness:'fresh',params:{hc_gap:0},confidence:0.95,source:'内部数据 · 2026Q1',phase:'BP'},
-    {label:'人力缺口 22人',freshness:'fresh',params:{hc_gap:22,talent_pool:60,train_cycle:9},confidence:0.95,source:'HR系统 · 2026Q1',phase:'BP'},
-    {label:'人才薪资基准 -15%',freshness:'stale',params:{salary_comp:-15,talent_pool:40},confidence:0.60,source:'薪资调研 · 2025Q4',phase:'BP'},
-    {label:'技术趋势 AI+国产替代',freshness:'stale',params:{mkt_growth:12,localization:55},confidence:0.40,source:'行业白皮书 · 2024Q2',phase:'BP'}
+    // BP[1] 澄清战略方向
+    {label:'SP-BP映射完整度 85%',freshness:'fresh',params:{sp_bp_alignment:85},confidence:0.90,source:'战略解码工作坊 · 2026Q1',phase:'BP[1]'},
+    {label:'战略主题清晰度 4/5',freshness:'fresh',params:{mkt_growth:14},confidence:0.85,source:'高管访谈 · 2026Q1',phase:'BP[1]'},
+    {label:'年度主题穿透率 70%',freshness:'usable',params:{sp_bp_alignment:70},confidence:0.75,source:'部门规划汇总 · 2025Q4',phase:'BP[1]'},
+    // BP[2] 导出战略举措
+    {label:'举措覆盖完整度 90%',freshness:'fresh',params:{initiative_coverage:90},confidence:0.90,source:'举措评审会 · 2026Q1',phase:'BP[2]'},
+    {label:'优先级共识度 3/5',freshness:'usable',params:{comp_lead:2},confidence:0.75,source:'高管投票 · 2026Q1',phase:'BP[2]'},
+    {label:'跨举措协同度 4/5',freshness:'fresh',params:{initiative_coverage:92},confidence:0.85,source:'举措依赖矩阵 · 2026Q1',phase:'BP[2]'},
+    // BP[3] 导出衡量指标
+    {label:'指标覆盖率 88%',freshness:'fresh',params:{metric_coverage:88},confidence:0.90,source:'KPI审查会 · 2026Q1',phase:'BP[3]'},
+    {label:'指标目标挑战度 4/5',freshness:'fresh',params:{mkt_growth:13},confidence:0.85,source:'行业对标 · 2026Q1',phase:'BP[3]'},
+    {label:'先导/滞后指标比 0.8',freshness:'usable',params:{metric_coverage:80},confidence:0.70,source:'指标库统计 · 2025Q4',phase:'BP[3]'},
+    // BP[4] 确定措施目标
+    {label:'渠道覆盖 45%→80%',freshness:'fresh',params:{hc_gap:0},confidence:0.95,source:'内部数据 · 2026Q1',phase:'BP[4]'},
+    {label:'人力缺口 22人',freshness:'fresh',params:{hc_gap:22,talent_pool:60,train_cycle:9},confidence:0.95,source:'HR系统 · 2026Q1',phase:'BP[4]'},
+    {label:'预算-措施匹配度 82%',freshness:'fresh',params:{budget_measure_match:82,rd_budget:1.9},confidence:0.90,source:'财务审核 · 2026Q1',phase:'BP[4]'},
+    {label:'措施SMART具体度 4/5',freshness:'fresh',params:{rd_budget:2.1},confidence:0.85,source:'COO评审 · 2026Q1',phase:'BP[4]'},
+    // BP[5] 分解措施目标
+    {label:'责任人明确度 95%',freshness:'fresh',params:{owner_accountability:95},confidence:0.95,source:'RACI矩阵 · 2026Q1',phase:'BP[5]'},
+    {label:'部门承诺率 80%',freshness:'usable',params:{owner_accountability:80},confidence:0.80,source:'部门签核 · 2025Q4',phase:'BP[5]'},
+    {label:'分解一致性 4/5',freshness:'fresh',params:{hc_gap:18},confidence:0.85,source:'AUD审计 · 2026Q1',phase:'BP[5]'},
+    {label:'人才薪资基准 -15%',freshness:'stale',params:{salary_comp:-15,talent_pool:40},confidence:0.60,source:'薪资调研 · 2025Q4',phase:'BP[5]'},
+    // BP[6] 导出工作计划
+    {label:'三维规划完整度 78%',freshness:'usable',params:{budget_measure_match:78},confidence:0.75,source:'年度规划 · 2025Q4',phase:'BP[6]'},
+    {label:'资源承诺率 85%',freshness:'fresh',params:{budget_measure_match:88},confidence:0.90,source:'资源审批 · 2026Q1',phase:'BP[6]'},
+    {label:'风险缓解覆盖率 65%',freshness:'usable',params:{risk_mitigation_cov:65},confidence:0.75,source:'风险评估 · 2026Q1',phase:'BP[6]'},
+    // RT[1] 执行进度监控
+    {label:'里程碑达成率 72%',freshness:'usable',params:{milestone_achieve:72},confidence:0.85,source:'项目月报 · 2026Q1',phase:'RT[1]'},
+    {label:'预算执行率 95%',freshness:'fresh',params:{rd_budget:2.1},confidence:0.95,source:'财务月报 · 2026Q1',phase:'RT[1]'},
+    {label:'任务完成速度 8项/月',freshness:'fresh',params:{train_cycle:8},confidence:0.80,source:'PMO数据 · 2026Q1',phase:'RT[1]'},
+    // RT[2] 资源效率
+    {label:'研发投入产出比 2.5',freshness:'usable',params:{rd_budget:1.7},confidence:0.75,source:'CTO季报 · 2026Q1',phase:'RT[2]'},
+    {label:'关键人才留存率 88%',freshness:'fresh',params:{talent_retention:88},confidence:0.90,source:'HR季报 · 2026Q1',phase:'RT[2]'},
+    {label:'销售费用率 22%',freshness:'usable',params:{talent_pool:50},confidence:0.75,source:'CFO季报 · 2026Q1',phase:'RT[2]'},
+    // RT[3] 结果评价
+    {label:'实际投资回收期 4.2年',freshness:'usable',params:{launch_cycle:14},confidence:0.80,source:'CFO年报 · 2025',phase:'RT[3]'},
+    {label:'NPV偏差率 -8%',freshness:'fresh',params:{milestone_achieve:78},confidence:0.85,source:'投资复盘 · 2026Q1',phase:'RT[3]'},
+    {label:'战略弹性得分 4/5',freshness:'fresh',params:{risk_mitigation_cov:70},confidence:0.85,source:'压力测试 · 2026Q1',phase:'RT[3]'},
+    // 跨阶段参考证据
+    {label:'技术趋势 AI+国产替代',freshness:'stale',params:{mkt_growth:12,localization:55},confidence:0.40,source:'行业白皮书 · 2024Q2',phase:'RT[3]'}
   ];
   // === 七步层次树渲染 ===
   const phaseGroups=[
@@ -1256,18 +1302,17 @@ function buildWorkbench(){
       {step:'[6]',label:'执行设计',keys:['关键任务就绪度 3/5','组织能力差距 中等']}
     ]},
     {tag:'BP',label:'年度业务计划 (BEM)',color:'#00875A',phases:[
-      {step:'BP[1]',label:'澄清战略方向',keys:[]},
-      {step:'BP[2]',label:'导出战略举措',keys:[]},
-      {step:'BP[3]',label:'导出衡量指标',keys:[]},
-      {step:'BP[4]',label:'确定措施目标',keys:['渠道覆盖 45%→80%','人力缺口 22人']},
-      {step:'BP[5]',label:'分解措施目标',keys:['人才薪资基准 -15%']},
-      {step:'BP[6]',label:'导出工作计划',keys:[]}
+      {step:'BP[1]',label:'澄清战略方向',keys:['SP-BP映射完整度 85%','战略主题清晰度 4/5','年度主题穿透率 70%']},
+      {step:'BP[2]',label:'导出战略举措',keys:['举措覆盖完整度 90%','优先级共识度 3/5','跨举措协同度 4/5']},
+      {step:'BP[3]',label:'导出衡量指标',keys:['指标覆盖率 88%','指标目标挑战度 4/5','先导/滞后指标比 0.8']},
+      {step:'BP[4]',label:'确定措施目标',keys:['渠道覆盖 45%→80%','人力缺口 22人','预算-措施匹配度 82%','措施SMART具体度 4/5']},
+      {step:'BP[5]',label:'分解措施目标',keys:['责任人明确度 95%','部门承诺率 80%','分解一致性 4/5','人才薪资基准 -15%']},
+      {step:'BP[6]',label:'导出工作计划',keys:['三维规划完整度 78%','资源承诺率 85%','风险缓解覆盖率 65%']}
     ]},
     {tag:'RT',label:'运行时监控',color:'#B86E00',phases:[
-      {step:'RT[1]',label:'执行进度监控',keys:[]},
-      {step:'RT[2]',label:'资源效率',keys:[]},
-      {step:'RT[3]',label:'结果评价',keys:[]},
-      {step:'RT[4]',label:'Checkpoint审计',keys:['技术趋势 AI+国产替代']}
+      {step:'RT[1]',label:'执行进度监控',keys:['里程碑达成率 72%','预算执行率 95%','任务完成速度 8项/月']},
+      {step:'RT[2]',label:'资源效率',keys:['研发投入产出比 2.5','关键人才留存率 88%','销售费用率 22%']},
+      {step:'RT[3]',label:'结果评价',keys:['实际投资回收期 4.2年','NPV偏差率 -8%','战略弹性得分 4/5','技术趋势 AI+国产替代']}
     ]}
   ];
   function renderPhaseTree(){
@@ -1413,8 +1458,10 @@ function buildWorkbench(){
     function calcTrustsGeneric(params){
       var p=function(k){return params[k]||(PARAM_REGISTRY[k]?PARAM_REGISTRY[k].default:0)};
       var dir=clamp(0.92-(15-p('mkt_growth'))*0.018-(p('comp_lead'))*0.045+(p('localization')-55)*0.001,0,1);
-      var dec=clamp(1.0-(p('rd_budget')<1.5?0.08:0)-(p('hc_gap')>20?0.05:0)+(p('talent_pool')>50?0.03:0),0,1);
-      var exec=clamp(88-(2.0-p('rd_budget'))*25-(p('hc_gap'))*0.7+(p('train_cycle')<6?5:0)-(p('launch_cycle')>12?3:0),0,100);
+      // decode: SP→BP翻译质量 — BP[1-3]参数加权
+      var dec=clamp(1.0-(p('rd_budget')<1.5?0.08:0)-(p('hc_gap')>20?0.05:0)+(p('talent_pool')>50?0.03:0)+(p('sp_bp_alignment')-85)*0.003+(p('initiative_coverage')-90)*0.002+(p('metric_coverage')-88)*0.002,0,1);
+      // execution: BP[4-6]+RT参数加权
+      var exec=clamp(88-(2.0-p('rd_budget'))*25-(p('hc_gap'))*0.7+(p('train_cycle')<6?5:0)-(p('launch_cycle')>12?3:0)+(p('milestone_achieve')-72)*0.4+(p('budget_measure_match')-82)*0.3+(p('talent_retention')-88)*0.35+(p('risk_mitigation_cov')-65)*0.25,0,100);
       return{direction:dir,decode:dec,execution:exec};
     }
     window._updateWB=function(){
