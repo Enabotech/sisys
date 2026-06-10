@@ -1259,8 +1259,10 @@ function resolveCard(cardId){
     // 去重: 移除同一卡片之前的决策证据
     allEvidence=allEvidence.filter(function(e){return!(e.isDecision&&e.decisionCard===cardId)});
     if(window._pendingDecisions)window._pendingDecisions=window._pendingDecisions.filter(function(e){return e.decisionCard!==cardId});
-    var strategyLabel='';if(inst.aiComp.confirmed){var cs=inst.aiComp.suggestions.find(function(s){return s.id===inst.aiComp.confirmed});if(cs)strategyLabel=' · 采纳"'+cs.name+'"'}
-    var decEntry={label:inst.def.title+strategyLabel,freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 张总 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId};
+    var strategyName='';if(inst.aiComp.confirmed){var cs=inst.aiComp.suggestions.find(function(s){return s.id===inst.aiComp.confirmed});if(cs)strategyName=cs.name}
+    var changes=[];inst.def.sliders.forEach(function(sdef){var nv=st[sdef.key],ov=sdef.value;if(Math.abs(nv-ov)>0.01)changes.push((PARAM_REGISTRY[sdef.paramKey||sdef.key]||{}).name+' '+ov+'→'+nv)});
+    var detail='';if(strategyName)detail='采纳: '+strategyName;if(changes.length)detail=(detail?detail+' | ':'')+'参数: '+changes.join(', ');
+    var decEntry={label:inst.def.title,freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 张总 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId,detail:detail};
     allEvidence.push(decEntry);
     // buffer: buildWorkbench首次渲染时合并，防止allEvidence被覆盖
     if(!window._pendingDecisions)window._pendingDecisions=[];
@@ -1550,12 +1552,17 @@ function buildWorkbench(){
     // 决策型: ✅图标+深蓝色文字, 研究型: 🟢🟡🔴
     if(e.isDecision){h+='<span style="font-size:11px;flex-shrink:0">✅</span>'}
     else{h+='<span class="evidence-freshness '+e.freshness+'">'+(e.freshness==='fresh'?'🟢':e.freshness==='usable'?'🟡':'🔴')+'</span>'}
-    h+='<span class="ev-label" style="flex:1;font-size:11px'+(e.isDecision?' color:#1d3a5c;font-weight:500':'')+'">'+e.label+'</span>';
-    if(e.isDecision&&e.source){h+='<span style="font-size:9px;color:#1d3a5c;flex-shrink:0;margin-left:2px">'+e.source+'</span>'}
-    if(e.params&&!e.isDecision){var pnames=Object.keys(e.params).map(function(k){return(PARAM_REGISTRY[k]||{}).name||k}).join(', ');h+='<span style="font-size:8px;color:var(--color-text-tertiary);flex-shrink:0" title="影响参数: '+pnames+'">→ '+pnames+'</span>'}
+    if(e.isDecision){
+      h+='<span class="ev-label" style="flex:1;font-size:11px;color:#1d3a5c;font-weight:500;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px" onclick="var det=this.closest(\'.wb-evidence-row\').nextElementSibling;det.style.display=det.style.display===\'none\'?\'block\':\'none\'" title="点击查看决策详情">'+e.label+'</span>';
+      if(e.source)h+='<span style="font-size:9px;color:#1d3a5c;flex-shrink:0;margin-left:2px">'+e.source+'</span>';
+    }else{
+      h+='<span class="ev-label" style="flex:1;font-size:11px">'+e.label+'</span>';
+      if(e.params){var pnames=Object.keys(e.params).map(function(k){return(PARAM_REGISTRY[k]||{}).name||k}).join(', ');h+='<span style="font-size:8px;color:var(--color-text-tertiary);flex-shrink:0" title="影响参数: '+pnames+'">→ '+pnames+'</span>'}
+    }
     if(e.decodesTo)h+='<span style="font-size:8px;color:var(--color-primary);flex-shrink:0;cursor:pointer;margin-left:2px" onclick="event.stopPropagation();var cid=\'bp13\';if(window.jumpToCard)jumpToCard(cid)" title="解码到: '+e.decodesTo+'">🔗 '+e.decodesTo+'</span>';
     if(e.source&&!e.isDecision)h+='<span style="font-size:9px;color:var(--color-text-tertiary);flex-shrink:0;margin-left:2px;cursor:help" title="'+e.source+'">📄</span>';
     h+='</div>';
+    if(e.isDecision&&e.detail)h+='<div style="display:none;font-size:10px;color:#1d3a5c;padding:2px 0 4px 28px;line-height:1.5">'+e.detail+'</div>';
     return h;
   }
   // === 证据引擎 ===
