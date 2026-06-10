@@ -1576,6 +1576,7 @@ function buildWorkbench(){
     return result;
   }
   function updateParentCheckboxes(){
+    window._updateParentCheckboxes=updateParentCheckboxes;
     document.querySelectorAll('.ev-check-group').forEach(function(pcb){
       var group=pcb.closest('.wb-phase-group');if(!group)return;
       var children=group.querySelectorAll(':scope > .wb-phase-items .ev-check');
@@ -1605,7 +1606,7 @@ function buildWorkbench(){
       var cb=document.querySelector('.scenario-btn[data-scenario="custom"]');
       if(cb)cb.classList.add('active');
     }
-    updateParentCheckboxes();
+    (window._updateParentCheckboxes||updateParentCheckboxes)();
   }
   function syncWorkbenchSliders(params){
     const activeKeys=Object.keys(params).filter(k=>!params[k].isDefault||params[k].sources.length>0);
@@ -1712,7 +1713,7 @@ function rebuildWorkbench(){
     '</div><div class="evidence-tree">'+(window._renderPhaseTree||renderPhaseTree)()+'</div>'+
     '<div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div>';
   panel.innerHTML=treeHTML;
-  updateParentCheckboxes();
+  if(window._updateParentCheckboxes)window._updateParentCheckboxes();
   // 恢复当前情景按钮激活态
   if(window._currentScenario){
     var ab=panel.querySelector('.scenario-btn[data-scenario="'+window._currentScenario+'"]');
