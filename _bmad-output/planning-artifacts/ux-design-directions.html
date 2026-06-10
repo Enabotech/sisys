@@ -1707,7 +1707,7 @@ function toggleDecisionEvidence(){
   if(!decChecks.length){showToast('暂无决策证据 · 在决策舱处理卡片后自动生成','info');return}
   var allChecked=Array.from(decChecks).every(function(c){return c.checked});
   decChecks.forEach(function(c){c.checked=!allChecked});
-  window.recalcEvidenceDiscount();
+  window._scenarioChanging=true;window.recalcEvidenceDiscount();window._scenarioChanging=false;
   // 决策是独立开关，不影响场景按钮激活态
   var btn=document.querySelector('.scenario-btn[data-scenario="decision"]');
   if(btn)btn.classList.toggle('active',!allChecked);
