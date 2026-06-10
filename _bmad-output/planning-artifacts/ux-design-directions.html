@@ -1710,6 +1710,7 @@ function rebuildWorkbench(){
     '</div><div class="evidence-tree">'+renderPhaseTree()+'</div>'+
     '<div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div>';
   panel.innerHTML=treeHTML;
+  updateParentCheckboxes();
   // 恢复当前情景按钮激活态
   if(window._currentScenario){
     var ab=panel.querySelector('.scenario-btn[data-scenario="'+window._currentScenario+'"]');
