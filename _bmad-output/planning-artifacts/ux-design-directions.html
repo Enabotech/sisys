@@ -905,6 +905,7 @@ function buildCockpit(){
           '<div><span class="card-title-text">'+d.title+'</span>'+
           '<div class="card-summary">'+d.summary+'</div>'+
           (d.spBpMapping?'<div class="decode-ribbon"><span class="decode-ribbon-label">解码到 →</span>'+d.spBpMapping.map(m=>'<span class="decode-ribbon-tag bp-tag" onclick="event.stopPropagation();jumpToCard(\''+m.bpId+'\')" title="'+m.csf+' → '+m.kpi+' → '+m.target+' (权重:'+m.weight+')">📋 '+m.bpId.replace('bp','举措')+'</span>').join('')+'</div>':'')+
+          (d.spAnchor?'<div class="decode-ribbon"><span class="decode-ribbon-label">锚定 ←</span><span class="decode-ribbon-tag sp-tag" onclick="event.stopPropagation();jumpToCard(\''+d.spAnchor.spId+'\')" title="'+d.spAnchor.csf+' → '+d.spAnchor.kpi+' → '+d.spAnchor.target+' (权重:'+d.spAnchor.weight+')">'+d.spAnchor.spTitle+'</span></div>':'')+
           '</div>'+
         '</div>'+
         '<div class="card-header-mid"><span class="mini-nav-hint" id="mini-hint-'+d.id+'"></span>'+
@@ -918,7 +919,6 @@ function buildCockpit(){
           '<button class="card-expand-btn" onclick="toggleCardExpand(\''+d.id+'\')" title="展开/折叠">▸</button>'+
         '</div>'+
       '</div>'+
-      (d.spAnchor?'<div class="decode-ribbon"><span class="decode-ribbon-label">锚定 ←</span><span class="decode-ribbon-tag sp-tag" onclick="event.stopPropagation();jumpToCard(\''+d.spAnchor.spId+'\')" title="'+d.spAnchor.csf+' → '+d.spAnchor.kpi+' → '+d.spAnchor.target+' (权重:'+d.spAnchor.weight+')">'+d.spAnchor.spTitle+'</span></div>':'')+
       '<div class="card-body">'+
         '<div class="trust-bars-stack" id="trusts-'+d.id+'"></div>'+
         '<div class="card-body-ops">'+
