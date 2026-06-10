@@ -1530,6 +1530,14 @@ function buildWorkbench(){
     }); // close phases.forEach
     h+='</div></div>'; // close group items + group
     }); // close phaseGroups.forEach
+    // 追加决策结果型证据（不在phaseGroups keys中，单独渲染）
+    var decEv=allEvidence.filter(function(e){return e.isDecision});
+    if(decEv.length>0){
+      h+='<div style="margin-top:8px;padding-top:8px;border-top:2px solid #1d3a5c">';
+      h+='<div style="font-size:12px;font-weight:600;color:#1d3a5c;margin-bottom:6px;padding:0 4px">✅ 决策结果 ('+decEv.length+'条)</div>';
+      decEv.forEach(function(e){h+=renderEvidenceRow(e)});
+      h+='</div>';
+    }
     return h;
   }
   function renderEvidenceRow(e){
