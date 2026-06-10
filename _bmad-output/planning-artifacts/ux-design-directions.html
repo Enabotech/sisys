@@ -1259,7 +1259,8 @@ function resolveCard(cardId){
     // 去重: 移除同一卡片之前的决策证据
     allEvidence=allEvidence.filter(function(e){return!(e.isDecision&&e.decisionCard===cardId)});
     if(window._pendingDecisions)window._pendingDecisions=window._pendingDecisions.filter(function(e){return e.decisionCard!==cardId});
-    var decEntry={label:inst.def.title+' · 决策确认',freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 张总 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId};
+    var strategyLabel='';if(inst.aiComp.confirmed){var cs=inst.aiComp.suggestions.find(function(s){return s.id===inst.aiComp.confirmed});if(cs)strategyLabel=' · 采纳"'+cs.name+'"'}
+    var decEntry={label:inst.def.title+strategyLabel,freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 张总 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId};
     allEvidence.push(decEntry);
     // buffer: buildWorkbench首次渲染时合并，防止allEvidence被覆盖
     if(!window._pendingDecisions)window._pendingDecisions=[];
@@ -1508,7 +1509,7 @@ function buildWorkbench(){
       const total=allKeys.length||1;
       const badge=f>=total*0.6?'good':f>0||u>0?'warn':'empty';
       const id='ph-'+pi+'-'+Math.random().toString(36).slice(2,5);
-      h+='<div class="wb-phase-group'+(pi<=1?' open':'')+'" id="'+id+'">';
+      h+='<div class="wb-phase-group" id="'+id+'">';
       h+='<div class="wb-phase-header" onclick="document.getElementById(\''+id+'\').classList.toggle(\'open\')"><input type="checkbox" class="ev-check-group" onclick="event.stopPropagation();var grp=document.getElementById(\''+id+'\');var cbs=grp.querySelectorAll(\'.ev-check\');var all=Array.from(cbs).every(function(c){return c.checked});cbs.forEach(function(c){c.checked=!all});window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" title="全选/取消本阶段"><span class="wb-phase-arrow">▶</span><strong>'+p.step+' '+p.label+'</strong><span class="wb-phase-badge '+badge+'">🟢'+f+' 🟡'+u+' 🔴'+s+'</span></div>';
       h+='<div class="wb-phase-items">';
       if(p.subs){
@@ -1624,7 +1625,8 @@ function buildWorkbench(){
   // 中栏：动态推演沙盘 — 参数体系由选中证据决定
   let sandboxHTML='<div class="workbench-panel"><h3>🎮 推演沙盘</h3>'+
     '<div id="wb-evidence-discount" style="margin-bottom:4px;padding:3px 8px;background:#f0f8ff;border-radius:3px;font-size:10px;color:var(--color-primary)">📏 勾选左侧证据 → 参数自动聚合</div>'+
-    '<div class="trust-bars-stack" id="wb-trusts" style="margin-bottom:var(--spacing-md)"></div>'+
+    '<div class="trust-bars-stack" id="wb-trusts" style="margin-bottom:4px"></div>'+
+    '<div style="font-size:9px;color:var(--color-text-tertiary);text-align:center;margin-bottom:var(--spacing-md)">全证据聚合 · 含SP+BP+RT参数加权</div>'+
     '<div id="wb-sliders-container"></div>'+
     '<div style="margin-top:var(--spacing-sm);font-size:10px;color:var(--color-text-tertiary);line-height:1.5" id="wb-param-detail"></div>'+
     '<div style="margin-top:var(--spacing-sm);display:flex;gap:6px">'+
