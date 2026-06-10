@@ -1573,6 +1573,17 @@ function buildWorkbench(){
     Object.keys(PARAM_REGISTRY).forEach(k=>{if(!result[k])result[k]={value:PARAM_REGISTRY[k].default,sources:[],isDefault:true}});
     return result;
   }
+  function updateParentCheckboxes(){
+    document.querySelectorAll('.ev-check-group').forEach(function(pcb){
+      var group=pcb.closest('.wb-phase-group');if(!group)return;
+      var children=group.querySelectorAll(':scope > .wb-phase-items .ev-check');
+      if(children.length===0)return;
+      var checked=group.querySelectorAll(':scope > .wb-phase-items .ev-check:checked').length;
+      pcb.checked=checked===children.length;
+      pcb.indeterminate=checked>0&&checked<children.length;
+      pcb.style.accentColor=pcb.indeterminate?'#91d5ff':'var(--color-primary)';
+    });
+  }
   function onEvidenceChange(){
     const checks=document.querySelectorAll('.ev-check:checked');
     const byLabel={};allEvidence.forEach(e=>{byLabel[e.label]=e});
@@ -1592,6 +1603,7 @@ function buildWorkbench(){
       var cb=document.querySelector('.scenario-btn[data-scenario="custom"]');
       if(cb)cb.classList.add('active');
     }
+    updateParentCheckboxes();
   }
   function syncWorkbenchSliders(params){
     const activeKeys=Object.keys(params).filter(k=>!params[k].isDefault||params[k].sources.length>0);
