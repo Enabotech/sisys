@@ -102,8 +102,8 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .card-header-right{display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0}
 
 /* 折叠态趋势线 — 逐段着色（颜色=状态，走向=趋势，圆点=当前位置） */
-.card-header-mid{display:flex;align-items:center;gap:6px;flex-shrink:0;padding:0 4px}
-.folded-spark{width:120px;height:56px;flex-shrink:0}
+.card-header-mid{flex:0 0 25%;display:flex;align-items:center;gap:4px;padding:0 4px}
+.folded-spark{flex:1;min-width:0;height:56px}
 .folded-hint{font-size:11px;font-weight:500;flex-shrink:0;white-space:nowrap}
 /* 折叠卡片脉冲 — Steve的"余光感知" */
 @keyframes cardPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(212,139,6,.4)}}
