@@ -732,6 +732,16 @@ class AICompensation {
     if(s.budget!==undefined&&s.budget<1.5&&s.hc!==undefined&&s.hc>15) sug.push({id:'resource-opt',name:'砍边缘产品线，集中资源保核心',logic:'预算和人力双重承压，分散投入=全面溃败',impacts:[{label:'方向分',delta:+0.02,name:'direction'},{label:'解码分',delta:-0.05,name:'decode'},{label:'执行分',delta:+10,name:'execution'}],actions:{budget:1.5,hc:Math.max(0,s.hc-10)}});
     if(s.hc!==undefined&&s.hc>20) sug.push({id:'org-adj',name:'启动外部联合引进，降低自有人力依赖',logic:'人力缺口'+s.hc+'人远超可控范围，组织模式需要调整',impacts:[{label:'解码分',delta:-0.04,name:'decode'},{label:'执行分',delta:+7,name:'execution'}],actions:{hc:Math.max(0,s.hc-15)}});
     if(s.budget!==undefined&&s.budget>2.5) sug.push({id:'invest-more',name:'追加研发投资，拉大技术护城河',logic:'预算充足时，技术领先是最好的防御',impacts:[{label:'方向分',delta:+0.03,name:'direction'},{label:'执行分',delta:+4,name:'execution'}],actions:{budget:2.8}});
+    // === BP13 人才引进 ===
+    if(s.salary!==undefined&&s.salary<-15) sug.push({id:'salary-boost',name:'提升核心岗位薪资至市场基准',logic:'薪资低于市场'+Math.abs(s.salary)+'%，关键岗位离职风险急剧上升',impacts:[{label:'方向分',delta:+0.04,name:'direction'},{label:'执行分',delta:+12,name:'execution'}],actions:{salary:-5}});
+    if(s.talent_pool!==undefined&&s.talent_pool<30) sug.push({id:'talent-expand',name:'拓展招聘地域+启动远程团队方案',logic:'人才市场热度仅'+s.talent_pool+'分，本地招聘难以满足缺口',impacts:[{label:'方向分',delta:-0.02,name:'direction'},{label:'执行分',delta:+6,name:'execution'}],actions:{talent_pool:50}});
+    if(s.train_time!==undefined&&s.train_time>15) sug.push({id:'mentor-program',name:'启动内部导师制+外部培训加速',logic:'培养周期'+s.train_time+'个月远超行业基准9个月，影响Q3交付节点',impacts:[{label:'解码分',delta:-0.03,name:'decode'},{label:'执行分',delta:+8,name:'execution'}],actions:{train_time:9}});
+    if(s.salary!==undefined&&s.salary>5&&s.talent_pool!==undefined&&s.talent_pool>50) sug.push({id:'talent-blitz',name:'趁人才市场热度高批量引进，锁定核心团队',logic:'薪资竞争力+'+s.salary+'%，人才市场热度'+s.talent_pool+'分——当前是最佳招聘窗口',impacts:[{label:'方向分',delta:+0.03,name:'direction'},{label:'执行分',delta:+5,name:'execution'}],actions:{salary:Math.max(s.salary-5,0)}});
+    // === SC-1 高端医疗设备 ===
+    if(s.mkt_growth!==undefined&&s.mkt_growth<=8) sug.push({id:'defensive-posture',name:'从进攻转为防御型市场布局',logic:'市场增速降至'+s.mkt_growth+'%，窗口期红利消退，先发优势转为先发风险',impacts:[{label:'方向分',delta:+0.05,name:'direction'},{label:'执行分',delta:-3,name:'execution'}],actions:{mkt_growth:Math.min(s.mkt_growth+4,15)}});
+    if(s.localization!==undefined&&s.localization<35) sug.push({id:'localize-push',name:'加速国产供应链替代计划',logic:'国产替代率仅'+s.localization+'%，面临政策合规风险+进口成本上升双重压力',impacts:[{label:'方向分',delta:+0.04,name:'direction'},{label:'解码分',delta:-0.05,name:'decode'},{label:'执行分',delta:+8,name:'execution'}],actions:{localization:50}});
+    if(s.rd_invest!==undefined&&s.rd_invest<1.2) sug.push({id:'rd-rescue',name:'紧急追加研发预算，防止技术断档',logic:'研发投入仅¥'+s.rd_invest.toFixed(1)+'亿，低于技术护城河维持线（¥1.5亿），领先优势将在18个月内丧失',impacts:[{label:'方向分',delta:+0.03,name:'direction'},{label:'解码分',delta:-0.04,name:'decode'},{label:'执行分',delta:+5,name:'execution'}],actions:{rd_invest:1.5}});
+    if(s.rd_invest!==undefined&&s.rd_invest>2.5) sug.push({id:'tech-leap',name:'将富余研发预算投入技术并购，拉大护城河',logic:'研发预算充裕（¥'+s.rd_invest.toFixed(1)+'亿），技术并购可缩短产品上市周期12-18个月',impacts:[{label:'方向分',delta:+0.06,name:'direction'},{label:'执行分',delta:+3,name:'execution'}],actions:{rd_invest:2.8}});
     this.suggestions=sug.length?this._rank(sug):[];
     this._render();
   }
@@ -754,10 +764,23 @@ class AICompensation {
       if(cur.mkt_growth<=8){narr.significance='🔴 市场增速已跌破关键阈值。行业进入存量竞争阶段——窗口期窗口正在关闭。';narr.margin='建议密切关注竞争动态。'}
       else if(cur.mkt_growth<=12){narr.significance='🟡 增速放缓至中等水平。国产替代率成为关键变量——关注政策信号。';narr.margin='当前安全边际尚可。'}
       else{narr.significance='🟢 市场增速健康。按原计划推进是最优策略。';narr.margin=''}
+    }else if(cur.salary!==undefined||cur.talent_pool!==undefined||cur.train_time!==undefined){
+      // BP13 人才引进参数风险梯度
+      if(cur.salary!==undefined&&cur.salary<-15){narr.significance='🔴 薪资竞争力严重不足——低于市场基准'+Math.abs(cur.salary)+'%。人才池热度有限叠加薪资倒挂，招聘周期将进一步拉长——CHO评估Q3交付节点面临风险。';narr.margin='建议将薪资调整至至少-5%区间。'}
+      else if(cur.salary!==undefined&&cur.salary<-5){narr.significance='🟡 薪资竞争力略低于市场基准。单个因素影响可控，但叠加人才池不足将形成复合风险。';narr.margin='关注人才池热度变化，适时调整。'}
+      else if(cur.talent_pool!==undefined&&cur.talent_pool<30){narr.significance='🔴 人才市场严重萎缩。仅靠本地招聘无法满足缺口，CHO建议启动远程团队+跨地域方案。';narr.margin='若薪资同时偏低，招聘周期将倍增。'}
+      else if(cur.talent_pool!==undefined&&cur.talent_pool<50){narr.significance='🟡 人才市场热度中等。招聘窗口仍在但收窄——建议优先锁定核心岗位。';narr.margin='春季招聘季结束前完成核心岗位填充。'}
+      else if(cur.train_time!==undefined&&cur.train_time>15){narr.significance='🔴 培养周期严重超标（>15个月）。内部导师制+外部培训加速可压缩至9个月——COO评估Q3交付面临风险。';narr.margin='若人才池充足，可考虑并购小型团队绕过培养周期。'}
+      else if(cur.train_time!==undefined&&cur.train_time>12){narr.significance='🟡 培养周期超出标准3个月。建议部分岗位转外包或启动导师制压缩周期。';narr.margin=''}
+      else{narr.significance='🟢 人才参数配置在可接受范围内。';narr.margin=''}
+    }else if(cur.localization!==undefined||cur.rd_invest!==undefined){
+      // SC-1 高端医疗设备参数风险梯度
+      if(cur.localization!==undefined&&cur.localization<20){narr.significance='🔴 国产替代率已跌破安全线。进口依赖度过高+政策不确定性——供应链面临中断风险。CTO评估加速国产替代为当前最高优先级。';narr.margin='若研发投入同步不足，技术自主性将进一步恶化。'}
+      else if(cur.localization!==undefined&&cur.localization<40){narr.significance='🟡 国产替代率偏低。进口成本上升+政策收紧趋势下，建议启动替代方案预研。';narr.margin='关注十四五规划后续政策动态。'}
+      else if(cur.rd_invest!==undefined&&cur.rd_invest<1.2){narr.significance='🔴 研发投入严重不足。低于技术护城河维持线（¥1.5亿）——CTO评估18个月内领先优势将丧失。';narr.margin='建议优先砍掉边缘产品线，集中预算保核心技术。'}
+      else if(cur.rd_invest!==undefined&&cur.rd_invest<1.8){narr.significance='🟡 研发投入处于警戒区间。维持现有技术优势勉强够用，但不足以应对竞品加速。';narr.margin='若市场增速同步放缓，建议适当追加研发预算。'}
+      else{narr.significance='🟢 战略配置稳健。市场增速、国产替代、研发投入形成正向循环。';narr.margin=''}
     }else{
-      if(cur.salary!==undefined&&cur.salary<-15){narr.significance='🔴 薪资竞争力严重不足——低于市场基准15%以上。在人才池热度有限的背景下，这可能导致招聘周期进一步拉长。';narr.margin='建议将薪资调整至至少-5%区间。'}
-      else{narr.significance='参数调整在可接受范围内。';narr.margin=''}
-    }
     return narr;
   }
   _render(){
