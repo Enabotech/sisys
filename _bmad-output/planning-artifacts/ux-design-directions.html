@@ -903,14 +903,14 @@ function buildCockpit(){
           '<span class="card-urgency-tag '+d.urgency+'">'+d.icon+' '+d.tag+'</span>'+
           '<span class="card-title-text">'+d.title+'</span>'+
         '</div>'+
-        '<div class="card-header-right">'+
-          '<span class="mini-nav-hint" id="mini-hint-'+d.id+'"></span>'+
+        '<div class="card-header-mid"><span class="mini-nav-hint" id="mini-hint-'+d.id+'"></span>'+
           '<div class="card-folded-trusts" id="mini-trusts-'+d.id+'">'+
             '<div class="card-folded-trust-conn" id="mini-conn-'+d.id+'" style="background:'+(function(){var w=Math.min(bs.direction,bs.decode,bs.execution/d.maxTrusts.execution);return w<0.4?'var(--color-trust-red)':w<0.6?'var(--color-trust-yellow)':w<0.75?'var(--color-trust-amber)':'var(--color-trust-green)'})()+'"></div>'+
             '<canvas class="card-folded-trust-mini" id="mini-spark-dir-'+d.id+'" width="30" height="24"></canvas>'+
             '<canvas class="card-folded-trust-mini" id="mini-spark-dec-'+d.id+'" width="30" height="24"></canvas>'+
             '<canvas class="card-folded-trust-mini" id="mini-spark-exe-'+d.id+'" width="30" height="24"></canvas>'+
-          '</div>'+
+          '</div></div>'+
+        '<div class="card-header-right">'+
           '<button class="card-expand-btn" onclick="toggleCardExpand(\''+d.id+'\')" title="展开/折叠">▸</button>'+
         '</div>'+
       '</div>'+
