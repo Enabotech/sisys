@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>SISYS V3.2 · 战略承诺墙</title>
+<style>
+:root{--p:#1890ff;--s:#00875A;--w:#B86E00;--d:#C53030;--det:#3B82F6;--bg:#f5f5f5;--card:#fff;--bd:#e8e8e8;--t1:#262626;--t2:#595959;--t3:#8c8c8c;--ok:#E6F7F1;--wn:#FFF8E6;--dn:#FFF1F0;--db:#EFF6FF;--f:'PingFang SC','Microsoft YaHei',sans-serif;--fm:'Consolas',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--f);background:var(--bg);color:var(--t1);overflow:hidden;height:100vh}
+@keyframes detPulse{0%,100%{box-shadow:0 0 0 rgba(59,130,246,0)}50%{box-shadow:0 0 14px rgba(59,130,246,.4)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastIn{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
+
+.app{display:flex;flex-direction:column;height:100vh;max-width:1440px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:center;height:44px;padding:0 16px;border-bottom:1px solid var(--bd);flex-shrink:0;z-index:100;background:var(--card)}
+.header-brand{font-size:15px;font-weight:700}
+.mode-toggle{display:flex;border-radius:4px;overflow:hidden;border:1px solid var(--bd)}
+.mode-btn{padding:3px 12px;font-size:11px;cursor:pointer;border:none;background:var(--card);font-family:var(--f)}
+.mode-btn.on{background:var(--p);color:#fff}
+.header-right{display:flex;align-items:center;gap:16px;font-size:12px;color:var(--t2)}
+
+.slider-zone{padding:8px 24px;flex-shrink:0;z-index:90;background:var(--card);border-bottom:1px solid var(--bd)}
+.slider-label-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.slider-label{font-size:12px;font-weight:600;color:var(--t2)}
+.slider-reason{font-size:10px;color:var(--det)}
+.slider-dt{font-size:12px;cursor:pointer;color:var(--t3);padding:0 4px}
+
+.param-drawer{height:0;overflow:hidden;transition:height .35s ease-out;z-index:80;background:var(--card);border-bottom:1px solid var(--bd)}
+.param-drawer.open{height:480px}
+.drawer-inner{padding:16px 24px;display:flex;flex-direction:column;gap:12px}
+.param-tabs{display:flex;gap:0;border-bottom:2px solid var(--bd)}
+.param-tab{padding:6px 12px;font-size:11px;cursor:pointer;border:none;background:none;font-family:var(--f);color:var(--t3);border-bottom:2px solid transparent;margin-bottom:-2px}
+.param-tab.on{color:var(--p);border-bottom-color:var(--p);font-weight:600}
+.param-presets{display:flex;gap:8px}
+.preset-card{flex:1;padding:8px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;text-align:center;font-size:11px;transition:all .15s}
+.preset-card:hover{border-color:var(--p)}.preset-card.on{border-color:var(--p);background:#e6f7ff}
+.preset-card .pn{font-weight:600}.preset-card .pi{font-size:10px;color:var(--t3);margin-top:2px}
+.param-list{flex:1;overflow-y:auto;font-size:11px}
+.param-row{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--bg)}
+.param-why{font-size:11px;color:var(--t2);padding:8px;background:var(--db);border-radius:6px;border-left:3px solid var(--det)}
+
+.counter-zone{display:none;padding:4px 24px;flex-shrink:0;font-size:11px;background:var(--db);border-bottom:1px solid #BFDBFE}
+.counter-zone.on{display:block}
+
+.content-zone{flex:1;display:flex;overflow:hidden;position:relative}
+
+/* Detection Strip */
+.detection-strip{width:24px;flex-shrink:0;background:var(--bg);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;transition:width .3s cubic-bezier(0.34,1.56,0.64,1);z-index:55;cursor:pointer}
+.detection-strip:hover,.detection-strip.exp{width:280px}
+.strip-dots{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:12px 0;gap:12px}
+.detection-strip:hover .strip-dots,.detection-strip.exp .strip-dots{display:none}
+.summary-dot{width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background-color .3s}
+.summary-dot.red{background:var(--d)}.summary-dot.amber{background:var(--w)}.summary-dot.green{background:var(--s)}.summary-dot.detected{animation:detPulse 3s infinite}
+.summary-dot .sc{font-size:9px;font-weight:700;color:#fff;line-height:1}
+
+.strip-rows{display:none;padding:8px;flex-direction:column}
+.detection-strip:hover .strip-rows,.detection-strip.exp .strip-rows{display:flex}
+.strip-search{padding:4px 8px;border:1px solid var(--bd);border-radius:4px;font-size:11px;width:100%;margin-bottom:8px}
+.strip-gh{font-size:10px;font-weight:700;color:var(--t3);padding:8px 4px 2px}
+.strip-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;cursor:pointer;transition:background .12s;font-size:11px}
+.strip-row:hover{background:#e6f7ff}.strip-row.on{background:#e6f7ff;border:1px solid var(--p)}
+.sr-d{width:10px;height:10px;border-radius:50%;flex-shrink:0}.sr-d.red{background:var(--d)}.sr-d.amber{background:var(--w)}.sr-d.green{background:var(--s)}.sr-d.detected{animation:detPulse 3s infinite}
+.sr-n{flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr-s{font-family:var(--fm);font-weight:700;width:28px;text-align:right}
+.sr-o{font-size:10px;color:var(--t3);width:24px;text-align:center}
+
+/* Focus Area */
+.focus-area{flex:1;overflow-y:auto;padding:24px}
+.focus-card{background:var(--card);border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.08);padding:24px;max-width:900px;margin:0 auto;position:relative;transition:opacity .3s,filter .3s}
+.focus-card.detected{border:2px solid #BFDBFE;animation:detPulse 3s infinite}
+/* Ghost preview — dramatic */
+.focus-card.ghost{opacity:.45;filter:grayscale(30%) blur(.3px);border:2px dashed var(--p)}
+.ghost-banner{display:none;position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:var(--p);color:#fff;padding:4px 16px;border-radius:10px;font-size:12px;font-weight:700;z-index:10;animation:fadeIn .3s}
+.focus-card.ghost .ghost-banner{display:block}
+
+.focus-badge{display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;margin-bottom:8px}
+.focus-badge.detection{background:var(--det);color:#fff}
+.focus-title{font-size:22px;font-weight:700;margin-bottom:4px}
+.focus-score{font-size:48px;font-weight:700;font-family:var(--fm);line-height:1;transition:color .3s}
+.focus-score.green{color:var(--s)}.focus-score.amber{color:var(--w)}.focus-score.red{color:var(--d)}
+.focus-owner{font-size:14px;color:var(--t2);margin-top:4px}
+
+.tree{margin-top:16px}
+.tree-sec{border-left:3px solid var(--bd);padding-left:16px;margin-top:12px}.tree-sec.danger{border-left-color:var(--d)}.tree-sec.warn{border-left-color:var(--w)}.tree-sec.det{border-left-color:var(--det)}
+.tree-ttl{font-size:10px;font-weight:700;color:var(--t3);margin-bottom:4px;letter-spacing:.5px}
+.tree-body{font-size:13px;color:var(--t2);line-height:1.5}
+.ct{width:100%;border-collapse:collapse;font-size:12px;margin:4px 0}.ct th{text-align:left;font-weight:600;color:var(--t3);padding:4px 8px;border-bottom:2px solid var(--bd);font-size:10px}.ct td{padding:5px 8px;border-bottom:1px solid var(--bg)}.rh td{background:var(--dn)}.rm td{background:var(--wn)}
+.rn{padding:8px;border-radius:4px;font-size:12px;cursor:pointer;border:1px solid transparent;margin-top:4px;transition:all .15s}.rn:hover{border-color:var(--d);box-shadow:0 0 6px rgba(197,48,48,.15)}.rn .rt{font-weight:600;color:var(--d)}.rn.am .rt{color:var(--w)}
+
+.dissent{margin-top:16px}.dissent-hd{display:flex;justify-content:space-between;cursor:pointer;padding:4px 0;font-size:12px;font-weight:600;color:var(--t2)}.dissent-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}.dissent-list.closed{display:none}.dissent-card{padding:8px 12px;border-radius:8px;font-size:12px;border-left:3px solid var(--w);background:var(--wn)}.dissent-card .dr{font-weight:700;color:var(--w);margin-bottom:2px}.dissent-card .dt{color:var(--t2)}.dissent-card .ds{font-size:10px;color:var(--t3);margin-top:4px}
+
+.paths{margin-top:16px}.paths-ttl{font-size:13px;font-weight:700;color:var(--s);margin-bottom:8px}.path-card{padding:8px 12px;border-radius:8px;border:1px solid var(--bd);cursor:pointer;transition:all .15s;font-size:12px;margin-bottom:8px}.path-card:hover{border-color:var(--s)}.path-card.rec{border-color:var(--s);background:var(--ok)}.path-card .pname{font-weight:600}.path-card .peff{color:var(--s);font-weight:600}.path-actions{margin-top:8px;display:none}.path-actions.on{display:flex;gap:8px}
+.btn{padding:4px 12px;border-radius:4px;border:1px solid var(--bd);cursor:pointer;font-size:11px;background:var(--card);font-family:var(--f);transition:all .15s}.btn:hover{border-color:var(--p);color:var(--p)}.btn.apply{background:var(--s);color:#fff;border-color:var(--s)}.btn.apply:hover{background:#006d45}
+
+.matrix-area{flex:1;overflow-y:auto;padding:24px;display:none;align-items:center;justify-content:center}.matrix-area.on{display:flex}.matrix-grid{display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(5,1fr);gap:16px;max-width:1000px}
+.mdot{width:60px;height:60px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .3s;font-size:15px;font-weight:700;font-family:var(--fm);position:relative}.mdot:hover{transform:scale(1.2);z-index:10}.mdot.green{background:rgba(0,135,90,.12);color:var(--s);border:2px solid var(--s)}.mdot.amber{background:rgba(212,107,8,.10);color:var(--w);border:2px solid var(--w)}.mdot.red{background:rgba(197,48,48,.10);color:var(--d);border:2px solid var(--d)}.mdot.detected{animation:detPulse 3s infinite}.mdn{font-size:7px;font-weight:400;font-family:var(--f);color:var(--t3);margin-top:2px;text-align:center;line-height:1.1;max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.safety-zone{padding:8px 24px;border-top:1px solid var(--bd);flex-shrink:0;z-index:60;font-size:12px;background:var(--wn)}
+.safety-inner{display:flex;align-items:center;gap:12px}
+.safety-countdown{font-weight:700;color:var(--w);font-family:var(--fm);font-size:14px}
+.watermark{position:absolute;bottom:8px;right:12px;font-size:9px;color:var(--t3);opacity:.35;pointer-events:none}
+
+.toast-container{position:fixed;top:56px;right:24px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+.toast{padding:10px 16px;border-radius:4px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.12);animation:toastIn .3s ease-out}
+.toast.success{background:#f6ffed;border:1px solid #b7eb8f;color:#135200}.toast.info{background:#e6f7ff;border:1px solid #91d5ff;color:#003a8c}
+
+.cs{display:flex;align-items:center;gap:8px}.cs .sw{flex:1;height:20px;display:flex;align-items:center;position:relative;cursor:pointer}.cs .st{width:100%;height:8px;border-radius:4px;background:#e8e8e8;position:relative;overflow:visible}.cs .sf{position:absolute;top:0;left:0;height:100%;border-radius:inherit;background:linear-gradient(to right,#C53030,#D48806,#00875A);background-size:300% 100%;transition:width .05s linear;pointer-events:none}.cs .thumb{position:absolute;top:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#fff,#f5f5f5);border:3px solid #1890ff;box-shadow:0 2px 8px rgba(24,144,255,.2);cursor:grab;z-index:2}.cs .val{font-size:18px;font-weight:700;width:45px;text-align:center;flex-shrink:0;font-family:var(--fm)}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="header">
+  <div class="header-brand">🎯 SISYS · 战略承诺墙</div>
+  <div class="mode-toggle">
+    <button class="mode-btn on" id="btn-brief" onclick="setMode('briefing')">📋 简报</button>
+    <button class="mode-btn" id="btn-matrix" onclick="setMode('matrix')">🔮 矩阵</button>
+  </div>
+  <div class="header-right"><span>XX公司 2026 SP-BP</span><span>👤 张总</span></div>
+</div>
+<div class="slider-zone" id="sz">
+  <div class="slider-label-row">
+    <span class="slider-label" id="sl">🔵 国产化率目标</span>
+    <span class="slider-reason" id="sr">— 供应商达标签约率连续3月下降</span>
+    <span class="slider-dt" id="dt" onclick="toggleDrawer()">▾</span>
+  </div>
+  <div id="sc"></div>
+</div>
+<div class="param-drawer" id="drawer"><div class="drawer-inner" id="drawerIn"></div></div>
+<div class="counter-zone" id="cz"><div id="ci" style="display:flex;align-items:center;gap:12px;color:var(--t2)"></div></div>
+<div class="content-zone">
+  <div class="detection-strip" id="strip"></div>
+  <div class="focus-area" id="focus"></div>
+  <div class="matrix-area" id="matrix"></div>
+</div>
+<div class="safety-zone" id="safez"><div class="safety-inner" id="safezIn"></div></div>
+</div>
+<div class="toast-container" id="toasts"></div>
+<script>
+// === Utils ===
+function T(m,t){const c=document.getElementById('toasts'),e=document.createElement('div');e.className='toast '+(t||'info');e.textContent=m;c.appendChild(e);setTimeout(()=>{e.style.opacity='0';e.style.transition='opacity .3s';setTimeout(()=>e.remove(),300)},3000)}
+function C(v,min,max){return Math.max(min,Math.min(max,v))}
+function MR(v,imin,imax,omin,omax){return omin+(omax-omin)*((v-imin)/(imax-imin))}
+function TA(iso){const d=new Date(iso),n=new Date(),s=Math.floor((n-d)/1000);if(s<60)return'刚刚';if(s<3600)return Math.floor(s/60)+'分钟前';if(s<86400)return Math.floor(s/3600)+'小时前';return Math.floor(s/86400)+'天前'}
+
+// === Data ===
+const TH={g:70,a:40};
+function S2C(s){return s>=TH.g?'green':s>=TH.a?'amber':'red'}
+function S2L(s){return s>=TH.g?'稳定执行':s>=TH.a?'需关注':'恶化中'}
+
+const PD={localization:{name:'国产化率',tier:'环境',unit:'%',min:0,max:100,def:67,reason:'供应商达标签约率连续3月下降'},channel_cov:{name:'渠道覆盖率',tier:'战略',unit:'%',min:10,max:100,def:52},rd_invest:{name:'研发投入占比',tier:'执行',unit:'%',min:3,max:15,def:8.2},mkt_growth:{name:'市场增速',tier:'环境',unit:'%',min:0,max:25,def:10},talent_pool:{name:'人才市场热度',tier:'环境',unit:'分',min:0,max:100,def:60}};
+const PACT='localization';const PRESETS=['localization','channel_cov','rd_invest'];
+
+const SENS={
+revenue_growth:{localization:{b:84,s:-0.18,a:67},mkt_growth:{b:80,s:0.45,a:10}},
+market_share:{localization:{b:80,s:-0.06,a:67},mkt_growth:{b:78,s:0.55,a:10}},
+customer_retention:{localization:{b:91,s:0.02,a:67}},
+product_launch:{localization:{b:85,s:0.04,a:67},rd_invest:{b:84,s:0.35,a:8.2}},
+rd_invest_card:{localization:{b:76,s:0.10,a:67},rd_invest:{b:80,s:0.60,a:8.2}},
+supplier_local:{localization:{b:72,s:-0.80,a:67},channel_cov:{b:70,s:-0.45,a:52}},
+talent_acq:{localization:{b:88,s:0.05,a:67},talent_pool:{b:86,s:0.30,a:60}},
+cost_control:{localization:{b:92,s:-0.04,a:67}},
+compliance:{localization:{b:94,s:-0.12,a:67}},
+nps_satisfaction:{localization:{b:81,s:0.03,a:67}},
+channel_coverage:{localization:{b:68,s:-0.55,a:67},channel_cov:{b:72,s:0.60,a:52}},
+ebitda_margin:{localization:{b:74,s:0.08,a:67}},
+innovation_pipeline:{rd_invest:{b:72,s:0.40,a:8.2}},
+esg_compliance:{localization:{b:85,s:0.05,a:67}},
+talent_retention:{talent_pool:{b:88,s:0.28,a:60}},
+supply_chain_resilience:{localization:{b:92,s:-0.08,a:67}},
+talent_pipeline:{talent_pool:{b:88,s:0.30,a:60}},
+customer_success:{localization:{b:89,s:0.02,a:67}},
+digital_channel:{channel_cov:{b:83,s:0.50,a:52}},
+patent_filing:{rd_invest:{b:78,s:0.45,a:8.2}},
+tech_moat:{rd_invest:{b:79,s:0.50,a:8.2}},
+data_governance:{localization:{b:86,s:0.04,a:67}},
+process_maturity:{localization:{b:90,s:0.03,a:67}},
+supplier_diversity:{localization:{b:75,s:-0.20,a:67}},
+knowledge_assets:{talent_pool:{b:91,s:0.12,a:60}},
+digital_transformation:{rd_invest:{b:86,s:0.35,a:8.2}},
+partner_ecosystem:{channel_cov:{b:85,s:0.35,a:52}},
+brand_equity:{localization:{b:77,s:0.03,a:67}},
+};
+
+const CARDS=[
+{id:'revenue_growth',title:'营收增长目标',cat:'north-star',row:1,col:1,owner:'赵总',role:'CEO',ua:'2025-11-15T11:30:00',det:false,affects:['supplier_local','channel_coverage'],tree:{ta:'国产化率保持67%以上',cts:[{id:'C-2025-001',sup:'上海华信科技',amt:'¥4.2亿',risk:'mid'}],rns:[{role:'CEO',name:'赵总',impact:'年度营收KPI面临¥1.6亿缺口',sev:'high'}]},dissent:[{role:'CFO Agent',cf:82,text:'营收目标对国产化率敏感度可能被高估。Q2数据显示替代供应链可用，实际影响约¥8,000万。',src:'Q2供应链弹性评估报告'}],paths:[{name:'调整国产化率至45%',eff:'营收卡Score 82→86 回归绿色',cost:'零额外支出',time:'立即生效',tr:45}]},
+{id:'market_share',title:'市场份额',cat:'north-star',row:1,col:2,owner:'李明',role:'CMO',ua:'2025-11-14T09:00:00',det:false,affects:[],tree:{ta:'市场增速维持12%'},dissent:[],paths:[]},
+{id:'customer_retention',title:'客户留存率',cat:'north-star',row:1,col:3,owner:'王芳',role:'COO',ua:'2025-11-15T08:15:00',det:false,affects:[],tree:{ta:'服务质量保持行业领先'},dissent:[],paths:[]},
+{id:'product_launch',title:'产品上线里程碑',cat:'north-star',row:1,col:4,owner:'陈伟',role:'CTO',ua:'2025-11-13T14:00:00',det:false,affects:[],tree:{ta:'研发管线按计划推进'},dissent:[],paths:[]},
+{id:'rd_invest_card',title:'研发投入占比',cat:'capability',row:2,col:1,owner:'刘洋',role:'CTO',ua:'2025-11-15T10:00:00',det:false,affects:['product_launch'],tree:{ta:'研发预算占营收≥8%'},dissent:[],paths:[]},
+{id:'supplier_local',title:'供应商国产化达标率',cat:'capability',row:2,col:2,owner:'张总',role:'采购副总裁',ua:'2025-11-15T02:14:00',det:true,detInfo:{da:'2025-11-15T02:14:00',prob:'78%',su:'2025-11-17T02:14:00',ev:'鑫达贸易:月度出货量下降23%(9月)→续约谈判推迟(10月)→合同终止风险(11月)',ds:'ERP采购模块/合同管理系统'},affects:['channel_coverage','revenue_growth','cost_control'],tree:{os:{events:[{time:'2025年9月',event:'鑫达贸易月度出货量下降23%',st:'warning'},{time:'2025年10月',event:'续约谈判推迟(第2次)',st:'warning'},{time:'2025年11月',event:'⚠ 合同终止风险—当前状态',st:'danger'}],ds:'ERP采购模块/合同管理系统',alg:'连续3月下降+续约事件缺失→概率模型触发'},ta:'国产化率保持67%以上·"关键供应商中≥70%须为国产替代"→当前仅45%',cts:[{id:'C-2024-089',sup:'上海华信',amt:'¥1.2亿',ir:'95%',risk:'high'},{id:'C-2024-112',sup:'北京中科',amt:'¥8,500万',ir:'92%',risk:'high'},{id:'C-2024-156',sup:'深圳鹏程',amt:'¥4,200万',ir:'41%',risk:'mid'}],rns:[{role:'采购总监',name:'王立明',impact:'KPI不可达成·年终考核受影响',sev:'high'},{role:'Q1预算窗口',name:'',impact:'¥2.8亿采购预算需重分配',sev:'high'}]},dissent:[{role:'CFO Agent',cf:82,text:'鑫达贸易下降可能为临时性—其Q2出货量曾出现类似波动后恢复(+8%)。建议等待至12月数据确认。',src:'Q2出货量反弹数据'},{role:'COO Agent',cf:76,text:'上海华信虽非国产但其供应链韧性评分92/100,过往3年零断供。建议纳入战略合作白名单而非强制替代。',src:'华信3年交付记录'},{role:'CMO Agent',cf:68,text:'渠道覆盖下降可能与此直接相关—鑫达是华东区最大渠道伙伴。国产化压力下放弃鑫达将导致华东市场份额下降5-8%。',src:'渠道依赖度分析·华东区市场份额预测'}],paths:[{name:'⭐ 调整国产化率目标67%→45%',eff:'供应商卡Score 48→78回归绿色·3张合同变合规',cost:'零额外支出(仅目标调整)',time:'立即生效',tr:45},{name:'替换供应商上海华信→国产替代',eff:'供应商卡Score 48→72',cost:'¥1.2亿合同重新谈判·6个月过渡期',time:'6个月',tr:55},{name:'分阶段推进Q1→45% Q4→67%',eff:'短期缓解·长期达标',cost:'需额外供应商开发资源',time:'12个月分4阶段',tr:52}]},
+{id:'talent_acq',title:'人才引进计划',cat:'capability',row:2,col:3,owner:'孙静',role:'CHO',ua:'2025-11-15T07:00:00',det:false,affects:['rd_invest_card'],tree:{ta:'关键岗位招聘按计划推进'},dissent:[],paths:[]},
+{id:'cost_control',title:'成本控制目标',cat:'capability',row:2,col:4,owner:'周涛',role:'CFO',ua:'2025-11-14T16:00:00',det:false,affects:['ebitda_margin'],tree:{ta:'采购成本降幅≥5%'},dissent:[{role:'CFO Agent',cf:78,text:'成本控制对国产化率敏感度被低估。进口替代将推高短期采购成本8-12%,需要在Q1预算中预留缓冲。',src:'Q1采购预算模拟'}],paths:[{name:'预留¥5,000万成本缓冲',eff:'成本控制卡Score维持92',cost:'¥5,000万预算预留',time:'Q1',tr:60}]},
+{id:'compliance',title:'合规达标',cat:'health',row:3,col:1,owner:'吴强',role:'法务总监',ua:'2025-11-14T11:00:00',det:false,affects:[],tree:{ta:'法规遵从度100%'},dissent:[],paths:[]},
+{id:'nps_satisfaction',title:'客户满意度NPS',cat:'health',row:3,col:2,owner:'赵总',role:'CEO',ua:'2025-11-13T10:00:00',det:false,affects:[],tree:{ta:'NPS维持行业领先'},dissent:[],paths:[]},
+{id:'channel_coverage',title:'渠道覆盖',cat:'health',row:3,col:3,owner:'郑刚',role:'渠道总监',ua:'2025-11-15T06:00:00',det:false,affects:[],tree:{ta:'渠道覆盖率≥85%·数字化渠道占比≥60%',rns:[{role:'渠道总监',name:'郑刚',impact:'渠道覆盖KPI面临¥5,000万缺口',sev:'mid'}]},dissent:[{role:'CMO Agent',cf:74,text:'渠道覆盖下降与供应商国产化压力高度相关。鑫达贸易是华东区最大渠道伙伴,其流失将直接导致渠道覆盖降至60%以下。',src:'渠道伙伴出货量统计·Q3数据'}],paths:[{name:'调整国产化率至52%',eff:'渠道卡Score 52→67',cost:'零额外支出',time:'立即生效',tr:52}]},
+{id:'ebitda_margin',title:'EBITDA利润率',cat:'health',row:3,col:4,owner:'张总',role:'CEO',ua:'2025-11-12T09:00:00',det:false,affects:[],tree:{ta:'利润率维持行业基准'},dissent:[],paths:[]},
+{id:'innovation_pipeline',title:'创新孵化管道',cat:'innovation',row:4,col:1,owner:'陈伟',role:'CTO',ua:'2025-11-14T13:00:00',det:false,affects:[],tree:{ta:'创新项目按计划推进'},dissent:[],paths:[]},
+{id:'esg_compliance',title:'ESG达标',cat:'compliance',row:4,col:2,owner:'吴强',role:'法务总监',ua:'2025-11-13T15:00:00',det:false,affects:[],tree:{ta:'ESG评级不低于A'},dissent:[],paths:[]},
+{id:'talent_retention',title:'关键人才留存',cat:'capability',row:4,col:3,owner:'孙静',role:'CHO',ua:'2025-11-15T08:00:00',det:false,affects:[],tree:{ta:'关键人才流失率<5%'},dissent:[],paths:[]},
+{id:'supply_chain_resilience',title:'供应链韧性',cat:'capability',row:4,col:4,owner:'张总',role:'采购副总裁',ua:'2025-11-14T17:00:00',det:false,affects:[],tree:{ta:'供应链中断恢复时间<48h'},dissent:[],paths:[]},
+{id:'talent_pipeline',title:'人才梯队',cat:'capability',row:4,col:5,owner:'孙静',role:'CHO',ua:'2025-11-15T09:00:00',det:false,affects:[],tree:{ta:'关键岗位继任者就绪度≥80%'},dissent:[],paths:[]},
+{id:'customer_success',title:'客户成功健康度',cat:'health',row:5,col:1,owner:'赵总',role:'CEO',ua:'2025-11-14T10:00:00',det:false,affects:[],tree:{ta:'客户健康评分≥85'},dissent:[],paths:[]},
+{id:'digital_channel',title:'数字渠道转化率',cat:'health',row:5,col:2,owner:'郑刚',role:'渠道总监',ua:'2025-11-15T05:00:00',det:false,affects:[],tree:{ta:'数字化渠道占比≥60%'},dissent:[],paths:[]},
+{id:'patent_filing',title:'专利申报',cat:'innovation',row:5,col:3,owner:'陈伟',role:'CTO',ua:'2025-11-14T12:00:00',det:false,affects:[],tree:{ta:'年度专利申请≥15项'},dissent:[],paths:[]},
+{id:'tech_moat',title:'技术护城河',cat:'innovation',row:5,col:4,owner:'陈伟',role:'CTO',ua:'2025-11-14T14:00:00',det:false,affects:[],tree:{ta:'核心技术领先竞品≥18个月'},dissent:[],paths:[]},
+{id:'data_governance',title:'数据治理',cat:'compliance',row:5,col:5,owner:'刘洋',role:'CTO',ua:'2025-11-13T16:00:00',det:false,affects:[],tree:{ta:'数据质量标准达标率≥95%'},dissent:[],paths:[]},
+{id:'process_maturity',title:'流程成熟度',cat:'compliance',row:5,col:6,owner:'王芳',role:'COO',ua:'2025-11-13T11:00:00',det:false,affects:[],tree:{ta:'核心流程标准化率≥90%'},dissent:[],paths:[]},
+{id:'supplier_diversity',title:'供应商多样性',cat:'innovation',row:6,col:1,owner:'张总',role:'采购副总裁',ua:'2025-11-14T15:00:00',det:false,affects:[],tree:{ta:'供应商地域分布≥5省'},dissent:[],paths:[]},
+{id:'knowledge_assets',title:'知识资产',cat:'innovation',row:6,col:2,owner:'孙静',role:'CHO',ua:'2025-11-15T04:00:00',det:false,affects:[],tree:{ta:'知识管理系统覆盖率≥90%'},dissent:[],paths:[]},
+{id:'digital_transformation',title:'数字化转型进度',cat:'innovation',row:6,col:3,owner:'刘洋',role:'CTO',ua:'2025-11-14T08:00:00',det:false,affects:[],tree:{ta:'数字化成熟度L3→L4'},dissent:[],paths:[]},
+{id:'partner_ecosystem',title:'合作伙伴生态',cat:'ecosystem',row:6,col:4,owner:'赵总',role:'CEO',ua:'2025-11-13T09:00:00',det:false,affects:[],tree:{ta:'战略合作伙伴≥20家'},dissent:[],paths:[]},
+{id:'brand_equity',title:'品牌资产',cat:'ecosystem',row:6,col:5,owner:'李明',role:'CMO',ua:'2025-11-12T10:00:00',det:false,affects:[],tree:{ta:'品牌认知度行业前3'},dissent:[],paths:[]},
+];
+
+// === State ===
+let pv={},pid=PACT,sv=PD[PACT].def,focusId='supplier_local',mode='briefing',ghost=false,ghostRate=null,drawerOpen=false,tabActive='环境',previewIdx=null,_slider=null;
+
+(function initPV(){for(const[k,d]of Object.entries(PD))pv[k]=d.def;})();
+function calc(cid){const s=SENS[cid];if(!s)return 50;let sc=0,w=0;for(const[k,c]of Object.entries(s)){const v=pv[k]??PD[k]?.def??50;sc+=(c.b+(v-c.a)*c.s);w++;}return C(Math.round(sc/Math.max(w,1)),0,100);}
+function gs(cid){if(ghost&&ghostRate!==null){const sv=pv[pid];pv[pid]=ghostRate;const sc=calc(cid);pv[pid]=sv;return{score:sc,color:S2C(sc),label:S2L(sc)};}const sc=calc(cid);return{score:sc,color:S2C(sc),label:S2L(sc)};}
+function gc(){const c={red:0,amber:0,green:0,detected:0};for(const x of CARDS){const s=gs(x.id);c[s.color]++;if(x.det)c.detected++;}return c;}
+
+// === Slider ===
+function onSC(v){sv=v;pv[pid]=v;updateDots();updateFocusScore();}
+function onSR(v){sv=v;pv[pid]=v;updateDots();updateFocusScore();setTimeout(()=>renderAll(),50);}
+function buildSlider(){
+  const def=PD[pid];const c=document.getElementById('sc');
+  c.innerHTML='<div class="cs"><div class="sw" id="sw"><div class="st"><div class="sf" id="sf"></div></div><div class="thumb" id="thumb"></div></div><span class="val" id="sv"></span></div>';
+  const sf=c.querySelector('#sf'),thumb=c.querySelector('#thumb'),sw=c.querySelector('#sw'),svEl=c.querySelector('#sv');
+  let val=def.def,isDragging=false,vel=[],raf=null;
+  function setUI(v,a){
+    const p=MR(v,def.min,def.max,0,100);thumb.style.left=p+'%';
+    if(a)sf.style.width=p+'%';else{sf.style.transition='none';sf.style.width=p+'%';sf.offsetHeight;sf.style.transition='';}
+    svEl.textContent=v+def.unit;sf.style.backgroundPosition=(100-p)+'% center';
+  }
+  thumb.addEventListener('pointerdown',e=>{e.preventDefault();thumb.setPointerCapture(e.pointerId);isDragging=true;thumb.style.transform='translate(-50%,-50%) scale(1.35)';thumb.style.boxShadow='0 1px 4px rgba(24,144,255,.5),0 0 0 12px rgba(24,144,255,.12)'});
+  thumb.addEventListener('pointermove',e=>{if(!isDragging)return;const r=sw.getBoundingClientRect();const x=C(e.clientX,r.left,r.right);const p=(x-r.left)/r.width;const nv=Math.round((def.min+p*(def.max-def.min)));val=nv;setUI(nv,true);onSC(nv);});
+  thumb.addEventListener('pointerup',()=>{if(!isDragging)return;isDragging=false;thumb.style.transform='translate(-50%,-50%)';thumb.style.boxShadow='0 2px 8px rgba(24,144,255,.2)';onSR(val);});
+  sw.addEventListener('pointerdown',e=>{if(e.target===thumb)return;const r=sw.getBoundingClientRect();const p=(e.clientX-r.left)/r.width;val=Math.round((def.min+p*(def.max-def.min)));setUI(val,false);onSR(val);});
+  setUI(def.def,false);
+  return{setValue(v){val=C(Math.round(v),def.min,def.max);setUI(val,true);onSR(val);}};
+}
+
+// === Detection Strip ===
+function renderStrip(){
+  const s=document.getElementById('strip');
+  const cards=CARDS.map(c=>({...c,state:gs(c.id)}));
+  cards.sort((a,b)=>{if(a.state.color!==b.state.color)return a.state.color==='red'?-1:a.state.color==='amber'&&b.state.color==='green'?-1:1;return a.state.score-b.state.score;});
+  const counts=gc();
+  let rows='',lc='';
+  for(const c of cards){
+    if(c.state.color!==lc){const lb=c.state.color==='red'?'🔴 恶化中':c.state.color==='amber'?'🟡 需关注':'🟢 稳定执行';rows+=`<div class="strip-gh">${lb} (${counts[c.state.color]}项)</div>`;lc=c.state.color;}
+    const oi=c.owner.charAt(0)+(c.owner.length>1?c.owner.charAt(c.owner.length-1):'');
+    rows+=`<div class="strip-row${focusId===c.id?' on':''}" onclick="selectCard('${c.id}')"><span class="sr-d ${c.state.color}${c.det?' detected':''}"></span><span class="sr-n">${c.title}</span><span class="sr-s">${c.state.score}</span><span class="sr-o">${oi}</span>${c.det?'<span style="font-size:8px">🔵</span>':''}</div>`;
+  }
+  s.innerHTML=`<div class="strip-dots">
+    <div class="summary-dot red${counts.detected>0?' detected':''}" title="恶化中:${counts.red}项"><span class="sc">${counts.red}</span></div>
+    <div class="summary-dot amber" title="需关注:${counts.amber}项"><span class="sc">${counts.amber}</span></div>
+    <div class="summary-dot green" title="稳定执行:${counts.green}项"><span class="sc">${counts.green}</span></div>
+  </div><div class="strip-rows"><input class="strip-search" placeholder="🔍 搜索..." oninput="filterStrip(this.value)">${rows}</div>`;
+}
+function filterStrip(q){document.querySelectorAll('.strip-row').forEach(r=>{r.style.display=r.textContent.toLowerCase().includes(q.toLowerCase())?'flex':'none';});}
+function updateDots(){
+  const counts=gc();
+  const dots=document.querySelectorAll('.summary-dot');
+  if(dots.length<3)return;
+  dots[0].querySelector('.sc').textContent=counts.red;
+  dots[1].querySelector('.sc').textContent=counts.amber;
+  dots[2].querySelector('.sc').textContent=counts.green;
+  if(counts.detected>0)dots[0].classList.add('detected');else dots[0].classList.remove('detected');
+  updateCounter();
+}
+function updateFocusScore(){
+  if(mode!=='briefing')return;
+  const el=document.querySelector('.focus-score');if(!el)return;
+  const s=gs(focusId);el.textContent=s.score;el.className='focus-score '+s.color;
+}
+
+// === Focus Card ===
+function renderFocus(){
+  const a=document.getElementById('focus');
+  const c=CARDS.find(x=>x.id===focusId);if(!c)return;
+  const s=gs(c.id),tr=s.label,isD=c.det,isG=ghost,tree=c.tree;
+  const ti=getTrend(c.id);const tic=ti==='up'?'↗':ti==='down'?'↘':'→';
+  const scCls=s.color;
+  let h=`<div class="focus-card${isD?' detected':''}${isG?' ghost':''}" id="focusCard">`;
+  if(isG)h+=`<div class="ghost-banner">🔮 幽灵预览 — 滑块未移动 · 仅预览效果</div>`;
+  if(isD)h+=`<div class="focus-badge detection">🔵 系统检测 · ${TA(c.detInfo.da)} · ${c.detInfo.prob} 可能脱轨</div>`;
+  h+=`<div class="focus-title">${c.title}</div><div class="focus-score ${isG?'amber':scCls}">${s.score} <span>${tic}</span></div><div class="focus-owner">${c.role||c.owner} · ${tr}</div>`;
+  if(tree.os){h+=`<div class="tree-sec det"><div class="tree-ttl">OPERATIONAL SIGNAL</div><div class="tree-body">${tree.os.events.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:2px 0"><span style="font-size:10px;color:var(--t3)">${e.time}</span>${e.event}${e.st==='danger'?'<span style="font-size:10px;color:var(--d);font-weight:600">←当前</span>':''}</div>`).join('')}<div style="font-size:10px;color:var(--t3);margin-top:4px">数据源:${tree.os.ds}·算法:${tree.os.alg||''}</div></div></div>`;}
+  h+=`<div class="tree-sec"><div class="tree-ttl">TRIGGER ASSUMPTION</div><div class="tree-body">${tree.ta}</div></div>`;
+  if(tree.cts&&tree.cts.length>0){h+=`<div class="tree-sec ${tree.cts.some(x=>x.risk==='high')?'danger':'warn'}"><div class="tree-ttl">受影响的合同(${tree.cts.length})</div><table class="ct"><tr><th>合同</th><th>供应商</th><th>金额</th><th>${isD?'进口率':'风险'}</th></tr>${tree.cts.map(x=>`<tr class="${x.risk==='high'?'rh':x.risk==='mid'?'rm':''}"><td>${x.id}</td><td>${x.sup}</td><td>${x.amt}</td><td>${x.risk==='high'?'🔴高':x.risk==='mid'?'🟡中':'🟢低'}${x.ir?'·'+x.ir:''}</td></tr>`).join('')}</table></div>`;}
+  if(tree.rns&&tree.rns.length>0){h+=`<div class="tree-sec danger"><div class="tree-ttl">风险传导</div>${tree.rns.map(n=>`<div class="rn${n.sev==='mid'?' am':''}" onclick="onRiskClick('${c.id}')"><span class="rt">${n.sev==='high'?'🔴':'🟡'} ${n.role||n.name}</span>: ${n.impact}</div>`).join('')}</div>`;}
+  if(c.dissent&&c.dissent.length>0){h+=`<div class="dissent"><div class="dissent-hd" onclick="toggleDissent()">🤖 AI异议(${c.dissent.length})<span id="disToggle">▲收起</span></div><div class="dissent-list" id="disList">${c.dissent.map(d=>`<div class="dissent-card"><div class="dr">${d.role}<span style="font-size:10px;color:var(--t3)">(置信度:${d.cf}%)</span></div><div class="dt">${d.text}</div><div class="ds">📎 ${d.src}</div></div>`).join('')}</div></div>`;}
+  if(c.paths&&c.paths.length>0){h+=`<div class="paths"><div class="paths-ttl">🟢 Path Back to Green</div>${c.paths.map((p,i)=>`<div class="path-card${i===0?' rec':''}" onclick="previewPath(${i})"><div class="pname">${p.name}</div><div class="peff">效果:${p.eff}</div><div style="font-size:11px;color:var(--t3)">成本:${p.cost}·${p.time}</div></div>`).join('')}<div class="path-actions" id="pa"><button class="btn" onclick="cancelPreview()">←返回</button><button class="btn apply" onclick="applyPath()">确认应用此路径</button></div></div>`;}
+  h+=`<div class="watermark">🔶 模拟数据 · 更新于 ${TA(c.ua)}</div></div>`;
+  a.innerHTML=h;
+}
+function getTrend(cid){const cur=calc(cid);const sv=pv[pid];pv[pid]=C(sv-3,PD[pid].min,PD[pid].max);const prev=calc(cid);pv[pid]=sv;const d=cur-prev;return d>1?'up':d<-1?'down':'flat';}
+function toggleDissent(){const l=document.getElementById('disList'),t=document.getElementById('disToggle');if(!l||!t)return;l.classList.toggle('closed');t.textContent=l.classList.contains('closed')?'▶展开':'▲收起';}
+
+// === Ghost Preview ===
+function previewPath(idx){
+  const c=CARDS.find(x=>x.id===focusId);if(!c||!c.paths[idx])return;
+  const p=c.paths[idx];previewIdx=idx;
+  ghost=true;ghostRate=p.tr;
+  renderFocus();
+  document.getElementById('pa').classList.add('on');
+  T('🔮 幽灵预览: '+p.name+' · 滑块未移动','info');
+}
+function cancelPreview(){
+  ghost=false;ghostRate=null;previewIdx=null;
+  renderFocus();
+  document.getElementById('pa').classList.remove('on');
+}
+function applyPath(){
+  const c=CARDS.find(x=>x.id===focusId);if(!c||previewIdx===null)return;
+  const p=c.paths[previewIdx];
+  ghost=false;ghostRate=null;
+  sv=p.tr;pv[pid]=p.tr;
+  _slider.setValue(p.tr);
+  previewIdx=null;
+  if(c.det&&gs(c.id).color==='green')c.det=false;
+  renderAll();
+  T('✅ 路径已应用 · 滑块调整至 '+p.tr+'%','success');
+}
+function onRiskClick(cid){const c=CARDS.find(x=>x.id===cid);if(!c||!c.paths||!c.paths[0])return;previewPath(0);}
+
+// === Matrix ===
+function renderMatrix(){
+  const a=document.getElementById('matrix');let h='<div class="matrix-grid">';
+  for(let r=1;r<=5;r++)for(let cl=1;cl<=6;cl++){const c=CARDS.find(x=>x.row===r&&x.col===cl);if(!c){h+='<div></div>';continue;}const s=gs(c.id);h+=`<div class="mdot ${s.color}${c.det?' detected':''}" onclick="selectCard('${c.id}');setMode('briefing')">${s.score}<span class="mdn">${c.title}</span></div>`;}
+  h+='</div>';a.innerHTML=h;
+}
+
+// === Drawer ===
+function buildDrawer(){
+  const tiers=['环境','战略','执行','监控','风险','解码'];
+  document.getElementById('drawerIn').innerHTML=`
+    <div class="param-tabs">${tiers.map(t=>`<button class="param-tab${t===tabActive?' on':''}" onclick="tabActive='${t}';buildDrawer()">${t}</button>`).join('')}</div>
+    <div class="param-presets">${PRESETS.map(k=>{const d=PD[k];return`<div class="preset-card${k===pid?' on':''}" onclick="switchParam('${k}')"><div class="pn">⭐ ${d.name}</div><div class="pi">${d.tier}·当前${pv[k]}${d.unit}${k===pid?'·🔵激活':''}</div></div>`;}).join('')}</div>
+    <div class="param-list">${Object.entries(PD).filter(([k,d])=>d.tier===tabActive).map(([k,d])=>{const active=k===pid;return`<div class="param-row" style="${active?'background:#e6f7ff':''}"><span class="pn" style="width:80px;font-weight:500">${d.name}</span><span style="width:45px;text-align:right;font-family:var(--fm)">${pv[k]}${d.unit}</span><span style="font-size:10px;color:var(--t3)">对${Object.keys(SENS).filter(cid=>SENS[cid]?.[k]).length}张卡影响</span>${active?'<span style="font-size:10px;color:var(--p)">🔵当前</span>':''}</div>`;}).join('')}</div>
+    <div class="param-why"><strong>当前检测:</strong> 🔵 ${PD[pid].name} · ${PD[pid].reason||'无活跃检测'}<br><span style="font-size:10px">原因:此参数对supplier_local卡的敏感度最高(0.80)</span></div>`;
+}
+function toggleDrawer(){drawerOpen=!drawerOpen;document.getElementById('drawer').classList.toggle('open',drawerOpen);}
+function switchParam(k){pid=k;sv=pv[k];const d=PD[k];document.getElementById('sl').textContent=(d.reason?'🔵 ':'')+d.name+'目标';document.getElementById('sr').textContent=d.reason?'— '+d.reason:'';drawerOpen=false;document.getElementById('drawer').classList.remove('open');buildSlider();renderAll();T('已切换至 '+d.name,'info');}
+
+// === Counter + Safety ===
+function updateCounter(){const cz=document.getElementById('cz');const counts=gc();let n=counts.detected+counts.amber+counts.red;if(ghost)n++;if(n===0){cz.classList.remove('on');return;}cz.classList.add('on');let t='';if(counts.detected>0)t+=`🔵<strong>${counts.detected}项系统检测</strong>`;if(counts.amber>0)t+=`·🟡${counts.amber}项需关注`;if(counts.red>0)t+=`·<span style="color:var(--d)">${counts.red}项恶化中</span>`;if(ghost)t+=`·<span style="color:var(--p);font-weight:600">🔮幽灵预览·未保存</span>`;const dc=CARDS.find(c=>c.det);if(dc&&dc.detInfo){const rem=Math.max(0,Math.floor((new Date(dc.detInfo.su)-new Date())/3600000));t+=`·🕐响应窗口剩余${rem}h`;}document.getElementById('ci').innerHTML=t;}
+function updateSafety(){const dc=CARDS.find(c=>c.det);const el=document.getElementById('safezIn');if(!dc){el.innerHTML='<span style="color:var(--t3)">✅无静默检测项·系统监控运行中</span>';return;}const rem=Math.max(0,Math.floor((new Date(dc.detInfo.su)-new Date())/3600000));el.innerHTML=`<span>🔵</span><div style="flex:1"><strong>静默检测中—仅责任人及直线上级可见</strong><br><span style="font-size:11px;color:var(--t2)">${dc.title}·检测于${dc.detInfo.da}·责任人:${dc.owner}(${dc.role||''})·主管:赵总</span></div><span class="safety-countdown">剩余${rem}h</span><button class="btn" onclick="T('✅已确认知晓','info')">确认已知晓</button><button class="btn apply" onclick="previewPath(0);T('🟢已启动纠正措施','success')">发起纠正措施</button>`;}
+
+// === Render All ===
+function renderAll(){renderStrip();if(mode==='briefing')renderFocus();else renderMatrix();updateCounter();updateSafety();}
+function setMode(m){mode=m;document.getElementById('btn-brief').classList.toggle('on',m==='briefing');document.getElementById('btn-matrix').classList.toggle('on',m==='matrix');document.getElementById('focus').style.display=m==='briefing'?'block':'none';document.getElementById('matrix').style.display=m==='matrix'?'flex':'none';document.getElementById('matrix').classList.toggle('on',m==='matrix');renderAll();}
+function selectCard(cid){focusId=cid;if(mode==='matrix')setMode('briefing');renderAll();}
+
+// === Init ===
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('sl').textContent='🔵 '+PD[pid].name+'目标';
+  document.getElementById('sr').textContent='— '+PD[pid].reason;
+  _slider=buildSlider();
+  buildDrawer();
+  renderAll();
+  setInterval(updateSafety,30000);
+  T('🟢V3.2战略承诺墙已就绪·1焦点卡+检测条(3点汇总/全量展开)','success');
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(drawerOpen)toggleDrawer();if(ghost)cancelPreview();}});
+</script>
+</body>
+</html>
