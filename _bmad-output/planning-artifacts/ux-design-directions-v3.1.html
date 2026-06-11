@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SISYS V3.1 · 战略承诺墙</title>
+<style>
+/* ============================================================
+   CSS 设计 Token — 复用 V1，精简
+   ============================================================ */
+:root {
+  --color-primary:#1890ff; --color-primary-hover:#096dd9; --color-primary-active:#40a9ff; --color-primary-bg:#e6f7ff;
+  --color-success:#00875A; --color-warning:#B86E00; --color-danger:#C53030;
+  --color-score-red:#C53030; --color-score-amber:#D46B08; --color-score-green:#00875A;
+  --color-detection:#3B82F6; --color-detection-bg:#EFF6FF; --color-detection-border:#BFDBFE;
+  --color-signal-ok-bg:#E6F7F1; --color-signal-warn-bg:#FFF8E6; --color-signal-danger-bg:#FFF1F0;
+  --color-text-primary:#262626; --color-text-secondary:#595959; --color-text-tertiary:#8c8c8c; --color-text-disabled:#bfbfbf;
+  --color-bg-primary:#f5f5f5; --color-bg-card:#fff; --color-border:#e8e8e8; --color-white:#fff;
+  --font-family-base:'PingFang SC','Microsoft YaHei',sans-serif; --font-family-code:'Consolas','Monaco',monospace;
+  --spacing-xs:4px; --spacing-sm:8px; --spacing-md:16px; --spacing-lg:24px; --spacing-xl:32px;
+  --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.1); --shadow-md:0 4px 12px rgba(0,0,0,.08); --shadow-lg:0 8px 24px rgba(0,0,0,.12);
+  --slider-track-h:8px; --slider-touch-h:20px; --slider-thumb-size:28px;
+  --spring-bounce:cubic-bezier(0.34,1.56,0.64,1); --spring-settle:cubic-bezier(0.25,0.1,0.25,1);
+  --ripple-dur:0.6s;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font-family-base);background:var(--color-bg-primary);color:var(--color-text-primary);line-height:1.6;overflow-x:hidden}
+
+/* 关键帧 — 仅保留必需的 */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastIn{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
+@keyframes rippleOut{0%{transform:translate(-50%,-50%) scale(0);opacity:.4}100%{transform:translate(-50%,-50%) scale(3.5);opacity:0}}
+@keyframes thumbPulseNotch{0%{transform:translate(-50%,-50%) scale(1.3)}50%{transform:translate(-50%,-50%) scale(1.22)}100%{transform:translate(-50%,-50%) scale(1.3)}}
+@keyframes detectionPulse{0%,100%{box-shadow:0 0 0 rgba(59,130,246,0)}50%{box-shadow:0 0 12px rgba(59,130,246,.35)}}
+@keyframes floatUp{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes sliderPulse{0%,100%{box-shadow:0 0 0 rgba(24,144,255,0)}50%{box-shadow:0 0 16px rgba(24,144,255,.4)}}
+@keyframes ghostGlow{0%,100%{opacity:.35}50%{opacity:.55}}
+
+/* ============================================================
+   Zone 布局
+   ============================================================ */
+.app{max-width:1440px;margin:0 auto;display:flex;flex-direction:column;min-height:100vh;padding:0 var(--spacing-md)}
+
+/* Header Zone */
+.header{display:flex;justify-content:space-between;align-items:center;height:52px;padding:0 var(--spacing-sm);border-bottom:1px solid var(--color-border);flex-shrink:0}
+.header-brand{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.header-center{display:flex;align-items:center;gap:var(--spacing-md)}
+.header-right{display:flex;align-items:center;gap:var(--spacing-md);font-size:13px}
+.header-project{padding:3px 10px;border-radius:4px;border:1px solid var(--color-border);background:var(--color-bg-card);font-size:12px;font-family:var(--font-family-base);cursor:pointer;max-width:200px}
+.present-btn{padding:4px 10px;border-radius:4px;border:1px solid var(--color-border);background:var(--color-bg-card);cursor:pointer;font-size:11px;font-family:var(--font-family-base);transition:all .15s}
+.present-btn:hover{border-color:var(--color-primary);color:var(--color-primary)}
+.present-btn.active{background:var(--color-primary);color:white;border-color:var(--color-primary)}
+
+/* Slider Zone */
+.slider-zone{padding:var(--spacing-sm) var(--spacing-lg);flex-shrink:0;display:flex;align-items:center;gap:var(--spacing-md)}
+.slider-zone-label{font-size:13px;font-weight:600;color:var(--color-text-secondary);white-space:nowrap}
+.slider-zone-wrap{flex:1;max-width:600px}
+
+/* Counter Zone */
+.counter-zone{display:none;padding:0 var(--spacing-lg) var(--spacing-sm);flex-shrink:0}
+.counter-zone.visible{display:block;animation:fadeIn .2s ease-out}
+.counter-inner{display:flex;align-items:center;gap:var(--spacing-md);padding:var(--spacing-sm) var(--spacing-md);background:var(--color-detection-bg);border:1px solid var(--color-detection-border);border-radius:var(--radius-md);font-size:12px;color:var(--color-text-secondary)}
+.counter-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.counter-dot.detection{background:var(--color-detection)}
+.counter-dot.warning{background:var(--color-warning)}
+.counter-highlight{font-weight:700;color:var(--color-detection)}
+
+/* Card Grid Zone */
+.card-grid{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:var(--spacing-md);padding:var(--spacing-md) 0;align-content:start}
+.card-grid.presenting{grid-template-columns:1fr;grid-template-rows:1fr;max-width:900px;margin:0 auto;padding:var(--spacing-xl) 0}
+
+/* ============================================================
+   卡片样式
+   ============================================================ */
+.commitment-card{background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);padding:var(--spacing-md);cursor:pointer;transition:box-shadow .2s,transform .15s,grid-row-end .35s var(--spring-settle);position:relative;display:flex;flex-direction:column;gap:var(--spacing-xs);border:2px solid transparent;min-height:160px}
+.commitment-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.commitment-card:active{transform:scale(.99)}
+
+/* 颜色状态 */
+.commitment-card.green{border-color:transparent;background:linear-gradient(135deg,var(--color-bg-card),var(--color-signal-ok-bg))}
+.commitment-card.amber{border-color:rgba(212,107,8,.25);background:linear-gradient(135deg,var(--color-bg-card),var(--color-signal-warn-bg))}
+.commitment-card.red{border-color:rgba(197,48,48,.35);background:linear-gradient(135deg,var(--color-bg-card),var(--color-signal-danger-bg))}
+.commitment-card.detected{animation:detectionPulse 3s ease-in-out infinite;border-color:var(--color-detection-border)}
+
+/* 幽灵预览状态 */
+.commitment-card.ghost-green{background:linear-gradient(135deg,var(--color-bg-card),rgba(0,135,90,.12));border-color:rgba(0,135,90,.2)}
+.commitment-card.ghost-green .card-score,.commitment-card.ghost-green .card-title{opacity:.55}
+.commitment-card.ghost-amber{background:linear-gradient(135deg,var(--color-bg-card),rgba(212,107,8,.08));border-color:rgba(212,107,8,.15)}
+.commitment-card.ghost-amber .card-score,.commitment-card.ghost-amber .card-title{opacity:.55}
+
+/* 展开状态 */
+.commitment-card.expanded{grid-row-end:span 2;cursor:default;box-shadow:var(--shadow-lg);z-index:10;min-height:480px}
+.commitment-card.expanded:hover{transform:none}
+
+/* 演示模式卡片 */
+.presenting .commitment-card{min-height:70vh;padding:var(--spacing-xl) var(--spacing-2xl);font-size:1.2em}
+
+/* 卡片内部元素 */
+.card-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--spacing-sm)}
+.card-title{font-size:14px;font-weight:600;flex:1;line-height:1.3}
+.card-badges{display:flex;gap:4px;flex-shrink:0}
+.card-lifecycle{font-size:9px;padding:1px 6px;border-radius:8px;font-weight:500;white-space:nowrap}
+.card-lifecycle.stable{background:var(--color-signal-ok-bg);color:var(--color-success)}
+.card-lifecycle.attention{background:var(--color-signal-warn-bg);color:var(--color-warning)}
+.card-lifecycle.deteriorating{background:var(--color-signal-danger-bg);color:var(--color-danger)}
+.card-lifecycle.forming{background:#f0f5ff;color:var(--color-primary)}
+
+.card-score-row{display:flex;align-items:baseline;gap:var(--spacing-sm)}
+.card-score{font-size:32px;font-weight:700;font-family:var(--font-family-code);line-height:1}
+.card-score.green{color:var(--color-success)}
+.card-score.amber{color:var(--color-score-amber)}
+.card-score.red{color:var(--color-danger)}
+.card-trend{font-size:18px;font-weight:700}
+.card-trend.up{color:var(--color-success)}
+.card-trend.flat{color:var(--color-text-tertiary)}
+.card-trend.down{color:var(--color-danger)}
+
+.card-owner{font-size:11px;color:var(--color-text-tertiary)}
+.card-updated{font-size:10px;color:var(--color-text-disabled)}
+
+/* 自动检测徽章 */
+.detection-badge{position:absolute;top:-8px;right:12px;background:var(--color-detection);color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(59,130,246,.3);white-space:nowrap}
+.detection-badge.hidden{display:none}
+
+/* 卡片内 sparkline 区域 */
+.card-spark{display:flex;align-items:flex-end;gap:2px;height:20px;margin-top:auto}
+.spark-dot{width:4px;border-radius:2px;background:var(--color-border)}
+.spark-dot.rising{background:var(--color-success)}
+.spark-dot.falling{background:var(--color-danger)}
+
+/* ============================================================
+   卡片展开 — 后果树
+   ============================================================ */
+.expanded-content{display:none;flex-direction:column;gap:var(--spacing-md);margin-top:var(--spacing-md);padding-top:var(--spacing-md);border-top:1px solid var(--color-border)}
+.commitment-card.expanded .expanded-content{display:flex;animation:fadeIn .25s ease-out}
+
+.tree-section{border-left:3px solid var(--color-border);padding-left:var(--spacing-md)}
+.tree-section.danger{border-left-color:var(--color-danger)}
+.tree-section.warning{border-left-color:var(--color-warning)}
+.tree-section.detection{border-left-color:var(--color-detection)}
+.tree-section-title{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--color-text-tertiary);margin-bottom:var(--spacing-xs);letter-spacing:.5px}
+.tree-section-body{font-size:13px;color:var(--color-text-secondary);line-height:1.5}
+
+/* 合同表格 */
+.contract-table{width:100%;border-collapse:collapse;font-size:12px;margin:var(--spacing-xs) 0}
+.contract-table th{text-align:left;font-weight:600;color:var(--color-text-tertiary);padding:4px 8px;border-bottom:2px solid var(--color-border);font-size:10px}
+.contract-table td{padding:6px 8px;border-bottom:1px solid var(--color-bg-primary)}
+.contract-table tr.risk-high td{background:var(--color-signal-danger-bg)}
+.contract-table tr.risk-mid td{background:var(--color-signal-warn-bg)}
+.contract-status{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.contract-status.high{background:var(--color-danger)}
+.contract-status.mid{background:var(--color-warning)}
+
+/* 风险传导节点 */
+.risk-node{padding:var(--spacing-sm);background:var(--color-signal-danger-bg);border-radius:var(--radius-sm);font-size:12px;cursor:pointer;transition:all .15s;border:1px solid transparent}
+.risk-node:hover{border-color:var(--color-danger);box-shadow:0 0 6px rgba(197,48,48,.15)}
+.risk-node .risk-target{font-weight:600;color:var(--color-danger)}
+
+/* ============================================================
+   AI Dissent 区
+   ============================================================ */
+.dissent-section{margin-top:var(--spacing-sm)}
+.dissent-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:var(--spacing-xs) 0;font-size:12px;font-weight:600;color:var(--color-text-secondary)}
+.dissent-header:hover{color:var(--color-primary)}
+.dissent-list{display:flex;flex-direction:column;gap:var(--spacing-sm);margin-top:var(--spacing-sm)}
+.dissent-list.collapsed{display:none}
+.dissent-card{padding:var(--spacing-sm) var(--spacing-md);border-radius:var(--radius-md);font-size:12px;border-left:3px solid var(--color-warning);background:var(--color-signal-warn-bg);animation:floatUp .2s ease-out}
+.dissent-card .dissent-role{font-weight:700;color:var(--color-warning);margin-bottom:2px}
+.dissent-card .dissent-text{color:var(--color-text-secondary);line-height:1.5}
+.dissent-card .dissent-source{font-size:10px;color:var(--color-text-tertiary);margin-top:4px}
+.dissent-card .dissent-confidence{font-size:10px;color:var(--color-text-tertiary)}
+
+/* ============================================================
+   Path Back to Green
+   ============================================================ */
+.path-section{margin-top:var(--spacing-sm)}
+.path-section-title{font-size:12px;font-weight:700;color:var(--color-success);margin-bottom:var(--spacing-sm)}
+.path-list{display:flex;flex-direction:column;gap:var(--spacing-sm)}
+.path-card{padding:var(--spacing-sm) var(--spacing-md);border-radius:var(--radius-md);border:1px solid var(--color-border);cursor:pointer;transition:all .15s;font-size:12px}
+.path-card:hover{border-color:var(--color-success);box-shadow:0 0 6px rgba(0,135,90,.1)}
+.path-card.recommended{border-color:var(--color-success);background:var(--color-signal-ok-bg)}
+.path-card .path-name{font-weight:600;color:var(--color-text-primary)}
+.path-card .path-effect{color:var(--color-success);font-weight:600}
+.path-card .path-cost{color:var(--color-text-tertiary);font-size:11px}
+.path-card .path-timeline{font-size:10px;color:var(--color-text-disabled)}
+.path-card.ghost-previewing{border-color:var(--color-primary);box-shadow:0 0 10px rgba(24,144,255,.2)}
+.path-actions{margin-top:var(--spacing-sm);display:flex;gap:var(--spacing-sm)}
+.path-btn{padding:4px 12px;border-radius:var(--radius-sm);border:1px solid var(--color-border);cursor:pointer;font-size:11px;font-family:var(--font-family-base);background:var(--color-bg-card);transition:all .15s}
+.path-btn:hover{border-color:var(--color-primary);color:var(--color-primary)}
+.path-btn.apply{background:var(--color-success);color:white;border-color:var(--color-success)}
+.path-btn.apply:hover{background:#006d45}
+
+/* ============================================================
+   双向传染 — 滑块脉冲 + 反向分析
+   ============================================================ */
+.slider-pulse-hint{position:absolute;top:-28px;transform:translateX(-50%);font-size:11px;color:var(--color-primary);font-weight:600;white-space:nowrap;pointer-events:none;animation:fadeIn .3s ease-out}
+.reverse-analysis{padding:var(--spacing-sm);background:#f0f8ff;border-radius:var(--radius-sm);font-size:12px;margin-top:var(--spacing-sm);border-left:3px solid var(--color-primary)}
+
+/* ============================================================
+   图例 Zone
+   ============================================================ */
+.legend-zone{display:flex;align-items:center;gap:var(--spacing-lg);padding:var(--spacing-sm) var(--spacing-lg);border-top:1px solid var(--color-border);font-size:11px;color:var(--color-text-tertiary);flex-shrink:0}
+.legend-item{display:flex;align-items:center;gap:4px}
+.legend-dot{width:10px;height:10px;border-radius:50%}
+.legend-dot.green{background:var(--color-success)}
+.legend-dot.amber{background:var(--color-score-amber)}
+.legend-dot.red{background:var(--color-danger)}
+.legend-dot.blue{background:var(--color-detection)}
+
+/* ============================================================
+   政治安全 Zone
+   ============================================================ */
+.safety-zone{padding:var(--spacing-sm) var(--spacing-lg);border-top:1px solid var(--color-border);flex-shrink:0;font-size:12px}
+.safety-inner{display:flex;align-items:center;gap:var(--spacing-md);padding:var(--spacing-sm) var(--spacing-md);background:var(--color-signal-warn-bg);border-radius:var(--radius-md);border:1px dashed var(--color-warning)}
+.safety-icon{font-size:16px}
+.safety-info{flex:1}
+.safety-title{font-weight:600;color:var(--color-warning)}
+.safety-detail{font-size:11px;color:var(--color-text-secondary)}
+.safety-countdown{font-weight:700;color:var(--color-warning);font-family:var(--font-family-code)}
+.safety-actions{display:flex;gap:var(--spacing-sm)}
+.safety-btn{padding:3px 10px;border-radius:var(--radius-sm);border:1px solid var(--color-border);cursor:pointer;font-size:11px;font-family:var(--font-family-base);background:var(--color-bg-card);transition:all .15s}
+.safety-btn:hover{border-color:var(--color-warning)}
+.safety-btn.primary{background:var(--color-warning);color:white;border-color:var(--color-warning)}
+
+/* ============================================================
+   演示模式
+   ============================================================ */
+.present-nav{display:none;justify-content:center;align-items:center;gap:var(--spacing-lg);padding:var(--spacing-md)}
+.present-nav.visible{display:flex}
+.present-nav-arrow{font-size:24px;cursor:pointer;color:var(--color-text-tertiary);padding:var(--spacing-sm);border-radius:50%;transition:all .15s;user-select:none}
+.present-nav-arrow:hover{color:var(--color-primary);background:var(--color-primary-bg)}
+.present-nav-info{font-size:14px;color:var(--color-text-secondary);font-weight:500}
+body.presenting .slider-zone{display:none}
+body.presenting .legend-zone{display:none}
+body.presenting .counter-zone{display:block}
+
+/* ============================================================
+   Toast
+   ============================================================ */
+.toast-container{position:fixed;top:64px;right:var(--spacing-lg);z-index:3000;display:flex;flex-direction:column;gap:var(--spacing-sm)}
+.toast{padding:10px 16px;border-radius:var(--radius-sm);font-size:13px;box-shadow:var(--shadow-lg);animation:toastIn .3s ease-out;display:flex;align-items:center;gap:var(--spacing-sm);max-width:360px}
+.toast.success{background:#f6ffed;border:1px solid #b7eb8f;color:#135200}
+.toast.warning{background:#fffbe6;border:1px solid #ffe58f;color:#874d00}
+.toast.info{background:var(--color-primary-bg);border:1px solid #91d5ff;color:#003a8c}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <!-- Header Zone -->
+  <div class="header">
+    <div class="header-brand">🎯 SISYS · 战略承诺墙</div>
+    <div class="header-center">
+      <select class="header-project" id="navProject" onchange="showToast('已切换项目','info')">
+        <option>XX公司 2026 SP-BP</option>
+        <option>YY医疗 2025 战略复盘</option>
+      </select>
+    </div>
+    <div class="header-right">
+      <button class="present-btn" id="presentBtn" onclick="togglePresentMode()">🎥 演示模式</button>
+      <span>👤 赵总</span>
+    </div>
+  </div>
+
+  <!-- Slider Zone -->
+  <div class="slider-zone" id="sliderZone">
+    <span class="slider-zone-label">国产化率目标</span>
+    <div class="slider-zone-wrap" id="sliderContainer"></div>
+  </div>
+
+  <!-- Counter Zone -->
+  <div class="counter-zone" id="counterZone">
+    <div class="counter-inner" id="counterInner"></div>
+  </div>
+
+  <!-- Card Grid Zone -->
+  <div class="card-grid" id="cardGrid"></div>
+
+  <!-- Present Nav -->
+  <div class="present-nav" id="presentNav">
+    <span class="present-nav-arrow" onclick="presentPrev()">◀</span>
+    <span class="present-nav-info" id="presentInfo">1 / 12</span>
+    <span class="present-nav-arrow" onclick="presentNext()">▶</span>
+  </div>
+
+  <!-- Legend Zone -->
+  <div class="legend-zone" id="legendZone">
+    <span style="font-weight:600;">图例:</span>
+    <span class="legend-item"><span class="legend-dot green"></span> 绿色 ≥70</span>
+    <span class="legend-item"><span class="legend-dot amber"></span> 琥珀 40-69</span>
+    <span class="legend-item"><span class="legend-dot red"></span> 红色 &lt;40</span>
+    <span class="legend-item"><span class="legend-dot blue"></span> 🔵 系统检测</span>
+    <span style="margin-left:auto;">↗改善 →持平 ↘恶化</span>
+  </div>
+
+  <!-- Political Safety Zone -->
+  <div class="safety-zone" id="safetyZone">
+    <div class="safety-inner" id="safetyInner"></div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ============================================================
+// 工具函数 — 复用 V1
+// ============================================================
+function showToast(m,t){var ct=document.getElementById('toastContainer'),to=document.createElement('div');to.className='toast '+(t||'info');to.textContent=m;ct.appendChild(to);setTimeout(function(){to.style.opacity='0';to.style.transition='opacity .3s';setTimeout(function(){to.remove();},300);},3000)}
+function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+function mapRange(v,inMin,inMax,outMin,outMax){return outMin+(outMax-outMin)*((v-inMin)/(inMax-inMin))}
+
+// ============================================================
+// SliderPhysics — 完整复用 V1
+// ============================================================
+class SliderPhysics{constructor(container,opts){this.container=container;this.min=opts.min??0;this.max=opts.max??100;this.value=opts.value??50;this.step=opts.step??1;this.notches=opts.notches||[];this.onChange=opts.onChange||(()=>{});this.onRelease=opts.onRelease||(()=>{});this.formatValue=opts.formatValue||(v=>v);this.reverseGradient=opts.reverseGradient||false;this.valueSuffix=opts.valueSuffix||'';this.warnBelow=opts.warnBelow;this.dangerBelow=opts.dangerBelow;this._label=opts.label||container.dataset.label||'';this.isDragging=false;this.prevNotchIdx=-1;this._velTracker=[];this._inertiaRAF=null;this._build();this._bindEvents()}
+_build(){const c=this.container;c.classList.add('custom-slider');c.style.cssText='display:flex;align-items:center;gap:8px;user-select:none;touch-action:none';c.innerHTML='<div class="slider-track-wrap" style="flex:1;height:20px;display:flex;align-items:center;position:relative;cursor:pointer"><div class="slider-track" style="width:100%;height:8px;border-radius:4px;background:#e8e8e8;position:relative;overflow:visible"><div class="slider-track-bg'+(this.reverseGradient?' reverse':'')+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:inherit;background:linear-gradient(to right,#C53030 0%,#D48806 50%,#00875A 100%);opacity:.18;pointer-events:none"></div><div class="slider-fill'+(this.reverseGradient?' reverse':'')+'" style="position:absolute;top:0;left:0;height:100%;border-radius:inherit;background:linear-gradient(to right,#C53030,#D48806,#00875A);background-size:300% 100%;transition:width .05s linear,background-position .3s ease;pointer-events:none"></div><div class="slider-notches" style="position:absolute;top:50%;left:0;width:100%;height:100%;pointer-events:none">'+this.notches.map((n,i)=>'<span class="slider-notch'+(n.aiRec?' ai-rec':'')+'" style="position:absolute;top:50%;transform:translate(-50%,-50%);width:'+(n.aiRec?'8px;height:8px;background:#1890ff;border-radius:50%;box-shadow:0 0 4px rgba(24,144,255,.4)':'2px;height:10px;background:rgba(0,0,0,.15);border-radius:1px')+';left:'+mapRange(n.value,this.min,this.max,0,100)+'%"></span>').join('')+'</div><div class="slider-thumb" style="position:absolute;top:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#fff,#f5f5f5);border:3px solid #1890ff;box-shadow:0 2px 8px rgba(24,144,255,.2);cursor:grab;z-index:2;transition:transform .15s ease-out,box-shadow .15s ease-out"><div class="slider-ripple" style="position:absolute;top:50%;left:50%;width:60px;height:60px;border-radius:50%;background:rgba(24,144,255,.12);transform:translate(-50%,-50%) scale(0);pointer-events:none;opacity:0"></div></div></div></div><span class="slider-value" style="font-size:18px;font-weight:700;width:50px;text-align:center;flex-shrink:0;font-family:Consolas,Monaco,monospace;transition:color .3s"></span>';this.thumb=c.querySelector('.slider-thumb');this.trackWrap=c.querySelector('.slider-track-wrap');this.track=c.querySelector('.slider-track');this.fill=c.querySelector('.slider-fill');this.ripple=c.querySelector('.slider-ripple');this.valueEl=c.querySelector('.slider-value');this._setValueUI(this.value,false)}
+_bindEvents(){this.thumb.addEventListener('pointerdown',e=>{e.preventDefault();this.thumb.setPointerCapture(e.pointerId);this.isDragging=true;this.thumb.classList.add('active');this.thumb.style.transform='translate(-50%,-50%) scale(1.35)';this.thumb.style.boxShadow='0 1px 4px rgba(24,144,255,.5),0 0 0 12px rgba(24,144,255,.12)'});this.thumb.addEventListener('pointermove',e=>{if(!this.isDragging)return;const rect=this.track.getBoundingClientRect();const x=clamp(e.clientX,rect.left,rect.right);const pct=(x-rect.left)/rect.width;const now=performance.now();this._velTracker.push({time:now,x:x});if(this._velTracker.length>5)this._velTracker.shift();this.value=this._snapToStep(this.min+pct*(this.max-this.min));this._setValueUI(this.value,true);this._checkNotchPulse();this.onChange(this.value)});this.thumb.addEventListener('pointerup',e=>{if(!this.isDragging)return;this.isDragging=false;this.thumb.style.transform='translate(-50%,-50%)';this.thumb.style.boxShadow='0 2px 8px rgba(24,144,255,.2)';this._startInertiaOrSnap()});this.trackWrap.addEventListener('pointerdown',e=>{if(e.target===this.thumb)return;const rect=this.track.getBoundingClientRect();const pct=(e.clientX-rect.left)/rect.width;this.value=this._snapToStep(this.min+pct*(this.max-this.min));this._setValueUI(this.value,false);this.thumb.classList.add('active');this.thumb.style.transform='translate(-50%,-50%) scale(1.35)';setTimeout(()=>{this.thumb.style.transform='translate(-50%,-50%)';this.thumb.style.boxShadow='0 2px 8px rgba(24,144,255,.2)';this._doSnapAndRipple()},80);this.onChange(this.value)});this.thumb.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){e.preventDefault();this.value=clamp(this.value+this.step,this.min,this.max);this._setValueUI(this.value,true);this.onChange(this.value);this._doSnapAndRipple()}if(e.key==='ArrowLeft'){e.preventDefault();this.value=clamp(this.value-this.step,this.min,this.max);this._setValueUI(this.value,true);this.onChange(this.value);this._doSnapAndRipple()}});this.thumb.setAttribute('tabindex','0')}
+_setValueUI(v,animateFill){const pct=mapRange(v,this.min,this.max,0,100);this.thumb.style.left=pct+'%';if(animateFill)this.fill.style.width=pct+'%';else{this.fill.style.transition='none';this.fill.style.width=pct+'%';this.fill.offsetHeight;this.fill.style.transition='';this.fill.style.width=pct+'%'}this.valueEl.textContent=this.formatValue(v)+this.valueSuffix;this.fill.style.backgroundPosition=(100-pct)+'% center'}
+_snapToStep(v){return Math.round(v/this.step)*this.step}
+_startInertiaOrSnap(){if(this._velTracker.length<2){this._doSnapAndRipple();return}const first=this._velTracker[0],last=this._velTracker[this._velTracker.length-1];const dt=(last.time-first.time)/1000;if(dt<=0){this._doSnapAndRipple();return}const vx=(last.x-first.x)/dt;const trackW=this.track.getBoundingClientRect().width;const vNorm=vx/trackW;if(Math.abs(vNorm)<0.12){this._doSnapAndRipple();return}const momentum=vNorm*(this.max-this.min)*0.3;this._velTracker=[];this._applyInertia(momentum)}
+_applyInertia(momentum){if(this._inertiaRAF)cancelAnimationFrame(this._inertiaRAF);const decay=0.94;const minMomentum=0.3;const step=()=>{if(this.isDragging){this._inertiaRAF=null;return}if(Math.abs(momentum)<minMomentum){this._inertiaRAF=null;this._doSnapAndRipple();return}this.value=this._snapToStep(clamp(this.value+momentum,this.min,this.max));this._setValueUI(this.value,true);this._checkNotchPulse();this.onChange(this.value);momentum*=decay;this._inertiaRAF=requestAnimationFrame(step)};this._inertiaRAF=requestAnimationFrame(step)}
+_doSnapAndRipple(){let snapTarget=this.value;const snapRange=(this.max-this.min)*0.03;let closestNotch=null,closestDist=Infinity;for(const n of this.notches){const d=Math.abs(this.value-n.value);if(d<snapRange&&d<closestDist){closestDist=d;closestNotch=n}}if(closestNotch){snapTarget=closestNotch.value}if(snapTarget!==this.value){this.value=snapTarget;this._setValueUI(this.value,false)}this.ripple.classList.remove('trigger');void this.ripple.offsetWidth;this.ripple.classList.add('trigger');this.ripple.style.animation='rippleOut .6s cubic-bezier(0.25,0.1,0.25,1) forwards';this.onRelease(this.value)}
+_checkNotchPulse(){for(let i=0;i<this.notches.length;i++){const nPct=mapRange(this.notches[i].value,this.min,this.max,0,100);const tPct=mapRange(this.value,this.min,this.max,0,100);if(Math.abs(tPct-nPct)<2&&this.prevNotchIdx!==i){this.thumb.style.animation='thumbPulseNotch .08s ease-out';setTimeout(()=>this.thumb.style.animation='',80);this.prevNotchIdx=i;break}if(Math.abs(tPct-nPct)>=3&&this.prevNotchIdx===i)this.prevNotchIdx=-1}}
+setValue(v,animate){this.value=this._snapToStep(clamp(v,this.min,this.max));this._setValueUI(this.value,animate!==false);this.onChange(this.value)}}
+
+// ============================================================
+// 数据模型 — 12 张战略承诺卡片
+// ============================================================
+const SCORE_THRESHOLDS = {green:70, amber:40}; // >=70 green, 40-69 amber, <40 red
+function scoreToColor(s){return s>=SCORE_THRESHOLDS.green?'green':s>=SCORE_THRESHOLDS.amber?'amber':'red'}
+function scoreToLabel(s){return s>=SCORE_THRESHOLDS.green?'稳定执行':s>=SCORE_THRESHOLDS.amber?'需关注':'恶化中'}
+
+// 评分公式: 滑块位置 → 各卡片分数 (线性模型)
+function calcAllScores(locRate){
+  // locRate = 国产化率 0-100
+  // 各卡片基准分 + 国产化率敏感度
+  const sensitivity = {
+    revenue_growth:     {base:84, sens:-0.18},
+    market_share:       {base:80, sens:-0.06},
+    customer_retention: {base:91, sens:0.02},
+    product_launch:     {base:85, sens:0.04},
+    rd_invest:          {base:76, sens:0.10},
+    supplier_local:     {base:72, sens:-0.80},
+    talent_acq:         {base:88, sens:0.05},
+    cost_control:       {base:92, sens:-0.04},
+    compliance:         {base:94, sens:-0.12},
+    nps_satisfaction:   {base:81, sens:0.03},
+    channel_coverage:   {base:68, sens:-0.55},
+    ebitda_margin:      {base:74, sens:0.08}
+  };
+  const scores = {};
+  for(const [id, s] of Object.entries(sensitivity)){
+    scores[id] = clamp(Math.round(s.base + (locRate - 67) * s.sens), 0, 100);
+  }
+  return scores;
+}
+
+const COMMITMENT_DEFS = [
+  // Row 1 - 北极星
+  {id:'revenue_growth',title:'营收增长目标',category:'north-star',row:1,col:1,owner:'赵总',ownerTitle:'CEO',affects:['supplier_local','channel_coverage'],hasDetection:false,consequenceTree:{triggerAssumption:'国产化率保持67%以上 · 华东区采购政策',contracts:[{id:'C-2025-001',supplier:'上海华信科技',amount:'¥4.2亿',risk:'mid'},{id:'C-2025-002',supplier:'北京中科精密',amount:'¥2.8亿',risk:'low'}],suppliers:[{name:'上海华信科技',revenueShare:'18%',relationship:'12年合作',risk:'mid'},{name:'北京中科精密',revenueShare:'11%',relationship:'8年合作',risk:'low'}],riskNodes:[{target:'赵总 · CEO',impact:'年度营收KPI面临¥1.6亿缺口',severity:'high'},{target:'董事会',impact:'Q4战略目标需重新审视',severity:'mid'}]},aiDissent:[{role:'CFO Agent',confidence:82,text:'营收目标对国产化率的敏感度可能被高估。Q2数据显示华东区有3条替代供应链可用，实际影响约¥8,000万而非¥1.6亿。',source:'Q2供应链弹性评估报告'},{role:'COO Agent',confidence:76,text:'上海华信虽非国产但其交付可靠度99.2%。建议将其纳入战略合作白名单而非强制替换。',source:'华信3年交付记录'}],pathsToGreen:[{name:'调整国产化率目标至45%',effect:'营收卡Score 82→86, 预算缺口消除',cost:'零额外支出',timeline:'立即生效',targetRate:45},{name:'启动替代供应链(方案B)',effect:'营收卡维持82, 供应链韧性提升',cost:'¥8,000万过渡成本',timeline:'6个月',targetRate:55},{name:'分阶段: Q1 45% → Q4 67%',effect:'短期稳定, 长期达标',cost:'需额外供应商开发资源',timeline:'12个月',targetRate:52}]},
+  {id:'market_share',title:'市场份额',category:'north-star',row:1,col:2,owner:'李明',ownerTitle:'CMO',affects:[],hasDetection:false,consequenceTree:{triggerAssumption:'市场增速维持12% · 华东区为主要贡献',contracts:[],suppliers:[],riskNodes:[]},aiDissent:[],pathsToGreen:[]},
+  {id:'customer_retention',title:'客户留存率',category:'north-star',row:1,col:3,owner:'王芳',ownerTitle:'COO',affects:[],hasDetection:false,consequenceTree:{triggerAssumption:'服务质量保持行业领先',contracts:[],suppliers:[],riskNodes:[]},aiDissent:[],pathsToGreen:[]},
+  {id:'product_launch',title:'产品上线里程碑',category:'north-star',row:1,col:4,owner:'陈伟',ownerTitle:'CTO',affects:[],hasDetection:false,consequenceTree:{triggerAssumption:'研发管线按计划推进',contracts:[],suppliers:[],riskNodes:[]},aiDissent:[],pathsToGreen:[]},
+  // Row 2 - 能力
+  {id:'rd_invest',title:'研发投入占比',category:'capability',row:2,col:1,owner:'刘洋',ownerTitle:'CTO',affects:['product_launch'],hasDetection:false,consequenceTree:{triggerAssumption:'研发预算占营收≥8%',contracts:[],suppliers:[],riskNodes:[]},aiDissent:[],pathsToGreen:[]},
+  {id:'supplier_local',title:'供应商国产化达标率',category:'capability',row:2,col:2,owner:'张总',ownerTitle:'采购副总裁',affects:['channel_coverage','revenue_growth','cost_control'],hasDetection:true,detectionInfo:{detectedAt:'2025-11-15 02:14',probability:'78%',silenceUntil:'2025-11-17 02:14',event:'鑫达贸易: 月度出货量下降23% (2025年9月) → 续约谈判推迟 (10月) → 合同终止风险 (11月)',dataSources:'ERP采购模块 / 合同管理系统'},consequenceTree:{operationalSignal:{title:'🔵 运营信号',events:[{time:'2025年9月',event:'鑫达贸易月度出货量下降23%',status:'warning'},{time:'2025年10月',event:'续约谈判推迟(第2次)',status:'warning'},{time:'2025年11月',event:'⚠ 合同终止风险 — 当前状态',status:'danger'}],dataSource:'ERP采购模块 / 合同管理系统',algorithm:'连续3月下降 + 续约事件缺失 → 概率模型触发'},triggerAssumption:'国产化率保持67%以上 · "关键供应商中≥70%须为国产替代" → 当前仅45%',contracts:[{id:'C-2024-089',supplier:'上海华信',amount:'¥1.2亿',category:'电子元件',expiry:'2026年3月',importRate:'95%',risk:'high'},{id:'C-2024-112',supplier:'北京中科',amount:'¥8,500万',category:'精密加工',expiry:'2025年12月',importRate:'92%',risk:'high'},{id:'C-2024-156',supplier:'深圳鹏程',amount:'¥4,200万',category:'软件开发',expiry:'2026年6月',importRate:'41%',risk:'mid'}],suppliers:[{name:'Shanghai Huaxin',revenueShare:'18%','alternative':'无国产替代方案',risk:'high'},{name:'Beijing Zhongke',revenueShare:'11%','alternative':'替代方案评估中',risk:'mid'}],riskNodes:[{target:'王立明 · 采购总监',impact:'KPI不可达成 · 年终考核受影响',severity:'high'},{target:'Q1预算窗口',impact:'¥2.8亿采购预算需重分配',severity:'high'}]},aiDissent:[{role:'CFO Agent',confidence:82,text:'鑫达贸易下降可能为临时性——其Q2出货量曾出现类似波动后恢复(+8%)。建议等待至12月数据确认后再调整国产化率。',source:'Q2出货量 -12%→+8% 反弹数据'},{role:'COO Agent',confidence:76,text:'上海华信虽非国产供应商，但其供应链韧性评分92/100，过往3年零断供记录。建议将华信纳入战略合作白名单而非强制替代。',source:'华信3年交付记录 / 韧性评估报告'},{role:'CMO Agent',confidence:68,text:'渠道覆盖下降可能与此直接相关——鑫达是华东区最大渠道伙伴。国产化压力下放弃鑫达将导致华东市场份额下降5-8%。',source:'渠道依赖度分析 · 华东区市场份额预测'}],pathsToGreen:[{name:'⭐ 调整国产化率目标 67%→45%',effect:'供应商卡 Score 48→78 回归绿色 · 3张合同变合规',cost:'零额外支出(仅目标调整)',timeline:'立即生效',targetRate:45},{name:'替换供应商 上海华信→国产替代',effect:'供应商卡 Score 48→72',cost:'¥1.2亿合同重新谈判 · 6个月过渡期',timeline:'6个月',targetRate:55},{name:'分阶段推进 Q1→45% Q4→67%',effect:'短期缓解 · 长期达标',cost:'需额外供应商开发资源',timeline:'12个月分4阶段',targetRate:52}]},
+  {id:'talent_acq',title:'人才引进计划',category:'capability',row:2,col:3,owner:'孙静',ownerTitle:'CHO',affects:['rd_invest'],hasDetection:false,consequenceTree:{triggerAssumption:'关键岗位招聘按计划推进',contracts:[],suppliers:[],riskNodes:[]},aiDissent:[],pathsToGreen:[]},
+  {id:'cost_control',title:'成本控制目标',category:'capability',row:2,col:4,owner:'周涛',ownerTitle:'CFO',affects:['ebitda_margin'],hasDetection:false,consequenceTree:{triggerAssumption:'采购成本降幅≥5%',contracts:[],suppliers:[],riskNodes:[]},aiDissent:[],pathsToGreen:[]},
+  // Row 3 - 健康度
+  {id:'compliance',title:'合规达标',category:'health',row:3,col:1,owner:'吴强',ownerTitle:'法务总监',affects:[],hasDetection:false,consequenceTree:{triggerAssumption:'法规遵从度100%',contracts:[],suppliers:[],riskNodes:[]},aiDissent:[],pathsToGreen:[]},
+  {id:'nps_satisfaction',title:'客户满意度NPS',category:'health',row:3,col:2,owner:'赵总',ownerTitle:'CEO',affects:[],hasDetection:false,consequenceTree:{triggerAssumption:'NPS维持行业领先',contracts:[],suppliers:[],riskNodes:[]},aiDissent:[],pathsToGreen:[]},
+  {id:'channel_coverage',title:'渠道覆盖',category:'health',row:3,col:3,owner:'郑刚',ownerTitle:'渠道总监',affects:[],hasDetection:false,consequenceTree:{triggerAssumption:'渠道覆盖率≥85% · 数字化渠道占比≥60%',contracts:[],suppliers:[],riskNodes:[{target:'郑刚 · 渠道总监',impact:'渠道覆盖KPI面临¥5,000万缺口',severity:'mid'}]},aiDissent:[{role:'CMO Agent',confidence:74,text:'渠道覆盖下降与供应商国产化压力高度相关。鑫达贸易是华东区最大渠道伙伴，其流失将直接导致渠道覆盖降至60%以下。',source:'渠道伙伴出货量统计 · Q3数据'}],pathsToGreen:[{name:'调整国产化率至52%',effect:'渠道卡Score 52→67 回归琥珀',cost:'零额外支出',timeline:'立即生效',targetRate:52}]},
+  {id:'ebitda_margin',title:'EBITDA利润率',category:'health',row:3,col:4,owner:'张总',ownerTitle:'CEO',affects:[],hasDetection:false,consequenceTree:{triggerAssumption:'利润率维持行业基准',contracts:[],suppliers:[],riskNodes:[]},aiDissent:[],pathsToGreen:[]}
+];
+
+// 按 row, col 排序
+COMMITMENT_DEFS.sort((a,b)=>a.row!==b.row?a.row-b.row:a.col-b.col);
+
+// ============================================================
+// Ghost Manifest — 预计算所有滑块位置的卡片状态
+// ============================================================
+let ghostManifest = {};
+let currentSliderValue = 67;
+let ghostPreviewMode = false;
+let ghostPreviewRate = null;
+let expandedCardId = null;
+let presentMode = false;
+let presentIndex = 0;
+let safetyTimers = {};
+
+function buildGhostManifest(){
+  ghostManifest = {};
+  for(let pct=0;pct<=100;pct++){
+    const scores = calcAllScores(pct);
+    ghostManifest[pct] = {};
+    for(const card of COMMITMENT_DEFS){
+      const score = scores[card.id];
+      ghostManifest[pct][card.id] = {
+        score: score,
+        color: scoreToColor(score),
+        label: scoreToLabel(score)
+      };
+    }
+  }
+}
+
+// ============================================================
+// 卡片渲染
+// ============================================================
+function getCardState(cardId){
+  if(ghostPreviewMode && ghostPreviewRate!==null && ghostManifest[ghostPreviewRate]){
+    return ghostManifest[ghostPreviewRate][cardId];
+  }
+  return ghostManifest[currentSliderValue]?.[cardId] || {score:0,color:'green',label:'稳定执行'};
+}
+
+function getCardTrend(cardId){
+  // 基于当前分数 vs 30天前分数 (简化: 用滑块位置模拟)
+  const cur = ghostManifest[currentSliderValue]?.[cardId]?.score || 0;
+  const prev = ghostManifest[clamp(currentSliderValue-3,0,100)]?.[cardId]?.score || cur;
+  const diff = cur - prev;
+  if(diff > 1) return 'up';
+  if(diff < -1) return 'down';
+  return 'flat';
+}
+
+function renderCardGrid(){
+  const grid = document.getElementById('cardGrid');
+  const scores = ghostManifest[currentSliderValue] || {};
+
+  grid.innerHTML = COMMITMENT_DEFS.map(card => {
+    const state = scores[card.id] || {score:0, color:'green', label:'稳定执行'};
+    const trend = getCardTrend(card.id);
+    const trendIcon = trend==='up'?'↗':trend==='down'?'↘':'→';
+    const trendClass = trend==='up'?'up':trend==='down'?'down':'flat';
+    const isExpanded = expandedCardId === card.id;
+    const isDetected = card.hasDetection;
+
+    // Sparkline dots — 简化为基于趋势的5点
+    const sparkDots = (()=>{
+      const dots = [];
+      for(let i=0;i<5;i++){
+        if(trend==='up') dots.push(i>=3?'rising':'');
+        else if(trend==='down') dots.push(i>=2?'falling':'');
+        else dots.push('');
+      }
+      return dots.map((c,i)=>`<span class="spark-dot${c?' '+c:''}" style="height:${6+Math.abs(i-2)*3}px"></span>`).join('');
+    })();
+
+    const colorClass = isExpanded ? (state.color + (ghostPreviewMode?' ghost-'+state.color:'')) : (state.color + (isDetected?' detected':'') + (ghostPreviewMode&&state.color==='amber'?' ghost-green':ghostPreviewMode&&state.color==='red'?' ghost-amber':''));
+
+    return `
+    <div class="commitment-card ${colorClass}${isExpanded?' expanded':''}" id="card-${card.id}" onclick="onCardClick('${card.id}', event)" data-card-id="${card.id}">
+      ${isDetected && !isExpanded ? `
+      <div class="detection-badge">
+        🔵 系统检测 · 2h前 · ${card.detectionInfo.probability}可能脱轨
+      </div>`:''}
+      <div class="card-header-row">
+        <span class="card-title">${card.title}</span>
+        <div class="card-badges">
+          <span class="card-lifecycle ${state.label==='稳定执行'?'stable':state.label==='需关注'?'attention':'deteriorating'}">${state.label}</span>
+        </div>
+      </div>
+      <div class="card-score-row">
+        <span class="card-score ${state.color}">${state.score}</span>
+        <span class="card-trend ${trendClass}">${trendIcon}</span>
+      </div>
+      <div class="card-owner">${card.owner} · ${card.ownerTitle}</div>
+      <div class="card-spark">${sparkDots}</div>
+      <div class="card-updated">更新于 ${isDetected?'检测于2h前':'2h前'}</div>
+      ${isExpanded ? renderExpandedContent(card) : ''}
+    </div>`;
+  }).join('');
+
+  // 更新 Counter Zone
+  updateCounter();
+  // 更新政治安全区
+  updateSafetyZone();
+  // 更新滑块脉冲
+  updateSliderPulse();
+}
+
+function renderExpandedContent(card){
+  const tree = card.consequenceTree;
+  const isDetected = card.hasDetection && tree.operationalSignal;
+
+  let html = '<div class="expanded-content">';
+
+  // 检测徽章（展开态）
+  if(isDetected){
+    html += `
+    <div style="background:var(--color-detection-bg);border:1px solid var(--color-detection-border);border-radius:var(--radius-md);padding:var(--spacing-sm) var(--spacing-md);margin-bottom:var(--spacing-sm)">
+      <span style="font-weight:700;color:var(--color-detection)">🔵 系统检测 · 2h前 · ${card.detectionInfo.probability} 可能脱轨</span>
+      <span style="font-size:11px;color:var(--color-text-tertiary);margin-left:var(--spacing-md)">🕐 剩余响应窗口: <span id="safety-countdown-expanded">23h</span></span>
+    </div>`;
+  }
+
+  // OPERATIONAL SIGNAL 层
+  if(isDetected && tree.operationalSignal){
+    html += `
+    <div class="tree-section detection">
+      <div class="tree-section-title">OPERATIONAL SIGNAL</div>
+      <div class="tree-section-body">
+        ${tree.operationalSignal.events.map(e=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:2px 0">
+            <span style="font-size:10px;color:var(--color-text-tertiary)">${e.time}</span>
+            <span>${e.event}</span>
+            ${e.status==='danger'?'<span style="font-size:10px;color:var(--color-danger);font-weight:600">← 当前状态</span>':''}
+          </div>
+        `).join('')}
+        <div style="font-size:10px;color:var(--color-text-tertiary);margin-top:4px">数据源: ${tree.operationalSignal.dataSource} · 算法: ${tree.operationalSignal.algorithm}</div>
+      </div>
+    </div>`;
+  }
+
+  // TRIGGER ASSUMPTION
+  html += `
+  <div class="tree-section">
+    <div class="tree-section-title">TRIGGER ASSUMPTION</div>
+    <div class="tree-section-body">${tree.triggerAssumption}</div>
+  </div>`;
+
+  // 受影响的合同
+  if(tree.contracts && tree.contracts.length > 0){
+    html += `
+    <div class="tree-section ${tree.contracts.some(c=>c.risk==='high')?'danger':'warning'}">
+      <div class="tree-section-title">受影响的合同 (${tree.contracts.length})</div>
+      <table class="contract-table">
+        <tr><th>合同编号</th><th>供应商</th><th>金额</th><th>${isDetected?'进口率':'风险'}</th></tr>
+        ${tree.contracts.map(c=>`
+          <tr class="${c.risk==='high'?'risk-high':c.risk==='mid'?'risk-mid':''}">
+            <td><span class="contract-status ${c.risk}"></span>${c.id}</td>
+            <td>${c.supplier}</td>
+            <td>${c.amount}</td>
+            <td>${isDetected?c.importRate:c.risk==='high'?'🔴 高':c.risk==='mid'?'🟡 中':'🟢 低'}</td>
+          </tr>
+        `).join('')}
+      </table>
+    </div>`;
+  }
+
+  // 受影响供应商
+  if(tree.suppliers && tree.suppliers.length > 0){
+    html += `
+    <div class="tree-section ${tree.suppliers.some(s=>s.risk==='high')?'danger':'warning'}">
+      <div class="tree-section-title">受影响供应商</div>
+      <div class="tree-section-body">
+        ${tree.suppliers.map(s=>`
+          <div style="padding:4px 0;display:flex;align-items:center;gap:8px">
+            <span class="contract-status ${s.risk}"></span>
+            <strong>${s.name}</strong>
+            <span style="font-size:11px;color:var(--color-text-tertiary)">营收占比 ${s.revenueShare} · ${s.alternative||s.relationship}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }
+
+  // 风险传导
+  if(tree.riskNodes && tree.riskNodes.length > 0){
+    html += `
+    <div class="tree-section danger">
+      <div class="tree-section-title">风险传导</div>
+      ${tree.riskNodes.map((n,i)=>`
+        <div class="risk-node" onclick="event.stopPropagation();onRiskNodeClick('${card.id}',${i})" data-risk-idx="${i}">
+          <span class="risk-target">${n.severity==='high'?'🔴':'🟡'} ${n.target}</span>: ${n.impact}
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
+  // AI DISSENT 区（默认展开）
+  if(card.aiDissent && card.aiDissent.length > 0){
+    html += `
+    <div class="dissent-section">
+      <div class="dissent-header" onclick="event.stopPropagation();toggleDissent('${card.id}')">
+        🤖 AI 异议 (${card.aiDissent.length}) <span id="dissent-toggle-${card.id}" style="font-size:10px">▲ 收起</span>
+      </div>
+      <div class="dissent-list" id="dissent-list-${card.id}">
+        ${card.aiDissent.map(d=>`
+          <div class="dissent-card">
+            <div class="dissent-role">${d.role} <span class="dissent-confidence">(置信度: ${d.confidence}%)</span></div>
+            <div class="dissent-text">${d.text}</div>
+            <div class="dissent-source">📎 证据: ${d.source}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }
+
+  // PATH BACK TO GREEN
+  if(card.pathsToGreen && card.pathsToGreen.length > 0){
+    html += `
+    <div class="path-section">
+      <div class="path-section-title">🟢 Path Back to Green</div>
+      <div class="path-list">
+        ${card.pathsToGreen.map((p,i)=>`
+          <div class="path-card ${i===0?'recommended':''}" id="path-${card.id}-${i}" onclick="event.stopPropagation();previewPath('${card.id}',${i})">
+            <div class="path-name">${i===0?'⭐ ':''}${p.name}</div>
+            <div class="path-effect">效果: ${p.effect}</div>
+            <div class="path-cost">成本: ${p.cost}</div>
+            <div class="path-timeline">时间线: ${p.timeline}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="path-actions" id="path-actions-${card.id}" style="display:none">
+        <button class="path-btn" onclick="event.stopPropagation();cancelPreview()">← 返回路径列表</button>
+        <button class="path-btn apply" id="apply-btn-${card.id}" onclick="event.stopPropagation();applyPath('${card.id}')">确认应用此路径</button>
+      </div>
+    </div>`;
+  }
+
+  // 政治安全元数据（仅检测卡片）
+  if(isDetected){
+    html += `
+    <div style="margin-top:var(--spacing-sm);padding:var(--spacing-sm);background:var(--color-bg-primary);border-radius:var(--radius-sm);font-size:11px;color:var(--color-text-tertiary)">
+      🕐 检测于 ${card.detectionInfo.detectedAt} · 静默期48h · 责任人已通知 (${card.owner})
+      · 👤 可见范围: ${card.owner} + ${COMMITMENT_DEFS.find(c=>c.id==='revenue_growth')?.owner||'赵总'} (直线上级)
+      · 剩余响应窗口: <span id="safety-countdown-bottom">23h</span>
+    </div>`;
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// ============================================================
+// 交互逻辑
+// ============================================================
+function onCardClick(cardId, event){
+  if(event.target.closest('.path-card') || event.target.closest('.path-btn') ||
+     event.target.closest('.dissent-header') || event.target.closest('.risk-node') ||
+     event.target.closest('.slider-track-wrap') || event.target.closest('.slider-thumb')) return;
+
+  if(expandedCardId === cardId){
+    // 再次点击 → 收起
+    expandedCardId = null;
+  } else {
+    expandedCardId = cardId;
+    // 如果有幽灵预览，清除
+    if(ghostPreviewMode) cancelPreview();
+  }
+  renderCardGrid();
+
+  if(expandedCardId && presentMode){
+    // 演示模式：滚动到展开卡片
+    setTimeout(()=>{
+      const card = document.getElementById('card-'+cardId);
+      if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
+    },100);
+  }
+}
+
+function toggleDissent(cardId){
+  const list = document.getElementById('dissent-list-'+cardId);
+  const toggle = document.getElementById('dissent-toggle-'+cardId);
+  if(!list || !toggle) return;
+  list.classList.toggle('collapsed');
+  toggle.textContent = list.classList.contains('collapsed') ? '▶ 展开' : '▲ 收起';
+}
+
+// ============================================================
+// Path Back to Green — 幽灵预览
+// ============================================================
+let previewPathCardId = null;
+let previewPathIdx = null;
+
+function previewPath(cardId, pathIdx){
+  const card = COMMITMENT_DEFS.find(c=>c.id===cardId);
+  if(!card || !card.pathsToGreen[pathIdx]) return;
+
+  const path = card.pathsToGreen[pathIdx];
+  previewPathCardId = cardId;
+  previewPathIdx = pathIdx;
+
+  // 进入幽灵预览模式
+  ghostPreviewMode = true;
+  ghostPreviewRate = path.targetRate;
+
+  // 高亮被预览的路径卡片
+  renderCardGrid();
+
+  // 显示路径操作按钮
+  const prevCard = document.querySelectorAll('.path-card');
+  prevCard.forEach(c=>c.classList.remove('ghost-previewing'));
+  const targetPath = document.getElementById('path-'+cardId+'-'+pathIdx);
+  if(targetPath) targetPath.classList.add('ghost-previewing');
+
+  const actions = document.getElementById('path-actions-'+cardId);
+  if(actions) actions.style.display = 'flex';
+
+  // 滑块不跟随移动（保持原位），仅墙面显示幽灵状态
+  showToast('🔮 幽灵预览: '+path.name+' · 200ms','info');
+}
+
+function cancelPreview(){
+  ghostPreviewMode = false;
+  ghostPreviewRate = null;
+  previewPathCardId = null;
+  previewPathIdx = null;
+
+  // 隐藏所有路径操作按钮
+  document.querySelectorAll('[id^="path-actions-"]').forEach(el=>el.style.display='none');
+  document.querySelectorAll('.path-card').forEach(c=>c.classList.remove('ghost-previewing'));
+
+  renderCardGrid();
+}
+
+function applyPath(cardId){
+  const card = COMMITMENT_DEFS.find(c=>c.id===cardId);
+  if(!card || previewPathIdx===null) return;
+
+  const path = card.pathsToGreen[previewPathIdx];
+
+  // 移动滑块到目标位置
+  if(window._slider){
+    window._slider.setValue(path.targetRate, true);
+    currentSliderValue = path.targetRate;
+  }
+
+  // 退出幽灵预览模式
+  ghostPreviewMode = false;
+  ghostPreviewRate = null;
+  previewPathCardId = null;
+  previewPathIdx = null;
+
+  document.querySelectorAll('[id^="path-actions-"]').forEach(el=>el.style.display='none');
+
+  // 如果供应商卡变绿了 → 清除检测徽章
+  const supplierCard = COMMITMENT_DEFS.find(c=>c.id==='supplier_local');
+  const newScore = ghostManifest[currentSliderValue]?.['supplier_local']?.score || 0;
+  if(newScore >= SCORE_THRESHOLDS.green && supplierCard){
+    supplierCard.hasDetection = false;
+    showToast('✅ 供应商国产化卡回归绿色 · 系统检测徽章已清除','success');
+  }
+
+  renderCardGrid();
+  showToast('✅ 路径已应用 · 滑块调整至 '+path.targetRate+'%','success');
+}
+
+// ============================================================
+// 双向传染 — 点击风险节点
+// ============================================================
+function onRiskNodeClick(cardId, nodeIdx){
+  const card = COMMITMENT_DEFS.find(c=>c.id===cardId);
+  if(!card) return;
+  const node = card.consequenceTree.riskNodes[nodeIdx];
+  if(!node) return;
+
+  // 查找对应的 Path Back to Green
+  const paths = card.pathsToGreen;
+  if(!paths || paths.length===0) return;
+
+  // 自动选择推荐路径进行幽灵预览
+  const bestPath = paths[0];
+  ghostPreviewMode = true;
+  ghostPreviewRate = bestPath.targetRate;
+  previewPathCardId = cardId;
+  previewPathIdx = 0;
+
+  renderCardGrid();
+
+  // 显示反向传染分析
+  showToast(`🔮 双向传染: 调整国产化率至 ${bestPath.targetRate}% 可恢复此节点 · 滑块脉冲提示中`,'info');
+}
+
+// ============================================================
+// 滑块脉冲 — 反向传染视觉
+// ============================================================
+function updateSliderPulse(){
+  const trackWrap = document.querySelector('.slider-track-wrap');
+  if(!trackWrap) return;
+
+  // 移除旧脉冲
+  const oldHints = trackWrap.querySelectorAll('.slider-pulse-hint');
+  oldHints.forEach(h=>h.remove());
+
+  if(ghostPreviewMode && ghostPreviewRate!==null){
+    // 在目标位置添加脉冲提示
+    const pct = mapRange(ghostPreviewRate, 0, 100, 0, 100);
+    const hint = document.createElement('div');
+    hint.className = 'slider-pulse-hint';
+    hint.style.left = pct+'%';
+    hint.textContent = `调整至 ${ghostPreviewRate}% → 恢复绿色`;
+    trackWrap.appendChild(hint);
+
+    // 滑块脉冲动画
+    if(window._slider && window._slider.thumb){
+      window._slider.thumb.style.animation = 'sliderPulse 1.2s ease-in-out infinite';
+    }
+  } else {
+    if(window._slider && window._slider.thumb){
+      window._slider.thumb.style.animation = '';
+    }
+  }
+}
+
+// ============================================================
+// Counter Zone
+// ============================================================
+function updateCounter(){
+  const counterZone = document.getElementById('counterZone');
+  const counterInner = document.getElementById('counterInner');
+  const scores = ghostManifest[currentSliderValue] || {};
+
+  // 统计状态
+  let detected = 0, amber = 0, red = 0;
+  for(const card of COMMITMENT_DEFS){
+    const state = scores[card.id];
+    if(!state) continue;
+    if(card.hasDetection) detected++;
+    if(state.color==='amber') amber++;
+    if(state.color==='red') red++;
+  }
+
+  const total = detected + amber + red;
+  if(total === 0 && !ghostPreviewMode){
+    counterZone.classList.remove('visible');
+    return;
+  }
+
+  counterZone.classList.add('visible');
+
+  let html = '';
+  if(detected > 0) html += `<span class="counter-dot detection"></span> <span class="counter-highlight">${detected} 项系统检测</span>`;
+  if(amber > 0) html += ` · <span class="counter-dot warning"></span> ${amber} 项需关注`;
+  if(red > 0) html += ` · <span style="color:var(--color-danger);font-weight:600">${red} 项恶化中</span>`;
+
+  const supplierCard = COMMITMENT_DEFS.find(c=>c.id==='supplier_local');
+  if(supplierCard && supplierCard.hasDetection && supplierCard.detectionInfo){
+    const remaining = getRemainingSilence(supplierCard);
+    html += ` · 🕐 <span style="font-weight:600;color:var(--color-detection)">响应窗口剩余 ${remaining}</span>`;
+  }
+
+  if(ghostPreviewMode) html += ' · <span style="color:var(--color-primary);font-weight:600">🔮 幽灵预览模式 · 未保存</span>';
+
+  counterInner.innerHTML = html;
+}
+
+// ============================================================
+// 政治安全区
+// ============================================================
+function getRemainingSilence(card){
+  if(!card.detectionInfo) return 'N/A';
+  // 模拟: 基于 silenceUntil 计算剩余时间
+  const now = new Date();
+  const silenceUntil = new Date(card.detectionInfo.silenceUntil);
+  const diff = silenceUntil - now;
+  if(diff <= 0) return '0h (已过期)';
+  const hours = Math.floor(diff / (1000*60*60));
+  const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
+  return hours+'h '+mins+'min';
+}
+
+function updateSafetyZone(){
+  const safetyInner = document.getElementById('safetyInner');
+  const detectedCards = COMMITMENT_DEFS.filter(c=>c.hasDetection);
+
+  if(detectedCards.length === 0){
+    safetyInner.innerHTML = '<span style="color:var(--color-text-tertiary)">✅ 无静默检测项 · 系统监控运行中</span>';
+    return;
+  }
+
+  const card = detectedCards[0];
+  const remaining = getRemainingSilence(card);
+
+  safetyInner.innerHTML = `
+    <span class="safety-icon">🔵</span>
+    <div class="safety-info">
+      <div class="safety-title">静默检测中 — 仅责任人及直线上级可见</div>
+      <div class="safety-detail">
+        🟡 ${card.title} · 检测于 ${card.detectionInfo.detectedAt} · 触发: ${card.detectionInfo.event.split('→')[0].trim()}<br>
+        责任人: ${card.owner} (${card.ownerTitle}) · 主管: 赵总
+      </div>
+    </div>
+    <span class="safety-countdown" id="safety-countdown">剩余 ${remaining}</span>
+    <div class="safety-actions">
+      <button class="safety-btn" onclick="safetyAction('acknowledge')">确认已知晓</button>
+      <button class="safety-btn primary" onclick="safetyAction('correct')">发起纠正措施</button>
+    </div>`;
+}
+
+function safetyAction(action){
+  const card = COMMITMENT_DEFS.find(c=>c.hasDetection);
+  if(!card) return;
+
+  if(action === 'acknowledge'){
+    showToast('✅ 已确认知晓 · 响应窗口计时器继续 · 剩余 '+getRemainingSilence(card),'info');
+  } else if(action === 'correct'){
+    // 模拟纠正: 自动选择推荐路径
+    if(card.pathsToGreen && card.pathsToGreen[0]){
+      const path = card.pathsToGreen[0];
+      previewPath(card.id, 0);
+      showToast('🟢 已启动纠正措施: '+path.name+' · 请确认预览效果','success');
+    }
+  }
+}
+
+// ============================================================
+// 演示模式
+// ============================================================
+function togglePresentMode(){
+  presentMode = !presentMode;
+  const btn = document.getElementById('presentBtn');
+  const grid = document.getElementById('cardGrid');
+  const presentNav = document.getElementById('presentNav');
+  const sliderZone = document.getElementById('sliderZone');
+  const legendZone = document.getElementById('legendZone');
+
+  if(presentMode){
+    btn.classList.add('active');
+    btn.textContent = '🎥 退出演示';
+    grid.classList.add('presenting');
+    presentNav.classList.add('visible');
+    sliderZone.style.display = 'none';
+    legendZone.style.display = 'none';
+    document.body.classList.add('presenting');
+
+    // 收起已展开卡片
+    expandedCardId = null;
+    if(ghostPreviewMode) cancelPreview();
+
+    // 定位到第一张需关注的卡片
+    presentIndex = 0;
+    const scores = ghostManifest[currentSliderValue] || {};
+    for(let i=0;i<COMMITMENT_DEFS.length;i++){
+      const card = COMMITMENT_DEFS[i];
+      const state = scores[card.id];
+      if(card.hasDetection || (state && state.color!=='green')){
+        presentIndex = i;
+        break;
+      }
+    }
+    renderPresentCard();
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '🎥 演示模式';
+    grid.classList.remove('presenting');
+    presentNav.classList.remove('visible');
+    sliderZone.style.display = '';
+    legendZone.style.display = '';
+    document.body.classList.remove('presenting');
+    renderCardGrid();
+  }
+}
+
+function renderPresentCard(){
+  const grid = document.getElementById('cardGrid');
+  const presentInfo = document.getElementById('presentInfo');
+  const card = COMMITMENT_DEFS[presentIndex];
+  if(!card) return;
+
+  const state = ghostManifest[currentSliderValue]?.[card.id] || {score:0,color:'green',label:'稳定执行'};
+  const trend = getCardTrend(card.id);
+  const trendIcon = trend==='up'?'↗':trend==='down'?'↘':'→';
+  const isDetected = card.hasDetection;
+
+  presentInfo.textContent = `${presentIndex+1} / ${COMMITMENT_DEFS.length}`;
+
+  // 演示模式: 展开所有需关注卡片
+  expandedCardId = card.id;
+
+  const colorClass = state.color + (isDetected?' detected':'');
+  grid.innerHTML = `
+  <div class="commitment-card ${colorClass} expanded" id="card-${card.id}" onclick="onCardClick('${card.id}', event)">
+    ${isDetected ? `
+    <div class="detection-badge" style="font-size:14px;padding:4px 16px;top:-12px">
+      🔵 系统检测 · 2h前 · ${card.detectionInfo.probability} 可能脱轨
+    </div>`:''}
+    <div class="card-header-row">
+      <span class="card-title" style="font-size:28px">${card.title}</span>
+      <div class="card-badges">
+        <span class="card-lifecycle ${state.label==='稳定执行'?'stable':state.label==='需关注'?'attention':'deteriorating'}" style="font-size:14px;padding:4px 12px">${state.label}</span>
+      </div>
+    </div>
+    <div class="card-score-row">
+      <span class="card-score ${state.color}" style="font-size:64px">${state.score}</span>
+      <span class="card-trend ${trend==='up'?'up':trend==='down'?'down':'flat'}" style="font-size:36px">${trendIcon}</span>
+    </div>
+    <div class="card-owner" style="font-size:18px">${card.owner} · ${card.ownerTitle}</div>
+    ${renderExpandedContent(card)}
+  </div>`;
+}
+
+function presentPrev(){
+  if(!presentMode) return;
+  presentIndex = (presentIndex - 1 + COMMITMENT_DEFS.length) % COMMITMENT_DEFS.length;
+  expandedCardId = COMMITMENT_DEFS[presentIndex].id;
+  renderPresentCard();
+}
+
+function presentNext(){
+  if(!presentMode) return;
+  presentIndex = (presentIndex + 1) % COMMITMENT_DEFS.length;
+  expandedCardId = COMMITMENT_DEFS[presentIndex].id;
+  renderPresentCard();
+}
+
+// 键盘导航
+document.addEventListener('keydown', function(e){
+  if(!presentMode) return;
+  if(e.key === 'ArrowRight'){e.preventDefault();presentNext();}
+  if(e.key === 'ArrowLeft'){e.preventDefault();presentPrev();}
+  if(e.key === 'Escape'){e.preventDefault();togglePresentMode();}
+});
+
+// ============================================================
+// 初始化
+// ============================================================
+function init(){
+  // 构建 Ghost Manifest
+  buildGhostManifest();
+
+  // 初始化滑块
+  const sliderContainer = document.getElementById('sliderContainer');
+  window._slider = new SliderPhysics(sliderContainer, {
+    min:0, max:100, value:67, step:1,
+    formatValue: v=>v+'%',
+    valueSuffix:'',
+    notches:[
+      {value:45, aiRec:true},
+      {value:52, aiRec:false},
+      {value:67, aiRec:false}
+    ],
+    onChange: function(v){
+      currentSliderValue = v;
+      // 如果有幽灵预览在显示，保持幽灵模式
+      if(!ghostPreviewMode){
+        renderCardGrid();
+      }
+    },
+    onRelease: function(v){
+      currentSliderValue = v;
+      if(!ghostPreviewMode){
+        renderCardGrid();
+      }
+    }
+  });
+
+  // 渲染初始墙面
+  renderCardGrid();
+
+  // 政治安全区倒计时更新
+  setInterval(function(){
+    const card = COMMITMENT_DEFS.find(c=>c.hasDetection);
+    if(card && card.hasDetection){
+      const remaining = getRemainingSilence(card);
+      const countdowns = document.querySelectorAll('#safety-countdown, #safety-countdown-expanded, #safety-countdown-bottom');
+      countdowns.forEach(el=>{el.textContent = '剩余 '+remaining});
+      if(expandedCardId === card.id || presentMode){
+        updateCounter();
+      }
+    }
+  }, 30000); // 30s 更新
+
+  showToast('🟢 战略承诺墙已就绪 · 12张卡片 · 单滑块 · Ghost Manifest预计算完成','success');
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
