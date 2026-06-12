@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>SISYS V7.0 · 战略驾驶舱 REBIRTH</title>
+<style>
+:root{--p:#1890ff;--s:#00875A;--w:#B86E00;--d:#C53030;--bg:#0a0e27;--card:#111827;--bd:#1f2937;--t1:#f1f5f9;--t2:#9ca3af;--t3:#6b7280;--ok:#064e3b;--wn:#422006;--dn:#450a0a;--db:#172554;--f:'PingFang SC','Microsoft YaHei',sans-serif;--fm:'Consolas',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--f);background:var(--bg);color:var(--t1);overflow:hidden;height:100vh}
+@keyframes toastIn{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes glowGreen{0%{box-shadow:inset 0 0 12px rgba(0,135,90,.4)}100%{box-shadow:inset 0 0 0 rgba(0,135,90,0)}}
+@keyframes glowRed{0%{box-shadow:inset 0 0 12px rgba(197,48,48,.4)}100%{box-shadow:inset 0 0 0 rgba(197,48,48,0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-3px)}30%{transform:translateX(3px)}45%{transform:translateX(-2px)}60%{transform:translateX(2px)}75%{transform:translateX(-1px)}90%{transform:translateX(1px)}}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.88}}
+@keyframes ghostPulse{0%{box-shadow:0 0 0 0 var(--p)}50%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes advisorIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.app{display:flex;flex-direction:column;height:100vh}
+.nav{display:flex;justify-content:space-between;align-items:center;height:48px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--bd);flex-shrink:0}
+.nav-brand{font-size:15px;font-weight:700;display:flex;align-items:center;gap:6px}
+.nav-right{display:flex;align-items:center;gap:12px;font-size:11px;color:var(--t2)}
+.pulse{height:36px;flex-shrink:0;background:linear-gradient(90deg,var(--card),var(--db));border-bottom:1px solid var(--bd);display:flex;align-items:center;padding:0 16px;font-size:11px;gap:16px;position:relative;overflow:hidden}
+.pulse::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(24,144,255,.06),transparent);animation:shimmer 2s ease-in-out infinite}
+.pulse-item{display:flex;align-items:center;gap:4px}.pulse-dot{width:8px;height:8px;border-radius:50%}.pulse-dot.red{background:var(--d)}.pulse-dot.amber{background:var(--w)}.pulse-dot.green{background:var(--s)}
+.pulse-val{font-family:var(--fm);font-weight:700;font-size:13px}.pulse-val.red{color:var(--d)}.pulse-val.amber{color:var(--w)}.pulse-val.green{color:var(--s)}
+.main{display:flex;flex:1;overflow:hidden}
+.tree-panel{flex:1;overflow-y:auto;padding:20px 24px}
+.debate-panel{width:320px;flex-shrink:0;border-left:1px solid var(--bd);overflow-y:auto;background:var(--card);padding:14px}
+.trend-panel{height:140px;flex-shrink:0;border-top:1px solid var(--bd);background:var(--card);padding:12px 24px;position:relative}
+.tree-node{padding:6px 0;position:relative;cursor:pointer;transition:all .15s}
+.tree-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:4px;border-left:3px solid transparent}
+.tree-row:hover{background:var(--db)}.tree-row.sel{border-left-color:var(--p);background:var(--db)}
+.tree-row.sp{border-left-color:var(--t3);padding:8px}
+.tree-row.critical{border-left-color:var(--d)}.tree-row.at-risk{border-left-color:var(--w)}.tree-row.on-track{border-left-color:var(--s)}
+.tree-indent{padding-left:24px;border-left:1px solid var(--bd)}
+.tree-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}.tree-dot.red{background:var(--d)}.tree-dot.amber{background:var(--w)}.tree-dot.green{background:var(--s)}
+.tree-name{font-weight:500;font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree-dev{font-family:var(--fm);font-weight:700;font-size:13px;min-width:55px;text-align:right}.tree-dev.red{color:var(--d)}.tree-dev.amber{color:var(--w)}.tree-dev.green{color:var(--s)}
+.tree-meta{font-size:10px;color:var(--t3)}
+.delta-tag{font-size:10px;font-weight:700;padding:1px 4px;border-radius:3px;white-space:nowrap}.delta-tag.worse{background:var(--dn);color:var(--d)}.delta-tag.better{background:var(--ok);color:var(--s)}.delta-tag.flat{background:var(--bg);color:var(--t3)}
+.em-tag{font-size:9px;padding:1px 4px;border-radius:3px;font-weight:600;white-space:nowrap}.em-tag.green{background:#064e3b;color:#4ade80}.em-tag.amber{background:#422006;color:#fbbf24}.em-tag.red{background:#450a0a;color:#f87171}
+.sparkline-svg{width:45px;height:14px;flex-shrink:0}
+.exec-badge{font-size:9px;padding:2px 6px;border-radius:3px;font-weight:600}.exec-badge.applied{background:#172554;color:#60a5fa}.exec-badge.improved{background:#064e3b;color:#4ade80}.exec-badge.worsened{background:#450a0a;color:#f87171}
+.correct-btn{font-size:10px;padding:2px 8px;border-radius:3px;cursor:pointer;border:1px solid var(--s);background:transparent;color:var(--s);font-family:var(--f);transition:all .15s;white-space:nowrap}.correct-btn:hover{background:var(--s);color:#fff}
+.correct-btn:disabled,.correct-btn.done{opacity:.4;cursor:not-allowed;border-color:var(--t3);color:var(--t3)}.correct-btn.done:hover{background:transparent;color:var(--t3)}
+.debate-title{font-size:12px;font-weight:700;margin-bottom:10px;color:var(--t1)}
+.debate-item{padding:8px 10px;margin-bottom:6px;border-radius:6px;background:var(--bg);font-size:11px}
+.debate-agent{font-weight:600;font-size:12px;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.debate-stance{font-size:10px;padding:0 5px;border-radius:3px}.debate-stance.pro{background:#064e3b;color:#4ade80}.debate-stance.con{background:#450a0a;color:#f87171}.debate-stance.neutral{background:#422006;color:#fbbf24}
+.debate-text{color:var(--t2);line-height:1.4;margin-bottom:3px}
+.debate-bar{height:4px;border-radius:2px;background:var(--bd);overflow:hidden}.debate-bar-fill{height:100%;border-radius:2px;background:var(--p);transition:width .3s}
+.advisor{position:fixed;bottom:16px;right:16px;z-index:1500;background:var(--card);border:1px solid var(--p);border-radius:10px;padding:12px;max-width:320px;box-shadow:0 8px 32px rgba(24,144,255,.2);animation:advisorIn .4s ease-out;font-size:11px}
+.advisor-title{font-weight:700;color:var(--p);margin-bottom:4px;font-size:12px}
+.advisor-body{color:var(--t2);line-height:1.4;margin-bottom:6px}.advisor-body b{color:var(--t1)}.advisor-body .red{color:var(--d)}.advisor-body .green{color:var(--s)}
+.advisor-actions{display:flex;gap:6px}
+.advisor-btn{padding:4px 10px;border-radius:4px;font-size:10px;cursor:pointer;border:1px solid var(--p);background:transparent;color:var(--p);font-family:var(--f);transition:all .15s}.advisor-btn:hover{background:var(--p);color:#fff}
+.advisor-btn.primary{background:var(--s);color:#fff;border-color:var(--s)}.advisor-btn.primary:hover{background:#006d45}
+.advisor-btn.danger{background:var(--d);color:#fff;border-color:var(--d)}.advisor-btn.danger:hover{background:#9b2c2c}
+.trend-svg{width:100%;height:100%}
+.toast-container{position:fixed;top:56px;right:16px;z-index:2000;display:flex;flex-direction:column;gap:4px}
+.toast{padding:6px 12px;border-radius:4px;font-size:11px;box-shadow:0 4px 16px rgba(0,0,0,.3);animation:toastIn .3s ease-out}
+.toast.success{background:#064e3b;border:1px solid #065f46;color:#6ee7b7}.toast.info{background:#172554;border:1px solid #1e3a5f;color:#93c5fd}
+.ghost-bar{display:none;height:32px;flex-shrink:0;background:linear-gradient(90deg,#172554,#1e3a5f);border-bottom:1px solid var(--p);align-items:center;justify-content:space-between;padding:0 16px;font-size:11px}.ghost-bar.on{display:flex}
+.ghost-glow{border-color:var(--p)!important;animation:ghostPulse 1.5s ease-in-out infinite}
+.ghost-dim{opacity:.38}
+.tree-row.verifying{animation:breathe 1s ease-in-out infinite}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="nav"><div class="nav-brand">🎯 SISYS V7.0 · 战略驾驶舱</div><div class="nav-right"><span>XX公司 2026 SP-BP</span><span>👤 张总</span></div></div>
+<div class="ghost-bar" id="ghostBar"><span>🔮 幽灵预览 — KPI目标调整中</span><span style="display:flex;gap:6px"><button class="correct-btn" onclick="cancelPreview()" style="width:auto">✖ 取消</button><button class="correct-btn" onclick="confirmApply()" style="width:auto;background:var(--s);color:#fff;border-color:var(--s)">✓ 确认</button></span></div>
+<div class="pulse" id="pulseBar"></div>
+<div class="main">
+<div class="tree-panel" id="treePanel"></div>
+<div class="debate-panel" id="debatePanel"></div>
+</div>
+<div class="trend-panel" id="trendPanel"></div>
+</div>
+<div class="toast-container" id="toasts"></div>
+<div class="advisor" id="advisor" style="display:none"></div>
+<script>
+//=== Utils ===
+function T(m,t){const c=document.getElementById('toasts'),e=document.createElement('div');e.className='toast '+(t||'info');e.textContent=m;c.appendChild(e);setTimeout(()=>{e.style.opacity='0';e.style.transition='opacity .3s';setTimeout(()=>e.remove(),300)},3000)}
+function S2C(s){return s>=70?'green':s>=40?'amber':'red'}
+
+//=== Data: Unified Tree ===
+const ROOT={id:'root',type:'root',label:'2026 战略规划',deviation:0,children:[
+  {id:'sp1',type:'sp',label:'供应链自主可控',owner:'张总',target:'国产化率≥67%',deviation:0,status:'critical',children:[
+    {id:'bp1',type:'bp',label:'供应商国产化替代计划',owner:'张总',budget:5.0,kpiTarget:70,kpiActual:45,kpiUnit:'%',deviation:0,weight:0.68,execState:'idle',execResult:null,
+      history:[{t:'W1',d:-22},{t:'W2',d:-25},{t:'W3',d:-29},{t:'W4',d:-32},{t:'W5',d:-30},{t:'W6',d:-33},{t:'W7',d:-35},{t:'W8',d:-35.7}],
+      events:[{time:'2025-09',event:'鑫达贸易出货量降23%',impact:-12,agent:'CMO Agent'},{time:'2025-10',event:'续约谈判推迟第2次',impact:-8,agent:'COO Agent'},{time:'2025-11',event:'合同终止风险',impact:-15,agent:'AUD Agent'}],
+      cf:{earliest:'2025-09-15',action:'启动备选供应商资质预审',agent:'CFO Agent',confidence:82,missed:63,hypoEvents:[{impact:20}]},
+      paths:[{name:'分阶段推进Q1→Q4',targetKpi:55,eff:'偏差35.7%→15%',cost:'额外供应商开发资源',time:'12月',agent:'CFO Agent',confidence:78}]},
+    {id:'bp2',type:'bp',label:'供应链韧性提升计划',owner:'张总',budget:2.4,kpiTarget:48,kpiActual:72,kpiUnit:'h',deviation:0,weight:0.32,execState:'idle',execResult:null,
+      history:[{t:'W1',d:-35},{t:'W2',d:-38},{t:'W3',d:-42},{t:'W4',d:-45},{t:'W5',d:-48},{t:'W6',d:-47},{t:'W7',d:-49},{t:'W8',d:-50}],
+      events:[{time:'2025-08',event:'华东仓库水灾断供3天',impact:-18,agent:'COO Agent'}],
+      cf:{earliest:'2025-07-01',action:'启动异地备灾仓库建设',agent:'COO Agent',confidence:71,missed:94,hypoEvents:[{impact:15}]},
+      paths:[{name:'加速异地仓库建设',targetKpi:55,eff:'恢复72h→55h',cost:'¥8000万',time:'6月',agent:'COO Agent',confidence:65}]}
+  ]},
+  {id:'sp2',type:'sp',label:'核心器件供应安全',owner:'李明',target:'7类器件国产化',deviation:0,status:'at_risk',children:[
+    {id:'bp3',type:'bp',label:'核心器件国产替代专项',owner:'李明',budget:3.2,kpiTarget:80,kpiActual:55,kpiUnit:'%',deviation:0,weight:1.0,execState:'idle',execResult:null,
+      history:[{t:'W1',d:-21},{t:'W2',d:-24},{t:'W3',d:-26},{t:'W4',d:-28},{t:'W5',d:-29},{t:'W6',d:-30},{t:'W7',d:-31},{t:'W8',d:-31}],
+      events:[{time:'2025-07',event:'3类器件认证测试失败',impact:-10,agent:'CTO Agent'},{time:'2025-10',event:'供应商A退出竞标',impact:-15,agent:'CMO Agent'}],
+      cf:{earliest:'2025-06-01',action:'启动备选认证实验室',agent:'CTO Agent',confidence:74,missed:112,hypoEvents:[{impact:12}]},
+      paths:[{name:'引入第3方认证机构',targetKpi:65,eff:'偏差31%→18%',cost:'¥5000万',time:'4月',agent:'CTO Agent',confidence:68}]}
+  ]},
+  {id:'sp3',type:'sp',label:'海外市场营收占比',owner:'赵总',target:'海外营收≥15%',deviation:0,status:'at_risk',children:[
+    {id:'bp4',type:'bp',label:'东南亚市场落地计划',owner:'赵总',budget:1.8,kpiTarget:20,kpiActual:8,kpiUnit:'家',deviation:0,weight:1.0,execState:'idle',execResult:null,
+      history:[{t:'W1',d:-35},{t:'W2',d:-40},{t:'W3',d:-45},{t:'W4',d:-50},{t:'W5',d:-55},{t:'W6',d:-58},{t:'W7',d:-59},{t:'W8',d:-60}],
+      events:[{time:'2025-04',event:'当地合规审批延迟4月',impact:-22,agent:'AUD Agent'}],
+      cf:{earliest:'2025-02-15',action:'提前启动当地法人注册',agent:'CMO Agent',confidence:69,missed:151,hypoEvents:[{impact:14}]},
+      paths:[{name:'加速合资公司设立',targetKpi:14,eff:'偏差60%→30%',cost:'¥3000万',time:'3月',agent:'CMO Agent',confidence:62}]}
+  ]},
+  {id:'sp4',type:'sp',label:'研发投入强度',owner:'陈伟',target:'研发占比≥8%',deviation:0,status:'on_track',children:[
+    {id:'bp5',type:'bp',label:'研发管线推进计划',owner:'陈伟',budget:6.0,kpiTarget:15,kpiActual:16,kpiUnit:'件',deviation:0,weight:1.0,execState:'idle',execResult:null,
+      history:[{t:'W1',d:3},{t:'W2',d:5},{t:'W3',d:4},{t:'W4',d:6},{t:'W5',d:7},{t:'W6',d:5},{t:'W7',d:6.7},{t:'W8',d:6.7}],events:[],cf:null,paths:[]}
+  ]},
+  {id:'sp5',type:'sp',label:'人才梯队健康度',owner:'孙静',target:'继任率≥80%',deviation:0,status:'on_track',children:[
+    {id:'bp6',type:'bp',label:'关键人才保留计划',owner:'孙静',budget:0.8,kpiTarget:80,kpiActual:72,kpiUnit:'%',deviation:0,weight:1.0,execState:'idle',execResult:null,
+      history:[{t:'W1',d:-4},{t:'W2',d:-6},{t:'W3',d:-7},{t:'W4',d:-8},{t:'W5',d:-9},{t:'W6',d:-9},{t:'W7',d:-10},{t:'W8',d:-10}],
+      events:[{time:'2025-09',event:'2位总监级提出离职',impact:-5,agent:'CHO Agent'}],
+      cf:{earliest:'2025-06-01',action:'提前启动股权激励方案',agent:'CHO Agent',confidence:76,missed:98,hypoEvents:[{impact:6}]},
+      paths:[{name:'加速股权激励落地',targetKpi:78,eff:'偏差10%→2.5%',cost:'¥2000万',time:'2月',agent:'CHO Agent',confidence:72}]}
+  ]}
+]};
+
+//=== State ===
+let selNodeId='bp1',ghost=false,ghostTarget=null,previewNodeId=null,ghostStep='idle',ghostUndo=null,advisorDismissed=false;
+
+//=== Compute Engine ===
+function computeDeviation(node){if(!node||node.type!=='bp')return 0;return Math.round((node.kpiActual-node.kpiTarget)/node.kpiTarget*1000)/10}
+function computeEventImpact(node){if(!node||!node.events)return 0;return Math.round(node.events.reduce((s,ev)=>s+(ev.impact||0),0)*10)/10}
+function computeCounterfactual(node){if(!node||!node.cf||!node.cf.hypoEvents)return node?computeDeviation(node):0;const totalHypoImpact=node.cf.hypoEvents.reduce((s,ev)=>s+(ev.impact||0),0);const cfActual=Math.max(0,node.kpiActual+totalHypoImpact);return Math.round((cfActual-node.kpiTarget)/node.kpiTarget*1000)/10}
+function computeDelta(node){if(!node||!node.history||node.history.length<2)return {value:0,dir:'flat'};const prev=node.history[node.history.length-2].d;const cur=node.history[node.history.length-1].d;const val=Math.round((cur-prev)*10)/10;const posGain=cur>=0&&prev>=0;const improving=posGain?val>0.5:val<-0.5;const worsening=posGain?val<-0.5:val>0.5;return {value:Math.abs(val),dir:improving?'better':worsening?'worse':'flat'}}
+function computeEMIndicator(node){const d=computeDeviation(node);if(d>=0)return {type:'success',label:'达标',cls:'green'};const t=node.trend||{};const slope=t.slope||0;if(slope<-0.3)return {type:'execution_lag',label:'执行滞后',cls:'amber'};if(slope>=-0.3&&slope<=0.3&&node.history&&node.history.length>=2){const r=node.history.slice(-2);if(r[1].d>r[0].d)return {type:'execution_lag',label:'执行改善中',cls:'amber'};if(r[1].d<=r[0].d)return {type:'execution_stalled',label:'执行停滞',cls:'amber'}}if(slope>0.3)return {type:'strategy_failure',label:'策略失效',cls:'red'};return {type:'execution_stalled',label:'执行停滞',cls:'amber'}}
+function projectTrend(node){if(!node||!node.history||node.history.length<2){if(node)node.trend={slope:0,projected:computeDeviation(node),warn:false};return node?node.trend:{slope:0,projected:0,warn:false}}const h=node.history;let sTotal=0,wTotal=0;for(let i=1;i<h.length;i++){const days=(h.length-i)*7;const w=Math.exp(-days/30);wTotal+=w;sTotal+=(h[i].d-h[i-1].d)/7*w}const slope=wTotal>0?Math.round(sTotal/wTotal*1000)/1000:0;const projected=Math.round((computeDeviation(node)+slope*30)*10)/10;node.trend={slope,projected,warn:projected<-20};return node.trend}
+function aggregateSPDeviation(sp){if(!sp||!sp.children)return 0;const bps=sp.children.filter(c=>c.type==='bp');if(!bps.length)return 0;let wSum=0,dSum=0;for(const bp of bps){const d=computeDeviation(bp);const w=bp.weight||1/bps.length;wSum+=w;dSum+=d*w}const avg=Math.round(dSum/wSum*10)/10;sp.deviation=avg;sp.status=avg<-20?'critical':avg<-10?'at_risk':'on_track';return avg}
+// V7.0 NEW: Post-Apply Effect Verification
+function computeEffect(node,oldDev){if(!node)return {improved:false,delta:0,recommendation:'rollback'};const newDev=computeDeviation(node);const delta=Math.round((newDev-oldDev)*10)/10;return {improved:newDev>oldDev,delta:Math.abs(delta),recommendation:newDev>oldDev?'keep':'rollback'}}
+// V7.0: Execution Guard
+function canRecommend(node){return node&&node.type==='bp'&&['idle','dismissed'].includes(node.execState)&&computeDeviation(node)<-20}
+function findNode(id,root=ROOT){if(root.id===id)return root;if(!root.children)return null;for(const c of root.children){const f=findNode(id,c);if(f)return f}return null}
+function findSP(spId){for(const c of ROOT.children)if(c.id===spId)return c;return null}
+
+//=== Render: Pulse Bar ===
+function renderPulse(){
+  const el=document.getElementById('pulseBar');const allBp=[];for(const sp of ROOT.children)for(const c of sp.children)if(c.type==='bp')allBp.push(c);
+  const total=allBp.length;const critical=allBp.filter(b=>computeDeviation(b)<-20).length;const atRisk=allBp.filter(b=>{const d=computeDeviation(b);return d>=-20&&d<-10}).length;const onTrack=total-critical-atRisk;
+  const spHealth=Math.round(ROOT.children.filter(s=>s.status==='on_track').length/ROOT.children.length*100);
+  el.innerHTML=`<div class="pulse-item"><span class="pulse-dot red"></span>SP健康 ${spHealth}%</div><div class="pulse-item"><span class="pulse-dot amber"></span>BP: <span class="pulse-val red">${critical}</span>恶化 <span class="pulse-val amber">${atRisk}</span>关注 <span class="pulse-val green">${onTrack}</span>达标</div><div style="flex:1"></div><span style="font-size:10px;color:var(--t3)">EM 监控运行中 · ${new Date().toLocaleTimeString()}</span>`;
+}
+
+//=== Render: SP-BP-EM Tree ===
+function renderTree(){
+  const el=document.getElementById('treePanel');let h='';
+  for(const sp of ROOT.children){
+    h+=`<div class="tree-node"><div class="tree-row sp ${sp.status}" onclick="onSelectNode('${sp.id}')"><span class="tree-dot ${sp.status==='critical'?'red':sp.status==='at_risk'?'amber':'green'}"></span><span class="tree-name">📁 SP: ${sp.label} · ${sp.owner}</span><span class="tree-dev ${sp.status==='critical'?'red':sp.status==='at_risk'?'amber':'green'}">${sp.deviation>0?'+':''}${sp.deviation}%</span><span class="tree-meta">← ${sp.children.length}个BP</span></div>`;
+    h+=`<div class="tree-indent">`;
+    for(const bp of sp.children.filter(c=>c.type==='bp')){
+      const d=computeDeviation(bp);const delta=computeDelta(bp);const em=computeEMIndicator(bp);const isSel=bp.id===selNodeId;
+      const rowCls=['tree-row',d<-20?'critical':d<-10?'at-risk':'on-track'];if(isSel)rowCls.push('sel');if(ghost&&bp.id===previewNodeId)rowCls.push('ghost-glow');if(ghost&&bp.id!==previewNodeId)rowCls.push('ghost-dim');if(bp.execState==='verifying')rowCls.push('verifying');
+      h+=`<div class="tree-node"><div class="${rowCls.join(' ')}" onclick="onSelectNode('${bp.id}')"><span class="tree-dot ${d<-20?'red':d<-10?'amber':'green'}"></span><span class="tree-name">├─ BP: ${bp.label} · ${bp.owner}</span><span class="tree-dev ${d<-20?'red':d<-10?'amber':'green'}">${d>0?'+':''}${d}%</span><span class="delta-tag ${delta.dir}">${delta.dir==='worse'?'↓恶化':delta.dir==='better'?'↑改善':'→持平'}${delta.value}pp</span><span class="em-tag ${em.cls}">${em.label}</span>${renderSparkline(bp)}`;
+      // Exec state badge
+      if(bp.execState==='applied')h+=`<span class="exec-badge applied">已纠正</span>`;
+      else if(bp.execState==='verified_improved')h+=`<span class="exec-badge improved">✅改善+${bp.execResult?bp.execResult.delta:''}pp</span>`;
+      else if(bp.execState==='verified_worsened')h+=`<span class="exec-badge worsened">⚠恶化</span>`;
+      else if(bp.execState==='verifying')h+=`<span class="exec-badge applied">验证中...</span>`;
+      // Correct button
+      if(bp.paths&&bp.paths.length>0){
+        const disabled=['applied','verified_improved','verified_worsened','verifying'].includes(bp.execState);
+        h+=`<button class="correct-btn${disabled?' done':''}" ${disabled?'disabled':''} onclick="event.stopPropagation();oneClickCorrect('${bp.id}',0)" title="${disabled?'已执行过纠正':canRecommend(bp)?'一键纠正偏差':'偏差未达纠正阈值'}">⚡${disabled?'已纠正':'纠正'}</button>`;
+      }
+      h+=`</div>`;
+      // Ghost preview row
+      if(ghost&&bp.id===previewNodeId&&ghostTarget!==null){
+        const oldTarget=bp.kpiTarget;const previewActual=Math.round(bp.kpiActual+(ghostTarget-oldTarget)*0.6);const previewDev=Math.round((previewActual-ghostTarget)/ghostTarget*100);
+        h+=`<div class="tree-indent"><div class="tree-row" style="border:1px dashed var(--p);border-radius:4px;opacity:.9"><span style="color:var(--p);font-size:11px">🔮 预览: 目标${ghostTarget}${bp.kpiUnit} · 预估实际${previewActual}${bp.kpiUnit} · 预估偏差${previewDev}%</span></div></div>`;
+      }
+      // Ripple row
+      if(ghost&&bp.id!==previewNodeId&&ghostTarget!==null&&sp.children.filter(c=>c.type==='bp').some(c=>c.id===previewNodeId)){
+        const previewBp=findNode(previewNodeId);if(previewBp){const rf=0.3;const pd=(ghostTarget-previewBp.kpiTarget)*rf*(bp.budget/(previewBp.budget+bp.budget));const sa=Math.round(Math.max(0,bp.kpiActual+pd));const sd=Math.round((sa-bp.kpiTarget)/bp.kpiTarget*100);
+          h+=`<div class="tree-indent"><div class="tree-row" style="border:1px dashed var(--bd);border-radius:4px;opacity:.5;font-size:10px;color:var(--t3)">🌊涟漪: ${sa}${bp.kpiUnit} · 偏差${sd}%</div></div>`;}
+      }
+      if(isSel&&bp.events&&bp.events.length>0){h+=`<div class="tree-indent"><div style="font-size:10px;color:var(--t2);padding:4px 0">`;const ti=computeEventImpact(bp);for(const ev of bp.events){h+=`<div style="display:flex;gap:4px;padding:1px 0"><span style="color:var(--t3);width:42px">${ev.time}</span>${ev.event} <span style="font-family:var(--fm);font-size:9px;padding:0 3px;border-radius:2px;${(ev.impact||0)<0?'background:var(--dn);color:var(--d)':'background:var(--ok);color:var(--s)'}">${(ev.impact||0)>0?'+':''}${ev.impact||0}pp</span> 🤖${ev.agent}</div>`;}h+=`<div style="margin-top:2px;color:var(--t3)">Σimpact=${ti}pp · 偏差=${d}%</div></div></div>`;}
+      if(isSel&&bp.paths&&bp.paths.length>0){h+=`<div class="tree-indent"><div style="font-size:10px;padding:4px 0">`;for(let i=0;i<bp.paths.length;i++){const p=bp.paths[i];h+=`<div style="padding:2px 6px;border:1px solid var(--bd);border-radius:4px;margin-bottom:2px;cursor:pointer;font-size:10px" onclick="event.stopPropagation();previewPath('${bp.id}',${i})">${p.name} · ${p.eff} · ${p.cost} · ${p.time} · 🤖${p.agent} ${p.confidence}%</div>`;}h+=`</div></div>`;}
+      h+=`</div>`;
+    }
+    h+=`</div></div>`;
+  }
+  el.innerHTML=h;
+}
+
+//=== Sparkline ===
+function renderSparkline(node){
+  if(!node||!node.history||node.history.length<2)return '';
+  const pts=node.history;const max=Math.max(...pts.map(p=>Math.abs(p.d)),1);
+  const str=pts.map((p,i)=>{const x=Math.round(i/(pts.length-1)*40);const y=Math.round(7-(p.d/max)*5);return x+','+y}).join(' ');
+  const last=pts[pts.length-1].d,first=pts[0].d;const posBase=last>=0&&first>=0;const clr=posBase?(last>first?'var(--s)':last<first?'var(--d)':'var(--t3)'):(last>first?'var(--s)':last<first?'var(--d)':'var(--t3)');
+  return `<svg class="sparkline-svg" viewBox="0 0 40 14"><polyline points="${str}" fill="none" stroke="${clr}" stroke-width="1.2"/></svg>`;
+}
+
+//=== Render: Debate Panel ===
+const DEBATES=[
+  {agent:'CEO Agent',stance:'pro',text:'优先纠正BP-01，这是最关键的差距来源',confidence:78},
+  {agent:'CFO Agent',stance:'neutral',text:'需要评估纠正成本vs预期收益，建议先做敏感性模拟',confidence:62},
+  {agent:'CMO Agent',stance:'con',text:'应先稳住BP-02，客户流失成本更高，渠道覆盖优先',confidence:55},
+  {agent:'CTO Agent',stance:'pro',text:'BP-01的技术方案已就绪，可立即启动执行',confidence:71},
+  {agent:'COO Agent',stance:'neutral',text:'执行资源需跨BU调配，建议Q1分阶段推进',confidence:53},
+  {agent:'CHO Agent',stance:'con',text:'华东区销售招聘周期需4个月，短期人力支撑不足',confidence:45},
+];
+function renderDebate(){
+  const el=document.getElementById('debatePanel');let h=`<div class="debate-title">🗣 Agent 辩论室</div>`;
+  for(const d of DEBATES){
+    h+=`<div class="debate-item"><div class="debate-agent">🤖 ${d.agent} <span class="debate-stance ${d.stance}">${d.stance==='pro'?'赞同':d.stance==='con'?'反对':'中立'}</span></div><div class="debate-text">${d.text}</div><div class="debate-bar"><div class="debate-bar-fill" style="width:${d.confidence}%"></div></div><div style="font-size:9px;color:var(--t3);margin-top:2px">置信度 ${d.confidence}%</div></div>`;
+  }
+  const consensus=Math.round(DEBATES.reduce((s,d)=>s+d.confidence*(d.stance==='pro'?1:d.stance==='neutral'?0.5:0),0)/DEBATES.length);
+  h+=`<div style="margin-top:8px;font-size:11px;color:var(--p);font-weight:600">共识度 ${consensus}% · 建议: 优先BP-01，同步关注BP-02</div>`;
+  el.innerHTML=h;
+}
+
+//=== Render: Trend Chart ===
+function renderTrend(){
+  const el=document.getElementById('trendPanel');const w=el.clientWidth-48,h=el.clientHeight-24;if(w<=0||h<=0)return;
+  const allBp=[];for(const sp of ROOT.children)for(const c of sp.children)if(c.type==='bp')allBp.push(c);
+  const maxHist=Math.max(...allBp.map(b=>b.history?b.history.length:0),0);if(maxHist===0){el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t3);font-size:11px">趋势数据采集中...</div>';return}
+  const colors=['#f87171','#fbbf24','#60a5fa','#4ade80','#c084fc','#fb923c'];
+  let svg=`<svg class="trend-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs>`;
+  for(let i=0;i<allBp.length;i++){const b=allBp[i];if(!b.history||!b.history.length)continue;
+    svg+=`<linearGradient id="g${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${colors[i]}" stop-opacity="0.15"/><stop offset="100%" stop-color="${colors[i]}" stop-opacity="0"/></linearGradient>`;
+  }
+  svg+=`</defs>`;
+  const allMax=Math.max(...allBp.flatMap(b=>b.history?b.history.map(p=>Math.abs(p.d)):[0]),1);const allMin=-allMax;
+  const yRange=allMax-allMin||1;const stepX=w/Math.max(maxHist-1,1);
+  for(let i=0;i<allBp.length;i++){const b=allBp[i];if(!b.history||!b.history.length)continue;const pts=b.history.map((p,j)=>{const x=Math.round(j*stepX);const y=Math.round((1-(p.d-allMin)/yRange)*h);return x+','+y}).join(' ');
+    svg+=`<polyline points="${pts}" fill="url(#g${i})" stroke="${colors[i]}" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>`;
+  }
+  svg+=`<line x1="0" y1="${Math.round((1-(0-allMin)/yRange)*h)}" x2="${w}" y2="${Math.round((1-(0-allMin)/yRange)*h)}" stroke="var(--t3)" stroke-width="0.5" stroke-dasharray="4,2"/>`;
+  svg+=`</svg>`;
+  el.innerHTML=`<div style="display:flex;gap:12px;margin-bottom:4px;font-size:9px;color:var(--t3)">`+allBp.map((b,i)=>`<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colors[i]};margin-right:2px"></span>${b.label.substring(0,6)}</span>`).join('')+`<span style="margin-left:auto">全局趋势 (8周)</span></div>${svg}`;
+}
+
+//=== AI Advisor ===
+function computeAdvisor(){
+  const allBp=[];for(const sp of ROOT.children)for(const c of sp.children)if(c.type==='bp')allBp.push(c);
+  const criticals=allBp.filter(b=>canRecommend(b));if(!criticals.length)return null;
+  criticals.sort((a,b)=>computeDeviation(a)-computeDeviation(b));return criticals[0];
+}
+function renderAdvisor(){
+  const el=document.getElementById('advisor');const adv=computeAdvisor();
+  if(!adv||advisorDismissed||ghost){el.style.display='none';return}
+  el.style.display='block';const d=computeDeviation(adv);const delta=computeDelta(adv);const em=computeEMIndicator(adv);const sp=findSP(adv.id.startsWith('bp')?findNode(adv.id).id:'');const spNode=adv.id.startsWith('bp')?(ROOT.children.find(s=>s.children.some(c=>c.id===adv.id))||ROOT.children[0]):ROOT.children[0];
+  const cfDev=computeCounterfactual(adv);const improvement=Math.round((cfDev-d)*10)/10;
+  el.innerHTML=`<button style="position:absolute;top:4px;right:6px;cursor:pointer;background:none;border:none;color:var(--t3);font-size:14px" onclick="advisorDismissed=true;renderAdvisor()">×</button>
+    <div class="advisor-title">🤖 AI 战略顾问</div>
+    <div class="advisor-body">建议优先纠正 <b>${adv.label}</b>。<br>偏差 <span class="red">${d}%</span> · ${delta.dir==='worse'?'↓恶化':'↑改善'}${delta.value}pp · EM:${em.label}。<br>预计 SP <b>${spNode.label}</b> 改善 +${improvement}pp。<br>⏰ 已错过${adv.cf?adv.cf.missed:'—'}天窗口。</div>
+    <div class="advisor-actions"><button class="advisor-btn primary" onclick="oneClickCorrect('${adv.id}',0)">⚡ 执行建议</button><button class="advisor-btn" onclick="advisorDismissed=true;renderAdvisor()">💤 忽略</button></div>`;
+}
+
+//=== Render All ===
+function renderAll(){renderPulse();renderTree();renderDebate();renderTrend();renderAdvisor();document.getElementById('ghostBar').classList.toggle('on',ghost)}
+
+//=== Interaction ===
+function onSelectNode(id){selNodeId=id;renderAll()}
+function previewPath(bpId,idx){const node=findNode(bpId);if(!node||!node.paths||!node.paths[idx])return;ghost=true;ghostTarget=node.paths[idx].targetKpi;previewNodeId=bpId;ghostStep='preview';renderAll();T('🔮 幽灵预览: '+node.paths[idx].name,'info')}
+function cancelPreview(){ghost=false;ghostTarget=null;previewNodeId=null;ghostStep='idle';ghostUndo=null;renderAll()}
+// V7.0: oneClickCorrect with execution guard
+function oneClickCorrect(bpId,idx){const node=findNode(bpId);if(!node||!canRecommend(node)){T('⚠ 该BP已执行过纠正，无法重复执行','info');return}
+  ghost=true;ghostTarget=node.paths[idx].targetKpi;previewNodeId=bpId;ghostStep='preview';ghostUndo={nodeId:bpId,prevTarget:node.kpiTarget};advisorDismissed=true;renderAll();
+  setTimeout(()=>{ghostStep='ripple';renderAll();T('🌊 涟漪评估: 计算跨BP影响...','info');setTimeout(()=>{ghostStep='confirm';renderAll()},800)},300)}
+function confirmApply(){const node=findNode(previewNodeId);if(!node||ghostTarget===null)return;const oldDev=computeDeviation(node);const oldTarget=node.kpiTarget;node.kpiTarget=ghostTarget;node.kpiActual=Math.round(Math.max(0,node.kpiActual+(ghostTarget-oldTarget)*0.6));if(node.history&&node.history.length>0){node.history.push({t:'W'+(node.history.length+1),d:computeDeviation(node)});if(node.history.length>12)node.history.shift()}projectTrend(node);const sp=ROOT.children.find(s=>s.children.some(c=>c.id===previewNodeId));if(sp)aggregateSPDeviation(sp);node.execState='verifying';ghost=false;ghostTarget=null;previewNodeId=null;ghostStep='idle';ghostUndo=null;advisorDismissed=false;renderAll();
+  setTimeout(()=>{const effect=computeEffect(node,oldDev);node.execResult=effect;node.execState=effect.improved?'verified_improved':'verified_worsened';renderAll();T(effect.improved?`✅ 偏差改善 +${effect.delta}pp · 建议保留 · [保留] 已自动应用`:`⚠ 偏差恶化 ${effect.delta}pp · 建议回滚 · 按 ESC 撤销`,'info')},600);}
+// ESC undo
+document.addEventListener('DOMContentLoaded',()=>{for(const sp of ROOT.children){aggregateSPDeviation(sp);for(const bp of sp.children.filter(c=>c.type==='bp'))projectTrend(bp);}window.addEventListener('resize',renderTrend);renderAll()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ghost){if(ghostUndo){const node=findNode(ghostUndo.nodeId);if(node){node.kpiTarget=ghostUndo.prevTarget;node.execState='idle';node.execResult=null;ghostUndo=null;T('↺ 已撤销 · 恢复原始KPI目标','info')}}cancelPreview()}});
+</script>
+</body>
+</html>
