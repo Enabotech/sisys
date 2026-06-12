@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SISYS V0.1 · 战略闭环驾驶舱</title>
+<style>
+/* ============================================================
+   CSS 变量（融合 V2.0/V3.3/V4.2 三原型统一）
+   ============================================================ */
+:root{
+  /* 状态色 */
+  --p:#1890ff; --s:#00875A; --w:#B86E00; --d:#C53030; --det:#3B82F6;
+  /* 分层背景色 */
+  --bg:#f5f5f5; --card:#fff; --bd:#e8e8e8;
+  --t1:#262626; --t2:#595959; --t3:#8c8c8c;
+  --ok:#E6F7F1; --wn:#FFF8E6; --dn:#FFF1F0; --db:#EFF6FF;
+  /* DeviationState 三层涟漪 */
+  --ripple-healthy:#E6F7F1; --ripple-drifting:#FFF8E6; --ripple-broken:#FFF1F0;
+  /* 弹簧动画（V2.0） */
+  --spring-bounce:cubic-bezier(0.34,1.56,0.64,1);
+  --spring-settle:cubic-bezier(0.25,0.1,0.25,1);
+  /* 字体 */
+  --f:'PingFang SC','Microsoft YaHei',sans-serif;
+  --fm:'Consolas','Monaco',monospace;
+  /* 尺寸 */
+  --sp-panel-w:240px; --ai-panel-w:320px;
+  --header-h:52px; --ghost-bar-h:36px; --bottom-bar-h:56px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--f);background:var(--bg);color:var(--t1);overflow:hidden;height:100vh}
+
+/* ============================================================
+   动画关键帧（融合三原型）
+   ============================================================ */
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ripple{0%{box-shadow:0 0 0 0 rgba(24,144,255,.4)}100%{box-shadow:0 0 0 12px rgba(24,144,255,0)}}
+@keyframes detPulse{0%,100%{box-shadow:0 0 0 rgba(59,130,246,0)}50%{box-shadow:0 0 14px rgba(59,130,246,.4)}}
+@keyframes scoreGlow{0%{box-shadow:inset 0 0 12px rgba(0,135,90,.4)}100%{box-shadow:inset 0 0 0 rgba(0,135,90,0)}}
+@keyframes scoreShake{0%,100%{transform:translateX(0)}15%{transform:translateX(-4px)}30%{transform:translateX(4px)}45%{transform:translateX(-3px)}60%{transform:translateX(3px)}75%{transform:translateX(-1px)}90%{transform:translateX(1px)}}
+@keyframes ghostPulse{0%,100%{opacity:.45}50%{opacity:.55}}
+@keyframes trendFlip{0%{transform:rotate(0deg)}50%{transform:rotate(180deg)}100%{transform:rotate(0deg)}}
+@keyframes toastIn{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
+
+/* ============================================================
+   App 容器
+   ============================================================ */
+.app{display:flex;flex-direction:column;height:100vh;max-width:1440px;margin:0 auto}
+
+/* ============================================================
+   顶部状态栏（sticky）
+   ============================================================ */
+.header{display:flex;justify-content:space-between;align-items:center;height:var(--header-h);
+  padding:0 16px;border-bottom:1px solid var(--bd);flex-shrink:0;z-index:100;background:var(--card)}
+.header-brand{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.header-status{display:flex;align-items:center;gap:12px;font-size:12px}
+.status-item{display:flex;align-items:center;gap:4px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--s)}
+.status-dot.warn{background:var(--w);animation:detPulse 2s infinite}
+.status-dot.danger{background:var(--d)}
+.status-value{font-weight:600;font-family:var(--fm)}
+.header-right{display:flex;align-items:center;gap:16px;font-size:12px;color:var(--t2)}
+
+/* ============================================================
+   Ghost 预览栏（仅 ghost=true 时可见）
+   ============================================================ */
+.ghost-bar{display:none;height:var(--ghost-bar-h);flex-shrink:0;
+  background:linear-gradient(90deg,#e6f7ff,#f0f5ff);border-bottom:1px solid var(--p);
+  align-items:center;justify-content:space-between;padding:0 16px;font-size:12px}
+.ghost-bar.on{display:flex}
+.ghost-bar-title{color:var(--p);font-weight:600}
+.ghost-bar-preview{display:flex;gap:16px;color:var(--t2)}
+.ghost-bar-actions{display:flex;gap:8px}
+.ghost-btn{padding:4px 12px;border-radius:4px;font-size:12px;cursor:pointer;font-family:var(--f);border:1px solid var(--bd);background:var(--card)}
+.ghost-btn:hover{border-color:var(--p);color:var(--p)}
+.ghost-btn.apply{background:var(--s);color:#fff;border-color:var(--s)}
+.ghost-btn.apply:hover{background:#006d45}
+
+/* ============================================================
+   主体三栏布局
+   ============================================================ */
+.main{display:flex;flex:1;overflow:hidden;position:relative}
+
+/* ❶ SP 战略层 */
+.sp-panel{width:var(--sp-panel-w);flex-shrink:0;border-right:1px solid var(--bd);
+  overflow-y:auto;background:var(--card);display:flex;flex-direction:column}
+.sp-header{padding:12px;font-size:13px;font-weight:600;border-bottom:1px solid var(--bd);color:var(--t2)}
+.sp-cover{padding:8px 12px;font-size:10px;color:var(--t2);border-top:1px solid var(--bd)}
+.sp-cover-bar{height:6px;border-radius:3px;background:var(--bd);margin-top:4px;overflow:hidden}
+.sp-cover-fill{height:100%;border-radius:3px;background:var(--s);transition:width .3s}
+.sp-item{padding:10px 12px;cursor:pointer;border-left:3px solid transparent;transition:all .15s;font-size:12px}
+.sp-item:hover{background:var(--db)}
+.sp-item.on{border-left-color:var(--p);background:#e6f7ff}
+.sp-item.ghost-glow{background:rgba(24,144,255,.08)}
+.sp-item.ghost-dim{opacity:.38;filter:grayscale(30%)}
+.sp-row{display:flex;align-items:center;gap:8px}
+.sp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.sp-dot.critical{background:var(--d)}.sp-dot.at-risk{background:var(--w)}.sp-dot.on-track{background:var(--s)}
+.sp-name{flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-dev{font-family:var(--fm);font-weight:700;font-size:13px}
+.sp-dev.critical{color:var(--d)}.sp-dev.at-risk{color:var(--w)}.sp-dev.on-track{color:var(--s)}
+.sp-dir{font-size:10px;color:var(--t3);padding-left:18px}
+.sp-sub{font-size:10px;padding:2px 0 2px 18px;color:var(--t3);cursor:pointer}
+.sp-sub:hover{color:var(--p)}
+.sp-sub-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px}
+.sp-sub-dot.critical{background:var(--d)}.sp-sub-dot.at-risk{background:var(--w)}.sp-sub-dot.on-track{background:var(--s)}
+.sp-mode{padding:8px 12px;border-top:1px solid var(--bd);display:flex;gap:8px;font-size:11px}
+.mode-btn{padding:3px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--bd);background:var(--card)}
+.mode-btn.on{background:var(--p);color:#fff;border-color:var(--p)}
+
+/* ❷ 因果链 */
+.chain-panel{flex:1;overflow-y:auto;padding:24px}
+.chain-sp{font-size:15px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.chain-sp-emoji{font-size:18px}
+.chain-sp-title{flex:1}
+.chain-sp-target{font-size:11px;color:var(--t3);margin-bottom:4px}
+.chain-sp-agg{font-size:11px;color:var(--p);margin-bottom:12px;cursor:pointer;padding:6px 10px;
+  background:var(--db);border-radius:4px;border-left:3px solid var(--p)}
+.chain-sp-agg:hover{text-decoration:underline}
+.chain-sp-agg-title{font-weight:600;margin-bottom:2px}
+.chain-sp-agg-formula{font-family:var(--fm);color:var(--t2)}
+.chain-bp{border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:12px;
+  transition:all .3s;position:relative;border-left:4px solid transparent}
+.chain-bp.on{border-color:var(--p);background:#f0f7ff}
+.chain-bp::before{content:'├─';position:absolute;left:-18px;top:12px;color:var(--t3);font-size:11px}
+.chain-bp.critical{border-left-color:var(--d)}
+.chain-bp.at-risk{border-left-color:var(--w)}
+.chain-bp.on-track{border-left-color:var(--s)}
+.chain-bp.ghost{opacity:.45;filter:grayscale(30%) blur(.3px);border:2px dashed var(--p);animation:ghostPulse 2s infinite}
+.chain-bp.ghost-glow{border-color:var(--p);box-shadow:0 0 12px rgba(24,144,255,.2);animation:ripple .6s ease-out}
+.chain-bp.ghost-dim{opacity:.38}
+.chain-bp-name{font-weight:600;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.chain-bp-status{font-size:11px;padding:1px 6px;border-radius:10px}
+.chain-bp-status.critical{background:var(--dn);color:var(--d)}
+.chain-bp-status.at-risk{background:var(--wn);color:var(--w)}
+.chain-bp-status.on-track{background:var(--ok);color:var(--s)}
+.chain-kpi{display:flex;gap:12px;align-items:center;font-size:12px;margin:8px 0}
+.chain-kpi-item{flex:1;text-align:center;padding:6px 10px;border-radius:6px;background:var(--bg)}
+.chain-kpi-label{font-size:10px;color:var(--t3);margin-bottom:2px}
+.chain-kpi-val{font-family:var(--fm);font-weight:700;font-size:16px}
+.chain-kpi-val.critical{color:var(--d)}.chain-kpi-val.at-risk{color:var(--w)}.chain-kpi-val.on-track{color:var(--s)}
+.chain-events{margin-top:8px;font-size:11px;color:var(--t2)}
+.chain-event{padding:3px 0;display:flex;gap:6px;align-items:center}
+.chain-event-time{color:var(--t3);width:55px;flex-shrink:0}
+.chain-event-text{flex:1}
+.chain-event-imp{font-family:var(--fm);font-size:10px;padding:0 4px;border-radius:3px}
+.chain-event-imp.neg{background:var(--dn);color:var(--d)}
+.chain-event-imp.pos{background:var(--ok);color:var(--s)}
+.chain-trend{margin-top:8px;padding:8px 10px;border-radius:4px;font-size:11px}
+.chain-trend.warn{background:var(--wn);color:var(--w);font-weight:600}
+.chain-paths{margin-top:10px}
+.chain-path{padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid var(--bd);
+  margin-bottom:6px;transition:all .15s}
+.chain-path:hover{border-color:var(--s)}
+.chain-path.rec{border-color:var(--s);background:var(--ok)}
+.chain-path.ghosting{background:var(--db);border:1px dashed var(--p)}
+.chain-path-name{font-weight:600}
+.chain-path-eff{color:var(--s);font-size:11px}
+.chain-path-meta{font-size:10px;color:var(--t3);margin-top:2px}
+.chain-path-actions{display:flex;gap:6px;margin-top:6px}
+.path-btn{padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--f);
+  border:1px solid var(--bd);background:var(--card)}
+.path-btn:hover{border-color:var(--p);color:var(--p)}
+.path-btn.apply{background:var(--s);color:#fff;border-color:var(--s)}
+.path-btn.apply:hover{background:#006d45}
+
+/* EM 实时块（内嵌于 BP） */
+.em-block{margin-top:10px;padding:10px;border-radius:6px;background:linear-gradient(135deg,#f0f5ff,#e6f7ff);border:1px solid #bfdbfe}
+.em-block-title{font-size:10px;font-weight:600;color:var(--p);margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.em-block-title-dot{width:6px;height:6px;border-radius:50%;background:var(--p);animation:detPulse 2s infinite}
+.em-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.em-label{font-size:11px;color:var(--t3);width:80px}
+.em-score{font-family:var(--fm);font-weight:700;font-size:14px}
+.em-score.critical{color:var(--d)}.em-score.at-risk{color:var(--w)}.em-score.on-track{color:var(--s)}
+.em-bar{flex:1;height:10px;border-radius:5px;background:#e8e8e8;position:relative;overflow:hidden}
+.em-bar-fill{position:absolute;top:0;left:0;height:100%;border-radius:5px;
+  background:linear-gradient(to right,var(--d),var(--w),var(--s));background-size:300% 100%;transition:width .3s}
+.em-trend{font-size:12px;font-weight:600}
+.em-trend.down{color:var(--d)}.em-trend.flat{color:var(--t3)}.em-trend.up{color:var(--s)}
+.em-source{font-size:9px;color:var(--t3);margin-top:2px;display:flex;align-items:center;gap:4px}
+.em-source-dot{width:4px;height:4px;border-radius:50%;background:var(--p)}
+
+/* Ghost 三层涟漪 */
+.ghost-ripple-box{margin-top:10px;padding:8px;border-radius:6px;background:rgba(24,144,255,.05);border:1px dashed var(--p)}
+.ghost-ripple-title{font-size:10px;font-weight:600;color:var(--p);margin-bottom:6px}
+.ghost-ripple-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11px}
+.ghost-ripple-label{width:30px;color:var(--t3)}
+.ghost-ripple-bars{flex:1;height:12px;border-radius:6px;background:#f5f5f5;position:relative;overflow:hidden}
+.ghost-ripple-fill{position:absolute;top:0;left:0;height:100%;border-radius:6px;background:var(--p);opacity:.35;transition:width .3s}
+.ghost-ripple-symbol{font-family:var(--fm);font-size:14px;font-weight:600;color:var(--p)}
+
+/* ❹ AI 智能层 */
+.ai-panel{width:var(--ai-panel-w);flex-shrink:0;border-left:1px solid var(--bd);
+  overflow-y:auto;background:var(--card);padding:16px}
+.ai-title{font-size:13px;font-weight:700;margin-bottom:12px}
+
+/* 反事实推演卡 */
+.cf-card{background:var(--db);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px}
+.cf-card-title{font-weight:600;color:var(--p);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.cf-card-agent{font-size:10px;color:var(--t3)}
+.cf-card-action{font-size:11px;color:var(--t2);margin:6px 0}
+.cf-card-compare{display:flex;gap:8px;align-items:center;margin:8px 0}
+.cf-cur{padding:6px 10px;border-radius:4px;font-size:13px;font-family:var(--fm);font-weight:700;background:var(--dn);color:var(--d)}
+.cf-arrow{font-size:16px;color:var(--t3)}
+.cf-pre{padding:6px 10px;border-radius:4px;font-size:13px;font-family:var(--fm);font-weight:700;background:var(--ok);color:var(--s)}
+.cf-card-delta{font-size:11px;color:var(--s);margin-top:4px}
+.cf-card-missed{font-size:11px;color:var(--d);font-weight:600}
+
+/* AI 代偿建议 */
+.ai-strategies{margin-bottom:12px}
+.ai-strategy-card{border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px;transition:all .2s}
+.ai-strategy-card[data-rank="primary"]{border-color:#d4a006;box-shadow:0 0 6px rgba(212,139,6,.1)}
+.strategy-name{font-weight:600;margin-bottom:2px}
+.strategy-name.primary::before{content:'🥇 ';color:#d4a006}
+.strategy-name.secondary::before{content:'🥈 ';color:var(--t3)}
+.strategy-eff{font-size:11px;color:var(--s)}
+.strategy-meta{font-size:10px;color:var(--t3);margin-top:2px}
+.strategy-actions{display:flex;gap:6px;margin-top:6px}
+.strategy-btn{padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--f);border:1px solid var(--bd);background:var(--card)}
+.strategy-btn:hover{border-color:var(--p);color:var(--p)}
+.strategy-btn.apply{background:var(--s);color:#fff;border-color:var(--s)}
+
+/* AI 异议 */
+.dissent{margin-bottom:12px}
+.dissent-hd{display:flex;justify-content:space-between;cursor:pointer;padding:6px 0;font-size:12px;font-weight:600;color:var(--t2)}
+.dissent-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.dissent-list.closed{display:none}
+.dissent-card{padding:8px 10px;border-radius:6px;font-size:11px;border-left:3px solid var(--w);background:var(--wn)}
+.dissent-role{font-weight:700;color:var(--w);margin-bottom:2px}
+.dissent-text{color:var(--t2)}
+.dissent-src{font-size:10px;color:var(--t3);margin-top:4px}
+
+/* Agent badge（V4.2 统一） */
+.agent-badge{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;
+  background:#EFF6FF;border-left:3px solid var(--p);color:var(--p);font-weight:500;white-space:nowrap}
+
+/* 闭环验证面板 */
+.closure-panel{background:linear-gradient(135deg,#f0f7ff,#e6f7ff);border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #bfdbfe}
+.closure-title{font-size:12px;font-weight:600;color:var(--p);margin-bottom:8px}
+.closure-prediction{display:flex;gap:12px;margin:8px 0;font-size:11px}
+.closure-pred-item{flex:1;text-align:center;padding:4px 8px;border-radius:4px;background:var(--card)}
+.closure-pred-label{font-size:10px;color:var(--t3);margin-bottom:2px}
+.closure-pred-value{font-family:var(--fm);font-weight:700}
+.closure-pred-value.improve{color:var(--s)}
+.closure-time{font-size:10px;color:var(--t3);margin-bottom:8px}
+.closure-actions{display:flex;gap:8px}
+.closure-btn{padding:6px 14px;border-radius:4px;font-size:12px;cursor:pointer;font-family:var(--f);border:1px solid var(--bd);background:var(--card)}
+.closure-btn:hover{border-color:var(--p);color:var(--p)}
+.closure-btn.apply{background:var(--s);color:#fff;border-color:var(--s)}
+.closure-btn.apply:hover{background:#006d45}
+
+/* ============================================================
+   ❸ EM 执行层闭环面板（底部）
+   ============================================================ */
+.em-panel{height:140px;flex-shrink:0;border-top:1px solid var(--bd);background:var(--card);overflow-y:auto}
+.em-panel-header{padding:8px 16px;font-size:11px;color:var(--t2);display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--bd)}
+.em-panel-header-dot{width:6px;height:6px;border-radius:50%;background:var(--p);animation:detPulse 2s infinite}
+.em-panel-table{width:100%;border-collapse:collapse;font-size:11px}
+.em-panel-table th{text-align:left;font-weight:600;color:var(--t3);padding:6px 12px;border-bottom:1px solid var(--bd);font-size:10px;background:var(--bg)}
+.em-panel-table td{padding:6px 12px;border-bottom:1px solid var(--bg)}
+.em-panel-table .critical td{background:var(--dn)}
+.em-panel-table .at-risk td{background:var(--wn)}
+.em-ripple-cell{display:flex;gap:4px;font-family:var(--fm);font-size:12px}
+.em-ripple-symbol{padding:2px 4px;border-radius:3px}
+.em-ripple-symbol.healthy{background:var(--ok);color:var(--s)}
+.em-ripple-symbol.drifting{background:var(--wn);color:var(--w)}
+.em-ripple-symbol.broken{background:var(--dn);color:var(--d)}
+.em-action-cell{font-size:10px;color:var(--t3)}
+.em-action-cell.trigger{color:var(--d);font-weight:600}
+.em-action-cell.pool{color:var(--w)}
+.em-action-cell.silent{color:var(--t3)}
+
+/* ============================================================
+   📌 今日行动条（sticky bottom）
+   ============================================================ */
+.bottom-bar{height:var(--bottom-bar-h);flex-shrink:0;border-top:1px solid var(--bd);
+  padding:8px 16px;display:flex;align-items:center;gap:16px;font-size:11px;background:var(--card)}
+.bottom-title{font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.bottom-count{font-family:var(--fm);color:var(--p)}
+.bottom-closure{color:var(--t2);display:flex;align-items:center;gap:4px}
+.bottom-closure-value{font-family:var(--fm);font-weight:700;color:var(--s)}
+.bottom-closure-delta{font-size:10px;color:var(--s)}
+.bottom-actions{flex:1;overflow-x:auto;display:flex;gap:8px}
+.bottom-act{flex:1;min-width:200px;padding:6px 10px;border-radius:4px;background:var(--bg);font-size:11px;cursor:pointer;transition:all .15s;border:1px solid transparent}
+.bottom-act:hover{border-color:var(--p)}
+.bottom-act.critical{border-left:3px solid var(--d)}
+.bottom-act.at-risk{border-left:3px solid var(--w)}
+.bottom-act-num{font-family:var(--fm);font-weight:700;margin-right:4px;color:var(--p)}
+.bottom-act-from{font-size:9px;color:var(--t3)}
+
+/* ============================================================
+   Toast
+   ============================================================ */
+.toast-container{position:fixed;top:64px;right:24px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+.toast{padding:10px 16px;border-radius:4px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.12);animation:toastIn .3s ease-out}
+.toast.success{background:#f6ffed;border:1px solid #b7eb8f;color:#135200}
+.toast.info{background:#e6f7ff;border:1px solid #91d5ff;color:#003a8c}
+.toast.warning{background:#fffbe6;border:1px solid #ffe58f;color:#874d00}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+@media(max-width:1200px){
+  .sp-panel{width:200px}
+  .ai-panel{width:280px}
+}
+@media(max-width:768px){
+  .sp-panel,.ai-panel{display:none}
+  .chain-panel{padding:16px}
+  .em-panel{height:100px}
+  .bottom-bar{height:auto;padding:6px 12px;flex-wrap:wrap}
+  .bottom-actions{width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- App 容器 -->
+<div class="app">
+
+<!-- 顶部状态栏 -->
+<header class="header">
+  <div class="header-brand">🎯 SISYS 战略闭环驾驶舱</div>
+  <div class="header-status">
+    <span class="status-item"><span class="status-dot" id="statusDot"></span><span>SP健康度</span><span class="status-value" id="spHealth">0.78</span></span>
+    <span class="status-item"><span style="color:var(--w)">⚠</span><span id="alertCount">2</span><span>断点待补</span></span>
+    <span class="status-item">●准实时 T+15min</span>
+    <span class="status-item">闭环率 <span class="status-value" id="closureRate">92%</span><span style="color:var(--s)">↗</span></span>
+  </div>
+  <div class="header-right">
+    <span>XX公司 2026 SP-BP</span>
+    <span>👤 张总</span>
+  </div>
+</header>
+
+<!-- Ghost 预览栏 -->
+<div class="ghost-bar" id="ghostBar">
+  <span class="ghost-bar-title">🔮 幽灵预览中</span>
+  <span class="ghost-bar-preview" id="ghostPreview"></span>
+  <div class="ghost-bar-actions">
+    <button class="ghost-btn" onclick="cancelPreview()">✖ 取消</button>
+    <button class="ghost-btn apply" onclick="applyPath()">✓ 确认下达</button>
+  </div>
+</div>
+
+<!-- 主体三栏 -->
+<div class="main">
+  <!-- ❶ SP 战略层 -->
+  <div class="sp-panel" id="spPanel"></div>
+
+  <!-- ❷ 因果链 -->
+  <div class="chain-panel" id="chainPanel"></div>
+
+  <!-- ❹ AI 智能层 -->
+  <div class="ai-panel" id="aiPanel"></div>
+</div>
+
+<!-- ❸ EM 执行层闭环面板 -->
+<div class="em-panel" id="emPanel"></div>
+
+<!-- 📌 今日行动条 -->
+<div class="bottom-bar" id="bottomBar"></div>
+
+</div>
+
+<!-- Toast 容器 -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ============================================================
+// 工具函数
+// ============================================================
+function T(m,t){const c=document.getElementById('toastContainer'),e=document.createElement('div');
+  e.className='toast '+t;e.textContent=m;c.appendChild(e);
+  setTimeout(()=>{e.style.opacity='0';e.style.transition='opacity .3s';
+    setTimeout(()=>e.remove(),300)},3000)}
+function C(v,min,max){return Math.max(min,Math.min(max,v))}
+function TA(iso){const d=new Date(iso),n=new Date(),s=Math.floor((n-d)/1000);
+  if(s<60)return'刚刚';if(s<3600)return Math.floor(s/60)+'分钟前';
+  if(s<86400)return Math.floor(s/3600)+'小时前';
+  return Math.floor(s/86400)+'天前'}
+
+// ============================================================
+// DeviationState 枚举
+// ============================================================
+const DeviationState={HEALTHY:{code:'green',symbol:'░',cls:'on-track'},
+  DRIFTING:{code:'amber',symbol:'▒',cls:'at-risk'},BROKEN:{code:'red',symbol:'▓',cls:'critical'}};
+function getDevState(deviation,thresholds){const t=thresholds||{healthy:-10,drifting:-20};
+  if(deviation>=t.healthy)return DeviationState.HEALTHY;
+  if(deviation>=t.drifting)return DeviationState.DRIFTING;
+  return DeviationState.BROKEN}
+function getEMDevState(pct){const abs=Math.abs(pct);
+  if(abs<=5)return DeviationState.HEALTHY;
+  if(abs<=10)return DeviationState.DRIFTING;
+  return DeviationState.BROKEN}
+
+// ============================================================
+// 数据定义：SPS / BPIS / EMS
+// ============================================================
+const SPS=[
+  {id:'sp1',name:'供应链自主可控',target:'国产化≥67%',owner:'张总',tier:'strategic',
+    bpIds:['bp1','bp2'],weight:[0.68,0.32],deviation:0,direction:0.35,current:0,status:'critical'},
+  {id:'sp2',name:'核心器件供应安全',target:'7类器件国产化',owner:'李明',tier:'strategic',
+    bpIds:['bp3'],weight:[1.0],deviation:0,direction:0.41,current:0,status:'critical'},
+  {id:'sp3',name:'海外市场营收占比',target:'海外营收≥15%',owner:'赵总',tier:'strategic',
+    bpIds:['bp4'],weight:[1.0],deviation:0,direction:0.62,current:0,status:'at-risk'},
+  {id:'sp4',name:'研发投入强度',target:'研发占比≥8%',owner:'陈伟',tier:'execution',
+    bpIds:['bp5'],weight:[1.0],deviation:0,direction:0.88,current:0,status:'on-track'},
+  {id:'sp5',name:'人才梯队健康度',target:'继任率≥80%',owner:'孙静',tier:'capability',
+    bpIds:['bp6'],weight:[1.0],deviation:0,direction:0.78,current:0,status:'at-risk'}
+];
+
+const BPIS=[
+  {id:'bp1',cpId:'sp1',name:'国产供应商替代计划',owner:'张总',budget:5.0,
+    kpiName:'国产供应商签约率',kpiTarget:70,kpiActual:45,kpiUnit:'%',decode:0.45,
+    events:[{time:'2025-09',event:'鑫达贸易月度出货量下降23%',st:'danger',impact:-12,agent:'CMO Agent'},
+            {time:'2025-10',event:'续约谈判推迟(第2次)',st:'warning',impact:-8,agent:'COO Agent'},
+            {time:'2025-11',event:'⚠ 合同终止风险',st:'danger',impact:-15,agent:'AUD Agent'}],
+    cf:{earliest:'2025-09-15',action:'启动备选供应商资质预审',agent:'CFO Agent',confidence:82,missed:63,
+        hypoEvents:[{impact:20,label:'备选供应商替代'}]},
+    paths:[{name:'分阶段推进 Q1→Q4',targetKpi:55,eff:'偏差35%→15%',cost:'额外供应商开发资源',time:'12个月',agent:'CFO Agent',confidence:78},
+           {name:'替换供应商华信→国产替代',targetKpi:60,eff:'偏差35%→28%',cost:'¥1.2亿合同重新谈判',time:'6个月',agent:'COO Agent',confidence:65}],
+    trend:{slope:0,projected:-48,warn:true}},
+  {id:'bp2',cpId:'sp1',name:'供应链韧性提升计划',owner:'张总',budget:2.4,
+    kpiName:'供应中断恢复时间',kpiTarget:48,kpiActual:72,kpiUnit:'h',decode:0.52,
+    events:[{time:'2025-08',event:'华东仓库水灾导致3天断供',st:'danger',impact:-18,agent:'COO Agent'}],
+    cf:{earliest:'2025-07-01',action:'启动异地备灾仓库建设',agent:'COO Agent',confidence:71,missed:94,
+        hypoEvents:[{impact:15,label:'备灾仓库启用'}]},
+    paths:[{name:'加速异地仓库建设',targetKpi:55,eff:'恢复时间72h→55h',cost:'¥8,000万追加投资',time:'6个月',agent:'COO Agent',confidence:65}],
+    trend:{slope:0,projected:-35,warn:true}},
+  {id:'bp3',cpId:'sp2',name:'核心器件国产替代专项',owner:'李明',budget:3.2,
+    kpiName:'国产器件认证通过率',kpiTarget:80,kpiActual:55,kpiUnit:'%',decode:0.38,
+    events:[{time:'2025-07',event:'3类器件认证测试失败',st:'warning',impact:-10,agent:'CTO Agent'},
+            {time:'2025-10',event:'供应商A退出竞标',st:'danger',impact:-15,agent:'CMO Agent'}],
+    cf:{earliest:'2025-06-01',action:'启动备选认证实验室',agent:'CTO Agent',confidence:74,missed:112,
+        hypoEvents:[{impact:12,label:'备选实验室'}]},
+    paths:[{name:'引入第3方认证机构',targetKpi:65,eff:'偏差31%→18%',cost:'¥5,000万',time:'4个月',agent:'CTO Agent',confidence:68}],
+    trend:{slope:0,projected:-25,warn:true}},
+  {id:'bp4',cpId:'sp3',name:'东南亚市场落地计划',owner:'赵总',budget:1.8,
+    kpiName:'海外渠道签约数',kpiTarget:20,kpiActual:8,kpiUnit:'家',decode:0.58,
+    events:[{time:'2025-04',event:'当地合规审批延迟4个月',st:'danger',impact:-22,agent:'AUD Agent'}],
+    cf:{earliest:'2025-02-15',action:'提前启动当地法人注册',agent:'CMO Agent',confidence:69,missed:151,
+        hypoEvents:[{impact:14,label:'提前注册'}]},
+    paths:[{name:'加速合资公司设立',targetKpi:14,eff:'偏差60%→30%',cost:'¥3,000万',time:'3个月',agent:'CMO Agent',confidence:62}],
+    trend:{slope:0,projected:-20,warn:true}},
+  {id:'bp5',cpId:'sp4',name:'研发管线推进计划',owner:'陈伟',budget:6.0,
+    kpiName:'专利申请数',kpiTarget:15,kpiActual:16,kpiUnit:'件',decode:0.92,
+    events:[],cf:null,paths:[],trend:{slope:0,projected:7,warn:false}},
+  {id:'bp6',cpId:'sp5',name:'关键人才保留计划',owner:'孙静',budget:0.8,
+    kpiName:'关键岗位继任率',kpiTarget:80,kpiActual:72,kpiUnit:'%',decode:0.72,
+    events:[{time:'2025-09',event:'2位总监级提出离职',st:'warning',impact:-5,agent:'CHO Agent'}],
+    cf:{earliest:'2025-06-01',action:'提前启动股权激励方案',agent:'CHO Agent',confidence:76,missed:98,
+        hypoEvents:[{impact:6,label:'股权激励'}]},
+    paths:[{name:'加速股权激励落地',targetKpi:78,eff:'偏差10%→2.5%',cost:'¥2,000万',time:'2个月',agent:'CHO Agent',confidence:72}],
+    trend:{slope:0,projected:-12,warn:false}}
+];
+
+const EMS=[
+  {id:'em1',bpId:'bp1',name:'里程碑达成率',metric:'里程碑完成数',target:55,actual:21,unit:'项',
+    execution:28,deviationPct:62,detectionState:'red',rippleLevel:3,feedbackAction:'trigger_ai',
+    lastUpdate:'2026-06-12T14:32:00',dataSource:'ERP/PM',trend:'down'},
+  {id:'em2',bpId:'bp1',name:'关键人才留存',metric:'关键岗位留存率',target:90,actual:78,unit:'%',
+    execution:76,deviationPct:-12,detectionState:'amber',rippleLevel:2,feedbackAction:'pool',
+    lastUpdate:'2026-06-12T14:32:00',dataSource:'HR系统',trend:'flat'},
+  {id:'em3',bpId:'bp2',name:'成本控制',metric:'运营成本',target:100,actual:103,unit:'%',
+    execution:92,deviationPct:3,detectionState:'green',rippleLevel:0,feedbackAction:'silent',
+    lastUpdate:'2026-06-12T14:32:00',dataSource:'ERP',trend:'up'},
+  {id:'em4',bpId:'bp3',name:'合规达标',metric:'合规审计通过率',target:100,actual:100,unit:'%',
+    execution:100,deviationPct:0,detectionState:'green',rippleLevel:0,feedbackAction:'silent',
+    lastUpdate:'2026-06-12T14:32:00',dataSource:'AUD系统',trend:'flat'}
+];
+
+// ============================================================
+// Ghost 状态
+// ============================================================
+let ghost={active:false,pathIdx:null,bpId:null,targetKpi:null,
+  rippleSiblings:{},rippleSP:{},rippleEM:{}};
+let selection={spId:'sp1',bpId:'bp1',emId:'em1'};
+let mode='briefing';
+let closureRate=92,closureWeekDelta=5;
+
+// ============================================================
+// 核心引擎（复用 V4.2）
+// ============================================================
+function computeDeviation(bp){if(!bp)return 0;
+  return Math.round((bp.kpiActual-bp.kpiTarget)/bp.kpiTarget*1000)/10}
+function computeEventImpact(bp){if(!bp||!bp.events)return 0;
+  return Math.round(bp.events.reduce((s,ev)=>s+(ev.impact||0),0)*10)/10}
+function projectTrend(bp){if(!bp||!bp.events||!bp.events.length){
+  if(bp)bp.trend={slope:0,projected:computeDeviation(bp),warn:false};
+  return bp?bp.trend:{slope:0,projected:0,warn:false}}
+  const now=new Date('2025-12-01'),msDay=86400000;
+  let wTotal=0,sTotal=0;
+  for(const ev of bp.events){const days=(now-new Date(ev.time+'-01'))/msDay;
+    const w=Math.exp(-days/30);wTotal+=w;sTotal+=(ev.impact||0)/Math.max(days,1)*w}
+  const slope=wTotal>0?Math.round(sTotal/wTotal*1000)/1000:0;
+  const projected=Math.round((computeDeviation(bp)+slope*30)*10)/10;
+  const warn=projected<-20;
+  bp.trend={slope,projected,warn};return bp.trend}
+function computeCounterfactual(bp){if(!bp||!bp.cf||!bp.cf.hypoEvents)return computeDeviation(bp);
+  const totalHypoImpact=bp.cf.hypoEvents.reduce((s,ev)=>s+(ev.impact||0),0);
+  const cfActual=Math.max(0,bp.kpiActual+totalHypoImpact);
+  return Math.round((cfActual-bp.kpiTarget)/bp.kpiTarget*1000)/10}
+function aggregateSPDeviation(spId){const sp=SPS.find(s=>s.id===spId);
+  if(!sp||!sp.bpIds.length)return 0;
+  const bps=BPIS.filter(b=>b.cpId===spId);
+  let wSum=0,dSum=0;
+  for(let i=0;i<bps.length;i++){const d=computeDeviation(bps[i]);
+    const w=sp.weight[i]||1/bps.length;wSum+=w;dSum+=d*w}
+  const avg=Math.round(dSum/wSum*10)/10;
+  sp.deviation=avg;
+  sp.current=Math.round(bps.reduce((s,bp)=>s+bp.kpiActual,0)/bps.length);
+  sp.status=avg<-20?'critical':avg<-10?'at-risk':'on-track';
+  // 计算方向分（V2.0风格）
+  sp.direction=Math.max(0,Math.min(1,1-avg/50));
+  return avg}
+function computeEMState(em){const pct=((em.actual-em.target)/em.target)*100;
+  em.deviationPct=Math.round(pct*10)/10;
+  const abs=Math.abs(pct);
+  em.detectionState=abs<=5?'green':abs<=10?'amber':'red';
+  em.feedbackAction=abs<=5?'silent':abs<=10?'pool':'trigger_ai';
+  em.execution=Math.max(0,Math.min(100,100-abs*1.5));
+  return em}
+function computeRippleLevel(em){if(em.detectionState==='green')return 0;
+  if(em.execution>=60)return 1;
+  const bp=BPIS.find(b=>b.id===em.bpId);if(!bp)return 1;
+  const bpDev=computeDeviation(bp);if(bpDev>-20)return 2;
+  return 3}
+
+// ============================================================
+// 初始化计算
+// ============================================================
+function initCompute(){SPS.forEach(sp=>aggregateSPDeviation(sp.id));
+  BPIS.forEach(bp=>projectTrend(bp));
+  EMS.forEach(em=>{computeEMState(em);computeRippleLevel(em)})}
+
+// ============================================================
+// SP健康度聚合
+// ============================================================
+function getSPHealth(){const healthy=SPS.filter(s=>s.status==='on_track').length;
+  const total=SPS.length;const ratio=healthy/total;
+  const avgDir=SPS.reduce((s,sp)=>s+sp.direction,0)/total;
+  return Math.round(avgDir*100)/100}
+function getAlertCount(){return SPS.filter(s=>s.status==='critical').length+SPS.filter(s=>s.status==='at-risk').length}
+
+// ============================================================
+// 渲染函数
+// ============================================================
+function renderHeader(){const health=getSPHealth();
+  const alert=getAlertCount();
+  document.getElementById('spHealth').textContent=health.toFixed(2);
+  document.getElementById('alertCount').textContent=alert;
+  document.getElementById('closureRate').textContent=closureRate+'%';
+  const dot=document.getElementById('statusDot');
+  dot.className='status-dot';
+  if(health<0.6)dot.classList.add('danger');
+  else if(health<0.8)dot.classList.add('warn')}
+
+function renderSPPanel(){const el=document.getElementById('spPanel');
+  const sorted=[...SPS].sort((a,b)=>a.deviation-b.deviation);
+  let h='<div class="sp-header">❶ SP 战略层</div>';
+  for(const sp of sorted){const state=getDevState(sp.deviation);
+    const cls=['sp-item'];if(sp.id===selection.spId)cls.push('on');
+    if(ghost.active&&ghost.rippleSP[sp.id])cls.push('ghost-glow');
+    else if(ghost.active&&sp.id!==selection.spId)cls.push('ghost-dim');
+    h+='<div class="'+cls.join(' ')+'" onclick="onSelectSP(\''+sp.id+'\')">'+
+      '<div class="sp-row"><span class="sp-dot '+state.cls+'"></span>'+
+      '<span class="sp-name">'+sp.name+'</span>'+
+      '<span class="sp-dev '+state.cls+'">'+(sp.deviation>0?'+':'')+sp.deviation+'%</span></div>'+
+      '<div class="sp-dir">方向分 '+sp.direction.toFixed(2)+' · '+sp.tier+'</div>';
+    for(const bpId of sp.bpIds){const bp=BPIS.find(b=>b.id===bpId);
+      if(!bp)continue;const bpState=getDevState(computeDeviation(bp));
+      h+='<div class="sp-sub" onclick="event.stopPropagation();onSelectBP(\''+bpId+'\')">'+
+        '<span class="sp-sub-dot '+bpState.cls+'"></span>'+bp.name+' '+computeDeviation(bp)+'%</div>'}
+    h+='</div>'}
+  // 覆盖率
+  const total=SPS.length;const mapped=SPS.filter(s=>s.bpIds.length>0).length;
+  const pct=Math.round(mapped/total*100);
+  h+='<div class="sp-cover">📊 SP→BP 映射覆盖率: '+pct+'% ('+mapped+'/'+total+')'+
+    '<div class="sp-cover-bar"><div class="sp-cover-fill" style="width:'+pct+'%"></div></div></div>';
+  // 模式切换
+  h+='<div class="sp-mode">'+
+    '<button class="mode-btn'+(mode==='briefing'?' on':'')+'" onclick="setMode(\'briefing\')">📋 简报</button>'+
+    '<button class="mode-btn'+(mode==='matrix'?' on':'')+'" onclick="setMode(\'matrix\')">🔮 矩阵</button></div>';
+  el.innerHTML=h}
+
+function renderChainPanel(){const el=document.getElementById('chainPanel');
+  const sp=SPS.find(s=>s.id===selection.spId);if(!sp)return;
+  const bps=BPIS.filter(b=>b.cpId===selection.spId);
+  const state=getDevState(sp.deviation);
+  let h='<div class="chain-sp"><span class="chain-sp-emoji">'+(state.cls==='critical'?'🔴':state.cls==='at-risk'?'🟡':'🟢')+
+    '</span><span class="chain-sp-title">'+sp.name+'</span>'+
+    '<span class="agent-badge">方向分 '+sp.direction.toFixed(2)+' · '+sp.owner+'</span></div>'+
+    '<div class="chain-sp-target">目标: '+sp.target+' · 偏差: '+sp.deviation+'% · '+sp.tier+'</div>';
+  // 聚合公式
+  h+='<div class="chain-sp-agg" onclick="T(\'聚合公式: Σ(BP偏差×权重)/Σ(权重)\',\'info\')">'+
+    '<div class="chain-sp-agg-title">📐 聚合公式</div>'+
+    '<div class="chain-sp-agg-formula">'+bps.map((bp,i)=>{
+      const w=sp.weight[i]||1/bps.length;return bp.name.split('')[0]+computeDeviation(bp)+'%×'+Math.round(w*100)+'%'
+    }).join(' + ')+' = '+sp.deviation+'%</div></div>';
+  // BP卡片
+  for(const bp of bps){const bpDev=computeDeviation(bp);const bpState=getDevState(bpDev);
+    const cls=['chain-bp',bpState.cls];if(bp.id===selection.bpId)cls.push('on');
+    if(ghost.active&&bp.id===ghost.bpId)cls.push('ghost');
+    else if(ghost.active&&ghost.rippleSiblings[bp.id])cls.push('ghost-glow');
+    else if(ghost.active&&bp.id!==ghost.bpId&&bp.cpId===selection.spId)cls.push('ghost-dim');
+    h+='<div class="'+cls.join(' ')+'" onclick="onSelectBP(\''+bp.id+'\')">'+
+      '<div class="chain-bp-name">'+(bpState.cls==='critical'?'🔴':bpState.cls==='at-risk'?'🟡':'🟢')+
+        ' BP: '+bp.name+' · '+bp.owner+' · ¥'+bp.budget+'亿'+
+        '<span class="chain-bp-status '+bpState.cls+'">'+bpState.cls.toUpperCase()+'</span></div>'+
+      '<div class="chain-kpi">'+
+        '<div class="chain-kpi-item"><div class="chain-kpi-label">目标</div>'+
+        '<div class="chain-kpi-val">'+bp.kpiTarget+bp.kpiUnit+'</div></div>'+
+        '<div class="chain-kpi-item"><div class="chain-kpi-label">实际</div>'+
+        '<div class="chain-kpi-val '+bpState.cls+'">'+bp.kpiActual+bp.kpiUnit+'</div></div>'+
+        '<div class="chain-kpi-item"><div class="chain-kpi-label">偏差</div>'+
+        '<div class="chain-kpi-val '+bpState.cls+'">'+bpDev+'%</div></div></div>';
+    // Ghost预览（主卡片）
+    if(ghost.active&&bp.id===ghost.bpId&&ghost.targetKpi){
+      const previewActual=Math.round(bp.kpiActual+(ghost.targetKpi-bp.kpiTarget)*0.6);
+      const previewDev=Math.round((previewActual-ghost.targetKpi)/ghost.targetKpi*100);
+      h+='<div class="chain-kpi" style="opacity:.7;border:1px dashed var(--p);border-radius:4px">'+
+        '<div class="chain-kpi-item"><div class="chain-kpi-label">预览目标</div>'+
+        '<div class="chain-kpi-val" style="color:var(--p)">'+ghost.targetKpi+bp.kpiUnit+'</div></div>'+
+        '<div class="chain-kpi-item"><div class="chain-kpi-label">预估实际</div>'+
+        '<div class="chain-kpi-val" style="color:var(--p)">'+previewActual+bp.kpiUnit+'</div></div>'+
+        '<div class="chain-kpi-item"><div class="chain-kpi-label">预估偏差</div>'+
+        '<div class="chain-kpi-val" style="color:var(--p)">'+previewDev+'%</div></div></div>'}
+    // Ghost涟漪（兄弟BP）
+    if(ghost.active&&ghost.rippleSiblings[bp.id]&&bp.id!==ghost.bpId){
+      const sibActual=ghost.rippleSiblings[bp.id];
+      const sibDev=Math.round((sibActual-bp.kpiTarget)/bp.kpiTarget*100);
+      h+='<div class="chain-kpi" style="opacity:.5;border:1px dashed var(--bd);border-radius:4px">'+
+        '<div class="chain-kpi-item"><div class="chain-kpi-label">涟漪预估</div>'+
+        '<div class="chain-kpi-val" style="color:var(--t3)">'+sibActual+bp.kpiUnit+'</div></div>'+
+        '<div class="chain-kpi-item"><div class="chain-kpi-label">涟漪偏差</div>'+
+        '<div class="chain-kpi-val" style="color:var(--t3)">'+sibDev+'%</div></div></div>'}
+    // 事件因果链
+    if(bp.events&&bp.events.length){h+='<div class="chain-events">';
+      for(const ev of bp.events){h+='<div class="chain-event">'+
+        '<span class="chain-event-time">'+ev.time+'</span>'+
+        '<span class="chain-event-text">'+ev.event+'</span>'+
+        '<span class="chain-event-imp '+((ev.impact||0)<0?'neg':'pos')+'">'+(ev.impact||0)+'pp</span>'+
+        '<span class="agent-badge">🤖 '+ev.agent+'</span></div>'}
+      h+='<div style="font-size:10px;color:var(--t3);margin-top:2px">Σimpact = '+computeEventImpact(bp)+'pp</div></div>'}
+    // 趋势预警
+    if(bp.trend&&bp.trend.warn){h+='<div class="chain-trend warn">⚠ 30日趋势预警: 按当前斜率 '+bp.trend.slope+'/周'+
+      '，偏差将达 '+bp.trend.projected+'% (超危险阈值-20%) · 建议干预窗口: 6日内</div>'}
+    // EM 实时块
+    const ems=EMS.filter(e=>e.bpId===bp.id);
+    if(ems.length){h+='<div class="em-block"><div class="em-block-title">'+
+        '<span class="em-block-title-dot"></span>EM 实时执行 (T+15min ●)</div>';
+      for(const em of ems){const emState=getEMDevState(em.deviationPct);
+        h+='<div class="em-row"><span class="em-label">'+em.name+'</span>'+
+          '<span class="em-score '+emState.cls+'">'+em.execution+'</span>'+
+          '<div class="em-bar"><div class="em-bar-fill" style="width:'+em.execution+'%;background-position:'+em.execution+'% center"></div></div>'+
+          '<span class="em-trend '+em.trend+'">'+(em.trend==='down'?'↘':em.trend==='up'?'↗':'→')+'</span></div>'+
+        '<div class="em-source"><span class="em-source-dot"></span>'+em.dataSource+' · '+TA(em.lastUpdate)+'更新</div>'}
+      h+='</div>'}
+    // Ghost三层涟漪
+    if(ghost.active&&bp.id===ghost.bpId){const spState=getDevState(ghost.rippleSP[selection.spId]||sp.deviation);
+      h+='<div class="ghost-ripple-box"><div class="ghost-ripple-title">🔮 Ghost涟漪三层联动</div>'+
+        '<div class="ghost-ripple-row"><span class="ghost-ripple-label">SP</span>'+
+        '<div class="ghost-ripple-bars"><div class="ghost-ripple-fill" style="width:50%"></div></div>'+
+        '<span class="ghost-ripple-symbol">'+(spState.symbol+spState.symbol+spState.symbol)+'</span></div>'+
+        '<div class="ghost-ripple-row"><span class="ghost-ripple-label">BP</span>'+
+        '<div class="ghost-ripple-bars"><div class="ghost-ripple-fill" style="width:40%"></div></div>'+
+        '<span class="ghost-ripple-symbol">'+(bpState.symbol+bpState.symbol+bpState.symbol)+'</span></div>'+
+        '<div class="ghost-ripple-row"><span class="ghost-ripple-label">EM</span>'+
+        '<div class="ghost-ripple-bars"><div class="ghost-ripple-fill" style="width:30%"></div></div>'+
+        '<span class="ghost-ripple-symbol">▓▓▒</span></div></div>'}
+    // 路径
+    if(bp.paths&&bp.paths.length){h+='<div class="chain-paths">';
+      for(let i=0;i<bp.paths.length;i++){const p=bp.paths[i];
+        h+='<div class="chain-path'+(i===0?' rec':'')+'" onclick="event.stopPropagation();previewPath(\''+bp.id+'\','+i+')">'+
+          '<div class="chain-path-name">'+(i===0?'🥇 ':'🥈 ')+' '+p.name+'</div>'+
+          '<div class="chain-path-eff">'+p.eff+'</div>'+
+          '<div class="chain-path-meta">成本:'+p.cost+' · '+p.time+' · <span class="agent-badge">🤖 '+p.agent+' · '+p.confidence+'%</span></div>'+
+          '<div class="chain-path-actions">'+
+          '<button class="path-btn" onclick="event.stopPropagation();previewPath(\''+bp.id+'\','+i+')">▶ 预览</button>'+
+          '<button class="path-btn apply" onclick="event.stopPropagation();applyPath()">✓ 采纳</button></div></div>'}
+      h+='</div>'}
+    h+='</div>'}
+  el.innerHTML=h}
+
+function renderAIPanel(){const el=document.getElementById('aiPanel');
+  const bp=BPIS.find(b=>b.id===selection.bpId);
+  let h='<div class="ai-title">❹ AI 智能层</div>';
+  if(!bp){h+='<div style="font-size:12px;color:var(--t3)">← 选择BP查看AI分析</div>';el.innerHTML=h;return}
+  // 反事实推演
+  if(bp.cf){const cfDev=computeCounterfactual(bp);const curDev=computeDeviation(bp);
+    h+='<div class="cf-card"><div class="cf-card-title">💡 反事实推演</div>'+
+      '<span class="agent-badge">🤖 '+bp.cf.agent+' · 置信度 '+bp.cf.confidence+'%</span>'+
+      '<div class="cf-card-action">在 <b>'+bp.cf.earliest+'</b><br>'+bp.cf.action+'</div>'+
+      '<div class="cf-card-compare"><span class="cf-cur">当前<br>'+curDev+'%</span>'+
+      '<span class="cf-arrow">→</span><span class="cf-pre">反事实<br>'+cfDev+'%</span></div>'+
+      '<div class="cf-card-delta">改善 +'+(cfDev-curDev).toFixed(1)+'pp</div>'+
+      '<div class="cf-card-missed">⏰ 错过 '+bp.cf.missed+' 天最佳窗口</div></div>'}
+  // 趋势预警
+  if(bp.trend&&bp.trend.warn){h+='<div class="chain-trend warn" style="margin-bottom:12px">'+
+    '⚠ 30日趋势预警: 偏差将达 '+bp.trend.projected+'% · 干预窗口: 6日内</div>'}
+  // AI代偿建议
+  if(bp.paths&&bp.paths.length){h+='<div class="ai-strategies">';
+    for(let i=0;i<bp.paths.length;i++){const p=bp.paths[i];
+      h+='<div class="ai-strategy-card" data-rank="'+(i===0?'primary':'secondary')+'">'+
+        '<div class="strategy-name '+p.name+'">'+p.name+'</div>'+
+        '<div class="strategy-eff">'+p.eff+'</div>'+
+        '<div class="strategy-meta">'+p.cost+' · '+p.time+'</div>'+
+        '<span class="agent-badge">🤖 '+p.agent+' · '+p.confidence+'%</span>'+
+        '<div class="strategy-actions">'+
+        '<button class="strategy-btn" onclick="previewPath(\''+bp.id+'\','+i+')">▶ 预览</button>'+
+        '<button class="strategy-btn apply" onclick="applyPath()">✓ 采纳</button></div></div>'}
+    h+='</div>'}
+  // AI异议
+  const dissentTexts=[
+    {role:'CFO Agent',cf:82,text:'鑫达贸易下降可能为临时性—其Q2出货量曾出现类似波动后恢复(+8%)',src:'Q2出货量反弹数据'},
+    {role:'COO Agent',cf:76,text:'上海华信虽非国产但其供应链韧性评分92/100，过往3年零断供',src:'华信3年交付记录'},
+    {role:'CMO Agent',cf:68,text:'渠道覆盖下降与供应商国产化压力高度相关，鑫达是华东区最大渠道伙伴',src:'渠道依赖度分析'}
+  ];
+  h+='<div class="dissent"><div class="dissent-hd" onclick="toggleDissent()">🤖 AI异议 ('+dissentTexts.length+')'+
+    '<span id="dissentToggle">▲收起</span></div><div class="dissent-list" id="dissentList">';
+  for(const d of dissentTexts){h+='<div class="dissent-card">'+
+    '<div class="dissent-role">'+d.role+'<span style="font-size:10px;color:var(--t3)">(置信度:'+d.cf+'%)</span></div>'+
+    '<div class="dissent-text">'+d.text+'</div>'+
+    '<div class="dissent-src">📎 '+d.src+'</div></div>'}
+  h+='</div></div>';
+  // 闭环验证
+  h+='<div class="closure-panel"><div class="closure-title">🎯 闭环② 反馈验证</div>'+
+    '<div style="font-size:11px;color:var(--t2);margin-bottom:8px">采纳后预测 (Ghost涟漪三层联动):</div>'+
+    '<div class="closure-prediction">'+
+    '<div class="closure-pred-item"><div class="closure-pred-label">SP-1</div>'+
+    '<div class="closure-pred-value">-35%→-18%</div></div>'+
+    '<div class="closure-pred-item"><div class="closure-pred-label">BP-1</div>'+
+    '<div class="closure-pred-value improve">-35%→-15%</div></div>'+
+    '<div class="closure-pred-item"><div class="closure-pred-label">EM-1</div>'+
+    '<div class="closure-pred-value improve">28→52 ↗</div></div></div>'+
+    '<div class="closure-time">闭环达成时间: 60s内 · 趋势箭头↘→↗</div>'+
+    '<div class="closure-actions">'+
+    '<button class="closure-btn apply" onclick="applyPath()">✓ 确认下达</button>'+
+    '<button class="closure-btn" onclick="T(\'验证任务已生成，60s后EM趋势将更新\',\'info\')">⊕ 生成验证任务</button></div></div>';
+  el.innerHTML=h}
+
+function renderEMPanel(){const el=document.getElementById('emPanel');
+  let h='<div class="em-panel-header"><span class="em-panel-header-dot"></span>'+
+    'ERP/项目管理系统 准实时拉取 ● T+15min 刷新</div>'+
+    '<table class="em-panel-table"><tr>'+
+    '<th>EM执行项</th><th>偏离检测</th><th>执行分</th><th>Ghost涟漪(三层)</th><th>闭环②回灌</th></tr>';
+  for(const em of EMS){const emState=getEMDevState(em.deviationPct);
+    const rowCls=emState.cls;
+    h+='<tr class="'+rowCls+'"><td>⬢ '+em.name+'</td>'+
+      '<td><span class="em-ripple-symbol '+emState.cls+'">'+emState.symbol+'</span> '+em.deviationPct+'% '+
+      (emState.code==='red'?'⚠':'')+'</td>'+
+      '<td><span style="color:'+(emState.code==='green'?'var(--s)':emState.code==='amber'?'var(--w)':'var(--d)')+'">'+em.execution+'</span></td>'+
+      '<td class="em-ripple-cell">'+
+      '<span class="em-ripple-symbol '+DeviationState.HEALTHY.code+'">'+DeviationState.HEALTHY.symbol+'</span>'+
+      '<span class="em-ripple-symbol '+DeviationState.DRIFTING.code+'">'+DeviationState.DRIFTING.symbol+'</span>'+
+      '<span class="em-ripple-symbol '+DeviationState.BROKEN.code+'">'+DeviationState.BROKEN.symbol+'</span></td>'+
+      '<td class="em-action-cell '+em.feedbackAction+'">'+(em.feedbackAction==='trigger_ai'?'→ 自动触发AI归因 ●':
+        em.feedbackAction==='pool'?'→ 静默归因入池':'→ 仅记录')+'</td></tr>'}
+  h+='</table>';el.innerHTML=h}
+
+function renderBottomBar(){const el=document.getElementById('bottomBar');
+  const criticals=BPIS.filter(b=>computeDeviation(b)<-20).slice(0,3);
+  let h='<div class="bottom-title">📌 今日行动 (<span class="bottom-count">'+criticals.length+'</span>项待处理)</div>'+
+    '<div class="bottom-closure">闭环率 <span class="bottom-closure-value">'+closureRate+'%</span>'+
+    '<span class="bottom-closure-delta">↗ (本周 +'+closureWeekDelta+'pp)</span></div>'+
+    '<div class="bottom-actions">';
+  for(let i=0;i<criticals.length;i++){const bp=criticals[i];const sp=SPS.find(s=>s.id===bp.cpId);
+    const p=bp.paths&&bp.paths[0]?bp.paths[0]:null;const d=computeDeviation(bp);
+    h+='<div class="bottom-act critical" onclick="onSelectSP(\''+bp.cpId+'\');onSelectBP(\''+bp.id+'\')">'+
+      '<span class="bottom-act-num">'+(i+1)+'.</span>'+bp.name+' (偏差'+d+'%)'+
+      '<br><span class="bottom-act-from">关联SP: '+sp.name+' · '+bp.owner+' · <span class="agent-badge">🤖 '+p.agent+' · '+p.confidence+'%</span></span></div>'}
+  h+='</div>';el.innerHTML=h}
+
+function renderGhostBar(){const el=document.getElementById('ghostBar');
+  if(!ghost.active){el.classList.remove('on');return}
+  el.classList.add('on');
+  const bp=BPIS.find(b=>b.id===ghost.bpId);
+  if(!bp)return;
+  document.getElementById('ghostPreview').innerHTML=
+    'KPI目标 '+bp.kpiTarget+'→'+ghost.targetKpi+bp.kpiUnit+
+    ' · SP聚合偏差预览 '+SPS.find(s=>s.id===bp.cpId).deviation+'%→'+(ghost.rippleSP[bp.cpId]||'待算')+'%'}
+
+function renderAll(){renderHeader();renderSPPanel();renderChainPanel();
+  renderAIPanel();renderEMPanel();renderBottomBar();renderGhostBar()}
+
+// ============================================================
+// 交互绑定
+// ============================================================
+function onSelectSP(spId){selection.spId=spId;
+  const bps=BPIS.filter(b=>b.cpId===spId);
+  selection.bpId=bps.length>0?bps[0].id:null;
+  if(ghost.active){ghost={active:false,pathIdx:null,bpId:null,targetKpi:null,
+    rippleSiblings:{},rippleSP:{},rippleEM:{}}}
+  renderAll()}
+function onSelectBP(bpId){selection.bpId=bpId;renderAll()}
+function toggleDissent(){const l=document.getElementById('dissentList'),t=document.getElementById('dissentToggle');
+  if(!l||!t)return;l.classList.toggle('closed');
+  t.textContent=l.classList.contains('closed')?'▶展开':'▲收起'}
+function setMode(m){mode=m;renderAll()}
+
+// Ghost预览流程
+function previewPath(bpId,idx){const bp=BPIS.find(b=>b.id===bpId);
+  if(!bp||!bp.paths||!bp.paths[idx])return;
+  const p=bp.paths[idx];
+  ghost={active:true,pathIdx:idx,bpId:bpId,targetKpi:p.targetKpi,
+    rippleSiblings:{},rippleSP:{},rippleEM:{}};
+  // 计算涟漪
+  // 主预览
+  const previewActual=Math.round(bp.kpiActual+(p.targetKpi-bp.kpiTarget)*0.6);
+  // 兄弟涟漪（V4.2公式）
+  const sp=SPS.find(s=>s.id===bp.cpId);
+  const otherBps=BPIS.filter(b=>b.cpId===bp.cpId&&b.id!==bpId);
+  for(const obp of otherBps){const previewBp=bp;
+    const rippleFactor=0.3;
+    const previewDelta=(p.targetKpi-previewBp.kpiTarget)*rippleFactor*(obp.budget/(previewBp.budget+obp.budget));
+    ghost.rippleSiblings[obp.id]=Math.round(Math.max(0,obp.kpiActual+previewDelta))}
+  // SP涟漪
+  const oldDev=sp.deviation;
+  const previewDev=Math.round(oldDev+(p.targetKpi-bp.kpiTarget)*0.2);
+  ghost.rippleSP[sp.id]=previewDev;
+  // EM涟漪
+  const ems=EMS.filter(e=>e.bpId===bpId);
+  for(const em of ems){ghost.rippleEM[em.id]=Math.round(em.execution+15)}
+  renderAll();T('🔮 幽灵预览: '+p.name+' · 60s内可验证','info')}
+function cancelPreview(){ghost={active:false,pathIdx:null,bpId:null,targetKpi:null,
+  rippleSiblings:{},rippleSP:{},rippleEM:{}}
+  renderAll();T('预览已取消','info')}
+function applyPath(){if(!ghost.active||!ghost.bpId||ghost.targetKpi===null)return;
+  const bp=BPIS.find(b=>b.id===ghost.bpId);
+  if(!bp)return;
+  const oldTarget=bp.kpiTarget;
+  bp.kpiTarget=ghost.targetKpi;
+  const newActual=Math.round(bp.kpiActual+(ghost.targetKpi-oldTarget)*0.6);
+  bp.kpiActual=Math.max(0,newActual);
+  projectTrend(bp.id);aggregateSPDeviation(bp.cpId);
+  ghost={active:false,pathIdx:null,bpId:null,targetKpi:null,
+    rippleSiblings:{},rippleSP:{},rippleEM:{}}
+  closureRate=Math.min(100,closureRate+1);
+  renderAll();
+  T('✅ 路径已下达 · KPI '+oldTarget+'→'+bp.kpiTarget+bp.kpiUnit+' · SP偏差已重算','success')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ghost.active)cancelPreview()})
+
+// ============================================================
+// EM 实时数据模拟
+// ============================================================
+function fetchEMUpdate(){for(const em of EMS){
+  // 模拟随机扰动 ±5%
+  const perturb=Math.round((Math.random()*10-5)*10)/10;
+  em.actual=Math.max(0,em.target*(1+perturb/100));
+  computeEMState(em);computeRippleLevel(em)}
+  // 检测是否需要触发AI归因
+  for(const em of EMS){if(em.detectionState==='red'&&em.feedbackAction==='trigger_ai'){
+    T('🔵 系统检测: '+em.name+' 偏差超阈值，AI归因已就绪','warning')}}
+  renderAll()}
+// 定时刷新（演示版30s，生产版15min）
+setInterval(fetchEMUpdate,30000);
+
+// ============================================================
+// 初始化
+// ============================================================
+document.addEventListener('DOMContentLoaded',()=>{
+  initCompute();
+  selection.spId=SPS.reduce((a,b)=>a.deviation<b.deviation?a:b,SPS[0]).id;
+  selection.bpId=BPIS.filter(b=>b.cpId===selection.spId)[0]?.id||null;
+  renderAll();
+  T('🟢 V0.1 战略闭环驾驶舱 · Ghost三层涟漪+双闭环','success')
+})
+</script>
+</body>
+</html>
