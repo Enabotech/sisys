@@ -346,7 +346,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
     </select>
     <span class="nav-link" onclick="switchPage('workbench')" id="linkWorkbench">📐 工作台</span>
   </div>
-  <span class="nav-user">👤 张总</span>
+  <span class="nav-user">👤 乔布斯克</span>
 </nav>
 
 <!-- ============================================================
@@ -848,7 +848,7 @@ class AICompensation {
 // 决策卡片数据定义
 // ============================================================
 const DECISION_DEFS = [
-  // #1 SC-3 现金流危机 — SP↓ BP↓ BE↓ 全部红色
+  // #1 SC-3 现金流危机 — SP↓ BP↓ EM↓ 全部红色
   {
     id:'sc3', urgency:'urgent', icon:'🔴', tag:'紧急', title:'SC-3 现金流与投资回报危机',
     summary:'现金流压力极高 · 回收期5.8年 · ROI持续恶化',
@@ -903,7 +903,7 @@ const DECISION_DEFS = [
       return{direction:dir,decode:dec,execution:exec};
     },
   },
-  // #3 BP14 供应链中断风险 — BE红色, 其余绿
+  // #3 BP14 供应链中断风险 — EM红色, 其余绿
   {
     id:'bp14', urgency:'urgent', icon:'🚨', tag:'紧急', title:'举措 1.4 供应链韧性',
     summary:'供应链成本失控 · 上市周期18个月 · 国产替代不足',
@@ -1190,7 +1190,7 @@ function updateFoldedCard(cardId){
   });
   // 最弱维度提示
   var dimScores={direction:scores.direction,decode:scores.decode,execution:scores.execution/100};
-  var labels={direction:'SP方向分',decode:'BP解码分',execution:'BE执行分'};
+  var labels={direction:'SP方向分',decode:'BP解码分',execution:'EM执行分'};
   var worstKey=Object.keys(dimScores).reduce(function(a,b){return dimScores[a]<dimScores[b]?a:b});
   var worst=dimScores[worstKey],label=labels[worstKey];
   var el=document.getElementById('folded-hint-'+cardId);if(!el)return;
@@ -1224,7 +1224,7 @@ function resolveCard(cardId){
     var strategyName='';if(inst.aiComp.confirmed){var cs=inst.aiComp.suggestions.find(function(s){return s.id===inst.aiComp.confirmed});if(cs)strategyName=cs.name}
     var changes=[];inst.def.sliders.forEach(function(sdef){var nv=st[sdef.key],ov=sdef.value;if(Math.abs(nv-ov)>0.01)changes.push((PARAM_REGISTRY[sdef.paramKey||sdef.key]||{}).name+' '+ov+'→'+nv)});
     var detail='';if(strategyName)detail='采纳: '+strategyName;if(changes.length)detail=(detail?detail+' | ':'')+'参数: '+changes.join(', ');
-    var decEntry={label:inst.def.title,freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 张总 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId,detail:detail};
+    var decEntry={label:inst.def.title,freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 乔布斯克 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId,detail:detail};
     allEvidence.push(decEntry);
     // buffer: buildWorkbench首次渲染时合并，防止allEvidence被覆盖
     if(!window._pendingDecisions)window._pendingDecisions=[];
@@ -1428,9 +1428,9 @@ function buildWorkbench(){
   if(window._pendingDecisions){window._pendingDecisions.forEach(function(e){allEvidence.push(e)});window._pendingDecisions=[]}
   // === 七步层次树渲染 ===
   const phaseGroups=[
-    {tag:'SP',label:'战略规划 (BLM)',color:'#1890ff',phases:[
-      {step:'[1]',label:'业绩差距分析',keys:['收入差距率 12%','利润差距率 8%']},
-      {step:'[2]',label:'市场洞察',subs:[
+    {tag:'SP',label:'战略规划 (SP)',color:'#1890ff',phases:[
+      {step:'SP[1]',label:'业绩差距分析',keys:['收入差距率 12%','利润差距率 8%']},
+      {step:'SP[2]',label:'市场洞察',subs:[
         {sub:'(1)看趋势',keys:['总可用市场 ¥520亿','政策支持度 中']},
         {sub:'(2)看市场与客户',keys:['客户需求清晰度 4/5']},
         {sub:'(3)看竞争',keys:['市场集中度 62%','竞品先发优势 6个月']},
@@ -1438,12 +1438,12 @@ function buildWorkbench(){
         {sub:'(5)看机会',keys:['增长路径可行性 4/5']},
         {sub:'(6)机会差距',keys:['能力-机会匹配度 3/5']}
       ]},
-      {step:'[3]',label:'战略意图',keys:['三年营收目标 ¥50亿','市场份额目标 25%','专利布局目标 3项','毛利率目标 60%']},
-      {step:'[4]',label:'创新焦点',keys:['技术创新度 3/5']},
-      {step:'[5]',label:'业务设计',keys:['价值主张清晰度 4/5','战略控制点强度 3/5']},
-      {step:'[6]',label:'执行设计',keys:['关键任务就绪度 3/5','组织能力差距 中等']}
+      {step:'SP[3]',label:'战略意图',keys:['三年营收目标 ¥50亿','市场份额目标 25%','专利布局目标 3项','毛利率目标 60%']},
+      {step:'SP[4]',label:'创新焦点',keys:['技术创新度 3/5']},
+      {step:'SP[5]',label:'业务设计',keys:['价值主张清晰度 4/5','战略控制点强度 3/5']},
+      {step:'SP[6]',label:'执行设计',keys:['关键任务就绪度 3/5','组织能力差距 中等']}
     ]},
-    {tag:'BP',label:'业务计划 (BEM)',color:'#00875A',phases:[
+    {tag:'BP',label:'业务计划 (BP)',color:'#00875A',phases:[
       {step:'BP[1]',label:'澄清战略方向',keys:['SP-BP映射完整度 85%','战略主题清晰度 4/5','年度主题穿透率 70%']},
       {step:'BP[2]',label:'导出战略举措',keys:['举措覆盖完整度 90%','优先级共识度 3/5','跨举措协同度 4/5']},
       {step:'BP[3]',label:'导出衡量指标',keys:['指标覆盖率 88%','指标目标挑战度 4/5','先导/滞后指标比 0.8']},
@@ -1451,7 +1451,7 @@ function buildWorkbench(){
       {step:'BP[5]',label:'分解措施目标',keys:['责任人明确度 95%','部门承诺率 80%','分解一致性 4/5','人才薪资基准 -15%']},
       {step:'BP[6]',label:'导出工作计划',keys:['三维规划完整度 78%','资源承诺率 85%','风险缓解覆盖率 65%']}
     ]},
-    {tag:'EM',label:'执行管理',color:'#B86E00',phases:[
+    {tag:'EM',label:'执行管理 (EM)',color:'#B86E00',phases:[
       {step:'EM[1]',label:'执行进度监控',keys:['里程碑达成率 72%','预算执行率 95%','任务完成速度 8项/月']},
       {step:'EM[2]',label:'资源效率',keys:['研发投入产出比 2.5','关键人才留存率 88%','销售费用率 22%']},
       {step:'EM[3]',label:'结果评价',keys:['实际投资回收期 4.2年','NPV偏差率 -8%','战略弹性得分 4/5','技术趋势 AI+国产替代']}
@@ -1665,7 +1665,7 @@ function buildWorkbench(){
     const sendBtn=layout.querySelector('.debate-send');
     const input=layout.querySelector('.debate-input');
     if(sendBtn&&input){
-      sendBtn.onclick=()=>{if(input.value.trim()){const thread=layout.querySelector('.debate-thread');const msg=document.createElement('div');msg.className='debate-msg neutral';msg.innerHTML='<span class="debate-agent-avatar">👤 张总</span><span class="debate-msg-text">'+input.value+'</span>';thread.appendChild(msg);input.value='';thread.scrollTop=thread.scrollHeight;showToast('已发送 · AI角色将陆续回应','info')}};
+      sendBtn.onclick=()=>{if(input.value.trim()){const thread=layout.querySelector('.debate-thread');const msg=document.createElement('div');msg.className='debate-msg neutral';msg.innerHTML='<span class="debate-agent-avatar">👤 乔布斯克</span><span class="debate-msg-text">'+input.value+'</span>';thread.appendChild(msg);input.value='';thread.scrollTop=thread.scrollHeight;showToast('已发送 · AI角色将陆续回应','info')}};
       input.onkeydown=e=>{if(e.key==='Enter')sendBtn.click()};
     }
   },200);
