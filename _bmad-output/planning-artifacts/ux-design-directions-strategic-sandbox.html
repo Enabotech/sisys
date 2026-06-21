@@ -650,7 +650,7 @@
                     <div class="trust-header">
                         <div>
                             <div class="trust-icon">🎯</div>
-                            <div class="trust-title">方向可信</div>
+                            <div class="trust-title">SP 置信度</div>
                         </div>
                         <div class="trust-score" id="score-direction">0.92</div>
                     </div>
@@ -665,7 +665,7 @@
                     <div class="trust-header">
                         <div>
                             <div class="trust-icon">🔗</div>
-                            <div class="trust-title">解码可信</div>
+                            <div class="trust-title">BP 置信度</div>
                         </div>
                         <div class="trust-score" id="score-decode">100%</div>
                     </div>
@@ -682,7 +682,7 @@
                     <div class="trust-header">
                         <div>
                             <div class="trust-icon">✅</div>
-                            <div class="trust-title">执行可信</div>
+                            <div class="trust-title">EM 置信度</div>
                         </div>
                         <div class="trust-score" id="score-execute">95/100</div>
                     </div>
@@ -827,7 +827,7 @@
             let isWarning = false;
             let isDanger = false;
 
-            // 评估方向可信 (受市场和竞品影响)
+            // 评估SP 置信度 (受市场和竞品影响)
             let dirScore = 0.92 - ((15 - cagr) * 0.02) - (comp * 0.05);
             const cardDir = document.getElementById('card-direction');
             const cfoText = document.getElementById('cfo-status');
@@ -852,7 +852,7 @@
             }
             document.getElementById('score-direction').innerText = Math.max(0, dirScore).toFixed(2);
 
-            // 评估执行可信 (受预算和 HC 影响)
+            // 评估EM 置信度 (受预算和 HC 影响)
             let execScore = 95 - ((2.0 - budget) * 30) - (hc * 0.8);
             const cardExec = document.getElementById('card-execute');
             const m2Box = document.getElementById('m2-status-box');
@@ -886,7 +886,7 @@
             }
             document.getElementById('score-execute').innerText = Math.max(0, execScore).toFixed(0) + '/100';
 
-            // 评估解码可信 (权重转移视觉表现)
+            // 评估BP 置信度 (权重转移视觉表现)
             const cardDec = document.getElementById('card-decode');
             if (budget < 1.5) {
                 cardDec.className = 'trust-card status-warning';
