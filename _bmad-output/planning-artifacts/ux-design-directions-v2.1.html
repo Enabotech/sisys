@@ -1777,13 +1777,13 @@ function resolveDecisionPhase(def){
 // ============================================================
 // v2.1 新增：辩论共识追踪
 // ============================================================
-function updateConsensus(chain){
+function updateConsensus(chain, sliderValue){
   var container=document.getElementById('wb-consensus');if(!container||!chain)return;
-  // 从辩论链的实际立场计算共识度
   var proAgents=[],conAgents=[],neutralAgents=[];
   chain.forEach(function(r){
-    if(r.stance==='pro')proAgents.push(r.agent);
-    else if(r.stance==='con')conAgents.push(r.agent);
+    var st=typeof r.s==='function'?r.s(sliderValue):(r.stance||'neutral');
+    if(st==='pro')proAgents.push(r.agent);
+    else if(st==='con')conAgents.push(r.agent);
     else neutralAgents.push(r.agent);
   });
   var total=chain.length;
@@ -1860,55 +1860,55 @@ function jumpToCard(targetId){
 // TODO: V2 替换为 LangGraph Agent 流式响应 — 当前使用随机延迟模拟真实AI思考节奏
 const DEBATE_CHAINS={
   mkt_growth:[
-    {delay:0,agent:'CMO',stance:'pro',t:function(v){return '市场增速调至'+v+'%。低于12%需重评先发策略——低增速市场抢占存量比培育增量更紧迫。';}},
-    {delay:1200,agent:'CFO',stance:'con',t:function(v){return '增速每降1个百分点，2028年营收预期下调¥3.2亿。若低于8%，原定¥50亿目标需修正。';}},
-    {delay:2400,agent:'CEO',stance:'neutral',t:function(v){return v<10?'现在决定：坚持进攻还是转入防御。'+v+'%高于行业均值，维持进攻但收紧资源投放。':'增速健康，维持原定战略节奏，继续产品注册和渠道建设。';}}
+    {delay:0,agent:'CMO',s:function(v){return v>=15?'pro':v>=10?'neutral':'con';},t:function(v){return '市场增速'+v+'%。'+(v>=15?'窗口期极佳，激进进入是最优策略。':v>=10?'增速放缓但仍在健康区间，维持进攻节奏。':'低于10%警戒线——需从进攻转入防御，优先保利润。');}},
+    {delay:1200,agent:'CFO',s:function(v){return v>=12?'pro':'con';},t:function(v){return v>=12?'增速健康，2028年营收¥50亿目标可实现。研发投入产出比在合理区间。':'增速每降1个百分点营收下调¥3.2亿，低于8%需修正2028目标。';}},
+    {delay:2400,agent:'CEO',s:function(v){return v>=12?'pro':v>=8?'neutral':'con';},t:function(v){return v>=12?'战略态势良好，维持进攻节奏，继续推进产品注册和渠道建设。':v>=8?'增速边际收窄但仍在可控范围——收紧非核心投放，集中资源保关键节点。':'增速跌破安全区间，建议启动应急预案：优先保障现金流，暂停扩张性投入。';}}
   ],
   localization:[
-    {delay:0,agent:'CTO',stance:'pro',t:function(v){return '国产替代率'+v+'%。核心光学器件进口占比'+(100-v)+'%——若日本供应商交期恶化，CT量产将延迟3-5个月。';}},
-    {delay:1200,agent:'COO',stance:'con',t:function(v){return v<40?'替代率偏低，供应链韧性不足。建议目标提升至60%，启动双源认证。':'替代率在安全区间，双源策略已覆盖核心器件。';}},
-    {delay:2400,agent:'CFO',stance:'neutral',t:function(v){return '国产替代需额外¥0.8-1.2亿认证费+6-9月验证周期。但长期降进口关税15%，3年ROI为正。';}}
+    {delay:0,agent:'CTO',s:function(v){return v>=50?'pro':v>=35?'neutral':'con';},t:function(v){return '国产替代率'+v+'%。'+(v>=50?'核心器件双源策略已覆盖，供应链韧性达标。':v>=35?'替代率在推进中但关键器件仍依赖进口——需加速光学器件认证。':'进口依赖度过高，日本供应商一旦断供CT量产将延迟3-5个月。');}},
+    {delay:1200,agent:'COO',s:function(v){return v>=45?'pro':v>=30?'neutral':'con';},t:function(v){return v>=45?'国产供应链基本成型，可启动批量验证——Q3前完成关键器件切换。':v>=30?'替代进度中等。建议优先认证用量最大的3类器件，分阶段切换。':'替代率严重不足，供应链风险敞口过大。立即启动双源认证+战略库存。';}},
+    {delay:2400,agent:'CFO',s:function(v){return v>=50?'pro':'neutral';},t:function(v){return v>=50?'国产替代的额外投入已在预算内消化，长期降关税15%将改善毛利率2-3个百分点。':'国产替代需追加¥0.5-1亿认证费用——短期增加成本但长期ROI为正，建议分批投入。';}}
   ],
   rd_budget:[
-    {delay:0,agent:'CTO',stance:'pro',t:function(v){return '研发预算¥'+v.toFixed(1)+'亿。低于¥1.5亿时AI引擎开发将压缩至MVP——CT/MR硬件优先，SaaS后移。';}},
-    {delay:1200,agent:'CFO',stance:'con',t:function(v){return v>2.0?'预算充裕，但研发费用率勿长期超22%——会侵蚀毛利率。建议¥0.3亿转投临床验证加速注册。':'预算偏紧，砍边缘项目保核心。AI SaaS可推迟到V2，先保CT/MR注册节点。';}},
-    {delay:2400,agent:'CHO',stance:'neutral',t:function(v){return '预算对应约'+(v*60).toFixed(0)+'人研发团队。当前缺口22人，需Q3前填补。';}}
+    {delay:0,agent:'CTO',s:function(v){return v>=1.8?'pro':v>=1.2?'neutral':'con';},t:function(v){return '研发预算¥'+v.toFixed(1)+'亿。'+(v>=1.8?'预算充足，可同时推进CT/MR硬件+AI引擎开发，研发节奏不受限。':v>=1.2?'预算勉强够用——优先CT/MR硬件，AI SaaS平台需推迟到V2。':'预算严重不足，只能保CT/MR核心开发，AI引擎和临床验证全部暂停。');}},
+    {delay:1200,agent:'CFO',s:function(v){return v<=2.5?'pro':'neutral';},t:function(v){return v>2.5?'研发费用率偏高，可能侵蚀毛利率目标。建议将¥0.3亿转投临床验证，提升资金效率。':'研发投入在合理区间——既保证了技术护城河，也不会过度影响利润率。';}},
+    {delay:2400,agent:'CHO',s:function(v){return v>=1.5?'pro':'con';},t:function(v){return '预算对应约'+(v*60).toFixed(0)+'人研发团队。'+(v>=1.5?'编制充足，Q3前可填补22人缺口。':'编制不足，核心AI架构师岗位无法开放——招聘计划需缩减40%。');}}
   ],
   hc_gap:[
-    {delay:0,agent:'CHO',stance:'con',t:function(v){return '人才缺口'+v+'人——影响AI算法、临床验证、市场拓展三条线。招聘周期45天，Q3节点面临风险。';}},
-    {delay:1200,agent:'COO',stance:'pro',t:function(v){return v>20?'缺口超可控范围。建议外包+并购双线：非核心模块外包，关键技术岗并购小型团队。':'缺口可控。加强内推+校招，Q2内可到位70%。';}},
-    {delay:2400,agent:'CEO',stance:'neutral',t:function(v){return '人才是第一约束。核心AI架构师必须Q2到位至少5人——做不到，产品路线图需重排。';}}
+    {delay:0,agent:'CHO',s:function(v){return v<=10?'pro':v<=20?'neutral':'con';},t:function(v){return '人才缺口'+v+'人。'+(v<=10?'缺口在可控范围。加强内推+校招，Q2可到位70%。':v<=20?'招聘压力中等。建议优先填补AI架构师和临床支持岗，其他岗位分阶段。':'缺口远超可控范围——招聘周期45天，Q3节点面临严重风险。');}},
+    {delay:1200,agent:'COO',s:function(v){return v<=15?'pro':v<=25?'neutral':'con';},t:function(v){return v<=15?'团队编制基本健全，Q3交付节点有保障。':v<=25?'部分岗位空缺但核心团队到位——可通过加班+外包缓解压力。':'人力严重不足，建议启动并购小型技术团队方案，一次性解决缺口。';}},
+    {delay:2400,agent:'CEO',s:function(v){return v<=10?'pro':v<=20?'neutral':'con';},t:function(v){return v<=10?'人才配置合理，各条线Q2-Q3交付信心充足。':v<=20?'核心岗位基本覆盖，非核心岗可适当放宽招聘标准。':'人才是第一约束。核心AI架构师若Q2不到位，产品路线图需重排。';}}
   ],
   comp_lead:[
-    {delay:0,agent:'CMO',stance:'con',t:function(v){return '竞品领先'+v+'个月。每月窗口损失≈¥1.5亿份额。华为联影已签42家三甲——18家与我们目标重叠。';}},
-    {delay:1200,agent:'CEO',stance:'con',t:function(v){return v>3?'竞品优势拉大——避开综合三甲，优先切入专科医院和区域医疗中心。':'竞品领先有限。我们有后发优势——学习其渠道策略，避免踩坑。';}},
-    {delay:2400,agent:'CTO',stance:'neutral',t:function(v){return 'AI诊断准确率91% vs 竞品93%——差距可追赶。关键是加速临床数据积累，这是追赶核心杠杆。';}}
+    {delay:0,agent:'CMO',s:function(v){return v<=1?'pro':v<=3?'neutral':'con';},t:function(v){return '竞品领先'+v+'个月。'+(v<=1?'我们有充分的先发窗口——加速渠道铺开可抢占先机。':v<=3?'窗口期在收窄，需加快销售团队组建和样板医院建设。':'窗口已大幅收窄，每延迟1月≈¥1.5亿市场份额损失——必须立即行动。');}},
+    {delay:1200,agent:'CEO',s:function(v){return v<=2?'pro':v<=4?'neutral':'con';},t:function(v){return v<=2?'竞品威胁可控。我们可学习其渠道策略，避免踩坑，发挥后发优势。':v<=4?'竞品已有先发优势但尚未形成壁垒——差异化策略仍有机会。':'竞品优势已拉大，正面竞争不利。建议转向专科医院和区域医疗中心差异化突破。';}},
+    {delay:2400,agent:'CTO',s:function(v){return v<=2?'pro':v<=4?'neutral':'con';},t:function(v){return v<=2?'技术参数差距在可追赶范围。加速临床数据积累+AI算法迭代，8个月内可追平。':v<=4?'追赶压力增大但并非不可能——集中资源突破AI诊断准确率，以此作为差异化卖点。':'时间窗口紧迫，建议优先确保核心功能达标杆水平，非核心功能可V2补齐。';}}
   ],
   channel_cov:[
-    {delay:0,agent:'CMO',stance:'pro',t:function(v){return '渠道覆盖率'+v+'%。目标80%，差值'+(80-v)+'个百分点≈'+(80-v)+'个城市未触达。';}},
-    {delay:1200,agent:'COO',stance:'con',t:function(v){return v<50?'覆盖率过低——直销仅15人，需至少30人覆盖非一线。Q2优先招渠道销售。':'覆盖率在轨道上。Q2重点深化已覆盖城市渗透率，非盲目扩张。';}},
-    {delay:2400,agent:'CFO',stance:'neutral',t:function(v){return '每+10%覆盖率≈¥0.3亿销售费用。当前预算¥0.8亿——目标80%需追加¥0.7亿，建议分阶段投。';}}
+    {delay:0,agent:'CMO',s:function(v){return v>=70?'pro':v>=50?'neutral':'con';},t:function(v){return '渠道覆盖率'+v+'%。'+(v>=70?'覆盖率达标，Q2重点深化已覆盖城市的渗透率。':v>=50?'覆盖率中等——二三线城市仍有较大空白，建议Q2优先招聘渠道销售。':'覆盖率严重不足，近一半目标市场处于空白——需启动渠道闪电战。');}},
+    {delay:1200,agent:'COO',s:function(v){return v>=60?'pro':v>=40?'neutral':'con';},t:function(v){return v>=60?'渠道运营团队可支撑当前覆盖，Q2可启动新城市拓展。':v>=40?'直销团队仅15人——需扩至30人以上才能覆盖非一线城市。':'覆盖率过低，运营团队无法支撑大规模拓展——建议先用SaaS工具+代理商模式。';}},
+    {delay:2400,agent:'CFO',s:function(v){return v>=60?'pro':'neutral';},t:function(v){return v>=60?'渠道投入产出比健康——每+10%覆盖率≈¥0.3亿销售费用，ROI 3:1。':'渠道投资需谨慎——建议分阶段投入，先验证单位经济模型再规模复制。';}}
   ],
   launch_cycle:[
-    {delay:0,agent:'COO',stance:'con',t:function(v){return '上市周期'+v+'个月。每延迟1月≈¥0.15亿机会成本。NMPA型检+临床+注册审批已无可压缩空间。';}},
-    {delay:1200,agent:'CMO',stance:'con',t:function(v){return v>15?'周期过长——竞品平均12月上市，窗口优势被抵消。建议评估绿色通道/优先审批。':'周期可控。上市前6月启动预热——让医院在注册完成时已完成评估。';}},
-    {delay:2400,agent:'CTO',stance:'neutral',t:function(v){return '技术层面可并行——AI训练和硬件验证同时推进。但临床验证必须串行，最多压缩2个月。';}}
+    {delay:0,agent:'COO',s:function(v){return v<=12?'pro':v<=18?'neutral':'con';},t:function(v){return '上市周期'+v+'个月。'+(v<=12?'周期优于行业平均——NMPA型检+临床+注册审批均在可控范围。':v<=18?'周期略长但可接受——关键路径无重大阻塞，Q4可完成注册。':'周期过长，竞品平均12个月上市——建议评估绿色通道/优先审批，压缩3-4个月。');}},
+    {delay:1200,agent:'CMO',s:function(v){return v<=12?'pro':v<=15?'neutral':'con';},t:function(v){return v<=12?'上市时间窗口极佳——可在竞品换代前抢占三甲医院。':v<=15?'上市时间在窗口期内——但需提前6个月启动预热，让医院在注册完成时已完成评估。':'错失窗口期风险增大——建议并行准备：注册+预热同步推进，压缩上市后启动时间。';}},
+    {delay:2400,agent:'CTO',s:function(v){return v<=15?'pro':v<=18?'neutral':'con';},t:function(v){return v<=15?'技术开发节奏正常。AI训练和硬件验证可并行推进，临床验证是唯一串行环节。':v<=18?'技术层面有2-3个月优化空间——建议AI算法和电磁兼容测试并行。':'时间紧张但技术上可压缩——建议增加测试资源，AI训练用更大算力集群加速。';}}
   ],
   cashflow_risk:[
-    {delay:0,agent:'CFO',stance:'con',t:function(v){return '现金流压力'+v+'/5级。达4级需30天内启动紧急融资——备2套方案：银行授信+战略投资者。';}},
-    {delay:1200,agent:'CEO',stance:'con',t:function(v){return v>=4?'立即三件事：1)暂停非核心支出 2)加速应收回收 3)启动¥5亿授信。Q3前必须降到2级。':'现金流可控。但保持至少6个月运营储备以防万一。';}}
+    {delay:0,agent:'CFO',s:function(v){return v<=2?'pro':v<=3?'neutral':'con';},t:function(v){return '现金流压力'+v+'/5级。'+(v<=2?'现金流健康，储备可覆盖6个月+运营支出。':v<=3?'压力中等——建议保持现有融资额度，暂不新增重大支出。':'现金流告急——需30天内启动紧急融资，备2套方案：银行授信+战略投资者。');}},
+    {delay:1200,agent:'CEO',s:function(v){return v<=2?'pro':v<=3?'neutral':'con';},t:function(v){return v<=2?'财务稳健，可维持当前战略节奏。':v<=3?'现金流需关注但不影响战略推进——适当控制非核心支出即可。':'现金流是生命线。立即三件事：1)暂停非核心支出 2)加速应收回收 3)启动¥5亿授信。Q3前必须降到2级。';}}
   ],
   talent_pool:[
-    {delay:0,agent:'CHO',stance:'con',t:function(v){return '人才热度'+v+'分。低于40分本地招聘基本停滞——需启动远程团队+跨地域招聘。';}},
-    {delay:1200,agent:'COO',stance:'neutral',t:function(v){return v<40?'热度不足——将非核心研发转二线城市，人力成本可降30%。':'市场活跃度尚可。优先填补AI架构师和临床支持岗。';}}
+    {delay:0,agent:'CHO',s:function(v){return v>=60?'pro':v>=40?'neutral':'con';},t:function(v){return '人才热度'+v+'分。'+(v>=60?'市场活跃，招聘窗口期充裕——AI架构师和临床支持岗均可正常推进。':v>=40?'热度中等——核心岗位仍可招到，但需提升薪资竞争力。':'热度不足，本地招聘基本停滞——需启动远程团队+跨地域招聘方案。');}},
+    {delay:1200,agent:'COO',s:function(v){return v>=50?'pro':v>=35?'neutral':'con';},t:function(v){return v>=50?'人才市场供给充足——可完成Q2-Q3招聘计划。':v>=35?'部分岗位需放宽地域限制，考虑二线城市设立研发分支。':'热度严重不足——建议将非核心研发岗位外包，集中自有团队做核心技术。';}}
   ],
   train_cycle:[
-    {delay:0,agent:'COO',stance:'con',t:function(v){return '培养周期'+v+'个月。超12月将影响Q3交付。建议导师制+外部培训双线加速——可压缩至9月。';}},
-    {delay:1200,agent:'CHO',stance:'neutral',t:function(v){return v>12?'新员工ramp-up太慢。30%岗位转有经验者直聘，跳过培养周期。薪资+25%，但时间省6个月。':'培养周期可接受。保持导师制+轮岗培训节奏。';}}
+    {delay:0,agent:'COO',s:function(v){return v<=9?'pro':v<=12?'neutral':'con';},t:function(v){return '培养周期'+v+'个月。'+(v<=9?'周期合理——导师制+轮岗培训可保证Q3交付能力。':v<=12?'周期略长但可控——建议增加实战项目比例，加速上手。':'周期过长将影响Q3交付——建议30%岗位转有经验者直聘，跳过培养周期。');}},
+    {delay:1200,agent:'CHO',s:function(v){return v<=10?'pro':v<=14?'neutral':'con';},t:function(v){return v<=10?'新员工ramp-up效率达标——培训体系和导师资源配置合理。':v<=14?'培养节奏可优化——建议引入外部专家培训+项目制学习。':'培养周期过长，新员工产出太慢。建议提高有经验者招聘比例，减少纯校招依赖。';}}
   ],
   salary_comp:[
-    {delay:0,agent:'CFO',stance:'neutral',t:function(v){return '薪资竞争力'+v+'%。低于-15%核心岗位离职风险剧增——AI架构师市场溢价35%，必须跟上。';}},
-    {delay:1200,agent:'CHO',stance:'con',t:function(v){return v<-10?'薪资倒挂严重。CTO团队3人已收竞品offer——不调至P75分位，Q2可能流失关键人才。':'薪资在市场区间。但关注AI架构师细分——该赛道涨速是其他岗2倍。';}}
+    {delay:0,agent:'CFO',s:function(v){return v>=-5?'pro':v>=-12?'neutral':'con';},t:function(v){return '薪资竞争力'+v+'%。'+(v>=-5?'薪资在市场区间内——人力成本可控，利润率不受侵蚀。':v>=-12?'薪资略低于市场中位——核心岗位有流失风险，建议定向调整。':'薪资倒挂严重——AI架构师市场溢价35%，核心人才流失风险剧增。');}},
+    {delay:1200,agent:'CHO',s:function(v){return v>=-8?'pro':v>=-15?'neutral':'con';},t:function(v){return v>=-8?'薪酬竞争力充足——招聘漏斗各项指标正常，核心岗位投递量达标。':v>=-15?'部分岗位薪酬低于P50分位——建议对AI架构师和临床经理做定向调整。':'薪酬严重偏低——CTO团队3人已收竞品offer，必须将核心岗调至P75分位。';}}
   ]
 };
 
@@ -1917,7 +1917,7 @@ function refreshDebateRoom(layout, sliderKey, newValue){
   var reg=PARAM_REGISTRY[sliderKey];var pname=reg?reg.name:sliderKey;
   var chain=DEBATE_CHAINS[sliderKey];
   if(!chain){chain=[{delay:0,agent:'AUD',stance:'neutral',t:function(){return '['+pname+'] 更新至 '+newValue+'——评估对战略态势影响中。';}}];}
-  updateConsensus(chain);
+  updateConsensus(chain, newValue);
   chain.forEach(function(r,i){
     var ph=document.createElement('div');ph.className='debate-msg neutral';ph.style.animation='floatUp .25s ease-out';
     ph.innerHTML='<span class="debate-agent-avatar">'+r.agent+'</span><span class="debate-msg-text">⚡ 分析中...</span>';
@@ -1925,7 +1925,8 @@ function refreshDebateRoom(layout, sliderKey, newValue){
     var d=i===0?250+Math.random()*350:Math.random()*1600+600;
     setTimeout(function(){
       var txt=typeof r.t==='function'?r.t(newValue):r.t;
-      ph.className='debate-msg '+r.stance;
+      var st=typeof r.s==='function'?r.s(newValue):(r.stance||'neutral');
+      ph.className='debate-msg '+st;
       ph.innerHTML='<span class="debate-agent-avatar">'+r.agent+'</span><span class="debate-msg-text">'+txt+'</span>';
       thread.scrollTop=thread.scrollHeight;
       while(thread.children.length>20)thread.firstElementChild.remove();
