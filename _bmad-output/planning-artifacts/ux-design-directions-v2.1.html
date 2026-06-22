@@ -126,13 +126,14 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 
 /* 顶层双栏：KPI仪表盘 | 风险雷达 */
 .overview-top{display:grid;grid-template-columns:1.2fr 1fr;gap:var(--spacing-lg)}
-.overview-panel{background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);padding:var(--spacing-xl);border:1px solid #f0f0f0}
+.overview-panel{background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:var(--spacing-xl);transition:box-shadow .3s}
+.overview-panel:hover{box-shadow:var(--shadow-lg)}
 .overview-panel-title{font-size:14px;font-weight:600;margin-bottom:var(--spacing-lg);display:flex;align-items:center;gap:6px;color:var(--color-text-primary)}
 
 /* KPI 5数字趋势卡片 */
 .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--spacing-md);margin-bottom:0}
-.kpi-card{text-align:center;padding:var(--spacing-md) var(--spacing-sm);border-radius:var(--radius-lg);background:var(--color-bg-card);box-shadow:var(--shadow-sm);transition:all .25s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:4px;border:1px solid #f0f0f0}
-.kpi-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.kpi-card{text-align:center;padding:var(--spacing-md) var(--spacing-sm);border-radius:var(--radius-lg);background:var(--color-bg-card);box-shadow:var(--shadow-md);transition:box-shadow .3s,transform .3s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:4px}
+.kpi-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
 .kpi-card-label{font-size:12px;font-weight:500;color:var(--color-text-secondary)}
 .kpi-sparkline{flex:1;min-height:48px;display:flex;align-items:center;justify-content:center}
 .kpi-sparkline canvas{display:block;width:100%;height:48px;margin:0 auto}
@@ -145,7 +146,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 
 /* 风险雷达面板 */
 .risk-radar-list{display:flex;flex-direction:column;gap:6px}
-.risk-radar-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius-sm);font-size:11px;transition:background .15s}
+.risk-radar-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius-md);font-size:11px;transition:background .15s}
 .risk-radar-item:hover{background:#fafcff}
 .risk-radar-rank{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:white}
 .risk-radar-rank.rank-1{background:var(--color-danger)}.risk-radar-rank.rank-2{background:#e87040}.risk-radar-rank.rank-3{background:var(--color-warning)}.risk-radar-rank.rank-4,.risk-radar-rank.rank-5{background:var(--color-text-tertiary)}
@@ -166,7 +167,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .health-table th:first-child{text-align:left;padding-left:0}
 .health-table td{padding:10px 8px;text-align:center;border-bottom:1px solid #fafafa;white-space:nowrap}
 .health-table td:first-child{text-align:left;padding-left:0;font-weight:500}
-.health-table tr:hover td{background:#fafcff}
+.health-table tr:hover td{background:#fafcff}.health-table tr:hover td:first-child{border-radius:var(--radius-md) 0 0 var(--radius-md)}.health-table tr:hover td:last-child{border-radius:0 var(--radius-md) var(--radius-md) 0}
 .health-table .rag-dot{display:inline-block;width:18px;height:18px;border-radius:50%;font-size:10px;line-height:18px;font-weight:700}
 .rag-dot.green{background:#f6ffed;color:var(--color-success);border:1px solid #b7eb8f}
 .rag-dot.amber{background:#fffbe6;color:#d48806;border:1px solid #ffe58f}
@@ -399,7 +400,8 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
    工作台页面
    ============================================================ */
 .workbench-layout{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--spacing-lg);min-height:calc(100vh - 200px)}
-.workbench-panel{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--spacing-lg);overflow-y:auto;max-height:calc(100vh - 160px)}
+.workbench-panel{background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:var(--spacing-lg);overflow-y:auto;max-height:calc(100vh - 160px);transition:box-shadow .3s}
+.workbench-panel:hover{box-shadow:var(--shadow-lg)}
 .workbench-panel h3{font-size:15px;font-weight:600;margin-bottom:var(--spacing-md);padding-bottom:var(--spacing-sm);border-bottom:1px solid var(--color-bg-primary)}
 .back-link{color:var(--color-primary);text-decoration:none;font-size:14px;cursor:pointer;font-weight:500;display:inline-block;margin-bottom:var(--spacing-md)}.back-link:hover{text-decoration:underline}
 
@@ -425,7 +427,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .wb-phase-group .wb-phase-group .wb-phase-group .wb-phase-header{font-size:10px;padding:2px 5px;color:var(--color-text-secondary)}
 .wb-phase-group .wb-phase-group .wb-phase-group .wb-phase-items{padding:1px 0 1px 8px;margin-left:4px;border-left:1px dashed #e8e8e8}
 /* 证据行 */
-.wb-evidence-row{display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;font-size:11px;transition:background .12s}
+.wb-evidence-row{display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:var(--radius-md);font-size:11px;transition:background .12s}
 .wb-evidence-row:hover{background:#fafafa}
 /* 新鲜度 */
 .evidence-freshness{font-size:9px;padding:1px 5px;border-radius:8px;flex-shrink:0;font-weight:500}
@@ -441,7 +443,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 
 /* 辩论室 */
 .debate-thread{display:flex;flex-direction:column;gap:var(--spacing-sm)}
-.debate-msg{display:flex;gap:var(--spacing-sm);padding:var(--spacing-sm);border-radius:var(--radius-sm);font-size:12px;animation:floatUp .2s ease-out}
+.debate-msg{display:flex;gap:var(--spacing-sm);padding:var(--spacing-sm);border-radius:var(--radius-md);font-size:12px;animation:floatUp .2s ease-out}
 .debate-msg.pro{background:var(--color-signal-ok-bg);border-left:3px solid var(--color-success)}.debate-msg.con{background:#fff1f0;border-left:3px solid var(--color-danger)}.debate-msg.neutral{background:var(--color-bg-primary);border-left:3px solid var(--color-border)}
 .debate-agent-avatar{font-weight:700;font-size:11px;flex-shrink:0;min-width:36px}
 .debate-msg-text{color:var(--color-text-secondary);flex:1}
