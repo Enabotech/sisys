@@ -133,8 +133,6 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--spacing-md);margin-bottom:0}
 .kpi-card{text-align:center;padding:var(--spacing-md) var(--spacing-sm);border-radius:var(--radius-lg);background:var(--color-bg-card);box-shadow:var(--shadow-sm);transition:all .25s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:4px;border:1px solid #f0f0f0}
 .kpi-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
-.kpi-card.warn{border-left:3px solid var(--color-warning)}
-.kpi-card.danger{border-left:3px solid var(--color-danger)}
 .kpi-card-label{font-size:12px;font-weight:500;color:var(--color-text-secondary)}
 .kpi-sparkline{flex:1;min-height:40px;display:flex;align-items:center;justify-content:center;margin:2px 0}
 .kpi-sparkline canvas{width:100%;height:100%}
@@ -225,6 +223,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .nav-project{padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:transparent;color:white;font-size:12px;font-family:var(--font-family-base);cursor:pointer;max-width:200px}
 .nav-link{color:rgba(255,255,255,.55);text-decoration:none;font-size:13px;cursor:pointer;padding:4px 10px;border-radius:4px;transition:all .2s}
 .nav-link:hover{color:white;background:rgba(255,255,255,.08)}
+.nav-link.active{color:white;background:rgba(255,255,255,.15)}
 .nav-user{font-size:13px;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:6px}
 
 /* ============================================================
@@ -396,7 +395,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .gpu-indicator.computing{color:var(--color-primary);animation:gpuPulse .8s infinite}
 
 /* ============================================================
-   工作台页面（辅助）
+   工作台页面
    ============================================================ */
 .workbench-layout{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:var(--spacing-lg);min-height:calc(100vh - 200px)}
 .workbench-panel{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--spacing-lg);overflow-y:auto;max-height:calc(100vh - 160px)}
@@ -512,6 +511,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
     <select class="nav-project" id="navProject" onchange="showToast('已切换项目','info')">
       <option>XX公司 2026 SP-BP</option><option>YY医疗 2025 战略复盘</option><option>ZZ集团 2026 市场进入</option>
     </select>
+    <span class="nav-link active" onclick="switchPage('cockpit')" id="linkCockpit">🎯 决策舱</span>
     <span class="nav-link" onclick="switchPage('workbench')" id="linkWorkbench">📐 工作台</span>
   </div>
   <span class="nav-user">👤 乔布斯克</span>
@@ -550,7 +550,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 
     <!-- 中部：BG 运营健康度矩阵 -->
     <div class="overview-panel" id="healthPanel">
-      <div class="overview-panel-title">🏢 各BG运营健康度 <span style="font-size:10px;font-weight:400;color:var(--color-text-tertiary);">RAG 状态矩阵</span></div>
+      <div class="overview-panel-title">🏢 业务运营健康度 <span style="font-size:10px;font-weight:400;color:var(--color-text-tertiary);">RAG 状态矩阵</span></div>
       <div class="health-matrix" id="healthMatrix"></div>
     </div>
   </div>
@@ -563,11 +563,10 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 </div>
 
 <!-- ============================================================
-     Page 2: 工作台 (辅助)
+     Page 2: 工作台
      ============================================================ -->
 <div class="page" id="page-workbench">
   <div class="workbench-toolbar">
-    <span class="back-link" onclick="switchPage('cockpit')">← 返回决策舱</span>
     <span style="font-size:14px;font-weight:600;">战略工作台 · XX公司 2026 SP-BP</span>
     <span style="font-size:12px;color:var(--color-text-tertiary);">🟢 推演引擎就绪</span>
   </div>
@@ -685,7 +684,9 @@ function switchPage(p){
   currentPage=p;
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
-  document.getElementById('linkWorkbench').style.display=p==='cockpit'?'':'none';
+  // 导航高亮
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+  document.getElementById(p==='cockpit'?'linkCockpit':'linkWorkbench').classList.add('active');
   if(p==='workbench')buildWorkbench();
 }
 function openBrand(){document.getElementById('brandOverlay').classList.add('show');document.getElementById('brandModal').classList.add('show')}
@@ -1479,84 +1480,51 @@ function renderKpiDashboard(){
     rdRatio:   [21.8,21.5,21.3,21.1,21.0,20.9,20.8,20.8],
     cashflow:  [35,36,34,32,33,35,37,38.5],
     perCapita: [150,149,148,147,146,145,143.5,142.5],
-    opMargin:  [16.2,15.8,15.4,15.0,14.7,14.4,14.3,14.3],
-    debtRatio: [54,55,56,57,58,58.5,59,59.2],
-    strRev:    [44,45,46,45,46,47,47.5,47.8],
-    cashBal:   [52,55,58,54,50,48,49,51],
-    nps:       [72,71,70,69,68,67,66.5,66]
+    opMargin:  [15.0,14.5,14.1,13.6,13.2,12.8,12.5,12.3],
+    debtRatio: [52,53,55,57,59,60.5,61.5,62.8],
+    strRev:    [42,43,45,47,49,50,51,52],
+    cashBal:   [62,60,58,55,52,50,48,46],
+    nps:       [75,73,71,68,66,64,63,61]
   };
   var kpis=[
-    // === 第1行：原有5项 ===
-    {id:'revenue',  label:'全球销售收入',  val:427.5, target:520,  unit:'¥亿', sub:'目标 ¥520亿',         pct:82,  color:'#1890ff'},
-    {id:'profit',   label:'净利润',        val:61.2,  target:85,   unit:'¥亿', sub:'净利率 14.3%',         pct:72,  color:'#1890ff'},
-    {id:'rdRatio',  label:'研发投入占比',  val:20.8,  target:21.8, unit:'%',   sub:'承诺值 21.8%',         pct:95,  color:'#722ed1'},
-    {id:'cashflow', label:'经营性现金流',  val:38.5,  target:0,    unit:'¥亿', sub:'储备覆盖5.2月',         pct:null,color:'#00875A'},
-    {id:'perCapita',label:'人均产出',      val:142.5, target:148,  unit:'¥万', sub:'员工 3000人',          pct:96,  color:'#B86E00'},
-    // === 第2行：新增5项 ===
-    {id:'opMargin', label:'营业利润率',    val:14.3,  target:18,   unit:'%',   sub:'盈利质量 · 连续2季↓', pct:79,  color:'#C53030'},
-    {id:'debtRatio',label:'资产负债率',    val:59.2,  target:60,   unit:'%',   sub:'财务安全 · 警戒线60%', pct:null,color:'#D48806'},
-    {id:'strRev',   label:'战略业务收入占比',val:47.8,target:55,   unit:'%',   sub:'战略布局 · 目标55%',   pct:87,  color:'#1890ff'},
-    {id:'cashBal',  label:'现金与短期投资',val:51,    target:null, unit:'¥亿', sub:'同比降幅 18.5%',        pct:null,color:'#D48806'},
-    {id:'nps',      label:'客户满意度NPS', val:66,    target:70,   unit:'分',  sub:'行业标杆 75分',         pct:94,  color:'#C53030'}
+    // === 第1行 ===
+    {id:'revenue',  label:'全球销售收入',  val:427.5, target:520,  unit:'¥亿', sub:'目标 ¥520亿',         color:'#1890ff'},
+    {id:'profit',   label:'净利润',        val:61.2,  target:85,   unit:'¥亿', sub:'净利率 14.3%',         color:'#1890ff'},
+    {id:'rdRatio',  label:'研发投入占比',  val:20.8,  target:21.8, unit:'%',   sub:'承诺值 21.8%',         color:'#722ed1'},
+    {id:'cashflow', label:'经营性现金流',  val:45.2,  target:null, unit:'¥亿', sub:'储备覆盖7.3月',         color:'#00875A'},
+    {id:'perCapita',label:'人均产出',      val:142.5, target:148,  unit:'¥万', sub:'员工 3000人',          color:'#B86E00'},
+    // === 第2行 ===
+    {id:'opMargin', label:'营业利润率',    val:12.3,  target:18,   unit:'%',   sub:'连续两季下滑',         color:'#C53030'},
+    {id:'debtRatio',label:'资产负债率',    val:62.8,  target:60,   unit:'%',   sub:'已超警戒线 60%',       color:'#D48806'},
+    {id:'strRev',   label:'战略业务收入占比',val:52,  target:55,   unit:'%',   sub:'战略布局优化中',       color:'#1890ff'},
+    {id:'cashBal',  label:'现金与短期投资',val:46,    target:null, unit:'¥亿', sub:'同比降幅 26%',         color:'#D48806'},
+    {id:'nps',      label:'客户满意度NPS', val:61,    target:75,   unit:'分',  sub:'行业标杆 75分',         color:'#C53030'}
   ];
-  // 阈值判定
   function classify(k){
-    if(k.id==='opMargin'){
-      if(k.val<14)return{colorClass:'red',cardClass:' danger',pctClass:'critical'}; // 连续两季下滑
-      return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
-    }
-    if(k.id==='debtRatio'){
-      if(k.val>65)return{colorClass:'red',cardClass:' danger',pctClass:'critical'};
-      if(k.val>60)return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
-      return{colorClass:'green',cardClass:'',pctClass:'on-track'};
-    }
-    if(k.id==='strRev'){
-      if(k.val<48)return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
-      return{colorClass:'green',cardClass:'',pctClass:'on-track'};
-    }
-    if(k.id==='cashBal'){
-      // 同比降幅>20%黄灯
-      if(k.val<45)return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
-      return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'}; // 降幅18.5%接近警戒
-    }
-    if(k.id==='nps'){
-      if(k.val<65)return{colorClass:'red',cardClass:' danger',pctClass:'critical'};
-      if(k.val<70)return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
-      return{colorClass:'green',cardClass:'',pctClass:'on-track'};
-    }
-    // 默认判定
-    var ratio=k.target>0?k.val/k.target:null;
-    if(k.id==='perCapita')return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
-    if(k.id==='rdRatio')return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
-    if(ratio!==null&&ratio<0.6)return{colorClass:'red',cardClass:' danger',pctClass:'critical'};
-    if(ratio!==null&&ratio<0.8)return{colorClass:'amber',cardClass:'',pctClass:'off-track'};
-    return{colorClass:'green',cardClass:'',pctClass:'on-track'};
+    if(k.id==='cashflow'||k.id==='strRev')return'green';
+    if(k.id==='opMargin'||k.id==='nps')return'red';
+    return'amber';
   }
+  var statusColor={green:'#00875A',amber:'#B86E00',red:'#C53030'};
   container.innerHTML=kpis.map(function(k,i){
-    var cls=classify(k);
-    var canvasId='kpiSpark'+k.id;
-    var ratio=k.target>0?k.val/k.target:null;
-    var pctText='';
-    if(k.id==='debtRatio'||k.id==='cashBal')pctText=k.val.toFixed(1)+k.unit; // 无完成率
-    else if(ratio!==null)pctText='完成率 '+Math.round(ratio*100)+'%';
-    else if(k.pct!==null)pctText=k.pct+'%';
-    return '<div class="kpi-card'+cls.cardClass+'" style="animation-delay:'+(i*0.04)+'s">'+
+    var cls=classify(k);var canvasId='kpiSpark'+k.id;
+    var ratio=k.target>0?Math.round(k.val/k.target*100):null;
+    return '<div class="kpi-card" style="animation:fadeIn .4s ease-out;animation-delay:'+(i*0.04)+'s">'+
       '<div class="kpi-card-label">'+k.label+'</div>'+
       '<div class="kpi-sparkline"><canvas id="'+canvasId+'" width="160" height="40"></canvas></div>'+
       '<div class="kpi-card-bottom">'+
-        '<span class="kpi-card-value '+cls.colorClass+'">'+(k.id==='rdRatio'||k.id==='opMargin'||k.id==='debtRatio'||k.id==='strRev'?k.val.toFixed(1):k.val.toFixed(1))+'</span>'+
+        '<span class="kpi-card-value '+cls+'">'+(k.id==='rdRatio'||k.id==='opMargin'||k.id==='debtRatio'||k.id==='strRev'?k.val.toFixed(1):k.val.toFixed(1))+'</span>'+
         '<span style="font-size:10px;color:var(--color-text-tertiary);">'+k.unit+'</span>'+
-        (pctText?'<span class="kpi-card-pct '+cls.pctClass+'">'+pctText+'</span>':'')+
+        (ratio!==null?'<span class="kpi-card-pct '+(cls==='red'?'critical':cls==='amber'?'off-track':'on-track')+'">完成率 '+ratio+'%</span>':'')+
       '</div>'+
       '<div class="kpi-card-sub">'+k.sub+'</div>'+
     '</div>';
   }).join('');
-  // canvas 延迟绘制 sparkline
   setTimeout(function(){
     kpis.forEach(function(k){
       var cv=document.getElementById('kpiSpark'+k.id);if(!cv)return;
       var data=T[k.id];if(!data)return;
-      _drawKpiSparkline(cv, data, k.color);
+      _drawKpiSparkline(cv, data, statusColor[classify(k)]);
     });
   },150);
 }
