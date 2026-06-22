@@ -1712,7 +1712,7 @@ function resolveCard(cardId){
     var threshold=unit==='%'?3:unit==='¥亿'?0.3:unit==='月'?2:unit==='人'?10:unit==='等级'?1:999;
     if(Math.abs(newVal-oldVal)>=threshold){evParams[pKey]=newVal;hasChange=true}
   });
-  if(hasChange){
+  if(hasChange && isHealthy){
     // 去重: 移除同一卡片之前的决策证据
     allEvidence=allEvidence.filter(function(e){return!(e.isDecision&&e.decisionCard===cardId)});
     if(window._pendingDecisions)window._pendingDecisions=window._pendingDecisions.filter(function(e){return e.decisionCard!==cardId});
@@ -1746,7 +1746,6 @@ function resolveCard(cardId){
       if(allOk){showToast('🎉 全部战略决策已处理——下一批已就绪','success');setTimeout(_loadNextBatch,2000);}
     }
   },400);
-  showToast(inst.def.title+' 已处理'+(hasChange?' · 已同步至证据链 📊':'')+' ✅','success');
 }
 function _loadNextBatch(){
   DECISION_DEFS.forEach(function(d){d.urgency=d._origUrgency||d.urgency;d.tag=d._origTag||d.tag;});
@@ -2037,7 +2036,7 @@ function buildWorkbench(){
     {label:'战略弹性测试：若芯片禁运→产品上市延迟5-7个月，NPV影响¥2.8亿',freshness:'fresh',params:{risk_mitigation_cov:70},confidence:0.85,source:'压力测试 · 2026Q1',phase:'EM[3]'},
   ];
   // 恢复resolveCard提前注入的决策证据
-  if(window._pendingDecisions){window._pendingDecisions.forEach(function(e){allEvidence.push(e)});window._pendingDecisions=[]}
+  if(window._pendingDecisions){window._pendingDecisions.forEach(function(e){allEvidence.push(e)})}
   // === 七步层次树渲染 ===
   const phaseGroups=[
     {tag:'SP',label:'战略规划 (SP)',color:'#1890ff',phases:[
@@ -2081,7 +2080,7 @@ function buildWorkbench(){
     phaseGroups.forEach((g,gi)=>{
       const gid='grp-'+gi+'-'+Math.random().toString(36).slice(2,5);
       h+='<div class="wb-phase-group open" id="'+gid+'">';
-      h+='<div class="wb-phase-header" style="font-weight:700;font-size:13px;padding:7px 10px;border-left:3px solid '+g.color+';background:#fafafa;cursor:pointer" onclick="document.getElementById(\''+gid+'\').classList.toggle(\'open\');var ar=this.querySelector(\'.wb-phase-arrow\');if(ar)ar.classList.toggle(\'rotated\')"><input type="checkbox" class="ev-check-group" onclick="event.stopPropagation();var grp=document.getElementById(\''+gid+'\');var cbs=grp.querySelectorAll(\'.ev-check\');var all=Array.from(cbs).every(function(c){return c.checked});cbs.forEach(function(c){c.checked=!all});window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" title="全选/取消本组"><span class="wb-phase-arrow">▶</span> '+g.label+'</div>';
+      h+='<div class="wb-phase-header" style="font-weight:700;font-size:13px;padding:7px 10px;border-left:3px solid '+g.color+';background:#fafafa;cursor:pointer" onclick="document.getElementById(\''+gid+'\').classList.toggle(\'open\')"><input type="checkbox" class="ev-check-group" onclick="event.stopPropagation();var grp=document.getElementById(\''+gid+'\');var cbs=grp.querySelectorAll(\'.ev-check\');var all=Array.from(cbs).every(function(c){return c.checked});cbs.forEach(function(c){c.checked=!all});window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" title="全选/取消本组"><span class="wb-phase-arrow">▶</span> '+g.label+'</div>';
       h+='<div class="wb-phase-items">';
       g.phases.forEach((p,pi)=>{
       // 递归收集所有 key
