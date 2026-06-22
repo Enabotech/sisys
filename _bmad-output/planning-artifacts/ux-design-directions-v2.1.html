@@ -1528,9 +1528,7 @@ function renderRiskRadar(){
   var topRisks=[
     {rank:1,text:'华为/联影新一代AI影像设备2026Q3上市，价格低30%',impact:'危急',level:'critical'},
     {rank:2,text:'美国BIS出口管制升级，A100/H100 GPU禁售范围扩至医疗AI',impact:'危急',level:'critical'},
-    {rank:3,text:'核心光学器件（CMOS传感器）日本供应商产能紧张，交期延长至8个月',impact:'高',level:'high'},
-    {rank:4,text:'欧盟MDR新规2027年生效，临床验证成本预计增加¥1.2亿',impact:'高',level:'high'},
-    {rank:5,text:'关键AI算法工程师3人收到竞品offer，薪酬倒挂35%',impact:'高',level:'high'}
+    {rank:3,text:'核心光学器件（CMOS传感器）日本供应商产能紧张，交期延长至8个月',impact:'高',level:'high'}
   ];
   var redProjects=[
     {name:'Cloud&AI BG · 智慧医疗云平台',deviation:'-35%'},
@@ -1542,7 +1540,7 @@ function renderRiskRadar(){
     {text:'Cloud&AI BG研发预算超支¥4200万（超标28%）',tag:'预算',cls:'budget'},
     {text:'上海工厂产能利用率已达93%，Q4排产缺口15%',tag:'产能',cls:'capacity'}
   ];
-  var h='<div style="margin-bottom:var(--spacing-md);"><div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px;">⚠️ 重大风险 TOP5</div>';
+  var h='<div style="margin-bottom:var(--spacing-md);"><div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px;">⚠️ 重大风险 TOP3</div>';
   topRisks.forEach(function(r){
     h+='<div class="risk-radar-item"><span class="risk-radar-rank rank-'+r.rank+'">'+r.rank+'</span><span class="risk-radar-text" title="'+r.text+'">'+r.text+'</span><span class="risk-radar-impact '+r.level+'">'+r.impact+'</span></div>';
   });
@@ -1578,7 +1576,7 @@ function renderHealthMatrix(){
     if(t==='↓')return '<span class="trend-down">↓</span>';
     return '<span class="trend-flat">→</span>';
   };
-  var h='<table class="health-table"><thead><tr><th>BG/SBG/BU</th><th>收入达成</th><th>利润贡献</th><th>客户满意度</th><th>关键项目</th><th>综合状态</th><th>趋势</th></tr></thead><tbody>';
+  var h='<table class="health-table"><thead><tr><th>业务单元</th><th>收入达成</th><th>利润贡献</th><th>客户满意度</th><th>关键项目</th><th>综合状态</th><th>趋势</th></tr></thead><tbody>';
   bgs.forEach(function(bg){
     h+='<tr><td>'+bg.name+'</td>'+
       '<td>'+bg.revenue+' '+ragIcon(bg.revRag)+'</td>'+
