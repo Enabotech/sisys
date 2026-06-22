@@ -417,9 +417,12 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .wb-phase-badge.good{background:#f6ffed;color:var(--color-success)}
 .wb-phase-badge.warn{background:#fffbe6;color:#d48806}
 .wb-phase-badge.empty{background:#f5f5f5;color:var(--color-text-disabled)}
-/* 子步骤 */
+/* 二级子步骤 */
 .wb-phase-group .wb-phase-group .wb-phase-header{font-size:11px;padding:3px 6px}
 .wb-phase-group .wb-phase-group .wb-phase-items{padding:1px 0 2px 10px;margin-left:6px}
+/* 三级子步骤 */
+.wb-phase-group .wb-phase-group .wb-phase-group .wb-phase-header{font-size:10px;padding:2px 5px;color:var(--color-text-secondary)}
+.wb-phase-group .wb-phase-group .wb-phase-group .wb-phase-items{padding:1px 0 1px 8px;margin-left:4px;border-left:1px dashed #e8e8e8}
 /* 证据行 */
 .wb-evidence-row{display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;font-size:11px;transition:background .12s}
 .wb-evidence-row:hover{background:#fafafa}
@@ -1923,7 +1926,10 @@ function buildWorkbench(){
     {label:'华为联影联合推出AI-CT，上市18个月签约42家三甲，速度超预期',freshness:'fresh',params:{comp_lead:6},confidence:0.85,source:'竞品动态监测 · 2026Q1',phase:'SP[2]',substep:'(3)看竞争'},
     {label:'内部：已获8项核心专利、3项NMPA注册证在途，研发团队120人',freshness:'fresh',params:{talent_pool:55,rd_budget:2.0},confidence:0.90,source:'CTO技术盘点 · 2026Q1',phase:'SP[2]',substep:'(4)看自己'},
     {label:'机会窗口：AI影像诊断+国产替代双驱动，3年内可抢占15-20%份额',freshness:'fresh',params:{mkt_growth:15,comp_lead:1},confidence:0.85,source:'安索夫矩阵分析 · 2026Q1',phase:'SP[2]',substep:'(5)看机会'},
-    {label:'核心差距：AI算法人才缺口22人、渠道覆盖仅45%、品牌认知度28%',freshness:'fresh',params:{talent_pool:55,hc_gap:22},confidence:0.82,source:'GE-麦肯锡矩阵 · 2026Q1',phase:'SP[2]',substep:'(6)机会差距'},
+    {label:'核心差距：AI算法人才缺口22人、渠道覆盖仅45%、品牌认知度28%',freshness:'fresh',params:{talent_pool:55,hc_gap:22},confidence:0.82,source:'GE-麦肯锡矩阵 · 2026Q1',phase:'SP[2]',substep:'关键短板'},
+    // (6)机会差距 — 外部未纳入规划的机会
+    {label:'县域及基层医疗市场未纳入规划（规模约¥80亿/年）',freshness:'fresh',params:{mkt_growth:10,channel_cov:50},confidence:0.78,source:'县域医疗调研 · 2026Q1',phase:'SP[2]',substep:'(6)机会差距'},
+    {label:'AI辅助诊断在非影像科室（病理/心电/超声）的需求尚未覆盖',freshness:'fresh',params:{mkt_growth:18},confidence:0.75,source:'科室需求调研 · 2026Q1',phase:'SP[2]',substep:'(6)机会差距'},
     // SP[3] 战略意图 — 实际战略目标
     {label:'2028年营收达¥50亿，其中高端CT/MR占60%、AI诊断服务占25%',freshness:'fresh',params:{mkt_growth:15,channel_cov:75},confidence:0.95,source:'董事会决议 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2, 举措1.3'},
     {label:'市场份额2028年达25%，三甲覆盖率≥35%（105家）',freshness:'fresh',params:{mkt_share:25},confidence:0.90,source:'SP 2026-2028 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2'},
@@ -1983,10 +1989,16 @@ function buildWorkbench(){
       {step:'SP[2]',label:'市场洞察',subs:[
         {sub:'(1)看趋势',keys:['中国高端医疗影像设备市场2026年规模¥520亿，CAGR 15%','十四五规划明确高端医疗装备国产化率≥70%目标，政策窗口期3年']},
         {sub:'(2)看市场与客户',keys:['三甲医院影像科主任最关注：AI辅助诊断准确率(82%)、设备维保响应(74%)、扫描速度(68%)']},
-        {sub:'(3)看竞争',keys:['TOP3（GE/西门子/飞利浦）占62%份额，但国产替代率已从18%升至35%','华为联影联合推出AI-CT，上市18个月签约42家三甲，速度超预期']},
-        {sub:'(4)看自己',keys:['内部：已获8项核心专利、3项NMPA注册证在途，研发团队120人']},
+        {sub:'(3)看竞争',subs:[
+          {sub:'市场格局',keys:['TOP3（GE/西门子/飞利浦）占62%份额，但国产替代率已从18%升至35%']},
+          {sub:'关键对手动态',keys:['华为联影联合推出AI-CT，上市18个月签约42家三甲，速度超预期']}
+        ]},
+        {sub:'(4)看自己',subs:[
+          {sub:'核心能力',keys:['内部：已获8项核心专利、3项NMPA注册证在途，研发团队120人']},
+          {sub:'关键短板',keys:['核心差距：AI算法人才缺口22人、渠道覆盖仅45%、品牌认知度28%']}
+        ]},
         {sub:'(5)看机会',keys:['机会窗口：AI影像诊断+国产替代双驱动，3年内可抢占15-20%份额']},
-        {sub:'(6)机会差距',keys:['核心差距：AI算法人才缺口22人、渠道覆盖仅45%、品牌认知度28%']}
+        {sub:'(6)机会差距',keys:['县域及基层医疗市场未纳入规划（规模约¥80亿/年）','AI辅助诊断在非影像科室（病理/心电/超声）的需求尚未覆盖']}
       ]},
       {step:'SP[3]',label:'战略意图',keys:['2028年营收达¥50亿，其中高端CT/MR占60%、AI诊断服务占25%','市场份额2028年达25%，三甲覆盖率≥35%（105家）','累计发明专利≥15项、NMPA三类注册证≥8项','整体毛利率≥60%，研发费用率维持在20-22%']},
       {step:'SP[4]',label:'创新焦点',keys:['AI影像辅助诊断引擎：基于Transformer的多模态融合，目标准确率≥95%','商业模式创新：设备销售→"设备+AI诊断SaaS订阅"，ARPU提升3倍']},
@@ -2016,7 +2028,9 @@ function buildWorkbench(){
       h+='<div class="wb-phase-header" style="font-weight:700;font-size:13px;padding:7px 10px;border-left:3px solid '+g.color+';background:#fafafa;cursor:pointer" onclick="document.getElementById(\''+gid+'\').classList.toggle(\'open\');var ar=this.querySelector(\'.wb-phase-arrow\');if(ar)ar.classList.toggle(\'rotated\')"><input type="checkbox" class="ev-check-group" onclick="event.stopPropagation();var grp=document.getElementById(\''+gid+'\');var cbs=grp.querySelectorAll(\'.ev-check\');var all=Array.from(cbs).every(function(c){return c.checked});cbs.forEach(function(c){c.checked=!all});window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" title="全选/取消本组"><span class="wb-phase-arrow">▶</span> '+g.label+'</div>';
       h+='<div class="wb-phase-items">';
       g.phases.forEach((p,pi)=>{
-      const allKeys=(p.keys||[]).concat(p.subs?p.subs.flatMap(s=>s.keys):[]);
+      // 递归收集所有 key
+      function collectKeys(node){var ks=node.keys||[];if(node.subs)node.subs.forEach(function(c){ks=ks.concat(collectKeys(c));});return ks;}
+      const allKeys=(p.keys||[]).concat(p.subs?p.subs.flatMap(function(s){return collectKeys(s);}):[]);
       const items=allKeys.map(k=>byLabel[k]).filter(Boolean);
       const f=items.filter(e=>e.freshness==='fresh').length;
       const u=items.filter(e=>e.freshness==='usable').length;
@@ -2027,21 +2041,33 @@ function buildWorkbench(){
       h+='<div class="wb-phase-group" id="'+id+'">';
       h+='<div class="wb-phase-header" onclick="document.getElementById(\''+id+'\').classList.toggle(\'open\')"><input type="checkbox" class="ev-check-group" onclick="event.stopPropagation();var grp=document.getElementById(\''+id+'\');var cbs=grp.querySelectorAll(\'.ev-check\');var all=Array.from(cbs).every(function(c){return c.checked});cbs.forEach(function(c){c.checked=!all});window.recalcEvidenceDiscount()" style="flex-shrink:0;cursor:pointer;accent-color:var(--color-primary)" title="全选/取消本阶段"><span class="wb-phase-arrow">▶</span><strong>'+p.step+' '+p.label+'</strong><span class="wb-phase-badge '+badge+'">🟢'+f+' 🟡'+u+' 🔴'+s+'</span></div>';
       h+='<div class="wb-phase-items">';
+      // 递归渲染子级（支持2级和3级）
+      function renderSubLevel(sub,idx,parentId){
+        var sKeys=collectKeys(sub);var sItems=sKeys.map(function(k){return byLabel[k];}).filter(Boolean);
+        var sid=parentId+'-'+idx+'-'+Math.random().toString(36).slice(2,5);
+        var sf=sItems.filter(function(e){return e.freshness==='fresh';}).length;
+        var su=sItems.filter(function(e){return e.freshness==='usable';}).length;
+        var st=sItems.filter(function(e){return e.freshness==='stale';}).length;
+        var sbadge=sf>=Math.max(sKeys.length,1)*0.6?'good':sf>0||su>0?'warn':'empty';
+        var html='<div class="wb-phase-group'+(sItems.length>0?' open':'')+'" id="'+sid+'">';
+        html+='<div class="wb-phase-header" style="font-weight:400" onclick="document.getElementById(\''+sid+'\').classList.toggle(\'open\')"><span class="wb-phase-arrow">▶</span>'+sub.sub+' <span class="wb-phase-badge '+sbadge+'">🟢'+sf+' 🟡'+su+' 🔴'+st+'</span></div>';
+        html+='<div class="wb-phase-items">';
+        if(sub.subs){
+          // 三级：递归渲染嵌套子级
+          sub.subs.forEach(function(ss,i){html+=renderSubLevel(ss,i,sid);});
+        }else if(sub.keys){
+          // 叶节点：渲染证据行
+          if(sItems.length===0)html+='<div style="font-size:10px;color:var(--color-text-disabled);padding:4px 0;font-style:italic">📌 待补充证据</div>';
+          sItems.forEach(function(e){html+=renderEvidenceRow(e);});
+        }
+        html+='</div></div>';
+        return html;
+      }
       if(p.subs){
-        p.subs.forEach((ss,ssi)=>{
-          const sItems=ss.keys.map(k=>byLabel[k]).filter(Boolean);
-          const sid='sub-'+pi+'-'+ssi+'-'+Math.random().toString(36).slice(2,5);
-          h+='<div class="wb-phase-group'+(sItems.length>0?' open':'')+'" id="'+sid+'">';
-          const sf=sItems.filter(e=>e.freshness==='fresh').length;const su=sItems.filter(e=>e.freshness==='usable').length;const ss2=sItems.filter(e=>e.freshness==='stale').length;const sbadge=sf>=sItems.length*0.6?'good':sf>0||su>0?'warn':'empty';
-          h+='<div class="wb-phase-header" style="font-weight:400" onclick="document.getElementById(\''+sid+'\').classList.toggle(\'open\')"><span class="wb-phase-arrow">▶</span>'+ss.sub+' <span class="wb-phase-badge '+sbadge+'">🟢'+sf+' 🟡'+su+' 🔴'+ss2+'</span></div>';
-          h+='<div class="wb-phase-items">';
-          if(sItems.length===0)h+='<div style="font-size:10px;color:var(--color-text-disabled);padding:4px 0;font-style:italic">📌 待补充证据</div>';
-          sItems.forEach(e=>{h+=renderEvidenceRow(e)});
-          h+='</div></div>';
-        });
+        p.subs.forEach(function(ss,ssi){h+=renderSubLevel(ss,ssi,id);});
       }else{
         if(items.length===0)h+='<div style="font-size:10px;color:var(--color-text-disabled);padding:4px 0;font-style:italic">📌 待补充证据</div>';
-        items.forEach(e=>{h+=renderEvidenceRow(e)});
+        items.forEach(function(e){h+=renderEvidenceRow(e);});
       }
       h+='</div></div>';
     }); // close phases.forEach
