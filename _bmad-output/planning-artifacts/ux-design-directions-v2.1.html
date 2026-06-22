@@ -623,16 +623,16 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 // ============================================================
 window._th={};function tH(cid){if(!window._th[cid])window._th[cid]=[];return window._th[cid]}
 function tPush(cid,sp,bp,em){var h=tH(cid);h.push({sp:sp,bp:bp,em:em,ts:Date.now()});if(h.length>100)h.shift()}
-function tDraw(cv,cid,key,mx){var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;var hist=tH(cid).map(function(p){return p[key]});if(hist.length<2)return;ctx.clearRect(0,0,w,h);var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0,0.5,1].forEach(function(p){var y=h-8-p*(h-16);ctx.beginPath();ctx.moveTo(2,y);ctx.lineTo(w-2,y);ctx.stroke()});var getColor=function(v){var ratio=v/mx;return ratio>=0.75?'#00875A':ratio>=0.4?'#D46B08':'#C53030'};var grad=ctx.createLinearGradient(0,0,w,0),n=hist.length;for(var i=0;i<n;i++)grad.addColorStop(i/Math.max(n-1,1),getColor(hist[i]));ctx.strokeStyle=grad;ctx.lineWidth=2;ctx.beginPath();hist.forEach(function(v,i){var x=2+i/Math.max(n-1,1)*(w-4);var y=h-8-(v-mn)/r*(h-16);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();var lv=hist[n-1],lx=2+(n-1)/Math.max(n-1,1)*(w-4),ly=h-8-(lv-mn)/r*(h-16);ctx.fillStyle=getColor(lv);ctx.beginPath();ctx.arc(lx,ly,3,0,Math.PI*2);ctx.fill()}
-function tModal(cid,key){key=key||'sp';var ns={sp:'SP 战略规划',bp:'BP 业务计划',em:'EM 业务执行'};var cl={sp:'#1890ff',bp:'#00875A',em:'#B86E00'};var mx={sp:1,bp:1,em:100};var m=document.getElementById('tM'),o=document.getElementById('tO');if(!m){o=document.createElement('div');o.id='tO';o.className='overlay';o.onclick=function(){o.classList.remove('show');m.classList.remove('show')};document.body.appendChild(o);m=document.createElement('div');m.id='tM';m.className='modal';m.style.cssText='max-width:500px';m.innerHTML='<div class="modal-header"><span class="modal-title" id="tT"></span><button class="modal-close" onclick="document.getElementById(\'tO\').classList.remove(\'show\');document.getElementById(\'tM\').classList.remove(\'show\')">X</button></div><div class="modal-body"><canvas id="tC" width="460" height="200" style="width:100%;height:auto"></canvas><div style="margin-top:8px;font-size:13px;text-align:center;font-weight:700" id="tV"></div></div>';document.body.appendChild(m)}o.classList.add('show');m.classList.add('show');document.getElementById('tT').textContent='📈 '+ns[key]+' 置信度走势（最近'+tH(cid).length+'次）';setTimeout(function(){var c=document.getElementById('tC');if(!c)return;var ctx=c.getContext('2d'),w=c.width,h=c.height;var hist=tH(cid).map(function(p){return p[key]});var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#eee';ctx.lineWidth=0.5;[0.25,0.5,0.75].forEach(function(p){var y=h-20-p*(h-30);ctx.beginPath();ctx.moveTo(10,y);ctx.lineTo(w-10,y);ctx.stroke()});ctx.strokeStyle=cl[key];ctx.lineWidth=2.5;ctx.beginPath();hist.forEach(function(v,i){var x=10+i/Math.max(hist.length-1,1)*(w-20);var y=h-20-(v-mn)/r*(h-30);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();var lv=hist[hist.length-1],pv=hist[hist.length-2],d=pv?lv-pv:0;document.getElementById('tV').innerHTML='<span style="color:'+cl[key]+'">'+(key==='em'?Math.round(lv):lv.toFixed(2))+'</span> <span style="font-size:12px;color:'+(d>=0?'var(--color-success)':'var(--color-danger)')+'">'+(d>0?'↑+':d<0?'↓':'→')+(key==='em'?Math.round(Math.abs(d)):Math.abs(d).toFixed(2))+'</span>'},100)}
+function tDraw(cv,cid,key,mx){var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;var hist=tH(cid).map(function(p){return p[key]});if(hist.length<2)return;ctx.clearRect(0,0,w,h);var r=mx||1;var getColor=function(v){var pct=v/r;return pct>=0.75?'#00875A':pct>=0.4?'#D46B08':'#C53030'};var grad=ctx.createLinearGradient(0,0,w,0),n=hist.length;for(var i=0;i<n;i++)grad.addColorStop(i/Math.max(n-1,1),getColor(hist[i]));ctx.strokeStyle=grad;ctx.lineWidth=2;ctx.beginPath();hist.forEach(function(v,i){var x=2+i/Math.max(n-1,1)*(w-4);var y=h-8-v/r*(h-16);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();var lv=hist[n-1],lx=2+(n-1)/Math.max(n-1,1)*(w-4),ly=h-8-lv/r*(h-16);ctx.fillStyle=getColor(lv);ctx.beginPath();ctx.arc(lx,ly,3,0,Math.PI*2);ctx.fill()}
+function tModal(cid,key){key=key||'sp';var ns={sp:'SP 战略规划',bp:'BP 业务计划',em:'EM 业务执行'};var cl={sp:'#1890ff',bp:'#00875A',em:'#B86E00'};var mx={sp:1,bp:1,em:1};var m=document.getElementById('tM'),o=document.getElementById('tO');if(!m){o=document.createElement('div');o.id='tO';o.className='overlay';o.onclick=function(){o.classList.remove('show');m.classList.remove('show')};document.body.appendChild(o);m=document.createElement('div');m.id='tM';m.className='modal';m.style.cssText='max-width:500px';m.innerHTML='<div class="modal-header"><span class="modal-title" id="tT"></span><button class="modal-close" onclick="document.getElementById(\'tO\').classList.remove(\'show\');document.getElementById(\'tM\').classList.remove(\'show\')">X</button></div><div class="modal-body"><canvas id="tC" width="460" height="200" style="width:100%;height:auto"></canvas><div style="margin-top:8px;font-size:13px;text-align:center;font-weight:700" id="tV"></div></div>';document.body.appendChild(m)}o.classList.add('show');m.classList.add('show');document.getElementById('tT').textContent='📈 '+ns[key]+' 置信度走势（最近'+tH(cid).length+'次）';setTimeout(function(){var c=document.getElementById('tC');if(!c)return;var ctx=c.getContext('2d'),w=c.width,h=c.height;var hist=tH(cid).map(function(p){return p[key]});var mn=Math.min.apply(null,hist),r=Math.max.apply(null,hist)-mn||1;ctx.clearRect(0,0,w,h);ctx.strokeStyle=cl[key];ctx.lineWidth=2.5;ctx.beginPath();hist.forEach(function(v,i){var x=10+i/Math.max(hist.length-1,1)*(w-20);var y=h-20-(v-mn)/r*(h-30);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.stroke();var lv=hist[hist.length-1],pv=hist[hist.length-2],d=pv?lv-pv:0;document.getElementById('tV').innerHTML='<span style="color:'+cl[key]+'">'+lv.toFixed(2)+'</span> <span style="font-size:12px;color:'+(d>=0?'var(--color-success)':'var(--color-danger)')+'">'+(d>0?'↑+':d<0?'↓':'→')+Math.abs(d).toFixed(2)+'</span>'},100)}
 function buildTrendCell(container,prefix,key,title,color,val,mxVal){
   var pid=prefix+key;var d=document.createElement('div');d.style.cssText='text-align:center;cursor:pointer';d.onclick=function(){tModal(prefix.replace('-',''),key)};
-  d.innerHTML='<div style=\"font-size:12px;font-weight:700;color:'+color+'\">'+title+'</div><canvas id=\"c'+pid+'\" width=\"400\" height=\"100\" style=\"width:100%\"></canvas><div style=\"font-size:14px;font-weight:700;margin-top:2px\" id=\"v'+pid+'\">'+(key==='em'?Math.round(val):val.toFixed(2))+'</div><div style=\"font-size:10px;color:var(--color-text-tertiary)\" id=\"d'+pid+'\"></div>';
+  d.innerHTML='<div style=\"font-size:12px;font-weight:700;color:'+color+'\">'+title+'</div><canvas id=\"c'+pid+'\" width=\"400\" height=\"100\" style=\"width:100%\"></canvas><div style=\"font-size:14px;font-weight:700;margin-top:2px\" id=\"v'+pid+'\">'+(val.toFixed(2))+'</div><div style=\"font-size:10px;color:var(--color-text-tertiary)\" id=\"d'+pid+'\"></div>';
   container.appendChild(d);return function(scores){
-    [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'em',mx:100,v:scores.execution}].forEach(function(s){
+    [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'em',mx:1,v:scores.execution}].forEach(function(s){
       var ip=prefix+s.k;var cv=document.getElementById('c'+ip);if(cv)tDraw(cv,prefix.replace('-',''),s.k,s.mx);
-      var ve=document.getElementById('v'+ip);if(ve)ve.textContent=s.k==='em'?Math.round(s.v):s.v.toFixed(2);
-      var de=document.getElementById('d'+ip);if(de){var hh=tH(prefix.replace('-',''));if(hh.length>1){var pv=hh[hh.length-2][s.k];var d=s.v-pv;de.textContent=d>0?'↑ +'+(s.k==='em'?Math.round(d):d.toFixed(2)):d<0?'↓ '+(s.k==='em'?Math.round(d):d.toFixed(2)):'→';de.style.color=d>0?'var(--color-success)':d<0?'var(--color-danger)':'var(--color-text-tertiary)'}}
+      var ve=document.getElementById('v'+ip);if(ve)ve.textContent=s.v.toFixed(2);
+      var de=document.getElementById('d'+ip);if(de){var hh=tH(prefix.replace('-',''));if(hh.length>1){var pv=hh[hh.length-2][s.k];var d=s.v-pv;de.textContent=d>0?'↑ +'+(d.toFixed(2)):d<0?'↓ '+(d.toFixed(2)):'→';de.style.color=d>0?'var(--color-success)':d<0?'var(--color-danger)':'var(--color-text-tertiary)'}}
     });
   };
 }
@@ -808,7 +808,7 @@ class SliderPhysics {
 // ============================================================
 class ScoreBar {
   constructor(container, opts){
-    this.container=container; this.label=opts.label; this.value=opts.value??0; this.maxValue=opts.max??100;
+    this.container=container; this.label=opts.label; this.value=opts.value??0; this.maxValue=opts.max??1;
     this.prevValue=this.value; this.isPercent=opts.isPercent||false;
     this._build();
   }
@@ -1048,8 +1048,8 @@ const DECISION_DEFS = [
     ],
     staleData:[{label:'现金流预测报告',freshness:'过期12个月',desc:'2025Q1现金流模型'}],
     options:['紧急融资','💡 砍边缘业务保核心（AI推荐）'],
-    baseScores:{direction:0.35, decode:0.42, execution:28},
-    maxScores:{direction:1, decode:1, execution:100},
+    baseScores:{direction:0.35, decode:0.42, execution:0.28},
+    maxScores:{direction:1, decode:1, execution:0.01},
     sliders:[
       {key:'cashflow',paramKey:'cashflow_risk',label:'现金流\n压力',min:1,max:5,value:4,step:1,formatValue:v=>({1:'极低',2:'低',3:'中',4:'高',5:'极高'})[v],suffix:'',reverseGradient:true,notches:[{value:2,aiRec:true},{value:4}],warnBelow:0,dangerBelow:0},
       {key:'payback',paramKey:'payback_years',label:'投资回\n收期',min:1,max:7,value:5.8,step:0.1,formatValue:v=>v.toFixed(1)+'年',suffix:'',reverseGradient:true,notches:[{value:3.5,aiRec:true},{value:5}],warnBelow:4,dangerBelow:5},
@@ -1061,7 +1061,7 @@ const DECISION_DEFS = [
       const dir=clamp(0.30+(sliders.mkt_growth-6)*0.015+(5-sliders.cashflow)*0.08+(7-sliders.payback)*0.02,0,1);
       // decode: 研发>1.5+0.15, 现金流<2+0.12, 回收期<4+0.10 → 最优0.87 最差0.42
       const dec=clamp(0.50+(sliders.rd_budget>1.5?0.15:0)+(sliders.cashflow<2?0.12:0)+(sliders.payback<4?0.10:0),0,1);
-      const exec=clamp(25+(sliders.rd_budget-0.8)*20+(5-sliders.cashflow)*8+(7-sliders.payback)*6+(sliders.mkt_growth-6)*1.5,0,100);
+      const exec=clamp((25+(sliders.rd_budget-0.8)*20+(5-sliders.cashflow)*8+(7-sliders.payback)*6+(sliders.mkt_growth-6)*1.5)/100,0,1);
       return{direction:dir,decode:dec,execution:exec};
     },
   },
@@ -1076,8 +1076,8 @@ const DECISION_DEFS = [
     ],
     staleData:[{label:'技术趋势报告',freshness:'过期18个月',desc:'AI+国产替代双驱动（2024Q2行业白皮书）'}],
     options:['激进进入','💡 合资探索（AI推荐）'],
-    baseScores:{direction:0.52, decode:0.95, execution:85},
-    maxScores:{direction:1, decode:1, execution:100},
+    baseScores:{direction:0.52, decode:0.95, execution:0.85},
+    maxScores:{direction:1, decode:1, execution:0.01},
     sliders:[
       {key:'cagr',paramKey:'mkt_growth',label:'年复合\n增长率',min:0,max:30,value:10,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
       {key:'comp',paramKey:'comp_lead',label:'竞品提\n前时间',min:0,max:6,value:2,step:1,formatValue:v=>v===0?'正常':v+'个月',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:3}],warnBelow:0,dangerBelow:0},
@@ -1088,7 +1088,7 @@ const DECISION_DEFS = [
       // 来源说明: 0.92基准→行业均值; 0.018→麦肯锡2025战略规划调研(增速弹性); 0.045→历史回归(2020-2025竞争数据,竞品月领先影响因子)
       const dir=clamp(0.92-(15-sliders.cagr)*0.018-(sliders.comp*0.045),0,1);
       const dec=clamp(1.0-(sliders.budget<1.5?0.08:0)-(sliders.hc>20?0.05:0),0,1);
-      const exec=clamp(95-(2.0-sliders.budget)*28-(sliders.hc*0.75),0,100);
+      const exec=clamp((95-(2.0-sliders.budget)*28-(sliders.hc*0.75))/100,0,1);
       return{direction:dir,decode:dec,execution:exec};
     },
   },
@@ -1099,8 +1099,8 @@ const DECISION_DEFS = [
     spAnchor:{spId:'sc4',spTitle:'SC-4 市场进入策略',csf:'CSF-6 运营效率',kpi:'KPI-6.1 供应链成本指数',target:'<¥1.5亿',weight:0.4},
     staleData:[{label:'供应商成本基准',freshness:'过期9个月',desc:'2025供应链审计报告'}],
     options:['维持现状','💡 竞价谈判+国产替代（AI推荐）'],
-    baseScores:{direction:0.88, decode:0.80, execution:32},
-    maxScores:{direction:1, decode:1, execution:100},
+    baseScores:{direction:0.88, decode:0.80, execution:0.32},
+    maxScores:{direction:1, decode:1, execution:0.01},
     sliders:[
       {key:'supply',paramKey:'supply_cost',label:'供应链\n成本',min:0.5,max:3.0,value:2.5,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',reverseGradient:true,notches:[{value:1.2,aiRec:true},{value:2.0}],warnBelow:0,dangerBelow:0},
       {key:'launch',paramKey:'launch_cycle',label:'上市\n周期',min:6,max:24,value:18,step:1,formatValue:v=>v+'个月',suffix:'',reverseGradient:true,notches:[{value:12,aiRec:true},{value:18}],warnBelow:0,dangerBelow:0},
@@ -1109,7 +1109,7 @@ const DECISION_DEFS = [
     calcScores:function(sliders){
       const dir=clamp(0.88+(sliders.localization-30)*0.002,0,1);
       const dec=clamp(0.80+(sliders.supply<1.5?0.1:0)+(sliders.launch<12?0.05:0),0,1);
-      const exec=clamp(32+(3.0-sliders.supply)*30+(24-sliders.launch)*4+(sliders.localization-30)*0.6,0,100);
+      const exec=clamp((32+(3.0-sliders.supply)*30+(24-sliders.launch)*4+(sliders.localization-30)*0.6)/100,0,1);
       return{direction:dir,decode:dec,execution:exec};
     },
   },
@@ -1120,8 +1120,8 @@ const DECISION_DEFS = [
     spAnchor:{spId:'sc1',spTitle:'SC-1 高端医疗设备市场领先',csf:'CSF-3 市场覆盖面',kpi:'KPI-3.2 签约数',target:'28家',weight:0.3},
     staleData:[{label:'数字化营销ROI基准',freshness:'过期6个月',desc:'2025Q4营销效率报告'}],
     options:['逐步推进','💡 渠道闪电战+SaaS工具（AI推荐）'],
-    baseScores:{direction:0.90, decode:0.48, execution:80},
-    maxScores:{direction:1, decode:1, execution:100},
+    baseScores:{direction:0.90, decode:0.48, execution:0.8},
+    maxScores:{direction:1, decode:1, execution:0.01},
     sliders:[
       {key:'channel_cov',label:'渠道覆\n盖率',min:0,max:100,value:45,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:80,aiRec:true},{value:50}],warnBelow:50,dangerBelow:30},
       {key:'mkt_growth2',paramKey:'mkt_growth',label:'市场\n增速',min:0,max:25,value:14,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
@@ -1132,7 +1132,7 @@ const DECISION_DEFS = [
       const dir=clamp(0.90+(sliders.mkt_growth2-14)*0.015,0,1);
       // decode: 渠道>60+0.12, >80+0.08, 预算>1.5+0.08, >2.0+0.06 → 最优0.89 最差0.55
       const dec=clamp(0.55+(sliders.channel_cov>60?0.12:0)+(sliders.channel_cov>80?0.08:0)+(sliders.budget2>1.5?0.08:0)+(sliders.budget2>2.0?0.06:0),0,1);
-      const exec=clamp(80+(sliders.channel_cov-45)*0.4+(sliders.budget2-1.0)*20-(sliders.hc*0.5),0,100);
+      const exec=clamp((80+(sliders.channel_cov-45)*0.4+(sliders.budget2-1.0)*20-(sliders.hc*0.5))/100,0,1);
       return{direction:dir,decode:dec,execution:exec};
     },
   },
@@ -1145,8 +1145,8 @@ const DECISION_DEFS = [
       {bpId:'bp13',csf:'CSF-4 人才保障',kpi:'KPI-4.1 学科带头人数',target:'5名',weight:0.3}
     ],
     options:['按原计划推进','微调资源配置'],
-    baseScores:{direction:0.92, decode:0.98, execution:88},
-    maxScores:{direction:1, decode:1, execution:100},
+    baseScores:{direction:0.92, decode:0.98, execution:0.88},
+    maxScores:{direction:1, decode:1, execution:0.01},
     sliders:[
       {key:'mkt_growth',label:'市场\n增速',min:0,max:25,value:15,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:10}],warnBelow:10,dangerBelow:5},
       {key:'localization',label:'国产替\n代率',min:0,max:100,value:55,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:60,aiRec:true},{value:40}],warnBelow:35,dangerBelow:20},
@@ -1156,7 +1156,7 @@ const DECISION_DEFS = [
       // 来源: 0.92基准→行业均值; 0.015→市场增速弹性(麦肯锡2025); 0.001→国产替代率弱影响因子
       const dir=clamp(0.92-(15-sliders.mkt_growth)*0.015+(sliders.localization-55)*0.001,0,1);
       const dec=clamp(0.98-(sliders.rd_invest<1.5?0.06:0),0,1);
-      const exec=clamp(88+(sliders.mkt_growth-15)*1.2+(sliders.localization-55)*0.3+(sliders.rd_invest-2.0)*15,0,100);
+      const exec=clamp((88+(sliders.mkt_growth-15)*1.2+(sliders.localization-55)*0.3+(sliders.rd_invest-2.0)*15)/100,0,1);
       return{direction:dir,decode:dec,execution:exec};
     },
   }
@@ -1231,7 +1231,7 @@ function buildCockpit(){
     scoreContainer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
     var pre=d.id+'-';var updateTrends=buildTrendCell(scoreContainer,pre,'sp','SP','#1890ff',d.baseScores.direction,1);
     buildTrendCell(scoreContainer,pre,'bp','BP','#00875A',d.baseScores.decode,1);
-    buildTrendCell(scoreContainer,pre,'em','EM','#B86E00',d.baseScores.execution,100);
+    buildTrendCell(scoreContainer,pre,'em','EM','#B86E00',d.baseScores.execution,1);
 
     // 创建AI代偿
     const aiComp=new AICompensation(aiContainer,{cardId:d.id,baseScores:d.baseScores,staleData:d.staleData||[]});
@@ -1251,17 +1251,17 @@ function buildCockpit(){
       const st=getSliderState(d.id);const scores=d.calcScores(st);
       updateTrends(scores);showToast('策略已采纳 ✅','success');
       // 采纳后标记卡片为已处理，重排
-      var w=Math.min(scores.direction,scores.decode,scores.execution/100);
+      var w=Math.min(scores.direction,scores.decode,scores.execution);
       if(w>=0.75){d.urgency='stable';d.tag='稳定';var card=document.getElementById('card-'+d.id);if(card){card.dataset.urgency='stable';var tag=card.querySelector('.card-urgency-tag');if(tag){tag.className='card-urgency-tag stable';tag.innerHTML=d.icon+' 稳定'}}}
-      resortCards();
     };
     aiComp.onUndo=function(){
-      d.sliders.forEach(sdef=>{sliders[sdef.key].setValue(sdef.value,true)});var st0={};d.sliders.forEach(sdef=>{st0[sdef.key]=sdef.value});updateTrends(d.calcScores(st0));resortCards();
+      d.sliders.forEach(sdef=>{sliders[sdef.key].setValue(sdef.value,true)});var st0={};d.sliders.forEach(sdef=>{st0[sdef.key]=sdef.value});updateTrends(d.calcScores(st0));
     };
 
 
     // 存储实例
     const initSt={};d.sliders.forEach(sdef=>{initSt[sdef.key]=sdef.value});
+    d._origUrgency=d.urgency;d._origTag=d.tag;
     cardInstances[d.id]={def:d,sliders,aiComp,updateTrends};
     var ss,bs,es;
     // 生成50点种子趋势数据 — 五张卡片各自叙事
@@ -1271,31 +1271,31 @@ function buildCockpit(){
         // 叙事: 持续恶化→全线红色 (L形探底)
         ss.push(Math.round((0.45-t*0.2)*100)/100);
         bs.push(Math.round((0.52-t*0.18)*100)/100);
-        es.push(Math.round(40-t*25));
+        es.push(Math.round(40-t*25)/100);
       }else if(d.id==='sc4'){
         // 叙事: 曾经绿色→跌入琥珀→当前缓慢恢复
         var sp=t<0.7?0.65-t*0.2:0.51+(t-0.7)*0.03;
         ss.push(Math.round(sp*100)/100);
         bs.push(1.0);
         var em=t<0.7?95-t*15:84.5+(t-0.7)*1.7;
-        es.push(Math.round(em));
+        es.push(Math.round(em)/100);
       }else if(d.id==='bp14'){
         // 叙事: 成本陡升→执行分崩溃→最近触底
         var bd=0.92-t*0.13;
         ss.push(Math.round(bd*100)/100);
         bs.push(Math.round((0.88-t*0.1)*100)/100);
         var bed=t<0.85?40-t*10:31.5+(t-0.85)*3.3;
-        es.push(Math.round(bed));
+        es.push(Math.round(bed)/100);
       }else if(d.id==='bp12'){
         // 叙事: 渠道缓慢爬升→解码分低迷→最近改善
         ss.push(Math.round((0.88+t*0.02)*100)/100);
         bs.push(Math.round((0.40+t*0.12+t*t*0.06)*100)/100);
-        es.push(Math.round(78+t*4));
+        es.push(Math.round(78+t*4)/100);
       }else{
         // SC-1 叙事: 稳定健康，微幅上行
         ss.push(Math.round((0.91+t*0.01)*100)/100);
         bs.push(0.98);
-        es.push(Math.round(86+t*2));
+        es.push(Math.round(86+t*2)/100);
       }
     }
     for(var si=0;si<50;si++)tPush(d.id,ss[si],bs[si],es[si])
@@ -1325,7 +1325,7 @@ function renderDashboard(){
     totalDir+=scores.direction;totalDec+=scores.decode;totalExec+=scores.execution;
     count++;
     // 风险概览
-    var worst=Math.min(scores.direction,scores.decode,scores.execution/100);
+    var worst=Math.min(scores.direction,scores.decode,scores.execution);
     var level=worst<0.4?'critical':worst<0.6?'high':worst<0.75?'medium':'low';
     risks.push({name:inst.def.title,level:level,score:worst,urgency:inst.def.urgency});
   });
@@ -1616,8 +1616,8 @@ function resortCards(){
     var stA={};Object.keys(ai.sliders).forEach(k=>{stA[k]=ai.sliders[k].value});
     var stB={};Object.keys(bi.sliders).forEach(k=>{stB[k]=bi.sliders[k].value});
     var tA=ai.def.calcScores(stA),tB=bi.def.calcScores(stB);
-    var wA=Math.min(tA.direction,tA.decode,tA.execution/100);
-    var wB=Math.min(tB.direction,tB.decode,tB.execution/100);
+    var wA=Math.min(tA.direction,tA.decode,tA.execution);
+    var wB=Math.min(tB.direction,tB.decode,tB.execution);
     return wA-wB;
   });
   // 重新插入排序后的卡片，导航条始终保持在最后
@@ -1657,7 +1657,7 @@ function onSliderChange(cardId){
     if(card.classList.contains('card-folded')&&cid!==cardId){
       const prevScores=card.dataset.prevScores?JSON.parse(card.dataset.prevScores):{};
       const instC=cardInstances[cid];if(!instC)return;
-      var cst2={};Object.keys(instC.sliders).forEach(function(k){cst2[k]=instC.sliders[k].value});var curScores=instC.def.calcScores(cst2);curScores.execution=curScores.execution/100;
+      var cst2={};Object.keys(instC.sliders).forEach(function(k){cst2[k]=instC.sliders[k].value});var curScores=instC.def.calcScores(cst2);curScores.execution=curScores.execution;
       const changed=Object.keys(curScores).some(k=>Math.abs(curScores[k]-(prevScores[k]||0))>0.03);
       if(changed){card.classList.add('card-pulse');setTimeout(()=>card.classList.remove('card-pulse'),400)}
       card.dataset.prevScores=JSON.stringify(curScores);
@@ -1675,11 +1675,11 @@ function updateFoldedCard(cardId){
   var st={};Object.keys(inst.sliders).forEach(function(k){st[k]=inst.sliders[k].value});
   var scores=inst.def.calcScores(st);
   // 三条彩色趋势线（逐段着色：颜色=状态，走向=趋势，圆点=当前位置）
-  [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'em',mx:100,v:scores.execution}].forEach(function(s){
+  [{k:'sp',mx:1,v:scores.direction},{k:'bp',mx:1,v:scores.decode},{k:'em',mx:1,v:scores.execution}].forEach(function(s){
     var cv=document.getElementById('folded-spark-'+cardId+'-'+s.k);if(cv)tDraw(cv,cardId,s.k,s.mx);
   });
   // 最弱维度提示
-  var dimScores={direction:scores.direction,decode:scores.decode,execution:scores.execution/100};
+  var dimScores={direction:scores.direction,decode:scores.decode,execution:scores.execution};
   var labels={direction:'SP方向分',decode:'BP解码分',execution:'EM执行分'};
   var worstKey=Object.keys(dimScores).reduce(function(a,b){return dimScores[a]<dimScores[b]?a:b});
   var worst=dimScores[worstKey],label=labels[worstKey];
@@ -1724,10 +1724,36 @@ function resolveCard(cardId){
   // 帧2: 弹簧收起 (400ms)
   setTimeout(()=>{
     card.classList.add('card-folded');card.classList.remove('card-full');
-    const mid=card.querySelector('.card-header-mid');if(mid)mid.style.display='flex';
-    updateFoldedCard(cardId);resortCards();
+    var mid=card.querySelector('.card-header-mid');if(mid)mid.style.display='flex';
+    updateFoldedCard(cardId);
+    // 只有状态健康（SP/BP/EM最低分≥0.7）才重排序，不健康卡片保持原位
+    var sc=inst.def.calcScores(st);var worst=Math.min(sc.direction,sc.decode,sc.execution);
+    if(worst>=0.7)resortCards();
+    // 全部处理完毕且健康→加载下一批
+    var all=document.querySelectorAll('#decisionGrid .decision-card');
+    var allDone=Array.from(all).every(function(c){return c.dataset.urgency==='stable';});
+    if(allDone){
+      var allOk=true;
+      Object.keys(cardInstances).forEach(function(cid2){
+        var st2=getSliderState(cid2);var sc2=cardInstances[cid2].def.calcScores(st2);
+        if(Math.min(sc2.direction,sc2.decode,sc2.execution)<0.7)allOk=false;
+      });
+      if(allOk){showToast('🎉 全部战略决策已处理——下一批已就绪','success');setTimeout(_loadNextBatch,2000);}
+    }
   },400);
   showToast(inst.def.title+' 已处理'+(hasChange?' · 已同步至证据链 📊':'')+' ✅','success');
+}
+function _loadNextBatch(){
+  DECISION_DEFS.forEach(function(d){d.urgency=d._origUrgency||d.urgency;d.tag=d._origTag||d.tag;});
+  Object.keys(cardInstances).forEach(function(cid){
+    var inst=cardInstances[cid];
+    inst.def.sliders.forEach(function(sdef){inst.sliders[sdef.key].setValue(sdef.value,true);});
+  });
+  var grid=document.getElementById('decisionGrid');if(grid)grid.innerHTML='';
+  var bar=document.getElementById('carouselBar');if(bar&&bar.parentNode)bar.parentNode.removeChild(bar);
+  Object.keys(cardInstances).forEach(function(k){delete cardInstances[k];});
+  buildCockpit();carouselInit();renderDashboard();
+  showToast('🔄 下一批战略决策已加载','info');
 }
 function resolveDecisionPhase(def){
   if(def.spBpMapping&&def.spBpMapping.length>0)return'SP[3]';
@@ -2243,14 +2269,14 @@ function buildWorkbench(){
     wbScoreContainer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
     buildTrendCell(wbScoreContainer,'wb-','sp','SP','#1890ff',0.85,1);
     buildTrendCell(wbScoreContainer,'wb-','bp','BP','#00875A',1.0,1);
-    var wbUpdateTrends=buildTrendCell(wbScoreContainer,'wb-','em','EM','#B86E00',82,100);
+    var wbUpdateTrends=buildTrendCell(wbScoreContainer,'wb-','em','EM','#B86E00',0.82,1);
     function calcScoresGeneric(params){
       var p=function(k){return params[k]||(PARAM_REGISTRY[k]?PARAM_REGISTRY[k].default:0)};
       var dir=clamp(0.92-(15-p('mkt_growth'))*0.018-(p('comp_lead'))*0.045+(p('localization')-55)*0.001+(p('mkt_share')-18)*0.003+(p('patent_count')-3)*0.015+(p('channel_cov')-75)*0.002,0,1);
       // decode: SP→BP翻译质量 — BP[1-3]参数加权
       var dec=clamp(1.0-(p('rd_budget')<1.5?0.08:0)-(p('hc_gap')>20?0.05:0)+(p('talent_pool')>50?0.03:0)+(p('sp_bp_alignment')-85)*0.003+(p('initiative_coverage')-90)*0.002+(p('metric_coverage')-88)*0.002,0,1);
       // execution: BP[4-6]+RT参数加权
-      var exec=clamp(88-(2.0-p('rd_budget'))*25-(p('hc_gap'))*0.7+(p('train_cycle')<6?5:0)-(p('launch_cycle')>12?3:0)+(p('milestone_achieve')-72)*0.4+(p('budget_measure_match')-82)*0.3+(p('talent_retention')-88)*0.35+(p('risk_mitigation_cov')-65)*0.25,0,100);
+      var exec=clamp((88-(2.0-p('rd_budget'))*25-(p('hc_gap'))*0.7+(p('train_cycle')<6?5:0)-(p('launch_cycle')>12?3:0)+(p('milestone_achieve')-72)*0.4+(p('budget_measure_match')-82)*0.3+(p('talent_retention')-88)*0.35+(p('risk_mitigation_cov')-65)*0.25)/100,0,1);
       return{direction:dir,decode:dec,execution:exec};
     }
     window._updateWB=function(){
@@ -2258,8 +2284,8 @@ function buildWorkbench(){
       var scores=calcScoresGeneric(st);
       wbUpdateTrends(scores);window._lastWBScores=scores;
     };
-    wbUpdateTrends({direction:0.85,decode:1.0,execution:82});
-    var wss=[0.87,0.87,0.86,0.81,0.79,0.80,0.83,0.85,0.85,0.85];var wbs=[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0];var wes=[86,85,84,78,75,77,80,83,83,83];for(var si=0;si<10;si++)tPush('wb',wss[si],wbs[si],wes[si]);setTimeout(function(){if(window.scenarioApply)window.scenarioApply('optimistic')},200);
+    wbUpdateTrends({direction:0.85,decode:1.0,execution:0.82});
+    var wss=[0.87,0.87,0.86,0.81,0.79,0.80,0.83,0.85,0.85,0.85];var wbs=[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0];var wes=[0.86,0.85,0.84,0.78,0.75,0.77,0.80,0.83,0.83,0.83];for(var si=0;si<10;si++)tPush('wb',wss[si],wbs[si],wes[si]);setTimeout(function(){if(window.scenarioApply)window.scenarioApply('optimistic')},200);
   },100);
 
   // 辩论室交互
@@ -2331,7 +2357,7 @@ document.addEventListener('DOMContentLoaded',function(){
 // 卡片点击展开/折叠（桌面+移动端统一）
 document.addEventListener('click',function(e){
   const card=e.target.closest('.decision-card');if(!card)return;
-  if(e.target.closest('.card-expand-btn')||e.target.closest('.custom-slider')||e.target.closest('button')||e.target.closest('select')||e.target.closest('input')||e.target.closest('textarea'))return;
+  if(e.target.closest('.card-expand-btn')||e.target.closest('.card-body-sliders')||e.target.closest('.card-body-ai')||e.target.closest('.score-bars-stack')||e.target.closest('button')||e.target.closest('select')||e.target.closest('input')||e.target.closest('textarea'))return;
   const cardId=card.id.replace('card-','');
   if(window.innerWidth<=768){
     document.querySelectorAll('.decision-card.mobile-expanded').forEach(c=>{if(c!==card)c.classList.remove('mobile-expanded')});
