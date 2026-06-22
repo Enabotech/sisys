@@ -1747,23 +1747,37 @@ function resolveDecisionPhase(def){
 // ============================================================
 // v2.1 新增：辩论共识追踪
 // ============================================================
+function updateConsensus(chain){
+  var container=document.getElementById('wb-consensus');if(!container||!chain)return;
+  // 从辩论链的实际立场计算共识度
+  var proAgents=[],conAgents=[],neutralAgents=[];
+  chain.forEach(function(r){
+    if(r.stance==='pro')proAgents.push(r.agent);
+    else if(r.stance==='con')conAgents.push(r.agent);
+    else neutralAgents.push(r.agent);
+  });
+  var total=chain.length;
+  var score=(proAgents.length-conAgents.length)/total; // -1 ~ +1
+  var status=score>=0.5?'strong':score>=0.2?'weak':score>-0.2?'split':'oppose';
+  var labels={strong:'✅ 强共识',weak:'⚡ 弱共识',split:'🔴 分歧',oppose:'🚫 多数反对'};
+  var pct=Math.round(((score+1)/2)*100); // 0~100
+  var detail='支持: '+(proAgents.length?proAgents.join('/'):'无')+
+    ' · 反对: '+(conAgents.length?conAgents.join('/'):'无')+
+    (neutralAgents.length?' · 中立: '+neutralAgents.join('/'):'');
+  container.innerHTML=
+    '<div class="consensus-bar '+status+'">'+
+      '<span style="font-weight:600;">'+labels[status]+' ('+proAgents.length+'/'+total+')</span>'+
+      '<div style="flex:1;height:6px;background:#f0f0f0;border-radius:3px;margin:0 8px;overflow:hidden;">'+
+        '<div style="height:100%;width:'+pct+'%;border-radius:3px;background:'+(status==='strong'?'var(--color-success)':status==='weak'?'var(--color-warning)':'var(--color-danger)')+';transition:width .5s;"></div>'+
+      '</div>'+
+      '<span style="font-size:10px;color:var(--color-text-tertiary);">'+detail+'</span>'+
+    '</div>';
+}
+
 function renderConsensusBar(containerId){
+  // 初始空状态——滑块拖动后由 refreshDebateRoom 调用 updateConsensus 更新
   var container=document.getElementById(containerId);if(!container)return;
-  // 模拟投票结果
-  var votes={pro:3,con:1,neutral:2};
-  var total=votes.pro+votes.con+votes.neutral;
-  var proPct=votes.pro/total;
-  var status=proPct>=0.6?'strong':proPct>=0.45?'weak':'split';
-  var statusText={strong:'✅ 强共识 ('+votes.pro+'/'+total+')',weak:'⚡ 弱共识 ('+votes.pro+'/'+total+')',split:'🔴 分歧严重 ('+votes.pro+'/'+total+')'};
-  container.innerHTML='<div class="consensus-bar '+status+'">'+
-    '<span style="font-weight:600;">'+statusText[status]+'</span>'+
-    '<div class="consensus-votes">'+
-      Array(votes.pro).fill().map(function(){return '<span class="consensus-vote pro">✓</span>';}).join('')+
-      Array(votes.con).fill().map(function(){return '<span class="consensus-vote con">✗</span>';}).join('')+
-      Array(votes.neutral).fill().map(function(){return '<span class="consensus-vote neutral">—</span>';}).join('')+
-    '</div>'+
-    '<span style="font-size:10px;color:var(--color-text-tertiary);">支持: CEO/CMO/COO · 反对: CFO · 中立: CTO/CHO</span>'+
-  '</div>';
+  container.innerHTML='<div class="consensus-bar" style="color:var(--color-text-tertiary);justify-content:center;">拖动推演沙盘滑块，AI高管团将分析态势并评估共识度</div>';
 }
 
 // ============================================================
@@ -1815,60 +1829,80 @@ function jumpToCard(targetId){
 // ============================================================
 // TODO: V2 替换为 LangGraph Agent 流式响应 — 当前使用随机延迟模拟真实AI思考节奏
 const DEBATE_CHAINS={
-  cagr:[
-    {delay:0,agent:'CFO',stance:'con',text:'增速已偏离基准情景。基于最新数字，我重新计算了回收期——如果持续低于10%，我们在第3年就会面临流动性压力。合资方案的净现值开始优于自建。'},
-    {delay:1200,agent:'CMO',stance:'pro',text:'CFO的担忧是合理的——但我必须指出：在低增速市场，先发优势的溢价反而更高。蛋糕变小的时候，能抢到存量的玩家才是赢家。合资方案可以让我们以更低成本抢占先机。'},
-    {delay:2400,agent:'CFO',stance:'con',text:'CMO——我同意先发优势的价值。但先发的前提是活到"后发"那一天。以目前的现金储备和4.8年回收期，我们在第3年就会撞墙。先发变成了先死。'},
-    {delay:3600,agent:'CTO',stance:'neutral',text:'二位说的都是对的。技术上有个中间路径：合资进入+18个月转换期权条款。先用合资模式满足现金流要求，同时在协议中保留转为自建的权利。这需要我们在谈判中争取特定条款——但我认为可行。'}
+  mkt_growth:[
+    {delay:0,agent:'CMO',stance:'pro',t:function(v){return '市场增速调至'+v+'%。低于12%需重评先发策略——低增速市场抢占存量比培育增量更紧迫。';}},
+    {delay:1200,agent:'CFO',stance:'con',t:function(v){return '增速每降1个百分点，2028年营收预期下调¥3.2亿。若低于8%，原定¥50亿目标需修正。';}},
+    {delay:2400,agent:'CEO',stance:'neutral',t:function(v){return v<10?'现在决定：坚持进攻还是转入防御。'+v+'%高于行业均值，维持进攻但收紧资源投放。':'增速健康，维持原定战略节奏，继续产品注册和渠道建设。';}}
   ],
-  comp:[
-    {delay:0,agent:'CMO',stance:'con',text:'竞品提前了——这意味着我们的窗口期正在收窄。每延迟1个月，获客成本预计上升12%。我建议立即启动快速响应方案。'},
-    {delay:1200,agent:'COO',stance:'pro',text:'CMO说得对——但我需要2个月准备供应链。加速可以，但不能以质量为代价。给我一个压缩周期方案，我可以在30天内给你确切的时间表。'},
-    {delay:2400,agent:'CMO',stance:'con',text:'2个月太长。竞品不会等你。我建议分阶段：第一个月先用现有渠道覆盖核心市场，第二个月启动全面铺开。这样至少不会让竞品在前30天内独占窗口。'},
-    {delay:3600,agent:'COO',stance:'pro',text:'分阶段方案可行。我立即去排资源——如果CMO确认核心市场的优先级列表，我可以在72小时内给出第一阶段执行计划。'}
+  localization:[
+    {delay:0,agent:'CTO',stance:'pro',t:function(v){return '国产替代率'+v+'%。核心光学器件进口占比'+(100-v)+'%——若日本供应商交期恶化，CT量产将延迟3-5个月。';}},
+    {delay:1200,agent:'COO',stance:'con',t:function(v){return v<40?'替代率偏低，供应链韧性不足。建议目标提升至60%，启动双源认证。':'替代率在安全区间，双源策略已覆盖核心器件。';}},
+    {delay:2400,agent:'CFO',stance:'neutral',t:function(v){return '国产替代需额外¥0.8-1.2亿认证费+6-9月验证周期。但长期降进口关税15%，3年ROI为正。';}}
   ],
-  budget:[
-    {delay:0,agent:'CFO',stance:'neutral',text:'预算调整触发全局资源重新分配。如果研发预算削减到¥1.5亿以下，我们需要从其他费用项中对冲——我建议优先考虑将非核心模块外包，可节省约40%成本。'},
-    {delay:1200,agent:'CHO',stance:'con',text:'研发预算缩减直接影响招聘。顶级AI架构师的市场薪资溢价已达35%——没有足够预算，我们无法吸引核心人才。这会导致『预算省了，但项目交不了』的局面。'},
-    {delay:2400,agent:'CTO',stance:'neutral',text:'CHO的担心我理解。但CFO的方案——外包非核心模块——在技术上是可行的。核心AI引擎我们自己保留，测试和部署模块外包。这样既保住核心人才预算，又总体压缩成本。'}
+  rd_budget:[
+    {delay:0,agent:'CTO',stance:'pro',t:function(v){return '研发预算¥'+v.toFixed(1)+'亿。低于¥1.5亿时AI引擎开发将压缩至MVP——CT/MR硬件优先，SaaS后移。';}},
+    {delay:1200,agent:'CFO',stance:'con',t:function(v){return v>2.0?'预算充裕，但研发费用率勿长期超22%——会侵蚀毛利率。建议¥0.3亿转投临床验证加速注册。':'预算偏紧，砍边缘项目保核心。AI SaaS可推迟到V2，先保CT/MR注册节点。';}},
+    {delay:2400,agent:'CHO',stance:'neutral',t:function(v){return '预算对应约'+(v*60).toFixed(0)+'人研发团队。当前缺口22人，需Q3前填补。';}}
   ],
-  hc:[
-    {delay:0,agent:'CHO',stance:'con',text:'人才缺口已经影响下游3个举措。招聘启动2个月0位候选人进入终面的现实说明：现有JD和薪资策略需要根本性调整。'},
-    {delay:1200,agent:'CEO',stance:'pro',text:'这不是招聘的问题——这是人才策略的问题。如果自有人才不够，我建议考虑并购小型技术团队。一次性解决经验和数量问题，比逐个招聘快得多。'},
-    {delay:2400,agent:'CFO',stance:'neutral',text:'并购方案的财务模型我马上做。初步估算：并购一个15-20人的AI团队大约需要¥3000-5000万——相当于2年自建团队的人力成本。但时间节省约12个月。'}
+  hc_gap:[
+    {delay:0,agent:'CHO',stance:'con',t:function(v){return '人才缺口'+v+'人——影响AI算法、临床验证、市场拓展三条线。招聘周期45天，Q3节点面临风险。';}},
+    {delay:1200,agent:'COO',stance:'pro',t:function(v){return v>20?'缺口超可控范围。建议外包+并购双线：非核心模块外包，关键技术岗并购小型团队。':'缺口可控。加强内推+校招，Q2内可到位70%。';}},
+    {delay:2400,agent:'CEO',stance:'neutral',t:function(v){return '人才是第一约束。核心AI架构师必须Q2到位至少5人——做不到，产品路线图需重排。';}}
   ],
-  // PARAM_REGISTRY 键的辩论链
-  mkt_growth:[{delay:0,agent:'CMO',stance:'pro',text:'市场增速调整了——我需要重新评估窗口期。如果增速持续走低，我们的先发优势策略需要调整为防御型布局。'}],
-  comp_lead:[{delay:0,agent:'CEO',stance:'con',text:'竞品先发优势的变化直接影响我们的时间窗口。每增加一个月的领先，我们的获客成本预计上升8-12%。'}],
-  hc_gap:[{delay:0,agent:'CHO',stance:'con',text:'人才缺口数据更新了——这会影响至少3个下游举措的交付时间。我建议立即启动应急招聘方案。'}],
-  rd_budget:[{delay:0,agent:'CFO',stance:'neutral',text:'研发预算的调整会触发全局资源重分配。我需要重新计算各举措的ROI优先级。'}],
-  talent_pool:[{delay:0,agent:'CHO',stance:'neutral',text:'人才市场热度的变化会影响我们的招聘周期和薪资策略。热度下降意味着我们可以考虑更灵活的地域策略。'}],
-  train_cycle:[{delay:0,agent:'COO',stance:'con',text:'培养周期的延长意味着Q3交付节点面临风险。我需要和各部门确认是否可以通过内部导师制度压缩周期。'}],
-  salary_comp:[{delay:0,agent:'CFO',stance:'neutral',text:'薪资竞争力的调整会直接影响利润率。我建议在核心岗位和非核心岗位之间做差异化调整。'}],
-  localization:[{delay:0,agent:'CTO',stance:'pro',text:'国产替代率的变化反映了政策+技术的双重驱动。加速国产替代可以显著提升我们的竞争壁垒。'}],
-  launch_cycle:[{delay:0,agent:'COO',stance:'con',text:'产品上市周期的延长会让我们错失关键窗口。我建议评估并行开发策略来压缩整体周期。'}]
+  comp_lead:[
+    {delay:0,agent:'CMO',stance:'con',t:function(v){return '竞品领先'+v+'个月。每月窗口损失≈¥1.5亿份额。华为联影已签42家三甲——18家与我们目标重叠。';}},
+    {delay:1200,agent:'CEO',stance:'con',t:function(v){return v>3?'竞品优势拉大——避开综合三甲，优先切入专科医院和区域医疗中心。':'竞品领先有限。我们有后发优势——学习其渠道策略，避免踩坑。';}},
+    {delay:2400,agent:'CTO',stance:'neutral',t:function(v){return 'AI诊断准确率91% vs 竞品93%——差距可追赶。关键是加速临床数据积累，这是追赶核心杠杆。';}}
+  ],
+  channel_cov:[
+    {delay:0,agent:'CMO',stance:'pro',t:function(v){return '渠道覆盖率'+v+'%。目标80%，差值'+(80-v)+'个百分点≈'+(80-v)+'个城市未触达。';}},
+    {delay:1200,agent:'COO',stance:'con',t:function(v){return v<50?'覆盖率过低——直销仅15人，需至少30人覆盖非一线。Q2优先招渠道销售。':'覆盖率在轨道上。Q2重点深化已覆盖城市渗透率，非盲目扩张。';}},
+    {delay:2400,agent:'CFO',stance:'neutral',t:function(v){return '每+10%覆盖率≈¥0.3亿销售费用。当前预算¥0.8亿——目标80%需追加¥0.7亿，建议分阶段投。';}}
+  ],
+  launch_cycle:[
+    {delay:0,agent:'COO',stance:'con',t:function(v){return '上市周期'+v+'个月。每延迟1月≈¥0.15亿机会成本。NMPA型检+临床+注册审批已无可压缩空间。';}},
+    {delay:1200,agent:'CMO',stance:'con',t:function(v){return v>15?'周期过长——竞品平均12月上市，窗口优势被抵消。建议评估绿色通道/优先审批。':'周期可控。上市前6月启动预热——让医院在注册完成时已完成评估。';}},
+    {delay:2400,agent:'CTO',stance:'neutral',t:function(v){return '技术层面可并行——AI训练和硬件验证同时推进。但临床验证必须串行，最多压缩2个月。';}}
+  ],
+  cashflow_risk:[
+    {delay:0,agent:'CFO',stance:'con',t:function(v){return '现金流压力'+v+'/5级。达4级需30天内启动紧急融资——备2套方案：银行授信+战略投资者。';}},
+    {delay:1200,agent:'CEO',stance:'con',t:function(v){return v>=4?'立即三件事：1)暂停非核心支出 2)加速应收回收 3)启动¥5亿授信。Q3前必须降到2级。':'现金流可控。但保持至少6个月运营储备以防万一。';}}
+  ],
+  talent_pool:[
+    {delay:0,agent:'CHO',stance:'con',t:function(v){return '人才热度'+v+'分。低于40分本地招聘基本停滞——需启动远程团队+跨地域招聘。';}},
+    {delay:1200,agent:'COO',stance:'neutral',t:function(v){return v<40?'热度不足——将非核心研发转二线城市，人力成本可降30%。':'市场活跃度尚可。优先填补AI架构师和临床支持岗。';}}
+  ],
+  train_cycle:[
+    {delay:0,agent:'COO',stance:'con',t:function(v){return '培养周期'+v+'个月。超12月将影响Q3交付。建议导师制+外部培训双线加速——可压缩至9月。';}},
+    {delay:1200,agent:'CHO',stance:'neutral',t:function(v){return v>12?'新员工ramp-up太慢。30%岗位转有经验者直聘，跳过培养周期。薪资+25%，但时间省6个月。':'培养周期可接受。保持导师制+轮岗培训节奏。';}}
+  ],
+  salary_comp:[
+    {delay:0,agent:'CFO',stance:'neutral',t:function(v){return '薪资竞争力'+v+'%。低于-15%核心岗位离职风险剧增——AI架构师市场溢价35%，必须跟上。';}},
+    {delay:1200,agent:'CHO',stance:'con',t:function(v){return v<-10?'薪资倒挂严重。CTO团队3人已收竞品offer——不调至P75分位，Q2可能流失关键人才。':'薪资在市场区间。但关注AI架构师细分——该赛道涨速是其他岗2倍。';}}
+  ]
 };
+
 function refreshDebateRoom(layout, sliderKey, newValue){
-  const thread=document.getElementById('wb-debate-thread');if(!thread)return;
-  let chain=DEBATE_CHAINS[sliderKey];
-  if(!chain){var reg=PARAM_REGISTRY[sliderKey];var name=reg?reg.name:sliderKey;chain=[{delay:0,agent:'AUD',stance:'neutral',text:'参数 ['+name+'] 已更新——正在评估此变化对整体战略一致性的影响。'}]}
-  chain.forEach((r,i)=>{
-    // 先插入"思考中..."占位
-    const placeholder=document.createElement('div');
-    placeholder.className='debate-msg neutral';
-    placeholder.style.animation='floatUp .25s ease-out';
-    placeholder.innerHTML='<span class="debate-agent-avatar">'+r.agent+'</span><span class="debate-msg-text">⚡ 思考中...</span>';
-    thread.appendChild(placeholder);thread.scrollTop=thread.scrollHeight;
-    // 随机延迟模拟真实AI思考（800-2800ms），首条稍快
-    const thinkingDelay=i===0?300+Math.random()*500:Math.random()*2000+800;
-    setTimeout(()=>{
-      placeholder.className='debate-msg '+r.stance;
-      placeholder.innerHTML='<span class="debate-agent-avatar">'+r.agent+'</span><span class="debate-msg-text">'+r.text+'</span>';
+  var thread=document.getElementById('wb-debate-thread');if(!thread)return;
+  var reg=PARAM_REGISTRY[sliderKey];var pname=reg?reg.name:sliderKey;
+  var chain=DEBATE_CHAINS[sliderKey];
+  if(!chain){chain=[{delay:0,agent:'AUD',stance:'neutral',t:function(){return '['+pname+'] 更新至 '+newValue+'——评估对战略态势影响中。';}}];}
+  updateConsensus(chain);
+  chain.forEach(function(r,i){
+    var ph=document.createElement('div');ph.className='debate-msg neutral';ph.style.animation='floatUp .25s ease-out';
+    ph.innerHTML='<span class="debate-agent-avatar">'+r.agent+'</span><span class="debate-msg-text">⚡ 分析中...</span>';
+    thread.appendChild(ph);thread.scrollTop=thread.scrollHeight;
+    var d=i===0?250+Math.random()*350:Math.random()*1600+600;
+    setTimeout(function(){
+      var txt=typeof r.t==='function'?r.t(newValue):r.t;
+      ph.className='debate-msg '+r.stance;
+      ph.innerHTML='<span class="debate-agent-avatar">'+r.agent+'</span><span class="debate-msg-text">'+txt+'</span>';
       thread.scrollTop=thread.scrollHeight;
       while(thread.children.length>20)thread.firstElementChild.remove();
-    },thinkingDelay);
+    },d);
   });
 }
+
 // === 动态沙盘构建器 — 参数体系由选中证据决定 ===
 window._wbSliders={};window._wbActiveParams={};
 window._rebuildSliders=function(activeParamKeys,aggregatedParams){
