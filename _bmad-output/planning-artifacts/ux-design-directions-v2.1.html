@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>sisys — 决策舱</title>
+<title>sisys ux design v2.1</title>
 <style>
 /* ============================================================
    CSS 变量与重置
@@ -47,6 +47,174 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 @keyframes goldPulse{0%,100%{border-color:rgba(212,139,6,.3);box-shadow:0 0 0 rgba(212,139,6,0)}50%{border-color:rgba(212,139,6,.6);box-shadow:0 0 8px rgba(212,139,6,.15)}}
 @keyframes floatUp{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
 @keyframes gpuPulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes dashKpiIn{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+@keyframes ringFill{from{stroke-dashoffset:283}to{}}
+
+/* ============================================================
+   v2.1 新增：战略总览仪表盘
+   ============================================================ */
+.dashboard-overview{display:grid;grid-template-columns:2fr 1fr 1.2fr;gap:var(--spacing-lg);margin-bottom:var(--spacing-xl)}
+.dashboard-card{background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:var(--spacing-lg);transition:box-shadow .3s}
+.dashboard-card:hover{box-shadow:var(--shadow-lg)}
+.dash-kpi-row{display:flex;gap:var(--spacing-lg);align-items:center}
+.dash-kpi-item{text-align:center;flex:1;animation:dashKpiIn .5s var(--spring-bounce) both}
+.dash-kpi-item:nth-child(1){animation-delay:0s}.dash-kpi-item:nth-child(2){animation-delay:.1s}.dash-kpi-item:nth-child(3){animation-delay:.2s}
+.dash-kpi-ring{position:relative;width:80px;height:80px;margin:0 auto var(--spacing-sm)}
+.dash-kpi-ring svg{transform:rotate(-90deg)}
+.dash-kpi-ring .bg{fill:none;stroke:#f0f0f0;stroke-width:6}
+.dash-kpi-ring .fill{fill:none;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset 1s var(--spring-settle)}
+.dash-kpi-ring .center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:20px;font-weight:700;font-family:var(--font-family-code)}
+.dash-kpi-label{font-size:12px;color:var(--color-text-secondary);margin-top:2px}
+.dash-kpi-sub{font-size:10px;color:var(--color-text-tertiary)}
+.dash-section-title{font-size:13px;font-weight:600;color:var(--color-text-primary);margin-bottom:var(--spacing-sm);display:flex;align-items:center;gap:6px}
+.dash-metric-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #fafafa;font-size:13px}
+.dash-metric-row:last-child{border-bottom:none}
+.dash-metric-val{font-weight:600;font-family:var(--font-family-code);font-size:14px}
+.dash-metric-val.up{color:var(--color-success)}.dash-metric-val.down{color:var(--color-danger)}
+.dash-phase-tag{font-size:10px;padding:1px 6px;border-radius:8px;font-weight:500;flex-shrink:0}
+.dash-phase-tag.sp{background:var(--color-primary-bg);color:var(--color-primary)}
+.dash-phase-tag.bp{background:#f6ffed;color:var(--color-success)}
+.dash-phase-tag.em{background:#fffbe6;color:#d48806}
+
+/* ============================================================
+   v2.1 新增：财务量化指标卡片
+   ============================================================ */
+.finance-strip{display:flex;gap:var(--spacing-md);padding:var(--spacing-sm) var(--spacing-md);background:linear-gradient(135deg,#faf5ff,#f0f8ff);border-radius:var(--radius-md);margin-top:var(--spacing-sm);flex-wrap:wrap}
+.finance-item{display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px}
+.finance-item-val{font-size:15px;font-weight:700;font-family:var(--font-family-code)}
+.finance-item-val.positive{color:var(--color-success)}.finance-item-val.negative{color:var(--color-danger)}
+.finance-item-label{font-size:10px;color:var(--color-text-tertiary)}
+
+/* ============================================================
+   v2.1 新增：SP→BP 强化追溯链
+   ============================================================ */
+.trace-chain{display:flex;align-items:center;gap:2px;margin-top:6px;flex-wrap:wrap;font-size:10px}
+.trace-node{padding:3px 8px;border-radius:12px;font-weight:500;white-space:nowrap}
+.trace-node.sp-node{background:var(--color-primary-bg);color:var(--color-primary);border:1px solid #91d5ff}
+.trace-node.bp-node{background:#f6ffed;color:var(--color-success);border:1px solid #b7eb8f}
+.trace-node.em-node{background:#fffbe6;color:#d48806;border:1px solid #ffe58f}
+.trace-arrow{color:var(--color-text-disabled);font-size:8px}
+.trace-kpi{font-size:9px;color:var(--color-text-tertiary);padding:1px 4px}
+
+/* ============================================================
+   v2.1 新增：辩论共识追踪
+   ============================================================ */
+.consensus-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-sm);margin-bottom:var(--spacing-sm);font-size:11px}
+.consensus-bar.strong{background:#f6ffed;color:var(--color-success)}
+.consensus-bar.weak{background:#fffbe6;color:#d48806}
+.consensus-bar.split{background:#fff1f0;color:var(--color-danger)}
+.consensus-votes{display:flex;gap:4px;flex:1}
+.consensus-vote{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.consensus-vote.pro{background:#f6ffed;color:var(--color-success);border:1px solid #b7eb8f}
+.consensus-vote.con{background:#fff1f0;color:var(--color-danger);border:1px solid #ffa39e}
+.consensus-vote.neutral{background:#f5f5f5;color:var(--color-text-tertiary);border:1px solid var(--color-border)}
+
+/* ============================================================
+   v2.1 新增：快捷导航面板
+   ============================================================ */
+.quick-nav{display:flex;gap:var(--spacing-sm);margin-bottom:var(--spacing-lg);flex-wrap:wrap}
+.quick-nav-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--color-border);background:var(--color-bg-card);cursor:pointer;font-size:12px;font-family:var(--font-family-base);display:flex;align-items:center;gap:4px;transition:all .2s;white-space:nowrap}
+.quick-nav-btn:hover,.quick-nav-btn.active{border-color:var(--color-primary);color:var(--color-primary);background:var(--color-primary-bg)}
+.quick-nav-badge{font-size:10px;padding:0 5px;border-radius:8px;font-weight:600}
+.quick-nav-badge.urgent{background:#fff1f0;color:var(--color-danger)}
+
+
+/* ============================================================
+   v2.2 新增：总览层主屏 — KPI仪表盘 + 风险雷达 + BG健康矩阵 + 单卡轮播
+   ============================================================ */
+.overview-layer{display:flex;flex-direction:column;gap:var(--spacing-xl);margin-bottom:var(--spacing-xl)}
+
+/* 顶层双栏：KPI仪表盘 | 风险雷达 */
+.overview-top{display:grid;grid-template-columns:1.2fr 1fr;gap:var(--spacing-lg)}
+.overview-panel{background:var(--color-bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);padding:var(--spacing-xl);border:1px solid #f0f0f0}
+.overview-panel-title{font-size:14px;font-weight:600;margin-bottom:var(--spacing-lg);display:flex;align-items:center;gap:6px;color:var(--color-text-primary)}
+
+/* KPI 5数字趋势卡片 */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--spacing-md);margin-bottom:0}
+.kpi-card{text-align:center;padding:var(--spacing-md) var(--spacing-sm);border-radius:var(--radius-lg);background:var(--color-bg-card);box-shadow:var(--shadow-sm);transition:all .25s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:4px;border:1px solid #f0f0f0}
+.kpi-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.kpi-card.warn{border-left:3px solid var(--color-warning)}
+.kpi-card.danger{border-left:3px solid var(--color-danger)}
+.kpi-card-label{font-size:12px;font-weight:500;color:var(--color-text-secondary)}
+.kpi-sparkline{flex:1;min-height:40px;display:flex;align-items:center;justify-content:center;margin:2px 0}
+.kpi-sparkline canvas{width:100%;height:100%}
+.kpi-card-bottom{display:flex;align-items:baseline;justify-content:center;gap:var(--spacing-sm);flex-wrap:wrap}
+.kpi-card-value{font-size:20px;font-weight:700;font-family:var(--font-family-code);line-height:1.2}
+.kpi-card-value.green{color:var(--color-success)}.kpi-card-value.amber{color:var(--color-warning)}.kpi-card-value.red{color:var(--color-danger)}
+.kpi-card-pct{font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px}
+.kpi-card-pct.on-track{background:#f6ffed;color:var(--color-success)}.kpi-card-pct.off-track{background:#fffbe6;color:#ad6800}.kpi-card-pct.critical{background:#fff1f0;color:var(--color-danger)}
+.kpi-card-sub{font-size:9px;color:var(--color-text-disabled)}
+
+/* 风险雷达面板 */
+.risk-radar-list{display:flex;flex-direction:column;gap:6px}
+.risk-radar-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius-sm);font-size:11px;transition:background .15s}
+.risk-radar-item:hover{background:#fafcff}
+.risk-radar-rank{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:white}
+.risk-radar-rank.rank-1{background:var(--color-danger)}.risk-radar-rank.rank-2{background:#e87040}.risk-radar-rank.rank-3{background:var(--color-warning)}.risk-radar-rank.rank-4,.risk-radar-rank.rank-5{background:var(--color-text-tertiary)}
+.risk-radar-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.risk-radar-impact{font-size:9px;padding:1px 5px;border-radius:6px;flex-shrink:0;font-weight:600}
+.risk-radar-impact.critical{background:#fff1f0;color:var(--color-danger)}.risk-radar-impact.high{background:#fff7e6;color:#d46b08}
+.risk-radar-empty{font-size:11px;color:var(--color-text-disabled);text-align:center;padding:var(--spacing-md);font-style:italic}
+.red-project-row{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:var(--radius-sm);font-size:11px;margin-bottom:4px;background:#fff1f0}
+.red-project-deviation{font-weight:600;color:var(--color-danger);font-family:var(--font-family-code)}
+.alert-row{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:var(--radius-sm);font-size:11px;margin-bottom:4px;background:#fffbe6}
+.alert-tag{font-size:9px;padding:0 5px;border-radius:6px;font-weight:500;flex-shrink:0}
+.alert-tag.talent{background:#f0f5ff;color:var(--color-primary)}.alert-tag.budget{background:#fff1f0;color:var(--color-danger)}.alert-tag.capacity{background:#fff7e6;color:#d46b08}
+
+/* BG健康矩阵 */
+.health-matrix{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.health-table{width:100%;border-collapse:collapse;font-size:12px;min-width:700px}
+.health-table th{background:transparent;padding:10px 8px;text-align:center;font-weight:500;color:var(--color-text-tertiary);border-bottom:1px solid #f0f0f0;white-space:nowrap;font-size:11px}
+.health-table th:first-child{text-align:left;padding-left:0}
+.health-table td{padding:10px 8px;text-align:center;border-bottom:1px solid #fafafa;white-space:nowrap}
+.health-table td:first-child{text-align:left;padding-left:0;font-weight:500}
+.health-table tr:hover td{background:#fafcff}
+.health-table .rag-dot{display:inline-block;width:18px;height:18px;border-radius:50%;font-size:10px;line-height:18px;font-weight:700}
+.rag-dot.green{background:#f6ffed;color:var(--color-success);border:1px solid #b7eb8f}
+.rag-dot.amber{background:#fffbe6;color:#d48806;border:1px solid #ffe58f}
+.rag-dot.red{background:#fff1f0;color:var(--color-danger);border:1px solid #ffa39e}
+.health-table .trend-up{color:var(--color-success)}.health-table .trend-down{color:var(--color-danger)}.health-table .trend-flat{color:var(--color-text-tertiary)}
+
+/* 决策卡轮播 — 底部导航条 */
+.decision-card.carousel-hidden{display:none !important}
+.carousel-bar{display:flex;align-items:center;justify-content:center;gap:var(--spacing-md);padding:var(--spacing-md) 0 0 0;margin-top:var(--spacing-md);border-top:1px solid var(--color-bg-primary)}
+.carousel-btn{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--color-border);background:var(--color-bg-card);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .15s;color:var(--color-text-secondary);flex-shrink:0}
+.carousel-btn:hover{border-color:var(--color-primary);color:var(--color-primary);background:var(--color-primary-bg)}
+.carousel-dots{display:flex;align-items:center;gap:6px}
+.carousel-dot{width:6px;height:6px;border-radius:3px;background:var(--color-border);cursor:pointer;transition:all .3s}
+.carousel-dot:hover{background:var(--color-text-tertiary)}
+.carousel-dot.active{background:var(--color-primary);width:20px}
+.carousel-info{font-size:11px;color:var(--color-text-tertiary);text-align:center;padding-top:var(--spacing-xs)}
+
+/* v2.2 响应式增强 */
+@media(max-width:1200px){.overview-top{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(5,1fr)}}
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:768px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.health-table{font-size:10px}.carousel-arrow{width:30px;height:30px;font-size:14px}.carousel-arrow-left{left:-12px}.carousel-arrow-right{right:-12px}}
+
+/* ============================================================
+   v2.1 增强：响应式优化
+   ============================================================ */
+@media(max-width:1400px){.dashboard-overview{grid-template-columns:1fr 1fr}.dashboard-overview>*:first-child{grid-column:1/-1}}
+@media(max-width:1200px){.card-body-ops{grid-template-columns:1fr}.workbench-layout{grid-template-columns:1fr 1.4fr}.workbench-layout>*:last-child{grid-column:1/-1}}
+@media(max-width:768px){
+  .dashboard-overview{grid-template-columns:1fr}
+  .nav{padding:var(--spacing-sm);height:auto}.nav-center{order:3;width:100%;justify-content:center}
+  .main{padding:var(--spacing-md)}
+  .card-header{flex-direction:column;align-items:flex-start}
+  .card-body-ops{grid-template-columns:1fr}
+  .workbench-layout{grid-template-columns:1fr}
+  .decision-grid{gap:var(--spacing-md)}
+  .decision-card:not(.card-full){cursor:pointer}
+  .card-folded .card-body{display:none}
+  .card-folded .card-summary{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .decision-card.mobile-expanded{position:fixed;top:52px;left:0;right:0;bottom:0;z-index:200;border-radius:0;overflow-y:auto;margin:0;box-shadow:none}
+  .decision-card.mobile-expanded .card-body{display:flex}
+  #linkWorkbench{display:none !important}
+  .workbench-layout{display:none !important}
+  .workbench-toolbar{display:none !important}
+  .quick-nav{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+  .quick-nav-btn{flex-shrink:0}
+}
 
 /* ============================================================
    导航 (极简 — 只有品牌+项目+用户)
@@ -364,8 +532,31 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
     </div>
   </div>
 
+  <!-- v2.2 新增：总览层主屏 -->
+  <div class="overview-layer" id="overviewLayer">
+    <!-- 顶部双栏 -->
+    <div class="overview-top">
+      <!-- 左栏：KPI 仪表盘 -->
+      <div class="overview-panel" id="kpiPanel">
+        <div class="overview-panel-title">📊 核心经营指标</div>
+        <div class="kpi-grid" id="kpiGrid"></div>
+      </div>
+      <!-- 右栏：三大风险雷达 -->
+      <div class="overview-panel" id="riskPanel">
+        <div class="overview-panel-title">🎯 风险雷达 <span style="font-size:10px;font-weight:400;color:var(--color-text-tertiary);">实时预警</span></div>
+        <div id="riskRadarContent"></div>
+      </div>
+    </div>
+
+    <!-- 中部：BG 运营健康度矩阵 -->
+    <div class="overview-panel" id="healthPanel">
+      <div class="overview-panel-title">🏢 各BG运营健康度 <span style="font-size:10px;font-weight:400;color:var(--color-text-tertiary);">RAG 状态矩阵</span></div>
+      <div class="health-matrix" id="healthMatrix"></div>
+    </div>
+  </div>
+
   <div class="decision-grid" id="decisionGrid">
-    <!-- 卡片由 JS 动态构建 -->
+    <!-- 轮播UI由 carouselInit 动态注入；卡片由 buildCockpit 构建 -->
   </div>
 
   <div class="compliance-watermark">🔒 本页面所有操作均受 WORM 保护 · 保留至 2033-06-09 · 不可篡改 · 审计 ID: SESSION-AUD-20260609-001</div>
@@ -1117,7 +1308,340 @@ function buildCockpit(){
     aiComp.evaluate(initSt);
     updateFoldedCard(d.id);
   });
+  // v2.1: 初始化总览层主屏
+  // v2.2: 初始化总览层主屏（KPI+风险雷达+健康矩阵），卡片轮播由 renderDashboard 内 carouselInit 控制
+  setTimeout(function(){renderDashboard();},300);
 }
+
+// ============================================================
+// v2.1 新增：战略总览仪表盘渲染
+// ============================================================
+function renderDashboard(){
+  // 聚合所有决策卡评分
+  var totalDir=0,totalDec=0,totalExec=0,count=0;
+  var risks=[];
+  Object.keys(cardInstances).forEach(function(cid){
+    var inst=cardInstances[cid];if(!inst)return;
+    var st=getSliderState(cid);
+    var scores=inst.def.calcScores(st);
+    totalDir+=scores.direction;totalDec+=scores.decode;totalExec+=scores.execution;
+    count++;
+    // 风险概览
+    var worst=Math.min(scores.direction,scores.decode,scores.execution/100);
+    var level=worst<0.4?'critical':worst<0.6?'high':worst<0.75?'medium':'low';
+    risks.push({name:inst.def.title,level:level,score:worst,urgency:inst.def.urgency});
+  });
+  if(count===0)return;
+  var avgDir=totalDir/count,avgDec=totalDec/count,avgExec=totalExec/count;
+
+  // KPI 环形图
+  var kpiRow=document.getElementById('dashKpiRow');if(!kpiRow)return;
+  var kpis=[
+    {label:'SP 方向',val:avgDir,max:1,color:'#1890ff',sub:'战略方向置信度'},
+    {label:'BP 解码',val:avgDec,max:1,color:'#00875A',sub:'业务解码置信度'},
+    {label:'EM 执行',val:avgExec,max:100,color:'#B86E00',sub:'执行管理置信度'}
+  ];
+  kpiRow.innerHTML=kpis.map(function(k){
+    var pct=Math.round((k.val/k.max)*100);
+    var r=38,c=2*Math.PI*r,offset=c*(1-pct/100);
+    return '<div class="dash-kpi-item"><div class="dash-kpi-ring"><svg width="86" height="86" viewBox="0 0 86 86"><circle class="bg" cx="43" cy="43" r="'+r+'"/><circle class="fill" cx="43" cy="43" r="'+r+'" stroke="'+k.color+'" stroke-dasharray="'+c+'" stroke-dashoffset="'+c+'" id="ring-'+k.label.replace(' ','')+'"/></svg><div class="center" style="color:'+k.color+'">'+pct+'%</div></div><div class="dash-kpi-label">'+k.label+'</div><div class="dash-kpi-sub">'+k.sub+'</div></div>';
+  }).join('');
+  // 环形图动画
+  setTimeout(function(){
+    kpis.forEach(function(k){
+      var el=document.getElementById('ring-'+k.label.replace(' ',''));
+      if(el){var pct=Math.round((k.val/k.max)*100);var r=38,c=2*Math.PI*r;el.style.strokeDashoffset=c*(1-pct/100);}
+    });
+  },100);
+
+  // 财务摘要
+  var finDiv=document.getElementById('dashFinanceContent');if(!finDiv)return;
+  var totalNpv=count*1.2; // 模拟: 每项决策约¥1.2亿NPV
+  var avgIrr=18+Math.round(avgExec/10);
+  var totalBudget=count*1.5;
+  finDiv.innerHTML='<div class="dash-metric-row"><span>组合 NPV</span><span class="dash-metric-val up">¥'+totalNpv.toFixed(1)+'亿</span></div>'+
+    '<div class="dash-metric-row"><span>加权 IRR</span><span class="dash-metric-val up">'+avgIrr+'%</span></div>'+
+    '<div class="dash-metric-row"><span>总预算需求</span><span class="dash-metric-val">¥'+totalBudget.toFixed(1)+'亿</span></div>'+
+    '<div class="dash-metric-row"><span>投资回收期（均值）</span><span class="dash-metric-val">3.8年</span></div>'+
+    '<div class="dash-metric-row"><span>财务量化覆盖率</span><span class="dash-metric-val up">100%</span></div>';
+
+  // 风险概览
+  risks.sort(function(a,b){return a.score-b.score;});
+  var riskCount=risks.filter(function(r){return r.level==='critical'||r.level==='high';}).length;
+  var riskBadge=document.getElementById('dashRiskCount');if(riskBadge){riskBadge.textContent=riskCount;riskBadge.style.display=riskCount>0?'':'none';}
+  var riskList=document.getElementById('dashRiskList');if(!riskList)return;
+  riskList.innerHTML=risks.map(function(r){
+    var icon=r.level==='critical'?'🔴':r.level==='high'?'🟠':r.level==='medium'?'🟡':'🟢';
+    var color=r.level==='critical'?'var(--color-score-red)':r.level==='high'?'var(--color-score-amber)':r.level==='medium'?'var(--color-score-yellow)':'var(--color-score-green)';
+    return '<div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span>'+icon+'</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.name+'</span><span style="font-weight:600;color:'+color+';font-family:var(--font-family-code);">'+(r.score*100).toFixed(0)+'%</span></div>';
+  }).join('');
+}
+
+// ============================================================
+// v2.2 新增：决策卡片轮播控制（仅控制原卡片显示/隐藏，不改原实现）
+// ============================================================
+var _carouselIndex=0;
+
+function carouselInit(){
+  var grid=document.getElementById('decisionGrid');if(!grid)return;
+  var cards=grid.querySelectorAll('.decision-card');if(cards.length===0)return;
+  if(document.getElementById('carouselBar')){carouselShow();return;}
+  _carouselIndex=0;
+  // 底部导航条：◀ ●●●●● ▶ + 页码
+  var bar=document.createElement('div');
+  bar.id='carouselBar';
+  bar.innerHTML=
+    '<div class="carousel-bar">'+
+      '<button class="carousel-btn" onclick="carouselPrev()">◀</button>'+
+      '<div class="carousel-dots" id="carouselDots"></div>'+
+      '<button class="carousel-btn" onclick="carouselNext()">▶</button>'+
+    '</div>'+
+    '<div class="carousel-info" id="carouselInfo">第 1/'+cards.length+' 张</div>';
+  grid.appendChild(bar);
+  carouselShow();
+}
+
+function carouselShow(){
+  var grid=document.getElementById('decisionGrid');if(!grid)return;
+  var cards=grid.querySelectorAll('.decision-card');
+  cards.forEach(function(c,i){c.classList.toggle('carousel-hidden',i!==_carouselIndex);});
+  var info=document.getElementById('carouselInfo');if(info)info.textContent='第 '+(_carouselIndex+1)+'/'+cards.length+' 张';
+  var dots=document.getElementById('carouselDots');if(!dots)return;
+  dots.innerHTML=Array.from(cards).map(function(_,i){
+    return '<span class="carousel-dot'+(i===_carouselIndex?' active':'')+'" onclick="carouselGoTo('+i+')"></span>';
+  }).join('');
+}
+
+function carouselPrev(){
+  var cards=document.querySelectorAll('#decisionGrid .decision-card');if(cards.length===0)return;
+  _carouselIndex=(_carouselIndex-1+cards.length)%cards.length;carouselShow();
+}
+function carouselNext(){
+  var cards=document.querySelectorAll('#decisionGrid .decision-card');if(cards.length===0)return;
+  _carouselIndex=(_carouselIndex+1)%cards.length;carouselShow();
+}
+function carouselGoTo(idx){
+  var cards=document.querySelectorAll('#decisionGrid .decision-card');if(idx<0||idx>=cards.length)return;
+  _carouselIndex=idx;carouselShow();
+}
+
+
+
+// ============================================================
+// v2.2 新增：KPI 仪表盘渲染
+// ============================================================
+function _drawKpiSparkline(cv, data, lineColor){
+  if(!cv||!cv.getContext)return;
+  var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;
+  var mn=Math.min.apply(null,data),mx=Math.max.apply(null,data);
+  var r=mx-mn||1,padX=4,padY=6,plotW=w-padX*2,plotH=h-padY*2;
+  ctx.clearRect(0,0,w,h);
+  // 网格线
+  ctx.strokeStyle='#f0f0f0';ctx.lineWidth=0.5;
+  [0.25,0.5,0.75].forEach(function(p){
+    var y=padY+plotH*(1-p);ctx.beginPath();ctx.moveTo(padX,y);ctx.lineTo(w-padX,y);ctx.stroke();
+  });
+  // 渐变填充
+  var grad=ctx.createLinearGradient(0,padY,0,h-padY);
+  grad.addColorStop(0,lineColor+'26');grad.addColorStop(1,lineColor+'03');
+  ctx.fillStyle=grad;ctx.beginPath();
+  data.forEach(function(v,di){
+    var x=padX+di/Math.max(data.length-1,1)*plotW;
+    var y=padY+plotH-(v-mn)/r*plotH;
+    if(di===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  });
+  ctx.lineTo(padX+(data.length-1)/Math.max(data.length-1,1)*plotW,padY+plotH);
+  ctx.lineTo(padX,padY+plotH);ctx.closePath();ctx.fill();
+  // 折线
+  ctx.strokeStyle=lineColor;ctx.lineWidth=2;ctx.lineJoin='round';ctx.beginPath();
+  data.forEach(function(v,di){
+    var x=padX+di/Math.max(data.length-1,1)*plotW;
+    var y=padY+plotH-(v-mn)/r*plotH;
+    if(di===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // 终点圆点
+  var lx=padX+(data.length-1)/Math.max(data.length-1,1)*plotW;
+  var ly=padY+plotH-(data[data.length-1]-mn)/r*plotH;
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(lx,ly,3.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=lineColor;ctx.beginPath();ctx.arc(lx,ly,2.5,0,Math.PI*2);ctx.fill();
+  // 起点小圆
+  var fx=padX,fy=padY+plotH-(data[0]-mn)/r*plotH;
+  ctx.fillStyle=lineColor;ctx.beginPath();ctx.arc(fx,fy,2,0,Math.PI*2);ctx.fill();
+}
+
+function renderKpiDashboard(){
+  var container=document.getElementById('kpiGrid');if(!container)return;
+  // 月度趋势数据（最近8个月）
+  var T={
+    revenue:   [398,405,412,418,422,425,427,427.5],
+    profit:    [52,55,57,58.5,59.8,60.5,61,61.2],
+    rdRatio:   [21.8,21.5,21.3,21.1,21.0,20.9,20.8,20.8],
+    cashflow:  [35,36,34,32,33,35,37,38.5],
+    perCapita: [150,149,148,147,146,145,143.5,142.5],
+    opMargin:  [16.2,15.8,15.4,15.0,14.7,14.4,14.3,14.3],
+    debtRatio: [54,55,56,57,58,58.5,59,59.2],
+    strRev:    [44,45,46,45,46,47,47.5,47.8],
+    cashBal:   [52,55,58,54,50,48,49,51],
+    nps:       [72,71,70,69,68,67,66.5,66]
+  };
+  var kpis=[
+    // === 第1行：原有5项 ===
+    {id:'revenue',  label:'全球销售收入',  val:427.5, target:520,  unit:'¥亿', sub:'目标 ¥520亿',         pct:82,  color:'#1890ff'},
+    {id:'profit',   label:'净利润',        val:61.2,  target:85,   unit:'¥亿', sub:'净利率 14.3%',         pct:72,  color:'#1890ff'},
+    {id:'rdRatio',  label:'研发投入占比',  val:20.8,  target:21.8, unit:'%',   sub:'承诺值 21.8%',         pct:95,  color:'#722ed1'},
+    {id:'cashflow', label:'经营性现金流',  val:38.5,  target:0,    unit:'¥亿', sub:'储备覆盖5.2月',         pct:null,color:'#00875A'},
+    {id:'perCapita',label:'人均产出',      val:142.5, target:148,  unit:'¥万', sub:'员工 3000人',          pct:96,  color:'#B86E00'},
+    // === 第2行：新增5项 ===
+    {id:'opMargin', label:'营业利润率',    val:14.3,  target:18,   unit:'%',   sub:'盈利质量 · 连续2季↓', pct:79,  color:'#C53030'},
+    {id:'debtRatio',label:'资产负债率',    val:59.2,  target:60,   unit:'%',   sub:'财务安全 · 警戒线60%', pct:null,color:'#D48806'},
+    {id:'strRev',   label:'战略业务收入占比',val:47.8,target:55,   unit:'%',   sub:'战略布局 · 目标55%',   pct:87,  color:'#1890ff'},
+    {id:'cashBal',  label:'现金与短期投资',val:51,    target:null, unit:'¥亿', sub:'同比降幅 18.5%',        pct:null,color:'#D48806'},
+    {id:'nps',      label:'客户满意度NPS', val:66,    target:70,   unit:'分',  sub:'行业标杆 75分',         pct:94,  color:'#C53030'}
+  ];
+  // 阈值判定
+  function classify(k){
+    if(k.id==='opMargin'){
+      if(k.val<14)return{colorClass:'red',cardClass:' danger',pctClass:'critical'}; // 连续两季下滑
+      return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
+    }
+    if(k.id==='debtRatio'){
+      if(k.val>65)return{colorClass:'red',cardClass:' danger',pctClass:'critical'};
+      if(k.val>60)return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
+      return{colorClass:'green',cardClass:'',pctClass:'on-track'};
+    }
+    if(k.id==='strRev'){
+      if(k.val<48)return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
+      return{colorClass:'green',cardClass:'',pctClass:'on-track'};
+    }
+    if(k.id==='cashBal'){
+      // 同比降幅>20%黄灯
+      if(k.val<45)return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
+      return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'}; // 降幅18.5%接近警戒
+    }
+    if(k.id==='nps'){
+      if(k.val<65)return{colorClass:'red',cardClass:' danger',pctClass:'critical'};
+      if(k.val<70)return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
+      return{colorClass:'green',cardClass:'',pctClass:'on-track'};
+    }
+    // 默认判定
+    var ratio=k.target>0?k.val/k.target:null;
+    if(k.id==='perCapita')return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
+    if(k.id==='rdRatio')return{colorClass:'amber',cardClass:' warn',pctClass:'off-track'};
+    if(ratio!==null&&ratio<0.6)return{colorClass:'red',cardClass:' danger',pctClass:'critical'};
+    if(ratio!==null&&ratio<0.8)return{colorClass:'amber',cardClass:'',pctClass:'off-track'};
+    return{colorClass:'green',cardClass:'',pctClass:'on-track'};
+  }
+  container.innerHTML=kpis.map(function(k,i){
+    var cls=classify(k);
+    var canvasId='kpiSpark'+k.id;
+    var ratio=k.target>0?k.val/k.target:null;
+    var pctText='';
+    if(k.id==='debtRatio'||k.id==='cashBal')pctText=k.val.toFixed(1)+k.unit; // 无完成率
+    else if(ratio!==null)pctText='完成率 '+Math.round(ratio*100)+'%';
+    else if(k.pct!==null)pctText=k.pct+'%';
+    return '<div class="kpi-card'+cls.cardClass+'" style="animation-delay:'+(i*0.04)+'s">'+
+      '<div class="kpi-card-label">'+k.label+'</div>'+
+      '<div class="kpi-sparkline"><canvas id="'+canvasId+'" width="160" height="40"></canvas></div>'+
+      '<div class="kpi-card-bottom">'+
+        '<span class="kpi-card-value '+cls.colorClass+'">'+(k.id==='rdRatio'||k.id==='opMargin'||k.id==='debtRatio'||k.id==='strRev'?k.val.toFixed(1):k.val.toFixed(1))+'</span>'+
+        '<span style="font-size:10px;color:var(--color-text-tertiary);">'+k.unit+'</span>'+
+        (pctText?'<span class="kpi-card-pct '+cls.pctClass+'">'+pctText+'</span>':'')+
+      '</div>'+
+      '<div class="kpi-card-sub">'+k.sub+'</div>'+
+    '</div>';
+  }).join('');
+  // canvas 延迟绘制 sparkline
+  setTimeout(function(){
+    kpis.forEach(function(k){
+      var cv=document.getElementById('kpiSpark'+k.id);if(!cv)return;
+      var data=T[k.id];if(!data)return;
+      _drawKpiSparkline(cv, data, k.color);
+    });
+  },150);
+}
+
+function renderRiskRadar(){
+  var container=document.getElementById('riskRadarContent');if(!container)return;
+  var topRisks=[
+    {rank:1,text:'华为/联影新一代AI影像设备2026Q3上市，价格低30%',impact:'危急',level:'critical'},
+    {rank:2,text:'美国BIS出口管制升级，A100/H100 GPU禁售范围扩至医疗AI',impact:'危急',level:'critical'},
+    {rank:3,text:'核心光学器件（CMOS传感器）日本供应商产能紧张，交期延长至8个月',impact:'高',level:'high'},
+    {rank:4,text:'欧盟MDR新规2027年生效，临床验证成本预计增加¥1.2亿',impact:'高',level:'high'},
+    {rank:5,text:'关键AI算法工程师3人收到竞品offer，薪酬倒挂35%',impact:'高',level:'high'}
+  ];
+  var redProjects=[
+    {name:'Cloud&AI BG · 智慧医疗云平台',deviation:'-35%'},
+    {name:'企业BG · 渠道数字化项目',deviation:'-22%'},
+    {name:'SC-3 现金流改善计划',deviation:'-41%'}
+  ];
+  var alerts=[
+    {text:'CTO团队3名AI架构师拟离职（薪酬低于市场35%）',tag:'人才',cls:'talent'},
+    {text:'Cloud&AI BG研发预算超支¥4200万（超标28%）',tag:'预算',cls:'budget'},
+    {text:'上海工厂产能利用率已达93%，Q4排产缺口15%',tag:'产能',cls:'capacity'}
+  ];
+  var h='<div style="margin-bottom:var(--spacing-md);"><div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px;">⚠️ 重大风险 TOP5</div>';
+  topRisks.forEach(function(r){
+    h+='<div class="risk-radar-item"><span class="risk-radar-rank rank-'+r.rank+'">'+r.rank+'</span><span class="risk-radar-text" title="'+r.text+'">'+r.text+'</span><span class="risk-radar-impact '+r.level+'">'+r.impact+'</span></div>';
+  });
+  h+='</div><div style="margin-bottom:var(--spacing-md);"><div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px;">🔴 严重偏离项目 ('+redProjects.length+')</div>';
+  redProjects.forEach(function(p){
+    h+='<div class="red-project-row"><span>'+p.name+'</span><span class="red-project-deviation">偏差 '+p.deviation+'</span></div>';
+  });
+  h+='</div><div><div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px;">📢 资源预警</div>';
+  alerts.forEach(function(a){
+    h+='<div class="alert-row"><span>'+a.text+'</span><span class="alert-tag '+a.cls+'">'+a.tag+'</span></div>';
+  });
+  h+='</div>';
+  container.innerHTML=h;
+}
+
+function renderHealthMatrix(){
+  var container=document.getElementById('healthMatrix');if(!container)return;
+  var bgs=[
+    {name:'运营商BG',revenue:'92%',revRag:'green',profit:'105%',profRag:'green',csat:'88',csatRag:'green',projRag:'green',overall:'green',trend:'→'},
+    {name:'企业BG',revenue:'78%',revRag:'amber',profit:'82%',profRag:'amber',csat:'85',csatRag:'green',projRag:'amber',overall:'amber',trend:'↓'},
+    {name:'消费者BG',revenue:'115%',revRag:'green',profit:'120%',profRag:'green',csat:'91',csatRag:'green',projRag:'green',overall:'green',trend:'↑'},
+    {name:'Cloud&AI BG',revenue:'65%',revRag:'red',profit:'60%',profRag:'red',csat:'80',csatRag:'amber',projRag:'red',overall:'red',trend:'↓'},
+    {name:'智能汽车BU',revenue:'200%',revRag:'green',profit:'—',profRag:'',csat:'93',csatRag:'green',projRag:'green',overall:'green',trend:'↑'}
+  ];
+  var ragIcon=function(r){
+    if(r==='green')return '<span class="rag-dot green">✓</span>';
+    if(r==='amber')return '<span class="rag-dot amber">!</span>';
+    if(r==='red')return '<span class="rag-dot red">✗</span>';
+    return '<span style="color:var(--color-text-disabled)">—</span>';
+  };
+  var trendIcon=function(t){
+    if(t==='↑')return '<span class="trend-up">↑</span>';
+    if(t==='↓')return '<span class="trend-down">↓</span>';
+    return '<span class="trend-flat">→</span>';
+  };
+  var h='<table class="health-table"><thead><tr><th>BG/SBG/BU</th><th>收入达成</th><th>利润贡献</th><th>客户满意度</th><th>关键项目</th><th>综合状态</th><th>趋势</th></tr></thead><tbody>';
+  bgs.forEach(function(bg){
+    h+='<tr><td>'+bg.name+'</td>'+
+      '<td>'+bg.revenue+' '+ragIcon(bg.revRag)+'</td>'+
+      '<td>'+bg.profit+' '+ragIcon(bg.profRag)+'</td>'+
+      '<td>'+bg.csat+'分 '+ragIcon(bg.csatRag)+'</td>'+
+      '<td>'+ragIcon(bg.projRag)+'</td>'+
+      '<td>'+ragIcon(bg.overall)+'</td>'+
+      '<td>'+trendIcon(bg.trend)+'</td></tr>';
+  });
+  h+='</tbody></table>';
+  container.innerHTML=h;
+}
+
+// ============================================================
+// v2.2：renderDashboard 入口（KPI+风险雷达+健康矩阵+卡片轮播+旧仪表盘）
+// ============================================================
+var _origRenderDashboard=renderDashboard;
+renderDashboard=function(){
+  renderKpiDashboard();
+  renderRiskRadar();
+  renderHealthMatrix();
+  carouselInit();
+  if(_origRenderDashboard&&_origRenderDashboard!==renderDashboard)_origRenderDashboard();
+};
+
 
 function resortCards(){
   var grid=document.getElementById('decisionGrid');if(!grid)return;
@@ -1134,11 +1658,15 @@ function resortCards(){
     var wB=Math.min(tB.direction,tB.decode,tB.execution/100);
     return wA-wB;
   });
-  // 重新插入排序后的卡片
+  // 重新插入排序后的卡片，导航条始终保持在最后
   cards.forEach(c=>grid.appendChild(c));
+  var bar=document.getElementById('carouselBar');if(bar)grid.appendChild(bar);
   // 更新状态栏
   var urgent=cards.filter(c=>c.dataset.urgency!=='stable').length;
   document.getElementById('cockpitStatus').textContent=urgent===0?'✅ 全部战略决策已处理 — 系统就绪':urgent+'项战略决策待关注。拖动任一滑块开始探索。';
+  // v2.1: 同步更新导航徽标和仪表盘
+  var badge=document.getElementById('navBadgeUrgent');if(badge){badge.textContent=urgent;badge.style.display=urgent>0?'':'none';}
+  renderDashboard();
 }
 
 function createScoreRow(container,label){
@@ -1245,6 +1773,60 @@ function resolveDecisionPhase(def){
   if(def.id.indexOf('bp')===0)return'BP[4]';
   return'EM[3]';
 }
+
+// ============================================================
+// v2.1 新增：龙卷风图（敏感性分析）
+// ============================================================
+
+// ============================================================
+// v2.1 新增：文档预览面板
+// ============================================================
+
+// ============================================================
+// v2.1 新增：辩论共识追踪
+// ============================================================
+function renderConsensusBar(containerId){
+  var container=document.getElementById(containerId);if(!container)return;
+  // 模拟投票结果
+  var votes={pro:3,con:1,neutral:2};
+  var total=votes.pro+votes.con+votes.neutral;
+  var proPct=votes.pro/total;
+  var status=proPct>=0.6?'strong':proPct>=0.45?'weak':'split';
+  var statusText={strong:'✅ 强共识 ('+votes.pro+'/'+total+')',weak:'⚡ 弱共识 ('+votes.pro+'/'+total+')',split:'🔴 分歧严重 ('+votes.pro+'/'+total+')'};
+  container.innerHTML='<div class="consensus-bar '+status+'">'+
+    '<span style="font-weight:600;">'+statusText[status]+'</span>'+
+    '<div class="consensus-votes">'+
+      Array(votes.pro).fill().map(function(){return '<span class="consensus-vote pro">✓</span>';}).join('')+
+      Array(votes.con).fill().map(function(){return '<span class="consensus-vote con">✗</span>';}).join('')+
+      Array(votes.neutral).fill().map(function(){return '<span class="consensus-vote neutral">—</span>';}).join('')+
+    '</div>'+
+    '<span style="font-size:10px;color:var(--color-text-tertiary);">支持: CEO/CMO/COO · 反对: CFO · 中立: CTO/CHO</span>'+
+  '</div>';
+}
+
+// ============================================================
+// v2.1 新增：快捷导航滚动
+// ============================================================
+function scrollToSection(id){
+  var el=document.getElementById(id);if(!el)return;
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  // 更新快捷键激活态
+  document.querySelectorAll('.quick-nav-btn').forEach(function(b){b.classList.remove('active');});
+  var btn=document.querySelector('.quick-nav-btn[onclick*=\"'+id+'\"]');
+  if(btn)btn.classList.add('active');
+}
+
+// ============================================================
+// v2.1 增强：onSliderChange 同步更新仪表盘
+// ============================================================
+var _origOnSliderChange=onSliderChange;
+onSliderChange=function(cardId){
+  _origOnSliderChange(cardId);
+  // 防抖更新仪表盘
+  clearTimeout(window._dashTimeout);
+  window._dashTimeout=setTimeout(function(){renderDashboard();},200);
+};
+
 function toggleCardExpand(cardId){
   const card=document.getElementById('card-'+cardId);if(!card)return;
   const isFull=card.classList.contains('card-full');
@@ -1613,6 +2195,7 @@ function buildWorkbench(){
     '<div style="font-size:9px;color:var(--color-text-tertiary);text-align:center;margin-bottom:var(--spacing-md)">全证据聚合 · 含SP+BP+RT参数加权</div>'+
     '<div id="wb-sliders-container"></div>'+
     '<div style="margin-top:var(--spacing-sm);font-size:10px;color:var(--color-text-tertiary);line-height:1.5" id="wb-param-detail"></div>'+
+    ''+
     '<div style="margin-top:var(--spacing-sm);display:flex;gap:6px">'+
       '<button onclick="window._wbReset()" style="padding:3px 10px;border:1px solid var(--color-border);border-radius:3px;background:var(--color-bg-card);cursor:pointer;font-size:11px;font-family:var(--font-family-base)">↻ 重置为证据值</button>'+
     '</div></div>';
@@ -1626,7 +2209,7 @@ function buildWorkbench(){
     {agent:'CEO',stance:'pro',text:'这是长期战略价值的赌注。5年回收期看着长，但高端医疗设备的客户生命周期价值是20年+。我支持CMO的判断，但CFO的财务风险必须被对冲——合资是折中方案。'},
     {agent:'CHO',stance:'neutral',text:'自建模式需要6个月内到位22名核心人才——在当前人才市场，这个目标极其激进。我已经和3所高校谈过联合培养方案，但最快见效也要9个月。这是执行维度的最大风险。'}
   ];
-  let debateHTML='<div class="workbench-panel"><h3>💬 辩论室 <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400;">— 6/7角色已发言</span></h3><div class="debate-thread" id="wb-debate-thread">';
+  let debateHTML='<div class="workbench-panel"><h3>💬 辩论室 <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400;">— 6/7角色已发言</span></h3><div id="wb-consensus"></div><div class="debate-thread" id="wb-debate-thread">';
   debateMsgs.forEach(dm=>{
     debateHTML+='<div class="debate-msg '+dm.stance+'"><span class="debate-agent-avatar">'+dm.agent+'</span><span class="debate-msg-text">'+dm.text+'</span></div>';
   });
@@ -1669,6 +2252,10 @@ function buildWorkbench(){
       input.onkeydown=e=>{if(e.key==='Enter')sendBtn.click()};
     }
   },200);
+  // v2.1: 初始化共识追踪
+  setTimeout(function(){
+    renderConsensusBar('wb-consensus');
+  },400);
 }
 function rebuildWorkbench(){
   var layout=document.getElementById('workbenchLayout');if(!layout||!layout.innerHTML)return;
@@ -1682,6 +2269,7 @@ function rebuildWorkbench(){
     '</div><div class="evidence-tree">'+(window._renderPhaseTree||renderPhaseTree)()+'</div>'+
     '<div id="evidence-discount-badge" style="display:none;margin-top:var(--spacing-sm);padding:4px 8px;background:#f0f8ff;border-radius:4px;font-size:11px;color:var(--color-primary);text-align:center"></div>';
   panel.innerHTML=treeHTML;
+
   if(window._updateParentCheckboxes)window._updateParentCheckboxes();
   // 恢复当前情景按钮激活态
   if(window._currentScenario){
