@@ -134,8 +134,8 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 .kpi-card{text-align:center;padding:var(--spacing-md) var(--spacing-sm);border-radius:var(--radius-lg);background:var(--color-bg-card);box-shadow:var(--shadow-sm);transition:all .25s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:4px;border:1px solid #f0f0f0}
 .kpi-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
 .kpi-card-label{font-size:12px;font-weight:500;color:var(--color-text-secondary)}
-.kpi-sparkline{flex:1;min-height:40px;display:flex;align-items:center;justify-content:center;margin:2px 0}
-.kpi-sparkline canvas{width:100%;height:100%}
+.kpi-sparkline{flex:1;min-height:48px;display:flex;align-items:center;justify-content:center}
+.kpi-sparkline canvas{display:block;width:100%;height:48px;margin:0 auto}
 .kpi-card-bottom{display:flex;align-items:baseline;justify-content:center;gap:var(--spacing-sm);flex-wrap:wrap}
 .kpi-card-value{font-size:20px;font-weight:700;font-family:var(--font-family-code);line-height:1.2}
 .kpi-card-value.green{color:var(--color-success)}.kpi-card-value.amber{color:var(--color-warning)}.kpi-card-value.red{color:var(--color-danger)}
@@ -525,7 +525,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 <div class="page active" id="page-cockpit">
   <div class="cockpit-header">
     <h1 class="cockpit-title">决策舱</h1>
-    <p class="cockpit-subtitle">拖动滑块探索不同情景——AI高管团实时响应</p>
+    <p class="cockpit-subtitle">拖动决策卡中的滑块探索不同情景——AI高管团实时响应</p>
     <p class="cockpit-meta">最后更新：2026-06-09 09:15 · <span style="cursor:pointer;color:var(--color-primary);" onclick="showToast('数据已刷新','info')">🔄 刷新</span></p>
   </div>
 
@@ -1430,15 +1430,12 @@ function carouselGoTo(idx){
 // ============================================================
 function _drawKpiSparkline(cv, data, lineColor){
   if(!cv||!cv.getContext)return;
-  var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;
+  var ctx=cv.getContext('2d'),dpr=window.devicePixelRatio||1;
+  var w=200,h=48;
+  cv.width=w*dpr;cv.height=h*dpr;ctx.scale(dpr,dpr);
   var mn=Math.min.apply(null,data),mx=Math.max.apply(null,data);
   var r=mx-mn||1,padX=4,padY=6,plotW=w-padX*2,plotH=h-padY*2;
   ctx.clearRect(0,0,w,h);
-  // 网格线
-  ctx.strokeStyle='#f0f0f0';ctx.lineWidth=0.5;
-  [0.25,0.5,0.75].forEach(function(p){
-    var y=padY+plotH*(1-p);ctx.beginPath();ctx.moveTo(padX,y);ctx.lineTo(w-padX,y);ctx.stroke();
-  });
   // 渐变填充
   var grad=ctx.createLinearGradient(0,padY,0,h-padY);
   grad.addColorStop(0,lineColor+'26');grad.addColorStop(1,lineColor+'03');
@@ -1508,7 +1505,7 @@ function renderKpiDashboard(){
     var ratio=k.target>0?Math.round(k.val/k.target*100):null;
     return '<div class="kpi-card" style="animation:fadeIn .4s ease-out;animation-delay:'+(i*0.04)+'s">'+
       '<div class="kpi-card-label">'+k.label+'</div>'+
-      '<div class="kpi-sparkline"><canvas id="'+canvasId+'" width="160" height="40"></canvas></div>'+
+      '<div class="kpi-sparkline"><canvas id="'+canvasId+'" width="200" height="48"></canvas></div>'+
       '<div class="kpi-card-bottom">'+
         '<span class="kpi-card-value '+cls+'">'+(k.id==='rdRatio'||k.id==='opMargin'||k.id==='debtRatio'||k.id==='strRev'?k.val.toFixed(1):k.val.toFixed(1))+'</span>'+
         '<span style="font-size:10px;color:var(--color-text-tertiary);">'+k.unit+'</span>'+
