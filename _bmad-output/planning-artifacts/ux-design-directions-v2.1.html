@@ -504,6 +504,78 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
   .workbench-layout{display:none !important}
   .workbench-toolbar{display:none !important}
 }
+
+/* ============================================================
+   v2.3 新增：战略地图页面 — BSC四层瀑布流
+   ============================================================ */
+.strategy-map{display:flex;flex-direction:column;gap:0;padding-bottom:var(--spacing-2xl)}
+.sm-layer{position:relative;margin-bottom:0}
+/* BSC四层色彩体系 */
+.sm-layer.finance{--sm-accent:#1d3a5c;--sm-accent-light:#e6f0fa;--sm-accent-border:#b3d4f0}
+.sm-layer.customer{--sm-accent:#00875A;--sm-accent-light:#e6f7f1;--sm-accent-border:#b3e5d0}
+.sm-layer.internal{--sm-accent:#722ed1;--sm-accent-light:#f9f0ff;--sm-accent-border:#d3adf7}
+.sm-layer.learning{--sm-accent:#B86E00;--sm-accent-light:#fff8e6;--sm-accent-border:#ffd591}
+.sm-layer-header{display:flex;align-items:center;gap:var(--spacing-md);padding:var(--spacing-md) var(--spacing-xl);border-radius:var(--radius-lg) var(--radius-lg) 0 0;cursor:pointer;user-select:none;transition:background .2s;position:relative;z-index:2}
+.sm-layer-header:hover{filter:brightness(0.97)}
+.sm-layer.finance .sm-layer-header{background:linear-gradient(135deg,#1d3a5c,#2a5080);color:#fff}
+.sm-layer.customer .sm-layer-header{background:linear-gradient(135deg,#00875A,#00a870);color:#fff}
+.sm-layer.internal .sm-layer-header{background:linear-gradient(135deg,#531dab,#722ed1);color:#fff}
+.sm-layer.learning .sm-layer-header{background:linear-gradient(135deg,#874d00,#B86E00);color:#fff}
+.sm-layer-number{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0;background:rgba(255,255,255,.2);backdrop-filter:blur(4px)}
+.sm-layer-title-group{flex:1;min-width:0}
+.sm-layer-title{font-size:18px;font-weight:700;line-height:1.3}
+.sm-layer-subtitle{font-size:12px;opacity:.85;margin-top:2px}
+.sm-layer-toggle{font-size:12px;opacity:.7;transition:transform .3s;flex-shrink:0;width:24px;text-align:center}
+.sm-layer.open .sm-layer-toggle{transform:rotate(180deg)}
+.sm-layer-body{display:none;padding:var(--spacing-lg) var(--spacing-xl);background:var(--color-bg-card);border-radius:0 0 var(--radius-lg) var(--radius-lg);border:2px solid var(--sm-accent-border);border-top:none;box-shadow:var(--shadow-md)}
+.sm-layer.open .sm-layer-body{display:block;animation:slideDown .35s ease-out}
+/* 战略主题卡片 */
+.sm-theme-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--spacing-md);margin-bottom:var(--spacing-md)}
+.sm-theme-card{background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--spacing-md);transition:box-shadow .2s,border-color .2s}
+.sm-theme-card:hover{box-shadow:var(--shadow-md);border-color:var(--sm-accent-border)}
+.sm-theme-card-header{display:flex;align-items:baseline;gap:var(--spacing-sm);margin-bottom:var(--spacing-sm);padding-bottom:var(--spacing-sm);border-bottom:1px solid var(--color-bg-primary)}
+.sm-theme-card-title{font-size:14px;font-weight:700;color:var(--color-text-primary)}
+.sm-theme-card-quote{font-size:11px;color:var(--sm-accent);font-style:italic;opacity:.8}
+.sm-kpi-table{width:100%;border-collapse:collapse;font-size:11px}
+.sm-kpi-table th{text-align:left;padding:5px 8px;font-weight:500;color:var(--color-text-tertiary);border-bottom:1px solid var(--color-bg-primary);white-space:nowrap;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+.sm-kpi-table td{padding:6px 8px;border-bottom:1px solid #fafafa;vertical-align:top}
+.sm-kpi-table tr:last-child td{border-bottom:none}
+.sm-kpi-table tr:hover td{background:var(--sm-accent-light)}
+.sm-kpi-table .kpi-val{font-weight:700;font-family:var(--font-family-code);white-space:nowrap;text-align:right}
+.sm-kpi-table .kpi-val.up{color:var(--color-success)}.sm-kpi-table .kpi-val.target{color:var(--color-text-tertiary)}
+/* 因果箭头 — 层与层之间 */
+.sm-causal-arrow{display:flex;align-items:center;justify-content:center;height:48px;position:relative;z-index:1}
+.sm-arrow-line{width:3px;height:32px;background:linear-gradient(to bottom,var(--from-color),var(--to-color));border-radius:2px;position:relative}
+.sm-arrow-head{position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid var(--to-color)}
+.sm-arrow-label{position:absolute;left:calc(50% + 16px);font-size:10px;color:var(--color-text-tertiary);white-space:nowrap;font-style:italic;background:var(--color-bg-card);padding:2px 8px;border-radius:10px;border:1px solid var(--color-border)}
+/* 客户层三栏 */
+.sm-customer-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--spacing-md);margin-bottom:var(--spacing-sm)}
+.sm-customer-card{text-align:center;padding:var(--spacing-md);border-radius:var(--radius-md);background:var(--sm-accent-light);border:1px solid var(--sm-accent-border);transition:box-shadow .2s}
+.sm-customer-card:hover{box-shadow:var(--shadow-md)}
+.sm-customer-icon{font-size:28px;margin-bottom:var(--spacing-xs)}
+.sm-customer-name{font-size:14px;font-weight:700;color:var(--sm-accent);margin-bottom:4px}
+.sm-customer-value{font-size:11px;color:var(--color-text-secondary);line-height:1.5}
+.sm-customer-kpi{font-size:10px;color:var(--color-text-tertiary);margin-top:var(--spacing-xs);font-family:var(--font-family-code)}
+/* 因果逻辑条 */
+.sm-logic-bar{padding:var(--spacing-sm) var(--spacing-md);border-radius:var(--radius-sm);font-size:11px;margin-top:var(--spacing-sm);display:flex;align-items:center;gap:var(--spacing-sm)}
+.sm-logic-bar .sm-logic-icon{font-size:14px;flex-shrink:0}
+.sm-logic-bar .sm-logic-text{color:var(--color-text-secondary);line-height:1.5}
+.sm-layer.finance .sm-logic-bar{background:#f0f5fa;border-left:3px solid #1d3a5c}
+.sm-layer.customer .sm-logic-bar{background:#e6f7f1;border-left:3px solid #00875A}
+.sm-layer.internal .sm-logic-bar{background:#f9f0ff;border-left:3px solid #722ed1}
+.sm-layer.learning .sm-logic-bar{background:#fff8e6;border-left:3px solid #B86E00}
+/* 内部运营层 — 五列产业卡片 */
+.sm-ops-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--spacing-sm);margin-bottom:var(--spacing-sm)}
+.sm-ops-card{text-align:center;padding:var(--spacing-sm);border-radius:var(--radius-md);background:var(--sm-accent-light);border:1px solid var(--sm-accent-border);font-size:10px;transition:box-shadow .2s}
+.sm-ops-card:hover{box-shadow:var(--shadow-sm)}
+.sm-ops-icon{font-size:20px;margin-bottom:2px}
+.sm-ops-name{font-weight:700;color:var(--sm-accent);font-size:12px;margin-bottom:2px}
+.sm-ops-kpi{font-family:var(--font-family-code);font-size:9px;color:var(--color-text-tertiary)}
+.sm-ops-tag{display:inline-block;padding:1px 6px;border-radius:8px;font-size:9px;margin-top:4px;font-weight:500}
+.sm-ops-tag.ai{background:#e6f7ff;color:#1890ff}.sm-ops-tag.eco{background:#f6ffed;color:#00875A}.sm-ops-tag.quality{background:#fffbe6;color:#d48806}
+/* 战略地图响应式 */
+@media(max-width:1200px){.sm-ops-grid{grid-template-columns:repeat(3,1fr)}.sm-theme-grid{grid-template-columns:1fr}}
+@media(max-width:768px){.sm-ops-grid{grid-template-columns:repeat(2,1fr)}.sm-customer-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -518,6 +590,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
       <option>XX公司 2026 SP-BP</option><option>YY医疗 2025 战略复盘</option><option>ZZ集团 2026 市场进入</option>
     </select>
     <span class="nav-link active" onclick="switchPage('cockpit')" id="linkCockpit">🎯 决策舱</span>
+    <span class="nav-link" onclick="switchPage('strategymap')" id="linkStrategyMap">🗺️ 战略地图</span>
     <span class="nav-link" onclick="switchPage('workbench')" id="linkWorkbench">📐 工作台</span>
   </div>
   <span class="nav-user">👤 乔布斯克</span>
@@ -576,7 +649,316 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
     <!-- 由 JS 动态构建 -->
   </div>
   <div class="compliance-watermark">🔒 本页面所有操作均受 WORM 保护 · 保留至 2033-06-09 · 不可篡改 · 审计 ID: SESSION-AUD-20260609-001</div>
+	</div>
+
+<!-- ============================================================
+     Page 3: 战略地图 — BSC四层瀑布流
+     ============================================================ -->
+<div class="page" id="page-strategymap">
+  <!-- 战略宣言横幅 — 对标PPT P-72风格 -->
+  <div style="background:linear-gradient(135deg,#1d3a5c,#2a5080);color:#fff;border-radius:var(--radius-lg);padding:var(--spacing-xl) var(--spacing-2xl);margin-bottom:var(--spacing-xl);text-align:center;box-shadow:var(--shadow-lg)">
+    <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;letter-spacing:1px">华为2025年战略地图（战略解码版）</h1>
+    <p style="font-size:14px;opacity:.9;margin-bottom:4px">以"有利润的收入，有现金流的利润"为财务导向，构筑数智底座</p>
+    <p style="font-size:11px;opacity:.6">基于 DSTE 战略管理体系 · 华为2025年度报告数据 · 最后更新 2026-06-09</p>
+  </div>
+
+  <div class="strategy-map" id="strategyMapContainer">
+
+    <!-- ============ 第一层：财务层面 ============ -->
+    <div class="sm-layer finance open" id="sm-finance">
+      <div class="sm-layer-header" onclick="toggleSMLayer('sm-finance')">
+        <div class="sm-layer-number">一</div>
+        <div class="sm-layer-title-group">
+          <div class="sm-layer-title">财务层面（F） — 有利润的收入，有现金流的利润</div>
+          <div class="sm-layer-subtitle">战略主题：稳步提升收入规模 · 提升盈利质量 · 强化现金流安全</div>
+        </div>
+        <div class="sm-layer-toggle">▼</div>
+      </div>
+      <div class="sm-layer-body">
+        <div class="sm-theme-grid">
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">📈 战略主题 1：稳步提升收入规模</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键衡量指标</th></tr>
+              <tr><td>五大产业持续攻坚，优化产业组合增强韧性</td><td class="kpi-val up">销售收入<br>8,809亿元<br><span style="font-size:9px;font-weight:400;">同比增长 ↑2.2%</span></td></tr>
+              <tr><td>战略业务（车/云）高增长</td><td class="kpi-val up">智能汽车/云计算<br>高速增长引擎</td></tr>
+            </table>
+          </div>
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">💰 战略主题 2：提升盈利质量</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键衡量指标</th></tr>
+              <tr><td>坚持"有利润的收入"，强化各BG经营责任</td><td class="kpi-val up">营业利润率<br>11.0%<br><span style="font-size:9px;font-weight:400;">同比 ↑1.8p.p.</span></td></tr>
+              <tr><td>持续优化成本结构</td><td class="kpi-val up">净利润<br>680亿元</td></tr>
+            </table>
+          </div>
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">🏦 战略主题 3：强化现金流安全</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键衡量指标</th></tr>
+              <tr><td>保持充足"弹药储备"，有效管理流动性风险</td><td class="kpi-val up">经营现金流<br>1,274亿元<br><span style="font-size:9px;font-weight:400;">同比 ↑44.1%</span></td></tr>
+              <tr><td>优化资本结构</td><td class="kpi-val up">现金与短投<br>3,614亿元</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="sm-logic-bar">
+          <span class="sm-logic-icon">💡</span>
+          <span class="sm-logic-text"><strong>因果逻辑：</strong>只有各产业实现有效增长，才能支撑整体盈利与现金流改善；只有保持充足现金储备，才能在不确定性中持续投入未来。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 因果箭头：客户 → 财务 -->
+    <div class="sm-causal-arrow">
+      <div class="sm-arrow-line" style="--from-color:#00875A;--to-color:#1d3a5c">
+        <div class="sm-arrow-head" style="border-top-color:#1d3a5c"></div>
+      </div>
+      <div class="sm-arrow-label">（客户买单是实现财务结果的唯一途径）</div>
+    </div>
+
+    <!-- ============ 第二层：客户层面 ============ -->
+    <div class="sm-layer customer open" id="sm-customer">
+      <div class="sm-layer-header" onclick="toggleSMLayer('sm-customer')">
+        <div class="sm-layer-number">二</div>
+        <div class="sm-layer-title-group">
+          <div class="sm-layer-title">客户层面（C） — 以客户为中心，深入行业场景，为客户创造价值</div>
+          <div class="sm-layer-subtitle">通过多产业联合创新方式，解决客户实际问题</div>
+        </div>
+        <div class="sm-layer-toggle">▼</div>
+      </div>
+      <div class="sm-layer-body">
+        <div class="sm-customer-grid">
+          <div class="sm-customer-card">
+            <div class="sm-customer-icon">📡</div>
+            <div class="sm-customer-name">运营商客户</div>
+            <div class="sm-customer-value">价值主张："助力从流量经营迈向体验经营"</div>
+            <div class="sm-customer-kpi">🌐 5G-A 体验经营走深向实<br>📶 全球5G-A用户 <strong>6,000万</strong><br>🤝 40+运营商发展新模式</div>
+          </div>
+          <div class="sm-customer-card">
+            <div class="sm-customer-icon">🏢</div>
+            <div class="sm-customer-name">政企客户</div>
+            <div class="sm-customer-value">价值主张："深入行业场景解决实际问题"</div>
+            <div class="sm-customer-kpi">🤝 <strong>59,000+</strong> 合作伙伴<br>🏭 500+行业智能化场景<br>🌍 全球15,000+ ISP客户</div>
+          </div>
+          <div class="sm-customer-card">
+            <div class="sm-customer-icon">📱</div>
+            <div class="sm-customer-name">消费者</div>
+            <div class="sm-customer-value">价值主张："鸿蒙与小艺体验领先"</div>
+            <div class="sm-customer-kpi">📲 鸿蒙终端 <strong>3,600万</strong><br>📦 应用/服务 35万+<br>👨‍💻 开发者 1,000万+</div>
+          </div>
+        </div>
+        <div class="sm-logic-bar">
+          <span class="sm-logic-icon">💡</span>
+          <span class="sm-logic-text"><strong>因果逻辑：</strong>只有深入客户实际作业流程、理解其真实痛点，才能提供"用得上、用得好"的解决方案；客户愿意为更高价值付费，才能支撑收入与利润增长。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 因果箭头：内部运营 → 客户 -->
+    <div class="sm-causal-arrow">
+      <div class="sm-arrow-line" style="--from-color:#722ed1;--to-color:#00875A">
+        <div class="sm-arrow-head" style="border-top-color:#00875A"></div>
+      </div>
+      <div class="sm-arrow-label">（靠什么交付客户价值？靠五大产业的执行力）</div>
+    </div>
+
+    <!-- ============ 第三层：内部运营层面 ============ -->
+    <div class="sm-layer internal open" id="sm-internal">
+      <div class="sm-layer-header" onclick="toggleSMLayer('sm-internal')">
+        <div class="sm-layer-number">三</div>
+        <div class="sm-layer-title-group">
+          <div class="sm-layer-title">内部运营层面（I） — 做强核心竞争力：将AI嵌入每一个产品和网络</div>
+          <div class="sm-layer-subtitle">联接 · 计算 · 云 · 终端 · 智能汽车 — 五大产业协同</div>
+        </div>
+        <div class="sm-layer-toggle">▼</div>
+      </div>
+      <div class="sm-layer-body">
+        <!-- 五大产业概览卡片 -->
+        <div class="sm-ops-grid">
+          <div class="sm-ops-card">
+            <div class="sm-ops-icon">📶</div>
+            <div class="sm-ops-name">联接产业</div>
+            <div class="sm-ops-kpi">50张5G-A网络<br>240张400G骨干</div>
+            <span class="sm-ops-tag ai">🤖 AI嵌入网络</span>
+          </div>
+          <div class="sm-ops-card">
+            <div class="sm-ops-icon">💻</div>
+            <div class="sm-ops-name">计算产业</div>
+            <div class="sm-ops-kpi">780万+开发者<br>26,000+方案</div>
+            <span class="sm-ops-tag eco">🔗 集群+超节点</span>
+          </div>
+          <div class="sm-ops-card">
+            <div class="sm-ops-icon">☁️</div>
+            <div class="sm-ops-name">云计算</div>
+            <div class="sm-ops-kpi">1,000万+开发者<br>1,800+智算客户</div>
+            <span class="sm-ops-tag ai">🤖 AI解行业难题</span>
+          </div>
+          <div class="sm-ops-card">
+            <div class="sm-ops-icon">📱</div>
+            <div class="sm-ops-name">终端</div>
+            <div class="sm-ops-kpi">35万+应用<br>1,000万+开发者</div>
+            <span class="sm-ops-tag eco">🔗 精品+竞争力</span>
+          </div>
+          <div class="sm-ops-card">
+            <div class="sm-ops-icon">🚗</div>
+            <div class="sm-ops-name">智能汽车</div>
+            <div class="sm-ops-kpi">140万+辆搭载<br>市占率第一</div>
+            <span class="sm-ops-tag ai">🤖 乾崑智驾ADS4</span>
+          </div>
+        </div>
+        <!-- 五大战略主题详细卡片 -->
+        <div class="sm-theme-grid">
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">📶 联接产业</span>
+              <span class="sm-theme-card-quote">"AI嵌入网络"</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键指标</th></tr>
+              <tr><td>5G-A全速推进，规模商用部署</td><td class="kpi-val">50张网络 · 300+城市</td></tr>
+              <tr><td>F5G-A全光网规模化商用</td><td class="kpi-val">240张400G骨干网</td></tr>
+              <tr><td>星河AI网络持续升级</td><td class="kpi-val">10+运营商AIWAN创新</td></tr>
+            </table>
+          </div>
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">💻 计算产业</span>
+              <span class="sm-theme-card-quote">"集群+超节点"</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键指标</th></tr>
+              <tr><td>灵衢互联协议全面开源开放</td><td class="kpi-val">灵衢2.0 · 技术规范开放</td></tr>
+              <tr><td>昇腾384超节点规模商用</td><td class="kpi-val">互联网·金融·运营商</td></tr>
+              <tr><td>鲲鹏/昇腾全面开源</td><td class="kpi-val">780万开发者 · 9,800+伙伴</td></tr>
+            </table>
+          </div>
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">☁️ 云计算</span>
+              <span class="sm-theme-card-quote">"AI解行业难题"</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键指标</th></tr>
+              <tr><td>打造"行业AI梦工厂"</td><td class="kpi-val">赋能千行百业</td></tr>
+              <tr><td>ModelArts / AgentArts平台</td><td class="kpi-val">1,000万+开发者</td></tr>
+              <tr><td>智算云服务全面上线</td><td class="kpi-val">1,800+智算客户</td></tr>
+            </table>
+          </div>
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">📱 终端</span>
+              <span class="sm-theme-card-quote">"精品+竞争力"</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键指标</th></tr>
+              <tr><td>鸿蒙生态跨越临界点</td><td class="kpi-val">35万+应用 · 1,000万+开发者</td></tr>
+              <tr><td>五大核心场景深耕</td><td class="kpi-val">手机·平板·PC·穿戴·智行</td></tr>
+              <tr><td>小艺智能体持续升级</td><td class="kpi-val">AI全场景体验领先</td></tr>
+            </table>
+          </div>
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">🚗 智能汽车</span>
+              <span class="sm-theme-card-quote">"把智能带入每一辆车"</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键指标</th></tr>
+              <tr><td>乾崑智驾ADS4（WEWA架构）</td><td class="kpi-val">业界首个高速L3商用方案</td></tr>
+              <tr><td>引望正式运营</td><td class="kpi-val">智能汽车战略载体</td></tr>
+              <tr><td>生态共建</td><td class="kpi-val">140万+辆 · 市占率第一</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="sm-logic-bar">
+          <span class="sm-logic-icon">💡</span>
+          <span class="sm-logic-text"><strong>共性战略动作：</strong>① 开源开放、共建生态 ② 以质取胜、端到端高质量 ③ 全场景AI使能</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 因果箭头：学习成长 → 内部运营 -->
+    <div class="sm-causal-arrow">
+      <div class="sm-arrow-line" style="--from-color:#B86E00;--to-color:#722ed1">
+        <div class="sm-arrow-head" style="border-top-color:#722ed1"></div>
+      </div>
+      <div class="sm-arrow-label">（核心竞争力源自长期的研发投入、生态、人才与组织）</div>
+    </div>
+
+    <!-- ============ 第四层：学习与成长层面 ============ -->
+    <div class="sm-layer learning open" id="sm-learning">
+      <div class="sm-layer-header" onclick="toggleSMLayer('sm-learning')">
+        <div class="sm-layer-number">四</div>
+        <div class="sm-layer-title-group">
+          <div class="sm-layer-title">学习与成长层面（L） — 创新 · 生态 · 人才 · 组织，构筑可持续竞争壁垒</div>
+          <div class="sm-layer-subtitle">聚焦主航道创新 · 开源开放共建繁荣 · 奋斗进取充满活力 · 以质取胜</div>
+        </div>
+        <div class="sm-layer-toggle">▼</div>
+      </div>
+      <div class="sm-layer-body">
+        <div class="sm-theme-grid">
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">🔬 研究与创新</span>
+              <span class="sm-theme-card-quote">"聚焦主航道创新"</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键指标</th></tr>
+              <tr><td>持续将营收20%以上投入研发</td><td class="kpi-val">研发投入 <strong style="color:var(--sm-accent)">1,923亿</strong>（21.8%）<br><span style="font-size:9px;">近十年累计 1.38万亿</span></td></tr>
+              <tr><td>聚焦AI算法、通信、光技术等六大领域</td><td class="kpi-val">11.4万研发人员<br><span style="font-size:9px;">占员工 53.7%</span></td></tr>
+            </table>
+          </div>
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">🌐 生态建设</span>
+              <span class="sm-theme-card-quote">"开源开放，共建繁荣生态"</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键指标</th></tr>
+              <tr><td>鸿蒙/鲲鹏/昇腾/华为云全面开源</td><td class="kpi-val">开发者合计超 <strong style="color:var(--sm-accent)">2,200万</strong></td></tr>
+              <tr><td>"伙伴先成功，华为才能成功"</td><td class="kpi-val">59,000+合作伙伴<br>26,000+联合方案</td></tr>
+            </table>
+          </div>
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">👥 人才与组织</span>
+              <span class="sm-theme-card-quote">"奋斗进取、充满活力"</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键指标</th></tr>
+              <tr><td>"代表处审结"变革，精简机关</td><td class="kpi-val">21.3万员工<br>自主经营·独立担责</td></tr>
+              <tr><td>坚持"责任结果导向"获取分享制</td><td class="kpi-val">差异化激励机制<br>大平台+精兵队伍</td></tr>
+            </table>
+          </div>
+          <div class="sm-theme-card">
+            <div class="sm-theme-card-header">
+              <span class="sm-theme-card-title">🏅 质量文化</span>
+              <span class="sm-theme-card-quote">"以质取胜，端到端全面高质量"</span>
+            </div>
+            <table class="sm-kpi-table">
+              <tr><th>核心举措</th><th>关键指标</th></tr>
+              <tr><td>五维质量提升：产品/制造/服务/网络/经营</td><td class="kpi-val">端到端全面<br>高质量发展路线</td></tr>
+              <tr><td>ISO9000全面质量管理体系</td><td class="kpi-val">质量反追溯<br>与正向激励</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="sm-logic-bar">
+          <span class="sm-logic-icon">💡</span>
+          <span class="sm-logic-text"><strong>因果逻辑：</strong>研发创新是技术领先的根基 → 开放生态放大创新价值 → 人才与组织变革释放生产力 → 质量文化保障可持续发展。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="compliance-watermark">🔒 本页面所有操作均受 WORM 保护 · 保留至 2033-06-09 · 不可篡改 · 审计 ID: SESSION-AUD-20260609-001</div>
 </div>
+
 </main>
 
 <!-- V2砍掉: 品牌配置弹窗 — V1默认色做到无可挑剔
@@ -688,8 +1070,15 @@ function switchPage(p){
   document.getElementById('page-'+p).classList.add('active');
   // 导航高亮
   document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
-  document.getElementById(p==='cockpit'?'linkCockpit':'linkWorkbench').classList.add('active');
+  var navMap={cockpit:'linkCockpit',strategymap:'linkStrategyMap',workbench:'linkWorkbench'};
+  var linkId=navMap[p];
+  if(linkId)document.getElementById(linkId).classList.add('active');
   if(p==='workbench')buildWorkbench();
+}
+// v2.3 战略地图 — BSC四层折叠展开交互
+function toggleSMLayer(layerId){
+  var el=document.getElementById(layerId);if(!el)return;
+  el.classList.toggle('open');
 }
 function openBrand(){document.getElementById('brandOverlay').classList.add('show');document.getElementById('brandModal').classList.add('show')}
 function closeBrand(){document.getElementById('brandOverlay').classList.remove('show');document.getElementById('brandModal').classList.remove('show')}
@@ -2345,7 +2734,8 @@ function toggleDecisionEvidence(){
 document.addEventListener('keydown',function(e){
   const m=e.metaKey||e.ctrlKey;
   if(m&&e.key==='1'){e.preventDefault();switchPage('cockpit')}
-  if(m&&e.key==='2'){e.preventDefault();switchPage('workbench')}
+  if(m&&e.key==='2'){e.preventDefault();switchPage('strategymap')}
+  if(m&&e.key==='3'){e.preventDefault();switchPage('workbench')}
   // V2砍掉: 品牌配置快捷键
   // if(m&&e.key===','){e.preventDefault();openBrand()}
   if(e.key==='Escape'){closeBrand()}
