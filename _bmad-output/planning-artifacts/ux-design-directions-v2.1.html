@@ -590,8 +590,8 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
       <option>XX公司 2026 SP-BP</option><option>YY医疗 2025 战略复盘</option><option>ZZ集团 2026 市场进入</option>
     </select>
     <span class="nav-link active" onclick="switchPage('cockpit')" id="linkCockpit">🎯 决策舱</span>
-    <span class="nav-link" onclick="switchPage('strategymap')" id="linkStrategyMap">🗺️ 战略地图</span>
     <span class="nav-link" onclick="switchPage('workbench')" id="linkWorkbench">📐 工作台</span>
+    <span class="nav-link" onclick="switchPage('strategymap')" id="linkStrategyMap">🗺️ 战略地图</span>
   </div>
   <span class="nav-user">👤 乔布斯克</span>
 </nav>
@@ -2734,8 +2734,8 @@ function toggleDecisionEvidence(){
 document.addEventListener('keydown',function(e){
   const m=e.metaKey||e.ctrlKey;
   if(m&&e.key==='1'){e.preventDefault();switchPage('cockpit')}
-  if(m&&e.key==='2'){e.preventDefault();switchPage('strategymap')}
-  if(m&&e.key==='3'){e.preventDefault();switchPage('workbench')}
+  if(m&&e.key==='2'){e.preventDefault();switchPage('workbench')}
+  if(m&&e.key==='3'){e.preventDefault();switchPage('strategymap')}
   // V2砍掉: 品牌配置快捷键
   // if(m&&e.key===','){e.preventDefault();openBrand()}
   if(e.key==='Escape'){closeBrand()}
