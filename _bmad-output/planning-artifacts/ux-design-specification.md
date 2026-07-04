@@ -9,8 +9,8 @@ workflowType: ux-design
 projectName: sisys
 userName: Agimtech
 date: 2026-02-23
-lastRevised: 2026-07-03
-revisionFocus: "与 ux-design-prototype-v2.1 对齐 — 三页面驾驶舱（决策舱/工作台/战略地图）+ 物理仿真交互模型 + 三重置信度评分 + AI 代偿引擎"
+lastRevised: 2026-07-04
+revisionFocus: "与 ux-design-prototype-v2.1 对齐 — 三页面统一为华为2025战略叙事 + 推演沙盘华为量级适配 + calcScoresGeneric偏差驱动评分"
 documentStatus: revised
 ---
 
@@ -18,7 +18,7 @@ documentStatus: revised
 
 **Author:** Agimtech
 **Date:** 2026-02-23
-**Last Revised:** 2026-07-03（与 ux-design-prototype-v2.1 对齐）
+**Last Revised:** 2026-07-04（华为 2025 叙事统一 + 推演沙盘修复）
 **Version:** 2.0.0
 **Status:** Revised（与 HTML 样机 v2.1 对齐）
 **HTML 样机参考：** `_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html`
@@ -1596,10 +1596,12 @@ const sisysDesignTokens = {
 | **方向 5** | 数据驱动 | 财务龙卷风图、风险热力图、辩论时间线 | 自信 | P1 |
 | **方向 6** | 流程透明 | BLM/BEM 阶段进度、Checkpoint 审批、任务依赖 | 安心感 | P1 |
 
-**HTML 样机已生成：**
-- 当前版本：`_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html`（v2.1，2026-06-09）
-- 历史版本：`_bmad-output/planning-artifacts/ux-design-directions.html`（v0.1，已归档）
-- v2.1 包含内容：决策舱（总览仪表盘 + 决策卡片轮播 + 三重置信度评分 + 物理仿真滑块 + AI 代偿面板 + SP→BP 解码追溯带）、工作台（七步证据树 + 辩论室 + 推演沙盘 + 情景切换）、战略地图（BSC 四层瀑布流 + 因果箭头）、键盘快捷键 + 移动端响应式
+**HTML 样机 v2.1：**
+- 文件位置：`_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html`
+- 演示场景：华为 2025 年度战略规划（SP-BP），基于华为 2025 年报真实数据
+- 5 张决策卡：Cloud&AI BG 扭亏 / 芯片供应链韧性 / 现金流与债务风险 / 企业BG数字化转型 / 智能汽车BU盈利路径
+- 48 条证据覆盖 SP[1-6]/BP[1-6]/EM[1-3] 全 15 工序，数据来源标注华为 2025 年报/IDC/GSMA/Gartner
+- 三页面数据闭环：战略地图（BSC 四层）→决策舱（推演+AI 代偿）→工作台（证据聚合+辩论追溯），全部引用同一数据源
 
 ---
 

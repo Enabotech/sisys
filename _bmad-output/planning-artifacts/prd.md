@@ -4,7 +4,7 @@ workflowType: 'prd'
 projectName: 'sisys'
 userName: 'Agimtech'
 date: '2026-02-22'
-lastUpdated: '2026-07-03'
+lastUpdated: '2026-07-04'
 documentStatus: 'complete'
 uxAlignVersion: 'ux-design-prototype-v2.1'
 ---
@@ -1908,7 +1908,7 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 
 ### 6. 用户交互与报告（UI - User Interaction）[or.md 六.1-六.14]
 
-**模块核心使命：** 用户交互模块承载 sisys 三页面驾驶舱的全部前端能力——决策舱（战略推演与 AI 代偿）、工作台（证据树与辩论追溯）、战略地图（BSC 四层瀑布流）。所有 UI 组件遵循物理仿真交互模型（滑块惯性/notch 吸附/评分四阶段动画）和渐进式信息披露原则（折叠→展开→深入工作台）。**UX 样机参考：** `_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html`。
+**模块核心使命：** 用户交互模块承载 sisys 三页面驾驶舱的全部前端能力——决策舱（战略推演与 AI 代偿）、工作台（证据树与辩论追溯）、战略地图（BSC 四层瀑布流）。所有 UI 组件遵循物理仿真交互模型（滑块惯性/notch 吸附/评分四阶段动画）和渐进式信息披露原则（折叠→展开→深入工作台）。**UX 样机参考：** `_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html`（演示场景：华为 2025 SP-BP，5 张决策卡+48 条证据+三页面数据闭环）。
 
 **共享数据层 — PARAM_REGISTRY 参数注册表：**
 决策舱与工作台共享统一的参数定义体系（`PARAM_REGISTRY`），包含 26 个参数，按 6 个 tier 分类：
