@@ -587,7 +587,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
   <div class="nav-brand">🎯 sisys</div>
   <div class="nav-center">
     <select class="nav-project" id="navProject" onchange="showToast('已切换项目','info')">
-      <option>XX公司 2026 SP-BP</option><option>YY医疗 2025 战略复盘</option><option>ZZ集团 2026 市场进入</option>
+      <option>华为 2025 SP-BP</option><option>华为 2026 战略刷新</option><option>华为 Cloud&AI 战略聚焦</option>
     </select>
     <span class="nav-link active" onclick="switchPage('cockpit')" id="linkCockpit">🎯 决策舱</span>
     <span class="nav-link" onclick="switchPage('workbench')" id="linkWorkbench">📐 工作台</span>
@@ -604,7 +604,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
   <div class="cockpit-header">
     <h1 class="cockpit-title">决策舱</h1>
     <p class="cockpit-subtitle">拖动决策卡中的滑块探索不同情景——AI高管团实时响应</p>
-    <p class="cockpit-meta">最后更新：2026-06-09 09:15 · <span style="cursor:pointer;color:var(--color-primary);" onclick="showToast('数据已刷新','info')">🔄 刷新</span></p>
+    <p class="cockpit-meta">最后更新：2026-06-09 09:15 · 华为2025年报数据 · <span style="cursor:pointer;color:var(--color-primary);" onclick="showToast('数据已刷新','info')">🔄 刷新</span></p>
   </div>
 
   <!-- v2.2 新增：总览层主屏 -->
@@ -642,7 +642,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
      ============================================================ -->
 <div class="page" id="page-workbench">
   <div class="workbench-toolbar">
-    <span style="font-size:14px;font-weight:600;">战略工作台 · XX公司 2026 SP-BP</span>
+    <span style="font-size:14px;font-weight:600;">战略工作台 · 华为 2025 SP-BP</span>
     <span style="font-size:12px;color:var(--color-text-tertiary);">🟢 推演引擎就绪</span>
   </div>
   <div class="workbench-layout" id="workbenchLayout">
@@ -1429,126 +1429,121 @@ class AICompensation {
 // 决策卡片数据定义
 // ============================================================
 const DECISION_DEFS = [
-  // #1 SC-3 现金流危机 — SP↓ BP↓ EM↓ 全部红色
+  // #1 Cloud&AI BG 扭亏为盈 — 收入65%达成，偏差-35%，RED
   {
-    id:'sc3', urgency:'urgent', icon:'🔴', tag:'紧急', title:'SC-3 现金流与投资回报危机',
-    summary:'现金流压力极高 · 回收期5.8年 · ROI持续恶化',
+    id:'cloud', urgency:'urgent', icon:'🔴', tag:'紧急', title:'Cloud&AI BG 扭亏为盈',
+    summary:'收入达成仅65% · 利润60% · 研发预算超支28% · 云业务面临头部厂商挤压',
     spBpMapping:[
-      {bpId:'bp12',csf:'CSF-1 财务健康',kpi:'KPI-1.1 现金流安全垫',target:'≥3个月',weight:0.5},
-      {bpId:'bp14',csf:'CSF-6 运营效率',kpi:'KPI-6.2 成本优化率',target:'降本30%',weight:0.3},
-      {bpId:'bp11',csf:'CSF-2 产品竞争力',kpi:'KPI-2.2 研发ROI',target:'≥2.5',weight:0.2}
+      {bpId:'bp11',csf:'CSF-1 技术领先',kpi:'KPI-1.1 AI算力市场份额',target:'≥15%',weight:0.4},
+      {bpId:'bp12',csf:'CSF-3 生态繁荣',kpi:'KPI-3.1 开发者数量',target:'≥1,200万',weight:0.3},
+      {bpId:'bp14',csf:'CSF-6 运营效率',kpi:'KPI-6.1 云服务毛利率',target:'≥45%',weight:0.3}
     ],
-    staleData:[{label:'现金流预测报告',freshness:'过期12个月',desc:'2025Q1现金流模型'}],
-    options:['紧急融资','💡 砍边缘业务保核心（AI推荐）'],
-    baseScores:{direction:0.35, decode:0.42, execution:0.28},
+    staleData:[{label:'云服务市场份额报告',freshness:'过期9个月',desc:'2025Q3 IDC云市场追踪'}],
+    options:['维持投入','💡 聚焦AI算力+砍边缘云服务（AI推荐）'],
+    baseScores:{direction:0.42, decode:0.55, execution:0.30},
     maxScores:{direction:1, decode:1, execution:1},
     sliders:[
-      {key:'cashflow',paramKey:'cashflow_risk',label:'现金流\n压力',min:1,max:5,value:4,step:1,formatValue:v=>({1:'极低',2:'低',3:'中',4:'高',5:'极高'})[v],suffix:'',reverseGradient:true,notches:[{value:2,aiRec:true},{value:4}],warnBelow:0,dangerBelow:0},
-      {key:'payback',paramKey:'payback_years',label:'投资回\n收期',min:1,max:7,value:5.8,step:0.1,formatValue:v=>v.toFixed(1)+'年',suffix:'',reverseGradient:true,notches:[{value:3.5,aiRec:true},{value:5}],warnBelow:4,dangerBelow:5},
-      {key:'mkt_growth',label:'市场\n增速',min:0,max:25,value:6,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
-      {key:'rd_budget',paramKey:'rd_budget',label:'研发\n预算',min:0.5,max:3.0,value:0.8,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.2}],warnBelow:1.2,dangerBelow:0.8}
+      {key:'rd_budget',paramKey:'rd_budget',label:'Cloud&AI\n研发投入',min:50,max:500,value:320,step:10,formatValue:v=>'¥'+v+'亿',suffix:'亿',notches:[{value:200,aiRec:true},{value:350}],warnBelow:200,dangerBelow:150},
+      {key:'mkt_growth',label:'云市场\n增速',min:0,max:40,value:18,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:25,aiRec:true},{value:15}],warnBelow:15,dangerBelow:10},
+      {key:'hc_gap',paramKey:'hc_gap',label:'AI人才\n缺口',min:0,max:500,value:280,step:10,formatValue:v=>v===0?'无缺口':v+'人',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:200}],warnBelow:150,dangerBelow:300},
+      {key:'talent_pool',label:'人才市场\n热度',min:0,max:100,value:45,step:5,formatValue:v=>v+'分',suffix:'分',notches:[{value:70,aiRec:true},{value:40}],warnBelow:40,dangerBelow:25}
     ],
     calcScores:function(sliders){
-      // direction: 市场增速↑好, 现金流低压↑好, 回收期短↑好 → 默认0.40 最优0.92
-      const dir=clamp(0.30+(sliders.mkt_growth-6)*0.015+(5-sliders.cashflow)*0.08+(7-sliders.payback)*0.02,0,1);
-      // decode: 研发>1.5+0.15, 现金流<2+0.12, 回收期<4+0.10 → 最优0.87 最差0.42
-      const dec=clamp(0.50+(sliders.rd_budget>1.5?0.15:0)+(sliders.cashflow<2?0.12:0)+(sliders.payback<4?0.10:0),0,1);
-      const exec=clamp((25+(sliders.rd_budget-0.8)*20+(5-sliders.cashflow)*8+(7-sliders.payback)*6+(sliders.mkt_growth-6)*1.5)/100,0,1);
+      const dir=clamp(0.35+(sliders.mkt_growth-18)*0.012+(sliders.talent_pool-45)*0.004,0,1);
+      const dec=clamp(0.45+(sliders.rd_budget>250?0.12:0)+(sliders.hc_gap<200?0.10:0)+(sliders.talent_pool>60?0.08:0),0,1);
+      const exec=clamp((25+(sliders.rd_budget-320)*0.08+(300-sliders.hc_gap)*0.06+(sliders.mkt_growth-18)*1.5+(sliders.talent_pool-45)*0.4)/100,0,1);
       return{direction:dir,decode:dec,execution:exec};
     },
   },
-  // #2 SC-4 市场进入策略 — SP琥珀, 其余绿
+  // #2 芯片供应链韧性 — 美国BIS出口管制
   {
-    id:'sc4', urgency:'urgent', icon:'🟠', tag:'紧急', title:'SC-4 市场进入策略',
-    summary:'进入方式：自建渠道 vs 合资探索 · CEO/CFO/CTO严重分歧',
+    id:'chip', urgency:'urgent', icon:'🚨', tag:'紧急', title:'芯片供应链韧性',
+    summary:'美国BIS出口管制升级 · A100/H100禁售扩至AI算力 · 昇腾替代窗口紧迫',
+    spAnchor:{spId:'cloud',spTitle:'Cloud&AI BG 扭亏为盈',csf:'CSF-6 运营效率',kpi:'KPI-6.3 供应链安全指数',target:'国产化率≥70%',weight:0.4},
+    staleData:[{label:'芯片供应商评估',freshness:'过期6个月',desc:'2025Q4半导体供应链报告'}],
+    options:['维持现有供应商','💡 昇腾集群+国产替代加速（AI推荐）'],
+    baseScores:{direction:0.55, decode:0.62, execution:0.25},
+    maxScores:{direction:1, decode:1, execution:1},
+    sliders:[
+      {key:'localization',label:'芯片国产\n化率',min:0,max:100,value:35,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:70,aiRec:true},{value:50}],warnBelow:40,dangerBelow:25},
+      {key:'supply',paramKey:'supply_cost',label:'供应链\n替代成本',min:50,max:500,value:380,step:10,formatValue:v=>'¥'+v+'亿',suffix:'亿',reverseGradient:true,notches:[{value:200,aiRec:true},{value:300}],warnBelow:0,dangerBelow:0},
+      {key:'launch',paramKey:'launch_cycle',label:'替代方案\n落地周期',min:6,max:36,value:24,step:1,formatValue:v=>v+'个月',suffix:'',reverseGradient:true,notches:[{value:12,aiRec:true},{value:18}],warnBelow:0,dangerBelow:0}
+    ],
+    calcScores:function(sliders){
+      const dir=clamp(0.50+(sliders.localization-35)*0.008,0,1);
+      const dec=clamp(0.55+(sliders.supply<250?0.12:0)+(sliders.launch<15?0.10:0),0,1);
+      const exec=clamp((20+(500-sliders.supply)*0.1+(36-sliders.launch)*2.5+(sliders.localization-35)*0.6)/100,0,1);
+      return{direction:dir,decode:dec,execution:exec};
+    },
+  },
+  // #3 现金流与债务风险
+  {
+    id:'cash', urgency:'urgent', icon:'🔴', tag:'紧急', title:'现金流与债务风险管理',
+    summary:'现金储备下降26% · 资产负债率62.8%超警戒 · 经营现金流虽增44%但投资支出同步扩大',
     spBpMapping:[
-      {bpId:'bp11',csf:'CSF-3 市场覆盖面',kpi:'KPI-3.1 三甲覆盖率',target:'30家',weight:0.4},
-      {bpId:'bp12',csf:'CSF-3 市场覆盖面',kpi:'KPI-3.2 签约数',target:'28家',weight:0.3},
-      {bpId:'bp13',csf:'CSF-4 人才保障',kpi:'KPI-4.1 学科带头人数',target:'5名',weight:0.3}
+      {bpId:'bp11',csf:'CSF-1 财务健康',kpi:'KPI-1.1 现金储备覆盖月数',target:'≥12个月',weight:0.5},
+      {bpId:'bp14',csf:'CSF-6 运营效率',kpi:'KPI-6.2 资产负债率',target:'≤60%',weight:0.3},
+      {bpId:'bp12',csf:'CSF-3 投资效率',kpi:'KPI-3.3 研发投入产出比',target:'≥2.5',weight:0.2}
     ],
-    staleData:[{label:'技术趋势报告',freshness:'过期18个月',desc:'AI+国产替代双驱动（2024Q2行业白皮书）'}],
-    options:['激进进入','💡 合资探索（AI推荐）'],
-    baseScores:{direction:0.52, decode:0.95, execution:0.85},
+    staleData:[{label:'现金流预测模型',freshness:'过期6个月',desc:'2025Q3现金流预测'}],
+    options:['维持现有投资节奏','💡 优化资本结构+加速应收回收（AI推荐）'],
+    baseScores:{direction:0.48, decode:0.58, execution:0.38},
     maxScores:{direction:1, decode:1, execution:1},
     sliders:[
-      {key:'cagr',paramKey:'mkt_growth',label:'年复合\n增长率',min:0,max:30,value:6,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
-      {key:'comp',paramKey:'comp_lead',label:'竞品提\n前时间',min:0,max:6,value:2,step:1,formatValue:v=>v===0?'正常':v+'个月',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:3}],warnBelow:0,dangerBelow:0},
-      {key:'budget',paramKey:'rd_budget',label:'研发\n预算',min:0.5,max:3.0,value:2.0,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.5}],warnBelow:1.2,dangerBelow:0.8},
-      {key:'hc',paramKey:'hc_gap',label:'人才\n缺口',min:0,max:50,value:0,step:5,formatValue:v=>v===0?'无缺口':v+'人',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:20}],warnBelow:10,dangerBelow:20}
+      {key:'cashflow',paramKey:'cashflow_risk',label:'现金流\n压力',min:1,max:5,value:3,step:1,formatValue:v=>({1:'极低',2:'低',3:'中',4:'高',5:'极高'})[v],suffix:'',reverseGradient:true,notches:[{value:2,aiRec:true},{value:4}],warnBelow:0,dangerBelow:0},
+      {key:'payback',paramKey:'payback_years',label:'战略投资\n回收期',min:1,max:10,value:6.5,step:0.5,formatValue:v=>v.toFixed(1)+'年',suffix:'',reverseGradient:true,notches:[{value:4,aiRec:true},{value:6}],warnBelow:5,dangerBelow:7},
+      {key:'rd_budget',paramKey:'rd_budget',label:'研发投入\n占比',min:15,max:30,value:21.8,step:0.5,formatValue:v=>v.toFixed(1)+'%',suffix:'%',notches:[{value:20,aiRec:true},{value:25}],warnBelow:18,dangerBelow:15}
     ],
     calcScores:function(sliders){
-      // 来源说明: 0.92基准→行业均值; 0.018→麦肯锡2025战略规划调研(增速弹性); 0.045→历史回归(2020-2025竞争数据,竞品月领先影响因子)
-      const dir=clamp(0.92-(15-sliders.cagr)*0.018-(sliders.comp*0.045),0,1);
-      const dec=clamp(1.0-(sliders.budget<1.5?0.08:0)-(sliders.hc>20?0.05:0),0,1);
-      const exec=clamp((95-(2.0-sliders.budget)*28-(sliders.hc*0.75))/100,0,1);
+      const dir=clamp(0.40+(5-sliders.cashflow)*0.10+(10-sliders.payback)*0.03,0,1);
+      const dec=clamp(0.50+(sliders.cashflow<3?0.15:0)+(sliders.payback<5?0.12:0)+(sliders.rd_budget>=20?0.08:0),0,1);
+      const exec=clamp((30+(5-sliders.cashflow)*12+(10-sliders.payback)*5+(sliders.rd_budget-21.8)*2)/100,0,1);
       return{direction:dir,decode:dec,execution:exec};
     },
   },
-  // #3 BP14 供应链中断风险 — EM红色, 其余绿
+  // #4 企业BG数字化转型
   {
-    id:'bp14', urgency:'urgent', icon:'🚨', tag:'紧急', title:'举措 1.4 供应链韧性',
-    summary:'供应链成本失控 · 上市周期18个月 · 国产替代不足',
-    spAnchor:{spId:'sc4',spTitle:'SC-4 市场进入策略',csf:'CSF-6 运营效率',kpi:'KPI-6.1 供应链成本指数',target:'<¥1.5亿',weight:0.4},
-    staleData:[{label:'供应商成本基准',freshness:'过期9个月',desc:'2025供应链审计报告'}],
-    options:['维持现状','💡 竞价谈判+国产替代（AI推荐）'],
-    baseScores:{direction:0.88, decode:0.80, execution:0.32},
+    id:'ent', urgency:'pending', icon:'🟠', tag:'待定', title:'企业BG 数字化转型加速',
+    summary:'收入达成78% · 59,000+合作伙伴但数字化协同不足 · 500+行业场景亟待平台化',
+    spAnchor:{spId:'cloud',spTitle:'Cloud&AI BG 扭亏为盈',csf:'CSF-3 生态繁荣',kpi:'KPI-3.2 伙伴数字化率',target:'≥80%',weight:0.4},
+    staleData:[{label:'伙伴数字化成熟度评估',freshness:'过期9个月',desc:'2025Q3伙伴调研'}],
+    options:['逐步推进','💡 平台化+AI赋能伙伴（AI推荐）'],
+    baseScores:{direction:0.82, decode:0.50, execution:0.65},
     maxScores:{direction:1, decode:1, execution:1},
     sliders:[
-      {key:'supply',paramKey:'supply_cost',label:'供应链\n成本',min:0.5,max:3.0,value:2.5,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',reverseGradient:true,notches:[{value:1.2,aiRec:true},{value:2.0}],warnBelow:0,dangerBelow:0},
-      {key:'launch',paramKey:'launch_cycle',label:'上市\n周期',min:6,max:24,value:22,step:1,formatValue:v=>v+'个月',suffix:'',reverseGradient:true,notches:[{value:12,aiRec:true},{value:18}],warnBelow:0,dangerBelow:0},
-      {key:'localization',label:'国产替\n代率',min:0,max:100,value:30,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:60,aiRec:true},{value:40}],warnBelow:35,dangerBelow:20}
+      {key:'channel_cov',label:'伙伴数字\n化覆盖率',min:0,max:100,value:42,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:80,aiRec:true},{value:55}],warnBelow:50,dangerBelow:30},
+      {key:'mkt_growth',label:'企业数字\n化市场增速',min:0,max:35,value:22,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:25,aiRec:true},{value:15}],warnBelow:15,dangerBelow:8},
+      {key:'budget2',paramKey:'rd_budget',label:'数字化\n预算',min:10,max:200,value:45,step:5,formatValue:v=>'¥'+v+'亿',suffix:'亿',notches:[{value:80,aiRec:true},{value:50}],warnBelow:40,dangerBelow:25},
+      {key:'hc',paramKey:'hc_gap',label:'数字化\n人才缺口',min:0,max:300,value:120,step:10,formatValue:v=>v===0?'无缺口':v+'人',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:100}],warnBelow:80,dangerBelow:150}
     ],
     calcScores:function(sliders){
-      const dir=clamp(0.88+(sliders.localization-30)*0.002,0,1);
-      const dec=clamp(0.80+(sliders.supply<1.5?0.1:0)+(sliders.launch<12?0.05:0),0,1);
-      const exec=clamp((32+(3.0-sliders.supply)*30+(24-sliders.launch)*4+(sliders.localization-30)*0.6)/100,0,1);
+      const dir=clamp(0.82+(sliders.mkt_growth-22)*0.01,0,1);
+      const dec=clamp(0.42+(sliders.channel_cov>60?0.15:0)+(sliders.channel_cov>80?0.10:0)+(sliders.budget2>80?0.10:0)+(sliders.budget2>120?0.07:0),0,1);
+      const exec=clamp((60+(sliders.channel_cov-42)*0.5+(sliders.budget2-45)*0.15-(sliders.hc*0.15))/100,0,1);
       return{direction:dir,decode:dec,execution:exec};
     },
   },
-  // #4 BP12 数字化渠道建设 — BP琥珀, 其余绿
+  // #5 智能汽车BU 盈利路径
   {
-    id:'bp12', urgency:'pending', icon:'📡', tag:'待定', title:'举措 1.2 数字化渠道建设',
-    summary:'渠道覆盖率仅45% · 预算不足 · 数字化团队缺口15人',
-    spAnchor:{spId:'sc1',spTitle:'SC-1 高端医疗设备市场领先',csf:'CSF-3 市场覆盖面',kpi:'KPI-3.2 签约数',target:'28家',weight:0.3},
-    staleData:[{label:'数字化营销ROI基准',freshness:'过期6个月',desc:'2025Q4营销效率报告'}],
-    options:['逐步推进','💡 渠道闪电战+SaaS工具（AI推荐）'],
-    baseScores:{direction:0.90, decode:0.48, execution:0.8},
-    maxScores:{direction:1, decode:1, execution:1},
-    sliders:[
-      {key:'channel_cov',label:'渠道覆\n盖率',min:0,max:100,value:45,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:80,aiRec:true},{value:50}],warnBelow:50,dangerBelow:30},
-      {key:'mkt_growth2',paramKey:'mkt_growth',label:'市场\n增速',min:0,max:25,value:14,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:8}],warnBelow:10,dangerBelow:5},
-      {key:'budget2',paramKey:'rd_budget',label:'数字化\n预算',min:0.5,max:3.0,value:1.0,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.2}],warnBelow:1.2,dangerBelow:0.8},
-      {key:'hc',paramKey:'hc_gap',label:'人才\n缺口',min:0,max:50,value:15,step:5,formatValue:v=>v===0?'无缺口':v+'人',suffix:'',reverseGradient:true,notches:[{value:0,aiRec:true},{value:20}],warnBelow:10,dangerBelow:20}
-    ],
-    calcScores:function(sliders){
-      const dir=clamp(0.90+(sliders.mkt_growth2-14)*0.015,0,1);
-      // decode: 渠道>60+0.12, >80+0.08, 预算>1.5+0.08, >2.0+0.06 → 最优0.89 最差0.55
-      const dec=clamp(0.55+(sliders.channel_cov>60?0.12:0)+(sliders.channel_cov>80?0.08:0)+(sliders.budget2>1.5?0.08:0)+(sliders.budget2>2.0?0.06:0),0,1);
-      const exec=clamp((80+(sliders.channel_cov-45)*0.4+(sliders.budget2-1.0)*20-(sliders.hc*0.5))/100,0,1);
-      return{direction:dir,decode:dec,execution:exec};
-    },
-  },
-  {
-    id:'sc1', urgency:'stable', icon:'📌', tag:'稳定', title:'SC-1 高端医疗设备市场领先',
-    summary:'全票通过 · 市场前景确认 · 按原计划推进',
+    id:'car', urgency:'stable', icon:'📌', tag:'稳定', title:'智能汽车BU 从规模到盈利',
+    summary:'收入增长200% · 140万+辆搭载 · 市占率第一 · 乾崑智驾ADS4业界首个高速L3 · 盈利路径待验证',
     spBpMapping:[
-      {bpId:'bp11',csf:'CSF-1 产品竞争力',kpi:'KPI-1.1 专利数',target:'3项',weight:0.4},
-      {bpId:'bp12',csf:'CSF-3 市场覆盖面',kpi:'KPI-3.2 签约数',target:'28家',weight:0.3},
-      {bpId:'bp13',csf:'CSF-4 人才保障',kpi:'KPI-4.1 学科带头人数',target:'5名',weight:0.3}
+      {bpId:'bp11',csf:'CSF-2 产品竞争力',kpi:'KPI-2.1 智驾方案搭载量',target:'≥200万辆',weight:0.4},
+      {bpId:'bp12',csf:'CSF-3 生态建设',kpi:'KPI-3.4 引望合作伙伴数',target:'≥15家',weight:0.3},
+      {bpId:'bp13',csf:'CSF-4 人才保障',kpi:'KPI-4.2 智驾算法人才',target:'≥800人',weight:0.3}
     ],
     options:['按原计划推进','微调资源配置'],
-    baseScores:{direction:0.92, decode:0.98, execution:0.88},
+    baseScores:{direction:0.94, decode:0.88, execution:0.78},
     maxScores:{direction:1, decode:1, execution:1},
     sliders:[
-      {key:'mkt_growth',label:'市场\n增速',min:0,max:25,value:15,step:1,formatValue:v=>v+'%',suffix:'%',notches:[{value:15,aiRec:true},{value:10}],warnBelow:10,dangerBelow:5},
-      {key:'localization',label:'国产替\n代率',min:0,max:100,value:55,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:60,aiRec:true},{value:40}],warnBelow:35,dangerBelow:20},
-      {key:'rd_invest',label:'研发\n投入',min:0.5,max:3.0,value:2.0,step:0.1,formatValue:v=>'¥'+v.toFixed(1)+'亿',suffix:'亿',notches:[{value:2.0,aiRec:true},{value:1.2}],warnBelow:1.0,dangerBelow:0.7}
+      {key:'mkt_growth',label:'智驾市场\n增速',min:0,max:50,value:35,step:5,formatValue:v=>v+'%',suffix:'%',notches:[{value:30,aiRec:true},{value:20}],warnBelow:20,dangerBelow:10},
+      {key:'comp',paramKey:'comp_lead',label:'竞品追赶\n时间',min:0,max:24,value:6,step:1,formatValue:v=>v===0?'无威胁':v+'个月',suffix:'',reverseGradient:true,notches:[{value:12,aiRec:true},{value:6}],warnBelow:0,dangerBelow:0},
+      {key:'rd_invest',label:'智驾研发\n投入',min:20,max:200,value:85,step:5,formatValue:v=>'¥'+v+'亿',suffix:'亿',notches:[{value:100,aiRec:true},{value:60}],warnBelow:60,dangerBelow:40}
     ],
     calcScores:function(sliders){
-      // 来源: 0.92基准→行业均值; 0.015→市场增速弹性(麦肯锡2025); 0.001→国产替代率弱影响因子
-      const dir=clamp(0.92-(15-sliders.mkt_growth)*0.015+(sliders.localization-55)*0.001,0,1);
-      const dec=clamp(0.98-(sliders.rd_invest<1.5?0.06:0),0,1);
-      const exec=clamp((88+(sliders.mkt_growth-15)*1.2+(sliders.localization-55)*0.3+(sliders.rd_invest-2.0)*15)/100,0,1);
+      const dir=clamp(0.94-(35-sliders.mkt_growth)*0.003-(sliders.comp*0.008),0,1);
+      const dec=clamp(0.88-(sliders.rd_invest<80?0.06:0),0,1);
+      const exec=clamp((78+(sliders.mkt_growth-35)*0.5+(24-sliders.comp)*1.5+(sliders.rd_invest-85)*0.15)/100,0,1);
       return{direction:dir,decode:dec,execution:exec};
     },
   }
@@ -1656,35 +1651,35 @@ function buildCockpit(){
     // 生成50点种子趋势数据 — 五张卡片各自叙事
     var ss=[],bs=[],es=[];
     for(var si=0;si<50;si++){var t=si/49;
-      if(d.id==='sc3'){
-        // 叙事: 持续恶化→全线红色 (L形探底)
-        ss.push(Math.round((0.45-t*0.2)*100)/100);
-        bs.push(Math.round((0.52-t*0.18)*100)/100);
-        es.push(Math.round(40-t*25)/100);
-      }else if(d.id==='sc4'){
-        // 叙事: 曾经绿色→跌入琥珀→当前缓慢恢复
-        var sp=t<0.7?0.65-t*0.2:0.51+(t-0.7)*0.03;
+      if(d.id==='cloud'){
+        // 叙事: Cloud&AI BG扭亏 — L形探底后缓慢恢复
+        ss.push(Math.round((0.52-t*0.18)*100)/100);
+        bs.push(Math.round((0.60-t*0.10)*100)/100);
+        es.push(Math.round(40-t*18)/100);
+      }else if(d.id==='chip'){
+        // 叙事: 芯片供应链韧性 — 持续恶化→近期加速下跌
+        var sp=t<0.6?0.65-t*0.18:0.54+(t-0.6)*0.02;
         ss.push(Math.round(sp*100)/100);
-        bs.push(1.0);
-        var em=t<0.7?95-t*15:84.5+(t-0.7)*1.7;
+        bs.push(Math.round((0.72-t*0.15)*100)/100);
+        var em=t<0.7?35-t*12:26.6+(t-0.7)*3;
         es.push(Math.round(em)/100);
-      }else if(d.id==='bp14'){
-        // 叙事: 成本陡升→执行分崩溃→最近触底
-        var bd=0.92-t*0.13;
+      }else if(d.id==='cash'){
+        // 叙事: 现金流风险 — 缓慢恶化→加速下行
+        var bd=0.58-t*0.18;
         ss.push(Math.round(bd*100)/100);
-        bs.push(Math.round((0.88-t*0.1)*100)/100);
-        var bed=t<0.85?40-t*10:31.5+(t-0.85)*3.3;
+        bs.push(Math.round((0.65-t*0.12)*100)/100);
+        var bed=t<0.85?48-t*12:37.8+(t-0.85)*2;
         es.push(Math.round(bed)/100);
-      }else if(d.id==='bp12'){
-        // 叙事: 渠道缓慢爬升→解码分低迷→最近改善
-        ss.push(Math.round((0.88+t*0.02)*100)/100);
-        bs.push(Math.round((0.40+t*0.12+t*t*0.06)*100)/100);
-        es.push(Math.round(78+t*4)/100);
+      }else if(d.id==='ent'){
+        // 叙事: 企业BG数字化 — 渠道低迷→近期改善
+        ss.push(Math.round((0.80+t*0.03)*100)/100);
+        bs.push(Math.round((0.38+t*0.15+t*t*0.08)*100)/100);
+        es.push(Math.round(62+t*5)/100);
       }else{
-        // SC-1 叙事: 稳定健康，微幅上行
-        ss.push(Math.round((0.91+t*0.01)*100)/100);
-        bs.push(0.98);
-        es.push(Math.round(86+t*2)/100);
+        // 智能汽车BU 叙事: 高速增长，稳定上行
+        ss.push(Math.round((0.93+t*0.02)*100)/100);
+        bs.push(Math.round((0.86+t*0.02)*100)/100);
+        es.push(Math.round(76+t*3)/100);
       }
     }
     for(var si=0;si<50;si++)tPush(d.id,ss[si],bs[si],es[si])
@@ -1746,10 +1741,10 @@ function renderDashboard(){
   var totalNpv=count*1.2; // 模拟: 每项决策约¥1.2亿NPV
   var avgIrr=18+Math.round(avgExec/10);
   var totalBudget=count*1.5;
-  finDiv.innerHTML='<div class="dash-metric-row"><span>组合 NPV</span><span class="dash-metric-val up">¥'+totalNpv.toFixed(1)+'亿</span></div>'+
+  finDiv.innerHTML='<div class="dash-metric-row"><span>组合 NPV</span><span class="dash-metric-val up">¥'+(totalNpv*100).toFixed(0)+'亿</span></div>'+
     '<div class="dash-metric-row"><span>加权 IRR</span><span class="dash-metric-val up">'+avgIrr+'%</span></div>'+
-    '<div class="dash-metric-row"><span>总预算需求</span><span class="dash-metric-val">¥'+totalBudget.toFixed(1)+'亿</span></div>'+
-    '<div class="dash-metric-row"><span>投资回收期（均值）</span><span class="dash-metric-val">3.8年</span></div>'+
+    '<div class="dash-metric-row"><span>总预算需求</span><span class="dash-metric-val">¥'+(totalBudget*100).toFixed(0)+'亿</span></div>'+
+    '<div class="dash-metric-row"><span>投资回收期（均值）</span><span class="dash-metric-val">4.5年</span></div>'+
     '<div class="dash-metric-row"><span>财务量化覆盖率</span><span class="dash-metric-val up">100%</span></div>';
 
   // 风险概览
@@ -1858,30 +1853,30 @@ function renderKpiDashboard(){
   var container=document.getElementById('kpiGrid');if(!container)return;
   // 月度趋势数据（最近8个月）
   var T={
-    revenue:   [398,405,412,418,422,425,427,427.5],
-    profit:    [52,55,57,58.5,59.8,60.5,61,61.2],
-    rdRatio:   [21.8,21.5,21.3,21.1,21.0,20.9,20.8,20.8],
-    cashflow:  [35,36,34,32,33,35,37,38.5],
-    perCapita: [150,149,148,147,146,145,143.5,142.5],
-    opMargin:  [15.0,14.5,14.1,13.6,13.2,12.8,12.5,12.3],
-    debtRatio: [52,53,55,57,59,60.5,61.5,62.8],
-    strRev:    [42,43,45,47,49,50,51,52],
-    cashBal:   [62,60,58,55,52,50,48,46],
-    nps:       [75,73,71,68,66,64,63,61]
+    revenue:   [8450,8510,8580,8620,8700,8750,8790,8809],
+    profit:    [580,595,610,625,640,655,670,680],
+    rdRatio:   [22.3,22.1,22.0,21.9,21.8,21.8,21.8,21.8],
+    cashflow:  [980,1020,1050,1100,1150,1200,1240,1274],
+    perCapita: [420,418,417,416,415,414,413.5,413],
+    opMargin:  [9.2,9.5,9.8,10.2,10.5,10.8,10.9,11.0],
+    debtRatio: [55,56,57,58,59,60.5,61.5,62.8],
+    strRev:    [40,42,44,46,48,50,53,55],
+    cashBal:   [3950,3880,3800,3750,3700,3660,3630,3614],
+    nps:       [78,77,76,75,74,73,72,72]
   };
   var kpis=[
     // === 第1行 ===
-    {id:'revenue',  label:'全球销售收入',  val:427.5, target:520,  unit:'¥亿', sub:'目标 ¥520亿',         color:'#1890ff'},
-    {id:'profit',   label:'净利润',        val:61.2,  target:85,   unit:'¥亿', sub:'净利率 14.3%',         color:'#1890ff'},
-    {id:'rdRatio',  label:'研发投入占比',  val:20.8,  target:21.8, unit:'%',   sub:'承诺值 21.8%',         color:'#722ed1'},
-    {id:'cashflow', label:'经营性现金流',  val:45.2,  target:null, unit:'¥亿', sub:'储备覆盖7.3月',         color:'#00875A'},
-    {id:'perCapita',label:'人均产出',      val:142.5, target:148,  unit:'¥万', sub:'员工 3000人',          color:'#B86E00'},
+    {id:'revenue',  label:'全球销售收入',  val:8809,  target:9000, unit:'¥亿', sub:'同比 ↑2.2%',           color:'#1890ff'},
+    {id:'profit',   label:'净利润',        val:680,   target:720,  unit:'¥亿', sub:'净利率 7.7%',          color:'#1890ff'},
+    {id:'rdRatio',  label:'研发投入占比',  val:21.8,  target:21.8, unit:'%',   sub:'1,923亿·十年1.38万亿', color:'#722ed1'},
+    {id:'cashflow', label:'经营性现金流',  val:1274,  target:null, unit:'¥亿', sub:'同比 ↑44.1%',           color:'#00875A'},
+    {id:'perCapita',label:'人均产出',      val:413,   target:430,  unit:'¥万', sub:'员工 21.3万人',         color:'#B86E00'},
     // === 第2行 ===
-    {id:'opMargin', label:'营业利润率',    val:12.3,  target:18,   unit:'%',   sub:'连续两季下滑',         color:'#C53030'},
-    {id:'debtRatio',label:'资产负债率',    val:62.8,  target:60,   unit:'%',   sub:'已超警戒线 60%',       color:'#D48806'},
-    {id:'strRev',   label:'战略业务收入占比',val:52,  target:55,   unit:'%',   sub:'战略布局优化中',       color:'#1890ff'},
-    {id:'cashBal',  label:'现金与短期投资',val:46,    target:null, unit:'¥亿', sub:'同比降幅 26%',         color:'#D48806'},
-    {id:'nps',      label:'客户满意度NPS', val:61,    target:75,   unit:'分',  sub:'行业标杆 75分',         color:'#C53030'}
+    {id:'opMargin', label:'营业利润率',    val:11.0,  target:15,   unit:'%',   sub:'同比 ↑1.8p.p.',        color:'#C53030'},
+    {id:'debtRatio',label:'资产负债率',    val:62.8,  target:60,   unit:'%',   sub:'已超警戒线 60%',        color:'#D48806'},
+    {id:'strRev',   label:'战略业务收入占比',val:55,  target:60,   unit:'%',   sub:'车/云高速增长',         color:'#1890ff'},
+    {id:'cashBal',  label:'现金与短期投资',val:3614,  target:null, unit:'¥亿', sub:'储备覆盖15.2月',        color:'#D48806'},
+    {id:'nps',      label:'客户满意度NPS', val:72,    target:78,   unit:'分',  sub:'运营商+企业BG调研',      color:'#B86E00'}
   ];
   function classify(k){
     if(k.id==='cashflow'||k.id==='strRev')return'green';
@@ -1915,19 +1910,19 @@ function renderKpiDashboard(){
 function renderRiskRadar(){
   var container=document.getElementById('riskRadarContent');if(!container)return;
   var topRisks=[
-    {rank:1,text:'华为/联影新一代AI影像设备2026Q3上市，价格低30%',impact:'危急',level:'critical'},
-    {rank:2,text:'美国BIS出口管制升级，A100/H100 GPU禁售范围扩至医疗AI',impact:'危急',level:'critical'},
-    {rank:3,text:'核心光学器件（CMOS传感器）日本供应商产能紧张，交期延长至8个月',impact:'高',level:'high'}
+    {rank:1,text:'美国BIS出口管制再升级，A100/H100/B200全面禁售，昇腾910C替代窗口仅6-9个月',impact:'危急',level:'critical'},
+    {rank:2,text:'Cloud&AI BG收入达成仅65%，研发预算超支¥4,200亿（超标28%），全年亏损风险加剧',impact:'危急',level:'critical'},
+    {rank:3,text:'先进制程芯片（5nm/3nm）代工渠道完全阻断，14nm以上产能依赖SMIC，交付周期延长至12个月',impact:'高',level:'high'}
   ];
   var redProjects=[
-    {name:'Cloud&AI BG · 智慧医疗云平台',deviation:'-35%'},
-    {name:'企业BG · 渠道数字化项目',deviation:'-22%'},
-    {name:'SC-3 现金流改善计划',deviation:'-41%'}
+    {name:'Cloud&AI BG · 智慧云平台',deviation:'-35%'},
+    {name:'企业BG · 伙伴数字化平台',deviation:'-22%'},
+    {name:'芯片供应链 · 昇腾替代方案',deviation:'-41%'}
   ];
   var alerts=[
-    {text:'CTO团队3名AI架构师拟离职（薪酬低于市场35%）',tag:'人才',cls:'talent'},
-    {text:'Cloud&AI BG研发预算超支¥4200万（超标28%）',tag:'预算',cls:'budget'},
-    {text:'上海工厂产能利用率已达93%，Q4排产缺口15%',tag:'产能',cls:'capacity'}
+    {text:'AI研究院3名首席科学家拟离职（薪酬低于市场35%）',tag:'人才',cls:'talent'},
+    {text:'Cloud&AI BG研发预算超支¥4,200亿（超标28%）',tag:'预算',cls:'budget'},
+    {text:'昇腾910C产能利用率已达93%，Q4排产缺口15%',tag:'产能',cls:'capacity'}
   ];
   var h='<div style="margin-bottom:var(--spacing-md);"><div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px;">⚠️ 重大风险 TOP3</div>';
   topRisks.forEach(function(r){
@@ -2227,7 +2222,7 @@ function toggleCardExpand(cardId){
   updateFoldedCard(cardId);
 }
 function jumpToCard(targetId){
-  // 查找对应的真实卡片ID（bp11→无，bp12→无，bp13→bp13, sc4→sc4等）
+  // 查找对应的真实卡片ID（cloud→Cloud&AI, chip→芯片供应链, cash→现金流, ent→企业BG, car→智能汽车）
   const card=document.getElementById('card-'+targetId);if(!card)return;
   // 如果是折叠状态，展开
   if(card.classList.contains('card-folded')){card.classList.remove('card-folded');card.classList.add('card-full')}
@@ -2253,9 +2248,9 @@ const DEBATE_CHAINS={
     {delay:2400,agent:'CFO',s:function(v){return v>=50?'pro':'neutral';},t:function(v){return v>=50?'国产替代的额外投入已在预算内消化，长期降关税15%将改善毛利率2-3个百分点。':'国产替代需追加¥0.5-1亿认证费用——短期增加成本但长期ROI为正，建议分批投入。';}}
   ],
   rd_budget:[
-    {delay:0,agent:'CTO',s:function(v){return v>=1.8?'pro':v>=1.2?'neutral':'con';},t:function(v){return '研发预算¥'+v.toFixed(1)+'亿。'+(v>=1.8?'预算充足，可同时推进CT/MR硬件+AI引擎开发，研发节奏不受限。':v>=1.2?'预算勉强够用——优先CT/MR硬件，AI SaaS平台需推迟到V2。':'预算严重不足，只能保CT/MR核心开发，AI引擎和临床验证全部暂停。');}},
-    {delay:1200,agent:'CFO',s:function(v){return v<=2.5?'pro':'neutral';},t:function(v){return v>2.5?'研发费用率偏高，可能侵蚀毛利率目标。建议将¥0.3亿转投临床验证，提升资金效率。':'研发投入在合理区间——既保证了技术护城河，也不会过度影响利润率。';}},
-    {delay:2400,agent:'CHO',s:function(v){return v>=1.5?'pro':'con';},t:function(v){return '预算对应约'+(v*60).toFixed(0)+'人研发团队。'+(v>=1.5?'编制充足，Q3前可填补22人缺口。':'编制不足，核心AI架构师岗位无法开放——招聘计划需缩减40%。');}}
+    {delay:0,agent:'CTO',s:function(v){return v>=200?'pro':v>=120?'neutral':'con';},t:function(v){return '研发投入¥'+v+'亿。'+(v>=200?'预算充足，可同时推进昇腾910C量产+盘古大模型5.0+灵衢2.0互联协议，研发节奏不受限。':v>=120?'预算勉强够用——优先昇腾量产和盘古大模型，灵衢协议推迟到Q3。':'预算严重不足，只能保昇腾核心开发，盘古和灵衢全部暂停。');}},
+    {delay:1200,agent:'CFO',s:function(v){return v<=250?'pro':'neutral';},t:function(v){return v>250?'研发费用率偏高，可能侵蚀集团整体利润率。建议将¥50亿转投市场拓展，提升资金效率。':'研发投入在合理区间——既保证了技术护城河，也不会过度影响利润率。';}},
+    {delay:2400,agent:'CHO',s:function(v){return v>=150?'pro':'con';},t:function(v){return '预算对应约'+(v*0.24).toFixed(0)+'人研发团队（按人均¥420万人力成本）。'+(v>=150?'编制充足，Q3前可填补AI研究院扩招需求。':'编制不足，核心AI架构师岗位无法开放——招聘计划需缩减40%。');}}
   ],
   hc_gap:[
     {delay:0,agent:'CHO',s:function(v){return v<=10?'pro':v<=20?'neutral':'con';},t:function(v){return '人才缺口'+v+'人。'+(v<=10?'缺口在可控范围。加强内推+校招，Q2可到位70%。':v<=20?'招聘压力中等。建议优先填补AI架构师和临床支持岗，其他岗位分阶段。':'缺口远超可控范围——招聘周期45天，Q3节点面临严重风险。');}},
@@ -2265,7 +2260,7 @@ const DEBATE_CHAINS={
   comp_lead:[
     {delay:0,agent:'CMO',s:function(v){return v<=1?'pro':v<=3?'neutral':'con';},t:function(v){return '竞品领先'+v+'个月。'+(v<=1?'我们有充分的先发窗口——加速渠道铺开可抢占先机。':v<=3?'窗口期在收窄，需加快销售团队组建和样板医院建设。':'窗口已大幅收窄，每延迟1月≈¥1.5亿市场份额损失——必须立即行动。');}},
     {delay:1200,agent:'CEO',s:function(v){return v<=2?'pro':v<=4?'neutral':'con';},t:function(v){return v<=2?'竞品威胁可控。我们可学习其渠道策略，避免踩坑，发挥后发优势。':v<=4?'竞品已有先发优势但尚未形成壁垒——差异化策略仍有机会。':'竞品优势已拉大，正面竞争不利。建议转向专科医院和区域医疗中心差异化突破。';}},
-    {delay:2400,agent:'CTO',s:function(v){return v<=2?'pro':v<=4?'neutral':'con';},t:function(v){return v<=2?'技术参数差距在可追赶范围。加速临床数据积累+AI算法迭代，8个月内可追平。':v<=4?'追赶压力增大但并非不可能——集中资源突破AI诊断准确率，以此作为差异化卖点。':'时间窗口紧迫，建议优先确保核心功能达标杆水平，非核心功能可V2补齐。';}}
+    {delay:2400,agent:'CTO',s:function(v){return v<=6?'pro':v<=12?'neutral':'con';},t:function(v){return v<=6?'技术优势明显，昇腾910C+乾崑ADS4业界领先，窗口期充裕——可加速生态建设巩固壁垒。':v<=12?'追赶压力增大但并非不可能——集中资源突破AI算力性能，以此作为差异化卖点。':'时间窗口紧迫，建议优先确保昇腾和乾崑核心指标达标杆水平，非核心功能可V2补齐。';}}
   ],
   channel_cov:[
     {delay:0,agent:'CMO',s:function(v){return v>=70?'pro':v>=50?'neutral':'con';},t:function(v){return '渠道覆盖率'+v+'%。'+(v>=70?'覆盖率达标，Q2重点深化已覆盖城市的渗透率。':v>=50?'覆盖率中等——二三线城市仍有较大空白，建议Q2优先招聘渠道销售。':'覆盖率严重不足，近一半目标市场处于空白——需启动渠道闪电战。');}},
@@ -2273,8 +2268,8 @@ const DEBATE_CHAINS={
     {delay:2400,agent:'CFO',s:function(v){return v>=60?'pro':'neutral';},t:function(v){return v>=60?'渠道投入产出比健康——每+10%覆盖率≈¥0.3亿销售费用，ROI 3:1。':'渠道投资需谨慎——建议分阶段投入，先验证单位经济模型再规模复制。';}}
   ],
   launch_cycle:[
-    {delay:0,agent:'COO',s:function(v){return v<=12?'pro':v<=18?'neutral':'con';},t:function(v){return '上市周期'+v+'个月。'+(v<=12?'周期优于行业平均——NMPA型检+临床+注册审批均在可控范围。':v<=18?'周期略长但可接受——关键路径无重大阻塞，Q4可完成注册。':'周期过长，竞品平均12个月上市——建议评估绿色通道/优先审批，压缩3-4个月。');}},
-    {delay:1200,agent:'CMO',s:function(v){return v<=12?'pro':v<=15?'neutral':'con';},t:function(v){return v<=12?'上市时间窗口极佳——可在竞品换代前抢占三甲医院。':v<=15?'上市时间在窗口期内——但需提前6个月启动预热，让医院在注册完成时已完成评估。':'错失窗口期风险增大——建议并行准备：注册+预热同步推进，压缩上市后启动时间。';}},
+    {delay:0,agent:'COO',s:function(v){return v<=12?'pro':v<=18?'neutral':'con';},t:function(v){return '替代方案落地周期'+v+'个月。'+(v<=12?'周期优于预期——14nm Chiplet方案验证+昇腾910C产能爬坡均在可控范围。':v<=18?'周期略长但可接受——关键路径无重大阻塞，Q4可完成国产化认证。':'周期过长，竞品平均12个月完成替代方案——建议加投测试资源，压缩3-4个月。');}},
+    {delay:1200,agent:'CMO',s:function(v){return v<=12?'pro':v<=15?'neutral':'con';},t:function(v){return v<=12?'国产替代窗口极佳——可在BIS进一步收紧前完成供应链切换，确保2026年产能不受影响。':v<=15?'替代窗口在收窄——需提前6个月与客户沟通国产方案迁移计划。':'错失窗口期风险增大——建议并行推进：国产认证+海外备货同步，压缩切换周期。';}},
     {delay:2400,agent:'CTO',s:function(v){return v<=15?'pro':v<=18?'neutral':'con';},t:function(v){return v<=15?'技术开发节奏正常。AI训练和硬件验证可并行推进，临床验证是唯一串行环节。':v<=18?'技术层面有2-3个月优化空间——建议AI算法和电磁兼容测试并行。':'时间紧张但技术上可压缩——建议增加测试资源，AI训练用更大算力集群加速。';}}
   ],
   cashflow_risk:[
@@ -2333,13 +2328,20 @@ window._rebuildSliders=function(activeParamKeys,aggregatedParams){
       const reg=PARAM_REGISTRY[k];if(!reg)return;
       const v=aggregatedParams[k]||{value:reg.default,isDefault:true,sources:[]};
       const w=document.createElement('div');w.style.marginBottom='6px';
-      const step=reg.unit==='%'?1:reg.unit==='¥亿'?0.1:reg.unit==='人'?5:reg.unit==='分'?5:reg.unit==='月'?1:1;
-      // 范围由 unit 驱动，特殊键硬编码覆盖
+      var step=reg.unit==='%'?1:reg.unit==='¥亿'?0.1:reg.unit==='人'?5:reg.unit==='分'?5:reg.unit==='月'?1:1;
+      // 范围由 unit 驱动，特殊键硬编码覆盖（华为量级适配）
       var mn=0,mx=reg.unit==='%'?100:reg.unit==='¥亿'?3:reg.unit==='人'?50:reg.unit==='分'?100:reg.unit==='月'?24:reg.unit==='年'?10:reg.unit==='比率'?5:3;
       if(k==='salary_comp'){mn=-30;mx=20}
       if(k==='mkt_growth')mx=30;
       if(k==='comp_lead')mx=6;
       if(k==='train_cycle'||k==='launch_cycle')mx=24;
+      // 华为量级参数覆盖（范围+步长）
+      if(k==='rd_budget'){mx=2500;step=50}
+      if(k==='supply_cost'){mx=500;step=10}
+      if(k==='sales_cost'){mx=500;step=10}
+      if(k==='hc_gap'){mx=500;step=10}
+      if(k==='patent_count'){mx=200000;step=5000}
+      if(k==='payback_years')mx=10;
       const sp=new SliderPhysics(w,{label:reg.name+(v.isDefault?' (默认)':''),min:mn,max:mx,value:v.value,step:step,formatValue:x=>x.toFixed(1)+reg.unit,valueSuffix:'',notches:[],warnBelow:undefined,dangerBelow:undefined,onChange:val=>{window._wbSliders[k].value=val;if(window._updateWB)window._updateWB()},onRelease:val=>{if(window._lastWBScores)tPush('wb',window._lastWBScores.direction,window._lastWBScores.decode,window._lastWBScores.execution);refreshDebateRoom(null,k,val)}});
       window._wbSliders[k]=sp;window._wbActiveParams[k]=true;container.appendChild(w);
       const sl=document.createElement('div');sl.style.cssText='font-size:9px;color:'+(v.isDefault?'#999':'var(--color-text-tertiary)')+';margin-top:-4px;padding-left:56px';sl.textContent=v.isDefault?'← 默认值':'← '+(v.sources?.length||0)+'条证据';container.appendChild(sl);
@@ -2354,108 +2356,110 @@ window._wbReset=function(){if(window.onEvidenceChange)window.onEvidenceChange()}
 function buildWorkbench(){
   const layout=document.getElementById('workbenchLayout');if(!layout)return;
     allEvidence=[
-    // SP[1] 业绩差距分析 — 实际差距数据
-    {label:'2025年营收¥480亿 vs 目标¥520亿，差距¥40亿（7.7%）',freshness:'fresh',params:{mkt_growth:14},confidence:0.95,source:'2025年报 · 2026Q1',phase:'SP[1]'},
-    {label:'净利润¥58亿 vs 目标¥85亿，差距¥27亿，主因原材料成本上涨22%',freshness:'fresh',params:{rd_budget:1.8},confidence:0.92,source:'2025年报 · 2026Q1',phase:'SP[1]'},
-    // SP[2] 市场洞察 — 实际市场发现
-    {label:'中国高端医疗影像设备市场2026年规模¥520亿，CAGR 15%',freshness:'fresh',params:{mkt_growth:15,comp_lead:0},confidence:0.95,source:'Frost & Sullivan · 2026Q1',phase:'SP[2]',substep:'(1)看趋势'},
-    {label:'十四五规划明确高端医疗装备国产化率≥70%目标，政策窗口期3年',freshness:'fresh',params:{localization:60},confidence:0.88,source:'十四五医药工业规划 · 2025',phase:'SP[2]',substep:'(1)看趋势'},
-    {label:'三甲医院影像科主任最关注：AI辅助诊断准确率(82%)、设备维保响应(74%)、扫描速度(68%)',freshness:'fresh',params:{mkt_growth:15},confidence:0.90,source:'APPEALS调研 · 2026Q1 · n=120',phase:'SP[2]',substep:'(2)看市场与客户'},
-    {label:'TOP3（GE/西门子/飞利浦）占62%份额，但国产替代率已从18%升至35%',freshness:'fresh',params:{comp_lead:1,localization:45},confidence:0.88,source:'券商研报+集采数据 · 2026Q1',phase:'SP[2]',substep:'(3)看竞争'},
-    {label:'华为联影联合推出AI-CT，上市18个月签约42家三甲，速度超预期',freshness:'fresh',params:{comp_lead:6},confidence:0.85,source:'竞品动态监测 · 2026Q1',phase:'SP[2]',substep:'(3)看竞争'},
-    {label:'内部：已获8项核心专利、3项NMPA注册证在途，研发团队120人',freshness:'fresh',params:{talent_pool:55,rd_budget:2.0},confidence:0.90,source:'CTO技术盘点 · 2026Q1',phase:'SP[2]',substep:'(4)看自己'},
-    {label:'机会窗口：AI影像诊断+国产替代双驱动，3年内可抢占15-20%份额',freshness:'fresh',params:{mkt_growth:15,comp_lead:1},confidence:0.85,source:'安索夫矩阵分析 · 2026Q1',phase:'SP[2]',substep:'(5)看机会'},
-    {label:'核心差距：AI算法人才缺口22人、渠道覆盖仅45%、品牌认知度28%',freshness:'fresh',params:{talent_pool:55,hc_gap:22},confidence:0.82,source:'GE-麦肯锡矩阵 · 2026Q1',phase:'SP[2]',substep:'关键短板'},
-    // (6)机会差距 — 外部未纳入规划的机会
-    {label:'县域及基层医疗市场未纳入规划（规模约¥80亿/年）',freshness:'fresh',params:{mkt_growth:10,channel_cov:50},confidence:0.78,source:'县域医疗调研 · 2026Q1',phase:'SP[2]',substep:'(6)机会差距'},
-    {label:'AI辅助诊断在非影像科室（病理/心电/超声）的需求尚未覆盖',freshness:'fresh',params:{mkt_growth:18},confidence:0.75,source:'科室需求调研 · 2026Q1',phase:'SP[2]',substep:'(6)机会差距'},
-    // SP[3] 战略意图 — 实际战略目标
-    {label:'2028年营收达¥50亿，其中高端CT/MR占60%、AI诊断服务占25%',freshness:'fresh',params:{mkt_growth:15,channel_cov:75},confidence:0.95,source:'董事会决议 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2, 举措1.3'},
-    {label:'市场份额2028年达25%，三甲覆盖率≥35%（105家）',freshness:'fresh',params:{mkt_share:25},confidence:0.90,source:'SP 2026-2028 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.1, 举措1.2'},
-    {label:'累计发明专利≥15项、NMPA三类注册证≥8项',freshness:'fresh',params:{patent_count:3},confidence:0.88,source:'技术路线图 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.1'},
-    {label:'整体毛利率≥60%，研发费用率维持在20-22%',freshness:'fresh',params:{rd_budget:2.0},confidence:0.85,source:'财务规划 · 2026Q1',phase:'SP[3]',decodesTo:'举措1.3'},
-    // SP[4] 创新焦点 — 实际创新方向
-    {label:'AI影像辅助诊断引擎：基于Transformer的多模态融合，目标准确率≥95%',freshness:'fresh',params:{rd_budget:2.2},confidence:0.88,source:'技术立项书 · 2026Q1',phase:'SP[4]'},
-    {label:'商业模式创新：设备销售→"设备+AI诊断SaaS订阅"，ARPU提升3倍',freshness:'fresh',params:{mkt_growth:12},confidence:0.82,source:'商业模式工作坊 · 2026Q1',phase:'SP[4]'},
-    // SP[5] 业务设计 — 实际设计方案
-    {label:'价值主张：国产高端影像+AI辅助诊断一体化方案，总成本比进口低40%',freshness:'fresh',params:{comp_lead:1,mkt_share:20},confidence:0.90,source:'价值主张画布 · 2026Q1',phase:'SP[5]'},
-    {label:'战略控制点：核心算法专利池+三甲医院临床数据库+国产供应链认证',freshness:'fresh',params:{rd_budget:2.0,patent_count:3},confidence:0.85,source:'战略控制点评估 · 2026Q1',phase:'SP[5]'},
-    // SP[6] 执行设计 — 实际执行计划
-    {label:'2026关键任务：①完成3款CT/MR注册 ②签约30家三甲 ③AI引擎FDA/CE预审',freshness:'fresh',params:{hc_gap:22,train_cycle:9},confidence:0.90,source:'PMO · 2026Q1',phase:'SP[6]'},
-    {label:'组织保障：新建AI研究院(50人)、扩建临床支持团队(30人)、渠道团队(40人)',freshness:'fresh',params:{talent_pool:60,hc_gap:22},confidence:0.85,source:'HR规划 · 2026Q1',phase:'SP[6]'},
-    // BP[1] 澄清战略方向 — 实际战略主题解码
-    {label:'年度战略主题1：高端CT/MR产品线突破 — 源于SP创新焦点+业务设计',freshness:'fresh',params:{sp_bp_alignment:90},confidence:0.92,source:'战略解码会 · 2026Q1',phase:'BP[1]'},
-    {label:'年度战略主题2：AI诊断平台商业化 — 源于SP业务设计+市场洞察',freshness:'fresh',params:{mkt_growth:14},confidence:0.90,source:'战略解码会 · 2026Q1',phase:'BP[1]'},
-    {label:'年度战略主题3：国产供应链认证与本地化 — 源于SP竞争分析+风险应对',freshness:'fresh',params:{localization:55},confidence:0.88,source:'战略解码会 · 2026Q1',phase:'BP[1]'},
-    // BP[2] 导出战略举措 — 实际举措内容
-    {label:'举措1.1：高端CT/MR产品线 — 完成256排CT和3.0T MR研发及NMPA注册',freshness:'fresh',params:{rd_budget:2.2},confidence:0.92,source:'举措定义 · 2026Q1',phase:'BP[2]'},
-    {label:'举措1.2：三甲医院渠道建设 — 2026年签约28家，覆盖北上广+省会城市',freshness:'fresh',params:{channel_cov:80,hc_gap:0},confidence:0.90,source:'举措定义 · 2026Q1',phase:'BP[2]'},
-    {label:'举措1.3：AI诊断SaaS平台 — Q2完成MVP，Q3启动10家试点医院',freshness:'fresh',params:{rd_budget:1.5},confidence:0.88,source:'举措定义 · 2026Q1',phase:'BP[2]'},
-    {label:'举措1.4：供应链韧性建设 — 核心器件国产替代率从35%→60%',freshness:'fresh',params:{localization:50,supply_cost:1.2},confidence:0.85,source:'举措定义 · 2026Q1',phase:'BP[2]'},
-    // BP[3] 导出衡量指标 — 实际KPI定义
-    {label:'CSF-1产品竞争力 → 专利数≥3项、NMPA注册≥2项、AI准确率≥95%',freshness:'fresh',params:{patent_count:3},confidence:0.92,source:'KPI设定 · 2026Q1',phase:'BP[3]'},
-    {label:'CSF-3市场覆盖面 → 三甲签约28家、渠道覆盖率80%、品牌认知度≥40%',freshness:'fresh',params:{channel_cov:80,mkt_share:15},confidence:0.90,source:'KPI设定 · 2026Q1',phase:'BP[3]'},
-    {label:'CSF-6运营效率 → 供应链成本指数<¥1.5亿、产品上市周期≤12个月',freshness:'fresh',params:{launch_cycle:12},confidence:0.88,source:'KPI设定 · 2026Q1',phase:'BP[3]'},
-    // BP[4] 确定措施目标 — 实际目标值
-    {label:'举措1.2渠道建设：Q1-Q4逐季签约6/8/8/6家，年末累计28家',freshness:'fresh',params:{channel_cov:80},confidence:0.92,source:'里程碑计划 · 2026Q1',phase:'BP[4]'},
-    {label:'举措1.3人才引进：AI算法22人+临床支持30人+渠道销售40人，Q2到位70%',freshness:'fresh',params:{hc_gap:22,talent_pool:60},confidence:0.88,source:'HR招聘计划 · 2026Q1',phase:'BP[4]'},
-    {label:'举措1.1研发预算：¥2.2亿（硬件¥1.2亿+AI软件¥0.7亿+临床¥0.3亿）',freshness:'fresh',params:{rd_budget:2.2},confidence:0.90,source:'财务预算 · 2026Q1',phase:'BP[4]'},
-    // BP[5] 分解措施目标 — 实际分解
-    {label:'举措1.2渠道RACI：CMO总负责→区域总监执行→销售经理落地',freshness:'fresh',params:{owner_accountability:95},confidence:0.92,source:'RACI矩阵 · 2026Q1',phase:'BP[5]'},
-    {label:'Q1渠道阶段目标：完成北上广6家三甲签约，组建15人直销团队',freshness:'fresh',params:{hc_gap:15},confidence:0.90,source:'季度分解 · 2026Q1',phase:'BP[5]'},
-    {label:'核心岗位薪酬对标：AI架构师需上浮25-35%至市场P75分位',freshness:'stale',params:{salary_comp:-15,talent_pool:40},confidence:0.70,source:'薪酬调研 · 2025Q4',phase:'BP[5]'},
-    // BP[6] 导出工作计划 — 实际工作计划
-    {label:'Q1工作包：产品→完成256排CT设计评审；渠道→签约6家；AI→完成算法选型',freshness:'fresh',params:{rd_budget:2.0},confidence:0.92,source:'Q1工作计划 · 2026Q1',phase:'BP[6]'},
-    {label:'关键依赖：NMPA型检排期(Q2)、华为联影芯片供应确认(Q1)、临床试验伦理审批(Q2)',freshness:'fresh',params:{launch_cycle:14},confidence:0.88,source:'依赖分析 · 2026Q1',phase:'BP[6]'},
-    {label:'风险预案：核心芯片若禁运→启动展锐/海光替代方案（+3个月周期）',freshness:'fresh',params:{risk_mitigation_cov:70},confidence:0.85,source:'风险预案 · 2026Q1',phase:'BP[6]'},
-    // EM[1] 执行进度 — 实际进度
-    {label:'Q1产品：256排CT机械设计完成、3.0T MR磁体方案冻结',freshness:'fresh',params:{milestone_achieve:75},confidence:0.95,source:'项目月报 · 2026Q1',phase:'EM[1]'},
-    {label:'Q1渠道：已签约4家三甲（北京2/上海1/广州1），达成率67%',freshness:'fresh',params:{channel_cov:55},confidence:0.92,source:'销售月报 · 2026Q1',phase:'EM[1]'},
-    {label:'Q1人才：AI团队到位8/22人、渠道团队到位12/40人，整体达成率32%',freshness:'fresh',params:{hc_gap:14},confidence:0.90,source:'HR月报 · 2026Q1',phase:'EM[1]'},
-    // EM[2] 资源效率 — 实际效率数据
-    {label:'研发投入产出：2项发明专利申请、1项软件著作权、AI模型准确率提升至91%',freshness:'fresh',params:{rd_budget:1.9},confidence:0.88,source:'CTO季报 · 2026Q1',phase:'EM[2]'},
-    {label:'关键人才留存率94%，但AI架构师岗位招聘周期长达45天（目标30天）',freshness:'fresh',params:{talent_retention:94},confidence:0.90,source:'HR季报 · 2026Q1',phase:'EM[2]'},
-    // EM[3] 结果评价 — 实际评价
-    {label:'Q1综合评估：产品进度正常、渠道和招聘滞后，整体偏差约-12%',freshness:'fresh',params:{milestone_achieve:72},confidence:0.88,source:'Q1复盘 · 2026Q1',phase:'EM[3]'},
-    {label:'战略弹性测试：若芯片禁运→产品上市延迟5-7个月，NPV影响¥2.8亿',freshness:'fresh',params:{risk_mitigation_cov:70},confidence:0.85,source:'压力测试 · 2026Q1',phase:'EM[3]'},
+    // SP[1] 业绩差距分析
+    {label:'2025年全球销售收入8,809亿元，同比+2.2%，五大产业组合韧性增强',freshness:'fresh',params:{mkt_growth:2.2},confidence:0.95,source:'华为2025年报 · 2026Q1',phase:'SP[1]'},
+    {label:'净利润680亿元，营业利润率11.0%（+1.8p.p.），盈利质量持续改善',freshness:'fresh',params:{rd_budget:1923},confidence:0.92,source:'华为2025年报 · 2026Q1',phase:'SP[1]'},
+    // SP[2] 市场洞察
+    {label:'全球AI算力市场2026年规模$1,200亿，CAGR 35%，华为昇腾生态位列中国第一',freshness:'fresh',params:{mkt_growth:35,comp_lead:0},confidence:0.95,source:'IDC全球AI服务器追踪 · 2026Q1',phase:'SP[2]',substep:'(1)看趋势'},
+    {label:'中国智能汽车市场2026年L3级智驾渗透率预计达25%，乾崑智驾ADS4业界首个高速L3商用方案',freshness:'fresh',params:{mkt_growth:30,comp_lead:6},confidence:0.90,source:'工信部智能网联汽车报告 · 2026Q1',phase:'SP[2]',substep:'(1)看趋势'},
+    {label:'全球5G-A商用加速：40+运营商发展新模式，华为承建50张5G-A网络',freshness:'fresh',params:{mkt_growth:20},confidence:0.92,source:'GSMA Mobile Economy · 2026',phase:'SP[2]',substep:'(1)看趋势'},
+    {label:'运营商客户核心诉求：从流量经营迈向体验经营，确定性体验成为差异化关键',freshness:'fresh',params:{mkt_growth:15},confidence:0.88,source:'华为CIO峰会调研 · 2026Q1 · n=200',phase:'SP[2]',substep:'(2)看市场与客户'},
+    {label:'政企客户：500+行业智能化场景亟待平台化，59,000+合作伙伴生态',freshness:'fresh',params:{channel_cov:42},confidence:0.90,source:'华为企业BG年度调研 · 2026Q1',phase:'SP[2]',substep:'(2)看市场与客户'},
+    {label:'全球云计算市场TOP3（AWS 32%/Azure 23%/阿里云 10%），华为云份额5.2%排名第五',freshness:'fresh',params:{comp_lead:3,localization:55},confidence:0.88,source:'Gartner IaaS Market Share · 2026Q1',phase:'SP[2]',substep:'(3)看竞争'},
+    {label:'智能汽车芯片竞争：英伟达Thor 2026Q4量产，高通Snapdragon Ride Flex加速',freshness:'fresh',params:{comp_lead:6},confidence:0.85,source:'竞品动态监测 · 2026Q1',phase:'SP[2]',substep:'(3)看竞争'},
+    {label:'内部：昇腾910C量产、鸿蒙生态35万+应用、乾崑智驾140万+辆搭载',freshness:'fresh',params:{talent_pool:65,rd_budget:1923},confidence:0.92,source:'CTO技术盘点 · 2026Q1',phase:'SP[2]',substep:'(4)看自己'},
+    {label:'核心差距：Cloud&AI BG收入达成65%、AI算力人才缺口280人、芯片国产化率仅35%',freshness:'fresh',params:{talent_pool:45,hc_gap:280,localization:35},confidence:0.85,source:'内部能力评估 · 2026Q1',phase:'SP[2]',substep:'关键短板'},
+    {label:'机会窗口：5G-A+AI+云+车四大产业协同，3年内可构建端到端智能化解决方案壁垒',freshness:'fresh',params:{mkt_growth:25,comp_lead:6},confidence:0.85,source:'安索夫矩阵分析 · 2026Q1',phase:'SP[2]',substep:'(5)看机会'},
+    // (6)机会差距
+    {label:'全球南方市场（东南亚/中东/非洲）5G建设加速，未纳入主流规划（规模约$300亿/年）',freshness:'fresh',params:{mkt_growth:18,channel_cov:30},confidence:0.78,source:'华为区域市场调研 · 2026Q1',phase:'SP[2]',substep:'(6)机会差距'},
+    {label:'AI在制造/能源/金融行业的垂直大模型需求爆发，华为盘古大模型可覆盖但生态待建',freshness:'fresh',params:{mkt_growth:40},confidence:0.75,source:'行业AI需求调研 · 2026Q1',phase:'SP[2]',substep:'(6)机会差距'},
+    // SP[3] 战略意图
+    {label:'2028年营收目标突破¥1万亿，其中战略业务（车/云/计算）占比≥40%',freshness:'fresh',params:{mkt_growth:15,channel_cov:75},confidence:0.95,source:'华为董事会决议 · 2026Q1',phase:'SP[3]',decodesTo:'Cloud&AI扭亏, 企业BG数字化, 智能汽车规模化'},
+    {label:'昇腾AI算力市场份额2028年≥25%，鸿蒙生态设备≥50M，开发者≥2,000万',freshness:'fresh',params:{mkt_share:25},confidence:0.90,source:'SP 2026-2028 · 2026Q1',phase:'SP[3]',decodesTo:'芯片供应链韧性, Cloud&AI扭亏'},
+    {label:'累计发明专利≥15万件、研发投入占比维持在20%以上',freshness:'fresh',params:{patent_count:150000},confidence:0.88,source:'技术路线图 · 2026Q1',phase:'SP[3]',decodesTo:'芯片供应链韧性'},
+    {label:'整体营业利润率≥15%，经营性现金流≥¥1,500亿，资产负债率<60%',freshness:'fresh',params:{rd_budget:1923},confidence:0.85,source:'财务规划 · 2026Q1',phase:'SP[3]',decodesTo:'现金流与债务风险管理'},
+    // SP[4] 创新焦点
+    {label:'AI全栈创新：昇腾910C→灵衢2.0互联协议→盘古大模型5.0→AI原生应用生态',freshness:'fresh',params:{rd_budget:2500},confidence:0.90,source:'技术立项书 · 2026Q1',phase:'SP[4]'},
+    {label:'商业模式创新：从设备销售→"联接+计算+云+AI"一体化服务，订阅收入占比目标30%',freshness:'fresh',params:{mkt_growth:20},confidence:0.82,source:'商业模式工作坊 · 2026Q1',phase:'SP[4]'},
+    // SP[5] 业务设计
+    {label:'价值主张：以AI为核心的全栈解决方案，帮助客户实现"有利润的收入，有现金流的利润"',freshness:'fresh',params:{comp_lead:6,mkt_share:20},confidence:0.92,source:'价值主张画布 · 2026Q1',phase:'SP[5]'},
+    {label:'战略控制点：昇腾AI芯片IP+鸿蒙OS生态+乾崑智驾系统+华为云AI开发平台',freshness:'fresh',params:{rd_budget:1923,patent_count:150000},confidence:0.88,source:'战略控制点评估 · 2026Q1',phase:'SP[5]'},
+    // SP[6] 执行设计
+    {label:'2026关键任务：①昇腾910C规模商用突破1,800+智算客户 ②乾崑ADS4搭载200万+辆 ③鸿蒙生态设备50M',freshness:'fresh',params:{hc_gap:280,train_cycle:9},confidence:0.92,source:'PMO · 2026Q1',phase:'SP[6]'},
+    {label:'组织保障：AI研究院扩至500人、引望独立运营智能汽车战略载体、Cloud&AI BG独立核算',freshness:'fresh',params:{talent_pool:65,hc_gap:280},confidence:0.88,source:'HR规划 · 2026Q1',phase:'SP[6]'},
+    // BP[1] 澄清战略方向
+    {label:'年度战略主题1：AI算力领先 — 昇腾+灵衢+盘古全栈突破，源于SP创新焦点',freshness:'fresh',params:{sp_bp_alignment:90},confidence:0.94,source:'战略解码会 · 2026Q1',phase:'BP[1]'},
+    {label:'年度战略主题2：智能汽车规模化 — 乾崑ADS4+引望生态，源于SP市场洞察+业务设计',freshness:'fresh',params:{mkt_growth:30},confidence:0.92,source:'战略解码会 · 2026Q1',phase:'BP[1]'},
+    {label:'年度战略主题3：芯片供应链韧性 — 昇腾国产化+先进封装突破，源于SP竞争分析+风险应对',freshness:'fresh',params:{localization:35},confidence:0.88,source:'战略解码会 · 2026Q1',phase:'BP[1]'},
+    // BP[2] 导出战略举措
+    {label:'举措1：Cloud&AI BG扭亏 — 聚焦AI算力，砍边缘云服务，目标收入达成率≥85%',freshness:'fresh',params:{rd_budget:320},confidence:0.92,source:'举措定义 · 2026Q1',phase:'BP[2]'},
+    {label:'举措2：企业BG数字化 — 伙伴平台化+AI赋能，伙伴数字化覆盖率从42%→80%',freshness:'fresh',params:{channel_cov:80,hc_gap:0},confidence:0.90,source:'举措定义 · 2026Q1',phase:'BP[2]'},
+    {label:'举措3：芯片供应链韧性 — 昇腾910C量产+14nm以上国产化率从35%→70%',freshness:'fresh',params:{localization:70,supply_cost:380},confidence:0.88,source:'举措定义 · 2026Q1',phase:'BP[2]'},
+    {label:'举措4：现金流优化 — 加速应收回收+优化资本结构，资产负债率目标<60%',freshness:'fresh',params:{payback_years:4},confidence:0.85,source:'举措定义 · 2026Q1',phase:'BP[2]'},
+    // BP[3] 导出衡量指标
+    {label:'CSF-1技术领先 → AI算力市场份额≥15%、昇腾客户≥1,800家、专利≥15万件',freshness:'fresh',params:{patent_count:150000},confidence:0.92,source:'KPI设定 · 2026Q1',phase:'BP[3]'},
+    {label:'CSF-3生态繁荣 → 鸿蒙开发者≥1,200万、伙伴数字化率≥80%、引望合作≥15家',freshness:'fresh',params:{channel_cov:80,mkt_share:15},confidence:0.90,source:'KPI设定 · 2026Q1',phase:'BP[3]'},
+    {label:'CSF-6运营效率 → 云服务毛利率≥45%、芯片国产化率≥70%、资产负债率<60%',freshness:'fresh',params:{launch_cycle:18},confidence:0.88,source:'KPI设定 · 2026Q1',phase:'BP[3]'},
+    // BP[4] 确定措施目标
+    {label:'Cloud&AI BG：Q1-Q4逐季收入达成60%/70%/80%/85%，研发预算控制在¥300亿以内',freshness:'fresh',params:{rd_budget:300},confidence:0.92,source:'里程碑计划 · 2026Q1',phase:'BP[4]'},
+    {label:'企业BG数字化：Q1平台MVP上线→Q2试点50家伙伴→Q3推广500家→Q4覆盖80%',freshness:'fresh',params:{channel_cov:80},confidence:0.90,source:'里程碑计划 · 2026Q1',phase:'BP[4]'},
+    {label:'芯片供应链：Q1昇腾910C产能爬坡→Q2国产化率50%→Q3 14nm认证→Q4国产化率70%',freshness:'fresh',params:{localization:70,launch_cycle:12},confidence:0.88,source:'里程碑计划 · 2026Q1',phase:'BP[4]'},
+    // BP[5] 分解措施目标
+    {label:'Cloud&AI BG RACI：CTO总负责→Cloud BU执行→AI研究院支撑→财务BP监控',freshness:'fresh',params:{owner_accountability:95},confidence:0.92,source:'RACI矩阵 · 2026Q1',phase:'BP[5]'},
+    {label:'Q1阶段目标：Cloud&AI完成业务诊断+裁撤30%低效云服务，企业BG完成数字化平台MVP',freshness:'fresh',params:{hc_gap:150,channel_cov:50},confidence:0.90,source:'季度分解 · 2026Q1',phase:'BP[5]'},
+    {label:'核心岗位薪酬对标：AI首席科学家需上浮25-35%至市场P75分位，防止核心人才流失',freshness:'stale',params:{salary_comp:-15,talent_pool:40},confidence:0.70,source:'薪酬调研 · 2025Q4',phase:'BP[5]'},
+    // BP[6] 导出工作计划
+    {label:'Q1工作包：Cloud&AI→完成业务诊断+组织调整；芯片→昇腾910C产能验证；企业→数字化平台MVP',freshness:'fresh',params:{rd_budget:250},confidence:0.92,source:'Q1工作计划 · 2026Q1',phase:'BP[6]'},
+    {label:'关键依赖：昇腾910C 7nm产能确认(Q1)、引望合作伙伴签约(Q2)、鸿蒙生态临界点突破(Q3)',freshness:'fresh',params:{launch_cycle:14},confidence:0.88,source:'依赖分析 · 2026Q1',phase:'BP[6]'},
+    {label:'风险预案：若7nm以下制程完全禁运→启动14nm Chiplet堆叠方案（性能损失30%但可用）',freshness:'fresh',params:{risk_mitigation_cov:70},confidence:0.85,source:'风险预案 · 2026Q1',phase:'BP[6]'},
+    // EM[1] 执行进度
+    {label:'Q1 Cloud&AI：业务诊断完成、裁撤3条低ROI产品线、AI算力客户新增120家',freshness:'fresh',params:{milestone_achieve:65},confidence:0.95,source:'项目月报 · 2026Q1',phase:'EM[1]'},
+    {label:'Q1芯片：昇腾910C良率提升至78%（目标85%）、14nm国产化认证启动3家代工厂',freshness:'fresh',params:{localization:42},confidence:0.92,source:'项目月报 · 2026Q1',phase:'EM[1]'},
+    {label:'Q1企业BG：数字化平台MVP延期2周、伙伴试点报名52家（超预期）',freshness:'fresh',params:{channel_cov:48},confidence:0.90,source:'项目月报 · 2026Q1',phase:'EM[1]'},
+    // EM[2] 资源效率
+    {label:'研发投入产出：昇腾910C对比A100推理性能达85%、3项核心专利通过PCT国际阶段',freshness:'fresh',params:{rd_budget:1850},confidence:0.88,source:'CTO季报 · 2026Q1',phase:'EM[2]'},
+    {label:'关键人才留存率92%，但AI架构师岗位招聘周期长达55天（目标30天），3名首席科学家拟离职',freshness:'fresh',params:{talent_retention:92},confidence:0.90,source:'HR季报 · 2026Q1',phase:'EM[2]'},
+    // EM[3] 结果评价
+    {label:'Q1综合评估：芯片良率爬坡滞后、Cloud&AI改革开局良好、企业BG数字化延期可控，整体偏差约-8%',freshness:'fresh',params:{milestone_achieve:68},confidence:0.88,source:'Q1复盘 · 2026Q1',phase:'EM[3]'},
+    {label:'战略弹性测试：若7nm以下全面禁运→AI算力产能下降60%，2026年营收影响¥1,500亿，NPV影响¥4,500亿',freshness:'fresh',params:{risk_mitigation_cov:65},confidence:0.85,source:'压力测试 · 2026Q1',phase:'EM[3]'},
   ];
   // 恢复resolveCard提前注入的决策证据
   if(window._pendingDecisions){window._pendingDecisions.forEach(function(e){allEvidence.push(e)})}
   // === 七步层次树渲染 ===
   const phaseGroups=[
     {tag:'SP',label:'战略规划 (SP)',color:'#1890ff',phases:[
-      {step:'SP[1]',label:'业绩差距分析',keys:['2025年营收¥480亿 vs 目标¥520亿，差距¥40亿（7.7%）','净利润¥58亿 vs 目标¥85亿，差距¥27亿，主因原材料成本上涨22%']},
+      {step:'SP[1]',label:'业绩差距分析',keys:['2025年全球销售收入8,809亿元，同比+2.2%，五大产业组合韧性增强','净利润680亿元，营业利润率11.0%（+1.8p.p.），盈利质量持续改善']},
       {step:'SP[2]',label:'市场洞察',subs:[
-        {sub:'(1)看趋势',keys:['中国高端医疗影像设备市场2026年规模¥520亿，CAGR 15%','十四五规划明确高端医疗装备国产化率≥70%目标，政策窗口期3年']},
-        {sub:'(2)看市场与客户',keys:['三甲医院影像科主任最关注：AI辅助诊断准确率(82%)、设备维保响应(74%)、扫描速度(68%)']},
+        {sub:'(1)看趋势',keys:['全球AI算力市场2026年规模$1,200亿，CAGR 35%，华为昇腾生态位列中国第一','中国智能汽车市场2026年L3级智驾渗透率预计达25%，乾崑智驾ADS4业界首个高速L3商用方案','全球5G-A商用加速：40+运营商发展新模式，华为承建50张5G-A网络']},
+        {sub:'(2)看市场与客户',keys:['运营商客户核心诉求：从流量经营迈向体验经营，确定性体验成为差异化关键','政企客户：500+行业智能化场景亟待平台化，59,000+合作伙伴生态']},
         {sub:'(3)看竞争',subs:[
-          {sub:'市场格局',keys:['TOP3（GE/西门子/飞利浦）占62%份额，但国产替代率已从18%升至35%']},
-          {sub:'关键对手动态',keys:['华为联影联合推出AI-CT，上市18个月签约42家三甲，速度超预期']}
+          {sub:'云计算市场格局',keys:['全球云计算市场TOP3（AWS 32%/Azure 23%/阿里云 10%），华为云份额5.2%排名第五']},
+          {sub:'智能汽车竞争',keys:['智能汽车芯片竞争：英伟达Thor 2026Q4量产，高通Snapdragon Ride Flex加速']}
         ]},
         {sub:'(4)看自己',subs:[
-          {sub:'核心能力',keys:['内部：已获8项核心专利、3项NMPA注册证在途，研发团队120人']},
-          {sub:'关键短板',keys:['核心差距：AI算法人才缺口22人、渠道覆盖仅45%、品牌认知度28%']}
+          {sub:'核心能力',keys:['内部：昇腾910C量产、鸿蒙生态35万+应用、乾崑智驾140万+辆搭载']},
+          {sub:'关键短板',keys:['核心差距：Cloud&AI BG收入达成65%、AI算力人才缺口280人、芯片国产化率仅35%']}
         ]},
-        {sub:'(5)看机会',keys:['机会窗口：AI影像诊断+国产替代双驱动，3年内可抢占15-20%份额']},
-        {sub:'(6)机会差距',keys:['县域及基层医疗市场未纳入规划（规模约¥80亿/年）','AI辅助诊断在非影像科室（病理/心电/超声）的需求尚未覆盖']}
+        {sub:'(5)看机会',keys:['机会窗口：5G-A+AI+云+车四大产业协同，3年内可构建端到端智能化解决方案壁垒']},
+        {sub:'(6)机会差距',keys:['全球南方市场（东南亚/中东/非洲）5G建设加速，未纳入主流规划（规模约$300亿/年）','AI在制造/能源/金融行业的垂直大模型需求爆发，华为盘古大模型可覆盖但生态待建']}
       ]},
-      {step:'SP[3]',label:'战略意图',keys:['2028年营收达¥50亿，其中高端CT/MR占60%、AI诊断服务占25%','市场份额2028年达25%，三甲覆盖率≥35%（105家）','累计发明专利≥15项、NMPA三类注册证≥8项','整体毛利率≥60%，研发费用率维持在20-22%']},
-      {step:'SP[4]',label:'创新焦点',keys:['AI影像辅助诊断引擎：基于Transformer的多模态融合，目标准确率≥95%','商业模式创新：设备销售→"设备+AI诊断SaaS订阅"，ARPU提升3倍']},
-      {step:'SP[5]',label:'业务设计',keys:['价值主张：国产高端影像+AI辅助诊断一体化方案，总成本比进口低40%','战略控制点：核心算法专利池+三甲医院临床数据库+国产供应链认证']},
-      {step:'SP[6]',label:'执行设计',keys:['2026关键任务：①完成3款CT/MR注册 ②签约30家三甲 ③AI引擎FDA/CE预审','组织保障：新建AI研究院(50人)、扩建临床支持团队(30人)、渠道团队(40人)']}
+      {step:'SP[3]',label:'战略意图',keys:['2028年营收目标突破¥1万亿，其中战略业务（车/云/计算）占比≥40%','昇腾AI算力市场份额2028年≥25%，鸿蒙生态设备≥50M，开发者≥2,000万','累计发明专利≥15万件、研发投入占比维持在20%以上','整体营业利润率≥15%，经营性现金流≥¥1,500亿，资产负债率<60%']},
+      {step:'SP[4]',label:'创新焦点',keys:['AI全栈创新：昇腾910C→灵衢2.0互联协议→盘古大模型5.0→AI原生应用生态','商业模式创新：从设备销售→"联接+计算+云+AI"一体化服务，订阅收入占比目标30%']},
+      {step:'SP[5]',label:'业务设计',keys:['价值主张：以AI为核心的全栈解决方案，帮助客户实现"有利润的收入，有现金流的利润"','战略控制点：昇腾AI芯片IP+鸿蒙OS生态+乾崑智驾系统+华为云AI开发平台']},
+      {step:'SP[6]',label:'执行设计',keys:['2026关键任务：①昇腾910C规模商用突破1,800+智算客户 ②乾崑ADS4搭载200万+辆 ③鸿蒙生态设备50M','组织保障：AI研究院扩至500人、引望独立运营智能汽车战略载体、Cloud&AI BG独立核算']}
     ]},
     {tag:'BP',label:'业务计划 (BP)',color:'#00875A',phases:[
-      {step:'BP[1]',label:'澄清战略方向',keys:['年度战略主题1：高端CT/MR产品线突破 — 源于SP创新焦点+业务设计','年度战略主题2：AI诊断平台商业化 — 源于SP业务设计+市场洞察','年度战略主题3：国产供应链认证与本地化 — 源于SP竞争分析+风险应对']},
-      {step:'BP[2]',label:'导出战略举措',keys:['举措1.1：高端CT/MR产品线 — 完成256排CT和3.0T MR研发及NMPA注册','举措1.2：三甲医院渠道建设 — 2026年签约28家，覆盖北上广+省会城市','举措1.3：AI诊断SaaS平台 — Q2完成MVP，Q3启动10家试点医院','举措1.4：供应链韧性建设 — 核心器件国产替代率从35%→60%']},
-      {step:'BP[3]',label:'导出衡量指标',keys:['CSF-1产品竞争力 → 专利数≥3项、NMPA注册≥2项、AI准确率≥95%','CSF-3市场覆盖面 → 三甲签约28家、渠道覆盖率80%、品牌认知度≥40%','CSF-6运营效率 → 供应链成本指数<¥1.5亿、产品上市周期≤12个月']},
-      {step:'BP[4]',label:'确定措施目标',keys:['举措1.2渠道建设：Q1-Q4逐季签约6/8/8/6家，年末累计28家','举措1.3人才引进：AI算法22人+临床支持30人+渠道销售40人，Q2到位70%','举措1.1研发预算：¥2.2亿（硬件¥1.2亿+AI软件¥0.7亿+临床¥0.3亿）']},
-      {step:'BP[5]',label:'分解措施目标',keys:['举措1.2渠道RACI：CMO总负责→区域总监执行→销售经理落地','Q1渠道阶段目标：完成北上广6家三甲签约，组建15人直销团队','核心岗位薪酬对标：AI架构师需上浮25-35%至市场P75分位']},
-      {step:'BP[6]',label:'导出工作计划',keys:['Q1工作包：产品→完成256排CT设计评审；渠道→签约6家；AI→完成算法选型','关键依赖：NMPA型检排期(Q2)、华为联影芯片供应确认(Q1)、临床试验伦理审批(Q2)','风险预案：核心芯片若禁运→启动展锐/海光替代方案（+3个月周期）']}
+      {step:'BP[1]',label:'澄清战略方向',keys:['年度战略主题1：AI算力领先 — 昇腾+灵衢+盘古全栈突破，源于SP创新焦点','年度战略主题2：智能汽车规模化 — 乾崑ADS4+引望生态，源于SP市场洞察+业务设计','年度战略主题3：芯片供应链韧性 — 昇腾国产化+先进封装突破，源于SP竞争分析+风险应对']},
+      {step:'BP[2]',label:'导出战略举措',keys:['举措1：Cloud&AI BG扭亏 — 聚焦AI算力，砍边缘云服务，目标收入达成率≥85%','举措2：企业BG数字化 — 伙伴平台化+AI赋能，伙伴数字化覆盖率从42%→80%','举措3：芯片供应链韧性 — 昇腾910C量产+14nm以上国产化率从35%→70%','举措4：现金流优化 — 加速应收回收+优化资本结构，资产负债率目标<60%']},
+      {step:'BP[3]',label:'导出衡量指标',keys:['CSF-1技术领先 → AI算力市场份额≥15%、昇腾客户≥1,800家、专利≥15万件','CSF-3生态繁荣 → 鸿蒙开发者≥1,200万、伙伴数字化率≥80%、引望合作≥15家','CSF-6运营效率 → 云服务毛利率≥45%、芯片国产化率≥70%、资产负债率<60%']},
+      {step:'BP[4]',label:'确定措施目标',keys:['Cloud&AI BG：Q1-Q4逐季收入达成60%/70%/80%/85%，研发预算控制在¥300亿以内','企业BG数字化：Q1平台MVP上线→Q2试点50家伙伴→Q3推广500家→Q4覆盖80%','芯片供应链：Q1昇腾910C产能爬坡→Q2国产化率50%→Q3 14nm认证→Q4国产化率70%']},
+      {step:'BP[5]',label:'分解措施目标',keys:['Cloud&AI BG RACI：CTO总负责→Cloud BU执行→AI研究院支撑→财务BP监控','Q1阶段目标：Cloud&AI完成业务诊断+裁撤30%低效云服务，企业BG完成数字化平台MVP','核心岗位薪酬对标：AI首席科学家需上浮25-35%至市场P75分位，防止核心人才流失']},
+      {step:'BP[6]',label:'导出工作计划',keys:['Q1工作包：Cloud&AI→完成业务诊断+组织调整；芯片→昇腾910C产能验证；企业→数字化平台MVP','关键依赖：昇腾910C 7nm产能确认(Q1)、引望合作伙伴签约(Q2)、鸿蒙生态临界点突破(Q3)','风险预案：若7nm以下制程完全禁运→启动14nm Chiplet堆叠方案（性能损失30%但可用）']}
     ]},
     {tag:'EM',label:'执行管理 (EM)',color:'#B86E00',phases:[
-      {step:'EM[1]',label:'执行进度监控',keys:['Q1产品：256排CT机械设计完成、3.0T MR磁体方案冻结','Q1渠道：已签约4家三甲（北京2/上海1/广州1），达成率67%','Q1人才：AI团队到位8/22人、渠道团队到位12/40人，整体达成率32%']},
-      {step:'EM[2]',label:'资源效率',keys:['研发投入产出：2项发明专利申请、1项软件著作权、AI模型准确率提升至91%','关键人才留存率94%，但AI架构师岗位招聘周期长达45天（目标30天）']},
-      {step:'EM[3]',label:'结果评价',keys:['Q1综合评估：产品进度正常、渠道和招聘滞后，整体偏差约-12%','战略弹性测试：若芯片禁运→产品上市延迟5-7个月，NPV影响¥2.8亿']}
+      {step:'EM[1]',label:'执行进度监控',keys:['Q1 Cloud&AI：业务诊断完成、裁撤3条低ROI产品线、AI算力客户新增120家','Q1芯片：昇腾910C良率提升至78%（目标85%）、14nm国产化认证启动3家代工厂','Q1企业BG：数字化平台MVP延期2周、伙伴试点报名52家（超预期）']},
+      {step:'EM[2]',label:'资源效率',keys:['研发投入产出：昇腾910C对比A100推理性能达85%、3项核心专利通过PCT国际阶段','关键人才留存率92%，但AI架构师岗位招聘周期长达55天（目标30天），3名首席科学家拟离职']},
+      {step:'EM[3]',label:'结果评价',keys:['Q1综合评估：芯片良率爬坡滞后、Cloud&AI改革开局良好、企业BG数字化延期可控，整体偏差约-8%','战略弹性测试：若7nm以下全面禁运→AI算力产能下降60%，2026年营收影响¥1,500亿，NPV影响¥4,500亿']}
     ]}
   ];
   function renderPhaseTree(){
@@ -2635,12 +2639,12 @@ function buildWorkbench(){
 
   // 右栏：辩论室
   const debateMsgs=[
-    {agent:'CMO',stance:'pro',text:'窗口期极佳，竞品尚在观望。市场增量15%意味着每等一个月就损失¥4.3亿的市场机会。激进进入是唯一正确的选择——速度就是一切。'},
-    {agent:'CFO',stance:'con',text:'投资回收期5年，远超行业基准（3.5年）。如果市场增量跌到10%以下，我们会在第4年面临现金流断裂。必须先合资试水，用实际数据验证假设。'},
-    {agent:'CTO',stance:'neutral',text:'从技术角度看，我们的核心模块（AI影像引擎）还有3个月才过NMPA验证。合资模式可以借用合作伙伴的已有资质，但这个窗口只有6个月。我的建议：先合资进入，同时并行自建技术栈。'},
-    {agent:'COO',stance:'pro',text:'供应链可复用现有体系。我们与8家三甲医院已有合作基础，渠道团队可以支撑自建模式。但需要CHO确认人才引进计划。'},
-    {agent:'CEO',stance:'pro',text:'这是长期战略价值的赌注。5年回收期看着长，但高端医疗设备的客户生命周期价值是20年+。我支持CMO的判断，但CFO的财务风险必须被对冲——合资是折中方案。'},
-    {agent:'CHO',stance:'neutral',text:'自建模式需要6个月内到位22名核心人才——在当前人才市场，这个目标极其激进。我已经和3所高校谈过联合培养方案，但最快见效也要9个月。这是执行维度的最大风险。'}
+    {agent:'CMO',stance:'pro',text:'AI算力市场CAGR 35%，昇腾生态已位列中国第一。Cloud&AI BG虽然有亏损压力，但聚焦AI算力、砍掉边缘云服务是正确方向。200亿研发投入必须坚持——这是未来5年最大的增长引擎。'},
+    {agent:'CFO',stance:'con',text:'Cloud&AI BG收入达成仅65%，研发预算超支28%（¥4,200亿）。如果持续亏损，会拖累集团整体利润率跌破10%。建议先将研发预算砍至¥150亿，止血优先，再谈增长。'},
+    {agent:'CTO',stance:'neutral',text:'昇腾910C对比A100推理性能已达85%，但良率只有78%（目标85%）。技术层面可追赶，但美国BIS若全面禁运7nm以下制程，我们的备选方案——14nm Chiplet堆叠——性能会损失30%。建议：维持研发投入但加速14nm备选验证，双线并行。'},
+    {agent:'COO',stance:'pro',text:'供应链端，14nm以上产能SMIC可保障，但需提前锁定2026全年产能。建议Q1完成3家代工厂认证协议。另外Cloud&AI裁撤的3条产品线人员可转岗至昇腾和盘古团队，减少裁员成本。'},
+    {agent:'CEO',stance:'pro',text:'AI算力是华为未来20年的战略底座。短期亏损可以接受——运营商BG和消费者BG的利润可以反哺。但CFO的担忧也需要尊重：设一个18个月的止损线，届时若Cloud&AI收入达成不到85%，重新评估投入规模。'},
+    {agent:'CHO',stance:'neutral',text:'AI首席科学家离职风险是最大的执行隐患。市场薪酬已高出我们35%，3名核心科学家同时谈离职。我已启动"天才少年2.0"计划+外部引进方案，但9个月内效果有限。建议：先将核心10人的薪酬调至P75分位，成本增加¥1.2亿/年。'}
   ];
   let debateHTML='<div class="workbench-panel"><h3>💬 辩论室 <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400;">— 6/7角色已发言</span></h3><div id="wb-consensus"></div><div class="debate-thread" id="wb-debate-thread">';
   debateMsgs.forEach(dm=>{
@@ -2659,12 +2663,26 @@ function buildWorkbench(){
     buildTrendCell(wbScoreContainer,'wb-','bp','BP','#00875A',1.0,1);
     var wbUpdateTrends=buildTrendCell(wbScoreContainer,'wb-','em','EM','#B86E00',0.82,1);
     function calcScoresGeneric(params){
-      var p=function(k){return params[k]||(PARAM_REGISTRY[k]?PARAM_REGISTRY[k].default:0)};
-      var dir=clamp(0.92-(15-p('mkt_growth'))*0.018-(p('comp_lead'))*0.045+(p('localization')-55)*0.001+(p('mkt_share')-18)*0.003+(p('patent_count')-3)*0.015+(p('channel_cov')-75)*0.002,0,1);
-      // decode: SP→BP翻译质量 — BP[1-3]参数加权
-      var dec=clamp(1.0-(p('rd_budget')<1.5?0.08:0)-(p('hc_gap')>20?0.05:0)+(p('talent_pool')>50?0.03:0)+(p('sp_bp_alignment')-85)*0.003+(p('initiative_coverage')-90)*0.002+(p('metric_coverage')-88)*0.002,0,1);
-      // execution: BP[4-6]+RT参数加权
-      var exec=clamp((88-(2.0-p('rd_budget'))*25-(p('hc_gap'))*0.7+(p('train_cycle')<6?5:0)-(p('launch_cycle')>12?3:0)+(p('milestone_achieve')-72)*0.4+(p('budget_measure_match')-82)*0.3+(p('talent_retention')-88)*0.35+(p('risk_mitigation_cov')-65)*0.25)/100,0,1);
+      // 华为量级通用评分：以 PARAM_REGISTRY 默认值为基准，计算偏差驱动评分
+      var p=function(k,def){var v=params[k];if(v!==undefined&&v!==null)return v;var r=PARAM_REGISTRY[k];return r?r.default:(def||0)};
+      // direction: 市场增速↑好、国产替代↑好、渠道↑好、竞争压力↓好
+      var mkt=p('mkt_growth',15),loc=p('localization',50),comp=p('comp_lead',0);
+      var dir=mkt>=25?0.92:mkt>=15?0.78:mkt>=10?0.62:mkt>=5?0.45:0.30;
+      dir=clamp(dir+(loc>=60?0.06:loc>=40?0.03:loc>=20?0:-0.03)-(comp>6?0.08:comp>3?0.04:0),0,1);
+      // decode: 研发充足↑好、人才缺口↓好、人才热度↑好
+      var rd=p('rd_budget',2.0),hc=p('hc_gap',0),tp=p('talent_pool',60);
+      var dec=0.70;
+      if(rd>=2000)dec+=0.15;else if(rd>=1500)dec+=0.10;else if(rd>=500)dec+=0.05;else if(rd<200)dec-=0.10;
+      if(hc<=50)dec+=0.08;else if(hc<=150)dec+=0.04;else if(hc>300)dec-=0.08;
+      if(tp>=60)dec+=0.05;else if(tp<30)dec-=0.05;
+      dec=clamp(dec,0,1);
+      // execution: 里程碑↑好、人才留存↑好、风险缓解↑好
+      var ms=p('milestone_achieve',72),tr=p('talent_retention',88),rc=p('risk_mitigation_cov',65);
+      var exec=0.65;
+      exec+=(ms-70)*0.006+(tr-88)*0.008+(rc-65)*0.005;
+      if(p('launch_cycle',12)>18)exec-=0.10;
+      if(p('train_cycle',9)>15)exec-=0.06;
+      exec=clamp(exec,0,1);
       return{direction:dir,decode:dec,execution:exec};
     }
     window._updateWB=function(){
