@@ -295,6 +295,29 @@ Day 3: 邀请高管审批 → 获得反馈 → 完成第一个 Checkpoint
 
 ---
 
+### Shared Data Architecture — PARAM_REGISTRY
+
+**决策舱与工作台共享的参数注册表（26 参数 × 6 tier）：**
+
+`PARAM_REGISTRY` 是样机 v2.1 的核心数据架构，定义了推演沙盘和证据聚合引擎统一使用的参数体系。每个参数包含 `name`（中文名）、`unit`（单位）、`tier`（分类）、`default`（默认值）四个属性。
+
+| Tier | 数量 | 代表参数 | UX 用途 |
+|------|------|---------|--------|
+| **环境** | 4 | mkt_growth（市场增速%）、localization（国产替代率%）、policy_support（政策支持度）、comp_lead（竞品提前月数） | 决策舱滑块 + 工作台外部环境参数面板 |
+| **战略** | 3 | mkt_share（目标市场份额%）、channel_cov（渠道覆盖率%）、patent_count（专利数） | SP 方向评分计算输入 |
+| **解码** | 3 | sp_bp_alignment（SP-BP 映射完整度%）、initiative_coverage（举措覆盖完整度%）、metric_coverage（指标覆盖率%） | BP 解码评分计算输入 + 解码追溯带权重标注 |
+| **执行** | 10 | rd_budget（研发预算¥亿）、hc_gap（人才缺口人）、salary_comp（薪资竞争力%）、talent_pool（人才市场热度分）、supply_cost（供应链成本¥亿）、launch_cycle（上市周期月）等 | 决策卡滑块主体 + AI 代偿策略触发条件 + 工作台推演沙盘动态参数面板 |
+| **监控** | 2 | milestone_achieve（里程碑达成率%）、talent_retention（关键人才留存率%） | EM 执行评分的实时监控输入 |
+| **风险** | 4 | payback_years（投资回收期年）、cashflow_risk（现金流压力等级）、compliance（合规风险等级）、risk_mitigation_cov（风险缓解覆盖率%） | 风险雷达面板 + AI 代偿现金流/合规策略触发 |
+
+**设计含义：**
+- 决策舱滑块通过 `paramKey` 映射到 PARAM_REGISTRY 条目，滑块标签/单位/默认值自动从注册表解析
+- 工作台证据聚合引擎通过 PARAM_REGISTRY 识别每条证据的 `params` 字段，按新鲜度权重×置信度加权平均计算参数值
+- 26 个参数覆盖了从 SP 环境分析到 EM 执行监控的全链路，保证决策舱与工作台的数据一致性
+- 新增参数只需在 PARAM_REGISTRY 注册即可自动出现在工作台动态参数面板（按 tier 分组）
+
+---
+
 **以上核心体验定义将指导后续所有 UX 设计决策。**
 
 ---
