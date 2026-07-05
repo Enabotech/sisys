@@ -4,15 +4,16 @@ inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/architecture.md
   - _bmad-output/planning-artifacts/ux-design-specification.md
+  - _bmad-output/planning-artifacts/ux-design-prototype-v2.1.html
   - docs/or.md
   - docs/developer/EPIC_0_REFACTORED.md
 workflowType: 'epics-and-stories'
 projectName: 'sisys'
 userName: 'Agimtech'
 date: '2026-02-28'
-documentStatus: 'round-5-final-complete'
-lastUpdated: '2026-05-29'
-updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节点 + 关键路径识别 + Epic 1 存档'
+documentStatus: 'sync-prd-v1.1.0'
+lastUpdated: '2026-07-05'
+updateReason: '与 PRD v1.1.0 (145 FR) / UX Spec v2.0.0 / HTML 样机 v2.1 同步 — FR-UI 13→23 项扩展 + FR-IF 新增 7 项 + NFR 40→47 项 + 三页面驾驶舱 Epic 扩展'
 ---
 
 # sisys - Epic Breakdown
@@ -27,9 +28,9 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 
 ### Functional Requirements
 
-**共 131 项功能需求（FR-SA-10 群体智能为 V3+，不纳入本次分解），按优先级划分：**
+**共 145 项功能需求（FR-SA-10 群体智能为 V3+，不纳入本次分解），按优先级划分：**
 
-#### P0 (MVP) - 59 项
+#### P0 (MVP) - 69 项
 
 **文档与数据管理 (DM-01 ~ DM-08) - 8 项：**
 - FR-DM-01: 支持 17 种格式文档上传 (pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/html + zip/tar 压缩包)
@@ -72,14 +73,26 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 - FR-SP-03: 创建 Checkpoint 快照（阶段标识、完成状态、用户反馈、修正记录）
 - FR-SP-04: 输出 JSON 思维链（Input→<Reflection>→<Tools_Used>→<Constraints_Check>→JSON）
 
-**用户交互与报告 (UI-01 ~ UI-07) - 7 项：**
+**用户交互与报告 (UI-01 ~ UI-12, UI-23) - 13 项：**
 - FR-UI-01: 通过 CLI 执行命令（文档上传/Agent 调用/规划生成/Checkpoint 恢复）
 - FR-UI-02: 通过 REST API 提供接口（文档管理/工具调用/Agent 协作/规划生成/系统管理）
 - FR-UI-03: 通过 API Gateway 统一入口处理所有外部请求（统一认证/限流/路由/安全控制）
-- FR-UI-04: 生成多格式报告（PDF/Markdown），包含可点击的引文索引
-- FR-UI-05: 查看 Checkpoint 摘要并修正关键参数后恢复运行
-- FR-UI-06: 展示溯源树（从结论逐层展开至原始数据）
-- FR-UI-07: 支持高管简化视图（仪表盘/审批中心/审计摘要）
+- FR-UI-04: 提供决策舱总览仪表盘 — KPI 仪表盘（10 项指标含趋势迷你图）+ 风险雷达 TOP3 + BG 健康矩阵（RAG 状态）+ 财务量化摘要条，加载<2s
+- FR-UI-05: 提供三重置信度评分系统 — SP/BP/EM 三维独立评分条 + 趋势历史≥50 点 + 四阶段动画（流光→光晕/震动→计数→呼吸）+ 最弱维度 4 级风险提示
+- FR-UI-06: 提供决策卡片系统 — 5 张卡片按严重度排序 + 折叠/展开态 + 轮播导航 + 卡片联动脉冲动画
+- FR-UI-07: 提供物理仿真参数滑块 — 惯性动量（decay=0.94）+ notch 吸附（AI 推荐位）+ 涟漪反馈 + 弹簧回弹 + 键盘可访问，响应<16ms（60fps）
+- FR-UI-08: 提供 AI 代偿引擎界面 — 风险梯度检测 + 26 种策略（8 大风险类别）+ 预览/采纳/撤销 + 三段式风险叙述 + 过期数据警告
+- FR-UI-09: 提供 SP→BP 解码追溯带（Decode Ribbon）— SP↔BP 双向跳转 + CSF→KPI→目标值→权重完整链路，追溯跳转<100ms
+- FR-UI-10: 支持决策卡片联动与重排序 — 联动闪烁 + 自动重排序 + 全部处理完毕检测 + 决策证据自动沉淀至工作台
+- FR-UI-11: 支持报告生成（PDF/Markdown），含可点击的引文索引，标准报告<30 秒
+- FR-UI-12: 提供战略地图（Strategy Map）— BSC 四层瀑布流（财务→客户→内部运营→学习与成长）+ 因果箭头 + 战略主题卡片 + KPI 表格 + 折叠/展开交互，四层全展开渲染<1s
+- FR-UI-23: 提供键盘快捷键（Ctrl+1/2/3 三页面切换 + Esc 关闭弹窗）+ 移动端响应式（768/1200/1400px 三断点自适应）
+
+**接口与协议 (IF-01 ~ IF-04) - 4 项：**
+- FR-IF-01: 保证 CLI 接口符合七条核心原则（内部工具 100% 有 CLI 入口 / Skills 渐进式加载 / Skill=SOP / MCP 退居生态层 / Less scaffolding / 负向触发条件 / input_examples 驱动）
+- FR-IF-02: 执行 Skills 三级渐进式加载（L1 TOOLS.md <200 tokens → L2 SKILL.md <500 行 → L3 scripts/references 按需加载）
+- FR-IF-03: 定义 SAP（sisys Agent Protocol）消息 Schema（REQUEST/RESPONSE/NOTIFICATION/BROADCAST/DEBATE 五种消息类型 + 公共黑板 MVCC）
+- FR-IF-04: 监听 10 种领域事件并触发下游用例（DocumentProcessed/ToolExecuted/AgentDecided/CheckpointReached 等），双通道分发（Redis Pub/Sub + RabbitMQ），幂等性保证
 
 **系统管理与合规 (SC-01 ~ SC-08) - 8 项：**
 - FR-SC-01: 管理用户认证与 RBAC 权限（用户表/角色表/权限表/关联表）
@@ -112,7 +125,7 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 - FR-AR-03: 执行跨存储事务基础（PostgreSQL 事务，MVP 方案），保证最终一致性
 - FR-AR-04: 通过仓储模式向领域层提供统一存储接口（领域层不直接依赖具体存储实现）
 
-#### P1 (V1) - 48 项
+#### P1 (V1) - 55 项
 
 **文档与数据管理 (DM-09 ~ DM-12) - 4 项：**
 - FR-DM-09: 追溯每个解析后的数据切片至导入批次与原始文件版本
@@ -151,12 +164,20 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 - FR-SP-09: 执行 Time-travel 两阶段能力（单点恢复/分支对比）
 - FR-SP-10: 支持红蓝辩论机制完整实现（发散 Temperature=0.8→收敛 Temperature=0.5→裁决 Temperature=0.2）
 
-**用户交互与报告 (UI-08 ~ UI-12) - 5 项：**
-- FR-UI-08: 可视化展示决策过程（关键决策路径和依据）
-- FR-UI-09: 创建/切换/删除分支，提供分支差异对比视图
-- FR-UI-10: 展示 Checkpoint 恢复模式选择界面（影响范围、推荐模式、风险提示）
-- FR-UI-11: 支持无障碍设计（WCAG 2.1 AA，键盘导航，屏幕阅读器兼容）
-- FR-UI-12: 支持多语言界面（中文/英文切换）
+**用户交互与报告 (UI-13 ~ UI-20) - 8 项：**
+- FR-UI-13: 提供工作台完整交互 — 三栏布局（战略证据链七步层次树（50 条预置证据覆盖 15 工序）+ 推演沙盘（情景切换：乐观/保守/自定义/决策 + 证据聚合引擎 + 动态参数面板）+ 辩论室（Agent 发言气泡 + 共识条 + 11 个参数辩论链 + 用户手动输入））
+- FR-UI-14: 可视化展示决策过程（关键决策路径和依据）
+- FR-UI-15: 创建/切换/删除分支，提供分支差异对比视图
+- FR-UI-16: 展示 Checkpoint 恢复模式选择界面（影响范围、推荐模式、风险提示）
+- FR-UI-17: 支持无障碍设计（WCAG 2.1 AA，键盘导航，屏幕阅读器兼容）
+- FR-UI-18: 支持多语言界面（中文/英文切换）
+- FR-UI-19: 支持辩论共识追踪完整实现（7 Agent 实时投票 + 共识度评分 + 多数派/少数派标注）
+- FR-UI-20: 支持 Checkpoint 摘要查看并修正关键参数后恢复运行
+
+**接口与协议 (IF-05 ~ IF-07) - 3 项：**
+- FR-IF-05: 提供 Web 前端三页面驾驶舱架构（决策舱/工作台/战略地图），含角色自适应视图（高管默认决策舱总览仪表盘 / 分析师默认决策卡片列表 / 战略人员默认战略地图），三页面间数据联动
+- FR-IF-06: 支持无障碍设计，符合 WCAG 2.1 AA 标准（色盲友好 / 键盘导航 / 屏幕阅读器 / prefers-reduced-motion / 200% 字体缩放）
+- FR-IF-07: 支持多语言界面（中文/英文切换），翻译准确率≥95%，术语表统一，切换延迟<100ms
 
 **系统管理与合规 (SC-09 ~ SC-12) - 4 项：**
 - FR-SC-09: 对敏感数据脱敏（个人可识别信息、商业机密）
@@ -182,7 +203,7 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 - FR-EV-03: 执行 CUSUM 漂移检测与触发重校准（Agent 输出质量连续降级时自动告警并触发重新校准）
 - FR-EV-04: 实现 CheckpointWithEvaluation 集成（Checkpoint 快照携带评估指标，支持历史质量回溯）
 
-#### P2 (V2) - 24 项
+#### P2 (V2) - 25 项
 
 **文档与数据管理 (DM-13 ~ DM-15) - 3 项：**
 - FR-DM-13: 识别数学公式并输出 LaTeX 与 MathML 双格式表达
@@ -211,8 +232,9 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 - FR-SP-16: 通过 REST API 提供白标品牌定制和监管报告导出，品牌元素准确率 100%
 - FR-SP-17: 通过 REST API 提供风险热力图（高管视图核心可视化），数据更新延迟 < 2s
 
-**用户交互与报告 (UI-13) - 1 项：**
-- FR-UI-13: 支持决策影响分析（Shapley 贡献值，反事实推理）
+**用户交互与报告 (UI-21 ~ UI-22) - 2 项：**
+- FR-UI-21: 支持决策影响分析（Shapley 贡献值，反事实推理）
+- FR-UI-22: 支持 AI 代偿跨卡联动策略（全局参数优化 + 多卡之间 trade-off 分析）
 
 **系统管理与合规 (SC-13 ~ SC-14) - 2 项：**
 - FR-SC-13: 支持 ISO 27001 认证（信息安全管理体系）
@@ -230,7 +252,7 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 
 ### Non-Functional Requirements
 
-**共 40 项非功能需求，按类别划分：**
+**共 47 项非功能需求，按类别划分：**
 
 #### 性能 (NFR-PERF-01 ~ NFR-PERF-07) - 7 项
 
@@ -307,6 +329,18 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 | NFR-ACC-01 | 无障碍设计 | WCAG 2.1 AA 标准，键盘导航 100% 支持，屏幕阅读器兼容 |
 | NFR-ACC-02 | 多语言支持 | 中文/英文界面，翻译准确率≥95%，术语表统一 |
 
+#### 接口性能 (NFR-IF-01 ~ NFR-IF-07) - 7 项
+
+| 编号 | 需求 | 验收标准 |
+|------|------|---------|
+| NFR-IF-01 | 决策舱仪表盘加载 | 总加载延迟 < 2s（含 KPI 迷你图 sparkline canvas 渲染≤100ms） |
+| NFR-IF-02 | 三重评分计算延迟 | < 100ms（SP/BP/EM 三维评分 + 趋势历史读取 + Delta 计算） |
+| NFR-IF-03 | 滑块响应帧率 | ≥ 60fps（惯性滑动时 requestAnimationFrame 监控，无跳帧） |
+| NFR-IF-04 | 战略地图渲染 | 四层全展开 < 1s（BSC 财务→学习与成长 + 因果箭头动画） |
+| NFR-IF-05 | SP→BP 追溯跳转 | < 100ms（Decode Ribbon 双向跳转 + 卡片 scrollIntoView 定位） |
+| NFR-IF-06 | 证据树展开响应 | < 100ms（三级嵌套节点折叠/展开动画），辩论首条消息延迟 < 200ms |
+| NFR-IF-07 | 页面切换延迟 | < 100ms（Ctrl+1/2/3 切换决策舱/工作台/战略地图 + 导航高亮更新） |
+
 ---
 
 ### Additional Requirements
@@ -340,32 +374,40 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 
 #### 从 UX Design 提取的要求
 
-**1. 核心体验要求：**
-- 高保真溯源：Bounding Box 坐标级跳转至原始文档，响应<300ms，定位准确率≥95%
-- 高管仪表盘：第一屏仅显示 3 个关键指标，红/黄/绿状态指示器，30 秒理解率≥90%
-- 白标报告：品牌元素（Logo/配色/字体）100% 准确应用，导出时间<1 分钟
+**1. 三页面驾驶舱架构（与 ux-design-prototype-v2.1.html 对齐）：**
+- 决策舱（Page 1）：总览仪表盘（KPI 10 项+风险雷达 TOP3+BG 健康矩阵 5 条目）+ 决策卡片轮播（5 张：Cloud&AI/芯片/现金流/企业BG/智能汽车）+ 三重置信度评分（SP/BP/EM）+ 物理仿真滑块 + AI 代偿面板（26 策略/8 风险类别）+ SP→BP 解码追溯带
+- 工作台（Page 2）：三栏布局 — 战略证据链（七步层次树/50 条证据/15 工序）+ 推演沙盘（情景切换/证据聚合引擎 calcScoresGeneric/动态参数面板）+ 辩论室（11 参数辩论链/共识追踪）
+- 战略地图（Page 3）：BSC 四层瀑布流（财务深蓝→客户绿→内部运营紫→学习成长琥珀）+ 因果箭头 + 战略主题卡片 + KPI 表格 + 折叠展开交互
 
-**2. 设计系统要求：**
-- Ant Design 5.x + CSS-in-JS + Design Tokens
-- 三视图架构：高管视图（简化决策）、分析师视图（专业工具）、企业战略与市场人员视图（流程标准化）
+**2. 共享数据架构 — PARAM_REGISTRY：**
+- 26 参数 × 6 tier（环境 4/战略 3/解码 3/执行 10/监控 2/风险 4），决策舱滑块与工作台证据聚合引擎统一使用
+- 证据新鲜度权重折扣：fresh=1.0 / usable=0.9 / stale=0.75
+- 证据聚合引擎：多源证据按新鲜度权重×置信度加权平均计算参数值
 
-**3. 情感目标：**
-- 高管：掌控感（30 秒决策）
-- 企业战略人员：成就感（30 秒溯源）
-- 顾问：专业感（白标输出可直接交付客户）
+**3. 物理仿真交互模型：**
+- 滑块：惯性动量（decay=0.94）+ notch 吸附（3% 范围）+ 涟漪反馈（0.6s）+ 弹簧回弹（cubic-bezier 弹性曲线）
+- 评分条：四阶段动画交响乐（流光扫过 0.3s → 颜色过渡 0.8s → 数字平滑计数 1.2s → 持续微呼吸 6s）
+- AI 代偿：三段式风险叙述（你调整了什么→这意味着什么→安全边际还有多少）
 
-**4. 关键交互要求：**
-- 悬浮弹窗溯源卡片：不跳转新页面，保持当前上下文
-- 置信度显示：颜色（绿/黄/红）+ 文字（高/中/低）双重编码
-- 骨架屏加载：模拟真实内容结构，减少感知等待时间
+**4. 设计系统要求：**
+- 样机：纯 HTML5/CSS3/原生 JS（零框架依赖），CSS 自定义属性 45 个
+- 生产：React 18 + TypeScript + Ant Design 5.x + CSS-in-JS + Design Tokens
+- 评分色五级：#C53030/#D46B08/#D48806/#7CB305/#00875A
+- 响应式三断点：768px/1200px/1400px
+
+**5. 导航与快捷键：**
+- Ctrl+1 决策舱 / Ctrl+2 工作台 / Ctrl+3 战略地图 / Esc 关闭弹窗
+- 移动端：决策卡片全屏展开（position:fixed），工作台隐藏，单栏布局
 
 ---
 
 ### FR Coverage Map（双向追溯矩阵）
 
-**完整 FR 总览：131 项功能需求完整映射（P0: 59 项，P1: 48 项，P2: 24 项）**
+**完整 FR 总览：145 项功能需求完整映射（P0: 69 项，P1: 55 项，P2: 25 项，EV: 4 项跨版本）**
 
-#### P0 FR 映射（59 项 - MVP）
+**注：** FR-EV-01~04（Agent 评估与可观测性）源自架构设计文档，作为 PRD 的技术细化补充；新 FR-IF-01~07（接口与协议）和扩展 FR-UI-04~23（23 项 vs 旧版 13 项）为 PRD v1.1.0 新增。
+
+#### P0 FR 映射（69 项 - MVP）
 
 | FR 编号 | FR 描述 | 归属 Epic | 归属 Story | 优先级 |
 |--------|--------|----------|-----------|-------|
@@ -427,25 +469,36 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 | FR-SP-02 | 市场洞察六子步骤 | Epic 6 | Story 6.2 | P0 |
 | FR-SP-03 | Checkpoint 快照 | Epic 6 | Story 6.3 | P0 |
 | FR-SP-04 | JSON 思维链 | Epic 6 | Story 6.4 | P0 |
-| **用户交互与报告 (UI) - 7 项** |
+| **用户交互与报告 (UI) - 13 项** |
 | FR-UI-01 | CLI 接口 | Epic 7 | Story 7.1 | P0 |
 | FR-UI-02 | REST API | Epic 7 | Story 7.2 | P0 |
 | FR-UI-03 | API Gateway | Epic 7 | Story 7.3 | P0 |
-| FR-UI-04 | 多格式报告 | Epic 6 | Story 6.5a/6.5b | P0 |
-| FR-UI-05 | Checkpoint 恢复 | Epic 6 | Story 6.6 | P0 |
-| FR-UI-06 | 溯源树展示 | Epic 6 | Story 6.7 | P0 |
-| FR-UI-07 | 高管简化视图 | Epic 6 | Story 6.8 | P0 |
+| FR-UI-04 | 决策舱总览仪表盘（KPI+风险雷达+BG矩阵） | Epic 21 | Story 21.1 | P0 |
+| FR-UI-05 | 三重置信度评分系统（SP/BP/EM+四阶段动画） | Epic 21 | Story 21.2 | P0 |
+| FR-UI-06 | 决策卡片系统（折叠/展开+轮播+联动脉冲） | Epic 21 | Story 21.3 | P0 |
+| FR-UI-07 | 物理仿真参数滑块（惯性+notch+涟漪+弹簧） | Epic 21 | Story 21.4 | P0 |
+| FR-UI-08 | AI 代偿引擎界面（26策略/8风险类别+预览/采纳/撤销） | Epic 21 | Story 21.5 | P0 |
+| FR-UI-09 | SP→BP 解码追溯带（双向跳转+CSF→KPI链路） | Epic 21 | Story 21.6 | P0 |
+| FR-UI-10 | 决策卡片联动与重排序 | Epic 21 | Story 21.7 | P0 |
+| FR-UI-11 | 多格式报告（PDF/Markdown+引文索引） | Epic 6 | Story 6.5a/6.5b | P0 |
+| FR-UI-12 | 战略地图 BSC 四层瀑布流 | Epic 21 | Story 21.8 | P0 |
+| FR-UI-23 | 键盘快捷键+移动端响应式适配 | Epic 21 | Story 21.9 | P0 |
+| **接口与协议 (IF) - 4 项** |
+| FR-IF-01 | CLI 七原则合规 | Epic 7 | Story 7.1b | P0 |
+| FR-IF-02 | Skills 三级渐进式加载 | Epic 5 | Story 5.2b | P0 |
+| FR-IF-03 | SAP 消息 Schema 定义 | Epic 5 | Story 5.1b | P0 |
+| FR-IF-04 | 10 种领域事件监听+双通道分发 | Epic 1 | Story 1.2b | P0 |
 | **战略档案库 (SA) - 3 项** |
 | FR-SA-01 | 永久存储 | Epic 1 | Story 1.15b | P0 |
 | FR-SA-02 | 有效期标签 | Epic 3 | Story 3.11 | P0 |
 | FR-SA-03 | 数据陈旧标记 | Epic 3 | Story 3.12 | P0 |
 
-**P0 FR 覆盖统计：59/59 项 ✅**
-- AR: 4/4 | SC: 8/8 | CP: 4/4 | DM: 8/8 | SR: 8/8 | ST: 5/5 | AC: 6/6 | EV: 2/2 | SP: 4/4 | UI: 7/7 | SA: 3/3
+**P0 FR 覆盖统计：69/69 项 ✅**
+- AR: 4/4 | SC: 8/8 | CP: 4/4 | DM: 8/8 | SR: 8/8 | ST: 5/5 | AC: 6/6 | EV: 2/2 | SP: 4/4 | UI: 13/13 | IF: 4/4 | SA: 3/3
 
 ---
 
-#### P1 FR 映射（48 项 - V1）
+#### P1 FR 映射（55 项 - V1）
 
 | FR 编号 | FR 描述 | 归属 Epic | 归属 Story | 优先级 |
 |--------|--------|----------|-----------|-------|
@@ -484,12 +537,19 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 | FR-SP-08 | Override 覆盖模式 | Epic 10 | Story 10.4 | P1 |
 | FR-SP-09 | Time-travel 两阶段能力 | Epic 10 | Story 10.5 | P1 |
 | FR-SP-10 | 红蓝辩论机制完整实现 | Epic 10 | Story 10.6 | P1 |
-| **用户交互与报告 (UI) - 5 项** |
-| FR-UI-08 | 决策过程可视化 | Epic 14 | Story 14.1 | P1 |
-| FR-UI-09 | 分支管理 | Epic 14 | Story 14.2 | P1 |
-| FR-UI-10 | Checkpoint 恢复模式选择界面 | Epic 14 | Story 14.3 | P1 |
-| FR-UI-11 | 无障碍设计 | Epic 7 | Story 7.5 | P1 |
-| FR-UI-12 | 多语言界面 | Epic 14 | Story 14.4 | P1 |
+| **用户交互与报告 (UI) - 8 项** |
+| FR-UI-13 | 工作台完整交互（证据树+推演沙盘+辩论室） | Epic 22 | Story 22.1 | P1 |
+| FR-UI-14 | 决策过程可视化 | Epic 22 | Story 22.2 | P1 |
+| FR-UI-15 | 分支管理 | Epic 22 | Story 22.3 | P1 |
+| FR-UI-16 | Checkpoint 恢复模式选择界面 | Epic 22 | Story 22.4 | P1 |
+| FR-UI-17 | 无障碍设计 | Epic 7 | Story 7.5 | P1 |
+| FR-UI-18 | 多语言界面 | Epic 22 | Story 22.5 | P1 |
+| FR-UI-19 | 辩论共识追踪完整实现（7 Agent 实时投票） | Epic 22 | Story 22.6 | P1 |
+| FR-UI-20 | Checkpoint 摘要查看+参数修正恢复 | Epic 22 | Story 22.7 | P1 |
+| **接口与协议 (IF) - 3 项** |
+| FR-IF-05 | Web 前端三页面驾驶舱架构+角色自适应 | Epic 22 | Story 22.8 | P1 |
+| FR-IF-06 | 无障碍设计 WCAG 2.1 AA（色盲/键盘/屏幕阅读器） | Epic 7 | Story 7.5b | P1 |
+| FR-IF-07 | 多语言界面（中/英切换+术语表+延迟<100ms） | Epic 22 | Story 22.5 | P1 |
 | **系统管理与合规 (SC) - 4 项** |
 | FR-SC-09 | 敏感数据脱敏 | Epic 13 | Story 13.1 | P1 |
 | FR-SC-10 | L2 级修正专家确认 | Epic 13 | Story 13.2 | P1 |
@@ -508,12 +568,12 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 | FR-SA-06 | 战略偏差预警事件 | Epic 13 | Story 13.7 | P1 |
 | FR-SA-07 | 分支管理（主线/分支对比） | Epic 13 | Story 13.8 | P1 |
 
-**P1 FR 覆盖统计：48/48 项 ✅**
-- DM: 4/4 | SR: 5/5 | ST: 4/4 | AC: 8/8 | EV: 2/2 | SP: 6/6 | UI: 5/5 | SC: 4/4 | CP: 6/6 | SA: 4/4
+**P1 FR 覆盖统计：55/55 项 ✅**
+- DM: 4/4 | SR: 5/5 | ST: 4/4 | AC: 8/8 | EV: 2/2 | SP: 6/6 | UI: 8/8 | IF: 3/3 | SC: 4/4 | CP: 6/6 | SA: 4/4
 
 ---
 
-#### P2 FR 映射（24 项 - V2）
+#### P2 FR 映射（25 项 - V2）
 
 | FR 编号 | FR 描述 | 归属 Epic | 归属 Story | 优先级 |
 |--------|--------|----------|-----------|-------|
@@ -539,8 +599,9 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 | FR-SP-15 | 情景对比 API（3 方案并排） | Epic 20 | Story 20.3 | P2 |
 | FR-SP-16 | 白标品牌定制与监管报告导出 API | Epic 20 | Story 20.4 | P2 |
 | FR-SP-17 | 风险热力图 API | Epic 20 | Story 20.5 | P2 |
-| **用户交互与报告 (UI) - 1 项** |
-| FR-UI-13 | 决策影响分析（Shapley 贡献值） | Epic 19 | Story 19.1 | P2 |
+| **用户交互与报告 (UI) - 2 项** |
+| FR-UI-21 | 决策影响分析（Shapley 贡献值） | Epic 19 | Story 19.1 | P2 |
+| FR-UI-22 | AI 代偿跨卡联动策略 | Epic 19 | Story 19.1b | P2 |
 | **系统管理与合规 (SC) - 2 项** |
 | FR-SC-13 | ISO 27001 认证 | Epic 16 | Story 16.1 | P2 |
 | FR-SC-14 | 银保监会规范（1104/EAST 报表） | Epic 16 | Story 16.2 | P2 |
@@ -551,8 +612,8 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 | FR-SA-08 | 知识更新主动推送 | Epic 19 | Story 19.2 | P2 |
 | FR-SA-09 | 预测性战略预警（CUSUM 漂移检测） | Epic 19 | Story 19.3 | P2 |
 
-**P2 FR 覆盖统计：24/24 项 ✅**
-- DM: 3/3 | SR: 3/3 | ST: 2/2 | AC: 2/2 | SP: 7/7 | UI: 1/1 | SC: 2/2 | CP: 2/2 | SA: 2/2
+**P2 FR 覆盖统计：25/25 项 ✅**
+- DM: 3/3 | SR: 3/3 | ST: 2/2 | AC: 2/2 | SP: 7/7 | UI: 2/2 | SC: 2/2 | CP: 2/2 | SA: 2/2
 
 ---
 
@@ -569,11 +630,12 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 | AC（Agent 协作） | 6 | 8 | 2 | 16 | ✅ 16/16 |
 | EV（Agent 评估与可观测性） | 2 | 2 | 0 | 4 | ✅ 4/4 |
 | SP（战略规划流程） | 4 | 6 | 7 | 17 | ✅ 17/17 |
-| UI（用户交互与报告） | 7 | 5 | 1 | 13 | ✅ 13/13 |
+| UI（用户交互与报告） | 13 | 8 | 2 | 23 | ✅ 23/23 |
+| IF（接口与协议） | 4 | 3 | 0 | 7 | ✅ 7/7 |
 | SA（战略档案库） | 3 | 4 | 2 | 9 | ✅ 9/9 |
-| **总计** | **59** | **48** | **24** | **131** | ✅ **131/131** |
+| **总计** | **69** | **55** | **25** | **149**¹ | ✅ **149/149** |
 
-**注：** FR-SA-10（群体智能，P3）为 V3+ 版本功能，暂不纳入本次 Epic 分解；FR-IF-01~07（接口与协议）详见 PRD 补充说明，部分验收标准已融入对应 UI/ST/AR 系列 Story；**FR-EV-01~04（Agent 评估与可观测性）源自架构设计文档（sisys-core-domain-design.md 17.3.8），作为 PRD 的技术细化补充**，待后续同步更新至 PRD
+> ¹ 含 FR-EV-01~04（Agent 评估与可观测性，源自架构设计文档）；FR-SA-10（群体智能，P3）为 V3+ 版本功能，暂不纳入本次 Epic 分解。PRD 实际总数 = 145（不含 EV），+ EV = 149。
 
 ---
 
@@ -590,8 +652,8 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 | Story 1.14a/b/c | 自主调用循环（auto-trigger/auto-route/auto-execute） | or.md 系统公理一 | or.md 追溯 |
 | Story 1.15a/b | 外部化记忆（上下文压缩/六层存储协同） | or.md 系统公理二 | or.md 追溯 |
 | Story 1.16 | 集成测试框架 | 测试基础设施 | 测试 Story |
-| Story 6.9 | 分析师视图 | UX 三视图（分析师） | UX Story |
-| Story 6.10 | 顾问视图 | UX 三视图（顾问） | UX Story |
+| Story 6.9 | 分析师视图 | UX 三页面驾驶舱（分析师） | UX Story |
+| Story 6.10 | 顾问视图 | UX 三页面驾驶舱（顾问） | UX Story |
 | Story 7.5 | 无障碍设计 | NFR-ACC-01（可访问性） | NFR Story |
 | Story 7.6 | API 契约测试 | NFR-INT-05（集成性） | NFR Story |
 | Story 7.7 | API E2E 测试 | 端到端测试 | 测试 Story |
@@ -604,6 +666,7 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 - NFR-SCALE（可扩展性）：Story 1.13（K8s 扩缩容）✅
 - NFR-INT（集成性）：Story 7.6（API 契约测试）✅
 - NFR-ACC（可访问性）：Story 7.5（无障碍设计）✅
+- NFR-IF（接口性能）：Story 21.1（决策舱加载<2s NFR-IF-01）、Story 21.2（评分<100ms NFR-IF-02）、Story 21.4（滑块≥60fps NFR-IF-03）、Story 21.8（BSC渲染<1s NFR-IF-04）、Story 21.6（追溯跳转<100ms NFR-IF-05）、Story 22.1（证据树<100ms+辩论<200ms NFR-IF-06）、Story 21.9（页面切换<100ms NFR-IF-07）
 
 ---
 
@@ -615,15 +678,16 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 |---------|---------|-------|--------|---------|---------|
 | Epic 0 | Iteration 0 | P0 | - | 3 | 开发环境、CI/CD、测试框架（合入 Epic 1） |
 | Epic 0 | Iteration 1 | P0 | - | 12 | 开发环境、CI/CD、测试框架（含0-30应用启动集成） |
-| Epic 1 | **企业级架构基础与合规** | P0 | AR-01~04, SC-01/02/03/07/08, CP-01/04, SA-01 | 23 | 系统稳定性、性能、安全、合规（等保 2.0） |
+| Epic 1 | **企业级架构基础与合规** | P0 | AR-01~04, SC-01/02/03/07/08, CP-01/04, SA-01, IF-04 | 24 | 系统稳定性、性能、安全、合规（等保 2.0） |
 | Epic 2 | 文档与数据管理 | P0 | DM-01~08 | 9 | 用户可以上传和管理 17 种格式文档 |
 | Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 13 | 用户可以检索文档并溯源至原始坐标点 |
 | Epic 4 | 战略工具箱 | P0 | ST-01~05 | 9 | 用户可以执行 23 种战略工具分析（含 ST-06~09 P1 V1 扩展） |
-| Epic 5 | Agent 协作系统 | P0 | AC-01~06, EV-01/02 | 10 | 用户可以通过 CEO Agent 执行战略规划（含 EV-03/04 P1 扩展） |
-| Epic 6 | 战略规划流程 (BLM 前两阶段) | P0 | SP-01~04, UI-04/05/06/07 | 12 | 用户可以生成战略规划并审批 |
-| Epic 7 | **多触点用户界面与 API 集成** | P0 | UI-01/02/03, CP-03 | 8 | 用户可以通过 CLI/API/仪表盘操作系统 |
+| Epic 5 | Agent 协作系统 | P0 | AC-01~06, EV-01/02, IF-02/03 | 12 | 用户可以通过 CEO Agent 执行战略规划（含 EV-03/04 P1 扩展） |
+| Epic 6 | 战略规划流程 (BLM 前两阶段) | P0 | SP-01~04, UI-11 | 12 | 用户可以生成战略规划并审批 |
+| Epic 7 | **多触点用户界面与 API 集成** | P0 | UI-01/02/03, CP-03, IF-01 | 9 | 用户可以通过 CLI/API/仪表盘操作系统 |
 | Epic 8 | **用户权限管理与审计合规** | P0 | SC-04/05/06 | 6 | 管理员可以管理权限和审计日志 |
-| **总计** | - | - | **59 项 FR** | **105** | - |
+| Epic 21 | 🆕 **三页面驾驶舱 — 决策舱** | P0 | UI-04~10, UI-12, UI-23 | 9 | 高管 30 秒理解全局态势、拖拽推演 + AI 实时代偿、BSC 四层战略地图可视化 |
+| **总计** | - | - | **69 项 FR** | **118** | - |
 
 **V1 (P1) Epic 列表：**
 
@@ -634,8 +698,9 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 | Epic 11 | UDMR 动态模型路由 | P1 | CP-05~10 | 6 | 云端路由≥80%，本地兜底 |
 | Epic 12 | 知识图谱与 GraphRAG | P1 | SR-09~13 | 6 | GraphRAG 增强检索与实体关联查询 |
 | Epic 13 | 高级系统管理与合规 | P1 | SC-09~12, SA-04~07 | 8 | SOX 合规与时间轴查询 |
-| Epic 14 | 用户体验增强 | P1 | UI-08~12 | 4 | 决策可视化与分支管理 |
-| **总计** | - | - | **38 项 FR** | **38** | - |
+| Epic 14 | 用户体验增强 | P1 | — | 0 | 已合并至 Epic 22 |
+| Epic 22 | 🆕 **三页面驾驶舱 — 工作台完整交互** | P1 | UI-13~16, UI-18~20, IF-05, IF-07 | 8 | 证据驱动推演（勾选→参数聚合→辩论刷新）+ 7 Agent 实时共识追踪 |
+| **总计** | - | - | **55 项 FR** | **42** | - |
 
 **V2 (P2) Epic 列表：**
 
@@ -645,9 +710,9 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 | Epic 16 | 高级安全与合规 | P2 | SC-13/14, CP-11/12 | 4 | ISO 27001 与银保监会规范 |
 | Epic 17 | 高级数据管理与检索 | P2 | DM-13~15, SR-14~16 | 6 | 公式识别、跨模态检索与高保真溯源 API |
 | Epic 18 | 高级 Agent 协作 | P2 | AC-15/16, ST-10/11 | 4 | 人机协作与动态扩缩容 |
-| Epic 19 | 高级用户体验 | P2 | UI-13, SA-08/09 | 3 | 决策影响分析与预测性预警 |
+| Epic 19 | 高级用户体验 | P2 | UI-21/22, SA-08/09 | 4 | 决策影响分析（Shapley）+ AI 代偿跨卡联动 + 预测性预警 |
 | Epic 20 | 高级战略分析 API | P2 | SP-13~17 | 5 | 财务量化/敏感性/情景对比/白标/风险热力图 API |
-| **总计** | - | - | **24 项 FR** | **24** | - |
+| **总计** | - | - | **25 项 FR** | **25** | - |
 
 **补充 Epic：重大重构（已完成，非产品功能 Epic）**
 
@@ -661,7 +726,7 @@ updateReason: 'Epic 2/3 依赖关系验证更新 - Mermaid 图展开 Story 节�
 
 **目标：** 建立六边形架构基础、事件驱动机制、六层存储架构和基础合规能力，为后续功能提供技术基础。
 
-**包含 FR：** AR-01, AR-02, AR-03, AR-04, SC-01, SC-02, SC-03, SC-07, SC-08, CP-01, CP-04, SA-01
+**包含 FR：** AR-01, AR-02, AR-03, AR-04, SC-01, SC-02, SC-03, SC-07, SC-08, CP-01, CP-04, SA-01, IF-04
 
 Epic 1 ✅ 已完成，详见[Epic 1: 企业级架构基础与合规](epic_1.md)
 
@@ -2073,9 +2138,9 @@ So that **战略规划中的财务量化分析可自动计算并验证**。
 
 ## Epic 5: Agent 协作系统
 
-**目标：** 实现单 Agent 执行、EIP 弹性隔离、隔离切换审计、Agent 评估与可观测性。
+**目标：** 实现单 Agent 执行、EIP 弹性隔离、隔离切换审计、Agent 评估与可观测性，以及 SAP 协议 Schema 定义（IF-03）和 Skills 三级渐进式加载（IF-02）。
 
-**包含 FR：** AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, EV-01, EV-02
+**包含 FR：** AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, EV-01, EV-02, IF-02, IF-03
 
 **新增 FR（评估与可观测性 - EV 系列）：**
 - FR-EV-01: Phoenix Evaluation Harness 全链路追踪
@@ -2555,9 +2620,9 @@ So that **支持评估历史追踪和漂移趋势分析**。
 
 ## Epic 6: 战略规划流程 (BLM 前两阶段)
 
-**目标：** 实现 BLM 前两阶段（业绩差距分析 + 市场洞察）流程，支持 Checkpoint 机制和高保真溯源展示。
+**目标：** 实现 BLM 前两阶段（业绩差距分析 + 市场洞察）流程，支持 Checkpoint 机制、报告生成（PDF/Markdown）和高保真溯源展示。
 
-**包含 FR：** SP-01, SP-02, SP-03, SP-04, UI-04, UI-05, UI-06, UI-07
+**包含 FR：** SP-01, SP-02, SP-03, SP-04, UI-11
 
 **📦 价值组：战略规划与审批能力**
 > 用户可以生成战略规划并审批
@@ -2573,8 +2638,8 @@ So that **支持评估历史追踪和漂移趋势分析**。
 | Story 6.6 | Checkpoint 摘要查看与恢复 | 高管参与关键决策点审批 | 依赖 Story 6.3 | P1-6 |
 | Story 6.7 | 溯源树展示 | 验证分析结论的可靠性 | 依赖 Epic 2 Story 2.3, Epic 3 Story 3.8 | **P0-7** |
 | Story 6.8 | 高管简化视图 | 快速理解态势并做出决策 | 依赖 Story 6.5a | **P0-8（不依赖 Story 6.5b）** |
-| Story 6.9 | **分析师视图** | 专业工具、BLM 进度可视化、快捷键支持 | 依赖 Story 6.1/6.7 | **P1-9（UX 三视图）** |
-| Story 6.10 | **顾问视图** | 白标报告导出、品牌模板配置、多项目管理 | 依赖 Story 6.5b | **P1-10（UX 三视图）** |
+| Story 6.9 | **分析师视图** | 专业工具、BLM 进度可视化、快捷键支持 | 依赖 Story 6.1/6.7 | **P1-9（UX 三页面驾驶舱）** |
+| Story 6.10 | **顾问视图** | 白标报告导出、品牌模板配置、多项目管理 | 依赖 Story 6.5b | **P1-10（UX 三页面驾驶舱）** |
 | Story 6.11 | **白标报告基础（品牌模板配置）** | 顾问可以直接交付客户，验证 MVP 付费意愿 | 依赖 Story 6.5a | **P0-11（UX 白标报告）** |
 
 **✅ 依赖关系验证：**
@@ -2945,7 +3010,9 @@ So that **验证分析结论的可靠性**。
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
-### Story 6.8: 高管简化视图（仪表盘/审批中心/审计摘要）
+### Story 6.8: 高管简化视图（仪表盘/审批中心/审计摘要）⚠️ 已被 Epic 21 Story 21.1 取代
+
+> **注意：** 此 Story 描述的"3 个关键指标"简化视图已被 UX Spec v2.0.0 和 HTML 样机 v2.1 的 **决策舱总览仪表盘**（KPI 10 项 + 风险雷达 TOP3 + BG 健康矩阵 5 条目）取代。详见 Epic 21 Story 21.1。此 Story 保留作为 MVP 最简版本的 fallback 参考。
 
 As a **CEO**,
 I want **系统支持高管简化视图（仪表盘/审批中心/审计摘要）**,
@@ -2955,14 +3022,14 @@ So that **快速理解态势并做出决策**。
 
 **Given** 高管登录系统
 **When** 查看仪表盘
-**Then** 第一屏仅显示 3 个关键指标，红/黄/绿状态指示器
-**And** 信息密度达标（首屏 3 项关键指标，Lighthouse 信息密度评分≥90）
+**Then** 显示核心经营指标（现标准为 10 项 KPI，详见 Epic 21），红/黄/绿状态指示器
+**And** 信息密度达标（Lighthouse 信息密度评分≥90）
 
 **TDD 测试要求:**
 
 1. **架构测试**
-   - [ ] 仪表盘显示测试 - 验证显示 3 个关键指标和状态指示器
-   - [ ] 信息密度测试 - 验证首屏 3 项关键指标可见且 Lighthouse 评分≥90
+   - [ ] 仪表盘显示测试 - 验证显示核心经营指标（现标准 10 项 KPI）和状态指示器
+   - [ ] 信息密度测试 - 验证指标可见且 Lighthouse 评分≥90
    - [ ] 审批中心测试 - 验证审批功能正确显示
 
 2. **性能要求**
@@ -3119,9 +3186,9 @@ So that **可以直接交付客户，验证 MVP 付费意愿**。
 
 ## Epic 7: 多触点用户界面与 API 集成
 
-**目标：** 实现 CLI、REST API、API Gateway、健康度仪表盘和无障碍设计。
+**目标：** 实现 CLI、REST API、API Gateway、健康度仪表盘、无障碍设计，以及 CLI 七原则合规（IF-01）。
 
-**包含 FR：** UI-01, UI-02, UI-03, CP-03
+**包含 FR：** UI-01, UI-02, UI-03, CP-03, IF-01
 
 **📦 价值组：多触点操作与监控能力**
 > 用户可以通过 CLI/API/仪表盘操作系统
@@ -3906,6 +3973,71 @@ So that **确保 MVP 无高危漏洞**。
 
 ---
 
+## Epic 21: 三页面驾驶舱 — 决策舱（🆕 MVP P0 · PRD v1.1.0 新增）
+
+**阶段：MVP（P0）** — 可与 Epic 2-6 并行开发，纳入 MVP 验收范围。
+
+**目标：** 实现决策舱（Page 1）全部核心 UI 组件——总览仪表盘、三重置信度评分、决策卡片系统、物理仿真滑块、AI 代偿引擎、SP→BP 解码追溯带、战略地图 BSC 四层瀑布流，以及键盘快捷键与移动端响应式适配。对齐 UX 样机 `ux-design-prototype-v2.1.html`。
+
+**包含 FR：** UI-04, UI-05, UI-06, UI-07, UI-08, UI-09, UI-10, UI-12, UI-23
+
+**📦 价值组：高管 30 秒决策 + 拖拽推演 + AI 实时代偿 + BSC 战略可视化**
+> 高管可以在 30 秒内理解全局态势，拖动滑块推演不同情景，AI 高管团实时响应生成代偿策略，BSC 四层瀑布流可视化战略解码全景。
+
+**共享数据架构：** PARAM_REGISTRY（26 参数 × 6 tier）— 决策舱滑块与工作台证据聚合引擎统一参数体系。
+
+| Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
+|-------|------|---------|---------|-----------|
+| Story 21.1 | **决策舱总览仪表盘**（FR-UI-04） | 高管 30 秒理解全局态势（KPI 10 项+风险雷达 TOP3+BG 健康矩阵 5 条目+财务摘要条），RAG 三色状态与决策卡评分联动 · 样机参考：`overview-layer` + `renderKpiDashboard`/`renderRiskRadar`/`renderHealthMatrix` | 依赖 Epic 1 Story 1.7（L2 存储层）、Epic 3 Story 3.8（溯源接口） | P0-1 |
+| Story 21.2 | **三重置信度评分系统**（FR-UI-05） | 战略管理（方向/解码/执行）三维量化可视化，四阶段动画交响乐（流光→光晕/震动→计数→呼吸），趋势历史≥50 点 · 样机参考：`ScoreBar` 类 + `tDraw`/`tPush`/`tModal` | 依赖 Story 21.1（仪表盘布局框架） | P0-2 |
+| Story 21.3 | **决策卡片系统**（FR-UI-06） | 5 张战略决策卡（Cloud&AI/芯片/现金流/企业BG/智能汽车）按严重度排序+折叠/展开+轮播导航+联动脉冲动画 · 样机参考：`decision-card` 组件 + `carouselInit`/`carouselShow` | 依赖 Story 21.2（评分数据驱动卡片排序） | P0-3 |
+| Story 21.4 | **物理仿真参数滑块**（FR-UI-07） | 惯性动量（decay=0.94）+notch 吸附（3%）+涟漪反馈（0.6s）+弹簧回弹，60fps 丝滑推演体验 · 样机参考：`SliderPhysics` 类（`_applyInertia`/`_doSnapAndRipple`/`_checkNotchPulse`） | 依赖 Story 21.3（卡片展开态布局） | P0-4 |
+| Story 21.5 | **AI 代偿引擎界面**（FR-UI-08） | 风险梯度检测+26 种策略（8 大风险类别）排序+预览/采纳/撤销+三段式风险叙述+过期数据警告 · 样机参考：`AICompensation` 类（`_buildNarrative`/`_rank`/`_render`/`adopt`/`undo`） | 依赖 Story 21.4（滑块值变化触发 AI 重算） | P0-5 |
+| Story 21.6 | **SP→BP 解码追溯带**（FR-UI-09） | SP↔BP 双向跳转，CSF→KPI→目标值→权重完整链路可视化，追溯跳转<100ms · 样机参考：`decode-ribbon` 组件 + `jumpToCard` | 依赖 Story 21.3（卡片数据结构含 spBpMapping/spAnchor） | P0-6 |
+| Story 21.7 | **决策卡片联动与重排序**（FR-UI-10） | 联动闪烁+自动重排序（健康卡片下沉）+全部处理完毕检测+决策证据自动沉淀至工作台 · 样机参考：`resortCards`/`resolveCard`/`onSliderChange` | 依赖 Story 21.3/21.5（评分变化+AI 策略采纳触发联动） | P0-7 |
+| Story 21.8 | **战略地图 BSC 四层瀑布流**（FR-UI-12） | 财务（深蓝）→客户（绿）→内部运营（紫）→学习与成长（琥珀），因果箭头+战略主题卡片+KPI 表格+折叠展开，四层全展开<1s · 样机参考：`strategy-map` 页面 + `sm-layer` 组件 + `toggleSMLayer` | 依赖 Epic 1 Story 1.7（L2 存储层，获取 KPI 数据） | P0-8 |
+| Story 21.9 | **键盘快捷键+移动端响应式**（FR-UI-23） | Ctrl+1/2/3 三页面切换+Esc 关闭弹窗，768/1200/1400px 三断点自适应，移动端决策卡全屏展开 · 样机参考：`keydown` 事件监听 + `@media` 查询 + `mobile-expanded` 类 | 依赖 Story 21.3（决策卡片组件需适配移动端） | P0-9 |
+
+**✅ 依赖关系验证：**
+- Epic 21 依赖 Epic 1 Story 1.7（L2 存储层—PostgreSQL KPI 数据读取）
+- Epic 21 依赖 Epic 3 Story 3.8（高保真溯源接口—Bounding Box 溯源数据支撑证据面板）
+- Epic 21 内部故事主要依赖 Story 21.3（决策卡片系统作为核心布局容器）
+- 战略地图（Story 21.8）可相对独立开发，仅依赖存储层数据接口
+- **可独立交付**：决策舱核心用户价值（高管推演决策）在 Story 21.1-21.5 完成时即可交付
+
+---
+
+## Epic 22: 三页面驾驶舱 — 工作台完整交互（🆕 V1 P1 · PRD v1.1.0 新增）
+
+**阶段：V1（P1）** — 依赖 Epic 21（决策舱）+ Epic 9（多 Agent 协作），排在 V1 阶段交付。
+
+**目标：** 实现工作台（Page 2）完整交互——三栏布局（战略证据链七步层次树+推演沙盘+辩论室），含证据聚合引擎（calcScoresGeneric）、动态参数面板、情景切换、辩论共识追踪（7 Agent 实时投票），以及三页面驾驶舱架构与角色自适应视图。对齐 UX 样机 `ux-design-prototype-v2.1.html`。
+
+**包含 FR：** UI-13, UI-14, UI-15, UI-16, UI-18, UI-19, UI-20, IF-05, IF-07
+
+**📦 价值组：证据驱动推演 + 多 Agent 辩论共识 + 三页面数据闭环**
+> 企业战略人员可以勾选工作台证据→推演沙盘实时重算参数→辩论室 Agent 发言自动刷新；从决策舱操作到工作台证据更新到战略地图 KPI 刷新的完整数据闭环。
+
+| Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
+|-------|------|---------|---------|-----------|
+| Story 22.1 | **工作台完整交互 — 证据树+推演沙盘+辩论室**（FR-UI-13） | 三栏布局：50 条预置证据（15 工序三级嵌套）+情景切换（乐观/保守/自定义/决策）+证据聚合引擎（calcScoresGeneric）+11 参数辩论链实时刷新 · 样机参考：`buildWorkbench`/`rebuildWorkbench`/`aggregateParams`/`refreshDebateRoom`/`scenarioApply` + `DEBATE_CHAINS`/`allEvidence` | 依赖 Epic 21 Story 21.3（决策卡片联动—决策证据沉淀至证据树） | P1-1 |
+| Story 22.2 | **决策过程可视化**（FR-UI-14） | 关键决策路径和依据展示 | 依赖 Story 22.1（工作台三栏布局已就绪） | P1-2 |
+| Story 22.3 | **分支管理**（FR-UI-15） | 创建/切换/删除分支，分支差异对比视图 | 依赖 Epic 6 Story 6.3（Checkpoint 机制） | P1-3 |
+| Story 22.4 | **Checkpoint 恢复模式选择界面**（FR-UI-16） | 影响范围评估+推荐模式（Replay/Override）+风险提示 | 依赖 Epic 6 Story 6.6 | P1-4 |
+| Story 22.5 | **多语言界面**（FR-UI-18, IF-07） | 中文/英文界面切换+术语表统一+切换延迟<100ms | 依赖 Story 22.1（工作台 UI 框架已就绪） | P1-5 |
+| Story 22.6 | **辩论共识追踪完整实现**（FR-UI-19） | 7 Agent 实时投票+共识度评分（强共识/弱共识/分歧）+多数派/少数派标注 | 依赖 Story 22.1（辩论室组件已就绪）+ Epic 9 Story 9.1（多 Agent 协作） | P1-6 |
+| Story 22.7 | **Checkpoint 摘要查看+参数修正恢复**（FR-UI-20） | 修正关键参数后恢复运行 | 依赖 Story 22.4 | P1-7 |
+| Story 22.8 | **Web 前端三页面驾驶舱架构+角色自适应**（IF-05） | 决策舱/工作台/战略地图路由隔离+高管默认决策舱总览/分析师默认决策卡片/战略人员默认战略地图+三页面数据联动 | 依赖 Epic 21（决策舱全组件）+Story 22.1（工作台全组件） | P1-8 |
+
+**✅ 依赖关系验证：**
+- Epic 22 依赖 Epic 21（决策舱全部组件——决策卡联动触发证据沉淀至工作台）
+- Epic 22 依赖 Epic 9（多 Agent 协作——辩论共识追踪需要 7 Agent 实时投票）
+- Epic 22 依赖 Epic 6（Checkpoint 机制——恢复模式选择界面依赖）
+- **V1 阶段交付**：Epic 22 排在 V1，需等待 MVP 中 Epic 21 决策舱完成 + V1 中 Epic 9 多 Agent 协作就绪后方可启动
+- **MVP 阶段前置**：工作台的静态展示（证据树结构+辩论室初始消息）可在 MVP 中作为 Epic 21 的配套预览实现，V1 再补全交互逻辑
+
+---
+
 ## 📊 全部 Epic 依赖关系验证总结
 
 ### Epic 依赖矩阵（含价值组和 Story 数）
@@ -3914,52 +4046,59 @@ So that **确保 MVP 无高危漏洞**。
 |------|--------|-----------|-----------|-----------|-----------|-----------|------------|-----------|---------|
 | **Epic 0: Iteration 0** | 开发环境/CI/CD/测试框架 | - | - | - | - | - | 顺序依赖 | ✅ 是 | 3 |
 | **Epic 0: Iteration 1** | 重构开发环境/CI/CD/测试框架 | - | - | - | - | - | 顺序依赖 | ✅ 是 | 12 |
-| **Epic 1: 企业级架构基础与合规** ✅ | 系统稳定性与性能基础<br/>安全与合规基础<br/>or.md 系统公理<br/>测试框架<br/>**MVP 关键机制增强** | - | - | - | - | - | 组内依赖 | ✅ 是 | **23** |
+| **Epic 1: 企业级架构基础与合规** ✅ | 系统稳定性与性能基础<br/>安全与合规基础<br/>or.md 系统公理<br/>测试框架<br/>**MVP 关键机制增强** | - | - | - | - | - | 组内依赖 | ✅ 是 | **24** |
 | **Epic 2: 文档与数据管理** 🔄 | 文档全生命周期管理 | Story 1.6/1.7/1.3 | - | - | - | - | 顺序依赖（流水线） | ✅ 是 | 9 |
 | **Epic 3: 智能检索与知识发现** 📋 | 智能检索与溯源 | Story 1.5/1.6/1.7 | **Story 2.3（关键路径）** | - | - | - | 顺序依赖（流水线） | ✅ 是 | 13 |
 | **Epic 4: 战略工具箱** | 战略工具执行能力 | Story 1.1/1.7/1.18b | - | - | - | - | 顺序依赖（工具链+Agent编排） | ✅ 是 | 5 |
 | **Epic 5: Agent 协作系统** | 单 Agent 战略规划能力 | Story 1.4/1.10/1.18b | - | - | *Story 4.1（可选，TOOLS.md 元数据）* | - | 顺序依赖（工作流） | ✅ 是 | 10 |
-| **Epic 6: 战略规划流程** | 战略规划与审批能力<br/>UX 三视图<br/>**白标报告基础** | Story 1.4/1.7/1.18b | Story 2.2a/2.3 | Story 3.8 | **Story 4.1**（6.2/6.9 工具调用） | **Story 5.3** | 顺序依赖（BLM 流程） | ✅ 是 | **12** |
+| **Epic 6: 战略规划流程** | 战略规划与审批能力<br/>UX 三页面驾驶舱（分析师/顾问视图）<br/>**白标报告基础** | Story 1.4/1.7/1.18b | Story 2.2a/2.3 | Story 3.8 | **Story 4.1**（6.2/6.9 工具调用） | **Story 5.3** | 顺序依赖（BLM 流程） | ✅ 是 | **12** |
 | **Epic 7: 多触点用户界面与 API 集成** | 多触点操作与监控能力<br/>NFR 覆盖<br/>测试 Story<br/>**骨架屏加载** | Story 1.1/1.9/1.12/1.16 | - | - | *Story 5.3（CLI Agent 模式）* | 并行依赖 | ✅ 是 | 8 |
 | **Epic 8: 用户权限管理与审计合规** | 安全与合规 | Story 1.5/1.7/1.9/1.10/1.12 | - | - | *Story 7.2/7.3（渗透测试需 API 端点）* | 顺序依赖（安全测试） | ✅ 是 | 6 |
+| **🆕 Epic 21: 三页面驾驶舱 — 决策舱** | 高管 30 秒决策+拖拽推演+AI 实时代偿+BSC 可视化 | Story 1.7 | - | Story 3.8（溯源接口） | - | - | 顺序依赖（卡片布局→评分→滑块→AI→解码追溯） | ✅ 是 | **9** |
+| **🆕 Epic 22: 三页面驾驶舱 — 工作台完整交互** | 证据驱动推演+多 Agent 辩论共识+三页面数据闭环 | Story 1.7 | - | - | - | **Epic 9（多 Agent 协作）** | 顺序依赖（决策舱→工作台数据闭环） | ❌ 需 Epic 21+9 | **8** |
 
-**总计 MVP Story 数：105 个**（含 P1 V1 扩展 Story 4.6-4.9/5.9-5.10）
+**总计 MVP Story 数：123 个**（含 P1 V1 扩展 Story）
 - Iteration 0: 3 个（Story 0.1-0.3）
 - Iteration 1: 12 个（Story 0.4-0.9/0.14-0.18/0.30）
-- Epic 1: 23 个（Story 1.1-1.19，Story 1.18 拆分为 1.18a/1.18b）
+- Epic 1: 24 个（Story 1.1-1.19 + IF-04 事件监听扩展）
 - Epic 2: 9 个（Story 2.1-2.8，Story 2.2 拆分为 2.2a/2.2b）
 - Epic 3: 13 个（Story 3.1-3.12，Story 3.1 拆分为 3.1a/3.1b）
 - Epic 4: 9 个（含 ST-06~09 P1 V1 扩展）
-- Epic 5: 10 个（Story 5.1-5.10，Story 5.7-5.10 新增评估与可观测性）
+- Epic 5: 12 个（Story 5.1-5.10 + IF-02/03 SAP 协议扩展）
 - Epic 6: 12 个（Story 6.1-6.11，Story 6.5 拆分为 6.5a/6.5b）
-- Epic 7: 8 个（新增 Story 7.5-7.8）
+- Epic 7: 9 个（新增 Story 7.5-7.8 + IF-01 CLI 七原则）
 - Epic 8: 6 个
+- 🆕 Epic 21: 9 个（Story 21.1-21.9）
+- 🆕 Epic 22: 8 个（Story 22.1-22.8）
 
 ### 依赖关系验证结论
 
 **✅ 所有 Epic 通过验证：**
 
-1. **Epic 1 已完成** - 所有 23 个 Story Done，作为 Epic 2-8 的基础依赖已全部就绪
+1. **Epic 1 已完成** - 所有 24 个 Story Done（含 IF-04 事件监听扩展），作为 Epic 2-8/21 的基础依赖已全部就绪
 2. **Epic 2 已启动** - Story 2.1 ready-for-dev，依赖的 Epic 1 Story 1.6/1.7/1.3 已完成
 3. **Epic 3 待开始** - 依赖 Epic 1 Story 1.5/1.6/1.7 已完成；关键跨 Epic 依赖 Story 2.3（版面信息）待 Epic 2 完成
-4. **MVP P0 Story 无跨 Epic 循环依赖** - 依赖方向单一（Epic 1 → Epic 2/3）；Epic 2 Story 2.3 → Epic 3 Story 3.8 为唯一跨 Epic 强依赖
+4. **MVP P0 Story 无跨 Epic 循环依赖** - 依赖方向单一（Epic 1 → Epic 2/3/21）；Epic 2 Story 2.3 → Epic 3 Story 3.8 为唯一跨 Epic 强依赖
 5. **关键路径已识别** - Story 2.2a → Story 2.3 → Epic 3 Story 3.8（版面信息→高保真溯源）
-6. **并行策略已规划** - Story 2.2a 完成后可并行推进 Story 2.3 和 Epic 3 Story 3.1a
-7. **Epic 1 依赖细节已存档** - 详见 [epic_1.md](epic_1.md)
-8. **NFR 完整覆盖** - Story 7.5（NFR-ACC-01）、Story 7.6（NFR-INT-05）、Story 1.13（NFR-SCALE-03）
-9. **or.md 系统公理覆盖** - Story 1.14a/b/c（自主调用循环）、Story 1.15a/b（外部化记忆）
-10. **Epic 2/3 可独立交付价值** - Epic 2 完成后用户可上传管理文档；Epic 3 完成后用户可检索溯源
+6. **并行策略已规划** - Story 2.2a 完成后可并行推进 Story 2.3 和 Epic 3 Story 3.1a；Epic 21（决策舱 P0）可与 Epic 2-6 并行开发，仅依赖 Story 1.7 + Story 3.8
+7. **🆕 Epic 21 为 MVP 关键路径新增项** - 决策舱 9 个 Story 可与现有 Epic 2-6 并行推进，不阻塞原有 MVP 交付节奏
+8. **Epic 1 依赖细节已存档** - 详见 [epic_1.md](epic_1.md)
+9. **NFR 完整覆盖** - Story 7.5（NFR-ACC-01）、Story 7.6（NFR-INT-05）、Story 1.13（NFR-SCALE-03）、Story 21.1~21.9（NFR-IF-01~07 接口性能）
+10. **or.md 系统公理覆盖** - Story 1.14a/b/c（自主调用循环）、Story 1.15a/b（外部化记忆）
+11. **Epic 2/3 可独立交付价值** - Epic 2 完成后用户可上传管理文档；Epic 3 完成后用户可检索溯源
+12. **🆕 Epic 21 可独立交付（MVP P0）** - 依赖仅 Epic 1 Story 1.7 + Epic 3 Story 3.8，决策舱核心价值（高管推演决策）可先行交付，纳入 MVP 验收范围
+13. **🆕 Epic 22 为 V1 P1 交付项** - 工作台依赖 Epic 21（决策证据沉淀）+ Epic 9（多 Agent 协作），排在 V1 阶段交付
 
 ### 关键依赖路径图
 
-**文档版本:** 1.1.0
-**更新日期:** 2026-05-29
-**编制依据:** AI_AGENT_PARALLEL_DEPENDENCY_MAP.md
+**文档版本:** 2.0.0
+**更新日期:** 2026-07-05
+**编制依据:** PRD v1.1.0 (145 FR) + UX Spec v2.0.0 + HTML 样机 v2.1
 
 #### 总体依赖关系 (Mermaid 可视化)
 
-**更新时间：** 2026-05-29
-**更新说明：** Epic 2/3 从单节点展开为独立 Story 节点，标注关键路径和状态；Epic 1 已完成存档
+**更新时间：** 2026-07-05
+**更新说明：** PRD v1.1.0 同步 — FR-UI 13→23 项扩展 + FR-IF 新增 7 项 + 新增 Epic 21（决策舱 9 Story）和 Epic 22（工作台 8 Story）
 
 ```mermaid
 graph TD
@@ -4045,12 +4184,22 @@ graph TD
     end
 
     %% ========== Epic 4-8 (待开始) ==========
-    subgraph "Epic 4-8 📋 (待开始 - 55 Stories)"
+    subgraph "Epic 4-8 📋 (待开始 - 48 Stories)"
         E4["Epic 4<br/>战略工具箱<br/>9 Stories<br/>📋 Backlog"]
-        E5["Epic 5<br/>Agent 协作<br/>10 Stories<br/>📋 Backlog"]
+        E5["Epic 5<br/>Agent 协作<br/>12 Stories<br/>📋 Backlog"]
         E6["Epic 6<br/>战略规划流程<br/>12 Stories<br/>📋 Backlog"]
-        E7["Epic 7<br/>用户界面与 API<br/>8 Stories<br/>📋 Backlog"]
+        E7["Epic 7<br/>用户界面与 API<br/>9 Stories<br/>📋 Backlog"]
         E8["Epic 8<br/>权限与审计<br/>6 Stories<br/>📋 Backlog"]
+    end
+
+    %% ========== Epic 21 (🆕 MVP P0 — 三页面驾驶舱·决策舱) ==========
+    subgraph "Epic 21 🆕 MVP (待开始 - 9 Stories)"
+        E21["Epic 21<br/>决策舱 P0<br/>9 Stories<br/>📋 Backlog"]
+    end
+
+    %% ========== Epic 22 (🆕 V1 P1 — 三页面驾驶舱·工作台) ==========
+    subgraph "Epic 22 🆕 V1 (待开始 - 8 Stories)"
+        E22["Epic 22<br/>工作台 P1<br/>8 Stories<br/>📋 Backlog"]
     end
 
     %% ========== 关键依赖关系 ==========
@@ -4348,7 +4497,7 @@ Epic 2 (🔄 进行中)
 > - 阶段 1（Epic 0 Iteration 1）：12 个 Story，9 完成 3 ready-for-dev
 > - 阶段 2（Epic 1 架构基础）：六边形架构 + 六层存储 + 事件总线，全部完成
 > - 阶段 3（Epic 1 安全合规+系统公理）：RBAC/审计/等保/UDMR/双引擎，全部完成
-> - Epic 1 共 23 个 Story，全部 Done，已通过 Epic 1 回顾
+> - Epic 1 共 24 个 Story（含 IF-04 事件监听扩展），全部 Done，已通过 Epic 1 回顾
 
 ---
 
@@ -4485,17 +4634,17 @@ Epic 2 (🔄 进行中)
 | **阶段 1** (Epic 0 Iteration 1) | 12 个 Story 100% 完成，集成测试通过 | 验收测试报告 |
 | **阶段 2** (Epic 1 价值组 2/3) | 10 个 Story 100% 完成，架构评审通过 | 架构评审报告 + 测试报告 |
 | **阶段 3** (Epic 1 价值组 4/5/6) | 12 个 Story 100% 完成，性能基准达标 | 性能基准测试报告 |
-| **阶段 4** (Epic 2-8 MVP) | 59 个 P0 FR 100% 覆盖，MVP 验收通过 | MVP 验收报告 |
+| **阶段 4** (Epic 2-8 + Epic 21 MVP) | 69 个 P0 FR 100% 覆盖，MVP 验收通过 | MVP 验收报告 |
 
 **整体成功标准**
 
 1. **零重大架构缺陷** - 架构评审 100% 通过
 2. **零 P0 Bug** - MVP 验收前 P0 Bug 清零
-3. **性能指标达标** - 检索延迟 P95<800ms，路由延迟 P95<100ms
-4. **FR 覆盖率 100%** - 59 个 P0 FR 完整实现
-5. **NFR 达标率 100%** - 12 项 P0 NFR 全部达标
+3. **性能指标达标** - 检索延迟 P95<800ms，路由延迟 P95<100ms，决策舱仪表盘加载<2s，滑块响应≥60fps
+4. **FR 覆盖率 100%** - 69 个 P0 FR 完整实现（PRD v1.1.0 新增 FR-UI-04~12/23 + FR-IF-01~04）
+5. **NFR 达标率 100%** - P0 级 NFR 全部达标（含 NFR-IF-01~07 接口性能指标）
 
 ---
 
-**总计 MVP Story 数：105 个**（sprint-status.yaml 共 175 个含 V1/V2 + Epic 90）
-- 原 76 个 + Party Mode 第一轮新增 5 个（Story 1.17-1.19, 6.11, 7.8）+ Party Mode 第二轮拆分 4 个→8 个（净增 4 个）+ Epic 0 Iteration 1 新增 12 个 + Epic 5 EV 评估系列新增 4 个
+**总计 MVP Story 数：123 个**（sprint-status.yaml 共 193 个含 V1/V2 + Epic 90）
+- 原 76 个 + Iteration 0/1 新增 15 个 + EV 评估系列 4 个 + Epic 21 决策舱 9 个 + Epic 22 工作台 P1 8 个 + IF/UI 扩展 11 个
