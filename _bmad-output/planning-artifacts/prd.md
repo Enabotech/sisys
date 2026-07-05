@@ -2051,7 +2051,7 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
   - 滑条联动辩论：滑块值变化→触发 refreshDebateRoom→逐 Agent 延迟渲染（首条 250-600ms，后续 600-2200ms 随机延迟模拟思考）
   - 用户可手动输入消息参与辩论（Enter 发送），消息气泡以 👤 头像 + neutral 样式展示
   - 辩论消息上限 20 条（超出自动移除最旧消息）
-  - **验收标准：** 辩论消息延迟<200ms（首条），共识度更新<100ms，12 个参数辩论链覆盖率 100%
+  - **验收标准：** 辩论消息延迟<200ms（首条），共识度更新<100ms，11 个参数辩论链覆盖率 100%
 
   - **UX 样机参考：** `ux-design-prototype-v2.1.html` — buildWorkbench/rebuildWorkbench/aggregateParams/refreshDebateRoom/scenarioApply/updateParentCheckboxes/calcScoresGeneric 函数 + DEBATE_CHAINS/allEvidence 数据
 
