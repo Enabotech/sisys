@@ -10,7 +10,7 @@ projectName: sisys
 userName: Agimtech
 date: 2026-02-23
 lastRevised: 2026-07-05
-revisionFocus: "第一次对齐审查 — 三页面统一为华为2025战略叙事 + 推演沙盘华为量级适配 + calcScoresGeneric偏差驱动评分"
+revisionFocus: "第二次对齐审查通过 — PARAM_REGISTRY/Design Tokens/物理参数/动画阈值/DEBATE_CHAINS/KPI数据/风险雷达/BG健康矩阵/BSC色系 全部13类数据点三文档精确一致；仅FR-UI-05折叠提示3→4级修正"
 documentStatus: revised
 ---
 
@@ -18,7 +18,7 @@ documentStatus: revised
 
 **Author:** Agimtech
 **Date:** 2026-02-23
-**Last Revised:** 2026-07-05（第一次对齐审查：华为 2025 叙事统一 + 决策卡命名对齐 + KPI 数量修正）
+**Last Revised:** 2026-07-05（第二次对齐审查：13 类数据点全部通过，仅 1 处 3→4 级修正）
 **Version:** 2.0.0
 **Status:** Revised（与 HTML 样机 v2.1 对齐）
 **HTML 样机参考：** `_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html`
@@ -2176,7 +2176,26 @@ const sisysDesignTokens = {
 
 **🎉 UX 设计规格文档修订完成总结：**
 
-**本次修订（2026-07-05）第一次对齐审查 — 与 ux-design-prototype-v2.1 精确对齐：**
+**本次修订（2026-07-05）第二次对齐审查 — 深度逐项验证通过：**
+
+**13 类数据点精确一致 ✅：**
+1. ✅ PARAM_REGISTRY：26 参数名称/单位/tier/default 全部一致
+2. ✅ 评分色 5 级 #C53030/#D46B08/#D48806/#7CB305/#00875A
+3. ✅ 信号背景色 #E6F7F1/#FFF8E6/#FFF1F0
+4. ✅ 物理参数 11 项（滑块尺寸/弹簧曲线/动画时长）
+5. ✅ Design Tokens 45 个 CSS 变量（色值/字体/间距/圆角/阴影/z-index）
+6. ✅ ScoreBar 动画阈值（shimmer>0.2/glow>+0.5/shake<-0.5/count 1.2s/breathe 6s）
+7. ✅ SliderPhysics 参数（decay=0.94/吸附 3%/涟漪 0.6s/弹簧 0.4s）
+8. ✅ DEBATE_CHAINS：11 个参数键/7 个 3-Agent 链/4 个 2-Agent 链
+9. ✅ KPI 仪表盘 10 项指标（id/label/val/target 完全一致）
+10. ✅ 风险雷达 TOP3+红项 3+预警 3
+11. ✅ BG 健康矩阵 5 条目（RAG 状态/趋势 完全一致）
+12. ✅ BSC 四层色系（深蓝/绿/紫/琥珀+渐变+逻辑条）
+13. ✅ allEvidence 15 阶段/50 条目/freshness 分布
+
+**唯一修正：** FR-UI-05 折叠提示 3 级 → 4 级（新增 0.6-0.75 "⚡ 偏低 建议关注"）
+
+**前次修订（2026-07-05）第一次对齐审查 — 与 ux-design-prototype-v2.1 精确对齐：**
 - 🔄 KPI 指标数量修正：MVP 范围表 "5 项"→"10 项"（与样机 v2.2 KPI 仪表盘两行各 5 项一致）
 - 🔄 决策卡命名对齐：旧版 ID 引用（sc3/sc4/bp14/bp12/sc1）→ 中文标题（Cloud&AI BG 扭亏为盈/芯片供应链韧性/现金流与债务风险管理/企业BG 数字化转型加速/智能汽车BU 从规模到盈利）
 - 🔄 证据数量统一：多处 "45+ 条"/"48 条"→"50 条"（与样机 `allEvidence` 数组初始值精确一致）
