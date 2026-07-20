@@ -346,7 +346,7 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
     </select>
     <span class="nav-link" onclick="switchPage('workbench')" id="linkWorkbench">📐 工作台</span>
   </div>
-  <span class="nav-user">👤 乔布斯克</span>
+  <span class="nav-user">👤 乔布克</span>
 </nav>
 
 <!-- ============================================================
@@ -1224,7 +1224,7 @@ function resolveCard(cardId){
     var strategyName='';if(inst.aiComp.confirmed){var cs=inst.aiComp.suggestions.find(function(s){return s.id===inst.aiComp.confirmed});if(cs)strategyName=cs.name}
     var changes=[];inst.def.sliders.forEach(function(sdef){var nv=st[sdef.key],ov=sdef.value;if(Math.abs(nv-ov)>0.01)changes.push((PARAM_REGISTRY[sdef.paramKey||sdef.key]||{}).name+' '+ov+'→'+nv)});
     var detail='';if(strategyName)detail='采纳: '+strategyName;if(changes.length)detail=(detail?detail+' | ':'')+'参数: '+changes.join(', ');
-    var decEntry={label:inst.def.title,freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 乔布斯克 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId,detail:detail};
+    var decEntry={label:inst.def.title,freshness:'fresh',params:evParams,confidence:0.90,source:'决策舱 · 乔布克 · '+new Date().toISOString().slice(0,10),phase:resolveDecisionPhase(inst.def),isDecision:true,decisionCard:cardId,detail:detail};
     allEvidence.push(decEntry);
     // buffer: buildWorkbench首次渲染时合并，防止allEvidence被覆盖
     if(!window._pendingDecisions)window._pendingDecisions=[];
@@ -1665,7 +1665,7 @@ function buildWorkbench(){
     const sendBtn=layout.querySelector('.debate-send');
     const input=layout.querySelector('.debate-input');
     if(sendBtn&&input){
-      sendBtn.onclick=()=>{if(input.value.trim()){const thread=layout.querySelector('.debate-thread');const msg=document.createElement('div');msg.className='debate-msg neutral';msg.innerHTML='<span class="debate-agent-avatar">👤 乔布斯克</span><span class="debate-msg-text">'+input.value+'</span>';thread.appendChild(msg);input.value='';thread.scrollTop=thread.scrollHeight;showToast('已发送 · AI角色将陆续回应','info')}};
+      sendBtn.onclick=()=>{if(input.value.trim()){const thread=layout.querySelector('.debate-thread');const msg=document.createElement('div');msg.className='debate-msg neutral';msg.innerHTML='<span class="debate-agent-avatar">👤 乔布克</span><span class="debate-msg-text">'+input.value+'</span>';thread.appendChild(msg);input.value='';thread.scrollTop=thread.scrollHeight;showToast('已发送 · AI角色将陆续回应','info')}};
       input.onkeydown=e=>{if(e.key==='Enter')sendBtn.click()};
     }
   },200);
