@@ -148,7 +148,7 @@ curl "http://localhost:8000/documents/{id}/trace?query=营收增长"
 
 ## 🖼️ UX 原型样机
 
-<a href="./_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html" target="_blank">
+<a href="./_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html">
   <img src="./docs/images/ux-prototype-cover.svg" alt="sisys UX 原型样机" width="100%" style="border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.12)">
 </a>
 
@@ -156,7 +156,10 @@ curl "http://localhost:8000/documents/{id}/trace?query=营收增长"
 > 📐 **工作台** — 七步层次证据树 + 辩论室
 > 🗺️ **战略地图** — BSC 四层因果链瀑布流
 
-点击预览图或 **[在新标签页中打开交互原型](./_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html)**
+```bash
+git clone https://gitea.sisys.local/sisys/sisys.git
+open sisys/_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html
+```
 
 ---
 
