@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#001529"/>
+      <stop offset="100%" stop-color="#1d3a5c"/>
+    </linearGradient>
+    <linearGradient id="finance" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1d3a5c"/><stop offset="100%" stop-color="#2a5080"/>
+    </linearGradient>
+    <linearGradient id="customer" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#00875A"/><stop offset="100%" stop-color="#00a870"/>
+    </linearGradient>
+    <linearGradient id="internal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#531dab"/><stop offset="100%" stop-color="#722ed1"/>
+    </linearGradient>
+    <linearGradient id="learning" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#874d00"/><stop offset="100%" stop-color="#B86E00"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="960" height="540" rx="12" fill="url(#bg)"/>
+
+  <!-- 顶部导航条 -->
+  <rect x="0" y="0" width="960" height="44" fill="#001529" rx="12"/>
+  <rect x="0" y="32" width="960" height="12" fill="#001529"/>
+  <text x="24" y="28" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" fill="#fff">🎯 sisys</text>
+  <rect x="340" y="12" width="100" height="20" rx="4" fill="rgba(255,255,255,.15)"/>
+  <text x="350" y="26" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" fill="#fff">XX公司 2026 SP-BP</text>
+  <rect x="460" y="12" width="70" height="20" rx="4" fill="rgba(255,255,255,.15)"/>
+  <text x="472" y="26" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" fill="#fff">🎯 决策舱</text>
+  <rect x="540" y="12" width="70" height="20" rx="4" fill="rgba(255,255,255,.08)"/>
+  <text x="552" y="26" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" fill="rgba(255,255,255,.55)">📐 工作台</text>
+  <rect x="620" y="12" width="80" height="20" rx="4" fill="rgba(255,255,255,.08)"/>
+  <text x="632" y="26" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" fill="rgba(255,255,255,.55)">🗺️ 战略地图</text>
+
+  <!-- 左侧：决策舱 KPI 卡片 -->
+  <rect x="24" y="60" width="430" height="210" rx="8" fill="#fff" opacity=".95"/>
+  <text x="40" y="84" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" fill="#262626">📊 核心经营态势</text>
+  <!-- KPI 小卡片 -->
+  <rect x="40" y="96" width="75" height="50" rx="6" fill="#f5f5f5"/>
+  <text x="48" y="116" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">年度营收</text>
+  <text x="48" y="138" font-family="Consolas,monospace" font-size="16" font-weight="700" fill="#00875A">8,809亿</text>
+  <rect x="122" y="96" width="75" height="50" rx="6" fill="#f5f5f5"/>
+  <text x="130" y="116" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">利润率</text>
+  <text x="130" y="138" font-family="Consolas,monospace" font-size="16" font-weight="700" fill="#00875A">11.0%</text>
+  <rect x="204" y="96" width="75" height="50" rx="6" fill="#f5f5f5"/>
+  <text x="212" y="116" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">现金流</text>
+  <text x="212" y="138" font-family="Consolas,monospace" font-size="16" font-weight="700" fill="#00875A">1,274亿</text>
+  <!-- RAG 灯 -->
+  <rect x="40" y="156" width="410" height="28" rx="6" fill="#fafafa"/>
+  <text x="52" y="174" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#8c8c8c">业务单元健康度</text>
+  <circle cx="190" cy="170" r="4" fill="#00875A"/>
+  <circle cx="225" cy="170" r="4" fill="#d48806"/>
+  <circle cx="260" cy="170" r="4" fill="#00875A"/>
+  <circle cx="295" cy="170" r="4" fill="#C53030"/>
+  <circle cx="330" cy="170" r="4" fill="#00875A"/>
+  <!-- 风险雷达 -->
+  <text x="40" y="206" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="700" fill="#262626">🎯 风险雷达</text>
+  <text x="40" y="226" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="10" fill="#C53030">① 现金流压力 5/5级</text>
+  <text x="40" y="242" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="10" fill="#d46b08">② 供应链成本超标</text>
+  <text x="40" y="258" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="10" fill="#8c8c8c">③ 渠道覆盖不足</text>
+
+  <!-- 右侧：决策卡片 -->
+  <rect x="470" y="60" width="466" height="210" rx="8" fill="#fff" opacity=".95"/>
+  <text x="486" y="84" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" fill="#262626">🃏 决策卡片</text>
+  <text x="486" y="100" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="10" fill="#8c8c8c">拖动滑块探索不同情景 — AI高管团实时响应</text>
+  <!-- 卡片1 -->
+  <rect x="486" y="112" width="434" height="44" rx="6" fill="#fffbe6" stroke="#ffe58f"/>
+  <text x="500" y="128" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" font-weight="700" fill="#262626">🔴 SC-3 现金流与投资回报危机</text>
+  <text x="500" y="144" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">现金流压力极高 · 回收期5.8年 · ROI持续恶化</text>
+  <!-- 卡片2 -->
+  <rect x="486" y="162" width="434" height="44" rx="6" fill="#e6f7ff" stroke="#91d5ff"/>
+  <text x="500" y="178" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" font-weight="700" fill="#262626">🟠 SC-4 市场进入策略</text>
+  <text x="500" y="194" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">进入方式：自建渠道 vs 合资探索 · CEO/CFO/CTO严重分歧</text>
+  <!-- 卡片3 -->
+  <rect x="486" y="212" width="434" height="44" rx="6" fill="#fff1f0" stroke="#ffa39e"/>
+  <text x="500" y="228" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" font-weight="700" fill="#262626">🚨 举措 1.4 供应链韧性</text>
+  <text x="500" y="244" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">供应链成本失控 · 上市周期18个月 · 国产替代不足</text>
+
+  <!-- 底部：战略地图 -->
+  <rect x="24" y="284" width="912" height="236" rx="8" fill="#fff" opacity=".95"/>
+  <text x="40" y="310" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="14" font-weight="700" fill="#262626">🗺️ 战略地图 — 华为2025（战略解码版）</text>
+  <!-- 财务层 -->
+  <rect x="40" y="324" width="880" height="42" rx="6" fill="url(#finance)"/>
+  <text x="56" y="350" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="700" fill="#fff">一、财务层面（F）— 有利润的收入，有现金流的利润</text>
+  <!-- 箭头 -->
+  <text x="470" y="378" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="16" fill="#8c8c8c" text-anchor="middle">▼</text>
+  <!-- 客户层 -->
+  <rect x="40" y="382" width="880" height="42" rx="6" fill="url(#customer)"/>
+  <text x="56" y="408" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="700" fill="#fff">二、客户层面（C）— 以客户为中心，深入行业场景，为客户创造价值</text>
+  <!-- 箭头 -->
+  <text x="470" y="436" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="16" fill="#8c8c8c" text-anchor="middle">▼</text>
+  <!-- 内部运营层 -->
+  <rect x="40" y="440" width="880" height="42" rx="6" fill="url(#internal)"/>
+  <text x="56" y="466" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="700" fill="#fff">三、内部运营层面（I）— 做强核心竞争力：将AI嵌入每一个产品和网络</text>
+  <!-- 箭头 -->
+  <text x="470" y="494" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="16" fill="#8c8c8c" text-anchor="middle">▼</text>
+  <!-- 学习成长层 -->
+  <rect x="40" y="498" width="880" height="42" rx="6" fill="url(#learning)"/>
+  <text x="56" y="524" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="700" fill="#fff">四、学习与成长层面（L）— 创新 · 生态 · 人才 · 组织</text>
+
+  <!-- 底部条 -->
+  <rect x="0" y="526" width="960" height="14" fill="#001529" rx="0"/>
+  <rect x="0" y="526" width="960" height="14" rx="12"/>
+  <text x="480" y="536" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="7" fill="rgba(255,255,255,.3)" text-anchor="middle">🔒 本页面所有操作均受 WORM 保护 · 不可篡改</text>
+</svg>
