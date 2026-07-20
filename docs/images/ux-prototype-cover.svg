@@ -1,107 +1,178 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" font-family="PingFang SC,Microsoft YaHei,sans-serif">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#001529"/>
-      <stop offset="100%" stop-color="#1d3a5c"/>
+    <filter id="cardShadow" x="-2%" y="-2%" width="104%" height="108%">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity=".08"/>
+    </filter>
+    <filter id="panelShadow" x="-2%" y="-2%" width="104%" height="108%">
+      <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#000" flood-opacity=".08"/>
+    </filter>
+    <linearGradient id="sparkGreen" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#00875A"/><stop offset="100%" stop-color="#52c41a"/>
     </linearGradient>
-    <linearGradient id="finance" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#1d3a5c"/><stop offset="100%" stop-color="#2a5080"/>
-    </linearGradient>
-    <linearGradient id="customer" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#00875A"/><stop offset="100%" stop-color="#00a870"/>
-    </linearGradient>
-    <linearGradient id="internal" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#531dab"/><stop offset="100%" stop-color="#722ed1"/>
-    </linearGradient>
-    <linearGradient id="learning" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#874d00"/><stop offset="100%" stop-color="#B86E00"/>
+    <linearGradient id="sparkAmber" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#B86E00"/><stop offset="100%" stop-color="#00875A"/>
     </linearGradient>
   </defs>
 
-  <!-- 背景 -->
-  <rect width="960" height="540" rx="12" fill="url(#bg)"/>
+  <!-- 页面背景 -->
+  <rect width="960" height="540" fill="#f5f5f5"/>
 
-  <!-- 顶部导航条 -->
-  <rect x="0" y="0" width="960" height="44" fill="#001529" rx="12"/>
-  <rect x="0" y="32" width="960" height="12" fill="#001529"/>
-  <text x="24" y="28" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" fill="#fff">🎯 sisys</text>
-  <rect x="340" y="12" width="100" height="20" rx="4" fill="rgba(255,255,255,.15)"/>
-  <text x="350" y="26" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" fill="#fff">XX公司 2026 SP-BP</text>
-  <rect x="460" y="12" width="70" height="20" rx="4" fill="rgba(255,255,255,.15)"/>
-  <text x="472" y="26" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" fill="#fff">🎯 决策舱</text>
-  <rect x="540" y="12" width="70" height="20" rx="4" fill="rgba(255,255,255,.08)"/>
-  <text x="552" y="26" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" fill="rgba(255,255,255,.55)">📐 工作台</text>
-  <rect x="620" y="12" width="80" height="20" rx="4" fill="rgba(255,255,255,.08)"/>
-  <text x="632" y="26" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" fill="rgba(255,255,255,.55)">🗺️ 战略地图</text>
+  <!-- ===== 导航栏 ===== -->
+  <rect x="0" y="0" width="960" height="44" fill="#001529"/>
+  <text x="16" y="28" font-size="14" font-weight="700" fill="#fff">🎯 sisys</text>
+  <!-- 项目选择器 -->
+  <rect x="320" y="10" width="200" height="24" rx="4" fill="none" stroke="rgba(255,255,255,.2)"/>
+  <text x="334" y="26" font-size="11" fill="#fff">华为 2025 SP-BP</text>
+  <!-- 导航链接 -->
+  <rect x="540" y="10" width="80" height="24" rx="4" fill="rgba(255,255,255,.15)"/>
+  <text x="548" y="26" font-size="11" fill="#fff">🎯 决策舱</text>
+  <rect x="628" y="10" width="80" height="24" rx="4" fill="rgba(255,255,255,.08)"/>
+  <text x="636" y="26" font-size="11" fill="rgba(255,255,255,.55)">📐 工作台</text>
+  <rect x="716" y="10" width="90" height="24" rx="4" fill="rgba(255,255,255,.08)"/>
+  <text x="724" y="26" font-size="11" fill="rgba(255,255,255,.55)">🗺️ 战略地图</text>
+  <!-- 用户 -->
+  <text x="884" y="26" font-size="11" fill="rgba(255,255,255,.8)" text-anchor="end">👤 乔布斯克</text>
 
-  <!-- 左侧：决策舱 KPI 卡片 -->
-  <rect x="24" y="60" width="430" height="210" rx="8" fill="#fff" opacity=".95"/>
-  <text x="40" y="84" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" fill="#262626">📊 核心经营态势</text>
-  <!-- KPI 小卡片 -->
-  <rect x="40" y="96" width="75" height="50" rx="6" fill="#f5f5f5"/>
-  <text x="48" y="116" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">年度营收</text>
-  <text x="48" y="138" font-family="Consolas,monospace" font-size="16" font-weight="700" fill="#00875A">8,809亿</text>
-  <rect x="122" y="96" width="75" height="50" rx="6" fill="#f5f5f5"/>
-  <text x="130" y="116" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">利润率</text>
-  <text x="130" y="138" font-family="Consolas,monospace" font-size="16" font-weight="700" fill="#00875A">11.0%</text>
-  <rect x="204" y="96" width="75" height="50" rx="6" fill="#f5f5f5"/>
-  <text x="212" y="116" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">现金流</text>
-  <text x="212" y="138" font-family="Consolas,monospace" font-size="16" font-weight="700" fill="#00875A">1,274亿</text>
-  <!-- RAG 灯 -->
-  <rect x="40" y="156" width="410" height="28" rx="6" fill="#fafafa"/>
-  <text x="52" y="174" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#8c8c8c">业务单元健康度</text>
-  <circle cx="190" cy="170" r="4" fill="#00875A"/>
-  <circle cx="225" cy="170" r="4" fill="#d48806"/>
-  <circle cx="260" cy="170" r="4" fill="#00875A"/>
-  <circle cx="295" cy="170" r="4" fill="#C53030"/>
-  <circle cx="330" cy="170" r="4" fill="#00875A"/>
-  <!-- 风险雷达 -->
-  <text x="40" y="206" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="700" fill="#262626">🎯 风险雷达</text>
-  <text x="40" y="226" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="10" fill="#C53030">① 现金流压力 5/5级</text>
-  <text x="40" y="242" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="10" fill="#d46b08">② 供应链成本超标</text>
-  <text x="40" y="258" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="10" fill="#8c8c8c">③ 渠道覆盖不足</text>
+  <!-- ===== 页面标题 ===== -->
+  <text x="16" y="74" font-size="22" font-weight="700" fill="#262626">决策舱</text>
+  <text x="16" y="93" font-size="12" fill="#595959">拖动决策卡中的滑块探索不同情景——AI高管团实时响应</text>
+  <text x="16" y="109" font-size="10" fill="#8c8c8c">最后更新：2026-06-09 09:15 · 华为2025年报数据 · 🔄 刷新</text>
 
-  <!-- 右侧：决策卡片 -->
-  <rect x="470" y="60" width="466" height="210" rx="8" fill="#fff" opacity=".95"/>
-  <text x="486" y="84" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" fill="#262626">🃏 决策卡片</text>
-  <text x="486" y="100" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="10" fill="#8c8c8c">拖动滑块探索不同情景 — AI高管团实时响应</text>
-  <!-- 卡片1 -->
-  <rect x="486" y="112" width="434" height="44" rx="6" fill="#fffbe6" stroke="#ffe58f"/>
-  <text x="500" y="128" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" font-weight="700" fill="#262626">🔴 SC-3 现金流与投资回报危机</text>
-  <text x="500" y="144" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">现金流压力极高 · 回收期5.8年 · ROI持续恶化</text>
-  <!-- 卡片2 -->
-  <rect x="486" y="162" width="434" height="44" rx="6" fill="#e6f7ff" stroke="#91d5ff"/>
-  <text x="500" y="178" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" font-weight="700" fill="#262626">🟠 SC-4 市场进入策略</text>
-  <text x="500" y="194" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">进入方式：自建渠道 vs 合资探索 · CEO/CFO/CTO严重分歧</text>
-  <!-- 卡片3 -->
-  <rect x="486" y="212" width="434" height="44" rx="6" fill="#fff1f0" stroke="#ffa39e"/>
-  <text x="500" y="228" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" font-weight="700" fill="#262626">🚨 举措 1.4 供应链韧性</text>
-  <text x="500" y="244" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="9" fill="#595959">供应链成本失控 · 上市周期18个月 · 国产替代不足</text>
+  <!-- ===== 顶部双栏 ===== -->
+  <!-- 左栏：KPI 面板 -->
+  <rect x="16" y="122" width="560" height="196" rx="10" fill="#fff" filter="url(#panelShadow)"/>
+  <text x="32" y="148" font-size="13" font-weight="600" fill="#262626">📊 核心经营态势</text>
 
-  <!-- 底部：战略地图 -->
-  <rect x="24" y="284" width="912" height="236" rx="8" fill="#fff" opacity=".95"/>
-  <text x="40" y="310" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="14" font-weight="700" fill="#262626">🗺️ 战略地图 — 华为2025（战略解码版）</text>
-  <!-- 财务层 -->
-  <rect x="40" y="324" width="880" height="42" rx="6" fill="url(#finance)"/>
-  <text x="56" y="350" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="700" fill="#fff">一、财务层面（F）— 有利润的收入，有现金流的利润</text>
-  <!-- 箭头 -->
-  <text x="470" y="378" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="16" fill="#8c8c8c" text-anchor="middle">▼</text>
-  <!-- 客户层 -->
-  <rect x="40" y="382" width="880" height="42" rx="6" fill="url(#customer)"/>
-  <text x="56" y="408" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="700" fill="#fff">二、客户层面（C）— 以客户为中心，深入行业场景，为客户创造价值</text>
-  <!-- 箭头 -->
-  <text x="470" y="436" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="16" fill="#8c8c8c" text-anchor="middle">▼</text>
-  <!-- 内部运营层 -->
-  <rect x="40" y="440" width="880" height="42" rx="6" fill="url(#internal)"/>
-  <text x="56" y="466" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="700" fill="#fff">三、内部运营层面（I）— 做强核心竞争力：将AI嵌入每一个产品和网络</text>
-  <!-- 箭头 -->
-  <text x="470" y="494" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="16" fill="#8c8c8c" text-anchor="middle">▼</text>
-  <!-- 学习成长层 -->
-  <rect x="40" y="498" width="880" height="42" rx="6" fill="url(#learning)"/>
-  <text x="56" y="524" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="700" fill="#fff">四、学习与成长层面（L）— 创新 · 生态 · 人才 · 组织</text>
+  <!-- KPI 趋势卡片 1 营收 -->
+  <g transform="translate(32,158)">
+    <rect x="0" y="0" width="98" height="72" rx="8" fill="#fff"/>
+    <text x="49" y="14" font-size="10" fill="#595959" text-anchor="middle">年度营收</text>
+    <!-- 迷你走势 -->
+    <polyline points="2,52 18,48 34,42 50,38 66,32 82,28 96,22" fill="none" stroke="#00875A" stroke-width="2" stroke-linecap="round"/>
+    <text x="49" y="66" font-size="17" font-family="Consolas,monospace" font-weight="700" fill="#00875A" text-anchor="middle">8,809亿</text>
+    <rect x="70" y="52" width="24" height="12" rx="6" fill="#f6ffed"/>
+    <text x="82" y="61" font-size="7" fill="#00875A" font-weight="600" text-anchor="middle">↑2.2%</text>
+  </g>
 
-  <!-- 底部条 -->
-  <rect x="0" y="526" width="960" height="14" fill="#001529" rx="0"/>
-  <rect x="0" y="526" width="960" height="14" rx="12"/>
-  <text x="480" y="536" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="7" fill="rgba(255,255,255,.3)" text-anchor="middle">🔒 本页面所有操作均受 WORM 保护 · 不可篡改</text>
+  <!-- KPI 趋势卡片 2 利润率 -->
+  <g transform="translate(138,158)">
+    <rect x="0" y="0" width="98" height="72" rx="8" fill="#fff"/>
+    <text x="49" y="14" font-size="10" fill="#595959" text-anchor="middle">营业利润率</text>
+    <polyline points="2,48 18,44 34,43 50,41 66,39 82,36 96,34" fill="none" stroke="#00875A" stroke-width="2" stroke-linecap="round"/>
+    <text x="49" y="66" font-size="17" font-family="Consolas,monospace" font-weight="700" fill="#00875A" text-anchor="middle">11.0%</text>
+    <rect x="70" y="52" width="24" height="12" rx="6" fill="#f6ffed"/>
+    <text x="82" y="61" font-size="7" fill="#00875A" font-weight="600" text-anchor="middle">↑1.8pp</text>
+  </g>
+
+  <!-- KPI 趋势卡片 3 现金流 -->
+  <g transform="translate(244,158)">
+    <rect x="0" y="0" width="98" height="72" rx="8" fill="#fff"/>
+    <text x="49" y="14" font-size="10" fill="#595959" text-anchor="middle">经营现金流</text>
+    <polyline points="2,40 18,44 34,42 50,36 66,30 82,26 96,22" fill="none" stroke="#00875A" stroke-width="2" stroke-linecap="round"/>
+    <text x="49" y="66" font-size="17" font-family="Consolas,monospace" font-weight="700" fill="#00875A" text-anchor="middle">1,274亿</text>
+    <rect x="70" y="52" width="24" height="12" rx="6" fill="#f6ffed"/>
+    <text x="82" y="61" font-size="7" fill="#00875A" font-weight="600" text-anchor="middle">↑44%</text>
+  </g>
+
+  <!-- KPI 趋势卡片 4 研发 -->
+  <g transform="translate(350,158)">
+    <rect x="0" y="0" width="98" height="72" rx="8" fill="#fff"/>
+    <text x="49" y="14" font-size="10" fill="#595959" text-anchor="middle">研发投入率</text>
+    <polyline points="2,44 18,42 34,40 50,39 66,38 82,36 96,36" fill="none" stroke="#B86E00" stroke-width="2" stroke-linecap="round"/>
+    <text x="49" y="66" font-size="17" font-family="Consolas,monospace" font-weight="700" fill="#B86E00" text-anchor="middle">21.8%</text>
+    <rect x="70" y="52" width="24" height="12" rx="6" fill="#fffbe6"/>
+    <text x="82" y="61" font-size="7" fill="#ad6800" font-weight="600" text-anchor="middle">→ 持平</text>
+  </g>
+
+  <!-- KPI 趋势卡片 5 研发人员 -->
+  <g transform="translate(456,158)">
+    <rect x="0" y="0" width="98" height="72" rx="8" fill="#fff"/>
+    <text x="49" y="14" font-size="10" fill="#595959" text-anchor="middle">研发人员</text>
+    <polyline points="2,40 18,38 34,34 50,30 66,28 82,24 96,22" fill="none" stroke="#00875A" stroke-width="2" stroke-linecap="round"/>
+    <text x="49" y="66" font-size="17" font-family="Consolas,monospace" font-weight="700" fill="#00875A" text-anchor="middle">11.4万</text>
+    <rect x="70" y="52" width="24" height="12" rx="6" fill="#f6ffed"/>
+    <text x="82" y="61" font-size="7" fill="#00875A" font-weight="600" text-anchor="middle">53.7%</text>
+  </g>
+
+  <!-- RAG 健康灯 -->
+  <rect x="32" y="242" width="528" height="30" rx="6" fill="#fafafa" stroke="#f0f0f0"/>
+  <text x="44" y="261" font-size="9" fill="#8c8c8c">业务单元健康度 · 点击查看详情</text>
+  <rect x="240" y="249" width="56" height="15" rx="8" fill="#f6ffed" stroke="#b7eb8f"/>
+  <circle cx="252" cy="256" r="3" fill="#00875A"/>
+  <text x="259" y="260" font-size="8" fill="#262626">运营商 ↑</text>
+  <rect x="302" y="249" width="56" height="15" rx="8" fill="#fffbe6" stroke="#ffe58f"/>
+  <circle cx="314" cy="256" r="3" fill="#d48806"/>
+  <text x="321" y="260" font-size="8" fill="#262626">企业BG →</text>
+  <rect x="364" y="249" width="56" height="15" rx="8" fill="#f6ffed" stroke="#b7eb8f"/>
+  <circle cx="376" cy="256" r="3" fill="#00875A"/>
+  <text x="383" y="260" font-size="8" fill="#262626">消费者 ↑</text>
+  <rect x="426" y="249" width="60" height="15" rx="8" fill="#fff1f0" stroke="#ffa39e"/>
+  <circle cx="438" cy="256" r="3" fill="#C53030"/>
+  <text x="445" y="260" font-size="8" fill="#262626">Cloud&AI ↓</text>
+  <rect x="492" y="249" width="56" height="15" rx="8" fill="#f6ffed" stroke="#b7eb8f"/>
+  <circle cx="504" cy="256" r="3" fill="#00875A"/>
+  <text x="511" y="260" font-size="8" fill="#262626">智车BU ↑</text>
+
+  <!-- 右栏：风险雷达面板 -->
+  <rect x="588" y="122" width="356" height="196" rx="10" fill="#fff" filter="url(#panelShadow)"/>
+  <text x="604" y="148" font-size="13" font-weight="600" fill="#262626">🎯 风险雷达</text>
+  <text x="604" y="162" font-size="9" fill="#8c8c8c">实时预警</text>
+
+  <!-- 风险条目 -->
+  <g transform="translate(604,176)">
+    <rect x="0" y="0" width="20" height="20" rx="10" fill="#C53030"/>
+    <text x="10" y="14" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">1</text>
+    <text x="28" y="10" font-size="11" fill="#262626">现金流与投资回报危机</text>
+    <text x="28" y="22" font-size="9" fill="#595959">现金流压力极高 · 回收期5.8年</text>
+    <rect x="290" y="3" width="32" height="14" rx="4" fill="#fff1f0"/>
+    <text x="306" y="13" font-size="8" font-weight="600" fill="#C53030" text-anchor="middle">严重</text>
+  </g>
+  <g transform="translate(604,206)">
+    <rect x="0" y="0" width="20" height="20" rx="10" fill="#e87040"/>
+    <text x="10" y="14" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">2</text>
+    <text x="28" y="10" font-size="11" fill="#262626">市场进入策略分歧</text>
+    <text x="28" y="22" font-size="9" fill="#595959">自建 vs 合资 · CEO/CFO/CTO分歧</text>
+    <rect x="290" y="3" width="32" height="14" rx="4" fill="#fff7e6"/>
+    <text x="306" y="13" font-size="8" font-weight="600" fill="#d46b08" text-anchor="middle">高</text>
+  </g>
+  <g transform="translate(604,236)">
+    <rect x="0" y="0" width="20" height="20" rx="10" fill="#B86E00"/>
+    <text x="10" y="14" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">3</text>
+    <text x="28" y="10" font-size="11" fill="#262626">供应链成本失控</text>
+    <text x="28" y="22" font-size="9" fill="#595959">成本¥2.5亿 · 上市周期22个月</text>
+    <rect x="290" y="3" width="32" height="14" rx="4" fill="#fff7e6"/>
+    <text x="306" y="13" font-size="8" font-weight="600" fill="#d46b08" text-anchor="middle">高</text>
+  </g>
+  <!-- 更多风险提示 -->
+  <text x="604" y="278" font-size="9" fill="#8c8c8c">+ 2 条其他预警 · 点击展开</text>
+
+  <!-- ===== 底部：决策卡片面板 ===== -->
+  <rect x="16" y="332" width="928" height="182" rx="10" fill="#fff" filter="url(#panelShadow)"/>
+  <text x="32" y="358" font-size="13" font-weight="600" fill="#262626">🃏 决策卡片</text>
+  <text x="32" y="374" font-size="9" fill="#8c8c8c">拖动滑块探索不同情景 — AI高管团实时响应</text>
+
+  <!-- 决策卡 1 - 紧急 -->
+  <rect x="32" y="386" width="896" height="36" rx="6" fill="#fffbe6" stroke="#ffe58f" stroke-width="1"/>
+  <rect x="32" y="386" width="3" height="36" rx="2" fill="#B86E00"/>
+  <text x="44" y="400" font-size="10" font-weight="600" fill="#B86E00">🔴 紧急</text>
+  <text x="95" y="400" font-size="12" font-weight="600" fill="#262626">SC-3 现金流与投资回报危机</text>
+  <text x="95" y="414" font-size="9" fill="#595959">现金流压力 4/5级 · 投资回收期 5.8年 · ROI 持续恶化</text>
+
+  <!-- 决策卡 2 - 紧急 -->
+  <rect x="32" y="428" width="896" height="36" rx="6" fill="#e6f7ff" stroke="#91d5ff" stroke-width="1"/>
+  <rect x="32" y="428" width="3" height="36" rx="2" fill="#1890ff"/>
+  <text x="44" y="442" font-size="10" font-weight="600" fill="#1890ff">🟠 待决策</text>
+  <text x="95" y="442" font-size="12" font-weight="600" fill="#262626">SC-4 市场进入策略 — 自建渠道 vs 合资探索</text>
+  <text x="95" y="456" font-size="9" fill="#595959">年复合增长率 6% · 竞品提前 2个月 · 急需确定进入方式</text>
+
+  <!-- 决策卡 3 - 稳定 -->
+  <rect x="32" y="470" width="896" height="36" rx="6" fill="#fff1f0" stroke="#ffa39e" stroke-width="1"/>
+  <rect x="32" y="470" width="3" height="36" rx="2" fill="#C53030"/>
+  <text x="44" y="484" font-size="10" font-weight="600" fill="#C53030">🚨 紧急</text>
+  <text x="95" y="484" font-size="12" font-weight="600" fill="#262626">举措 1.4 供应链韧性 — 成本失控与国产替代不足</text>
+  <text x="95" y="498" font-size="9" fill="#595959">供应链成本 ¥2.5亿 · 上市周期 22个月 · 国产替代率仅 30%</text>
+
+  <!-- ===== 底部水印 ===== -->
+  <rect x="0" y="522" width="960" height="18" fill="#f5f5f5"/>
+  <text x="480" y="534" font-size="8" fill="#bfbfbf" text-anchor="middle">🔒 本页面所有操作均受 WORM 保护 · 保留至 2033-06-09 · 不可篡改</text>
 </svg>
