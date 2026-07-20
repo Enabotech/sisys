@@ -16,7 +16,7 @@
   --color-text-primary:#262626; --color-text-secondary:#595959; --color-text-tertiary:#8c8c8c; --color-text-disabled:#bfbfbf;
   --color-bg-primary:#f5f5f5; --color-bg-card:#fff; --color-border:#e8e8e8; --color-white:#fff;
   --font-family-base:'PingFang SC','Microsoft YaHei',sans-serif; --font-family-code:'Consolas','Monaco',monospace;
-  --spacing-xs:4px; --spacing-sm:8px; --spacing-md:16px; --spacing-lg:24px; --spacing-xl:32px; --spacing-2xl:48px;
+  --spacing-xs:4px; --spacing-sm:8px; --spacing-md:16px; --spacing-lg:24px; --spacing-xl:16px; --spacing-2xl:32px;
   --radius-sm:4px; --radius-md:8px; --radius-lg:12px; --radius-xl:16px;
   --shadow-sm:0 1px 2px rgba(0,0,0,.1); --shadow-md:0 4px 12px rgba(0,0,0,.08); --shadow-lg:0 8px 24px rgba(0,0,0,.12); --shadow-xl:0 12px 32px rgba(0,0,0,.18);
   --z-modal:1000; --z-overlay:999;
@@ -576,6 +576,18 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
 /* 战略地图响应式 */
 @media(max-width:1200px){.sm-ops-grid{grid-template-columns:repeat(3,1fr)}.sm-theme-grid{grid-template-columns:1fr}}
 @media(max-width:768px){.sm-ops-grid{grid-template-columns:repeat(2,1fr)}.sm-customer-grid{grid-template-columns:1fr}}
+
+/* 五盏业务单元健康灯 */
+.rag-strip{display:flex;gap:8px;align-items:center}
+.rag-light{display:flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;cursor:pointer;transition:all .2s;border:1px solid transparent;white-space:nowrap}
+.rag-light:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.rag-light .rag-dot-sm{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.rag-light .rag-dot-sm.green{background:var(--color-success)}
+.rag-light .rag-dot-sm.amber{background:#d48806}
+.rag-light .rag-dot-sm.red{background:var(--color-danger)}
+.rag-light.green{background:#f6ffed;border-color:#b7eb8f}
+.rag-light.amber{background:#fffbe6;border-color:#ffe58f}
+.rag-light.red{background:#fff1f0;border-color:#ffa39e}
 </style>
 </head>
 <body>
@@ -613,8 +625,13 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
     <div class="overview-top">
       <!-- 左栏：KPI 仪表盘 -->
       <div class="overview-panel" id="kpiPanel">
-        <div class="overview-panel-title">📊 核心经营指标</div>
+        <div class="overview-panel-title">📊 核心经营态势</div>
         <div class="kpi-grid" id="kpiGrid"></div>
+        <!-- 五盏业务单元健康灯 -->
+        <div style="margin-top:var(--spacing-md);padding-top:var(--spacing-sm);border-top:1px solid var(--color-bg-primary)">
+          <div style="font-size:10px;color:var(--color-text-tertiary);margin-bottom:6px">业务单元健康度 · 点击查看详情</div>
+          <div class="rag-strip" id="ragStrip" style="display:flex;gap:8px;align-items:center"></div>
+        </div>
       </div>
       <!-- 右栏：三大风险雷达 -->
       <div class="overview-panel" id="riskPanel">
@@ -623,16 +640,15 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
       </div>
     </div>
 
-    <!-- 中部：BG 运营健康度矩阵 -->
-    <div class="overview-panel" id="healthPanel">
-      <div class="overview-panel-title">🏢 业务运营健康度 <span style="font-size:10px;font-weight:400;color:var(--color-text-tertiary);">RAG 状态矩阵</span></div>
-      <div class="health-matrix" id="healthMatrix"></div>
+    <!-- 中部：决策卡片（全宽） -->
+    <div class="overview-panel">
+      <div class="overview-panel-title">🃏 决策卡片 <span style="font-size:10px;font-weight:400;color:var(--color-text-tertiary);">拖动滑块探索不同情景 — AI高管团实时响应</span></div>
+      <div class="decision-grid" id="decisionGrid" style="margin-top:0">
+        <!-- 轮播UI由 carouselInit 动态注入；卡片由 buildCockpit 构建 -->
+      </div>
     </div>
   </div>
 
-  <div class="decision-grid" id="decisionGrid">
-    <!-- 轮播UI由 carouselInit 动态注入；卡片由 buildCockpit 构建 -->
-  </div>
 
   <div class="compliance-watermark">🔒 本页面所有操作均受 WORM 保护 · 保留至 2033-06-09 · 不可篡改 · 审计 ID: SESSION-AUD-20260609-001</div>
 </div>
@@ -993,6 +1009,20 @@ body{font-family:var(--font-family-base);background:var(--color-bg-primary);colo
   </div>
 </div>
 -->
+
+<!-- ============================================================
+     业务单元健康度详情弹窗
+     ============================================================ -->
+<div class="overlay" id="healthOverlay" onclick="closeHealthDetail()"></div>
+<div class="modal" id="healthModal">
+  <div class="modal-header">
+    <span class="modal-title" id="healthModalTitle">🏢 业务运营健康度</span>
+    <button class="modal-close" onclick="closeHealthDetail()">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="health-matrix" id="healthMatrixDetail"></div>
+  </div>
+</div>
 
 <!-- ============================================================
      Toast容器
@@ -1941,10 +1971,11 @@ function renderRiskRadar(){
 }
 
 function renderHealthMatrix(){
-  var container=document.getElementById('healthMatrix');if(!container)return;
+  var strip=document.getElementById('ragStrip');if(!strip)return;
+  var detailContainer=document.getElementById('healthMatrixDetail');if(!detailContainer)return;
   var bgs=[
-    {name:'运营商BG',revenue:'92%',revRag:'green',profit:'105%',profRag:'green',csat:'88',csatRag:'green',projRag:'green',overall:'green',trend:'→'},
-    {name:'企业BG',revenue:'78%',revRag:'amber',profit:'82%',profRag:'amber',csat:'85',csatRag:'green',projRag:'amber',overall:'amber',trend:'↓'},
+    {name:'运营商BG',revenue:'92%',revRag:'green',profit:'105%',profRag:'green',csat:'88',csatRag:'green',projRag:'green',overall:'green',trend:'↑'},
+    {name:'企业BG',revenue:'78%',revRag:'amber',profit:'82%',profRag:'amber',csat:'85',csatRag:'green',projRag:'amber',overall:'amber',trend:'→'},
     {name:'消费者BG',revenue:'115%',revRag:'green',profit:'120%',profRag:'green',csat:'91',csatRag:'green',projRag:'green',overall:'green',trend:'↑'},
     {name:'Cloud&AI BG',revenue:'65%',revRag:'red',profit:'60%',profRag:'red',csat:'80',csatRag:'amber',projRag:'red',overall:'red',trend:'↓'},
     {name:'智能汽车BU',revenue:'200%',revRag:'green',profit:'—',profRag:'',csat:'93',csatRag:'green',projRag:'green',overall:'green',trend:'↑'}
@@ -1960,9 +1991,21 @@ function renderHealthMatrix(){
     if(t==='↓')return '<span class="trend-down">↓</span>';
     return '<span class="trend-flat">→</span>';
   };
+  // Render 5 RAG lights in KPI panel
+  var lights='';
+  bgs.forEach(function(bg,i){
+    var cls=bg.overall==='green'?'green':bg.overall==='amber'?'amber':'red';
+    var trendArrow=bg.trend==='↑'?' ↑':bg.trend==='↓'?' ↓':'';
+    lights+='<span class="rag-light '+cls+'" onclick="showHealthDetail('+i+')" title="点击查看'+bg.name+'详情">'+
+      '<span class="rag-dot-sm '+cls+'"></span>'+
+      bg.name+trendArrow+
+      '</span>';
+  });
+  strip.innerHTML=lights;
+  // Pre-render the full table for the modal
   var h='<table class="health-table"><thead><tr><th>业务单元</th><th>收入达成</th><th>利润贡献</th><th>客户满意度</th><th>关键项目</th><th>综合状态</th><th>趋势</th></tr></thead><tbody>';
   bgs.forEach(function(bg){
-    h+='<tr><td>'+bg.name+'</td>'+
+    h+='<tr><td><strong>'+bg.name+'</strong></td>'+
       '<td>'+bg.revenue+' '+ragIcon(bg.revRag)+'</td>'+
       '<td>'+bg.profit+' '+ragIcon(bg.profRag)+'</td>'+
       '<td>'+bg.csat+'分 '+ragIcon(bg.csatRag)+'</td>'+
@@ -1971,9 +2014,21 @@ function renderHealthMatrix(){
       '<td>'+trendIcon(bg.trend)+'</td></tr>';
   });
   h+='</tbody></table>';
-  container.innerHTML=h;
+  detailContainer.innerHTML=h;
 }
-
+// 健康度详情弹窗
+var _healthBgs=null;
+function showHealthDetail(idx){
+  document.getElementById('healthOverlay').classList.add('show');
+  document.getElementById('healthModal').classList.add('show');
+  // Highlight the selected row
+  var rows=document.querySelectorAll('#healthMatrixDetail .health-table tbody tr');
+  rows.forEach(function(r,i){r.style.background=i===idx?'var(--color-primary-bg)':''});
+}
+function closeHealthDetail(){
+  document.getElementById('healthOverlay').classList.remove('show');
+  document.getElementById('healthModal').classList.remove('show');
+}
 // ============================================================
 // v2.2：renderDashboard 入口（KPI+风险雷达+健康矩阵+卡片轮播+旧仪表盘）
 // ============================================================
