@@ -78,7 +78,8 @@ tinytag = "^2.2.1"
 ffmpeg-python = "^0.2.0"
 
 # OCR
-pytesseract = "^0.3.10"
+paddlepaddle-gpu = "3.3.1"
+paddleocr = "3.6.0"
 onnxruntime = "^1.26.0"
 pypdfium2 = "^5.9.0"
 
@@ -168,6 +169,11 @@ priority = "supplemental"
 [[tool.poetry.source]]
 name = "tencent"
 url = "https://mirrors.cloud.tencent.com/pypi/simple/"
+priority = "supplemental"
+
+[[tool.poetry.source]]
+name = "paddlepaddle-gpu"
+url = "https://www.paddlepaddle.org.cn/packages/stable/cu130/"
 priority = "supplemental"
 
 [[tool.poetry.source]]
