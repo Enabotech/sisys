@@ -350,6 +350,7 @@ spec:
                 "insecure-registries": ["harbor.sisys.local"],
                 "dns": ["10.43.0.10", "8.8.8.8"],
                 "dns-search": ["gitea-advacts.svc.cluster.local", "svc.cluster.local", "cluster.local"],
+                "mtu": 1450,
                 "ipv6": false
               }
               EOF
