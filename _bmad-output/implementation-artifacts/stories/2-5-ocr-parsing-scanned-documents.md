@@ -1153,6 +1153,9 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 | 19 | Docker Compose include+profiles 内部矛盾（Subtask 5.3 vs AC-5 vs 文件清单） | P0 | 统一为内联写入 docker-compose.yml（与 embedding-api 一致），paddleocrvl/ 保留参考模板 |
 | 20 | `tests/fixtures/` 为单文件 `fixtures.py`，非目录，无法存放 JSON fixture | P1 | 路径改为 `tests/data/paddleocr_vl_response_sample.json` |
 | 21 | Story 状态 `backlog` 与 sprint-status.yaml `ready-for-dev` 不一致 | P1 | 同步为 `ready-for-dev` |
+| 22 | AC→Task 追溯矩阵残留 `include` 描述 | P1 | 更新为 `profiles: [gpu] 内联写入 docker-compose.yml` |
+| 23 | 项目结构 exception_handlers 注释 HTTP 映射不精确 | P1 | `EXCEPTION_320/321→502` → `320→504 / 321→502` |
+| 24 | 审查日期"待定" + 完成总结未勾选 + Last Updated 未更新 | P2 | 三处全部更新为完成状态 |
 
 ---
 
