@@ -154,8 +154,8 @@ def given_collection_with_sparse_vectors(
     async def _setup():
         # 创建支持 sparse vectors 的 Collection
         await collection_manager.create_collection(name=collection, vector_size=1024, distance="Cosine")
-        dense_vecs = embedding_service.embed_documents(texts)
-        sparse_vecs = embedding_service.embed_sparse(texts)
+        dense_vecs = await embedding_service.embed_documents(texts)
+        sparse_vecs = await embedding_service.embed_sparse(texts)
         points = [
             VectorPoint(
                 id=f"doc_{i}",
@@ -232,7 +232,7 @@ def given_collection_with_vectors(
 
     async def _setup():
         await collection_manager.create_collection(name=collection, vector_size=1024, distance="Cosine")
-        dense_vecs = embedding_service.embed_documents(texts)
+        dense_vecs = await embedding_service.embed_documents(texts)
         points = [VectorPoint(id=f"doc_{i}", vector=dense_vecs[i], payload={"text": texts[i]}) for i in range(len(texts))]
         await vector_storage.upsert_points(collection, points)
 
@@ -399,11 +399,15 @@ def given_sparse_down(context: dict[str, Any]) -> None:
 
 
 @given("generate_embedding 已产出 EmbeddingResult")
-def given_embedding_ready(context: dict[str, Any], embedding_service) -> None:
+def given_embedding_ready(context: dict[str, Any], embedding_service, event_loop) -> None:
     from src.infrastructure.workflow.tasks.document_tasks import EmbeddingResult
 
-    dense = embedding_service.embed_documents(["验收测试文档内容"])
-    sparse = embedding_service.embed_sparse(["验收测试文档内容"])
+    async def _embed():
+        dense = await embedding_service.embed_documents(["验收测试文档内容"])
+        sparse = await embedding_service.embed_sparse(["验收测试文档内容"])
+        return dense, sparse
+
+    dense, sparse = event_loop.run_until_complete(_embed())
     context["embedding_obj"] = EmbeddingResult(dense_vectors=dense, sparse_vectors=sparse)
 
 

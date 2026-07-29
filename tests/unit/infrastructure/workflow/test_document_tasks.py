@@ -19,8 +19,8 @@ from src.infrastructure.workflow.tasks.document_tasks import EmbeddingResult
 def mock_embedding_service() -> MagicMock:
     """Mock EmbeddingService — Dense + Sparse 均返回模拟数据"""
     service = MagicMock()
-    service.embed_documents = MagicMock(return_value=[[0.1] * 1024])
-    service.embed_sparse = MagicMock(return_value=[SparseEmbedding(indices=[0, 5, 10], values=[1.0, 0.5, 0.8])])
+    service.embed_documents = AsyncMock(return_value=[[0.1] * 1024])
+    service.embed_sparse = AsyncMock(return_value=[SparseEmbedding(indices=[0, 5, 10], values=[1.0, 0.5, 0.8])])
     return service
 
 

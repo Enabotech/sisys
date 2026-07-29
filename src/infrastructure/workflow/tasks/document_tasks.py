@@ -16,7 +16,7 @@ from typing import Any, TypedDict, cast
 
 from prefect import task
 
-from src.domain.ports.embedding_service import SparseEmbedding
+from src.domain.ports.embedding_service import EmbeddingServicePort, SparseEmbedding
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ async def generate_embedding(parse_result: dict[str, Any]) -> EmbeddingResult:
             return empty
 
         resolver = get_resolver()
-        service = resolver.resolve("embedding_service")
+        service = cast(EmbeddingServicePort, resolver.resolve("embedding_service"))
         repo = resolver.resolve("document_repository")
         doc = await repo.find(
             DocumentQuery(
@@ -137,7 +137,7 @@ async def generate_embedding(parse_result: dict[str, Any]) -> EmbeddingResult:
         # 并行生成 Dense 和 Sparse 嵌入（asyncio.gather 确保 task 生命周期安全）
         async def _safe_sparse() -> list[SparseEmbedding]:
             try:
-                return await asyncio.to_thread(service.embed_sparse, [text])
+                return await service.embed_sparse([text])
             except Exception as e:
                 logger.warning(
                     "Sparse 嵌入生成失败，降级为仅 Dense 索引: document_id=%s, error=%s",
@@ -149,7 +149,7 @@ async def generate_embedding(parse_result: dict[str, Any]) -> EmbeddingResult:
         dense_raw: Any
         sparse_raw: Any
         dense_raw, sparse_raw = await asyncio.gather(
-            asyncio.to_thread(service.embed_documents, [text]),
+            service.embed_documents([text]),
             _safe_sparse(),
             return_exceptions=True,
         )

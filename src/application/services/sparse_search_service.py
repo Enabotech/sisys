@@ -5,12 +5,11 @@ l3_vector.search_sparse()（稀疏向量→检索）两个端口，
 提供端到端 BM25 稀疏检索能力。
 
 严格镜像 DenseSemanticSearchService [Source: src/application/services/dense_search_service.py]
-的架构模式：构造函数注入 + asyncio.to_thread() + tenant_id 注入。
+的架构模式：构造函数注入 + tenant_id 注入。
 """
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, cast
 
 from src.domain.exceptions import ValidationError
@@ -71,7 +70,7 @@ class Bm25SparseSearchService:
             raise ValidationError(message=f"limit 必须为正整数，当前值: {limit}")
 
         # 生成查询稀疏向量（批量接口取首元素）
-        sparse_embeddings = await asyncio.to_thread(self._embedding.embed_sparse, [query_text])
+        sparse_embeddings = await self._embedding.embed_sparse([query_text])
         query_sparse = sparse_embeddings[0]
 
         # 构建组合过滤条件（自动注入 tenant_id）
