@@ -542,9 +542,9 @@ Feature: OCR 解析扫描件文档
 > **目的：** 实现 `PaddleOCRVLAdapter`，作为 `OCRPort` 的基础设施层实现，
 > 通过 HTTP 调用 PaddleOCR-VL 服务化 API。
 
-> ⚠️ **技术决策：** 使用同步 `httpx.Client`（项目已有依赖，与 `EmbeddingAPIClient` 模式一致），
-> `OCRPort.recognize()` 保持同步方法签名，调用方通过 `await asyncio.to_thread()` 包装。
-> 不引入 `requests`（额外依赖）或 `aiohttp`（额外依赖）。
+> ⚠️ **技术决策：** 使用 `httpx.AsyncClient`（项目已有依赖）进行 HTTP 通信，
+> `OCRPort.recognize()` 为 `async def`（**与项目中绝大多数端口一致**：56 端口文件 213 async 方法，仅 4 个 CPU 密集端口为同步），
+> 不引入 `requests`（同步阻塞）或 `aiohttp`（额外依赖）。
 
 #### TDD 循环 A：PaddleOCRVLAdapter 核心逻辑
 
@@ -937,7 +937,7 @@ Feature: OCR 解析扫描件文档
 1. **[MUST] 可选增强注入模式** — `table_extractor` 作为 Optional 构造参数注入 `DocumentParsingService`，`ocr` 遵循相同模式（默认 None，优雅降级）
 2. **[MUST] 三级降级策略一致性** — Port=None→跳过增强（不记日志）；运行时异常→WARNING 日志+返回原始结果；初始化失败→raise（配置错误，不降级）
 3. **[MUST] 值对象后向兼容扩展** — `ParsedTable.metadata` 使用 `field(default_factory=dict)`；OCR 结果通过现有 `ParsedElement.confidence` + `metadata` 字段承载，不新增顶层字段
-4. **[MUST] 临时文件安全** — OCR 前写临时文件必须使用 `tempfile.NamedTemporaryFile(delete=False)` + `os.fchmod(0o600)` + `try/finally os.unlink()` 确保安全创建和清理（含 `CancelledError` 场景）。PaddleOCR-VL HTTP 调用使用同步 `httpx.Client`（与 `EmbeddingAPIClient` 一致），由 `_apply_ocr()` 通过 `await asyncio.to_thread()` 包装，文件 I/O 仍需 try/finally
+4. **[MUST] 临时文件安全** — OCR 前写临时文件必须使用 `tempfile.NamedTemporaryFile(delete=False)` + `os.fchmod(0o600)` + `try/finally os.unlink()` 确保安全创建和清理（含 `CancelledError` 场景）。PaddleOCR-VL HTTP 调用使用 `httpx.AsyncClient`（`_apply_ocr()` 中直接 `await`），文件 I/O `open()` 为同步（项目惯例：网络 I/O async，文件 I/O sync）
 5. **[SHOULD] MIME 类型一致性** — `composition_root.py` 中的 MIME 类型应与 `DocumentFormat` 常量匹配，不在基础设施层重新定义
 
 **来源:** [Story 2-3 版面信息保留](./2-3-layout-preservation-doclaynet.md)
@@ -980,9 +980,8 @@ Feature: OCR 解析扫描件文档
 ┌─────────────────────────────────────────┐
 │         SISYS Application               │
 │  DocumentParsingService._apply_ocr()    │
-│         │ httpx.Client (sync)           │
+│         │ httpx.AsyncClient             │
 │         │ POST /layout-parsing          │
-│         │ (via asyncio.to_thread)       │
 │         ▼                               │
 │  localhost:8080 (paddleocr-vl-api)      │
 │  ┌─────────────────────────────────┐    │
@@ -1005,9 +1004,8 @@ Feature: OCR 解析扫描件文档
 import base64
 import httpx
 
-# 同步 httpx.Client（与 EmbeddingAPIClient 模式一致）
-# 由 _apply_ocr() 通过 await asyncio.to_thread() 包装调用
-with httpx.Client(timeout=300.0) as client:
+# httpx.AsyncClient（I/O 密集 HTTP，项目绝大多数端口为 async）
+async with httpx.AsyncClient(timeout=300.0) as client:
     with open(file_path, "rb") as f:
         b64_data = base64.b64encode(f.read()).decode("ascii")
 
@@ -1015,7 +1013,7 @@ with httpx.Client(timeout=300.0) as client:
         "file": b64_data,
         "fileType": 0,  # 0=PDF, 1=image
     }
-    resp = client.post(
+    resp = await client.post(
         "http://localhost:8080/layout-parsing",
         json=payload,
     )
@@ -1204,13 +1202,13 @@ with httpx.Client(timeout=300.0) as client:
 
 ### Round 2 审查修复（2026-07-29）
 
-> **审查发现：** (1) `httpx.AsyncClient` 与同步 `OCRPort.recognize()` 方法签名矛盾；
+> **审查发现：** (1) `OCRPort.recognize()` 应为 `async def`——项目 56 端口文件 213 async 方法，仅 4 个 CPU 密集端口为同步；
 > (2) `ImageParser(ocr=_ocr)` 跨作用域引用会导致 `NameError`；
 > (3) OCR 本质上替换文本（非增强），注入模式是 MVP 权衡。
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| R2-1 | `httpx.AsyncClient` 无法在同步 `OCRPort.recognize()` 中使用（项目现有模式为同步 `httpx.Client`） | P0 | 全量改为同步 `httpx.Client`（与 `EmbeddingAPIClient` 一致），`_apply_ocr()` 通过 `await asyncio.to_thread()` 包装 |
+| R2-1 | `OCRPort.recognize()` 同步方法签名与项目异步惯例不一致（仅 4/56 端口为 sync，均为 CPU 密集） | P1 | 改为 `async def recognize()` + `httpx.AsyncClient`（I/O 密集 HTTP，应异步） |
 | R2-2 | `ImageParser(ocr=_ocr)` 在 module-level lambda 中引用 `_create_parsing_service()` 局部变量，运行时 `NameError` | P0 | 改为在 `CompositeDocumentParser` impl lambda 内通过 `resolver.resolve("ocr")` 获取，`ocr` 端口必须在 `document_parser` 之前注册 |
 | R2-3 | OCR 本质为文本替换（非增强），注入模式是架构权衡 | P1 | 已记录为已知技术债务（构造函数 9 参数），后续 Epic 应重构为 Pipeline/Chain of Responsibility |
 | R2-4 | 置信度推导缺少明确决策树（API 可能不返回 per-block 置信度） | P1 | Subtask 0.0 增加三路径：① API per-block conf → 直接使用；② layout_det_res score → 代理；③ 均无 → 默认 0.5 |
