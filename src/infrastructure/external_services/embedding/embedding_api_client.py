@@ -1,6 +1,7 @@
 """基础设施层 Embedding API 客户端
 
 通过 HTTP 调用独立部署的 BGE-M3 嵌入服务，实现 EmbeddingServicePort 协议。
+使用 httpx.AsyncClient 异步 HTTP 通信（I/O 密集型，与项目 56 端口 213 async 方法惯例一致）。
 
 架构参考: architecture.md §4.3 嵌入模型配置
 异常规范: sisys-uni-exception-design.md — 使用统一异常层次结构
@@ -32,8 +33,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
     """BGE-M3 嵌入 API 客户端
 
     通过 HTTP POST /v1/embeddings 调用独立 API 服务，实现 EmbeddingServicePort 协议。
-    方法签名使用同步 def，内部使用 httpx.Client（同步），
-    调用方通过 asyncio.to_thread 包装以避免阻塞事件循环。
+    使用 httpx.AsyncClient 异步 HTTP 通信，调用方直接 await 无需 asyncio.to_thread 包装。
 
     异常策略：
     - 超时 → TimeoutError (EXCEPTION_302)
@@ -57,19 +57,19 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         if not config.api_url:
             raise ValidationError(message="EMBEDDING_API_URL 未配置，API 模式需要指定嵌入服务地址")
         self._config = config
-        self._client = httpx.Client(
+        self._client = httpx.AsyncClient(
             base_url=config.api_url,
             timeout=config.api_timeout,
         )
         self._closed = False
 
-    def __enter__(self) -> EmbeddingAPIClient:
-        """支持 with 语句，确保资源正确释放"""
+    async def __aenter__(self) -> EmbeddingAPIClient:
+        """支持 async with 语句，确保资源正确释放"""
         return self
 
-    def __exit__(self, *args: object) -> None:
-        """退出 with 块时自动关闭"""
-        self.close()
+    async def __aexit__(self, *args: object) -> None:
+        """退出 async with 块时自动关闭"""
+        await self.close()
 
     def _check_closed(self) -> None:
         """检查客户端是否已关闭
@@ -89,7 +89,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         """
         return 1024
 
-    def embed_query(self, text: str) -> list[float]:
+    async def embed_query(self, text: str) -> list[float]:
         """查询文本 Dense 嵌入
 
         对标 LangChain Embeddings.embed_query()。
@@ -106,10 +106,10 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         """
         if not text or not text.strip():
             raise ValidationError(message="文本不能为空")
-        result = self._encode([text], return_sparse=False)
+        result = await self._encode([text], return_sparse=False)
         return cast(list[float], result["dense"][0])
 
-    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+    async def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """文档批量 Dense 嵌入
 
         对标 LangChain Embeddings.embed_documents()。
@@ -129,10 +129,10 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         for i, t in enumerate(texts):
             if not t or not t.strip():
                 raise ValidationError(message=f"文本列表第 {i} 项不能为空")
-        result = self._encode(texts, return_sparse=False)
+        result = await self._encode(texts, return_sparse=False)
         return cast(list[list[float]], result["dense"])
 
-    def embed_sparse(self, texts: list[str]) -> list[SparseEmbedding]:
+    async def embed_sparse(self, texts: list[str]) -> list[SparseEmbedding]:
         """文档 Sparse 嵌入（批量）
 
         将文档文本批量编码为稀疏词汇权重向量。
@@ -151,7 +151,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         for i, t in enumerate(texts):
             if not t or not t.strip():
                 raise ValidationError(message=f"文本列表第 {i} 项不能为空")
-        result = self._encode(texts, return_sparse=True)
+        result = await self._encode(texts, return_sparse=True)
         sparse_list = cast(list[dict[str, Any]], result.get("sparse", []))
         if not sparse_list:
             return [SparseEmbedding(indices=[], values=[]) for _ in texts]
@@ -160,7 +160,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
             raise EmbeddingResponseError(f"Sparse 结果数({len(sparse_list)})与输入数({len(texts)})不匹配")
         return [SparseEmbedding(indices=s["indices"], values=s["values"]) for s in sparse_list]
 
-    def _encode(self, texts: list[str], *, return_sparse: bool) -> dict[str, Any]:
+    async def _encode(self, texts: list[str], *, return_sparse: bool) -> dict[str, Any]:
         """统一请求 /v1/embeddings
 
         Args:
@@ -178,7 +178,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         """
         self._check_closed()
         try:
-            resp = self._client.post(
+            resp = await self._client.post(
                 "/v1/embeddings",
                 json={"texts": texts, "return_sparse": return_sparse},
             )
@@ -204,7 +204,7 @@ class EmbeddingAPIClient(EmbeddingServicePort):
 
         return data
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """关闭 HTTP 客户端，释放连接池资源
 
         关闭后实例不可再使用，再次调用 embed_* 方法将抛出 ServiceUnavailableError。
@@ -213,6 +213,6 @@ class EmbeddingAPIClient(EmbeddingServicePort):
         if not self._closed:
             self._closed = True
             try:
-                self._client.close()
+                await self._client.aclose()
             except Exception:
-                logger.debug("httpx.Client.close() 异常（可忽略）", exc_info=True)
+                logger.debug("httpx.AsyncClient.aclose() 异常（可忽略）", exc_info=True)

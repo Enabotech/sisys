@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, TypedDict
 
 from src.domain.exceptions import ValidationError
@@ -78,7 +77,7 @@ class DenseSemanticSearchService:
         if limit < 1:
             raise ValidationError(message=f"limit 必须为正整数，当前值: {limit}")
 
-        query_vector = await asyncio.to_thread(self._embedding.embed_query, query_text)
+        query_vector = await self._embedding.embed_query(query_text)
 
         combined_filter = self._build_filter(tenant_id, filter_payload)
 

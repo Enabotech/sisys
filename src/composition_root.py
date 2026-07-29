@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 
@@ -1641,7 +1640,7 @@ async def shutdown() -> None:
     try:
         embedding = resolver.resolve("embedding_service")
         if embedding is not None:
-            await asyncio.to_thread(embedding.close)
+            await embedding.close()
             logger.info("Closed embedding_service")
     except Exception as e:
         logger.error("Failed to close embedding_service: %s", e)

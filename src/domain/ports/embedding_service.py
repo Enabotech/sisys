@@ -51,7 +51,7 @@ class EmbeddingServicePort(Protocol):
         """
         ...
 
-    def embed_query(self, text: str) -> list[float]:
+    async def embed_query(self, text: str) -> list[float]:
         """查询文本 Dense 嵌入
 
         用于搜索场景：将用户的自然语言查询编码为语义向量。
@@ -69,7 +69,7 @@ class EmbeddingServicePort(Protocol):
         """
         ...
 
-    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+    async def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """文档批量 Dense 嵌入
 
         用于索引场景：将待检索的文档批量编码为语义向量。
@@ -86,7 +86,7 @@ class EmbeddingServicePort(Protocol):
         """
         ...
 
-    def embed_sparse(self, texts: list[str]) -> list[SparseEmbedding]:
+    async def embed_sparse(self, texts: list[str]) -> list[SparseEmbedding]:
         """文档 Sparse 嵌入（批量）
 
         生成词汇权重的稀疏向量，用于 BM25 风格的精确关键词匹配检索。
@@ -104,7 +104,7 @@ class EmbeddingServicePort(Protocol):
         """
         ...
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """释放嵌入服务持有的资源
 
         关闭 HTTP 连接池或其他网络资源。调用后实例不可再使用。
