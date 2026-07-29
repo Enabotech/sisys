@@ -386,7 +386,7 @@ Feature: OCR 解析扫描件文档
 | AC-3 | OCR 服务不可用降级 | Task 4 | 应用层降级编排 | `test_document_parsing_service_ocr.py` |
 | AC-4 | 置信度标注与质量标记 | Task 1 | OCRResult 值对象校验 | `test_ocr_result.py` |
 | AC-4 | 置信度标注与质量标记 | Task 4 | DocumentParsingService 标记逻辑 | `test_document_parsing_service_ocr.py` |
-| AC-5 | PaddleOCR-VL 服务化部署 | Task 5 | paddleocrvl.yaml + envparam（include 集成） | `deploy/app/paddleocrvl/` |
+| AC-5 | PaddleOCR-VL 服务化部署 | Task 5 | docker-compose.yml 内联写入（profiles: [gpu]）+ paddleocrvl/ 参考模板 | `deploy/app/paddleocrvl/` |
 
 ---
 
@@ -869,7 +869,7 @@ Feature: OCR 解析扫描件文档
 │   │
 │   ├── interfaces/
 │   │   └── api/
-│   │       └── exception_handlers.py        # [MODIFY] EXCEPTION_320/321 → HTTP 502
+│   │       └── exception_handlers.py        # [MODIFY] EXCEPTION_320 → 504 / EXCEPTION_321 → 502
 │   │
 │   └── composition_root.py                  # [MODIFY] 注册 ocr 端口 + 注入 parsing service
 │
@@ -1119,12 +1119,12 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 
 ### 完成总结 Completion Summary
 
-1. [ ] All tasks defined 所有任务定义完成（Task 0-6，7 Tasks）
-2. [ ] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-5）
-3. [ ] Architecture constraints extracted 架构约束已提取（六边形 + OCRPort 注入模式）
-4. [ ] Previous story learnings integrated 前序故事学习经验已整合（Story 2-1/2-2a/2-3/2-4）
-5. [ ] PaddleOCR-VL-1.6 tech research completed 技术调研完成
-6. [ ] Sprint status synced to `ready-for-dev`
+1. [x] All tasks defined 所有任务定义完成（Task 0-6，7 Tasks）
+2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-5）
+3. [x] Architecture constraints extracted 架构约束已提取（六边形 + OCRPort 注入模式）
+4. [x] Previous story learnings integrated 前序故事学习经验已整合（Story 2-1/2-2a/2-3/2-4）
+5. [x] PaddleOCR-VL-1.6 tech research completed 技术调研完成
+6. [x] Sprint status synced to `ready-for-dev`
 
 ### 🔧 文档审查修复 Docs Review Fixes
 
@@ -1158,7 +1158,7 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 
 ### 🔍 代码审查发现 Review Findings
 
-**审查日期:** 待定
+**审查日期:** 2026-07-29（5 轮多 Agent 并行审查：科学性与可行性 / 代码一致性 / 合理性与最佳实践 / 交叉验证 / 全量复查）
 
 #### 需决策 Decision Needed
 
@@ -1185,6 +1185,7 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 
 **故事版本/Story Version:** v1.0.0
 **创建日期/Created:** 2026-07-29
-**最后更新/Last Updated:** 2026-07-29
+**最后更新/Last Updated:** 2026-07-29（5 轮多 Agent 并行文档审查修订）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件——OCR 解析扫描件文档（PaddleOCR-VL-1.6 + RTX 5090 Blackwell）
+- 5 轮审查修订：修正 RTX 5090 显存规格、文本密度公式、置信度默认值、HTTP 状态码映射、部署方案简化（include→内联写入）、21 项 P0/P1/P2 问题修复
