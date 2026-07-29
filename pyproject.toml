@@ -74,7 +74,7 @@ tinytag = "^2.2.1"
 ffmpeg-python = "^0.2.0"
 
 # OCR
-# paddlepaddle-gpu = {version = "3.3.1", source = "paddlepaddle-gpu"}
+pytesseract = "^0.3.10"
 onnxruntime = "^1.26.0"
 pypdfium2 = "^5.9.0"
 
