@@ -106,7 +106,7 @@ development_status:
   2-2b-document-parsing-extended-formats: done
   2-3-layout-preservation-doclaynet: done
   2-4-table-semantic-extraction: review
-  2-5-ocr-parsing-scanned-documents: ready-for-dev
+  2-5-ocr-parsing-scanned-documents: backlog
   2-6-document-version-snapshot: backlog
   2-7-metadata-validation: backlog
   2-8-semantic-chunking: backlog
