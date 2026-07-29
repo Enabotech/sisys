@@ -700,19 +700,21 @@ Feature: OCR 解析扫描件文档
   - VLM healthcheck 端口修正：`8080` → `8118`
   - API 端口变量化：`${PADDLEOCR_VL_API_PORT:-8080}:8080`
 
-- [ ] Subtask 5.2: **规范 `deploy/app/paddleocrvl/envparam`**（对齐变量名）：
-  - `API_IMAGE_TAG_SUFFIX` → `API_IMAGE_TAG`，`VLM_IMAGE_TAG_SUFFIX` → `VLM_IMAGE_TAG`
-  - 新增 `API_REGISTRY`、`VLM_MODEL_NAME`、`PADDLEOCR_VL_API_PORT`
+- [ ] Subtask 5.2: **规范 `deploy/app/paddleocrvl/envparam`**（参考模板，对齐实际镜像路径）：
+  - `API_IMAGE_TAG=latest-nvidia-gpu-sm120-offline`
+  - `VLM_IMAGE_TAG=latest-nvidia-gpu-sm120-offline`
+  - `PADDLEOCR_VL_REGISTRY=harbor.sisys.local/sisys/tools/paddlepaddle`
+  - `VLM_BACKEND=vllm`
 
 - [ ] Subtask 5.3: **在 `deploy/app/docker-compose.yml` 中直接内联写入两服务**（与现有 `embedding-api` 模式一致，不使用 `include:`）：
 
   **`paddleocr-vl-vllm`（VLM 推理 — 内部）：**
-  - 镜像：`${PADDLEOCR_VL_REGISTRY:-harbor.sisys.local}/paddleocr-genai-vllm-server:${VLM_IMAGE_TAG:-latest-nvidia-gpu-sm120}`
+  - 镜像：`harbor.sisys.local/sisys/tools/paddlepaddle/paddleocr-genai-vllm-server:latest-nvidia-gpu-sm120-offline`
   - GPU 独占（`deploy.resources.reservations.devices`），内部 `--port 8118`，vLLM backend
   - `container_name: sisys-paddleocr-vl-vllm`，`profiles: [gpu]`，healthcheck 指向 `8118`
 
   **`paddleocr-vl-api`（API — 对外）：**
-  - 镜像：`${PADDLEOCR_VL_REGISTRY:-harbor.sisys.local}/paddleocr-vl:${API_IMAGE_TAG:-latest-nvidia-gpu-sm120}`
+  - 镜像：`harbor.sisys.local/sisys/tools/paddlepaddle/paddleocr-vl:latest-nvidia-gpu-sm120-offline`
   - 端口 `"${PADDLEOCR_VL_API_PORT:-8080}:8080"`，依赖 vllm 服务 healthy
   - `container_name: sisys-paddleocr-vl-api`，`profiles: [gpu]`，healthcheck 指向 `/health`
 
@@ -1021,8 +1023,8 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 | GPU | RTX 5090 (Blackwell SM120, 32GB GDDR7) |
 | CUDA | ≥ 12.9 |
 | Docker | ≥ 19.03 |
-| 镜像 | `paddleocr-vl:latest-nvidia-gpu-sm120` (~10GB) |
-| VLM 镜像 | `paddleocr-genai-vllm-server:latest-nvidia-gpu-sm120` (~13GB) |
+| 镜像 | `harbor.sisys.local/sisys/tools/paddlepaddle/paddleocr-vl:latest-nvidia-gpu-sm120-offline` (~10GB) |
+| VLM 镜像 | `harbor.sisys.local/sisys/tools/paddlepaddle/paddleocr-genai-vllm-server:latest-nvidia-gpu-sm120-offline` (~13GB) |
 | GPU 内存 | 建议 ≥ 8GB（0.9B 模型约需 4-6GB，vLLM KV cache + CUDA kernel 开销需额外 2-4GB） |
 | `gpu-memory-utilization` | 推荐 0.3（0.9B 模型 + vLLM 约需 10-13GB，RTX 5090 32GB 留足余量；可根据模型大小调整） |
 
@@ -1031,7 +1033,7 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 - **Python 版本:** PaddleOCR 支持 3.9-3.13，与项目 Python 3.11+ 兼容
 - **vLLM 与 Transformers 冲突:** vLLM 和 SGLang 与 Transformers 引擎所需的 `transformers` 库版本存在冲突，需使用独立 venv（Docker 方式天然隔离）
 - **强烈不建议直接调用 VLM 推理服务（8118）:** 必须通过 API 服务（8080）的 `/layout-parsing` 端点调用，VLM 服务仅为内部组件
-- **离线部署:** 提供 `-offline` 后缀镜像（如 `paddleocr3.3-nvidia-gpu-sm120-offline`）
+- **离线部署:** 镜像已推送至本地 Harbor：`harbor.sisys.local/sisys/tools/paddlepaddle/`（`-offline` 后缀，无需外网拉取）
 
 ---
 
