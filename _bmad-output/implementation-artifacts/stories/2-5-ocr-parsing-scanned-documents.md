@@ -331,7 +331,7 @@ Feature: OCR 解析扫描件文档
 | **TDD 契约测试** | 端口契约 / 接口抽象 / registry | 端口注册、版本、兼容性 | `test_port_contract_ocr.py` | Task 0 |
 | **TDD 领域异常测试** | `src/domain/exceptions/ocr_exceptions.py` | 构造/属性/`to_dict()` 序列化/cause 链 | `tests/unit/domain/exceptions/test_ocr_exceptions.py` | Task 1 |
 | **TDD 领域异常测试** | 编码唯一性 + 子域范围 | 自动反射扫描 | `test_error_code_uniqueness.py` + `test_code_ranges.py` | Task 1 |
-| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `test_arch_document_ocr.py` | Task 5 |
+| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `test_arch_document_ocr.py` | Task 6 |
 | **集成测试** | PaddleOCR-VL 端到端调用 | Mock HTTP 响应 / TestContainer | `test_integration_ocr.py` | Task 5 |
 
 ---
@@ -424,7 +424,7 @@ Feature: OCR 解析扫描件文档
   - `recognize(file_path: str, page_numbers: list[int] | None = None) -> list[OCRPageResult]`
 - [ ] Subtask 0.3: 定义扫描页检测逻辑（`src/domain/services/scanned_page_detector.py`）：
   - 纯函数：`detect_scanned_pages(pages: list[ParsedPage]) -> list[int]`（返回需要 OCR 的页码列表）
-  - 检测策略：文本密度 = 总字符数 / 页面数，密度 < `SCANNED_PAGE_TEXT_DENSITY_THRESHOLD` 判定为扫描页
+  - 检测策略：**逐页独立比较**（非全文档平均），对每个 `page` 计算 `char_count = sum(len(e.content) for e in page.elements)`，若 `char_count < SCANNED_PAGE_TEXT_DENSITY_THRESHOLD`（=50）→ 该页判定为扫描页
 - [ ] Subtask 0.4: 定义 OCR 子域异常（**新建** `src/domain/exceptions/ocr_exceptions.py`）：
   - `OCRConnectionError(EXCEPTION_320)` — 继承 `ExternalException`（参考 `EmbeddingAPIError` 模式）
   - `OCRProcessingError(EXCEPTION_321)` — 继承 `ExternalException`
@@ -562,7 +562,7 @@ Feature: OCR 解析扫描件文档
   - 空页面（无文字块）→ 返回空 `elements` 列表
   - 中文识别结果正确映射到 `ParsedElement`
   - 英文识别结果正确映射到 `ParsedElement`
-  - 置信度从 `prunedResult` 中提取（⚠️ **P0 前提：须在 Task 0 实测 PaddleOCR-VL API 确认置信度字段存在**；若无置信度字段则所有元素 `confidence=None`，下游按"未知"处理触发 `needs_review=True`）
+  - 置信度从 `prunedResult` 中提取（⚠️ **P0 前提：须在 Task 0 实测 PaddleOCR-VL API 确认置信度字段存在**；若无置信度字段则默认 `confidence=0.5`，与 AC-4 及 `ImageParser` pytesseract 降级模式对齐）
 - [ ] Subtask 3.2: 🟢 绿 — 实现 `PaddleOCRVLAdapter`（`src/infrastructure/document_parsing/paddleocr_vl_adapter.py`）：
   - 构造函数：`__init__(self, base_url: str = "http://localhost:8080", timeout: float = 300.0)`
   - `recognize()` 方法：
@@ -763,10 +763,10 @@ Feature: OCR 解析扫描件文档
 > **性质说明：** 验证前面 Task 创建的代码是否符合六边形架构约束，以及交付物完成清单。
 >
 > ⚠️ **架构验证应持续执行，非集中到 Task 6：**
-> - Task 1 完成后：运行 `test_arch_document_ocr.py`（OCR domain 部分）+ 检查 domain 层零外部依赖
+> - Task 1 完成后：手动检查 domain 层零外部依赖（`grep -r "import httpx\|import requests\|import paddleocr" src/domain/` 零输出）
 > - Task 3 完成后：运行 `import-linter` 检查 infrastructure 层依赖方向
 > - Task 4 完成后：检查 composition_root 注册方向 + 契约测试
-> - Task 6 仅做**全量最终确认**，非首次验证
+> - Task 6：创建 `test_arch_document_ocr.py` 并做**全量最终确认**
 
 #### 架构验证测试
 
@@ -1076,13 +1076,13 @@ with httpx.Client(timeout=300.0) as client:
 
 ### 完成清单 Completion Notes List
 
-- [ ] 故事需求从 `epics_v1.0.md` Epic 2 Stori 2.5 提取
-- [ ] 架构约束从 `architecture.md` + Story 2-3/2-4 Dev Notes 提取
-- [ ] 前一个故事学习经验整合（Story 2-1/2-2a/2-3/2-4）
-- [ ] PaddleOCR-VL-1.6 技术调研完成（API + Docker 部署 + RTX 5090 Blackwell）
-- [ ] 状态设置为 `ready-for-dev`
-- [ ] SDD+TDD 融合开发要求定义完成
-- [ ] 项目结构对齐 Epic 2 统一规范
+- [x] 故事需求从 `epics_v1.0.md` Epic 2 Stori 2.5 提取
+- [x] 架构约束从 `architecture.md` + Story 2-3/2-4 Dev Notes 提取
+- [x] 前一个故事学习经验整合（Story 2-1/2-2a/2-3/2-4）
+- [x] PaddleOCR-VL-1.6 技术调研完成（API + Docker 部署 + RTX 5090 Blackwell）
+- [x] 状态设置为 `ready-for-dev`
+- [x] SDD+TDD 融合开发要求定义完成
+- [x] 项目结构对齐 Epic 2 统一规范
 
 ### 文件清单 File List
 
@@ -1093,6 +1093,7 @@ with httpx.Client(timeout=300.0) as client:
 
 领域层：
 - `src/domain/ports/ocr.py` — OCRPort Protocol
+- `src/domain/ports/__init__.py` — 修改（导出 OCRPort）
 - `src/domain/value_objects/ocr_result.py` — OCRPageResult + OCRConfidenceMark
 - `src/domain/services/scanned_page_detector.py` — 扫描页检测
 - `src/domain/exceptions/ocr_exceptions.py` — OCR 子域异常（EXCEPTION_320/321）
@@ -1214,6 +1215,19 @@ with httpx.Client(timeout=300.0) as client:
 | R2-3 | OCR 本质为文本替换（非增强），注入模式是架构权衡 | P1 | 已记录为已知技术债务（构造函数 9 参数），后续 Epic 应重构为 Pipeline/Chain of Responsibility |
 | R2-4 | 置信度推导缺少明确决策树（API 可能不返回 per-block 置信度） | P1 | Subtask 0.0 增加三路径：① API per-block conf → 直接使用；② layout_det_res score → 代理；③ 均无 → 默认 0.5 |
 | R2-5 | P95<1s 对多页 PDF 不现实 | P2 | 明确标注为"单页最佳努力目标"，多页处理延迟 = `per_page * page_count` |
+
+### Round 3 审查修复（2026-07-29）
+
+> **审查发现：** 测试分类表 Task 分配错误、持续验证指引与文件创建时序矛盾、SDD 规格说明与实现公式不一致。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R3-1 | `test_arch_document_ocr.py` 测试分类表分配至 Task 5，实现在 Task 6 | P1 | 测试分类表 Task 5 → Task 6 |
+| R3-2 | Task 6 持续验证指引要求在 Task 1 运行尚未创建的 `test_arch_document_ocr.py` | P1 | 改为手动检查命令（grep import-linter），文件创建保留在 Task 6 |
+| R3-3 | Subtask 3.1 `confidence=None` 与 `ParsedElement.confidence: float` 类型约束矛盾 | P1 | 改为 `confidence=0.5`（与 AC-4 及 ImageParser pytesseract 降级模式对齐） |
+| R3-4 | Subtask 0.3 使用基于平均值的文本密度公式（与 Subtask 2.2 已修正的逐页逻辑矛盾） | P1 | 改为逐页独立比较公式 |
+| R3-5 | `src/domain/ports/__init__.py` [MODIFY] 未列入待创建文件清单 | P2 | 补充到清单 |
+| R3-6 | 完成笔记清单未勾选（与 ready-for-dev 状态不一致） | P3 | 全部勾选为 `[x]` |
 
 ---
 
