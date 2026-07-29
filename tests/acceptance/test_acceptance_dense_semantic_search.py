@@ -79,14 +79,16 @@ def vector_storage(qdrant_client: QdrantManager) -> QdrantVectorStorage:
     return QdrantVectorStorage(qdrant_client.get_client())
 
 
-@pytest.fixture(scope="session")
-def embedding_service():
-    """bge-m3 嵌入服务实例（会话级共享，避免重复加载模型）"""
+@pytest.fixture
+async def embedding_service():
+    """bge-m3 嵌入服务实例（async httpx.AsyncClient）"""
     get_test_env()
     try:
         from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingAPIClient
 
-        return EmbeddingAPIClient(EmbeddingConfig.from_env())
+        client = EmbeddingAPIClient(EmbeddingConfig.from_env())
+        yield client
+        await client.close()
     except Exception as e:
         pytest.skip(f"embedding-api 不可用: {e}")
 
@@ -136,7 +138,7 @@ def qdrant_service_available(qdrant_client: QdrantManager, event_loop):
 
 
 @given("嵌入服务已加载 bge-m3 模型")
-def embedding_service_loaded(embedding_service):
+def embedding_service_loaded(embedding_service, event_loop):
     """确认嵌入服务已加载"""
     assert embedding_service is not None
 
@@ -153,9 +155,9 @@ def test_ac1_embedding_generation():
 
 
 @when('我使用 EmbeddingService 编码文本 "企业战略规划报告"')
-def encode_single_text(context: dict[str, Any], embedding_service):
+def encode_single_text(context: dict[str, Any], embedding_service, event_loop):
     """编码单条文本"""
-    context["embedding"] = embedding_service.embed_query("企业战略规划报告")
+    context["embedding"] = event_loop.run_until_complete(embedding_service.embed_query("企业战略规划报告"))
 
 
 @then("返回的嵌入向量维度为 1024")
@@ -183,10 +185,10 @@ def test_ac1b_batch_embedding_generation():
 
 
 @when("我使用 EmbeddingService 批量编码文本列表")
-def encode_batch_texts(context: dict[str, Any], embedding_service):
+def encode_batch_texts(context: dict[str, Any], embedding_service, event_loop):
     """编码批量文本"""
     texts = ["企业战略规划报告", "财务分析总结", "市场调研数据"]
-    context["embeddings"] = embedding_service.embed_documents(texts)
+    context["embeddings"] = event_loop.run_until_complete(embedding_service.embed_documents(texts))
     context["input_count"] = len(texts)
 
 
@@ -228,7 +230,7 @@ def collection_has_document_vectors(
 
     async def _setup():
         await collection_manager.create_collection(name=collection, vector_size=1024, distance="Cosine")
-        vectors = embedding_service.embed_documents(texts)
+        vectors = await embedding_service.embed_documents(texts)
         points = [
             VectorPoint(
                 id=f"doc_{i}",
@@ -371,7 +373,7 @@ def collection_has_multi_domain_vectors(
 
     async def _setup():
         await collection_manager.create_collection(name=collection, vector_size=1024, distance="Cosine")
-        vectors = embedding_service.embed_documents(texts)
+        vectors = await embedding_service.embed_documents(texts)
         points = [
             VectorPoint(
                 id=f"doc_{i}",
@@ -482,9 +484,9 @@ def test_ac_embed_sparse_empty_rejected():
 
 
 @when('我使用 EmbeddingService 稀疏编码文本 "企业战略规划报告"')
-def embed_sparse_single_text(context: dict[str, Any], embedding_service):
+def embed_sparse_single_text(context: dict[str, Any], embedding_service, event_loop):
     """稀疏编码单条文本"""
-    context["sparse_result"] = embedding_service.embed_sparse(["企业战略规划报告"])[0]
+    context["sparse_result"] = event_loop.run_until_complete(embedding_service.embed_sparse(["企业战略规划报告"]))[0]
 
 
 @then("返回的稀疏向量包含 indices 和 values 字段")
@@ -523,9 +525,9 @@ def sparse_values_all_positive(context: dict[str, Any]):
 
 
 @when('我使用 EmbeddingService 稀疏编码文本 "人工智能与数字化转型战略"')
-def embed_sparse_chinese_text(context: dict[str, Any], embedding_service):
+def embed_sparse_chinese_text(context: dict[str, Any], embedding_service, event_loop):
     """稀疏编码中文文本"""
-    context["sparse_result"] = embedding_service.embed_sparse(["人工智能与数字化转型战略"])[0]
+    context["sparse_result"] = event_loop.run_until_complete(embedding_service.embed_sparse(["人工智能与数字化转型战略"]))[0]
 
 
 @then("返回的稀疏向量至少包含 3 个词元")
@@ -536,11 +538,11 @@ def sparse_minimum_tokens(context: dict[str, Any]):
 
 
 @when("我使用 EmbeddingService 稀疏编码空文本")
-def embed_sparse_empty_text(context: dict[str, Any], embedding_service):
+def embed_sparse_empty_text(context: dict[str, Any], embedding_service, event_loop):
     """尝试编码空文本（预期失败）"""
     context["sparse_error"] = None
     try:
-        embedding_service.embed_sparse([""])
+        event_loop.run_until_complete(embedding_service.embed_sparse([""]))
     except ValidationError as e:
         context["sparse_error"] = e
 
