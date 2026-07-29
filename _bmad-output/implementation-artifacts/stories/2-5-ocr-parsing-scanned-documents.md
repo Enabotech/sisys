@@ -834,7 +834,21 @@ Feature: OCR 解析扫描件文档
 3. 阈值可配置（`SCANNED_PAGE_TEXT_DENSITY_THRESHOLD` 默认为 50 字符/页）
 4. 即使误判（文本页被 OCR），OCR 结果也不会比原文本差（PaddleOCR-VL 准确率 ≥ 95%）
 
-### 项目结构说明 Project Structure
+#### 文本分块策略：VLM 版面分析自然分块 vs 后处理切分
+
+| 方案 | 优点 | 缺点 | 评分 |
+|------|------|------|------|
+| **VLM 自然分块（1:1 映射）** | 版面语义完整，阅读顺序保证，零额外开销 | 粒度由 VLM 决定，不可控 | ✅ 9/10 |
+| 按句子/滑动窗口切分 | 粒度可控，适合语义检索 | 破坏版面语义（表格跨句断裂），增加复杂度 | 5/10 |
+| 混合：VLM 分块 + 长文本二次切分 | 兼顾语义和粒度 | 实现复杂，边界判断易出错 | 6/10 |
+
+**决策理由：**
+1. PaddleOCR-VL 返回的 `parsing_res_list` 中每个 block 是版面分析后的**语义完整最小单元**（title/text/table/figure），`block_label` 已标注区域类型
+2. `parsing_res_list` 按阅读顺序排列，1:1 映射为 `ParsedElement` 保留了这个顺序——这对下游（全文检索、知识图谱）至关重要
+3. 更细粒度的切分（按句子、滑动窗口）是 Story 2-8（语义分块）的职责，不应在 OCR 阶段越界处理
+4. `ParsedElement.metadata` 中保留 `ocr_format: "markdown"` 和 `original_markdown`，下游如需重新分块有原始数据可用
+
+**实现：** 一个 PaddleOCR-VL block → 一个 `ParsedElement`，`content` 为 `_strip_markdown(block_content)` 纯文本，`metadata` 保留原始 Markdown 和 `block_label`。
 
 ```
 ./
