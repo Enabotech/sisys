@@ -1,6 +1,6 @@
 # Story 2-5: OCR 解析（扫描件/图像 PDF）
 
-**Status:** `backlog`
+**Status:** `ready-for-dev`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -89,14 +89,13 @@
 ### AC-5: PaddleOCR-VL 服务化部署
 
 **Given** RTX 5090 (Blackwell SM120, 32GB GDDR7) GPU 环境，`deploy/app/docker-compose.yml` 已配置所有基础服务
-**When** 在 `deploy/app/docker-compose.yml` 顶层添加 `include: [paddleocrvl/paddleocrvl.yaml]`，
-在 `paddleocrvl.yaml` 中两服务声明 `profiles: [gpu]`，
+**When** 在 `docker-compose.yml` 中直接添加 `paddleocr-vl-vllm` + `paddleocr-vl-api` 两服务定义（与现有 `embedding-api` 一样内联），
+两服务声明 `profiles: [gpu]`，
 并执行 `cd deploy/app && docker compose up -d`（基础服务）和 `docker compose --profile gpu up -d`（含 GPU 服务）
 **Then** PaddleOCR-VL-1.6 两服务与所有基础服务可独立管理：
   - `paddleocr-vl-api` → `localhost:8080`（API 服务）
   - `paddleocr-vl-vllm` → 内部 `8118`（vLLM 推理，仅 API 服务访问）
 **And** 非 GPU 环境下 `docker compose up -d` 仅启动基础服务，不因 GPU 缺失而失败
-**And** OCR 配置文件集中管理在 `deploy/app/paddleocrvl/`（`paddleocrvl.yaml` + `envparam`）
 **And** `/layout-parsing` 端点可接受 base64 编码的 PDF/图像
 **And** 返回结构化 JSON（含 `prunedResult`、`markdown`、置信度信息）
 
@@ -105,8 +104,8 @@
 - [ ] `cd deploy/app && docker compose --profile gpu up -d` 额外启动 PaddleOCR-VL 两服务
 - [ ] `docker compose ps` 显示 `sisys-paddleocr-vl-api` + `sisys-paddleocr-vl-vllm` 均为 `healthy`（GPU 环境）
 - [ ] `curl -X POST http://localhost:8080/layout-parsing` 返回 200
-- [ ] CUDA 12.9+ 驱动兼容，GPU 显存分配正常（推荐 `gpu-memory-utilization: 0.3`，0.9B 模型仅需 4-6GB，32GB 显存留足余量）
-- [ ] 两服务加入 `sisys-network`，SISYS 应用可通过 `http://paddleocr-vl-api:8080` 容器名调用
+- [ ] CUDA 12.9+ 驱动兼容，GPU 显存分配正常（推荐 `gpu-memory-utilization: 0.3`）
+- [ ] SISYS 应用可通过 `http://paddleocr-vl-api:8080` 容器名调用
 - [ ] 模型/镜像不在 git 中（`.gitignore` 忽略大文件）
 - [ ] `docs/deploy/paddleocr-vl-setup.md` 存在且含首次镜像拉取耗时说明（~30-60 分钟）
 
@@ -688,50 +687,41 @@ Feature: OCR 解析扫描件文档
 
 **关联 AC:** AC-5
 
-> **目的：** 验证并更新 PaddleOCR-VL-1.6 两服务的模块化部署配置（`deploy/app/paddleocrvl/` 已存在基础文件），
-> 修复服务名/容器名/网络/healthcheck 与文档规范的不一致，通过 `profiles` 实现 GPU 服务可选启动（非 GPU 环境不阻断基础服务）。
+> **目的：** 将 PaddleOCR-VL-1.6 两服务以 `profiles: [gpu]` 方式直接内联写入 `docker-compose.yml`（与现有 `embedding-api` 一致），
+> 实现 GPU 服务可选启动（非 GPU 环境不阻断基础服务）。`deploy/app/paddleocrvl/` 保留为独立参考模板。
 > **注意：** 集成测试使用 `httpx.MockTransport` Mock HTTP 优先（fixture 数据须来自真实 API 录播），仅在 GPU 可用时执行真实 OCR 测试。
 
-#### 部署文件验证与更新
+#### 部署配置
 
-- [ ] Subtask 5.1: **验证并更新** `deploy/app/paddleocrvl/paddleocrvl.yaml`（文件已存在，需修正以下不一致项）：
+- [ ] Subtask 5.1: **规范 `deploy/app/paddleocrvl/paddleocrvl.yaml` 为参考模板**（文件已存在，修正为规范格式，保留作为独立部署参考）：
+  - 服务名修正：`paddleocr-vlm-server` → `paddleocr-vl-vllm`
+  - 容器名统一 `sisys-` 前缀：`sisys-paddleocr-vl-api`、`sisys-paddleocr-vl-vllm`
+  - 两服务添加 `profiles: [gpu]` 和 `networks: [sisys-network]`
+  - VLM healthcheck 端口修正：`8080` → `8118`
+  - API 端口变量化：`${PADDLEOCR_VL_API_PORT:-8080}:8080`
 
-  **修正清单（对标文档 AC-5 规范）：**
-  - 服务名：`paddleocr-vlm-server` → `paddleocr-vl-vllm`
-  - 容器名：`paddleocr-vl-api` → `sisys-paddleocr-vl-api`，`paddleocr-vlm-server` → `sisys-paddleocr-vl-vllm`（统一 `sisys-` 前缀）
-  - 两服务均添加 `networks: [sisys-network]`，文件末尾声明外部网络 `sisys-network`（确保容器名互通）
-  - VLM 服务 healthcheck 端口修正：`8080` → `8118`（VLM 推理端口，非 API 端口）
-  - 添加 GPU `profiles: [gpu]`，使 PaddleOCR-VL 仅在 `docker compose --profile gpu up -d` 时启动（默认 `docker compose up -d` 仅启动基础服务）
+- [ ] Subtask 5.2: **规范 `deploy/app/paddleocrvl/envparam`**（对齐变量名）：
+  - `API_IMAGE_TAG_SUFFIX` → `API_IMAGE_TAG`，`VLM_IMAGE_TAG_SUFFIX` → `VLM_IMAGE_TAG`
+  - 新增 `API_REGISTRY`、`VLM_MODEL_NAME`、`PADDLEOCR_VL_API_PORT`
+
+- [ ] Subtask 5.3: **在 `deploy/app/docker-compose.yml` 中直接内联写入两服务**（与现有 `embedding-api` 模式一致，不使用 `include:`）：
 
   **`paddleocr-vl-vllm`（VLM 推理 — 内部）：**
-  - 镜像：`paddleocr-genai-vllm-server:latest-nvidia-gpu-sm120`
-  - GPU 独占，不暴露宿主机端口，内部 `--port 8118`，vLLM backend
-  - `container_name: sisys-paddleocr-vl-vllm`，`sisys-network`，healthcheck 指向 `8118`
+  - 镜像：`${PADDLEOCR_VL_REGISTRY:-harbor.sisys.local}/paddleocr-genai-vllm-server:${VLM_IMAGE_TAG:-latest-nvidia-gpu-sm120}`
+  - GPU 独占（`deploy.resources.reservations.devices`），内部 `--port 8118`，vLLM backend
+  - `container_name: sisys-paddleocr-vl-vllm`，`profiles: [gpu]`，healthcheck 指向 `8118`
 
   **`paddleocr-vl-api`（API — 对外）：**
-  - 镜像：`paddleocr-vl:latest-nvidia-gpu-sm120`
-  - 端口 `${PADDLEOCR_VL_API_PORT:-8080}:8080`，依赖 vllm 服务 healthy
-  - `container_name: sisys-paddleocr-vl-api`，`sisys-network`，healthcheck 指向 `/health`
+  - 镜像：`${PADDLEOCR_VL_REGISTRY:-harbor.sisys.local}/paddleocr-vl:${API_IMAGE_TAG:-latest-nvidia-gpu-sm120}`
+  - 端口 `"${PADDLEOCR_VL_API_PORT:-8080}:8080"`，依赖 vllm 服务 healthy
+  - `container_name: sisys-paddleocr-vl-api`，`profiles: [gpu]`，healthcheck 指向 `/health`
 
-- [ ] Subtask 5.2: **验证并更新** `deploy/app/paddleocrvl/envparam`（文件已存在，需对齐变量名）：
-  - 统一变量命名：`API_IMAGE_TAG_SUFFIX` → `API_IMAGE_TAG`，`VLM_IMAGE_TAG_SUFFIX` → `VLM_IMAGE_TAG`（去除 `_SUFFIX` 后缀，与 paddleocrvl.yaml 中引用一致）
-  - 新增变量：`API_REGISTRY`（默认 `harbor.sisys.local`）、`VLM_MODEL_NAME`（默认 `PaddleOCR-VL-1.6-0.9B`）、`PADDLEOCR_VL_API_PORT`（默认 `8080`）
-  - 保留变量：`VLM_BACKEND`（`vllm`）
-  - **安全声明：** 生产环境必须使用 `harbor.sisys.local` 私有仓库，开发环境可使用 Docker Hub；envparam 中标注默认值的使用场景
-
-- [ ] Subtask 5.3: 修改 `deploy/app/docker-compose.yml`：
-  - **方案：** 顶层添加 `include:` 指令引用 paddleocrvl.yaml（docker compose v2.20+ 支持），**同时** paddleocrvl.yaml 中两服务已声明 `profiles: [gpu]`。
-  - **行为：** `include:` 使 docker compose 能发现 paddleocrvl 服务定义；`profiles: [gpu]` 控制默认不启动。
-    - `docker compose up -d` → 基础服务（Redis/PostgreSQL/...）+ embedding-api（profiles 仅过滤 GPU 服务）
-    - `docker compose --profile gpu up -d` → 基础服务 + PaddleOCR-VL 两服务
-  ```yaml
-  include:
-    - paddleocrvl/paddleocrvl.yaml
-  ```
-  - **参考：** 当前 docker-compose.yml 中无现有 `include:` 使用模式，paddleocrvl 是本项目首个引入 `include` + `profiles` 组合机制的服务组。
+  **行为：**
+  - `docker compose up -d` → 基础服务（Redis/PostgreSQL/...）+ embedding-api
+  - `docker compose --profile gpu up -d` → 基础服务 + PaddleOCR-VL 两服务
 
 - [ ] Subtask 5.4: 更新 `.gitignore`：忽略 OCR 模型缓存（Docker volume 管理，不纳入 git）
-- [ ] Subtask 5.5: 编写 `docs/deploy/paddleocr-vl-setup.md`（**新建**，含：CUDA 12.9+ 驱动要求、镜像拉取耗时预估 30-60 分钟、`docker compose --profile gpu pull` 提前拉取、GPU 配置、`docker compose --profile gpu up -d` 启动、镜像来源验证 `docker image inspect`）
+- [ ] Subtask 5.5: 编写 `docs/deploy/paddleocr-vl-setup.md`（**新建**，含：CUDA 12.9+ 驱动要求、镜像拉取耗时预估 30-60 分钟、`docker compose --profile gpu pull` 提前拉取、`docker compose --profile gpu up -d` 启动、镜像来源验证 `docker image inspect`）
 
 #### 集成测试
 
@@ -849,9 +839,9 @@ Feature: OCR 解析扫描件文档
 ```
 ./
 ├── deploy/app/
-│   ├── docker-compose.yml                  # [MODIFY] 顶层添加 `include: [paddleocrvl/paddleocrvl.yaml]`（服务发现）+ profiles 控制启动
-│   └── paddleocrvl/                        # [EXISTS] PaddleOCR-VL 模块化部署配置（基础文件已存在，需修正）
-│       ├── paddleocrvl.yaml                # [MODIFY] 修正服务名/容器名/网络/healthcheck/profiles
+│   ├── docker-compose.yml                  # [MODIFY] 内联添加 paddleocr-vl-vllm + paddleocr-vl-api 两服务（profiles: [gpu]）
+│   └── paddleocrvl/                        # [MODIFY] 规范化为参考模板（独立部署参考，修正服务名/网络/healthcheck）
+│       ├── paddleocrvl.yaml                # [MODIFY] 参考模板：vLLM + API 两服务定义规范
 │       └── envparam                        # [MODIFY] 对齐变量名，新增缺失变量
 │
 ├── src/
@@ -952,7 +942,7 @@ Feature: OCR 解析扫描件文档
 - [x] 不新增领域事件，通过现有 `DocumentProcessed` 传递 OCR 结果
 - [x] 版本号 v1.2.0 → v1.3.0，PortSpec/Composition Root/契约测试三处同步
 - [x] OCR 模型由 Docker 镜像管理，不纳入 git
-- [x] PaddleOCR-VL 模块化部署：`deploy/app/paddleocrvl/paddleocrvl.yaml` + `envparam`，通过 `profiles: [gpu]` 实现可选启动（`docker compose --profile gpu up -d`），非 GPU 环境不阻断基础服务
+- [x] PaddleOCR-VL 部署：`docker-compose.yml` 直接内联写入两服务（`profiles: [gpu]`），`paddleocrvl/` 保留为独立参考模板（与 `embedding-api` 模式一致）
 
 ---
 
@@ -1096,7 +1086,7 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 部署：
 - `deploy/app/paddleocrvl/paddleocrvl.yaml` — PaddleOCR-VL 两服务定义（vLLM + API）
 - `deploy/app/paddleocrvl/envparam` — 镜像标签 + VLM 后端配置
-- `deploy/app/docker-compose.yml` — 修改（顶层添加 `include: [paddleocrvl/paddleocrvl.yaml]`）
+- `deploy/app/docker-compose.yml` — 修改（内联添加两服务：`profiles: [gpu]`）
 - `docs/deploy/paddleocr-vl-setup.md` — 部署指南（CUDA 12.9+ / 镜像拉取 / GPU 配置）
 
 测试文件：
@@ -1160,6 +1150,9 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 | 16 | Dev Notes 错误声称 embedding-api 使用 `include` | P2 | 修正为 `profiles` 机制说明 |
 | 17 | `ScannedPageDetection` 值对象定义后未使用 | P1 | 从数据模型中删除（实现中不使用） |
 | 18 | Lessons Learned 无优先级区分 | P1 | 全部加 `[MUST]`/`[SHOULD]`/`[REF]` 标签 |
+| 19 | Docker Compose include+profiles 内部矛盾（Subtask 5.3 vs AC-5 vs 文件清单） | P0 | 统一为内联写入 docker-compose.yml（与 embedding-api 一致），paddleocrvl/ 保留参考模板 |
+| 20 | `tests/fixtures/` 为单文件 `fixtures.py`，非目录，无法存放 JSON fixture | P1 | 路径改为 `tests/data/paddleocr_vl_response_sample.json` |
+| 21 | Story 状态 `backlog` 与 sprint-status.yaml `ready-for-dev` 不一致 | P1 | 同步为 `ready-for-dev` |
 
 ---
 
