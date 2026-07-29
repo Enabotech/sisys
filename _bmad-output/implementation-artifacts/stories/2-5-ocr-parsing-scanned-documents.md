@@ -81,16 +81,17 @@
 **And** 置信度信息持久化到 `Document.metadata["parse_result"]`
 
 **验证标准/Validation Criteria:**
-- [ ] 置信度阈值配置为常量 `OCR_CONFIDENCE_THRESHOLD = 0.85`
-- [ ] 低置信度元素正确标注
-- [ ] 高置信度元素不标注
+- [ ] 置信度阈值常量 `OCR_CONFIDENCE_THRESHOLD = 0.85` 定义在 `src/domain/ports/ocr.py`
+- [ ] 低置信度元素正确标注 `needs_review = True`
+- [ ] 高置信度元素不标注 `needs_review`
+- [ ] OCR 无法获取置信度时默认使用 0.5（与 `ImageParser` pytesseract 降级模式对齐）
 - [ ] parse_result 持久化包含完整置信度数据
 
 ### AC-5: PaddleOCR-VL 服务化部署
 
 **Given** RTX 5090 (Blackwell SM120, 32GB GDDR7) GPU 环境，`deploy/app/docker-compose.yml` 已配置所有基础服务
 **When** 在 `docker-compose.yml` 中直接添加 `paddleocr-vl-vllm` + `paddleocr-vl-api` 两服务定义（与现有 `embedding-api` 一样内联），
-两服务声明 `profiles: [gpu]`，
+两服务通过 `deploy.resources.reservations.devices` 分配 GPU（与 `embedding-api` 一致），
 并执行 `cd deploy/app && docker compose up -d`（基础服务）和 `docker compose --profile gpu up -d`（含 GPU 服务）
 **Then** PaddleOCR-VL-1.6 两服务与所有基础服务可独立管理：
   - `paddleocr-vl-api` → `localhost:8080`（API 服务）
@@ -322,6 +323,7 @@ Feature: OCR 解析扫描件文档
 | **TDD 单元测试** | OCRResult 值对象 | 构造/序列化/校验 | `test_ocr_result.py` | Task 1 |
 | **TDD 单元测试** | 扫描页检测领域服务 | 文本密度计算、阈值判断 | `test_scanned_page_detector.py` | Task 2 |
 | **TDD 单元测试** | PaddleOCRVLAdapter | HTTP 请求/响应解析/降级/超时 | `test_paddleocr_vl_adapter.py` | Task 3 |
+| **TDD 单元测试** | ImageParser OCR 注入 | 可选 `ocr` 注入/降级/pytesseract 回退 | `test_image_parser.py` | Task 3 |
 | **TDD 单元测试** | DocumentParsingService OCR 集成 | OCR 步骤注入/调用/结果合并 | `test_document_parsing_service_ocr.py` | Task 4 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_ocr.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_ocr.py` | Task 0 |
@@ -330,7 +332,7 @@ Feature: OCR 解析扫描件文档
 | **TDD 领域异常测试** | `src/domain/exceptions/ocr_exceptions.py` | 构造/属性/`to_dict()` 序列化/cause 链 | `tests/unit/domain/exceptions/test_ocr_exceptions.py` | Task 1 |
 | **TDD 领域异常测试** | 编码唯一性 + 子域范围 | 自动反射扫描 | `test_error_code_uniqueness.py` + `test_code_ranges.py` | Task 1 |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `test_arch_document_ocr.py` | Task 5 |
-| **集成测试** | PaddleOCR-VL 真实调用 | Mock HTTP 响应 / TestContainer | `test_integration_ocr.py` | Task 4 |
+| **集成测试** | PaddleOCR-VL 端到端调用 | Mock HTTP 响应 / TestContainer | `test_integration_ocr.py` | Task 5 |
 
 ---
 
@@ -386,7 +388,7 @@ Feature: OCR 解析扫描件文档
 | AC-3 | OCR 服务不可用降级 | Task 4 | 应用层降级编排 | `test_document_parsing_service_ocr.py` |
 | AC-4 | 置信度标注与质量标记 | Task 1 | OCRResult 值对象校验 | `test_ocr_result.py` |
 | AC-4 | 置信度标注与质量标记 | Task 4 | DocumentParsingService 标记逻辑 | `test_document_parsing_service_ocr.py` |
-| AC-5 | PaddleOCR-VL 服务化部署 | Task 5 | docker-compose.yml 内联写入（profiles: [gpu]）+ paddleocrvl/ 参考模板 | `deploy/app/paddleocrvl/` |
+| AC-5 | PaddleOCR-VL 服务化部署 | Task 5 | docker-compose.yml 内联写入 + paddleocrvl/ 参考模板 | N/A（部署配置，通过 Docker 命令验证） |
 
 ---
 
@@ -417,7 +419,7 @@ Feature: OCR 解析扫描件文档
 - [ ] Subtask 0.0: **PaddleOCR-VL API 响应格式实测**（P0 前提，保存 `tests/data/paddleocr_vl_response_sample.json`）
 - [ ] Subtask 0.1: 定义 OCRResult 值对象 Schema（`src/domain/value_objects/ocr_result.py`）：
   - `OCRPageResult`（frozen dataclass）：`page_number: int, elements: list[ParsedElement], raw_response: dict[str, Any]`
-  - `OCRConfidenceMark`（frozen dataclass，`_mark_low_confidence()` 方法内部使用的辅助值对象）：`element_index: int, confidence: float | None, needs_review: bool`（`confidence=None` 时视为未知，`needs_review=True`）
+  - `OCRConfidenceMark`（frozen dataclass，`_mark_low_confidence()` 方法内部使用的辅助值对象）：`element_index: int, confidence: float, needs_review: bool`（`confidence` 类型与 `ParsedElement.confidence: float = 1.0` 对齐，OCR 场景下若无法获取置信度则使用默认值 0.5，与 `ImageParser` 现有模式一致）
 - [ ] Subtask 0.2: 定义 `OCRPort` 端口契约（`src/domain/ports/ocr.py`）：
   - `recognize(file_path: str, page_numbers: list[int] | None = None) -> list[OCRPageResult]`
 - [ ] Subtask 0.3: 定义扫描页检测逻辑（`src/domain/services/scanned_page_detector.py`）：
@@ -687,7 +689,7 @@ Feature: OCR 解析扫描件文档
 
 **关联 AC:** AC-5
 
-> **目的：** 将 PaddleOCR-VL-1.6 两服务以 `profiles: [gpu]` 方式直接内联写入 `docker-compose.yml`（与现有 `embedding-api` 一致），
+> **目的：** 将 PaddleOCR-VL-1.6 两服务直接内联写入 `deploy/app/docker-compose.yml`（与现有 `embedding-api` 模式一致：GPU 通过 `deploy.resources.reservations.devices` 分配，不使用 profiles，`docker compose up -d` 默认启动），
 > 实现 GPU 服务可选启动（非 GPU 环境不阻断基础服务）。`deploy/app/paddleocrvl/` 保留为独立参考模板。
 > **注意：** 集成测试使用 `httpx.MockTransport` Mock HTTP 优先（fixture 数据须来自真实 API 录播），仅在 GPU 可用时执行真实 OCR 测试。
 
@@ -696,7 +698,7 @@ Feature: OCR 解析扫描件文档
 - [ ] Subtask 5.1: **规范 `deploy/app/paddleocrvl/paddleocrvl.yaml` 为参考模板**（文件已存在，修正为规范格式，保留作为独立部署参考）：
   - 服务名修正：`paddleocr-vlm-server` → `paddleocr-vl-vllm`
   - 容器名统一 `sisys-` 前缀：`sisys-paddleocr-vl-api`、`sisys-paddleocr-vl-vllm`
-  - 两服务添加 `profiles: [gpu]` 和 `networks: [sisys-network]`
+  - 两服务加入 `networks: [sisys-network]`，GPU 通过 `deploy.resources.reservations.devices` 分配
   - VLM healthcheck 端口修正：`8080` → `8118`
   - API 端口变量化：`${PADDLEOCR_VL_API_PORT:-8080}:8080`
 
@@ -711,12 +713,12 @@ Feature: OCR 解析扫描件文档
   **`paddleocr-vl-vllm`（VLM 推理 — 内部）：**
   - 镜像：`harbor.sisys.local/sisys/tools/paddlepaddle/paddleocr-genai-vllm-server:latest-nvidia-gpu-sm120-offline`
   - GPU 独占（`deploy.resources.reservations.devices`），内部 `--port 8118`，vLLM backend
-  - `container_name: sisys-paddleocr-vl-vllm`，`profiles: [gpu]`，healthcheck 指向 `8118`
+  - `container_name: sisys-paddleocr-vl-vllm`，GPU device reservation，healthcheck 指向 `8118`
 
   **`paddleocr-vl-api`（API — 对外）：**
   - 镜像：`harbor.sisys.local/sisys/tools/paddlepaddle/paddleocr-vl:latest-nvidia-gpu-sm120-offline`
   - 端口 `"${PADDLEOCR_VL_API_PORT:-8080}:8080"`，依赖 vllm 服务 healthy
-  - `container_name: sisys-paddleocr-vl-api`，`profiles: [gpu]`，healthcheck 指向 `/health`
+  - `container_name: sisys-paddleocr-vl-api`，端口映射 `8080`，healthcheck 指向 `/health`
 
   **行为：**
   - `docker compose up -d` → 基础服务（Redis/PostgreSQL/...）+ embedding-api
@@ -855,7 +857,7 @@ Feature: OCR 解析扫描件文档
 ```
 ./
 ├── deploy/app/
-│   ├── docker-compose.yml                  # [MODIFY] 内联添加 paddleocr-vl-vllm + paddleocr-vl-api 两服务（profiles: [gpu]）
+│   ├── docker-compose.yml                  # [MODIFY] 内联添加 paddleocr-vl-vllm + paddleocr-vl-api 两服务（GPU via deploy.resources）
 │   └── paddleocrvl/                        # [MODIFY] 规范化为参考模板（独立部署参考，修正服务名/网络/healthcheck）
 │       ├── paddleocrvl.yaml                # [MODIFY] 参考模板：vLLM + API 两服务定义规范
 │       └── envparam                        # [MODIFY] 对齐变量名，新增缺失变量
@@ -958,7 +960,7 @@ Feature: OCR 解析扫描件文档
 - [x] 不新增领域事件，通过现有 `DocumentProcessed` 传递 OCR 结果
 - [x] 版本号 v1.2.0 → v1.3.0，PortSpec/Composition Root/契约测试三处同步
 - [x] OCR 模型由 Docker 镜像管理，不纳入 git
-- [x] PaddleOCR-VL 部署：`docker-compose.yml` 直接内联写入两服务（`profiles: [gpu]`），`paddleocrvl/` 保留为独立参考模板（与 `embedding-api` 模式一致）
+- [x] PaddleOCR-VL 部署：`docker-compose.yml` 直接内联写入两服务（GPU via `deploy.resources.reservations.devices`，与 `embedding-api` 模式一致），`paddleocrvl/` 保留为独立参考模板
 
 ---
 
@@ -1102,7 +1104,7 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 部署：
 - `deploy/app/paddleocrvl/paddleocrvl.yaml` — PaddleOCR-VL 两服务定义（vLLM + API）
 - `deploy/app/paddleocrvl/envparam` — 镜像标签 + VLM 后端配置
-- `deploy/app/docker-compose.yml` — 修改（内联添加两服务：`profiles: [gpu]`）
+- `deploy/app/docker-compose.yml` — 修改（内联添加两服务，GPU via `deploy.resources.reservations.devices`）
 - `docs/deploy/paddleocr-vl-setup.md` — 部署指南（CUDA 12.9+ / 镜像拉取 / GPU 配置）
 
 测试文件：
@@ -1112,6 +1114,7 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 - `tests/unit/domain/services/test_scanned_page_detector.py`
 - `tests/unit/application/services/test_document_parsing_service_ocr.py`
 - `tests/unit/infrastructure/document_parsing/test_paddleocr_vl_adapter.py`
+- `tests/unit/infrastructure/document_parsing/test_image_parser.py` — 修改（OCR 注入测试）
 - `tests/unit/architecture/test_arch_document_ocr.py`
 - `tests/integration/test_integration_ocr.py`
 - `tests/acceptance/test_acceptance_ocr.feature`
@@ -1172,6 +1175,20 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 | 22 | AC→Task 追溯矩阵残留 `include` 描述 | P1 | 更新为 `profiles: [gpu] 内联写入 docker-compose.yml` |
 | 23 | 项目结构 exception_handlers 注释 HTTP 映射不精确 | P1 | `EXCEPTION_320/321→502` → `320→504 / 321→502` |
 | 24 | 审查日期"待定" + 完成总结未勾选 + Last Updated 未更新 | P2 | 三处全部更新为完成状态 |
+
+### Round 1 审查修复（2026-07-29）
+
+> **审查发现：** `embedding-api` 不使用 `profiles: [gpu]`（GPU 通过 `deploy.resources.reservations.devices` 分配，默认启动），
+> Story 多处声称 PaddleOCR-VL 使用 `profiles` 机制是错误的。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R1-1 | AC-5 / Task 5 / Dev Notes / 文件清单 共 7 处错误声称 `embedding-api` 使用 `profiles: [gpu]` | P0 | 统一修正：GPU 分配方式为 `deploy.resources.reservations.devices`（与 embedding-api 实际实现一致），不使用 profiles |
+| R1-2 | `OCRConfidenceMark.confidence` 类型为 `float \| None`，但 `ParsedElement.confidence` 实际类型为 `float = 1.0`（不可为 None） | P1 | 改为 `float`（默认值 0.5，与 `ImageParser` pytesseract 降级模式对齐） |
+| R1-3 | `test_image_parser.py` [MODIFY] 出现在项目结构中，但测试分类表和待创建文件清单均缺失 | P1 | 补充到测试分类表和待创建文件清单 |
+| R1-4 | AC→Task 追溯矩阵 AC-5 "测试文件"列为目录路径 `deploy/app/paddleocrvl/`，非测试文件 | P1 | 改为 N/A（部署配置通过 Docker 命令验证） |
+| R1-5 | AC-4 缺少 `confidence` 边界情况（无法获取置信度时的默认处理） | P1 | 补充：OCR 无法获取置信度时默认 0.5，与 `ImageParser` 现有降级模式一致 |
+| R1-6 | `OCR_CONFIDENCE_THRESHOLD` 常量位置未明确定义 | P1 | 明确定义在 `src/domain/ports/ocr.py`（`@runtime_checkable` Protocol 同文件） |
 
 ---
 
