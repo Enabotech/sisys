@@ -69,12 +69,12 @@ openpyxl = "^3.1.2"
 pillow = "^12.1.1"
 scrapy = "^2.11"
 pypdf = "^6.12.1"
+pdfplumber = "^0.11.0"
 tinytag = "^2.2.1"
 ffmpeg-python = "^0.2.0"
 
 # OCR
 paddlepaddle-gpu = {version = "3.3.1", source = "paddlepaddle-gpu"}
-paddleocr = "3.6.0"
 onnxruntime = "^1.26.0"
 pypdfium2 = "^5.9.0"
 
@@ -100,6 +100,9 @@ aiofiles = "^25.1.0"
 
 # Others
 scrapy-playwright = "^0.0.46"
+beautifulsoup4 = "^4.15.0"
+lxml = "^6.1.1"
+lupa = "^2.8"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.0.0"
@@ -276,6 +279,7 @@ addopts = [
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
+    "ignore:No ccache found::paddle",
 ]
 
 # Coverage Configuration
