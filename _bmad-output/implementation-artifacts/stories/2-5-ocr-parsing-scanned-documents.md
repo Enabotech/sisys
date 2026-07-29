@@ -89,8 +89,9 @@
 ### AC-5: PaddleOCR-VL 服务化部署
 
 **Given** RTX 5090 (Blackwell SM120, 32GB GDDR7) GPU 环境，`deploy/app/docker-compose.yml` 已配置所有基础服务
-**When** 在 `deploy/app/paddleocrvl/paddleocrvl.yaml` 中两服务声明 `profiles: [gpu]`，
-并执行 `cd deploy/app && docker compose --profile gpu up -d`（GPU 服务）和 `docker compose up -d`（基础服务）分别启动
+**When** 在 `deploy/app/docker-compose.yml` 顶层添加 `include: [paddleocrvl/paddleocrvl.yaml]`，
+在 `paddleocrvl.yaml` 中两服务声明 `profiles: [gpu]`，
+并执行 `cd deploy/app && docker compose up -d`（基础服务）和 `docker compose --profile gpu up -d`（含 GPU 服务）
 **Then** PaddleOCR-VL-1.6 两服务与所有基础服务可独立管理：
   - `paddleocr-vl-api` → `localhost:8080`（API 服务）
   - `paddleocr-vl-vllm` → 内部 `8118`（vLLM 推理，仅 API 服务访问）
@@ -404,7 +405,7 @@ Feature: OCR 解析扫描件文档
 >
 > ⚠️ **P0 前提：PaddleOCR-VL API 响应格式实测验证**
 > 在 Subtask 0.1-0.9 之前，必须先调用一次 PaddleOCR-VL `/layout-parsing` 真实 API（GPU 环境或已部署的测试实例），
-> 获取完整 JSON 响应示例并保存为 `tests/fixtures/paddleocr_vl_response_sample.json`。
+> 获取完整 JSON 响应示例并保存为 `tests/data/paddleocr_vl_response_sample.json`。
 > **验证清单：**
 > - 确认 `prunedResult.parsing_res_list` 中每个 block 是否包含 `confidence` 字段
 > - 确认 `fileType` 参数的准确枚举值（0=PDF/1=image 是否与实际 API 一致）
@@ -414,7 +415,7 @@ Feature: OCR 解析扫描件文档
 > **若无法在 Task 0 阶段访问 GPU 环境：** 参考 PaddleOCR-VL 官方文档中的示例响应体（URL: `https://www.paddleocr.ai/latest/version3.x/pipeline_usage/PaddleOCR-VL-NVIDIA-Blackwell.html`），
 > 并在 Task 5 集成测试阶段补做真实 API 验证，如有差异则回溯修正 Adapter 解析逻辑。
 
-- [ ] Subtask 0.0: **PaddleOCR-VL API 响应格式实测**（P0 前提，保存 `tests/fixtures/paddleocr_vl_response_sample.json`）
+- [ ] Subtask 0.0: **PaddleOCR-VL API 响应格式实测**（P0 前提，保存 `tests/data/paddleocr_vl_response_sample.json`）
 - [ ] Subtask 0.1: 定义 OCRResult 值对象 Schema（`src/domain/value_objects/ocr_result.py`）：
   - `OCRPageResult`（frozen dataclass）：`page_number: int, elements: list[ParsedElement], raw_response: dict[str, Any]`
   - `OCRConfidenceMark`（frozen dataclass，`_mark_low_confidence()` 方法内部使用的辅助值对象）：`element_index: int, confidence: float | None, needs_review: bool`（`confidence=None` 时视为未知，`needs_review=True`）
@@ -719,9 +720,15 @@ Feature: OCR 解析扫描件文档
   - **安全声明：** 生产环境必须使用 `harbor.sisys.local` 私有仓库，开发环境可使用 Docker Hub；envparam 中标注默认值的使用场景
 
 - [ ] Subtask 5.3: 修改 `deploy/app/docker-compose.yml`：
-  - **推荐方案（profiles 隔离）：** paddleocrvl.yaml 中两服务已声明 `profiles: [gpu]`，docker-compose.yml **不需要** `include:` 指令。用户通过 `docker compose --profile gpu up -d` 选择性启动 GPU 服务，基础服务（Redis/PostgreSQL/Qdrant/MinIO/Neo4j/RabbitMQ/embedding-api）不受 GPU 可用性影响。
-  - **参考：** 当前 docker-compose.yml 中无现有 `include:` 使用模式，paddleocrvl 是本项目首个引入 profiles 机制的服务组。
-  - docker compose v2.20+ 支持 `profiles` 条件启动。
+  - **方案：** 顶层添加 `include:` 指令引用 paddleocrvl.yaml（docker compose v2.20+ 支持），**同时** paddleocrvl.yaml 中两服务已声明 `profiles: [gpu]`。
+  - **行为：** `include:` 使 docker compose 能发现 paddleocrvl 服务定义；`profiles: [gpu]` 控制默认不启动。
+    - `docker compose up -d` → 基础服务（Redis/PostgreSQL/...）+ embedding-api（profiles 仅过滤 GPU 服务）
+    - `docker compose --profile gpu up -d` → 基础服务 + PaddleOCR-VL 两服务
+  ```yaml
+  include:
+    - paddleocrvl/paddleocrvl.yaml
+  ```
+  - **参考：** 当前 docker-compose.yml 中无现有 `include:` 使用模式，paddleocrvl 是本项目首个引入 `include` + `profiles` 组合机制的服务组。
 
 - [ ] Subtask 5.4: 更新 `.gitignore`：忽略 OCR 模型缓存（Docker volume 管理，不纳入 git）
 - [ ] Subtask 5.5: 编写 `docs/deploy/paddleocr-vl-setup.md`（**新建**，含：CUDA 12.9+ 驱动要求、镜像拉取耗时预估 30-60 分钟、`docker compose --profile gpu pull` 提前拉取、GPU 配置、`docker compose --profile gpu up -d` 启动、镜像来源验证 `docker image inspect`）
@@ -842,7 +849,7 @@ Feature: OCR 解析扫描件文档
 ```
 ./
 ├── deploy/app/
-│   ├── docker-compose.yml                  # [MODIFY] 添加 profiles 支持（paddleocrvl 通过 --profile gpu 启动）
+│   ├── docker-compose.yml                  # [MODIFY] 顶层添加 `include: [paddleocrvl/paddleocrvl.yaml]`（服务发现）+ profiles 控制启动
 │   └── paddleocrvl/                        # [EXISTS] PaddleOCR-VL 模块化部署配置（基础文件已存在，需修正）
 │       ├── paddleocrvl.yaml                # [MODIFY] 修正服务名/容器名/网络/healthcheck/profiles
 │       └── envparam                        # [MODIFY] 对齐变量名，新增缺失变量
