@@ -76,14 +76,16 @@ def vector_storage(qdrant_client: QdrantManager) -> QdrantVectorStorage:
     return QdrantVectorStorage(qdrant_client.get_client())
 
 
-@pytest.fixture(scope="session")
-def embedding_service():
-    """bge-m3 嵌入服务实例（会话级共享，避免重复加载模型）"""
+@pytest.fixture
+async def embedding_service():
+    """bge-m3 嵌入服务实例（async httpx.AsyncClient）"""
     get_test_env()
     try:
         from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingAPIClient
 
-        return EmbeddingAPIClient(EmbeddingConfig.from_env())
+        client = EmbeddingAPIClient(EmbeddingConfig.from_env())
+        yield client
+        await client.close()
     except Exception as e:
         pytest.skip(f"embedding-api 不可用: {e}")
 
