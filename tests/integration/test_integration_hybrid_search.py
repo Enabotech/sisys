@@ -8,8 +8,9 @@
 
 from __future__ import annotations
 
-import asyncio
 import time
+
+import pytest
 
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.services.rrf_fusion import RRF_K_DEFAULT, fuse
@@ -18,7 +19,8 @@ from src.domain.services.rrf_fusion import RRF_K_DEFAULT, fuse
 class TestRrfFusionIntegration:
     """RRF 融合算法集成测试（纯内存计算，无外部依赖）"""
 
-    def test_fuse_two_realistic_result_sets(self) -> None:
+    @pytest.mark.asyncio
+    async def test_fuse_two_realistic_result_sets(self) -> None:
         """模拟真实 Dense + Sparse 结果集的两路融合"""
         dense_results: list[SearchResult] = [
             SearchResult(id="doc-1", score=0.95, payload={"title": "战略规划报告"}),
@@ -50,7 +52,8 @@ class TestRrfFusionIntegration:
         scores = [r["score"] for r in result]
         assert scores == sorted(scores, reverse=True)
 
-    def test_fuse_with_mock_results_large(self) -> None:
+    @pytest.mark.asyncio
+    async def test_fuse_with_mock_results_large(self) -> None:
         """大结果集（50 路各 50 结果）的融合性能"""
         dense = []
         sparse = []
@@ -68,7 +71,8 @@ class TestRrfFusionIntegration:
         assert len(result) == 90  # 50 + 50 - 10 duplicates = 90
         assert elapsed_ms < 50  # P95 门禁
 
-    def test_symmetric_fusion_with_same_results(self) -> None:
+    @pytest.mark.asyncio
+    async def test_symmetric_fusion_with_same_results(self) -> None:
         """两路结果完全相同时的对称融合"""
         same: list[SearchResult] = [
             SearchResult(id="a", score=0.9, payload={}),
@@ -81,7 +85,8 @@ class TestRrfFusionIntegration:
         assert result[0]["id"] == "a"
         assert result[0]["score"] > result[1]["score"]
 
-    def test_three_way_fusion_v1(self) -> None:
+    @pytest.mark.asyncio
+    async def test_three_way_fusion_v1(self) -> None:
         """三路融合 V1 预留接口（Story 3-4）"""
         dense: list[SearchResult] = [SearchResult(id="d1", score=0.9, payload={})]
         sparse: list[SearchResult] = [SearchResult(id="s1", score=10.0, payload={})]
@@ -97,7 +102,8 @@ class TestRrfFusionIntegration:
         # payload 保留首次出现（dense 在前，payload={}）
         assert d1["payload"] == {}
 
-    def test_single_list_passthrough(self) -> None:
+    @pytest.mark.asyncio
+    async def test_single_list_passthrough(self) -> None:
         """单路直通 — 原样返回"""
         results: list[SearchResult] = [
             SearchResult(id="x", score=0.5, payload={}),
@@ -110,7 +116,8 @@ class TestRrfFusionIntegration:
 class TestHybridSearchCompositionValidation:
     """验证 Composition Root 端口注册正确性（无 DI 实例化）"""
 
-    def test_all_ports_registered(self) -> None:
+    @pytest.mark.asyncio
+    async def test_all_ports_registered(self) -> None:
         """三个搜索端口均已注册"""
 
         # 确保 bootstrap 已运行
@@ -123,7 +130,8 @@ class TestHybridSearchCompositionValidation:
         assert "sparse_search_service" in names
         assert "hybrid_search_service" in names
 
-    def test_search_ports_have_search_team_owner(self) -> None:
+    @pytest.mark.asyncio
+    async def test_search_ports_have_search_team_owner(self) -> None:
         """所有搜索端口的所有者为 search-team"""
         from src.domain.ports.registry import _global_registry
 
@@ -134,15 +142,6 @@ class TestHybridSearchCompositionValidation:
             assert spec.owner == "search-team", f"{name} owner={spec.owner}"
 
 
-def _run_async(coro):
-    """跨环境安全的事件循环包装——避免 Docker/CI 中 get_event_loop() 报错"""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
-
-
 class TestHybridSearchEndToEnd:
     """端到端混合检索：embed → Dense + Sparse → RRF fusion
 
@@ -150,7 +149,7 @@ class TestHybridSearchEndToEnd:
     """
 
     @staticmethod
-    def _create_test_collection(context: dict) -> str:
+    async def _create_test_collection(context: dict) -> str:
         """创建含文档的测试 Collection，返回 Collection 名称"""
         import uuid
 
@@ -182,18 +181,17 @@ class TestHybridSearchEndToEnd:
             "人力资源发展规划",
         ]
 
-        async def _setup():
-            await collection_mgr.create_collection(name=name, vector_size=1024, distance="Cosine")
-            dense = embed.embed_documents(texts)
-            points = [VectorPoint(id=f"doc_{i}", vector=dense[i], payload={"text": texts[i]}) for i in range(len(texts))]
-            await storage.upsert_points(name, points)
+        await collection_mgr.create_collection(name=name, vector_size=1024, distance="Cosine")
+        dense = await embed.embed_documents(texts)
+        points = [VectorPoint(id=f"doc_{i}", vector=dense[i], payload={"text": texts[i]}) for i in range(len(texts))]
+        await storage.upsert_points(name, points)
+        await embed.close()
 
-        _run_async(_setup())
         context["_cleanup"] = name
         return name
 
     @staticmethod
-    def _cleanup(context: dict) -> None:
+    async def _cleanup(context: dict) -> None:
         """清理测试 Collection"""
 
         name = context.get("_cleanup")
@@ -209,13 +207,10 @@ class TestHybridSearchEndToEnd:
         env = get_test_env()
         qdrant = QdrantManager(QdrantConfig(host=env.qdrant.host, port=env.qdrant.port, timeout=30.0))
         collection_mgr = QdrantCollectionManager(qdrant.get_client())
+        await collection_mgr.delete_collection(name)
 
-        async def _clean():
-            await collection_mgr.delete_collection(name)
-
-        _run_async(_clean())
-
-    def test_full_hybrid_search_pipeline(self) -> None:
+    @pytest.mark.asyncio
+    async def test_full_hybrid_search_pipeline(self) -> None:
         """完整端到端链路：embed → Dense + Sparse → RRF fusion → 结果验证"""
         import time
 
@@ -236,7 +231,7 @@ class TestHybridSearchEndToEnd:
 
         try:
             # 1. 创建测试 Collection 并索引文档
-            collection = self._create_test_collection(context)
+            collection = await self._create_test_collection(context)
 
             env = get_test_env()
             qdrant = QdrantManager(QdrantConfig(host=env.qdrant.host, port=env.qdrant.port, timeout=30.0))
@@ -249,11 +244,8 @@ class TestHybridSearchEndToEnd:
             hybrid_svc = HybridSearchService(dense_svc, sparse_svc, fuse)
 
             # 3. 执行混合检索
-            async def _run():
-                return await hybrid_svc.search(collection, "企业战略", limit=5)
-
             t0 = time.perf_counter()
-            results = _run_async(_run())
+            results = await hybrid_svc.search(collection, "企业战略", limit=5)
             elapsed_ms = (time.perf_counter() - t0) * 1000
 
             # 4. 验证结果
@@ -272,4 +264,4 @@ class TestHybridSearchEndToEnd:
             assert elapsed_ms < 1500, f"端到端延迟 {elapsed_ms:.0f}ms 超过 1500ms 门禁"
 
         finally:
-            self._cleanup(context)
+            await self._cleanup(context)
