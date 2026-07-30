@@ -176,3 +176,99 @@ class TestEmbeddingAPI503Unavailable:
         """模型未加载时 POST /v1/embeddings 返回 503"""
         resp = client_no_model.post("/v1/embeddings", json={"texts": ["test"]})
         assert resp.status_code == 503
+
+
+class TestEmbeddingAPISanitization:
+    """NaN/Inf 防御性净化测试"""
+
+    @pytest.fixture
+    def client_with_nan_model(self) -> Generator[TestClient, None, None]:
+        """注入会返回 NaN 的 mock 模型"""
+        from src.infrastructure.external_services.embedding.embedding_api_server import app
+
+        model = MagicMock()
+        old_state = {
+            "model": getattr(app.state, "model", None),
+            "model_name": getattr(app.state, "model_name", None),
+            "device": getattr(app.state, "device", None),
+            "load_error": getattr(app.state, "load_error", None),
+        }
+
+        def mock_encode(texts, return_dense=False, return_sparse=False, **kwargs):
+            n = len(texts) if isinstance(texts, list) else 1
+            arr = np.random.randn(n, 1024).astype(np.float32)
+            arr[0, 0] = np.nan
+            arr[0, 1] = np.inf
+            arr[0, 2] = -np.inf
+            return {"dense_vecs": arr}
+
+        model.encode.side_effect = mock_encode
+        app.state.model = model
+        app.state.model_name = "BAAI/bge-m3"
+        app.state.device = "cpu"
+        app.state.load_error = None
+        yield TestClient(app)
+        app.state.model = old_state["model"]
+        app.state.model_name = old_state["model_name"]
+        app.state.device = old_state["device"]
+        app.state.load_error = old_state["load_error"]
+
+    def test_nan_inf_sanitized_to_zero(self, client_with_nan_model: TestClient) -> None:
+        """NaN/Inf 值被净化后 JSON 序列化成功"""
+        resp = client_with_nan_model.post("/v1/embeddings", json={"texts": ["测试文本"], "return_sparse": False})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["dense"]) == 1
+        assert len(data["dense"][0]) == 1024
+        # 前 3 个值应为 0.0（NaN/Inf/-Inf 被净化）
+        assert data["dense"][0][0] == 0.0
+        assert data["dense"][0][1] == 0.0
+        assert data["dense"][0][2] == 0.0
+
+    def test_normal_values_unchanged(self, client_with_nan_model: TestClient) -> None:
+        """正常值（非 NaN/Inf）保留原值"""
+        resp = client_with_nan_model.post("/v1/embeddings", json={"texts": ["测试文本"], "return_sparse": False})
+        data = resp.json()
+        # 第 3 个值之后应为正常值（非 0.0）
+        assert data["dense"][0][3] != 0.0
+
+    def test_sanitize_dense_vectors_importable(self) -> None:
+        """_sanitize_dense_vectors 函数可导入"""
+        from src.infrastructure.external_services.embedding.embedding_api_server import _sanitize_dense_vectors
+
+        assert callable(_sanitize_dense_vectors)
+
+
+class TestEmbeddingAPIConcurrency:
+    """并发请求安全测试（模型推理锁）"""
+
+    def test_concurrent_requests_succeed(self, client: TestClient) -> None:
+        """并发请求均正常返回 200（不因锁争用而超时或死锁）"""
+        import threading
+
+        results = []
+        errors = []
+
+        def do_request():
+            try:
+                resp = client.post("/v1/embeddings", json={"texts": ["测试"], "return_sparse": False})
+                results.append(resp.status_code)
+            except Exception as e:
+                errors.append(str(e))
+
+        threads = [threading.Thread(target=do_request) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0, f"并发请求异常: {errors}"
+        assert all(s == 200 for s in results), f"非 200 状态码: {results}"
+
+    def test_embed_lock_prevents_race_condition(self) -> None:
+        """_embed_lock 是 threading.Lock 实例"""
+        import threading
+
+        from src.infrastructure.external_services.embedding.embedding_api_server import _embed_lock
+
+        assert isinstance(_embed_lock, type(threading.Lock()))

@@ -22,8 +22,10 @@ from src.domain.exceptions import (
     ValidationError,
 )
 from src.infrastructure.config.embedding import EmbeddingConfig
+from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
 from src.infrastructure.external_services.embedding.embedding_api_client import (
     EmbeddingAPIClient,
+    _is_retryable_http_error,
 )
 
 
@@ -388,3 +390,190 @@ class TestEmbeddingExceptionCodes:
     async def test_service_unavailable_error_code(self) -> None:
         """ServiceUnavailableError.code == EXCEPTION_303"""
         assert ServiceUnavailableError.code == "EXCEPTION_303"
+
+
+class TestEmbeddingAPIClientRetry:
+    """指数退避重试行为"""
+
+    @pytest.mark.asyncio
+    async def test_retry_on_500(self, api_config: EmbeddingConfig) -> None:
+        """500 错误重试 3 次后抛出 EmbeddingAPIError"""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 500
+        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError("Server Error", request=MagicMock(), response=mock_resp)
+
+        with patch("httpx.AsyncClient.post", return_value=mock_resp) as mock_post:
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=3)
+            with pytest.raises(EmbeddingAPIError, match="HTTP 500"):
+                await client.embed_query("测试文本")
+            # 重试 3 次 → 共 3 次调用
+            assert mock_post.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_retry_on_503(self, api_config: EmbeddingConfig) -> None:
+        """503 错误重试后抛出 EmbeddingAPIError"""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 503
+        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Service Unavailable", request=MagicMock(), response=mock_resp
+        )
+
+        with patch("httpx.AsyncClient.post", return_value=mock_resp) as mock_post:
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=2)
+            with pytest.raises(EmbeddingAPIError, match="HTTP 503"):
+                await client.embed_query("测试文本")
+            assert mock_post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_retry_on_timeout(self, api_config: EmbeddingConfig) -> None:
+        """超时错误重试后抛出 TimeoutError"""
+        with patch(
+            "httpx.AsyncClient.post",
+            side_effect=httpx.TimeoutException("timeout"),
+        ) as mock_post:
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=2)
+            with pytest.raises(TimeoutError, match="超时"):
+                await client.embed_query("测试文本")
+            assert mock_post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_retry_on_network_error(self, api_config: EmbeddingConfig) -> None:
+        """网络错误重试后抛出 NetworkError"""
+        with patch(
+            "httpx.AsyncClient.post",
+            side_effect=httpx.NetworkError("connection refused"),
+        ) as mock_post:
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=2)
+            with pytest.raises(NetworkError, match="网络错误"):
+                await client.embed_query("测试文本")
+            assert mock_post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_no_retry_on_400(self, api_config: EmbeddingConfig) -> None:
+        """400 错误不重试（不可恢复）"""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 400
+        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError("Bad Request", request=MagicMock(), response=mock_resp)
+
+        with patch("httpx.AsyncClient.post", return_value=mock_resp) as mock_post:
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=3)
+            with pytest.raises(EmbeddingAPIError, match="HTTP 400"):
+                await client.embed_query("测试文本")
+            assert mock_post.call_count == 1  # 仅首次，不重试
+
+    @pytest.mark.asyncio
+    async def test_success_on_second_attempt(self, api_config: EmbeddingConfig) -> None:
+        """首次失败、第二次成功，返回正常结果"""
+        mock_resp_fail = MagicMock(spec=httpx.Response)
+        mock_resp_fail.status_code = 500
+        mock_resp_fail.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Server Error", request=MagicMock(), response=mock_resp_fail
+        )
+        mock_resp_ok = _make_mock_response(_fake_dense_response())
+
+        with patch("httpx.AsyncClient.post", side_effect=[mock_resp_fail, mock_resp_ok]) as mock_post:
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=2)
+            result = await client.embed_query("测试文本")
+            assert len(result) == 1024
+            assert mock_post.call_count == 2
+
+
+class TestEmbeddingAPIClientCircuitBreaker:
+    """熔断器行为"""
+
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_opens_after_failures(self, api_config: EmbeddingConfig) -> None:
+        """连续失败达到阈值后熔断器断开"""
+        cb = CircuitBreaker(failure_threshold=2, recovery_timeout=60.0)
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 500
+        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError("Server Error", request=MagicMock(), response=mock_resp)
+
+        with patch("httpx.AsyncClient.post", return_value=mock_resp):
+            client = EmbeddingAPIClient(api_config, circuit_breaker=cb, retry_max_attempts=1)
+            # 第一次失败 → 熔断器计数 +1
+            with pytest.raises(EmbeddingAPIError):
+                await client.embed_query("测试文本")
+            assert cb.state.name == "CLOSED"
+            # 第二次失败 → 达到阈值 → Open
+            with pytest.raises(EmbeddingAPIError):
+                await client.embed_query("测试文本")
+            assert cb.state.name == "OPEN"
+
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_blocks_fast(self, api_config: EmbeddingConfig) -> None:
+        """熔断器断开后快速失败，不发起网络请求"""
+        cb = CircuitBreaker(failure_threshold=1, recovery_timeout=60.0)
+        cb.on_failure()  # 手动触发断开
+
+        with patch("httpx.AsyncClient.post") as mock_post:
+            client = EmbeddingAPIClient(api_config, circuit_breaker=cb, retry_max_attempts=1)
+            with pytest.raises(ServiceUnavailableError, match="熔断器"):
+                await client.embed_query("测试文本")
+            mock_post.assert_not_called()  # 未发起网络请求
+
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_recovers(self, api_config: EmbeddingConfig) -> None:
+        """熔断器恢复后正常请求通过"""
+        cb = CircuitBreaker(failure_threshold=1, recovery_timeout=0.01)
+        mock_resp_ok = _make_mock_response(_fake_dense_response())
+
+        # 触发断开
+        mock_resp_fail = MagicMock(spec=httpx.Response)
+        mock_resp_fail.status_code = 500
+        mock_resp_fail.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Server Error", request=MagicMock(), response=mock_resp_fail
+        )
+
+        with patch("httpx.AsyncClient.post", side_effect=[mock_resp_fail, mock_resp_ok]):
+            client = EmbeddingAPIClient(api_config, circuit_breaker=cb, retry_max_attempts=1)
+            # 第一次失败 → Open
+            with pytest.raises(EmbeddingAPIError):
+                await client.embed_query("测试文本")
+            assert cb.state.name == "OPEN"
+
+        # 等待恢复超时
+        import asyncio
+
+        await asyncio.sleep(0.02)
+
+        # 恢复后请求成功 → Closed
+        with patch("httpx.AsyncClient.post", return_value=mock_resp_ok):
+            result = await client.embed_query("测试文本")
+            assert len(result) == 1024
+            assert cb.state.name == "CLOSED"
+
+
+class TestIsRetryableHttpError:
+    """_is_retryable_http_error 判断逻辑"""
+
+    def test_retryable_500(self) -> None:
+        """500 可重试"""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 500
+        exc = httpx.HTTPStatusError("err", request=MagicMock(), response=mock_resp)
+        assert _is_retryable_http_error(exc) is True
+
+    def test_retryable_503(self) -> None:
+        """503 可重试"""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 503
+        exc = httpx.HTTPStatusError("err", request=MagicMock(), response=mock_resp)
+        assert _is_retryable_http_error(exc) is True
+
+    def test_non_retryable_400(self) -> None:
+        """400 不可重试"""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 400
+        exc = httpx.HTTPStatusError("err", request=MagicMock(), response=mock_resp)
+        assert _is_retryable_http_error(exc) is False
+
+    def test_retryable_timeout(self) -> None:
+        """超时可重试"""
+        exc = httpx.TimeoutException("timeout")
+        assert _is_retryable_http_error(exc) is True
+
+    def test_retryable_transport_error(self) -> None:
+        """TransportError 可重试"""
+        exc = httpx.TransportError("connection error")
+        assert _is_retryable_http_error(exc) is True
