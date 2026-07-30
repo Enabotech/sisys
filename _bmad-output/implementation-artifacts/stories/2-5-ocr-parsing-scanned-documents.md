@@ -91,18 +91,17 @@
 
 **Given** RTX 5090 (Blackwell SM120, 32GB GDDR7) GPU 环境，`deploy/app/docker-compose.yml` 已配置所有基础服务
 **When** 在 `docker-compose.yml` 中直接添加 `paddleocr-vl-vllm` + `paddleocr-vl-api` 两服务定义（与现有 `embedding-api` 一样内联），
-两服务通过 `deploy.resources.reservations.devices` 分配 GPU（与 `embedding-api` 一致），
-并执行 `cd deploy/app && docker compose up -d`（基础服务）和 `docker compose --profile gpu up -d`（含 GPU 服务）
-**Then** PaddleOCR-VL-1.6 两服务与所有基础服务可独立管理：
+两服务通过 `deploy.resources.reservations.devices` 分配 GPU 且使用 `count: 1`（与 `embedding-api` 一致），
+并执行 `cd deploy/app && docker compose up -d`
+**Then** PaddleOCR-VL-1.6 两服务与所有基础服务一并启动：
   - `paddleocr-vl-api` → `localhost:8080`（API 服务）
   - `paddleocr-vl-vllm` → 内部 `8118`（vLLM 推理，仅 API 服务访问）
-**And** 非 GPU 环境下 `docker compose up -d` 仅启动基础服务，不因 GPU 缺失而失败
+**And** 非 GPU 环境下 `docker compose up -d` 的行为与现有 `embedding-api` 一致——GPU reservation 的缺失会导致容器启动失败，此限制非 PaddleOCR-VL 引入的新问题
 **And** `/layout-parsing` 端点可接受 base64 编码的 PDF/图像
 **And** 返回结构化 JSON（含 `prunedResult`、`markdown`、置信度信息）
 
 **验证标准/Validation Criteria:**
-- [ ] `cd deploy/app && docker compose up -d` 一键启动基础服务（不含 PaddleOCR-VL）
-- [ ] `cd deploy/app && docker compose --profile gpu up -d` 额外启动 PaddleOCR-VL 两服务
+- [ ] `cd deploy/app && docker compose up -d` 一键启动所有服务（含 PaddleOCR-VL 两服务）——**注意：非 GPU 环境下 `embedding-api` 已有 GPU reservation 同样会失败，此限制非本 Story 引入**
 - [ ] `docker compose ps` 显示 `sisys-paddleocr-vl-api` + `sisys-paddleocr-vl-vllm` 均为 `healthy`（GPU 环境）
 - [ ] `curl -X POST http://localhost:8080/layout-parsing` 返回 200
 - [ ] CUDA 12.9+ 驱动兼容，GPU 显存分配正常（推荐 `gpu-memory-utilization: 0.3`）
@@ -179,6 +178,11 @@
 | `OCRConnectionError` | EXCEPTION_320 | `ExternalException` | ocr | PaddleOCR-VL 服务不可达/连接超时 |
 | `OCRProcessingError` | EXCEPTION_321 | `ExternalException` | ocr | PaddleOCR-VL 返回错误/响应解析失败 |
 
+**设计理由（异常继承链选择）：** `OCRConnectionError` 和 `OCRProcessingError` 均直接继承 `ExternalException`（而非 `ThirdPartyError`），原因如下：
+- `OCRConnectionError(320)→504` 与 `TimeoutError(302)→504` 同属"上游未响应"类别，但 `TimeoutError` 是通用超时（`ExternalException` 子类），`OCRConnectionError` 是 OCR 专用连接错误，两者语义不同，不宜共用继承链
+- `EmbeddingAPIError` 继承 `ThirdPartyError`（默认 502）是因为 embedding 服务的所有错误本质都是"第三方返回错误响应"，而 OCR 的错误类型需要区分"连接不可达（504）"和"处理错误（502）"两种语义
+- 直接继承 `ExternalException` 并通过 HTTP 映射显式区分 504/502 是最清晰的设计，与 sandbox 子域（`SandboxError` 直接继承 `ExternalException`，映射到 502）模式一致
+
 **预留编码（本 Story 不实现，后续迭代追加）：**
 | 预留编码 | 预期场景 |
 |---------|---------|
@@ -187,7 +191,7 @@
 | EXCEPTION_324 | OCR 速率限制（Rate Limit 429） |
 | EXCEPTION_325-329 | 预留扩展 |
 
-- [ ] 归属模块与基类 — 新建 `src/domain/exceptions/ocr_exceptions.py`，继承 `ExternalException`（参考 `embedding_exceptions.py`/`sandbox_exceptions.py` 模式）
+- [ ] 归属模块与基类 — 新建 `src/domain/exceptions/ocr_exceptions.py`，继承 `ExternalException`（参考 `embedding_exceptions.py`/`sandbox_exceptions.py` 模式）。**注意：** `OCRConnectionError` 和 `OCRProcessingError` 均直接继承 `ExternalException`，而非 `ThirdPartyError`——这是因为 OCR 错误需要区分"连接不可达→504"和"处理错误→502"两种语义，直接继承 `ExternalException` 并通过 HTTP 映射显式区分是最清晰的设计（参见领域异常契约章节的设计理由说明）
 - [ ] 唯一编码分配 — OCR 子域编码范围 320-329（预留 8 个扩展位），`grep -r "EXCEPTION_320\|EXCEPTION_321" src/domain/exceptions/` 验证无碰撞
 - [ ] 构造器参数设计 — `OCRConnectionError(service_url: str, cause: Exception | None = None)`，`OCRProcessingError(service_url: str, status_code: int | None = None, response_body: str | None = None)`
 - [ ] 消息安全性审查 — 错误消息不泄露 API key/完整 URL/原始响应 body（仅暴露状态码和截断的摘要）
@@ -413,6 +417,8 @@ Feature: OCR 解析扫描件文档
 > - 确认 `block_content` 的实际格式（Markdown/纯文本/HTML）
 > - 将真实响应结构作为 Mock 测试 fixture 的**唯一数据来源**（禁止凭空构造）
 >
+> **⚠️ 关键风险说明：** 若 PaddleOCR-VL API 不返回 per-block `confidence` 字段，则 AC-4 的置信度标注架构需要从三路径推导（API per-block → layout_det_res score → 默认 0.5）调整为"统一默认 0.5 + 后处理评分"模式，这将影响 Task 1 的 `OCRConfidenceMark` 值对象设计和 Task 3 的 Adapter 解析逻辑。此风险必须在 Task 0 阶段通过实测排除。
+>
 > **若无法在 Task 0 阶段访问 GPU 环境：** 参考 PaddleOCR-VL 官方文档中的示例响应体（URL: `https://www.paddleocr.ai/latest/version3.x/pipeline_usage/PaddleOCR-VL-NVIDIA-Blackwell.html`），
 > 并在 Task 5 集成测试阶段补做真实 API 验证，如有差异则回溯修正 Adapter 解析逻辑。
 
@@ -524,8 +530,9 @@ Feature: OCR 解析扫描件文档
   - 纯函数，零外部依赖
   - **逐页比较**（非全文档平均）：对每个 `page` 独立计算 `char_count = sum(len(e.content) for e in page.elements)`
   - 若 `char_count < SCANNED_PAGE_TEXT_DENSITY_THRESHOLD` → 该页判定为扫描页，加入返回列表
-  - 阈值常量 `SCANNED_PAGE_TEXT_DENSITY_THRESHOLD = 50`（单页 < 50 字符 → 扫描件；该值为经验值，可通过环境变量覆盖）
+  - 阈值常量 `SCANNED_PAGE_TEXT_DENSITY_THRESHOLD = 50`（单页 < 50 字符 → 扫描件；该值为经验值，**需在 Task 0 使用真实扫描件样本验证**，若发现带水印/页码的扫描件 char_count 超过 50，可适当调高阈值；可通过环境变量覆盖）
   - **设计理由：** 逐页比较确保混合 PDF（部分文本页+部分扫描页）正确识别，Gherkin 场景"混合 PDF"依赖此行为
+  - **边界场景：** 空页面（0 字符）→ 判定为扫描页；恰好等于阈值 50 → 不触发 OCR（非扫描页）；仅含页码/页眉等少量噪声文本（< 50 字符）→ 仍判定为扫描页触发 OCR（OCR 结果可能优于 pypdf 提取的噪声文本）
 - [ ] Subtask 2.3: 🔄 重构 — 抽取常量，完善 docstring，处理边缘场景（`pages=[]`）
 
 **完成标准/Definition of Done:**
@@ -567,9 +574,9 @@ Feature: OCR 解析扫描件文档
   - 构造函数：`__init__(self, base_url: str = "http://localhost:8080", timeout: float = 300.0)`
   - `recognize()` 方法：
     1. **安全写临时文件：** 使用 `tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)` + `os.fchmod(0o600)` 创建临时文件，`try/finally` 确保 `os.unlink()` 清理（含 `CancelledError` 场景）
-    2. 读取文件为 base64（PDF 文件）或 bytes（图像）；**大文件限制：** 单次请求 ≤ 50MB（原始文件），超大文件需预先拆分
+    2. 读取文件为 base64（PDF 文件）或 bytes（图像）；**大文件限制：** 单次请求 ≤ 50MB（原始文件），超大文件需预先拆分。**注意：** `_limits.py` 中 `MAX_PDF_BYTES = 100MB` 为 PDF 解析器上限，`MAX_IMAGE_BYTES = 50MB` 为图像解析器上限。OCR 步骤的 50MB 限制与 `MAX_IMAGE_BYTES` 对齐；对于 PDF 文件，若文件在 50-100MB 之间，OCR 步骤将跳过并记录 WARNING 日志（`_apply_ocr()` 中实现文件大小守卫），PDFParser 的基础解析不受影响
     3. POST `{base_url}/layout-parsing`，payload: `{"file": base64_data, "fileType": 0/1}`
-    4. **PDF 按页拆分：** 若 `page_numbers` 指定了页码范围，调用 `pdfplumber` 或 `pypdf` 拆分 PDF 为单页文件后分别请求（PaddleOCR-VL `/layout-parsing` 无原生页码过滤参数）
+    4. **PDF 按页拆分：** 若 `page_numbers` 指定了页码范围，调用 `pypdf`（项目已有依赖）拆分 PDF 为单页文件后分别请求（PaddleOCR-VL `/layout-parsing` 无原生页码过滤参数）。**性能模型：** 多页文档的总处理延迟 = `n * (avg_page_time + network_overhead)`，单页 P95 目标 < 1s（最佳努力），100 页文档预期延迟 100-300s，应在 300s 解析超时内。**注意：** 若 Task 0 实测发现 `/layout-parsing` 支持多页 PDF 输入并返回所有页结果，则 `_split_pdf_pages()` 仅在混合 PDF 场景（部分页需 OCR）时才需要，全扫描件 PDF 可直接传递完整文件
     5. 解析 `resp.json()["result"]["layoutParsingResults"][].prunedResult.parsing_res_list`
     6. 将每个 block 的 `block_content`（Markdown 格式）通过 `_strip_markdown()` 转为纯文本后映射为 `ParsedElement(content=plain_text, confidence=extracted_confidence, metadata={"ocr_format": "markdown", "original_block": block_content, ...})`
     7. 按页组织为 `OCRPageResult`
@@ -578,7 +585,7 @@ Feature: OCR 解析扫描件文档
     - HTTP status != 200 → `OCRProcessingError`
     - JSON decode error → `OCRProcessingError`
   - 日志：INFO 记录请求耗时，WARNING 记录低置信度元素数量
-- [ ] Subtask 3.3: 🔄 重构 — 抽取 `_call_ocr_api()`、`_parse_response()`、`_block_to_element()`、`_strip_markdown()`、`_split_pdf_pages()` 方法，添加 `retries=2`（指数退避：1s→2s，仅对 5xx/连接错误重试，每次重试独立超时），配置超时从构造参数传入
+- [ ] Subtask 3.3: 🔄 重构 — 抽取 `_call_ocr_api()`、`_parse_response()`、`_block_to_element()`、`_strip_markdown()`、`_split_pdf_pages()` 方法，添加 `retries=2`（指数退避：1s→2s，**增加随机抖动 jitter：`sleep = base * (2 ** attempt) + random.uniform(0, 1)`**，避免同一瞬态故障窗口内连续重试；仅对 5xx/连接错误重试，每次重试独立超时），配置超时从构造参数传入。**日志风格统一：** WARNING 日志使用 `exc_info=True` 记录异常堆栈，与 `layout_detector` 现有模式（`composition_root.py` 第 1241 行）对齐
 
 #### TDD 循环 B：image_parser.py 增强（可选——统一 OCR 后端）
 
@@ -627,17 +634,17 @@ Feature: OCR 解析扫描件文档
   - OCR 返回空结果 → 页面保持原始状态，日志 INFO
 - [ ] Subtask 4.2: 🟢 绿 — 修改 `DocumentParsingService`（`src/application/services/document_parsing_service.py`）：
   - 构造函数新增参数：`ocr: OCRPort | None = None`（注：构造函数已有 8 个参数，本 Story 增至 9 个——后续 Epic 应考虑重构为 Pipeline/Chain of Responsibility 模式，但本 Story 保持与 `layout_detector`/`table_extractor` 一致的注入风格）
-  - 新增 `_apply_ocr(self, parsed_doc: ParsedDocument, file_path: str, mime_type: str) -> ParsedDocument` 方法（签名与 `_apply_layout_detection`/`_apply_table_extraction` 对齐）：
+  - 新增 `_apply_ocr(self, parsed_doc: ParsedDocument, file_path: str, mime_type: str) -> ParsedDocument` 方法（签名与 `_apply_layout_detection`/`_apply_table_extraction` 对齐，均为 `async def`）：
     0. **守卫：** `if self._ocr is None: return parsed_doc`（OCR 端口未注入时静默跳过）
     1. 调用 `detect_scanned_pages()` 识别需要 OCR 的页码
     2. 如果无扫描页，直接返回 `parsed_doc`
-    3. 调用 `ocr.recognize(file_path, scanned_pages)`
+    3. 调用 `await ocr.recognize(file_path, scanned_pages)`（`OCRPort.recognize()` 为 `async def`，必须 `await`）
     4. **部分页失败处理：** 若 `recognize()` 返回结果少于请求的 `scanned_pages`，成功页合并回 `ParsedDocument`，失败页保持原始状态，`metadata["ocr_failed_pages"]` 记录失败页码，不阻塞整体流程
     5. 将 OCR 结果的 `ParsedElement` 替换/合并到对应页面
     6. 标记低置信度元素（`needs_review`）
   - 在 `parse_document()` 流程中（解析后、版面检测前）调用 `_apply_ocr()`
   - 版本号升级：`document_parsing_service` v1.2.0 → v1.3.0
-- [ ] Subtask 4.3: 🔄 重构 — 抽取 `_mark_low_confidence()` 为独立方法，对齐 `_apply_layout_detection()` 的降级模式（`try/except` → WARNING + 返回原始结果，但不阻塞流程），更新 `composition_root.py` 中 `_create_parsing_service()` 工厂函数以注入 `ocr`
+- [ ] Subtask 4.3: 🔄 重构 — 抽取 `_mark_low_confidence()` 为独立方法，对齐 `_apply_layout_detection()` 的降级模式（`try/except` → WARNING 日志（含 `exc_info=True`）+ 返回原始结果，但不阻塞流程），更新 `composition_root.py` 中 `_create_parsing_service()` 工厂函数以注入 `ocr`
 
 #### TDD 循环 B：composition_root.py 注册
 
@@ -664,8 +671,8 @@ Feature: OCR 解析扫描件文档
     _ocr = None
     try:
         _ocr = resolver.resolve("ocr")
-    except (ImportError, RuntimeError, OSError) as e:
-        logger.warning("OCR 服务不可用，扫描件解析将降级: %s", e)
+    except (FileNotFoundError, ImportError, RuntimeError, OSError) as e:
+        logger.warning("OCR 服务不可用，扫描件解析将降级: %s", e, exc_info=True)
     except (KeyError, TypeError) as e:
         raise RuntimeError(f"OCR port config error: {e}") from e
     ```
@@ -706,31 +713,30 @@ Feature: OCR 解析扫描件文档
 - [ ] Subtask 5.1: **规范 `deploy/app/paddleocrvl/paddleocrvl.yaml` 为参考模板**（文件已存在，修正为规范格式，保留作为独立部署参考）：
   - 服务名修正：`paddleocr-vlm-server` → `paddleocr-vl-vllm`
   - 容器名统一 `sisys-` 前缀：`sisys-paddleocr-vl-api`、`sisys-paddleocr-vl-vllm`
-  - 两服务加入 `networks: [sisys-network]`，GPU 通过 `deploy.resources.reservations.devices` 分配
+  - 两服务加入 `networks: [sisys-network]`，GPU 通过 `deploy.resources.reservations.devices` 分配，使用 `count: 1`（与主 `docker-compose.yml` 中 `embedding-api` 一致，不使用 `device_ids: ["0"]` 硬编码）
   - VLM healthcheck 端口修正：`8080` → `8118`
   - API 端口变量化：`${PADDLEOCR_VL_API_PORT:-8080}:8080`
 
-- [ ] Subtask 5.2: **规范 `deploy/app/paddleocrvl/envparam`**（参考模板，对齐实际镜像路径）：
-  - `API_IMAGE_TAG=latest-nvidia-gpu-sm120-offline`
-  - `VLM_IMAGE_TAG=latest-nvidia-gpu-sm120-offline`
-  - `PADDLEOCR_VL_REGISTRY=harbor.sisys.local/sisys/tools/paddlepaddle`
+- [ ] Subtask 5.2: **规范 `deploy/app/paddleocrvl/envparam`**（参考模板，对齐实际镜像路径，**注意：保留现有文件中的 `_SUFFIX` 变量名后缀**，与 `paddleocrvl.yaml` 中的变量引用 `${API_IMAGE_TAG_SUFFIX}` 保持一致）：
+  - `API_IMAGE_TAG_SUFFIX=latest-nvidia-gpu-sm120-offline`
+  - `VLM_IMAGE_TAG_SUFFIX=latest-nvidia-gpu-sm120-offline`
+  - `PADDLEOCR_VL_REGISTRY=harbor.sisys.local/sisys/tools/paddlepaddle`（新增）
   - `VLM_BACKEND=vllm`
 
-- [ ] Subtask 5.3: **在 `deploy/app/docker-compose.yml` 中直接内联写入两服务**（与现有 `embedding-api` 模式一致，不使用 `include:`）：
+- [ ] Subtask 5.3: **在 `deploy/app/docker-compose.yml` 中直接内联写入两服务**（与现有 `embedding-api` 模式一致：GPU 通过 `deploy.resources.reservations.devices` 分配，`count: 1`，不使用 profiles，`docker compose up -d` 默认启动所有服务）。`deploy/app/paddleocrvl/` 保留为独立参考模板。
 
   **`paddleocr-vl-vllm`（VLM 推理 — 内部）：**
   - 镜像：`harbor.sisys.local/sisys/tools/paddlepaddle/paddleocr-genai-vllm-server:latest-nvidia-gpu-sm120-offline`
-  - GPU 独占（`deploy.resources.reservations.devices`），内部 `--port 8118`，vLLM backend
+  - GPU 分配：`deploy.resources.reservations.devices` 使用 `count: 1`（与 `embedding-api` 完全一致，避免硬编码 `device_ids: ["0"]`）
+  - 内部 `--port 8118`，vLLM backend
   - `container_name: sisys-paddleocr-vl-vllm`，GPU device reservation，healthcheck 指向 `8118`
 
   **`paddleocr-vl-api`（API — 对外）：**
   - 镜像：`harbor.sisys.local/sisys/tools/paddlepaddle/paddleocr-vl:latest-nvidia-gpu-sm120-offline`
   - 端口 `"${PADDLEOCR_VL_API_PORT:-8080}:8080"`，依赖 vllm 服务 healthy
-  - `container_name: sisys-paddleocr-vl-api`，端口映射 `8080`，healthcheck 指向 `/health`
+  - `container_name: sisys-paddleocr-vl-api`，healthcheck 指向 `/health`
 
-  **行为：**
-  - `docker compose up -d` → 基础服务（Redis/PostgreSQL/...）+ embedding-api
-  - `docker compose --profile gpu up -d` → 基础服务 + PaddleOCR-VL 两服务
+  **行为：** 所有服务通过 `docker compose up -d` 统一启动（不使用 profiles，与 `embedding-api` 实际实现一致）。非 GPU 环境限制：`embedding-api` 已有 GPU reservation，非 GPU 环境下 `docker compose up -d` 会因 `embedding-api` 的 GPU reservation 失败而报错——此限制非本 Story 引入，为现有系统固有约束。
 
 - [ ] Subtask 5.4: 更新 `.gitignore`：忽略 OCR 模型缓存（Docker volume 管理，不纳入 git）
 - [ ] Subtask 5.5: 编写 `docs/deploy/paddleocr-vl-setup.md`（**新建**，含：CUDA 12.9+ 驱动要求、镜像拉取耗时预估 30-60 分钟、`docker compose --profile gpu pull` 提前拉取、`docker compose --profile gpu up -d` 启动、镜像来源验证 `docker image inspect`）
@@ -865,7 +871,7 @@ Feature: OCR 解析扫描件文档
 ```
 ./
 ├── deploy/app/
-│   ├── docker-compose.yml                  # [MODIFY] 内联添加 paddleocr-vl-vllm + paddleocr-vl-api 两服务（GPU via deploy.resources）
+│   ├── docker-compose.yml                  # [MODIFY] 内联添加 paddleocr-vl-vllm + paddleocr-vl-api 两服务（GPU via deploy.resources, count:1, 不使用 profiles）
 │   └── paddleocrvl/                        # [MODIFY] 规范化为参考模板（独立部署参考，修正服务名/网络/healthcheck）
 │       ├── paddleocrvl.yaml                # [MODIFY] 参考模板：vLLM + API 两服务定义规范
 │       └── envparam                        # [MODIFY] 对齐变量名，新增缺失变量
@@ -968,7 +974,7 @@ Feature: OCR 解析扫描件文档
 - [x] 不新增领域事件，通过现有 `DocumentProcessed` 传递 OCR 结果
 - [x] 版本号 v1.2.0 → v1.3.0，PortSpec/Composition Root/契约测试三处同步
 - [x] OCR 模型由 Docker 镜像管理，不纳入 git
-- [x] PaddleOCR-VL 部署：`docker-compose.yml` 直接内联写入两服务（GPU via `deploy.resources.reservations.devices`，与 `embedding-api` 模式一致），`paddleocrvl/` 保留为独立参考模板
+- [x] PaddleOCR-VL 部署：`docker-compose.yml` 直接内联写入两服务（GPU 通过 `deploy.resources.reservations.devices` 分配，`count: 1`，与 `embedding-api` 实际方式一致，不使用 profiles），`paddleocrvl/` 保留为独立参考模板
 
 ---
 
@@ -1227,11 +1233,30 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 | R3-5 | `src/domain/ports/__init__.py` [MODIFY] 未列入待创建文件清单 | P2 | 补充到清单 |
 | R3-6 | 完成笔记清单未勾选（与 ready-for-dev 状态不一致） | P3 | 全部勾选为 `[x]` |
 
+### Round 4 审查修复（2026-07-30）
+
+> **审查发现：** 4 视角并行审查（科学性/可行性 / 代码一致性 / 合理性/最佳实践 / 交叉验证），基于 D1 阶段对 14 个实际代码文件的全面调研，发现 2 个 P0 问题、1 个 P1 问题、4 个 P2 问题。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R4-1 | **部署方案 `profiles` 内部矛盾**：R1-1 已说"不使用 profiles"，但 AC-5/Subtask 5.3 仍保留 `--profile gpu` 描述；且 `docker-compose.yml` 中 `embedding-api` 实际无 profiles | **P0** | 统一为 `docker compose up -d` 启动所有服务（不使用 profiles），GPU 通过 `deploy.resources.reservations.devices` + `count: 1` 分配，与 `embedding-api` 实际实现一致。非 GPU 环境限制如实说明 |
+| R4-2 | **非 GPU 环境行为描述错误**：文档声称"非 GPU 环境下 `docker compose up -d` 仅启动基础服务"，但 `embedding-api` 已有 GPU reservation 且无 profiles，非 GPU 环境同样会失败 | **P0** | 修正为"非 GPU 环境下 `docker compose up -d` 的行为与现有 `embedding-api` 一致——GPU reservation 的缺失会导致容器启动失败，此限制非 PaddleOCR-VL 引入的新问题" |
+| R4-3 | **大文件限制冲突**：文档 OCR 50MB 限制与 `_limits.py` 中 `MAX_PDF_BYTES = 100MB` 不一致，50-100MB 文件 OCR 阶段会失败 | P1 | 增加文件大小守卫：50-100MB 的 PDF 跳过 OCR 步骤并记录 WARNING 日志，PDFParser 基础解析不受影响 |
+| R4-4 | **`_apply_ocr()` 缺少 `async` 标注和 `await`**：`OCRPort.recognize()` 为 `async def`，但文档中 `_apply_ocr()` 签名未标注 `async`，步骤 3 的 `ocr.recognize()` 缺少 `await` | P1 | 签名标注 `async def`，补全 `await` 关键字 |
+| R4-5 | **重试退避缺少随机抖动（jitter）**：1s→2s 的指数退避间隔太小，可能在同一瞬态故障窗口内连续重试 | P2 | 增加随机抖动：`sleep = base * (2 ** attempt) + random.uniform(0, 1)` |
+| R4-6 | **`OCRConnectionError` 继承链设计理由缺失**：与 `EmbeddingAPIError` 继承 `ThirdPartyError` 的设计不一致，缺少选择 `ExternalException` 直接继承的理由 | P2 | 在领域异常契约章节补充设计理由说明 |
+| R4-7 | **`paddleocrvl.yaml` 中 GPU 分配方式不一致**：现有文件使用 `device_ids: ["0"]` 硬编码 GPU 0，但主 `docker-compose.yml` 中 `embedding-api` 使用 `count: 1` | P2 | 统一为 `count: 1`（与 embedding-api 一致），Subtask 5.1 明确标注 |
+| R4-8 | **`envparam` 变量名 `_SUFFIX` 后缀问题**：文档 Subtask 5.2 列出的变量名不带 `_SUFFIX` 后缀，但现有 `paddleocrvl.yaml` 引用 `${API_IMAGE_TAG_SUFFIX}` | P2 | 保留 `_SUFFIX` 后缀，与 `paddleocrvl.yaml` 变量引用保持一致 |
+| R4-9 | **日志 `exc_info=True` 缺失**：文档 OCR try/except 的 WARNING 日志未使用 `exc_info=True`，与 `layout_detector` 现有模式不一致 | P2 | 统一添加 `exc_info=True`，并在 Subtask 3.3/4.3 中明确标注 |
+| R4-10 | **PDF 拆分使用 `pypdf` 而非 `pdfplumber`**：文档 Subtask 3.2 说"`pdfplumber` 或 `pypdf`"，选择不明确；`pypdf` 为项目已有依赖，更适合 PDF 结构操作 | P2 | 明确使用 `pypdf`（项目已有依赖），并补充性能模型说明 |
+| R4-11 | **文本密度阈值 50 缺乏验证依据**：经验值未用真实扫描件验证，带水印/页码的扫描件可能误判 | P2 | Subtask 2.2 补充说明：需在 Task 0 使用真实扫描件样本验证阈值有效性 |
+| R4-12 | **PaddleOCR-VL API 响应格式未验证风险**：若 API 不返回 per-block confidence，置信度架构需重构 | P1 | Task 0 前置条件增加风险说明：若 API 无 confidence 字段，则调整为"统一默认 0.5 + 后处理评分"模式 |
+
 ---
 
 ### 🔍 代码审查发现 Review Findings
 
-**审查日期:** 2026-07-29（5 轮多 Agent 并行审查：科学性与可行性 / 代码一致性 / 合理性与最佳实践 / 交叉验证 / 全量复查）
+**审查日期:** 2026-07-30（第 6 轮多 Agent 并行审查：D1 代码调研 + D2 四视角审查（科学性/可行性 / 代码一致性 / 合理性/最佳实践 / 交叉验证）+ D3 系统修正 12 项问题）
 
 #### 需决策 Decision Needed
 
@@ -1256,9 +1281,10 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-07-29
-**最后更新/Last Updated:** 2026-07-29（5 轮多 Agent 并行文档审查修订）
+**最后更新/Last Updated:** 2026-07-30（第 6 轮多 Agent 并行审查修订：D1 代码调研 + D2 四视角审查 + D3 系统修正）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件——OCR 解析扫描件文档（PaddleOCR-VL-1.6 + RTX 5090 Blackwell）
 - 5 轮审查修订：修正 RTX 5090 显存规格、文本密度公式、置信度默认值、HTTP 状态码映射、部署方案简化（include→内联写入）、21 项 P0/P1/P2 问题修复
+- v1.1.0: 第 6 轮审查修订（D1 代码调研 + D2 四视角审查 + D3 系统修正）：修正部署方案 profiles 矛盾（2 P0）、大文件限制冲突（1 P1）、async/await 标注缺失（1 P1）、API 响应格式未验证风险（1 P1）、重试退避 jitter/GDP 分配方式/变量名/日志风格/PDF 拆分/阈值验证 等 7 项 P2 问题，共 12 项修复
