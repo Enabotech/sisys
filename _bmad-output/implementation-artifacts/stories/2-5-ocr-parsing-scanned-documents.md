@@ -104,7 +104,7 @@
 - [ ] `cd deploy/app && docker compose up -d` 一键启动所有服务（含 PaddleOCR-VL 两服务）——**注意：非 GPU 环境下 `embedding-api` 已有 GPU reservation 同样会失败，此限制非本 Story 引入**
 - [ ] `docker compose ps` 显示 `sisys-paddleocr-vl-api` + `sisys-paddleocr-vl-vllm` 均为 `healthy`（GPU 环境）
 - [ ] `curl -X POST http://localhost:8080/layout-parsing` 返回 200
-- [ ] CUDA 12.9+ 驱动兼容，GPU 显存分配正常（推荐 `gpu-memory-utilization: 0.3`）
+- [ ] CUDA 12.9+ 驱动兼容，GPU 显存分配正常（推荐 `gpu-memory-utilization: 0.4`）
 - [ ] SISYS 应用可通过 `http://paddleocr-vl-api:8080` 容器名调用
 - [ ] 模型/镜像不在 git 中（`.gitignore` 忽略大文件）
 - [ ] `docs/deploy/paddleocr-vl-setup.md` 存在且含首次镜像拉取耗时说明（~30-60 分钟）
@@ -1275,11 +1275,19 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 | R5-6 | **Subtask 5.5 残留 `--profile gpu` 引用**：部署文档命令仍使用 `--profile gpu`，与全文统一不使用 profiles 矛盾 | P2 | 修正为 `docker compose pull` 和 `docker compose up -d` |
 | R5-7 | **白名单描述与代码不一致**：文档说图像后缀需添加，实际 `_ALLOWED_TEMP_SUFFIXES` 已包含全部图像后缀 | P2 | 修正为"`.jpg`/`.jpeg`/`.png`/`.gif`/`.bmp`/`.tiff`/`.tif` 已在白名单中" |
 
+### Round 6 审查修复（2026-07-30）
+
+> **审查发现：** 第 3 轮全量一致性验证，文档经过 R1-R5 修正后已达高度一致，仅残留 1 处 P2 问题。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R6-1 | **AC-5 验证标准 `gpu-memory-utilization` 未同步更新**：第 107 行仍为 0.3，但 GPU 要求表已在 R5 修正为 0.4 | P2 | 将第 107 行同步更新为 `gpu-memory-utilization: 0.4` |
+
 ---
 
 ### 🔍 代码审查发现 Review Findings
 
-**审查日期:** 2026-07-30（第 6 轮多 Agent 并行审查：D1 代码调研 + D2 四视角审查（科学性/可行性 / 代码一致性 / 合理性/最佳实践 / 交叉验证）+ D3 系统修正 12 项问题）
+**审查日期:** 2026-07-30（第 6 轮多 Agent 并行审查：D1 代码调研 + D2 四视角审查（科学性/可行性 / 代码一致性 / 合理性/最佳实践 / 交叉验证）+ D3 系统修正 19 项问题）
 
 #### 需决策 Decision Needed
 
@@ -1313,3 +1321,4 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 - v1.1.0: 第 6 轮审查修订（D1 代码调研 + D2 四视角审查 + D3 系统修正）：
   - 第 1 轮（R4）：修正部署方案 profiles 矛盾（2 P0）、大文件限制冲突（1 P1）、async/await 标注缺失（1 P1）、API 响应格式未验证风险（1 P1）、重试退避 jitter/GDP 分配方式/变量名/日志风格/PDF 拆分/阈值验证 等 7 项 P2 问题，共 12 项修复
   - 第 2 轮（R5）：修正 ImageParser sync/async 不匹配（1 P0）、OCR 标签冲突/性能模型/部分页数据一致性（3 P1）、gpu-memory-utilization/Subtask 5.5 残留/白名单描述（3 P2），共 7 项修复
+  - 第 3 轮（R6）：全量一致性验证，修正 AC-5 验证标准 gpu-memory-utilization 未同步更新（1 P2），共 1 项修复
