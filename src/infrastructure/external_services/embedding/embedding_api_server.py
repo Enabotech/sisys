@@ -5,14 +5,24 @@ Docker Compose 独立部署，通过 POST /v1/embeddings 提供 Dense/Sparse 编
 
 架构参考: architecture.md §4.3 嵌入模型配置 — API 模式独立部署
 依赖: fastapi, FlagEmbedding, uvicorn
+
+线程安全策略：
+- 模型推理使用 threading.Lock 串行化，避免并发请求下
+  encode_single_device() 内 model.to(device) + model.eval() 非原子操作
+  导致模型精度状态被部分重置，输出 NaN/Inf。
+- 输出向量经 np.nan_to_num 防御性净化，确保 JSON 序列化零失败。
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import threading
 from contextlib import asynccontextmanager
+from typing import cast
 
+import numpy as np
+import numpy.typing as npt
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
@@ -42,6 +52,42 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SISYS Embedding API", version="1.0.0", lifespan=lifespan)
+
+# 模型推理锁：串行化 encode() 调用，防止并发 model.to(device) + model.eval() 非原子操作
+# 参考: FlagEmbedding encode_single_device() 源码中设备切换非线程安全
+_embed_lock = threading.Lock()
+
+
+def _sanitize_dense_vectors(dense_vecs: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+    """防御性净化浮点向量，剔除 NaN/Inf 确保 JSON 序列化兼容
+
+    Starlette 0.37.2 JSONResponse 默认 allow_nan=False，
+    NaN/Inf 会导致 json.dumps 抛出 ValueError → HTTP 500。
+    浮点推理在 fp16 精度下偶现 NaN/Inf（并发竞争、GPU 数值不稳定等），
+    此函数作为最后一道防线，将不安全值替换为 0.0。
+
+    Args:
+        dense_vecs: 原始模型输出向量
+
+    Returns:
+        净化后的向量（不含 NaN/Inf）
+
+    Note:
+        np.nan_to_num 同时处理 float16/float32/float64，
+        将 NaN→0.0, +Inf→finfo.max, -Inf→finfo.min。
+        float16 下 finfo.max=65504，finfo.min=-65504，
+        均远小于正常嵌入值范围（~[-0.5, 0.5]），
+        不会与正常值混淆。
+    """
+    if not np.any(np.isnan(dense_vecs)) and not np.any(np.isinf(dense_vecs)):
+        return dense_vecs
+    logger.warning(
+        "检测到 NaN/Inf 向量，已自动净化 (shape=%s, nan_count=%d, inf_count=%d)",
+        dense_vecs.shape,
+        int(np.sum(np.isnan(dense_vecs))),
+        int(np.sum(np.isinf(dense_vecs))),
+    )
+    return cast(npt.NDArray[np.floating], np.nan_to_num(dense_vecs, nan=0.0, posinf=0.0, neginf=0.0))
 
 
 class EmbedRequest(BaseModel):
@@ -267,11 +313,15 @@ def embed(req: EmbedRequest) -> dict:
 
     model = app.state.model
     try:
-        result = model.encode(
-            req.texts,
-            return_dense=True,
-            return_sparse=req.return_sparse,
-        )
+        # 串行化模型推理：FlagEmbedding encode_single_device() 非线程安全
+        # 并发调用时 model.to(device) + model.eval() 非原子操作，
+        # 可能导致模型精度状态被部分重置，输出 NaN/Inf。
+        with _embed_lock:
+            result = model.encode(
+                req.texts,
+                return_dense=True,
+                return_sparse=req.return_sparse,
+            )
     except Exception:
         logger.exception("模型推理失败 (texts=%d, return_sparse=%s)", len(req.texts), req.return_sparse)
         raise HTTPException(status_code=500, detail="Embedding inference failed")
@@ -285,6 +335,9 @@ def embed(req: EmbedRequest) -> dict:
     if len(dense_vecs) != len(req.texts):
         logger.error("模型输出向量数(%d)与请求数(%d)不匹配", len(dense_vecs), len(req.texts))
         raise HTTPException(status_code=500, detail=f"Vector count mismatch: {len(dense_vecs)} != {len(req.texts)}")
+
+    # 防御性净化：剔除 NaN/Inf 确保 JSON 序列化兼容
+    dense_vecs = _sanitize_dense_vectors(dense_vecs)
 
     response: dict = {"dense": dense_vecs.tolist()}
 
