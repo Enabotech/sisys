@@ -39,6 +39,10 @@ from src.domain.exceptions.external_exceptions import (
     TimeoutError,
     UnknownError,
 )
+from src.domain.exceptions.ocr_exceptions import (
+    OCRConnectionError,
+    OCRProcessingError,
+)
 from src.domain.exceptions.permission_exceptions import InsufficientTokenError
 from src.domain.exceptions.role_exceptions import (
     CannotDeleteRoleWithUsersError,
@@ -131,6 +135,9 @@ __all__ = [
     "EmbeddingAPIError",
     "EmbeddingResponseError",
     "EmbeddingModelError",
+    # OCR 异常
+    "OCRConnectionError",
+    "OCRProcessingError",
     # 权限异常
     "InsufficientTokenError",
     # 事件异常

@@ -1123,15 +1123,15 @@ def bootstrap() -> None:
                 "image/jpeg": __import__(
                     "src.infrastructure.document_parsing.image_parser",
                     fromlist=["ImageParser"],
-                ).ImageParser(),
+                ).ImageParser(ocr=resolver.resolve("ocr")),
                 "image/png": __import__(
                     "src.infrastructure.document_parsing.image_parser",
                     fromlist=["ImageParser"],
-                ).ImageParser(),
+                ).ImageParser(ocr=resolver.resolve("ocr")),
                 "image/gif": __import__(
                     "src.infrastructure.document_parsing.image_parser",
                     fromlist=["ImageParser"],
-                ).ImageParser(),
+                ).ImageParser(ocr=resolver.resolve("ocr")),
                 "text/html": __import__(
                     "src.infrastructure.document_parsing.html_parser",
                     fromlist=["HTMLParser"],
@@ -1219,17 +1219,32 @@ def bootstrap() -> None:
         tags=("table", "pdf", "document"),
     )
 
+    # === OCR Port (Story 2-5) ===
+    # 必须在 document_parser 之前注册，以便 ImageParser 可以通过 resolver 获取 OCR 实例
+    from src.domain.ports.ocr import OCRPort
+
+    register_port(
+        name="ocr",
+        version="v1.0.0",
+        interface=OCRPort,
+        impl="src.infrastructure.document_parsing.paddleocr_vl_adapter.PaddleOCRVLAdapter",
+        module="src.infrastructure.document_parsing.paddleocr_vl_adapter",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+    )
+
     # DocumentParsingService — 应用层文档解析编排
     from src.application.services.document_parsing_service import DocumentParsingService
     from src.domain.ports.resolver import Resolver
 
     def _create_parsing_service(resolver: Resolver) -> DocumentParsingService:
-        """创建文档解析服务，版面检测和表格提取端口可选注入
+        """创建文档解析服务，版面检测、表格提取和 OCR 端口可选注入
 
         当 ONNX 模型文件不存在或 onnxruntime 未安装时，
         layout_detector 和 pdf_page_renderer 降级为 None，
         文档解析以无版面检测模式运行（所有 bbox=None）。
         当 table_extractor 初始化失败时降级为 None（无表格语义增强）。
+        当 OCR 服务不可用时降级为 None（无 OCR 识别）。
         """
         _layout_detector = None
         _pdf_page_renderer = None
@@ -1252,6 +1267,14 @@ def bootstrap() -> None:
         except (KeyError, TypeError) as e:
             raise RuntimeError(f"表格提取端口注册配置错误: {e}") from e
 
+        _ocr = None
+        try:
+            _ocr = resolver.resolve("ocr")
+        except (FileNotFoundError, ImportError, RuntimeError, OSError) as e:
+            logger.warning("OCR 服务不可用，扫描件解析将降级: %s", e, exc_info=True)
+        except (KeyError, TypeError) as e:
+            raise RuntimeError(f"OCR port config error: {e}") from e
+
         return DocumentParsingService(
             document_repository=resolver.resolve("document_repository"),
             document_storage=resolver.resolve("document_storage"),
@@ -1261,11 +1284,12 @@ def bootstrap() -> None:
             layout_detector=_layout_detector,
             pdf_page_renderer=_pdf_page_renderer,
             table_extractor=_table_extractor,
+            ocr=_ocr,
         )
 
     register_port(
         name="document_parsing_service",
-        version="v1.2.0",
+        version="v1.3.0",
         interface=DocumentParsingService,
         impl=_create_parsing_service,
         module="src.application.services.document_parsing_service",

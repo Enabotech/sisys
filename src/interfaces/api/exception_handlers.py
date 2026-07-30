@@ -43,6 +43,8 @@ from src.domain.exceptions import (
     MinIOConnectionError,
     NetworkError,
     NotFoundError,
+    OCRConnectionError,
+    OCRProcessingError,
     PasswordValidationError,
     PermissionDeniedError,
     RoleAlreadyExistsError,
@@ -117,6 +119,9 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     ContainerStartError: status.HTTP_502_BAD_GATEWAY,  # 310
     ExecutionError: status.HTTP_502_BAD_GATEWAY,  # 311
     ContainerStopError: status.HTTP_502_BAD_GATEWAY,  # 312
+    # OCR 异常
+    OCRConnectionError: status.HTTP_504_GATEWAY_TIMEOUT,  # 320 — 连接超时/不可达
+    OCRProcessingError: status.HTTP_502_BAD_GATEWAY,  # 321 — 上游返回错误/响应解析失败
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

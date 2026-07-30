@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 from src.domain.entities.document import Document, ParseStatus
 from src.domain.events.document_events import DocumentProcessed
 from src.domain.ports.document_repository import DocumentQuery
+from src.domain.services.scanned_page_detector import detect_scanned_pages
+from src.domain.value_objects.ocr_result import OCRConfidenceMark
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage, ParsedTable
 
 if TYPE_CHECKING:
@@ -26,6 +28,7 @@ if TYPE_CHECKING:
     from src.domain.ports.document_repository import DocumentRepositoryPort
     from src.domain.ports.event_publisher import EventPublisher
     from src.domain.ports.layout_detector import LayoutDetector
+    from src.domain.ports.ocr import OCRPort
     from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
     from src.domain.ports.table_extractor import TableExtractorPort
 
@@ -79,6 +82,7 @@ class DocumentParsingService:
         layout_detector: "LayoutDetector | None" = None,
         pdf_page_renderer: "PdfPageRendererPort | None" = None,
         table_extractor: "TableExtractorPort | None" = None,
+        ocr: "OCRPort | None" = None,
     ) -> None:
         self._repository = document_repository
         self._storage = document_storage
@@ -88,6 +92,7 @@ class DocumentParsingService:
         self._layout_detector = layout_detector
         self._pdf_page_renderer = pdf_page_renderer
         self._table_extractor = table_extractor
+        self._ocr = ocr
 
     async def parse_document(self, document_id: uuid.UUID, tenant_id: str) -> Document:
         """解析文档
@@ -166,6 +171,9 @@ class DocumentParsingService:
 
             # 表格语义提取增强（table_extractor 注入时触发，运行时错误不阻断解析）
             parsed_doc = await self._apply_table_extraction(parsed_doc, temp_path, document.mime_type)
+
+            # OCR 解析增强（ocr 端口注入时触发，对扫描件执行 OCR 识别，运行时错误不阻断解析）
+            parsed_doc = await self._apply_ocr(parsed_doc, temp_path, document.mime_type)
 
             # 更新状态和元数据
             document.parse_status = ParseStatus.COMPLETED
@@ -485,3 +493,156 @@ class DocumentParsingService:
             else:
                 enhanced.append(table)
         return enhanced
+
+    async def _apply_ocr(
+        self,
+        parsed_doc: ParsedDocument,
+        file_path: str,
+        mime_type: str,
+    ) -> ParsedDocument:
+        """对已解析文档应用 OCR 增强（扫描件 PDF 识别）
+
+        算法流程：
+        0. OCR 端口未注入时静默跳过
+        1. 文件大小守卫：仅对 ≤ 50MB 的文件执行 OCR，50-100MB 的 PDF 跳过并记录 WARNING
+        2. 调用 detect_scanned_pages() 识别需要 OCR 的页码
+        3. 无扫描页时直接返回
+        4. 调用 OCRPort.recognize() 执行 OCR 识别
+        5. 部分页失败处理：成功页合并回 ParsedDocument，失败页保持原始状态
+        6. 标记低置信度元素（needs_review）
+        7. OCR 标签隔离：block_label 暂存到 metadata["ocr_block_label"]
+
+        Args:
+            parsed_doc: 已完成解析的 ParsedDocument
+            file_path: 文档临时文件路径
+            mime_type: 文档 MIME 类型
+
+        Returns:
+            OCR 增强后的 ParsedDocument 或原文档（降级时）
+        """
+        # 降级条件：ocr 端口未注入
+        if self._ocr is None:
+            return parsed_doc
+
+        # 文件大小守卫：仅对 ≤ 50MB 的文件执行 OCR
+        from src.infrastructure.document_parsing._limits import MAX_PDF_BYTES
+
+        try:
+            file_size = os.path.getsize(file_path)
+        except OSError:
+            logger.warning("OCR 步骤无法获取文件大小，跳过 OCR: %s", file_path, exc_info=True)
+            return parsed_doc
+
+        # 50-100MB：跳过 OCR，记录 WARNING
+        from src.infrastructure.document_parsing.paddleocr_vl_adapter import OCR_MAX_BYTES
+
+        if file_size > OCR_MAX_BYTES:
+            if file_size <= MAX_PDF_BYTES and mime_type == "application/pdf":
+                logger.warning(
+                    "PDF 文件大小 %dMB 超过 OCR 限制 %dMB，跳过 OCR 步骤（基础解析不受影响）",
+                    file_size // (1024 * 1024),
+                    OCR_MAX_BYTES // (1024 * 1024),
+                )
+                return parsed_doc
+            logger.warning(
+                "文件大小 %dMB 超过 OCR 限制 %dMB，跳过 OCR 步骤",
+                file_size // (1024 * 1024),
+                OCR_MAX_BYTES // (1024 * 1024),
+            )
+            return parsed_doc
+
+        try:
+            # 扫描页检测
+            scanned_pages = detect_scanned_pages(parsed_doc.pages)
+            if not scanned_pages:
+                logger.info("未检测到扫描页，跳过 OCR 步骤")
+                return parsed_doc
+
+            logger.info("检测到扫描页: %s，执行 OCR 识别", scanned_pages)
+
+            # 调用 OCR 识别（OCRPort.recognize 为 async def，直接 await）
+            ocr_results = await self._ocr.recognize(file_path, scanned_pages)
+
+            if not ocr_results:
+                logger.info("OCR 返回空结果，保持原始文档状态")
+                return parsed_doc
+
+            # 按页合并 OCR 结果
+            page_map = {r.page_number: r for r in ocr_results}
+            ocr_pages: list[ParsedPage] = []
+            failed_pages: list[int] = []
+
+            for page in parsed_doc.pages:
+                if page.page_number in page_map:
+                    ocr_page_result = page_map[page.page_number]
+                    # 标记低置信度元素
+                    elements = self._mark_low_confidence(ocr_page_result.elements)
+                    ocr_pages.append(
+                        ParsedPage(
+                            page_number=page.page_number,
+                            texts=elements,
+                            tables=page.tables,
+                            images=page.images,
+                        )
+                    )
+                elif page.page_number in scanned_pages:
+                    # 扫描页但 OCR 未返回结果 → 部分页失败
+                    failed_pages.append(page.page_number)
+                    ocr_pages.append(page)
+                else:
+                    # 非扫描页，保持原样
+                    ocr_pages.append(page)
+
+            parsed_doc = replace(parsed_doc, pages=ocr_pages)
+
+            # 记录 OCR 元数据
+            ocr_metadata: dict = {
+                "ocr_engine": "paddleocr-vl",
+                "ocr_scanned_pages": scanned_pages,
+                "ocr_processed_pages": list(page_map.keys()),
+            }
+            if failed_pages:
+                ocr_metadata["ocr_failed_pages"] = failed_pages
+
+            return parsed_doc
+
+        except Exception:
+            logger.warning(
+                "OCR 解析失败，降级保留原始文档（文档 MIME=%s）",
+                mime_type,
+                exc_info=True,
+            )
+            return parsed_doc
+
+    @staticmethod
+    def _mark_low_confidence(elements: list[ParsedElement]) -> list[ParsedElement]:
+        """标记低置信度元素
+
+        对 confidence < OCR_CONFIDENCE_THRESHOLD 的元素，
+        在 metadata 中设置 needs_review = True。
+
+        Args:
+            elements: 待标记的元素列表
+
+        Returns:
+            标记后的元素列表
+        """
+        from src.domain.ports.ocr import OCR_CONFIDENCE_THRESHOLD
+
+        result: list[ParsedElement] = []
+        for elem in elements:
+            if elem.confidence < OCR_CONFIDENCE_THRESHOLD:
+                result.append(
+                    ParsedElement(
+                        content=elem.content,
+                        bbox=elem.bbox,
+                        confidence=elem.confidence,
+                        metadata={
+                            **elem.metadata,
+                            "needs_review": True,
+                        },
+                    )
+                )
+            else:
+                result.append(elem)
+        return result
