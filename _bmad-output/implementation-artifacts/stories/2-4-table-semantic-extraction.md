@@ -427,14 +427,14 @@ PDF 表格初始检测使用 pdfplumber（MIT 许可证，专有表格检测算�
 | 🟢 绿 | 在 `src/domain/ports/table_extractor.py` 实现 `TableExtractorPort` Protocol（`extract(file_path, mime_type, tables) -> list[ParsedTable]`） |
 | 🔄 重构 | Google 中文注释、端口文档完善 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 `TestTableExtractorPort`（Protocol 合规检查/实现类 isinstance 验证/签名约束）
-- [ ] Subtask 2.2: 🟢 绿 — 实现 `TableExtractorPort` Protocol 最小代码
-- [ ] Subtask 2.3: 🔄 重构 — 完善 docstring
+- [x] Subtask 2.1: 🔴 红 — 编写 `TestTableExtractorPort`（Protocol 合规检查/实现类 isinstance 验证/签名约束）
+- [x] Subtask 2.2: 🟢 绿 — 实现 `TableExtractorPort` Protocol 最小代码
+- [x] Subtask 2.3: 🔄 重构 — 完善 docstring
 
 **完成标准/Definition of Done:**
-- [ ] `TableExtractorPort` Protocol 定义完成
-- [ ] 端口协议测试通过
-- [ ] 领域层零外部依赖（仅标准库 `typing`/`dataclasses`）
+- [x] `TableExtractorPort` Protocol 定义完成
+- [x] 端口协议测试通过
+- [x] 领域层零外部依赖（仅标准库 `typing`/`dataclasses`）
 
 
 ---
@@ -822,6 +822,7 @@ tests/
 - `tests/contracts/test_port_contract_layout_detector.py` — 更新版本断言
 - `tests/acceptance/test_acceptance_table_extraction.feature` — 9 个 Gherkin 场景
 - `tests/acceptance/test_acceptance_table_extraction.py` — BDD 步骤实现
+- `tests/integration/test_integration_table_extraction.py` — 16 个集成测试
 
 ---
 

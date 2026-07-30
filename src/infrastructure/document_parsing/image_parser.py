@@ -5,10 +5,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from src.domain.ports.document_parser import DocumentParserPort
 from src.domain.value_objects.parsed_document import (
@@ -18,6 +20,9 @@ from src.domain.value_objects.parsed_document import (
 )
 from src.infrastructure.document_parsing._limits import MAX_IMAGE_BYTES
 
+if TYPE_CHECKING:
+    from src.domain.ports.ocr import OCRPort
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,11 +31,20 @@ class ImageParser(DocumentParserPort):
 
     使用 Pillow 提取元数据，pytesseract 执行 OCR，支持：
     - 图像元数据提取（format/size/mode）
-    - OCR 文本提取（中英双语）
+    - OCR 文本提取（中英双语，可选 PaddleOCR-VL 注入）
     - GIF 仅处理第一帧
     - Tesseract 不可用时优雅降级
     - 文件大小上限保护
+    - 可选 OCR 端口注入（PaddleOCR-VL 替换 pytesseract）
     """
+
+    def __init__(self, ocr: "OCRPort | None" = None) -> None:
+        """初始化图像解析器
+
+        Args:
+            ocr: 可选的 OCR 端口实例（注入 PaddleOCR-VL 时替换 pytesseract）
+        """
+        self._ocr = ocr
 
     def parse(self, file_path: str, mime_type: str) -> ParsedDocument:
         """解析图像文件
@@ -96,29 +110,37 @@ class ImageParser(DocumentParserPort):
                 # OCR 文本提取
                 texts: list[ParsedElement] = []
                 try:
-                    import pytesseract
+                    if self._ocr is not None:
+                        # PaddleOCR-VL 注入路径：使用 asyncio.run() 桥接 sync/async
+                        ocr_results = asyncio.run(self._ocr.recognize(file_path))
+                        if ocr_results and ocr_results[0].elements:
+                            texts = ocr_results[0].elements
+                        else:
+                            logger.info("PaddleOCR-VL 返回空结果，保持图像元数据")
+                    else:
+                        import pytesseract
 
-                    ocr_text = pytesseract.image_to_string(img, lang="chi_sim+eng")
-                    if ocr_text.strip():
-                        # 获取置信度
-                        try:
-                            data = pytesseract.image_to_data(img, lang="chi_sim+eng", output_type=pytesseract.Output.DICT)
-                            confidences = [int(c) for c in data.get("conf", []) if c != "-1"]
-                            avg_confidence = sum(confidences) / len(confidences) / 100.0 if confidences else 0.5
-                        except Exception:
-                            avg_confidence = 0.5
+                        ocr_text = pytesseract.image_to_string(img, lang="chi_sim+eng")
+                        if ocr_text.strip():
+                            # 获取置信度
+                            try:
+                                data = pytesseract.image_to_data(img, lang="chi_sim+eng", output_type=pytesseract.Output.DICT)
+                                confidences = [int(c) for c in data.get("conf", []) if c != "-1"]
+                                avg_confidence = sum(confidences) / len(confidences) / 100.0 if confidences else 0.5
+                            except Exception:
+                                avg_confidence = 0.5
 
-                        texts.append(
-                            ParsedElement(
-                                content=ocr_text.strip(),
-                                confidence=round(avg_confidence, 4),
-                                metadata={"source": "ocr"},
+                            texts.append(
+                                ParsedElement(
+                                    content=ocr_text.strip(),
+                                    confidence=round(avg_confidence, 4),
+                                    metadata={"source": "ocr"},
+                                )
                             )
-                        )
                 except ImportError:
-                    logger.warning("pytesseract 未安装，跳过 OCR 文本提取")
+                    logger.warning("pytesseract 未安装且无 OCR 端口注入，跳过 OCR 文本提取")
                 except Exception:
-                    logger.warning("OCR 文本提取失败，继续返回图像元数据")
+                    logger.warning("OCR 文本提取失败，继续返回图像元数据", exc_info=True)
 
             page = ParsedPage(
                 page_number=1,

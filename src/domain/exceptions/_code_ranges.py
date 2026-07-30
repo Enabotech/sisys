@@ -40,6 +40,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "embedding": (306, 308),
     # 沙箱（309-319）
     "sandbox": (309, 319),
+    # OCR 子域（320-329）
+    "ocr": (320, 329),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -108,6 +110,9 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ContainerStartError": "sandbox",
     "ContainerStopError": "sandbox",
     "ExecutionError": "sandbox",
+    # ocr_exceptions.py
+    "OCRConnectionError": "ocr",
+    "OCRProcessingError": "ocr",
 }
 
 
