@@ -21,12 +21,13 @@ import pytest
 from src.domain.value_objects.ocr_result import OCRPageResult
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage
 from src.infrastructure.document_parsing.paddleocr_vl_adapter import PaddleOCRVLAdapter
+from tests.environments import get_test_env
 
 # ===================================================================
 # Helpers
 # ===================================================================
 
-_PADDLEOCR_VL_URL = "http://localhost:8080"
+_PADDLEOCR_VL_URL = get_test_env().paddleocr.api_url
 
 
 def _paddleocr_vl_available() -> bool:

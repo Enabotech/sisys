@@ -146,6 +146,14 @@ class EmbeddingConfig:
 
 
 @dataclass
+class PaddleOCRConfig:
+    """PaddleOCR-VL 配置"""
+
+    api_url: str = "http://localhost:8080"
+    api_timeout: float = 300.0
+
+
+@dataclass
 class TestEnvConfig:
     """测试环境完整配置"""
 
@@ -158,6 +166,7 @@ class TestEnvConfig:
     rabbitmq: RabbitMQConfig = field(default_factory=RabbitMQConfig)
     app: AppConfig = field(default_factory=AppConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
+    paddleocr: PaddleOCRConfig = field(default_factory=PaddleOCRConfig)
 
 
 # =============================================================================
@@ -214,6 +223,7 @@ CI_CONFIG = TestEnvConfig(
     minio=MinIOConfig(endpoint="host.docker.internal:9000"),
     neo4j=Neo4jConfig(host="host.docker.internal", http_port=7474, bolt_port=7687),
     rabbitmq=RabbitMQConfig(host="host.docker.internal", port=5672, mgmt_port=15672),
+    paddleocr=PaddleOCRConfig(api_url="http://host.docker.internal:8080"),
 )
 
 K8S_CONFIG = TestEnvConfig(
@@ -224,6 +234,7 @@ K8S_CONFIG = TestEnvConfig(
     minio=MinIOConfig(endpoint="sisys-minio:9000"),
     neo4j=Neo4jConfig(host="sisys-neo4j", http_port=7474, bolt_port=7687),
     rabbitmq=RabbitMQConfig(host="sisys-rabbitmq", port=5672, mgmt_port=15672),
+    paddleocr=PaddleOCRConfig(api_url="http://sisys-paddleocr-vl-api:8080"),
 )
 
 TEST_CONFIG = TestEnvConfig(
@@ -405,6 +416,11 @@ def _apply_dotenv_if_empty(config: TestEnvConfig, env_values) -> None:
         if url := env_values.get("EMBEDDING_API_URL"):
             config.embedding.api_url = url
 
+    # PaddleOCR-VL 配置
+    if not config.paddleocr.api_url:
+        if url := env_values.get("PADDLEOCR_VL_API_URL"):
+            config.paddleocr.api_url = url
+
 
 def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
     """从环境变量覆盖配置"""
@@ -469,6 +485,12 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
     if api_url := os.getenv("EMBEDDING_API_URL"):
         config.embedding.api_url = api_url
 
+    # PaddleOCR-VL 配置
+    if api_url := os.getenv("PADDLEOCR_VL_API_URL"):
+        config.paddleocr.api_url = api_url
+    if api_timeout := os.getenv("PADDLEOCR_VL_API_TIMEOUT"):
+        config.paddleocr.api_timeout = float(api_timeout)
+
     return config
 
 
@@ -525,6 +547,9 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
 
     # Embedding API 配置
     os.environ.setdefault("EMBEDDING_API_URL", config.embedding.api_url)
+
+    # PaddleOCR-VL 配置
+    os.environ.setdefault("PADDLEOCR_VL_API_URL", config.paddleocr.api_url)
 
 
 def reset_test_env() -> None:

@@ -22,6 +22,7 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage
+from tests.environments import get_test_env
 
 scenarios("test_acceptance_ocr.feature")
 
@@ -29,7 +30,7 @@ scenarios("test_acceptance_ocr.feature")
 # 常量
 # ===================================================================
 
-_PADDLEOCR_VL_URL = "http://localhost:8080"
+_PADDLEOCR_VL_URL = get_test_env().paddleocr.api_url
 _OCR_CONFIDENCE_THRESHOLD = 0.85
 
 
