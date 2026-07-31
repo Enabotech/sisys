@@ -250,7 +250,7 @@ class TestDocumentParsingServiceOCR:
 
     @pytest.mark.asyncio
     async def test_ocr_unexpected_exception_fallback(self) -> None:
-        """OCR 调用抛出未预期异常 → WARNING 日志 + 返回原始文档"""
+        """OCR 调用抛出未预期异常 → 返回 FAILED 状态 + 脱敏错误信息"""
         ocr_mock = AsyncMock()
         ocr_mock.recognize.side_effect = RuntimeError("unexpected")
 
@@ -260,8 +260,10 @@ class TestDocumentParsingServiceOCR:
             doc = _create_parsed_doc()
             result = await service._apply_ocr(doc, temp_path, "application/pdf")
 
-            # 降级返回原始文档
-            assert result[0] is doc
+            # 返回 FAILED 状态（不再静默降级）
+            assert result[0].is_failed()
+            assert result[0].error_message is not None
+            assert "unexpected" not in result[0].error_message  # 脱敏
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
