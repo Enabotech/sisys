@@ -337,6 +337,10 @@ services:
           memory: 4G
         reservations:
           memory: 2G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     logging:
       driver: "json-file"
       options:
