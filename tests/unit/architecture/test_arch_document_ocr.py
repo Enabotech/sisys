@@ -12,36 +12,24 @@ import importlib
 import inspect
 
 
-def _get_module_imports(module_path: str) -> list[str]:
-    """获取模块的外部导入列表（排除 stdlib 和自身引用）"""
-    import builtins
-    import sys
-
-    stdlib_modules = set(sys.stdlib_module_names) if hasattr(sys, "stdlib_module_names") else set()
-
-    module = importlib.import_module(module_path)
-    imports: list[str] = []
-    for name, val in inspect.getmembers(module):
-        if isinstance(val, type) and val.__module__ != module_path:
-            imports.append(f"{name} from {val.__module__}")
-    return imports
-
-
 class TestDomainLayerNoExternalDependencies:
     """领域层零外部依赖验证"""
 
     def test_ocr_port_no_external_deps(self) -> None:
         """验证 OCRPort 端口无第三方导入"""
-        from src.domain.ports.ocr import OCRPort
 
         # 验证 Protocol 仅使用 stdlib
         module = importlib.import_module("src.domain.ports.ocr")
         source = inspect.getsource(module)
         # 应仅导入 typing 和 domain 内部模块
-        import_lines = [l for l in source.split("\n") if l.strip().startswith("import ") or l.strip().startswith("from ")]
-        suspicious = [l for l in import_lines if not l.startswith("from __future__") and not l.startswith("from src.domain")]
+        import_lines = [
+            line for line in source.split("\n") if line.strip().startswith("import ") or line.strip().startswith("from ")
+        ]
+        suspicious = [
+            line for line in import_lines if not line.startswith("from __future__") and not line.startswith("from src.domain")
+        ]
         # 允许 from typing import 和 from __future__ import
-        suspicious = [l for l in suspicious if "import typing" not in l and "from typing" not in l]
+        suspicious = [line for line in suspicious if "import typing" not in line and "from typing" not in line]
         assert not suspicious, f"OCRPort 包含潜在外部依赖: {suspicious}"
 
     def test_ocr_result_no_external_deps(self) -> None:

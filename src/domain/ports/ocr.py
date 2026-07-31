@@ -16,6 +16,10 @@ from src.domain.value_objects.ocr_result import OCRPageResult
 # 与 AC-4 一致，使用 0.85 作为阈值
 OCR_CONFIDENCE_THRESHOLD: float = 0.85
 
+# OCR 最大文件大小：与 MAX_IMAGE_BYTES（50MB）对齐
+# 超过此大小的文件跳过 OCR 步骤（基础解析不受影响）
+OCR_MAX_BYTES: int = 50 * 1024 * 1024  # 50MB
+
 
 @runtime_checkable
 class OCRPort(Protocol):

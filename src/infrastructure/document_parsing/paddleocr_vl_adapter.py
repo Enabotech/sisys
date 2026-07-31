@@ -15,14 +15,13 @@ import asyncio
 import base64
 import logging
 import os
-import random
+import secrets
 import tempfile
 from typing import Any
 
 import httpx
 
 from src.domain.exceptions.ocr_exceptions import OCRConnectionError, OCRProcessingError
-from src.domain.ports.ocr import OCRPort
 from src.domain.value_objects.ocr_result import OCRPageResult
 from src.domain.value_objects.parsed_document import ParsedElement
 
@@ -33,8 +32,6 @@ DEFAULT_BASE_URL = "http://localhost:8080"
 DEFAULT_TIMEOUT = 300.0
 MAX_RETRIES = 2
 MAX_CONCURRENCY = 5
-# OCR 大文件限制：与 MAX_IMAGE_BYTES 对齐
-OCR_MAX_BYTES = 50 * 1024 * 1024  # 50MB
 
 
 class PaddleOCRVLAdapter:
@@ -190,6 +187,7 @@ class PaddleOCRVLAdapter:
                 logger.warning("第 %d 页 OCR 失败: %s", pn, res)
                 continue
             if res is not None:
+                assert isinstance(res, OCRPageResult)
                 results.append(res)
 
         if not results:
@@ -309,7 +307,7 @@ class PaddleOCRVLAdapter:
             attempt: 当前重试次数（0-indexed）
         """
         base = 1.0
-        delay = base * (2**attempt) + random.uniform(0, 1)
+        delay = base * (2**attempt) + secrets.randbelow(1000) / 1000.0
         logger.info("OCR 重试等待 %.2f 秒 (attempt %d)", delay, attempt + 1)
         await asyncio.sleep(delay)
 
@@ -475,5 +473,4 @@ __all__ = [
     "DEFAULT_BASE_URL",
     "DEFAULT_TIMEOUT",
     "MAX_CONCURRENCY",
-    "OCR_MAX_BYTES",
 ]
