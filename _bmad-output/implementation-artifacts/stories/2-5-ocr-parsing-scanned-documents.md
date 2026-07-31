@@ -104,7 +104,7 @@
 - [ ] `cd deploy/app && docker compose up -d` 一键启动所有服务（含 PaddleOCR-VL 两服务）——**注意：非 GPU 环境下 `embedding-api` 已有 GPU reservation 同样会失败，此限制非本 Story 引入**
 - [ ] `docker compose ps` 显示 `sisys-paddleocr-vl-api` + `sisys-paddleocr-vl-vllm` 均为 `healthy`（GPU 环境）
 - [ ] `curl -X POST http://localhost:8080/layout-parsing` 返回 200
-- [ ] CUDA 12.9+ 驱动兼容，GPU 显存分配正常（推荐 `gpu-memory-utilization: 0.4`）
+- [ ] CUDA 12.9+ 驱动兼容，GPU 显存分配正常（推荐 `gpu-memory-utilization: 0.15`）
 - [ ] SISYS 应用可通过 `http://paddleocr-vl-api:8080` 容器名调用
 - [ ] 模型/镜像不在 git 中（`.gitignore` 忽略大文件）
 - [ ] `docs/deploy/paddleocr-vl-setup.md` 存在且含首次镜像拉取耗时说明（~30-60 分钟）
@@ -430,7 +430,7 @@ Feature: OCR 解析扫描件文档
   - `recognize(file_path: str, page_numbers: list[int] | None = None) -> list[OCRPageResult]`
 - [ ] Subtask 0.3: 定义扫描页检测逻辑（`src/domain/services/scanned_page_detector.py`）：
   - 纯函数：`detect_scanned_pages(pages: list[ParsedPage]) -> list[int]`（返回需要 OCR 的页码列表）
-  - 检测策略：**逐页独立比较**（非全文档平均），对每个 `page` 计算 `char_count = sum(len(e.content) for e in page.elements)`，若 `char_count < SCANNED_PAGE_TEXT_DENSITY_THRESHOLD`（=50）→ 该页判定为扫描页
+  - 检测策略：**逐页独立比较**（非全文档平均），对每个 `page` 计算 `char_count = sum(len(e.content) for e in page.texts)`，若 `char_count < SCANNED_PAGE_TEXT_DENSITY_THRESHOLD`（=50）→ 该页判定为扫描页
 - [ ] Subtask 0.4: 定义 OCR 子域异常（**新建** `src/domain/exceptions/ocr_exceptions.py`）：
   - `OCRConnectionError(EXCEPTION_320)` — 继承 `ExternalException`（参考 `EmbeddingAPIError` 模式）
   - `OCRProcessingError(EXCEPTION_321)` — 继承 `ExternalException`
@@ -528,7 +528,7 @@ Feature: OCR 解析扫描件文档
   - 边界值：恰好等于阈值 → 不触发 OCR
 - [ ] Subtask 2.2: 🟢 绿 — 实现 `detect_scanned_pages(pages: list[ParsedPage]) -> list[int]`
   - 纯函数，零外部依赖
-  - **逐页比较**（非全文档平均）：对每个 `page` 独立计算 `char_count = sum(len(e.content) for e in page.elements)`
+  - **逐页比较**（非全文档平均）：对每个 `page` 独立计算 `char_count = sum(len(e.content) for e in page.texts)`
   - 若 `char_count < SCANNED_PAGE_TEXT_DENSITY_THRESHOLD` → 该页判定为扫描页，加入返回列表
   - 阈值常量 `SCANNED_PAGE_TEXT_DENSITY_THRESHOLD = 50`（单页 < 50 字符 → 扫描件；该值为经验值，**需在 Task 0 使用真实扫描件样本验证**，若发现带水印/页码的扫描件 char_count 超过 50，可适当调高阈值；可通过环境变量覆盖）
   - **设计理由：** 逐页比较确保混合 PDF（部分文本页+部分扫描页）正确识别，Gherkin 场景"混合 PDF"依赖此行为
@@ -641,7 +641,7 @@ Feature: OCR 解析扫描件文档
   - OCR 返回空结果 → 页面保持原始状态，日志 INFO
 - [ ] Subtask 4.2: 🟢 绿 — 修改 `DocumentParsingService`（`src/application/services/document_parsing_service.py`）：
   - 构造函数新增参数：`ocr: OCRPort | None = None`（注：构造函数已有 8 个参数，本 Story 增至 9 个——后续 Epic 应考虑重构为 Pipeline/Chain of Responsibility 模式，但本 Story 保持与 `layout_detector`/`table_extractor` 一致的注入风格）
-  - 新增 `_apply_ocr(self, parsed_doc: ParsedDocument, file_path: str, mime_type: str) -> ParsedDocument` 方法（签名与 `_apply_layout_detection`/`_apply_table_extraction` 对齐，均为 `async def`）：
+  - 新增 `_apply_ocr(self, parsed_doc: ParsedDocument, file_path: str, mime_type: str) -> tuple[ParsedDocument, dict]` 方法（签名与 `_apply_layout_detection`/`_apply_table_extraction` 对齐，均为 `async def`；返回 `(ParsedDocument, ocr_metadata_dict)` 以支持 OCR 元数据持久化）：
     0. **守卫：** `if self._ocr is None: return parsed_doc`（OCR 端口未注入时静默跳过）
     1. 调用 `detect_scanned_pages()` 识别需要 OCR 的页码
     2. 如果无扫描页，直接返回 `parsed_doc`
@@ -1052,7 +1052,7 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 | 镜像 | `harbor.sisys.local/sisys/tools/paddlepaddle/paddleocr-vl:latest-nvidia-gpu-sm120-offline` (~10GB) |
 | VLM 镜像 | `harbor.sisys.local/sisys/tools/paddlepaddle/paddleocr-genai-vllm-server:latest-nvidia-gpu-sm120-offline` (~13GB) |
 | GPU 内存 | 建议 ≥ 8GB（0.9B 模型约需 4-6GB，vLLM KV cache + CUDA kernel 开销需额外 2-4GB） |
-| `gpu-memory-utilization` | 推荐 **0.4**（0.9B 模型 + vLLM 约需 10-13GB，0.4 × 32GB = 12.8GB，留足余量；`paddleocrvl.yaml` 的 `command` 中通过 `--gpu-memory-utilization 0.4` 传递；若后续升级到更大模型需相应调高） |
+| `gpu-memory-utilization` | 推荐 **0.15**（0.9B 模型 + vLLM 约需 4-6GB，0.15 × 32GB = 4.8GB，配合 `--enforce-eager` 禁用 CUDA graph 节省额外 2-3GB；`paddleocrvl.yaml` 的 `command` 中通过 `--gpu-memory-utilization 0.15` 传递；若后续升级到更大模型需相应调高） |
 
 ### 重要约束
 
