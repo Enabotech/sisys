@@ -115,14 +115,17 @@
 
 - [ ] 新建事件 `DocumentVersionSnapshotCreated`（`src/domain/events/document_events.py`）
   - `event_type = "DocumentVersionSnapshotCreated"`
-  - `document_id: uuid.UUID`
+  - `document_id: uuid.UUID` = field(default_factory=uuid.uuid4)
   - `new_version: int` — 新版本号
-  - `snapshot_id: uuid.UUID` — 快照唯一标识
+  - `snapshot_id: uuid.UUID` = field(default_factory=uuid.uuid4)
   - `created_by: str` — 操作者
   - `diff_summary: str` — 差异摘要
   - `tenant_id: str` — 租户标识
   - `__post_init__` 设置 `aggregate_id=document_id`, `aggregate_type="Document"`
-- [ ] 事件注册到 `DomainEvent._registry`
+  - 注意：`snapshot_id` 字段使用 `default_factory=uuid.uuid4`（非必填，与 `document_id` 模式一致），事件构造时默认生成新 UUID
+- [ ] 事件自动注册到 `DomainEvent._registry`（通过 `__init_subclass__` 自动注册）
+- [ ] 导出到 `src/domain/events/__init__.py`：在 `document_events` 导入中添加 `DocumentVersionSnapshotCreated`，在 `__all__` 中添加同名导出
+- [ ] 事件测试文件命名：`tests/unit/domain/events/test_document_uploaded.py` 中新增 `TestDocumentVersionSnapshotCreatedCreation/Registration/PostInit/Serialization` 测试类（与现有文档事件测试共享同一文件，遵循现有模式；也可新建 `tests/unit/domain/events/test_document_version_snapshot.py` 独立文件，两种方式均可）
 - [ ] 事件通道配置：`configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS`（RELIABLE 模式，RabbitMQ via Outbox）
 - [ ] 通道配置：`redis_channel="sisys:rt:document_version_snapshot_created"`, `rabbitmq_routing_key="sisys.events.reliable.document_version_snapshot_created"`
 
@@ -152,8 +155,9 @@
       changed_fields: list[str] = field(default_factory=list)
       is_initial: bool = False
   ```
+  **注意：** `DocumentVersionDiff` 是 diff 计算过程中的中间值对象，不持久化。其 `diff_summary` 字段在创建快照时存入 `DocumentVersionSnapshot.diff_summary`，`changed_fields` 作为 `dict[str, Any]` 存入 `DocumentVersionSnapshot.diff_json`（通过 `{"changed_fields": changed_fields, "is_initial": is_initial}` 结构）。
 - [ ] 扩展 `DocumentVersion`（`src/domain/entities/document.py`）—— 新增 `diff_summary` 字段（可选，用于内存中的历史记录）
-- [ ] 扩展 `Document` 实体方法 —— `create_version_snapshot()` 方法
+- [ ] 注意：`DocumentVersion` 使用 `@dataclass`（非 frozen），与持久化值对象 `DocumentVersionSnapshot` 用途不同——前者是内存中的历史记录，后者是持久化快照。`Document.bump_version()` 已提供版本递增能力（`src/domain/entities/document.py:155-174`），快照创建逻辑由应用层 `DocumentVersionService` 编排，不扩展 `Document` 实体方法
 
 #### 统一端口定义注册与管理
 
@@ -161,6 +165,7 @@
   - `save_version_snapshot(document_id, version, snapshot_data) -> DocumentVersionSnapshot`
   - `list_versions(document_id, tenant_id) -> list[DocumentVersionSnapshot]`
   - `get_version(document_id, version, tenant_id) -> DocumentVersionSnapshot | None`
+  - `save_with_version_check(document, expected_version) -> Document` — 带乐观锁版本检查的保存方法，当 `document.version == expected_version` 时执行保存并递增版本号，否则抛出 `DocumentVersionConflictError`
 - [ ] 端口注册到 `_global_registry` 作为 `document_repository` 端口版本升级（v1.0.0 → v1.1.0）
 - [ ] 端口契约测试通过（`tests/contracts/test_port_contract_document_version.py`）
 - [ ] 新增 `DocumentVersionService` 在 composition_root 注册为 `document_version_service`
@@ -173,9 +178,9 @@
   - 构造器参数：`document_id: UUID`, `expected_version: int`, `actual_version: int`
   - 消息格式：`"文档版本冲突: document_id={doc_id}, expected={expected}, actual={actual}"`
   - 编码范围：子域 "storage" 的 (211, 219) 范围，当前已使用 211-215，216 可用
-- [ ] 异常注册到 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN`
-- [ ] 异常导出到 `src/domain/exceptions/__init__.py` 的 `__all__`
-- [ ] HTTP 映射：`EXCEPTION_HTTP_MAP` 中 `DocumentVersionConflictError` → `409 CONFLICT`
+- [ ] 异常注册到 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN`（添加 `"DocumentVersionConflictError": "storage"`）
+- [ ] 异常导出到 `src/domain/exceptions/__init__.py` 的 `__all__`（添加 `"DocumentVersionConflictError"`）
+- [ ] HTTP 映射：`EXCEPTION_HTTP_MAP` 中 `DocumentVersionConflictError` → `409 CONFLICT`（添加到 `src/interfaces/api/exception_handlers.py`）
 - [ ] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性/子域范围
 
 #### API 契约
@@ -257,7 +262,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/events/test_document_events.py` 中新增的 `DocumentVersionSnapshotCreated` 测试（构造/字段/自动注册/序列化/反序列化） |
+| 🔴 红 | 编写 `tests/unit/domain/events/test_document_version_snapshot.py`（测试 `DocumentVersionSnapshotCreated` 构造/字段/自动注册/序列化/反序列化） |
 | 🟢 绿 | 在 `src/domain/events/document_events.py` 中新增 `DocumentVersionSnapshotCreated` 事件类 |
 | 🔄 重构 | 运行 `ruff` + `mypy`，更新 `__init__.py` 导出 |
 
@@ -292,10 +297,11 @@
 
 #### 端口契约定义
 
-- [ ] 扩展 `DocumentRepositoryPort`（`src/domain/ports/document_repository.py`）新增 3 个方法：
+- [ ] 扩展 `DocumentRepositoryPort`（`src/domain/ports/document_repository.py`）新增 4 个方法：
   - `save_version_snapshot(document_id, version, snapshot_data) -> DocumentVersionSnapshot`
   - `list_versions(document_id, tenant_id) -> list[DocumentVersionSnapshot]`
   - `get_version(document_id, version, tenant_id) -> DocumentVersionSnapshot | None`
+  - `save_with_version_check(document, expected_version) -> Document` — 带乐观锁版本检查的保存方法
 
 #### 端口契约测试
 
@@ -304,7 +310,7 @@
   - 验证接口类型为 `DocumentRepositoryPort`
   - 验证版本为 `v1.1.0`（升级后）
   - 验证生命周期为 `SCOPED`
-  - 验证 `save_version_snapshot`、`list_versions`、`get_version` 方法存在
+  - 验证 `save_version_snapshot`、`list_versions`、`get_version`、`save_with_version_check` 方法存在
   - 验证 `DocumentVersionSnapshotCreated` 事件自动注册到 `DomainEvent._registry`
   - 验证通道配置在 `ChannelRouter.DEFAULT_MAPPINGS`
   - 验证通道模式为 `RELIABLE`
@@ -420,8 +426,16 @@ CREATE INDEX idx_doc_ver_snapshots_doc_id ON document_version_snapshots(document
 | 🟢 绿 | 实现 `src/application/services/document_version_service.py` |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-`DocumentVersionService` 设计：
+`DocumentVersionService` 依赖注入模式（对齐 Story 2-5 TYPE_CHECKING 模式）：
 ```python
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.domain.ports.document_repository import DocumentRepositoryPort
+    from src.domain.ports.event_publisher import EventPublisher
+
+
 class DocumentVersionService:
     def __init__(
         self,
@@ -439,12 +453,12 @@ class DocumentVersionService:
     ) -> DocumentVersionSnapshot:
         """创建文档版本快照
 
-        1. 查询文档实体（乐观锁检查）
+        1. 查询文档实体（获取当前版本号）
         2. 获取前一个版本的 metadata（用于 diff 计算）
-        3. 调用 bump_version() 递增版本号
-        4. 计算差异摘要（domain service）
+        3. 调用领域服务 compute_diff() 计算差异摘要
+        4. 调用 bump_version() 递增文档版本号
         5. 持久化 DocumentVersionSnapshot
-        6. 保存更新后的 Document
+        6. 通过 save_with_version_check() 保存文档（乐观锁验证）
         7. 发布 DocumentVersionSnapshotCreated 事件
         """
         ...
@@ -475,9 +489,49 @@ class DocumentVersionService:
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_document_version_auto_trigger.py`（测试上传/解析后自动触发版本快照创建） |
-| 🟢 绿 | 在 `DocumentUploadService.upload()` 和 `DocumentParsingService.parse_document()` 中集成版本快照自动创建 |
+| 🔴 红 | 编写 `tests/unit/application/services/test_document_version_auto_trigger.py`（测试事件处理器 handle 方法） |
+| 🟢 绿 | 新建 `src/application/event_handlers/document_version_handler.py`（`DocumentVersionHandler` 监听 `DocumentUploaded` 和 `DocumentProcessed` 事件） |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
+
+**设计决策：采用事件驱动方案替代服务直接注入**
+
+当前系统已有成熟的事件处理器模式（`src/application/event_handlers/` 下有 6 个处理器），所有下游处理均通过事件驱动。AC-5 应遵循此模式：
+
+- **方案：** 新建 `DocumentVersionHandler` 事件处理器，监听 `DocumentUploaded` 和 `DocumentProcessed` 事件
+- **理由：**
+  - 完全遵循六边形架构关注点分离（上传/解析服务不承担版本管理职责）
+  - 与当前系统模式完全一致（`memory_changed_handler.py`、`auto_trigger_handler.py` 均为此模式）
+  - 错误隔离：处理器失败不影响主流程
+  - 开闭原则：新增处理器即可，不修改现有代码
+- **事件处理器设计：**
+  ```python
+  class DocumentVersionHandler:
+      def __init__(
+          self,
+          document_version_service: DocumentVersionService,
+      ) -> None:
+          self._document_version_service = document_version_service
+
+      async def handle_document_uploaded(self, event: DocumentUploaded) -> None:
+          """文档上传后自动创建首次版本快照（version=1）"""
+          await self._document_version_service.create_snapshot(
+              document_id=event.document_id,
+              tenant_id=event.tenant_id,
+              created_by=event.uploaded_by,
+              change_description="文档上传",
+          )
+
+      async def handle_document_processed(self, event: DocumentProcessed) -> None:
+          """文档解析后自动创建版本快照（version=2）"""
+          await self._document_version_service.create_snapshot(
+              document_id=event.document_id,
+              tenant_id=event.tenant_id,
+              created_by="system",
+              change_description="文档解析完成",
+          )
+  ```
+- **移除方案：** 不在 `DocumentUploadService.upload()` 和 `DocumentParsingService.parse_document()` 中直接集成版本快照创建
+- **注册方式：** 在 `composition_root.py` 中注册 `DocumentVersionHandler` 并绑定到 `EventSubscriber`
 
 - [ ] Subtask 4.4: 🔴 红 — 编写自动触发失败测试
 - [ ] Subtask 4.5: 🟢 绿 — 实现自动触发集成
@@ -504,7 +558,7 @@ class DocumentVersionService:
 
 #### CLI 命令
 
-- [ ] 在 `src/interfaces/cli/commands/document_commands.py` 中新增命令：
+- [ ] 在 `src/interfaces/cli/commands/document_commands.py` 中新增命令（注意：`commands/` 子目录当前不存在，需新建 `src/interfaces/cli/commands/` 目录和 `__init__.py` 文件）：
   - `sisys document version list --id <doc-id>` — 列出版本历史
   - `sisys document version snapshot --id <doc-id>` — 创建版本快照
 
@@ -548,9 +602,9 @@ class DocumentVersionService:
 #### 注册配置
 
 - [ ] 在 `src/composition_root.py` 中注册 `DocumentVersionService` 为 `document_version_service`
+- [ ] 在 `src/composition_root.py` 中注册 `DocumentVersionHandler` 并绑定到 `EventSubscriber`（监听 `DocumentUploaded` 和 `DocumentProcessed` 事件）
 - [ ] 更新 `document_repository` 端口版本为 `v1.1.0`
-- [ ] 在 `src/application/services/document_upload_service.py` 中注入 `DocumentVersionService`（可选注入，向后兼容）
-- [ ] 在 `src/application/services/document_parsing_service.py` 中注入 `DocumentVersionService`（可选注入，向后兼容）
+- [ ] 注意：`DocumentUploadService` 和 `DocumentParsingService` 不注入 `DocumentVersionService`（采用事件驱动方案，通过 `DocumentVersionHandler` 处理器异步触发）
 
 #### 事件通道配置
 
@@ -670,7 +724,7 @@ class DocumentVersionService:
 | 版本快照存储方式 | PostgreSQL 独立表 `document_version_snapshots` | 与 `documents` 表解耦，支持高效版本查询，避免 `version_history` JSONB 膨胀 |
 | 版本冲突策略 | 乐观锁（基于 `document.version` 字段） | 简单可靠，适合 MVP；悲观锁在低冲突场景下不必要 |
 | diff 计算范围 | 元数据 + 文件内容摘要 | 元数据 diff 精确且轻量；文件内容 diff 使用 hash 摘要，全量 diff 延迟敏感 |
-| 自动触发时机 | 上传完成（version=1）+ 解析完成（version=2） | 覆盖文档生命周期关键节点，不阻塞主流程 |
+| 自动触发时机 | 事件驱动（`DocumentVersionHandler` 监听 `DocumentUploaded` / `DocumentProcessed` 事件） | 完全遵循六边形架构关注点分离，与当前系统事件处理器模式一致（`memory_changed_handler.py`、`auto_trigger_handler.py`），错误隔离，不修改现有服务代码 |
 | 领域事件通道 | RELIABLE（RabbitMQ + Outbox） | 版本快照事件属于业务状态型，需要可靠投递 |
 | 端口扩展方式 | 扩展 `DocumentRepositoryPort`（非独立端口） | 版本快照是文档子域的一部分，避免端口碎片化 |
 
@@ -690,13 +744,15 @@ src/
 │   │   ├── _code_ranges.py              # MODIFY — 注册新异常
 │   │   └── __init__.py                  # MODIFY — 导出新异常
 │   └── ports/
-│       └── document_repository.py       # MODIFY — 新增 3 个方法
+│       └── document_repository.py       # MODIFY — 新增 4 个方法
 │
 ├── application/
+│   ├── event_handlers/
+│   │   └── document_version_handler.py  # NEW — 事件驱动自动触发版本快照
 │   └── services/
 │       ├── document_version_service.py  # NEW — 版本快照应用服务
-│       ├── document_upload_service.py   # MODIFY — 集成自动触发
-│       └── document_parsing_service.py  # MODIFY — 集成自动触发
+│       ├── document_upload_service.py   # UNCHANGED — 事件驱动，不注入版本服务
+│       └── document_parsing_service.py  # UNCHANGED — 事件驱动，不注入版本服务
 │
 ├── infrastructure/
 │   └── storage/
@@ -704,7 +760,7 @@ src/
 │           ├── models/
 │           │   └── document_version.py  # NEW — DocumentVersionSnapshotModel
 │           └── repository/
-│               └── document_repository.py  # MODIFY — 新增 3 个方法
+│               └── document_repository.py  # MODIFY — 新增 4 个方法
 │
 ├── interfaces/
 │   ├── api/
@@ -725,7 +781,7 @@ tests/
 │   │   ├── services/
 │   │   │   └── test_document_version_diff.py # NEW
 │   │   ├── events/
-│   │   │   └── test_document_events.py      # MODIFY
+│   │   │   └── test_document_version_snapshot.py # NEW — 独立事件测试文件
 │   │   └── exceptions/
 │   │       └── test_document_version_exceptions.py # NEW
 │   ├── application/
@@ -753,8 +809,8 @@ deploy/postgresql/alembic/versions/
 ### 前一个故事学习经验（Story 2-5 OCR）
 
 **关键学习：**
-1. **可选增强注入模式** — OCR 端口作为 Optional 构造参数注入，默认 None 优雅降级。本 Story 中 `DocumentVersionService` 同样作为可选注入（`DocumentUploadService` 和 `DocumentParsingService` 的构造参数），不阻塞主流程
-2. **三级降级策略** — Port=None 跳过；运行时异常 WARNING 日志 + 返回原始结果；初始化失败 raise。本 Story 中版本快照创建失败不影响文档上传/解析主流程
+1. **可选增强注入模式** — OCR 端口作为 Optional 构造参数注入，默认 None 优雅降级。本 Story 中 `DocumentVersionService` 采用事件驱动方案（通过 `DocumentVersionHandler` 处理器），不直接注入到上传/解析服务
+2. **三级降级策略** — Port=None 跳过；运行时异常 WARNING 日志 + 返回原始结果；初始化失败 raise。本 Story 中版本快照创建失败不影响文档上传/解析主流程（事件处理器内部异常独立）
 3. **值对象后向兼容扩展** — 本 Story 新增的 `DocumentVersionDiff` 值对象，通过 `is_initial` 字段区分首次版本
 4. **契约门禁版本升级** — `DocumentRepositoryPort` 版本从 `v1.0.0` 升级至 `v1.1.0`，三处同步（PortSpec/Composition Root/契约测试断言）
 5. **DI 注册延迟加载陷阱** — impl 字符串拼写错误不会立即报错，需要契约测试覆盖
@@ -815,15 +871,17 @@ deploy/postgresql/alembic/versions/
 - `src/domain/events/document_events.py` — 新增事件（MODIFY）
 - `src/domain/ports/document_repository.py` — 扩展端口（MODIFY）
 - `src/application/services/document_version_service.py` — 应用服务
-- `src/application/services/document_upload_service.py` — 集成自动触发（MODIFY）
-- `src/application/services/document_parsing_service.py` — 集成自动触发（MODIFY）
+- `src/application/event_handlers/document_version_handler.py` — 事件驱动自动触发版本快照（NEW）
+- `src/application/event_handlers/__init__.py` — 导出新处理器（MODIFY）
 - `src/infrastructure/storage/postgresql/models/document_version.py` — ORM 模型
 - `src/infrastructure/storage/postgresql/repository/document_repository.py` — 仓储实现（MODIFY）
 - `src/composition_root.py` — 注册服务（MODIFY）
 - `configs/event_channels.yaml` — 事件通道（MODIFY）
+- `src/interfaces/api/exception_handlers.py` — HTTP 映射（MODIFY）
 - `deploy/postgresql/alembic/versions/006_document_version_snapshots.py` — 迁移
 - `tests/unit/domain/value_objects/test_document_version.py`
 - `tests/unit/domain/services/test_document_version_diff.py`
+- `tests/unit/domain/events/test_document_version_snapshot.py` — 事件测试（NEW）
 - `tests/unit/domain/exceptions/test_document_version_exceptions.py`
 - `tests/unit/application/services/test_document_version_service.py`
 - `tests/unit/application/services/test_document_version_auto_trigger.py`
@@ -870,8 +928,9 @@ deploy/postgresql/alembic/versions/
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-07-31
 **最后更新/Last Updated:** 2026-07-31
 **更新说明/Description:**
+- v1.1.0: 5轮审查修订 — R1架构科学性修复(移除create_version_snapshot、新增save_with_version_check、对齐TYPE_CHECKING模式、明确DocumentVersionDiff职责)、R2合理性修复(事件驱动方案替代服务直接注入)、R3一致性修复(异常导出/事件测试文件/CLI目录说明)、R4回归验证、R5终审验收
 - v1.0.0: 创建故事文件
