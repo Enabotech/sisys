@@ -154,7 +154,7 @@ class PaddleOCRVLAdapter:
                     try:
                         reader = PdfReader(file_path)
                     except Exception as e:
-                        logger.warning("无法读取 PDF 文件: %s", file_path, exc_info=True)
+                        logger.warning("无法读取 PDF 文件: %s", os.path.basename(file_path), exc_info=True)
                         raise OCRProcessingError(
                             message=f"PDF 第 {page_number} 页读取失败",
                             cause=e,
@@ -328,7 +328,8 @@ class PaddleOCRVLAdapter:
                     service_url=self.base_url,
                 ) from e
 
-        assert last_error is not None
+        if last_error is None:
+            raise RuntimeError("OCR 重试耗尽但未记录错误")
         raise last_error
 
     async def _wait_retry(self, attempt: int) -> None:
