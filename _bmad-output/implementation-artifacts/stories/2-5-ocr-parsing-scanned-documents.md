@@ -1,6 +1,6 @@
 # Story 2-5: OCR 解析（扫描件/图像 PDF）
 
-**Status:** `in-progress`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1287,19 +1287,30 @@ async with httpx.AsyncClient(timeout=300.0) as client:
 
 ### 🔍 代码审查发现 Review Findings
 
-**审查日期:** 2026-07-30（第 6 轮多 Agent 并行审查：D1 代码调研 + D2 四视角审查（科学性/可行性 / 代码一致性 / 合理性/最佳实践 / 交叉验证）+ D3 系统修正 19 项问题）
-
-#### 需决策 Decision Needed
-
-- [ ] —
+**审查日期:** 2026-07-31（第 7 轮多 Agent 并行审查：Blind Hunter + Edge Case Hunter + Acceptance Auditor 三视角，覆盖 24 个实际代码文件，发现 25 项问题，去重后 10 项 Patch 修复 + 3 项 Defer + 6 项 Dismiss）
 
 #### 已修复 Patch
 
-- [ ] —
+- [x] [Review][Patch] P1: ocr_metadata 未持久化 [document_parsing_service.py:607-616] — _apply_ocr() 返回 tuple(ParsedDocument, dict)，parse_document() 将 OCR 元数据合并到 result_dict["ocr_metadata"]
+- [x] [Review][Patch] P2: partial_ocr_failure 标记缺失 [document_parsing_service.py:613-614] — 部分页失败时设置 ocr_metadata["partial_ocr_failure"] = True
+- [x] [Review][Patch] P3: 验收测试断言恒真 [test_acceptance_ocr.py:1068-1077] — `x < 1.0 or x == 1.0` → `x < 1.0`
+- [x] [Review][Patch] P4: assert isinstance 残留 [paddleocr_vl_adapter.py:190] — 改为 `if not isinstance(...): continue`
+- [x] [Review][Patch] P5: 0 字节文件穿透 OCR 守卫 [document_parsing_service.py:542-545] — 增加空文件检查
+- [x] [Review][Patch] P6: 事件循环泄漏 [test_acceptance_ocr.py:1085-1092] — 文档注释说明销毁责任
+- [x] [Review][Patch] P7: 验收测试空断言 [test_acceptance_ocr.py:945-952,1014-1021] — 增加实际断言验证
+- [x] [Review][Patch] P8: vLLM 端口不一致 [docker-compose.yml vs paddleocrvl.yaml] — docker-compose 8080 → 8118
+- [x] [Review][Patch] P9: paddleocrvl.yaml networks external:true 矛盾 [paddleocrvl.yaml:203-205] — external: true → driver: bridge
+- [x] [Review][Patch] P10: start_period 300s → 120s 启动链优化 [docker-compose.yml] — 减少等待时间
 
 #### 已推迟 Defer
 
-- [ ] —
+- [x] [Review][Defer] CUDA_VISIBLE_DEVICES="" 保留 GPU 映射 [docker-compose.yml] — 镜像构建问题，非本 Story 范围
+- [x] [Review][Defer] PaddleOCRConfig 默认值覆盖差异 [environments.py] — 设计决策，不同环境需要不同默认值
+- [x] [Review][Defer] 硬编码 100MB 常量 [document_parsing_service.py] — 可改进但非 bug，后续迭代处理
+
+#### 已驳回 Dismiss
+
+- 6 项误报（secrets 替代 random 功能等价、异常构造器签名正确、>100MB 文件守卫审核错误等）
 
 ---
 
