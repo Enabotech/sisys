@@ -132,6 +132,13 @@ class PaddleOCRVLAdapter:
         """
         from pypdf import PdfReader, PdfWriter
 
+        # 去重并校验页码
+        page_numbers = sorted(set(page_numbers))
+        if not page_numbers:
+            return []
+        if any(pn < 1 for pn in page_numbers):
+            raise ValueError(f"页码必须为正整数: {page_numbers}")
+
         results: list[OCRPageResult] = []
         semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
 
@@ -141,8 +148,16 @@ class PaddleOCRVLAdapter:
                 tmp_path = ""
                 try:
                     # 写入单页临时 PDF
-                    reader = PdfReader(file_path)
-                    if page_number - 1 >= len(reader.pages):
+                    try:
+                        reader = PdfReader(file_path)
+                    except Exception as e:
+                        logger.warning("无法读取 PDF 文件: %s", file_path, exc_info=True)
+                        raise OCRProcessingError(
+                            message=f"PDF 第 {page_number} 页读取失败",
+                            cause=e,
+                            service_url=self.base_url,
+                        ) from e
+                    if page_number - 1 < 0 or page_number - 1 >= len(reader.pages):
                         logger.warning("PDF 页码超出范围: page=%d, total=%d", page_number, len(reader.pages))
                         return None
                     writer = PdfWriter()
@@ -182,7 +197,12 @@ class PaddleOCRVLAdapter:
         tasks = [_process_page(pn) for pn in page_numbers]
         page_results = await asyncio.gather(*tasks, return_exceptions=True)
 
+        connection_failures = 0
         for pn, res in zip(page_numbers, page_results):
+            if isinstance(res, OCRConnectionError):
+                connection_failures += 1
+                logger.warning("第 %d 页 OCR 连接失败: %s", pn, res)
+                continue
             if isinstance(res, Exception):
                 logger.warning("第 %d 页 OCR 失败: %s", pn, res)
                 continue
@@ -193,6 +213,11 @@ class PaddleOCRVLAdapter:
                 results.append(res)
 
         if not results:
+            if connection_failures == len(page_numbers):
+                raise OCRConnectionError(
+                    message="OCR 服务不可达：所有页面连接失败",
+                    service_url=self.base_url,
+                )
             raise OCRProcessingError(
                 message="OCR 处理失败：所有页面均未返回结果",
                 service_url=self.base_url,
@@ -391,6 +416,7 @@ class PaddleOCRVLAdapter:
             confidence = float(confidence)
             confidence = max(0.0, min(1.0, confidence))
         except (ValueError, TypeError):
+            logger.warning("OCR 返回非数值置信度: %s，回退至 0.5", confidence)
             confidence = 0.5
 
         confidence = round(confidence, 4)
@@ -468,6 +494,14 @@ class PaddleOCRVLAdapter:
     async def close(self) -> None:
         """关闭 HTTP 客户端"""
         await self._client.aclose()
+
+    async def __aenter__(self) -> PaddleOCRVLAdapter:
+        """异步上下文管理器入口"""
+        return self
+
+    async def __aexit__(self, *args) -> None:
+        """异步上下文管理器退出"""
+        await self.close()
 
 
 __all__ = [

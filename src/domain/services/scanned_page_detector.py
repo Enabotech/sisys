@@ -20,25 +20,43 @@ from src.domain.value_objects.parsed_document import ParsedPage
 SCANNED_PAGE_TEXT_DENSITY_THRESHOLD: int = 50
 
 
-def detect_scanned_pages(pages: list[ParsedPage]) -> list[int]:
+def detect_scanned_pages(
+    pages: list[ParsedPage],
+    threshold: int | None = None,
+) -> list[int]:
     """检测需要 OCR 的扫描页页码列表
 
     逐页独立计算文本密度（字符数），低于阈值则判定为扫描页。
     空页面（0 字符）判定为扫描页触发 OCR。
     恰好等于阈值的页面不触发 OCR（非扫描页）。
 
+    纯函数实现，零外部依赖。阈值可通过参数传入，未指定时使用默认值。
+    支持通过 SISYS_SCANNED_PAGE_THRESHOLD 环境变量覆盖默认值。
+
     Args:
         pages: 文档解析后的页面列表
+        threshold: 文本密度阈值，None 则使用默认值或环境变量覆盖
 
     Returns:
         需要 OCR 的页码列表（1-indexed，与 ParsedPage.page_number 一致）
+
+    Raises:
+        ValueError: 环境变量 SISYS_SCANNED_PAGE_THRESHOLD 非数字
     """
     if not pages:
         return []
 
-    from os import environ
+    if threshold is None:
+        from os import environ
 
-    threshold = int(environ.get("SISYS_SCANNED_PAGE_THRESHOLD", str(SCANNED_PAGE_TEXT_DENSITY_THRESHOLD)))
+        env_val = environ.get("SISYS_SCANNED_PAGE_THRESHOLD")
+        if env_val is not None:
+            try:
+                threshold = int(env_val)
+            except ValueError:
+                raise ValueError(f"SISYS_SCANNED_PAGE_THRESHOLD 环境变量必须为整数，实际值: {env_val}")
+        else:
+            threshold = SCANNED_PAGE_TEXT_DENSITY_THRESHOLD
 
     scanned_pages: list[int] = []
     for page in pages:

@@ -17,6 +17,7 @@ from src.domain.entities.document import Document, ParseStatus
 from src.domain.events.document_events import DocumentProcessed
 from src.domain.exceptions.ocr_exceptions import OCRConnectionError, OCRProcessingError
 from src.domain.ports.document_repository import DocumentQuery
+from src.domain.ports.ocr import OCR_CONFIDENCE_THRESHOLD, OCR_MAX_BYTES
 from src.domain.services.scanned_page_detector import detect_scanned_pages
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage, ParsedTable
 
@@ -536,7 +537,7 @@ class DocumentParsingService:
 
         # 文件大小守卫：仅对 ≤ 50MB 的文件执行 OCR
         # 使用领域层常量，避免直接依赖基础设施层
-        from src.domain.ports.ocr import OCR_MAX_BYTES
+        max_pdf_bytes = 100 * 1024 * 1024  # 100MB — PDF 解析器上限（与 _limits.py MAX_PDF_BYTES 对齐）
 
         try:
             file_size = os.path.getsize(file_path)
@@ -550,8 +551,6 @@ class DocumentParsingService:
             return parsed_doc, {}
 
         # 50-100MB：跳过 OCR，记录 WARNING
-        # MAX_PDF_BYTES 为 100MB，在此用于检测 50-100MB 的 PDF 文件
-        max_pdf_bytes = 100 * 1024 * 1024  # 100MB
 
         if file_size > OCR_MAX_BYTES:
             if file_size <= max_pdf_bytes and mime_type == "application/pdf":
@@ -644,11 +643,15 @@ class DocumentParsingService:
 
         except Exception:
             logger.warning(
-                "OCR 解析意外异常，降级保留原始文档（文档 MIME=%s）",
+                "OCR 解析意外异常，标记为 FAILED（文档 MIME=%s）",
                 mime_type,
                 exc_info=True,
             )
-            return parsed_doc, {}
+            return replace(
+                parsed_doc,
+                parse_status="failed",
+                error_message="OCR 解析意外异常，请检查文件或系统日志",
+            ), {}
 
     @staticmethod
     def _mark_low_confidence(elements: list[ParsedElement]) -> list[ParsedElement]:
@@ -663,8 +666,6 @@ class DocumentParsingService:
         Returns:
             标记后的元素列表
         """
-        from src.domain.ports.ocr import OCR_CONFIDENCE_THRESHOLD
-
         result: list[ParsedElement] = []
         for elem in elements:
             if elem.confidence < OCR_CONFIDENCE_THRESHOLD:
