@@ -146,8 +146,10 @@ striprtf = "^0.0.32"
 
 [project.scripts]
 crawler = "plugins.crawler.cli:app"
+sisys-ocr = "src.interfaces.cli.ocr_cli:main"
 
 [tool.poetry.scripts]
+sisys-ocr = "src.interfaces.cli.ocr_cli:main"
 
 [[tool.poetry.source]]
 name = "tsinghua"
