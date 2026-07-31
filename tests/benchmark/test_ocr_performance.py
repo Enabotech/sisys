@@ -270,7 +270,15 @@ class TestOCRRetryBehavior:
 
         使用 MockTransport 模拟超时，验证重试机制正常工作。
         """
+        import tempfile
+
         from src.domain.exceptions.ocr_exceptions import OCRConnectionError
+
+        # 创建临时文件作为测试输入
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        tmp.write(b"%PDF-1.4 fake pdf content for testing")
+        tmp.close()
+        fake_pdf = tmp.name
 
         # 创建 Mock 传输，模拟连接超时
         async def mock_timeout_handler(request: httpx.Request) -> httpx.Response:
@@ -289,7 +297,7 @@ class TestOCRRetryBehavior:
         try:
             t0 = time.monotonic()
             with pytest.raises(OCRConnectionError):
-                await adapter.recognize("/tmp/nonexistent.pdf", page_numbers=[1])
+                await adapter.recognize(fake_pdf, page_numbers=[1])
             elapsed = time.monotonic() - t0
 
             # 验证重试耗时（2 次重试：1s + 2s + jitter ≈ 3-5 秒）
@@ -297,6 +305,8 @@ class TestOCRRetryBehavior:
             assert elapsed >= 1.0, f"重试应至少耗时 1 秒，实际: {elapsed:.2f}秒"
         finally:
             await adapter.close()
+            if os.path.exists(fake_pdf):
+                os.unlink(fake_pdf)
 
 
 # ===================================================================
