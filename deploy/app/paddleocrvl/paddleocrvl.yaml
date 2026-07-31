@@ -44,16 +44,17 @@ services:
     restart: unless-stopped
     command: [
       "python3", "-m", "vllm.entrypoints.openai.api_server",
-      "--port", "8118",
+      "--port", "8080",
       "--model", "/home/paddleocr/.paddlex/official_models/PaddleOCR-VL-1.6",
+      "--served-model-name", "PaddleOCR-VL-1.6-0.9B",
       "--gpu-memory-utilization", "0.15",
-      "--max-model-len", "2048",
+      "--max-model-len", "8192",
       "--max-num-seqs", "64",
       "--enforce-eager",
       "--trust-remote-code"
     ]
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8118/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
