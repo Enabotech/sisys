@@ -229,15 +229,12 @@ LARGE_DOCUMENTS: tuple[OCRDocumentSpec, ...] = (
     FEYNMAN_2,
 )
 
-# 准确率测试用（中等大小，包含中英文）
+# 准确率测试用（不超过 500 页 PDFParser 限制，不超过 50MB OCR 限制，未加密）
 ACCURACY_TEST_DOCUMENTS: tuple[OCRDocumentSpec, ...] = (
-    SHAONIANSHI_36,
-    FEYNMAN_1,
+    FEYNMAN_3,  # 20MB, 377页, 纯扫描件
 )
 
-# 性能测试用（覆盖小/中/大）
+# 性能测试用（覆盖小/中/大，均不超过 500 页限制和 50MB OCR 限制且未加密）
 PERF_TEST_DOCUMENTS: tuple[OCRDocumentSpec, ...] = (
-    SHAONIANSHI_36,  # 44MB, 134页
-    FEYNMAN_1,  # 28MB, 588页
-    SHAONIANSHI_50,  # 128MB, 140页
+    FEYNMAN_3,  # 20MB, 377页, 纯扫描件
 )
