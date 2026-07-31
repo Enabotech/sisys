@@ -628,7 +628,7 @@ class DocumentParsingService:
             logger.warning("OCR 服务不可用，扫描件解析失败: %s", mime_type, exc_info=True)
             return replace(
                 parsed_doc,
-                parse_status="failed",
+                parse_status=ParseStatus.FAILED.value,
                 error_message="OCR 服务不可用，请稍后重试",
             ), {}
 
@@ -637,7 +637,7 @@ class DocumentParsingService:
             logger.warning("OCR 处理异常，扫描件解析失败: %s", mime_type, exc_info=True)
             return replace(
                 parsed_doc,
-                parse_status="failed",
+                parse_status=ParseStatus.FAILED.value,
                 error_message="OCR 处理异常，请检查文件是否可读",
             ), {}
 
@@ -649,7 +649,7 @@ class DocumentParsingService:
             )
             return replace(
                 parsed_doc,
-                parse_status="failed",
+                parse_status=ParseStatus.FAILED.value,
                 error_message="OCR 解析意外异常，请检查文件或系统日志",
             ), {}
 

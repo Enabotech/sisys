@@ -56,4 +56,5 @@ class OCRPort(Protocol):
 __all__ = [
     "OCRPort",
     "OCR_CONFIDENCE_THRESHOLD",
+    "OCR_MAX_BYTES",
 ]
