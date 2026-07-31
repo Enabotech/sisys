@@ -81,7 +81,7 @@ class TestDocumentParsingServiceOCR:
         doc = _create_parsed_doc()
         result = await service._apply_ocr(doc, "/tmp/test.pdf", "application/pdf")
         # 文档不变
-        assert result is doc
+        assert result[0] is doc
 
     @pytest.mark.asyncio
     async def test_ocr_injected_scanned_pages_triggered(self) -> None:
@@ -103,14 +103,19 @@ class TestDocumentParsingServiceOCR:
             result = await service._apply_ocr(doc, temp_path, "application/pdf")
 
             # 第 1 页（文本页）不变
-            assert len(result.pages[0].texts) == 1
-            assert result.pages[0].texts[0].content == "A" * 100
-            assert result.pages[0].texts[0].confidence == 1.0
+            assert len(result[0].pages[0].texts) == 1
+            assert result[0].pages[0].texts[0].content == "A" * 100
+            assert result[0].pages[0].texts[0].confidence == 1.0
 
             # 第 2 页（扫描页）被 OCR 替换
-            assert len(result.pages[1].texts) == 1
-            assert result.pages[1].texts[0].content == "OCR 识别结果"
-            assert result.pages[1].texts[0].confidence == 0.95
+            assert len(result[0].pages[1].texts) == 1
+            assert result[0].pages[1].texts[0].content == "OCR 识别结果"
+            assert result[0].pages[1].texts[0].confidence == 0.95
+
+            # 验证 OCR 元数据已返回
+            assert result[1]["ocr_engine"] == "paddleocr-vl"
+            assert result[1]["ocr_scanned_pages"] == [2]
+            assert result[1]["ocr_processed_pages"] == [2]
 
             ocr_mock.recognize.assert_called_once()
         finally:
@@ -143,7 +148,8 @@ class TestDocumentParsingServiceOCR:
             # OCR 未被调用
             ocr_mock.recognize.assert_not_called()
             # 文档不变
-            assert result.pages[0].texts[0].confidence == 1.0
+            assert result[0] is doc
+            assert result[0].pages[0].texts[0].confidence == 1.0
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -164,11 +170,11 @@ class TestDocumentParsingServiceOCR:
             result = await service._apply_ocr(doc, temp_path, "application/pdf")
 
             # 返回 FAILED 状态
-            assert result.is_failed()
-            assert result.error_message is not None
+            assert result[0].is_failed()
+            assert result[0].error_message is not None
             # 错误信息不泄露内部 URL
-            assert "localhost" not in result.error_message
-            assert "8080" not in result.error_message
+            assert "localhost" not in result[0].error_message
+            assert "8080" not in result[0].error_message
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -190,8 +196,8 @@ class TestDocumentParsingServiceOCR:
             result = await service._apply_ocr(doc, temp_path, "application/pdf")
 
             # 返回 FAILED 状态
-            assert result.is_failed()
-            assert result.error_message is not None
+            assert result[0].is_failed()
+            assert result[0].error_message is not None
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -217,9 +223,9 @@ class TestDocumentParsingServiceOCR:
             result = await service._apply_ocr(doc, temp_path, "application/pdf")
 
             # 低置信度元素
-            assert result.pages[1].texts[0].metadata.get("needs_review") is True
+            assert result[0].pages[1].texts[0].metadata.get("needs_review") is True
             # 高置信度元素
-            assert result.pages[1].texts[1].metadata.get("needs_review") is None
+            assert result[0].pages[1].texts[1].metadata.get("needs_review") is None
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -237,7 +243,7 @@ class TestDocumentParsingServiceOCR:
             result = await service._apply_ocr(doc, temp_path, "application/pdf")
 
             # 文档不变
-            assert result is doc
+            assert result[0] is doc
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -255,7 +261,7 @@ class TestDocumentParsingServiceOCR:
             result = await service._apply_ocr(doc, temp_path, "application/pdf")
 
             # 降级返回原始文档
-            assert result is doc
+            assert result[0] is doc
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)

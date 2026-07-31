@@ -187,7 +187,9 @@ class PaddleOCRVLAdapter:
                 logger.warning("第 %d 页 OCR 失败: %s", pn, res)
                 continue
             if res is not None:
-                assert isinstance(res, OCRPageResult)
+                if not isinstance(res, OCRPageResult):
+                    logger.warning("第 %d 页返回非 OCRPageResult 类型: %s", pn, type(res))
+                    continue
                 results.append(res)
 
         if not results:

@@ -62,4 +62,4 @@ services:
 
 networks:
   sisys-network:
-    external: true
+    driver: bridge

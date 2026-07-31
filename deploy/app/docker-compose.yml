@@ -285,7 +285,7 @@ services:
               capabilities: [gpu]
     command: [
       "python3", "-m", "vllm.entrypoints.openai.api_server",
-      "--port", "8080",
+      "--port", "8118",
       "--model", "/home/paddleocr/.paddlex/official_models/PaddleOCR-VL-1.6",
       "--gpu-memory-utilization", "0.15",
       "--max-model-len", "2048",
@@ -294,11 +294,11 @@ services:
       "--trust-remote-code"
     ]
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8118/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 300s
+      start_period: 120s
     networks:
       sisys-network:
         aliases:
