@@ -99,6 +99,7 @@ class TestOCRExceptionHTTPMapping:
     def test_ocr_connection_error_http_status(self) -> None:
         """验证 OCRConnectionError 映射到 504"""
         from fastapi import status
+
         from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP
 
         assert EXCEPTION_HTTP_MAP.get(OCRConnectionError) == status.HTTP_504_GATEWAY_TIMEOUT
@@ -106,6 +107,7 @@ class TestOCRExceptionHTTPMapping:
     def test_ocr_processing_error_http_status(self) -> None:
         """验证 OCRProcessingError 映射到 502"""
         from fastapi import status
+
         from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP
 
         assert EXCEPTION_HTTP_MAP.get(OCRProcessingError) == status.HTTP_502_BAD_GATEWAY

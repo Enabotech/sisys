@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -150,7 +150,7 @@ class TestDocumentParsingServiceOCR:
 
     @pytest.mark.asyncio
     async def test_ocr_connection_error_fallback(self) -> None:
-        """OCR 调用抛出 OCRConnectionError → WARNING 日志 + 返回原始文档"""
+        """OCR 调用抛出 OCRConnectionError → 返回 FAILED 状态 + 脱敏错误信息"""
         ocr_mock = AsyncMock()
         ocr_mock.recognize.side_effect = OCRConnectionError(
             message="服务不可达",
@@ -163,15 +163,19 @@ class TestDocumentParsingServiceOCR:
             doc = _create_parsed_doc()
             result = await service._apply_ocr(doc, temp_path, "application/pdf")
 
-            # 降级返回原始文档
-            assert result is doc
+            # 返回 FAILED 状态
+            assert result.is_failed()
+            assert result.error_message is not None
+            # 错误信息不泄露内部 URL
+            assert "localhost" not in result.error_message
+            assert "8080" not in result.error_message
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
 
     @pytest.mark.asyncio
     async def test_ocr_processing_error_fallback(self) -> None:
-        """OCR 调用抛出 OCRProcessingError → WARNING 日志 + 返回原始文档"""
+        """OCR 调用抛出 OCRProcessingError → 返回 FAILED 状态 + 脱敏错误信息"""
         ocr_mock = AsyncMock()
         ocr_mock.recognize.side_effect = OCRProcessingError(
             message="处理失败",
@@ -185,8 +189,9 @@ class TestDocumentParsingServiceOCR:
             doc = _create_parsed_doc()
             result = await service._apply_ocr(doc, temp_path, "application/pdf")
 
-            # 降级返回原始文档
-            assert result is doc
+            # 返回 FAILED 状态
+            assert result.is_failed()
+            assert result.error_message is not None
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)

@@ -53,9 +53,7 @@ class TestOCRPortContract:
         from src.domain.ports.ocr import OCRPort
 
         required_methods = {"recognize"}
-        actual_methods = {
-            name for name in dir(OCRPort) if not name.startswith("_") and callable(getattr(OCRPort, name))
-        }
+        actual_methods = {name for name in dir(OCRPort) if not name.startswith("_") and callable(getattr(OCRPort, name))}
         assert required_methods.issubset(actual_methods), f"缺少方法: {required_methods - actual_methods}"
 
     def test_ocr_port_is_runtime_checkable(self) -> None:

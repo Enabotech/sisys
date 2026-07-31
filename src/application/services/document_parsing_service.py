@@ -15,9 +15,9 @@ from typing import TYPE_CHECKING
 
 from src.domain.entities.document import Document, ParseStatus
 from src.domain.events.document_events import DocumentProcessed
+from src.domain.exceptions.ocr_exceptions import OCRConnectionError, OCRProcessingError
 from src.domain.ports.document_repository import DocumentQuery
 from src.domain.services.scanned_page_detector import detect_scanned_pages
-from src.domain.value_objects.ocr_result import OCRConfidenceMark
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage, ParsedTable
 
 if TYPE_CHECKING:
@@ -174,6 +174,13 @@ class DocumentParsingService:
 
             # OCR 解析增强（ocr 端口注入时触发，对扫描件执行 OCR 识别，运行时错误不阻断解析）
             parsed_doc = await self._apply_ocr(parsed_doc, temp_path, document.mime_type)
+
+            # OCR 失败时提前返回（解析状态为 FAILED）
+            if parsed_doc.is_failed():
+                document.parse_status = ParseStatus.FAILED
+                document.metadata["parse_error"] = parsed_doc.error_message or "OCR 解析失败"
+                await self._repository.save(document)
+                return document
 
             # 更新状态和元数据
             document.parse_status = ParseStatus.COMPLETED
@@ -525,7 +532,8 @@ class DocumentParsingService:
             return parsed_doc
 
         # 文件大小守卫：仅对 ≤ 50MB 的文件执行 OCR
-        from src.infrastructure.document_parsing._limits import MAX_PDF_BYTES
+        # 使用领域层常量，避免直接依赖基础设施层
+        from src.domain.ports.ocr import OCR_MAX_BYTES
 
         try:
             file_size = os.path.getsize(file_path)
@@ -534,10 +542,11 @@ class DocumentParsingService:
             return parsed_doc
 
         # 50-100MB：跳过 OCR，记录 WARNING
-        from src.infrastructure.document_parsing.paddleocr_vl_adapter import OCR_MAX_BYTES
+        # MAX_PDF_BYTES 为 100MB，在此用于检测 50-100MB 的 PDF 文件
+        max_pdf_bytes = 100 * 1024 * 1024  # 100MB
 
         if file_size > OCR_MAX_BYTES:
-            if file_size <= MAX_PDF_BYTES and mime_type == "application/pdf":
+            if file_size <= max_pdf_bytes and mime_type == "application/pdf":
                 logger.warning(
                     "PDF 文件大小 %dMB 超过 OCR 限制 %dMB，跳过 OCR 步骤（基础解析不受影响）",
                     file_size // (1024 * 1024),
@@ -606,9 +615,27 @@ class DocumentParsingService:
 
             return parsed_doc
 
+        except OCRConnectionError:
+            # OCR 服务不可达：返回 FAILED 状态，不泄露内部细节
+            logger.warning("OCR 服务不可用，扫描件解析失败: %s", mime_type, exc_info=True)
+            return replace(
+                parsed_doc,
+                parse_status="failed",
+                error_message="OCR 服务不可用，请稍后重试",
+            )
+
+        except OCRProcessingError:
+            # OCR 处理错误：返回 FAILED 状态
+            logger.warning("OCR 处理异常，扫描件解析失败: %s", mime_type, exc_info=True)
+            return replace(
+                parsed_doc,
+                parse_status="failed",
+                error_message="OCR 处理异常，请检查文件是否可读",
+            )
+
         except Exception:
             logger.warning(
-                "OCR 解析失败，降级保留原始文档（文档 MIME=%s）",
+                "OCR 解析意外异常，降级保留原始文档（文档 MIME=%s）",
                 mime_type,
                 exc_info=True,
             )

@@ -49,6 +49,8 @@ from src.domain.exceptions import (
     MinIOConnectionError,
     NetworkError,
     NotFoundError,
+    OCRConnectionError,
+    OCRProcessingError,
     PasswordValidationError,
     PermissionDeniedError,
     RoleAlreadyExistsError,
@@ -188,6 +190,9 @@ class TestExceptionHttpMap:
             ContainerStartError,
             ExecutionError,
             ContainerStopError,
+            # OCR 异常
+            OCRConnectionError,
+            OCRProcessingError,
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

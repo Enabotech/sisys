@@ -28,7 +28,7 @@ from src.domain.ports.memory_repository import (
     L2GroupMemberRepositoryPort,
     L2MetadataRepositoryPort,
 )
-from src.domain.ports.ocr import OCR_CONFIDENCE_THRESHOLD, OCRPort
+from src.domain.ports.ocr import OCR_CONFIDENCE_THRESHOLD, OCR_MAX_BYTES, OCRPort
 from src.domain.ports.outbox import OutboxRepository
 from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
 from src.domain.ports.permission_repository import PermissionRepositoryPort
@@ -68,6 +68,7 @@ __all__ = [
     "LayoutDetector",
     "OCRPort",
     "OCR_CONFIDENCE_THRESHOLD",
+    "OCR_MAX_BYTES",
     "OutboxRepository",
     "PdfPageRendererPort",
     "PermissionRepositoryPort",

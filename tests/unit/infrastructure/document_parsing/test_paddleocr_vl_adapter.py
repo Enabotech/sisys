@@ -6,10 +6,10 @@
 
 from __future__ import annotations
 
-import json
 import os
 import tempfile
-from unittest.mock import AsyncMock, patch
+from collections.abc import Generator
+from typing import Any
 
 import httpx
 import pytest
@@ -46,7 +46,7 @@ _SAMPLE_RESPONSE = {
     }
 }
 
-_EMPTY_RESPONSE = {
+_EMPTY_RESPONSE: dict[str, Any] = {
     "result": {
         "layoutParsingResults": [],
     }
@@ -90,7 +90,7 @@ def _create_temp_file(content: str = "test content", suffix: str = ".pdf") -> st
 
 
 @pytest.fixture
-def temp_pdf() -> str:
+def temp_pdf() -> Generator[str, None, None]:
     """创建临时 PDF 测试文件"""
     path = _create_temp_file(content="fake pdf content", suffix=".pdf")
     yield path
@@ -99,7 +99,7 @@ def temp_pdf() -> str:
 
 
 @pytest.fixture
-def temp_image() -> str:
+def temp_image() -> Generator[str, None, None]:
     """创建临时图像测试文件"""
     path = _create_temp_file(content="fake image content", suffix=".png")
     yield path
@@ -113,6 +113,7 @@ class TestPaddleOCRVLAdapter:
     @pytest.mark.asyncio
     async def test_successful_ocr(self, temp_pdf: str) -> None:
         """测试成功场景：Mock 返回标准响应 → 验证 OCRPageResult 输出"""
+
         async def mock_handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json=_SAMPLE_RESPONSE)
 
@@ -134,6 +135,7 @@ class TestPaddleOCRVLAdapter:
     @pytest.mark.asyncio
     async def test_chinese_recognition(self, temp_pdf: str) -> None:
         """测试中文识别结果正确映射"""
+
         async def mock_handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json=_SAMPLE_RESPONSE)
 
@@ -149,6 +151,7 @@ class TestPaddleOCRVLAdapter:
     @pytest.mark.asyncio
     async def test_english_recognition(self, temp_pdf: str) -> None:
         """测试英文识别结果正确映射"""
+
         async def mock_handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json=_ENGLISH_RESPONSE)
 
@@ -164,6 +167,7 @@ class TestPaddleOCRVLAdapter:
     @pytest.mark.asyncio
     async def test_empty_page(self, temp_pdf: str) -> None:
         """测试空页面（无文字块）→ 返回空 elements 列表"""
+
         async def mock_handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json=_EMPTY_RESPONSE)
 
@@ -180,6 +184,7 @@ class TestPaddleOCRVLAdapter:
     @pytest.mark.asyncio
     async def test_connect_timeout(self, temp_pdf: str) -> None:
         """测试连接超时 → 抛出 OCRConnectionError"""
+
         async def mock_handler(request: httpx.Request) -> httpx.Response:
             raise httpx.ConnectError("Connection refused")
 
@@ -196,6 +201,7 @@ class TestPaddleOCRVLAdapter:
     @pytest.mark.asyncio
     async def test_http_500(self, temp_pdf: str) -> None:
         """测试 HTTP 5xx → 抛出 OCRProcessingError"""
+
         async def mock_handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(500, text="Internal Server Error")
 
@@ -212,6 +218,7 @@ class TestPaddleOCRVLAdapter:
     @pytest.mark.asyncio
     async def test_http_400(self, temp_pdf: str) -> None:
         """测试 HTTP 4xx → 抛出 OCRProcessingError"""
+
         async def mock_handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(400, text="Bad Request")
 
@@ -228,6 +235,7 @@ class TestPaddleOCRVLAdapter:
     @pytest.mark.asyncio
     async def test_json_parse_error(self, temp_pdf: str) -> None:
         """测试响应 JSON 解析失败 → 抛出 OCRProcessingError"""
+
         async def mock_handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, text="not-json")
 
@@ -243,6 +251,7 @@ class TestPaddleOCRVLAdapter:
     @pytest.mark.asyncio
     async def test_image_file_recognition(self, temp_image: str) -> None:
         """测试图像文件识别"""
+
         async def mock_handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json=_SAMPLE_RESPONSE)
 
@@ -366,6 +375,7 @@ class TestPaddleOCRVLAdapter:
     @pytest.mark.asyncio
     async def test_retry_eventually_fails(self, temp_pdf: str) -> None:
         """测试重试耗尽后仍失败"""
+
         async def mock_handler(request: httpx.Request) -> httpx.Response:
             raise httpx.ConnectError("Connection refused")
 
