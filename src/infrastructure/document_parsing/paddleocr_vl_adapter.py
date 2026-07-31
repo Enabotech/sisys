@@ -137,7 +137,10 @@ class PaddleOCRVLAdapter:
         if not page_numbers:
             return []
         if any(pn < 1 for pn in page_numbers):
-            raise ValueError(f"页码必须为正整数: {page_numbers}")
+            raise OCRProcessingError(
+                message=f"页码必须为正整数: {page_numbers}",
+                service_url=self.base_url,
+            )
 
         results: list[OCRPageResult] = []
         semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
@@ -325,7 +328,8 @@ class PaddleOCRVLAdapter:
                     service_url=self.base_url,
                 ) from e
 
-        raise last_error  # type: ignore[misc]
+        assert last_error is not None
+        raise last_error
 
     async def _wait_retry(self, attempt: int) -> None:
         """指数退避等待（含随机抖动 jitter）

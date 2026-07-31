@@ -54,7 +54,12 @@ def detect_scanned_pages(
             try:
                 threshold = int(env_val)
             except ValueError:
-                raise ValueError(f"SISYS_SCANNED_PAGE_THRESHOLD 环境变量必须为整数，实际值: {env_val}")
+                from src.domain.exceptions.ocr_exceptions import OCRProcessingError
+
+                raise OCRProcessingError(
+                    message=f"SISYS_SCANNED_PAGE_THRESHOLD 环境变量必须为整数，实际值: {env_val}",
+                    service_url="",
+                )
         else:
             threshold = SCANNED_PAGE_TEXT_DENSITY_THRESHOLD
 

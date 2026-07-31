@@ -299,6 +299,11 @@ services:
       timeout: 10s
       retries: 5
       start_period: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       sisys-network:
         aliases:
@@ -318,7 +323,7 @@ services:
       - CUDA_VISIBLE_DEVICES=""  # 强制 CPU 模式，不占用 GPU 显存
     command: /bin/bash -c "paddlex --serve --pipeline /home/paddleocr/pipeline_config_vllm.yaml"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -326,15 +331,17 @@ services:
     networks:
       - sisys-network
     shm_size: 2g
-    # PaddlePaddle 需要 CUDA 驱动库才能启动（即使跑 CPU 模式）
-    # 保留 GPU 设备映射但不分配显存
     deploy:
       resources:
+        limits:
+          memory: 4G
         reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 # =============================================================================
 # 存储卷
