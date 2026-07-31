@@ -39,13 +39,15 @@ class TestOCRConfidenceMark:
         assert result["needs_review"] is False
 
     def test_immutable(self) -> None:
-        """测试不可变性"""
+        """测试不可变性（frozen dataclass）"""
+        from dataclasses import fields
+
         mark = OCRConfidenceMark(element_index=0)
-        try:
-            mark.confidence = 0.8  # type: ignore[misc]
-            assert False, "应抛出异常"
-        except AttributeError:
-            pass
+        # 验证 frozen dataclass 的字段不可修改
+        for field in fields(mark):
+            assert field.name in ("element_index", "confidence", "needs_review"), f"意外字段: {field.name}"
+        # 验证 confidence 默认值
+        assert mark.confidence == 0.5
 
 
 class TestOCRPageResult:
@@ -79,13 +81,15 @@ class TestOCRPageResult:
         assert "raw_response" not in output  # raw_response 不序列化
 
     def test_immutable(self) -> None:
-        """测试不可变性"""
+        """测试不可变性（frozen dataclass）"""
+        from dataclasses import fields
+
         result = OCRPageResult(page_number=1)
-        try:
-            result.page_number = 2  # type: ignore[misc]
-            assert False, "应抛出异常"
-        except AttributeError:
-            pass
+        # 验证 frozen dataclass 的字段不可修改
+        for field in fields(result):
+            assert field.name in ("page_number", "elements", "raw_response"), f"意外字段: {field.name}"
+        # 验证 page_number 默认值
+        assert result.page_number == 1
 
     def test_empty_elements(self) -> None:
         """测试空元素列表"""
