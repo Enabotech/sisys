@@ -180,10 +180,6 @@ class PaddleOCRVLAdapter:
                     # 调用 OCR API
                     return await self._call_ocr_api(tmp_path, file_type=0, page_number=page_number)
 
-                except OCRConnectionError:
-                    raise
-                except OCRProcessingError:
-                    raise
                 except Exception as e:
                     raise OCRProcessingError(
                         message=f"PDF 第 {page_number} 页 OCR 处理失败",
@@ -329,7 +325,10 @@ class PaddleOCRVLAdapter:
                 ) from e
 
         if last_error is None:
-            raise RuntimeError("OCR 重试耗尽但未记录错误")
+            raise OCRProcessingError(
+                message="OCR 重试耗尽但未记录错误",
+                service_url=self.base_url,
+            )
         raise last_error
 
     async def _wait_retry(self, attempt: int) -> None:
