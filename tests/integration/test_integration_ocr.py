@@ -232,10 +232,10 @@ class TestOCRServiceIntegration:
             result = await service._apply_ocr(doc, pdf_path, "application/pdf")
 
             # 验证 OCR 已执行：第 1 页内容被替换（即使 PaddleOCR-VL 可能返回空结果）
-            assert result is not doc  # OCR 已执行，返回新文档
+            assert result[0] is not doc  # OCR 已执行，返回新文档
 
             # 验证置信度标记
-            for page in result.pages:
+            for page in result[0].pages:
                 for elem in page.texts:
                     assert 0.0 <= elem.confidence <= 1.0
         finally:
@@ -284,6 +284,6 @@ class TestOCRServiceIntegration:
 
             # 文本页不触发 OCR
             ocr_mock.recognize.assert_not_called()
-            assert result is doc
+            assert result[0] is doc
         finally:
             _cleanup(pdf_path)

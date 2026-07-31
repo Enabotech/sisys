@@ -173,7 +173,7 @@ class DocumentParsingService:
             parsed_doc = await self._apply_table_extraction(parsed_doc, temp_path, document.mime_type)
 
             # OCR 解析增强（ocr 端口注入时触发，对扫描件执行 OCR 识别，运行时错误不阻断解析）
-            parsed_doc = await self._apply_ocr(parsed_doc, temp_path, document.mime_type)
+            parsed_doc, ocr_metadata = await self._apply_ocr(parsed_doc, temp_path, document.mime_type)
 
             # OCR 失败时提前返回（解析状态为 FAILED）
             if parsed_doc.is_failed():
@@ -185,6 +185,9 @@ class DocumentParsingService:
             # 更新状态和元数据
             document.parse_status = ParseStatus.COMPLETED
             result_dict = parsed_doc.to_dict()
+            # 将 OCR 元数据合并到 parse_result（AC-4 要求持久化）
+            if ocr_metadata:
+                result_dict["ocr_metadata"] = ocr_metadata
             document.metadata["parse_result"] = result_dict
             saved_doc = await self._repository.save(document)
 
@@ -506,7 +509,7 @@ class DocumentParsingService:
         parsed_doc: ParsedDocument,
         file_path: str,
         mime_type: str,
-    ) -> ParsedDocument:
+    ) -> tuple[ParsedDocument, dict]:
         """对已解析文档应用 OCR 增强（扫描件 PDF 识别）
 
         算法流程：
@@ -525,11 +528,11 @@ class DocumentParsingService:
             mime_type: 文档 MIME 类型
 
         Returns:
-            OCR 增强后的 ParsedDocument 或原文档（降级时）
+            (OCR 增强后的 ParsedDocument 或原文档（降级时）, OCR 元数据字典)
         """
         # 降级条件：ocr 端口未注入
         if self._ocr is None:
-            return parsed_doc
+            return parsed_doc, {}
 
         # 文件大小守卫：仅对 ≤ 50MB 的文件执行 OCR
         # 使用领域层常量，避免直接依赖基础设施层
@@ -539,7 +542,12 @@ class DocumentParsingService:
             file_size = os.path.getsize(file_path)
         except OSError:
             logger.warning("OCR 步骤无法获取文件大小，跳过 OCR: %s", file_path, exc_info=True)
-            return parsed_doc
+            return parsed_doc, {}
+
+        # 0 字节文件：跳过 OCR，记录 WARNING
+        if file_size == 0:
+            logger.warning("空文件跳过 OCR: %s", file_path)
+            return parsed_doc, {}
 
         # 50-100MB：跳过 OCR，记录 WARNING
         # MAX_PDF_BYTES 为 100MB，在此用于检测 50-100MB 的 PDF 文件
@@ -552,20 +560,20 @@ class DocumentParsingService:
                     file_size // (1024 * 1024),
                     OCR_MAX_BYTES // (1024 * 1024),
                 )
-                return parsed_doc
+                return parsed_doc, {}
             logger.warning(
                 "文件大小 %dMB 超过 OCR 限制 %dMB，跳过 OCR 步骤",
                 file_size // (1024 * 1024),
                 OCR_MAX_BYTES // (1024 * 1024),
             )
-            return parsed_doc
+            return parsed_doc, {}
 
         try:
             # 扫描页检测
             scanned_pages = detect_scanned_pages(parsed_doc.pages)
             if not scanned_pages:
                 logger.info("未检测到扫描页，跳过 OCR 步骤")
-                return parsed_doc
+                return parsed_doc, {}
 
             logger.info("检测到扫描页: %s，执行 OCR 识别", scanned_pages)
 
@@ -574,7 +582,7 @@ class DocumentParsingService:
 
             if not ocr_results:
                 logger.info("OCR 返回空结果，保持原始文档状态")
-                return parsed_doc
+                return parsed_doc, {}
 
             # 按页合并 OCR 结果
             page_map = {r.page_number: r for r in ocr_results}
@@ -604,7 +612,7 @@ class DocumentParsingService:
 
             parsed_doc = replace(parsed_doc, pages=ocr_pages)
 
-            # 记录 OCR 元数据
+            # 构建 OCR 元数据（用于持久化到 Document.metadata["parse_result"]）
             ocr_metadata: dict = {
                 "ocr_engine": "paddleocr-vl",
                 "ocr_scanned_pages": scanned_pages,
@@ -612,8 +620,9 @@ class DocumentParsingService:
             }
             if failed_pages:
                 ocr_metadata["ocr_failed_pages"] = failed_pages
+                ocr_metadata["partial_ocr_failure"] = True
 
-            return parsed_doc
+            return parsed_doc, ocr_metadata
 
         except OCRConnectionError:
             # OCR 服务不可达：返回 FAILED 状态，不泄露内部细节
@@ -622,7 +631,7 @@ class DocumentParsingService:
                 parsed_doc,
                 parse_status="failed",
                 error_message="OCR 服务不可用，请稍后重试",
-            )
+            ), {}
 
         except OCRProcessingError:
             # OCR 处理错误：返回 FAILED 状态
@@ -631,7 +640,7 @@ class DocumentParsingService:
                 parsed_doc,
                 parse_status="failed",
                 error_message="OCR 处理异常，请检查文件是否可读",
-            )
+            ), {}
 
         except Exception:
             logger.warning(
@@ -639,7 +648,7 @@ class DocumentParsingService:
                 mime_type,
                 exc_info=True,
             )
-            return parsed_doc
+            return parsed_doc, {}
 
     @staticmethod
     def _mark_low_confidence(elements: list[ParsedElement]) -> list[ParsedElement]:
