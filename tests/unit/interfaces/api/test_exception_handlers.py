@@ -34,6 +34,7 @@ from src.domain.exceptions import (
     ConflictError,
     ContainerStartError,
     ContainerStopError,
+    DocumentVersionConflictError,
     EntityBusinessRuleError,
     EntityStateTransitionError,
     EntityValidationError,
@@ -167,6 +168,7 @@ class TestExceptionHttpMap:
             MemoryVersionConflictError,
             BucketNameValidationError,
             MemoryAccessDeniedError,
+            DocumentVersionConflictError,
             # 角色子域异常
             RoleNotFoundError,
             RoleAlreadyExistsError,

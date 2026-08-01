@@ -26,12 +26,12 @@ class TestDocumentRepositoryPortContract:
         assert spec.interface is DocumentRepositoryPort
 
     def test_port_version_is_v1(self) -> None:
-        """验证端口版本为 v1.0.0"""
+        """验证端口版本为 v1.1.0"""
         from src.domain.ports.registry import _global_registry
 
         spec = _global_registry.get("document_repository")
         assert spec is not None
-        assert spec.version == "v1.0.0"
+        assert spec.version == "v1.1.0"
 
     def test_port_lifetime_is_scoped(self) -> None:
         """验证端口生命周期为 SCOPED"""

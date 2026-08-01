@@ -64,6 +64,7 @@ from src.domain.exceptions.service_exceptions import (
 from src.domain.exceptions.storage_exceptions import (
     BucketNameValidationError,
     BucketNotFoundError,
+    DocumentVersionConflictError,
     MemoryAccessDeniedError,
     MemoryNotFoundError,
     MemoryVersionConflictError,
@@ -114,6 +115,7 @@ __all__ = [
     "AuditError",
     "PasswordValidationError",
     "ComplianceLockError",
+    "DocumentVersionConflictError",
     # 存储异常
     "MemoryVersionConflictError",
     "MemoryNotFoundError",

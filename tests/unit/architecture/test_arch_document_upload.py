@@ -123,7 +123,7 @@ class TestPortRegistration:
 
         spec = _global_registry.get("document_repository")
         assert spec is not None
-        assert spec.version == "v1.0.0"
+        assert spec.version == "v1.1.0"
         assert spec.lifetime.value in ("singleton", "scoped", "transient")
 
     def test_document_repository_impl_points_to_correct_class(self) -> None:

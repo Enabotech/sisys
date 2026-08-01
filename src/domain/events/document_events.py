@@ -67,3 +67,35 @@ class DocumentUploaded(DomainEvent):
             object.__setattr__(self, "aggregate_id", self.document_id)
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "Document")
+
+
+@dataclass(frozen=True)
+class DocumentVersionSnapshotCreated(DomainEvent):
+    """文档版本快照创建完成事件（RELIABLE 模式，RabbitMQ via Outbox）
+
+    文档上传或解析完成后自动触发，或在用户手动创建版本快照时触发。
+
+    Attributes:
+        document_id: 文档唯一标识符
+        event_type: 事件类型，固定为"DocumentVersionSnapshotCreated"
+        new_version: 创建的新版本号
+        snapshot_id: 快照唯一标识符
+        created_by: 操作者标识
+        diff_summary: 差异摘要文本
+        tenant_id: 租户标识符
+    """
+
+    document_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    event_type: str = field(default="DocumentVersionSnapshotCreated", init=False)
+    new_version: int = 0
+    snapshot_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    created_by: str = ""
+    diff_summary: str = ""
+    tenant_id: str = ""
+
+    def __post_init__(self) -> None:
+        """设置aggregate_id和aggregate_type"""
+        if self.aggregate_id is None:
+            object.__setattr__(self, "aggregate_id", self.document_id)
+        if not self.aggregate_type:
+            object.__setattr__(self, "aggregate_type", "Document")

@@ -32,6 +32,10 @@ from src.domain.value_objects.document_format import (
     get_mime_type,
     is_supported,
 )
+from src.domain.value_objects.document_version import (
+    DocumentVersionDiff,
+    DocumentVersionSnapshot,
+)
 from src.domain.value_objects.flow_status import FlowStatus
 from src.domain.value_objects.intrusion_detection_result import (
     AttackDetectionResult,
@@ -82,6 +86,8 @@ __all__ = [
     "ColumnInfo",
     "ColumnType",
     "ComplianceResult",
+    "DocumentVersionDiff",
+    "DocumentVersionSnapshot",
     "DOCUMENT_EXTENSIONS",
     "EncryptedData",
     "EncryptionVerificationResult",
