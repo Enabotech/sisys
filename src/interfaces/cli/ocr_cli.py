@@ -3,6 +3,10 @@
 提供 OCR 命令行工具，支持指定页数识别和输出到指定位置。
 使用 argparse 标准库（零额外依赖），通过 pyproject.toml 注册为 sisys-ocr 入口点。
 
+架构约束：
+- 位于 interfaces 层，不得直接 import infrastructure 层
+- 通过 importlib 动态加载适配器实现（与 composition_root 的 impl 字符串模式一致）
+
 运行方式：
     sisys-ocr <file> [options]
     poetry run sisys-ocr <file> [options]
@@ -25,13 +29,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib
 import json
 import logging
 import os
 import sys
 from typing import Any
-
-from src.infrastructure.document_parsing.paddleocr_vl_adapter import PaddleOCRVLAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +103,33 @@ def parse_page_spec(spec: str) -> list[int]:
 
 
 # ===================================================================
+# 适配器工厂（通过 importlib 动态加载，避免 interfaces→infrastructure 直接 import）
+# ===================================================================
+
+_ADAPTER_MODULE = "src.infrastructure.document_parsing.paddleocr_vl_adapter"
+_ADAPTER_CLASS = "PaddleOCRVLAdapter"
+
+
+def _create_ocr_adapter(base_url: str = "http://localhost:8080", timeout: float = 300.0) -> Any:
+    """通过动态导入创建 OCR 适配器实例
+
+    使用 importlib 而非直接 import，遵循六边形架构 interfaces→infrastructure 依赖约束。
+    与 composition_root.py 中 impl 字符串延迟加载模式一致。
+
+    Args:
+        base_url: PaddleOCR-VL API 地址
+        timeout: HTTP 请求超时时间
+
+    Returns:
+        OCRPort 实现实例
+    """
+    module = importlib.import_module(_ADAPTER_MODULE)
+    adapter_cls = getattr(module, _ADAPTER_CLASS)
+    instance = adapter_cls(base_url=base_url, timeout=timeout)
+    return instance
+
+
+# ===================================================================
 # OCR 识别核心逻辑
 # ===================================================================
 
@@ -130,7 +160,7 @@ async def ocr_recognize(
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"文件不存在: {file_path}")
 
-    adapter = PaddleOCRVLAdapter(base_url=base_url, timeout=timeout)
+    adapter = _create_ocr_adapter(base_url=base_url, timeout=timeout)
     try:
         results = await adapter.recognize(file_path, page_numbers)
         return [r.to_dict() for r in results]
