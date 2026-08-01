@@ -48,18 +48,22 @@ class PaddleOCRVLAdapter:
 
     def __init__(
         self,
-        base_url: str = DEFAULT_BASE_URL,
-        timeout: float = DEFAULT_TIMEOUT,
+        base_url: str | None = None,
+        timeout: float | None = None,
     ) -> None:
         """初始化 PaddleOCR-VL 适配器
 
         Args:
-            base_url: PaddleOCR-VL API 基础 URL，默认 http://localhost:8080
-            timeout: HTTP 请求超时时间（秒），默认 300s
+            base_url: PaddleOCR-VL API 基础 URL，默认从环境变量读取
+            timeout: HTTP 请求超时时间（秒），默认从环境变量读取
         """
-        self.base_url = base_url.rstrip("/")
-        self.timeout = timeout
-        self._client = httpx.AsyncClient(timeout=httpx.Timeout(timeout))
+        # 优先级：参数 > 环境变量 > 默认值
+        from src.infrastructure.config.paddleocr import PaddleOCRConfig
+
+        config = PaddleOCRConfig.from_env()
+        self.base_url = (base_url or config.api_url).rstrip("/")
+        self.timeout = timeout or config.api_timeout
+        self._client = httpx.AsyncClient(timeout=httpx.Timeout(self.timeout))
 
     async def recognize(
         self,
