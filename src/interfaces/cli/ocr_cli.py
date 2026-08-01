@@ -157,8 +157,9 @@ def _format_as_markdown(
 ) -> str:
     """将 OCR 结果格式化为 Markdown 文本
 
-    利用 PaddleOCR-VL 原生输出的 Markdown 内容（block_content），
-    按页面组织输出，保留原始格式（标题、粗体、列表、表格等）。
+    利用 PaddleOCR-VL 原生输出的页面级 Markdown（markdown_text），
+    包含公式 LaTeX、图片占位符、表格等完整格式。
+    回退到逐 block 拼接（original_markdown）。
 
     Args:
         results: OCRPageResult 列表
@@ -175,14 +176,27 @@ def _format_as_markdown(
         lines.append(f"## 第 {page_result.page_number} 页")
         lines.append("")
 
-        for elem in page_result.elements:
-            # 优先使用原始 Markdown 内容
-            original_md = elem.metadata.get("original_markdown", "")
-            if original_md:
-                lines.append(original_md)
-            else:
-                lines.append(elem.content)
-            lines.append("")
+        # 优先使用页面级 markdown_text（含公式 LaTeX、图片占位符、表格）
+        if hasattr(page_result, "markdown_text") and page_result.markdown_text:
+            lines.append(page_result.markdown_text)
+        else:
+            # 回退：逐 block 拼接原始 Markdown
+            for elem in page_result.elements:
+                original_md = elem.metadata.get("original_markdown", "")
+                if original_md:
+                    lines.append(original_md)
+                else:
+                    lines.append(elem.content)
+                lines.append("")
+
+        # 添加图片引用（如有）
+        if hasattr(page_result, "markdown_images") and page_result.markdown_images:
+            for img_path, img_data in page_result.markdown_images.items():
+                if img_data.startswith("http"):
+                    lines.append(f"![{img_path}]({img_data})")
+                elif img_data.startswith("/9j/") or img_data.startswith("iVBOR"):
+                    lines.append(f"![{img_path}](data:image/jpeg;base64,{img_data[:50]}...)")
+                lines.append("")
 
     return "\n".join(lines)
 

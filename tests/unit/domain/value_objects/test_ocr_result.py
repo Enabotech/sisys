@@ -87,7 +87,9 @@ class TestOCRPageResult:
         result = OCRPageResult(page_number=1)
         # 验证 frozen dataclass 的字段不可修改
         for field in fields(result):
-            assert field.name in ("page_number", "elements", "raw_response"), f"意外字段: {field.name}"
+            assert field.name in ("page_number", "elements", "raw_response", "markdown_text", "markdown_images"), (
+                f"意外字段: {field.name}"
+            )
         # 验证 page_number 默认值
         assert result.page_number == 1
 

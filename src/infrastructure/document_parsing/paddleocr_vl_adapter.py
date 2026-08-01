@@ -278,6 +278,7 @@ class PaddleOCRVLAdapter:
         payload = {
             "file": b64_data,
             "fileType": file_type,
+            "formatBlockContent": True,
         }
 
         last_error: Exception | None = None
@@ -384,6 +385,11 @@ class PaddleOCRVLAdapter:
         page_result = layout_results[0]
         actual_page = page_number or (page_result.get("pageIndex", 0) + 1)
 
+        # 提取页面级 Markdown（含公式 LaTeX、图片占位符、表格等）
+        page_markdown = page_result.get("markdown", {})
+        markdown_text = page_markdown.get("text", "") if isinstance(page_markdown, dict) else ""
+        markdown_images = page_markdown.get("images", {}) if isinstance(page_markdown, dict) else {}
+
         pruned = page_result.get("prunedResult", {})
         parsing_res_list = pruned.get("parsing_res_list", [])
 
@@ -396,6 +402,8 @@ class PaddleOCRVLAdapter:
             page_number=actual_page,
             elements=elements,
             raw_response=response_data,
+            markdown_text=markdown_text,
+            markdown_images=markdown_images,
         )
 
     def _block_to_element(self, block: dict[str, Any]) -> ParsedElement:
