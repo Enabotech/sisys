@@ -5,7 +5,8 @@
 
 架构约束：
 - 位于 interfaces 层，不得直接 import infrastructure 层
-- 通过 importlib 动态加载适配器实现（与 composition_root 的 impl 字符串模式一致）
+- 通过 composition_root 的 resolve("ocr") 获取适配器实例
+- 适配器参数通过环境变量传递（PADDLEOCR_VL_API_URL / PADDLEOCR_VL_API_TIMEOUT）
 
 运行方式：
     sisys-ocr <file> [options]
@@ -29,12 +30,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import importlib
 import json
 import logging
 import os
 import sys
 from typing import Any
+
+from src.composition_root import bootstrap
+from src.domain.ports.resolver import resolve
 
 logger = logging.getLogger(__name__)
 
@@ -103,33 +106,6 @@ def parse_page_spec(spec: str) -> list[int]:
 
 
 # ===================================================================
-# 适配器工厂（通过 importlib 动态加载，避免 interfaces→infrastructure 直接 import）
-# ===================================================================
-
-_ADAPTER_MODULE = "src.infrastructure.document_parsing.paddleocr_vl_adapter"
-_ADAPTER_CLASS = "PaddleOCRVLAdapter"
-
-
-def _create_ocr_adapter(base_url: str = "http://localhost:8080", timeout: float = 300.0) -> Any:
-    """通过动态导入创建 OCR 适配器实例
-
-    使用 importlib 而非直接 import，遵循六边形架构 interfaces→infrastructure 依赖约束。
-    与 composition_root.py 中 impl 字符串延迟加载模式一致。
-
-    Args:
-        base_url: PaddleOCR-VL API 地址
-        timeout: HTTP 请求超时时间
-
-    Returns:
-        OCRPort 实现实例
-    """
-    module = importlib.import_module(_ADAPTER_MODULE)
-    adapter_cls = getattr(module, _ADAPTER_CLASS)
-    instance = adapter_cls(base_url=base_url, timeout=timeout)
-    return instance
-
-
-# ===================================================================
 # OCR 识别核心逻辑
 # ===================================================================
 
@@ -137,16 +113,15 @@ def _create_ocr_adapter(base_url: str = "http://localhost:8080", timeout: float 
 async def ocr_recognize(
     file_path: str,
     page_numbers: list[int] | None = None,
-    base_url: str = "http://localhost:8080",
-    timeout: float = 300.0,
 ) -> list[dict[str, Any]]:
     """对指定文件执行 OCR 识别
+
+    适配器通过 composition_root 的 resolve("ocr") 获取，
+    参数通过环境变量传递（由 CLI 在 main() 中设置）。
 
     Args:
         file_path: 文件路径
         page_numbers: 需要 OCR 的页码列表，None 表示全部
-        base_url: PaddleOCR-VL API 地址
-        timeout: 超时时间（秒）
 
     Returns:
         OCR 结果列表（已序列化为 dict）
@@ -160,7 +135,9 @@ async def ocr_recognize(
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"文件不存在: {file_path}")
 
-    adapter = _create_ocr_adapter(base_url=base_url, timeout=timeout)
+    # 通过 composition_root 的标准 resolve 获取适配器
+    # 适配器参数已通过环境变量设置
+    adapter = resolve("ocr")
     try:
         results = await adapter.recognize(file_path, page_numbers)
         return [r.to_dict() for r in results]
@@ -215,17 +192,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--url",
         type=str,
-        default="http://localhost:8080",
+        default=None,
         metavar="URL",
-        help="PaddleOCR-VL API 地址（默认 http://localhost:8080）",
+        help="PaddleOCR-VL API 地址（默认 http://localhost:8080 或 PADDLEOCR_VL_API_URL 环境变量）",
     )
 
     parser.add_argument(
         "--timeout",
         type=float,
-        default=300.0,
+        default=None,
         metavar="SECONDS",
-        help="HTTP 请求超时时间（默认 300s）",
+        help="HTTP 请求超时时间（默认 300s 或 PADDLEOCR_VL_API_TIMEOUT 环境变量）",
     )
 
     parser.add_argument(
@@ -273,6 +250,15 @@ def main(argv: list[str] | None = None) -> int:
             logger.error("页码范围解析失败: %s", e)
             return 1
 
+    # 通过环境变量传递适配器参数（composition_root resolve 机制）
+    if args.url:
+        os.environ["PADDLEOCR_VL_API_URL"] = args.url
+    if args.timeout:
+        os.environ["PADDLEOCR_VL_API_TIMEOUT"] = str(args.timeout)
+
+    # 初始化端口注册表
+    bootstrap()
+
     # 执行 OCR 识别
     try:
         logger.info("开始 OCR 识别: %s", os.path.basename(args.file))
@@ -283,8 +269,6 @@ def main(argv: list[str] | None = None) -> int:
             ocr_recognize(
                 file_path=args.file,
                 page_numbers=page_numbers,
-                base_url=args.url,
-                timeout=args.timeout,
             )
         )
 
