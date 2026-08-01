@@ -113,7 +113,8 @@ def parse_page_spec(spec: str) -> list[int]:
 async def ocr_recognize(
     file_path: str,
     page_numbers: list[int] | None = None,
-) -> list[dict[str, Any]]:
+    output_format: str = "json",
+) -> list[dict[str, Any]] | str:
     """对指定文件执行 OCR 识别
 
     适配器通过 composition_root 的 resolve("ocr") 获取，
@@ -122,9 +123,11 @@ async def ocr_recognize(
     Args:
         file_path: 文件路径
         page_numbers: 需要 OCR 的页码列表，None 表示全部
+        output_format: 输出格式，"json"（结构化）或 "md"（Markdown）
 
     Returns:
-        OCR 结果列表（已序列化为 dict）
+        output_format="json" 时返回 OCR 结果列表（已序列化为 dict）
+        output_format="md" 时返回 Markdown 格式文本
 
     Raises:
         FileNotFoundError: 文件不存在
@@ -140,9 +143,48 @@ async def ocr_recognize(
     adapter = resolve("ocr")
     try:
         results = await adapter.recognize(file_path, page_numbers)
+
+        if output_format == "md":
+            return _format_as_markdown(results, file_path)
         return [r.to_dict() for r in results]
     finally:
         await adapter.close()
+
+
+def _format_as_markdown(
+    results: list,
+    file_path: str,
+) -> str:
+    """将 OCR 结果格式化为 Markdown 文本
+
+    利用 PaddleOCR-VL 原生输出的 Markdown 内容（block_content），
+    按页面组织输出，保留原始格式（标题、粗体、列表、表格等）。
+
+    Args:
+        results: OCRPageResult 列表
+        file_path: 原始文件路径
+
+    Returns:
+        Markdown 格式文本
+    """
+    lines: list[str] = []
+    lines.append(f"# OCR 结果: {os.path.basename(file_path)}")
+    lines.append("")
+
+    for page_result in results:
+        lines.append(f"## 第 {page_result.page_number} 页")
+        lines.append("")
+
+        for elem in page_result.elements:
+            # 优先使用原始 Markdown 内容
+            original_md = elem.metadata.get("original_markdown", "")
+            if original_md:
+                lines.append(original_md)
+            else:
+                lines.append(elem.content)
+            lines.append("")
+
+    return "\n".join(lines)
 
 
 # ===================================================================
@@ -209,7 +251,15 @@ def build_parser() -> argparse.ArgumentParser:
         "-q",
         "--quiet",
         action="store_true",
-        help="静默模式（仅输出 JSON，不输出日志到 stderr）",
+        help="静默模式（仅输出，不输出日志到 stderr）",
+    )
+
+    parser.add_argument(
+        "--md",
+        "--markdown",
+        action="store_true",
+        dest="markdown",
+        help="以 Markdown 格式输出（保留原生格式，如标题/粗体/表格）",
     )
 
     return parser
@@ -265,28 +315,38 @@ def main(argv: list[str] | None = None) -> int:
         if page_numbers:
             logger.info("处理页码: %s", page_numbers)
 
-        results = asyncio.run(
+        results: Any = asyncio.run(
             ocr_recognize(
                 file_path=args.file,
                 page_numbers=page_numbers,
+                output_format="md" if args.markdown else "json",
             )
         )
 
         # 序列化输出
-        output_data = {
-            "file": os.path.basename(args.file),
-            "total_pages": len(results),
-            "pages": results,
-        }
-        json_str = json.dumps(output_data, ensure_ascii=False, indent=2)
-
-        # 输出到文件或 stdout
-        if args.output:
-            with open(args.output, "w", encoding="utf-8") as f:
-                f.write(json_str)
-            logger.info("OCR 结果已写入: %s (%d 页)", args.output, len(results))
+        if args.markdown:
+            assert isinstance(results, str)
+            if args.output:
+                with open(args.output, "w", encoding="utf-8") as f:
+                    f.write(results)
+                logger.info("OCR 结果已写入: %s", args.output)
+            else:
+                print(results)
         else:
-            print(json_str)
+            assert isinstance(results, list)
+            output_data = {
+                "file": os.path.basename(args.file),
+                "total_pages": len(results),
+                "pages": results,
+            }
+            json_str = json.dumps(output_data, ensure_ascii=False, indent=2)
+
+            if args.output:
+                with open(args.output, "w", encoding="utf-8") as f:
+                    f.write(json_str)
+                logger.info("OCR 结果已写入: %s (%d 页)", args.output, len(results))
+            else:
+                print(json_str)
 
         return 0
 
