@@ -158,8 +158,12 @@ def _format_as_markdown(
     """将 OCR 结果格式化为 Markdown 文本
 
     利用 PaddleOCR-VL 原生输出的页面级 Markdown（markdown_text），
-    包含公式 LaTeX、图片占位符、表格等完整格式。
-    回退到逐 block 拼接（original_markdown）。
+    包含公式 LaTeX、图片 base64（替换占位符）、表格等完整格式。
+
+    图片处理：
+    - markdown_text 中的 <img src="imgs/xxx.jpg"> 是占位符
+    - markdown_images 字典存储了图片路径→base64 的映射
+    - 将占位符替换为内联 base64 数据 URL
 
     Args:
         results: OCRPageResult 列表
@@ -168,6 +172,8 @@ def _format_as_markdown(
     Returns:
         Markdown 格式文本
     """
+    import re as _re
+
     lines: list[str] = []
     lines.append(f"# OCR 结果: {os.path.basename(file_path)}")
     lines.append("")
@@ -176,9 +182,33 @@ def _format_as_markdown(
         lines.append(f"## 第 {page_result.page_number} 页")
         lines.append("")
 
-        # 优先使用页面级 markdown_text（含公式 LaTeX、图片占位符、表格）
         if hasattr(page_result, "markdown_text") and page_result.markdown_text:
-            lines.append(page_result.markdown_text)
+            md_text = page_result.markdown_text
+
+            # 替换图片占位符为内联 base64
+            if hasattr(page_result, "markdown_images") and page_result.markdown_images:
+
+                def _replace_img(match: _re.Match) -> str:
+                    img_src = match.group(1)
+                    # 从 markdown_images 中查找 base64 数据
+                    raw_data = page_result.markdown_images.get(img_src)
+                    if raw_data and isinstance(raw_data, str) and not raw_data.startswith("http"):
+                        if raw_data.startswith("/9j/"):
+                            mime = "image/jpeg"
+                        elif raw_data.startswith("iVBOR"):
+                            mime = "image/png"
+                        else:
+                            mime = "image/jpeg"
+                        return f'<img src="data:{mime};base64,{raw_data}" alt="Image" />'
+                    return str(match.group(0))
+
+                md_text = _re.sub(
+                    r'<img\s+src="([^"]+)"\s*[^>]*>',
+                    _replace_img,
+                    md_text,
+                )
+
+            lines.append(md_text)
         else:
             # 回退：逐 block 拼接原始 Markdown
             for elem in page_result.elements:
@@ -187,15 +217,6 @@ def _format_as_markdown(
                     lines.append(original_md)
                 else:
                     lines.append(elem.content)
-                lines.append("")
-
-        # 添加图片引用（如有）
-        if hasattr(page_result, "markdown_images") and page_result.markdown_images:
-            for img_path, img_data in page_result.markdown_images.items():
-                if img_data.startswith("http"):
-                    lines.append(f"![{img_path}]({img_data})")
-                elif img_data.startswith("/9j/") or img_data.startswith("iVBOR"):
-                    lines.append(f"![{img_path}](data:image/jpeg;base64,{img_data[:50]}...)")
                 lines.append("")
 
     return "\n".join(lines)

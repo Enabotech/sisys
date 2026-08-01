@@ -114,15 +114,26 @@
 #### 领域事件 Schema
 
 - [ ] 新建事件 `DocumentVersionSnapshotCreated`（`src/domain/events/document_events.py`）
-  - `event_type = "DocumentVersionSnapshotCreated"`
-  - `document_id: uuid.UUID` = field(default_factory=uuid.uuid4)
-  - `new_version: int` — 新版本号
-  - `snapshot_id: uuid.UUID` = field(default_factory=uuid.uuid4)
-  - `created_by: str` — 操作者
-  - `diff_summary: str` — 差异摘要
-  - `tenant_id: str` — 租户标识
-  - `__post_init__` 设置 `aggregate_id=document_id`, `aggregate_type="Document"`
+  - 字段定义模式与现有 `DocumentUploaded` 一致（使用 `field(default=..., init=False)` 定义 `event_type`）：
+    ```python
+    @dataclass(frozen=True)
+    class DocumentVersionSnapshotCreated(DomainEvent):
+        document_id: uuid.UUID = field(default_factory=uuid.uuid4)
+        event_type: str = field(default="DocumentVersionSnapshotCreated", init=False)
+        new_version: int = 0
+        snapshot_id: uuid.UUID = field(default_factory=uuid.uuid4)
+        created_by: str = ""
+        diff_summary: str = ""
+        tenant_id: str = ""
+
+        def __post_init__(self) -> None:
+            if self.aggregate_id is None:
+                object.__setattr__(self, "aggregate_id", self.document_id)
+            if not self.aggregate_type:
+                object.__setattr__(self, "aggregate_type", "Document")
+    ```
   - 注意：`snapshot_id` 字段使用 `default_factory=uuid.uuid4`（非必填，与 `document_id` 模式一致），事件构造时默认生成新 UUID
+  - 注意：`event_type` 必须使用 `field(default="DocumentVersionSnapshotCreated", init=False)` 模式（而非直接赋值），以确保 `__init_subclass__` 自动注册到 `DomainEvent._registry` 的正确性
 - [ ] 事件自动注册到 `DomainEvent._registry`（通过 `__init_subclass__` 自动注册）
 - [ ] 导出到 `src/domain/events/__init__.py`：在 `document_events` 导入中添加 `DocumentVersionSnapshotCreated`，在 `__all__` 中添加同名导出
 - [ ] 事件测试文件命名：`tests/unit/domain/events/test_document_uploaded.py` 中新增 `TestDocumentVersionSnapshotCreatedCreation/Registration/PostInit/Serialization` 测试类（与现有文档事件测试共享同一文件，遵循现有模式；也可新建 `tests/unit/domain/events/test_document_version_snapshot.py` 独立文件，两种方式均可）
@@ -147,6 +158,7 @@
       file_size_bytes: int = 0
       checksum: str = ""
   ```
+  **注意：** `DocumentVersionSnapshot` 是所有字段在构造时强制传入的 frozen dataclass，`document_id`、`version`、`snapshot_id`、`created_at`、`created_by` 这 5 个必填字段无默认值，确保值对象构造时语义完整。`diff_json`、`storage_object_key`、`file_size_bytes`、`checksum` 为可选字段，仅在快照创建时从上下文获取。
 - [ ] 新建 `DocumentVersionDiff` 值对象（`src/domain/value_objects/document_version.py`）
   ```python
   @dataclass(frozen=True)
@@ -155,17 +167,16 @@
       changed_fields: list[str] = field(default_factory=list)
       is_initial: bool = False
   ```
-  **注意：** `DocumentVersionDiff` 是 diff 计算过程中的中间值对象，不持久化。其 `diff_summary` 字段在创建快照时存入 `DocumentVersionSnapshot.diff_summary`，`changed_fields` 作为 `dict[str, Any]` 存入 `DocumentVersionSnapshot.diff_json`（通过 `{"changed_fields": changed_fields, "is_initial": is_initial}` 结构）。
-- [ ] 扩展 `DocumentVersion`（`src/domain/entities/document.py`）—— 新增 `diff_summary` 字段（可选，用于内存中的历史记录）
-- [ ] 注意：`DocumentVersion` 使用 `@dataclass`（非 frozen），与持久化值对象 `DocumentVersionSnapshot` 用途不同——前者是内存中的历史记录，后者是持久化快照。`Document.bump_version()` 已提供版本递增能力（`src/domain/entities/document.py:155-174`），快照创建逻辑由应用层 `DocumentVersionService` 编排，不扩展 `Document` 实体方法
+  **注意：** `DocumentVersionDiff` 是 diff 计算过程中的**中间值对象**，不持久化。其 `diff_summary` 字段在创建快照时存入 `DocumentVersionSnapshot.diff_summary`，`changed_fields` 作为 `dict[str, Any]` 存入 `DocumentVersionSnapshot.diff_json`（通过 `{"changed_fields": changed_fields, "is_initial": is_initial}` 结构）。
+- [ ] **不扩展** `DocumentVersion`（`src/domain/entities/document.py`）—— `DocumentVersion` 是内存中的版本历史记录，职责是追踪版本递增日志（version/created_at/created_by/change_description），`diff_summary` 是持久化快照的属性，不应混入内存历史记录。`Document.bump_version()` 已提供版本递增能力（`src/domain/entities/document.py:155-174`），快照创建逻辑由应用层 `DocumentVersionService` 编排，不扩展 `Document` 实体方法
 
 #### 统一端口定义注册与管理
 
 - [ ] 扩展 `DocumentRepositoryPort`（`src/domain/ports/document_repository.py`）—— 新增方法：
-  - `save_version_snapshot(document_id, version, snapshot_data) -> DocumentVersionSnapshot`
-  - `list_versions(document_id, tenant_id) -> list[DocumentVersionSnapshot]`
-  - `get_version(document_id, version, tenant_id) -> DocumentVersionSnapshot | None`
-  - `save_with_version_check(document, expected_version) -> Document` — 带乐观锁版本检查的保存方法，当 `document.version == expected_version` 时执行保存并递增版本号，否则抛出 `DocumentVersionConflictError`
+  - `save_version_snapshot(snapshot: DocumentVersionSnapshot) -> DocumentVersionSnapshot` — 持久化版本快照（参数为值对象，符合 DDD 聚合模式）
+  - `list_versions(document_id: UUID, tenant_id: str) -> list[DocumentVersionSnapshot]` — 按文档 ID 和租户列出版本
+  - `get_version(document_id: UUID, version: int, tenant_id: str) -> DocumentVersionSnapshot | None` — 获取指定版本
+  - `save_with_version_check(document: Document, expected_version: int) -> Document` — 带乐观锁版本检查的保存方法，当 `document.version == expected_version` 时执行保存并递增版本号，否则抛出 `DocumentVersionConflictError`
 - [ ] 端口注册到 `_global_registry` 作为 `document_repository` 端口版本升级（v1.0.0 → v1.1.0）
 - [ ] 端口契约测试通过（`tests/contracts/test_port_contract_document_version.py`）
 - [ ] 新增 `DocumentVersionService` 在 composition_root 注册为 `document_version_service`
@@ -177,9 +188,11 @@
   - 继承自 `ConflictError`（EXCEPTION_203）
   - 构造器参数：`document_id: UUID`, `expected_version: int`, `actual_version: int`
   - 消息格式：`"文档版本冲突: document_id={doc_id}, expected={expected}, actual={actual}"`
-  - 编码范围：子域 "storage" 的 (211, 219) 范围，当前已使用 211-215，216 可用
+  - 编码范围：子域 "storage" 的 (211, 219) 范围，当前已使用 211-215（`MemoryNotFoundError`/`BucketNotFoundError`/`MemoryVersionConflictError`/`BucketNameValidationError`/`MemoryAccessDeniedError`），216 可用
+  - 注意：`MemoryVersionConflictError`（EXCEPTION_213）是记忆版本冲突，`DocumentVersionConflictError`（EXCEPTION_216）是文档版本冲突，两者概念不同，编码独立
 - [ ] 异常注册到 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN`（添加 `"DocumentVersionConflictError": "storage"`）
 - [ ] 异常导出到 `src/domain/exceptions/__init__.py` 的 `__all__`（添加 `"DocumentVersionConflictError"`）
+- [ ] 异常导出到 `src/domain/exceptions/storage_exceptions.py` 的 `__all__`（添加 `"DocumentVersionConflictError"`）
 - [ ] HTTP 映射：`EXCEPTION_HTTP_MAP` 中 `DocumentVersionConflictError` → `409 CONFLICT`（添加到 `src/interfaces/api/exception_handlers.py`）
 - [ ] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性/子域范围
 
@@ -251,8 +264,18 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/domain/services/test_document_version_diff.py`（测试 `compute_diff` 纯函数：文本 diff、元数据 diff、首次版本、空变更） |
-| 🟢 绿 | 实现 `src/domain/services/document_version_diff_service.py`（`compute_diff(old_metadata, new_metadata, old_content_summary, new_content_summary) -> DocumentVersionDiff`） |
+| 🟢 绿 | 实现 `src/domain/services/document_version_diff_service.py`（`compute_diff(old_metadata: dict[str, Any], new_metadata: dict[str, Any], old_content_summary: str, new_content_summary: str) -> DocumentVersionDiff`） |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
+
+**diff 计算策略（对齐架构文档 §11.2.9 MemoryChangeHistory.diff_summary 模式）：**
+- 元数据 diff：比较 `old_metadata` 与 `new_metadata` 的字段差异，生成 `changed_fields` 列表
+- 内容 diff：比较 `old_content_summary` 与 `new_content_summary` 的文本差异，使用 `difflib.unified_diff` 生成摘要
+- 首次版本：`is_initial=True` 时 `diff_summary="initial version"`，`changed_fields=[]`
+- 空变更：无差异时 `diff_summary="no changes"`，`changed_fields=[]`
+
+**关键约束：**
+- `compute_diff` 是纯函数（无 I/O、无状态），定义在领域层，仅使用 `difflib` 标准库
+- 全量内容 diff 不在领域层做（性能敏感），由应用层在调用 `compute_diff` 前将内容转为摘要字符串
 
 - [ ] Subtask 1.4: 🔴 红 — 编写差异计算领域服务失败测试
 - [ ] Subtask 1.5: 🟢 绿 — 实现差异计算服务
@@ -298,10 +321,10 @@
 #### 端口契约定义
 
 - [ ] 扩展 `DocumentRepositoryPort`（`src/domain/ports/document_repository.py`）新增 4 个方法：
-  - `save_version_snapshot(document_id, version, snapshot_data) -> DocumentVersionSnapshot`
-  - `list_versions(document_id, tenant_id) -> list[DocumentVersionSnapshot]`
-  - `get_version(document_id, version, tenant_id) -> DocumentVersionSnapshot | None`
-  - `save_with_version_check(document, expected_version) -> Document` — 带乐观锁版本检查的保存方法
+  - `save_version_snapshot(snapshot: DocumentVersionSnapshot) -> DocumentVersionSnapshot` — 持久化版本快照
+  - `list_versions(document_id: UUID, tenant_id: str) -> list[DocumentVersionSnapshot]` — 列出版本
+  - `get_version(document_id: UUID, version: int, tenant_id: str) -> DocumentVersionSnapshot | None` — 获取指定版本
+  - `save_with_version_check(document: Document, expected_version: int) -> Document` — 带乐观锁版本检查的保存方法
 
 #### 端口契约测试
 
@@ -312,7 +335,7 @@
   - 验证生命周期为 `SCOPED`
   - 验证 `save_version_snapshot`、`list_versions`、`get_version`、`save_with_version_check` 方法存在
   - 验证 `DocumentVersionSnapshotCreated` 事件自动注册到 `DomainEvent._registry`
-  - 验证通道配置在 `ChannelRouter.DEFAULT_MAPPINGS`
+  - 验证通道配置在 `ChannelRouter.DEFAULT_MAPPINGS` 中
   - 验证通道模式为 `RELIABLE`
   - 配置了 `rabbitmq_routing_key` 包含 `document_version_snapshot_created`
 
@@ -332,10 +355,10 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/infrastructure/test_document_version_model.py`（测试 ORM 模型字段/关系/约束） |
-| 🟢 绿 | 新建 `src/infrastructure/storage/postgresql/models/document_version.py`（`DocumentVersionSnapshotModel`） |
+| 🟢 绿 | 新建 `src/infrastructure/storage/postgresql/models/document_version.py`（`DocumentVersionSnapshotModel`），并在 `src/infrastructure/storage/postgresql/models/__init__.py` 中导出 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-`DocumentVersionSnapshotModel` 定义：
+`DocumentVersionSnapshotModel` 定义（对齐现有 `DocumentModel` 的编码风格：`Mapped[T] = mapped_column(...)` 现代风格、`id` 为 UUID PK、`__init__` 显式定义而非 dataclass 模式）：
 ```python
 class DocumentVersionSnapshotModel(Base):
     __tablename__ = "document_version_snapshots"
@@ -357,6 +380,9 @@ class DocumentVersionSnapshotModel(Base):
         UniqueConstraint("document_id", "version", name="uq_document_version"),
         Index("idx_doc_ver_snapshots_doc_id", "document_id"),
     )
+
+    def __init__(self, ...) -> None:  # 显式 __init__，与 DocumentModel 保持一致
+        ...
 ```
 
 - [ ] Subtask 3.1: 🔴 红 — 编写 ORM 模型失败测试
@@ -426,7 +452,7 @@ CREATE INDEX idx_doc_ver_snapshots_doc_id ON document_version_snapshots(document
 | 🟢 绿 | 实现 `src/application/services/document_version_service.py` |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-`DocumentVersionService` 依赖注入模式（对齐 Story 2-5 TYPE_CHECKING 模式）：
+`DocumentVersionService` 依赖注入模式（对齐 Story 2-5 TYPE_CHECKING 模式，与当前 `document_parsing_service.py` 第 6-34 行的 TYPE_CHECKING 模式一致）：
 ```python
 from __future__ import annotations
 from typing import TYPE_CHECKING
@@ -434,6 +460,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from src.domain.ports.document_repository import DocumentRepositoryPort
     from src.domain.ports.event_publisher import EventPublisher
+    from src.domain.value_objects.document_version import DocumentVersionSnapshot
 
 
 class DocumentVersionService:
@@ -442,7 +469,8 @@ class DocumentVersionService:
         document_repository: DocumentRepositoryPort,
         event_publisher: EventPublisher,
     ) -> None:
-        ...
+        self._repository = document_repository
+        self._publisher = event_publisher
 
     async def create_snapshot(
         self,
@@ -456,10 +484,9 @@ class DocumentVersionService:
         1. 查询文档实体（获取当前版本号）
         2. 获取前一个版本的 metadata（用于 diff 计算）
         3. 调用领域服务 compute_diff() 计算差异摘要
-        4. 调用 bump_version() 递增文档版本号
+        4. 使用 save_with_version_check() 保存文档（乐观锁验证）
         5. 持久化 DocumentVersionSnapshot
-        6. 通过 save_with_version_check() 保存文档（乐观锁验证）
-        7. 发布 DocumentVersionSnapshotCreated 事件
+        6. 发布 DocumentVersionSnapshotCreated 事件
         """
         ...
 
@@ -928,9 +955,10 @@ deploy/postgresql/alembic/versions/
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-07-31
-**最后更新/Last Updated:** 2026-07-31
+**最后更新/Last Updated:** 2026-08-01
 **更新说明/Description:**
+- v1.2.0: R1第二轮审查修复 — 基于实际代码调研的6项修复：(1)领域事件event_type使用field(default=...,init=False)模式确保自动注册；(2)DocumentVersionSnapshot必填字段无默认值确保语义完整；(3)DOCUMENT UPLOADED导出补全到events/__init__.py；(4)不扩展DocumentVersion实体(职责分离)；(5)异常注册细节补充(storage_exceptions.py的__all__)； (6)ORM模型显式__init__对齐现有编码风格
 - v1.1.0: 5轮审查修订 — R1架构科学性修复(移除create_version_snapshot、新增save_with_version_check、对齐TYPE_CHECKING模式、明确DocumentVersionDiff职责)、R2合理性修复(事件驱动方案替代服务直接注入)、R3一致性修复(异常导出/事件测试文件/CLI目录说明)、R4回归验证、R5终审验收
 - v1.0.0: 创建故事文件
