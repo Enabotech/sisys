@@ -55,18 +55,25 @@ class OCRPageResult:
         page_number: 页码（1-indexed）
         elements: OCR 识别后的 ParsedElement 列表，每个元素含 confidence
         raw_response: PaddleOCR-VL 原始响应（调试用，不序列化到持久化结果）
+        markdown_text: 页面级 Markdown 文本（含公式 LaTeX 和图片占位符）
+        markdown_images: Markdown 图片相对路径到 base64/URL 的映射
     """
 
     page_number: int
     elements: list[ParsedElement] = field(default_factory=list)
     raw_response: dict[str, Any] = field(default_factory=dict)
+    markdown_text: str = ""
+    markdown_images: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典（不含 raw_response）"""
-        return {
+        result: dict[str, Any] = {
             "page_number": self.page_number,
             "elements": [e.to_dict() for e in self.elements],
         }
+        if self.markdown_text:
+            result["markdown_text"] = self.markdown_text
+        return result
 
 
 __all__ = [
