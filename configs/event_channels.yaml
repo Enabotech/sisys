@@ -50,6 +50,12 @@ event_channels:
     delivery_mode: "reliable"
     description: "文档上传完成"
 
+  DocumentVersionSnapshotCreated:
+    redis_channel: "sisys:rt:document_version_snapshot_created"
+    rabbitmq_routing_key: "sisys.events.reliable.document_version_snapshot_created"
+    delivery_mode: "reliable"
+    description: "文档版本快照创建完成"
+
   MemoryChanged:
     rabbitmq_routing_key: "sisys.events.reliable.memory_changed"
     delivery_mode: "reliable"

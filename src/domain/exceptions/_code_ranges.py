@@ -80,6 +80,7 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "MemoryVersionConflictError": "storage",
     "BucketNameValidationError": "storage",
     "MemoryAccessDeniedError": "storage",
+    "DocumentVersionConflictError": "storage",
     # role_exceptions.py
     "RoleNotFoundError": "role",
     "RoleAlreadyExistsError": "role",

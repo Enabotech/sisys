@@ -28,6 +28,7 @@ from src.domain.exceptions import (
     ConflictError,
     ContainerStartError,
     ContainerStopError,
+    DocumentVersionConflictError,
     EntityBusinessRuleError,
     EntityStateTransitionError,
     EntityValidationError,
@@ -96,6 +97,7 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     MemoryVersionConflictError: status.HTTP_409_CONFLICT,  # 213
     BucketNameValidationError: status.HTTP_400_BAD_REQUEST,  # 214
     MemoryAccessDeniedError: status.HTTP_403_FORBIDDEN,  # 215
+    DocumentVersionConflictError: status.HTTP_409_CONFLICT,  # 216
     # 角色子域异常
     RoleNotFoundError: status.HTTP_404_NOT_FOUND,  # 221
     RoleAlreadyExistsError: status.HTTP_409_CONFLICT,  # 222

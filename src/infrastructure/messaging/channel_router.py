@@ -98,6 +98,13 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="文档上传完成",
         ),
+        "DocumentVersionSnapshotCreated": ChannelMapping(
+            event_type="DocumentVersionSnapshotCreated",
+            redis_channel="sisys:rt:document_version_snapshot_created",
+            rabbitmq_routing_key="sisys.events.reliable.document_version_snapshot_created",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="文档版本快照创建完成",
+        ),
         "MemoryChanged": ChannelMapping(
             event_type="MemoryChanged",
             rabbitmq_routing_key="sisys.events.reliable.memory_changed",

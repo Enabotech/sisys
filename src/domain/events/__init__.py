@@ -20,7 +20,7 @@ from .compliance_events import (
     SensitiveDataDetected,
 )
 from .correction_events import CorrectionApproved
-from .document_events import DocumentProcessed, DocumentUploaded
+from .document_events import DocumentProcessed, DocumentUploaded, DocumentVersionSnapshotCreated
 from .enums import CorrectionType, DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
 from .heartbeat_events import HeartbeatTriggered
 from .isolation_events import IsolationLevelSwitched
@@ -34,6 +34,7 @@ __all__ = [
     "DomainEvent",
     "DocumentProcessed",
     "DocumentUploaded",
+    "DocumentVersionSnapshotCreated",
     "ToolExecuted",
     "AgentDecided",
     "CheckpointReached",

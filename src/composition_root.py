@@ -1046,7 +1046,7 @@ def bootstrap() -> None:
 
     register_port(
         name="document_repository",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=DocumentRepositoryPort,
         impl="src.infrastructure.storage.postgresql.repository.document_repository.PostgreSQLDocumentRepository",
         module="src.infrastructure.storage.postgresql.repository.document_repository",
@@ -1294,6 +1294,37 @@ def bootstrap() -> None:
         impl=_create_parsing_service,
         module="src.application.services.document_parsing_service",
         lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+    )
+
+    # DocumentVersionService — 文档版本快照服务
+    from src.application.services.document_version_service import DocumentVersionService
+
+    register_port(
+        name="document_version_service",
+        version="v1.0.0",
+        interface=DocumentVersionService,
+        impl=lambda resolver: DocumentVersionService(
+            document_repository=resolver.resolve("document_repository"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.services.document_version_service",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+    )
+
+    # DocumentVersionHandler — 事件驱动自动触发版本快照
+    from src.application.event_handlers.document_version_handler import DocumentVersionHandler
+
+    register_port(
+        name="document_version_handler",
+        version="v1.0.0",
+        interface=DocumentVersionHandler,
+        impl=lambda resolver: DocumentVersionHandler(
+            document_version_service=resolver.resolve("document_version_service"),
+        ),
+        module="src.application.event_handlers.document_version_handler",
+        lifetime=Lifetime.SINGLETON,
         owner="epic-2",
     )
 

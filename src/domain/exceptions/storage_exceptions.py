@@ -111,7 +111,53 @@ class MemoryAccessDeniedError(PermissionDeniedError):
     message = "Memory access denied"
 
 
+class DocumentVersionConflictError(ConflictError):
+    """文档版本冲突异常
+
+    当乐观锁检查发现文档版本不匹配时抛出。
+
+    Attributes:
+        code: 异常编码
+        document_id: 冲突的文档标识
+        expected_version: 期望的版本号
+        actual_version: 实际的版本号
+    """
+
+    code = "EXCEPTION_216"
+
+    def __init__(
+        self,
+        document_id: UUID,
+        expected_version: int,
+        actual_version: int,
+        message: str | None = None,
+        cause: Exception | None = None,
+        context: dict | None = None,
+    ) -> None:
+        """初始化文档版本冲突异常
+
+        Args:
+            document_id: 冲突的文档标识
+            expected_version: 期望的版本号
+            actual_version: 实际的版本号
+            message: 异常消息，默认使用标准格式
+            cause: 导致此异常的原因
+            context: 额外上下文信息
+        """
+        self.document_id = document_id
+        self.expected_version = expected_version
+        self.actual_version = actual_version
+        if message is None:
+            message = f"文档版本冲突: document_id={document_id}, expected={expected_version}, actual={actual_version}"
+        merged_context = dict(context or {})
+        merged_context["document_id"] = str(document_id)
+        merged_context["expected_version"] = expected_version
+        merged_context["actual_version"] = actual_version
+        super().__init__(message, cause=cause, context=merged_context)
+
+
 __all__ = [
+    "DocumentVersionConflictError",
     "MemoryVersionConflictError",
     "MemoryNotFoundError",
     "BucketNotFoundError",
