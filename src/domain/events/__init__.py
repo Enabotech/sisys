@@ -20,7 +20,7 @@ from .compliance_events import (
     SensitiveDataDetected,
 )
 from .correction_events import CorrectionApproved
-from .document_events import DocumentProcessed
+from .document_events import DocumentProcessed, DocumentUploaded
 from .enums import CorrectionType, DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
 from .heartbeat_events import HeartbeatTriggered
 from .isolation_events import IsolationLevelSwitched
@@ -33,6 +33,7 @@ from .workflow_events import RAGIndexed, ReportGenerated, WorkflowSubmitted
 __all__ = [
     "DomainEvent",
     "DocumentProcessed",
+    "DocumentUploaded",
     "ToolExecuted",
     "AgentDecided",
     "CheckpointReached",
