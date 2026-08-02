@@ -227,7 +227,12 @@ def create_document_upload_router(
             tmp.write(content)
             tmp_path = tmp.name
 
-        meta_dict = json.loads(metadata) if metadata else {}
+        meta_dict: dict[str, Any] | None = None
+        try:
+            parsed = json.loads(metadata) if metadata else {}
+            meta_dict = parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            meta_dict = None
 
         doc = await svc.upload(
             filename=file.filename or "unknown",
@@ -279,7 +284,12 @@ def create_document_upload_router(
             tmp.close()
             file_paths.append(tmp.name)
 
-        metadata_list = json.loads(metadata) if metadata else []
+        metadata_list: list[dict[str, Any] | None] | None = None
+        try:
+            parsed_list = json.loads(metadata) if metadata else []
+            metadata_list = parsed_list if isinstance(parsed_list, list) else None
+        except json.JSONDecodeError:
+            metadata_list = None
 
         result = await svc.upload_batch(
             files=file_infos,
@@ -380,9 +390,11 @@ def create_document_upload_router(
         meta_dict: dict[str, Any] | None = None
         if state.metadata:
             try:
-                meta_dict = json.loads(state.metadata)
+                parsed = json.loads(state.metadata)
+                if isinstance(parsed, dict):
+                    meta_dict = parsed
             except json.JSONDecodeError:
-                meta_dict = None
+                pass
 
         doc = await svc.register_document(
             filename=state.filename,

@@ -73,11 +73,13 @@ class DocumentMetadata:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """确保 metadata 不为 None。"""
+        """确保 metadata 为 dict 类型。"""
         if self.metadata is None:
             object.__setattr__(self, "metadata", {})
+        elif not isinstance(self.metadata, dict):
+            object.__setattr__(self, "metadata", {})
 
-    def validate(self, raise_on_error: bool = True) -> list[str] | None:
+    def validate(self, raise_on_error: bool = True) -> list[str]:
         """验证最小元字段集完整性。
 
         支持灰度日志模式：当 raise_on_error=False 时，
@@ -88,9 +90,7 @@ class DocumentMetadata:
                             （True=抛出，False=仅返回缺失字段列表）
 
         Returns:
-            当 raise_on_error=False 时，返回缺失字段列表
-            （无缺失返回空列表）；raise_on_error=True 时返回 None
-            （无缺失时返回空列表）
+            缺失字段列表（无缺失时返回空列表）
 
         Raises:
             MetadataValidationError: 当 raise_on_error=True 且存在缺失字段时抛出
@@ -151,11 +151,11 @@ class DocumentMetadata:
         metadata = dict(raw_metadata or {})
 
         # 自动填充 creator（如果未显式提供）
-        if "creator" not in metadata or metadata["creator"] is None or metadata["creator"] == "":
+        if not metadata.get("creator"):
             metadata["creator"] = uploaded_by
 
         # 自动填充 created_at（如果未显式提供）
-        if "created_at" not in metadata or metadata["created_at"] is None or metadata["created_at"] == "":
+        if not metadata.get("created_at"):
             metadata["created_at"] = datetime.now(UTC).isoformat()
 
         return cls(document_id=document_id, metadata=metadata)
