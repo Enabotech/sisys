@@ -64,6 +64,7 @@ from src.domain.exceptions.service_exceptions import (
 from src.domain.exceptions.storage_exceptions import (
     BucketNameValidationError,
     BucketNotFoundError,
+    ChunkingError,
     DocumentVersionConflictError,
     MemoryAccessDeniedError,
     MemoryNotFoundError,
@@ -118,6 +119,7 @@ __all__ = [
     "ComplianceLockError",
     "DocumentVersionConflictError",
     "MetadataValidationError",
+    "ChunkingError",
     # 存储异常
     "MemoryVersionConflictError",
     "MemoryNotFoundError",

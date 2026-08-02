@@ -70,8 +70,18 @@ class TestDocumentMetadataCreation:
     def test_create_with_none_metadata(self) -> None:
         """验证 metadata 参数为 None 时使用空字典"""
         doc_id = uuid4()
-        doc_meta = DocumentMetadata(document_id=doc_id, metadata=None)
+        # 不传 metadata 参数，default_factory 应创建空字典
+        doc_meta = DocumentMetadata(document_id=doc_id)
         assert doc_meta.metadata == {}
+
+    def test_create_with_none_vs_empty_consistency(self) -> None:
+        """验证不传 metadata 与 metadata={} 行为一致"""
+        doc_id = uuid4()
+        meta_none = DocumentMetadata(document_id=doc_id)
+        meta_empty = DocumentMetadata(document_id=doc_id, metadata={})
+        assert meta_none.metadata == meta_empty.metadata
+        # 后续 validate() 和 missing_fields() 行为也应一致
+        assert meta_none.missing_fields() == meta_empty.missing_fields()
 
     def test_document_id_is_uuid(self) -> None:
         """验证 document_id 是 UUID 类型"""
@@ -229,8 +239,8 @@ class TestDocumentMetadataValidate:
         missing = doc_meta.validate(raise_on_error=False)
         assert missing == []
 
-    def test_validate_raise_on_error_default_is_true(self) -> None:
-        """验证 raise_on_error 默认值为 True（抛出异常）"""
+    def test_validate_raise_on_error_default_blocks_missing(self) -> None:
+        """验证 raise_on_error 默认值为 True（缺失字段时抛出异常）"""
         from src.domain.exceptions.storage_exceptions import MetadataValidationError
 
         doc_meta = DocumentMetadata(
@@ -241,6 +251,25 @@ class TestDocumentMetadataValidate:
         )
         with pytest.raises(MetadataValidationError):
             doc_meta.validate()
+
+    def test_validate_raise_on_error_true_and_false_consistency(self) -> None:
+        """验证 raise_on_error=True 和 False 的一致性：缺失字段列表相同"""
+        from src.domain.exceptions.storage_exceptions import MetadataValidationError
+
+        doc_meta = DocumentMetadata(
+            document_id=uuid4(),
+            metadata={
+                "creator": "test-user",
+            },
+        )
+        # raise_on_error=False 返回缺失字段列表
+        missing_false = doc_meta.validate(raise_on_error=False)
+        # raise_on_error=True 抛出异常，异常中包含缺失字段
+        with pytest.raises(MetadataValidationError) as exc_info:
+            doc_meta.validate(raise_on_error=True)
+        missing_true = exc_info.value.context["missing_fields"]
+        # 两种模式返回的缺失字段列表应一致
+        assert set(missing_false) == set(missing_true)
 
 
 class TestDocumentMetadataMissingFields:

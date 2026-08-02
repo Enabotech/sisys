@@ -52,6 +52,11 @@ from src.domain.value_objects.parsed_document import (
     ParsedPage,
     ParsedTable,
 )
+from src.domain.value_objects.semantic_chunk import (
+    ChunkBoundaryType,
+    ChunkingConfig,
+    SemanticChunk,
+)
 from src.domain.value_objects.storage_encryption_result import (
     EncryptedData,
     EncryptionVerificationResult,
@@ -81,6 +86,8 @@ __all__ = [
     "BackupType",
     "BoundingBox",
     "BoundingBoxResult",
+    "ChunkBoundaryType",
+    "ChunkingConfig",
     "CHUNKED_UPLOAD_TTL",
     "CHUNK_SIZES",
     "ColumnInfo",
@@ -113,6 +120,7 @@ __all__ = [
     "RateLimitResult",
     "ResourceLimitsStatus",
     "RestoreResult",
+    "SemanticChunk",
     "SUPPORTED_FORMATS",
     "TokenPayload",
     "UDMRTask",

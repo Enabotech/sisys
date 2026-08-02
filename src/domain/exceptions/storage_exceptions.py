@@ -201,7 +201,49 @@ class MetadataValidationError(BusinessRuleViolationError):
         super().__init__(message, cause=cause, context=merged_context)
 
 
+class ChunkingError(BusinessRuleViolationError):
+    """语义分块异常
+
+    当文档语义分块算法内部出现异常时抛出（如不可序列化的数据结构）。
+    空文档/所有页面无有效文本内容时，分块器返回空列表且不抛异常。
+
+    Attributes:
+        code: 异常编码 EXCEPTION_218
+        document_id: 分块失败的文档标识
+        reason: 失败原因描述
+    """
+
+    code = "EXCEPTION_218"
+
+    def __init__(
+        self,
+        document_id: UUID,
+        reason: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+        context: dict | None = None,
+    ) -> None:
+        """初始化语义分块异常
+
+        Args:
+            document_id: 分块失败的文档标识
+            reason: 失败原因描述
+            message: 异常消息，默认使用标准格式
+            cause: 导致此异常的原因
+            context: 额外上下文信息
+        """
+        self.document_id = document_id
+        self.reason = reason
+        if message is None:
+            message = f"语义分块失败: document_id={document_id}, reason={reason}" if reason else f"语义分块失败: document_id={document_id}"
+        merged_context = dict(context or {})
+        merged_context["document_id"] = str(document_id)
+        merged_context["reason"] = reason
+        super().__init__(message, cause=cause, context=merged_context)
+
+
 __all__ = [
+    "ChunkingError",
     "DocumentVersionConflictError",
     "MemoryVersionConflictError",
     "MemoryNotFoundError",

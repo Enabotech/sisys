@@ -122,7 +122,7 @@ class TestUploadMetadataIntegration:
         assert "created_at" in doc.metadata  # 自动填充
 
     @pytest.mark.asyncio
-    async def test_upload_missing_metadata_blocks(self) -> None:
+    async def test_upload_missing_metadata_blocks_and_no_side_effects(self) -> None:
         """验证缺失必需字段时阻断（无 MinIO 存储、无 PG 持久化）"""
         from src.domain.exceptions.storage_exceptions import MetadataValidationError
 
@@ -143,7 +143,7 @@ class TestUploadMetadataIntegration:
                 file_path="/tmp/test.pdf",
                 metadata=metadata,
             )
-        # 验证 MinIO 存储未被调用
+        # 验证 MinIO 存储未被调用（校验在 MinIO 前执行）
         svc._storage.store_document.assert_not_called()
         # 验证 PG 持久化未被调用
         svc._repository.save.assert_not_called()
@@ -195,23 +195,7 @@ class TestUploadMetadataIntegration:
         assert "source" in missing
         assert "license" in missing
         assert "business_domain" in missing
-
-    @pytest.mark.asyncio
-    async def test_upload_validation_before_minio_storage(self) -> None:
-        """验证校验在 MinIO 存储前执行"""
-        from src.domain.exceptions.storage_exceptions import MetadataValidationError
-
-        svc = _make_upload_service()
-        with pytest.raises(MetadataValidationError):
-            await svc.upload(
-                filename="test.pdf",
-                mime_type="application/pdf",
-                file_size_bytes=1024,
-                tenant_id="tenant-1",
-                uploaded_by="user-1",
-                file_path="/tmp/test.pdf",
-            )
-        # MinIO 不应被调用
+        # MinIO 不应被调用（校验在 MinIO 前执行）
         svc._storage.store_document.assert_not_called()
 
     @pytest.mark.asyncio
@@ -241,6 +225,28 @@ class TestUploadMetadataIntegration:
         # 事件发布被调用
         svc._publisher.publish.assert_called_once()
         assert doc.metadata.get("source") == "internal"
+
+    @pytest.mark.asyncio
+    async def test_upload_log_only_mode_does_not_block(self) -> None:
+        """验证灰度日志模式（log_only）下校验失败不阻断上传"""
+        svc = _make_upload_service()
+        # 设置 log_only 模式
+        svc._validation_mode = "log_only"
+        # 不传 metadata 触发校验失败，但应不阻断
+        doc = await svc.upload(
+            filename="test.pdf",
+            mime_type="application/pdf",
+            file_size_bytes=1024,
+            tenant_id="tenant-1",
+            uploaded_by="user-1",
+            file_path="/tmp/test.pdf",
+        )
+        # 上传仍成功（不抛出异常）
+        assert doc is not None
+        # MinIO 存储被调用
+        svc._storage.store_document.assert_called_once()
+        # PG 持久化被调用
+        svc._repository.save.assert_called_once()
 
 
 class TestRegisterDocumentMetadataIntegration:
@@ -433,12 +439,67 @@ class TestUploadBatchMetadataIntegration:
         assert result["success"] == 1
         assert result["failed"] == 2
 
+    @pytest.mark.asyncio
+    async def test_upload_batch_metadata_list_longer_than_files(self) -> None:
+        """验证 metadata_list 长度大于 files 时超出部分被忽略"""
+        svc = _make_upload_service()
+        file_infos = [
+            {"filename": "doc1.pdf", "mime_type": "application/pdf", "file_size_bytes": 100},
+        ]
+        metadata_list = [
+            {
+                "creator": "user1",
+                "created_at": "2024-01-15T10:30:00Z",
+                "source": "internal",
+                "license": "confidential",
+                "business_domain": "finance",
+            },
+            None,  # 超出部分，应被忽略
+        ]
+        result = await svc.upload_batch(
+            files=file_infos,
+            tenant_id="tenant-1",
+            uploaded_by="user-1",
+            file_paths=["/tmp/doc1.pdf"],
+            metadata_list=metadata_list,
+        )
+        assert result["success"] == 1
+        assert result["failed"] == 0
+
+    @pytest.mark.asyncio
+    async def test_upload_batch_metadata_list_shorter_than_files(self) -> None:
+        """验证 metadata_list 长度小于 files 时不足部分传 None"""
+        svc = _make_upload_service()
+        file_infos = [
+            {"filename": "doc1.pdf", "mime_type": "application/pdf", "file_size_bytes": 100},
+            {"filename": "doc2.pdf", "mime_type": "application/pdf", "file_size_bytes": 200},
+        ]
+        metadata_list = [
+            {
+                "creator": "user1",
+                "created_at": "2024-01-15T10:30:00Z",
+                "source": "internal",
+                "license": "confidential",
+                "business_domain": "finance",
+            },
+            # 不足部分，第二个文件传 None
+        ]
+        result = await svc.upload_batch(
+            files=file_infos,
+            tenant_id="tenant-1",
+            uploaded_by="user-1",
+            file_paths=["/tmp/doc1.pdf", "/tmp/doc2.pdf"],
+            metadata_list=metadata_list,
+        )
+        # 第一个文件有完整 metadata 成功，第二个文件无 metadata 失败
+        assert result["success"] == 1
+        assert result["failed"] == 1
+
 
 class TestChunkedUploadStateMetadata:
     """验证 ChunkedUploadState metadata 持久化"""
 
-    @pytest.mark.asyncio
-    async def test_chunked_upload_state_metadata_serialization(self) -> None:
+    def test_chunked_upload_state_metadata_serialization(self) -> None:
         """验证 metadata 字段在 to_json() 序列化后被保留"""
         from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
 
@@ -453,8 +514,7 @@ class TestChunkedUploadStateMetadata:
         assert "metadata" in json_str
         assert "test-user" in json_str
 
-    @pytest.mark.asyncio
-    async def test_chunked_upload_state_metadata_deserialization(self) -> None:
+    def test_chunked_upload_state_metadata_deserialization(self) -> None:
         """验证 from_json() 反序列化后 metadata 字段正确恢复"""
         from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
 
@@ -469,8 +529,7 @@ class TestChunkedUploadStateMetadata:
         restored = ChunkedUploadState.from_json(json_str)
         assert restored.metadata == '{"creator": "test-user", "source": "internal"}'
 
-    @pytest.mark.asyncio
-    async def test_chunked_upload_state_metadata_none(self) -> None:
+    def test_chunked_upload_state_metadata_none(self) -> None:
         """验证 metadata=None 时向后兼容"""
         from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadState
 
@@ -485,8 +544,7 @@ class TestChunkedUploadStateMetadata:
         restored = ChunkedUploadState.from_json(json_str)
         assert restored.metadata is None
 
-    @pytest.mark.asyncio
-    async def test_chunked_upload_state_metadata_missing_in_json(self) -> None:
+    def test_chunked_upload_state_metadata_missing_in_json(self) -> None:
         """验证旧数据（无 metadata 字段）反序列化时兼容"""
         import json
 
