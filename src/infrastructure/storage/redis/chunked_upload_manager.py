@@ -31,6 +31,7 @@ class ChunkedUploadState:
         uploaded_parts: list[dict[str, Any]] | None = None,
         minio_upload_id: str | None = None,
         object_key: str | None = None,
+        metadata: str | None = None,
     ) -> None:
         self.upload_id = upload_id
         self.filename = filename
@@ -39,6 +40,7 @@ class ChunkedUploadState:
         self.uploaded_parts = uploaded_parts or []
         self.minio_upload_id = minio_upload_id
         self.object_key = object_key
+        self.metadata = metadata
 
     def to_json(self) -> str:
         return json.dumps(
@@ -50,6 +52,7 @@ class ChunkedUploadState:
                 "uploaded_parts": self.uploaded_parts,
                 "minio_upload_id": self.minio_upload_id,
                 "object_key": self.object_key,
+                "metadata": self.metadata,
             }
         )
 
@@ -64,6 +67,7 @@ class ChunkedUploadState:
             uploaded_parts=obj.get("uploaded_parts", []),
             minio_upload_id=obj.get("minio_upload_id"),
             object_key=obj.get("object_key"),
+            metadata=obj.get("metadata"),
         )
 
 
@@ -93,6 +97,7 @@ class ChunkedUploadManager:
         file_size: int,
         minio_upload_id: str | None = None,
         object_key: str | None = None,
+        metadata: str | None = None,
     ) -> dict[str, Any]:
         """初始化分片上传
 
@@ -101,6 +106,7 @@ class ChunkedUploadManager:
             file_size: 文件总大小（字节）
             minio_upload_id: MinIO 分片上传会话 ID
             object_key: MinIO 对象键
+            metadata: 文档元数据 JSON 字符串（可选，用于持久化）
 
         Returns:
             {"upload_id": str, "chunk_size": int, "total_parts": int}
@@ -117,6 +123,7 @@ class ChunkedUploadManager:
             chunk_size=chunk_size,
             minio_upload_id=minio_upload_id,
             object_key=object_key,
+            metadata=metadata,
         )
 
         await self._cache.set(

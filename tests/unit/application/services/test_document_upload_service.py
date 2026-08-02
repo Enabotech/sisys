@@ -58,6 +58,13 @@ class TestDocumentUploadServiceUploadSingleFile:
                 tenant_id="t1",
                 uploaded_by="u1",
                 file_path="/tmp/test.pdf",
+                metadata={
+                    "creator": "u1",
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "source": "internal",
+                    "license": "confidential",
+                    "business_domain": "finance",
+                },
             )
         )
 
@@ -180,6 +187,13 @@ class TestDocumentUploadServiceUploadSingleFile:
                 tenant_id="t1",
                 uploaded_by="u1",
                 file_path="/tmp/test.pdf",
+                metadata={
+                    "creator": "u1",
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "source": "internal",
+                    "license": "confidential",
+                    "business_domain": "finance",
+                },
             )
         )
 
@@ -208,7 +222,28 @@ class TestDocumentUploadServiceUploadBatch:
         ]
 
         result = asyncio.run(
-            service.upload_batch(files=files, tenant_id="t1", uploaded_by="u1", file_paths=["/tmp/a", "/tmp/b"])
+            service.upload_batch(
+                files=files,
+                tenant_id="t1",
+                uploaded_by="u1",
+                file_paths=["/tmp/a", "/tmp/b"],
+                metadata_list=[
+                    {
+                        "creator": "u1",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "source": "internal",
+                        "license": "confidential",
+                        "business_domain": "finance",
+                    },
+                    {
+                        "creator": "u1",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "source": "internal",
+                        "license": "confidential",
+                        "business_domain": "finance",
+                    },
+                ],
+            )
         )
 
         assert result["total"] == 2
@@ -218,7 +253,7 @@ class TestDocumentUploadServiceUploadBatch:
     def test_upload_batch_empty_raises(self) -> None:
         service = _make_upload_service()
         with pytest.raises(ValidationError, match="空批量"):
-            asyncio.run(service.upload_batch(files=[], tenant_id="t1", uploaded_by="u1", file_paths=[]))
+            asyncio.run(service.upload_batch(files=[], tenant_id="t1", uploaded_by="u1", file_paths=[], metadata_list=[]))
 
     def test_upload_batch_partial_failure(self) -> None:
         repo = AsyncMock(spec=DocumentRepositoryPort)
@@ -234,7 +269,22 @@ class TestDocumentUploadServiceUploadBatch:
         ]
 
         result = asyncio.run(
-            service.upload_batch(files=files, tenant_id="t1", uploaded_by="u1", file_paths=["/tmp/a", "/tmp/b"])
+            service.upload_batch(
+                files=files,
+                tenant_id="t1",
+                uploaded_by="u1",
+                file_paths=["/tmp/a", "/tmp/b"],
+                metadata_list=[
+                    {
+                        "creator": "u1",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "source": "internal",
+                        "license": "confidential",
+                        "business_domain": "finance",
+                    },
+                    None,
+                ],
+            )
         )
 
         assert result["total"] == 2
@@ -266,7 +316,22 @@ class TestDocumentUploadServiceUploadBatch:
             {"filename": "exact.pdf", "mime_type": "application/pdf", "file_size_bytes": max_batch},
         ]
 
-        result = asyncio.run(service.upload_batch(files=files, tenant_id="t1", uploaded_by="u1", file_paths=["/tmp/a"]))
+        meta = {
+            "creator": "u1",
+            "created_at": "2024-01-15T10:30:00Z",
+            "source": "internal",
+            "license": "confidential",
+            "business_domain": "finance",
+        }
+        result = asyncio.run(
+            service.upload_batch(
+                files=files,
+                tenant_id="t1",
+                uploaded_by="u1",
+                file_paths=["/tmp/a"],
+                metadata_list=[meta],
+            )
+        )
 
         assert result["total"] == 1
         assert result["success"] == 1
@@ -361,6 +426,13 @@ class TestDocumentUploadServiceEdgeCases:
                     tenant_id="t1",
                     uploaded_by="u1",
                     file_path="/tmp/test.pdf",
+                    metadata={
+                        "creator": "u1",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "source": "internal",
+                        "license": "confidential",
+                        "business_domain": "finance",
+                    },
                 )
             )
 
@@ -388,6 +460,13 @@ class TestDocumentUploadServiceEdgeCases:
                     tenant_id="t1",
                     uploaded_by="u1",
                     file_path="/tmp/test.pdf",
+                    metadata={
+                        "creator": "u1",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "source": "internal",
+                        "license": "confidential",
+                        "business_domain": "finance",
+                    },
                 )
             )
 
@@ -416,6 +495,13 @@ class TestDocumentUploadServiceEdgeCases:
                     tenant_id="t1",
                     uploaded_by="u1",
                     file_path="/tmp/test.pdf",
+                    metadata={
+                        "creator": "u1",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "source": "internal",
+                        "license": "confidential",
+                        "business_domain": "finance",
+                    },
                 )
             )
 
@@ -445,6 +531,13 @@ class TestDocumentUploadServiceRegisterDocument:
                 file_size_bytes=1024 * 1024 * 100,
                 tenant_id="t1",
                 uploaded_by="u1",
+                metadata={
+                    "creator": "u1",
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "source": "internal",
+                    "license": "confidential",
+                    "business_domain": "finance",
+                },
             )
         )
 
@@ -467,6 +560,13 @@ class TestDocumentUploadServiceRegisterDocument:
                 file_size_bytes=1024,
                 tenant_id="t1",
                 uploaded_by="u1",
+                metadata={
+                    "creator": "u1",
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "source": "internal",
+                    "license": "confidential",
+                    "business_domain": "finance",
+                },
             )
         )
 
@@ -491,6 +591,13 @@ class TestDocumentUploadServiceRegisterDocument:
                 file_size_bytes=1024,
                 tenant_id="t1",
                 uploaded_by="u1",
+                metadata={
+                    "creator": "u1",
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "source": "internal",
+                    "license": "confidential",
+                    "business_domain": "finance",
+                },
             )
         )
 

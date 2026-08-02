@@ -7,9 +7,7 @@ Run with: poetry run pytest tests/unit/domain/exceptions/test_metadata_validatio
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
-
-import pytest
+from uuid import uuid4
 
 from src.domain.exceptions import BusinessRuleViolationError
 from src.domain.exceptions.storage_exceptions import MetadataValidationError
@@ -154,6 +152,7 @@ class TestMetadataValidationErrorHttpMapping:
         exc = MetadataValidationError(document_id=uuid4(), missing_fields=["license"])
         status_code = _get_http_status(exc)
         from fastapi import status
+
         assert status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_exception_http_map_contains_exact_type(self) -> None:
@@ -163,4 +162,5 @@ class TestMetadataValidationErrorHttpMapping:
     def test_exception_http_map_maps_to_422(self) -> None:
         """验证 EXCEPTION_HTTP_MAP 中映射到 422"""
         from fastapi import status
+
         assert EXCEPTION_HTTP_MAP[MetadataValidationError] == status.HTTP_422_UNPROCESSABLE_ENTITY

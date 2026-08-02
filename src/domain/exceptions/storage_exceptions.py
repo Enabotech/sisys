@@ -13,11 +13,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from src.domain.exceptions.business_exceptions import (
+    BusinessRuleViolationError,
     ConflictError,
     NotFoundError,
     PermissionDeniedError,
     ValidationError,
-    BusinessRuleViolationError,
 )
 from src.domain.exceptions.system_exceptions import NetworkError
 

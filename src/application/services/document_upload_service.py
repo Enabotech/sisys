@@ -7,9 +7,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import uuid
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from src.application.ports.document_storage_port import DocumentStoragePort
 from src.domain.entities.document import Document, DocumentType, ParseStatus
@@ -18,6 +19,7 @@ from src.domain.exceptions import ValidationError
 from src.domain.ports.document_repository import DocumentQuery, DocumentRepositoryPort
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.value_objects.document_format import get_mime_type, is_supported
+from src.domain.value_objects.document_metadata import DocumentMetadata
 from src.domain.value_objects.upload_limits import MAX_BATCH_SIZE, MAX_FILE_SIZE, MAX_FILENAME_LENGTH
 
 # 文件名非法字符模式
@@ -25,6 +27,9 @@ _INVALID_FILENAME_PATTERN = re.compile(r"[\x00\\/]")
 
 # 批量上传并发数
 _BATCH_CONCURRENCY = 20
+
+# 元数据校验模式（灰度日志模式：校验失败仅记录日志，不阻断上传）
+_VALIDATION_MODE = os.getenv("METADATA_VALIDATION_MODE", "enforce")
 
 
 class BatchFileInfo(TypedDict):
@@ -82,10 +87,11 @@ class DocumentUploadService:
         uploaded_by: str,
         file_path: str,
         document_type: str = "other",
+        metadata: dict[str, Any] | None = None,
     ) -> Document:
         """上传单个文件
 
-        流程：格式校验 → 实体构造 → MinIO 存储 → PG 元数据 → 事件发布
+        流程：格式校验 → 实体构造 → 元数据校验 → MinIO 存储 → PG 元数据 → 事件发布
 
         Args:
             filename: 原始文件名
@@ -95,12 +101,14 @@ class DocumentUploadService:
             uploaded_by: 上传者用户标识符
             file_path: 临时文件路径
             document_type: 文档类型（默认 other）
+            metadata: 文档元数据字典（可选，包含 creator/created_at/source/license/business_domain）
 
         Returns:
             持久化后的 Document 实体
 
         Raises:
             ValidationError: 格式不支持、文件大小超限、文件名非法等
+            MetadataValidationError: 元数据缺失或不合法
         """
         self._validate_upload(filename, mime_type, file_size_bytes)
 
@@ -114,6 +122,9 @@ class DocumentUploadService:
             tenant_id=tenant_id,
             uploaded_by=uploaded_by,
         )
+
+        # 元数据校验（MinIO 存储前）
+        self._validate_and_apply_metadata(doc, metadata, uploaded_by)
 
         object_key = await self._storage.store_document(
             user_id=uploaded_by,
@@ -143,6 +154,7 @@ class DocumentUploadService:
         tenant_id: str,
         uploaded_by: str,
         file_paths: list[str],
+        metadata_list: list[dict[str, Any] | None] | None = None,
     ) -> BatchUploadResult:
         """批量上传文件
 
@@ -154,6 +166,7 @@ class DocumentUploadService:
             tenant_id: 租户标识符
             uploaded_by: 上传者
             file_paths: 对应的临时文件路径列表
+            metadata_list: 每个文件的元数据字典列表（可选，索引与 files 对齐）
 
         Returns:
             批量结果汇总
@@ -176,6 +189,7 @@ class DocumentUploadService:
             """带并发控制的单文件上传"""
             async with semaphore:
                 try:
+                    meta = metadata_list[index] if metadata_list and index < len(metadata_list) else None
                     doc = await self.upload(
                         filename=file_info["filename"],
                         mime_type=file_info["mime_type"],
@@ -183,13 +197,14 @@ class DocumentUploadService:
                         tenant_id=tenant_id,
                         uploaded_by=uploaded_by,
                         file_path=file_paths[index] if index < len(file_paths) else "",
+                        metadata=meta,
                     )
                     return {
                         "filename": file_info["filename"],
                         "status": "success",
                         "document_id": str(doc.document_id),
                     }
-                except (ValueError, Exception) as e:
+                except Exception as e:
                     return {
                         "filename": file_info["filename"],
                         "status": "failed",
@@ -232,6 +247,7 @@ class DocumentUploadService:
         uploaded_by: str,
         document_type: str = "other",
         object_key: str = "",
+        metadata: dict[str, Any] | None = None,
     ) -> Document:
         """注册已上传的文档（分片上传完成后调用）
 
@@ -246,12 +262,14 @@ class DocumentUploadService:
             uploaded_by: 上传者
             document_type: 文档类型
             object_key: MinIO 对象键（分片上传完成后获取）
+            metadata: 文档元数据字典（可选，分片上传在 init 时传入）
 
         Returns:
             持久化后的 Document 实体
 
         Raises:
             ValidationError: 格式校验失败
+            MetadataValidationError: 元数据缺失或不合法
         """
         self._validate_upload(filename, mime_type, file_size_bytes)
 
@@ -265,6 +283,9 @@ class DocumentUploadService:
             tenant_id=tenant_id,
             uploaded_by=uploaded_by,
         )
+
+        # 元数据校验（PG 持久化前）
+        self._validate_and_apply_metadata(doc, metadata, uploaded_by)
 
         if object_key:
             doc.metadata["storage_object_key"] = object_key
@@ -305,3 +326,49 @@ class DocumentUploadService:
 
         if file_size_bytes > MAX_FILE_SIZE:
             raise ValidationError(message=f"文件大小超过限制（最大 {MAX_FILE_SIZE // (1024**3)}GB）")
+
+    def _validate_and_apply_metadata(
+        self,
+        doc: Document,
+        metadata: dict[str, Any] | None,
+        uploaded_by: str,
+    ) -> None:
+        """校验并应用元数据到文档实体。
+
+        使用 DocumentMetadata 值对象执行校验：
+        1. 调用 from_upload() 自动填充 creator/created_at
+        2. 执行 validate() 校验最小元字段集
+        3. 校验通过后将元数据拷贝到 Document 实体
+
+        支持灰度日志模式（METADATA_VALIDATION_MODE=log_only）：
+        校验失败仅记录 WARNING 日志，不阻断上传。
+
+        Args:
+            doc: 文档实体（将在校验通过后写入 metadata）
+            metadata: 原始元数据字典
+            uploaded_by: 上传者标识符
+
+        Raises:
+            MetadataValidationError: 元数据校验失败
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        doc_metadata = DocumentMetadata.from_upload(
+            document_id=doc.document_id,
+            raw_metadata=metadata,
+            uploaded_by=uploaded_by,
+        )
+        if _VALIDATION_MODE == "log_only":
+            missing = doc_metadata.validate(raise_on_error=False)
+            if missing:
+                logger.warning(
+                    "元数据校验失败（灰度模式）: document_id=%s, missing_fields=%s",
+                    doc.document_id,
+                    missing,
+                )
+        else:
+            doc_metadata.validate()
+
+        doc.metadata = dict(doc_metadata.metadata)

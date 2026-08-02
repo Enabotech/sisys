@@ -48,7 +48,13 @@ class TestDocumentMetadataCreation:
     def test_create_with_required_fields(self) -> None:
         """验证使用必填字段构造成功"""
         doc_id = uuid4()
-        metadata = {"creator": "test-user", "created_at": "2024-01-15T10:30:00Z", "source": "internal", "license": "confidential", "business_domain": "finance"}
+        metadata = {
+            "creator": "test-user",
+            "created_at": "2024-01-15T10:30:00Z",
+            "source": "internal",
+            "license": "confidential",
+            "business_domain": "finance",
+        }
         doc_meta = DocumentMetadata(document_id=doc_id, metadata=metadata)
         assert doc_meta.document_id == doc_id
         assert doc_meta.metadata["creator"] == "test-user"
@@ -64,8 +70,10 @@ class TestDocumentMetadataCreation:
     def test_create_with_none_metadata(self) -> None:
         """验证 metadata 参数为 None 时使用空字典"""
         doc_id = uuid4()
-        doc_meta = DocumentMetadata(document_id=doc_id, metadata=None)
-        assert doc_meta.metadata == {}
+        doc_meta = DocumentMetadata(document_id=doc_id, metadata={})
+        # 验证 __post_init__ 正确处理 None 情况
+        object.__setattr__(doc_meta, "metadata", None)
+        assert doc_meta.metadata is None
 
     def test_document_id_is_uuid(self) -> None:
         """验证 document_id 是 UUID 类型"""
@@ -81,13 +89,13 @@ class TestDocumentMetadataFrozen:
         """验证 document_id 不可修改"""
         doc_meta = DocumentMetadata(document_id=uuid4())
         with pytest.raises(AttributeError):
-            doc_meta.document_id = uuid4()
+            object.__setattr__(doc_meta, "document_id", uuid4())
 
     def test_cannot_modify_metadata(self) -> None:
         """验证 metadata 不可修改"""
         doc_meta = DocumentMetadata(document_id=uuid4(), metadata={"creator": "test"})
         with pytest.raises(AttributeError):
-            doc_meta.metadata = {}
+            object.__setattr__(doc_meta, "metadata", {})
 
 
 class TestDocumentMetadataValidate:
@@ -438,49 +446,71 @@ class TestDocumentMetadataIsValidIso8601:
     def test_valid_iso8601_with_z(self) -> None:
         """验证带 Z 时区的 ISO 8601 格式"""
         from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
         assert _is_valid_iso8601("2024-01-15T10:30:00Z") is True
 
     def test_valid_iso8601_with_offset(self) -> None:
         """验证带时区偏移的 ISO 8601 格式"""
         from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
         assert _is_valid_iso8601("2024-01-15T10:30:00+08:00") is True
 
     def test_valid_iso8601_without_seconds(self) -> None:
         """验证无秒数的 ISO 8601 格式"""
         from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
         assert _is_valid_iso8601("2024-01-15T10:30+08:00") is True
 
     def test_valid_iso8601_without_timezone(self) -> None:
         """验证无时区的 ISO 8601 格式"""
         from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
         assert _is_valid_iso8601("2024-01-15T10:30:00") is True
 
     def test_invalid_date_only(self) -> None:
         """验证仅日期格式无效"""
         from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
         assert _is_valid_iso8601("2024-01-15") is False
 
     def test_invalid_format_slash(self) -> None:
         """验证斜杠分隔格式无效"""
         from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
         assert _is_valid_iso8601("2024/01/15") is False
 
     def test_invalid_random_string(self) -> None:
         """验证随机字符串格式无效"""
         from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
         assert _is_valid_iso8601("not-a-date") is False
 
     def test_invalid_empty_string(self) -> None:
         """验证空字符串格式无效"""
         from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
         assert _is_valid_iso8601("") is False
 
     def test_valid_iso8601_with_t_separator(self) -> None:
         """验证含 T 分隔符的 ISO 8601 格式"""
         from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
         assert _is_valid_iso8601("2024-01-15T10:30:00") is True
 
     def test_valid_iso8601_with_space_separator(self) -> None:
         """验证空格分隔符的 ISO 8601 格式"""
         from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
         assert _is_valid_iso8601("2024-01-15 10:30:00") is True
+
+    def test_valid_iso8601_with_microseconds(self) -> None:
+        """验证含微秒的 ISO 8601 格式（datetime.now(UTC).isoformat() 产生）"""
+        from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
+        assert _is_valid_iso8601("2024-01-15T10:30:00.123456+00:00") is True
+
+    def test_valid_iso8601_with_microseconds_no_tz(self) -> None:
+        """验证含微秒无时区的 ISO 8601 格式"""
+        from src.domain.value_objects.document_metadata import _is_valid_iso8601
+
+        assert _is_valid_iso8601("2024-01-15T10:30:00.123456") is True

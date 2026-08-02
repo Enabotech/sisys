@@ -80,6 +80,13 @@ class TestFullUploadFlow:
             tenant_id="tenant-1",
             uploaded_by="user-1",
             file_path="/tmp/report.pdf",
+            metadata={
+                "creator": "user-1",
+                "created_at": "2024-01-15T10:30:00Z",
+                "source": "internal",
+                "license": "confidential",
+                "business_domain": "finance",
+            },
         )
 
         assert doc.filename == "report.pdf"
@@ -104,12 +111,30 @@ class TestFullUploadFlow:
             {"filename": "bad.exe", "mime_type": "application/x-msdownload", "file_size_bytes": 100},
             {"filename": "also_good.txt", "mime_type": "text/plain", "file_size_bytes": 50},
         ]
+        metadata_list = [
+            {
+                "creator": "u1",
+                "created_at": "2024-01-15T10:30:00Z",
+                "source": "internal",
+                "license": "confidential",
+                "business_domain": "finance",
+            },
+            None,
+            {
+                "creator": "u1",
+                "created_at": "2024-01-15T10:30:00Z",
+                "source": "internal",
+                "license": "confidential",
+                "business_domain": "finance",
+            },
+        ]
 
         result = await service.upload_batch(
             files=files,
             tenant_id="t1",
             uploaded_by="u1",
             file_paths=["/tmp/a", "/tmp/b", "/tmp/c"],
+            metadata_list=metadata_list,
         )
 
         assert result["total"] == 3
@@ -143,6 +168,13 @@ class TestFullUploadFlow:
             tenant_id="tenant-42",
             uploaded_by="user-42",
             file_path="/tmp/spec.pdf",
+            metadata={
+                "creator": "user-42",
+                "created_at": "2024-01-15T10:30:00Z",
+                "source": "internal",
+                "license": "confidential",
+                "business_domain": "finance",
+            },
         )
 
         event = publisher.publish.call_args[0][0]
@@ -290,6 +322,13 @@ class TestTenantIsolation:
             tenant_id="tenant-A",
             uploaded_by="u1",
             file_path="/tmp/test.pdf",
+            metadata={
+                "creator": "u1",
+                "created_at": "2024-01-15T10:30:00Z",
+                "source": "internal",
+                "license": "confidential",
+                "business_domain": "finance",
+            },
         )
 
         found = await service.get_document(uploaded.document_id, "tenant-A")
