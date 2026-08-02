@@ -6,11 +6,14 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.application.services.document_version_service import DocumentVersionService
     from src.domain.events.document_events import DocumentProcessed, DocumentUploaded
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentVersionHandler:
@@ -39,12 +42,19 @@ class DocumentVersionHandler:
         Args:
             event: 文档上传事件
         """
-        await self._document_version_service.create_snapshot(
-            document_id=event.document_id,
-            tenant_id=event.tenant_id,
-            created_by=event.uploaded_by,
-            change_description="文档上传",
-        )
+        try:
+            await self._document_version_service.create_snapshot(
+                document_id=event.document_id,
+                tenant_id=event.tenant_id,
+                created_by=event.uploaded_by,
+                change_description="文档上传",
+            )
+        except Exception:
+            logger.exception(
+                "文档上传后自动创建版本快照失败，不影响主流程: document_id=%s, tenant_id=%s",
+                event.document_id,
+                event.tenant_id,
+            )
 
     async def handle_document_processed(self, event: DocumentProcessed) -> None:
         """文档解析后自动创建版本快照（version=2）
@@ -52,9 +62,16 @@ class DocumentVersionHandler:
         Args:
             event: 文档解析完成事件
         """
-        await self._document_version_service.create_snapshot(
-            document_id=event.document_id,
-            tenant_id=event.tenant_id,
-            created_by="system",
-            change_description="文档解析完成",
-        )
+        try:
+            await self._document_version_service.create_snapshot(
+                document_id=event.document_id,
+                tenant_id=event.tenant_id,
+                created_by="system",
+                change_description="文档解析完成",
+            )
+        except Exception:
+            logger.exception(
+                "文档解析后自动创建版本快照失败，不影响主流程: document_id=%s, tenant_id=%s",
+                event.document_id,
+                event.tenant_id,
+            )

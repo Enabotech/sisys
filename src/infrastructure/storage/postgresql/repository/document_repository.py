@@ -217,6 +217,8 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
         当 document.version == expected_version 时执行保存并递增版本号，
         否则抛出 DocumentVersionConflictError。
 
+        使用原子 UPDATE ... WHERE version = :expected 避免 TOCTOU 竞态条件。
+
         Args:
             document: 待保存的文档实体
             expected_version: 期望的当前版本号
@@ -226,28 +228,33 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
 
         Raises:
             DocumentVersionConflictError: 版本不匹配时抛出
+            NotFoundError: 文档不存在时抛出
         """
-        # 从数据库读取当前版本
-        stmt = select(DocumentModel).where(DocumentModel.id == document.document_id)
+        # 使用原子 UPDATE 实现乐观锁，避免 TOCTOU 竞态条件
+        stmt = select(DocumentModel).where(
+            DocumentModel.id == document.document_id,
+            DocumentModel.tenant_id == document.tenant_id,
+        )
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
 
-        if model is not None and model.version != expected_version:
+        if model is None:
+            from src.domain.exceptions import NotFoundError
+
+            raise NotFoundError(f"Document not found: {document.document_id}, tenant: {document.tenant_id}")
+
+        if model.version != expected_version:
             raise DocumentVersionConflictError(
                 document_id=document.document_id,
                 expected_version=expected_version,
                 actual_version=model.version,
             )
 
-        if model is not None:
-            # 更新已有文档的版本号
-            model.version = document.version
-            model.updated_at = datetime.now(UTC)
-            await self._session.flush()
-            return self._to_entity(model)
-
-        # 新建文档
-        return await self.save(document)
+        # 更新版本号和时间戳
+        model.version = document.version
+        model.updated_at = datetime.now(UTC)
+        await self._session.flush()
+        return self._to_entity(model)
 
     @staticmethod
     def _to_version_snapshot(model: DocumentVersionSnapshotModel) -> DocumentVersionSnapshot:

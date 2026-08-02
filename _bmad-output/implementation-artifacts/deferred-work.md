@@ -33,6 +33,11 @@
 - DomainEvent 注册表无隔离 — 测试检查 `_registry["WorkflowSubmitted"]` 但未确保清洁状态。预存模式。`tests/unit/domain/events/test_workflow_events.py:61-67`
 - 不可序列化参数延迟失败 — parameters 包含 Prefect 对象时仅在 `to_dict()` 时报错。预存问题。`src/domain/events/workflow_events.py:31`
 
-## Deferred from: code review of 1-19-cost-metrics-basic (2026-05-25)
+## Deferred from: code review of 2-6-document-version-snapshot (2026-08-02)
+
+- 缺少性能基准测试（P95 指标未验证） — AC-1/AC-2 要求 P95<100ms/<200ms，但无基准测试。后续 Story 补充性能测试时覆盖。
+- 缺少并发版本控制测试（≥10 并发操作） — AC-3 要求 ≥10 并发操作，但测试仅覆盖单次冲突场景。后续 Story 补充并发测试时覆盖。
+- `list_versions`/`get_version` N+1 查询问题 — 先查 documents 验证租户，再查 snapshots，可用 JOIN 优化。预存，当前数据量小，性能影响可接受。
+- 内联 import 散落问题 — `create_snapshot` 方法体内有 6 个内联 import 块。预存，当前为规避循环依赖的方案，后续可统一重构。
 
 - ~~InMemoryRoutingDecisionLogRepository 非线程安全~~ — **RESOLVED** (2026-05-25)：引入 asyncio.Lock + max_size(1000) + TTL(24h) 淘汰。`src/infrastructure/messaging/inmemory_routing_decision_log_repository.py`

@@ -149,8 +149,8 @@ def _compute_content_diff(old_content: str, new_content: str) -> str:
     max_lines = 10
     if len(actual_changes) > max_lines:
         remaining = len(actual_changes) - max_lines
-        summary = "content diff: " + "".join(actual_changes[:max_lines]).rstrip()
-        summary += f"\n... and {remaining} more changes"
+        summary = "content diff: " + "".join(actual_changes[:max_lines])
+        summary += "\n... and {} more changes".format(remaining)
         return summary
 
-    return "content diff: " + "".join(actual_changes).rstrip()
+    return "content diff: " + "".join(actual_changes)

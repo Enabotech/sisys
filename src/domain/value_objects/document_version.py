@@ -40,7 +40,7 @@ class DocumentVersionSnapshot:
 
     Attributes:
         document_id: 文档唯一标识符
-        version: 版本号
+        version: 版本号（必须 ≥ 1）
         snapshot_id: 快照唯一标识符
         created_at: 快照创建时间
         created_by: 操作者标识
@@ -48,7 +48,7 @@ class DocumentVersionSnapshot:
         diff_summary: 差异摘要文本
         diff_json: 结构化差异数据（JSONB 存储）
         storage_object_key: MinIO 对象存储 key
-        file_size_bytes: 文件大小（字节）
+        file_size_bytes: 文件大小（字节，必须 ≥ 0）
         checksum: 文件校验和
     """
 
@@ -63,6 +63,13 @@ class DocumentVersionSnapshot:
     storage_object_key: str = ""
     file_size_bytes: int = 0
     checksum: str = ""
+
+    def __post_init__(self) -> None:
+        """验证版本号和文件大小合法性"""
+        if self.version < 1:
+            raise ValueError(f"version 必须 ≥ 1，实际值: {self.version}")
+        if self.file_size_bytes < 0:
+            raise ValueError(f"file_size_bytes 必须 ≥ 0，实际值: {self.file_size_bytes}")
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典

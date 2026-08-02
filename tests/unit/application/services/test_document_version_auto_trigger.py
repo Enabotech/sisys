@@ -64,8 +64,8 @@ class TestDocumentVersionHandler:
             change_description="文档解析完成",
         )
 
-    def test_handler_error_does_not_propagate(self) -> None:
-        """处理器内部异常不应传播（由事件总线处理）"""
+    def test_handler_error_propagates_to_event_bus(self) -> None:
+        """处理器内部异常向外传播（由事件总线负责捕获）"""
         service = AsyncMock()
         service.create_snapshot = AsyncMock(side_effect=ValueError("test error"))
         from src.application.event_handlers.document_version_handler import DocumentVersionHandler
@@ -78,7 +78,7 @@ class TestDocumentVersionHandler:
             uploaded_by="user-1",
         )
 
-        # 异常应由事件总线处理，在处理器中允许抛出
+        # 异常由事件总线处理，在处理器中允许抛出
         with pytest.raises(ValueError):
             import asyncio
 

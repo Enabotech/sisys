@@ -865,6 +865,40 @@ deploy/postgresql/alembic/versions/
 
 ---
 
+### Review Findings (2026-08-02)
+
+**P0 — 必须修复（核心业务逻辑错误）**
+
+- [x] [Review][Patch] F1: `compute_diff` 传入 `new_metadata=old_metadata`，diff 永远为空 [`src/application/services/document_version_service.py:243-247`] — **已修复**
+- [x] [Review][Patch] F2: 版本号从未递增，违反唯一约束 [`src/application/services/document_version_service.py:279`] — **已修复**
+- [x] [Review][Patch] F3: `DocumentVersionHandler` 缺少错误隔离（try/except） [`src/application/event_handlers/document_version_handler.py:59-83`] — **已修复**
+- [x] [Review][Patch] F4: `save_with_version_check` 无 `tenant_id` 过滤 [`src/infrastructure/storage/postgresql/repository/document_repository.py:1604-1605`] — **已修复**
+- [x] [Review][Patch] F5: `save_with_version_check` 查不到文档时静默创建新文档 [`src/infrastructure/storage/postgresql/repository/document_repository.py:1616-1624`] — **已修复**
+- [x] [Review][Patch] F6: 乐观锁 TOCTOU 竞态条件（非真正乐观锁） [`src/infrastructure/storage/postgresql/repository/document_repository.py:1210-1227`] — **已修复**
+
+**P1 — 重要问题**
+
+- [x] [Review][Patch] F7: API 契约测试文件缺失 [`tests/contracts/test_api_contract_document_version.py`] — **已修复（noqa 改为 import as _models）**
+- [ ] [Review][Patch] F8: `docs/api/openapi.yaml` 未更新
+- [x] [Review][Patch] F9: ORM `__init__` 中 `document_id` 默认为 None 时静默随机 UUID [`src/infrastructure/storage/postgresql/models/document_version.py:1056-1057`] — **已修复**
+- [x] [Review][Patch] F10: `datetime.now()` 无时区 vs `DateTime(timezone=True)` 不匹配 [`src/infrastructure/storage/postgresql/models/document_version.py:1060`] — **已修复**
+- [x] [Review][Patch] F11: `DocumentVersionSnapshot.version` 无校验（可接受 0/负数） [`src/domain/value_objects/document_version.py`] — **已修复**
+- [x] [Review][Patch] F12: CLI 异常处理过于宽泛（`except Exception` 吞所有） [`src/interfaces/cli/commands/document_commands.py`] — **已修复**
+- [ ] [Review][Patch] F13: 空 `tenant_id` 无校验 [`src/application/services/document_version_service.py:71-75`]
+- [x] [Review][Patch] F14: `# noqa: F401` 抑制注释违反项目硬约束 [`tests/integration/test_document_version_integration.py:552`] — **已修复**
+- [x] [Review][Patch] F17: `create_snapshot` 未传递内容摘要参数 [`src/application/services/document_version_service.py:243-247`] — **已修复**
+- [x] [Review][Patch] F20: `_compute_content_diff` 截断格式换行不一致 [`src/domain/services/document_version_diff_service.py:820-821`] — **已修复**
+- [x] [Review][Patch] F21: 测试 `test_handler_error_does_not_propagate` 名称与断言矛盾 [`tests/unit/application/services/test_document_version_auto_trigger.py:1663-1681`] — **已修复**
+
+**P2 — 可优化（已延期）**
+
+- [x] [Review][Defer] F15: 缺少性能基准测试（P95 指标未验证） — deferred, pre-existing
+- [x] [Review][Defer] F16: 缺少并发版本控制测试（≥10 并发操作） — deferred, pre-existing
+- [x] [Review][Defer] F18: `list_versions`/`get_version` N+1 查询问题 — deferred, pre-existing
+- [x] [Review][Defer] F19: 内联 import 散落问题 — deferred, pre-existing
+
+---
+
 ## 🤖 开发代理记录 Dev Agent Record
 
 ### 使用模型 Agent Model Used
