@@ -1322,6 +1322,7 @@ def bootstrap() -> None:
         interface=DocumentVersionHandler,
         impl=lambda resolver: DocumentVersionHandler(
             document_version_service=resolver.resolve("document_version_service"),
+            event_listener=resolver.resolve("event_listener"),
         ),
         module="src.application.event_handlers.document_version_handler",
         lifetime=Lifetime.SINGLETON,
