@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from src.domain.exceptions import NotFoundError
 from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
+from src.domain.value_objects.document_format import get_mime_type
 from src.domain.value_objects.token_payload import TokenPayload
 
 logger = logging.getLogger(__name__)
@@ -396,9 +397,12 @@ def create_document_upload_router(
             except json.JSONDecodeError:
                 pass
 
+        # 从 filename 推断 mime_type（分片上传未存储原始 mime_type）
+        chunked_mime = get_mime_type(state.filename) or "application/octet-stream"
+
         doc = await svc.register_document(
             filename=state.filename,
-            mime_type="application/octet-stream",
+            mime_type=chunked_mime,
             file_size_bytes=state.file_size,
             tenant_id=x_tenant_id,
             uploaded_by=str(current_user.user_id),

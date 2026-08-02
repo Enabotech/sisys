@@ -21,7 +21,7 @@ from src.domain.ports.document_repository import DocumentQuery, DocumentReposito
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.value_objects.document_format import get_mime_type, is_supported
 from src.domain.value_objects.document_metadata import DocumentMetadata
-from src.domain.value_objects.upload_limits import MAX_BATCH_SIZE, MAX_FILE_SIZE, MAX_FILENAME_LENGTH
+from src.domain.value_objects.upload_limits import MAX_BATCH_COUNT, MAX_BATCH_SIZE, MAX_FILE_SIZE, MAX_FILENAME_LENGTH
 
 # 文件名非法字符模式
 _INVALID_FILENAME_PATTERN = re.compile(r"[\x00\\/]")
@@ -167,7 +167,7 @@ class DocumentUploadService:
         """批量上传文件
 
         每个文件独立校验、独立存储，部分失败不影响其他文件。
-        使用 asyncio.Semaphore 控制并发数（≥20）。
+        使用 asyncio.Semaphore 控制并发数。
 
         Args:
             files: 文件信息列表，每个 dict 包含 filename/mime_type/file_size_bytes
@@ -184,6 +184,10 @@ class DocumentUploadService:
         """
         if not files:
             raise ValidationError(message="空批量请求，至少需要一个文件")
+
+        # 校验文件数量限制
+        if len(files) > MAX_BATCH_COUNT:
+            raise ValidationError(message=f"批量上传文件数超过限制（最大 {MAX_BATCH_COUNT} 个）")
 
         # 校验总大小限制
         total_size = sum(f["file_size_bytes"] for f in files)
@@ -372,6 +376,8 @@ class DocumentUploadService:
                     doc.document_id,
                     missing,
                 )
+                # 灰度模式：校验失败时不写入不完整元数据
+                return
         else:
             doc_metadata.validate()
 
@@ -379,6 +385,9 @@ class DocumentUploadService:
         # validated 中的字段覆盖 existing 中同名字段（此时 doc.metadata 尚为空，
         # storage_object_key 在调用后由调用方设置，因此不会被覆盖）
         validated = dict(doc_metadata.metadata)
+        existing = dict(doc.metadata or {})
+        existing.update(validated)
+        doc.metadata = existing
         existing = dict(doc.metadata or {})
         existing.update(validated)
         doc.metadata = existing
