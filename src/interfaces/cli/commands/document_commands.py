@@ -137,6 +137,9 @@ def _handle_snapshot(args: argparse.Namespace) -> int:
         print(f"  创建者: {snapshot.created_by}")
         print(f"  差异摘要: {snapshot.diff_summary}")
         return 0
+    except ValueError as e:
+        print(f"错误: 参数无效: {e}")
+        return 1
     except Exception as e:
         print(f"错误: 创建版本快照失败: {e}")
         return 1

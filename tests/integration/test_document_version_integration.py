@@ -33,10 +33,6 @@ from src.domain.value_objects.document_version import (
     DocumentVersionSnapshot,
 )
 from src.infrastructure.config.postgresql import PostgreSQLConfig
-from src.infrastructure.storage.postgresql.models import (  # noqa: F401 — ensure table creation
-    DocumentModel,
-    DocumentVersionSnapshotModel,
-)
 from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 from src.infrastructure.storage.postgresql.repository.document_repository import (
     PostgreSQLDocumentRepository,

@@ -47,9 +47,9 @@ class DocumentVersionService:
         """创建文档版本快照
 
         1. 查询文档实体（获取当前版本号）
-        2. 获取前一个版本的 metadata（用于 diff 计算）
+        2. 获取当前 metadata（用于 diff 计算）
         3. 调用领域服务 compute_diff() 计算差异摘要
-        4. 使用 save_with_version_check() 保存文档（乐观锁验证）
+        4. 递增版本号并使用 save_with_version_check() 保存（乐观锁验证）
         5. 持久化 DocumentVersionSnapshot
         6. 发布 DocumentVersionSnapshotCreated 事件
 
@@ -80,22 +80,23 @@ class DocumentVersionService:
 
         current_version = document.version
 
-        # 2. 获取前一个版本的 metadata
-        old_metadata = dict(document.metadata) if document.metadata else {}
+        # 2. 获取当前 metadata（作为新版本 metadata）
+        new_metadata = dict(document.metadata) if document.metadata else {}
 
         # 3. 计算差异摘要
         is_initial = current_version == 1
         diff = compute_diff(
-            old_metadata=old_metadata,
-            new_metadata=old_metadata,
+            old_metadata={},
+            new_metadata=new_metadata,
             is_initial=is_initial,
         )
 
-        # 4. 使用 save_with_version_check 保存文档（乐观锁验证）
+        # 4. 递增版本号并使用 save_with_version_check 保存（乐观锁验证）
         from datetime import UTC, datetime
         from uuid import uuid4
 
-        document.version = current_version
+        new_version = current_version + 1
+        document.version = new_version
         await self._repository.save_with_version_check(
             document=document,
             expected_version=current_version,
@@ -107,7 +108,7 @@ class DocumentVersionService:
         snapshot_id = uuid4()
         snapshot = DocumentVersionSnapshot(
             document_id=document_id,
-            version=current_version,
+            version=new_version,
             snapshot_id=snapshot_id,
             created_at=datetime.now(UTC),
             created_by=created_by,
@@ -128,7 +129,7 @@ class DocumentVersionService:
 
         event = DocumentVersionSnapshotCreated(
             document_id=document_id,
-            new_version=current_version,
+            new_version=new_version,
             snapshot_id=snapshot_id,
             created_by=created_by,
             diff_summary=diff.diff_summary,

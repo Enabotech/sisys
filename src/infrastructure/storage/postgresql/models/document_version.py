@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -68,10 +68,10 @@ class DocumentVersionSnapshotModel(Base):
     ) -> None:
         """初始化文档版本快照模型"""
         self.id = id or uuid4()
-        self.document_id = cast("UUID", document_id or uuid4())
+        self.document_id = cast("UUID", document_id)  # 允许 None，由数据库外键约束捕获
         self.version = version
         self.snapshot_id = cast("UUID", snapshot_id or uuid4())
-        self.created_at = cast("datetime", created_at or datetime.now())
+        self.created_at = cast("datetime", created_at or datetime.now(timezone.utc))
         self.created_by = created_by
         self.change_description = change_description
         self.diff_summary = diff_summary
