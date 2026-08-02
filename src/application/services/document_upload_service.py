@@ -11,7 +11,7 @@ import logging
 import os
 import re
 import uuid
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 from src.application.ports.document_storage_port import DocumentStoragePort
 from src.domain.entities.document import Document, DocumentType, ParseStatus
@@ -76,12 +76,15 @@ class DocumentUploadService:
         document_repository: DocumentRepositoryPort,
         document_storage: DocumentStoragePort,
         event_publisher: EventPublisher,
-        validation_mode: str | None = None,
+        validation_mode: Literal["enforce", "log_only"] | None = None,
     ) -> None:
         self._repository = document_repository
         self._storage = document_storage
         self._publisher = event_publisher
-        self._validation_mode = validation_mode or os.getenv("METADATA_VALIDATION_MODE", "enforce")
+        mode = validation_mode or os.getenv("METADATA_VALIDATION_MODE") or "enforce"
+        if mode not in ("enforce", "log_only"):
+            mode = "enforce"
+        self._validation_mode = mode
 
     async def upload(
         self,
@@ -372,7 +375,9 @@ class DocumentUploadService:
         else:
             doc_metadata.validate()
 
-        # 合并校验后的元数据，不覆盖已在 doc.metadata 中的字段（如 storage_object_key）
+        # 合并校验后的元数据到 Document 实体
+        # validated 中的字段覆盖 existing 中同名字段（此时 doc.metadata 尚为空，
+        # storage_object_key 在调用后由调用方设置，因此不会被覆盖）
         validated = dict(doc_metadata.metadata)
         existing = dict(doc.metadata or {})
         existing.update(validated)
