@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from src.domain.exceptions import EntityValidationError
+
 
 @dataclass(frozen=True)
 class DocumentVersionDiff:
@@ -67,9 +69,15 @@ class DocumentVersionSnapshot:
     def __post_init__(self) -> None:
         """验证版本号和文件大小合法性"""
         if self.version < 1:
-            raise ValueError(f"version 必须 ≥ 1，实际值: {self.version}")
+            raise EntityValidationError(
+                f"version 必须 ≥ 1，实际值: {self.version}",
+                context={"field": "version", "constraint": "≥1", "actual": self.version},
+            )
         if self.file_size_bytes < 0:
-            raise ValueError(f"file_size_bytes 必须 ≥ 0，实际值: {self.file_size_bytes}")
+            raise EntityValidationError(
+                f"file_size_bytes 必须 ≥ 0，实际值: {self.file_size_bytes}",
+                context={"field": "file_size_bytes", "constraint": "≥0", "actual": self.file_size_bytes},
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典
