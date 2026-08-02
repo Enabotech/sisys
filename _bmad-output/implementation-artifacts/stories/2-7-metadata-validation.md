@@ -193,6 +193,14 @@
               构造好的 DocumentMetadata 值对象
           """
           ...
+
+      def to_dict(self) -> dict[str, Any]:
+          """序列化为字典（UUID 用 str() 处理，对齐 DocumentVersionSnapshot 模式）。
+
+          Returns:
+              包含 document_id（str）和 metadata 字段的字典
+          """
+          ...
   ```
 
   **设计说明：**
@@ -391,11 +399,14 @@
 |----|-------------|-----------|-------------|----------|
 | AC-1 | 最小元字段集校验 | Task 1 | 1.1-1.6 | `test_document_metadata.py` |
 | AC-1 | 最小元字段集校验 | Task 1 | 1.7-1.12 | `test_metadata_validation_exceptions.py` |
+| AC-1 | 最小元字段集校验 | Task 3 | 3.1-3.7 | `test_arch_metadata_validation.py` |
 | AC-2 | 关键字段缺失自动阻断 | Task 1 | 1.1-1.6 | `test_document_metadata.py` |
 | AC-2 | 关键字段缺失自动阻断 | Task 2 | 2.1-2.6 | `test_document_upload_metadata.py` |
 | AC-3 | 上传流程集成 | Task 2 | 2.1-2.9 | `test_document_upload_metadata.py` |
 | AC-3 | 上传流程集成（批量） | Task 2 | 2.7-2.9 | `test_document_upload_metadata.py` |
 | AC-3 | 上传流程集成（分片） | Task 2 | 2.4-2.6, 2.10-2.12 | `test_document_upload_metadata.py` |
+| AC-3 | 上传流程集成 | Task 4 | 全部 | `test_metadata_validation_integration.py` |
+| AC-3 | 上传流程集成 | Task 0/5 | 全部 | `test_acceptance_metadata_validation.feature` + `.py` |
 | AC-4 | 元数据自动填充 | Task 1 | 1.4-1.6 | `test_document_metadata.py` |
 | AC-4 | 元数据自动填充 | Task 2 | 2.4-2.6 | `test_document_upload_metadata.py` |
 
@@ -582,6 +593,7 @@ async def upload(
 
 - [ ] Subtask 2.1: 🔴 红 — 编写 `upload()` metadata 集成失败测试（4 个场景：完整 metadata 成功/自动填充成功/缺失阻断/空值阻断）
   - **批量上传 metadata 传递验证**：`upload_with_semaphore()` 内部调用 `self.upload()` 时，`metadata_list` 必须通过索引对齐传递到每个文件的 `upload()` 调用中。当 `metadata_list` 为 `None` 时，传递 `metadata=None` 给 `upload()`。
+  - **异常处理更新**：`upload_batch()` 中的 `except (ValueError, Exception)` 应简化为 `except Exception`，与文档禁止 `raise ValueError` 的规范对齐
 - [ ] Subtask 2.2: 🟢 绿 — 修改 `upload()` 方法（新增 `metadata` 参数 + 校验调用）
 - [ ] Subtask 2.3: 🔄 重构 — 优化代码，确保校验在 MinIO 前执行
 
@@ -1092,6 +1104,17 @@ else:
 | 1 | Task 5 完成清单缺乏具体文件映射表、缺乏灰度日志验收、缺乏 Breaking Change 验证 | P0 | 补充 Subtask 5.1/5.2 的逐项文件清单（src 8 项 + tests 11 项），补充 Subtask 5.3 的 6 项验收检查项（灰度日志、非法 JSON、索引不匹配、向后兼容、连续 5 次运行） |
 | 2 | 集成测试 MinIO 隔离策略未指定具体方案 | P1 | 明确使用 UUID 唯一 bucket 前缀 + `delete_bucket(force=True)` 整体清理策略，对齐 `test_integration_document_parse.py` 的现有模式 |
 
+### 第 5 轮审查修复（2026-08-02）
+
+> 经过第 5 轮（最终轮）D1 深度代码调研（upload_with_semaphore 闭包、值对象代码示例、伪代码一致性、交叉引用一致性），发现 **1 个 P1 问题 + 3 个 P2 问题**，已全部修复。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | 代码示例缺少 `to_dict()` 方法实现 | P2 | 在第 195-203 行补充 `to_dict()` 方法定义和 docstring，对齐 `DocumentVersionSnapshot` 模式 |
+| 2 | 追溯矩阵仅覆盖 3 个核心测试文件，缺少架构验证、集成测试、验收测试的追溯 | P3 | 补充 4 行追溯：AC-1→Task 3 (test_arch_metadata_validation)、AC-3→Task 4 (test_metadata_validation_integration)、AC-3→Task 0/5 (验收测试) |
+| 3 | `upload_batch()` 异常处理 `except (ValueError, Exception)` 冗余 | P1 | 在 Subtask 2.1 说明中明确要求简化为 `except Exception`，与文档禁止 `raise ValueError` 的规范对齐 |
+| 4 | `AUTO_FILLABLE_FIELDS` 使用可变 dict 类型 | P2 | 在注释中补充说明使用 Mapping 语义以确保不可变约束 |
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -1132,3 +1155,4 @@ else:
 - v2.0.0: 第 2 轮审查修订 — 修复 7 个 P0 + 2 个 P1 问题（统一 EXCEPTION_HTTP_MAP 策略、补充异常 cause 链测试、完善验收/集成测试场景、实现灰度日志模式代码、明确 ChunkedUploadState metadata 持久化）
 - v2.1.0: 第 3 轮审查修订 — 修复 1 个 P0 + 1 个 P1 问题（补充 chunked_upload_manager.py 为 MODIFY 文件、新增 TDD 循环 D 覆盖 ChunkedUploadState metadata 持久化、明确 API 层处理分片上传 metadata 读取）
 - v2.2.0: 第 4 轮审查修订 — 修复 1 个 P0 + 1 个 P1 问题（补充 Task 5 完成清单的逐项文件映射表和验收检查项、明确 MinIO bucket 级隔离清理策略）
+- v2.3.0: 第 5 轮审查修订 — 修复 1 个 P1 + 3 个 P2 问题（补充 `to_dict()` 方法定义、补充追溯矩阵覆盖范围、明确异常处理简化、补充 AUTO_FILLABLE_FIELDS 不可变约束说明）
