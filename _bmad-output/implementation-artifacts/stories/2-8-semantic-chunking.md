@@ -472,6 +472,8 @@ MD 解析器输出：`[H1, H2, P1, P2]`
 #### Token 计数算法
 
 ```python
+import re
+
 def estimate_tokens(text: str) -> int:
     """字符启发式 token 估算（领域层纯函数，零依赖）。
 
@@ -785,7 +787,7 @@ class SemanticChunkerImpl:
 - [ ] Token 计数误差 <20%
 - [ ] 分块大小在 `min_chunk_size_tokens`（50）到 `max_chunk_size_tokens`（8192）范围内，实际聚合围绕 `target_chunk_size_tokens`（300）波动
 - [ ] `to_dict()` 序列化正确
-- [ ] 基础设施层覆盖率 ≥ 75%
+- [ ] 基础设施层覆盖率 ≥ 90%
 
 ---
 
@@ -1031,7 +1033,7 @@ class SemanticChunkingHandler:
 |------|------|------|
 | **分块触发方式** | 事件驱动（`SemanticChunkingHandler` 监听 `DocumentProcessed`） | 对齐 Story 2-6 `DocumentVersionHandler` 模式；关注点分离（解析不关心分块）；错误隔离（分块失败不影响解析状态） |
 | **分块存储方式** | `document.metadata["chunks"]` JSONB 列表 | 无需新增数据库迁移；JSONB 天然支持列表查询（`jsonb_array_length`）；单文档分块数通常 < 1000，JSONB 性能满足需求 |
-| **Token 计数算法** | 字符启发式（无 tiktoken 依赖） | 零外部依赖满足领域层约束；误差 <15% 满足 300±50 token 目标精度；避免引入大型 tokenizer 库 |
+| **Token 计数算法** | 字符启发式（无 tiktoken 依赖） | 零外部依赖满足领域层约束；误差 <20% 满足 300±50 token 目标精度；参考 XLM-RoBERTa SentencePiece 比例 |
 | **边界检测策略** | 规则驱动（`metadata["style"]` + 正则 + 页面号） | 确定性逻辑 100% 可靠；无 LLM/ML 依赖保证 P95<500ms；`metadata["style"]` 在各解析器中均有输出 |
 | **表格格式化** | pipe-separated 结构化文本 | 保持表格语义在分块中的可读性；方便后续嵌入向量捕获行列关系 |
 | **分块粒度** | 平均 300 tokens，硬限制 8192 tokens | 对齐 bge-m3 最佳实践（300 tokens 平衡语义完整性与检索精度）；8192 硬限制对齐 bge-m3 max_position_embeddings |
@@ -1245,10 +1247,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v3.0.0
+**故事版本/Story Version:** v3.1.0
 **创建日期/Created:** 2026-08-02
 **最后更新/Last Updated:** 2026-08-02
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 语义分块（规则驱动的语义边界检测 + Token 预算聚合）
-- v2.0.0: 审查修正版 — 修复 P0/P1 问题：统一 `max_chunk_size_tokens` 为 8192（bge-m3 实际能力）；修正 Token 估算参考模型为 XLM-RoBERTa；补充 `parsed_document_from_dict` 实现细节；修正章节标题检测方式为 `metadata["style"]`；修正 `ChunkingError` 继承链说明；补充 `_extract_segments` 中 `PAGE_BREAK` 检测、PDF/HTML 二次分割、样式归一化、表格展平伪代码；修正基础设施测试文件路径；提升基础设施层覆盖率目标至 90%
-- v3.0.0: 第二轮审查修订版 — 修复 17 个 P0 问题：`ChunkingError` 构造器对齐 `BaseException` 标准参数模式；`PAGE_BREAK` 页码修正为新页码；HTML 二次分割支持 `\n` 单换行；空表格跳过；`_classify_boundary()` 使用严格正则匹配；`_aggregate_segments()` 增加 `max_chunk_size_tokens` 硬限制；新增 `_split_by_token_limit()` 和 `_merge_small_chunks()` 完整实现；`parsed_document_from_dict()` 恢复 `images` 和 `_parsed_table_from_dict()` 完整实现；`RAGIndexed` 事件新增 `tenant_id` 字段；验收测试新增场景 8/9；补充事件订阅注册说明；代码库调研发现新增 2 条（HTML 分隔符、RAGIndexed tenant_id）
+- v2.0.0: 审查修正版 — 修复 P0/P1 问题
+- v3.0.0: 第二轮审查修订版 — 修复 17 个 P0 问题
+- v3.1.0: R2 深度审查修正版 — 修复 R2 轮审查发现的 P0/P1 问题：修正 Gherkin 场景 3 引用 `Section-header` label 的严重误导；补充 `_parsed_table_from_dict` 方法（含 column_types/merged_cells/images 递归重建）；补充 `_create_chunk`/`_merge_chunks` 完整方法实现；修复 `_aggregate_segments` 单段超限时空分块创建缺陷；修复 `_merge_small_chunks` 控制流缺陷；修复 PAGE_BREAK 空文本追加问题；新增 AC-1 token_limit 边界类型定义；补充 `_CLASS_TO_SUBDOMAIN` 注册说明；澄清 `ChunkingError` 适用场景；标记 MD 段落归属偏差为 Known Limitation；验收场景从 9 扩展至 13 个；集成测试新增 RAGIndexed 事件验证和反序列化验证；架构验证新增 `__module__`/isinstance/注册检查
