@@ -694,6 +694,7 @@ async def upload(
 - Schema 自创建（fixture 内完成）
 - 测试数据使用 UUID 唯一标识符
 - 每个测试只清理自己创建的资源
+- **MinIO 隔离策略**：使用 UUID 唯一 bucket 前缀（如 `test-meta-{uuid4().hex[:8]}`），每个测试/测试类使用独立 bucket，测试结束后执行 `bucket_manager.delete_bucket(bucket_name, force=True)` 整体清理（对齐 `test_integration_document_parse.py` 的 bucket 级清理模式）
 
 **完成标准/Definition of Done:**
 - [ ] 集成测试全部通过
@@ -714,8 +715,38 @@ async def upload(
 | 🔄 重构 | 收敛场景命名、统一断言表达、保持步骤函数可维护性 |
 
 - [ ] Subtask 5.1: 场景 1 — 验证 `src` 完成清单的逐项确认
+  ```
+  src/domain/value_objects/document_metadata.py          ✅ 创建完成
+  src/domain/exceptions/storage_exceptions.py            ✅ MetadataValidationError 新增
+  src/domain/exceptions/_code_ranges.py                  ✅ _CLASS_TO_SUBDOMAIN 注册
+  src/domain/exceptions/__init__.py                      ✅ __all__ 导出
+  src/interfaces/api/exception_handlers.py               ✅ EXCEPTION_HTTP_MAP 显式映射 + expected_types 更新
+  src/application/services/document_upload_service.py    ✅ upload/register_document/upload_batch 修改
+  src/interfaces/api/document_upload.py                  ✅ API 路由参数新增 + DocumentResponse 新增 metadata 字段
+  src/infrastructure/storage/redis/chunked_upload_manager.py ✅ ChunkedUploadState 新增 metadata 字段
+  ```
 - [ ] Subtask 5.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
+  ```
+  tests/unit/domain/value_objects/test_document_metadata.py      ✅ 值对象测试通过
+  tests/unit/domain/exceptions/test_metadata_validation_exceptions.py ✅ 异常测试通过
+  tests/unit/application/services/test_document_upload_metadata.py ✅ 应用服务测试通过
+  tests/unit/architecture/test_arch_metadata_validation.py       ✅ 架构验证测试通过
+  tests/integration/test_metadata_validation_integration.py      ✅ 集成测试通过
+  tests/acceptance/test_acceptance_metadata_validation.feature   ✅ 10 个场景全部通过
+  tests/acceptance/test_acceptance_metadata_validation.py        ✅ BDD 步骤实现通过
+  tests/contracts/test_api_contract_document_upload.py           ✅ API 契约测试通过
+  tests/unit/interfaces/api/test_exception_handlers.py           ✅ expected_types 集合已更新
+  tests/unit/domain/exceptions/test_error_code_uniqueness.py     ✅ 编码唯一性验证通过
+  tests/unit/domain/exceptions/test_code_ranges.py               ✅ 子域范围验证通过
+  ```
 - [ ] Subtask 5.3: 运行开发结束验收测试并确认通过
+  - 验证 10 个 Gherkin 场景全部通过
+  - 验证 `METADATA_VALIDATION_MODE=log_only` 环境变量生效（灰度日志模式）
+  - 验证不传 `metadata` 参数时返回 422 且格式符合 API 契约
+  - 验证 `metadata` 为非法 JSON 字符串时返回 422
+  - 验证 `metadata_list` 索引与 `files` 长度不匹配时的行为正确
+  - 验证 `metadata=None` 时旧 API 调用方行为（Breaking Change 向后兼容）
+  - 验证连续 5 次运行无随机失败
 - [ ] Subtask 5.4: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
 
 **完成标准/Definition of Done:**
@@ -1050,7 +1081,16 @@ else:
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
 | 1 | "项目结构说明"未列出 `chunked_upload_manager.py` 作为 MODIFY 文件 | P0 | 在项目结构说明中新增 `infrastructure/storage/redis/chunked_upload_manager.py # MODIFY` 行，在文件清单中新增此文件，新增 TDD 循环 D（Subtask 2.10-2.12）覆盖 ChunkedUploadState metadata 持久化 |
-| 2 | `DocumentUploadService` 未注入 `ChunkedUploadManager`，分片上传完成时无法读取 metadata | P1 | 分片上传的 metadata 读取在 API 层（`chunked_complete` 路由）处理，`state` 通过 `chunked_manager.complete_upload()` 返回，无需在 `DocumentUploadService` 中注入 `ChunkedUploadManager`。API 路由从 `state.metadata` 读取后直接传递给 `svc.register_document(metadata=...)`
+| 2 | `DocumentUploadService` 未注入 `ChunkedUploadManager`，分片上传完成时无法读取 metadata | P1 | 分片上传的 metadata 读取在 API 层（`chunked_complete` 路由）处理，`state` 通过 `chunked_manager.complete_upload()` 返回，无需在 `DocumentUploadService` 中注入 `ChunkedUploadManager`。API 路由从 `state.metadata` 读取后直接传递给 `svc.register_document(metadata=...)` |
+
+### 第 4 轮审查修复（2026-08-02）
+
+> 经过第 4 轮 D1 深度代码调研（集成测试 MinIO 隔离、验收测试 BDD 模式、异常映射可靠性、Task 5 完成清单），发现 **1 个 P0 问题 + 1 个 P1 问题**，已全部修复。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | Task 5 完成清单缺乏具体文件映射表、缺乏灰度日志验收、缺乏 Breaking Change 验证 | P0 | 补充 Subtask 5.1/5.2 的逐项文件清单（src 8 项 + tests 11 项），补充 Subtask 5.3 的 6 项验收检查项（灰度日志、非法 JSON、索引不匹配、向后兼容、连续 5 次运行） |
+| 2 | 集成测试 MinIO 隔离策略未指定具体方案 | P1 | 明确使用 UUID 唯一 bucket 前缀 + `delete_bucket(force=True)` 整体清理策略，对齐 `test_integration_document_parse.py` 的现有模式 |
 
 ---
 
@@ -1091,3 +1131,4 @@ else:
 - v1.0.0: 创建故事文件 — 元数据标准化校验
 - v2.0.0: 第 2 轮审查修订 — 修复 7 个 P0 + 2 个 P1 问题（统一 EXCEPTION_HTTP_MAP 策略、补充异常 cause 链测试、完善验收/集成测试场景、实现灰度日志模式代码、明确 ChunkedUploadState metadata 持久化）
 - v2.1.0: 第 3 轮审查修订 — 修复 1 个 P0 + 1 个 P1 问题（补充 chunked_upload_manager.py 为 MODIFY 文件、新增 TDD 循环 D 覆盖 ChunkedUploadState metadata 持久化、明确 API 层处理分片上传 metadata 读取）
+- v2.2.0: 第 4 轮审查修订 — 修复 1 个 P0 + 1 个 P1 问题（补充 Task 5 完成清单的逐项文件映射表和验收检查项、明确 MinIO bucket 级隔离清理策略）
