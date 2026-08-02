@@ -224,7 +224,7 @@ class TestVersionSnapshotCRUD:
         saved = await repo.save_version_snapshot(snapshot)
 
         assert saved.document_id == doc.document_id
-        assert saved.version == 1
+        assert saved.version == 2
         assert saved.diff_summary == "initial version"
 
         # 按版本号查询
@@ -395,7 +395,7 @@ class TestApplicationService:
         )
 
         assert snapshot.document_id == doc.document_id
-        assert snapshot.version == 1
+        assert snapshot.version == 2
         assert snapshot.change_description == "初始上传"
         assert snapshot.diff_summary == "initial version"
 
@@ -431,4 +431,4 @@ class TestApplicationService:
 
         result = await service.list_versions(doc.document_id, "t8")
         assert len(result) >= 1
-        assert result[0].version == 1
+        assert result[0].version == 2

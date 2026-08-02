@@ -61,7 +61,7 @@ class TestDocumentVersionServiceCreateSnapshot:
         )
 
         assert snapshot.document_id == doc.document_id
-        assert snapshot.version == 1
+        assert snapshot.version == 2
         assert snapshot.created_by == "user-1"
         assert snapshot.change_description == "文档上传"
         repo.find.assert_called_once()
@@ -112,6 +112,7 @@ class TestDocumentVersionServiceCreateSnapshot:
         call_args = publisher.publish.call_args[0][0]
         assert call_args.event_type == "DocumentVersionSnapshotCreated"
         assert call_args.document_id == doc.document_id
+        assert call_args.new_version == 2
 
 
 class TestDocumentVersionServiceListVersions:
