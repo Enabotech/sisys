@@ -192,7 +192,7 @@ class MetadataValidationError(BusinessRuleViolationError):
         self.missing_fields = missing_fields
         self.tenant_id = tenant_id
         if message is None:
-            message = f"文档元数据校验失败: document_id={document_id}, missing_fields={missing_fields}"
+            message = f"文档元数据校验失败: document_id={str(document_id)}, missing_fields={missing_fields}"
         merged_context = {
             "document_id": str(document_id),
             "missing_fields": missing_fields,
