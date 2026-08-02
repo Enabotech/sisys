@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from src.domain.exceptions.storage_exceptions import MetadataValidationError
+
 # 最小元字段集常量（FR-DM-07 定义，单点维护）
 REQUIRED_METADATA_FIELDS: tuple[str, ...] = (
     "creator",
@@ -88,19 +90,20 @@ class DocumentMetadata:
         Returns:
             当 raise_on_error=False 时，返回缺失字段列表
             （无缺失返回空列表）；raise_on_error=True 时返回 None
+            （无缺失时返回空列表）
 
         Raises:
             MetadataValidationError: 当 raise_on_error=True 且存在缺失字段时抛出
         """
         missing = self.missing_fields()
-        if missing and raise_on_error:
-            from src.domain.exceptions.storage_exceptions import MetadataValidationError
-
-            raise MetadataValidationError(
-                document_id=self.document_id,
-                missing_fields=missing,
-            )
-        return missing
+        if missing:
+            if raise_on_error:
+                raise MetadataValidationError(
+                    document_id=self.document_id,
+                    missing_fields=missing,
+                )
+            return missing
+        return []
 
     def missing_fields(self) -> list[str]:
         """返回缺失的必需字段列表（不抛出异常）。
@@ -115,8 +118,11 @@ class DocumentMetadata:
                 missing.append(field_name)
                 continue
             # 特殊校验 created_at 的 ISO 8601 格式
-            if field_name == "created_at" and isinstance(value, str):
-                if not _is_valid_iso8601(value):
+            # 非字符串类型（如 datetime 对象）视为非法格式，标记为缺失
+            if field_name == "created_at":
+                if not isinstance(value, str):
+                    missing.append(field_name)
+                elif not _is_valid_iso8601(value):
                     missing.append(field_name)
         return missing
 
@@ -170,5 +176,4 @@ __all__ = [
     "REQUIRED_METADATA_FIELDS",
     "AUTO_FILLABLE_FIELDS",
     "DocumentMetadata",
-    "_is_valid_iso8601",
 ]

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 import uuid
@@ -28,8 +29,7 @@ _INVALID_FILENAME_PATTERN = re.compile(r"[\x00\\/]")
 # 批量上传并发数
 _BATCH_CONCURRENCY = 20
 
-# 元数据校验模式（灰度日志模式：校验失败仅记录日志，不阻断上传）
-_VALIDATION_MODE = os.getenv("METADATA_VALIDATION_MODE", "enforce")
+logger = logging.getLogger(__name__)
 
 
 class BatchFileInfo(TypedDict):
@@ -66,6 +66,9 @@ class DocumentUploadService:
 
     依赖注入 DocumentRepositoryPort + DocumentStoragePort + EventPublisher，
     编排单文件上传、批量上传和事件发布流程。
+
+    Attributes:
+        _validation_mode: 元数据校验模式（"enforce" 或 "log_only"）
     """
 
     def __init__(
@@ -73,10 +76,12 @@ class DocumentUploadService:
         document_repository: DocumentRepositoryPort,
         document_storage: DocumentStoragePort,
         event_publisher: EventPublisher,
+        validation_mode: str | None = None,
     ) -> None:
         self._repository = document_repository
         self._storage = document_storage
         self._publisher = event_publisher
+        self._validation_mode = validation_mode or os.getenv("METADATA_VALIDATION_MODE", "enforce")
 
     async def upload(
         self,
@@ -338,7 +343,7 @@ class DocumentUploadService:
         使用 DocumentMetadata 值对象执行校验：
         1. 调用 from_upload() 自动填充 creator/created_at
         2. 执行 validate() 校验最小元字段集
-        3. 校验通过后将元数据拷贝到 Document 实体
+        3. 校验通过后将元数据合并到 Document 实体（保留已有字段如 storage_object_key）
 
         支持灰度日志模式（METADATA_VALIDATION_MODE=log_only）：
         校验失败仅记录 WARNING 日志，不阻断上传。
@@ -351,16 +356,12 @@ class DocumentUploadService:
         Raises:
             MetadataValidationError: 元数据校验失败
         """
-        import logging
-
-        logger = logging.getLogger(__name__)
-
         doc_metadata = DocumentMetadata.from_upload(
             document_id=doc.document_id,
             raw_metadata=metadata,
             uploaded_by=uploaded_by,
         )
-        if _VALIDATION_MODE == "log_only":
+        if self._validation_mode == "log_only":
             missing = doc_metadata.validate(raise_on_error=False)
             if missing:
                 logger.warning(
@@ -371,4 +372,8 @@ class DocumentUploadService:
         else:
             doc_metadata.validate()
 
-        doc.metadata = dict(doc_metadata.metadata)
+        # 合并校验后的元数据，不覆盖已在 doc.metadata 中的字段（如 storage_object_key）
+        validated = dict(doc_metadata.metadata)
+        existing = dict(doc.metadata or {})
+        existing.update(validated)
+        doc.metadata = existing

@@ -382,7 +382,6 @@ class TestMetadataValidationRealService:
             # 验证 PG 无残留：查询所有文档，无此文档记录
             all_docs = await repo.list(DocumentQuery(tenant_id="tenant-1"))
             doc_ids_with_license = [d for d in all_docs if d.metadata.get("license") is None]
-            doc_ids_with_license = [d for d in all_docs if d.metadata.get("license") is None]
             assert len(doc_ids_with_license) == 0
         finally:
             _cleanup(pdf_path)

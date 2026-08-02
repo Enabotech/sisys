@@ -6,12 +6,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import tempfile
 import uuid
 from typing import Any, Callable
 
-from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, Form, Header, HTTPException, UploadFile, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
@@ -31,11 +32,13 @@ class ChunkedInitRequest(BaseModel):
         filename: 文件名
         file_size: 文件大小（字节）
         doc_type: 文档类型（用于路径生成）
+        metadata: 文档元数据 JSON 字符串（可选，在 complete 时传递给 register_document）
     """
 
     filename: str = Field(..., min_length=1, max_length=255)
     file_size: int = Field(..., gt=0)
     doc_type: str = Field(default="other")
+    metadata: str | None = Field(default=None, description="文档元数据 JSON 字符串")
 
 
 class ChunkedInitResponse(BaseModel):
@@ -72,6 +75,7 @@ class DocumentResponse(BaseModel):
         file_size_bytes: 文件大小
         parse_status: 解析状态
         created_at: 创建时间
+        metadata: 文档元数据字典
     """
 
     document_id: str
@@ -80,6 +84,7 @@ class DocumentResponse(BaseModel):
     file_size_bytes: int
     parse_status: str
     created_at: str
+    metadata: dict[str, Any] | None = None
 
 
 class BatchUploadResponse(BaseModel):
@@ -209,6 +214,7 @@ def create_document_upload_router(
     )
     async def upload_document(
         file: UploadFile,
+        metadata: str = Form(default="{}"),
         x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
         current_user: TokenPayload = Depends(get_current_user),
     ) -> DocumentResponse:
@@ -221,6 +227,8 @@ def create_document_upload_router(
             tmp.write(content)
             tmp_path = tmp.name
 
+        meta_dict = json.loads(metadata) if metadata else {}
+
         doc = await svc.upload(
             filename=file.filename or "unknown",
             mime_type=file.content_type or "application/octet-stream",
@@ -228,6 +236,7 @@ def create_document_upload_router(
             tenant_id=x_tenant_id,
             uploaded_by=str(current_user.user_id),
             file_path=tmp_path,
+            metadata=meta_dict,
         )
         return DocumentResponse(
             document_id=str(doc.document_id),
@@ -236,6 +245,7 @@ def create_document_upload_router(
             file_size_bytes=doc.file_size_bytes,
             parse_status=doc.parse_status.value,
             created_at=doc.created_at.isoformat(),
+            metadata=doc.metadata if doc.metadata else None,
         )
 
     @router.post(
@@ -245,6 +255,7 @@ def create_document_upload_router(
     )
     async def upload_batch(
         files: list[UploadFile],
+        metadata: str = Form(default="[]"),
         x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
         current_user: TokenPayload = Depends(get_current_user),
     ) -> BatchUploadResponse:
@@ -268,11 +279,14 @@ def create_document_upload_router(
             tmp.close()
             file_paths.append(tmp.name)
 
+        metadata_list = json.loads(metadata) if metadata else []
+
         result = await svc.upload_batch(
             files=file_infos,
             tenant_id=x_tenant_id,
             uploaded_by=str(current_user.user_id),
             file_paths=file_paths,
+            metadata_list=metadata_list,
         )
         return BatchUploadResponse(**result)
 
@@ -301,6 +315,7 @@ def create_document_upload_router(
             request.file_size,
             minio_upload_id=minio_upload_id,
             object_key=object_key,
+            metadata=request.metadata,
         )
         return ChunkedInitResponse(**result)
 
@@ -361,6 +376,14 @@ def create_document_upload_router(
                 parts=state.uploaded_parts,
             )
 
+        # 从 state 中读取 metadata 并反序列化
+        meta_dict: dict[str, Any] | None = None
+        if state.metadata:
+            try:
+                meta_dict = json.loads(state.metadata)
+            except json.JSONDecodeError:
+                meta_dict = None
+
         doc = await svc.register_document(
             filename=state.filename,
             mime_type="application/octet-stream",
@@ -368,6 +391,7 @@ def create_document_upload_router(
             tenant_id=x_tenant_id,
             uploaded_by=str(current_user.user_id),
             object_key=state.object_key,
+            metadata=meta_dict,
         )
         return DocumentResponse(
             document_id=str(doc.document_id),
@@ -376,6 +400,7 @@ def create_document_upload_router(
             file_size_bytes=doc.file_size_bytes,
             parse_status=doc.parse_status.value,
             created_at=doc.created_at.isoformat(),
+            metadata=doc.metadata if doc.metadata else None,
         )
 
     @router.get(
@@ -403,6 +428,7 @@ def create_document_upload_router(
             file_size_bytes=doc.file_size_bytes,
             parse_status=doc.parse_status.value,
             created_at=doc.created_at.isoformat(),
+            metadata=doc.metadata if doc.metadata else None,
         )
 
     return router

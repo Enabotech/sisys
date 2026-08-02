@@ -462,6 +462,24 @@ class TestDomainExceptionHttpIntegration:
         data = resp.json()
         assert data["error"]["code"] == "EXCEPTION_244"
 
+    def test_metadata_validation_error_returns_422(self):
+        """验证 MetadataValidationError 返回 422."""
+        from uuid import uuid4
+
+        from src.domain.exceptions.storage_exceptions import MetadataValidationError
+
+        client = self._make_app_with_exc(
+            MetadataValidationError(
+                document_id=uuid4(),
+                missing_fields=["license", "source"],
+            )
+        )
+        resp = client.get("/test")
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        data = resp.json()
+        assert data["error"]["code"] == "EXCEPTION_217"
+        assert "license" in data["error"]["context"]["missing_fields"]
+
     def test_third_party_returns_502(self):
         """验证 ThirdPartyError 返回 502."""
         client = self._make_app_with_exc(ThirdPartyError("ext service down"))

@@ -70,10 +70,8 @@ class TestDocumentMetadataCreation:
     def test_create_with_none_metadata(self) -> None:
         """验证 metadata 参数为 None 时使用空字典"""
         doc_id = uuid4()
-        doc_meta = DocumentMetadata(document_id=doc_id, metadata={})
-        # 验证 __post_init__ 正确处理 None 情况
-        object.__setattr__(doc_meta, "metadata", None)
-        assert doc_meta.metadata is None
+        doc_meta = DocumentMetadata(document_id=doc_id, metadata=None)
+        assert doc_meta.metadata == {}
 
     def test_document_id_is_uuid(self) -> None:
         """验证 document_id 是 UUID 类型"""
