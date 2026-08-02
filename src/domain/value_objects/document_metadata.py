@@ -27,10 +27,11 @@ AUTO_FILLABLE_FIELDS: dict[str, str] = {
     "created_at": "当前 UTC 时间（ISO 8601）",
 }
 
-# ISO 8601 简化校验正则（接受常见变体：YYYY-MM-DDTHH:MM:SS ±HH:MM / Z）
+# ISO 8601 简化校验正则（接受常见变体：YYYY-MM-DDTHH:MM:SS ±HH:MM / Z / 小数秒）
 _ISO8601_PATTERN = re.compile(
     r"^\d{4}-\d{2}-\d{2}"  # 日期部分
     r"([ T]\d{2}:\d{2}(:\d{2})?"  # 时间部分（秒可选）
+    r"(\.\d+)?"  # 小数秒（可选，datetime.now(UTC).isoformat() 产生）
     r"([+-]\d{2}:?\d{2}|Z)?"  # 时区偏移（可选）
     r")$"
 )

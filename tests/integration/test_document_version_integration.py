@@ -224,7 +224,7 @@ class TestVersionSnapshotCRUD:
         saved = await repo.save_version_snapshot(snapshot)
 
         assert saved.document_id == doc.document_id
-        assert saved.version == 2
+        assert saved.version == 1
         assert saved.diff_summary == "initial version"
 
         # 按版本号查询
