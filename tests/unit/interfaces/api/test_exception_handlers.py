@@ -29,6 +29,7 @@ from src.domain.exceptions import (
     BusinessRuleViolationError,
     CannotDeleteRoleWithUsersError,
     CannotDeleteSystemRoleError,
+    ChunkingError,
     ComplianceLockError,
     ConfigurationError,
     ConflictError,
@@ -171,6 +172,7 @@ class TestExceptionHttpMap:
             MemoryAccessDeniedError,
             DocumentVersionConflictError,
             MetadataValidationError,
+            ChunkingError,
             # 角色子域异常
             RoleNotFoundError,
             RoleAlreadyExistsError,
