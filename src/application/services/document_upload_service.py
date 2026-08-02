@@ -388,6 +388,3 @@ class DocumentUploadService:
         existing = dict(doc.metadata or {})
         existing.update(validated)
         doc.metadata = existing
-        existing = dict(doc.metadata or {})
-        existing.update(validated)
-        doc.metadata = existing
