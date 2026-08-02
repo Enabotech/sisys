@@ -310,6 +310,9 @@ class TestMetadataValidationRealService:
             reloaded = await repo.find(DocumentQuery(tenant_id="tenant-1", document_id=doc.document_id))
             assert reloaded is not None, "文档应持久化到 PG"
             assert reloaded.metadata.get("source") == "internal"
+
+            # 验证事件发布
+            svc._publisher.publish.assert_called_once()
         finally:
             _cleanup(pdf_path)
 
@@ -344,6 +347,9 @@ class TestMetadataValidationRealService:
             assert "created_at" in doc.metadata
             # 显式字段
             assert doc.metadata.get("source") == "internal"
+
+            # 验证事件发布
+            svc._publisher.publish.assert_called_once()
         finally:
             _cleanup(pdf_path)
 
@@ -353,12 +359,16 @@ class TestMetadataValidationRealService:
         pg_session: AsyncSession,
         repo,
         minio_storage,
+        minio_bucket_name,
     ) -> None:
         """测试 3: 缺失 license 字段阻断 + 无 MinIO/PG 残留"""
         from src.domain.exceptions.storage_exceptions import MetadataValidationError
 
         svc = self._make_upload_service(repo, minio_storage)
         pdf_path = _create_test_pdf("missing_license.pdf")
+        # 记录当前文档数量作为基线
+        docs_before = await repo.list(DocumentQuery(tenant_id="tenant-1"))
+        baseline_count = len(docs_before)
         try:
             metadata = {
                 "creator": "test-user",
@@ -379,10 +389,9 @@ class TestMetadataValidationRealService:
             # 异常包含缺失字段
             assert "license" in exc_info.value.context["missing_fields"]
 
-            # 验证 PG 无残留：查询所有文档，无此文档记录
-            all_docs = await repo.list(DocumentQuery(tenant_id="tenant-1"))
-            doc_ids_with_license = [d for d in all_docs if d.metadata.get("license") is None]
-            assert len(doc_ids_with_license) == 0
+            # 验证 PG 无残留：文档数量与基线一致
+            docs_after = await repo.list(DocumentQuery(tenant_id="tenant-1"))
+            assert len(docs_after) == baseline_count, "校验失败后 PG 不应有新增文档记录"
         finally:
             _cleanup(pdf_path)
 
@@ -549,6 +558,9 @@ class TestMetadataValidationRealService:
             )
             assert result["success"] == 1
             assert result["failed"] == 1
+            # 验证成功文档的 metadata 索引对应
+            success_detail = next(d for d in result["details"] if d["status"] == "success")
+            assert success_detail["filename"] == "batch1.pdf"
         finally:
             _cleanup(pdf1)
             _cleanup(pdf2)
