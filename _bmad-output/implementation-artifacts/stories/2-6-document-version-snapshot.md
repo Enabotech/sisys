@@ -1,6 +1,6 @@
 # Story 2-6: 文档版本快照
 
-**Status:** `review`
+**Status:** `in-progress`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。

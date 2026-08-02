@@ -8,8 +8,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
-import pytest
-
 from src.domain.events.document_events import DocumentProcessed, DocumentUploaded
 
 
@@ -64,8 +62,8 @@ class TestDocumentVersionHandler:
             change_description="文档解析完成",
         )
 
-    def test_handler_error_propagates_to_event_bus(self) -> None:
-        """处理器内部异常向外传播（由事件总线负责捕获）"""
+    def test_handler_error_caught_by_handler(self) -> None:
+        """处理器内部异常被 handler 捕获，不向外传播"""
         service = AsyncMock()
         service.create_snapshot = AsyncMock(side_effect=ValueError("test error"))
         from src.application.event_handlers.document_version_handler import DocumentVersionHandler
@@ -78,8 +76,8 @@ class TestDocumentVersionHandler:
             uploaded_by="user-1",
         )
 
-        # 异常由事件总线处理，在处理器中允许抛出
-        with pytest.raises(ValueError):
-            import asyncio
+        # 异常被 handler 内部的 try/except 捕获，不向外传播
+        import asyncio
 
-            asyncio.run(handler.handle_document_uploaded(event))
+        result = asyncio.run(handler.handle_document_uploaded(event))
+        assert result is None  # handler 返回 None（异常被捕获）
