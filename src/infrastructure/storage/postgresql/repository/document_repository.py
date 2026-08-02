@@ -11,6 +11,7 @@ from typing import List, cast
 from uuid import UUID
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
 from src.domain.exceptions import DocumentVersionConflictError
@@ -150,7 +151,15 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
             checksum=snapshot.checksum,
         )
         self._session.add(model)
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except IntegrityError:
+            await self._session.rollback()
+            raise DocumentVersionConflictError(
+                document_id=snapshot.document_id,
+                expected_version=snapshot.version - 1,
+                actual_version=snapshot.version,
+            )
         return snapshot
 
     async def list_versions(self, document_id: UUID, tenant_id: str) -> List[DocumentVersionSnapshot]:

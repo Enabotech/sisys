@@ -127,8 +127,9 @@ class DocumentRepositoryPort(Protocol):
     async def save_with_version_check(self, document: Document, expected_version: int) -> Document:
         """带乐观锁版本检查的保存方法
 
-        当 document.version == expected_version 时执行保存并递增版本号，
-        否则抛出 DocumentVersionConflictError。
+        使用原子 UPDATE ... WHERE version = :expected_version 执行乐观锁保存，
+        将版本号更新为 document.version。
+        若 DB 中版本不匹配则抛出 DocumentVersionConflictError。
 
         Args:
             document: 待保存的文档实体
