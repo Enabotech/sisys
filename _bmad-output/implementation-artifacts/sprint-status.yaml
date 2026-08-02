@@ -108,7 +108,7 @@ development_status:
   2-4-table-semantic-extraction: done
   2-5-ocr-parsing-scanned-documents: done
   2-6-document-version-snapshot: in-progress
-  2-7-metadata-validation: ready-for-dev
+  2-7-metadata-validation: in-progress
   2-8-semantic-chunking: ready-for-dev
   epic-2-retrospective: optional
 

@@ -17,6 +17,7 @@ from src.domain.exceptions.business_exceptions import (
     NotFoundError,
     PermissionDeniedError,
     ValidationError,
+    BusinessRuleViolationError,
 )
 from src.domain.exceptions.system_exceptions import NetworkError
 
@@ -156,6 +157,50 @@ class DocumentVersionConflictError(ConflictError):
         super().__init__(message, cause=cause, context=merged_context)
 
 
+class MetadataValidationError(BusinessRuleViolationError):
+    """文档元数据校验失败异常
+
+    当入库文档的元数据不满足最小元字段集要求时抛出。
+
+    Attributes:
+        code: 异常编码 EXCEPTION_217
+        document_id: 校验失败的文档标识
+        missing_fields: 缺失的必需字段列表
+        tenant_id: 租户标识符
+    """
+
+    code = "EXCEPTION_217"
+
+    def __init__(
+        self,
+        document_id: UUID,
+        missing_fields: list[str],
+        tenant_id: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        """初始化文档元数据校验失败异常
+
+        Args:
+            document_id: 校验失败的文档标识
+            missing_fields: 缺失的必需字段列表
+            tenant_id: 租户标识符
+            message: 异常消息，默认使用标准格式
+            cause: 导致此异常的原因
+        """
+        self.document_id = document_id
+        self.missing_fields = missing_fields
+        self.tenant_id = tenant_id
+        if message is None:
+            message = f"文档元数据校验失败: document_id={document_id}, missing_fields={missing_fields}"
+        merged_context = {
+            "document_id": str(document_id),
+            "missing_fields": missing_fields,
+            "tenant_id": tenant_id,
+        }
+        super().__init__(message, cause=cause, context=merged_context)
+
+
 __all__ = [
     "DocumentVersionConflictError",
     "MemoryVersionConflictError",
@@ -164,4 +209,5 @@ __all__ = [
     "MinIOConnectionError",
     "BucketNameValidationError",
     "MemoryAccessDeniedError",
+    "MetadataValidationError",
 ]

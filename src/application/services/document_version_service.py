@@ -43,11 +43,13 @@ class DocumentVersionService:
         tenant_id: str,
         created_by: str,
         change_description: str = "",
+        old_content_summary: str | None = None,
+        new_content_summary: str | None = None,
     ) -> DocumentVersionSnapshot:
         """创建文档版本快照
 
         1. 查询文档实体（获取当前版本号）
-        2. 获取当前 metadata（用于 diff 计算）
+        2. 获取前一个版本的 metadata 和当前 metadata（用于 diff 计算）
         3. 调用领域服务 compute_diff() 计算差异摘要
         4. 递增版本号并使用 save_with_version_check() 保存（乐观锁验证）
         5. 持久化 DocumentVersionSnapshot
@@ -58,6 +60,8 @@ class DocumentVersionService:
             tenant_id: 租户标识符
             created_by: 操作者标识
             change_description: 变更描述
+            old_content_summary: 旧版本内容摘要
+            new_content_summary: 新版本内容摘要
 
         Returns:
             创建成功的版本快照
@@ -80,14 +84,26 @@ class DocumentVersionService:
 
         current_version = document.version
 
-        # 2. 获取当前 metadata（作为新版本 metadata）
+        # 2. 获取前一个版本的 metadata 和当前 metadata
         new_metadata = dict(document.metadata) if document.metadata else {}
+        old_metadata: dict = {}
+        if current_version > 1:
+            # 从上一个版本的快照中获取 metadata
+            prev_snapshot = await self._repository.get_version(
+                document_id,
+                current_version,
+                tenant_id,
+            )
+            if prev_snapshot and prev_snapshot.diff_json:
+                old_metadata = prev_snapshot.diff_json.get("metadata", {})
 
         # 3. 计算差异摘要
         is_initial = current_version == 1
         diff = compute_diff(
-            old_metadata={},
+            old_metadata=old_metadata,
             new_metadata=new_metadata,
+            old_content_summary=old_content_summary,
+            new_content_summary=new_content_summary,
             is_initial=is_initial,
         )
 
@@ -106,6 +122,11 @@ class DocumentVersionService:
         from src.domain.value_objects.document_version import DocumentVersionSnapshot
 
         snapshot_id = uuid4()
+        diff_json: dict | None = {
+            "changed_fields": diff.changed_fields,
+            "is_initial": diff.is_initial,
+            "metadata": new_metadata,
+        }
         snapshot = DocumentVersionSnapshot(
             document_id=document_id,
             version=new_version,
@@ -114,12 +135,7 @@ class DocumentVersionService:
             created_by=created_by,
             change_description=change_description,
             diff_summary=diff.diff_summary,
-            diff_json={
-                "changed_fields": diff.changed_fields,
-                "is_initial": diff.is_initial,
-            }
-            if diff.changed_fields or diff.is_initial
-            else None,
+            diff_json=diff_json,
         )
 
         await self._repository.save_version_snapshot(snapshot)

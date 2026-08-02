@@ -41,6 +41,7 @@ from src.domain.exceptions import (
     MemoryNotFoundError,
     MemoryVersionConflictError,
     MessageBusError,
+    MetadataValidationError,
     MinIOConnectionError,
     NetworkError,
     NotFoundError,
@@ -98,6 +99,7 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     BucketNameValidationError: status.HTTP_400_BAD_REQUEST,  # 214
     MemoryAccessDeniedError: status.HTTP_403_FORBIDDEN,  # 215
     DocumentVersionConflictError: status.HTTP_409_CONFLICT,  # 216
+    MetadataValidationError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 217
     # 角色子域异常
     RoleNotFoundError: status.HTTP_404_NOT_FOUND,  # 221
     RoleAlreadyExistsError: status.HTTP_409_CONFLICT,  # 222
