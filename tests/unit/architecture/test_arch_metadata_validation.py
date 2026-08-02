@@ -181,7 +181,7 @@ class TestDocumentMetadataFrozen:
 
         doc_meta = DocumentMetadata(document_id=uuid.uuid4())
         with pytest.raises(FrozenInstanceError):
-            object.__setattr__(doc_meta, "metadata", {"test": "value"})
+            setattr(doc_meta, "metadata", {"test": "value"})
 
 
 class TestDocumentMetadataModuleExports:

@@ -87,15 +87,19 @@ class TestDocumentMetadataFrozen:
 
     def test_cannot_modify_document_id(self) -> None:
         """验证 document_id 不可修改"""
+        from dataclasses import FrozenInstanceError
+
         doc_meta = DocumentMetadata(document_id=uuid4())
-        with pytest.raises(AttributeError):
-            object.__setattr__(doc_meta, "document_id", uuid4())
+        with pytest.raises(FrozenInstanceError):
+            setattr(doc_meta, "document_id", uuid4())
 
     def test_cannot_modify_metadata(self) -> None:
         """验证 metadata 不可修改"""
+        from dataclasses import FrozenInstanceError
+
         doc_meta = DocumentMetadata(document_id=uuid4(), metadata={"creator": "test"})
-        with pytest.raises(AttributeError):
-            object.__setattr__(doc_meta, "metadata", {})
+        with pytest.raises(FrozenInstanceError):
+            setattr(doc_meta, "metadata", {})
 
 
 class TestDocumentMetadataValidate:
