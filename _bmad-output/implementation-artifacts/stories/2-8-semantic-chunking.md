@@ -105,7 +105,13 @@
 **Given** 分块包含文本和表格内容
 **When** 生成分块的 `content` 字符串
 **Then** 文本按阅读顺序拼合
-**And** 表格内容展平为结构化字符串格式：`[表格: 标题或位置] | 表头1 | 表头2 | ...\n| 数据1 | 数据2 | ...`
+**And** 表格内容展平为结构化字符串格式：
+  ```
+  [表格: 标题或位置]
+  | 表头1 | 表头2 | ...
+  | 数据1 | 数据2 | ...
+  ```
+  （标题/前缀行单独一行，表头和数据行各占一行，pipe-separated 格式）
 **And** 文档级元数据（`business_domain`）透传到分块 `metadata` 中
 
 **验证标准/Validation Criteria:**
@@ -125,7 +131,9 @@
 - [ ] 本 Story 不需要新增领域事件。
   - 分块完成后发布**已有的** `RAGIndexed` 事件（`src/domain/events/workflow_events.py`）
   - `RAGIndexed` 的 `chunk_count` 字段从默认值 0 更新为实际分块数量
+  - **注意：** `RAGIndexed` 事件当前缺少 `tenant_id` 字段。需在 `RAGIndexed` 事件定义中新增 `tenant_id: str = ""` 字段，与 `DocumentProcessed` 事件对齐，确保多租户场景下事件可正确路由
   - 分块通过事件处理器监听 `DocumentProcessed` 异步触发（对齐 Story 2-6 `DocumentVersionHandler` 模式）
+  - 事件订阅注册：`SemanticChunkingHandler` 需要在 `composition_root.py` 中注册为 `SINGLETON` 端口，并通过 `EventListener` 或消息总线消费者绑定到 `DocumentProcessed` 事件
 
 #### 数据模型
 
@@ -230,9 +238,19 @@
   - 归属模块：`storage_exceptions.py`（存储子域，编码范围 211-219；已使用 211-217，218 空闲可用）
   - 继承自 `BusinessRuleViolationError`（EXCEPTION_207）—— 分块失败是"业务规则违反"
     - **继承说明**：storage 子域异常继承 business 基类，CI 规则 R2 允许。`DocumentVersionConflictError`（216）继承 `ConflictError`，`MetadataValidationError`（217）继承 `BusinessRuleViolationError`，本异常对齐 `MetadataValidationError` 模式
-  - 构造器参数：`document_id: UUID`, `reason: str = ""`
+  - 构造器参数（对齐 `BaseException.__init__` 标准模式）：
+    ```python
+    def __init__(
+        self,
+        document_id: UUID,
+        reason: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+        context: dict | None = None,
+    ) -> None:
+    ```
   - 消息格式：`"语义分块失败: document_id={doc_id}, reason={reason}"`
-  - `context` 暴露：`{"document_id": str, "reason": str}`
+  - `context` 暴露：`{"document_id": str, "reason": str}`（合并到传入的 `context` 字典）
   - 适用场景：ParsedDocument 所有页面均无有效文本内容（空文档/仅有空字符串页→返回空列表，不抛异常；ChunkingError 仅用于内部算法异常，如不可序列化的数据结构）
 - [ ] 异常注册到 `_code_ranges.py`、`__init__.py`、`exception_handlers.py`
   - HTTP 映射：`ChunkingError` → `422 UNPROCESSABLE ENTITY`
@@ -265,9 +283,11 @@
   - 场景 3: 章节标题边界 → `Section-header` label 触发新分块
   - 场景 4: 表格独立分块 → 表格内容展平为结构化文本
   - 场景 5: 跨页边界 → 新页码必然新分块
-  - 场景 6: 大段落超过 8192 tokens → 按 token_limit 类型硬切分（`max_chunk_size_tokens` 硬限制）
+  - 场景 6: 大段落超过 8192 tokens → 按 token_limit 类型硬切分（`max_chunk_size_tokens` 硬限制），验证 `boundary_type` 为 `TOKEN_LIMIT`
   - 场景 7: 空文档 → 返回空列表（不抛异常）
-  - Edge Cases: 纯表格文档（无文本）、全中文/全英文/中英混合 token 计数
+  - **场景 8: 分块元数据完整性** — 验证所有元数据字段（chunk_id/document_id/chunk_index/boundary_type/token_count/page_start/page_end/content_hash/metadata）非空且类型正确
+  - **场景 9: 流水线集成** — 解析完成后自动触发分块，分块结果持久化到 `metadata["chunks"]`，`RAGIndexed` 事件含 `chunk_count`
+  - Edge Cases: 纯表格文档（无文本）、全中文/全英文/中英混合 token 计数、大段落按 8192 硬限制切分后的语义完整性
 
 **Task 0 完成标志：**
 - [ ] 规范项全部定义完毕
@@ -291,8 +311,8 @@
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | SemanticChunk 值对象 | 构造/不可变性/to_dict/content_hash | `test_semantic_chunk.py` | Task 1 |
 | **TDD 单元测试** | ChunkingConfig | 默认值/自定义值/不可变性 | `test_semantic_chunk.py` | Task 1 |
-| **TDD 单元测试** | SemanticChunkerImpl | 段落边界/章节边界/表格边界/页面边界/token 计数 | `test_semantic_chunker_impl.py` | Task 2 |
-| **TDD 单元测试** | SemanticChunkingService | Mock 端口测试编排逻辑 | `test_semantic_chunking_service.py` | Task 3 |
+| **TDD 单元测试** | SemanticChunkerImpl | 段落边界/章节边界/表格边界/页面边界/token 计数/边界聚合/硬限制切分 | `test_semantic_chunker_impl.py` | Task 2 |
+| **TDD 单元测试** | SemanticChunkingService | Mock 端口测试编排逻辑（`_make_service()` 工厂函数模式） | `test_semantic_chunking_service.py` | Task 3 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_semantic_chunking.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_semantic_chunking.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收 | 完成清单最终确认 | `.feature` + `.py` | Task 6 |
@@ -498,7 +518,7 @@ class SemanticChunkerImpl:
         for page in doc.pages:
             # 跨页检测：页码变化时生成 PAGE_BREAK 边界
             if page.page_number != prev_page and prev_page > 0:
-                yield (ChunkBoundaryType.PAGE_BREAK, "", prev_page)
+                yield (ChunkBoundaryType.PAGE_BREAK, "", page.page_number)  # 使用新页码
             prev_page = page.page_number
 
             for element in page.texts:
@@ -507,7 +527,11 @@ class SemanticChunkerImpl:
                 # PDF/HTML 等大块文本需要二次段落分割
                 # 判定条件：元素内容过长（>500 字符）且包含段落分隔符
                 if boundary == ChunkBoundaryType.PARAGRAPH and len(content) > 500:
+                    # 先尝试双换行分割（PDF/Word 段落分隔）
                     sub_paragraphs = re.split(r"\n\s*\n", content.strip())
+                    if len(sub_paragraphs) <= 1:
+                        # 无双换行，按单换行分句聚合（HTML 分隔符为 \n）
+                        sub_paragraphs = [line.strip() for line in content.split("\n") if line.strip()]
                     for para in sub_paragraphs:
                         if para.strip():
                             yield (ChunkBoundaryType.PARAGRAPH, para.strip(), page.page_number)
@@ -515,6 +539,8 @@ class SemanticChunkerImpl:
                     yield (boundary, content, page.page_number)
 
             for table in page.tables:
+                if not table.rows:  # 跳过空表格（AC-5 要求）
+                    continue
                 text = self._flatten_table(table)
                 yield (ChunkBoundaryType.TABLE, text, page.page_number)
 
@@ -524,6 +550,7 @@ class SemanticChunkerImpl:
         支持多种标题格式归一化：
         - Markdown/HTML: "h1"~"h6" → SECTION_HEADER
         - Word: "Heading 1"~"Heading 9" → SECTION_HEADER
+        - Word 变体: "Heading 1 Char", "heading 1 + 中文" 等含 heading 子串的样式 → SECTION_HEADER
         - 其他/无 style → PARAGRAPH
         """
         style = element.metadata.get("style", "")
@@ -531,13 +558,14 @@ class SemanticChunkerImpl:
             return ChunkBoundaryType.PARAGRAPH
 
         style_lower = style.lower()
-        # Markdown/HTML 格式: "h1"~"h6"
-        if style_lower.startswith("h") and style_lower[1:].isdigit():
-            level = int(style_lower[1:])
-            if 1 <= level <= 6:
-                return ChunkBoundaryType.SECTION_HEADER
+        # Markdown/HTML 格式: "h1"~"h6"（严格正则匹配，避免误判 "body"、"highlight" 等）
+        if re.match(r"^h[1-6]$", style_lower):
+            return ChunkBoundaryType.SECTION_HEADER
         # Word 格式: "Heading 1"~"Heading 9"
-        if style_lower.startswith("heading ") and style_lower[8:].isdigit():
+        if re.match(r"^heading [1-9]$", style_lower):
+            return ChunkBoundaryType.SECTION_HEADER
+        # Word 变体: 含 "heading" 子串的样式（如 "Heading 1 Char"）
+        if "heading" in style_lower:
             return ChunkBoundaryType.SECTION_HEADER
 
         return ChunkBoundaryType.PARAGRAPH
@@ -563,7 +591,7 @@ class SemanticChunkerImpl:
         for boundary, text, page in segments:
             text_tokens = estimate_tokens(text)
 
-            # 硬边界：必然创建新分块
+            # 硬边界：必然创建新分块（章节/表格/页面边界）
             if boundary in (ChunkBoundaryType.SECTION_HEADER, ChunkBoundaryType.TABLE, ChunkBoundaryType.PAGE_BREAK):
                 if current_parts:
                     chunks.append(self._create_chunk(current_parts, ...))
@@ -574,6 +602,19 @@ class SemanticChunkerImpl:
                 chunks.append(self._create_chunk(current_parts, ...))
                 current_parts, current_tokens = [], 0
 
+            # 硬限制：单段超过 max_chunk_size_tokens 时必须切分
+            if text_tokens >= cfg.max_chunk_size_tokens:
+                # 按字符比例切分文本，确保每个子段不超过 max_chunk_size_tokens
+                sub_texts = self._split_by_token_limit(text, cfg.max_chunk_size_tokens)
+                for i, sub_text in enumerate(sub_texts):
+                    sub_tokens = estimate_tokens(sub_text)
+                    current_parts.append((ChunkBoundaryType.TOKEN_LIMIT, sub_text, page))
+                    current_tokens += sub_tokens
+                    if current_parts and i < len(sub_texts) - 1:
+                        chunks.append(self._create_chunk(current_parts, ...))
+                        current_parts, current_tokens = [], 0
+                continue
+
             current_parts.append((boundary, text, page))
             current_tokens += text_tokens
 
@@ -581,8 +622,55 @@ class SemanticChunkerImpl:
             chunks.append(self._create_chunk(current_parts, ...))
 
         # 后处理：合并过小分块（< min_chunk_size_tokens）到前一个分块
-        # 但跨硬边界的合并仅限 paragraph 类型
+        # 注意：以 SECTION_HEADER/TABLE/PAGE_BREAK 开头的分块禁止向后合并
+        # 短标题分块向前合并到后一个分块（标题属于其后内容）
         return self._merge_small_chunks(chunks, cfg)
+
+    def _split_by_token_limit(self, text: str, max_tokens: int) -> list[str]:
+        """按 token 硬限制切分文本（基于字符比例估算，不引入第三方 tokenizer）"""
+        total_tokens = estimate_tokens(text)
+        if total_tokens <= max_tokens:
+            return [text]
+        # 按字符比例切分：每个子段最多 max_tokens 个 token
+        ratio = max_tokens / total_tokens
+        chars_per_segment = max(1, int(len(text) * ratio))
+        segments = []
+        for i in range(0, len(text), chars_per_segment):
+            segments.append(text[i:i + chars_per_segment])
+        return segments
+
+    def _merge_small_chunks(self, chunks: list, cfg) -> list:
+        """合并过小分块，但保持语义边界完整性。
+
+        规则：
+        - 分块 token 数 < min_chunk_size_tokens 时尝试合并
+        - 以 SECTION_HEADER 开头的分块不向后合并（避免跨章节污染）
+        - 以 TABLE/PAGE_BREAK 开头的分块不向后合并
+        - 短标题分块向前合并到后一个分块（标题属于其后内容）
+        """
+        if not chunks:
+            return chunks
+        merged = []
+        i = 0
+        while i < len(chunks):
+            chunk = chunks[i]
+            # 检查是否需要合并
+            if chunk.token_count < cfg.min_chunk_size_tokens and i > 0:
+                # 检查当前分块是否以硬边界开头
+                first_boundary = chunk.boundary_type
+                if first_boundary in (ChunkBoundaryType.SECTION_HEADER, ChunkBoundaryType.TABLE, ChunkBoundaryType.PAGE_BREAK):
+                    # 硬边界分块 → 向前合并到后一个分块
+                    if i + 1 < len(chunks):
+                        chunks[i + 1] = self._merge_chunks(chunk, chunks[i + 1])
+                    else:
+                        merged.append(chunk)
+                else:
+                    # 段落分块 → 向后合并到前一个分块
+                    merged[-1] = self._merge_chunks(merged[-1], chunk)
+            else:
+                merged.append(chunk)
+            i += 1
+        return merged
 ```
 
 **完成标准/Definition of Done:**
@@ -652,10 +740,20 @@ class SemanticChunkingService:
                 for e in page_data.get("texts", [])
             ]
             tables = [_parsed_table_from_dict(t) for t in page_data.get("tables", [])]
+            images = [
+                ParsedElement(
+                    content=img["content"],
+                    bbox=BoundingBox(**img["bbox"]) if img.get("bbox") else None,
+                    confidence=img.get("confidence", 1.0),
+                    metadata=img.get("metadata", {}),
+                )
+                for img in page_data.get("images", [])
+            ]
             pages.append(ParsedPage(
                 page_number=page_data["page_number"],
                 texts=texts,
                 tables=tables,
+                images=images,
             ))
 
         return ParsedDocument(
@@ -910,6 +1008,14 @@ tests/
    - **MVP 方案**：使用字符启发式（零 I/O，P95<50ms 亚毫秒级），后续可用 `tokenizers` 做精确切换
    - `tiktoken` 也在 lock 中，但与 XLM-RoBERTa tokenizer 不匹配（OpenAI vs SentencePiece），不能用
 
+7. **HTML 解析器使用 `\n` 单换行分隔符**
+   - HTML 解析器使用 `body.get_text(separator="\n")`，内容以**单换行符** `\n` 分隔，而非 `\n\n` 双换行
+   - **二次分割必须同时支持 `\n` 和 `\n\n`**：先尝试双换行分割，无匹配时再按单换行分句聚合
+
+8. **`RAGIndexed` 事件缺少 `tenant_id` 字段**
+   - `RAGIndexed` 事件（`workflow_events.py`）当前仅包含 `document_id`, `index_name`, `chunk_count`
+   - **需在事件定义中新增 `tenant_id: str = ""` 字段**，与 `DocumentProcessed` 事件对齐
+
 ### 向后兼容性
 
 | 场景 | 行为 | 影响 |
@@ -917,7 +1023,8 @@ tests/
 | `DocumentProcessed` 事件发布后 | `SemanticChunkingHandler` 异步触发分块 | 新增行为，向后兼容 |
 | 现有文档（解析完成但未分块） | `metadata.chunks` 字段不存在或为空 | 不影响现有查询和检索 |
 | `generate_embedding` 当前实现 | 不分块，全文档单向量 | 保持现有行为（仅 Story 3.1a 集成时修改） |
-| `RAGIndexed` 事件 | `chunk_count` 从 0 变为实际数 | 新增字段值填充，语义增强 |
+| `RAGIndexed` 事件 | `chunk_count` 从 0 变为实际数，新增 `tenant_id` 字段 | 新增字段值填充，语义增强 |
+| `RAGIndexed` 事件 `tenant_id` | 新增 `tenant_id: str = ""` 字段（对齐 `DocumentProcessed`） | 向后兼容（默认空字符串） |
 
 ---
 
@@ -960,7 +1067,7 @@ tests/
 - `tests/unit/domain/exceptions/test_chunking_exceptions.py`
 - `tests/unit/application/services/test_semantic_chunking_service.py`
 - `tests/unit/application/event_handlers/test_semantic_chunking_handler.py`
-- `tests/unit/infrastructure/test_semantic_chunker_impl.py`
+- `tests/unit/infrastructure/document_parsing/test_semantic_chunker_impl.py`
 - `tests/unit/architecture/test_arch_semantic_chunking.py`
 - `tests/integration/test_semantic_chunking_integration.py`
 - `tests/contracts/test_port_contract_semantic_chunker.py`
@@ -995,9 +1102,10 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v2.0.0
+**故事版本/Story Version:** v3.0.0
 **创建日期/Created:** 2026-08-02
 **最后更新/Last Updated:** 2026-08-02
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 语义分块（规则驱动的语义边界检测 + Token 预算聚合）
 - v2.0.0: 审查修正版 — 修复 P0/P1 问题：统一 `max_chunk_size_tokens` 为 8192（bge-m3 实际能力）；修正 Token 估算参考模型为 XLM-RoBERTa；补充 `parsed_document_from_dict` 实现细节；修正章节标题检测方式为 `metadata["style"]`；修正 `ChunkingError` 继承链说明；补充 `_extract_segments` 中 `PAGE_BREAK` 检测、PDF/HTML 二次分割、样式归一化、表格展平伪代码；修正基础设施测试文件路径；提升基础设施层覆盖率目标至 90%
+- v3.0.0: 第二轮审查修订版 — 修复 17 个 P0 问题：`ChunkingError` 构造器对齐 `BaseException` 标准参数模式；`PAGE_BREAK` 页码修正为新页码；HTML 二次分割支持 `\n` 单换行；空表格跳过；`_classify_boundary()` 使用严格正则匹配；`_aggregate_segments()` 增加 `max_chunk_size_tokens` 硬限制；新增 `_split_by_token_limit()` 和 `_merge_small_chunks()` 完整实现；`parsed_document_from_dict()` 恢复 `images` 和 `_parsed_table_from_dict()` 完整实现；`RAGIndexed` 事件新增 `tenant_id` 字段；验收测试新增场景 8/9；补充事件订阅注册说明；代码库调研发现新增 2 条（HTML 分隔符、RAGIndexed tenant_id）
