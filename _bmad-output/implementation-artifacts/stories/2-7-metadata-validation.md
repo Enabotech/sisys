@@ -239,7 +239,11 @@
 - [ ] 异常注册到 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN`（添加 `"MetadataValidationError": "storage"`）
 - [ ] 异常导出到 `src/domain/exceptions/__init__.py` 的 `__all__`
 - [ ] 异常导出到 `src/domain/exceptions/storage_exceptions.py` 的 `__all__`
-- [ ] HTTP 映射：`EXCEPTION_HTTP_MAP` 中 `MetadataValidationError` → `422 UNPROCESSABLE ENTITY`（添加到 `src/interfaces/api/exception_handlers.py`）
+- [ ] HTTP 映射：`EXCEPTION_HTTP_MAP` 中 `MetadataValidationError` → `422 UNPROCESSABLE ENTITY`（显式添加到 `src/interfaces/api/exception_handlers.py`）
+  - **选择显式添加而非依赖 `isinstance` 继承回退**：原因有三
+    1. 对齐 `DocumentVersionConflictError` 等 storage 子域异常的显式映射模式
+    2. 提高可发现性——新加入的开发者可直接在 `EXCEPTION_HTTP_MAP` 中看到所有异常映射
+    3. `test_exception_handlers.py` 的 `test_map_contains_all_expected_exception_types()` 使用 `expected_types` 集合验证，显式添加后必须同步更新该集合
   - **选择 422 而非 400**：元数据语义上可理解但字段不完整，属于"非格式错误的语义问题"，422 更精确
 - [ ] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性/子域范围
   - `poetry run pytest tests/unit/domain/exceptions/ -v`（含 `test_error_code_uniqueness.py` + `test_code_ranges.py`）
@@ -299,9 +303,11 @@
   - 场景 3: 元数据缺失阻断 — 缺少 license 字段，返回 422 + EXCEPTION_217
   - 场景 4: 空值阻断 — source="" 视为缺失，返回 422
   - 场景 5: 无 metadata 上传 — 请求体无 metadata 字段，creator/created_at 自动填充，但 source/license/business_domain 缺失，返回 422
-  - **场景 6: 校验失败无 MinIO 残留** — 缺少 license 字段，校验失败后验证 MinIO 未存储该文档对象
-  - **场景 7: 校验失败无 PG 残留** — 缺少 source 字段，校验失败后验证 PG 无该文档记录
-  - **场景 8: 校验通过正常上传完整流程** — 完整元数据，验证 MinIO 存储 + PG 持久化 + 事件发布
+  - 场景 6: **校验失败无 MinIO 残留（单文件上传）** — 缺少 license 字段，校验失败后验证 MinIO 未存储该文档对象
+  - **场景 7: 校验失败无 MinIO 残留（分片上传）** — 缺少 license 字段，校验失败后验证 `abort_multipart_upload` 被调用清理 MinIO 已上传对象
+  - **场景 8: 校验失败无 PG 残留** — 缺少 source 字段，校验失败后验证 PG 无该文档记录
+  - **场景 9: 校验通过正常上传完整流程** — 完整元数据，验证 MinIO 存储 + PG 持久化 + 事件发布
+  - **场景 10: 批量上传 metadata_list 索引对齐** — 3 个文件分别传入不同 metadata，验证索引对应关系正确
   - Edge Cases: created_at 非法格式拒绝、恶意超长字段值、metadata 为 null、跨租户隔离验证
 
 **Task 0 完成标志：**
@@ -488,14 +494,23 @@ def _is_valid_iso8601(value: str) -> bool:
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/exceptions/test_metadata_validation_exceptions.py`（测试构造/属性/to_dict/HTTP 422 映射） |
+| 🔴 红 | 编写 `tests/unit/domain/exceptions/test_metadata_validation_exceptions.py`（测试构造/属性/to_dict/cause 链/HTTP 422 映射） |
 | 🟢 绿 | 在 `src/domain/exceptions/storage_exceptions.py` 中新增 `MetadataValidationError`（EXCEPTION_217） |
 | 🔄 重构 | 注册到 `_code_ranges.py`、`__init__.py`、`exception_handlers.py`，运行异常编码唯一性测试 |
 
 - [ ] Subtask 1.10: 🔴 红 — 编写异常失败测试
+  - **覆盖场景**：构造器参数（document_id/missing_fields/tenant_id）→ 属性访问正确
+  - `to_dict()` 序列化 → 精确验证 `context` 字段：
+    - `document_id` 为 `str` 类型（UUID 的 `str()` 序列化，非 `UUID` 对象）
+    - `missing_fields` 列表内容与传入值一致
+    - `tenant_id` 字符串值正确
+  - `cause` 链测试：传入 `cause=ValueError("原始错误")` → `to_dict()` 输出包含 `cause.type` 和 `cause.message`
+  - 消息格式验证：`"文档元数据校验失败: document_id={doc_id}, missing_fields={fields}"`
+  - 继承链验证：`isinstance(MetadataValidationError(), BusinessRuleViolationError)` 为 True
+  - HTTP 422 映射验证：`_get_http_status(MetadataValidationError(...))` 返回 422（通过 `EXCEPTION_HTTP_MAP` 显式映射）
 - [ ] Subtask 1.11: 🟢 绿 — 实现 `MetadataValidationError` 异常类
 - [ ] Subtask 1.12: 🔄 重构 — 注册异常（三处同步：`_code_ranges.py` `__init__.py` `exception_handlers.py`），验证编码唯一性
-  - **注意：** `test_exception_handlers.py` 中 `TestExceptionHttpMap.test_map_contains_all_expected_exception_types()` 使用硬编码 `expected_types` 集合，必须将 `MetadataValidationError` 加入该集合，否则 CI 会阻断
+  - **注意：** `test_exception_handlers.py` 中 `TestExceptionHttpMap.test_map_contains_all_expected_exception_types()` 使用硬编码 `expected_types` 集合。由于 `MetadataValidationError` 已**显式添加**到 `EXCEPTION_HTTP_MAP`，必须将 `MetadataValidationError` 加入该集合，否则 CI 会阻断
 
 **完成标准/Definition of Done:**
 - [ ] `DocumentMetadata` 值对象全部实现且测试通过
@@ -565,6 +580,7 @@ async def upload(
 ```
 
 - [ ] Subtask 2.1: 🔴 红 — 编写 `upload()` metadata 集成失败测试（4 个场景：完整 metadata 成功/自动填充成功/缺失阻断/空值阻断）
+  - **批量上传 metadata 传递验证**：`upload_with_semaphore()` 内部调用 `self.upload()` 时，`metadata_list` 必须通过索引对齐传递到每个文件的 `upload()` 调用中。当 `metadata_list` 为 `None` 时，传递 `metadata=None` 给 `upload()`。
 - [ ] Subtask 2.2: 🟢 绿 — 修改 `upload()` 方法（新增 `metadata` 参数 + 校验调用）
 - [ ] Subtask 2.3: 🔄 重构 — 优化代码，确保校验在 MinIO 前执行
 
@@ -640,8 +656,16 @@ async def upload(
   - 测试 4: 空值阻断
   - 测试 5: created_at 非法格式阻断
   - 测试 6: 跨租户数据隔离验证
-  - 测试 7: 批量上传 metadata 传递（统一 metadata 或各文件独立 metadata）
-  - 测试 8: 分片上传 metadata 传递（chunked/init → chunked/complete 路径）
+  - 测试 7: 批量上传 metadata 传递
+    - 验证 `metadata_list` 索引与 `files` 列表索引一一对应
+    - 验证 `metadata_list` 长度与 `files` 长度不匹配时的行为（超出部分忽略，不足部分传 None）
+    - 验证混合场景：部分文件有 metadata、部分文件无 metadata
+    - 验证统一 metadata 应用于所有文件
+  - 测试 8: 分片上传 metadata 传递
+    - 验证 metadata 在 `POST /chunked/init` 时传入并持久化到 `ChunkedUploadState`
+    - 验证 metadata 在 `POST /chunked/{upload_id}/complete` 时从 `state` 读取并传递给 `register_document()`
+    - 验证校验失败后调用 `abort_multipart_upload` 清理 MinIO 已上传对象
+    - 验证校验通过后 `register_document()` 收到正确的 metadata 并被持久化
 
 **集成测试隔离约束：**
 - 使用 transaction rollback（PostgreSQL savepoint）
@@ -728,7 +752,7 @@ src/
 │   │   │               # MODIFY — batch 路由新增 metadata 参数
 │   │   │               # MODIFY — chunked/init 路由新增 metadata 参数
 │   │   │               # MODIFY — DocumentResponse 新增 metadata 字段
-│   │   └── exception_handlers.py          # MODIFY — MetadataValidationError → 422 映射（已在 EXCEPTION_HTTP_MAP 中通过 BusinessRuleViolationError 继承）
+│   │   └── exception_handlers.py          # MODIFY — MetadataValidationError → 422 映射（显式添加 EXCEPTION_HTTP_MAP 条目，同步更新 expected_types 集合）
 │   └── cli/
 │       └── commands/
 │           └── document_commands.py       # UNCHANGED — 当前无文档上传 CLI 命令，本 Story 不新增
@@ -817,6 +841,51 @@ deploy/postgresql/alembic/versions/
 | **Phase 1: 灰度日志** | 校验失败仅记录 WARNING 日志，不阻断上传 | 设置环境变量 `METADATA_VALIDATION_MODE=log_only`，持续 1 个发版周期 |
 | **Phase 2: 强制校验** | 校验失败阻断上传（默认行为） | 移除环境变量 或 设置 `METADATA_VALIDATION_MODE=enforce` |
 | **Phase 3: 清理** | 移除灰度日志代码 | 清理 `log_only` 模式相关代码 |
+
+**灰度日志模式实现方案：**
+
+`DocumentMetadata` 值对象的 `validate()` 方法增加 `raise_on_error: bool = True` 参数：
+
+```python
+def validate(self, raise_on_error: bool = True) -> list[str] | None:
+    """验证最小元字段集完整性。
+
+    Args:
+        raise_on_error: 是否在验证失败时抛出异常（True=抛出，False=仅返回缺失字段列表）
+
+    Returns:
+        当 raise_on_error=False 时，返回缺失字段列表（无缺失返回空列表）
+
+    Raises:
+        MetadataValidationError: 当 raise_on_error=True 且存在缺失字段时抛出
+    """
+    missing = self.missing_fields()
+    if missing and raise_on_error:
+        raise MetadataValidationError(
+            document_id=self.document_id,
+            missing_fields=missing,
+        )
+    return missing
+```
+
+`DocumentUploadService` 集成层读取环境变量：
+
+```python
+import os
+
+_VALIDATION_MODE = os.getenv("METADATA_VALIDATION_MODE", "enforce")
+
+# 在 metadata 校验调用处：
+doc_metadata = DocumentMetadata.from_upload(...)
+if _VALIDATION_MODE == "log_only":
+    missing = doc_metadata.validate(raise_on_error=False)
+    if missing:
+        logger.warning("元数据校验失败（灰度模式）: document_id=%s, missing_fields=%s", doc.document_id, missing)
+else:
+    doc_metadata.validate()  # 默认抛出异常
+```
+
+**Phase 1 实现任务：** Task 1 的 TDD 循环 B 中增加 `validate(raise_on_error=False)` 的测试场景；Task 2 的集成层增加 `_VALIDATION_MODE` 读取和条件分支。Phase 3 清理时移除 `_VALIDATION_MODE` 判断和 `log_only` 分支。
 
 **API 消费者迁移指南：**
 1. 所有上传请求必须携带 `source`、`license`、`business_domain` 三个字段
@@ -930,6 +999,22 @@ deploy/postgresql/alembic/versions/
 | 17 | 应用服务测试未指定 `_make_service()` 工厂模式 | P1 | 补充到 Task 2 说明 |
 | 18 | 集成测试缺少分片/批量上传路径覆盖 | P0 | 新增测试 7/8 |
 
+### 第 2 轮审查修复（2026-08-02）
+
+> 经过第 2 轮 D1 全量代码调研 + D2 四视角并行审查（架构合规性/代码一致性/测试完整性/向后兼容性），共发现 **7 个 P0 问题 + 2 个 P1 问题**，已全部修复。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | 文档内部矛盾：`MetadataValidationError` 是否应加入 `EXCEPTION_HTTP_MAP` 描述不一致 | P0 | 统一为"显式添加"到 `EXCEPTION_HTTP_MAP`，修正第731行注释，同步更新 `expected_types` 集合 |
+| 2 | 异常测试缺少 `cause` 链测试和 `context` 精确序列化验证 | P0 | 在 Subtask 1.10 中增加 `cause` 链测试、`context` 字段精确断言 |
+| 3 | 验收测试缺少"分片上传校验失败+MinIO残留清理"场景 | P0 | 新增场景 7（分片上传校验失败 → `abort_multipart_upload` 清理），原场景 7/8 顺延为 8/9 |
+| 4 | 验收测试缺少批量上传 metadata_list 索引对齐 BDD 场景 | P0 | 新增场景 10（3 个文件分别传入不同 metadata，验证索引对应关系） |
+| 5 | 集成测试分片上传路径描述不完整 | P0 | 明确测试 8 的 4 个验证步骤：init 传入→持久化→complete 传递→失败清理 |
+| 6 | 集成测试批量上传描述不明确 | P0 | 明确测试 7 的 4 个验证点：索引对齐、长度不匹配、混合场景、统一 metadata |
+| 7 | 三阶段迁移策略的 Phase 1 灰度日志模式在代码中不存在 | P0 | 在 `validate()` 方法中增加 `raise_on_error: bool = True` 参数，在 `DocumentUploadService` 集成层增加 `_VALIDATION_MODE` 环境变量读取和条件分支 |
+| 8 | 架构测试未验证 `AUTO_FILLABLE_FIELDS` 不可变性 | P1 | 建议增加对 `AUTO_FILLABLE_FIELDS` 的不可变类型验证 |
+| 9 | 集成测试未指定 MinIO 隔离的具体策略 | P1 | 建议明确使用唯一 bucket 前缀或测试前清理策略 |
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -944,7 +1029,8 @@ deploy/postgresql/alembic/versions/
 
 #### 已修复 Patch
 
-本次审查共发现并修复 **22 个 P0 问题**，详见上表"文档审查修复"。
+**第 1 轮审查（22 个 P0 问题）：** 详见上表"文档审查修复"。
+**第 2 轮审查（7 个 P0 问题 + 2 个 P1 问题）：** 详见上表"第 2 轮审查修复"。
 
 #### 已推迟 Defer
 
@@ -961,8 +1047,9 @@ deploy/postgresql/alembic/versions/
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v2.0.0
 **创建日期/Created:** 2026-08-02
 **最后更新/Last Updated:** 2026-08-02
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 元数据标准化校验
+- v2.0.0: 第 2 轮审查修订 — 修复 7 个 P0 + 2 个 P1 问题（统一 EXCEPTION_HTTP_MAP 策略、补充异常 cause 链测试、完善验收/集成测试场景、实现灰度日志模式代码、明确 ChunkedUploadState metadata 持久化）
