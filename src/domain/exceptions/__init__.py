@@ -68,6 +68,7 @@ from src.domain.exceptions.storage_exceptions import (
     MemoryAccessDeniedError,
     MemoryNotFoundError,
     MemoryVersionConflictError,
+    MetadataValidationError,
     MinIOConnectionError,
 )
 from src.domain.exceptions.system_exceptions import (
@@ -116,6 +117,7 @@ __all__ = [
     "PasswordValidationError",
     "ComplianceLockError",
     "DocumentVersionConflictError",
+    "MetadataValidationError",
     # 存储异常
     "MemoryVersionConflictError",
     "MemoryNotFoundError",

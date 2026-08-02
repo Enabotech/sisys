@@ -47,6 +47,7 @@ from src.domain.exceptions import (
     MemoryNotFoundError,
     MemoryVersionConflictError,
     MessageBusError,
+    MetadataValidationError,
     MinIOConnectionError,
     NetworkError,
     NotFoundError,
@@ -169,6 +170,7 @@ class TestExceptionHttpMap:
             BucketNameValidationError,
             MemoryAccessDeniedError,
             DocumentVersionConflictError,
+            MetadataValidationError,
             # 角色子域异常
             RoleNotFoundError,
             RoleAlreadyExistsError,

@@ -7,10 +7,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import List
+from typing import List, cast
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
 from src.domain.exceptions import DocumentVersionConflictError
@@ -214,7 +214,7 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
     async def save_with_version_check(self, document: Document, expected_version: int) -> Document:
         """带乐观锁版本检查的保存方法
 
-        当 document.version == expected_version 时执行保存并递增版本号，
+        当 document.version == expected_version + 1 时执行保存，
         否则抛出 DocumentVersionConflictError。
 
         使用原子 UPDATE ... WHERE version = :expected 避免 TOCTOU 竞态条件。
@@ -230,30 +230,50 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
             DocumentVersionConflictError: 版本不匹配时抛出
             NotFoundError: 文档不存在时抛出
         """
-        # 使用原子 UPDATE 实现乐观锁，避免 TOCTOU 竞态条件
-        stmt = select(DocumentModel).where(
-            DocumentModel.id == document.document_id,
-            DocumentModel.tenant_id == document.tenant_id,
+        # 原子 UPDATE 实现乐观锁，避免 TOCTOU 竞态条件
+        stmt = (
+            update(DocumentModel)
+            .where(
+                DocumentModel.id == document.document_id,
+                DocumentModel.tenant_id == document.tenant_id,
+                DocumentModel.version == expected_version,
+            )
+            .values(
+                version=document.version,
+                updated_at=datetime.now(UTC),
+            )
         )
         result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+        from sqlalchemy.engine import CursorResult
 
-        if model is None:
-            from src.domain.exceptions import NotFoundError
+        cursor_result = cast(CursorResult, result)
 
-            raise NotFoundError(f"Document not found: {document.document_id}, tenant: {document.tenant_id}")
+        if cursor_result.rowcount == 0:
+            # rowcount == 0：文档不存在或版本不匹配
+            check_stmt = select(DocumentModel).where(
+                DocumentModel.id == document.document_id,
+                DocumentModel.tenant_id == document.tenant_id,
+            )
+            check_result = await self._session.execute(check_stmt)
+            model = check_result.scalar_one_or_none()
 
-        if model.version != expected_version:
+            if model is None:
+                from src.domain.exceptions import NotFoundError
+
+                raise NotFoundError(f"Document not found: {document.document_id}, tenant: {document.tenant_id}")
+
             raise DocumentVersionConflictError(
                 document_id=document.document_id,
                 expected_version=expected_version,
                 actual_version=model.version,
             )
 
-        # 更新版本号和时间戳
-        model.version = document.version
-        model.updated_at = datetime.now(UTC)
-        await self._session.flush()
+        # 读取更新后的数据
+        reload_stmt = select(DocumentModel).where(
+            DocumentModel.id == document.document_id,
+        )
+        reload_result = await self._session.execute(reload_stmt)
+        model = reload_result.scalar_one()
         return self._to_entity(model)
 
     @staticmethod
