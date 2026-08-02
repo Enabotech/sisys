@@ -333,6 +333,7 @@
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | DocumentMetadata 值对象 | 构造/不可变性/validate/missing_fields/from_upload/to_dict | `test_document_metadata.py` | Task 1 |
 | **TDD 单元测试** | DocumentUploadService 集成 | upload 方法 metadata 参数 + 校验阻断 | `test_document_upload_metadata.py` | Task 2 |
+| **TDD 单元测试** | ChunkedUploadManager 元数据持久化 | metadata 序列化/反序列化/init_upload 传递 | `test_document_upload_metadata.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收（5 个场景 + AC-3 流程集成场景） | `test_acceptance_metadata_validation.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_metadata_validation.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | 完成清单最终确认 | `test_acceptance_metadata_validation.feature` | Task 5 |
@@ -394,7 +395,7 @@
 | AC-2 | 关键字段缺失自动阻断 | Task 2 | 2.1-2.6 | `test_document_upload_metadata.py` |
 | AC-3 | 上传流程集成 | Task 2 | 2.1-2.9 | `test_document_upload_metadata.py` |
 | AC-3 | 上传流程集成（批量） | Task 2 | 2.7-2.9 | `test_document_upload_metadata.py` |
-| AC-3 | 上传流程集成（分片） | Task 2 | 2.4-2.6 | `test_document_upload_metadata.py` |
+| AC-3 | 上传流程集成（分片） | Task 2 | 2.4-2.6, 2.10-2.12 | `test_document_upload_metadata.py` |
 | AC-4 | 元数据自动填充 | Task 1 | 1.4-1.6 | `test_document_metadata.py` |
 | AC-4 | 元数据自动填充 | Task 2 | 2.4-2.6 | `test_document_upload_metadata.py` |
 
@@ -608,6 +609,27 @@ async def upload(
 - [ ] Subtask 2.8: 🟢 绿 — 修改 `upload_batch()` 方法（新增 `metadata_list` 参数）
 - [ ] Subtask 2.9: 🔄 重构 — 公共校验逻辑提取
 
+#### TDD 循环 D：ChunkedUploadManager 元数据持久化
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `ChunkedUploadState` 新增 `metadata` 字段测试（序列化/反序列化保留 metadata） |
+| 🟢 绿 | 修改 `ChunkedUploadState` 新增 `metadata` 字段，更新 `to_json()`/`from_json()`，修改 `init_upload()` 接收 `metadata` 参数 |
+| 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
+
+- [ ] Subtask 2.10: 🔴 红 — 编写 `ChunkedUploadState` metadata 持久化失败测试
+  - 验证 `metadata` 字段在 `to_json()` 序列化后被保留
+  - 验证 `from_json()` 反序列化后 `metadata` 字段正确恢复
+  - 验证 `init_upload()` 接收 `metadata` 参数并存储到状态中
+  - 验证 `complete_upload()` 返回状态中包含 `metadata`
+  - 验证 `metadata=None` 时向后兼容（不破坏现有分片上传）
+- [ ] Subtask 2.11: 🟢 绿 — 修改 `chunked_upload_manager.py`
+  - `ChunkedUploadState.__init__()` 新增 `metadata: str | None = None` 参数
+  - `to_json()` 序列化时包含 `metadata` 字段
+  - `from_json()` 反序列化时恢复 `metadata` 字段（兼容旧数据，`metadata` 缺失时设为 `None`）
+  - `init_upload()` 新增 `metadata: str | None = None` 参数
+- [ ] Subtask 2.12: 🔄 重构 — 优化代码，运行 `ruff` + `mypy`
+
 **完成标准/Definition of Done:**
 - [ ] `upload()` 和 `register_document()` 方法新增 `metadata` 可选参数
 - [ ] `upload_batch()` 方法新增 `metadata_list` 可选参数
@@ -756,6 +778,11 @@ src/
 │   └── cli/
 │       └── commands/
 │           └── document_commands.py       # UNCHANGED — 当前无文档上传 CLI 命令，本 Story 不新增
+│
+├── infrastructure/
+│   └── storage/
+│       └── redis/
+│           └── chunked_upload_manager.py  # MODIFY — ChunkedUploadState 新增 metadata 字段，init_upload() 接收 metadata 参数
 
 tests/
 ├── unit/
@@ -940,6 +967,7 @@ else:
 - `src/domain/exceptions/_code_ranges.py` — 注册新异常（MODIFY）
 - `src/domain/exceptions/__init__.py` — 导出新异常（MODIFY）
 - `src/application/services/document_upload_service.py` — upload()/register_document() 新增 metadata 参数（MODIFY）
+- `src/infrastructure/storage/redis/chunked_upload_manager.py` — ChunkedUploadState 新增 metadata 字段，init_upload() 接收 metadata 参数（MODIFY）
 - `src/interfaces/api/exception_handlers.py` — MetadataValidationError → 422 映射（MODIFY）
 - `tests/unit/domain/value_objects/test_document_metadata.py` — 值对象测试
 - `tests/unit/domain/exceptions/test_metadata_validation_exceptions.py` — 异常测试
@@ -1015,6 +1043,15 @@ else:
 | 8 | 架构测试未验证 `AUTO_FILLABLE_FIELDS` 不可变性 | P1 | 建议增加对 `AUTO_FILLABLE_FIELDS` 的不可变类型验证 |
 | 9 | 集成测试未指定 MinIO 隔离的具体策略 | P1 | 建议明确使用唯一 bucket 前缀或测试前清理策略 |
 
+### 第 3 轮审查修复（2026-08-02）
+
+> 经过第 3 轮 D1 深度代码调研（ChunkedUploadState、composition_root、测试模式），发现 **1 个 P0 问题 + 1 个 P1 问题**，已全部修复。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | "项目结构说明"未列出 `chunked_upload_manager.py` 作为 MODIFY 文件 | P0 | 在项目结构说明中新增 `infrastructure/storage/redis/chunked_upload_manager.py # MODIFY` 行，在文件清单中新增此文件，新增 TDD 循环 D（Subtask 2.10-2.12）覆盖 ChunkedUploadState metadata 持久化 |
+| 2 | `DocumentUploadService` 未注入 `ChunkedUploadManager`，分片上传完成时无法读取 metadata | P1 | 分片上传的 metadata 读取在 API 层（`chunked_complete` 路由）处理，`state` 通过 `chunked_manager.complete_upload()` 返回，无需在 `DocumentUploadService` 中注入 `ChunkedUploadManager`。API 路由从 `state.metadata` 读取后直接传递给 `svc.register_document(metadata=...)`
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -1053,3 +1090,4 @@ else:
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 元数据标准化校验
 - v2.0.0: 第 2 轮审查修订 — 修复 7 个 P0 + 2 个 P1 问题（统一 EXCEPTION_HTTP_MAP 策略、补充异常 cause 链测试、完善验收/集成测试场景、实现灰度日志模式代码、明确 ChunkedUploadState metadata 持久化）
+- v2.1.0: 第 3 轮审查修订 — 修复 1 个 P0 + 1 个 P1 问题（补充 chunked_upload_manager.py 为 MODIFY 文件、新增 TDD 循环 D 覆盖 ChunkedUploadState metadata 持久化、明确 API 层处理分片上传 metadata 读取）
