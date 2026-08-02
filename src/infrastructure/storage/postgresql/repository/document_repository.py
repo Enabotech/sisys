@@ -153,13 +153,16 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
         self._session.add(model)
         try:
             await self._session.flush()
-        except IntegrityError:
+        except IntegrityError as exc:
             await self._session.rollback()
-            raise DocumentVersionConflictError(
-                document_id=snapshot.document_id,
-                expected_version=snapshot.version - 1,
-                actual_version=snapshot.version,
-            )
+            # 区分唯一约束冲突与外键/非空约束违反
+            if "uq_document_version" in str(exc):
+                raise DocumentVersionConflictError(
+                    document_id=snapshot.document_id,
+                    expected_version=snapshot.version - 1,
+                    actual_version=snapshot.version,
+                )
+            raise
         return snapshot
 
     async def list_versions(self, document_id: UUID, tenant_id: str) -> List[DocumentVersionSnapshot]:
