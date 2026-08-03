@@ -1329,6 +1329,51 @@ def bootstrap() -> None:
         owner="epic-2",
     )
 
+    # SemanticChunkerPort — 语义分块器端口
+    from src.domain.ports.semantic_chunker import SemanticChunkerPort
+
+    register_port(
+        name="semantic_chunker",
+        version="v1.0.0",
+        interface=SemanticChunkerPort,
+        impl="src.infrastructure.document_parsing.semantic_chunker_impl.SemanticChunkerImpl",
+        module="src.infrastructure.document_parsing.semantic_chunker_impl",
+        lifetime=Lifetime.SINGLETON,
+        owner="epic-2",
+    )
+
+    # SemanticChunkingService — 语义分块编排服务
+    from src.application.services.semantic_chunking_service import SemanticChunkingService
+
+    register_port(
+        name="semantic_chunking_service",
+        version="v1.0.0",
+        interface=SemanticChunkingService,
+        impl=lambda resolver: SemanticChunkingService(
+            document_repository=resolver.resolve("document_repository"),
+            semantic_chunker=resolver.resolve("semantic_chunker"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.services.semantic_chunking_service",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+    )
+
+    # SemanticChunkingHandler — 事件驱动自动触发语义分块
+    from src.application.event_handlers.semantic_chunking_handler import SemanticChunkingHandler
+
+    register_port(
+        name="semantic_chunking_handler",
+        version="v1.0.0",
+        interface=SemanticChunkingHandler,
+        impl=lambda resolver: SemanticChunkingHandler(
+            semantic_chunking_service=resolver.resolve("semantic_chunking_service"),
+        ),
+        module="src.application.event_handlers.semantic_chunking_handler",
+        lifetime=Lifetime.SINGLETON,
+        owner="epic-2",
+    )
+
     # ChunkedUploadManager — 分片上传状态管理
     from src.infrastructure.storage.redis.chunked_upload_manager import ChunkedUploadManager
 

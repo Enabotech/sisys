@@ -7,9 +7,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-import pytest
-
-from src.domain.exceptions import ChunkingError, BusinessRuleViolationError
+from src.domain.exceptions import BusinessRuleViolationError, ChunkingError
 
 
 class TestChunkingError:
@@ -33,7 +31,7 @@ class TestChunkingError:
         exc = ChunkingError(document_id=doc_id)
         assert exc.document_id == doc_id
         assert exc.reason == ""
-        assert "语义分块失败" in str(exc.message) if hasattr(exc, 'message') else "语义分块失败" in str(exc)
+        assert "语义分块失败" in str(exc.message) if hasattr(exc, "message") else "语义分块失败" in str(exc)
 
     def test_constructor_with_all_args(self) -> None:
         """验证全参数构造"""

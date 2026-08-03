@@ -235,7 +235,11 @@ class ChunkingError(BusinessRuleViolationError):
         self.document_id = document_id
         self.reason = reason
         if message is None:
-            message = f"语义分块失败: document_id={document_id}, reason={reason}" if reason else f"语义分块失败: document_id={document_id}"
+            message = (
+                f"语义分块失败: document_id={document_id}, reason={reason}"
+                if reason
+                else f"语义分块失败: document_id={document_id}"
+            )
         merged_context = dict(context or {})
         merged_context["document_id"] = str(document_id)
         merged_context["reason"] = reason
