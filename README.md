@@ -1,4 +1,4 @@
-# sisys - AI 战略规划与决策智能平台
+# sisys - AI 战略规划与决策智能体
 
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](./LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -176,6 +176,6 @@ open sisys/_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html
 
 ## 📌 版本
 
-**当前版本：** 0.1.0（开发中）
+**当前版本：** 0.0.6（开发中）
 
-**© 2026 sisys - AI 战略规划与决策智能平台**
+**© 2026 sisys - AI 战略规划与决策智能体**
