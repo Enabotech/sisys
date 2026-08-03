@@ -1,6 +1,6 @@
 # Story 2-8: 语义分块
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1260,7 +1260,7 @@ tests/
 | **Story ID** | 2.8 |
 | **Story Key** | 2-8-semantic-chunking |
 | **File** | `_bmad-output/implementation-artifacts/stories/2-8-semantic-chunking.md` |
-| **Status** | `backlog` → `ready-for-dev` |
+| **Status** | `backlog` → `done` |
 | **Epic** | Epic 2: 文档与数据管理 |
 | **价值组** | 文档全生命周期管理 |
 | **优先级** | P0（MVP），内部执行优先级 P1-8 |
@@ -1271,11 +1271,11 @@ tests/
 
 ### 完成总结
 
-1. [ ] All tasks defined
-2. [ ] All acceptance criteria specified
-3. [ ] Architecture constraints extracted
-4. [ ] Previous story learnings integrated
-5. [ ] Sprint status synced to `ready-for-dev`
+1. [x] All tasks defined
+2. [x] All acceptance criteria specified
+3. [x] Architecture constraints extracted
+4. [x] Previous story learnings integrated
+5. [x] Sprint status synced to `done`
 
 ---
 
