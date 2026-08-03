@@ -15,6 +15,9 @@
 - 中英混合文档（token 计数准确性）
 - 分块后的 metadata.chunks JSONB 存储和读取
 - RAGIndexed 事件发布验证
+- 自定义 config 参数正确传递
+- parse_result 为空时返回空列表并发布 chunk_count=0 事件
+- 文档不存在时返回空列表并发布 chunk_count=0 事件
 """
 
 from __future__ import annotations
@@ -548,4 +551,122 @@ class TestSemanticChunkingIntegration:
         assert event.event_type == "RAGIndexed"
         assert event.document_id == doc_id
         assert event.chunk_count == len(chunks)
+        assert event.tenant_id == tenant_id
+
+    @pytest.mark.asyncio
+    async def test_custom_config(
+        self,
+        repository: PostgreSQLDocumentRepository,
+        mock_event_publisher: AsyncMock,
+    ) -> None:
+        """自定义 config 参数集成测试"""
+        from src.application.services.semantic_chunking_service import SemanticChunkingService
+        from src.domain.value_objects.semantic_chunk import ChunkingConfig
+        from src.infrastructure.document_parsing.semantic_chunker_impl import SemanticChunkerImpl
+
+        # 准备：使用小目标大小，验证 config 被正确传递
+        doc_id = uuid4()
+        tenant_id = "t1"
+        parse_result = _make_parse_result(texts=["测试自定义配置。" * 200, "第二段。" * 200])
+        metadata = {"business_domain": "test"}
+
+        doc = _make_doc(
+            document_id=doc_id,
+            tenant_id=tenant_id,
+            metadata=metadata | {"parse_result": parse_result},
+        )
+        await repository.save(doc)
+
+        # 执行：使用自定义 config（target=50，加速分块）
+        chunker = SemanticChunkerImpl()
+        service = SemanticChunkingService(
+            document_repository=repository,
+            semantic_chunker=chunker,
+            event_publisher=mock_event_publisher,
+        )
+        custom_config = ChunkingConfig(target_chunk_size_tokens=50, min_chunk_size_tokens=20)
+        chunks = await service.chunk_document(
+            document_id=doc_id,
+            tenant_id=tenant_id,
+            config=custom_config,
+        )
+
+        # 验证：使用小目标分块应产生更多分块
+        assert len(chunks) > 1, "小目标分块应产生多个分块"
+        # 验证所有分块不超过自定义配置的硬限制
+        for chunk in chunks:
+            assert chunk.token_count <= custom_config.max_chunk_size_tokens, (
+                f"分块 {chunk.chunk_index} 超过最大 token 限制: {chunk.token_count}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_empty_parse_result(
+        self,
+        repository: PostgreSQLDocumentRepository,
+        mock_event_publisher: AsyncMock,
+    ) -> None:
+        """parse_result 为空时返回空列表并发布 chunk_count=0 事件"""
+        from src.application.services.semantic_chunking_service import SemanticChunkingService
+        from src.infrastructure.document_parsing.semantic_chunker_impl import SemanticChunkerImpl
+
+        doc_id = uuid4()
+        tenant_id = "t1"
+
+        doc = _make_doc(
+            document_id=doc_id,
+            tenant_id=tenant_id,
+            metadata={},  # 无 parse_result
+        )
+        await repository.save(doc)
+
+        chunker = SemanticChunkerImpl()
+        service = SemanticChunkingService(
+            document_repository=repository,
+            semantic_chunker=chunker,
+            event_publisher=mock_event_publisher,
+        )
+        chunks = await service.chunk_document(
+            document_id=doc_id,
+            tenant_id=tenant_id,
+        )
+
+        assert chunks == [], "parse_result 为空时应返回空列表"
+        # 验证发布了 chunk_count=0 的事件
+        mock_event_publisher.publish.assert_called_once()
+        call_args = mock_event_publisher.publish.call_args
+        event = call_args[0][0]
+        assert event.chunk_count == 0
+        assert event.tenant_id == tenant_id
+
+    @pytest.mark.asyncio
+    async def test_document_not_found(
+        self,
+        repository: PostgreSQLDocumentRepository,
+        mock_event_publisher: AsyncMock,
+    ) -> None:
+        """文档不存在时返回空列表并发布 chunk_count=0 事件"""
+        from src.application.services.semantic_chunking_service import SemanticChunkingService
+        from src.infrastructure.document_parsing.semantic_chunker_impl import SemanticChunkerImpl
+
+        doc_id = uuid4()
+        tenant_id = "t1"
+
+        # 不保存文档，直接执行分块
+        chunker = SemanticChunkerImpl()
+        service = SemanticChunkingService(
+            document_repository=repository,
+            semantic_chunker=chunker,
+            event_publisher=mock_event_publisher,
+        )
+        chunks = await service.chunk_document(
+            document_id=doc_id,
+            tenant_id=tenant_id,
+        )
+
+        assert chunks == [], "文档不存在时应返回空列表"
+        # 验证发布了 chunk_count=0 的事件
+        mock_event_publisher.publish.assert_called_once()
+        call_args = mock_event_publisher.publish.call_args
+        event = call_args[0][0]
+        assert event.chunk_count == 0
         assert event.tenant_id == tenant_id
