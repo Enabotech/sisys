@@ -4,7 +4,7 @@
 生成 MergedCell 值对象列表。纯 Python 实现，零外部依赖。
 
 V1 版本：仅处理合并范围的元数据生成，不修改原始 rows 数据。
-实际合并单元格值填充由基础设施层的 PdfTableExtractor / ExcelParser 执行。
+实际合并单元格值填充由基础设施层的 PdfTableDetector / ExcelParser 执行。
 """
 
 from __future__ import annotations
@@ -29,16 +29,28 @@ def resolve_merged_cells(
     if not rows:
         return []
 
+    max_row = len(rows) - 1
+    max_col = max(len(row) for row in rows) - 1 if rows else 0
+
     result: list[MergedCell] = []
     for row_start, row_end, col_start, col_end in merge_ranges:
-        # 边界检查：确保合并范围在有效区域内
-        if row_start >= len(rows):
+        # 边界检查：确保合并范围在有效区域内，超界时裁剪到边界
+        if row_start < 0:
+            row_start = 0
+        if row_end > max_row:
+            row_end = max_row
+        if col_start < 0:
+            col_start = 0
+        if col_end > max_col:
+            col_end = max_col
+
+        if row_start > row_end or col_start > col_end:
             continue
-        if col_start >= len(rows[row_start]):
+        if row_start > max_row or col_start > max_col:
             continue
 
         # 取左上角单元格的值
-        value = rows[row_start][col_start] if col_start < len(rows[row_start]) else ""
+        value = rows[row_start][col_start]
 
         result.append(
             MergedCell(

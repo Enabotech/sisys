@@ -1189,12 +1189,27 @@ def bootstrap() -> None:
     )
 
     # === Table Extraction Ports (Story 2-4) ===
-    from src.domain.ports.table_extractor import TableExtractorPort
+    from src.domain.ports.table_detector import TableDetectorPort
+    from src.domain.ports.table_enhancer import TableSemanticEnhancerPort
 
     register_port(
-        name="table_extractor",
+        name="table_detector",
         version="v1.0.0",
-        interface=TableExtractorPort,
+        interface=TableDetectorPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.document_parsing.pdf_table_extractor",
+            fromlist=["PdfTableDetector"],
+        ).PdfTableDetector(),
+        module="src.infrastructure.document_parsing.pdf_table_extractor",
+        lifetime=Lifetime.SCOPED,
+        owner="epic-2",
+        tags=("table", "pdf", "document"),
+    )
+
+    register_port(
+        name="table_enhancer",
+        version="v1.0.0",
+        interface=TableSemanticEnhancerPort,
         impl=lambda resolver: __import__(
             "src.infrastructure.document_parsing.table_semantic_extractor",
             fromlist=["TableSemanticExtractor"],
@@ -1203,20 +1218,6 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED,
         owner="epic-2",
         tags=("table", "semantic", "document"),
-    )
-
-    register_port(
-        name="pdf_table_extractor",
-        version="v1.0.0",
-        interface=TableExtractorPort,
-        impl=lambda resolver: __import__(
-            "src.infrastructure.document_parsing.pdf_table_extractor",
-            fromlist=["PdfTableExtractor"],
-        ).PdfTableExtractor(),
-        module="src.infrastructure.document_parsing.pdf_table_extractor",
-        lifetime=Lifetime.SCOPED,
-        owner="epic-2",
-        tags=("table", "pdf", "document"),
     )
 
     # === OCR Port (Story 2-5) ===
@@ -1238,12 +1239,13 @@ def bootstrap() -> None:
     from src.domain.ports.resolver import Resolver
 
     def _create_parsing_service(resolver: Resolver) -> DocumentParsingService:
-        """创建文档解析服务，版面检测、表格提取和 OCR 端口可选注入
+        """创建文档解析服务，版面检测、表格检测、表格语义增强和 OCR 端口可选注入
 
         当 ONNX 模型文件不存在或 onnxruntime 未安装时，
         layout_detector 和 pdf_page_renderer 降级为 None，
         文档解析以无版面检测模式运行（所有 bbox=None）。
-        当 table_extractor 初始化失败时降级为 None（无表格语义增强）。
+        当 table_detector 初始化失败时降级为 None（PDF 表格检测降级）。
+        当 table_enhancer 初始化失败时降级为 None（表格语义增强降级）。
         当 OCR 服务不可用时降级为 None（无 OCR 识别）。
         """
         _layout_detector = None
@@ -1258,14 +1260,21 @@ def bootstrap() -> None:
             # 端口注册配置错误应向上传播，避免掩盖启动时配置问题
             raise RuntimeError(f"版面检测端口注册配置错误: {e}") from e
 
-        _table_extractor = None
+        _table_detector = None
         try:
-            _table_extractor = resolver.resolve("table_extractor")
+            _table_detector = resolver.resolve("table_detector")
         except (ImportError, RuntimeError) as e:
-            # pdfplumber 等依赖未安装时降级
-            logger.warning("表格提取端口初始化失败，文档解析将以无表格语义增强模式运行: %s", e)
+            logger.warning("PDF 表格检测端口初始化失败，PDF 表格检测将降级: %s", e)
         except (KeyError, TypeError) as e:
-            raise RuntimeError(f"表格提取端口注册配置错误: {e}") from e
+            raise RuntimeError(f"PDF 表格检测端口注册配置错误: {e}") from e
+
+        _table_enhancer = None
+        try:
+            _table_enhancer = resolver.resolve("table_enhancer")
+        except (ImportError, RuntimeError) as e:
+            logger.warning("表格语义增强端口初始化失败，表格语义增强将降级: %s", e)
+        except (KeyError, TypeError) as e:
+            raise RuntimeError(f"表格语义增强端口注册配置错误: {e}") from e
 
         _ocr = None
         try:
@@ -1283,7 +1292,8 @@ def bootstrap() -> None:
             redis_client=resolver.resolve("redis_client"),
             layout_detector=_layout_detector,
             pdf_page_renderer=_pdf_page_renderer,
-            table_extractor=_table_extractor,
+            table_detector=_table_detector,
+            table_enhancer=_table_enhancer,
             ocr=_ocr,
         )
 

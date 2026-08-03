@@ -78,45 +78,67 @@ class TestDomainLayerPurity:
 class TestPortDefinitions:
     """验证端口在 domain/ports 中定义"""
 
-    def test_table_extractor_port_in_domain_ports(self) -> None:
-        """TableExtractorPort 定义在 src/domain/ports/"""
-        port_file = _DOMAIN_ROOT / "ports" / "table_extractor.py"
-        assert port_file.exists(), "TableExtractorPort 端口文件应存在于 src/domain/ports/"
+    def test_table_detector_port_in_domain_ports(self) -> None:
+        """TableDetectorPort 定义在 src/domain/ports/"""
+        port_file = _DOMAIN_ROOT / "ports" / "table_detector.py"
+        assert port_file.exists(), "TableDetectorPort 端口文件应存在于 src/domain/ports/"
 
-    def test_table_extractor_port_is_runtime_checkable(self) -> None:
-        """TableExtractorPort 是 @runtime_checkable Protocol"""
-        from src.domain.ports.table_extractor import TableExtractorPort
+    def test_table_enhancer_port_in_domain_ports(self) -> None:
+        """TableSemanticEnhancerPort 定义在 src/domain/ports/"""
+        port_file = _DOMAIN_ROOT / "ports" / "table_enhancer.py"
+        assert port_file.exists(), "TableSemanticEnhancerPort 端口文件应存在于 src/domain/ports/"
 
-        assert hasattr(TableExtractorPort, "__protocol_attrs__") or hasattr(TableExtractorPort, "_is_protocol")
+    def test_table_detector_port_is_runtime_checkable(self) -> None:
+        """TableDetectorPort 是 @runtime_checkable Protocol"""
+        from src.domain.ports.table_detector import TableDetectorPort
 
-    def test_table_extractor_port_has_extract_method(self) -> None:
-        """TableExtractorPort 包含 extract 方法签名"""
-        from src.domain.ports.table_extractor import TableExtractorPort
+        assert hasattr(TableDetectorPort, "__protocol_attrs__") or hasattr(TableDetectorPort, "_is_protocol")
+
+    def test_table_enhancer_port_is_runtime_checkable(self) -> None:
+        """TableSemanticEnhancerPort 是 @runtime_checkable Protocol"""
+        from src.domain.ports.table_enhancer import TableSemanticEnhancerPort
+
+        assert hasattr(TableSemanticEnhancerPort, "__protocol_attrs__") or hasattr(TableSemanticEnhancerPort, "_is_protocol")
+
+    def test_table_detector_port_has_detect_method(self) -> None:
+        """TableDetectorPort 包含 detect 方法签名"""
+        from src.domain.ports.table_detector import TableDetectorPort
 
         methods = {
-            name for name in dir(TableExtractorPort) if not name.startswith("_") and callable(getattr(TableExtractorPort, name))
+            name for name in dir(TableDetectorPort) if not name.startswith("_") and callable(getattr(TableDetectorPort, name))
         }
-        assert "extract" in methods
+        assert "detect" in methods
+
+    def test_table_enhancer_port_has_enhance_method(self) -> None:
+        """TableSemanticEnhancerPort 包含 enhance 方法签名"""
+        from src.domain.ports.table_enhancer import TableSemanticEnhancerPort
+
+        methods = {
+            name
+            for name in dir(TableSemanticEnhancerPort)
+            if not name.startswith("_") and callable(getattr(TableSemanticEnhancerPort, name))
+        }
+        assert "enhance" in methods
 
 
 class TestProtocolCompliance:
     """验证基础设施实现类满足 Protocol"""
 
-    def test_table_semantic_extractor_satisfies_protocol(self) -> None:
-        """TableSemanticExtractor 满足 TableExtractorPort Protocol"""
-        from src.domain.ports.table_extractor import TableExtractorPort
+    def test_table_semantic_extractor_satisfies_enhancer_protocol(self) -> None:
+        """TableSemanticExtractor 满足 TableSemanticEnhancerPort Protocol"""
+        from src.domain.ports.table_enhancer import TableSemanticEnhancerPort
         from src.infrastructure.document_parsing.table_semantic_extractor import (
             TableSemanticExtractor,
         )
 
-        assert isinstance(TableSemanticExtractor(), TableExtractorPort)
+        assert isinstance(TableSemanticExtractor(), TableSemanticEnhancerPort)
 
-    def test_pdf_table_extractor_satisfies_protocol(self) -> None:
-        """PdfTableExtractor 满足 TableExtractorPort Protocol"""
-        from src.domain.ports.table_extractor import TableExtractorPort
-        from src.infrastructure.document_parsing.pdf_table_extractor import PdfTableExtractor
+    def test_pdf_table_detector_satisfies_detector_protocol(self) -> None:
+        """PdfTableDetector 满足 TableDetectorPort Protocol"""
+        from src.domain.ports.table_detector import TableDetectorPort
+        from src.infrastructure.document_parsing.pdf_table_extractor import PdfTableDetector
 
-        assert isinstance(PdfTableExtractor(), TableExtractorPort)
+        assert isinstance(PdfTableDetector(), TableDetectorPort)
 
 
 class TestInfrastructureLayerPlacement:
@@ -130,11 +152,11 @@ class TestInfrastructureLayerPlacement:
 
         assert "infrastructure" in TableSemanticExtractor.__module__
 
-    def test_pdf_table_extractor_in_infrastructure(self) -> None:
-        """PdfTableExtractor 位于 infrastructure 层"""
-        from src.infrastructure.document_parsing.pdf_table_extractor import PdfTableExtractor
+    def test_pdf_table_detector_in_infrastructure(self) -> None:
+        """PdfTableDetector 位于 infrastructure 层"""
+        from src.infrastructure.document_parsing.pdf_table_extractor import PdfTableDetector
 
-        assert "infrastructure" in PdfTableExtractor.__module__
+        assert "infrastructure" in PdfTableDetector.__module__
 
     def test_domain_services_in_domain_layer(self) -> None:
         """领域服务位于 domain/services"""
@@ -161,7 +183,8 @@ class TestDependencyDirection:
         """domain 层不导入 infrastructure 层"""
         domain_modules = [
             "src.domain.value_objects.parsed_document",
-            "src.domain.ports.table_extractor",
+            "src.domain.ports.table_detector",
+            "src.domain.ports.table_enhancer",
             "src.domain.services.table_header_detector",
             "src.domain.services.table_column_classifier",
             "src.domain.services.table_merge_resolver",

@@ -1,9 +1,9 @@
-"""基础设施层 通用表格语义提取编排器
+"""基础设施层 通用表格语义增强编排器
 
 编排调用领域服务（表头检测、列类型推断、合并单元格还原），
 对解析器产出的原始 ParsedTable 进行语义增强。
 
-实现 TableExtractorPort 端口协议。
+实现 TableSemanticEnhancerPort 端口协议。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class TableSemanticExtractor:
-    """通用表格语义提取编排器
+    """通用表格语义增强编排器
 
     编排调用三个领域服务对 ParsedTable 进行语义增强：
     1. detect_header — 表头检测
@@ -30,18 +30,16 @@ class TableSemanticExtractor:
     降级返回原始 ParsedTable（语义字段保持默认值）。
     """
 
-    def extract(
+    def enhance(
         self,
-        file_path: str,
-        mime_type: str,
         tables: list[ParsedTable],
+        mime_type: str,
     ) -> list[ParsedTable]:
-        """对原始表格列表执行语义提取
+        """对原始表格列表执行语义增强
 
         Args:
-            file_path: 源文档文件路径
-            mime_type: 源文档 MIME 类型
             tables: 解析器产出的原始 ParsedTable 列表
+            mime_type: 源文档 MIME 类型
 
         Returns:
             语义增强后的 ParsedTable 列表
@@ -56,7 +54,7 @@ class TableSemanticExtractor:
                 enhanced.append(enhanced_table)
             except Exception:
                 logger.warning(
-                    "表格语义提取失败，降级返回原始表格（行数=%d）",
+                    "表格语义增强失败，降级返回原始表格（行数=%d）",
                     len(table.rows),
                     exc_info=True,
                 )
@@ -93,12 +91,9 @@ class TableSemanticExtractor:
         # 2. 列类型推断
         column_types = classify_columns(data_rows, column_names=header)
 
-        # 3. 合并单元格还原（V1：仅 xlsx 格式）
+        # 3. 合并单元格还原（V1：仅 xlsx/spreadsheetml 格式）
+        # 当前 V1 阶段暂不从 file_path 读取 xlsx 合并信息，merged_cells 保持 None
         merged_cells = None
-        if "spreadsheetml" in mime_type or "xlsx" in mime_type:
-            # V1: xlsx 合并单元格信息由上层 PdfTableExtractor/ExcelParser 提供
-            # 此处仅标记为 None（暂不从 file_path 读取合并信息）
-            merged_cells = None
 
         # 4. 计算综合置信度
         semantic_confidence = self._calc_semantic_confidence(
@@ -120,12 +115,12 @@ class TableSemanticExtractor:
             },
         )
 
+    @staticmethod
     def _calc_semantic_confidence(
-        self,
         header_confidence: float,
         column_types: list[ColumnInfo],
     ) -> float:
-        """计算语义提取综合置信度
+        """计算语义增强综合置信度
 
         Args:
             header_confidence: 表头检测置信度
