@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -87,7 +87,7 @@ class SemanticChunk:
     page_start: int
     page_end: int
     content_hash: str
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典

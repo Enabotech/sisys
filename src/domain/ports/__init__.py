@@ -34,6 +34,7 @@ from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
 from src.domain.ports.permission_repository import PermissionRepositoryPort
 from src.domain.ports.saga import SagaRepositoryProtocol, SagaStep
 from src.domain.ports.sandbox_executor import SandboxExecutor
+from src.domain.ports.semantic_chunker import SemanticChunkerPort
 from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
 from src.domain.ports.session_storage import SessionStorage
 from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
@@ -75,6 +76,7 @@ __all__ = [
     "SagaRepositoryProtocol",
     "SagaStep",
     "SandboxExecutor",
+    "SemanticChunkerPort",
     "SemanticRouterProtocol",
     "SessionStorage",
     "SnapshotRepositoryProtocol",

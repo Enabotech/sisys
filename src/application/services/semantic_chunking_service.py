@@ -57,6 +57,26 @@ class SemanticChunkingService:
         self._semantic_chunker = semantic_chunker
         self._event_publisher = event_publisher
 
+    async def _publish_rag_indexed(
+        self,
+        document_id: uuid.UUID,
+        tenant_id: str,
+        chunk_count: int,
+    ) -> None:
+        """发布 RAGIndexed 事件
+
+        Args:
+            document_id: 文档标识符
+            tenant_id: 租户标识符
+            chunk_count: 分块数量（0 表示无分块）
+        """
+        event = RAGIndexed(
+            document_id=document_id,
+            chunk_count=chunk_count,
+            tenant_id=tenant_id,
+        )
+        await self._event_publisher.publish(event)
+
     async def chunk_document(
         self,
         document_id: uuid.UUID,
@@ -80,12 +100,14 @@ class SemanticChunkingService:
         doc = await self._document_repository.find(query)
         if doc is None:
             logger.warning("文档未找到: document_id=%s, tenant_id=%s", document_id, tenant_id)
+            await self._publish_rag_indexed(document_id, tenant_id, chunk_count=0)
             return []
 
         # 2. 从 parse_result 重构 ParsedDocument
         parse_result = doc.metadata.get("parse_result", {})
         if not parse_result:
             logger.warning("文档解析结果为空: document_id=%s", document_id)
+            await self._publish_rag_indexed(document_id, tenant_id, chunk_count=0)
             return []
 
         parsed_doc = self.parsed_document_from_dict(parse_result)
@@ -101,12 +123,7 @@ class SemanticChunkingService:
         await self._document_repository.save(doc)
 
         # 6. 发布 RAGIndexed 事件
-        event = RAGIndexed(
-            document_id=document_id,
-            chunk_count=len(chunks),
-            tenant_id=tenant_id,
-        )
-        await self._event_publisher.publish(event)
+        await self._publish_rag_indexed(document_id, tenant_id, chunk_count=len(chunks))
 
         logger.info(
             "语义分块完成: document_id=%s, chunk_count=%s",
