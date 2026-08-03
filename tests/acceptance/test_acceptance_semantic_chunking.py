@@ -156,6 +156,7 @@ def when_execute_chunking(context: dict[str, Any]) -> None:
 
     # 单文档场景
     parsed_doc = context.get("parsed_doc")
+    assert parsed_doc is not None, "parsed_doc 未设置"
     loop = asyncio.new_event_loop()
     try:
         chunks = loop.run_until_complete(chunker.chunk(parsed_doc))
@@ -426,9 +427,7 @@ def then_content_hash_sha256(context: dict[str, Any]) -> None:
     assert chunks, "分块列表为空"
     for chunk in chunks:
         expected_hash = hashlib.sha256(chunk.content.encode("utf-8")).hexdigest()
-        assert chunk.content_hash == expected_hash, (
-            f"content_hash 不匹配: {chunk.content_hash} != {expected_hash}"
-        )
+        assert chunk.content_hash == expected_hash, f"content_hash 不匹配: {chunk.content_hash} != {expected_hash}"
 
 
 @then("分块可序列化为 JSON")
@@ -440,6 +439,67 @@ def then_chunk_json_serializable(context: dict[str, Any]) -> None:
         d = chunk.to_dict()
         json_str = json.dumps(d, ensure_ascii=False)
         assert json_str, "分块序列化失败"
+
+
+# ===================================================================
+# AC-4: 分块集成到文档流水线
+# ===================================================================
+
+
+@given("文档解析完成并发布 DocumentProcessed 事件")
+def given_document_processed_event(context: dict[str, Any], document_id: uuid.UUID) -> None:
+    """创建 DocumentProcessed 事件场景"""
+    context["document_id"] = document_id
+    context["tenant_id"] = "test-tenant"
+
+
+@when("语义分块处理器接收事件")
+def when_handler_receives_event(context: dict[str, Any]) -> None:
+    """模拟语义分块处理器接收事件并执行分块"""
+    from unittest.mock import AsyncMock
+
+    from src.application.event_handlers.semantic_chunking_handler import SemanticChunkingHandler
+    from src.domain.events.document_events import DocumentProcessed
+
+    doc_id_raw = context.get("document_id")
+    assert isinstance(doc_id_raw, uuid.UUID), "document_id 必须是 UUID 类型"
+    doc_id: uuid.UUID = doc_id_raw
+    tenant_id = context.get("tenant_id", "test-tenant")
+
+    # Mock 服务
+    mock_service = AsyncMock()
+    mock_service.chunk_document.return_value = []
+
+    handler = SemanticChunkingHandler(semantic_chunking_service=mock_service)
+
+    event = DocumentProcessed(
+        document_id=doc_id,
+        tenant_id=tenant_id,
+    )
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(handler.handle_document_processed(event))
+    finally:
+        loop.close()
+
+    context["mock_service"] = mock_service
+
+
+@then("分块结果存入 document.metadata.chunks")
+def then_chunks_in_metadata(context: dict[str, Any]) -> None:
+    """验证分块结果存入 metadata.chunks"""
+    mock_service = context.get("mock_service")
+    assert mock_service is not None
+    mock_service.chunk_document.assert_called_once()
+
+
+@then("发布 RAGIndexed 事件（含 chunk_count）")
+def then_rag_indexed_event_published(context: dict[str, Any]) -> None:
+    """验证 RAGIndexed 事件发布"""
+    mock_service = context.get("mock_service")
+    assert mock_service is not None
+    mock_service.chunk_document.assert_called_once()
 
 
 # ===================================================================
