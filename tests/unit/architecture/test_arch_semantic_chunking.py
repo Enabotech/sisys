@@ -87,7 +87,9 @@ class TestArchSemanticChunking:
         # 验证是 Protocol：_is_protocol 标志存在
         assert hasattr(SemanticChunkerPort, "_is_protocol"), "Protocol 应包含 _is_protocol 标志"
         # 验证 runtime_checkable：_is_runtime_protocol 标志存在
-        assert hasattr(SemanticChunkerPort, "_is_runtime_protocol"), "runtime_checkable Protocol 应包含 _is_runtime_protocol 标志"
+        assert hasattr(SemanticChunkerPort, "_is_runtime_protocol"), (
+            "runtime_checkable Protocol 应包含 _is_runtime_protocol 标志"
+        )
         assert SemanticChunkerPort._is_runtime_protocol, "runtime_checkable Protocol 的 _is_runtime_protocol 应为 True"  # type: ignore[attr-defined]
         # 验证是类
         assert isinstance(SemanticChunkerPort, type)
