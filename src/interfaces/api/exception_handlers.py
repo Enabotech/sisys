@@ -23,6 +23,7 @@ from src.domain.exceptions import (
     BusinessRuleViolationError,
     CannotDeleteRoleWithUsersError,
     CannotDeleteSystemRoleError,
+    ChunkingError,
     ComplianceLockError,
     ConfigurationError,
     ConflictError,
@@ -100,6 +101,7 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     MemoryAccessDeniedError: status.HTTP_403_FORBIDDEN,  # 215
     DocumentVersionConflictError: status.HTTP_409_CONFLICT,  # 216
     MetadataValidationError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 217
+    ChunkingError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 218
     # 角色子域异常
     RoleNotFoundError: status.HTTP_404_NOT_FOUND,  # 221
     RoleAlreadyExistsError: status.HTTP_409_CONFLICT,  # 222

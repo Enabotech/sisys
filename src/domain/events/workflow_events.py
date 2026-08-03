@@ -41,6 +41,7 @@ class RAGIndexed(DomainEvent):
     document_id: uuid.UUID = field(default_factory=uuid.uuid4)
     index_name: str = ""
     chunk_count: int = 0
+    tenant_id: str = ""
     event_type: str = field(default="RAGIndexed", init=False)
 
     def __post_init__(self) -> None:

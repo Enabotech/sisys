@@ -48,7 +48,6 @@ class TestSemanticChunkerPortContract:
 
     def test_chunk_method_async(self) -> None:
         """chunk 方法应为 async"""
-        import inspect
 
         assert hasattr(SemanticChunkerPort, "chunk")
         method = SemanticChunkerPort.chunk

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from src.domain.value_objects.semantic_chunk import ChunkingConfig, SemanticChunk
 from src.domain.value_objects.parsed_document import ParsedDocument
+from src.domain.value_objects.semantic_chunk import ChunkingConfig, SemanticChunk
 
 
 @runtime_checkable
