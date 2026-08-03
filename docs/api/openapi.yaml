@@ -18,6 +18,114 @@ servers:
 
 paths:
   # ============================================================================
+  # 文档管理端点 (Document Management)
+  # ============================================================================
+  /documents:
+    get:
+      tags:
+        - documents
+      summary: 查询文档列表
+      description: 获取文档列表（支持分页和过滤）
+      security:
+        - OAuth2: []
+      parameters:
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: 分页偏移
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: 每页数量
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        "401":
+          description: 未认证
+
+  /documents/{document_id}/versions:
+    get:
+      tags:
+        - documents
+      summary: 查询文档版本历史
+      description: 返回按版本号降序排列的版本快照列表
+      security:
+        - OAuth2: []
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 文档 UUID
+        - name: tenant_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 租户标识符
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentVersionSnapshotResponse'
+        "401":
+          description: 未认证
+        "404":
+          description: 文档不存在
+
+  /documents/{document_id}/versions/snapshot:
+    post:
+      tags:
+        - documents
+      summary: 创建文档版本快照
+      description: 手动创建文档版本快照，记录差异摘要
+      security:
+        - OAuth2: []
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 文档 UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVersionSnapshotRequest'
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentVersionSnapshotResponse'
+        "401":
+          description: 未认证
+        "404":
+          description: 文档不存在
+        "409":
+          description: 版本冲突
+
+  # ============================================================================
   # 认证端点 (Authentication)
   # ============================================================================
   /auth/login:
@@ -966,6 +1074,93 @@ paths:
 
 components:
   schemas:
+    # --------------------------------------------------------------------------
+    # 文档版本快照相关 schemas (Story 2-6)
+    # --------------------------------------------------------------------------
+    CreateVersionSnapshotRequest:
+      type: object
+      required:
+        - tenant_id
+      properties:
+        tenant_id:
+          type: string
+          description: 租户标识符
+        created_by:
+          type: string
+          description: 操作者标识
+        change_description:
+          type: string
+          description: 变更描述
+        old_content_summary:
+          type: string
+          nullable: true
+          description: 旧版本内容摘要
+        new_content_summary:
+          type: string
+          nullable: true
+          description: 新版本内容摘要
+
+    DocumentVersionSnapshotResponse:
+      type: object
+      required:
+        - document_id
+        - version
+        - snapshot_id
+        - created_at
+        - created_by
+      properties:
+        document_id:
+          type: string
+          format: uuid
+          description: 文档唯一标识符
+        version:
+          type: integer
+          description: 版本号
+        snapshot_id:
+          type: string
+          format: uuid
+          description: 快照唯一标识符
+        created_at:
+          type: string
+          format: date-time
+          description: 快照创建时间
+        created_by:
+          type: string
+          description: 操作者标识
+        change_description:
+          type: string
+          description: 变更描述
+        diff_summary:
+          type: string
+          description: 差异摘要文本
+        diff_json:
+          type: object
+          nullable: true
+          description: 结构化差异数据
+        storage_object_key:
+          type: string
+          description: 对象存储引用
+        file_size_bytes:
+          type: integer
+          description: 文件大小
+        checksum:
+          type: string
+          description: 文件校验和
+
+    DocumentListResponse:
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentVersionSnapshotResponse'
+        total:
+          type: integer
+          description: 总数量
+
     # --------------------------------------------------------------------------
     # 认证相关 schemas
     # --------------------------------------------------------------------------
