@@ -5,10 +5,12 @@
 - 接口类型正确
 - 版本号正确
 - 生命周期正确
-- 方法签名存在
+- 方法签名存在且为 async
 """
 
 from __future__ import annotations
+
+import inspect
 
 from src.domain.ports.registry import _global_registry
 from src.domain.ports.semantic_chunker import SemanticChunkerPort
@@ -48,9 +50,15 @@ class TestSemanticChunkerPortContract:
 
     def test_chunk_method_async(self) -> None:
         """chunk 方法应为 async"""
-
         assert hasattr(SemanticChunkerPort, "chunk")
         method = SemanticChunkerPort.chunk
-        # Protocol 方法的签名对于 async 检查比较特殊
-        # 验证方法名确实为 chunk
         assert method.__name__ == "chunk"
+
+        # 验证异步性质
+        assert inspect.iscoroutinefunction(method), "chunk 方法应为 async"
+
+        # 验证参数签名
+        sig = inspect.signature(method)
+        param_names = list(sig.parameters.keys())
+        expected_params = ["self", "parsed_doc", "config"]
+        assert param_names == expected_params, f"chunk 参数应为 {expected_params}，实际: {param_names}"

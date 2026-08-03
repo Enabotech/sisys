@@ -39,11 +39,11 @@
 **And** 原始文档内容引用（MinIO object_key）存入快照记录
 
 **验证标准/Validation Criteria:**
-- [ ] 版本快照创建后 `version` 递增 +1
-- [ ] 快照记录包含 `created_by`、`created_at`、`change_description`、`diff_summary`
-- [ ] 快照记录关联正确的 `document_id`
-- [ ] 版本快照可通过 `document_id` + `version` 唯一查询
-- [ ] 版本快照创建延迟 P95 < 100ms
+- [x] 版本快照创建后 `version` 递增 +1
+- [x] 快照记录包含 `created_by`、`created_at`、`change_description`、`diff_summary`
+- [x] 快照记录关联正确的 `document_id`
+- [x] 版本快照可通过 `document_id` + `version` 唯一查询
+- [ ] 版本快照创建延迟 P95 < 100ms (deferred, 性能测试)
 
 ### AC-2: 差异摘要计算
 
@@ -54,11 +54,11 @@
 **And** 差异摘要可跨格式（文本/元数据/文件内容）
 
 **验证标准/Validation Criteria:**
-- [ ] 差异计算延迟 P95 < 200ms
-- [ ] diff 输出包含变更摘要（human-readable summary）
-- [ ] diff 输出包含结构化 diff 字段（changed_fields 列表）
-- [ ] 空变更（无差异）的 diff 正确标记为 "no changes"
-- [ ] 首次版本快照（version=1）的 diff 标记为 "initial version"
+- [ ] 差异计算延迟 P95 < 200ms (deferred, 性能测试)
+- [x] diff 输出包含变更摘要（human-readable summary）
+- [x] diff 输出包含结构化 diff 字段（changed_fields 列表）
+- [x] 空变更（无差异）的 diff 正确标记为 "no changes"
+- [x] 首次版本快照（version=1）的 diff 标记为 "initial version"
 
 ### AC-3: 版本冲突检测
 
@@ -69,10 +69,10 @@
 **And** 不影响其他正常操作
 
 **验证标准/Validation Criteria:**
-- [ ] 乐观锁策略：检查 `document.version` 与预期版本一致
-- [ ] 版本不一致时抛出 `DocumentVersionConflictError`
-- [ ] 错误消息包含 `document_id`、`expected_version`、`actual_version`
-- [ ] 并发版本控制 ≥ 10 个并发操作
+- [x] 乐观锁策略：检查 `document.version` 与预期版本一致
+- [x] 版本不一致时抛出 `DocumentVersionConflictError`
+- [x] 错误消息包含 `document_id`、`expected_version`、`actual_version`
+- [ ] 并发版本控制 ≥ 10 个并发操作 (deferred, 并发测试)
 
 ### AC-4: 版本快照列表查询
 
@@ -83,10 +83,10 @@
 **And** 支持按文档 ID 和租户隔离查询
 
 **验证标准/Validation Criteria:**
-- [ ] 列表按版本号降序排列
-- [ ] 列表包含所有必需字段
-- [ ] 空版本历史返回空列表（非 None）
-- [ ] 跨租户隔离：租户 A 不能看到租户 B 的版本历史
+- [x] 列表按版本号降序排列
+- [x] 列表包含所有必需字段
+- [x] 空版本历史返回空列表（非 None）
+- [x] 跨租户隔离：租户 A 不能看到租户 B 的版本历史
 
 ### AC-5: 上传/解析后自动创建版本快照
 
@@ -96,10 +96,10 @@
 **And** 不阻塞上传/解析主流程（异步或同步非阻塞）
 
 **验证标准/Validation Criteria:**
-- [ ] 上传完成后自动创建首次版本快照（version=1）
-- [ ] 解析完成后自动创建版本快照（version=2）
-- [ ] 上传/解析流水线不因版本快照创建失败而阻断
-- [ ] 版本快照创建失败不影响文档状态
+- [x] 上传完成后自动创建首次版本快照（version=1）
+- [x] 解析完成后自动创建版本快照（version=2）
+- [x] 上传/解析流水线不因版本快照创建失败而阻断
+- [x] 版本快照创建失败不影响文档状态
 
 ---
 
@@ -993,5 +993,6 @@ deploy/postgresql/alembic/versions/
 **创建日期/Created:** 2026-07-31
 **最后更新/Last Updated:** 2026-08-03
 **更新说明/Description:**
+- v1.5.0: 补充缺失的3个测试文件 — test_document_version_model.py(17项模型测试) + test_document_version_repository.py(9项仓储测试) + test_api_contract_document_version.py(11项API契约测试)
 - v1.4.0: 补充两个延期项修复 — openapi.yaml 版本快照端点定义 + 空 tenant_id 校验（ValidationError/EXCEPTION_201）
 - v1.3.0: 5轮代码审查修订 — 22项修复

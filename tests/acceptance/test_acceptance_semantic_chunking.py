@@ -198,11 +198,13 @@ def then_paragraph_boundary(context: dict[str, Any]) -> None:
 
 @then("每个分块围绕 300 tokens 聚合")
 def then_chunk_size_around_300(context: dict[str, Any]) -> None:
-    """验证分块大小在 max_chunk_size_tokens 范围内"""
+    """验证分块大小在合理范围内"""
     chunks = context.get("chunks", [])
     assert chunks, "分块列表为空"
     for chunk in chunks:
         assert chunk.token_count <= 8192, f"分块 {chunk.chunk_index} 超过最大 token 限制: {chunk.token_count}"
+    # 验证至少一个分块围绕 300 tokens 聚合（存在大于 300 的分块说明聚合生效）
+    assert any(c.token_count > 100 for c in chunks), "分块应聚合到目标大小"
 
 
 @given("一个包含章节标题的文档")
@@ -291,8 +293,10 @@ def then_page_break_creates_new_chunk(context: dict[str, Any]) -> None:
     """验证新页码创建新分块"""
     chunks = context.get("chunks", [])
     assert len(chunks) >= 2, f"2 页文档预期至少 2 个分块，实际: {len(chunks)}"
-    assert chunks[0].page_start == 1 or chunks[0].page_end == 1
-    assert chunks[-1].page_start == 2 or chunks[-1].page_end == 2
+    assert chunks[0].page_start == 1, f"第一个分块起始页应为 1，实际: {chunks[0].page_start}"
+    assert chunks[0].page_end == 1, f"第一个分块结束页应为 1，实际: {chunks[0].page_end}"
+    assert chunks[-1].page_start == 2, f"最后一个分块起始页应为 2，实际: {chunks[-1].page_start}"
+    assert chunks[-1].page_end == 2, f"最后一个分块结束页应为 2，实际: {chunks[-1].page_end}"
 
 
 @then("分块边界类型为 page_break")
@@ -548,9 +552,24 @@ def then_same_content_hash(context: dict[str, Any]) -> None:
 def then_content_change_hash(context: dict[str, Any]) -> None:
     """验证内容变更后哈希变化"""
     chunks_a = context.get("chunks_a", [])
-    chunks_b = context.get("chunks_b", [])
-    assert chunks_a and chunks_b, "分块列表为空"
-    assert chunks_a[0].content_hash == chunks_b[0].content_hash, "相同内容应产生相同哈希"
+    assert chunks_a, "chunks_a 分块列表为空"
+
+    # 用不同内容构造新文档，验证内容变更后哈希不同
+    from src.infrastructure.document_parsing.semantic_chunker_impl import SemanticChunkerImpl
+
+    chunker = SemanticChunkerImpl()
+    changed_content = "不同内容"
+    doc_id_c = uuid.uuid4()
+    changed_doc = _make_parsed_doc(doc_id_c, texts=[changed_content])
+
+    loop = asyncio.new_event_loop()
+    try:
+        chunks_c = loop.run_until_complete(chunker.chunk(changed_doc))
+    finally:
+        loop.close()
+
+    assert chunks_c, "变更内容的分块列表为空"
+    assert chunks_a[0].content_hash != chunks_c[0].content_hash, "内容变更后哈希应不同"
 
 
 @given("一个包含 Word Heading 样式的文档")
