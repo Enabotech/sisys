@@ -1,6 +1,6 @@
 # Story 2-6: 文档版本快照
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -113,7 +113,7 @@
 
 #### 领域事件 Schema
 
-- [ ] 新建事件 `DocumentVersionSnapshotCreated`（`src/domain/events/document_events.py`）
+- [x] 新建事件 `DocumentVersionSnapshotCreated`（`src/domain/events/document_events.py`）
   - 字段定义模式与现有 `DocumentUploaded` 一致（使用 `field(default=..., init=False)` 定义 `event_type`）：
     ```python
     @dataclass(frozen=True)
@@ -134,15 +134,15 @@
     ```
   - 注意：`snapshot_id` 字段使用 `default_factory=uuid.uuid4`（非必填，与 `document_id` 模式一致），事件构造时默认生成新 UUID
   - 注意：`event_type` 必须使用 `field(default="DocumentVersionSnapshotCreated", init=False)` 模式（而非直接赋值），以确保 `__init_subclass__` 自动注册到 `DomainEvent._registry` 的正确性
-- [ ] 事件自动注册到 `DomainEvent._registry`（通过 `__init_subclass__` 自动注册）
-- [ ] 导出到 `src/domain/events/__init__.py`：在 `document_events` 导入中添加 `DocumentVersionSnapshotCreated`，在 `__all__` 中添加同名导出
-- [ ] 事件测试文件命名：`tests/unit/domain/events/test_document_uploaded.py` 中新增 `TestDocumentVersionSnapshotCreatedCreation/Registration/PostInit/Serialization` 测试类（与现有文档事件测试共享同一文件，遵循现有模式；也可新建 `tests/unit/domain/events/test_document_version_snapshot.py` 独立文件，两种方式均可）
-- [ ] 事件通道配置：`configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS`（RELIABLE 模式，RabbitMQ via Outbox）
-- [ ] 通道配置：`redis_channel="sisys:rt:document_version_snapshot_created"`, `rabbitmq_routing_key="sisys.events.reliable.document_version_snapshot_created"`
+- [x] 事件自动注册到 `DomainEvent._registry`（通过 `__init_subclass__` 自动注册）
+- [x] 导出到 `src/domain/events/__init__.py`：在 `document_events` 导入中添加 `DocumentVersionSnapshotCreated`，在 `__all__` 中添加同名导出
+- [x] 事件测试文件命名：`tests/unit/domain/events/test_document_uploaded.py` 中新增 `TestDocumentVersionSnapshotCreatedCreation/Registration/PostInit/Serialization` 测试类（与现有文档事件测试共享同一文件，遵循现有模式；也可新建 `tests/unit/domain/events/test_document_version_snapshot.py` 独立文件，两种方式均可）
+- [x] 事件通道配置：`configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS`（RELIABLE 模式，RabbitMQ via Outbox）
+- [x] 通道配置：`redis_channel="sisys:rt:document_version_snapshot_created"`, `rabbitmq_routing_key="sisys.events.reliable.document_version_snapshot_created"`
 
 #### 数据模型
 
-- [ ] 新建 `DocumentVersionSnapshot` 值对象（`src/domain/value_objects/document_version.py`）
+- [x] 新建 `DocumentVersionSnapshot` 值对象（`src/domain/value_objects/document_version.py`）
   ```python
   @dataclass(frozen=True)
   class DocumentVersionSnapshot:
@@ -159,7 +159,7 @@
       checksum: str = ""
   ```
   **注意：** `DocumentVersionSnapshot` 是所有字段在构造时强制传入的 frozen dataclass，`document_id`、`version`、`snapshot_id`、`created_at`、`created_by` 这 5 个必填字段无默认值，确保值对象构造时语义完整。`diff_json`、`storage_object_key`、`file_size_bytes`、`checksum` 为可选字段，仅在快照创建时从上下文获取。
-- [ ] 新建 `DocumentVersionDiff` 值对象（`src/domain/value_objects/document_version.py`）
+- [x] 新建 `DocumentVersionDiff` 值对象（`src/domain/value_objects/document_version.py`）
   ```python
   @dataclass(frozen=True)
   class DocumentVersionDiff:
@@ -168,41 +168,41 @@
       is_initial: bool = False
   ```
   **注意：** `DocumentVersionDiff` 是 diff 计算过程中的**中间值对象**，不持久化。其 `diff_summary` 字段在创建快照时存入 `DocumentVersionSnapshot.diff_summary`，`changed_fields` 作为 `dict[str, Any]` 存入 `DocumentVersionSnapshot.diff_json`（通过 `{"changed_fields": changed_fields, "is_initial": is_initial}` 结构）。
-- [ ] **不扩展** `DocumentVersion`（`src/domain/entities/document.py`）—— `DocumentVersion` 是内存中的版本历史记录，职责是追踪版本递增日志（version/created_at/created_by/change_description），`diff_summary` 是持久化快照的属性，不应混入内存历史记录。`Document.bump_version()` 已提供版本递增能力（`src/domain/entities/document.py:155-174`），快照创建逻辑由应用层 `DocumentVersionService` 编排，不扩展 `Document` 实体方法
+- [x] **不扩展** `DocumentVersion`（`src/domain/entities/document.py`）—— `DocumentVersion` 是内存中的版本历史记录，职责是追踪版本递增日志（version/created_at/created_by/change_description），`diff_summary` 是持久化快照的属性，不应混入内存历史记录。`Document.bump_version()` 已提供版本递增能力（`src/domain/entities/document.py:155-174`），快照创建逻辑由应用层 `DocumentVersionService` 编排，不扩展 `Document` 实体方法
 
 #### 统一端口定义注册与管理
 
-- [ ] 扩展 `DocumentRepositoryPort`（`src/domain/ports/document_repository.py`）—— 新增方法：
+- [x] 扩展 `DocumentRepositoryPort`（`src/domain/ports/document_repository.py`）—— 新增方法：
   - `save_version_snapshot(snapshot: DocumentVersionSnapshot) -> DocumentVersionSnapshot` — 持久化版本快照（参数为值对象，符合 DDD 聚合模式）
   - `list_versions(document_id: UUID, tenant_id: str) -> list[DocumentVersionSnapshot]` — 按文档 ID 和租户列出版本
   - `get_version(document_id: UUID, version: int, tenant_id: str) -> DocumentVersionSnapshot | None` — 获取指定版本
   - `save_with_version_check(document: Document, expected_version: int) -> Document` — 带乐观锁版本检查的保存方法，当 `document.version == expected_version` 时执行保存并递增版本号，否则抛出 `DocumentVersionConflictError`
-- [ ] 端口注册到 `_global_registry` 作为 `document_repository` 端口版本升级（v1.0.0 → v1.1.0）
-- [ ] 端口契约测试通过（`tests/contracts/test_port_contract_document_version.py`）
-- [ ] 新增 `DocumentVersionService` 在 composition_root 注册为 `document_version_service`
+- [x] 端口注册到 `_global_registry` 作为 `document_repository` 端口版本升级（v1.0.0 → v1.1.0）
+- [x] 端口契约测试通过（`tests/contracts/test_port_contract_document_version.py`）
+- [x] 新增 `DocumentVersionService` 在 composition_root 注册为 `document_version_service`
 
 #### 领域异常契约
 
-- [ ] 新增异常：`DocumentVersionConflictError`（EXCEPTION_216）
+- [x] 新增异常：`DocumentVersionConflictError`（EXCEPTION_216）
   - 归属模块：`storage_exceptions.py`（存储子域，编码范围 211-219）
   - 继承自 `ConflictError`（EXCEPTION_203）
   - 构造器参数：`document_id: UUID`, `expected_version: int`, `actual_version: int`
   - 消息格式：`"文档版本冲突: document_id={doc_id}, expected={expected}, actual={actual}"`
   - 编码范围：子域 "storage" 的 (211, 219) 范围，当前已使用 211-215（`MemoryNotFoundError`/`BucketNotFoundError`/`MemoryVersionConflictError`/`BucketNameValidationError`/`MemoryAccessDeniedError`），216 可用
   - 注意：`MemoryVersionConflictError`（EXCEPTION_213）是记忆版本冲突，`DocumentVersionConflictError`（EXCEPTION_216）是文档版本冲突，两者概念不同，编码独立
-- [ ] 异常注册到 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN`（添加 `"DocumentVersionConflictError": "storage"`）
-- [ ] 异常导出到 `src/domain/exceptions/__init__.py` 的 `__all__`（添加 `"DocumentVersionConflictError"`）
-- [ ] 异常导出到 `src/domain/exceptions/storage_exceptions.py` 的 `__all__`（添加 `"DocumentVersionConflictError"`）
-- [ ] HTTP 映射：`EXCEPTION_HTTP_MAP` 中 `DocumentVersionConflictError` → `409 CONFLICT`（添加到 `src/interfaces/api/exception_handlers.py`）
-- [ ] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性/子域范围
+- [x] 异常注册到 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN`（添加 `"DocumentVersionConflictError": "storage"`）
+- [x] 异常导出到 `src/domain/exceptions/__init__.py` 的 `__all__`（添加 `"DocumentVersionConflictError"`）
+- [x] 异常导出到 `src/domain/exceptions/storage_exceptions.py` 的 `__all__`（添加 `"DocumentVersionConflictError"`）
+- [x] HTTP 映射：`EXCEPTION_HTTP_MAP` 中 `DocumentVersionConflictError` → `409 CONFLICT`（添加到 `src/interfaces/api/exception_handlers.py`）
+- [x] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性/子域范围
 
 #### API 契约
 
-- [ ] 新增 API 端点（P1 优先级，此 Story 仅实现 CLI 入口）：
+- [x] 新增 API 端点（P1 优先级，此 Story 仅实现 CLI 入口）：
   - `GET /api/v1/documents/{document_id}/versions` — 查询版本历史（P1，此 Story 只需定义 OpenAPI 契约）
   - `POST /api/v1/documents/{document_id}/versions/snapshot` — 创建版本快照（P1，此 Story 只需定义 OpenAPI 契约）
-- [ ] 更新 `docs/api/openapi.yaml`
-- [ ] API 契约测试通过（`tests/contracts/test_api_contract_document_version.py`）
+- [x] 更新 `docs/api/openapi.yaml`
+- [x] API 契约测试通过（`tests/contracts/test_api_contract_document_version.py`）
 
 #### 六边形架构约束（必须遵守）
 
@@ -228,9 +228,9 @@
 
 #### 验收标准 Gherkin
 
-- [ ] 验收测试文件：`tests/acceptance/test_acceptance_document_version.feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_document_version.py`
-- [ ] 覆盖场景：
+- [x] 验收测试文件：`tests/acceptance/test_acceptance_document_version.feature`
+- [x] 步骤实现文件：`tests/acceptance/test_acceptance_document_version.py`
+- [x] 覆盖场景：
   - 场景 1: 文档上传后自动创建版本快照
   - 场景 2: 文档解析后自动创建版本快照
   - 场景 3: 查询文档版本历史
@@ -238,8 +238,8 @@
   - Edge Cases: 文档不存在时创建快照、跨租户隔离、空版本历史
 
 **Task 0 完成标志：**
-- [ ] 规范项全部定义完毕
-- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
+- [x] 规范项全部定义完毕
+- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
 
 ---
 
@@ -255,9 +255,9 @@
 | 🟢 绿 | 实现 `src/domain/value_objects/document_version.py`（`DocumentVersionSnapshot` + `DocumentVersionDiff` frozen dataclass） |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写值对象失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现值对象最小代码
-- [ ] Subtask 1.3: 🔄 重构 — 优化代码
+- [x] Subtask 1.1: 🔴 红 — 编写值对象失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现值对象最小代码
+- [x] Subtask 1.3: 🔄 重构 — 优化代码
 
 #### TDD 循环 B：文档版本差异计算领域服务
 
@@ -277,9 +277,9 @@
 - `compute_diff` 是纯函数（无 I/O、无状态），定义在领域层，仅使用 `difflib` 标准库
 - 全量内容 diff 不在领域层做（性能敏感），由应用层在调用 `compute_diff` 前将内容转为摘要字符串
 
-- [ ] Subtask 1.4: 🔴 红 — 编写差异计算领域服务失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现差异计算服务
-- [ ] Subtask 1.6: 🔄 重构 — 优化代码
+- [x] Subtask 1.4: 🔴 红 — 编写差异计算领域服务失败测试
+- [x] Subtask 1.5: 🟢 绿 — 实现差异计算服务
+- [x] Subtask 1.6: 🔄 重构 — 优化代码
 
 #### TDD 循环 C：文档版本快照领域事件
 
@@ -289,9 +289,9 @@
 | 🟢 绿 | 在 `src/domain/events/document_events.py` 中新增 `DocumentVersionSnapshotCreated` 事件类 |
 | 🔄 重构 | 运行 `ruff` + `mypy`，更新 `__init__.py` 导出 |
 
-- [ ] Subtask 1.7: 🔴 红 — 编写领域事件失败测试
-- [ ] Subtask 1.8: 🟢 绿 — 实现领域事件
-- [ ] Subtask 1.9: 🔄 重构 — 优化代码，更新导出
+- [x] Subtask 1.7: 🔴 红 — 编写领域事件失败测试
+- [x] Subtask 1.8: 🟢 绿 — 实现领域事件
+- [x] Subtask 1.9: 🔄 重构 — 优化代码，更新导出
 
 #### TDD 循环 D：文档版本冲突异常
 
@@ -301,16 +301,16 @@
 | 🟢 绿 | 在 `src/domain/exceptions/storage_exceptions.py` 中新增 `DocumentVersionConflictError`（EXCEPTION_216） |
 | 🔄 重构 | 注册到 `_code_ranges.py`、`__init__.py`、`exception_handlers.py`，运行异常编码唯一性测试 |
 
-- [ ] Subtask 1.10: 🔴 红 — 编写异常失败测试
-- [ ] Subtask 1.11: 🟢 绿 — 实现异常类
-- [ ] Subtask 1.12: 🔄 重构 — 注册异常并验证
+- [x] Subtask 1.10: 🔴 红 — 编写异常失败测试
+- [x] Subtask 1.11: 🟢 绿 — 实现异常类
+- [x] Subtask 1.12: 🔄 重构 — 注册异常并验证
 
 **完成标准/Definition of Done:**
-- [ ] 值对象全部实现且测试通过
-- [ ] 差异计算服务全部实现且测试通过
-- [ ] 领域事件测试通过（构造/注册/序列化/反序列化）
-- [ ] 异常测试通过（构造/`to_dict()`/HTTP 映射/编码唯一性）
-- [ ] 覆盖率 ≥ 90%（领域层标准）
+- [x] 值对象全部实现且测试通过
+- [x] 差异计算服务全部实现且测试通过
+- [x] 领域事件测试通过（构造/注册/序列化/反序列化）
+- [x] 异常测试通过（构造/`to_dict()`/HTTP 映射/编码唯一性）
+- [x] 覆盖率 ≥ 90%（领域层标准）
 
 ---
 
@@ -320,7 +320,7 @@
 
 #### 端口契约定义
 
-- [ ] 扩展 `DocumentRepositoryPort`（`src/domain/ports/document_repository.py`）新增 4 个方法：
+- [x] 扩展 `DocumentRepositoryPort`（`src/domain/ports/document_repository.py`）新增 4 个方法：
   - `save_version_snapshot(snapshot: DocumentVersionSnapshot) -> DocumentVersionSnapshot` — 持久化版本快照
   - `list_versions(document_id: UUID, tenant_id: str) -> list[DocumentVersionSnapshot]` — 列出版本
   - `get_version(document_id: UUID, version: int, tenant_id: str) -> DocumentVersionSnapshot | None` — 获取指定版本
@@ -328,7 +328,7 @@
 
 #### 端口契约测试
 
-- [ ] 新建 `tests/contracts/test_port_contract_document_version.py`
+- [x] 新建 `tests/contracts/test_port_contract_document_version.py`
   - 验证 `document_repository` 端口已注册到 `_global_registry`
   - 验证接口类型为 `DocumentRepositoryPort`
   - 验证版本为 `v1.1.0`（升级后）
@@ -340,9 +340,9 @@
   - 配置了 `rabbitmq_routing_key` 包含 `document_version_snapshot_created`
 
 **完成标准/Definition of Done:**
-- [ ] 端口契约全部定义
-- [ ] 端口契约测试通过
-- [ ] 兼容性检查通过
+- [x] 端口契约全部定义
+- [x] 端口契约测试通过
+- [x] 兼容性检查通过
 
 ---
 
@@ -385,9 +385,9 @@ class DocumentVersionSnapshotModel(Base):
         ...
 ```
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 ORM 模型失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现 ORM 模型
-- [ ] Subtask 3.3: 🔄 重构 — 优化代码
+- [x] Subtask 3.1: 🔴 红 — 编写 ORM 模型失败测试
+- [x] Subtask 3.2: 🟢 绿 — 实现 ORM 模型
+- [x] Subtask 3.3: 🔄 重构 — 优化代码
 
 #### TDD 循环 B：Alembic 迁移
 
@@ -416,9 +416,9 @@ CREATE TABLE document_version_snapshots (
 CREATE INDEX idx_doc_ver_snapshots_doc_id ON document_version_snapshots(document_id);
 ```
 
-- [ ] Subtask 3.4: 🔴 红 — 编写迁移失败测试
-- [ ] Subtask 3.5: 🟢 绿 — 创建迁移文件
-- [ ] Subtask 3.6: 🔄 重构 — 验证迁移链
+- [x] Subtask 3.4: 🔴 红 — 编写迁移失败测试
+- [x] Subtask 3.5: 🟢 绿 — 创建迁移文件
+- [x] Subtask 3.6: 🔄 重构 — 验证迁移链
 
 #### TDD 循环 C：版本快照仓储实现
 
@@ -428,15 +428,15 @@ CREATE INDEX idx_doc_ver_snapshots_doc_id ON document_version_snapshots(document
 | 🟢 绿 | 在 `src/infrastructure/storage/postgresql/repository/document_repository.py` 中实现 3 个新方法 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 3.7: 🔴 红 — 编写仓储实现失败测试
-- [ ] Subtask 3.8: 🟢 绿 — 实现仓储方法
-- [ ] Subtask 3.9: 🔄 重构 — 优化代码
+- [x] Subtask 3.7: 🔴 红 — 编写仓储实现失败测试
+- [x] Subtask 3.8: 🟢 绿 — 实现仓储方法
+- [x] Subtask 3.9: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [ ] ORM 模型实现且测试通过
-- [ ] Alembic 迁移创建且验证通过
-- [ ] 仓储方法实现且测试通过
-- [ ] 基础设施层覆盖率 ≥ 75%
+- [x] ORM 模型实现且测试通过
+- [x] Alembic 迁移创建且验证通过
+- [x] 仓储方法实现且测试通过
+- [x] 基础设施层覆盖率 ≥ 75%
 
 ---
 
@@ -508,9 +508,9 @@ class DocumentVersionService:
         ...
 ```
 
-- [ ] Subtask 4.1: 🔴 红 — 编写应用服务失败测试
-- [ ] Subtask 4.2: 🟢 绿 — 实现应用服务
-- [ ] Subtask 4.3: 🔄 重构 — 优化代码
+- [x] Subtask 4.1: 🔴 红 — 编写应用服务失败测试
+- [x] Subtask 4.2: 🟢 绿 — 实现应用服务
+- [x] Subtask 4.3: 🔄 重构 — 优化代码
 
 #### TDD 循环 B：上传/解析自动触发版本快照
 
@@ -560,14 +560,14 @@ class DocumentVersionService:
 - **移除方案：** 不在 `DocumentUploadService.upload()` 和 `DocumentParsingService.parse_document()` 中直接集成版本快照创建
 - **注册方式：** 在 `composition_root.py` 中注册 `DocumentVersionHandler` 并绑定到 `EventSubscriber`
 
-- [ ] Subtask 4.4: 🔴 红 — 编写自动触发失败测试
-- [ ] Subtask 4.5: 🟢 绿 — 实现自动触发集成
-- [ ] Subtask 4.6: 🔄 重构 — 优化代码
+- [x] Subtask 4.4: 🔴 红 — 编写自动触发失败测试
+- [x] Subtask 4.5: 🟢 绿 — 实现自动触发集成
+- [x] Subtask 4.6: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [ ] 应用服务全部实现且测试通过
-- [ ] 自动触发集成完成
-- [ ] 应用层覆盖率 ≥ 85%
+- [x] 应用服务全部实现且测试通过
+- [x] 自动触发集成完成
+- [x] 应用层覆盖率 ≥ 85%
 
 ---
 
@@ -577,7 +577,7 @@ class DocumentVersionService:
 
 #### API 契约定义
 
-- [ ] 新建 `tests/contracts/test_api_contract_document_version.py`
+- [x] 新建 `tests/contracts/test_api_contract_document_version.py`
   - 验证 `GET /api/v1/documents/{document_id}/versions` 端点存在
   - 验证 `POST /api/v1/documents/{document_id}/versions/snapshot` 端点存在
   - 验证响应格式（扁平 JSON，字段类型正确）
@@ -585,14 +585,14 @@ class DocumentVersionService:
 
 #### CLI 命令
 
-- [ ] 在 `src/interfaces/cli/commands/document_commands.py` 中新增命令（注意：`commands/` 子目录当前不存在，需新建 `src/interfaces/cli/commands/` 目录和 `__init__.py` 文件）：
+- [x] 在 `src/interfaces/cli/commands/document_commands.py` 中新增命令（注意：`commands/` 子目录当前不存在，需新建 `src/interfaces/cli/commands/` 目录和 `__init__.py` 文件）：
   - `sisys document version list --id <doc-id>` — 列出版本历史
   - `sisys document version snapshot --id <doc-id>` — 创建版本快照
 
 **完成标准/Definition of Done:**
-- [ ] API 契约测试通过
-- [ ] CLI 命令实现并验证
-- [ ] 接口层覆盖率 ≥ 85% (骨架豁免)
+- [x] API 契约测试通过
+- [x] CLI 命令实现并验证
+- [x] 接口层覆盖率 ≥ 85% (骨架豁免)
 
 ---
 
@@ -602,7 +602,7 @@ class DocumentVersionService:
 
 #### 集成测试实现
 
-- [ ] 新建 `tests/integration/test_document_version_integration.py`
+- [x] 新建 `tests/integration/test_document_version_integration.py`
   - 测试 1: 创建版本快照完整流程（真实 PostgreSQL，Mock MinIO）
   - 测试 2: 差异摘要计算准确性
   - 测试 3: 版本冲突检测（乐观锁）
@@ -617,8 +617,8 @@ class DocumentVersionService:
 - 每个测试只清理自己创建的资源
 
 **完成标准/Definition of Done:**
-- [ ] 集成测试全部通过
-- [ ] 集成测试覆盖率 ≥ 70%
+- [x] 集成测试全部通过
+- [x] 集成测试覆盖率 ≥ 70%
 
 ---
 
@@ -628,20 +628,20 @@ class DocumentVersionService:
 
 #### 注册配置
 
-- [ ] 在 `src/composition_root.py` 中注册 `DocumentVersionService` 为 `document_version_service`
-- [ ] 在 `src/composition_root.py` 中注册 `DocumentVersionHandler` 并绑定到 `EventSubscriber`（监听 `DocumentUploaded` 和 `DocumentProcessed` 事件）
-- [ ] 更新 `document_repository` 端口版本为 `v1.1.0`
-- [ ] 注意：`DocumentUploadService` 和 `DocumentParsingService` 不注入 `DocumentVersionService`（采用事件驱动方案，通过 `DocumentVersionHandler` 处理器异步触发）
+- [x] 在 `src/composition_root.py` 中注册 `DocumentVersionService` 为 `document_version_service`
+- [x] 在 `src/composition_root.py` 中注册 `DocumentVersionHandler` 并绑定到 `EventSubscriber`（监听 `DocumentUploaded` 和 `DocumentProcessed` 事件）
+- [x] 更新 `document_repository` 端口版本为 `v1.1.0`
+- [x] 注意：`DocumentUploadService` 和 `DocumentParsingService` 不注入 `DocumentVersionService`（采用事件驱动方案，通过 `DocumentVersionHandler` 处理器异步触发）
 
 #### 事件通道配置
 
-- [ ] 更新 `configs/event_channels.yaml` 新增 `DocumentVersionSnapshotCreated` 事件
-- [ ] 更新 `ChannelRouter.DEFAULT_MAPPINGS` 新增 `DocumentVersionSnapshotCreated` 事件
+- [x] 更新 `configs/event_channels.yaml` 新增 `DocumentVersionSnapshotCreated` 事件
+- [x] 更新 `ChannelRouter.DEFAULT_MAPPINGS` 新增 `DocumentVersionSnapshotCreated` 事件
 
 **完成标准/Definition of Done:**
-- [ ] Composition Root 注册完成
-- [ ] 事件通道配置完成
-- [ ] 向后兼容验证通过
+- [x] Composition Root 注册完成
+- [x] 事件通道配置完成
+- [x] 向后兼容验证通过
 
 ---
 
@@ -651,15 +651,15 @@ class DocumentVersionService:
 
 #### 架构验证测试实现
 
-- [ ] 新建 `tests/unit/architecture/test_arch_document_version.py`
+- [x] 新建 `tests/unit/architecture/test_arch_document_version.py`
   - 验证：领域层零外部依赖（`src/domain/value_objects/document_version.py` 仅标准库）
   - 验证：领域层零外部依赖（`src/domain/services/document_version_diff_service.py` 仅标准库）
   - 验证：依赖方向正确（domain → 无外部依赖）
   - 验证：端口方法签名正确
 
 **完成标准/Definition of Done:**
-- [ ] 架构约束测试全部通过
-- [ ] Ruff 和 isort 循环依赖检测通过
+- [x] 架构约束测试全部通过
+- [x] Ruff 和 isort 循环依赖检测通过
 
 ---
 
@@ -675,16 +675,16 @@ class DocumentVersionService:
 | 🟢 绿 | 编写 `tests/acceptance/test_acceptance_document_version.py` 的 BDD 步骤实现 |
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 9.1: 场景 1 — 验证 `src` 完成清单的逐项确认
-- [ ] Subtask 9.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
-- [ ] Subtask 9.3: 运行开发结束验收测试并确认通过
-- [ ] Subtask 9.4: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
+- [x] Subtask 9.1: 场景 1 — 验证 `src` 完成清单的逐项确认
+- [x] Subtask 9.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
+- [x] Subtask 9.3: 运行开发结束验收测试并确认通过
+- [x] Subtask 9.4: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
 
 **完成标准/Definition of Done:**
-- [ ] `src` 完成清单已逐项验证确认
-- [ ] 所有测试目录完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `done`
+- [x] `src` 完成清单已逐项验证确认
+- [x] 所有测试目录完成清单已逐项验证确认
+- [x] 开发结束验收测试通过
+- [x] Story 可进入 `done`
 
 ---
 
@@ -856,12 +856,12 @@ deploy/postgresql/alembic/versions/
 
 ### 代码质量门禁
 
-- [ ] Ruff 检查通过（`ruff check src/ tests/`）
-- [ ] MyPy 类型检查通过（`mypy src/`）
-- [ ] 无 P0/P1 级别问题
-- [ ] 预提交 Hooks 通过（`pre-commit run --all-files`）
-- [ ] **禁止** `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释
-- [ ] **禁止** `raise ValueError` — 使用 `DocumentVersionConflictError` 领域异常
+- [x] Ruff 检查通过（`ruff check src/ tests/`）
+- [x] MyPy 类型检查通过（`mypy src/`）
+- [x] 无 P0/P1 级别问题
+- [x] 预提交 Hooks 通过（`pre-commit run --all-files`）
+- [x] **禁止** `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释
+- [x] **禁止** `raise ValueError` — 使用 `DocumentVersionConflictError` 领域异常
 
 ---
 
@@ -983,9 +983,9 @@ deploy/postgresql/alembic/versions/
 ### 下一步
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
-- [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
+- [x] 运行 `dev-story` 开始实施
+- [x] 运行 `code-review` 进行代码审查
+- [x] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
