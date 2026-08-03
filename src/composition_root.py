@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import TYPE_CHECKING
 
 import redis.asyncio as aioredis
 
@@ -17,7 +18,29 @@ from src.domain.ports.registry import (
     register_port,
 )
 
+if TYPE_CHECKING:
+    from src.domain.services.cost_calculator import CostCalculator
+
 logger = logging.getLogger(__name__)
+
+
+def _cost_calculator_from_udmr() -> CostCalculator:
+    """从 UDMRConfig 构建 CostCalculator（组合根工厂函数）
+
+    提取 UDMRConfig 中的定价参数，通过 CostCalculator.for_pricing() 创建实例。
+    定义为模块级函数（非嵌套在 bootstrap 内），保持组合根声明式风格。
+    """
+    from src.domain.services.cost_calculator import CostCalculator
+    from src.infrastructure.config.udmr import UDMRConfig
+
+    cfg = UDMRConfig.from_env()
+    return CostCalculator.for_pricing(
+        cloud_input_price=cfg.cloud_configs[0].price_per_input_1k_tokens if cfg.cloud_configs else 0.02,
+        cloud_output_price=cfg.cloud_configs[0].price_per_output_1k_tokens if cfg.cloud_configs else 0.02,
+        model_pricing_map={
+            c.model: {"input": c.price_per_input_1k_tokens, "output": c.price_per_output_1k_tokens} for c in cfg.cloud_configs
+        },
+    )
 
 
 def bootstrap() -> None:
@@ -496,22 +519,16 @@ def bootstrap() -> None:
 
     # === Event Ports ===
     from src.infrastructure.messaging.channel_router import ChannelRouter
-    from src.infrastructure.messaging.event_bus_config_loader import DEFAULT_CONFIG_PATH, EventBusConfigLoader
     from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
     from src.infrastructure.messaging.redis_event_bus import RedisEventBus
     from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
     from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
-    def _create_router() -> ChannelRouter:
-        router = ChannelRouter()
-        EventBusConfigLoader().load(router, DEFAULT_CONFIG_PATH)
-        return router
-
     register_port(
         name="router",
         version="v1.0.0",
         interface=ChannelRouter,
-        impl=lambda resolver: _create_router(),
+        impl=lambda resolver: ChannelRouter.from_default_config(),
         module="src.infrastructure.messaging.channel_router",
         lifetime=Lifetime.SINGLETON,
         owner="messaging-team",
@@ -1235,73 +1252,38 @@ def bootstrap() -> None:
     )
 
     # DocumentParsingService — 应用层文档解析编排
+    # 可选端口通过 resolver.resolve_optional() 解析，依赖缺失时自动降级为 None
     from src.application.services.document_parsing_service import DocumentParsingService
-    from src.domain.ports.resolver import Resolver
-
-    def _create_parsing_service(resolver: Resolver) -> DocumentParsingService:
-        """创建文档解析服务，版面检测、表格检测、表格语义增强和 OCR 端口可选注入
-
-        当 ONNX 模型文件不存在或 onnxruntime 未安装时，
-        layout_detector 和 pdf_page_renderer 降级为 None，
-        文档解析以无版面检测模式运行（所有 bbox=None）。
-        当 table_detector 初始化失败时降级为 None（PDF 表格检测降级）。
-        当 table_enhancer 初始化失败时降级为 None（表格语义增强降级）。
-        当 OCR 服务不可用时降级为 None（无 OCR 识别）。
-        """
-        _layout_detector = None
-        _pdf_page_renderer = None
-        try:
-            _layout_detector = resolver.resolve("layout_detector")
-            _pdf_page_renderer = resolver.resolve("pdf_page_renderer")
-        except (FileNotFoundError, ImportError, RuntimeError, OSError):
-            # 预期的运行环境缺失：模型文件不存在/onnxruntime 未安装/依赖异常
-            logger.warning("版面检测端口初始化失败，文档解析将以无版面检测模式运行", exc_info=True)
-        except (KeyError, TypeError) as e:
-            # 端口注册配置错误应向上传播，避免掩盖启动时配置问题
-            raise RuntimeError(f"版面检测端口注册配置错误: {e}") from e
-
-        _table_detector = None
-        try:
-            _table_detector = resolver.resolve("table_detector")
-        except (ImportError, RuntimeError) as e:
-            logger.warning("PDF 表格检测端口初始化失败，PDF 表格检测将降级: %s", e)
-        except (KeyError, TypeError) as e:
-            raise RuntimeError(f"PDF 表格检测端口注册配置错误: {e}") from e
-
-        _table_enhancer = None
-        try:
-            _table_enhancer = resolver.resolve("table_enhancer")
-        except (ImportError, RuntimeError) as e:
-            logger.warning("表格语义增强端口初始化失败，表格语义增强将降级: %s", e)
-        except (KeyError, TypeError) as e:
-            raise RuntimeError(f"表格语义增强端口注册配置错误: {e}") from e
-
-        _ocr = None
-        try:
-            _ocr = resolver.resolve("ocr")
-        except (FileNotFoundError, ImportError, RuntimeError, OSError) as e:
-            logger.warning("OCR 服务不可用，扫描件解析将降级: %s", e, exc_info=True)
-        except (KeyError, TypeError) as e:
-            raise RuntimeError(f"OCR port config error: {e}") from e
-
-        return DocumentParsingService(
-            document_repository=resolver.resolve("document_repository"),
-            document_storage=resolver.resolve("document_storage"),
-            event_publisher=resolver.resolve("event_publisher"),
-            document_parser=resolver.resolve("document_parser"),
-            redis_client=resolver.resolve("redis_client"),
-            layout_detector=_layout_detector,
-            pdf_page_renderer=_pdf_page_renderer,
-            table_detector=_table_detector,
-            table_enhancer=_table_enhancer,
-            ocr=_ocr,
-        )
 
     register_port(
         name="document_parsing_service",
         version="v1.3.0",
         interface=DocumentParsingService,
-        impl=_create_parsing_service,
+        impl=lambda resolver: DocumentParsingService(
+            document_repository=resolver.resolve("document_repository"),
+            document_storage=resolver.resolve("document_storage"),
+            event_publisher=resolver.resolve("event_publisher"),
+            document_parser=resolver.resolve("document_parser"),
+            redis_client=resolver.resolve("redis_client"),
+            layout_detector=resolver.resolve_optional(
+                "layout_detector",
+                fallback_on=(FileNotFoundError, ImportError, RuntimeError, OSError),
+            ),
+            pdf_page_renderer=resolver.resolve_optional(
+                "pdf_page_renderer",
+                fallback_on=(FileNotFoundError, ImportError, RuntimeError, OSError),
+            ),
+            table_detector=resolver.resolve_optional(
+                "table_detector",
+            ),
+            table_enhancer=resolver.resolve_optional(
+                "table_enhancer",
+            ),
+            ocr=resolver.resolve_optional(
+                "ocr",
+                fallback_on=(FileNotFoundError, ImportError, RuntimeError, OSError),
+            ),
+        ),
         module="src.application.services.document_parsing_service",
         lifetime=Lifetime.SCOPED,
         owner="epic-2",
@@ -1588,25 +1570,12 @@ def bootstrap() -> None:
         tags=("udmr", "cost", "infrastructure"),
     )
 
-    # CostCalculator — 成本计算领域服务
-    def _make_cost_calculator(resolver: object) -> CostCalculator:
-        cfg = UDMRConfig.from_env()
-        return CostCalculator(
-            local_input_price=0.002,
-            local_output_price=0.002,
-            cloud_input_price=(cfg.cloud_configs[0].price_per_input_1k_tokens if cfg.cloud_configs else 0.02),
-            cloud_output_price=(cfg.cloud_configs[0].price_per_output_1k_tokens if cfg.cloud_configs else 0.02),
-            model_pricing_map={
-                c.model: {"input": c.price_per_input_1k_tokens, "output": c.price_per_output_1k_tokens}
-                for c in cfg.cloud_configs
-            },
-        )
-
+    # CostCalculator — 成本计算领域服务（通过模块级工厂 _cost_calculator_from_udmr 创建）
     register_port(
         name="cost_calculator",
         version="v1.0.0",
         interface=CostCalculator,
-        impl=_make_cost_calculator,
+        impl=lambda resolver: _cost_calculator_from_udmr(),
         module="src.domain.services.cost_calculator",
         lifetime=Lifetime.SINGLETON,
         owner="routing-team",

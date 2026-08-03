@@ -91,6 +91,37 @@ class Resolver:
 
         return instance
 
+    def resolve_optional(
+        self,
+        port_name: str,
+        *,
+        fallback_on: tuple[type[Exception], ...] = (ImportError, RuntimeError),
+    ) -> Any | None:
+        """解析可选端口，依赖缺失时返回 None
+
+        封装修复的降级模式：
+        - 端口未注册或类型不匹配（KeyError/TypeError）→ 视为配置错误，抛出 RuntimeError
+        - 端口依赖缺失（fallback_on 中指定的异常）→ WARNING 日志 + 返回 None
+        - 解析成功 → 返回端口实例
+
+        Args:
+            port_name: 待解析的端口名称
+            fallback_on: 降级异常类型元组（默认 ImportError/RuntimeError）
+
+        Returns:
+            端口实现实例或 None（降级时）
+
+        Raises:
+            RuntimeError: 端口注册配置错误（KeyError/TypeError 包装）
+        """
+        try:
+            return self.resolve(port_name)
+        except (KeyError, TypeError) as e:
+            raise RuntimeError(f"可选端口 '{port_name}' 注册配置错误: {e}") from e
+        except fallback_on:
+            logger.warning("可选端口 '%s' 不可用，降级跳过", port_name, exc_info=True)
+            return None
+
     @overload
     def resolve_by_interface(self, interface: Type[T]) -> T: ...
 
