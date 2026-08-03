@@ -445,8 +445,10 @@ class TestSemanticChunkingIntegration:
 
         # 验证
         assert len(chunks) >= 2, "Should produce at least 2 chunks for 2 pages"
-        assert chunks[0].page_start == 1 or chunks[0].page_end == 1
-        assert chunks[-1].page_start == 2 or chunks[-1].page_end == 2
+        assert chunks[0].page_start == 1
+        assert chunks[0].page_end == 1
+        assert chunks[-1].page_start == 2
+        assert chunks[-1].page_end == 2
 
     @pytest.mark.asyncio
     async def test_chunks_jsonb_storage(

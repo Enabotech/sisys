@@ -38,7 +38,7 @@
   - 章节标题边界（`ParsedElement.metadata["style"]` 中的 `"h1"`~`"h6"` 或 `"Heading 1"`~`"Heading 9"` 样式——具体见代码库调研关键发现第 1 条）
   - 表格边界（`ParsedTable` 元素始终作为独立分块边界，表格内容不分割）
   - 页面边界（跨页文本不合并——新页起新分块）
-  - Token 硬限制边界（`token_limit`：单段超过 `max_chunk_size_tokens` 时按字符比例硬切分）
+  - Token 硬限制边界（`token_limit`：单段超过 `max_chunk_size_tokens` 时优先在语义边界（换行符、句号等）处切分，无语义边界时回退到字符级硬切分）
 **And** 分块内容保持原始阅读顺序（page_number 升序 → 同页内 texts 列表原始顺序——解析器已保证元素顺序，不依赖 bbox 坐标排序）
 
 **验证标准/Validation Criteria:**
@@ -527,10 +527,12 @@ def estimate_tokens(text: str) -> int:
 
 ```python
 class SemanticChunkerImpl:
-    async def chunk(self, parsed_doc: ParsedDocument, config=None) -> list[SemanticChunk]:
+    async def chunk(self, parsed_doc: ParsedDocument, config: ChunkingConfig | None = None, metadata: dict[str, Any] | None = None) -> list[SemanticChunk]:
         cfg = config or ChunkingConfig()
+        document_id = parsed_doc.document_id
+        doc_metadata = metadata or {}
         segments = self._extract_segments(parsed_doc)  # [(boundary_type, text, page_num)]
-        chunks = self._aggregate_segments(segments, cfg)
+        chunks = self._aggregate_segments(segments, cfg, document_id, doc_metadata)
         return chunks
 
     def _extract_segments(self, doc: ParsedDocument) -> Generator[tuple[ChunkBoundaryType, str, int], None, None]:
@@ -609,7 +611,7 @@ class SemanticChunkerImpl:
             lines.append("| " + " | ".join(row) + " |")
         return "\n".join(lines)
 
-    def _aggregate_segments(self, segments, cfg) -> list[SemanticChunk]:
+    def _aggregate_segments(self, segments, cfg, document_id, doc_metadata) -> list[SemanticChunk]:
         """按 token 预算聚合片段为分块"""
         chunks = []
         current_parts = []
@@ -636,7 +638,7 @@ class SemanticChunkerImpl:
                 if current_parts:  # 先刷新已有段落
                     chunks.append(self._create_chunk(current_parts, ...))
                     current_parts, current_tokens = [], 0
-                # 按字符比例切分此大段
+                # 按语义边界优先切分此大段
                 sub_texts = self._split_by_token_limit(text, cfg.max_chunk_size_tokens)
                 for i, sub_text in enumerate(sub_texts):
                     sub_tokens = estimate_tokens(sub_text)
@@ -659,16 +661,18 @@ class SemanticChunkerImpl:
             chunks.append(self._create_chunk(current_parts, ...))
 
         # 后处理：合并过小分块（< min_chunk_size_tokens）到前一个分块
-        # 注意：以 SECTION_HEADER/TABLE/PAGE_BREAK 开头的分块禁止向后合并
-        # 短标题分块向前合并到后一个分块（标题属于其后内容）
+        # 注意：以 SECTION_HEADER 开头的分块向后合并后续内容到标题分块（标题保留）
+        # 以 TABLE/PAGE_BREAK 开头的分块不向后合并
+        # 段落分块向后合并到前一个分块
         return self._merge_small_chunks(chunks, cfg)
 
     def _create_chunk(
         self,
         parts: list[tuple[ChunkBoundaryType, str, int]],
         chunk_index: int,
-        document_id: uuid.UUID,
-        metadata: dict[str, Any],
+        document_id: str,
+        page: int,
+        doc_metadata: dict[str, Any],
     ) -> SemanticChunk:
         """从片段列表创建 SemanticChunk 值对象。
 
@@ -685,8 +689,8 @@ class SemanticChunkerImpl:
 
         # 页码范围
         pages = [p for _, _, p in parts]
-        page_start = min(pages) if pages else 1
-        page_end = max(pages) if pages else 1
+        page_start = min(pages) if pages else page
+        page_end = max(pages) if pages else page
 
         # 边界类型：取第一个片段的类型
         boundary_type = parts[0][0] if parts else ChunkBoundaryType.PARAGRAPH
@@ -707,7 +711,7 @@ class SemanticChunkerImpl:
             page_start=page_start,
             page_end=page_end,
             content_hash=content_hash,
-            metadata=metadata,
+            metadata=doc_metadata,
         )
 
     def _merge_chunks(self, chunk_a: SemanticChunk, chunk_b: SemanticChunk) -> SemanticChunk:
@@ -734,17 +738,43 @@ class SemanticChunkerImpl:
             metadata=chunk_a.metadata,
         )
 
+    def _find_safe_split_point(self, text: str, max_chars: int) -> int:
+        """在 max_chars 之前的最近语义边界处切分
+
+        优先在换行符、句号等语义边界处切分，保持语义完整性。
+        无语义边界时回退到字符级硬切分。
+        """
+        # 优先在换行符处切分
+        candidate = text.rfind("\n", 0, max_chars)
+        if candidate != -1:
+            return candidate + 1
+        # 其次在中文句号处切分
+        candidate = text.rfind("。", 0, max_chars)
+        if candidate != -1:
+            return candidate + 1
+        # 其次在英文句号处切分
+        candidate = text.rfind(".", 0, max_chars)
+        if candidate != -1:
+            return candidate + 1
+        # 无语义边界时回退到字符级硬切分
+        return max_chars
+
     def _split_by_token_limit(self, text: str, max_tokens: int) -> list[str]:
-        """按 token 硬限制切分文本（基于字符比例估算，不引入第三方 tokenizer）"""
+        """按 token 硬限制切分文本（基于字符比例估算，优先语义边界）"""
         total_tokens = estimate_tokens(text)
         if total_tokens <= max_tokens:
             return [text]
-        # 按字符比例切分：每个子段最多 max_tokens 个 token
+        # 按字符比例估算每段最大字符数
         ratio = max_tokens / total_tokens
         chars_per_segment = max(1, int(len(text) * ratio))
         segments = []
-        for i in range(0, len(text), chars_per_segment):
-            segments.append(text[i:i + chars_per_segment])
+        i = 0
+        while i < len(text):
+            segment_end = min(i + chars_per_segment, len(text))
+            if segment_end < len(text):
+                segment_end = self._find_safe_split_point(text, segment_end)
+            segments.append(text[i:segment_end])
+            i = segment_end
         return segments
 
     def _merge_small_chunks(self, chunks: list, cfg) -> list:
@@ -752,9 +782,9 @@ class SemanticChunkerImpl:
 
         规则：
         - 分块 token 数 < min_chunk_size_tokens 时尝试合并
-        - 以 SECTION_HEADER 开头的分块不向后合并（避免跨章节污染）
+        - 以 SECTION_HEADER 开头的分块：向后合并后续内容到标题分块（标题保留）
         - 以 TABLE/PAGE_BREAK 开头的分块不向后合并
-        - 短标题分块向前合并到后一个分块（标题属于其后内容）
+        - 段落分块：向后合并到前一个分块
         """
         if not chunks:
             return chunks
@@ -767,9 +797,11 @@ class SemanticChunkerImpl:
                 # 检查当前分块是否以硬边界开头
                 first_boundary = chunk.boundary_type
                 if first_boundary in (ChunkBoundaryType.SECTION_HEADER, ChunkBoundaryType.TABLE, ChunkBoundaryType.PAGE_BREAK):
-                    # 硬边界分块 → 向前合并到后一个分块
+                    # 硬边界分块（含标题）：向后合并后一个分块的内容到标题分块
                     if i + 1 < len(chunks):
-                        chunks[i + 1] = self._merge_chunks(chunk, chunks[i + 1])
+                        chunk = self._merge_chunks(chunk, chunks[i + 1])
+                        merged.append(chunk)
+                        i += 1  # 跳过已合并的后续分块
                     else:
                         merged.append(chunk)
                 else:
@@ -1247,11 +1279,12 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v3.1.0
+**故事版本/Story Version:** v3.2.0
 **创建日期/Created:** 2026-08-02
-**最后更新/Last Updated:** 2026-08-02
+**最后更新/Last Updated:** 2026-08-03
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 语义分块（规则驱动的语义边界检测 + Token 预算聚合）
 - v2.0.0: 审查修正版 — 修复 P0/P1 问题
 - v3.0.0: 第二轮审查修订版 — 修复 17 个 P0 问题
-- v3.1.0: R2 深度审查修正版 — 修复 R2 轮审查发现的 P0/P1 问题：修正 Gherkin 场景 3 引用 `Section-header` label 的严重误导；补充 `_parsed_table_from_dict` 方法（含 column_types/merged_cells/images 递归重建）；补充 `_create_chunk`/`_merge_chunks` 完整方法实现；修复 `_aggregate_segments` 单段超限时空分块创建缺陷；修复 `_merge_small_chunks` 控制流缺陷；修复 PAGE_BREAK 空文本追加问题；新增 AC-1 token_limit 边界类型定义；补充 `_CLASS_TO_SUBDOMAIN` 注册说明；澄清 `ChunkingError` 适用场景；标记 MD 段落归属偏差为 Known Limitation；验收场景从 9 扩展至 13 个；集成测试新增 RAGIndexed 事件验证和反序列化验证；架构验证新增 `__module__`/isinstance/注册检查
+- v3.1.0: R2 深度审查修正版 — 修复 R2 轮审查发现的 P0/P1 问题
+- v3.2.0: 代码审查对齐更新 — 同步设计文档与代码实现的一致性（_merge_small_chunks合并方向、_split_by_token_limit语义切分、_create_chunk/_aggregate_segments签名、metadata参数）；修复集成测试跨页断言；更新sprint状态为done：修正 Gherkin 场景 3 引用 `Section-header` label 的严重误导；补充 `_parsed_table_from_dict` 方法（含 column_types/merged_cells/images 递归重建）；补充 `_create_chunk`/`_merge_chunks` 完整方法实现；修复 `_aggregate_segments` 单段超限时空分块创建缺陷；修复 `_merge_small_chunks` 控制流缺陷；修复 PAGE_BREAK 空文本追加问题；新增 AC-1 token_limit 边界类型定义；补充 `_CLASS_TO_SUBDOMAIN` 注册说明；澄清 `ChunkingError` 适用场景；标记 MD 段落归属偏差为 Known Limitation；验收场景从 9 扩展至 13 个；集成测试新增 RAGIndexed 事件验证和反序列化验证；架构验证新增 `__module__`/isinstance/注册检查
