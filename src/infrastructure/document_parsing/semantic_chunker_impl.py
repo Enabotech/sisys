@@ -83,8 +83,7 @@ class SemanticChunkerImpl:
 
     def __init__(self) -> None:
         """初始化语义分块器"""
-        self._document_id: str = ""
-        self._metadata: dict[str, Any] = {}
+        pass
 
     async def chunk(
         self,
@@ -103,8 +102,8 @@ class SemanticChunkerImpl:
             SemanticChunk 列表（空文档返回空列表，不抛异常）
         """
         cfg = config or ChunkingConfig()
-        self._document_id = parsed_doc.document_id
-        self._metadata = metadata or {}
+        document_id = parsed_doc.document_id
+        doc_metadata = metadata or {}
 
         # 提取所有文本片段
         segments = list(self._extract_segments(parsed_doc))
@@ -113,7 +112,7 @@ class SemanticChunkerImpl:
             return []
 
         # 聚合片段为分块
-        chunks = self._aggregate_segments(segments, cfg)
+        chunks = self._aggregate_segments(segments, cfg, document_id, doc_metadata)
 
         return chunks
 
@@ -232,12 +231,16 @@ class SemanticChunkerImpl:
         self,
         segments: list[tuple[ChunkBoundaryType, str, int]],
         cfg: ChunkingConfig,
+        document_id: str,
+        doc_metadata: dict[str, Any],
     ) -> list[SemanticChunk]:
         """按 token 预算聚合片段为分块
 
         Args:
             segments: 片段列表（boundary_type, text, page_number）
             cfg: 分块配置
+            document_id: 文档标识符
+            doc_metadata: 文档级元数据
 
         Returns:
             SemanticChunk 列表
@@ -253,7 +256,7 @@ class SemanticChunkerImpl:
             # PAGE_BREAK 边界：创建新分块后跳过追加
             if boundary == ChunkBoundaryType.PAGE_BREAK:
                 if current_parts:
-                    chunks.append(self._create_chunk(current_parts, chunk_index, page))
+                    chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
                     chunk_index += 1
                     current_parts, current_tokens = [], 0
                 continue
@@ -261,14 +264,14 @@ class SemanticChunkerImpl:
             # 硬边界：章节/表格边界，必然创建新分块
             if boundary in (ChunkBoundaryType.SECTION_HEADER, ChunkBoundaryType.TABLE):
                 if current_parts:
-                    chunks.append(self._create_chunk(current_parts, chunk_index, page))
+                    chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
                     chunk_index += 1
                     current_parts, current_tokens = [], 0
 
             # 检查当前段落是否超过 max_chunk_size_tokens
             if text_tokens >= cfg.max_chunk_size_tokens:
                 if current_parts:
-                    chunks.append(self._create_chunk(current_parts, chunk_index, page))
+                    chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
                     chunk_index += 1
                     current_parts, current_tokens = [], 0
 
@@ -279,14 +282,14 @@ class SemanticChunkerImpl:
                     current_parts.append((ChunkBoundaryType.TOKEN_LIMIT, sub_text, page))
                     current_tokens += sub_tokens
                     if i < len(sub_texts) - 1:
-                        chunks.append(self._create_chunk(current_parts, chunk_index, page))
+                        chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
                         chunk_index += 1
                         current_parts, current_tokens = [], 0
                 continue
 
             # Token 预算：仅当 current_parts 非空且超限时触发
             if current_parts and current_tokens + text_tokens > cfg.target_chunk_size_tokens:
-                chunks.append(self._create_chunk(current_parts, chunk_index, page))
+                chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
                 chunk_index += 1
                 current_parts, current_tokens = [], 0
 
@@ -295,7 +298,7 @@ class SemanticChunkerImpl:
 
         # 处理剩余片段
         if current_parts:
-            chunks.append(self._create_chunk(current_parts, chunk_index, page))
+            chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
 
         # 合并过小分块
         return self._merge_small_chunks(chunks, cfg)
@@ -304,14 +307,18 @@ class SemanticChunkerImpl:
         self,
         parts: list[tuple[ChunkBoundaryType, str, int]],
         chunk_index: int,
+        document_id: str,
         page: int,
+        doc_metadata: dict[str, Any],
     ) -> SemanticChunk:
         """从片段列表创建 SemanticChunk 值对象
 
         Args:
             parts: 片段列表
             chunk_index: 分块索引
+            document_id: 文档标识符
             page: 当前页码（用于 fallback）
+            doc_metadata: 文档级元数据
 
         Returns:
             SemanticChunk 实例
@@ -336,7 +343,7 @@ class SemanticChunkerImpl:
 
         return SemanticChunk(
             chunk_id=uuid.uuid4(),
-            document_id=uuid.UUID(self._document_id) if self._document_id else uuid.uuid4(),
+            document_id=uuid.UUID(document_id) if document_id else uuid.uuid4(),
             content=content,
             chunk_index=chunk_index,
             boundary_type=boundary_type,
@@ -344,7 +351,7 @@ class SemanticChunkerImpl:
             page_start=page_start,
             page_end=page_end,
             content_hash=content_hash,
-            metadata=dict(self._metadata),
+            metadata=dict(doc_metadata),
         )
 
     def _merge_chunks(self, chunk_a: SemanticChunk, chunk_b: SemanticChunk) -> SemanticChunk:
