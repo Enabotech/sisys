@@ -11,6 +11,25 @@ from uuid import UUID
 
 from src.domain.services.document_version_diff_service import compute_diff
 
+from src.domain.exceptions import ValidationError
+
+
+def _validate_tenant_id(tenant_id: str) -> None:
+    """校验租户标识符不为空
+
+    Args:
+        tenant_id: 租户标识符
+
+    Raises:
+        ValidationError: tenant_id 为空时抛出
+    """
+    if not tenant_id or not tenant_id.strip():
+        raise ValidationError(
+            message="tenant_id must not be empty",
+            context={"field": "tenant_id"},
+        )
+
+
 if TYPE_CHECKING:
     from src.domain.ports.document_repository import DocumentRepositoryPort
     from src.domain.ports.event_publisher import EventPublisher
@@ -69,6 +88,8 @@ class DocumentVersionService:
         Raises:
             DocumentVersionConflictError: 版本冲突时抛出
         """
+        _validate_tenant_id(tenant_id)
+
         # 1. 查询文档实体
         from src.domain.ports.document_repository import DocumentQuery
 
@@ -169,6 +190,7 @@ class DocumentVersionService:
         Returns:
             版本快照列表（按版本号降序排列）
         """
+        _validate_tenant_id(tenant_id)
         return await self._repository.list_versions(document_id, tenant_id)
 
     async def get_version(
@@ -187,4 +209,5 @@ class DocumentVersionService:
         Returns:
             版本快照或 None
         """
+        _validate_tenant_id(tenant_id)
         return await self._repository.get_version(document_id, version, tenant_id)
