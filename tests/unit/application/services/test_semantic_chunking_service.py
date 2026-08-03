@@ -98,8 +98,76 @@ class TestSemanticChunkingService:
         # 验证事件发布
         mock_event_publisher.publish.assert_called_once()
 
+    def test_chunk_document_not_found(self, service, mock_document_repository, mock_event_publisher):
+        """文档不存在时返回空列表并发布事件"""
+        doc_id = uuid.uuid4()
+        tenant_id = "tenant-1"
+
+        # Mock 返回 None（文档不存在）
+        mock_document_repository.find.return_value = None
+
+        loop = asyncio.new_event_loop()
+        try:
+            result = loop.run_until_complete(service.chunk_document(document_id=doc_id, tenant_id=tenant_id))
+        finally:
+            loop.close()
+
+        assert result == []
+        # 文档不存在时也应发布 RAGIndexed 事件（chunk_count=0）
+        mock_event_publisher.publish.assert_called_once()
+
+    def test_chunk_document_parse_result_empty(self, service, mock_document_repository, mock_event_publisher):
+        """parse_result 为空时返回空列表并发布事件"""
+        doc_id = uuid.uuid4()
+        tenant_id = "tenant-1"
+
+        # Mock 文档实体但 parse_result 为空
+        mock_doc = MagicMock()
+        mock_doc.metadata = {}
+        mock_document_repository.find.return_value = mock_doc
+
+        loop = asyncio.new_event_loop()
+        try:
+            result = loop.run_until_complete(service.chunk_document(document_id=doc_id, tenant_id=tenant_id))
+        finally:
+            loop.close()
+
+        assert result == []
+        mock_event_publisher.publish.assert_called_once()
+
+    def test_chunk_document_config_passed(self, service, mock_document_repository, mock_semantic_chunker, mock_event_publisher):
+        """自定义 config 被正确传递到 chunker"""
+        from src.domain.value_objects.semantic_chunk import ChunkingConfig
+
+        doc_id = uuid.uuid4()
+        tenant_id = "tenant-1"
+
+        mock_doc = MagicMock()
+        mock_doc.metadata = {
+            "parse_result": {
+                "document_id": str(doc_id),
+                "mime_type": "text/plain",
+                "pages": [],
+                "parse_status": "completed",
+            }
+        }
+        mock_document_repository.find.return_value = mock_doc
+        mock_semantic_chunker.chunk.return_value = []
+
+        custom_config = ChunkingConfig(target_chunk_size_tokens=500)
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(service.chunk_document(document_id=doc_id, tenant_id=tenant_id, config=custom_config))
+        finally:
+            loop.close()
+
+        # 验证 config 参数被传递到 chunker
+        mock_semantic_chunker.chunk.assert_called_once()
+        _, kwargs = mock_semantic_chunker.chunk.call_args
+        assert kwargs.get("config") == custom_config
+
     def test_chunk_document_empty(self, service, mock_document_repository, mock_semantic_chunker, mock_event_publisher):
-        """空文档分块"""
         doc_id = uuid.uuid4()
         tenant_id = "tenant-1"
 

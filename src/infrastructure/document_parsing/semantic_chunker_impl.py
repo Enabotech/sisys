@@ -12,9 +12,9 @@ import re
 import uuid
 from typing import Any
 
+from src.domain.exceptions.storage_exceptions import ChunkingError
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedTable
 from src.domain.value_objects.semantic_chunk import ChunkBoundaryType, ChunkingConfig, SemanticChunk
-from src.domain.exceptions.storage_exceptions import ChunkingError
 
 logger = logging.getLogger(__name__)
 
@@ -121,8 +121,12 @@ class SemanticChunkerImpl:
 
             return chunks
         except (ValueError, TypeError, KeyError) as e:
+            try:
+                doc_uuid = uuid.UUID(parsed_doc.document_id)
+            except (ValueError, TypeError):
+                doc_uuid = uuid.uuid4()
             raise ChunkingError(
-                document_id=parsed_doc.document_id,
+                document_id=doc_uuid,
                 reason=f"语义分块内部异常: {e}",
                 cause=e,
             )
@@ -356,8 +360,10 @@ class SemanticChunkerImpl:
         try:
             doc_uuid = uuid.UUID(document_id) if document_id else uuid.uuid4()
         except (ValueError, TypeError) as e:
+            # 无法转换时使用随机 UUID 作为 fallback
+            fallback_uuid = uuid.uuid4()
             raise ChunkingError(
-                document_id=document_id,
+                document_id=fallback_uuid,
                 reason=f"document_id 不是有效的 UUID 格式: {document_id}",
                 cause=e,
             )
