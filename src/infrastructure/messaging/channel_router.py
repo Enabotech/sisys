@@ -363,3 +363,18 @@ class ChannelRouter:
             不含默认映射的 ChannelRouter 实例
         """
         return cls(load_defaults=False)
+
+    @classmethod
+    def from_default_config(cls) -> ChannelRouter:
+        """从默认配置文件创建路由器（组合根工厂方法）
+
+        加载 DEFAULT_MAPPINGS + event_channels.yaml 配置。
+
+        Returns:
+            已完成配置的 ChannelRouter 实例
+        """
+        from src.infrastructure.messaging.event_bus_config_loader import DEFAULT_CONFIG_PATH, EventBusConfigLoader
+
+        router = cls()
+        EventBusConfigLoader().load(router, DEFAULT_CONFIG_PATH)
+        return router
