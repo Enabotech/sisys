@@ -879,12 +879,12 @@ deploy/postgresql/alembic/versions/
 **P1 — 重要问题**
 
 - [x] [Review][Patch] F7: API 契约测试文件缺失 [`tests/contracts/test_api_contract_document_version.py`] — **已修复**
-- [x] [Review][Defer] F8: `docs/api/openapi.yaml` 未更新 — deferred, 后续Story补充API端点时更新
+- [x] [Review][Patch] F8: `docs/api/openapi.yaml` 未更新 — **已修复**
 - [x] [Review][Patch] F9: ORM `__init__` 中 `document_id` 默认为 None 时静默随机 UUID [`src/infrastructure/storage/postgresql/models/document_version.py:1056-1057`] — **已修复**
 - [x] [Review][Patch] F10: `datetime.now()` 无时区 vs `DateTime(timezone=True)` 不匹配 [`src/infrastructure/storage/postgresql/models/document_version.py:1060`] — **已修复**
 - [x] [Review][Patch] F11: `DocumentVersionSnapshot.version` 无校验（可接受 0/负数） [`src/domain/value_objects/document_version.py`] — **已修复**
 - [x] [Review][Patch] F12: CLI 异常处理过于宽泛（`except Exception` 吞所有） [`src/interfaces/cli/commands/document_commands.py`] — **已修复**
-- [x] [Review][Defer] F13: 空 `tenant_id` 无校验 — deferred, 后续Story补充
+- [x] [Review][Patch] F13: 空 `tenant_id` 无校验 — **已修复**
 - [x] [Review][Patch] F14: `# noqa: F401` 抑制注释违反项目硬约束 [`tests/integration/test_document_version_integration.py:552`] — **已修复**
 - [x] [Review][Patch] F17: `create_snapshot` 未传递内容摘要参数 [`src/application/services/document_version_service.py:243-247`] — **已修复**
 - [x] [Review][Patch] F20: `_compute_content_diff` 截断格式换行不一致 [`src/domain/services/document_version_diff_service.py:820-821`] — **已修复**
@@ -892,8 +892,6 @@ deploy/postgresql/alembic/versions/
 
 **P2 — 可优化（已延期）**
 
-- [x] [Review][Defer] F8: `docs/api/openapi.yaml` 未更新 — deferred, 后续Story补充API端点时更新
-- [x] [Review][Defer] F13: 空 `tenant_id` 无校验 — deferred, 后续Story补充
 - [x] [Review][Defer] F15: 缺少性能基准测试（P95 指标未验证） — deferred, pre-existing
 - [x] [Review][Defer] F16: 缺少并发版本控制测试（≥10 并发操作） — deferred, pre-existing
 - [x] [Review][Defer] F18: `list_versions`/`get_version` N+1 查询问题 — deferred, pre-existing
@@ -993,9 +991,7 @@ deploy/postgresql/alembic/versions/
 
 **故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-07-31
-**最后更新/Last Updated:** 2026-08-02
+**最后更新/Last Updated:** 2026-08-03
 **更新说明/Description:**
-- v1.3.0: 5轮代码审查修订 — 22项修复：P0 9项(compute_diff参数/版本号递增/错误隔离/跨租户过滤/静默创建/TOCTOU/原子乐观锁/内容摘要/ValueError→EntityValidationError) + P1 9项(noqa/时区/值对象校验/CLI异常/old_metadata/diff_json完整性/端口docstring/IntegrityError约束区分/事件处理器注册) + P2 4项延期
-- v1.2.0: R1第二轮审查修复 — 基于实际代码调研的6项修复：(1)领域事件event_type使用field(default=...,init=False)模式确保自动注册；(2)DocumentVersionSnapshot必填字段无默认值确保语义完整；(3)DOCUMENT UPLOADED导出补全到events/__init__.py；(4)不扩展DocumentVersion实体(职责分离)；(5)异常注册细节补充(storage_exceptions.py的__all__)； (6)ORM模型显式__init__对齐现有编码风格
-- v1.1.0: 5轮审查修订 — R1架构科学性修复(移除create_version_snapshot、新增save_with_version_check、对齐TYPE_CHECKING模式、明确DocumentVersionDiff职责)、R2合理性修复(事件驱动方案替代服务直接注入)、R3一致性修复(异常导出/事件测试文件/CLI目录说明)、R4回归验证、R5终审验收
-- v1.0.0: 创建故事文件
+- v1.4.0: 补充两个延期项修复 — openapi.yaml 版本快照端点定义 + 空 tenant_id 校验（ValidationError/EXCEPTION_201）
+- v1.3.0: 5轮代码审查修订 — 22项修复

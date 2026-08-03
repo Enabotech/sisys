@@ -9,9 +9,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from src.domain.services.document_version_diff_service import compute_diff
-
 from src.domain.exceptions import ValidationError
+from src.domain.services.document_version_diff_service import compute_diff
 
 
 def _validate_tenant_id(tenant_id: str) -> None:
