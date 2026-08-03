@@ -14,6 +14,7 @@ from typing import Any
 
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedTable
 from src.domain.value_objects.semantic_chunk import ChunkBoundaryType, ChunkingConfig, SemanticChunk
+from src.domain.exceptions.storage_exceptions import ChunkingError
 
 logger = logging.getLogger(__name__)
 
@@ -100,21 +101,31 @@ class SemanticChunkerImpl:
 
         Returns:
             SemanticChunk 列表（空文档返回空列表，不抛异常）
+
+        Raises:
+            ChunkingError: 分块算法内部异常（如不可序列化的数据结构）
         """
-        cfg = config or ChunkingConfig()
-        document_id = parsed_doc.document_id
-        doc_metadata = metadata or {}
+        try:
+            cfg = config or ChunkingConfig()
+            document_id = parsed_doc.document_id
+            doc_metadata = metadata or {}
 
-        # 提取所有文本片段
-        segments = list(self._extract_segments(parsed_doc))
+            # 提取所有文本片段
+            segments = list(self._extract_segments(parsed_doc))
 
-        if not segments:
-            return []
+            if not segments:
+                return []
 
-        # 聚合片段为分块
-        chunks = self._aggregate_segments(segments, cfg, document_id, doc_metadata)
+            # 聚合片段为分块
+            chunks = self._aggregate_segments(segments, cfg, document_id, doc_metadata)
 
-        return chunks
+            return chunks
+        except (ValueError, TypeError, KeyError) as e:
+            raise ChunkingError(
+                document_id=parsed_doc.document_id,
+                reason=f"语义分块内部异常: {e}",
+                cause=e,
+            )
 
     def _extract_segments(
         self,
@@ -341,9 +352,19 @@ class SemanticChunkerImpl:
         # Token 估算
         token_count = estimate_tokens(content)
 
+        # 安全转换 document_id
+        try:
+            doc_uuid = uuid.UUID(document_id) if document_id else uuid.uuid4()
+        except (ValueError, TypeError) as e:
+            raise ChunkingError(
+                document_id=document_id,
+                reason=f"document_id 不是有效的 UUID 格式: {document_id}",
+                cause=e,
+            )
+
         return SemanticChunk(
             chunk_id=uuid.uuid4(),
-            document_id=uuid.UUID(document_id) if document_id else uuid.uuid4(),
+            document_id=doc_uuid,
             content=content,
             chunk_index=chunk_index,
             boundary_type=boundary_type,
@@ -378,8 +399,39 @@ class SemanticChunkerImpl:
             metadata=chunk_a.metadata,
         )
 
+    def _find_safe_split_point(self, text: str, max_chars: int) -> int:
+        """在 max_chars 之前的最近语义边界处切分
+
+        优先在换行符、句号等语义边界处切分，保持语义完整性。
+        无语义边界时回退到字符级硬切分。
+
+        Args:
+            text: 待切分的文本
+            max_chars: 最大字符数
+
+        Returns:
+            切分点索引（包含边界分隔符）
+        """
+        # 优先在换行符处切分
+        candidate = text.rfind("\n", 0, max_chars)
+        if candidate != -1:
+            return candidate + 1
+        # 其次在中文句号处切分
+        candidate = text.rfind("。", 0, max_chars)
+        if candidate != -1:
+            return candidate + 1
+        # 其次在英文句号处切分
+        candidate = text.rfind(".", 0, max_chars)
+        if candidate != -1:
+            return candidate + 1
+        # 无语义边界时回退到字符级硬切分
+        return max_chars
+
     def _split_by_token_limit(self, text: str, max_tokens: int) -> list[str]:
         """按 token 硬限制切分文本
+
+        优先在语义边界（换行符、句号）处切分，
+        无语义边界时回退到字符级硬切分。
 
         Args:
             text: 待切分的文本
@@ -392,12 +444,18 @@ class SemanticChunkerImpl:
         if total_tokens <= max_tokens:
             return [text]
 
-        # 按字符比例切分
+        # 按字符比例估算每段最大字符数
         ratio = max_tokens / total_tokens
         chars_per_segment = max(1, int(len(text) * ratio))
         segments: list[str] = []
-        for i in range(0, len(text), chars_per_segment):
-            segments.append(text[i : i + chars_per_segment])
+        i = 0
+        while i < len(text):
+            segment_end = min(i + chars_per_segment, len(text))
+            # 在语义边界处切分
+            if segment_end < len(text):
+                segment_end = self._find_safe_split_point(text, segment_end)
+            segments.append(text[i:segment_end])
+            i = segment_end
         return segments
 
     def _merge_small_chunks(self, chunks: list[SemanticChunk], cfg: ChunkingConfig) -> list[SemanticChunk]:
@@ -405,8 +463,9 @@ class SemanticChunkerImpl:
 
         规则：
         - 分块 token 数 < min_chunk_size_tokens 时尝试合并
-        - 以 SECTION_HEADER/TABLE/PAGE_BREAK 开头的分块不向后合并
-        - 短标题分块向前合并到后一个分块
+        - 以 SECTION_HEADER 开头的分块：向后合并后续内容到标题分块（标题保留）
+        - 以 TABLE/PAGE_BREAK 开头的分块不向后合并
+        - 段落分块：向后合并到前一个分块
 
         Args:
             chunks: 分块列表
@@ -429,13 +488,15 @@ class SemanticChunkerImpl:
                     ChunkBoundaryType.TABLE,
                     ChunkBoundaryType.PAGE_BREAK,
                 ):
-                    # 硬边界分块 → 向前合并到后一个分块
+                    # 硬边界分块（含标题）：向后合并后一个分块的内容到标题分块
                     if i + 1 < len(chunks):
-                        chunks[i + 1] = self._merge_chunks(chunk, chunks[i + 1])
+                        chunk = self._merge_chunks(chunk, chunks[i + 1])
+                        merged.append(chunk)
+                        i += 1  # 跳过已合并的后续分块
                     else:
                         merged.append(chunk)
                 else:
-                    # 段落分块 → 向后合并到前一个分块
+                    # 段落分块：向后合并到前一个分块
                     merged[-1] = self._merge_chunks(merged[-1], chunk)
             else:
                 merged.append(chunk)
