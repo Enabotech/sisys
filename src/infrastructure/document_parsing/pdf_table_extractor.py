@@ -1,7 +1,7 @@
 """基础设施层 PDF 表格初始检测器
 
 使用 pdfplumber 从 PDF 页面中检测表格区域，提取行列结构，
-转换为 ParsedTable 值对象。实现 TableExtractorPort 端口协议。
+转换为 ParsedTable 值对象。实现 TableDetectorPort 端口协议。
 
 pdfplumber 为 MIT 许可证，专有表格检测算法，无 Ghostscript 系统依赖。
 """
@@ -16,7 +16,7 @@ from src.domain.value_objects.parsed_document import ParsedTable
 logger = logging.getLogger(__name__)
 
 # pdfplumber 延迟导入，仅在运行时加载
-pdfplumber: Any = None
+_pdfplumber: Any = None
 
 
 def _ensure_pdfplumber() -> Any:
@@ -28,22 +28,23 @@ def _ensure_pdfplumber() -> Any:
     Raises:
         ImportError: pdfplumber 未安装
     """
-    global pdfplumber
-    if pdfplumber is None:
+    global _pdfplumber
+    if _pdfplumber is None:
         try:
             import pdfplumber as _plumber
 
-            pdfplumber = _plumber
+            _pdfplumber = _plumber
         except ImportError as e:
             raise ImportError("pdfplumber 未安装。请执行: poetry add pdfplumber") from e
-    return pdfplumber
+    return _pdfplumber
 
 
-class PdfTableExtractor:
+class PdfTableDetector:
     """PDF 专用表格检测器
 
     使用 pdfplumber 逐页检测 PDF 页面中的表格区域，
     提取行列结构并转换为 ParsedTable 值对象列表。
+    实现 TableDetectorPort 端口协议。
 
     降级策略：
     - 非 PDF MIME 类型 → 直接返回空列表
@@ -51,24 +52,22 @@ class PdfTableExtractor:
     - 单页检测异常 → 跳过该页，继续处理其他页
     """
 
-    def extract(
+    def detect(
         self,
         file_path: str,
         mime_type: str,
-        tables: list[ParsedTable],
     ) -> list[ParsedTable]:
         """从 PDF 文件中检测表格
 
         Args:
             file_path: PDF 文件路径
             mime_type: 文档 MIME 类型
-            tables: 忽略（PDF 表格从文件中直接检测）
 
         Returns:
-            检测到的 ParsedTable 列表
+            检测到的 ParsedTable 列表（仅含 rows 字段，无语义信息）
         """
-        # MIME 类型过滤
-        if mime_type != "application/pdf":
+        # MIME 类型过滤：支持带参数的 MIME 类型（如 "application/pdf; charset=utf-8"）
+        if not mime_type.startswith("application/pdf"):
             return []
 
         try:
@@ -100,7 +99,8 @@ class PdfTableExtractor:
 
         return detected_tables
 
-    def _extract_tables_from_page(self, page: Any) -> list[ParsedTable]:
+    @staticmethod
+    def _extract_tables_from_page(page: Any) -> list[ParsedTable]:
         """从单个 PDF 页面提取表格
 
         Args:
@@ -113,10 +113,16 @@ class PdfTableExtractor:
         if not raw_tables:
             return []
 
+        # 过滤 None 行（部分 PDF 变种可能返回 None 作为行）
+        raw_tables = [rt for rt in raw_tables if rt is not None]
+
         result: list[ParsedTable] = []
         for raw_table in raw_tables:
             if not raw_table:
                 continue
+
+            # 过滤 None 行
+            raw_table = [r for r in raw_table if r is not None]
 
             # 将 pdfplumber 返回的二维列表转为 list[list[str]]
             rows: list[list[str]] = []

@@ -1,10 +1,18 @@
 """领域层 表头检测服务
 
-表头检测领域服务，使用多特征加权策略（首行类型差异 + 格式特征 + 空值模式）
+表头检测领域服务，使用首行类型差异法（首行文本 vs 后续行数据类型）
 识别表格中的表头行索引。纯 Python 实现，零外部依赖。
+
+MVP 实现使用简化启发式策略：
+- 单行表格无法区分表头与数据，判定为无表头
+- 首行全为空单元格，判定为无表头
+- 首行全为文本类型且后续行含数字/日期 → 判定为表头（高置信度）
+- 首行含数字/日期等数据类型 → 判定为无表头
 """
 
 from __future__ import annotations
+
+import re
 
 
 def detect_header(rows: list[list[str]]) -> tuple[int | None, float]:
@@ -15,13 +23,6 @@ def detect_header(rows: list[list[str]]) -> tuple[int | None, float]:
 
     Returns:
         tuple[int | None, float]: 表头行索引（无表头时为 None）和置信度
-
-    Note:
-        MVP 实现使用首行类型差异法：
-        - 单行表格无法区分表头与数据，判定为无表头
-        - 首行全为空单元格，判定为无表头
-        - 首行全为文本类型且后续行含数字/日期 → 判定为表头（高置信度）
-        - 首行含数字/日期等数据类型 → 判定为无表头
     """
     if not rows or not rows[0]:
         return None, 0.0
@@ -49,6 +50,8 @@ def detect_header(rows: list[list[str]]) -> tuple[int | None, float]:
 def _is_data_type(cell: str) -> bool:
     """判断单元格是否为数据类型（数字/日期/货币等）
 
+    与 table_column_classifier._detect_single_value_type 保持一致的检测逻辑。
+
     Args:
         cell: 单元格文本
 
@@ -66,14 +69,12 @@ def _is_data_type(cell: str) -> bool:
     except ValueError:
         pass
 
-    # 日期检测（ISO 格式）
-    if len(cell) >= 10 and "-" in cell:
-        parts = cell.split("-")
-        if len(parts) == 3 and all(p.isdigit() for p in parts):
-            return True
+    # 日期检测（ISO 格式，含单数字月/日）
+    if re.match(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$", cell):
+        return True
 
-    # 货币检测
-    if cell.startswith("¥") or cell.startswith("$") or cell.startswith("€"):
+    # 货币检测（与列分类器一致的正则校验）
+    if re.match(r"^[¥$€£]\s*-?\d[\d,]*\.?\d*$", cell):
         return True
 
     return False

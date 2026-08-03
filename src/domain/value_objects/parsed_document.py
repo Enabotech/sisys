@@ -60,6 +60,13 @@ class ColumnInfo:
     nullable_ratio: float = 0.0
     sample_values: list[str] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        """校验 confidence 和 nullable_ratio 值域范围 [0.0, 1.0]"""
+        if not (0.0 <= self.confidence <= 1.0):
+            raise EntityValidationError(f"confidence 必须在 [0.0, 1.0] 范围内，实际值: {self.confidence}")
+        if not (0.0 <= self.nullable_ratio <= 1.0):
+            raise EntityValidationError(f"nullable_ratio 必须在 [0.0, 1.0] 范围内，实际值: {self.nullable_ratio}")
+
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典"""
         return {
@@ -90,6 +97,19 @@ class MergedCell:
     col_start: int
     col_end: int
     value: str
+
+    def __post_init__(self) -> None:
+        """校验坐标有效性"""
+        if self.row_start < 0 or self.row_end < 0 or self.col_start < 0 or self.col_end < 0:
+            raise EntityValidationError(
+                f"合并单元格坐标不能为负值: "
+                f"row_start={self.row_start}, row_end={self.row_end}, "
+                f"col_start={self.col_start}, col_end={self.col_end}"
+            )
+        if self.row_start > self.row_end:
+            raise EntityValidationError(f"合并单元格 row_start({self.row_start}) 不能大于 row_end({self.row_end})")
+        if self.col_start > self.col_end:
+            raise EntityValidationError(f"合并单元格 col_start({self.col_start}) 不能大于 col_end({self.col_end})")
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典"""
@@ -223,8 +243,8 @@ class ParsedTable:
             "confidence": self.confidence,
             "metadata": self.metadata,
             "header": self.header,
-            "column_types": [ct.to_dict() for ct in self.column_types] if self.column_types else None,
-            "merged_cells": [mc.to_dict() for mc in self.merged_cells] if self.merged_cells else None,
+            "column_types": [ct.to_dict() for ct in self.column_types] if self.column_types is not None else None,
+            "merged_cells": [mc.to_dict() for mc in self.merged_cells] if self.merged_cells is not None else None,
             "semantic_confidence": self.semantic_confidence,
             "table_caption": self.table_caption,
         }
@@ -274,7 +294,7 @@ class ParsedDocument:
     pages: list[ParsedPage] = field(default_factory=list)
     parse_status: Literal["completed", "failed"] = "completed"
     error_message: str | None = None
-    parse_timestamp: str = ""
+    parse_timestamp: str | None = None
 
     def is_failed(self) -> bool:
         """判断解析是否失败

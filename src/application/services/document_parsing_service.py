@@ -31,7 +31,8 @@ if TYPE_CHECKING:
     from src.domain.ports.layout_detector import LayoutDetector
     from src.domain.ports.ocr import OCRPort
     from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
-    from src.domain.ports.table_extractor import TableExtractorPort
+    from src.domain.ports.table_detector import TableDetectorPort
+    from src.domain.ports.table_enhancer import TableSemanticEnhancerPort
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,8 @@ class DocumentParsingService:
         redis_client: "aioredis.Redis | None" = None,
         layout_detector: "LayoutDetector | None" = None,
         pdf_page_renderer: "PdfPageRendererPort | None" = None,
-        table_extractor: "TableExtractorPort | None" = None,
+        table_detector: "TableDetectorPort | None" = None,
+        table_enhancer: "TableSemanticEnhancerPort | None" = None,
         ocr: "OCRPort | None" = None,
     ) -> None:
         self._repository = document_repository
@@ -92,7 +94,8 @@ class DocumentParsingService:
         self._redis = redis_client
         self._layout_detector = layout_detector
         self._pdf_page_renderer = pdf_page_renderer
-        self._table_extractor = table_extractor
+        self._table_detector = table_detector
+        self._table_enhancer = table_enhancer
         self._ocr = ocr
 
     async def parse_document(self, document_id: uuid.UUID, tenant_id: str) -> Document:
@@ -170,8 +173,11 @@ class DocumentParsingService:
             # 版面检测增强（仅 PDF + layout_detector 注入时触发，运行时错误不阻断解析）
             parsed_doc = await self._apply_layout_detection(parsed_doc, temp_path, document.mime_type)
 
-            # 表格语义提取增强（table_extractor 注入时触发，运行时错误不阻断解析）
-            parsed_doc = await self._apply_table_extraction(parsed_doc, temp_path, document.mime_type)
+            # PDF 表格初始检测（仅 PDF + table_detector 注入时触发，检测结果注入 ParsedPage.tables）
+            parsed_doc = await self._apply_table_detection(parsed_doc, temp_path, document.mime_type)
+
+            # 表格语义增强（table_enhancer 注入时触发，对 tables 执行表头/列类型推断）
+            parsed_doc = await self._apply_table_enhancement(parsed_doc, document.mime_type)
 
             # OCR 解析增强（ocr 端口注入时触发，对扫描件执行 OCR 识别，运行时错误不阻断解析）
             parsed_doc, ocr_metadata = await self._apply_ocr(parsed_doc, temp_path, document.mime_type)
@@ -358,18 +364,21 @@ class DocumentParsingService:
 
         return replace(parsed_doc, pages=enhanced_pages)
 
-    async def _apply_table_extraction(
+    async def _apply_table_detection(
         self,
         parsed_doc: ParsedDocument,
         file_path: str,
         mime_type: str,
     ) -> ParsedDocument:
-        """对已解析文档应用表格语义提取增强
+        """对已解析文档应用 PDF 表格初始检测
+
+        仅 PDF 格式 + table_detector 注入时触发，检测结果注入 ParsedPage.tables。
+        如果文档已有表格（如 xlsx 解析器已产出 tables），则跳过检测。
 
         降级策略（与 _apply_layout_detection 对齐）：
-        1. table_extractor 未注入（None）→ 跳过增强，保留原始 tables
-        2. 运行时异常 → WARNING 日志 + 返回原文档（解析状态不受影响）
-        3. 初始化失败（ImportError）→ 由 composition_root 处理，此处不涉及
+        1. table_detector 未注入（None）→ 跳过检测
+        2. 运行时异常 → WARNING 日志 + 返回原文档
+        3. 非 PDF 格式 → 跳过
 
         Args:
             parsed_doc: 已完成解析的 ParsedDocument
@@ -377,10 +386,88 @@ class DocumentParsingService:
             mime_type: 文档 MIME 类型
 
         Returns:
+            检测表格后的 ParsedDocument 或原文档（降级时）
+        """
+        # 降级条件：table_detector 未注入
+        if self._table_detector is None:
+            return parsed_doc
+
+        # 仅 PDF 格式触发表格检测
+        if not mime_type.startswith("application/pdf"):
+            return parsed_doc
+
+        # 已有表格时跳过检测（如 xlsx 解析器已产出 tables 的情况不应进入此路径，
+        # 但 PDFParser 当前始终输出 tables=[]，需要检测）
+        has_existing_tables = any(page.tables for page in parsed_doc.pages)
+        if has_existing_tables:
+            return parsed_doc
+
+        try:
+            # 调用 table_detector 进行 PDF 表格检测
+            detected_tables = await asyncio.to_thread(
+                self._table_detector.detect,
+                file_path,
+                mime_type,
+            )
+
+            if not detected_tables:
+                return parsed_doc
+
+            # 将检测到的表格分配到各页（单页 PDF 通常仅一个页面）
+            enhanced_pages: list[ParsedPage] = []
+            table_idx = 0
+            tables_per_page = len(detected_tables) // max(len(parsed_doc.pages), 1)
+            remaining = len(detected_tables) % max(len(parsed_doc.pages), 1)
+
+            for page_idx, page in enumerate(parsed_doc.pages):
+                start = table_idx
+                count = tables_per_page + (1 if page_idx < remaining else 0)
+                page_tables = detected_tables[start : start + count]
+                table_idx += count
+
+                enhanced_pages.append(
+                    ParsedPage(
+                        page_number=page.page_number,
+                        texts=page.texts,
+                        tables=page_tables if page_tables else page.tables,
+                        images=page.images,
+                    )
+                )
+
+            return replace(parsed_doc, pages=enhanced_pages)
+
+        except Exception:
+            logger.warning(
+                "PDF 表格检测失败，降级保留原始表格（文档 MIME=%s）",
+                mime_type,
+                exc_info=True,
+            )
+            return parsed_doc
+
+    async def _apply_table_enhancement(
+        self,
+        parsed_doc: ParsedDocument,
+        mime_type: str,
+    ) -> ParsedDocument:
+        """对已解析文档应用表格语义增强
+
+        对解析器/检测器产出的原始 ParsedTable 列表执行语义增强
+        （表头识别、列类型推断、合并单元格还原）。
+
+        降级策略（与 _apply_layout_detection 对齐）：
+        1. table_enhancer 未注入（None）→ 跳过增强，保留原始 tables
+        2. 运行时异常 → WARNING 日志 + 返回原文档（解析状态不受影响）
+        3. 初始化失败（ImportError）→ 由 composition_root 处理，此处不涉及
+
+        Args:
+            parsed_doc: 已完成解析的 ParsedDocument
+            mime_type: 文档 MIME 类型
+
+        Returns:
             增强后的 ParsedDocument 或原文档（降级时）
         """
-        # 降级条件：table_extractor 未注入
-        if self._table_extractor is None:
+        # 降级条件：table_enhancer 未注入
+        if self._table_enhancer is None:
             return parsed_doc
 
         # 收集所有页面中的表格
@@ -392,12 +479,11 @@ class DocumentParsingService:
             return parsed_doc
 
         try:
-            # 调用 table_extractor 进行语义增强
+            # 调用 table_enhancer 进行语义增强
             enhanced_tables = await asyncio.to_thread(
-                self._table_extractor.extract,
-                file_path,
-                mime_type,
+                self._table_enhancer.enhance,
                 all_tables,
+                mime_type,
             )
 
             # 将增强后的表格重新分配到各页面
@@ -421,7 +507,7 @@ class DocumentParsingService:
         except Exception:
             # 运行时异常降级：WARNING 日志 + 返回原文档
             logger.warning(
-                "表格语义提取失败，降级保留原始表格（文档 MIME=%s）",
+                "表格语义增强失败，降级保留原始表格（文档 MIME=%s）",
                 mime_type,
                 exc_info=True,
             )

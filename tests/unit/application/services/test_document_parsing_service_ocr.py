@@ -38,7 +38,8 @@ def _create_parsing_service(
         redis_client=None,
         layout_detector=None,
         pdf_page_renderer=None,
-        table_extractor=None,
+        table_detector=None,
+        table_enhancer=None,
         ocr=ocr_mock,
     )
 

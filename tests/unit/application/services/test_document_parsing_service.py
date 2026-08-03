@@ -1096,12 +1096,12 @@ class TestDocumentParsingServiceLayoutDetection:
 class TestDocumentParsingServiceTableExtraction:
     """表格语义提取集成测试
 
-    测试 DocumentParsingService 的 table_extractor 可选注入和 _apply_table_extraction 编排。
+    测试 DocumentParsingService 的 table_detector 和 table_enhancer 可选注入以及编排。
     """
 
     @pytest.mark.asyncio
-    async def test_table_extractor_injected_enhances_tables(self) -> None:
-        """table_extractor 注入时触发语义增强"""
+    async def test_table_enhancer_injected_enhances_tables(self) -> None:
+        """table_enhancer 注入时触发语义增强"""
         from src.application.services.document_parsing_service import DocumentParsingService
         from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage, ParsedTable
 
@@ -1138,30 +1138,30 @@ class TestDocumentParsingServiceTableExtraction:
         )
         mock_parser.parse.return_value = parsed
 
-        # mock table_extractor
-        mock_table_extractor = MagicMock()
+        # mock table_enhancer
+        mock_table_enhancer = MagicMock()
         enhanced_table = ParsedTable(
             rows=[["姓名", "年龄"], ["张三", "30"]],
             header=["姓名", "年龄"],
             semantic_confidence=0.85,
         )
-        mock_table_extractor.extract.return_value = [enhanced_table]
+        mock_table_enhancer.enhance.return_value = [enhanced_table]
 
         service = DocumentParsingService(
             document_repository=mock_repo,
             document_storage=mock_storage,
             event_publisher=AsyncMock(),
             document_parser=mock_parser,
-            table_extractor=mock_table_extractor,
+            table_enhancer=mock_table_enhancer,
         )
 
         result = await service.parse_document(doc_id, "t1")
         assert result.parse_status == ParseStatus.COMPLETED
-        mock_table_extractor.extract.assert_called_once()
+        mock_table_enhancer.enhance.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_table_extractor_none_skips_enhancement(self) -> None:
-        """table_extractor=None 时跳过语义增强"""
+    async def test_table_enhancer_none_skips_enhancement(self) -> None:
+        """table_enhancer=None 时跳过语义增强"""
         from src.application.services.document_parsing_service import DocumentParsingService
         from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage, ParsedTable
 
@@ -1203,15 +1203,15 @@ class TestDocumentParsingServiceTableExtraction:
             document_storage=mock_storage,
             event_publisher=AsyncMock(),
             document_parser=mock_parser,
-            table_extractor=None,
+            table_enhancer=None,
         )
 
         result = await service.parse_document(doc_id, "t1")
         assert result.parse_status == ParseStatus.COMPLETED
 
     @pytest.mark.asyncio
-    async def test_table_extractor_failure_degrades(self) -> None:
-        """table_extractor 运行时异常降级（WARNING + 原始 tables）"""
+    async def test_table_enhancer_failure_degrades(self) -> None:
+        """table_enhancer 运行时异常降级（WARNING + 原始 tables）"""
         from src.application.services.document_parsing_service import DocumentParsingService
         from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage, ParsedTable
 
@@ -1248,15 +1248,15 @@ class TestDocumentParsingServiceTableExtraction:
         )
         mock_parser.parse.return_value = parsed
 
-        mock_table_extractor = MagicMock()
-        mock_table_extractor.extract.side_effect = RuntimeError("表格语义提取失败")
+        mock_table_enhancer = MagicMock()
+        mock_table_enhancer.enhance.side_effect = RuntimeError("表格语义增强失败")
 
         service = DocumentParsingService(
             document_repository=mock_repo,
             document_storage=mock_storage,
             event_publisher=AsyncMock(),
             document_parser=mock_parser,
-            table_extractor=mock_table_extractor,
+            table_enhancer=mock_table_enhancer,
         )
 
         result = await service.parse_document(doc_id, "t1")
@@ -1264,8 +1264,8 @@ class TestDocumentParsingServiceTableExtraction:
         assert result.parse_status == ParseStatus.COMPLETED
 
     @pytest.mark.asyncio
-    async def test_table_extraction_preserves_parse_status(self) -> None:
-        """表格提取失败不影响解析状态"""
+    async def test_table_enhancement_preserves_parse_status(self) -> None:
+        """表格增强失败不影响解析状态"""
         from src.application.services.document_parsing_service import DocumentParsingService
         from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage
 
@@ -1302,15 +1302,15 @@ class TestDocumentParsingServiceTableExtraction:
         )
         mock_parser.parse.return_value = parsed
 
-        mock_table_extractor = MagicMock()
-        mock_table_extractor.extract.side_effect = RuntimeError("提取失败")
+        mock_table_enhancer = MagicMock()
+        mock_table_enhancer.enhance.side_effect = RuntimeError("增强失败")
 
         service = DocumentParsingService(
             document_repository=mock_repo,
             document_storage=mock_storage,
             event_publisher=AsyncMock(),
             document_parser=mock_parser,
-            table_extractor=mock_table_extractor,
+            table_enhancer=mock_table_enhancer,
         )
 
         result = await service.parse_document(doc_id, "t1")

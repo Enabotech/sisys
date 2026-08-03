@@ -106,7 +106,8 @@ class PDFParser(DocumentParserPort):
                         parse_timestamp=timestamp,
                     )
 
-                # 表格检测：MVP 仅契约预留，真实检测推迟至 Story 2-4
+                # 表格检测：PDF 表格初始检测由 DocumentParsingService
+                # 在 _apply_table_detection() 步骤中通过 PdfTableDetector 完成
                 pages: list[ParsedPage] = []
                 for i, page in enumerate(reader.pages):
                     text = page.extract_text() or ""

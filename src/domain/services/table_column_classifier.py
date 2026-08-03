@@ -46,7 +46,8 @@ def classify_columns(
 
         col_name = column_names[col_idx] if column_names and col_idx < len(column_names) else f"col_{col_idx}"
         col_type, confidence = _infer_column_type(col_values)
-        nullable_ratio = _calc_nullable_ratio(col_idx, sampled_rows)
+        # 空值比率使用全量 rows 计算，确保统计准确性
+        nullable_ratio = _calc_nullable_ratio(col_idx, rows)
 
         results.append(
             ColumnInfo(
@@ -101,8 +102,8 @@ def _detect_single_value_type(value: str) -> ColumnType:
     Returns:
         ColumnType: 推断的列类型
     """
-    # 布尔值检测
-    if value.lower() in ("true", "false", "是", "否", "yes", "no", "1", "0"):
+    # 布尔值检测（仅匹配文本布尔值，"1"/"0" 交由 NUMBER 检测处理）
+    if value.lower() in ("true", "false", "是", "否", "yes", "no"):
         return ColumnType.BOOLEAN
 
     # 百分比检测

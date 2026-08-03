@@ -6,8 +6,9 @@
 测试策略：
 - 使用 mock 规避真实文件系统和 pdfplumber 依赖
 - 验证 TableSemanticExtractor 编排三个领域服务的正确性
-- 验证降级路径：table_extractor=None 跳过、运行时异常不阻断
-- 验证 DocumentParsingService._apply_table_extraction() 集成行为
+- 验证降级路径：table_enhancer=None 跳过、运行时异常不阻断
+- 验证 DocumentParsingService._apply_table_enhancement() 集成行为
+- 验证 DocumentParsingService._apply_table_detection() 集成行为
 
 Run with: poetry run pytest tests/integration/test_integration_table_extraction.py -v
 """
@@ -83,7 +84,7 @@ class TestTableSemanticExtractorIntegration:
     """TableSemanticExtractor 集成测试（mock 领域服务）"""
 
     @pytest.mark.asyncio
-    async def test_extract_enhances_single_table(self) -> None:
+    async def test_enhance_single_table(self) -> None:
         """标准表格语义提取：表头+列类型"""
         from src.infrastructure.document_parsing.table_semantic_extractor import (
             TableSemanticExtractor,
@@ -91,10 +92,9 @@ class TestTableSemanticExtractorIntegration:
 
         extractor = TableSemanticExtractor()
         table = _create_sample_table()
-        result = extractor.extract(
-            file_path="/tmp/test.xlsx",
-            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        result = extractor.enhance(
             tables=[table],
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
         assert len(result) == 1
@@ -109,7 +109,7 @@ class TestTableSemanticExtractorIntegration:
         assert enhanced.rows == table.rows
 
     @pytest.mark.asyncio
-    async def test_extract_no_header_table(self) -> None:
+    async def test_enhance_no_header_table(self) -> None:
         """无表头表格：header=None，列类型仍被推断"""
         from src.infrastructure.document_parsing.table_semantic_extractor import (
             TableSemanticExtractor,
@@ -117,10 +117,9 @@ class TestTableSemanticExtractorIntegration:
 
         extractor = TableSemanticExtractor()
         table = _create_no_header_table()
-        result = extractor.extract(
-            file_path="/tmp/test.csv",
-            mime_type="text/csv",
+        result = extractor.enhance(
             tables=[table],
+            mime_type="text/csv",
         )
 
         assert len(result) == 1
@@ -132,22 +131,21 @@ class TestTableSemanticExtractorIntegration:
         assert all(ct.col_type == ColumnType.NUMBER for ct in enhanced.column_types)
 
     @pytest.mark.asyncio
-    async def test_extract_empty_tables(self) -> None:
+    async def test_enhance_empty_tables(self) -> None:
         """空表格列表返回空"""
         from src.infrastructure.document_parsing.table_semantic_extractor import (
             TableSemanticExtractor,
         )
 
         extractor = TableSemanticExtractor()
-        result = extractor.extract(
-            file_path="/tmp/test.xlsx",
-            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        result = extractor.enhance(
             tables=[],
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_extract_preserves_multiple_tables(self) -> None:
+    async def test_enhance_preserves_multiple_tables(self) -> None:
         """多表格同时增强"""
         from src.infrastructure.document_parsing.table_semantic_extractor import (
             TableSemanticExtractor,
@@ -155,10 +153,9 @@ class TestTableSemanticExtractorIntegration:
 
         extractor = TableSemanticExtractor()
         tables = [_create_sample_table(), _create_no_header_table()]
-        result = extractor.extract(
-            file_path="/tmp/test.xlsx",
-            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        result = extractor.enhance(
             tables=tables,
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
         assert len(result) == 2
@@ -166,7 +163,7 @@ class TestTableSemanticExtractorIntegration:
         assert result[1].header is None
 
     @pytest.mark.asyncio
-    async def test_extract_semantic_confidence_calculated(self) -> None:
+    async def test_enhance_semantic_confidence_calculated(self) -> None:
         """语义提取综合置信度被正确计算"""
         from src.infrastructure.document_parsing.table_semantic_extractor import (
             TableSemanticExtractor,
@@ -174,10 +171,9 @@ class TestTableSemanticExtractorIntegration:
 
         extractor = TableSemanticExtractor()
         table = _create_sample_table()
-        result = extractor.extract(
-            file_path="/tmp/test.xlsx",
-            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        result = extractor.enhance(
             tables=[table],
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
         enhanced = result[0]
@@ -185,7 +181,7 @@ class TestTableSemanticExtractorIntegration:
         assert 0.0 <= enhanced.semantic_confidence <= 1.0
 
     @pytest.mark.asyncio
-    async def test_extract_to_dict_contains_all_semantic_fields(self) -> None:
+    async def test_enhance_to_dict_contains_all_semantic_fields(self) -> None:
         """to_dict() 输出包含所有语义字段"""
         from src.infrastructure.document_parsing.table_semantic_extractor import (
             TableSemanticExtractor,
@@ -193,10 +189,9 @@ class TestTableSemanticExtractorIntegration:
 
         extractor = TableSemanticExtractor()
         table = _create_sample_table()
-        result = extractor.extract(
-            file_path="/tmp/test.xlsx",
-            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        result = extractor.enhance(
             tables=[table],
+            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
         d = result[0].to_dict()
@@ -219,10 +214,9 @@ class TestTableSemanticExtractorIntegration:
         ):
             extractor = TableSemanticExtractor()
             tables = [_create_sample_table(), _create_sample_table()]
-            result = extractor.extract(
-                file_path="/tmp/test.xlsx",
-                mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            result = extractor.enhance(
                 tables=tables,
+                mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
             assert len(result) == 2
@@ -234,11 +228,11 @@ class TestTableSemanticExtractorIntegration:
 
 
 class TestDocumentParsingServiceTableExtractionIntegration:
-    """DocumentParsingService._apply_table_extraction() 集成测试"""
+    """DocumentParsingService._apply_table_enhancement() 和 _apply_table_detection() 集成测试"""
 
     @pytest.mark.asyncio
-    async def test_table_extractor_injected_enhances_tables(self) -> None:
-        """table_extractor 注入时，表格被语义增强"""
+    async def test_table_enhancer_injected_enhances_tables(self) -> None:
+        """table_enhancer 注入时，表格被语义增强"""
         from src.application.services.document_parsing_service import (
             DocumentParsingService,
         )
@@ -252,13 +246,12 @@ class TestDocumentParsingServiceTableExtractionIntegration:
             event_publisher=MagicMock(),
             document_storage=MagicMock(),
             redis_client=MagicMock(),
-            table_extractor=TableSemanticExtractor(),
+            table_enhancer=TableSemanticExtractor(),
         )
 
         doc = _create_parsed_doc([_create_sample_table()])
-        result = await service._apply_table_extraction(
+        result = await service._apply_table_enhancement(
             parsed_doc=doc,
-            file_path="/tmp/test.xlsx",
             mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
@@ -266,8 +259,8 @@ class TestDocumentParsingServiceTableExtractionIntegration:
         assert result.pages[0].tables[0].header == ["姓名", "年龄", "薪资"]
 
     @pytest.mark.asyncio
-    async def test_table_extractor_none_skips_enhancement(self) -> None:
-        """table_extractor=None 时跳过表格语义增强"""
+    async def test_table_enhancer_none_skips_enhancement(self) -> None:
+        """table_enhancer=None 时跳过表格语义增强"""
         from src.application.services.document_parsing_service import (
             DocumentParsingService,
         )
@@ -278,13 +271,12 @@ class TestDocumentParsingServiceTableExtractionIntegration:
             event_publisher=MagicMock(),
             document_storage=MagicMock(),
             redis_client=MagicMock(),
-            table_extractor=None,
+            table_enhancer=None,
         )
 
         doc = _create_parsed_doc([_create_sample_table()])
-        result = await service._apply_table_extraction(
+        result = await service._apply_table_enhancement(
             parsed_doc=doc,
-            file_path="/tmp/test.xlsx",
             mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
@@ -298,8 +290,8 @@ class TestDocumentParsingServiceTableExtractionIntegration:
             DocumentParsingService,
         )
 
-        failing_extractor = MagicMock()
-        failing_extractor.extract.side_effect = RuntimeError("表格提取失败")
+        failing_enhancer = MagicMock()
+        failing_enhancer.enhance.side_effect = RuntimeError("表格语义增强失败")
 
         service = DocumentParsingService(
             document_repository=MagicMock(),
@@ -307,13 +299,12 @@ class TestDocumentParsingServiceTableExtractionIntegration:
             event_publisher=MagicMock(),
             document_storage=MagicMock(),
             redis_client=MagicMock(),
-            table_extractor=failing_extractor,
+            table_enhancer=failing_enhancer,
         )
 
         doc = _create_parsed_doc([_create_sample_table()])
-        result = await service._apply_table_extraction(
+        result = await service._apply_table_enhancement(
             parsed_doc=doc,
-            file_path="/tmp/test.pdf",
             mime_type="application/pdf",
         )
 
@@ -323,41 +314,98 @@ class TestDocumentParsingServiceTableExtractionIntegration:
 
     @pytest.mark.asyncio
     async def test_no_tables_skips_processing(self) -> None:
-        """无表格时跳过处理，不调用 extractor"""
+        """无表格时跳过处理，不调用 enhancer"""
         from src.application.services.document_parsing_service import (
             DocumentParsingService,
         )
 
-        mock_extractor = MagicMock()
+        mock_enhancer = MagicMock()
         service = DocumentParsingService(
             document_repository=MagicMock(),
             document_parser=MagicMock(),
             event_publisher=MagicMock(),
             document_storage=MagicMock(),
             redis_client=MagicMock(),
-            table_extractor=mock_extractor,
+            table_enhancer=mock_enhancer,
         )
 
         doc = _create_parsed_doc([])  # 无表格
-        result = await service._apply_table_extraction(
+        result = await service._apply_table_enhancement(
+            parsed_doc=doc,
+            mime_type="application/pdf",
+        )
+
+        mock_enhancer.enhance.assert_not_called()
+        assert len(result.pages) == 1
+        assert result.pages[0].tables == []
+
+    @pytest.mark.asyncio
+    async def test_table_detector_injected_detects_tables(self) -> None:
+        """table_detector 注入时，PDF 表格被检测"""
+        from src.application.services.document_parsing_service import (
+            DocumentParsingService,
+        )
+
+        mock_detector = MagicMock()
+        mock_detector.detect.return_value = [
+            ParsedTable(rows=[["名称", "数量"], ["项目A", "100"]]),
+        ]
+
+        service = DocumentParsingService(
+            document_repository=MagicMock(),
+            document_parser=MagicMock(),
+            event_publisher=MagicMock(),
+            document_storage=MagicMock(),
+            redis_client=MagicMock(),
+            table_detector=mock_detector,
+        )
+
+        doc = _create_parsed_doc([], mime_type="application/pdf")
+        result = await service._apply_table_detection(
             parsed_doc=doc,
             file_path="/tmp/test.pdf",
             mime_type="application/pdf",
         )
 
-        mock_extractor.extract.assert_not_called()
-        assert len(result.pages) == 1
+        mock_detector.detect.assert_called_once_with("/tmp/test.pdf", "application/pdf")
+        assert len(result.pages[0].tables) == 1
+        assert result.pages[0].tables[0].rows == [["名称", "数量"], ["项目A", "100"]]
+
+    @pytest.mark.asyncio
+    async def test_table_detector_none_skips_detection(self) -> None:
+        """table_detector=None 时跳过 PDF 表格检测"""
+        from src.application.services.document_parsing_service import (
+            DocumentParsingService,
+        )
+
+        service = DocumentParsingService(
+            document_repository=MagicMock(),
+            document_parser=MagicMock(),
+            event_publisher=MagicMock(),
+            document_storage=MagicMock(),
+            redis_client=MagicMock(),
+            table_detector=None,
+        )
+
+        doc = _create_parsed_doc([], mime_type="application/pdf")
+        result = await service._apply_table_detection(
+            parsed_doc=doc,
+            file_path="/tmp/test.pdf",
+            mime_type="application/pdf",
+        )
+
+        # 无检测，表格为空
         assert result.pages[0].tables == []
 
 
-class TestPdfTableExtractorIntegration:
-    """PdfTableExtractor 集成测试（mock pdfplumber）"""
+class TestPdfTableDetectorIntegration:
+    """PdfTableDetector 集成测试（mock pdfplumber）"""
 
     @pytest.mark.asyncio
     async def test_detect_single_table_with_pdfplumber(self) -> None:
         """pdfplumber 检测到单表格"""
         from src.infrastructure.document_parsing.pdf_table_extractor import (
-            PdfTableExtractor,
+            PdfTableDetector,
         )
 
         # Mock pdfplumber 页面（与单元测试同样的 mock 模式）
@@ -369,14 +417,13 @@ class TestPdfTableExtractorIntegration:
         mock_pdf = MagicMock()
         mock_pdf.pages = [mock_page]
 
-        with patch("src.infrastructure.document_parsing.pdf_table_extractor.pdfplumber") as mock_pdfplumber:
+        with patch("src.infrastructure.document_parsing.pdf_table_extractor._pdfplumber") as mock_pdfplumber:
             mock_pdfplumber.open.return_value.__enter__.return_value = mock_pdf
 
-            extractor = PdfTableExtractor()
-            result = extractor.extract(
+            detector = PdfTableDetector()
+            result = detector.detect(
                 file_path="/tmp/test.pdf",
                 mime_type="application/pdf",
-                tables=[],
             )
 
             assert len(result) == 1
@@ -386,14 +433,13 @@ class TestPdfTableExtractorIntegration:
     async def test_non_pdf_mime_returns_empty(self) -> None:
         """非 PDF MIME 类型返回空列表"""
         from src.infrastructure.document_parsing.pdf_table_extractor import (
-            PdfTableExtractor,
+            PdfTableDetector,
         )
 
-        extractor = PdfTableExtractor()
-        result = extractor.extract(
+        detector = PdfTableDetector()
+        result = detector.detect(
             file_path="/tmp/test.xlsx",
             mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            tables=[],
         )
         assert result == []
 
@@ -401,15 +447,14 @@ class TestPdfTableExtractorIntegration:
     async def test_pdfplumber_unavailable_returns_empty(self) -> None:
         """pdfplumber 未安装时降级返回空列表"""
         from src.infrastructure.document_parsing.pdf_table_extractor import (
-            PdfTableExtractor,
+            PdfTableDetector,
         )
 
         with patch.dict("sys.modules", {"pdfplumber": None}):
-            extractor = PdfTableExtractor()
-            result = extractor.extract(
+            detector = PdfTableDetector()
+            result = detector.detect(
                 file_path="/tmp/test.pdf",
                 mime_type="application/pdf",
-                tables=[],
             )
             assert result == []
 
@@ -418,16 +463,16 @@ class TestCompositionRootTableExtractor:
     """Composition Root 端口注册验证"""
 
     @pytest.mark.asyncio
-    async def test_table_extractor_port_registered(self) -> None:
-        """table_extractor 端口在 composition_root 中注册"""
+    async def test_table_detector_port_registered(self) -> None:
+        """table_detector 端口在 composition_root 中注册"""
         from src.domain.ports.registry import _global_registry
 
-        # 检查 table_extractor 是否在注册表中
-        assert "table_extractor" in _global_registry._ports, "table_extractor 端口应已注册"
+        # 检查 table_detector 是否在注册表中
+        assert "table_detector" in _global_registry._ports, "table_detector 端口应已注册"
 
     @pytest.mark.asyncio
-    async def test_pdf_table_extractor_port_registered(self) -> None:
-        """pdf_table_extractor 端口在 composition_root 中注册"""
+    async def test_table_enhancer_port_registered(self) -> None:
+        """table_enhancer 端口在 composition_root 中注册"""
         from src.domain.ports.registry import _global_registry
 
-        assert "pdf_table_extractor" in _global_registry._ports, "pdf_table_extractor 端口应已注册"
+        assert "table_enhancer" in _global_registry._ports, "table_enhancer 端口应已注册"

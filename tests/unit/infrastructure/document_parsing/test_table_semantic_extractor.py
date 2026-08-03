@@ -15,66 +15,56 @@ from src.infrastructure.document_parsing.table_semantic_extractor import (
 
 
 class TestTableSemanticExtractorStandard:
-    """标准表格语义提取测试"""
+    """标准表格语义增强测试"""
 
-    def test_extract_enhances_single_table(self) -> None:
+    def test_enhance_single_table(self) -> None:
         """单表格语义增强"""
         extractor = TableSemanticExtractor()
         tables = [
             ParsedTable(rows=[["姓名", "年龄"], ["张三", "30"]]),
         ]
-        result = extractor.extract(
-            "/tmp/test.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", tables
-        )
+        result = extractor.enhance(tables, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         assert len(result) == 1
         assert result[0].header is not None
         assert result[0].column_types is not None
 
-    def test_extract_enhances_multiple_tables(self) -> None:
+    def test_enhance_multiple_tables(self) -> None:
         """多表格语义增强"""
         extractor = TableSemanticExtractor()
         tables = [
             ParsedTable(rows=[["A", "B"], ["1", "2"]]),
             ParsedTable(rows=[["C", "D"], ["3", "4"]]),
         ]
-        result = extractor.extract(
-            "/tmp/test.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", tables
-        )
+        result = extractor.enhance(tables, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         assert len(result) == 2
 
-    def test_extract_empty_table_list(self) -> None:
+    def test_enhance_empty_table_list(self) -> None:
         """空表格列表直接返回"""
         extractor = TableSemanticExtractor()
-        result = extractor.extract("/tmp/test.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", [])
+        result = extractor.enhance([], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         assert result == []
 
-    def test_extract_preserves_original_rows(self) -> None:
+    def test_enhance_preserves_original_rows(self) -> None:
         """语义增强不修改原始 rows"""
         extractor = TableSemanticExtractor()
         original_rows = [["姓名", "年龄"], ["张三", "30"]]
         tables = [ParsedTable(rows=original_rows)]
-        result = extractor.extract(
-            "/tmp/test.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", tables
-        )
+        result = extractor.enhance(tables, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         assert result[0].rows == original_rows
 
-    def test_extract_sets_semantic_confidence(self) -> None:
+    def test_enhance_sets_semantic_confidence(self) -> None:
         """语义增强设置综合置信度"""
         extractor = TableSemanticExtractor()
         tables = [ParsedTable(rows=[["姓名", "年龄"], ["张三", "30"]])]
-        result = extractor.extract(
-            "/tmp/test.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", tables
-        )
+        result = extractor.enhance(tables, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         assert result[0].semantic_confidence is not None
         assert 0.0 <= result[0].semantic_confidence <= 1.0
 
-    def test_extract_to_dict_contains_all_semantic_fields(self) -> None:
+    def test_enhance_to_dict_contains_all_semantic_fields(self) -> None:
         """to_dict() 包含所有语义字段"""
         extractor = TableSemanticExtractor()
         tables = [ParsedTable(rows=[["姓名", "年龄"], ["张三", "30"]])]
-        result = extractor.extract(
-            "/tmp/test.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", tables
-        )
+        result = extractor.enhance(tables, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         d = result[0].to_dict()
         assert "header" in d
         assert "column_types" in d
@@ -89,7 +79,7 @@ class TestTableSemanticExtractorNoHeader:
         """无表头表格的 header 字段为 None"""
         extractor = TableSemanticExtractor()
         tables = [ParsedTable(rows=[["100", "200"], ["300", "400"]])]
-        result = extractor.extract("/tmp/test.csv", "text/csv", tables)
+        result = extractor.enhance(tables, "text/csv")
         # 无表头时 header 应为 None
         assert result[0].header is None
 
@@ -97,7 +87,7 @@ class TestTableSemanticExtractorNoHeader:
         """无表头时仍执行列类型推断"""
         extractor = TableSemanticExtractor()
         tables = [ParsedTable(rows=[["100", "200"], ["300", "400"]])]
-        result = extractor.extract("/tmp/test.csv", "text/csv", tables)
+        result = extractor.enhance(tables, "text/csv")
         assert result[0].column_types is not None
 
 
@@ -109,9 +99,7 @@ class TestTableSemanticExtractorDegradation:
         extractor = TableSemanticExtractor()
         # 空行数据模拟边缘 case
         tables = [ParsedTable(rows=[[""]])]
-        result = extractor.extract(
-            "/tmp/test.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", tables
-        )
+        result = extractor.enhance(tables, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         # 不应抛异常，降级处理
         assert len(result) == 1
 
@@ -119,32 +107,30 @@ class TestTableSemanticExtractorDegradation:
         """列类型推断失败时降级"""
         extractor = TableSemanticExtractor()
         tables = [ParsedTable(rows=[])]
-        result = extractor.extract(
-            "/tmp/test.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", tables
-        )
+        result = extractor.enhance(tables, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         # 空行不抛异常
         assert len(result) == 1
 
     def test_non_table_mime_type_still_processes(self) -> None:
-        """非表格 MIME 类型仍可处理（语义提取不依赖 MIME 过滤）"""
+        """非表格 MIME 类型仍可处理（语义增强不依赖 MIME 过滤）"""
         extractor = TableSemanticExtractor()
         tables = [ParsedTable(rows=[["A", "B"], ["1", "2"]])]
-        result = extractor.extract("/tmp/test.txt", "text/plain", tables)
+        result = extractor.enhance(tables, "text/plain")
         assert len(result) == 1
 
 
 class TestTableSemanticExtractorProtocol:
     """Protocol 合规性测试"""
 
-    def test_implements_table_extractor_port(self) -> None:
-        """验证 TableSemanticExtractor 满足 TableExtractorPort Protocol"""
-        from src.domain.ports.table_extractor import TableExtractorPort
+    def test_implements_table_semantic_enhancer_port(self) -> None:
+        """验证 TableSemanticExtractor 满足 TableSemanticEnhancerPort Protocol"""
+        from src.domain.ports.table_enhancer import TableSemanticEnhancerPort
 
         extractor = TableSemanticExtractor()
-        assert isinstance(extractor, TableExtractorPort)
+        assert isinstance(extractor, TableSemanticEnhancerPort)
 
-    def test_has_extract_method(self) -> None:
-        """验证 extract 方法存在"""
+    def test_has_enhance_method(self) -> None:
+        """验证 enhance 方法存在"""
         extractor = TableSemanticExtractor()
-        assert hasattr(extractor, "extract")
-        assert callable(extractor.extract)
+        assert hasattr(extractor, "enhance")
+        assert callable(extractor.enhance)
