@@ -96,29 +96,39 @@ def _infer_column_type(values: list[str]) -> tuple[ColumnType, float]:
 def _detect_single_value_type(value: str) -> ColumnType:
     """检测单个值的类型
 
+    检测优先级（按 Story 规格）：
+    DATE > CURRENCY > PERCENTAGE > BOOLEAN > NUMBER > STRING
+
+    日期优先检测（格式最明确），货币/百分比次之（带符号标记），
+    布尔在数字之前（防止 "1"/"0" 直接被转为 NUMBER）。
+
     Args:
         value: 单元格文本值
 
     Returns:
         ColumnType: 推断的列类型
     """
-    # 布尔值检测（仅匹配文本布尔值，"1"/"0" 交由 NUMBER 检测处理）
-    if value.lower() in ("true", "false", "是", "否", "yes", "no"):
-        return ColumnType.BOOLEAN
-
-    # 百分比检测
-    if re.match(r"^-?\d+\.?\d*\s*%$", value):
-        return ColumnType.PERCENTAGE
-
-    # 货币检测
-    if re.match(r"^[¥$€£]\s*-?\d[\d,]*\.?\d*$", value):
-        return ColumnType.CURRENCY
-
-    # 日期检测（ISO / 中文格式）
+    # 日期检测（ISO / 中文格式 / 欧美格式）
     if re.match(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$", value):
+        return ColumnType.DATE
+    if re.match(r"^\d{1,2}[-/]\d{1,2}[-/]\d{4}$", value):
         return ColumnType.DATE
     if re.match(r"^\d{4}年\d{1,2}月\d{1,2}日?$", value):
         return ColumnType.DATE
+
+    # 货币检测（支持负号在符号前/后、无前导零的小数）
+    if re.match(r"^-?[¥$€£]\s*\d*\.?\d+$", value):
+        return ColumnType.CURRENCY
+    if re.match(r"^[¥$€£]\s*-?\d[\d,]*\.?\d*$", value):
+        return ColumnType.CURRENCY
+
+    # 百分比检测（支持千分位格式）
+    if re.match(r"^-?\d[\d,]*\.?\d*\s*%$", value):
+        return ColumnType.PERCENTAGE
+
+    # 布尔值检测（仅匹配文本布尔值，"1"/"0" 交由 NUMBER 检测处理）
+    if value.lower() in ("true", "false", "是", "否", "yes", "no"):
+        return ColumnType.BOOLEAN
 
     # 数字检测
     try:

@@ -1,14 +1,26 @@
 """领域层 表格语义提取端口
 
-定义表格语义提取器的 Protocol 接口，接收解析器产出的原始 ParsedTable 列表，
-返回语义增强后的 ParsedTable 列表（含表头、列类型、合并单元格等结构化信息）。
+.. deprecated::
+    自 v1.2.0 起废弃，拆分为两个职责更单一的端口：
+    - TableDetectorPort: 从文档中检测表格（初始检测）
+    - TableSemanticEnhancerPort: 对已提取的表格做语义增强（表头/列类型）
+
+    新代码请使用 src.domain.ports.table_detector 和 src.domain.ports.table_enhancer。
+    此文件保留仅用于向后兼容，将在 v2.0 移除。
 """
 
 from __future__ import annotations
 
+import warnings
 from typing import Protocol, runtime_checkable
 
 from src.domain.value_objects.parsed_document import ParsedTable
+
+warnings.warn(
+    "TableExtractorPort 已废弃，请使用 TableDetectorPort + TableSemanticEnhancerPort 替代",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 @runtime_checkable

@@ -11,6 +11,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 
+from src.domain.ports.table_enhancer import TableSemanticEnhancerPort
 from src.domain.services.table_column_classifier import classify_columns
 from src.domain.services.table_header_detector import detect_header
 from src.domain.value_objects.parsed_document import ColumnInfo, ParsedTable
@@ -18,7 +19,7 @@ from src.domain.value_objects.parsed_document import ColumnInfo, ParsedTable
 logger = logging.getLogger(__name__)
 
 
-class TableSemanticExtractor:
+class TableSemanticExtractor(TableSemanticEnhancerPort):
     """通用表格语义增强编排器
 
     编排调用三个领域服务对 ParsedTable 进行语义增强：

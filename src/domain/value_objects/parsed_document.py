@@ -58,14 +58,19 @@ class ColumnInfo:
     col_type: ColumnType = ColumnType.UNKNOWN
     confidence: float = 1.0
     nullable_ratio: float = 0.0
-    sample_values: list[str] = field(default_factory=list)
+    sample_values: list[str] = field(default_factory=list)  # __post_init__ 中冻结为 tuple
 
     def __post_init__(self) -> None:
-        """校验 confidence 和 nullable_ratio 值域范围 [0.0, 1.0]"""
+        """校验 confidence 和 nullable_ratio 值域范围 [0.0, 1.0]，
+        并对 sample_values 做防御性拷贝
+        """
         if not (0.0 <= self.confidence <= 1.0):
             raise EntityValidationError(f"confidence 必须在 [0.0, 1.0] 范围内，实际值: {self.confidence}")
         if not (0.0 <= self.nullable_ratio <= 1.0):
             raise EntityValidationError(f"nullable_ratio 必须在 [0.0, 1.0] 范围内，实际值: {self.nullable_ratio}")
+        # 防御性拷贝：防止外部修改传入的列表影响值对象内部状态
+        if self.sample_values:
+            object.__setattr__(self, "sample_values", list(self.sample_values))
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典"""
@@ -234,6 +239,27 @@ class ParsedTable:
     merged_cells: list[MergedCell] | None = None
     semantic_confidence: float | None = None
     table_caption: str | None = None
+
+    def __post_init__(self) -> None:
+        """对内部可变集合做防御性拷贝
+
+        frozen=True 仅阻止属性赋值，不阻止内部容器修改。
+        此方法做 shallow copy 确保外部传入的列表/字典不会被
+        外部代码后续修改影响值对象内部状态。
+        """
+        # rows: 浅拷贝外层列表和每行列表
+        if self.rows:
+            object.__setattr__(self, "rows", [row.copy() if isinstance(row, list) else list(row) for row in self.rows])
+        # metadata: 浅拷贝字典
+        if self.metadata:
+            object.__setattr__(self, "metadata", dict(self.metadata))
+        # column_types/merged_cells/header: 浅拷贝防止外部增删
+        if self.column_types is not None:
+            object.__setattr__(self, "column_types", list(self.column_types))
+        if self.merged_cells is not None:
+            object.__setattr__(self, "merged_cells", list(self.merged_cells))
+        if self.header is not None:
+            object.__setattr__(self, "header", list(self.header))
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典"""

@@ -147,6 +147,16 @@ class TestHeaderDetectionEdgeCases:
         idx, conf = detect_header(rows)
         assert idx is None or conf < 0.3
 
+    def test_header_with_partial_empty_cells(self) -> None:
+        """首行部分空白非全部空白 → 仍检测为表头（blank cell 被 _is_data_type 判为非数据）"""
+        rows = [
+            ["", "金额", "日期"],
+            ["X", "¥1000", "2024-01-01"],
+        ]
+        idx, conf = detect_header(rows)
+        assert idx == 0
+        assert conf >= 0.5
+
     def test_header_with_whitespace(self) -> None:
         """表头含前后空白"""
         rows = [
