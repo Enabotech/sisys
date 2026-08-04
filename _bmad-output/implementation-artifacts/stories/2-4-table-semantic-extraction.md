@@ -859,20 +859,57 @@ tests/
 
 ### 🔍 代码审查发现 Review Findings
 
-> 待 `code-review` 完成后填写。
+> 2026-08-04 `code-review` 5轮审查完成。
 
----
+**第 1 轮：算法+架构 P0 修复**
 
-### 下一步 Next Steps
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | header_detector 单特征→多特征加权（规格要求40%+35%+25%） | P0 | 实现三特征加权策略：类型差异+格式特征+空值模式 |
+| 2 | _is_data_type 中 float(cell.replace(",","")) 误判逗号日期 | P0 | 日期检测在数字检测之前执行 |
+| 3 | 全文本首行错当表头（缺少后续行校验） | P0 | _calc_type_diff_score 增加后续行含数据检查 |
+| 4 | column_classifier 检测优先级与规格不符 | P0 | DATE>CURRENCY>PERCENTAGE>BOOLEAN>NUMBER>STRING |
+| 5 | 日期正则缺失 DD/MM/YYYY, MM/DD/YYYY | P0 | 补充欧美日期格式匹配 |
+| 6 | 货币检测不支持负号在前、.50格式 | P0 | 补充两条货币正则 |
+| 7 | merge_resolver 取值前未校验 col_start 行范围 | P0 | 添加 col_start >= len(rows[row_start]) 检查 |
+| 8 | 重叠合并区域未检测 | P0 | occupied set 追踪已占用坐标 |
+| 9-10 | TableSemanticExtractor/PdfTableDetector 未显式继承端口Protocol | P0 | 显式继承 TableSemanticEnhancerPort/TableDetectorPort |
+| 11 | ParsedTable/ColumnInfo frozen但内部集合可变 | P0 | __post_init__ 防御性拷贝 (shallow copy) |
+| 12 | resolve_optional 缺少 fallback_on | P0 | 统一 (FileNotFoundError,ImportError,RuntimeError,OSError) |
+| 13 | TableExtractorPort 废弃但未标记 | P0 | DeprecationWarning + __init__注释 |
+
+**第 2 轮：异常处理+降级 P1 修复**
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 14 | table_semantic_extractor 裸 except Exception | P1 | 限定为 (ValueError,TypeError,RuntimeError,AttributeError) |
+| 15 | 三个领域服务失败无差异化处理 | P1 | 分别 try/except，保留部分成功结果 |
+| 16 | 部分成功时不在 metadata 中标记 | P1 | metadata["semantic_enhancement_error"]=True |
+| 17 | WARNING 日志缺结构化上下文 | P1 | 添加 table_index/mime_type/row_count |
+| 18 | pdf_table_extractor 裸 except Exception | P1 | 限定为具体异常类型+OSError |
+| 19 | document_parsing_service 降级不一致 | P1 | None检查添加 DEBUG 日志 |
+| 20 | 增强步骤缺少具体异常类型 | P1 | _apply_table_* 的 except 限定异常类型 |
+
+**第 3 轮：P2 改进**
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 21 | _is_data_type NaN/Infinity 误判 | P2 | math.isfinite() 检查 |
+| 22 | 采样策略仅为顺序取前N行 | P2 | 前N/2+安全随机N/2混合采样 (secrets.randbelow) |
+
+**审查结论：** 代码已通过 228 个表格相关测试，ruff+mypy+bandit 全通过。覆盖率：领域服务 ≥89%，基础设施 ≥85%，值对象 95%。
+
+### 🚀 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `dev-story` 完成实施
+- [x] 运行 `code-review` 完成 5 轮代码审查
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-06-04
-**最后更新/Last Updated:** 2026-06-04
+**最后更新/Last Updated:** 2026-08-04
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（遵循 SDD+TDD 融合模式模板 v2.7.0）
+- v1.1.0: 5 轮代码审查完成（22 个问题修复：P0×13 + P1×7 + P2×2）
