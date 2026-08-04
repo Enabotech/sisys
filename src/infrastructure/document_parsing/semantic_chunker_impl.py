@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 # BGE-M3 精准 token 计数
 # ---------------------------------------------------------------------------
 
-# BGE-M3 tokenizer 本地路径（可通过环境变量覆盖）
+# BGE-M3 tokenizer 本地路径
+# 默认值与项目 .env 中 EMBEDDING_MODEL_PATH 指向的 BGE-M3 模型目录一致
+# 可通过 SISYS_BGE_M3_TOKENIZER_PATH 环境变量覆盖
 _BGE_M3_TOKENIZER_PATH = os.environ.get(
     "SISYS_BGE_M3_TOKENIZER_PATH",
     "/mnt/x/.cache/BAAI/bge-m3/models--BAAI--bge-m3/tokenizer.json",
