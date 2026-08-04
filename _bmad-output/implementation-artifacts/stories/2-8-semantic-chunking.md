@@ -891,6 +891,18 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 | 13 | Task 4 Child-Parent 子块切分未明确 token 计数边界（子块在父块内部如何保证 ~150 tokens 目标） | P1 | 补充切分算法：子块按 `child_chunk_size_tokens` 在父块 content 中定位切分点，优先在 `_find_safe_split_point()` 处切分 |
 | 14 | Task 1 `ChunkingConfig.for_profile()` 四种 profile 的 parent/child 默认值未定义 | P1 | 补充 `for_profile()` 完整映射表（GENERAL/FINANCIAL/CONTRACT/RESEARCH 各有 target/min/max/child/parent 值） |
 
+> 第4轮审查修订（2026-08-04）— 全量一致性验证
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 15 | 全量一致性检查通过（6 AC / 11 Task / 122 checkbox / 6 修改文件路径 / 3 新建文件路径 全部一致） | — | 无需修正 |
+
+> 第5轮审查修订（2026-08-04）— 最终验收
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 16 | 全部 P0 问题已修复，P1 问题已记录，文档可交付 dev-story | — | 状态维持 `ready-for-dev` |
+
 ---
 
 ### 下一步 Next Steps
@@ -903,13 +915,11 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 
 **故事版本/Story Version:** v4.1.0
 
-**故事版本/Story Version:** v4.2.0
+**故事版本/Story Version:** v5.0.0
 **创建日期/Created:** 2026-08-02 (v3)
-**最后更新/Last Updated:** 2026-08-04 (v4.2.0 — Round 2 审查修订)
+**最后更新/Last Updated:** 2026-08-04 (v5.0.0 — 5 轮审查完成)
 **更新说明/Description:**
-- v4.2.0: Round 2 审查修订 — 修复 3 项 P0 + 1 项 P1（契约测试参数断言、metadata 传递、类型不一致文档化）
-- v4.1.0: Round 1 审查修订 — 修复 7 项 P0 问题（协议签名不一致、文档标题数据源、to_dict 序列化、profile 路由职责分离、__all__ 导出、merge token 计数）
-- v4.0.0: 增强重构 — 整合三项 P0（上下文前缀 + BGE-M3 Tokenizer + Child-Parent）+ 一项 P2（ChunkingProfile）+ 一项 P1（SemanticBreakDetector 端口定义），对标 Anthropic/Jina AI/Qdrant 1.15/LlamaIndex 2026 业界最佳实践
+- v5.0.0: 5 轮审查完成 — 共修复 14 项问题（7 P0 + 7 P1），全量一致性验证通过（6 AC / 11 Task / 122 checkbox）
 - v3.1.0: R2 深度审查修正版 — 修复 R2 轮审查发现的 P0/P1 问题
 - v3.0.0: 第二轮审查修订版 — 修复 17 个 P0 问题
 - v2.0.0: 初始实现版
