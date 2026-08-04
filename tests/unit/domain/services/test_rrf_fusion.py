@@ -269,6 +269,19 @@ class TestRrfFusionCustomKValue:
         assert math.isclose(result[0]["score"], 1.0, rel_tol=1e-9)
         assert math.isclose(result[1]["score"], 1.0, rel_tol=1e-9)
 
+    def test_k_negative_raises_validation_error(self) -> None:
+        """k<0 抛出 ValidationError"""
+        dense = [_make_result("doc1", 0.9)]
+        with pytest.raises(ValidationError, match="k 必须为非负数"):
+            fuse(dense, k=-1)
+
+    def test_weights_negative_element_raises_validation_error(self) -> None:
+        """weights 含负数时抛出 ValidationError"""
+        dense = [_make_result("doc1", 0.9)]
+        sparse = [_make_result("doc2", 5.0)]
+        with pytest.raises(ValidationError, match="weights 元素必须为非负数"):
+            fuse(dense, sparse, weights=[-0.5, 1.0])
+
 
 class TestRrfFusionIdTypes:
     """不同 ID 类型的支持"""

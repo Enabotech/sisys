@@ -192,3 +192,47 @@ class TestDocumentVersionDiffFrozen:
 
         with pytest.raises(AttributeError):
             diff.diff_summary = "modified"  # type: ignore[misc]
+
+
+class TestDocumentVersionSnapshotValidation:
+    """测试 DocumentVersionSnapshot __post_init__ 校验"""
+
+    def test_version_must_be_ge_1(self) -> None:
+        """version < 1 时抛出 EntityValidationError"""
+        from src.domain.exceptions import EntityValidationError
+
+        with pytest.raises(EntityValidationError, match="version 必须 ≥ 1"):
+            DocumentVersionSnapshot(
+                document_id=uuid4(),
+                version=0,
+                snapshot_id=uuid4(),
+                created_at=datetime.now(UTC),
+                created_by="user",
+            )
+
+    def test_version_negative_raises(self) -> None:
+        """version 负值时抛出 EntityValidationError"""
+        from src.domain.exceptions import EntityValidationError
+
+        with pytest.raises(EntityValidationError, match="version 必须 ≥ 1"):
+            DocumentVersionSnapshot(
+                document_id=uuid4(),
+                version=-1,
+                snapshot_id=uuid4(),
+                created_at=datetime.now(UTC),
+                created_by="user",
+            )
+
+    def test_file_size_bytes_negative_raises(self) -> None:
+        """file_size_bytes < 0 时抛出 EntityValidationError"""
+        from src.domain.exceptions import EntityValidationError
+
+        with pytest.raises(EntityValidationError, match="file_size_bytes 必须 ≥ 0"):
+            DocumentVersionSnapshot(
+                document_id=uuid4(),
+                version=1,
+                snapshot_id=uuid4(),
+                created_at=datetime.now(UTC),
+                created_by="user",
+                file_size_bytes=-1,
+            )

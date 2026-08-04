@@ -129,3 +129,42 @@ class TestDetectScannedPages:
         ]
         result = detect_scanned_pages(pages)
         assert result == [1]
+
+    def test_custom_threshold_parameter(self) -> None:
+        """通过参数传入自定义阈值"""
+        pages = [
+            ParsedPage(
+                page_number=1,
+                texts=[ParsedElement(content="A" * 30)],
+            ),
+        ]
+        # 自定义阈值为 20 → 30 >= 20 不触发
+        result = detect_scanned_pages(pages, threshold=20)
+        assert result == []
+
+    def test_env_var_threshold_override(self, monkeypatch) -> None:
+        """环境变量 SISYS_SCANNED_PAGE_THRESHOLD 覆盖默认阈值"""
+        pages = [
+            ParsedPage(
+                page_number=1,
+                texts=[ParsedElement(content="A" * 30)],
+            ),
+        ]
+        monkeypatch.setenv("SISYS_SCANNED_PAGE_THRESHOLD", "20")
+        # 30 >= 20 → 不触发 OCR
+        result = detect_scanned_pages(pages)
+        assert result == []
+
+    def test_env_var_threshold_invalid_type_raises(self, monkeypatch) -> None:
+        """环境变量值非整数时抛出 OCRProcessingError"""
+        from src.domain.exceptions.ocr_exceptions import OCRProcessingError
+
+        pages = [
+            ParsedPage(page_number=1, texts=[ParsedElement(content="test")]),
+        ]
+        monkeypatch.setenv("SISYS_SCANNED_PAGE_THRESHOLD", "not_a_number")
+        try:
+            detect_scanned_pages(pages)
+            assert False, "应该抛出 OCRProcessingError"
+        except OCRProcessingError as e:
+            assert "SISYS_SCANNED_PAGE_THRESHOLD" in str(e)
