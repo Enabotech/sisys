@@ -1275,9 +1275,11 @@ def bootstrap() -> None:
             ),
             table_detector=resolver.resolve_optional(
                 "table_detector",
+                fallback_on=(FileNotFoundError, ImportError, RuntimeError, OSError),
             ),
             table_enhancer=resolver.resolve_optional(
                 "table_enhancer",
+                fallback_on=(FileNotFoundError, ImportError, RuntimeError, OSError),
             ),
             ocr=resolver.resolve_optional(
                 "ocr",

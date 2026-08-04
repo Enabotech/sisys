@@ -33,6 +33,8 @@ def resolve_merged_cells(
     max_col = max(len(row) for row in rows) - 1 if rows else 0
 
     result: list[MergedCell] = []
+    occupied: set[tuple[int, int]] = set()  # 已占用的单元格坐标集（用于重叠检测）
+
     for row_start, row_end, col_start, col_end in merge_ranges:
         # 边界检查：确保合并范围在有效区域内，超界时裁剪到边界
         if row_start < 0:
@@ -49,8 +51,23 @@ def resolve_merged_cells(
         if row_start > max_row or col_start > max_col:
             continue
 
+        # 取值前校验 col_start 在 row 的列范围内，防止 IndexError
+        # （某些行可能比其他行更短，导致 cols[col_start] 越界）
+        if col_start >= len(rows[row_start]):
+            continue
+
         # 取左上角单元格的值
         value = rows[row_start][col_start]
+
+        # 重叠检测：如果该区域的左上角已被其他合并范围覆盖，跳过
+        if (row_start, col_start) in occupied:
+            continue
+
+        # 标记该区域覆盖的所有单元格为已占用
+        for r in range(row_start, row_end + 1):
+            for c in range(col_start, col_end + 1):
+                if r <= max_row and c <= max_col:
+                    occupied.add((r, c))
 
         result.append(
             MergedCell(

@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.domain.ports.table_detector import TableDetectorPort
 from src.domain.value_objects.parsed_document import ParsedTable
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ def _ensure_pdfplumber() -> Any:
     return _pdfplumber
 
 
-class PdfTableDetector:
+class PdfTableDetector(TableDetectorPort):
     """PDF 专用表格检测器
 
     使用 pdfplumber 逐页检测 PDF 页面中的表格区域，
