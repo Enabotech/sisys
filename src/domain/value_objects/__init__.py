@@ -55,6 +55,8 @@ from src.domain.value_objects.parsed_document import (
 from src.domain.value_objects.semantic_chunk import (
     ChunkBoundaryType,
     ChunkingConfig,
+    ChunkingProfile,
+    IndexLevel,
     SemanticChunk,
 )
 from src.domain.value_objects.storage_encryption_result import (
@@ -121,6 +123,8 @@ __all__ = [
     "ResourceLimitsStatus",
     "RestoreResult",
     "SemanticChunk",
+    "ChunkingProfile",
+    "IndexLevel",
     "SUPPORTED_FORMATS",
     "TokenPayload",
     "UDMRTask",

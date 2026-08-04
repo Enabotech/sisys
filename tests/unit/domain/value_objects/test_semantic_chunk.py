@@ -13,7 +13,13 @@ from typing import Any
 
 import pytest
 
-from src.domain.value_objects.semantic_chunk import ChunkBoundaryType, ChunkingConfig, SemanticChunk
+from src.domain.value_objects.semantic_chunk import (
+    ChunkBoundaryType,
+    ChunkingConfig,
+    ChunkingProfile,
+    IndexLevel,
+    SemanticChunk,
+)
 
 
 class TestChunkBoundaryType:
@@ -77,14 +83,16 @@ class TestChunkingConfig:
         assert ChunkingConfig.__dataclass_params__.frozen  # type: ignore[attr-defined]
 
     def test_to_dict(self) -> None:
-        """验证 to_dict 序列化"""
+        """验证 to_dict 序列化（v4 扩展）"""
         config = ChunkingConfig()
         d = config.to_dict()
-        assert d == {
-            "target_chunk_size_tokens": 300,
-            "min_chunk_size_tokens": 50,
-            "max_chunk_size_tokens": 8192,
-        }
+        assert d["profile"] == "general"
+        assert d["target_chunk_size_tokens"] == 300
+        assert d["min_chunk_size_tokens"] == 50
+        assert d["max_chunk_size_tokens"] == 8192
+        assert d["child_chunk_size_tokens"] is None
+        assert d["parent_chunk_size_tokens"] is None
+        assert d["token_count_type"] == "bge-m3"
 
 
 class TestSemanticChunk:
@@ -248,8 +256,11 @@ def _make_chunk(
     page_end: int = 1,
     metadata: dict[str, Any] | None = None,
     token_count: int | None = None,
+    parent_chunk_id: uuid.UUID | None = None,
+    index_level: IndexLevel | None = None,
+    chunk_header: str = "",
 ) -> SemanticChunk:
-    """测试辅助：创建 SemanticChunk 实例"""
+    """测试辅助：创建 SemanticChunk 实例（v4 兼容）"""
     doc_id = uuid.uuid4()
     content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
     if token_count is None:
@@ -265,4 +276,218 @@ def _make_chunk(
         page_end=page_end,
         content_hash=content_hash,
         metadata=metadata or {},
+        parent_chunk_id=parent_chunk_id,
+        index_level=index_level or IndexLevel.PARENT,
+        chunk_header=chunk_header,
     )
+
+
+# =============================================================================
+# v4 增强重构新增测试类
+# =============================================================================
+
+
+class TestChunkingProfile:
+    """测试 ChunkingProfile 枚举"""
+
+    def test_enum_values(self) -> None:
+        """验证四种 profile 值定义"""
+        assert ChunkingProfile.GENERAL.value == "general"
+        assert ChunkingProfile.FINANCIAL.value == "financial"
+        assert ChunkingProfile.CONTRACT.value == "contract"
+        assert ChunkingProfile.RESEARCH.value == "research"
+
+    def test_enum_members_count(self) -> None:
+        """验证枚举成员数量"""
+        assert len(ChunkingProfile) == 4
+
+    def test_is_str_enum(self) -> None:
+        """验证是 str 枚举"""
+        assert issubclass(ChunkingProfile, str)
+
+    def test_enum_from_string(self) -> None:
+        """验证从字符串构造"""
+        assert ChunkingProfile("general") is ChunkingProfile.GENERAL
+        assert ChunkingProfile("financial") is ChunkingProfile.FINANCIAL
+
+
+class TestIndexLevel:
+    """测试 IndexLevel 枚举"""
+
+    def test_enum_values(self) -> None:
+        """验证两种索引层级"""
+        assert IndexLevel.CHILD.value == "child"
+        assert IndexLevel.PARENT.value == "parent"
+
+    def test_enum_members_count(self) -> None:
+        """验证枚举成员数量"""
+        assert len(IndexLevel) == 2
+
+    def test_is_str_enum(self) -> None:
+        """验证是 str 枚举"""
+        assert issubclass(IndexLevel, str)
+
+
+class TestChunkingConfigV4:
+    """测试 ChunkingConfig v4 扩展字段"""
+
+    def test_default_v4_fields(self) -> None:
+        """验证 v4 新增字段的默认值"""
+        config = ChunkingConfig()
+        assert config.profile == ChunkingProfile.GENERAL
+        assert config.child_chunk_size_tokens is None
+        assert config.parent_chunk_size_tokens is None
+        assert config.token_count_type == "bge-m3"
+
+    def test_v3_backward_compatible(self) -> None:
+        """验证无参构造行为与 v3 完全一致"""
+        config = ChunkingConfig()
+        assert config.target_chunk_size_tokens == 300
+        assert config.min_chunk_size_tokens == 50
+        assert config.max_chunk_size_tokens == 8192
+
+    def test_to_dict_v4(self) -> None:
+        """验证 to_dict 包含 v4 新字段"""
+        config = ChunkingConfig()
+        d = config.to_dict()
+        assert d["profile"] == "general"
+        assert d["child_chunk_size_tokens"] is None
+        assert d["parent_chunk_size_tokens"] is None
+        assert d["token_count_type"] == "bge-m3"
+        # v3 字段仍然存在
+        assert d["target_chunk_size_tokens"] == 300
+        assert d["min_chunk_size_tokens"] == 50
+        assert d["max_chunk_size_tokens"] == 8192
+
+    def test_to_dict_custom_v4(self) -> None:
+        """验证自定义 v4 字段的序列化"""
+        config = ChunkingConfig(
+            profile=ChunkingProfile.FINANCIAL,
+            child_chunk_size_tokens=200,
+            parent_chunk_size_tokens=800,
+        )
+        d = config.to_dict()
+        assert d["profile"] == "financial"
+        assert d["child_chunk_size_tokens"] == 200
+        assert d["parent_chunk_size_tokens"] == 800
+
+    def test_for_profile_general(self) -> None:
+        """验证 GENERAL profile 工厂方法"""
+        config = ChunkingConfig.for_profile(ChunkingProfile.GENERAL)
+        assert config.target_chunk_size_tokens == 300
+        assert config.min_chunk_size_tokens == 50
+        assert config.max_chunk_size_tokens == 8192
+        assert config.child_chunk_size_tokens is None
+        assert config.parent_chunk_size_tokens is None
+
+    def test_for_profile_financial(self) -> None:
+        """验证 FINANCIAL profile 工厂方法"""
+        config = ChunkingConfig.for_profile(ChunkingProfile.FINANCIAL)
+        assert config.target_chunk_size_tokens == 400
+        assert config.min_chunk_size_tokens == 100
+        assert config.child_chunk_size_tokens == 200
+        assert config.parent_chunk_size_tokens == 800
+
+    def test_for_profile_contract(self) -> None:
+        """验证 CONTRACT profile 工厂方法"""
+        config = ChunkingConfig.for_profile(ChunkingProfile.CONTRACT)
+        assert config.target_chunk_size_tokens == 250
+        assert config.min_chunk_size_tokens == 80
+        assert config.child_chunk_size_tokens == 125
+        assert config.parent_chunk_size_tokens == 500
+
+    def test_for_profile_research(self) -> None:
+        """验证 RESEARCH profile 工厂方法"""
+        config = ChunkingConfig.for_profile(ChunkingProfile.RESEARCH)
+        assert config.target_chunk_size_tokens == 350
+        assert config.min_chunk_size_tokens == 60
+        assert config.child_chunk_size_tokens == 175
+        assert config.parent_chunk_size_tokens == 700
+
+    def test_for_profile_returns_frozen_dataclass(self) -> None:
+        """验证 for_profile 返回的是 frozen dataclass"""
+        config = ChunkingConfig.for_profile(ChunkingProfile.GENERAL)
+        assert dataclasses.is_dataclass(config)
+        with pytest.raises(AttributeError):
+            setattr(config, "target_chunk_size_tokens", 999)  # type: ignore[attr-defined]
+
+    def test_heuristic_fallback_token_type(self) -> None:
+        """验证 token_count_type 可设为 heuristic"""
+        config = ChunkingConfig(token_count_type="heuristic")
+        assert config.token_count_type == "heuristic"
+
+
+class TestSemanticChunkV4:
+    """测试 SemanticChunk v4 扩展字段"""
+
+    def test_default_v4_fields(self) -> None:
+        """验证 v4 新增字段的默认值"""
+        chunk = _make_chunk()
+        assert chunk.parent_chunk_id is None
+        assert chunk.index_level == IndexLevel.PARENT
+        assert chunk.chunk_header == ""
+
+    def test_child_chunk_with_parent(self) -> None:
+        """验证子块关联父块"""
+        parent_id = uuid.uuid4()
+        chunk = _make_chunk(
+            parent_chunk_id=parent_id,
+            index_level=IndexLevel.CHILD,
+            chunk_header="[文档: 《年报》→ 第四章]",
+        )
+        assert chunk.parent_chunk_id == parent_id
+        assert chunk.index_level == IndexLevel.CHILD
+        assert chunk.chunk_header == "[文档: 《年报》→ 第四章]"
+
+    def test_parent_chunk_no_parent(self) -> None:
+        """验证父块的 parent_chunk_id 为 None"""
+        chunk = _make_chunk(index_level=IndexLevel.PARENT)
+        assert chunk.parent_chunk_id is None
+        assert chunk.index_level == IndexLevel.PARENT
+
+    def test_to_dict_v4(self) -> None:
+        """验证 to_dict 包含 v4 新字段"""
+        parent_id = uuid.uuid4()
+        chunk = _make_chunk(
+            parent_chunk_id=parent_id,
+            index_level=IndexLevel.CHILD,
+            chunk_header="[文档: 《年报》]",
+        )
+        d = chunk.to_dict()
+        assert d["parent_chunk_id"] == str(parent_id)
+        assert d["index_level"] == "child"
+        assert d["chunk_header"] == "[文档: 《年报》]"
+        # v3 字段仍然存在
+        assert "chunk_id" in d
+        assert "content" in d
+        assert "token_count" in d
+
+    def test_to_dict_parent_chunk_null(self) -> None:
+        """验证父块的 parent_chunk_id 序列化为 null"""
+        chunk = _make_chunk(parent_chunk_id=None)
+        d = chunk.to_dict()
+        assert d["parent_chunk_id"] is None
+
+    def test_to_dict_json_serializable_v4(self) -> None:
+        """验证 v4 字段可 JSON 序列化"""
+        parent_id = uuid.uuid4()
+        chunk = _make_chunk(
+            parent_chunk_id=parent_id,
+            index_level=IndexLevel.CHILD,
+            chunk_header="[文档: 《年报》→ 第四章]",
+        )
+        d = chunk.to_dict()
+        json_str = json.dumps(d)
+        assert isinstance(json_str, str)
+        # 验证可反序列化
+        parsed = json.loads(json_str)
+        assert parsed["parent_chunk_id"] == str(parent_id)
+        assert parsed["index_level"] == "child"
+
+    def test_v3_backward_compatible_creation(self) -> None:
+        """验证不使用新字段时与 v3 一致"""
+        chunk = _make_chunk()
+        d = chunk.to_dict()
+        assert d["parent_chunk_id"] is None
+        assert d["index_level"] == "parent"
+        assert d["chunk_header"] == ""

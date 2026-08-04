@@ -1326,7 +1326,7 @@ def bootstrap() -> None:
 
     register_port(
         name="semantic_chunker",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=SemanticChunkerPort,
         impl="src.infrastructure.document_parsing.semantic_chunker_impl.SemanticChunkerImpl",
         module="src.infrastructure.document_parsing.semantic_chunker_impl",
