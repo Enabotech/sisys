@@ -218,8 +218,24 @@ class ChunkingConfig:
 
     @staticmethod
     def for_profile(profile: ChunkingProfile) -> ChunkingConfig:
-        """根据 profile 创建推荐配置"""
+        """根据 profile 创建推荐配置（领域层工厂方法）。
+
+        注意：此方法接收 ChunkingProfile 枚举值，
+        business_domain → ChunkingProfile 的映射在应用层完成。
+        """
         ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """序列化为 JSON 可存储字典"""
+        return {
+            "profile": self.profile.value,
+            "target_chunk_size_tokens": self.target_chunk_size_tokens,
+            "min_chunk_size_tokens": self.min_chunk_size_tokens,
+            "max_chunk_size_tokens": self.max_chunk_size_tokens,
+            "child_chunk_size_tokens": self.child_chunk_size_tokens,
+            "parent_chunk_size_tokens": self.parent_chunk_size_tokens,
+            "token_count_type": self.token_count_type,
+        }
 ```
 
 **IndexLevel 枚举（新增）：**
@@ -271,9 +287,16 @@ class SemanticChunk:
 - [ ] 不注册到 `registry.py`（无实现时不注册）
 - [ ] 不注册到 `composition_root.py`
 
-**端口签名不变（SemanticChunkerPort）：**
-- `chunk(parsed_doc, config) -> list[SemanticChunk]` 签名不变
+**端口签名（SemanticChunkerPort）— v4 扩展：**
+- `chunk(parsed_doc, config=None, metadata=None) -> list[SemanticChunk]` — 新增 `metadata` 参数传递文档级上下文
 - 版本从 v1.0.0 升级至 v1.1.0（行为增强：上下文前缀 + bge-m3 tokenizer + Child-Parent）
+- 契约测试 `test_port_contract_semantic_chunker.py:62` 参数断言从 `["self", "parsed_doc", "config"]` 更新为 `["self", "parsed_doc", "config", "metadata"]`
+
+**`metadata` 参数设计（关键架构决策）：**
+- 用途：传递 `ParsedDocument` 中不存在的文档级元数据
+- `SemanticChunkingService.chunk_document()` 从 `Document` 实体提取 `{"doc_title": doc.filename, "business_domain": doc.metadata.get("business_domain", "")}`
+- 分块器内部通过 `_build_chunk_header()` 读取 `doc_metadata["doc_title"]` 构建上下文前缀
+- 向后兼容：`metadata=None` 时上下文前缀退化为仅章节路径（无文档标题）
 
 #### 六边形架构约束
 - 领域层零外部依赖
@@ -535,16 +558,27 @@ class SemanticChunk:
 | 🔄 重构 | 优化映射逻辑 |
 
 - [ ] Subtask 5.1: 🔴 红 — 编写 profile 路由测试
-- [ ] Subtask 5.2: 🟢 绿 — 实现 `_BUSINESS_DOMAIN_PROFILE_MAP`
+- [ ] Subtask 5.2: 🟢 绿 — 实现 `_resolve_profile_from_domain()` + `chunk_document()` 集成
   ```python
-  _BUSINESS_DOMAIN_PROFILE_MAP = {
+  # 应用层 — business_domain → ChunkingProfile 映射
+  _BUSINESS_DOMAIN_PROFILE_MAP: dict[str, ChunkingProfile] = {
       "finance": ChunkingProfile.FINANCIAL,
       "legal": ChunkingProfile.CONTRACT,
       "research": ChunkingProfile.RESEARCH,
   }
+
+  def _resolve_profile_from_domain(business_domain: str) -> ChunkingProfile:
+      """将业务域字符串映射到分块策略配置档案。
+
+      应用层职责：business_domain（Document 实体中的字符串）→ ChunkingProfile 枚举。
+      领域层 ChunkingConfig.for_profile() 接收 ChunkingProfile 枚举值（非字符串）。
+      """
+      return _BUSINESS_DOMAIN_PROFILE_MAP.get(
+          business_domain, ChunkingProfile.GENERAL
+      )
   ```
-  - 在 `chunk_document()` 中：无显式 config 时根据 `doc.metadata["business_domain"]` 自动选择 profile
-  - 显式传入 config 时覆盖自动选择
+  - 在 `chunk_document()` 中：无显式 config 时从 `doc.metadata["business_domain"]` 自动选择 profile
+  - 显式传入 `config` 参数时覆盖自动选择（优先级：显式 config > profile 自动选择 > 默认 GENERAL）
 - [ ] Subtask 5.3: 🔄 重构
 
 **完成标准/Definition of Done:**
@@ -583,6 +617,8 @@ class SemanticChunk:
       ) -> list[int]:
           """检测语义断裂点。Returns: 断裂点索引列表"""
           ...
+
+  __all__ = ["SemanticBreakDetector"]
   ```
 - [ ] Subtask 6.3: 🔄 重构
 
@@ -799,6 +835,22 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 
 ---
 
+### 🔧 文档审查修复 Docs Review Fixes
+
+> 第1轮审查修订（2026-08-04）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | `SemanticChunkerPort` 协议与实现签名不一致（协议 2 参数，实现 3 参数含 `metadata`） | P0 | 协议签名扩展为 `chunk(parsed_doc, config=None, metadata=None)`，契约测试参数断言同步更新 |
+| 2 | `ParsedDocument` 无 `title` 字段，上下文前缀数据源不明确 | P0 | 通过 `metadata` 参数传递 `doc_title`（从 `Document.filename` 提取），`_build_chunk_header()` 从 `doc_metadata["doc_title"]` 读取 |
+| 3 | `ChunkingConfig.to_dict()` 缺少 `token_count_type`/`profile`/child/parent 新字段序列化 | P0 | 补充 `to_dict()` 完整序列化（profile.value + 新字段） |
+| 4 | `_BUSINESS_DOMAIN_PROFILE_MAP` 职责边界模糊（领域层 vs 应用层） | P0 | 明确分离：领域层 `ChunkingConfig.for_profile(profile: ChunkingProfile)` + 应用层 `_resolve_profile_from_domain(business_domain: str) -> ChunkingProfile` |
+| 5 | `ChunkingConfig.to_dict()` 缺少 `token_count_type` 字段序列化 | P0 | 补充 `to_dict()` 序列化 `profile`, `child_chunk_size_tokens`, `parent_chunk_size_tokens`, `token_count_type` |
+| 6 | `SemanticBreakDetector` 端口定义缺少 `__all__` 导出 | P0 | 补充 `__all__ = ["SemanticBreakDetector"]` |
+| 7 | `_merge_chunks()` token_count 简单相加需要记录设计决策 | P0 | 在 Child-Parent 分块逻辑和 `_merge_chunks()` 重构中使用 bge-m3 tokenizer 重新计数 |
+
+---
+
 ### 下一步 Next Steps
 
 - [ ] 运行 `dev-story` 开始 v4 增强重构
@@ -807,10 +859,13 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 
 ---
 
-**故事版本/Story Version:** v4.0.0
+**故事版本/Story Version:** v4.1.0
+
+**故事版本/Story Version:** v4.1.0
 **创建日期/Created:** 2026-08-02 (v3)
-**最后更新/Last Updated:** 2026-08-04 (v4 增强重构)
+**最后更新/Last Updated:** 2026-08-04 (v4.1.0 — Round 1 审查修订)
 **更新说明/Description:**
+- v4.1.0: Round 1 审查修订 — 修复 7 项 P0 问题（协议签名不一致、文档标题数据源、to_dict 序列化、profile 路由职责分离、__all__ 导出、merge token 计数）
 - v4.0.0: 增强重构 — 整合三项 P0（上下文前缀 + BGE-M3 Tokenizer + Child-Parent）+ 一项 P2（ChunkingProfile）+ 一项 P1（SemanticBreakDetector 端口定义），对标 Anthropic/Jina AI/Qdrant 1.15/LlamaIndex 2026 业界最佳实践
 - v3.1.0: R2 深度审查修正版 — 修复 R2 轮审查发现的 P0/P1 问题
 - v3.0.0: 第二轮审查修订版 — 修复 17 个 P0 问题
