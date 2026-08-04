@@ -222,6 +222,12 @@ class ChunkingConfig:
 
         注意：此方法接收 ChunkingProfile 枚举值，
         business_domain → ChunkingProfile 的映射在应用层完成。
+
+        Profile 默认值映射：
+        - GENERAL:   target=300, min=50,  max=8192, child=None, parent=None  (单层模式)
+        - FINANCIAL: target=400, min=100, max=8192, child=200, parent=800    (双层模式)
+        - CONTRACT:  target=250, min=80,  max=8192, child=125, parent=500    (双层模式)
+        - RESEARCH:  target=350, min=60,  max=8192, child=175, parent=700    (双层模式)
         """
         ...
 
@@ -454,7 +460,9 @@ class SemanticChunk:
 
 **关联 AC:** AC-2
 
-> **说明：** `tokenizers 0.22.2` 已在 `poetry.lock` main 组（via litellm 传递依赖）。
+> **说明：** `tokenizers 0.22.2` 已在 `poetry.lock` main 组（依赖链：`sentence-transformers` → `transformers` → `tokenizers`）。
+> 可通过 `tokenizers.Tokenizer.from_pretrained("BAAI/bge-m3")` 直接加载 BGE-M3 的 XLM-RoBERTa tokenizer（无需完整模型下载，仅 tokenizer.json ~2MB）。
+> 或使用 `FlagEmbedding`（已有直接依赖 `^1.2.8`）内置的 `BGEM3FlagModel.tokenizer`。
 > 将字符启发式 `estimate_tokens()` 替换为 bge-m3 tokenizer 精确计数。
 
 #### TDD 循环 A：BGE-M3 Token 计数器
@@ -874,6 +882,14 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 | 9 | `SemanticChunkingService.chunk_document()` 调用时不传 `metadata`（v3 中所有 chunk.metadata 始终为空） | P0 | `chunk_document()` 中构建 `metadata={"doc_title": doc.filename, "business_domain": ...}` 传给 `chunk()` |
 | 10 | `ParsedDocument.document_id` 为 `str` 但 `SemanticChunk.document_id` 为 `UUID`（类型不一致未记录） | P1 | Dev Notes 向后兼容性矩阵上方补充类型不一致说明 |
 | 11 | `page_range` vs `page_start`/`page_end` 术语不一致 | P2 | 已在 AC 描述中统一使用 `page_start`/`page_end`（v3 即如此），AC-3 的 `page_range` 作为概念性描述保持不变 |
+
+> 第3轮审查修订（2026-08-04）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 12 | bge-m3 tokenizer 依赖来源未明确（`tokenizers 0.22.2` 通过 `sentence-transformers` 间接引入，非独立依赖） | P1 | Task 2 补充技术说明：tokenizer 通过 `tokenizers.Tokenizer.from_pretrained("BAAI/bge-m3")` 加载，或使用 FlagEmbedding 内置 tokenizer |
+| 13 | Task 4 Child-Parent 子块切分未明确 token 计数边界（子块在父块内部如何保证 ~150 tokens 目标） | P1 | 补充切分算法：子块按 `child_chunk_size_tokens` 在父块 content 中定位切分点，优先在 `_find_safe_split_point()` 处切分 |
+| 14 | Task 1 `ChunkingConfig.for_profile()` 四种 profile 的 parent/child 默认值未定义 | P1 | 补充 `for_profile()` 完整映射表（GENERAL/FINANCIAL/CONTRACT/RESEARCH 各有 target/min/max/child/parent 值） |
 
 ---
 
