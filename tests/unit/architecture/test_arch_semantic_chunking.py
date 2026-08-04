@@ -130,7 +130,7 @@ class TestArchSemanticChunking:
         spec = _global_registry.get("semantic_chunker")
         assert spec is not None
         assert spec.name == "semantic_chunker"
-        assert spec.version == "v1.0.0"
+        assert spec.version == "v1.1.0"
 
     def test_semantic_chunking_handler_registered(self) -> None:
         """semantic_chunking_handler 端口已注册"""

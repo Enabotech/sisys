@@ -30,11 +30,11 @@ class TestSemanticChunkerPortContract:
         assert spec is not None
         assert spec.interface is SemanticChunkerPort
 
-    def test_version_is_v1_0_0(self) -> None:
-        """端口版本应为 v1.0.0"""
+    def test_version_is_v1_1_0(self) -> None:
+        """端口版本应为 v1.1.0（v4 增强重构）"""
         spec = _global_registry.get("semantic_chunker")
         assert spec is not None
-        assert spec.version == "v1.0.0"
+        assert spec.version == "v1.1.0"
 
     def test_lifetime_is_singleton(self) -> None:
         """生命周期应为 SINGLETON"""
@@ -60,5 +60,5 @@ class TestSemanticChunkerPortContract:
         # 验证参数签名
         sig = inspect.signature(method)
         param_names = list(sig.parameters.keys())
-        expected_params = ["self", "parsed_doc", "config"]
+        expected_params = ["self", "parsed_doc", "config", "metadata"]
         assert param_names == expected_params, f"chunk 参数应为 {expected_params}，实际: {param_names}"

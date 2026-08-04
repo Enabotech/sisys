@@ -1,22 +1,104 @@
 """语义分块基础设施实现
 
 实现 SemanticChunkerPort 端口协议，基于规则驱动的语义边界检测和令牌预算聚合。
-零 ML 模型依赖，纯确定性逻辑，P95<500ms。
+v4 增强：BGE-M3 精准 token 计数 + 上下文前缀 + Child-Parent 双层索引。
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import re
 import uuid
 from typing import Any
 
 from src.domain.exceptions.storage_exceptions import ChunkingError
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedTable
-from src.domain.value_objects.semantic_chunk import ChunkBoundaryType, ChunkingConfig, SemanticChunk
+from src.domain.value_objects.semantic_chunk import (
+    ChunkBoundaryType,
+    ChunkingConfig,
+    IndexLevel,
+    SemanticChunk,
+)
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# BGE-M3 精准 token 计数
+# ---------------------------------------------------------------------------
+
+# BGE-M3 tokenizer 本地路径（可通过环境变量覆盖）
+_BGE_M3_TOKENIZER_PATH = os.environ.get(
+    "SISYS_BGE_M3_TOKENIZER_PATH",
+    "/mnt/x/.cache/BAAI/bge-m3/models--BAAI--bge-m3/tokenizer.json",
+)
+
+# 模块级惰性加载的 tokenizer 实例
+_bge_m3_tokenizer: Any = None
+_bge_m3_load_attempted: bool = False
+
+
+def _get_bge_m3_tokenizer() -> Any:
+    """惰性加载 BGE-M3 tokenizer（模块级单例）
+
+    首次调用时从本地文件加载 tokenizer.json，后续调用复用实例。
+    加载失败时返回 None，调用方应降级为 estimate_tokens()。
+
+    Returns:
+        tokenizers.Tokenizer 实例，或 None（加载失败时）
+    """
+    global _bge_m3_tokenizer, _bge_m3_load_attempted
+
+    if _bge_m3_load_attempted:
+        return _bge_m3_tokenizer
+
+    _bge_m3_load_attempted = True
+    try:
+        from tokenizers import Tokenizer  # noqa: F811
+
+        _bge_m3_tokenizer = Tokenizer.from_file(_BGE_M3_TOKENIZER_PATH)
+        logger.info("BGE-M3 tokenizer 已加载: %s", _BGE_M3_TOKENIZER_PATH)
+    except FileNotFoundError:
+        logger.warning(
+            "BGE-M3 tokenizer 文件不可用: %s，降级为字符启发式 token 估算",
+            _BGE_M3_TOKENIZER_PATH,
+        )
+        _bge_m3_tokenizer = None
+    except ImportError:
+        logger.warning("tokenizers 库不可用，降级为字符启发式 token 估算。安装: pip install tokenizers")
+        _bge_m3_tokenizer = None
+    except Exception as e:
+        logger.warning("BGE-M3 tokenizer 加载失败: %s，降级为字符启发式 token 估算", e)
+        _bge_m3_tokenizer = None
+
+    return _bge_m3_tokenizer
+
+
+def _count_tokens_bge_m3(text: str) -> int:
+    """使用 BGE-M3 XLM-RoBERTa tokenizer 精确计算 token 数量
+
+    当 tokenizer 不可用时，自动降级为 estimate_tokens() 并记录 WARNING。
+
+    Args:
+        text: 待计数的文本
+
+    Returns:
+        精确的 token 数量（至少 1；空字符串返回 0）
+    """
+    if not text:
+        return 0
+
+    tokenizer = _get_bge_m3_tokenizer()
+    if tokenizer is None:
+        return estimate_tokens(text)
+
+    try:
+        encoding = tokenizer.encode(text)
+        return max(1, len(encoding.ids))
+    except Exception:
+        logger.warning("BGE-M3 tokenizer 编码失败，降级为字符启发式")
+        return estimate_tokens(text)
 
 
 def estimate_tokens(text: str) -> int:
@@ -84,7 +166,8 @@ class SemanticChunkerImpl:
 
     def __init__(self) -> None:
         """初始化语义分块器"""
-        pass
+        # 预热 tokenizer（首调用时加载，后续复用模块级单例）
+        _get_bge_m3_tokenizer()
 
     async def chunk(
         self,
@@ -94,10 +177,15 @@ class SemanticChunkerImpl:
     ) -> list[SemanticChunk]:
         """对解析完成的结构化文档执行语义分块
 
+        v4 增强：
+        - BGE-M3 精准 token 计数（替代字符启发式）
+        - 上下文前缀拼接（从 doc_metadata["doc_title"] + 标题链构建）
+        - Child-Parent 双层索引（cfg.child_chunk_size_tokens 非 None 时触发）
+
         Args:
             parsed_doc: 解析完成的结构化文档
             config: 分块配置（为 None 时使用默认值）
-            metadata: 文档级元数据（透传到每个分块）
+            metadata: 文档级元数据（透传到每个分块；含 doc_title, business_domain 等）
 
         Returns:
             SemanticChunk 列表（空文档返回空列表，不抛异常）
@@ -116,8 +204,12 @@ class SemanticChunkerImpl:
             if not segments:
                 return []
 
-            # 聚合片段为分块
+            # 聚合片段为分块（使用精确 token 计数）
             chunks = self._aggregate_segments(segments, cfg, document_id, doc_metadata)
+
+            # v4: Child-Parent 双层切分
+            if cfg.child_chunk_size_tokens is not None and cfg.parent_chunk_size_tokens is not None:
+                chunks = self._split_child_parent(chunks, cfg)
 
             return chunks
         except (ValueError, TypeError, KeyError) as e:
@@ -266,7 +358,7 @@ class SemanticChunkerImpl:
         chunk_index = 0
 
         for boundary, text, page in segments:
-            text_tokens = estimate_tokens(text)
+            text_tokens = _count_tokens_bge_m3(text)
 
             # PAGE_BREAK 边界：创建新分块后跳过追加
             if boundary == ChunkBoundaryType.PAGE_BREAK:
@@ -293,7 +385,7 @@ class SemanticChunkerImpl:
                 # 按字符比例切分此大段
                 sub_texts = self._split_by_token_limit(text, cfg.max_chunk_size_tokens)
                 for i, sub_text in enumerate(sub_texts):
-                    sub_tokens = estimate_tokens(sub_text)
+                    sub_tokens = _count_tokens_bge_m3(sub_text)
                     current_parts.append((ChunkBoundaryType.TOKEN_LIMIT, sub_text, page))
                     current_tokens += sub_tokens
                     if i < len(sub_texts) - 1:
@@ -326,7 +418,12 @@ class SemanticChunkerImpl:
         page: int,
         doc_metadata: dict[str, Any],
     ) -> SemanticChunk:
-        """从片段列表创建 SemanticChunk 值对象
+        """从片段列表创建 SemanticChunk 值对象（v4 增强）
+
+        v4 增强：
+        - 使用 BGE-M3 精准 token 计数
+        - 构建上下文前缀 chunk_header
+        - content 包含前缀，token_count 不包含前缀
 
         Args:
             parts: 片段列表
@@ -338,9 +435,9 @@ class SemanticChunkerImpl:
         Returns:
             SemanticChunk 实例
         """
-        # 聚合文本内容
+        # 聚合文本内容（不含前缀）
         texts = [t for _, t, _ in parts if t]
-        content = "\n\n".join(texts)
+        raw_content = "\n\n".join(texts)
 
         # 页码范围
         pages = [p for _, _, p in parts]
@@ -350,11 +447,20 @@ class SemanticChunkerImpl:
         # 边界类型：取第一个片段的类型
         boundary_type = parts[0][0] if parts else ChunkBoundaryType.PARAGRAPH
 
-        # 内容哈希
+        # v4: 构建上下文前缀
+        chunk_header = self._build_chunk_header(parts, doc_metadata)
+
+        # v4: 带前缀的完整 content
+        if chunk_header:
+            content = chunk_header + "\n" + raw_content
+        else:
+            content = raw_content
+
+        # 内容哈希（基于带前缀的完整 content）
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
-        # Token 估算
-        token_count = estimate_tokens(content)
+        # v4: BGE-M3 精准 token 计数（仅针对原始内容，不含前缀）
+        token_count = _count_tokens_bge_m3(raw_content)
 
         # 安全转换 document_id
         try:
@@ -446,7 +552,7 @@ class SemanticChunkerImpl:
         Returns:
             切分后的文本列表
         """
-        total_tokens = estimate_tokens(text)
+        total_tokens = _count_tokens_bge_m3(text)
         if total_tokens <= max_tokens:
             return [text]
 
@@ -510,8 +616,122 @@ class SemanticChunkerImpl:
 
         return merged
 
+    # ------------------------------------------------------------------
+    # v4 新增方法
+    # ------------------------------------------------------------------
+
+    def _build_chunk_header(
+        self,
+        parts: list[tuple[ChunkBoundaryType, str, int]],
+        doc_metadata: dict[str, Any],
+    ) -> str:
+        """构建上下文前缀（v4 新增）
+
+        对标 Anthropic Contextual Retrieval (2026)，利用解析阶段已有的
+        文档标题和标题层级数据，拼结构前缀。
+
+        格式：
+        - 有文档标题 + 章节路径: [文档: 《title》→ h1_path → h2_path]
+        - 仅文档标题: [文档: 《title》]
+        - 无标题信息: 返回空字符串
+
+        Args:
+            parts: 片段列表
+            doc_metadata: 文档级元数据（含 doc_title）
+
+        Returns:
+            上下文前缀字符串，或空字符串
+        """
+        doc_title = doc_metadata.get("doc_title", "")
+
+        # 收集标题路径
+        title_path: list[str] = []
+        for boundary, text, _ in parts:
+            if boundary == ChunkBoundaryType.SECTION_HEADER and text:
+                title_path.append(text)
+
+        # 构建前缀
+        if doc_title and title_path:
+            path_str = " → ".join(title_path)
+            return f"[文档: 《{doc_title}》→ {path_str}]"
+        elif doc_title:
+            return f"[文档: 《{doc_title}》]"
+        elif title_path:
+            path_str = " → ".join(title_path)
+            return f"[{path_str}]"
+        else:
+            return ""
+
+    def _split_child_parent(
+        self,
+        chunks: list[SemanticChunk],
+        cfg: ChunkingConfig,
+    ) -> list[SemanticChunk]:
+        """Child-Parent 双层切分（v4 新增）
+
+        对标 Qdrant 1.15 Multivector group_by：
+        - 父块 ~parent_chunk_size_tokens，不索引
+        - 子块 ~child_chunk_size_tokens，索引 + 关联父块
+
+        单层模式（child_chunk_size_tokens=None）时跳过此方法。
+
+        Args:
+            chunks: 聚合后的父块列表（单层模式）
+            cfg: 分块配置
+
+        Returns:
+            Child + Parent 混合列表（双层模式），或原列表（单层模式）
+        """
+        if cfg.child_chunk_size_tokens is None:
+            return chunks
+
+        result: list[SemanticChunk] = []
+        for parent in chunks:
+            # 父块标记为 PARENT 层级
+            parent_obj = SemanticChunk(
+                chunk_id=parent.chunk_id,
+                document_id=parent.document_id,
+                content=parent.content,
+                chunk_index=len(result),
+                boundary_type=parent.boundary_type,
+                token_count=parent.token_count,
+                page_start=parent.page_start,
+                page_end=parent.page_end,
+                content_hash=parent.content_hash,
+                metadata=dict(parent.metadata),
+                parent_chunk_id=None,
+                index_level=IndexLevel.PARENT,
+                chunk_header=parent.chunk_header,
+            )
+            result.append(parent_obj)
+
+            # 按 child_chunk_size_tokens 切分子块
+            child_texts = self._split_by_token_limit(parent.content, cfg.child_chunk_size_tokens)
+            for child_text in child_texts:
+                child_tokens = _count_tokens_bge_m3(child_text)
+                child_obj = SemanticChunk(
+                    chunk_id=uuid.uuid4(),
+                    document_id=parent.document_id,
+                    content=child_text,
+                    chunk_index=len(result),
+                    boundary_type=parent.boundary_type,
+                    token_count=child_tokens,
+                    page_start=parent.page_start,
+                    page_end=parent.page_end,
+                    content_hash=hashlib.sha256(child_text.encode("utf-8")).hexdigest(),
+                    metadata=dict(parent.metadata),
+                    parent_chunk_id=parent.chunk_id,
+                    index_level=IndexLevel.CHILD,
+                    chunk_header=parent.chunk_header,
+                )
+                result.append(child_obj)
+
+        return result
+
 
 __all__ = [
     "SemanticChunkerImpl",
     "estimate_tokens",
+    "_count_tokens_bge_m3",
+    "_get_bge_m3_tokenizer",
 ]

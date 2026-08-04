@@ -23,9 +23,34 @@ from src.domain.value_objects.parsed_document import (
     ParsedPage,
     ParsedTable,
 )
-from src.domain.value_objects.semantic_chunk import ChunkingConfig, SemanticChunk
+from src.domain.value_objects.semantic_chunk import ChunkingConfig, ChunkingProfile, SemanticChunk
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# v4: business_domain → ChunkingProfile 映射（应用层）
+# ---------------------------------------------------------------------------
+
+_BUSINESS_DOMAIN_PROFILE_MAP: dict[str, ChunkingProfile] = {
+    "finance": ChunkingProfile.FINANCIAL,
+    "legal": ChunkingProfile.CONTRACT,
+    "research": ChunkingProfile.RESEARCH,
+}
+
+
+def _resolve_profile_from_domain(business_domain: str) -> ChunkingProfile:
+    """将业务域字符串映射到分块策略配置档案（应用层）
+
+    应用层职责：business_domain（Document 实体中的字符串）→ ChunkingProfile 枚举。
+    领域层 ChunkingConfig.for_profile() 接收 ChunkingProfile 枚举值（非字符串）。
+
+    Args:
+        business_domain: Document.metadata 中的业务域字符串
+
+    Returns:
+        ChunkingProfile 枚举值（未匹配时返回 GENERAL）
+    """
+    return _BUSINESS_DOMAIN_PROFILE_MAP.get(business_domain, ChunkingProfile.GENERAL)
 
 
 class SemanticChunkingService:
@@ -112,8 +137,21 @@ class SemanticChunkingService:
 
         parsed_doc = self.parsed_document_from_dict(parse_result)
 
-        # 3. 执行语义分块
-        chunks = await self._semantic_chunker.chunk(parsed_doc, config=config)
+        # 3. v4: 构建文档级元数据（doc_title + business_domain）
+        chunk_metadata = {
+            "doc_title": doc.filename,
+            "business_domain": doc.metadata.get("business_domain", ""),
+        }
+
+        # 4. v4: 自动选择 ChunkingProfile（无显式 config 时）
+        if config is None:
+            business_domain = doc.metadata.get("business_domain", "")
+            profile = _resolve_profile_from_domain(business_domain)
+            if profile != ChunkingProfile.GENERAL:
+                config = ChunkingConfig.for_profile(profile)
+
+        # 5. 执行语义分块（传入 metadata）
+        chunks = await self._semantic_chunker.chunk(parsed_doc, config=config, metadata=chunk_metadata)
 
         # 4. 持久化分块结果到 metadata.chunks
         chunks_data = [chunk.to_dict() for chunk in chunks]
