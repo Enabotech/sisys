@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import argparse
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from src.interfaces.cli.commands.document_commands import (
@@ -113,7 +113,9 @@ class TestHandleSnapshot:
             assert result == 1
 
     def test_value_error_returns_1(self) -> None:
-        mock_service = AsyncMock()
+        # 使用 MagicMock 而非 AsyncMock：asyncio.run 已被 patch，AsyncMock 方法
+        # 调用会产生未 await 的协程对象，触发 RuntimeWarning
+        mock_service = MagicMock()
         mock_service.create_snapshot.side_effect = ValueError("invalid param")
 
         with (
@@ -150,7 +152,9 @@ class TestHandleList:
         assert "无效的文档 ID" in captured.out
 
     def test_empty_versions_prints_message(self, capsys) -> None:
-        mock_service = AsyncMock()
+        # 使用 MagicMock 而非 AsyncMock：asyncio.run 已被 patch，AsyncMock 方法
+        # 调用会产生未 await 的协程对象，触发 RuntimeWarning
+        mock_service = MagicMock()
         mock_service.list_versions.return_value = []
 
         with (
