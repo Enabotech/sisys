@@ -391,7 +391,10 @@ class SemanticChunk:
 - [ ] Subtask 0.3: 定义 `ChunkingConfig` 扩展字段（profile, child/parent_chunk_size_tokens, token_count_type）
 - [ ] Subtask 0.4: 定义 `SemanticChunk` 扩展字段（parent_chunk_id, index_level, chunk_header）
 - [ ] Subtask 0.5: 定义 `SemanticBreakDetector` Protocol（`semantic_break_detector.py` 新建）
-- [ ] Subtask 0.6: 更新端口契约测试（`SemanticChunkerPort` v1.0.0→v1.1.0）
+- [ ] Subtask 0.6: 更新端口契约测试 `test_port_contract_semantic_chunker.py`
+  - `test_version_is_v1_0_0`: 期望版本 `"v1.0.0"` → `"v1.1.0"`
+  - `test_chunk_method_exists`: 参数断言 `["self", "parsed_doc", "config"]` → `["self", "parsed_doc", "config", "metadata"]`
+  - `test_lifetime_is_singleton`: 确认 SINGLETON 不变
 - [ ] Subtask 0.7: 编写 Gherkin 验收测试扩展场景
 - [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
@@ -501,9 +504,19 @@ class SemanticChunk:
   - 无标题元素：`title=None` → 不添加前缀
   - 前缀不计入 `token_count`
   - `content_hash` 基于带前缀的完整 content
-- [ ] Subtask 3.2: 🟢 绿 — 实现 `_build_chunk_header()`
-  - 遍历当前 chunk 的 parts，累积标题路径
+- [ ] Subtask 3.2: 🟢 绿 — 实现 `_build_chunk_header()` + `chunk_document()` metadata 传递
+  - 在 `SemanticChunkingService.chunk_document()` 中构建 metadata:
+    ```python
+    chunk_metadata = {
+        "doc_title": doc.filename,
+        "business_domain": doc.metadata.get("business_domain", ""),
+    }
+    chunks = await self._semantic_chunker.chunk(parsed_doc, config=config, metadata=chunk_metadata)
+    ```
+  - 分块器内部 `_build_chunk_header(parts, doc_metadata)` 从 `doc_metadata["doc_title"]` 读取标题
   - 格式：`[文档: {title}]` / `[文档: {title} → h1 → h2]` / `[文档: {title} → 第N节]`
+  - 标题缺失时退化为仅章节路径
+  - **注意：** `ParsedDocument` 无 `title` 字段（v3 设计），文档标题通过 `metadata` dict 传入是唯一可行路径
 - [ ] Subtask 3.3: 🔄 重构
 
 **完成标准/Definition of Done:**
@@ -732,6 +745,10 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 
 ### 向后兼容性矩阵
 
+> **类型不一致说明：** `ParsedDocument.document_id` 为 `str` 类型，`SemanticChunk.document_id` 为 `uuid.UUID` 类型。
+> `SemanticChunkerImpl._create_chunk()` 通过 `uuid.UUID(document_id)` 进行转换，转换失败时抛出 `ChunkingError`。
+> v4 不改变此行为（改 `ParsedDocument.document_id` 类型会影响 Story 2-2a/2-2b 的所有解析器）。
+
 | v3 行为 | v4 行为 | 兼容 |
 |---------|---------|------|
 | `ChunkingConfig()` → target=300 | 完全一致（GENERAL profile 默认 target=300） | ✅ |
@@ -849,6 +866,15 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 | 6 | `SemanticBreakDetector` 端口定义缺少 `__all__` 导出 | P0 | 补充 `__all__ = ["SemanticBreakDetector"]` |
 | 7 | `_merge_chunks()` token_count 简单相加需要记录设计决策 | P0 | 在 Child-Parent 分块逻辑和 `_merge_chunks()` 重构中使用 bge-m3 tokenizer 重新计数 |
 
+> 第2轮审查修订（2026-08-04）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 8 | 契约测试 `chunk` 方法参数断言未更新（`["self", "parsed_doc", "config"]` 缺少 `metadata`） | P0 | Subtask 0.6 明确更新契约测试的三项改动（版本 v1.1.0 + 参数断言 + 生命周期） |
+| 9 | `SemanticChunkingService.chunk_document()` 调用时不传 `metadata`（v3 中所有 chunk.metadata 始终为空） | P0 | `chunk_document()` 中构建 `metadata={"doc_title": doc.filename, "business_domain": ...}` 传给 `chunk()` |
+| 10 | `ParsedDocument.document_id` 为 `str` 但 `SemanticChunk.document_id` 为 `UUID`（类型不一致未记录） | P1 | Dev Notes 向后兼容性矩阵上方补充类型不一致说明 |
+| 11 | `page_range` vs `page_start`/`page_end` 术语不一致 | P2 | 已在 AC 描述中统一使用 `page_start`/`page_end`（v3 即如此），AC-3 的 `page_range` 作为概念性描述保持不变 |
+
 ---
 
 ### 下一步 Next Steps
@@ -861,10 +887,11 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 
 **故事版本/Story Version:** v4.1.0
 
-**故事版本/Story Version:** v4.1.0
+**故事版本/Story Version:** v4.2.0
 **创建日期/Created:** 2026-08-02 (v3)
-**最后更新/Last Updated:** 2026-08-04 (v4.1.0 — Round 1 审查修订)
+**最后更新/Last Updated:** 2026-08-04 (v4.2.0 — Round 2 审查修订)
 **更新说明/Description:**
+- v4.2.0: Round 2 审查修订 — 修复 3 项 P0 + 1 项 P1（契约测试参数断言、metadata 传递、类型不一致文档化）
 - v4.1.0: Round 1 审查修订 — 修复 7 项 P0 问题（协议签名不一致、文档标题数据源、to_dict 序列化、profile 路由职责分离、__all__ 导出、merge token 计数）
 - v4.0.0: 增强重构 — 整合三项 P0（上下文前缀 + BGE-M3 Tokenizer + Child-Parent）+ 一项 P2（ChunkingProfile）+ 一项 P1（SemanticBreakDetector 端口定义），对标 Anthropic/Jina AI/Qdrant 1.15/LlamaIndex 2026 业界最佳实践
 - v3.1.0: R2 深度审查修正版 — 修复 R2 轮审查发现的 P0/P1 问题
