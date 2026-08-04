@@ -11,7 +11,7 @@ import logging
 import os
 import re
 import uuid
-from typing import Any
+from typing import Any, Callable
 
 from src.domain.exceptions.storage_exceptions import ChunkingError
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedTable
@@ -55,9 +55,9 @@ def _get_bge_m3_tokenizer() -> Any:
 
     _bge_m3_load_attempted = True
     try:
-        from tokenizers import Tokenizer  # noqa: F811
+        import tokenizers
 
-        _bge_m3_tokenizer = Tokenizer.from_file(_BGE_M3_TOKENIZER_PATH)
+        _bge_m3_tokenizer = tokenizers.Tokenizer.from_file(_BGE_M3_TOKENIZER_PATH)
         logger.info("BGE-M3 tokenizer 已加载: %s", _BGE_M3_TOKENIZER_PATH)
     except FileNotFoundError:
         logger.warning(
@@ -198,14 +198,20 @@ class SemanticChunkerImpl:
             document_id = parsed_doc.document_id
             doc_metadata = metadata or {}
 
+            # v4: 根据配置选择 token 计数函数
+            if cfg.token_count_type == "heuristic":
+                _count_fn = estimate_tokens
+            else:
+                _count_fn = _count_tokens_bge_m3
+
             # 提取所有文本片段
             segments = list(self._extract_segments(parsed_doc))
 
             if not segments:
                 return []
 
-            # 聚合片段为分块（使用精确 token 计数）
-            chunks = self._aggregate_segments(segments, cfg, document_id, doc_metadata)
+            # 聚合片段为分块（使用配置指定的 token 计数函数）
+            chunks = self._aggregate_segments(segments, cfg, document_id, doc_metadata, _count_fn)
 
             # v4: Child-Parent 双层切分
             if cfg.child_chunk_size_tokens is not None and cfg.parent_chunk_size_tokens is not None:
@@ -340,6 +346,7 @@ class SemanticChunkerImpl:
         cfg: ChunkingConfig,
         document_id: str,
         doc_metadata: dict[str, Any],
+        count_fn: Callable[[str], int] | None = None,
     ) -> list[SemanticChunk]:
         """按 token 预算聚合片段为分块
 
@@ -357,13 +364,16 @@ class SemanticChunkerImpl:
         current_tokens = 0
         chunk_index = 0
 
+        # 默认使用 bge-m3，可通过 count_fn 覆盖
+        _count = count_fn if count_fn is not None else _count_tokens_bge_m3
+
         for boundary, text, page in segments:
-            text_tokens = _count_tokens_bge_m3(text)
+            text_tokens = _count(text)
 
             # PAGE_BREAK 边界：创建新分块后跳过追加
             if boundary == ChunkBoundaryType.PAGE_BREAK:
                 if current_parts:
-                    chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
+                    chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata, _count))
                     chunk_index += 1
                     current_parts, current_tokens = [], 0
                 continue
@@ -371,32 +381,32 @@ class SemanticChunkerImpl:
             # 硬边界：章节/表格边界，必然创建新分块
             if boundary in (ChunkBoundaryType.SECTION_HEADER, ChunkBoundaryType.TABLE):
                 if current_parts:
-                    chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
+                    chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata, _count))
                     chunk_index += 1
                     current_parts, current_tokens = [], 0
 
             # 检查当前段落是否超过 max_chunk_size_tokens
             if text_tokens >= cfg.max_chunk_size_tokens:
                 if current_parts:
-                    chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
+                    chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata, _count))
                     chunk_index += 1
                     current_parts, current_tokens = [], 0
 
                 # 按字符比例切分此大段
                 sub_texts = self._split_by_token_limit(text, cfg.max_chunk_size_tokens)
                 for i, sub_text in enumerate(sub_texts):
-                    sub_tokens = _count_tokens_bge_m3(sub_text)
+                    sub_tokens = _count(sub_text)
                     current_parts.append((ChunkBoundaryType.TOKEN_LIMIT, sub_text, page))
                     current_tokens += sub_tokens
                     if i < len(sub_texts) - 1:
-                        chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
+                        chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata, _count))
                         chunk_index += 1
                         current_parts, current_tokens = [], 0
                 continue
 
             # Token 预算：仅当 current_parts 非空且超限时触发
             if current_parts and current_tokens + text_tokens > cfg.target_chunk_size_tokens:
-                chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
+                chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata, _count))
                 chunk_index += 1
                 current_parts, current_tokens = [], 0
 
@@ -405,7 +415,7 @@ class SemanticChunkerImpl:
 
         # 处理剩余片段
         if current_parts:
-            chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata))
+            chunks.append(self._create_chunk(current_parts, chunk_index, document_id, page, doc_metadata, _count))
 
         # 合并过小分块
         return self._merge_small_chunks(chunks, cfg)
@@ -417,6 +427,7 @@ class SemanticChunkerImpl:
         document_id: str,
         page: int,
         doc_metadata: dict[str, Any],
+        count_fn: Callable[[str], int] | None = None,
     ) -> SemanticChunk:
         """从片段列表创建 SemanticChunk 值对象（v4 增强）
 
@@ -460,7 +471,8 @@ class SemanticChunkerImpl:
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
         # v4: BGE-M3 精准 token 计数（仅针对原始内容，不含前缀）
-        token_count = _count_tokens_bge_m3(raw_content)
+        _count = count_fn if count_fn is not None else _count_tokens_bge_m3
+        token_count = _count(raw_content)
 
         # 安全转换 document_id
         try:
@@ -485,6 +497,8 @@ class SemanticChunkerImpl:
             page_end=page_end,
             content_hash=content_hash,
             metadata=dict(doc_metadata),
+            chunk_header=chunk_header,
+            index_level=IndexLevel.PARENT,
         )
 
     def _merge_chunks(self, chunk_a: SemanticChunk, chunk_b: SemanticChunk) -> SemanticChunk:
@@ -504,11 +518,13 @@ class SemanticChunkerImpl:
             content=content,
             chunk_index=chunk_a.chunk_index,
             boundary_type=chunk_a.boundary_type,
-            token_count=chunk_a.token_count + chunk_b.token_count,
+            token_count=_count_tokens_bge_m3(content),
             page_start=min(chunk_a.page_start, chunk_b.page_start),
             page_end=max(chunk_a.page_end, chunk_b.page_end),
             content_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
             metadata=chunk_a.metadata,
+            chunk_header=chunk_a.chunk_header if chunk_a.chunk_header else chunk_b.chunk_header,
+            index_level=IndexLevel.PARENT,
         )
 
     def _find_safe_split_point(self, text: str, max_chars: int) -> int:
