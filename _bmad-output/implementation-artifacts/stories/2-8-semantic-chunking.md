@@ -923,7 +923,7 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 | 18 | `_merge_chunks` 未传递 v4 新增字段且 `token_count` 简单相加不精确 | P0 | 使用 `_count_tokens_bge_m3(content)` 重新计数，传递 `chunk_header` 和 `index_level` |
 | 19 | `# noqa: F811` 违反项目 CLAUDE.md 绝对规则 | P0 | 改为 `import tokenizers; tokenizers.Tokenizer.from_file()` 动态导入模式 |
 | 20 | `token_count_type` 配置值未被分块器消费（硬编码 bge-m3） | P1 | 在 `chunk()` 中根据 `cfg.token_count_type` 选择 `_count_fn`，通过 `_aggregate_segments` → `_create_chunk` 链路传递 |
-| 21 | BGE-M3 默认路径 `/mnt/x/.cache/...` 是否通用？ | — | 已确认：路径来自 `.env` 中 `EMBEDDING_MODEL_PATH`，与项目其它 BGE-M3 使用保持一致，非问题 |
+| 21 | BGE-M3 tokenizer 路径应复用 `EMBEDDING_MODEL_PATH` 而非独立维护默认值 | P1 | 改为 `_resolve_tokenizer_path()`: 优先级 SISYS_BGE_M3_TOKENIZER_PATH → EMBEDDING_MODEL_PATH + /tokenizer.json → 默认路径 |
 | 22 | `_merge_small_chunks` 中合并后 token_count 不精确（根因同问题 18） | P0 | 问题 18 修复自动覆盖 `_merge_chunks` 调用链 |
 
 > 第2轮代码审查修复（2026-08-04）
