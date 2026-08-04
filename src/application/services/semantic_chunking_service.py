@@ -153,14 +153,14 @@ class SemanticChunkingService:
         # 5. 执行语义分块（传入 metadata）
         chunks = await self._semantic_chunker.chunk(parsed_doc, config=config, metadata=chunk_metadata)
 
-        # 4. 持久化分块结果到 metadata.chunks
+        # 6. 持久化分块结果到 metadata.chunks
         chunks_data = [chunk.to_dict() for chunk in chunks]
         doc.metadata["chunks"] = chunks_data
 
-        # 5. 保存文档实体
+        # 7. 保存文档实体
         await self._document_repository.save(doc)
 
-        # 6. 发布 RAGIndexed 事件
+        # 8. 发布 RAGIndexed 事件
         await self._publish_rag_indexed(document_id, tenant_id, chunk_count=len(chunks))
 
         logger.info(
