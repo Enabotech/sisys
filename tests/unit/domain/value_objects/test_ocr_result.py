@@ -99,3 +99,15 @@ class TestOCRPageResult:
         assert result.elements == []
         output = result.to_dict()
         assert output["elements"] == []
+
+    def test_to_dict_with_markdown_text(self) -> None:
+        """验证 markdown_text 非空时包含在序列化输出中"""
+        result = OCRPageResult(page_number=1, markdown_text="# Title\n\nContent")
+        output = result.to_dict()
+        assert output["markdown_text"] == "# Title\n\nContent"
+
+    def test_to_dict_without_markdown_text(self) -> None:
+        """验证空 markdown_text 不包含在序列化输出中"""
+        result = OCRPageResult(page_number=1, markdown_text="")
+        output = result.to_dict()
+        assert "markdown_text" not in output
