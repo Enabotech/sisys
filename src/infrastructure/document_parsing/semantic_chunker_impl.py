@@ -29,13 +29,31 @@ logger = logging.getLogger(__name__)
 # BGE-M3 精准 token 计数
 # ---------------------------------------------------------------------------
 
-# BGE-M3 tokenizer 本地路径
-# 默认值与项目 .env 中 EMBEDDING_MODEL_PATH 指向的 BGE-M3 模型目录一致
-# 可通过 SISYS_BGE_M3_TOKENIZER_PATH 环境变量覆盖
-_BGE_M3_TOKENIZER_PATH = os.environ.get(
-    "SISYS_BGE_M3_TOKENIZER_PATH",
-    "/mnt/x/.cache/BAAI/bge-m3/models--BAAI--bge-m3/tokenizer.json",
-)
+
+# BGE-M3 tokenizer 路径解析逻辑
+# 优先级: SISYS_BGE_M3_TOKENIZER_PATH → EMBEDDING_MODEL_PATH + /tokenizer.json → 默认路径
+def _resolve_tokenizer_path() -> str:
+    """解析 BGE-M3 tokenizer.json 文件路径
+
+    优先级：
+    1. SISYS_BGE_M3_TOKENIZER_PATH 环境变量（精确指定 tokenizer.json 路径）
+    2. EMBEDDING_MODEL_PATH 环境变量 + /tokenizer.json（与 embedding 服务共享模型目录）
+    3. 默认路径（与 .env 中 EMBEDDING_MODEL_PATH 一致）
+    """
+    # 精确路径优先
+    if "SISYS_BGE_M3_TOKENIZER_PATH" in os.environ:
+        return os.environ["SISYS_BGE_M3_TOKENIZER_PATH"]
+
+    # 从 EMBEDDING_MODEL_PATH 推导（与 embedding 服务同源）
+    model_path = os.environ.get("EMBEDDING_MODEL_PATH", "")
+    if model_path:
+        return os.path.join(model_path, "tokenizer.json")
+
+    # 最终 fallback（与 .env 中 EMBEDDING_MODEL_PATH 默认值一致）
+    return "/mnt/x/.cache/BAAI/bge-m3/models--BAAI--bge-m3/tokenizer.json"
+
+
+_BGE_M3_TOKENIZER_PATH = _resolve_tokenizer_path()
 
 # 模块级惰性加载的 tokenizer 实例（线程安全）
 _bge_m3_tokenizer: Any = None
