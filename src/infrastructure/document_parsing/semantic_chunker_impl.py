@@ -556,9 +556,10 @@ class SemanticChunkerImpl:
         if total_tokens <= max_tokens:
             return [text]
 
-        # 按字符比例估算每段最大字符数
+        # 按字符比例估算每段最大字符数（应用 0.95 安全因子，
+        # 因为 bge-m3 token 计数与字符比例估算之间存在方差）
         ratio = max_tokens / total_tokens
-        chars_per_segment = max(1, int(len(text) * ratio))
+        chars_per_segment = max(1, int(len(text) * ratio * 0.95))
         segments: list[str] = []
         i = 0
         while i < len(text):
