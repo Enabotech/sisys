@@ -113,3 +113,59 @@ class TestMergeResolution:
         assert isinstance(result, list)
         for cell in result:
             assert isinstance(cell, MergedCell)
+
+    def test_merge_range_negative_coordinates_clamped_to_zero(self) -> None:
+        """合并范围负值坐标被裁剪为 0"""
+        rows = [["A", "B"], ["C", "D"]]
+        merge_ranges = [(-5, 0, -3, 0)]  # row_start=-5, row_end=0, col_start=-3, col_end=0
+        result = resolve_merged_cells(rows, merge_ranges)
+        assert len(result) == 1
+        assert result[0].row_start == 0
+        assert result[0].row_end == 0
+        assert result[0].col_start == 0
+        assert result[0].col_end == 0
+        assert result[0].value == "A"
+
+    def test_merge_range_exceeds_bounds_clamped(self) -> None:
+        """合并范围超出表格边界时裁剪到边界"""
+        rows = [["A", "B"], ["C", "D"]]
+        merge_ranges = [(0, 10, 0, 10)]  # row_end 和 col_end 远超实际大小
+        result = resolve_merged_cells(rows, merge_ranges)
+        assert len(result) == 1
+        assert result[0].row_start == 0
+        assert result[0].row_end == 1  # 裁剪到 max_row
+        assert result[0].col_start == 0
+        assert result[0].col_end == 1  # 裁剪到 max_col
+
+    def test_merge_range_fully_out_of_bounds_filtered(self) -> None:
+        """合并范围完全超出表格维度时被过滤"""
+        rows = [["A", "B"], ["C", "D"]]
+        merge_ranges = [(5, 10, 0, 1)]  # row_start=5 > max_row=1
+        result = resolve_merged_cells(rows, merge_ranges)
+        assert result == []
+
+    def test_merge_range_inverted_coordinates_filtered(self) -> None:
+        """row_start > row_end 或 col_start > col_end 时被过滤"""
+        rows = [["A", "B"], ["C", "D"]]
+        merge_ranges = [(1, 0, 0, 0)]  # row_start > row_end
+        result = resolve_merged_cells(rows, merge_ranges)
+        assert result == []
+
+    def test_merge_range_negative_and_exceeds_bounds(self) -> None:
+        """负值起点 + 超出边界终点的组合裁剪"""
+        rows = [["只有一行"]]
+        merge_ranges = [(-3, 100, -5, 50)]
+        result = resolve_merged_cells(rows, merge_ranges)
+        assert len(result) == 1
+        assert result[0].row_start == 0
+        assert result[0].row_end == 0
+        assert result[0].col_start == 0
+        assert result[0].col_end == 0
+        assert result[0].value == "只有一行"
+
+    def test_merge_range_col_start_exceeds_max_col_filtered(self) -> None:
+        """col_start 超出表格最大列时被过滤"""
+        rows = [["A", "B"], ["C", "D"]]
+        merge_ranges = [(0, 1, 5, 7)]  # col_start=5 > max_col=1
+        result = resolve_merged_cells(rows, merge_ranges)
+        assert result == []

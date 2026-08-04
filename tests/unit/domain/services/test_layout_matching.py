@@ -77,6 +77,14 @@ class TestIoUCalculation:
         b = _bbox(0, 0, 100, 100)
         assert _compute_iou(a, b) == 0.0
 
+    def test_both_zero_area_boxes_iou_is_zero(self) -> None:
+        """两个 bbox 面积均为零时 IoU 为 0.0（覆盖 union_area <= 0 分支）"""
+        from src.domain.services.layout_matching import _compute_iou
+
+        a = _bbox(0, 0, 0, 0)  # 零宽零高
+        b = _bbox(100, 100, 0, 0)  # 零宽零高
+        assert _compute_iou(a, b) == 0.0
+
 
 class TestBboxMatching:
     """bbox 贪心匹配测试"""
