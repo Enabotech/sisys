@@ -109,7 +109,7 @@ development_status:
   2-5-ocr-parsing-scanned-documents: done
   2-6-document-version-snapshot: done
   2-7-metadata-validation: done
-  2-8-semantic-chunking: review
+  2-8-semantic-chunking: done
   epic-2-retrospective: optional
 
   # ===========================================================================
