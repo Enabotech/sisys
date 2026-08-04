@@ -7,12 +7,34 @@
 from __future__ import annotations
 
 import re
+import secrets
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     pass
 
 from src.domain.value_objects.parsed_document import ColumnInfo, ColumnType
+
+
+def _secure_sample(population: range, k: int) -> list[int]:
+    """从 range 中安全采样 k 个不重复元素
+
+    使用 secrets.randbelow 替代 random.sample，避免伪随机数生成器
+    在非加密场景中使用。
+
+    Args:
+        population: 采样范围
+        k: 采样数量
+
+    Returns:
+        采样结果列表（升序排列）
+    """
+    chosen: set[int] = set()
+    max_val = population.stop - population.start
+    while len(chosen) < k:
+        idx = population.start + secrets.randbelow(max_val)
+        chosen.add(idx)
+    return sorted(chosen)
 
 
 def classify_columns(
@@ -24,7 +46,7 @@ def classify_columns(
 
     Args:
         rows: 表格数据行（不含表头行）
-        sample_size: 采样行数（前 N 行 + 随机采样）
+        sample_size: 采样行数（前 N/2 行 + 随机采样 N/2 行）
         column_names: 列名列表（来自表头，用于填充 ColumnInfo.name）
 
     Returns:
@@ -37,8 +59,15 @@ def classify_columns(
     if num_cols == 0:
         return []
 
-    # 采样行（前 sample_size 行）
-    sampled_rows = rows[:sample_size]
+    # 采样策略：前 N/2 行 + 随机采样 N/2 行（避免顺序偏差）
+    if len(rows) > sample_size:
+        half = sample_size // 2
+        head = rows[:half]
+        tail_indices = _secure_sample(range(half, len(rows)), min(half, len(rows) - half))
+        tail = [rows[i] for i in sorted(tail_indices)]
+        sampled_rows = head + tail
+    else:
+        sampled_rows = rows[:sample_size]
 
     results: list[ColumnInfo] = []
     for col_idx in range(num_cols):

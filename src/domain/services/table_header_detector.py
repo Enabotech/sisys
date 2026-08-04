@@ -239,10 +239,13 @@ def _is_data_type(cell: str) -> bool:
     if re.match(r"^-?[¥$€£]\s*\d[\d,]*\.?\d*$", cell):
         return True
 
-    # 数字检测
+    # 数字检测（排除 NaN/Infinity 等 IEEE 754 特殊值）
     try:
-        float(cell.replace(",", ""))
-        return True
+        value = float(cell.replace(",", ""))
+        import math
+
+        if math.isfinite(value):
+            return True
     except ValueError:
         pass
 
