@@ -169,3 +169,23 @@ class TestMergeResolution:
         merge_ranges = [(0, 1, 5, 7)]  # col_start=5 > max_col=1
         result = resolve_merged_cells(rows, merge_ranges)
         assert result == []
+
+    def test_merge_range_overlapping_top_left_filtered(self) -> None:
+        """两个合并范围的左上角重叠时，第二个被 occupied 检测跳过"""
+        rows = [
+            ["A", "", ""],
+            ["", "", ""],
+        ]
+        merge_ranges = [(0, 1, 0, 1), (0, 1, 0, 1)]
+        result = resolve_merged_cells(rows, merge_ranges)
+        assert len(result) == 1
+        assert result[0].value == "A"
+
+    def test_col_start_exceeds_row_length_filtered(self) -> None:
+        """col_start 超出该行实际列数时被安全过滤（不等长行）"""
+        rows = [
+            ["短行"],  # 只有 1 列
+        ]
+        merge_ranges = [(0, 0, 5, 7)]  # col_start=5 > len(rows[0])=1
+        result = resolve_merged_cells(rows, merge_ranges)
+        assert result == []
