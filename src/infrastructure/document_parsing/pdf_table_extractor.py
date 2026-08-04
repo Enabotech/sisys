@@ -81,16 +81,17 @@ class PdfTableDetector(TableDetectorPort):
 
         try:
             with pl.open(file_path) as pdf:
-                for page in pdf.pages:
+                for page_idx, page in enumerate(pdf.pages):
                     try:
                         page_tables = self._extract_tables_from_page(page)
                         detected_tables.extend(page_tables)
-                    except Exception:
+                    except (ValueError, TypeError, RuntimeError, OSError, AttributeError):
                         logger.warning(
-                            "PDF 页面表格检测失败，跳过该页",
+                            "PDF 页面表格检测失败，跳过该页（page=%d）",
+                            page_idx + 1,
                             exc_info=True,
                         )
-        except Exception:
+        except (ValueError, TypeError, RuntimeError, OSError, AttributeError):
             logger.warning(
                 "PDF 文件打开失败: %s",
                 file_path,

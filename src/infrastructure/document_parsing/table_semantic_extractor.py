@@ -29,6 +29,9 @@ class TableSemanticExtractor(TableSemanticEnhancerPort):
 
     降级策略：单个表格增强失败时不影响其他表格，
     降级返回原始 ParsedTable（语义字段保持默认值）。
+
+    部分失败语义：单个领域服务失败时，保留已成功的增强结果，
+    失败的服务对应字段保持 None，metadata 中标记 "semantic_enhancement_error"。
     """
 
     def enhance(
@@ -49,17 +52,27 @@ class TableSemanticExtractor(TableSemanticEnhancerPort):
             return []
 
         enhanced: list[ParsedTable] = []
-        for table in tables:
+        for table_idx, table in enumerate(tables):
             try:
                 enhanced_table = self._enhance_single_table(table, mime_type)
                 enhanced.append(enhanced_table)
-            except Exception:
+            except (ValueError, TypeError, RuntimeError, AttributeError):
                 logger.warning(
-                    "表格语义增强失败，降级返回原始表格（行数=%d）",
+                    "表格语义增强失败，降级返回原始表格（table_index=%d, mime_type=%s, row_count=%d）",
+                    table_idx,
+                    mime_type,
                     len(table.rows),
                     exc_info=True,
                 )
-                enhanced.append(table)
+                # 降级表格在 metadata 中标记增强失败
+                degraded = dataclasses.replace(
+                    table,
+                    metadata={
+                        **table.metadata,
+                        "semantic_enhancement_error": True,
+                    },
+                )
+                enhanced.append(degraded)
 
         return enhanced
 
@@ -69,6 +82,8 @@ class TableSemanticExtractor(TableSemanticEnhancerPort):
         mime_type: str,
     ) -> ParsedTable:
         """增强单个表格的语义信息
+
+        三个领域服务分别 try/except，单个失败不影响其他增强结果。
 
         Args:
             table: 原始 ParsedTable
@@ -81,16 +96,35 @@ class TableSemanticExtractor(TableSemanticEnhancerPort):
             return table
 
         # 1. 表头检测
-        header_row_index, header_confidence = detect_header(table.rows)
+        header_row_index, header_confidence, header_failed = None, 0.0, False
+        try:
+            header_row_index, header_confidence = detect_header(table.rows)
+        except (ValueError, TypeError, RuntimeError, AttributeError):
+            logger.warning(
+                "表头检测失败，降级为无表头（mime_type=%s）",
+                mime_type,
+                exc_info=True,
+            )
+            header_failed = True
 
         header: list[str] | None = None
         data_rows: list[list[str]] = table.rows
         if header_row_index is not None:
-            header = table.rows[header_row_index]
-            data_rows = table.rows[header_row_index + 1 :]
+            header = list(table.rows[header_row_index])
+            data_rows = list(table.rows[header_row_index + 1 :])
 
         # 2. 列类型推断
-        column_types = classify_columns(data_rows, column_names=header)
+        column_types: list[ColumnInfo] = []
+        column_types_failed = False
+        try:
+            column_types = classify_columns(data_rows, column_names=header)
+        except (ValueError, TypeError, RuntimeError, AttributeError):
+            logger.warning(
+                "列类型推断失败，降级为空列表（mime_type=%s）",
+                mime_type,
+                exc_info=True,
+            )
+            column_types_failed = True
 
         # 3. 合并单元格还原（V1：仅 xlsx/spreadsheetml 格式）
         # 当前 V1 阶段暂不从 file_path 读取 xlsx 合并信息，merged_cells 保持 None
@@ -102,17 +136,24 @@ class TableSemanticExtractor(TableSemanticEnhancerPort):
             column_types=column_types,
         )
 
-        # 5. 使用 dataclasses.replace 构建增强后的 ParsedTable
+        # 5. 构建 metadata，标记部分失败信息
+        enhancement_metadata: dict = {
+            "header_row_indices": [header_row_index] if header_row_index is not None else [],
+            "header_confidence": header_confidence,
+        }
+        if header_failed or column_types_failed:
+            enhancement_metadata["semantic_enhancement_error"] = True
+
+        # 6. 使用 dataclasses.replace 构建增强后的 ParsedTable
         return dataclasses.replace(
             table,
             header=header,
-            column_types=column_types,
+            column_types=column_types if column_types else None,
             merged_cells=merged_cells,
             semantic_confidence=semantic_confidence,
             metadata={
                 **table.metadata,
-                "header_row_indices": [header_row_index] if header_row_index is not None else [],
-                "header_confidence": header_confidence,
+                **enhancement_metadata,
             },
         )
 
