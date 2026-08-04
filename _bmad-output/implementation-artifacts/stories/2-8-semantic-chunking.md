@@ -913,13 +913,27 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 
 ---
 
-**故事版本/Story Version:** v4.1.0
+### 🔧 代码审查修复 Code Review Fixes
 
-**故事版本/Story Version:** v5.0.0
+> 第1轮代码审查修复（2026-08-04）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 17 | `_create_chunk` 未传递 v4 新增字段 `chunk_header`/`index_level` 到 `SemanticChunk` 构造函数 | P0 | 添加 `chunk_header=chunk_header, index_level=IndexLevel.PARENT` |
+| 18 | `_merge_chunks` 未传递 v4 新增字段且 `token_count` 简单相加不精确 | P0 | 使用 `_count_tokens_bge_m3(content)` 重新计数，传递 `chunk_header` 和 `index_level` |
+| 19 | `# noqa: F811` 违反项目 CLAUDE.md 绝对规则 | P0 | 改为 `import tokenizers; tokenizers.Tokenizer.from_file()` 动态导入模式 |
+| 20 | `token_count_type` 配置值未被分块器消费（硬编码 bge-m3） | P1 | 在 `chunk()` 中根据 `cfg.token_count_type` 选择 `_count_fn`，通过 `_aggregate_segments` → `_create_chunk` 链路传递 |
+| 21 | BGE-M3 默认路径硬编码为特定 WSL 路径 `/mnt/x/.cache/...` | P1 | 记录为已知限制，需通过 env `SISYS_BGE_M3_TOKENIZER_PATH` 配置 |
+| 22 | `_merge_small_chunks` 中合并后 token_count 不精确（根因同问题 18） | P0 | 问题 18 修复自动覆盖 `_merge_chunks` 调用链 |
+
+---
+
+**故事版本/Story Version:** v5.1.0
+
 **创建日期/Created:** 2026-08-02 (v3)
-**最后更新/Last Updated:** 2026-08-04 (v5.0.0 — 5 轮审查完成)
+**最后更新/Last Updated:** 2026-08-04 (v5.1.0 — 第1轮代码审查完成)
 **更新说明/Description:**
+- v5.1.0: 代码审查第1轮 — 修复 3 项 P0 + 2 项 P1 问题（_create_chunk v4字段丢失/noqa违反规范/_merge_chunks token不精确/token_count_type未消费）
 - v5.0.0: 5 轮审查完成 — 共修复 14 项问题（7 P0 + 7 P1），全量一致性验证通过（6 AC / 11 Task / 122 checkbox）
-- v3.1.0: R2 深度审查修正版 — 修复 R2 轮审查发现的 P0/P1 问题
-- v3.0.0: 第二轮审查修订版 — 修复 17 个 P0 问题
-- v2.0.0: 初始实现版
+- v4.1.0: R1 审查修订版 — 修复 7 项 P0 问题
+- v4.0.0: 初始增强重构版
