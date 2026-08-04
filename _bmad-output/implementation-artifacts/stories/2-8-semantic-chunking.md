@@ -926,6 +926,19 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 | 21 | BGE-M3 默认路径硬编码为特定 WSL 路径 `/mnt/x/.cache/...` | P1 | 记录为已知限制，需通过 env `SISYS_BGE_M3_TOKENIZER_PATH` 配置 |
 | 22 | `_merge_small_chunks` 中合并后 token_count 不精确（根因同问题 18） | P0 | 问题 18 修复自动覆盖 `_merge_chunks` 调用链 |
 
+> 第2轮代码审查修复（2026-08-04）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 23 | `_get_bge_m3_tokenizer` 模块级惰性加载存在线程竞态条件 | P1 | 添加 `threading.Lock` + 双重检查锁定（double-checked locking） |
+| 24 | `_merge_chunks` 中 `chunk_header` 选择逻辑可能丢失更具体的路径信息 | P1 | 改为按长度比较选择更长的 header：`len(a) >= len(b)` |
+
+> 第3轮代码审查（2026-08-04）— 无新增关键问题
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 25 | `_split_child_parent` 中子块 token_count 包含上下文前缀 | P1 | 设计权衡记录：子块保留前缀以提升 Qdrant 检索精度，AC-1 优先满足父块 |
+
 ---
 
 **故事版本/Story Version:** v5.1.0

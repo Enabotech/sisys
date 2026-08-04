@@ -10,6 +10,7 @@ import hashlib
 import logging
 import os
 import re
+import threading
 import uuid
 from typing import Any, Callable
 
@@ -34,9 +35,10 @@ _BGE_M3_TOKENIZER_PATH = os.environ.get(
     "/mnt/x/.cache/BAAI/bge-m3/models--BAAI--bge-m3/tokenizer.json",
 )
 
-# 模块级惰性加载的 tokenizer 实例
+# 模块级惰性加载的 tokenizer 实例（线程安全）
 _bge_m3_tokenizer: Any = None
 _bge_m3_load_attempted: bool = False
+_bge_m3_lock: threading.Lock = threading.Lock()
 
 
 def _get_bge_m3_tokenizer() -> Any:
@@ -50,27 +52,33 @@ def _get_bge_m3_tokenizer() -> Any:
     """
     global _bge_m3_tokenizer, _bge_m3_load_attempted
 
+    # 快速路径：已加载则直接返回（不需要加锁）
     if _bge_m3_load_attempted:
         return _bge_m3_tokenizer
 
-    _bge_m3_load_attempted = True
-    try:
-        import tokenizers
+    # 双重检查锁定（double-checked locking）：确保仅初始化一次
+    with _bge_m3_lock:
+        if _bge_m3_load_attempted:
+            return _bge_m3_tokenizer
 
-        _bge_m3_tokenizer = tokenizers.Tokenizer.from_file(_BGE_M3_TOKENIZER_PATH)
-        logger.info("BGE-M3 tokenizer 已加载: %s", _BGE_M3_TOKENIZER_PATH)
-    except FileNotFoundError:
-        logger.warning(
-            "BGE-M3 tokenizer 文件不可用: %s，降级为字符启发式 token 估算",
-            _BGE_M3_TOKENIZER_PATH,
-        )
-        _bge_m3_tokenizer = None
-    except ImportError:
-        logger.warning("tokenizers 库不可用，降级为字符启发式 token 估算。安装: pip install tokenizers")
-        _bge_m3_tokenizer = None
-    except Exception as e:
-        logger.warning("BGE-M3 tokenizer 加载失败: %s，降级为字符启发式 token 估算", e)
-        _bge_m3_tokenizer = None
+        _bge_m3_load_attempted = True
+        try:
+            import tokenizers
+
+            _bge_m3_tokenizer = tokenizers.Tokenizer.from_file(_BGE_M3_TOKENIZER_PATH)
+            logger.info("BGE-M3 tokenizer 已加载: %s", _BGE_M3_TOKENIZER_PATH)
+        except FileNotFoundError:
+            logger.warning(
+                "BGE-M3 tokenizer 文件不可用: %s，降级为字符启发式 token 估算",
+                _BGE_M3_TOKENIZER_PATH,
+            )
+            _bge_m3_tokenizer = None
+        except ImportError:
+            logger.warning("tokenizers 库不可用，降级为字符启发式 token 估算。安装: pip install tokenizers")
+            _bge_m3_tokenizer = None
+        except Exception as e:
+            logger.warning("BGE-M3 tokenizer 加载失败: %s，降级为字符启发式 token 估算", e)
+            _bge_m3_tokenizer = None
 
     return _bge_m3_tokenizer
 
@@ -523,7 +531,9 @@ class SemanticChunkerImpl:
             page_end=max(chunk_a.page_end, chunk_b.page_end),
             content_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
             metadata=chunk_a.metadata,
-            chunk_header=chunk_a.chunk_header if chunk_a.chunk_header else chunk_b.chunk_header,
+            chunk_header=(
+                chunk_a.chunk_header if len(chunk_a.chunk_header) >= len(chunk_b.chunk_header) else chunk_b.chunk_header
+            ),
             index_level=IndexLevel.PARENT,
         )
 
