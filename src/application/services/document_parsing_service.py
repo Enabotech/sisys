@@ -390,6 +390,7 @@ class DocumentParsingService:
         """
         # 降级条件：table_detector 未注入
         if self._table_detector is None:
+            logger.debug("table_detector 未注入，跳过 PDF 表格检测")
             return parsed_doc
 
         # 仅 PDF 格式触发表格检测
@@ -436,7 +437,7 @@ class DocumentParsingService:
 
             return replace(parsed_doc, pages=enhanced_pages)
 
-        except Exception:
+        except (ValueError, TypeError, RuntimeError, OSError, AttributeError):
             logger.warning(
                 "PDF 表格检测失败，降级保留原始表格（文档 MIME=%s）",
                 mime_type,
@@ -468,6 +469,7 @@ class DocumentParsingService:
         """
         # 降级条件：table_enhancer 未注入
         if self._table_enhancer is None:
+            logger.debug("table_enhancer 未注入，跳过表格语义增强")
             return parsed_doc
 
         # 收集所有页面中的表格
@@ -504,7 +506,7 @@ class DocumentParsingService:
 
             return replace(parsed_doc, pages=enhanced_pages)
 
-        except Exception:
+        except (ValueError, TypeError, RuntimeError, OSError, AttributeError):
             # 运行时异常降级：WARNING 日志 + 返回原文档
             logger.warning(
                 "表格语义增强失败，降级保留原始表格（文档 MIME=%s）",
