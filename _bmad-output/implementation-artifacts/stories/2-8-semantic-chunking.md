@@ -941,12 +941,14 @@ src/application/services/semantic_chunking_service.py  ← 应用层扩展
 
 ---
 
-**故事版本/Story Version:** v5.1.0
+**故事版本/Story Version:** v5.3.0
 
 **创建日期/Created:** 2026-08-02 (v3)
-**最后更新/Last Updated:** 2026-08-04 (v5.1.0 — 第1轮代码审查完成)
+**最后更新/Last Updated:** 2026-08-04 (v5.3.0 — 5轮代码审查全部完成)
 **更新说明/Description:**
-- v5.1.0: 代码审查第1轮 — 修复 3 项 P0 + 2 项 P1 问题（_create_chunk v4字段丢失/noqa违反规范/_merge_chunks token不精确/token_count_type未消费）
-- v5.0.0: 5 轮审查完成 — 共修复 14 项问题（7 P0 + 7 P1），全量一致性验证通过（6 AC / 11 Task / 122 checkbox）
+- v5.3.0: 第4-5轮代码审查 — 全量回归验证通过（768 tests pass）
+- v5.2.0: 第2轮代码审查 — 修复线程安全 + chunk_header 精度
+- v5.1.0: 代码审查第1轮 — 修复 3 项 P0 + 2 项 P1 问题
+- v5.0.0: 5 轮文档审查完成 — 共修复 14 项问题（7 P0 + 7 P1）
 - v4.1.0: R1 审查修订版 — 修复 7 项 P0 问题
 - v4.0.0: 初始增强重构版
