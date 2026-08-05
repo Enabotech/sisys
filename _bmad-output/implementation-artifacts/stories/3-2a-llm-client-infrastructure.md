@@ -79,8 +79,9 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 **And** 包含两个核心方法：
   - `structured_generate(prompt: str, response_schema: type, config: LLMConfig | None = None) -> LLMResponse`
   - `generate(prompt: str, config: LLMConfig | None = None) -> LLMResponse`（自由文本，无需 schema 验证）
-**And** 支持 `close()` 释放资源
-**And** 支持 `async with` 上下文管理器
+**And** 支持 `close()` 释放资源（幂等、`_closed` 守卫）
+**And** 支持 `async with` 上下文管理器（`__aenter__`→`self` / `__aexit__`→`await self.close()`，对标 `EmbeddingAPIClient` [Source: embedding_api_client.py:128-134]）
+**And** `_check_closed()` 守卫：关闭后调用任一方法抛出 `ServiceUnavailableError`
 **And** `LLMResponse` 为 `@dataclass(frozen=True)`（`content: str` / `finish_reason: str` / `usage: dict[str, int | None]` / `model: str`）
 **And** `usage` 字段对标 litellm 返回结构：`{"prompt_tokens": int, "completion_tokens": int, "total_tokens": int}`（字段值可为 None 表示单厂商未返回）
 
@@ -111,6 +112,8 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 - [ ] 熔断器由 `LitellmLLMClient` 内部构造 `CircuitBreaker(name="llm")`，对标 `EmbeddingAPIClient` 的私有构造模式
 - [ ] 重试使用 `tenacity.AsyncRetrying`（与 EmbeddingAPIClient 一致）
 - [ ] `_map_llm_error()` 内联异常映射（**对标 EmbeddingAPIClient 的内联 `_map_exception` 模式**，不使用 `ErrorMapper` 外部映射）
+- [ ] `close()` 幂等设计（`_closed` 守卫，对标 `EmbeddingAPIClient.close()` [Source: embedding_api_client.py:317-328]）
+- [ ] `_check_closed()` 守卫：关闭后调用任一方法抛出 `ServiceUnavailableError`（对标 `EmbeddingAPIClient._check_closed()` [Source: embedding_api_client.py:136-143]）
 - [ ] 支持 `async with` 上下文管理器
 
 ### AC-4: LLM 专属异常体系
@@ -410,12 +413,12 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写基本调用测试（`patch("litellm.acompletion")` / 结构化输出 / 自由文本 / close / async with） |
+| 🔴 红 | 编写基本调用测试（`patch("litellm.acompletion")` / 结构化输出 / 自由文本 / close / async with / _check_closed 守卫） |
 | 🟢 绿 | 实现 `LitellmLLMClient.structured_generate()` + `generate()` |
 | 🔄 重构 | 添加 docstring、type hints |
 
 - [ ] Subtask 2.1: 🔴 红 — Mock 模式：`patch("litellm.acompletion")` + `MagicMock` 构造 mock_response
-- [ ] Subtask 2.2: 🟢 绿 — 实现 `structured_generate()`（litellm `acompletion` + `response_schema.model_validate_json()`）+ `generate()` + `close()`
+- [ ] Subtask 2.2: 🟢 绿 — 实现 `structured_generate()`（litellm `acompletion` + `response_schema.model_validate_json()`）+ `generate()` + `close()`（幂等，`_closed` 守卫）+ `_check_closed()`（关闭后抛 `ServiceUnavailableError`）+ `__aenter__`/`__aexit__`
 - [ ] Subtask 2.3: 🔄 重构
 
 #### TDD 循环 B：api_type 适配器（openai / anthropic / openai_responses）
@@ -499,7 +502,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
   )
   ```
 
-  并在 `shutdown()` 函数中新增 LLM Client 资源清理（对标 embedding_service 的 shutdown 模式 [Source: composition_root.py:1722-1728]）：
+  并在 `shutdown()` 函数中新增 LLM Client 资源清理（对标 `embedding_service` 的 shutdown 模式 [Source: composition_root.py:1721-1728]，独立 try/except 分支而非加入批量 managers 列表）：
   ```python
   # 关闭 llm_client HTTP 客户端连接池
   try:
