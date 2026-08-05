@@ -46,7 +46,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 - **多厂商支持**：通过 litellm 统一网关，支持 `openai`/`anthropic`/`openai_responses` 三种 api_type（SBOM Story 1.17 的 LLM API 兼容性调研）
 - **基础设施实现**：`LitellmLLMClient` — 实现 `LLMClientPort`，litellm + Pydantic JSON Mode 结构化输出
 - **容错机制**：参考 `EmbeddingAPIClient` [Source: src/infrastructure/external_services/embedding/embedding_api_client.py] — 熔断器（连续5次失败断开30秒）+ 指数退避重试（3次：1s→2s→4s）
-- **异常体系**：新增 LLM 专属异常 — `LLMAPIError`（EXCEPTION_321）/ `LLMResponseError`（EXCEPTION_322）/ `LLMConfigError`（EXCEPTION_323）
+- **异常体系**：新增 LLM 专属异常 — `LLMAPIError`（EXCEPTION_330）/ `LLMResponseError`（EXCEPTION_331）/ `LLMConfigError`（EXCEPTION_332）
 
 ---
 
@@ -61,7 +61,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 **And** 字段为 `CloudModelConfig` 的领域层镜像：`api_type` / `model` / `endpoint` / `api_key` / `temperature` / `max_tokens` / `timeout`
 **And** 支持类方法 `from_cloud_model_config(c: CloudModelConfig, timeout: float = 30.0) -> LLMConfig` 从 UDMR 配置转换
 **And** 支持类方法 `from_env() -> LLMConfig` 从独立环境变量构造（`LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` 等）
-**And** `from_env()` 在缺失 `api_key` 或 `endpoint+model` 时抛出 `LLMConfigError`（EXCEPTION_323）
+**And** `from_env()` 在缺失 `api_key` 或 `endpoint+model` 时抛出 `LLMConfigError`（EXCEPTION_332）
 **And** 领域层零外部依赖（dataclass/typing 为标准库）
 
 **验证标准/Validation Criteria:**
@@ -69,7 +69,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 - [ ] 字段列表：`api_type: Literal["openai", "anthropic", "openai_responses"] = "openai"` / `model: str = ""` / `endpoint: str = ""` / `api_key: str = ""` / `temperature: float = 0.7` / `max_tokens: int | None = None` / `timeout: float = 30.0`
 - [ ] `from_cloud_model_config()` 仅复制字段，不引入基础设施层依赖（类型通过参数传入）
 - [ ] `from_env()` 读取 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_TYPE` / `LLM_MAX_TOKENS` / `LLM_TEMPERATURE` / `LLM_TIMEOUT`
-- [ ] LLMConfigError 位于 `src/domain/exceptions/llm_exceptions.py`，继承 `ConfigurationError`（EXCEPTION_323）
+- [ ] LLMConfigError 位于 `src/domain/exceptions/llm_exceptions.py`，继承 `ConfigurationError`（EXCEPTION_332）
 
 ### AC-2: LLMClientPort 端口定义（领域层）
 
@@ -107,9 +107,9 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 - [ ] `LitellmLLMClient` 位于 `src/infrastructure/external_services/llm/litellm_llm_client.py`
 - [ ] 显式实现 `LLMClientPort` 协议
 - [ ] 容错模式参考 `EmbeddingAPIClient`（`_is_retryable_http_error` → `_is_retryable_llm_error`）
-- [ ] 熔断器复用 `CircuitBreaker`（`name="llm"`，与 `name="embedding"` 分布式独立）[Source: src/infrastructure/external_services/embedding/circuit_breaker.py]
+- [ ] 熔断器由 `LitellmLLMClient` 内部构造 `CircuitBreaker(name="llm")`，对标 `EmbeddingAPIClient` 的私有构造模式
 - [ ] 重试使用 `tenacity.AsyncRetrying`（与 EmbeddingAPIClient 一致）
-- [ ] `_encode()` 内部方法处理 litellm 调用 + 重试 + Pydantic 验证
+- [ ] `_map_llm_error()` 内联异常映射（**对标 EmbeddingAPIClient 的内联 `_map_exception` 模式**，不使用 `ErrorMapper` 外部映射）
 - [ ] 支持 `async with` 上下文管理器
 
 ### AC-4: LLM 专属异常体系
@@ -120,9 +120,9 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 
 | 异常类型 | 编码 | 继承 | HTTP | 使用场景 |
 |---------|------|------|------|----------|
-| `LLMAPIError` | EXCEPTION_321 | `ThirdPartyError` | 502 | LLM API 传输层错误（429 速率限制/401 认证失败/500+ 服务端错误） |
-| `LLMResponseError` | EXCEPTION_322 | `ThirdPartyError` | 502 | LLM API 响应格式/内容错误（400 context_length/invalid_request / JSON 不匹配 Schema） |
-| `LLMConfigError` | EXCEPTION_323 | `ConfigurationError` | 500 | LLM 配置错误（缺少 api_key/endpoint/model，api_type 非法） |
+| `LLMAPIError` | EXCEPTION_330 | `ThirdPartyError` | 502 | LLM API 传输层错误（429 速率限制/401 认证失败/500+ 服务端错误） |
+| `LLMResponseError` | EXCEPTION_331 | `ThirdPartyError` | 502 | LLM API 响应格式/内容错误（400 context_length/invalid_request / JSON 不匹配 Schema） |
+| `LLMConfigError` | EXCEPTION_332 | `ConfigurationError` | 500 | LLM 配置错误（缺少 api_key/endpoint/model，api_type 非法） |
 
 **并复用已有异常：**
 
@@ -136,7 +136,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 - [ ] `LLMAPIError` 构造器接受 `retry_after: float | None` / `endpoint: str | None` / `http_status: int | None` 可选参数
 - [ ] `LLMResponseError` 构造器接受 `schema_type: str | None` / `raw_content: str | None` 可选参数
 - [ ] 遵循 `sisys-uni-exception-design.md §3.12` 三阶段注册清单（设计 A1-A6 / 实现 B1-B7 / 验证 C1-C7）
-- [ ] 更新 `_code_ranges.py` 新增 `llm` 子域（321–329）
+- [ ] 更新 `_code_ranges.py` 新增 `llm` 子域（330–339）
 - [ ] EXCEPTION_HTTP_MAP 显式声明映射
 - [ ] 编码唯一性 + 子域范围测试通过
 
@@ -145,7 +145,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 **Given** LLM Client 基础设施已实现
 **When** 在 `src/composition_root.py` 注册
 **Then** `llm_client` 端口注册为 SINGLETON（全局唯一，缓存 httpx 连接池）
-**And** `llm_circuit_breaker` 作为独立端口注册（SINGLETON，name="llm"）
+**And** 熔断器由 `LitellmLLMClient` 内部构造（`CircuitBreaker(name="llm")`），**不做独立端口注册**（对标 `EmbeddingAPIClient` 模式：熔断器是其内部私有组件 [Source: src/infrastructure/external_services/embedding/embedding_api_client.py:118-123]）
 **And** `LLMConfig` 通过 lambda 工厂注入：
   - 优先从 `UDMRConfig.from_env()` 的第一个 enabled 云端配置转换（`LLMConfig.from_cloud_model_config(first_enabled_cloud, timeout=config.llm_timeout)`）
   - 如无云端配置，从 `LLMConfig.from_env()` 独立环境变量构造
@@ -153,8 +153,8 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 
 **验证标准/Validation Criteria:**
 - [ ] `llm_client` 端口名：`llm_client`，version: `v1.0.0`，owner: `search-team`
-- [ ] `llm_circuit_breaker` 端口名：`llm_circuit_breaker`，version: `v1.0.0`
-- [ ] 生命周期：均为 `SINGLETON`
+- [ ] 生命周期：`SINGLETON`
+- [ ] 熔断器**不作为独立端口注册**（对标 embedding 模式：私有构造，不暴露到 PortRegistry）
 - [ ] 端口契约测试同步更新
 
 ### AC-6: 验收测试
@@ -209,19 +209,21 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 | 端口名称 | 版本 | 接口 | 实现模块 | 生命周期 | Owner |
 |---------|------|------|----------|----------|-------|
 | `llm_client` | v1.0.0 | `LLMClientPort` | `LitellmLLMClient` | SINGLETON | search-team |
-| `llm_circuit_breaker` | v1.0.0 | `CircuitBreaker` | `CircuitBreaker` (name="llm") | SINGLETON | search-team |
+
+> **⚠️ 熔断器不作为独立端口注册**：对标 `EmbeddingAPIClient` 模式（`CircuitBreaker` 为其内部私有组件 [Source: embedding_api_client.py:118-123]），`LitellmLLMClient` 在构造器中自行创建 `CircuitBreaker(name="llm")`，不暴露到 PortRegistry。
 
 #### 领域异常契约 (Domain Exception Contract)
 
-> **策略：新增 LLM 子域异常（EXCEPTION_321–329）**，遵循 `sisys-uni-exception-design.md §3.12` 三阶段注册清单。编码遵循 `_code_ranges.py` 的 `CODE_RANGES` 表。
+> **策略：新增 LLM 子域异常（EXCEPTION_330–339）**，遵循 `sisys-uni-exception-design.md §3.12` 三阶段注册清单。编码遵循 `_code_ranges.py` 的 `CODE_RANGES` 表。
+> **⚠️ 编码选择理由：** OCR 子域已占用 320–329（`OCRConnectionError`=320, `OCRProcessingError`=321），external 大范围 301–399 中 330–339 为空闲区间。
 
 **新增异常清单：**
 
 | 异常类型 | 编码 | 继承 | HTTP | 关键 context 字段 |
 |---------|------|------|------|------------------|
-| `LLMAPIError` | EXCEPTION_321 | `ThirdPartyError` | 502 | `http_status`, `endpoint`, `retry_after` |
-| `LLMResponseError` | EXCEPTION_322 | `ThirdPartyError` | 502 | `schema_type`, `raw_content`（截断至500字符） |
-| `LLMConfigError` | EXCEPTION_323 | `ConfigurationError` | 500 | `missing_fields`, `invalid_value` |
+| `LLMAPIError` | EXCEPTION_330 | `ThirdPartyError` | 502 | `http_status`, `endpoint`, `retry_after` |
+| `LLMResponseError` | EXCEPTION_331 | `ThirdPartyError` | 502 | `schema_type`, `raw_content`（截断至500字符） |
+| `LLMConfigError` | EXCEPTION_332 | `ConfigurationError` | 500 | `missing_fields`, `invalid_value` |
 
 **设计决策：**
 - 不新增 `LLMRateLimitError`、`LLMAuthenticationError` 等细粒度异常 — 通过 `LLMAPIError` 的 `context` 字典携带差异化信息，降低异常类爆炸风险
@@ -451,17 +453,17 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 - [ ] Subtask 2.11: 🟢 绿
 - [ ] Subtask 2.12: 🔄 重构
 
-#### TDD 循环 E：异常映射
+#### TDD 循环 E：异常映射（内联模式，对标 EmbeddingAPIClient）
 
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写异常映射测试（401→LLMAPIError / 429→LLMAPIError / 400→LLMResponseError / 500+→LLMAPIError / Timeout→TimeoutError） |
-| 🟢 绿 | 实现 `_map_llm_error()` + `ErrorMapper.LLM_ERROR_MAP` |
+| 🟢 绿 | 实现 `_map_llm_error()` 内联方法（**对标 EmbeddingAPIClient 的内联 `_map_exception` 模式，不使用外部 ErrorMapper**） |
 | 🔄 重构 | |
 
 - [ ] Subtask 2.13: 🔴 红
 - [ ] Subtask 2.14: 🟢 绿 — `_map_llm_error()` 从 litellm 响应提取错误信息并映射为 LLMAPIError/LLMResponseError
-- [ ] Subtask 2.15: 🔄 重构 — 更新 `src/infrastructure/messaging/error_mapper.py`
+- [ ] Subtask 2.15: 🔄 重构
 
 **完成标准/Definition of Done:**
 - [ ] `LitellmLLMClient` 全部实现（核心调用 + api_type 适配 + 重试 + 熔断 + 异常映射）
@@ -482,28 +484,19 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 - [ ] Subtask 3.1: 🔴 红 — 扩展 `tests/contracts/test_port_contract_llm_client.py`
 - [ ] Subtask 3.2: 🟢 绿 — 注册端口：
   ```python
-  # 熔断器（name="llm"，与 embedding 的 name="embedding" 独立）
-  register_port(
-      name="llm_circuit_breaker",
-      version="v1.0.0",
-      interface=CircuitBreaker,
-      impl=lambda resolver: CircuitBreaker(name="llm"),
-      module="src.infrastructure.external_services.embedding.circuit_breaker",
-      lifetime=Lifetime.SINGLETON,
-      owner="search-team",
-      tags=("llm", "circuit-breaker"),
-  )
-
   # LLM Client — 按优先顺序构造 LLMConfig：
   # 1. 从 UDMR 配置的第一个 enabled 云端模型转换
   # 2. 降级到独立环境变量
+  #
+  # 熔断器由 LitellmLLMClient 内部构造（CircuitBreaker(name="llm")），
+  # 对标 EmbeddingAPIClient 模式，不做独立端口注册
+
   register_port(
       name="llm_client",
       version="v1.0.0",
       interface=LLMClientPort,
       impl=lambda resolver: LitellmLLMClient(
           config=_build_llm_config(),
-          circuit_breaker=resolver.resolve("llm_circuit_breaker"),
       ),
       module="src.infrastructure.external_services.llm.litellm_llm_client",
       lifetime=Lifetime.SINGLETON,
@@ -526,7 +519,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 - [ ] Subtask 3.3: 🔄 重构 — 验证现有测试无回归
 
 **完成标准/Definition of Done:**
-- [ ] `llm_client` + `llm_circuit_breaker` 端口注册完成
+- [ ] `llm_client` 端口注册完成
 - [ ] 端口契约测试通过
 - [ ] 已有测试全部通过（无回归）
 
@@ -566,7 +559,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 |------|------|------------------|
 | `CloudModelConfig` | `src/infrastructure/config/udmr.py` | `LLMConfig.from_cloud_model_config()` 的输入源 |
 | `UDMRConfig` | `src/infrastructure/config/udmr.py` | `_build_llm_config()` 读取 `cloud_configs[0]` + `llm_timeout` |
-| `CircuitBreaker` | `src/infrastructure/external_services/embedding/circuit_breaker.py` | 新实例 `CircuitBreaker(name="llm")`，与 embedding 独立 |
+| `CircuitBreaker` | `src/infrastructure/external_services/embedding/circuit_breaker.py` | 熔断器由 LitellmLLMClient 内部构造（`CircuitBreaker(name="llm")`），对标 embedding 模式，不做独立端口注册 |
 | API 兼容性调研 | Story 1.17 Dev Notes §LLM API 兼容性调研 | `LitellmLLMClient` 的 api_type 适配逻辑设计依据 |
 | Anthropic 格式差异表 | Story 1.17 Dev Notes §Anthropic 格式关键差异 | `_adapt_request_for_api_type()` 实现依据 |
 
@@ -653,12 +646,10 @@ src/
 │   │   │   └── circuit_breaker.py    # 复用: CircuitBreaker (name="llm")
 │   │   └── llm/
 │   │       ├── __init__.py            # 更新：导出 LitellmLLMClient
-│   │       ├── litellm_llm_client.py  # 🆕 LitellmLLMClient 实现
+│   │       ├── litellm_llm_client.py  # 🆕 LitellmLLMClient（内联熔断器+异常映射）
 │   │       └── cloud_health_checker.py # 复用 Story 1.17: CloudHealthChecker
-│   └── messaging/
-│       └── error_mapper.py            # 更新：新增 LLM_ERROR_MAP
 │
-└── composition_root.py                # 更新：注册 llm_client + llm_circuit_breaker
+└── composition_root.py                # 更新：注册 llm_client
 
 tests/
 ├── unit/
