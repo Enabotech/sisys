@@ -25,17 +25,17 @@ Story 3-2 是 Epic 3（智能检索与知识发现）的第三个故事（P0-2�
 - Story 3-3（战略领域词典库）：为规则基抽取提供领域专用词典
 
 **核心设计：LLM + 规则混合策略**
-- **规则基路径**（高精确率路径）：AC 自动机/正则/依存句法 — 高精确率（≥80%），确定性抽取
+- **规则基路径**（高精确率路径）：spaCy PhraseMatcher/正则/依存句法 — 高精确率（≥80%），确定性抽取
 - **LLM 语义路径**（高召回率路径）：Few-Shot + CoT + Schema 约束 — 高召回率（≥90%），覆盖规则无法处理的模糊表达
 - **冲突仲裁器**：规则基和 LLM 结果并集 + 加权置信度融合 → 三元组列表
 - **融合权重** (`rule_weight=0.6`, `llm_weight=0.4`): 初始经验值，定义于 `ConflictArbiter` 构造参数，V1+ 通过标注数据集校准
 
 **关键假设：**
-- LLM 调用：`LLMExtractor` 通过 `LLMInvocationPort`（新增领域端口）调用 LLM，由基础设施层 `OllamaAdapter` / `LiteLLMAdapter` 实现。UDMR 路由通过 `udmr_service.decide()` 获取路由决策（`RoutingDecided` 事件），LLMExtractor 据此选择调用目标
-- 规则基的 AC 自动机使用 `pyahocorasick` 库（Python C 扩展），正则/依存句法使用 `spaCy`（zh_core_web_sm 中文模型）
+- LLM 调用通过已有 UDMR 路由（`udmr_service.decide()` → `RoutingDecided` 事件），优先本地 Ollama+Qwen2.5，云端兜底
+- 规则基统一使用 `spaCy` + `zh_core_web_sm` 中文模型：PhraseMatcher（实体短语匹配）+ 正则（METRIC 模式）+ DependencyParser（SVO 三元组），三者复用同一个 `nlp` 对象，避免重复分词和额外依赖
 - 输出三元组写入 L5 Neo4j 图存储：通过 `L5GraphPort.create_entity()` 创建实体节点，通过 `L5GraphPort.create_relationship()` 创建关系边。`MemoryGraphPort.index_memory_relations()` 用于其他记忆索引场景，非本 Story 实体批量写入入口
 - MVP 阶段以中文语料为主要处理目标（战略文档、市场报告、会议纪要）
-- **种子词典**：MVP 阶段内嵌静态种子词典文件（`seed_data/entities.json`，50-100 条按实体类型均匀分布），Story 3-3 交付后将替换为动态词典管理。AC 自动机构造函数接受 `seed_dict: dict[str, list[str]] | None = None` 参数，支持空词典启动
+- **种子词典**：MVP 阶段内嵌静态种子词典文件（`seed_data/entities.json`，50-100 条按实体类型均匀分布），Story 3-3 交付后将替换为动态词典管理。PhraseMatcher 初始化接受 `seed_dict: dict[str, list[str]] | None = None` 参数，支持空词典启动
 
 ---
 
@@ -114,11 +114,11 @@ Story 3-2 是 Epic 3（智能检索与知识发现）的第三个故事（P0-2�
 - [ ] 应用层 `entity_extraction_service.py` 依赖 `EntityExtractorPort` + `L5GraphPort`（图写入）
 - [ ] `Triple.confidence` 值 ∈ [0.0, 1.0]，验证在 `__post_init__` 中
 
-### AC-3: 规则基抽取（AC 自动机 + 依存句法）
+### AC-3: 规则基抽取（spaCy PhraseMatcher + 正则 + 依存句法）
 
 **Given** 加载了领域词典（包含约 500 条种子实体：公司名/人名/产品/政策）
 **When** 系统执行规则基抽取
-**Then** AC 自动机扫描文本识别已知实体
+**Then** spaCy PhraseMatcher 基于 Token 序列匹配已知实体（词边界由 `zh_core_web_sm` 分词器保证）
 **And** 正则模式匹配 `METRIC` 类型（数字+单位模式：`\d+[\.\d]*\s*(亿|万|%|倍|美元|元|人|家|个)`）
 **And** spaCy 依存句法解析 `主谓宾` 三元组（nsubj → ROOT → dobj）
 **And** 规则基抽取准确率 ≥ 80%（组织/人物/产品 ≥ 90%，策略/事件 ≥ 70%）
@@ -126,11 +126,11 @@ Story 3-2 是 Epic 3（智能检索与知识发现）的第三个故事（P0-2�
 
 **验证标准/Validation Criteria:**
 - [ ] 规则基引擎位于 `src/infrastructure/extraction/rule_engine/` 目录
-- [ ] `AhoCorasickMatcher` 类：封装 `pyahocorasick.Automaton`，支持构建/匹配/按类型过滤
+- [ ] `PhraseMatcherAdapter` 类：封装 spaCy `PhraseMatcher`，支持 `add_patterns(seed_dict)` 按类型批量注册 + `match(doc) -> list[dict]` 返回匹配实体
 - [ ] `RegexPatternMatcher` 类：至少包含 METRIC（数字+单位）、日期百分比（如 `2024年Q3`）、金额（如 `300亿元`）
 - [ ] `DependencyParserMatcher` 类：封装 spaCy `zh_core_web_sm`，提取 SVO 三元组，合并共指关系
-- [ ] `RuleBasedExtractor` 类：组合上述三个匹配器，输出 `RawTriple`（subject_text/relation_text/object_text/confidence）
-- [ ] AC 自动机词典初始化在构造函数中完成（一次性加载），`extract()` 调用不重复构建
+- [ ] `RuleBasedExtractor` 类：组合上述三个匹配器（复用同一个 `nlp` 对象），输出 `RawTriple`（subject_text/relation_text/object_text/confidence）
+- [ ] PhraseMatcher 词典初始化在构造函数中完成（一次性加载，`nlp` 对象在三个匹配器间共享），`extract()` 调用不重复构建
 
 ### AC-4: LLM 语义抽取（Few-Shot + CoT + Schema 约束）
 
@@ -346,7 +346,7 @@ CoT 步骤：
 |---------|------|----------|
 | `ValidationError` | EXCEPTION_201 | 输入文本为空/过长（>50K tokens）、Schema 验证失败 |
 | `EntityBusinessRuleError` | EXCEPTION_244 | 抽取结果违反业务约束（如三元组 subject==object） |
-| `ConfigurationError` | EXCEPTION_101 | AC 自动机词典文件不存在/spaCy 模型未安装 |
+| `ConfigurationError` | EXCEPTION_101 | spaCy 模型未安装/种子词典文件不存在 |
 
 **设计决策：**
 - `EntityExtractionError` 使用 entity 子域编码 245，继承 `EntityBusinessRuleError`（entity 子域），表示抽取失败是 entity 层面的业务异常
@@ -377,7 +377,7 @@ CoT 步骤：
 - `src/domain/value_objects/entity_types.py` → 仅 `enum` 标准库
 - `src/domain/value_objects/triple.py` → 仅 `dataclasses` 标准库
 - `src/domain/ports/entity_extractor.py` → 仅 `typing` 标准库
-- `src/infrastructure/extraction/rule_engine/` → 可依赖 `pyahocorasick`, `spacy`（第三方库）
+- `src/infrastructure/extraction/rule_engine/` → 可依赖 `spacy`（第三方库，三个匹配器共享 nlp 对象）
 - `src/infrastructure/extraction/llm_extractor.py` → 可依赖 `httpx`（通过 UDMR 间接调用 LLM）
 
 ---
@@ -397,15 +397,15 @@ CoT 步骤：
 - [ ] **0.10** 更新 `config/event_channels.yaml` 和 `channel_router.py`
 
 ### Task 1: 规则基抽取引擎 (AC-3)
-- [ ] **1.1** TDD 红：编写 `AhoCorasickMatcher` 单元测试（构建/匹配/类型过滤）
-- [ ] **1.2** TDD 绿：实现 `AhoCorasickMatcher` — 封装 `pyahocorasick.Automaton`
+- [ ] **1.1** TDD 红：编写 `PhraseMatcherAdapter` 单元测试（按类型批量注册/匹配/空词典）
+- [ ] **1.2** TDD 绿：实现 `PhraseMatcherAdapter` — 封装 spaCy `PhraseMatcher`，共享 `nlp` 对象
 - [ ] **1.3** TDD 红：编写 `RegexPatternMatcher` 单元测试（METRIC/日期百分比/金额 3 个模式）
 - [ ] **1.4** TDD 绿：实现 `RegexPatternMatcher` — 编译预定义正则模式
 - [ ] **1.5** TDD 红：编写 `DependencyParserMatcher` 单元测试（SVO 三元组提取）
 - [ ] **1.6** TDD 绿：实现 `DependencyParserMatcher` — 封装 spaCy 依存句法
-- [ ] **1.7** TDD 红：编写 `RuleBasedExtractor` 单元测试（三匹配器组合 + 准确率验证）
+- [ ] **1.7** TDD 红：编写 `RuleBasedExtractor` 单元测试（三匹配器共享 nlp + 准确率验证）
 - [ ] **1.8** TDD 绿：实现 `RuleBasedExtractor` — 组合匹配器，产出 `RawTriple`
-- [ ] **1.9** TDD 绿：集成 AC 词典种子数据文件（JSON 格式，按实体类型组织）
+- [ ] **1.9** TDD 绿：集成实体种子词典文件（JSON 格式，按实体类型组织）
 
 ### Task 2: LLM 语义抽取 (AC-4)
 - [ ] **2.1** TDD 红：编写 `LLMExtractor` 单元测试（Mock UDMR Service 验证 Prompt 构建）
@@ -489,7 +489,7 @@ CoT 步骤：
 | `tests/unit/domain/value_objects/test_triple.py` | 单元 | Triple frozen dataclass |
 | `tests/unit/domain/value_objects/test_extraction_result.py` | 单元 | ExtractionResult/ExtractedEntity/ExtractionStatistics |
 | `tests/unit/domain/services/test_conflict_arbiter.py` | 单元 | ConflictArbiter 融合逻辑 |
-| `tests/unit/infrastructure/extraction/test_ac_matcher.py` | 单元 | AhoCorasickMatcher |
+| `tests/unit/infrastructure/extraction/test_phrase_matcher.py` | 单元 | PhraseMatcherAdapter |
 | `tests/unit/infrastructure/extraction/test_regex_matcher.py` | 单元 | RegexPatternMatcher |
 | `tests/unit/infrastructure/extraction/test_dep_parser_matcher.py` | 单元 | DependencyParserMatcher |
 | `tests/unit/infrastructure/extraction/test_rule_extractor.py` | 单元 | RuleBasedExtractor 组合 |
@@ -560,11 +560,11 @@ CoT 步骤：
 | `src/infrastructure/extraction/__init__.py` | infrastructure | 抽取模块初始化 |
 | `src/infrastructure/extraction/hybrid_entity_extractor.py` | infrastructure | `HybridEntityExtractor`（实现 `EntityExtractorPort`，组合 RuleBasedExtractor + LLMExtractor + ConflictArbiter） |
 | `src/infrastructure/extraction/rule_engine/__init__.py` | infrastructure | 规则引擎模块初始化 |
-| `src/infrastructure/extraction/rule_engine/ac_matcher.py` | infrastructure | `AhoCorasickMatcher` |
+| `src/infrastructure/extraction/rule_engine/ac_matcher.py` | infrastructure | `PhraseMatcherAdapter`（spaCy 内置 PhraseMatcher） |
 | `src/infrastructure/extraction/rule_engine/regex_matcher.py` | infrastructure | `RegexPatternMatcher` |
 | `src/infrastructure/extraction/rule_engine/dep_parser_matcher.py` | infrastructure | `DependencyParserMatcher` |
 | `src/infrastructure/extraction/rule_engine/rule_extractor.py` | infrastructure | `RuleBasedExtractor` 组合引擎 |
-| `src/infrastructure/extraction/rule_engine/seed_data/entities.json` | infrastructure | AC 自动机种子词典（MVP 50-100 条） |
+| `src/infrastructure/extraction/rule_engine/seed_data/entities.json` | infrastructure | 种子实体词典（PhraseMatcher 用，MVP 50-100 条） |
 | `src/infrastructure/extraction/llm_extractor.py` | infrastructure | `LLMExtractor`（UDMR 路由 + Few-Shot + CoT） |
 | `src/infrastructure/extraction/prompts/__init__.py` | infrastructure | Prompt 模板初始化 |
 | `src/infrastructure/extraction/prompts/entity_extraction_examples.py` | infrastructure | Few-Shot 示例集（8-10 个） |
@@ -579,7 +579,7 @@ CoT 步骤：
 | LLM 中文实体抽取质量不稳定 | 召回率 < 90% | 3 个精心设计的中文战略领域 Few-Shot 示例 + CoT 分步推理 |
 | spaCy `zh_core_web_sm` 在战略文本上精度不足 | 依存句法 SVO 提取准确率低 | `DependencyParserMatcher` 添加领域特定规则补充（如 "X投资Y"、"X收购Y" 式模板） |
 | LLM 调用延迟超 10s | 整体延迟超标 | UDMR 本地路由（Ollama+Qwen2.5）优先；重试策略增加超时控制，MVP 接受 < 15s |
-| AC 自动机内存占用过大（>100MB） | 容器内存不足 | 种子词典限 500 条；超出时按频率 Top-K 筛选 |
+| PhraseMatcher 词典过大导致 spaCy pipeline 启动慢 | Doc 处理延迟增加 | 种子词典限 500 条（spaCy PhraseMatcher 在 500 条规模下匹配耗时 < 1ms）；超出时按频率 Top-K 筛选 |
 
 ---
 
@@ -597,10 +597,9 @@ CoT 步骤：
 - 测试覆盖率门禁：领域层 ≥ 90%、应用层 ≥ 85%、基础设施层 ≥ 80%
 
 ### 注意事项
-- `pyahocorasick` 和 `spaCy` 需要添加至 `pyproject.toml` 依赖并安装。`pyahocorasick` 是 C 扩展，需要编译环境（Linux: gcc/python3-dev；Windows: Visual C++ Build Tools）
-- spaCy 模型需在测试前下载：`python -m spacy download zh_core_web_sm`（约 45MB）
-- 应确认 `zh_core_web_sm` 已在 CI runner 镜像中预装（参见 Epic 0）
-- Task 0（SDD 规范定义）中新增子任务 0.0：验证并安装所有第三方依赖，确认 CI runner 编译环境
+- spaCy `zh_core_web_sm` 模型需在测试前下载：`python -m spacy download zh_core_web_sm`（约 45MB）；应确认 CI runner 镜像已预装（参见 Epic 0）
+- 三个规则基匹配器共享同一个 `nlp` 对象以降低内存和初始化成本，`RuleBasedExtractor` 构造函数接受 `nlp` 参数注入
+- 单元测试中 `RuleBasedExtractor` 需 mock `nlp` 对象（`Morphology` 需 `label_data`），参考 `tests/conftest.py` 中的 `mock_nlp` fixture
 
 ---
 
@@ -608,10 +607,9 @@ CoT 步骤：
 
 | 组件 | 版本 | 用途 |
 |------|------|------|
-| `pyahocorasick` | ^2.0+ | AC 自动机——规则基匹配（需添加至 pyproject.toml 依赖） |
-| `spaCy` | ^3.7+ | 依存句法解析（需添加至 pyproject.toml 依赖） |
-| `zh_core_web_sm` | latest | spaCy 中文模型 |
-| `httpx` | ^0.27+ (已有) | LLM HTTP 调用（LLMInvocationPort 的实现层） |
+| `spaCy` | ^3.7+ | PhraseMatcher（实体短语匹配）+ DependencyParser（SVO 三元组）— 需添加至 pyproject.toml 依赖 |
+| `zh_core_web_sm` | latest | spaCy 中文模型（分词/词性标注/依存句法） |
+| `httpx` | ^0.27+ (已有) | LLM HTTP 调用（通过 UDMR 路由间接） |
 | LiteLLM | ^1.28+ (已有) | LLM 统一接口（LLMInvocationPort 的云端实现，间接依赖） |
 
 ---
