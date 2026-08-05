@@ -193,15 +193,24 @@ def then_page_structure(context: dict[str, Any]) -> None:
         assert isinstance(d["images"], list)
 
 
-@then("每个元素的 bbox 字段值为 null")
-def then_bbox_is_null(context: dict[str, Any]) -> None:
-    """验证 bbox 字段为 null"""
+@then("每个元素的 bbox 字段包含归一化坐标 [0, 1]")
+def then_bbox_is_normalized(context: dict[str, Any]) -> None:
+    """验证 bbox 字段为非 None 归一化坐标 [0, 1]"""
     result = context["parse_result"]
     for page in result.pages:
         for elem in page.texts:
-            assert elem.to_dict()["bbox"] is None
+            bbox = elem.to_dict()["bbox"]
+            assert bbox is not None, f"页 {page.page_number} 文本元素 bbox 不应为 None"
+            assert 0.0 <= bbox["x"] <= 1.0, f"bbox.x={bbox['x']} 超出 [0,1]"
+            assert 0.0 <= bbox["y"] <= 1.0, f"bbox.y={bbox['y']} 超出 [0,1]"
+            assert 0.0 <= bbox["width"] <= 1.0, f"bbox.width={bbox['width']} 超出 [0,1]"
+            assert 0.0 <= bbox["height"] <= 1.0, f"bbox.height={bbox['height']} 超出 [0,1]"
+            assert bbox["page"] == page.page_number
         for table in page.tables:
-            assert table.to_dict()["bbox"] is None
+            # 表格 bbox 可能仍为 None（PDFParser 不提取表格 bbox）
+            bbox = table.to_dict()["bbox"]
+            if bbox is not None:
+                assert 0.0 <= bbox["x"] <= 1.0
 
 
 @then("解析状态为 completed")

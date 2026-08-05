@@ -44,6 +44,9 @@ _DOCLAYNET_LABELS: dict[int, str] = {
 # 默认置信度过滤阈值
 _DEFAULT_CONFIDENCE_THRESHOLD = 0.5
 
+# ONNX 模型输入尺寸（_preprocess 统一 resize 到此尺寸）
+_MODEL_INPUT_SIZE = 640
+
 
 class OnnxLayoutDetector:
     """基于 onnxruntime 的版面检测实现
@@ -172,7 +175,8 @@ class OnnxLayoutDetector:
     def _postprocess(self, outputs: list[Any], page_number: int) -> list[BoundingBoxResult]:
         """后处理模型输出，转换为 BoundingBoxResult 列表
 
-        将 ONNX 输出的 xyxy 坐标转换为 BoundingBox 的 xywh 格式，
+        将 ONNX 输出的 xyxy 像素坐标转换为 BoundingBox 的 xywh 格式，
+        归一化到 [0, 1] 页面坐标空间（除以模型输入尺寸 _MODEL_INPUT_SIZE），
         并过滤低于置信度阈值的结果。
 
         Args:
@@ -180,7 +184,7 @@ class OnnxLayoutDetector:
             page_number: 页码
 
         Returns:
-            过滤后的 BoundingBoxResult 列表
+            过滤后的 BoundingBoxResult 列表（坐标已归一化到 [0, 1]）
         """
         results: list[BoundingBoxResult] = []
 
@@ -216,11 +220,12 @@ class OnnxLayoutDetector:
                 logger.warning("检测坐标异常 (x1=%.2f, y1=%.2f, x2=%.2f, y2=%.2f)，跳过", x1, y1, x2, y2)
                 continue
 
+            # 归一化到 [0, 1] 页面坐标空间（与 PDFParser bbox 坐标系一致）
             bbox = BoundingBox(
-                x=x1,
-                y=y1,
-                width=width,
-                height=height,
+                x=x1 / _MODEL_INPUT_SIZE,
+                y=y1 / _MODEL_INPUT_SIZE,
+                width=width / _MODEL_INPUT_SIZE,
+                height=height / _MODEL_INPUT_SIZE,
                 page=page_number,
             )
 

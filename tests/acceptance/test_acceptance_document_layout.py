@@ -221,11 +221,11 @@ def result_label_is_doclaynet_category(context: dict[str, Any]) -> None:
 def coordinates_are_xywh_format(context: dict[str, Any]) -> None:
     results = context["detect_results"]
     bbox = results[0].bbox
-    # xyxy [10,20,110,70] → xywh (x=10, y=20, w=100, h=50)
-    assert bbox.x == 10.0
-    assert bbox.y == 20.0
-    assert bbox.width == 100.0
-    assert bbox.height == 50.0
+    # xyxy [10,20,110,70] → xywh 归一化: x=10/640, y=20/640, w=100/640, h=50/640
+    assert bbox.x == pytest.approx(10.0 / 640)
+    assert bbox.y == pytest.approx(20.0 / 640)
+    assert bbox.width == pytest.approx(100.0 / 640)
+    assert bbox.height == pytest.approx(50.0 / 640)
 
 
 @given("ONNX 模型文件路径不存在")

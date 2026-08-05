@@ -562,13 +562,11 @@ MIT 许可证，原生 ONNX 模型预导出，符合 SISYS 企业商业软件合
 | 匹配策略 | 一一对应 | 检测区域被匹配后不再参与后续匹配；元素被匹配后不再参与后续匹配 |
 | 页面隔离 | 必须同页 | `bbox.page` 相同才能匹配 |
 
-> **MVP 降级说明（v1.4.0 审查修订）：**
+> **匹配策略（v2.0 2026-08-05 更新）：**
 > `layout_matching.py` 中 `match_detections()` 已正确实现 IoU 空间匹配算法并通过完整测试。
-> 但当前 `PDFParser` 不输出 bbox（所有 `ParsedElement.bbox=None`），IoU 匹配无法工作（两个 None bbox 无法计算 IoU）。
-> 因此 `_apply_layout_detection()` 采用**顺序索引匹配**作为 MVP 临时方案：
-> - Table 标签检测结果（`label='Table'`）按顺序映射到 `ParsedTable.bbox`
-> - 非 Table 检测结果按顺序映射到 `ParsedElement.bbox`
-> - 当 `PDFParser` 未来输出真实坐标时，需切换为 `match_detections()` IoU 算法
+> PDFParser 通过 `visitor_text` 输出归一化 [0, 1] bbox，OnnxLayoutDetector 同样输出归一化坐标。
+> `_apply_layout_detection()` 主路径使用 `_match_by_iou()` → `match_detections()` IoU 空间匹配。
+> 降级路径保留：visitor_text 失败/非 PDF 格式时回退为顺序索引匹配。
 
 **边缘情况处理：**
 - 多检测区域覆盖同一元素：首个匹配的检测区域（最高 IoU）"消费"该元素，后续检测区域无法再匹配
