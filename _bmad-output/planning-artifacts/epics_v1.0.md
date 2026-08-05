@@ -1154,7 +1154,7 @@ So that **检索结果更符合语义完整性**。
 |-------|------|---------|---------|-----------|
 | Story 3.1a | **Dense 语义检索** | 支持语义相似度检索（bge-m3 嵌入） | 依赖 Epic 1 Story 1.6（Qdrant） | **P0-1a（关键路径）** |
 | Story 3.1b | **BM25 稀疏检索 + RRF 融合** | 支持关键词检索，与 Dense 检索融合 | 依赖 Story 3.1a | **P0-1b（关键路径）** |
-| Story 3.2a | **LLM Client 基础设施** | 统一 LLM 调用端口（结构化输出 + 熔断 + 重试），供所有 LLM 相关 Story 复用 | 无（参考 EmbeddingAPIClient 模式） | **P0-1c（公共基础设施）** |
+| Story 3.2a | **LLM Client 基础设施** | 统一 LLM 调用端口（结构化输出 + 熔断 + 重试），供所有 LLM 相关 Story 复用 | 依赖 Story 1.17（UDMR 路由） | **P0-1c（公共基础设施）** |
 | Story 3.2b | 实体抽取（LLM+ 规则混合） | 构建知识图谱的实体和关系 | 依赖 Story 3.1b + Story 3.2a | P0-2 |
 | Story 3.3 | 战略领域词典库管理 | 实体抽取准确率持续提升 | 依赖 Story 3.2b | P1-3 |
 | Story 3.4 | RRF 融合排序 | 综合多种检索信号提升相关性 | 依赖 Story 3.1b | P0-4 |
@@ -4339,6 +4339,7 @@ graph TD
     %% Epic 3 内部依赖 (检索流水线)
     S3_1a --> S3_1b
     S3_1b --> S3_2b
+    S1_17 --> S3_2a
     S3_2a --> S3_2b
     S3_2b --> S3_3
     S3_1b --> S3_4
@@ -4599,7 +4600,7 @@ Epic 21 (📋 待开始 · 可与 Epic 2-6 并行)
 | P1-7 | Epic 2 | 2.7 (元数据校验) | 📋 backlog | Story 2.2a | 2 天 |
 | P1-8 | Epic 2 | 2.8 (语义分块) | 📋 backlog | Story 2.2a | 3 天 |
 | P1-2b | Epic 2 | 2.2b (扩展格式) | 📋 backlog | Story 2.2a | 5 天 |
-| P0-1c | Epic 3 | 3.2a (LLM Client 基础设施) | 📋 backlog | 无（参考 EmbeddingAPIClient 模式） | 3 天 |
+| P0-1c | Epic 3 | 3.2a (LLM Client 基础设施) | 📋 backlog | Story 1.17（UDMR 路由） | 3 天 |
 | P0-2 | Epic 3 | 3.2b (实体抽取) | 📋 backlog | Story 3.1b + Story 3.2a | 4 天 |
 | P0-4 | Epic 3 | 3.4 (RRF 融合排序) | 📋 backlog | Story 3.1b | 3 天 |
 | P0-5 | Epic 3 | 3.5 (分层检索 L1-L4) | 📋 backlog | Story 3.4 | 4 天 |
@@ -4641,7 +4642,7 @@ Epic 21 (📋 待开始 · 可与 Epic 2-6 并行)
 |-------|---------|---------|---------|---------|------|
 | **3.1a** (Dense 语义检索) | 1.6 ✅ | 3.1b, 3.9 | Hard | ✅ 检索核心 | 📋 backlog |
 | **3.1b** (BM25+RRF 融合) | 3.1a | 3.2b, 3.4 | Hard | ✅ 检索核心 | 📋 backlog |
-| **3.2a** (LLM Client 基础设施) | 无（参考 EmbeddingAPIClient） | 3.2b, 3.6, 4.5, 5.1 | Hard | ✅ 公共基础设施 | 📋 backlog |
+| **3.2a** (LLM Client 基础设施) | 1.17（UDMR 路由） | 3.2b, 3.6, 4.5, 5.1 | Hard | ✅ 公共基础设施 | 📋 backlog |
 | **3.2b** (实体抽取) | 3.1b, 3.2a | 3.3 | Soft | - | 📋 backlog |
 | **3.3** (领域词典管理) | 3.2b | - | Soft | - | 📋 backlog |
 | **3.4** (RRF 融合排序) | 3.1b | 3.5 | Hard | ✅ 排序核心 | 📋 backlog |
