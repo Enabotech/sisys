@@ -187,6 +187,13 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 - `LLMConfig.from_env()` 时 endpoint 格式无效 → `LLMConfigError`
 - 运行时目标 URL 不可达 → `NetworkError`（EXCEPTION_102）
 
+> **⚠️ 验收测试策略（混合模式）：** 基于同类项目验收测试（OCR/Embedding/Dense Search）的调研结论：
+> - **真实 API 场景（2 个）**：Happy Path（`structured_generate` + `generate`）— 真实 LLM API 调用，API 不可用时 `pytest.skip`
+> - **Mock 注入场景（8 个）**：401/429/400/5xx/熔断断开/超时/JSON 不匹配/URL 不可达 — 通过 `patch("litellm.acompletion")` mock 注入异常响应。429 场景**不应尝试真实触发**（成本高、不可复现、与 xdist 并行执行冲突）
+> - **配置层测试（1 个）**：`LLMConfigError` — 通过 `patch.dict(os.environ)` 设置无效环境变量触发
+> - **熔断器验收**：使用真实 `CircuitBreaker` 实例 + mock litellm 调用，连续 3 次 mock 失败后验证第 4 次快速拒绝
+> - **Service marker**：`tests/acceptance/conftest.py` 的 `_SERVICE_MARKERS` 需新增 `"llm": "llm"` 条目
+
 ---
 
 ## 🏗️ SDD+TDD 融合开发
@@ -698,7 +705,10 @@ UDMRConfig.from_env() ────────┤
 |------|---------------------|-------------------|------|
 | failure_threshold | 5 次 | 3 次 | LLM API 调用成本更高（token 计费），更快速熔断以减少无效消费 |
 | recovery_timeout | 30 秒 | 60 秒 | LLM API 故障恢复通常需要分钟级（服务重启/限流窗口重置），30 秒过短 |
+| half_open_max_calls | 1 | 1 | 仅允许一个探测请求，减少无效消费（LLM 每次探测消耗 token） |
 | 单次调用延迟 | 毫秒级（<100ms） | 秒级（2-30s+） | LLM 延迟更高，连续失败的检测时间更长，恢复应更保守 |
+
+> **⚠️ 实施注意：** `CircuitBreaker` 默认值为 `failure_threshold=5, recovery_timeout=30.0`，必须显式传参覆盖：`CircuitBreaker(failure_threshold=3, recovery_timeout=60.0, half_open_max_calls=1, name="llm-api")`。熔断器按**调用级**（非 HTTP 请求级）计数——`on_failure()` 在整个 `_encode()`/`structured_generate()` 失败后调用一次（tenacity 重试不计入熔断器计数），对标 `EmbeddingAPIClient` 模式。
 
 **决策理由：** LLM API 的时间尺度和成本模型与 Embedding API 本质不同——每次 LLM 调用消耗 token 成本（计费）且延迟远高于 Embedding。快速熔断（3 次而非 5 次）减少经济损失，更长恢复期（60s 而非 30s）匹配实际的 API 恢复时间。阈值可通过 `LLMConfig` 扩展字段覆盖，满足不同 LLM 厂商的差异化需求。
 
