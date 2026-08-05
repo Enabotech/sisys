@@ -36,6 +36,7 @@ Story 3-2 是 Epic 3（智能检索与知识发现）的第三个故事（P0-2�
 - 输出三元组写入 L5 Neo4j 图存储：通过 `L5GraphPort.create_entity()` 创建实体节点，通过 `L5GraphPort.create_relationship()` 创建关系边。`MemoryGraphPort.index_memory_relations()` 用于其他记忆索引场景，非本 Story 实体批量写入入口
 - MVP 阶段以中文语料为主要处理目标（战略文档、市场报告、会议纪要）
 - **种子词典**：MVP 阶段内嵌静态种子词典文件（`seed_data/entities.json`，50-100 条按实体类型均匀分布），Story 3-3 交付后将替换为动态词典管理。PhraseMatcher 初始化接受 `seed_dict: dict[str, list[str]] | None = None` 参数，支持空词典启动
+  - JSON 格式：`{"ORGANIZATION": ["华为", "财政部", "中国证监会"], "PERSON": ["任正非", "马斯克"], "PRODUCT": ["P60手机", "ChatGPT"], ...}` — 顶层键为 `EntityType` 值，值为实体名称列表。完整示例见 Task 0.11 子任务
 
 ---
 
@@ -75,6 +76,8 @@ Story 3-2 是 Epic 3（智能检索与知识发现）的第三个故事（P0-2�
 | `DEPENDS_ON` | 已有 | 有向 | 依赖关系（A → B） |
 
 **注：** 上表仅展示与实体抽取直接相关的关系类型。已有类型 `MENTIONS`、`RELATES_TO`、`CONTRADICTS` 在本 Story 中不会被实体抽取引擎产出，但其枚举值在 `RelationshipType` 中保留不变（总计 13 种 = 7 新增 + 6 已有）。
+
+**无向关系 Neo4j 建模策略：** `COMPETES_WITH` 在语义上是双向等价的无向关系。Neo4j 原生仅支持有向边，建模策略为：按 `entity_id` 字典序确定方向（`source_id < target_id`），边始终从字典序较小的节点指向较大的节点。查询时使用 `(a)-[:COMPETES_WITH]-(b)`（忽略方向）获取完整竞争关系。此转换在 `HybridEntityExtractor` 持久化阶段执行，对 `ConflictArbiter` 透明。`INFLUENCES` 作为双向关系同样遵循此策略，并在边属性中标注 `bidirectional: true`。
 
 **验证标准/Validation Criteria:**
 - [ ] 领域层 `src/domain/value_objects/entity_types.py` — `EntityType` StrEnum（9 种实体类型，含 `OTHER` 兜底类型）
@@ -123,7 +126,7 @@ Story 3-2 是 Epic 3（智能检索与知识发现）的第三个故事（P0-2�
 **Then** spaCy PhraseMatcher 基于 Token 序列匹配已知实体（词边界由 `zh_core_web_sm` 分词器保证）
 **And** 正则模式匹配 `METRIC` 类型（数字+单位模式：`\d+[\.\d]*\s*(亿|万|%|倍|美元|元|人|家|个)`）
 **And** spaCy 依存句法解析 `主谓宾` 三元组（nsubj → ROOT → dobj）
-**And** 规则基抽取准确率 ≥ 80%（组织/人物/产品 ≥ 90%，策略/事件 ≥ 70%）
+**And** 规则基抽取精确率 (Precision) ≥ 80%（ORGANIZATION/PERSON/PRODUCT ≥ 90%，策略/事件 ≥ 70%）
 **And** 每次调用延迟 P95 < 1000ms（纯规则路径，不含 LLM，文本长度 < 2000 tokens）
 
 **验证标准/Validation Criteria:**
@@ -177,6 +180,7 @@ CoT 步骤：
   - 通过 `llm_invoker.invoke(model, prompt)` 发送 LLM 请求（基础设施层 `OllamaAdapter` / `LiteLLMAdapter` 实现）
   - 解析 JSON 输出 → `jsonschema.validate()` 验证 Schema → 类型转换修复 → 返回 `list[RawTriple]` + `list[RawEntity]`
 - [ ] LLM 输出 JSON 解析 + Schema 验证失败时重试 1 次（重新请求 + 强调 Schema），第 2 次失败抛出 `LLMExtractionError`，由上游 `HybridEntityExtractor.extract()` 捕获并降级为纯规则基结果
+- [ ] LLM 返回合法 JSON 且 Schema 验证通过但 `entities`/`triples` 为空数组时：记录 WARNING 日志（`"LLM returned valid but empty extraction result"`），不触发重试（避免无效调用浪费），直接返回空结果。此场景表明文本中无可识别实体，属于正常业务结果而非错误
 - [ ] Few-Shot 示例存储在 `src/infrastructure/extraction/prompts/entity_extraction_examples.py` 中（3 个示例，覆盖 5+ 实体类型和高频关系类型）
 - [ ] CoT 推理链嵌入每个 Few-Shot 示例的 `reasoning` 字段中，展示完整推理过程：实体识别 → 规范化 → 关系判断 → 置信度评估
 - [ ] 使用 `ollama` 的 `format: json` 参数确保输出合法 JSON；引入 `jsonschema.validate()` 做 Schema 后处理验证
@@ -258,6 +262,52 @@ CoT 步骤：
 | `entity_extraction_event_handler` | （事件处理器） | `EntityExtractionHandler`（lambda 工厂注入 `entity_extraction_service`） | SINGLETON | `extraction, handler, application` |
 
 **And** 已有 `l5_graph`, `memory_graph_storage`, `udmr_service`, `event_publisher`, `event_subscriber` 端口复用
+
+**Composition Root 注册参考模式（lambda 工厂注入）：**
+
+```python
+# entity_extractor — SCOPED（每次请求新建，组合三个组件）
+container.register(
+    "entity_extractor",
+    EntityExtractorPort,
+    lambda: HybridEntityExtractor(
+        rule_extractor=RuleBasedExtractor(nlp=spacy.load("zh_core_web_sm")),
+        llm_extractor=LLMExtractor(
+            udmr_service=container["udmr_service"],
+            llm_invoker=container.get("llm_invoker", _create_ollama_adapter()),
+        ),
+        arbiter=ConflictArbiter(rule_weight=0.6),
+    ),
+    lifetime=LifeTime.SCOPED,
+    tags=["extraction", "entity", "infrastructure"],
+)
+
+# entity_extraction_service — SCOPED
+container.register(
+    "entity_extraction_service",
+    EntityExtractionService,
+    lambda: EntityExtractionService(
+        extractor=container["entity_extractor"],
+        graph_port=container["l5_graph"],
+        event_publisher=container["event_publisher"],
+    ),
+    lifetime=LifeTime.SCOPED,
+    tags=["extraction", "entity", "application"],
+)
+
+# entity_extraction_event_handler — SINGLETON（启动时注册订阅）
+handler = EntityExtractionHandler(
+    extraction_service=container["entity_extraction_service"],
+    subscriber=container["event_subscriber"],
+)
+handler.register()  # 内部调用 subscriber.subscribe_async("DocumentProcessed", handler.handle)
+container.register(
+    "entity_extraction_event_handler",
+    lambda: handler,
+    lifetime=LifeTime.SINGLETON,
+    tags=["extraction", "handler", "application"],
+)
+```
 
 **验证标准/Validation Criteria:**
 - [ ] `entity_extractor` 端口注册到 Composition Root（SCOPED lifetime）
@@ -385,6 +435,19 @@ CoT 步骤：
 - `src/domain/value_objects/entity_types.py` → 仅 `enum` 标准库
 - `src/domain/value_objects/triple.py` → 仅 `dataclasses` 标准库
 - `src/domain/ports/entity_extractor.py` → 仅 `typing` 标准库
+- `src/domain/ports/llm_invocation.py` → 仅 `typing` 标准库。`LLMInvocationPort` Protocol 定义了 LLM API 调用抽象：
+  ```python
+  @runtime_checkable
+  class LLMInvocationPort(Protocol):
+      async def invoke(self, model: str, messages: list[dict[str, str]],
+                       temperature: float = 0.1, max_tokens: int = 4096,
+                       response_format: dict[str, str] | None = None) -> str:
+          """调用 LLM API 并返回原始文本响应（通常为 JSON 字符串）。
+           败时抛出 LLMExtractionError。"""
+      async def health_check(self) -> bool:
+          """检查 LLM 服务可用性。"""
+  ```
+  `OllamaAdapter`（基础设施层）和 `LiteLLMAdapter` 均实现此端口。`response_format` 参数透传 `{"type": "json_object"}` 等 Ollama/OpenAI 格式参数
 - `src/infrastructure/extraction/rule_engine/` → 可依赖 `spacy`（第三方库，三个匹配器共享 nlp 对象）
 - `src/infrastructure/extraction/llm_extractor.py` → 可依赖 `httpx`（通过 UDMR 间接调用 LLM）
 
@@ -395,7 +458,7 @@ CoT 步骤：
 ### Task 0: SDD 规范定义 (AC: 全部)
 - [ ] **0.1** 创建 `EntityType` StrEnum 值对象（9 种实体类型，含 `OTHER` 兜底类型）
 - [ ] **0.2** 创建 `Triple` frozen dataclass 值对象（含 `__post_init__` 验证）
-- [ ] **0.3** 创建 `ExtractedEntity`、`ExtractionResult`、`ExtractionStatistics` frozen dataclass
+- [ ] **0.3** 创建 `ExtractedEntity`、`EntityExtractionResult`、`ExtractionStatistics` frozen dataclass
 - [ ] **0.4** 创建 `EntityRelation` frozen dataclass 值对象
 - [ ] **0.5** 创建 `EntityExtractorPort` 领域端口 Protocol
 - [ ] **0.6** 扩展 `RelationshipType` StrEnum（基础设施层 DTO）
@@ -463,9 +526,9 @@ CoT 步骤：
 
 | 指标 | 目标 | 测量方式 |
 |------|------|---------|
-| 规则基抽取准确率 | ≥ 80%（ORGANIZATION/PERSON/PRODUCT ≥ 90%，文本长度 < 2000 tokens） | 最小标注测试集验证（≥50 句中文战略文本） |
-| LLM 语义抽取召回率 | ≥ 85%（MVP 阶段，Qwen2.5-7B 本地模型） | 测试集验证 |
-| 冲突仲裁准确率 | ≥ 85% | 测试集验证 |
+| 规则基抽取精确率 (Precision) | ≥ 80%（ORGANIZATION/PERSON/PRODUCT ≥ 90%，文本长度 < 2000 tokens） | 标注测试集验证（≥50 句中文战略文本，全实体+三元组标注） |
+| LLM 语义抽取召回率 (Recall) | ≥ 85%（MVP 阶段，Qwen2.5-7B 本地模型） | 同上标注测试集（≥50 句，按关系类型分层抽样） |
+| 冲突仲裁 F1 | ≥ 85% | 同上标注测试集（人工标注的三元组作为金标） |
 | 规则基抽取延迟 P95 | < 1000ms（不含 LLM，文本长度 < 2000 tokens） | `time.perf_counter()` |
 | 端到端抽取延迟 P95 | < 10s（MVP 阶段，含 LLM 调用） | 集成测试测量 |
 
@@ -495,9 +558,10 @@ CoT 步骤：
 |------|---------|---------|
 | `tests/unit/domain/value_objects/test_entity_types.py` | 单元 | EntityType 枚举 |
 | `tests/unit/domain/value_objects/test_triple.py` | 单元 | Triple frozen dataclass |
-| `tests/unit/domain/value_objects/test_extraction_result.py` | 单元 | ExtractionResult/ExtractedEntity/ExtractionStatistics |
+| `tests/unit/domain/value_objects/test_raw_entity.py` | 单元 | RawEntity/EntityRelation 值对象 |
+| `tests/unit/domain/value_objects/test_extraction_result.py` | 单元 | EntityExtractionResult/ExtractedEntity/ExtractionStatistics |
 | `tests/unit/domain/services/test_conflict_arbiter.py` | 单元 | ConflictArbiter 融合逻辑 |
-| `tests/unit/infrastructure/extraction/test_phrase_matcher.py` | 单元 | PhraseMatcherAdapter |
+| `tests/unit/infrastructure/extraction/test_phrase_matcher_adapter.py` | 单元 | PhraseMatcherAdapter |
 | `tests/unit/infrastructure/extraction/test_regex_matcher.py` | 单元 | RegexPatternMatcher |
 | `tests/unit/infrastructure/extraction/test_dep_parser_matcher.py` | 单元 | DependencyParserMatcher |
 | `tests/unit/infrastructure/extraction/test_rule_extractor.py` | 单元 | RuleBasedExtractor 组合 |
@@ -506,7 +570,7 @@ CoT 步骤：
 | `tests/unit/application/event_handlers/test_entity_extraction_handler.py` | 单元 | EntityExtractionHandler |
 | `tests/unit/domain/exceptions/test_code_ranges.py` | 单元 | 异常编码唯一性验证（更新已注册异常） |
 | `tests/contracts/test_port_contract_entity_extraction.py` | 契约 | 端口契约兼容性 |
-| `tests/integration/test_entity_extraction_integration.py` | 集成 | 端到端集成测试 |
+| `tests/integration/test_entity_extraction_integration.py` | 集成 | 端到端集成测试（含并发场景：5 并发 DocumentProcessed 事件 → 验证无重复节点/边） |
 | `tests/unit/architecture/test_entity_extraction.py` | 架构 | 领域层零外部依赖 + 端口契约合规 |
 
 ---
@@ -575,7 +639,7 @@ CoT 步骤：
 | `src/infrastructure/extraction/rule_engine/seed_data/entities.json` | infrastructure | 种子实体词典（PhraseMatcher 用，MVP 50-100 条） |
 | `src/infrastructure/extraction/llm_extractor.py` | infrastructure | `LLMExtractor`（UDMR 路由 + Few-Shot + CoT） |
 | `src/infrastructure/extraction/prompts/__init__.py` | infrastructure | Prompt 模板初始化 |
-| `src/infrastructure/extraction/prompts/entity_extraction_examples.py` | infrastructure | Few-Shot 示例集（8-10 个） |
+| `src/infrastructure/extraction/prompts/entity_extraction_examples.py` | infrastructure | Few-Shot 示例集（3 个） |
 | `src/infrastructure/external_services/llm/ollama_adapter.py` | infrastructure | `OllamaAdapter`（实现 `LLMInvocationPort`） |
 
 ---
