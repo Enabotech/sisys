@@ -98,9 +98,9 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 **When** 调用 `LitellmLLMClient.structured_generate(prompt, response_schema, config)`
 **Then** 使用 litellm `acompletion` API 以 `response_format=response_schema` 模式调用（litellm 原生支持直接传入 Pydantic BaseModel 类，自动生成 JSON Schema 并处理 Anthropic tool_use 等厂商格式转换）
 **And** 返回的 JSON 通过 `response_schema.model_validate_json()` 验证（Pydantic Schema 约束），`ValidationError` 和 `json.JSONDecodeError` 均映射为 `LLMResponseError`
-**And** 支持两种 api_type：`openai`（直接传递，litellm 自动检测 provider）/ `anthropic`（litellm 内置 Anthropic provider 自动处理标准 endpoint（`api.anthropic.com`）的转换：system 消息提取到顶层 + `x-api-key` 认证构造 + `max_tokens` 注入。非标准 Anthropic endpoint（如 MiniMax `api.minimax.chat`）下，litellm 可能无法自动识别，此时通过 `custom_llm_provider` 参数显式指定）
+**And** 支持两种 api_type：`openai`（直接传递，litellm 自动检测 provider）/ `anthropic`（litellm 内置 Anthropic provider 自动处理标准 endpoint（`api.anthropic.com`）的转换：system 消息提取到顶层 + `x-api-key` 认证构造 + `max_tokens` 注入。**MiniMax（`api.minimax.io/anthropic`）已被 litellm 通过 `MinimaxMessagesConfig` 完全支持，自动识别，无需 `custom_llm_provider`。** 仅当 endpoint 完全不在 litellm 的 URL/模型匹配列表时，才需要 `acompletion(custom_llm_provider="xxx")` 显式指定）
 **And** `openai_responses` api_type 标记为 Phase 2（litellm ≥1.60.0 有 `aresponses()` 函数支持，但当前约束 `^1.28.0` 可能不包含；下游 Story 明确需要 OpenAI Responses API 时再评估实现路径）
-**And** api_type 适配逻辑参考 Story 1.17 Dev Notes 中的 "统一抽象层架构" 和 "Anthropic 格式关键差异" [Source: _bmad-output/implementation-artifacts/stories/1-17-udmr-basic-routing.md §Anthropic 格式关键差异]。注意：litellm 负责标准 Anthropic endpoint 的格式转换，LitellmLLMClient 的 `_adapt_request_for_api_type()` 仅处理 litellm 覆盖不到的边缘场景（非标准 endpoint + 无法自动识别 provider）
+**And** api_type 适配逻辑参考 Story 1.17 Dev Notes 中的 "统一抽象层架构" 和 "Anthropic 格式关键差异" [Source: _bmad-output/implementation-artifacts/stories/1-17-udmr-basic-routing.md §Anthropic 格式关键差异]。注意：litellm 负责标准 Anthropic endpoint + MiniMax endpoint 的格式转换，`_adapt_request_for_api_type()` 仅处理 litellm 完全无法识别的新 provider 类型
 **And** 熔断器（连续 3 次失败断开 60 秒、`half_open_max_calls=1`，对标 EmbeddingAPIClient 模式：构造器中内部创建 `CircuitBreaker(failure_threshold=3, recovery_timeout=60.0, half_open_max_calls=1, name="llm-api")`，默认值匹配 LLM API 时间尺度）保护
 **And** `circuit_breaker.on_success()` 在整个 `structured_generate()`/`generate()` 调用链路全部成功后调用（litellm 调用成功 + Pydantic 验证通过之后），对标 `EmbeddingAPIClient._encode()` 末尾的 `on_success()` 模式 [Source: embedding_api_client.py:314]
 **And** 指数退避重试（3 次：1s→2s→4s，白名单模式：`{429, 500, 502, 503, 504}` + `httpx.TimeoutException` + `httpx.TransportError` 可重试；429 重试使用 `retry_after` header 动态调整等待时间）
@@ -113,7 +113,12 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 **验证标准/Validation Criteria:**
 - [ ] `LitellmLLMClient` 位于 `src/infrastructure/external_services/llm/litellm_llm_client.py`
 - [ ] 显式实现 `LLMClientPort` 协议
-- [ ] `_is_retryable_llm_error` 模块级函数：白名单 `{429, 500, 502, 503, 504}` + `httpx.TimeoutException` + `httpx.TransportError`（对标 `EmbeddingAPIClient._is_retryable_http_error` [Source: embedding_api_client.py:51-66]，仅判断 httpx 层异常。litellm 特定异常（如 `RateLimitError`）在 `_map_llm_error()` 的 inline try/except 中按 HTTP 状态码判断是否可重试，不在本函数中处理）。429 重试时在 tenacity `before_sleep` 回调中从 `attempt.exception()` 提取 `Retry-After` 或 `x-ratelimit-reset-requests` header 动态调整等待时间
+- [ ] `_is_retryable_llm_error` 模块级函数：白名单 `{429, 500, 502, 503, 504}` + `httpx.TimeoutException` + `httpx.TransportError`（对标 `EmbeddingAPIClient._is_retryable_http_error` [Source: embedding_api_client.py:51-66]，仅判断 httpx 层异常。litellm 特定异常（如 `RateLimitError`）在 `_map_llm_error()` 的 inline try/except 中按 HTTP 状态码判断是否可重试）。
+- [ ] **⚠️ 重要：litellm `APIStatusError` 子类（`RateLimitError`/`AuthenticationError`/`BadRequestError` 等）有 `.response` 属性**（`httpx.Response` 对象），可安全访问 `e.response.headers` 和 `e.response.status_code`。连接层异常（`Timeout`/`APIConnectionError`/`APIError`）无 `.response`。
+- [ ] 429 重试时在 tenacity `before_sleep` 回调中从 `retry_state.outcome.exception()` 提取动态等待时间：
+  1. 优先: `e.response.headers.get("Retry-After")`（支持秒数和 HTTP-date 两种格式）
+  2. 辅助: 可使用 `litellm._get_retry_after_from_exception_header(response_headers)` 解析
+  3. 回退: 当 headers 中无 `Retry-After` 时使用 `wait_exponential` 默认退避
 - [ ] 重试使用 `tenacity.AsyncRetrying`（与 EmbeddingAPIClient 一致：`stop=stop_after_attempt(3)`, `wait=wait_exponential(multiplier=1, min=1.0, max=4.0)`, `retry=retry_if_exception(_is_retryable_llm_error)`, `reraise=True`, `before_sleep=before_sleep_log(logger, logging.WARNING)`）
 - [ ] `_map_llm_error()` 异常映射采用 inline try/except 分支模式（**对标 EmbeddingAPIClient._encode() 的异常处理模式** [Source: embedding_api_client.py:290-301]，每个 `except` 分支先调用 `circuit_breaker.on_failure()` 再转换为领域异常；litellm 异常类型较复杂时可抽取为独立方法，但时序不变）
 - [ ] `close()` 幂等设计（`_closed` 守卫 + `try/except` 静默 `aclose()` 异常，对标 `EmbeddingAPIClient.close()` [Source: embedding_api_client.py:317-328]）
