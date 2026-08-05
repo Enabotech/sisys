@@ -61,7 +61,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 **And** 字段为 `CloudModelConfig` 的领域层镜像：`api_type` / `model` / `endpoint` / `api_key` / `temperature` / `max_tokens` / `timeout`
 **And** 支持类方法 `from_cloud_model_config(c: CloudModelConfig, timeout: float = 600.0) -> LLMConfig` 从 UDMR 配置转换
 **And** 支持类方法 `from_env() -> LLMConfig` 从独立环境变量构造（`LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` 等）
-**And** `from_env()` 在缺失 `api_key` 或 `endpoint+model` 时抛出 `LLMConfigError`（EXCEPTION_332）
+**And** `from_env()` 在缺失 `api_key` 或 `endpoint+model` 时抛出 `LLMConfigError`（EXCEPTION_332，继承 `ExternalException`）
 **And** 领域层零外部依赖（dataclass/typing 为标准库，`from __future__ import annotations` + `TYPE_CHECKING` 守卫避免循环导入）
 
 **验证标准/Validation Criteria:**
@@ -456,7 +456,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写熔断器测试（连续5次失败断开 / 断开后快速失败 / 恢复 / 半开→闭合） |
+| 🔴 红 | 编写熔断器测试（连续3次失败断开 / 断开后快速失败 / 恢复 / 半开→闭合） |
 | 🟢 绿 | 集成 `CircuitBreaker`（before_call / on_success / on_failure） |
 | 🔄 重构 | 优化异常信息 |
 
@@ -654,7 +654,7 @@ UDMRConfig.from_env() ────────┤
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
-| **litellm + Pydantic JSON Mode** | 项目已依赖 litellm ^1.28.0；多厂商统一网关；无需额外依赖；ipynb `response_format` 支持 | Pydantic 验证需手动调用 | ✅ 9/10 |
+| **litellm + Pydantic JSON Mode** | 项目已依赖 litellm ^1.28.0；多厂商统一网关；无需额外依赖；内置 `response_format` 支持 | Pydantic 验证需手动调用 | ✅ 9/10 |
 | instructor SDK | 自动重试修复；深度 Pydantic 集成；支持流式结构化输出 | 额外依赖（非项目已有）；不兼容所有 litellm 模型 | 7/10 |
 | 直接 openai/anthropic SDK | 原生功能完整 | 多厂商调用需适配层；增加依赖链 | 5/10 |
 
@@ -666,6 +666,27 @@ UDMRConfig.from_env() ────────┤
 |------|------|------|------|
 | **LLMAPIError (330) + LLMResponseError (331) + LLMConfigError (332)** | 简洁；调用方通过 context 字典获取详细信息 | context 字典非结构化 | ✅ 8/10 |
 | 按 HTTP 状态码细分（LLMRateLimitError/LLMAuthenticationError/LLMContextLengthError...） | 调用方类型匹配精确 | 异常类爆炸（~10+类）；新增状态码需新增类 | 5/10 |
+
+**决策理由：** LLM API 的 HTTP 状态码语义与标准 HTTP 不同（如 400 可能表示 context_length/content_filter/invalid_request 三种语义），按状态码细分会导致异常类与实际 API 错误耦合。通过 `LLMAPIError` 的 `context` 字典（`http_status`/`retry_after`/`endpoint`）携带差异化信息，调用方按需读取，避免异常类随 API 演进爆炸。
+
+**ADR: LLMConfig 放置位置 — domain/ports vs infrastructure/config**
+
+| 方案 | 优点 | 缺点 | 评分 |
+|------|------|------|------|
+| **domain/ports/llm_client.py（本 Story 采用）** | 应用层可直接导入构造；领域层统一抽象；避免循环依赖（应用层→infrastructure 不合法） | 与 `EmbeddingConfig` 放置模式不一致 | ✅ 8/10 |
+| infrastructure/config/llm.py | 与 `EmbeddingConfig` 模式一致（配置值对象统一在 infrastructure） | 多个应用层 Story 导入基础设施层类型（违反六边形架构） | 5/10 |
+
+**决策理由：** 这是一项**新引入的架构决策**（非遵循既有惯例）。`LLMConfig` 是多方消费者类型（LitellmLLMClient + Story 3-2b/3-6/4-5/5-1 的应用层服务），不同于 `EmbeddingConfig` 的单消费者模式。放在 domain/ports 中确保应用层无需依赖基础设施层即可覆盖全局 LLM 配置。`TYPE_CHECKING` 守卫处理 `from_cloud_model_config()` 的跨层类型引用。
+
+**ADR: 熔断器阈值 — LLM (3次/60s) vs Embedding (5次/30s)**
+
+| 维度 | Embedding API (现有) | LLM API (本 Story) | 理由 |
+|------|---------------------|-------------------|------|
+| failure_threshold | 5 次 | 3 次 | LLM API 调用成本更高（token 计费），更快速熔断以减少无效消费 |
+| recovery_timeout | 30 秒 | 60 秒 | LLM API 故障恢复通常需要分钟级（服务重启/限流窗口重置），30 秒过短 |
+| 单次调用延迟 | 毫秒级（<100ms） | 秒级（2-30s+） | LLM 延迟更高，连续失败的检测时间更长，恢复应更保守 |
+
+**决策理由：** LLM API 的时间尺度和成本模型与 Embedding API 本质不同——每次 LLM 调用消耗 token 成本（计费）且延迟远高于 Embedding。快速熔断（3 次而非 5 次）减少经济损失，更长恢复期（60s 而非 30s）匹配实际的 API 恢复时间。阈值可通过 `LLMConfig` 扩展字段覆盖，满足不同 LLM 厂商的差异化需求。
 
 ### 项目结构说明
 
