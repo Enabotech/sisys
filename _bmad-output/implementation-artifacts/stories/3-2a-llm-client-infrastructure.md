@@ -485,13 +485,6 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 - [ ] Subtask 3.1: 🔴 红 — 扩展 `tests/contracts/test_port_contract_llm_client.py`
 - [ ] Subtask 3.2: 🟢 绿 — 注册端口：
   ```python
-  # LLM Client — 按优先顺序构造 LLMConfig：
-  # 1. 从 UDMR 配置的第一个 enabled 云端模型转换
-  # 2. 降级到独立环境变量
-  #
-  # 熔断器由 LitellmLLMClient 内部构造（CircuitBreaker(name="llm")），
-  # 对标 EmbeddingAPIClient 模式，不做独立端口注册
-
   register_port(
       name="llm_client",
       version="v1.0.0",
@@ -505,6 +498,19 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
       tags=("llm", "client"),
   )
   ```
+
+  并在 `shutdown()` 函数中新增 LLM Client 资源清理（对标 embedding_service 的 shutdown 模式 [Source: composition_root.py:1722-1728]）：
+  ```python
+  # 关闭 llm_client HTTP 客户端连接池
+  try:
+      llm = resolver.resolve("llm_client")
+      if llm is not None:
+          await llm.close()
+          logger.info("Closed llm_client")
+  except Exception as e:
+      logger.error("Failed to close llm_client: %s", e)
+  ```
+
   其中 `_build_llm_config()` 辅助函数实现：
   ```python
   def _build_llm_config() -> LLMConfig:
@@ -609,6 +615,13 @@ UDMRConfig.from_env() ────────┤
 | 字段 | `api_type`, `endpoint`, `api_key`, `model`, `enabled`, `max_tokens`, `temperature`, `price_per_input_1k_tokens`, `price_per_output_1k_tokens` | `api_type`, `endpoint`, `api_key`, `model`, `temperature`, `max_tokens`, `timeout` |
 | 用途 | UDMR 配置存储 | LLM 调用参数 |
 | 转换 | — | `LLMConfig.from_cloud_model_config(c, timeout=T)` |
+
+> **⚠️ 设计说明（LLMConfig 放在 domain/ports/ vs infrastructure/config/）：**
+> - `EmbeddingConfig` 在 `infrastructure/config/embedding.py` 中，作为 `EmbeddingAPIClient` 的配置输入
+> - `LLMConfig` 选择放在 `domain/ports/llm_client.py` 中，基于两个理由：
+>   1. **R1（领域层统一抽象基础端口）**：`LLMConfig` 是 `LLMClientPort` 的方法参数类型，端口定义在领域层，其参数类型也应在其文件内
+>   2. **可复用性**：多个 Story（3-2b, 3-6, 4-5, 5-1）的应用层服务注入 `LLMClientPort` 时可直接构造 `LLMConfig` 覆盖全局默认，无需依赖基础设施层
+> - `from_cloud_model_config()` 和 `from_env()` 通过参数类型注入绕过基础设施层依赖（`CloudModelConfig` 类型从调用方传入）
 
 ### 关键架构决策
 
