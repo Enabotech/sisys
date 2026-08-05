@@ -17,7 +17,7 @@
     当 系统解析该 PDF 文件
     那么 提取的文本应包含原文关键词
     并且 每页包含 texts、tables、images 数组
-    并且 每个元素的 bbox 字段值为 null
+    并且 每个元素的 bbox 字段包含归一化坐标 [0, 1]
     并且 解析状态为 completed
 
   场景: 解析加密 PDF 文档失败

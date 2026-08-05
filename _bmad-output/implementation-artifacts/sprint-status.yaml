@@ -100,7 +100,7 @@ development_status:
   # ===========================================================================
   # Epic 2: 文档与数据管理 - 📋 待开始
   # ===========================================================================
-  epic-2: in-progress
+  epic-2: done
   2-1-document-upload-17-formats: done
   2-2a-document-parsing-basic-formats: done
   2-2b-document-parsing-extended-formats: done
@@ -110,7 +110,7 @@ development_status:
   2-6-document-version-snapshot: done
   2-7-metadata-validation: done
   2-8-semantic-chunking: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   # ===========================================================================
   # Epic 3: 智能检索与知识发现 - 🔄 进行中

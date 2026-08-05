@@ -18,8 +18,15 @@ from src.domain.events.document_events import DocumentProcessed
 from src.domain.exceptions.ocr_exceptions import OCRConnectionError, OCRProcessingError
 from src.domain.ports.document_repository import DocumentQuery
 from src.domain.ports.ocr import OCR_CONFIDENCE_THRESHOLD, OCR_MAX_BYTES
+from src.domain.services.layout_matching import match_detections
 from src.domain.services.scanned_page_detector import detect_scanned_pages
-from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage, ParsedTable
+from src.domain.value_objects.parsed_document import (
+    BoundingBoxResult,
+    ParsedDocument,
+    ParsedElement,
+    ParsedPage,
+    ParsedTable,
+)
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
@@ -298,15 +305,14 @@ class DocumentParsingService:
         算法流程：
         1. 检查 layout_detector 和 pdf_page_renderer 是否已注入
         2. 仅 PDF 格式触发检测，其他格式跳过
-        3. 逐页渲染 PDF 页面为 PNG → 调用 detect() → 顺序匹配 → 填充 bbox
+        3. 逐页渲染 PDF 页面为 PNG → 调用 detect() → IoU 空间匹配（有 bbox 时）
+           → 顺序索引匹配（降级，元素无 bbox 时）
         4. 单页检测失败不影响其他页面（逐页独立 try/except）
         5. 运行时错误不阻断解析流程（记录日志并返回原文档）
 
-        MVP 匹配策略：
-        - 当前 PDFParser 不输出 bbox（均为 None），无法做 IoU 空间匹配
-        - 降级为按顺序一一对应检测结果与文本/表格元素
-        - 当 PDFParser 未来输出非 None bbox 时，应替换为 layout_matching.match_detections()
-        - Table 标签检测结果按顺序映射到 ParsedTable.bbox
+        匹配策略（v2.0）：
+        - 元素含非 None bbox 时：使用 layout_matching.match_detections() IoU 空间匹配
+        - 元素 bbox 均为 None 时：降级为顺序索引一一对应（非 PDF 格式/visitor_text 失败）
 
         Args:
             parsed_doc: 已完成文本解析的 ParsedDocument
@@ -338,15 +344,36 @@ class DocumentParsingService:
                     enhanced_pages.append(page)
                     continue
 
-                # 筛选 Table 和非 Table 检测结果，分别处理
-                table_detections = [d for d in detections if d.label == "Table"]
-                text_detections = [d for d in detections if d.label != "Table"]
+                # 收集有 bbox 的元素（用于 IoU 匹配判断）
+                element_bboxes: list = []
+                text_bbox_entries: list[tuple[int, ParsedElement]] = []
+                table_bbox_entries: list[tuple[int, ParsedTable]] = []
 
-                # 处理文本元素 bbox 填充
-                enhanced_texts = self._apply_text_detections(page.texts, text_detections)
+                for idx, elem in enumerate(page.texts):
+                    if elem.bbox is not None:
+                        element_bboxes.append(elem.bbox)
+                        text_bbox_entries.append((idx, elem))
 
-                # 处理表格元素 bbox 填充
-                enhanced_tables = self._apply_table_detections(page.tables, table_detections)
+                for idx, table in enumerate(page.tables):
+                    if table.bbox is not None:
+                        element_bboxes.append(table.bbox)
+                        table_bbox_entries.append((idx, table))
+
+                if element_bboxes:
+                    # 主路径：IoU 空间匹配（PDFParser 已输出归一化 bbox）
+                    enhanced_texts, enhanced_tables = self._match_by_iou(
+                        page,
+                        detections,
+                        element_bboxes,
+                        text_bbox_entries,
+                        table_bbox_entries,
+                    )
+                else:
+                    # 降级路径：顺序索引匹配（非 PDF 格式或 visitor_text 提取失败）
+                    table_detections = [d for d in detections if d.label == "Table"]
+                    text_detections = [d for d in detections if d.label != "Table"]
+                    enhanced_texts = self._apply_text_detections(page.texts, text_detections)
+                    enhanced_tables = self._apply_table_detections(page.tables, table_detections)
 
                 enhanced_pages.append(
                     ParsedPage(
@@ -522,8 +549,8 @@ class DocumentParsingService:
     ) -> list[ParsedElement]:
         """将非 Table 检测结果按顺序映射到文本元素的 bbox
 
-        MVP 降级策略：由于 PDFParser 当前不输出 bbox（均为 None），
-        无法使用 IoU 空间匹配，采用顺序索引一一对应。
+        降级策略：PDFParser 未输出 bbox 时（如 visitor_text 提取失败），
+        采用顺序索引一一对应。主路径（有 bbox）使用 _match_by_iou。
 
         Args:
             elements: 文本元素列表
@@ -555,14 +582,99 @@ class DocumentParsingService:
         return enhanced
 
     @staticmethod
+    def _match_by_iou(
+        page: ParsedPage,
+        detections: list[BoundingBoxResult],
+        element_bboxes: list,
+        text_entries: list[tuple[int, ParsedElement]],
+        table_entries: list[tuple[int, ParsedTable]],
+    ) -> tuple[list[ParsedElement], list[ParsedTable]]:
+        """使用 IoU 空间匹配将版面检测结果关联到文本/表格元素
+
+        调用 domain/services/layout_matching.py 的 match_detections()，
+        按空间位置将检测 bbox 匹配到最接近的元素，填充其 bbox 字段。
+
+        Args:
+            page: 当前页面
+            detections: 版面检测结果列表
+            element_bboxes: 所有元素 bbox 的扁平列表（用于 match_detections 输入）
+            text_entries: (原始索引, ParsedElement) 列表
+            table_entries: (原始索引, ParsedTable) 列表
+
+        Returns:
+            (enhanced_texts, enhanced_tables) 元组
+        """
+        # bbox → 元素反向索引（用列表位置映射，BoundingBox 值对象相等语义安全）
+        bbox_to_owner: dict[int, tuple[str, int]] = {}
+        combined: list = []
+        bbox_idx = 0
+
+        for orig_idx, elem in text_entries:
+            bbox_to_owner[bbox_idx] = ("text", orig_idx)
+            combined.append((orig_idx, elem))
+            bbox_idx += 1
+
+        for orig_idx, table in table_entries:
+            bbox_to_owner[bbox_idx] = ("table", orig_idx)
+            combined.append((orig_idx, table))
+            bbox_idx += 1
+
+        # 执行 IoU 匹配
+        matches = match_detections(detections, element_bboxes)
+
+        # 构建增强后的元素列表
+        enhanced_texts = list(page.texts)
+        enhanced_tables = list(page.tables)
+
+        for match_idx, (det, matched_bbox) in enumerate(matches):
+            if matched_bbox is None:
+                continue
+            # 找到匹配的 bbox 在 element_bboxes 中的索引
+            try:
+                bbox_idx = element_bboxes.index(matched_bbox)
+            except ValueError:
+                continue
+
+            entry = bbox_to_owner.get(bbox_idx)
+            if entry is None:
+                continue
+
+            owner_type, orig_idx = entry
+            if owner_type == "text":
+                elem = page.texts[orig_idx]
+                enhanced_texts[orig_idx] = ParsedElement(
+                    content=elem.content,
+                    bbox=det.bbox,
+                    confidence=elem.confidence,
+                    metadata={**elem.metadata, "layout_confidence": det.confidence},
+                )
+            elif owner_type == "table":
+                table = page.tables[orig_idx]
+                enhanced_tables[orig_idx] = ParsedTable(
+                    rows=table.rows,
+                    bbox=det.bbox,
+                    confidence=table.confidence,
+                    header=table.header,
+                    column_types=table.column_types,
+                    merged_cells=table.merged_cells,
+                    semantic_confidence=table.semantic_confidence,
+                    table_caption=table.table_caption,
+                    metadata={**table.metadata, "layout_confidence": det.confidence},
+                )
+
+        return enhanced_texts, enhanced_tables
+
+    @staticmethod
     def _apply_table_detections(
         tables: list[ParsedTable],
         table_detections: list,
     ) -> list[ParsedTable]:
         """将 Table 标签检测结果按顺序映射到 ParsedTable 的 bbox
 
+        降级策略：PDFParser 未输出 bbox 时采用顺序索引一一对应。
+        主路径（有 bbox）使用 _match_by_iou。
+
         DocLayNet 映射：label='Table' 的检测结果映射到 ParsedTable.bbox。
-        MVP 降级策略：顺序索引一一对应。
 
         Args:
             tables: 表格元素列表

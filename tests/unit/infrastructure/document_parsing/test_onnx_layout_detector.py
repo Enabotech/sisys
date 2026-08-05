@@ -87,7 +87,13 @@ class TestOnnxLayoutDetectorInit:
 
 
 class TestOnnxLayoutDetectorDetect:
-    """OnnxLayoutDetector.detect() 推理测试"""
+    """OnnxLayoutDetector.detect() 推理测试
+
+    坐标已归一化到 [0, 1] 页面坐标空间（除以 _MODEL_INPUT_SIZE=640）。
+    """
+
+    # 归一化缩放因子
+    _INPUT_SIZE = 640.0
 
     def _create_detector_with_mock(self) -> tuple[Any, MagicMock]:
         """创建使用 mock session 的检测器（绕过 __init__ 直接注入 mock session）"""
@@ -136,8 +142,9 @@ class TestOnnxLayoutDetectorDetect:
         return detector, mock_session
 
     def test_detect_single_element(self) -> None:
-        """验证单元素检测：xyxy→xywh 转换"""
+        """验证单元素检测：xyxy→xywh→归一化 [0,1]"""
         detector, mock_session = self._create_detector_with_mock()
+        s = self._INPUT_SIZE
         # ONNX 输出 xyxy 格式：[x1, y1, x2, y2]
         mock_session.run.return_value = [
             [[10.0, 20.0, 110.0, 70.0]],  # boxes: 1 个检测框
@@ -152,11 +159,11 @@ class TestOnnxLayoutDetectorDetect:
         assert isinstance(result, BoundingBoxResult)
         assert result.label == "Text"
         assert result.confidence == 0.95
-        # xyxy [10,20,110,70] → xywh (x=10, y=20, w=100, h=50)
-        assert result.bbox.x == 10.0
-        assert result.bbox.y == 20.0
-        assert result.bbox.width == 100.0  # 110 - 10
-        assert result.bbox.height == 50.0  # 70 - 20
+        # xyxy [10,20,110,70] → xywh → /640: x=10/640, y=20/640, w=100/640, h=50/640
+        assert result.bbox.x == pytest.approx(10.0 / s)
+        assert result.bbox.y == pytest.approx(20.0 / s)
+        assert result.bbox.width == pytest.approx(100.0 / s)  # (110-10)/640
+        assert result.bbox.height == pytest.approx(50.0 / s)  # (70-20)/640
         assert result.bbox.page == 1
 
     def test_detect_multiple_elements(self) -> None:
@@ -207,8 +214,9 @@ class TestOnnxLayoutDetectorDetect:
         assert results[0].confidence >= detector._confidence_threshold
 
     def test_detect_xyxy_to_xywh_conversion(self) -> None:
-        """验证 xyxy→xywh 坐标转换：width=x2-x1, height=y2-y1"""
+        """验证 xyxy→xywh→归一化 [0,1]：width=x2-x1, height=y2-y1，除以 640"""
         detector, mock_session = self._create_detector_with_mock()
+        s = self._INPUT_SIZE
         mock_session.run.return_value = [
             [[50.5, 100.3, 250.7, 200.9]],
             [10],
@@ -217,10 +225,10 @@ class TestOnnxLayoutDetectorDetect:
 
         results = detector.detect(b"image", page_number=3)
         bbox = results[0].bbox
-        assert bbox.x == 50.5
-        assert bbox.y == 100.3
-        assert bbox.width == pytest.approx(200.2)  # 250.7 - 50.5
-        assert bbox.height == pytest.approx(100.6)  # 200.9 - 100.3
+        assert bbox.x == pytest.approx(50.5 / s)
+        assert bbox.y == pytest.approx(100.3 / s)
+        assert bbox.width == pytest.approx(200.2 / s)  # (250.7-50.5)/640
+        assert bbox.height == pytest.approx(100.6 / s)  # (200.9-100.3)/640
         assert bbox.page == 3
 
     def test_detect_filters_low_confidence(self) -> None:
@@ -308,6 +316,7 @@ class TestOnnxLayoutDetectorDetect:
     def test_detect_inverted_coordinates_skipped(self) -> None:
         """验证 xyxy 坐标反转（x2<x1）时跳过该检测（防御性 clamp）"""
         detector, mock_session = self._create_detector_with_mock()
+        s = self._INPUT_SIZE
         mock_session.run.return_value = [
             [
                 [100.0, 200.0, 50.0, 150.0],  # x2<x1, y2<y1 → width=0, height=0
@@ -320,7 +329,7 @@ class TestOnnxLayoutDetectorDetect:
         results = detector.detect(b"image", page_number=1)
         # 第一个因 width=0 被跳过，只保留第二个
         assert len(results) == 1
-        assert results[0].bbox.x == 10.0
+        assert results[0].bbox.x == pytest.approx(10.0 / s)
 
     def test_close_releases_session(self) -> None:
         """验证 close() 释放 ONNX session 资源"""
