@@ -81,7 +81,8 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
   - `generate(prompt: str, config: LLMConfig | None = None) -> LLMResponse`（自由文本，无需 schema 验证）
 **And** 支持 `close()` 释放资源
 **And** 支持 `async with` 上下文管理器
-**And** `LLMResponse` 为 `@dataclass(frozen=True)`（`content: str` / `finish_reason: str` / `usage: dict[str, int]` / `model: str`）
+**And** `LLMResponse` 为 `@dataclass(frozen=True)`（`content: str` / `finish_reason: str` / `usage: dict[str, int | None]` / `model: str`）
+**And** `usage` 字段对标 litellm 返回结构：`{"prompt_tokens": int, "completion_tokens": int, "total_tokens": int}`（字段值可为 None 表示单厂商未返回）
 
 **验证标准/Validation Criteria:**
 - [ ] `LLMClientPort` 定义为 `@runtime_checkable` Protocol
@@ -97,9 +98,9 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 **And** 支持三种 api_type：`openai`（直接传递）/ `anthropic`（system 提取 + max_tokens 注入 + 认证适配）/ `openai_responses`（增量流式处理 + 状态管理）
 **And** api_type 适配逻辑参考 Story 1.17 Dev Notes 中的 "统一抽象层架构" 和 "Anthropic 格式关键差异" [Source: _bmad-output/implementation-artifacts/stories/1-17-udmr-basic-routing.md §Anthropic 格式关键差异]
 **And** 熔断器（连续 5 次失败断开 30 秒）保护
-**And** 指数退避重试（3 次：1s→2s→4s，仅 500/502/503/504 + Timeout + Transport 可重试）
-**And** 4xx 客户端错误（401/403/404/422/429）不重试，直接映射为领域异常
-**And** Pydantic 验证失败（`ValidationError`）不重试（非 API 错误，数据格式问题）
+**And** 指数退避重试（3 次：1s→2s→4s，白名单模式：仅 `{500, 502, 503, 504}` + `httpx.TimeoutException` + `httpx.TransportError` 可重试）
+**And** 所有其他异常（包括 4xx 客户端错误、Pydantic 验证失败、网络不可达等）一律不重试，直接映射为领域异常
+**And** 对标 `EmbeddingAPIClient._is_retryable_http_error` 的白名单策略 [Source: embedding_api_client.py:51-66]
 **And** `close()` 释放 httpx 客户端资源
 **And** 构造参数支持 `config: LLMConfig | None` / `circuit_breaker: CircuitBreaker | None` / `retry_max_attempts: int = 3` 等
 
@@ -619,7 +620,7 @@ UDMRConfig.from_env() ────────┤
 | instructor SDK | 自动重试修复；深度 Pydantic 集成；支持流式结构化输出 | 额外依赖（非项目已有）；不兼容所有 litellm 模型 | 7/10 |
 | 直接 openai/anthropic SDK | 原生功能完整 | 多厂商调用需适配层；增加依赖链 | 5/10 |
 
-**决策理由：** 项目 `pyproject.toml` 已依赖 `litellm ^1.28.0` 和 `httpx ^0.27.0`。litellm 内置 `response_format` 支持（JSON Mode + Schema），与 instructor 功能等效。结构化输出在基础设施层实现，领域层只依赖标准库类型（`type` 参数）。
+**决策理由：** 项目 `pyproject.toml` 已依赖 `litellm ^1.28.0` 和 `httpx ^0.27.0`。litellm 内置 `response_format` 支持（JSON Mode + Schema），与 instructor 功能等效。`response_schema: type` 参数接受 Pydantic `BaseModel` 子类作为 type hint，领域层 Protocol 仅将其视为不可变类型引用（不实例化、不导入 pydantic），结构化输出的 Pydantic 验证在基础设施层 `LitellmLLMClient.structured_generate()` 内执行。
 
 **ADR: LLM 异常不按 HTTP 状态码细分**
 
