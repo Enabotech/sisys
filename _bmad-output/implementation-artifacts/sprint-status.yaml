@@ -118,7 +118,8 @@ development_status:
   epic-3: in-progress
   3-1a-dense-semantic-search: done
   3-1b-bm25-sparse-search-rrf-fusion: done
-  3-2-entity-extraction-llm-rules: backlog
+  3-2a-llm-client-infrastructure: backlog
+  3-2b-entity-extraction-llm-rules: backlog
   3-3-domain-dictionary-management: backlog
   3-4-rrf-fusion-ranking: backlog
   3-5-layered-search-l1-l4: backlog

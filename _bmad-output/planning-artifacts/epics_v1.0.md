@@ -441,7 +441,7 @@ updateReason: '与 PRD v1.1.0 (145 FR) / UX Spec v2.0.0 / HTML 样机 v2.1 同�
 | FR-DM-08 | 语义分块 | Epic 2 | Story 2.8 | P0 |
 | **智能检索与知识发现 (SR) - 8 项** |
 | FR-SR-01 | 混合检索 | Epic 3 | Story 3.1a/3.1b | P0 |
-| FR-SR-02 | 实体抽取 | Epic 3 | Story 3.2 | P0 |
+| FR-SR-02 | 实体抽取 | Epic 3 | Story 3.2a/3.2b | P0 |
 | FR-SR-03 | 领域词典管理 | Epic 3 | Story 3.3 | P0 |
 | FR-SR-04 | RRF 融合排序 | Epic 3 | Story 3.4 | P0 |
 | FR-SR-05 | 分层检索 | Epic 3 | Story 3.5 | P0 |
@@ -680,14 +680,14 @@ updateReason: '与 PRD v1.1.0 (145 FR) / UX Spec v2.0.0 / HTML 样机 v2.1 同�
 | Epic 0 | Iteration 1 | P0 | - | 12 | 开发环境、CI/CD、测试框架（含0-30应用启动集成） |
 | Epic 1 | **企业级架构基础与合规** | P0 | AR-01~04, SC-01/02/03/07/08, CP-01/04, SA-01, IF-04 | 24 | 系统稳定性、性能、安全、合规（等保 2.0） |
 | Epic 2 | 文档与数据管理 | P0 | DM-01~08 | 9 | 用户可以上传和管理 17 种格式文档 |
-| Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 13 | 用户可以检索文档并溯源至原始坐标点 |
+| Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 14 | 用户可以检索文档并溯源至原始坐标点 |
 | Epic 4 | 战略工具箱 | P0 | ST-01~05 | 9 | 用户可以执行 23 种战略工具分析（含 ST-06~09 P1 V1 扩展） |
 | Epic 5 | Agent 协作系统 | P0 | AC-01~06, EV-01/02, IF-02/03 | 12 | 用户可以通过 CEO Agent 执行战略规划（含 EV-03/04 P1 扩展） |
 | Epic 6 | 战略规划流程 (BLM 前两阶段) | P0 | SP-01~04, UI-11 | 12 | 用户可以生成战略规划并审批 |
 | Epic 7 | **多触点用户界面与 API 集成** | P0 | UI-01/02/03, CP-03, IF-01 | 9 | 用户可以通过 CLI/API/仪表盘操作系统 |
 | Epic 8 | **用户权限管理与审计合规** | P0 | SC-04/05/06 | 6 | 管理员可以管理权限和审计日志 |
 | Epic 21 | 🆕 **三页面驾驶舱 — 决策舱** | P0 | UI-04~10, UI-12, UI-23 | 9 | 高管 30 秒理解全局态势、拖拽推演 + AI 实时代偿、BSC 四层战略地图可视化 |
-| **总计** | - | - | **69 项 FR** | **118** | - |
+| **总计** | - | - | **69 项 FR** | **119** | - |
 
 **V1 (P1) Epic 列表：**
 
@@ -1154,8 +1154,9 @@ So that **检索结果更符合语义完整性**。
 |-------|------|---------|---------|-----------|
 | Story 3.1a | **Dense 语义检索** | 支持语义相似度检索（bge-m3 嵌入） | 依赖 Epic 1 Story 1.6（Qdrant） | **P0-1a（关键路径）** |
 | Story 3.1b | **BM25 稀疏检索 + RRF 融合** | 支持关键词检索，与 Dense 检索融合 | 依赖 Story 3.1a | **P0-1b（关键路径）** |
-| Story 3.2 | 实体抽取（LLM+ 规则混合） | 构建知识图谱的实体和关系 | 依赖 Story 3.1b | P0-2 |
-| Story 3.3 | 战略领域词典库管理 | 实体抽取准确率持续提升 | 依赖 Story 3.2 | P1-3 |
+| Story 3.2a | **LLM Client 基础设施** | 统一 LLM 调用端口（结构化输出 + 熔断 + 重试），供所有 LLM 相关 Story 复用 | 无（参考 EmbeddingAPIClient 模式） | **P0-1c（公共基础设施）** |
+| Story 3.2b | 实体抽取（LLM+ 规则混合） | 构建知识图谱的实体和关系 | 依赖 Story 3.1b + Story 3.2a | P0-2 |
+| Story 3.3 | 战略领域词典库管理 | 实体抽取准确率持续提升 | 依赖 Story 3.2b | P1-3 |
 | Story 3.4 | RRF 融合排序 | 综合多种检索信号提升相关性 | 依赖 Story 3.1b | P0-4 |
 | Story 3.5 | 分层检索（L1-L4） | 支持自顶向下和自底向上的双向检索 | 依赖 Story 3.4 | P0-5 |
 | Story 3.6 | 契约化结构化摘要生成 | 摘要质量可控且可验证 | 依赖 Story 3.5 | P1-6 |
@@ -1263,7 +1264,53 @@ So that **同时支持语义检索和关键词检索，综合提升相关性**�
 **And** 使用 RRF（Reciprocal Rank Fusion）融合两路结果
 **And** 检索延迟 P95<800ms（MVP，含 RRF 融合）
 
-### Story 3.2: 实体抽取（LLM+ 规则混合）
+### Story 3.2a: LLM Client 基础设施
+
+As a **系统架构师**,
+I want **系统具备统一 LLM Client 基础设施（端口 + 结构化输出 + 容错机制）**,
+So that **所有需要 LLM 调用的 Story（实体抽取、摘要生成、Agent 推理）复用同一套可靠的基础设施**。
+
+**Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] LLM Client 测试 - 验证结构化输出（instructor/JSON Mode）
+   - [ ] 熔断器测试 - 验证 Closed→Open→HalfOpen 三态转换
+   - [ ] 重试测试 - 验证指数退避重试（1s→2s→4s）
+   - [ ] 结构化输出 Schema 验证测试
+
+2. **性能要求**
+   - [ ] LLM 调用超时控制 P95<30 秒
+   - [ ] 熔断器切换延迟 P95<50ms
+
+3. **覆盖率要求**
+   - [ ] 领域层覆盖率≥90%
+   - [ ] 基础设施层覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/domain/ports/test_llm_client_port.py` - 端口单元测试
+   - [ ] `tests/unit/infrastructure/external_services/llm/test_llm_client.py` - LLM Client 单元测试
+   - [ ] `tests/integration/test_integration_llm_client.py` - 集成测试
+
+**实施指南:**
+- 容错模式参考：`EmbeddingAPIClient`（`embedding_api_client.py` + `circuit_breaker.py`）
+- 结构化输出：`instructor`（Pydantic 验证 + 自动重试修复）
+- LLM Client 通用化：httpx.AsyncClient + tenacity 指数退避重试
+
+**Given** LLM API endpoint 已配置
+**When** 调用 `LLMClientPort.structured_generate(prompt, schema, config)`
+**Then** 返回经验证的 JSON 结构（Pydantic Schema 约束）
+**And** 熔断器（连续 5 次失败断开 30 秒）+ 指数退避重试（3 次：1s→2s→4s）
+
+---
+
+### Story 3.2b: 实体抽取（LLM+ 规则混合）
 
 As a **知识工程师**,
 I want **系统抽取实体（LLM+ 规则混合策略），输出三元组**,
@@ -1276,8 +1323,9 @@ So that **构建知识图谱的实体和关系**。
 1. **架构测试**
    - [ ] 实体抽取测试 - 验证 LLM+ 规则混合策略
    - [ ] 规则基测试 - 验证 AC 自动机/正则/依存句法
-   - [ ] LLM 语义测试 - 验证 Few-Shot+CoT+Schema 约束
+   - [ ] LLM 语义测试 - 验证 Few-Shot+CoT+Schema 约束（基于 Story 3.2a 的 `LLMClientPort`）
    - [ ] 冲突仲裁测试 - 验证规则权重 0.6/LLM 权重 0.4
+   - [ ] L5 Neo4j 持久化测试 - 验证实体/关系 MERGE 写入
 
 2. **性能要求**
    - [ ] 规则基抽取准确率≥80%
@@ -1298,12 +1346,16 @@ So that **构建知识图谱的实体和关系**。
    - [ ] `tests/integration/test_entity_extraction_integration.py` - 集成测试
 
 **实施指南:**
-参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+- 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+- LLM 调用通过 `LLMClientPort`（Story 3.2a 交付），不使用裸 httpx
+- 规则引擎使用 pyahocorasick + re（领域层零外部服务依赖）
+- L5 Neo4j 持久化复用现有 `L5GraphPort`
 
 **Given** 文档解析完成
 **When** 系统执行实体抽取
 **Then** 规则基抽取（领域词典 AC 自动机、正则、依存句法）准确率≥80%
 **And** LLM 语义抽取（Few-Shot+CoT+Schema 约束）高召回率，冲突仲裁器融合（规则权重 0.6/LLM 权重 0.4）
+**And** 抽取结果通过 L5GraphPort 写入 Neo4j（MERGE 语义）
 
 ### Story 3.3: 战略领域词典库管理
 
@@ -4048,7 +4100,7 @@ So that **确保 MVP 无高危漏洞**。
 | **Epic 0: Iteration 1** | 重构开发环境/CI/CD/测试框架 | - | - | - | - | - | 顺序依赖 | ✅ 是 | 12 |
 | **Epic 1: 企业级架构基础与合规** ✅ | 系统稳定性与性能基础<br/>安全与合规基础<br/>or.md 系统公理<br/>测试框架<br/>**MVP 关键机制增强** | - | - | - | - | - | 组内依赖 | ✅ 是 | **24** |
 | **Epic 2: 文档与数据管理** 🔄 | 文档全生命周期管理 | Story 1.6/1.7/1.3 | - | - | - | - | 顺序依赖（流水线） | ✅ 是 | 9 |
-| **Epic 3: 智能检索与知识发现** 📋 | 智能检索与溯源 | Story 1.5/1.6/1.7 | **Story 2.3（关键路径）** | - | - | - | 顺序依赖（流水线） | ✅ 是 | 13 |
+| **Epic 3: 智能检索与知识发现** 📋 | 智能检索与溯源 | Story 1.5/1.6/1.7 | **Story 2.3（关键路径）** | - | - | - | 顺序依赖（流水线） | ✅ 是 | 14 |
 | **Epic 4: 战略工具箱** | 战略工具执行能力 | Story 1.1/1.7/1.18b | - | - | - | - | 顺序依赖（工具链+Agent编排） | ✅ 是 | 5 |
 | **Epic 5: Agent 协作系统** | 单 Agent 战略规划能力 | Story 1.4/1.10/1.18b | - | - | *Story 4.1（可选，TOOLS.md 元数据）* | - | 顺序依赖（工作流） | ✅ 是 | 10 |
 | **Epic 6: 战略规划流程** | 战略规划与审批能力<br/>UX 三页面驾驶舱（分析师/顾问视图）<br/>**白标报告基础** | Story 1.4/1.7/1.18b | Story 2.2a/2.3 | Story 3.8 | **Story 4.1**（6.2/6.9 工具调用） | **Story 5.3** | 顺序依赖（BLM 流程） | ✅ 是 | **12** |
@@ -4057,12 +4109,12 @@ So that **确保 MVP 无高危漏洞**。
 | **🆕 Epic 21: 三页面驾驶舱 — 决策舱** | 高管 30 秒决策+拖拽推演+AI 实时代偿+BSC 可视化 | Story 1.7 | - | Story 3.8（溯源接口） | - | - | 顺序依赖（卡片布局→评分→滑块→AI→解码追溯） | ✅ 是 | **9** |
 | **🆕 Epic 22: 三页面驾驶舱 — 工作台完整交互** | 证据驱动推演+多 Agent 辩论共识+三页面数据闭环 | Story 1.7 | - | - | - | **Epic 9（多 Agent 协作）** | 顺序依赖（决策舱→工作台数据闭环） | ❌ 需 Epic 21+9 | **8** |
 
-**总计 MVP Story 数：123 个**（含 P1 V1 扩展 Story）
+**总计 MVP Story 数：124 个**（含 P1 V1 扩展 Story）
 - Iteration 0: 3 个（Story 0.1-0.3）
 - Iteration 1: 12 个（Story 0.4-0.9/0.14-0.18/0.30）
 - Epic 1: 24 个（Story 1.1-1.19 + IF-04 事件监听扩展）
 - Epic 2: 9 个（Story 2.1-2.8，Story 2.2 拆分为 2.2a/2.2b）
-- Epic 3: 13 个（Story 3.1-3.12，Story 3.1 拆分为 3.1a/3.1b）
+- Epic 3: 14 个（Story 3.1-3.12，Story 3.1 拆分为 3.1a/3.1b，Story 3.2 拆分为 3.2a/3.2b）
 - Epic 4: 9 个（含 ST-06~09 P1 V1 扩展）
 - Epic 5: 12 个（Story 5.1-5.10 + IF-02/03 SAP 协议扩展）
 - Epic 6: 12 个（Story 6.1-6.11，Story 6.5 拆分为 6.5a/6.5b）
@@ -4167,10 +4219,11 @@ graph TD
     end
 
     %% ========== Epic 3 (待开始) ==========
-    subgraph "Epic 3 📋 (待开始 - 0/13)"
+    subgraph "Epic 3 📋 (待开始 - 0/14)"
         S3_1a["Story 3.1a<br/>Dense 语义检索<br/>📋 backlog 🔑关键路径"]
         S3_1b["Story 3.1b<br/>BM25+RRF 融合<br/>📋 backlog 🔑关键路径"]
-        S3_2["Story 3.2<br/>实体抽取<br/>📋 backlog"]
+        S3_2a["Story 3.2a<br/>LLM Client 基础设施<br/>📋 backlog 🔑公共基础设施"]
+        S3_2b["Story 3.2b<br/>实体抽取<br/>📋 backlog"]
         S3_3["Story 3.3<br/>领域词典管理<br/>📋 backlog"]
         S3_4["Story 3.4<br/>RRF 融合排序<br/>📋 backlog"]
         S3_5["Story 3.5<br/>分层检索 L1-L4<br/>📋 backlog"]
@@ -4285,8 +4338,9 @@ graph TD
 
     %% Epic 3 内部依赖 (检索流水线)
     S3_1a --> S3_1b
-    S3_1b --> S3_2
-    S3_2 --> S3_3
+    S3_1b --> S3_2b
+    S3_2a --> S3_2b
+    S3_2b --> S3_3
     S3_1b --> S3_4
     S3_4 --> S3_5
     S3_5 --> S3_6
@@ -4324,7 +4378,7 @@ graph TD
     class S1_1,S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_9,S1_10,S1_11,S1_12,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_15b,S1_16,S1_17,S1_18a,S1_18b,S1_19 done;
     class S2_1 ready;
     class S2_2a,S2_2b,S2_3,S2_4,S2_5,S2_6,S2_7,S2_8 backlog;
-    class S3_1a,S3_1b,S3_2,S3_3,S3_4,S3_5,S3_6,S3_7,S3_8,S3_9,S3_10,S3_11,S3_12 backlog;
+    class S3_1a,S3_1b,S3_2a,S3_2b,S3_3,S3_4,S3_5,S3_6,S3_7,S3_8,S3_9,S3_10,S3_11,S3_12 backlog;
     class E4,E5,E6,E7,E8 backlog;
 ```
 
@@ -4442,8 +4496,9 @@ Story 1.6 (Qdrant 向量层 - ✅ Done) + Story 1.7 (MinIO 对象层 - ✅ Done)
 Story 1.6 (Qdrant - ✅ Done)
   → Story 3.1a (Dense 语义检索 bge-m3 - 📋 backlog) ← 🔑 MVP 关键路径
     → Story 3.1b (BM25 稀疏检索 + RRF 融合 - 📋 backlog) ← 🔑 MVP 关键路径
-      ├→ Story 3.2 (实体抽取 LLM+规则 - 📋 backlog)
-      │   → Story 3.3 (领域词典管理 - 📋 backlog)
+      ├→ Story 3.2a (LLM Client 基础设施 - 📋 backlog) ← 🔑 公共基础设施（供 3.2b/3.6/4.5/5.1 共用）
+      │   → Story 3.2b (实体抽取 LLM+规则 - 📋 backlog)
+      │       → Story 3.3 (领域词典管理 - 📋 backlog)
       └→ Story 3.4 (RRF 融合排序 - 📋 backlog)
           → Story 3.5 (分层检索 L1-L4 - 📋 backlog)
             → Story 3.6 (契约化摘要 - 📋 backlog)
@@ -4544,7 +4599,8 @@ Epic 21 (📋 待开始 · 可与 Epic 2-6 并行)
 | P1-7 | Epic 2 | 2.7 (元数据校验) | 📋 backlog | Story 2.2a | 2 天 |
 | P1-8 | Epic 2 | 2.8 (语义分块) | 📋 backlog | Story 2.2a | 3 天 |
 | P1-2b | Epic 2 | 2.2b (扩展格式) | 📋 backlog | Story 2.2a | 5 天 |
-| P0-2 | Epic 3 | 3.2 (实体抽取) | 📋 backlog | Story 3.1b | 4 天 |
+| P0-1c | Epic 3 | 3.2a (LLM Client 基础设施) | 📋 backlog | 无（参考 EmbeddingAPIClient 模式） | 3 天 |
+| P0-2 | Epic 3 | 3.2b (实体抽取) | 📋 backlog | Story 3.1b + Story 3.2a | 4 天 |
 | P0-4 | Epic 3 | 3.4 (RRF 融合排序) | 📋 backlog | Story 3.1b | 3 天 |
 | P0-5 | Epic 3 | 3.5 (分层检索 L1-L4) | 📋 backlog | Story 3.4 | 4 天 |
 | P1-6 | Epic 3 | 3.6 (契约化摘要) | 📋 backlog | Story 3.5 | 3 天 |
@@ -4584,9 +4640,10 @@ Epic 21 (📋 待开始 · 可与 Epic 2-6 并行)
 | Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 | 状态 |
 |-------|---------|---------|---------|---------|------|
 | **3.1a** (Dense 语义检索) | 1.6 ✅ | 3.1b, 3.9 | Hard | ✅ 检索核心 | 📋 backlog |
-| **3.1b** (BM25+RRF 融合) | 3.1a | 3.2, 3.4 | Hard | ✅ 检索核心 | 📋 backlog |
-| **3.2** (实体抽取) | 3.1b | 3.3 | Soft | - | 📋 backlog |
-| **3.3** (领域词典管理) | 3.2 | - | Soft | - | 📋 backlog |
+| **3.1b** (BM25+RRF 融合) | 3.1a | 3.2b, 3.4 | Hard | ✅ 检索核心 | 📋 backlog |
+| **3.2a** (LLM Client 基础设施) | 无（参考 EmbeddingAPIClient） | 3.2b, 3.6, 4.5, 5.1 | Hard | ✅ 公共基础设施 | 📋 backlog |
+| **3.2b** (实体抽取) | 3.1b, 3.2a | 3.3 | Soft | - | 📋 backlog |
+| **3.3** (领域词典管理) | 3.2b | - | Soft | - | 📋 backlog |
 | **3.4** (RRF 融合排序) | 3.1b | 3.5 | Hard | ✅ 排序核心 | 📋 backlog |
 | **3.5** (分层检索 L1-L4) | 3.4 | 3.6 | Hard | ✅ 分层核心 | 📋 backlog |
 | **3.6** (契约化摘要) | 3.5 | 3.7 | Soft | - | 📋 backlog |
@@ -4607,7 +4664,7 @@ Epic 21 (📋 待开始 · 可与 Epic 2-6 并行)
 | **1.7** (MinIO 对象层) | 文档存储 + WORM | Epic 2 Story 2.1（文档上传）、Epic 3 Story 3.10（战略档案库） | Hard |
 | **1.5** (PostgreSQL) | 关系存储 + 事务 | Epic 3 Story 3.10（战略档案库） | Hard |
 | **1.3** (事件总线) | 事件驱动 | Epic 2 Story 2.1（文档上传事件） | Hard |
-| **1.17** (UDMR 路由) | 模型路由 | Epic 3 Story 3.2（实体抽取 LLM 调用） | Soft |
+| **1.17** (UDMR 路由) | 模型路由 | Epic 3 Story 3.2a（LLM Client 基础设施，供应 LLM 调用） | Soft |
 
 ---
 
