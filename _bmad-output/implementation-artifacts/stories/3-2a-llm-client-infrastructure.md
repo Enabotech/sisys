@@ -194,7 +194,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 
 #### 数据模型 (Data Models)
 - [ ] **新增** `LLMConfig` dataclass（`src/domain/ports/llm_client.py`）：
-  - 字段：`api_type: Literal["openai", "anthropic", "openai_responses"] = "openai"` / `model: str = ""` / `endpoint: str = ""` / `api_key: str = ""` / `temperature: float = 0.7` / `max_tokens: int | None = None` / `timeout: float = 30.0`
+  - 字段：`api_type: Literal["openai", "anthropic", "openai_responses"] = "openai"` / `model: str = ""` / `endpoint: str = ""` / `api_key: str = ""` / `temperature: float = 0.7` / `max_tokens: int | None = None` / `timeout: float = 600.0`
   - 类方法 `from_cloud_model_config(c: CloudModelConfig, timeout: float = 30.0) -> LLMConfig`
   - 类方法 `from_env() -> LLMConfig`
   - **关键设计决策：`LLMConfig` 是 `CloudModelConfig`（基础设施层 frozen dataclass）的领域层镜像** — 字段一致但定义在领域层，确保领域层零外部依赖
@@ -271,10 +271,14 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
   - 结构化输出（Pydantic Schema 验证通过）
   - 自由文本生成（无 Schema 验证）
   - API Key 无效（401 → `LLMAPIError`）
-  - 速率限制（429 → `LLMAPIError`）
-  - 上下文过长（400 → `LLMResponseError`）
-  - 服务端错误（503 → 重试后异常）
-  - 配置错误（url 不合法 → `LLMConfigError`）
+  - 速率限制（429 → 3次重试后仍失败 → `LLMAPIError`，带 `retry_after` 上下文）
+  - 上下文过长（400 context_length → `LLMResponseError`）
+  - 服务端错误（500/502/503/504 → 重试后 `LLMAPIError`；501/505+ → 不重试，直接 `LLMAPIError`）
+  - 熔断器断开（连续3次失败后 → `ServiceUnavailableError`，后续请求快速失败）
+  - LLM API 超时（`httpx.TimeoutException` → `TimeoutError`，HTTP 504）
+  - 无效 JSON / Pydantic Schema 不匹配（`json.JSONDecodeError` → `LLMResponseError(schema_type="json_parse")`；`pydantic.ValidationError` → `LLMResponseError(schema_type=类名)`）
+  - 端点格式无效（`LLMConfig.from_env()` 阶段 → `LLMConfigError`）
+  - 运行时目标 URL 不可达（连接失败 → `NetworkError`，EXCEPTION_102）
 
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试
@@ -303,16 +307,13 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 | **TDD 单元测试** | LLMConfig | from_env / from_cloud_model_config / 异常 | `test_llm_config.py` | Task 1 |
 | **TDD 单元测试** | LitellmLLMClient | structured_generate / generate / 重试 / 熔断 / 异常映射 / close | `test_litellm_llm_client.py` | Task 2 |
 | **TDD 单元测试** | LLM 异常体系 | 构造/to_dict()/cause 链 / HTTP 映射 | `test_llm_exceptions.py` | Task 1 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_llm_client.feature` | Task 0 |
-| **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_llm_client.py` | Task 0 |
-| **TDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | `test_acceptance_llm_client.feature` | Task 6 |
-| **TDD 验收测试** | 收尾 BDD 步骤实现 | 完成清单断言与步骤函数 | `test_acceptance_llm_client.py` | Task 6 |
+| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖 | `test_arch_llm_client.py` | Task 4 |
+| **TDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | `test_acceptance_llm_client.feature` | Task 5 |
+| **TDD 验收测试** | 收尾 BDD 步骤实现 | 完成清单断言与步骤函数 | `test_acceptance_llm_client.py` | Task 5 |
 | **TDD 契约测试** | 端口契约 / registry / resolver | 端口注册/版本/lifetime/owner | `test_port_contract_llm_client.py` | Task 0 |
-| **TDD 领域异常测试** | 层次结构 | 构造/属性/to_dict()/cause 链 | `test_llm_exceptions.py` | Task 1 |
-| **TDD 领域异常测试** | 编码唯一性 | 所有异常类 code 无碰撞 | `test_error_code_uniqueness.py` | Task 1 |
-| **TDD 领域异常测试** | 编码子域范围 | 子域范围/继承链一致性 | `test_code_ranges.py` | Task 1 |
-| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖 | `test_arch_llm_client.py` | Task 5 |
-| **集成测试** | 端到端 LLM 调用 | 真实 LLM API 调用 + 结构化输出 | `test_integration_llm_client.py` | Task 6 |
+| **TDD 领域异常测试** | 构造/属性/to_dict()/HTTP映射/编码唯一性/子域范围 | LLM异常三阶段注册 | `test_llm_exceptions.py` / `test_error_code_uniqueness.py` / `test_code_ranges.py` | Task 1 |
+| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖 | `test_arch_llm_client.py` | Task 4 |
+| **集成测试** | 端到端 LLM 调用 | 真实 LLM API 调用 + 结构化输出 | `test_integration_llm_client.py` | Task 5 |
 
 ---
 
@@ -341,7 +342,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 | AC-3 | LitellmLLMClient 实现 + 重试 + 熔断 + api_type 适配 | Task 2 | Subtask 2.1-2.12 | `test_litellm_llm_client.py` |
 | AC-4 | LLM 异常体系 | Task 1 | Subtask 1.8-1.11 | `test_llm_exceptions.py` |
 | AC-5 | Composition Root 注册 | Task 3 | Subtask 3.1-3.3 | `test_port_contract_llm_client.py` |
-| AC-6 | 验收测试 | Task 0 + Task 6 | Subtask 0.2-0.4 + 6.2-6.4 | `test_acceptance_llm_client.feature` + `.py` |
+| AC-6 | 验收测试 | Task 0 + Task 5 | Subtask 0.2-0.4 + 5.1-5.3 | `test_acceptance_llm_client.feature` + `.py` |
 
 ---
 
@@ -717,7 +718,8 @@ tests/
 
 **关键学习:**
 - **端口契约三方法模式**（Story 3-1b）：端口存在性 → 方法签名 → 元数据验证
-- **降级策略**（Story 3-1b）：单路失败降级为单路，双路失败才抛异常 → LLM Client：主模型失败不降级（Story 3-2a 为基础设施，降级策略在 UDMR 层实现）
+- **降级策略**（Story 3-1b）：单路失败降级为单路，双路失败才抛异常
+  - **对本 Story 的适用性判定：不直接适用。** LLM Client 作为基础设施层，不实现模型降级。模型切换/降级策略归属于 UDMR 路由层（Story 1.17）。LLM Client 仅负责：重试当前模型 → 熔断保护 → 抛出领域异常。调用方（应用层/UDMR）收到异常后自行决定降级策略。
 - **Mock 模式**（Story 3-1b）：`patch("httpx.AsyncClient.post")` → `patch("litellm.acompletion")` 对标
 - **BDD async 约束**（Story 3-1b）：不使 `@pytest.mark.asyncio`，用 `event_loop.run_until_complete()`
 - **熔断器复用**（Story 1.17）：`CircuitBreaker(name="embedding-api")` → `CircuitBreaker(name="llm-api")`，命名区分不同组件实例，LLM 场景默认阈值调整为 `failure_threshold=3, recovery_timeout=60.0`
