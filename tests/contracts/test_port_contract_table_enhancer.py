@@ -33,6 +33,11 @@ class TestTableSemanticEnhancerPortContract:
         assert params == ["self", "tables", "mime_type"]
         assert sig.return_annotation == "list[ParsedTable]"
 
+    def test_enhance_is_sync(self) -> None:
+        """enhance 是同步方法（非 async）"""
+        method = getattr(TableSemanticEnhancerPort, "enhance")
+        assert not inspect.iscoroutinefunction(method)
+
     def test_compliant_implementation(self) -> None:
         """验证合规实现可通过 isinstance 检查"""
 

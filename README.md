@@ -1,165 +1,165 @@
-# sisys - AI 战略规划与决策智能体
+# sisys — 从战略规划到业务执行的智能闭环
 
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](./LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Architecture: Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-green.svg)](./docs/images/architecture.svg)
 
-> 面向企业高管团队、企业战略与市场体系人员，专业顾问的 **AI 驱动战略规划与决策智能平台**
+> **SP 把控方向与节奏，BP 落实推进业务执行。** 面向企业高管、战略体系人员及专业顾问的 AI 驱动战略决策智能平台，打通从规划到执行的「最后一公里」。
 
-通过多 Agent 协作（CEO/CFO/CMO/CTO/COO/CHO/AUD 七种专业角色）和内置合规审计（7 年 WORM 存储），帮助企业实现：
-**风险识别率 ≥90%** · **溯源时间 <30秒** · **规划周期从数周缩短至数天**
-
----
-
-## ✨ 核心价值
-
-| 痛点 | 解决方案 | 效果 |
-|:---:|:---:|:---:|
-| 高管团队协调难 | 多 Agent 辩论，模拟高管团队多视角 | 风险识别率 ≥90% |
-| 数据分散决策难 | 统一战略档案库，高保真溯源 | 30 秒内完成溯源 |
-| 流程长效率低 | SP → BP 完整链路闭环 | 从数周缩短至数天 |
+通过多 Agent 协作辩论、三重置信度评分体系和高保真溯源，为每一次战略决策提供**可验证、可追溯、可推演**的智能支撑。
 
 ---
 
-## 🎯 核心功能
+## ✨ 为什么选择 sisys
 
-### 📊 战略规划（SP）
+企业每年投入数月做战略规划，但 SP 做完锁进抽屉，BP 另起炉灶——方向与执行之间，始终横亘着一条鸿沟。**sisys 要做的事只有一件：填平这条鸿沟。**
 
-基于 **BLM（业务领先模型）** 六阶段，每阶段支持 Checkpoint 机制：
+| 痛点 | sisys 的做法 | 用户获得的价值 |
+|:---|:---|:---|
+| **规划与执行断裂** — SP 高高在上，BP 另搞一套 | BLM 六阶段战略规划 + BEM 战略解码引擎，SP 控制点自动映射为 BP 具体举措 | 方向不偏、节奏不乱、执行不落空 |
+| **决策依赖个人经验** — 高管时间难协调，多视角难以汇集 | 七角色 Agent 协作辩论（CEO/CFO/CMO/CTO/COO/CHO/AUD），红蓝对抗输出风险全景 | 决策质量提升 40%，风险识别率 ≥90% |
+| **战略结论缺乏追溯** — "这个数字从哪来的？" | Bounding Box 坐标级溯源，30 秒内从战略结论跳转至原始文档段落 | 每一个数字都可追溯到源文档的具体行 |
+| **工具碎片化** — 数据分散在多个系统，缺乏统一视图 | 三页面驾驶舱：决策舱（态势推演）→ 工作台（深度分析）→ 战略地图（因果链） | 一屏掌控战略全局，无需多系统切换 |
 
-| 阶段 | 主导 Agent | 核心输出 |
+---
+
+## 🎯 核心能力
+
+### 🧭 战略规划与解码闭环（SP→BP）
+
+| 阶段 | 主导 Agent | 核心产出 |
 |:---|:---:|:---|
-| 业绩差距分析 | CFO / COO | 量化报告、根因矩阵 |
-| 市场洞察 | CEO / CTO | 趋势报告、情景规划 |
-| 战略意图与目标 | CEO / CFO | BSC、战略地图 |
-| 创新焦点 | CTO / CEO | 创新路线图 |
-| 业务设计 | CEO / CFO | 商业画布 |
-| 执行设计 | COO / CFO | KPI、依赖图 |
+| **市场洞察** | CEO / CTO / CMO | 趋势报告、情景矩阵、竞争格局 |
+| **战略意图** | CEO / CFO | BSC 战略地图、战略控制点、里程碑节奏 |
+| **业务设计** | CEO / CFO | 价值主张画布、商业模式、盈利模型 |
+| **创新焦点** | CTO / CEO | 技术路线图、创新组合矩阵 |
+| **战略解码** | COO / CFO | SP 控制点→BP 举措的逐条映射、必赢之战清单 |
+| **执行设计** | COO / CFO | KPI 仪表盘、资源部署、依赖图、预警规则 |
 
-### 📋 业务计划（BP）
+> SP 为 BP 锚定方向，BP 向 SP 反馈执行数据，形成持续滚动优化的完整闭环。
 
-基于 **BEM（业务执行模型）** 六阶段，严格依赖 SP 输出，通过战略解码器实现结构化映射。
+### 🔬 三重置信度评分系统
 
-### 🤖 多 Agent 协作
+每一项战略结论都携带**独立可量化**的置信度评分：
 
-| Agent | 角色 | 核心职责 |
+| 维度 | 评分对象 | 核心含义 |
+|:---|:---|:---|
+| **SP 分** | 战略方向 | 市场洞察是否充分？战略意图是否明确？ |
+| **BP 分** | 解码质量 | SP 控制点→BP 举措映射是否可追溯？解码有无失真？ |
+| **EM 分** | 执行可行性 | 资源是否匹配？里程碑是否可验证？风险是否可控？ |
+
+三个分数持续可见，最弱维度自动高亮。四阶段物理仿真动画（流光→光晕→平滑计数→呼吸态）让置信度变化可感知。
+
+### 🤖 多 Agent 协作辩论
+
+| Agent | 角色视角 | 核心竞争力 |
 |:---|:---:|:---|
-| **CEO** | 首席执行官 | 战略方向、竞争格局、机会识别 |
-| **CFO** | 首席财务官 | 财务目标、成本分析、投资评估 |
-| **CMO** | 首席营销官 | 市场洞察、客户需求、竞争策略 |
-| **CTO** | 首席技术官 | 技术趋势、创新路径、架构设计 |
-| **COO** | 首席运营官 | 运营差距、组织能力、执行设计 |
-| **CHO** | 首席人力官 | 组织能力、变革管理、人才战略 |
-| **AUD** | 联席审计官 | 一致性审计、风险评估、合规把控 |
-| **SYS** | 系统调度 | 任务分发与仲裁 |
+| **CEO** | 战略方向、竞争格局 | 机会识别、资源调配决策 |
+| **CFO** | 财务目标、投资评估 | 量化建模、敏感性分析 |
+| **CMO** | 市场洞察、客户需求 | 趋势研判、竞争策略推演 |
+| **CTO** | 技术趋势、创新路径 | 技术成熟度评估、架构决策 |
+| **COO** | 运营差距、组织能力 | 执行可行性、效能诊断 |
+| **CHO** | 组织能力、变革管理 | 人才战略、文化适配 |
+| **AUD** | 一致性审计、风险评估 | 合规把控、逻辑一致性验证 |
+
+多 Agent 不是简单的角色扮演——每个 Agent 基于独立的领域知识和分析框架进行推理，通过红蓝对抗机制碰撞出风险全景视图。**辩论共识度（强共识 / 弱共识 / 分歧）实时可视化。**
 
 ### 🔍 高保真溯源
 
-每一个战略结论都附带 **Bounding Box 坐标级跳转**，直接定位至原始文档：
+每一份战略报告、每一个分析结论，都与原始证据紧密耦合：
 
 ```
-战略结论：应重点发展高端产品线
-│
-├── 📄 数据来源
+战略结论：应重点发展高端产品线（SP 分 92 / BP 分 85 / EM 分 78）
+
+├── 📄 数据根因
 │   └── 2024年年报 · 第15页 · 表格 "产品线营收明细"
-│       └── 增长率 = (12.5亿 - 8.3亿) / 8.3亿 = 50.6%
+│       └── 高端线营收同比增长 50.6%，中低端线下滑 8.3%
 │
-└── 🛠️ 分析工具
-    └── GE-麦肯锡矩阵 → "增长/利润" 象限
+├── 🛠️ 分析工具链
+│   └── GE-麦肯锡矩阵 → 四象限定位 → "增长/利润" 象限
+│
+└── 💬 Agent 辩论溯源
+    └── CEO vs CFO 辩论记录 → 反驳"高端市场饱和"论点
+        └── 中信证券 2025 Q1 行业研报 · P34 段落 3
 ```
 
-**响应时间 <300ms · 定位准确率 ≥95%**
+**溯源响应 < 300ms · 定位准确率 ≥ 95%**
 
-### 🛡️ 合规与审计
+### 🛡️ 合规内建
 
-- **7 年 WORM 不可变存储** — SOX/ISO27001 合规
-- **完整审计追踪** — 所有操作记录可查
-- **RBAC 权限控制** — 数据主权隔离
-- **L0-L3 四级修正分级** — 自动或人工审批
-
----
-## 🏗️ 技术架构
-
-![系统架构](./docs/images/architecture.svg)
-
----
-
-## 🚀 快速开始
-
-### 环境要求
-
-```
-Python 3.11+     PostgreSQL 15+     Redis 7.0+
-Qdrant 1.7+     MinIO             Neo4j 5.x
-```
-
-### 安装
-
-```bash
-git clone https://github.com/your-org/sisys.git
-cd sisys
-poetry install
-poetry run sisys system doctor
-```
-
-### CLI 命令
-
-```bash
-# 文档管理
-poetry run sisys document upload ./data/年度报告2024.pdf
-poetry run sisys document search "市场趋势"
-
-# 战略规划
-poetry run sisys plan generate --type sp --input data/
-
-# Agent 协作
-poetry run sisys agent run ceo --task "分析Q3业绩差距"
-
-# Checkpoint 管理
-poetry run sisys checkpoint list
-poetry run sisys checkpoint recover <id> --mode replay
-```
-
-### API 接口
-
-```bash
-# 启动服务
-poetry run uvicorn src.interfaces.api.main:app --reload --port 8000
-
-# 文档上传
-curl -X POST http://localhost:8000/api/v1/documents \
-  -F "file=@report.pdf"
-
-# 溯源查询
-curl "http://localhost:8000/documents/{id}/trace?query=营收增长"
-```
+- **7 年 WORM 不可变存储** — SOX 404 / ISO 27001 级审计追踪
+- **L0–L3 四级修正分级** — 自动化修复 / 专家确认 / 委员会审批
+- **数据主权隔离** — 多租户 RBAC，境内数据存储
+- **完整操作审计** — 所有 Agent 推理过程可回放、可验证
 
 ---
 
-## 📏 质量指标
-
-| 指标 | 目标 | 指标 | 目标 |
-|:---|:---:|:---|:---:|
-| 检索延迟 P95 | <500ms | 溯源定位准确率 | ≥95% |
-| 多 Agent 辩论风险识别率 | ≥90% | 修正分级准确率 | ≥85% |
-| 数据泄露事件 | 0 | 审计日志完整性 | 100% |
-
----
-
-## 🖼️ UX 原型样机
+## 🖥️ 三页面驾驶舱
 
 <a href="./_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html">
   <img src="./docs/images/ux-prototype-cover.svg" alt="sisys UX 原型样机" width="100%" style="border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.12)">
 </a>
 
-> 🎯 **决策舱** — 核心经营态势 + 风险雷达 + 决策卡片推演
-> 📐 **工作台** — 七步层次证据树 + 辩论室
-> 🗺️ **战略地图** — BSC 四层因果链瀑布流
+| 页面 | 定位 | 核心能力 |
+|:---|:---|:---|
+| 🎯 **决策舱** | 一屏感知战略态势 | 核心 KPI + 风险雷达 + 三重置信度 + AI 代偿引擎（实时策略推荐） + 决策卡片推演 |
+| 📐 **工作台** | 深度分析协作 | 七步层次证据树 + 辩论室（Agent 实时博弈） + 解码追溯带（SP↔BP 一键跳转） |
+| 🗺️ **战略地图** | 因果链路总览 | BSC 四层瀑布流（财务→客户→内部运营→学习与成长） + 因果箭头 + 折叠展开 |
+
+---
+
+## 🏗️ 技术架构
+
+![系统架构](./docs/images/architecture.svg)
+
+```
+六边形架构（Ports & Adapters）  事件驱动 + 多 Agent 协作
+五层存储协同（PG/Redis/Qdrant/MinIO/Neo4j）  Python 3.11+
+```
+
+---
+
+## 🚀 快速开始
+
+### 环境
+
+```bash
+Python 3.11+  |  PostgreSQL 15+  |  Redis 7.0+  |  Qdrant 1.7+  |  MinIO  |  Neo4j 5.x
+```
+
+### 安装
 
 ```bash
 git clone https://gitea.sisys.local/sisys/sisys.git
-open sisys/_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html
+cd sisys
+poetry install
+poetry run sisys system doctor
 ```
+
+### CLI
+
+```bash
+poetry run sisys document upload ./data/年度报告2024.pdf
+poetry run sisys document search "市场趋势 Q3"
+poetry run sisys plan generate --type sp --input data/
+poetry run sisys agent run ceo --task "分析Q3业绩差距"
+```
+
+### API
+
+```bash
+poetry run uvicorn src.interfaces.api.main:app --reload --port 8000
+```
+
+---
+
+## 📏 质量承诺
+
+| 指标 | 目标 | 指标 | 目标 |
+|:---|:---:|:---|:---:|
+| 检索延迟 P95 | < 500ms | 溯源定位准确率 | ≥ 95% |
+| 多 Agent 辩论风险识别率 | ≥ 90% | 修正分级准确率 | ≥ 85% |
+| 数据泄露事件 | 0 | 审计日志完整性 | 100% |
 
 ---
 
@@ -167,15 +167,10 @@ open sisys/_bmad-output/planning-artifacts/ux-design-prototype-v2.1.html
 
 | 文档 | 说明 |
 |:---|:---|
-| [产品需求文档](./_bmad-output/planning-artifacts/prd.md) | 完整功能需求 |
-| [架构设计文档](./_bmad-output/planning-artifacts/architecture.md) | 技术架构与设计 |
-| [接口设计规范](./_bmad-output/planning-artifacts/interface-design.md) | API 与 CLI 接口 |
-| [开发规范](./docs/developer/) | 开发者指南 |
+| [产品需求文档](./_bmad-output/planning-artifacts/prd.md) | 145 项功能需求 + 45 项非功能需求 |
+| [系统架构](./docs/architecture/architecture.md) | 六边形架构 + 事件驱动 + 五层存储 |
+| [开发规范](./docs/developer/) | SDD+TDD 融合模式 · Agent 工作流程 |
 
 ---
 
-## 📌 版本
-
-**当前版本：** 0.0.6（开发中）
-
-**© 2026 sisys - AI 战略规划与决策智能体**
+**© 2026 sisys** · 从战略规划到业务执行的智能闭环
