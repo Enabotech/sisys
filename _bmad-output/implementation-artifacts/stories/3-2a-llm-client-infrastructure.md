@@ -192,7 +192,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
   - 类方法 `from_env() -> LLMConfig`
   - **关键设计决策：`LLMConfig` 是 `CloudModelConfig`（基础设施层 frozen dataclass）的领域层镜像** — 字段一致但定义在领域层，确保领域层零外部依赖
 - [ ] **新增** `LLMResponse` dataclass（`src/domain/ports/llm_client.py`）：
-  - 字段：`content: str` / `finish_reason: str` / `usage: dict[str, int]` / `model: str`
+  - 字段：`content: str` / `finish_reason: str` / `usage: dict[str, int | None]` / `model: str`
   - `frozen=True`（不可变）
 
 #### 统一端口定义注册与管理 (Port Contract)
