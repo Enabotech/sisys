@@ -183,6 +183,44 @@ CoT 步骤：
 - [ ] LLM 返回合法 JSON 且 Schema 验证通过但 `entities`/`triples` 为空数组时：记录 WARNING 日志（`"LLM returned valid but empty extraction result"`），不触发重试（避免无效调用浪费），直接返回空结果。此场景表明文本中无可识别实体，属于正常业务结果而非错误
 - [ ] Few-Shot 示例存储在 `src/infrastructure/extraction/prompts/entity_extraction_examples.py` 中（3 个示例，覆盖 5+ 实体类型和高频关系类型）
 - [ ] CoT 推理链嵌入每个 Few-Shot 示例的 `reasoning` 字段中，展示完整推理过程：实体识别 → 规范化 → 关系判断 → 置信度评估
+- [ ] Few-Shot 示例格式参考（至少 1 个示例在 `entity_extraction_examples.py` 中按此模板实现）：
+
+```python
+# src/infrastructure/extraction/prompts/entity_extraction_examples.py
+
+FEW_SHOT_EXAMPLES = [
+    {
+        "input": "华为在2024年Q3发布了P70手机，欧洲市场份额达到15%，引发了与苹果的激烈竞争。",
+        "output": {
+            "entities": [
+                {"name": "华为", "type": "ORGANIZATION", "mentions": ["华为"]},
+                {"name": "P70手机", "type": "PRODUCT", "mentions": ["P70手机"]},
+                {"name": "欧洲市场", "type": "MARKET", "mentions": ["欧洲市场"]},
+                {"name": "15%", "type": "METRIC", "mentions": ["15%"]},
+                {"name": "苹果", "type": "ORGANIZATION", "mentions": ["苹果"]},
+                {"name": "2024年Q3", "type": "EVENT", "mentions": ["2024年Q3"]}
+            ],
+            "triples": [
+                {"subject": "华为", "relation": "LAUNCHED", "object": "P70手机", "confidence": 0.95, "evidence": "华为在2024年Q3发布了P70手机"},
+                {"subject": "华为", "relation": "OPERATES_IN", "object": "欧洲市场", "confidence": 0.90, "evidence": "欧洲市场份额达到15%"},
+                {"subject": "华为", "relation": "COMPETES_WITH", "object": "苹果", "confidence": 0.92, "evidence": "引发了与苹果的激烈竞争"}
+            ]
+        },
+        "reasoning": (
+            "1. 实体识别：识别到华为（组织）、苹果（组织）、P70手机（产品）、欧洲市场（市场，非简单地名）、"
+            "15%（指标，含数字+符号）、2024年Q3（事件，时间关键点）。共识别 6 个实体覆盖 5 种类型。\n"
+            "2. 规范化：华为和苹果是知名企业，无需消歧。P70手机是华为旗下产品。欧洲市场是市场概念（非 GPE 地名）。\n"
+            "3. 关系判断：(a) 华为→P70手机：发布时间关系，LAUNCHED，显式陈述\"发布了\"，confidence=0.95。\n"
+            "(b) 华为→欧洲市场：经营地域关系，OPERATES_IN，强暗示\"欧洲市场份额达到\"表明在经营，confidence=0.90。\n"
+            "(c) 华为→苹果：竞争关系，COMPETES_WITH，显式陈述\"激烈竞争\"，confidence=0.92。\n"
+            "4. 置信度评估：三组关系均为显式陈述或强暗示，置信度≥0.90。未发现弱暗示关系，无需标记低置信度。"
+        )
+    },
+    # ... 另外 2 个示例（分别覆盖投资/法规场景和供应链/依赖场景）
+]
+```
+
+> 关键约束：每个示例必须覆盖至少 3 种不同的关系类型，`reasoning` 字段必须按 4 步结构编写。
 - [ ] 使用 `ollama` 的 `format: json` 参数确保输出合法 JSON；引入 `jsonschema.validate()` 做 Schema 后处理验证
 
 ### AC-5: 冲突仲裁与融合
@@ -215,7 +253,15 @@ CoT 步骤：
 **Given** 实体抽取产生了规范化三元组
 **When** 系统执行持久化
 **Then** 通过 `L5GraphPort` 写入 Neo4j：
-  - 每个 `ExtractedEntity` → 将 `entity_id`（SHA-256 哈希）作为节点主键（对应 `L5GraphPort.create_entity()` 的 `memory_id` 参数），`entity_type` 映射为 Neo4j 标签，构建节点属性 `dict` 传入。注意：已有 `GraphNode.__post_init__` 要求 `properties` 含 `business_domain`/`entity_type`/`content_hash` 三个字段，需传入填充值以满足此契约
+  - 每个 `ExtractedEntity` → 将 `entity_id`（SHA-256 哈希）作为节点主键（对应 `L5GraphPort.create_entity()` 的 `memory_id` 参数），`entity_type` 映射为 Neo4j 标签，构建节点属性 `dict` 传入。注意：已有 `GraphNode.__post_init__` 要求 `properties` 含 `business_domain`/`entity_type`/`content_hash` 三个字段，需传入填充值以满足此契约：
+
+    | GraphNode 必需字段 | 填充来源 | 示例值 |
+    |-------------------|---------|--------|
+    | `business_domain` | 固定值 | `"knowledge"` |
+    | `entity_type` | `ExtractedEntity.type.value` | `"ORGANIZATION"` |
+    | `content_hash` | `hashlib.sha256(entity.name.encode()).hexdigest()[:16]` | `"a3f8c2e1b4d5"` |  # pragma: allowlist secret
+
+    `content_hash` 用于 Neo4j MERGE 时的幂等键辅助，与项目中 `neo4j_memory_graph_storage._content_hash()` 的 SHA-256 模式一致。
   - 每个 `Triple` → 调用 `L5GraphPort.create_relationship()` 创建关系边
 **And** 节点属性包含：`name`, `type`, `mentions`, `properties`, `source`, `created_at`, `business_domain`（固定 `"knowledge"`）, `entity_type`, `content_hash`
 **And** 边属性包含：`confidence`, `evidence`, `source`, `created_at`
@@ -673,7 +719,32 @@ container.register(
 - 三个规则基匹配器共享同一个 `nlp` 对象以降低内存和初始化成本，`RuleBasedExtractor` 构造函数接受 `nlp` 参数注入
 - 单元测试中 `RuleBasedExtractor` 需 mock `nlp` 对象（`Morphology` 需 `label_data`），参考 `tests/conftest.py` 中的 `mock_nlp` fixture
 - **nlp 对象并发安全：** spaCy `nlp` 对象在 C 扩展层释放 GIL（通过 `nogil`），允许 `asyncio.to_thread` 中并发调用。但 tokenizer 缓存等内部状态不是线程安全的。对于 `extract_batch` 的高并发（50+ 文本），建议每个 worker 使用独立 `nlp` pipeline 或 `threading.Lock` 序列化调用
-- **spaCy 依赖：** 需将 `spacy = "^3.7.0"` 添加到 `pyproject.toml` 的 `[tool.poetry.dependencies]` 中（Task 0 前置步骤）。在 `tests/conftest.py` 中添加 `spacy` 可用性跳过标记，当 `zh_core_web_sm` 模型未安装时跳过相关测试并给出明确提示
+- **spaCy 依赖：** 需将 `spacy = "^3.7.0"` 添加到 `pyproject.toml` 的 `[tool.poetry.dependencies]` 中（Task 0 前置步骤）。在 `tests/conftest.py` 中添加 `spacy` 可用性跳过标记，当 `zh_core_web_sm` 模型未安装时跳过相关测试并给出明确提示：
+
+```python
+# tests/conftest.py 新增 fixture
+import pytest
+
+@pytest.fixture(scope="session")
+def spacy_available() -> bool:
+    """检查 spaCy 和 zh_core_web_sm 是否可用。"""
+    try:
+        import spacy
+        spacy.load("zh_core_web_sm")
+        return True
+    except (ImportError, OSError):
+        return False
+
+@pytest.fixture
+def mock_nlp():
+    """返回 spaCy 空模型（单元测试用，避免加载 45MB 真实模型）。"""
+    from spacy.lang.zh import Chinese
+    nlp = Chinese()
+    # 注入必要的 pipeline 组件标签以通过 Morphology 初始化
+    nlp.add_pipe("sentencizer")
+    return nlp
+```
+
 - **Mock 策略补充：** 单元测试中 `UDMRService.decide()` Mock 返回 `RoutingDecided(route_type="local", selected_model="qwen2.5:7b")`；`LLMInvocationPort.invoke()` Mock 返回固定 JSON 字符串（含 entities + triples）；失败场景 Mock `invoke()` 抛出 `LLMExtractionError` 或返回不合规 JSON
 
 ---
