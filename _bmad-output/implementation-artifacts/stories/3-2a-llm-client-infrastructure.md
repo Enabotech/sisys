@@ -389,7 +389,7 @@ Story 1.17 (已完成)                      Story 3.2a (本 Story)              
 
 - [ ] Subtask 1.7: 🔴 红 — 编写 `tests/unit/domain/exceptions/test_llm_exceptions.py`
 - [ ] Subtask 1.8: 🟢 绿 — 实现 `src/domain/exceptions/llm_exceptions.py`
-- [ ] Subtask 1.9: 🔄 重构 — 更新 `_code_ranges.py`（新增 llm 子域 321-329）/ `__init__.py` / `EXCEPTION_HTTP_MAP`
+- [ ] Subtask 1.9: 🔄 重构 — 更新 `_code_ranges.py`（新增 llm 子域 330-339）/ `__init__.py` / `EXCEPTION_HTTP_MAP`
 - [ ] Subtask 1.10: 运行 `pytest tests/unit/domain/exceptions/ -v`（编码唯一性 + 子域范围）
 
 **完成标准/Definition of Done:**
@@ -639,7 +639,7 @@ UDMRConfig.from_env() ────────┤
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
-| **LLMAPIError (321) + LLMResponseError (322) + LLMConfigError (323)** | 简洁；调用方通过 context 字典获取详细信息 | context 字典非结构化 | ✅ 8/10 |
+| **LLMAPIError (330) + LLMResponseError (331) + LLMConfigError (332)** | 简洁；调用方通过 context 字典获取详细信息 | context 字典非结构化 | ✅ 8/10 |
 | 按 HTTP 状态码细分（LLMRateLimitError/LLMAuthenticationError/LLMContextLengthError...） | 调用方类型匹配精确 | 异常类爆炸（~10+类）；新增状态码需新增类 | 5/10 |
 
 ### 项目结构说明
