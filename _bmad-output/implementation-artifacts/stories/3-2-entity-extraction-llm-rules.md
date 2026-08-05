@@ -28,7 +28,7 @@ Story 3-2 是 Epic 3（智能检索与知识发现）的第三个故事（P0-2�
 - **规则基路径**（高精确率路径）：spaCy PhraseMatcher/正则/依存句法 — 高精确率（≥80%），确定性抽取
 - **LLM 语义路径**（高召回率路径）：Few-Shot + CoT + Schema 约束 — 高召回率（≥90%），覆盖规则无法处理的模糊表达
 - **冲突仲裁器**：规则基和 LLM 结果并集 + 加权置信度融合 → 三元组列表
-- **融合权重** (`rule_weight=0.6`, `llm_weight=0.4`): 初始经验值，定义于 `ConflictArbiter` 构造参数，V1+ 通过标注数据集校准
+- **融合权重** (`rule_weight=0.6`, `llm_weight=0.4`): 初始经验值，定义于 `ConflictArbiter` 构造参数。最终公式：`weighted_confidence = alpha * rule.confidence + (1-alpha) * llm.confidence`，其中 `alpha` 作为可配置参数（默认 0.6），V1+ 通过标注数据集校准。权重支持运行时通过 `configs/extraction.yaml` 覆盖
 
 **关键假设：**
 - LLM 调用通过已有 UDMR 路由（`udmr_service.decide()` → `RoutingDecided` 事件），优先本地 Ollama+Qwen2.5，云端兜底
@@ -61,18 +61,20 @@ Story 3-2 是 Epic 3（智能检索与知识发现）的第三个故事（P0-2�
 
 **And** 使用以下关系类型（在本 Story 中扩展 `RelationshipType` 枚举至 13 种 -- 保留全部 6 种已有值 + 新增 7 种）：
 
-| 关系类型 | 已有/新增 | 说明 |
-|---------|----------|------|
-| `COMPETES_WITH` | 新增 | 竞争关系（A vs B） |
-| `SUPPLIES_TO` | 新增 | 供应关系（A → B） |
-| `INVESTS_IN` | 新增 | 投资关系 |
-| `OWNS` | 新增 | 拥有关系（母子公司） |
-| `LAUNCHED` | 新增 | 发布关系（公司→产品） |
-| `OPERATES_IN` | 新增 | 经营地域/市场 |
-| `REGULATED_BY` | 新增 | 受法规约束 |
-| `INFLUENCES` | 已有 | 影响关系 |
-| `PART_OF` | 已有 | 包含关系 |
-| `DEPENDS_ON` | 已有 | 依赖关系 |
+| 关系类型 | 已有/新增 | 方向性 | 说明 |
+|---------|----------|--------|------|
+| `COMPETES_WITH` | 新增 | 无向 | 竞争关系（A vs B），双向等价 |
+| `SUPPLIES_TO` | 新增 | 有向 | 供应关系（A → B） |
+| `INVESTS_IN` | 新增 | 有向 | 投资关系（A → B） |
+| `OWNS` | 新增 | 有向 | 拥有关系（母公司 → 子公司） |
+| `LAUNCHED` | 新增 | 有向 | 发布关系（公司 → 产品） |
+| `OPERATES_IN` | 新增 | 有向 | 经营地域/市场（公司 → 市场） |
+| `REGULATED_BY` | 新增 | 有向 | 受法规约束（实体 → 法规） |
+| `INFLUENCES` | 已有 | 双向 | 影响关系（A ↔ B），Neo4j 建模中标注 `bidirectional: true` 属性 |
+| `PART_OF` | 已有 | 有向 | 包含关系（子 → 父） |
+| `DEPENDS_ON` | 已有 | 有向 | 依赖关系（A → B） |
+
+**注：** 上表仅展示与实体抽取直接相关的关系类型。已有类型 `MENTIONS`、`RELATES_TO`、`CONTRADICTS` 在本 Story 中不会被实体抽取引擎产出，但其枚举值在 `RelationshipType` 中保留不变（总计 13 种 = 7 新增 + 6 已有）。
 
 **验证标准/Validation Criteria:**
 - [ ] 领域层 `src/domain/value_objects/entity_types.py` — `EntityType` StrEnum（9 种实体类型，含 `OTHER` 兜底类型）
@@ -116,13 +118,13 @@ Story 3-2 是 Epic 3（智能检索与知识发现）的第三个故事（P0-2�
 
 ### AC-3: 规则基抽取（spaCy PhraseMatcher + 正则 + 依存句法）
 
-**Given** 加载了领域词典（包含约 500 条种子实体：公司名/人名/产品/政策）
+**Given** 加载了领域种子词典（MVP 阶段约 50-100 条种子实体，按实体类型均匀分布；V1+ 阶段通过 Story 3-3 动态词典扩展至 500 条）
 **When** 系统执行规则基抽取
 **Then** spaCy PhraseMatcher 基于 Token 序列匹配已知实体（词边界由 `zh_core_web_sm` 分词器保证）
 **And** 正则模式匹配 `METRIC` 类型（数字+单位模式：`\d+[\.\d]*\s*(亿|万|%|倍|美元|元|人|家|个)`）
 **And** spaCy 依存句法解析 `主谓宾` 三元组（nsubj → ROOT → dobj）
 **And** 规则基抽取准确率 ≥ 80%（组织/人物/产品 ≥ 90%，策略/事件 ≥ 70%）
-**And** 每次调用延迟 P95 < 500ms（纯规则路径，不含 LLM）
+**And** 每次调用延迟 P95 < 1000ms（纯规则路径，不含 LLM，文本长度 < 2000 tokens）
 
 **验证标准/Validation Criteria:**
 - [ ] 规则基引擎位于 `src/infrastructure/extraction/rule_engine/` 目录
@@ -164,18 +166,18 @@ CoT 步骤：
 }
 ```
 
-**And** LLM 语义抽取召回率 ≥ 90%
+**And** LLM 语义抽取召回率 ≥ 85%（MVP 阶段，Qwen2.5-7B 本地模型；V1+ 目标 ≥ 90%）
 
 **验证标准/Validation Criteria:**
 - [ ] `LLMExtractor` 类位于 `src/infrastructure/extraction/llm_extractor.py`
 - [ ] 构造函数注入 `udmr_service: UDMRService`（用于路由决策）+ `llm_invoker: LLMInvocationPort`（新增领域端口，用于实际 LLM API 调用）
 - [ ] `extract(text, context)` 方法：
-  - 构建 Few-Shot Prompt（含 8-10 个精选示例，每个关系类型至少 1 个，覆盖全部实体类型）
+  - 构建 Few-Shot Prompt（含 3 个精选中文战略领域示例，覆盖 5+ 实体类型和主要关系类型）
   - 调用 `await udmr_service.decide(task)` 获取 `RoutingDecided`（`route_type` + `selected_model`）
   - 通过 `llm_invoker.invoke(model, prompt)` 发送 LLM 请求（基础设施层 `OllamaAdapter` / `LiteLLMAdapter` 实现）
   - 解析 JSON 输出 → `jsonschema.validate()` 验证 Schema → 类型转换修复 → 返回 `list[RawTriple]` + `list[RawEntity]`
-- [ ] LLM 输出 JSON 解析 + Schema 验证失败时重试 2 次（重新请求 + 强调 Schema），第 3 次失败抛出 `LLMExtractionError`，由上游 `EntityExtractionService` 降级到纯规则基结果
-- [ ] Few-Shot 示例存储在 `src/infrastructure/extraction/prompts/entity_extraction_examples.py` 中（8-10 个示例，每个关系类型至少 1 个）
+- [ ] LLM 输出 JSON 解析 + Schema 验证失败时重试 1 次（重新请求 + 强调 Schema），第 2 次失败抛出 `LLMExtractionError`，由上游 `HybridEntityExtractor.extract()` 捕获并降级为纯规则基结果
+- [ ] Few-Shot 示例存储在 `src/infrastructure/extraction/prompts/entity_extraction_examples.py` 中（3 个示例，覆盖 5+ 实体类型和高频关系类型）
 - [ ] CoT 推理链嵌入每个 Few-Shot 示例的 `reasoning` 字段中，展示完整推理过程：实体识别 → 规范化 → 关系判断 → 置信度评估
 - [ ] 使用 `ollama` 的 `format: json` 参数确保输出合法 JSON；引入 `jsonschema.validate()` 做 Schema 后处理验证
 
@@ -209,17 +211,17 @@ CoT 步骤：
 **Given** 实体抽取产生了规范化三元组
 **When** 系统执行持久化
 **Then** 通过 `L5GraphPort` 写入 Neo4j：
-  - 每个 `ExtractedEntity` → 调用 `L5GraphPort.create_entity()` 创建节点（`entity_type` 参数传入 `EntityType` 值）
+  - 每个 `ExtractedEntity` → 将 `entity_id`（SHA-256 哈希）作为节点主键（对应 `L5GraphPort.create_entity()` 的 `memory_id` 参数），`entity_type` 映射为 Neo4j 标签，构建节点属性 `dict` 传入。注意：已有 `GraphNode.__post_init__` 要求 `properties` 含 `business_domain`/`entity_type`/`content_hash` 三个字段，需传入填充值以满足此契约
   - 每个 `Triple` → 调用 `L5GraphPort.create_relationship()` 创建关系边
-**And** 节点属性包含：`name`, `type`, `mentions`, `properties`, `source`, `created_at`
+**And** 节点属性包含：`name`, `type`, `mentions`, `properties`, `source`, `created_at`, `business_domain`（固定 `"knowledge"`）, `entity_type`, `content_hash`
 **And** 边属性包含：`confidence`, `evidence`, `source`, `created_at`
 **And** 写入失败不中断抽取流程（L5 降级为 optional）
 
 **验证标准/Validation Criteria:**
 - [ ] `EntityExtractionService` 应用服务位于 `src/application/services/entity_extraction_service.py`
 - [ ] `extract_and_persist()` 流程：规则基抽取 → LLM 抽取（并行）→ 冲突仲裁 → Neo4j 写入
-- [ ] `extract_and_persist()` 返回完整 `ExtractionResult`（含持久化状态）
-- [ ] Neo4j 写入失败时降级策略：WARNING 日志 + 不中断 + 结果中 `persisted=False` 标记
+- [ ] `extract_and_persist()` 返回完整 `EntityExtractionResult`（含持久化状态）
+- [ ] Neo4j 写入失败时降级策略：WARNING 日志 + 不中断 + 结果中 `persisted=False` 标记（通过 `dataclasses.replace(result, persisted=False)` 构造新实例）
 - [ ] 已存在的节点/边使用 `MERGE` 语义（不产生重复数据）
 
 ### AC-7: 事件驱动集成
@@ -238,8 +240,9 @@ CoT 步骤：
 - [ ] `configs/event_channels.yaml` 新增 `EntitiesExtracted` 通道配置（`rabbitmq` 通道，`reliable` 投递模式）
 - [ ] `src/infrastructure/messaging/channel_router.py` 同步更新 `DEFAULT_MAPPINGS`
 - [ ] 新增事件处理器 `EntityExtractionHandler` 于 `src/application/event_handlers/entity_extraction_handler.py`
-  - 监听 `DocumentProcessed` 事件
+  - 监听 `DocumentProcessed` 事件（通过 `event_subscriber.subscribe_async()` 异步订阅模式）
   - 调用 `entity_extraction_service.extract_and_persist()`
+  - 幂等性：Neo4j 节点/边通过 `MERGE` 语义保证最终一致性。RabbitMQ at-least-once 投递产生的重复 `DocumentProcessed` 事件可接受——重复抽取可能因 LLM 随机性产生略有不同的三元组，但节点 MERGE 避免数据重复。如需严格去重，可在 V1+ 引入 Redis SETNX 幂等性键（`extraction:dedup:{document_id}`）
 - [ ] `EntityExtractionService.extract_and_persist()` 内部完成统计日志记录，不再需要独立 `EntityExtractedHandler` 监听自己发布的事件，避免同进程内事件回环
 
 ### AC-8: Composition Root 注册
@@ -258,8 +261,8 @@ CoT 步骤：
 
 **验证标准/Validation Criteria:**
 - [ ] `entity_extractor` 端口注册到 Composition Root（SCOPED lifetime）
-- [ ] `EntityExtractionHandler` 订阅 `DocumentProcessed` 事件（通过 `event_subscriber`）
-- [ ] `EntityExtractedHandler` 订阅 `EntitiesExtracted` 事件
+- [ ] `EntityExtractionHandler` 订阅 `DocumentProcessed` 事件（通过 `event_subscriber.subscribe_async()` 异步订阅模式）
+- [ ] `EntitiesExtracted` 事件用于跨服务/跨进程通知（如通知 Story 3-4 RRF 融合服务），不在本 Story 内注册同进程 handler 监听
 - [ ] 端口契约测试更新
 - [ ] 已有测试全部保持通过（无回归）
 
@@ -297,18 +300,23 @@ CoT 步骤：
 - [ ] **新增** `EntityRelation` frozen dataclass（`src/domain/value_objects/entity_relation.py`）：
   - `subject: str`, `relation: str`, `object: str`, `confidence: float`, `source: str`
   - 使用字符串引用实体（提取阶段），区别于 `Triple`（持久化阶段，使用 entity_id）
+  - **注意：** `EntityRelation` 等同于 AC-3 中引用的 `RawTriple`——两者是同一概念的不同命名。规则基和 LLM 抽取器均产出一组 `EntityRelation`，输入到 `ConflictArbiter` 进行融合。
+- [ ] **新增** `RawEntity` frozen dataclass（`src/domain/value_objects/extraction_result.py`）：
+  - `name: str`, `type: EntityType`, `mentions: tuple[str, ...]`, `properties: dict[str, Any]`, `source: str`
+  - 提取阶段的临时实体表示（不含 entity_id），由 `RuleBasedExtractor` 和 `LLMExtractor` 产出，输入到 `ConflictArbiter` 融合后生成 `ExtractedEntity`（含 entity_id）
+  - `entity_id` 生成放在 `HybridEntityExtractor`（基础设施层），在 `ConflictArbiter` 融合之后统一计算 SHA-256 哈希（`name + type.value` 为输入）
 - [ ] **扩展** `RelationshipType` StrEnum（`src/infrastructure/storage/neo4j/models.py`）：
   - 新增 7 种关系类型：`COMPETES_WITH`, `SUPPLIES_TO`, `INVESTS_IN`, `OWNS`, `LAUNCHED`, `OPERATES_IN`, `REGULATED_BY`（保留全部 6 种已有值，总计 13 种）
   - 注意：`RelationshipType` 作为基础设施层 DTO 的枚举，其扩展不影响领域层
 
 #### 统一端口定义注册与管理 (Port Contract)
 - [ ] **新增** `EntityExtractorPort` 领域端口（`src/domain/ports/entity_extractor.py`）：
-  - `extract(text, context) -> ExtractionResult`（async）
-  - `extract_batch(texts) -> list[ExtractionResult]`（async）
+  - `extract(text, context) -> EntityExtractionResult`（async）
+  - `extract_batch(texts) -> list[EntityExtractionResult]`（async）
 - [ ] **新增** `EntityExtractionService` 应用服务（`src/application/services/entity_extraction_service.py`）：
   - 构造注入：`EntityExtractorPort`, `L5GraphPort`, `EventPublisher`
-  - `extract_and_persist(text, document_id, tenant_id) -> ExtractionResult`
-  - `extract_and_persist_batch(texts, document_id, tenant_id) -> list[ExtractionResult]`
+  - `extract_and_persist(text, document_id, tenant_id) -> EntityExtractionResult`
+  - `extract_and_persist_batch(texts, document_id, tenant_id) -> list[EntityExtractionResult]`
 - [ ] **端口注册** — 在 `src/composition_root.py` 注册（AC-8 规范）
 - [ ] **端口契约门禁**（`src/domain/ports/contract_gate.py`）：新端口通过兼容性检查
 - [ ] **端口契约测试**（`tests/contracts/test_port_contract_entity_extraction.py`）
@@ -385,7 +393,7 @@ CoT 步骤：
 ## 📋 Tasks / Subtasks
 
 ### Task 0: SDD 规范定义 (AC: 全部)
-- [ ] **0.1** 创建 `EntityType` StrEnum 值对象（8 种实体类型）
+- [ ] **0.1** 创建 `EntityType` StrEnum 值对象（9 种实体类型，含 `OTHER` 兜底类型）
 - [ ] **0.2** 创建 `Triple` frozen dataclass 值对象（含 `__post_init__` 验证）
 - [ ] **0.3** 创建 `ExtractedEntity`、`ExtractionResult`、`ExtractionStatistics` frozen dataclass
 - [ ] **0.4** 创建 `EntityRelation` frozen dataclass 值对象
@@ -394,7 +402,7 @@ CoT 步骤：
 - [ ] **0.7** 新增 `EntityExtractionError` (245) 和 `LLMExtractionError` (304) 领域异常
 - [ ] **0.8** 更新异常体系：`__all__`、`__init__.py`、`_code_ranges.py`（`_CLASS_TO_SUBDOMAIN`: `"EntityExtractionError": "entity"`, `"LLMExtractionError": "external"`）、`EXCEPTION_HTTP_MAP`（精确注册: `EntityExtractionError: 422`, `LLMExtractionError: 502`）
 - [ ] **0.9** 新增 `EntitiesExtracted` 领域事件定义
-- [ ] **0.10** 更新 `config/event_channels.yaml` 和 `channel_router.py`
+- [ ] **0.10** 更新 `configs/event_channels.yaml` 和 `channel_router.py`
 
 ### Task 1: 规则基抽取引擎 (AC-3)
 - [ ] **1.1** TDD 红：编写 `PhraseMatcherAdapter` 单元测试（按类型批量注册/匹配/空词典）
@@ -411,7 +419,7 @@ CoT 步骤：
 - [ ] **2.1** TDD 红：编写 `LLMExtractor` 单元测试（Mock UDMR Service 验证 Prompt 构建）
 - [ ] **2.2** TDD 绿：实现 `LLMExtractor` — UDMR 路由 → LLM 调用 → JSON Schema 解析
 - [ ] **2.3** TDD 绿：实现 Few-Shot 示例集（3 个精选示例，覆盖 5+ 实体类型）
-- [ ] **2.4** TDD 绿：实现 JSON 解析重试机制（失败 1 次 → 重试 → 第 2 次失败返回空结果 + 记录异常）
+- [ ] **2.4** TDD 绿：实现 JSON 解析重试机制（失败 → 重试 1 次（3s 退避）→ 第 2 次失败抛出 `LLMExtractionError`）
 - [ ] **2.5** TDD 绿：实现 `LLMExtractionError` 抛出逻辑（超过重试次数）
 
 ### Task 3: 冲突仲裁领域服务 (AC-5)
@@ -538,7 +546,7 @@ CoT 步骤：
 | `src/domain/events/base.py` | `DomainEvent` 基类 | 事件继承基类 |
 | `src/domain/exceptions/_code_ranges.py` | 编码范围约束 | entity 子域 245/246 注册 |
 | `src/domain/exceptions/business_exceptions.py` | 业务异常基类 | EntityBusinessRuleError 复用于 245 |
-| `src/domain/exceptions/external_exceptions.py` | 外部异常基类 | ThirdPartyError 复用于 246 |
+| `src/domain/exceptions/external_exceptions.py` | 外部异常基类 | ThirdPartyError（EXCEPTION_301），LLMExtractionError（EXCEPTION_304）继承自此 |
 | `src/composition_root.py` | DI 容器 | 端口注册位置 |
 | `configs/event_channels.yaml` | 事件通道配置 | 新增 EntitiesExtracted 通道 |
 | `src/infrastructure/messaging/channel_router.py` | 通道路由 | 新增 EntitiesExtracted 映射 |
@@ -560,7 +568,7 @@ CoT 步骤：
 | `src/infrastructure/extraction/__init__.py` | infrastructure | 抽取模块初始化 |
 | `src/infrastructure/extraction/hybrid_entity_extractor.py` | infrastructure | `HybridEntityExtractor`（实现 `EntityExtractorPort`，组合 RuleBasedExtractor + LLMExtractor + ConflictArbiter） |
 | `src/infrastructure/extraction/rule_engine/__init__.py` | infrastructure | 规则引擎模块初始化 |
-| `src/infrastructure/extraction/rule_engine/ac_matcher.py` | infrastructure | `PhraseMatcherAdapter`（spaCy 内置 PhraseMatcher） |
+| `src/infrastructure/extraction/rule_engine/phrase_matcher_adapter.py` | infrastructure | `PhraseMatcherAdapter`（spaCy 内置 PhraseMatcher） |
 | `src/infrastructure/extraction/rule_engine/regex_matcher.py` | infrastructure | `RegexPatternMatcher` |
 | `src/infrastructure/extraction/rule_engine/dep_parser_matcher.py` | infrastructure | `DependencyParserMatcher` |
 | `src/infrastructure/extraction/rule_engine/rule_extractor.py` | infrastructure | `RuleBasedExtractor` 组合引擎 |
@@ -588,7 +596,7 @@ CoT 步骤：
 ### 领域知识要点
 - 实体抽取准确率不追求 100%——接受噪声，Story 3-3（领域词典）和 Story 12-1（实体消歧）将迭代改进
 - `Triple.confidence` 不是最终信仰——下游 Story（3-4 RRF 融合）会把它当做 Graph 信号的权重
-- Neo4j 写入是 optional 的——如果 Neo4j 不可用，抽取结果仍在 `ExtractionResult` 中可用
+- Neo4j 写入是 optional 的——如果 Neo4j 不可用，抽取结果仍在 `EntityExtractionResult` 中可用（`persisted=False`）
 
 ### 测试约定
 - Mock LLM/UDMR 调用（除非集成测试显式启用本地 LLM），Mock 策略见 `tests/unit/infrastructure/extraction/` fixture
@@ -600,6 +608,9 @@ CoT 步骤：
 - spaCy `zh_core_web_sm` 模型需在测试前下载：`python -m spacy download zh_core_web_sm`（约 45MB）；应确认 CI runner 镜像已预装（参见 Epic 0）
 - 三个规则基匹配器共享同一个 `nlp` 对象以降低内存和初始化成本，`RuleBasedExtractor` 构造函数接受 `nlp` 参数注入
 - 单元测试中 `RuleBasedExtractor` 需 mock `nlp` 对象（`Morphology` 需 `label_data`），参考 `tests/conftest.py` 中的 `mock_nlp` fixture
+- **nlp 对象并发安全：** spaCy `nlp` 对象在 C 扩展层释放 GIL（通过 `nogil`），允许 `asyncio.to_thread` 中并发调用。但 tokenizer 缓存等内部状态不是线程安全的。对于 `extract_batch` 的高并发（50+ 文本），建议每个 worker 使用独立 `nlp` pipeline 或 `threading.Lock` 序列化调用
+- **spaCy 依赖：** 需将 `spacy = "^3.7.0"` 添加到 `pyproject.toml` 的 `[tool.poetry.dependencies]` 中（Task 0 前置步骤）。在 `tests/conftest.py` 中添加 `spacy` 可用性跳过标记，当 `zh_core_web_sm` 模型未安装时跳过相关测试并给出明确提示
+- **Mock 策略补充：** 单元测试中 `UDMRService.decide()` Mock 返回 `RoutingDecided(route_type="local", selected_model="qwen2.5:7b")`；`LLMInvocationPort.invoke()` Mock 返回固定 JSON 字符串（含 entities + triples）；失败场景 Mock `invoke()` 抛出 `LLMExtractionError` 或返回不合规 JSON
 
 ---
 
