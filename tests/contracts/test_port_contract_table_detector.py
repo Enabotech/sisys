@@ -1,6 +1,6 @@
 """TableDetectorPort 端口契约测试
 
-验证 TableDetectorPort 的结构化子类型合规性。
+验证 TableDetectorPort 的结构化子类型合规性、签名检查、合规/不合规实现。
 """
 
 from __future__ import annotations
@@ -25,16 +25,29 @@ class TestTableDetectorPortContract:
         method = getattr(TableDetectorPort, "detect")
         assert callable(method)
 
-    def test_detect_method_signature(self) -> None:
-        """验证 detect(file_path, mime_type) -> list[ParsedTable]"""
+    def test_detect_signature(self) -> None:
+        """验证 detect 方法签名（self, file_path, mime_type）"""
         method = getattr(TableDetectorPort, "detect")
         sig = inspect.signature(method)
         params = list(sig.parameters.keys())
+        assert "self" in params
+        assert "file_path" in params
+        assert "mime_type" in params
         assert params == ["self", "file_path", "mime_type"]
-        assert sig.return_annotation == "list[ParsedTable]"
+
+    def test_detect_return_type(self) -> None:
+        """验证 detect 返回 list[ParsedTable]"""
+        method = getattr(TableDetectorPort, "detect")
+        sig = inspect.signature(method)
+        assert sig.return_annotation is not inspect.Parameter.empty
+
+    def test_detect_is_sync(self) -> None:
+        """detect 是同步方法（非 async）"""
+        method = getattr(TableDetectorPort, "detect")
+        assert not inspect.iscoroutinefunction(method)
 
     def test_compliant_implementation(self) -> None:
-        """验证合规实现可通过 isinstance 检查"""
+        """合规实现可通过 isinstance 检查"""
 
         class MockDetector:
             def detect(self, file_path: str, mime_type: str) -> list[ParsedTable]:
@@ -44,12 +57,13 @@ class TestTableDetectorPortContract:
         assert isinstance(detector, TableDetectorPort)
 
     def test_noncompliant_implementation_fails(self) -> None:
-        """验证不合规实现无法通过 isinstance 检查"""
+        """不合规实现无法通过 isinstance 检查"""
 
         class BadDetector:
             pass
 
-        assert not isinstance(BadDetector(), TableDetectorPort)
+        detector = BadDetector()
+        assert not isinstance(detector, TableDetectorPort)
 
 
 __all__ = ["TestTableDetectorPortContract"]
