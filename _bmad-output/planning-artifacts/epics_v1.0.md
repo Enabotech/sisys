@@ -1299,6 +1299,7 @@ So that **所有需要 LLM 调用的 Story（实体抽取、摘要生成、Agent
    - [ ] `tests/integration/test_integration_llm_client.py` - 集成测试
 
 **实施指南:**
+- 依赖 Story 1.17 UDMR 路由，目前已配置真实可用的 GLM 与 DEEPSEEK 云端大模型
 - 容错模式参考：`EmbeddingAPIClient`（`embedding_api_client.py` + `circuit_breaker.py`）
 - 结构化输出：`instructor`（Pydantic 验证 + 自动重试修复）
 - LLM Client 通用化：httpx.AsyncClient + tenacity 指数退避重试

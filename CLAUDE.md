@@ -55,6 +55,8 @@ src/
   - **单字段标识查找** → 直接参数（如 `get_by_id(id)`、`get_by_username(name)`）
   - **命令型操作** → 直接参数（如 `assign_role(user_id, role_id)`、`record_attempt(username, ...)`)
   - 不强制全量统一，按查询特征选择模式；新增端口含多字段查询时必须使用 Query Object
+- 验收 BDD：服务级（`scenarios()` + 真实服务 + `event_loop.run_until_complete()`）和 HTTP 级（`@scenario()` + `TestClient` + `AsyncMock` 注入）两种子模式，尽可能使用真实服务；步骤**按 AC 分组**；**禁止** `@pytest.mark.asyncio`
+- 集成测试：Mock 工厂（`AsyncMock(spec=ProtocolClass)` + `_make_*()` 工厂函数）和真实服务 Schema 隔离（独立 PG schema + savepoint rollback + 租户隔离 bucket）两种子模式，尽可能使用真实服务；领域服务用真实实例，禁止手动 delete/truncate
 
 ## 5. Hard Constraints
 
