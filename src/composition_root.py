@@ -19,28 +19,13 @@ from src.domain.ports.registry import (
 )
 
 if TYPE_CHECKING:
-    from src.domain.services.cost_calculator import CostCalculator
+    pass
 
 logger = logging.getLogger(__name__)
 
 
-def _cost_calculator_from_udmr() -> CostCalculator:
-    """从 UDMRConfig 构建 CostCalculator（组合根工厂函数）
-
-    提取 UDMRConfig 中的定价参数，通过 CostCalculator.for_pricing() 创建实例。
-    定义为模块级函数（非嵌套在 bootstrap 内），保持组合根声明式风格。
-    """
-    from src.domain.services.cost_calculator import CostCalculator
-    from src.infrastructure.config.udmr import UDMRConfig
-
-    cfg = UDMRConfig.from_env()
-    return CostCalculator.for_pricing(
-        cloud_input_price=cfg.cloud_configs[0].price_per_input_1k_tokens if cfg.cloud_configs else 0.02,
-        cloud_output_price=cfg.cloud_configs[0].price_per_output_1k_tokens if cfg.cloud_configs else 0.02,
-        model_pricing_map={
-            c.model: {"input": c.price_per_input_1k_tokens, "output": c.price_per_output_1k_tokens} for c in cfg.cloud_configs
-        },
-    )
+# 工厂函数已迁移至对应 infrastructure/config/ 模块；组合根仅做装配，不包含业务逻辑
+# 组合根仅做装配，不包含业务逻辑
 
 
 def bootstrap() -> None:
@@ -1480,7 +1465,7 @@ def bootstrap() -> None:
     from src.domain.ports.udmr_policy import UdmrPolicyPort
     from src.domain.services.cost_calculator import CostCalculator
     from src.domain.services.udmr_service import UDMRService
-    from src.infrastructure.config.udmr import UDMRConfig
+    from src.infrastructure.config.udmr import UDMRConfig, build_cost_calculator
     from src.infrastructure.external_services.llm.cloud_health_checker import (
         CloudHealthChecker,
     )
@@ -1572,12 +1557,12 @@ def bootstrap() -> None:
         tags=("udmr", "cost", "infrastructure"),
     )
 
-    # CostCalculator — 成本计算领域服务（通过模块级工厂 _cost_calculator_from_udmr 创建）
+    # CostCalculator — 成本计算领域服务（工厂函数已迁移至 infrastructure/config/cost.py）
     register_port(
         name="cost_calculator",
         version="v1.0.0",
         interface=CostCalculator,
-        impl=lambda resolver: _cost_calculator_from_udmr(),
+        impl=lambda resolver: build_cost_calculator(),
         module="src.domain.services.cost_calculator",
         lifetime=Lifetime.SINGLETON,
         owner="routing-team",

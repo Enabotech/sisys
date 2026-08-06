@@ -197,3 +197,32 @@ def _parse_cloud_config(index: int) -> CloudModelConfig | None:
         price_per_input_1k_tokens=price_input,
         price_per_output_1k_tokens=price_output,
     )
+
+
+# ---------------------------------------------------------------------------
+# 工厂函数：UDMR 配置 → 领域对象
+# ---------------------------------------------------------------------------
+
+
+def build_cost_calculator():
+    """从 UDMRConfig 构建 CostCalculator 领域服务
+
+    提取 UDMRConfig 中的定价参数，通过 CostCalculator.for_pricing() 创建实例。
+
+    Returns:
+        CostCalculator 实例（含云端定价和模型定价映射）
+    """
+    from src.domain.services.cost_calculator import CostCalculator
+
+    cfg = UDMRConfig.from_env()
+    return CostCalculator.for_pricing(
+        cloud_input_price=cfg.cloud_configs[0].price_per_input_1k_tokens if cfg.cloud_configs else 0.02,
+        cloud_output_price=cfg.cloud_configs[0].price_per_output_1k_tokens if cfg.cloud_configs else 0.02,
+        model_pricing_map={
+            c.model: {
+                "input": c.price_per_input_1k_tokens,
+                "output": c.price_per_output_1k_tokens,
+            }
+            for c in cfg.cloud_configs
+        },
+    )
