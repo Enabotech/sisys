@@ -64,7 +64,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `LLMAPIError`（EXCEPTION_330）— 继承 `ThirdPartyError`，对应 LLM API HTTP 4xx/5xx
-- [ ] `LLMResponseError`（EXCEPTION_331）— 继承 `ExternalException`，对应响应解析错误
+- [ ] `LLMResponseError`（EXCEPTION_331）— 继承 `ThirdPartyError`，对应响应解析错误
 - [ ] `LLMConfigError`（EXCEPTION_332）— 继承 `ExternalException`，对应配置错误
 - [ ] 异常编码在 `_code_ranges.py` 注册，无碰撞
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册
@@ -90,18 +90,18 @@
 
 ### AC-4: UDMR 路由集成
 
-**Given** Story 1.17 已提供 UDMR 路由决策和 CloudModelConfig
-**When** `LitellmLLMClient` 接收 UDMR 路由结果
-**Then** 根据 `route_type` 选择对应的模型配置
+**Given** Story 1.17 已提供 UDMR 路由决策
+**When** `LitellmLLMClient` 接收 UDMR 路由结果（`route_type + selected_model`）
+**Then** 根据 `route_type` 对应的模型配置构造 LLM 调用
 **And** 云端优先时使用 `CloudModelConfig` 初始化 LLM 调用
 **And** 本地回退时使用本地模型配置
-**And** 熔断器状态与 UDMR 健康检查联动
+**And** 熔断器作为被动保护机制（追踪实际调用失败），与 UDMR 健康检查（主动探测 API 可达性）互补
 
 **验证标准/Validation Criteria:**
-- [ ] `LitellmLLMClient` 支持 `configs: list[CloudModelConfig]` 多配置模式
-- [ ] `_call_with_fallback()` 按 UDMR 路由顺序尝试
-- [ ] 云端失败后自动回退到下一个可用配置
-- [ ] 回退错误信息传递到 `LLMResponse`
+- [ ] `LitellmLLMClient` 提供 `_build_llm_config_from_cloud_model(cfg: CloudModelConfig) -> LLMConfig` 辅助方法（infrastructure 层转换）
+- [ ] 调用方（应用层服务）负责根据 UDMR 路由决策将 `CloudModelConfig` 转换为 `LLMConfig` 并传入
+- [ ] 云端调用失败时，`LitellmLLMClient` 抛出领域异常，由调用方决定是否回退
+- [ ] 熔断器记录实际调用失败，不干预 UDMR 路由决策
 
 ### AC-5: 端口注册与 DI 集成
 
@@ -176,9 +176,9 @@
 
 | 异常类 | 编码 | 继承 | HTTP 映射 | 说明 |
 |--------|------|------|-----------|------|
-| `LLMAPIError` | EXCEPTION_330 | `ThirdPartyError` | 502 | LLM API HTTP 4xx/5xx 错误 |
-| `LLMResponseError` | EXCEPTION_331 | `ExternalException` | 502 | 响应解析错误（JSON/Pydantic Schema） |
-| `LLMConfigError` | EXCEPTION_332 | `ExternalException` | 500 | 配置错误（API Key 缺失、endpoint 无效等） |
+| `LLMAPIError` | EXCEPTION_330 | `ThirdPartyError` | 502 | LLM API HTTP 4xx/5xx 错误。继承 `ThirdPartyError` 理由：与 `EmbeddingAPIError(306)`→`ThirdPartyError` 一致，LLM API 返回错误响应本质是"第三方返回错误" |
+| `LLMResponseError` | EXCEPTION_331 | `ThirdPartyError` | 502 | 响应解析错误（JSON/Pydantic Schema）。继承 `ThirdPartyError` 理由：与 `EmbeddingResponseError(307)`→`ThirdPartyError` 一致，响应解析失败源于第三方返回格式异常 |
+| `LLMConfigError` | EXCEPTION_332 | `ExternalException` | 500 | 配置错误（API Key 缺失、endpoint 无效等）。继承 `ExternalException` 理由：与 `EmbeddingModelError(308)`→`ExternalException` 一致，LLM 配置是外部服务连接配置，非系统配置（`ConfigurationError(101)`→`SystemException` 用于系统级配置错误）。HTTP 500 理由：服务端配置缺失，非外部服务故障 |
 
 **编码分配验证：**
 - `external` 子域范围：301-399 ✅
@@ -186,7 +186,7 @@
 - **LLM 分配 330-339** — 紧接 OCR 之后，预留 10 个编码
 - 运行 `grep -r "EXCEPTION_33[0-9]" src/domain/exceptions/` 确认无碰撞
 
-- [ ] 归属模块与基类 — LLM 调用属于外部服务，`LLMAPIError` 继承 `ThirdPartyError`，`LLMResponseError`/`LLMConfigError` 直接继承 `ExternalException`
+- [ ] 归属模块与基类 — LLM 调用属于外部服务，`LLMAPIError` 继承 `ThirdPartyError`（与 `EmbeddingAPIError(306)` 一致），`LLMResponseError` 继承 `ThirdPartyError`（与 `EmbeddingResponseError(307)` 一致），`LLMConfigError` 继承 `ExternalException`（与 `EmbeddingModelError(308)` 一致）
 - [ ] 唯一编码分配 — 330/331/332，确认无碰撞
 - [ ] 构造器参数设计 — 携带 `model`、`endpoint`、`status_code` 等上下文
 - [ ] 编码注册 — 在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 中注册；新增 `llm` 子域范围 (330, 339)
@@ -319,7 +319,7 @@
 | AC-2 | LLM 异常体系（LLMAPIError/LLMResponseError/LLMConfigError） | Task 1 | Subtask 1.4-1.6 | `test_llm_exceptions.py` |
 | AC-3 | LitellmLLMClient 实现（generate/structured_generate/熔断器/重试） | Task 2 | Subtask 2.1-2.3 | `test_litellm_llm_client.py` |
 | AC-3 | 异常映射（httpx/litellm → 领域异常） | Task 2 | Subtask 2.4-2.5 | `test_llm_client_error_mapping.py` |
-| AC-4 | UDMR 路由集成（多配置回退、CloudModelConfig 转换） | Task 2 | Subtask 2.6-2.7 | `test_litellm_llm_client.py` |
+| AC-4 | UDMR 路由集成（CloudModelConfig → LLMConfig 转换） | Task 2 | Subtask 2.7-2.9 | `test_litellm_llm_client.py` |
 | AC-5 | 端口注册与 DI 集成（composition_root + 契约测试） | Task 3 | Subtask 3.1-3.3 | `test_port_contract_llm_client.py` |
 | AC-5 | 架构约束验证 + 集成测试 | Task 3 | Subtask 3.4-3.6 | `test_arch_llm_client.py` + `test_integration_llm_client.py` |
 
@@ -385,13 +385,14 @@
 | 🔄 重构 | 更新 `__init__.py` + `_code_ranges.py` + `EXCEPTION_HTTP_MAP`，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 1.4: 🔴 红 — 编写 LLM 异常失败测试
-  - `LLMAPIError` 构造（含 model/endpoint/status_code 上下文）
-  - `LLMResponseError` 构造（含 model/response 上下文）
+  - `LLMAPIError` 构造（含 model/endpoint/status_code/response_body 上下文，参照 OCRProcessingError 模式）
+  - `LLMResponseError` 构造（含 model/response_summary 上下文，参照 OCRProcessingError 模式）
   - `LLMConfigError` 构造（含 config_key 上下文）
-  - `to_dict()` 序列化正确
+  - `to_dict()` 序列化正确（含 cause 链）
   - HTTP 映射正确（330→502, 331→502, 332→500）
   - 编码唯一性（`test_error_code_uniqueness.py` 中确认无碰撞）
   - 子域范围（`test_code_ranges.py` 中新增 llm 子域）
+  - **注意：** `LLMResponseError` 的继承链从 `ExternalException` 改为 `ThirdPartyError`，与 `EmbeddingResponseError(307)` 一致
 - [ ] Subtask 1.5: 🟢 绿 — 实现 LLM 异常类
   - 创建 `src/domain/exceptions/llm_exceptions.py`
   - 更新 `src/domain/exceptions/__init__.py` 导出
@@ -441,7 +442,7 @@
   - 熔断器集成: `before_call()`, `on_success()`, `on_failure()`
   - 重试集成: `tenacity.AsyncRetrying` 指数退避
   - 配置管理: `_build_acompletion_kwargs()` 构建 litellm 参数
-  - 多配置回退: `_call_with_fallback()` 按顺序尝试
+  - 配置转换: `_build_llm_config_from_cloud_model()` 从 CloudModelConfig 构建 LLMConfig
 - [ ] Subtask 2.3: 🔄 重构 — 优化代码，运行 `ruff` + `mypy`
 
 #### TDD 循环 [B]：异常映射
@@ -465,28 +466,27 @@
 - [ ] Subtask 2.5: 🟢 绿 — 实现异常映射
 - [ ] Subtask 2.6: 🔄 重构 — 运行 `ruff` + `mypy`
 
-#### TDD 循环 [C]：UDMR 路由集成
+#### TDD 循环 [C]：UDMR 路由集成（配置转换）
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 在 `test_litellm_llm_client.py` 中追加 UDMR 集成测试 |
-| 🟢 绿 | 实现 `_call_with_fallback()` 多配置回退逻辑 |
-| 🔄 重构 | 优化回退策略，运行 `ruff` + `mypy` |
+| 🔴 红 | 在 `test_litellm_llm_client.py` 中追加 UDMR 配置转换测试 |
+| 🟢 绿 | 实现 `_build_llm_config_from_cloud_model()` 辅助方法 |
+| 🔄 重构 | 优化转换逻辑，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 2.7: 🔴 红 — 编写 UDMR 集成失败测试
-  - `CloudModelConfig` → `LLMConfig` 转换正确
-  - 多配置 `configs` 按 UDMR 路由顺序尝试
-  - 第一个配置失败时自动回退到第二个配置
-  - 所有配置都失败时抛出 `ServiceUnavailableError`
-  - 回退原因记录到日志
-- [ ] Subtask 2.8: 🟢 绿 — 实现 UDMR 集成
+- [ ] Subtask 2.7: 🔴 红 — 编写 UDMR 配置转换失败测试
+  - `CloudModelConfig` → `LLMConfig` 字段映射正确（api_type, model, endpoint, api_key, temperature, max_tokens, timeout）
+  - 本地模型字符串 → `LLMConfig` 转换正确
+  - 调用方（应用层服务）负责根据 UDMR 路由决策调用辅助方法
+  - **注意：** LitellmLLMClient 不自行回退，回退是调用方职责
+- [ ] Subtask 2.8: 🟢 绿 — 实现 UDMR 配置转换
 - [ ] Subtask 2.9: 🔄 重构 — 运行 `ruff` + `mypy`
 
 **完成标准/Definition of Done:**
 - [ ] LitellmLLMClient 实现完成（generate/structured_generate/close）
 - [ ] 熔断器 + 指数退避重试集成完成
 - [ ] 异常映射完整（所有 litellm 异常 → 领域异常）
-- [ ] UDMR 路由集成完成（多配置回退）
+- [ ] UDMR 配置转换完成（CloudModelConfig → LLMConfig）
 - [ ] TDD 循环全部通过
 - [ ] 基础设施层覆盖率≥75%
 
@@ -502,10 +502,28 @@
 
 - [ ] Subtask 3.1: 更新 `src/domain/ports/__init__.py` 导出 `LLMClientPort`、`LLMConfig`、`LLMResponse`
 - [ ] Subtask 3.2: 更新 `src/composition_root.py` 注册 `llm_client` 端口
-  - `register_port(name="llm_client", version="v1.0.0", interface=LLMClientPort, impl=lambda resolver: LitellmLLMClient(configs=UDMRConfig.from_env().cloud_configs, local_model=UDMRConfig.from_env().local_model, llm_timeout=UDMRConfig.from_env().llm_timeout), ...)`
+  ```python
+  register_port(
+      name="llm_client",
+      version="v1.0.0",
+      interface=LLMClientPort,
+      impl=lambda resolver: LitellmLLMClient(
+          config=LLMConfig(
+              model=UDMRConfig.from_env().local_model,
+              api_type="openai",
+              endpoint="http://localhost:11434",
+              timeout=UDMRConfig.from_env().llm_timeout,
+          ),
+      ),
+      module="src.infrastructure.external_services.llm.litellm_llm_client",
+      lifetime=Lifetime.SINGLETON,
+      owner="foundation-team",
+      tags=("llm", "client", "infrastructure"),
+  )
+  ```
   - 生命周期: SINGLETON
   - Owner: foundation-team
-  - `shutdown()` 中关闭 `llm_client` 的 HTTP 连接池
+  - `shutdown()` 中关闭 `llm_client` 的 HTTP 连接池（参照 embedding_service 关闭模式）
 
 #### 端口契约测试
 
@@ -527,7 +545,7 @@
 - [ ] Subtask 3.5: 创建 `tests/integration/test_integration_llm_client.py`
   - 端到端：LLM 调用流程（Mock LLM API）
   - 熔断器 + 重试协同工作
-  - 多配置回退流程
+  - CloudModelConfig → LLMConfig 转换流程
   - 异常映射链路（litellm 异常 → 领域异常 → HTTP 响应）
 
 **完成标准/Definition of Done:**
@@ -585,26 +603,33 @@
 ```
 UDMR 路由决策（Story 1.17）
     │
-    ▼  route_type: "cloud" | "local"
-    │  selected_model: str
-    │  cloud_configs: list[CloudModelConfig]
+    ▼  decide() returns: RoutingDecided
+    │  { route_type: "cloud" | "local"
+    │    selected_model: str }
+    │
+    ▼  UDMRHandler / 消费方应用层服务
+    │  根据 route_type 选择对应的 CloudModelConfig
+    │  调用基础设施层辅助方法构建 LLMConfig
     │
     ▼
 LitellmLLMClient（本 Story）
-    ├─ configs: list[CloudModelConfig]  ← 来自 UDMRConfig
-    ├─ config: LLMConfig                ← 单配置模式（from_cloud_model_config）
+    ├─ 接收 LLMConfig（单配置，已由调用方解析）
     │
     ├─ generate() / structured_generate()
-    │   ├─ 熔断器检查（before_call）
-    │   ├─ 指数退避重试（tenacity）
+    │   ├─ 熔断器检查（before_call）— 被动保护
+    │   ├─ 指数退避重试（tenacity）— 对可恢复错误
     │   ├─ LiteLLM.acompletion() 调用
     │   └─ 异常映射（litellm → 领域异常）
     │
-    └─ _call_with_fallback()
-        ├─ 云端优先（按 UDMR 路由顺序）
-        ├─ 云端失败 → 下一个配置
-        └─ 全部失败 → 抛出 ServiceUnavailableError
+    └─ 调用失败 → 抛出领域异常
+        调用方决定是否重试或回退到下一个配置
 ```
+
+**关键设计决策：**
+- `LitellmLLMClient` 不直接接收 `configs: list[CloudModelConfig]`，而是接收**单配置** `LLMConfig`
+- 多配置回退是**调用方（应用层）** 的职责，不是 LLM Client 的职责
+- 熔断器是被动保护机制，追踪实际调用失败，不干预 UDMR 路由决策
+- 熔断器与 UDMR 健康检查互补：健康检查主动探测 API 可达性，熔断器被动记录调用失败
 
 **配置流：**
 ```
@@ -881,11 +906,34 @@ export UDMR_CLOUD_0_MODEL=deepseek-v4-flash
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+## 🔧 文档审查修复 Docs Review Fixes [Round 2]
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 7 | AC-4 描述 LitellmLLMClient"接收 configs 自行回退"与 UDMR 架构设计冲突 — UDMRService.decide() 已做出路由决策，LLM Client 不应自行决策回退 | **P0** | 改为"接收单配置 LLMConfig，回退是调用方职责"。LitellmLLMClient 不自行回退，通过 `_build_llm_config_from_cloud_model()` 辅助方法做配置转换 |
+| 8 | 熔断器与 UDMR 健康检查的关系未明确 — 两者是互补关系，非替代关系 | **P1** | 明确熔断器为被动保护机制（追踪实际调用失败），与 UDMR 健康检查（主动探测 API 可达性）互补 |
+| 9 | 测试文件路径验证通过 — 全部与项目现有约定一致，无需修改 | **P2** | 确认 `test_llm_client_port.py`、`test_llm_exceptions.py`、`test_litellm_llm_client.py`、`test_arch_llm_client.py`、`test_port_contract_llm_client.py`、`test_integration_llm_client.py` 路径均正确 |
+
+---
+
+## 🔧 文档审查修复 Docs Review Fixes [Round 3]
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 10 | `LLMResponseError` 继承 `ExternalException` 与 `EmbeddingResponseError(307)`→`ThirdPartyError` 不一致 | **P0** | 改为继承 `ThirdPartyError`，与 `EmbeddingResponseError(307)` 保持一致。响应解析失败源于第三方返回格式异常 |
+| 11 | `composition_root.py` 注册 lambda 中 `configs` 参数与 Round 2 修复的"单配置"设计决策矛盾 | **P0** | 修正注册代码为单 `LLMConfig` 参数，并补全 `module=`、`lifetime=`、`owner=`、`tags=` 参数 |
+| 12 | `LLMResponseError` 缺少 `ThirdPartyError` 的 HTTP 502 对应 | **P1** | 修正异常映射表，确认 `LLMResponseError`(331) 映射到 502（通过 `ThirdPartyError` 继承链自动映射） |
+| 13 | 异常构造器参数设计未参照 OCR 模式（缺少 endpoint 脱敏、response_body 截断等安全处理） | **P1** | 异常构造器按 OCRProcessingError 模式设计：endpoint 脱敏、response_body 截断至 200 字符、status_code 存入 context |
+
+---
+
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-08-06
 **最后更新/Last Updated:** 2026-08-06
 **更新说明/Description:**
-- v1.1.0: Round 1 审查修复 — P0: `structured_generate()` 签名改为 `type[Any]` 避免领域层依赖 pydantic；P0: 移除 `from_cloud_model_config()` 方法，转换逻辑移至 infrastructure 层；P1: 修正异常映射表 HTTP 状态码；P1: 标注 tenacity 和 instructor 依赖状态；P2: 标注与 architecture.md 目录结构差异
+- v1.3.0: Round 3 审查修复 — P0: `LLMResponseError` 继承链改为 `ThirdPartyError`（与 `EmbeddingResponseError` 一致）；P0: 修正 composition_root 注册 lambda 为单配置模式；P1: 异常构造器按 OCR 模式增加 endpoint 脱敏和 response_body 截断
+- v1.2.0: Round 2 审查修复 — P0: AC-4 修正为"LLM Client 接收单配置，回退是调用方职责"；P0: 移除 `_call_with_fallback()` 多配置回退，增加 `_build_llm_config_from_cloud_model()` 辅助方法；P1: 明确熔断器与 UDMR 健康检查的互补关系
+- v1.1.0: Round 1 审查修复 — P0: `structured_generate()` 签名改为 `type[Any]`；P0: 移除 `from_cloud_model_config()` 方法；P1: 修正异常映射表 HTTP 状态码；P1: 标注 tenacity 和 instructor 依赖状态
 - v1.0.0: 创建故事文件
 
 <!-- 仅用作跟踪故事文件模板修订记录，故事开发时[务必删除]此段 -->
