@@ -1674,17 +1674,13 @@ def bootstrap() -> None:
 
     # === LLM Client Port ===
     from src.domain.ports.llm_client import LLMClientPort, LLMConfig
+    from src.infrastructure.external_services.llm import LitellmLLMClient
 
     register_port(
         name="llm_client",
         version="v1.0.0",
         interface=LLMClientPort,
-        impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.llm.litellm_llm_client",
-            fromlist=["LitellmLLMClient"],
-        ).LitellmLLMClient(
-            config=LLMConfig.from_env(),
-        ),
+        impl=lambda resolver: LitellmLLMClient(LLMConfig.from_env()),
         module="src.infrastructure.external_services.llm.litellm_llm_client",
         lifetime=Lifetime.SINGLETON,
         owner="foundation-team",
