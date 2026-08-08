@@ -1672,6 +1672,25 @@ def bootstrap() -> None:
         tags=("crawler", "client"),
     )
 
+    # === LLM Client Port ===
+    from src.domain.ports.llm_client import LLMClientPort, LLMConfig
+
+    register_port(
+        name="llm_client",
+        version="v1.0.0",
+        interface=LLMClientPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.llm.litellm_llm_client",
+            fromlist=["LitellmLLMClient"],
+        ).LitellmLLMClient(
+            config=LLMConfig.from_env(),
+        ),
+        module="src.infrastructure.external_services.llm.litellm_llm_client",
+        lifetime=Lifetime.SINGLETON,
+        owner="foundation-team",
+        tags=("llm", "client", "infrastructure"),
+    )
+
     logger.info("Registered %d ports", len(_global_registry.list_all()))
 
 
@@ -1711,6 +1730,15 @@ async def shutdown() -> None:
             logger.info("Closed embedding_service")
     except Exception as e:
         logger.error("Failed to close embedding_service: %s", e)
+
+    # 关闭 llm_client HTTP 连接池
+    try:
+        llm_client = resolver.resolve("llm_client")
+        if llm_client is not None:
+            await llm_client.close()
+            logger.info("Closed llm_client")
+    except Exception as e:
+        logger.error("Failed to close llm_client: %s", e)
 
     # 关闭 ONNX 版面检测模型会话（释放 GPU/CPU 推理资源）
     try:

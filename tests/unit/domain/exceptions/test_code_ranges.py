@@ -135,6 +135,7 @@ def test_subclass_code_in_same_subdomain_as_parent() -> None:
         ("embedding", "external"),
         ("sandbox", "external"),
         ("ocr", "external"),
+        ("llm", "external"),
         # 兜底 → external 基类
         ("fallback", "external"),
     }
@@ -263,6 +264,7 @@ def test_all_subdomain_ranges_are_valid() -> None:
         "embedding": "external",
         "sandbox": "external",
         "ocr": "external",
+        "llm": "external",
     }
 
     for subdomain, (start, end) in CODE_RANGES.items():

@@ -22,7 +22,7 @@ from src.domain.ports.l2_rdb import BaseRepository, L2RdbPort
 from src.domain.ports.l3_vector import L3VectorPort
 from src.domain.ports.l4_object import L4ObjectPort
 from src.domain.ports.l5_graph import L5GraphPort
-from src.domain.ports.layout_detector import LayoutDetector
+from src.domain.ports.llm_client import LLMClientPort, LLMConfig, LLMResponse
 from src.domain.ports.memory_repository import (
     L2ChangeHistoryRepositoryPort,
     L2GroupMemberRepositoryPort,
@@ -71,6 +71,9 @@ __all__ = [
     "L4ObjectPort",
     "L5GraphPort",
     "LayoutDetector",
+    "LLMClientPort",
+    "LLMConfig",
+    "LLMResponse",
     "OCRPort",
     "OCR_CONFIDENCE_THRESHOLD",
     "OCR_MAX_BYTES",

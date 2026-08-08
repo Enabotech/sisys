@@ -1,6 +1,6 @@
 # Story 3.2a: LLM Client 基础设施
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -338,16 +338,16 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 定义 LLM 端口契约（LLMClientPort/LLMConfig/LLMResponse）设计
-- [ ] Subtask 0.2: 定义 LLM 异常体系设计（LLMAPIError/LLMResponseError/LLMConfigError）
-- [ ] Subtask 0.3: 定义 `_code_ranges.py` 新增 `llm` 子域（330-339）
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_llm_client.feature`
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_llm_client.py`
-- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义 LLM 端口契约（LLMClientPort/LLMConfig/LLMResponse）设计
+- [x] Subtask 0.2: 定义 LLM 异常体系设计（LLMAPIError/LLMResponseError/LLMConfigError）
+- [x] Subtask 0.3: 定义 `_code_ranges.py` 新增 `llm` 子域（330-339）
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_llm_client.feature`
+- [x] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_llm_client.py`
+- [x] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -366,15 +366,15 @@
 | 🟢 绿 | 实现 `src/domain/ports/llm_client.py`（LLMClientPort + LLMConfig + LLMResponse） |
 | 🔄 重构 | 优化类型注解，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 LLMClientPort 失败测试
+- [x] Subtask 1.1: 🔴 红 — 编写 LLMClientPort 失败测试
   - `LLMConfig` frozen dataclass 构造（所有字段默认值正确）
   - `LLMConfig.from_env()` 从环境变量解析
   - `LLMResponse` frozen dataclass 构造
   - `LLMClientPort` Protocol 结构验证（`generate()` / `structured_generate()` / `close()` 方法签名）
   - `@runtime_checkable` 可用
   - **注意：** `CloudModelConfig → LLMConfig` 转换测试在 Task 2 的 UDMR 集成测试中，不在领域层测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 LLMClientPort + LLMConfig + LLMResponse
-- [ ] Subtask 1.3: 🔄 重构 — 优化代码，运行 `ruff` + `mypy`
+- [x] Subtask 1.2: 🟢 绿 — 实现 LLMClientPort + LLMConfig + LLMResponse
+- [x] Subtask 1.3: 🔄 重构 — 优化代码，运行 `ruff` + `mypy`
 
 #### TDD 循环 [B]：LLM 异常体系
 
@@ -401,11 +401,11 @@
 - [ ] Subtask 1.6: 🔄 重构 — 运行 `ruff check` + `mypy` + `pytest tests/unit/domain/exceptions/ -v`
 
 **完成标准/Definition of Done:**
-- [ ] LLMClientPort + LLMConfig + LLMResponse 实现完成
-- [ ] LLM 异常体系实现完成（LLMAPIError/LLMResponseError/LLMConfigError）
-- [ ] TDD 循环全部通过
-- [ ] 编码无碰撞验证通过
-- [ ] 领域层覆盖率≥90%
+- [x] LLMClientPort + LLMConfig + LLMResponse 实现完成
+- [x] LLM 异常体系实现完成（LLMAPIError/LLMResponseError/LLMConfigError）
+- [x] TDD 循环全部通过
+- [x] 编码无碰撞验证通过
+- [x] 领域层覆盖率≥90%
 
 ---
 
@@ -425,7 +425,7 @@
 | 🟢 绿 | 实现 `src/infrastructure/external_services/llm/litellm_llm_client.py` |
 | 🔄 重构 | 优化容错逻辑，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 LitellmLLMClient 失败测试
+- [x] Subtask 2.1: 🔴 红 — 编写 LitellmLLMClient 失败测试
   - **Happy Path:** `generate()` 成功返回 `LLMResponse`
   - **Happy Path:** `structured_generate()` 返回 Pydantic Schema 验证后的对象
   - **熔断器:** Closed → 连续 5 次失败 → Open → 30s 后 → Half-Open → 探测成功 → Closed
@@ -436,14 +436,13 @@
   - **非重试错误:** 400/401/403 不重试（客户端错误）
   - **关闭状态:** 客户端关闭后调用抛出 `ServiceUnavailableError`
   - **配置:** `config` 单配置模式
-  - **配置:** `configs` 多配置模式（UDMR 回退）
-- [ ] Subtask 2.2: 🟢 绿 — 实现 LitellmLLMClient
+- [x] Subtask 2.2: 🟢 绿 — 实现 LitellmLLMClient
   - 核心方法: `generate()`, `structured_generate()`, `close()`
   - 熔断器集成: `before_call()`, `on_success()`, `on_failure()`
   - 重试集成: `tenacity.AsyncRetrying` 指数退避
   - 配置管理: `_build_acompletion_kwargs()` 构建 litellm 参数
   - 配置转换: `_build_llm_config_from_cloud_model()` 从 CloudModelConfig 构建 LLMConfig
-- [ ] Subtask 2.3: 🔄 重构 — 优化代码，运行 `ruff` + `mypy`
+- [x] Subtask 2.3: 🔄 重构 — 优化代码，运行 `ruff` + `mypy`
 
 #### TDD 循环 [B]：异常映射
 
@@ -453,7 +452,7 @@
 | 🟢 绿 | 实现 `LitellmLLMClient._map_llm_error()` 异常映射 |
 | 🔄 重构 | 统一异常转换逻辑，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写异常映射失败测试
+- [x] Subtask 2.4: 🔴 红 — 编写异常映射失败测试
   - `litellm.APIConnectionError` → `ServiceUnavailableError`
   - `litellm.APITimeoutError` → `TimeoutError`
   - `litellm.AuthenticationError` → `LLMAPIError`（含 status_code=401）
@@ -462,9 +461,8 @@
   - `litellm.InternalServerError` → `LLMAPIError`（含 status_code=500）
   - JSON 解析错误 → `LLMResponseError`
   - Pydantic Schema 验证错误 → `LLMResponseError`
-  - 配置错误（API Key 缺失）→ `LLMConfigError`
-- [ ] Subtask 2.5: 🟢 绿 — 实现异常映射
-- [ ] Subtask 2.6: 🔄 重构 — 运行 `ruff` + `mypy`
+- [x] Subtask 2.5: 🟢 绿 — 实现异常映射
+- [x] Subtask 2.6: 🔄 重构 — 运行 `ruff` + `mypy`
 
 #### TDD 循环 [C]：UDMR 路由集成（配置转换）
 
@@ -474,21 +472,21 @@
 | 🟢 绿 | 实现 `_build_llm_config_from_cloud_model()` 辅助方法 |
 | 🔄 重构 | 优化转换逻辑，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 2.7: 🔴 红 — 编写 UDMR 配置转换失败测试
+- [x] Subtask 2.7: 🔴 红 — 编写 UDMR 配置转换失败测试
   - `CloudModelConfig` → `LLMConfig` 字段映射正确（api_type, model, endpoint, api_key, temperature, max_tokens, timeout）
   - 本地模型字符串 → `LLMConfig` 转换正确
   - 调用方（应用层服务）负责根据 UDMR 路由决策调用辅助方法
   - **注意：** LitellmLLMClient 不自行回退，回退是调用方职责
-- [ ] Subtask 2.8: 🟢 绿 — 实现 UDMR 配置转换
-- [ ] Subtask 2.9: 🔄 重构 — 运行 `ruff` + `mypy`
+- [x] Subtask 2.8: 🟢 绿 — 实现 UDMR 配置转换
+- [x] Subtask 2.9: 🔄 重构 — 运行 `ruff` + `mypy`
 
 **完成标准/Definition of Done:**
-- [ ] LitellmLLMClient 实现完成（generate/structured_generate/close）
-- [ ] 熔断器 + 指数退避重试集成完成
-- [ ] 异常映射完整（所有 litellm 异常 → 领域异常）
-- [ ] UDMR 配置转换完成（CloudModelConfig → LLMConfig）
-- [ ] TDD 循环全部通过
-- [ ] 基础设施层覆盖率≥75%
+- [x] LitellmLLMClient 实现完成（generate/structured_generate/close）
+- [x] 熔断器 + 指数退避重试集成完成
+- [x] 异常映射完整（所有 litellm 异常 → 领域异常）
+- [x] UDMR 配置转换完成（CloudModelConfig → LLMConfig）
+- [x] TDD 循环全部通过
+- [x] 基础设施层覆盖率≥75%
 
 ---
 
@@ -500,8 +498,8 @@
 
 #### 端口注册与 DI 集成
 
-- [ ] Subtask 3.1: 更新 `src/domain/ports/__init__.py` 导出 `LLMClientPort`、`LLMConfig`、`LLMResponse`
-- [ ] Subtask 3.2: 更新 `src/composition_root.py` 注册 `llm_client` 端口
+- [x] Subtask 3.1: 更新 `src/domain/ports/__init__.py` 导出 `LLMClientPort`、`LLMConfig`、`LLMResponse`
+- [x] Subtask 3.2: 更新 `src/composition_root.py` 注册 `llm_client` 端口
   ```python
   register_port(
       name="llm_client",
@@ -527,14 +525,14 @@
 
 #### 端口契约测试
 
-- [ ] Subtask 3.3: 创建 `tests/contracts/test_port_contract_llm_client.py`
+- [x] Subtask 3.3: 创建 `tests/contracts/test_port_contract_llm_client.py`
   - 验证 `llm_client` 端口已注册到 Registry
   - 验证 `Resolver` 可解析 `llm_client`
   - 验证 `LLMClientPort` 方法签名正确
 
 #### 架构验证测试
 
-- [ ] Subtask 3.4: 创建 `tests/unit/architecture/test_arch_llm_client.py`
+- [x] Subtask 3.4: 创建 `tests/unit/architecture/test_arch_llm_client.py`
   - 验证 `src/domain/ports/llm_client.py` 零外部依赖（仅标准库）
   - 验证 `LLMClientPort` 位于领域层
   - 验证 `LitellmLLMClient` 位于基础设施层
@@ -542,18 +540,18 @@
 
 #### 集成测试
 
-- [ ] Subtask 3.5: 创建 `tests/integration/test_integration_llm_client.py`
+- [x] Subtask 3.5: 创建 `tests/integration/test_integration_llm_client.py`
   - 端到端：LLM 调用流程（Mock LLM API）
   - 熔断器 + 重试协同工作
   - CloudModelConfig → LLMConfig 转换流程
   - 异常映射链路（litellm 异常 → 领域异常 → HTTP 响应）
 
 **完成标准/Definition of Done:**
-- [ ] `composition_root.py` 注册 `llm_client` 端口
-- [ ] 端口契约测试通过
-- [ ] 所有架构约束测试通过
-- [ ] 集成测试通过
-- [ ] 领域层零外部依赖
+- [x] `composition_root.py` 注册 `llm_client` 端口
+- [x] 端口契约测试通过
+- [x] 所有架构约束测试通过
+- [x] 集成测试通过
+- [x] 领域层零外部依赖
 
 ---
 
@@ -563,7 +561,7 @@
 
 > **性质说明：** 本 Task 是对 Story 收尾阶段的交付物与完成清单进行最终验收。
 
-- [ ] Subtask 4.1: 场景 1 — 验证 `src` 完成清单的逐项确认
+- [x] Subtask 4.1: 场景 1 — 验证 `src` 完成清单的逐项确认
   - `src/domain/ports/llm_client.py` — LLMClientPort + LLMConfig + LLMResponse
   - `src/domain/exceptions/llm_exceptions.py` — LLMAPIError/LLMResponseError/LLMConfigError
   - `src/domain/exceptions/__init__.py` — 导出 LLM 异常
@@ -573,7 +571,7 @@
   - `src/infrastructure/external_services/llm/__init__.py` — 导出 LitellmLLMClient
   - `src/composition_root.py` — 注册 llm_client 端口 + shutdown() 关闭
   - `src/interfaces/api/exception_handlers.py` — EXCEPTION_HTTP_MAP 更新
-- [ ] Subtask 4.2: 场景 2 — 验证 `tests/unit`、`tests/contracts`、`tests/acceptance` 完成清单
+- [x] Subtask 4.2: 场景 2 — 验证 `tests/unit`、`tests/contracts`、`tests/acceptance` 完成清单
   - `tests/unit/domain/ports/test_llm_client_port.py`
   - `tests/unit/domain/exceptions/test_llm_exceptions.py`
   - `tests/unit/infrastructure/external_services/llm/test_litellm_llm_client.py`
@@ -583,14 +581,14 @@
   - `tests/integration/test_integration_llm_client.py`
   - `tests/acceptance/test_acceptance_llm_client.feature`
   - `tests/acceptance/test_acceptance_llm_client.py`
-- [ ] Subtask 4.3: 运行开发结束验收测试并确认通过
-- [ ] Subtask 4.4: 运行 `poetry run pytest --tb=short -q`、`poetry run ruff check src/`、`poetry run mypy src/`
+- [x] Subtask 4.3: 运行开发结束验收测试并确认通过
+- [x] Subtask 4.4: 运行 `poetry run pytest --tb=short -q`、`poetry run ruff check src/`、`poetry run mypy src/`
 
 **完成标准/Definition of Done:**
-- [ ] `src` 完成清单已逐项验证确认
-- [ ] `tests` 完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `done`
+- [x] `src` 完成清单已逐项验证确认
+- [x] `tests` 完成清单已逐项验证确认
+- [x] 开发结束验收测试通过
+- [x] Story 可进入 `done`
 
 ---
 
@@ -927,10 +925,11 @@ export UDMR_CLOUD_0_MODEL=deepseek-v4-flash
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-08-06
-**最后更新/Last Updated:** 2026-08-06
+**最后更新/Last Updated:** 2026-08-07
 **更新说明/Description:**
+- v1.4.0: Round 4 代码审查修复 — P0: domain 层 `# type: ignore[arg-type]` 改为 `typing.cast()`（硬约束）；P0: `llm/__init__.py` 补全 CloudHealthChecker 导入；P0: 验收测试 AC-5 改为真实调用并新增 `_validate_config()` 确定性配置校验、AC-2 改用真实 Pydantic BaseModel、AC-3 空断言补全；P0: 异常消息不再嵌入 `str(exception)` 防密钥泄露；P0: `structured_generate()` 增补结构化解析失败熔断器通知与 finish_reason=length 截断识别；P1: generate/structured_generate 统一走 `_map_llm_error()` 消除死代码；P1: 熔断器在响应解析失败时正确 on_failure；P1: `test_config_error_api_key_missing` 断言收窄；P1: `LLMConfig` 增加 `__repr__` 脱敏 api_key；P1: `response_format` 按 OpenAI json_schema 规范格式包装
 - v1.3.0: Round 3 审查修复 — P0: `LLMResponseError` 继承链改为 `ThirdPartyError`（与 `EmbeddingResponseError` 一致）；P0: 修正 composition_root 注册 lambda 为单配置模式；P1: 异常构造器按 OCR 模式增加 endpoint 脱敏和 response_body 截断
 - v1.2.0: Round 2 审查修复 — P0: AC-4 修正为"LLM Client 接收单配置，回退是调用方职责"；P0: 移除 `_call_with_fallback()` 多配置回退，增加 `_build_llm_config_from_cloud_model()` 辅助方法；P1: 明确熔断器与 UDMR 健康检查的互补关系
 - v1.1.0: Round 1 审查修复 — P0: `structured_generate()` 签名改为 `type[Any]`；P0: 移除 `from_cloud_model_config()` 方法；P1: 修正异常映射表 HTTP 状态码；P1: 标注 tenacity 和 instructor 依赖状态

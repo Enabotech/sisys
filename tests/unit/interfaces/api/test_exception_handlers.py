@@ -44,6 +44,9 @@ from src.domain.exceptions import (
     InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
+    LLMAPIError,
+    LLMConfigError,
+    LLMResponseError,
     MemoryAccessDeniedError,
     MemoryNotFoundError,
     MemoryVersionConflictError,
@@ -199,6 +202,10 @@ class TestExceptionHttpMap:
             # OCR 异常
             OCRConnectionError,
             OCRProcessingError,
+            # LLM 异常
+            LLMAPIError,
+            LLMResponseError,
+            LLMConfigError,
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

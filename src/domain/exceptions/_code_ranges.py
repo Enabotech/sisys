@@ -42,6 +42,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "sandbox": (309, 319),
     # OCR 子域（320-329）
     "ocr": (320, 329),
+    # LLM 子域（330-339）
+    "llm": (330, 339),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -116,6 +118,10 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     # ocr_exceptions.py
     "OCRConnectionError": "ocr",
     "OCRProcessingError": "ocr",
+    # llm_exceptions.py
+    "LLMAPIError": "llm",
+    "LLMResponseError": "llm",
+    "LLMConfigError": "llm",
 }
 
 

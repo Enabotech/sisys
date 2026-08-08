@@ -38,6 +38,9 @@ from src.domain.exceptions import (
     InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
+    LLMAPIError,
+    LLMConfigError,
+    LLMResponseError,
     MemoryAccessDeniedError,
     MemoryNotFoundError,
     MemoryVersionConflictError,
@@ -128,6 +131,10 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     # OCR 异常
     OCRConnectionError: status.HTTP_504_GATEWAY_TIMEOUT,  # 320 — 连接超时/不可达
     OCRProcessingError: status.HTTP_502_BAD_GATEWAY,  # 321 — 上游返回错误/响应解析失败
+    # LLM 异常
+    LLMAPIError: status.HTTP_502_BAD_GATEWAY,  # 330 — LLM API 返回错误
+    LLMResponseError: status.HTTP_502_BAD_GATEWAY,  # 331 — 响应解析错误
+    LLMConfigError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 332 — 配置错误
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
