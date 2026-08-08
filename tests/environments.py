@@ -154,6 +154,19 @@ class PaddleOCRConfig:
 
 
 @dataclass
+class LLMConfig:
+    """LLM API 配置（对齐 LLMConfig.from_env() 读取的 LLM_* 变量）"""
+
+    api_type: str = "openai"
+    model: str = "qwen2.5:7b"
+    endpoint: str | None = None
+    api_key: str | None = None
+    temperature: float = 0.7
+    max_tokens: int | None = None
+    timeout: float = 600.0
+
+
+@dataclass
 class TestEnvConfig:
     """测试环境完整配置"""
 
@@ -167,6 +180,7 @@ class TestEnvConfig:
     app: AppConfig = field(default_factory=AppConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     paddleocr: PaddleOCRConfig = field(default_factory=PaddleOCRConfig)
+    llm: LLMConfig = field(default_factory=LLMConfig)
 
 
 # =============================================================================
@@ -213,6 +227,7 @@ LOCAL_CONFIG = TestEnvConfig(
     minio=MinIOConfig(endpoint="localhost:9000"),
     neo4j=Neo4jConfig(host="localhost", http_port=7474, bolt_port=7687),
     rabbitmq=RabbitMQConfig(host="localhost", port=5672, mgmt_port=15672),
+    llm=LLMConfig(api_type="openai", model="qwen2.5:7b", endpoint="http://localhost:11434", timeout=600.0),
 )
 
 CI_CONFIG = TestEnvConfig(
@@ -224,6 +239,7 @@ CI_CONFIG = TestEnvConfig(
     neo4j=Neo4jConfig(host="host.docker.internal", http_port=7474, bolt_port=7687),
     rabbitmq=RabbitMQConfig(host="host.docker.internal", port=5672, mgmt_port=15672),
     paddleocr=PaddleOCRConfig(api_url="http://host.docker.internal:8080"),
+    llm=LLMConfig(api_type="openai", model="qwen2.5:7b", endpoint="http://host.docker.internal:11434", timeout=600.0),
 )
 
 K8S_CONFIG = TestEnvConfig(
@@ -235,6 +251,7 @@ K8S_CONFIG = TestEnvConfig(
     neo4j=Neo4jConfig(host="sisys-neo4j", http_port=7474, bolt_port=7687),
     rabbitmq=RabbitMQConfig(host="sisys-rabbitmq", port=5672, mgmt_port=15672),
     paddleocr=PaddleOCRConfig(api_url="http://sisys-paddleocr-vl-api:8080"),
+    llm=LLMConfig(api_type="openai", model="qwen2.5:7b", endpoint="http://sisys-ollama:11434", timeout=600.0),
 )
 
 TEST_CONFIG = TestEnvConfig(
@@ -245,6 +262,7 @@ TEST_CONFIG = TestEnvConfig(
     minio=MinIOConfig(endpoint="localhost:9010"),
     neo4j=Neo4jConfig(host="localhost", http_port=7475, bolt_port=7688),
     rabbitmq=RabbitMQConfig(host="localhost", port=5673, mgmt_port=15673),
+    llm=LLMConfig(api_type="openai", model="qwen2.5:7b", endpoint="http://localhost:11434", timeout=600.0),
 )
 
 
@@ -421,6 +439,38 @@ def _apply_dotenv_if_empty(config: TestEnvConfig, env_values) -> None:
         if url := env_values.get("PADDLEOCR_VL_API_URL"):
             config.paddleocr.api_url = url
 
+    # LLM API 配置
+    if not config.llm.api_type or config.llm.api_type == "openai":
+        if api_type := env_values.get("LLM_API_TYPE"):
+            config.llm.api_type = api_type
+    if not config.llm.model or config.llm.model == "qwen2.5:7b":
+        if model := env_values.get("LLM_MODEL"):
+            config.llm.model = model
+    if not config.llm.endpoint:
+        if endpoint := env_values.get("LLM_ENDPOINT"):
+            config.llm.endpoint = endpoint
+    if not config.llm.api_key:
+        if api_key := env_values.get("LLM_API_KEY"):
+            config.llm.api_key = api_key
+    if config.llm.temperature == 0.7:
+        if temp := env_values.get("LLM_TEMPERATURE"):
+            try:
+                config.llm.temperature = float(temp)
+            except ValueError:
+                pass
+    if config.llm.max_tokens is None:
+        if max_tokens := env_values.get("LLM_MAX_TOKENS"):
+            try:
+                config.llm.max_tokens = int(max_tokens)
+            except ValueError:
+                pass
+    if config.llm.timeout == 600.0:
+        if timeout := env_values.get("LLM_TIMEOUT"):
+            try:
+                config.llm.timeout = float(timeout)
+            except ValueError:
+                pass
+
 
 def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
     """从环境变量覆盖配置"""
@@ -491,6 +541,31 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
     if api_timeout := os.getenv("PADDLEOCR_VL_API_TIMEOUT"):
         config.paddleocr.api_timeout = float(api_timeout)
 
+    # LLM API 配置
+    if api_type := os.getenv("LLM_API_TYPE"):
+        config.llm.api_type = api_type
+    if model := os.getenv("LLM_MODEL"):
+        config.llm.model = model
+    if endpoint := os.getenv("LLM_ENDPOINT"):
+        config.llm.endpoint = endpoint
+    if api_key := os.getenv("LLM_API_KEY"):
+        config.llm.api_key = api_key
+    if temp := os.getenv("LLM_TEMPERATURE"):
+        try:
+            config.llm.temperature = float(temp)
+        except ValueError:
+            pass
+    if max_tokens := os.getenv("LLM_MAX_TOKENS"):
+        try:
+            config.llm.max_tokens = int(max_tokens)
+        except ValueError:
+            pass
+    if timeout := os.getenv("LLM_TIMEOUT"):
+        try:
+            config.llm.timeout = float(timeout)
+        except ValueError:
+            pass
+
     return config
 
 
@@ -550,6 +625,18 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
 
     # PaddleOCR-VL 配置
     os.environ.setdefault("PADDLEOCR_VL_API_URL", config.paddleocr.api_url)
+
+    # LLM API 配置
+    os.environ.setdefault("LLM_API_TYPE", config.llm.api_type)
+    os.environ.setdefault("LLM_MODEL", config.llm.model)
+    if config.llm.endpoint:
+        os.environ.setdefault("LLM_ENDPOINT", config.llm.endpoint)
+    if config.llm.api_key:
+        os.environ.setdefault("LLM_API_KEY", config.llm.api_key)
+    os.environ.setdefault("LLM_TEMPERATURE", str(config.llm.temperature))
+    if config.llm.max_tokens is not None:
+        os.environ.setdefault("LLM_MAX_TOKENS", str(config.llm.max_tokens))
+    os.environ.setdefault("LLM_TIMEOUT", str(config.llm.timeout))
 
 
 def reset_test_env() -> None:

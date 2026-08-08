@@ -63,6 +63,7 @@ src/
 - **domain 层禁止任何外部依赖**（import-linter 强制校验，包括 pydantic/sqlalchemy/redis 等），违反则 CI 失败
 - **禁止** `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释，**禁止**修改阈值/规则消除告警——必须修复根因
   - **`import-untyped` 修复**：第三方库缺少类型注解（无 `py.typed`、无 types-* 包）时，**禁止**用 `ignore_missing_imports=true` 豁免。必须在 `stubs/<package>/__init__.pyi` 创建 PEP 561 类型存根，仅覆盖项目实际使用的 API 面
+- **验收/集成测试禁止 mock**：必须尽量用真实服务调用验证真实代码行为，`mock`仅限单元测试
 - **异常是领域契约** 禁止 raise ValueError、手动 raise HTTPException、继承内置 Exception，所有异常必须走 src/domain/exceptions/ 体系 + ExceptionHandlers 自动映射，提交前三条 grep 自查必须零输出。必须遵守 `docs/architecture/sisys-uni-exception-design.md`
 - **禁止** 绕过 pre-commit hooks（`--no-verify`），提交必须通过预提交钩子检查
 - **禁止** git commit 信息中包含任何 AI 辅助署名（如 `Co-Authored-By: Claude`、`anthropic.com` 等），提交信息保持纯净

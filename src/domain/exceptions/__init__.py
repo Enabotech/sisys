@@ -39,6 +39,11 @@ from src.domain.exceptions.external_exceptions import (
     TimeoutError,
     UnknownError,
 )
+from src.domain.exceptions.llm_exceptions import (
+    LLMAPIError,
+    LLMConfigError,
+    LLMResponseError,
+)
 from src.domain.exceptions.ocr_exceptions import (
     OCRConnectionError,
     OCRProcessingError,
@@ -141,6 +146,10 @@ __all__ = [
     "EmbeddingAPIError",
     "EmbeddingResponseError",
     "EmbeddingModelError",
+    # LLM 异常
+    "LLMAPIError",
+    "LLMResponseError",
+    "LLMConfigError",
     # OCR 异常
     "OCRConnectionError",
     "OCRProcessingError",
