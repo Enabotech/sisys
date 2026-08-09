@@ -63,8 +63,9 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `EntitiesExtracted` 定义于 `src/domain/events/entity_extraction_events.py`
-- [ ] 字段：`memory_id`, `entity_count`, `relation_count`, `extraction_type`
-- [ ] 事件注册于 `src/domain/events/__init__.py`
+- [ ] 字段：`memory_id`（str）、`entity_count`（int）、`relation_count`（int）、`extraction_type`（str）
+- [ ] `__post_init__` 设置 `aggregate_id = self.memory_id`、`aggregate_type = "EntityExtraction"`
+- [ ] 事件注册于 `src/domain/events/__init__.py` 和 `configs/event_channels.yaml`
 
 ### AC-3: 实体抽取异常体系
 
@@ -175,7 +176,8 @@
   - `__post_init__` 设置 `aggregate_id = self.memory_id`（str 类型赋值给 `aggregate_id`，与 `MemoryChanged` 模式一致）、`aggregate_type = "EntityExtraction"`
   - Schema 版本: v1.0.0
   - 通道: `RabbitMQ + Outbox`（业务状态型）
-  - 注册于 `src/domain/events/__init__.py` 和 `config/event_channels.yaml`
+  - 注册于 `src/domain/events/__init__.py` 和 `configs/event_channels.yaml`
+  - 同时更新 `ChannelRouter.DEFAULT_MAPPINGS`（`src/infrastructure/messaging/channel_router.py`），新增事件同时更新两处，保持同步
 
 #### 数据模型 (Data Models)
 
@@ -350,7 +352,7 @@
 
 | 约束类型 | 规则 | 违反后果 |
 |---------|------|---------|
-| **外部服务隔离** | LLM API 使用 AsyncMock，Neo4j 使用 Mock | 真实调用导致失败 |
+| **外部服务隔离** | LLM API 使用 aiohttp 本地 HTTP 服务器（参照 Story 3.2a 集成测试模式），Neo4j 使用 AsyncMock(spec=L5GraphPort) | 真实调用导致失败 |
 | **配置隔离** | 每个测试使用独立的提取配置实例 | 配置污染 |
 | **资源唯一性** | 测试数据使用 UUID 等唯一标识符 | ID 冲突 |
 | **并行隔离** | 并行测试使用 UUID 前缀隔离资源 | 资源冲突 |
@@ -526,11 +528,13 @@
   - **Edge Case:** Schema 验证失败 → 降级至空结果
   - **召回率验证:** 模拟 LLM 返回结果，验证正确解析
 - [ ] Subtask 2.5: 🟢 绿 — 实现 LLMEntityExtractor
-  - 注入 `LLMClientPort` 调用
+  - 实现 `EntityExtractionPort` 接口（`extract_entities(content, domain_context?)`）
+  - 构造函数注入 `LLMClientPort` 调用 `structured_generate()`
   - 定义 `EntityExtractionSchema`（Pydantic BaseModel，结构化输出 Schema）
   - Few-Shot 提示模板（含 3-5 个示例）
   - CoT 推理步骤提示
   - 错误处理：LLM 失败时返回空结果（非抛出异常，由编排层决策）
+  - 匹配结果映射为 `ExtractedEntity` / `ExtractedRelation` 值对象（`extraction_source="llm"`）
 - [ ] Subtask 2.6: 🔄 重构 — 运行 `ruff` + `mypy`
 
 #### TDD 循环 [C]：ConflictArbitrator（规则+LLM 融合）
@@ -654,10 +658,10 @@
 #### 集成测试
 
 - [ ] Subtask 4.5: 创建 `tests/integration/test_integration_entity_extraction.py`
-  - 端到端：实体抽取完整流程（Mock LLM + Mock Neo4j）
-  - 规则基 + LLM 混合抽取
+  - 端到端：实体抽取完整流程（使用真实 AC 自动机规则基抽取 + aiohttp 本地 HTTP 服务器模拟 LLM API）
+  - 规则基 + LLM 混合抽取（参照 Story 3.2a 集成测试的 aiohttp 模式）
   - 冲突仲裁逻辑
-  - Neo4j 持久化调用验证
+  - Neo4j 持久化调用验证（通过 Mock L5GraphPort）
   - 异常链路（EntityExtractionError 抛出）
 
 **完成标准/Definition of Done:**
