@@ -212,16 +212,13 @@ jobs:
       - name: 启动测试服务
         shell: bash
         run: |
-          set -a
-          source ./.env
-          set +a
           docker network create sisys-network 2>/dev/null || true
-          docker compose -f ./deploy/app/docker-compose.yml up -d
+          docker compose --env-file ./.env -f ./deploy/app/docker-compose.yml up -d
 
-          total=$(docker compose -f ./deploy/app/docker-compose.yml ps --services | wc -l)
+          total=$(docker compose --env-file ./.env -f ./deploy/app/docker-compose.yml ps --services | wc -l)
           echo "检测到 $total 个服务，等待所有服务健康..."
           for i in {1..60}; do
-            healthy=$(docker compose -f ./deploy/app/docker-compose.yml ps 2>/dev/null | grep -c -i '\(healthy\)' || true)
+            healthy=$(docker compose --env-file ./.env -f ./deploy/app/docker-compose.yml ps 2>/dev/null | grep -c -i '\(healthy\)' || true)
             if [ "$healthy" -ge "$total" ]; then
               echo "✅ 所有服务已就绪 ($healthy/$total)"
               break
@@ -229,7 +226,7 @@ jobs:
             echo "等待服务健康... ($i/60) - 当前: $healthy/$total"
             sleep 3
           done
-          docker compose -f ./deploy/app/docker-compose.yml ps
+          docker compose --env-file ./.env -f ./deploy/app/docker-compose.yml ps
 
       - name: 增量更新依赖
         run: |
