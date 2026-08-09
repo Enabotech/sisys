@@ -92,6 +92,7 @@
 - [ ] 使用 `re` 正则模式匹配结构化实体
 - [ ] 内置基础战略领域词典（战略管理、财务、市场等基本词条）
 - [ ] 支持规则可配置（词典可扩展、正则可追加）
+- [ ] 匹配结果映射为 `ExtractedEntity` 值对象（`extraction_source="rule"`）
 
 ### AC-5: LLM 语义实体抽取
 
@@ -102,10 +103,11 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `LLMEntityExtractor` 位于 `src/infrastructure/external_services/entity_extraction/llm_extractor.py`
+- [ ] 实现 `EntityExtractionPort` 接口（`extract_entities(content, domain_context?)`），注入 `LLMClientPort` 调用 `structured_generate()`
 - [ ] 使用 `LLMClientPort.structured_generate()` 而非裸 httpx
 - [ ] 定义 `EntityExtractionSchema`（Pydantic BaseModel）作为结构化输出 Schema
 - [ ] 提示模板包含 Few-Shot 示例和 CoT 推理步骤
-- [ ] 错误处理：LLM 调用失败时透明降级至规则基结果
+- [ ] 错误处理：LLM 调用失败时透明降级至规则基结果（返回空结果，不抛出异常）
 
 ### AC-6: 冲突仲裁器（规则 + LLM 融合）
 
@@ -165,11 +167,12 @@
 **新建事件：**
 - [ ] `EntitiesExtracted`（`src/domain/events/entity_extraction_events.py`）
   - 继承 `DomainEvent`
-  - 字段: `memory_id: str` — 关联记忆 ID
+  - 字段: `memory_id: str` — 关联记忆 ID（str 类型，对标 `MemoryChanged` 模式）
   - `entity_count: int` — 抽取实体数量
   - `relation_count: int` — 抽取关系数量
   - `extraction_type: str` — 抽取类型（"rule_only" / "llm_only" / "hybrid"）
-  - 事件类型: `"EntitiesExtracted"`
+  - 事件类型: `"EntitiesExtracted"`（`field(default="EntitiesExtracted", init=False)`）
+  - `__post_init__` 设置 `aggregate_id = self.memory_id`（str 类型赋值给 `aggregate_id`，与 `MemoryChanged` 模式一致）、`aggregate_type = "EntityExtraction"`
   - Schema 版本: v1.0.0
   - 通道: `RabbitMQ + Outbox`（业务状态型）
   - 注册于 `src/domain/events/__init__.py` 和 `config/event_channels.yaml`
@@ -233,6 +236,8 @@
 - [ ] 归属模块与基类 — 实体抽取属于外部抽取服务，继承 `ExternalException`
 - [ ] 唯一编码分配 — 340，确认无碰撞
 - [ ] 构造器参数设计 — 携带 `content_preview`、`extraction_strategy`、`entity_count` 等上下文
+  - `content_preview` 应截断至 200 字符（对标 OCR 的 `response_body[:200]` 模式），避免在 context 中泄露完整内容
+  - 建议添加 `content_preview_truncated: bool` 标记，指示是否被截断
 - [ ] 编码注册 — 在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 中注册；新增 `entity_extraction` 子域范围 (340, 349)
 - [ ] 导出完整性 — `__init__.py` + `EXCEPTION_HTTP_MAP`
 - [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性
@@ -1088,6 +1093,7 @@ export ENTITY_EXTRACTION_TEMPERATURE=0.1          # 低温度保证确定性
 **创建日期/Created:** 2026-08-09
 **最后更新/Last Updated:** 2026-08-09
 **更新说明/Description:**
+- v1.2.0: Round 2 文档审查修复 — P1: 补充 `EntitiesExtracted` 事件 `__post_init__` 模式细节（`aggregate_id = self.memory_id` 对标 `MemoryChanged`、`aggregate_type = "EntityExtraction"`）；P1: LLMEntityExtractor 增加实现 `EntityExtractionPort` 接口的验证标准；P1: RuleBasedExtractor 增加匹配结果映射为 `ExtractedEntity`（`extraction_source="rule"`）的验证标准；P1: EntityExtractionError 构造器 `content_preview` 增加截断脱敏规范（对标 OCR 模式）
 - v1.1.0: Round 1 文档审查修复 — P0: 修正 Neo4j 实体类型映射（`Memory:Person` 复合标签 → 统一 `Memory` 标签 + `n.type` 属性）；P0: `ExtractedRelation` 字段命名冲突（`source` 专指源实体名称，来源标识改用 `extraction_source`，`ExtractedEntity` 同步统一命名）；P0: 修正 `EntityExtractionService` 构造函数注入（`llm_client`（LLMClientPort）→ `llm_extractor`（EntityExtractionPort），LLM 通过 LLMEntityExtractor 间接调用 LLMClientPort）；P1: 补充 Neo4j 持久化策略关键约束（关系类型大写命名规范、属性键清洗、memory_id 主键）
 - v1.0.0: 创建故事文件
 
