@@ -48,7 +48,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `EntityExtractionPort` Protocol 定义于 `src/domain/ports/entity_extraction.py`
-- [ ] `ExtractedEntity` frozen dataclass（name, entity_type, confidence, extraction_source, metadata）
+- [ ] `ExtractedEntity` frozen dataclass（name, entity_type, confidence, extraction_source, metadata, normalized_name）
 - [ ] `ExtractedRelation` frozen dataclass（source, target, relation_type, confidence, extraction_source, metadata）
 - [ ] `ExtractionResult` frozen dataclass（entities, relations, extraction_metadata）
 - [ ] `extract_entities(content, domain_context?)` — 核心抽取方法
@@ -137,8 +137,8 @@
 - [ ] 构造函数注入：`rule_extractor`（EntityExtractionPort）、`llm_extractor`（EntityExtractionPort）、`l5_graph`（L5GraphPort）、`event_publisher`、`arbitrator`（ConflictArbitrator）
 - [ ] LLM 实体抽取通过 `LLMEntityExtractor`（实现 EntityExtractionPort）间接调用 `LLMClientPort`，不在服务中直接依赖 LLMClientPort
 - [ ] 异常处理：抽取失败时抛出 `EntityExtractionError`
-- [ ] 异常处理：抽取失败时抛出 `EntityExtractionError`
 - [ ] 输入验证：空内容或无效内容返回空结果而非抛出异常
+- [ ] 事件发布失败时记录日志（不阻止主流程返回 ExtractionResult）
 
 ### AC-8: 端口注册与 DI 集成
 
@@ -222,7 +222,9 @@
 
 | 端口名称 | 版本 | Owner | 注册 | 解析 | 契约测试 | 状态 |
 |---------|------|-------|------|------|---------|------|
-| EntityExtractionPort | v1.0.0 | foundation-team | 新建 | 新建 | 新建 | **新建** |
+| EntityExtractionPort | v1.0.0 | foundation-team | 新建（2个实现：entity_extraction_rule + entity_extraction_llm） | 新建 | 新建 | **新建** |
+| ConflictArbitrator | v1.0.0 | foundation-team | 新建（conflict_arbitrator） | 新建 | 新建 | **新建** |
+| EntityExtractionService | v1.0.0 | foundation-team | 新建（entity_extraction_service） | 新建 | 新建 | **新建** |
 
 #### 领域异常契约 (Domain Exception Contract)
 
@@ -692,8 +694,11 @@
 #### 端口契约测试
 
 - [ ] Subtask 4.3: 创建 `tests/contracts/test_port_contract_entity_extraction.py`
-  - 验证 `entity_extraction` 端口已注册到 Registry
-  - 验证 `Resolver` 可解析 `entity_extraction`
+  - 验证 `entity_extraction_rule` 端口已注册到 Registry
+  - 验证 `entity_extraction_llm` 端口已注册到 Registry
+  - 验证 `conflict_arbitrator` 端口已注册到 Registry
+  - 验证 `entity_extraction_service` 端口已注册到 Registry
+  - 验证 `Resolver` 可解析各端口
   - 验证 `EntityExtractionPort` 方法签名正确
 
 #### 架构验证测试
@@ -714,7 +719,7 @@
   - 异常链路（EntityExtractionError 抛出）
 
 **完成标准/Definition of Done:**
-- [ ] `composition_root.py` 注册 `entity_extraction` 端口
+- [ ] `composition_root.py` 注册 `entity_extraction_rule` / `entity_extraction_llm` / `conflict_arbitrator` / `entity_extraction_service` 端口
 - [ ] 端口契约测试通过
 - [ ] 所有架构约束测试通过
 - [ ] 集成测试通过
@@ -740,8 +745,10 @@
   - `src/infrastructure/external_services/entity_extraction/llm_extractor.py` — LLMEntityExtractor
   - `src/infrastructure/external_services/entity_extraction/conflict_arbitrator.py` — ConflictArbitrator
   - `src/application/services/entity_extraction_service.py` — EntityExtractionService
-  - `src/composition_root.py` — 注册 entity_extraction 端口
-  - `src/interfaces/api/exception_handlers.py` — EXCEPTION_HTTP_MAP 更新
+  - `src/composition_root.py` — 注册 entity_extraction_rule / entity_extraction_llm / conflict_arbitrator / entity_extraction_service 端口
+- `src/interfaces/api/exception_handlers.py` — EXCEPTION_HTTP_MAP 更新
+- `configs/event_channels.yaml` — 新增 EntitiesExtracted 事件通道
+- `src/infrastructure/messaging/channel_router.py` — DEFAULT_MAPPINGS 新增 EntitiesExtracted
 - [ ] Subtask 5.2: 场景 2 — 验证 `tests/unit`、`tests/contracts`、`tests/acceptance` 完成清单
   - `tests/unit/domain/ports/test_entity_extraction_port.py`
   - `tests/unit/domain/events/test_entity_extraction_events.py`
@@ -1144,13 +1151,14 @@ export ENTITY_EXTRACTION_TEMPERATURE=0.1          # 低温度保证确定性
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-08-09
 **最后更新/Last Updated:** 2026-08-09
 **更新说明/Description:**
-- v1.3.0: Round 3 文档审查修复 — P1: 修正 AC-1 值对象验证标准（补充 `extraction_source` 字段，与 SDD 数据模型部分一致）；P1: 修正 AC-8 端口注册设计（RuleBasedExtractor/LLMEntityExtractor 各自实现 EntityExtractionPort 分别注册为独立端口，不是单一 `entity_extraction` 端口）；P1: 修正 Subtask 4.2 注册代码（拆分 4 个端口注册，补齐 EntityExtractionService 注入依赖）；P2: 修正 `config/event_channels.yaml` → `configs/event_channels.yaml` 路径；P2: 补充 `ChannelRouter.DEFAULT_MAPPINGS` 更新要求；P2: 修正 `pyahocorasick` 依赖状态（当前未安装，非传递依赖，需显式声明）
-- v1.2.0: Round 2 文档审查修复 — P1: 补充 `EntitiesExtracted` 事件 `__post_init__` 模式细节（`aggregate_id = self.memory_id` 对标 `MemoryChanged`、`aggregate_type = "EntityExtraction"`）；P1: LLMEntityExtractor 增加实现 `EntityExtractionPort` 接口的验证标准；P1: RuleBasedExtractor 增加匹配结果映射为 `ExtractedEntity`（`extraction_source="rule"`）的验证标准；P1: EntityExtractionError 构造器 `content_preview` 增加截断脱敏规范（对标 OCR 模式）
-- v1.1.0: Round 1 文档审查修复 — P0: 修正 Neo4j 实体类型映射（`Memory:Person` 复合标签 → 统一 `Memory` 标签 + `n.type` 属性）；P0: `ExtractedRelation` 字段命名冲突（`source` 专指源实体名称，来源标识改用 `extraction_source`，`ExtractedEntity` 同步统一命名）；P0: 修正 `EntityExtractionService` 构造函数注入（`llm_client`（LLMClientPort）→ `llm_extractor`（EntityExtractionPort），LLM 通过 LLMEntityExtractor 间接调用 LLMClientPort）；P1: 补充 Neo4j 持久化策略关键约束（关系类型大写命名规范、属性键清洗、memory_id 主键）
+- v1.4.0: Round 5 文档审查修复 — P1: AC-1 值对象验证标准补充 `normalized_name` 字段（与 SDD 数据模型一致）；P1: AC-7 去除重复项并补充事件发布失败处理（日志记录不阻塞主流程）；P1: 端口契约清单扩展（拆分 EntityExtractionPort × 2 实现 + ConflictArbitrator + EntityExtractionService 四端口）；P1: 端口契约测试 Subtask 扩展为验证 4 个端口注册；P2: 删除重复的"异常处理"验证项（AC-7 第 139-140 行重复）
+- v1.3.0: Round 4 文档审查修复 — P1: 修正 AC-8 端口注册设计（RuleBasedExtractor/LLMEntityExtractor 各自实现 EntityExtractionPort 分别注册为独立端口）；P1: 修正 Subtask 4.2 注册代码（拆分 4 个端口注册）；P2: 修正 `pyahocorasick` 依赖状态
+- v1.2.0: Round 3 文档审查修复 — P1: 修正 AC-2 领域事件验证标准；P1: 修正集成测试描述为 aiohttp 模式；P1: 修正测试隔离约束
+- v1.1.0: Round 2 文档审查修复 — P1: 补充事件/LLM抽取/异常脱敏规范
 - v1.0.0: 创建故事文件
 
 <!-- 仅用作跟踪故事文件模板修订记录，故事开发时[务必删除]此段 -->
