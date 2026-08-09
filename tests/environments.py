@@ -478,21 +478,29 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
 
     config = copy.deepcopy(base_config)
 
+    # CI/K8S 等远程环境中，os.environ 中的 localhost 可能来自第三方库
+    # （如 litellm 导入时 dotenv.load_dotenv()）的副作用，而非用户显式设置。
+    # 此类环境的预设 host 不是 localhost，故 localhost 一律视为注入污染，跳过不覆盖。
+    _is_remote_env = config.env in (TestEnvironment.CI, TestEnvironment.K8S)
+
     # Redis
     if redis_host := os.getenv("REDIS_HOST"):
-        config.redis.host = redis_host
+        if not (_is_remote_env and redis_host == "localhost"):
+            config.redis.host = redis_host
     if redis_port := os.getenv("REDIS_PORT"):
         config.redis.port = int(redis_port)
 
     # PostgreSQL
     if pg_host := os.getenv("POSTGRES_HOST"):
-        config.postgres.host = pg_host
+        if not (_is_remote_env and pg_host == "localhost"):
+            config.postgres.host = pg_host
     if pg_port := os.getenv("POSTGRES_PORT"):
         config.postgres.port = int(pg_port)
 
     # Qdrant
     if qdrant_host := os.getenv("QDRANT_HOST"):
-        config.qdrant.host = qdrant_host
+        if not (_is_remote_env and qdrant_host == "localhost"):
+            config.qdrant.host = qdrant_host
     if qdrant_port := os.getenv("QDRANT_PORT"):
         config.qdrant.port = int(qdrant_port)
     if qdrant_grpc_port := os.getenv("QDRANT_GRPC_PORT"):
@@ -500,8 +508,9 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
 
     # MinIO
     if minio_host := os.getenv("MINIO_HOST"):
-        minio_port = os.getenv("MINIO_API_PORT", "9000")
-        config.minio.endpoint = f"{minio_host}:{minio_port}"
+        if not (_is_remote_env and minio_host == "localhost"):
+            minio_port = os.getenv("MINIO_API_PORT", "9000")
+            config.minio.endpoint = f"{minio_host}:{minio_port}"
     if minio_access_key := os.getenv("MINIO_ACCESS_KEY"):
         config.minio.access_key = minio_access_key
     if minio_secret_key := os.getenv("MINIO_SECRET_KEY"):
@@ -511,11 +520,13 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
 
     # Neo4j
     if neo4j_host := os.getenv("NEO4J_HOST"):
-        config.neo4j.host = neo4j_host
+        if not (_is_remote_env and neo4j_host == "localhost"):
+            config.neo4j.host = neo4j_host
 
     # RabbitMQ
     if rmq_host := os.getenv("RABBITMQ_HOST"):
-        config.rabbitmq.host = rmq_host
+        if not (_is_remote_env and rmq_host == "localhost"):
+            config.rabbitmq.host = rmq_host
     if rmq_port := os.getenv("RABBITMQ_PORT"):
         config.rabbitmq.port = int(rmq_port)
     if rmq_mgmt_port := os.getenv("RABBITMQ_MGMT_PORT"):
