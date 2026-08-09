@@ -31,6 +31,7 @@ from src.domain.exceptions import (
     ContainerStopError,
     DocumentVersionConflictError,
     EntityBusinessRuleError,
+    EntityExtractionError,
     EntityStateTransitionError,
     EntityValidationError,
     ExecutionError,
@@ -135,6 +136,7 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     LLMAPIError: status.HTTP_502_BAD_GATEWAY,  # 330 — LLM API 返回错误
     LLMResponseError: status.HTTP_502_BAD_GATEWAY,  # 331 — 响应解析错误
     LLMConfigError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 332 — 配置错误
+    EntityExtractionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 340 — 实体抽取失败
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

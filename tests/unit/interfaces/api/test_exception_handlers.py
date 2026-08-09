@@ -37,6 +37,7 @@ from src.domain.exceptions import (
     ContainerStopError,
     DocumentVersionConflictError,
     EntityBusinessRuleError,
+    EntityExtractionError,
     EntityStateTransitionError,
     EntityValidationError,
     ExecutionError,
@@ -206,6 +207,8 @@ class TestExceptionHttpMap:
             LLMAPIError,
             LLMResponseError,
             LLMConfigError,
+            # 实体抽取异常
+            EntityExtractionError,
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

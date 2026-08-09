@@ -61,6 +61,11 @@ event_channels:
     delivery_mode: "reliable"
     description: "记忆变更"
 
+  EntitiesExtracted:
+    rabbitmq_routing_key: "sisys.events.reliable.entities_extracted"
+    delivery_mode: "reliable"
+    description: "实体抽取完成"
+
   CheckpointReached:
     rabbitmq_routing_key: "sisys.events.reliable.checkpoint_reached"
     delivery_mode: "reliable"

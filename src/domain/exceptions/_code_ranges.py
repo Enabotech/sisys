@@ -44,6 +44,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "ocr": (320, 329),
     # LLM 子域（330-339）
     "llm": (330, 339),
+    # 实体抽取子域（340-349）
+    "entity_extraction": (340, 349),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -122,6 +124,8 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "LLMAPIError": "llm",
     "LLMResponseError": "llm",
     "LLMConfigError": "llm",
+    # entity_extraction_exceptions.py
+    "EntityExtractionError": "entity_extraction",
 }
 
 

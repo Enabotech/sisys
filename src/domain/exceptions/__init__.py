@@ -31,6 +31,7 @@ from src.domain.exceptions.embedding_exceptions import (
     EmbeddingModelError,
     EmbeddingResponseError,
 )
+from src.domain.exceptions.entity_extraction_exceptions import EntityExtractionError
 from src.domain.exceptions.event_exceptions import VersionError
 from src.domain.exceptions.external_exceptions import (
     ExternalException,
@@ -150,6 +151,8 @@ __all__ = [
     "LLMAPIError",
     "LLMResponseError",
     "LLMConfigError",
+    # 实体抽取异常
+    "EntityExtractionError",
     # OCR 异常
     "OCRConnectionError",
     "OCRProcessingError",

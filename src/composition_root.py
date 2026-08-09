@@ -1687,7 +1687,77 @@ def bootstrap() -> None:
         tags=("llm", "client", "infrastructure"),
     )
 
-    logger.info("Registered %d ports", len(_global_registry.list_all()))
+    # === Entity Extraction Ports ===
+    from src.application.services.entity_extraction_service import EntityExtractionService
+    from src.domain.ports.entity_extraction import (
+        EntityArbitratorPort,
+        EntityExtractionPort,
+    )
+    from src.infrastructure.external_services.entity_extraction.conflict_arbitrator import (
+        ConflictArbitrator,
+    )
+    from src.infrastructure.external_services.entity_extraction.llm_extractor import (
+        LLMEntityExtractor,
+    )
+    from src.infrastructure.external_services.entity_extraction.rule_extractor import (
+        RuleBasedExtractor,
+    )
+
+    # 注册规则基实体抽取器（RuleBasedExtractor 实现 EntityExtractionPort）
+    register_port(
+        name="entity_extraction_rule",
+        version="v1.0.0",
+        interface=EntityExtractionPort,
+        impl=lambda resolver: RuleBasedExtractor(),
+        module="src.infrastructure.external_services.entity_extraction.rule_extractor",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("entity_extraction", "rule", "nlp"),
+    )
+
+    # 注册 LLM 语义实体抽取器（LLMEntityExtractor 实现 EntityExtractionPort）
+    register_port(
+        name="entity_extraction_llm",
+        version="v1.0.0",
+        interface=EntityExtractionPort,
+        impl=lambda resolver: LLMEntityExtractor(
+            llm_client=resolver.resolve("llm_client"),
+        ),
+        module="src.infrastructure.external_services.entity_extraction.llm_extractor",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("entity_extraction", "llm"),
+    )
+
+    # 注册冲突仲裁器
+    register_port(
+        name="conflict_arbitrator",
+        version="v1.0.0",
+        interface=EntityArbitratorPort,
+        impl=lambda resolver: ConflictArbitrator(),
+        module="src.infrastructure.external_services.entity_extraction.conflict_arbitrator",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("entity_extraction", "arbitrator"),
+    )
+
+    # 注册 EntityExtractionService 应用服务（注入所需的端口）
+    register_port(
+        name="entity_extraction_service",
+        version="v1.0.0",
+        interface=EntityExtractionService,
+        impl=lambda resolver: EntityExtractionService(
+            rule_extractor=resolver.resolve("entity_extraction_rule"),
+            llm_extractor=resolver.resolve("entity_extraction_llm"),
+            l5_graph=resolver.resolve("l5_graph"),
+            arbitrator=resolver.resolve("conflict_arbitrator"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.services.entity_extraction_service",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("entity_extraction", "service"),
+    )
 
 
 async def shutdown() -> None:

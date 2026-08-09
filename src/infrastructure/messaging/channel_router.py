@@ -111,6 +111,12 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="记忆变更",
         ),
+        "EntitiesExtracted": ChannelMapping(
+            event_type="EntitiesExtracted",
+            rabbitmq_routing_key="sisys.events.reliable.entities_extracted",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="实体抽取完成",
+        ),
         "CheckpointReached": ChannelMapping(
             event_type="CheckpointReached",
             rabbitmq_routing_key="sisys.events.reliable.checkpoint_reached",
