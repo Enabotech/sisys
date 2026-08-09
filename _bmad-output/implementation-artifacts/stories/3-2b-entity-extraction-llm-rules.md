@@ -48,8 +48,8 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `EntityExtractionPort` Protocol 定义于 `src/domain/ports/entity_extraction.py`
-- [ ] `ExtractedEntity` frozen dataclass（name, entity_type, confidence, metadata）
-- [ ] `ExtractedRelation` frozen dataclass（source, target, relation_type, confidence）
+- [ ] `ExtractedEntity` frozen dataclass（name, entity_type, confidence, extraction_source, metadata）
+- [ ] `ExtractedRelation` frozen dataclass（source, target, relation_type, confidence, extraction_source, metadata）
 - [ ] `ExtractionResult` frozen dataclass（entities, relations, extraction_metadata）
 - [ ] `extract_entities(content, domain_context?)` — 核心抽取方法
 - [ ] 端口注册于 `composition_root.py`，通过 `register_port()` 注册为 `entity_extraction` 端口
@@ -144,12 +144,15 @@
 
 **Given** 所有组件实现完成
 **When** 在 `composition_root.py` 注册
-**Then** `entity_extraction` 端口注册为 SCOPED
+**Then** `entity_extraction_rule`、`entity_extraction_llm`、`conflict_arbitrator`、`entity_extraction_service` 四个端口注册为 SCOPED
 **And** 通过 `Resolver` 可正确解析
 **And** 端口契约测试通过
 
 **验证标准/Validation Criteria:**
-- [ ] `composition_root.py` 注册 `entity_extraction` 端口
+- [ ] `composition_root.py` 注册 `entity_extraction_rule` 端口（RuleBasedExtractor 实现 EntityExtractionPort）
+- [ ] `composition_root.py` 注册 `entity_extraction_llm` 端口（LLMEntityExtractor 实现 EntityExtractionPort）
+- [ ] `composition_root.py` 注册 `conflict_arbitrator` 端口（ConflictArbitrator）
+- [ ] `composition_root.py` 注册 `entity_extraction_service` 端口（EntityExtractionService 编排服务）
 - [ ] 端口契约测试 `tests/contracts/test_port_contract_entity_extraction.py` 通过
 - [ ] `src/domain/ports/__init__.py` 导出 `EntityExtractionPort`
 
@@ -483,7 +486,8 @@
 
 **关联 AC:** AC-4, AC-5, AC-6
 
-> **基础设施层依赖：** 本 Task 代码位于 `src/infrastructure/`，可使用 pyahoclasick、re、litellm 等第三方库。
+> **基础设施层依赖：** 本 Task 代码位于 `src/infrastructure/`，可使用 pyahocorasick、re、litellm 等第三方库。
+> **⚠️ 依赖前置条件：** `pyahocorasick` 当前**未安装**（非任何依赖的传递依赖）。实施前**必须**在 `pyproject.toml` 显式声明并安装 `pyahocorasick`（`poetry add pyahocorasick@^2.1.0`），否则 `import pyahocorasick` 会失败。
 > **规则基参考：** or.md §二.3 明确使用 pyahocorasick 构建 AC 自动机。
 > **LLM 调用：** 通过 Story 3.2a 的 `LLMClientPort`，不使用裸 httpx。
 
@@ -621,10 +625,11 @@
 #### 端口注册与 DI 集成
 
 - [ ] Subtask 4.1: 更新 `src/domain/ports/__init__.py` 导出 `EntityExtractionPort`、`ExtractedEntity`、`ExtractedRelation`、`ExtractionResult`
-- [ ] Subtask 4.2: 更新 `src/composition_root.py` 注册 `entity_extraction` 端口
+- [ ] Subtask 4.2: 更新 `src/composition_root.py` 注册相关端口
   ```python
+  # 注册规则基实体抽取器（RuleBasedExtractor 实现 EntityExtractionPort）
   register_port(
-      name="entity_extraction",
+      name="entity_extraction_rule",
       version="v1.0.0",
       interface=EntityExtractionPort,
       impl=lambda resolver: RuleBasedExtractor(
@@ -633,12 +638,56 @@
       module="src.infrastructure.external_services.entity_extraction.rule_extractor",
       lifetime=Lifetime.SCOPED,
       owner="foundation-team",
-      tags=("entity_extraction", "llm", "nlp"),
+      tags=("entity_extraction", "rule", "nlp"),
+  )
+
+  # 注册 LLM 语义实体抽取器（LLMEntityExtractor 实现 EntityExtractionPort）
+  register_port(
+      name="entity_extraction_llm",
+      version="v1.0.0",
+      interface=EntityExtractionPort,
+      impl=lambda resolver: LLMEntityExtractor(
+          llm_client=resolver.resolve("llm_client"),
+      ),
+      module="src.infrastructure.external_services.entity_extraction.llm_extractor",
+      lifetime=Lifetime.SCOPED,
+      owner="foundation-team",
+      tags=("entity_extraction", "llm"),
+  )
+
+  # 注册冲突仲裁器
+  register_port(
+      name="conflict_arbitrator",
+      version="v1.0.0",
+      interface=ConflictArbitrator,
+      impl=lambda resolver: ConflictArbitrator(),
+      module="src.infrastructure.external_services.entity_extraction.conflict_arbitrator",
+      lifetime=Lifetime.SCOPED,
+      owner="foundation-team",
+      tags=("entity_extraction", "arbitrator"),
+  )
+
+  # 注册 EntityExtractionService 应用服务（注入所需的端口）
+  register_port(
+      name="entity_extraction_service",
+      version="v1.0.0",
+      interface=EntityExtractionService,
+      impl=lambda resolver: EntityExtractionService(
+          rule_extractor=resolver.resolve("entity_extraction_rule"),
+          llm_extractor=resolver.resolve("entity_extraction_llm"),
+          l5_graph=resolver.resolve("l5_graph"),
+          arbitrator=resolver.resolve("conflict_arbitrator"),
+          event_publisher=resolver.resolve("event_publisher"),
+      ),
+      module="src.application.services.entity_extraction_service",
+      lifetime=Lifetime.SCOPED,
+      owner="foundation-team",
+      tags=("entity_extraction", "service"),
   )
   ```
   - 生命周期: SCOPED
   - Owner: foundation-team
-  - 注册 `EntityExtractionService` 应用服务（注入所需的端口）
+  - 注意：RuleBasedExtractor 和 LLMEntityExtractor 各自实现 EntityExtractionPort，分别注册为独立端口。EntityExtractionService 通过 resolver 注入所有依赖。
 
 #### 端口契约测试
 
@@ -859,7 +908,7 @@ Neo4j 持久化失败
 ### 依赖配置
 
 **新增依赖（pyproject.toml）：**
-- `pyahocorasick` — AC 自动机实现（当前为 `detect_secrets` 传递依赖，需升级为直接依赖）
+- `pyahocorasick` — AC 自动机实现（⚠️ 当前**未安装**，**不是任何已有依赖的传递依赖**，需在 `pyproject.toml` 显式声明并执行 `poetry add pyahocorasick@^2.1.0`）
 
 **需确认的依赖：**
 - `pyahocorasick` 版本选择：最新稳定版（^2.1.0）
@@ -876,7 +925,7 @@ Neo4j 持久化失败
   - Neo4j 持久化通过 `L5GraphPort`（Story 1.8），不直接使用 neo4j driver
 - **技术栈:**
   - Python 3.11+
-  - pyahocorasick（⚠️ 当前为传递依赖，需升级为直接依赖）
+  - pyahocorasick（⚠️ 当前**未安装**，需在 `pyproject.toml` 显式声明后 `poetry add pyahocorasick@^2.1.0`）
   - re（Python 标准库）
   - litellm（通过 LLMClientPort 间接使用）
 
@@ -1058,8 +1107,10 @@ export ENTITY_EXTRACTION_TEMPERATURE=0.1          # 低温度保证确定性
 - `src/domain/exceptions/__init__.py` — 导出 EntityExtractionError
 - `src/domain/exceptions/_code_ranges.py` — 新增 entity_extraction 子域 (340-349)
 - `src/interfaces/api/exception_handlers.py` — EXCEPTION_HTTP_MAP 新增
-- `src/composition_root.py` — 注册 entity_extraction 端口
+- `src/composition_root.py` — 注册 entity_extraction_rule / entity_extraction_llm / conflict_arbitrator / entity_extraction_service 端口
 - `pyproject.toml` — 新增 pyahocorasick 直接依赖
+- `configs/event_channels.yaml` — 新增 EntitiesExtracted 事件通道
+- `src/infrastructure/messaging/channel_router.py` — DEFAULT_MAPPINGS 新增 EntitiesExtracted
 
 ---
 
@@ -1097,6 +1148,7 @@ export ENTITY_EXTRACTION_TEMPERATURE=0.1          # 低温度保证确定性
 **创建日期/Created:** 2026-08-09
 **最后更新/Last Updated:** 2026-08-09
 **更新说明/Description:**
+- v1.3.0: Round 3 文档审查修复 — P1: 修正 AC-1 值对象验证标准（补充 `extraction_source` 字段，与 SDD 数据模型部分一致）；P1: 修正 AC-8 端口注册设计（RuleBasedExtractor/LLMEntityExtractor 各自实现 EntityExtractionPort 分别注册为独立端口，不是单一 `entity_extraction` 端口）；P1: 修正 Subtask 4.2 注册代码（拆分 4 个端口注册，补齐 EntityExtractionService 注入依赖）；P2: 修正 `config/event_channels.yaml` → `configs/event_channels.yaml` 路径；P2: 补充 `ChannelRouter.DEFAULT_MAPPINGS` 更新要求；P2: 修正 `pyahocorasick` 依赖状态（当前未安装，非传递依赖，需显式声明）
 - v1.2.0: Round 2 文档审查修复 — P1: 补充 `EntitiesExtracted` 事件 `__post_init__` 模式细节（`aggregate_id = self.memory_id` 对标 `MemoryChanged`、`aggregate_type = "EntityExtraction"`）；P1: LLMEntityExtractor 增加实现 `EntityExtractionPort` 接口的验证标准；P1: RuleBasedExtractor 增加匹配结果映射为 `ExtractedEntity`（`extraction_source="rule"`）的验证标准；P1: EntityExtractionError 构造器 `content_preview` 增加截断脱敏规范（对标 OCR 模式）
 - v1.1.0: Round 1 文档审查修复 — P0: 修正 Neo4j 实体类型映射（`Memory:Person` 复合标签 → 统一 `Memory` 标签 + `n.type` 属性）；P0: `ExtractedRelation` 字段命名冲突（`source` 专指源实体名称，来源标识改用 `extraction_source`，`ExtractedEntity` 同步统一命名）；P0: 修正 `EntityExtractionService` 构造函数注入（`llm_client`（LLMClientPort）→ `llm_extractor`（EntityExtractionPort），LLM 通过 LLMEntityExtractor 间接调用 LLMClientPort）；P1: 补充 Neo4j 持久化策略关键约束（关系类型大写命名规范、属性键清洗、memory_id 主键）
 - v1.0.0: 创建故事文件
