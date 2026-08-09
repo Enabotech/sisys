@@ -583,44 +583,67 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
 def _sync_config_to_environ(config: TestEnvConfig) -> None:
     """将最终测试环境配置同步到 os.environ
 
-    确保生产代码的 Config.from_env()（读 os.getenv）也能拿到与测试环境一致的值
-    使用 setdefault 而非直接赋值，尊重用户显式设置的环境变量（最高优先级）
+    确保生产代码的 Config.from_env()（读 os.getenv）也能拿到与测试环境一致的值。
+
+    覆盖策略：
+    - 对 host 类变量（如 REDIS_HOST/POSTGRES_HOST 等）：使用 setdefault。若 os.environ
+      中已有非 localhost 的显式值则尊重之；若仅剩 localhost（第三方库如 litellm
+      导入时 dotenv.load_dotenv() 注入的污染值），则强制覆盖为计算出的正确 host，
+      保证生产代码 Config.from_env() 与 get_test_env() 解析一致。
+    - 其余变量：使用 setdefault，尊重用户显式设置（最高优先级）。
 
     Args:
         config: 计算完成的测试环境配置
     """
+    # 远程环境（CI/K8S）中 localhost 是 litellm 等第三方库导入副作用注入的污染值，
+    # 需强制覆盖为计算出的正确 host，避免生产代码 Config.from_env() 读到错误值
+    _is_remote_env = config.env in (TestEnvironment.CI, TestEnvironment.K8S)
+
+    def _set_host_env(key: str, value: str) -> None:
+        """设置 host 类环境变量
+
+        远程环境下若当前值为 localhost（污染值），强制覆盖；否则 setdefault 尊重显式值。
+        """
+        if _is_remote_env and os.getenv(key) == "localhost":
+            os.environ[key] = value
+        else:
+            os.environ.setdefault(key, value)
+
     # Redis
-    os.environ.setdefault("REDIS_HOST", config.redis.host)
+    _set_host_env("REDIS_HOST", config.redis.host)
     os.environ.setdefault("REDIS_PORT", str(config.redis.port))
     if config.redis.password:
         os.environ.setdefault("REDIS_PASSWORD", config.redis.password)
 
     # PostgreSQL
-    os.environ.setdefault("POSTGRES_HOST", config.postgres.host)
+    _set_host_env("POSTGRES_HOST", config.postgres.host)
     os.environ.setdefault("POSTGRES_PORT", str(config.postgres.port))
     os.environ.setdefault("POSTGRES_USERNAME", config.postgres.username)
     os.environ.setdefault("POSTGRES_PASSWORD", config.postgres.password)
     os.environ.setdefault("POSTGRES_DATABASE", config.postgres.database)
 
     # Qdrant
-    os.environ.setdefault("QDRANT_HOST", config.qdrant.host)
+    _set_host_env("QDRANT_HOST", config.qdrant.host)
     os.environ.setdefault("QDRANT_PORT", str(config.qdrant.port))
     os.environ.setdefault("QDRANT_GRPC_PORT", str(config.qdrant.grpc_port))
 
     # Neo4j
-    os.environ.setdefault("NEO4J_HOST", config.neo4j.host)
+    _set_host_env("NEO4J_HOST", config.neo4j.host)
     os.environ.setdefault("NEO4J_HTTP_PORT", str(config.neo4j.http_port))
     os.environ.setdefault("NEO4J_BOLT_PORT", str(config.neo4j.bolt_port))
 
     # RabbitMQ
-    os.environ.setdefault("RABBITMQ_HOST", config.rabbitmq.host)
+    _set_host_env("RABBITMQ_HOST", config.rabbitmq.host)
     os.environ.setdefault("RABBITMQ_PORT", str(config.rabbitmq.port))
     os.environ.setdefault("RABBITMQ_MGMT_PORT", str(config.rabbitmq.mgmt_port))
     os.environ.setdefault("RABBITMQ_USERNAME", config.rabbitmq.username)
     os.environ.setdefault("RABBITMQ_PASSWORD", config.rabbitmq.password)
 
-    # MinIO
-    os.environ.setdefault("MINIO_ENDPOINT", config.minio.endpoint)
+    # MinIO - endpoint 是 "host:port" 格式，host 部分同样可能被污染
+    if _is_remote_env and (os.getenv("MINIO_HOST") == "localhost" or os.getenv("MINIO_ENDPOINT") == "localhost:9000"):
+        os.environ["MINIO_ENDPOINT"] = config.minio.endpoint
+    else:
+        os.environ.setdefault("MINIO_ENDPOINT", config.minio.endpoint)
     os.environ.setdefault("MINIO_ACCESS_KEY", config.minio.access_key)
     os.environ.setdefault("MINIO_SECRET_KEY", config.minio.secret_key)
     os.environ.setdefault("MINIO_BUCKET", config.minio.bucket)
