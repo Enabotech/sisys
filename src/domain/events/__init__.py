@@ -21,6 +21,7 @@ from .compliance_events import (
 )
 from .correction_events import CorrectionApproved
 from .document_events import DocumentProcessed, DocumentUploaded, DocumentVersionSnapshotCreated
+from .entity_extraction_events import EntitiesExtracted
 from .enums import CorrectionType, DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
 from .heartbeat_events import HeartbeatTriggered
 from .isolation_events import IsolationLevelSwitched
@@ -40,6 +41,7 @@ __all__ = [
     "CheckpointReached",
     "CheckpointRecovered",
     "CorrectionApproved",
+    "EntitiesExtracted",
     "StrategicDeviationWarning",
     "HeartbeatTriggered",
     "IsolationLevelSwitched",

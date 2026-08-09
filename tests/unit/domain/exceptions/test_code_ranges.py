@@ -265,6 +265,7 @@ def test_all_subdomain_ranges_are_valid() -> None:
         "sandbox": "external",
         "ocr": "external",
         "llm": "external",
+        "entity_extraction": "external",
     }
 
     for subdomain, (start, end) in CODE_RANGES.items():
