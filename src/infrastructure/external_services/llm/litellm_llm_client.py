@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -592,8 +593,61 @@ class LitellmLLMClient(LLMClientPort):
         """
         if not self._closed:
             self._closed = True
-            # LiteLLM 使用全局连接池，无需手动关闭
+            # LiteLLM 使用全局连接池，无需手动关闭；
+            # 但其全局日志工作线程会在事件循环中创建后台任务，关闭时需一并停止，
+            # 否则协程会在事件循环关闭后被 GC，触发 "Event loop is closed" 告警。
+            await self._stop_litellm_logging_worker()
             logger.info("LLM 客户端已关闭")
+
+    @staticmethod
+    async def _stop_litellm_logging_worker() -> None:
+        """停止 LiteLLM 全局日志工作线程
+
+        LiteLLM 通过模块级 LoggingWorker 在事件循环中异步处理日志/回调。
+        若不在关闭时停止，该后台协程会在事件循环关闭后被垃圾回收时触发
+        "RuntimeError: Event loop is closed" 告警（PytestUnraisableExceptionWarning）。
+
+        清理顺序（关键：先等待任务完成，而非取消）：
+        1. 等待正在运行的任务自然完成，而非直接取消。
+           _worker_loop 出队极快，协程几乎立即进入 _running_tasks 的
+           processing_task 中。若直接 stop() 取消这些 task，其中的
+           async_success_handler 协程会悬挂，GC 时触发 "coroutine was never awaited"。
+           等待完成确保了协程被正常 await 执行完毕。
+        2. 清除队列中尚未被 worker 出队的协程，直接 await 避免悬挂。
+        3. 最后停止工作线程（此时已无运行中任务，stop() 几乎无操作）。
+
+        stop() 幂等且可安全重复调用；worker 会在下一次 enqueue 时自动重建，
+        因此多个客户端实例共享同一全局 worker 也无副作用。
+        """
+        try:
+            from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
+
+            # 第 1 步：等待正在运行的任务自然完成
+            # 这些 processing_task 正在 await async_success_handler 等协程，
+            # 直接取消会导致协程悬挂。等待完成确保协程被正常执行完毕。
+            running = list(GLOBAL_LOGGING_WORKER._running_tasks)
+            if running:
+                await asyncio.gather(*running, return_exceptions=True)
+
+            # 第 2 步：清除队列中尚未被 worker 出队的协程
+            queue = getattr(GLOBAL_LOGGING_WORKER, "_queue", None)
+            if queue is not None:
+                for _ in range(200):  # 与 litellm MAX_ITERATIONS_TO_CLEAR_QUEUE 一致
+                    try:
+                        item = queue.get_nowait()
+                        try:
+                            await asyncio.wait_for(item["coroutine"], timeout=20.0)
+                        except Exception:
+                            pass
+                        finally:
+                            queue.task_done()
+                    except asyncio.QueueEmpty:
+                        break
+
+            # 第 3 步：停止工作线程（此时已无运行中任务，安全）
+            await GLOBAL_LOGGING_WORKER.stop()
+        except Exception:
+            logger.warning("停止 LiteLLM 日志工作线程失败", exc_info=True)
 
 
 __all__ = ["LitellmLLMClient"]

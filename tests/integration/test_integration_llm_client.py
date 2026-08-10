@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
@@ -191,16 +192,48 @@ def llm_config(mock_llm_server: tuple[MockLLMHandler, int]) -> LLMConfig:
 
 
 @pytest.fixture
-def client(mock_llm_server: tuple[MockLLMHandler, int], llm_config: LLMConfig) -> LitellmLLMClient:
+async def client(mock_llm_server: tuple[MockLLMHandler, int], llm_config: LLMConfig) -> AsyncGenerator[LitellmLLMClient, None]:
     """LLM 客户端，带熔断器和重试配置"""
     cb = CircuitBreaker(failure_threshold=3, recovery_timeout=1.0, name="test-llm")
-    return LitellmLLMClient(
+    c = LitellmLLMClient(
         config=llm_config,
         circuit_breaker=cb,
         retry_max_attempts=1,
         retry_min_wait=0.1,
         retry_max_wait=0.2,
     )
+    yield c
+    await c.close()
+
+
+# ===================================================================
+# 全局清理：停止 LiteLLM 日志工作线程
+# ===================================================================
+
+
+@pytest.fixture(autouse=True)
+async def _stop_litellm_worker():
+    """每个测试结束后停止 LiteLLM 全局日志工作线程
+
+    LiteLLM 的 LoggingWorker 是模块级单例，在首次调用 acompletion() 时
+    创建后台 _worker_loop 协程。若不在测试间清理，该协程会在事件循环关闭后
+    被 GC 时触发 PytestUnraisableExceptionWarning("RuntimeError: Event loop is closed")。
+
+    清理顺序：
+    1. 先停止工作线程，取消 _worker_loop 与 _running_tasks
+    2. 再清除队列中排队的日志协程（async_success_handler 等），
+       否则它们会在事件循环关闭后被 GC 时触发 "coroutine was never awaited" 告警。
+    """
+    yield
+    try:
+        from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
+
+        # 第 1 步：先停止工作线程，取消 _worker_loop 和 _running_tasks
+        await GLOBAL_LOGGING_WORKER.stop()
+        # 第 2 步：清除队列中未被处理的日志协程，避免悬挂协程告警
+        await GLOBAL_LOGGING_WORKER.clear_queue()
+    except Exception:
+        pass
 
 
 # ===================================================================
