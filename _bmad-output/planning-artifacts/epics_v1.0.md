@@ -4144,14 +4144,14 @@ So that **确保 MVP 无高危漏洞**。
 
 ### 关键依赖路径图
 
-**文档版本:** 2.0.0
-**更新日期:** 2026-07-05
-**编制依据:** PRD v1.1.0 (145 FR) + UX Spec v2.0.0 + HTML 样机 v2.1
+**文档版本:** 2.1.0
+**更新日期:** 2026-08-10
+**编制依据:** PRD v1.1.0 (145 FR) + UX Spec v2.0.0 + HTML 样机 v2.1 + sprint-status.yaml (2026-08-09)
 
 #### 总体依赖关系 (Mermaid 可视化)
 
-**更新时间：** 2026-07-05
-**更新说明：** PRD v1.1.0 同步 — FR-UI 13→23 项扩展 + FR-IF 新增 7 项 + 新增 Epic 21（决策舱 9 Story）和 Epic 22（工作台 8 Story）
+**更新时间：** 2026-08-10
+**更新说明：** 实际进度同步 — Epic 2 全部 9 Story 已完成 ✅；Epic 3 3.1a/3.1b 已完成 ✅，3.2a/3.2b ready-for-dev；Mermaid 图/关键路径/阶段表格/依赖矩阵全量同步
 
 ```mermaid
 graph TD
@@ -4206,25 +4206,25 @@ graph TD
         S1_19["Story 1.19<br/>成本度量基础<br/>✅ Done"]
     end
 
-    %% ========== Epic 2 (进行中) ==========
-    subgraph "Epic 2 🔄 (进行中 - 0/9 完成)"
-        S2_1["Story 2.1<br/>文档上传 17 格式<br/>📋 ready-for-dev"]
-        S2_2a["Story 2.2a<br/>基础格式解析<br/>📋 backlog"]
-        S2_2b["Story 2.2b<br/>扩展格式解析<br/>📋 backlog"]
-        S2_3["Story 2.3<br/>版面信息 DocLayNet<br/>📋 backlog 🔑关键路径"]
-        S2_4["Story 2.4<br/>表格语义提取<br/>📋 backlog"]
-        S2_5["Story 2.5<br/>OCR 解析<br/>📋 backlog"]
-        S2_6["Story 2.6<br/>版本快照<br/>📋 backlog"]
-        S2_7["Story 2.7<br/>元数据校验<br/>📋 backlog"]
-        S2_8["Story 2.8<br/>语义分块<br/>📋 backlog"]
+    %% ========== Epic 2 (已完成) ==========
+    subgraph "Epic 2 ✅ (已完成 - 9/9)"
+        S2_1["Story 2.1<br/>文档上传 17 格式<br/>✅ Done"]
+        S2_2a["Story 2.2a<br/>基础格式解析<br/>✅ Done"]
+        S2_2b["Story 2.2b<br/>扩展格式解析<br/>✅ Done"]
+        S2_3["Story 2.3<br/>版面信息 DocLayNet<br/>✅ Done"]
+        S2_4["Story 2.4<br/>表格语义提取<br/>✅ Done"]
+        S2_5["Story 2.5<br/>OCR 解析<br/>✅ Done"]
+        S2_6["Story 2.6<br/>版本快照<br/>✅ Done"]
+        S2_7["Story 2.7<br/>元数据校验<br/>✅ Done"]
+        S2_8["Story 2.8<br/>语义分块<br/>✅ Done"]
     end
 
-    %% ========== Epic 3 (待开始) ==========
-    subgraph "Epic 3 📋 (待开始 - 0/14)"
-        S3_1a["Story 3.1a<br/>Dense 语义检索<br/>📋 backlog 🔑关键路径"]
-        S3_1b["Story 3.1b<br/>BM25+RRF 融合<br/>📋 backlog 🔑关键路径"]
-        S3_2a["Story 3.2a<br/>LLM Client 基础设施<br/>📋 backlog 🔑公共基础设施"]
-        S3_2b["Story 3.2b<br/>实体抽取<br/>📋 backlog"]
+    %% ========== Epic 3 (进行中) ==========
+    subgraph "Epic 3 🔄 (进行中 - 2/14 完成)"
+        S3_1a["Story 3.1a<br/>Dense 语义检索<br/>✅ Done"]
+        S3_1b["Story 3.1b<br/>BM25+RRF 融合<br/>✅ Done"]
+        S3_2a["Story 3.2a<br/>LLM Client 基础设施<br/>📋 ready-for-dev 🔑公共基础设施"]
+        S3_2b["Story 3.2b<br/>实体抽取<br/>📋 ready-for-dev"]
         S3_3["Story 3.3<br/>领域词典管理<br/>📋 backlog"]
         S3_4["Story 3.4<br/>RRF 融合排序<br/>📋 backlog"]
         S3_5["Story 3.5<br/>分层检索 L1-L4<br/>📋 backlog"]
@@ -4378,9 +4378,10 @@ graph TD
     class S0_1,S0_3,S0_4,S0_5,S0_6,S0_7,S0_8,S0_9,S0_14,S0_15,S0_16 done;
     class S0_17,S0_18,S0_30 ready;
     class S1_1,S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_9,S1_10,S1_11,S1_12,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_15b,S1_16,S1_17,S1_18a,S1_18b,S1_19 done;
-    class S2_1 ready;
-    class S2_2a,S2_2b,S2_3,S2_4,S2_5,S2_6,S2_7,S2_8 backlog;
-    class S3_1a,S3_1b,S3_2a,S3_2b,S3_3,S3_4,S3_5,S3_6,S3_7,S3_8,S3_9,S3_10,S3_11,S3_12 backlog;
+    class S2_1,S2_2a,S2_2b,S2_3,S2_4,S2_5,S2_6,S2_7,S2_8 done;
+    class S3_1a,S3_1b done;
+    class S3_2a,S3_2b ready;
+    class S3_3,S3_4,S3_5,S3_6,S3_7,S3_8,S3_9,S3_10,S3_11,S3_12 backlog;
     class E4,E5,E6,E7,E8 backlog;
 ```
 
@@ -4465,48 +4466,48 @@ Story 1.1 (六边形架构)
 
 ---
 
-**关键路径 5: Epic 2 文档处理流水线 🔄 进行中**
+**关键路径 5: Epic 2 文档处理流水线 ✅ 已完成**
 
 ```
 Story 1.6 (Qdrant 向量层 - ✅ Done) + Story 1.7 (MinIO 对象层 - ✅ Done)
-  → Story 2.1 (文档上传 17 格式 - 📋 ready-for-dev)
-    → Story 2.2a (基础格式解析 PDF/Word/TXT - 📋 backlog) ← 🔑 MVP 关键路径
-      ├→ Story 2.3 (版面信息 DocLayNet - 📋 backlog) ← 🔑 Epic 3 前置依赖
-      ├→ Story 2.4 (表格语义提取 - 📋 backlog)
-      ├→ Story 2.5 (OCR 解析 - 📋 backlog)
-      ├→ Story 2.6 (版本快照 - 📋 backlog)
-      ├→ Story 2.7 (元数据校验 - 📋 backlog)
-      └→ Story 2.8 (语义分块 - 📋 backlog) ← 🔑 Epic 3 检索前置依赖
+  → Story 2.1 (文档上传 17 格式 - ✅ Done)
+    → Story 2.2a (基础格式解析 PDF/Word/TXT - ✅ Done) <- 🔑 MVP 关键路径
+      ├→ Story 2.3 (版面信息 DocLayNet - ✅ Done) <- 🔑 Epic 3 前置依赖
+      ├→ Story 2.4 (表格语义提取 - ✅ Done)
+      ├→ Story 2.5 (OCR 解析 - ✅ Done)
+      ├→ Story 2.6 (版本快照 - ✅ Done)
+      ├→ Story 2.7 (元数据校验 - ✅ Done)
+      └→ Story 2.8 (语义分块 - ✅ Done) <- 🔑 Epic 3 检索前置依赖
 ```
 
 **关键性分析:**
-- Story 2.1 是整个文档处理流水线的入口，已 ready-for-dev
-- **Story 2.2a → Story 2.3 是跨 Epic 关键路径**：版面信息保留是 Epic 3 Story 3.8（高保真溯源）的前置
-- Story 2.8（语义分块）的输出直接供 Epic 3 的向量检索使用
-- Story 2.2b（扩展格式）可延至 V1，不阻塞 MVP
+- Story 2.1 是整个文档处理流水线的入口，已完成
+- **Story 2.2a → Story 2.3 是跨 Epic 关键路径**：版面信息保留是 Epic 3 Story 3.8（高保真溯源）的前置，两者均已 Done
+- Story 2.8（语义分块）的输出直接供 Epic 3 的向量检索使用，已完成
+- Epic 2 全部 9 个 Story 已完成，文档管理/解析能力可交付
 
 **技术风险:**
-- 17 种格式解析的准确率和性能
-- DocLayNet 版面模型的 ONNX 跨平台推理
-- 语义分块边界的准确性（影响检索质量）
+- 17 种格式解析的准确率和性能（已解决）
+- DocLayNet 版面模型的 ONNX 跨平台推理（已解决）
+- 语义分块边界的准确性（影响检索质量）（已解决）
 
 ---
 
-**关键路径 6: Epic 3 智能检索流水线 📋 待开始**
+**关键路径 6: Epic 3 智能检索流水线 🔄 进行中**
 
 ```
 Story 1.6 (Qdrant - ✅ Done)
-  → Story 3.1a (Dense 语义检索 bge-m3 - 📋 backlog) ← 🔑 MVP 关键路径
-    → Story 3.1b (BM25 稀疏检索 + RRF 融合 - 📋 backlog) ← 🔑 MVP 关键路径
-      ├→ Story 3.2a (LLM Client 基础设施 - 📋 backlog) ← 🔑 公共基础设施（供 3.2b/3.6/4.5/5.1 共用）
-      │   → Story 3.2b (实体抽取 LLM+规则 - 📋 backlog)
+  → Story 3.1a (Dense 语义检索 bge-m3 - ✅ Done) <- 🔑 MVP 关键路径
+    → Story 3.1b (BM25 稀疏检索 + RRF 融合 - ✅ Done) <- 🔑 MVP 关键路径
+      ├→ Story 3.2a (LLM Client 基础设施 - 📋 ready-for-dev) <- 🔑 公共基础设施（供 3.2b/3.6/4.5/5.1 共用）
+      │   → Story 3.2b (实体抽取 LLM+规则 - 📋 ready-for-dev)
       │       → Story 3.3 (领域词典管理 - 📋 backlog)
       └→ Story 3.4 (RRF 融合排序 - 📋 backlog)
           → Story 3.5 (分层检索 L1-L4 - 📋 backlog)
             → Story 3.6 (契约化摘要 - 📋 backlog)
               → Story 3.7 (检索相关性评估 - 📋 backlog)
 
-Story 2.3 (版面信息 DocLayNet - Epic 2) -. "🔑 跨 Epic 关键依赖" .-> Story 3.8 (高保真溯源 BBox - 📋 backlog)
+Story 2.3 (版面信息 DocLayNet - Epic 2, ✅ Done) -. "🔑 跨 Epic 关键依赖" .-> Story 3.8 (高保真溯源 BBox - 📋 backlog)
 
 Story 1.5 (PostgreSQL - ✅ Done) + Story 1.7 (MinIO - ✅ Done)
   → Story 3.10 (战略档案库 - 📋 backlog)
@@ -4515,13 +4516,14 @@ Story 1.5 (PostgreSQL - ✅ Done) + Story 1.7 (MinIO - ✅ Done)
 ```
 
 **关键性分析:**
-- **Story 3.1a/3.1b 是检索核心**：Dense + Sparse 双路召回是所有检索功能的基础
-- **Story 3.8 依赖 Story 2.3**：高保真溯源需要版面坐标信息，这是 Epic 2→Epic 3 的唯一跨 Epic 强依赖
+- **Story 3.1a/3.1b 是检索核心，均已 Done**：Dense + Sparse 双路召回已实现，为后续所有检索功能奠定基础
+- **Story 3.8 依赖 Story 2.3**：高保真溯源需要版面坐标信息，Story 2.3 已 Done，Story 3.8 的前置已就绪
+- Story 3.2a/3.2b（LLM 客户端 + 实体抽取）已 ready-for-dev，即将开发
 - Story 3.9（语义缓存）和 Story 3.10-3.12（档案库系列）可独立于主流水线开发
-- 完整流水线需要 3.1a→3.1b→3.4→3.5→3.6→3.7 顺序执行
+- 完整流水线仍需 3.4→3.5→3.6→3.7 顺序执行
 
 **技术风险:**
-- bge-m3 嵌入模型性能（维度 1024，P95<200ms）
+- bge-m3 嵌入模型性能（维度 1024，P95<200ms）（已解决）
 - RRF 融合参数调优（可配置权重）
 - 检索延迟 P95<800ms 目标达成
 
@@ -4536,19 +4538,19 @@ Epic 1 (✅ 已完成)
   │                                                └→ Story 2.8 (语义分块) ─→ Story 3.1a (向量索引)
   └→ Story 1.5 (PG)     ─→ Story 3.10 (档案库)
 
-Epic 2 (🔄 进行中)
-  Story 2.3 (版面信息 DocLayNet) ──→ Epic 3 Story 3.8 (高保真溯源 BBox)
-                                     ↑
-                        跨 Epic 唯一强依赖：版面坐标→溯源跳转
+Epic 2 (✅ 已完成)
+  Story 2.3 (版面信息 DocLayNet, ✅ Done) ──→ Epic 3 Story 3.8 (高保真溯源 BBox, 📋 backlog)
+                                                 ↑
+                                    跨 Epic 唯一强依赖：版面坐标→溯源跳转
 
-并行策略: Epic 2 Story 2.2a 完成后，可同时启动 Story 2.3 和 Epic 3 Story 3.1a
+并行策略: Epic 2 全部完成后，Story 3.1a/3.1b 已先行完成，可直接推进 Story 3.4→3.5→3.6→3.7
 ```
 
 **Epic 2/3 交付策略:**
-1. **先完成 Story 2.1 + 2.2a**（文档上传和基础解析）→ 可交付文档管理 MVP
-2. **并行推进 Story 2.3 + Story 3.1a**（版面信息 + Dense 检索）→ 降低关键路径时间
-3. **Story 2.8 + Story 3.1a 衔接**（语义分块输出→向量索引输入）→ 数据流水线打通
-4. **Story 2.3 → Story 3.8**（版面信息→高保真溯源）→ 完成跨 Epic 关键路径
+1. **✅ Epic 2 全部 9 个 Story 已完成**（文档上传→解析→版面→表格→OCR→版本→元数据→语义分块）→ 文档管理能力可交付
+2. **✅ Epic 3 Story 3.1a/3.1b 已完成**（Dense 检索 + BM25 稀疏检索 + RRF 融合）→ 双路召回基础就绪
+3. **📋 下一步推进** Story 3.2a/3.2b（LLM 客户端 + 实体抽取）→ 解锁 LLM 增强能力
+4. **📋 Story 3.8 前置已就绪**（Story 2.3 版面信息 Done）→ 高保真溯源可随时启动
 
 **🆕 Epic 21 关键依赖路径（决策舱 MVP）：**
 
@@ -4585,39 +4587,44 @@ Epic 21 (📋 待开始 · 可与 Epic 2-6 并行)
 
 **阶段 4: Epic 2-3 并行开发 (2026-05-29 起)**
 
-**当前焦点：Epic 2 + Epic 3 并行推进**
+**当前焦点：Epic 3 推进（Epic 2 已完成）**
 
 | 优先级 | Epic | Story | 状态 | 依赖 | 预计工期 |
 |--------|------|-------|------|------|---------|
-| **P0-1** | Epic 2 | 2.1 (文档上传 17 格式) | 📋 ready-for-dev | Story 1.6/1.7 ✅ | 3 天 |
-| **P0-2a** | Epic 2 | 2.2a (基础格式解析) | 📋 backlog | Story 2.1 | 5 天 |
-| **P0-3** | Epic 2 | 2.3 (版面信息 DocLayNet) | 📋 backlog | Story 2.2a | 4 天 |
-| **P0-1a** | Epic 3 | 3.1a (Dense 语义检索) | 📋 backlog | Story 1.6 ✅ | 4 天 |
-| **P0-1b** | Epic 3 | 3.1b (BM25+RRF 融合) | 📋 backlog | Story 3.1a | 3 天 |
-| **P0-8** | Epic 3 | 3.8 (高保真溯源 BBox) | 📋 backlog | Story 2.3 | 4 天 |
-| P1-4 | Epic 2 | 2.4 (表格语义提取) | 📋 backlog | Story 2.2a | 3 天 |
-| P1-5 | Epic 2 | 2.5 (OCR 解析) | 📋 backlog | Story 2.2a | 4 天 |
-| P1-6 | Epic 2 | 2.6 (版本快照) | 📋 backlog | Story 2.2a | 2 天 |
-| P1-7 | Epic 2 | 2.7 (元数据校验) | 📋 backlog | Story 2.2a | 2 天 |
-| P1-8 | Epic 2 | 2.8 (语义分块) | 📋 backlog | Story 2.2a | 3 天 |
-| P1-2b | Epic 2 | 2.2b (扩展格式) | 📋 backlog | Story 2.2a | 5 天 |
-| P0-1c | Epic 3 | 3.2a (LLM Client 基础设施) | 📋 backlog | Story 1.17（UDMR 路由） | 3 天 |
-| P0-2 | Epic 3 | 3.2b (实体抽取) | 📋 backlog | Story 3.1b + Story 3.2a | 4 天 |
+| **P0-1** | Epic 2 | 2.1 (文档上传 17 格式) | ✅ Done | Story 1.6/1.7 ✅ | 3 天 ✅ |
+| **P0-2a** | Epic 2 | 2.2a (基础格式解析) | ✅ Done | Story 2.1 | 5 天 ✅ |
+| **P0-3** | Epic 2 | 2.3 (版面信息 DocLayNet) | ✅ Done | Story 2.2a | 4 天 ✅ |
+| **P0-1a** | Epic 3 | 3.1a (Dense 语义检索) | ✅ Done | Story 1.6 ✅ | 4 天 ✅ |
+| **P0-1b** | Epic 3 | 3.1b (BM25+RRF 融合) | ✅ Done | Story 3.1a | 3 天 ✅ |
+| **P0-8** | Epic 3 | 3.8 (高保真溯源 BBox) | 📋 backlog | Story 2.3 ✅ (前置已就绪) | 4 天 |
+| P1-4 | Epic 2 | 2.4 (表格语义提取) | ✅ Done | Story 2.2a | 3 天 ✅ |
+| P1-5 | Epic 2 | 2.5 (OCR 解析) | ✅ Done | Story 2.2a | 4 天 ✅ |
+| P1-6 | Epic 2 | 2.6 (版本快照) | ✅ Done | Story 2.2a | 2 天 ✅ |
+| P1-7 | Epic 2 | 2.7 (元数据校验) | ✅ Done | Story 2.2a | 2 天 ✅ |
+| P1-8 | Epic 2 | 2.8 (语义分块) | ✅ Done | Story 2.2a | 3 天 ✅ |
+| P1-2b | Epic 2 | 2.2b (扩展格式) | ✅ Done | Story 2.2a | 5 天 ✅ |
+| P0-1c | Epic 3 | 3.2a (LLM Client 基础设施) | 📋 ready-for-dev | Story 1.17 (UDMR 路由) | 3 天 |
+| P0-2 | Epic 3 | 3.2b (实体抽取) | 📋 ready-for-dev | Story 3.1b + Story 3.2a | 4 天 |
 | P0-4 | Epic 3 | 3.4 (RRF 融合排序) | 📋 backlog | Story 3.1b | 3 天 |
 | P0-5 | Epic 3 | 3.5 (分层检索 L1-L4) | 📋 backlog | Story 3.4 | 4 天 |
 | P1-6 | Epic 3 | 3.6 (契约化摘要) | 📋 backlog | Story 3.5 | 3 天 |
 | P1-7 | Epic 3 | 3.7 (检索相关性评估) | 📋 backlog | Story 3.6 | 3 天 |
-| P1-9 | Epic 3 | 3.9 (语义缓存) | 📋 backlog | Story 3.1a | 3 天 |
+| P1-9 | Epic 3 | 3.9 (语义缓存) | 📋 backlog | Story 3.1a ✅ | 3 天 |
 | P1-10 | Epic 3 | 3.10 (战略档案库) | 📋 backlog | Story 1.5/1.7 ✅ | 3 天 |
 | P1-11 | Epic 3 | 3.11 (有效期标签) | 📋 backlog | Story 3.10 | 2 天 |
 | P1-12 | Epic 3 | 3.12 (数据陈旧标记) | 📋 backlog | Story 3.11 | 2 天 |
 
-**并行策略:**
-- **波次 1**: Story 2.1 → 2.2a（文档上传+基础解析，~8 天）
-- **波次 2**: Story 2.3 ∥ Story 3.1a（版面信息 ∥ Dense 检索并行，~4 天）← 关键路径并行
-- **波次 3**: Story 3.1b ∥ Story 2.4/2.5/2.8（检索增强 ∥ 文档增强并行）
-- **波次 4**: Story 3.8（高保真溯源，依赖 Story 2.3 完成）
-- **波次 5**: Story 3.4→3.5→3.6→3.7（检索流水线深度）
+**完成情况:**
+- **Epic 2 全部 9 个 Story 已完成** ✅
+- **Epic 3 已完成 2 个 (3.1a/3.1b)，ready-for-dev 2 个 (3.2a/3.2b)**
+- **下一步:** 推进 Story 3.2a → 3.2b (LLM 能力)，随后 3.4→3.5→3.6→3.7 (检索流水线深度)
+
+**并行策略 (已更新):**
+- **波次 1**: ✅ Story 2.1 → 2.2a (已完成)
+- **波次 2**: ✅ Story 2.3 ∥ Story 3.1a (已完成)
+- **波次 3**: ✅ Story 3.1b ∥ Story 2.4/2.5/2.8 (已完成)
+- **波次 4**: 📋 Story 3.8 (高保真溯源，前置 Story 2.3 ✅ 已就绪)
+- **波次 5**: 📋 Story 3.4→3.5→3.6→3.7 (检索流水线深度)
 
 ---
 
@@ -4627,30 +4634,30 @@ Epic 21 (📋 待开始 · 可与 Epic 2-6 并行)
 
 | Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 | 状态 |
 |-------|---------|---------|---------|---------|------|
-| **2.1** (文档上传) | 1.6 ✅, 1.7 ✅ | 2.2a, 2.2b | Hard | ✅ 入口 | 📋 ready-for-dev |
-| **2.2a** (基础格式解析) | 2.1 | 2.2b, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8 | Hard | ✅ 核心路径 | 📋 backlog |
-| **2.2b** (扩展格式解析) | 2.2a | - | Soft | - | 📋 backlog |
-| **2.3** (版面信息 DocLayNet) | 2.2a | **Epic 3 Story 3.8** | Hard | ✅ **跨 Epic 关键路径** | 📋 backlog |
-| **2.4** (表格语义提取) | 2.2a | - | Soft | - | 📋 backlog |
-| **2.5** (OCR 解析) | 2.2a | - | Soft | - | 📋 backlog |
-| **2.6** (版本快照) | 2.2a, 1.7 ✅ | - | Soft | - | 📋 backlog |
-| **2.7** (元数据校验) | 2.2a | - | Soft | - | 📋 backlog |
-| **2.8** (语义分块) | 2.2a, 1.6 ✅ | Epic 3 Story 3.1a | Hard | ✅ 数据流水线 | 📋 backlog |
+| **2.1** (文档上传) | 1.6 ✅, 1.7 ✅ | 2.2a, 2.2b | Hard | ✅ 入口 | ✅ Done |
+| **2.2a** (基础格式解析) | 2.1 | 2.2b, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8 | Hard | ✅ 核心路径 | ✅ Done |
+| **2.2b** (扩展格式解析) | 2.2a | - | Soft | - | ✅ Done |
+| **2.3** (版面信息 DocLayNet) | 2.2a | **Epic 3 Story 3.8** | Hard | ✅ **跨 Epic 关键路径** | ✅ Done |
+| **2.4** (表格语义提取) | 2.2a | - | Soft | - | ✅ Done |
+| **2.5** (OCR 解析) | 2.2a | - | Soft | - | ✅ Done |
+| **2.6** (版本快照) | 2.2a, 1.7 ✅ | - | Soft | - | ✅ Done |
+| **2.7** (元数据校验) | 2.2a | - | Soft | - | ✅ Done |
+| **2.8** (语义分块) | 2.2a, 1.6 ✅ | Epic 3 Story 3.1a | Hard | ✅ 数据流水线 | ✅ Done |
 
 **Epic 3 (智能检索与知识发现) 依赖矩阵**
 
 | Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 | 状态 |
 |-------|---------|---------|---------|---------|------|
-| **3.1a** (Dense 语义检索) | 1.6 ✅ | 3.1b, 3.9 | Hard | ✅ 检索核心 | 📋 backlog |
-| **3.1b** (BM25+RRF 融合) | 3.1a | 3.2b, 3.4 | Hard | ✅ 检索核心 | 📋 backlog |
-| **3.2a** (LLM Client 基础设施) | 1.17（UDMR 路由） | 3.2b, 3.6, 4.5, 5.1 | Hard | ✅ 公共基础设施 | 📋 backlog |
-| **3.2b** (实体抽取) | 3.1b, 3.2a | 3.3 | Soft | - | 📋 backlog |
+| **3.1a** (Dense 语义检索) | 1.6 ✅ | 3.1b, 3.9 | Hard | ✅ 检索核心 | ✅ Done |
+| **3.1b** (BM25+RRF 融合) | 3.1a | 3.2b, 3.4 | Hard | ✅ 检索核心 | ✅ Done |
+| **3.2a** (LLM Client 基础设施) | 1.17 (UDMR 路由) | 3.2b, 3.6, 4.5, 5.1 | Hard | ✅ 公共基础设施 | 📋 ready-for-dev |
+| **3.2b** (实体抽取) | 3.1b, 3.2a | 3.3 | Soft | - | 📋 ready-for-dev |
 | **3.3** (领域词典管理) | 3.2b | - | Soft | - | 📋 backlog |
 | **3.4** (RRF 融合排序) | 3.1b | 3.5 | Hard | ✅ 排序核心 | 📋 backlog |
 | **3.5** (分层检索 L1-L4) | 3.4 | 3.6 | Hard | ✅ 分层核心 | 📋 backlog |
 | **3.6** (契约化摘要) | 3.5 | 3.7 | Soft | - | 📋 backlog |
 | **3.7** (检索相关性评估) | 3.6 | - | Soft | - | 📋 backlog |
-| **3.8** (高保真溯源 BBox) | **2.3 (Epic 2)** | - | Hard | ✅ **跨 Epic 关键路径** | 📋 backlog |
+| **3.8** (高保真溯源 BBox) | **2.3 (Epic 2, ✅ Done)** | - | Hard | ✅ **跨 Epic 关键路径** | 📋 backlog |
 | **3.9** (语义缓存) | 3.1a | - | Soft | - | 📋 backlog |
 | **3.10** (战略档案库) | 1.5 ✅, 1.7 ✅ | 3.11 | Soft | - | 📋 backlog |
 | **3.11** (有效期标签) | 3.10 | 3.12 | Soft | - | 📋 backlog |
@@ -4672,16 +4679,16 @@ Epic 21 (📋 待开始 · 可与 Epic 2-6 并行)
 
 #### 风险识别与缓解措施
 
-**Epic 2/3 当前技术风险**
+**Epic 2/3 技术风险（已更新）**
 
-| 风险项 | 影响 Story | 影响程度 | 发生概率 | 缓解措施 |
-|-------|-----------|---------|---------|---------|
-| **17 种格式解析准确率** | 2.2a/2.2b | 高 | 中 | 分阶段验证：先 PDF/Word/TXT（P0），再扩展格式 |
-| **DocLayNet ONNX 推理性能** | 2.3 | 高 | 中 | 性能基准测试，GPU 加速兜底 |
-| **语义分块边界准确性** | 2.8 → 3.1a | 高 | 中 | 评估 bge-m3 分块策略，人工抽检验证 |
-| **bge-m3 嵌入延迟 P95<200ms** | 3.1a | 高 | 中 | ONNX 量化 + GPU 加速 |
-| **RRF 融合参数调优** | 3.1b/3.4 | 中 | 高 | 可配置权重，A/B 测试对比 |
-| **检索延迟 P95<800ms 达标** | 3.1b | 高 | 中 | 初检 200ms + 精排 250ms + 融合 50ms 分级预算 |
+| 风险项 | 影响 Story | 影响程度 | 状态 | 缓解措施 |
+|-------|-----------|---------|------|---------|
+| **17 种格式解析准确率** | 2.2a/2.2b | 高 | ✅ 已解决 | 分阶段验证：先 PDF/Word/TXT（P0），再扩展格式 |
+| **DocLayNet ONNX 推理性能** | 2.3 | 高 | ✅ 已解决 | 性能基准测试，GPU 加速兜底 |
+| **语义分块边界准确性** | 2.8 → 3.1a | 高 | ✅ 已解决 | 评估 bge-m3 分块策略，人工抽检验证 |
+| **bge-m3 嵌入延迟 P95<200ms** | 3.1a | 高 | ✅ 已解决 | ONNX 量化 + GPU 加速 |
+| **RRF 融合参数调优** | 3.1b/3.4 | 中 | 📋 待验证（3.1b 已实现，3.4 待开发） | 可配置权重，A/B 测试对比 |
+| **检索延迟 P95<800ms 达标** | 3.1b | 高 | 📋 待验证（3.1b 已实现，整体流水线待集成） | 初检 200ms + 精排 250ms + 融合 50ms 分级预算 |
 
 > **Epic 0/1 的历史风险已全部解决，详见 [epic_1.md](epic_1.md)**
 
