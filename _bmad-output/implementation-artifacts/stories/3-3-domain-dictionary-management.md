@@ -362,7 +362,7 @@
 | **TDD 单元测试** | DomainDictionaryPort + 值对象 + DictionaryConsumerPort | 端口契约、值对象构造、Query 默认值、消费端端口签名 | `test_domain_dictionary_port.py` | Task 1 |
 | **TDD 单元测试** | DictionaryUpdated 事件 | 事件构造、序列化、注册 | `test_dictionary_events.py` | Task 1 |
 | **TDD 单元测试** | 词典异常 | 构造/属性/to_dict()/HTTP 映射 | `test_dictionary_exceptions.py` | Task 1 |
-| **TDD 单元测试** | DomainDictionaryService | CRUD 编排、热更新、快照/回滚、事件发布 | `test_domain_dictionary_service.py` | Task 2 |
+| **TDD 单元测试** | DomainDictionaryService | CRUD 编排、热更新 `reload_dictionary()` 调用验证、快照/回滚、事件发布（**mock `DictionaryConsumerPort`**） | `test_domain_dictionary_service.py` | Task 2 |
 | **TDD 单元测试** | PostgreSQLDomainDictionaryRepository | 词条 CRUD、版本快照、乐观锁 | `test_domain_dictionary_repository.py` | Task 3 |
 | **TDD 单元测试** | Dictionary 路由 | 请求/响应、错误映射、认证 | `test_domain_dictionary_api.py` | Task 3 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_domain_dictionary.feature` | Task 0 |
@@ -370,7 +370,7 @@
 | **TDD 契约测试** | DomainDictionaryPort | 端口注册/解析/契约门禁 | `test_port_contract_domain_dictionary.py` | Task 0 |
 | **TDD 领域异常测试** | 词典异常 | 编码唯一性/子域范围 | `test_error_code_uniqueness.py` + `test_code_ranges.py` | Task 1 |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖 | `test_arch_domain_dictionary.py` | Task 4 |
-| **集成测试** | 词典存储 + 热更新管线 | 端到端 CRUD/快照/回滚 + 热更新 | `test_integration_domain_dictionary.py` | Task 4 |
+| **集成测试** | 词典存储 + 热更新管线 | 端到端 CRUD/快照/回滚 + 热更新（含真实 `RuleBasedExtractor` 热更新→抽取端到端验证，吸收 Subtask 2.4 用例） | `test_integration_domain_dictionary.py` | Task 4 |
 
 ---
 
@@ -580,16 +580,17 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 在 `test_domain_dictionary_service.py` 追加热更新集成测试 |
+| 🔴 红 | 在 `tests/unit/application/services/test_domain_dictionary_service.py` 完成 mock 单元测试（Subtask 2.1 已含）；**Subtask 2.4 的真实热更新验证移至 `tests/integration/test_integration_domain_dictionary.py`**（见下文说明） |
 | 🟢 绿 | 完善 DomainDictionaryService 热更新逻辑 |
 | 🔄 重构 | 优化 reload 触发，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写热更新失败测试
+- [ ] Subtask 2.4: 🔴 红 — 编写热更新失败测试（**归属调整：移至集成测试 `tests/integration/test_integration_domain_dictionary.py`**）
+  - **为什么放集成测试：** 本用例使用真实 `RuleBasedExtractor` 做端到端"热更新→抽取"断言，属于真实服务集成验证。虽然 `RuleBasedExtractor` 是纯内存、无外部依赖，但项目 Testing 策略明确"单元测试 Mock 端口，禁止真实服务；集成测试真实服务优先"。为避免与 `tests/unit/application/services/test_domain_dictionary_service.py` 中 mock 端口的单元测试混淆分层，本用例归入集成测试（Subtask 4.5 同一文件，合并为热更新管线用例）。
   - 注册真实 `RuleBasedExtractor`（同时实现 `DictionaryConsumerPort`），初始词典不含 "元宇宙"
   - 添加 "元宇宙" 词条 → `refresh_dictionary()` → 用真实 `RuleBasedExtractor.extract_entities("元宇宙技术趋势")` 断言返回 CONCEPT 实体
   - 热更新后不再匹配已删除词条
   - 热更新延迟 P95<100ms（性能断言，宽松阈值）
-  - 核心战略概念覆盖率≥95%（预置词条集验证：BLM/BEM/SWOT/NPV/IRR/PESTEL 等均被识别）
+  - 核心战略概念覆盖率≥95%（预置词条集验证：BLM/BEM/SWOT/NPV/IRR/PESTEL 等均被识别；注意：**内置词典不含"元宇宙"**，其余预置词条 BLM/BEM/SWOT/NPV/IRR/PESTEL 均已存在，覆盖率断言基于这些已存在词条）
 - [ ] Subtask 2.5: 🟢 绿 — 确保 refresh_dictionary 正确注入 list[tuple[str,str]]
 - [ ] Subtask 2.6: 🔄 重构 — 运行 `ruff` + `mypy`
 
@@ -739,7 +740,7 @@
   - 端到端：真实 PG 仓储 CRUD（遵循测试 schema 隔离 + savepoint rollback）
   - 词条 → 快照 → 回滚 全链路
   - 乐观锁并发冲突
-  - 热更新管线（真实 RuleBasedExtractor + 词典服务）
+  - 热更新管线（真实 RuleBasedExtractor + 词典服务）——**吸收原 Subtask 2.4 的真实热更新验证用例**（见 Task 2 TDD 循环 [B] 归属调整说明）
 
 **完成标准/Definition of Done:**
 - [ ] `composition_root.py` 注册 `domain_dictionary_repo` / `domain_dictionary_service` 端口
@@ -1140,10 +1141,11 @@ sisys/
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.1.1
 **创建日期/Created:** 2026-08-10
 **最后更新/Last Updated:** 2026-08-11
 **更新说明/Description:**
+- v1.1.1: Round 2 修复 — 将 Subtask 2.4 真实 RuleBasedExtractor 热更新验证从单元测试移至集成测试 Subtask 4.5，避免与"单元测试 Mock 端口"规则语义冲突；更新测试分类表对应描述
 - v1.1.0: Round 1 审查修复 — P0: 新增 DictionaryConsumerPort 端口契约修复六边形架构违规/统一 dictionary_version 字段名/补充 test_code_ranges.py 的 allowed_child_parent_subdomains；P1: 明确 entity_extraction_rule 生命周期为 SINGLETON/明确 event_channels 配置/统一路由命名/修正覆盖率门禁
 
 <!-- 仅用作跟踪故事文件模板修订记录，故事开发时[务必删除]此段 -->
