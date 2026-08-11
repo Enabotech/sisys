@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import uuid
 
 from src.domain.events.entity_extraction_events import EntitiesExtracted
 from src.domain.exceptions import EntityExtractionError
@@ -141,7 +142,7 @@ class EntityExtractionService:
 
         Args:
             content: 待抽取的文本内容
-            memory_id: 关联记忆 ID（用于 Neo4j 持久化）
+            memory_id: 关联记忆 ID（用于 Neo4j 持久化，须为 UUID 字符串）
             domain_context: 领域上下文（可选）
 
         Returns:
@@ -195,8 +196,13 @@ class EntityExtractionService:
         if memory_id:
             try:
                 extraction_type = _map_extraction_type(final_result)
+                # memory_id 可能是 UUID 字符串或任意字符串，兼容处理
+                try:
+                    event_memory_id = uuid.UUID(memory_id)
+                except (ValueError, AttributeError):
+                    event_memory_id = uuid.uuid4()
                 event = EntitiesExtracted(
-                    memory_id=memory_id,
+                    memory_id=event_memory_id,
                     entity_count=len(final_result.entities),
                     relation_count=len(final_result.relations),
                     extraction_type=extraction_type,

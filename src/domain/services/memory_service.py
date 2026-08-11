@@ -464,7 +464,7 @@ class MemoryService:
             return
 
         event = MemoryChanged(
-            memory_id=str(memory_id),
+            memory_id=memory_id,
             user_id=user_id,
             name=name,
             change_type=change_type,

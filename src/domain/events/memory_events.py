@@ -12,8 +12,6 @@
 3. 失效 L1 Redis 缓存
 """
 
-from __future__ import annotations
-
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -26,7 +24,7 @@ class MemoryChanged(DomainEvent):
     """用户记忆变更事件
 
     Attributes:
-        memory_id: 记忆唯一标识（UUID 字符串，用于业务关联，与 aggregate_id 语义不同）
+        memory_id: 记忆唯一标识（UUID）
         user_id: 用户标识（多租户隔离）
         name: 记忆名称（UNIQUE）
         change_type: 变更类型（create/update/delete）
@@ -36,7 +34,7 @@ class MemoryChanged(DomainEvent):
     """
 
     event_type: str = field(default="MemoryChanged", init=False)
-    memory_id: str = ""
+    memory_id: uuid.UUID = field(default_factory=uuid.uuid4)
     user_id: str = ""
     name: str = ""
     change_type: str = ""  # "create" | "update" | "delete"

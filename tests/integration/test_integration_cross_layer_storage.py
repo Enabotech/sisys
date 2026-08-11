@@ -271,7 +271,7 @@ class TestL0L1L2CrossLayer:
 
         # Create MemoryChanged event (simulating what Gateway.save() would publish)
         event = MemoryChanged(
-            memory_id=memory_id,
+            memory_id=uuid.UUID(memory_id),
             user_id=user_id,
             name=name,
             change_type="create",

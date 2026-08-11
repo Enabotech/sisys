@@ -254,7 +254,7 @@ class TestMemoryChangedListenerL2WriteRealPostgreSQL:
 
         # Create event
         event = MemoryChanged(
-            memory_id=memory_id,
+            memory_id=uuid.UUID(memory_id),
             user_id=user_id,
             name=name,
             change_type="create",
@@ -287,7 +287,7 @@ class TestMemoryChangedListenerL2WriteRealPostgreSQL:
 
         # Create event
         event = MemoryChanged(
-            memory_id=memory_id,
+            memory_id=uuid.UUID(memory_id),
             user_id=user_id,
             name=name,
             change_type="create",
@@ -348,7 +348,7 @@ class TestMemoryChangedListenerCompleteFlow:
 
         # Step 2: Create MemoryChanged event (simulating what MemoryService.save() would publish)
         event = MemoryChanged(
-            memory_id=memory_id,
+            memory_id=uuid.UUID(memory_id),
             user_id=user_id,
             name=name,
             change_type="create",

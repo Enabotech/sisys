@@ -20,7 +20,7 @@ def _make_event(
 ) -> MemoryChanged:
     """Helper to create MemoryChanged event with unique ID."""
     return MemoryChanged(
-        memory_id=memory_id or str(uuid.uuid4()),
+        memory_id=uuid.UUID(memory_id) if memory_id else uuid.uuid4(),
         user_id=user_id,
         name=name,
         change_type=change_type,
@@ -247,7 +247,7 @@ class TestMemoryChangedListenerHelperMethods:
         )
 
         event = MemoryChanged(
-            memory_id=str(uuid.uuid4()),
+            memory_id=uuid.uuid4(),
             user_id="user-456",
             name="test-memory",
             change_type="create",
@@ -281,7 +281,7 @@ class TestMemoryChangedListenerHelperMethods:
         )
 
         event = MemoryChanged(
-            memory_id=str(uuid.uuid4()),
+            memory_id=uuid.uuid4(),
             user_id="user-456",
             name="test-memory",
             change_type="create",

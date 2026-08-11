@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -153,7 +154,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             from src.domain.events.memory_events import MemoryChanged
 
             event = MemoryChanged(
-                memory_id=memory_id,
+                memory_id=uuid.UUID(memory_id),
                 user_id=owner_id,
                 name=name,
                 change_type="create",
@@ -254,7 +255,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             from src.domain.events.memory_events import MemoryChanged
 
             event = MemoryChanged(
-                memory_id=memory_id,
+                memory_id=uuid.UUID(memory_id),
                 user_id=owner_id,
                 name=name,
                 change_type="delete",

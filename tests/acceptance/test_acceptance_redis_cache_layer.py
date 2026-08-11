@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 import redis.asyncio as aioredis
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenarios, then, when
 
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
@@ -139,12 +139,6 @@ def given_all_services_use_fakeredis(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_redis_cache_layer.feature", "会话状态保存与恢复")
-def test_session_save_and_load():
-    """Test session state save and load."""
-    pass
-
-
 @given("调用 SessionStorage.save 保存会话")
 def given_call_session_save(
     context: dict,
@@ -190,12 +184,6 @@ def then_session_state_matches(context: dict) -> None:
     assert loaded["state"]["data"] == "test"
 
 
-@scenario("test_acceptance_redis_cache_layer.feature", "会话状态删除")
-def test_session_delete():
-    """Test session state deletion."""
-    pass
-
-
 @given("会话状态已保存")
 def given_session_saved(
     context: dict,
@@ -238,12 +226,6 @@ def then_return_none(context: dict) -> None:
     assert loaded is None
 
 
-@scenario("test_acceptance_redis_cache_layer.feature", "会话状态过期")
-def test_session_expiry():
-    """Test session state expiry."""
-    pass
-
-
 @given("会话状态已保存并设置 TTL 为 1 秒")
 def given_session_saved_with_ttl(
     context: dict,
@@ -265,28 +247,39 @@ def given_session_saved_with_ttl(
     event_loop.run_until_complete(_save())
 
 
-@when("推进 fakeredis 时间使 TTL 过期")
-def when_advance_time(context: dict) -> None:
-    """Advance time to expire TTL.
+@when("验证会话 TTL 已设置")
+def when_verify_ttl_set(
+    context: dict,
+    redis_client: aioredis.Redis,
+    event_loop,
+) -> None:
+    """验证会话键的 TTL 已正确设置
 
-    Note: With real Redis we cannot easily expire keys.
-    This step verifies the TTL mechanism exists.
+    通过 Redis TTL 命令直接校验键的剩余生存时间，
+    避免真实等待 TTL 过期（time.sleep）导致的测试变慢。
+    过期行为本身由单元测试（fakeredis 时间推进）覆盖。
     """
-    import time
+    session_id = context["session_id"]
+    key = build_key("session", session_id)
 
-    time.sleep(2)
-    context["time_advanced"] = True
+    async def _ttl():
+        return await redis_client.ttl(key)
+
+    ttl = event_loop.run_until_complete(_ttl())
+    context["ttl"] = ttl
+
+
+@then("TTL 值在有效范围内")
+def then_ttl_in_range(context: dict) -> None:
+    """验证 TTL 大于 0 且在设定值（1s）范围内"""
+    ttl = context.get("ttl")
+    # 保存时 TTL=1，验证尚未来得及自动过期的剩余值
+    assert ttl is not None and 0 < ttl <= 1, f"TTL 应落在 (0, 1] 区间，实际为 {ttl}"
 
 
 # ===================================================================
 # AC-3: 语义缓存服务
 # ===================================================================
-
-
-@scenario("test_acceptance_redis_cache_layer.feature", "语义缓存命中")
-def test_semantic_cache_hit():
-    """Test semantic cache hit."""
-    pass
 
 
 @given("语义缓存已存储查询结果")
@@ -339,12 +332,6 @@ def then_return_cached_result(context: dict) -> None:
     assert result.get("result") == "cached_result"
 
 
-@scenario("test_acceptance_redis_cache_layer.feature", "语义缓存未命中")
-def test_semantic_cache_miss():
-    """Test semantic cache miss."""
-    pass
-
-
 @given("语义缓存无匹配结果")
 def given_semantic_cache_no_match(context: dict) -> None:
     """No matching result in semantic cache."""
@@ -372,12 +359,6 @@ def then_return_none_on_miss(context: dict) -> None:
     """Verify None is returned on cache miss."""
     result = context.get("cache_result")
     assert result is None
-
-
-@scenario("test_acceptance_redis_cache_layer.feature", "语义缓存命中率统计")
-def test_semantic_cache_hit_rate():
-    """Test semantic cache hit rate statistics."""
-    pass
 
 
 @given("注入 EventMetricsCollector 到 SemanticCache")
@@ -430,12 +411,6 @@ def then_query_hit_rate(
 # ===================================================================
 # AC-4: 公共黑板服务
 # ===================================================================
-
-
-@scenario("test_acceptance_redis_cache_layer.feature", "公共黑板多 Agent 并发写入")
-def test_blackboard_multi_agent():
-    """Test public blackboard multi-agent concurrent writes."""
-    pass
 
 
 @given("Agent 发布消息")
@@ -492,12 +467,6 @@ def then_messages_sorted(context: dict) -> None:
     messages = context.get("messages")
     assert messages is not None
     assert len(messages) >= 1
-
-
-@scenario("test_acceptance_redis_cache_layer.feature", "公共黑板版本号递增")
-def test_blackboard_version_increment():
-    """Test public blackboard version increment."""
-    pass
 
 
 @given("Agent 向会话发布第 1 条消息")
@@ -559,12 +528,6 @@ def then_version_incremented(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_redis_cache_layer.feature", "SessionStorage 连接失败优雅降级")
-def test_session_storage_graceful_degradation():
-    """Test SessionStorage graceful degradation on connection failure."""
-    pass
-
-
 @given("Redis 服务不可用")
 def given_redis_unavailable(context: dict) -> None:
     """Simulate Redis service unavailable."""
@@ -601,12 +564,6 @@ def then_no_exception(context: dict) -> None:
     assert context.get("save_result") is None or context.get("save_result") is not False
 
 
-@scenario("test_acceptance_redis_cache_layer.feature", "SemanticCache 连接失败优雅降级")
-def test_semantic_cache_graceful_degradation():
-    """Test SemanticCache graceful degradation on connection failure."""
-    pass
-
-
 @when("调用 SemanticCache.get 查询缓存")
 def when_call_semantic_cache_get_degraded(
     context: dict,
@@ -636,12 +593,6 @@ def then_return_none_degraded(context: dict) -> None:
     """Verify None is returned on connection failure."""
     result = context.get("cache_result")
     assert result is None
-
-
-@scenario("test_acceptance_redis_cache_layer.feature", "PublicBlackboard 连接失败优雅降级")
-def test_public_blackboard_graceful_degradation():
-    """Test PublicBlackboard graceful degradation on connection failure."""
-    pass
 
 
 @when("调用 PublicBlackboard.post 发布消息")
@@ -684,12 +635,6 @@ def then_return_zero_degraded(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_redis_cache_layer.feature", "Redis 键命名规范")
-def test_redis_key_naming():
-    """Test Redis key naming convention."""
-    pass
-
-
 @given("所有存储服务使用 KeyBuilder 构建键名")
 def given_use_key_builder(context: dict) -> None:
     """Use KeyBuilder to build key names."""
@@ -713,12 +658,6 @@ def then_key_follows_convention(context: dict) -> None:
     assert key is not None
     assert key.startswith("sisys:session:")
     assert len(key.split(":")) == 3
-
-
-@scenario("test_acceptance_redis_cache_layer.feature", "Redis 键批量清理")
-def test_redis_key_cleanup():
-    """Test Redis key batch cleanup."""
-    pass
 
 
 @given("命名空间下有多个键")

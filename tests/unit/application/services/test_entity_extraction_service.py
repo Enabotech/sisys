@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
@@ -114,7 +115,7 @@ class TestEntityExtractionService:
         """验证完整流程执行（规则→LLM→仲裁→持久化→事件发布）"""
         result = await service.extract_entities(
             content="BLM 和 SWOT 是常用战略工具",
-            memory_id="test-mem-001",
+            memory_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         )
 
         # 验证规则基和 LLM 都被调用
@@ -129,7 +130,7 @@ class TestEntityExtractionService:
         event_publisher.publish.assert_called_once()
         published_event = event_publisher.publish.call_args[0][0]
         assert isinstance(published_event, EntitiesExtracted)
-        assert published_event.memory_id == "test-mem-001"
+        assert published_event.memory_id == uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
         assert published_event.entity_count >= 2
         assert published_event.relation_count >= 1
         assert published_event.extraction_type == "hybrid"
