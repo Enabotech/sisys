@@ -462,7 +462,7 @@ def when_memory_changed_event_processed(
     event_loop,
 ):
     """Trigger MemoryChanged event handling with real Redis + PostgreSQL."""
-    memory_id = str(uuid.uuid4())
+    memory_id = uuid.uuid4()
     user_id = f"user-{uuid.uuid4().hex[:8]}"
     name = f"test-memory-{uuid.uuid4().hex[:8]}"
     owner_id = user_id

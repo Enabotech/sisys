@@ -17,7 +17,6 @@ Story: 1.15a
 from __future__ import annotations
 
 import logging
-import uuid
 from datetime import UTC, datetime
 
 from src.domain.events.memory_events import MemoryChanged
@@ -126,7 +125,7 @@ class MemoryChangedHandler:
 
         memory_type = self._get_memory_type(event)
         metadata = MemoryMetadata(
-            memory_id=uuid.UUID(event.memory_id),
+            memory_id=event.memory_id,
             name=event.name,
             type=memory_type,
             path=f"{memory_type}/{event.memory_id}.md",
@@ -140,7 +139,7 @@ class MemoryChangedHandler:
         )
 
         history = MemoryChangeHistory.create(
-            memory_id=uuid.UUID(event.memory_id),
+            memory_id=event.memory_id,
             version=1,
             change_type=event.change_type,
             changed_by=event.user_id,

@@ -4,8 +4,6 @@
 事件携带完整的抽取结果元数据（entity_count, relation_count, memory_id）。
 """
 
-from __future__ import annotations
-
 import uuid
 from dataclasses import dataclass, field
 
@@ -19,14 +17,14 @@ class EntitiesExtracted(DomainEvent):
     在实体抽取完成后发布，包含抽取结果元数据。
 
     Attributes:
-        memory_id: 关联记忆 ID（str 类型，用于业务关联，与 aggregate_id 语义不同）
+        memory_id: 关联记忆 ID（UUID）
         entity_count: 抽取实体数量
         relation_count: 抽取关系数量
         extraction_type: 抽取类型（"rule_only" / "llm_only" / "hybrid"）
     """
 
     event_type: str = field(default="EntitiesExtracted", init=False)
-    memory_id: str = ""
+    memory_id: uuid.UUID = field(default_factory=uuid.uuid4)
     entity_count: int = 0
     relation_count: int = 0
     extraction_type: str = ""

@@ -22,7 +22,7 @@ class TestEntitiesExtracted:
     def test_event_type(self) -> None:
         """验证 event_type 默认值为 EntitiesExtracted"""
         event = EntitiesExtracted(
-            memory_id="mem-123",
+            memory_id=uuid.uuid4(),
             entity_count=5,
             relation_count=3,
             extraction_type="hybrid",
@@ -31,13 +31,14 @@ class TestEntitiesExtracted:
 
     def test_constructor_with_all_fields(self) -> None:
         """验证完整字段构造"""
+        mem_id = uuid.uuid4()
         event = EntitiesExtracted(
-            memory_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            memory_id=mem_id,
             entity_count=5,
             relation_count=3,
             extraction_type="hybrid",
         )
-        assert event.memory_id == "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        assert event.memory_id == mem_id
         assert event.entity_count == 5
         assert event.relation_count == 3
         assert event.extraction_type == "hybrid"
@@ -50,19 +51,19 @@ class TestEntitiesExtracted:
     def test_post_init_sets_aggregate_id(self) -> None:
         """验证 __post_init__ 设置 UUID 类型的 aggregate_id"""
         event = EntitiesExtracted(
-            memory_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            memory_id=uuid.uuid4(),
             entity_count=10,
             relation_count=2,
             extraction_type="rule_only",
         )
         assert isinstance(event.aggregate_id, uuid.UUID)
         # aggregate_id 是独立生成的 UUID，与 memory_id 无关
-        assert str(event.aggregate_id) != "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        assert event.aggregate_id != event.memory_id
 
     def test_post_init_sets_aggregate_type(self) -> None:
         """验证 __post_init__ 设置 aggregate_type"""
         event = EntitiesExtracted(
-            memory_id="mem-456",
+            memory_id=uuid.uuid4(),
             entity_count=10,
             relation_count=2,
             extraction_type="rule_only",
@@ -72,28 +73,29 @@ class TestEntitiesExtracted:
     def test_frozen_dataclass(self) -> None:
         """验证 frozen=True 不可变"""
         event = EntitiesExtracted(
-            memory_id="mem-123",
+            memory_id=uuid.uuid4(),
             entity_count=5,
             relation_count=3,
             extraction_type="hybrid",
         )
         try:
-            event.memory_id = "changed"  # type: ignore[misc]
+            event.memory_id = uuid.uuid4()  # type: ignore[misc]
             assert False, "应抛出 FrozenInstanceError"
         except Exception:
             pass
 
     def test_to_dict_serialization(self) -> None:
         """验证 to_dict() 序列化正确"""
+        mem_id = uuid.uuid4()
         event = EntitiesExtracted(
-            memory_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            memory_id=mem_id,
             entity_count=5,
             relation_count=3,
             extraction_type="hybrid",
         )
         d = event.to_dict()
         assert d["event_type"] == "EntitiesExtracted"
-        assert d["payload"]["memory_id"] == "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        assert d["payload"]["memory_id"] == str(mem_id)
         assert d["payload"]["entity_count"] == 5
         assert d["payload"]["relation_count"] == 3
         assert d["payload"]["extraction_type"] == "hybrid"
@@ -103,7 +105,7 @@ class TestEntitiesExtracted:
     def test_from_dict_deserialization(self) -> None:
         """验证 from_dict() 反序列化正确（aggregate_id 为合法 UUID 字符串）"""
         original = EntitiesExtracted(
-            memory_id="mem-123",
+            memory_id=uuid.uuid4(),
             entity_count=5,
             relation_count=3,
             extraction_type="hybrid",
@@ -113,7 +115,7 @@ class TestEntitiesExtracted:
         assert isinstance(d["aggregate_id"], str)
         restored = DomainEvent.from_dict(d)
         assert isinstance(restored, EntitiesExtracted)
-        assert restored.memory_id == "mem-123"
+        assert restored.memory_id == original.memory_id
         assert restored.entity_count == 5
         assert restored.relation_count == 3
         assert restored.extraction_type == "hybrid"
@@ -123,12 +125,13 @@ class TestEntitiesExtracted:
 
     def test_from_dict_without_optional_fields(self) -> None:
         """验证反序列化时可选字段正常"""
+        mem_id = uuid.uuid4()
         d = {
             "event_id": str(uuid.uuid4()),
             "event_type": "EntitiesExtracted",
             "timestamp": "2026-08-09T12:00:00+00:00",
             "payload": {
-                "memory_id": "mem-789",
+                "memory_id": str(mem_id),
                 "entity_count": 0,
                 "relation_count": 0,
                 "extraction_type": "rule_only",
@@ -136,7 +139,7 @@ class TestEntitiesExtracted:
         }
         restored = DomainEvent.from_dict(d)
         assert isinstance(restored, EntitiesExtracted)
-        assert restored.memory_id == "mem-789"
+        assert restored.memory_id == mem_id
         assert restored.entity_count == 0
         assert restored.relation_count == 0
         assert restored.extraction_type == "rule_only"

@@ -31,7 +31,7 @@ class TestMemoryChangedSchema:
     def test_memory_changed_event_type_default(self):
         """验证 event_type 默认值为 'MemoryChanged'"""
         event = MemoryChanged(
-            memory_id=str(uuid.uuid4()),
+            memory_id=uuid.uuid4(),
             user_id="user123",
             name="test-memory",
             change_type="create",
@@ -40,7 +40,7 @@ class TestMemoryChangedSchema:
 
     def test_memory_changed_aggregate_id_from_memory_id(self):
         """验证 aggregate_id 自动设置为 UUID"""
-        memory_id = str(uuid.uuid4())
+        memory_id = uuid.uuid4()
         event = MemoryChanged(
             memory_id=memory_id,
             user_id="user123",
@@ -49,12 +49,12 @@ class TestMemoryChangedSchema:
         )
         # aggregate_id 是独立生成的 UUID，与 memory_id 无关
         assert isinstance(event.aggregate_id, uuid.UUID)
-        assert str(event.aggregate_id) != memory_id
+        assert event.aggregate_id != memory_id
 
     def test_memory_changed_aggregate_type(self):
         """验证 aggregate_type 设置为 'Memory'"""
         event = MemoryChanged(
-            memory_id=str(uuid.uuid4()),
+            memory_id=uuid.uuid4(),
             user_id="user123",
             name="test-memory",
             change_type="create",
@@ -65,7 +65,7 @@ class TestMemoryChangedSchema:
         """验证 change_type 支持 create/update/delete"""
         for change_type in ("create", "update", "delete"):
             event = MemoryChanged(
-                memory_id=str(uuid.uuid4()),
+                memory_id=uuid.uuid4(),
                 user_id="user123",
                 name="test-memory",
                 change_type=change_type,
@@ -75,7 +75,7 @@ class TestMemoryChangedSchema:
     def test_memory_changed_is_automatic_false_by_default(self):
         """验证 is_automatic 默认为 False（用户主动操作）"""
         event = MemoryChanged(
-            memory_id=str(uuid.uuid4()),
+            memory_id=uuid.uuid4(),
             user_id="user123",
             name="test-memory",
             change_type="create",
@@ -87,7 +87,7 @@ class TestMemoryChangedSchema:
         old_val = {"name": "old-name", "content": "old content"}
         new_val = {"name": "new-name", "content": "new content"}
         event = MemoryChanged(
-            memory_id=str(uuid.uuid4()),
+            memory_id=uuid.uuid4(),
             user_id="user123",
             name="test-memory",
             change_type="update",
@@ -103,7 +103,7 @@ class TestMemoryChangedSerialization:
 
     def test_to_dict(self):
         """验证 to_dict() 序列化"""
-        memory_id = str(uuid.uuid4())
+        memory_id = uuid.uuid4()
         event = MemoryChanged(
             memory_id=memory_id,
             user_id="user123",
@@ -113,13 +113,13 @@ class TestMemoryChangedSerialization:
         )
         data = event.to_dict()
         assert data["event_type"] == "MemoryChanged"
-        assert data["payload"]["memory_id"] == memory_id
+        assert data["payload"]["memory_id"] == str(memory_id)
         assert data["payload"]["user_id"] == "user123"
         assert data["payload"]["change_type"] == "create"
 
     def test_from_dict(self):
         """验证 from_dict() 反序列化"""
-        memory_id = str(uuid.uuid4())
+        memory_id = uuid.uuid4()
         original = MemoryChanged(
             memory_id=memory_id,
             user_id="user123",
@@ -136,7 +136,7 @@ class TestMemoryChangedSerialization:
     def test_roundtrip(self):
         """验证序列化往返一致性"""
         event = MemoryChanged(
-            memory_id=str(uuid.uuid4()),
+            memory_id=uuid.uuid4(),
             user_id="user123",
             name="test-memory",
             change_type="update",

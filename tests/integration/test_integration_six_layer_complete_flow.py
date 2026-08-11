@@ -438,7 +438,7 @@ class TestSixLayerCompleteFlow:
 
         # === Step 2: Trigger MemoryChanged handler for L1 + L2 ===
         event = MemoryChanged(
-            memory_id=memory_id,
+            memory_id=uuid.UUID(memory_id),
             user_id=user_id,
             name=name,
             change_type="create",
@@ -585,7 +585,7 @@ class TestSixLayerCompleteFlow:
 
         # Trigger handler for L1 invalidation + L2 write
         event = MemoryChanged(
-            memory_id=memory_id,
+            memory_id=uuid.UUID(memory_id),
             user_id=user_id,
             name=name,
             change_type="create",
@@ -670,7 +670,7 @@ class TestSixLayerCompleteFlow:
 
         # Trigger handler
         event = MemoryChanged(
-            memory_id=memory_id,
+            memory_id=uuid.UUID(memory_id),
             user_id=user_id,
             name=name,
             change_type="create",
@@ -789,7 +789,7 @@ class TestLayerCoordinationInvariants:
 
         # Create and handle event
         event = MemoryChanged(
-            memory_id=memory_id,
+            memory_id=uuid.UUID(memory_id),
             user_id=user_id,
             name=name,
             change_type="create",

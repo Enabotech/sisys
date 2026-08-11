@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 from pydantic import BaseModel, Field
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenarios, then, when
 
 from src.domain.exceptions import LLMAPIError, LLMConfigError, ServiceUnavailableError
 from src.domain.ports.llm_client import LLMConfig, LLMResponse
@@ -134,11 +134,6 @@ def llm_client_configured(context: dict[str, Any], udmr_config: LLMConfig):
 # ===================================================================
 
 
-@scenario("test_acceptance_llm_client.feature", "AC-1 - 使用 UDMR 云端配置成功生成文本")
-def test_ac1_llm_text_generation():
-    pass
-
-
 @when("调用 generate 生成文本")
 def call_generate(context: dict[str, Any], real_client: LitellmLLMClient, event_loop):
     context["result"] = event_loop.run_until_complete(
@@ -169,11 +164,6 @@ def response_has_usage(context: dict[str, Any]):
 # ===================================================================
 # AC-2: 结构化输出成功
 # ===================================================================
-
-
-@scenario("test_acceptance_llm_client.feature", "AC-2 - 使用 UDMR 云端配置成功生成结构化输出")
-def test_ac2_structured_output():
-    pass
 
 
 @given("定义一个 Pydantic Schema 用于结构化输出")
@@ -221,11 +211,6 @@ def all_fields_correctly_filled(context: dict[str, Any]):
 # ===================================================================
 # AC-3: 熔断器断开后快速失败
 # ===================================================================
-
-
-@scenario("test_acceptance_llm_client.feature", "AC-3 - 熔断器断开后快速失败")
-def test_ac3_circuit_breaker_open():
-    pass
 
 
 @given("熔断器已断开")
@@ -285,11 +270,6 @@ def verify_no_http_request(context: dict[str, Any]):
 # ===================================================================
 
 
-@scenario("test_acceptance_llm_client.feature", "AC-4 - 重试耗尽后抛出异常")
-def test_ac4_retry_exhausted():
-    pass
-
-
 @given("LLM API 持续返回 500 错误")
 def llm_api_returns_500(context: dict[str, Any]):
     bad_config = LLMConfig(api_type="openai", model="test-model", endpoint="http://127.0.0.1:1", timeout=1.0)
@@ -332,11 +312,6 @@ def verify_circuit_breaker_recorded(context: dict[str, Any]):
 # ===================================================================
 
 
-@scenario("test_acceptance_llm_client.feature", "AC-5 - 配置错误（API Key 缺失）")
-def test_ac5_config_error():
-    pass
-
-
 @given("LLM 配置缺少 API Key")
 def config_missing_api_key(context: dict[str, Any]):
     context["invalid_config"] = LLMConfig(api_type="openai", model="test-model", api_key="")
@@ -369,11 +344,6 @@ def verify_error_code_332(context: dict[str, Any]):
 # ===================================================================
 # AC-6: 客户端关闭后调用抛出异常
 # ===================================================================
-
-
-@scenario("test_acceptance_llm_client.feature", "AC-6 - 客户端关闭后调用抛出异常")
-def test_ac6_closed_client():
-    pass
 
 
 @given("LLM 客户端已关闭")
