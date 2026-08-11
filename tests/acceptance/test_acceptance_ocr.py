@@ -243,13 +243,13 @@ def when_parse_document(context: dict[str, Any]) -> None:
     # 如果 OCR 服务不可用（模拟降级场景），使用不可达的 URL
     ocr_available = context.get("ocr_available", True)
     if not ocr_available:
-        # 使用不可达的 URL 模拟降级
+        # 使用不可达的 URL 模拟降级；缩短超时避免等待默认 300s 连接超时
         from unittest.mock import MagicMock
 
         from src.application.services.document_parsing_service import DocumentParsingService
         from src.infrastructure.document_parsing.paddleocr_vl_adapter import PaddleOCRVLAdapter
 
-        adapter = PaddleOCRVLAdapter(base_url="http://localhost:19999", timeout=5.0)
+        adapter = PaddleOCRVLAdapter(base_url="http://localhost:19999", timeout=0.5)
         try:
             service = DocumentParsingService(
                 document_repository=MagicMock(),

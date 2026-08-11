@@ -39,7 +39,7 @@ class TestMemoryChangedSchema:
         assert event.event_type == "MemoryChanged"
 
     def test_memory_changed_aggregate_id_from_memory_id(self):
-        """验证 aggregate_id 自动设置为 memory_id"""
+        """验证 aggregate_id 自动设置为 UUID"""
         memory_id = str(uuid.uuid4())
         event = MemoryChanged(
             memory_id=memory_id,
@@ -47,8 +47,9 @@ class TestMemoryChangedSchema:
             name="test-memory",
             change_type="create",
         )
-        # aggregate_id 应从 memory_id 派生（UUID 转换）
-        assert event.aggregate_id is not None
+        # aggregate_id 是独立生成的 UUID，与 memory_id 无关
+        assert isinstance(event.aggregate_id, uuid.UUID)
+        assert str(event.aggregate_id) != memory_id
 
     def test_memory_changed_aggregate_type(self):
         """验证 aggregate_type 设置为 'Memory'"""

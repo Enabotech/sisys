@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 
 from .base import DomainEvent
@@ -18,7 +19,7 @@ class EntitiesExtracted(DomainEvent):
     在实体抽取完成后发布，包含抽取结果元数据。
 
     Attributes:
-        memory_id: 关联记忆 ID（str 类型，对标 MemoryChanged 模式）
+        memory_id: 关联记忆 ID（str 类型，用于业务关联，与 aggregate_id 语义不同）
         entity_count: 抽取实体数量
         relation_count: 抽取关系数量
         extraction_type: 抽取类型（"rule_only" / "llm_only" / "hybrid"）
@@ -32,8 +33,8 @@ class EntitiesExtracted(DomainEvent):
 
     def __post_init__(self) -> None:
         """设置 aggregate_id, aggregate_type"""
-        if self.aggregate_id is None and self.memory_id:
-            object.__setattr__(self, "aggregate_id", self.memory_id)
+        if self.aggregate_id is None:
+            object.__setattr__(self, "aggregate_id", uuid.uuid4())
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "EntityExtraction")
 

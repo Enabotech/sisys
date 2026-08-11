@@ -636,7 +636,7 @@ class LitellmLLMClient(LLMClientPort):
                     try:
                         item = queue.get_nowait()
                         try:
-                            await asyncio.wait_for(item["coroutine"], timeout=20.0)
+                            await asyncio.wait_for(item["coroutine"], timeout=1.0)
                         except Exception:
                             pass
                         finally:
