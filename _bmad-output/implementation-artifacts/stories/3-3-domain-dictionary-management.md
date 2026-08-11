@@ -195,7 +195,7 @@
   - Schema 版本: v1.0.0
   - 通道: `RabbitMQ + Outbox`（业务状态型，RELIABLE 模式）
   - 注册于 `src/domain/events/__init__.py`、`configs/event_channels.yaml`、`ChannelRouter.DEFAULT_MAPPINGS`
-  - **`event_channels.yaml` 配置指引：** 参照 `MemoryChanged` / `EntitiesExtracted` 模式，仅配置 `rabbitmq_routing_key`，不配置 `redis_channel`。示例：`rabbitmq_routing_key: "sisys.events.reliable.dictionary_updated"` + `delivery_mode: "reliable"`
+  - **`event_channels.yaml` 配置指引：** 参照 `MemoryChanged` / `EntitiesExtracted` 模式，仅配置 `rabbitmq_routing_key`，不配置 `redis_channel`。示例：`rabbitmq_routing_key: "sisys.events.reliable.dictionary_updated"` + `delivery_mode: "reliable"`。**注意预存 bug：** `event_bus_config_loader.py` 的 `DEFAULT_CONFIG_PATH` 指向不存在的 `config/`（单数），YAML 实际未加载，需在实施时一并修复（见下方"环境变量设计"章节的预存 Bug 提示）；`DEFAULT_MAPPINGS` 注册是 DictionaryUpdated 通道生效的可靠保证。
 
 > **⚠️ `dictionary_version` 字段说明：** `DomainEvent` 基类已有 `version: int = 0`（事件版本号）。**DictionaryUpdated 使用独立字段名 `dictionary_version: int`** 表示词典版本，避免与基类 `version`（事件单调版本）语义冲突。`dictionary_version` 不在 `_CORE_FIELD_NAMES` 中，序列化时会自动进入 `merged_payload`，反序列化时从 payload 提取。`__post_init__` 中不覆盖基类 `version`。
 
@@ -1005,6 +1005,10 @@ sisys/
 本 Story 无需新增环境变量。复用现有：
 - `PostgreSQLConfig.from_env()` — PG 连接（仓储）
 - 事件配置 — 复用 `event_publisher`
+
+> **⚠️ 预存 Bug 提示（DictionaryUpdated 事件通道配置）：** `src/infrastructure/messaging/event_bus_config_loader.py` 第18行 `DEFAULT_CONFIG_PATH` 硬编码为 `"config" / "event_channels.yaml"`（单数 `config`），但项目实际路径为 `configs/event_channels.yaml`（复数 `configs`），且 `config/` 目录不存在。导致 `EventBusConfigLoader.load()` 因 `if not path.exists(): return` **静默返回，YAML 配置从未被加载**，系统仅依赖 `ChannelRouter.DEFAULT_MAPPINGS`。
+>
+> **对 DictionaryUpdated 的影响：** 本 Story 在 `DEFAULT_MAPPINGS` 中注册 `DictionaryUpdated` 即可保证事件通道可用（回退到 baseline），**功能不受影响**。但"配置驱动"机制（YAML 覆盖）实际失效。**建议实施时一并修复**：将 `DEFAULT_CONFIG_PATH` 的 `"config"` 改为 `"configs"`（一行字符串，成本极低），并同步修正 `CLAUDE.md` 第48/50行的 `config/event_channels.yaml` 引用为 `configs/event_channels.yaml`。此为 Story 3.3 之外但对 DictionaryUpdated 事件相关的预存问题，需在 Task 1 事件注册时记录决策。
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
 
