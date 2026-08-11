@@ -93,6 +93,8 @@
 **And** 三路均失败时抛出 `HybridSearchError`（领域异常，非 `RuntimeError`）
 
 > **异常合规说明：** 项目 Hard Constraints 禁止使用裸内置异常（`RuntimeError`）。三路均失败属于检索编排业务异常，定义 `HybridSearchError`（继承 `BusinessException`，编码 EXCEPTION_209）作为专用领域异常，由 `ExceptionHandlers` 自动映射为 HTTP 500。**同步修正现有 `hybrid_search_service.py` 中的 `RuntimeError` 历史违规。**
+>
+> **编码合规说明：** business 子域当前范围 `(201, 208)` 已全部占用，EXCEPTION_209 落在该范围外。实施时需将 `_code_ranges.py` 的 `CODE_RANGES` 中 business 范围扩展为 `(201, 209)`，并在 `_CLASS_TO_SUBDOMAIN` 中添加 `"HybridSearchError": "business"` 映射。CI 的 `test_code_ranges.py` 会校验子域范围，**必须同步更新** `allowed_child_parent_subdomains` 登记 `("hybrid_search", "business")` 或 `HybridSearchError` 归入 `reranker` 子域。
 
 **验证标准/Validation Criteria:**
 - [ ] `HybridSearchService` 升级为三路编排（新增 `graph_search` 注入）
@@ -115,7 +117,7 @@
 
 > **架构决策（对标业界最佳实践）：** 重排序是**独立的评分任务**，与文本生成本质不同。业界标准做法（如 Cohere Rerank、bge-reranker、Jina Reranker）均提供**专用重排序 API**（输入 query+documents，返回 score 数组），而非复用文本生成端点。因此：
 > - **弃用** `LLMClientPort`（仅含 `generate()`/`structured_generate()`，无法返回数值分数）作为重排序后端；
-> - 新建 **`RerankingPort` 的独立基础设施客户端**（`LiteLLMRerankerClient`），直接调用 `litellm.rerank()` 专用端点，注入 `RerankerConfig`（model/base_url/api_key/timeout）；
+> - 新建 **`RerankerPort` 的独立基础设施客户端**（`LiteLLMRerankerClient`），直接调用 `litellm.rerank()` 专用端点，注入 `RerankerConfig`（model/base_url/api_key/timeout）；
 > - `RerankerPort` 作为领域端口，`LiteLLMRerankerClient` 作为其基础设施实现。
 
 **验证标准/Validation Criteria:**
@@ -123,7 +125,7 @@
 - [ ] 方法：`async rerank(query: str, results: list[SearchResult], top_k: int = 20) -> list[SearchResult]`
 - [ ] **`top_k` 语义：截断参数** — 对全部输入结果重排序，仅返回分数最高的前 `top_k` 个；`top_k >= len(results)` 时返回全部（结果数量不变）
 - [ ] **删除冗余的 `RerankResult` 值对象**（端口统一返回 `SearchResult`），`original_score` 存入 `payload["original_score"]`
-- [ ] `CrossEncoderReranker` 实现位于 `src/infrastructure/external_services/reranker/cross_encoder_reranker.py`（或命名 `LiteLLMRerankerClient`）
+- [ ] `LiteLLMRerankerClient` 实现位于 `src/infrastructure/external_services/reranker/litellm_reranker_client.py
 - [ ] 使用**专用重排序 API**（如 `BAAI/bge-reranker-v2-m3` 的 `rerank` 端点），通过 `litellm.rerank()` 调用，**不经过 LLMClientPort**
 - [ ] 注入 `RerankerConfig.from_env()`（model/base_url/api_key/timeout，非"可选"）
 - [ ] 分数契约：`score = 归一化重排序分数`，`payload["original_score"] = 原 RRF 分数`，`payload["rerank_score"] = 重排序分数`
@@ -159,7 +161,7 @@
 - [ ] `composition_root.py` 注册 `graph_search_service` 端口（GraphSearchService，SCOPED）
 - [ ] `composition_root.py` 注册 `reranker` 端口（`LiteLLMRerankerClient` 实现 RerankerPort，注入 `RerankerConfig`，非 LLMClientPort）
 - [ ] `composition_root.py` 升级 `hybrid_search_service` 端口注册（三路注入 + 版本升级处理 compatibility）
-- [ ] 端口契约测试 `tests/contracts/test_port_contract_hybrid_search.py` 更新通过
+- [ ] 端口契约测试 `tests/contracts/test_port_contract_search_services.py` 更新通过
 - [ ] `src/domain/ports/__init__.py` 导出 `RerankerPort`
 
 ---
@@ -299,7 +301,7 @@
 | **TDD 单元测试** | RerankerPort | 端口契约、方法签名 | `test_reranker_port.py` | Task 1 |
 | **TDD 单元测试** | 重排序异常 | 构造/属性/to_dict()/HTTP 映射 | `test_reranker_exceptions.py` | Task 1 |
 | **TDD 单元测试** | GraphSearchService | L5GraphPort 注入、SearchResult 转换 | `test_graph_search_service.py` | Task 2 |
-| **TDD 单元测试** | LiteLLMRerankerClient | 重排序逻辑、降级策略 | `test_cross_encoder_reranker.py` | Task 2 |
+| **TDD 单元测试** | LiteLLMRerankerClient | 重排序逻辑、降级策略 | `test_litellm_reranker_client.py` | Task 2 |
 | **TDD 单元测试** | 升级 HybridSearchService | 三路编排、加权融合、降级 | `test_hybrid_search_service.py`（更新） | Task 3 |
 | **TDD 回归验证** | 三路 RRF 融合 | 补充三路加权融合缺失用例 | `test_rrf_fusion.py`（更新，不新建文件） | Task 1 |
 | **TDD 验收测试** | Gherkin 场景（更新） | 业务价值验收 | `test_acceptance_hybrid_search.feature` | Task 0 |
@@ -363,7 +365,7 @@
 | AC-1 | Graph 检索服务（第三路信号） | Task 2 | Subtask 2.1-2.3 | `test_graph_search_service.py` |
 | AC-2 | 三路加权 RRF 融合 | Task 1 | Subtask 1.1-1.3 | `test_rrf_fusion.py`（更新，补充三路用例） |
 | AC-3 | 升级后的混合检索编排服务 | Task 3 | Subtask 3.1-3.3 | `test_hybrid_search_service.py`（更新） |
-| AC-4 | ColBERT 重排序端口与实现 | Task 2 | Subtask 2.4-2.6 | `test_reranker_port.py` + `test_cross_encoder_reranker.py` |
+| AC-4 | ColBERT 重排序端口与实现 | Task 2 | Subtask 2.4-2.6 | `test_reranker_port.py` + `test_litellm_reranker_client.py` |
 | AC-5 | 重排序异常体系 | Task 1 | Subtask 1.4-1.6 | `test_reranker_exceptions.py` |
 | AC-6 | 端口注册与 DI 集成 | Task 4 | Subtask 4.1-4.3 | `test_port_contract_reranker.py` + `test_port_contract_search_services.py` |
 | AC-6 | 架构约束验证 + 集成测试 | Task 4 | Subtask 4.4-4.6 | `test_arch_hybrid_search.py` + `test_integration_hybrid_search.py` |
@@ -383,7 +385,7 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 定义 RerankerPort 端口契约（rerank 方法签名 + RerankResult 值对象）设计
+- [ ] Subtask 0.1: 定义 RerankerPort 端口契约（`rerank` 方法签名 + `top_k` 截断语义）设计
 - [ ] Subtask 0.2: 定义 GraphSearchService 接口设计（与 Dense/Sparse 服务签名对齐）
 - [ ] Subtask 0.3: 定义 HybridSearchService 升级设计（三路注入 + 可配置权重 + 重排序集成）
 - [ ] Subtask 0.4: 定义重排序异常体系设计（RerankError EXCEPTION_350）
@@ -489,7 +491,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_graph_search_service.py` |
+| 🔴 红 | 编写 `tests/unit/application/test_graph_search_service.py` |
 | 🟢 绿 | 实现 `src/application/services/graph_search_service.py` |
 | 🔄 重构 | 优化图遍历逻辑，运行 `ruff` + `mypy` |
 
@@ -561,7 +563,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_hybrid_search_service.py`（更新，新增三路测试） |
+| 🔴 红 | 编写 `tests/unit/application/test_hybrid_search_service.py`（更新，新增三路测试） |
 | 🟢 绿 | 升级 `src/application/services/hybrid_search_service.py`（三路注入 + 可配置权重 + 重排序集成） |
 | 🔄 重构 | 优化编排逻辑，运行 `ruff` + `mypy` |
 
@@ -609,6 +611,10 @@
 - [ ] Subtask 4.2: 更新 `src/composition_root.py` 注册相关端口
   ```python
   # 注册 GraphSearchService（第三路检索，仅注入 L5GraphPort）
+  # ⚠️ 注意：l5_graph 端口当前注册为字符串路径（Neo4jAdapter），
+  #   其构造参数 `storage: Any` 无法通过 Resolver._auto_inject 自动解析。
+  #   实施时需先将 l5_graph 注册改为 lambda 工厂函数：
+  #   register_port(name="l5_graph", ..., impl=lambda r: Neo4jAdapter(storage=r.resolve("neo4j_graph_storage")))
   register_port(
       name="graph_search_service",
       version="v1.0.0",
@@ -637,8 +643,11 @@
   )
 
   # 升级 HybridSearchService 注册（三路注入 + 可配置权重 + 重排序）
-  # 注意：v1.0.0 → v1.1.0 需先 unregister 旧端口 + 设置 compatibility=("v1.0.0",)，
-  #       否则 PortRegistry 对同名不同 spec 抛 ConflictError
+  # 注意：v1.0.0 → v1.1.0 必须先 unregister 旧端口再 register，否则 PortRegistry
+  #       对同名不同 spec 抛 ConflictError。compatibility 为可选元数据标记。
+  # 正确升级流程：
+  #   _global_registry.unregister("hybrid_search_service")
+  #   然后 register_port(...) 注册 v1.1.0
   register_port(
       name="hybrid_search_service",
       version="v1.1.0",
@@ -655,12 +664,12 @@
       lifetime=Lifetime.SCOPED,
       owner="search-team",
       tags=("search", "hybrid", "rrf", "three-way"),
-      compatibility=("v1.0.0",),
+      compatibility=("v1.0.0",),  # 可选元数据，仅用于追溯/契约测试
   )
   ```
   - 生命周期: SCOPED
   - Owner: search-team
-  - **版本升级前置条件：** `hybrid_search_service` 从 `v1.0.0` 升级到 `v1.1.0`，因 `PortRegistry.register()` 对同名不同 spec 抛 `ConflictError`，必须在 bootstrap 中先 `unregister("hybrid_search_service")` 旧端口，再注册新端口，并设置 `compatibility=("v1.0.0",)`
+  - **版本升级前置条件：** `hybrid_search_service` 从 `v1.0.0` 升级到 `v1.1.0`，因 `PortRegistry.register()` 对同名不同 spec 抛 `ConflictError`，**必须在 bootstrap 中先 `_global_registry.unregister("hybrid_search_service")` 旧端口，再注册新端口**。`compatibility=("v1.0.0",)` 为**可选元数据标记**（供契约测试/追溯用），非注册必需步骤
   - **RERANKER_ENABLED=false 时：** composition_root 不注册 `reranker` 端口（或注册为返回 None 的占位），`hybrid_search_service` 注入 `reranker=None` 跳过精排（其逻辑已支持可选）
 
 #### 端口契约测试
@@ -680,7 +689,7 @@
 - [ ] Subtask 4.5: 更新 `tests/unit/architecture/test_arch_hybrid_search.py`
   - 验证 `src/domain/ports/reranker.py` 零外部依赖（仅标准库）
   - 验证 `RerankerPort` 位于领域层
-  - 验证 `CrossEncoderReranker` 位于基础设施层
+  - 验证 `LiteLLMRerankerClient` 位于基础设施层
   - 验证 `GraphSearchService` 位于应用层
   - 验证依赖方向正确（infrastructure → domain，application → domain）
 
@@ -727,8 +736,8 @@
   - `tests/unit/domain/services/test_rrf_fusion.py`（更新，补充三路默认权重/对称权重用例）
   - `tests/unit/domain/exceptions/test_reranker_exceptions.py`（含精确类型断言 HTTP 500）
   - `tests/unit/domain/exceptions/test_hybrid_search_exceptions.py`（HybridSearchError 异常测试）
-  - `tests/unit/application/services/test_graph_search_service.py`（路径：`tests/unit/application/test_graph_search_service.py`，遵循项目结构）
-  - `tests/unit/application/services/test_hybrid_search_service.py`（更新，路径：`tests/unit/application/test_hybrid_search_service.py`）
+  - `tests/unit/application/test_graph_search_service.py`（新建）
+  - `tests/unit/application/test_hybrid_search_service.py`（更新）
   - `tests/unit/infrastructure/external_services/reranker/test_litellm_reranker_client.py`
   - `tests/unit/architecture/test_arch_hybrid_search.py`（更新，覆盖 reranker/GraphSearchService/LiteLLMRerankerClient）
   - `tests/contracts/test_port_contract_reranker.py`
@@ -990,11 +999,13 @@ sisys/
 ### 环境变量设计
 
 ```bash
-# 重排序配置（可选，默认使用 LLMClientPort 默认配置）
+# 重排序配置（必需，通过 RerankerConfig.from_env() 加载）
 export RERANKER_ENABLED=true
 export RERANKER_MODEL=BAAI/bge-reranker-v2-m3   # 重排序模型
 export RERANKER_TOP_K=20                          # 默认 Top-K 数量
 export RERANKER_TIMEOUT=10                        # 重排序超时（秒）
+export RERANKER_API_KEY=...                       # 重排序 API 密钥
+export RERANKER_BASE_URL=...                      # 重排序 API 端点
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
