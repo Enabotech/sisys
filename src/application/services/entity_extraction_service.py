@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
-from typing import Any
 
 from src.domain.events.entity_extraction_events import EntitiesExtracted
 from src.domain.exceptions import EntityExtractionError
@@ -16,6 +16,7 @@ from src.domain.ports.entity_extraction import (
     EntityExtractionPort,
     ExtractionResult,
 )
+from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.l5_graph import L5GraphPort
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,60 @@ _ENTITY_TYPE_MAP: dict[str, str] = {
     "PERCENT": "percent",
     "CONTACT": "contact",
 }
+
+
+def _make_entity_node_id(memory_id: str, entity_name: str) -> str:
+    """为抽取实体生成独立的 Neo4j 节点 ID
+
+    基于 memory_id + 实体名称的确定性哈希，确保：
+    - 同一 memory_id 下不同实体名称 → 不同节点 ID（独立节点）
+    - 同一 memory_id + 同一实体名称 → 相同节点 ID（幂等 MERGE）
+
+    Args:
+        memory_id: 关联记忆 ID
+        entity_name: 实体名称
+
+    Returns:
+        Neo4j 节点 ID（格式: {memory_id}:{sha256前16位}）
+    """
+    suffix = hashlib.sha256(entity_name.encode("utf-8")).hexdigest()[:16]
+    return f"{memory_id}:{suffix}"
+
+
+def _map_extraction_type(result: ExtractionResult) -> str:
+    """将仲裁策略映射为领域事件规范定义的 extraction_type 值
+
+    SDD 规范定义 extraction_type 合法值为 "rule_only" / "llm_only" / "hybrid"。
+    仲裁器 metadata 中的 strategy 取值为 "rule" / "llm" / "hybrid"，
+    此处按抽取结果实际来源分布映射为规范值。
+
+    Args:
+        result: 仲裁后的抽取结果
+
+    Returns:
+        extraction_type 规范值（rule_only / llm_only / hybrid）
+    """
+    strategy = result.extraction_metadata.get("strategy", "")
+
+    # 有实体/关系时按实际来源判定
+    # hybrid 表示规则+LLM均有贡献，rule 表示仅规则，llm 表示仅 LLM
+    has_rule = any(e.extraction_source in ("rule", "hybrid") for e in result.entities)
+    has_llm = any(e.extraction_source in ("llm", "hybrid") for e in result.entities)
+
+    if has_rule and has_llm:
+        return "hybrid"
+    if has_rule:
+        return "rule_only"
+    if has_llm:
+        return "llm_only"
+    # 无实体时回退到仲裁器策略或默认值
+    if strategy == "hybrid":
+        return "hybrid"
+    if strategy == "llm":
+        return "llm_only"
+    if strategy == "rule":
+        return "rule_only"
+    return "unknown"
 
 
 class EntityExtractionService:
@@ -53,7 +108,7 @@ class EntityExtractionService:
         llm_extractor: EntityExtractionPort,
         l5_graph: L5GraphPort,
         arbitrator: EntityArbitratorPort,
-        event_publisher: Any,
+        event_publisher: EventPublisher,
     ) -> None:
         """初始化实体抽取编排服务
 
@@ -139,12 +194,13 @@ class EntityExtractionService:
         # 5. 发布事件
         if memory_id:
             try:
-                extraction_type = final_result.extraction_metadata.get("strategy", "unknown")
+                extraction_type = _map_extraction_type(final_result)
                 event = EntitiesExtracted(
                     memory_id=memory_id,
                     entity_count=len(final_result.entities),
                     relation_count=len(final_result.relations),
                     extraction_type=extraction_type,
+                    source="entity_extraction_service",
                 )
                 publish_result = await self._event_publisher.publish(event)
                 if not publish_result.is_success:
@@ -161,13 +217,19 @@ class EntityExtractionService:
     ) -> None:
         """将抽取结果持久化到 Neo4j
 
+        每个抽取实体生成独立节点 ID（memory_id + 实体名称哈希），
+        关系通过实体节点 ID 建立有向边，形成正确的"实体-关系-实体"三元组图结构。
+
         Args:
             memory_id: 关联记忆 ID
             result: 抽取结果
         """
         # 持久化实体
+        entity_node_ids: dict[str, str] = {}
         for entity in result.entities:
             entity_type_value = _ENTITY_TYPE_MAP.get(entity.entity_type, entity.entity_type.lower())
+            entity_node_id = _make_entity_node_id(memory_id, entity.name)
+            entity_node_ids[entity.name] = entity_node_id
             properties = {
                 "name": entity.name,
                 "entity_type": entity_type_value,
@@ -176,16 +238,36 @@ class EntityExtractionService:
                 "normalized_name": entity.normalized_name or entity.name,
             }
             await self._l5_graph.create_entity(
-                memory_id=memory_id,
+                memory_id=entity_node_id,
                 entity_type=entity_type_value,
                 properties=properties,
             )
 
         # 持久化关系
         for relation in result.relations:
+            # 如果关系源/目标实体未被抽取为独立实体，为其创建占位节点
+            if relation.source not in entity_node_ids:
+                placeholder_id = _make_entity_node_id(memory_id, relation.source)
+                entity_node_ids[relation.source] = placeholder_id
+                await self._l5_graph.create_entity(
+                    memory_id=placeholder_id,
+                    entity_type="unknown",
+                    properties={"name": relation.source, "extraction_source": "relation"},
+                )
+            if relation.target not in entity_node_ids:
+                placeholder_id = _make_entity_node_id(memory_id, relation.target)
+                entity_node_ids[relation.target] = placeholder_id
+                await self._l5_graph.create_entity(
+                    memory_id=placeholder_id,
+                    entity_type="unknown",
+                    properties={"name": relation.target, "extraction_source": "relation"},
+                )
+
+            source_node_id = entity_node_ids[relation.source]
+            target_node_id = entity_node_ids[relation.target]
             await self._l5_graph.create_relationship(
-                source_memory_id=memory_id,
-                target_memory_id=memory_id,
+                source_memory_id=source_node_id,
+                target_memory_id=target_node_id,
                 relationship_type=relation.relation_type,
                 properties={
                     "source_name": relation.source,

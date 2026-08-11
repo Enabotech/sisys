@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-08-09
+last_updated: 2026-08-10
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -118,10 +118,10 @@ development_status:
   epic-3: in-progress
   3-1a-dense-semantic-search: done
   3-1b-bm25-sparse-search-rrf-fusion: done
-  3-2a-llm-client-infrastructure: ready-for-dev
-  3-2b-entity-extraction-llm-rules: ready-for-dev
-  3-3-domain-dictionary-management: backlog
-  3-4-rrf-fusion-ranking: backlog
+  3-2a-llm-client-infrastructure: done
+  3-2b-entity-extraction-llm-rules: review
+  3-3-domain-dictionary-management: ready-for-dev
+  3-4-rrf-fusion-ranking: ready-for-dev
   3-5-layered-search-l1-l4: backlog
   3-6-contractual-summary-generation: backlog
   3-7-search-relevance-evaluation: backlog
