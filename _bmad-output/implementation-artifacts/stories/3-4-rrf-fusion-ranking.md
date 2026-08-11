@@ -207,17 +207,30 @@
 
 #### 领域异常契约 (Domain Exception Contract)
 
-**新建异常类（`src/domain/exceptions/reranker_exceptions.py`）：**
+**新建异常类（`src/domain/exceptions/reranker_exceptions.py` + `src/domain/exceptions/hybrid_search_exceptions.py`）：**
 
 | 异常类 | 编码 | 继承 | HTTP 映射 | 说明 |
 |--------|------|------|-----------|------|
 | `RerankError` | EXCEPTION_350 | `ExternalException` | 500 | 重排序失败（模型加载失败/调用超时/结果异常）。继承 `ExternalException` 理由：重排序是外部模型服务，属于外部异常范畴。HTTP 500 理由：服务端处理失败 |
+| `HybridSearchError` | EXCEPTION_209 | `BusinessException` | 500 | 三路检索通道均失败（替换 RuntimeError 历史违规）。继承 `BusinessException` 理由：检索编排属于业务子域，非外部服务错误。HTTP 500 理由：服务端处理失败 |
 
 **编码分配验证：**
 - `external` 子域范围：301-399 ✅
+- `business` 子域范围：201-208（**需扩展为 201-209** 以容纳 HybridSearchError EXCEPTION_209）
 - `embedding` 306-308, `sandbox` 309-319, `ocr` 320-329, `llm` 330-339, `entity_extraction` 340-349
 - **重排序分配 350** — 紧接实体抽取之后，预留 350-359 范围
 - 运行 `grep -r "EXCEPTION_35[0-9]" src/domain/exceptions/` 确认无碰撞
+
+### HybridSearchError 编码注册（EXCEPTION_209）
+
+- [ ] **business 子域范围扩展** — 将 `_code_ranges.py` 的 `CODE_RANGES["business"]` 从 `(201, 208)` 扩展为 `(201, 209)`，容纳 EXCEPTION_209
+- [ ] **`_CLASS_TO_SUBDOMAIN` 注册** — 添加 `"HybridSearchError": "business"` 映射
+- [ ] **CI 子域登记同步** — 更新 `tests/unit/domain/exceptions/test_code_ranges.py` 的 `allowed_child_parent_subdomains`，登记 `("hybrid_search", "business")` 或 `("reranker", "business")`（取决于子域命名），否则 `test_subclass_code_in_same_subdomain_as_parent` 会因"非法跨子域继承"失败
+- [ ] 归属模块与基类 — 检索编排属于业务子域，继承 `BusinessException`（非 `ExternalException`）
+- [ ] 导出完整性 — `__init__.py` + `EXCEPTION_HTTP_MAP`（500）
+- [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性/子域范围
+
+### RerankError 编码注册（EXCEPTION_350）
 
 - [ ] 归属模块与基类 — 重排序属于外部模型服务，继承 `ExternalException`
 - [ ] 唯一编码分配 — 350，确认无碰撞
@@ -225,7 +238,8 @@
   - `model_name: str` — 重排序模型名称
   - `top_k: int` — 重排序的 Top-K 数量
   - `result_count: int` — 输入结果数量
-- [ ] 编码注册 — 在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 中注册；新增 `reranker` 子域范围 (350, 359)
+- [ ] 编码注册 — 在 `_code_ranges.py` 的 `CODE_RANGES` 新增 `"reranker": (350, 359)` + `_CLASS_TO_SUBDOMAIN` 注册 `RerankError`
+- [ ] CI 子域登记同步 — 更新 `tests/unit/domain/exceptions/test_code_ranges.py` 的 `allowed_child_parent_subdomains` 登记 `("reranker", "external")` + `nested_subdomains` 登记 `"reranker": "external"`
 - [ ] 导出完整性 — `__init__.py` + `EXCEPTION_HTTP_MAP`
 - [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性
 
@@ -366,7 +380,7 @@
 | AC-2 | 三路加权 RRF 融合 | Task 1 | Subtask 1.1-1.3 | `test_rrf_fusion.py`（更新，补充三路用例） |
 | AC-3 | 升级后的混合检索编排服务 | Task 3 | Subtask 3.1-3.3 | `test_hybrid_search_service.py`（更新） |
 | AC-4 | ColBERT 重排序端口与实现 | Task 2 | Subtask 2.4-2.6 | `test_reranker_port.py` + `test_litellm_reranker_client.py` |
-| AC-5 | 重排序异常体系 | Task 1 | Subtask 1.4-1.6 | `test_reranker_exceptions.py` |
+| AC-5 | 重排序异常体系 | Task 1 | Subtask 1.7-1.9 | `test_reranker_exceptions.py` |
 | AC-6 | 端口注册与 DI 集成 | Task 4 | Subtask 4.1-4.3 | `test_port_contract_reranker.py` + `test_port_contract_search_services.py` |
 | AC-6 | 架构约束验证 + 集成测试 | Task 4 | Subtask 4.4-4.6 | `test_arch_hybrid_search.py` + `test_integration_hybrid_search.py` |
 
@@ -1141,10 +1155,16 @@ export RERANKER_BASE_URL=...                      # 重排序 API 端点
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-08-10
 **最后更新/Last Updated:** 2026-08-11
 **更新说明/Description:**
+- v1.2.0: 第3轮审查修复（异常契约表补全 + AC追溯矩阵修正 + 编码注册细节完善）
+  - 异常契约表新增 HybridSearchError(EXCEPTION_209) 行
+  - AC-5 追溯矩阵 Subtask 引用修正（1.4-1.6→1.7-1.9）
+  - 编码注册细化：business 子域扩展至 209、CI 子域登记（allowed_child_parent_subdomains/nested_subdomains）同步说明
+  - L5GraphPort.search_entities 方法签名与 Cypher 实现、契约测试更新说明
+  - 验收测试需新增 Graph/重排序 fixtures（参考 embedding_service 的 skip 模式）
 - v1.1.0: 文档审查修复（对标实际代码实现，修复 P0×3 + P1×7 + P2×16 共 26 项问题）
   - P0-1: 异常合规 — RuntimeError→HybridSearchError(EXCEPTION_209)
   - P0-2: HTTP 映射 — RerankError 精确注册 500 说明
