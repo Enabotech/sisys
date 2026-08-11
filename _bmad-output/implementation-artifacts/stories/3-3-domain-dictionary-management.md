@@ -81,7 +81,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `DictionaryUpdated` 定义于 `src/domain/events/dictionary_events.py`
-- [ ] 字段：`term`（str）、`action`（str: add/update/delete/rollback）、`trigger`（str）、`version`（int）
+- [ ] 字段：`term`（str）、`action`（str: add/update/delete/rollback）、`trigger`（str）、`dictionary_version`（int）
 - [ ] `__post_init__` 设置 `aggregate_type = "Dictionary"`
 - [ ] 事件注册于 `src/domain/events/__init__.py`、`configs/event_channels.yaml`、`ChannelRouter.DEFAULT_MAPPINGS`（RELIABLE 模式）
 
@@ -96,11 +96,13 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `DomainDictionaryService` 位于 `src/application/services/domain_dictionary_service.py`
-- [ ] 构造函数注入：`dictionary_repo`（DomainDictionaryPort）、`rule_extractor`（EntityExtractionPort）、`event_publisher`
-- [ ] `refresh_dictionary()` 调用 `rule_extractor.reload_dictionary(repo.get_active_dictionary())`（复用 Story 3.2b 已交付的方法）
+- [ ] 构造函数注入：`dictionary_repo`（DomainDictionaryPort）、`dictionary_consumer`（DictionaryConsumerPort）、`event_publisher`（EventPublisher）
+- [ ] `refresh_dictionary()` 调用 `dictionary_consumer.reload_dictionary(repo.get_active_dictionary())`（复用 Story 3.2b 已交付的 `RuleBasedExtractor.reload_dictionary()` 能力）
 - [ ] `add_entry()`/`update_entry()`/`delete_entry()` → 变更后自动发布 `DictionaryUpdated` 事件
 - [ ] `rollback(version)` → 恢复该版本词典 + 触发热更新 + 发布事件
 - [ ] 空输入/无效词条校验走领域异常体系（禁止 `ValueError`）
+
+> **⚠️ 端口契约（P0 关键设计决策）：** `DomainDictionaryService` **不得**注入 `EntityExtractionPort` 并调用其 `reload_dictionary()`。`EntityExtractionPort` 协议（`src/domain/ports/entity_extraction.py`）**仅声明 `extract_entities()` 一个方法**，`reload_dictionary()` 是 `RuleBasedExtractor` 具体类的方法（`rule_extractor.py:218`），**不在**端口协议上。若直接注入 `EntityExtractionPort` 却调用 `reload_dictionary()`，将违反六边形架构依赖倒置原则（应用层依赖具体类方法），且触发 mypy 报错（项目禁止 `# type: ignore`）。**方案：遵循接口隔离原则（ISP），新建独立 `DictionaryConsumerPort` 协议**（见 SDD 规范"统一端口定义"章节），`RuleBasedExtractor` 同时实现 `EntityExtractionPort` 与 `DictionaryConsumerPort`，`DomainDictionaryService` 注入 `DictionaryConsumerPort`。
 
 ### AC-5: 基础设施层 PostgreSQL 词典仓储
 
@@ -140,7 +142,7 @@
 **And** 所有接口过认证中间件，遵循统一错误响应
 
 **验证标准/Validation Criteria:**
-- [ ] 路由名为 `document_dictionary`（或 `dictionary`），工厂函数 `create_dictionary_router()`，前缀 `/api/v1/documents/dictionary`
+- [ ] 路由名为 `document_dictionary_router`，工厂函数 `create_document_dictionary_router()`，前缀 `/api/v1/documents/dictionary`
 - [ ] `GET /api/v1/documents/dictionary/entries` — 列表词条（分页 + 过滤）
 - [ ] `POST /api/v1/documents/dictionary/entries` — 添加词条
 - [ ] `PUT /api/v1/documents/dictionary/entries/{term}` — 修改词条
@@ -183,14 +185,15 @@
   - 字段: `term: str` — 变更词条
   - `action: str` — 动作（"add" / "update" / "delete" / "rollback"）
   - `trigger: str` — 触发源（"api" / "ingest" / "manual"）
-  - `version: int` — 变更后的词典版本号（⚠️ 覆盖基类 `version` 字段的注意点见下）
+  - `dictionary_version: int = 0` — 变更后的词典版本号（独立字段，不覆盖基类 `version`）
   - 事件类型: `"DictionaryUpdated"`（`field(default="DictionaryUpdated", init=False)`）
   - `__post_init__` 设置 `aggregate_type = "Dictionary"`
   - Schema 版本: v1.0.0
-  - 通道: `RabbitMQ + Outbox`（业务状态型）
+  - 通道: `RabbitMQ + Outbox`（业务状态型，RELIABLE 模式）
   - 注册于 `src/domain/events/__init__.py`、`configs/event_channels.yaml`、`ChannelRouter.DEFAULT_MAPPINGS`
+  - **`event_channels.yaml` 配置指引：** 参照 `MemoryChanged` / `EntitiesExtracted` 模式，仅配置 `rabbitmq_routing_key`，不配置 `redis_channel`。示例：`rabbitmq_routing_key: "sisys.events.reliable.dictionary_updated"` + `delivery_mode: "reliable"`
 
-> **⚠️ `version` 字段冲突注意：** `DomainEvent` 基类已有 `version: int = 0`（事件版本号）。若 `DictionaryUpdated` 复用它表示"词典版本号"，必须在 `__post_init__` 或文档中明确语义。**推荐方案：** 使用独立字段名 `dictionary_version: int` 表示词典版本，避免与基类 `version`（事件单调版本）语义冲突。`__post_init__` 中不覆盖基类 `version`。
+> **⚠️ `dictionary_version` 字段说明：** `DomainEvent` 基类已有 `version: int = 0`（事件版本号）。**DictionaryUpdated 使用独立字段名 `dictionary_version: int`** 表示词典版本，避免与基类 `version`（事件单调版本）语义冲突。`dictionary_version` 不在 `_CORE_FIELD_NAMES` 中，序列化时会自动进入 `merged_payload`，反序列化时从 payload 提取。`__post_init__` 中不覆盖基类 `version`。
 
 #### 数据模型 (Data Models)
 
@@ -236,11 +239,20 @@
   - 版本: v1.0.0, owner: foundation-team
   - 端口契约测试: `tests/contracts/test_port_contract_domain_dictionary.py`
 
+**新建消费端端口（P0 关键设计）：**
+- [ ] `DictionaryConsumerPort`（`src/domain/ports/domain_dictionary.py`，与 `DomainDictionaryPort` 同文件）
+  - 方法: `def reload_dictionary(dictionary: list[tuple[str, str]]) -> None`
+  - 语义: 将完整词典 `(词条, 实体类型)` 列表热注入消费端运行时状态（如 `RuleBasedExtractor` 的 AC 自动机）
+  - 目的: 遵循接口隔离原则（ISP），抽象"词典消费端"能力，避免 `DomainDictionaryService` 依赖 `EntityExtractionPort` 协议之外的 `RuleBasedExtractor.reload_dictionary()` 具体方法
+  - 实现: `RuleBasedExtractor` 同时实现 `EntityExtractionPort` 与 `DictionaryConsumerPort`（`RuleBasedExtractor.reload_dictionary()` 已存在，仅需在类声明中追加 `DictionaryConsumerPort` 基类即可，无需改动方法体）
+  - 版本: v1.0.0, owner: foundation-team
+
 **端口契约清单（强制）：**
 
 | 端口名称 | 版本 | Owner | 注册 | 解析 | 契约测试 | 状态 |
 |---------|------|-------|------|------|---------|------|
 | DomainDictionaryPort | v1.0.0 | foundation-team | 新建（domain_dictionary_repo） | 新建 | 新建 | **新建** |
+| DictionaryConsumerPort | v1.0.0 | foundation-team | 复用（RuleBasedExtractor 实现） | 复用 | 复用/扩展 | **新建** |
 | DomainDictionaryService | v1.0.0 | foundation-team | 新建（domain_dictionary_service） | 新建 | 新建 | **新建** |
 
 #### 领域异常契约 (Domain Exception Contract)
@@ -264,7 +276,8 @@
 - [ ] 归属模块与基类 — 词典管理是**业务子域**，继承 `BusinessException` 层次（`NotFoundError`/`ConflictError`），不继承 `ExternalException`
 - [ ] 唯一编码分配 — 270/271/272，确认无碰撞
 - [ ] 构造器参数设计 — 携带 `term`、`expected_version`、`actual_version` 等上下文
-- [ ] 编码注册 — 在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 注册 `dictionary` 子域 (270, 279)
+- [ ] 编码注册 — 在 `_code_ranges.py` 的 `CODE_RANGES` 新增 `dictionary` 子域 (270, 279) + `_CLASS_TO_SUBDOMAIN` 注册三个异常类
+- [ ] **⚠️ 同步更新 `tests/unit/domain/exceptions/test_code_ranges.py` 的 `allowed_child_parent_subdomains`** — 新增 `("dictionary", "business")`，否则 CI 的 `test_subclass_code_in_same_subdomain_as_parent` 会因"非法跨子域继承"失败（三个异常均继承 `business` 子域的 `NotFoundError`/`ConflictError`，子域为 `dictionary），必须登记合法父子域关系
 - [ ] 导出完整性 — `__init__.py` + `EXCEPTION_HTTP_MAP`
 - [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性/子域范围
 
@@ -295,7 +308,7 @@
 
 **R1-R5 设计规则对齐：**
 - **R1** 领域层统一抽象基础端口：`DomainDictionaryPort` 定义于 `src/domain/ports/`，value objects 同文件
-- **R2** 应用层具体端口组合：`DomainDictionaryService` 组合注入 `DomainDictionaryPort`（字典数据）+ `EntityExtractionPort`（RuleBasedExtractor 消费端）+ 事件发布
+- **R2** 应用层具体端口组合：`DomainDictionaryService` 组合注入 `DomainDictionaryPort`（字典数据）+ **`DictionaryConsumerPort`**（RuleBasedExtractor 词典消费端）+ 事件发布。**不注入 `EntityExtractionPort`**（见 AC-4 端口契约 P0 决策）
 - **R3** 基础设施层实现端口：`PostgreSQLDomainDictionaryRepository` 实现 `DomainDictionaryPort`，负责 PostgreSQL 技术实现
 - **R4** 接口层适配外部请求：Dictionary 路由负责格式化请求/响应，适配 REST 到端口调用
 - **R5** 严格遵循异常设计：新增异常走 `_code_ranges.py` → `__init__.py` → `EXCEPTION_HTTP_MAP` 完整流程
@@ -346,7 +359,7 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | DomainDictionaryPort + 值对象 | 端口契约、值对象构造、Query 默认值 | `test_domain_dictionary_port.py` | Task 1 |
+| **TDD 单元测试** | DomainDictionaryPort + 值对象 + DictionaryConsumerPort | 端口契约、值对象构造、Query 默认值、消费端端口签名 | `test_domain_dictionary_port.py` | Task 1 |
 | **TDD 单元测试** | DictionaryUpdated 事件 | 事件构造、序列化、注册 | `test_dictionary_events.py` | Task 1 |
 | **TDD 单元测试** | 词典异常 | 构造/属性/to_dict()/HTTP 映射 | `test_dictionary_exceptions.py` | Task 1 |
 | **TDD 单元测试** | DomainDictionaryService | CRUD 编排、热更新、快照/回滚、事件发布 | `test_domain_dictionary_service.py` | Task 2 |
@@ -368,11 +381,12 @@
 根据 epics_v1.0.md CI/CD 质量门禁和 prd.md NFR 测试覆盖计划：
 
 - [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
-- [ ] **领域层覆盖率 ≥90%**（`pytest --cov=src/domain/ports/domain_dictionary.py`）
-- [ ] **应用层覆盖率 ≥85%**（`pytest --cov=src/application/services/domain_dictionary_service.py`）
-- [ ] **基础设施层覆盖率 ≥75%**（`pytest --cov=src/infrastructure/storage/postgresql/repository/domain_dictionary_repository.py`）
-- [ ] **接口层覆盖率 ≥85%**（`pytest --cov=src/interfaces/api/domain_dictionary.py`）
-- [ ] **集成测试覆盖率 ≥70%**（`pytest --cov=tests/integration/test_integration_domain_dictionary.py`）
+- [ ] **领域层覆盖率 ≥90%**（`pytest --cov=src --cov-fail-under=90 --cov=src/domain/`）
+- [ ] **应用层覆盖率 ≥85%**（`pytest --cov=src --cov-fail-under=85 --cov=src/application/`）
+- [ ] **基础设施层覆盖率 ≥75%**（`pytest --cov=src --cov-fail-under=75 --cov=src/infrastructure/storage/postgresql/repository/domain_dictionary_repository.py`）
+- [ ] **接口层覆盖率 ≥85%**（`pytest --cov=src --cov-fail-under=85 --cov=src/interfaces/api/domain_dictionary.py`）
+
+> ⚠️ **覆盖率说明：** `pyproject.toml` 中 `[tool.coverage.run] omit = ["*/tests/*"]`，覆盖率仅对 `src` 测量，逐层 `--cov-fail-under` 门禁配合 `--cov=src` 整体覆盖。集成测试文件不在 `src` 中，不单独设置覆盖率阈值。
 
 > ⚠️ **骨架 Story 覆盖率豁免：** 本 Story 为应用层实现，非骨架 Story，需达到标准覆盖率要求。
 
@@ -461,7 +475,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/domain/ports/test_domain_dictionary_port.py`（端口契约 + 值对象构造） |
-| 🟢 绿 | 实现 `src/domain/ports/domain_dictionary.py`（DomainDictionaryPort + 值对象） |
+| 🟢 绿 | 实现 `src/domain/ports/domain_dictionary.py`（DomainDictionaryPort + DictionaryConsumerPort + 值对象） |
 | 🔄 重构 | 优化类型注解，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 1.1: 🔴 红 — 编写 DomainDictionaryPort 失败测试
@@ -469,11 +483,13 @@
   - `DictionaryQuery` frozen dataclass 构造（默认 category=None, active_only=True, page=1, page_size=50，page_size 上限 100）
   - `DictionarySnapshot` frozen dataclass 构造
   - `DomainDictionaryPort` Protocol 结构验证（`list_entries`/`add_entry`/`update_entry`/`delete_entry`/`get_active_dictionary`/`create_snapshot`/`rollback`/`list_snapshots` 方法签名）
+  - `DictionaryConsumerPort` Protocol 结构验证（`reload_dictionary` 方法签名，参数为 `list[tuple[str, str]]`，返回 `None`）
   - `@runtime_checkable` 可用
-- [ ] Subtask 1.2: 🟢 绿 — 实现 DomainDictionaryPort + 值对象
+- [ ] Subtask 1.2: 🟢 绿 — 实现 DomainDictionaryPort + DictionaryConsumerPort + 值对象
   - `DictionaryEntry`：用 `__post_init__` 校验 term 非空（违反时抛 `EntityValidationError`，领域异常体系）
   - `DictionaryQuery`：`__post_init__` 钳制 page_size ≤100、page ≥1（抛 `EntityValidationError`）
   - `DomainDictionaryPort` Protocol 定义全部方法
+  - `DictionaryConsumerPort` Protocol 定义 `reload_dictionary()` 方法
 - [ ] Subtask 1.3: 🔄 重构 — 优化代码，运行 `ruff` + `mypy`
 
 #### TDD 循环 [B]：词典异常体系
@@ -496,6 +512,7 @@
   - 更新 `src/domain/exceptions/__init__.py` 导出
   - 更新 `src/domain/exceptions/_code_ranges.py` 新增 `dictionary` 子域 (270, 279) + `_CLASS_TO_SUBDOMAIN` 映射
   - 更新 `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP`
+  - **⚠️ 更新 `tests/unit/domain/exceptions/test_code_ranges.py` 的 `allowed_child_parent_subdomains`** 新增 `("dictionary", "business")`（否则 CI 的 `test_subclass_code_in_same_subdomain_as_parent` 会因 DictionaryNotFoundError 等的子域 `dictionary` 继承自 `business` 子域的父类而报"非法跨子域继承"）
 - [ ] Subtask 1.6: 🔄 重构 — 运行 `ruff check` + `mypy` + `pytest tests/unit/domain/exceptions/ -v`
 
 #### TDD 循环 [C]：DictionaryUpdated 领域事件
@@ -530,7 +547,7 @@
 
 **关联 AC:** AC-4, AC-6
 
-> **应用层编排：** 本 Task 实现 `DomainDictionaryService`，组合 `DomainDictionaryPort`（持久化）与 `EntityExtractionPort`（RuleBasedExtractor 热更新消费端）。
+> **应用层编排：** 本 Task 实现 `DomainDictionaryService`，组合 `DomainDictionaryPort`（持久化）与 **`DictionaryConsumerPort`**（RuleBasedExtractor 热更新消费端）。**不注入 `EntityExtractionPort`**（见 AC-4 端口契约 P0 决策）。
 
 #### TDD 循环 [A]：DomainDictionaryService 编排 + 热更新
 
@@ -544,17 +561,17 @@
   - **Happy Path:** `add_entry()` 添加词条 → 调用 repo.add_entry + 发布 DictionaryUpdated 事件（action=add）
   - **Happy Path:** `update_entry()` 修改词条 → 调用 repo.update_entry + 发布事件（action=update）
   - **Happy Path:** `delete_entry()` 删除词条 → 调用 repo.delete_entry + 发布事件（action=delete）
-  - **Happy Path:** `refresh_dictionary()` → 调用 repo.get_active_dictionary() + rule_extractor.reload_dictionary(entries)
+  - **Happy Path:** `refresh_dictionary()` → 调用 repo.get_active_dictionary() + dictionary_consumer.reload_dictionary(entries)
   - **Happy Path:** `create_snapshot()` 创建快照 → 调用 repo.create_snapshot
   - **Happy Path:** `rollback(version)` 回滚 → 调用 repo.rollback + reload_dictionary + 发布事件（action=rollback）
   - **Edge Case:** 添加空词条 → 抛 `DictionaryEntryConflictError` 或校验异常（走领域异常）
   - **Edge Case:** 回滚到不存在版本 → 抛 `DictionaryNotFoundError`
   - **Edge Case:** 事件发布失败 → 记录日志（不阻止主流程返回结果）
-  - **热更新验证:** refresh 后 rule_extractor 实际加载了新词条（用真实 RuleBasedExtractor + 待注入词典断言）
+  - **热更新验证:** refresh 后 dictionary_consumer 实际加载了新词条（mock `DictionaryConsumerPort`，断言 `reload_dictionary()` 被调用且参数为 `repo.get_active_dictionary()` 返回值）
 - [ ] Subtask 2.2: 🟢 绿 — 实现 DomainDictionaryService
-  - 构造函数注入: `dictionary_repo`（DomainDictionaryPort）、`rule_extractor`（EntityExtractionPort）、`event_publisher`
+  - 构造函数注入: `dictionary_repo`（DomainDictionaryPort）、`dictionary_consumer`（DictionaryConsumerPort）、`event_publisher`
   - CRUD 编排：add/update/delete 均委托 repo，成功后发布事件
-  - `refresh_dictionary()`：读取活动词典 → 调用 rule_extractor.reload_dictionary(list[tuple[str,str]])
+  - `refresh_dictionary()`：读取活动词典 → 调用 dictionary_consumer.reload_dictionary(list[tuple[str,str]])
   - 快照/回滚：create_snapshot 委托 repo；rollback(version) 委托 repo 后自动 refresh + 发布事件
   - 事件发布失败仅记录日志（不抛出），遵循 Story 3.2b 模式
 - [ ] Subtask 2.3: 🔄 重构 — 运行 `ruff` + `mypy`
@@ -568,8 +585,8 @@
 | 🔄 重构 | 优化 reload 触发，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 2.4: 🔴 红 — 编写热更新失败测试
-  - 注册真实 `RuleBasedExtractor`，初始词典不含 "元宇宙"
-  - 添加 "元宇宙" 词条 → `refresh_dictionary()` → 用 extract_entities("元宇宙技术趋势") 断言返回 CONCEPT 实体
+  - 注册真实 `RuleBasedExtractor`（同时实现 `DictionaryConsumerPort`），初始词典不含 "元宇宙"
+  - 添加 "元宇宙" 词条 → `refresh_dictionary()` → 用真实 `RuleBasedExtractor.extract_entities("元宇宙技术趋势")` 断言返回 CONCEPT 实体
   - 热更新后不再匹配已删除词条
   - 热更新延迟 P95<100ms（性能断言，宽松阈值）
   - 核心战略概念覆盖率≥95%（预置词条集验证：BLM/BEM/SWOT/NPV/IRR/PESTEL 等均被识别）
@@ -638,7 +655,7 @@
   - **Edge Case:** 修改不存在词条 → 404，error.code=EXCEPTION_270
   - **Edge Case:** 认证失败 → 401（`get_current_user_override` 可跳过）
 - [ ] Subtask 3.5: 🟢 绿 — 实现 Dictionary 路由
-  - `create_dictionary_router()` 工厂函数，前缀 `/api/v1/documents/dictionary`
+  - `create_document_dictionary_router()` 工厂函数，前缀 `/api/v1/documents/dictionary`
   - 请求/响应 Schema 用 Pydantic 定义于同文件
   - 双重注入：构造器参数（测试 mock）/ `get_resolver().resolve("domain_dictionary_service")`（生产）
   - 认证：`Depends(get_current_user)` + `get_current_user_override` 支持
@@ -660,7 +677,7 @@
 
 #### 端口注册与 DI 集成
 
-- [ ] Subtask 4.1: 更新 `src/domain/ports/__init__.py` 导出 `DomainDictionaryPort`、`DictionaryEntry`、`DictionaryQuery`、`DictionarySnapshot`
+- [ ] Subtask 4.1: 更新 `src/domain/ports/__init__.py` 导出 `DomainDictionaryPort`、`DictionaryConsumerPort`、`DictionaryEntry`、`DictionaryQuery`、`DictionarySnapshot`
 - [ ] Subtask 4.2: 更新 `src/composition_root.py` 注册相关端口
   ```python
   # 注册领域词典仓储（PostgreSQLDomainDictionaryRepository 实现 DomainDictionaryPort）
@@ -675,14 +692,14 @@
       tags=("dictionary", "gateway", "application"),
   )
 
-  # 注册 DomainDictionaryService 应用服务（注入仓储 + RuleBasedExtractor + 事件发布）
+  # 注册 DomainDictionaryService 应用服务（注入仓储 + 词典消费端 + 事件发布）
   register_port(
       name="domain_dictionary_service",
       version="v1.0.0",
       interface=DomainDictionaryService,
       impl=lambda resolver: DomainDictionaryService(
           dictionary_repo=resolver.resolve("domain_dictionary_repo"),
-          rule_extractor=resolver.resolve("entity_extraction_rule"),
+          dictionary_consumer=resolver.resolve("entity_extraction_rule"),
           event_publisher=resolver.resolve("event_publisher"),
       ),
       module="src.application.services.domain_dictionary_service",
@@ -693,7 +710,9 @@
   ```
   - 生命周期: SCOPED
   - Owner: foundation-team
-  - **注意：** `rule_extractor` 复用 Story 3.2b 已注册的 `entity_extraction_rule` 端口（SCOPED），通过实体抽取服务的热更新能力注入词典。若 SCOPED 生命周期导致跨请求状态污染问题，需评估 RuleBasedExtractor 的词典持有是否为共享状态——热更新语义要求词典全局共享，必要时调整该端口生命周期或采用 SINGLETON 包装，需在实施时验证并记录决策。
+  - **端口契约（P0）：** `DomainDictionaryService` 注入 `dictionary_consumer` 端口，其运行时类型为 `RuleBasedExtractor`（同时实现 `EntityExtractionPort` 与 `DictionaryConsumerPort`）。`entity_extraction_rule` 端口在 composition_root 中以 `interface=EntityExtractionPort` 注册——由于 `RuleBasedExtractor` 同时实现 `DictionaryConsumerPort`，`resolver.resolve("entity_extraction_rule")` 返回的实例可安全作为 `DictionaryConsumerPort` 注入（`RuleBasedExtractor` 已实现 `reload_dictionary()`）。**不需要**为 `DictionaryConsumerPort` 单独注册新端口，复用 `entity_extraction_rule` 即可。
+
+  > **⚠️ 生命周期（P1 关键决策）：** `entity_extraction_rule` 端口当前以 **`Lifetime.SCOPED`** 注册（`composition_root.py:1713`）。**热更新语义要求词典全局共享**——若 SCOPED，每个请求作用域新建 `RuleBasedExtractor` 实例，`refresh_dictionary()` 只更新当前作用域实例的词典，其他并发请求仍持有旧词典，**热更新跨请求不生效**。**必须将 `entity_extraction_rule` 生命周期改为 `Lifetime.SINGLETON`**，确保所有请求共享同一词典自动机实例。改生命周期时需注意：`RuleBasedExtractor` 非线程安全，`reload_dictionary()` 替换 `_automaton` 与 `extract_entities()` 读取 `_automaton` 并发访问需用 `asyncio.Lock`（**声明为类变量**，见项目 Gotchas）或 copy-on-write 模式保护。
 
 #### 端口契约测试
 
@@ -702,6 +721,7 @@
   - 验证 `domain_dictionary_service` 端口已注册到 Registry
   - 验证 `Resolver` 可解析各端口
   - 验证 `DomainDictionaryPort` 方法签名正确
+  - 验证 `RuleBasedExtractor` 实现 `DictionaryConsumerPort`（`hasattr(extractor, "reload_dictionary")` + 签名检查）
   - 遵循"三方法"模式（注册验证、实现方法签名验证、元数据验证）
 
 #### 架构验证测试
@@ -737,7 +757,7 @@
 > **性质说明：** 本 Task 是对 Story 收尾阶段的交付物与完成清单进行最终验收。
 
 - [ ] Subtask 5.1: 场景 1 — 验证 `src` 完成清单的逐项确认
-  - `src/domain/ports/domain_dictionary.py` — DomainDictionaryPort + 值对象
+  - `src/domain/ports/domain_dictionary.py` — DomainDictionaryPort + DictionaryConsumerPort + 值对象
   - `src/domain/exceptions/dictionary_exceptions.py` — DictionaryNotFoundError/DictionaryEntryConflictError/DictionaryVersionConflictError
   - `src/domain/exceptions/__init__.py` — 导出词典异常
   - `src/domain/exceptions/_code_ranges.py` — 新增 dictionary 子域 (270-279)
@@ -792,7 +812,7 @@ DomainDictionaryService (Application)
     ├─→ refresh_dictionary()
     │       │
     │       ▼  get_active_dictionary() → list[tuple[str, str]]
-    │   RuleBasedExtractor.reload_dictionary(entries)   ← 复用 Story 3.2b 已交付方法
+    │   DictionaryConsumerPort.reload_dictionary(entries)  ← 通过端口契约调用，非具体类方法
     │       │
     │       ▼  AC 自动机重建（无需重启）
     │   后续实体抽取立即使用新词典
@@ -802,10 +822,17 @@ DomainDictionaryService (Application)
         └─ rollback(version) → 恢复快照 → 重新热更新
 ```
 
+**端口契约架构（P0 设计决策）：**
+- `EntityExtractionPort` 协议（`src/domain/ports/entity_extraction.py`）**仅声明 `extract_entities()`**，`reload_dictionary()` 不在其上
+- 新建 **`DictionaryConsumerPort`**（`src/domain/ports/domain_dictionary.py`，与 `DomainDictionaryPort` 同文件），抽象"词典消费端热更新能力"
+- `RuleBasedExtractor` 同时实现 `EntityExtractionPort` 与 `DictionaryConsumerPort`
+- `DomainDictionaryService` 注入 `DictionaryConsumerPort`，调用 `reload_dictionary()` 通过端口契约进行
+- 遵循接口隔离原则（ISP），不污染 `EntityExtractionPort` 的职责边界
+
 **与 Story 3.2b RuleBasedExtractor 的集成：**
 - `RuleBasedExtractor.reload_dictionary(dictionary: list[tuple[str, str]])` 已存在，本 Story 直接复用
-- `DomainDictionaryService.refresh_dictionary()` 调用 `repo.get_active_dictionary()`（返回 `list[tuple[str, str]]`）→ `rule_extractor.reload_dictionary(entries)`
-- **不修改 RuleBasedExtractor**（Surgical Changes 原则），仅注入其热更新能力
+- `DomainDictionaryService.refresh_dictionary()` 调用 `repo.get_active_dictionary()`（返回 `list[tuple[str, str]]`）→ `dictionary_consumer.reload_dictionary(entries)`
+- **`RuleBasedExtractor` 仅需在类声明中追加 `DictionaryConsumerPort` 基类**，无需改动方法体（Surgical Changes 原则）
 - 热更新延迟 P95<100ms：`reload_dictionary()` 仅为重建 AC 自动机（O(n)），性能满足
 
 ### 领域事件设计（DictionaryUpdated）
@@ -901,9 +928,10 @@ DomainDictionaryService (Application)
 
 | 组件 | 文件路径 | 说明 |
 |------|---------|------|
-| RuleBasedExtractor | `src/infrastructure/external_services/entity_extraction/rule_extractor.py` | Story 3.2b 交付，含 `reload_dictionary()` |
+| RuleBasedExtractor | `src/infrastructure/external_services/entity_extraction/rule_extractor.py` | Story 3.2b 交付，含 `reload_dictionary()`；本 Story 追加实现 `DictionaryConsumerPort` |
 | `_create_builtin_dictionary()` | 同上 | 内置战略词典（~100 词条），作为初始词典种子 |
-| EntityExtractionPort | `src/domain/ports/entity_extraction.py` | Story 3.2b 端口（DomainDictionaryService 注入其实现） |
+| EntityExtractionPort | `src/domain/ports/entity_extraction.py` | Story 3.2b 端口（实体抽取能力，**不含** `reload_dictionary`） |
+| **DictionaryConsumerPort** | `src/domain/ports/domain_dictionary.py` | **新建**：词典消费端热更新契约，`RuleBasedExtractor` 实现 |
 | PostgreSQLAdapter | `src/infrastructure/storage/postgresql/repository/postgresql_adapter.py` | L2 仓储泛型基类，可继承遵循 CRUD 模式 |
 | EventPublisher | `src/domain/ports/event_publisher.py` | 事件发布端口 |
 | DomainEvent | `src/domain/events/base.py` | 事件基类 |
@@ -916,8 +944,8 @@ sisys/
 ├── src/
 │   ├── domain/
 │   │   ├── ports/
-│   │   │   ├── __init__.py                    # 更新：导出 DomainDictionaryPort + 值对象
-│   │   │   └── domain_dictionary.py           # 新建：DomainDictionaryPort + DictionaryEntry/DictionaryQuery/DictionarySnapshot
+│   │   │   ├── __init__.py                    # 更新：导出 DomainDictionaryPort + DictionaryConsumerPort + 值对象
+│   │   │   └── domain_dictionary.py           # 新建：DomainDictionaryPort + DictionaryConsumerPort + DictionaryEntry/DictionaryQuery/DictionarySnapshot
 │   │   ├── events/
 │   │   │   ├── __init__.py                    # 更新：导出 DictionaryUpdated
 │   │   │   └── dictionary_events.py           # 新建：DictionaryUpdated 事件
@@ -1035,7 +1063,7 @@ sisys/
 - `_bmad-output/implementation-artifacts/stories/3-3-domain-dictionary-management.md`
 
 **待创建的文件 (Dev Story 实施):**
-- `src/domain/ports/domain_dictionary.py` — DomainDictionaryPort + 值对象
+- `src/domain/ports/domain_dictionary.py` — DomainDictionaryPort + DictionaryConsumerPort + 值对象
 - `src/domain/events/dictionary_events.py` — DictionaryUpdated 事件
 - `src/domain/exceptions/dictionary_exceptions.py` — 词典异常
 - `src/application/services/domain_dictionary_service.py` — DomainDictionaryService
@@ -1102,14 +1130,20 @@ sisys/
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| 1 | [待审查后填写] | P[N] | [修复方案] |
+| 1 | `EntityExtractionPort` 协议无 `reload_dictionary()`，但文档 AC-4/Subtask 2.1/2.2 让 `DomainDictionaryService` 注入 `EntityExtractionPort` 并调用 `reload_dictionary()`，违反六边形架构依赖倒置原则，且 mypy 报错、mock 无法构造 | P0 | 新建独立 `DictionaryConsumerPort` 协议（含 `reload_dictionary()`），`RuleBasedExtractor` 同时实现 `EntityExtractionPort` 与 `DictionaryConsumerPort`，`DomainDictionaryService` 注入 `DictionaryConsumerPort`。同步修正 AC-4、SDD 端口定义、Subtask 2.1/2.2、composition_root 注入、架构图、可复用组件清单、项目结构 |
+| 2 | 文档中 `version` / `dictionary_version` 字段命名自相矛盾（AC-3 第84行 `version`、SDD 第186行 `version`、第193/816行 `dictionary_version`） | P0 | 统一为 `dictionary_version: int`（独立字段，不覆盖基类 `version`），同步修改 AC-3 验证标准、SDD 事件字段、Subtask 1.7/1.8 |
+| 3 | 文档 Subtask 1.5 只提更新 `_code_ranges.py`，遗漏 `tests/unit/domain/exceptions/test_code_ranges.py` 的 `allowed_child_parent_subdomains` 需新增 `("dictionary", "business")`，否则 CI 的 `test_subclass_code_in_same_subdomain_as_parent` 会报"非法跨子域继承" | P0 | 在 Subtask 1.5 和 SDD 异常契约中明确补充更新 `test_code_ranges.py` 的 `allowed_child_parent_subdomains` |
+| 4 | `entity_extraction_rule` 端口生命周期为 SCOPED，热更新语义要求词典全局共享，SCOPED 导致热更新跨请求不生效 | P1 | 明确将 `entity_extraction_rule` 生命周期改为 `Lifetime.SINGLETON`，并说明 `RuleBasedExtractor` 非线程安全的并发保护（`asyncio.Lock` 类变量或 copy-on-write） |
+| 5 | DictionaryUpdated RELIABLE 模式未明确是否配置 `redis_channel` | P1 | 明确参照 `MemoryChanged`/`EntitiesExtracted` 模式，仅配置 `rabbitmq_routing_key`，不配置 `redis_channel` |
+| 6 | 路由命名二选一"`document_dictionary`（或 `dictionary`）"不明确 | P1 | 统一为 `document_dictionary_router` / `create_document_dictionary_router()`，与 `document_upload_router` 命名对称 |
+| 7 | "集成测试覆盖率 ≥70%" 对测试文件测覆盖率无意义，且与 `pyproject.toml` 的 `omit = ["*/tests/*"]` 冲突 | P1 | 删除对测试文件测覆盖率的条目，修正为仅对 `src` 测量（domain/application/infrastructure/interfaces 分层阈值） |
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-08-10
-**最后更新/Last Updated:** 2026-08-10
+**最后更新/Last Updated:** 2026-08-11
 **更新说明/Description:**
-- v1.0.0: 创建故事文件
+- v1.1.0: Round 1 审查修复 — P0: 新增 DictionaryConsumerPort 端口契约修复六边形架构违规/统一 dictionary_version 字段名/补充 test_code_ranges.py 的 allowed_child_parent_subdomains；P1: 明确 entity_extraction_rule 生命周期为 SINGLETON/明确 event_channels 配置/统一路由命名/修正覆盖率门禁
 
 <!-- 仅用作跟踪故事文件模板修订记录，故事开发时[务必删除]此段 -->
