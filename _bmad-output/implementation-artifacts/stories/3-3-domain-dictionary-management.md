@@ -50,12 +50,14 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `DomainDictionaryPort` Protocol 定义于 `src/domain/ports/domain_dictionary.py`
+- [ ] `DictionaryConsumerPort` Protocol 定义于同一文件，包含 `reload_dictionary(dictionary: list[tuple[str, str]]) -> None` 方法
 - [ ] `DictionaryEntry` frozen dataclass（term, entity_type, category, active, version, created_by, created_at, updated_at）
 - [ ] `DictionaryQuery` frozen dataclass（category, entity_type, active_only, page, page_size）
 - [ ] `DictionarySnapshot` frozen dataclass（snapshot_id, version, entries, created_by, created_at, change_summary）
 - [ ] `get_active_dictionary() -> list[tuple[str, str]]` — 返回 (词条, 实体类型) 列表，**直接对接 `RuleBasedExtractor` 的 `reload_dictionary()` 输入格式**
+- [ ] `get_entry(term) -> DictionaryEntry | None` — 按词条名查询
 - [ ] `add_entry()` / `update_entry()` / `delete_entry()` / `list_entries()` — 词条 CRUD
-- [ ] `create_snapshot()` / `rollback()` — 版本管理
+- [ ] `create_snapshot()` / `rollback()` / `list_snapshots()` — 版本管理
 - [ ] 端口注册于 `composition_root.py`，通过 `register_port()` 注册为 `domain_dictionary` 端口
 
 ### AC-2: 领域词典异常体系
@@ -164,8 +166,10 @@
 **验证标准/Validation Criteria:**
 - [ ] `composition_root.py` 注册 `domain_dictionary_repo` 端口（PostgreSQLDomainDictionaryRepository 实现 DomainDictionaryPort）
 - [ ] `composition_root.py` 注册 `domain_dictionary_service` 端口（DomainDictionaryService 编排服务）
+- [ ] **`entity_extraction_rule` 端口生命周期改为 `Lifetime.SINGLETON`**（确保词典热更新跨请求全局生效）
 - [ ] 端口契约测试 `tests/contracts/test_port_contract_domain_dictionary.py` 通过
-- [ ] `src/domain/ports/__init__.py` 导出 `DomainDictionaryPort` 及值对象
+- [ ] **`DictionaryConsumerPort` 契约验证通过**：`RuleBasedExtractor` 同时实现 `EntityExtractionPort` 与 `DictionaryConsumerPort`，`reload_dictionary()` 签名正确
+- [ ] `src/domain/ports/__init__.py` 导出 `DomainDictionaryPort`、`DictionaryConsumerPort` 及值对象
 
 ---
 
@@ -424,12 +428,12 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | DomainDictionaryPort + 值对象契约 | Task 1 | Subtask 1.1-1.3 | `test_domain_dictionary_port.py` |
+| AC-1 | DomainDictionaryPort + DictionaryConsumerPort + 值对象契约 | Task 1 | Subtask 1.1-1.3 | `test_domain_dictionary_port.py` |
 | AC-2 | 词典异常体系（270-272） | Task 1 | Subtask 1.4-1.6 | `test_dictionary_exceptions.py` |
 | AC-3 | DictionaryUpdated 领域事件 | Task 1 | Subtask 1.7-1.9 | `test_dictionary_events.py` |
 | AC-4 | DomainDictionaryService 编排 | Task 2 | Subtask 2.1-2.3 | `test_domain_dictionary_service.py` |
 | AC-5 | PostgreSQL 词典仓储 | Task 3 | Subtask 3.1-3.3 | `test_domain_dictionary_repository.py` |
-| AC-6 | 词典热更新集成 | Task 2 | Subtask 2.4-2.6 | `test_domain_dictionary_service.py` |
+| AC-6 | 词典热更新集成 | Task 2 | Subtask 2.5-2.6（mock 侧）+ Subtask 4.5（真实热更新，原 Subtask 2.4 并入） | `test_domain_dictionary_service.py` + `test_integration_domain_dictionary.py` |
 | AC-7 | Dictionary REST API | Task 3 | Subtask 3.4-3.6 | `test_domain_dictionary_api.py` |
 | AC-8 | 端口注册与 DI 集成 | Task 4 | Subtask 4.1-4.3 | `test_port_contract_domain_dictionary.py` |
 | AC-8 | 架构约束验证 + 集成测试 | Task 4 | Subtask 4.4-4.6 | `test_arch_domain_dictionary.py` + `test_integration_domain_dictionary.py` |
@@ -763,7 +767,7 @@
   - `src/domain/exceptions/__init__.py` — 导出词典异常
   - `src/domain/exceptions/_code_ranges.py` — 新增 dictionary 子域 (270-279)
   - `src/domain/events/dictionary_events.py` — DictionaryUpdated 事件
-  - `src/domain/ports/__init__.py` — 导出 DomainDictionaryPort
+  - `src/domain/ports/__init__.py` — 导出 DomainDictionaryPort + DictionaryConsumerPort + 值对象
   - `src/domain/events/__init__.py` — 导出 DictionaryUpdated
   - `src/application/services/domain_dictionary_service.py` — DomainDictionaryService
   - `src/infrastructure/storage/postgresql/repository/domain_dictionary_repository.py` — PostgreSQLDomainDictionaryRepository
@@ -903,9 +907,9 @@ DomainDictionaryService (Application)
 
 - **架构模式:** 六边形架构（端口与适配器）+ 领域数据管理
 - **设计约束:**
-  - 领域层零外部依赖（`DomainDictionaryPort` 仅使用 Python 标准库）
+  - 领域层零外部依赖（`DomainDictionaryPort` / `DictionaryConsumerPort` 仅使用 Python 标准库）
   - 依赖倒置：领域层定义 `DomainDictionaryPort`，基础设施层实现 `PostgreSQLDomainDictionaryRepository`
-  - 热更新复用 Story 3.2b 的 `RuleBasedExtractor.reload_dictionary()`，不重写
+  - 热更新复用 Story 3.2b 的 `RuleBasedExtractor.reload_dictionary()`，仅追加 `DictionaryConsumerPort` 基类，不重写方法体
   - 事件发布复用 Story 1.2/1.3 的事件基础设施（RELIABLE 双通道）
 - **技术栈:**
   - Python 3.11+
@@ -1016,7 +1020,7 @@ sisys/
 7. **透明降级/容错理念** — 外部能力失败时保主流程，词典服务同样遵循
 
 **应用到本故事/Applied to This Story:**
-- [x] 复用 `RuleBasedExtractor.reload_dictionary()` 实现热更新，不修改其实现
+- [x] 复用 `RuleBasedExtractor.reload_dictionary()` 实现热更新，仅追加 `DictionaryConsumerPort` 基类，不改动方法体
 - [x] `get_active_dictionary()` 返回 `list[tuple[str, str]]` 精确对接
 - [x] 严格遵循异常编码注册流程（270/271/272）
 - [x] 通过 `register_port()` 注册 `domain_dictionary_repo` / `domain_dictionary_service` 端口
@@ -1084,7 +1088,7 @@ sisys/
 - `tests/acceptance/test_acceptance_domain_dictionary.py`
 
 **更新的文件/Updated Files:**
-- `src/domain/ports/__init__.py` — 导出 DomainDictionaryPort
+- `src/domain/ports/__init__.py` — 导出 DomainDictionaryPort + DictionaryConsumerPort + 值对象
 - `src/domain/events/__init__.py` — 导出 DictionaryUpdated
 - `src/domain/exceptions/__init__.py` — 导出词典异常
 - `src/domain/exceptions/_code_ranges.py` — 新增 dictionary 子域 (270-279)
