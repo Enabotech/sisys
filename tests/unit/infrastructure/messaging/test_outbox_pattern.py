@@ -271,12 +271,16 @@ class TestAsyncOutboxPoller:
         mock_publisher.async_publish.side_effect = RuntimeError("publish failed")
 
         from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
+        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 
+        # 注入快速重试策略，避免默认指数退避（base_delay=1.0）导致的 ~6s 睡眠
+        fast_retry = RetryPolicy(base_delay=0.01, max_retries=2)
         poller = AsyncOutboxPoller(
             outbox_repository=repo,
             publisher=mock_publisher,
             router=router,
-            poll_interval=0.1,
+            poll_interval=0.01,
+            retry_policy=fast_retry,
         )
 
         await poller.poll_once()

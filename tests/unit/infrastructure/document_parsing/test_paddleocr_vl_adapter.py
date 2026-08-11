@@ -192,9 +192,13 @@ class TestPaddleOCRVLAdapter:
         adapter._client = httpx.AsyncClient(transport=httpx.MockTransport(mock_handler))
 
         try:
-            with pytest.raises(OCRConnectionError) as exc_info:
-                await adapter.recognize(temp_pdf)
-            assert "EXCEPTION_320" in str(exc_info.value.code)
+            # Mock _wait_retry 避免真实指数退避睡眠（~3.5s）
+            from unittest.mock import AsyncMock, patch
+
+            with patch.object(adapter, "_wait_retry", AsyncMock()):
+                with pytest.raises(OCRConnectionError) as exc_info:
+                    await adapter.recognize(temp_pdf)
+                assert "EXCEPTION_320" in str(exc_info.value.code)
         finally:
             await adapter.close()
 
@@ -366,9 +370,15 @@ class TestPaddleOCRVLAdapter:
         adapter._client = httpx.AsyncClient(transport=httpx.MockTransport(mock_handler))
 
         try:
-            results = await adapter.recognize(temp_pdf)
-            assert len(results) == 1
-            assert call_count == 3  # 初始 + 2 次重试
+            # Mock _wait_retry 避免真实指数退避睡眠（~4s）
+            from unittest.mock import AsyncMock, patch
+
+            with patch.object(adapter, "_wait_retry", AsyncMock()) as mock_wait:
+                results = await adapter.recognize(temp_pdf)
+                assert len(results) == 1
+                assert call_count == 3  # 初始 + 2 次重试
+                # 验证 _wait_retry 被调用了 2 次（attempt 0 和 attempt 1）
+                assert mock_wait.call_count == 2
         finally:
             await adapter.close()
 
@@ -383,7 +393,14 @@ class TestPaddleOCRVLAdapter:
         adapter._client = httpx.AsyncClient(transport=httpx.MockTransport(mock_handler))
 
         try:
-            with pytest.raises(OCRConnectionError):
-                await adapter.recognize(temp_pdf)
+            # Mock _wait_retry 避免真实指数退避睡眠（~3.5s）
+            from unittest.mock import AsyncMock, patch
+
+            with patch.object(adapter, "_wait_retry", AsyncMock()) as mock_wait:
+                with pytest.raises(OCRConnectionError):
+                    await adapter.recognize(temp_pdf)
+                # 验证重试耗尽：初始 + MAX_RETRIES(2) 次重试后仍失败
+                # _wait_retry 被调用了 MAX_RETRIES 次
+                assert mock_wait.call_count == 2
         finally:
             await adapter.close()

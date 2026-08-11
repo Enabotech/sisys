@@ -114,7 +114,8 @@ class TestRedisEventPublisher:
         """RedisEventPublisher 连接失败应返回 PublishResult（优雅降级）"""
         from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 
-        config = RedisConfig(host="invalid-host", port=9999)
+        # 缩短 socket 超时，避免连接 invalid-host 时等待默认 5s
+        config = RedisConfig(host="invalid-host", port=9999, socket_timeout=0.5)
         publisher = RedisEventPublisher(config)
         event = self._make_event()
 
