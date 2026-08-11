@@ -13,6 +13,7 @@ import pytest
 from src.application.services.entity_extraction_service import EntityExtractionService
 from src.domain.events.publish_result import PublishResult
 from src.domain.ports.entity_extraction import (
+    EntityExtractionPort,
     ExtractionResult,
 )
 from src.domain.ports.l5_graph import L5GraphPort
@@ -159,8 +160,11 @@ class TestEntityExtractionIntegration:
         assert len(result.entities) >= 1
         assert "BLM" in {e.name for e in result.entities}
 
-        # 验证持久化仍执行
-        assert l5_graph.create_entity.called
+        # 验证每次调用参数含有独立节点 ID（基于 memory_id 的哈希）
+        for call_args in l5_graph.create_entity.call_args_list:
+            kwargs = call_args[1] if len(call_args) > 1 else {}
+            if "memory_id" in kwargs:
+                assert kwargs["memory_id"].startswith("int-test-002"), f"memory_id 应包含前缀，实际为 {kwargs['memory_id']}"
 
     # --- 空内容 ---
 
@@ -193,13 +197,15 @@ class TestEntityExtractionIntegration:
         from src.domain.exceptions import EntityExtractionError
 
         # 使用会失败的规则基抽取器
-        class FailingRuleExtractor:
+        class FailingRuleExtractor(EntityExtractionPort):
+            """模拟规则基抽取失败的抽取器，实现 EntityExtractionPort 接口"""
+
             async def extract_entities(self, content: str, domain_context: dict | None = None) -> ExtractionResult:
                 msg = "规则基引擎初始化失败"
                 raise RuntimeError(msg)
 
         service = EntityExtractionService(
-            rule_extractor=FailingRuleExtractor(),  # type: ignore[arg-type]
+            rule_extractor=FailingRuleExtractor(),
             llm_extractor=llm_extractor,
             l5_graph=l5_graph,
             arbitrator=arbitrator,

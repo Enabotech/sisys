@@ -17,6 +17,9 @@ from src.domain.ports.entity_extraction import (
     ExtractionResult,
 )
 from src.domain.ports.llm_client import LLMClientPort
+from src.infrastructure.external_services.entity_extraction.llm_extractor_schema import (
+    EntityExtractionSchema,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,11 +170,7 @@ class LLMEntityExtractor(EntityExtractionPort):
 
         # 调用 LLM
         try:
-            from src.infrastructure.external_services.entity_extraction.llm_extractor_schema import (
-                EntityExtractionSchema,
-            )
-
-            schema_result = await self._llm_client.structured_generate(
+            result = await self._llm_client.structured_generate(
                 prompt=prompt,
                 response_schema=EntityExtractionSchema,
             )
@@ -184,7 +183,7 @@ class LLMEntityExtractor(EntityExtractionPort):
                     confidence=entity.confidence,
                     extraction_source="llm",
                 )
-                for entity in schema_result.entities
+                for entity in result.entities
             )
 
             relations = tuple(
@@ -195,7 +194,7 @@ class LLMEntityExtractor(EntityExtractionPort):
                     confidence=rel.confidence,
                     extraction_source="llm",
                 )
-                for rel in schema_result.relations
+                for rel in result.relations
             )
 
             duration_ms = (time.monotonic() - start_time) * 1000

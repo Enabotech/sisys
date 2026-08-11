@@ -558,7 +558,7 @@
   - **Edge Case:** 仅规则基结果（无 LLM 结果）→ 直接返回规则结果
   - **Edge Case:** 仅 LLM 结果（无规则结果）→ 直接返回 LLM 结果
   - **Edge Case:** 两者均为空 → 返回空结果
-  - **Edge Case:** 同一实体置信度冲突 → 采用较高置信度
+  - **Edge Case:** 同一实体置信度冲突 → 采用置信度加权平均（规则权重 0.6 / LLM 权重 0.4）
   - **关系融合:** 规则基关系 + LLM 语义关系去重合并
   - **仲裁准确率:** 预定义测试集准确率≥85%
 - [ ] Subtask 2.8: 🟢 绿 — 实现 ConflictArbitrator
@@ -873,6 +873,10 @@ EntityExtractionService
 | DATE | `Memory` | `date` | 日期实体 |
 | AMOUNT | `Memory` | `amount` | 金额实体 |
 | PERCENT | `Memory` | `percent` | 百分比实体 |
+| CONTACT | `Memory` | `contact` | 联系方式实体（电话、邮箱，由正则模式产出） |
+
+> **注意：** `CONTACT` 类型由规则基抽取器的正则模式匹配产出（电话、邮箱），
+> 在 `_ENTITY_TYPE_MAP` 中映射为 `contact` 属性值。
 
 > **注意：** `Neo4jAdapter.create_entity()` 使用统一 `Memory` 标签，`entity_type` 作为节点属性 `n.type` 存储。
 > 不使用 `Memory:Person` 复合标签。`entity_type` 属性值使用小写蛇形命名。

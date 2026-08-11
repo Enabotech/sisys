@@ -133,6 +133,7 @@ class TestEntityExtractionService:
         assert published_event.entity_count >= 2
         assert published_event.relation_count >= 1
         assert published_event.extraction_type == "hybrid"
+        assert published_event.source == "entity_extraction_service"
 
         # 验证返回完整结果
         assert result is not None
@@ -155,11 +156,17 @@ class TestEntityExtractionService:
 
         # 验证 create_entity 被调用
         l5_graph.create_entity.assert_called()
-        # 验证每次调用参数含有 memory_id
+        # 每个实体生成独立节点 ID（基于 memory_id 的确定性哈希）
+        node_ids: list[str] = []
         for call_args in l5_graph.create_entity.call_args_list:
             kwargs = call_args[1] if len(call_args) > 1 else {}
             if "memory_id" in kwargs:
-                assert kwargs["memory_id"] == "test-mem-002"
+                mid = kwargs["memory_id"]
+                node_ids.append(mid)
+                assert mid.startswith("test-mem-002"), f"节点ID应含memory_id前缀: {mid}"
+                assert ":" in mid, f"节点ID应含实体哈希后缀: {mid}"
+        # 不同实体名称应生成不同节点 ID（独立节点）
+        assert len(set(node_ids)) >= 2, "BLM 与 SWOT 应生成不同节点 ID"
 
     # --- Edge Case: LLM 调用失败降级 ---
 
@@ -239,16 +246,19 @@ class TestEntityExtractionService:
         service: EntityExtractionService,
         l5_graph: AsyncMock,
     ) -> None:
-        """验证持久化失败抛出 EntityExtractionError"""
+        """验证持久化失败抛出 EntityExtractionError（包装原始异常）"""
         from src.domain.exceptions import EntityExtractionError
 
-        l5_graph.create_entity.side_effect = EntityExtractionError("Neo4j 写入失败")
+        l5_graph.create_entity.side_effect = RuntimeError("Neo4j 连接超时")
 
-        with pytest.raises(EntityExtractionError):
+        with pytest.raises(EntityExtractionError) as exc_info:
             await service.extract_entities(
                 content="BLM 模型",
                 memory_id="test-mem-006",
             )
+        assert exc_info.value.code == "EXCEPTION_340"
+        assert exc_info.value.context.get("entity_count", -1) >= 0
+        assert exc_info.value.context.get("content_preview", "") == "BLM 模型"
 
     # --- Edge Case: 事件发布失败记录日志 ---
 

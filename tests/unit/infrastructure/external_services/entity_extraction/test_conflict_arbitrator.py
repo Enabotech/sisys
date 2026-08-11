@@ -144,8 +144,8 @@ class TestConflictArbitrator:
         assert len(final.entities) == 0
         assert len(final.relations) == 0
 
-    def test_confidence_conflict_higher_wins(self, arbitrator: ConflictArbitrator) -> None:
-        """验证同一实体置信度冲突采用较高置信度"""
+    def test_confidence_conflict_weighted_average(self, arbitrator: ConflictArbitrator) -> None:
+        """验证同一实体置信度冲突时使用加权平均（AC-6规范）"""
         rule_result = ExtractionResult(
             entities=(ExtractedEntity(name="BLM", entity_type="CONCEPT", confidence=0.4, extraction_source="rule"),),
         )

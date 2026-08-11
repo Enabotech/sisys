@@ -63,8 +63,7 @@ class EntityExtractionError(ExternalException):
             ctx["content_preview_truncated"] = len(content_preview) > 200
         if extraction_strategy:
             ctx["extraction_strategy"] = extraction_strategy
-        if entity_count:
-            ctx["entity_count"] = entity_count
+        ctx["entity_count"] = entity_count
         super().__init__(message=message, cause=cause, context=ctx)
 
 
