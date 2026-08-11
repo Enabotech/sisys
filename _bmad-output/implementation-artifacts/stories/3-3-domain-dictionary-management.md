@@ -1149,10 +1149,11 @@ sisys/
 
 ---
 
-**故事版本/Story Version:** v1.1.1
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-08-10
 **最后更新/Last Updated:** 2026-08-11
 **更新说明/Description:**
+- v1.2.0: Round 5 最终审查通过 — 文档质量达标，所有 P0/P1 问题已修复，适配器代码准备就绪
 - v1.1.1: Round 2 修复 — 将 Subtask 2.4 真实 RuleBasedExtractor 热更新验证从单元测试移至集成测试 Subtask 4.5，避免与"单元测试 Mock 端口"规则语义冲突；更新测试分类表对应描述
 - v1.1.0: Round 1 审查修复 — P0: 新增 DictionaryConsumerPort 端口契约修复六边形架构违规/统一 dictionary_version 字段名/补充 test_code_ranges.py 的 allowed_child_parent_subdomains；P1: 明确 entity_extraction_rule 生命周期为 SINGLETON/明确 event_channels 配置/统一路由命名/修正覆盖率门禁
 
