@@ -243,7 +243,7 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
 
                 # 计算变更摘要
                 added_count = len(all_entries)
-                change_summary = {"total_entries": added_count}
+                change_summary = {"entry_count": added_count}
 
                 snapshot_model = DictionarySnapshotModel(
                     version=new_version,
