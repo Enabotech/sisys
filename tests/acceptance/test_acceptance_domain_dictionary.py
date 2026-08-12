@@ -268,7 +268,7 @@ def update_entry_blm_to_strategy(event_loop, context):
     """修改词条类型"""
     ctx = context["_svc"]
     service = ctx["service"]
-    updated = DictionaryEntry(term="BLM", entity_type="STRATEGY", category="strategy", version=2)
+    updated = DictionaryEntry(term="BLM", entity_type="STRATEGY", category="strategy", version=1)
     event_loop.run_until_complete(service.update_entry("BLM", updated, trigger="api"))
 
 
@@ -332,7 +332,7 @@ def update_blm_to_strategy_for_snapshot(event_loop, context):
     """修改词条用于回滚测试"""
     ctx = context["_svc"]
     service = ctx["service"]
-    entry = DictionaryEntry(term="BLM", entity_type="STRATEGY", category="strategy", version=2)
+    entry = DictionaryEntry(term="BLM", entity_type="STRATEGY", category="strategy", version=1)
     event_loop.run_until_complete(service.update_entry("BLM", entry, trigger="api"))
 
 
@@ -551,12 +551,11 @@ def try_concurrent_update(event_loop, context):
     service = ctx["service"]
 
     # 第一次修改成功（version 1 -> 2）
-    entry = DictionaryEntry(term="BLM", entity_type="STRATEGY", version=2)
+    entry = DictionaryEntry(term="BLM", entity_type="STRATEGY", version=1)
     event_loop.run_until_complete(service.update_entry("BLM", entry, trigger="api"))
 
-    # 第二次基于旧版本 1 修改 -> 冲突（实际需传 version=2 被拒绝，因为当前已为 2）
-    # 传入 version=2（期望当前版本=1），但实际当前版本=2，所以冲突
-    entry2 = DictionaryEntry(term="BLM", entity_type="TOOL", version=2)
+    # 第二次基于旧版本 1 修改 -> 冲突（当前版本已为 2，仍传 version=1 应冲突）
+    entry2 = DictionaryEntry(term="BLM", entity_type="TOOL", version=1)
     try:
         event_loop.run_until_complete(service.update_entry("BLM", entry2, trigger="api"))
         context["last_error"] = None
