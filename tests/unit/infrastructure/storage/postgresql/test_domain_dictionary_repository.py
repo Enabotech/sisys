@@ -168,7 +168,7 @@ class TestUpdateEntry:
 
     def test_update_entry_success(self, repo, mock_session):
         """修改词条成功，版本递增"""
-        entry = DictionaryEntry(term="BLM", entity_type="STRATEGY", version=2)
+        entry = DictionaryEntry(term="BLM", entity_type="STRATEGY", version=1)
         updated_model = _make_model(term="BLM", entity_type="STRATEGY")
         updated_model.version = 2
 
@@ -185,7 +185,7 @@ class TestUpdateEntry:
 
     def test_update_entry_not_found(self, repo, mock_session):
         """修改不存在的词条 -> 抛 DictionaryNotFoundError"""
-        entry = DictionaryEntry(term="不存在的词", entity_type="CONCEPT", version=2)
+        entry = DictionaryEntry(term="不存在的词", entity_type="CONCEPT", version=1)
         # 第一次 execute UPDATE rowcount=0，第二次查询返回 None
         mock_session.execute.side_effect = [
             _MockResult(rowcount=0),
@@ -197,11 +197,11 @@ class TestUpdateEntry:
 
     def test_update_entry_version_conflict(self, repo, mock_session):
         """版本不匹配 -> 抛 DictionaryVersionConflictError"""
-        entry = DictionaryEntry(term="BLM", entity_type="CONCEPT", version=3)
+        entry = DictionaryEntry(term="BLM", entity_type="CONCEPT", version=2)
         existing_model = _make_model(term="BLM", entity_type="CONCEPT")
-        existing_model.version = 2
+        existing_model.version = 1
 
-        # 第一次 execute UPDATE rowcount=0，第二次查询返回版本2的模型
+        # 第一次 execute UPDATE rowcount=0，第二次查询返回版本1的模型
         mock_session.execute.side_effect = [
             _MockResult(rowcount=0),
             _MockResult(scalar_one_or_none=existing_model),

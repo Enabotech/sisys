@@ -138,23 +138,27 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
     async def update_entry(self, term: str, entry: DictionaryEntry) -> DictionaryEntry:
         """修改词条
 
+        使用乐观锁（version 字段）防止并发冲突。
+        entry.version 是客户端已知的当前版本号，方法会将其递增为新版本。
+
         Raises:
             DictionaryNotFoundError: 词条不存在
             DictionaryVersionConflictError: 版本冲突
         """
-        # 原子 UPDATE 实现乐观锁
+        # 原子 UPDATE 实现乐观锁：WHERE version = 已知版本，SET version = 已知版本 + 1
         now = datetime.now(UTC)
+        new_version = entry.version + 1
         stmt = (
             update(DictionaryEntryModel)
             .where(
                 DictionaryEntryModel.term == term,
-                DictionaryEntryModel.version == entry.version - 1,
+                DictionaryEntryModel.version == entry.version,
             )
             .values(
                 entity_type=entry.entity_type,
                 category=entry.category,
                 active=entry.active,
-                version=entry.version,
+                version=new_version,
                 updated_at=now,
             )
         )
@@ -171,7 +175,7 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
                 raise DictionaryNotFoundError(term=term)
 
             raise DictionaryVersionConflictError(
-                expected_version=entry.version - 1,
+                expected_version=entry.version,
                 actual_version=model.version,
             )
 

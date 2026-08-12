@@ -139,7 +139,7 @@ class TestDomainDictionaryPersistence:
         assert fetched.entity_type == "CONCEPT"
 
         # Update
-        updated = DictionaryEntry(term="元宇宙", entity_type="TECH_CONCEPT", version=2)
+        updated = DictionaryEntry(term="元宇宙", entity_type="TECH_CONCEPT", version=1)
         result = event_loop.run_until_complete(repo.update_entry("元宇宙", updated))
         assert result.entity_type == "TECH_CONCEPT"
         assert result.version == 2
@@ -175,7 +175,7 @@ class TestDomainDictionaryPersistence:
         event_loop.run_until_complete(
             repo.update_entry(
                 "BLM",
-                DictionaryEntry(term="BLM", entity_type="STRATEGY", version=2),
+                DictionaryEntry(term="BLM", entity_type="STRATEGY", version=1),
             )
         )
 
@@ -202,7 +202,7 @@ class TestDomainDictionaryPersistence:
         event_loop.run_until_complete(
             repo.update_entry(
                 "SWOT",
-                DictionaryEntry(term="SWOT", entity_type="TOOL", version=2),
+                DictionaryEntry(term="SWOT", entity_type="TOOL", version=1),
             )
         )
 
@@ -211,7 +211,7 @@ class TestDomainDictionaryPersistence:
             event_loop.run_until_complete(
                 repo.update_entry(
                     "SWOT",
-                    DictionaryEntry(term="SWOT", entity_type="TOOL", version=2),
+                    DictionaryEntry(term="SWOT", entity_type="TOOL", version=1),
                 )
             )
 
