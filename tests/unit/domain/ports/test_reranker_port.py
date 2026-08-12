@@ -15,9 +15,8 @@ class TestRerankerPort:
 
     def test_is_protocol(self) -> None:
         """验证 RerankerPort 是 Protocol"""
-        # Protocol 类具有 __protocol_attrs__ 属性（与普通类区分）
-        assert hasattr(RerankerPort, "__protocol_attrs__")
-        assert getattr(RerankerPort, "__protocol_attrs__", None) is not None
+        # Protocol 类通过 _is_protocol 类属性区分（Python 3.11）
+        assert RerankerPort._is_protocol is True
 
     def test_is_runtime_checkable(self) -> None:
         """验证 @runtime_checkable 可用"""
