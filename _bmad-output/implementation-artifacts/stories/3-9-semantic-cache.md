@@ -1,6 +1,6 @@
 # Story 3.9: 语义缓存
 
-**Status:** `backlog`
+**Status:** `ready-for-dev`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -265,8 +265,10 @@
   - Happy Path: 相似查询（相似度>0.9）命中缓存
   - Edge Case: 相似度<0.9 不命中缓存
   - Edge Case: Redis 不可用时透明降级
+  - Edge Case: 缓存数据损坏时视为未命中，执行完整检索
   - Edge Case: 缓存 TTL 过期后自动失效
-  - Edge Case: 事件驱动缓存失效（DocumentProcessed → 缓存清除）
+  - Edge Case: 事件驱动缓存失效（DocumentProcessed → 二级索引精确失效清除缓存）
+  - Edge Case: 不同 weights 缓存隔离（相同查询 + 不同 weights → 不同缓存键）
   - Metrics: 缓存命中率指标采集正确
 
 **Task 0 完成标志：**
