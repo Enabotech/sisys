@@ -35,6 +35,9 @@ from src.domain.exceptions import (
     ConflictError,
     ContainerStartError,
     ContainerStopError,
+    DictionaryEntryConflictError,
+    DictionaryNotFoundError,
+    DictionaryVersionConflictError,
     DocumentVersionConflictError,
     EntityBusinessRuleError,
     EntityExtractionError,
@@ -42,6 +45,7 @@ from src.domain.exceptions import (
     EntityValidationError,
     ExecutionError,
     ExternalException,
+    HybridSearchError,
     InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
@@ -60,6 +64,7 @@ from src.domain.exceptions import (
     OCRProcessingError,
     PasswordValidationError,
     PermissionDeniedError,
+    RerankError,
     RoleAlreadyExistsError,
     RoleNotFoundError,
     SandboxError,
@@ -209,6 +214,14 @@ class TestExceptionHttpMap:
             LLMConfigError,
             # 实体抽取异常
             EntityExtractionError,
+            # 重排序异常
+            RerankError,
+            # 混合检索异常
+            HybridSearchError,
+            # 词典管理异常
+            DictionaryNotFoundError,
+            DictionaryEntryConflictError,
+            DictionaryVersionConflictError,
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

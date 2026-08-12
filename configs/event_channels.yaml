@@ -66,6 +66,11 @@ event_channels:
     delivery_mode: "reliable"
     description: "实体抽取完成"
 
+  DictionaryUpdated:
+    rabbitmq_routing_key: "sisys.events.reliable.dictionary_updated"
+    delivery_mode: "reliable"
+    description: "词典更新完成"
+
   CheckpointReached:
     rabbitmq_routing_key: "sisys.events.reliable.checkpoint_reached"
     delivery_mode: "reliable"

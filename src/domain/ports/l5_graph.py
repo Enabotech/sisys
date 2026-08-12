@@ -170,3 +170,21 @@ class L5GraphPort(Protocol):
         Returns:
             邻居节点列表 [{memory_id, type, properties}, ...]
         """
+
+    async def search_entities(
+        self,
+        query_text: str,
+        limit: int = 10,
+    ) -> list[dict]:
+        """按实体名模糊匹配搜索实体
+
+        将查询文本解析为实体 ID，补齐 query_text → memory_id 的桥梁，
+        供 GraphSearchService 的检索流程使用。
+
+        Args:
+            query_text: 查询文本（按实体名模糊匹配）
+            limit: 最多返回的候选实体数量
+
+        Returns:
+            候选实体列表 [{memory_id, type, properties, ...}, ...]
+        """

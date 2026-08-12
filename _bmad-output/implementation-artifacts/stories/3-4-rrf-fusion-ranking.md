@@ -1006,8 +1006,8 @@ sisys/
 │   ├── integration/
 │   │   └── test_integration_hybrid_search.py   # 更新：三路集成测试
 │   └── acceptance/
-│       ├── test_acceptance_hybrid_search.feature # 更新：三路场景
-│       └── test_acceptance_hybrid_search.py      # 更新：三路步骤实现
+│       ├── test_acceptance_hybrid_search_3_4.feature # 新建：三路场景（独立文件，不覆盖原 Story 3-1b）
+│       └── test_acceptance_hybrid_search_3_4.py      # 新建：三路步骤实现（独立文件，不覆盖原 Story 3-1b）
 ```
 
 ### 环境变量设计
@@ -1120,8 +1120,8 @@ export RERANKER_BASE_URL=...                      # 重排序 API 端点
 - `tests/unit/architecture/test_arch_hybrid_search.py` — 架构约束更新（覆盖 reranker/GraphSearchService/LiteLLMRerankerClient）
 - `tests/contracts/test_port_contract_search_services.py` — 端口契约更新（新增 GraphSearchService 端口契约）
 - `tests/integration/test_integration_hybrid_search.py` — 集成测试更新
-- `tests/acceptance/test_acceptance_hybrid_search.feature` — 验收场景更新
-- `tests/acceptance/test_acceptance_hybrid_search.py` — 步骤实现更新
+- `tests/acceptance/test_acceptance_hybrid_search.feature` — 更新 AC-6 RuntimeError→HybridSearchError 说明
+- `tests/acceptance/test_acceptance_hybrid_search.py` — 更新 AC-6 步骤实现（RuntimeError→HybridSearchError）
 
 ---
 

@@ -12,6 +12,13 @@ from src.domain.ports.agent_engine import AgentEnginePort
 from src.domain.ports.connection_manager import ConnectionManager
 from src.domain.ports.crawler_client import CrawlerClientPort
 from src.domain.ports.dead_letter_queue import DeadLetterQueue
+from src.domain.ports.domain_dictionary import (
+    DictionaryConsumerPort,
+    DictionaryEntry,
+    DictionaryQuery,
+    DictionarySnapshot,
+    DomainDictionaryPort,
+)
 from src.domain.ports.embedding_service import EmbeddingServicePort, SparseEmbedding
 from src.domain.ports.entity_extraction import (
     EntityArbitratorPort,
@@ -39,6 +46,7 @@ from src.domain.ports.ocr import OCR_CONFIDENCE_THRESHOLD, OCR_MAX_BYTES, OCRPor
 from src.domain.ports.outbox import OutboxRepository
 from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
 from src.domain.ports.permission_repository import PermissionRepositoryPort
+from src.domain.ports.reranker import RerankerPort
 from src.domain.ports.saga import SagaRepositoryProtocol, SagaStep
 from src.domain.ports.sandbox_executor import SandboxExecutor
 from src.domain.ports.semantic_chunker import SemanticChunkerPort
@@ -63,6 +71,11 @@ __all__ = [
     "DataAccessPattern",
     "BaseRepository",
     "DeadLetterQueue",
+    "DictionaryConsumerPort",
+    "DictionaryEntry",
+    "DictionaryQuery",
+    "DictionarySnapshot",
+    "DomainDictionaryPort",
     "EmbeddingServicePort",
     "EntityArbitratorPort",
     "EntityExtractionPort",
@@ -92,6 +105,7 @@ __all__ = [
     "OutboxRepository",
     "PdfPageRendererPort",
     "PermissionRepositoryPort",
+    "RerankerPort",
     "SagaRepositoryProtocol",
     "SagaStep",
     "SandboxExecutor",

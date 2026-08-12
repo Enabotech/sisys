@@ -115,6 +115,62 @@ class TestServicePlacement:
 
         assert hasattr(HybridSearchService, "search")
 
+    def test_graph_search_service_in_application(self) -> None:
+        """GraphSearchService 在 application/services 中定义"""
+        from src.application.services.graph_search_service import GraphSearchService
+
+        assert hasattr(GraphSearchService, "search")
+
+    def test_reranker_port_in_domain(self) -> None:
+        """RerankerPort 在 domain/ports 中定义"""
+        from src.domain.ports.reranker import RerankerPort
+
+        assert hasattr(RerankerPort, "rerank")
+
+    def test_litellm_reranker_client_in_infrastructure(self) -> None:
+        """LiteLLMRerankerClient 在 infrastructure/external_services 中定义"""
+        from src.infrastructure.external_services.reranker.litellm_reranker_client import (
+            LiteLLMRerankerClient,
+        )
+
+        assert hasattr(LiteLLMRerankerClient, "rerank")
+
+
+class TestRerankerPortDomainPurity:
+    """验证 RerankerPort 领域层零外部依赖"""
+
+    def test_reranker_port_no_external_deps(self) -> None:
+        """reranker.py 仅使用 Python 标准库 + SearchResult"""
+        import ast
+        from pathlib import Path
+
+        src_path = Path("src/domain/ports/reranker.py")
+        source = src_path.read_text()
+        tree = ast.parse(source)
+
+        blocked_prefixes = (
+            "pydantic",
+            "litellm",
+            "torch",
+            "sentence_transformers",
+            "transformers",
+            "qdrant_client",
+            "fastapi",
+            "sqlalchemy",
+            "prefect",
+            "redis",
+            "neo4j",
+            "minio",
+        )
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert not alias.name.startswith(blocked_prefixes), f"reranker.py 禁止导入 {alias.name}"
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    assert not node.module.startswith(blocked_prefixes), f"reranker.py 禁止导入 {node.module}"
+
 
 class TestDependencyDirection:
     """验证依赖方向：application → domain ✓，application → infrastructure ✗"""
@@ -167,6 +223,52 @@ class TestDependencyDirection:
                 if node.module:
                     assert not node.module.startswith(blocked_prefixes), (
                         f"hybrid_search_service.py 禁止导入 infrastructure: {node.module}"
+                    )
+
+    def test_graph_search_service_imports_domain_only(self) -> None:
+        """GraphSearchService 仅导入 domain，不导入 infrastructure"""
+        import ast
+        from pathlib import Path
+
+        src_path = Path("src/application/services/graph_search_service.py")
+        source = src_path.read_text()
+        tree = ast.parse(source)
+
+        blocked_prefixes = (
+            "src.infrastructure",
+            "qdrant_client",
+            "fastapi",
+            "sqlalchemy",
+            "prefect",
+            "redis",
+        )
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module:
+                    assert not node.module.startswith(blocked_prefixes), (
+                        f"graph_search_service.py 禁止导入 infrastructure: {node.module}"
+                    )
+
+    def test_litellm_reranker_client_imports_domain_only(self) -> None:
+        """LiteLLMRerankerClient 仅导入 domain，不导入 application"""
+        import ast
+        from pathlib import Path
+
+        src_path = Path("src/infrastructure/external_services/reranker/litellm_reranker_client.py")
+        source = src_path.read_text()
+        tree = ast.parse(source)
+
+        blocked_prefixes = (
+            "src.application",
+            "src.interfaces",
+        )
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module:
+                    assert not node.module.startswith(blocked_prefixes), (
+                        f"litellm_reranker_client.py 禁止导入 application/interfaces: {node.module}"
                     )
 
 

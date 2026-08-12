@@ -11,6 +11,7 @@ import time
 
 import ahocorasick
 
+from src.domain.ports.domain_dictionary import DictionaryConsumerPort
 from src.domain.ports.entity_extraction import (
     EntityExtractionPort,
     ExtractedEntity,
@@ -186,7 +187,7 @@ _COMPILED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 ]
 
 
-class RuleBasedExtractor(EntityExtractionPort):
+class RuleBasedExtractor(EntityExtractionPort, DictionaryConsumerPort):
     """规则基实体抽取器
 
     使用 AC 自动机（pyahocorasick）匹配命名实体（人员、组织、地点、产品、概念），
@@ -213,7 +214,8 @@ class RuleBasedExtractor(EntityExtractionPort):
         self._automaton = ahocorasick.Automaton()
         for idx, (term, entity_type) in enumerate(self._dictionary):
             self._automaton.add_word(term, (idx, term, entity_type))
-        self._automaton.make_automaton()
+        if self._dictionary:
+            self._automaton.make_automaton()
 
     def reload_dictionary(self, dictionary: list[tuple[str, str]]) -> None:
         """热更新词典
@@ -245,15 +247,16 @@ class RuleBasedExtractor(EntityExtractionPort):
 
         # 1. AC 自动机匹配命名实体
         ac_entities: dict[str, ExtractedEntity] = {}
-        for end_idx, (idx, term, entity_type) in self._automaton.iter(content):
-            if term not in ac_entities:
-                ac_entities[term] = ExtractedEntity(
-                    name=term,
-                    entity_type=entity_type,
-                    confidence=0.85,
-                    extraction_source="rule",
-                    metadata={"position": end_idx},
-                )
+        if self._dictionary:
+            for end_idx, (idx, term, entity_type) in self._automaton.iter(content):
+                if term not in ac_entities:
+                    ac_entities[term] = ExtractedEntity(
+                        name=term,
+                        entity_type=entity_type,
+                        confidence=0.85,
+                        extraction_source="rule",
+                        metadata={"position": end_idx},
+                    )
 
         # 2. 正则匹配结构化实体
         regex_entities: dict[str, ExtractedEntity] = {}

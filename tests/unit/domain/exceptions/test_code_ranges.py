@@ -131,11 +131,16 @@ def test_subclass_code_in_same_subdomain_as_parent() -> None:
         ("entity", "business"),
         ("event", "business"),
         ("transfer", "business"),
+        # 子域 → business 基类（词典管理）
+        ("dictionary", "business"),
         # 子域 → external 基类
         ("embedding", "external"),
         ("sandbox", "external"),
         ("ocr", "external"),
         ("llm", "external"),
+        ("entity_extraction", "external"),
+        # 重排序子域 → external 基类
+        ("reranker", "external"),
         # 兜底 → external 基类
         ("fallback", "external"),
     }
@@ -266,6 +271,7 @@ def test_all_subdomain_ranges_are_valid() -> None:
         "ocr": "external",
         "llm": "external",
         "entity_extraction": "external",
+        "reranker": "external",
     }
 
     for subdomain, (start, end) in CODE_RANGES.items():

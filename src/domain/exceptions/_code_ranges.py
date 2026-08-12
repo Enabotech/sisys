@@ -18,8 +18,8 @@ from __future__ import annotations
 CODE_RANGES: dict[str, tuple[int, int]] = {
     # 系统级异常（1XX）
     "system": (101, 109),
-    # 业务级基类（201-208）
-    "business": (201, 208),
+    # 业务级基类（201-209）
+    "business": (201, 209),
     # 存储子域（211-219）
     "storage": (211, 219),
     # 角色子域（221-229）
@@ -34,6 +34,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "event": (251, 259),
     # 跨境传输子域（261-269）
     "transfer": (261, 269),
+    # 词典管理子域（270-279）
+    "dictionary": (270, 279),
     # 外部服务（3XX）
     "external": (301, 399),
     # 嵌入服务（306-308）
@@ -46,6 +48,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "llm": (330, 339),
     # 实体抽取子域（340-349）
     "entity_extraction": (340, 349),
+    # 重排序子域（350-359）
+    "reranker": (350, 359),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -126,6 +130,14 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "LLMConfigError": "llm",
     # entity_extraction_exceptions.py
     "EntityExtractionError": "entity_extraction",
+    # reranker_exceptions.py
+    "RerankError": "reranker",
+    # hybrid_search_exceptions.py
+    "HybridSearchError": "business",
+    # dictionary_exceptions.py
+    "DictionaryNotFoundError": "dictionary",
+    "DictionaryEntryConflictError": "dictionary",
+    "DictionaryVersionConflictError": "dictionary",
 }
 
 

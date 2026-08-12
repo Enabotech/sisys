@@ -262,7 +262,6 @@ markers = [
     "AC-7: Acceptance Criterion - common use for AC tests",
     "AC-8: Acceptance Criterion - common use for AC tests",
     "AC-9: Acceptance Criterion - common use for AC tests",
-    "edge-case: Edge case scenarios",
 ]
 
 # 插件配置

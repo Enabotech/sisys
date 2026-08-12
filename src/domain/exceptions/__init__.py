@@ -26,6 +26,11 @@ from src.domain.exceptions.business_exceptions import (
     PermissionDeniedError,
     ValidationError,
 )
+from src.domain.exceptions.dictionary_exceptions import (
+    DictionaryEntryConflictError,
+    DictionaryNotFoundError,
+    DictionaryVersionConflictError,
+)
 from src.domain.exceptions.embedding_exceptions import (
     EmbeddingAPIError,
     EmbeddingModelError,
@@ -40,6 +45,7 @@ from src.domain.exceptions.external_exceptions import (
     TimeoutError,
     UnknownError,
 )
+from src.domain.exceptions.hybrid_search_exceptions import HybridSearchError
 from src.domain.exceptions.llm_exceptions import (
     LLMAPIError,
     LLMConfigError,
@@ -50,6 +56,7 @@ from src.domain.exceptions.ocr_exceptions import (
     OCRProcessingError,
 )
 from src.domain.exceptions.permission_exceptions import InsufficientTokenError
+from src.domain.exceptions.reranker_exceptions import RerankError
 from src.domain.exceptions.role_exceptions import (
     CannotDeleteRoleWithUsersError,
     CannotDeleteSystemRoleError,
@@ -153,6 +160,10 @@ __all__ = [
     "LLMConfigError",
     # 实体抽取异常
     "EntityExtractionError",
+    # 重排序异常
+    "RerankError",
+    # 混合检索异常
+    "HybridSearchError",
     # OCR 异常
     "OCRConnectionError",
     "OCRProcessingError",
@@ -163,4 +174,8 @@ __all__ = [
     # 跨境传输异常
     "TransferNotFoundError",
     "TransferNotApprovedError",
+    # 词典管理异常
+    "DictionaryNotFoundError",
+    "DictionaryEntryConflictError",
+    "DictionaryVersionConflictError",
 ]

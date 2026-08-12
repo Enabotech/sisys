@@ -23,7 +23,7 @@ from pytest_bdd import given, scenarios, then, when
 from src.application.services.dense_search_service import DenseSemanticSearchService
 from src.application.services.hybrid_search_service import HybridSearchService
 from src.application.services.sparse_search_service import Bm25SparseSearchService
-from src.domain.exceptions import ValidationError
+from src.domain.exceptions import HybridSearchError, ValidationError
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.services.rrf_fusion import fuse
 from src.infrastructure.config.embedding import EmbeddingConfig
@@ -333,7 +333,7 @@ def when_hybrid_search(
         try:
             event_loop.run_until_complete(_run(dense_svc, sparse_svc))
             context["hybrid_error"] = None
-        except RuntimeError as e:
+        except (HybridSearchError, RuntimeError) as e:
             context["results"] = []
             context["hybrid_error"] = e
         return
@@ -658,12 +658,15 @@ def then_degradation_logged(context: dict[str, Any], caplog) -> None:
     assert len(degradation_logs) > 0, "降级应产生 WARNING 日志"
 
 
-@then("抛出 RuntimeError 异常")
-def then_runtime_error(context: dict[str, Any]) -> None:
+@then("抛出 HybridSearchError 异常")
+def then_hybrid_search_error_ac6(context: dict[str, Any]) -> None:
+    """两路均失败时抛出 HybridSearchError（Story 3-4 升级替换 RuntimeError）"""
     error = context.get("hybrid_error")
-    assert error is not None, "期望 RuntimeError 但未抛出"
-    assert isinstance(error, RuntimeError)
-    assert "Dense 和 Sparse 检索通道均失败" in str(error)
+    assert error is not None, "期望异常但未抛出"
+    from src.domain.exceptions.hybrid_search_exceptions import HybridSearchError
+
+    assert isinstance(error, HybridSearchError), f"期望 HybridSearchError, 实际 {type(error).__name__}"
+    assert "三路检索通道均失败" in str(error)
 
 
 @then("抛出 ValidationError 异常")
