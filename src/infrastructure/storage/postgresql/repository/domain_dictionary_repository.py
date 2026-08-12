@@ -10,7 +10,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import cast
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 
@@ -285,10 +286,13 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
             raise DictionaryNotFoundError(version=version)
 
         if not snapshot_model.entries:
+            # 空快照：清空所有词条，不回重建
+            await self._session.execute(sa_delete(DictionaryEntryModel))
+            await self._session.flush()
             return
 
         # 清空现有词条（批量删除，避免 N+1）
-        await self._session.execute(delete(DictionaryEntryModel))
+        await self._session.execute(sa_delete(DictionaryEntryModel))
 
         # 从快照重建词条
         for term_data in snapshot_model.entries.values():
