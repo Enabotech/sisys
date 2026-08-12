@@ -22,8 +22,8 @@
 
 | 层级 | 名称 | 粒度 | 数据来源 | 覆盖范围 |
 |------|------|------|---------|---------|
-| **L4** | 实体级片段 | 子块（~150 tokens） | 现有 `SemanticChunk` Child 块 | 单文档内的细粒度语义片段 |
-| **L3** | 文档切片 | 父块（~600 tokens） | 现有 `SemanticChunk` Parent 块 | 单文档内的语义完整段落 |
+| **L4** | 实体级片段 | 子块（~150 tokens） | 现有 `SemanticChunk` Child 块（需重构为分块级索引） | 单文档内的细粒度语义片段 |
+| **L3** | 文档切片 | 父块（~600 tokens） | 现有 `SemanticChunk` Parent 块（需重构为分块级索引） | 单文档内的语义完整段落 |
 | **L2** | 文档摘要 | 单文档摘要（~1K tokens） | 新建：LLM 摘要 / 聚合 | 单文档级语义摘要 |
 | **L1** | 跨文档摘要 | 多文档摘要（~2K tokens） | 新建：L2 摘要聚合 | 多文档级主题/项目摘要 |
 
@@ -39,7 +39,7 @@
 - Story 3.1b（BM25 稀疏检索 ✅ 已实现）— 提供 `Bm25SparseSearchService`
 - Story 3.2b（实体抽取 ✅ 已实现）— 提供 `L5GraphPort.search_entities()` 用于 L4 实体增强
 
-> **注意：** 当前 Qdrant 索引流程 (`document_tasks.py`) 的 payload 仅存储 `chunk_index` 和 `created_at`，不包含 `parent_chunk_id` 和 `index_level`。实施本 Story 前需修改索引流程以存储这些字段。
+> **注意：** 当前 Qdrant 索引流程 (`document_tasks.py`) 是**文档级粒度**——将整个文档文本拼接后生成一个向量并写入一个 Qdrant 点，payload 仅存储 `chunk_index` 和 `created_at`。分块流程 (`SemanticChunkingService`) 将 Child/Parent 块存入 PostgreSQL，但**不写入 Qdrant**。两条管道完全独立，L4/L3 分层检索所需的**分块级向量索引**尚不存在。实施本 Story 前需重构索引流程为分块级粒度，并确保 payload 包含 `parent_chunk_id` 和 `index_level`。
 
 **后续依赖:** Story 3.6（契约化摘要）、Story 3.7（检索相关性评估）、Story 3.8（高保真溯源）
 
@@ -128,11 +128,12 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `LayeredRetrievalError`（EXCEPTION_280）— 继承 `BusinessException`，检索编排失败
-- [ ] `LevelTransitionError`（EXCEPTION_281）— 继承 `BusinessException`，层级遍历失败
+- [ ] `LevelTransitionError`（EXCEPTION_281）— 继承 `BusinessException`，层级遍历非法
 - [ ] 异常编码在 `_code_ranges.py` 注册 `retrieval` 子域（280, 289）及 `_CLASS_TO_SUBDOMAIN` 映射
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册（500/500）
 - [ ] `allowed_child_parent_subdomains` 添加 `("retrieval", "business")`（定义在 tests/unit/domain/exceptions/test_code_ranges.py 中）
 - [ ] 无编码碰撞（`grep -rw "EXCEPTION_28[0-9]"` 零输出）
+- [ ] HTTP 映射测试覆盖：`test_exception_handlers.py` 中精确类型集合断言含 `LayeredRetrievalError` 和 `LevelTransitionError`
 
 ### AC-6: L2 文档摘要检索（骨架）
 
@@ -220,7 +221,7 @@
     - `_CLASS_TO_SUBDOMAIN` 新增 `"LayeredRetrievalError": "retrieval"`、`"LevelTransitionError": "retrieval"`
 - [ ] **导出完整性** — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
 - [ ] **测试覆盖** — 构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过
-- [ ] **BDD 验收场景** — 异常路径的 Gherkin 场景纳入 Edge Cases
+- [ ] **BDD 验收场景（额外）** — 异常路径的 Gherkin 场景纳入 Edge Cases
 
 #### API 契约 (API Contract)
 - [ ] 遵循 OpenAPI 标准的 API 契约定义位于 `docs/api/openapi.yaml`
@@ -294,14 +295,13 @@
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | 分层检索端口 | 端口契约方法签名、参数校验 | `tests/unit/domain/ports/test_layered_retrieval_port.py` | Task 1 |
 | **TDD 单元测试** | 分层检索服务 | 自底向上/自顶向下/降级/输入验证 | `tests/unit/application/services/test_layered_retrieval_service.py` | Task 2 |
-| **TDD 单元测试** | 分层检索异常 | 构造/属性/`to_dict()`/cause 链 | `tests/unit/domain/exceptions/test_layered_retrieval_exceptions.py` | Task 1 |
+| **TDD 单元测试** | 分层检索异常 | 构造/属性/`to_dict()`/cause 链/HTTP 映射/序列化 | `tests/unit/domain/exceptions/test_layered_retrieval_exceptions.py` | Task 1 |
 | **SDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_layered_retrieval.feature` | Task 0 |
 | **SDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_layered_retrieval.py` | Task 0 |
 | **SDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | `test_acceptance_layered_retrieval.feature` | Task 4 |
 | **SDD 验收测试** | 收尾 BDD 步骤实现 | 完成清单断言与步骤函数 | `test_acceptance_layered_retrieval.py` | Task 4 |
 | **SDD 契约测试** | 端口契约 | 端口注册、版本、兼容性、实现解析 | `tests/contracts/test_port_contract_layered_retrieval.py` | Task 0 |
-| **TDD 领域异常测试** | `src/domain/exceptions/` | 构造/属性/`to_dict()` 序列化 | `tests/unit/domain/exceptions/test_layered_retrieval_exceptions.py` | Task 1 |
-| **TDD 领域异常测试** | `src/interfaces/api/exception_handlers.py` | HTTP 映射/状态码/响应结构 | `tests/unit/interfaces/api/test_exception_handlers.py` | Task 1 |
+| **TDD 领域异常测试** | 异常 HTTP 映射 | HTTP 映射/状态码/响应结构 | `tests/unit/interfaces/api/test_exception_handlers.py` | Task 1 |
 | **TDD 领域异常测试** | 编码唯一性 | 所有异常类 `code` 无碰撞 | `tests/unit/domain/exceptions/test_error_code_uniqueness.py` | Task 1 |
 | **TDD 领域异常测试** | 编码子域范围 | 子域范围/继承链一致性 | `tests/unit/domain/exceptions/test_code_ranges.py` | Task 1 |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `tests/unit/architecture/test_arch_layered_retrieval.py` | Task 3 |
@@ -416,11 +416,9 @@
 - [ ] Subtask 1.2: 🟢 绿 — 实现 `LayeredRetrievalPort` Protocol
 - [ ] Subtask 1.3: 🔄 重构 — 优化端口代码
 
-#### TDD 循环 [A-1]：Qdrant payload 扩展（索引流程适配）
+#### TDD 循环 [A-1]：分块级索引重构（索引流程适配）
 
-> **说明：** 分层检索的 L4→L3 回溯和 L3→L4 展开依赖 `parent_chunk_id` 和 `index_level` payload 字段进行过滤。
-> 当前 Qdrant 索引流程 (`document_tasks.py`) 的 payload 仅存储 `chunk_index` 和 `created_at`，不包含上述字段，
-> 因此需修改索引流程，确保 upsert 时写入这两个字段。
+> **说明：** 分层检索的 L4→L3 回溯和 L3→L4 展开依赖**分块级向量索引**——每个 Child/Parent 块必须生成独立向量并写入 Qdrant。当前索引流程是文档级粒度：将整个文档文本拼接后生成一个向量，写入一个 Qdrant 点。分块流程 (`SemanticChunkingService`) 将 Child/Parent 块存入 PostgreSQL，但**不写入 Qdrant**。因此需重构索引流程，将分块管道前置到索引管道之前，确保每个 Chunk 块都有独立向量索引和完整 payload（含 `parent_chunk_id`、`index_level`、`chunk_id`、`document_id`）。
 
 | 阶段 | 动作 |
 |------|------|
@@ -428,9 +426,9 @@
 | 🟢 绿 | 修改 `src/infrastructure/workflow/tasks/document_tasks.py`，在 Qdrant upsert 的 payload 中追加 `parent_chunk_id` 和 `index_level` 字段 |
 | 🔄 重构 | 优化 payload 构建逻辑，确保与现有 `SemanticChunk` 值对象字段名一致 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写索引 payload 扩展失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 修改 `document_tasks.py` 追加 `parent_chunk_id` 和 `index_level`
-- [ ] Subtask 1.6: 🔄 重构 — 优化 payload 构建逻辑
+- [ ] Subtask 1.4: 🔴 红 — 编写分块级索引失败测试
+- [ ] Subtask 1.5: 🟢 绿 — 重构索引流程为分块级粒度，确保每个 Chunk 块独立向量 upsert 并包含完整 payload
+- [ ] Subtask 1.6: 🔄 重构 — 优化索引流程，确保文档级与分块级索引共存（通过 index_level 区分）
 
 #### TDD 循环 [B]：分层检索异常体系
 
@@ -450,6 +448,7 @@
 - [ ] 异常体系完整注册（`_code_ranges.py`/`__init__.py`/`EXCEPTION_HTTP_MAP`/`test_code_ranges.py`）
 - [ ] 所有 TDD 循环测试通过
 - [ ] 异常编码无碰撞（`grep -rw "EXCEPTION_28[0-9]"` 零输出）
+- [ ] 分块级索引重构完成：每个 Child/Parent 块在 Qdrant 中有独立向量点，payload 含 parent_chunk_id/index_level/chunk_id/document_id
 
 ---
 
@@ -602,6 +601,7 @@
 | **服务编排** | 复用 `DenseSemanticSearchService` 而非重新实现检索 | 保持与现有搜索服务一致，避免重复 |
 | **L4 检索策略** | 默认使用 Dense 语义检索（L4 Child 块有向量索引） | Child 块已索引向量，可直接复用现有 Dense 检索 |
 | **Qdrant payload 扩展** | 修改 `document_tasks.py` 索引流程，在 payload 中存储 `parent_chunk_id` 和 `index_level` | 分层检索依赖 payload 过滤进行回溯/展开 |
+| **索引粒度** | 重构索引流程：从文档级→分块级（每个 Child/Parent 块生成独立向量 upsert 到 Qdrant） | 当前文档级索引无法支持 L4/L3 分层检索 |
 
 ### 项目结构说明 Project Structure
 
@@ -725,6 +725,18 @@ tests/
 - `tests/contracts/test_port_contract_layered_retrieval.py` - 端口契约测试
 - `tests/acceptance/test_acceptance_layered_retrieval.feature` - Gherkin 场景
 - `tests/acceptance/test_acceptance_layered_retrieval.py` - BDD 步骤实现
+
+**待更新的文件/To Be Updated:**
+- `src/domain/exceptions/_code_ranges.py` — 新增 `retrieval` 子域（280-289）和 `_CLASS_TO_SUBDOMAIN` 映射
+- `src/domain/exceptions/__init__.py` — 导出 `LayeredRetrievalError`、`LevelTransitionError`
+- `src/domain/ports/__init__.py` — 导出 `LayeredRetrievalPort`
+- `src/interfaces/api/exception_handlers.py` — 注册 `EXCEPTION_HTTP_MAP` 映射
+- `src/composition_root.py` — 注册 `layered_retrieval_service` 端口
+- `src/infrastructure/workflow/tasks/document_tasks.py` — 重构索引流程为分块级粒度
+- `configs/event_channels.yaml` — 新增 `LayeredRetrievalCompleted` 事件通道（如保留事件）
+- `src/infrastructure/messaging/channel_router.py` — 同步更新 `DEFAULT_MAPPINGS`（如保留事件）
+- `tests/unit/domain/exceptions/test_code_ranges.py` — `allowed_child_parent_subdomains` 添加 `("retrieval", "business")`
+- `tests/unit/interfaces/api/test_exception_handlers.py` — 更新精确类型集合断言
 
 ---
 
