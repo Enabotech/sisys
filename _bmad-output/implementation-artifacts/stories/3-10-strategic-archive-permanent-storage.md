@@ -329,10 +329,11 @@
 - `tests/acceptance/test_acceptance_strategic_archive.py`
 
 **必须覆盖的场景：**
-- Happy Path: 归档完整流程（L2+L3+L4+L5 协同成功）
+- Happy Path: 归档完整流程（L2+L3+L4+L5 协同成功，含 `ArchiveCreated` 事件发布验证）
 - 归档查询: 按 archive_type / plan_id / 时间范围过滤
 - 档案详情: 按 archive_id 查询
 - 按规划查询: `list_by_plan()`
+- 事件验证: 归档成功时 `ArchiveCreated` 事件被正确发布（含 archive_id, plan_id, archive_type, storage_refs）
 - Edge Cases: 档案不存在（404）、存储层协同部分失败（L3 降级不影响主流程）
 - 异常路径: 资源不存在（404）、权限不足（403）、资源冲突（409）
 
