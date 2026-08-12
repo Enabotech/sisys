@@ -152,11 +152,14 @@ class HybridSearchService:
         if graph_failed:
             logger.warning("Graph 检索通道失败，降级为两路融合: %s", graph_raw)
 
-        # 应用有效权重
-        effective_weights = weights or self._weights
-        # 仅使用有效通道对应的权重
-        if len(effective_weights) > len(result_lists):
-            effective_weights = effective_weights[: len(result_lists)]
+        # 应用有效权重（按通道索引映射，而非前缀截断）
+        all_weights = weights or self._weights
+        channel_active = [
+            not dense_failed,  # dense 通道状态
+            not sparse_failed,  # sparse 通道状态
+            self._graph is not None and not graph_failed,  # graph 通道状态
+        ]
+        effective_weights = [w for w, active in zip(all_weights, channel_active) if active]
 
         # RRF 融合
         fused = self._fuse(*result_lists, weights=effective_weights)

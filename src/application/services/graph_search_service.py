@@ -137,4 +137,5 @@ class GraphSearchService:
 
         # 按 score 降序排列
         results.sort(key=lambda r: r["score"], reverse=True)
-        return results
+        # 按 limit 截断返回（结果数量不得超过请求上限）
+        return results[:limit]

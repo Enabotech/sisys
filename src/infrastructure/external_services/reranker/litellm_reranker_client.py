@@ -21,13 +21,16 @@ from src.infrastructure.external_services.reranker.config import RerankerConfig
 logger = logging.getLogger(__name__)
 
 # 尝试导入 litellm（可选依赖）
-try:
-    import litellm as _litellm
+_litellm: Any
+_litellm_available = False
 
+try:
+    import litellm
+
+    _litellm = litellm
     _litellm_available = True
 except ImportError:
-    _litellm = None  # type: ignore[assignment]
-    _litellm_available = False
+    _litellm = None
 
 
 class LiteLLMRerankerClient:

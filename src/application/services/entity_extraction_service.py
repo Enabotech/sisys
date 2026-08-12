@@ -197,10 +197,15 @@ class EntityExtractionService:
             try:
                 extraction_type = _map_extraction_type(final_result)
                 # memory_id 可能是 UUID 字符串或任意字符串，兼容处理
+                # 非 UUID 格式时，使用原始字符串作为事件 memory_id（UUID 类型）
+                # 但保持 aggregate_id 的可追溯性：memory_id 非 UUID 时，
+                # 生成散列 UUID 确保事件仍可序列化，同时记录 warning
                 try:
                     event_memory_id = uuid.UUID(memory_id)
                 except (ValueError, AttributeError):
-                    event_memory_id = uuid.uuid4()
+                    logger.warning("memory_id 不是合法 UUID 格式: %s，将生成散列 UUID", memory_id[:50])
+                    # 基于 memory_id 的确定性 UUID 生成，确保可追溯
+                    event_memory_id = uuid.uuid5(uuid.NAMESPACE_DNS, memory_id)
                 event = EntitiesExtracted(
                     memory_id=event_memory_id,
                     entity_count=len(final_result.entities),

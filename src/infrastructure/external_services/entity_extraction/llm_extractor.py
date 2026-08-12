@@ -10,6 +10,11 @@ from __future__ import annotations
 import logging
 import time
 
+from src.domain.exceptions import (
+    LLMAPIError,
+    ServiceUnavailableError,
+    TimeoutError,
+)
 from src.domain.ports.entity_extraction import (
     EntityExtractionPort,
     ExtractedEntity,
@@ -164,15 +169,20 @@ class LLMEntityExtractor(EntityExtractionPort):
         if domain_context and "domain" in domain_context:
             domain_hint = f"\n领域上下文：{domain_context['domain']}"
 
+        # 先注入 Few-Shot 示例
+        few_shot = _FEW_SHOT_EXAMPLES
+        system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(few_shot_examples=few_shot)
+
         prompt = (
             f"请从以下文本中抽取实体和关系。\n\n文本：{content}{domain_hint}\n\n请严格按照 JSON Schema 格式输出实体和关系列表。"
         )
 
-        # 调用 LLM
+        # 调用 LLM（使用 system_prompt 作为 system role，提升系统指令遵循度）
         try:
             result = await self._llm_client.structured_generate(
                 prompt=prompt,
                 response_schema=EntityExtractionSchema,
+                system_prompt=system_prompt,
             )
 
             # 转换结果为 ExtractionResult
@@ -210,8 +220,10 @@ class LLMEntityExtractor(EntityExtractionPort):
                 },
             )
 
-        except Exception as e:
-            # 透明降级：LLM 失败时返回空结果
+        except (LLMAPIError, ServiceUnavailableError, TimeoutError) as e:
+            # 透明降级：LLM 外部服务不可用/超时时返回空结果，不阻塞主流程
+            # LLMConfigError（配置错误）和 LLMResponseError（Schema 验证失败）
+            # 属于设计/配置级错误，应传播到应用层，此处不捕获
             logger.warning("LLM 实体抽取失败，降级至空结果: %s", e)
             return ExtractionResult(
                 extraction_metadata={

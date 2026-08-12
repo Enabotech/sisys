@@ -177,20 +177,26 @@ class LitellmLLMClient(LLMClientPort):
         self,
         prompt: str,
         config: LLMConfig | None = None,
+        system_prompt: str | None = None,
     ) -> dict[str, Any]:
         """构建 litellm.acompletion() 调用参数
 
         Args:
             prompt: 输入提示
             config: LLM 调用配置
+            system_prompt: 系统提示（可选，作为 system role 输入）
 
         Returns:
             litellm.acompletion() 关键字参数字典
         """
         cfg = config or self._config
+        messages: list[dict[str, Any]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
         kwargs: dict[str, Any] = {
             "model": cfg.model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "temperature": cfg.temperature,
         }
 
@@ -387,6 +393,7 @@ class LitellmLLMClient(LLMClientPort):
         self,
         prompt: str,
         config: LLMConfig | None = None,
+        system_prompt: str | None = None,
     ) -> LLMResponse:
         """标准 LLM 文本生成
 
@@ -418,7 +425,7 @@ class LitellmLLMClient(LLMClientPort):
             ) from e
 
         # 第 2 步：构建 litellm 调用参数
-        kwargs = self._build_acompletion_kwargs(prompt, cfg)
+        kwargs = self._build_acompletion_kwargs(prompt, cfg, system_prompt=system_prompt)
 
         # 第 3 步：指数退避重试
         try:
@@ -464,6 +471,7 @@ class LitellmLLMClient(LLMClientPort):
         prompt: str,
         response_schema: type[Any],
         config: LLMConfig | None = None,
+        system_prompt: str | None = None,
     ) -> Any:
         """结构化输出生成
 
@@ -499,7 +507,7 @@ class LitellmLLMClient(LLMClientPort):
             ) from e
 
         # 第 2 步：构建 litellm 调用参数（含 response_format）
-        kwargs = self._build_acompletion_kwargs(prompt, cfg)
+        kwargs = self._build_acompletion_kwargs(prompt, cfg, system_prompt=system_prompt)
         # 将 Pydantic Schema 转换为 JSON Schema dict（litellm 原生支持）
         # 领域层不依赖 pydantic，此处仅在基础设施层访问 model_json_schema()
         response_format = None

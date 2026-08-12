@@ -1693,10 +1693,8 @@ def bootstrap() -> None:
 
     # 升级 HybridSearchService 注册（三路注入 + 可配置权重 + 重排序）
     # v1.0.0 → v1.1.0：先 unregister 旧端口再 register
-    try:
-        _global_registry.unregister("hybrid_search_service")
-    except Exception:
-        pass
+    # unregister 对不存在的名字是静默 no-op，无需异常防护
+    _global_registry.unregister("hybrid_search_service")
     register_port(
         name="hybrid_search_service",
         version="v1.1.0",

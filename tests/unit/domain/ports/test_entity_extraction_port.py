@@ -47,11 +47,13 @@ class TestExtractedEntity:
     def test_frozen_dataclass(self) -> None:
         """验证 frozen=True 不可变"""
         entity = ExtractedEntity(name="PESTEL", entity_type="CONCEPT")
-        try:
-            entity.name = "NEW"  # type: ignore[misc]
-            assert False, "应抛出 FrozenInstanceError"
-        except Exception:
-            pass  # frozen dataclass 抛出异常
+        from dataclasses import FrozenInstanceError
+
+        import pytest
+
+        # setattr() 会调用 frozen dataclass 覆盖的 __setattr__，抛出 FrozenInstanceError
+        with pytest.raises(FrozenInstanceError):
+            setattr(entity, "name", "NEW")
 
     def test_equality(self) -> None:
         """验证相等性比较"""
@@ -99,11 +101,12 @@ class TestExtractedRelation:
     def test_frozen_dataclass(self) -> None:
         """验证 frozen=True 不可变"""
         relation = ExtractedRelation(source="A", target="B", relation_type="DEPENDS_ON")
-        try:
-            relation.source = "C"  # type: ignore[misc]
-            assert False, "应抛出 FrozenInstanceError"
-        except Exception:
-            pass
+        from dataclasses import FrozenInstanceError
+
+        import pytest
+
+        with pytest.raises(FrozenInstanceError):
+            setattr(relation, "source", "C")
 
     def test_source_is_entity_name_not_extraction_source(self) -> None:
         """验证 source 字段是源实体名称，与 extraction_source 不冲突"""
@@ -146,11 +149,12 @@ class TestExtractionResult:
     def test_frozen_dataclass(self) -> None:
         """验证 frozen=True 不可变"""
         result = ExtractionResult()
-        try:
-            result.entities = (ExtractedEntity(name="X", entity_type="CONCEPT"),)  # type: ignore[misc]
-            assert False, "应抛出 FrozenInstanceError"
-        except Exception:
-            pass
+        from dataclasses import FrozenInstanceError
+
+        import pytest
+
+        with pytest.raises(FrozenInstanceError):
+            setattr(result, "entities", (ExtractedEntity(name="X", entity_type="CONCEPT"),))
 
     def test_empty_result(self) -> None:
         """验证空结果"""

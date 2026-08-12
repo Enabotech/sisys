@@ -138,12 +138,14 @@ class LLMClientPort(Protocol):
         self,
         prompt: str,
         config: LLMConfig | None = None,
+        system_prompt: str | None = None,
     ) -> LLMResponse:
         """标准 LLM 文本生成
 
         Args:
             prompt: 输入提示文本
             config: LLM 调用配置（可选，使用默认配置）
+            system_prompt: 系统提示文本（可选，作为 system role 传入）
 
         Returns:
             LLMResponse 包含生成的文本内容
@@ -162,6 +164,7 @@ class LLMClientPort(Protocol):
         prompt: str,
         response_schema: type[Any],
         config: LLMConfig | None = None,
+        system_prompt: str | None = None,
     ) -> Any:
         """结构化输出生成
 
@@ -173,6 +176,7 @@ class LLMClientPort(Protocol):
             prompt: 输入提示文本
             response_schema: 目标 Schema 类（Pydantic BaseModel 子类）
             config: LLM 调用配置（可选，使用默认配置）
+            system_prompt: 系统提示文本（可选，作为 system role 传入）
 
         Returns:
             response_schema 类型的实例（已验证）

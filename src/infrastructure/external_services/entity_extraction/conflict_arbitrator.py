@@ -46,6 +46,7 @@ class ConflictArbitrator(EntityArbitratorPort):
         self._default_rule_weight = default_rule_weight
         self._default_llm_weight = default_llm_weight
         self._entity_type_weights: dict[str, tuple[float, float]] = {}
+        self._relation_type_weights: dict[str, tuple[float, float]] = {}
 
     def set_entity_type_weight(
         self,
@@ -62,6 +63,21 @@ class ConflictArbitrator(EntityArbitratorPort):
         """
         self._entity_type_weights[entity_type] = (rule_weight, llm_weight)
 
+    def set_relation_type_weight(
+        self,
+        relation_type: str,
+        rule_weight: float,
+        llm_weight: float,
+    ) -> None:
+        """设置关系类型的差异化权重
+
+        Args:
+            relation_type: 关系类型
+            rule_weight: 规则权重
+            llm_weight: LLM 权重
+        """
+        self._relation_type_weights[relation_type] = (rule_weight, llm_weight)
+
     def _get_weights(self, entity_type: str) -> tuple[float, float]:
         """获取实体类型的权重
 
@@ -73,6 +89,19 @@ class ConflictArbitrator(EntityArbitratorPort):
         """
         if entity_type in self._entity_type_weights:
             return self._entity_type_weights[entity_type]
+        return (self._default_rule_weight, self._default_llm_weight)
+
+    def _get_relation_weights(self, relation_type: str) -> tuple[float, float]:
+        """获取关系类型的权重
+
+        Args:
+            relation_type: 关系类型
+
+        Returns:
+            (rule_weight, llm_weight) 权重元组
+        """
+        if relation_type in self._relation_type_weights:
+            return self._relation_type_weights[relation_type]
         return (self._default_rule_weight, self._default_llm_weight)
 
     def arbitrate(
@@ -214,8 +243,8 @@ class ConflictArbitrator(EntityArbitratorPort):
             llm_rel = llm_map.get(key)
 
             if rule_rel is not None and llm_rel is not None:
-                # 两者都存在 → 加权平均
-                rule_weight, llm_weight = self._get_weights(rule_rel.relation_type)
+                # 两者都存在 → 加权平均（使用关系类型专属权重，避免与实体类型混淆）
+                rule_weight, llm_weight = self._get_relation_weights(rule_rel.relation_type)
                 weighted_confidence = rule_rel.confidence * rule_weight + llm_rel.confidence * llm_weight
                 source = "hybrid" if rule_rel.extraction_source != llm_rel.extraction_source else rule_rel.extraction_source
                 result.append(

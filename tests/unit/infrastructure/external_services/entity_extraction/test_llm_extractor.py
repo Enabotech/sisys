@@ -101,20 +101,19 @@ class TestLLMEntityExtractor:
         assert len(result.entities) == 0
         assert len(result.relations) == 0
 
-    # --- Edge Case: Schema 验证失败 ---
+    # --- Edge Case: Schema 验证失败（设计级错误，应传播） ---
 
     @pytest.mark.asyncio
-    async def test_schema_validation_failure_returns_empty(
+    async def test_schema_validation_failure_propagates(
         self, extractor: LLMEntityExtractor, mock_llm_client: AsyncMock
     ) -> None:
-        """验证 Schema 验证失败时降级至空结果"""
+        """验证 Schema 验证失败时传播 LLMResponseError（设计/配置级错误不应被静默吞掉）"""
         from src.domain.exceptions import LLMResponseError
 
         mock_llm_client.structured_generate.side_effect = LLMResponseError("Schema 验证失败")
 
-        result = await extractor.extract_entities("测试内容")
-        assert isinstance(result, ExtractionResult)
-        assert len(result.entities) == 0
+        with pytest.raises(LLMResponseError):
+            await extractor.extract_entities("测试内容")
 
 
 # --- 辅助 Mock Schema 类 ---

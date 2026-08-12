@@ -30,9 +30,12 @@ class EntitiesExtracted(DomainEvent):
     extraction_type: str = ""
 
     def __post_init__(self) -> None:
-        """设置 aggregate_id, aggregate_type"""
-        if self.aggregate_id is None:
-            object.__setattr__(self, "aggregate_id", uuid.uuid4())
+        """设置 aggregate_id = memory_id, aggregate_type = "EntityExtraction"
+
+        与故事 AC-2 规范一致：aggregate_id 关联回产生该事件的记忆实例，
+        支持下游消费端通过 aggregate_id 做聚合溯源与事件重放。
+        """
+        object.__setattr__(self, "aggregate_id", self.memory_id)
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "EntityExtraction")
 

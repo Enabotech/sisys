@@ -181,6 +181,8 @@ class TestLLMClientPort:
         assert "response_schema" in params, "structured_generate 应包含 response_schema 参数"
         assert "config" in params, "structured_generate 应包含 config 参数"
         assert params["config"].default is None, "config 应默认为 None"
+        assert "system_prompt" in params, "structured_generate 应包含 system_prompt 参数"
+        assert params["system_prompt"].default is None, "system_prompt 应默认为 None"
 
     def test_response_schema_type_any(self) -> None:
         """验证 structured_generate 的 response_schema 参数为 type[Any] 而非 type[BaseModel]"""
@@ -204,10 +206,21 @@ class TestLLMClientPort:
         """验证符合 Protocol 的类可通过 isinstance 检查"""
 
         class MockLLMClient:
-            async def generate(self, prompt: str, config: LLMConfig | None = None) -> LLMResponse:
+            async def generate(
+                self,
+                prompt: str,
+                config: LLMConfig | None = None,
+                system_prompt: str | None = None,
+            ) -> LLMResponse:
                 return LLMResponse(content="test")
 
-            async def structured_generate(self, prompt: str, response_schema: type, config: LLMConfig | None = None):
+            async def structured_generate(
+                self,
+                prompt: str,
+                response_schema: type,
+                config: LLMConfig | None = None,
+                system_prompt: str | None = None,
+            ):
                 return response_schema()
 
             async def close(self) -> None:
