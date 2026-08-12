@@ -79,6 +79,9 @@ class GraphSearchService:
         # 空查询直接返回空列表（与 Dense/Sparse 行为一致）
         if not query_text or not query_text.strip():
             return []
+        # collection 空校验（与 Dense/Sparse 行为一致）
+        if not collection or not collection.strip():
+            return []
 
         # 步骤 1：通过 search_entities 解析查询文本中的实体
         try:

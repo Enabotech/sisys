@@ -118,13 +118,34 @@ class LiteLLMRerankerClient:
             timeout=self._config.timeout,
         )
 
-        # 处理响应
+        # 处理响应——支持对象属性访问和 dict 两种响应格式
         reranked: list[SearchResult] = []
-        for item in response.results if hasattr(response, "results") else response.get("results", []):
-            index = item["index"] if isinstance(item, dict) else item.index
-            original = results[index]
+        raw_results: list[Any] = []
+        if hasattr(response, "results"):
+            raw_results = list(response.results) if response.results else []
+        elif isinstance(response, dict):
+            raw_results = response.get("results", [])
+        else:
+            logger.warning("重排序响应格式异常: %s", type(response).__name__)
+            raise ValueError(f"Unexpected response type: {type(response).__name__}")
 
-            rerank_score = item["relevance_score"] if isinstance(item, dict) else item.relevance_score
+        for item in raw_results:
+            if isinstance(item, dict):
+                index = item.get("index")
+                rerank_score = item.get("relevance_score")
+            else:
+                index = getattr(item, "index", None)
+                rerank_score = getattr(item, "relevance_score", None)
+
+            if index is None or rerank_score is None:
+                logger.warning("重排序响应项缺少 index 或 relevance_score: %s", item)
+                continue
+
+            if not isinstance(index, int) or index < 0 or index >= len(results):
+                logger.warning("重排序响应 index 越界: index=%d, results_len=%d", index, len(results))
+                continue
+
+            original = results[index]
             original_score = original["score"]
 
             payload: dict[str, Any] = dict(original.get("payload", {}))
