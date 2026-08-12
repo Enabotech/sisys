@@ -98,10 +98,10 @@
 **验证标准/Validation Criteria:**
 - [ ] 缓存失效监听器位于 `src/infrastructure/messaging/event_handlers/cache_invalidation_handler.py`
 - [ ] 监听 `DocumentProcessed` 事件（`event_type == "DocumentProcessed"`）
-- [ ] 失效策略：维护文档 ID → 缓存键的二级索引（Redis Set），缓存写入时记录关联关系，失效时通过文档 ID 查关联缓存键后逐一删除
+- [ ] 失效策略：通过 `SemanticCache.invalidate_by_document_id()` 端口方法维护"文档 ID → 缓存键"二级索引（Redis Set），缓存写入时记录关联关系，失效时通过文档 ID 查关联缓存键后逐一删除
 - [ ] 失效操作仅记录日志，不抛出异常（事件处理不阻塞主流程）
-- [ ] 支持手动触发全量缓存清理（`invalidate_all` 方法）
-- [ ] 支持按 collection 前缀匹配清理（`invalidate_pattern` 方法，基于 SCAN 模式匹配）
+- [ ] 支持手动触发全量缓存清理（`invalidate_all` 方法，删除 `sisys:cache:semantic:*` 前缀下所有键，含缓存 + 二级索引）
+- [ ] 支持按 collection 前缀匹配清理（`invalidate_pattern` 方法，基于 SCAN 模式匹配，使用 `COUNT` 参数控制批量大小，默认 100）
 
 > **⚠️ 失效策略设计说明（原稿 P0 修正）**：`RedisSemanticCache._build_cache_key()` 基于**嵌入向量 MD5 哈希**生成缓存键（`vec:{md5[:16]}`），**无法通过文档 ID 直接反查**。因此原稿的 `cache_key = f"doc:{event.aggregate_id}"` 完全失效——构造的键与任何实际缓存键都不匹配。本修正方案采用二级索引（Redis Set）维护文档 ID ↔ 缓存键的关联关系，实现按文档 ID 精确失效。
 
@@ -122,12 +122,14 @@
 **And** Token 消耗降低 40-50%
 
 **验证标准/Validation Criteria:**
-- [ ] 复用 `EventMetricsCollector` 的 `record_cache_hit()` / `record_cache_miss()` 方法
-- [ ] 新增 `record_cache_latency(latency_seconds)` 方法记录延迟
+- [ ] 通过应用层 `CacheMetricsPort` 指标端口（`src/application/ports/cache_metrics_port.py`）采集缓存指标，**禁止**直接依赖基础设施层 `EventMetricsCollector`（六边形架构约束）
+- [ ] `CacheMetricsPort` 定义 `record_cache_hit()` / `record_cache_miss()` / `record_cache_latency(latency_seconds)` / `hit_rate` 属性
 - [ ] 新增 `estimated_tokens_saved` 属性（基于 `avg_tokens_per_search` 配置参数，作为 `SemanticCacheMiddleware` 构造参数注入，默认值 5000）
-- [ ] 指标可通过 `SemanticCacheMiddleware.metrics` 属性访问
+- [ ] 指标可通过 `SemanticCacheMiddleware.metrics` 属性访问（返回 `CacheMetricsPort` 实例）
 - [ ] 缓存命中延迟 P95<50ms（仅向量搜索 + 反序列化，排除嵌入生成）
 - [ ] 缓存命中率≥40%
+
+> **⚠️ 架构合规说明（Round 2 P0 修正）**：`EventMetricsCollector` 位于基础设施层（`src/infrastructure/monitoring/`），`SemanticCacheMiddleware` 位于应用层（`src/application/services/`），应用层直接引用基础设施层类型违反六边形架构约束（import-linter 将阻断 CI）。本 Story **新建** 应用层指标端口 `CacheMetricsPort`（Protocol），`SemanticCacheMiddleware` 仅注入该端口。`RedisSemanticCache` 内部仍可继续使用 `EventMetricsCollector`（基础设施层内部依赖合法）。在 `composition_root.py` 中注册 `cache_metrics` 端口，将 `EventMetricsCollector` 实例作为 `CacheMetricsPort` 实现注入。
 
 ### AC-4: 降级策略
 
@@ -452,7 +454,7 @@
     3. 命中 → 反序列化 → 返回缓存结果
     4. 未命中 → 调用 `search_service.search()` → 序列化结果 → `cache.set()` → 返回
   - **缓存键设计（P1 修正）**：缓存键包含 `weights` 参数的哈希后缀，不同 weights 产生不同缓存键，避免不同 weights 返回错误融合结果。`_build_cache_key(query_embedding, weights)` 在中间件层实现。
-  - **二级索引维护**：缓存写入时从 `SearchResult` 结果中提取所有文档 ID，为每个文档 ID 维护 Redis Set（`sisys:cache:semantic:doc:{doc_id}`），记录关联的缓存键。
+  - **二级索引维护**：缓存写入时从 `SearchResult` 结果中提取所有文档 ID，为每个文档 ID 维护 Redis Set（`sisys:cache:semantic:idx:doc:{doc_id}`），记录关联的缓存键。使用 Redis pipeline 批量操作（`async with self._redis.pipeline(transaction=True) as pipe`），将所有 SADD 命令和 SET/EXPIRE 打包为一次网络往返，减少写入延迟。
   - 异常安全：嵌入/缓存异常时降级为直接检索，记录 WARNING 日志
   - 指标采集：命中/未命中计数、延迟记录
 
@@ -472,15 +474,15 @@
   - **命中率计算**：`hit_rate = hits / (hits + misses)` 正确
   - **延迟记录**：命中后 `cache_hit_latency_seconds` 有记录
   - **预估节省 Token**：`estimated_tokens_saved` = 命中次数 × `avg_tokens_per_search`
-  - **metrics 属性可访问**：`middleware.metrics` 返回 `EventMetricsCollector` 实例
+  - **metrics 属性可访问**：`middleware.metrics` 返回 `CacheMetricsPort` 实例（通过 Protocol 注入，**非** `EventMetricsCollector` 具体类型）
   - **不同 weights 缓存隔离**：相同查询文本 + 不同 weights → 不同缓存键，互不影响
   - **缓存键碰撞检测**：MD5 哈希碰撞时自动检测并覆盖
 
 - [ ] Subtask 1.5: 🟢 绿 — 实现指标采集
-  - 复用 `EventMetricsCollector` 的 `record_cache_hit()` / `record_cache_miss()`
-  - 新增 `record_cache_latency()` 方法
-  - 新增 `estimated_tokens_saved` 属性（基于 `avg_tokens_per_search` 配置参数）
-  - 暴露 `metrics` 属性
+  - 通过应用层 `CacheMetricsPort` 端口（`src/application/ports/cache_metrics_port.py`）采集指标，**禁止**直接引用基础设施层 `EventMetricsCollector`
+  - `CacheMetricsPort` 定义：`record_cache_hit()` / `record_cache_miss()` / `record_cache_latency(latency_seconds)` / `hit_rate` 属性
+  - 新增 `estimated_tokens_saved` 属性（基于 `avg_tokens_per_search` 构造参数）
+  - 暴露 `metrics` 属性（返回 `CacheMetricsPort` 实例）
 
 - [ ] Subtask 1.6: 🔄 重构 — 运行 `ruff check` + `mypy` + `pytest`
 
@@ -535,12 +537,11 @@
       """缓存失效事件处理器
 
       监听 DocumentProcessed 事件，触发语义缓存失效。
-      采用二级索引精确失效策略：维护文档 ID → 缓存键的 Redis Set 映射。
+      通过 SemanticCache.invalidate_by_document_id() 端口方法封装二级索引逻辑。
       """
 
-      def __init__(self, cache: SemanticCache, redis_client: aioredis.Redis):
+      def __init__(self, cache: SemanticCache):
           self._cache = cache
-          self._redis = redis_client
 
       async def handle(self, event: DomainEvent) -> None:
           """处理 DocumentProcessed 事件，触发缓存失效"""
@@ -550,18 +551,7 @@
           if doc_id is None:
               return
           try:
-              # 1. 查二级索引：doc_id → [cache_key1, cache_key2, ...]
-              doc_index_key = f"sisys:cache:semantic:doc:{doc_id}"
-              cache_keys = await self._redis.smembers(doc_index_key)
-              if not cache_keys:
-                  logger.warning("No cache keys found for document %s, skipping", doc_id)
-                  return
-              # 2. 逐一失效
-              for cache_key in cache_keys:
-                  await self._cache.invalidate(cache_key.decode() if isinstance(cache_key, bytes) else cache_key)
-              # 3. 清理二级索引
-              await self._redis.delete(doc_index_key)
-              logger.debug("Invalidated %d cache entries for document %s", len(cache_keys), doc_id)
+              await self._cache.invalidate_by_document_id(str(doc_id))
           except Exception:
               logger.warning("缓存失效失败: %s", doc_id)
   ```
@@ -592,19 +582,33 @@
     - `semantic_cache`（应用层端口，已有，生命周期已改为 SINGLETON）
     - `hybrid_search_service`（应用层服务，已有）
     - 可选：`metrics_collector`（指标采集）
-  - 注册 `cache_invalidation_handler` 端口（SCOPED），注入 `semantic_cache` + `redis_client`
+  - 注册 `cache_invalidation_handler` 端口（SCOPED），注入 `semantic_cache`（通过 `invalidate_by_document_id()` 间接操作二级索引，无需直接注入 `redis_client`）
   - 注册事件监听：`document_processed` → `cache_invalidation_handler.handle()`
 
-- [ ] Subtask 3.2: 扩展 `SemanticCache` 协议 + `RedisSemanticCache` 实现
+- [ ] Subtask 3.2: 扩展 `SemanticCache` 协议 + `RedisSemanticCache` 实现 + 新建 `CacheMetricsPort`
+  - **新建** `src/application/ports/cache_metrics_port.py`，定义 `CacheMetricsPort` Protocol：
+    - `record_cache_hit() -> None`
+    - `record_cache_miss() -> None`
+    - `record_cache_latency(latency_seconds: float) -> None`
+    - `hit_rate` 属性（返回 `float`）
+    - `cache_hits_total` 属性（返回 `int`）
+    - `cache_misses_total` 属性（返回 `int`）
   - 在 `SemanticCache` 协议中新增：
-    - `invalidate_pattern(pattern: str) -> None` — 按模式匹配批量失效
-    - `invalidate_all() -> None` — 全量缓存清理
+    - `invalidate_pattern(pattern: str) -> None` — 按模式匹配批量失效（基于 SCAN，默认 COUNT=100）
+    - `invalidate_all() -> None` — 全量缓存清理（删除 `sisys:cache:semantic:*` 前缀下的所有键，含缓存数据 + 二级索引）
+    - `invalidate_by_document_id(doc_id: str) -> None` — 按文档 ID 使关联的缓存条目失效（封装二级索引逻辑，避免 CacheInvalidationHandler 直接操作 redis_client）
   - 在 `RedisSemanticCache` 中实现：
-    - `invalidate_pattern()`: 基于 Redis SCAN + DELETE 模式匹配
-    - `invalidate_all()`: 删除整个 `cache:semantic` 命名空间
+    - `invalidate_pattern()`: 基于 Redis SCAN + DELETE 模式匹配，使用 `COUNT` 参数控制批量大小
+    - `invalidate_all()`: 通过 `scan(match="sisys:cache:semantic:*")` 批量删除
+    - `invalidate_by_document_id()`: 内部维护二级索引（`SADD` 写入时 + `SMEMBERS`/`DELETE` 失效时），使用 `build_key("cache:semantic", "idx:doc", doc_id)` 规范构建键名
   - 在 `SemanticCacheMiddleware` 中：
-    - 缓存写入时维护二级索引：`Redis Set sisys:cache:semantic:doc:{doc_id}` 记录缓存键
+    - 缓存写入时使用 Redis pipeline 维护二级索引：`sisys:cache:semantic:idx:doc:{doc_id}` 记录缓存键
     - 缓存键包含 `weights` 参数的哈希后缀（不同 weights 隔离缓存）
+  - 二级索引 key 命名空间分层：
+    - `sisys:cache:semantic:vec:{md5}` — 缓存数据（已有）
+    - `sisys:cache:semantic:idx:doc:{doc_id}` — 文档 ID 二级索引（新增，`idx:` 中间段与 `vec:` 精确区分）
+
+> **⚠️ 二级索引命名说明（Round 2 P1 修正）**：使用 `idx:doc:` 而非 `doc:` 作为中间段，确保 `invalidate_pattern("vec:*")` 只匹配缓存数据、`invalidate_pattern("idx:*")` 只匹配二级索引，避免误删。`invalidate()` 的文档注释增加警告：传入的 `cache_key` 应是缓存条目键，不要传入二级索引键。
 
 - [ ] Subtask 3.3: 端口契约测试
   - 创建 `tests/contracts/test_port_contract_semantic_cache.py`
@@ -643,11 +647,11 @@
   - **场景 5: 降级策略**
     - 断开 Redis 连接
     - 发送查询 → 验证降级为直接检索
-    - 恢复 Redis 连接
+    - 恢复 Redis 连接（`redis-py` 连接池采用懒连接模式，下次请求自动创建新连接，无需手动重连）
     - 发送查询 → 验证自动恢复缓存功能
   - **场景 6: 二级索引失效**
     - 写入缓存（含多个文档 ID 的检索结果）
-    - 验证 `sisys:cache:semantic:doc:{doc_id}` 二级索引已维护
+    - 验证 `sisys:cache:semantic:idx:doc:{doc_id}` 二级索引已维护
     - 触发 `DocumentProcessed` 事件 → 验证关联缓存键被删除，索引被清理
   - **场景 7: 不同 weights 缓存隔离**
     - 相同查询 + 不同 weights → 验证产生不同缓存键，互不影响
@@ -657,8 +661,9 @@
   - 确保 `src/domain/ports/__init__.py` 正确导出 `L1CachePort`（已有）
 
 **完成标准/Definition of Done:**
-- [ ] `composition_root.py` 注册完成（生命周期变更 + 新端口注册）
-- [ ] `SemanticCache` 协议扩展完成（`invalidate_pattern()` + `invalidate_all()`）
+- [ ] `composition_root.py` 注册完成（生命周期变更 + 新端口注册 + `CacheMetricsPort` 注册）
+- [ ] `SemanticCache` 协议扩展完成（`invalidate_pattern()` + `invalidate_all()` + `invalidate_by_document_id()`）
+- [ ] `CacheMetricsPort` 应用层指标端口创建完成
 - [ ] 端口契约测试通过
 - [ ] 架构验证测试通过
 - [ ] 集成测试通过（真实 Redis）
@@ -670,7 +675,9 @@
 
 **关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-5
 
-> **性质说明：** 本 Task 不是功能实现，而是对 Story 收尾阶段的交付物与完成清单进行最终验收。
+> **性质说明：** 本 Task 不是功能实现，而是对 Story 收尾阶段进行最终验收。
+
+> **⚠️ 验收方式说明（Round 2 P2 修正）**：原稿 Subtask 4.1/4.2 使用 BDD/Gherkin 场景验证"文件存在性"，这是反模式——BDD 的作用是验证**业务行为**而非文件清单（参考 `test_acceptance_hybrid_search.feature` 无此类场景）。现将文件清单验证改为 **Definition of Done checklist 条目**（非 BDD 测试），Task 4 聚焦端到端行为验证与收尾校验。
 
 #### 开发结束验收测试实现
 
@@ -680,11 +687,20 @@
 | 🟢 绿 | 编写 `tests/acceptance/test_acceptance_semantic_cache.py` 的 BDD 步骤实现 |
 | 🔄 重构 | 收敛场景命名、统一断言表达、保持步骤函数可维护性 |
 
-- [ ] Subtask 4.1: 场景 1 — 验证 `src` 完成清单的逐项确认
-  - `SemanticCacheMiddleware` 位于 `src/application/services/semantic_cache_middleware.py`
-  - `CacheInvalidationHandler` 位于 `src/infrastructure/messaging/event_handlers/cache_invalidation_handler.py`
-  - `composition_root.py` 注册完成
-- [ ] Subtask 4.2: 场景 2 — 验证 `tests/` 完成清单的逐项确认
+- [ ] Subtask 4.1: 端到端行为验证场景
+  - **业务行为**：给定语义缓存已运行，当混合检索执行时，缓存命中率指标正确记录
+  - **降级行为**：给定 Redis 不可用，当混合检索执行时，系统降级且不抛出异常
+  - **一致行为**：给定文档已缓存，当 DocumentProcessed 事件发布时，缓存正确失效
+- [ ] Subtask 4.2: 运行开发结束验收测试并确认通过
+- [ ] Subtask 4.3: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
+
+**完成标准（含文件清单 checklist，非 BDD 场景）/Definition of Done:**
+- [ ] `src` 完成清单已逐项验证：
+  - `src/application/services/semantic_cache_middleware.py`
+  - `src/application/ports/cache_metrics_port.py`
+  - `src/infrastructure/messaging/event_handlers/cache_invalidation_handler.py`
+  - `src/composition_root.py` 注册完成
+- [ ] `tests/` 完成清单已逐项验证：
   - `tests/unit/application/services/test_semantic_cache_middleware.py`
   - `tests/unit/infrastructure/messaging/test_cache_invalidation_handler.py`
   - `tests/contracts/test_port_contract_semantic_cache.py`
@@ -692,12 +708,6 @@
   - `tests/integration/test_integration_semantic_cache.py`
   - `tests/acceptance/test_acceptance_semantic_cache.feature`
   - `tests/acceptance/test_acceptance_semantic_cache.py`
-- [ ] Subtask 4.3: 运行开发结束验收测试并确认通过
-- [ ] Subtask 4.4: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
-
-**完成标准/Definition of Done:**
-- [ ] `src` 完成清单已逐项验证确认
-- [ ] `tests/` 完成清单已逐项验证确认
 - [ ] 开发结束验收测试通过
 - [ ] Story 可进入 `done`
 
@@ -713,10 +723,13 @@
 - **设计约束:**
   - 语义缓存是"已就绪但未接入"状态，本 Story 不修改已有端口和实现（除 `SemanticCache` 协议扩展外）
   - `SemanticCache` 端口生命周期从 `SCOPED` 改为 `SINGLETON`（缓存实例全局共享，`aioredis.Redis` 连接池线程安全，`_index_ready` 竞态因 `FT.CREATE` 幂等不影响功能）
-  - 缓存失效监听器采用**二级索引精确失效**策略：缓存写入时维护"文档 ID → 缓存键"的 Redis Set 映射，失效时先查文档 ID 关联的所有缓存键再逐一删除
+  - 缓存失效监听器采用**二级索引精确失效**策略：通过 `SemanticCache.invalidate_by_document_id()` 端口方法封装，`CacheInvalidationHandler` 不直接操作 `redis_client`
   - 缓存失效触发事件：`DocumentProcessed`（文档解析/索引完成后发布），而非 `MemoryChanged`（用户记忆变更事件，与文档检索结果无关）
   - 缓存异常透明降级（WARNING 日志），不抛出异常
   - 不新增缓存领域异常（复用 `StorageError` / `NetworkError`）
+  - **指标采集**：`SemanticCacheMiddleware` 通过应用层 `CacheMetricsPort` 端口注入，**禁止**直接引用基础设施层 `EventMetricsCollector`（六边形架构约束，import-linter 强制校验）
+  - **二级索引命名空间**：`sisys:cache:semantic:idx:doc:{doc_id}`（`idx:` 中间段与 `vec:` 精确区分，避免 `invalidate_pattern` 误删）
+  - **Redis pipeline 批量操作**：二级索引维护使用 `async with self._redis.pipeline(transaction=True) as pipe` 打包所有 SADD 命令，减少网络往返
 - **技术栈:** Redis 7.0+（RediSearch FT.SEARCH 向量索引）、bge-m3 嵌入（1024 维）
 
 ### 关键架构决策
@@ -745,6 +758,8 @@
 .\
 ├── src/
 │   ├── application/
+│   │   ├── ports/
+│   │   │   └── cache_metrics_port.py               # [新建] 应用层缓存指标端口
 │   │   └── services/
 │   │       └── semantic_cache_middleware.py   # [新建] 语义缓存中间件
 │   │
@@ -828,6 +843,7 @@
 - `_bmad-output/implementation-artifacts/stories/3-9-semantic-cache.md`
 
 **待创建的文件/To Be Created (Dev Story 实施):**
+- `src/application/ports/cache_metrics_port.py` - 应用层缓存指标端口
 - `src/application/services/semantic_cache_middleware.py` - 语义缓存中间件
 - `src/infrastructure/messaging/event_handlers/cache_invalidation_handler.py` - 缓存失效监听器
 - `tests/unit/application/services/test_semantic_cache_middleware.py` - 中间件单元测试
@@ -879,6 +895,14 @@
 | 7 | `invalidate_pattern` / `invalidate_all` 不存在：端口协议和实现均不支持 AC-2 要求的功能 | **P1** | Subtask 3.2 新增协议扩展和实现 |
 | 8 | 测试覆盖缺口：缺少并发查询竞态、缓存键碰撞、嵌入生成超时降级、不同 weights 缓存隔离、TTL 续期测试 | **P1** | 补充缺失的测试场景（Subtask 1.4/3.5） |
 | 9 | SINGLETON 生命周期安全性未说明：`_index_ready` 竞态和 Redis 重启后状态不正确 | **P2** | 补充 SINGLETON 安全性说明文档 |
+| 10 | 六边形架构违反：SemanticCacheMiddleware 直接引用基础设施层 EventMetricsCollector | **P0** | 新建应用层 `CacheMetricsPort` Protocol，SemanticCacheMiddleware 通过端口注入，禁止直接依赖 EventMetricsCollector |
+| 11 | 二级索引 key 与缓存 key 共享前缀，invalidate_pattern 存在误删风险 | **P1** | 索引 key 增加 `idx:` 中间分段（`idx:doc:{doc_id}`），文档明确 invalidate 方法边界契约 |
+| 12 | CacheInvalidationHandler 直接操作 redis_client 处理二级索引，缓存实现细节暴露给事件处理器 | **P2** | 新增 `SemanticCache.invalidate_by_document_id()` 端口方法，封装二级索引逻辑，CacheInvalidationHandler 仅注入 SemanticCache |
+| 13 | Task 4 使用 BDD 场景验证文件存在性，是反模式（BDD 应验证业务行为而非文件清单） | **P2** | 移除 Task 4 文件清单 BDD 场景，改为 Definition of Done checklist 条目 |
+| 14 | 二级索引写入无 pipeline 批量操作，100 个文档需 100 次 Redis SADD 增加延迟 | **P1** | 文档补充 Redis pipeline 批量操作要求 |
+| 15 | SCAN 无 COUNT 参数控制，大键空间下迭代次数过多 | **P2** | 文档补充 COUNT 参数约定（默认 100） |
+| 16 | invalidate_all() 缺少安全声明，未说明是否清理二级索引 | **P2** | 文档补充 invalidate_all() 安全声明（仅影响 `sisys:cache:semantic:*` 前缀） |
+| 17 | Redis 断连恢复测试缺少机制说明 | **P2** | 文档补充 `redis-py` 连接池懒连接恢复机制说明 |
 
 ---
 
@@ -934,9 +958,10 @@
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-08-12
 **最后更新/Last Updated:** 2026-08-12
 **更新说明/Description:**
+- v1.2.0: Round 2 架构审查修复 — 引入 `CacheMetricsPort` 解耦应用层与基础设施层 `EventMetricsCollector`（P0）；明确二级索引 key 命名空间分层策略（`idx:doc:`）和 invalidate 边界契约（P1）；新增 `SemanticCache.invalidate_by_document_id()` 端口方法优化 `CacheInvalidationHandler` 注入（P2）；移除 Task 4 非 BDD 风格的文件清单验收场景（P2）；补充 Redis pipeline 批量操作（P1）、SCAN COUNT 参数（P2）、`invalidate_all()` 安全声明（P2）、Redis 断连恢复机制（P2）
 - v1.1.0: Round 1 文档审查修订 — 修复 9 项问题（P0×3 + P1×5 + P2×1），包括：事件概念错配（MemoryChanged→DocumentProcessed）、缓存失效键策略重设计（二级索引）、P95 指标修正、缓存值类型修正、weights 纳入缓存键、avg_tokens_per_search 定义、协议扩展补充、测试覆盖补充、SINGLETON 安全性说明
 - v1.0.0: 创建故事文件 — 语义缓存接入混合检索流水线
