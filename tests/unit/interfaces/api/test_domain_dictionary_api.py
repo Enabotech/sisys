@@ -71,6 +71,7 @@ class TestListEntries:
         """正常列出词条返回 200"""
         client, service = _make_app()
         service.list_entries = AsyncMock(return_value=[])
+        service.count_entries = AsyncMock(return_value=0)
 
         resp = client.get("/api/v1/documents/dictionary/entries")
 
@@ -78,6 +79,7 @@ class TestListEntries:
         data = resp.json()
         assert data["items"] == []
         assert data["page"] == 1
+        assert data["total"] == 0
 
 
 # ===================================================================
