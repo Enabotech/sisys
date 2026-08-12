@@ -2,10 +2,14 @@
 
 实现 EntityExtractionPort 端口，使用 AC 自动机（pyahocorasick）+ 正则模式匹配。
 内置基础战略领域词典，支持词典热更新。
+
+并发安全：SINGLETON 生命周期下，使用 asyncio.Lock 保护 _automaton 读写，
+确保 reload_dictionary() 重建自动机时与 extract_entities() 并发读取不冲突。
 """
 
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 
@@ -196,7 +200,10 @@ class RuleBasedExtractor(EntityExtractionPort, DictionaryConsumerPort):
     Attributes:
         _automaton: AC 自动机实例
         _dictionary: 当前词典列表
+        _lock: asyncio.Lock 类变量，保护 _automaton 并发读写安全
     """
+
+    _lock: asyncio.Lock = asyncio.Lock()
 
     def __init__(self, builtin_dictionary: list[tuple[str, str]] | None = None) -> None:
         """初始化规则基抽取器
@@ -210,15 +217,19 @@ class RuleBasedExtractor(EntityExtractionPort, DictionaryConsumerPort):
         self._build_automaton()
 
     def _build_automaton(self) -> None:
-        """构建 AC 自动机"""
-        self._automaton = ahocorasick.Automaton()
+        """构建 AC 自动机（调用方必须持有 _lock）"""
+        new_automaton = ahocorasick.Automaton()
         for idx, (term, entity_type) in enumerate(self._dictionary):
-            self._automaton.add_word(term, (idx, term, entity_type))
+            new_automaton.add_word(term, (idx, term, entity_type))
         if self._dictionary:
-            self._automaton.make_automaton()
+            new_automaton.make_automaton()
+        self._automaton = new_automaton
 
     def reload_dictionary(self, dictionary: list[tuple[str, str]]) -> None:
         """热更新词典
+
+        使用 asyncio.Lock 保护 _automaton 的写操作，确保与 extract_entities()
+        的并发读取不冲突。新自动机在释放锁前构建完成，读操作始终看到完整状态。
 
         Args:
             dictionary: 新词典列表
@@ -233,6 +244,10 @@ class RuleBasedExtractor(EntityExtractionPort, DictionaryConsumerPort):
     ) -> ExtractionResult:
         """执行规则基实体抽取
 
+        使用 asyncio.Lock 保护 _automaton 的并发读取，确保与 reload_dictionary()
+        的写操作不冲突。采用 copy-on-read 模式：在锁保护下获取词典快照和自动机引用，
+        释放锁后执行匹配，避免长持有锁阻塞热更新。
+
         Args:
             content: 待抽取的文本内容
             domain_context: 领域上下文（可选）
@@ -245,17 +260,25 @@ class RuleBasedExtractor(EntityExtractionPort, DictionaryConsumerPort):
 
         start_time = time.monotonic()
 
-        # 1. AC 自动机匹配命名实体
+        # 在锁保护下获取词典和自动机快照（copy-on-read）
+        async with self._lock:
+            snapshot_dictionary = list(self._dictionary)
+            snapshot_automaton = self._automaton
+
+        # 1. AC 自动机匹配命名实体（释放锁后执行匹配，不阻塞热更新）
         ac_entities: dict[str, ExtractedEntity] = {}
-        if self._dictionary:
-            for end_idx, (idx, term, entity_type) in self._automaton.iter(content):
+        if snapshot_dictionary:
+            for end_idx, (idx, term, entity_type) in snapshot_automaton.iter(content):
                 if term not in ac_entities:
+                    # pyahocorasick 的 iter() 返回结束索引（含），
+                    # 换算为起始位置保持与正则 match.start() 语义一致
+                    start_idx = end_idx - len(term) + 1
                     ac_entities[term] = ExtractedEntity(
                         name=term,
                         entity_type=entity_type,
                         confidence=0.85,
                         extraction_source="rule",
-                        metadata={"position": end_idx},
+                        metadata={"position": start_idx},
                     )
 
         # 2. 正则匹配结构化实体

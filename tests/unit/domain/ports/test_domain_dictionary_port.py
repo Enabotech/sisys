@@ -199,6 +199,8 @@ class TestDomainDictionaryPort:
         assert hasattr(DomainDictionaryPort, "rollback")
         # list_snapshots
         assert hasattr(DomainDictionaryPort, "list_snapshots")
+        # count_entries
+        assert hasattr(DomainDictionaryPort, "count_entries")
 
 
 class TestConcreteDomainDictionaryPort:
@@ -236,6 +238,9 @@ class TestConcreteDomainDictionaryPort:
 
             async def list_snapshots(self):  # type: ignore[no-untyped-def]
                 return []
+
+            async def count_entries(self, query):  # type: ignore[no-untyped-def]
+                return 0
 
         repo = FakeRepo()
         assert isinstance(repo, DomainDictionaryPort)

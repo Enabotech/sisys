@@ -38,6 +38,7 @@ def _make_mock_repo(**kwargs: object) -> MagicMock:
     repo.create_snapshot = AsyncMock(**kwargs)
     repo.rollback = AsyncMock(**kwargs)
     repo.list_snapshots = AsyncMock(**kwargs)
+    repo.count_entries = AsyncMock(**kwargs)
     return repo
 
 

@@ -32,6 +32,7 @@ class TestDomainDictionaryRepoPortContract:
         "create_snapshot",
         "rollback",
         "list_snapshots",
+        "count_entries",
     ]
 
     def test_port_is_registered(self, registry: PortRegistry) -> None:
@@ -87,6 +88,7 @@ class TestDomainDictionaryServicePortContract:
         "create_snapshot",
         "rollback",
         "list_snapshots",
+        "count_entries",
     ]
 
     def test_port_is_registered(self, registry: PortRegistry) -> None:

@@ -44,11 +44,16 @@ class DictionaryEntry:
     updated_at: str = ""
 
     def __post_init__(self) -> None:
-        """验证 term 非空"""
+        """验证 term 和 entity_type 非空"""
         if not self.term or not self.term.strip():
             raise EntityValidationError(
                 message="term must not be empty",
                 context={"entity": "DictionaryEntry", "field": "term", "value": self.term},
+            )
+        if not self.entity_type or not self.entity_type.strip():
+            raise EntityValidationError(
+                message="entity_type must not be empty",
+                context={"entity": "DictionaryEntry", "field": "entity_type", "value": self.entity_type},
             )
 
 
@@ -219,6 +224,17 @@ class DomainDictionaryPort(Protocol):
 
         Returns:
             快照列表（按版本降序）
+        """
+        ...
+
+    async def count_entries(self, query: DictionaryQuery) -> int:
+        """统计符合条件的词条总数
+
+        Args:
+            query: 查询条件（仅使用过滤字段，忽略分页参数）
+
+        Returns:
+            符合条件的词条总数
         """
         ...
 
