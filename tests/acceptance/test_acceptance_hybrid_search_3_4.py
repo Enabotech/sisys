@@ -199,6 +199,10 @@ def given_2_graph(context: dict[str, Any]) -> None:
 def given_graph_unavailable_any(context: dict[str, Any]) -> None:
     """Graph 检索不可用（AC-2 降级 / AC-6 降级共享同一实现）"""
     context["graph_unavailable"] = True
+
+
+@when("我执行三路加权 RRF 融合（默认权重 [1.0, 1.0, 0.5]）")
+def when_three_way_weighted_fusion(context: dict[str, Any]) -> None:
     context["fused"] = fuse(
         context.get("dense", []),
         context.get("sparse", []),
