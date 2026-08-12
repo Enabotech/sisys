@@ -68,13 +68,13 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
             try:
                 created_at = datetime.fromisoformat(entry.created_at)
             except (ValueError, TypeError):
-                created_at = datetime.now(UTC)
+                created_at = None
         updated_at = None
         if entry.updated_at:
             try:
                 updated_at = datetime.fromisoformat(entry.updated_at)
             except (ValueError, TypeError):
-                updated_at = datetime.now(UTC)
+                updated_at = None
 
         return DictionaryEntryModel(
             term=entry.term,
@@ -208,44 +208,58 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
         return [(m.term, m.entity_type) for m in models]
 
     async def create_snapshot(self, created_by: str) -> DictionarySnapshot:
-        """创建词典快照"""
+        """创建词典快照
+
+        使用 savepoint 重试机制处理并发版本号冲突。
+        """
         # 获取所有词条
         stmt = select(DictionaryEntryModel).order_by(DictionaryEntryModel.term)
         result = await self._session.execute(stmt)
         all_entries = result.scalars().all()
 
-        # 计算版本号
-        version_stmt = select(DictionarySnapshotModel).order_by(DictionarySnapshotModel.version.desc()).limit(1)
-        version_result = await self._session.execute(version_stmt)
-        latest_snapshot = version_result.scalar_one_or_none()
-        new_version = (latest_snapshot.version + 1) if latest_snapshot else 1
+        # 使用 savepoint 重试处理并发版本号冲突
+        for attempt in range(3):
+            try:
+                # 计算版本号（每次重试重新读取最新版本）
+                version_stmt = select(DictionarySnapshotModel).order_by(DictionarySnapshotModel.version.desc()).limit(1)
+                version_result = await self._session.execute(version_stmt)
+                latest_snapshot = version_result.scalar_one_or_none()
+                new_version = (latest_snapshot.version + 1) if latest_snapshot else 1
 
-        # 序列化词条
-        entries_dict = {}
-        for entry in all_entries:
-            entries_dict[entry.term] = {
-                "term": entry.term,
-                "entity_type": entry.entity_type,
-                "category": entry.category,
-                "active": entry.active,
-                "version": entry.version,
-                "created_by": entry.created_by,
-                "created_at": entry.created_at.isoformat() if entry.created_at else "",
-                "updated_at": entry.updated_at.isoformat() if entry.updated_at else "",
-            }
+                # 序列化词条
+                entries_dict = {}
+                for entry in all_entries:
+                    entries_dict[entry.term] = {
+                        "term": entry.term,
+                        "entity_type": entry.entity_type,
+                        "category": entry.category,
+                        "active": entry.active,
+                        "version": entry.version,
+                        "created_by": entry.created_by,
+                        "created_at": entry.created_at.isoformat() if entry.created_at else "",
+                        "updated_at": entry.updated_at.isoformat() if entry.updated_at else "",
+                    }
 
-        # 计算变更摘要
-        added_count = len(all_entries)
-        change_summary = {"total_entries": added_count}
+                # 计算变更摘要
+                added_count = len(all_entries)
+                change_summary = {"total_entries": added_count}
 
-        snapshot_model = DictionarySnapshotModel(
-            version=new_version,
-            entries=entries_dict,
-            created_by=created_by,
-            change_summary=change_summary,
-        )
-        self._session.add(snapshot_model)
-        await self._session.flush()
+                snapshot_model = DictionarySnapshotModel(
+                    version=new_version,
+                    entries=entries_dict,
+                    created_by=created_by,
+                    change_summary=change_summary,
+                )
+                self._session.add(snapshot_model)
+                async with self._session.begin_nested():
+                    await self._session.flush()
+                break  # 成功，跳出重试循环
+            except IntegrityError:
+                if attempt >= 2:
+                    raise
+                # 版本冲突，清除 session 中残留对象后重试
+                self._session.expire_all()
+                continue
 
         return DictionarySnapshot(
             snapshot_id=str(snapshot_model.snapshot_id),
@@ -277,10 +291,9 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
         await self._session.execute(delete(DictionaryEntryModel))
 
         # 从快照重建词条
-        now = datetime.now(UTC)
         for term_data in snapshot_model.entries.values():
-            created_at = _parse_datetime(term_data.get("created_at", ""), now)
-            updated_at = _parse_datetime(term_data.get("updated_at", ""), now)
+            created_at = _parse_datetime(term_data.get("created_at", ""), None)
+            updated_at = _parse_datetime(term_data.get("updated_at", ""), None)
 
             entry_model = DictionaryEntryModel(
                 term=term_data.get("term", ""),
@@ -343,11 +356,11 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
         return int(result.scalar() or 0)
 
 
-def _parse_datetime(dt_str: str, default: datetime) -> datetime | None:
-    """解析 ISO 时间字符串"""
+def _parse_datetime(dt_str: str, _default: datetime | None = None) -> datetime | None:
+    """解析 ISO 时间字符串，解析失败或空字符串返回 None"""
     if not dt_str:
-        return default
+        return None
     try:
         return datetime.fromisoformat(dt_str)
     except (ValueError, TypeError):
-        return default
+        return None
