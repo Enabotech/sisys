@@ -5,6 +5,10 @@
 
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
 from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel
+from src.infrastructure.storage.postgresql.models.dictionary import (
+    DictionaryEntryModel,
+    DictionarySnapshotModel,
+)
 from src.infrastructure.storage.postgresql.models.document import DocumentModel
 from src.infrastructure.storage.postgresql.models.document_version import (
     DocumentVersionSnapshotModel,
@@ -37,6 +41,8 @@ __all__ = [
     "AuditOutboxModel",
     "DocumentModel",
     "DocumentVersionSnapshotModel",
+    "DictionaryEntryModel",
+    "DictionarySnapshotModel",
     "MemoryMetadataModel",
     "MemoryChangeHistoryModel",
     "LoginAttemptModel",

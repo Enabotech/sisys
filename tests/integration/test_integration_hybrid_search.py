@@ -238,7 +238,7 @@ class TestHybridSearchEndToEnd:
             vector_storage = QdrantVectorStorage(qdrant.get_client())
             embed = EmbeddingAPIClient(EmbeddingConfig.from_env())
 
-            # 2. 构造服务
+            # 2. 构造服务（两路注入，向后兼容）
             dense_svc = DenseSemanticSearchService(embed, vector_storage)
             sparse_svc = Bm25SparseSearchService(embed, vector_storage)
             hybrid_svc = HybridSearchService(dense_svc, sparse_svc, fuse)
@@ -265,3 +265,112 @@ class TestHybridSearchEndToEnd:
 
         finally:
             await self._cleanup(context)
+
+    @pytest.mark.asyncio
+    async def test_three_way_hybrid_search_with_mock_graph(self) -> None:
+        """三路混合检索集成：Dense + Sparse（真实）+ Graph（Mock）→ 三路 RRF 加权融合"""
+        from src.application.services.dense_search_service import DenseSemanticSearchService
+        from src.application.services.hybrid_search_service import HybridSearchService
+        from src.application.services.sparse_search_service import Bm25SparseSearchService
+        from src.domain.ports.l3_vector import SearchResult
+        from src.domain.services.rrf_fusion import fuse
+        from src.infrastructure.config.embedding import EmbeddingConfig
+        from src.infrastructure.config.qdrant import QdrantConfig
+        from src.infrastructure.external_services.embedding.embedding_api_client import (
+            EmbeddingAPIClient,
+        )
+        from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
+        from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
+        from tests.environments import get_test_env
+
+        context: dict = {}
+
+        try:
+            # 1. 创建测试 Collection 并索引文档
+            collection = await self._create_test_collection(context)
+
+            env = get_test_env()
+            qdrant = QdrantManager(QdrantConfig(host=env.qdrant.host, port=env.qdrant.port, timeout=30.0))
+            vector_storage = QdrantVectorStorage(qdrant.get_client())
+            embed = EmbeddingAPIClient(EmbeddingConfig.from_env())
+
+            # 2. 构造 Mock Graph 检索服务
+            class MockGraphService:
+                async def search(self, collection, query_text, limit=10, tenant_id=None, filter_payload=None):
+                    return [
+                        SearchResult(id="doc_0", score=0.5, payload={"title": "战略规划", "from_graph": True}),
+                    ]
+
+            # 3. 三路混合检索
+            dense_svc = DenseSemanticSearchService(embed, vector_storage)
+            sparse_svc = Bm25SparseSearchService(embed, vector_storage)
+            hybrid_svc = HybridSearchService(
+                dense_search=dense_svc,
+                sparse_search=sparse_svc,
+                fuse=fuse,
+                graph_search=MockGraphService(),
+                weights=[1.0, 1.0, 0.5],
+            )
+
+            # 4. 执行三路混合检索
+            results = await hybrid_svc.search(collection, "企业战略", limit=5)
+
+            # 5. 验证结果
+            assert isinstance(results, list)
+            assert len(results) > 0
+            for r in results:
+                assert "id" in r
+                assert "score" in r
+                assert "payload" in r
+
+        finally:
+            await self._cleanup(context)
+
+    @pytest.mark.asyncio
+    async def test_rerank_integration_with_mock(self) -> None:
+        """重排序集成：Mock 重排序器对 RRF 融合结果进行精排"""
+        from src.application.services.hybrid_search_service import HybridSearchService
+        from src.domain.ports.l3_vector import SearchResult
+        from src.domain.services.rrf_fusion import fuse
+
+        dense_results = [
+            SearchResult(id="doc1", score=0.95, payload={"title": "战略规划"}),
+            SearchResult(id="doc2", score=0.85, payload={"title": "市场分析"}),
+            SearchResult(id="doc3", score=0.75, payload={"title": "财务预算"}),
+        ]
+        sparse_results = [
+            SearchResult(id="doc2", score=10.0, payload={"title": "市场分析"}),
+            SearchResult(id="doc4", score=8.0, payload={"title": "市场调研"}),
+        ]
+
+        class MockReranker:
+            def __init__(self) -> None:
+                self.called = False
+
+            async def rerank(self, query: str, results: list[SearchResult], top_k: int = 20) -> list[SearchResult]:
+                self.called = True
+                for r in results:
+                    r["payload"]["rerank_score"] = r["score"]
+                return sorted(results, key=lambda r: r["score"], reverse=True)[:top_k]
+
+        class MockDense:
+            async def search(self, collection, query_text, limit=10, tenant_id=None, filter_payload=None):
+                return dense_results
+
+        class MockSparse:
+            async def search(self, collection, query_text, limit=10, tenant_id=None, filter_payload=None):
+                return sparse_results
+
+        reranker = MockReranker()
+        hybrid_svc = HybridSearchService(
+            dense_search=MockDense(),
+            sparse_search=MockSparse(),
+            fuse=fuse,
+            reranker=reranker,
+        )
+
+        results = await hybrid_svc.search("test", "查询", limit=5)
+
+        assert isinstance(results, list)
+        assert len(results) > 0
+        assert reranker.called, "重排序器应被调用"

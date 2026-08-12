@@ -265,6 +265,12 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="单文件爬取完成",
         ),
+        "DictionaryUpdated": ChannelMapping(
+            event_type="DictionaryUpdated",
+            rabbitmq_routing_key="sisys.events.reliable.dictionary_updated",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="词典更新完成",
+        ),
     }
 
     def __init__(self, load_defaults: bool = True) -> None:

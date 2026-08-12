@@ -29,6 +29,9 @@ from src.domain.exceptions import (
     ConflictError,
     ContainerStartError,
     ContainerStopError,
+    DictionaryEntryConflictError,
+    DictionaryNotFoundError,
+    DictionaryVersionConflictError,
     DocumentVersionConflictError,
     EntityBusinessRuleError,
     EntityExtractionError,
@@ -36,6 +39,7 @@ from src.domain.exceptions import (
     EntityValidationError,
     ExecutionError,
     ExternalException,
+    HybridSearchError,
     InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
@@ -54,6 +58,7 @@ from src.domain.exceptions import (
     OCRProcessingError,
     PasswordValidationError,
     PermissionDeniedError,
+    RerankError,
     RoleAlreadyExistsError,
     RoleNotFoundError,
     SandboxError,
@@ -121,6 +126,10 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     # 跨境传输子域异常
     TransferNotFoundError: status.HTTP_404_NOT_FOUND,  # 261
     TransferNotApprovedError: status.HTTP_409_CONFLICT,  # 262
+    # 词典管理异常
+    DictionaryNotFoundError: status.HTTP_404_NOT_FOUND,  # 270
+    DictionaryEntryConflictError: status.HTTP_409_CONFLICT,  # 271
+    DictionaryVersionConflictError: status.HTTP_409_CONFLICT,  # 272
     # 外部服务异常
     ThirdPartyError: status.HTTP_502_BAD_GATEWAY,
     TimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,
@@ -137,6 +146,8 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     LLMResponseError: status.HTTP_502_BAD_GATEWAY,  # 331 — 响应解析错误
     LLMConfigError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 332 — 配置错误
     EntityExtractionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 340 — 实体抽取失败
+    RerankError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 350 — 重排序失败（精确注册，避免回退 502）
+    HybridSearchError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 209 — 三路检索通道均失败
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

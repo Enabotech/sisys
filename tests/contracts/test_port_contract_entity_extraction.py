@@ -55,12 +55,12 @@ class TestEntityExtractionRulePortContract:
         assert spec.module and spec.module != ""
 
     def test_lifetime_is_scoped(self, registry: PortRegistry) -> None:
-        """实体抽取器必须是 SCOPED 生命周期"""
+        """实体抽取器现在是 SINGLETON 生命周期（词典热更新跨请求全局共享）"""
         from src.domain.ports.registry import Lifetime
 
         spec = registry.get(self.PORT_NAME)
         assert spec is not None
-        assert spec.lifetime == Lifetime.SCOPED
+        assert spec.lifetime == Lifetime.SINGLETON
 
 
 class TestEntityExtractionLlmPortContract:

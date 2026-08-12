@@ -100,7 +100,7 @@
     假如 Qdrant Collection 包含已索引的文档向量
     并且 Dense 检索服务和 Sparse 检索服务均不可用
     当 我执行混合检索查询 "企业战略"
-    那么 抛出 RuntimeError 异常
+    那么 抛出 HybridSearchError 异常
 
   场景: AC-6 - 空查询文本抛出 ValidationError
     假如 Dense 检索服务和 Sparse 检索服务均可用

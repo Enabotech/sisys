@@ -1655,6 +1655,67 @@ def bootstrap() -> None:
         tags=("search", "hybrid", "rrf"),
     )
 
+    # === Story 3-4: Graph Search + Reranker + 升级 HybridSearchService ===
+    from src.application.services.graph_search_service import GraphSearchService
+    from src.domain.ports.reranker import RerankerPort
+    from src.infrastructure.external_services.reranker import LiteLLMRerankerClient
+    from src.infrastructure.external_services.reranker.config import RerankerConfig
+
+    # 注册 GraphSearchService（第三路检索，仅注入 L5GraphPort）
+    register_port(
+        name="graph_search_service",
+        version="v1.0.0",
+        interface=GraphSearchService,
+        impl=lambda resolver: GraphSearchService(
+            l5_graph=resolver.resolve("l5_graph"),
+        ),
+        module="src.application.services.graph_search_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "graph", "neo4j"),
+    )
+
+    # 注册重排序器（LiteLLMRerankerClient 实现 RerankerPort，注入 RerankerConfig）
+    reranker_enabled = os.getenv("RERANKER_ENABLED", "true").lower() == "true"
+    if reranker_enabled:
+        register_port(
+            name="reranker",
+            version="v1.0.0",
+            interface=RerankerPort,
+            impl=lambda resolver: LiteLLMRerankerClient(
+                config=RerankerConfig.from_env(),
+            ),
+            module="src.infrastructure.external_services.reranker.litellm_reranker_client",
+            lifetime=Lifetime.SCOPED,
+            owner="search-team",
+            tags=("reranker", "colbert", "search"),
+        )
+
+    # 升级 HybridSearchService 注册（三路注入 + 可配置权重 + 重排序）
+    # v1.0.0 → v1.1.0：先 unregister 旧端口再 register
+    try:
+        _global_registry.unregister("hybrid_search_service")
+    except Exception:
+        pass
+    register_port(
+        name="hybrid_search_service",
+        version="v1.1.0",
+        interface=HybridSearchService,
+        impl=lambda resolver: HybridSearchService(
+            dense_search=resolver.resolve("dense_search_service"),
+            sparse_search=resolver.resolve("sparse_search_service"),
+            fuse=fuse,
+            graph_search=resolver.resolve("graph_search_service"),
+            weights=[1.0, 1.0, 0.5],
+            reranker=resolver.resolve_optional("reranker", fallback=None),
+        ),
+        module="src.application.services.hybrid_search_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "hybrid", "rrf", "three-way"),
+        compatibility=("v1.0.0",),
+    )
+
     # === Crawler Ports ===
     register_port(
         name="crawler_client",
@@ -1703,16 +1764,17 @@ def bootstrap() -> None:
         RuleBasedExtractor,
     )
 
-    # 注册规则基实体抽取器（RuleBasedExtractor 实现 EntityExtractionPort）
+    # 注册规则基实体抽取器（RuleBasedExtractor 实现 EntityExtractionPort + DictionaryConsumerPort）
+    # 生命周期 SINGLETON：确保词典热更新跨请求全局共享（词典消费端）
     register_port(
         name="entity_extraction_rule",
         version="v1.0.0",
         interface=EntityExtractionPort,
         impl=lambda resolver: RuleBasedExtractor(),
         module="src.infrastructure.external_services.entity_extraction.rule_extractor",
-        lifetime=Lifetime.SCOPED,
+        lifetime=Lifetime.SINGLETON,
         owner="foundation-team",
-        tags=("entity_extraction", "rule", "nlp"),
+        tags=("entity_extraction", "rule", "nlp", "dictionary_consumer"),
     )
 
     # 注册 LLM 语义实体抽取器（LLMEntityExtractor 实现 EntityExtractionPort）
@@ -1757,6 +1819,45 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED,
         owner="foundation-team",
         tags=("entity_extraction", "service"),
+    )
+
+    # === Domain Dictionary Ports ===
+    from src.application.services.domain_dictionary_service import DomainDictionaryService
+    from src.domain.ports.domain_dictionary import (
+        DomainDictionaryPort,
+    )
+    from src.infrastructure.storage.postgresql.repository.domain_dictionary_repository import (
+        PostgreSQLDomainDictionaryRepository,
+    )
+
+    # 注册领域词典仓储（PostgreSQLDomainDictionaryRepository 实现 DomainDictionaryPort）
+    register_port(
+        name="domain_dictionary_repo",
+        version="v1.0.0",
+        interface=DomainDictionaryPort,
+        impl=lambda resolver: PostgreSQLDomainDictionaryRepository(),
+        module="src.infrastructure.storage.postgresql.repository.domain_dictionary_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("dictionary", "gateway", "application"),
+    )
+
+    # 注册 DomainDictionaryService 应用服务（注入仓储 + 词典消费端 + 事件发布）
+    # dictionary_consumer 复用 entity_extraction_rule（RuleBasedExtractor 同时实现
+    # EntityExtractionPort 与 DictionaryConsumerPort）
+    register_port(
+        name="domain_dictionary_service",
+        version="v1.0.0",
+        interface=DomainDictionaryService,
+        impl=lambda resolver: DomainDictionaryService(
+            dictionary_repo=resolver.resolve("domain_dictionary_repo"),
+            dictionary_consumer=resolver.resolve("entity_extraction_rule"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.services.domain_dictionary_service",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("dictionary", "service", "application"),
     )
 
 

@@ -20,6 +20,7 @@ from .compliance_events import (
     SensitiveDataDetected,
 )
 from .correction_events import CorrectionApproved
+from .dictionary_events import DictionaryUpdated
 from .document_events import DocumentProcessed, DocumentUploaded, DocumentVersionSnapshotCreated
 from .entity_extraction_events import EntitiesExtracted
 from .enums import CorrectionType, DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
@@ -41,6 +42,7 @@ __all__ = [
     "CheckpointReached",
     "CheckpointRecovered",
     "CorrectionApproved",
+    "DictionaryUpdated",
     "EntitiesExtracted",
     "StrategicDeviationWarning",
     "HeartbeatTriggered",

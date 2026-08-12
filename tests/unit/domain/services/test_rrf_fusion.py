@@ -187,6 +187,57 @@ class TestRrfFusionWeighted:
         # 所有分数应为 0
         assert all(r["score"] == 0.0 for r in result)
 
+    # === 补充三路缺失用例（Story 3-4） ===
+
+    def test_three_way_default_weights(self) -> None:
+        """三路默认权重 [1.0, 1.0, 0.5] 融合"""
+        dense = [_make_result("doc1", 0.9)]
+        sparse = [_make_result("doc2", 5.0)]
+        graph = [_make_result("doc3", 0.5)]
+
+        result = fuse(dense, sparse, graph, weights=[1.0, 1.0, 0.5])
+
+        assert len(result) == 3
+        # doc1: 1.0/(60+1) ≈ 0.016393
+        doc1 = next(r for r in result if r["id"] == "doc1")
+        assert math.isclose(doc1["score"], 1.0 / 61, rel_tol=1e-9)
+        # doc2: 1.0/(60+1) ≈ 0.016393
+        doc2 = next(r for r in result if r["id"] == "doc2")
+        assert math.isclose(doc2["score"], 1.0 / 61, rel_tol=1e-9)
+        # doc3: 0.5/(60+1) ≈ 0.008197
+        doc3 = next(r for r in result if r["id"] == "doc3")
+        assert math.isclose(doc3["score"], 0.5 / 61, rel_tol=1e-9)
+
+    def test_three_way_symmetric_no_weights(self) -> None:
+        """三路对称无权重融合（weights=None）"""
+        dense = [_make_result("doc1", 0.9)]
+        sparse = [_make_result("doc2", 5.0)]
+        graph = [_make_result("doc3", 0.5)]
+
+        result = fuse(dense, sparse, graph)
+
+        assert len(result) == 3
+        # 对称融合：所有权重为 1.0
+        for r in result:
+            assert math.isclose(r["score"], 1.0 / 61, rel_tol=1e-9), f"doc {r['id']} score={r['score']}"
+
+    def test_three_way_performance(self) -> None:
+        """三路各 50 结果的融合延迟 P95 < 50ms"""
+        dense = [_make_result(f"d_{i}", 0.9 - i * 0.01) for i in range(50)]
+        sparse = [_make_result(f"s_{i}", 5.0 - i * 0.1) for i in range(50)]
+        graph = [_make_result(f"g_{i}", 0.5 - i * 0.005) for i in range(50)]
+
+        latencies: list[float] = []
+        for _ in range(100):
+            start = time.perf_counter()
+            fuse(dense, sparse, graph, weights=[1.0, 1.0, 0.5])
+            latencies.append((time.perf_counter() - start) * 1000)
+
+        latencies.sort()
+        p95 = latencies[int(len(latencies) * 0.95)]
+
+        assert p95 < 50, f"三路 RRF 融合延迟 P95={p95:.2f}ms，超过 50ms 门禁"
+
 
 class TestRrfFusionSingleList:
     """单路直通（跳过融合）"""
