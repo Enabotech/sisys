@@ -15,8 +15,11 @@ class TestRerankerPort:
 
     def test_is_protocol(self) -> None:
         """验证 RerankerPort 是 Protocol"""
-        # Protocol 类通过 _is_protocol 类属性区分（Python 3.11）
-        assert RerankerPort._is_protocol is True
+        # 通过 typing 模块判断是否为 Protocol 类
+        import typing
+
+        # Protocol 的子类会在 MRO 中包含 Protocol 和 Generic
+        assert typing.Protocol in RerankerPort.__mro__
 
     def test_is_runtime_checkable(self) -> None:
         """验证 @runtime_checkable 可用"""

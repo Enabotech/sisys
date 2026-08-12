@@ -134,9 +134,7 @@ def _build_entity_extraction_service(
 
     if rule_extractor is None:
         rule_extractor = RuleBasedExtractor()
-    _llm_extractor: EntityExtractionPort = (
-        llm_extractor if llm_extractor is not None else RuleBasedExtractor()
-    )
+    _llm_extractor: EntityExtractionPort = llm_extractor if llm_extractor is not None else RuleBasedExtractor()
     if arbitrator is None:
         arbitrator = ConflictArbitrator()
     if l5_graph is None:

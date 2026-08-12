@@ -122,7 +122,7 @@ development_status:
   3-2b-entity-extraction-llm-rules: review
   3-3-domain-dictionary-management: review
   3-4-rrf-fusion-ranking: review
-  3-5-layered-search-l1-l4: backlog
+  3-5-layered-search-l1-l4: ready-for-dev
   3-6-contractual-summary-generation: backlog
   3-7-search-relevance-evaluation: backlog
   3-8-high-fidelity-traceability-bounding-box: backlog

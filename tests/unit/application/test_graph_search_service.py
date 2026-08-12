@@ -170,6 +170,53 @@ class TestGraphSearchServiceEdgeCases:
         assert results == []
 
     @pytest.mark.asyncio
+    async def test_results_truncated_to_limit(self) -> None:
+        """关联文档超过 limit 时仅返回前 limit 个（按 score 降序后的前 limit）"""
+        port = _make_graph_port(
+            entities=[{"memory_id": f"ent{i}", "type": "concept", "properties": {}} for i in range(5)],
+            related={
+                f"ent{i}": [
+                    {
+                        "memory_id": f"doc{i}_{j}",
+                        "type": "document",
+                        "properties": {},
+                        "path": [f"ent{i}", f"doc{i}_{j}"],
+                    }
+                    for j in range(5)
+                ]
+                for i in range(5)
+            },
+        )
+        service = _make_service(port)
+
+        results = await service.search("test_collection", "查询", limit=5)
+
+        assert len(results) <= 5, f"结果数 {len(results)} 超过 limit=5"
+
+    @pytest.mark.asyncio
+    async def test_results_under_limit_not_truncated(self) -> None:
+        """关联文档少于 limit 时返回全部结果（不误截断）"""
+        port = _make_graph_port(
+            entities=[{"memory_id": "ent1", "type": "concept", "properties": {}}],
+            related={
+                "ent1": [
+                    {
+                        "memory_id": f"doc{i}",
+                        "type": "document",
+                        "properties": {},
+                        "path": ["ent1", f"doc{i}"],
+                    }
+                    for i in range(3)
+                ]
+            },
+        )
+        service = _make_service(port)
+
+        results = await service.search("test_collection", "查询", limit=10)
+
+        assert len(results) == 3  # 少于 limit，返回全部
+
+    @pytest.mark.asyncio
     async def test_dedup_by_memory_id(self) -> None:
         """多个实体关联到同一文档时按 memory_id 去重"""
         port = _make_graph_port(

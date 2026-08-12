@@ -49,16 +49,17 @@ class TestEntitiesExtracted:
         assert DomainEvent._registry["EntitiesExtracted"] is EntitiesExtracted
 
     def test_post_init_sets_aggregate_id(self) -> None:
-        """验证 __post_init__ 设置 UUID 类型的 aggregate_id"""
+        """验证 __post_init__ 设置 aggregate_id = memory_id"""
+        mem_id = uuid.uuid4()
         event = EntitiesExtracted(
-            memory_id=uuid.uuid4(),
+            memory_id=mem_id,
             entity_count=10,
             relation_count=2,
             extraction_type="rule_only",
         )
         assert isinstance(event.aggregate_id, uuid.UUID)
-        # aggregate_id 是独立生成的 UUID，与 memory_id 无关
-        assert event.aggregate_id != event.memory_id
+        # aggregate_id 必须等于 memory_id（AC-2 规范：聚合溯源）
+        assert event.aggregate_id == mem_id
 
     def test_post_init_sets_aggregate_type(self) -> None:
         """验证 __post_init__ 设置 aggregate_type"""
@@ -78,11 +79,12 @@ class TestEntitiesExtracted:
             relation_count=3,
             extraction_type="hybrid",
         )
-        try:
-            event.memory_id = uuid.uuid4()  # type: ignore[misc]
-            assert False, "应抛出 FrozenInstanceError"
-        except Exception:
-            pass
+        from dataclasses import FrozenInstanceError
+
+        import pytest
+
+        with pytest.raises(FrozenInstanceError):
+            setattr(event, "memory_id", uuid.uuid4())
 
     def test_to_dict_serialization(self) -> None:
         """验证 to_dict() 序列化正确"""

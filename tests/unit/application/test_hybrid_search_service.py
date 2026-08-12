@@ -195,6 +195,75 @@ class TestHybridSearchServiceDegradation:
     """降级策略"""
 
     @pytest.mark.asyncio
+    async def test_dense_failure_two_way_weights_correct(self) -> None:
+        """Dense 失败 → 降级两路（Sparse + Graph），权重应为 [1.0, 0.5] 而非前缀截断 [1.0, 1.0]"""
+        sparse_results = [SearchResult(id="doc2", score=8.0, payload={})]
+        graph_results = [SearchResult(id="doc3", score=0.5, payload={})]
+        dense_mock = _make_mock_dense_service(side_effect=RuntimeError("Dense 不可用"))
+        sparse_mock = _make_mock_sparse_service(sparse_results)
+        graph_mock = _make_mock_graph_service(graph_results)
+        fuse_mock = MagicMock(return_value=sparse_results + graph_results)
+        service = _make_hybrid_service(
+            dense_service=dense_mock,
+            sparse_service=sparse_mock,
+            graph_service=graph_mock,
+            fuse_fn=fuse_mock,
+        )
+
+        await service.search("test_collection", "查询文本")
+
+        fuse_mock.assert_called_once()
+        call_args = fuse_mock.call_args[0]
+        assert len(call_args) == 2  # Sparse + Graph 两路
+        # 权重必须按通道映射：[sparse=1.0, graph=0.5]，而非截断 [1.0, 1.0]
+        assert fuse_mock.call_args.kwargs.get("weights") == [1.0, 0.5]
+
+    @pytest.mark.asyncio
+    async def test_sparse_failure_two_way_weights_correct(self) -> None:
+        """Sparse 失败 → 降级两路（Dense + Graph），权重应为 [1.0, 0.5] 而非前缀截断 [1.0, 1.0]"""
+        dense_results = [SearchResult(id="doc1", score=0.95, payload={})]
+        graph_results = [SearchResult(id="doc3", score=0.5, payload={})]
+        dense_mock = _make_mock_dense_service(dense_results)
+        sparse_mock = _make_mock_sparse_service(side_effect=RuntimeError("Sparse 不可用"))
+        graph_mock = _make_mock_graph_service(graph_results)
+        fuse_mock = MagicMock(return_value=dense_results + graph_results)
+        service = _make_hybrid_service(
+            dense_service=dense_mock,
+            sparse_service=sparse_mock,
+            graph_service=graph_mock,
+            fuse_fn=fuse_mock,
+        )
+
+        await service.search("test_collection", "查询文本")
+
+        fuse_mock.assert_called_once()
+        call_args = fuse_mock.call_args[0]
+        assert len(call_args) == 2  # Dense + Graph 两路
+        # 权重必须按通道映射：[dense=1.0, graph=0.5]，而非截断 [1.0, 1.0]
+        assert fuse_mock.call_args.kwargs.get("weights") == [1.0, 0.5]
+
+    @pytest.mark.asyncio
+    async def test_graph_failure_two_way_weights_correct(self) -> None:
+        """Graph 失败 → 降级两路（Dense + Sparse），权重应为 [1.0, 1.0]（回归验证）"""
+        dense_results = [SearchResult(id="doc1", score=0.95, payload={})]
+        sparse_results = [SearchResult(id="doc2", score=8.0, payload={})]
+        dense_mock = _make_mock_dense_service(dense_results)
+        sparse_mock = _make_mock_sparse_service(sparse_results)
+        graph_mock = _make_mock_graph_service(side_effect=RuntimeError("Graph 不可用"))
+        fuse_mock = MagicMock(return_value=dense_results + sparse_results)
+        service = _make_hybrid_service(
+            dense_service=dense_mock,
+            sparse_service=sparse_mock,
+            graph_service=graph_mock,
+            fuse_fn=fuse_mock,
+        )
+
+        await service.search("test_collection", "查询文本")
+
+        fuse_mock.assert_called_once()
+        assert fuse_mock.call_args.kwargs.get("weights") == [1.0, 1.0]
+
+    @pytest.mark.asyncio
     async def test_graph_failure_degrade_to_two_way(self) -> None:
         """Graph 通道失败 → 降级为两路（Dense + Sparse）融合"""
         dense_results = [SearchResult(id="doc1", score=0.95, payload={})]
