@@ -39,6 +39,8 @@
 - Story 3.1b（BM25 稀疏检索 ✅ 已实现）— 提供 `Bm25SparseSearchService`
 - Story 3.2b（实体抽取 ✅ 已实现）— 提供 `L5GraphPort.search_entities()` 用于 L4 实体增强
 
+> **注意：** 当前 Qdrant 索引流程 (`document_tasks.py`) 的 payload 仅存储 `chunk_index` 和 `created_at`，不包含 `parent_chunk_id` 和 `index_level`。实施本 Story 前需修改索引流程以存储这些字段。
+
 **后续依赖:** Story 3.6（契约化摘要）、Story 3.7（检索相关性评估）、Story 3.8（高保真溯源）
 
 ---
@@ -53,13 +55,13 @@
 **And** 所有领域层定义零外部依赖（仅 Python 标准库 + Protocol + `SearchResult`）
 
 **验证标准/Validation Criteria:**
-- [ ] `LayeredRetrievalPort` Protocol 定义于 `src/domain/ports/layered_retrieval.py`（或 `src/domain/ports/layered_search.py`）
+- [ ] `LayeredRetrievalPort` Protocol 定义于 `src/domain/ports/layered_retrieval.py`
 - [ ] 包含 `search_top_down(query_text, target_level, limit, ...)` 方法 — 自顶向下遍历
 - [ ] 包含 `search_bottom_up(query_text, target_level, limit, ...)` 方法 — 自底向上遍历
 - [ ] 返回 `list[SearchResult]`，与现有搜索服务签名一致
 - [ ] `target_level` 参数类型为 `str`（"L1"/"L2"/"L3"/"L4"），默认 "L4"
 - [ ] 其余参数（`collection`, `limit`, `tenant_id`, `filter_payload`）与 `DenseSemanticSearchService.search()` 签名对齐
-- [ ] 端口注册于 `composition_root.py`，通过 `register_port()` 注册为 `layered_retrieval_service` 端口
+- [ ] 端口注册于 `composition_root.py`，通过 `register_port()` 注册为 `layered_retrieval_service` 端口（含 module 参数）
 
 ### AC-2: L4 → L3 自底向上遍历（Parent-Child 回溯）
 
@@ -67,32 +69,37 @@
 **When** 执行自底向上检索，目标层级为 L3
 **Then** 系统首先在 L4 层执行 Dense 语义检索（使用现有 `DenseSemanticSearchService`）
 **And** 对命中结果的 `payload.parent_chunk_id` 去重，回溯到 L3 父块（Parent 块）
-**And** 通过 `L3VectorPort.search()` 或 payload 过滤获取完整父块内容
+**And** 通过 DenseSemanticSearchService（复用 L4 检索时生成的查询向量）对父块集合执行带 filter_payload 的向量检索；或者使用 L3VectorPort.get_point(collection, point_id) 按 ID 直接获取父块内容
 **And** 返回 L3 层的去重合并结果列表
 **And** 无 Child 匹配时返回空列表
 
 **验证标准/Validation Criteria:**
+> **【V1 目标】L4→L3 自底向上回溯**
 - [ ] `search_bottom_up(query_text, target_level="L3")` 执行 L4→L3 回溯
 - [ ] 回溯去重：同一 Parent 的多个 Child 命中合并为一条结果
+- [ ] 父块内容获取：`L3VectorPort.get_point()`（按 ID 回溯）或 DenseSemanticSearchService 带 payload 过滤
 - [ ] 结果 `payload` 携带 `parent_chunk_id`、`child_count`（命中子块数）、`index_level="parent"`
 - [ ] 合并后结果按最高 Child 分数降序排列
-- [ ] 延迟 P95 < 200ms（L4 检索 + L3 回溯）
+- [ ] 延迟 P95 < 200ms（L4 检索 + L3 回溯）(V1 目标，MVP 阶段可放宽至 350ms，总预算 ≤800ms)
+- [ ] 并发检索 ≥ 50
 
 ### AC-3: L3 → L4 自顶向下展开（Parent 展开到 Child）
 
 **Given** 用户查询文本在 L3 文档切片（Parent 块）中命中
 **When** 执行自顶向下检索，目标层级为 L4
 **Then** 系统首先在 L3 层执行 Dense 语义检索
-**And** 对命中结果的每个 Parent 块，检索其所有 Child 子块（通过 `parent_chunk_id` 过滤）
+**And** 复用 L3 检索时使用的查询向量，对 Child 集合执行带 parent_chunk_id payload 过滤的向量检索
 **And** 将命中 Parent 的 Top-K Child 子块作为结果返回
 **And** 结果 `payload` 携带 `parent_chunk_id`、`parent_content` 摘要、`index_level="child"`
 
 **验证标准/Validation Criteria:**
 - [ ] `search_top_down(query_text, target_level="L4")` 执行 L3→L4 展开
 - [ ] 每个命中 Parent 展开 Top-3 Child 子块（可配置）
+- [ ] Child 展开通过复用 L3 查询向量，对 Child 集合执行带 parent_chunk_id payload 过滤的向量检索
 - [ ] 结果 `payload` 包含 `parent_content` 截断摘要（前 200 字符）
 - [ ] 结果按 Parent 分数 × Child 分数降序排列
-- [ ] 延迟 P95 < 250ms（L3 检索 + L4 展开）
+- [ ] 延迟 P95 < 250ms（L3 检索 + L4 展开）(V1 目标，MVP 阶段可放宽至 400ms)
+- [ ] 并发检索 ≥ 50
 
 ### AC-4: 分层检索编排服务
 
@@ -101,7 +108,7 @@
 **Then** 注入 `DenseSemanticSearchService`、`L3VectorPort` 等依赖
 **And** 实现自底向上和自顶向下两种遍历策略
 **And** 支持降级策略（L4 检索失败→降级为普通 L3 检索）
-**And** 支持 `LayeredSearchCompleted` 事件发布（可选，REALTIME 模式）
+**And** 支持 `LayeredRetrievalCompleted` 事件发布（可选，REALTIME 模式）
 
 **验证标准/Validation Criteria:**
 - [ ] `LayeredRetrievalService` 位于 `src/application/services/layered_retrieval_service.py`
@@ -124,8 +131,8 @@
 - [ ] `LevelTransitionError`（EXCEPTION_281）— 继承 `BusinessException`，层级遍历失败
 - [ ] 异常编码在 `_code_ranges.py` 注册 `retrieval` 子域（280, 289）及 `_CLASS_TO_SUBDOMAIN` 映射
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册（500/500）
-- [ ] `allowed_child_parent_subdomains` 添加 `("retrieval", "business")`
-- [ ] 无编码碰撞（`grep -r "EXCEPTION_28[0-9]"` 零输出）
+- [ ] `allowed_child_parent_subdomains` 添加 `("retrieval", "business")`（定义在 tests/unit/domain/exceptions/test_code_ranges.py 中）
+- [ ] 无编码碰撞（`grep -rw "EXCEPTION_28[0-9]"` 零输出）
 
 ### AC-6: L2 文档摘要检索（骨架）
 
@@ -168,7 +175,7 @@
 #### 领域事件 Schema (Domain Events)
 - [ ] 事件定义位于 `src/domain/events/`
 - [ ] 使用标准库实现领域事件校验（如 dataclass / Enum / 自定义验证），禁止在领域层依赖 Pydantic
-- [ ] 事件命名符合规范（`[Aggregate][EventName]`，如 `LayeredSearchCompleted`）
+- [ ] 事件命名使用业务含义直名（如 `LayeredRetrievalCompleted`）
 
 #### 数据模型 (Data Models)
 - [ ] 无新增数据模型（复用现有 `SemanticChunk`、`IndexLevel` 值对象）
@@ -182,7 +189,8 @@
 - [ ] 端口契约门禁位于 `src/domain/ports/contract_gate.py`，端口变更必须通过兼容性检查
 - [ ] 端口契约测试通过（`tests/contracts/test_port_contract_layered_retrieval.py`）
 - [ ] 接口命名符合单一职责，禁止同义接口重复定义
-- [ ] 端口具备唯一名称、版本、owner、兼容策略
+- [ ] 端口注册时提供 module 参数（register_port() 的第 5 个必需参数）
+- [ ] 端口具备唯一名称、版本、owner、兼容策略、module（注册必需参数）
 - [ ] 跨模块调用仅依赖抽象接口，不直接依赖实现类
 - [ ] 端口变更配套契约测试与兼容性检查
 - [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
@@ -204,7 +212,7 @@
 - [ ] **归属模块与基类** — 新增 `retrieval` 子域（280-289）：
     - `LayeredRetrievalError`（EXCEPTION_280）→ 继承 `BusinessException`，检索编排失败
     - `LevelTransitionError`（EXCEPTION_281）→ 继承 `BusinessException`，层级遍历非法
-- [ ] **唯一编码分配** — 从 `retrieval` 子域（280-289）选取，`grep -r "EXCEPTION_28[0-9]" src/` 验证无碰撞
+- [ ] **唯一编码分配** — 从 `retrieval` 子域（280-289）选取，`grep -rw "EXCEPTION_28[0-9]" src/` 验证无碰撞
 - [ ] **构造器参数设计** — 携带层级上下文（`current_level`、`target_level`、`query_text` 等），通过 `context` 字典暴露
 - [ ] **消息安全性审查** — 错误消息面向调用方可理解，不泄露 SQL/堆栈等内部实现细节
 - [ ] **编码注册** — 更新 `_code_ranges.py`：
@@ -243,8 +251,8 @@
 | **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_layered_search.feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_layered_search.py`
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_layered_retrieval.feature`
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_layered_retrieval.py`
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）
 
@@ -284,20 +292,20 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | 分层检索端口 | 端口契约方法签名、参数校验 | `test_layered_retrieval_port.py` | Task 1 |
-| **TDD 单元测试** | 分层检索服务 | 自底向上/自顶向下/降级/输入验证 | `test_layered_retrieval_service.py` | Task 2 |
+| **TDD 单元测试** | 分层检索端口 | 端口契约方法签名、参数校验 | `tests/unit/domain/ports/test_layered_retrieval_port.py` | Task 1 |
+| **TDD 单元测试** | 分层检索服务 | 自底向上/自顶向下/降级/输入验证 | `tests/unit/application/services/test_layered_retrieval_service.py` | Task 2 |
 | **TDD 单元测试** | 分层检索异常 | 构造/属性/`to_dict()`/cause 链 | `tests/unit/domain/exceptions/test_layered_retrieval_exceptions.py` | Task 1 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_layered_search.feature` | Task 0 |
-| **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_layered_search.py` | Task 0 |
-| **TDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | `test_acceptance_layered_search.feature` | Task 4 |
-| **TDD 验收测试** | 收尾 BDD 步骤实现 | 完成清单断言与步骤函数 | `test_acceptance_layered_search.py` | Task 4 |
-| **TDD 契约测试** | 端口契约 | 端口注册、版本、兼容性、实现解析 | `tests/contracts/test_port_contract_layered_retrieval.py` | Task 0 |
+| **SDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_layered_retrieval.feature` | Task 0 |
+| **SDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_layered_retrieval.py` | Task 0 |
+| **SDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | `test_acceptance_layered_retrieval.feature` | Task 4 |
+| **SDD 验收测试** | 收尾 BDD 步骤实现 | 完成清单断言与步骤函数 | `test_acceptance_layered_retrieval.py` | Task 4 |
+| **SDD 契约测试** | 端口契约 | 端口注册、版本、兼容性、实现解析 | `tests/contracts/test_port_contract_layered_retrieval.py` | Task 0 |
 | **TDD 领域异常测试** | `src/domain/exceptions/` | 构造/属性/`to_dict()` 序列化 | `tests/unit/domain/exceptions/test_layered_retrieval_exceptions.py` | Task 1 |
 | **TDD 领域异常测试** | `src/interfaces/api/exception_handlers.py` | HTTP 映射/状态码/响应结构 | `tests/unit/interfaces/api/test_exception_handlers.py` | Task 1 |
 | **TDD 领域异常测试** | 编码唯一性 | 所有异常类 `code` 无碰撞 | `tests/unit/domain/exceptions/test_error_code_uniqueness.py` | Task 1 |
 | **TDD 领域异常测试** | 编码子域范围 | 子域范围/继承链一致性 | `tests/unit/domain/exceptions/test_code_ranges.py` | Task 1 |
-| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `test_arch_layered_retrieval.py` | Task 3 |
-| **集成测试** | 层间协作 | 真实 L3VectorPort + DenseSearchService 协作 | `test_integration_layered_retrieval.py` | Task 3 |
+| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `tests/unit/architecture/test_arch_layered_retrieval.py` | Task 3 |
+| **集成测试** | 层间协作 | 真实 L3VectorPort + DenseSearchService 协作 | `tests/integration/test_integration_layered_retrieval.py` | Task 3 |
 
 ---
 
@@ -376,11 +384,11 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。这是 SDD 规范驱动的基础。
 
-- [ ] Subtask 0.1: 定义领域事件 Schema（`LayeredSearchCompleted` 事件，REALTIME 模式）
+- [ ] Subtask 0.1: 定义领域事件 Schema（`LayeredRetrievalCompleted` 事件，REALTIME 模式）
 - [ ] Subtask 0.2: 定义分层检索值对象（`DocumentSummary`、`CrossDocSummary`，可选）
 - [ ] Subtask 0.3: 创建/更新 `docs/api/openapi.yaml`（新增 `POST /api/v1/search/layered` 端点）
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_layered_search.feature`
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_layered_search.py`
+- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_layered_retrieval.feature`
+- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_layered_retrieval.py`
 - [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -408,24 +416,40 @@
 - [ ] Subtask 1.2: 🟢 绿 — 实现 `LayeredRetrievalPort` Protocol
 - [ ] Subtask 1.3: 🔄 重构 — 优化端口代码
 
+#### TDD 循环 [A-1]：Qdrant payload 扩展（索引流程适配）
+
+> **说明：** 分层检索的 L4→L3 回溯和 L3→L4 展开依赖 `parent_chunk_id` 和 `index_level` payload 字段进行过滤。
+> 当前 Qdrant 索引流程 (`document_tasks.py`) 的 payload 仅存储 `chunk_index` 和 `created_at`，不包含上述字段，
+> 因此需修改索引流程，确保 upsert 时写入这两个字段。
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/infrastructure/workflow/test_document_tasks_index_payload.py`（验证 payload 包含 parent_chunk_id 和 index_level） |
+| 🟢 绿 | 修改 `src/infrastructure/workflow/tasks/document_tasks.py`，在 Qdrant upsert 的 payload 中追加 `parent_chunk_id` 和 `index_level` 字段 |
+| 🔄 重构 | 优化 payload 构建逻辑，确保与现有 `SemanticChunk` 值对象字段名一致 |
+
+- [ ] Subtask 1.4: 🔴 红 — 编写索引 payload 扩展失败测试
+- [ ] Subtask 1.5: 🟢 绿 — 修改 `document_tasks.py` 追加 `parent_chunk_id` 和 `index_level`
+- [ ] Subtask 1.6: 🔄 重构 — 优化 payload 构建逻辑
+
 #### TDD 循环 [B]：分层检索异常体系
 
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/domain/exceptions/test_layered_retrieval_exceptions.py`（异常构造/序列化） |
 | 🟢 绿 | 实现 `src/domain/exceptions/layered_retrieval_exceptions.py` |
-| 🔄 重构 | 注册异常到 `_code_ranges.py`、`__init__.py`、`EXCEPTION_HTTP_MAP`、`test_code_ranges.py` |
+| 🔄 重构 | 注册异常到 `_code_ranges.py`、`__init__.py`、`EXCEPTION_HTTP_MAP`，并更新 `test_code_ranges.py` 中的 `allowed_child_parent_subdomains` |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写分层检索异常失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现 `LayeredRetrievalError` 和 `LevelTransitionError`
-- [ ] Subtask 1.6: 🔄 重构 — 注册异常到 `_code_ranges.py`（新增 `retrieval` 子域 280-289）、`__init__.py`、`EXCEPTION_HTTP_MAP`、`test_code_ranges.py.allowed_child_parent_subdomains`
+- [ ] Subtask 1.7: 🔴 红 — 编写分层检索异常失败测试
+- [ ] Subtask 1.8: 🟢 绿 — 实现 `LayeredRetrievalError` 和 `LevelTransitionError`
+- [ ] Subtask 1.9: 🔄 重构 — 注册异常到 `_code_ranges.py`（新增 `retrieval` 子域 280-289）、`__init__.py`、`EXCEPTION_HTTP_MAP`、`test_code_ranges.py.allowed_child_parent_subdomains`
 
 **完成标准/Definition of Done:**
 - [ ] `LayeredRetrievalPort` 端口契约定义完成
 - [ ] `LayeredRetrievalError`（EXCEPTION_280）和 `LevelTransitionError`（EXCEPTION_281）定义完成
 - [ ] 异常体系完整注册（`_code_ranges.py`/`__init__.py`/`EXCEPTION_HTTP_MAP`/`test_code_ranges.py`）
 - [ ] 所有 TDD 循环测试通过
-- [ ] 异常编码无碰撞（`grep -r "EXCEPTION_28[0-9]"` 零输出）
+- [ ] 异常编码无碰撞（`grep -rw "EXCEPTION_28[0-9]"` 零输出）
 
 ---
 
@@ -533,8 +557,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/acceptance/test_acceptance_layered_search.feature` 中的收尾验收场景 |
-| 🟢 绿 | 编写 `tests/acceptance/test_acceptance_layered_search.py` 的 BDD 步骤实现 |
+| 🔴 红 | 编写 `tests/acceptance/test_acceptance_layered_retrieval.feature` 中的收尾验收场景 |
+| 🟢 绿 | 编写 `tests/acceptance/test_acceptance_layered_retrieval.py` 的 BDD 步骤实现 |
 | 🔄 重构 | 收敛场景命名、统一断言表达、保持步骤函数可维护性 |
 
 - [ ] Subtask 4.1: 场景 1 — 验证 `src` 完成清单的逐项确认
@@ -554,7 +578,7 @@
 
 ### 相关架构模式和约束 Architecture Patterns & Constraints
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
+**来源:** epics_v1.0.md Story 3.5 节定义
 
 - **架构模式:** 六边形架构（Ports & Adapters）、分层检索（L1-L4 检索粒度）
 - **设计约束:**
@@ -566,17 +590,18 @@
 
 ### 关键架构决策
 
-**来源:** 架构设计文档 - 分层检索设计决策
+**来源:** epics_v1.0.md Story 3.5 节 + Story 3.4 已有实现经验
 
 | 决策 | 方案 | 理由 |
 |------|------|------|
 | **L4→L3 回溯方式** | 通过 `payload.parent_chunk_id` 过滤 Qdrant | 已有 `parent_chunk_id` 字段，无需额外索引 |
 | **L3→L4 展开方式** | L3 检索后，按 `parent_chunk_id` 过滤检索 Child 子块 | 复用现有 `L3VectorPort.search()` 的 payload 过滤 |
 | **L2/L1 实现策略** | MVP 骨架（返回空列表），V1 完整实现 | 降低 MVP 风险，核心价值在 L4→L3 双向遍历 |
-| **异常子域** | 新增 `retrieval` 子域（280-289） | `business` 子域（201-209）已满 |
+| **异常子域** | 新增 `retrieval` 子域（280-289） | `business` 子域（201-209）已有 8 个异常类，为保持扩展空间 |
 | **端口命名** | `LayeredRetrievalPort` 而非 `LayeredSearchPort` | 强调"检索"而非"搜索"，与 `SearchResult` 区分 |
 | **服务编排** | 复用 `DenseSemanticSearchService` 而非重新实现检索 | 保持与现有搜索服务一致，避免重复 |
 | **L4 检索策略** | 默认使用 Dense 语义检索（L4 Child 块有向量索引） | Child 块已索引向量，可直接复用现有 Dense 检索 |
+| **Qdrant payload 扩展** | 修改 `document_tasks.py` 索引流程，在 payload 中存储 `parent_chunk_id` 和 `index_level` | 分层检索依赖 payload 过滤进行回溯/展开 |
 
 ### 项目结构说明 Project Structure
 
@@ -584,7 +609,7 @@
 src/
 ├── domain/
 │   ├── events/
-│   │   └── layered_search_events.py          # [新增] LayeredSearchCompleted 事件
+│   │   └── layered_retrieval_events.py          # [新增] LayeredRetrievalCompleted 事件
 │   ├── exceptions/
 │   │   ├── layered_retrieval_exceptions.py    # [新增] 分层检索异常
 │   │   └── _code_ranges.py                   # [修改] 新增 retrieval 子域
@@ -604,22 +629,23 @@ src/
 
 tests/
 ├── acceptance/
-│   ├── test_acceptance_layered_search.feature # [新增] Gherkin 场景
-│   └── test_acceptance_layered_search.py     # [新增] BDD 步骤实现
+│   ├── test_acceptance_layered_retrieval.feature # [新增] Gherkin 场景
+│   └── test_acceptance_layered_retrieval.py     # [新增] BDD 步骤实现
 ├── contracts/
 │   └── test_port_contract_layered_retrieval.py # [新增] 端口契约测试
 ├── integration/
 │   └── test_integration_layered_retrieval.py  # [新增] 集成测试
 ├── unit/
 │   ├── application/
-│   │   └── test_layered_retrieval_service.py  # [新增] 应用服务单元测试
+│   │   └── services/
+│   │       └── test_layered_retrieval_service.py  # [新增] 应用服务单元测试
 │   ├── architecture/
 │   │   └── test_arch_layered_retrieval.py     # [新增] 架构验证测试
 │   └── domain/
 │       ├── exceptions/
 │       │   └── test_layered_retrieval_exceptions.py  # [新增] 异常测试
 │       └── ports/
-│           └── test_layered_retrieval_port.py  # [新增] 端口契约测试
+│           └── test_layered_retrieval_port.py  # [新增] 端口单元测试
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
@@ -630,14 +656,21 @@ tests/
 1. **GraphSearchService 仅注入 L5GraphPort**（领域端口），不使用 GraphRetriever（基础设施具象类）— 保持六边形架构严格
 2. **HybridSearchService 构造函数新参数全部具名默认**（`graph_search=None`, `weights=None`, `reranker=None`）— 保证向后兼容
 3. **端口升级时必须先 `unregister()` 再 `register()`** — `PortRegistry.register()` 对同名不同 spec 抛 `ConflictError`
-4. **异常注册 5 步流程**：定义类 → 注册子域 → 注册映射 → 导出 → HTTP 映射 → 同步 CI 测试
+4. **异常注册 7 步流程**：
+   1. 定义异常类（layered_retrieval_exceptions.py）
+   2. CODE_RANGES 注册子域（_code_ranges.py）
+   3. _CLASS_TO_SUBDOMAIN 注册映射（_code_ranges.py）
+   4. __init__.py 导出（import + __all__）
+   5. EXCEPTION_HTTP_MAP 注册（exception_handlers.py）
+   6. allowed_child_parent_subdomains 登记（test_code_ranges.py）
+   7. 测试文件更新（test_layered_retrieval_exceptions.py + test_exception_handlers.py 精确集合断言）
 5. **`fuse` 函数作为可调用对象注入**，不注册为端口
 
 **应用到本故事/Applied to This Story:**
 - [x] `LayeredRetrievalService` 注入现有服务（`DenseSemanticSearchService`, `L3VectorPort`），不直接操作 Qdrant
 - [x] 构造函数新增参数全部具名默认（`reranker=None`, `weights=None`）
 - [x] 使用 `_safe_*_search()` 私有方法模式实现降级策略
-- [x] 异常注册遵循 5 步流程
+- [x] 异常注册遵循 7 步流程
 - [x] 端口注册使用 `Lifetime.SCOPED`（轻量编排）
 
 ---
@@ -660,14 +693,14 @@ tests/
 | **Instructions** | `_bmad/bmm/workflows/4-implementation/create-story/instructions.xml` |
 | **Template** | `_bmad/bmm/workflows/4-implementation/create-story/template.md` |
 | **Epic 配置** | `_bmad-output/planning-artifacts/epics_v1.0.md` |
-| **架构文档** | `_bmad-output/planning-artifacts/architecture.md` |
+| **架构文档** | `docs/architecture/architecture.md`（无 L1-L4 检索粒度章节，需补充） |
 | **前一个 Story** | `_bmad-output/implementation-artifacts/stories/3-4-rrf-fusion-ranking.md` |
 | **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
 
 ### 完成清单 Completion Notes List
 
 - [x] 故事需求从 `epics_v1.0.md` 提取
-- [x] 架构约束从 `architecture.md` 提取
+- [x] 架构约束从 `epics_v1.0.md` 提取
 - [x] 前一个故事学习经验整合
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成
@@ -681,17 +714,17 @@ tests/
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/domain/ports/layered_retrieval.py` - 分层检索端口契约
 - `src/domain/exceptions/layered_retrieval_exceptions.py` - 分层检索异常
-- `src/domain/events/layered_search_events.py` - 分层检索事件
+- `src/domain/events/layered_retrieval_events.py` - 分层检索事件
 - `src/application/services/layered_retrieval_service.py` - 分层检索服务
 - `src/interfaces/api/layered_retrieval.py` - API 路由（可选 MVP）
-- `tests/unit/domain/ports/test_layered_retrieval_port.py` - 端口契约测试
+- `tests/unit/domain/ports/test_layered_retrieval_port.py` - 端口单元测试
 - `tests/unit/domain/exceptions/test_layered_retrieval_exceptions.py` - 异常测试
-- `tests/unit/application/test_layered_retrieval_service.py` - 应用服务测试
+- `tests/unit/application/services/test_layered_retrieval_service.py` - 应用服务测试
 - `tests/unit/architecture/test_arch_layered_retrieval.py` - 架构验证测试
 - `tests/integration/test_integration_layered_retrieval.py` - 集成测试
 - `tests/contracts/test_port_contract_layered_retrieval.py` - 端口契约测试
-- `tests/acceptance/test_acceptance_layered_search.feature` - Gherkin 场景
-- `tests/acceptance/test_acceptance_layered_search.py` - BDD 步骤实现
+- `tests/acceptance/test_acceptance_layered_retrieval.feature` - Gherkin 场景
+- `tests/acceptance/test_acceptance_layered_retrieval.py` - BDD 步骤实现
 
 ---
 
@@ -722,26 +755,42 @@ tests/
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| 1 | [问题描述] | P[N] | [修复方案] |
+| 1 | 命名不一致：`LayeredSearchCompleted` 与 `LayeredRetrievalPort` 冲突 | P0 | 统一为 `retrieval`：事件名→`LayeredRetrievalCompleted`，事件文件→`layered_retrieval_events.py`，验收测试文件→`test_acceptance_layered_retrieval.*` |
+| 2 | AC-2/AC-3 中 `L3VectorPort.search()` 调用方式不可行（需 `query_vector` 向量参数） | P0 | 修正为复用查询向量带 payload 过滤，或使用 `L3VectorPort.get_point()` 按 ID 回溯 |
+| 3 | Qdrant payload 实际不存储 `parent_chunk_id` 和 `index_level` | P0 | 新增 Task 1 TDD 循环 [A-1]：修改 `document_tasks.py` 索引流程，在 payload 中追加这两个字段 |
+| 4 | 异常注册"5步流程"遗漏 `allowed_child_parent_subdomains` 和 `_CLASS_TO_SUBDOMAIN` | P0 | 修正为"7步流程"，明确列出每一步，补充白名单位置说明 |
+| 5 | 引用不存在的 `_bmad-output/planning-artifacts/architecture.md` 和"分层检索设计决策"文档 | P0 | 替换为 `epics_v1.0.md` Story 3.5 节作为来源 |
+| 6 | 延迟预算 500ms 与 NFR-PERF-01 MVP 800ms 冲突，未标注版本归属 | P0 | 标注为 V1 目标，MVP 阶段放宽值，并补充"并发检索≥50"指标 |
+| 7 | 测试路径缺少 `services/` 子目录，端口单元测试误标为"端口契约测试" | P0 | 修正项目结构图和测试分类表 |
+| 8 | `register_port()` 缺失 `module` 参数 | P0 | 在 AC-1 验证标准和端口清单中补充 module 参数要求 |
+| 9 | `business` 子域"已满"声明不准确（209 仍可用） | P1 | 修正为"已有 8 个异常类，为保持扩展空间" |
+| 10 | 事件命名模式描述与实际不符（`[Aggregate][EventName]` 模式不存在） | P1 | 修正为"业务含义直名" |
 
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
 **审查日期:** 2026-08-12
-**审查模式:** 待定
+**审查模式:** 多Agent并行审查（端口契约/异常体系/事件与测试/需求一致性）
 
 #### 需决策 Decision Needed
 
-- [ ] [待填写]
+- [ ] MVP 阶段延迟预算是否按 NFR-PERF-01 的 800ms 总预算重新分配（当前 AC-2=200ms + AC-3=250ms 为 V1 目标）
 
 #### 已修复 Patch
 
-- [ ] [待填写]
+- [x] 命名统一：`LayeredSearchCompleted` → `LayeredRetrievalCompleted`，所有 `layered_search` → `layered_retrieval`
+- [x] AC-2/AC-3 回溯/展开机制修正（复用查询向量 + payload 过滤 / `get_point()` 按 ID 回溯）
+- [x] 新增 Task 1 TDD 循环 [A-1]：Qdrant payload 扩展
+- [x] 异常注册流程 5步→7步
+- [x] 架构引用修正（删除不存在的 architecture.md 引用）
+- [x] 延迟预算标注 V1 目标 + 补充并发检索≥50
+- [x] 测试路径与标注修正
+- [x] `module` 参数补充
 
 #### 已推迟 Defer
 
-- [ ] [待填写]
+- [ ] L2/L1 骨架实现的延迟预算约束（P2，MVP 阶段骨架返回空列表开销极低）
 
 ---
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.domain.exceptions import RerankError
 from src.domain.ports.l3_vector import SearchResult
 from src.infrastructure.external_services.reranker.config import RerankerConfig
 
@@ -127,7 +128,10 @@ class LiteLLMRerankerClient:
             raw_results = response.get("results", [])
         else:
             logger.warning("重排序响应格式异常: %s", type(response).__name__)
-            raise ValueError(f"Unexpected response type: {type(response).__name__}")
+            raise RerankError(
+                "Unexpected response type",
+                context={"response_type": type(response).__name__},
+            )
 
         for item in raw_results:
             if isinstance(item, dict):
