@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import cast
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 
@@ -126,9 +126,10 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
         model = self._to_model(entry)
         self._session.add(model)
         try:
-            await self._session.flush()
+            # 使用 savepoint 局部回滚，避免破坏外层事务
+            async with self._session.begin_nested():
+                await self._session.flush()
         except IntegrityError as exc:
-            await self._session.rollback()
             if "dictionary_entries_pkey" in str(exc) or "unique" in str(exc).lower():
                 raise DictionaryEntryConflictError(term=entry.term)
             raise
@@ -268,11 +269,8 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
         if not snapshot_model.entries:
             return
 
-        # 清空现有词条并重建
-        delete_stmt = select(DictionaryEntryModel)
-        delete_result = await self._session.execute(delete_stmt)
-        for entry in delete_result.scalars().all():
-            await self._session.delete(entry)
+        # 清空现有词条（批量删除，避免 N+1）
+        await self._session.execute(delete(DictionaryEntryModel))
 
         # 从快照重建词条
         now = datetime.now(UTC)
@@ -318,6 +316,27 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
                 )
             )
         return snapshots
+
+    async def count_entries(self, query: DictionaryQuery) -> int:
+        """统计符合条件的词条总数
+
+        Args:
+            query: 查询条件
+
+        Returns:
+            符合条件的词条总数
+        """
+        from sqlalchemy import func as sa_func
+
+        stmt = select(sa_func.count()).select_from(DictionaryEntryModel)
+        if query.category is not None:
+            stmt = stmt.where(DictionaryEntryModel.category == query.category)
+        if query.entity_type is not None:
+            stmt = stmt.where(DictionaryEntryModel.entity_type == query.entity_type)
+        if query.active_only:
+            stmt = stmt.where(DictionaryEntryModel.active.is_(True))
+        result = await self._session.execute(stmt)
+        return int(result.scalar() or 0)
 
 
 def _parse_datetime(dt_str: str, default: datetime) -> datetime | None:

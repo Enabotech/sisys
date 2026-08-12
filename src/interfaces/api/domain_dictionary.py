@@ -264,9 +264,18 @@ def create_document_dictionary_router(
         )
         service = _get_service()
         entries = await service.list_entries(query)
+        total = await service.count_entries(
+            DictionaryQuery(
+                category=category,
+                entity_type=entity_type,
+                active_only=active_only,
+                page=1,
+                page_size=1,
+            )
+        )
         return DictionaryListResponse(
             items=[_to_entry_response(e) for e in entries],
-            total=len(entries),
+            total=total,
             page=page,
             page_size=page_size,
         )

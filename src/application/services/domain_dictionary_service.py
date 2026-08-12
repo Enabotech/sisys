@@ -39,6 +39,7 @@ class DomainDictionaryService:
         dictionary_repo: 词典持久化仓储
         dictionary_consumer: 词典消费端（热更新）
         event_publisher: 事件发布器
+        _current_dictionary_version: 当前词典版本号，用于事件 payload
     """
 
     def __init__(
@@ -57,6 +58,7 @@ class DomainDictionaryService:
         self._dictionary_repo = dictionary_repo
         self._dictionary_consumer = dictionary_consumer
         self._event_publisher = event_publisher
+        self._current_dictionary_version: int = 0
 
     async def list_entries(self, query: DictionaryQuery) -> list[DictionaryEntry]:
         """按查询条件列出词条
@@ -95,6 +97,7 @@ class DomainDictionaryService:
             已保存的词条
         """
         saved = await self._dictionary_repo.add_entry(entry)
+        self._current_dictionary_version += 1
         await self._publish_event(term=entry.term, action="add", trigger=trigger)
         return saved
 
@@ -115,6 +118,7 @@ class DomainDictionaryService:
             更新后的词条
         """
         updated = await self._dictionary_repo.update_entry(term, entry)
+        self._current_dictionary_version += 1
         await self._publish_event(term=term, action="update", trigger=trigger)
         return updated
 
@@ -132,6 +136,7 @@ class DomainDictionaryService:
         if existing is None:
             raise DictionaryNotFoundError(term=term)
         await self._dictionary_repo.delete_entry(term)
+        self._current_dictionary_version += 1
         await self._publish_event(term=term, action="delete", trigger=trigger)
 
     async def refresh_dictionary(self) -> None:
@@ -164,6 +169,7 @@ class DomainDictionaryService:
             DictionaryNotFoundError: 目标版本不存在
         """
         await self._dictionary_repo.rollback(version)
+        self._current_dictionary_version = version
         # 回滚后自动刷新
         await self.refresh_dictionary()
         await self._publish_event(term="", action="rollback", trigger=trigger)
@@ -175,6 +181,17 @@ class DomainDictionaryService:
             快照列表
         """
         return await self._dictionary_repo.list_snapshots()
+
+    async def count_entries(self, query: DictionaryQuery) -> int:
+        """统计符合条件的词条总数
+
+        Args:
+            query: 查询条件
+
+        Returns:
+            词条总数
+        """
+        return await self._dictionary_repo.count_entries(query)
 
     async def _publish_event(
         self,
@@ -192,7 +209,12 @@ class DomainDictionaryService:
             trigger: 触发源
         """
         try:
-            event = DictionaryUpdated(term=term, action=action, trigger=trigger)
+            event = DictionaryUpdated(
+                term=term,
+                action=action,
+                trigger=trigger,
+                dictionary_version=self._current_dictionary_version,
+            )
             await self._event_publisher.publish(event)
         except Exception:
             logger.warning("词典事件发布失败: term=%s, action=%s", term, action)

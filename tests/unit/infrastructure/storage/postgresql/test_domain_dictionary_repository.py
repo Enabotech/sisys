@@ -88,6 +88,10 @@ def mock_session():
     session.flush = AsyncMock()
     session.rollback = AsyncMock()
     session.execute = AsyncMock()
+    # begin_nested 返回支持异步上下文管理协议的对象（savepoint）
+    session.begin_nested = MagicMock()
+    session.begin_nested.return_value.__aenter__ = AsyncMock(return_value=None)
+    session.begin_nested.return_value.__aexit__ = AsyncMock(return_value=None)
     return session
 
 
@@ -134,7 +138,6 @@ class TestAddEntry:
 
         with pytest.raises(DictionaryEntryConflictError):
             _run(repo.add_entry(entry))
-        mock_session.rollback.assert_awaited_once()
 
 
 class TestGetEntry:
@@ -263,7 +266,8 @@ class TestCreateSnapshot:
     def test_create_snapshot_success(self, repo, mock_session):
         """创建快照"""
         entries = [_make_model(term="BLM")]
-        snapshot_model = DictionarySnapshotModel(
+        # 变量赋值给 _ 表示有意不使用（变量仅用于触发 mock 行为验证）
+        _ = DictionarySnapshotModel(
             version=1,
             entries={"BLM": {"term": "BLM", "entity_type": "CONCEPT"}},
             created_by="admin",
