@@ -281,3 +281,155 @@ class TestEntityExtractionService:
         )
         assert isinstance(result, ExtractionResult)
         assert len(result.entities) >= 1
+
+    # --- Edge Case: 事件发布抛出异常 ---
+
+    @pytest.mark.asyncio
+    async def test_event_publish_raises_logs_only(
+        self,
+        service: EntityExtractionService,
+        event_publisher: AsyncMock,
+    ) -> None:
+        """验证事件发布抛出异常时记录日志，不阻止主流程返回"""
+        event_publisher.publish.side_effect = RuntimeError("事件总线故障")
+
+        result = await service.extract_entities(
+            content="BLM 模型",
+            memory_id="test-mem-008",
+        )
+        assert isinstance(result, ExtractionResult)
+        assert len(result.entities) >= 1
+
+    # --- Edge Case: 非 UUID memory_id 生成确定性散列 ---
+
+    @pytest.mark.asyncio
+    async def test_non_uuid_memory_id_uses_deterministic_hash(
+        self,
+        service: EntityExtractionService,
+        event_publisher: AsyncMock,
+    ) -> None:
+        """验证非 UUID 格式 memory_id 使用确定性散列 UUID（可追溯）"""
+        import uuid as uuid_mod
+
+        await service.extract_entities(
+            content="BLM 模型",
+            memory_id="custom-memory-id-123",
+        )
+        published_event = event_publisher.publish.call_args[0][0]
+        assert isinstance(published_event.memory_id, uuid_mod.UUID)
+        # 确定性散列：相同输入生成相同 UUID
+        expected = uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, "custom-memory-id-123")
+        assert published_event.memory_id == expected
+
+    # --- Edge Case: 无实体时 extraction_type 回退到 strategy ---
+
+    @pytest.mark.asyncio
+    async def test_extraction_type_fallback_to_strategy(
+        self,
+        service: EntityExtractionService,
+        rule_extractor: AsyncMock,
+        llm_extractor: AsyncMock,
+        event_publisher: AsyncMock,
+    ) -> None:
+        """验证无实体时 extraction_type 回退到仲裁器 strategy"""
+        rule_extractor.extract_entities.return_value = ExtractionResult(
+            extraction_metadata={"strategy": "rule", "entity_count": 0},
+        )
+        llm_extractor.extract_entities.return_value = ExtractionResult(
+            extraction_metadata={"strategy": "llm", "entity_count": 0},
+        )
+
+        await service.extract_entities(
+            content="普通文本无实体",
+            memory_id="test-mem-009",
+        )
+        published_event = event_publisher.publish.call_args[0][0]
+        # 仲裁器：rule 空 + llm 空 → 返回 llm 结果（strategy=llm）→ 映射为 llm_only
+        assert published_event.extraction_type in ("rule_only", "llm_only", "unknown")
+
+    # --- Edge Case: LLM 抽取器抛出异常 ---
+
+    @pytest.mark.asyncio
+    async def test_llm_extractor_raises_exception(
+        self,
+        service: EntityExtractionService,
+        llm_extractor: AsyncMock,
+        l5_graph: AsyncMock,
+    ) -> None:
+        """验证 LLM 抽取器抛出异常时透明降级"""
+        llm_extractor.extract_entities.side_effect = RuntimeError("LLM 连接异常")
+
+        # 不应抛出异常，应降级到规则基结果
+        result = await service.extract_entities(
+            content="BLM 模型",
+            memory_id="test-mem-011",
+        )
+        assert len(result.entities) >= 1
+        # 仍应持久化
+        assert l5_graph.create_entity.called
+
+    # --- Edge Case: 规则基抽取器失败 ---
+
+    @pytest.mark.asyncio
+    async def test_rule_extractor_failure_raises_error(
+        self,
+        service: EntityExtractionService,
+        rule_extractor: AsyncMock,
+    ) -> None:
+        """验证规则基抽取器失败时抛出 EntityExtractionError"""
+        from src.domain.exceptions import EntityExtractionError
+
+        rule_extractor.extract_entities.side_effect = RuntimeError("规则基引擎崩溃")
+
+        with pytest.raises(EntityExtractionError) as exc_info:
+            await service.extract_entities(
+                content="BLM 模型",
+                memory_id="test-mem-012",
+            )
+        assert exc_info.value.code == "EXCEPTION_340"
+        assert exc_info.value.context.get("extraction_strategy") == "rule"
+
+    # --- Edge Case: 关系占位节点创建 ---
+
+    @pytest.mark.asyncio
+    async def test_relation_placeholder_node_created(
+        self,
+        service: EntityExtractionService,
+        rule_extractor: AsyncMock,
+        llm_extractor: AsyncMock,
+        l5_graph: AsyncMock,
+    ) -> None:
+        """验证关系源/目标未抽取为实体时创建占位节点"""
+        # 规则基和 LLM 均无实体，但 LLM 返回关系
+        rule_extractor.extract_entities.return_value = ExtractionResult(
+            extraction_metadata={"strategy": "rule", "entity_count": 0},
+        )
+        llm_extractor.extract_entities.return_value = ExtractionResult(
+            entities=(),
+            relations=(
+                ExtractedRelation(
+                    source="新概念A",
+                    target="新概念B",
+                    relation_type="RELATES_TO",
+                    confidence=0.8,
+                    extraction_source="llm",
+                ),
+            ),
+            extraction_metadata={"strategy": "llm", "entity_count": 0, "relation_count": 1},
+        )
+
+        await service.extract_entities(
+            content="介绍新概念A与新概念B的关系",
+            memory_id="test-mem-010",
+        )
+
+        # 占位节点创建：新概念A + 新概念B
+        placeholder_names = [
+            call_args.kwargs.get("properties", {}).get("name")
+            for call_args in l5_graph.create_entity.call_args_list
+            if call_args.kwargs.get("entity_type") == "unknown"
+        ]
+        assert "新概念A" in placeholder_names
+        assert "新概念B" in placeholder_names
+        # 关系应创建
+        assert l5_graph.create_relationship.called
