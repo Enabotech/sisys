@@ -174,6 +174,7 @@
 - [ ] L4 写入：`object_storage.archive()` 归档证据包（bucket: `archive-evidence`，retention 7 年）
 - [ ] L5 写入：`graph_storage.create_entity()` 创建档案节点（entity_type: `StrategicArchive`）
 - [ ] 优雅降级：L3 失败 → 记录日志，`embedding_ref = None`（`embedding_ref` 由应用层在调用前生成，如 `f"strategic_archive:{archive_id}"`，而非从 `upsert_points()` 返回值获取）；L5 失败 → 记录日志，`graph_ref = None`
+- [ ] L3 `upsert_points()` 部分失败脏数据处理：若返回 `False`，调用 `delete_points()` 清理该 `archive_id` 对应的向量点（使用 `id` 前缀匹配）
 - [ ] L2 或 L4 失败 → 抛出 `ArchiveStorageError`，归档流程回滚
 - [ ] 归档延迟 P95<500ms
 - [ ] 存储完整性 100%（L2+L4 强制成功保障）
@@ -187,6 +188,8 @@
 
 **验证标准/Validation Criteria:**
 - [ ] 路由工厂函数 `create_archive_router()`，前缀 `/api/v1/archive`
+  - 签名：`create_archive_router(archive_service: Any = None, auth_service: AuthServicePort | None = None, get_current_user_override: Callable | None = None) -> APIRouter`
+  - 认证依赖注入：优先级链 `get_current_user_override > auth_service > 默认(从容器获取)`，与 `create_document_dictionary_router()` 模式一致
 - [ ] `GET /api/v1/archive/entries` — 档案列表（分页 + 过滤：plan_id, archive_type, plan_type, date_range）
 - [ ] `GET /api/v1/archive/entries/{archive_id}` — 档案详情
 - [ ] `POST /api/v1/archive/archive` — 手动触发归档
@@ -279,12 +282,17 @@
 
 **新建异常：**
 - [ ] `ArchiveNotFoundError`（EXCEPTION_280）— `src/domain/exceptions/archive_exceptions.py`，继承 `NotFoundError`
-  - 构造参数：`archive_id: UUID`，`message: str = "Archive not found"`
-  - `context` 暴露 `archive_id`
+  - 构造参数：`archive_id: UUID`，`message: str | None = None`，`cause: Exception | None = None`
+  - `message` 默认构造：`f"Archive not found: {archive_id}"`
+  - `context` 暴露 `archive_id`（`context={"archive_id": str(archive_id)}`）
 - [ ] `ArchiveConflictError`（EXCEPTION_281）— 继承 `ConflictError`
-  - 构造参数：`archive_id: UUID`，`message: str = "Archive conflict"`
+  - 构造参数：`archive_id: UUID`，`message: str | None = None`，`cause: Exception | None = None`
+  - `message` 默认构造：`f"Archive conflict: {archive_id}"`
+  - `context` 暴露 `archive_id`（`context={"archive_id": str(archive_id)}`）
 - [ ] `ArchiveStorageError`（EXCEPTION_282）— 继承 `BusinessException`
-  - 构造参数：`message: str = "Archive storage error"`，`layer: str`（指示失败存储层：l2/l3/l4/l5），`cause: Exception | None`
+  - 构造参数：`layer: str`（指示失败存储层：l2/l3/l4/l5），`message: str | None = None`，`cause: Exception | None = None`
+  - `message` 默认构造：`f"Archive storage error at layer {layer}"`
+  - `context` 暴露 `layer`（`context={"layer": layer}`）
 - [ ] 编码分配：`archive` 子域 (280, 289)，已在 `_code_ranges.py` 预留 `# 档案子域（280-289）`
 - [ ] 异常在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 注册
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册（404/409/500）
@@ -293,6 +301,8 @@
 #### API 契约 (API Contract)
 
 - [ ] 路由工厂函数 `create_archive_router()`，前缀 `/api/v1/archive`
+  - 签名：`create_archive_router(archive_service: Any = None, auth_service: AuthServicePort | None = None, get_current_user_override: Callable | None = None) -> APIRouter`
+  - 认证依赖注入：优先级链 `get_current_user_override > auth_service > 默认(从容器获取)`，与 `create_document_dictionary_router()` 模式一致
 - [ ] 端点见 AC-8 定义
 - [ ] 所有路由过认证中间件
 - [ ] 响应遵循统一错误格式（`error.code` + `error.message` + `request_id`）
@@ -927,6 +937,12 @@ CREATE TABLE strategic_archives (
 );
 ```
 
+**并发归档与唯一约束：**
+- 同一 `plan_id` 允许多次归档（创建新版本记录），`archive_id` 自增 UUID 保证唯一性
+- 如业务需要禁止重复归档，`ArchiveConflictError` 在应用层 `archive_plan()` 前置检查中触发：
+  `find(ArchiveQuery(plan_id=plan_id, archive_type=archive_type))` 非空时抛出
+- 当前表设计不设 `UNIQUE(plan_id, archive_type)` 约束，保留灵活扩展空间
+
 **L3 Qdrant collection:**
 - collection 名称: `strategic_archive`
 - 向量维度: 1024（bge-m3）
@@ -938,6 +954,7 @@ CREATE TABLE strategic_archives (
 - 对象命名: `{archive_id}/{created_at.isoformat()}_{archive_type}.json`
 - retention: 2555 天（7 年 WORM 默认，到期后可申请延长）
 - 注意：`archive()` 方法参数名为 `bucket_type`（非 `bucket`），传入 `archive-evidence`
+- **测试约束**：集成测试中 MinIO 需启用对象锁定模式（`MINIO_CI_ENABLE_OBJECT_LOCK=on`）；若环境不支持 WORM，集成测试应动态跳过（`pytest.skip("WORM not available")`）
 
 **L5 Neo4j 节点:**
 - 标签: `StrategicArchive`
@@ -1056,7 +1073,28 @@ CREATE TABLE strategic_archives (
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| — | 初始版本 | — | — |
+| R1-1 | 异常编码 360-369 与 reranker 子域概念冲突 | P0 | 全文档 360→280、361→281、362→282 |
+| R1-2 | "永久存储"标题与 AC-2 delete() 方法语义矛盾 | P0 | 标题改为"长期存储与归档"，新增永久存储语义定义小节 |
+| R1-3 | 事件通道键名 archive_created 非驼峰 | P0 | 改为 ArchiveCreated（与项目事件命名规范一致） |
+| R1-4 | ChannelConfig 类名不存在（实际为 ChannelMapping） | P0 | 全文档替换为 ChannelMapping |
+| R1-5 | ArchiveRepositoryPort 未继承 L2RdbPort | P0 | 明确继承 L2RdbPort[StrategicArchive] |
+| R1-6 | 测试分类表遗漏 test_archive_routes.py | P0 | 补充至测试分类与归属表 |
+| R1-7 | 实体缺少 created_by/version/metadata/deleted_at | P1 | 补充完整字段定义 |
+| R1-8 | 表设计与实体字段不同步 | P1 | 同步更新表设计 |
+| R1-9 | L4 archive() 参数名写 bucket 实际为 bucket_type | P1 | 更正为 bucket_type |
+| R1-10 | L5 create_entity() memory_id 映射未说明 | P1 | 补充参数映射说明 |
+| R1-11 | 缺少 register_port() 示例代码 | P1 | 新增完整示例代码 |
+| R1-12 | Task 5 路由测试依赖未说明 | P1 | 补充 override_dependencies 说明 |
+| R2-1 | get_archive() 返回类型未说明缺失异常抛出 | P1 | 补充仓储返回 None 时抛 ArchiveNotFoundError |
+| R2-2 | embedding_ref 赋值依赖 upsert_points 返回值（返回 bool） | P1 | 说明由应用层生成，不依赖返回值 |
+| R2-3 | 软删除配置未说明 | P1 | 补充 soft_delete_column = "deleted_at" |
+| R2-4 | ArchiveQuery limit 缺少边界验证 | P1 | 补充 1-1000 范围验证 |
+| R3-1 | Gherkin 场景未覆盖 AC-4 事件发布 | P1 | 补充 ArchiveCreated 事件验证场景 |
+| R4-1 | 异常构造参数模式与 dictionary_exceptions 不一致 | P1 | 重写 __init__，增加 cause/context 参数 |
+| R4-2 | 路由工厂缺少 auth_service 参数 | P1 | 补充 auth_service 参数及认证注入逻辑 |
+| R4-3 | L3 部分失败脏数据未处理 | P1 | 补充 upsert_points 失败时 delete_points 清理 |
+| R4-4 | 并发归档唯一约束未定义 | P1 | 补充并发归档策略说明 |
+| R4-5 | 未说明 WORM 测试约束 | P1 | 补充测试环境 MinIO 配置要求 |
 
 ---
 
@@ -1088,8 +1126,10 @@ CREATE TABLE strategic_archives (
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-08-12
 **最后更新/Last Updated:** 2026-08-12
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
+- v1.1.0: Round 1-3 审查修复 — 异常编码修正、永久存储语义定义、继承链修复、实体字段补充、存储层参数映射、register_port 示例、Gherkin 场景补充
+- v1.2.0: Round 4 审查修复 — 异常构造参数模式修正、路由工厂参数补充、L3 脏数据处理说明、并发归档约束定义、WORM 测试约束说明
