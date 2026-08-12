@@ -92,6 +92,11 @@ class DictionaryQuery:
                 message="page must be >= 1",
                 context={"query": "DictionaryQuery", "field": "page", "value": self.page},
             )
+        if self.page > 10000:
+            raise EntityValidationError(
+                message="page must not exceed 10000",
+                context={"query": "DictionaryQuery", "field": "page", "value": self.page},
+            )
 
 
 @dataclass(frozen=True)

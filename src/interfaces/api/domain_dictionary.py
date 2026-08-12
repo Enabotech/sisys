@@ -496,7 +496,7 @@ def _to_snapshot_response(snapshot: Any) -> DictionarySnapshotResponse:
         DictionarySnapshotResponse 响应模型
     """
     change_summary = dict(snapshot.change_summary or {})
-    entry_count = change_summary.pop("entry_count", len(snapshot.entries))
+    entry_count = change_summary.get("entry_count", 0)
     return DictionarySnapshotResponse(
         snapshot_id=snapshot.snapshot_id,
         version=snapshot.version,
