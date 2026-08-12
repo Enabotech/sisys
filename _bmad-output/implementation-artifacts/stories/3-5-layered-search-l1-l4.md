@@ -69,37 +69,40 @@
 **When** 执行自底向上检索，目标层级为 L3
 **Then** 系统首先在 L4 层执行 Dense 语义检索（使用现有 `DenseSemanticSearchService`）
 **And** 对命中结果的 `payload.parent_chunk_id` 去重，回溯到 L3 父块（Parent 块）
-**And** 通过 DenseSemanticSearchService（复用 L4 检索时生成的查询向量）对父块集合执行带 filter_payload 的向量检索；或者使用 L3VectorPort.get_point(collection, point_id) 按 ID 直接获取父块内容
+**And** 通过 DenseSemanticSearchService（需扩展 `search_with_vector()` 方法以支持传入查询向量）对父块集合执行带 filter_payload 的向量检索；或者使用 L3VectorPort.get_point(collection, point_id) 按 ID 直接获取父块内容（推荐方案，点 ID 必须等于 `str(chunk.chunk_id)`）
 **And** 返回 L3 层的去重合并结果列表
 **And** 无 Child 匹配时返回空列表
 
 **验证标准/Validation Criteria:**
-> **【V1 目标】L4→L3 自底向上回溯**
+> **【V1 目标】L4→L3 自底向上回溯（MVP 仅支持相邻层级单级回溯，多级全遍历 L4→L1 依赖 L2/L1 摘要索引就绪后迭代）**
 - [ ] `search_bottom_up(query_text, target_level="L3")` 执行 L4→L3 回溯
 - [ ] 回溯去重：同一 Parent 的多个 Child 命中合并为一条结果
-- [ ] 父块内容获取：`L3VectorPort.get_point()`（按 ID 回溯）或 DenseSemanticSearchService 带 payload 过滤
+- [ ] 父块内容获取：`L3VectorPort.get_point()`（按 ID 回溯，推荐）或 DenseSemanticSearchService 带 payload 过滤（需扩展 `search_with_vector()`）
 - [ ] 结果 `payload` 携带 `parent_chunk_id`、`child_count`（命中子块数）、`index_level="parent"`
 - [ ] 合并后结果按最高 Child 分数降序排列
 - [ ] 延迟 P95 < 200ms（L4 检索 + L3 回溯）(V1 目标，MVP 阶段可放宽至 350ms，总预算 ≤800ms)
 - [ ] 并发检索 ≥ 50
+- [ ] 融合延迟 P95 < 50ms（L4→L3 回溯结果合并排序）
 
 ### AC-3: L3 → L4 自顶向下展开（Parent 展开到 Child）
 
 **Given** 用户查询文本在 L3 文档切片（Parent 块）中命中
 **When** 执行自顶向下检索，目标层级为 L4
 **Then** 系统首先在 L3 层执行 Dense 语义检索
-**And** 复用 L3 检索时使用的查询向量，对 Child 集合执行带 parent_chunk_id payload 过滤的向量检索
+**And** 复用 L3 检索时使用的查询向量（需扩展 DenseSemanticSearchService 新增 `search_with_vector()` 方法，或由 LayeredRetrievalService 直接调用 L3VectorPort.search() 传入向量），对 Child 集合执行带 parent_chunk_id payload 过滤的向量检索
 **And** 将命中 Parent 的 Top-K Child 子块作为结果返回
 **And** 结果 `payload` 携带 `parent_chunk_id`、`parent_content` 摘要、`index_level="child"`
 
 **验证标准/Validation Criteria:**
+> **【V1 目标】L3→L4 自顶向下展开（MVP 仅支持相邻层级单级展开，多级全遍历 L1→L4 依赖 L2/L1 摘要索引就绪后迭代）**
 - [ ] `search_top_down(query_text, target_level="L4")` 执行 L3→L4 展开
 - [ ] 每个命中 Parent 展开 Top-3 Child 子块（可配置）
-- [ ] Child 展开通过复用 L3 查询向量，对 Child 集合执行带 parent_chunk_id payload 过滤的向量检索
+- [ ] Child 展开通过 `L3VectorPort.search()` 直接传入向量 + parent_chunk_id payload 过滤（需扩展 Port 或由 LayeredRetrievalService 直接调用；注意 N+1 问题：每个命中 Parent 单独调用 search() 时，展开 Parent 数建议上限 5 个，或扩展 L3VectorPort 支持 Qdrant group_by 参数实现单次分组查询）
 - [ ] 结果 `payload` 包含 `parent_content` 截断摘要（前 200 字符）
 - [ ] 结果按 Parent 分数 × Child 分数降序排列
 - [ ] 延迟 P95 < 250ms（L3 检索 + L4 展开）(V1 目标，MVP 阶段可放宽至 400ms)
 - [ ] 并发检索 ≥ 50
+- [ ] 融合延迟 P95 < 50ms（L3→L4 展开结果合并排序）
 
 ### AC-4: 分层检索编排服务
 
@@ -140,7 +143,7 @@
 **Given** 文档摘要索引已构建（占位，当前返回空列表）
 **When** 执行自顶向下检索，目标层级为 L2
 **Then** 调用 `search_top_down(query_text, target_level="L2")`
-**And** 当前返回空列表（骨架实现，标记 TODO）
+**And** 当前返回空列表（骨架实现，标记 TODO；完整实现依赖 Story 3.6 交付的文档摘要索引）
 **And** 方法签名完整，可被上层调用
 
 **验证标准/Validation Criteria:**
@@ -154,7 +157,7 @@
 **Given** 跨文档摘要索引已构建（占位，当前返回空列表）
 **When** 执行自顶向下检索，目标层级为 L1
 **Then** 调用 `search_top_down(query_text, target_level="L1")`
-**And** 当前返回空列表（骨架实现，标记 TODO）
+**And** 当前返回空列表（骨架实现，标记 TODO；完整实现依赖 Story 3.6 交付的文档摘要索引）
 **And** 方法签名完整，可被上层调用
 
 **验证标准/Validation Criteria:**
@@ -319,7 +322,7 @@
 - [ ] **应用层覆盖率 ≥85%**（核心业务流，事务管理）
 - [ ] **领域层覆盖率 ≥90%**（关键业务逻辑，不变量验证）
 - [ ] **接口层覆盖率 ≥85%**（API 路由，请求响应验证）
-- [ ] **集成测试覆盖率 ≥70%**（`pytest --cov=tests/integration`）
+- [ ] **集成测试覆盖率 ≥75%**（`pytest --cov=tests/integration --cov-fail-under=75`）
 
 #### 代码质量门禁
 - [ ] **Ruff 检查通过**（`ruff check src/`）
@@ -384,7 +387,7 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。这是 SDD 规范驱动的基础。
 
-- [ ] Subtask 0.1: 定义领域事件 Schema（`LayeredRetrievalCompleted` 事件，REALTIME 模式）
+- [ ] Subtask 0.1: 定义领域事件 Schema（`LayeredRetrievalCompleted` 事件，REALTIME 模式；如不保留事件可跳过，同步更新 AC-4 验证标准）
 - [ ] Subtask 0.2: 定义分层检索值对象（`DocumentSummary`、`CrossDocSummary`，可选）
 - [ ] Subtask 0.3: 创建/更新 `docs/api/openapi.yaml`（新增 `POST /api/v1/search/layered` 端点）
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_layered_retrieval.feature`
@@ -420,11 +423,15 @@
 
 > **说明：** 分层检索的 L4→L3 回溯和 L3→L4 展开依赖**分块级向量索引**——每个 Child/Parent 块必须生成独立向量并写入 Qdrant。当前索引流程是文档级粒度：将整个文档文本拼接后生成一个向量，写入一个 Qdrant 点。分块流程 (`SemanticChunkingService`) 将 Child/Parent 块存入 PostgreSQL，但**不写入 Qdrant**。因此需重构索引流程，将分块管道前置到索引管道之前，确保每个 Chunk 块都有独立向量索引和完整 payload（含 `parent_chunk_id`、`index_level`、`chunk_id`、`document_id`）。
 
+**集成方案（关键）：** 当前 `document_processing_flow.py`（parse→embed→index）与 `SemanticChunkingHandler`（监听 DocumentProcessed 事件异步分块）是两条独立管道，无同步点。推荐采用**方案 B 变体**：在 `SemanticChunkingHandler` 完成分块持久化后，发布 `ChunkIndexed` 事件（或复用 `RAGIndexed`），由新增的 `ChunkIndexingHandler` 消费，从 PostgreSQL 读取已持久化的 chunks 并逐块嵌入、索引到 Qdrant。点 ID 必须等于 `str(chunk.chunk_id)`（而非随机 UUID），确保 `get_point()` 可通过 `parent_chunk_id` 回溯。
+
+**嵌入保护（关键）：** 批量嵌入需增加 `max_batch_size`（建议 16-32 个 chunk，超量分批）和 token 截断保护（发送前按 bge-m3 的 8192 token 上限截断），避免 API 413 或超时。
+
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/infrastructure/workflow/test_document_tasks_index_payload.py`（验证 payload 包含 parent_chunk_id 和 index_level） |
-| 🟢 绿 | 修改 `src/infrastructure/workflow/tasks/document_tasks.py`，在 Qdrant upsert 的 payload 中追加 `parent_chunk_id` 和 `index_level` 字段 |
-| 🔄 重构 | 优化 payload 构建逻辑，确保与现有 `SemanticChunk` 值对象字段名一致 |
+| 🟢 绿 | 新增 `ChunkIndexingHandler` 消费分块完成事件，从 PostgreSQL 读取 chunks 逐块嵌入并 upsert 到 Qdrant（点 ID = chunk_id，payload 含 parent_chunk_id/index_level/chunk_id/document_id；文档级点追加 index_level="document" 以保持一致性） |
+| 🔄 重构 | 优化批量嵌入（max_batch_size + token 截断 + 并发控制），确保文档级与分块级索引共存（通过 index_level 区分，检索时自动注入对应层级过滤条件） |
 
 - [ ] Subtask 1.4: 🔴 红 — 编写分块级索引失败测试
 - [ ] Subtask 1.5: 🟢 绿 — 重构索引流程为分块级粒度，确保每个 Chunk 块独立向量 upsert 并包含完整 payload
@@ -537,11 +544,12 @@
 - [ ] Subtask 3.6: 创建 `tests/unit/architecture/test_arch_layered_retrieval.py`
 - [ ] Subtask 3.7: 验证领域层零外部依赖
 - [ ] Subtask 3.8: 验证依赖方向正确
+- [ ] Subtask 3.9: 补充 Parent-Child 层级关系测试（IndexLevel 枚举值、parent_chunk_id 引用完整性、层级关系约束）
 
 **完成标准/Definition of Done:**
 - [ ] 端口注册完成
 - [ ] 集成测试通过
-- [ ] 架构验证测试通过
+- [ ] 架构验证测试通过（含 Parent-Child 层级关系测试）
 - [ ] Ruff + MyPy 全部通过
 
 ---
@@ -783,6 +791,14 @@ tests/
 | 14 | 测试分类表重复行（第 297 行与第 303 行） | P2 | 合并重复行，删除冗余条目 |
 | 15 | LevelTransitionError 描述用语不一致（"失败"vs"非法"） | P2 | 统一为"层级遍历非法" |
 | 16 | SDD 异常契约清单 8 项 vs 7 步流程字面矛盾 | P2 | BDD 验收场景标注"（额外）" |
+| 17 | 集成测试覆盖率 ≥70% 与 epics ≥75% 不一致 | P0 | 修正为 ≥75% |
+| 18 | 融合延迟 P95<50ms 遗漏（epics 明确要求） | P0 | AC-2/AC-3 补充融合延迟指标 |
+| 19 | 向量复用不可行：`DenseSemanticSearchService.search()` 不暴露向量参数 | P0 | 明确需扩展 `search_with_vector()` 或直接调用 `L3VectorPort.search()` 传向量；`get_point()` 回溯为推荐方案 |
+| 20 | 分块管道与索引管道集成方案缺失 | P0 | Task 1 [A-1] 补充集成方案：新增 `ChunkIndexingHandler` 消费分块完成事件 |
+| 21 | 多级全遍历（L1↔L4）未说明 MVP 限制 | P1 | AC-2/AC-3 标注 MVP 仅支持相邻单级遍历 |
+| 22 | Parent-Child 层级关系专项测试缺失 | P1 | 在架构测试中补充层级关系测试（IndexLevel 枚举、引用完整性） |
+| 23 | 嵌入批量保护缺失（max_batch_size/token 截断） | P1 | Task 1 [A-1] 补充嵌入保护要求 |
+| 24 | 事件发布 Task 0（必选）与 AC-4（可选）矛盾 | P2 | Subtask 0.1 标注"如不保留事件可跳过" |
 
 ---
 
@@ -840,10 +856,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-08-12
 **最后更新/Last Updated:** 2026-08-12
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 分层检索（L1-L4）完整定义
 - v1.1.0: 文档审查 Round 1 修复（命名统一/回溯机制修正/Qdrant payload 扩展/异常 7 步流程/架构引用修正/延迟预算标注/测试路径修正/module 参数补充）
-- v1.2.0: 文档审查 Round 2 修复（索引粒度重构/待更新文件清单/AC-5 增强/用语统一/测试分类表去重）
+- v1.2.0: 文档审查 Round 2 修复（索引粒度重构/待更新文件清单/AC-5 增强/用语统一/测试分类表去重/SDD 清单分组）
+- v1.3.0: 文档审查 Round 4 修复（融合延迟指标/集成测试覆盖率≥75%/向量复用方案/分块管道集成方案/多级遍历限制/Parent-Child 层级测试/嵌入保护/事件冲突消除）
