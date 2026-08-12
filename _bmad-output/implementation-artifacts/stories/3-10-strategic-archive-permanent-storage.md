@@ -141,7 +141,7 @@
   - 调用 `graph_storage.create_entity()` 写入 L5 图谱（参数 `memory_id=str(archive_id)`，`entity_type="StrategicArchive"`）
   - 发布 `ArchiveCreated` 事件
   - 优雅降级：L3/L5 失败不阻塞 L2+L4 主流程
-- [ ] `get_archive(archive_id) -> StrategicArchive` — 按 ID 查询
+- [ ] `get_archive(archive_id) -> StrategicArchive` — 按 ID 查询（内部调用 `archive_repo.get_by_id()`，若返回 None 则抛出 `ArchiveNotFoundError(archive_id=archive_id)`）
 - [ ] `query_archive(query: ArchiveQuery) -> list[StrategicArchive]` — 按条件查询
 - [ ] `archive_plan()` 中 L3/L4/L5 存储异常走 `ArchiveStorageError`（禁止 `ValueError`/原始 Exception）
 
@@ -155,6 +155,7 @@
 **验证标准/Validation Criteria:**
 - [ ] 仓储实现 `ArchiveRepositoryPort` 位于 `src/infrastructure/storage/postgresql/repository/archive_repository.py`
 - [ ] 继承 `PostgreSQLAdapter[StrategicArchive, ArchiveModel]` 泛型基类，复用 `get_by_id`/`save`/`delete` 基础 CRUD
+  - 软删除配置：`soft_delete_column = "deleted_at"`（基类自动路由软删除/硬删除）
 - [ ] **额外实现** `ArchiveRepositoryPort` 的 `find()`、`list_by_plan()`、`list_by_archive_type()`、`count(query)` 方法（`PostgreSQLAdapter` 基类不提供这些方法）
 - [ ] Alembic migration 新增 `strategic_archives` 表（只新增不修改已合入 migration）
 - [ ] 表字段：`archive_id`（UUID PK）、`plan_id`（UUID nullable）、`plan_type`、`archive_type`、`created_by`（UUID）、`version`（int）、`metadata`（JSONB）、`deleted_at`（nullable）、`assumptions`（JSONB）、`decision_basis`（JSONB）、`execution_deviation`（JSONB）、`metadata_ref`、`embedding_ref`（nullable）、`blob_ref`（nullable）、`graph_ref`（nullable）、`created_at`、`archived_at`
@@ -172,7 +173,7 @@
 - [ ] L3 写入：`vector_storage.upsert_points()` 写入档案内容嵌入向量（collection: `strategic_archive`）
 - [ ] L4 写入：`object_storage.archive()` 归档证据包（bucket: `archive-evidence`，retention 7 年）
 - [ ] L5 写入：`graph_storage.create_entity()` 创建档案节点（entity_type: `StrategicArchive`）
-- [ ] 优雅降级：L3 失败 → 记录日志，`embedding_ref = None`；L5 失败 → 记录日志，`graph_ref = None`
+- [ ] 优雅降级：L3 失败 → 记录日志，`embedding_ref = None`（`embedding_ref` 由应用层在调用前生成，如 `f"strategic_archive:{archive_id}"`，而非从 `upsert_points()` 返回值获取）；L5 失败 → 记录日志，`graph_ref = None`
 - [ ] L2 或 L4 失败 → 抛出 `ArchiveStorageError`，归档流程回滚
 - [ ] 归档延迟 P95<500ms
 - [ ] 存储完整性 100%（L2+L4 强制成功保障）
@@ -251,6 +252,7 @@
 - [ ] `ArchiveQuery`（`src/domain/ports/archive_repository.py`）
   - `@dataclass(frozen=True)`
   - 字段: `plan_id: UUID | None = None`、`archive_type: ArchiveType | None = None`、`plan_type: str | None = None`、`start_date: datetime | None = None`、`end_date: datetime | None = None`、`offset: int = 0`、`limit: int = 20`
+  - `limit` 取值范围：1-1000，默认 20。仓储层做边界检查：`limit = max(1, min(limit, 1000))`
 
 **新建 SQLAlchemy 模型：**
 - [ ] `ArchiveModel`（`src/infrastructure/storage/postgresql/models/archive.py`）
@@ -928,6 +930,7 @@ CREATE TABLE strategic_archives (
 - collection 名称: `strategic_archive`
 - 向量维度: 1024（bge-m3）
 - payload: `archive_id`, `plan_id`, `plan_type`, `archive_type`, `assumptions` (摘要), `decision_basis` (摘要), `created_at`
+- `embedding_ref` 赋值策略：由应用层在调用 `upsert_points()` 前生成（如 `f"strategic_archive:{archive_id}"`），成功写入后保留该值，失败则置 None。不依赖 `upsert_points()` 的返回值（`bool`）。
 
 **L4 MinIO bucket:**
 - bucket 类型: `archive-evidence`
