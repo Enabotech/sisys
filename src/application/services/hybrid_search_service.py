@@ -63,7 +63,7 @@ class HybridSearchService:
         self._sparse = sparse_search
         self._graph = graph_search
         self._fuse = fuse
-        self._weights = weights or _DEFAULT_WEIGHTS
+        self._weights = list(weights) if weights else list(_DEFAULT_WEIGHTS)
         self._reranker = reranker
 
     async def search(

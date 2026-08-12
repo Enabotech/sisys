@@ -314,7 +314,7 @@ def verify_circuit_breaker_recorded(context: dict[str, Any]):
 
 @given("LLM 配置缺少 API Key")
 def config_missing_api_key(context: dict[str, Any]):
-    context["invalid_config"] = LLMConfig(api_type="openai", model="test-model", api_key="")
+    context["invalid_config"] = LLMConfig(api_type="openai", model="test-model", api_key="", timeout=1.0)
 
 
 @when("在缺少 API Key 时调用 generate")
@@ -348,7 +348,7 @@ def verify_error_code_332(context: dict[str, Any]):
 
 @given("LLM 客户端已关闭")
 def llm_client_closed(context: dict[str, Any], event_loop):
-    client = LitellmLLMClient(config=LLMConfig(api_type="openai", model="test-model"))
+    client = LitellmLLMClient(config=LLMConfig(api_type="openai", model="test-model", timeout=1.0))
     event_loop.run_until_complete(client.close())
     context["closed_client"] = client
 
