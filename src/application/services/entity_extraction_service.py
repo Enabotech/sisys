@@ -11,7 +11,11 @@ import logging
 import uuid
 
 from src.domain.events.entity_extraction_events import EntitiesExtracted
-from src.domain.exceptions import EntityExtractionError
+from src.domain.exceptions import (
+    EntityExtractionError,
+    LLMConfigError,
+    LLMResponseError,
+)
 from src.domain.ports.entity_extraction import (
     EntityArbitratorPort,
     EntityExtractionPort,
@@ -170,9 +174,15 @@ class EntityExtractionService:
         # 2. LLM 语义抽取（透明降级）
         try:
             llm_result = await self._llm_extractor.extract_entities(content, domain_context)
-        except Exception:
-            logger.warning("LLM 实体抽取失败，降级至仅规则基结果")
-            llm_result = ExtractionResult(extraction_metadata={"strategy": "llm", "entity_count": 0, "error": "LLM 调用异常"})
+        except (LLMConfigError, LLMResponseError):
+            # 设计/配置级错误（模型配置错误、Schema 验证失败）应传播到上层，
+            # 由异常处理链映射 HTTP 状态码，避免静默降级掩盖配置问题
+            logger.warning("LLM 实体抽取配置/格式错误，向上传播")
+            raise
+        except Exception as e:
+            # 其他意外异常：透明降级至仅规则基结果，不阻塞主流程
+            logger.warning("LLM 实体抽取失败，降级至仅规则基结果: %s", e)
+            llm_result = ExtractionResult(extraction_metadata={"strategy": "llm", "entity_count": 0, "error": str(e)[:200]})
 
         # 3. 冲突仲裁
         final_result = self._arbitrator.arbitrate(rule_result, llm_result)

@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-08-12
+last_updated: 2026-08-13
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -121,12 +121,12 @@ development_status:
   3-2a-llm-client-infrastructure: done
   3-2b-entity-extraction-llm-rules: review
   3-3-domain-dictionary-management: review
-  3-4-rrf-fusion-ranking: review
+  3-4-rrf-fusion-ranking: done
   3-5-layered-search-l1-l4: ready-for-dev
   3-6-contractual-summary-generation: backlog
   3-7-search-relevance-evaluation: backlog
   3-8-high-fidelity-traceability-bounding-box: backlog
-  3-9-semantic-cache: ready-for-dev
+  3-9-semantic-cache: in-progress
   3-10-strategic-archive-permanent-storage: ready-for-dev
   3-11-fact-validity-period-management: backlog
   3-12-data-staleness-marking: backlog

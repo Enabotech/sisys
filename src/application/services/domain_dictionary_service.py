@@ -95,6 +95,8 @@ class DomainDictionaryService:
             已保存的词条
         """
         saved = await self._dictionary_repo.add_entry(entry)
+        # 持久化后立即触发热更新，确保 RuleBasedExtractor 内存词典与数据库同步
+        await self.refresh_dictionary()
         await self._publish_event(term=entry.term, action="add", trigger=trigger)
         return saved
 
@@ -115,6 +117,8 @@ class DomainDictionaryService:
             更新后的词条
         """
         updated = await self._dictionary_repo.update_entry(term, entry)
+        # 持久化后立即触发热更新，确保 RuleBasedExtractor 内存词典与数据库同步
+        await self.refresh_dictionary()
         await self._publish_event(term=term, action="update", trigger=trigger)
         return updated
 
@@ -132,6 +136,8 @@ class DomainDictionaryService:
         if existing is None:
             raise DictionaryNotFoundError(term=term)
         await self._dictionary_repo.delete_entry(term)
+        # 删除后立即触发热更新，确保 RuleBasedExtractor 内存词典与数据库同步
+        await self.refresh_dictionary()
         await self._publish_event(term=term, action="delete", trigger=trigger)
 
     async def refresh_dictionary(self) -> None:
