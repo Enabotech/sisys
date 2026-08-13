@@ -16,7 +16,7 @@ class TestPdfPageRendererPortContract:
     def test_protocol_is_runtime_checkable(self) -> None:
         """验证 Protocol 使用 @runtime_checkable 装饰器"""
         assert hasattr(PdfPageRendererPort, "_is_runtime_protocol")
-        assert PdfPageRendererPort._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert PdfPageRendererPort._is_runtime_protocol is True
 
     def test_render_page_method_exists(self) -> None:
         """验证 render_page 方法存在"""

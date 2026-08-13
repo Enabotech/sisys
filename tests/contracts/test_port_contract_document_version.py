@@ -10,6 +10,10 @@
 
 from __future__ import annotations
 
+import dataclasses
+
+import pytest
+
 from src.domain.events.base import DomainEvent
 from src.domain.events.document_events import DocumentVersionSnapshotCreated
 from src.domain.ports.document_repository import DocumentRepositoryPort
@@ -77,10 +81,10 @@ class TestDocumentVersionSnapshotCreatedEventContract:
 
     def test_event_is_frozen_dataclass(self) -> None:
         """事件应为 frozen dataclass"""
-        import dataclasses
-
         assert dataclasses.is_dataclass(DocumentVersionSnapshotCreated)
-        assert DocumentVersionSnapshotCreated.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        # 行为验证：frozen dataclass 修改字段抛出 FrozenInstanceError
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            setattr(DocumentVersionSnapshotCreated(), "new_version", 99)
 
     def test_event_has_required_fields(self) -> None:
         """事件应包含所有必需字段"""

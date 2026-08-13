@@ -144,15 +144,20 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         models = result.scalars().all()
         return [self._to_entity(m) for m in models]
 
-    async def count(self, query: ArchiveQuery) -> int:  # type: ignore[override]
+    async def count(self, query: ArchiveQuery | None = None) -> int:
         """统计满足条件的档案数量
 
+        query 为 None 时统计全部档案数量（兼容父类 PostgreSQLAdapter.count() 无参签名）。
+
         Args:
-            query: 查询条件
+            query: 查询条件（None 时使用全量统计）
 
         Returns:
             符合条件的档案数量
         """
+        if query is None:
+            query = ArchiveQuery()
+
         stmt = select(func.count()).select_from(ArchiveModel)
         stmt = self._apply_soft_delete_filter(stmt)
 

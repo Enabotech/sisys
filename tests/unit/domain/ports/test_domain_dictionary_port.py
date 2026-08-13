@@ -43,7 +43,7 @@ class TestDictionaryEntry:
         """frozen dataclass 不可变"""
         entry = DictionaryEntry(term="BLM", entity_type="CONCEPT")
         with pytest.raises(AttributeError):
-            entry.term = "SWOT"  # type: ignore[misc]
+            entry.term = "SWOT"
 
     def test_term_empty_raises_validation_error(self):
         """term 为空字符串时抛 EntityValidationError"""
@@ -89,7 +89,7 @@ class TestDictionaryQuery:
         """frozen dataclass 不可变"""
         query = DictionaryQuery()
         with pytest.raises(AttributeError):
-            query.page = 2  # type: ignore[misc]
+            query.page = 2
 
     def test_page_size_clamped_to_100(self):
         """page_size 超过 100 时抛 EntityValidationError"""
@@ -155,7 +155,7 @@ class TestDictionarySnapshot:
         """frozen dataclass 不可变"""
         snapshot = DictionarySnapshot(snapshot_id="snap-001", version=1, entries=())
         with pytest.raises(AttributeError):
-            snapshot.version = 2  # type: ignore[misc]
+            snapshot.version = 2
 
     def test_entries_tuple(self):
         """entries 是 tuple 类型"""
@@ -212,16 +212,16 @@ class TestConcreteDomainDictionaryPort:
 
         @dataclass
         class FakeRepo:
-            async def list_entries(self, query):  # type: ignore[no-untyped-def]
+            async def list_entries(self, query):
                 return []
 
             async def get_entry(self, term: str) -> DictionaryEntry | None:
                 return None
 
-            async def add_entry(self, entry):  # type: ignore[no-untyped-def]
+            async def add_entry(self, entry):
                 return entry
 
-            async def update_entry(self, term, entry):  # type: ignore[no-untyped-def]
+            async def update_entry(self, term, entry):
                 return entry
 
             async def delete_entry(self, term: str) -> None:
@@ -230,16 +230,16 @@ class TestConcreteDomainDictionaryPort:
             async def get_active_dictionary(self) -> list[tuple[str, str]]:
                 return []
 
-            async def create_snapshot(self, created_by: str):  # type: ignore[no-untyped-def]
+            async def create_snapshot(self, created_by: str):
                 return DictionarySnapshot(snapshot_id="s1", version=1, entries=())
 
             async def rollback(self, version: int) -> None:
                 pass
 
-            async def list_snapshots(self):  # type: ignore[no-untyped-def]
+            async def list_snapshots(self):
                 return []
 
-            async def count_entries(self, query):  # type: ignore[no-untyped-def]
+            async def count_entries(self, query):
                 return 0
 
         repo = FakeRepo()

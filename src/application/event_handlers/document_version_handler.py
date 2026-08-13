@@ -69,10 +69,13 @@ class DocumentVersionHandler:
 
         def handle(event: DomainEvent) -> None:
             try:
+                # 事件分发前已按 event_type 过滤，此处用 isinstance 窄化类型
                 if handler_type == "uploaded":
-                    asyncio.run(self.handle_document_uploaded(event))  # type: ignore[arg-type]
+                    if isinstance(event, DocumentUploaded):
+                        asyncio.run(self.handle_document_uploaded(event))
                 else:
-                    asyncio.run(self.handle_document_processed(event))  # type: ignore[arg-type]
+                    if isinstance(event, DocumentProcessed):
+                        asyncio.run(self.handle_document_processed(event))
             except Exception:
                 logger.exception("文档版本快照自动创建失败，不影响主流程")
 

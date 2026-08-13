@@ -75,12 +75,14 @@ class TestChunkingConfig:
         """验证 frozen 不可变性"""
         config = ChunkingConfig()
         with pytest.raises(AttributeError):
-            setattr(config, "target_chunk_size_tokens", 500)  # type: ignore[attr-defined]
+            setattr(config, "target_chunk_size_tokens", 500)
 
     def test_is_dataclass(self) -> None:
         """验证是 dataclass"""
         assert dataclasses.is_dataclass(ChunkingConfig)
-        assert ChunkingConfig.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        # 行为验证：frozen dataclass 修改字段抛出 FrozenInstanceError
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            setattr(ChunkingConfig(), "target_chunk_size_tokens", 500)
 
     def test_to_dict(self) -> None:
         """验证 to_dict 序列化（v4 扩展）"""
@@ -133,12 +135,14 @@ class TestSemanticChunk:
         """验证 frozen 不可变性"""
         chunk = _make_chunk()
         with pytest.raises(AttributeError):
-            setattr(chunk, "content", "新内容")  # type: ignore[attr-defined]
+            setattr(chunk, "content", "新内容")
 
     def test_is_dataclass(self) -> None:
         """验证是 frozen dataclass"""
         assert dataclasses.is_dataclass(SemanticChunk)
-        assert SemanticChunk.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        # 行为验证：frozen dataclass 修改字段抛出 FrozenInstanceError
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            setattr(_make_chunk(), "content", "修改内容")
 
     def test_to_dict(self) -> None:
         """验证 to_dict 序列化"""
@@ -409,7 +413,7 @@ class TestChunkingConfigV4:
         config = ChunkingConfig.for_profile(ChunkingProfile.GENERAL)
         assert dataclasses.is_dataclass(config)
         with pytest.raises(AttributeError):
-            setattr(config, "target_chunk_size_tokens", 999)  # type: ignore[attr-defined]
+            setattr(config, "target_chunk_size_tokens", 999)
 
     def test_heuristic_fallback_token_type(self) -> None:
         """验证 token_count_type 可设为 heuristic"""

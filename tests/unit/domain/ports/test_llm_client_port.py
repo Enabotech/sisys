@@ -99,7 +99,7 @@ class TestLLMConfig:
         import pytest
 
         with pytest.raises(AttributeError):
-            config.model = "gpt-3.5"  # type: ignore[misc]
+            setattr(config, "model", "gpt-3.5")
 
     def test_immutable_hashable(self) -> None:
         """验证 frozen dataclass 可哈希（可用作字典键）"""
@@ -137,7 +137,7 @@ class TestLLMResponse:
         import pytest
 
         with pytest.raises(AttributeError):
-            response.content = "World"  # type: ignore[misc]
+            setattr(response, "content", "World")
 
 
 class TestLLMClientPort:

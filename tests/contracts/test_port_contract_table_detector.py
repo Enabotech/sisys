@@ -17,7 +17,7 @@ class TestTableDetectorPortContract:
     def test_protocol_is_runtime_checkable(self) -> None:
         """验证 Protocol 使用 @runtime_checkable 装饰器"""
         assert hasattr(TableDetectorPort, "_is_runtime_protocol")
-        assert TableDetectorPort._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert TableDetectorPort._is_runtime_protocol is True
 
     def test_detect_method_exists(self) -> None:
         """验证 detect 方法存在"""

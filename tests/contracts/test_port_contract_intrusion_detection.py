@@ -15,7 +15,7 @@ class TestIntrusionDetectionServiceContract:
 
     def test_protocol_is_runtime_checkable(self) -> None:
         assert hasattr(IntrusionDetectionServicePort, "_is_runtime_protocol")
-        assert IntrusionDetectionServicePort._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert IntrusionDetectionServicePort._is_runtime_protocol is True
 
     def test_detect_attack_method_exists(self) -> None:
         assert hasattr(IntrusionDetectionServicePort, "detect_attack")

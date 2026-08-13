@@ -509,7 +509,7 @@ def start(self) -> None:
 
 ```python
 # 删除注册行（含 # type: ignore[arg-type] 注释）
-# self._app.add_exception_handler(ValueError, self._handle_value_error)  # type: ignore[arg-type]
+# self._app.add_exception_handler(ValueError, self._handle_value_error)
 
 # 删除处理器方法
 # async def _handle_value_error(self, request, exc): ...  # 已移除

@@ -171,7 +171,7 @@ async def mock_llm_server():
     await site.start()
 
     # 获取实际端口号
-    port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
+    port = site._server.sockets[0].getsockname()[1]
 
     yield handler, port
 

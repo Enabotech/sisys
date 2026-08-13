@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 from uuid import UUID
 
@@ -87,10 +88,8 @@ class StrategicArchiveService:
         from datetime import UTC, datetime
 
         now = datetime.now(UTC)
-        archive_id = UUID(int=0)  # 临时占位，save 后会被 DB 生成
-
         archive = StrategicArchive(
-            archive_id=archive_id,
+            archive_id=uuid.uuid4(),
             plan_id=plan_id,
             plan_type=plan_type,
             archive_type=ArchiveType.ASSUMPTION,

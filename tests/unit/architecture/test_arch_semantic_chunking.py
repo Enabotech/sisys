@@ -12,6 +12,9 @@
 from __future__ import annotations
 
 import dataclasses
+import uuid
+
+import pytest
 
 from src.domain.ports.registry import _global_registry
 from src.domain.ports.semantic_chunker import SemanticChunkerPort
@@ -90,19 +93,35 @@ class TestArchSemanticChunking:
         assert hasattr(SemanticChunkerPort, "_is_runtime_protocol"), (
             "runtime_checkable Protocol 应包含 _is_runtime_protocol 标志"
         )
-        assert SemanticChunkerPort._is_runtime_protocol, "runtime_checkable Protocol 的 _is_runtime_protocol 应为 True"  # type: ignore[attr-defined]
+        assert SemanticChunkerPort._is_runtime_protocol, "runtime_checkable Protocol 的 _is_runtime_protocol 应为 True"
         # 验证是类
         assert isinstance(SemanticChunkerPort, type)
 
     def test_semantic_chunk_is_frozen_dataclass(self) -> None:
         """SemanticChunk 是 frozen=True dataclass"""
         assert dataclasses.is_dataclass(SemanticChunk)
-        assert SemanticChunk.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        # 行为验证：frozen dataclass 修改字段抛出 FrozenInstanceError
+        chunk = SemanticChunk(
+            chunk_id=uuid.uuid4(),
+            document_id=uuid.uuid4(),
+            content="测试内容",
+            chunk_index=0,
+            boundary_type=ChunkBoundaryType.PARAGRAPH,
+            token_count=4,
+            page_start=1,
+            page_end=1,
+            content_hash="abc",
+            metadata={},
+        )
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            setattr(chunk, "content", "修改内容")
 
     def test_chunking_config_is_frozen_dataclass(self) -> None:
         """ChunkingConfig 是 frozen=True dataclass"""
         assert dataclasses.is_dataclass(ChunkingConfig)
-        assert ChunkingConfig.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        # 行为验证：frozen dataclass 修改字段抛出 FrozenInstanceError
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            setattr(ChunkingConfig(), "target_chunk_size_tokens", 500)
 
     def test_chunk_boundary_type_is_str_enum(self) -> None:
         """ChunkBoundaryType 是 str 枚举"""

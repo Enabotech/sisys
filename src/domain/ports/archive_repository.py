@@ -96,7 +96,7 @@ class ArchiveRepositoryPort(L2RdbPort[StrategicArchive], Protocol):
             指定类型的档案列表
         """
 
-    async def count(self, query: ArchiveQuery) -> int:  # type: ignore[override]
+    async def count(self, query: ArchiveQuery) -> int:
         """统计满足条件的档案数量
 
         Args:

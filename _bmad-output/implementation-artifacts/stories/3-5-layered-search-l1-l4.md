@@ -126,13 +126,13 @@
 
 **Given** 分层检索过程中可能发生多种错误
 **When** 定义分层检索异常类
-**Then** 新增 `retrieval` 子域（280-289），分配唯一异常编码
+**Then** 新增 `retrieval` 子域（280-281），分配唯一异常编码
 **And** 继承适当的基类层次结构
 
 **验证标准/Validation Criteria:**
 - [ ] `LayeredRetrievalError`（EXCEPTION_280）— 继承 `BusinessException`，检索编排失败
 - [ ] `LevelTransitionError`（EXCEPTION_281）— 继承 `BusinessException`，层级遍历非法
-- [ ] 异常编码在 `_code_ranges.py` 注册 `retrieval` 子域（280, 289）及 `_CLASS_TO_SUBDOMAIN` 映射
+- [ ] 异常编码在 `_code_ranges.py` 注册 `retrieval` 子域（280, 281）及 `_CLASS_TO_SUBDOMAIN` 映射
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册（500/500）
 - [ ] `allowed_child_parent_subdomains` 添加 `("retrieval", "business")`（定义在 tests/unit/domain/exceptions/test_code_ranges.py 中）
 - [ ] 无编码碰撞（`grep -rw "EXCEPTION_28[0-9]"` 零输出）
@@ -213,14 +213,14 @@
 > **禁止 `raise ValueError`：** 所有验证失败均使用领域异常体系。
 > 完整检查清单与全量异常分类详见 [`sisys-uni-exception-design.md §3.12`](../architecture/sisys-uni-exception-design.md#312-异常注册检查清单)。
 
-- [ ] **归属模块与基类** — 新增 `retrieval` 子域（280-289）：
+- [ ] **归属模块与基类** — 新增 `retrieval` 子域（280-281）：
     - `LayeredRetrievalError`（EXCEPTION_280）→ 继承 `BusinessException`，检索编排失败
     - `LevelTransitionError`（EXCEPTION_281）→ 继承 `BusinessException`，层级遍历非法
-- [ ] **唯一编码分配** — 从 `retrieval` 子域（280-289）选取，`grep -rw "EXCEPTION_28[0-9]" src/` 验证无碰撞
+- [ ] **唯一编码分配** — 从 `retrieval` 子域（280-281）选取，`grep -rw "EXCEPTION_28[0-9]" src/` 验证无碰撞
 - [ ] **构造器参数设计** — 携带层级上下文（`current_level`、`target_level`、`query_text` 等），通过 `context` 字典暴露
 - [ ] **消息安全性审查** — 错误消息面向调用方可理解，不泄露 SQL/堆栈等内部实现细节
 - [ ] **编码注册** — 更新 `_code_ranges.py`：
-    - `CODE_RANGES` 新增 `"retrieval": (280, 289)`
+    - `CODE_RANGES` 新增 `"retrieval": (280, 281)`
     - `_CLASS_TO_SUBDOMAIN` 新增 `"LayeredRetrievalError": "retrieval"`、`"LevelTransitionError": "retrieval"`
 - [ ] **导出完整性** — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
 - [ ] **测试覆盖** — 构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过
@@ -447,7 +447,7 @@
 
 - [ ] Subtask 1.7: 🔴 红 — 编写分层检索异常失败测试
 - [ ] Subtask 1.8: 🟢 绿 — 实现 `LayeredRetrievalError` 和 `LevelTransitionError`
-- [ ] Subtask 1.9: 🔄 重构 — 注册异常到 `_code_ranges.py`（新增 `retrieval` 子域 280-289）、`__init__.py`、`EXCEPTION_HTTP_MAP`、`test_code_ranges.py.allowed_child_parent_subdomains`
+- [ ] Subtask 1.9: 🔄 重构 — 注册异常到 `_code_ranges.py`（新增 `retrieval` 子域 280-281）、`__init__.py`、`EXCEPTION_HTTP_MAP`、`test_code_ranges.py.allowed_child_parent_subdomains`
 
 **完成标准/Definition of Done:**
 - [ ] `LayeredRetrievalPort` 端口契约定义完成
@@ -604,7 +604,7 @@
 | **L4→L3 回溯方式** | 通过 `payload.parent_chunk_id` 过滤 Qdrant | 已有 `parent_chunk_id` 字段，无需额外索引 |
 | **L3→L4 展开方式** | L3 检索后，按 `parent_chunk_id` 过滤检索 Child 子块 | 复用现有 `L3VectorPort.search()` 的 payload 过滤 |
 | **L2/L1 实现策略** | MVP 骨架（返回空列表），V1 完整实现 | 降低 MVP 风险，核心价值在 L4→L3 双向遍历 |
-| **异常子域** | 新增 `retrieval` 子域（280-289） | `business` 子域（201-209）已有 8 个异常类，为保持扩展空间 |
+| **异常子域** | 新增 `retrieval` 子域（280-281） | `business` 子域（201-209）已有 8 个异常类，为保持扩展空间 |
 | **端口命名** | `LayeredRetrievalPort` 而非 `LayeredSearchPort` | 强调"检索"而非"搜索"，与 `SearchResult` 区分 |
 | **服务编排** | 复用 `DenseSemanticSearchService` 而非重新实现检索 | 保持与现有搜索服务一致，避免重复 |
 | **L4 检索策略** | 默认使用 Dense 语义检索（L4 Child 块有向量索引） | Child 块已索引向量，可直接复用现有 Dense 检索 |
@@ -735,7 +735,7 @@ tests/
 - `tests/acceptance/test_acceptance_layered_retrieval.py` - BDD 步骤实现
 
 **待更新的文件/To Be Updated:**
-- `src/domain/exceptions/_code_ranges.py` — 新增 `retrieval` 子域（280-289）和 `_CLASS_TO_SUBDOMAIN` 映射
+- `src/domain/exceptions/_code_ranges.py` — 新增 `retrieval` 子域（280-281）和 `_CLASS_TO_SUBDOMAIN` 映射
 - `src/domain/exceptions/__init__.py` — 导出 `LayeredRetrievalError`、`LevelTransitionError`
 - `src/domain/ports/__init__.py` — 导出 `LayeredRetrievalPort`
 - `src/interfaces/api/exception_handlers.py` — 注册 `EXCEPTION_HTTP_MAP` 映射
@@ -856,11 +856,12 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-08-12
-**最后更新/Last Updated:** 2026-08-12
+**最后更新/Last Updated:** 2026-08-13
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 分层检索（L1-L4）完整定义
 - v1.1.0: 文档审查 Round 1 修复（命名统一/回溯机制修正/Qdrant payload 扩展/异常 7 步流程/架构引用修正/延迟预算标注/测试路径修正/module 参数补充）
 - v1.2.0: 文档审查 Round 2 修复（索引粒度重构/待更新文件清单/AC-5 增强/用语统一/测试分类表去重/SDD 清单分组）
 - v1.3.0: 文档审查 Round 4 修复（融合延迟指标/集成测试覆盖率≥75%/向量复用方案/分块管道集成方案/多级遍历限制/Parent-Child 层级测试/嵌入保护/事件冲突消除）
+- v1.3.1: dev-story 实施修正 — retrieval 子域范围 (280,289) 修正为 (280,281)（Story 3.9/3.10 新增 archive 子域占用 282-289 所致）

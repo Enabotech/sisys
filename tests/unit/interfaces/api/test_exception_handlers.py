@@ -21,6 +21,9 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError as PydanticValidationError
 
 from src.domain.exceptions import (
+    ArchiveConflictError,
+    ArchiveNotFoundError,
+    ArchiveStorageError,
     AuthenticationError,
     BaseException,
     BucketNameValidationError,
@@ -223,6 +226,10 @@ class TestExceptionHttpMap:
             # 分层检索异常
             LayeredRetrievalError,
             LevelTransitionError,
+            # 档案子域异常
+            ArchiveNotFoundError,
+            ArchiveConflictError,
+            ArchiveStorageError,
             # 词典管理异常
             DictionaryNotFoundError,
             DictionaryEntryConflictError,

@@ -40,7 +40,7 @@ class TestAgentEnginePortContract:
     def test_protocol_is_runtime_checkable(self) -> None:
         """验证 Protocol 使用 @runtime_checkable 装饰器"""
         assert hasattr(AgentEnginePort, "_is_runtime_protocol")
-        assert AgentEnginePort._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert AgentEnginePort._is_runtime_protocol is True
 
     def test_submit_graph_method_exists(self) -> None:
         """验证 submit_graph 方法存在且可调用"""

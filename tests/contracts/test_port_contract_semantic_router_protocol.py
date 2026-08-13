@@ -17,7 +17,7 @@ class TestSemanticRouterProtocolContract:
     def test_protocol_is_runtime_checkable(self) -> None:
         """验证 Protocol 使用 @runtime_checkable 装饰器"""
         assert hasattr(SemanticRouterProtocol, "_is_runtime_protocol")
-        assert SemanticRouterProtocol._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert SemanticRouterProtocol._is_runtime_protocol is True
 
     def test_route_method_exists(self) -> None:
         """验证 route 方法存在且为异步"""
