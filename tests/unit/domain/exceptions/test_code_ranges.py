@@ -133,6 +133,8 @@ def test_subclass_code_in_same_subdomain_as_parent() -> None:
         ("transfer", "business"),
         # 子域 → business 基类（词典管理）
         ("dictionary", "business"),
+        # 子域 → business 基类（档案管理）
+        ("archive", "business"),
         # 子域 → business 基类（分层检索）
         ("retrieval", "business"),
         # 子域 → external 基类

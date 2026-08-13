@@ -271,6 +271,12 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="词典更新完成",
         ),
+        "ArchiveCreated": ChannelMapping(
+            event_type="ArchiveCreated",
+            rabbitmq_routing_key="sisys.events.reliable.archive_created",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="战略档案创建完成",
+        ),
     }
 
     def __init__(self, load_defaults: bool = True) -> None:

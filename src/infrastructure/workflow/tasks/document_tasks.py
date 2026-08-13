@@ -197,6 +197,10 @@ async def index_document(embedding_result: EmbeddingResult) -> dict[str, Any]:
                 "payload": {
                     "chunk_index": i,
                     "created_at": datetime.now(UTC).isoformat(),
+                    # 分块级索引所需字段（Story 3.5 分层检索）
+                    "index_level": "document",  # 文档级索引，后续分块索引为 "child"/"parent"
+                    "parent_chunk_id": None,  # 文档级无父块
+                    "chunk_id": None,  # 文档级无 chunk_id
                 },
             }
             # 如果有稀疏向量，附加到 payload

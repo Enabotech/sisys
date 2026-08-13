@@ -176,6 +176,11 @@ event_channels:
     delivery_mode: "reliable"
     description: "加密密钥轮换完成"
 
+  ArchiveCreated:
+    rabbitmq_routing_key: "sisys.events.reliable.archive_created"
+    delivery_mode: "reliable"
+    description: "战略档案创建完成"
+
   # =========================================================================
   # CRAWLER 事件
   # =========================================================================

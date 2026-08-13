@@ -1899,7 +1899,6 @@ def bootstrap() -> None:
         PostgreSQLDomainDictionaryRepository,
     )
 
-    # 注册领域词典仓储（PostgreSQLDomainDictionaryRepository 实现 DomainDictionaryPort）
     register_port(
         name="domain_dictionary_repo",
         version="v1.0.0",
@@ -1927,6 +1926,44 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED,
         owner="foundation-team",
         tags=("dictionary", "service", "application"),
+    )
+
+    # === Strategic Archive Ports (Story 3.10) ===
+    from src.application.services.strategic_archive_service import StrategicArchiveService
+    from src.domain.ports.archive_repository import ArchiveRepositoryPort
+    from src.infrastructure.storage.postgresql.repository.archive_repository import (
+        PostgreSQLArchiveRepository,
+    )
+
+    # 注册档案仓储（PostgreSQLArchiveRepository 实现 ArchiveRepositoryPort）
+    register_port(
+        name="archive_repository",
+        version="v1.0.0",
+        interface=ArchiveRepositoryPort,
+        impl=lambda resolver: PostgreSQLArchiveRepository(),
+        module="src.infrastructure.storage.postgresql.repository.archive_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("archive", "gateway", "application"),
+    )
+
+    # 注册 StrategicArchiveService 应用服务（注入 L2-L5 各层存储 + 事件发布）
+    # L3/L5 使用 resolve_optional 实现优雅降级（依赖缺失时自动降级为 None）
+    register_port(
+        name="strategic_archive_service",
+        version="v1.0.0",
+        interface=StrategicArchiveService,
+        impl=lambda resolver: StrategicArchiveService(
+            archive_repo=resolver.resolve("archive_repository"),
+            vector_storage=resolver.resolve_optional("l3_vector"),
+            object_storage=resolver.resolve("l4_object"),
+            graph_storage=resolver.resolve_optional("l5_graph"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.services.strategic_archive_service",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("archive", "service", "application"),
     )
 
 
