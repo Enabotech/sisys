@@ -43,6 +43,8 @@ from src.domain.exceptions import (
     InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
+    LayeredRetrievalError,
+    LevelTransitionError,
     LLMAPIError,
     LLMConfigError,
     LLMResponseError,
@@ -148,6 +150,9 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     EntityExtractionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 340 — 实体抽取失败
     RerankError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 350 — 重排序失败（精确注册，避免回退 502）
     HybridSearchError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 209 — 三路检索通道均失败
+    # 分层检索异常
+    LayeredRetrievalError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 280 — 分层检索编排失败
+    LevelTransitionError: status.HTTP_400_BAD_REQUEST,  # 281 — 层级遍历非法
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

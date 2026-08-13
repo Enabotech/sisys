@@ -49,6 +49,8 @@ from src.domain.exceptions import (
     InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
+    LayeredRetrievalError,
+    LevelTransitionError,
     LLMAPIError,
     LLMConfigError,
     LLMResponseError,
@@ -218,6 +220,9 @@ class TestExceptionHttpMap:
             RerankError,
             # 混合检索异常
             HybridSearchError,
+            # 分层检索异常
+            LayeredRetrievalError,
+            LevelTransitionError,
             # 词典管理异常
             DictionaryNotFoundError,
             DictionaryEntryConflictError,

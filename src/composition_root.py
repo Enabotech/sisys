@@ -51,8 +51,6 @@ def bootstrap() -> None:
     from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
     from src.application.event_handlers.udmr_handler import UDMRHandler
     from src.application.ports.compressor_service import CompressorService
-
-    # Application layer ports
     from src.application.ports.document_storage_port import DocumentStoragePort
     from src.application.ports.event_subscriber import EventSubscriber
     from src.application.ports.exception_metrics_port import ExceptionMetricsPort
@@ -748,14 +746,17 @@ def bootstrap() -> None:
     )
 
     # === Application Layer Ports ===
+    # semantic_cache 从 SCOPED 升级为 SINGLETON（缓存实例全局共享）
+    _global_registry.unregister("semantic_cache")
     register_port(
         name="semantic_cache",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=SemanticCache,
         impl="src.infrastructure.storage.redis.semantic_cache.RedisSemanticCache",
         module="src.infrastructure.storage.redis.semantic_cache",
-        lifetime=Lifetime.SCOPED,
+        lifetime=Lifetime.SINGLETON,
         owner="cache-team",
+        compatibility=("v1.0.0",),
     )
 
     register_port(
@@ -1712,6 +1713,76 @@ def bootstrap() -> None:
         owner="search-team",
         tags=("search", "hybrid", "rrf", "three-way"),
         compatibility=("v1.0.0",),
+    )
+
+    # === Story 3-9: Semantic Cache ===
+    # CacheMetricsPort — 应用层缓存指标端口（EventMetricsCollector 作为实现注入）
+    from src.application.ports.cache_metrics_port import CacheMetricsPort
+    from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
+
+    register_port(
+        name="cache_metrics",
+        version="v1.0.0",
+        interface=CacheMetricsPort,
+        impl=lambda resolver: EventMetricsCollector(),
+        module="src.infrastructure.monitoring.event_metrics",
+        lifetime=Lifetime.SINGLETON,
+        owner="cache-team",
+        tags=("cache", "metrics", "search"),
+    )
+
+    # SemanticCacheMiddleware — 语义缓存中间件（包装 HybridSearchService）
+    from src.application.services.semantic_cache_middleware import SemanticCacheMiddleware
+
+    register_port(
+        name="semantic_cache_middleware",
+        version="v1.0.0",
+        interface=SemanticCacheMiddleware,
+        impl=lambda resolver: SemanticCacheMiddleware(
+            search_service=resolver.resolve("hybrid_search_service"),
+            cache=resolver.resolve("semantic_cache"),
+            embedding_service=resolver.resolve("embedding_service"),
+            metrics=resolver.resolve("cache_metrics"),
+        ),
+        module="src.application.services.semantic_cache_middleware",
+        lifetime=Lifetime.SCOPED,
+        owner="cache-team",
+        tags=("cache", "semantic", "middleware", "search"),
+    )
+
+    # CacheInvalidationHandler — 缓存失效事件监听器（订阅 DocumentProcessed）
+    from src.infrastructure.messaging.event_handlers.cache_invalidation_handler import (
+        CacheInvalidationHandler,
+    )
+
+    register_port(
+        name="cache_invalidation_handler",
+        version="v1.0.0",
+        interface=CacheInvalidationHandler,
+        impl=lambda resolver: CacheInvalidationHandler(
+            cache=resolver.resolve("semantic_cache"),
+        ),
+        module="src.infrastructure.messaging.event_handlers.cache_invalidation_handler",
+        lifetime=Lifetime.SCOPED,
+        owner="cache-team",
+        tags=("cache", "invalidation", "handler", "messaging"),
+    )
+
+    # === Story 3-5: Layered Retrieval (L1-L4) Port ===
+    from src.application.services.layered_retrieval_service import LayeredRetrievalService
+
+    register_port(
+        name="layered_retrieval_service",
+        version="v1.0.0",
+        interface=LayeredRetrievalService,
+        impl=lambda resolver: LayeredRetrievalService(
+            dense_search=resolver.resolve("dense_search_service"),
+            l3_vector=resolver.resolve("l3_vector"),
+        ),
+        module="src.application.services.layered_retrieval_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "layered", "l1-l4"),
     )
 
     # === Crawler Ports ===

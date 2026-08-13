@@ -46,6 +46,10 @@ from src.domain.exceptions.external_exceptions import (
     UnknownError,
 )
 from src.domain.exceptions.hybrid_search_exceptions import HybridSearchError
+from src.domain.exceptions.layered_retrieval_exceptions import (
+    LayeredRetrievalError,
+    LevelTransitionError,
+)
 from src.domain.exceptions.llm_exceptions import (
     LLMAPIError,
     LLMConfigError,
@@ -164,6 +168,9 @@ __all__ = [
     "RerankError",
     # 混合检索异常
     "HybridSearchError",
+    # 分层检索异常
+    "LayeredRetrievalError",
+    "LevelTransitionError",
     # OCR 异常
     "OCRConnectionError",
     "OCRProcessingError",

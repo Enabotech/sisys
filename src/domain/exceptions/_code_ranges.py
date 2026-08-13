@@ -36,6 +36,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "transfer": (261, 269),
     # 词典管理子域（270-279）
     "dictionary": (270, 279),
+    # 分层检索子域（280-289）
+    "retrieval": (280, 289),
     # 外部服务（3XX）
     "external": (301, 399),
     # 嵌入服务（306-308）
@@ -138,6 +140,9 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "DictionaryNotFoundError": "dictionary",
     "DictionaryEntryConflictError": "dictionary",
     "DictionaryVersionConflictError": "dictionary",
+    # layered_retrieval_exceptions.py
+    "LayeredRetrievalError": "retrieval",
+    "LevelTransitionError": "retrieval",
 }
 
 
