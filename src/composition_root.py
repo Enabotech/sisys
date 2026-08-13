@@ -1705,7 +1705,7 @@ def bootstrap() -> None:
             fuse=fuse,
             graph_search=resolver.resolve("graph_search_service"),
             weights=[1.0, 1.0, 0.5],
-            reranker=resolver.resolve_optional("reranker", fallback=None),
+            reranker=resolver.resolve_optional("reranker"),
         ),
         module="src.application.services.hybrid_search_service",
         lifetime=Lifetime.SCOPED,

@@ -65,7 +65,9 @@ class LiteLLMRerankerClient:
         Args:
             query: 原始查询文本
             results: 待重排序的候选结果列表
-            top_k: 截断参数——仅返回分数最高的前 top_k 个
+            top_k: 截断参数——仅返回分数最高的前 top_k 个；
+                   顶部调用方传入（如 HybridSearchService 计算 min(limit*2, 20)），
+                   config.top_k 作为配置默认值参考
 
         Returns:
             按重排序分数降序排列的结果列表，长度不超过 top_k
