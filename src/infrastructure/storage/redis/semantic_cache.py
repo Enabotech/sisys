@@ -265,7 +265,7 @@ class RedisSemanticCache:
             vec_bytes = _vector_to_bytes(query_embedding)
 
             # 缓存主数据写入 + 二级索引维护：pipeline 打包为一次网络往返
-            async with await self._redis.pipeline(transaction=True) as pipe:
+            async with self._redis.pipeline(transaction=True) as pipe:
                 pipe.hset(key, mapping={"embedding": vec_bytes, "result": json_dumps(result)})
                 pipe.expire(key, ttl)
                 if doc_ids:

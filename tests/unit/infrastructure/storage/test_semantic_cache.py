@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import struct
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -25,15 +25,17 @@ def _make_cache(
     mock_redis = AsyncMock()
 
     # Mock pipeline（async context manager 协议）
-    mock_pipe = AsyncMock()
-
-    async def _pipeline(*args, **kwargs):  # noqa: ANN002 参数透传给 Redis
-        return mock_pipe
-
-    mock_redis.pipeline = AsyncMock(side_effect=_pipeline)
+    # 真实 redis-py pipeline 中 hset/expire/sadd 是同步命令（返回 pipeline 实例链式调用），
+    # 仅 execute()/__aenter__/__aexit__ 为异步。使用 MagicMock 避免产生未 await 的 coroutine。
+    mock_pipe = MagicMock()
+    mock_pipe.hset = MagicMock(return_value=None)
+    mock_pipe.expire = MagicMock(return_value=True)
+    mock_pipe.sadd = MagicMock(return_value=1)
     mock_pipe.__aenter__ = AsyncMock(return_value=mock_pipe)
     mock_pipe.__aexit__ = AsyncMock(return_value=False)
     mock_pipe.execute = AsyncMock(return_value=[1, True])
+
+    mock_redis.pipeline = MagicMock(return_value=mock_pipe)
 
     cache = RedisSemanticCache(
         redis_client=mock_redis,
@@ -120,8 +122,8 @@ class TestRedisSemanticCache:
 
         # Should have stored via pipeline HSET + EXPIRE
         assert mock_redis.pipeline.called, "pipeline 应被调用"
-        # 由于 AsyncMock pipeline() 返回 coroutine，使用 await 后获取 mock_pipe
-        mock_pipe = await mock_redis.pipeline(transaction=True)
+        # MagicMock 返回的 pipeline 实例可直接访问
+        mock_pipe = mock_redis.pipeline(transaction=True)
         assert mock_pipe.hset.called, "pipeline.hset 应被调用"
         hset_args = mock_pipe.hset.call_args
         assert "embedding" in (hset_args[1]["mapping"] if hset_args[1] else {})
@@ -193,3 +195,5 @@ class TestRedisSemanticCache:
 
         await cache.set([0.1, 0.2, 0.3], {"answer": "test"})
         assert mock_redis.pipeline.called, "索引已存在时也应执行缓存写入"
+        mock_pipe = mock_redis.pipeline(transaction=True)
+        assert mock_pipe.hset.called, "pipeline.hset 应被调用"
