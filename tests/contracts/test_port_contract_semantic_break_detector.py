@@ -17,7 +17,7 @@ class TestSemanticBreakDetectorContract:
     def test_protocol_is_runtime_checkable(self) -> None:
         """验证 Protocol 使用 @runtime_checkable 装饰器"""
         assert hasattr(SemanticBreakDetector, "_is_runtime_protocol")
-        assert SemanticBreakDetector._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert SemanticBreakDetector._is_runtime_protocol is True
 
     def test_protocol_inherits_protocol(self) -> None:
         """验证继承自 Protocol

@@ -17,7 +17,7 @@ class TestConnectionManagerContract:
     def test_protocol_is_runtime_checkable(self) -> None:
         """验证 Protocol 使用 @runtime_checkable 装饰器"""
         assert hasattr(ConnectionManager, "_is_runtime_protocol")
-        assert ConnectionManager._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert ConnectionManager._is_runtime_protocol is True
 
     def test_health_check_method_exists(self) -> None:
         """验证 health_check 方法存在且为异步"""

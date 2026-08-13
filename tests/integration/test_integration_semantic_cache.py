@@ -72,11 +72,11 @@ async def real_redis():
 @pytest.fixture
 async def cache(real_redis):
     """RedisSemanticCache 实例（测试隔离 key 前缀 + RediSearch 索引维度一致）"""
-    from src.infrastructure.storage.redis.semantic_cache import _INDEX_NAME
+    from src.infrastructure.storage.redis.semantic_cache import _build_index_name
 
     # 清理可能存在的旧 RediSearch 索引（维度不一致会导致查询报错）
     try:
-        await real_redis.execute_command("FT.DROPINDEX", _INDEX_NAME)
+        await real_redis.execute_command("FT.DROPINDEX", _build_index_name(3))
     except Exception:
         pass  # 索引不存在时忽略
 
@@ -100,7 +100,7 @@ async def cache(real_redis):
         if cursor == 0:
             break
     try:
-        await real_redis.execute_command("FT.DROPINDEX", _INDEX_NAME)
+        await real_redis.execute_command("FT.DROPINDEX", _build_index_name(3))
     except Exception:
         pass
 

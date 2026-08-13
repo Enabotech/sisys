@@ -37,7 +37,7 @@ class TestRoutingDecisionLogRepositoryContract:
 
     def test_protocol_is_runtime_checkable(self) -> None:
         assert hasattr(RoutingDecisionLogRepository, "_is_runtime_protocol")
-        assert RoutingDecisionLogRepository._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert RoutingDecisionLogRepository._is_runtime_protocol is True
 
     def test_save_method_exists(self) -> None:
         assert hasattr(RoutingDecisionLogRepository, "save")

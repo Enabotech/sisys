@@ -26,11 +26,27 @@ from src.infrastructure.utils import json_dumps, json_loads
 
 logger = logging.getLogger(__name__)
 
-_INDEX_NAME = "idx:sisys_semantic_cache"
+# RediSearch 索引名前缀（索引名后缀维度，不同维度向量不能共用一个索引）
+_INDEX_NAME_PREFIX = "idx:sisys_semantic_cache"
 
 # 二级索引 key 段前缀（与缓存数据键 vec: 精确区分）
 _IDX_SEGMENT = "idx"
 _DOC_IDX_PREFIX = f"{_IDX_SEGMENT}:doc"
+
+
+def _build_index_name(embedding_dim: int) -> str:
+    """生成 RediSearch 向量索引名（含维度后缀）
+
+    不同维度的向量不能共用一个 RediSearch 索引，因此索引名需包含维度。
+    生产环境 bge-m3 为 1024 维，测试环境可用更小维度。
+
+    Args:
+        embedding_dim: 向量维度
+
+    Returns:
+        索引名，如 `idx:sisys_semantic_cache:1024`
+    """
+    return f"{_INDEX_NAME_PREFIX}:{embedding_dim}"
 
 
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
@@ -97,6 +113,7 @@ class RedisSemanticCache:
         self._embedding_dim = embedding_dim
         self._metrics_collector = metrics_collector
         self._index_ready = False
+        self._index_name = _build_index_name(embedding_dim)
 
     async def _ensure_index(self) -> None:
         """Create RediSearch vector index if not exists (idempotent)."""
@@ -105,7 +122,7 @@ class RedisSemanticCache:
         try:
             await self._redis.execute_command(
                 "FT.CREATE",
-                _INDEX_NAME,
+                self._index_name,
                 "ON",
                 "HASH",
                 "PREFIX",
@@ -123,7 +140,7 @@ class RedisSemanticCache:
                 "DISTANCE_METRIC",
                 "COSINE",
             )
-            logger.info("Created RediSearch vector index %s (dim=%d)", _INDEX_NAME, self._embedding_dim)
+            logger.info("Created RediSearch vector index %s (dim=%d)", self._index_name, self._embedding_dim)
         except Exception as e:
             if "already exists" not in str(e).lower():
                 raise
@@ -153,7 +170,7 @@ class RedisSemanticCache:
 
             response = await self._redis.execute_command(
                 "FT.SEARCH",
-                _INDEX_NAME,
+                self._index_name,
                 "*=>[KNN 1 @embedding $query_vec]",
                 "PARAMS",
                 "2",

@@ -213,4 +213,4 @@ class TestRerankerConfig:
         """验证 frozen dataclass"""
         config = RerankerConfig()
         with pytest.raises(dataclasses.FrozenInstanceError):
-            config.model = "other-model"  # type: ignore[misc]
+            setattr(config, "model", "other-model")

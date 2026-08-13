@@ -15,7 +15,7 @@ class TestSandboxExecutorContract:
 
     def test_protocol_is_runtime_checkable(self) -> None:
         assert hasattr(SandboxExecutor, "_is_runtime_protocol")
-        assert SandboxExecutor._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert SandboxExecutor._is_runtime_protocol is True
 
     def test_start_container_method_exists(self) -> None:
         assert hasattr(SandboxExecutor, "start_container")

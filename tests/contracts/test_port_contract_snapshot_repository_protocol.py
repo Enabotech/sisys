@@ -16,7 +16,7 @@ class TestSnapshotRepositoryProtocolContract:
     def test_protocol_is_runtime_checkable(self) -> None:
         """验证 Protocol 使用 @runtime_checkable 装饰器"""
         assert hasattr(SnapshotRepositoryProtocol, "_is_runtime_protocol")
-        assert SnapshotRepositoryProtocol._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert SnapshotRepositoryProtocol._is_runtime_protocol is True
 
     def test_save_method_exists(self) -> None:
         """验证 save 方法存在且为异步"""

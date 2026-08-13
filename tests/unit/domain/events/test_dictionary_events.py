@@ -62,7 +62,7 @@ class TestDictionaryUpdatedSchema:
         """frozen dataclass 不可变"""
         event = DictionaryUpdated(term="BLM", action="add", trigger="api")
         with pytest.raises(AttributeError):
-            event.term = "SWOT"  # type: ignore[misc]
+            event.term = "SWOT"
 
     def test_auto_registered(self):
         """事件自动注册到 _registry"""

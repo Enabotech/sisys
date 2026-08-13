@@ -89,7 +89,7 @@ class TestDocumentVersionSnapshotFrozen:
         )
 
         with pytest.raises(AttributeError):
-            snapshot.diff_summary = "modified"  # type: ignore[misc]
+            setattr(snapshot, "diff_summary", "modified")
 
 
 class TestDocumentVersionSnapshotSerialization:
@@ -191,7 +191,7 @@ class TestDocumentVersionDiffFrozen:
         diff = DocumentVersionDiff(diff_summary="test")
 
         with pytest.raises(AttributeError):
-            diff.diff_summary = "modified"  # type: ignore[misc]
+            setattr(diff, "diff_summary", "modified")
 
 
 class TestDocumentVersionSnapshotValidation:

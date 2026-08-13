@@ -131,10 +131,14 @@ class TestRetrievalSubdomain:
     """retrieval 子域范围验证"""
 
     def test_code_within_retrieval_subdomain(self) -> None:
-        """验证编码在 retrieval 子域（280-289）范围内"""
+        """验证编码在 retrieval 子域（280-281）范围内
+
+        说明：Story 3.9/3.10 新增 archive 子域占用 (282, 289)，
+        retrieval 子域因此收缩为 (280, 281)，仅容纳本故事的两个异常。
+        """
         from src.domain.exceptions._code_ranges import get_range_for_subdomain, get_subdomain_for_class
 
-        assert get_range_for_subdomain("retrieval") == (280, 289), "retrieval 子域范围应为 (280, 289)"
+        assert get_range_for_subdomain("retrieval") == (280, 281), "retrieval 子域范围应为 (280, 281)"
 
         assert get_subdomain_for_class("LayeredRetrievalError") == "retrieval"
         assert get_subdomain_for_class("LevelTransitionError") == "retrieval"
@@ -143,8 +147,8 @@ class TestRetrievalSubdomain:
         """验证编码不与相邻子域碰撞"""
         from src.domain.exceptions._code_ranges import CODE_RANGES
 
-        # dictionary 子域是 (270, 279)，retrieval 是 (280, 289)，external 是 (301, 399)
-        # 280-289 不与任何其他子域重叠
+        # dictionary 子域是 (270, 279)，retrieval 是 (280, 281)，archive 是 (282, 289)，external 是 (301, 399)
+        # retrieval 不与任何其他子域重叠
         retrieval_start, retrieval_end = CODE_RANGES["retrieval"]
         for subdomain, (start, end) in CODE_RANGES.items():
             if subdomain == "retrieval":

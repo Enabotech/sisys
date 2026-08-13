@@ -15,7 +15,7 @@ class TestSagaStepContract:
 
     def test_protocol_is_runtime_checkable(self) -> None:
         assert hasattr(SagaStep, "_is_runtime_protocol")
-        assert SagaStep._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert SagaStep._is_runtime_protocol is True
 
     def test_name_property_exists(self) -> None:
         assert hasattr(SagaStep, "name")
@@ -96,7 +96,7 @@ class TestSagaRepositoryProtocolContract:
 
     def test_protocol_is_runtime_checkable(self) -> None:
         assert hasattr(SagaRepositoryProtocol, "_is_runtime_protocol")
-        assert SagaRepositoryProtocol._is_runtime_protocol is True  # type: ignore[attr-defined]
+        assert SagaRepositoryProtocol._is_runtime_protocol is True
 
     def test_save_method_exists(self) -> None:
         assert hasattr(SagaRepositoryProtocol, "save")
