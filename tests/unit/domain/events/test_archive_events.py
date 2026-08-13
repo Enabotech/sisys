@@ -124,7 +124,7 @@ class TestArchiveCreated:
 
         event = ArchiveCreated(archive_id=uuid.uuid4())
         with pytest.raises(AttributeError):
-            event.plan_type = "BP"  # type: ignore[misc]
+            setattr(event, "plan_type", "BP")
 
     def test_auto_registered(self) -> None:
         """事件必须自动注册到 DomainEvent._registry"""

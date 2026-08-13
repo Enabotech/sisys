@@ -207,7 +207,7 @@ class TestArchiveQuery:
         """frozen dataclass 不可变"""
         query = ArchiveQuery()
         with pytest.raises(AttributeError):
-            query.plan_id = uuid.uuid4()  # type: ignore[misc]
+            setattr(query, "plan_id", uuid.uuid4())
 
     def test_all_fields(self) -> None:
         """所有字段赋值"""
