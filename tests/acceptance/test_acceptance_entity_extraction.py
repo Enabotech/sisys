@@ -26,6 +26,7 @@ from pytest_bdd import given, scenarios, then, when
 
 from src.domain.events.publish_result import PublishResult
 from src.domain.ports.entity_extraction import (
+    EntityArbitratorPort,
     EntityExtractionPort,
     ExtractionResult,
 )
@@ -179,7 +180,6 @@ def _build_failing_llm_extractor():
 def port_contract_defined():
     """验证 EntityExtractionPort 端口契约已定义"""
     from src.domain.ports.entity_extraction import (
-        EntityArbitratorPort,
         EntityExtractionPort,
         ExtractedEntity,
         ExtractedRelation,
@@ -502,10 +502,18 @@ def extraction_does_not_raise(context: dict[str, Any]):
 
 
 @then("系统记录 LLM 降级警告日志")
-def llm_fallback_logged():
-    """验证 LLM 降级警告日志记录抽象（不阻塞主流程）"""
-    # LLM 降级本身不阻塞主流程，此处验证抽象
-    pass
+def llm_fallback_logged(context: dict[str, Any], caplog: pytest.LogCaptureFixture):
+    """验证 LLM 降级警告日志记录
+
+    通过 caplog 捕获日志断言 LLM 降级警告被记录。
+    """
+    # 验证日志中包含 LLM 降级关键词（llm_extractor 或 service 层的降级日志）
+    llm_fallback_messages = [
+        record.message
+        for record in caplog.records
+        if "LLM" in record.message and any(keyword in record.message for keyword in ("降级", "失败", "fallback", "Fallback"))
+    ]
+    assert len(llm_fallback_messages) > 0, f"未找到 LLM 降级相关的警告日志，实际日志: {[r.message for r in caplog.records]}"
 
 
 # ===================================================================
@@ -692,6 +700,13 @@ def entities_extracted_event_published(context: dict[str, Any]):
     assert event_publisher.publish.called, "事件发布器应被调用"
     published_event = event_publisher.publish.call_args[0][0]
     assert isinstance(published_event, EntitiesExtracted), f"事件类型应为 EntitiesExtracted，实际为 {type(published_event)}"
+    # P0-2 修复：验证事件 `source` 和 `extraction_type` 字段
+    assert published_event.source == "entity_extraction_service", (
+        f"事件 source 应为 entity_extraction_service，实际为 {published_event.source}"
+    )
+    assert published_event.extraction_type in ("rule_only", "llm_only", "hybrid"), (
+        f"事件 extraction_type 应在规范值内，实际为 {published_event.extraction_type}"
+    )
 
 
 @then("事件包含正确的 entity_count 和 relation_count")
@@ -711,3 +726,189 @@ def event_has_correct_counts(context: dict[str, Any]):
     assert published_event.relation_count == len(result.relations), (
         f"事件 relation_count ({published_event.relation_count}) 应与结果关系数 ({len(result.relations)}) 一致"
     )
+
+
+# ===================================================================
+# AC-3: 异常体系（EntityExtractionError 映射 HTTP 500）
+# ===================================================================
+
+
+@given("规则基抽取器抛出内部异常")
+def rule_extractor_raises_error(context: dict[str, Any]):
+    """设置规则基抽取器抛出 RuntimeError"""
+    from src.domain.ports.entity_extraction import EntityExtractionPort
+
+    class FailingRuleExtractor(EntityExtractionPort):
+        """模拟规则基抽取失败的抽取器"""
+
+        async def extract_entities(self, content: str, domain_context: dict | None = None) -> ExtractionResult:
+            msg = "规则基引擎初始化失败"
+            raise RuntimeError(msg)
+
+    context["failing_rule_extractor"] = FailingRuleExtractor()
+
+
+@when("对BLM模型文本执行异常抽取")
+def perform_extraction_with_error(context: dict[str, Any], event_loop):
+    """执行抽取（预期规则基抛出 EntityExtractionError）"""
+    from src.application.services.entity_extraction_service import EntityExtractionService
+    from src.domain.exceptions import EntityExtractionError
+    from src.infrastructure.external_services.entity_extraction.conflict_arbitrator import (
+        ConflictArbitrator,
+    )
+
+    failing_rule = context.get("failing_rule_extractor")
+    assert failing_rule is not None, "failing_rule_extractor 未在 context 中设置"
+    assert isinstance(failing_rule, EntityExtractionPort), "failing_rule_extractor 应实现 EntityExtractionPort"
+    _, l5_graph, event_publisher = _build_entity_extraction_service()
+
+    service = EntityExtractionService(
+        rule_extractor=failing_rule,
+        llm_extractor=failing_rule,
+        l5_graph=l5_graph,
+        arbitrator=ConflictArbitrator(),
+        event_publisher=event_publisher,
+    )
+
+    try:
+        event_loop.run_until_complete(
+            service.extract_entities(
+                content="BLM 模型是战略规划工具",
+                memory_id=f"ac3-{uuid.uuid4().hex[:8]}",
+            )
+        )
+        context["error"] = None
+    except EntityExtractionError as e:
+        context["error"] = e
+    except Exception as e:
+        context["error"] = e
+
+
+@then("抛出 EntityExtractionError 异常")
+def raises_entity_extraction_error(context: dict[str, Any]):
+    """验证抛出 EntityExtractionError"""
+    from src.domain.exceptions import EntityExtractionError
+
+    error = context.get("error")
+    assert error is not None, "应抛出异常"
+    assert isinstance(error, EntityExtractionError), f"异常类型应为 EntityExtractionError，实际为 {type(error)}"
+
+
+@then("异常编码为 EXCEPTION_340")
+def exception_code_340(context: dict[str, Any]):
+    """验证异常编码为 EXCEPTION_340"""
+    from src.domain.exceptions import EntityExtractionError
+
+    error = context.get("error")
+    assert isinstance(error, EntityExtractionError)
+    assert error.code == "EXCEPTION_340", f"异常编码应为 EXCEPTION_340，实际为 {error.code}"
+
+
+@then("异常 HTTP 映射为 500")
+def exception_http_500():
+    """验证异常 HTTP 映射为 500"""
+    from src.domain.exceptions import EntityExtractionError
+    from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP
+
+    assert EXCEPTION_HTTP_MAP.get(EntityExtractionError) == 500, "EntityExtractionError 应映射到 HTTP 500"
+
+
+# ===================================================================
+# AC-6: 冲突仲裁器（规则 + LLM 融合）
+# ===================================================================
+
+
+@when("对冲突仲裁文本执行仲裁抽取")
+def perform_arbitration(context: dict[str, Any], event_loop):
+    """执行冲突仲裁（规则 + LLM 权重融合）"""
+    from src.domain.ports.entity_extraction import (
+        ExtractedEntity,
+        ExtractionResult,
+    )
+    from src.infrastructure.external_services.entity_extraction.conflict_arbitrator import (
+        ConflictArbitrator,
+    )
+
+    arbitrator = ConflictArbitrator()
+    rule_result = ExtractionResult(
+        entities=(ExtractedEntity(name="BLM", entity_type="CONCEPT", confidence=0.9, extraction_source="rule"),),
+    )
+    llm_result = ExtractionResult(
+        entities=(ExtractedEntity(name="BLM", entity_type="CONCEPT", confidence=0.7, extraction_source="llm"),),
+    )
+    final = arbitrator.arbitrate(rule_result, llm_result)
+    context["arbitrated_result"] = final
+
+
+@then("返回的实体列表包含 BLM 且仅有一个")
+def arbitrated_contains_single_blm(context: dict[str, Any]):
+    """验证仲裁结果包含唯一的 BLM 实体"""
+    final = context.get("arbitrated_result")
+    assert final is not None, "仲裁结果不应为空"
+    blm_entities = [e for e in final.entities if e.name == "BLM"]
+    assert len(blm_entities) == 1, f"仲裁结果应包含唯一 BLM，实际为 {len(blm_entities)}"
+
+
+@then("合并实体的置信度为规则与LLM的加权平均")
+def arbitrated_confidence_weighted(context: dict[str, Any]):
+    """验证合并实体的置信度为加权平均（0.9*0.6 + 0.7*0.4 = 0.82）"""
+    from src.domain.ports.entity_extraction import ExtractionResult
+
+    final = context.get("arbitrated_result")
+    assert isinstance(final, ExtractionResult), "仲裁结果应为 ExtractionResult"
+    blm = [e for e in final.entities if e.name == "BLM"][0]
+    assert abs(blm.confidence - 0.82) < 0.01, f"BLM 置信度应为 0.82，实际为 {blm.confidence}"
+
+
+@then("合并实体的 extraction_source 为hybrid")
+def arbitrated_source_hybrid(context: dict[str, Any]):
+    """验证合并实体的 extraction_source 为 hybrid"""
+    from src.domain.ports.entity_extraction import ExtractionResult
+
+    final = context.get("arbitrated_result")
+    assert isinstance(final, ExtractionResult), "仲裁结果应为 ExtractionResult"
+    blm = [e for e in final.entities if e.name == "BLM"][0]
+    assert blm.extraction_source == "hybrid", f"BLM extraction_source 应为 hybrid，实际为 {blm.extraction_source}"
+
+
+# ===================================================================
+# AC-8: 端口注册与 DI 集成
+# ===================================================================
+
+
+@given("端口注册中心已初始化")
+def port_registry_initialized():
+    """验证端口注册中心已初始化"""
+    from src.domain.ports.registry import _global_registry
+
+    assert _global_registry is not None, "全局端口注册中心应已初始化"
+
+
+@then("四个实体抽取端口均已注册 entity_extraction_rule entity_extraction_llm conflict_arbitrator entity_extraction_service")
+def four_ports_registered():
+    """验证四个实体抽取端口均已注册"""
+    from src.domain.ports.registry import _global_registry
+
+    for port_name in ("entity_extraction_rule", "entity_extraction_llm", "conflict_arbitrator", "entity_extraction_service"):
+        assert _global_registry.get(port_name) is not None, f"端口 {port_name} 未注册"
+
+
+@then("规则基抽取器实现 EntityExtractionPort 接口")
+def rule_extractor_implements_port():
+    """验证 RuleBasedExtractor 实现 EntityExtractionPort"""
+    from src.domain.ports.entity_extraction import EntityExtractionPort
+    from src.infrastructure.external_services.entity_extraction.rule_extractor import (
+        RuleBasedExtractor,
+    )
+
+    assert isinstance(RuleBasedExtractor(), EntityExtractionPort), "RuleBasedExtractor 应实现 EntityExtractionPort"
+
+
+@then("冲突仲裁器实现 EntityArbitratorPort 接口")
+def arbitrator_implements_port():
+    """验证 ConflictArbitrator 实现 EntityArbitratorPort"""
+    from src.infrastructure.external_services.entity_extraction.conflict_arbitrator import (
+        ConflictArbitrator,
+    )
+
+    assert isinstance(ConflictArbitrator(), EntityArbitratorPort), "ConflictArbitrator 应实现 EntityArbitratorPort"
