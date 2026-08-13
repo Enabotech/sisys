@@ -15,11 +15,13 @@ from .permission import Permission
 from .pipl_compliance_record import PIPLComplianceRecord
 from .routing_decision_log import RoutingDecisionLog
 from .sensitive_data_result import SensitiveDataResult
+from .strategic_archive import ArchiveType, StrategicArchive
 from .strategic_plan import StrategicPlan
 from .tool import Tool
 
 __all__ = [
     "Agent",
+    "ArchiveType",
     "Checkpoint",
     "CrossBorderTransferRequest",
     "DataResidencyPolicy",
@@ -31,6 +33,7 @@ __all__ = [
     "PIPLComplianceRecord",
     "RoutingDecisionLog",
     "SensitiveDataResult",
+    "StrategicArchive",
     "StrategicPlan",
     "Tool",
 ]

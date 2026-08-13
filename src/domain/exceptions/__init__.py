@@ -11,6 +11,11 @@
 
 from __future__ import annotations
 
+from src.domain.exceptions.archive_exceptions import (
+    ArchiveConflictError,
+    ArchiveNotFoundError,
+    ArchiveStorageError,
+)
 from src.domain.exceptions.base_exceptions import BaseException, DomainError  # BaseException 是向后兼容别名
 from src.domain.exceptions.business_exceptions import (
     AuthenticationError,
@@ -185,4 +190,8 @@ __all__ = [
     "DictionaryNotFoundError",
     "DictionaryEntryConflictError",
     "DictionaryVersionConflictError",
+    # 档案管理异常
+    "ArchiveNotFoundError",
+    "ArchiveConflictError",
+    "ArchiveStorageError",
 ]

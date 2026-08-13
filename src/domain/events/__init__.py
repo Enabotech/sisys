@@ -4,7 +4,7 @@
 """
 
 from .agent_events import AgentDecided
-from .audit_events import AuditActionType, AuditEvent
+from .archive_events import ArchiveCreated
 from .auto_execute_events import AutoExecuted
 from .auto_route_events import AutoRouted
 from .auto_trigger_events import AutoTriggered
@@ -33,6 +33,7 @@ from .tool_events import ToolExecuted
 from .workflow_events import RAGIndexed, ReportGenerated, WorkflowSubmitted
 
 __all__ = [
+    "ArchiveCreated",
     "DomainEvent",
     "DocumentProcessed",
     "DocumentUploaded",

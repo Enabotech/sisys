@@ -151,6 +151,16 @@ class EventMetricsCollector:
             return 0.0
         return self.metrics.cache_hits_total / total
 
+    @property
+    def cache_hits_total(self) -> int:
+        """缓存命中总次数"""
+        return self.metrics.cache_hits_total
+
+    @property
+    def cache_misses_total(self) -> int:
+        """缓存未命中总次数"""
+        return self.metrics.cache_misses_total
+
 
 # ============================================================================
 # Task 5.2 + Task 5.4: OpenTelemetry Trace 基础版 + OTLP 导出器配置

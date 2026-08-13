@@ -57,6 +57,7 @@
 - [ ] `get_active_dictionary() -> list[tuple[str, str]]` — 返回 (词条, 实体类型) 列表，**直接对接 `RuleBasedExtractor` 的 `reload_dictionary()` 输入格式**
 - [ ] `get_entry(term) -> DictionaryEntry | None` — 按词条名查询
 - [ ] `add_entry()` / `update_entry()` / `delete_entry()` / `list_entries()` — 词条 CRUD
+- [ ] `count_entries(query: DictionaryQuery) -> int` — 按查询条件统计词条总数（支持分页总数统计）
 - [ ] `create_snapshot()` / `rollback()` / `list_snapshots()` — 版本管理
 - [ ] 端口注册于 `composition_root.py`，通过 `register_port()` 注册为 `domain_dictionary` 端口
 
@@ -240,6 +241,7 @@
   - 方法: `async create_snapshot(created_by: str) -> DictionarySnapshot`
   - 方法: `async rollback(version: int) -> None`
   - 方法: `async list_snapshots() -> list[DictionarySnapshot]`
+  - 方法: `async count_entries(query: DictionaryQuery) -> int` — 统计符合条件的词条总数（支持分页总数统计）
   - 版本: v1.0.0, owner: foundation-team
   - 端口契约测试: `tests/contracts/test_port_contract_domain_dictionary.py`
 

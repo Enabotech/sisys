@@ -23,6 +23,18 @@ def _make_cache(
 ) -> tuple[RedisSemanticCache, AsyncMock]:
     """Create SemanticCache with mocked Redis client."""
     mock_redis = AsyncMock()
+
+    # Mock pipeline（async context manager 协议）
+    mock_pipe = AsyncMock()
+
+    async def _pipeline(*args, **kwargs):  # noqa: ANN002 参数透传给 Redis
+        return mock_pipe
+
+    mock_redis.pipeline = AsyncMock(side_effect=_pipeline)
+    mock_pipe.__aenter__ = AsyncMock(return_value=mock_pipe)
+    mock_pipe.__aexit__ = AsyncMock(return_value=False)
+    mock_pipe.execute = AsyncMock(return_value=[1, True])
+
     cache = RedisSemanticCache(
         redis_client=mock_redis,
         embedding_dim=embedding_dim,
@@ -96,8 +108,6 @@ class TestRedisSemanticCache:
     async def test_set_creates_index_and_stores(self) -> None:
         cache, mock_redis = _make_cache()
         mock_redis.execute_command = AsyncMock(return_value="OK")
-        mock_redis.hset = AsyncMock(return_value=1)
-        mock_redis.expire = AsyncMock(return_value=True)
 
         embedding = [0.1, 0.2, 0.3]
         result = {"answer": "test"}
@@ -108,11 +118,14 @@ class TestRedisSemanticCache:
         call_args = mock_redis.execute_command.call_args[0]
         assert call_args[0] == "FT.CREATE"
 
-        # Should have stored via HSET
-        mock_redis.hset.assert_called_once()
-        hset_args = mock_redis.hset.call_args
-        assert "embedding" in hset_args[1]["mapping"]
-        assert "result" in hset_args[1]["mapping"]
+        # Should have stored via pipeline HSET + EXPIRE
+        assert mock_redis.pipeline.called, "pipeline 应被调用"
+        # 由于 AsyncMock pipeline() 返回 coroutine，使用 await 后获取 mock_pipe
+        mock_pipe = await mock_redis.pipeline(transaction=True)
+        assert mock_pipe.hset.called, "pipeline.hset 应被调用"
+        hset_args = mock_pipe.hset.call_args
+        assert "embedding" in (hset_args[1]["mapping"] if hset_args[1] else {})
+        assert "result" in (hset_args[1]["mapping"] if hset_args[1] else {})
 
     async def test_get_hit(self) -> None:
         cache, mock_redis = _make_cache()
@@ -177,8 +190,6 @@ class TestRedisSemanticCache:
     async def test_index_already_exists_is_ok(self) -> None:
         cache, mock_redis = _make_cache()
         mock_redis.execute_command = AsyncMock(side_effect=Exception("Index already exists"))
-        mock_redis.hset = AsyncMock(return_value=1)
-        mock_redis.expire = AsyncMock(return_value=True)
 
         await cache.set([0.1, 0.2, 0.3], {"answer": "test"})
-        mock_redis.hset.assert_called_once()
+        assert mock_redis.pipeline.called, "索引已存在时也应执行缓存写入"

@@ -3,8 +3,8 @@
 定义所有 SQLAlchemy ORM 模型，映射到 PostgreSQL 数据库表
 """
 
+from src.infrastructure.storage.postgresql.models.archive import ArchiveModel
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
-from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel
 from src.infrastructure.storage.postgresql.models.dictionary import (
     DictionaryEntryModel,
     DictionarySnapshotModel,
@@ -32,6 +32,9 @@ from src.infrastructure.storage.postgresql.models.role import RoleModel
 from src.infrastructure.storage.postgresql.models.user import UserModel
 
 __all__ = [
+    "ArchiveModel",
+    "AuditLogModel",
+    "AuditOutboxModel",
     "Base",
     "OutboxModel",
     "UserModel",

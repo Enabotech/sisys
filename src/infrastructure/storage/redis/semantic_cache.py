@@ -2,6 +2,11 @@
 
 基于 RediSearch FT.SEARCH 向量索引实现语义缓存查找，
 替代 SCAN + Python 余弦相似度方案以提升性能
+
+二级索引命名空间：
+- sisys:cache:semantic:vec:{md5} — 缓存数据主键（已有）
+- sisys:cache:semantic:idx:doc:{doc_id} — 文档 ID 二级索引（Story 3-9 新增）
+  `idx:` 中间段与 `vec:` 精确区分，避免 invalidate_pattern 误删
 """
 
 from __future__ import annotations
@@ -22,6 +27,10 @@ from src.infrastructure.utils import json_dumps, json_loads
 logger = logging.getLogger(__name__)
 
 _INDEX_NAME = "idx:sisys_semantic_cache"
+
+# 二级索引 key 段前缀（与缓存数据键 vec: 精确区分）
+_IDX_SEGMENT = "idx"
+_DOC_IDX_PREFIX = f"{_IDX_SEGMENT}:doc"
 
 
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
@@ -166,7 +175,7 @@ class RedisSemanticCache:
                 return None
 
             # Parse first result: response[1] = doc key, response[2] = [field, value, ...]
-            fields = response[2] if len(response) > 2 else []
+            fields = response[2] if len(response) > 2 and response[2] is not None else []
             distance = None
             result_data = None
 
@@ -216,22 +225,46 @@ class RedisSemanticCache:
             logger.error("Failed to query semantic cache: %s", e)
             return None
 
-    async def set(self, query_embedding: list[float], result: dict, ttl: int = 86400) -> None:
+    async def set(
+        self,
+        query_embedding: list[float],
+        result: dict,
+        ttl: int = 86400,
+        doc_ids: list[str] | None = None,
+    ) -> None:
         """Store result in semantic cache with vector embedding.
 
         Args:
             query_embedding: Embedding vector.
             result: Result data to cache.
             ttl: Time-to-live in seconds.
+            doc_ids: 关联的文档 ID 列表（维护"文档 ID → 缓存键"二级索引）。
+                使用 Redis pipeline 批量操作，减少网络往返。
         """
         cache_key = self._build_cache_key(query_embedding)
         key = build_key(self._NAMESPACE, cache_key)
         try:
             await self._ensure_index()
             vec_bytes = _vector_to_bytes(query_embedding)
-            await self._redis.hset(key, mapping={"embedding": vec_bytes, "result": json_dumps(result)})
-            await self._redis.expire(key, ttl)
-            logger.debug("Cached result with key %s and TTL %d", cache_key, ttl)
+
+            # 缓存主数据写入 + 二级索引维护：pipeline 打包为一次网络往返
+            async with await self._redis.pipeline(transaction=True) as pipe:
+                pipe.hset(key, mapping={"embedding": vec_bytes, "result": json_dumps(result)})
+                pipe.expire(key, ttl)
+                if doc_ids:
+                    unique_doc_ids = list(dict.fromkeys(doc_ids))  # 去重保持顺序
+                    for doc_id in unique_doc_ids:
+                        doc_idx_key = build_key(self._NAMESPACE, _DOC_IDX_PREFIX, doc_id)
+                        pipe.sadd(doc_idx_key, cache_key)
+                        pipe.expire(doc_idx_key, ttl)
+                await pipe.execute()
+
+            logger.debug(
+                "Cached result with key %s and TTL %d (doc_ids=%d)",
+                cache_key,
+                ttl,
+                len(doc_ids) if doc_ids else 0,
+            )
         except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error("Failed to store semantic cache: %s", e)
 
@@ -251,6 +284,59 @@ class RedisSemanticCache:
             logger.debug("Invalidated cache key %s", cache_key)
         except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error("Failed to invalidate cache key %s: %s", cache_key, e)
+
+    async def invalidate_pattern(self, pattern: str, count: int = 100) -> None:
+        """按模式匹配批量失效缓存条目
+
+        基于 Redis SCAN 模式匹配，使用 COUNT 参数控制每批扫描数量。
+
+        Args:
+            pattern: 模式匹配（如 `vec:*`、`idx:*` 或 `*`）
+            count: SCAN 每批数量（默认 100）
+        """
+        prefix = build_key(self._NAMESPACE, pattern)
+        try:
+            cursor = 0
+            while True:
+                cursor, keys = await self._redis.scan(cursor=cursor, match=prefix, count=count)
+                if keys:
+                    await self._redis.delete(*keys)
+                if cursor == 0:
+                    break
+            logger.debug("Invalidated keys matching pattern %s", pattern)
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
+            logger.error("Failed to invalidate pattern %s: %s", pattern, e)
+
+    async def invalidate_all(self) -> None:
+        """全量清理语义缓存
+
+        删除 sisys:cache:semantic:* 前缀下的所有键（含缓存数据 + 二级索引）
+        """
+        await self.invalidate_pattern("*")
+
+    async def invalidate_by_document_id(self, doc_id: str) -> None:
+        """按文档 ID 使关联的缓存条目失效
+
+        通过二级索引（Redis Set）查询文档关联的所有缓存键，逐一删除。
+
+        Args:
+            doc_id: 文档 ID
+        """
+        doc_idx_key = build_key(self._NAMESPACE, _DOC_IDX_PREFIX, doc_id)
+        try:
+            cache_keys = await self._redis.smembers(doc_idx_key)
+            if cache_keys:
+                # SMEMBERS 返回内部缓存键（vec:{md5}），需转换为完整 Redis 键后删除
+                cache_key_strs = [build_key(self._NAMESPACE, str(k)) for k in cache_keys]
+                await self._redis.delete(*cache_key_strs)
+            await self._redis.delete(doc_idx_key)
+            logger.debug(
+                "Invalidated %d cache entries for document %s",
+                len(cache_keys),
+                doc_id,
+            )
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
+            logger.error("Failed to invalidate document %s: %s", doc_id, e)
 
     async def __aenter__(self) -> RedisSemanticCache:
         return self

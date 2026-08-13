@@ -15,6 +15,9 @@ from pydantic import ValidationError as PydanticValidationError
 
 from src.application.ports.exception_metrics_port import ExceptionMetricsPort
 from src.domain.exceptions import (
+    ArchiveConflictError,
+    ArchiveNotFoundError,
+    ArchiveStorageError,
     AuthenticationError,
     BaseException,
     BucketNameValidationError,
@@ -132,6 +135,10 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     DictionaryNotFoundError: status.HTTP_404_NOT_FOUND,  # 270
     DictionaryEntryConflictError: status.HTTP_409_CONFLICT,  # 271
     DictionaryVersionConflictError: status.HTTP_409_CONFLICT,  # 272
+    # 档案管理异常
+    ArchiveNotFoundError: status.HTTP_404_NOT_FOUND,  # 282
+    ArchiveConflictError: status.HTTP_409_CONFLICT,  # 283
+    ArchiveStorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 284
     # 外部服务异常
     ThirdPartyError: status.HTTP_502_BAD_GATEWAY,
     TimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,
