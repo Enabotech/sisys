@@ -229,8 +229,9 @@ class RuleBasedExtractor(EntityExtractionPort, DictionaryConsumerPort):
         """热更新词典
 
         采用 copy-on-write 模式：先构建完整的新自动机，再一次性原子替换
-        _automaton 引用。构建过程中读操作仍持有旧自动机引用，替换后新请求
-        立即使用新词典，因此无需加锁即可保证读操作始终看到完整一致的自动机状态。
+        _automaton 引用。在 asyncio 单线程事件循环下，本方法无 await 点，
+        _dictionary 与 _automaton 的赋值不会被并发读中断；替换后新请求
+        立即使用新词典，读操作始终看到完整一致的自动机状态。
 
         Args:
             dictionary: 新词典列表
@@ -264,6 +265,8 @@ class RuleBasedExtractor(EntityExtractionPort, DictionaryConsumerPort):
         # 在锁保护下获取自动机引用快照（copy-on-read）
         async with self._lock:
             snapshot_automaton = self._automaton
+            # _dictionary 与 _automaton 在 reload_dictionary() 中同步更新，
+            # 锁保证快照读取时两者一致
             snapshot_empty = not self._dictionary
 
         # 1. AC 自动机匹配命名实体（释放锁后执行匹配，不阻塞热更新）
