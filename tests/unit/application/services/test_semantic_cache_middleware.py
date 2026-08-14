@@ -359,6 +359,11 @@ class TestSemanticCacheMiddleware:
         # 不同 weights 应产生不同缓存键，所以仍是未命中
         assert search_service.search.call_count == 1
 
+        # 验证 cache.set() 调用了 cache_key 参数（weights 哈希后缀通过 cache_key 传递）
+        set_call_kwargs = cache.set.call_args[1]
+        assert "cache_key" in set_call_kwargs, "cache.set() 应包含 cache_key 参数"
+        assert "w" in str(set_call_kwargs["cache_key"]), "cache_key 应包含 weights 哈希后缀"
+
 
 class TestSemanticCacheMiddlewareMetrics:
     """指标采集验证"""
