@@ -1987,6 +1987,26 @@ def bootstrap() -> None:
         tags=("archive", "service", "application"),
     )
 
+    # === 事件处理器注册（register_handlers）===
+    # 所有事件处理器端口注册完成后，统一调用 register_handlers()
+    # 将处理器订阅到 InMemoryEventListener 事件总线
+    from src.domain.ports.resolver import get_resolver
+
+    handler_names = [
+        "document_version_handler",
+        "chunk_indexing_handler",
+    ]
+    resolver = get_resolver()
+    for handler_name in handler_names:
+        try:
+            handler = resolver.resolve(handler_name)
+        except Exception:
+            logger.warning("事件处理器未注册，跳过 register_handlers: %s", handler_name)
+            continue
+        register_fn = getattr(handler, "register_handlers", None)
+        if callable(register_fn):
+            register_fn()
+
 
 async def shutdown() -> None:
     """关闭所有连接管理器，释放资源
