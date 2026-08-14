@@ -239,6 +239,12 @@ class StrategicArchiveService:
                     await self._graph_storage.delete_entity(memory_id=graph_node_id)
                 except Exception:
                     logger.warning("L5 cleanup after L2 ref-update failure failed for archive %s", saved.archive_id)
+            if self._object_storage is not None and blob_ref_val is not None:
+                try:
+                    await self._object_storage.delete(bucket_type=self.L4_BUCKET_TYPE, object_key=blob_key)
+                except Exception:
+                    logger.warning("L4 cleanup after L2 ref-update failure failed for archive %s", saved.archive_id)
+            raise ArchiveStorageError(layer="l2", cause=e)
 
         # Step 5: 发布 ArchiveCreated 事件
         if self._event_publisher is not None:
