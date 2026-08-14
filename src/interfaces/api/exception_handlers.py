@@ -159,7 +159,7 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     HybridSearchError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 209 — 三路检索通道均失败
     # 分层检索异常
     LayeredRetrievalError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 280 — 分层检索编排失败
-    LevelTransitionError: status.HTTP_400_BAD_REQUEST,  # 281 — 层级遍历非法
+    LevelTransitionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 281 — 层级遍历非法
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

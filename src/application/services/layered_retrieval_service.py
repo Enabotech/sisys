@@ -29,6 +29,24 @@ logger = logging.getLogger(__name__)
 # 有效层级常量
 VALID_LEVELS = frozenset({"L1", "L2", "L3", "L4"})
 
+
+def _safe_truncate(text: str, max_len: int) -> str:
+    """安全截断文本，处理多字节 UTF-8 字符
+
+    Args:
+        text: 输入文本
+        max_len: 最大字符数
+
+    Returns:
+        截断后的文本
+    """
+    if not text:
+        return ""
+    # 按 Unicode 字符（而非字节）截断，避免多字节字符被从中截断
+    chars = list(text)
+    return "".join(chars[:max_len])
+
+
 # 层级数字映射（用于层级合法性判断）
 _LEVEL_ORDER = {
     "L1": 1,
@@ -102,8 +120,11 @@ class LayeredRetrievalService:
         self._validate_level(target_level)
 
         # L1/L2 骨架实现
-        if target_level in ("L1", "L2"):
-            logger.warning("%s 文档摘要检索尚未实现，返回空列表", target_level)
+        if target_level == "L1":
+            logger.warning("L1 跨文档摘要检索尚未实现，返回空列表")
+            return []
+        if target_level == "L2":
+            logger.warning("L2 文档摘要检索尚未实现，返回空列表")
             return []
 
         # L3 直接检索
@@ -163,8 +184,11 @@ class LayeredRetrievalService:
         self._validate_level(target_level)
 
         # L1/L2 骨架实现
-        if target_level in ("L1", "L2"):
-            logger.warning("%s 文档摘要检索尚未实现，返回空列表", target_level)
+        if target_level == "L1":
+            logger.warning("L1 跨文档摘要检索尚未实现，返回空列表")
+            return []
+        if target_level == "L2":
+            logger.warning("L2 文档摘要检索尚未实现，返回空列表")
             return []
 
         # L4 直接检索
@@ -344,38 +368,55 @@ class LayeredRetrievalService:
                     "max_child_score": r["score"],
                     "child_count": 0,
                     "parent_chunk_id": parent_id,
-                    "child_ids": [],
                 }
             else:
                 if r["score"] > parent_info[parent_id]["max_child_score"]:
                     parent_info[parent_id]["max_child_score"] = r["score"]
             parent_info[parent_id]["child_count"] += 1
-            parent_info[parent_id]["child_ids"].append(r.get("id", ""))
 
         if not parent_info:
             return []
 
-        # 3. 通过 get_point() 回溯获取父块内容
+        # 3. 通过 get_point() 回溯获取父块内容（并发获取，避免 N+1 串行查询）
         merged_results: list[SearchResult] = []
-        for parent_id, info in parent_info.items():
-            parent_point = await self._l3_vector.get_point(collection, parent_id)
+        import asyncio
+
+        async def _fetch_parent(parent_id: str, info: dict[str, Any]) -> SearchResult | None:
+            """获取单个父块内容
+
+            Args:
+                parent_id: 父块 ID
+                info: 父块去重信息
+
+            Returns:
+                合并后的 SearchResult，或 None（获取失败时）
+            """
+            try:
+                parent_point = await self._l3_vector.get_point(collection, parent_id)
+            except Exception:
+                logger.warning("L4→L3 回溯: 获取父块 %s 失败，跳过", parent_id)
+                return None
             if parent_point is None:
-                continue
+                return None
 
             parent_payload = parent_point.get("payload", {})
-            merged_results.append(
-                SearchResult(
-                    id=parent_id,
-                    score=info["max_child_score"],
-                    payload={
-                        "parent_chunk_id": parent_id,
-                        "child_count": info["child_count"],
-                        "index_level": "parent",
-                        "content": parent_payload.get("content", ""),
-                        "document_id": parent_payload.get("document_id", ""),
-                    },
-                )
+            return SearchResult(
+                id=parent_id,
+                score=info["max_child_score"],
+                payload={
+                    "parent_chunk_id": parent_id,
+                    "child_count": info["child_count"],
+                    "index_level": "parent",
+                    "content": parent_payload.get("content", ""),
+                    "document_id": parent_payload.get("document_id", ""),
+                },
             )
+
+        tasks = [asyncio.ensure_future(_fetch_parent(pid, inf)) for pid, inf in parent_info.items()]
+        for task in tasks:
+            result = await task
+            if result is not None:
+                merged_results.append(result)
 
         # 4. 按最高 Child 分数降序排列
         merged_results.sort(key=lambda r: r["score"], reverse=True)
@@ -429,9 +470,15 @@ class LayeredRetrievalService:
         expanded_results: list[SearchResult] = []
         for parent_result in l3_results:
             parent_id = parent_result.get("id")
+            if parent_id is None:
+                logger.warning("L3→L4 展开: Parent id 为 None，跳过")
+                continue
+
             parent_payload = parent_result.get("payload", {})
-            parent_content = parent_payload.get("content", "")
-            parent_content_preview = parent_content[:200] if parent_content else ""
+            parent_content = parent_payload.get("content")
+            if not isinstance(parent_content, str):
+                parent_content = ""
+            parent_content_preview = _safe_truncate(parent_content, 200)
 
             child_filter = self._merge_filter(
                 filter_payload,

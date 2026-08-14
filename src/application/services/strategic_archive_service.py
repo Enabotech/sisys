@@ -179,6 +179,15 @@ class StrategicArchiveService:
                 )
             except Exception as e:
                 logger.error("L4 object archive failed for archive %s: %s", saved.archive_id, e)
+                # L4 失败时清理已写入的 L3 向量点，避免脏数据残留
+                if self._vector_storage is not None and embedding_ref is not None:
+                    try:
+                        await self._vector_storage.delete_points(
+                            collection=self.L3_COLLECTION,
+                            point_ids=[embedding_point_id],
+                        )
+                    except Exception as cleanup_err:
+                        logger.warning("L3 cleanup after L4 failure failed for archive %s: %s", saved.archive_id, cleanup_err)
                 raise ArchiveStorageError(layer="l4", cause=e)
         else:
             blob_ref_val = None

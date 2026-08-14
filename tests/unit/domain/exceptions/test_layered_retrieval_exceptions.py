@@ -60,16 +60,19 @@ class TestLayeredRetrievalError:
         assert d["cause"]["type"] == "RuntimeError"
         assert d["context"]["target_level"] == "L3"
 
-    def test_http_status_400(self) -> None:
-        """验证 HTTP 映射"""
+    def test_http_status_500(self) -> None:
+        """验证 HTTP 映射（500 — 规范要求 500/500）
 
+        Raises:
+            AssertionError: HTTP 映射非 500 时抛出
+        """
         from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP, _get_http_status
 
         error = LayeredRetrievalError("分层检索编排失败")
 
         assert LayeredRetrievalError in EXCEPTION_HTTP_MAP, "LayeredRetrievalError 必须在 EXCEPTION_HTTP_MAP 中注册"
         http_status = _get_http_status(error)
-        assert http_status == 500 or http_status == 400, f"HTTP 映射异常: {http_status}"
+        assert http_status == 500, f"HTTP 映射异常: {http_status}"
 
 
 class TestLevelTransitionError:
@@ -117,14 +120,14 @@ class TestLevelTransitionError:
         assert d["context"]["current_level"] == "L2"
 
     def test_http_status(self) -> None:
-        """验证 HTTP 映射"""
+        """验证 HTTP 映射（500 — 规范要求 500/500）"""
         from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP, _get_http_status
 
         error = LevelTransitionError("层级遍历非法")
 
         assert LevelTransitionError in EXCEPTION_HTTP_MAP, "LevelTransitionError 必须在 EXCEPTION_HTTP_MAP 中注册"
         http_status = _get_http_status(error)
-        assert http_status == 500 or http_status == 400, f"HTTP 映射异常: {http_status}"
+        assert http_status == 500, f"HTTP 映射异常: {http_status}"
 
 
 class TestRetrievalSubdomain:

@@ -229,12 +229,11 @@ class SemanticCacheMiddleware:
             if cached is not None:
                 # 缓存命中
                 results = self._deserialize_results(cached)
-                if self._metrics:
-                    self._metrics.record_cache_latency(latency)
                 if results is not None:
                     # 有效缓存命中
                     if self._metrics:
                         self._metrics.record_cache_hit()
+                        self._metrics.record_cache_latency(latency)
                     logger.debug("缓存命中: query=%s, latency=%.2fms", query_text[:50], latency * 1000)
                     return results[:limit]
                 else:

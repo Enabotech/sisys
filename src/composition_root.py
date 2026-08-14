@@ -1764,7 +1764,7 @@ def bootstrap() -> None:
             event_listener=resolver.resolve("event_listener"),
         ),
         module="src.infrastructure.messaging.event_handlers.cache_invalidation_handler",
-        lifetime=Lifetime.SCOPED,
+        lifetime=Lifetime.SINGLETON,
         owner="cache-team",
         tags=("cache", "invalidation", "handler", "messaging"),
     )
@@ -1784,6 +1784,24 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED,
         owner="search-team",
         tags=("search", "layered", "l1-l4"),
+    )
+
+    # ChunkIndexingHandler — 分块向量索引（Story 3.5 分层检索依赖）
+    from src.application.event_handlers.chunk_indexing_handler import ChunkIndexingHandler
+
+    register_port(
+        name="chunk_indexing_handler",
+        version="v1.0.0",
+        interface=ChunkIndexingHandler,
+        impl=lambda resolver: ChunkIndexingHandler(
+            embedding_service=resolver.resolve("embedding_service"),
+            l3_vector=resolver.resolve("l3_vector"),
+            document_repository=resolver.resolve("document_repository"),
+        ),
+        module="src.application.event_handlers.chunk_indexing_handler",
+        lifetime=Lifetime.SINGLETON,
+        owner="search-team",
+        tags=("search", "layered", "indexing"),
     )
 
     # === Crawler Ports ===
