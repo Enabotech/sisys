@@ -223,12 +223,22 @@ class StrategicArchiveService:
         saved.embedding_ref = embedding_ref
         saved.blob_ref = blob_ref_val
         saved.graph_ref = graph_ref_val
-        # 将更新后的存储引用写回 L2（失败时需传播错误，因 L3/L4/L5 已写入）
+        # 将更新后的存储引用写回 L2（失败时需清理 L3/L4/L5 脏数据）
         try:
             saved = await self._archive_repo.save(saved)
         except Exception as e:
             logger.error("L2 metadata update failed for archive %s: %s", saved.archive_id, e)
-            raise ArchiveStorageError(layer="l2", cause=e)
+            # 尽力清理 L3/L4/L5 脏数据
+            if self._vector_storage is not None and embedding_ref is not None:
+                try:
+                    await self._vector_storage.delete_points(collection=self.L3_COLLECTION, point_ids=[embedding_point_id])
+                except Exception:
+                    logger.warning("L3 cleanup after L2 ref-update failure failed for archive %s", saved.archive_id)
+            if self._graph_storage is not None and graph_ref_val is not None:
+                try:
+                    await self._graph_storage.delete_entity(memory_id=graph_node_id)
+                except Exception:
+                    logger.warning("L5 cleanup after L2 ref-update failure failed for archive %s", saved.archive_id)
 
         # Step 5: 发布 ArchiveCreated 事件
         if self._event_publisher is not None:

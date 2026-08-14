@@ -22,12 +22,15 @@ import json
 import logging
 import struct
 import time
-from typing import Any
+from typing import TYPE_CHECKING
 
 from src.application.ports.cache_metrics_port import CacheMetricsPort
 from src.application.ports.semantic_cache import SemanticCache
 from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.l3_vector import SearchResult
+
+if TYPE_CHECKING:
+    from src.application.services.hybrid_search_service import HybridSearchService
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +54,7 @@ class SemanticCacheMiddleware:
 
     def __init__(
         self,
-        search_service: Any,
+        search_service: HybridSearchService,
         cache: SemanticCache,
         embedding_service: EmbeddingServicePort,
         threshold: float = 0.9,
@@ -91,10 +94,11 @@ class SemanticCacheMiddleware:
         return self._avg_tokens_per_search
 
     def _build_cache_key(self, query_embedding: list[float], weights: list[float] | None = None) -> str:
-        """构建缓存键
+        """构建缓存键（含 weights 哈希后缀，用于 set() 时传入 RedisSemanticCache）
 
         缓存键基于查询嵌入向量的 MD5 哈希。
         包含 weights 参数的哈希后缀，不同 weights 产生不同缓存键。
+        此键作为 doc_ids 参数传入 cache.set()，由 RedisSemanticCache 内部用于二级索引。
 
         Args:
             query_embedding: 查询嵌入向量

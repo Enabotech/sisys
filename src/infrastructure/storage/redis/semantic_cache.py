@@ -11,15 +11,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
-import math
 import struct
 
 import redis.asyncio as aioredis
 
-from src.domain.exceptions import ValidationError
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.utils import json_dumps, json_loads
@@ -49,40 +48,6 @@ def _build_index_name(embedding_dim: int) -> str:
     return f"{_INDEX_NAME_PREFIX}:{embedding_dim}"
 
 
-def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
-    """Compute cosine similarity between two vectors (pure Python, no numpy).
-
-    Args:
-        vec1: First vector.
-        vec2: Second vector.
-
-    Returns:
-        Cosine similarity (-1.0 to 1.0), 0.0 for empty/zero vectors.
-    """
-    if len(vec1) != len(vec2):
-        raise ValidationError(message=f"Vector dimensions must match: {len(vec1)} != {len(vec2)}")
-    if not vec1:
-        return 0.0
-
-    dot_product = 0.0
-    norm1 = 0.0
-    norm2 = 0.0
-
-    for v1, v2 in zip(vec1, vec2):
-        dot_product += v1 * v2
-        norm1 += v1 * v1
-        norm2 += v2 * v2
-
-    norm1 = math.sqrt(norm1)
-    norm2 = math.sqrt(norm2)
-
-    if norm1 == 0.0 or norm2 == 0.0:
-        return 0.0
-
-    sim = dot_product / (norm1 * norm2)
-    return max(-1.0, min(1.0, sim))
-
-
 def _vector_to_bytes(vec: list[float]) -> bytes:
     """Pack float list into FLOAT32 little-endian bytes."""
     return struct.pack(f"<{len(vec)}f", *vec)
@@ -102,6 +67,7 @@ class RedisSemanticCache:
     """
 
     _NAMESPACE = "cache:semantic"
+    _ensure_index_lock: asyncio.Lock = asyncio.Lock()
 
     def __init__(
         self,
@@ -116,35 +82,43 @@ class RedisSemanticCache:
         self._index_name = _build_index_name(embedding_dim)
 
     async def _ensure_index(self) -> None:
-        """Create RediSearch vector index if not exists (idempotent)."""
+        """Create RediSearch vector index if not exists (idempotent).
+
+        并发保护：使用类级 asyncio.Lock 保证 FT.CREATE 的幂等创建，
+        避免多个协程同时执行 FT.CREATE 引发的竞态（重复创建索引）。
+        """
         if self._index_ready:
             return
-        try:
-            await self._redis.execute_command(
-                "FT.CREATE",
-                self._index_name,
-                "ON",
-                "HASH",
-                "PREFIX",
-                "1",
-                build_key(self._NAMESPACE, ""),
-                "SCHEMA",
-                "embedding",
-                "VECTOR",
-                "FLAT",
-                "6",
-                "TYPE",
-                "FLOAT32",
-                "DIM",
-                str(self._embedding_dim),
-                "DISTANCE_METRIC",
-                "COSINE",
-            )
-            logger.info("Created RediSearch vector index %s (dim=%d)", self._index_name, self._embedding_dim)
-        except Exception as e:
-            if "already exists" not in str(e).lower():
-                raise
-        self._index_ready = True
+        async with self._ensure_index_lock:
+            # 获取锁后再次检查，避免重复执行 FT.CREATE
+            if self._index_ready:
+                return
+            try:
+                await self._redis.execute_command(
+                    "FT.CREATE",
+                    self._index_name,
+                    "ON",
+                    "HASH",
+                    "PREFIX",
+                    "1",
+                    build_key(self._NAMESPACE, ""),
+                    "SCHEMA",
+                    "embedding",
+                    "VECTOR",
+                    "FLAT",
+                    "6",
+                    "TYPE",
+                    "FLOAT32",
+                    "DIM",
+                    str(self._embedding_dim),
+                    "DISTANCE_METRIC",
+                    "COSINE",
+                )
+                logger.info("Created RediSearch vector index %s (dim=%d)", self._index_name, self._embedding_dim)
+            except Exception as e:
+                if "already exists" not in str(e).lower():
+                    raise
+            self._index_ready = True
 
     def _build_cache_key(self, query_embedding: list[float]) -> str:
         """Generate deterministic cache key from full vector hash."""
