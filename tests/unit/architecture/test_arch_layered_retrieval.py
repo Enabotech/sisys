@@ -109,11 +109,15 @@ class TestServicePlacement:
 
     def test_service_does_not_define_local_protocol(self) -> None:
         """服务文件不本地定义 Protocol（端口定义在 domain/ports）"""
+        import re
+
         src_path = Path("src/application/services/layered_retrieval_service.py")
         if not src_path.exists():
             return
         source = src_path.read_text()
-        assert "class .*Protocol" not in source and "import Protocol" not in source, "服务文件禁止定义 Protocol"
+        # 使用正则匹配类定义中包含 Protocol 的模式（如 class FooProtocol、class MyProtocol）
+        assert not re.search(r"class\s+\w*Protocol", source), "服务文件禁止定义本地 Protocol"
+        assert "import Protocol" not in source, "服务文件禁止导入 Protocol"
 
 
 class TestChunkLevelIndexing:

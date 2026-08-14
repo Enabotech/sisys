@@ -47,14 +47,6 @@ def _safe_truncate(text: str, max_len: int) -> str:
     return "".join(chars[:max_len])
 
 
-# 层级数字映射（用于层级合法性判断）
-_LEVEL_ORDER = {
-    "L1": 1,
-    "L2": 2,
-    "L3": 3,
-    "L4": 4,
-}
-
 # 自顶向下展开时每个 Parent 最多展开的 Child 子块数
 _DEFAULT_CHILD_EXPAND_COUNT = 3
 
