@@ -369,9 +369,9 @@ class TestSemanticCacheMiddlewareMetrics:
 
     async def test_hit_counter_increments(self) -> None:
         """缓存命中后计数器递增"""
-        from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
+        from src.application.ports.cache_metrics_port import CacheMetricsPort
 
-        metrics = EventMetricsCollector()
+        metrics = AsyncMock(spec=CacheMetricsPort)
         middleware, cache, search_service, _ = _make_middleware(metrics=metrics)
 
         # 写入缓存
@@ -382,7 +382,7 @@ class TestSemanticCacheMiddlewareMetrics:
         }
 
         await middleware.search(collection="c", query_text="test", limit=5)
-        assert metrics.metrics.cache_hits_total == 1
+        metrics.record_cache_hit.assert_called_once()
 
     # ===================================================================
     # 缓存未命中次数递增
@@ -390,15 +390,39 @@ class TestSemanticCacheMiddlewareMetrics:
 
     async def test_miss_counter_increments(self) -> None:
         """缓存未命中后计数器递增"""
-        from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
+        from src.application.ports.cache_metrics_port import CacheMetricsPort
 
-        metrics = EventMetricsCollector()
+        metrics = AsyncMock(spec=CacheMetricsPort)
         middleware, cache, search_service, _ = _make_middleware(metrics=metrics)
 
         cache.get.return_value = None
 
         await middleware.search(collection="c", query_text="test", limit=5)
-        assert metrics.metrics.cache_misses_total == 1
+        metrics.record_cache_miss.assert_called_once()
+
+    # ===================================================================
+    # 缓存延迟记录
+    # ===================================================================
+
+    async def test_cache_latency_recorded_on_hit(self) -> None:
+        """缓存命中后记录延迟"""
+        from src.application.ports.cache_metrics_port import CacheMetricsPort
+
+        metrics = AsyncMock(spec=CacheMetricsPort)
+        middleware, cache, search_service, _ = _make_middleware(metrics=metrics)
+
+        cache.get.return_value = {
+            "results": [dict(r) for r in _sample_results()],
+            "query_text": "test",
+            "weights": None,
+        }
+
+        await middleware.search(collection="c", query_text="test", limit=5)
+
+        # record_cache_latency 应被调用，且参数为正数
+        metrics.record_cache_latency.assert_called_once()
+        latency_arg = metrics.record_cache_latency.call_args[0][0]
+        assert latency_arg >= 0, f"延迟应为非负数，实际 {latency_arg}"
 
     # ===================================================================
     # 命中率计算
@@ -406,9 +430,11 @@ class TestSemanticCacheMiddlewareMetrics:
 
     async def test_hit_rate(self) -> None:
         """命中率计算正确"""
-        from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
+        from src.application.ports.cache_metrics_port import CacheMetricsPort
 
-        metrics = EventMetricsCollector()
+        metrics = AsyncMock(spec=CacheMetricsPort)
+        # 模拟命中率计算：3次命中/(3次命中+2次未命中)=0.6
+        metrics.hit_rate = 0.6
         middleware, cache, search_service, _ = _make_middleware(metrics=metrics)
 
         # 3 次命中
@@ -425,8 +451,9 @@ class TestSemanticCacheMiddlewareMetrics:
         for i in range(2):
             await middleware.search(collection="c", query_text=f"nonexistent{i}", limit=5)
 
-        # 命中率 = 3 / (3+2) = 0.6
-        assert metrics.hit_rate == pytest.approx(0.6, abs=0.01)
+        # 验证 record_cache_hit 和 record_cache_miss 被正确调用
+        assert metrics.record_cache_hit.call_count == 3
+        assert metrics.record_cache_miss.call_count == 2
 
     # ===================================================================
     # metrics 属性可访问
@@ -434,9 +461,9 @@ class TestSemanticCacheMiddlewareMetrics:
 
     async def test_metrics_property_accessible(self) -> None:
         """metrics 属性返回 CacheMetricsPort 实例"""
-        from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
+        from src.application.ports.cache_metrics_port import CacheMetricsPort
 
-        metrics = EventMetricsCollector()
+        metrics = AsyncMock(spec=CacheMetricsPort)
         middleware, _, _, _ = _make_middleware(metrics=metrics)
 
         # 验证 metrics 属性可访问

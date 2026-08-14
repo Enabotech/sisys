@@ -7,6 +7,7 @@ ArchiveRepositoryPort 继承 L2RdbPort[StrategicArchive] 获得基础 CRUD，
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, runtime_checkable
@@ -14,6 +15,8 @@ from uuid import UUID
 
 from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
 from src.domain.ports.l2_rdb import L2RdbPort
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -44,9 +47,15 @@ class ArchiveQuery:
         """构造后校验 limit 取值范围"""
         # 使用 object.__setattr__ 因为 frozen=True
         if self.limit < 1:
+            logger.warning("ArchiveQuery limit %s clamped to 1", self.limit)
             object.__setattr__(self, "limit", 1)
         elif self.limit > 1000:
+            logger.warning("ArchiveQuery limit %s clamped to 1000", self.limit)
             object.__setattr__(self, "limit", 1000)
+        if self.offset < 0:
+            object.__setattr__(self, "offset", 0)
+        if self.start_date is not None and self.end_date is not None and self.start_date > self.end_date:
+            raise ValueError("start_date must be before or equal to end_date")
 
 
 @runtime_checkable

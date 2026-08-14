@@ -39,6 +39,8 @@ class EventMetrics:
         event_processing_duration_seconds: 处理耗时采样（有界队列，防止 OOM）
         cache_hits_total: 缓存命中总数
         cache_misses_total: 缓存未命中总数
+        cache_latency_seconds: 缓存命中延迟采样（有界队列，防止 OOM）
+        current_avg_tokens_per_search: 当前预估每次检索的 Token 数
     """
 
     events_processed_total: int = 0
@@ -50,6 +52,10 @@ class EventMetrics:
     )
     cache_hits_total: int = 0
     cache_misses_total: int = 0
+    cache_latency_seconds: deque[float] = field(
+        default_factory=lambda: deque(maxlen=10_000),
+    )
+    current_avg_tokens_per_search: int = 5000
 
 
 class EventMetricsCollector:
@@ -160,6 +166,33 @@ class EventMetricsCollector:
     def cache_misses_total(self) -> int:
         """缓存未命中总次数"""
         return self.metrics.cache_misses_total
+
+    def record_cache_latency(self, latency_seconds: float) -> None:
+        """记录缓存命中延迟
+
+        Args:
+            latency_seconds: 缓存命中延迟（秒）
+        """
+        self.metrics.cache_latency_seconds.append(latency_seconds)
+        logger.debug("Cache latency: %.4f s", latency_seconds)
+
+    @property
+    def estimated_tokens_saved(self) -> int:
+        """预估节省的 Token 总数
+
+        Returns:
+            预估节省的 Token 数（命中次数 × current_avg_tokens_per_search）
+        """
+        return self.metrics.cache_hits_total * self.metrics.current_avg_tokens_per_search
+
+    def set_avg_tokens_per_search(self, value: int) -> None:
+        """设置预估每次检索的 Token 数
+
+        Args:
+            value: 预估每次检索的 Token 数
+        """
+        self.metrics.current_avg_tokens_per_search = value
+        logger.debug("avg_tokens_per_search 设置为 %d", value)
 
 
 # ============================================================================

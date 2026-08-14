@@ -32,7 +32,7 @@ class ArchiveCreated(DomainEvent):
     """
 
     event_type: str = field(default="ArchiveCreated", init=False)
-    archive_id: uuid.UUID = uuid.UUID(int=0)
+    archive_id: uuid.UUID = field(default_factory=uuid.uuid4)
     plan_id: uuid.UUID | None = None
     plan_type: str = ""
     archive_type: ArchiveType = ArchiveType.ASSUMPTION

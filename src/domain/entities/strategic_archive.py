@@ -83,11 +83,33 @@ class StrategicArchive:
                 message="archive_type must be a valid ArchiveType",
                 context={"entity": "StrategicArchive", "field": "archive_type"},
             )
+        if self.plan_type not in ("SP", "BP", ""):
+            raise EntityValidationError(
+                message="plan_type must be 'SP' or 'BP'",
+                context={"entity": "StrategicArchive", "field": "plan_type"},
+            )
+        if self.version < 1:
+            raise EntityValidationError(
+                message="version must be >= 1",
+                context={"entity": "StrategicArchive", "field": "version"},
+            )
         if self.created_at is not None and self.archived_at is not None:
             if self.created_at > self.archived_at:
                 raise EntityBusinessRuleError(
                     message="created_at must be before or equal to archived_at",
                     context={"entity": "StrategicArchive", "rule": "timestamp_ordering"},
+                )
+        # deleted_at 晚于 created_at 和 archived_at
+        if self.deleted_at is not None:
+            if self.created_at is not None and self.deleted_at < self.created_at:
+                raise EntityBusinessRuleError(
+                    message="deleted_at must be after created_at",
+                    context={"entity": "StrategicArchive", "rule": "deleted_at_after_created_at"},
+                )
+            if self.archived_at is not None and self.deleted_at < self.archived_at:
+                raise EntityBusinessRuleError(
+                    message="deleted_at must be after archived_at",
+                    context={"entity": "StrategicArchive", "rule": "deleted_at_after_archived_at"},
                 )
         # 非证据包类型必须有 plan_id
         if self.archive_type in (ArchiveType.ASSUMPTION, ArchiveType.DECISION, ArchiveType.DEVIATION):

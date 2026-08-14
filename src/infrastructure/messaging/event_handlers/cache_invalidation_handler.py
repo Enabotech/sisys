@@ -11,12 +11,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.application.ports.semantic_cache import SemanticCache
     from src.domain.events.base import DomainEvent
+    from src.domain.ports.event_listener import EventListener
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +34,36 @@ class CacheInvalidationHandler:
         _cache: 语义缓存端口实例
     """
 
-    def __init__(self, cache: SemanticCache) -> None:
+    def __init__(
+        self,
+        cache: SemanticCache,
+        event_listener: EventListener | None = None,
+    ) -> None:
         """初始化缓存失效处理器
 
         Args:
             cache: 语义缓存端口实例（用于执行缓存失效操作）
+            event_listener: 事件监听器（可选，用于注册 DocumentProcessed 处理器）
         """
         self._cache = cache
+        if event_listener is not None:
+            event_listener.on_event("DocumentProcessed", self._wrap_handler())
+            logger.info("CacheInvalidationHandler 已注册 DocumentProcessed 事件")
+
+    def _wrap_handler(self) -> Callable[[DomainEvent], None]:
+        """将异步 handle 包装为同步回调
+
+        Returns:
+            同步包装函数，适用于 EventListener.on_event() 注册
+        """
+
+        def handle(event: DomainEvent) -> None:
+            try:
+                asyncio.run(self.handle(event))
+            except Exception:
+                logger.exception("缓存失效处理失败，不影响主流程")
+
+        return handle
 
     async def handle(self, event: DomainEvent) -> None:
         """处理 DocumentProcessed 事件，触发缓存失效

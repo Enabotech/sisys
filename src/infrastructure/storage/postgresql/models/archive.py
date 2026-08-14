@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, Integer, String
@@ -59,46 +59,6 @@ class ArchiveModel(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    def __init__(
-        self,
-        archive_id: UUID | None = None,
-        plan_id: UUID | None = None,
-        plan_type: str = "",
-        archive_type: str = "assumption",
-        assumptions: dict | None = None,
-        decision_basis: dict | None = None,
-        execution_deviation: dict | None = None,
-        metadata_ref: str = "",
-        embedding_ref: str | None = None,
-        blob_ref: str | None = None,
-        graph_ref: str | None = None,
-        created_by: UUID | None = None,
-        version: int = 1,
-        metadata: dict | None = None,
-        deleted_at: datetime | None = None,
-        created_at: datetime | None = None,
-        archived_at: datetime | None = None,
-    ) -> None:
-        """初始化档案模型"""
-        self.archive_id = archive_id or uuid4()
-        self.plan_id = plan_id
-        self.plan_type = plan_type
-        self.archive_type = archive_type
-        self.assumptions = assumptions or {}
-        self.decision_basis = decision_basis or {}
-        self.execution_deviation = execution_deviation or {}
-        self.metadata_ref = metadata_ref
-        self.embedding_ref = embedding_ref
-        self.blob_ref = blob_ref
-        self.graph_ref = graph_ref
-        self.created_by = created_by
-        self.version = version
-        self.metadata_ = metadata or {}
-        self.deleted_at = deleted_at
-        now = datetime.now(timezone.utc)
-        self.created_at = created_at or now
-        self.archived_at = archived_at or now
 
 
 __all__ = [

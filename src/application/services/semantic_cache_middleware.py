@@ -77,6 +77,8 @@ class SemanticCacheMiddleware:
         self._ttl = ttl
         self._avg_tokens_per_search = avg_tokens_per_search
         self._metrics = metrics
+        if metrics is not None:
+            metrics.set_avg_tokens_per_search(avg_tokens_per_search)
 
     @property
     def metrics(self) -> CacheMetricsPort | None:
@@ -227,6 +229,8 @@ class SemanticCacheMiddleware:
             if cached is not None:
                 # 缓存命中
                 results = self._deserialize_results(cached)
+                if self._metrics:
+                    self._metrics.record_cache_latency(latency)
                 if results is not None:
                     # 有效缓存命中
                     if self._metrics:

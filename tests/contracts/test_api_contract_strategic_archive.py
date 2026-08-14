@@ -162,7 +162,7 @@ class TestApiContractStrategicArchive:
                 "execution_deviation": {},
             },
         )
-        assert response.status_code in (200, 201)
+        assert response.status_code == 201
 
     def test_archive_endpoint_returns_archive(self, auth_client: TestClient) -> None:
         """POST /archive 返回创建的档案"""

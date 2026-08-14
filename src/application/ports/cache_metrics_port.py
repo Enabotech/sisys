@@ -43,3 +43,28 @@ class CacheMetricsPort(Protocol):
     def cache_misses_total(self) -> int:
         """缓存未命中总次数"""
         ...
+
+    def record_cache_latency(self, latency_seconds: float) -> None:
+        """记录缓存命中延迟
+
+        Args:
+            latency_seconds: 缓存命中延迟（秒）
+        """
+        ...
+
+    @property
+    def estimated_tokens_saved(self) -> int:
+        """预估节省的 Token 总数
+
+        Returns:
+            预估节省的 Token 数（命中次数 × avg_tokens_per_search）
+        """
+        ...
+
+    def set_avg_tokens_per_search(self, value: int) -> None:
+        """设置预估每次检索的 Token 数
+
+        Args:
+            value: 预估每次检索的 Token 数
+        """
+        ...

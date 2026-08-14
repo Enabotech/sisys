@@ -53,4 +53,8 @@ def create_app() -> FastAPI:
     app.add_middleware(ExceptionContextMiddleware)
     # 注册统一异常处理器
     register_exception_handlers(app)
+    # 注册路由
+    from src.interfaces.api.strategic_archive import archive_router
+
+    app.include_router(archive_router)
     return app

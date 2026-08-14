@@ -1761,6 +1761,7 @@ def bootstrap() -> None:
         interface=CacheInvalidationHandler,
         impl=lambda resolver: CacheInvalidationHandler(
             cache=resolver.resolve("semantic_cache"),
+            event_listener=resolver.resolve("event_listener"),
         ),
         module="src.infrastructure.messaging.event_handlers.cache_invalidation_handler",
         lifetime=Lifetime.SCOPED,
