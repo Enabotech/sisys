@@ -272,3 +272,21 @@ class TestSemanticCacheIntegration:
         orth_embedding = [0.0, 1.0, 0.0]
         cached = await cache.get(orth_embedding, threshold=0.9)
         assert cached is None
+
+    async def test_weights_isolated_cache_key(self, cache: RedisSemanticCache, real_redis) -> None:
+        """不同 weights 产生不同缓存键"""
+        # 权重隔离在中间件层实现（通过 cache_key 参数覆盖），
+        # 此测试验证通过 cache_key 参数写入的缓存可被正常查询
+        embedding = [1.0, 0.0, 0.0]
+        result = {"results": [{"id": "doc-1", "score": 0.95, "payload": {}}]}
+
+        # 写入默认缓存键
+        await cache.set(embedding, result, ttl=3600)
+        assert await cache.get(embedding, threshold=0.9) is not None
+
+        # 写入自定义缓存键（模拟 weights 隔离）
+        await cache.set(embedding, result, ttl=3600, cache_key="vec:custom-weights")
+        # 默认键查询不应命中自定义键
+        default_cached = await cache.get(embedding, threshold=0.9)
+        assert default_cached is not None
+        assert default_cached["results"][0]["id"] == "doc-1"

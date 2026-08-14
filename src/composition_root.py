@@ -1771,11 +1771,12 @@ def bootstrap() -> None:
 
     # === Story 3-5: Layered Retrieval (L1-L4) Port ===
     from src.application.services.layered_retrieval_service import LayeredRetrievalService
+    from src.domain.ports.layered_retrieval import LayeredRetrievalPort
 
     register_port(
         name="layered_retrieval_service",
         version="v1.0.0",
-        interface=LayeredRetrievalService,
+        interface=LayeredRetrievalPort,
         impl=lambda resolver: LayeredRetrievalService(
             dense_search=resolver.resolve("dense_search_service"),
             l3_vector=resolver.resolve("l3_vector"),
@@ -1797,6 +1798,7 @@ def bootstrap() -> None:
             embedding_service=resolver.resolve("embedding_service"),
             l3_vector=resolver.resolve("l3_vector"),
             document_repository=resolver.resolve("document_repository"),
+            event_listener=resolver.resolve("event_listener"),
         ),
         module="src.application.event_handlers.chunk_indexing_handler",
         lifetime=Lifetime.SINGLETON,

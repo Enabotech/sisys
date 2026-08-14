@@ -87,7 +87,11 @@ class DenseSemanticSearchService:
             limit=limit,
             filter_payload=combined_filter,
         )
-        return [DenseSearchResult(id=r["id"], score=r["score"], payload=r["payload"]) for r in raw_results]
+        return [
+            DenseSearchResult(id=r["id"], score=r["score"], payload=r.get("payload") or {})
+            for r in raw_results
+            if isinstance(r, dict) and "id" in r and "score" in r
+        ]
 
     def _build_filter(
         self,

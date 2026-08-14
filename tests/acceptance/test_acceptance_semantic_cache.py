@@ -615,3 +615,64 @@ def then_scoped(context: dict[str, Any]) -> None:
     spec = context["middleware_spec"]
     assert spec is not None, "semantic_cache_middleware 端口未注册"
     assert spec.lifetime == Lifetime.SCOPED, f"生命周期应为 SCOPED，实际 {spec.lifetime}"
+
+
+# ===================================================================
+# AC-1: 不同 weights 缓存隔离
+# ===================================================================
+
+
+@when("我使用 weights=[1.0, 1.0] 发送查询 Q1 时")
+def when_send_q1_weights_a(context: dict[str, Any], event_loop) -> None:
+    """使用 weights=[1.0, 1.0] 发送查询"""
+    middleware = context["middleware"]
+    mock_search = context["mock_search"]
+    mock_search.search.reset_mock()
+    mock_search.search.return_value = _sample_results()
+
+    async def _run():
+        return await middleware.search(
+            collection="test",
+            query_text="企业战略规划",
+            limit=5,
+            weights=[1.0, 1.0],
+        )
+
+    context["weights_a_results"] = event_loop.run_until_complete(_run())
+
+
+@then("缓存未命中，执行完整混合检索")
+def then_weights_a_miss(context: dict[str, Any]) -> None:
+    """缓存未命中，执行完整检索"""
+    results = context.get("weights_a_results")
+    if results is None:
+        results = context.get("q1_results")
+    assert results is not None
+    assert len(results) == 3
+
+
+@when("我使用 weights=[0.5, 1.0] 发送相同查询 Q1 时")
+def when_send_q1_weights_b(context: dict[str, Any], event_loop) -> None:
+    """使用 weights=[0.5, 1.0] 发送相同查询"""
+    middleware = context["middleware"]
+    mock_search = context["mock_search"]
+    mock_search.search.reset_mock()
+    mock_search.search.return_value = _sample_results()
+
+    async def _run():
+        return await middleware.search(
+            collection="test",
+            query_text="企业战略规划",
+            limit=5,
+            weights=[0.5, 1.0],
+        )
+
+    context["weights_b_results"] = event_loop.run_until_complete(_run())
+
+
+@then("不同 weights 产生不同缓存键")
+def then_weights_isolated(context: dict[str, Any]) -> None:
+    """不同 weights 应产生不同缓存键，导致未命中并执行检索"""
+    mock_search = context["mock_search"]
+    # weights A 写入一次检索，weights B 不同键再次执行检索
+    assert mock_search.search.call_count == 1, "不同 weights 应各自执行检索"
