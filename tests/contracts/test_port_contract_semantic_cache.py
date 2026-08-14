@@ -160,11 +160,11 @@ class TestCacheInvalidationHandlerPortContract:
         assert spec.owner and spec.owner != ""
         assert spec.module and spec.module != ""
 
-    def test_lifetime_is_scoped(self, registry: PortRegistry) -> None:
-        """处理器必须是 SCOPED 生命周期"""
+    def test_lifetime_is_singleton(self, registry: PortRegistry) -> None:
+        """处理器必须是 SINGLETON 生命周期（确保事件注册仅执行一次）"""
         spec = registry.get(self.PORT_NAME)
         assert spec is not None
-        assert spec.lifetime == Lifetime.SCOPED, f"生命周期={spec.lifetime}，应为 SCOPED"
+        assert spec.lifetime == Lifetime.SINGLETON, f"生命周期={spec.lifetime}，应为 SINGLETON"
 
     def test_owner_is_cache_team(self, registry: PortRegistry) -> None:
         """所有者为 cache-team"""

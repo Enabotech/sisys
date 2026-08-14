@@ -41,10 +41,22 @@ def _get_all_imports(filepath: str) -> set[str]:
 
 
 def _get_files_in_dir(dir_path: str) -> list[str]:
-    """获取目录下所有 Python 文件"""
+    """获取目录下所有 Python 文件（递归扫描子目录）
+
+    Args:
+        dir_path: 目录路径
+
+    Returns:
+        该目录及其子目录下所有 .py 文件路径列表
+    """
     if not os.path.isdir(dir_path):
         return []
-    return [os.path.join(dir_path, f) for f in os.listdir(dir_path) if f.endswith(".py") and not f.startswith("__pycache__")]
+    py_files = []
+    for root, _dirs, files in os.walk(dir_path):
+        for f in files:
+            if f.endswith(".py"):
+                py_files.append(os.path.join(root, f))
+    return py_files
 
 
 class TestDomainLayer:

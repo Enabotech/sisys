@@ -1072,6 +1072,40 @@ paths:
         "503":
           description: 模型未加载
 
+  # ============================================================================
+  # 分层检索端点 (Layered Retrieval, Story 3-5)
+  # ============================================================================
+  /api/v1/search/layered:
+    post:
+      tags:
+        - search
+      summary: 分层检索（L1-L4）
+      description: |
+        支持自顶向下（L3→L4 展开）与自底向上（L4→L3 回溯）双向遍历检索。
+        L1/L2 为骨架实现（返回空列表），L3/L4 依赖分块级向量索引。
+      security:
+        - OAuth2: []
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LayeredRetrievalRequest"
+      responses:
+        "200":
+          description: 分层检索成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayeredRetrievalResponse"
+        "400":
+          description: 请求参数校验失败（ValidationError）
+        "500":
+          description: 检索编排失败或层级遍历非法
+        "422":
+          description: 请求体校验失败
+
 components:
   schemas:
     # --------------------------------------------------------------------------
@@ -1804,6 +1838,100 @@ components:
         error:
           type: string
           nullable: true
+
+    # --------------------------------------------------------------------------
+    # 分层检索 schemas (Story 3-5)
+    # --------------------------------------------------------------------------
+    LayeredRetrievalRequest:
+      type: object
+      required:
+        - query_text
+      properties:
+        query_text:
+          type: string
+          description: 查询文本
+        target_level:
+          type: string
+          enum: ["L1", "L2", "L3", "L4"]
+          default: "L4"
+          description: 检索目标粒度层级
+        direction:
+          type: string
+          enum: ["top_down", "bottom_up"]
+          default: "top_down"
+          description: 遍历方向（自顶向下/自底向上）
+        collection:
+          type: string
+          default: "documents"
+          description: Qdrant Collection 名称
+        limit:
+          type: integer
+          default: 10
+          minimum: 1
+          maximum: 100
+          description: 返回结果数量限制
+        tenant_id:
+          type: string
+          description: 租户标识符
+        filter_payload:
+          type: object
+          description: Payload 过滤条件
+
+    LayeredRetrievalResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/LayeredSearchResult"
+        total:
+          type: integer
+          description: 结果总数
+        query_text:
+          type: string
+          description: 原始查询文本
+        target_level:
+          type: string
+          description: 实际检索目标层级
+
+    LayeredSearchResult:
+      type: object
+      required:
+        - id
+        - score
+      properties:
+        id:
+          type: string
+          description: 向量点标识
+        score:
+          type: number
+          format: float
+          description: 相似度得分
+        payload:
+          type: object
+          properties:
+            parent_chunk_id:
+              type: string
+              nullable: true
+              description: 父块 ID（L4 Child 结果时非空）
+            child_count:
+              type: integer
+              description: 命中子块数（L3 回溯结果时）
+            index_level:
+              type: string
+              enum: ["child", "parent", "document"]
+              description: 索引层级
+            parent_content:
+              type: string
+              description: 父块内容截断摘要（L4 展开结果时）
+            content:
+              type: string
+              description: 块内容
+            document_id:
+              type: string
+              description: 所属文档 ID
 
   securitySchemes:
     OAuth2:

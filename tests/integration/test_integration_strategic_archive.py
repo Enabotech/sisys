@@ -203,16 +203,20 @@ class TestArchiveServiceIntegration:
 
         from src.application.services.strategic_archive_service import StrategicArchiveService
         from src.domain.entities.strategic_archive import ArchiveType
+        from src.domain.ports.event_publisher import EventPublisher
+        from src.domain.ports.l3_vector import L3VectorPort
+        from src.domain.ports.l4_object import L4ObjectPort
+        from src.domain.ports.l5_graph import L5GraphPort
         from src.infrastructure.storage.postgresql.repository.archive_repository import (
             PostgreSQLArchiveRepository,
         )
 
         service = StrategicArchiveService(
             archive_repo=PostgreSQLArchiveRepository(),
-            vector_storage=AsyncMock(),
-            object_storage=AsyncMock(),
-            graph_storage=AsyncMock(),
-            event_publisher=AsyncMock(),
+            vector_storage=AsyncMock(spec=L3VectorPort),
+            object_storage=AsyncMock(spec=L4ObjectPort),
+            graph_storage=AsyncMock(spec=L5GraphPort),
+            event_publisher=AsyncMock(spec=EventPublisher),
         )
 
         plan_id = uuid.uuid4()

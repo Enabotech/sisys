@@ -125,8 +125,15 @@ def get_current_user_dependency(auth_service: AuthServicePort) -> Callable:
                 detail="Not authenticated",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        result: TokenPayload = await auth_service.verify_token(token)
-        return result
+        try:
+            result: TokenPayload = await auth_service.verify_token(token)
+            return result
+        except AuthenticationError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
     return get_current_user
 
