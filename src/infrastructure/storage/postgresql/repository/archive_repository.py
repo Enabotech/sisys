@@ -73,7 +73,7 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
             graph_ref=archive.graph_ref,
             created_by=archive.created_by,
             version=archive.version,
-            metadata=archive.metadata,
+            metadata_=archive.metadata,
             deleted_at=archive.deleted_at,
             created_at=archive.created_at,
             archived_at=archive.archived_at,

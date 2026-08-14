@@ -100,7 +100,12 @@ class ArchiveStorageError(BusinessException):
         """
         self.layer = layer
         if layer not in self._VALID_LAYERS:
-            raise ValueError(f"layer must be one of {self._VALID_LAYERS}, got {layer!r}")
+            from src.domain.exceptions import EntityValidationError
+
+            raise EntityValidationError(
+                message=f"layer must be one of {self._VALID_LAYERS}, got {layer!r}",
+                context={"entity": "ArchiveStorageError", "field": "layer"},
+            )
         if message is None:
             message = f"Archive storage error at layer {layer}"
         super().__init__(message, cause=cause, context={"layer": layer})

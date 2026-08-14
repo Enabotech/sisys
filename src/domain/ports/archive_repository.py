@@ -14,6 +14,7 @@ from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
+from src.domain.exceptions import EntityValidationError
 from src.domain.ports.l2_rdb import L2RdbPort
 
 logger = logging.getLogger(__name__)
@@ -55,7 +56,10 @@ class ArchiveQuery:
         if self.offset < 0:
             object.__setattr__(self, "offset", 0)
         if self.start_date is not None and self.end_date is not None and self.start_date > self.end_date:
-            raise ValueError("start_date must be before or equal to end_date")
+            raise EntityValidationError(
+                message="start_date must be before or equal to end_date",
+                context={"entity": "ArchiveQuery", "field": "start_date"},
+            )
 
 
 @runtime_checkable
