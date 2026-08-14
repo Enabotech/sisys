@@ -310,11 +310,18 @@ def create_archive_router(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid base64 encoded evidence_blob",
                 )
+        try:
+            archive_type = ArchiveType(payload.archive_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid archive_type: {payload.archive_type}",
+            )
         service = _get_service()
         archive = await service.archive_plan(
             plan_id=payload.plan_id,
             plan_type=payload.plan_type,
-            archive_type=ArchiveType(payload.archive_type),
+            archive_type=archive_type,
             assumptions=payload.assumptions,
             decision_basis=payload.decision_basis,
             execution_deviation=payload.execution_deviation,
@@ -349,7 +356,7 @@ def create_archive_router(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid plan_id: {plan_id}",
             )
-        query = ArchiveQuery(plan_id=parsed_plan_id)
+        query = ArchiveQuery(plan_id=parsed_plan_id, limit=1000)
         service = _get_service()
         archives = await service.query_archive(query)
         return [_to_archive_response(a) for a in archives]

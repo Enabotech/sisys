@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -15,6 +16,8 @@ from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
 from src.domain.ports.archive_repository import ArchiveQuery
 from src.infrastructure.storage.postgresql.models.archive import ArchiveModel
 from src.infrastructure.storage.postgresql.repository.postgresql_adapter import PostgreSQLAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveModel]):
@@ -37,11 +40,20 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
 
     def _to_entity(self, model: ArchiveModel) -> StrategicArchive:
         """将 ORM 模型转换为领域实体"""
+        try:
+            archive_type = ArchiveType(model.archive_type) if model.archive_type else ArchiveType.ASSUMPTION
+        except ValueError:
+            logger.warning(
+                "Invalid archive_type %r in DB for archive %s, defaulting to ASSUMPTION",
+                model.archive_type,
+                model.archive_id,
+            )
+            archive_type = ArchiveType.ASSUMPTION
         return StrategicArchive(
             archive_id=model.archive_id,
             plan_id=model.plan_id,
             plan_type=model.plan_type or "",
-            archive_type=ArchiveType(model.archive_type) if model.archive_type else ArchiveType.ASSUMPTION,
+            archive_type=archive_type,
             created_by=model.created_by,
             version=model.version,
             assumptions=model.assumptions or {},
