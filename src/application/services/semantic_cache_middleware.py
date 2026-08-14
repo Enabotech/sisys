@@ -271,11 +271,14 @@ class SemanticCacheMiddleware:
             try:
                 cache_value = self._serialize_results(result_list, query_text, weights)
                 doc_ids = self._extract_doc_ids(result_list)
+                # 生成含 weights 哈希后缀的缓存键，确保不同 weights 产生不同缓存键
+                cache_key = self._build_cache_key(embedding, weights)
                 await self._cache.set(
                     embedding,
                     cache_value,
                     ttl=self._ttl,
                     doc_ids=doc_ids if doc_ids else None,
+                    cache_key=cache_key,
                 )
                 logger.debug("缓存写入成功: query=%s, docs=%d", query_text[:50], len(doc_ids))
             except Exception as e:
