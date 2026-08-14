@@ -31,6 +31,7 @@ class SemanticCache(Protocol):
         result: dict,
         ttl: int = 86400,
         doc_ids: list[str] | None = None,
+        cache_key: str | None = None,
     ) -> None:
         """存储到语义缓存
 
@@ -39,6 +40,7 @@ class SemanticCache(Protocol):
             result: 缓存结果数据
             ttl: 过期时间（秒）
             doc_ids: 关联的文档 ID 列表（维护"文档 ID → 缓存键"二级索引）
+            cache_key: 可选缓存键覆盖（含 weights 哈希后缀，默认由 query_embedding 派生）
         """
 
     async def invalidate(self, cache_key: str) -> None:

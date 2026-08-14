@@ -258,6 +258,7 @@ class RedisSemanticCache:
         result: dict,
         ttl: int = 86400,
         doc_ids: list[str] | None = None,
+        cache_key: str | None = None,
     ) -> None:
         """Store result in semantic cache with vector embedding.
 
@@ -267,8 +268,10 @@ class RedisSemanticCache:
             ttl: Time-to-live in seconds.
             doc_ids: 关联的文档 ID 列表（维护"文档 ID → 缓存键"二级索引）。
                 使用 Redis pipeline 批量操作，减少网络往返。
+            cache_key: 可选缓存键覆盖（含 weights 哈希后缀，默认由 query_embedding 派生）
         """
-        cache_key = self._build_cache_key(query_embedding)
+        if cache_key is None:
+            cache_key = self._build_cache_key(query_embedding)
         key = build_key(self._NAMESPACE, cache_key)
         try:
             await self._ensure_index()
