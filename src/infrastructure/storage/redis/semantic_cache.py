@@ -15,10 +15,12 @@ import asyncio
 import hashlib
 import json
 import logging
+import math
 import struct
 
 import redis.asyncio as aioredis
 
+from src.domain.exceptions import ValidationError
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.utils import json_dumps, json_loads
@@ -46,6 +48,40 @@ def _build_index_name(embedding_dim: int) -> str:
         索引名，如 `idx:sisys_semantic_cache:1024`
     """
     return f"{_INDEX_NAME_PREFIX}:{embedding_dim}"
+
+
+def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
+    """Compute cosine similarity between two vectors (pure Python, no numpy).
+
+    Args:
+        vec1: First vector.
+        vec2: Second vector.
+
+    Returns:
+        Cosine similarity (-1.0 to 1.0), 0.0 for empty/zero vectors.
+    """
+    if len(vec1) != len(vec2):
+        raise ValidationError(message=f"Vector dimensions must match: {len(vec1)} != {len(vec2)}")
+    if not vec1:
+        return 0.0
+
+    dot_product = 0.0
+    norm1 = 0.0
+    norm2 = 0.0
+
+    for v1, v2 in zip(vec1, vec2):
+        dot_product += v1 * v2
+        norm1 += v1 * v1
+        norm2 += v2 * v2
+
+    norm1 = math.sqrt(norm1)
+    norm2 = math.sqrt(norm2)
+
+    if norm1 == 0.0 or norm2 == 0.0:
+        return 0.0
+
+    sim = dot_product / (norm1 * norm2)
+    return max(-1.0, min(1.0, sim))
 
 
 def _vector_to_bytes(vec: list[float]) -> bytes:
