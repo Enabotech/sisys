@@ -348,21 +348,28 @@ class RedisSemanticCache:
         """按文档 ID 使关联的缓存条目失效
 
         通过二级索引（Redis Set）查询文档关联的所有缓存键，逐一删除。
+        使用 Redis pipeline 将 SMEMBERS + 多 DELETE 打包为一次网络往返。
 
         Args:
             doc_id: 文档 ID
         """
         doc_idx_key = build_key(self._NAMESPACE, _DOC_IDX_PREFIX, doc_id)
         try:
-            cache_keys = await self._redis.smembers(doc_idx_key)
-            if cache_keys:
-                # SMEMBERS 返回内部缓存键（vec:{md5}），需转换为完整 Redis 键后删除
-                cache_key_strs = [build_key(self._NAMESPACE, str(k)) for k in cache_keys]
+            # 使用 pipeline 打包 SMEMBERS + DELETE 为一次网络往返
+            async with self._redis.pipeline(transaction=True) as pipe:
+                pipe.smembers(doc_idx_key)
+                pipe.delete(doc_idx_key)
+                results = await pipe.execute()
+
+            cache_keys_raw = results[0] if results else []
+
+            if cache_keys_raw:
+                cache_key_strs = [build_key(self._NAMESPACE, str(k)) for k in cache_keys_raw]
                 await self._redis.delete(*cache_key_strs)
-            await self._redis.delete(doc_idx_key)
+
             logger.debug(
                 "Invalidated %d cache entries for document %s",
-                len(cache_keys),
+                len(cache_keys_raw),
                 doc_id,
             )
         except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
