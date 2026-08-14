@@ -28,9 +28,9 @@ class TestLayeredRetrievalPortContract:
         """端口必须在全局注册中心注册"""
         spec = registry.get(self.PORT_NAME)
         assert spec is not None, f"端口 {self.PORT_NAME} 未注册"
-        from src.application.services.layered_retrieval_service import LayeredRetrievalService
+        from src.domain.ports.layered_retrieval import LayeredRetrievalPort
 
-        assert spec.interface is LayeredRetrievalService
+        assert spec.interface is LayeredRetrievalPort
 
     def test_implementation_has_required_methods(self, registry: PortRegistry) -> None:
         """实现类必须包含所有必需方法"""

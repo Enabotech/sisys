@@ -10,14 +10,17 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from src.domain.events.workflow_events import RAGIndexed
 from src.domain.ports.document_repository import DocumentQuery, DocumentRepositoryPort
 from src.domain.ports.embedding_service import EmbeddingServicePort, SparseEmbedding
+from src.domain.ports.event_listener import EventListener
 from src.domain.ports.l3_vector import L3VectorPort
 
 if TYPE_CHECKING:
-    from src.domain.events.workflow_events import RAGIndexed
+    from src.domain.events.base import DomainEvent
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +47,7 @@ class ChunkIndexingHandler:
         embedding_service: EmbeddingServicePort,
         l3_vector: L3VectorPort,
         document_repository: DocumentRepositoryPort,
+        event_listener: EventListener | None = None,
         max_batch_size: int = DEFAULT_MAX_BATCH_SIZE,
     ) -> None:
         """初始化分块索引处理器
@@ -52,12 +56,46 @@ class ChunkIndexingHandler:
             embedding_service: EmbeddingServicePort 实例
             l3_vector: L3VectorPort 实例
             document_repository: DocumentRepositoryPort 实例
+            event_listener: 事件监听器（用于注册 RAGIndexed 处理器，可选）
             max_batch_size: 单批嵌入的 chunk 数上限（默认 32）
         """
         self._embedding_service = embedding_service
         self._l3_vector = l3_vector
         self._document_repository = document_repository
+        self._event_listener = event_listener
         self._max_batch_size = max(max_batch_size, 1)
+
+    def register_handlers(self) -> None:
+        """注册事件处理器到事件监听器
+
+        监听 RAGIndexed 事件，触发分块向量索引。
+        """
+        if self._event_listener is None:
+            logger.warning("event_listener 未注入，跳过 RAGIndexed 事件处理器注册")
+            return
+
+        self._event_listener.on_event("RAGIndexed", self._wrap_handler())
+        logger.info("ChunkIndexingHandler 已注册: RAGIndexed")
+
+    def _wrap_handler(self) -> Callable[[DomainEvent], None]:
+        """将异步处理器包装为同步回调
+
+        Returns:
+            同步包装函数，适用于 EventListener.on_event() 注册
+        """
+
+        def handle(event: DomainEvent) -> None:
+            if not isinstance(event, RAGIndexed):
+                logger.warning("ChunkIndexingHandler: 收到非 RAGIndexed 事件，跳过")
+                return
+            try:
+                import asyncio
+
+                asyncio.run(self.handle_chunk_indexed(event))
+            except Exception:
+                logger.exception("分块索引处理器异步执行失败，不影响主流程")
+
+        return handle
 
     async def handle_chunk_indexed(self, event: RAGIndexed) -> None:
         """处理 RAGIndexed 事件，执行分块向量索引
@@ -196,18 +234,6 @@ class ChunkIndexingHandler:
             len(all_texts),
             indexed,
         )
-
-    async def _embeddable_text(self, content: str) -> str:
-        """截断超长文本至 bge-m3 token 上限（按字符估算）
-
-        Args:
-            content: 原始文本
-
-        Returns:
-            截断后的文本
-        """
-        del self
-        return _truncate_tokens(content)
 
 
 def _safe_chunk_content(chunk: dict[str, Any], index: int) -> str | None:

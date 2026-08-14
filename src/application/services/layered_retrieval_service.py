@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -371,7 +372,6 @@ class LayeredRetrievalService:
 
         # 3. 通过 get_point() 回溯获取父块内容（并发获取，避免 N+1 串行查询）
         merged_results: list[SearchResult] = []
-        import asyncio
 
         async def _fetch_parent(parent_id: str, info: dict[str, Any]) -> SearchResult | None:
             """获取单个父块内容
@@ -438,14 +438,25 @@ class LayeredRetrievalService:
         Returns:
             展开后的 L4 层结果列表
         """
-        # 1. L3 层 Dense 检索
-        parent_filter = self._merge_filter(filter_payload, {"index_level": "parent"})
+        # 1. 嵌入查询向量一次，L3 检索与后续 Child 展开复用
         try:
-            l3_results = await self._dense_search.search(
+            query_vector = await self._dense_search._embedding.embed_query(query_text)
+        except Exception as e:
+            logger.error("L3 查询嵌入失败: %s", e)
+            raise LayeredRetrievalError(
+                f"L3 查询嵌入失败: {e}",
+                context={"collection": collection, "target_level": "L4"},
+            ) from e
+
+        # 2. L3 层 Dense 检索（直接传向量，避免二次嵌入）
+        parent_filter = self._merge_filter(filter_payload, {"index_level": "parent"})
+        if tenant_id:
+            parent_filter = self._merge_filter(parent_filter, {"tenant_id": tenant_id})
+        try:
+            l3_raw = await self._l3_vector.search(
                 collection=collection,
-                query_text=query_text,
+                query_vector=query_vector,
                 limit=min(limit, 5),  # 限制展开 Parent 数，避免 N+1 问题
-                tenant_id=tenant_id,
                 filter_payload=parent_filter,
             )
         except Exception as e:
@@ -455,10 +466,15 @@ class LayeredRetrievalService:
                 context={"collection": collection, "target_level": "L4"},
             ) from e
 
+        l3_results = [
+            SearchResult(id=r["id"], score=r["score"], payload=r.get("payload") or {})
+            for r in l3_raw
+            if isinstance(r, dict) and "id" in r and "score" in r
+        ]
         if not l3_results:
             return []
 
-        # 2. 对每个命中 Parent，展开 Top-3 Child
+        # 3. 对每个命中 Parent，展开 Top-3 Child（复用 query_vector 传向量）
         expanded_results: list[SearchResult] = []
         for parent_result in l3_results:
             parent_id = parent_result.get("id")
@@ -476,18 +492,21 @@ class LayeredRetrievalService:
                 filter_payload,
                 {"index_level": "child", "parent_chunk_id": str(parent_id)},
             )
+            if tenant_id:
+                child_filter = self._merge_filter(child_filter, {"tenant_id": tenant_id})
 
             try:
-                child_results = await self._dense_search.search(
+                child_raw = await self._l3_vector.search(
                     collection=collection,
-                    query_text=query_text,
+                    query_vector=query_vector,
                     limit=_DEFAULT_CHILD_EXPAND_COUNT,
-                    tenant_id=tenant_id,
                     filter_payload=child_filter,
                 )
             except Exception:
                 logger.warning("Parent %s 的 Child 展开失败，跳过", parent_id)
                 continue
+
+            child_results = [r for r in child_raw if isinstance(r, dict) and "id" in r and "score" in r]
 
             # 服务自身强制 Top-3 截断，不依赖后端 limit 行为
             for child in child_results[:_DEFAULT_CHILD_EXPAND_COUNT]:

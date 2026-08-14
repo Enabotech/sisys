@@ -31,9 +31,11 @@ def _make_dense_search(
         search_side_effect: search() 抛出的异常
 
     Returns:
-        带 search() 方法的 mock 服务
+        带 search() 和 _embedding 的 mock 服务
     """
     mock = AsyncMock()
+    mock._embedding = AsyncMock()
+    mock._embedding.embed_query.return_value = [0.1] * 128
     if search_side_effect is not None:
         mock.search.side_effect = search_side_effect
     else:
@@ -43,14 +45,16 @@ def _make_dense_search(
 
 def _make_l3_vector(
     points: dict[str, dict] | None = None,
+    search_results: list[dict] | None = None,
 ) -> AsyncMock:
     """构造 L3VectorPort mock
 
     Args:
         points: get_point() 返回的点 dict
+        search_results: search() 返回的结果列表
 
     Returns:
-        带 get_point() 方法的 mock
+        带 get_point() 和 search() 方法的 mock
     """
     mock = AsyncMock()
 
@@ -60,6 +64,10 @@ def _make_l3_vector(
         return None
 
     mock.get_point.side_effect = _get_point
+    if search_results is not None:
+        mock.search.return_value = search_results
+    else:
+        mock.search.return_value = []
     return mock
 
 
@@ -246,28 +254,68 @@ class TestBottomUpL4ToL3:
 class TestTopDownL3ToL4:
     """自顶向下（L3→L4）展开测试"""
 
+    async def _make_top_down_scenario(
+        self,
+        parent_id: str,
+        score: float = 0.8,
+        child_count: int = 2,
+        child_score: float = 0.7,
+    ) -> LayeredRetrievalService:
+        """构造自顶向下展开测试场景
+
+        Args:
+            parent_id: 父块 ID
+            score: 父块分数
+            child_count: 子块数
+            child_score: 子块分数
+
+        Returns:
+            配置好的 LayeredRetrievalService
+        """
+        dense_search = _make_dense_search()
+        l3_vector = _make_l3_vector(
+            search_results=[
+                {
+                    "id": parent_id,
+                    "score": score,
+                    "payload": {
+                        "chunk_id": parent_id,
+                        "document_id": str(uuid.uuid4()),
+                        "index_level": "parent",
+                        "content": f"L3 Parent 块内容（分数 {score}）",
+                    },
+                }
+            ]
+        )
+
+        def _child_search(
+            collection: str,
+            query_vector: list[float],
+            limit: int = 10,
+            filter_payload: dict | None = None,
+        ) -> list[dict]:
+            if filter_payload and filter_payload.get("index_level") == "child":
+                return [_make_child_result_raw(child_score, parent_id) for _ in range(child_count)]
+            return [
+                {
+                    "id": parent_id,
+                    "score": score,
+                    "payload": {
+                        "chunk_id": parent_id,
+                        "document_id": str(uuid.uuid4()),
+                        "index_level": "parent",
+                        "content": f"L3 Parent 块内容（分数 {score}）",
+                    },
+                }
+            ]
+
+        l3_vector.search.side_effect = _child_search
+        return LayeredRetrievalService(dense_search=dense_search, l3_vector=l3_vector)
+
     async def test_top_down_l3_to_l4_basic(self) -> None:
         """基本 L3→L4 展开"""
         parent_id = str(uuid.uuid4())
-        dense_search = _make_dense_search(search_results=[_make_parent_result(parent_id, score=0.8)])
-
-        async def _search(
-            collection: str,
-            query_text: str,
-            limit: int = 10,
-            tenant_id: str | None = None,
-            filter_payload: dict | None = None,
-        ):
-            # 第二次调用（Child 展开）返回子块
-            if filter_payload and filter_payload.get("index_level") == "child":
-                return [_make_child_result(0.7, parent_id) for _ in range(2)]
-            return [_make_parent_result(parent_id, score=0.8)]
-
-        dense_search.search.side_effect = _search
-        service = LayeredRetrievalService(
-            dense_search=dense_search,
-            l3_vector=_make_l3_vector(),
-        )
+        service = await self._make_top_down_scenario(parent_id, child_count=2)
 
         results = await service.search_top_down(
             query_text="测试查询",
@@ -283,24 +331,7 @@ class TestTopDownL3ToL4:
     async def test_top_down_expands_top3_children(self) -> None:
         """每个命中 Parent 展开 Top-3 Child 子块"""
         parent_id = str(uuid.uuid4())
-        dense_search = _make_dense_search(search_results=[_make_parent_result(parent_id, score=0.8)])
-
-        async def _search(
-            collection: str,
-            query_text: str,
-            limit: int = 10,
-            tenant_id: str | None = None,
-            filter_payload: dict | None = None,
-        ):
-            if filter_payload and filter_payload.get("index_level") == "child":
-                return [_make_child_result(0.7, parent_id) for _ in range(6)]
-            return [_make_parent_result(parent_id, score=0.8)]
-
-        dense_search.search.side_effect = _search
-        service = LayeredRetrievalService(
-            dense_search=dense_search,
-            l3_vector=_make_l3_vector(),
-        )
+        service = await self._make_top_down_scenario(parent_id, child_count=6)
 
         results = await service.search_top_down(
             query_text="测试查询",
@@ -314,27 +345,48 @@ class TestTopDownL3ToL4:
     async def test_top_down_combined_score_sort(self) -> None:
         """结果按 Parent 分数 × Child 分数降序排列"""
         parent_id = str(uuid.uuid4())
-        dense_search = _make_dense_search(search_results=[_make_parent_result(parent_id, score=0.8)])
+        dense_search = _make_dense_search()
+        l3_vector = _make_l3_vector(
+            search_results=[
+                {
+                    "id": parent_id,
+                    "score": 0.8,
+                    "payload": {
+                        "chunk_id": parent_id,
+                        "document_id": str(uuid.uuid4()),
+                        "index_level": "parent",
+                        "content": "L3 Parent 块内容",
+                    },
+                }
+            ]
+        )
 
-        async def _search(
+        def _search(
             collection: str,
-            query_text: str,
+            query_vector: list[float],
             limit: int = 10,
-            tenant_id: str | None = None,
             filter_payload: dict | None = None,
-        ):
+        ) -> list[dict]:
             if filter_payload and filter_payload.get("index_level") == "child":
                 return [
-                    _make_child_result(0.9, parent_id),
-                    _make_child_result(0.6, parent_id),
+                    _make_child_result_raw(0.9, parent_id),
+                    _make_child_result_raw(0.6, parent_id),
                 ]
-            return [_make_parent_result(parent_id, score=0.8)]
+            return [
+                {
+                    "id": parent_id,
+                    "score": 0.8,
+                    "payload": {
+                        "chunk_id": parent_id,
+                        "document_id": str(uuid.uuid4()),
+                        "index_level": "parent",
+                        "content": "L3 Parent 块内容",
+                    },
+                }
+            ]
 
-        dense_search.search.side_effect = _search
-        service = LayeredRetrievalService(
-            dense_search=dense_search,
-            l3_vector=_make_l3_vector(),
-        )
+        l3_vector.search.side_effect = _search
+        service = LayeredRetrievalService(dense_search=dense_search, l3_vector=l3_vector)
 
         results = await service.search_top_down(
             query_text="测试查询",
@@ -349,34 +401,35 @@ class TestTopDownL3ToL4:
     async def test_top_down_parent_content_preview(self) -> None:
         """结果 payload 包含 parent_content 截断摘要（前 200 字符）"""
         parent_id = str(uuid.uuid4())
-        dense_search = _make_dense_search(search_results=[_make_parent_result(parent_id, score=0.8)])
-
-        async def _search(
-            collection: str,
-            query_text: str,
-            limit: int = 10,
-            tenant_id: str | None = None,
-            filter_payload: dict | None = None,
-        ):
-            if filter_payload and filter_payload.get("index_level") == "child":
-                return [_make_child_result(0.7, parent_id)]
-            return [_make_parent_result(parent_id, score=0.8)]
-
-        dense_search.search.side_effect = _search
-
-        # 构造超长 Parent 内容
-        parent_result = await _search(
-            collection="c",
-            query_text="q",
-            limit=10,
-            filter_payload={"index_level": "parent"},
+        dense_search = _make_dense_search()
+        l3_vector = _make_l3_vector(
+            search_results=[
+                {
+                    "id": parent_id,
+                    "score": 0.8,
+                    "payload": {
+                        "chunk_id": parent_id,
+                        "document_id": str(uuid.uuid4()),
+                        "index_level": "parent",
+                        "content": "长" * 300,
+                    },
+                }
+            ]
         )
-        parent_result[0]["payload"]["content"] = "长" * 300
 
-        service = LayeredRetrievalService(
-            dense_search=dense_search,
-            l3_vector=_make_l3_vector(),
-        )
+        l3_vector.search.return_value = [
+            {
+                "id": parent_id,
+                "score": 0.8,
+                "payload": {
+                    "chunk_id": parent_id,
+                    "document_id": str(uuid.uuid4()),
+                    "index_level": "parent",
+                    "content": "长" * 300,
+                },
+            }
+        ]
+        service = LayeredRetrievalService(dense_search=dense_search, l3_vector=l3_vector)
 
         results = await service.search_top_down(
             query_text="测试查询",
@@ -385,6 +438,30 @@ class TestTopDownL3ToL4:
         )
 
         assert len(results[0]["payload"]["parent_content"]) <= 200
+
+
+def _make_child_result_raw(score: float, parent_id: str, child_id: str | None = None) -> dict:
+    """构造 L4 Child 块原始检索结果 dict
+
+    Args:
+        score: 相似度得分
+        parent_id: 父块 ID
+        child_id: 子块 ID（默认随机）
+
+    Returns:
+        Qdrant 格式的检索结果 dict
+    """
+    return {
+        "id": child_id or str(uuid.uuid4()),
+        "score": score,
+        "payload": {
+            "chunk_id": str(uuid.uuid4()),
+            "document_id": str(uuid.uuid4()),
+            "parent_chunk_id": parent_id,
+            "index_level": "child",
+            "content": f"L4 Child 块内容（分数 {score}）",
+        },
+    }
 
 
 # ===================================================================
