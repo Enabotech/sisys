@@ -296,20 +296,20 @@
 
 **扩展 SQLAlchemy 模型（修改 `src/infrastructure/storage/postgresql/models/archive.py`）：**
 
-`ArchiveModel` 新增字段（可选：直接新增列或通过 metadata JSONB 字段）：
-- [ ] 方案 A（推荐）：新增 `valid_from` 和 `valid_until` 列
+`ArchiveModel` 新增字段（方案 A：显式列，已决策通过）：
+- [ ] 方案 A：新增 `valid_from` 和 `valid_until` 列
   ```python
   valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
   valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
   ```
-- [ ] 方案 B：通过 `metadata_` JSONB 字段存储（`metadata_["valid_from"]`、`metadata_["valid_until"]`）
-  - 选择方案 A 的理由：显式列便于索引、查询性能更优、类型安全
 
 > **架构决策：** 采用方案 A（显式列）。原因：
 > 1. `valid_from`/`valid_until` 是核心业务字段，频繁用于时间轴查询过滤
 > 2. 显式列可创建索引，保障时间轴查询 P95<200ms 的性能要求
 > 3. 与 `ExternalAPIWhitelist` 实体的 `valid_from`/`valid_until` 显式字段模式一致
 > 4. `metadata` 字段保留给 Story 3.12 的陈旧标记扩展使用
+>
+> **备选方案 B（不采用）：** 通过 `metadata_` JSONB 字段存储（`metadata_["valid_from"]`、`metadata_["valid_until"]`）— 查询性能差、类型不安全、无法索引，已排除。
 
 #### 统一端口定义注册与管理 (Port Contract)
 
@@ -444,6 +444,7 @@
 | **TDD 单元测试** | 编码唯一性 | 异常 code 无碰撞 | `test_error_code_uniqueness.py` | Task 2 |
 | **TDD 单元测试** | 编码子域范围 | 子域范围/继承链一致性 | `test_code_ranges.py` | Task 2 |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向/零依赖 | `test_arch_archive_validity.py` | Task 5 |
+| **SDD 性能验证** | 有效期查询性能 | P95<200ms（时间轴查询延迟） | `test_perf_archive_validity.py` | Task 5 |
 | **集成测试** | 有效期管理集成 | 有效期设置+查询+陈旧标记 | `test_integration_archive_validity.py` | Task 3 |
 
 ---
@@ -895,7 +896,8 @@ tests/
 │   ├── test_acceptance_archive_validity.feature # NEW: Gherkin 场景
 │   └── test_acceptance_archive_validity.py      # NEW: BDD 步骤实现
 └── unit/architecture/
-    └── test_arch_archive_validity.py   # NEW: 架构验证测试
+    ├── test_arch_archive_validity.py   # NEW: 架构验证测试
+    └── test_perf_archive_validity.py   # NEW: 有效期查询性能验证测试（P95<200ms）
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
@@ -940,12 +942,14 @@ FactBecameStale:
 "ValidityPeriodSet": ChannelMapping(
     event_type="ValidityPeriodSet",
     rabbitmq_routing_key="sisys.events.reliable.validity_period_set",
+    redis_channel="sisys:rt:validity_period_set",
     delivery_mode=DeliveryMode.RELIABLE,
     description="档案有效期设置完成",
 ),
 "FactBecameStale": ChannelMapping(
     event_type="FactBecameStale",
     rabbitmq_routing_key="sisys.events.reliable.fact_became_stale",
+    redis_channel="sisys:rt:fact_became_stale",
     delivery_mode=DeliveryMode.RELIABLE,
     description="事实变为陈旧",
 ),
@@ -1080,6 +1084,7 @@ mark_stale_archives(batch_size=100):
 - `tests/acceptance/test_acceptance_archive_validity.feature` - Gherkin 场景
 - `tests/acceptance/test_acceptance_archive_validity.py` - BDD 步骤实现
 - `tests/unit/architecture/test_arch_archive_validity.py` - 架构验证测试
+- `tests/unit/architecture/test_perf_archive_validity.py` - 有效期查询性能验证测试（P95<200ms）
 
 **待更新的文件/To Be Updated:**
 - `src/domain/entities/strategic_archive.py` - 新增 valid_from/valid_until 字段 + is_valid/is_expired/days_until_expiry
