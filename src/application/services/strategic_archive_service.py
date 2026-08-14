@@ -14,6 +14,7 @@ from uuid import UUID
 
 from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
 from src.domain.events.archive_events import ArchiveCreated
+from src.domain.exceptions import EntityValidationError
 from src.domain.exceptions.archive_exceptions import ArchiveNotFoundError, ArchiveStorageError
 from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
 from src.domain.ports.event_publisher import EventPublisher, PublishResult
@@ -90,8 +91,6 @@ class StrategicArchiveService:
         from datetime import UTC, datetime
 
         if plan_type not in ("SP", "BP"):
-            from src.domain.exceptions import EntityValidationError
-
             raise EntityValidationError(
                 message="plan_type must be 'SP' or 'BP'",
                 context={"entity": "StrategicArchive", "field": "plan_type"},
@@ -126,6 +125,8 @@ class StrategicArchiveService:
         blob_ref: str | None = blob_key
         graph_node_id = str(saved.archive_id)
         graph_ref: str | None = graph_node_id
+        # 修正 metadata_ref 为真实 archive_id
+        saved.metadata_ref = f"strategic_archives:{saved.archive_id}"
 
         # Step 2: L3 向量存储（可降级）
         has_embedding = False
@@ -219,15 +220,15 @@ class StrategicArchiveService:
             graph_ref_val = None
 
         # 更新存储引用
-        saved.metadata_ref = f"strategic_archives:{saved.archive_id}"
         saved.embedding_ref = embedding_ref
         saved.blob_ref = blob_ref_val
         saved.graph_ref = graph_ref_val
-        # 将更新后的存储引用写回 L2
+        # 将更新后的存储引用写回 L2（失败时需传播错误，因 L3/L4/L5 已写入）
         try:
             saved = await self._archive_repo.save(saved)
         except Exception as e:
             logger.error("L2 metadata update failed for archive %s: %s", saved.archive_id, e)
+            raise ArchiveStorageError(layer="l2", cause=e)
 
         # Step 5: 发布 ArchiveCreated 事件
         if self._event_publisher is not None:
