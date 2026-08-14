@@ -148,8 +148,8 @@ class TestGetEntry:
 class TestArchivePlan:
     """POST /api/v1/archive/archive"""
 
-    def test_returns_200(self) -> None:
-        """返回 200"""
+    def test_returns_201(self) -> None:
+        """返回 201 Created"""
         client, _ = _make_app()
         response = client.post(
             "/api/v1/archive/archive",
@@ -159,7 +159,7 @@ class TestArchivePlan:
                 "assumptions": {"key": "value"},
             },
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
 
     def test_returns_archive(self) -> None:
         """返回创建的档案"""

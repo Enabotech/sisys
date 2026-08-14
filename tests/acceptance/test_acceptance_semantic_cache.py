@@ -403,7 +403,7 @@ def when_document_processed(context: dict[str, Any], event_loop) -> None:
         CacheInvalidationHandler,
     )
 
-    handler = CacheInvalidationHandler(cache=cache)
+    handler = CacheInvalidationHandler(cache=cache, event_listener=None)
     event_loop.run_until_complete(handler.handle(event))
 
 
@@ -558,9 +558,12 @@ def then_estimated_tokens(context: dict[str, Any]) -> None:
     hits = metrics.metrics.cache_hits_total
     expected = hits * 5000
     middleware = context["middleware"]
-    if hasattr(middleware, "metrics") and hasattr(middleware.metrics, "estimated_tokens_saved"):
-        actual = middleware.metrics.estimated_tokens_saved
-        assert actual == expected, f"预估 Token 数应为 {expected}，实际 {actual}"
+    # 验证 estimated_tokens_saved 属性存在且计算正确
+    assert hasattr(middleware, "metrics"), "middleware.metrics 不存在"
+    assert middleware.metrics is not None, "middleware.metrics 为 None"
+    assert hasattr(middleware.metrics, "estimated_tokens_saved"), "metrics.estimated_tokens_saved 不存在"
+    actual = middleware.metrics.estimated_tokens_saved
+    assert actual == expected, f"预估 Token 数应为 {expected}，实际 {actual}"
 
 
 # ===================================================================

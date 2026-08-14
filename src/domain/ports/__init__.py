@@ -8,6 +8,7 @@
 # from src.domain.ports.graph_storage import GraphManager, GraphStorage  # deprecated
 # from src.domain.ports.vector_storage import VectorStorage  # deprecated
 
+from src.domain.ports.agent_engine import AgentEnginePort
 from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
 from src.domain.ports.connection_manager import ConnectionManager
 from src.domain.ports.crawler_client import CrawlerClientPort

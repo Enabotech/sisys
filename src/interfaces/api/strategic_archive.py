@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import base64
 import logging
 import uuid
 from typing import Any, Callable
@@ -14,6 +15,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
+from src.domain.entities.strategic_archive import ArchiveType
+from src.domain.ports.archive_repository import ArchiveQuery
 from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
 from src.domain.value_objects.token_payload import TokenPayload
 
@@ -33,18 +36,24 @@ class ArchiveRequest(BaseModel):
     Attributes:
         plan_id: 规划 ID
         plan_type: 规划类型（SP/BP）
+        archive_type: 档案类型（默认 assumption）
         assumptions: 关键假设变量
         decision_basis: 决策依据
         execution_deviation: 实际执行偏差
         evidence_blob: 证据包内容（Base64 编码）
     """
 
-    plan_id: str = Field(..., description="规划 ID")
+    plan_id: uuid.UUID = Field(..., description="规划 ID")
     plan_type: str = Field(default="SP", pattern="^(SP|BP)$", description="规划类型")
+    archive_type: str = Field(
+        default="assumption",
+        pattern="^(assumption|decision|deviation|evidence_package)$",
+        description="档案类型",
+    )
     assumptions: dict[str, Any] = Field(default_factory=dict, description="关键假设变量")
     decision_basis: dict[str, Any] = Field(default_factory=dict, description="决策依据")
     execution_deviation: dict[str, Any] = Field(default_factory=dict, description="实际执行偏差")
-    evidence_blob: str | None = Field(default=None, description="证据包内容（Base64 编码）")
+    evidence_blob: str | None = Field(default=None, max_length=10485760, description="证据包内容（Base64 编码，最大 10MB）")
 
 
 class ArchiveResponse(BaseModel):
@@ -206,19 +215,27 @@ def create_archive_router(
             档案列表
         """
         del current_user  # 仅认证
-        from src.domain.entities.strategic_archive import ArchiveType
-        from src.domain.ports.archive_repository import ArchiveQuery
 
         parsed_archive_type: ArchiveType | None = None
         if archive_type is not None:
             try:
                 parsed_archive_type = ArchiveType(archive_type)
             except ValueError:
-                pass
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Invalid archive_type: {archive_type}",
+                )
+        try:
+            parsed_plan_id = uuid.UUID(plan_id) if plan_id else None
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid plan_id: {plan_id}",
+            )
         query = ArchiveQuery(
             archive_type=parsed_archive_type,
             plan_type=plan_type,
-            plan_id=uuid.UUID(plan_id) if plan_id else None,
+            plan_id=parsed_plan_id,
             offset=offset,
             limit=limit,
         )
@@ -247,18 +264,19 @@ def create_archive_router(
         del current_user  # 仅认证
         service = _get_service()
         try:
-            archive = await service.get_archive(uuid.UUID(archive_id))
+            parsed_id = uuid.UUID(archive_id)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid archive_id: {archive_id}",
             )
+        archive = await service.get_archive(parsed_id)
         return _to_archive_response(archive)
 
     @router.post(
         "/archive",
         response_model=ArchiveResponse,
-        status_code=status.HTTP_200_OK,
+        status_code=status.HTTP_201_CREATED,
         summary="手动触发归档",
     )
     async def archive_plan(
@@ -275,13 +293,21 @@ def create_archive_router(
             已归档的档案
         """
         del current_user  # 仅认证
-        import base64
 
-        evidence_blob = base64.b64decode(payload.evidence_blob) if payload.evidence_blob else None
+        evidence_blob = None
+        if payload.evidence_blob:
+            try:
+                evidence_blob = base64.b64decode(payload.evidence_blob, validate=True)
+            except Exception:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid base64 encoded evidence_blob",
+                )
         service = _get_service()
         archive = await service.archive_plan(
-            plan_id=uuid.UUID(payload.plan_id),
+            plan_id=payload.plan_id,
             plan_type=payload.plan_type,
+            archive_type=ArchiveType(payload.archive_type),
             assumptions=payload.assumptions,
             decision_basis=payload.decision_basis,
             execution_deviation=payload.execution_deviation,
@@ -308,15 +334,15 @@ def create_archive_router(
             档案列表
         """
         del current_user  # 仅认证
-        from src.domain.ports.archive_repository import ArchiveQuery
 
         try:
-            query = ArchiveQuery(plan_id=uuid.UUID(plan_id))
+            parsed_plan_id = uuid.UUID(plan_id)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid plan_id: {plan_id}",
             )
+        query = ArchiveQuery(plan_id=parsed_plan_id)
         service = _get_service()
         archives = await service.query_archive(query)
         return [_to_archive_response(a) for a in archives]
@@ -330,14 +356,6 @@ def create_archive_router(
 
 
 def _to_archive_response(archive: Any) -> ArchiveResponse:
-    """将领域档案转换为响应模型
-
-    Args:
-        archive: StrategicArchive 领域实体
-
-    Returns:
-        ArchiveResponse 响应模型
-    """
     return ArchiveResponse(
         archive_id=str(archive.archive_id),
         plan_id=str(archive.plan_id) if archive.plan_id else None,

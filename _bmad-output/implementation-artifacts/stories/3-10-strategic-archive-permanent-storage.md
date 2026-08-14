@@ -1100,20 +1100,55 @@ CREATE TABLE strategic_archives (
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** (待定)
-**审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+**审查日期:** 2026-08-14
+**审查模式:** full（Blind Hunter + Edge Case Hunter）
 
 #### 需决策 Decision Needed
 
-- [ ] (待定)
+- [ ] [Review][Decision] `_code_ranges.py` 将 `retrieval` 子域从 (280,289) 缩为 (280,281)，现有 `layered_retrieval_exceptions.py` 仅占用 280-281（`LayeredRetrievalError`=280, `LevelTransitionError`=281），与新增 `archive` (282,289) 无冲突。但需确认无其他位置使用了 282-289 范围的 retrieval 异常码。
 
-#### 已修复 Patch
+#### 已修复 Patch — P0 阻断性
 
-- [ ] (待定)
+- [x] [Review][Patch] **`archive_router` 未注册到 `app.py`** [src/interfaces/api/app.py] — 功能未接线，AC-8 要求的"在 app.py 注册路由"未实现。需在 `create_app()` 中添加 `app.include_router(archive_router)`。
+- [x] [Review][Patch] **`ArchiveModel` 自定义 `__init__` 破坏 SQLAlchemy ORM** [src/infrastructure/storage/postgresql/models/archive.py] — 删除整个 `__init__` 方法，依赖 SQLAlchemy 内置构造机制。所有默认值已在 `mapped_column` 的 `default=` 中声明。
+- [x] [Review][Patch] **`ArchiveModel.__init__` 中 `archived_at` 默认等于 `created_at`** [src/infrastructure/storage/postgresql/models/archive.py] — 删除 `__init__` 后该问题自动修复。`archived_at` 应由业务层显式赋值。
+- [x] [Review][Patch] **手动 `raise HTTPException` 违反项目红线** [src/interfaces/api/strategic_archive.py:多处] — 4 处手抛 HTTPException。应通过领域异常体系映射：无效 UUID 应使用自定义异常，由 ExceptionHandlers 自动映射为 400。
+- [x] [Review][Patch] **`src/domain/events/__init__.py` 中 `AuditEvent`/`AuditActionType` 悬挂导出** — 恢复 import 行。
+- [x] [Review][Patch] **`src/infrastructure/storage/postgresql/models/__init__.py` 中 `AuditOutboxModel` 悬挂导出** — 恢复 import 行。
+- [x] [Review][Patch] **`src/domain/ports/__init__.py` 中 `AgentEnginePort` 悬挂导出** — 恢复 import 行。
+- [x] [Review][Patch] **`list_entries` 中 `uuid.UUID(plan_id)` 未捕获异常 → 500** [src/interfaces/api/strategic_archive.py:list_entries] — 添加 `try/except ValueError` 返回 400。
+- [x] [Review][Patch] **`archive_plan` 中 `uuid.UUID(payload.plan_id)` + `base64.b64decode()` 未捕获异常 → 500** [src/interfaces/api/strategic_archive.py:archive_plan] — `ArchiveRequest.plan_id` 改为 `plan_id: uuid.UUID` 让 Pydantic 自动校验；base64 解码异常捕获返回 400。
+- [x] [Review][Patch] **`list_entries` 中 `except ValueError: pass` 静默忽略非法 `archive_type`** [src/interfaces/api/strategic_archive.py:list_entries] — 改为返回 400 错误。
+- [x] [Review][Patch] **`ArchiveCreated.archive_id` 使用 nil UUID 默认值** [src/domain/events/archive_events.py:37] — 改为 `field(default_factory=uuid.uuid4)`。
+- [x] [Review][Patch] **`saved.metadata_ref` 在 L2 `save()` 之后才赋值，L2 数据不一致** [src/application/services/strategic_archive_service.py:207-211] — 在 `save()` 之前预置 `metadata_ref`，`save()` 之后调用 `save()` 写回 L2。
+
+#### 已修复 Patch — P1 高优先级
+
+- [x] [Review][Patch] **`archive_plan()` 中 `archive_type` 硬编码为 `ArchiveType.ASSUMPTION`** [src/application/services/strategic_archive_service.py:101] — 增加 `archive_type: ArchiveType = ArchiveType.ASSUMPTION` 参数。
+- [x] [Review][Patch] **`archive_plan()` 中 `plan_type` 无校验** [src/application/services/strategic_archive_service.py:68-74] — 增加 `if plan_type not in ("SP", "BP"): raise EntityValidationError`。
+- [x] [Review][Patch] **`ArchiveQuery.__post_init__` 静默截断 `limit`** [src/domain/ports/archive_repository.py:338-341] — 添加警告日志，增加 `offset < 0` 和 `start_date > end_date` 校验。
+- [x] [Review][Patch] **`find()` 和 `count()` 重复过滤逻辑** [src/infrastructure/storage/postgresql/repository/archive_repository.py:275-366] — 提取 `_apply_filters(stmt, query)` 共享方法。
+- [x] [Review][Patch] **`get_entry` 中 `except ValueError` 捕获范围过宽** [src/interfaces/api/strategic_archive.py:get_entry] — 只将 `uuid.UUID()` 置于 try 中。
+- [x] [Review][Patch] **`POST /api/v1/archive/archive` 返回 200 而非 201** [src/interfaces/api/strategic_archive.py:528] — 改为 `status_code=status.HTTP_201_CREATED`。
+- [x] [Review][Patch] **`evidence_blob` 无体积上限** [src/interfaces/api/strategic_archive.py:314] — 添加 `max_length=10485760` 限制。
+- [x] [Review][Patch] **`list_entries` 和 `archive_plan` 中函数级 import 提至模块级** — 将所有模块级 import 提到文件顶部。
+
+#### 已修复 Patch — P2 中优先级
+
+- [x] [Review][Patch] **`StrategicArchive.validate()` 增加 `plan_type` 取值校验（SP/BP）**
+- [x] [Review][Patch] **`StrategicArchive.validate()` 增加 `version >= 1` 校验**
+- [x] [Review][Patch] **`StrategicArchive.validate()` 增加 `deleted_at` 时间先后关系校验**
+- [x] [Review][Patch] **`ArchiveQuery` 增加 `offset < 0`、`start_date > end_date` 校验**
+- [x] [Review][Patch] **`ArchiveStorageError.layer` 增加取值校验（l2/l3/l4/l5）**
+- [x] [Review][Patch] **API 层类型注解使用具体类型而非 `Any`** — `ArchiveRequest.plan_id` 改为 `uuid.UUID`
+- [x] [Review][Patch] **函数级 import 提至模块级**
 
 #### 已推迟 Defer
 
-- [ ] (待定)
+- [x] [Review][Defer] **`ArchiveConflictError` 已定义但未被使用** — 为 Story 3.11/3.12 预留，当前无冲突检测场景，延期到后续 Story 实现时启用。
+- [x] [Review][Defer] **`Base` 从 `outbox` 模块导入** — 既存问题，非本次变更引入，不应在此修复。
+- [x] [Review][Defer] **`version` 列名为乐观锁但无实际机制** — 设计预留，当前无并发冲突场景，后续 Story 再实现完整乐观锁。
+- [x] [Review][Defer] **`_to_entity`/`_to_model` 手动全字段映射** — 28 个字段手动映射，但当前无批量映射工具可用，且项目其他仓储也使用相同模式，延期到统一重构时处理。
 
 ---
 

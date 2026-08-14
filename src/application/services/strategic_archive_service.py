@@ -61,6 +61,7 @@ class StrategicArchiveService:
         self,
         plan_id: UUID,
         plan_type: str,
+        archive_type: ArchiveType = ArchiveType.ASSUMPTION,
         assumptions: dict[str, Any] | None = None,
         decision_basis: dict[str, Any] | None = None,
         execution_deviation: dict[str, Any] | None = None,
@@ -74,6 +75,7 @@ class StrategicArchiveService:
         Args:
             plan_id: 规划 ID
             plan_type: 规划类型（"SP"/"BP"）
+            archive_type: 档案类型（默认 ASSUMPTION）
             assumptions: 关键假设变量
             decision_basis: 决策依据
             execution_deviation: 实际执行偏差
@@ -87,15 +89,24 @@ class StrategicArchiveService:
         """
         from datetime import UTC, datetime
 
+        if plan_type not in ("SP", "BP"):
+            from src.domain.exceptions import EntityValidationError
+
+            raise EntityValidationError(
+                message="plan_type must be 'SP' or 'BP'",
+                context={"entity": "StrategicArchive", "field": "plan_type"},
+            )
+
         now = datetime.now(UTC)
         archive = StrategicArchive(
             archive_id=uuid.uuid4(),
             plan_id=plan_id,
             plan_type=plan_type,
-            archive_type=ArchiveType.ASSUMPTION,
+            archive_type=archive_type,
             assumptions=assumptions or {},
             decision_basis=decision_basis or {},
             execution_deviation=execution_deviation or {},
+            metadata_ref=f"strategic_archives:{uuid.uuid4()}",
             created_at=now,
             archived_at=now,
         )
@@ -203,6 +214,11 @@ class StrategicArchiveService:
         saved.embedding_ref = embedding_ref
         saved.blob_ref = blob_ref_val
         saved.graph_ref = graph_ref_val
+        # 将更新后的存储引用写回 L2
+        try:
+            saved = await self._archive_repo.save(saved)
+        except Exception as e:
+            logger.error("L2 metadata update failed for archive %s: %s", saved.archive_id, e)
 
         # Step 5: 发布 ArchiveCreated 事件
         if self._event_publisher is not None:

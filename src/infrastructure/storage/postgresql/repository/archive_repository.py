@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -82,6 +83,28 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
     # ArchiveRepositoryPort 实现
     # ------------------------------------------------------------------
 
+    def _apply_filters(self, stmt: Any, query: ArchiveQuery) -> Any:
+        """应用 ArchiveQuery 过滤条件到 statement
+
+        Args:
+            stmt: SQLAlchemy select/count statement
+            query: ArchiveQuery 查询条件
+
+        Returns:
+            添加了过滤条件的 statement
+        """
+        if query.plan_id is not None:
+            stmt = stmt.where(ArchiveModel.plan_id == query.plan_id)
+        if query.archive_type is not None:
+            stmt = stmt.where(ArchiveModel.archive_type == query.archive_type.value)
+        if query.plan_type is not None:
+            stmt = stmt.where(ArchiveModel.plan_type == query.plan_type)
+        if query.start_date is not None:
+            stmt = stmt.where(ArchiveModel.archived_at >= query.start_date)
+        if query.end_date is not None:
+            stmt = stmt.where(ArchiveModel.archived_at <= query.end_date)
+        return stmt
+
     async def find(self, query: ArchiveQuery) -> list[StrategicArchive]:
         """按条件查询档案
 
@@ -93,18 +116,7 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         """
         stmt = select(ArchiveModel)
         stmt = self._apply_soft_delete_filter(stmt)
-
-        if query.plan_id is not None:
-            stmt = stmt.where(ArchiveModel.plan_id == query.plan_id)
-        if query.archive_type is not None:
-            stmt = stmt.where(ArchiveModel.archive_type == query.archive_type.value)
-        if query.plan_type is not None:
-            stmt = stmt.where(ArchiveModel.plan_type == query.plan_type)
-        if query.start_date is not None:
-            stmt = stmt.where(ArchiveModel.archived_at >= query.start_date)
-        if query.end_date is not None:
-            stmt = stmt.where(ArchiveModel.archived_at <= query.end_date)
-
+        stmt = self._apply_filters(stmt, query)
         # 分页
         stmt = stmt.order_by(ArchiveModel.archived_at.desc()).offset(query.offset).limit(query.limit)
 
@@ -160,17 +172,7 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
 
         stmt = select(func.count()).select_from(ArchiveModel)
         stmt = self._apply_soft_delete_filter(stmt)
-
-        if query.plan_id is not None:
-            stmt = stmt.where(ArchiveModel.plan_id == query.plan_id)
-        if query.archive_type is not None:
-            stmt = stmt.where(ArchiveModel.archive_type == query.archive_type.value)
-        if query.plan_type is not None:
-            stmt = stmt.where(ArchiveModel.plan_type == query.plan_type)
-        if query.start_date is not None:
-            stmt = stmt.where(ArchiveModel.archived_at >= query.start_date)
-        if query.end_date is not None:
-            stmt = stmt.where(ArchiveModel.archived_at <= query.end_date)
+        stmt = self._apply_filters(stmt, query)
 
         result = await self._session.execute(stmt)
         return int(result.scalar() or 0)

@@ -119,8 +119,8 @@ development_status:
   3-1a-dense-semantic-search: done
   3-1b-bm25-sparse-search-rrf-fusion: done
   3-2a-llm-client-infrastructure: done
-  3-2b-entity-extraction-llm-rules: review
-  3-3-domain-dictionary-management: review
+  3-2b-entity-extraction-llm-rules: done
+  3-3-domain-dictionary-management: done
   3-4-rrf-fusion-ranking: done
   3-5-layered-search-l1-l4: review
   3-6-contractual-summary-generation: backlog

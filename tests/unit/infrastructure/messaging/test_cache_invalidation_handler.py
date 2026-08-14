@@ -34,7 +34,7 @@ def _make_handler(
         cache.invalidate_pattern = AsyncMock()
         cache.invalidate_all = AsyncMock()
 
-    handler = CacheInvalidationHandler(cache=cache)
+    handler = CacheInvalidationHandler(cache=cache, event_listener=None)
     return handler, cache
 
 
@@ -172,7 +172,7 @@ class TestCacheInvalidationHandlerEdgeCases:
         from unittest.mock import MagicMock
 
         mock_cache = MagicMock(spec=SemanticCache)
-        handler = CacheInvalidationHandler(cache=mock_cache)
+        handler = CacheInvalidationHandler(cache=mock_cache, event_listener=None)
         assert handler._cache is mock_cache
 
     async def test_document_processed_event_type_check(self) -> None:

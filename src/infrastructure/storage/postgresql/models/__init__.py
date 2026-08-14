@@ -5,6 +5,7 @@
 
 from src.infrastructure.storage.postgresql.models.archive import ArchiveModel
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
+from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel
 from src.infrastructure.storage.postgresql.models.dictionary import (
     DictionaryEntryModel,
     DictionarySnapshotModel,
