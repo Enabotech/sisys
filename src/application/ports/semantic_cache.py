@@ -14,12 +14,19 @@ class SemanticCache(Protocol):
     支持基于向量相似度的缓存查询和存储
     """
 
-    async def get(self, query_embedding: list[float], threshold: float = 0.9) -> dict | None:
+    async def get(
+        self,
+        query_embedding: list[float],
+        threshold: float = 0.9,
+        cache_key: str | None = None,
+    ) -> dict | None:
         """查询语义缓存
 
         Args:
             query_embedding: 查询向量嵌入
             threshold: 相似度阈值
+            cache_key: 可选精确缓存键（含 weights 哈希后缀），提供时按精确键查找，
+                用于 weights 缓存隔离（不同 weights 不应命中彼此的缓存）
 
         Returns:
             缓存结果，如果未命中则返回 None

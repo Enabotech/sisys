@@ -226,8 +226,10 @@ class SemanticCacheMiddleware:
 
         # 步骤 2: 查询语义缓存
         try:
+            # 生成含 weights 哈希后缀的缓存键（weights 隔离：不同 weights 不命中彼此的缓存）
+            query_cache_key = self._build_cache_key(embedding, weights)
             start_time = time.monotonic()
-            cached = await self._cache.get(embedding, threshold=self._threshold)
+            cached = await self._cache.get(embedding, threshold=self._threshold, cache_key=query_cache_key)
             latency = time.monotonic() - start_time
 
             if cached is not None:

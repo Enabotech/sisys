@@ -162,12 +162,20 @@ class RedisSemanticCache:
         vector_id = hashlib.md5(vec_bytes, usedforsecurity=False).hexdigest()[:16]
         return f"vec:{vector_id}"
 
-    async def get(self, query_embedding: list[float], threshold: float = 0.9) -> dict | None:
+    async def get(
+        self,
+        query_embedding: list[float],
+        threshold: float = 0.9,
+        cache_key: str | None = None,
+    ) -> dict | None:
         """Query semantic cache via RediSearch KNN vector search.
 
         Args:
             query_embedding: Query embedding vector.
             threshold: Minimum cosine similarity (0.0-1.0).
+            cache_key: Optional exact cache key (with weights hash suffix).
+                When provided, performs exact key lookup instead of KNN search,
+                enabling weights-based cache isolation.
 
         Returns:
             Cached result dict if hit, None if miss.
@@ -175,6 +183,32 @@ class RedisSemanticCache:
         try:
             await self._ensure_index()
 
+            # 当提供 cache_key 时，执行精确键查找（支持 weights 缓存隔离）
+            if cache_key is not None:
+                key = build_key(self._NAMESPACE, cache_key)
+                result_data = await self._redis.hget(key, "result")
+                if result_data is None:
+                    if self._metrics_collector:
+                        self._metrics_collector.record_cache_miss()
+                    logger.debug("Cache miss (exact key): %s", cache_key)
+                    return None
+                try:
+                    parsed = json_loads(result_data)
+                except (json.JSONDecodeError, TypeError) as e:
+                    logger.warning("Corrupt result data: %s", e)
+                    if self._metrics_collector:
+                        self._metrics_collector.record_cache_miss()
+                    return None
+                if not isinstance(parsed, dict):
+                    logger.warning("Unexpected result type: %s", type(parsed).__name__)
+                    if self._metrics_collector:
+                        self._metrics_collector.record_cache_miss()
+                    return None
+                if self._metrics_collector:
+                    self._metrics_collector.record_cache_hit()
+                return parsed
+
+            # 无 cache_key 时，使用 RediSearch KNN 向量相似度检索
             query_bytes = _vector_to_bytes(query_embedding)
             max_distance = 1.0 - threshold
 

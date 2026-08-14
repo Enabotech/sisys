@@ -49,12 +49,12 @@
 **验证标准/Validation Criteria:**
 - [ ] StrategicArchive 新增 `valid_from: datetime | None` 字段（默认 `None`，表示创建时生效）
 - [ ] StrategicArchive 新增 `valid_until: datetime | None` 字段（默认 `None`，表示永久有效）
-- [ ] `is_valid() -> bool` 方法 — 检查当前时间是否在有效期内（valid_from <= now <= valid_until，valid_until 为 None 时仅检查 valid_from）
+- [ ] `is_valid() -> bool` 方法 — 检查当前时间是否在有效期内（valid_from 为 None 时仅检查 valid_until，valid_until 为 None 时仅检查 valid_from，两者均为 None 时返回 True 视为永久有效）
 - [ ] `is_expired() -> bool` 方法 — 检查是否已过期（now > valid_until，valid_until 为 None 时返回 False）
-- [ ] `days_until_expiry() -> int | None` 方法 — 计算距离过期的天数（valid_until 为 None 时返回 None）
+- [ ] `days_until_expiry() -> int | None` 方法 — 计算距离过期的天数（valid_until 为 None 时返回 None；已过期时返回负数，与 `ExternalAPIWhitelist` 行为一致）
 - [ ] `validate()` 方法扩展 — 验证 valid_until 必须晚于或等于 valid_from（如果两者均非 None）
-- [ ] 字段类型为 `datetime`（非 `date`），使用时区感知（UTC）
-- [ ] 遵循 `ExternalAPIWhitelist` 的 `valid_from`/`valid_until` 模式（`src/domain/entities/external_api_whitelist.py`）
+- [ ] 字段类型为 `datetime`（非 `date`），使用时区感知（UTC）；在 `is_valid()`/`is_expired()`/`days_until_expiry()` 中通过模块级 `_now()` 函数获取当前时间，支持测试注入（默认 `lambda: datetime.now(UTC)`）
+- [ ] 遵循 `ExternalAPIWhitelist` 的 `valid_from`/`valid_until` 模式（`src/domain/entities/external_api_whitelist.py`），但注意 StrategicArchive 的 valid_from/valid_until 为 `datetime | None`（非必填），而 ExternalAPIWhitelist 为 `datetime`（必填）
 
 ### AC-2: 有效期领域事件
 
@@ -65,16 +65,16 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `ValidityPeriodSet` 事件（`src/domain/events/archive_events.py`）— 有效期设置时发布
-  - 字段：`archive_id: UUID`、`plan_id: UUID | None`、`archive_type: ArchiveType`、`valid_from: datetime | None`、`valid_until: datetime | None`
+  - 字段：`archive_id: UUID`（必填，无默认值）、`plan_id: UUID | None`、`archive_type: ArchiveType`、`valid_from: datetime | None`、`valid_until: datetime | None`
   - `event_type: str = "ValidityPeriodSet"`（`field(default="ValidityPeriodSet", init=False)`）
-  - 通过 `__post_init__` 设置 `aggregate_type = "StrategicArchive"`
+  - 通过 `__post_init__` 设置 `aggregate_id = archive_id` 与 `aggregate_type = "StrategicArchive"`（与 ArchiveCreated 一致的赋值逻辑）
   - 通道：RabbitMQ + Outbox（RELIABLE 模式）
 - [ ] `FactBecameStale` 事件（`src/domain/events/archive_events.py`）— 事实变为陈旧时发布
-  - 字段：`archive_id: UUID`、`plan_id: UUID | None`、`archive_type: ArchiveType`、`valid_until: datetime`、`stale_since: datetime`（标记为陈旧的时间）
+  - 字段：`archive_id: UUID`（必填，无默认值）、`plan_id: UUID | None`、`archive_type: ArchiveType`、`valid_until: datetime | None`（基于 archived_at 标记陈旧时为 None）、`stale_since: datetime`（标记为陈旧的时间，`field(default_factory=lambda: datetime.now(UTC))`）
   - `event_type: str = "FactBecameStale"`
-  - 通过 `__post_init__` 设置 `aggregate_type = "StrategicArchive"`
+  - 通过 `__post_init__` 设置 `aggregate_id = archive_id` 与 `aggregate_type = "StrategicArchive"`（与 ArchiveCreated 一致的赋值逻辑）
   - 通道：RabbitMQ + Outbox（RELIABLE 模式）
-- [ ] 两事件注册于 `src/domain/events/__init__.py`、`configs/event_channels.yaml`、`ChannelRouter.DEFAULT_MAPPINGS`
+- [ ] 两事件注册于 `src/domain/events/__init__.py`、`configs/event_channels.yaml`、`ChannelRouter.DEFAULT_MAPPINGS`（参见下方"环境变量与配置"章节的完整配置模板）
 
 ### AC-3: 有效期异常体系
 
@@ -84,7 +84,7 @@
 **And** 分配唯一异常编码（archive 子域 282-289 范围内，使用可用编码 285/286）
 
 **验证标准/Validation Criteria:**
-- [ ] `ValidityPeriodConflictError`（EXCEPTION_285）— 继承 `ConflictError`，有效期冲突（如重叠有效期）
+- [ ] `ValidityPeriodConflictError`（EXCEPTION_285）— 继承 `ConflictError`，有效期冲突（同一 `plan_id` + 同一 `archive_type` 下，与其他档案的有效期区间存在重叠）
   - 构造参数：`archive_id: UUID`、`message: str | None = None`、`cause: Exception | None = None`
   - `message` 默认构造：`f"Validity period conflict for archive: {archive_id}"`
   - `context` 暴露 `archive_id`（`context={"archive_id": str(archive_id)}`）
@@ -92,6 +92,8 @@
 - [ ] 异常在 `_CLASS_TO_SUBDOMAIN` 注册子域 `"archive"`
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册（409）
 - [ ] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性
+
+> **触发规则（冲突判定）：** `set_validity_period()` 在更新前需查询同一 `plan_id`、同一 `archive_type`、不同 `archive_id` 的既有档案，若新区间 `[valid_from, valid_until]`（None 视为开区间端点）与任一既有区间存在交集（含开区间边界），则抛出 `ValidityPeriodConflictError`。该判定在应用服务层完成（复用 `archive_repo.find()` 按 plan_id+archive_type 查询后内存比较）。
 
 ### AC-4: ArchiveQuery 扩展（时间轴查询）
 
@@ -101,10 +103,11 @@
 **And** 支持按 is_valid（当前有效）/is_expired（已过期）状态过滤
 
 **验证标准/Validation Criteria:**
-- [ ] ArchiveQuery 新增 `valid_from_filter: datetime | None = None` 字段 — 按 valid_from 过滤
-- [ ] ArchiveQuery 新增 `valid_until_filter: datetime | None = None` 字段 — 按 valid_until 过滤
-- [ ] ArchiveQuery 新增 `validity_status: str | None = None` 字段 — 按有效期状态过滤（`"valid"`/`"expired"`/`"all"`，默认 `None` 表示不过滤）
-- [ ] `__post_init__` 验证 `validity_status` 取值必须为 `("valid", "expired", "all", None)` 之一
+- [ ] ArchiveQuery 新增 `valid_from: datetime | None = None` 字段 — 按 valid_from 范围过滤（>= valid_from）
+- [ ] ArchiveQuery 新增 `valid_until: datetime | None = None` 字段 — 按 valid_until 范围过滤（<= valid_until）
+- [ ] ArchiveQuery 新增 `validity_status: ValidityStatus | None = None` 字段 — 按有效期状态过滤（使用 `ValidityStatus` 枚举：`VALID="valid"`/`EXPIRED="expired"`/`ALL="all"`，默认 `None` 表示不过滤）
+- [ ] 新增 `ValidityStatus` 枚举（`class ValidityStatus(str, Enum)`），定义在 `src/domain/ports/archive_repository.py` 中，与 `archive_type` 使用枚举的模式一致
+- [ ] `__post_init__` 验证 `validity_status` 取值必须为 `ValidityStatus` 枚举成员或 None
 - [ ] 向后兼容：所有新增字段均为可选，默认 None，不影响现有查询
 
 ### AC-5: 应用层有效期管理服务
@@ -119,15 +122,17 @@
   - 调用 `archive_repo.get_by_id()` 获取档案
   - 若档案不存在，抛出 `ArchiveNotFoundError`
   - 更新档案的 `valid_from`/`valid_until` 字段
+  - 调用 `archive.validate()` 验证 `valid_from <= valid_until`（若两者均非 None），防止无效数据写入
+  - **冲突检测**：查询同一 `plan_id` + 同一 `archive_type` 下、不同 `archive_id` 的档案，检查新区间与既有区间是否存在重叠（None 视为开区间端点）。若存在重叠，抛出 `ValidityPeriodConflictError`
   - 调用 `archive_repo.save()` 持久化
   - 发布 `ValidityPeriodSet` 事件
-- [ ] `query_by_validity(query: ArchiveQuery) -> list[StrategicArchive]` 方法 — 按有效期查询
-  - 委托给 `archive_repo.find()`，利用 ArchiveQuery 新增的字段
+- [ ] 复用现有 `query_archive(query: ArchiveQuery) -> list[StrategicArchive]` 方法 — 按有效期查询（通过 ArchiveQuery 新增的 `valid_from`/`valid_until`/`validity_status` 字段自然支持，无需新增方法）
 - [ ] `check_staleness(archive_id: UUID) -> bool` 方法 — 检查单个档案是否陈旧
   - 获取档案的 `valid_until`，如果 `valid_until` 为 None，则检查 `archived_at` 是否超过 12 个月
+  - 若 `valid_until` 和 `archived_at` 均为 None，返回 False（不标记为"未设置有效期"，该状态在 Story 3.12 处理）
   - 若已陈旧，返回 True
 - [ ] `mark_stale_archives(batch_size: int = 100) -> list[StrategicArchive]` 方法 — 批量标记陈旧档案
-  - 查询所有 valid_until < now（或 archived_at < now - 12个月）的档案
+  - 查询所有 valid_until < now（或 valid_until IS NULL AND archived_at < now - 12个月）的档案
   - 写入档案的 `metadata` 字典，设置 `{"staleness": "stale", "stale_since": <isoformat>}`
   - 发布 `FactBecameStale` 事件（每个档案一个事件）
   - 返回被标记为陈旧的档案列表
@@ -142,13 +147,14 @@
 **And** 支持 validity_status 状态过滤
 
 **验证标准/Validation Criteria:**
-- [ ] `_apply_filters()` 方法扩展 — 支持 `valid_from_filter`、`valid_until_filter`、`validity_status` 过滤
-  - `valid_from_filter`：`ArchiveModel.valid_from >= query.valid_from_filter`
-  - `valid_until_filter`：`ArchiveModel.valid_until <= query.valid_until_filter`
-  - `validity_status="valid"`：`ArchiveModel.valid_from <= now` AND `(ArchiveModel.valid_until >= now OR ArchiveModel.valid_until IS NULL)`
+- [ ] `_apply_filters()` 方法扩展 — 支持 `valid_from`、`valid_until`、`validity_status` 过滤
+  - `valid_from`：`ArchiveModel.valid_from >= query.valid_from`
+  - `valid_until`：`ArchiveModel.valid_until <= query.valid_until`
+  - `validity_status="valid"`：`(ArchiveModel.valid_from IS NULL OR ArchiveModel.valid_from <= now)` AND `(ArchiveModel.valid_until >= now OR ArchiveModel.valid_until IS NULL)` — **注意 NULL 安全处理**，确保已有档案（valid_from=NULL）被正确包含
   - `validity_status="expired"`：`ArchiveModel.valid_until < now`
 - [ ] 新增的过滤条件与现有 plan_id/archive_type/plan_type/start_date/end_date 组合兼容
-- [ ] 扩展 `ArchiveModel` 添加 `valid_from` 和 `valid_until` 列（可选迁移，或复用 `metadata` JSONB 字段）
+- [ ] 扩展 `ArchiveModel` 添加 `valid_from` 和 `valid_until` 列（方案 A：显式列，已决策通过）
+- [ ] `_to_entity()` 和 `_to_model()` 转换方法同步更新，新增 valid_from/valid_until 字段映射（`src/infrastructure/storage/postgresql/repository/archive_repository.py`）
 
 ### AC-7: 有效期变更事件处理
 
@@ -174,17 +180,19 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `PUT /api/v1/archive/entries/{archive_id}/validity` — 设置档案有效期
-  - 请求体：`{ "valid_from": datetime | null, "valid_until": datetime | null }`
-  - 响应：更新后的档案详情
-  - 错误：404（档案不存在）、409（有效期冲突）
+  - 请求体 Pydantic Schema：`ValidityRequest(BaseModel)` — 包含 `valid_from: datetime | None = None`、`valid_until: datetime | None = None`
+  - 响应 200：更新后的档案详情（`ArchiveResponse` 新增 `valid_from`、`valid_until` 字段）
+  - 响应 404：档案不存在
+  - 响应 409：有效期冲突
 - [ ] `GET /api/v1/archive/entries` 扩展查询参数 — 支持 `valid_from`、`valid_until`、`validity_status` 过滤
-  - 与现有 `plan_id`、`archive_type`、`plan_type`、`date_range` 参数组合使用
+  - 与现有 `plan_id`、`archive_type`、`plan_type` 参数组合使用（注：现有路由未暴露 `start_date`/`end_date` 查询参数，此处不新增）
   - 向后兼容：不传参时行为不变
 - [ ] `POST /api/v1/archive/staleness/check` — 手动触发陈旧标记检查
-  - 响应：被标记为陈旧的档案列表
+  - 响应 Pydantic Schema：`StalenessCheckResponse(BaseModel)` — 包含 `marked: list[str]`、`count: int`
   - 返回 200 + 标记结果列表
 - [ ] 请求/响应 Schema 使用 Pydantic，定义于路由同文件或共享 Schema 模块
-- [ ] 查询延迟 P95<200ms
+- [ ] `ArchiveResponse` 新增 `valid_from: str | None = None`、`valid_until: str | None = None` 字段，`_to_archive_response()` 同步映射
+- [ ] 查询延迟 P95<200ms（通过新增索引保障，性能验证见 `tests/unit/architecture/test_perf_archive_validity.py`）
 
 ### AC-9: 端口注册与 DI 集成
 
@@ -214,25 +222,25 @@
 **新增事件（在 `src/domain/events/archive_events.py` 中追加）：**
 - [ ] `ValidityPeriodSet`（`@dataclass(frozen=True)`）
   - 继承 `DomainEvent`
-  - 字段: `archive_id: uuid.UUID`（`field(default_factory=uuid.uuid4)`）
+  - 字段: `archive_id: uuid.UUID`（必填，无默认值 — 有效期事件须由调用方显式传入）
   - `plan_id: uuid.UUID | None = None`
   - `archive_type: ArchiveType = ArchiveType.ASSUMPTION`
   - `valid_from: datetime | None = None`
   - `valid_until: datetime | None = None`
   - `event_type: str = field(default="ValidityPeriodSet", init=False)`
-  - `__post_init__` 设置 `aggregate_type = "StrategicArchive"`
+  - `__post_init__` 设置 `aggregate_id = self.archive_id`（若为 None）和 `aggregate_type = "StrategicArchive"`（若为空）
   - Schema 版本: v1.0.0
   - 通道: RabbitMQ + Outbox（RELIABLE 模式）
 
 - [ ] `FactBecameStale`（`@dataclass(frozen=True)`）
   - 继承 `DomainEvent`
-  - 字段: `archive_id: uuid.UUID`（`field(default_factory=uuid.uuid4)`）
+  - 字段: `archive_id: uuid.UUID`（必填，无默认值 — 有效期事件须由调用方显式传入）
   - `plan_id: uuid.UUID | None = None`
   - `archive_type: ArchiveType = ArchiveType.ASSUMPTION`
-  - `valid_until: datetime`（档案的 valid_until 值）
+  - `valid_until: datetime | None = None`（基于 `archived_at` 标记陈旧时为 None，与实体字段类型一致）
   - `stale_since: datetime`（标记为陈旧的时间，`field(default_factory=lambda: datetime.now(UTC))`）
   - `event_type: str = field(default="FactBecameStale", init=False)`
-  - `__post_init__` 设置 `aggregate_type = "StrategicArchive"`
+  - `__post_init__` 设置 `aggregate_id = self.archive_id`（若为 None）和 `aggregate_type = "StrategicArchive"`（若为空）
   - Schema 版本: v1.0.0
   - 通道: RabbitMQ + Outbox（RELIABLE 模式）
 
@@ -248,26 +256,27 @@
 - [ ] `is_valid() -> bool` — 检查当前时间是否在有效期内
   ```python
   def is_valid(self) -> bool:
-      now = datetime.now(UTC)
+      now = _now()
       if self.valid_from is not None and self.valid_from > now:
           return False
       if self.valid_until is not None and self.valid_until < now:
           return False
       return True
   ```
+  （`_now()` 为模块级函数，默认 `lambda: datetime.now(UTC)`，测试可注入固定时间）
 - [ ] `is_expired() -> bool` — 检查是否已过期
   ```python
   def is_expired(self) -> bool:
       if self.valid_until is None:
           return False
-      return datetime.now(UTC) > self.valid_until
+      return _now() > self.valid_until
   ```
-- [ ] `days_until_expiry() -> int | None` — 计算距离过期的天数
+- [ ] `days_until_expiry() -> int | None` — 计算距离过期的天数（当日不足 24h 的部分向下取整；已过期返回负数）
   ```python
   def days_until_expiry(self) -> int | None:
       if self.valid_until is None:
           return None
-      delta = self.valid_until - datetime.now(UTC)
+      delta = self.valid_until - _now()
       return delta.days
   ```
 
@@ -277,12 +286,13 @@
 **扩展值对象（修改 `src/domain/ports/archive_repository.py`）：**
 
 `ArchiveQuery` 新增字段：
-- [ ] `valid_from_filter: datetime | None = None` — 按 valid_from 范围过滤（>= valid_from_filter）
-- [ ] `valid_until_filter: datetime | None = None` — 按 valid_until 范围过滤（<= valid_until_filter）
-- [ ] `validity_status: str | None = None` — 有效期状态过滤（`"valid"`/`"expired"`/`"all"`）
+- [ ] `valid_from: datetime | None = None` — 按 valid_from 范围过滤（>= valid_from）
+- [ ] `valid_until: datetime | None = None` — 按 valid_until 范围过滤（<= valid_until）
+- [ ] `validity_status: ValidityStatus | None = None` — 有效期状态过滤（使用 `ValidityStatus` 枚举：`VALID="valid"`/`EXPIRED="expired"`/`ALL="all"`）
 
 `__post_init__` 扩展：
-- [ ] 验证 `validity_status` 取值合法性
+- [ ] 验证 `validity_status` 取值必须为 `ValidityStatus` 枚举成员或 None
+- [ ] 新增 `ValidityStatus` 枚举定义（`class ValidityStatus(str, Enum)`），放在 `src/domain/ports/archive_repository.py` 中，与 `ArchiveQuery` 同文件
 
 **扩展 SQLAlchemy 模型（修改 `src/infrastructure/storage/postgresql/models/archive.py`）：**
 
@@ -421,8 +431,8 @@
 | **TDD 单元测试** | StrategicArchive 实体扩展 | valid_from/valid_until/is_valid/is_expired/days_until_expiry | `test_archive_entity.py` | Task 1 |
 | **TDD 单元测试** | 有效期事件 | ValidityPeriodSet/FactBecameStale 构造/序列化/反序列化 | `test_archive_events.py` | Task 2 |
 | **TDD 单元测试** | 有效期异常 | ValidityPeriodConflictError 构造/to_dict/HTTP 映射 | `test_archive_exceptions.py` | Task 2 |
-| **TDD 单元测试** | ArchiveQuery 扩展 | valid_from_filter/valid_until_filter/validity_status 字段 | `test_archive_repository_port.py` | Task 0 |
-| **TDD 单元测试** | StrategicArchiveService 扩展 | set_validity_period/query_by_validity/check_staleness/mark_stale | `test_strategic_archive_service.py` | Task 3 |
+| **TDD 单元测试** | ArchiveQuery 扩展 | valid_from/valid_until/validity_status 字段 + ValidityStatus 枚举 | `test_port_contract_strategic_archive.py` | Task 0 |
+| **TDD 单元测试** | StrategicArchiveService 扩展 | set_validity_period/check_staleness/mark_stale | `test_strategic_archive_service.py` | Task 3 |
 | **TDD 单元测试** | 事件处理器 | ValidityPeriodSet/FactBecameStale 事件处理逻辑 | `test_archive_handlers.py` | Task 3 |
 | **TDD 单元测试** | PostgreSQLArchiveRepository 扩展 | 有效期过滤/状态过滤查询 | `test_archive_repository.py` | Task 4 |
 | **TDD 单元测试** | 接口层 API 路由 | PUT validity/GET 扩展参数/POST staleness-check | `test_archive_routes.py` | Task 5 |
@@ -447,7 +457,7 @@
 - [ ] **应用层覆盖率 ≥85%**
 - [ ] **接口层覆盖率 ≥85%**
 - [ ] **基础设施层覆盖率 ≥75%**
-- [ ] **集成测试覆盖率 ≥70%**
+- [ ] 集成测试覆盖率 ≥70%（通过 `pytest tests/integration/ --cov=src --cov-report=term-missing` 单独测量；不含全局覆盖率门禁，仅作为内部质量参考）
 
 #### 代码质量门禁
 - [ ] **Ruff 检查通过**（`ruff check src/`）
@@ -484,7 +494,7 @@
 | AC-2 | 有效期领域事件 | Task 2 | TDD 事件实现 | `test_archive_events.py` |
 | AC-3 | 有效期异常体系 | Task 0 | SDD 规范定义（异常契约） | `test_archive_exceptions.py` |
 | AC-3 | 有效期异常体系 | Task 2 | TDD 异常实现 | `test_archive_exceptions.py` |
-| AC-4 | ArchiveQuery 扩展 | Task 0 | SDD 规范定义 | `test_archive_repository_port.py` |
+| AC-4 | ArchiveQuery 扩展 | Task 0 | SDD 规范定义（ValidityStatus 枚举） | `test_port_contract_strategic_archive.py` |
 | AC-4 | ArchiveQuery 扩展 | Task 4 | TDD 仓储实现 | `test_archive_repository.py` |
 | AC-5 | 应用层有效期管理服务 | Task 0 | SDD 规范定义 | `test_strategic_archive_service.py` |
 | AC-5 | 应用层有效期管理服务 | Task 3 | TDD 服务实现 | `test_strategic_archive_service.py` |
@@ -513,7 +523,7 @@
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。
 
 - [ ] Subtask 0.1: 扩展 `StrategicArchive` 实体 Schema — 新增 valid_from/valid_until 字段及业务方法
-- [ ] Subtask 0.2: 扩展 `ArchiveQuery` 值对象 — 新增 valid_from_filter/valid_until_filter/validity_status 字段
+- [ ] Subtask 0.2: 扩展 `ArchiveQuery` 值对象 — 新增 valid_from/valid_until/validity_status 字段 + ValidityStatus 枚举
 - [ ] Subtask 0.3: 定义 `ValidityPeriodConflictError` 异常契约（EXCEPTION_285）
 - [ ] Subtask 0.4: 定义 `ValidityPeriodSet` / `FactBecameStale` 事件 Schema
 - [ ] Subtask 0.5: 扩展 `ArchiveModel` SQLAlchemy 模型 — 新增 valid_from/valid_until 列
@@ -598,7 +608,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展 `tests/unit/application/services/test_strategic_archive_service.py`（set_validity_period/query_by_validity/check_staleness/mark_stale） |
+| 🔴 红 | 扩展 `tests/unit/application/services/test_strategic_archive_service.py`（set_validity_period/check_staleness/mark_stale） |
 | 🟢 绿 | 扩展 `StrategicArchiveService` — 实现有效期管理方法 |
 | 🔄 重构 | 添加类型注解、docstring、优雅降级逻辑 |
 
@@ -623,11 +633,11 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/integration/test_integration_archive_validity.py`（有效期设置+查询+陈旧标记） |
-| 🟢 绿 | 实现集成测试场景 |
+| 🟢 绿 | 实现有效期管理服务方法 + 仓储扩展，使集成测试通过 |
 | 🔄 重构 | 优化测试隔离和断言 |
 
-- [ ] Subtask 3.7: 🔴 红 — 编写集成测试（失败阶段）
-- [ ] Subtask 3.8: 🟢 绿 — 实现集成测试场景
+- [ ] Subtask 3.7: 🔴 红 — 编写集成测试（业务功能未实现，测试预期失败）
+- [ ] Subtask 3.8: 🟢 绿 — 实现服务方法 + 仓储扩展，使集成测试通过
 - [ ] Subtask 3.9: 🔄 重构 — 优化集成测试
 
 **完成标准/Definition of Done:**
@@ -690,17 +700,17 @@
 - [ ] Subtask 5.2: 🟢 绿 — 扩展 API 路由
 - [ ] Subtask 5.3: 🔄 重构 — 优化路由代码
 
-#### TDD 循环 B: composition_root 端口注册
+#### TDD 循环 B: composition_root 服务扩展验证
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写端口注册测试（Resolver 解析验证） |
-| 🟢 绿 | 在 `composition_root.py` 注册（如有新端口） |
+| 🔴 红 | 编写测试验证 `StrategicArchiveService` 扩展方法可解析（`set_validity_period`/`check_staleness`/`mark_stale_archives` 存在且可调用） |
+| 🟢 绿 | 验证服务已注册并可解析（无新端口需注册，复用现有 `strategic_archive_service` 端口） |
 | 🔄 重构 | 验证端口生命周期正确 |
 
-- [ ] Subtask 5.4: 🔴 红 — 编写端口注册失败测试
-- [ ] Subtask 5.5: 🟢 绿 — 注册端口到 `composition_root.py`
-- [ ] Subtask 5.6: 🔄 重构 — 验证 DI 集成
+- [ ] Subtask 5.4: 🔴 红 — 编写服务扩展方法解析失败测试
+- [ ] Subtask 5.5: 🟢 绿 — 验证 DI 容器可正确解析扩展后的服务
+- [ ] Subtask 5.6: 🔄 重构 — 验证端口生命周期正确
 
 #### TDD 循环 C: 架构验证测试
 
@@ -817,7 +827,7 @@ src/
 │   │   ├── strategic_archive.py          # UPDATE: 新增 valid_from/valid_until 字段 + is_valid/is_expired/days_until_expiry
 │   │   └── __init__.py                   # no change
 │   ├── ports/
-│   │   ├── archive_repository.py         # UPDATE: ArchiveQuery 新增 valid_from_filter/valid_until_filter/validity_status
+│   │   ├── archive_repository.py         # UPDATE: ArchiveQuery 新增 valid_from/valid_until/validity_status(ValidityStatus枚举)
 │   │   └── __init__.py                   # no change
 │   ├── events/
 │   │   ├── archive_events.py             # UPDATE: 新增 ValidityPeriodSet / FactBecameStale
@@ -829,7 +839,7 @@ src/
 │
 ├── application/
 │   ├── services/
-│   │   └── strategic_archive_service.py  # UPDATE: 新增 set_validity_period/query_by_validity/check_staleness/mark_stale
+│   │   └── strategic_archive_service.py  # UPDATE: 新增 set_validity_period/check_staleness/mark_stale（复用query_archive）
 │   └── event_handlers/
 │       ├── archive_handlers.py           # NEW: ValidityPeriodSet / FactBecameStale 事件处理器
 │       └── __init__.py                   # UPDATE: 导出新处理器
@@ -914,11 +924,13 @@ tests/
 ```yaml
 ValidityPeriodSet:
   rabbitmq_routing_key: "sisys.events.reliable.validity_period_set"
+  redis_channel: "sisys:rt:validity_period_set"
   delivery_mode: "reliable"
   description: "档案有效期设置完成"
 
 FactBecameStale:
   rabbitmq_routing_key: "sisys.events.reliable.fact_became_stale"
+  redis_channel: "sisys:rt:fact_became_stale"
   delivery_mode: "reliable"
   description: "事实变为陈旧"
 ```
@@ -978,9 +990,8 @@ ALTER TABLE strategic_archives
 ADD COLUMN valid_from TIMESTAMP WITH TIME ZONE,   -- 生效时间（None 表示创建时生效）
 ADD COLUMN valid_until TIMESTAMP WITH TIME ZONE;  -- 失效时间（None 表示永久有效）
 
--- 索引：提高时间轴查询性能
-CREATE INDEX idx_strategic_archives_valid_from ON strategic_archives(valid_from);
-CREATE INDEX idx_strategic_archives_valid_until ON strategic_archives(valid_until);
+-- 索引：提高时间轴查询性能（复合索引覆盖 validity_status="valid" 和 "expired" 两种查询）
+CREATE INDEX ix_strategic_archives_validity_period ON strategic_archives(valid_from, valid_until);
 ```
 
 **新旧数据兼容性：**
@@ -993,7 +1004,7 @@ CREATE INDEX idx_strategic_archives_valid_until ON strategic_archives(valid_unti
 
 | validity_status | SQL 过滤条件 |
 |----------------|-------------|
-| `"valid"` | `valid_from <= now AND (valid_until >= now OR valid_until IS NULL)` |
+| `"valid"` | `(valid_from IS NULL OR valid_from <= now) AND (valid_until >= now OR valid_until IS NULL)` — NULL 安全，已有档案（valid_from=NULL 且 valid_until=NULL）被包含 |
 | `"expired"` | `valid_until < now` |
 | `"all"` | 无有效期过滤 |
 | `None` | 无有效期过滤（默认，向后兼容） |
@@ -1005,12 +1016,13 @@ mark_stale_archives(batch_size=100):
   1. 查询待标记档案：
      - valid_until < now（已过期）
      - OR (valid_until IS NULL AND archived_at < now - 12个月)
+     - 注：valid_until IS NULL AND archived_at IS NULL 的档案不参与批量标记（"未设置有效期"状态）
   2. 对每个档案：
      a. 更新 metadata 字段：
         metadata["staleness"] = "stale"
         metadata["stale_since"] = now.isoformat()
      b. 保存到 L2
-     c. 发布 FactBecameStale 事件
+     c. 发布 FactBecameStale 事件（valid_until 为 None 时事件中该字段为 None）
   3. 返回被标记的档案列表
 ```
 
@@ -1071,16 +1083,16 @@ mark_stale_archives(batch_size=100):
 
 **待更新的文件/To Be Updated:**
 - `src/domain/entities/strategic_archive.py` - 新增 valid_from/valid_until 字段 + is_valid/is_expired/days_until_expiry
-- `src/domain/ports/archive_repository.py` - ArchiveQuery 新增 valid_from_filter/valid_until_filter/validity_status
+- `src/domain/ports/archive_repository.py` - ArchiveQuery 新增 valid_from/valid_until/validity_status(ValidityStatus枚举) + 新增 ValidityStatus 枚举
 - `src/domain/events/archive_events.py` - 新增 ValidityPeriodSet / FactBecameStale
 - `src/domain/events/__init__.py` - 导出新事件
 - `src/domain/exceptions/archive_exceptions.py` - 新增 ValidityPeriodConflictError (EXCEPTION_285)
 - `src/domain/exceptions/__init__.py` - 导出 ValidityPeriodConflictError
 - `src/domain/exceptions/_code_ranges.py` - 注册 ValidityPeriodConflictError
-- `src/application/services/strategic_archive_service.py` - 新增有效期管理方法
+- `src/application/services/strategic_archive_service.py` - 新增有效期管理方法（set_validity_period/check_staleness/mark_stale_archives，复用query_archive）
 - `src/application/event_handlers/__init__.py` - 导出新处理器
 - `src/infrastructure/storage/postgresql/models/archive.py` - 新增 valid_from/valid_until 列
-- `src/infrastructure/storage/postgresql/repository/archive_repository.py` - 扩展 _apply_filters
+- `src/infrastructure/storage/postgresql/repository/archive_repository.py` - 扩展 _apply_filters + 更新 _to_entity/_to_model
 - `src/interfaces/api/strategic_archive.py` - 新增 PUT validity / POST staleness-check 端点
 - `src/interfaces/api/exception_handlers.py` - 注册 ValidityPeriodConflictError 映射
 - `configs/event_channels.yaml` - 注册 ValidityPeriodSet / FactBecameStale 通道
@@ -1120,9 +1132,28 @@ mark_stale_archives(batch_size=100):
 
 > 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有对故事文件的修复项。
 
+**Round 1 审查修复（2026-08-14）：**
+
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| | | | |
+| 1 | ValidityPeriodSet/FactBecameStale 的 `__post_init__` 缺少 `aggregate_id = self.archive_id` 赋值 | P0 | 增加 aggregate_id 赋值逻辑，与 ArchiveCreated 一致 |
+| 2 | FactBecameStale.valid_until 类型为 `datetime`（非可选），与 valid_until=None 场景冲突 | P0 | 改为 `datetime \| None = None`，与实体字段类型一致 |
+| 3 | `set_validity_period` 流程未调用 `archive.validate()` | P0 | 在 save 之前显式调用 `archive.validate()` |
+| 4 | `query_by_validity` 与现有 `query_archive` 功能完全重复 | P0 | 删除 `query_by_validity`，复用 `query_archive` |
+| 5 | `validity_status="valid"` 的 SQL 条件未处理 valid_from IS NULL 场景 | P0 | 改为 NULL 安全形式：`(valid_from IS NULL OR valid_from <= now)` |
+| 6 | `ArchiveResponse` 未新增 valid_from/valid_until 字段 | P0 | 新增字段 + `_to_archive_response()` 映射 |
+| 7 | ValidityPeriodConflictError 无触发规则（"重叠有效期"未定义） | P1 | 定义冲突判定：同一 plan_id+archive_type 下区间重叠 |
+| 8 | valid_from_filter/valid_until_filter 命名与现有字段不一致 | P1 | 改为 valid_from/valid_until（去 _filter 后缀） |
+| 9 | validity_status 使用 str 而非枚举 | P1 | 新增 ValidityStatus 枚举（VALID/EXPIRED/ALL） |
+| 10 | 事件缺少 redis_channel 配置 | P1 | 补充 redis_channel 配置 |
+| 11 | _to_entity/_to_model 未显式要求更新 | P1 | 在 AC-6 和项目结构中明确标注 |
+| 12 | 索引设计可优化为复合索引 | P1 | 改为复合索引 `(valid_from, valid_until)` |
+| 13 | 文档引用不存在的 date_range 参数 | P1 | 修正为实际参数名 |
+| 14 | P95<200ms 无测试载体 | P1 | 新增性能测试文件 `test_perf_archive_validity.py` |
+| 15 | Task 3 TDD 循环 C 红绿语义颠倒 | P1 | 修正绿阶段为"实现服务方法+仓储扩展使测试通过" |
+| 16 | Task 5 TDD 循环 B 是空转循环（无新端口） | P1 | 改为"验证服务扩展方法可解析" |
+| 17 | 集成测试覆盖率门禁口径未定义 | P1 | 明确测量命令和范围 |
+| 18 | AC-1 方法缺少可测试性设计（datetime.now 直接硬编码） | P1 | 增加模块级 `_now()` 函数支持测试注入 |
 
 ---
 
@@ -1141,7 +1172,7 @@ mark_stale_archives(batch_size=100):
 
 #### 已推迟 Defer
 
-- [ ] [3-11-Defer-1][Review][Defer] **Qdrant/Neo4j 有效期同步** — 档案有效期变更时，L3 向量存储和 L5 图存储的 payload 是否需要同步更新有效期的讨论。当前 Story 3.11 仅处理 L2 元数据有效期，L3/L5 同步延期到 Story 3.12 处理。
+- [ ] [3-11-Defer-1][Review][Defer] **Qdrant/Neo4j 有效期同步** — 档案有效期变更时，L3 向量存储和 L5 图存储的 payload 是否需要同步更新有效期的讨论。当前 Story 3.11 仅处理 L2 元数据有效期，L3/L5 同步延期到 Story 3.12 处理。**延期影响分析**：在 3.12 完成 L3/L5 同步前，L3 向量搜索无法通过向量层 payload 过滤有效期，检索结果可能包含已过期档案，须依赖 L2 二次过滤兜底；L3 payload 建议在归档时写入 valid_from/valid_until 初始快照值，作为 3.12 兼容基础（本 Story 的 `archive_plan()` 沿用现有占位向量逻辑，不额外扩展）。
 
 ---
 
@@ -1160,3 +1191,4 @@ mark_stale_archives(batch_size=100):
 **最后更新/Last Updated:** 2026-08-14
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
+- v1.0.1: Round 1 审查修订 — 修复 6 个 P0 + 12 个 P1 问题（事件 aggregate_id、事件字段类型、validity_status NULL 安全、ArchiveResponse 扩展、冲突规则定义、枚举类型、时钟注入等）
