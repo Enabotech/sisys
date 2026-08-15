@@ -77,12 +77,13 @@
 **验证标准/Validation Criteria:**
 - [ ] `SummaryGenerationPort` 定义于 `src/domain/ports/summary_generation.py`（Protocol，`@runtime_checkable`）
 - [ ] `SearchResult` 从 `src/domain/ports/l3_vector.py` 导入（与 `LayeredRetrievalPort` 相同的现有模式，同域内类型引用，不引入新抽象）
-- [ ] 方法签名：`async generate_summary(query_text, search_results, perspective, config=None, tenant_id=None) -> Any`
+- [ ] 方法签名：`async generate_summary(query_text, search_results, perspective, config=None, tenant_id=None, cross_document=False) -> Any`
   - `query_text: str` — 原始查询文本
   - `search_results: list[SearchResult]` — 分层检索结果（L3/L4 内容）
   - `perspective: str` — 视角类型（"financial"/"market"/"technical"）
   - `config: LLMConfig | None` — 可选 LLM 调用配置
   - `tenant_id: str | None` — 可选租户 ID（多租户隔离，摘要存储/检索需透传，与 `LayeredRetrievalPort.search_top_down()` 的租户隔离模式一致）
+  - `cross_document: bool = False` — 跨文档摘要模式（`False` 生成单文档 L2 摘要，`True` 聚合 L2 摘要生成跨文档 L1 摘要）
   - 返回对应视角 Schema 的 Pydantic 实例（`Any` 类型，领域层不依赖 pydantic）
 - [ ] 端口注册于 `composition_root.py`，通过 `register_port()` 注册为 `summary_generation_service` 端口
 - [ ] 端口具备唯一名称、版本、interface、impl、module（必填五参数）及 owner、兼容策略（可选元数据）
@@ -97,9 +98,11 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `SummaryGenerationError`（EXCEPTION_290）— 继承 `BusinessException`，摘要生成整体失败
-  - 构造器参数：`perspective: str`（视图类型）、`query_text: str`（查询文本，截断至 100 字符）
+  - 构造器参数：`perspective: str`（视图类型）、`query_text: str`（查询文本，截断至 100 字符）、`message: str | None = None`、`cause: Exception | None = None`（遵循 `DomainError` 基类标准契约）
+  - `perspective`/`query_text` 通过 `context` 字典暴露
 - [ ] `SummaryPerspectiveNotSupportedError`（EXCEPTION_291）— 继承 `ValidationError`，不支持的视角类型
   - 构造器参数：`perspective: str`（不支持的视角）
+- [ ] **设计理由（docstring 必含）**：`SummaryGenerationError` 继承 `BusinessException` 但映射 HTTP 500——摘要编排属于业务子域，非外部服务错误（与 `HybridSearchError`/`LayeredRetrievalError`/`ArchiveStorageError` 先例一致），通过 `EXCEPTION_HTTP_MAP` 显式注册覆盖基类默认 400 映射
 - [ ] 异常编码在 `_code_ranges.py` 注册 `summary` 子域（290, 299）及 `_CLASS_TO_SUBDOMAIN` 映射
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册
 - [ ] 无编码碰撞（`grep -rw "EXCEPTION_29[0-9]" src/` 零输出）
@@ -122,13 +125,14 @@
 - [ ] 实现 `generate_summary()` 方法，签名与端口契约一致
 - [ ] 内部根据 `perspective` 参数选择对应的 Pydantic Schema 和 Prompt 模板
 - [ ] 调用 `LLMClientPort.structured_generate()` 传入 Schema 和 Prompt
-- [ ] 返回验证后的 Pydantic Schema 实例
+- [ ] 返回验证后的 Pydantic Schema 实例（通过 `Schema.model_validate()` 或 `Schema.model_validate_json()` 验证 LLM 返回的结构化输出）
 - [ ] 支持视角映射：`"financial"` → `FinancialSummary`，`"market"` → `MarketSummary`，`"technical"` → `TechnicalSummary`
 - [ ] 不支持的视角抛出 `SummaryPerspectiveNotSupportedError`
 - [ ] LLM 调用失败抛出 `SummaryGenerationError`（包装原始 LLM 异常）
 - [ ] 摘要生成延迟 P95 < 30 秒（含 LLM 调用）
 - [ ] LLM 异常处理：捕获 `LLMAPIError` 和 `ServiceUnavailableError` → 包装为 `SummaryGenerationError`（业务失败）；`LLMResponseError`（Schema 验证失败）→ 同样包装为 `SummaryGenerationError`（附录原始异常信息）；`LLMConfigError` → 透传不包装（配置错误不属于摘要生成失败）
 - [ ] 降级策略：LLM 调用失败时记录 WARNING 日志，抛出 `SummaryGenerationError`
+- [ ] **`generate_summary()` 包含存储副作用**：`cross_document=False` 时将摘要结果持久化到 `document_summaries` collection，`cross_document=True` 时持久化到 `cross_document_summaries` collection。`embedding_service` 和 `l3_vector` 依赖专用于此存储逻辑（Task 2 可先返回不存储，Task 3 实现存储逻辑后补充 `_store_summary()` 调用）
 
 ### AC-5: 摘要 Prompt 模板
 
@@ -169,10 +173,12 @@
   - 返回 `list[SearchResult]`，payload 包含摘要元数据
   - 移除原有骨架（返回空列表）逻辑
   - 日志记录 `INFO: L2 文档摘要检索执行成功`
-- [ ] **同步更新 `search_bottom_up` 骨架**：`LayeredRetrievalService.search_bottom_up()` 第 179-185 行包含与 `search_top_down` 完全相同的 L1/L2 骨架逻辑。实现时**必须同步填充** `search_bottom_up(target_level="L1"/"L2")`：复用 `_search_l4_direct` 的 `self._dense_search.search()` Dense 检索模式，在对应 collection 中执行检索，移除骨架逻辑，日志记录 `INFO: L1/L2 文档摘要检索执行成功`，降级策略与 `search_top_down` 一致（collection 不存在或 Qdrant 异常时降级返回空列表 + WARNING 日志）。
+- [ ] **同步更新 `search_bottom_up` 骨架**：`LayeredRetrievalService.search_bottom_up()` 第 179-185 行包含与 `search_top_down` 完全相同的 L1/L2 骨架逻辑。实现时**必须同步填充** `search_bottom_up(target_level="L1"/"L2")`：**使用硬编码 collection 名**（与 `search_top_down` 一致，`"document_summaries"`/`"cross_document_summaries"`，与顶层 `collection` 参数解耦），复用 `_search_l4_direct` 的 `self._dense_search.search()` Dense 检索模式，移除骨架逻辑，日志记录 `INFO: L1/L2 文档摘要检索执行成功`。
 - [ ] 摘要检索延迟 P95 < 200ms（Dense 检索）
 - [ ] 降级策略：摘要 collection 不存在时降级为骨架（返回空列表，WARNING 日志）；Qdrant 查询异常时捕获 `Exception` 降级返回空列表 + WARNING 日志
 - [ ] **L1/L2 Dense 检索调用模式**：复用 `_search_l3_direct`/`_search_l4_direct` 的 `self._dense_search.search()` 模式（端到端 Dense 检索：内部自动 `embed_query()` + `vector.search()`），**禁止**使用 `_search_top_down_l3_to_l4` 的私有属性访问模式（`self._dense_search._embedding.embed_query()`）
+- [ ] **L1/L2 检索的 filter_payload 策略**：L1/L2 检索**不传递** `index_level` 过滤条件（与 L3 的 `{"index_level": "parent"}`/L4 的 `{"index_level": "child"}` 不同）。摘要 collection 中的所有点均为摘要（`index_level` 为 `"L1"`/`"L2"`），无需额外过滤。如调用方传入 `filter_payload`，通过 `_merge_filter()` 合并，但 `index_level` 仅用于标识层级，不用于检索过滤。
+- [ ] **L1/L2 降级策略**（与 L3/L4 的 `raise LayeredRetrievalError` 不同，必须使用独立 try/except）：摘要 collection 不存在时降级为骨架（返回空列表，WARNING 日志）；Qdrant 查询异常时捕获 `Exception` 降级返回空列表 + WARNING 日志（**禁止**直接复用 `_search_l3_direct`/`_search_l4_direct` 的异常抛出逻辑）
 
 ### AC-7a: 跨文档摘要生成（L1 生成）
 
@@ -181,12 +187,12 @@
 **Then** 系统聚合相关文档摘要生成跨文档摘要
 
 **验证标准/Validation Criteria:**
-- [ ] `SummaryGenerationService` 扩展 `generate_cross_document_summary()` 方法（可选，或复用 `generate_summary` 加 `cross_document=True` 参数）
+- [ ] `SummaryGenerationService.generate_summary(cross_document=True)` 触发跨文档摘要模式（通过端口契约的 `cross_document` 参数区分，不再需要独立方法）
 - [ ] 跨文档摘要生成流程：
   1. 调用 `LayeredRetrievalPort.search_top_down(target_level="L2")` 获取已有 L2 摘要（L2 硬编码 `document_summaries` collection，与顶层 `collection` 参数解耦）
-  2. 聚合 Top-K 摘要结果作为上下文
+  2. 聚合 Top-K 摘要结果作为上下文（从 `SearchResult[].payload["summary_text"]` 提取摘要文本）
   3. 调用 `LLMClientPort.structured_generate()` 生成跨文档摘要
-  4. 通过 `EmbeddingServicePort.embed_documents()` 生成向量
+  4. 通过 `EmbeddingServicePort.embed_documents()` 生成向量（vector_size=1024 对齐 bge-m3）
   5. 通过 `L3VectorPort.upsert_points()` 写入 Qdrant（collection: `"cross_document_summaries"`，懒创建策略）
   6. payload 包含：`perspective`、`summary_text`、`key_points`、`confidence_score`、`source_document_ids`、`index_level`（"L1"）、`created_at`
 - [ ] 降级策略：L2 摘要不足（< 2 条）时降级为骨架（返回空列表，WARNING 日志）
@@ -201,11 +207,12 @@
 **验证标准/Validation Criteria:**
 - [ ] 更新 `LayeredRetrievalService.search_top_down(target_level="L1")`：
   - 在 `cross_document_summaries` collection 中执行 Dense 检索（**L1 硬编码 collection 名为 `"cross_document_summaries"`，与顶层 `collection` 参数解耦**）
+  - **不传递** `index_level` 过滤条件（与 L3 的 `{"index_level": "parent"}` 不同，摘要 collection 中的所有点均为摘要，无需额外过滤）
   - 返回 `list[SearchResult]`，payload 包含跨文档摘要元数据（含 `index_level: "L1"`）
   - 移除原有骨架（返回空列表）逻辑
   - 日志记录 `INFO: L1 跨文档摘要检索执行成功`
-- [ ] 降级策略：L1 collection 不存在时降级为骨架（返回空列表，WARNING 日志）；Qdrant 查询异常时捕获 `Exception` 降级返回空列表 + WARNING 日志
-- [ ] **同步更新 `search_bottom_up` 骨架**：`LayeredRetrievalService.search_bottom_up(target_level="L1")` 的骨架逻辑同样同步填充，复用 `self._dense_search.search()` 模式在 `cross_document_summaries` collection 中检索，降级策略与 `search_top_down` 一致
+- [ ] 降级策略：L1 collection 不存在时降级为骨架（返回空列表，WARNING 日志）；Qdrant 查询异常时捕获 `Exception` 降级返回空列表 + WARNING 日志（**禁止**直接复用 L3/L4 的 `raise LayeredRetrievalError` 模式）
+- [ ] **同步更新 `search_bottom_up` 骨架**：`LayeredRetrievalService.search_bottom_up(target_level="L1")` 的骨架逻辑同样同步填充，**使用硬编码 collection 名** `"cross_document_summaries"`，复用 `self._dense_search.search()` 模式，不传递 `index_level` 过滤条件，降级策略与 `search_top_down` 一致
 
 ### AC-8: 摘要 API 端点
 
@@ -580,7 +587,7 @@
 
 #### TDD 循环 [A]：摘要结果存储与 L2 检索
 
-> **Qdrant 策略：** 集成测试使用 Mock L3VectorPort（`AsyncMock(spec=L3VectorPort)` + `_make_l3_vector()` 工厂函数，Qdrant 为重型基础设施依赖，遵循项目惯例）。Mock 验证 `upsert_points()` 调用参数（collection 名称、点 ID 格式、payload 字段完整性），`search()` 返回预定义结果集验证检索逻辑。如需真实 Qdrant 验证，使用 `TestTenant` UUID 前缀隔离 + `pytest.skip("Qdrant 服务不可用")` 动态跳过。
+> **Qdrant 策略：** 集成测试遵循项目 CLAUDE.md 约束"集成测试真实服务优先"，但 Qdrant 为重型基础设施依赖，在 CI 环境无法保证可用。因此采用**双层策略**：优先使用真实 Qdrant 实例（`TestTenant` UUID 前缀隔离 + `pytest.skip("Qdrant 服务不可用")` 动态跳过）；降级时使用 Mock L3VectorPort（`AsyncMock(spec=L3VectorPort)` + `_make_l3_vector()` 工厂函数，遵循 `test_integration_layered_retrieval.py` 的 Mock 模式验证 `upsert_points()` 调用参数和 `search()` 结果）。
 
 | 阶段 | 动作 |
 |------|------|
@@ -717,6 +724,9 @@
 | **异常子域** | 新增 `summary` 子域（290-299） | 已有 BusinessException 子域均在 2XX 段，summary 异常继承 BusinessException 故编码落入 2XX 段，290-299 当前未占用 |
 | **L1/L2 Collection 策略** | L1/L2 硬编码独立 collection 名（`cross_document_summaries`/`document_summaries`），与顶层 `collection` 参数解耦；`search_top_down` 与 `search_bottom_up` 同步填充 | 避免 L3/L4 检索语义冲突，L1/L2 搜索固定集合，不影响 L3/L4 的 `collection` 参数传递；`search_bottom_up` 包含相同骨架代码需同步修改 |
 | **L1/L2 Dense 检索模式** | 复用 `_search_l3_direct`/`_search_l4_direct` 的 `self._dense_search.search()` 端到端模式 | 内部自动 `embed_query()` + `vector.search()`，禁止使用 `_search_top_down_l3_to_l4` 的私有属性访问模式 |
+| **L1/L2 降级策略** | 独立 try/except：异常降级返回空列表 + WARNING 日志 | 与 L3/L4 的 `raise LayeredRetrievalError` 不同，需独立实现；摘要不可用时静默降级保证检索可用性 |
+| **跨文档摘要设计** | `generate_summary(cross_document=True)` 参数区分单文档/跨文档模式 | 端口契约单一方法，避免额外方法导致 Task 1/3 契约不一致 |
+| **L1/L2 filter 策略** | 不传递 `index_level` 过滤条件 | 摘要 collection 的所有点均为摘要，无需层级过滤（L3 用 `"parent"`、L4 用 `"child"` 仅适用于切片层） |
 | **L1 实现策略** | 聚合 L2 摘要 → LLM 生成跨文档摘要 | 直接从 L2 摘要聚合，不重复从原始文档生成 |
 | **L2 实现策略** | 检索结果 → LLM 生成文档摘要 → 向量化存储 | 复用 `LLMClientPort.structured_generate()`，与 `LayeredRetrievalService` 集成 |
 | **摘要存储方式** | 独立 Qdrant collection（`document_summaries`、`cross_document_summaries`） | 与文档切片分离，避免 payload 冲突 |
@@ -794,6 +804,8 @@ docs/
 - [ ] 异常注册遵循 `_code_ranges.py` + `__init__.py` + `EXCEPTION_HTTP_MAP` 三步流程
 - [ ] 摘要存储使用独立 Qdrant collection，避免与文档切片混用
 - [ ] BDD 测试使用 `event_loop.run_until_complete()` 而非 `@pytest.mark.asyncio`
+- [ ] L1/L2 骨架填充必须同步修改 `search_top_down` 和 `search_bottom_up`（两个方法均有相同骨架代码）
+- [ ] 跨文档摘要通过 `generate_summary(cross_document=True)` 参数区分，非独立方法
 
 ### 已有资产（可直接复用）
 
