@@ -24,6 +24,7 @@ from src.domain.exceptions.layered_retrieval_exceptions import (
     LayeredRetrievalError,
     LevelTransitionError,
 )
+from src.domain.exceptions.system_exceptions import SystemException
 from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.ports.layered_retrieval import LAYERED_RETRIEVAL_LEVELS
@@ -41,6 +42,8 @@ def _safe_truncate(text: str, max_len: int) -> str:
     Returns:
         截断后的文本
     """
+    if max_len < 1:
+        return ""
     if not text:
         return ""
     # 按 Unicode 字符（而非字节）截断，避免多字节字符被从中截断
@@ -48,10 +51,13 @@ def _safe_truncate(text: str, max_len: int) -> str:
     return "".join(chars[:max_len])
 
 
+# 分层检索编排常量
 # 自顶向下展开时每个 Parent 最多展开的 Child 子块数
 _DEFAULT_CHILD_EXPAND_COUNT = 3
 # 自顶向下展开时最多展开的 Parent 数（限制 N+1 查询开销）
 _MAX_EXPAND_PARENTS = 5
+# 检索结果 limit 上限（防止向量数据库 OOM 或内存压力）
+_MAX_LIMIT = 200
 
 
 class LayeredRetrievalService:
@@ -115,7 +121,7 @@ class LayeredRetrievalService:
             ValidationError: 参数验证失败时
             LevelTransitionError: 层级遍历路径非法时
         """
-        self._validate_inputs(query_text, collection, limit)
+        self._validate_inputs(query_text, collection, limit, tenant_id)
         self._validate_level(target_level)
 
         # L1/L2 骨架实现
@@ -179,7 +185,7 @@ class LayeredRetrievalService:
             ValidationError: 参数验证失败时
             LevelTransitionError: 层级遍历路径非法时
         """
-        self._validate_inputs(query_text, collection, limit)
+        self._validate_inputs(query_text, collection, limit, tenant_id)
         self._validate_level(target_level)
 
         # L1/L2 骨架实现
@@ -249,8 +255,13 @@ class LayeredRetrievalService:
             )
             if not raw_results:
                 return []
+            # 归一化 payload：确保 index_level 层级标记存在，供调用方区分结果层级
             return [
-                SearchResult(id=r["id"], score=r["score"], payload=r.get("payload") or {})
+                SearchResult(
+                    id=r["id"],
+                    score=r["score"],
+                    payload=self._normalize_payload(r.get("payload", {}), "parent"),
+                )
                 for r in raw_results
                 if "id" in r and "score" in r
             ]
@@ -296,7 +307,7 @@ class LayeredRetrievalService:
             if not raw_results:
                 return []
             return [
-                SearchResult(id=r["id"], score=r["score"], payload=r.get("payload") or {})
+                SearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {}))
                 for r in raw_results
                 if "id" in r and "score" in r
             ]
@@ -343,8 +354,11 @@ class LayeredRetrievalService:
                 tenant_id=tenant_id,
                 filter_payload=child_filter,
             )
+        except SystemException:
+            # 基础设施故障：必须传播，不能降级掩盖
+            raise
         except Exception as e:
-            # 降级：L4 检索失败 → 透明降级为 L3 检索
+            # 业务级异常（如检索超时、无结果）：透明降级为 L3 检索
             logger.warning("L4 检索失败，降级为 L3 直接检索: %s", e)
             return await self._search_l3_direct(
                 query_text=query_text,
@@ -387,8 +401,8 @@ class LayeredRetrievalService:
         )
         merged_results: list[SearchResult] = [r for r in fetch_results if not isinstance(r, BaseException) and r is not None]
 
-        # 4. 按最高 Child 分数降序排列
-        merged_results.sort(key=lambda r: r["score"], reverse=True)
+        # 4. 按最高 Child 分数降序排列（分数相同时按 id 确保确定性）
+        merged_results.sort(key=lambda r: (-r["score"], r["id"]))
         return merged_results[:limit]
 
     async def _fetch_parent(
@@ -479,7 +493,7 @@ class LayeredRetrievalService:
             ) from e
 
         l3_results = [
-            SearchResult(id=r["id"], score=r["score"], payload=r.get("payload") or {})
+            SearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {}))
             for r in l3_raw
             if isinstance(r, dict) and "id" in r and "score" in r
         ]
@@ -518,6 +532,7 @@ class LayeredRetrievalService:
                 continue
 
             child_results = [r for r in child_raw if isinstance(r, dict) and "id" in r and "score" in r]
+            child_results.sort(key=lambda r: r["score"], reverse=True)  # 显式排序，不依赖后端顺序
 
             # 服务自身强制 Top-3 截断，不依赖后端 limit 行为
             for child in child_results[:_DEFAULT_CHILD_EXPAND_COUNT]:
@@ -535,8 +550,8 @@ class LayeredRetrievalService:
                     )
                 )
 
-        # 3. 按 Parent 分数 × Child 分数降序排列
-        expanded_results.sort(key=lambda r: r["score"], reverse=True)
+        # 3. 按 Parent 分数 × Child 分数降序排列（分数相同时按 id 确保确定性）
+        expanded_results.sort(key=lambda r: (-r["score"], r["id"]))
         return expanded_results[:limit]
 
     # ------------------------------------------------------------------
@@ -562,6 +577,8 @@ class LayeredRetrievalService:
             raise ValidationError(message="Collection 名称不能为空")
         if limit < 1:
             raise ValidationError(message=f"limit 必须为正整数，当前值: {limit}")
+        if limit > _MAX_LIMIT:
+            raise ValidationError(message=f"limit 不能超过 {_MAX_LIMIT}，当前值: {limit}")
         # tenant_id 空白校验：防止纯空白字符串绕过校验直接注入 Qdrant filter
         if tenant_id is not None and not tenant_id.strip():
             raise ValidationError(message="tenant_id 不能为空或仅含空白字符")
@@ -599,11 +616,29 @@ class LayeredRetrievalService:
         if base_filter is None and extra_filter is None:
             return None
         merged: dict[str, Any] = {}
-        if base_filter:
+        if base_filter is not None:
             merged.update(base_filter)
-        if extra_filter:
+        if extra_filter is not None:
             merged.update(extra_filter)
         return merged if merged else None
+
+    @staticmethod
+    def _normalize_payload(
+        payload: dict[str, Any],
+        index_level: str,
+    ) -> dict[str, Any]:
+        """归一化检索结果 payload，确保层级元数据完整
+
+        Args:
+            payload: 原始 payload
+            index_level: 目标层级（"parent"/"child"）
+
+        Returns:
+            确保包含 index_level 字段的 payload
+        """
+        normalized = dict(payload)
+        normalized.setdefault("index_level", index_level)
+        return normalized
 
     @classmethod
     def _merge_filter_with_tenant(
