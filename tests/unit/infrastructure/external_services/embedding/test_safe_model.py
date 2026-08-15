@@ -296,7 +296,7 @@ class TestModelInferenceEngine:
         )
 
         engine = ModelInferenceEngine("/fake/path", device="cpu", use_fp16=False)
-        engine._model = cast(SafeBGE3Model, MagicMock())
+        engine._model = cast(SafeBGE3Model, MagicMock())  # 模拟已加载
         engine._load_error = None
         engine.load()
         assert engine._model is not None
@@ -308,7 +308,7 @@ class TestModelInferenceEngine:
         )
 
         engine = ModelInferenceEngine("/fake/path", device="cpu", use_fp16=False)
-        engine._model = cast(SafeBGE3Model, MagicMock())
+        engine._model = cast(SafeBGE3Model, MagicMock())  # 模拟已加载
         engine._load_error = None
         engine.unload()
         assert engine._model is None
