@@ -99,6 +99,11 @@
 - [ ] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性
 
 > **触发规则（冲突判定）：** `set_validity_period()` 在更新前需查询同一 `plan_id`、同一 `archive_type`、不同 `archive_id` 的既有档案，若新区间 `[valid_from, valid_until)`（半开区间，None 视为开区间端点，即 valid_from=None 表示"从无限早开始"，valid_until=None 表示"直到无限远"）与任一既有区间存在交集，则抛出 `ValidityPeriodConflictError`。**半开区间规则**：区间包含 valid_from 端点、不包含 valid_until 端点；端点相接不视为冲突（档案 A 的 valid_until == 档案 B 的 valid_from 时，两者自然衔接，允许共存）。该判定在应用服务层完成（复用 `archive_repo.find()` 按 plan_id+archive_type 查询后内存比较）。
+>
+> > **并发安全（P0 强制）：** 应用层内存比较存在 TOCTOU 竞态，必须采用三层防御策略：
+> > 1. **（强制）PostgreSQL EXCLUDE 约束**：使用 `btree_gist` 扩展 + `EXCLUDE USING gist (plan_id WITH =, archive_type WITH =, tstzrange(COALESCE(valid_from, '-infinity'::timestamptz), COALESCE(valid_until, 'infinity'::timestamptz), '[)') WITH &&)`，数据库层面强制区间不重叠。违反时抛出 `exclusion_violation`，应用层捕获后转为 `ValidityPeriodConflictError`。
+> > 2. **（强制）SELECT FOR UPDATE 悲观锁**：冲突检测查询使用 `SELECT ... FOR UPDATE` 锁定同一 `plan_id+archive_type` 的所有相关行，防止并发读取。需在 `ArchiveRepositoryPort` 中新增 `find_for_update(query)` 方法或在 `find` 中增加可选锁参数。
+> > 3. **（建议）应用层内存比较**：作为第一道防线，快速失败减少不必要的数据库操作。
 
 ### AC-4: ArchiveQuery 扩展（时间轴查询）
 
@@ -129,17 +134,19 @@
   - 更新档案的 `valid_from`/`valid_until` 字段
   - 调用 `archive.validate()` 验证 `valid_from <= valid_until`（若两者均非 None），防止无效数据写入
   - **冲突检测**：查询同一 `plan_id` + 同一 `archive_type` 下、不同 `archive_id` 的档案，检查新区间与既有区间是否存在重叠（None 视为开区间端点）。若存在重叠，抛出 `ValidityPeriodConflictError`
+  - **并发安全**：冲突检测使用 `archive_repo.find_for_update()`（SELECT FOR UPDATE 悲观锁）锁定同一 plan_id+archive_type 下的相关档案，防止 TOCTOU 竞态；数据库层通过 EXCLUDE 约束兜底强制执行区间不重叠
   - 调用 `archive_repo.save()` 持久化
   - 发布 `ValidityPeriodSet` 事件
 - [ ] 复用现有 `query_archive(query: ArchiveQuery) -> list[StrategicArchive]` 方法 — 按有效期查询（通过 ArchiveQuery 新增的 `valid_from`/`valid_until`/`validity_status` 字段自然支持，无需新增方法）
-- [ ] `is_stale(archive_id: UUID) -> bool` 方法 — 检查单个档案是否陈旧（命名采用 `is_` 前缀，与 `is_valid()`/`is_expired()` 保持一致）
-  - 获取档案的 `valid_until`，如果 `valid_until` 为 None，则检查 `archived_at` 是否超过 12 个月
-  - 若 `valid_until` 和 `archived_at` 均为 None，返回 False（不标记为"未设置有效期"，该状态在 Story 3.12 处理）
-  - 若已陈旧，返回 True
-- [ ] `mark_stale_archives(batch_size: int = 100) -> list[StrategicArchive]` 方法 — 批量标记陈旧档案
+- [ ] `is_stale(archive_id: UUID) -> bool` 方法 — 检查单个档案是否陈旧（**委托实体方法 `StrategicArchive.is_stale()`，统一陈旧判定标准**；命名采用 `is_` 前缀，与 `is_valid()`/`is_expired()` 保持一致）
+  - 获取档案后调用 `archive.is_stale()`，实体内部判断：
+    - `valid_until` 非 None：`valid_until < now` → 陈旧
+    - `valid_until` 为 None 且 `archived_at` 非 None：`archived_at < now - 12个月` → 陈旧
+    - 两者均为 None：返回 False（"未设置有效期"，该状态在 Story 3.12 处理）
+- [ ] `mark_stale_archives(batch_size: int = 100) -> list[StrategicArchive]` 方法 — 批量标记陈旧档案（**幂等设计**）
   - 应用层循环调用 `archive_repo.find()` 并配合 `offset`/`limit` 实现分批查询（batch_size 映射为 limit 参数），每次查询一批后处理并发布事件，再查下一批
-  - 逐批处理：查询所有 valid_until < now（或 valid_until IS NULL AND archived_at < now - 12个月）的档案
-  - 写入档案的 `metadata` 字典，设置 `{"staleness": "stale", "stale_since": <isoformat>}`
+  - 逐批处理：查询所有 valid_until < now（或 valid_until IS NULL AND archived_at < now - 12个月）**且 `metadata->>'staleness' IS DISTINCT FROM 'stale'`（排除已标记档案，保证幂等）** 的档案
+  - 仅对首次标记的档案写入 `metadata` 字典 `{"staleness": "stale", "stale_since": <isoformat>}`（已标记档案跳过 stale_since 覆盖）
   - 发布 `FactBecameStale` 事件（每个档案一个事件，事件携带 `stale_reason` 区分陈旧原因）
   - 返回被标记为陈旧的档案列表
 - [ ] 有效期设置方法在 L2 失败时抛出 `ArchiveStorageError(layer="l2")`
@@ -161,6 +168,7 @@
 - [ ] 新增的过滤条件与现有 plan_id/archive_type/plan_type/start_date/end_date 组合兼容
 - [ ] 扩展 `ArchiveModel` 添加 `valid_from` 和 `valid_until` 列（方案 A：显式列，已决策通过）
 - [ ] `_to_entity()` 和 `_to_model()` 转换方法同步更新，新增 valid_from/valid_until 字段映射（`src/infrastructure/storage/postgresql/repository/archive_repository.py`）
+- [ ] **新增 `find_for_update(query)` 方法** — 用于冲突检测的悲观锁查询（`SELECT ... FOR UPDATE`），锁定同一 `plan_id+archive_type` 的所有相关行，防止 TOCTOU 竞态
 
 ### AC-7: 有效期变更事件处理
 
@@ -172,10 +180,17 @@
 - [ ] `ValidityPeriodSet` 事件处理器（`src/application/event_handlers/archive_handlers.py`）
   - 收到事件后，记录日志
   - 后续可扩展为触发缓存失效、通知下游等
+  - 预留 L3/L5 同步钩子（TODO: Story 3.12 - sync valid_from/valid_until to L3/L5 payload）
 - [ ] `FactBecameStale` 事件处理器（`src/application/event_handlers/archive_handlers.py`）
   - 收到事件后，记录日志
   - 后续可扩展为触发降权处理、通知前端等
-- [ ] 事件处理器注册到 `EventBus` 或 `ChannelRouter`（RELIABLE 模式）
+- [ ] 事件处理器遵循 `InMemoryEventListener.on_event()` + `register_handlers()` 模式注册：
+  - Handler 类构造函数注入 `event_listener: EventListener` 端口
+  - 在 `register_handlers()` 方法中调用 `self._event_listener.on_event("EventType", handler_callback)`
+  - 回调函数签名遵循 `Callable[[DomainEvent], None]` 约束
+  - 异步处理逻辑通过 `_wrap_handler()` 模式包装为同步回调（参照 `DocumentVersionHandler` 实现）
+- [ ] 在 `composition_root.py` 的 `handler_names` 列表中注册新处理器（如 `"archive_validity_handler"`）
+- [ ] 事件处理器在 `src/application/event_handlers/__init__.py` 中导出
 
 ### AC-8: 接口层有效期管理 API
 
@@ -198,7 +213,7 @@
   - 返回 200 + 标记结果列表
 - [ ] 请求/响应 Schema 使用 Pydantic，定义于路由同文件或共享 Schema 模块
 - [ ] `ArchiveResponse` 新增 `valid_from: str | None = None`、`valid_until: str | None = None` 字段，`_to_archive_response()` 中通过 `.isoformat()` 转换（与 `created_at`/`archived_at` 的转换方式一致）
-- [ ] 查询延迟 P95<200ms（通过索引保障，性能验证见 `tests/performance/test_perf_archive_validity.py`；测试数据量级≥10,000 条档案记录，连续执行 100 次查询取 P95 百分位，执行 10 次预热后开始测量；CI 环境下默认跳过，本地开发手动触发）
+- [ ] 查询延迟 P95<200ms（通过索引保障，性能验证见 `tests/unit/performance/test_perf_archive_validity.py`；测试数据量级≥10,000 条档案记录，连续执行 100 次查询取 P95 百分位，执行 10 次预热后开始测量；CI 环境下默认跳过，本地开发手动触发；对齐项目现有 `test_compression_performance.py` 先例）
 
 ### AC-9: 端口注册与 DI 集成
 
@@ -289,6 +304,19 @@
 
 `validate()` 方法扩展：
 - [ ] 新增验证：如果 `valid_from` 和 `valid_until` 均非 None，则 `valid_from <= valid_until`
+
+新增陈旧判断方法（与 `is_valid()`/`is_expired()` 并列，统一陈旧判定标准）：
+- [ ] `is_stale(ref_date: datetime | None = None) -> bool` — 检查实体是否陈旧
+  ```python
+  def is_stale(self, ref_date: datetime | None = None) -> bool:
+      now = ref_date or _now()
+      if self.valid_until is not None:
+          return self.valid_until < now
+      if self.archived_at is not None:
+          return self.archived_at < now - timedelta(days=365)
+      return False  # 两者均为 None，不标记
+  ```
+  （`is_stale()` 是实体方法，与应用层服务方法 `is_stale(archive_id)` 委托调用关系：服务方法获取实体后调用 `archive.is_stale()`）
 
 **扩展值对象（修改 `src/domain/ports/archive_repository.py`）：**
 
@@ -865,10 +893,10 @@ src/
 │
 ├── interfaces/
 │   └── api/
-│       ├── strategic_archive.py          # UPDATE: 新增 PUT validity / POST staleness-check 端点
+│       ├── strategic_archive.py          # UPDATE: 新增 PUT validity-period / POST staleness-check 端点
 │       └── app.py                        # no change（路由已注册）
 │
-└── composition_root.py                   # no change（服务已注册，扩展方法即可）
+└── composition_root.py                   # UPDATE: 注册 archive_handlers 端口 + 新增 handler_names 条目
 
 deploy/
 └── postgresql/
@@ -899,8 +927,8 @@ deploy/
 │   │   └── infrastructure/
 │   │       └── storage/
 │   │           └── test_archive_repository.py # UPDATE: 有效期查询测试
-│   ├── performance/
-│   │   └── test_perf_archive_validity.py   # NEW: 有效期查询性能验证测试（P95<200ms）
+│   │   └── performance/
+│   │       └── test_perf_archive_validity.py   # NEW: 有效期查询性能验证测试（P95<200ms）（对齐 test_compression_performance.py 先例）
 │   ├── integration/
 │   │   └── test_integration_archive_validity.py # NEW: 有效期管理集成测试
 │   ├── contracts/
@@ -1035,9 +1063,10 @@ mark_stale_archives(batch_size=100):
   1. 应用层循环调用 archive_repo.find()，batch_size 映射为 limit 参数，offset 逐批递增，分批查询待标记档案：
      - valid_until < now（已过期，stale_reason="expired"）
      - OR (valid_until IS NULL AND archived_at < now - 12个月)（归档超期，stale_reason="archived_too_long"）
+     - AND (metadata->>'staleness' IS DISTINCT FROM 'stale')（排除已标记档案，保证幂等）
      - 注：valid_until IS NULL AND archived_at IS NULL 的档案不参与批量标记（"未设置有效期"状态）
-  2. 对每个档案：
-     a. 更新 metadata 字段：
+  2. 对每个首次标记的档案：
+     a. 更新 metadata 字段（仅首次写入，重复执行不覆盖 stale_since）：
         metadata["staleness"] = "stale"
         metadata["stale_since"] = now.isoformat()
      b. 保存到 L2
@@ -1045,13 +1074,15 @@ mark_stale_archives(batch_size=100):
   3. 返回被标记的档案列表
 ```
 
+> **Outbox 事务边界说明：** `mark_stale_archives` 中 L2 save 与 FactBecameStale 事件发布存在双写不一致风险。RELIABLE 模式使用 RabbitMQ + Outbox，事件应通过事务性 Outbox 与 L2 元数据在**同一数据库事务**内持久化，由 Outbox 发布器异步投递，确保最终一致性。事件发布失败时由 Outbox 重试机制保障（非仅日志警告）。
+
 ### 优雅降级策略
 
 | 场景 | 失败影响 | 降级策略 |
 |------|---------|---------|
 | is_stale L2 失败 | 陈旧检查失败 | 抛出 `ArchiveStorageError(layer="l2")` |
 | mark_stale_archives 部分失败 | 部分档案陈旧标记失败 | 记录日志，继续处理下一批 |
-| 事件发布失败 | 下游无法感知有效期变更 | 记录警告日志，不影响主流程 |
+| 事件发布失败 | 下游无法感知有效期变更 | Outbox 重试机制保障最终一致性；若 Outbox 不可用则记录警告日志，不影响主流程 |
 
 ---
 
@@ -1092,7 +1123,7 @@ mark_stale_archives(batch_size=100):
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/application/event_handlers/archive_handlers.py` - 有效期事件处理器
-- `deploy/postgresql/alembic/versions/010_archive_validity_period.py` - valid_from/valid_until 列迁移
+- `deploy/postgresql/alembic/versions/010_archive_validity_period.py` - valid_from/valid_until 列迁移 + EXCLUDE 约束（btree_gist）
 - `tests/unit/domain/ports/test_archive_query.py` - ArchiveQuery + ValidityStatus 枚举单元测试
 - `tests/unit/application/event_handlers/test_archive_handlers.py` - 事件处理器测试
 - `tests/integration/test_integration_archive_validity.py` - 集成测试
@@ -1100,7 +1131,7 @@ mark_stale_archives(batch_size=100):
 - `tests/acceptance/test_acceptance_archive_validity.feature` - Gherkin 场景
 - `tests/acceptance/test_acceptance_archive_validity.py` - BDD 步骤实现
 - `tests/unit/architecture/test_arch_archive_validity.py` - 架构验证测试
-- `tests/performance/test_perf_archive_validity.py` - 有效期查询性能验证测试（P95<200ms）
+- `tests/unit/performance/test_perf_archive_validity.py` - 有效期查询性能验证测试（P95<200ms）
 
 **待更新的文件/To Be Updated:**
 - `src/domain/entities/strategic_archive.py` - 新增 valid_from/valid_until 字段 + is_valid/is_expired/days_until_expiry
@@ -1184,7 +1215,7 @@ mark_stale_archives(batch_size=100):
 | 2 | FactBecameStale 缺少陈旧原因字段，消费方无法区分两种陈旧机制 | P1 | 新增 `stale_reason: str` 字段（`"expired"` / `"archived_too_long"`） |
 | 3 | 冲突判定中"含开区间边界"表述自相矛盾 | P1 | 明确采用半开区间 `[valid_from, valid_until)`，端点相接不视为冲突 |
 | 4 | `check_staleness` 命名与 `is_valid()`/`is_expired()` 不一致 | P1 | 改为 `is_stale()` 保持 `is_` 前缀一致 |
-| 5 | 性能测试文件 `test_perf_archive_validity.py` 分类归属不当（混入 architecture 目录） | P1 | 移至 `tests/performance/` 目录，独立测试类型 |
+| 5 | 性能测试文件 `test_perf_archive_validity.py` 分类归属不当（混入 architecture 目录） | P1 | 移至 `tests/performance/` 目录（后修正为 `tests/unit/performance/` 对齐项目先例 `test_compression_performance.py`） |
 | 6 | 性能测试缺少数据量级与执行策略要求 | P1 | 补充：≥10,000 条记录、100 次迭代取 P95、10 次预热、CI 默认跳过 |
 | 7 | ArchiveQuery 单元测试混入端口契约测试文件 `test_port_contract_strategic_archive.py` | P1 | 拆分到独立文件 `tests/unit/domain/ports/test_archive_query.py` |
 | 8 | Task 3 TDD 循环 C 集成测试绿阶段要求同时实现服务+仓储两层，跨度不合理 | P1 | 明确绿阶段仅实现应用层服务方法，仓储依赖 Task 4 |
@@ -1198,6 +1229,21 @@ mark_stale_archives(batch_size=100):
 | 16 | 项目结构图中 `test_perf_archive_validity.py` 仍在 architecture 目录下 | P2 | 移至 `tests/performance/` 目录 |
 | 17 | 集成测试 Schema 自创建方式未明确 | P2 | 明确使用 `Base.metadata.create_all()` |
 | 18 | AC-1 `days_until_expiry` 返回类型表述歧义 | P2 | 明确"与 ExternalAPIWhitelist 的负数行为一致，但返回类型为 `int \| None`" |
+
+**Round 3 审查修复（2026-08-15）：**
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | set_validity_period 冲突检测存在 TOCTOU 竞态（应用层内存比较无数据库约束兜底） | P0 | 三层防御：PostgreSQL EXCLUDE 约束（btree_gist）+ find_for_update() 悲观锁 + 应用层内存比较 |
+| 2 | 事件处理器注册机制描述与实际架构不符（文档写"注册到 EventBus 或 ChannelRouter"，实际是 InMemoryEventListener + register_handlers()） | P0 | 修正 AC-7：更改为 on_event() + register_handlers() 模式，明确 handler_names 注册和 _wrap_handler() 回调包装 |
+| 3 | composition_root 标注为"no change"但实际需注册 archive_handlers 端口 + handler_names 条目 | P1 | 修正项目结构图标注为 UPDATE |
+| 4 | L3/L5 无有效期初始快照，3.12 无法增量同步 | P1 | archive_plan() 的 L3 payload/L5 properties 写入 valid_from/valid_until 初始值；ValidityPeriodSet 处理器预留同步钩子 |
+| 5 | mark_stale_archives 非幂等（重复执行覆盖 stale_since + 重复发布事件） | P1 | 查询排除已标记档案（metadata->>'staleness' IS DISTINCT FROM 'stale'）+ 仅首次写入 stale_since |
+| 6 | is_stale 与 mark_stale_archives 陈旧判断逻辑重复，存在语义分裂风险 | P1 | 提取实体方法 `StrategicArchive.is_stale()` 统一判定标准，服务方法委托实体 |
+| 7 | FactBecameStale 事件与 metadata 双写不一致（Outbox 事务边界未明确） | P1 | 明确 L2 save 与事件通过事务性 Outbox 同事务持久化，Outbox 重试保障最终一致性 |
+| 8 | 性能测试路径应与项目现有先例 `tests/unit/performance/` 对齐 | P1 | 统一改为 `tests/unit/performance/test_perf_archive_validity.py` |
+| 9 | 端口契约测试需补充 ArchiveQuery 新字段验证 + StrategicArchiveService 扩展方法验证 | P2 | AC-9 补充契约测试验证范围说明 |
+| 10 | ValidityPeriodSet 事件发布失败后的补偿机制未说明 | P2 | 补充最终一致性说明（Outbox 重试）+ 建议 replay 手段 |
 
 ---
 
@@ -1216,7 +1262,9 @@ mark_stale_archives(batch_size=100):
 
 #### 已推迟 Defer
 
-- [ ] [3-11-Defer-1][Review][Defer] **Qdrant/Neo4j 有效期同步** — 档案有效期变更时，L3 向量存储和 L5 图存储的 payload 是否需要同步更新有效期的讨论。当前 Story 3.11 仅处理 L2 元数据有效期，L3/L5 同步延期到 Story 3.12 处理。**延期影响分析**：在 3.12 完成 L3/L5 同步前，L3 向量搜索无法通过向量层 payload 过滤有效期，检索结果可能包含已过期档案，须依赖 L2 二次过滤兜底；L3 payload 建议在归档时写入 valid_from/valid_until 初始快照值，作为 3.12 兼容基础（本 Story 的 `archive_plan()` 沿用现有占位向量逻辑，不额外扩展）。
+- [ ] [3-11-Defer-1][Review][Defer] **Qdrant/Neo4j 有效期同步** — 档案有效期变更时，L3 向量存储和 L5 图存储的 payload 是否需要同步更新有效期的讨论。当前 Story 3.11 仅处理 L2 元数据有效期，L3/L5 同步延期到 Story 3.12 处理。**延期影响分析**：在 3.12 完成 L3/L5 同步前，L3 向量搜索无法通过向量层 payload 过滤有效期，检索结果可能包含已过期档案，须依赖 L2 二次过滤兜底。
+  >
+  > **补充（Round 2 审查发现）：** 当前 `archive_plan()` 的 L3 payload 和 L5 properties 中**未写入 valid_from/valid_until 初始快照值**。即使 Story 3.12 要实现 L3/L5 同步，也没有初始基线可供比对增量。建议在本 Story 的 `archive_plan()` 中向 L3 payload 追加 `"valid_from": None, "valid_until": None` 字段，L5 properties 同理，为 3.12 提供兼容基础。同时在 ValidityPeriodSet 事件处理器中预留 `TODO: Story 3.12 - sync valid_from/valid_until to L3/L5 payload` 钩子。
 
 ---
 
@@ -1236,4 +1284,5 @@ mark_stale_archives(batch_size=100):
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.0.1: Round 1 审查修订 — 修复 6 个 P0 + 12 个 P1 问题（事件 aggregate_id、事件字段类型、validity_status NULL 安全、ArchiveResponse 扩展、冲突规则定义、枚举类型、时钟注入等）
-- v1.1.0: Round 2 审查修订 — 修复 0 个 P0 + 12 个 P1 + 6 个 P2 问题（ValidityStatus 删除 ALL、FactBecameStale 新增 stale_reason、冲突判定半开区间、check_staleness→is_stale 重命名、性能测试移至 tests/performance/、ArchiveQuery 测试独立、索引策略优化、事件 __post_init__ 无条件赋值、集成测试循环跨度修正、覆盖率门禁定位明确等）
+- v1.1.0: Round 2 审查修订 — 修复 0 个 P0 + 12 个 P1 + 6 个 P2 问题（ValidityStatus 删除 ALL、FactBecameStale 新增 stale_reason、冲突判定半开区间 + 端点说明、check_staleness→is_stale 重命名 + 剥离实体方法、性能测试对齐 tests/unit/performance/、ArchiveQuery 测试独立、索引策略优化、事件 __post_init__ 无条件赋值、集成测试循环跨度修正、覆盖率门禁定位明确等）
+- v1.2.0: Round 3 审查修订 — 修复 1 个 P0 + 5 个 P1 + 1 个 P2 问题（TOCTOU 竞态三层防御 + EXCLUDE 约束 + FOR UPDATE、事件 handler 注册机制修正为 InMemoryEventListener + register_handlers 模式、composition_root 标注修正、L3 payload 初始快照、mark_stale_archives 幂等设计 + 实体 is_stale 方法、陈旧标记逻辑排除已标记档案 + Outbox 事务边界说明、性能测试路径对齐 tests/unit/performance/）
