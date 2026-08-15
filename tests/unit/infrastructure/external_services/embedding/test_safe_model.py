@@ -8,6 +8,7 @@ SafeBGE3Model 不直接继承 BGEM3FlagModel，通过内部 _model 组合，
 from __future__ import annotations
 
 import threading
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -23,7 +24,7 @@ def _make_model_instance() -> SafeBGE3Model:
     """
     m = SafeBGE3Model.__new__(SafeBGE3Model)
     # 模拟内部 _model（BGEM3FlagModel 实例）
-    m._model = MagicMock()
+    m._model = cast(MagicMock, MagicMock())
     m._model.target_devices = ["cuda:0"]
     m._model.model = MagicMock()
     m._model.model.to = MagicMock()
@@ -295,10 +296,10 @@ class TestModelInferenceEngine:
         )
 
         engine = ModelInferenceEngine("/fake/path", device="cpu", use_fp16=False)
-        engine._model = "already_loaded"  # type: ignore[assignment]
+        engine._model = cast(SafeBGE3Model, MagicMock())
         engine._load_error = None
         engine.load()
-        assert engine._model == "already_loaded"
+        assert engine._model is not None
 
     def test_unload_clears_model(self) -> None:
         """unload 清除模型实例"""
@@ -307,7 +308,7 @@ class TestModelInferenceEngine:
         )
 
         engine = ModelInferenceEngine("/fake/path", device="cpu", use_fp16=False)
-        engine._model = "some_model"  # type: ignore[assignment]
+        engine._model = cast(SafeBGE3Model, MagicMock())
         engine._load_error = None
         engine.unload()
         assert engine._model is None

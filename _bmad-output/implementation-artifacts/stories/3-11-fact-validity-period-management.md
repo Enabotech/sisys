@@ -98,7 +98,7 @@
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册（409）
 - [ ] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性
 
-> **触发规则（冲突判定）：** `set_validity_period()` 在更新前需查询同一 `plan_id`、同一 `archive_type`、不同 `archive_id` 的既有档案，若新区间 `[valid_from, valid_until)`（半开区间，None 视为开区间端点，即 valid_from=None 表示"从无限早开始"，valid_until=None 表示"直到无限远"）与任一既有区间存在交集，则抛出 `ValidityPeriodConflictError`。**半开区间规则**：端点相接不视为冲突（档案 A 的 valid_until == 档案 B 的 valid_from 时，两者自然衔接，允许共存）。该判定在应用服务层完成（复用 `archive_repo.find()` 按 plan_id+archive_type 查询后内存比较）。
+> **触发规则（冲突判定）：** `set_validity_period()` 在更新前需查询同一 `plan_id`、同一 `archive_type`、不同 `archive_id` 的既有档案，若新区间 `[valid_from, valid_until)`（半开区间，None 视为开区间端点，即 valid_from=None 表示"从无限早开始"，valid_until=None 表示"直到无限远"）与任一既有区间存在交集，则抛出 `ValidityPeriodConflictError`。**半开区间规则**：区间包含 valid_from 端点、不包含 valid_until 端点；端点相接不视为冲突（档案 A 的 valid_until == 档案 B 的 valid_from 时，两者自然衔接，允许共存）。该判定在应用服务层完成（复用 `archive_repo.find()` 按 plan_id+archive_type 查询后内存比较）。
 
 ### AC-4: ArchiveQuery 扩展（时间轴查询）
 

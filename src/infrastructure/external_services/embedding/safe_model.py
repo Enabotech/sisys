@@ -43,11 +43,6 @@ class SafeBGE3Model:
         device: 目标设备（cuda/cpu），None 时自动检测使用 self.target_devices[0]
     """
 
-    _model: Any  # BGEM3FlagModel 实例，运行时动态确定类型
-    _inference_lock: threading.Lock
-    _device: str
-    _use_fp16: bool
-
     def __init__(
         self,
         model_path: str,
@@ -65,7 +60,10 @@ class SafeBGE3Model:
         # 避免 pytest 收集阶段（含 xdist 多 worker）无谓加载 3 秒的 FlagEmbedding
         from FlagEmbedding import BGEM3FlagModel as _BGEM3FlagModel
 
-        self._model = _BGEM3FlagModel(model_path, use_fp16=use_fp16)
+        self._model: Any = _BGEM3FlagModel(model_path, use_fp16=use_fp16)
+        self._inference_lock: threading.Lock = threading.Lock()
+        self._device: str = device if device is not None else self._model.target_devices[0]
+        self._use_fp16: bool = use_fp16
 
         # 确定目标设备
         if device is None:
