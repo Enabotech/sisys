@@ -876,6 +876,37 @@ tests/
 
 ---
 
+### Round 2 代码审查修复记录
+
+**审查日期:** 2026-08-15
+**审查模式:** 3 Agent 并行（并发安全/业务正确性/测试充分性）
+
+#### 修复清单
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | 降级路径 `except Exception` 掩盖 `SystemException` 基础设施故障 | P1 | 区分 `SystemException`（传播）与业务异常（降级） |
+| 2 | 排序无 tie-breaker 导致结果不确定 | P2 | 改为 `(-score, id)` 复合键排序 |
+| 3 | Child 展开截断未显式按分数排序（依赖后端行为） | P2 | 添加 `child_results.sort(key=..., reverse=True)` |
+| 4 | limit 参数无上限校验 | P2 | 新增 `_MAX_LIMIT = 200` 常量，`_validate_inputs` 查越限 |
+| 5 | `_merge_filter` 空 dict `{}` 被静默丢弃 | P2 | `if base_filter:` → `if base_filter is not None:` |
+| 6 | 自底向上路径未截断 parent content | P2 | 应用 `_safe_truncate(content, 200)` |
+| 7 | 自顶向下 Child 展开串行化（5 次串行网络请求） | P1 | 改为 `asyncio.gather` 并发展开 |
+| 8 | 缺少 API 契约测试文件 | P2 | 创建 `test_api_contract_layered_retrieval.py`（4 测试） |
+| 9 | 缺少 `search_bottom_up L1` 返回空测试 | P2 | 新增 `test_search_bottom_up_l1_returns_empty` |
+| 10 | 缺少自顶向下无匹配测试 | P3 | 新增 `test_top_down_no_match_returns_empty` |
+| 11 | `_search_l3_direct`/`_search_l4_direct`/`_search_top_down_l3_to_l4` 缺少 `Raises` 段 | P2 | docstring 补充 `Raises` 段 |
+| 12 | `_safe_truncate` 未校验 `max_len` | P3 | 新增 `max_len < 1` 防御性校验 |
+| 13 | 测试覆盖增强：tenant_id 空白/超限 limit/SystemException 传播/异常路径/`_fetch_parent`/`_merge_filter_with_tenant` | P2 | 新增 8 个单元测试 |
+
+#### 质量门禁通过情况
+
+- [x] 全部测试通过：723 passed（含全量 723 个测试）
+- [x] Ruff 检查通过：All checks passed
+- [x] MyPy 检查通过：Success: no issues found
+
+---
+
 ## 📚 模板使用说明 Template Usage Guide
 
 ### 快速开始
