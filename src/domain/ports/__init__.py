@@ -44,6 +44,7 @@ from src.domain.ports.memory_repository import (
     L2GroupMemberRepositoryPort,
     L2MetadataRepositoryPort,
 )
+from src.domain.ports.model_inference import ModelInferencePort
 from src.domain.ports.ocr import OCR_CONFIDENCE_THRESHOLD, OCR_MAX_BYTES, OCRPort
 from src.domain.ports.outbox import OutboxRepository
 from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
@@ -104,6 +105,7 @@ __all__ = [
     "LLMClientPort",
     "LLMConfig",
     "LLMResponse",
+    "ModelInferencePort",
     "OCRPort",
     "OCR_CONFIDENCE_THRESHOLD",
     "OCR_MAX_BYTES",

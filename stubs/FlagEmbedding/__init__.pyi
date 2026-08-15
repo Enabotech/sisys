@@ -2,14 +2,15 @@
 
 基于 FlagEmbedding v1.2+ (BAAI/bge-m3) 公开 API 提供完整类型定义。
 FlagEmbedding 是 BAAI 开源的嵌入模型工具包，BGEM3FlagModel 封装 BGE-M3 的多语言嵌入生成。
-覆盖 EmbeddingAPIServer 使用的方法。
+覆盖 SafeBGE3Model 和 EmbeddingAPIServer 使用的方法。
 来源: src/infrastructure/external_services/embedding/embedding_api_server.py
 """
 
-from typing import Any, Literal, overload
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+from torch import nn
 
 class BGEM3FlagModel:
     """BGE-M3 多语言嵌入模型
@@ -22,6 +23,17 @@ class BGEM3FlagModel:
     GPU 推理时建议 use_fp16=True 以降低显存占用。
     """
 
+    model: nn.Module
+    target_devices: list[str]
+    use_fp16: bool
+    batch_size: int
+    passage_max_length: int
+    return_dense: bool
+    return_sparse: bool
+    return_colbert_vecs: bool
+    tokenizer: Any
+    pool: Any  # AbsEmbedder 多进程池，__del__ → stop_self_pool() 访问
+
     def __init__(
         self,
         model_name_or_path: str,
@@ -29,25 +41,14 @@ class BGEM3FlagModel:
         devices: str | list[str] | None = None,
         **kwargs: Any,
     ) -> None: ...
-    @overload
     def encode(
         self,
         sentences: str | list[str],
-        return_dense: Literal[True] = True,
+        return_dense: bool = True,
         return_sparse: bool = False,
         return_colbert_vecs: bool = False,
         batch_size: int = 256,
         max_length: int = 8192,
-    ) -> dict[str, NDArray[np.float32] | list[dict[str, Any]] | None]: ...
-    @overload
-    def encode(
-        self,
-        sentences: str | list[str],
-        *,
-        return_dense: bool = True,
-        return_sparse: Literal[True],
-        return_colbert_vecs: bool = False,
-        batch_size: int = 256,
-        max_length: int = 8192,
+        **kwargs: Any,
     ) -> dict[str, NDArray[np.float32] | list[dict[str, Any]] | None]: ...
     def __repr__(self) -> str: ...

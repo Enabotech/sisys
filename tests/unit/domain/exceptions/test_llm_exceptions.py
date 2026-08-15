@@ -196,9 +196,9 @@ class TestLLMErrorCodeUniqueness:
         assert llm_codes.isdisjoint(ocr_codes), "LLM 编码与 OCR 编码冲突"
 
     def test_llm_codes_not_conflict_with_sandbox(self) -> None:
-        """验证 LLM 330-339 不与 sandbox 309-319 冲突"""
+        """验证 LLM 330-339 不与 sandbox 311-319 冲突"""
         llm_codes = {330, 331, 332}
-        sandbox_codes = set(range(309, 320))
+        sandbox_codes = set(range(311, 320))
         assert llm_codes.isdisjoint(sandbox_codes), "LLM 编码与 sandbox 编码冲突"
 
     def test_llm_codes_within_external_range(self) -> None:

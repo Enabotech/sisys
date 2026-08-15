@@ -42,10 +42,10 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "retrieval": (280, 281),
     # 外部服务（3XX）
     "external": (301, 399),
-    # 嵌入服务（306-308）
-    "embedding": (306, 308),
-    # 沙箱（309-319）
-    "sandbox": (309, 319),
+    # 嵌入服务（306-310）
+    "embedding": (306, 310),
+    # 沙箱（311-319）
+    "sandbox": (311, 319),
     # OCR 子域（320-329）
     "ocr": (320, 329),
     # LLM 子域（330-339）
@@ -120,6 +120,8 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "EmbeddingAPIError": "embedding",
     "EmbeddingResponseError": "embedding",
     "EmbeddingModelError": "embedding",
+    "ModelInferenceError": "embedding",
+    "ConcurrencyOverloadError": "embedding",
     # sandbox_exceptions.py
     "SandboxError": "sandbox",
     "ContainerStartError": "sandbox",

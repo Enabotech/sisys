@@ -623,36 +623,30 @@ def test_ac_api_sparse_encoding():
 
 @pytest.fixture
 def api_client():
-    """创建 FastAPI TestClient 并注入 mock 模型"""
+    """创建 FastAPI TestClient 并注入 mock 引擎"""
     from unittest.mock import MagicMock
 
     import numpy as np
     from fastapi.testclient import TestClient
 
-    from src.infrastructure.external_services.embedding.embedding_api_server import app
+    import src.infrastructure.external_services.embedding.embedding_api_server as server
 
-    model = MagicMock()
+    engine = MagicMock()
+    engine.is_ready = True
+    engine.load_error = None
 
-    def mock_encode(
-        texts: str | list[str],
-        return_dense: bool = False,
-        return_sparse: bool = False,
-        **kwargs: object,
-    ) -> dict[str, Any]:
-        result: dict[str, Any] = {}
+    def mock_encode(texts: str | list[str], return_sparse: bool = False) -> dict[str, Any]:
         n = len(texts) if isinstance(texts, list) else 1
-        if return_dense:
-            result["dense_vecs"] = np.random.randn(n, 1024).astype(np.float32)
+        result: dict[str, Any] = {"dense": np.random.randn(n, 1024).astype(np.float32).tolist()}
         if return_sparse:
-            result["lexical_weights"] = [{"100": 0.5, "200": 0.3} for _ in range(n)]  # FlagEmbedding str keys
+            result["sparse"] = [{"indices": [100, 200], "values": [0.5, 0.3]} for _ in range(n)]
+        else:
+            result["sparse"] = None
         return result
 
-    model.encode.side_effect = mock_encode
-    app.state.model = model
-    app.state.model_name = "BAAI/bge-m3"
-    app.state.device = "cpu"
-    app.state.load_error = None
-    return TestClient(app)
+    engine.encode.side_effect = mock_encode
+    server._engine = engine
+    return TestClient(server.app)
 
 
 @given("嵌入 API 服务已启动")

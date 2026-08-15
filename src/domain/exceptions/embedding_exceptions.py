@@ -4,15 +4,17 @@
 对标业界最佳实践（Google domain+reason、Stripe type+code 二级编码），
 为 Embedding 子系统分配独立异常编码，提升监控可观测性和故障定位效率。
 
-异常编码范围：EXCEPTION_306 ~ EXCEPTION_319（预留）
+异常编码范围：EXCEPTION_306 ~ EXCEPTION_310（预留）
 - 306: API 传输层错误（HTTP 4xx/5xx）
 - 307: 响应格式错误（JSON 解析、结构校验、数量不匹配）
 - 308: 模型错误（未加载、推理失败、输出键缺失）
+- 309: 模型推理通用错误（GPU OOM、模型状态异常）
+- 310: 并发过载错误（请求队列满时拒绝）
 """
 
 from __future__ import annotations
 
-from src.domain.exceptions.external_exceptions import ExternalException, ThirdPartyError
+from src.domain.exceptions.external_exceptions import ExternalException, ServiceUnavailableError, ThirdPartyError
 
 
 class EmbeddingAPIError(ThirdPartyError):
@@ -71,8 +73,43 @@ class EmbeddingModelError(ExternalException):
     message = "Embedding model error"
 
 
+class ModelInferenceError(ExternalException):
+    """模型推理错误
+
+    模型推理过程中的通用故障，包括 GPU OOM、模型状态异常等。
+    继承 ExternalException，HTTP 映射自动回退至 502 Bad Gateway。
+    与 EmbeddingModelError(308) 的区别：
+    - EmbeddingModelError: 用于服务端 HTTP 端点内部错误分类
+    - ModelInferenceError: 用于 ModelInferenceEngine 推理引擎的通用错误
+
+    Attributes:
+        code: EXCEPTION_309
+        message: 模型推理错误描述
+    """
+
+    code = "EXCEPTION_309"
+    message = "Model inference error"
+
+
+class ConcurrencyOverloadError(ServiceUnavailableError):
+    """并发过载错误
+
+    请求队列已满时拒绝新请求，防止级联超时。
+    继承 ServiceUnavailableError，HTTP 映射返回 503 Service Unavailable。
+
+    Attributes:
+        code: EXCEPTION_310
+        message: 并发过载错误描述
+    """
+
+    code = "EXCEPTION_310"
+    message = "Concurrency overload, request rejected"
+
+
 __all__ = [
     "EmbeddingAPIError",
     "EmbeddingResponseError",
     "EmbeddingModelError",
+    "ModelInferenceError",
+    "ConcurrencyOverloadError",
 ]
