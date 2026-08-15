@@ -1,32 +1,36 @@
 """BGE-M3 嵌入 API 服务端
 
-通过 FastAPI + FlagEmbedding 将 BGE-M3 封装为独立 HTTP 服务。
+通过 FastAPI + ModelInferenceEngine 将 BGE-M3 封装为独立 HTTP 服务。
 Docker Compose 独立部署，通过 POST /v1/embeddings 提供 Dense/Sparse 编码。
 
-架构参考: architecture.md §4.3 嵌入模型配置 — API 模式独立部署
-依赖: fastapi, FlagEmbedding, uvicorn
+架构变更：
+- v1.0: 直接使用 BGEM3FlagModel（无锁，有竞态条件）
+- v1.1: 使用 _embed_lock + _sanitize_dense_vectors（线程安全锁）
+- v2.0: 使用 ModelInferenceEngine + SafeBGE3Model（重构版，消除冗余操作）
 
-线程安全策略：
-- 模型推理使用 threading.Lock 串行化，避免并发请求下
-  encode_single_device() 内 model.to(device) + model.eval() 非原子操作
-  导致模型精度状态被部分重置，输出 NaN/Inf。
-- 输出向量经 np.nan_to_num 防御性净化，确保 JSON 序列化零失败。
+架构参考: architecture.md §4.3 嵌入模型配置 — API 模式独立部署
+依赖: fastapi, uvicorn
+线程安全策略: ModelInferenceEngine 内部使用 threading.Lock 串行化模型推理
+输出向量经 np.nan_to_num 防御性净化，确保 JSON 序列化零失败
 """
 
 from __future__ import annotations
 
 import logging
 import os
-import threading
 from contextlib import asynccontextmanager
-from typing import cast
 
-import numpy as np
-import numpy.typing as npt
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from src.infrastructure.external_services.embedding.model_inference_engine import (
+    ModelInferenceEngine,
+)
+
 logger = logging.getLogger(__name__)
+
+# 全局推理引擎实例
+_engine: ModelInferenceEngine | None = None
 
 
 @asynccontextmanager
@@ -35,99 +39,17 @@ async def lifespan(app: FastAPI):
 
     替代已弃用的 @app.on_event("startup")，管理模型加载/卸载生命周期。
     """
+    global _engine
     load_model()
     yield
     # Shutdown: 释放模型和 GPU 资源
-    if getattr(app.state, "model", None) is not None:
-        del app.state.model
-        app.state.model = None
-        try:
-            import torch
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
+    if _engine is not None:
+        _engine.unload()
+        _engine = None
         logger.info("模型资源已释放")
 
 
-app = FastAPI(title="SISYS Embedding API", version="1.0.0", lifespan=lifespan)
-
-# 模型推理锁：串行化 encode() 调用，防止并发 model.to(device) + model.eval() 非原子操作
-# 参考: FlagEmbedding encode_single_device() 源码中设备切换非线程安全
-_embed_lock = threading.Lock()
-
-
-def _sanitize_dense_vectors(dense_vecs: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
-    """防御性净化浮点向量，剔除 NaN/Inf 确保 JSON 序列化兼容
-
-    Starlette 0.37.2 JSONResponse 默认 allow_nan=False，
-    NaN/Inf 会导致 json.dumps 抛出 ValueError → HTTP 500。
-    浮点推理在 fp16 精度下偶现 NaN/Inf（并发竞争、GPU 数值不稳定等），
-    此函数作为最后一道防线，将不安全值替换为 0.0。
-
-    Args:
-        dense_vecs: 原始模型输出向量
-
-    Returns:
-        净化后的向量（不含 NaN/Inf）
-
-    Note:
-        np.nan_to_num 同时处理 float16/float32/float64，
-        将 NaN→0.0, +Inf→finfo.max, -Inf→finfo.min。
-        float16 下 finfo.max=65504，finfo.min=-65504，
-        均远小于正常嵌入值范围（~[-0.5, 0.5]），
-        不会与正常值混淆。
-    """
-    if not np.any(np.isnan(dense_vecs)) and not np.any(np.isinf(dense_vecs)):
-        return dense_vecs
-    logger.warning(
-        "检测到 NaN/Inf 向量，已自动净化 (shape=%s, nan_count=%d, inf_count=%d)",
-        dense_vecs.shape,
-        int(np.sum(np.isnan(dense_vecs))),
-        int(np.sum(np.isinf(dense_vecs))),
-    )
-    return cast(npt.NDArray[np.floating], np.nan_to_num(dense_vecs, nan=0.0, posinf=0.0, neginf=0.0))
-
-
-class EmbedRequest(BaseModel):
-    """嵌入请求模型
-
-    Attributes:
-        texts: 待编码文本列表（至少 1 条，无上限，由 GPU 内存自然约束）
-        return_sparse: 是否返回稀疏词汇权重
-    """
-
-    texts: list[str] = Field(..., min_length=1, description="待编码文本列表")
-    return_sparse: bool = Field(False, description="是否返回稀疏词汇权重")
-
-
-class EmbedResponse(BaseModel):
-    """嵌入响应模型
-
-    Attributes:
-        dense: 稠密向量列表（每项 1024 维 float）
-        sparse: 稀疏向量列表（仅 return_sparse=True 时有值）
-    """
-
-    dense: list[list[float]]
-    sparse: list[dict] | None = None
-
-
-class HealthResponse(BaseModel):
-    """健康检查响应模型
-
-    Attributes:
-        status: 服务状态（ok/loading/unavailable）
-        model: 模型名称
-        device: 运行设备（cuda/cpu）
-        error: 错误信息（仅 status=unavailable 时有值）
-    """
-
-    status: str
-    model: str
-    device: str
-    error: str | None = None
+app = FastAPI(title="SISYS Embedding API", version="2.0.0", lifespan=lifespan)
 
 
 def _validate_model_path(path: str) -> bool:
@@ -180,16 +102,13 @@ def load_model() -> None:
     2. 若有效则从本地加载，否则从 HuggingFace Hub 下载
     3. 自动检测 CUDA 可用性，无 GPU 时降级至 CPU
 
-    若加载失败，设置 app.state.model = None，healthcheck 将返回 unavailable 状态
+    若加载失败，设置引擎内部错误状态，healthcheck 将返回 unavailable 状态
     """
+    global _engine
+
     model_name = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-m3")
     local_path = os.getenv("EMBEDDING_MODEL_PATH", "")
     device, use_fp16 = _detect_device()
-
-    app.state.model = None
-    app.state.model_name = model_name
-    app.state.device = device
-    app.state.load_error = None
 
     # 优先本地路径（需验证包含模型文件）
     if _validate_model_path(local_path):
@@ -201,28 +120,52 @@ def load_model() -> None:
         logger.info("从 HuggingFace Hub 加载模型: %s (device=%s, fp16=%s)", model_name, device, use_fp16)
         load_path = model_name
 
-    try:
-        from FlagEmbedding import BGEM3FlagModel
+    _engine = ModelInferenceEngine(
+        model_path=load_path,
+        device=device,
+        use_fp16=use_fp16,
+    )
+    _engine.load()
 
-        app.state.model = BGEM3FlagModel(load_path, use_fp16=use_fp16)
 
-        # 启动时一次性 fp16 转换，阻止 encode_single_device() 每次请求重复调用 model.half()
-        # 根因: RTX 5090 上请求并发时 model.to(device) + model.half() + model.eval() 非原子操作
-        #       导致模型精度状态在请求间被部分重置，引发 Float/Half 冲突或 NaN 输出
-        # 修复: 加载后立即转换一次，然后标记 use_fp16=False 阻止后续重复转换
-        if use_fp16 and hasattr(app.state.model, "model"):
-            app.state.model.model.half()
-            app.state.model.use_fp16 = False
+class EmbedRequest(BaseModel):
+    """嵌入请求模型
 
-        logger.info("模型加载成功: %s", load_path)
+    Attributes:
+        texts: 待编码文本列表（至少 1 条，无上限，由 GPU 内存自然约束）
+        return_sparse: 是否返回稀疏词汇权重
+    """
 
-    except (ImportError, OSError, RuntimeError, ValueError) as e:
-        logger.error("模型加载失败: %s", e)
-        app.state.load_error = str(e)
-        # 不抛出异常，让服务继续运行（healthcheck 会反映状态）
-    except Exception as e:
-        logger.exception("模型加载失败 (未预期异常: %s)", type(e).__name__)
-        app.state.load_error = str(e)
+    texts: list[str] = Field(..., min_length=1, description="待编码文本列表")
+    return_sparse: bool = Field(False, description="是否返回稀疏词汇权重")
+
+
+class EmbedResponse(BaseModel):
+    """嵌入响应模型
+
+    Attributes:
+        dense: 稠密向量列表（每项 1024 维 float）
+        sparse: 稀疏向量列表（仅 return_sparse=True 时有值）
+    """
+
+    dense: list[list[float]]
+    sparse: list[dict] | None = None
+
+
+class HealthResponse(BaseModel):
+    """健康检查响应模型
+
+    Attributes:
+        status: 服务状态（ok/loading/unavailable）
+        model: 模型名称
+        device: 运行设备（cuda/cpu）
+        error: 错误信息（仅 status=unavailable 时有值）
+    """
+
+    status: str
+    model: str
+    device: str
+    error: str | None = None
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -235,56 +178,25 @@ async def health() -> dict:
     Raises:
         HTTPException 503: 模型未加载
     """
-    if app.state.model is not None:
+    global _engine
+
+    if _engine is not None and _engine.is_ready:
         return {
             "status": "ok",
-            "model": app.state.model_name,
-            "device": app.state.device,
+            "model": os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-m3"),
+            "device": os.getenv("EMBEDDING_MODEL_DEVICE", "cuda"),
             "error": None,
         }
-
-    from fastapi import HTTPException
 
     raise HTTPException(
         status_code=503,
         detail={
             "status": "unavailable",
-            "model": app.state.model_name,
-            "device": app.state.device,
-            "error": app.state.load_error or "Model not loaded",
+            "model": os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-m3"),
+            "device": os.getenv("EMBEDDING_MODEL_DEVICE", "cuda"),
+            "error": _engine.load_error if _engine is not None else "Engine not initialized",
         },
     )
-
-
-def _parse_sparse_weights(lexical_weights: list[dict]) -> list[dict]:
-    """解析 FlagEmbedding 稀疏词汇权重为 API 响应格式
-
-    保证返回列表长度与输入 lexical_weights 长度一致，
-    即使某条文本的所有 token ID 解析失败，也会返回空 indices/values。
-
-    Args:
-        lexical_weights: FlagEmbedding 返回的词汇权重列表（键为 token ID 字符串）
-
-    Returns:
-        格式化的稀疏向量列表 [{"indices": [...], "values": [...]}, ...]
-    """
-    sparse_list: list[dict] = []
-    for w in lexical_weights:
-        sorted_items: list[tuple[int, float]] = []
-        for k, v in w.items():
-            try:
-                sorted_items.append((int(k), float(v)))
-            except (ValueError, TypeError):
-                logger.warning("跳过非法 token ID: %s", k)
-        sorted_items.sort(key=lambda x: x[0])
-        # 即使 sorted_items 为空也必须 append，保证输出长度与输入一致
-        sparse_list.append(
-            {
-                "indices": [idx for idx, _ in sorted_items],
-                "values": [val for _, val in sorted_items],
-            }
-        )
-    return sparse_list
 
 
 @app.post("/v1/embeddings", response_model=EmbedResponse)
@@ -292,7 +204,8 @@ def embed(req: EmbedRequest) -> dict:
     """嵌入编码端点
 
     使用同步 def（非 async），FastAPI 自动在线程池中执行，
-    避免 BGEM3FlagModel.encode() 的同步阻塞推理阻塞事件循环。
+    避免 ModelInferenceEngine.encode() 的同步推理阻塞事件循环。
+    线程安全由 ModelInferenceEngine 内部 threading.Lock 保证。
 
     Args:
         req: 嵌入请求
@@ -303,50 +216,13 @@ def embed(req: EmbedRequest) -> dict:
     Raises:
         HTTPException 503: 模型未加载
     """
-    from fastapi import HTTPException
+    global _engine
 
-    if app.state.model is None:
+    if _engine is None or not _engine.is_ready:
+        error_detail = _engine.load_error if _engine is not None else "Engine not initialized"
         raise HTTPException(
             status_code=503,
-            detail=f"Embedding model not available: {app.state.load_error or 'Not loaded'}",
+            detail=f"Embedding model not available: {error_detail}",
         )
 
-    model = app.state.model
-    try:
-        # 串行化模型推理：FlagEmbedding encode_single_device() 非线程安全
-        # 并发调用时 model.to(device) + model.eval() 非原子操作，
-        # 可能导致模型精度状态被部分重置，输出 NaN/Inf。
-        with _embed_lock:
-            result = model.encode(
-                req.texts,
-                return_dense=True,
-                return_sparse=req.return_sparse,
-            )
-    except Exception:
-        logger.exception("模型推理失败 (texts=%d, return_sparse=%s)", len(req.texts), req.return_sparse)
-        raise HTTPException(status_code=500, detail="Embedding inference failed")
-
-    # 校验模型输出结构：防止 FlagEmbedding 版本变更导致键名变化时产生无信息量的 500 错误
-    if "dense_vecs" not in result:
-        logger.error("模型输出缺少 'dense_vecs' 键，实际键: %s", list(result.keys()))
-        raise HTTPException(status_code=500, detail="Model output missing 'dense_vecs'")
-
-    dense_vecs = result["dense_vecs"]
-    if len(dense_vecs) != len(req.texts):
-        logger.error("模型输出向量数(%d)与请求数(%d)不匹配", len(dense_vecs), len(req.texts))
-        raise HTTPException(status_code=500, detail=f"Vector count mismatch: {len(dense_vecs)} != {len(req.texts)}")
-
-    # 防御性净化：剔除 NaN/Inf 确保 JSON 序列化兼容
-    dense_vecs = _sanitize_dense_vectors(dense_vecs)
-
-    response: dict = {"dense": dense_vecs.tolist()}
-
-    if req.return_sparse:
-        if "lexical_weights" not in result:
-            logger.error("模型输出缺少 'lexical_weights' 键（return_sparse=True）")
-            raise HTTPException(status_code=500, detail="Model output missing 'lexical_weights'")
-        response["sparse"] = _parse_sparse_weights(result["lexical_weights"])
-    else:
-        response["sparse"] = None
-
-    return response
+    return _engine.encode(req.texts, return_sparse=req.return_sparse)

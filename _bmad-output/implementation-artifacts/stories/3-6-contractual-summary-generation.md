@@ -76,14 +76,16 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `SummaryGenerationPort` 定义于 `src/domain/ports/summary_generation.py`（Protocol，`@runtime_checkable`）
-- [ ] 方法签名：`async generate_summary(query_text, search_results, perspective, config?) -> Any`
+- [ ] `SearchResult` 从 `src/domain/ports/l3_vector.py` 导入（与 `LayeredRetrievalPort` 相同的现有模式，同域内类型引用，不引入新抽象）
+- [ ] 方法签名：`async generate_summary(query_text, search_results, perspective, config=None, tenant_id=None) -> Any`
   - `query_text: str` — 原始查询文本
   - `search_results: list[SearchResult]` — 分层检索结果（L3/L4 内容）
   - `perspective: str` — 视角类型（"financial"/"market"/"technical"）
   - `config: LLMConfig | None` — 可选 LLM 调用配置
+  - `tenant_id: str | None` — 可选租户 ID（多租户隔离，摘要存储/检索需透传，与 `LayeredRetrievalPort.search_top_down()` 的租户隔离模式一致）
   - 返回对应视角 Schema 的 Pydantic 实例（`Any` 类型，领域层不依赖 pydantic）
 - [ ] 端口注册于 `composition_root.py`，通过 `register_port()` 注册为 `summary_generation_service` 端口
-- [ ] 端口具备唯一名称、版本、owner、module、兼容策略
+- [ ] 端口具备唯一名称、版本、interface、impl、module（必填五参数）及 owner、兼容策略（可选元数据）
 - [ ] 端口契约测试通过（`tests/contracts/test_port_contract_summary_generation.py`）
 
 ### AC-3: 摘要生成异常体系
@@ -94,13 +96,13 @@
 **And** 继承适当的基类层次结构
 
 **验证标准/Validation Criteria:**
-- [ ] `SummaryGenerationError`（EXCEPTION_360）— 继承 `BusinessException`，摘要生成整体失败
+- [ ] `SummaryGenerationError`（EXCEPTION_290）— 继承 `BusinessException`，摘要生成整体失败
   - 构造器参数：`perspective: str`（视图类型）、`query_text: str`（查询文本，截断至 100 字符）
-- [ ] `SummaryPerspectiveNotSupportedError`（EXCEPTION_361）— 继承 `ValidationError`，不支持的视角类型
+- [ ] `SummaryPerspectiveNotSupportedError`（EXCEPTION_291）— 继承 `ValidationError`，不支持的视角类型
   - 构造器参数：`perspective: str`（不支持的视角）
-- [ ] 异常编码在 `_code_ranges.py` 注册 `summary` 子域（360, 361）及 `_CLASS_TO_SUBDOMAIN` 映射
+- [ ] 异常编码在 `_code_ranges.py` 注册 `summary` 子域（290, 299）及 `_CLASS_TO_SUBDOMAIN` 映射
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册
-- [ ] 无编码碰撞（`grep -rw "EXCEPTION_36[0-9]" src/` 零输出）
+- [ ] 无编码碰撞（`grep -rw "EXCEPTION_29[0-9]" src/` 零输出）
 - [ ] HTTP 映射测试覆盖
 
 ### AC-4: 摘要生成应用服务
@@ -114,8 +116,9 @@
 **验证标准/Validation Criteria:**
 - [ ] `SummaryGenerationService` 位于 `src/application/services/summary_generation_service.py`
 - [ ] 构造函数注入 `llm_client: LLMClientPort`（或 `Any` 保持松耦合）
-- [ ] 构造函数注入 `layered_retrieval: LayeredRetrievalPort`（可选，用于获取检索上下文）
-- [ ] 构造函数注入 `embedding_service: EmbeddingServicePort`（可选，用于摘要向量生成）
+- [ ] 构造函数注入 `layered_retrieval: LayeredRetrievalPort`（必需，用于获取检索上下文和填充 L1/L2 骨架）
+- [ ] 构造函数注入 `embedding_service: EmbeddingServicePort`（必需，用于摘要向量生成）
+- [ ] 构造函数注入 `l3_vector: L3VectorPort`（或 `Any`，必需，用于摘要向量持久化 upsert 和 L1/L2 检索）
 - [ ] 实现 `generate_summary()` 方法，签名与端口契约一致
 - [ ] 内部根据 `perspective` 参数选择对应的 Pydantic Schema 和 Prompt 模板
 - [ ] 调用 `LLMClientPort.structured_generate()` 传入 Schema 和 Prompt
@@ -124,6 +127,7 @@
 - [ ] 不支持的视角抛出 `SummaryPerspectiveNotSupportedError`
 - [ ] LLM 调用失败抛出 `SummaryGenerationError`（包装原始 LLM 异常）
 - [ ] 摘要生成延迟 P95 < 30 秒（含 LLM 调用）
+- [ ] LLM 异常处理：捕获 `LLMAPIError` 和 `ServiceUnavailableError` → 包装为 `SummaryGenerationError`（业务失败）；`LLMResponseError`（Schema 验证失败）→ 同样包装为 `SummaryGenerationError`（附录原始异常信息）；`LLMConfigError` → 透传不包装（配置错误不属于摘要生成失败）
 - [ ] 降级策略：LLM 调用失败时记录 WARNING 日志，抛出 `SummaryGenerationError`
 
 ### AC-5: 摘要 Prompt 模板
@@ -143,7 +147,7 @@
   - 查询文本
   - 检索结果上下文（格式化的文档内容列表）
   - 输出要求
-- [ ] 模板使用 Python f-string 或 Jinja2 格式，支持动态注入
+- [ ] 模板使用 Python f-string 格式，支持动态注入（统一格式，无需额外依赖，与项目技术栈一致）
 - [ ] 所有 Prompt 模板通过单元测试验证（变量替换正确性）
 
 ### AC-6: 摘要结果存储与检索（L2 文档摘要实现）
@@ -157,36 +161,48 @@
 - [ ] 摘要结果通过 `EmbeddingServicePort.embed_documents()` 生成向量
 - [ ] 摘要向量通过 `L3VectorPort.upsert_points()` 写入 Qdrant
   - collection 名称：`"document_summaries"`（独立 collection，与文档切片分离）
+  - collection 创建策略：懒创建（首次 upsert 前调用 `l3_vector.collection_exists()` 检查，不存在时调用 `l3_vector.create_collection()` 创建，vector_size=1024 对齐 bge-m3 维度）
   - payload 包含：`perspective`（视角类型）、`summary_text`（摘要文本）、`key_points`（关键要点列表）、`confidence_score`（置信度）、`source_document_ids`（来源文档 ID 列表）、`index_level`（"L2"）、`created_at`（时间戳）
   - 点 ID 使用 `f"summary-{perspective}-{uuid4}"` 格式
 - [ ] 更新 `LayeredRetrievalService.search_top_down(target_level="L2")`：
-  - 在 `document_summaries` collection 中执行 Dense 检索
+  - 在 `document_summaries` collection 中执行 Dense 检索（**L2 硬编码 collection 名为 `"document_summaries"`，与顶层 `collection` 参数解耦**，避免 L3/L4 检索语义冲突）
   - 返回 `list[SearchResult]`，payload 包含摘要元数据
   - 移除原有骨架（返回空列表）逻辑
   - 日志记录 `INFO: L2 文档摘要检索执行成功`
 - [ ] 摘要检索延迟 P95 < 200ms（Dense 检索）
-- [ ] 降级策略：摘要 collection 不存在时降级为骨架（返回空列表，WARNING 日志）
+- [ ] 降级策略：摘要 collection 不存在时降级为骨架（返回空列表，WARNING 日志）；Qdrant 查询异常时捕获 `Exception` 降级返回空列表 + WARNING 日志
 
-### AC-7: 跨文档摘要检索（L1 实现）
+### AC-7a: 跨文档摘要生成（L1 生成）
 
 **Given** 多个文档摘要已存储
 **When** 执行多文档摘要聚合
 **Then** 系统聚合相关文档摘要生成跨文档摘要
-**And** 替换 Story 3.5 的 L1 骨架实现（返回空列表）
 
 **验证标准/Validation Criteria:**
 - [ ] `SummaryGenerationService` 扩展 `generate_cross_document_summary()` 方法（可选，或复用 `generate_summary` 加 `cross_document=True` 参数）
-- [ ] 跨文档摘要流程：
-  1. 在 `document_summaries` collection 中检索 L2 摘要
+- [ ] 跨文档摘要生成流程：
+  1. 调用 `LayeredRetrievalPort.search_top_down(target_level="L2")` 获取已有 L2 摘要（L2 硬编码 `document_summaries` collection，与顶层 `collection` 参数解耦）
   2. 聚合 Top-K 摘要结果作为上下文
   3. 调用 `LLMClientPort.structured_generate()` 生成跨文档摘要
-  4. 结果写入 Qdrant（collection: `"cross_document_summaries"`，index_level: "L1"）
+  4. 通过 `EmbeddingServicePort.embed_documents()` 生成向量
+  5. 通过 `L3VectorPort.upsert_points()` 写入 Qdrant（collection: `"cross_document_summaries"`，懒创建策略）
+  6. payload 包含：`perspective`、`summary_text`、`key_points`、`confidence_score`、`source_document_ids`、`index_level`（"L1"）、`created_at`
+- [ ] 降级策略：L2 摘要不足（< 2 条）时降级为骨架（返回空列表，WARNING 日志）
+
+### AC-7b: 跨文档摘要检索（L1 检索实现）
+
+**Given** 跨文档摘要已存储至 Qdrant
+**When** 执行 L1 层级检索
+**Then** 返回跨文档摘要结果
+**And** 替换 Story 3.5 的 L1 骨架实现（返回空列表）
+
+**验证标准/Validation Criteria:**
 - [ ] 更新 `LayeredRetrievalService.search_top_down(target_level="L1")`：
-  - 在 `cross_document_summaries` collection 中执行 Dense 检索
-  - 返回 `list[SearchResult]`，payload 包含跨文档摘要元数据
+  - 在 `cross_document_summaries` collection 中执行 Dense 检索（**L1 硬编码 collection 名为 `"cross_document_summaries"`，与顶层 `collection` 参数解耦**）
+  - 返回 `list[SearchResult]`，payload 包含跨文档摘要元数据（含 `index_level: "L1"`）
   - 移除原有骨架（返回空列表）逻辑
   - 日志记录 `INFO: L1 跨文档摘要检索执行成功`
-- [ ] 降级策略：L2 摘要不足或 L1 collection 不存在时降级为骨架（返回空列表，WARNING 日志）
+- [ ] 降级策略：L1 collection 不存在时降级为骨架（返回空列表，WARNING 日志）；Qdrant 查询异常时捕获 `Exception` 降级返回空列表 + WARNING 日志
 
 ### AC-8: 摘要 API 端点
 
@@ -198,7 +214,7 @@
 **验证标准/Validation Criteria:**
 - [ ] API 路由位于 `src/interfaces/api/summary.py`（或与 `search.py` 合并）
 - [ ] `POST /api/v1/search/summary` 端点
-  - 请求体：`{"query_text": str, "perspective": str, "limit": int (可选, 默认10)}`
+  - 请求体：`{"query_text": str, "perspective": str, "top_k": int (可选, 默认10, 控制检索结果数量), "tenant_id": str | None (可选)}`
   - 响应体：`{"summary": Schema实例, "query_text": str, "perspective": str, "confidence_score": float, "source_documents": list[str]}`
 - [ ] 在 `src/interfaces/api/app.py` 中通过 `app.include_router()` 注册路由
 - [ ] 更新 `docs/api/openapi.yaml` 添加 `/api/v1/search/summary` 端点
@@ -255,15 +271,16 @@
 > **禁止 `raise ValueError`：** 所有验证失败均使用领域异常体系。
 > 完整检查清单与全量异常分类详见 [`sisys-uni-exception-design.md §3.12`](../architecture/sisys-uni-exception-design.md#312-异常注册检查清单)。
 
-- [ ] **归属模块与基类** — 新增 `summary` 子域（360-369）：
-    - `SummaryGenerationError`（EXCEPTION_360）→ 继承 `BusinessException`，摘要生成整体失败
-    - `SummaryPerspectiveNotSupportedError`（EXCEPTION_361）→ 继承 `ValidationError`，不支持的视角
-- [ ] **唯一编码分配** — 从 `summary` 子域（360-361）选取，`grep -rw "EXCEPTION_36[0-9]" src/` 验证无碰撞
+- [ ] **归属模块与基类** — 新增 `summary` 子域（290-299）：
+    - `SummaryGenerationError`（EXCEPTION_290）→ 继承 `BusinessException`，摘要生成整体失败
+    - `SummaryPerspectiveNotSupportedError`（EXCEPTION_291）→ 继承 `ValidationError`，不支持的视角
+- [ ] **唯一编码分配** — 从 `summary` 子域（290-291）选取，`grep -rw "EXCEPTION_29[0-9]" src/` 验证无碰撞
 - [ ] **构造器参数设计** — 携带视角上下文（`perspective`、`query_text` 等），通过 `context` 字典暴露
 - [ ] **消息安全性审查** — 错误消息面向调用方可理解，不泄露 SQL/堆栈等内部实现细节
 - [ ] **编码注册** — 更新 `_code_ranges.py`：
-    - `CODE_RANGES` 新增 `"summary": (360, 369)`
+    - `CODE_RANGES` 新增 `"summary": (290, 299)`
     - `_CLASS_TO_SUBDOMAIN` 新增 `"SummaryGenerationError": "summary"`、`"SummaryPerspectiveNotSupportedError": "summary"`
+    - `allowed_child_parent_subdomains` 新增 `("summary", "business")`（因 `summary` 子域继承 `BusinessException`/`ValidationError`，均属 `business` 域）
 - [ ] **导出完整性** — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
 - [ ] **测试覆盖** — 构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过：
     - `poetry run pytest tests/unit/domain/exceptions/ -v`（含 `test_error_code_uniqueness.py` + `test_code_ranges.py`）
@@ -366,10 +383,10 @@
 根据 epics_v1.0.md CI/CD 质量门禁和 prd.md NFR 测试覆盖计划：
 
 - [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
-- [ ] **应用层覆盖率 ≥85%**（核心业务流，摘要生成编排）
-- [ ] **领域层覆盖率 ≥90%**（端口契约协议）
-- [ ] **接口层覆盖率 ≥85%**（API 路由，请求响应验证）
-- [ ] **集成测试覆盖率 ≥75%**（`pytest --cov=tests/integration --cov-fail-under=75`）
+- [ ] **应用层覆盖率 ≥85%**（核心业务流，摘要生成编排，CI 通过 `scripts/check_coverage_gates.py` 校验）
+- [ ] **领域层覆盖率 ≥90%**（端口契约协议，CI 通过 `scripts/check_coverage_gates.py` 校验）
+- [ ] **接口层覆盖率 ≥85%**（API 路由，请求响应验证；项目级建议指标，非 CI 强制门禁）
+- [ ] **集成测试覆盖率 ≥75%**（`pytest --cov=tests/integration --cov-fail-under=75`；项目级建议指标，非 CI 强制门禁）
 
 #### 代码质量门禁
 - [ ] **Ruff 检查通过**（`ruff check src/`）
@@ -421,7 +438,8 @@
 | AC-4 | 摘要生成应用服务 | Task 2 | TDD 服务实现 | `test_summary_generation_service.py` |
 | AC-5 | 摘要 Prompt 模板 | Task 2 | TDD Prompt 模板 | `test_summary_prompts.py` |
 | AC-6 | 摘要结果存储与检索（L2） | Task 3 | TDD 存储实现 | `test_integration_contractual_summary.py` |
-| AC-7 | 跨文档摘要检索（L1） | Task 3 | TDD 跨文档实现 | `test_integration_contractual_summary.py` |
+| AC-7a | 跨文档摘要生成（L1 生成） | Task 3 | TDD 跨文档实现 | `test_integration_contractual_summary.py` |
+| AC-7b | 跨文档摘要检索（L1 检索） | Task 3 | TDD L1 填充 | `test_integration_contractual_summary.py` |
 | AC-8 | 摘要 API 端点 | Task 3 | TDD API 端点 | `test_api_contract_summary.py` |
 
 ---
@@ -445,11 +463,11 @@
 - [ ] Subtask 0.4: 编写 API 契约测试 `tests/contracts/test_api_contract_summary.py`
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_contractual_summary.feature`
 - [ ] Subtask 0.6: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_contractual_summary.py`
-- [ ] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）
+- [ ] Subtask 0.7: 运行所有 Task 0 测试（端口契约测试 + API 契约测试 + 验收测试），确认全部失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [ ] 所有 Task 0 测试（端口契约测试 + API 契约测试 + 验收测试）运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -493,15 +511,15 @@
 
 - [ ] Subtask 1.7: 🔴 红 — 编写摘要异常失败测试
 - [ ] Subtask 1.8: 🟢 绿 — 实现 `SummaryGenerationError` 和 `SummaryPerspectiveNotSupportedError`
-- [ ] Subtask 1.9: 🔄 重构 — 注册异常到 `_code_ranges.py`（新增 `summary` 子域 360-369）、`__init__.py`、`EXCEPTION_HTTP_MAP`、`test_code_ranges.py`
+- [ ] Subtask 1.9: 🔄 重构 — 注册异常到 `_code_ranges.py`（新增 `summary` 子域 290-299）、`__init__.py`、`EXCEPTION_HTTP_MAP`、`test_code_ranges.py`
 
 **完成标准/Definition of Done:**
 - [ ] `FinancialSummary`、`MarketSummary`、`TechnicalSummary` Schema 定义完成
 - [ ] `SummaryGenerationPort` 端口契约定义完成
-- [ ] `SummaryGenerationError`（EXCEPTION_360）和 `SummaryPerspectiveNotSupportedError`（EXCEPTION_361）定义完成
+- [ ] `SummaryGenerationError`（EXCEPTION_290）和 `SummaryPerspectiveNotSupportedError`（EXCEPTION_291）定义完成
 - [ ] 异常体系完整注册（`_code_ranges.py`/`__init__.py`/`EXCEPTION_HTTP_MAP`）
 - [ ] 所有 TDD 循环测试通过
-- [ ] 异常编码无碰撞（`grep -rw "EXCEPTION_36[0-9]"` 零输出）
+- [ ] 异常编码无碰撞（`grep -rw "EXCEPTION_29[0-9]" src/` 零输出）
 
 ---
 
@@ -546,7 +564,7 @@
 
 ### Task 3: L1/L2 分层检索填充 + 摘要存储 + API 端点
 
-**关联 AC:** AC-6, AC-7, AC-8
+**关联 AC:** AC-6, AC-7a, AC-7b, AC-8
 
 > **说明：** 本 Task 将摘要结果持久化至 Qdrant，填充 Story 3.5 的 L1/L2 骨架实现，并暴露 API 端点。
 
@@ -624,21 +642,23 @@
 
 ### Task 5: 开发结束验收测试
 
-**关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7, AC-8
+**关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7a, AC-7b, AC-8
 
 > **性质说明：** 本 Task 不是功能实现，而是对 Story 收尾阶段的交付物与完成清单进行最终验收。
 
 #### 开发结束验收测试实现
 
+> **性质说明：** 验收测试场景与 BDD 步骤已在 Task 0 定义并完成红阶段验证，本 Task 验证已完成的实现满足全部验收场景，不编写新的功能测试。
+
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/acceptance/test_acceptance_contractual_summary.feature` 中的收尾验收场景 |
-| 🟢 绿 | 编写 `tests/acceptance/test_acceptance_contractual_summary.py` 的 BDD 步骤实现 |
-| 🔄 重构 | 收敛场景命名、统一断言表达、保持步骤函数可维护性 |
+| ✅ 验证 | 运行 Task 0 定义的 `tests/acceptance/test_acceptance_contractual_summary.feature` 全部场景，确认通过 |
+| ✅ 验证 | 逐项核对 `src` 与 `tests/` 完成清单 |
+| ✅ 验证 | 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验 |
 
-- [ ] Subtask 5.1: 场景 1 — 验证 `src` 完成清单的逐项确认
-- [ ] Subtask 5.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
-- [ ] Subtask 5.3: 运行开发结束验收测试并确认通过
+- [ ] Subtask 5.1: 验证 `src` 完成清单（`SummaryGenerationPort` 已注册、Schema 已定义可导入、异常编码无碰撞、API 端点可访问）
+- [ ] Subtask 5.2: 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单文件全部存在且可通过 pytest 发现
+- [ ] Subtask 5.3: 运行 Task 0 定义的验收测试并确认全部通过
 - [ ] Subtask 5.4: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
 
 **完成标准/Definition of Done:**
@@ -673,7 +693,8 @@
 |------|------|------|
 | **Schema 定义位置** | 应用层（`src/application/services/summary_schemas.py`） | Schema 使用 Pydantic BaseModel，领域层不允许依赖 Pydantic |
 | **端口类型** | 新增 `SummaryGenerationPort` Protocol | 遵循六边形架构，保持端口契约与实现分离 |
-| **异常子域** | 新增 `summary` 子域（360-369） | 已有 LLM 子域（330-339）已分配 3 个编码，摘要异常属于独立子域 |
+| **异常子域** | 新增 `summary` 子域（290-299） | 已有 BusinessException 子域均在 2XX 段，summary 异常继承 BusinessException 故编码落入 2XX 段，290-299 当前未占用 |
+| **L1/L2 Collection 策略** | L1/L2 硬编码独立 collection 名（`cross_document_summaries`/`document_summaries`），与顶层 `collection` 参数解耦 | 避免 L3/L4 检索语义冲突，L1/L2 搜索固定集合，不影响 L3/L4 的 `collection` 参数传递 |
 | **L1 实现策略** | 聚合 L2 摘要 → LLM 生成跨文档摘要 | 直接从 L2 摘要聚合，不重复从原始文档生成 |
 | **L2 实现策略** | 检索结果 → LLM 生成文档摘要 → 向量化存储 | 复用 `LLMClientPort.structured_generate()`，与 `LayeredRetrievalService` 集成 |
 | **摘要存储方式** | 独立 Qdrant collection（`document_summaries`、`cross_document_summaries`） | 与文档切片分离，避免 payload 冲突 |
@@ -755,7 +776,7 @@ docs/
 ### 已有资产（可直接复用）
 
 **端口层：**
-- `LLMClientPort` — `src/domain/ports/llm_client.py`，`structured_generate(prompt, response_schema, config)` 方法已就绪
+- **LLMClientPort** — `src/domain/ports/llm_client.py`，`structured_generate(prompt, response_schema, config=None, system_prompt=None)` 方法已就绪
 - `LayeredRetrievalPort` — `src/domain/ports/layered_retrieval.py`，`search_top_down()` 和 `search_bottom_up()` 方法已就绪
 - `L3VectorPort` — `src/domain/ports/l3_vector.py`，`upsert_points()` 和 `search()` 方法已就绪
 - `EmbeddingServicePort` — `src/domain/ports/embedding_service.py`，`embed_documents()` 方法已就绪

@@ -37,9 +37,11 @@ from src.domain.exceptions.dictionary_exceptions import (
     DictionaryVersionConflictError,
 )
 from src.domain.exceptions.embedding_exceptions import (
+    ConcurrencyOverloadError,
     EmbeddingAPIError,
     EmbeddingModelError,
     EmbeddingResponseError,
+    ModelInferenceError,
 )
 from src.domain.exceptions.entity_extraction_exceptions import EntityExtractionError
 from src.domain.exceptions.event_exceptions import VersionError
@@ -163,6 +165,8 @@ __all__ = [
     "EmbeddingAPIError",
     "EmbeddingResponseError",
     "EmbeddingModelError",
+    "ModelInferenceError",
+    "ConcurrencyOverloadError",
     # LLM 异常
     "LLMAPIError",
     "LLMResponseError",

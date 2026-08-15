@@ -75,29 +75,31 @@ class TestEmbeddingContractMatchesImplementation:
 
     @classmethod
     def setup_class(cls) -> None:
-        """创建 TestClient 并注入 mock 模型"""
+        """创建 TestClient 并注入 mock 引擎"""
         from unittest.mock import MagicMock
 
         import numpy as np
 
         from src.infrastructure.external_services.embedding.embedding_api_server import app
 
-        model = MagicMock()
+        engine = MagicMock()
+        engine.is_ready = True
+        engine.load_error = None
 
-        def mock_encode(texts, return_dense=False, return_sparse=False, **kwargs):
-            result = {}
+        def mock_encode(texts, return_sparse=False):
             n = len(texts) if isinstance(texts, list) else 1
-            if return_dense:
-                result["dense_vecs"] = np.random.randn(n, 1024).astype(np.float32)
+            result = {"dense": np.random.randn(n, 1024).astype(np.float32).tolist()}
             if return_sparse:
-                result["lexical_weights"] = [{str(i): 0.5 for i in range(3)} for _ in range(n)]
+                result["sparse"] = [{"indices": [0, 1, 2], "values": [0.5, 0.3, 0.2]} for _ in range(n)]
+            else:
+                result["sparse"] = None
             return result
 
-        model.encode.side_effect = mock_encode
-        app.state.model = model
-        app.state.model_name = "BAAI/bge-m3"
-        app.state.device = "cpu"
-        app.state.load_error = None
+        engine.encode.side_effect = mock_encode
+
+        import src.infrastructure.external_services.embedding.embedding_api_server as server
+
+        server._engine = engine
         cls.client = TestClient(app)
 
     def test_health_200_matches_contract(self) -> None:

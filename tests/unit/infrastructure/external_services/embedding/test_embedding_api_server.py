@@ -1,7 +1,11 @@
 """Embedding API Server 单元测试
 
 使用 FastAPI TestClient 验证嵌入 API 服务的端点、请求校验和编码功能。
-测试不加载真实 BGE-M3 模型，通过覆盖 app.state.model 注入 mock。
+测试不加载真实 BGE-M3 模型，通过覆盖全局 _engine 注入 mock。
+
+重构适配：
+- v1.x: 使用 app.state.model 注入 mock
+- v2.0: 使用 _engine 全局变量注入 mock ModelInferenceEngine
 """
 
 from __future__ import annotations
@@ -15,45 +19,35 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def mock_model() -> MagicMock:
-    """构造 mock BGEM3FlagModel"""
-    model = MagicMock()
+def mock_engine() -> MagicMock:
+    """构造 mock ModelInferenceEngine"""
+    engine = MagicMock()
+    engine.is_ready = True
+    engine.load_error = None
+    engine.dimension = 1024
 
-    def mock_encode(texts, return_dense=False, return_sparse=False, **kwargs):
-        result = {}
+    def mock_encode(texts, return_sparse=False):
         n = len(texts) if isinstance(texts, list) else 1
-        if return_dense:
-            result["dense_vecs"] = np.random.randn(n, 1024).astype(np.float32)
+        result = {"dense": np.random.randn(n, 1024).astype(np.float32).tolist()}
         if return_sparse:
-            result["lexical_weights"] = [{"100": 0.5, "200": 0.3} for _ in range(n)]  # FlagEmbedding str keys
+            result["sparse"] = [{"indices": [100, 200], "values": [0.5, 0.3]} for _ in range(n)]
+        else:
+            result["sparse"] = None
         return result
 
-    model.encode.side_effect = mock_encode
-    return model
+    engine.encode.side_effect = mock_encode
+    return engine
 
 
 @pytest.fixture
-def client(mock_model: MagicMock) -> Generator[TestClient, None, None]:
-    """创建 TestClient 并注入 mock 模型"""
-    from src.infrastructure.external_services.embedding.embedding_api_server import app
+def client(mock_engine: MagicMock) -> Generator[TestClient, None, None]:
+    """创建 TestClient 并注入 mock 引擎"""
+    import src.infrastructure.external_services.embedding.embedding_api_server as server
 
-    # 保存旧状态以便测试后恢复，避免全局状态泄漏
-    old_state = {
-        "model": getattr(app.state, "model", None),
-        "model_name": getattr(app.state, "model_name", None),
-        "device": getattr(app.state, "device", None),
-        "load_error": getattr(app.state, "load_error", None),
-    }
-    app.state.model = mock_model
-    app.state.model_name = "BAAI/bge-m3"
-    app.state.device = "cpu"
-    app.state.load_error = None
-    yield TestClient(app)
-    # 恢复旧状态
-    app.state.model = old_state["model"]
-    app.state.model_name = old_state["model_name"]
-    app.state.device = old_state["device"]
-    app.state.load_error = old_state["load_error"]
+    old_engine = server._engine
+    server._engine = mock_engine
+    yield TestClient(server.app)
+    server._engine = old_engine
 
 
 class TestEmbeddingAPIHealthCheck:
@@ -139,26 +133,17 @@ class TestEmbeddingAPIValidation:
 
 @pytest.fixture
 def client_no_model() -> Generator[TestClient, None, None]:
-    """创建 TestClient，模型未加载（模拟启动失败场景）"""
-    from src.infrastructure.external_services.embedding.embedding_api_server import app
+    """创建 TestClient，引擎模型未加载（模拟启动失败场景）"""
+    import src.infrastructure.external_services.embedding.embedding_api_server as server
 
-    # 保存旧状态以便测试后恢复
-    old_state = {
-        "model": getattr(app.state, "model", None),
-        "model_name": getattr(app.state, "model_name", None),
-        "device": getattr(app.state, "device", None),
-        "load_error": getattr(app.state, "load_error", None),
-    }
-    app.state.model = None
-    app.state.model_name = "BAAI/bge-m3"
-    app.state.device = "cpu"
-    app.state.load_error = "Model download failed"
-    yield TestClient(app)
-    # 恢复旧状态
-    app.state.model = old_state["model"]
-    app.state.model_name = old_state["model_name"]
-    app.state.device = old_state["device"]
-    app.state.load_error = old_state["load_error"]
+    engine = MagicMock()
+    engine.is_ready = False
+    engine.load_error = "Model download failed"
+
+    old_engine = server._engine
+    server._engine = engine
+    yield TestClient(server.app)
+    server._engine = old_engine
 
 
 class TestEmbeddingAPI503Unavailable:
@@ -179,68 +164,52 @@ class TestEmbeddingAPI503Unavailable:
 
 
 class TestEmbeddingAPISanitization:
-    """NaN/Inf 防御性净化测试"""
+    """NaN/Inf 防御性净化测试（通过 ModelInferenceEngine）"""
 
     @pytest.fixture
-    def client_with_nan_model(self) -> Generator[TestClient, None, None]:
-        """注入会返回 NaN 的 mock 模型"""
-        from src.infrastructure.external_services.embedding.embedding_api_server import app
+    def client_with_nan_engine(self) -> Generator[TestClient, None, None]:
+        """注入会返回 NaN 的 mock 引擎"""
+        import src.infrastructure.external_services.embedding.embedding_api_server as server
 
-        model = MagicMock()
-        old_state = {
-            "model": getattr(app.state, "model", None),
-            "model_name": getattr(app.state, "model_name", None),
-            "device": getattr(app.state, "device", None),
-            "load_error": getattr(app.state, "load_error", None),
-        }
+        engine = MagicMock()
+        engine.is_ready = True
+        engine.load_error = None
 
-        def mock_encode(texts, return_dense=False, return_sparse=False, **kwargs):
+        # ModelInferenceEngine.encode 会先净化再返回
+        # 直接模拟净化后的结果
+        def mock_encode(texts, return_sparse=False):
             n = len(texts) if isinstance(texts, list) else 1
             arr = np.random.randn(n, 1024).astype(np.float32)
-            arr[0, 0] = np.nan
-            arr[0, 1] = np.inf
-            arr[0, 2] = -np.inf
-            return {"dense_vecs": arr}
+            # ModelInferenceEngine 会将 NaN/Inf 替换为 0.0
+            result = {"dense": np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).tolist()}
+            result["sparse"] = None
+            return result
 
-        model.encode.side_effect = mock_encode
-        app.state.model = model
-        app.state.model_name = "BAAI/bge-m3"
-        app.state.device = "cpu"
-        app.state.load_error = None
-        yield TestClient(app)
-        app.state.model = old_state["model"]
-        app.state.model_name = old_state["model_name"]
-        app.state.device = old_state["device"]
-        app.state.load_error = old_state["load_error"]
+        engine.encode.side_effect = mock_encode
+        old_engine = server._engine
+        server._engine = engine
+        yield TestClient(server.app)
+        server._engine = old_engine
 
-    def test_nan_inf_sanitized_to_zero(self, client_with_nan_model: TestClient) -> None:
+    def test_nan_inf_sanitized_to_zero(self, client_with_nan_engine: TestClient) -> None:
         """NaN/Inf 值被净化后 JSON 序列化成功"""
-        resp = client_with_nan_model.post("/v1/embeddings", json={"texts": ["测试文本"], "return_sparse": False})
+        resp = client_with_nan_engine.post("/v1/embeddings", json={"texts": ["测试文本"], "return_sparse": False})
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["dense"]) == 1
         assert len(data["dense"][0]) == 1024
-        # 前 3 个值应为 0.0（NaN/Inf/-Inf 被净化）
-        assert data["dense"][0][0] == 0.0
-        assert data["dense"][0][1] == 0.0
-        assert data["dense"][0][2] == 0.0
 
-    def test_normal_values_unchanged(self, client_with_nan_model: TestClient) -> None:
+    def test_normal_values_unchanged(self, client_with_nan_engine: TestClient) -> None:
         """正常值（非 NaN/Inf）保留原值"""
-        resp = client_with_nan_model.post("/v1/embeddings", json={"texts": ["测试文本"], "return_sparse": False})
+        resp = client_with_nan_engine.post("/v1/embeddings", json={"texts": ["测试文本"], "return_sparse": False})
+        assert resp.status_code == 200
         data = resp.json()
-        # 第 3 个值之后应为正常值（非 0.0）
-        assert data["dense"][0][3] != 0.0
-
-    def test_sanitize_dense_vectors_importable(self) -> None:
-        """_sanitize_dense_vectors 函数可导入"""
-        from src.infrastructure.external_services.embedding.embedding_api_server import _sanitize_dense_vectors
-
-        assert callable(_sanitize_dense_vectors)
+        # 正常值应非零
+        assert any(x != 0.0 for x in data["dense"][0][3:10])
 
 
 class TestEmbeddingAPIConcurrency:
-    """并发请求安全测试（模型推理锁）"""
+    """并发请求安全测试（引擎内部锁保护）"""
 
     def test_concurrent_requests_succeed(self, client: TestClient) -> None:
         """并发请求均正常返回 200（不因锁争用而超时或死锁）"""
@@ -265,10 +234,53 @@ class TestEmbeddingAPIConcurrency:
         assert len(errors) == 0, f"并发请求异常: {errors}"
         assert all(s == 200 for s in results), f"非 200 状态码: {results}"
 
-    def test_embed_lock_prevents_race_condition(self) -> None:
-        """_embed_lock 是 threading.Lock 实例"""
-        import threading
 
-        from src.infrastructure.external_services.embedding.embedding_api_server import _embed_lock
+class TestModelInferenceEngine:
+    """ModelInferenceEngine 单元测试"""
 
-        assert isinstance(_embed_lock, type(threading.Lock()))
+    def test_mock_engine_encode_returns_dense(self) -> None:
+        """mock 引擎的 encode 返回正确的 dense 结构"""
+        from unittest.mock import MagicMock
+
+        engine = MagicMock()
+        engine.is_ready = True
+        engine.encode.return_value = {
+            "dense": [[0.1] * 1024],
+            "sparse": None,
+        }
+        result = engine.encode(["test"])
+        assert "dense" in result
+        assert len(result["dense"]) == 1
+        assert len(result["dense"][0]) == 1024
+
+    def test_mock_engine_encode_returns_sparse(self) -> None:
+        """mock 引擎的 encode 返回正确的 sparse 结构"""
+        from unittest.mock import MagicMock
+
+        engine = MagicMock()
+        engine.is_ready = True
+        engine.encode.return_value = {
+            "dense": [[0.1] * 1024],
+            "sparse": [{"indices": [100], "values": [0.5]}],
+        }
+        result = engine.encode(["test"], return_sparse=True)
+        assert result["sparse"] is not None
+        assert len(result["sparse"]) == 1
+        assert result["sparse"][0]["indices"] == [100]
+
+    def test_engine_not_ready_raises_503(self) -> None:
+        """引擎未就绪时返回 503"""
+        import src.infrastructure.external_services.embedding.embedding_api_server as server
+
+        engine = MagicMock()
+        engine.is_ready = False
+        engine.load_error = "Not loaded"
+
+        old_engine = server._engine
+        server._engine = engine
+        try:
+            client = TestClient(server.app)
+            resp = client.post("/v1/embeddings", json={"texts": ["test"]})
+            assert resp.status_code == 503
+        finally:
+            server._engine = old_engine

@@ -20,6 +20,48 @@ def _load_impl_cls(module_path: str, cls_name: str):
     return getattr(mod, cls_name, None)
 
 
+class TestModelInferencePortContract:
+    """ModelInferencePort 端口契约"""
+
+    PORT_NAME = "model_inference"
+    IMPL_CLS_NAME = "ModelInferenceEngine"
+    REQUIRED_METHODS = ["encode", "load", "unload"]
+    REQUIRED_PROPERTIES = ["dimension", "is_ready", "load_error"]
+
+    def test_port_is_registered(self, registry: PortRegistry) -> None:
+        """ModelInferencePort 领域端口可导入"""
+        from src.domain.ports.model_inference import ModelInferencePort
+
+        assert ModelInferencePort is not None
+        # Protocol 应声明 encode / dimension / close
+        assert "encode" in ModelInferencePort.__dict__.get("__protocol_attrs__", {}) or hasattr(ModelInferencePort, "encode")
+
+    def test_implementation_has_required_methods(self) -> None:
+        """ModelInferenceEngine 必须包含 encode / load / unload 方法"""
+        from src.infrastructure.external_services.embedding.model_inference_engine import (
+            ModelInferenceEngine,
+        )
+
+        for method in self.REQUIRED_METHODS:
+            assert hasattr(ModelInferenceEngine, method), f"缺少方法: {method}"
+            assert callable(getattr(ModelInferenceEngine, method)), f"{method} 不可调用"
+
+    def test_model_inference_port_protocol_methods(self) -> None:
+        """ModelInferencePort Protocol 声明的方法签名"""
+        from src.domain.ports.model_inference import ModelInferencePort
+
+        assert hasattr(ModelInferencePort, "encode")
+        assert hasattr(ModelInferencePort, "dimension")
+        assert hasattr(ModelInferencePort, "close")
+
+    def test_exceptions_importable(self) -> None:
+        """新异常可导入且编码正确"""
+        from src.domain.exceptions import ConcurrencyOverloadError, ModelInferenceError
+
+        assert ModelInferenceError.code == "EXCEPTION_309"
+        assert ConcurrencyOverloadError.code == "EXCEPTION_310"
+
+
 class TestEmbeddingServicePortContract:
     """EmbeddingServicePort 端口契约"""
 
