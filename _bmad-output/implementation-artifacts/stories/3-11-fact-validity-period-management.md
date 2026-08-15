@@ -1,6 +1,6 @@
 # Story 3.11: 事实有效期标签管理
 
-**Status:** `backlog`
+**Status:** `ready-for-dev`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1318,3 +1318,4 @@ mark_stale_archives(batch_size=100):
 - v1.0.1: Round 1 审查修订 — 修复 6 个 P0 + 12 个 P1 问题（事件 aggregate_id、事件字段类型、validity_status NULL 安全、ArchiveResponse 扩展、冲突规则定义、枚举类型、时钟注入等）
 - v1.1.0: Round 2 审查修订 — 修复 0 个 P0 + 12 个 P1 + 6 个 P2 问题（ValidityStatus 删除 ALL、FactBecameStale 新增 stale_reason、冲突判定半开区间 + 端点说明、check_staleness→is_stale 重命名 + 剥离实体方法、性能测试对齐 tests/unit/performance/、ArchiveQuery 测试独立、索引策略优化、事件 __post_init__ 无条件赋值、集成测试循环跨度修正、覆盖率门禁定位明确等）
 - v1.2.0: Round 3 审查修订 — 修复 1 个 P0 + 5 个 P1 + 1 个 P2 问题（TOCTOU 竞态双重防御：FOR UPDATE + 内存比较，EXCLUDE 约束经评估废弃；事件 handler 注册机制修正为 InMemoryEventListener + register_handlers 模式；composition_root 标注修正；L3 payload 初始快照；mark_stale_archives 幂等设计 + 实体 is_stale 方法；陈旧标记逻辑排除已标记档案 + Outbox 事务边界说明；索引策略补充部分索引 + 表达式索引；API 设计修正：PATCH 替代 PUT、staleness-checks 复数名词路径、datetime 解析、时区验证、错误响应格式）
+- v1.3.0: Round 4 审查修订 — 修复 0 个 P0 + 2 个 P1 + 9 个 P2 一致性遗留问题（AC-1 新增 is_stale 实体方法与 SDD 一致；AC-2 事件字段补充默认值 + Schema 版本；AC-5 冲突检测/并发安全/陈旧判断对齐；事件 event_type 统一 field() 写法；Task 2 Subtask 补充编码测试引用；Task 5 新增 TDD 循环 D 性能验证；文档头部状态修正为 ready-for-dev）
