@@ -1077,6 +1077,7 @@ paths:
   # ============================================================================
   /api/v1/search/layered:
     post:
+      x-implemented: false
       tags:
         - search
       summary: 分层检索（L1-L4）

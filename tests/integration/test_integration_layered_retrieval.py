@@ -89,16 +89,17 @@ class TestLayeredRetrievalIntegration:
         self,
         dense_search: DenseSemanticSearchService,
         l3_vector: AsyncMock,
+        embedding_service: AsyncMock,
     ) -> LayeredRetrievalService:
-        """真实 LayeredRetrievalService（注入真实 Dense + mock L3Vector）"""
+        """真实 LayeredRetrievalService（注入真实 Dense + mock L3Vector + mock Embedding）"""
         return LayeredRetrievalService(
             dense_search=dense_search,
             l3_vector=l3_vector,
+            embedding_service=embedding_service,
         )
 
     # --- 自底向上（L4→L3 回溯）集成 ---
 
-    @pytest.mark.asyncio
     async def test_bottom_up_integration(
         self,
         service: LayeredRetrievalService,
@@ -132,7 +133,6 @@ class TestLayeredRetrievalIntegration:
         # 验证 get_point 被调用（按 ID 回溯）
         l3_vector.get_point.assert_called()
 
-    @pytest.mark.asyncio
     async def test_bottom_up_no_match_integration(
         self,
         service: LayeredRetrievalService,
@@ -152,7 +152,6 @@ class TestLayeredRetrievalIntegration:
 
     # --- 自顶向下（L3→L4 展开）集成 ---
 
-    @pytest.mark.asyncio
     async def test_top_down_integration(
         self,
         service: LayeredRetrievalService,
@@ -205,7 +204,6 @@ class TestLayeredRetrievalIntegration:
 
     # --- 降级策略集成 ---
 
-    @pytest.mark.asyncio
     async def test_degrade_to_l3_integration(
         self,
         l3_vector: AsyncMock,
@@ -245,6 +243,7 @@ class TestLayeredRetrievalIntegration:
         service = LayeredRetrievalService(
             dense_search=dense_search,
             l3_vector=l3_vector,
+            embedding_service=embedding_service,
         )
 
         results = await service.search_bottom_up(
@@ -259,7 +258,6 @@ class TestLayeredRetrievalIntegration:
 
     # --- 输入验证集成 ---
 
-    @pytest.mark.asyncio
     async def test_input_validation_integration(
         self,
         service: LayeredRetrievalService,
@@ -276,7 +274,6 @@ class TestLayeredRetrievalIntegration:
 
     # --- 返回类型验证 ---
 
-    @pytest.mark.asyncio
     async def test_return_type_is_search_result(
         self,
         service: LayeredRetrievalService,

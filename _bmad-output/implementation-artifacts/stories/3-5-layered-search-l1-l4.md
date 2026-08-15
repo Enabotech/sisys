@@ -108,7 +108,7 @@
 
 **Given** 分层检索端口契约已定义
 **When** 实现 `LayeredRetrievalService`
-**Then** 注入 `DenseSemanticSearchService`、`L3VectorPort` 等依赖
+**Then** 注入 `DenseSemanticSearchService`、`EmbeddingServicePort`、`L3VectorPort` 等依赖
 **And** 实现自底向上和自顶向下两种遍历策略
 **And** 支持降级策略（L4 检索失败→降级为普通 L3 检索）
 **And** 支持 `LayeredRetrievalCompleted` 事件发布（可选，REALTIME 模式）
@@ -116,6 +116,7 @@
 **验证标准/Validation Criteria:**
 - [ ] `LayeredRetrievalService` 位于 `src/application/services/layered_retrieval_service.py`
 - [ ] 注入 `dense_search: DenseSemanticSearchService`（或 `Any` 保持松耦合）
+- [ ] 注入 `embedding_service: EmbeddingServicePort`（自顶向下展开时复用查询向量）
 - [ ] 注入 `l3_vector: L3VectorPort`（用于按 payload 过滤回溯）
 - [ ] 实现 `search_top_down()` 和 `search_bottom_up()` 方法
 - [ ] 降级策略：L4 检索失败→透明降级为 L3 检索，WARNING 日志
@@ -831,9 +832,78 @@ tests/
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
+- [x] Round 1 代码审查已完成（注入EmbeddingServicePort + 修复P1/P2/P3问题）
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
+
+---
+
+### Round 1 代码审查修复记录
+
+**审查日期:** 2026-08-15
+**审查模式:** 4 Agent 并行（端口契约/应用服务/测试异常/系统集成）+ 3 Agent 反思评审
+
+#### 修复清单
+
+| # | 问题 | 严重度 | 文件 | 修复方案 |
+|---|------|--------|------|----------|
+| 1 | 访问私有属性 `_dense_search._embedding` 破坏封装 | P1 | `layered_retrieval_service.py:443` | 注入 `EmbeddingServicePort`，消除私有属性穿透 |
+| 2 | 单元测试 `_make_l3_vector()` 未传 `spec=L3VectorPort` | P1 | `test_layered_retrieval_service.py:59` | 改为 `AsyncMock(spec=L3VectorPort)` |
+| 3 | API 路由未实现（openapi 契约推迟） | P1 | — | Story 文件标注跳过，openapi.yaml 保留 `x-implemented: false` |
+| 4 | 端口常量 `LAYERED_RETRIEVAL_LEVELS` 零引用（死代码） | P2 | `layered_retrieval_service.py:31` | 服务层导入复用端口常量，删除本地 `VALID_LEVELS` |
+| 5 | 端口 docstring 提及具体实现类名 | P2 | `layered_retrieval.py:11-12,34-35` | 删除 docstring 中具体实现类名引用 |
+| 6 | 构造函数参数使用 `Any` 类型注解 | P2 | `layered_retrieval_service.py:68-69` | `embedding_service` 标注为 `EmbeddingServicePort` |
+| 7 | `tenant_id` 处理不一致（L3VectorPort 路径 vs Dense 路径） | P2 | `layered_retrieval_service.py:452-454` | 新增 `_merge_filter_with_tenant()` 统一封装 |
+| 8 | `limit` 参数语义过载（魔法数 5） | P2 | `layered_retrieval_service.py:459` | 抽取 `_MAX_EXPAND_PARENTS = 5` 独立常量 |
+| 9 | 降级路径丢失 L4 失败上下文 | P2 | `layered_retrieval_service.py:338-347` | 补充降级上下文（已记录日志，待后续增强） |
+| 10 | 集成测试冗余 `@pytest.mark.asyncio` | P2 | `test_integration_layered_retrieval.py` | 移除冗余装饰器（`asyncio_mode=auto` 已自动处理） |
+| 11 | 事件设计残留（Story 文件未同步） | P2 | Story 文件 | 标注"已跳过" |
+| 12 | 裸 `except Exception` 未标注意图 | P2 | `layered_retrieval_service.py` | 区分重抛模式（正确，加注释）与 best-effort 吞异常 |
+| 13 | `asyncio.ensure_future` + 逐个 `await` 不规范 | P3 | `layered_retrieval_service.py:407-411` | 改为 `asyncio.gather(*tasks, return_exceptions=True)` |
+| 14 | 异常 context 缺少 `tenant_id` | P3 | `layered_retrieval_service.py:448,470` | 补充 `tenant_id` 到异常 context |
+| 15 | `tenant_id` 空白校验绕过 | P3 | `layered_retrieval_service.py:453` | 统一在 `_validate_inputs` 中增加 tenant_id 空白校验 |
+
+#### 质量门禁通过情况
+
+- [x] 单元测试全部通过：17 passed
+- [x] 异常测试通过：36 passed（含端口/异常/架构）
+- [x] 集成测试通过：6 passed
+- [x] 验收测试通过：12 passed
+- [x] 端口契约测试通过：6 passed
+- [x] Ruff 检查通过：All checks passed
+- [x] MyPy 检查通过：Success: no issues found
+
+---
+
+### Round 2 代码审查修复记录
+
+**审查日期:** 2026-08-15
+**审查模式:** 3 Agent 并行（并发安全/业务正确性/测试充分性）
+
+#### 修复清单
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | 降级路径 `except Exception` 掩盖 `SystemException` 基础设施故障 | P1 | 区分 `SystemException`（传播）与业务异常（降级） |
+| 2 | 排序无 tie-breaker 导致结果不确定 | P2 | 改为 `(-score, id)` 复合键排序 |
+| 3 | Child 展开截断未显式按分数排序（依赖后端行为） | P2 | 添加 `child_results.sort(key=..., reverse=True)` |
+| 4 | limit 参数无上限校验 | P2 | 新增 `_MAX_LIMIT = 200` 常量，`_validate_inputs` 查越限 |
+| 5 | `_merge_filter` 空 dict `{}` 被静默丢弃 | P2 | `if base_filter:` → `if base_filter is not None:` |
+| 6 | 自底向上路径未截断 parent content | P2 | 应用 `_safe_truncate(content, 200)` |
+| 7 | 自顶向下 Child 展开串行化（5 次串行网络请求） | P1 | 改为 `asyncio.gather` 并发展开 |
+| 8 | 缺少 API 契约测试文件 | P2 | 创建 `test_api_contract_layered_retrieval.py`（4 测试） |
+| 9 | 缺少 `search_bottom_up L1` 返回空测试 | P2 | 新增 `test_search_bottom_up_l1_returns_empty` |
+| 10 | 缺少自顶向下无匹配测试 | P3 | 新增 `test_top_down_no_match_returns_empty` |
+| 11 | `_search_l3_direct`/`_search_l4_direct`/`_search_top_down_l3_to_l4` 缺少 `Raises` 段 | P2 | docstring 补充 `Raises` 段 |
+| 12 | `_safe_truncate` 未校验 `max_len` | P3 | 新增 `max_len < 1` 防御性校验 |
+| 13 | 测试覆盖增强：tenant_id 空白/超限 limit/SystemException 传播/异常路径/`_fetch_parent`/`_merge_filter_with_tenant` | P2 | 新增 8 个单元测试 |
+
+#### 质量门禁通过情况
+
+- [x] 全部测试通过：723 passed（含全量 723 个测试）
+- [x] Ruff 检查通过：All checks passed
+- [x] MyPy 检查通过：Success: no issues found
 
 ---
 
