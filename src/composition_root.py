@@ -1780,6 +1780,7 @@ def bootstrap() -> None:
         impl=lambda resolver: LayeredRetrievalService(
             dense_search=resolver.resolve("dense_search_service"),
             l3_vector=resolver.resolve("l3_vector"),
+            embedding_service=resolver.resolve("embedding_service"),
         ),
         module="src.application.services.layered_retrieval_service",
         lifetime=Lifetime.SCOPED,

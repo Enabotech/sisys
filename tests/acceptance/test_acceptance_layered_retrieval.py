@@ -129,6 +129,7 @@ def layered_retrieval_service(mock_l3_vector: AsyncMock, mock_embedding_service:
     return LayeredRetrievalService(
         dense_search=dense_search,
         l3_vector=mock_l3_vector,
+        embedding_service=mock_embedding_service,
     )
 
 
@@ -312,6 +313,7 @@ def no_child_match(context: dict[str, Any], event_loop):
     service = LayeredRetrievalService(
         dense_search=empty_dense,
         l3_vector=empty_vector,
+        embedding_service=empty_vector,
     )
 
     result = event_loop.run_until_complete(
@@ -458,6 +460,7 @@ def l4_search_fails(context: dict[str, Any], event_loop):
     degrade_service = LayeredRetrievalService(
         dense_search=dense_search,
         l3_vector=l3_vector,
+        embedding_service=embedding,
     )
 
     result = event_loop.run_until_complete(
