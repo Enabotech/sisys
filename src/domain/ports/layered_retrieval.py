@@ -1,15 +1,12 @@
 """领域层 分层检索端口契约模块（LayeredRetrievalPort）
 
 定义分层检索（L1-L4 检索粒度）的统一抽象端口契约。
-支持自顶向下（L3→L4 展开）与自底向上（L4→L3 回溯）双向遍历检索。
+支持自顶向下（从高层级向低层级展开）与自底向上（从低层级向高层级回溯）双向遍历检索。
 
 设计决策：
 - 端口统一返回 `SearchResult`（与现有 Dense/Sparse/Hybrid 检索服务签名对齐）
 - `target_level` 为检索目标粒度层级字符串（"L1"/"L2"/"L3"/"L4"），默认 "L4"
 - 领域层零外部依赖（仅使用 Python 标准库 + SearchResult）
-
-实现：
-- LayeredRetrievalService（应用层，编排 DenseSemanticSearchService + L3VectorPort）
 """
 
 from __future__ import annotations
@@ -29,9 +26,6 @@ class LayeredRetrievalPort(Protocol):
     支持不同查询粒度在 L1-L4 层之间双向遍历检索：
     - 自顶向下（search_top_down）：从高层级向低层级展开（如 L3→L4）
     - 自底向上（search_bottom_up）：从低层级向高层级回溯（如 L4→L3）
-
-    实现：
-    - LayeredRetrievalService（应用层服务，编排 DenseSemanticSearchService + L3VectorPort）
     """
 
     async def search_top_down(
