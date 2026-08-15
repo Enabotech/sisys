@@ -195,7 +195,7 @@
   4. 通过 `EmbeddingServicePort.embed_documents()` 生成向量（vector_size=1024 对齐 bge-m3）
   5. 通过 `L3VectorPort.upsert_points()` 写入 Qdrant（collection: `"cross_document_summaries"`，懒创建策略）
   6. payload 包含：`perspective`、`summary_text`、`key_points`、`confidence_score`、`source_document_ids`、`index_level`（"L1"）、`created_at`
-- [ ] 降级策略：L2 摘要不足（< 2 条）时降级为骨架（返回空列表，WARNING 日志）
+- [ ] 降级策略：L2 摘要不足（< 2 条）时抛出 `SummaryGenerationError`，WARNING 日志记录原因（`generate_summary` 返回 Schema 实例而非列表，无法返回空列表）
 
 ### AC-7b: 跨文档摘要检索（L1 检索实现）
 
@@ -741,8 +741,9 @@
 src/
 ├── domain/
 │   ├── exceptions/
-│   │   ├── summary_exceptions.py              # [新增] 摘要异常类
-│   │   └── _code_ranges.py                   # [修改] 新增 summary 子域
+│   │   ├── __init__.py                       # [修改] 导入 SummaryGenerationError/SummaryPerspectiveNotSupportedError，更新 __all__
+│   │   ├── summary_exceptions.py             # [新增] 摘要异常类
+│   │   └── _code_ranges.py                   # [修改] 新增 summary 子域 (290-299)
 │   └── ports/
 │       └── summary_generation.py             # [新增] SummaryGenerationPort Protocol
 │
@@ -785,6 +786,11 @@ tests/
 docs/
 └── api/
     └── openapi.yaml                      # [修改] 新增 /api/v1/search/summary 端点
+
+测试依赖文件（已存在，无需修改但需通过校验）：
+- tests/unit/domain/exceptions/test_code_ranges.py         # [校验] allowed_child_parent_subdomains 新增校验需通过
+- tests/unit/domain/exceptions/test_error_code_uniqueness.py # [校验] 新异常编码需通过唯一性校验
+- tests/unit/interfaces/api/test_exception_handlers.py      # [校验] HTTP 映射测试需覆盖新异常
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
@@ -827,7 +833,7 @@ docs/
 
 **Qdrant 策略：**
 - 摘要向量存储在独立 collection（`document_summaries`、`cross_document_summaries`），不与文档切片混用
-- payload 中 `index_level` 字段标识层级（"L1"/"L2"），供 `LayeredRetrievalService` 过滤
+- payload 中 `index_level` 字段标识层级（"L1"/"L2"），仅用于标识，不用于检索过滤
 - 点 ID 格式：`summary-{perspective}-{uuid4}`
 
 ---
