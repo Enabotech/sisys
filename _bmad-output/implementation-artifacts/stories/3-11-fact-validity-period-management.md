@@ -100,10 +100,11 @@
 
 > **触发规则（冲突判定）：** `set_validity_period()` 在更新前需查询同一 `plan_id`、同一 `archive_type`、不同 `archive_id` 的既有档案，若新区间 `[valid_from, valid_until)`（半开区间，None 视为开区间端点，即 valid_from=None 表示"从无限早开始"，valid_until=None 表示"直到无限远"）与任一既有区间存在交集，则抛出 `ValidityPeriodConflictError`。**半开区间规则**：区间包含 valid_from 端点、不包含 valid_until 端点；端点相接不视为冲突（档案 A 的 valid_until == 档案 B 的 valid_from 时，两者自然衔接，允许共存）。该判定在应用服务层完成（复用 `archive_repo.find()` 按 plan_id+archive_type 查询后内存比较）。
 >
-> > **并发安全（P0 强制）：** 应用层内存比较存在 TOCTOU 竞态，必须采用三层防御策略：
-> > 1. **（强制）PostgreSQL EXCLUDE 约束**：使用 `btree_gist` 扩展 + `EXCLUDE USING gist (plan_id WITH =, archive_type WITH =, tstzrange(COALESCE(valid_from, '-infinity'::timestamptz), COALESCE(valid_until, 'infinity'::timestamptz), '[)') WITH &&)`，数据库层面强制区间不重叠。违反时抛出 `exclusion_violation`，应用层捕获后转为 `ValidityPeriodConflictError`。
-> > 2. **（强制）SELECT FOR UPDATE 悲观锁**：冲突检测查询使用 `SELECT ... FOR UPDATE` 锁定同一 `plan_id+archive_type` 的所有相关行，防止并发读取。需在 `ArchiveRepositoryPort` 中新增 `find_for_update(query)` 方法或在 `find` 中增加可选锁参数。
-> > 3. **（建议）应用层内存比较**：作为第一道防线，快速失败减少不必要的数据库操作。
+> > **并发安全（P0 强制）：** 应用层内存比较存在 TOCTOU 竞态，必须采用双重防御策略：
+> > 1. **（强制）SELECT FOR UPDATE 悲观锁**：冲突检测查询使用 `SELECT ... FOR UPDATE` 锁定同一 `plan_id+archive_type` 的所有相关行，防止并发读取。在 `ArchiveRepositoryPort` 中新增 `find_for_update(query)` 方法（或在 `find()` 中增加可选 `for_update: bool = False` 参数），实现层在 SQL 中追加 `FOR UPDATE`。
+> > 2. **（强制）应用层内存比较**：作为第一道防线，快速失败减少不必要的数据库操作。
+> >
+> > > **EXCLUDE 约束说明（已评估，不采用）：** 原计划使用 `PostgreSQL EXCLUDE USING gist` 约束作为数据库层兜底，但经评估废弃。原因：① 已有档案 `valid_from=NULL/valid_until=NULL` 被映射为 `[-infinity, infinity)`，与同 plan_id+archive_type 下其他档案必然冲突，无法共存；② `ALTER TABLE ADD CONSTRAINT` 不支持 `WHERE` 子句定义部分排除约束，无法排除 NULL 行；③ 测试环境使用 `Base.metadata.create_all()` 无法创建 EXCLUDE 约束。因此放弃此方案，`SELECT FOR UPDATE` + 应用层比较已足够保证并发安全。
 
 ### AC-4: ArchiveQuery 扩展（时间轴查询）
 
@@ -134,7 +135,7 @@
   - 更新档案的 `valid_from`/`valid_until` 字段
   - 调用 `archive.validate()` 验证 `valid_from <= valid_until`（若两者均非 None），防止无效数据写入
   - **冲突检测**：查询同一 `plan_id` + 同一 `archive_type` 下、不同 `archive_id` 的档案，检查新区间与既有区间是否存在重叠（None 视为开区间端点）。若存在重叠，抛出 `ValidityPeriodConflictError`
-  - **并发安全**：冲突检测使用 `archive_repo.find_for_update()`（SELECT FOR UPDATE 悲观锁）锁定同一 plan_id+archive_type 下的相关档案，防止 TOCTOU 竞态；数据库层通过 EXCLUDE 约束兜底强制执行区间不重叠
+  - **并发安全**：冲突检测使用 `archive_repo.find_for_update()`（SELECT FOR UPDATE 悲观锁）锁定同一 plan_id+archive_type 下的相关档案，防止 TOCTOU 竞态（详见冲突判定规则中的并发安全说明）
   - 调用 `archive_repo.save()` 持久化
   - 发布 `ValidityPeriodSet` 事件
 - [ ] 复用现有 `query_archive(query: ArchiveQuery) -> list[StrategicArchive]` 方法 — 按有效期查询（通过 ArchiveQuery 新增的 `valid_from`/`valid_until`/`validity_status` 字段自然支持，无需新增方法）
@@ -200,16 +201,18 @@
 **And** 所有接口过认证中间件，遵循统一错误响应
 
 **验证标准/Validation Criteria:**
-- [ ] `PUT /api/v1/archive/entries/{archive_id}/validity-period` — 设置档案有效期
+- [ ] `PATCH /api/v1/archive/entries/{archive_id}` — 更新档案有效期（使用 PATCH 语义，因有效期设置受其他档案状态影响，非幂等操作）
   - 请求体 Pydantic Schema：`ValidityRequest(BaseModel)` — 包含 `valid_from: datetime | None = None`、`valid_until: datetime | None = None`
+  - 请求体验证：`valid_from` 和 `valid_until` 必须为 timezone-aware（UTC），通过 `@field_validator` 强制校验；若两者均非 None 则 `valid_from <= valid_until`，通过 `@model_validator` 提前校验
   - 响应 200：更新后的档案详情（`ArchiveResponse` 新增 `valid_from`、`valid_until` 字段）
-  - 响应 404：档案不存在
-  - 响应 409：有效期冲突
+  - 响应 404：档案不存在（统一错误格式：`EXCEPTION_282`）
+  - 响应 409：有效期冲突（统一错误格式：`EXCEPTION_285`）
 - [ ] `GET /api/v1/archive/entries` 扩展查询参数 — 支持 `valid_from`、`valid_until`、`validity_status` 过滤
   - 与现有 `plan_id`、`archive_type`、`plan_type` 参数组合使用（注：现有路由未暴露 `start_date`/`end_date` 查询参数，此处不新增）
+  - 查询参数为 ISO 8601 字符串，路由函数中通过 `datetime.fromisoformat()` 显式解析为 datetime 对象（解析失败返回 400）
   - 向后兼容：不传参时行为不变
-- [ ] `POST /api/v1/archive/staleness/check` — 手动触发陈旧标记检查
-  - 响应 Pydantic Schema：`StalenessCheckResponse(BaseModel)` — 包含 `marked: list[str]`、`count: int`
+- [ ] `POST /api/v1/archive/staleness-checks` — 手动触发陈旧标记检查（资源路径使用名词复数，符合 RESTful 规范）
+  - 响应 Pydantic Schema：`StalenessCheckResponse(BaseModel)` — 包含 `marked: list[str]`（陈旧档案 ID 列表，`count` 由客户端通过 `len(marked)` 获取，不额外冗余存储）
   - 返回 200 + 标记结果列表
 - [ ] 请求/响应 Schema 使用 Pydantic，定义于路由同文件或共享 Schema 模块
 - [ ] `ArchiveResponse` 新增 `valid_from: str | None = None`、`valid_until: str | None = None` 字段，`_to_archive_response()` 中通过 `.isoformat()` 转换（与 `created_at`/`archived_at` 的转换方式一致）
@@ -379,16 +382,18 @@
 
 #### API 契约 (API Contract)
 
-- [ ] `PUT /api/v1/archive/entries/{archive_id}/validity-period` — 设置有效期
+- [ ] `PATCH /api/v1/archive/entries/{archive_id}` — 更新档案有效期（使用 PATCH 语义，因有效期设置受其他档案状态影响，非幂等操作）
   - 请求体：`{ "valid_from": "2026-01-01T00:00:00Z" | null, "valid_until": "2027-01-01T00:00:00Z" | null }`
+  - 请求体验证：`valid_from` 和 `valid_until` 必须为 timezone-aware（UTC）；若两者均非 None 则 `valid_from <= valid_until`
   - 响应 200：更新后的档案详情（`ArchiveResponse` 新增 `valid_from`、`valid_until` 字段，字段值使用 `.isoformat()` 转换为 ISO 字符串，与 `created_at`/`archived_at` 的转换方式一致）
-  - 响应 404：档案不存在
-  - 响应 409：有效期冲突
+  - 响应 404：档案不存在（统一错误格式：`EXCEPTION_282`）
+  - 响应 409：有效期冲突（统一错误格式：`EXCEPTION_285`）
 - [ ] `GET /api/v1/archive/entries` 扩展参数
-  - 新增可选查询参数：`valid_from`、`valid_until`、`validity_status`
+  - 新增可选查询参数：`valid_from`（ISO 8601 字符串）、`valid_until`（ISO 8601 字符串）、`validity_status`（`"valid"`/`"expired"`）
+  - 路由函数中通过 `datetime.fromisoformat()` 显式解析 datetime 字符串（解析失败返回 400）
   - 向后兼容：不传参时行为不变
-- [ ] `POST /api/v1/archive/staleness/check` — 手动触发陈旧标记检查
-  - 响应 200：`{ "marked": [archive_id, ...], "count": N }`
+- [ ] `POST /api/v1/archive/staleness-checks` — 手动触发陈旧标记检查（资源路径使用名词复数）
+  - 响应 200：`{ "marked": [archive_id, ...] }`（不冗余存储 `count`，客户端通过 `len(marked)` 获取）
 - [ ] API 契约测试通过（`tests/contracts/test_api_contract_archive_validity.py`）
 
 #### 六边形架构约束（必须遵守）
@@ -469,7 +474,7 @@
 | **TDD 单元测试** | StrategicArchiveService 扩展 | set_validity_period/is_stale/mark_stale | `test_strategic_archive_service.py` | Task 3 |
 | **TDD 单元测试** | 事件处理器 | ValidityPeriodSet/FactBecameStale 事件处理逻辑 | `test_archive_handlers.py` | Task 3 |
 | **TDD 单元测试** | PostgreSQLArchiveRepository 扩展 | 有效期过滤/状态过滤查询 | `test_archive_repository.py` | Task 4 |
-| **TDD 单元测试** | 接口层 API 路由 | PUT validity/GET 扩展参数/POST staleness-check | `test_archive_routes.py` | Task 5 |
+| **TDD 单元测试** | 接口层 API 路由 | PATCH validity/GET 扩展参数/POST staleness-checks | `test_archive_routes.py` | Task 5 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_archive_validity.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_archive_validity.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | src 与测试目录完成清单确认 | `test_acceptance_archive_validity.feature` | Task 6 |
@@ -562,7 +567,7 @@
 - [ ] Subtask 0.3: 定义 `ValidityPeriodConflictError` 异常契约（EXCEPTION_285）
 - [ ] Subtask 0.4: 定义 `ValidityPeriodSet` / `FactBecameStale` 事件 Schema
 - [ ] Subtask 0.5: 扩展 `ArchiveModel` SQLAlchemy 模型 — 新增 valid_from/valid_until 列
-- [ ] Subtask 0.6: 定义有效期 API 契约（PUT validity-period / GET 扩展参数 / POST staleness-check）
+- [ ] Subtask 0.6: 定义有效期 API 契约（PATCH validity / GET 扩展参数 / POST staleness-checks）
 - [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_archive_validity.feature`
 - [ ] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_archive_validity.py`
 - [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
@@ -730,7 +735,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展 `tests/unit/interfaces/api/test_archive_routes.py`（PUT validity/GET 扩展参数/POST staleness-check） |
+| 🔴 红 | 扩展 `tests/unit/interfaces/api/test_archive_routes.py`（PATCH validity/GET 扩展参数/POST staleness-checks） |
 | 🟢 绿 | 扩展 `create_archive_router()` — 新增有效期管理端点 |
 | 🔄 重构 | 添加 Pydantic Schema、错误处理 |
 
@@ -763,7 +768,7 @@
 - [ ] Subtask 5.9: 🔄 重构 — 优化架构验证
 
 **完成标准/Definition of Done:**
-- [ ] API 路由扩展完成（PUT validity / GET 扩展参数 / POST staleness-check）
+- [ ] API 路由扩展完成（PATCH validity / GET 扩展参数 / POST staleness-checks）
 - [ ] 端口注册完成，Resolver 可正确解析
 - [ ] 架构约束测试通过
 - [ ] 覆盖率≥85%
@@ -893,7 +898,7 @@ src/
 │
 ├── interfaces/
 │   └── api/
-│       ├── strategic_archive.py          # UPDATE: 新增 PUT validity-period / POST staleness-check 端点
+│       ├── strategic_archive.py          # UPDATE: 新增 PATCH validity / POST staleness-checks 端点
 │       └── app.py                        # no change（路由已注册）
 │
 └── composition_root.py                   # UPDATE: 注册 archive_handlers 端口 + 新增 handler_names 条目
@@ -1038,9 +1043,19 @@ ADD COLUMN valid_until TIMESTAMP WITH TIME ZONE;  -- 失效时间（None 表示�
 CREATE INDEX ix_strategic_archives_valid_until ON strategic_archives(valid_until);
 -- 索引2：valid_from 单列索引，加速 OR 查询中的 valid_from 条件过滤
 CREATE INDEX ix_strategic_archives_valid_from ON strategic_archives(valid_from);
+-- 索引3：部分索引，仅覆盖设置了有效期的记录子集，加速 validity_status="valid" 和 "expired"
+CREATE INDEX ix_strategic_archives_validity_active ON strategic_archives(valid_from, valid_until)
+    WHERE valid_from IS NOT NULL OR valid_until IS NOT NULL;
+-- 索引4：表达式索引，加速陈旧标记批量查询中的 metadata 过滤
+CREATE INDEX ix_strategic_archives_staleness ON strategic_archives((metadata->>'staleness'))
+    WHERE metadata->>'staleness' IS NOT NULL;
 ```
 
-> **索引设计说明：** `validity_status="valid"` 查询涉及 `(valid_from IS NULL OR valid_from <= now) AND (valid_until >= now OR valid_until IS NULL)` 混合 OR + IS NULL 条件，PostgreSQL B-tree 复合索引无法有效加速。采用**两个单列索引**分别覆盖 `valid_until` 和 `valid_from` 过滤条件，PostgreSQL 查询优化器可对两个索引做 Bitmap Combine。`validity_status="expired"` 查询仅需 `valid_until < now`，单列索引最优。P95<200ms 的性能目标通过索引 + 数据量级控制保障。
+> **索引设计说明：**
+> - `validity_status="expired"` 查询仅需 `valid_until < now`，单列索引 `ix_strategic_archives_valid_until` 最优。
+> - `validity_status="valid"` 查询涉及 `(valid_from IS NULL OR valid_from <= now) AND (valid_until >= now OR valid_until IS NULL)` 混合 OR + IS NULL 条件。两个单列索引 `(valid_from)` 和 `(valid_until)` 做 Bitmap OR + Bitmap AND 组合，但 NULL 选择性差（全部已有档案 valid_from=NULL 时 bitmap 几乎全满，效率低）。**补充部分索引** `ix_strategic_archives_validity_active` 仅覆盖设置了有效期的记录子集，可显著降低扫描范围。
+> - `mark_stale_archives` 批量查询中 `metadata->>'staleness' IS DISTINCT FROM 'stale'` 过滤条件通过表达式索引 `ix_strategic_archives_staleness` 加速，避免全表扫描。
+> - P95<200ms 的性能目标通过索引组合 + 数据量级控制保障。
 
 **新旧数据兼容性：**
 - 已有档案的 `valid_from` 和 `valid_until` 均为 None
@@ -1123,7 +1138,7 @@ mark_stale_archives(batch_size=100):
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/application/event_handlers/archive_handlers.py` - 有效期事件处理器
-- `deploy/postgresql/alembic/versions/010_archive_validity_period.py` - valid_from/valid_until 列迁移 + EXCLUDE 约束（btree_gist）
+- `deploy/postgresql/alembic/versions/010_archive_validity_period.py` - valid_from/valid_until 列迁移 + 4 个索引（2 单列索引 + 1 部分索引 + 1 表达式索引）
 - `tests/unit/domain/ports/test_archive_query.py` - ArchiveQuery + ValidityStatus 枚举单元测试
 - `tests/unit/application/event_handlers/test_archive_handlers.py` - 事件处理器测试
 - `tests/integration/test_integration_archive_validity.py` - 集成测试
@@ -1145,7 +1160,7 @@ mark_stale_archives(batch_size=100):
 - `src/application/event_handlers/__init__.py` - 导出新处理器
 - `src/infrastructure/storage/postgresql/models/archive.py` - 新增 valid_from/valid_until 列
 - `src/infrastructure/storage/postgresql/repository/archive_repository.py` - 扩展 _apply_filters + 更新 _to_entity/_to_model
-- `src/interfaces/api/strategic_archive.py` - 新增 PUT validity / POST staleness-check 端点
+- `src/interfaces/api/strategic_archive.py` - 新增 PATCH validity / POST staleness-checks 端点
 - `src/interfaces/api/exception_handlers.py` - 注册 ValidityPeriodConflictError 映射
 - `configs/event_channels.yaml` - 注册 ValidityPeriodSet / FactBecameStale 通道
 - `src/infrastructure/messaging/channel_router.py` - 注册 DEFAULT_MAPPINGS
@@ -1234,7 +1249,7 @@ mark_stale_archives(batch_size=100):
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| 1 | set_validity_period 冲突检测存在 TOCTOU 竞态（应用层内存比较无数据库约束兜底） | P0 | 三层防御：PostgreSQL EXCLUDE 约束（btree_gist）+ find_for_update() 悲观锁 + 应用层内存比较 |
+| 1 | set_validity_period 冲突检测存在 TOCTOU 竞态（应用层内存比较无数据库约束兜底） | P0 | 双重防御：find_for_update() 悲观锁 + 应用层内存比较（EXCLUDE 约束经评估废弃：NULL 记录全部冲突 + ALTER TABLE 不支持部分排除） |
 | 2 | 事件处理器注册机制描述与实际架构不符（文档写"注册到 EventBus 或 ChannelRouter"，实际是 InMemoryEventListener + register_handlers()） | P0 | 修正 AC-7：更改为 on_event() + register_handlers() 模式，明确 handler_names 注册和 _wrap_handler() 回调包装 |
 | 3 | composition_root 标注为"no change"但实际需注册 archive_handlers 端口 + handler_names 条目 | P1 | 修正项目结构图标注为 UPDATE |
 | 4 | L3/L5 无有效期初始快照，3.12 无法增量同步 | P1 | archive_plan() 的 L3 payload/L5 properties 写入 valid_from/valid_until 初始值；ValidityPeriodSet 处理器预留同步钩子 |
@@ -1285,4 +1300,4 @@ mark_stale_archives(batch_size=100):
 - v1.0.0: 创建故事文件
 - v1.0.1: Round 1 审查修订 — 修复 6 个 P0 + 12 个 P1 问题（事件 aggregate_id、事件字段类型、validity_status NULL 安全、ArchiveResponse 扩展、冲突规则定义、枚举类型、时钟注入等）
 - v1.1.0: Round 2 审查修订 — 修复 0 个 P0 + 12 个 P1 + 6 个 P2 问题（ValidityStatus 删除 ALL、FactBecameStale 新增 stale_reason、冲突判定半开区间 + 端点说明、check_staleness→is_stale 重命名 + 剥离实体方法、性能测试对齐 tests/unit/performance/、ArchiveQuery 测试独立、索引策略优化、事件 __post_init__ 无条件赋值、集成测试循环跨度修正、覆盖率门禁定位明确等）
-- v1.2.0: Round 3 审查修订 — 修复 1 个 P0 + 5 个 P1 + 1 个 P2 问题（TOCTOU 竞态三层防御 + EXCLUDE 约束 + FOR UPDATE、事件 handler 注册机制修正为 InMemoryEventListener + register_handlers 模式、composition_root 标注修正、L3 payload 初始快照、mark_stale_archives 幂等设计 + 实体 is_stale 方法、陈旧标记逻辑排除已标记档案 + Outbox 事务边界说明、性能测试路径对齐 tests/unit/performance/）
+- v1.2.0: Round 3 审查修订 — 修复 1 个 P0 + 5 个 P1 + 1 个 P2 问题（TOCTOU 竞态双重防御：FOR UPDATE + 内存比较，EXCLUDE 约束经评估废弃；事件 handler 注册机制修正为 InMemoryEventListener + register_handlers 模式；composition_root 标注修正；L3 payload 初始快照；mark_stale_archives 幂等设计 + 实体 is_stale 方法；陈旧标记逻辑排除已标记档案 + Outbox 事务边界说明；索引策略补充部分索引 + 表达式索引；API 设计修正：PATCH 替代 PUT、staleness-checks 复数名词路径、datetime 解析、时区验证、错误响应格式）
