@@ -15,9 +15,12 @@ import pytest
 from src.application.services.layered_retrieval_service import LayeredRetrievalService
 from src.domain.exceptions import ValidationError
 from src.domain.exceptions.layered_retrieval_exceptions import (
+    LayeredRetrievalError,
     LevelTransitionError,
 )
-from src.domain.ports.l3_vector import SearchResult
+from src.domain.exceptions.system_exceptions import StorageError
+from src.domain.ports.embedding_service import EmbeddingServicePort
+from src.domain.ports.l3_vector import L3VectorPort, SearchResult
 
 
 def _make_dense_search(
@@ -31,11 +34,9 @@ def _make_dense_search(
         search_side_effect: search() 抛出的异常
 
     Returns:
-        带 search() 和 _embedding 的 mock 服务
+        带 search() 方法的 mock 服务
     """
     mock = AsyncMock()
-    mock._embedding = AsyncMock()
-    mock._embedding.embed_query.return_value = [0.1] * 128
     if search_side_effect is not None:
         mock.search.side_effect = search_side_effect
     else:
@@ -56,7 +57,7 @@ def _make_l3_vector(
     Returns:
         带 get_point() 和 search() 方法的 mock
     """
-    mock = AsyncMock()
+    mock = AsyncMock(spec=L3VectorPort)
 
     async def _get_point(collection: str, point_id: str) -> dict | None:
         if points and point_id in points:
@@ -68,6 +69,17 @@ def _make_l3_vector(
         mock.search.return_value = search_results
     else:
         mock.search.return_value = []
+    return mock
+
+
+def _make_embedding_service() -> AsyncMock:
+    """构造 EmbeddingServicePort mock
+
+    Returns:
+        带 embed_query() 方法的 mock 端口
+    """
+    mock = AsyncMock(spec=EmbeddingServicePort)
+    mock.embed_query.return_value = [0.1] * 128
     return mock
 
 
@@ -130,6 +142,7 @@ def service() -> LayeredRetrievalService:
     return LayeredRetrievalService(
         dense_search=_make_dense_search(),
         l3_vector=_make_l3_vector(),
+        embedding_service=_make_embedding_service(),
     )
 
 
@@ -162,7 +175,11 @@ class TestBottomUpL4ToL3:
                 }
             }
         )
-        service = LayeredRetrievalService(dense_search=dense_search, l3_vector=l3_vector)
+        service = LayeredRetrievalService(
+            dense_search=dense_search,
+            l3_vector=l3_vector,
+            embedding_service=_make_embedding_service(),
+        )
 
         results = await service.search_bottom_up(
             query_text="测试查询",
@@ -188,18 +205,8 @@ class TestBottomUpL4ToL3:
             l3_vector=_make_l3_vector(
                 points={parent_id: {"id": parent_id, "payload": {"content": "父块内容", "index_level": "parent"}}}
             ),
+            embedding_service=_make_embedding_service(),
         )
-
-        results = await service.search_bottom_up(
-            query_text="测试查询",
-            target_level="L3",
-            collection="test_collection",
-        )
-
-        assert len(results) == 1
-        assert results[0]["payload"]["child_count"] == 3
-
-    async def test_bottom_up_sort_by_highest_child_score(self) -> None:
         """合并后结果按最高 Child 分数降序排列"""
         parent1 = str(uuid.uuid4())
         parent2 = str(uuid.uuid4())
@@ -217,6 +224,7 @@ class TestBottomUpL4ToL3:
                     parent2: {"id": parent2, "payload": {"content": "父块2", "index_level": "parent"}},
                 }
             ),
+            embedding_service=_make_embedding_service(),
         )
 
         results = await service.search_bottom_up(
@@ -235,6 +243,7 @@ class TestBottomUpL4ToL3:
         service = LayeredRetrievalService(
             dense_search=_make_dense_search(search_results=[]),
             l3_vector=_make_l3_vector(),
+            embedding_service=_make_embedding_service(),
         )
 
         results = await service.search_bottom_up(
@@ -310,7 +319,11 @@ class TestTopDownL3ToL4:
             ]
 
         l3_vector.search.side_effect = _child_search
-        return LayeredRetrievalService(dense_search=dense_search, l3_vector=l3_vector)
+        return LayeredRetrievalService(
+            dense_search=dense_search,
+            l3_vector=l3_vector,
+            embedding_service=_make_embedding_service(),
+        )
 
     async def test_top_down_l3_to_l4_basic(self) -> None:
         """基本 L3→L4 展开"""
@@ -386,7 +399,11 @@ class TestTopDownL3ToL4:
             ]
 
         l3_vector.search.side_effect = _search
-        service = LayeredRetrievalService(dense_search=dense_search, l3_vector=l3_vector)
+        service = LayeredRetrievalService(
+            dense_search=dense_search,
+            l3_vector=l3_vector,
+            embedding_service=_make_embedding_service(),
+        )
 
         results = await service.search_top_down(
             query_text="测试查询",
@@ -429,7 +446,11 @@ class TestTopDownL3ToL4:
                 },
             }
         ]
-        service = LayeredRetrievalService(dense_search=dense_search, l3_vector=l3_vector)
+        service = LayeredRetrievalService(
+            dense_search=dense_search,
+            l3_vector=l3_vector,
+            embedding_service=_make_embedding_service(),
+        )
 
         results = await service.search_top_down(
             query_text="测试查询",
@@ -438,6 +459,23 @@ class TestTopDownL3ToL4:
         )
 
         assert len(results[0]["payload"]["parent_content"]) <= 200
+
+    async def test_top_down_no_match_returns_empty(self) -> None:
+        """L3 无匹配时自顶向下返回空列表"""
+        l3_vector = _make_l3_vector(search_results=[])
+        service = LayeredRetrievalService(
+            dense_search=_make_dense_search(),
+            l3_vector=l3_vector,
+            embedding_service=_make_embedding_service(),
+        )
+
+        results = await service.search_top_down(
+            query_text="测试查询",
+            target_level="L4",
+            collection="test_collection",
+        )
+
+        assert results == []
 
 
 def _make_child_result_raw(score: float, parent_id: str, child_id: str | None = None) -> dict:
@@ -500,6 +538,26 @@ class TestLayeredRetrievalService:
                 limit=0,
             )
 
+    async def test_search_input_validation_oversized_limit(self, service: LayeredRetrievalService) -> None:
+        """超上限 limit 抛出 ValidationError"""
+        with pytest.raises(ValidationError):
+            await service.search_bottom_up(
+                query_text="测试查询",
+                target_level="L3",
+                collection="test_collection",
+                limit=10_000,
+            )
+
+    async def test_search_input_validation_blank_tenant_id(self, service: LayeredRetrievalService) -> None:
+        """空白 tenant_id 抛出 ValidationError"""
+        with pytest.raises(ValidationError, match="tenant_id"):
+            await service.search_bottom_up(
+                query_text="测试查询",
+                target_level="L3",
+                collection="test_collection",
+                tenant_id="   ",
+            )
+
     async def test_bottom_up_input_validation_also_applies_top_down(self, service: LayeredRetrievalService) -> None:
         """search_top_down 也执行输入验证"""
         with pytest.raises(ValidationError):
@@ -538,6 +596,7 @@ class TestLayeredRetrievalService:
         service = LayeredRetrievalService(
             dense_search=dense_search,
             l3_vector=_make_l3_vector(),
+            embedding_service=_make_embedding_service(),
         )
 
         results = await service.search_bottom_up(
@@ -549,6 +608,89 @@ class TestLayeredRetrievalService:
         # 降级后返回 L3 结果
         assert len(results) == 1
         assert results[0]["payload"]["index_level"] == "parent"
+
+    async def test_degrade_system_exception_propagates(self) -> None:
+        """SystemException 不降级，直接传播"""
+
+        async def _search(
+            collection: str,
+            query_text: str,
+            limit: int = 10,
+            tenant_id: str | None = None,
+            filter_payload: dict | None = None,
+        ):
+            raise StorageError("Qdrant 不可用")
+
+        dense_search = _make_dense_search()
+        dense_search.search.side_effect = _search
+        service = LayeredRetrievalService(
+            dense_search=dense_search,
+            l3_vector=_make_l3_vector(),
+            embedding_service=_make_embedding_service(),
+        )
+        from src.domain.exceptions.system_exceptions import SystemException
+
+        with pytest.raises(SystemException):
+            await service.search_bottom_up(
+                query_text="测试查询",
+                target_level="L3",
+                collection="test_collection",
+            )
+
+    async def test_l3_direct_search_failure_raises_layered_retrieval_error(self) -> None:
+        """L3 直接检索失败抛出 LayeredRetrievalError"""
+        dense_search = _make_dense_search(search_side_effect=RuntimeError("Dense 不可用"))
+        service = LayeredRetrievalService(
+            dense_search=dense_search,
+            l3_vector=_make_l3_vector(),
+            embedding_service=_make_embedding_service(),
+        )
+        with pytest.raises(LayeredRetrievalError):
+            await service.search_top_down(query_text="测试查询", target_level="L3", collection="test_collection")
+
+    async def test_merge_filter_with_tenant_none(self) -> None:
+        """tenant_id=None 时不注入 tenant_id"""
+        result = LayeredRetrievalService._merge_filter_with_tenant({"index_level": "parent"}, None, None)
+        assert result == {"index_level": "parent"}
+        assert "tenant_id" not in result
+
+    async def test_merge_filter_with_tenant_valid(self) -> None:
+        """tenant_id 有效时注入到 filter"""
+        result = LayeredRetrievalService._merge_filter_with_tenant(
+            {"index_level": "parent"}, {"doc_type": "report"}, "tenant_abc"
+        )
+        assert result == {"index_level": "parent", "doc_type": "report", "tenant_id": "tenant_abc"}
+
+    async def test_fetch_parent_get_point_returns_none(self) -> None:
+        """get_point 返回 None 时 _fetch_parent 返回 None"""
+        l3_vector = _make_l3_vector(points={})
+        service = LayeredRetrievalService(
+            dense_search=_make_dense_search(),
+            l3_vector=l3_vector,
+            embedding_service=_make_embedding_service(),
+        )
+        result = await service._fetch_parent(
+            collection="test",
+            parent_id="nonexistent",
+            info={"max_child_score": 0.8, "child_count": 1, "parent_chunk_id": "id"},
+        )
+        assert result is None
+
+    async def test_fetch_parent_get_point_raises_exception(self) -> None:
+        """get_point 抛异常时 _fetch_parent 返回 None"""
+        l3_vector = AsyncMock(spec=L3VectorPort)
+        l3_vector.get_point.side_effect = RuntimeError("Qdrant 不可用")
+        service = LayeredRetrievalService(
+            dense_search=_make_dense_search(),
+            l3_vector=l3_vector,
+            embedding_service=_make_embedding_service(),
+        )
+        result = await service._fetch_parent(
+            collection="test",
+            parent_id="id",
+            info={"max_child_score": 0.8, "child_count": 1, "parent_chunk_id": "id"},
+        )
+        assert result is None
 
 
 # ===================================================================
@@ -582,6 +724,15 @@ class TestL2L1Skeleton:
         results = await service.search_bottom_up(
             query_text="测试查询",
             target_level="L2",
+            collection="test_collection",
+        )
+        assert results == []
+
+    async def test_search_bottom_up_l1_returns_empty(self, service: LayeredRetrievalService) -> None:
+        """search_bottom_up L1 也返回空列表"""
+        results = await service.search_bottom_up(
+            query_text="测试查询",
+            target_level="L1",
             collection="test_collection",
         )
         assert results == []

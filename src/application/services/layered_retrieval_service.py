@@ -9,6 +9,7 @@
 
 依赖注入：
 - DenseSemanticSearchService（外部构造，用于执行 Dense 语义检索）
+- EmbeddingServicePort（用于查询向量嵌入，自顶向下展开时复用）
 - L3VectorPort（用于按 ID 回溯和按 payload 过滤检索）
 """
 
@@ -23,12 +24,12 @@ from src.domain.exceptions.layered_retrieval_exceptions import (
     LayeredRetrievalError,
     LevelTransitionError,
 )
+from src.domain.exceptions.system_exceptions import SystemException
+from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.l3_vector import SearchResult
+from src.domain.ports.layered_retrieval import LAYERED_RETRIEVAL_LEVELS
 
 logger = logging.getLogger(__name__)
-
-# 有效层级常量
-VALID_LEVELS = frozenset({"L1", "L2", "L3", "L4"})
 
 
 def _safe_truncate(text: str, max_len: int) -> str:
@@ -41,6 +42,8 @@ def _safe_truncate(text: str, max_len: int) -> str:
     Returns:
         截断后的文本
     """
+    if max_len < 1:
+        return ""
     if not text:
         return ""
     # 按 Unicode 字符（而非字节）截断，避免多字节字符被从中截断
@@ -48,18 +51,24 @@ def _safe_truncate(text: str, max_len: int) -> str:
     return "".join(chars[:max_len])
 
 
+# 分层检索编排常量
 # 自顶向下展开时每个 Parent 最多展开的 Child 子块数
 _DEFAULT_CHILD_EXPAND_COUNT = 3
+# 自顶向下展开时最多展开的 Parent 数（限制 N+1 查询开销）
+_MAX_EXPAND_PARENTS = 5
+# 检索结果 limit 上限（防止向量数据库 OOM 或内存压力）
+_MAX_LIMIT = 200
 
 
 class LayeredRetrievalService:
     """分层检索编排服务
 
-    编排 DenseSemanticSearchService + L3VectorPort 实现 L1-L4 分层检索。
+    编排 DenseSemanticSearchService + EmbeddingServicePort + L3VectorPort 实现 L1-L4 分层检索。
     支持自底向上（L4→L3 回溯）和自顶向下（L3→L4 展开）双向遍历。
 
     Attributes:
         _dense_search: Dense 语义检索服务
+        _embedding_service: 嵌入服务端口（自顶向下展开时复用查询向量）
         _l3_vector: L3 向量存储端口
     """
 
@@ -67,15 +76,18 @@ class LayeredRetrievalService:
         self,
         dense_search: Any,
         l3_vector: Any,
+        embedding_service: EmbeddingServicePort,
     ) -> None:
         """初始化分层检索服务
 
         Args:
             dense_search: DenseSemanticSearchService 实例
             l3_vector: L3VectorPort 实例（用于按 payload 过滤回溯和按 ID 获取）
+            embedding_service: EmbeddingServicePort 实例（用于查询向量嵌入）
         """
         self._dense_search = dense_search
         self._l3_vector = l3_vector
+        self._embedding_service = embedding_service
 
     async def search_top_down(
         self,
@@ -109,7 +121,7 @@ class LayeredRetrievalService:
             ValidationError: 参数验证失败时
             LevelTransitionError: 层级遍历路径非法时
         """
-        self._validate_inputs(query_text, collection, limit)
+        self._validate_inputs(query_text, collection, limit, tenant_id)
         self._validate_level(target_level)
 
         # L1/L2 骨架实现
@@ -173,7 +185,7 @@ class LayeredRetrievalService:
             ValidationError: 参数验证失败时
             LevelTransitionError: 层级遍历路径非法时
         """
-        self._validate_inputs(query_text, collection, limit)
+        self._validate_inputs(query_text, collection, limit, tenant_id)
         self._validate_level(target_level)
 
         # L1/L2 骨架实现
@@ -231,6 +243,9 @@ class LayeredRetrievalService:
 
         Returns:
             L3 层检索结果列表
+
+        Raises:
+            LayeredRetrievalError: 下游检索失败时包装为领域异常传播
         """
         parent_filter = self._merge_filter(filter_payload, {"index_level": "parent"})
         try:
@@ -243,16 +258,22 @@ class LayeredRetrievalService:
             )
             if not raw_results:
                 return []
+            # 归一化 payload：确保 index_level 层级标记存在，供调用方区分结果层级
             return [
-                SearchResult(id=r["id"], score=r["score"], payload=r.get("payload") or {})
+                SearchResult(
+                    id=r["id"],
+                    score=r["score"],
+                    payload=self._normalize_payload(r.get("payload", {}), "parent"),
+                )
                 for r in raw_results
                 if "id" in r and "score" in r
             ]
         except Exception as e:
+            # 依赖异常统一为领域契约：包装为 LayeredRetrievalError 向上传播
             logger.error("L3 直接检索失败: %s", e)
             raise LayeredRetrievalError(
                 f"L3 直接检索失败: {e}",
-                context={"collection": collection, "target_level": "L3"},
+                context={"collection": collection, "target_level": "L3", "tenant_id": tenant_id},
             ) from e
 
     async def _search_l4_direct(
@@ -276,6 +297,9 @@ class LayeredRetrievalService:
 
         Returns:
             L4 层检索结果列表
+
+        Raises:
+            LayeredRetrievalError: 下游检索失败时包装为领域异常传播
         """
         child_filter = self._merge_filter(filter_payload, {"index_level": "child"})
         try:
@@ -289,15 +313,16 @@ class LayeredRetrievalService:
             if not raw_results:
                 return []
             return [
-                SearchResult(id=r["id"], score=r["score"], payload=r.get("payload") or {})
+                SearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {}))
                 for r in raw_results
                 if "id" in r and "score" in r
             ]
         except Exception as e:
+            # 依赖异常统一为领域契约：包装为 LayeredRetrievalError 向上传播
             logger.error("L4 直接检索失败: %s", e)
             raise LayeredRetrievalError(
                 f"L4 直接检索失败: {e}",
-                context={"collection": collection, "target_level": "L4"},
+                context={"collection": collection, "target_level": "L4", "tenant_id": tenant_id},
             ) from e
 
     async def _search_bottom_up_l4_to_l3(
@@ -335,8 +360,11 @@ class LayeredRetrievalService:
                 tenant_id=tenant_id,
                 filter_payload=child_filter,
             )
+        except SystemException:
+            # 基础设施故障：必须传播，不能降级掩盖
+            raise
         except Exception as e:
-            # 降级：L4 检索失败 → 透明降级为 L3 检索
+            # 业务级异常（如检索超时、无结果）：透明降级为 L3 检索
             logger.warning("L4 检索失败，降级为 L3 直接检索: %s", e)
             return await self._search_l3_direct(
                 query_text=query_text,
@@ -371,48 +399,54 @@ class LayeredRetrievalService:
             return []
 
         # 3. 通过 get_point() 回溯获取父块内容（并发获取，避免 N+1 串行查询）
-        merged_results: list[SearchResult] = []
+        # 使用 gather(return_exceptions=True)：单个父块获取失败不影响其余结果
+        # 过滤异常，保留有效的 SearchResult（TypedDict 不支持 isinstance，故按异常类型过滤）
+        fetch_results = await asyncio.gather(
+            *[self._fetch_parent(collection, pid, inf) for pid, inf in parent_info.items()],
+            return_exceptions=True,
+        )
+        merged_results: list[SearchResult] = [r for r in fetch_results if not isinstance(r, BaseException) and r is not None]
 
-        async def _fetch_parent(parent_id: str, info: dict[str, Any]) -> SearchResult | None:
-            """获取单个父块内容
-
-            Args:
-                parent_id: 父块 ID
-                info: 父块去重信息
-
-            Returns:
-                合并后的 SearchResult，或 None（获取失败时）
-            """
-            try:
-                parent_point = await self._l3_vector.get_point(collection, parent_id)
-            except Exception:
-                logger.warning("L4→L3 回溯: 获取父块 %s 失败，跳过", parent_id)
-                return None
-            if parent_point is None:
-                return None
-
-            parent_payload = parent_point.get("payload", {})
-            return SearchResult(
-                id=parent_id,
-                score=info["max_child_score"],
-                payload={
-                    "parent_chunk_id": parent_id,
-                    "child_count": info["child_count"],
-                    "index_level": "parent",
-                    "content": parent_payload.get("content", ""),
-                    "document_id": parent_payload.get("document_id", ""),
-                },
-            )
-
-        tasks = [asyncio.ensure_future(_fetch_parent(pid, inf)) for pid, inf in parent_info.items()]
-        for task in tasks:
-            result = await task
-            if result is not None:
-                merged_results.append(result)
-
-        # 4. 按最高 Child 分数降序排列
-        merged_results.sort(key=lambda r: r["score"], reverse=True)
+        # 4. 按最高 Child 分数降序排列（分数相同时按 id 确保确定性）
+        merged_results.sort(key=lambda r: (-r["score"], r["id"]))
         return merged_results[:limit]
+
+    async def _fetch_parent(
+        self,
+        collection: str,
+        parent_id: str,
+        info: dict[str, Any],
+    ) -> SearchResult | None:
+        """获取单个父块内容（并发任务）
+
+        Args:
+            collection: Collection 名称
+            parent_id: 父块 ID
+            info: 父块去重信息
+
+        Returns:
+            合并后的 SearchResult，或 None（获取失败时）
+        """
+        try:
+            parent_point = await self._l3_vector.get_point(collection, parent_id)
+        except Exception:
+            logger.warning("L4→L3 回溯: 获取父块 %s 失败，跳过", parent_id)
+            return None
+        if parent_point is None:
+            return None
+
+        parent_payload = parent_point.get("payload", {})
+        return SearchResult(
+            id=parent_id,
+            score=info["max_child_score"],
+            payload={
+                "parent_chunk_id": parent_id,
+                "child_count": info["child_count"],
+                "index_level": "parent",
+                "content": _safe_truncate(parent_payload.get("content", ""), 200),
+                "document_id": parent_payload.get("document_id", ""),
+            },
+        )
 
     async def _search_top_down_l3_to_l4(
         self,
@@ -437,37 +471,38 @@ class LayeredRetrievalService:
 
         Returns:
             展开后的 L4 层结果列表
+
+        Raises:
+            LayeredRetrievalError: 查询嵌入或 L3 检索失败时包装为领域异常传播
         """
         # 1. 嵌入查询向量一次，L3 检索与后续 Child 展开复用
         try:
-            query_vector = await self._dense_search._embedding.embed_query(query_text)
+            query_vector = await self._embedding_service.embed_query(query_text)
         except Exception as e:
             logger.error("L3 查询嵌入失败: %s", e)
             raise LayeredRetrievalError(
                 f"L3 查询嵌入失败: {e}",
-                context={"collection": collection, "target_level": "L4"},
+                context={"collection": collection, "target_level": "L4", "tenant_id": tenant_id},
             ) from e
 
         # 2. L3 层 Dense 检索（直接传向量，避免二次嵌入）
-        parent_filter = self._merge_filter(filter_payload, {"index_level": "parent"})
-        if tenant_id:
-            parent_filter = self._merge_filter(parent_filter, {"tenant_id": tenant_id})
+        parent_filter = self._merge_filter_with_tenant(filter_payload, {"index_level": "parent"}, tenant_id)
         try:
             l3_raw = await self._l3_vector.search(
                 collection=collection,
                 query_vector=query_vector,
-                limit=min(limit, 5),  # 限制展开 Parent 数，避免 N+1 问题
+                limit=min(limit, _MAX_EXPAND_PARENTS),  # 限制展开 Parent 数，避免 N+1 问题
                 filter_payload=parent_filter,
             )
         except Exception as e:
             logger.error("L3 检索失败，无法展开 L4: %s", e)
             raise LayeredRetrievalError(
                 f"L3 检索失败，无法展开 L4: {e}",
-                context={"collection": collection, "target_level": "L4"},
+                context={"collection": collection, "target_level": "L4", "tenant_id": tenant_id},
             ) from e
 
         l3_results = [
-            SearchResult(id=r["id"], score=r["score"], payload=r.get("payload") or {})
+            SearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {}))
             for r in l3_raw
             if isinstance(r, dict) and "id" in r and "score" in r
         ]
@@ -475,12 +510,22 @@ class LayeredRetrievalService:
             return []
 
         # 3. 对每个命中 Parent，展开 Top-3 Child（复用 query_vector 传向量）
+        # 并发展开：避免串行 N+1 查询，gather 并发执行所有 Parent 的 Child 展开
         expanded_results: list[SearchResult] = []
-        for parent_result in l3_results:
+
+        async def _expand_child(parent_result: SearchResult) -> list[SearchResult]:
+            """展开单个 Parent 的 Child 子块
+
+            Args:
+                parent_result: Parent 检索结果
+
+            Returns:
+                展开后的 Child 结果列表
+            """
             parent_id = parent_result.get("id")
             if parent_id is None:
                 logger.warning("L3→L4 展开: Parent id 为 None，跳过")
-                continue
+                return []
 
             parent_payload = parent_result.get("payload", {})
             parent_content = parent_payload.get("content")
@@ -488,12 +533,11 @@ class LayeredRetrievalService:
                 parent_content = ""
             parent_content_preview = _safe_truncate(parent_content, 200)
 
-            child_filter = self._merge_filter(
+            child_filter = self._merge_filter_with_tenant(
                 filter_payload,
                 {"index_level": "child", "parent_chunk_id": str(parent_id)},
+                tenant_id,
             )
-            if tenant_id:
-                child_filter = self._merge_filter(child_filter, {"tenant_id": tenant_id})
 
             try:
                 child_raw = await self._l3_vector.search(
@@ -504,28 +548,32 @@ class LayeredRetrievalService:
                 )
             except Exception:
                 logger.warning("Parent %s 的 Child 展开失败，跳过", parent_id)
-                continue
+                return []
 
             child_results = [r for r in child_raw if isinstance(r, dict) and "id" in r and "score" in r]
+            child_results.sort(key=lambda r: r["score"], reverse=True)  # 显式排序，不依赖后端顺序
 
             # 服务自身强制 Top-3 截断，不依赖后端 limit 行为
+            children: list[SearchResult] = []
             for child in child_results[:_DEFAULT_CHILD_EXPAND_COUNT]:
                 combined_score = parent_result["score"] * child["score"]
                 child_payload = dict(child.get("payload", {}))
                 child_payload["parent_chunk_id"] = str(parent_id)
                 child_payload["parent_content"] = parent_content_preview
                 child_payload["index_level"] = "child"
+                children.append(SearchResult(id=child["id"], score=combined_score, payload=child_payload))
+            return children
 
-                expanded_results.append(
-                    SearchResult(
-                        id=child["id"],
-                        score=combined_score,
-                        payload=child_payload,
-                    )
-                )
+        child_batches = await asyncio.gather(
+            *[_expand_child(p) for p in l3_results],
+            return_exceptions=True,
+        )
+        for batch in child_batches:
+            if isinstance(batch, list):
+                expanded_results.extend(batch)
 
-        # 3. 按 Parent 分数 × Child 分数降序排列
-        expanded_results.sort(key=lambda r: r["score"], reverse=True)
+        # 3. 按 Parent 分数 × Child 分数降序排列（分数相同时按 id 确保确定性）
+        expanded_results.sort(key=lambda r: (-r["score"], r["id"]))
         return expanded_results[:limit]
 
     # ------------------------------------------------------------------
@@ -533,13 +581,14 @@ class LayeredRetrievalService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _validate_inputs(query_text: str, collection: str, limit: int) -> None:
+    def _validate_inputs(query_text: str, collection: str, limit: int, tenant_id: str | None = None) -> None:
         """验证输入参数
 
         Args:
             query_text: 查询文本
             collection: Collection 名称
             limit: 返回结果数量限制
+            tenant_id: 租户 ID（可选，仅空白时拒绝）
 
         Raises:
             ValidationError: 参数验证失败时
@@ -550,6 +599,11 @@ class LayeredRetrievalService:
             raise ValidationError(message="Collection 名称不能为空")
         if limit < 1:
             raise ValidationError(message=f"limit 必须为正整数，当前值: {limit}")
+        if limit > _MAX_LIMIT:
+            raise ValidationError(message=f"limit 不能超过 {_MAX_LIMIT}，当前值: {limit}")
+        # tenant_id 空白校验：防止纯空白字符串绕过校验直接注入 Qdrant filter
+        if tenant_id is not None and not tenant_id.strip():
+            raise ValidationError(message="tenant_id 不能为空或仅含空白字符")
 
     @staticmethod
     def _validate_level(level: str) -> None:
@@ -561,10 +615,10 @@ class LayeredRetrievalService:
         Raises:
             LevelTransitionError: 层级非法时
         """
-        if level not in VALID_LEVELS:
+        if level not in LAYERED_RETRIEVAL_LEVELS:
             raise LevelTransitionError(
                 f"无效的层级: {level}，有效层级: L1/L2/L3/L4",
-                context={"invalid_level": level, "valid_levels": sorted(VALID_LEVELS)},
+                context={"invalid_level": level, "valid_levels": sorted(LAYERED_RETRIEVAL_LEVELS)},
             )
 
     @staticmethod
@@ -584,8 +638,51 @@ class LayeredRetrievalService:
         if base_filter is None and extra_filter is None:
             return None
         merged: dict[str, Any] = {}
-        if base_filter:
+        if base_filter is not None:
             merged.update(base_filter)
-        if extra_filter:
+        if extra_filter is not None:
             merged.update(extra_filter)
         return merged if merged else None
+
+    @staticmethod
+    def _normalize_payload(
+        payload: dict[str, Any],
+        index_level: str,
+    ) -> dict[str, Any]:
+        """归一化检索结果 payload，确保层级元数据完整
+
+        Args:
+            payload: 原始 payload
+            index_level: 目标层级（"parent"/"child"）
+
+        Returns:
+            确保包含 index_level 字段的 payload
+        """
+        normalized = dict(payload)
+        normalized.setdefault("index_level", index_level)
+        return normalized
+
+    @classmethod
+    def _merge_filter_with_tenant(
+        cls,
+        base_filter: dict | None,
+        extra_filter: dict | None,
+        tenant_id: str | None,
+    ) -> dict | None:
+        """合并过滤条件并注入租户 ID
+
+        供直接调用 L3VectorPort.search() 的路径使用（该端口无独立 tenant_id 参数，
+        租户隔离依赖 filter_payload 注入，此处统一封装避免各路径重复实现）。
+
+        Args:
+            base_filter: 基础过滤条件
+            extra_filter: 额外过滤条件
+            tenant_id: 租户 ID（None 时不注入）
+
+        Returns:
+            合并后的过滤条件（含 tenant_id 条件）
+        """
+        merged = cls._merge_filter(base_filter, extra_filter)
+        if tenant_id is None:
+            return merged
+        return cls._merge_filter(merged or {}, {"tenant_id": tenant_id.strip()})
