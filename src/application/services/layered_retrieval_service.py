@@ -243,6 +243,9 @@ class LayeredRetrievalService:
 
         Returns:
             L3 层检索结果列表
+
+        Raises:
+            LayeredRetrievalError: 下游检索失败时包装为领域异常传播
         """
         parent_filter = self._merge_filter(filter_payload, {"index_level": "parent"})
         try:
@@ -294,6 +297,9 @@ class LayeredRetrievalService:
 
         Returns:
             L4 层检索结果列表
+
+        Raises:
+            LayeredRetrievalError: 下游检索失败时包装为领域异常传播
         """
         child_filter = self._merge_filter(filter_payload, {"index_level": "child"})
         try:
@@ -437,7 +443,7 @@ class LayeredRetrievalService:
                 "parent_chunk_id": parent_id,
                 "child_count": info["child_count"],
                 "index_level": "parent",
-                "content": parent_payload.get("content", ""),
+                "content": _safe_truncate(parent_payload.get("content", ""), 200),
                 "document_id": parent_payload.get("document_id", ""),
             },
         )
@@ -465,6 +471,9 @@ class LayeredRetrievalService:
 
         Returns:
             展开后的 L4 层结果列表
+
+        Raises:
+            LayeredRetrievalError: 查询嵌入或 L3 检索失败时包装为领域异常传播
         """
         # 1. 嵌入查询向量一次，L3 检索与后续 Child 展开复用
         try:
@@ -501,12 +510,22 @@ class LayeredRetrievalService:
             return []
 
         # 3. 对每个命中 Parent，展开 Top-3 Child（复用 query_vector 传向量）
+        # 并发展开：避免串行 N+1 查询，gather 并发执行所有 Parent 的 Child 展开
         expanded_results: list[SearchResult] = []
-        for parent_result in l3_results:
+
+        async def _expand_child(parent_result: SearchResult) -> list[SearchResult]:
+            """展开单个 Parent 的 Child 子块
+
+            Args:
+                parent_result: Parent 检索结果
+
+            Returns:
+                展开后的 Child 结果列表
+            """
             parent_id = parent_result.get("id")
             if parent_id is None:
                 logger.warning("L3→L4 展开: Parent id 为 None，跳过")
-                continue
+                return []
 
             parent_payload = parent_result.get("payload", {})
             parent_content = parent_payload.get("content")
@@ -529,26 +548,29 @@ class LayeredRetrievalService:
                 )
             except Exception:
                 logger.warning("Parent %s 的 Child 展开失败，跳过", parent_id)
-                continue
+                return []
 
             child_results = [r for r in child_raw if isinstance(r, dict) and "id" in r and "score" in r]
             child_results.sort(key=lambda r: r["score"], reverse=True)  # 显式排序，不依赖后端顺序
 
             # 服务自身强制 Top-3 截断，不依赖后端 limit 行为
+            children: list[SearchResult] = []
             for child in child_results[:_DEFAULT_CHILD_EXPAND_COUNT]:
                 combined_score = parent_result["score"] * child["score"]
                 child_payload = dict(child.get("payload", {}))
                 child_payload["parent_chunk_id"] = str(parent_id)
                 child_payload["parent_content"] = parent_content_preview
                 child_payload["index_level"] = "child"
+                children.append(SearchResult(id=child["id"], score=combined_score, payload=child_payload))
+            return children
 
-                expanded_results.append(
-                    SearchResult(
-                        id=child["id"],
-                        score=combined_score,
-                        payload=child_payload,
-                    )
-                )
+        child_batches = await asyncio.gather(
+            *[_expand_child(p) for p in l3_results],
+            return_exceptions=True,
+        )
+        for batch in child_batches:
+            if isinstance(batch, list):
+                expanded_results.extend(batch)
 
         # 3. 按 Parent 分数 × Child 分数降序排列（分数相同时按 id 确保确定性）
         expanded_results.sort(key=lambda r: (-r["score"], r["id"]))

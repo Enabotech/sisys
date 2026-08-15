@@ -460,6 +460,23 @@ class TestTopDownL3ToL4:
 
         assert len(results[0]["payload"]["parent_content"]) <= 200
 
+    async def test_top_down_no_match_returns_empty(self) -> None:
+        """L3 无匹配时自顶向下返回空列表"""
+        l3_vector = _make_l3_vector(search_results=[])
+        service = LayeredRetrievalService(
+            dense_search=_make_dense_search(),
+            l3_vector=l3_vector,
+            embedding_service=_make_embedding_service(),
+        )
+
+        results = await service.search_top_down(
+            query_text="测试查询",
+            target_level="L4",
+            collection="test_collection",
+        )
+
+        assert results == []
+
 
 def _make_child_result_raw(score: float, parent_id: str, child_id: str | None = None) -> dict:
     """构造 L4 Child 块原始检索结果 dict
@@ -707,6 +724,15 @@ class TestL2L1Skeleton:
         results = await service.search_bottom_up(
             query_text="测试查询",
             target_level="L2",
+            collection="test_collection",
+        )
+        assert results == []
+
+    async def test_search_bottom_up_l1_returns_empty(self, service: LayeredRetrievalService) -> None:
+        """search_bottom_up L1 也返回空列表"""
+        results = await service.search_bottom_up(
+            query_text="测试查询",
+            target_level="L1",
             collection="test_collection",
         )
         assert results == []
