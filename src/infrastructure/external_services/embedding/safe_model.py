@@ -62,26 +62,21 @@ class SafeBGE3Model:
 
         self._model: Any = _BGEM3FlagModel(model_path, use_fp16=use_fp16)
         self._inference_lock: threading.Lock = threading.Lock()
-        self._device: str = device if device is not None else self._model.target_devices[0]
+        device = device if device is not None else self._model.target_devices[0]
+        self._device: str = device
         self._use_fp16: bool = use_fp16
 
-        # 确定目标设备
-        if device is None:
-            device = self._model.target_devices[0]
-
         # 一次性固定设备/精度/评估模式
+        # model.to(device) 在 PyTorch 中幂等：模型已在目标设备上时无实际拷贝开销
+        # model.eval() 设置 dropout/batch_norm 模式，轻量幂等操作
         if use_fp16:
             self._model.model.half()
         self._model.model.to(device)
         self._model.model.eval()
 
         # 阻止父类 encode_single_device 每次推理重复调用 model.half()
+        # 父类逻辑：if self.use_fp16: self.model.half()
         self._model.use_fp16 = False
-
-        # 推理锁
-        self._inference_lock = threading.Lock()
-        self._device = device
-        self._use_fp16 = use_fp16
 
         logger.info(
             "SafeBGE3Model 初始化完成: device=%s, fp16=%s",
