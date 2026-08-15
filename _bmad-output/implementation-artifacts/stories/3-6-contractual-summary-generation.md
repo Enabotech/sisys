@@ -368,10 +368,10 @@
 | **TDD 单元测试** | 摘要生成服务 | 多视角生成、LLM 调用、Schema 验证 | `tests/unit/application/services/test_summary_generation_service.py` | Task 2 |
 | **TDD 单元测试** | 摘要异常 | 构造/属性/`to_dict()`/cause 链/HTTP 映射 | `tests/unit/domain/exceptions/test_summary_exceptions.py` | Task 1 |
 | **TDD 单元测试** | 摘要 Prompt 模板 | 模板变量替换、每个视角的 Prompt 完整性 | `tests/unit/application/services/test_summary_prompts.py` | Task 2 |
-| **SDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_contractual_summary.feature` | Task 0 |
-| **SDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_contractual_summary.py` | Task 0 |
-| **SDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | `test_acceptance_contractual_summary.feature` | Task 5 |
-| **SDD 验收测试** | 收尾 BDD 步骤实现 | 完成清单断言与步骤函数 | `test_acceptance_contractual_summary.py` | Task 5 |
+| **SDD 验收测试** | Gherkin 场景 | 业务价值验收 | `tests/acceptance/test_acceptance_contractual_summary.feature` | Task 0 |
+| **SDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_contractual_summary.py` | Task 0 |
+| **SDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | `tests/acceptance/test_acceptance_contractual_summary.feature` | Task 5 |
+| **SDD 验收测试** | 收尾 BDD 步骤实现 | 完成清单断言与步骤函数 | `tests/acceptance/test_acceptance_contractual_summary.py` | Task 5 |
 | **SDD 契约测试** | 端口契约 | 端口注册、版本、兼容性、实现解析 | `tests/contracts/test_port_contract_summary_generation.py` | Task 0 |
 | **SDD 契约测试** | API 契约 | OpenAPI 端点、请求/响应结构 | `tests/contracts/test_api_contract_summary.py` | Task 0 |
 | **TDD 领域异常测试** | 异常 HTTP 映射 | HTTP 映射/状态码/响应结构 | `tests/unit/interfaces/api/test_exception_handlers.py` | Task 1 |
@@ -440,13 +440,17 @@
 | AC-1 | 摘要 Schema 契约定义 | Task 1 | TDD Schema 实现 | `test_summary_schemas.py` |
 | AC-2 | 摘要生成服务端口契约 | Task 0 | SDD 规范定义 | `test_port_contract_summary_generation.py` |
 | AC-2 | 摘要生成服务端口契约 | Task 1 | TDD 端口实现 | `test_summary_generation_port.py` |
+| AC-3 | 摘要生成异常体系 | Task 0 | SDD 规范定义（异常契约设计） | `test_summary_exceptions.py` |
 | AC-3 | 摘要生成异常体系 | Task 1 | TDD 异常定义 | `test_summary_exceptions.py` |
 | AC-4 | 摘要生成应用服务 | Task 2 | TDD 服务实现 | `test_summary_generation_service.py` |
 | AC-5 | 摘要 Prompt 模板 | Task 2 | TDD Prompt 模板 | `test_summary_prompts.py` |
 | AC-6 | 摘要结果存储与检索（L2） | Task 3 | TDD 存储实现 | `test_integration_contractual_summary.py` |
 | AC-7a | 跨文档摘要生成（L1 生成） | Task 3 | TDD 跨文档实现 | `test_integration_contractual_summary.py` |
 | AC-7b | 跨文档摘要检索（L1 检索） | Task 3 | TDD L1 填充 | `test_integration_contractual_summary.py` |
+| AC-8 | 摘要 API 端点 | Task 0 | SDD 规范定义（API 契约设计） | `test_api_contract_summary.py` |
 | AC-8 | 摘要 API 端点 | Task 3 | TDD API 端点 | `test_api_contract_summary.py` |
+| AC-1,2,3,4 | 架构约束验证 | Task 4 | SDD 架构验证 | `test_arch_summary_generation.py` |
+| AC-1~8 | 开发结束验收 | Task 5 | 收尾验收 | `test_acceptance_contractual_summary.feature` |
 
 ---
 
