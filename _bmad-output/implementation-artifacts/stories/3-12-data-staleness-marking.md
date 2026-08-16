@@ -996,17 +996,15 @@ FactBecameStale:
 - `tests/unit/application/services/test_staleness_weight_service.py` - 降权服务测试
 
 **待更新的文件/To Be Updated:**
-- `src/application/services/strategic_archive_service.py` - UPDATE: archive_plan() L3/L5 payload 追加 valid_from/valid_until
-- `src/application/services/layered_retrieval_service.py` - UPDATE: 注入 StalenessWeightService，检索返回前降权
-- `src/application/services/summary_generation_service.py` - UPDATE: _build_search_context() 陈旧提示
+- `src/application/services/strategic_archive_service.py` - UPDATE: archive_plan() L3/L5 payload 追加 valid_from/valid_until; query_archive() 集成 StalenessWeightService 降权
+- `src/application/services/summary_generation_service.py` - UPDATE: _build_search_context() 陈旧提示 + 可选注入 archive_repo 兜底
 - `src/application/services/summary_prompts.py` - UPDATE: system_prompt 追加陈旧数据处理说明
 - `src/application/event_handlers/archive_handlers.py` - UPDATE: L3/L5 同步 + 降权触发
 - `src/domain/ports/archive_repository.py` - UPDATE: ArchiveQuery 新增 staleness_status 字段
 - `src/infrastructure/storage/postgresql/repository/archive_repository.py` - UPDATE: _apply_filters() 扩展 staleness_status 过滤
 - `src/interfaces/api/strategic_archive.py` - UPDATE: ArchiveResponse 新增字段 + staleness_status 参数
-- `src/composition_root.py` - UPDATE: 注册 StalenessWeightService + 更新 ArchiveValidityHandler
-- `tests/unit/application/services/test_strategic_archive_service.py` - UPDATE: L3/L5 payload 初始快照测试
-- `tests/unit/application/services/test_layered_retrieval_service.py` - UPDATE: 降权集成测试
+- `src/composition_root.py` - UPDATE: 注册 StalenessWeightService + 更新 ArchiveValidityHandler/StrategicArchiveService
+- `tests/unit/application/services/test_strategic_archive_service.py` - UPDATE: L3/L5 payload 初始快照 + query_archive 降权集成测试
 - `tests/unit/application/services/test_summary_generation_service.py` - UPDATE: 陈旧提示测试
 - `tests/unit/application/event_handlers/test_archive_handlers.py` - UPDATE: L3/L5 同步 + 降权触发测试
 - `tests/unit/domain/ports/test_archive_query.py` - UPDATE: staleness_status 字段测试
@@ -1051,7 +1049,7 @@ FactBecameStale:
 | R1-2 | `StalenessWeightService` 在 `LayeredRetrievalService` 中因 collection 不匹配（documents vs strategic_archive）无法工作 | P0 | 降权集成点从 `LayeredRetrievalService` 改为 `StrategicArchiveService.query_archive()`，适用范围限定为 `strategic_archive` collection |
 | R1-3 | `payload.get("archive_id")` 在 `documents` collection 检索结果中不存在，兜底链失效 | P0 | 同 R1-2，限定降权范围为 `strategic_archive` collection（payload 含 archive_id） |
 | R1-4 | 降权位置矛盾：AC-4 说在公开方法返回前降权，Subtask 3.2 说在四个私有方法返回前降权，存在重复降权风险 | P0 | 统一为 `StrategicArchiveService.query_archive()` 单一入口降权，删除 LayeredRetrievalService 多路径降权方案 |
-| R1-5 | `archive_repo` 为 None 且 payload 无 `is_stale` 标记时排序正确性问题 | P0 | 增加约束：跳过降权的结果保持原始位置不变（不参与重排序），增加 `get_by_id()` 返回 None 视为非陈旧的处理 |
+| R1-5 | `archive_repo` 为 None 且 payload 无 `is_stale` 标记时排序正确性问题 | P0 | 增加约束：跳过降权的结果 score 不变，参与全局 `(-score, id)` 重排序；"保持原始位置不变"修正为"score 不变，自然排序不刻意调整"；增加 `get_by_id()` 返回 None 视为非陈旧的处理 |
 | R1-6 | `SummaryGenerationService` 无 `archive_repo` 兜底，L3 缺 `is_stale` 标记时无法提示 | P0 | `SummaryGenerationService` 构造函数新增可选参数 `archive_repo: ArchiveRepositoryPort \| None = None`，通过 `archive.is_stale()` 兜底判断 |
 | R1-7 | `staleness_status` 与 `validity_status` 语义未区分 | P0 | 明确语义区分：`validity_status` 时间判断，`staleness_status` 标记判断，不得混用 |
 | R1-8 | `_apply_filters()` 使用 `text()` 与现有列表达式风格不一致 | P0 | 改用 SQLAlchemy JSONB 列表达式 `ArchiveModel.metadata_["staleness"].as_string() == "stale"`，与现有风格一致 |
