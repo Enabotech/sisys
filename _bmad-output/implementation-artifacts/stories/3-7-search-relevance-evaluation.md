@@ -281,6 +281,8 @@
 - [ ] 跨模块调用仅依赖抽象接口，不直接依赖实现类
 - [ ] 端口变更配套契约测试与兼容性检查
 - [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
+- [ ] **端口包导出**：`src/domain/ports/__init__.py` 中新增导出 `RelevanceEvaluationPort`、`RelevanceEvaluationResult`、`RuleBasedResult`（与 `RerankerPort`/`LayeredRetrievalPort` 的导出模式一致，便于其他模块统一导入）
+- [ ] **跨端口引用说明**：`relevance_evaluation.py` 模块 docstring 中说明"领域层零外部依赖（仅使用 Python 标准库 + SearchResult + LLMConfig）"，`SearchResult` 从 `l3_vector.py` 导入、`LLMConfig` 从 `llm_client.py` 导入（两者均为领域层同层类型引用，与 `LayeredRetrievalPort`/`RerankerPort` 模式一致，不违反零外部依赖原则）
 
 #### 端口契约清单执行约束（强制）
 - [ ] 本模板中的端口清单是唯一事实源（Single Source of Truth）
@@ -299,10 +301,20 @@
 - [ ] **归属模块与基类** — 新增 `relevance` 子域（360-369）：
     - `RelevanceEvaluationError`（EXCEPTION_360）→ 继承 `ExternalException`，LLM 评估调用失败（与 `RerankError`/`LLMAPIError` 模式一致，外部服务错误）
     - `RelevanceEvaluationBlockedError`（EXCEPTION_361）→ 继承 `BusinessException`，检索结果不足被阻断（业务规则违反）
-- [ ] **唯一编码分配** — 从 `relevance` 子域（360-361）选取，`grep -rw "EXCEPTION_36[0-9]" src/` 验证无碰撞
-  - 编码范围选择理由：360-369 属于 `external` 父域（301-399）内的空闲段，与 `reranker`（350-359）相邻，语义一致（评估类异常与重排序类异常同属检索质量评估子域）；`RelevanceEvaluationBlockedError` 继承 `BusinessException` 但编码仍落在 `relevance` 子域（360-369），`nested_subdomains` 仅关心范围是否在父域内（[360,369] 确实在 [301,399] 内），不关心继承链
 - [ ] **构造器参数设计** — 携带查询上下文（`query_text`、`result_count`、`overall_score`、`block_reason` 等），通过 `context` 字典暴露
 - [ ] **消息安全性审查** — 错误消息面向调用方可理解，不泄露 SQL/堆栈等内部实现细节
+
+**[R3 审查确认的关键事实（异常注册完备性）]：**
+
+1. **`CODE_RANGES` 插入位置**：`"relevance": (360, 369)` 应插入在 `"reranker": (350, 359)` 与 `"fallback": (999, 999)` 之间（保持编码升序）
+2. **`_CLASS_TO_SUBDOMAIN` 只需新增 2 个条目**：`"RelevanceEvaluationError": "relevance"`、`"RelevanceEvaluationBlockedError": "relevance"`。`RelevanceEvaluationService` 内部会捕获的所有 LLM 异常（`LLMAPIError`/`LLMResponseError`/`ServiceUnavailableError`/`LLMConfigError`）均已注册为 `llm` 或 `external` 子域，无需额外注册
+3. **`__init__.py` 导入位置**：`from src.domain.exceptions.relevance_exceptions import (...)` 按模块名字母序插入第 71 行（`reranker_exceptions` 之后）、第 72 行（`role_exceptions` 之前）
+4. **`EXCEPTION_HTTP_MAP` 注册位置**：`RelevanceEvaluationError`（→500）与 `RelevanceEvaluationBlockedError`（→422）插入第 162 行（`RerankError` 之后）、第 163 行（`HybridSearchError` 之前），**必须显式注册**（避免 `isinstance` 回退到 `ExternalException` 基类 502 / `BusinessException` 基类 400）
+5. **`exception_handlers.py` 的 import**：新增两个异常类按字母序插入 `RerankError`（第 66 行）之后
+
+**`nested_subdomains` 格式验证（R3 审查确认）**：`nested_subdomains` 实际类型为 `dict[str, str]`（子域名 → 父域名）。新增 `"relevance": "external"` 是**严格必需**的——否则 `relevance` (360-369) 将与 `external` (301-399) 发生 `covered` 重叠冲突，导致 `test_all_subdomain_ranges_are_valid` 失败。`allowed_child_parent_subdomains` 新增 `("relevance", "external")` 是防御性添加（Rule 2 跳过抽象基类，非严格必需，但推荐）；`("relevance", "business")` 同理非必需。
+
+**`test_error_code_uniqueness.py`**：无需修改，新增异常类加入 `__all__` 后自动被发现，只要编码唯一（EXCEPTION_360/361 无碰撞）即通过。
 - [ ] **编码注册** — 更新 `_code_ranges.py` 和 `test_code_ranges.py`：
     - `CODE_RANGES` 新增 `"relevance": (360, 369)`
     - `_CLASS_TO_SUBDOMAIN` 新增 `"RelevanceEvaluationError": "relevance"`、`"RelevanceEvaluationBlockedError": "relevance"`
@@ -906,14 +918,22 @@ docs/
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
 - [x] **Round 2 D2 审查发现并修复** 1 个 P0 + 2 个 P1 问题：
-  - P0#8: 请求体 `search_results` 安全缺陷 — 改为纯服务端检索后评估
-  - P0#9: `evaluate()` 返回类型承诺矛盾 — 明确永远不抛 BlockedError，只返回 result
-  - P1: quick_rule_check 防御性计算（NaN/缺失 score）
-  - P1: 时效性注入形式明确（嵌入 `{search_context}`，无需独立占位符）
+  - P0#8: 请求体 search_results 安全缺陷 — 改为纯服务端检索后评估
+  - P0#9: evaluate() 返回类型承诺 — 明确永远不抛 BlockedError，只返回 result
+  - P1: quick_rule_check 防御性计算（NaN/缺失 score 过滤）
+  - P1: 时效性注入形式明确（嵌入 {search_context}，无需独立占位符）
   - P1: 集成测试职责拆分（AC-4 和 AC-6 分离）
-  - P1: 响应体 `dimension_reasons` 改为顶层 `*_reason` 字段
+  - P1: 响应体 dimension_reasons 改为顶层 *_reason 字段
   - P1: 错误处理透传全局 ExceptionHandlers
-  - P2: 时效性测试合并入 `test_relevance_evaluation_service.py`
+  - P2: 时效性测试合并入 test_relevance_evaluation_service.py
+- [x] **Round 3 D2 审查发现并修复** 2 个 P1 + 3 个 P2 问题：
+  - P1: 删除 test_timeliness_evaluation.py 幽灵条目（已合并入服务测试）
+  - P1: 补全文件清单缺失项（integration/acceptance 测试文件）
+  - P2: Subtask 0.3 明确四方法模式含 test_lifetime_is_scoped
+  - P2: Subtask 3.2 标注构造签名变更影响面（5 个调用点）
+  - P2: Subtask 3.8 标注端口契约测试由红转绿
+  - P2: 补全测试依赖文件清单（test_summary_generation_service.py）
+- [x] **R3 架构/异常审查确认项**：LLMConfig 合规、SearchResult 跨端口引用合规、RelevanceEvaluationResult↔RelevanceEvaluation 双层结构合理、composition_root 注册顺序无严格依赖、shutdown() 无需修改、src/domain/ports/__init__.py 需更新导出（已添加至 SDD 规范）、异常注册完备性全部确认
 
 ### 文件清单 File List
 
