@@ -328,8 +328,8 @@ class TestSetValidityPeriod:
         service, repo, archive = _make_validity_service()
         vf = datetime(2026, 1, 1, tzinfo=UTC)
         vu = datetime(2027, 12, 31, tzinfo=UTC)
-        # find 返回空（无冲突）
-        repo.find.return_value = []
+        # find_for_update 返回目标档案（无冲突）
+        repo.find_for_update.return_value = [archive]
         result = await service.set_validity_period(archive.archive_id, vf, vu)
         assert result.valid_from == vf
         assert result.valid_until == vu
@@ -351,8 +351,8 @@ class TestSetValidityPeriod:
         other = _make_archive(
             {"valid_from": datetime(2026, 6, 1, tzinfo=UTC), "valid_until": datetime(2026, 12, 31, tzinfo=UTC)}
         )
-        repo.find.return_value = [other]
-        repo.find_for_update.return_value = [other]
+        # find_for_update 返回目标档案 + 冲突档案
+        repo.find_for_update.return_value = [other, archive]
         with pytest.raises(ValidityPeriodConflictError):
             await service.set_validity_period(
                 archive.archive_id,
@@ -366,8 +366,8 @@ class TestSetValidityPeriod:
         service, repo, archive = _make_validity_service()
         # 其他档案 valid_until == 新区间 valid_from，半开区间不重叠
         other = _make_archive({"valid_from": datetime(2025, 1, 1, tzinfo=UTC), "valid_until": datetime(2026, 1, 1, tzinfo=UTC)})
-        repo.find.return_value = [other]
-        repo.find_for_update.return_value = [other]
+        # find_for_update 返回目标档案 + 相邻档案
+        repo.find_for_update.return_value = [other, archive]
         result = await service.set_validity_period(
             archive.archive_id,
             datetime(2026, 1, 1, tzinfo=UTC),
@@ -379,7 +379,7 @@ class TestSetValidityPeriod:
     async def test_publishes_validity_event(self) -> None:
         """发布 ValidityPeriodSet 事件"""
         service, repo, archive = _make_validity_service()
-        repo.find.return_value = []
+        repo.find_for_update.return_value = [archive]
         vf = datetime(2026, 1, 1, tzinfo=UTC)
         vu = datetime(2027, 12, 31, tzinfo=UTC)
         await service.set_validity_period(archive.archive_id, vf, vu)
@@ -395,7 +395,7 @@ class TestSetValidityPeriod:
     async def test_l2_failure_raises_archive_storage_error(self) -> None:
         """L2 保存失败抛出 ArchiveStorageError(layer=l2)"""
         service, repo, archive = _make_validity_service()
-        repo.find.return_value = []
+        repo.find_for_update.return_value = [archive]
         repo.save.side_effect = RuntimeError("db down")
         with pytest.raises(ArchiveStoreErr) as exc_info:
             await service.set_validity_period(archive.archive_id, None, datetime(2027, 12, 31, tzinfo=UTC))
@@ -438,11 +438,12 @@ class TestMarkStaleArchives:
         expired = _make_archive({"valid_until": datetime(2021, 1, 1, tzinfo=UTC)})
         valid = _make_archive({"valid_until": datetime(2099, 12, 31, tzinfo=UTC)})
         repo.find.side_effect = [[expired, valid], []]
+        repo.mark_stale.return_value = True
+        repo.get_by_id.return_value = expired
         marked = await service.mark_stale_archives()
         # 仅过期档案被标记
         assert len(marked) == 1
-        assert marked[0].metadata.get("staleness") == "stale"
-        assert "stale_since" in marked[0].metadata
+        assert marked[0].archive_id == expired.archive_id
 
     @pytest.mark.asyncio
     async def test_marks_archived_too_long(self) -> None:
@@ -450,23 +451,34 @@ class TestMarkStaleArchives:
         service, repo, _ = _make_validity_service()
         old = _make_archive({"valid_until": None, "archived_at": datetime.now(UTC) - timedelta(days=400)})
         repo.find.side_effect = [[old], []]
+        repo.mark_stale.return_value = True
+        repo.get_by_id.return_value = old
         marked = await service.mark_stale_archives()
         assert len(marked) == 1
-        assert marked[0].metadata.get("staleness") == "stale"
+        assert marked[0].archive_id == old.archive_id
 
     @pytest.mark.asyncio
     async def test_skips_already_marked(self) -> None:
         """已标记档案跳过（幂等）"""
         service, repo, _ = _make_validity_service()
-        stale = _make_archive(
-            {
-                "valid_until": datetime(2021, 1, 1, tzinfo=UTC),
-                "metadata": {"staleness": "stale", "stale_since": "2026-01-01T00:00:00Z"},
-            }
-        )
-        repo.find.side_effect = [[stale], []]
+        # exclude_staleness=True 在 SQL 层已过滤已标记档案，find 返回空
+        repo.find.side_effect = [[], []]
         marked = await service.mark_stale_archives()
         assert len(marked) == 0
+        # 已被过滤，无需调用 mark_stale
+        assert not repo.mark_stale.called
+
+    @pytest.mark.asyncio
+    async def test_skips_when_mark_stale_returns_false(self) -> None:
+        """mark_stale 返回 False（被并发实例抢占）时跳过事件"""
+        service, repo, _ = _make_validity_service()
+        expired = _make_archive({"valid_until": datetime(2021, 1, 1, tzinfo=UTC)})
+        repo.find.side_effect = [[expired], []]
+        repo.mark_stale.return_value = False  # 被其他实例抢先标记
+        marked = await service.mark_stale_archives()
+        assert len(marked) == 0
+        publisher = cast(Any, service._event_publisher)
+        assert not publisher.publish.called
 
     @pytest.mark.asyncio
     async def test_publishes_fact_became_stale(self) -> None:
@@ -474,6 +486,8 @@ class TestMarkStaleArchives:
         service, repo, _ = _make_validity_service()
         expired = _make_archive({"valid_until": datetime(2021, 1, 1, tzinfo=UTC)})
         repo.find.side_effect = [[expired], []]
+        repo.mark_stale.return_value = True
+        repo.get_by_id.return_value = expired
         await service.mark_stale_archives()
         publisher = cast(Any, service._event_publisher)
         assert publisher.publish.called
@@ -500,6 +514,7 @@ def _make_validity_service(
     repo.get_by_id.side_effect = None
     repo.find.return_value = []
     repo.find_for_update.return_value = []
+    repo.mark_stale.return_value = True
     archive = _make_archive(
         {
             "valid_from": valid_from,

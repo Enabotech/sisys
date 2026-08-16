@@ -304,6 +304,8 @@ class StrategicArchiveService:
         """设置档案有效期
 
         获取档案，设置有效期，冲突检测，持久化，发布事件。
+        使用 find_for_update() 前置锁定同一 plan_id+archive_type 的所有行，
+        消除 get_by_id 与冲突检测之间的 TOCTOU 窗口期。
 
         Args:
             archive_id: 档案 ID
@@ -318,17 +320,10 @@ class StrategicArchiveService:
             ValidityPeriodConflictError: 有效期冲突时抛出
             ArchiveStorageError: L2 存储失败时抛出
         """
-        # 获取档案
+        # 获取档案（用于构造查询条件）
         archive = await self._archive_repo.get_by_id(archive_id)
         if archive is None:
             raise ArchiveNotFoundError(archive_id=archive_id)
-
-        # 更新有效期
-        archive.valid_from = valid_from
-        archive.valid_until = valid_until
-
-        # 验证有效期
-        archive.validate()
 
         # 冲突检测：同一 plan_id + 同一 archive_type 下，不同 archive_id 的档案
         if archive.plan_id is not None:
@@ -337,12 +332,18 @@ class StrategicArchiveService:
                 archive_type=archive.archive_type,
                 limit=1000,
             )
-            # 使用 find_for_update 悲观锁查询
+            # 使用 find_for_update 悲观锁查询（前置锁定，消除 TOCTOU 窗口期）
             try:
                 existing = await self._archive_repo.find_for_update(query)
             except AttributeError:
                 # 若 find_for_update 未实现，回退到普通 find
                 existing = await self._archive_repo.find(query)
+
+            # 从锁定结果集中重新获取目标档案（获取最新锁定状态，防止 lost update）
+            locked = next((a for a in existing if a.archive_id == archive_id), None)
+            if locked is None:
+                raise ArchiveNotFoundError(archive_id=archive_id)
+            archive = locked
 
             for existing_archive in existing:
                 if existing_archive.archive_id == archive_id:
@@ -355,6 +356,13 @@ class StrategicArchiveService:
                     existing_archive.valid_until,
                 ):
                     raise ValidityPeriodConflictError(archive_id=archive_id)
+
+        # 更新有效期
+        archive.valid_from = valid_from
+        archive.valid_until = valid_until
+
+        # 验证有效期
+        archive.validate()
 
         # 持久化
         try:
@@ -440,26 +448,23 @@ class StrategicArchiveService:
             for archive in batch:
                 # 陈旧判定（复用实体统一判定标准，区分陈旧原因）
                 if archive.is_stale(ref_date=now):
-                    is_stale_flag = True
                     stale_reason = "expired" if archive.valid_until is not None else "archived_too_long"
                 else:
-                    is_stale_flag = False
-                    stale_reason = ""
-
-                if archive.metadata.get("staleness") == "stale":
-                    is_stale_flag = False
-
-                if not is_stale_flag:
                     continue
 
-                # 标记陈旧
-                archive.metadata["staleness"] = "stale"
-                archive.metadata["stale_since"] = now.isoformat()
+                # 条件标记：SQL 层原子判定，被并发实例抢先标记时跳过事件
+                claimed = await self._archive_repo.mark_stale(archive.archive_id)
+                if not claimed:
+                    logger.info(
+                        "Archive %s already marked stale by another instance, skip event",
+                        archive.archive_id,
+                    )
+                    continue
 
-                try:
-                    saved = await self._archive_repo.save(archive)
-                except Exception as e:
-                    logger.warning("Failed to mark stale for archive %s: %s", archive.archive_id, e)
+                # 重新获取实体以获取最新 metadata 状态
+                saved = await self._archive_repo.get_by_id(archive.archive_id)
+                if saved is None:
+                    logger.warning("Archive %s disappeared before mark_stale readback", archive.archive_id)
                     continue
 
                 marked.append(saved)

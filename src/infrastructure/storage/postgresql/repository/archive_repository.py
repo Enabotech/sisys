@@ -166,8 +166,6 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         Returns:
             符合条件的档案列表
         """
-        from sqlalchemy import select
-
         stmt = select(ArchiveModel)
         stmt = self._apply_soft_delete_filter(stmt)
         stmt = self._apply_filters(stmt, query)
@@ -177,6 +175,41 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         result = await self._session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(m) for m in models]
+
+    async def mark_stale(self, archive_id: UUID) -> bool:
+        """条件标记档案为陈旧（并发安全）
+
+        使用 UPDATE ... WHERE ... AND metadata->>'staleness' IS DISTINCT FROM 'stale'
+        条件更新，确保仅当档案尚未标记时才写入。并发环境下被其他实例抢先标记时
+        返回 False，避免重复事件。
+
+        Args:
+            archive_id: 档案 ID
+
+        Returns:
+            标记成功返回 True，已被其他实例抢先标记返回 False
+        """
+        from datetime import UTC, datetime
+
+        from sqlalchemy import JSON, cast, update
+
+        stale_since = datetime.now(UTC).isoformat()
+        stmt = (
+            update(ArchiveModel)
+            .where(ArchiveModel.archive_id == archive_id)
+            .where(func.coalesce(ArchiveModel.metadata_["staleness"].as_string(), "") != "stale")
+            .values(
+                metadata_=func.jsonb_set(
+                    func.coalesce(ArchiveModel.metadata_, cast("{}", JSON)),
+                    cast(["staleness", "stale_since"], JSON),
+                    cast(['"stale"', f'"{stale_since}"'], JSON),
+                )
+            )
+        )
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        updated = getattr(result, "rowcount", 0)
+        return int(updated or 0) == 1
 
     async def list_by_plan(self, plan_id: UUID) -> list[StrategicArchive]:
         """按规划 ID 列出档案

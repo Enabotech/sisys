@@ -158,6 +158,20 @@ class ArchiveRepositoryPort(L2RdbPort[StrategicArchive], Protocol):
             符合条件的档案列表
         """
 
+    async def mark_stale(self, archive_id: UUID) -> bool:
+        """条件标记档案为陈旧（并发安全）
+
+        使用 UPDATE ... WHERE ... AND metadata->>'staleness' IS DISTINCT FROM 'stale'
+        条件更新，确保仅当档案尚未标记时才写入。并发环境下被其他实例抢先标记时
+        返回 False，避免重复事件。
+
+        Args:
+            archive_id: 档案 ID
+
+        Returns:
+            标记成功返回 True，已被其他实例抢先标记返回 False
+        """
+
 
 __all__ = [
     "ArchiveQuery",
