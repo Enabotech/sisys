@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from src.application.services.summary_prompts import PERSPECTIVE_PROMPT_MAP
@@ -26,6 +27,7 @@ from src.domain.exceptions import (
 )
 from src.domain.exceptions.llm_exceptions import LLMAPIError, LLMConfigError, LLMResponseError
 from src.domain.ports.l3_vector import SearchResult
+from src.domain.ports.llm_client import LLMConfig
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,7 @@ class SummaryGenerationService:
         query_text: str,
         search_results: list[SearchResult],
         perspective: str,
-        config: Any | None = None,
+        config: LLMConfig | None = None,
         tenant_id: str | None = None,
         cross_document: bool = False,
     ) -> Any:
@@ -84,7 +86,7 @@ class SummaryGenerationService:
             query_text: 原始查询文本
             search_results: 分层检索结果（L3/L4 内容）
             perspective: 视角类型（"financial"/"market"/"technical"）
-            config: 可选 LLM 调用配置
+            config: 可选 LLM 调用配置（LLMConfig 值对象）
             tenant_id: 可选租户 ID
             cross_document: 跨文档摘要模式
 
@@ -228,7 +230,7 @@ class SummaryGenerationService:
                 "confidence_score": confidence_score,
                 "source_document_ids": source_document_ids or [],
                 "index_level": index_level,
-                "created_at": "2026-08-15T00:00:00",
+                "created_at": datetime.now(timezone.utc).isoformat(),
             },
         }
 

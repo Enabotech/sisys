@@ -35,6 +35,7 @@ class SummaryRequest(BaseModel):
         perspective: 摘要视角类型（financial/market/technical）
         top_k: 检索结果数量（可选，默认 10）
         tenant_id: 租户 ID（可选）
+        cross_document: 是否跨文档摘要模式（可选，默认 False）
     """
 
     query_text: str = Field(..., min_length=1, description="查询文本")
@@ -45,6 +46,7 @@ class SummaryRequest(BaseModel):
     )
     top_k: int = Field(default=10, ge=1, le=100, description="检索结果数量")
     tenant_id: str | None = Field(default=None, description="租户 ID")
+    cross_document: bool = Field(default=False, description="是否跨文档摘要模式")
 
 
 class SummaryResponse(BaseModel):
@@ -125,12 +127,19 @@ def create_summary_router(
     # 延迟获取服务实例，避免模块导入时 DI 容器未初始化
     _summary_service: Any = summary_service
     _auth_service: AuthServicePort | None = auth_service
+    _layered_retrieval: Any = None
 
     def _get_summary_service() -> Any:
         nonlocal _summary_service
         if _summary_service is None:
             _summary_service = get_resolver().resolve("summary_generation_service")
         return _summary_service
+
+    def _get_layered_retrieval() -> Any:
+        nonlocal _layered_retrieval
+        if _layered_retrieval is None:
+            _layered_retrieval = get_resolver().resolve("layered_retrieval_service")
+        return _layered_retrieval
 
     async def _get_current_user(
         token: str | None = Depends(oauth2_scheme),
@@ -165,11 +174,30 @@ def create_summary_router(
         del current_user  # 仅认证
 
         try:
-            result = await _get_summary_service().generate_summary(
+            summary_service = _get_summary_service()
+
+            # 非跨文档模式：先执行检索获取上下文
+            search_results: list[dict[str, Any]] = []
+            if not request.cross_document:
+                try:
+                    layered_retrieval = _get_layered_retrieval()
+                    search_results = await layered_retrieval.search_top_down(
+                        query_text=request.query_text,
+                        target_level="L4",
+                        collection="documents",
+                        limit=request.top_k,
+                        tenant_id=request.tenant_id,
+                        filter_payload=None,
+                    )
+                except Exception as e:
+                    logger.warning("检索上下文获取失败，将使用空检索结果: %s", e)
+
+            result = await summary_service.generate_summary(
                 query_text=request.query_text,
-                search_results=[],
+                search_results=search_results,
                 perspective=request.perspective,
                 tenant_id=request.tenant_id,
+                cross_document=request.cross_document,
             )
 
             # 提取来源文档 ID

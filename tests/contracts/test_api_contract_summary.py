@@ -45,6 +45,10 @@ class TestSummaryPathsInContract:
         assert "perspective" in props
         assert "top_k" in props
         assert "tenant_id" in props
+        assert "cross_document" in props
+        cross_doc = props["cross_document"]
+        assert cross_doc["type"] == "boolean"
+        assert cross_doc["default"] is False
 
     def test_summary_response_schema(self) -> None:
         """SummaryResponse schema 存在且包含必要字段"""

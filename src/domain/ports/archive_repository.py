@@ -62,6 +62,7 @@ class ArchiveQuery:
     valid_from: datetime | None = None
     valid_until: datetime | None = None
     validity_status: ValidityStatus | None = None
+    exclude_staleness: bool = False
     offset: int = 0
     limit: int = 20
 

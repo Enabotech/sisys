@@ -7,6 +7,7 @@
 - 输入使用 SearchResult（与现有检索服务签名对齐，同域内类型引用）
 - perspective 为视角类型字符串（"financial"/"market"/"technical"）
 - cross_document 参数区分单文档摘要（L2）和跨文档摘要（L1）
+- config 使用 LLMConfig 值对象（同域内类型引用，提供精确类型约束）
 - 返回类型为 Any（领域层不依赖 pydantic）
 """
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from src.domain.ports.l3_vector import SearchResult
+from src.domain.ports.llm_client import LLMConfig
 
 
 @runtime_checkable
@@ -30,7 +32,7 @@ class SummaryGenerationPort(Protocol):
         query_text: str,
         search_results: list[SearchResult],
         perspective: str,
-        config: Any | None = None,
+        config: LLMConfig | None = None,
         tenant_id: str | None = None,
         cross_document: bool = False,
     ) -> Any:
@@ -43,7 +45,7 @@ class SummaryGenerationPort(Protocol):
             query_text: 原始查询文本
             search_results: 分层检索结果（L3/L4 内容）
             perspective: 视角类型（"financial"/"market"/"technical"）
-            config: 可选 LLM 调用配置
+            config: 可选 LLM 调用配置（LLMConfig 值对象）
             tenant_id: 可选租户 ID（多租户隔离）
             cross_document: 跨文档摘要模式（False 生成单文档 L2 摘要，
                            True 聚合 L2 摘要生成跨文档 L1 摘要）

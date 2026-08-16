@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -297,8 +298,8 @@ class StrategicArchiveService:
     async def set_validity_period(
         self,
         archive_id: UUID,
-        valid_from: Any = None,
-        valid_until: Any = None,
+        valid_from: datetime | None = None,
+        valid_until: datetime | None = None,
     ) -> StrategicArchive:
         """设置档案有效期
 
@@ -416,16 +417,17 @@ class StrategicArchiveService:
         Returns:
             被标记为陈旧的档案列表
         """
-        from datetime import UTC, datetime, timedelta
-
         now = datetime.now(UTC)
-        stale_threshold = now - timedelta(days=365)
         marked: list[StrategicArchive] = []
         offset = 0
 
         while True:
-            # 查询待标记档案
-            query = ArchiveQuery(limit=batch_size, offset=offset)
+            # 查询待标记档案（SQL 层过滤已标记档案 + 分页，保证幂等）
+            query = ArchiveQuery(
+                limit=batch_size,
+                offset=offset,
+                exclude_staleness=True,
+            )
             try:
                 batch = await self._archive_repo.find(query)
             except Exception as e:
@@ -436,19 +438,16 @@ class StrategicArchiveService:
                 break
 
             for archive in batch:
-                # 跳过已标记档案（幂等）
-                if archive.metadata.get("staleness") == "stale":
-                    continue
+                # 陈旧判定（复用实体统一判定标准，区分陈旧原因）
+                if archive.is_stale(ref_date=now):
+                    is_stale_flag = True
+                    stale_reason = "expired" if archive.valid_until is not None else "archived_too_long"
+                else:
+                    is_stale_flag = False
+                    stale_reason = ""
 
-                # 陈旧判定
-                is_stale_flag = False
-                stale_reason = ""
-                if archive.valid_until is not None and archive.valid_until < now:
-                    is_stale_flag = True
-                    stale_reason = "expired"
-                elif archive.valid_until is None and archive.archived_at is not None and archive.archived_at < stale_threshold:
-                    is_stale_flag = True
-                    stale_reason = "archived_too_long"
+                if archive.metadata.get("staleness") == "stale":
+                    is_stale_flag = False
 
                 if not is_stale_flag:
                     continue
@@ -500,13 +499,11 @@ def _intervals_overlap(
     Returns:
         重叠返回 True，否则返回 False
     """
-    from datetime import datetime
-
-    # 处理 None 为无限远端点
-    a_start = a_from if a_from is not None else datetime.min
-    a_end = a_until if a_until is not None else datetime.max
-    b_start = b_from if b_from is not None else datetime.min
-    b_end = b_until if b_until is not None else datetime.max
+    # 处理 None 为无限远端点（使用 timezone-aware 的 min/max 避免与 aware datetime 比较时崩溃）
+    a_start = a_from if a_from is not None else datetime.min.replace(tzinfo=UTC)
+    a_end = a_until if a_until is not None else datetime.max.replace(tzinfo=UTC)
+    b_start = b_from if b_from is not None else datetime.min.replace(tzinfo=UTC)
+    b_end = b_until if b_until is not None else datetime.max.replace(tzinfo=UTC)
 
     # 半开区间 [start, end)：a_start < b_end and a_end > b_start
     return a_start < b_end and a_end > b_start

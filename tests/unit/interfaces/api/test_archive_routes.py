@@ -223,3 +223,85 @@ class TestAuth:
 
         response = client.get("/api/v1/archive/entries")
         assert response.status_code == 401
+
+
+class TestUpdateValidity:
+    """PATCH /api/v1/archive/entries/{archive_id}"""
+
+    def test_returns_200(self) -> None:
+        """返回 200"""
+        client, service = _make_app()
+        archive_id = uuid.uuid4()
+        service.set_validity_period.return_value = _make_archive({"archive_id": archive_id})
+        response = client.patch(
+            f"/api/v1/archive/entries/{archive_id}",
+            json={"valid_from": "2026-01-01T00:00:00Z", "valid_until": "2027-12-31T00:00:00Z"},
+        )
+        assert response.status_code == 200
+
+    def test_returns_archive_with_validity(self) -> None:
+        """返回包含有效期字段的档案"""
+        client, service = _make_app()
+        archive_id = uuid.uuid4()
+        service.set_validity_period.return_value = _make_archive({"archive_id": archive_id})
+        response = client.patch(
+            f"/api/v1/archive/entries/{archive_id}",
+            json={"valid_from": "2026-01-01T00:00:00Z", "valid_until": "2027-12-31T00:00:00Z"},
+        )
+        data = response.json()
+        assert data["archive_id"] == str(archive_id)
+        assert "valid_from" in data
+        assert "valid_until" in data
+
+    def test_returns_400_on_invalid_id(self) -> None:
+        """非法 archive_id 返回 400"""
+        client, _ = _make_app()
+        response = client.patch(
+            "/api/v1/archive/entries/not-a-uuid",
+            json={"valid_from": "2026-01-01T00:00:00Z"},
+        )
+        assert response.status_code == 400
+
+    def test_returns_400_on_naive_datetime(self) -> None:
+        """naive datetime 返回 400"""
+        client, _ = _make_app()
+        archive_id = uuid.uuid4()
+        response = client.patch(
+            f"/api/v1/archive/entries/{archive_id}",
+            json={"valid_from": "2026-01-01T00:00:00"},
+        )
+        assert response.status_code == 400
+
+    def test_returns_409_on_conflict(self) -> None:
+        """有效期冲突返回 409"""
+        from src.domain.exceptions.archive_exceptions import ValidityPeriodConflictError
+
+        client, service = _make_app()
+        archive_id = uuid.uuid4()
+        service.set_validity_period.side_effect = ValidityPeriodConflictError(archive_id=archive_id)
+        response = client.patch(
+            f"/api/v1/archive/entries/{archive_id}",
+            json={"valid_from": "2026-01-01T00:00:00Z", "valid_until": "2027-12-31T00:00:00Z"},
+        )
+        assert response.status_code == 409
+
+
+class TestStalenessCheck:
+    """POST /api/v1/archive/staleness-checks"""
+
+    def test_returns_200(self) -> None:
+        """返回 200"""
+        client, _ = _make_app()
+        response = client.post("/api/v1/archive/staleness-checks")
+        assert response.status_code == 200
+
+    def test_returns_marked_list(self) -> None:
+        """返回 marked 列表"""
+        client, service = _make_app()
+        archive_id = uuid.uuid4()
+        service.mark_stale_archives.return_value = [_make_archive({"archive_id": archive_id})]
+        response = client.post("/api/v1/archive/staleness-checks")
+        data = response.json()
+        assert "marked" in data
+        assert isinstance(data["marked"], list)
+        assert str(archive_id) in data["marked"]

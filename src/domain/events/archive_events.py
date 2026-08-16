@@ -65,8 +65,8 @@ class ValidityPeriodSet(DomainEvent):
         valid_until: 失效时间
     """
 
-    event_type: str = field(default="ValidityPeriodSet", init=False)
     archive_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    event_type: str = field(default="ValidityPeriodSet", init=False)
     plan_id: uuid.UUID | None = None
     archive_type: ArchiveType = ArchiveType.ASSUMPTION
     valid_from: datetime | None = None
@@ -74,6 +74,8 @@ class ValidityPeriodSet(DomainEvent):
 
     def __post_init__(self) -> None:
         """设置 aggregate_id, aggregate_type（无条件赋值）"""
+        # archive_id 使用 default_factory 以兼容 dataclass 继承约束（父类字段均有默认值）
+        # 调用方必须显式传入 archive_id，不应依赖自动生成的值
         object.__setattr__(self, "aggregate_id", self.archive_id)
         object.__setattr__(self, "aggregate_type", "StrategicArchive")
 
@@ -95,8 +97,8 @@ class FactBecameStale(DomainEvent):
         stale_since: 标记为陈旧的时间
     """
 
-    event_type: str = field(default="FactBecameStale", init=False)
     archive_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    event_type: str = field(default="FactBecameStale", init=False)
     stale_reason: str = "expired"
     plan_id: uuid.UUID | None = None
     archive_type: ArchiveType = ArchiveType.ASSUMPTION
