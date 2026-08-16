@@ -305,7 +305,11 @@ class SummaryGenerationService:
         context_parts = []
         for i, result in enumerate(search_results, 1):
             payload = result.get("payload", {}) if isinstance(result, dict) else {}
-            content = payload.get("content", "") if isinstance(payload, dict) else ""
+            if isinstance(payload, dict):
+                # 优先使用 content（L3/L4 块级内容），降级到 summary_text（L2 摘要内容）
+                content = payload.get("content") or payload.get("summary_text") or ""
+            else:
+                content = ""
             context_parts.append(f"[{i}] {content}")
 
         return "\n\n".join(context_parts)
@@ -325,14 +329,12 @@ class SummaryGenerationService:
         context_parts = []
         for i, result in enumerate(l2_results, 1):
             payload = result.get("payload", {}) if isinstance(result, dict) else {}
-            if isinstance(payload, dict):
-                summary_text = payload.get("summary_text", "")
-                perspective_label = payload.get("perspective", "")
-                confidence = payload.get("confidence_score", "")
-                context_parts.append(f"[文档摘要 {i}] (视角:{perspective_label}, 置信度:{confidence}) {summary_text}")
-            else:
-                summary_text = payload.get("summary_text", "") if isinstance(payload, dict) else ""
-                context_parts.append(f"[文档摘要 {i}] {summary_text}")
+            summary_text = payload.get("summary_text", "") if isinstance(payload, dict) else ""
+            perspective_label = payload.get("perspective", "") if isinstance(payload, dict) else ""
+            confidence = payload.get("confidence_score", "") if isinstance(payload, dict) else ""
+            context_parts.append(
+                f"[文档摘要 {i}] (视角:{perspective_label}, 置信度:{confidence}) {summary_text}"
+            )
 
         return "\n\n".join(context_parts)
 

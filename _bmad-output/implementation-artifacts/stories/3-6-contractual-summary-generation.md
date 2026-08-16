@@ -77,13 +77,14 @@
 **验证标准/Validation Criteria:**
 - [ ] `SummaryGenerationPort` 定义于 `src/domain/ports/summary_generation.py`（Protocol，`@runtime_checkable`）
 - [ ] `SearchResult` 从 `src/domain/ports/l3_vector.py` 导入（与 `LayeredRetrievalPort` 相同的现有模式，同域内类型引用，不引入新抽象）
-- [ ] 方法签名：`async generate_summary(query_text, search_results, perspective, config=None, tenant_id=None, cross_document=False) -> Any`
+- [ ] 方法签名：`async generate_summary(query_text, search_results, perspective, config=None, tenant_id=None, cross_document=False, limit=10) -> Any`
   - `query_text: str` — 原始查询文本
   - `search_results: list[SearchResult]` — 分层检索结果（L3/L4 内容）
   - `perspective: str` — 视角类型（"financial"/"market"/"technical"）
   - `config: LLMConfig | None` — 可选 LLM 调用配置
   - `tenant_id: str | None` — 可选租户 ID（多租户隔离，摘要存储/检索需透传，与 `LayeredRetrievalPort.search_top_down()` 的租户隔离模式一致）
   - `cross_document: bool = False` — 跨文档摘要模式（`False` 生成单文档 L2 摘要，`True` 聚合 L2 摘要生成跨文档 L1 摘要）
+  - `limit: int = 10` — 跨文档模式下 L2 检索结果数量限制（默认 10，控制 Top-K 摘要聚合数量）
   - 返回对应视角 Schema 的 Pydantic 实例（`Any` 类型，领域层不依赖 pydantic）
 - [ ] 端口注册于 `composition_root.py`，通过 `register_port()` 注册为 `summary_generation_service` 端口
 - [ ] 端口具备唯一名称、版本、interface、impl、module（必填五参数）及 owner、兼容策略（可选元数据）
@@ -167,7 +168,7 @@
   - collection 名称：`"document_summaries"`（独立 collection，与文档切片分离）
   - collection 创建策略：懒创建（首次 upsert 前调用 `l3_vector.collection_exists()` 检查，不存在时调用 `l3_vector.create_collection()` 创建，vector_size=1024 对齐 bge-m3 维度）
   - payload 包含：`perspective`（视角类型）、`summary_text`（摘要文本）、`key_points`（关键要点列表）、`confidence_score`（置信度）、`source_document_ids`（来源文档 ID 列表）、`index_level`（"L2"）、`created_at`（时间戳）
-  - 点 ID 使用 `f"summary-{perspective}-{uuid4}"` 格式
+  - 点 ID 使用幂等方案：单文档摘要（`document_id` 唯一时）使用 `f"summary-{document_id}-{perspective}"` 实现 upsert 幂等更新；跨文档摘要或文档不唯一时使用 `f"summary-{perspective}-{uuid4}"`
 - [ ] 更新 `LayeredRetrievalService.search_top_down(target_level="L2")`：
   - 在 `document_summaries` collection 中执行 Dense 检索（**L2 硬编码 collection 名为 `"document_summaries"`，与顶层 `collection` 参数解耦**，避免 L3/L4 检索语义冲突）
   - 返回 `list[SearchResult]`，payload 包含摘要元数据
@@ -189,7 +190,7 @@
 **验证标准/Validation Criteria:**
 - [ ] `SummaryGenerationService.generate_summary(cross_document=True)` 触发跨文档摘要模式（通过端口契约的 `cross_document` 参数区分，不再需要独立方法）
 - [ ] 跨文档摘要生成流程：
-  1. 调用 `LayeredRetrievalPort.search_top_down(target_level="L2")` 获取已有 L2 摘要（L2 硬编码 `document_summaries` collection，与顶层 `collection` 参数解耦）
+  1. 调用 `LayeredRetrievalPort.search_top_down(target_level="L2", limit=limit)` 获取已有 L2 摘要（`limit` 参数控制 Top-K 检索数量，L2 硬编码 `document_summaries` collection，与顶层 `collection` 参数解耦）
   2. 聚合 Top-K 摘要结果作为上下文（从 `SearchResult[].payload["summary_text"]` 提取摘要文本）
   3. 调用 `LLMClientPort.structured_generate()` 生成跨文档摘要
   4. 通过 `EmbeddingServicePort.embed_documents()` 生成向量（vector_size=1024 对齐 bge-m3）

@@ -61,7 +61,7 @@ def _make_app(
 
     summary_service = AsyncMock()
     if summary_result:
-        summary_service.generate_summary.return_value = summary_result
+        summary_service.generate_summary.return_value = _MockSummaryResult(summary_result)
     if summary_side_effect:
         summary_service.generate_summary.side_effect = summary_side_effect
 
@@ -100,6 +100,16 @@ def _make_summary_dict(overrides: dict[str, Any] | None = None) -> dict[str, Any
     if overrides:
         result.update(overrides)
     return result
+
+
+class _MockSummaryResult:
+    """模拟 Pydantic 模型（有 model_dump 方法）"""
+
+    def __init__(self, data: dict[str, Any]) -> None:
+        self._data = data
+
+    def model_dump(self) -> dict[str, Any]:
+        return dict(self._data)
 
 
 class TestNonCrossDocumentSummary:
