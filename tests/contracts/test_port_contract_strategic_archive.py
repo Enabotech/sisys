@@ -28,6 +28,7 @@ class TestArchiveRepositoryPortContract:
         "delete",
         "find",
         "find_for_update",
+        "mark_stale",
         "list_by_plan",
         "list_by_archive_type",
         "count",
