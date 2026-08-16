@@ -27,6 +27,7 @@ class TestArchiveRepositoryPortContract:
         "save",
         "delete",
         "find",
+        "find_for_update",
         "list_by_plan",
         "list_by_archive_type",
         "count",
@@ -79,6 +80,9 @@ class TestStrategicArchiveServicePortContract:
         "archive_plan",
         "get_archive",
         "query_archive",
+        "set_validity_period",
+        "is_stale",
+        "mark_stale_archives",
     ]
 
     def test_port_is_registered(self, registry: PortRegistry) -> None:

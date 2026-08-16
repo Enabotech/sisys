@@ -17,7 +17,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.domain.entities.strategic_archive import ArchiveType
-from src.domain.ports.archive_repository import ArchiveQuery
+from src.domain.ports.archive_repository import ArchiveQuery, ValidityStatus
 from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
 from src.domain.value_objects.token_payload import TokenPayload
 
@@ -551,8 +551,6 @@ def _parse_validity_status(value: str | None):
     if value is None:
         return None
     try:
-        from src.domain.ports.archive_repository import ValidityStatus
-
         return ValidityStatus(value)
     except ValueError:
         raise HTTPException(

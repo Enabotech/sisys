@@ -133,6 +133,9 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
                 stmt = stmt.where((ArchiveModel.valid_until >= now) | (ArchiveModel.valid_until.is_(None)))
             elif query.validity_status.value == "expired":
                 stmt = stmt.where(ArchiveModel.valid_until < now)
+        # 排除已标记陈旧的档案（幂等保证）
+        if query.exclude_staleness:
+            stmt = stmt.where(func.coalesce(ArchiveModel.metadata_["staleness"].as_string(), "") != "stale")
         return stmt
 
     async def find(self, query: ArchiveQuery) -> list[StrategicArchive]:

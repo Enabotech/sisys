@@ -1112,7 +1112,7 @@ paths:
   # ============================================================================
   /api/v1/search/summary:
     post:
-      x-implemented: false
+      x-implemented: true
       tags:
         - search
       summary: 契约化摘要生成
@@ -1994,6 +1994,10 @@ components:
           type: string
           nullable: true
           description: 租户 ID
+        cross_document:
+          type: boolean
+          default: false
+          description: 是否跨文档摘要模式（False 生成单文档 L2 摘要，True 聚合 L2 摘要生成跨文档 L1 摘要）
       description: 摘要生成请求
 
     SummaryResponse:

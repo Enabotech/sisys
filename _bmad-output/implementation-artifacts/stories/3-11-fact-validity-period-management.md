@@ -1300,6 +1300,29 @@ mark_stale_archives(batch_size=100):
 
 ---
 
+#### Round 5 代码审查修订（2026-08-16，多Agent并行全量调研）
+
+**审查发现汇总（多Agent并行调研：领域层 / 应用层+基础设施层 / 接口层+DI / 测试层）：**
+
+| # | 严重度 | 问题 | 文件 | 修复方案 |
+|---|--------|------|------|---------|
+| 1 | P0 | `_intervals_overlap()` 使用 naive `datetime.min/max` 替代 None，与 timezone-aware 比较抛 `TypeError`，冲突检测路径崩溃 | `strategic_archive_service.py` L506-509 | 替换为 `datetime.min.replace(tzinfo=UTC)` / `datetime.max.replace(tzinfo=UTC)` |
+| 2 | P0 | `ValidityPeriodSet`/`FactBecameStale.archive_id` 误设 `field(default_factory=uuid.uuid4)`，违反 SDD"必填无默认值" | `archive_events.py` L69/99 | 移除 `default_factory`，改为必填字段 |
+| 3 | P1 | `mark_stale_archives()` 内存过滤已标记档案而非 SQL 层过滤，offset 分页不可靠 | `strategic_archive_service.py` L428 | `ArchiveQuery` 新增 `exclude_staleness` 字段，`_apply_filters()` SQL 层过滤（`metadata->>'staleness' != 'stale'`） |
+| 4 | P1 | `set_validity_period()` 参数类型为 `Any` 而非 `datetime \| None` | `strategic_archive_service.py` L299-301 | 改为 `valid_from: datetime \| None = None` |
+| 5 | P1 | `test_archive_routes.py` 缺少 PATCH/POST staleness-checks 单元测试 | `test_archive_routes.py` | 新增 TestUpdateValidity / TestStalenessCheck 测试类 |
+| 6 | P1 | 端口契约测试 `REQUIRED_METHODS` 未包含新增方法 | `test_port_contract_strategic_archive.py` | 补充 `find_for_update`/`set_validity_period`/`is_stale`/`mark_stale_archives` |
+| 7 | P1 | 性能测试 `test_perf_archive_validity.py` 缺失 | `tests/unit/performance/` | 新增（≥10,000 条数据，100 次迭代 P95，10 次预热，CI 跳过） |
+| 8 | P2 | `mark_stale_archives()` 自行实现陈旧判定，未复用 `archive.is_stale()` | `strategic_archive_service.py` L444-451 | 改用 `archive.is_stale(ref_date=now)` 统一判定标准 |
+| 9 | P2 | `from datetime import datetime` 在函数体内 | `strategic_archive_service.py` L503 | 移至模块顶部 |
+| 10 | P2 | `_parse_validity_status()` 函数内延迟导入 `ValidityStatus` | `strategic_archive.py` L554 | 移至模块顶部导入 |
+| 11 | P2 | `validate()` 中 valid_from>valid_until 使用 `EntityValidationError` 而非 `EntityBusinessRuleError` | `strategic_archive.py` L131 | 改为 `EntityBusinessRuleError`，与 created_at>archived_at 一致 |
+| 12 | Defer | `event_bus_config_loader.py` DEFAULT_CONFIG_PATH 指向 `config/`（无 s），实际文件在 `configs/` | `event_bus_config_loader.py` L18 | 预存问题，非本 Story 引入，暂时 Defer（DEFAULT_MAPPINGS 已兜底） |
+
+**审查结论：** 2 个 P0 + 5 个 P1 + 4 个 P2 全部修复，1 个 Defer 记录。全部修复通过验证。
+
+---
+
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
@@ -1310,9 +1333,9 @@ mark_stale_archives(batch_size=100):
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-08-14
-**最后更新/Last Updated:** 2026-08-15
+**最后更新/Last Updated:** 2026-08-16
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.0.1: Round 1 审查修订 — 修复 6 个 P0 + 12 个 P1 问题（事件 aggregate_id、事件字段类型、validity_status NULL 安全、ArchiveResponse 扩展、冲突规则定义、枚举类型、时钟注入等）

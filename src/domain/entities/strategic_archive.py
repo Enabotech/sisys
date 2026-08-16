@@ -129,9 +129,9 @@ class StrategicArchive:
                 )
         # valid_from 不能晚于 valid_until（两者均非 None 时校验）
         if self.valid_from is not None and self.valid_until is not None and self.valid_from > self.valid_until:
-            raise EntityValidationError(
+            raise EntityBusinessRuleError(
                 message="valid_from must be before or equal to valid_until",
-                context={"entity": "StrategicArchive", "field": "valid_from"},
+                context={"entity": "StrategicArchive", "rule": "validity_range"},
             )
         return True
 

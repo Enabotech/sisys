@@ -68,6 +68,19 @@ class TestSummaryGenerationPortProtocol:
         source = inspect.getsource(sg_module)
         assert "from src.domain.ports.l3_vector import SearchResult" in source
 
+    def test_port_imports_llm_config_from_llm_client(self) -> None:
+        """端口从 llm_client 导入 LLMConfig（同域内类型引用）"""
+        import src.domain.ports.summary_generation as sg_module
+
+        source = inspect.getsource(sg_module)
+        assert "from src.domain.ports.llm_client import LLMConfig" in source
+
+    def test_config_annotation_is_llm_config(self) -> None:
+        """config 参数类型注解为 LLMConfig | None（非 Any）"""
+        sig = inspect.signature(SummaryGenerationPort.generate_summary)
+        config_annotation = sig.parameters["config"].annotation
+        assert "LLMConfig" in str(config_annotation)
+
     def test_protocol_method_ellipsis_body(self) -> None:
         """Protocol 方法体使用 ... 占位符"""
         # 检查方法源码中包含 ...
