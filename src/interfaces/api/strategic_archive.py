@@ -9,7 +9,7 @@ from __future__ import annotations
 import base64
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -71,9 +71,12 @@ class ValidityRequest(BaseModel):
     @field_validator("valid_from", "valid_until")
     @classmethod
     def validate_timezone_aware(cls, v: datetime | None) -> datetime | None:
-        """强制 timezone-aware（UTC）"""
-        if v is not None and v.tzinfo is None:
-            raise ValueError("valid_from/valid_until must be timezone-aware (UTC)")
+        """强制 timezone-aware（UTC），非 UTC 时区自动转换为 UTC"""
+        if v is not None:
+            if v.tzinfo is None:
+                raise ValueError("valid_from/valid_until must be timezone-aware (UTC)")
+            if v.utcoffset() is not None and v.utcoffset() != timedelta(0):
+                return v.astimezone(UTC)
         return v
 
     @model_validator(mode="after")
@@ -514,7 +517,7 @@ def _parse_datetime_param(value: str | None, name: str) -> datetime | None:
         name: 参数名（错误信息用）
 
     Returns:
-        解析后的 datetime，None 表示未传参
+        解析后的 datetime 对象（已转换为 UTC），None 表示未传参
 
     Raises:
         HTTPException: 解析失败时返回 400
@@ -533,6 +536,9 @@ def _parse_datetime_param(value: str | None, name: str) -> datetime | None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"{name} must be timezone-aware (UTC): {value}",
         )
+    # 非 UTC 时区自动转换为 UTC
+    if parsed.utcoffset() is not None and parsed.utcoffset() != timedelta(0):
+        parsed = parsed.astimezone(UTC)
     return parsed
 
 

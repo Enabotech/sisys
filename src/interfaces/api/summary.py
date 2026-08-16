@@ -111,6 +111,7 @@ def create_summary_router(
     summary_service: Any | None = None,
     auth_service: AuthServicePort | None = None,
     get_current_user_override: Callable | None = None,
+    layered_retrieval: Any | None = None,
 ) -> APIRouter:
     """创建摘要生成路由
 
@@ -118,6 +119,7 @@ def create_summary_router(
         summary_service: 摘要生成服务实例（可选，默认从 DI 容器获取）
         auth_service: 认证服务实例（可选，默认从 DI 容器获取）
         get_current_user_override: 测试用认证覆盖
+        layered_retrieval: 分层检索服务实例（可选，默认从 DI 容器获取）
 
     Returns:
         APIRouter 实例
@@ -127,7 +129,7 @@ def create_summary_router(
     # 延迟获取服务实例，避免模块导入时 DI 容器未初始化
     _summary_service: Any = summary_service
     _auth_service: AuthServicePort | None = auth_service
-    _layered_retrieval: Any = None
+    _layered_retrieval: Any = layered_retrieval
 
     def _get_summary_service() -> Any:
         nonlocal _summary_service
@@ -190,7 +192,8 @@ def create_summary_router(
                         filter_payload=None,
                     )
                 except Exception as e:
-                    logger.warning("检索上下文获取失败，将使用空检索结果: %s", e)
+                    # 检索失败降级为空结果继续生成摘要，但记录 error 供运维观测
+                    logger.error("检索上下文获取失败，将使用空检索结果: %s", e)
 
             result = await summary_service.generate_summary(
                 query_text=request.query_text,
@@ -198,10 +201,17 @@ def create_summary_router(
                 perspective=request.perspective,
                 tenant_id=request.tenant_id,
                 cross_document=request.cross_document,
+                limit=request.top_k,
             )
 
-            # 提取来源文档 ID
-            source_documents: list[str] = []
+            # 提取来源文档 ID（保留检索顺序去重）
+            source_documents = list(
+                dict.fromkeys(
+                    str(r.get("payload", {}).get("document_id", ""))
+                    for r in search_results
+                    if isinstance(r, dict) and r.get("payload", {}).get("document_id")
+                )
+            )
             summary_dict = {}
             confidence_score = 0.0
 

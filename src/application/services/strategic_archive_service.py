@@ -473,6 +473,7 @@ class StrategicArchiveService:
                             archive_type=saved.archive_type,
                             valid_until=saved.valid_until,
                             stale_reason=stale_reason,
+                            stale_since=now,
                         )
                         result: PublishResult = await self._event_publisher.publish(event)
                         if not result.is_success:
