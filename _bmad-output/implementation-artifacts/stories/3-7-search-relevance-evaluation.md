@@ -494,7 +494,7 @@
 
 - [ ] Subtask 0.1: 定义评估 Schema 契约（`RelevanceEvaluation`、`RuleBasedEvaluation`）
 - [ ] Subtask 0.2: 创建/更新 `docs/api/openapi.yaml`（新增 `POST /api/v1/search/evaluate` 端点）
-- [ ] Subtask 0.3: 编写端口契约测试 `tests/contracts/test_port_contract_relevance_evaluation.py`
+- [ ] Subtask 0.3: 编写端口契约测试 `tests/contracts/test_port_contract_relevance_evaluation.py`（遵循项目标准四方法模式：`test_port_is_registered` + `test_implementation_has_required_methods` + `test_metadata_complete` + `test_lifetime_is_scoped`（断言 `Lifetime.SCOPED`））
 - [ ] Subtask 0.4: 编写 API 契约测试 `tests/contracts/test_api_contract_relevance_evaluation.py`
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_relevance_evaluation.feature`
 - [ ] Subtask 0.6: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_relevance_evaluation.py`
@@ -628,6 +628,12 @@
 | 🟢 绿 | 修改 `SummaryGenerationService` 注入 `relevance_evaluation_service`（可选依赖），在 `generate_summary()` 中插入评估守卫 |
 | 🔄 重构 | 优化降级策略、添加日志 |
 
+> **⚠️ 构造签名变更影响面**：`SummaryGenerationService.__init__()` 新增 `relevance_evaluation_service: Any | None = None` 参数（位置在现有 4 个必选参数之后）。此变更影响以下文件：
+> 1. `src/composition_root.py` — 注册 lambda 中通过 `resolver.resolve_optional()` 注入（Subtask 3.7 处理）
+> 2. `tests/unit/application/services/test_summary_generation_service.py` — 现有 4 参数构造调用保持兼容（默认 None，无需修改测试断言）
+> 3. `tests/acceptance/test_acceptance_contractual_summary.py` — 现有构造调用保持兼容（默认 None）
+> 4. `tests/integration/test_integration_contractual_summary.py` — 现有构造调用保持兼容（默认 None）
+
 - [ ] Subtask 3.1: 🔴 红 — 编写集成失败测试
 - [ ] Subtask 3.2: 🟢 绿 — 修改 `SummaryGenerationService` 集成评估守卫
 - [ ] Subtask 3.3: 🔄 重构 — 优化集成逻辑
@@ -654,7 +660,7 @@
   - 实现：工厂函数 `lambda resolver: RelevanceEvaluationService(llm_client=resolver.resolve("llm_client"))` 注入依赖
   - `summary_generation_service` 注册修改为：`SummaryGenerationService(..., relevance_evaluation_service=resolver.resolve_optional("relevance_evaluation_service"))`
   - **注意**：`resolve_optional` 对未注册端口抛 `RuntimeError`（包装 `KeyError`），None 分支仅覆盖注册后构造失败（`ImportError`/`RuntimeError`）。生产路径 Subtask 3.7 总会注册该端口，因此 "未注册" 降级分支实际不可达；构造失败降级分支可达。集成测试模拟降级时应通过真实构造 `SummaryGenerationService(relevance_evaluation_service=None)` 而非依赖 resolver 行为
-- [ ] Subtask 3.8: 更新端口契约测试 `tests/contracts/test_port_contract_relevance_evaluation.py`
+- [ ] Subtask 3.8: 更新端口契约测试 `tests/contracts/test_port_contract_relevance_evaluation.py` — **端口契约测试由红转绿**（Task 0 编写时端口未注册，测试断言失败；Subtask 3.7 注册后，测试通过）
 
 **完成标准/Definition of Done:**
 - [ ] `SummaryGenerationService` 集成评估守卫（可选依赖注入，降级策略）
@@ -801,8 +807,7 @@ tests/
     │       ├── test_relevance_schemas.py               # [新增] Schema 测试
     │       ├── test_relevance_prompts.py               # [新增] Prompt 测试
     │       ├── test_relevance_rule_check.py            # [新增] 规则预检测试
-    │       ├── test_relevance_evaluation_service.py    # [新增] 服务测试
-    │       └── test_timeliness_evaluation.py           # [新增] 时效性测试
+    │       └── test_relevance_evaluation_service.py    # [新增] 服务+时效性测试
     └── architecture/
         └── test_arch_relevance_evaluation.py           # [新增] 架构验证
 
@@ -814,13 +819,16 @@ docs/
 - src/application/services/summary_generation_service.py  # [修改] 注入评估服务（可选依赖），添加评估守卫
 - src/domain/exceptions/__init__.py                       # [修改] 导出新异常类
 - src/domain/exceptions/_code_ranges.py                   # [修改] 新增 relevance 子域
-- src/interfaces/api/app.py                               # [修改] 注册 search_router
-- src/composition_root.py                                 # [修改] 注册 relevance_evaluation_service 端口
+- src/interfaces/api/app.py                               # [修改] 注册 relevance_evaluation_router
+- src/composition_root.py                                 # [修改] 注册 relevance_evaluation_service 端口 + 修改 summary_generation_service 注册
+- tests/integration/test_integration_contractual_summary.py  # [修改] 追加 SummaryGenerationService + RelevanceEvaluationService 评估守卫集成用例（Subtask 3.1）
+- tests/acceptance/test_acceptance_contractual_summary.py    # [修改] SummaryGenerationService 构造签名变更（新增可选参数，默认 None，现有调用保持兼容）
 
 测试依赖文件（已存在，无需修改但需通过校验）：
 - tests/unit/domain/exceptions/test_code_ranges.py         # [校验] allowed_child_parent_subdomains 新增 (relevance, external) 和 (relevance, business)
 - tests/unit/domain/exceptions/test_error_code_uniqueness.py # [校验] 新异常编码需通过唯一性校验
 - tests/unit/interfaces/api/test_exception_handlers.py      # [校验] HTTP 映射测试需覆盖新异常
+- tests/unit/application/services/test_summary_generation_service.py  # [校验] SummaryGenerationService 构造签名变更（新增可选参数，默认 None，现有 4 参数调用保持兼容，无需修改测试断言）
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
