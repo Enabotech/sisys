@@ -24,7 +24,7 @@ import asyncio
 import json
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -299,7 +299,10 @@ class TestSummaryGenerationIntegration:
         site = web.TCPSite(runner, "127.0.0.1", 0)
         await site.start()
 
-        port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
+        assert site._server is not None, "TCPSite._server should not be None after start()"
+        # aiohttp AbstractServer 类型未声明 sockets 属性（运行时存在），
+        # cast 到 Any 获取实际端口号
+        port = cast(Any, site._server).sockets[0].getsockname()[1]
 
         yield handler, port
 
