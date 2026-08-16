@@ -1323,6 +1323,35 @@ mark_stale_archives(batch_size=100):
 
 ---
 
+#### Round 6 深度审计修复（2026-08-16，并发安全/领域模型/配置一致性/集成测试质量审计）
+
+**审查发现汇总（多Agent并行深度审计：并发与事务边界 / 领域模型科学性 / 配置一致性 / 测试质量）：**
+
+| # | 严重度 | 问题 | 文件 | 修复方案 |
+|---|--------|------|------|---------|
+| 1 | P0 | `validate()` 缺失 valid_from/valid_until 时区感知校验，naive datetime 可绕过 API 校验写入，导致 is_stale() 比较时 TypeError | `strategic_archive.py` L131 | 新增 tzinfo is None 检查 |
+| 2 | P1 | `ValidityRequest` 只检查 tzinfo 非 None，未强制转换 UTC（+08:00 等时区可通过） | `strategic_archive.py` L71-77 | 校验后自动 astimezone(UTC) |
+| 3 | P1 | `FactBecameStale` 事件未显式传 stale_since=now，与 metadata 写入时间戳不一致 | `strategic_archive_service.py` L470 | 显式传入 stale_since=now |
+| 4 | P1 | 性能测试 3 个用例 AsyncMock 链式调用失效 | `test_perf_archive_validity.py` L68 | MagicMock 替代 AsyncMock + CI 跳过环境变量检测 |
+| 5 | P2 | `_parse_datetime_param` 非 UTC 时区未转换 | `strategic_archive.py` L512-536 | 自动 astimezone(UTC) |
+| 6 | P2 | SKIP_PERFORMANCE 硬编码 False | `test_perf_archive_validity.py` L27 | 改为 os.environ.get("CI") == "true" |
+
+**审查结论：** 1 个 P0 + 3 个 P1 + 2 个 P2 全部修复。全部修复通过验证。
+
+---
+
+#### Round 7 并发深度修复（2026-08-16，TOCTOU幽灵插入/重复事件/条件更新）
+
+**审查发现汇总（多Agent并行调研：TOCTOU修复方案 / 并发重复事件方案 / 验收测试真实服务方案）：**
+
+| # | 严重度 | 问题 | 文件 | 修复方案 |
+|---|--------|------|------|---------|
+| 1 | P1 | `set_validity_period()` TOCTOU 幽灵插入：get_by_id() → find_for_update() 之间有 INSERT 窗口 | `strategic_archive_service.py` L321-361 | find_for_update() 前置锁定，从锁定结果集中提取目标档案 |
+| 2 | P1 | `mark_stale_archives()` 双实例并发重复事件：exclude_staleness 读时过滤不能防止并发 | `strategic_archive_service.py` L428-484 | 新增 mark_stale() 条件更新方法（UPDATE...WHERE...AND metadata->>'staleness' IS DISTINCT FROM 'stale'），仅抢占成功实例发布事件 |
+| 3 | P2 | 新增 `mark_stale` 端口和 REQUIRED_METHODS 补充 | archive_repository.py / test_port_contract | 端口协议新增 mark_stale 方法签名 |
+
+**审查结论：** 2 个 P1 + 1 个 P2 全部修复。全部修复通过验证。
+
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
@@ -1333,7 +1362,7 @@ mark_stale_archives(batch_size=100):
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-08-14
 **最后更新/Last Updated:** 2026-08-16
 **更新说明/Description:**
@@ -1342,3 +1371,6 @@ mark_stale_archives(batch_size=100):
 - v1.1.0: Round 2 审查修订 — 修复 0 个 P0 + 12 个 P1 + 6 个 P2 问题（ValidityStatus 删除 ALL、FactBecameStale 新增 stale_reason、冲突判定半开区间 + 端点说明、check_staleness→is_stale 重命名 + 剥离实体方法、性能测试对齐 tests/unit/performance/、ArchiveQuery 测试独立、索引策略优化、事件 __post_init__ 无条件赋值、集成测试循环跨度修正、覆盖率门禁定位明确等）
 - v1.2.0: Round 3 审查修订 — 修复 1 个 P0 + 5 个 P1 + 1 个 P2 问题（TOCTOU 竞态双重防御：FOR UPDATE + 内存比较，EXCLUDE 约束经评估废弃；事件 handler 注册机制修正为 InMemoryEventListener + register_handlers 模式；composition_root 标注修正；L3 payload 初始快照；mark_stale_archives 幂等设计 + 实体 is_stale 方法；陈旧标记逻辑排除已标记档案 + Outbox 事务边界说明；索引策略补充部分索引 + 表达式索引；API 设计修正：PATCH 替代 PUT、staleness-checks 复数名词路径、datetime 解析、时区验证、错误响应格式）
 - v1.3.0: Round 4 审查修订 — 修复 0 个 P0 + 2 个 P1 + 9 个 P2 一致性遗留问题（AC-1 新增 is_stale 实体方法与 SDD 一致；AC-2 事件字段补充默认值 + Schema 版本；AC-5 冲突检测/并发安全/陈旧判断对齐；事件 event_type 统一 field() 写法；Task 2 Subtask 补充编码测试引用；Task 5 新增 TDD 循环 D 性能验证；文档头部状态修正为 ready-for-dev）
+- v1.4.0: Round 5 代码审查修订 — 多Agent并行全量调研修复（2个P0+5个P1+4个P2+1个Defer），详见 Round 5 审查发现
+- v1.5.0: Round 6 深度审计修复 — 并发安全/领域模型/配置一致性/集成测试质量审计（1个P0+3个P1+2个P2），详见 Round 6 审查发现
+- v1.6.0: Round 7 并发深度修复 — TOCTOU幽灵插入/find_for_update前置锁定/mark_stale条件更新/mark_stale端口新增（2个P1），详见 Round 7 审查发现

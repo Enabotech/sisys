@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any, cast
 
@@ -48,7 +49,8 @@ class QdrantVectorStorage(L3VectorPort):
         Qdrant v1.7.x 要求 ID 为无符号整数或 UUID
         对于字符串 ID：
         - 纯数字字符串转换为整数
-        - 小整数（<1000）使用 hash 映射到有效范围避免被拒绝
+        - 其他字符串使用确定性 MD5 哈希映射（避免 Python hash() 随机化导致
+          PYTHONHASHSEED 变化后同一字符串映射到不同 ID，破坏幂等 upsert）
 
         Args:
             point_id: 原始点 ID（字符串）
@@ -59,10 +61,12 @@ class QdrantVectorStorage(L3VectorPort):
         try:
             pid = int(point_id)
             if pid < 1000:
-                return abs(hash(point_id)) % (2**31)
+                # 小整数用确定哈希避免冲突
+                return int(hashlib.md5(point_id.encode("utf-8")).hexdigest(), 16) % (2**31)
             return pid
         except ValueError:
-            return abs(hash(point_id)) % (2**31)
+            # 非纯数字字符串：确定性哈希，保证跨进程稳定（幂等 upsert 依赖）
+            return int(hashlib.md5(point_id.encode("utf-8")).hexdigest(), 16) % (2**63)
 
     async def upsert_points(self, collection: str, points: list[VectorPoint] | list[dict]) -> bool:
         """批量插入或更新向量点
