@@ -563,6 +563,30 @@ class LitellmLLMClient(LLMClientPort):
             import json
 
             content = llm_response.content
+            # 清理 Markdown 代码围栏（部分 LLM 在 JSON 输出外包裹 ```json ... ```）
+            if content:
+                content = content.strip()
+                if content.startswith("```"):
+                    # 移除开头的 ```json / ``` 等围栏标记
+                    first_newline = content.find("\n")
+                    if first_newline != -1:
+                        content = content[first_newline + 1 :]
+                    # 移除结尾的 ```
+                    if content.endswith("```"):
+                        content = content[:-3].rstrip()
+            # 移除 JSON 中的单行注释（部分 LLM 会在 JSON 后追加注释说明）
+            while "//" in content:
+                try:
+                    # 尝试解析，若成功则说明注释无害，跳出
+                    json.loads(content)
+                    break
+                except json.JSONDecodeError:
+                    # 找到注释起始位置并截断（保留合法 JSON 前缀）
+                    pos = content.find("//")
+                    if pos == -1:
+                        break
+                    content = content[:pos].rstrip()
+
             # 尝试解析 JSON 结构
             parsed = json.loads(content) if content else {}
             if isinstance(parsed, dict):
