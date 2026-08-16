@@ -452,7 +452,7 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 扩展 `ArchiveQuery` 值对象 — 新增 `staleness_status: str | None = None` 字段
+- [ ] Subtask 0.1: 扩展 `ArchiveQuery` 值对象 — 新增 `staleness_status: str | None = None` 字段（取值 "stale"/"fresh"/None，`__post_init__` 校验）+ `archive_ids: list[UUID] | None = None` 字段（供 `StalenessWeightService` 兜底批量查询，避免 N+1）
 - [ ] Subtask 0.2: 定义 `StalenessWeightService` 服务契约 — 降权因子常量、方法签名、降级策略
 - [ ] Subtask 0.3: 定义 `ArchiveValidityHandler` 扩展契约 — L3/L5 依赖注入 + 同步方法签名
 - [ ] Subtask 0.4: 定义 API 扩展契约 — `ArchiveResponse` 新增字段 + `staleness_status` 查询参数
