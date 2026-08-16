@@ -75,6 +75,8 @@ from src.domain.exceptions import (
     SandboxError,
     ServiceUnavailableError,
     StorageError,
+    SummaryGenerationError,
+    SummaryPerspectiveNotSupportedError,
     SystemException,
     ThirdPartyError,
     TimeoutError,
@@ -82,6 +84,7 @@ from src.domain.exceptions import (
     TransferNotFoundError,
     UnknownError,
     ValidationError,
+    ValidityPeriodConflictError,
     VersionError,
 )
 from src.interfaces.api.exception_handlers import (
@@ -230,10 +233,14 @@ class TestExceptionHttpMap:
             ArchiveNotFoundError,
             ArchiveConflictError,
             ArchiveStorageError,
+            ValidityPeriodConflictError,
             # 词典管理异常
             DictionaryNotFoundError,
             DictionaryEntryConflictError,
             DictionaryVersionConflictError,
+            # 摘要生成异常
+            SummaryGenerationError,
+            SummaryPerspectiveNotSupportedError,
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

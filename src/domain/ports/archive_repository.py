@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -18,6 +19,20 @@ from src.domain.exceptions import EntityValidationError
 from src.domain.ports.l2_rdb import L2RdbPort
 
 logger = logging.getLogger(__name__)
+
+
+class ValidityStatus(str, Enum):
+    """档案有效期状态枚举
+
+    用于 ArchiveQuery 按有效期状态过滤查询。
+
+    Attributes:
+        VALID: 当前有效（未过期且已生效）
+        EXPIRED: 已过期（valid_until 早于当前时间）
+    """
+
+    VALID = "valid"
+    EXPIRED = "expired"
 
 
 @dataclass(frozen=True)
@@ -32,6 +47,9 @@ class ArchiveQuery:
         plan_type: 按规划类型过滤（"SP"/"BP"）
         start_date: 归档时间范围起始
         end_date: 归档时间范围结束
+        valid_from: 按生效时间过滤（valid_from >= 指定值）
+        valid_until: 按失效时间过滤（valid_until <= 指定值）
+        validity_status: 按有效期状态过滤（VALID/EXPIRED，None 表示不过滤）
         offset: 分页偏移量
         limit: 每页条数（1-1000，默认 20）
     """
@@ -41,11 +59,14 @@ class ArchiveQuery:
     plan_type: str | None = None
     start_date: datetime | None = None
     end_date: datetime | None = None
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    validity_status: ValidityStatus | None = None
     offset: int = 0
     limit: int = 20
 
     def __post_init__(self) -> None:
-        """构造后校验 limit 取值范围"""
+        """构造后校验 limit 取值范围和 validity_status 取值"""
         # 使用 object.__setattr__ 因为 frozen=True
         if self.limit < 1:
             logger.warning("ArchiveQuery limit %s clamped to 1", self.limit)
@@ -59,6 +80,11 @@ class ArchiveQuery:
             raise EntityValidationError(
                 message="start_date must be before or equal to end_date",
                 context={"entity": "ArchiveQuery", "field": "start_date"},
+            )
+        if self.validity_status is not None and not isinstance(self.validity_status, ValidityStatus):
+            raise EntityValidationError(
+                message="validity_status must be a ValidityStatus enum member or None",
+                context={"entity": "ArchiveQuery", "field": "validity_status"},
             )
 
 
@@ -119,8 +145,21 @@ class ArchiveRepositoryPort(L2RdbPort[StrategicArchive], Protocol):
             符合条件的档案数量
         """
 
+    async def find_for_update(self, query: ArchiveQuery) -> list[StrategicArchive]:
+        """按条件查询档案（带 FOR UPDATE 悲观锁）
+
+        用于冲突检测等需要并发安全的场景，锁定同一 plan_id+archive_type 的相关行。
+
+        Args:
+            query: 查询条件（ArchiveQuery 值对象）
+
+        Returns:
+            符合条件的档案列表
+        """
+
 
 __all__ = [
     "ArchiveQuery",
     "ArchiveRepositoryPort",
+    "ValidityStatus",
 ]

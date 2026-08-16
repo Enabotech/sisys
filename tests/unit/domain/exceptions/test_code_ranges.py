@@ -137,6 +137,8 @@ def test_subclass_code_in_same_subdomain_as_parent() -> None:
         ("archive", "business"),
         # 子域 → business 基类（分层检索）
         ("retrieval", "business"),
+        # 子域 → business 基类（摘要生成）
+        ("summary", "business"),
         # 子域 → external 基类
         ("embedding", "external"),
         ("sandbox", "external"),

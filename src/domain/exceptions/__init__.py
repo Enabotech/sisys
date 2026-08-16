@@ -15,6 +15,7 @@ from src.domain.exceptions.archive_exceptions import (
     ArchiveConflictError,
     ArchiveNotFoundError,
     ArchiveStorageError,
+    ValidityPeriodConflictError,
 )
 from src.domain.exceptions.base_exceptions import BaseException, DomainError  # BaseException 是向后兼容别名
 from src.domain.exceptions.business_exceptions import (
@@ -95,6 +96,10 @@ from src.domain.exceptions.storage_exceptions import (
     MemoryVersionConflictError,
     MetadataValidationError,
     MinIOConnectionError,
+)
+from src.domain.exceptions.summary_exceptions import (
+    SummaryGenerationError,
+    SummaryPerspectiveNotSupportedError,
 )
 from src.domain.exceptions.system_exceptions import (
     ConfigurationError,
@@ -198,4 +203,8 @@ __all__ = [
     "ArchiveNotFoundError",
     "ArchiveConflictError",
     "ArchiveStorageError",
+    "ValidityPeriodConflictError",
+    # 摘要生成异常
+    "SummaryGenerationError",
+    "SummaryPerspectiveNotSupportedError",
 ]

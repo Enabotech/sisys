@@ -230,3 +230,36 @@ class TestArchiveQuery:
         assert query.end_date == end
         assert query.offset == 5
         assert query.limit == 30
+
+
+class TestArchiveModelValidity:
+    """ArchiveModel valid_from/valid_until 列测试"""
+
+    def test_validity_columns(self, repository: PostgreSQLArchiveRepository) -> None:
+        """ArchiveModel 包含 valid_from/valid_until 列"""
+
+        archive = _make_archive()
+        now = datetime.now(UTC)
+        model = repository._to_model(archive)
+        model.valid_from = now
+        model.valid_until = datetime(2027, 12, 31, tzinfo=UTC)
+        assert model.valid_from == now
+        assert model.valid_until == datetime(2027, 12, 31, tzinfo=UTC)
+
+    def test_to_entity_with_validity(self, repository: PostgreSQLArchiveRepository) -> None:
+        """_to_entity 转换包含有效期字段"""
+
+        now = datetime.now(UTC)
+        archive = _make_archive({"valid_from": now, "valid_until": datetime(2027, 12, 31, tzinfo=UTC)})
+        model = repository._to_model(archive)
+        entity = repository._to_entity(model)
+        assert entity.valid_from == now
+        assert entity.valid_until == datetime(2027, 12, 31, tzinfo=UTC)
+
+    def test_to_model_with_validity(self, repository: PostgreSQLArchiveRepository) -> None:
+        """_to_model 转换包含有效期字段"""
+        now = datetime.now(UTC)
+        archive = _make_archive({"valid_from": now, "valid_until": datetime(2027, 12, 31, tzinfo=UTC)})
+        model = repository._to_model(archive)
+        assert model.valid_from == now
+        assert model.valid_until == datetime(2027, 12, 31, tzinfo=UTC)

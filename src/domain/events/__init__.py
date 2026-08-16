@@ -4,7 +4,7 @@
 """
 
 from .agent_events import AgentDecided
-from .archive_events import ArchiveCreated
+from .archive_events import ArchiveCreated, FactBecameStale, ValidityPeriodSet
 from .audit_events import AuditActionType, AuditEvent
 from .auto_execute_events import AutoExecuted
 from .auto_route_events import AutoRouted
@@ -71,4 +71,6 @@ __all__ = [
     "RAGIndexed",
     "ReportGenerated",
     "WorkflowSubmitted",
+    "ValidityPeriodSet",
+    "FactBecameStale",
 ]

@@ -111,8 +111,40 @@ class ArchiveStorageError(BusinessException):
         super().__init__(message, cause=cause, context={"layer": layer})
 
 
+class ValidityPeriodConflictError(ConflictError):
+    """有效期冲突异常
+
+    同一 plan_id + 同一 archive_type 下，与其他档案的有效期区间存在重叠时抛出。
+
+    Attributes:
+        code: 异常编码 EXCEPTION_285
+        archive_id: 冲突的档案 ID
+    """
+
+    code = "EXCEPTION_285"
+
+    def __init__(
+        self,
+        archive_id: UUID,
+        message: str | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        """初始化有效期冲突异常
+
+        Args:
+            archive_id: 冲突的档案 ID
+            message: 异常消息，默认使用标准格式
+            cause: 导致此异常的原因
+        """
+        self.archive_id = archive_id
+        if message is None:
+            message = f"Validity period conflict for archive: {archive_id}"
+        super().__init__(message, cause=cause, context={"archive_id": str(archive_id)})
+
+
 __all__ = [
     "ArchiveNotFoundError",
     "ArchiveConflictError",
     "ArchiveStorageError",
+    "ValidityPeriodConflictError",
 ]

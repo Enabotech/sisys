@@ -6,7 +6,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 import pytest
 
@@ -102,7 +103,6 @@ class TestStrategicArchive:
 
     def test_validate_rejects_invalid_archive_id(self) -> None:
         """无效 archive_id 抛出 EntityValidationError"""
-        from typing import Any, cast
 
         archive = StrategicArchive(
             archive_id=cast(Any, "not-a-uuid"),
@@ -115,7 +115,6 @@ class TestStrategicArchive:
 
     def test_validate_rejects_invalid_archive_type(self) -> None:
         """无效 archive_type 抛出 EntityValidationError"""
-        from typing import Any, cast
 
         archive = StrategicArchive(
             archive_id=uuid.uuid4(),
@@ -187,3 +186,255 @@ class TestStrategicArchive:
         archive.graph_ref = "graph-test"
         assert archive.embedding_ref == "strategic_archive:test"
         assert archive.graph_ref == "graph-test"
+
+
+class TestStrategicArchiveValidity:
+    """StrategicArchive 有效期字段和方法测试"""
+
+    def test_valid_from_default_none(self) -> None:
+        """valid_from 默认值为 None"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+        )
+        assert archive.valid_from is None
+
+    def test_valid_until_default_none(self) -> None:
+        """valid_until 默认值为 None"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+        )
+        assert archive.valid_until is None
+
+    def test_valid_from_and_until_assigned(self) -> None:
+        """valid_from/valid_until 赋值"""
+        now = datetime.now(UTC)
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_from=now,
+            valid_until=datetime(2027, 12, 31, tzinfo=UTC),
+        )
+        assert archive.valid_from == now
+        assert archive.valid_until == datetime(2027, 12, 31, tzinfo=UTC)
+
+    def test_is_valid_returns_true_when_in_period(self) -> None:
+        """有效期内返回 True"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_from=datetime(2020, 1, 1, tzinfo=UTC),
+            valid_until=datetime(2099, 12, 31, tzinfo=UTC),
+        )
+        assert archive.is_valid() is True
+
+    def test_is_valid_returns_false_when_expired(self) -> None:
+        """过期后返回 False"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_from=datetime(2020, 1, 1, tzinfo=UTC),
+            valid_until=datetime(2021, 1, 1, tzinfo=UTC),
+        )
+        assert archive.is_valid() is False
+
+    def test_is_valid_returns_true_when_not_yet_started(self) -> None:
+        """尚未生效时返回 False（valid_from 晚于当前时间）"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_from=datetime(2099, 1, 1, tzinfo=UTC),
+            valid_until=datetime(2099, 12, 31, tzinfo=UTC),
+        )
+        assert archive.is_valid() is False
+
+    def test_is_valid_both_none_returns_true(self) -> None:
+        """valid_from 和 valid_until 均为 None 时视为永久有效"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+        )
+        assert archive.is_valid() is True
+
+    def test_is_valid_only_valid_from_none(self) -> None:
+        """valid_from 为 None 时仅检查 valid_until"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_from=None,
+            valid_until=datetime(2099, 12, 31, tzinfo=UTC),
+        )
+        assert archive.is_valid() is True
+
+    def test_is_valid_only_valid_until_none(self) -> None:
+        """valid_until 为 None 时仅检查 valid_from"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_from=datetime(2020, 1, 1, tzinfo=UTC),
+            valid_until=None,
+        )
+        assert archive.is_valid() is True
+
+    def test_is_expired_returns_true(self) -> None:
+        """已过期返回 True"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=datetime(2021, 1, 1, tzinfo=UTC),
+        )
+        assert archive.is_expired() is True
+
+    def test_is_expired_returns_false(self) -> None:
+        """未过期返回 False"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=datetime(2099, 12, 31, tzinfo=UTC),
+        )
+        assert archive.is_expired() is False
+
+    def test_is_expired_none_returns_false(self) -> None:
+        """valid_until 为 None 时返回 False"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=None,
+        )
+        assert archive.is_expired() is False
+
+    def test_days_until_expiry_positive(self) -> None:
+        """距离过期天数正数"""
+        future = datetime.now(UTC) + timedelta(days=30)
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=future,
+        )
+        days = archive.days_until_expiry()
+        assert days is not None
+        assert days > 0
+
+    def test_days_until_expiry_negative(self) -> None:
+        """已过期返回负数"""
+        past = datetime.now(UTC) - timedelta(days=5)
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=past,
+        )
+        days = archive.days_until_expiry()
+        assert days is not None
+        assert days < 0
+
+    def test_days_until_expiry_none(self) -> None:
+        """valid_until 为 None 返回 None"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=None,
+        )
+        assert archive.days_until_expiry() is None
+
+    def test_validate_accepts_valid_from_equal_valid_until(self) -> None:
+        """valid_from 等于 valid_until 通过校验"""
+        now = datetime.now(UTC)
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_from=now,
+            valid_until=now,
+        )
+        assert archive.validate() is True
+
+    def test_validate_rejects_valid_from_after_valid_until(self) -> None:
+        """valid_from 晚于 valid_until 抛出异常"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_from=datetime(2027, 1, 1, tzinfo=UTC),
+            valid_until=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+        with pytest.raises((EntityValidationError, EntityBusinessRuleError)):
+            archive.validate()
+
+    def test_is_stale_valid_until_expired(self) -> None:
+        """valid_until 过期标记为陈旧"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=datetime(2021, 1, 1, tzinfo=UTC),
+        )
+        assert archive.is_stale() is True
+
+    def test_is_stale_valid_until_not_expired(self) -> None:
+        """valid_until 未过期不标记陈旧"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=datetime(2099, 12, 31, tzinfo=UTC),
+        )
+        assert archive.is_stale() is False
+
+    def test_is_stale_archived_too_long(self) -> None:
+        """archived_at 超过 12 个月且 valid_until 为 None 标记为陈旧"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=None,
+            archived_at=datetime.now(UTC) - timedelta(days=400),
+        )
+        assert archive.is_stale() is True
+
+    def test_is_stale_both_none_returns_false(self) -> None:
+        """valid_until 和 archived_at 均为 None 不标记陈旧"""
+        archive = StrategicArchive(
+            archive_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=None,
+            archived_at=None,
+        )
+        assert archive.is_stale() is False

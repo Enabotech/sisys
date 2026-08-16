@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from src.domain.entities.strategic_archive import ArchiveType
 from src.domain.events.base import DomainEvent
@@ -31,8 +32,8 @@ class ArchiveCreated(DomainEvent):
         has_graph: 是否有 L5 图谱
     """
 
-    event_type: str = field(default="ArchiveCreated", init=False)
     archive_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    event_type: str = field(default="ArchiveCreated", init=False)
     plan_id: uuid.UUID | None = None
     plan_type: str = ""
     archive_type: ArchiveType = ArchiveType.ASSUMPTION
@@ -48,6 +49,68 @@ class ArchiveCreated(DomainEvent):
             object.__setattr__(self, "aggregate_type", "StrategicArchive")
 
 
+@dataclass(frozen=True)
+class ValidityPeriodSet(DomainEvent):
+    """档案有效期设置完成事件
+
+    在档案有效期设置完成时发布。
+    事件类型: "ValidityPeriodSet"（RELIABLE 模式）
+    Schema 版本: v1.0.0
+
+    Attributes:
+        archive_id: 档案标识（必填）
+        plan_id: 关联的 SP/BP 规划标识
+        archive_type: 档案类型
+        valid_from: 生效时间
+        valid_until: 失效时间
+    """
+
+    event_type: str = field(default="ValidityPeriodSet", init=False)
+    archive_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    plan_id: uuid.UUID | None = None
+    archive_type: ArchiveType = ArchiveType.ASSUMPTION
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+
+    def __post_init__(self) -> None:
+        """设置 aggregate_id, aggregate_type（无条件赋值）"""
+        object.__setattr__(self, "aggregate_id", self.archive_id)
+        object.__setattr__(self, "aggregate_type", "StrategicArchive")
+
+
+@dataclass(frozen=True)
+class FactBecameStale(DomainEvent):
+    """事实变为陈旧事件
+
+    在档案有效期过期或归档超 12 个月自动陈旧时发布。
+    事件类型: "FactBecameStale"（RELIABLE 模式）
+    Schema 版本: v1.0.0
+
+    Attributes:
+        archive_id: 档案标识（必填）
+        stale_reason: 陈旧原因（"expired"/"archived_too_long"）
+        plan_id: 关联的 SP/BP 规划标识
+        archive_type: 档案类型
+        valid_until: 失效时间（基于 archived_at 标记陈旧时为 None）
+        stale_since: 标记为陈旧的时间
+    """
+
+    event_type: str = field(default="FactBecameStale", init=False)
+    archive_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    stale_reason: str = "expired"
+    plan_id: uuid.UUID | None = None
+    archive_type: ArchiveType = ArchiveType.ASSUMPTION
+    valid_until: datetime | None = None
+    stale_since: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        """设置 aggregate_id, aggregate_type（无条件赋值）"""
+        object.__setattr__(self, "aggregate_id", self.archive_id)
+        object.__setattr__(self, "aggregate_type", "StrategicArchive")
+
+
 __all__ = [
     "ArchiveCreated",
+    "ValidityPeriodSet",
+    "FactBecameStale",
 ]

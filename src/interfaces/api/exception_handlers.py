@@ -69,6 +69,8 @@ from src.domain.exceptions import (
     SandboxError,
     ServiceUnavailableError,
     StorageError,
+    SummaryGenerationError,
+    SummaryPerspectiveNotSupportedError,
     SystemException,
     ThirdPartyError,
     TimeoutError,
@@ -76,6 +78,7 @@ from src.domain.exceptions import (
     TransferNotFoundError,
     UnknownError,
     ValidationError,
+    ValidityPeriodConflictError,
     VersionError,
 )
 
@@ -139,6 +142,7 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     ArchiveNotFoundError: status.HTTP_404_NOT_FOUND,  # 282
     ArchiveConflictError: status.HTTP_409_CONFLICT,  # 283
     ArchiveStorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 284
+    ValidityPeriodConflictError: status.HTTP_409_CONFLICT,  # 285
     # 外部服务异常
     ThirdPartyError: status.HTTP_502_BAD_GATEWAY,
     TimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,
@@ -160,6 +164,9 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     # 分层检索异常
     LayeredRetrievalError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 280 — 分层检索编排失败
     LevelTransitionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 281 — 层级遍历非法
+    # 摘要生成异常
+    SummaryGenerationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 290 — 摘要生成失败
+    SummaryPerspectiveNotSupportedError: status.HTTP_400_BAD_REQUEST,  # 291 — 不支持的视角
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

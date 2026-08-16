@@ -13,9 +13,9 @@ from typing import Any
 from uuid import UUID
 
 from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
-from src.domain.events.archive_events import ArchiveCreated
+from src.domain.events.archive_events import ArchiveCreated, FactBecameStale, ValidityPeriodSet
 from src.domain.exceptions import EntityValidationError
-from src.domain.exceptions.archive_exceptions import ArchiveNotFoundError, ArchiveStorageError
+from src.domain.exceptions.archive_exceptions import ArchiveNotFoundError, ArchiveStorageError, ValidityPeriodConflictError
 from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
 from src.domain.ports.event_publisher import EventPublisher, PublishResult
 from src.domain.ports.l3_vector import L3VectorPort
@@ -293,6 +293,223 @@ class StrategicArchiveService:
             符合条件的档案列表
         """
         return await self._archive_repo.find(query)
+
+    async def set_validity_period(
+        self,
+        archive_id: UUID,
+        valid_from: Any = None,
+        valid_until: Any = None,
+    ) -> StrategicArchive:
+        """设置档案有效期
+
+        获取档案，设置有效期，冲突检测，持久化，发布事件。
+
+        Args:
+            archive_id: 档案 ID
+            valid_from: 生效时间（timezone-aware datetime 或 None）
+            valid_until: 失效时间（timezone-aware datetime 或 None）
+
+        Returns:
+            更新后的 StrategicArchive 实体
+
+        Raises:
+            ArchiveNotFoundError: 档案不存在时抛出
+            ValidityPeriodConflictError: 有效期冲突时抛出
+            ArchiveStorageError: L2 存储失败时抛出
+        """
+        # 获取档案
+        archive = await self._archive_repo.get_by_id(archive_id)
+        if archive is None:
+            raise ArchiveNotFoundError(archive_id=archive_id)
+
+        # 更新有效期
+        archive.valid_from = valid_from
+        archive.valid_until = valid_until
+
+        # 验证有效期
+        archive.validate()
+
+        # 冲突检测：同一 plan_id + 同一 archive_type 下，不同 archive_id 的档案
+        if archive.plan_id is not None:
+            query = ArchiveQuery(
+                plan_id=archive.plan_id,
+                archive_type=archive.archive_type,
+                limit=1000,
+            )
+            # 使用 find_for_update 悲观锁查询
+            try:
+                existing = await self._archive_repo.find_for_update(query)
+            except AttributeError:
+                # 若 find_for_update 未实现，回退到普通 find
+                existing = await self._archive_repo.find(query)
+
+            for existing_archive in existing:
+                if existing_archive.archive_id == archive_id:
+                    continue
+                # 半开区间 [valid_from, valid_until) 冲突检测
+                if _intervals_overlap(
+                    valid_from,
+                    valid_until,
+                    existing_archive.valid_from,
+                    existing_archive.valid_until,
+                ):
+                    raise ValidityPeriodConflictError(archive_id=archive_id)
+
+        # 持久化
+        try:
+            saved = await self._archive_repo.save(archive)
+        except Exception as e:
+            logger.error("L2 save failed for archive %s: %s", archive_id, e)
+            raise ArchiveStorageError(layer="l2", cause=e)
+
+        # 发布 ValidityPeriodSet 事件
+        if self._event_publisher is not None:
+            try:
+                event = ValidityPeriodSet(
+                    archive_id=saved.archive_id,
+                    plan_id=saved.plan_id,
+                    archive_type=saved.archive_type,
+                    valid_from=saved.valid_from,
+                    valid_until=saved.valid_until,
+                )
+                result: PublishResult = await self._event_publisher.publish(event)
+                if not result.is_success:
+                    logger.warning("ValidityPeriodSet event publish partial failure: %s", result.partial_error)
+            except Exception as e:
+                logger.warning("ValidityPeriodSet event publish failed: %s", e)
+
+        return saved
+
+    async def is_stale(self, archive_id: UUID) -> bool:
+        """检查单个档案是否陈旧
+
+        委托实体方法 StrategicArchive.is_stale()，统一陈旧判定标准。
+
+        Args:
+            archive_id: 档案 ID
+
+        Returns:
+            陈旧返回 True，否则返回 False
+
+        Raises:
+            ArchiveNotFoundError: 档案不存在时抛出
+            ArchiveStorageError: L2 查询失败时抛出
+        """
+        try:
+            archive = await self._archive_repo.get_by_id(archive_id)
+        except Exception as e:
+            logger.error("L2 query failed for archive %s: %s", archive_id, e)
+            raise ArchiveStorageError(layer="l2", cause=e)
+        if archive is None:
+            raise ArchiveNotFoundError(archive_id=archive_id)
+        return archive.is_stale()
+
+    async def mark_stale_archives(self, batch_size: int = 100) -> list[StrategicArchive]:
+        """批量标记陈旧档案（幂等设计）
+
+        查询所有 valid_until < now 或 valid_until IS NULL AND archived_at < now - 12个月
+        且尚未标记陈旧的档案，逐批标记并发布 FactBecameStale 事件。
+
+        Args:
+            batch_size: 每批查询数量（默认 100）
+
+        Returns:
+            被标记为陈旧的档案列表
+        """
+        from datetime import UTC, datetime, timedelta
+
+        now = datetime.now(UTC)
+        stale_threshold = now - timedelta(days=365)
+        marked: list[StrategicArchive] = []
+        offset = 0
+
+        while True:
+            # 查询待标记档案
+            query = ArchiveQuery(limit=batch_size, offset=offset)
+            try:
+                batch = await self._archive_repo.find(query)
+            except Exception as e:
+                logger.error("L2 query failed at offset %s: %s", offset, e)
+                break
+
+            if not batch:
+                break
+
+            for archive in batch:
+                # 跳过已标记档案（幂等）
+                if archive.metadata.get("staleness") == "stale":
+                    continue
+
+                # 陈旧判定
+                is_stale_flag = False
+                stale_reason = ""
+                if archive.valid_until is not None and archive.valid_until < now:
+                    is_stale_flag = True
+                    stale_reason = "expired"
+                elif archive.valid_until is None and archive.archived_at is not None and archive.archived_at < stale_threshold:
+                    is_stale_flag = True
+                    stale_reason = "archived_too_long"
+
+                if not is_stale_flag:
+                    continue
+
+                # 标记陈旧
+                archive.metadata["staleness"] = "stale"
+                archive.metadata["stale_since"] = now.isoformat()
+
+                try:
+                    saved = await self._archive_repo.save(archive)
+                except Exception as e:
+                    logger.warning("Failed to mark stale for archive %s: %s", archive.archive_id, e)
+                    continue
+
+                marked.append(saved)
+
+                # 发布 FactBecameStale 事件
+                if self._event_publisher is not None:
+                    try:
+                        event = FactBecameStale(
+                            archive_id=saved.archive_id,
+                            plan_id=saved.plan_id,
+                            archive_type=saved.archive_type,
+                            valid_until=saved.valid_until,
+                            stale_reason=stale_reason,
+                        )
+                        result: PublishResult = await self._event_publisher.publish(event)
+                        if not result.is_success:
+                            logger.warning("FactBecameStale event publish partial failure: %s", result.partial_error)
+                    except Exception as e:
+                        logger.warning("FactBecameStale event publish failed for archive %s: %s", saved.archive_id, e)
+
+            offset += batch_size
+
+        return marked
+
+
+def _intervals_overlap(
+    a_from: Any,
+    a_until: Any,
+    b_from: Any,
+    b_until: Any,
+) -> bool:
+    """检测两个半开区间 [valid_from, valid_until) 是否有重叠
+
+    None 表示开区间端点（无限远）。
+    端点相接（a_until == b_from）不视为冲突。
+
+    Returns:
+        重叠返回 True，否则返回 False
+    """
+    from datetime import datetime
+
+    # 处理 None 为无限远端点
+    a_start = a_from if a_from is not None else datetime.min
+    a_end = a_until if a_until is not None else datetime.max
+    b_start = b_from if b_from is not None else datetime.min
+    b_end = b_until if b_until is not None else datetime.max
+
+    # 半开区间 [start, end)：a_start < b_end and a_end > b_start
+    return a_start < b_end and a_end > b_start
 
 
 __all__ = [

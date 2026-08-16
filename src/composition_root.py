@@ -1788,6 +1788,26 @@ def bootstrap() -> None:
         tags=("search", "layered", "l1-l4"),
     )
 
+    # === Story 3-6: Summary Generation Port ===
+    from src.application.services.summary_generation_service import SummaryGenerationService
+    from src.domain.ports.summary_generation import SummaryGenerationPort
+
+    register_port(
+        name="summary_generation_service",
+        version="v1.0.0",
+        interface=SummaryGenerationPort,
+        impl=lambda resolver: SummaryGenerationService(
+            llm_client=resolver.resolve("llm_client"),
+            layered_retrieval=resolver.resolve("layered_retrieval_service"),
+            embedding_service=resolver.resolve("embedding_service"),
+            l3_vector=resolver.resolve("l3_vector"),
+        ),
+        module="src.application.services.summary_generation_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "summary", "generation"),
+    )
+
     # ChunkIndexingHandler — 分块向量索引（Story 3.5 分层检索依赖）
     from src.application.event_handlers.chunk_indexing_handler import ChunkIndexingHandler
 
@@ -1805,6 +1825,22 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="search-team",
         tags=("search", "layered", "indexing"),
+    )
+
+    # === ArchiveValidityHandler — 档案有效期事件处理器（Story 3.11）===
+    from src.application.event_handlers.archive_handlers import ArchiveValidityHandler
+
+    register_port(
+        name="archive_validity_handler",
+        version="v1.0.0",
+        interface=ArchiveValidityHandler,
+        impl=lambda resolver: ArchiveValidityHandler(
+            event_listener=resolver.resolve("event_listener"),
+        ),
+        module="src.application.event_handlers.archive_handlers",
+        lifetime=Lifetime.SINGLETON,
+        owner="foundation-team",
+        tags=("archive", "validity", "event"),
     )
 
     # === Crawler Ports ===
@@ -1996,6 +2032,7 @@ def bootstrap() -> None:
     handler_names = [
         "document_version_handler",
         "chunk_indexing_handler",
+        "archive_validity_handler",
     ]
     resolver = get_resolver()
     for handler_name in handler_names:
