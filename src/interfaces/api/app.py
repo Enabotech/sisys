@@ -55,6 +55,8 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     # 注册路由
     from src.interfaces.api.strategic_archive import archive_router
+    from src.interfaces.api.summary import summary_router
 
     app.include_router(archive_router)
+    app.include_router(summary_router)
     return app

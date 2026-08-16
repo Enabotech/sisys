@@ -334,6 +334,14 @@ def return_empty_list(context: dict[str, Any]):
     assert len(result) == 0
 
 
+@then("返回非空结果列表")
+def return_non_empty_list(context: dict[str, Any]):
+    """验证返回非空结果列表"""
+    result = context.get("result", [])
+    assert isinstance(result, list)
+    assert len(result) > 0, "预期结果非空，但返回了空列表"
+
+
 # ===================================================================
 # AC-3: L3→L4 自顶向下展开
 # ===================================================================

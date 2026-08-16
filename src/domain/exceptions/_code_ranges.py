@@ -40,6 +40,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "archive": (282, 289),
     # 分层检索子域（280-281）
     "retrieval": (280, 281),
+    # 摘要生成子域（290-299）
+    "summary": (290, 299),
     # 外部服务（3XX）
     "external": (301, 399),
     # 嵌入服务（306-310）
@@ -148,9 +150,13 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ArchiveNotFoundError": "archive",
     "ArchiveConflictError": "archive",
     "ArchiveStorageError": "archive",
+    "ValidityPeriodConflictError": "archive",
     # layered_retrieval_exceptions.py
     "LayeredRetrievalError": "retrieval",
     "LevelTransitionError": "retrieval",
+    # summary_exceptions.py
+    "SummaryGenerationError": "summary",
+    "SummaryPerspectiveNotSupportedError": "summary",
 }
 
 

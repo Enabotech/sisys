@@ -9,11 +9,12 @@ from __future__ import annotations
 import base64
 import logging
 import uuid
+from datetime import datetime
 from typing import Any, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.domain.entities.strategic_archive import ArchiveType
 from src.domain.ports.archive_repository import ArchiveQuery
@@ -56,6 +57,44 @@ class ArchiveRequest(BaseModel):
     evidence_blob: str | None = Field(default=None, max_length=10485760, description="证据包内容（Base64 编码，最大 10MB）")
 
 
+class ValidityRequest(BaseModel):
+    """有效期更新请求
+
+    Attributes:
+        valid_from: 生效时间（timezone-aware，可为 None）
+        valid_until: 失效时间（timezone-aware，可为 None）
+    """
+
+    valid_from: datetime | None = Field(default=None, description="生效时间（UTC ISO 8601）")
+    valid_until: datetime | None = Field(default=None, description="失效时间（UTC ISO 8601）")
+
+    @field_validator("valid_from", "valid_until")
+    @classmethod
+    def validate_timezone_aware(cls, v: datetime | None) -> datetime | None:
+        """强制 timezone-aware（UTC）"""
+        if v is not None and v.tzinfo is None:
+            raise ValueError("valid_from/valid_until must be timezone-aware (UTC)")
+        return v
+
+    @model_validator(mode="after")
+    def validate_validity_range(self) -> "ValidityRequest":
+        """当两者均非 None 时校验 valid_from <= valid_until"""
+        if self.valid_from is not None and self.valid_until is not None:
+            if self.valid_from > self.valid_until:
+                raise ValueError("valid_from must be before or equal to valid_until")
+        return self
+
+
+class StalenessCheckResponse(BaseModel):
+    """陈旧标记检查响应
+
+    Attributes:
+        marked: 被标记为陈旧的档案 ID 列表
+    """
+
+    marked: list[str] = Field(default_factory=list, description="被标记为陈旧的档案 ID 列表")
+
+
 class ArchiveResponse(BaseModel):
     """档案响应
 
@@ -71,6 +110,8 @@ class ArchiveResponse(BaseModel):
         embedding_ref: L3 向量引用
         blob_ref: L4 对象存储引用
         graph_ref: L5 图存储引用
+        valid_from: 生效时间
+        valid_until: 失效时间
         created_at: 创建时间
         archived_at: 归档时间
     """
@@ -86,6 +127,8 @@ class ArchiveResponse(BaseModel):
     embedding_ref: str | None = None
     blob_ref: str | None = None
     graph_ref: str | None = None
+    valid_from: str | None = None
+    valid_until: str | None = None
     created_at: str | None = None
     archived_at: str | None = None
 
@@ -204,6 +247,9 @@ def create_archive_router(
         archive_type: str | None = Query(default=None, description="档案类型过滤"),
         plan_type: str | None = Query(default=None, description="规划类型过滤"),
         plan_id: str | None = Query(default=None, description="规划 ID 过滤"),
+        valid_from: str | None = Query(default=None, description="按生效时间过滤（ISO 8601）"),
+        valid_until: str | None = Query(default=None, description="按失效时间过滤（ISO 8601）"),
+        validity_status: str | None = Query(default=None, description="有效期状态过滤（valid/expired）"),
         offset: int = Query(default=0, ge=0, description="分页偏移"),
         limit: int = Query(default=20, ge=1, le=1000, description="每页条数"),
         current_user: TokenPayload = Depends(get_current_user),
@@ -214,6 +260,9 @@ def create_archive_router(
             archive_type: 按档案类型过滤
             plan_type: 按规划类型过滤
             plan_id: 按规划 ID 过滤
+            valid_from: 按生效时间过滤
+            valid_until: 按失效时间过滤
+            validity_status: 按有效期状态过滤
             offset: 分页偏移
             limit: 每页条数
             current_user: 当前用户
@@ -239,16 +288,84 @@ def create_archive_router(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid plan_id: {plan_id}",
             )
+        # 显式解析有效期查询参数（ISO 8601）
+        parsed_valid_from = _parse_datetime_param(valid_from, "valid_from")
+        parsed_valid_until = _parse_datetime_param(valid_until, "valid_until")
+        parsed_validity_status = _parse_validity_status(validity_status)
         query = ArchiveQuery(
             archive_type=parsed_archive_type,
             plan_type=plan_type,
             plan_id=parsed_plan_id,
+            valid_from=parsed_valid_from,
+            valid_until=parsed_valid_until,
+            validity_status=parsed_validity_status,
             offset=offset,
             limit=limit,
         )
         service = _get_service()
         archives = await service.query_archive(query)
         return [_to_archive_response(a) for a in archives]
+
+    @router.patch(
+        "/entries/{archive_id}",
+        response_model=ArchiveResponse,
+        summary="更新档案有效期",
+    )
+    async def update_validity(
+        archive_id: str,
+        payload: ValidityRequest,
+        current_user: TokenPayload = Depends(get_current_user),
+    ) -> ArchiveResponse:
+        """更新档案有效期（PATCH 语义，非幂等操作）
+
+        Args:
+            archive_id: 档案 ID
+            payload: 有效期请求
+            current_user: 当前用户
+
+        Returns:
+            更新后的档案
+
+        Raises:
+            ArchiveNotFoundError: 档案不存在（映射 404）
+            ValidityPeriodConflictError: 有效期冲突（映射 409）
+        """
+        del current_user  # 仅认证
+        try:
+            parsed_id = uuid.UUID(archive_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid archive_id: {archive_id}",
+            )
+        service = _get_service()
+        archive = await service.set_validity_period(
+            parsed_id,
+            valid_from=payload.valid_from,
+            valid_until=payload.valid_until,
+        )
+        return _to_archive_response(archive)
+
+    @router.post(
+        "/staleness-checks",
+        response_model=StalenessCheckResponse,
+        summary="手动触发陈旧标记检查",
+    )
+    async def run_staleness_check(
+        current_user: TokenPayload = Depends(get_current_user),
+    ) -> StalenessCheckResponse:
+        """手动触发陈旧标记检查，返回被标记的档案 ID 列表
+
+        Args:
+            current_user: 当前用户
+
+        Returns:
+            陈旧标记结果
+        """
+        del current_user  # 仅认证
+        service = _get_service()
+        marked = await service.mark_stale_archives()
+        return StalenessCheckResponse(marked=[str(a.archive_id) for a in marked])
 
     @router.get(
         "/entries/{archive_id}",
@@ -382,9 +499,66 @@ def _to_archive_response(archive: Any) -> ArchiveResponse:
         embedding_ref=archive.embedding_ref,
         blob_ref=archive.blob_ref,
         graph_ref=archive.graph_ref,
+        valid_from=archive.valid_from.isoformat() if archive.valid_from else None,
+        valid_until=archive.valid_until.isoformat() if archive.valid_until else None,
         created_at=archive.created_at.isoformat() if archive.created_at else None,
         archived_at=archive.archived_at.isoformat() if archive.archived_at else None,
     )
+
+
+def _parse_datetime_param(value: str | None, name: str) -> datetime | None:
+    """解析 ISO 8601 字符串为 timezone-aware datetime
+
+    Args:
+        value: 查询参数值
+        name: 参数名（错误信息用）
+
+    Returns:
+        解析后的 datetime，None 表示未传参
+
+    Raises:
+        HTTPException: 解析失败时返回 400
+    """
+    if value is None:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid {name}: {value}",
+        )
+    if parsed.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{name} must be timezone-aware (UTC): {value}",
+        )
+    return parsed
+
+
+def _parse_validity_status(value: str | None):
+    """解析 validity_status 查询参数
+
+    Args:
+        value: 查询参数值（"valid"/"expired"）
+
+    Returns:
+        ValidityStatus 枚举或 None
+
+    Raises:
+        HTTPException: 非法值时返回 400
+    """
+    if value is None:
+        return None
+    try:
+        from src.domain.ports.archive_repository import ValidityStatus
+
+        return ValidityStatus(value)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid validity_status: {value} (must be 'valid' or 'expired')",
+        )
 
 
 archive_router = create_archive_router()

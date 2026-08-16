@@ -66,6 +66,8 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
             created_at=model.created_at,
             archived_at=model.archived_at,
             deleted_at=model.deleted_at,
+            valid_from=model.valid_from,
+            valid_until=model.valid_until,
             metadata=model.metadata_ or {},
         )
 
@@ -89,6 +91,8 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
             deleted_at=archive.deleted_at,
             created_at=archive.created_at,
             archived_at=archive.archived_at,
+            valid_from=archive.valid_from,
+            valid_until=archive.valid_until,
         )
 
     # ------------------------------------------------------------------
@@ -105,6 +109,8 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         Returns:
             添加了过滤条件的 statement
         """
+        from datetime import UTC, datetime
+
         if query.plan_id is not None:
             stmt = stmt.where(ArchiveModel.plan_id == query.plan_id)
         if query.archive_type is not None:
@@ -115,6 +121,18 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
             stmt = stmt.where(ArchiveModel.archived_at >= query.start_date)
         if query.end_date is not None:
             stmt = stmt.where(ArchiveModel.archived_at <= query.end_date)
+        if query.valid_from is not None:
+            stmt = stmt.where(ArchiveModel.valid_from >= query.valid_from)
+        if query.valid_until is not None:
+            stmt = stmt.where(ArchiveModel.valid_until <= query.valid_until)
+        if query.validity_status is not None:
+            now = datetime.now(UTC)
+            if query.validity_status.value == "valid":
+                # (valid_from IS NULL OR valid_from <= now) AND (valid_until >= now OR valid_until IS NULL)
+                stmt = stmt.where((ArchiveModel.valid_from.is_(None)) | (ArchiveModel.valid_from <= now))
+                stmt = stmt.where((ArchiveModel.valid_until >= now) | (ArchiveModel.valid_until.is_(None)))
+            elif query.validity_status.value == "expired":
+                stmt = stmt.where(ArchiveModel.valid_until < now)
         return stmt
 
     async def find(self, query: ArchiveQuery) -> list[StrategicArchive]:
@@ -131,6 +149,27 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         stmt = self._apply_filters(stmt, query)
         # 分页
         stmt = stmt.order_by(ArchiveModel.archived_at.desc()).offset(query.offset).limit(query.limit)
+
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+        return [self._to_entity(m) for m in models]
+
+    async def find_for_update(self, query: ArchiveQuery) -> list[StrategicArchive]:
+        """按条件查询档案（带 FOR UPDATE 悲观锁）
+
+        Args:
+            query: 查询条件（ArchiveQuery 值对象）
+
+        Returns:
+            符合条件的档案列表
+        """
+        from sqlalchemy import select
+
+        stmt = select(ArchiveModel)
+        stmt = self._apply_soft_delete_filter(stmt)
+        stmt = self._apply_filters(stmt, query)
+        stmt = stmt.order_by(ArchiveModel.archived_at.desc())
+        stmt = stmt.with_for_update()
 
         result = await self._session.execute(stmt)
         models = result.scalars().all()

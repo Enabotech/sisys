@@ -8,11 +8,18 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
 from src.domain.exceptions import EntityBusinessRuleError, EntityValidationError
+
+
+# 模块级时钟函数，支持测试注入
+# 默认使用 datetime.now(UTC)，测试中可整体替换
+def _now() -> datetime:
+    """获取当前 UTC 时间，支持测试注入"""
+    return datetime.now(UTC)
 
 
 class ArchiveType(str, Enum):
@@ -61,6 +68,8 @@ class StrategicArchive:
     created_at: datetime | None = None
     archived_at: datetime | None = None
     deleted_at: datetime | None = None
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def validate(self) -> bool:
@@ -118,10 +127,78 @@ class StrategicArchive:
                     message="plan_id must not be None for ASSUMPTION/DECISION/DEVIATION archive types",
                     context={"entity": "StrategicArchive", "rule": "plan_id_required"},
                 )
+        # valid_from 不能晚于 valid_until（两者均非 None 时校验）
+        if self.valid_from is not None and self.valid_until is not None and self.valid_from > self.valid_until:
+            raise EntityValidationError(
+                message="valid_from must be before or equal to valid_until",
+                context={"entity": "StrategicArchive", "field": "valid_from"},
+            )
         return True
+
+    def is_valid(self) -> bool:
+        """检查当前时间是否在有效期内
+
+        valid_from 为 None 时仅检查 valid_until；
+        valid_until 为 None 时仅检查 valid_from；
+        两者均为 None 时返回 True（视为永久有效）。
+
+        Returns:
+            当前时间在有效期内返回 True，否则返回 False
+        """
+        now = _now()
+        if self.valid_from is not None and self.valid_from > now:
+            return False
+        if self.valid_until is not None and self.valid_until < now:
+            return False
+        return True
+
+    def is_expired(self) -> bool:
+        """检查是否已过期
+
+        Returns:
+            valid_until 非 None 且当前时间晚于 valid_until 时返回 True
+        """
+        if self.valid_until is None:
+            return False
+        return _now() > self.valid_until
+
+    def days_until_expiry(self) -> int | None:
+        """计算距离过期的天数
+
+        Returns:
+            valid_until 为 None 时返回 None；
+            已过期时返回负数；
+            正常时返回剩余天数（向下取整）
+        """
+        if self.valid_until is None:
+            return None
+        delta = self.valid_until - _now()
+        return delta.days
+
+    def is_stale(self, ref_date: datetime | None = None) -> bool:
+        """检查实体是否陈旧
+
+        统一陈旧判定标准：
+        - valid_until 非 None 时：valid_until < ref_date 为陈旧
+        - valid_until 为 None 且 archived_at 非 None 时：archived_at < ref_date - 12个月 为陈旧
+        - 两者均为 None 时返回 False
+
+        Args:
+            ref_date: 参考时间，None 时使用 _now()
+
+        Returns:
+            陈旧返回 True，否则返回 False
+        """
+        now = ref_date or _now()
+        if self.valid_until is not None:
+            return self.valid_until < now
+        if self.archived_at is not None:
+            return self.archived_at < now - timedelta(days=365)
+        return False
 
 
 __all__ = [
     "ArchiveType",
     "StrategicArchive",
+    "_now",
 ]

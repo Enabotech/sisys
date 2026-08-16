@@ -277,6 +277,20 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="战略档案创建完成",
         ),
+        "ValidityPeriodSet": ChannelMapping(
+            event_type="ValidityPeriodSet",
+            rabbitmq_routing_key="sisys.events.reliable.validity_period_set",
+            redis_channel="sisys:rt:validity_period_set",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="档案有效期设置完成",
+        ),
+        "FactBecameStale": ChannelMapping(
+            event_type="FactBecameStale",
+            rabbitmq_routing_key="sisys.events.reliable.fact_became_stale",
+            redis_channel="sisys:rt:fact_became_stale",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="事实变为陈旧",
+        ),
     }
 
     def __init__(self, load_defaults: bool = True) -> None:

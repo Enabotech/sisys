@@ -14,6 +14,7 @@ from src.domain.exceptions import (
     BusinessException,
     ConflictError,
     NotFoundError,
+    ValidityPeriodConflictError,
 )
 
 
@@ -145,3 +146,50 @@ class TestArchiveStorageError:
         exc = ArchiveStorageError(layer="l2", cause=cause)
         assert exc.cause is cause
         assert exc.to_dict()["cause"]["type"] == "ConnectionError"
+
+
+class TestValidityPeriodConflictError:
+    """ValidityPeriodConflictError 测试"""
+
+    def test_code(self) -> None:
+        """编码必须为 EXCEPTION_285"""
+        exc = ValidityPeriodConflictError(archive_id=uuid.uuid4())
+        assert exc.code == "EXCEPTION_285"
+
+    def test_inheritance(self) -> None:
+        """必须继承 ConflictError"""
+        exc = ValidityPeriodConflictError(archive_id=uuid.uuid4())
+        assert isinstance(exc, ConflictError)
+        assert isinstance(exc, BusinessException)
+
+    def test_default_message(self) -> None:
+        """默认消息格式"""
+        archive_id = uuid.uuid4()
+        exc = ValidityPeriodConflictError(archive_id=archive_id)
+        assert exc.message == f"Validity period conflict for archive: {archive_id}"
+
+    def test_custom_message(self) -> None:
+        """自定义消息"""
+        exc = ValidityPeriodConflictError(archive_id=uuid.uuid4(), message="custom")
+        assert exc.message == "custom"
+
+    def test_context_exposes_archive_id(self) -> None:
+        """context 暴露 archive_id 字符串"""
+        archive_id = uuid.uuid4()
+        exc = ValidityPeriodConflictError(archive_id=archive_id)
+        assert exc.context == {"archive_id": str(archive_id)}
+
+    def test_to_dict(self) -> None:
+        """to_dict 序列化"""
+        archive_id = uuid.uuid4()
+        exc = ValidityPeriodConflictError(archive_id=archive_id)
+        data = exc.to_dict()
+        assert data["code"] == "EXCEPTION_285"
+        assert data["message"] == f"Validity period conflict for archive: {archive_id}"
+        assert data["context"] == {"archive_id": str(archive_id)}
+
+    def test_cause(self) -> None:
+        """cause 保序传递"""
+        cause = ValueError("root")
+        exc = ValidityPeriodConflictError(archive_id=uuid.uuid4(), cause=cause)
+        assert exc.cause is cause

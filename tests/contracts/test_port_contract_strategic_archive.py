@@ -1,7 +1,7 @@
-"""战略档案端口契约测试
+"""战略档案端口契约测试（更新版）
 
 验证 archive_repository / strategic_archive_service 端口的注册、解析和实现。
-遵循项目三方法模式: test_port_is_registered + test_implementation_has_required_methods + test_metadata_complete
+新增验证：ArchiveQuery 有效期字段、StrategicArchiveService 扩展方法。
 """
 
 from __future__ import annotations

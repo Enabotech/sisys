@@ -1107,6 +1107,39 @@ paths:
         "422":
           description: 请求体校验失败
 
+  # ============================================================================
+  # 摘要生成端点 (Summary Generation, Story 3-6)
+  # ============================================================================
+  /api/v1/search/summary:
+    post:
+      x-implemented: false
+      tags:
+        - search
+      summary: 契约化摘要生成
+      description: |
+        根据视角类型生成结构化摘要（财务/市场/技术），输出符合预定义 JSON Schema。
+        支持单文档摘要（L2）和跨文档摘要（L1）两种模式。
+      security:
+        - OAuth2: []
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SummaryRequest"
+      responses:
+        "200":
+          description: 摘要生成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SummaryResponse"
+        "400":
+          description: 不支持的视角类型
+        "500":
+          description: 摘要生成失败
+
 components:
   schemas:
     # --------------------------------------------------------------------------
@@ -1933,6 +1966,66 @@ components:
             document_id:
               type: string
               description: 所属文档 ID
+
+    # --------------------------------------------------------------------------
+    # 摘要生成相关 schemas (Story 3-6)
+    # --------------------------------------------------------------------------
+    SummaryRequest:
+      type: object
+      required:
+        - query_text
+        - perspective
+      properties:
+        query_text:
+          type: string
+          minLength: 1
+          description: 查询文本
+        perspective:
+          type: string
+          enum: ["financial", "market", "technical"]
+          description: 摘要视角类型
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+          description: 检索结果数量
+        tenant_id:
+          type: string
+          nullable: true
+          description: 租户 ID
+      description: 摘要生成请求
+
+    SummaryResponse:
+      type: object
+      required:
+        - summary
+        - query_text
+        - perspective
+        - confidence_score
+        - source_documents
+      properties:
+        summary:
+          type: object
+          description: 结构化摘要对象（FinancialSummary/MarketSummary/TechnicalSummary 实例）
+        query_text:
+          type: string
+          description: 原始查询文本
+        perspective:
+          type: string
+          description: 摘要视角类型
+        confidence_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: LLM 自评置信度
+        source_documents:
+          type: array
+          items:
+            type: string
+          description: 来源文档 ID 列表
+      description: 摘要生成响应
 
   securitySchemes:
     OAuth2:

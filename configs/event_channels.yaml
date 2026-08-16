@@ -181,6 +181,18 @@ event_channels:
     delivery_mode: "reliable"
     description: "战略档案创建完成"
 
+  ValidityPeriodSet:
+    rabbitmq_routing_key: "sisys.events.reliable.validity_period_set"
+    redis_channel: "sisys:rt:validity_period_set"
+    delivery_mode: "reliable"
+    description: "档案有效期设置完成"
+
+  FactBecameStale:
+    rabbitmq_routing_key: "sisys.events.reliable.fact_became_stale"
+    redis_channel: "sisys:rt:fact_became_stale"
+    delivery_mode: "reliable"
+    description: "事实变为陈旧"
+
   # =========================================================================
   # CRAWLER 事件
   # =========================================================================

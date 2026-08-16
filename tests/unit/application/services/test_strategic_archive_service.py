@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from unittest.mock import AsyncMock
 
@@ -16,6 +17,7 @@ from src.application.services.strategic_archive_service import StrategicArchiveS
 from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
 from src.domain.exceptions import ArchiveNotFoundError
 from src.domain.exceptions.archive_exceptions import ArchiveStorageError as ArchiveStoreErr
+from src.domain.exceptions.archive_exceptions import ValidityPeriodConflictError
 from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.l3_vector import L3VectorPort
@@ -315,3 +317,202 @@ class TestQuery:
         result = await service.query_archive(query)
         assert result == expected
         assert repo.find.called
+
+
+class TestSetValidityPeriod:
+    """set_validity_period() 有效期管理测试"""
+
+    @pytest.mark.asyncio
+    async def test_sets_validity_and_saves(self) -> None:
+        """设置有效期并持久化"""
+        service, repo, archive = _make_validity_service()
+        vf = datetime(2026, 1, 1, tzinfo=UTC)
+        vu = datetime(2027, 12, 31, tzinfo=UTC)
+        # find 返回空（无冲突）
+        repo.find.return_value = []
+        result = await service.set_validity_period(archive.archive_id, vf, vu)
+        assert result.valid_from == vf
+        assert result.valid_until == vu
+        assert repo.save.called
+
+    @pytest.mark.asyncio
+    async def test_not_found_raises(self) -> None:
+        """档案不存在抛出 ArchiveNotFoundError"""
+        service, repo, _ = _make_validity_service()
+        repo.get_by_id.return_value = None
+        with pytest.raises(ArchiveNotFoundError):
+            await service.set_validity_period(uuid.uuid4(), None, None)
+
+    @pytest.mark.asyncio
+    async def test_conflict_detected(self) -> None:
+        """有效期冲突抛出 ValidityPeriodConflictError"""
+        service, repo, archive = _make_validity_service()
+        # 存在另一档案，其有效期与新区间重叠
+        other = _make_archive(
+            {"valid_from": datetime(2026, 6, 1, tzinfo=UTC), "valid_until": datetime(2026, 12, 31, tzinfo=UTC)}
+        )
+        repo.find.return_value = [other]
+        repo.find_for_update.return_value = [other]
+        with pytest.raises(ValidityPeriodConflictError):
+            await service.set_validity_period(
+                archive.archive_id,
+                datetime(2026, 1, 1, tzinfo=UTC),
+                datetime(2027, 6, 1, tzinfo=UTC),
+            )
+
+    @pytest.mark.asyncio
+    async def test_no_conflict_when_adjacent(self) -> None:
+        """端点相接不视为冲突"""
+        service, repo, archive = _make_validity_service()
+        # 其他档案 valid_until == 新区间 valid_from，半开区间不重叠
+        other = _make_archive({"valid_from": datetime(2025, 1, 1, tzinfo=UTC), "valid_until": datetime(2026, 1, 1, tzinfo=UTC)})
+        repo.find.return_value = [other]
+        repo.find_for_update.return_value = [other]
+        result = await service.set_validity_period(
+            archive.archive_id,
+            datetime(2026, 1, 1, tzinfo=UTC),
+            datetime(2027, 6, 1, tzinfo=UTC),
+        )
+        assert result.valid_from == datetime(2026, 1, 1, tzinfo=UTC)
+
+    @pytest.mark.asyncio
+    async def test_publishes_validity_event(self) -> None:
+        """发布 ValidityPeriodSet 事件"""
+        service, repo, archive = _make_validity_service()
+        repo.find.return_value = []
+        vf = datetime(2026, 1, 1, tzinfo=UTC)
+        vu = datetime(2027, 12, 31, tzinfo=UTC)
+        await service.set_validity_period(archive.archive_id, vf, vu)
+        publisher = cast(Any, service._event_publisher)
+        assert publisher.publish.called
+        event = publisher.publish.call_args[0][0]
+        assert event.event_type == "ValidityPeriodSet"
+        assert event.archive_id == archive.archive_id
+        assert event.valid_from == vf
+        assert event.valid_until == vu
+
+    @pytest.mark.asyncio
+    async def test_l2_failure_raises_archive_storage_error(self) -> None:
+        """L2 保存失败抛出 ArchiveStorageError(layer=l2)"""
+        service, repo, archive = _make_validity_service()
+        repo.find.return_value = []
+        repo.save.side_effect = RuntimeError("db down")
+        with pytest.raises(ArchiveStoreErr) as exc_info:
+            await service.set_validity_period(archive.archive_id, None, datetime(2027, 12, 31, tzinfo=UTC))
+        assert exc_info.value.layer == "l2"
+
+
+class TestIsStale:
+    """is_stale() 陈旧检查测试"""
+
+    @pytest.mark.asyncio
+    async def test_stale_when_expired(self) -> None:
+        """valid_until 过期标记为陈旧"""
+        service, repo, archive = _make_validity_service(valid_until=datetime(2021, 1, 1, tzinfo=UTC))
+        repo.get_by_id.return_value = archive
+        assert await service.is_stale(archive.archive_id) is True
+
+    @pytest.mark.asyncio
+    async def test_not_stale_when_in_validity(self) -> None:
+        """有效期内不标记陈旧"""
+        service, repo, archive = _make_validity_service(valid_until=datetime(2099, 12, 31, tzinfo=UTC))
+        repo.get_by_id.return_value = archive
+        assert await service.is_stale(archive.archive_id) is False
+
+    @pytest.mark.asyncio
+    async def test_not_found_raises(self) -> None:
+        """档案不存在抛出 ArchiveNotFoundError"""
+        service, repo, _ = _make_validity_service()
+        repo.get_by_id.return_value = None
+        with pytest.raises(ArchiveNotFoundError):
+            await service.is_stale(uuid.uuid4())
+
+
+class TestMarkStaleArchives:
+    """mark_stale_archives() 批量陈旧标记测试"""
+
+    @pytest.mark.asyncio
+    async def test_marks_expired_archives(self) -> None:
+        """标记过期档案"""
+        service, repo, _ = _make_validity_service()
+        expired = _make_archive({"valid_until": datetime(2021, 1, 1, tzinfo=UTC)})
+        valid = _make_archive({"valid_until": datetime(2099, 12, 31, tzinfo=UTC)})
+        repo.find.side_effect = [[expired, valid], []]
+        marked = await service.mark_stale_archives()
+        # 仅过期档案被标记
+        assert len(marked) == 1
+        assert marked[0].metadata.get("staleness") == "stale"
+        assert "stale_since" in marked[0].metadata
+
+    @pytest.mark.asyncio
+    async def test_marks_archived_too_long(self) -> None:
+        """valid_until 为 None 且归档超 12 个月标记陈旧"""
+        service, repo, _ = _make_validity_service()
+        old = _make_archive({"valid_until": None, "archived_at": datetime.now(UTC) - timedelta(days=400)})
+        repo.find.side_effect = [[old], []]
+        marked = await service.mark_stale_archives()
+        assert len(marked) == 1
+        assert marked[0].metadata.get("staleness") == "stale"
+
+    @pytest.mark.asyncio
+    async def test_skips_already_marked(self) -> None:
+        """已标记档案跳过（幂等）"""
+        service, repo, _ = _make_validity_service()
+        stale = _make_archive(
+            {
+                "valid_until": datetime(2021, 1, 1, tzinfo=UTC),
+                "metadata": {"staleness": "stale", "stale_since": "2026-01-01T00:00:00Z"},
+            }
+        )
+        repo.find.side_effect = [[stale], []]
+        marked = await service.mark_stale_archives()
+        assert len(marked) == 0
+
+    @pytest.mark.asyncio
+    async def test_publishes_fact_became_stale(self) -> None:
+        """发布 FactBecameStale 事件"""
+        service, repo, _ = _make_validity_service()
+        expired = _make_archive({"valid_until": datetime(2021, 1, 1, tzinfo=UTC)})
+        repo.find.side_effect = [[expired], []]
+        await service.mark_stale_archives()
+        publisher = cast(Any, service._event_publisher)
+        assert publisher.publish.called
+        event = publisher.publish.call_args[0][0]
+        assert event.event_type == "FactBecameStale"
+        assert event.stale_reason == "expired"
+
+    @pytest.mark.asyncio
+    async def test_marks_none_for_skipped_archived_too_long(self) -> None:
+        """valid_until 和 archived_at 均为 None 不标记"""
+        service, repo, _ = _make_validity_service()
+        neither = _make_archive({"valid_until": None, "archived_at": None})
+        repo.find.side_effect = [[neither], []]
+        marked = await service.mark_stale_archives()
+        assert len(marked) == 0
+
+
+def _make_validity_service(
+    valid_until: Any = None,
+    valid_from: Any = None,
+) -> tuple[StrategicArchiveService, Any, StrategicArchive]:
+    """构造带有有效期字段的 Mock 服务"""
+    repo = _make_repo()
+    repo.get_by_id.side_effect = None
+    repo.find.return_value = []
+    repo.find_for_update.return_value = []
+    archive = _make_archive(
+        {
+            "valid_from": valid_from,
+            "valid_until": valid_until,
+        }
+    )
+    repo.get_by_id.return_value = archive
+    publisher = _make_publisher()
+    service = StrategicArchiveService(
+        archive_repo=repo,
+        vector_storage=None,
+        object_storage=None,
+        graph_storage=None,
+        event_publisher=publisher,
+    )
+    return service, repo, archive

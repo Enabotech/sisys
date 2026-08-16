@@ -124,13 +124,21 @@ class LayeredRetrievalService:
         self._validate_inputs(query_text, collection, limit, tenant_id)
         self._validate_level(target_level)
 
-        # L1/L2 骨架实现
+        # L1/L2 摘要检索
         if target_level == "L1":
-            logger.warning("L1 跨文档摘要检索尚未实现，返回空列表")
-            return []
+            return await self._search_l1_summaries(
+                query_text=query_text,
+                limit=limit,
+                tenant_id=tenant_id,
+                filter_payload=filter_payload,
+            )
         if target_level == "L2":
-            logger.warning("L2 文档摘要检索尚未实现，返回空列表")
-            return []
+            return await self._search_l2_summaries(
+                query_text=query_text,
+                limit=limit,
+                tenant_id=tenant_id,
+                filter_payload=filter_payload,
+            )
 
         # L3 直接检索
         if target_level == "L3":
@@ -188,13 +196,21 @@ class LayeredRetrievalService:
         self._validate_inputs(query_text, collection, limit, tenant_id)
         self._validate_level(target_level)
 
-        # L1/L2 骨架实现
+        # L1/L2 摘要检索
         if target_level == "L1":
-            logger.warning("L1 跨文档摘要检索尚未实现，返回空列表")
-            return []
+            return await self._search_l1_summaries(
+                query_text=query_text,
+                limit=limit,
+                tenant_id=tenant_id,
+                filter_payload=filter_payload,
+            )
         if target_level == "L2":
-            logger.warning("L2 文档摘要检索尚未实现，返回空列表")
-            return []
+            return await self._search_l2_summaries(
+                query_text=query_text,
+                limit=limit,
+                tenant_id=tenant_id,
+                filter_payload=filter_payload,
+            )
 
         # L4 直接检索
         if target_level == "L4":
@@ -579,6 +595,134 @@ class LayeredRetrievalService:
     # ------------------------------------------------------------------
     # 辅助方法
     # ------------------------------------------------------------------
+
+    async def _search_l2_summaries(
+        self,
+        query_text: str,
+        limit: int = 10,
+        tenant_id: str | None = None,
+        filter_payload: dict | None = None,
+    ) -> list[SearchResult]:
+        """L2 文档摘要检索
+
+        在 document_summaries collection 中执行 Dense 语义检索。
+        L2 硬编码 collection 名为 "document_summaries"，与顶层 collection 参数解耦。
+
+        降级策略：摘要 collection 不存在时降级为骨架（返回空列表，WARNING 日志）；
+        Qdrant 查询异常时捕获 Exception 降级返回空列表 + WARNING 日志。
+
+        Args:
+            query_text: 查询文本
+            limit: 返回结果数量限制
+            tenant_id: 租户 ID
+            filter_payload: Payload 过滤条件
+
+        Returns:
+            摘要检索结果列表（list[SearchResult]）
+        """
+        return await self._search_summaries(
+            collection="document_summaries",
+            query_text=query_text,
+            limit=limit,
+            tenant_id=tenant_id,
+            filter_payload=filter_payload,
+            log_message="L2 文档摘要检索执行成功",
+        )
+
+    async def _search_l1_summaries(
+        self,
+        query_text: str,
+        limit: int = 10,
+        tenant_id: str | None = None,
+        filter_payload: dict | None = None,
+    ) -> list[SearchResult]:
+        """L1 跨文档摘要检索
+
+        在 cross_document_summaries collection 中执行 Dense 语义检索。
+        L1 硬编码 collection 名为 "cross_document_summaries"，与顶层 collection 参数解耦。
+
+        降级策略：摘要 collection 不存在时降级为骨架（返回空列表，WARNING 日志）；
+        Qdrant 查询异常时捕获 Exception 降级返回空列表 + WARNING 日志。
+
+        Args:
+            query_text: 查询文本
+            limit: 返回结果数量限制
+            tenant_id: 租户 ID
+            filter_payload: Payload 过滤条件
+
+        Returns:
+            跨文档摘要检索结果列表（list[SearchResult]）
+        """
+        return await self._search_summaries(
+            collection="cross_document_summaries",
+            query_text=query_text,
+            limit=limit,
+            tenant_id=tenant_id,
+            filter_payload=filter_payload,
+            log_message="L1 跨文档摘要检索执行成功",
+        )
+
+    async def _search_summaries(
+        self,
+        collection: str,
+        query_text: str,
+        limit: int = 10,
+        tenant_id: str | None = None,
+        filter_payload: dict | None = None,
+        log_message: str = "",
+    ) -> list[SearchResult]:
+        """摘要 collection 通用检索
+
+        在指定摘要 collection 中执行 Dense 语义检索。
+        不传递 index_level 过滤条件（摘要 collection 中的所有点均为摘要，无需额外过滤）。
+        复用 self._dense_search.search() 端到端 Dense 检索模式。
+
+        降级策略（独立 try/except，与 L3/L4 的 raise LayeredRetrievalError 不同）：
+        - 摘要 collection 不存在时降级为骨架（返回空列表，WARNING 日志）
+        - Qdrant 查询异常时捕获 Exception 降级返回空列表 + WARNING 日志
+
+        Args:
+            collection: 摘要 collection 名称（"document_summaries"/"cross_document_summaries"）
+            query_text: 查询文本
+            limit: 返回结果数量限制
+            tenant_id: 租户 ID
+            filter_payload: Payload 过滤条件
+            log_message: 成功日志消息
+
+        Returns:
+            摘要检索结果列表（list[SearchResult]）
+        """
+        # 摘要 collection 不存在时降级为骨架（返回空列表）
+        try:
+            if not await self._l3_vector.collection_exists(collection):
+                logger.warning("摘要 collection %s 不存在，降级返回空列表", collection)
+                return []
+        except Exception as e:
+            logger.warning("检查摘要 collection %s 失败，降级返回空列表: %s", collection, e)
+            return []
+
+        try:
+            raw_results = await self._dense_search.search(
+                collection=collection,
+                query_text=query_text,
+                limit=limit,
+                tenant_id=tenant_id,
+                filter_payload=filter_payload,
+            )
+        except Exception as e:
+            # 摘要不可用时静默降级保证检索可用性（与 L3/L4 的 raise 不同）
+            logger.warning("摘要检索失败，降级返回空列表: %s", e)
+            return []
+
+        if not raw_results:
+            return []
+        if log_message:
+            logger.info(log_message)
+        return [
+            SearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {}))
+            for r in raw_results
+            if "id" in r and "score" in r
+        ]
 
     @staticmethod
     def _validate_inputs(query_text: str, collection: str, limit: int, tenant_id: str | None = None) -> None:
