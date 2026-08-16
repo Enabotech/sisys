@@ -1007,9 +1007,10 @@ docs/
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-08-16
 **最后更新/Last Updated:** 2026-08-16
 **更新说明/Description:**
+- v1.2.0: Round 2~4 审查修订（P0#8 服务端检索安全、P0#9 evaluate 返回类型承诺、quick_rule_check 防御性计算、时效性注入形式、集成测试职责拆分、文件清单修正、端口导出、异常注册完备性确认、R4 完整性扫描确认全部 9 个 P0 已修复）
 - v1.1.0: Round 1 审查修订（修复 7 个 P0 问题：Schema computed_field/条件必填验证、Prompt-代码阻断规则一致、resolve_optional 语义、降级捕获边界、nested_subdomains 格式、HTTP 映射、API 文件命名）
 - v1.0.0: 创建故事文件
