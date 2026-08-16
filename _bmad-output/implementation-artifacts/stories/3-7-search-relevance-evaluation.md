@@ -145,16 +145,19 @@
   2. 若 `quick_block=True`，直接返回阻断结果（`should_block=True`, `block_reason="数据不足"`，各维度分数为 0.0）
   3. 否则调用 `LLMClientPort.structured_generate()` 传入评估 Prompt 和 `RelevanceEvaluation` Schema
   4. 返回 `RelevanceEvaluationResult`
+  - **返回类型承诺**：`evaluate()` **永远不抛 `RelevanceEvaluationBlockedError`**，阻断信息通过 `RelevanceEvaluationResult.should_block` / `block_reason` 字段传递；`RelevanceEvaluationBlockedError` 由调用方（`SummaryGenerationService` / API 路由）检查 `should_block == True` 时抛出
+  - `config` 参数直接透传给 `LLMClientPort.structured_generate()`（不重新构造 / 覆盖 `LLMConfig`）
 - [ ] 实现 `quick_rule_check()` 方法：
   - 空检索结果 → `quick_block=True`
   - 检索结果平均分 < 0.3 → `quick_block=True`
   - 其他情况 → `quick_block=False`
+  - **防御性计算**：计算 `avg_score` 前过滤 NaN/负值/缺失 score（score 无效时视为 0.0，使用 `math.isfinite()` + `result.get("score", 0.0)` + `max(0.0, s)`），避免 NaN 传播 (`NaN < 0.3` 返回 False) 导致阻断失效
 - [ ] 规则预检延迟 P95 < 100ms（纯计算，无外部调用）
 - [ ] LLM 评估延迟 P95 < 3s（含 LLM 调用）
 - [ ] 评估准确率 ≥ 90%（端到端多维评估与人工标注一致率）
 - [ ] 阻断准确率 100%（`overall_score < 0.6` 时必然阻断，`overall_score >= 0.6` 时必然不阻断）
 - [ ] LLM 调用失败抛出 `RelevanceEvaluationError`（包装原始 LLM 异常，携带 `result_count` 和 `query_text` 上下文）
-- [ ] 阻断业务规则违反抛出 `RelevanceEvaluationBlockedError`（携带 `overall_score` 和 `block_reason`）
+- [ ] 阻断业务规则违反由调用方（`SummaryGenerationService` 或 API 路由）基于 `RelevanceEvaluationResult.should_block` 抛出 `RelevanceEvaluationBlockedError`（携带 `overall_score` 和 `block_reason`）；`evaluate()` 本身不抛出该异常
 - [ ] LLM 异常处理：捕获 `LLMAPIError` 和 `ServiceUnavailableError` → 包装为 `RelevanceEvaluationError`；`LLMResponseError` → 同样包装为 `RelevanceEvaluationError`；`LLMConfigError` → 透传不包装
 
 ### AC-5: 评估 Prompt 模板
@@ -198,7 +201,7 @@
   - 若 `should_block=True`，不调用 LLM 生成，返回 "数据不足" 的阻断响应
 - [ ] 阻断响应格式：`{"error": "数据不足", "details": {"overall_score": float, "block_reason": str, "dimensions": {...}}}`
 - [ ] 降级策略：
-  - `relevance_evaluation_service` 为 None（未注入或构造失败）→ 跳过评估，直接生成摘要（WARNING 日志记录"相关性评估服务未注册，跳过评估"）
+  - `relevance_evaluation_service` 为 None（构造失败或 composition_root 中未注入）→ 跳过评估，直接生成摘要（WARNING 日志记录"相关性评估服务未注册，跳过评估"）
   - LLM 评估调用失败 → 捕获 `RelevanceEvaluationError`，跳过评估，直接生成摘要（WARNING 日志记录"LLM 评估调用失败，跳过评估"），不可抛出阻断异常
   - **关键边界**：仅捕获 `RelevanceEvaluationError`（`ExternalException` 派生）降级；`RelevanceEvaluationBlockedError`（`BusinessException` 派生）与规则预检阻断必然而向调用方抛出，禁止进入降级分支——两类异常的基类层次天然分离，正好利用
   - 规则预检阻断 → 必然阻断，不降级
@@ -215,8 +218,10 @@
 **验证标准/Validation Criteria:**
 - [ ] API 路由位于 `src/interfaces/api/relevance_evaluation.py`（新增文件，遵循现有按功能命名的约定，如 `summary.py`、`strategic_archive.py`、`audit.py`）
 - [ ] `POST /api/v1/search/evaluate` 端点
-  - 请求体：`{"query_text": str, "search_results": list[dict] | None (可选), "tenant_id": str | None (可选)}`
-  - 响应体：`{"overall_score": float, "context_relevance": float, "completeness": float, "timeliness": float, "should_block": bool, "block_reason": str | None, "dimension_reasons": {...}}`
+  - 请求体：`{"query_text": str, "tenant_id": str | None (可选)}`
+  - **安全设计**：系统内部通过 `resolver.resolve("layered_retrieval_service")` 执行真实检索后评估，不接受客户端直接传入 `search_results`（防止客户端伪造高分结果绕过质量守卫）
+  - 响应体：`{"overall_score": float, "context_relevance": float, "completeness": float, "timeliness": float, "context_relevance_reason": str, "completeness_reason": str, "timeliness_reason": str, "should_block": bool, "block_reason": str | None}`
+  - **错误处理**：领域异常透传到全局 `ExceptionHandlers`（不捕获异常抛 `HTTPException`，避免丢失 `code`/`request_id`/`X-Error-Code` 响应头）
 - [ ] 在 `src/interfaces/api/app.py` 中通过 `app.include_router()` 注册路由
 - [ ] 更新 `docs/api/openapi.yaml` 添加 `/api/v1/search/evaluate` 端点
 - [ ] API 契约测试通过（`tests/contracts/test_api_contract_relevance_evaluation.py`）
@@ -238,7 +243,8 @@
   4. 以上字段均不存在 — 默认 1.0（不惩罚）
 - [ ] 综合时效性评分 = 所有检索结果时效性评分的平均值
 - [ ] 时效性评估逻辑在 `RelevanceEvaluationService` 中实现（`_evaluate_timeliness()` 方法），服务端计算时效性引用值
-- [ ] **职责边界约定**：服务端计算的时效性评分作为 Prompt 上下文的补充输入注入（原始字段信息，如 `created_at`/`updated_at`/`valid_until`），供 LLM 在评估时效性时参考；最终 `timeliness` 分数由 LLM 输出。服务端计算的引用值不覆盖 LLM 输出（避免双重评估冲突）。若 LLM 未输出时效性评估所需信息，服务端引用值可直接作为 `timeliness` 兜底
+- [ ] **职责边界约定**：服务端计算的时效性评分作为 `{search_context}` 中嵌入的补充信息注入 Prompt（每个检索结果附带 `[时效性: updated_at=2026-01-15]` 标记），供 LLM 在评估时效性时参考；最终 `timeliness` 分数由 LLM 输出。服务端引用值不覆盖 LLM 输出（避免双重评估冲突）。若 LLM 未输出时效性评估所需信息，服务端引用值可直接作为 `timeliness` 兜底
+- [ ] **注入形式**：时效性字段信息嵌入在 `{search_context}` 中，**不需要新增独立 `{timeliness_context}` 占位符**；User Prompt 模板通过 `_build_search_context_with_timeliness()` 方法构建，该方法在标准 `_build_search_context()` 基础上为每个检索结果条目附加时效性标记
 
 ---
 
@@ -385,9 +391,8 @@
 | **TDD 单元测试** | 评估端口 | 端口契约方法签名、参数校验 | `tests/unit/domain/ports/test_relevance_evaluation_port.py` | Task 1 |
 | **TDD 单元测试** | 评估 Prompt 模板 | 模板变量替换、评估标准完整性 | `tests/unit/application/services/test_relevance_prompts.py` | Task 2 |
 | **TDD 单元测试** | 规则预检 | 空结果/低分快速阻断、规则预检逻辑 | `tests/unit/application/services/test_relevance_rule_check.py` | Task 2 |
-| **TDD 单元测试** | 评估服务 | LLM 评估调用、多维评分、阻断逻辑 | `tests/unit/application/services/test_relevance_evaluation_service.py` | Task 2 |
+| **TDD 单元测试** | 评估服务 | LLM 评估调用、多维评分、阻断逻辑、时效性评估 | `tests/unit/application/services/test_relevance_evaluation_service.py` | Task 2 |
 | **TDD 单元测试** | 评估异常 | 构造/属性/`to_dict()`/cause 链/HTTP 映射 | `tests/unit/domain/exceptions/test_relevance_exceptions.py` | Task 1 |
-| **TDD 单元测试** | 时效性评估 | 时效性字段提取、评分计算、默认值 | `tests/unit/application/services/test_timeliness_evaluation.py` | Task 2 |
 | **SDD 验收测试** | Gherkin 场景 | 业务价值验收 | `tests/acceptance/test_acceptance_relevance_evaluation.feature` | Task 0 |
 | **SDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_relevance_evaluation.py` | Task 0 |
 | **SDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | `tests/acceptance/test_acceptance_relevance_evaluation.feature` | Task 5 |
@@ -468,7 +473,7 @@
 | AC-6 | 与摘要生成集成 | Task 3 | TDD 集成实现 | `test_integration_relevance_evaluation.py` |
 | AC-7 | 评估 API 端点 | Task 0 | SDD 规范定义（API 契约设计） | `test_api_contract_relevance_evaluation.py` |
 | AC-7 | 评估 API 端点 | Task 3 | TDD API 端点 | `test_api_contract_relevance_evaluation.py` |
-| AC-8 | 时效性评估 | Task 2 | TDD 时效性逻辑 | `test_timeliness_evaluation.py` |
+| AC-8 | 时效性评估 | Task 2 | TDD 时效性逻辑（合并入评估服务） | `test_relevance_evaluation_service.py` |
 | AC-1,2,3,4 | 架构约束验证 | Task 4 | SDD 架构验证 | `test_arch_relevance_evaluation.py` |
 | AC-1~8 | 开发结束验收 | Task 5 | 收尾验收 | `test_acceptance_relevance_evaluation.feature` |
 
@@ -584,29 +589,17 @@
 - [ ] Subtask 2.5: 🟢 绿 — 实现规则预检
 - [ ] Subtask 2.6: 🔄 重构 — 优化预检逻辑
 
-#### TDD 循环 [C]：时效性评估
+#### TDD 循环 [C]：评估应用服务（含时效性评估合并）
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_timeliness_evaluation.py`（从 payload 提取 valid_until/updated_at/created_at、各字段缺失默认值、过期判定、综合评分计算） |
-| 🟢 绿 | 实现 `RelevanceEvaluationService._evaluate_timeliness()` 方法 |
-| 🔄 重构 | 优化时效性计算逻辑 |
-
-- [ ] Subtask 2.7: 🔴 红 — 编写时效性评估失败测试
-- [ ] Subtask 2.8: 🟢 绿 — 实现时效性评估
-- [ ] Subtask 2.9: 🔄 重构 — 优化时效性逻辑
-
-#### TDD 循环 [D]：评估应用服务
-
-| 阶段 | 动作 |
-|------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_relevance_evaluation_service.py`（多维评估、LLM 调用验证、Schema 验证、阻断逻辑、LLM 调用失败异常、空检索结果边界、LLM 返回无效分数） |
-| 🟢 绿 | 实现 `src/application/services/relevance_evaluation_service.py`（`RelevanceEvaluationService` 类） |
+| 🔴 红 | 编写 `tests/unit/application/services/test_relevance_evaluation_service.py`（多维评估、LLM 调用验证、Schema 验证、阻断逻辑、LLM 调用失败异常、空检索结果边界、LLM 返回无效分数、**时效性字段提取、过期判定、默认值**） |
+| 🟢 绿 | 实现 `src/application/services/relevance_evaluation_service.py`（`RelevanceEvaluationService` 类，含 `_evaluate_timeliness()` 方法） |
 | 🔄 重构 | 添加降级策略、日志、异常链包装 |
 
-- [ ] Subtask 2.10: 🔴 红 — 编写评估服务失败测试
-- [ ] Subtask 2.11: 🟢 绿 — 实现 `RelevanceEvaluationService`
-- [ ] Subtask 2.12: 🔄 重构 — 优化服务代码
+- [ ] Subtask 2.7: 🔴 红 — 编写评估服务失败测试（含时效性评估）
+- [ ] Subtask 2.8: 🟢 绿 — 实现 `RelevanceEvaluationService`（含 `_evaluate_timeliness()`）
+- [ ] Subtask 2.9: 🔄 重构 — 优化服务代码
 
 **完成标准/Definition of Done:**
 - [ ] `RelevanceEvaluationService` 完整实现（含 evaluate、quick_rule_check、_evaluate_timeliness）
@@ -631,7 +624,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_integration_relevance_evaluation.py`（评估服务注入 SummarGenerationService、评估阻断生成、评估通过后生成、服务未注册降级、LLM 评估失败降级） |
+| 🔴 红 | 编写 `tests/integration/test_integration_relevance_evaluation.py`（`RelevanceEvaluationService` + 真实 `LLMClientPort` 端到端 LLM 评估验证）+ `tests/integration/test_integration_contractual_summary.py` 追加用例（`SummaryGenerationService` + `RelevanceEvaluationService` 评估守卫阻断/降级验证） |
 | 🟢 绿 | 修改 `SummaryGenerationService` 注入 `relevance_evaluation_service`（可选依赖），在 `generate_summary()` 中插入评估守卫 |
 | 🔄 重构 | 优化降级策略、添加日志 |
 
@@ -904,17 +897,15 @@ docs/
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
-- [x] **Round 1 D2 审查（5 轮中的第 1 轮）** 发现并修复 7 个 P0 问题：
-  - P0#1: `overall_score` 用 `Field(default=...)` 无法实现跨字段计算 → 改用 `@computed_field`
-  - P0#2: `block_reason` 条件必填缺 Pydantic V2 验证 → 用 `@model_validator(mode="after")`
-  - P0#3: Prompt 阻断规则（任何维度<0.6）与代码逻辑（仅综合<0.6）不一致 → 统一为"服务端 `@computed_field` 为准，Prompt 仅供评分参考"
-  - P0#4: `resolve_optional` 未注册语义与降级策略矛盾 → 修正为：`resolve_optional` 调用在 composition_root 工厂 lambda 中，服务构造函数用 `None` 默认值
-  - P0#5: `evaluate()` 抛错 vs 降级缺少上下文边界 → 明确"仅捕获 `RelevanceEvaluationError`，`RelevanceEvaluationBlockedError` 禁止降级"
-  - P0#6: `nested_subdomains` 格式错误（写成了 `(360, 369)` 元组）→ 修正为 `"relevance": "external"`（`dict[str, str]`）
-  - P0#7: `RelevanceEvaluationError` HTTP 映射自相矛盾（文档说 502 与 RerankError 一致，实际 RerankError 是 500）→ 修正为 500
-- [x] API 文件命名从 `search.py` 改为 `relevance_evaluation.py`（遵循现有命名约定）
-- [x] 综合评分计算明确为服务端 `@computed_field` 计算，不依赖 LLM 输出
-- [x] 时效性评估职责边界约定：服务端计算的引用值作为 Prompt 上下文输入，最终 `timeliness` 由 LLM 输出
+- [x] **Round 2 D2 审查发现并修复** 1 个 P0 + 2 个 P1 问题：
+  - P0#8: 请求体 `search_results` 安全缺陷 — 改为纯服务端检索后评估
+  - P0#9: `evaluate()` 返回类型承诺矛盾 — 明确永远不抛 BlockedError，只返回 result
+  - P1: quick_rule_check 防御性计算（NaN/缺失 score）
+  - P1: 时效性注入形式明确（嵌入 `{search_context}`，无需独立占位符）
+  - P1: 集成测试职责拆分（AC-4 和 AC-6 分离）
+  - P1: 响应体 `dimension_reasons` 改为顶层 `*_reason` 字段
+  - P1: 错误处理透传全局 ExceptionHandlers
+  - P2: 时效性测试合并入 `test_relevance_evaluation_service.py`
 
 ### 文件清单 File List
 
@@ -933,8 +924,7 @@ docs/
 - `tests/unit/application/services/test_relevance_schemas.py` — Schema 单元测试
 - `tests/unit/application/services/test_relevance_prompts.py` — Prompt 单元测试
 - `tests/unit/application/services/test_relevance_rule_check.py` — 规则预检单元测试
-- `tests/unit/application/services/test_relevance_evaluation_service.py` — 服务单元测试
-- `tests/unit/application/services/test_timeliness_evaluation.py` — 时效性单元测试
+- `tests/unit/application/services/test_relevance_evaluation_service.py` — 服务+时效性单元测试
 - `tests/unit/architecture/test_arch_relevance_evaluation.py` — 架构验证测试
 - `tests/integration/test_integration_relevance_evaluation.py` — 集成测试
 - `tests/acceptance/test_acceptance_relevance_evaluation.feature` — Gherkin 场景
