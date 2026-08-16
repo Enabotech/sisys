@@ -45,6 +45,7 @@ class TestSummaryGenerationPortProtocol:
         assert "config" in params
         assert "tenant_id" in params
         assert "cross_document" in params
+        assert "limit" in params
 
     def test_generate_summary_defaults(self) -> None:
         """generate_summary 参数默认值正确"""
@@ -54,6 +55,7 @@ class TestSummaryGenerationPortProtocol:
         assert params["config"].default is None
         assert params["tenant_id"].default is None
         assert params["cross_document"].default is False
+        assert params["limit"].default == 10
 
     def test_generate_summary_return_type(self) -> None:
         """generate_summary 返回类型为 Any"""

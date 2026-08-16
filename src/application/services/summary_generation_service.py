@@ -24,6 +24,7 @@ from src.application.services.summary_schemas import (
 from src.domain.exceptions import (
     SummaryGenerationError,
     SummaryPerspectiveNotSupportedError,
+    ValidationError,
 )
 from src.domain.exceptions.llm_exceptions import LLMAPIError, LLMConfigError, LLMResponseError
 from src.domain.ports.l3_vector import SearchResult
@@ -76,6 +77,7 @@ class SummaryGenerationService:
         config: LLMConfig | None = None,
         tenant_id: str | None = None,
         cross_document: bool = False,
+        limit: int = 10,
     ) -> Any:
         """生成契约化结构化摘要
 
@@ -89,14 +91,21 @@ class SummaryGenerationService:
             config: 可选 LLM 调用配置（LLMConfig 值对象）
             tenant_id: 可选租户 ID
             cross_document: 跨文档摘要模式
+            limit: 跨文档模式下 L2 检索结果数量限制（默认 10）
 
         Returns:
             对应视角 Schema 的 Pydantic 实例
 
         Raises:
+            ValidationError: 查询文本为空时
             SummaryPerspectiveNotSupportedError: 不支持的视角类型
             SummaryGenerationError: 摘要生成整体失败
+            LLMConfigError: LLM 配置错误时透传
         """
+        # 验证查询文本
+        if not query_text or not query_text.strip():
+            raise ValidationError(message="查询文本不能为空")
+
         # 验证视角类型
         if perspective not in PERSPECTIVE_SCHEMA_MAP:
             raise SummaryPerspectiveNotSupportedError(perspective=perspective)
@@ -106,6 +115,7 @@ class SummaryGenerationService:
         prompt_map = PERSPECTIVE_PROMPT_MAP.get(perspective)
 
         # 构建检索上下文
+        l2_results: list[SearchResult] = []
         if cross_document:
             # 跨文档模式：从 L2 检索获取摘要上下文
             try:
@@ -113,7 +123,7 @@ class SummaryGenerationService:
                     query_text=query_text,
                     target_level="L2",
                     collection="documents",
-                    limit=10,
+                    limit=limit,
                     tenant_id=tenant_id,
                     filter_payload=None,
                 )
@@ -164,13 +174,43 @@ class SummaryGenerationService:
                 cause=e,
             ) from e
 
+        # 计算单文档模式的 document_id（唯一时用于幂等点 ID；跨文档模式或文档不唯一时为 None）
+        document_id: str | None = None
+        if not cross_document:
+            doc_ids = {
+                str(r.get("payload", {}).get("document_id", ""))
+                for r in search_results
+                if isinstance(r, dict) and r.get("payload", {}).get("document_id")
+            }
+            if len(doc_ids) == 1:
+                document_id = next(iter(doc_ids))
+
+        # 计算来源文档 ID（单文档模式从检索结果 payload 提取；跨文档模式从 L2 摘要 payload 提取）
+        source_document_ids: list[str] = []
+        if cross_document:
+            for r in l2_results:
+                payload = r.get("payload", {}) if isinstance(r, dict) else {}
+                if isinstance(payload, dict):
+                    source_document_ids.extend(payload.get("source_document_ids", []))
+            source_document_ids = list(dict.fromkeys(str(sid) for sid in source_document_ids if sid))
+        else:
+            source_document_ids = list(
+                dict.fromkeys(
+                    str(r.get("payload", {}).get("document_id", ""))
+                    for r in search_results
+                    if isinstance(r, dict) and r.get("payload", {}).get("document_id")
+                )
+            )
+
         # 存储摘要结果
         await self._store_summary(
             summary=result,
             perspective=perspective,
             query_text=query_text,
             cross_document=cross_document,
-            source_document_ids=[str(r.get("id", "")) for r in search_results if isinstance(r, dict)],
+            source_document_ids=source_document_ids,
+            tenant_id=tenant_id,
+            document_id=document_id,
         )
 
         return result
@@ -182,6 +222,8 @@ class SummaryGenerationService:
         query_text: str,
         cross_document: bool = False,
         source_document_ids: list[str] | None = None,
+        tenant_id: str | None = None,
+        document_id: str | None = None,
     ) -> None:
         """存储摘要结果到 Qdrant
 
@@ -191,6 +233,8 @@ class SummaryGenerationService:
             query_text: 查询文本
             cross_document: 是否跨文档摘要
             source_document_ids: 来源文档 ID 列表
+            tenant_id: 租户 ID（多租户隔离）
+            document_id: 文档 ID（单文档模式幂等点 ID 用）
         """
         collection = "cross_document_summaries" if cross_document else "document_summaries"
         index_level = "L1" if cross_document else "L2"
@@ -212,14 +256,19 @@ class SummaryGenerationService:
             vectors = await self._embedding_service.embed_documents([summary_text])
             vector = vectors[0] if vectors else [0.0] * DEFAULT_EMBEDDING_DIMENSION
         except Exception as e:
-            logger.warning("摘要向量生成失败: %s", e)
-            vector = [0.0] * DEFAULT_EMBEDDING_DIMENSION
+            logger.error("摘要向量生成失败，跳过存储: %s", e)
+            return
 
         # 构建 payload
-        key_points = getattr(summary, "key_points", [])
+        key_points = getattr(summary, "key_points", [])[:10]
         confidence_score = getattr(summary, "confidence_score", 0.0)
 
-        point_id = f"summary-{perspective}-{uuid.uuid4()}"
+        # 幂等点 ID：单文档模式用 document_id + perspective 实现 upsert 更新
+        if document_id:
+            point_id = f"summary-{document_id}-{perspective}"
+        else:
+            point_id = f"summary-{perspective}-{uuid.uuid4()}"
+
         point = {
             "id": point_id,
             "vector": vector,
@@ -231,6 +280,7 @@ class SummaryGenerationService:
                 "source_document_ids": source_document_ids or [],
                 "index_level": index_level,
                 "created_at": datetime.now(timezone.utc).isoformat(),
+                "tenant_id": tenant_id,
             },
         }
 
@@ -238,7 +288,7 @@ class SummaryGenerationService:
             await self._l3_vector.upsert_points(collection=collection, points=[point])
             logger.info("摘要已存储至 %s: %s", collection, point_id)
         except Exception as e:
-            logger.warning("摘要存储失败: %s", e)
+            logger.error("摘要存储至 %s 失败: %s", collection, e)
 
     def _build_search_context(self, search_results: list[SearchResult]) -> str:
         """构建检索上下文文本
@@ -275,8 +325,14 @@ class SummaryGenerationService:
         context_parts = []
         for i, result in enumerate(l2_results, 1):
             payload = result.get("payload", {}) if isinstance(result, dict) else {}
-            summary_text = payload.get("summary_text", "") if isinstance(payload, dict) else ""
-            context_parts.append(f"[文档摘要 {i}] {summary_text}")
+            if isinstance(payload, dict):
+                summary_text = payload.get("summary_text", "")
+                perspective_label = payload.get("perspective", "")
+                confidence = payload.get("confidence_score", "")
+                context_parts.append(f"[文档摘要 {i}] (视角:{perspective_label}, 置信度:{confidence}) {summary_text}")
+            else:
+                summary_text = payload.get("summary_text", "") if isinstance(payload, dict) else ""
+                context_parts.append(f"[文档摘要 {i}] {summary_text}")
 
         return "\n\n".join(context_parts)
 

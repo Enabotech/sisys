@@ -133,6 +133,17 @@ class StrategicArchive:
                 message="valid_from must be before or equal to valid_until",
                 context={"entity": "StrategicArchive", "rule": "validity_range"},
             )
+        # valid_from/valid_until 必须为 timezone-aware（防止 naive datetime 与 _now() 比较时抛出 TypeError）
+        if self.valid_from is not None and self.valid_from.tzinfo is None:
+            raise EntityValidationError(
+                message="valid_from must be timezone-aware",
+                context={"entity": "StrategicArchive", "field": "valid_from"},
+            )
+        if self.valid_until is not None and self.valid_until.tzinfo is None:
+            raise EntityValidationError(
+                message="valid_until must be timezone-aware",
+                context={"entity": "StrategicArchive", "field": "valid_until"},
+            )
         return True
 
     def is_valid(self) -> bool:

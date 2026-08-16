@@ -35,6 +35,7 @@ class SummaryGenerationPort(Protocol):
         config: LLMConfig | None = None,
         tenant_id: str | None = None,
         cross_document: bool = False,
+        limit: int = 10,
     ) -> Any:
         """生成契约化结构化摘要
 
@@ -49,13 +50,16 @@ class SummaryGenerationPort(Protocol):
             tenant_id: 可选租户 ID（多租户隔离）
             cross_document: 跨文档摘要模式（False 生成单文档 L2 摘要，
                            True 聚合 L2 摘要生成跨文档 L1 摘要）
+            limit: 跨文档模式下 L2 检索结果数量限制（默认 10）
 
         Returns:
             对应视角 Schema 的 Pydantic 实例
 
         Raises:
+            ValidationError: 查询文本为空时
             SummaryPerspectiveNotSupportedError: 不支持的视角类型
             SummaryGenerationError: 摘要生成整体失败
+            LLMConfigError: LLM 配置错误时透传
         """
         ...
 

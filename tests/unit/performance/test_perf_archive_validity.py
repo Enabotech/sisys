@@ -9,6 +9,7 @@ CI 环境下默认跳过，本地开发手动触发。
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
@@ -22,8 +23,8 @@ from src.infrastructure.storage.postgresql.repository.archive_repository import 
 )
 from src.infrastructure.storage.postgresql.session_context import with_session
 
-# CI 跳过标记
-SKIP_PERFORMANCE = False
+# CI 跳过标记：检测 CI 环境变量
+SKIP_PERFORMANCE = os.environ.get("CI") == "true"
 
 
 def _make_mock_models(count: int) -> list[MagicMock]:
@@ -59,12 +60,12 @@ class TestArchiveValidityPerformance:
 
     async def _run_benchmark(self, query: ArchiveQuery) -> float:
         """运行单次查询并返回延迟（毫秒）"""
-        model_count = 10_000
-        models = _make_mock_models(model_count)
-
+        models = _make_mock_models(10_000)
         repo = PostgreSQLArchiveRepository()
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        # scalars() 是同步方法，all() 是同步方法
+        # 不能用 AsyncMock 链式调用（scalars 会被当作 async 方法）
+        mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = models
         mock_session.execute.return_value = mock_result
 
