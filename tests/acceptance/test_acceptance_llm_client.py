@@ -7,11 +7,11 @@ AC-1/AC-2 通过 UDMRConfig.from_env() 读取真实云端配置，调用真实�
 运行: poetry run pytest tests/acceptance/test_acceptance_llm_client.py -v
 
 前置条件（AC-1/AC-2）:
-    - UDMR_CLOUD_0_ENABLED=true
-    - UDMR_CLOUD_0_API_TYPE=anthropic
-    - UDMR_CLOUD_0_MODEL=<模型名>
-    - UDMR_CLOUD_0_ENDPOINT=<云端端点>
-    - UDMR_CLOUD_0_API_KEY=<API Key>
+    - UDMR_CLOUD_*_ENABLED=true
+    - UDMR_CLOUD_*_API_TYPE=anthropic
+    - UDMR_CLOUD_*_MODEL=<模型名>
+    - UDMR_CLOUD_*_ENDPOINT=<云端端点>
+    - UDMR_CLOUD_*_API_KEY=<API Key>
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def _get_udmr_cloud_config() -> tuple[LLMConfig, bool]:
     """从 UDMRConfig 读取真实云端 LLM 配置
 
     优先级：
-    1. UDMR_CLOUD_0_* 环境变量（应用级配置，不走测试环境配置链）
+    1. UDMR_CLOUD_*_* 环境变量（应用级配置，不走测试环境配置链）
     2. LLM_* 环境变量（由测试环境配置链同步，适用于 CI/TEST_CONFIG）
 
     返回 (LLMConfig, is_available)：
