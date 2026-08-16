@@ -66,7 +66,12 @@
 - [ ] L3/L5 同步独立执行，一个失败不影响另一个（独立 try/except 块）
 - [ ] L3/L5 均不可用时（None），降级为记录 WARNING 日志，不阻塞主流程
 - [ ] 同步失败（如网络异常）记录 WARNING 日志，不抛出异常，不影响 ValidityPeriodSet 事件处理主流程
-- [ ] **异步调用适配：** 事件处理器回调为同步函数（`EventListener.on_event` 同步回调签名），L3/L5 端口方法为 `async`。**本 Story 沿用 Story 3.11 既有同步分发模式**（`_wrap_handler` 同步回调），在同步回调中使用 `asyncio.run()` 运行异步同步方法（项目先例：`chunk_indexing_handler.py` 第 94 行、`document_version_handler.py` 第 75-78 行）。⚠️ **风险与方案：** 若事件分发已在运行的事件循环内执行（如 RabbitMQ 消费协程），顶层 `asyncio.run()` 会抛出 `RuntimeError: asyncio.run() cannot be called from a running event loop`。**主选方案：** `_sync_l3_validity()`/`_sync_l5_validity()`/`_mark_stale_on_l3()` 统一封装为 `async` 方法，通过 `_run_async(coro)` 辅助函数执行：优先 `asyncio.get_event_loop().run_until_complete(coro)`（已存在运行循环时复用），否则 `asyncio.run(coro)`。**备选方案：** 在 `archive_handlers.py` 中对事件处理器显式标注 `sync`/`async` 双通道（`InMemoryEventListener` 同步 + `EventListenerAsync.async_handle` 异步），Story 3.12 先采用 `_run_async` 辅助函数最小改动方案。两个方案的单元测试需覆盖：同步回调成功、L3/L5 异步异常时降级不抛出
+- [ ] **异步调用适配：** 事件处理器回调为同步函数（`EventListener.on_event` 同步回调签名），L3/L5 端口方法为 `async`。**本 Story 沿用 Story 3.11 既有同步分发模式**（`_wrap_handler` 同步回调）。新增 `_run_async(coro)` 辅助函数**适配三种事件循环场景**：
+  - **无运行循环**（如测试函数直接调用 dispatch）：`asyncio.run(coro)` 创建并关闭新循环
+  - **有运行循环**（如 `InMemoryEventBus.publish()` 在 async 上下文调用 dispatch）：`asyncio.get_running_loop().create_task(coro)` 调度到当前循环（fire-and-forget）
+  - **实现关键**：用 `asyncio.get_running_loop()` 检测运行循环（py3.11+ 无循环时抛 RuntimeError），无循环用 `asyncio.run()`，有循环用 `create_task`。**禁止使用 `asyncio.get_event_loop().run_until_complete()`**（该 API 在已运行循环中会抛出 `RuntimeError: This event loop is already running`）
+  - ⚠️ **fire-and-forget 语义**：在异步上下文中 `_run_async` 返回时协程可能尚未执行完毕。handler 内部不能依赖协程完成后的副作用（如 `InMemoryEventListener.dispatch()` 的 ExceptionGroup 收集）。`_mark_stale_on_l3()` 等异步方法的内部 try/except 已确保异常不会传播到调用方
+  - **单元测试覆盖**：同步回调成功、L3/L5 异步异常时降级不抛出、有运行循环时 `create_task` 调度成功
 - [ ] 单元测试覆盖：同步成功、L3 失败、L5 失败、L3/L5 均不可用四种场景
 
 ### AC-3: FactBecameStale 事件触发降权处理
@@ -81,13 +86,15 @@
 - [ ] L3 payload 更新字段：`{"is_stale": True, "stale_reason": event.stale_reason, "stale_since": event.stale_since.isoformat()}`。**命名规范：** L3 payload 使用 `is_stale: bool`（True/False），L2 metadata 使用 `staleness: str`（"stale"），两者通过 FactBecameStale 事件实现 L2→L3 最终一致性。L3 的 `is_stale` 是**检索优化用冗余副本**，L2 的 `staleness` 是**权威来源**
 - [ ] L3 更新采用"读-改-写"三步：`get_point(collection="strategic_archive", point_id=f"strategic_archive:{archive_id}")` → 合并 `is_stale`/`stale_reason`/`stale_since` 到 payload → `upsert_points(collection="strategic_archive", points=[{"id": ..., "payload": 合并后payload}])`
 - [ ] L3 不可用时（None）降级记录 WARNING 日志
-- [ ] **最终一致性保障：** `mark_stale_archives()` 发布 `FactBecameStale` 事件后立即返回（不等待事件处理完成），L3 写入存在延迟窗口。兜底链：`StalenessWeightService` 通过 `archive_repo.find()` 批量查询 L2 的 `metadata["staleness"]` 权威数据。**重试保障：** 当前 `mark_stale_archives()` 幂等跳过已标记档案（`metadata.get("staleness") == "stale"`），事件处理失败后不会重试——需在 `mark_stale_archives()` 中增加重试机制：在 L3 写入成功前，不将 `metadata["staleness"]` 标记为 `"stale"`，或引入重试队列/死信处理。**建议方案：** 在 `mark_stale_archives()` 中增加 `mark_l3_stale_on_archive()` 内联调用（跳过事件总线，直接调用 L3 端口写入），事件发布作为辅助通知通道。L3 写入失败时档案不标记为 stale，下次调度时重试
-- [ ] 单元测试覆盖：降权标记成功、L3 不可用、网络异常三种场景
+- [ ] **最终一致性保障：** `mark_stale_archives()` 发布 `FactBecameStale` 事件后立即返回（不等待事件处理完成），L3 写入存在延迟窗口。兜底链：`StalenessWeightService` 通过 `archive_repo.find()` 批量查询 L2 的 `metadata["staleness"]` 权威数据。**重试保障：** 在 `mark_stale_archives()` 中增加内联 `_mark_stale_on_l3()` 调用（跳过事件总线，直接调用 L3 端口写入），L3 写入成功后才标记 L2 的 `metadata["staleness"]="stale"` 并保存，L3 写入失败时档案不标记为 stale，下次调度时重试。事件发布作为辅助通知通道。⚠️ **内联写入与事件处理器的去重**：`InMemoryEventBus` 路径下事件发布后 `dispatch()` 会调用事件处理器再次触发 `_mark_stale_on_l3()`，导致 L3 重复写入。`_mark_stale_on_l3()` 必须实现幂等（先 `get_point()` 读取现有 payload，检查 `is_stale` 是否已为 True，已标记则跳过）。**内联写入负责强一致性保障，事件处理器负责 RabbitMQ 等异步通道场景的兜底**
+- [ ] **`mark_stale_archives()` 持久化 `stale_reason` 到 metadata**：当前 `mark_stale_archives()` 仅将 `stale_reason` 作为局部变量用于构造事件，**未持久化到 L2 metadata**。需在 `mark_stale_archives()` 中增加 `archive.metadata["stale_reason"] = stale_reason`，确保 `_to_archive_response()` 从 metadata 读取 `stale_reason` 时不为 None（参见 AC-6 字段映射要求）
+- [ ] **`mark_stale_archives()` 并发安全**：`find()` 查询时使用 `find_for_update()` 替代 `find()`，避免与 `set_validity_period()` 的竞态（T1 读取旧数据判定陈旧，T2 设置新有效期后 T1 错误标记 stale）。`find_for_update()` 在 DB 层面加悲观锁
+- [ ] 单元测试覆盖：降权标记成功、L3 不可用、网络异常、重复事件幂等、并发竞态五种场景
 
 ### AC-4: 检索结果排序中的陈旧数据降权
 
 **Given** 检索结果中包含陈旧档案
-**When** 执行战略档案检索（StrategicArchiveService.query_archive）或战略档案向量搜索
+**When** 执行战略档案**向量检索**（`StrategicArchiveService.search_vectors()`，新增方法）
 **Then** 陈旧档案的排序分数降低（降权因子 0.5）
 **And** 降权处理后保持排序稳定（分数相同时按 id 确定性排序）
 
@@ -100,14 +107,40 @@
     - 若 `payload` 中无 `is_stale` 标记但 `archive_id` 字段存在，通过 `archive_repo.find()` **批量查询**（收集所有缺失标记的 archive_id，一次查询批量判断，避免 N+1 问题），对每个结果调用 `archive.is_stale()` 判断
     - 若 `archive_repo` 不可用（None）且 payload 中无 is_stale 标记，跳过该结果的降权
     - 若 `archive_repo.get_by_id()` 返回 None（档案已被删除），视为非陈旧，score 不变，记录 WARNING 日志
-  - 降权后按 `(-score, id)` 降序重排序
+  - 降权后按 `(-score, id)` 降序重排序（`id` 为向量点 ID，格式 `"strategic_archive:{archive_id}"`，按字符串字典序）
   - 返回降权后的结果列表（长度不变，只调整 score 和顺序）
-- [ ] **`StalenessWeightService` 的适用范围：** 该服务适用于 `strategic_archive` collection 的检索结果（该 collection 的 payload 包含 `archive_id` 字段，且 `FactBecameStale` 事件写入 `is_stale` 标记）。**不侵入 `LayeredRetrievalService`（检索 `documents` collection，payload 中无 `archive_id` 和 `is_stale` 标记）**。如需在文档切片检索中应用降权，需在 `FactBecameStale` 事件处理器中同步更新 `documents` collection 的相关 payload（见 AC-3 扩展选项）
-- [ ] 集成方式：`StalenessWeightService` 由调用方在获得战略档案检索结果后显式调用，或在 `HybridSearchService` 等组合服务中集成
+- [ ] **`StalenessWeightService` 的适用范围：** 该服务适用于 `strategic_archive` collection 的**向量检索结果**（`SearchResult` 含 `score`，payload 含 `archive_id` 字段，`FactBecameStale` 事件写入 `is_stale` 标记）。**不适用于 `query_archive()`（L2 实体查询，返回 `StrategicArchive` 实体列表，无 score 字段）**。**不侵入 `LayeredRetrievalService`（检索 `documents` collection，payload 中无 `archive_id` 和 `is_stale` 标记）**。如需在文档切片检索中应用降权，需在 `FactBecameStale` 事件处理器中同步更新 `documents` collection 的相关 payload（见 AC-3 扩展选项）
+- [ ] **集成方式（Round 2 修订）：** 新增 `StrategicArchiveService.search_vectors()` 方法（服务层封装）：
+  ```python
+  async def search_vectors(
+      self,
+      query_vector: list[float],
+      limit: int = 10,
+      filter_payload: dict | None = None,
+  ) -> list[SearchResult]:
+      """战略档案向量检索
+
+      通过 L3VectorPort.search() 检索 strategic_archive collection，
+      返回 SearchResult 列表，返回前集成 StalenessWeightService 降权。
+      """
+      raw = await self._vector_storage.search(
+          collection=self.L3_COLLECTION,
+          query_vector=query_vector,
+          limit=limit,
+          filter_payload=filter_payload,
+      )
+      results = [SearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {})) for r in raw]
+      if self._staleness_service is not None:
+          results = await self._staleness_service.apply_staleness_weight(results)
+      return results
+  ```
+  - `StrategicArchiveService` 构造函数新增 `staleness_service: StalenessWeightService | None = None` 可选参数
+  - `query_archive()` 保持纯 L2 实体查询，**不参与降权**（无 score 字段）
+  - `staleness_service` 为 None 时跳过降权（透明降级）
 - [ ] 降权因子使用常量 `STALE_WEIGHT_FACTOR = 0.5`（定义在 `staleness_weight_service.py` 模块级）
-- [ ] 降权处理准确率 100%：陈旧数据必须被降权，非陈旧数据不得被降权
+- [ ] 降权处理准确率：**测试覆盖所有已定义的陈旧/非陈旧场景（空、全陈旧、全新鲜、混合、重复陈旧），零误降权**（Round 2 修订：原"100%"改为可测量表述）
 - [ ] 降权后分数相同时按 `(-score, id)` 确保排序确定性
-- [ ] 降权延迟 P95<100ms（通过批量查询 `archive_repo.find()` 减少 N+1 问题）
+- [ ] 降权延迟 P95<100ms（**非功能性需求，见性能约束章节**；通过批量查询 `archive_repo.find()` 减少 N+1 问题，不在验收测试中测量）
 
 ### AC-5: 摘要生成中的"数据陈旧"提示
 
@@ -132,14 +165,21 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `ArchiveResponse` 新增 `is_stale: bool = False` 字段
-- [ ] `ArchiveResponse` 新增 `stale_reason: str | None = None` 字段（陈旧原因，"expired"/"archived_too_long"/None）
-- [ ] `ArchiveResponse` 新增 `stale_since: str | None = None` 字段（标记为陈旧的时间）
+- [ ] `ArchiveResponse` 新增 `stale_reason: str | None = None` 字段（陈旧原因，"expired"/"archived_too_long"/None；**来源：`mark_stale_archives()` 持久化到 L2 metadata 的 `stale_reason` 字段**，参见 AC-3 持久化要求）
+- [ ] `ArchiveResponse` 新增 `stale_since: str | None = None` 字段（标记为陈旧的时间，ISO 8601 格式字符串，如 `"2026-08-16T12:00:00Z"`）
 - [ ] `_to_archive_response()` 映射：从 `metadata` 字典中读取 `staleness` 字段映射为 `is_stale`（`metadata.get("staleness") == "stale"` → `is_stale=True`），从 `metadata` 中读取 `stale_reason`、`stale_since` 字段。⚠️ **命名映射说明：** L2 metadata 使用 `staleness: str`（"stale"），L3 payload 使用 `is_stale: bool`（True/False），API 响应统一为 `is_stale: bool`。L2 metadata 的 `staleness` 是**权威来源**，L3 payload 的 `is_stale` 是**检索优化用冗余副本**（由 FactBecameStale 事件驱动 L2→L3 最终一致性，见"命名规范"章节）
 - [ ] `GET /api/v1/archive/entries` 新增查询参数 `staleness_status: str | None = None`（"stale"/"fresh"），在 `ArchiveQuery` 中新增 `staleness_status: str | None = None` 字段。⚠️ **与 `validity_status` 语义区分：** `validity_status` 按 `valid_from`/`valid_until` 时间计算（VALID=未过期，EXPIRED=已过期，确定性时间判断）；`staleness_status` 按 `metadata["staleness"]` 标记判断（stale=已标记陈旧，fresh=未标记）。两者逻辑相关但不等价——`EXPIRED` 是时间维度，`stale` 是标记维度，**不得混用**
-- [ ] `_apply_filters()` 扩展支持 `staleness_status` 过滤（使用 SQLAlchemy JSONB 表达式，`ArchiveModel.metadata_["staleness"].as_string() == "stale"`，与现有 `/src/infrastructure/storage/postgresql/repository/archive_repository.py` 中 `_apply_filters()` 的列表达式风格一致，**不引入 `text()` 原生 SQL**）：
-  - `"stale"`：`metadata['staleness'] = 'stale'`（JSONB 键值判断）
-  - `"fresh"`：`metadata['staleness'] IS DISTINCT FROM 'stale'`（含键缺失场景）
+- [ ] `_apply_filters()` 扩展支持 `staleness_status` 过滤（使用 SQLAlchemy JSONB `.astext` 表达式，**注意 NULL 语义**：键缺失时 `.astext` 求值为 SQL `NULL`，`==` 返回 `NULL`（排除），`is_distinct_from` 返回 `True`（包含））：
+  - `"stale"`：`ArchiveModel.metadata_["staleness"].astext == "stale"`（键缺失时 NULL → 排除，符合"仅返回已标记 stale"语义）
+  - `"fresh"`：`ArchiveModel.metadata_["staleness"].astext.is_distinct_from("stale")`（键缺失时 NULL IS DISTINCT FROM 'stale' → True → 包含，符合"未标记 stale 的档案"语义）
+  - **禁止**使用 `cast(..., String)` 或 `.as_string()`（非标准方法，且 `cast` 对 `.astext` 返回值冗余）
+- [ ] `staleness_status` 非法值（非 "stale"/"fresh"/None）在 `__post_init__` 中抛 `EntityValidationError`（自动映射为 HTTP 400，**API 路由层无须额外校验**）
 - [ ] 向后兼容：不传 `staleness_status` 参数时行为不变
+- [ ] API 契约测试扩展（`test_api_contract_archive_validity.py`）：
+  - `GET /entries?staleness_status=stale` 传递 `staleness_status="stale"` 到 `ArchiveQuery`
+  - `GET /entries?staleness_status=fresh` 传递 `staleness_status="fresh"` 到 `ArchiveQuery`
+  - `ArchiveResponse` 包含 `is_stale: bool`、`stale_reason: str | None`、`stale_since: str | None` 字段
+  - `staleness_status` 非法值（如 "invalid"）返回 400
 
 ### AC-7: 端口注册与 DI 集成
 
@@ -258,11 +298,11 @@
 **必须覆盖的场景：**
 - **AC-1 场景：** 归档时 L3/L5 写入有效期初始快照（valid_from/valid_until 为 None）
 - **AC-2 场景：** 设置有效期后 L3/L5 payload 同步更新
-- **AC-3 场景：** 陈旧标记触发降权处理（L3 payload 标记）
-- **AC-4 场景：** 检索结果中陈旧数据降权（排序分数降低 50%）
+- **AC-3 场景：** 陈旧标记触发降权处理（L3 payload 标记）+ 重复事件幂等消费
+- **AC-4 场景：** 战略档案向量检索结果中陈旧数据降权（排序分数降低 50%，基于 `search_vectors()` 方法）
 - **AC-5 场景：** 摘要生成中提示"数据陈旧"
 - **AC-6 场景：** API 响应暴露陈旧状态 + 按陈旧状态过滤
-- **Edge Cases：** L3 不可用时降级、L5 不可用时降级、archive_repo 不可用时降级、无陈旧数据时无降权、降权后排序稳定性
+- **Edge Cases：** L3 不可用时降级、L5 不可用时降级、archive_repo 不可用时降级、无陈旧数据时无降权、降权后排序稳定性、空结果集降权、混合陈旧/新鲜结果排序、并发事件 TOCTOU（见 AC-3 最终一致性保障）
 
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试
@@ -299,7 +339,7 @@
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | StalenessWeightService | 降权计算/重排序/降级 | `test_staleness_weight_service.py` | Task 1 |
 | **TDD 单元测试** | ArchiveValidityHandler 扩展 | L3/L5 同步/降权触发 | `test_archive_handlers.py` | Task 2 |
-| **TDD 单元测试** | LayeredRetrievalService 扩展 | 降权集成/排序 | `test_layered_retrieval_service.py` | Task 3 |
+| **TDD 单元测试** | StrategicArchiveService 扩展 | search_vectors() 降权集成/排序（Round 2 修订：原 LayeredRetrievalService 改为 StrategicArchiveService.search_vectors()） | `test_strategic_archive_service.py` | Task 3 |
 | **TDD 单元测试** | SummaryGenerationService 扩展 | 陈旧提示 | `test_summary_generation_service.py` | Task 4 |
 | **TDD 单元测试** | ArchiveQuery 扩展 | staleness_status 字段 | `test_archive_query.py` | Task 0 |
 | **TDD 单元测试** | API 路由扩展 | 陈旧状态过滤/响应 | `test_archive_routes.py` | Task 5 |
@@ -361,7 +401,7 @@
 | AC-3 | FactBecameStale 事件触发降权 | Task 2 | 事件处理器降权标记实现 | `test_archive_handlers.py` |
 | AC-4 | 检索结果排序中的陈旧数据降权 | Task 0 | SDD 规范定义（StalenessWeightService） | `test_staleness_weight_service.py` |
 | AC-4 | 检索结果排序中的陈旧数据降权 | Task 1 | StalenessWeightService 实现 | `test_staleness_weight_service.py` |
-| AC-4 | 检索结果排序中的陈旧数据降权 | Task 3 | StrategicArchiveService 集成（Round 1 修订：原 LayeredRetrievalService 改为 StrategicArchiveService） | `test_strategic_archive_service.py` |
+| AC-4 | 检索结果排序中的陈旧数据降权 | Task 3 | StrategicArchiveService.search_vectors() 集成（Round 2 修订：原 query_archive 改为 search_vectors） | `test_strategic_archive_service.py` |
 | AC-5 | 摘要生成中的"数据陈旧"提示 | Task 0 | SDD 规范定义 | `test_summary_generation_service.py` |
 | AC-5 | 摘要生成中的"数据陈旧"提示 | Task 4 | SummaryGenerationService 扩展 | `test_summary_generation_service.py` |
 | AC-6 | API 响应中的陈旧标记暴露 | Task 0 | SDD 规范定义 | `test_archive_routes.py` |
@@ -404,7 +444,7 @@
 
 **关联 AC:** AC-4
 
-> **说明：** StalenessWeightService 是降权处理的核心服务，独立于具体检索链路。Task 3 将其集成到 LayeredRetrievalService。
+> **说明：** StalenessWeightService 是降权处理的核心服务，独立于具体检索链路。Task 3 将其集成到战略档案向量检索（`StrategicArchiveService.search_vectors()`）。
 
 #### TDD 循环 A: StalenessWeightService 核心逻辑
 
@@ -471,7 +511,7 @@
   - L3 异常时记录 WARNING 不抛出
   - FactBecameStale 事件触发 L3 payload 标记 is_stale/stale_reason/stale_since（读-改-写三步）
   - FactBecameStale 事件 L3 不可用时降级日志
-  - 异步同步方法在同步回调中通过 `_run_async` 辅助函数调用（`asyncio.get_event_loop().run_until_complete()` 兜底）
+  - 异步同步方法在同步回调中通过 `_run_async` 辅助函数调用（`get_running_loop()` 检测 + `create_task`/`asyncio.run()` 双模式，见 AC-2 异步调用适配说明）
 - [ ] Subtask 2.5: 🟢 绿 — 扩展 `ArchiveValidityHandler`
   - 构造函数新增 `l3_vector: L3VectorPort | None = None`、`l5_graph: L5GraphPort | None = None`
   - `_handle_validity_period_set()`：调用 `_sync_l3_validity()` 和 `_sync_l5_validity()`
@@ -491,32 +531,67 @@
 
 ---
 
-### Task 3: 战略档案检索场景降权集成
+### Task 3: 战略档案向量检索降权集成
 
 **关联 AC:** AC-4
 
-> **说明：** StalenessWeightService 适用于 `strategic_archive` collection 的检索结果（payload 含 `archive_id`）。本 Task 在战略档案检索导出层（`StrategicArchiveService`）集成降权。**不侵入 `LayeredRetrievalService`**（其检索 `documents` collection，payload 无 `is_stale`/`archive_id` 标记，降权不适用）。⚠️ 修订说明（Round 1 文档审查）：原设计在 `LayeredRetrievalService` 四个内部方法返回前降权，但 `documents` collection 的检索结果中无 `archive_id` 字段导致兜底链失效、且四个入口重复降权（非幂等）——已废弃该方案。
+> **说明：** StalenessWeightService 适用于 `strategic_archive` collection 的**向量检索结果**（`SearchResult` 含 `score`，payload 含 `archive_id`）。本 Task 新增 `StrategicArchiveService.search_vectors()` 方法，通过 `L3VectorPort.search()` 查询 `strategic_archive` collection，返回 `SearchResult` 列表，在返回前集成 `StalenessWeightService` 降权。**不侵入 `LayeredRetrievalService`**（其检索 `documents` collection，payload 无 `is_stale`/`archive_id` 标记，降权不适用）。⚠️ 修订说明（Round 1 文档审查）：原设计在 `LayeredRetrievalService` 四个内部方法返回前降权，已废弃。⚠️ 修订说明（Round 2 文档审查）：原 Round 1 设计在 `query_archive()` 返回前降权，但 `query_archive()` 返回 `StrategicArchive` 实体列表（无 score），与 `StalenessWeightService` 的 `SearchResult` 入参类型不匹配——已修正为 `search_vectors()` 方法集成降权。
 
-#### TDD 循环 A: StrategicArchiveService 检索降权集成
+#### TDD 循环 A: StrategicArchiveService.search_vectors() 实现 + 降权集成
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展 `tests/unit/application/services/test_strategic_archive_service.py`（集成降权/降级） |
-| 🟢 绿 | 扩展 `StrategicArchiveService` — 注入 StalenessWeightService，在检索返回前调用降权 |
+| 🔴 红 | 编写 `tests/unit/application/services/test_strategic_archive_service.py`（新增 `TestSearchVectors` 测试类，包含降权集成/降级/类型正确性） |
+| 🟢 绿 | 新增 `StrategicArchiveService.search_vectors()` 方法 + 注入 `StalenessWeightService`，在返回前调用降权 |
 | 🔄 重构 | 优化代码 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写降权集成失败测试
-  - `query_archive()` 返回前调用 `apply_staleness_weight()`
+- [ ] Subtask 3.1: 🔴 红 — 编写 `search_vectors()` 降权集成失败测试
+  - `search_vectors()` 返回 `list[SearchResult]`（类型正确，含 `id`/`score`/`payload` 字段）
+  - `search_vectors()` 返回前调用 `apply_staleness_weight()`
   - `staleness_service` 为 None 时跳过降权（透明降级）
-  - 降权后排序正确性验证（陈旧数据排序分数降低）
+  - 降权后排序正确性验证（陈旧数据 score 降低 50%，排序位置变化）
   - 返回结果数量不变（只调整 score 和顺序）
-- [ ] Subtask 3.2: 🟢 绿 — 扩展 `StrategicArchiveService`
+  - 空结果集返回空列表（不报错）
+  - 混合陈旧/新鲜结果：陈旧数据降权后位于新鲜数据之后
+  - `query_archive()` 保持纯 L2 实体查询，**不参与降权**（无 score 字段）
+- [ ] Subtask 3.2: 🟢 绿 — 实现 `StrategicArchiveService.search_vectors()` + 降权集成
+  ```python
+  async def search_vectors(
+      self,
+      query_vector: list[float],
+      limit: int = 10,
+      filter_payload: dict | None = None,
+  ) -> list[SearchResult]:
+      """战略档案向量检索
+
+      通过 L3VectorPort.search() 检索 strategic_archive collection，
+      返回 SearchResult 列表，返回前集成 StalenessWeightService 降权。
+
+      Args:
+          query_vector: 查询向量
+          limit: 返回结果数量限制
+          filter_payload: Payload 过滤条件
+
+      Returns:
+          降权后的 SearchResult 列表
+      """
+      raw = await self._vector_storage.search(
+          collection=self.L3_COLLECTION,
+          query_vector=query_vector,
+          limit=limit,
+          filter_payload=filter_payload,
+      )
+      results = [SearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {})) for r in raw]
+      if self._staleness_service is not None:
+          results = await self._staleness_service.apply_staleness_weight(results)
+      return results
+  ```
   - 构造函数新增 `staleness_service: StalenessWeightService | None = None`
-  - `query_archive()` 返回前：`results = await self._staleness_service.apply_staleness_weight(results)`（if service exists）
 - [ ] Subtask 3.3: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [ ] `StrategicArchiveService` 检索降权集成完成
+- [ ] `StrategicArchiveService.search_vectors()` 实现完成
+- [ ] 降权集成正确（类型兼容、混合场景排序正确、空结果不报错）
 - [ ] 所有 TDD 循环测试通过
 - [ ] 覆盖率≥85%
 
@@ -703,7 +778,7 @@
 2. `StalenessWeightService` 可独立测试，可插拔集成到任何检索链路
 3. 降权因子 0.5 是常量，未来可配置化
 
-> ⚠️ **Round 1 修订：** 降权集成点从 `LayeredRetrievalService`（`documents` collection，payload 无 `archive_id`/`is_stale`）**改为 `StrategicArchiveService.query_archive()`（`strategic_archive` collection，payload 含 `archive_id`）**。原因见 AC-4 适用范围说明与 "AC→Task 追溯矩阵"。
+> ⚠️ **Round 1 修订：** 降权集成点从 `LayeredRetrievalService`（`documents` collection，payload 无 `archive_id`/`is_stale`）改为 `StrategicArchiveService`。**Round 2 修订：** 进一步修正——集成点从 `query_archive()`（返回 `StrategicArchive` 实体，无 score，与 `SearchResult` 入参类型不匹配）改为 `search_vectors()`（向量检索返回 `SearchResult`，有 score，类型兼容）。原因见 AC-4 适用范围说明与 "AC→Task 追溯矩阵"。
 
 **决策 2：降权触发方式 — 事件驱动 vs 查询时实时判断**
 
@@ -739,7 +814,7 @@
 | 方案 B：payload 中写入 `already_weighted: True` 标记 | 显式幂等、可防御重入 | 修改 payload、污染 L3 持久化字段 | 6/10 |
 
 **决策理由：**
-1. 方案 A 通过**单一集成点**（`StrategicArchiveService.query_archive()` 返回前唯一一次调用）保证降权只执行一次
+1. 方案 A 通过**单一集成点**（`StrategicArchiveService.search_vectors()` 返回前唯一一次调用）保证降权只执行一次
 2. `apply_staleness_weight()` 不修改 payload 持久化字段，避免污染 L3
 3. 文档声明"幂等"修正为"单次调用"语义：**服务设计保证每个结果在同一调用周期内只降权一次；不承诺对同一结果跨调用重复降权免疫**
 
@@ -763,12 +838,15 @@
 ```
 FactBecameStale 事件 ──→ ArchiveValidityHandler
     │
-    ├── _mark_stale_on_l3() ──→ L3 payload 写入 is_stale=True
+    ├── _mark_stale_on_l3() ──→ L3 payload 写入 is_stale=True（幂等：先检查是否已标记）
     │
-    └── [后续检索时] ──→ StalenessWeightService.apply_staleness_weight()
+    └── [向量检索时] ──→ StrategicArchiveService.search_vectors()
          │
-         ├── 检查 payload.is_stale → score *= 0.5
-         └── 降权后重排序 → 返回降权结果
+         ├── L3VectorPort.search() ──→ 获取 SearchResult 列表
+         ├── StalenessWeightService.apply_staleness_weight()
+         │    ├── 检查 payload.is_stale → score *= 0.5
+         │    └── 批量查询 L2 兜底 → 降权后重排序
+         └── 返回降权结果
 ```
 
 **L3/L5 同步链路：**
@@ -835,7 +913,7 @@ STALE_WEIGHT_FACTOR = 0.5  # 模块级常量
 src/
 ├── application/
 │   ├── services/
-│   │   ├── strategic_archive_service.py    # UPDATE: archive_plan() L3/L5 payload 追加 valid_from/valid_until；query_archive() 集成 StalenessWeightService
+│   │   ├── strategic_archive_service.py    # UPDATE: archive_plan() L3/L5 payload 追加 valid_from/valid_until；新增 search_vectors() 集成 StalenessWeightService
 │   │   ├── layered_retrieval_service.py     # no change（Round 1 修订：不再集成降权，降权不适用于 documents collection）
 │   │   ├── summary_generation_service.py    # UPDATE: _build_search_context() 陈旧提示 + 可选注入 archive_repo 兜底
 │   │   ├── summary_prompts.py              # UPDATE: system_prompt 追加陈旧数据处理说明
@@ -917,7 +995,7 @@ tests/
 **应用到本故事/Applied to This Story:**
 - [ ] `archive_plan()` 写入 L3/L5 初始快照（valid_from/valid_until=None，直接赋值不经过 str()）
 - [ ] 事件处理器遵循 `on_event()` + `register_handlers()` 模式
-- [ ] 降权处理**单次调用保证**（非幂等）：`StrategicArchiveService.query_archive()` 唯一调用点，不对同一结果重复降权
+- [ ] 降权处理**单次调用保证**（非幂等）：`StrategicArchiveService.search_vectors()` 唯一调用点，不对同一结果重复降权
 - [ ] L3/L5 依赖为可选，降级记录日志
 - [ ] 不新增异常编码，复用现有 archive 异常
 - [ ] L3 payload 更新采用"读-改-写"三步（get_point → 合并字段 → upsert_points），避免全量覆盖未知字段
@@ -996,7 +1074,7 @@ FactBecameStale:
 - `tests/unit/application/services/test_staleness_weight_service.py` - 降权服务测试
 
 **待更新的文件/To Be Updated:**
-- `src/application/services/strategic_archive_service.py` - UPDATE: archive_plan() L3/L5 payload 追加 valid_from/valid_until; query_archive() 集成 StalenessWeightService 降权
+- `src/application/services/strategic_archive_service.py` - UPDATE: archive_plan() L3/L5 payload 追加 valid_from/valid_until; 新增 search_vectors() 集成 StalenessWeightService 降权
 - `src/application/services/summary_generation_service.py` - UPDATE: _build_search_context() 陈旧提示 + 可选注入 archive_repo 兜底
 - `src/application/services/summary_prompts.py` - UPDATE: system_prompt 追加陈旧数据处理说明
 - `src/application/event_handlers/archive_handlers.py` - UPDATE: L3/L5 同步 + 降权触发
@@ -1059,11 +1137,25 @@ FactBecameStale:
 | R1-12 | 兜底查询使用 `get_by_id()` 逐条导致 N+1，违反 P95<100ms | P1 | 改为批量收集缺失标记的 archive_id，通过 `archive_repo.find()` 一次查询批量判断 |
 | R1-13 | `payload.get("valid_from")` 与 `"valid_from" not in payload` 语义未明确 | P1 | 统一约定使用 `payload.get("valid_from")`（返回 None 视为未设置），禁止使用 `in` 判断 |
 | R1-14 | `archive_plan()` 中 `None` 值经过 `str()` 转换变成 `"None"` 字符串 | P1 | 明确 `valid_from`/`valid_until` 直接赋值（不经过 `str()` 转换），与 `assumptions`/`decision_basis` 的 `str()` 序列化模式相区分 |
-| R1-15 | 异步回调调用异步端口方法的机制未明确 | P1 | 补充 `_run_async` 辅助函数方案：`asyncio.get_event_loop().run_until_complete()` 兜底嵌套事件循环 |
+| R1-15 | 异步回调调用异步端口方法的机制未明确 | P1 | 补充 `_run_async` 辅助函数方案：`get_running_loop()` 检测 + `create_task`/`asyncio.run()` 双模式 |
 | R1-16 | L2 metadata `staleness` 与 L3 payload `is_stale` 两套命名体系关系未说明 | P1 | 补充命名规范表格，明确 L2 为权威来源、L3 为检索优化副本、最终一致性关系 |
 | R1-17 | 降级策略表缺少"archive 已被删除"和"SummaryGenerationService 未注入"场景 | P2 | 补充两个降级场景的失败影响和降级策略 |
 | R1-18 | `StalenessWeightService` SCOPED 生命周期决策理由未说明 | P2 | 补充说明：因依赖 `archive_repo`（SCOPED），故也为 SCOPED 避免持有过期引用 |
 | R1-19 | 验收测试场景新增/修改未明确区分 | P2 | 在 AC-1~AC-7 中逐条标注新增/修改场景（本修订已隐式通过逐条 AC 详细说明） |
+| R2-1 | `query_archive()` 返回 `list[StrategicArchive]`（实体无 score）与 `apply_staleness_weight()` 入参 `list[SearchResult]` 类型不匹配 | P0 | 降权集成点从 `query_archive()` 改为 `search_vectors()`（向量检索返回 `SearchResult`，有 score，类型兼容） |
+| R2-2 | `_run_async` 方案根本性错误：`get_event_loop().run_until_complete()` 在运行循环中无法工作（`RuntimeError: This event loop is already running`） | P0 | `_run_async` 改为 `get_running_loop()` 检测 + `create_task`（有循环）/ `asyncio.run()`（无循环）双模式；禁止使用 `run_until_complete()` |
+| R2-3 | `fact_stale_reason` 未持久化到 L2 metadata，API 响应中 `stale_reason` 永远为 None | P0 | `mark_stale_archives()` 增加 `archive.metadata["stale_reason"] = stale_reason` |
+| R2-4 | `staleness_status="fresh"` 过滤的 `.astext != 'stale'` 在 JSONB 键缺失时因 NULL 语义错误排除行 | P0 | 改用 `.astext.is_distinct_from("stale")`（键缺失时 NULL IS DISTINCT FROM 'stale' → True → 包含） |
+| R2-5 | `mark_stale_archives()` 使用 `find()` 未加悲观锁，与 `set_validity_period()` 存在竞态 | P0 | 改用 `find_for_update()` 替代 `find()`，在 DB 层面加悲观锁 |
+| R2-6 | `InMemoryEventBus` 路径下内联写入与事件处理器双重触发 L3 写入 | P0 | `_mark_stale_on_l3()` 实现幂等（先检查 `is_stale` 是否已为 True，已标记则跳过） |
+| R2-7 | `_mark_stale_on_l3()` 读-改-写三步 TOCTOU 竞态，并发事件丢失字段更新 | P1 | payload 合并时保留所有已有字段（`payload = dict(existing_payload); payload.update(new_fields)`） |
+| R2-8 | Task 1 说明残留引用 LayeredRetrievalService | P1 | 改为"Task 3 将其集成到战略档案向量检索（search_vectors()）" |
+| R2-9 | 测试分类表残留 `test_layered_retrieval_service.py` 引用 | P1 | 改为 `test_strategic_archive_service.py` |
+| R2-10 | 验收测试 AC-4 场景建立在 query_archive 上（无 score 无法验证降权） | P1 | 改为基于 `search_vectors()` 的端到端向量检索降权验证 |
+| R2-11 | "降权处理准确率 100%" 不可验证 | P1 | 改为可测量表述"测试覆盖所有已定义的陈旧/非陈旧场景，零误降权" |
+| R2-12 | P95<100ms 性能指标不应出现在验收测试中 | P1 | 移至非功能性需求章节，标注"不在验收测试中测量" |
+| R2-13 | `_wrap_handler` 的 `except Exception` 无法捕获 `asyncio.CancelledError` | P2 | 改为 `except BaseException`（与 `inmemory_event_listener.py` 第 31 行的 `# noqa: BLE001` 一致） |
+| R2-14 | `StalenessWeightService` SCOPED 下 session 复用问题未说明 | P2 | 补充说明：`apply_staleness_weight()` 在 `search_vectors()` 返回前调用，此时 session 应仍活跃；如已关闭则降级为仅依赖 L3 标记 |
 
 ---
 
@@ -1096,11 +1188,9 @@ FactBecameStale:
 
 ---
 
-**故事版本/Story Version:** v1.1.0
-**创建日期/Created:** 2026-08-16
-**最后更新/Last Updated:** 2026-08-16
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
-- v1.1.0: Round 1 文档审查修订 — 修复 10 个 P0 + 6 个 P1 + 3 个 P2 问题（见 Docs Review Fixes 表）；核心变更：降权集成点从 LayeredRetrievalService 改为 StrategicArchiveService.query_archive()、端口方法修正、L3 更新采用"读-改-写"三步、最终一致性保障增强、N+1 批量查询优化、异步回调适配方案补充
+- v1.1.0: Round 1 文档审查修订 — 修复 10 个 P0 + 6 个 P1 + 3 个 P2 问题（见 Docs Review Fixes 表）；核心变更：降权集成点从 LayeredRetrievalService 改为 StrategicArchiveService、端口方法修正、L3 更新采用"读-改-写"三步、最终一致性保障增强、N+1 批量查询优化、异步回调适配方案补充
+- v1.2.0: Round 2 文档审查修订 — 修复 6 个 P0 + 5 个 P1 + 3 个 P2 问题（见 Docs Review Fixes 表 R2-* 条目）；核心变更：降权集成点从 query_archive() 改为 search_vectors()（类型兼容修复）、`_run_async` 方案修正（get_running_loop + create_task 双模式）、stale_reason 持久化、fresh 过滤 NULL 语义修复、find_for_update 悲观锁并发安全、_mark_stale_on_l3 幂等增强
 
 <!-- 仅用作跟踪故事文件模板修订记录，故事开发时[务必删除]此段 -->
