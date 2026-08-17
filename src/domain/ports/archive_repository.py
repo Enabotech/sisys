@@ -170,7 +170,7 @@ class ArchiveRepositoryPort(L2RdbPort[StrategicArchive], Protocol):
             符合条件的档案列表
         """
 
-    async def mark_stale(self, archive_id: UUID) -> bool:
+    async def mark_stale(self, archive_id: UUID, stale_since: str | None = None, stale_reason: str | None = None) -> bool:
         """条件标记档案为陈旧（并发安全）
 
         使用 UPDATE ... WHERE ... AND metadata->>'staleness' IS DISTINCT FROM 'stale'
@@ -179,6 +179,8 @@ class ArchiveRepositoryPort(L2RdbPort[StrategicArchive], Protocol):
 
         Args:
             archive_id: 档案 ID
+            stale_since: 标记时间（ISO 8601 字符串，None 时由实现自行生成）
+            stale_reason: 陈旧原因（"expired"/"archived_too_long"，None 时不写入）
 
         Returns:
             标记成功返回 True，已被其他实例抢先标记返回 False

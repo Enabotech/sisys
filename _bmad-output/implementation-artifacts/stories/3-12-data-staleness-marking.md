@@ -1199,7 +1199,7 @@ FactBecameStale:
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 2026-08-16
+**审查日期:** 2026-08-17
 **审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
 
 #### 需决策 Decision Needed
@@ -1208,11 +1208,17 @@ FactBecameStale:
 
 #### 已修复 Patch
 
-- 暂无
+- [x] [Review][Patch] **Fix 1: cross_document 异常路径 l2_results UnboundLocalError** — `summary_generation_service.py:131` 中 `l2_results` 在 `search_top_down()` 抛出异常时未定义，导致第153行 `evaluation_results = l2_results if cross_document else search_results` 抛出 `UnboundLocalError`。修复：在 `if cross_document:` 前增加 `l2_results: list[SearchResult] = []` 初始化赋值。
+- [x] [Review][Patch] **Fix 2: mark_stale stale_since 双源不一致** — `mark_stale_archives()` 实体的 `mark_stale(now, stale_reason)` 写入 `metadata["stale_since"] = now.isoformat()`，但 `archive_repository.mark_stale()` SQL 内独立生成 `stale_since = datetime.now(UTC).isoformat()`，两者时间戳不同步。修复：`ArchiveRepositoryPort.mark_stale()` 签名扩展为 `mark_stale(archive_id, stale_since=None, stale_reason=None)`，`strategic_archive_service.py` 调用时传入 `stale_since=now.isoformat()` 和 `stale_reason=stale_reason`，实现单源时间戳。
+- [x] [Review][Patch] **Fix 3: archive_id 非法值处理不一致** — `StalenessWeightService.apply_staleness_weight()` 用 `_is_valid_uuid()` 过滤非法 archive_id，但 `SummaryGenerationService._prefetch_staleness()` 直接用 `UUID(aid)` 构造，非法值抛出 `ValueError` 中止整个兜底查询。修复：`_prefetch_staleness()` 改为逐条 try/except 过滤非法 archive_id，记录 WARNING 日志，行为与 `StalenessWeightService` 一致。
+- [x] [Review][Patch] **Fix 4: exclude_staleness 使用 .as_string() 而非 .astext** — `archive_repository.py:139` 的 `exclude_staleness` 过滤使用了 `func.coalesce(ArchiveModel.metadata_["staleness"].as_string(), "") != "stale"`，违反了 AC-6 禁止 `.as_string()` 的规范。修复：统一改为 `.astext`。
+- [x] [Review][Patch] **Fix 5: StalenessWeightService 未在 __init__.py 导出** — `src/application/services/__init__.py` 未导出 `StalenessWeightService`，违反 AC-7。修复：在 `__init__.py` 中导入并导出 `StalenessWeightService`。
+- [x] [Review][Patch] **Fix 6: _run_async done callback 静默吞噬异常** — `_run_async` 的 done callback `lambda t: t.exception() if not t.cancelled() else None` 调用了 `t.exception()` 消费异常但未记录日志，导致 `_update_l3_stale` 中的异常被静默吞噬。修复：改为命名回调函数 `_log_task_exception`，在异常时记录 `logger.warning("异步任务执行失败: %s", exc, exc_info=exc)`。
+- [x] [Review][Patch] **Fix 7: stale_reason 赋值逻辑潜在错误** — `mark_stale_archives()` 中 `stale_reason = "expired" if archive.valid_until is not None else "archived_too_long"` 只检查 `valid_until is not None` 而未检查 `valid_until < now`。但结合 `is_stale(ref_date=now)` 的调用上下文，`is_stale()` 返回 True 时 `valid_until` 非 None 必然已过期，当前逻辑实际正确。确认无需修复，添加注释说明。
 
 #### 已推迟 Defer
 
-- 暂无
+- [x] [Review][Defer] **TOCTOU 竞态修复** — `_update_l3_stale` 的 get_point → upsert 之间无原子性，并发事件时 stale_reason 后写覆盖。当前通过幂等检查（is_stale 已标记且 reason 相同跳过）减轻影响，完整修复需依赖 Qdrant 条件更新（set_payload 条件写入），待 Qdrant 客户端升级后处理。`strategic_archive_service.py`
 
 ---
 
@@ -1231,5 +1237,6 @@ FactBecameStale:
 - v1.1.0: Round 1 文档审查修订 — 修复 10 个 P0 + 6 个 P1 + 3 个 P2 问题（见 Docs Review Fixes 表）；核心变更：降权集成点从 LayeredRetrievalService 改为 StrategicArchiveService、端口方法修正、L3 更新采用"读-改-写"三步、最终一致性保障增强、N+1 批量查询优化、异步回调适配方案补充
 - v1.2.0: Round 2 文档审查修订 — 修复 6 个 P0 + 5 个 P1 + 3 个 P2 问题（见 Docs Review Fixes 表 R2-* 条目）；核心变更：降权集成点从 query_archive() 改为 search_vectors()（类型兼容修复）、`_run_async` 方案修正（get_running_loop + create_task 双模式）、stale_reason 持久化、fresh 过滤 NULL 语义修复、find_for_update 悲观锁并发安全、_mark_stale_on_l3 幂等增强
 - v1.3.0: Round 3 文档审查修订 — 修复 4 个 P0 + 2 个 P1 + 3 个 P2 问题（见 Docs Review Fixes 表 R3-* 条目）；核心变更：search_vectors() 增加 L3 None 检查和 SearchResult 导入、Subtask 5.5 的 cast/as_string 修正为 .astext、ArchiveQuery 新增 archive_ids 批量查询字段、StrategicArchive 实体新增 mark_stale() 方法（DDD 封装）、_wrap_handler 改为 except BaseException 以捕获 CancelledError
+- v1.4.0: Round 1 代码审查修订 — 修复 7 个 Patch + 1 个 Defer 问题（见 Review Findings 表）；核心变更：cross_document 异常路径 l2_results 初始化、mark_stale stale_since 双源一致化、archive_id 非法值处理一致化、.as_string() 统一为 .astext、StalenessWeightService 导出、_run_async 异常日志记录
 
 <!-- 仅用作跟踪故事文件模板修订记录，故事开发时[务必删除]此段 -->

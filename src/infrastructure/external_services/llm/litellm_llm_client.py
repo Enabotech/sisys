@@ -667,12 +667,16 @@ class LitellmLLMClient(LLMClientPort):
                 for _ in range(200):  # 与 litellm MAX_ITERATIONS_TO_CLEAR_QUEUE 一致
                     try:
                         item = queue.get_nowait()
-                        try:
-                            await asyncio.wait_for(item["coroutine"], timeout=1.0)
-                        except Exception:
-                            pass
-                        finally:
-                            queue.task_done()
+                        coroutine = item.get("coroutine")
+                        if coroutine is not None:
+                            try:
+                                await asyncio.wait_for(coroutine, timeout=1.0)
+                            except (asyncio.TimeoutError, asyncio.CancelledError):
+                                # 清理阶段协程超时/取消直接忽略
+                                pass
+                            except Exception:
+                                # 队列清理阶段协程执行失败不影响主流程
+                                pass
                     except asyncio.QueueEmpty:
                         break
 

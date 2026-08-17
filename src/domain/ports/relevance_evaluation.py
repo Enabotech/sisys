@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol, TypedDict, runtime_checkable
+from typing import Any, Protocol, TypedDict, runtime_checkable
 
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.ports.llm_client import LLMConfig
@@ -80,7 +80,7 @@ class RelevanceEvaluationPort(Protocol):
         query_text: str,
         search_results: list[SearchResult],
         config: LLMConfig | None = None,
-    ) -> RelevanceEvaluationResult:
+    ) -> Any:
         """执行 LLM-as-a-Judge 多维评估
 
         先执行规则预检快速过滤，再调用 LLM 进行深度评估。
@@ -93,7 +93,12 @@ class RelevanceEvaluationPort(Protocol):
             config: 可选 LLM 调用配置（LLMConfig 值对象）
 
         Returns:
-            RelevanceEvaluationResult 包含三维评分、综合评分和阻断状态
+            -- 返回类型说明 --
+            返回对象具有 Pydantic @computed_field 行为（RelevanceEvaluation 实例），
+            调用方按属性访问（result.overall_score / result.should_block）。
+            evaluate() 返回的实际对象包含 overall_score/should_block 等
+            @computed_field 计算字段，这是应用层 QoS 增强，端口契约无法精确表达。
+            与 SummaryGenerationPort 一致使用 Any。
 
         Raises:
             RelevanceEvaluationError: LLM 评估调用失败时抛出

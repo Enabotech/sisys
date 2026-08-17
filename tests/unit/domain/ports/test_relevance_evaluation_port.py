@@ -78,12 +78,12 @@ class TestRelevanceEvaluationPortProtocol:
         assert sig.parameters["config"].default is None
 
     def test_evaluate_return_type(self) -> None:
-        """evaluate 返回类型为 RelevanceEvaluationResult"""
+        """evaluate 返回类型为 Any（跨层类型无法精确表达，与 SummaryGenerationPort 一致）"""
         from src.domain.ports.relevance_evaluation import RelevanceEvaluationPort
 
         sig = inspect.signature(RelevanceEvaluationPort.evaluate)
         return_annotation = str(sig.return_annotation)
-        assert "RelevanceEvaluationResult" in return_annotation
+        assert "Any" in return_annotation
 
     def test_quick_rule_check_method_exists(self) -> None:
         """quick_rule_check 方法存在"""

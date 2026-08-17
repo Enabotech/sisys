@@ -115,10 +115,17 @@ def create_evaluate_router(
     async def _get_current_user(
         token: str | None = Depends(oauth2_scheme),
     ) -> TokenPayload | None:
-        """验证 Bearer token 返回当前用户"""
+        """验证 Bearer token 返回当前用户
+
+        无 token 时直接拒绝（401），与其他路由模块（auth/strategic_archive）认证策略一致。
+        """
         nonlocal _auth_service
         if not token:
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         if _auth_service is None:
             _auth_service = get_resolver().resolve("auth_service")
         try:
@@ -127,6 +134,7 @@ def create_evaluate_router(
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
     # 允许测试覆盖认证依赖

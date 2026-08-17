@@ -76,8 +76,9 @@ class LLMAPIError(ThirdPartyError):
                 safe_url = f"{parsed.scheme}://{parsed.hostname}" if parsed.hostname else ""
                 if safe_url:
                     ctx["service_host"] = safe_url
-            except Exception:
-                pass
+            except (ValueError, AttributeError) as e:
+                # URL 解析失败时不阻断上下文构建（消息安全性优先）
+                ctx["service_host_error"] = str(e)[:100]
         # 消息安全性：截断 response_body 至 200 字符
         if response_body:
             truncated = response_body[:200]

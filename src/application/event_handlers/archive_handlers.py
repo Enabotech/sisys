@@ -84,8 +84,17 @@ class ArchiveValidityHandler:
 
         # 有运行循环：create_task 调度（fire-and-forget，异常由 task 内部消化）
         task = running_loop.create_task(coro)
-        # 为未处理的 task 异常注册回调，避免 "Task exception was never retrieved" 警告
-        task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+
+        # 为未处理的 task 异常注册回调，记录日志避免 "Task exception was never retrieved" 警告
+        def _log_task_exception(task: asyncio.Task[Any]) -> None:
+            if task.cancelled():
+                logger.warning("异步任务被取消: %s", coro)
+                return
+            exc = task.exception()
+            if exc is not None:
+                logger.warning("异步任务执行失败: %s", exc, exc_info=exc)
+
+        task.add_done_callback(_log_task_exception)
         return None
 
     def register_handlers(self) -> None:
