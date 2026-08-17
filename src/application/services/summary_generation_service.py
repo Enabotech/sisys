@@ -332,9 +332,7 @@ class SummaryGenerationService:
             summary_text = payload.get("summary_text", "") if isinstance(payload, dict) else ""
             perspective_label = payload.get("perspective", "") if isinstance(payload, dict) else ""
             confidence = payload.get("confidence_score", "") if isinstance(payload, dict) else ""
-            context_parts.append(
-                f"[文档摘要 {i}] (视角:{perspective_label}, 置信度:{confidence}) {summary_text}"
-            )
+            context_parts.append(f"[文档摘要 {i}] (视角:{perspective_label}, 置信度:{confidence}) {summary_text}")
 
         return "\n\n".join(context_parts)
 
