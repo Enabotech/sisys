@@ -63,6 +63,8 @@ from src.domain.exceptions import (
     OCRProcessingError,
     PasswordValidationError,
     PermissionDeniedError,
+    RelevanceEvaluationBlockedError,
+    RelevanceEvaluationError,
     RerankError,
     RoleAlreadyExistsError,
     RoleNotFoundError,
@@ -160,6 +162,8 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     LLMConfigError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 332 — 配置错误
     EntityExtractionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 340 — 实体抽取失败
     RerankError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 350 — 重排序失败（精确注册，避免回退 502）
+    RelevanceEvaluationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 360 — LLM 评估调用失败（精确注册，避免回退 502）
+    RelevanceEvaluationBlockedError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 361 — 检索结果不足被阻断（精确注册，避免回退 400）
     HybridSearchError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 209 — 三路检索通道均失败
     # 分层检索异常
     LayeredRetrievalError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 280 — 分层检索编排失败

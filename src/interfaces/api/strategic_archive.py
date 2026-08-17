@@ -117,6 +117,9 @@ class ArchiveResponse(BaseModel):
         valid_until: 失效时间
         created_at: 创建时间
         archived_at: 归档时间
+        is_stale: 是否已标记陈旧
+        stale_reason: 陈旧原因（"expired"/"archived_too_long"/None）
+        stale_since: 标记为陈旧的时间（ISO 8601）
     """
 
     archive_id: str
@@ -134,6 +137,9 @@ class ArchiveResponse(BaseModel):
     valid_until: str | None = None
     created_at: str | None = None
     archived_at: str | None = None
+    is_stale: bool = False
+    stale_reason: str | None = None
+    stale_since: str | None = None
 
 
 # ===================================================================
@@ -253,6 +259,7 @@ def create_archive_router(
         valid_from: str | None = Query(default=None, description="按生效时间过滤（ISO 8601）"),
         valid_until: str | None = Query(default=None, description="按失效时间过滤（ISO 8601）"),
         validity_status: str | None = Query(default=None, description="有效期状态过滤（valid/expired）"),
+        staleness_status: str | None = Query(default=None, description="陈旧状态过滤（stale/fresh）"),
         offset: int = Query(default=0, ge=0, description="分页偏移"),
         limit: int = Query(default=20, ge=1, le=1000, description="每页条数"),
         current_user: TokenPayload = Depends(get_current_user),
@@ -265,7 +272,8 @@ def create_archive_router(
             plan_id: 按规划 ID 过滤
             valid_from: 按生效时间过滤
             valid_until: 按失效时间过滤
-            validity_status: 按有效期状态过滤
+            validity_status: 按有效期状态过滤（valid/expired）
+            staleness_status: 按陈旧状态过滤（stale/fresh）
             offset: 分页偏移
             limit: 每页条数
             current_user: 当前用户
@@ -295,6 +303,8 @@ def create_archive_router(
         parsed_valid_from = _parse_datetime_param(valid_from, "valid_from")
         parsed_valid_until = _parse_datetime_param(valid_until, "valid_until")
         parsed_validity_status = _parse_validity_status(validity_status)
+        # staleness_status 非法值由 ArchiveQuery.__post_init__ 抛 EntityValidationError
+        # （自动映射为 HTTP 400），路由层无须额外校验
         query = ArchiveQuery(
             archive_type=parsed_archive_type,
             plan_type=plan_type,
@@ -302,6 +312,7 @@ def create_archive_router(
             valid_from=parsed_valid_from,
             valid_until=parsed_valid_until,
             validity_status=parsed_validity_status,
+            staleness_status=staleness_status,
             offset=offset,
             limit=limit,
         )
@@ -490,6 +501,11 @@ def create_archive_router(
 
 
 def _to_archive_response(archive: Any) -> ArchiveResponse:
+    # 从 metadata 中读取陈旧标记
+    metadata = getattr(archive, "metadata", {}) or {}
+    is_stale = metadata.get("staleness") == "stale"
+    stale_reason = metadata.get("stale_reason") if is_stale else None
+    stale_since = metadata.get("stale_since") if is_stale else None
     return ArchiveResponse(
         archive_id=str(archive.archive_id),
         plan_id=str(archive.plan_id) if archive.plan_id else None,
@@ -506,6 +522,9 @@ def _to_archive_response(archive: Any) -> ArchiveResponse:
         valid_until=archive.valid_until.isoformat() if archive.valid_until else None,
         created_at=archive.created_at.isoformat() if archive.created_at else None,
         archived_at=archive.archived_at.isoformat() if archive.archived_at else None,
+        is_stale=is_stale,
+        stale_reason=stale_reason,
+        stale_since=stale_since,
     )
 
 

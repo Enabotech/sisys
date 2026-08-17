@@ -1140,6 +1140,41 @@ paths:
         "500":
           description: 摘要生成失败
 
+  # ============================================================================
+  # 检索相关性评估端点 (Relevance Evaluation, Story 3-7)
+  # ============================================================================
+  /api/v1/search/evaluate:
+    post:
+      x-implemented: true
+      tags:
+        - search
+      summary: 检索相关性评估
+      description: |
+        对检索结果执行 LLM-as-a-Judge 多维评估（相关性/完整性/时效性），
+        综合评分 < 0.6 时标注"数据不足"并阻断摘要生成。
+      security:
+        - OAuth2: []
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluateRequest"
+      responses:
+        "200":
+          description: 评估成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluateResponse"
+        "400":
+          description: 请求参数校验失败
+        "422":
+          description: 检索结果不足被阻断
+        "500":
+          description: LLM 评估调用失败
+
 components:
   schemas:
     # --------------------------------------------------------------------------
@@ -2030,6 +2065,79 @@ components:
             type: string
           description: 来源文档 ID 列表
       description: 摘要生成响应
+
+    # --------------------------------------------------------------------------
+    # 检索相关性评估相关 schemas (Story 3-7)
+    # --------------------------------------------------------------------------
+    EvaluateRequest:
+      type: object
+      required:
+        - query_text
+      properties:
+        query_text:
+          type: string
+          minLength: 1
+          description: 查询文本
+        tenant_id:
+          type: string
+          nullable: true
+          description: 租户 ID
+      description: 检索相关性评估请求（系统内部执行真实检索后评估，不接受客户端传入检索结果）
+
+    EvaluateResponse:
+      type: object
+      required:
+        - overall_score
+        - context_relevance
+        - completeness
+        - timeliness
+        - context_relevance_reason
+        - completeness_reason
+        - timeliness_reason
+        - should_block
+        - block_reason
+      properties:
+        overall_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: 综合评分 ((context_relevance + completeness + timeliness) / 3)
+        context_relevance:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: 上下文相关性评分
+        completeness:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: 完整性评分
+        timeliness:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: 时效性评分
+        context_relevance_reason:
+          type: string
+          description: 相关性判断理由
+        completeness_reason:
+          type: string
+          description: 完整性判断理由
+        timeliness_reason:
+          type: string
+          description: 时效性判断理由
+        should_block:
+          type: boolean
+          description: 是否阻断摘要生成（overall_score < 0.6 时为 true）
+        block_reason:
+          type: string
+          nullable: true
+          description: 阻断理由（should_block=True 时为"数据不足"，否则为 null）
+      description: 检索相关性评估响应
 
   securitySchemes:
     OAuth2:

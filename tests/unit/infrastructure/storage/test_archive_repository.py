@@ -263,3 +263,61 @@ class TestArchiveModelValidity:
         model = repository._to_model(archive)
         assert model.valid_from == now
         assert model.valid_until == datetime(2027, 12, 31, tzinfo=UTC)
+
+
+class TestStalenessFilter:
+    """_apply_filters staleness_status 过滤测试（Story 3.12 AC-6）"""
+
+    def test_staleness_status_stale(self, repository: PostgreSQLArchiveRepository) -> None:
+        """staleness_status='stale' 生成 metadata_['staleness'] == 'stale' 过滤"""
+        from sqlalchemy import select
+
+        from src.infrastructure.storage.postgresql.models.archive import ArchiveModel
+
+        query = ArchiveQuery(staleness_status="stale")
+        stmt = select(ArchiveModel)
+        stmt = repository._apply_filters(stmt, query)
+        sql = str(stmt)
+        # 生成 `.astext == 'stale'` 表达式：metadata ->> (JSONB text 提取) = 'stale'
+        assert "metadata ->>" in sql
+        assert "=" in sql
+
+    def test_staleness_status_fresh(self, repository: PostgreSQLArchiveRepository) -> None:
+        """staleness_status='fresh' 生成 .astext.is_distinct_from('stale') 过滤"""
+        from sqlalchemy import select
+
+        from src.infrastructure.storage.postgresql.models.archive import ArchiveModel
+
+        query = ArchiveQuery(staleness_status="fresh")
+        stmt = select(ArchiveModel)
+        stmt = repository._apply_filters(stmt, query)
+        sql = str(stmt)
+        # 生成 .astext.is_distinct_from('stale') 表达式
+        assert "IS DISTINCT FROM" in sql
+
+    def test_staleness_status_none_no_filter(self, repository: PostgreSQLArchiveRepository) -> None:
+        """staleness_status=None 不生成过滤条件"""
+        from sqlalchemy import select
+
+        from src.infrastructure.storage.postgresql.models.archive import ArchiveModel
+
+        query = ArchiveQuery()
+        stmt = select(ArchiveModel)
+        stmt = repository._apply_filters(stmt, query)
+        sql = str(stmt)
+        # 不包含 staleness 过滤
+        assert "staleness" not in sql
+
+    def test_archive_ids_filter(self, repository: PostgreSQLArchiveRepository) -> None:
+        """archive_ids 生成 .archive_id.in_(...) 过滤"""
+        from sqlalchemy import select
+
+        from src.infrastructure.storage.postgresql.models.archive import ArchiveModel
+
+        ids = [uuid.uuid4(), uuid.uuid4()]
+        query = ArchiveQuery(archive_ids=ids)
+        stmt = select(ArchiveModel)
+        stmt = repository._apply_filters(stmt, query)
+        sql = str(stmt)
+        assert "archive_id" in sql
+        assert "IN" in sql.upper()

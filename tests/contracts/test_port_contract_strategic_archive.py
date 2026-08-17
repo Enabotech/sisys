@@ -84,6 +84,7 @@ class TestStrategicArchiveServicePortContract:
         "set_validity_period",
         "is_stale",
         "mark_stale_archives",
+        "search_vectors",
     ]
 
     def test_port_is_registered(self, registry: PortRegistry) -> None:
@@ -122,3 +123,91 @@ class TestStrategicArchiveServicePortContract:
         spec = registry.get(self.PORT_NAME)
         assert spec is not None
         assert spec.lifetime == Lifetime.SCOPED
+
+
+class TestStalenessWeightServicePortContract:
+    """staleness_weight_service 端口契约（Story 3.12 AC-7）"""
+
+    PORT_NAME = "staleness_weight_service"
+    IMPL_CLS_NAME = "StalenessWeightService"
+    REQUIRED_METHODS = [
+        "apply_staleness_weight",
+    ]
+
+    def test_port_is_registered(self, registry: PortRegistry) -> None:
+        """端口必须在全局注册中心注册"""
+        spec = registry.get(self.PORT_NAME)
+        assert spec is not None, f"端口 {self.PORT_NAME} 未注册"
+        from src.application.services.staleness_weight_service import StalenessWeightService
+
+        assert spec.interface is StalenessWeightService
+
+    def test_implementation_has_required_methods(self, registry: PortRegistry) -> None:
+        """实现类必须包含所有必需方法"""
+        spec = registry.get(self.PORT_NAME)
+        assert spec is not None
+        assert spec.module, f"端口 {self.PORT_NAME} 缺少 module 元数据"
+
+        impl_cls = _load_impl_cls(spec.module, self.IMPL_CLS_NAME)
+        assert impl_cls is not None, f"无法从 {spec.module} 导入 {self.IMPL_CLS_NAME}"
+
+        for method in self.REQUIRED_METHODS:
+            assert hasattr(impl_cls, method), f"缺少方法: {method}"
+            assert callable(getattr(impl_cls, method))
+
+    def test_metadata_complete(self, registry: PortRegistry) -> None:
+        """端口元数据必须完整"""
+        spec = registry.get(self.PORT_NAME)
+        assert spec is not None
+        assert spec.version and spec.version != ""
+        assert spec.owner and spec.owner != ""
+        assert spec.module and spec.module != ""
+
+    def test_lifetime_is_scoped(self, registry: PortRegistry) -> None:
+        """服务必须是 SCOPED 生命周期"""
+        from src.domain.ports.registry import Lifetime
+
+        spec = registry.get(self.PORT_NAME)
+        assert spec is not None
+        assert spec.lifetime == Lifetime.SCOPED
+
+
+class TestArchiveValidityHandlerPortContract:
+    """archive_validity_handler 端口契约（Story 3.12 AC-7）"""
+
+    PORT_NAME = "archive_validity_handler"
+    IMPL_CLS_NAME = "ArchiveValidityHandler"
+    REQUIRED_METHODS = [
+        "register_handlers",
+        "_handle_validity_period_set",
+        "_handle_fact_became_stale",
+    ]
+
+    def test_port_is_registered(self, registry: PortRegistry) -> None:
+        """端口必须在全局注册中心注册"""
+        spec = registry.get(self.PORT_NAME)
+        assert spec is not None, f"端口 {self.PORT_NAME} 未注册"
+        from src.application.event_handlers.archive_handlers import ArchiveValidityHandler
+
+        assert spec.interface is ArchiveValidityHandler
+
+    def test_implementation_has_required_methods(self, registry: PortRegistry) -> None:
+        """实现类必须包含所有必需方法"""
+        spec = registry.get(self.PORT_NAME)
+        assert spec is not None
+        assert spec.module, f"端口 {self.PORT_NAME} 缺少 module 元数据"
+
+        impl_cls = _load_impl_cls(spec.module, self.IMPL_CLS_NAME)
+        assert impl_cls is not None, f"无法从 {spec.module} 导入 {self.IMPL_CLS_NAME}"
+
+        for method in self.REQUIRED_METHODS:
+            assert hasattr(impl_cls, method), f"缺少方法: {method}"
+            assert callable(getattr(impl_cls, method))
+
+    def test_metadata_complete(self, registry: PortRegistry) -> None:
+        """端口元数据必须完整"""
+        spec = registry.get(self.PORT_NAME)
+        assert spec is not None
+        assert spec.version and spec.version != ""
+        assert spec.owner and spec.owner != ""
+        assert spec.module and spec.module != ""

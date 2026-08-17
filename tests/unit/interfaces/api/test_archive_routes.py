@@ -305,3 +305,70 @@ class TestStalenessCheck:
         assert "marked" in data
         assert isinstance(data["marked"], list)
         assert str(archive_id) in data["marked"]
+
+
+class TestStalenessStatusFiltering:
+    """GET /entries?staleness_status= 陈旧状态过滤测试（Story 3.12 AC-6）"""
+
+    def test_passes_staleness_status_stale_to_query(self) -> None:
+        """staleness_status=stale 传递给 ArchiveQuery.staleness_status"""
+        client, service = _make_app()
+        response = client.get("/api/v1/archive/entries", params={"staleness_status": "stale"})
+        assert response.status_code == 200
+        # 验证 service.query_archive 收到的 ArchiveQuery 包含 staleness_status
+        call_args = service.query_archive.call_args[0][0]
+        assert call_args.staleness_status == "stale"
+
+    def test_passes_staleness_status_fresh_to_query(self) -> None:
+        """staleness_status=fresh 传递给 ArchiveQuery.staleness_status"""
+        client, service = _make_app()
+        response = client.get("/api/v1/archive/entries", params={"staleness_status": "fresh"})
+        assert response.status_code == 200
+        call_args = service.query_archive.call_args[0][0]
+        assert call_args.staleness_status == "fresh"
+
+    def test_default_staleness_status_none(self) -> None:
+        """不传 staleness_status 时默认 None（向后兼容）"""
+        client, service = _make_app()
+        response = client.get("/api/v1/archive/entries")
+        assert response.status_code == 200
+        call_args = service.query_archive.call_args[0][0]
+        assert call_args.staleness_status is None
+
+
+class TestArchiveResponseStalenessFields:
+    """ArchiveResponse 陈旧标记字段测试（Story 3.12 AC-6）"""
+
+    def test_response_contains_staleness_fields(self) -> None:
+        """ArchiveResponse 包含 is_stale/stale_reason/stale_since 字段"""
+        client, service = _make_app()
+        archive = _make_archive(
+            {
+                "metadata": {
+                    "staleness": "stale",
+                    "stale_reason": "expired",
+                    "stale_since": "2026-08-15T00:00:00+00:00",
+                }
+            }
+        )
+        service.get_archive.return_value = archive
+        archive_id = uuid.uuid4()
+        service.get_archive.return_value.archive_id = archive_id
+        response = client.get(f"/api/v1/archive/entries/{archive_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_stale"] is True
+        assert data["stale_reason"] == "expired"
+        assert data["stale_since"] == "2026-08-15T00:00:00+00:00"
+
+    def test_response_contains_staleness_fields_defaults(self) -> None:
+        """ArchiveResponse 无陈旧标记时默认 is_stale=False"""
+        client, service = _make_app()
+        archive_id = uuid.uuid4()
+        service.get_archive.return_value = _make_archive({"archive_id": archive_id})
+        response = client.get(f"/api/v1/archive/entries/{archive_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_stale"] is False
+        assert data["stale_reason"] is None
+        assert data["stale_since"] is None

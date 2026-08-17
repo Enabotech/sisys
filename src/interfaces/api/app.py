@@ -54,9 +54,11 @@ def create_app() -> FastAPI:
     # 注册统一异常处理器
     register_exception_handlers(app)
     # 注册路由
+    from src.interfaces.api.relevance_evaluation import evaluate_router
     from src.interfaces.api.strategic_archive import archive_router
     from src.interfaces.api.summary import summary_router
 
     app.include_router(archive_router)
     app.include_router(summary_router)
+    app.include_router(evaluate_router)
     return app

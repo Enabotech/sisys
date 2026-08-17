@@ -49,6 +49,11 @@ from src.domain.ports.ocr import OCR_CONFIDENCE_THRESHOLD, OCR_MAX_BYTES, OCRPor
 from src.domain.ports.outbox import OutboxRepository
 from src.domain.ports.pdf_page_renderer import PdfPageRendererPort
 from src.domain.ports.permission_repository import PermissionRepositoryPort
+from src.domain.ports.relevance_evaluation import (
+    RelevanceEvaluationPort,
+    RelevanceEvaluationResult,
+    RuleBasedResult,
+)
 from src.domain.ports.reranker import RerankerPort
 from src.domain.ports.saga import SagaRepositoryProtocol, SagaStep
 from src.domain.ports.sandbox_executor import SandboxExecutor
@@ -112,6 +117,9 @@ __all__ = [
     "OutboxRepository",
     "PdfPageRendererPort",
     "PermissionRepositoryPort",
+    "RelevanceEvaluationPort",
+    "RelevanceEvaluationResult",
+    "RuleBasedResult",
     "RerankerPort",
     "SagaRepositoryProtocol",
     "SagaStep",
