@@ -219,7 +219,7 @@
   - 返回 200 + 标记结果列表
 - [ ] 请求/响应 Schema 使用 Pydantic，定义于路由同文件或共享 Schema 模块
 - [ ] `ArchiveResponse` 新增 `valid_from: str | None = None`、`valid_until: str | None = None` 字段，`_to_archive_response()` 中通过 `.isoformat()` 转换（与 `created_at`/`archived_at` 的转换方式一致）
-- [ ] 查询延迟 P95<200ms（通过索引保障，性能验证见 `tests/unit/performance/test_perf_archive_validity.py`；测试数据量级≥10,000 条档案记录，连续执行 100 次查询取 P95 百分位，执行 10 次预热后开始测量；CI 环境下默认跳过，本地开发手动触发；对齐项目现有 `test_compression_performance.py` 先例）
+- [ ] 查询延迟 P95<200ms（通过索引保障，性能验证见 `tests/benchmark/test_benchmark_archive_validity.py`；测试数据量级≥10,000 条档案记录，连续执行 100 次查询取 P95 百分位，执行 10 次预热后开始测量；使用真实 PostgreSQL 基准测试，CI 可选触发）
 
 ### AC-9: 端口注册与 DI 集成
 
@@ -486,7 +486,7 @@
 | **TDD 单元测试** | 编码唯一性 | 异常 code 无碰撞 | `test_error_code_uniqueness.py` | Task 2 |
 | **TDD 单元测试** | 编码子域范围 | 子域范围/继承链一致性 | `test_code_ranges.py` | Task 2 |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向/零依赖 | `test_arch_archive_validity.py` | Task 5 |
-| **SDD 性能验证** | 有效期查询性能 | P95<200ms（时间轴查询延迟，≥10,000 条记录，100 次迭代取 P95，10 次预热后测量，CI 默认跳过） | `test_perf_archive_validity.py` | Task 5 |
+| **SDD 性能验证** | 有效期查询性能 | P95<200ms（时间轴查询延迟，≥10,000 条记录，100 次迭代取 P95，10 次预热后测量，真实 PostgreSQL 基准测试） | `test_benchmark_archive_validity.py`（`tests/benchmark/`，真实 PG 基准，CI 可选触发） | Task 5 |
 | **集成测试** | 有效期管理集成 | 有效期设置+查询+陈旧标记 | `test_integration_archive_validity.py` | Task 3 |
 
 ---
@@ -776,7 +776,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/performance/test_perf_archive_validity.py`（有效期查询性能 P95<200ms） |
+| 🔴 红 | 编写 `tests/benchmark/test_benchmark_archive_validity.py`（有效期查询性能 P95<200ms，真实 PostgreSQL 基准测试） |
 | 🟢 绿 | 确认索引添加后 P95<200ms |
 | 🔄 重构 | 优化索引策略或查询 SQL |
 
@@ -950,7 +950,7 @@ deploy/
 │   │       └── storage/
 │   │           └── test_archive_repository.py # UPDATE: 有效期查询测试
 │   │   └── performance/
-│   │       └── test_perf_archive_validity.py   # NEW: 有效期查询性能验证测试（P95<200ms）（对齐 test_compression_performance.py 先例）
+│   │       └── test_benchmark_archive_validity.py  # NEW: 有效期查询性能基准测试（P95<200ms，真实 PostgreSQL）
 │   ├── integration/
 │   │   └── test_integration_archive_validity.py # NEW: 有效期管理集成测试
 │   ├── contracts/
@@ -1163,7 +1163,7 @@ mark_stale_archives(batch_size=100):
 - `tests/acceptance/test_acceptance_archive_validity.feature` - Gherkin 场景
 - `tests/acceptance/test_acceptance_archive_validity.py` - BDD 步骤实现
 - `tests/unit/architecture/test_arch_archive_validity.py` - 架构验证测试
-- `tests/unit/performance/test_perf_archive_validity.py` - 有效期查询性能验证测试（P95<200ms）
+- `tests/benchmark/test_benchmark_archive_validity.py` - 有效期查询性能基准测试（P95<200ms，真实 PostgreSQL）
 
 **待更新的文件/To Be Updated:**
 - `src/domain/entities/strategic_archive.py` - 新增 valid_from/valid_until 字段 + is_valid/is_expired/days_until_expiry
@@ -1233,7 +1233,7 @@ mark_stale_archives(batch_size=100):
 | 11 | _to_entity/_to_model 未显式要求更新 | P1 | 在 AC-6 和项目结构中明确标注 |
 | 12 | 索引设计可优化为复合索引 | P1 | 改为复合索引 `(valid_from, valid_until)` |
 | 13 | 文档引用不存在的 date_range 参数 | P1 | 修正为实际参数名 |
-| 14 | P95<200ms 无测试载体 | P1 | 新增性能测试文件 `test_perf_archive_validity.py` |
+| 14 | P95<200ms 无测试载体 | P1 | 新增性能测试文件 `tests/benchmark/test_benchmark_archive_validity.py` |
 | 15 | Task 3 TDD 循环 C 红绿语义颠倒 | P1 | 修正绿阶段为"实现服务方法+仓储扩展使测试通过" |
 | 16 | Task 5 TDD 循环 B 是空转循环（无新端口） | P1 | 改为"验证服务扩展方法可解析" |
 | 17 | 集成测试覆盖率门禁口径未定义 | P1 | 明确测量命令和范围 |
@@ -1247,7 +1247,7 @@ mark_stale_archives(batch_size=100):
 | 2 | FactBecameStale 缺少陈旧原因字段，消费方无法区分两种陈旧机制 | P1 | 新增 `stale_reason: str` 字段（`"expired"` / `"archived_too_long"`） |
 | 3 | 冲突判定中"含开区间边界"表述自相矛盾 | P1 | 明确采用半开区间 `[valid_from, valid_until)`，端点相接不视为冲突 |
 | 4 | `check_staleness` 命名与 `is_valid()`/`is_expired()` 不一致 | P1 | 改为 `is_stale()` 保持 `is_` 前缀一致 |
-| 5 | 性能测试文件 `test_perf_archive_validity.py` 分类归属不当（混入 architecture 目录） | P1 | 移至 `tests/performance/` 目录（后修正为 `tests/unit/performance/` 对齐项目先例 `test_compression_performance.py`） |
+| 5 | 性能测试文件分类归属不当（混入 architecture 目录） | P1 | 移至 `tests/benchmark/` 目录（真实 PG 基准测试，对齐 `test_ocr_performance.py` 先例） |
 | 6 | 性能测试缺少数据量级与执行策略要求 | P1 | 补充：≥10,000 条记录、100 次迭代取 P95、10 次预热、CI 默认跳过 |
 | 7 | ArchiveQuery 单元测试混入端口契约测试文件 `test_port_contract_strategic_archive.py` | P1 | 拆分到独立文件 `tests/unit/domain/ports/test_archive_query.py` |
 | 8 | Task 3 TDD 循环 C 集成测试绿阶段要求同时实现服务+仓储两层，跨度不合理 | P1 | 明确绿阶段仅实现应用层服务方法，仓储依赖 Task 4 |
@@ -1362,15 +1362,16 @@ mark_stale_archives(batch_size=100):
 
 ---
 
-**故事版本/Story Version:** v1.6.0
+**故事版本/Story Version:** v1.7.0
 **创建日期/Created:** 2026-08-14
-**最后更新/Last Updated:** 2026-08-16
+**最后更新/Last Updated:** 2026-08-17
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
-- v1.0.1: Round 1 审查修订 — 修复 6 个 P0 + 12 个 P1 问题（事件 aggregate_id、事件字段类型、validity_status NULL 安全、ArchiveResponse 扩展、冲突规则定义、枚举类型、时钟注入等）
-- v1.1.0: Round 2 审查修订 — 修复 0 个 P0 + 12 个 P1 + 6 个 P2 问题（ValidityStatus 删除 ALL、FactBecameStale 新增 stale_reason、冲突判定半开区间 + 端点说明、check_staleness→is_stale 重命名 + 剥离实体方法、性能测试对齐 tests/unit/performance/、ArchiveQuery 测试独立、索引策略优化、事件 __post_init__ 无条件赋值、集成测试循环跨度修正、覆盖率门禁定位明确等）
-- v1.2.0: Round 3 审查修订 — 修复 1 个 P0 + 5 个 P1 + 1 个 P2 问题（TOCTOU 竞态双重防御：FOR UPDATE + 内存比较，EXCLUDE 约束经评估废弃；事件 handler 注册机制修正为 InMemoryEventListener + register_handlers 模式；composition_root 标注修正；L3 payload 初始快照；mark_stale_archives 幂等设计 + 实体 is_stale 方法；陈旧标记逻辑排除已标记档案 + Outbox 事务边界说明；索引策略补充部分索引 + 表达式索引；API 设计修正：PATCH 替代 PUT、staleness-checks 复数名词路径、datetime 解析、时区验证、错误响应格式）
-- v1.3.0: Round 4 审查修订 — 修复 0 个 P0 + 2 个 P1 + 9 个 P2 一致性遗留问题（AC-1 新增 is_stale 实体方法与 SDD 一致；AC-2 事件字段补充默认值 + Schema 版本；AC-5 冲突检测/并发安全/陈旧判断对齐；事件 event_type 统一 field() 写法；Task 2 Subtask 补充编码测试引用；Task 5 新增 TDD 循环 D 性能验证；文档头部状态修正为 ready-for-dev）
-- v1.4.0: Round 5 代码审查修订 — 多Agent并行全量调研修复（2个P0+5个P1+4个P2+1个Defer），详见 Round 5 审查发现
-- v1.5.0: Round 6 深度审计修复 — 并发安全/领域模型/配置一致性/集成测试质量审计（1个P0+3个P1+2个P2），详见 Round 6 审查发现
-- v1.6.0: Round 7 并发深度修复 — TOCTOU幽灵插入/find_for_update前置锁定/mark_stale条件更新/mark_stale端口新增（2个P1），详见 Round 7 审查发现
+- v1.0.1: Round 1 审查修订 — 修复 6 个 P0 + 12 个 P1 问题
+- v1.1.0: Round 2 审查修订 — 修复 0 个 P0 + 12 个 P1 + 6 个 P2 问题
+- v1.2.0: Round 3 审查修订 — 修复 1 个 P0 + 5 个 P1 + 1 个 P2 问题
+- v1.3.0: Round 4 审查修订 — 修复 0 个 P0 + 2 个 P1 + 9 个 P2 一致性遗留问题
+- v1.4.0: Round 5 代码审查修订 — 多Agent并行全量调研修复（2个P0+5个P1+4个P2+1个Defer）
+- v1.5.0: Round 6 深度审计修复 — 并发安全/领域模型/配置一致性审计（1个P0+3个P1+2个P2）
+- v1.6.0: Round 7 并发深度修复 — TOCTOU幽灵插入/find_for_update前置锁定/mark_stale条件更新（2个P1）
+- v1.7.0: 重构性能测试为真实 PG 基准测试 — 从 mock 方案（`tests/unit/performance/`）迁移到真实 PostgreSQL 基准测试（`tests/benchmark/`），删除旧 mock 文件

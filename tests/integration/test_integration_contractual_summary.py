@@ -569,6 +569,6 @@ class TestSummaryGenerationIntegration:
         points = call_args["points"]
         assert len(points) == 1
         point = points[0]
-        assert "summary-financial-" in point["id"]
+        assert "summary-doc-001-financial" in point["id"]
         assert point["payload"]["perspective"] == "financial"
         assert point["payload"]["index_level"] == "L2"
