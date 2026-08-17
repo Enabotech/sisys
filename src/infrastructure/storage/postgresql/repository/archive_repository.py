@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 from uuid import UUID
@@ -191,22 +192,22 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         """
         from datetime import UTC, datetime
 
-        from sqlalchemy import JSON, cast, update
+        from sqlalchemy import text
 
         stale_since = datetime.now(UTC).isoformat()
-        stmt = (
-            update(ArchiveModel)
-            .where(ArchiveModel.archive_id == archive_id)
-            .where(func.coalesce(ArchiveModel.metadata_["staleness"].as_string(), "") != "stale")
-            .values(
-                metadata_=func.jsonb_set(
-                    func.coalesce(ArchiveModel.metadata_, cast("{}", JSON)),
-                    cast(["staleness", "stale_since"], JSON),
-                    cast(['"stale"', f'"{stale_since}"'], JSON),
-                )
-            )
+        new_meta = json.dumps({"staleness": "stale", "stale_since": stale_since})
+        # raw UPDATE 精确控制 SQL 语义，避免 ORM 的 jsonb_set 类型转换问题
+        # COALESCE(metadata, '{}'::jsonb) || CAST(:new_meta AS jsonb) 合并保留已有 key
+        # WHERE metadata->>'staleness' != 'stale' 保证并发场景仅一个实例抢占成功
+        result = await self._session.execute(
+            text(
+                "UPDATE strategic_archives "
+                "SET metadata = COALESCE(metadata, '{}'::jsonb) || CAST(:new_meta AS jsonb) "
+                "WHERE archive_id = CAST(:archive_id AS uuid) "
+                "AND COALESCE(metadata ->> 'staleness', '') != 'stale'"
+            ),
+            {"new_meta": new_meta, "archive_id": str(archive_id)},
         )
-        result = await self._session.execute(stmt)
         await self._session.flush()
         updated = getattr(result, "rowcount", 0)
         return int(updated or 0) == 1
