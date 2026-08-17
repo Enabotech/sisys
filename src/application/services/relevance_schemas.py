@@ -83,8 +83,7 @@ class RelevanceEvaluation(BaseModel):
         description="阻断理由（should_block=True 时必须为非空，默认'数据不足'；should_block=False 时必须为 None）",
     )
 
-    @computed_field  # type: ignore[prop-decorator]
-    @property
+    @computed_field
     def overall_score(self) -> float:
         """综合评分：三维评分的算术平均
 
@@ -93,11 +92,10 @@ class RelevanceEvaluation(BaseModel):
         """
         return (self.context_relevance + self.completeness + self.timeliness) / 3.0
 
-    @computed_field  # type: ignore[prop-decorator]
-    @property
+    @computed_field
     def should_block(self) -> bool:
         """是否阻断生成：综合评分 < 0.6"""
-        return self.overall_score < BLOCK_THRESHOLD
+        return (self.context_relevance + self.completeness + self.timeliness) / 3.0 < BLOCK_THRESHOLD
 
     @model_validator(mode="after")
     def _validate_block_reason(self) -> "RelevanceEvaluation":
@@ -106,7 +104,9 @@ class RelevanceEvaluation(BaseModel):
         - should_block=True 时 block_reason 必须为非空（自动填充"数据不足"）
         - should_block=False 时 block_reason 必须为 None
         """
-        if self.should_block:
+        # 内联计算避免 mypy 将 @computed_field 方法误判为 Callable
+        score = (self.context_relevance + self.completeness + self.timeliness) / 3.0
+        if score < BLOCK_THRESHOLD:
             if not self.block_reason:
                 self.block_reason = BLOCK_REASON_TEXT
         else:

@@ -62,11 +62,11 @@ class QdrantVectorStorage(L3VectorPort):
             pid = int(point_id)
             if pid < 1000:
                 # 小整数用确定哈希避免冲突
-                return int(hashlib.md5(point_id.encode("utf-8")).hexdigest(), 16) % (2**31)
+                return int(hashlib.md5(point_id.encode("utf-8"), usedforsecurity=False).hexdigest(), 16) % (2**31)
             return pid
         except ValueError:
             # 非纯数字字符串：确定性哈希，保证跨进程稳定（幂等 upsert 依赖）
-            return int(hashlib.md5(point_id.encode("utf-8")).hexdigest(), 16) % (2**63)
+            return int(hashlib.md5(point_id.encode("utf-8"), usedforsecurity=False).hexdigest(), 16) % (2**63)
 
     async def upsert_points(self, collection: str, points: list[VectorPoint] | list[dict]) -> bool:
         """批量插入或更新向量点

@@ -654,6 +654,7 @@ def _when_request_evaluate_api(context: dict[str, Any]) -> None:
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
+    from src.domain.value_objects.token_payload import TokenPayload
     from src.interfaces.api.exception_handlers import register_exception_handlers
     from src.interfaces.api.middleware.exception_context import ExceptionContextMiddleware
     from src.interfaces.api.relevance_evaluation import create_evaluate_router
@@ -696,9 +697,13 @@ def _when_request_evaluate_api(context: dict[str, Any]) -> None:
     app.add_middleware(ExceptionContextMiddleware)
     register_exception_handlers(app)
 
+    def get_user_override() -> TokenPayload | None:
+        return None
+
     router = create_evaluate_router(
         evaluate_service=mock_service,
         layered_retrieval=mock_layered,
+        get_current_user_override=get_user_override,
     )
     app.include_router(router)
 

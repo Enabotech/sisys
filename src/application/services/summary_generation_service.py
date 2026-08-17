@@ -128,6 +128,7 @@ class SummaryGenerationService:
         prompt_map = PERSPECTIVE_PROMPT_MAP.get(perspective)
 
         # 陈旧提示兜底预取（Story 3.12）：payload 无 is_stale 标记时通过 archive_repo 批量判断
+        l2_results: list[SearchResult] = []
         if cross_document:
             try:
                 l2_results = await self._layered_retrieval.search_top_down(
@@ -141,9 +142,10 @@ class SummaryGenerationService:
                 await self._prefetch_staleness(l2_results)
                 search_context = self._build_cross_document_context(l2_results)
             except Exception as e:
-                logger.warning("L2 摘要检索失败: %s", e)
+                logger.warning("L2 摘要检索失败，回退到单文档结果: %s", e)
                 await self._prefetch_staleness(search_results)
                 search_context = self._build_search_context(search_results)
+                l2_results = list(search_results)  # 回退到单文档结果
         else:
             # 单文档模式：使用传入的检索结果
             await self._prefetch_staleness(search_results)
@@ -412,7 +414,15 @@ class SummaryGenerationService:
         try:
             from uuid import UUID
 
-            uuids = [UUID(aid) for aid in missing_ids]
+            # 过滤非法 archive_id，与 StalenessWeightService 的 _is_valid_uuid 策略一致
+            uuids: list[UUID] = []
+            for aid in missing_ids:
+                try:
+                    uuids.append(UUID(aid))
+                except (ValueError, AttributeError):
+                    logger.warning("跳过非法 archive_id: %s", aid)
+            if not uuids:
+                return
             query = ArchiveQuery(archive_ids=uuids, limit=1000)
             archives = await self._archive_repo.find(query)
             stale_map: dict[str, bool] = {}

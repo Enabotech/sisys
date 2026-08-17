@@ -136,7 +136,7 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
                 stmt = stmt.where(ArchiveModel.valid_until < now)
         # 排除已标记陈旧的档案（幂等保证）
         if query.exclude_staleness:
-            stmt = stmt.where(func.coalesce(ArchiveModel.metadata_["staleness"].as_string(), "") != "stale")
+            stmt = stmt.where(func.coalesce(ArchiveModel.metadata_["staleness"].astext, "") != "stale")
         # staleness_status 过滤（Story 3.12 AC-6）
         if query.staleness_status is not None:
             if query.staleness_status == "stale":
@@ -187,7 +187,7 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         models = result.scalars().all()
         return [self._to_entity(m) for m in models]
 
-    async def mark_stale(self, archive_id: UUID) -> bool:
+    async def mark_stale(self, archive_id: UUID, stale_since: str | None = None, stale_reason: str | None = None) -> bool:
         """条件标记档案为陈旧（并发安全）
 
         使用 UPDATE ... WHERE ... AND metadata->>'staleness' IS DISTINCT FROM 'stale'
@@ -196,6 +196,8 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
 
         Args:
             archive_id: 档案 ID
+            stale_since: 标记时间（ISO 8601 字符串，None 时由实现自行生成）
+            stale_reason: 陈旧原因（"expired"/"archived_too_long"，None 时不写入）
 
         Returns:
             标记成功返回 True，已被其他实例抢先标记返回 False
@@ -204,8 +206,11 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
 
         from sqlalchemy import text
 
-        stale_since = datetime.now(UTC).isoformat()
-        new_meta = json.dumps({"staleness": "stale", "stale_since": stale_since})
+        if stale_since is None:
+            stale_since = datetime.now(UTC).isoformat()
+        if stale_reason is None:
+            stale_reason = "stale"
+        new_meta = json.dumps({"staleness": "stale", "stale_reason": stale_reason, "stale_since": stale_since})
         # raw UPDATE 精确控制 SQL 语义，避免 ORM 的 jsonb_set 类型转换问题
         # COALESCE(metadata, '{}'::jsonb) || CAST(:new_meta AS jsonb) 合并保留已有 key
         # WHERE metadata->>'staleness' != 'stale' 保证并发场景仅一个实例抢占成功

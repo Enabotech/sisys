@@ -506,7 +506,11 @@ class StrategicArchiveService:
                 archive.mark_stale(now, stale_reason)
 
                 # 条件标记：SQL 层原子判定，被并发实例抢先标记时跳过事件
-                claimed = await self._archive_repo.mark_stale(archive.archive_id)
+                claimed = await self._archive_repo.mark_stale(
+                    archive.archive_id,
+                    stale_since=now.isoformat(),
+                    stale_reason=stale_reason,
+                )
                 if not claimed:
                     logger.info(
                         "Archive %s already marked stale by another instance, skip event",
