@@ -50,6 +50,10 @@ class ArchiveQuery:
         valid_from: 按生效时间过滤（valid_from >= 指定值）
         valid_until: 按失效时间过滤（valid_until <= 指定值）
         validity_status: 按有效期状态过滤（VALID/EXPIRED，None 表示不过滤）
+        staleness_status: 按陈旧状态过滤（"stale"/"fresh"，None 表示不过滤；
+                          与 validity_status 语义区分：validity_status 按时间计算，staleness_status 按 metadata 标记判断）
+        archive_ids: 按 ID 列表批量查询（供 StalenessWeightService 兜底链使用，避免 N+1 问题）
+        exclude_staleness: 排除已标记陈旧的档案（幂等保证）
         offset: 分页偏移量
         limit: 每页条数（1-1000，默认 20）
     """
@@ -62,12 +66,14 @@ class ArchiveQuery:
     valid_from: datetime | None = None
     valid_until: datetime | None = None
     validity_status: ValidityStatus | None = None
+    staleness_status: str | None = None
+    archive_ids: list[UUID] | None = None
     exclude_staleness: bool = False
     offset: int = 0
     limit: int = 20
 
     def __post_init__(self) -> None:
-        """构造后校验 limit 取值范围和 validity_status 取值"""
+        """构造后校验 limit 取值范围和 validity_status/staleness_status 取值"""
         # 使用 object.__setattr__ 因为 frozen=True
         if self.limit < 1:
             logger.warning("ArchiveQuery limit %s clamped to 1", self.limit)
@@ -86,6 +92,12 @@ class ArchiveQuery:
             raise EntityValidationError(
                 message="validity_status must be a ValidityStatus enum member or None",
                 context={"entity": "ArchiveQuery", "field": "validity_status"},
+            )
+        # staleness_status 校验：仅允许 "stale"/"fresh"/None
+        if self.staleness_status is not None and self.staleness_status not in ("stale", "fresh"):
+            raise EntityValidationError(
+                message="staleness_status must be 'stale', 'fresh', or None",
+                context={"entity": "ArchiveQuery", "field": "staleness_status"},
             )
 
 
