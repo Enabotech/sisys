@@ -69,6 +69,8 @@ from src.domain.exceptions import (
     OCRProcessingError,
     PasswordValidationError,
     PermissionDeniedError,
+    RelevanceEvaluationBlockedError,
+    RelevanceEvaluationError,
     RerankError,
     RoleAlreadyExistsError,
     RoleNotFoundError,
@@ -224,6 +226,9 @@ class TestExceptionHttpMap:
             EntityExtractionError,
             # 重排序异常
             RerankError,
+            # 检索相关性评估异常
+            RelevanceEvaluationError,
+            RelevanceEvaluationBlockedError,
             # 混合检索异常
             HybridSearchError,
             # 分层检索异常

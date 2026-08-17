@@ -1794,18 +1794,38 @@ def bootstrap() -> None:
 
     register_port(
         name="summary_generation_service",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=SummaryGenerationPort,
         impl=lambda resolver: SummaryGenerationService(
             llm_client=resolver.resolve("llm_client"),
             layered_retrieval=resolver.resolve("layered_retrieval_service"),
             embedding_service=resolver.resolve("embedding_service"),
             l3_vector=resolver.resolve("l3_vector"),
+            relevance_evaluation_service=resolver.resolve_optional("relevance_evaluation_service"),
+            archive_repo=resolver.resolve_optional("archive_repository"),
         ),
         module="src.application.services.summary_generation_service",
         lifetime=Lifetime.SCOPED,
         owner="search-team",
         tags=("search", "summary", "generation"),
+        compatibility=("v1.0.0",),
+    )
+
+    # === Story 3-7: Relevance Evaluation Port ===
+    from src.application.services.relevance_evaluation_service import RelevanceEvaluationService
+    from src.domain.ports.relevance_evaluation import RelevanceEvaluationPort
+
+    register_port(
+        name="relevance_evaluation_service",
+        version="v1.0.0",
+        interface=RelevanceEvaluationPort,
+        impl=lambda resolver: RelevanceEvaluationService(
+            llm_client=resolver.resolve("llm_client"),
+        ),
+        module="src.application.services.relevance_evaluation_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "relevance", "evaluation"),
     )
 
     # ChunkIndexingHandler — 分块向量索引（Story 3.5 分层检索依赖）
@@ -1827,15 +1847,17 @@ def bootstrap() -> None:
         tags=("search", "layered", "indexing"),
     )
 
-    # === ArchiveValidityHandler — 档案有效期事件处理器（Story 3.11）===
+    # === ArchiveValidityHandler — 档案有效期事件处理器（Story 3.11/3.12）===
     from src.application.event_handlers.archive_handlers import ArchiveValidityHandler
 
     register_port(
         name="archive_validity_handler",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=ArchiveValidityHandler,
         impl=lambda resolver: ArchiveValidityHandler(
             event_listener=resolver.resolve("event_listener"),
+            l3_vector=resolver.resolve_optional("l3_vector"),
+            l5_graph=resolver.resolve_optional("l5_graph"),
         ),
         module="src.application.event_handlers.archive_handlers",
         lifetime=Lifetime.SINGLETON,
@@ -2005,11 +2027,29 @@ def bootstrap() -> None:
         tags=("archive", "gateway", "application"),
     )
 
-    # 注册 StrategicArchiveService 应用服务（注入 L2-L5 各层存储 + 事件发布）
+    # 注册 StalenessWeightService 降权服务（Story 3.12 AC-7）
+    # SCOPED 生命周期：依赖 archive_repo（SCOPED），避免持有过期引用
+    from src.application.services.staleness_weight_service import StalenessWeightService
+
+    register_port(
+        name="staleness_weight_service",
+        version="v1.0.0",
+        interface=StalenessWeightService,
+        impl=lambda resolver: StalenessWeightService(
+            archive_repo=resolver.resolve_optional("archive_repository"),
+        ),
+        module="src.application.services.staleness_weight_service",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("archive", "staleness", "weight", "application"),
+    )
+
+    # 注册 StrategicArchiveService 应用服务（注入 L2-L5 各层存储 + 事件发布 + 降权服务）
     # L3/L5 使用 resolve_optional 实现优雅降级（依赖缺失时自动降级为 None）
+    _global_registry.unregister("strategic_archive_service")
     register_port(
         name="strategic_archive_service",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=StrategicArchiveService,
         impl=lambda resolver: StrategicArchiveService(
             archive_repo=resolver.resolve("archive_repository"),
@@ -2017,11 +2057,13 @@ def bootstrap() -> None:
             object_storage=resolver.resolve("l4_object"),
             graph_storage=resolver.resolve_optional("l5_graph"),
             event_publisher=resolver.resolve("event_publisher"),
+            staleness_service=resolver.resolve_optional("staleness_weight_service"),
         ),
         module="src.application.services.strategic_archive_service",
         lifetime=Lifetime.SCOPED,
         owner="foundation-team",
         tags=("archive", "service", "application"),
+        compatibility=("v1.0.0",),
     )
 
     # === 事件处理器注册（register_handlers）===

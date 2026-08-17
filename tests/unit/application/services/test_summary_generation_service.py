@@ -416,3 +416,213 @@ class TestConstructor:
             l3_vector=_make_l3_vector(),
         )
         assert service._l3_vector is not None
+
+
+class TestStalenessPrompt:
+    """陈旧提示注入测试（Story 3.12 AC-5）"""
+
+    @pytest.fixture
+    def service(self) -> SummaryGenerationService:
+        """创建 SummaryGenerationService 实例"""
+        return SummaryGenerationService(
+            llm_client=_make_llm_client(),
+            layered_retrieval=_make_layered_retrieval(),
+            embedding_service=_make_embedding_service(),
+            l3_vector=_make_l3_vector(),
+        )
+
+    def test_stale_result_in_context_prefixed(self, service: SummaryGenerationService) -> None:
+        """结果中包含 is_stale=True 时上下文文本附加 [数据陈旧: ...] 前缀"""
+        results = [
+            SearchResult(
+                id="doc-1",
+                score=0.8,
+                payload={
+                    "content": "陈旧文档内容",
+                    "document_id": "doc-001",
+                    "is_stale": True,
+                    "stale_reason": "expired",
+                    "stale_since": "2026-08-15T00:00:00+00:00",
+                },
+            ),
+        ]
+        context_text = service._build_search_context(results)
+        assert "[数据陈旧: 原因=expired, 标记时间=2026-08-15T00:00:00+00:00]" in context_text
+        assert "陈旧文档内容" in context_text
+
+    def test_fresh_result_no_prefix(self, service: SummaryGenerationService) -> None:
+        """结果中不包含陈旧数据时上下文文本无变化"""
+        results = [
+            SearchResult(
+                id="doc-1",
+                score=0.8,
+                payload={
+                    "content": "新鲜文档内容",
+                    "document_id": "doc-001",
+                    "is_stale": False,
+                },
+            ),
+        ]
+        context_text = service._build_search_context(results)
+        assert "[数据陈旧" not in context_text
+        assert "新鲜文档内容" in context_text
+
+    def test_no_is_stale_flag_no_prefix(self, service: SummaryGenerationService) -> None:
+        """payload 中无 is_stale 标记时（archive_repo 未注入）不提示"""
+        results = [
+            SearchResult(
+                id="doc-1",
+                score=0.8,
+                payload={
+                    "content": "无标记文档内容",
+                    "document_id": "doc-001",
+                },
+            ),
+        ]
+        context_text = service._build_search_context(results)
+        assert "[数据陈旧" not in context_text
+        assert "无标记文档内容" in context_text
+
+    @pytest.mark.asyncio
+    async def test_fallback_archive_repo_stale(self) -> None:
+        """payload 无 is_stale 标记时，通过 archive_repo 兜底判断（注入时）"""
+        from datetime import UTC, datetime
+        from unittest.mock import AsyncMock
+
+        from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
+        from src.domain.ports.archive_repository import ArchiveRepositoryPort
+
+        repo = AsyncMock(spec=ArchiveRepositoryPort)
+        from uuid import UUID
+
+        stale_archive = StrategicArchive(
+            archive_id=UUID("11111111-1111-1111-1111-111111111111"),
+            plan_id=UUID("22222222-2222-2222-2222-222222222222"),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=datetime(2021, 1, 1, tzinfo=UTC),
+        )
+        repo.find.return_value = [stale_archive]
+        svc = SummaryGenerationService(
+            llm_client=_make_llm_client(),
+            layered_retrieval=_make_layered_retrieval(),
+            embedding_service=_make_embedding_service(),
+            l3_vector=_make_l3_vector(),
+            archive_repo=repo,
+        )
+        results = [
+            SearchResult(
+                id="strategic_archive:11111111-1111-1111-1111-111111111111",
+                score=0.8,
+                payload={
+                    "content": "陈旧文档内容",
+                    "archive_id": "11111111-1111-1111-1111-111111111111",
+                },
+            ),
+        ]
+        # prefetch 是异步方法，需在调用 _build_search_context 前执行
+        await svc._prefetch_staleness(results)
+        context_text = svc._build_search_context(results)
+        assert "[数据陈旧: " in context_text
+        assert repo.find.called
+
+    @pytest.mark.asyncio
+    async def test_fallback_archive_repo_fresh(self) -> None:
+        """payload 无 is_stale 标记，archive_repo 判断为新鲜时不提示"""
+        from datetime import UTC, datetime
+        from unittest.mock import AsyncMock
+
+        from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
+        from src.domain.ports.archive_repository import ArchiveRepositoryPort
+
+        repo = AsyncMock(spec=ArchiveRepositoryPort)
+        from uuid import UUID
+
+        fresh_archive = StrategicArchive(
+            archive_id=UUID("11111111-1111-1111-1111-111111111111"),
+            plan_id=UUID("22222222-2222-2222-2222-222222222222"),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=datetime(2099, 1, 1, tzinfo=UTC),
+        )
+        repo.find.return_value = [fresh_archive]
+        svc = SummaryGenerationService(
+            llm_client=_make_llm_client(),
+            layered_retrieval=_make_layered_retrieval(),
+            embedding_service=_make_embedding_service(),
+            l3_vector=_make_l3_vector(),
+            archive_repo=repo,
+        )
+        results = [
+            SearchResult(
+                id="strategic_archive:11111111-1111-1111-1111-111111111111",
+                score=0.8,
+                payload={
+                    "content": "新鲜文档内容",
+                    "archive_id": "11111111-1111-1111-1111-111111111111",
+                },
+            ),
+        ]
+        await svc._prefetch_staleness(results)
+        context_text = svc._build_search_context(results)
+        assert "[数据陈旧" not in context_text
+
+    def test_cross_document_stale_prompt(self, service: SummaryGenerationService) -> None:
+        """跨文档模式（L1）同样支持陈旧提示"""
+        l2_results = [
+            SearchResult(
+                id="summary-1",
+                score=0.85,
+                payload={
+                    "summary_text": "已有摘要内容",
+                    "perspective": "financial",
+                    "index_level": "L2",
+                    "is_stale": True,
+                    "stale_reason": "archived_too_long",
+                    "stale_since": "2026-07-01T00:00:00+00:00",
+                },
+            ),
+        ]
+        context_text = service._build_cross_document_context(l2_results)
+        assert "[数据陈旧: 原因=archived_too_long, 标记时间=2026-07-01T00:00:00+00:00]" in context_text
+        assert "已有摘要内容" in context_text
+
+    def test_cross_document_fresh_no_prompt(self, service: SummaryGenerationService) -> None:
+        """跨文档模式无陈旧数据时不提示"""
+        l2_results = [
+            SearchResult(
+                id="summary-1",
+                score=0.85,
+                payload={
+                    "summary_text": "已有摘要内容",
+                    "perspective": "financial",
+                    "index_level": "L2",
+                },
+            ),
+        ]
+        context_text = service._build_cross_document_context(l2_results)
+        assert "[数据陈旧" not in context_text
+        assert "已有摘要内容" in context_text
+
+
+class TestSummaryPromptStaleness:
+    """summary_prompts.py 陈旧处理说明测试"""
+
+    def test_financial_prompt_contains_staleness_note(self) -> None:
+        """financial system_prompt 包含陈旧数据处理说明"""
+        from src.application.services.summary_prompts import FINANCIAL_SYSTEM_PROMPT
+
+        assert "数据陈旧" in FINANCIAL_SYSTEM_PROMPT
+        assert "部分引用数据已陈旧" in FINANCIAL_SYSTEM_PROMPT
+
+    def test_market_prompt_contains_staleness_note(self) -> None:
+        """market system_prompt 包含陈旧数据处理说明"""
+        from src.application.services.summary_prompts import MARKET_SYSTEM_PROMPT
+
+        assert "部分引用数据已陈旧" in MARKET_SYSTEM_PROMPT
+
+    def test_technical_prompt_contains_staleness_note(self) -> None:
+        """technical system_prompt 包含陈旧数据处理说明"""
+        from src.application.services.summary_prompts import TECHNICAL_SYSTEM_PROMPT
+
+        assert "部分引用数据已陈旧" in TECHNICAL_SYSTEM_PROMPT

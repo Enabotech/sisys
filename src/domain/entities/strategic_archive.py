@@ -207,6 +207,19 @@ class StrategicArchive:
             return self.archived_at < now - timedelta(days=365)
         return False
 
+    def mark_stale(self, stale_since: datetime, stale_reason: str) -> None:
+        """标记档案为陈旧（DDD 实体自包含行为）
+
+        封装 metadata 陈旧标记写入，服务层调用替代直接操作 metadata 字典。
+
+        Args:
+            stale_since: 标记为陈旧的时间
+            stale_reason: 陈旧原因（"expired"/"archived_too_long"）
+        """
+        self.metadata["staleness"] = "stale"
+        self.metadata["stale_since"] = stale_since.isoformat()
+        self.metadata["stale_reason"] = stale_reason
+
 
 __all__ = [
     "ArchiveType",

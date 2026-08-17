@@ -56,6 +56,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "entity_extraction": (340, 349),
     # 重排序子域（350-359）
     "reranker": (350, 359),
+    # 检索相关性评估子域（360-369）
+    "relevance": (360, 369),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -140,6 +142,9 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "EntityExtractionError": "entity_extraction",
     # reranker_exceptions.py
     "RerankError": "reranker",
+    # relevance_exceptions.py
+    "RelevanceEvaluationError": "relevance",
+    "RelevanceEvaluationBlockedError": "relevance",
     # hybrid_search_exceptions.py
     "HybridSearchError": "business",
     # dictionary_exceptions.py

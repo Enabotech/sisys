@@ -1,7 +1,7 @@
 """ArchiveQuery 值对象 + ValidityStatus 枚举单元测试
 
 纯领域层值对象验证，与端口契约测试分离。
-验证 ArchiveQuery 新字段（valid_from/valid_until/validity_status）和 ValidityStatus 枚举。
+验证 ArchiveQuery 新字段（valid_from/valid_until/validity_status/staleness_status/archive_ids）和 ValidityStatus 枚举。
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from uuid import uuid4
 import pytest
 
 from src.domain.entities.strategic_archive import ArchiveType
+from src.domain.exceptions import EntityValidationError
 from src.domain.ports.archive_repository import ArchiveQuery, ValidityStatus
 
 
@@ -111,3 +112,66 @@ class TestArchiveQueryValidityFields:
         query = ArchiveQuery()
         with pytest.raises(AttributeError):
             setattr(query, "valid_from", datetime.now(UTC))
+
+
+class TestArchiveQueryStalenessFields:
+    """ArchiveQuery 陈旧标记字段测试（Story 3.12）"""
+
+    def test_staleness_status_default(self) -> None:
+        """staleness_status 默认值为 None"""
+        query = ArchiveQuery()
+        assert query.staleness_status is None
+
+    def test_staleness_status_stale(self) -> None:
+        """staleness_status 设置为 'stale'"""
+        query = ArchiveQuery(staleness_status="stale")
+        assert query.staleness_status == "stale"
+
+    def test_staleness_status_fresh(self) -> None:
+        """staleness_status 设置为 'fresh'"""
+        query = ArchiveQuery(staleness_status="fresh")
+        assert query.staleness_status == "fresh"
+
+    def test_staleness_status_none_no_filter(self) -> None:
+        """staleness_status=None 表示不按陈旧状态过滤"""
+        query = ArchiveQuery(archive_type=ArchiveType.ASSUMPTION)
+        assert query.staleness_status is None
+        assert query.archive_type == ArchiveType.ASSUMPTION
+
+    def test_staleness_status_invalid_raises(self) -> None:
+        """非法 staleness_status 值抛出 EntityValidationError"""
+        with pytest.raises(EntityValidationError):
+            ArchiveQuery(staleness_status="invalid")
+
+    def test_staleness_status_invalid_value_raises(self) -> None:
+        """非法值如 'all' 抛出 EntityValidationError"""
+        with pytest.raises(EntityValidationError):
+            ArchiveQuery(staleness_status="all")
+
+    def test_archive_ids_default(self) -> None:
+        """archive_ids 默认值为 None"""
+        query = ArchiveQuery()
+        assert query.archive_ids is None
+
+    def test_archive_ids_assigned(self) -> None:
+        """archive_ids 赋值"""
+        ids = [uuid4(), uuid4()]
+        query = ArchiveQuery(archive_ids=ids)
+        assert query.archive_ids == ids
+
+    def test_archive_ids_empty_list(self) -> None:
+        """archive_ids 为空列表"""
+        query = ArchiveQuery(archive_ids=[])
+        assert query.archive_ids == []
+
+    def test_backward_compatible_with_new_fields(self) -> None:
+        """新增 staleness_status/archive_ids 均为可选，不影响现有构造"""
+        query = ArchiveQuery()
+        assert query.staleness_status is None
+        assert query.archive_ids is None
+        # 原有字段仍正常
+        plan_id = uuid4()
+        query2 = ArchiveQuery(plan_id=plan_id, archive_type=ArchiveType.ASSUMPTION)
+        assert query2.plan_id == plan_id
+        assert query2.staleness_status is None
+        assert query2.archive_ids is None

@@ -72,6 +72,15 @@ def _make_publisher() -> Any:
     return AsyncMock(spec=EventPublisher)
 
 
+def _make_staleness_service() -> Any:
+    """创建 Mock 降权服务"""
+    from src.application.services.staleness_weight_service import StalenessWeightService
+
+    mock = AsyncMock(spec=StalenessWeightService)
+    mock.apply_staleness_weight.side_effect = lambda results: results
+    return mock
+
+
 class TestArchivePlan:
     """archive_plan() 归档编排测试"""
 
@@ -125,6 +134,49 @@ class TestArchivePlan:
         assert archive.embedding_ref == f"strategic_archive:{archive.archive_id}"
         assert archive.blob_ref is not None
         assert archive.graph_ref == str(archive.archive_id)
+
+    @pytest.mark.asyncio
+    async def test_archive_plan_l3_payload_contains_validity_fields(self, service: StrategicArchiveService) -> None:
+        """L3 payload 包含 valid_from/valid_until 初始值 None（Story 3.12 AC-1）"""
+        plan_id = uuid.uuid4()
+        await service.archive_plan(
+            plan_id=plan_id,
+            plan_type="SP",
+            assumptions={"key": "value"},
+            decision_basis={},
+            execution_deviation={},
+        )
+        vector = cast(Any, service._vector_storage)
+        assert vector.upsert_points.called
+        call_args = vector.upsert_points.call_args[1]
+        points = call_args["points"]
+        assert len(points) == 1
+        payload = points[0].get("payload", {})
+        # valid_from/valid_union 直接赋值为 None（不经过 str() 转换）
+        assert "valid_from" in payload
+        assert payload["valid_from"] is None
+        assert "valid_until" in payload
+        assert payload["valid_until"] is None
+
+    @pytest.mark.asyncio
+    async def test_archive_plan_l5_properties_contains_validity_fields(self, service: StrategicArchiveService) -> None:
+        """L5 properties 包含 valid_from/valid_until 初始值 None（Story 3.12 AC-1）"""
+        plan_id = uuid.uuid4()
+        await service.archive_plan(
+            plan_id=plan_id,
+            plan_type="SP",
+            assumptions={},
+            decision_basis={},
+            execution_deviation={},
+        )
+        graph = cast(Any, service._graph_storage)
+        assert graph.create_entity.called
+        call_args = graph.create_entity.call_args[1]
+        properties = call_args.get("properties", {})
+        assert "valid_from" in properties
+        assert properties["valid_from"] is None
+        assert "valid_until" in properties
+        assert properties["valid_until"] is None
 
     @pytest.mark.asyncio
     async def test_archive_plan_l2_failure_raises(self) -> None:
@@ -437,7 +489,7 @@ class TestMarkStaleArchives:
         service, repo, _ = _make_validity_service()
         expired = _make_archive({"valid_until": datetime(2021, 1, 1, tzinfo=UTC)})
         valid = _make_archive({"valid_until": datetime(2099, 12, 31, tzinfo=UTC)})
-        repo.find.side_effect = [[expired, valid], []]
+        repo.find_for_update.side_effect = [[expired, valid], []]
         repo.mark_stale.return_value = True
         repo.get_by_id.return_value = expired
         marked = await service.mark_stale_archives()
@@ -450,7 +502,7 @@ class TestMarkStaleArchives:
         """valid_until 为 None 且归档超 12 个月标记陈旧"""
         service, repo, _ = _make_validity_service()
         old = _make_archive({"valid_until": None, "archived_at": datetime.now(UTC) - timedelta(days=400)})
-        repo.find.side_effect = [[old], []]
+        repo.find_for_update.side_effect = [[old], []]
         repo.mark_stale.return_value = True
         repo.get_by_id.return_value = old
         marked = await service.mark_stale_archives()
@@ -461,8 +513,8 @@ class TestMarkStaleArchives:
     async def test_skips_already_marked(self) -> None:
         """已标记档案跳过（幂等）"""
         service, repo, _ = _make_validity_service()
-        # exclude_staleness=True 在 SQL 层已过滤已标记档案，find 返回空
-        repo.find.side_effect = [[], []]
+        # exclude_staleness=True 在 SQL 层已过滤已标记档案，find_for_update 返回空
+        repo.find_for_update.side_effect = [[], []]
         marked = await service.mark_stale_archives()
         assert len(marked) == 0
         # 已被过滤，无需调用 mark_stale
@@ -473,7 +525,7 @@ class TestMarkStaleArchives:
         """mark_stale 返回 False（被并发实例抢占）时跳过事件"""
         service, repo, _ = _make_validity_service()
         expired = _make_archive({"valid_until": datetime(2021, 1, 1, tzinfo=UTC)})
-        repo.find.side_effect = [[expired], []]
+        repo.find_for_update.side_effect = [[expired], []]
         repo.mark_stale.return_value = False  # 被其他实例抢先标记
         marked = await service.mark_stale_archives()
         assert len(marked) == 0
@@ -485,7 +537,7 @@ class TestMarkStaleArchives:
         """发布 FactBecameStale 事件"""
         service, repo, _ = _make_validity_service()
         expired = _make_archive({"valid_until": datetime(2021, 1, 1, tzinfo=UTC)})
-        repo.find.side_effect = [[expired], []]
+        repo.find_for_update.side_effect = [[expired], []]
         repo.mark_stale.return_value = True
         repo.get_by_id.return_value = expired
         await service.mark_stale_archives()
@@ -500,9 +552,24 @@ class TestMarkStaleArchives:
         """valid_until 和 archived_at 均为 None 不标记"""
         service, repo, _ = _make_validity_service()
         neither = _make_archive({"valid_until": None, "archived_at": None})
-        repo.find.side_effect = [[neither], []]
+        repo.find_for_update.side_effect = [[neither], []]
         marked = await service.mark_stale_archives()
         assert len(marked) == 0
+
+    @pytest.mark.asyncio
+    async def test_mark_stale_persists_stale_reason(self) -> None:
+        """标记陈旧时持久化 stale_reason 到 metadata（Story 3.12 AC-3）"""
+        service, repo, _ = _make_validity_service()
+        expired = _make_archive({"valid_until": datetime(2021, 1, 1, tzinfo=UTC)})
+        repo.find_for_update.side_effect = [[expired], []]
+        repo.mark_stale.return_value = True
+        repo.get_by_id.return_value = expired
+        marked = await service.mark_stale_archives()
+        assert len(marked) == 1
+        # 实体 mark_stale() 方法写入 metadata 的 stale_reason
+        assert marked[0].metadata["stale_reason"] == "expired"
+        assert marked[0].metadata["staleness"] == "stale"
+        assert "stale_since" in marked[0].metadata
 
 
 def _make_validity_service(
@@ -531,3 +598,126 @@ def _make_validity_service(
         event_publisher=publisher,
     )
     return service, repo, archive
+
+
+class TestSearchVectors:
+    """search_vectors() 向量检索降权集成测试（Story 3.12 AC-4）"""
+
+    @pytest.fixture
+    def service(self) -> StrategicArchiveService:
+        """创建带降权服务的 Mock 服务实例"""
+        return StrategicArchiveService(
+            archive_repo=cast(ArchiveRepositoryPort, _make_repo()),
+            vector_storage=cast(L3VectorPort, _make_vector()),
+            object_storage=cast(L4ObjectPort, _make_object_storage()),
+            graph_storage=cast(L5GraphPort, _make_graph()),
+            event_publisher=cast(EventPublisher, _make_publisher()),
+            staleness_service=_make_staleness_service(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_search_vectors_returns_search_results(self, service: StrategicArchiveService) -> None:
+        """search_vectors() 返回 list[SearchResult]（类型正确）"""
+        vector = cast(Any, service._vector_storage)
+        vector.search.return_value = [
+            {"id": "strategic_archive:1111", "score": 0.9, "payload": {"archive_id": "1111"}},
+        ]
+        results = await service.search_vectors(
+            query_vector=[0.1] * 1024,
+            limit=10,
+        )
+        assert len(results) == 1
+        assert isinstance(results[0], dict)
+        assert "id" in results[0]
+        assert "score" in results[0]
+        assert "payload" in results[0]
+
+    @pytest.mark.asyncio
+    async def test_search_vectors_calls_staleness_weight(self, service: StrategicArchiveService) -> None:
+        """search_vectors() 返回前调用 apply_staleness_weight()"""
+        vector = cast(Any, service._vector_storage)
+        vector.search.return_value = [
+            {"id": "strategic_archive:1111", "score": 0.9, "payload": {"archive_id": "1111"}},
+        ]
+        stale = cast(Any, service._staleness_service)
+        await service.search_vectors(query_vector=[0.1] * 1024)
+        assert stale.apply_staleness_weight.called
+
+    @pytest.mark.asyncio
+    async def test_search_vectors_no_staleness_service(self) -> None:
+        """staleness_service 为 None 时跳过降权（透明降级）"""
+        svc = StrategicArchiveService(
+            archive_repo=cast(ArchiveRepositoryPort, _make_repo()),
+            vector_storage=cast(L3VectorPort, _make_vector()),
+            object_storage=cast(L4ObjectPort, _make_object_storage()),
+            graph_storage=cast(L5GraphPort, _make_graph()),
+            event_publisher=cast(EventPublisher, _make_publisher()),
+            staleness_service=None,
+        )
+        vector = cast(Any, svc._vector_storage)
+        vector.search.return_value = [
+            {"id": "strategic_archive:1111", "score": 0.9, "payload": {"archive_id": "1111"}},
+        ]
+        results = await svc.search_vectors(query_vector=[0.1] * 1024)
+        assert len(results) == 1
+        assert results[0]["score"] == 0.9
+
+    @pytest.mark.asyncio
+    async def test_search_vectors_stale_after_fresh(self, service: StrategicArchiveService) -> None:
+        """降权后排序正确性：陈旧数据 score 降低，排序位置变化"""
+        vector = cast(Any, service._vector_storage)
+        stale_svc = cast(Any, service._staleness_service)
+        from src.application.services.staleness_weight_service import STALE_WEIGHT_FACTOR
+
+        # 模拟降权：陈旧数据 score *= 0.5
+        async def _weight(results):
+            for r in results:
+                payload = r.get("payload", {})
+                if payload.get("is_stale"):
+                    r["score"] = r["score"] * STALE_WEIGHT_FACTOR
+            results.sort(key=lambda x: (-x["score"], str(x["id"])))
+            return results
+
+        stale_svc.apply_staleness_weight.side_effect = _weight
+        vector.search.return_value = [
+            {"id": "strategic_archive:1111", "score": 0.9, "payload": {"archive_id": "1111", "is_stale": True}},
+            {"id": "strategic_archive:2222", "score": 0.8, "payload": {"archive_id": "2222", "is_stale": False}},
+        ]
+        results = await service.search_vectors(query_vector=[0.1] * 1024)
+        # 新鲜 0.8 > 陈旧 0.45
+        assert len(results) == 2
+        assert results[0]["id"] == "strategic_archive:2222"  # fresh 0.8
+        assert results[1]["id"] == "strategic_archive:1111"  # stale 0.45
+
+    @pytest.mark.asyncio
+    async def test_search_vectors_result_count_unchanged(self, service: StrategicArchiveService) -> None:
+        """返回结果数量不变（只调整 score 和顺序）"""
+        vector = cast(Any, service._vector_storage)
+        vector.search.return_value = [
+            {"id": "a", "score": 0.9, "payload": {"archive_id": "a", "is_stale": True}},
+            {"id": "b", "score": 0.8, "payload": {"archive_id": "b", "is_stale": False}},
+            {"id": "c", "score": 0.7, "payload": {"archive_id": "c", "is_stale": True}},
+        ]
+        results = await service.search_vectors(query_vector=[0.1] * 1024)
+        assert len(results) == 3
+
+    @pytest.mark.asyncio
+    async def test_search_vectors_empty_results(self, service: StrategicArchiveService) -> None:
+        """空结果集返回空列表"""
+        vector = cast(Any, service._vector_storage)
+        vector.search.return_value = []
+        results = await service.search_vectors(query_vector=[0.1] * 1024)
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_search_vectors_l3_not_injected_raises(self) -> None:
+        """L3 未注入时抛出 ArchiveStorageError"""
+        svc = StrategicArchiveService(
+            archive_repo=cast(ArchiveRepositoryPort, _make_repo()),
+            vector_storage=None,
+            object_storage=cast(L4ObjectPort, _make_object_storage()),
+            graph_storage=cast(L5GraphPort, _make_graph()),
+            event_publisher=cast(EventPublisher, _make_publisher()),
+        )
+        with pytest.raises(ArchiveStoreErr):
+            await svc.search_vectors(query_vector=[0.1] * 1024)

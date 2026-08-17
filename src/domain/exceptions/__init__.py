@@ -68,6 +68,10 @@ from src.domain.exceptions.ocr_exceptions import (
     OCRProcessingError,
 )
 from src.domain.exceptions.permission_exceptions import InsufficientTokenError
+from src.domain.exceptions.relevance_exceptions import (
+    RelevanceEvaluationBlockedError,
+    RelevanceEvaluationError,
+)
 from src.domain.exceptions.reranker_exceptions import RerankError
 from src.domain.exceptions.role_exceptions import (
     CannotDeleteRoleWithUsersError,
@@ -180,6 +184,9 @@ __all__ = [
     "EntityExtractionError",
     # 重排序异常
     "RerankError",
+    # 检索相关性评估异常
+    "RelevanceEvaluationError",
+    "RelevanceEvaluationBlockedError",
     # 混合检索异常
     "HybridSearchError",
     # 分层检索异常

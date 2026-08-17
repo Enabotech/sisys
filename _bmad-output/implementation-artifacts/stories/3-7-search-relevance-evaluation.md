@@ -1,6 +1,6 @@
 # Story 3.7: 检索相关性评估（LLM-as-a-Judge）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -504,17 +504,17 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。这是 SDD 规范驱动的基础。
 
-- [ ] Subtask 0.1: 定义评估 Schema 契约（`RelevanceEvaluation`、`RuleBasedEvaluation`）
-- [ ] Subtask 0.2: 创建/更新 `docs/api/openapi.yaml`（新增 `POST /api/v1/search/evaluate` 端点）
-- [ ] Subtask 0.3: 编写端口契约测试 `tests/contracts/test_port_contract_relevance_evaluation.py`（遵循项目标准四方法模式：`test_port_is_registered` + `test_implementation_has_required_methods` + `test_metadata_complete` + `test_lifetime_is_scoped`（断言 `Lifetime.SCOPED`））
-- [ ] Subtask 0.4: 编写 API 契约测试 `tests/contracts/test_api_contract_relevance_evaluation.py`
-- [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_relevance_evaluation.feature`
-- [ ] Subtask 0.6: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_relevance_evaluation.py`
-- [ ] Subtask 0.7: 运行所有 Task 0 测试（端口契约测试 + API 契约测试 + 验收测试），确认全部失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义评估 Schema 契约（`RelevanceEvaluation`、`RuleBasedEvaluation`）
+- [x] Subtask 0.2: 创建/更新 `docs/api/openapi.yaml`（新增 `POST /api/v1/search/evaluate` 端点）
+- [x] Subtask 0.3: 编写端口契约测试 `tests/contracts/test_port_contract_relevance_evaluation.py`（遵循项目标准四方法模式：`test_port_is_registered` + `test_implementation_has_required_methods` + `test_metadata_complete` + `test_lifetime_is_scoped`（断言 `Lifetime.SCOPED`））
+- [x] Subtask 0.4: 编写 API 契约测试 `tests/contracts/test_api_contract_relevance_evaluation.py`
+- [x] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_relevance_evaluation.feature`
+- [x] Subtask 0.6: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_relevance_evaluation.py`
+- [x] Subtask 0.7: 运行所有 Task 0 测试（端口契约测试 + API 契约测试 + 验收测试），确认全部失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 所有 Task 0 测试（端口契约测试 + API 契约测试 + 验收测试）运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 所有 Task 0 测试（端口契约测试 + API 契约测试 + 验收测试）运行失败（预期行为，红阶段确认）
 
 ---
 

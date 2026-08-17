@@ -19,7 +19,7 @@ from src.domain.exceptions import EntityValidationError
 from src.domain.exceptions.archive_exceptions import ArchiveNotFoundError, ArchiveStorageError, ValidityPeriodConflictError
 from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
 from src.domain.ports.event_publisher import EventPublisher, PublishResult
-from src.domain.ports.l3_vector import L3VectorPort
+from src.domain.ports.l3_vector import L3VectorPort, SearchResult
 from src.domain.ports.l4_object import L4ObjectPort
 from src.domain.ports.l5_graph import L5GraphPort
 
@@ -43,6 +43,7 @@ class StrategicArchiveService:
         object_storage: L4ObjectPort | None = None,
         graph_storage: L5GraphPort | None = None,
         event_publisher: EventPublisher | None = None,
+        staleness_service: Any | None = None,
     ) -> None:
         """初始化战略档案编排服务
 
@@ -52,12 +53,14 @@ class StrategicArchiveService:
             object_storage: 对象存储端口（L4）
             graph_storage: 图存储端口（L5，可选，None 时降级）
             event_publisher: 事件发布器
+            staleness_service: 陈旧数据降权服务（可选，None 时跳过降权）
         """
         self._archive_repo = archive_repo
         self._vector_storage = vector_storage
         self._object_storage = object_storage
         self._graph_storage = graph_storage
         self._event_publisher = event_publisher
+        self._staleness_service = staleness_service
 
     async def archive_plan(
         self,
@@ -144,6 +147,10 @@ class StrategicArchiveService:
                         "assumptions": str(assumptions or {}),
                         "decision_basis": str(decision_basis or {}),
                         "created_at": now.isoformat(),
+                        # Story 3.12: L3 payload 有效期初始快照（直接赋值 None，不经过 str() 转换，
+                        # 与 assumptions/decision_basis 的 str(...) 序列化模式相区分）
+                        "valid_from": None,
+                        "valid_until": None,
                     },
                 }
                 success = await self._vector_storage.upsert_points(
@@ -207,6 +214,9 @@ class StrategicArchiveService:
                         "plan_type": plan_type,
                         "archive_type": saved.archive_type.value,
                         "created_at": now.isoformat(),
+                        # Story 3.12: L5 properties 有效期初始快照（直接赋值 None，不经过 str() 转换）
+                        "valid_from": None,
+                        "valid_until": None,
                     },
                 )
                 if success:
@@ -294,6 +304,41 @@ class StrategicArchiveService:
             符合条件的档案列表
         """
         return await self._archive_repo.find(query)
+
+    async def search_vectors(
+        self,
+        query_vector: list[float],
+        limit: int = 10,
+        filter_payload: dict | None = None,
+    ) -> list[SearchResult]:
+        """战略档案向量检索
+
+        通过 L3VectorPort.search() 检索 strategic_archive collection，
+        返回 SearchResult 列表，返回前集成 StalenessWeightService 降权。
+
+        Args:
+            query_vector: 查询向量
+            limit: 返回结果数量限制
+            filter_payload: Payload 过滤条件
+
+        Returns:
+            降权后的 SearchResult 列表
+
+        Raises:
+            ArchiveStorageError: L3 向量存储未注入（None）时抛出
+        """
+        if self._vector_storage is None:
+            raise ArchiveStorageError(layer="l3", cause=RuntimeError("l3_vector not injected"))
+        raw = await self._vector_storage.search(
+            collection=self.L3_COLLECTION,
+            query_vector=query_vector,
+            limit=limit,
+            filter_payload=filter_payload,
+        )
+        results = [SearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {})) for r in raw]
+        if self._staleness_service is not None:
+            results = await self._staleness_service.apply_staleness_weight(results)
+        return results
 
     async def set_validity_period(
         self,
@@ -419,6 +464,9 @@ class StrategicArchiveService:
         查询所有 valid_until < now 或 valid_until IS NULL AND archived_at < now - 12个月
         且尚未标记陈旧的档案，逐批标记并发布 FactBecameStale 事件。
 
+        Story 3.12 并发安全：查询使用 find_for_update() 悲观锁，
+        避免与 set_validity_period() 的竞态（读取陈旧判断后有效期被更新导致错误标记）。
+
         Args:
             batch_size: 每批查询数量（默认 100）
 
@@ -437,7 +485,8 @@ class StrategicArchiveService:
                 exclude_staleness=True,
             )
             try:
-                batch = await self._archive_repo.find(query)
+                # find_for_update() 悲观锁：锁定待标记行，避免 TOCTOU 竞态
+                batch = await self._archive_repo.find_for_update(query)
             except Exception as e:
                 logger.error("L2 query failed at offset %s: %s", offset, e)
                 break
@@ -451,6 +500,10 @@ class StrategicArchiveService:
                     stale_reason = "expired" if archive.valid_until is not None else "archived_too_long"
                 else:
                     continue
+
+                # 实体自包含行为：通过 mark_stale() 封装 metadata 写入
+                # （含 stale_reason 持久化，供 API 响应 stale_reason 字段读取）
+                archive.mark_stale(now, stale_reason)
 
                 # 条件标记：SQL 层原子判定，被并发实例抢先标记时跳过事件
                 claimed = await self._archive_repo.mark_stale(archive.archive_id)

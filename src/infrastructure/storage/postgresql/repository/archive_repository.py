@@ -137,6 +137,15 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         # 排除已标记陈旧的档案（幂等保证）
         if query.exclude_staleness:
             stmt = stmt.where(func.coalesce(ArchiveModel.metadata_["staleness"].as_string(), "") != "stale")
+        # staleness_status 过滤（Story 3.12 AC-6）
+        if query.staleness_status is not None:
+            if query.staleness_status == "stale":
+                stmt = stmt.where(ArchiveModel.metadata_["staleness"].astext == "stale")
+            elif query.staleness_status == "fresh":
+                stmt = stmt.where(ArchiveModel.metadata_["staleness"].astext.is_distinct_from("stale"))
+        # archive_ids 批量查询（Story 3.12 - StalenessWeightService 兜底链）
+        if query.archive_ids is not None:
+            stmt = stmt.where(ArchiveModel.archive_id.in_(query.archive_ids))
         return stmt
 
     async def find(self, query: ArchiveQuery) -> list[StrategicArchive]:
@@ -172,6 +181,7 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         stmt = self._apply_filters(stmt, query)
         stmt = stmt.order_by(ArchiveModel.archived_at.desc())
         stmt = stmt.with_for_update()
+        stmt = stmt.offset(query.offset).limit(query.limit)
 
         result = await self._session.execute(stmt)
         models = result.scalars().all()
