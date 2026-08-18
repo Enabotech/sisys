@@ -45,6 +45,13 @@ class OutboxRepository(Protocol):
             event_id: 事件唯一标识
         """
 
+    async def mark_pending(self, event_id: UUID) -> None:
+        """将失败事件恢复为待发布状态，供重试流程使用。
+
+        Args:
+            event_id: 事件唯一标识
+        """
+
     async def mark_failed(self, event_id: UUID, error: str) -> None:
         """标记事件发布失败
 

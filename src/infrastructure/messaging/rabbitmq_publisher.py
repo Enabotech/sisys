@@ -79,8 +79,8 @@ class RabbitMQPublisher:
         Raises:
             RuntimeError: 如果未调用 connect() 先
         """
-        if not self._exchange:
-            await self.connect()
+        if self._exchange is None:
+            raise RuntimeError("Not connected")
 
         payload = json.dumps(event.to_dict())
         message = aio_pika.Message(

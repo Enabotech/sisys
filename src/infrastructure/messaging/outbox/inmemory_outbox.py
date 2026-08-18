@@ -54,6 +54,14 @@ class InMemoryOutboxRepository(OutboxRepository):
                     e.mark_published()
                     break
 
+    async def mark_pending(self, event_id: UUID) -> None:
+        """将失败事件恢复为待发布状态。"""
+        async with self._lock:
+            for entity in self._entities:
+                if entity.event_id == event_id:
+                    entity.mark_pending()
+                    return
+
     async def mark_failed(self, event_id: UUID, error: str) -> None:
         """标记事件发布失败"""
         async with self._lock:
