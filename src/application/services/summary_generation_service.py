@@ -140,13 +140,15 @@ class SummaryGenerationService:
                     tenant_id=tenant_id,
                     filter_payload=None,
                 )
-                await self._prefetch_staleness(l2_results)
-                search_context = self._build_cross_document_context(l2_results)
             except Exception as e:
                 logger.warning("L2 摘要检索失败，回退到单文档结果: %s", e)
+                l2_results = list(search_results)
                 await self._prefetch_staleness(search_results)
                 search_context = self._build_search_context(search_results)
-                l2_results = list(search_results)  # 回退到单文档结果
+            else:
+                # L2 检索成功后，即使陈旧兜底失败，也保留有效的 L2 结果。
+                await self._prefetch_staleness(l2_results)
+                search_context = self._build_cross_document_context(l2_results)
         else:
             # 单文档模式：使用传入的检索结果
             await self._prefetch_staleness(search_results)

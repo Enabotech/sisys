@@ -89,11 +89,13 @@ class StalenessWeightService:
 
                 uuids = [UUID(aid) for aid in missing_ids if self._is_valid_uuid(aid)]
                 if uuids:
-                    query = ArchiveQuery(archive_ids=uuids, limit=1000)
-                    archives = await self._archive_repo.find(query)
                     archive_stale_map: dict[str, bool] = {}
-                    for a in archives:
-                        archive_stale_map[str(a.archive_id)] = a.is_stale()
+                    # ArchiveQuery.limit 上限为 1000，分片查询避免超大结果集静默漏处理。
+                    for start in range(0, len(uuids), 1000):
+                        query = ArchiveQuery(archive_ids=uuids[start : start + 1000], limit=1000)
+                        archives = await self._archive_repo.find(query)
+                        for a in archives:
+                            archive_stale_map[str(a.archive_id)] = a.is_stale()
 
                     # 更新缺失标记的结果
                     for r in results:

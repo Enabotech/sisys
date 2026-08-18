@@ -261,6 +261,7 @@ class QdrantVectorStorage(L3VectorPort):
         points = await self._client.retrieve(
             collection_name=collection,
             ids=[normalized_id],
+            with_vectors=True,
             with_payload=True,
         )
         if not points:

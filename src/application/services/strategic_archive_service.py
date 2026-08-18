@@ -475,20 +475,20 @@ class StrategicArchiveService:
         """
         now = datetime.now(UTC)
         marked: list[StrategicArchive] = []
-        offset = 0
 
         while True:
-            # 查询待标记档案（SQL 层过滤已标记档案 + 分页，保证幂等）
+            # 查询待标记档案。结果集会因本轮标记而动态缩小，因此每轮必须从首批重新扫描，
+            # 不递增 offset，避免已移除的行导致后续候选被跳过。
             query = ArchiveQuery(
                 limit=batch_size,
-                offset=offset,
+                offset=0,
                 exclude_staleness=True,
             )
             try:
                 # find_for_update() 悲观锁：锁定待标记行，避免 TOCTOU 竞态
                 batch = await self._archive_repo.find_for_update(query)
             except Exception as e:
-                logger.error("L2 query failed at offset %s: %s", offset, e)
+                logger.error("L2 query failed while scanning stale archives: %s", e)
                 break
 
             if not batch:
@@ -542,8 +542,6 @@ class StrategicArchiveService:
                             logger.warning("FactBecameStale event publish partial failure: %s", result.partial_error)
                     except Exception as e:
                         logger.warning("FactBecameStale event publish failed for archive %s: %s", saved.archive_id, e)
-
-            offset += batch_size
 
         return marked
 
