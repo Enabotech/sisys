@@ -86,6 +86,9 @@ class TestErrorPropagation:
             async def mark_published(self, event_id) -> None:
                 pass
 
+            async def mark_pending(self, event_id) -> None:
+                pass
+
             async def mark_failed(self, event_id, error: str) -> None:
                 pass
 
@@ -114,6 +117,9 @@ class TestErrorPropagation:
                 return []
 
             async def mark_published(self, event_id) -> None:
+                pass
+
+            async def mark_pending(self, event_id) -> None:
                 pass
 
             async def mark_failed(self, event_id, error: str) -> None:
