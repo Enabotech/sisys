@@ -80,7 +80,7 @@ class RabbitMQPublisher:
             RuntimeError: 如果未调用 connect() 先
         """
         if not self._exchange:
-            raise RuntimeError("Not connected. Call connect() first.")
+            await self.connect()
 
         payload = json.dumps(event.to_dict())
         message = aio_pika.Message(
@@ -91,7 +91,10 @@ class RabbitMQPublisher:
             headers={"x-retry-count": str(retry_count)},
         )
 
-        await self._exchange.publish(message, routing_key=routing_key)
+        exchange = self._exchange
+        if exchange is None:
+            raise RuntimeError("RabbitMQ connection did not initialize exchange")
+        await exchange.publish(message, routing_key=routing_key)
         logger.debug(
             "Published event %s to routing key %s",
             event.event_id,

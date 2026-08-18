@@ -52,7 +52,10 @@ class PostgreSQLOutboxRepository(OutboxRepository):
     async def get_unpublished(self, limit: int) -> list[DomainEvent]:
         """获取未发布的事件列表（FIFO 排序）"""
         result = await self._session.execute(
-            select(OutboxModel).where(OutboxModel.status == "pending").order_by(OutboxModel.created_at.asc()).limit(limit)
+            select(OutboxModel)
+            .where(OutboxModel.status.in_(("pending", "failed")))
+            .order_by(OutboxModel.created_at.asc())
+            .limit(limit)
         )
         models = list(result.scalars().all())
         return [SQLAlchemyEventOutboxAdapter.to_domain_event(m) for m in models]
@@ -66,7 +69,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         result = await self._session.execute(select(OutboxModel).where(OutboxModel.event_id == event_id))
         model = result.scalar_one_or_none()
         if model:
-            if model.status != "pending":
+            if model.status not in ("pending", "failed"):
                 raise InvalidStateTransitionError(model.status, "published")
             model.status = "published"
             model.published_at = datetime.now(UTC)

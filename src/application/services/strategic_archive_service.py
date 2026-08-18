@@ -475,14 +475,12 @@ class StrategicArchiveService:
         """
         now = datetime.now(UTC)
         marked: list[StrategicArchive] = []
-        offset = 0
-
         while True:
-            # 结果集会因本轮标记而动态缩小；offset 只累计本轮保留的 fresh 记录，
-            # 不累计被标记后从结果集中消失的记录。
+            # 每轮从首批查询当前未标记档案。动态结果集不能安全使用 offset，
+            # 否则已被标记的记录移除后会使后续候选发生前移并被跳过。
             query = ArchiveQuery(
                 limit=batch_size,
-                offset=offset,
+                offset=0,
                 exclude_staleness=True,
             )
             try:
@@ -545,8 +543,6 @@ class StrategicArchiveService:
                             logger.warning("FactBecameStale event publish partial failure: %s", result.partial_error)
                     except Exception as e:
                         logger.warning("FactBecameStale event publish failed for archive %s: %s", saved.archive_id, e)
-
-            offset += retained_count
 
         return marked
 
