@@ -475,13 +475,14 @@ class StrategicArchiveService:
         """
         now = datetime.now(UTC)
         marked: list[StrategicArchive] = []
+        offset = 0
 
         while True:
-            # 查询待标记档案。结果集会因本轮标记而动态缩小，因此每轮必须从首批重新扫描，
-            # 不递增 offset，避免已移除的行导致后续候选被跳过。
+            # 结果集会因本轮标记而动态缩小；offset 只累计本轮保留的 fresh 记录，
+            # 不累计被标记后从结果集中消失的记录。
             query = ArchiveQuery(
                 limit=batch_size,
-                offset=0,
+                offset=offset,
                 exclude_staleness=True,
             )
             try:
@@ -494,11 +495,13 @@ class StrategicArchiveService:
             if not batch:
                 break
 
+            retained_count = 0
             for archive in batch:
                 # 陈旧判定（复用实体统一判定标准，区分陈旧原因）
                 if archive.is_stale(ref_date=now):
                     stale_reason = "expired" if archive.valid_until is not None else "archived_too_long"
                 else:
+                    retained_count += 1
                     continue
 
                 # 实体自包含行为：通过 mark_stale() 封装 metadata 写入
@@ -542,6 +545,8 @@ class StrategicArchiveService:
                             logger.warning("FactBecameStale event publish partial failure: %s", result.partial_error)
                     except Exception as e:
                         logger.warning("FactBecameStale event publish failed for archive %s: %s", saved.archive_id, e)
+
+            offset += retained_count
 
         return marked
 

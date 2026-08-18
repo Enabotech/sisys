@@ -26,6 +26,8 @@ async def _lifespan(app: FastAPI):
 
     bootstrap()
     resolver = get_resolver()
+    rabbitmq_publisher = resolver.resolve("rabbitmq_publisher")
+    await rabbitmq_publisher.connect()
     poller = resolver.resolve("outbox_poller")
     poller_task = asyncio.create_task(poller.run())
 
