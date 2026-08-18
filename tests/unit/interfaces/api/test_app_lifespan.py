@@ -33,7 +33,12 @@ class TestLifespanStartup:
                 mock_resolver = MagicMock()
                 mock_poller = MagicMock()
                 mock_poller.run = AsyncMock(return_value=None)
-                mock_resolver.resolve.return_value = mock_poller
+                mock_rabbitmq_publisher = MagicMock()
+                mock_rabbitmq_publisher.connect = AsyncMock(return_value=None)
+                mock_resolver.resolve.side_effect = lambda name: {
+                    "rabbitmq_publisher": mock_rabbitmq_publisher,
+                    "outbox_poller": mock_poller,
+                }[name]
                 mock_get_resolver.return_value = mock_resolver
 
                 app = FastAPI()
@@ -59,7 +64,12 @@ class TestLifespanShutdown:
                     mock_poller = MagicMock()
                     mock_poller.run = AsyncMock(return_value=None)
                     mock_poller.stop = MagicMock()
-                    mock_resolver.resolve.return_value = mock_poller
+                    mock_rabbitmq_publisher = MagicMock()
+                    mock_rabbitmq_publisher.connect = AsyncMock(return_value=None)
+                    mock_resolver.resolve.side_effect = lambda name: {
+                        "rabbitmq_publisher": mock_rabbitmq_publisher,
+                        "outbox_poller": mock_poller,
+                    }[name]
                     mock_get_resolver.return_value = mock_resolver
 
                     app = FastAPI()
@@ -85,7 +95,12 @@ class TestCreateAppWithTestClient:
                     mock_poller = MagicMock()
                     mock_poller.run = AsyncMock(return_value=None)
                     mock_poller.stop = MagicMock()
-                    mock_resolver.resolve.return_value = mock_poller
+                    mock_rabbitmq_publisher = MagicMock()
+                    mock_rabbitmq_publisher.connect = AsyncMock(return_value=None)
+                    mock_resolver.resolve.side_effect = lambda name: {
+                        "rabbitmq_publisher": mock_rabbitmq_publisher,
+                        "outbox_poller": mock_poller,
+                    }[name]
                     mock_get_resolver.return_value = mock_resolver
 
                     app = create_app()
@@ -114,7 +129,12 @@ class TestLifespanCancelledError:
 
                     mock_poller.run = MagicMock(return_value=mock_run())
                     mock_poller.stop = MagicMock()
-                    mock_resolver.resolve.return_value = mock_poller
+                    mock_rabbitmq_publisher = MagicMock()
+                    mock_rabbitmq_publisher.connect = AsyncMock(return_value=None)
+                    mock_resolver.resolve.side_effect = lambda name: {
+                        "rabbitmq_publisher": mock_rabbitmq_publisher,
+                        "outbox_poller": mock_poller,
+                    }[name]
                     mock_get_resolver.return_value = mock_resolver
 
                     app = FastAPI()
@@ -141,7 +161,12 @@ class TestLifespanPollerStop:
                     mock_poller = MagicMock()
                     mock_poller.run = AsyncMock(return_value=None)
                     mock_poller.stop = MagicMock()
-                    mock_resolver.resolve.return_value = mock_poller
+                    mock_rabbitmq_publisher = MagicMock()
+                    mock_rabbitmq_publisher.connect = AsyncMock(return_value=None)
+                    mock_resolver.resolve.side_effect = lambda name: {
+                        "rabbitmq_publisher": mock_rabbitmq_publisher,
+                        "outbox_poller": mock_poller,
+                    }[name]
                     mock_get_resolver.return_value = mock_resolver
 
                     app = FastAPI()

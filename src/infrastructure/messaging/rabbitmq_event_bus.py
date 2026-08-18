@@ -50,7 +50,7 @@ class RabbitMQEventBus(EventPublisher):
         if routing_key is None:
             return PublishResult(
                 event_id=str(event.event_id),
-                results=(),
+                results=(ChannelResult("reliable", False, f"No routing key mapping for {event.event_type}"),),
             )
 
         try:

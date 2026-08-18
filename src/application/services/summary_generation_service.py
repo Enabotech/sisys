@@ -426,11 +426,13 @@ class SummaryGenerationService:
                     logger.warning("跳过非法 archive_id: %s", aid)
             if not uuids:
                 return
-            query = ArchiveQuery(archive_ids=uuids, limit=1000)
-            archives = await self._archive_repo.find(query)
             stale_map: dict[str, bool] = {}
-            for a in archives:
-                stale_map[str(a.archive_id)] = a.is_stale()
+            # ArchiveQuery.limit 上限为 1000，分片查询避免跨文档摘要漏处理陈旧标记。
+            for start in range(0, len(uuids), 1000):
+                query = ArchiveQuery(archive_ids=uuids[start : start + 1000], limit=1000)
+                archives = await self._archive_repo.find(query)
+                for a in archives:
+                    stale_map[str(a.archive_id)] = a.is_stale()
             for r in results:
                 payload = r.get("payload", {}) if isinstance(r, dict) else {}
                 if isinstance(payload, dict) and payload.get("is_stale") is None:
