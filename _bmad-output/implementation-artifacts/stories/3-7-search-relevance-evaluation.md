@@ -1007,10 +1007,11 @@ docs/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-08-16
 **最后更新/Last Updated:** 2026-08-17
 **更新说明/Description:**
+- v1.4.0: Round 2 代码审查修订（修复 P1-3 吞断言/AC-6 吞断言/P1-4 集成测试逻辑冲突/P2-1 死代码集成到 evaluate 流程/P2-5 兜底分支测试覆盖/P2-6 删除无关断言/P2-7 架构测试 AST 解析/P2-4 测试名称更正；新增 CancelledError 透传、_parse_timestamp naive→aware 保护、时效性引用值注入 Prompt；mypy/ruff/pytest 全部通过 181 项测试）
 - v1.3.0: Round 1 代码审查修订（修复 4 个 P0 问题：P0-1 认证强制实施、P0-2/P0-3 端口契约返回类型改为 Any、P0-4 cross_document 模式 l2_results 回退、P0-5 删除 @property 和 type: ignore；启用 pydantic.mypy 插件；mypy/ruff/pytest 全部通过 177 项测试）
 - v1.2.0: Round 2~4 审查修订（P0#8 服务端检索安全、P0#9 evaluate 返回类型承诺、quick_rule_check 防御性计算、时效性注入形式、集成测试职责拆分、文件清单修正、端口导出、异常注册完备性确认、R4 完整性扫描确认全部 9 个 P0 已修复）
 - v1.1.0: Round 1 审查修订（修复 7 个 P0 问题：Schema computed_field/条件必填验证、Prompt-代码阻断规则一致、resolve_optional 语义、降级捕获边界、nested_subdomains 格式、HTTP 映射、API 文件命名）

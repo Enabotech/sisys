@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from datetime import datetime, timezone
@@ -102,10 +103,16 @@ class RelevanceEvaluationService:
                 block_reason=reason,
             )
 
-        # 第二步：构建检索上下文（含时效性标记）
+        # 第二步：构建检索上下文（含时效性标记和引用值）
         search_context = self._build_search_context_with_timeliness(search_results)
 
-        # 第三步：构建 Prompt
+        # 第三步：计算时效性引用值（服务端备用，AC-8 要求）
+        # 当 LLM 未输出时效性评估所需信息时，此值可直接作为 timeliness 兜底
+        timeliness_ref = self._evaluate_timeliness(search_results)
+        # 将时效性引用值作为补充信息注入上下文
+        search_context += f"\n\n[时效性参考值: {timeliness_ref:.2f}]"
+
+        # 第四步：构建 Prompt
         user_prompt = USER_PROMPT_TEMPLATE.format(
             query_text=query_text,
             search_context=search_context,
@@ -137,6 +144,9 @@ class RelevanceEvaluationService:
                 message=f"LLM 评估调用失败: {e}",
                 cause=e,
             ) from e
+        except asyncio.CancelledError:
+            # 协程取消透传不包装，避免干扰协程取消机制
+            raise
         except Exception as e:
             # 其他异常包装为 RelevanceEvaluationError
             raise RelevanceEvaluationError(
@@ -290,27 +300,36 @@ class RelevanceEvaluationService:
     def _parse_timestamp(self, value: Any) -> datetime | None:
         """解析时间戳字符串为 datetime 对象
 
+        无时区信息的 naive datetime 统一视为 UTC（与 now 的 timezone.utc 对齐），
+        避免 naive/aware 混合比较抛 TypeError。
+
         Args:
             value: 时间戳值（str 或 datetime）
 
         Returns:
-            datetime 对象，解析失败返回 None
+            aware datetime 对象（UTC），解析失败返回 None
         """
         if value is None:
             return None
+        ts: datetime | None = None
         if isinstance(value, datetime):
-            return value
-        if isinstance(value, str):
+            ts = value
+        elif isinstance(value, str):
             try:
                 # 尝试 ISO 格式解析
-                return datetime.fromisoformat(value)
+                ts = datetime.fromisoformat(value)
             except (ValueError, TypeError):
                 try:
                     # 尝试去除时区信息的 ISO 格式
-                    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+                    ts = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
                 except (ValueError, TypeError):
                     pass
-        return None
+        if ts is None:
+            return None
+        if ts.tzinfo is None:
+            # naive datetime 统一视为 UTC
+            return ts.replace(tzinfo=timezone.utc)
+        return ts
 
     def _build_search_context_with_timeliness(self, search_results: list[SearchResult]) -> str:
         """构建含时效性标记的检索上下文

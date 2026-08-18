@@ -124,10 +124,31 @@ class TestDomainLayerZeroDependency:
         assert not external_imports, f"领域层不允许外部依赖: {external_imports}"
 
     def test_relevance_exceptions_imports_domain_exceptions(self) -> None:
-        """relevance_exceptions.py 继承 ExternalException/BusinessException"""
-        source = (_SRC_ROOT / "domain" / "exceptions" / "relevance_exceptions.py").read_text(encoding="utf-8")
-        assert "ExternalException" in source
-        assert "BusinessException" in source
+        """relevance_exceptions.py 继承 ExternalException/BusinessException（AST 解析验证）"""
+        exc_file = _SRC_ROOT / "domain" / "exceptions" / "relevance_exceptions.py"
+        source = exc_file.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+
+        # 收集所有类定义及其直接基类名
+        class_bases: dict[str, list[str]] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                bases: list[str] = []
+                for base in node.bases:
+                    if isinstance(base, ast.Name):
+                        bases.append(base.id)
+                    elif isinstance(base, ast.Attribute):
+                        bases.append(base.attr)
+                class_bases[node.name] = bases
+
+        assert "RelevanceEvaluationError" in class_bases
+        assert "ExternalException" in class_bases["RelevanceEvaluationError"], (
+            "RelevanceEvaluationError 应继承 ExternalException"
+        )
+        assert "RelevanceEvaluationBlockedError" in class_bases
+        assert "BusinessException" in class_bases["RelevanceEvaluationBlockedError"], (
+            "RelevanceEvaluationBlockedError 应继承 BusinessException"
+        )
 
     def test_relevance_exceptions_has_required_codes(self) -> None:
         """relevance_exceptions.py 定义 EXCEPTION_360 和 EXCEPTION_361"""

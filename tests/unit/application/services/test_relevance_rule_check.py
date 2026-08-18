@@ -178,14 +178,14 @@ class TestQuickRuleCheckBoundary:
         assert result["avg_score"] == 0.9
         assert result["quick_block"] is False
 
-    def test_result_without_score_key(self) -> None:
-        """结果无 score 字段（不是 None 值，而是缺失键）"""
+    def test_zero_score_result(self) -> None:
+        """score=0.0 的结果参与平均分计算（有效值，非缺失）"""
         service = _make_service()
-        from src.domain.ports.l3_vector import SearchResult
-
         results = [
-            SearchResult(id="doc-001", score=0.0, payload={"content": "内容"}),
+            _make_result(0.8),
+            _make_result(0.0),
         ]
         result = _run_quick_rule_check(service, query_text="query", search_results=results)
-        assert result["result_count"] == 1
-        assert result["avg_score"] == 0.0
+        assert result["result_count"] == 2
+        assert result["avg_score"] == pytest.approx(0.4)
+        assert result["quick_block"] is False

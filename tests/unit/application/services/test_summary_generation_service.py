@@ -330,6 +330,42 @@ class TestGenerateSummary:
             filter_payload=None,
         )
 
+    @pytest.mark.asyncio
+    async def test_cross_document_search_failure_falls_back_to_single_document(self) -> None:
+        """cross_document 模式 search_top_down 抛异常时回退到单文档结果（Fix 1 回归验证）"""
+        from unittest.mock import AsyncMock
+
+        from src.domain.ports.l3_vector import SearchResult
+
+        # 构造 layered_retrieval 在 search_top_down 时抛异常
+        mock_retrieval = AsyncMock()
+        mock_retrieval.search_top_down.side_effect = RuntimeError("L2 检索失败")
+
+        mock_llm = _make_llm_client()
+        svc = SummaryGenerationService(
+            llm_client=mock_llm,
+            layered_retrieval=mock_retrieval,
+            embedding_service=_make_embedding_service(),
+            l3_vector=_make_l3_vector(),
+        )
+        results = [
+            SearchResult(
+                id="strategic_archive:11111111-1111-1111-1111-111111111111",
+                score=0.8,
+                payload={"content": "单文档内容", "archive_id": "11111111-1111-1111-1111-111111111111"},
+            ),
+        ]
+        # 不应抛出 UnboundLocalError，回退到单文档路径
+        result = await svc.generate_summary(
+            query_text="测试",
+            search_results=results,
+            perspective="financial",
+            cross_document=True,
+        )
+        assert result is not None
+        # 验证回退后仍然调用 LLM 生成
+        mock_llm.structured_generate.assert_called_once()
+
 
 class TestStoreSummary:
     """摘要存储逻辑验证"""
@@ -564,6 +600,86 @@ class TestStalenessPrompt:
             ),
         ]
         await svc._prefetch_staleness(results)
+        context_text = svc._build_search_context(results)
+        assert "[数据陈旧" not in context_text
+
+    @pytest.mark.asyncio
+    async def test_prefetch_staleness_invalid_archive_id_skipped(self) -> None:
+        """非法 archive_id 被过滤，不中止兜底查询（与 StalenessWeightService 策略一致）"""
+        from datetime import UTC, datetime
+        from unittest.mock import AsyncMock
+
+        from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
+        from src.domain.ports.archive_repository import ArchiveRepositoryPort
+
+        repo = AsyncMock(spec=ArchiveRepositoryPort)
+        from uuid import UUID
+
+        stale_archive = StrategicArchive(
+            archive_id=UUID("11111111-1111-1111-1111-111111111111"),
+            plan_id=UUID("22222222-2222-2222-2222-222222222222"),
+            plan_type="SP",
+            archive_type=ArchiveType.ASSUMPTION,
+            valid_until=datetime(2021, 1, 1, tzinfo=UTC),
+        )
+        repo.find.return_value = [stale_archive]
+        svc = SummaryGenerationService(
+            llm_client=_make_llm_client(),
+            layered_retrieval=_make_layered_retrieval(),
+            embedding_service=_make_embedding_service(),
+            l3_vector=_make_l3_vector(),
+            archive_repo=repo,
+        )
+        results = [
+            SearchResult(
+                id="strategic_archive:11111111-1111-1111-1111-111111111111",
+                score=0.8,
+                payload={
+                    "content": "陈旧文档内容",
+                    "archive_id": "11111111-1111-1111-1111-111111111111",
+                },
+            ),
+            SearchResult(
+                id="strategic_archive:invalid",
+                score=0.7,
+                payload={
+                    "content": "非法 archive_id 文档",
+                    "archive_id": "not-a-uuid",
+                },
+            ),
+        ]
+        # 不应抛出异常，合法 ID 正常兜底查询
+        await svc._prefetch_staleness(results)
+        # 非法 ID 被过滤，仅合法 ID 进入查询
+        assert repo.find.called
+        # 合法 ID 的结果被标记陈旧
+        context_text = svc._build_search_context(results)
+        assert "[数据陈旧: " in context_text
+
+    @pytest.mark.asyncio
+    async def test_prefetch_staleness_all_invalid_returns_early(self) -> None:
+        """所有 archive_id 非法时提前返回，不调用 repo.find"""
+        from unittest.mock import AsyncMock
+
+        from src.domain.ports.archive_repository import ArchiveRepositoryPort
+
+        repo = AsyncMock(spec=ArchiveRepositoryPort)
+        svc = SummaryGenerationService(
+            llm_client=_make_llm_client(),
+            layered_retrieval=_make_layered_retrieval(),
+            embedding_service=_make_embedding_service(),
+            l3_vector=_make_l3_vector(),
+            archive_repo=repo,
+        )
+        results = [
+            SearchResult(
+                id="strategic_archive:invalid",
+                score=0.7,
+                payload={"content": "非法文档", "archive_id": "not-a-uuid"},
+            ),
+        ]
+        await svc._prefetch_staleness(results)
+        assert not repo.find.called
         context_text = svc._build_search_context(results)
         assert "[数据陈旧" not in context_text
 

@@ -346,6 +346,21 @@ class TestArchiveValidityHandler:
         handler._run_async(failing_coro())
         await asyncio.sleep(0)  # 让 task 执行
 
+    @pytest.mark.asyncio
+    async def test_run_async_logs_task_exception(self, caplog: pytest.LogCaptureFixture) -> None:
+        """_run_async create_task 路径下异常被记录 WARNING 日志"""
+        listener = _make_listener()
+        handler = ArchiveValidityHandler(event_listener=listener)
+
+        async def failing_coro() -> None:
+            raise RuntimeError("async error logged")
+
+        with caplog.at_level(logging.WARNING):
+            handler._run_async(failing_coro())
+            await asyncio.sleep(0.05)
+
+        assert "异步任务执行失败" in caplog.text
+
     # ===================================================================
     # 回调包装（同步回调 + _run_async 集成）
     # ===================================================================

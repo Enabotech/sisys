@@ -131,7 +131,6 @@ class TestSummaryGenerationGuard:
         summary_fake.confidence_score = 0.8
 
         service._llm_client.structured_generate.side_effect = lambda **kwargs: summary_fake
-        service._llm_client.structured_generate.return_value = summary_fake
 
         # 摘要生成不应抛异常（评估降级）
         result = asyncio.get_event_loop().run_until_complete(
