@@ -80,12 +80,6 @@ class TestRelevanceEvaluationError:
 
         assert issubclass(RelevanceEvaluationError, ExternalException)
 
-    def test_service_unavailable_error_caught(self) -> None:
-        """验证 ServiceUnavailableError 可以被捕获为 ExternalException"""
-        from src.domain.exceptions import ExternalException, ServiceUnavailableError
-
-        assert issubclass(ServiceUnavailableError, ExternalException)
-
 
 class TestRelevanceEvaluationBlockedError:
     """RelevanceEvaluationBlockedError 异常测试"""

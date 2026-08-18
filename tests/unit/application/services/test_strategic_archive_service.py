@@ -571,6 +571,22 @@ class TestMarkStaleArchives:
         assert marked[0].metadata["staleness"] == "stale"
         assert "stale_since" in marked[0].metadata
 
+    @pytest.mark.asyncio
+    async def test_mark_stale_passes_stale_since_and_reason(self) -> None:
+        """mark_stale 调用时传递 stale_since 和 stale_reason 参数（Fix 2 回归验证）"""
+        service, repo, _ = _make_validity_service()
+        expired = _make_archive({"valid_until": datetime(2021, 1, 1, tzinfo=UTC)})
+        repo.find_for_update.side_effect = [[expired], []]
+        repo.mark_stale.return_value = True
+        repo.get_by_id.return_value = expired
+        await service.mark_stale_archives()
+        assert repo.mark_stale.called
+        call_kwargs = repo.mark_stale.call_args[1]
+        assert "stale_since" in call_kwargs
+        assert call_kwargs["stale_since"] is not None
+        assert "T" in call_kwargs["stale_since"]
+        assert call_kwargs["stale_reason"] == "expired"
+
 
 def _make_validity_service(
     valid_until: Any = None,

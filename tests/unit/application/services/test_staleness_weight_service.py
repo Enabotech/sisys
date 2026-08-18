@@ -250,3 +250,37 @@ class TestStalenessWeightService:
         weighted = await service.apply_staleness_weight(results)
         assert len(weighted) == 1
         assert weighted[0]["score"] == 0.9
+
+    @pytest.mark.asyncio
+    async def test_repo_find_exception_degrades(self) -> None:
+        """archive_repo.find() 抛异常时降级为仅依赖 L3 标记，不抛出（兜底降级）"""
+        repo = _make_repo()
+        repo.find.side_effect = RuntimeError("L2 query failed")
+        service = StalenessWeightService(archive_repo=repo)
+
+        results = [
+            _make_search_result(
+                result_id="strategic_archive:11111111-1111-1111-1111-111111111111",
+                score=0.9,
+                is_stale=None,
+                archive_id="11111111-1111-1111-1111-111111111111",
+            ),
+        ]
+        # 不应抛出异常，score 不变（降级）
+        weighted = await service.apply_staleness_weight(results)
+        assert len(weighted) == 1
+        assert weighted[0]["score"] == 0.9
+
+    @pytest.mark.asyncio
+    async def test_repo_find_exception_with_explicit_stale(self) -> None:
+        """find() 抛异常时显式 is_stale=True 的结果仍降权"""
+        repo = _make_repo()
+        repo.find.side_effect = RuntimeError("L2 query failed")
+        service = StalenessWeightService(archive_repo=repo)
+
+        results = [
+            _make_search_result(result_id="a", score=0.9, is_stale=True),
+        ]
+        weighted = await service.apply_staleness_weight(results)
+        assert len(weighted) == 1
+        assert weighted[0]["score"] == pytest.approx(0.9 * STALE_WEIGHT_FACTOR)

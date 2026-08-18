@@ -547,11 +547,7 @@ def _then_llm_structured_generate_called(context: dict[str, Any]) -> None:
 @then("系统不调用 LLM")
 def _then_llm_not_called(context: dict[str, Any]) -> None:
     mock_llm = context["mock_llm_client"]
-    # 可能没有被调用，或者被调用了 0 次
-    try:
-        mock_llm.structured_generate.assert_not_called()
-    except AssertionError:
-        pass  # 允许在某些情况下被调用
+    mock_llm.structured_generate.assert_not_called()
 
 
 @then("返回 RelevanceEvaluationResult 实例")
@@ -624,10 +620,7 @@ def _when_evaluate_score_below_06(
 def _then_summary_service_not_call_llm(context: dict[str, Any]) -> None:
     mock_llm = context.get("mock_llm_client")
     if mock_llm:
-        try:
-            mock_llm.structured_generate.assert_not_called()
-        except AssertionError:
-            pass
+        mock_llm.structured_generate.assert_not_called()
 
 
 @then('返回"数据不足"的阻断响应')

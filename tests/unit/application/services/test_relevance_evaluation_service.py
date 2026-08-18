@@ -207,6 +207,36 @@ class TestEvaluateLLMFailure:
         with pytest.raises(LLMConfigError):
             await service.evaluate(query_text="测试查询", search_results=results)
 
+    @pytest.mark.asyncio
+    async def test_generic_exception_wraps_to_relevance_error(self) -> None:
+        """通用异常（非 LLM 异常）被兜底捕获并包装为 RelevanceEvaluationError"""
+        from src.domain.exceptions import RelevanceEvaluationError
+
+        mock_llm = AsyncMock()
+        mock_llm.structured_generate.side_effect = RuntimeError("意外的运行时错误")
+        service = _make_service(mock_llm)
+        results = [_make_search_result(0.8)]
+
+        with pytest.raises(RelevanceEvaluationError) as exc_info:
+            await service.evaluate(query_text="测试查询", search_results=results)
+
+        assert exc_info.value.code == "EXCEPTION_360"
+        assert "query_text" in exc_info.value.context
+        assert exc_info.value.context["result_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_cancelled_error_passthrough(self) -> None:
+        """CancelledError 透传不包装，避免干扰协程取消机制"""
+        import asyncio
+
+        mock_llm = AsyncMock()
+        mock_llm.structured_generate.side_effect = asyncio.CancelledError()
+        service = _make_service(mock_llm)
+        results = [_make_search_result(0.8)]
+
+        with pytest.raises(asyncio.CancelledError):
+            await service.evaluate(query_text="测试查询", search_results=results)
+
 
 class TestEvaluateTimeliness:
     """时效性评估验证"""
