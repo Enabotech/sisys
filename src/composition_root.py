@@ -2116,6 +2116,14 @@ async def shutdown() -> None:
         except Exception as e:
             logger.error("Failed to close %s: %s", name, e)
 
+    # 关闭 RabbitMQ 发布器连接
+    try:
+        rabbitmq_publisher = resolver.resolve("rabbitmq_publisher")
+        await rabbitmq_publisher.close()
+        logger.info("Closed rabbitmq_publisher")
+    except Exception as e:
+        logger.error("Failed to close rabbitmq_publisher: %s", e)
+
     # 关闭 embedding_service HTTP 客户端连接池
     try:
         embedding = resolver.resolve("embedding_service")
