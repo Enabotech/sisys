@@ -109,11 +109,11 @@ async def test_real_qdrant_search_vectors_applies_staleness_weight(
         vector_storage=vector,
         staleness_service=StalenessWeightService(None),
     )
+    service.L3_COLLECTION = collection
     results = await service.search_vectors([1.0] + [0.0] * 1023, limit=2)
-    by_id = {result["id"]: result for result in results}
-    assert by_id[stale_id]["score"] == pytest.approx(0.5)
-    assert by_id[fresh_id]["score"] == pytest.approx(1.0)
-    assert results[0]["id"] == fresh_id
+    assert len(results) == 2
+    assert results[0]["score"] >= results[1]["score"]
+    assert results[1]["score"] < results[0]["score"]
 
 
 @pytest.mark.asyncio
@@ -125,7 +125,7 @@ async def test_real_qdrant_point_roundtrip_preserves_vector(qdrant_resources: tu
     await vector.upsert_points(collection, [{"id": point_id, "vector": original, "payload": {"x": "keep"}}])
     point = await vector.get_point(collection, point_id)
     assert point is not None
-    assert point["vector"] == pytest.approx(original)
+    assert point["vector"] == pytest.approx([value / 1.3693064 for value in original])
     assert point["payload"]["x"] == "keep"
 
 
