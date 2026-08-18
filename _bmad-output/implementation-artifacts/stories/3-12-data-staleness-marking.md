@@ -1098,6 +1098,9 @@ FactBecameStale:
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/3-12-data-staleness-marking.md`
+- `tests/acceptance/test_acceptance_data_staleness.feature` - Story 3.12 AC-1~AC-7 独立 BDD 验收场景
+- `tests/acceptance/test_acceptance_data_staleness.py` - 真实 PostgreSQL + Resolver 验收步骤
+- `tests/integration/test_integration_data_staleness.py` - Story 3.12 PostgreSQL/Outbox/降权/摘要集成测试
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/application/services/staleness_weight_service.py` - 陈旧数据降权服务
