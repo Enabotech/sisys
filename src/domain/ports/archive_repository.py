@@ -54,6 +54,7 @@ class ArchiveQuery:
                           与 validity_status 语义区分：validity_status 按时间计算，staleness_status 按 metadata 标记判断）
         archive_ids: 按 ID 列表批量查询（供 StalenessWeightService 兜底链使用，避免 N+1 问题）
         exclude_staleness: 排除已标记陈旧的档案（幂等保证）
+        stale_before: 仅查询满足陈旧判定条件的档案（valid_until 早于该时间，或无有效期且 archived_at 早于该时间前 365 天）
         offset: 分页偏移量
         limit: 每页条数（1-1000，默认 20）
     """
@@ -69,6 +70,7 @@ class ArchiveQuery:
     staleness_status: str | None = None
     archive_ids: list[UUID] | None = None
     exclude_staleness: bool = False
+    stale_before: datetime | None = None
     offset: int = 0
     limit: int = 20
 

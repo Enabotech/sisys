@@ -110,7 +110,7 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         Returns:
             添加了过滤条件的 statement
         """
-        from datetime import UTC, datetime
+        from datetime import UTC, datetime, timedelta
 
         if query.plan_id is not None:
             stmt = stmt.where(ArchiveModel.plan_id == query.plan_id)
@@ -137,6 +137,13 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         # 排除已标记陈旧的档案（幂等保证）
         if query.exclude_staleness:
             stmt = stmt.where(func.coalesce(ArchiveModel.metadata_["staleness"].astext, "") != "stale")
+        # 仅返回满足实体 is_stale() 判定的候选，避免服务层重复扫描 fresh 档案
+        if query.stale_before is not None:
+            cutoff = query.stale_before - timedelta(days=365)
+            stmt = stmt.where(
+                (ArchiveModel.valid_until < query.stale_before)
+                | ((ArchiveModel.valid_until.is_(None)) & (ArchiveModel.archived_at < cutoff))
+            )
         # staleness_status 过滤（Story 3.12 AC-6）
         if query.staleness_status is not None:
             if query.staleness_status == "stale":

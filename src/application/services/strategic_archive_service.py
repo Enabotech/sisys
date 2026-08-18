@@ -482,6 +482,7 @@ class StrategicArchiveService:
                 limit=batch_size,
                 offset=0,
                 exclude_staleness=True,
+                stale_before=now,
             )
             try:
                 # find_for_update() 悲观锁：锁定待标记行，避免 TOCTOU 竞态
@@ -493,13 +494,11 @@ class StrategicArchiveService:
             if not batch:
                 break
 
-            retained_count = 0
             for archive in batch:
                 # 陈旧判定（复用实体统一判定标准，区分陈旧原因）
                 if archive.is_stale(ref_date=now):
                     stale_reason = "expired" if archive.valid_until is not None else "archived_too_long"
                 else:
-                    retained_count += 1
                     continue
 
                 # 实体自包含行为：通过 mark_stale() 封装 metadata 写入
