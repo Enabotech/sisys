@@ -1007,10 +1007,11 @@ docs/
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-08-16
 **最后更新/Last Updated:** 2026-08-18
 **更新说明/Description:**
+- v1.6.0: Round 4 代码审查修订 — 统一 `/api/v1/search` 下 summary/evaluate 路由认证策略为强制 Bearer 认证；补充 401 `WWW-Authenticate: Bearer` 响应头；路由类型改为非 Optional TokenPayload；Ruff/Mypy/相关 API 与验收测试全部通过
 - v1.5.0: Round 3 代码审查修订 — 修复摘要生成评估守卫捕获 `asyncio.CancelledError` 的协程取消传播问题；ruff/mypy/关键测试全部通过
 - v1.4.0: Round 2 代码审查修订（修复 P1-3 吞断言/AC-6 吞断言/P1-4 集成测试逻辑冲突/P2-1 死代码集成到 evaluate 流程/P2-5 兜底分支测试覆盖/P2-6 删除无关断言/P2-7 架构测试 AST 解析/P2-4 测试名称更正；新增 CancelledError 透传、_parse_timestamp naive→aware 保护、时效性引用值注入 Prompt；mypy/ruff/pytest 全部通过 181 项测试）
 - v1.3.0: Round 1 代码审查修订（修复 4 个 P0 问题：P0-1 认证强制实施、P0-2/P0-3 端口契约返回类型改为 Any、P0-4 cross_document 模式 l2_results 回退、P0-5 删除 @property 和 type: ignore；启用 pydantic.mypy 插件；mypy/ruff/pytest 全部通过 177 项测试）
