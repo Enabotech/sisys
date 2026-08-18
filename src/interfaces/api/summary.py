@@ -88,15 +88,21 @@ def get_current_user_dependency(
 
     async def get_current_user(
         token: str | None = Depends(oauth2_scheme),
-    ) -> TokenPayload | None:
+    ) -> TokenPayload:
+        """验证 Bearer token，未认证请求直接拒绝"""
         if not token:
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         try:
             return await auth_service.verify_token(token)
         except AuthenticationError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
     return get_current_user
@@ -145,11 +151,15 @@ def create_summary_router(
 
     async def _get_current_user(
         token: str | None = Depends(oauth2_scheme),
-    ) -> TokenPayload | None:
-        """验证 Bearer token 返回当前用户"""
+    ) -> TokenPayload:
+        """验证 Bearer token，未认证请求直接拒绝"""
         nonlocal _auth_service
         if not token:
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         if _auth_service is None:
             _auth_service = get_resolver().resolve("auth_service")
         try:
@@ -158,6 +168,7 @@ def create_summary_router(
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
     # 允许测试覆盖认证依赖
@@ -166,7 +177,7 @@ def create_summary_router(
     @router.post("/summary", response_model=SummaryResponse, summary="生成契约化结构化摘要")
     async def generate_summary(
         request: SummaryRequest,
-        current_user: TokenPayload | None = Depends(current_user_dep),
+        current_user: TokenPayload = Depends(current_user_dep),
     ) -> SummaryResponse:
         """生成契约化结构化摘要
 

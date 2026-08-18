@@ -143,7 +143,7 @@ def create_evaluate_router(
     @router.post("/evaluate", response_model=EvaluateResponse, summary="检索相关性评估")
     async def evaluate_search(
         request: EvaluateRequest,
-        current_user: TokenPayload | None = Depends(current_user_dep),
+        current_user: TokenPayload = Depends(current_user_dep),
     ) -> EvaluateResponse:
         """执行检索相关性评估（LLM-as-a-Judge 多维评估）
 
