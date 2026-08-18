@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -497,6 +498,9 @@ class SummaryGenerationService:
         except RelevanceEvaluationError as e:
             # LLM 评估调用失败 → 降级跳过评估（WARNING 日志）
             logger.warning("LLM 评估调用失败，跳过评估: %s", e)
+        except asyncio.CancelledError:
+            # 协程取消必须透传，避免摘要任务无法正常终止
+            raise
         except Exception as e:
             # 其他异常 → 降级跳过评估（WARNING 日志）
             logger.warning("相关性评估异常，跳过评估: %s", e)
