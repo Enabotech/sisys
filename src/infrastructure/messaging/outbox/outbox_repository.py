@@ -69,10 +69,23 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         result = await self._session.execute(select(OutboxModel).where(OutboxModel.event_id == event_id))
         model = result.scalar_one_or_none()
         if model:
-            if model.status not in ("pending", "failed"):
+            if model.status != "pending":
                 raise InvalidStateTransitionError(model.status, "published")
             model.status = "published"
             model.published_at = datetime.now(UTC)
+            await self._session.flush()
+
+    async def mark_pending(self, event_id: UUID) -> None:
+        """将失败事件恢复为待发布状态。"""
+        result = await self._session.execute(select(OutboxModel).where(OutboxModel.event_id == event_id))
+        model = result.scalar_one_or_none()
+        if model:
+            if model.status != "failed":
+                raise InvalidStateTransitionError(model.status, "pending")
+            if model.retry_count >= model.max_retries:
+                raise InvalidStateTransitionError(model.status, "pending", f"Max retries ({model.max_retries}) exceeded")
+            model.status = "pending"
+            model.error_message = None
             await self._session.flush()
 
     async def mark_failed(self, event_id: UUID, error: str) -> None:

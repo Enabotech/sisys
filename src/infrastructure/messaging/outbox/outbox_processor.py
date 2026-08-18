@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 from typing import Any
 
@@ -86,6 +87,13 @@ class AsyncOutboxPoller:
                 last_error: Exception | None = None
                 for attempt in range(self._retry_policy.max_retries + 1):
                     try:
+                        if attempt == 0:
+                            # failed 状态必须先通过状态机恢复为 pending；旧版测试桩可能未提供该方法。
+                            mark_pending = getattr(self._repo, "mark_pending", None)
+                            if callable(mark_pending):
+                                result = mark_pending(event.event_id)
+                                if inspect.isawaitable(result):
+                                    await result
                         await self._publisher.async_publish(
                             event,
                             routing_key=routing_key,
