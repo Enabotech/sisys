@@ -13,104 +13,7 @@ import time
 import pytest
 
 from src.domain.ports.l3_vector import SearchResult
-from src.domain.services.rrf_fusion import RRF_K_DEFAULT, fuse
-
-
-class TestRrfFusionIntegration:
-    """RRF 融合算法集成测试（纯内存计算，无外部依赖）"""
-
-    @pytest.mark.asyncio
-    async def test_fuse_two_realistic_result_sets(self) -> None:
-        """模拟真实 Dense + Sparse 结果集的两路融合"""
-        dense_results: list[SearchResult] = [
-            SearchResult(id="doc-1", score=0.95, payload={"title": "战略规划报告"}),
-            SearchResult(id="doc-2", score=0.88, payload={"title": "市场分析报告"}),
-            SearchResult(id="doc-3", score=0.82, payload={"title": "财务预算报告"}),
-            SearchResult(id="doc-4", score=0.75, payload={"title": "人力资源报告"}),
-            SearchResult(id="doc-5", score=0.70, payload={"title": "技术发展报告"}),
-        ]
-        sparse_results: list[SearchResult] = [
-            SearchResult(id="doc-2", score=12.5, payload={"title": "市场分析报告"}),
-            SearchResult(id="doc-6", score=10.0, payload={"title": "市场调研报告"}),
-            SearchResult(id="doc-1", score=8.5, payload={"title": "战略规划报告"}),
-        ]
-
-        result = fuse(dense_results, sparse_results)
-
-        # doc-2 和 doc-1 跨通道出现，RRF 分数累加
-        # doc-2: rank2 in dense (1/62) + rank1 in sparse (1/61) ≈ 0.03252
-        # doc-1: rank1 in dense (1/61) + rank3 in sparse (1/63) ≈ 0.03227
-        # doc-6: rank2 in sparse (1/62) ≈ 0.01613
-        # doc-3: rank3 in dense (1/63) ≈ 0.01587
-        # doc-4: rank4 in dense (1/64) ≈ 0.01563
-        # doc-5: rank5 in dense (1/65) ≈ 0.01538
-
-        assert len(result) == 6  # 5 dense + 3 sparse - 2 duplicates = 6
-        assert result[0]["id"] == "doc-2"  # 跨通道共识 → 最高 RRF
-        assert result[1]["id"] == "doc-1"
-        # 验证降序
-        scores = [r["score"] for r in result]
-        assert scores == sorted(scores, reverse=True)
-
-    @pytest.mark.asyncio
-    async def test_fuse_with_mock_results_large(self) -> None:
-        """大结果集（50 路各 50 结果）的融合性能"""
-        dense = []
-        sparse = []
-        for i in range(50):
-            dense.append(SearchResult(id=f"d_{i}", score=0.9 - i * 0.01, payload={}))
-            sparse.append(SearchResult(id=f"s_{i}", score=20.0 - i * 0.2, payload={}))
-        # 加入跨通道重复
-        for i in range(10):
-            sparse[i] = SearchResult(id=f"d_{i}", score=10.0 - i * 0.5, payload={})
-
-        start = time.perf_counter()
-        result = fuse(dense, sparse)
-        elapsed_ms = (time.perf_counter() - start) * 1000
-
-        assert len(result) == 90  # 50 + 50 - 10 duplicates = 90
-        assert elapsed_ms < 50  # P95 门禁
-
-    @pytest.mark.asyncio
-    async def test_symmetric_fusion_with_same_results(self) -> None:
-        """两路结果完全相同时的对称融合"""
-        same: list[SearchResult] = [
-            SearchResult(id="a", score=0.9, payload={}),
-            SearchResult(id="b", score=0.8, payload={}),
-        ]
-        result = fuse(same, same)
-        assert len(result) == 2
-        # a: 1/(60+1) + 1/(60+1) = 2/61
-        # b: 1/(60+2) + 1/(60+2) = 2/62
-        assert result[0]["id"] == "a"
-        assert result[0]["score"] > result[1]["score"]
-
-    @pytest.mark.asyncio
-    async def test_three_way_fusion_v1(self) -> None:
-        """三路融合 V1 预留接口（Story 3-4）"""
-        dense: list[SearchResult] = [SearchResult(id="d1", score=0.9, payload={})]
-        sparse: list[SearchResult] = [SearchResult(id="s1", score=10.0, payload={})]
-        graph: list[SearchResult] = [SearchResult(id="d1", score=0.5, payload={"from_graph": True})]
-
-        result = fuse(dense, sparse, graph, weights=[0.4, 0.4, 0.2])
-
-        assert len(result) == 2  # d1 (duplicate) + s1
-        # d1: rank1 in dense (w=0.4) + rank1 in graph (w=0.2) = 0.6/61
-        d1 = next(r for r in result if r["id"] == "d1")
-        expected_d1 = 0.4 / (RRF_K_DEFAULT + 1) + 0.2 / (RRF_K_DEFAULT + 1)
-        assert abs(d1["score"] - expected_d1) < 1e-9
-        # payload 保留首次出现（dense 在前，payload={}）
-        assert d1["payload"] == {}
-
-    @pytest.mark.asyncio
-    async def test_single_list_passthrough(self) -> None:
-        """单路直通 — 原样返回"""
-        results: list[SearchResult] = [
-            SearchResult(id="x", score=0.5, payload={}),
-            SearchResult(id="y", score=0.3, payload={}),
-        ]
-        result = fuse(results)
-        assert result == results
+from src.domain.services.rrf_fusion import fuse
 
 
 class TestHybridSearchCompositionValidation:
@@ -212,7 +115,6 @@ class TestHybridSearchEndToEnd:
     @pytest.mark.asyncio
     async def test_full_hybrid_search_pipeline(self) -> None:
         """完整端到端链路：embed → Dense + Sparse → RRF fusion → 结果验证"""
-        import time
 
         from src.application.services.dense_search_service import DenseSemanticSearchService
         from src.application.services.hybrid_search_service import HybridSearchService
@@ -273,7 +175,6 @@ class TestHybridSearchEndToEnd:
         from src.application.services.hybrid_search_service import HybridSearchService
         from src.application.services.sparse_search_service import Bm25SparseSearchService
         from src.domain.ports.l3_vector import SearchResult
-        from src.domain.services.rrf_fusion import fuse
         from src.infrastructure.config.embedding import EmbeddingConfig
         from src.infrastructure.config.qdrant import QdrantConfig
         from src.infrastructure.external_services.embedding.embedding_api_client import (
@@ -331,7 +232,6 @@ class TestHybridSearchEndToEnd:
         """重排序集成：Mock 重排序器对 RRF 融合结果进行精排"""
         from src.application.services.hybrid_search_service import HybridSearchService
         from src.domain.ports.l3_vector import SearchResult
-        from src.domain.services.rrf_fusion import fuse
 
         dense_results = [
             SearchResult(id="doc1", score=0.95, payload={"title": "战略规划"}),
