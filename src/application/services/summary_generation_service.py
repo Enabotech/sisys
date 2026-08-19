@@ -25,6 +25,7 @@ from src.application.services.summary_prompts import PERSPECTIVE_PROMPT_MAP
 from src.application.services.summary_schemas import (
     PERSPECTIVE_SCHEMA_MAP,
 )
+from src.domain.entities.strategic_archive import StrategicArchive
 from src.domain.exceptions import (
     RelevanceEvaluationBlockedError,
     RelevanceEvaluationError,
@@ -427,20 +428,29 @@ class SummaryGenerationService:
             if not uuids:
                 return
             stale_map: dict[str, bool] = {}
+            # 兜底标记原因溯源：归档超 12 个月而非 valid_until 过期时，默认 "expired" 会误导提示，
+            # 因此优先读取 L2 metadata 中 mark_stale_archives() 持久化的 stale_reason/stale_since。
+            meta_map: dict[str, StrategicArchive] = {}
             # ArchiveQuery.limit 上限为 1000，分片查询避免跨文档摘要漏处理陈旧标记。
             for start in range(0, len(uuids), 1000):
                 query = ArchiveQuery(archive_ids=uuids[start : start + 1000], limit=1000)
                 archives = await self._archive_repo.find(query)
                 for a in archives:
                     stale_map[str(a.archive_id)] = a.is_stale()
+                    meta_map[str(a.archive_id)] = a
             for r in results:
                 payload = r.get("payload", {}) if isinstance(r, dict) else {}
                 if isinstance(payload, dict) and payload.get("is_stale") is None:
                     aid = payload.get("archive_id")
                     if aid and stale_map.get(str(aid)):
                         payload["is_stale"] = True
-                        payload.setdefault("stale_reason", "expired")
-                        payload.setdefault("stale_since", "")
+                        archive = meta_map.get(str(aid))
+                        if archive is not None:
+                            payload.setdefault("stale_reason", archive.metadata.get("stale_reason") or "expired")
+                            payload.setdefault("stale_since", archive.metadata.get("stale_since") or "")
+                        else:
+                            payload.setdefault("stale_reason", "expired")
+                            payload.setdefault("stale_since", "")
         except Exception as e:
             logger.warning("陈旧数据兜底查询失败，跳过陈旧提示: %s", e)
 

@@ -168,7 +168,7 @@ class ArchiveValidityHandler:
         try:
             coro = self._update_l3_validity(point_id, event)
             self._run_async(coro)
-        except BaseException as e:
+        except Exception as e:
             logger.warning("L3 validity sync failed for archive %s: %s", event.archive_id, e)
 
     async def _update_l3_validity(self, point_id: str, event: ValidityPeriodSet) -> None:
@@ -192,12 +192,17 @@ class ArchiveValidityHandler:
         payload["valid_from"] = event.valid_from.isoformat() if event.valid_from else None
         payload["valid_until"] = event.valid_until.isoformat() if event.valid_until else None
 
+        vector = existing.get("vector")
+        if vector is None:
+            logger.warning("L3 point %s has no vector, skip validity sync", point_id)
+            return
+
         await self._l3_vector.upsert_points(
             collection=self.L3_COLLECTION,
             points=[
                 {
                     "id": point_id,
-                    "vector": existing.get("vector"),
+                    "vector": vector,
                     "payload": payload,
                 }
             ],
@@ -218,7 +223,7 @@ class ArchiveValidityHandler:
         try:
             coro = self._update_l5_validity(event)
             self._run_async(coro)
-        except BaseException as e:
+        except Exception as e:
             logger.warning("L5 validity sync failed for archive %s: %s", event.archive_id, e)
 
     async def _update_l5_validity(self, event: ValidityPeriodSet) -> None:
@@ -281,7 +286,7 @@ class ArchiveValidityHandler:
         try:
             coro = self._update_l3_stale(point_id, event)
             self._run_async(coro)
-        except BaseException as e:
+        except Exception as e:
             logger.warning("L3 stale marking failed for archive %s: %s", event.archive_id, e)
 
     async def _update_l3_stale(self, point_id: str, event: FactBecameStale) -> None:
@@ -312,12 +317,17 @@ class ArchiveValidityHandler:
         payload["stale_reason"] = event.stale_reason
         payload["stale_since"] = event.stale_since.isoformat()
 
+        vector = existing.get("vector")
+        if vector is None:
+            logger.warning("L3 point %s has no vector, skip stale marking", point_id)
+            return
+
         await self._l3_vector.upsert_points(
             collection=self.L3_COLLECTION,
             points=[
                 {
                     "id": point_id,
-                    "vector": existing.get("vector"),
+                    "vector": vector,
                     "payload": payload,
                 }
             ],

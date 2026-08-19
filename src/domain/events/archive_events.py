@@ -43,10 +43,10 @@ class ArchiveCreated(DomainEvent):
 
     def __post_init__(self) -> None:
         """设置 aggregate_id, aggregate_type"""
-        if self.aggregate_id is None:
-            object.__setattr__(self, "aggregate_id", self.archive_id)
-        if not self.aggregate_type:
-            object.__setattr__(self, "aggregate_type", "StrategicArchive")
+        # default_factory=uuid.uuid4 仅为兼容 dataclass 继承约束（父类 event_type 有默认值后，
+        # 子类首字段必须有默认值），调用方必须显式传入 archive_id，不应依赖自动生成的值
+        object.__setattr__(self, "aggregate_id", self.archive_id)
+        object.__setattr__(self, "aggregate_type", "StrategicArchive")
 
 
 @dataclass(frozen=True)
@@ -74,8 +74,8 @@ class ValidityPeriodSet(DomainEvent):
 
     def __post_init__(self) -> None:
         """设置 aggregate_id, aggregate_type（无条件赋值）"""
-        # archive_id 使用 default_factory 以兼容 dataclass 继承约束（父类字段均有默认值）
-        # 调用方必须显式传入 archive_id，不应依赖自动生成的值
+        # default_factory=uuid.uuid4 仅为兼容 dataclass 继承约束（父类 event_type 有默认值后，
+        # 子类首字段必须有默认值），调用方必须显式传入 archive_id，不应依赖自动生成的值
         object.__setattr__(self, "aggregate_id", self.archive_id)
         object.__setattr__(self, "aggregate_type", "StrategicArchive")
 
@@ -107,6 +107,8 @@ class FactBecameStale(DomainEvent):
 
     def __post_init__(self) -> None:
         """设置 aggregate_id, aggregate_type（无条件赋值）"""
+        # default_factory=uuid.uuid4 仅为兼容 dataclass 继承约束（父类 event_type 有默认值后，
+        # 子类首字段必须有默认值），调用方必须显式传入 archive_id，不应依赖自动生成的值
         object.__setattr__(self, "aggregate_id", self.archive_id)
         object.__setattr__(self, "aggregate_type", "StrategicArchive")
 
