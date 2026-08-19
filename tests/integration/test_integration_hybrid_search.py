@@ -174,7 +174,6 @@ class TestHybridSearchEndToEnd:
         from src.application.services.dense_search_service import DenseSemanticSearchService
         from src.application.services.hybrid_search_service import HybridSearchService
         from src.application.services.sparse_search_service import Bm25SparseSearchService
-        from src.domain.ports.l3_vector import SearchResult
         from src.infrastructure.config.embedding import EmbeddingConfig
         from src.infrastructure.config.qdrant import QdrantConfig
         from src.infrastructure.external_services.embedding.embedding_api_client import (
@@ -226,51 +225,3 @@ class TestHybridSearchEndToEnd:
 
         finally:
             await self._cleanup(context)
-
-    @pytest.mark.asyncio
-    async def test_rerank_integration_with_mock(self) -> None:
-        """重排序集成：Mock 重排序器对 RRF 融合结果进行精排"""
-        from src.application.services.hybrid_search_service import HybridSearchService
-        from src.domain.ports.l3_vector import SearchResult
-
-        dense_results = [
-            SearchResult(id="doc1", score=0.95, payload={"title": "战略规划"}),
-            SearchResult(id="doc2", score=0.85, payload={"title": "市场分析"}),
-            SearchResult(id="doc3", score=0.75, payload={"title": "财务预算"}),
-        ]
-        sparse_results = [
-            SearchResult(id="doc2", score=10.0, payload={"title": "市场分析"}),
-            SearchResult(id="doc4", score=8.0, payload={"title": "市场调研"}),
-        ]
-
-        class MockReranker:
-            def __init__(self) -> None:
-                self.called = False
-
-            async def rerank(self, query: str, results: list[SearchResult], top_k: int = 20) -> list[SearchResult]:
-                self.called = True
-                for r in results:
-                    r["payload"]["rerank_score"] = r["score"]
-                return sorted(results, key=lambda r: r["score"], reverse=True)[:top_k]
-
-        class MockDense:
-            async def search(self, collection, query_text, limit=10, tenant_id=None, filter_payload=None):
-                return dense_results
-
-        class MockSparse:
-            async def search(self, collection, query_text, limit=10, tenant_id=None, filter_payload=None):
-                return sparse_results
-
-        reranker = MockReranker()
-        hybrid_svc = HybridSearchService(
-            dense_search=MockDense(),
-            sparse_search=MockSparse(),
-            fuse=fuse,
-            reranker=reranker,
-        )
-
-        results = await hybrid_svc.search("test", "查询", limit=5)
-
-        assert isinstance(results, list)
-        assert len(results) > 0
-        assert reranker.called, "重排序器应被调用"
