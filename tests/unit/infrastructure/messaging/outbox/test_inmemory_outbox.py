@@ -196,3 +196,119 @@ class TestInMemoryOutboxRepositoryFIFO:
 
         unpublished = await repository.get_unpublished(limit=10)
         assert len(unpublished) == 3
+
+
+class TestInMemoryOutboxRepositoryMarkPending:
+    """验证 mark_pending()（失败事件恢复为待发布）"""
+
+    @pytest.fixture
+    def repository(self) -> InMemoryOutboxRepository:
+        """创建 InMemoryOutboxRepository 实例"""
+        return InMemoryOutboxRepository()
+
+    @pytest.fixture
+    def saved_event_id(self, repository: InMemoryOutboxRepository) -> str:
+        """保存一个事件并返回其 event_id（str 形态）"""
+
+        async def _save() -> str:
+            DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
+            event = DomainEvent(event_type="TestEventForOutbox", source="test")
+            await repository.save(event)
+            unpublished = await repository.get_unpublished(limit=10)
+            return str(unpublished[0].event_id)
+
+        import asyncio
+
+        return asyncio.get_event_loop().run_until_complete(_save())
+
+    async def test_mark_pending_restores_failed_event(self, repository: InMemoryOutboxRepository, saved_event_id: str) -> None:
+        """失败事件调用 mark_pending() 后应恢复为待发布状态"""
+        import uuid
+
+        await repository.mark_failed(uuid.UUID(saved_event_id), "error message")
+
+        unpublished_after_failed = await repository.get_unpublished(limit=10)
+        assert len(unpublished_after_failed) == 0
+
+        await repository.mark_pending(uuid.UUID(saved_event_id))
+
+        unpublished_after_pending = await repository.get_unpublished(limit=10)
+        assert len(unpublished_after_pending) == 1
+        assert unpublished_after_pending[0].event_id == uuid.UUID(saved_event_id)
+
+    async def test_mark_pending_handles_unknown_id(self, repository: InMemoryOutboxRepository) -> None:
+        """mark_pending() 处理未知 ID 不应抛出异常"""
+        await repository.mark_pending(uuid4())  # Should not raise
+
+    async def test_mark_pending_on_unfailed_event_is_noop(
+        self, repository: InMemoryOutboxRepository, saved_event_id: str
+    ) -> None:
+        """对未失败事件调用 mark_pending() 因状态机限制不会使其变为 pending"""
+        import uuid
+
+        # 状态为 pending 的事件调用 mark_pending() 会触发状态机异常，此处验证不将异常吞掉
+        with pytest.raises(Exception):
+            await repository.mark_pending(uuid.UUID(saved_event_id))
+
+
+class TestInMemoryOutboxRepositoryCleanup:
+    """验证 cleanup_old_published_records()（清理过期已发布记录）"""
+
+    @pytest.fixture
+    def repository(self) -> InMemoryOutboxRepository:
+        """创建 InMemoryOutboxRepository 实例"""
+        return InMemoryOutboxRepository()
+
+    async def test_cleanup_removes_old_published_records(self, repository: InMemoryOutboxRepository) -> None:
+        """超过保留期的已发布记录应被清理"""
+        DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
+        event = DomainEvent(event_type="TestEventForOutbox", source="test")
+        await repository.save(event)
+        unpublished = await repository.get_unpublished(limit=10)
+        event_id = unpublished[0].event_id
+
+        await repository.mark_published(event_id)
+
+        # 将 published_at 回拨到保留期之前
+        from datetime import UTC, datetime, timedelta
+
+        entity = repository._entities[0]
+        entity.published_at = datetime.now(UTC) - timedelta(days=31)
+        # 确保状态为 published
+        assert entity.status == "published"
+
+        removed = await repository.cleanup_old_published_records(older_than_days=30)
+
+        assert removed == 1
+        assert repository._entities == []
+
+    async def test_cleanup_keeps_recent_published_records(self, repository: InMemoryOutboxRepository) -> None:
+        """保留期内的已发布记录不应被清理"""
+        DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
+        event = DomainEvent(event_type="TestEventForOutbox", source="test")
+        await repository.save(event)
+        unpublished = await repository.get_unpublished(limit=10)
+        event_id = unpublished[0].event_id
+        await repository.mark_published(event_id)
+
+        removed = await repository.cleanup_old_published_records(older_than_days=30)
+
+        assert removed == 0
+        assert len(repository._entities) == 1
+
+    async def test_cleanup_ignores_pending_records(self, repository: InMemoryOutboxRepository) -> None:
+        """未发布（pending）记录即使创建时间较早也不应被清理"""
+        DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
+        event = DomainEvent(event_type="TestEventForOutbox", source="test")
+        await repository.save(event)
+
+        from datetime import UTC, datetime, timedelta
+
+        entity = repository._entities[0]
+        entity.created_at = datetime.now(UTC) - timedelta(days=60)
+        assert entity.status == "pending"
+
+        removed = await repository.cleanup_old_published_records(older_than_days=30)
+
+        assert removed == 0
+        assert len(repository._entities) == 1
