@@ -115,6 +115,8 @@ class PortRegistry:
         if name in self._ports:
             del self._ports[name]
             logger.info("Unregistered port: %s", name)
+        else:
+            logger.warning("Attempted to unregister non-existent port: %s", name)
 
     def __contains__(self, name: str) -> bool:
         return name in self._ports
