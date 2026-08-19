@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -198,7 +197,6 @@ class TestDocumentProcessingFlowExecution:
         event = DocumentProcessed(
             document_id=document_id,
             parse_result=parse_result,
-            embedding=cast(list[float], embedding),  # flow 升级为 EmbeddingResult，event 暂未适配
         )
         await mock_publisher.publish(event)
 
@@ -255,7 +253,6 @@ class TestDocumentProcessingFlowExecution:
         event = DocumentProcessed(
             document_id=document_id,
             parse_result=parse_result,
-            embedding=cast(list[float], embedding),  # flow 升级为 EmbeddingResult，event 暂未适配
         )
         result = await mock_publisher.publish(event)
 
