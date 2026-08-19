@@ -33,9 +33,13 @@ class DictionaryUpdated(DomainEvent):
     dictionary_version: int = 0
 
     def __post_init__(self) -> None:
-        """设置 aggregate_id, aggregate_type"""
+        """设置 aggregate_id, aggregate_type
+
+        aggregate_id 使用基于 dictionary_version 的确定性 UUID，
+        便于下游消费端通过 aggregate_id 做聚合溯源与事件重放。
+        """
         if self.aggregate_id is None:
-            object.__setattr__(self, "aggregate_id", uuid.uuid4())
+            object.__setattr__(self, "aggregate_id", uuid.uuid5(uuid.NAMESPACE_DNS, f"Dictionary:{self.dictionary_version}"))
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "Dictionary")
 

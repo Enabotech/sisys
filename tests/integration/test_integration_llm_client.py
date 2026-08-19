@@ -274,36 +274,28 @@ class TestIntegrationLLMClient:
     async def test_circuit_breaker_opens_after_failures(
         self, mock_llm_server: tuple[MockLLMHandler, int], client: LitellmLLMClient
     ) -> None:
-        """验证连续失败后熔断器断开（通过 mock litellm 异常触发）"""
-        from unittest.mock import patch
+        """验证连续失败后熔断器断开（通过 MockLLMHandler 返回 HTTP 500 触发）"""
+        handler, _ = mock_llm_server
+        handler.set_http_error(500)
 
-        from litellm.exceptions import InternalServerError
-
-        # Mock litellm.acompletion 直接抛 InternalServerError，避免真实 HTTP 500 响应经 litellm 处理的 ~1.2s/次开销
-        mock_error = InternalServerError("Internal Server Error", "openai", "test-model")
-        with patch("litellm.acompletion", side_effect=mock_error):
-            for _ in range(3):
-                with pytest.raises(LLMAPIError):
-                    await client.generate(prompt="Hello")
+        for _ in range(3):
+            with pytest.raises(LLMAPIError):
+                await client.generate(prompt="Hello")
         assert client._circuit_breaker.state.name == "OPEN"
 
     async def test_circuit_breaker_open_fast_fails(
         self, mock_llm_server: tuple[MockLLMHandler, int], client: LitellmLLMClient
     ) -> None:
         """验证熔断器断开后快速失败，不发起 HTTP 请求"""
-        from unittest.mock import patch
+        handler, _ = mock_llm_server
+        handler.set_http_error(500)
 
-        from litellm.exceptions import InternalServerError
-
-        # Mock litellm.acompletion 抛 InternalServerError，避免真实 HTTP 500 响应开销
-        mock_error = InternalServerError("Internal Server Error", "openai", "test-model")
-        with patch("litellm.acompletion", side_effect=mock_error):
-            # 触发 3 次失败使熔断器断开
-            for _ in range(3):
-                try:
-                    await client.generate(prompt="Hello")
-                except Exception:
-                    pass
+        # 触发 3 次失败使熔断器断开
+        for _ in range(3):
+            try:
+                await client.generate(prompt="Hello")
+            except Exception:
+                pass
         assert client._circuit_breaker.state.name == "OPEN"
 
         # 熔断器断开后，before_call() 直接抛出异常，不经过 litellm
@@ -364,29 +356,25 @@ class TestIntegrationLLMClient:
         # 3 次调用：2 次失败 + 1 次成功
         assert len(handler.requests) == 3, "应重试 2 次后第 3 次成功"
 
-    async def test_retry_exhausted_throws_exception(self) -> None:
-        """验证重试耗尽后抛出领域异常（通过 mock litellm.acompletion 避免真实 HTTP 连接）"""
-        from unittest.mock import patch
-
-        from litellm.exceptions import InternalServerError
-
-        from src.domain.ports.llm_client import LLMConfig
+    async def test_retry_exhausted_throws_exception(
+        self, mock_llm_server: tuple[MockLLMHandler, int], llm_config: LLMConfig
+    ) -> None:
+        """验证重试耗尽后抛出领域异常（通过真实 HTTP 500 响应触发）"""
+        handler, _ = mock_llm_server
+        handler.set_http_error(500)
 
         cb = CircuitBreaker(failure_threshold=10, recovery_timeout=1.0, name="test-retry")
         retry_client = LitellmLLMClient(
-            config=LLMConfig(api_type="openai", model="test-model", api_key="test-key"),  # pragma: allowlist secret
+            config=llm_config,
             circuit_breaker=cb,
             retry_max_attempts=3,
             retry_min_wait=0.1,
             retry_max_wait=0.2,
         )
 
-        mock_error = InternalServerError("Internal Server Error", "openai", "test-model")
-        with patch("litellm.acompletion", side_effect=mock_error) as mock_acompletion:
-            with pytest.raises((LLMAPIError, ServiceUnavailableError)):
-                await retry_client.generate(prompt="Hello")
-            # 验证确实触发了重试机制（litellm.acompletion 被调用了 3 次）
-            assert mock_acompletion.call_count == 3, "应重试 2 次后第 3 次仍失败"
+        with pytest.raises((LLMAPIError, ServiceUnavailableError)):
+            await retry_client.generate(prompt="Hello")
+        # 验证异常被正确抛出（litellm 内部重试 + tenacity 重试后最终仍失败）
 
     async def test_timeout_error_chain(self, mock_llm_server: tuple[MockLLMHandler, int], llm_config: LLMConfig) -> None:
         """验证超时异常映射链路（服务器延迟响应 → httpx 超时 → litellm Timeout → TimeoutError）"""

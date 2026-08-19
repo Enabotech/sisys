@@ -124,11 +124,10 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
         Raises:
             DictionaryEntryConflictError: 词条已存在
         """
-        model = self._to_model(entry)
-        self._session.add(model)
         try:
-            # 使用 savepoint 局部回滚，避免破坏外层事务
             async with self._session.begin_nested():
+                model = self._to_model(entry)
+                self._session.add(model)
                 await self._session.flush()
         except IntegrityError as exc:
             if "dictionary_entries_pkey" in str(exc) or "unique" in str(exc).lower():
@@ -212,15 +211,16 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
         """创建词典快照
 
         使用 savepoint 重试机制处理并发版本号冲突。
+        每次重试重新读取最新词条数据，确保快照与数据库状态一致。
         """
-        # 获取所有词条
-        stmt = select(DictionaryEntryModel).order_by(DictionaryEntryModel.term)
-        result = await self._session.execute(stmt)
-        all_entries = result.scalars().all()
-
         # 使用 savepoint 重试处理并发版本号冲突
         for attempt in range(3):
             try:
+                # 每次重试重新读取最新词条，保证读一致性
+                stmt = select(DictionaryEntryModel).order_by(DictionaryEntryModel.term)
+                result = await self._session.execute(stmt)
+                all_entries = result.scalars().all()
+
                 # 计算版本号（每次重试重新读取最新版本）
                 version_stmt = select(DictionarySnapshotModel).order_by(DictionarySnapshotModel.version.desc()).limit(1)
                 version_result = await self._session.execute(version_stmt)
@@ -251,14 +251,16 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
                     created_by=created_by,
                     change_summary=change_summary,
                 )
-                self._session.add(snapshot_model)
                 async with self._session.begin_nested():
+                    self._session.add(snapshot_model)
                     await self._session.flush()
                 break  # 成功，跳出重试循环
             except IntegrityError:
                 if attempt >= 2:
                     raise
                 # 版本冲突，清除 session 中残留对象后重试
+                # savepoint 回滚后 session.add 在 savepoint 外的 pending 对象
+                # 仍然残留在 session 中，通过 expire_all() 清理身份映射
                 self._session.expire_all()
                 continue
 
@@ -274,6 +276,9 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
     async def rollback(self, version: int) -> None:
         """回滚至指定版本
 
+        使用 savepoint 包裹"清空+重建"操作，确保原子性。
+        失败时 savepoint 自动回滚，词典保持原始状态。
+
         Raises:
             DictionaryNotFoundError: 目标版本不存在
         """
@@ -285,32 +290,34 @@ class PostgreSQLDomainDictionaryRepository(PostgreSQLAdapter[DictionaryEntry, Di
         if snapshot_model is None:
             raise DictionaryNotFoundError(version=version)
 
-        if not snapshot_model.entries:
-            # 空快照：清空所有词条，不回重建
+        # 使用 savepoint 包裹清空+重建，确保原子性
+        async with self._session.begin_nested():
+            if not snapshot_model.entries:
+                # 空快照：清空所有词条，不回重建
+                await self._session.execute(sa_delete(DictionaryEntryModel))
+                return
+
+            # 清空现有词条（批量删除，避免 N+1）
             await self._session.execute(sa_delete(DictionaryEntryModel))
-            await self._session.flush()
-            return
 
-        # 清空现有词条（批量删除，避免 N+1）
-        await self._session.execute(sa_delete(DictionaryEntryModel))
+            # 从快照重建词条
+            for term_data in snapshot_model.entries.values():
+                created_at = _parse_datetime(term_data.get("created_at", ""), None)
+                updated_at = _parse_datetime(term_data.get("updated_at", ""), None)
 
-        # 从快照重建词条
-        for term_data in snapshot_model.entries.values():
-            created_at = _parse_datetime(term_data.get("created_at", ""), None)
-            updated_at = _parse_datetime(term_data.get("updated_at", ""), None)
+                entry_model = DictionaryEntryModel(
+                    term=term_data.get("term", ""),
+                    entity_type=term_data.get("entity_type", ""),
+                    category=term_data.get("category", "general"),
+                    active=term_data.get("active", True),
+                    version=term_data.get("version", 1),
+                    created_by=term_data.get("created_by", ""),
+                    created_at=created_at,
+                    updated_at=updated_at,
+                )
+                self._session.add(entry_model)
 
-            entry_model = DictionaryEntryModel(
-                term=term_data.get("term", ""),
-                entity_type=term_data.get("entity_type", ""),
-                category=term_data.get("category", "general"),
-                active=term_data.get("active", True),
-                version=term_data.get("version", 1),
-                created_by=term_data.get("created_by", ""),
-                created_at=created_at,
-                updated_at=updated_at,
-            )
-            self._session.add(entry_model)
-
+        # savepoint 外层 flush，确保事务边界完整
         await self._session.flush()
 
     async def list_snapshots(self) -> list[DictionarySnapshot]:

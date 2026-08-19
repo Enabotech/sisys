@@ -192,6 +192,7 @@ class LLMEntityExtractor(EntityExtractionPort):
                     entity_type=entity.entity_type,
                     confidence=entity.confidence,
                     extraction_source="llm",
+                    normalized_name=entity.normalized_name,
                 )
                 for entity in result.entities
             )

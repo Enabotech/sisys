@@ -12,7 +12,7 @@ import uuid
 
 from src.domain.events.entity_extraction_events import EntitiesExtracted
 from src.domain.exceptions import EntityExtractionError
-from src.domain.exceptions.llm_exceptions import LLMConfigError
+from src.domain.exceptions.llm_exceptions import LLMConfigError, LLMResponseError
 from src.domain.ports.entity_extraction import (
     EntityArbitratorPort,
     EntityExtractionPort,
@@ -171,10 +171,9 @@ class EntityExtractionService:
         # 2. LLM 语义抽取（透明降级）
         try:
             llm_result = await self._llm_extractor.extract_entities(content, domain_context)
-        except LLMConfigError:
-            # 配置错误（模型不存在、API Key 缺失等）应传播到上层，
-            # 由异常处理链映射 HTTP 500，避免静默降级掩盖配置问题
-            logger.warning("LLM 实体抽取配置错误，向上传播")
+        except (LLMConfigError, LLMResponseError):
+            # 配置错误（模型不存在、API Key 缺失等）和 Schema 验证失败（设计级错误）
+            # 应传播到上层，由异常处理链映射 HTTP 500，避免静默降级掩盖配置/设计问题
             raise
         except Exception as e:
             # 其他异常（API 调用失败、Schema 验证失败、超时等）：

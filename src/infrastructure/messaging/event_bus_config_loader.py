@@ -1,6 +1,6 @@
 """基础设施层事件总线配置加载模块
 
-从 config/event_channels.yaml 加载事件通道映射，覆盖 ChannelRouter.DEFAULT_MAPPINGS
+从 configs/event_channels.yaml 加载事件通道映射，覆盖 ChannelRouter.DEFAULT_MAPPINGS
 
 优先级：YAML 配置 > DEFAULT_MAPPINGS（baseline fallback）
 新增事件必须同时更新两处以保持同步
@@ -15,7 +15,7 @@ import yaml
 
 from src.infrastructure.messaging.channel_router import ChannelMapping, ChannelRouter, DeliveryMode
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent.parent.parent.parent / "config" / "event_channels.yaml"
+DEFAULT_CONFIG_PATH = Path(__file__).parent.parent.parent.parent / "configs" / "event_channels.yaml"
 
 
 class EventBusConfigLoader:

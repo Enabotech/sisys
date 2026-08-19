@@ -177,8 +177,10 @@ class TestDeleteEntry:
         mock_publisher.publish.assert_awaited_once()
 
     async def test_not_found_raises(self, service, mock_repo):
-        """词条不存在 -> 抛 DictionaryNotFoundError"""
-        mock_repo.get_entry.return_value = None
+        """词条不存在 -> 仓储层抛 DictionaryNotFoundError（应用层透传）"""
+        from src.domain.exceptions import DictionaryNotFoundError
+
+        mock_repo.delete_entry.side_effect = DictionaryNotFoundError(term="不存在的词")
 
         with pytest.raises(DictionaryNotFoundError):
             await service.delete_entry("不存在的词", trigger="api")

@@ -122,10 +122,11 @@ class TestLLMEntityExtractor:
 class MockEntitySchema:
     """模拟 Pydantic Schema 实体"""
 
-    def __init__(self, name: str, entity_type: str, confidence: float):
+    def __init__(self, name: str, entity_type: str, confidence: float, normalized_name: str = ""):
         self.name = name
         self.entity_type = entity_type
         self.confidence = confidence
+        self.normalized_name = normalized_name
 
 
 class MockRelationSchema:
