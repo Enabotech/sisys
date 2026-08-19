@@ -111,6 +111,61 @@ class TestArchiveValidityHandler:
         assert payload["valid_until"] == "2027-12-31T00:00:00+00:00"
         assert "Validity period set for archive" in caplog.text
 
+    def test_update_l3_validity_already_synced_skips_upsert(self) -> None:
+        """L3 valid_from/valid_until 已同步时跳过 upsert（幂等）"""
+        listener = _make_listener()
+        l3 = _make_l3_vector()
+        # L3 payload 已包含与事件一致的 valid_from/valid_until
+        l3.get_point.return_value = {
+            "id": "strategic_archive:test",
+            "vector": [0.1] * 1024,
+            "payload": {
+                "archive_id": "test",
+                "valid_from": "2026-01-01T00:00:00+00:00",
+                "valid_until": "2027-12-31T00:00:00+00:00",
+            },
+        }
+        handler = ArchiveValidityHandler(
+            event_listener=listener,
+            l3_vector=cast(L3VectorPort, l3),
+            l5_graph=None,
+        )
+        event = ValidityPeriodSet(
+            archive_id=uuid.uuid4(),
+            valid_from=datetime(2026, 1, 1, tzinfo=UTC),
+            valid_until=datetime(2027, 12, 31, tzinfo=UTC),
+        )
+        handler._handle_validity_period_set(event)
+        assert l3.get_point.called
+        assert not l3.upsert_points.called  # 幂等跳过
+
+    def test_update_l3_stale_different_reason_allows_update(self) -> None:
+        """已标记 is_stale=True 但 stale_reason 不同时允许更新"""
+        listener = _make_listener()
+        l3 = _make_l3_vector()
+        # L3 已标记 is_stale=True，但 stale_reason 与事件不同
+        l3.get_point.return_value = {
+            "id": "strategic_archive:test",
+            "vector": [0.1] * 1024,
+            "payload": {
+                "archive_id": "test",
+                "is_stale": True,
+                "stale_reason": "archived_too_long",
+            },
+        }
+        handler = ArchiveValidityHandler(
+            event_listener=listener,
+            l3_vector=cast(L3VectorPort, l3),
+            l5_graph=None,
+        )
+        event = FactBecameStale(
+            archive_id=uuid.uuid4(),
+            stale_reason="expired",
+            stale_since=datetime(2026, 8, 15, 12, 0, 0, tzinfo=UTC),
+        )
+        handler._handle_fact_became_stale(event)
+        assert l3.upsert_points.called  # 原因不同，允许更新
+
     def test_validity_period_syncs_l5(self) -> None:
         """ValidityPeriodSet 事件同步 L5 properties（Cypher SET）"""
         listener = _make_listener()

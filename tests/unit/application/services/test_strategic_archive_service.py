@@ -326,6 +326,62 @@ class TestDegradation:
         )
         assert archive.graph_ref is None
 
+    @pytest.mark.asyncio
+    async def test_archive_plan_event_publish_partial_failure_raises(self) -> None:
+        """archive_plan 事件发布返回 is_success=False 时抛出 ArchiveStorageError（原子性）"""
+        from src.domain.events.publish_result import ChannelResult, PublishResult
+
+        repo = _make_repo()
+        vector = _make_vector()
+        obj = _make_object_storage()
+        graph = _make_graph()
+        publisher = _make_publisher()
+        publisher.publish.return_value = PublishResult(
+            event_id="test",
+            results=(ChannelResult(channel_name="reliable", success=False, error="outbox full"),),
+        )
+        service = StrategicArchiveService(
+            archive_repo=cast(ArchiveRepositoryPort, repo),
+            vector_storage=cast(L3VectorPort, vector),
+            object_storage=cast(L4ObjectPort, obj),
+            graph_storage=cast(L5GraphPort, graph),
+            event_publisher=cast(EventPublisher, publisher),
+        )
+        with pytest.raises(ArchiveStoreErr) as exc_info:
+            await service.archive_plan(
+                plan_id=uuid.uuid4(),
+                plan_type="SP",
+                assumptions={},
+                decision_basis={},
+                execution_deviation={},
+            )
+        assert "event publish" in str(exc_info.value.cause).lower()
+
+    @pytest.mark.asyncio
+    async def test_archive_plan_event_publish_exception_raises(self) -> None:
+        """archive_plan 事件发布抛出异常时抛出 ArchiveStorageError（原子性）"""
+        repo = _make_repo()
+        vector = _make_vector()
+        obj = _make_object_storage()
+        graph = _make_graph()
+        publisher = _make_publisher()
+        publisher.publish.side_effect = RuntimeError("broker unreachable")
+        service = StrategicArchiveService(
+            archive_repo=cast(ArchiveRepositoryPort, repo),
+            vector_storage=cast(L3VectorPort, vector),
+            object_storage=cast(L4ObjectPort, obj),
+            graph_storage=cast(L5GraphPort, graph),
+            event_publisher=cast(EventPublisher, publisher),
+        )
+        with pytest.raises(ArchiveStoreErr):
+            await service.archive_plan(
+                plan_id=uuid.uuid4(),
+                plan_type="SP",
+                assumptions={},
+                decision_basis={},
+                execution_deviation={},
+            )
+
 
 class TestQuery:
     """get_archive()/query_archive() 查询测试"""
@@ -452,6 +508,40 @@ class TestSetValidityPeriod:
         with pytest.raises(ArchiveStoreErr) as exc_info:
             await service.set_validity_period(archive.archive_id, None, datetime(2027, 12, 31, tzinfo=UTC))
         assert exc_info.value.layer == "l2"
+
+    @pytest.mark.asyncio
+    async def test_event_publish_partial_failure_raises(self) -> None:
+        """事件发布返回 is_success=False 时抛出 ArchiveStorageError（原子性）"""
+        from src.domain.events.publish_result import ChannelResult, PublishResult
+
+        service, repo, archive = _make_validity_service()
+        repo.find_for_update.return_value = [archive]
+        publisher = cast(Any, service._event_publisher)
+        publisher.publish.return_value = PublishResult(
+            event_id="test",
+            results=(ChannelResult(channel_name="reliable", success=False, error="outbox full"),),
+        )
+        with pytest.raises(ArchiveStoreErr) as exc_info:
+            await service.set_validity_period(
+                archive.archive_id,
+                datetime(2026, 1, 1, tzinfo=UTC),
+                datetime(2027, 12, 31, tzinfo=UTC),
+            )
+        assert "event publish" in str(exc_info.value.cause).lower()
+
+    @pytest.mark.asyncio
+    async def test_event_publish_exception_raises(self) -> None:
+        """事件发布抛出异常时抛出 ArchiveStorageError（原子性）"""
+        service, repo, archive = _make_validity_service()
+        repo.find_for_update.return_value = [archive]
+        publisher = cast(Any, service._event_publisher)
+        publisher.publish.side_effect = RuntimeError("broker unreachable")
+        with pytest.raises(ArchiveStoreErr):
+            await service.set_validity_period(
+                archive.archive_id,
+                datetime(2026, 1, 1, tzinfo=UTC),
+                datetime(2027, 12, 31, tzinfo=UTC),
+            )
 
 
 class TestIsStale:
