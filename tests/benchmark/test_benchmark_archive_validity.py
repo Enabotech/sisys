@@ -18,6 +18,7 @@ import asyncio
 import logging
 import statistics
 import time
+from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -136,11 +137,11 @@ def db_engine(pg_config) -> PostgreSQLManager:
 
 
 @pytest.fixture(scope="module")
-def benchmark_data(db_engine, pg_available, event_loop) -> list[StrategicArchive] | None:
+def benchmark_data(db_engine, pg_available, event_loop) -> Generator[list[StrategicArchive] | None, None, None]:
     """生成基准测试数据（模块级一次性准备，所有测试复用）
 
     在独立 session 中插入 ≥10,000 条档案记录并提交，
-    确保索引在真实查询中生效。
+    确保索引在真实查询中生效。模块结束时自动清理，避免污染后续集成测试。
     """
     if not pg_available:
         pytest.skip("PostgreSQL not available")
@@ -154,7 +155,10 @@ def benchmark_data(db_engine, pg_available, event_loop) -> list[StrategicArchive
     except Exception:
         pass
 
+    from sqlalchemy import delete
     from sqlalchemy.ext.asyncio import AsyncSession
+
+    from src.infrastructure.storage.postgresql.models.archive import ArchiveModel
 
     session = AsyncSession(async_engine)
     repo = PostgreSQLArchiveRepository()
@@ -211,7 +215,22 @@ def benchmark_data(db_engine, pg_available, event_loop) -> list[StrategicArchive
         reset_session(token)
         event_loop.run_until_complete(session.close())
 
-    return created
+    yield created
+
+    # 模块 teardown：清理基准数据，避免污染后续集成测试的 mark_stale 扫描
+    cleanup_session = AsyncSession(async_engine)
+    cleanup_token = set_session(cleanup_session)
+    try:
+        stmt = delete(ArchiveModel).where(ArchiveModel.metadata_ref.like("strategic_archives:benchmark:%"))
+        event_loop.run_until_complete(cleanup_session.execute(stmt))
+        event_loop.run_until_complete(cleanup_session.commit())
+        logger.info("基准数据清理完成: plan_id=%s", plan_id)
+    except Exception as e:
+        logger.warning("基准数据清理失败: %s", e)
+        event_loop.run_until_complete(cleanup_session.rollback())
+    finally:
+        reset_session(cleanup_token)
+        event_loop.run_until_complete(cleanup_session.close())
 
 
 # ===================================================================
