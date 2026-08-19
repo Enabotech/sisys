@@ -174,11 +174,15 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         models = result.scalars().all()
         return [self._to_entity(m) for m in models]
 
-    async def find_for_update(self, query: ArchiveQuery) -> list[StrategicArchive]:
+    async def find_for_update(self, query: ArchiveQuery, skip_locked: bool = False) -> list[StrategicArchive]:
         """按条件查询档案（带 FOR UPDATE 悲观锁）
 
         Args:
             query: 查询条件（ArchiveQuery 值对象）
+            skip_locked: 跳过已被其他事务锁定的行（默认 False 阻塞等待）。
+                         批量扫描场景（mark_stale_archives）传 True 避免并发实例互相阻塞；
+                         冲突检测场景（set_validity_period）必须保持 False，
+                         否则被锁定的同组行被跳过会导致有效期冲突漏报。
 
         Returns:
             符合条件的档案列表
@@ -187,7 +191,7 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
         stmt = self._apply_soft_delete_filter(stmt)
         stmt = self._apply_filters(stmt, query)
         stmt = stmt.order_by(ArchiveModel.archived_at.desc())
-        stmt = stmt.with_for_update()
+        stmt = stmt.with_for_update(skip_locked=skip_locked)
         stmt = stmt.offset(query.offset).limit(query.limit)
 
         result = await self._session.execute(stmt)

@@ -147,7 +147,11 @@ class TestArchiveValidityHandler:
             l3_vector=None,
             l5_graph=None,
         )
-        event = ValidityPeriodSet(archive_id=uuid.uuid4())
+        event = ValidityPeriodSet(
+            archive_id=uuid.uuid4(),
+            valid_from=datetime(2026, 1, 1, tzinfo=UTC),
+            valid_until=datetime(2027, 12, 31, tzinfo=UTC),
+        )
         with caplog.at_level(logging.WARNING, logger="src.application.event_handlers.archive_handlers"):
             handler._handle_validity_period_set(event)
         # 不抛出异常，正常完成
@@ -176,10 +180,15 @@ class TestArchiveValidityHandler:
             l3_vector=cast(L3VectorPort, l3),
             l5_graph=None,
         )
-        event = ValidityPeriodSet(archive_id=uuid.uuid4())
+        # 使用与 mock payload 不同的有效期值，触发 upsert（避免幂等检查跳过）
+        event = ValidityPeriodSet(
+            archive_id=uuid.uuid4(),
+            valid_from=datetime(2026, 1, 1, tzinfo=UTC),
+            valid_until=datetime(2027, 12, 31, tzinfo=UTC),
+        )
         # 不应抛出异常
         handler._handle_validity_period_set(event)
-        # 验证日志包含 WARNING
+        # 验证日志包含 WARNING（sync 异常捕获）
         assert any("L3" in msg and "sync" in msg for msg in caplog.messages)
 
     def test_l5_exception_logged_not_raised(self, caplog: pytest.LogCaptureFixture) -> None:
@@ -376,7 +385,11 @@ class TestArchiveValidityHandler:
                 validity_cb = call.args[1]
                 break
         assert validity_cb is not None
-        event = ValidityPeriodSet(archive_id=uuid.uuid4())
+        event = ValidityPeriodSet(
+            archive_id=uuid.uuid4(),
+            valid_from=datetime(2026, 1, 1, tzinfo=UTC),
+            valid_until=datetime(2027, 12, 31, tzinfo=UTC),
+        )
         validity_cb(event)
 
     def test_wrapped_callback_handles_fact_stale(self) -> None:
