@@ -464,10 +464,7 @@ def when_index_document(
     collection_manager: QdrantCollectionManager,
     event_loop,
 ) -> None:
-    """真实执行 index_document.fn()（patch get_resolver 注入真实 l3_vector）"""
-    from unittest.mock import MagicMock, patch
-
-    from src.infrastructure.storage.qdrant.qdrant_adapter import QdrantAdapter
+    """真实执行 index_document.fn()（使用真实 resolver 获取 l3_vector）"""
     from src.infrastructure.workflow.tasks.document_tasks import index_document
 
     # 创建 "documents" Collection（index_document.fn() 硬编码此名称）
@@ -478,12 +475,7 @@ def when_index_document(
     # 注册到清理列表
     context.setdefault("created_collections", []).append("documents")
 
-    adapter = QdrantAdapter(storage=vector_storage, collection_manager=collection_manager)
-    mock_resolver = MagicMock()
-    mock_resolver.resolve = MagicMock(return_value=adapter)
-
-    with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-        result = event_loop.run_until_complete(index_document.fn(context["embedding_obj"]))
+    result = event_loop.run_until_complete(index_document.fn(context["embedding_obj"]))
 
     context["index_result"] = result
 
