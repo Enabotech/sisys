@@ -135,7 +135,8 @@ async def generate_embedding(parse_result: dict[str, Any]) -> EmbeddingResult:
             return empty
 
         # 并行生成 Dense 和 Sparse 嵌入
-        # 使用 ensure_future 确保两个协程都显式调度，避免 asyncio.gather 短路径导致协程未被 await
+        # 使用 asyncio.gather(return_exceptions=True) 避免协程泄漏
+        # 不用 ensure_future：在 dense 异常时 sparse_task 不会被 await 导致协程泄漏
         async def _safe_sparse() -> list[SparseEmbedding]:
             try:
                 return await service.embed_sparse([text])
@@ -147,13 +148,14 @@ async def generate_embedding(parse_result: dict[str, Any]) -> EmbeddingResult:
                 )
                 return []
 
-        sparse_task = asyncio.ensure_future(_safe_sparse())
-        dense_task = asyncio.ensure_future(service.embed_documents([text]))
-        dense_vectors = await dense_task
-        try:
-            sparse_vectors = await sparse_task
-        except Exception:
-            sparse_vectors = []
+        dense_raw, sparse_raw = await asyncio.gather(
+            service.embed_documents([text]),
+            _safe_sparse(),
+            return_exceptions=True,
+        )
+
+        dense_vectors = dense_raw if isinstance(dense_raw, list) else []
+        sparse_vectors = sparse_raw if isinstance(sparse_raw, list) else []
 
         return EmbeddingResult(
             dense_vectors=dense_vectors,
