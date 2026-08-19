@@ -5,106 +5,98 @@
   以便用户明确识别过期或长期未更新的战略档案
 
   背景:
-    假如 Story 3.12 PostgreSQL 验收服务已就绪
+    假如 Story 3.12 验收服务已就绪
 
   # =============================================================================
-  # AC-1: L3/L5 有效期初始快照同步
+  # AC-1: L3/L5 有效期初始快照同步（归档时写入 valid_from/valid_until=None）
   # =============================================================================
-  场景: AC-1 - 归档时 L3/L5 写入 None 有效期快照
-    假如 真实 L3 和 L5 验收服务已就绪
+  场景: AC-1 - 归档时 L3 payload 写入 None 有效期快照
     当 通过真实服务归档一个战略档案
     那么 L2 档案已持久化
-    并且 L3 payload 包含 valid_from 为 None
-    并且 L3 payload 包含 valid_until 为 None
-    并且 L5 properties 包含 valid_from 为 None
-    并且 L5 properties 包含 valid_until 为 None
+    并且 L3 payload 写入 valid_from 为 None
+    并且 L3 payload 写入 valid_until 为 None
+
+  场景: AC-1 - 归档时 L5 properties 写入 None 有效期快照
+    当 通过真实服务归档一个战略档案
+    那么 L2 档案已持久化
+    并且 L5 properties 写入 valid_from 为 None
+    并且 L5 properties 写入 valid_until 为 None
 
   # =============================================================================
   # AC-2: ValidityPeriodSet 事件 L3/L5 同步
   # =============================================================================
   场景: AC-2 - 设置有效期后同步更新 L3/L5
-    假如 真实 L3 和 L5 验收服务已就绪
-    并且 已通过真实服务归档一个战略档案
+    假如 已通过真实服务归档一个战略档案
     当 通过真实服务设置档案有效期
     那么 L2 档案的有效期已更新
-    并且 ValidityPeriodSet 事件包含当前档案
-    并且 L3 payload 的有效期已同步
-    并且 L5 properties 的有效期已同步
+    并且 ValidityPeriodSet 事件已发布到事件总线
+    并且 L3 payload 已同步 valid_from/valid_until
+    并且 L5 properties 已同步 valid_from/valid_until
 
   # =============================================================================
   # AC-3: FactBecameStale 事件触发陈旧标记
   # =============================================================================
   场景: AC-3 - 过期档案被标记并发布 FactBecameStale
     假如 存在一个已过期的真实战略档案
-    当 执行 Story 3.12 陈旧标记检查
+    当 执行陈旧标记检查
     那么 L2 档案的 staleness 为 "stale"
     并且 L2 档案的 stale_reason 为 "expired"
-    并且 已发布当前档案的 FactBecameStale 事件
+    并且 FactBecameStale 事件已发布到事件总线
     当 再次执行陈旧标记检查
     那么 重复检查结果不包含当前档案
 
   场景: AC-3 - 归档超过十二个月档案使用 archived_too_long 原因
     假如 存在一个归档超过十二个月且没有 valid_until 的真实战略档案
-    当 执行 Story 3.12 陈旧标记检查
+    当 执行陈旧标记检查
     那么 L2 档案的 staleness 为 "stale"
     并且 L2 档案的 stale_reason 为 "archived_too_long"
 
-  场景: AC-3 - FactBecameStale 消费后更新 L3 且重复消费幂等
-    假如 真实 L3 和 L5 验收服务已就绪
-    并且 已通过真实服务归档一个过期战略档案
-    当 通过真实服务执行陈旧标记并消费当前 FactBecameStale 事件
-    那么 L3 payload 的 is_stale 为 True
+  场景: AC-3 - 陈旧标记事件触发 L3 payload 降权标记
+    假如 存在一个已过期的真实战略档案
+    当 执行陈旧标记检查
+    那么 L3 payload 已标记 is_stale 为 True
     并且 L3 payload 包含 stale_reason 和 stale_since
-    当 再次消费当前 FactBecameStale 事件
-    那么 L3 payload 不产生第二次等价更新
 
   # =============================================================================
-  # AC-4: 检索结果排序中的陈旧数据降权
+  # AC-4: 检索结果排序中的陈旧数据降权（search_vectors 集成）
   # =============================================================================
-  场景: AC-4 - 真实向量检索对陈旧结果降权并保持排序
-    假如 真实 Qdrant 验收服务已就绪
-    当 写入一组真实 fresh 和 stale 向量档案并执行战略档案向量检索
-    那么 fresh 结果排序高于 stale 结果
-    并且 stale 结果分数降低为原分数的百分之五十
+  场景: AC-4 - 向量检索对陈旧结果降权
+    当 基于 mock 向量检索执行战略档案向量检索
+    那么 混合陈旧/新鲜结果排序：新鲜结果优先于陈旧结果
+    并且 陈旧结果分数降低为原分数的 50%
     并且 检索结果数量保持不变
 
   # =============================================================================
   # AC-5: 摘要生成中的数据陈旧提示
   # =============================================================================
-  场景: AC-5 - 摘要上下文包含陈旧原因和标记时间
-    假如 Story 3.12 PostgreSQL 验收服务已就绪
-    并且 已准备一个真实陈旧档案的摘要检索结果
-    当 生成 Story 3.12 陈旧摘要上下文
+  场景: AC-5 - 单文档摘要上下文包含陈旧提示
+    假如 存在一个已过期的真实战略档案
+    当 生成摘要上下文（archive_repo 兜底）
     那么 摘要上下文包含数据陈旧提示
     并且 摘要上下文包含陈旧原因
     并且 摘要上下文包含标记时间
 
   场景: AC-5 - 跨文档摘要上下文包含数据陈旧提示
-    假如 Story 3.12 PostgreSQL 验收服务已就绪
-    并且 已准备一个真实陈旧 L2 摘要检索结果
-    当 生成 Story 3.12 跨文档陈旧摘要上下文
+    当 生成跨文档陈旧摘要上下文
     那么 跨文档摘要上下文包含数据陈旧提示
 
   # =============================================================================
   # AC-6: API 响应中的陈旧标记暴露
   # =============================================================================
   场景: AC-6 - stale 过滤和三项陈旧字段
-    假如 Story 3.12 API 验收服务已就绪
-    并且 PG 中存在当前测试 stale 档案和 fresh 档案
+    假如 PG 中存在 stale 档案和 fresh 档案
     当 通过 API 查询 staleness_status 为 "stale"
     那么 API 返回状态码为 200
-    并且 API 结果只包含当前测试 stale 档案
+    并且 API 结果只包含 stale 档案
     并且 API 结果包含 is_stale、stale_reason、stale_since 字段
 
   场景: AC-6 - fresh 过滤包含未标记档案
-    假如 Story 3.12 API 验收服务已就绪
-    并且 PG 中存在当前测试 stale 档案和 fresh 档案
+    假如 PG 中存在 stale 档案和 fresh 档案
     当 通过 API 查询 staleness_status 为 "fresh"
     那么 API 返回状态码为 200
-    并且 API 结果不包含当前测试 stale 档案
+    并且 API 结果不包含 stale 档案
 
   场景: AC-6 - 非法 staleness_status 返回客户端错误
-    假如 Story 3.12 API 验收服务已就绪
     当 通过 API 查询非法 staleness_status
     那么 API 返回客户端错误状态码
 
@@ -112,7 +104,6 @@
   # AC-7: 端口注册与 DI 集成
   # =============================================================================
   场景: AC-7 - Resolver 解析 Story 3.12 组件并完成事件注册
-    假如 Story 3.12 Resolver 已初始化
-    当 通过 Story 3.12 Resolver 解析组件
-    那么 Story 3.12 组件均解析成功
-    并且 ArchiveValidityHandler 已注册 ValidityPeriodSet 和 FactBecameStale
+    当 通过 Resolver 解析 Story 3.12 组件
+    那么 所有组件均解析成功
+    并且 ArchiveValidityHandler 已注册 ValidityPeriodSet 和 FactBecameStale 回调
