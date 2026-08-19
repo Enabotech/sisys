@@ -56,6 +56,31 @@ class TestLLMAPIError:
         assert "api.openai.com" in error.context["service_host"]
         assert "/v1/chat/completions" not in error.context["service_host"]
 
+    def test_endpoint_parse_failure_sets_error_context(self) -> None:
+        """endpoint URL 解析失败时应设置 service_host_error 上下文"""
+        from unittest.mock import patch
+
+        with patch("urllib.parse.urlparse", side_effect=ValueError("Invalid URL")):
+            error = LLMAPIError(
+                "LLM API 错误",
+                model="gpt-4",
+                endpoint="http://invalid",
+                status_code=500,
+            )
+        # 解析失败不会阻断异常构造，会记录错误信息
+        assert "service_host_error" in error.context
+        assert len(error.context["service_host_error"]) <= 100
+
+    def test_endpoint_without_hostname_sets_no_service_host(self) -> None:
+        """endpoint 无 hostname 时不设置 service_host"""
+        error = LLMAPIError(
+            "LLM API 错误",
+            model="gpt-4",
+            endpoint="",
+            status_code=500,
+        )
+        assert "service_host" not in error.context
+
     def test_response_body_truncated(self) -> None:
         """验证 response_body 截断至 200 字符"""
         long_body = "x" * 500

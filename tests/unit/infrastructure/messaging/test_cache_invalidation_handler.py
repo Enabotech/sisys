@@ -193,3 +193,61 @@ class TestCacheInvalidationHandlerEdgeCases:
         # event_type 匹配，但 DomainEvent 没有 document_id 字段
         # 所以不会触发 invalidate_by_document_id
         cache.invalidate_by_document_id.assert_not_called()
+
+
+class TestCacheInvalidationHandlerInitWithListener:
+    """验证 _wrap_handler 和 event_listener 注册路径"""
+
+    def test_init_with_event_listener_registers_handler(self) -> None:
+        """传入 event_listener 时应注册 DocumentProcessed 处理器"""
+        from unittest.mock import MagicMock
+
+        mock_cache = MagicMock(spec=SemanticCache)
+        mock_listener = MagicMock()
+        mock_listener.on_event = MagicMock()
+
+        CacheInvalidationHandler(cache=mock_cache, event_listener=mock_listener)
+
+        mock_listener.on_event.assert_called_once()
+        args, _ = mock_listener.on_event.call_args
+        assert args[0] == "DocumentProcessed"
+        assert callable(args[1])
+
+    def test_wrap_handler_returns_callable(self) -> None:
+        """_wrap_handler 应返回可调用对象"""
+
+        handler, _ = _make_handler()
+        wrapped = handler._wrap_handler()
+        assert callable(wrapped)
+
+    def test_wrap_handler_calls_handle(self) -> None:
+        """包装函数应调用 handle 方法"""
+        from unittest.mock import AsyncMock
+
+        cache = AsyncMock(spec=SemanticCache)
+        cache.invalidate_by_document_id = AsyncMock()
+        handler = CacheInvalidationHandler(cache=cache, event_listener=None)
+
+        wrapped = handler._wrap_handler()
+        doc_id = uuid.uuid4()
+        event = DocumentProcessed(document_id=doc_id, tenant_id="test-tenant")
+        wrapped(event)
+
+        cache.invalidate_by_document_id.assert_called_once_with(str(doc_id))
+
+    def test_wrap_handler_catches_exception(self) -> None:
+        """包装函数应捕获异步 handle 抛出的异常，不向上传播"""
+        from unittest.mock import AsyncMock, patch
+
+        cache = AsyncMock(spec=SemanticCache)
+        cache.invalidate_by_document_id = AsyncMock(side_effect=RuntimeError("test error"))
+        handler = CacheInvalidationHandler(cache=cache, event_listener=None)
+
+        # handle() 内部已捕获 invalidate_by_document_id 异常，需模拟 handle 本身抛出
+        # 未处理异常（防御路径：事件总线不因单个 handler 崩溃而中断）
+        with patch.object(handler, "handle", side_effect=RuntimeError("handler crashed")):
+            wrapped = handler._wrap_handler()
+            doc_id = uuid.uuid4()
+            event = DocumentProcessed(document_id=doc_id, tenant_id="test-tenant")
+            # 不应抛出异常
+            wrapped(event)
