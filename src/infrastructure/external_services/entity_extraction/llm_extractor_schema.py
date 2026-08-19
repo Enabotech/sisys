@@ -14,6 +14,7 @@ class ExtractedEntitySchema(BaseModel):
     name: str = Field(description="实体名称")
     entity_type: str = Field(description="实体类型: PERSON/ORG/LOC/PRODUCT/CONCEPT/DATE/AMOUNT/PERCENT")
     confidence: float = Field(ge=0.0, le=1.0, description="置信度 0.0-1.0")
+    normalized_name: str = Field(default="", description="归一化后的实体名称（可选）")
 
 
 class ExtractedRelationSchema(BaseModel):

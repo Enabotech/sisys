@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from typing import get_type_hints
+from typing import Literal, get_origin, get_type_hints
 
 from src.domain.ports.llm_client import LLMClientPort, LLMConfig, LLMResponse
 
@@ -49,44 +49,41 @@ class TestLLMConfig:
     def test_api_type_literal(self) -> None:
         """验证 api_type 使用 Literal 类型约束"""
         hints = get_type_hints(LLMConfig)
-        # 运行时检查类型提示是否包含 Literal（通过字符串表示）
-        assert "Literal" in str(hints.get("api_type", "")), "api_type 应使用 Literal 类型"
+        api_type_hint = hints.get("api_type")
+        assert get_origin(api_type_hint) is Literal, "api_type 应使用 Literal 类型"
 
-    def test_from_env(self) -> None:
+    def test_from_env(self, monkeypatch) -> None:
         """验证 from_env() 从环境变量构建 LLMConfig"""
-        import os
+        monkeypatch.setenv("LLM_API_TYPE", "anthropic")
+        monkeypatch.setenv("LLM_MODEL", "claude-3-opus")
+        monkeypatch.setenv("LLM_ENDPOINT", "https://api.anthropic.com")
+        monkeypatch.setenv("LLM_API_KEY", "sk-ant-test")  # pragma: allowlist secret
+        monkeypatch.setenv("LLM_TEMPERATURE", "0.5")
+        monkeypatch.setenv("LLM_MAX_TOKENS", "200")
+        monkeypatch.setenv("LLM_TIMEOUT", "120.0")
 
-        os.environ["LLM_API_TYPE"] = "anthropic"
-        os.environ["LLM_MODEL"] = "claude-3-opus"
-        os.environ["LLM_ENDPOINT"] = "https://api.anthropic.com"
-        os.environ["LLM_API_KEY"] = "sk-ant-test"  # pragma: allowlist secret
-        os.environ["LLM_TEMPERATURE"] = "0.5"
-        os.environ["LLM_MAX_TOKENS"] = "200"
-        os.environ["LLM_TIMEOUT"] = "120.0"
+        config = LLMConfig.from_env()
+        assert config.api_type == "anthropic"
+        assert config.model == "claude-3-opus"
+        assert config.endpoint == "https://api.anthropic.com"
+        assert config.api_key == "sk-ant-test"  # pragma: allowlist secret
+        assert config.temperature == 0.5
+        assert config.max_tokens == 200
+        assert config.timeout == 120.0
 
-        try:
-            config = LLMConfig.from_env()
-            assert config.api_type == "anthropic"
-            assert config.model == "claude-3-opus"
-            assert config.endpoint == "https://api.anthropic.com"
-            assert config.api_key == "sk-ant-test"  # pragma: allowlist secret
-            assert config.temperature == 0.5
-            assert config.max_tokens == 200
-            assert config.timeout == 120.0
-        finally:
-            for key in [
-                "LLM_API_TYPE",
-                "LLM_MODEL",
-                "LLM_ENDPOINT",
-                "LLM_API_KEY",
-                "LLM_TEMPERATURE",
-                "LLM_MAX_TOKENS",
-                "LLM_TIMEOUT",
-            ]:
-                os.environ.pop(key, None)
-
-    def test_from_env_defaults(self) -> None:
+    def test_from_env_defaults(self, monkeypatch) -> None:
         """验证 from_env() 使用默认值"""
+        # 清除环境变量确保默认值测试独立
+        for key in [
+            "LLM_API_TYPE",
+            "LLM_MODEL",
+            "LLM_ENDPOINT",
+            "LLM_API_KEY",
+            "LLM_TEMPERATURE",
+            "LLM_MAX_TOKENS",
+            "LLM_TIMEOUT",
+        ]:
+            monkeypatch.delenv(key, raising=False)
         config = LLMConfig.from_env()
         assert config.api_type == "openai"
         assert config.model == "qwen2.5:7b"

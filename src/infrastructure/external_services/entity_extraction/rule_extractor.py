@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import re
 import time
 
@@ -198,13 +197,17 @@ class RuleBasedExtractor(EntityExtractionPort, DictionaryConsumerPort):
     使用 AC 自动机（pyahocorasick）匹配命名实体（人员、组织、地点、产品、概念），
     正则模式匹配结构化实体（日期、金额、百分比、联系方式）。
 
+    并发安全设计：
+    reload_dictionary() 采用 copy-on-write 模式——先构建完整的新自动机，
+    再一次性原子替换 _automaton 引用。在 asyncio 单线程事件循环下，
+    reload_dictionary() 无 await 点，_dictionary 与 _automaton 的赋值
+    不会被并发读中断。extract_entities() 在开始匹配前快照 _automaton 引用，
+    读操作始终看到完整一致的自动机状态，热更新与抽取可安全并发。
+
     Attributes:
         _automaton: AC 自动机实例
         _dictionary: 当前词典列表
-        _lock: asyncio.Lock 类变量，保护 _automaton 并发读写安全
     """
-
-    _lock: asyncio.Lock = asyncio.Lock()
 
     def __init__(self, builtin_dictionary: list[tuple[str, str]] | None = None) -> None:
         """初始化规则基抽取器
@@ -246,9 +249,9 @@ class RuleBasedExtractor(EntityExtractionPort, DictionaryConsumerPort):
     ) -> ExtractionResult:
         """执行规则基实体抽取
 
-        在锁保护下获取自动机引用快照（copy-on-read），释放锁后执行匹配，
-        避免长持有锁阻塞热更新。reload_dictionary() 的写入是原子替换，
-        因此快照始终是完整一致的自动机。
+        快照 _automaton/_dictionary 引用后执行匹配（copy-on-read）。
+        reload_dictionary() 在 asyncio 单线程事件循环下无 await 点，
+        其写入是原子替换，因此快照始终是完整一致的自动机。
 
         Args:
             content: 待抽取的文本内容
@@ -262,14 +265,11 @@ class RuleBasedExtractor(EntityExtractionPort, DictionaryConsumerPort):
 
         start_time = time.monotonic()
 
-        # 在锁保护下获取自动机引用快照（copy-on-read）
-        async with self._lock:
-            snapshot_automaton = self._automaton
-            # _dictionary 与 _automaton 在 reload_dictionary() 中同步更新，
-            # 锁保证快照读取时两者一致
-            snapshot_empty = not self._dictionary
+        # 快照自动机引用（原子赋值，无需加锁）
+        snapshot_automaton = self._automaton
+        snapshot_empty = not self._dictionary
 
-        # 1. AC 自动机匹配命名实体（释放锁后执行匹配，不阻塞热更新）
+        # 1. AC 自动机匹配命名实体
         ac_entities: dict[str, ExtractedEntity] = {}
         if not snapshot_empty:
             for end_idx, (idx, term, entity_type) in snapshot_automaton.iter(content):

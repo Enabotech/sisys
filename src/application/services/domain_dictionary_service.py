@@ -14,7 +14,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from src.domain.events.dictionary_events import DictionaryUpdated
-from src.domain.exceptions import DictionaryNotFoundError
 
 if TYPE_CHECKING:
     from src.domain.ports.domain_dictionary import (
@@ -130,11 +129,8 @@ class DomainDictionaryService:
             trigger: 触发源
 
         Raises:
-            DictionaryNotFoundError: 词条不存在
+            DictionaryNotFoundError: 词条不存在（由仓储层抛出）
         """
-        existing = await self._dictionary_repo.get_entry(term)
-        if existing is None:
-            raise DictionaryNotFoundError(term=term)
         await self._dictionary_repo.delete_entry(term)
         # 删除后立即触发热更新，确保 RuleBasedExtractor 内存词典与数据库同步
         await self.refresh_dictionary()
@@ -209,7 +205,15 @@ class DomainDictionaryService:
             trigger: 触发源
         """
         try:
-            event = DictionaryUpdated(term=term, action=action, trigger=trigger)
+            # 获取当前词典版本号，使下游消费者能感知版本变化
+            version = 0
+            try:
+                snapshots = await self._dictionary_repo.list_snapshots()
+                if snapshots:
+                    version = snapshots[0].version
+            except Exception:
+                logger.warning("获取词典版本号失败，使用默认版本 0")
+            event = DictionaryUpdated(term=term, action=action, trigger=trigger, dictionary_version=version)
             await self._event_publisher.publish(event)
         except Exception:
             logger.warning("词典事件发布失败: term=%s, action=%s", term, action)

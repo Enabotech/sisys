@@ -144,7 +144,7 @@
 
 **Given** 所有组件实现完成
 **When** 在 `composition_root.py` 注册
-**Then** `entity_extraction_rule`、`entity_extraction_llm`、`conflict_arbitrator`、`entity_extraction_service` 四个端口注册为 SCOPED
+**Then** `entity_extraction_rule`（SINGLETON，热更新语义要求全局共享）、`entity_extraction_llm`、`conflict_arbitrator`、`entity_extraction_service` 四个端口注册
 **And** 通过 `Resolver` 可正确解析
 **And** 端口契约测试通过
 
@@ -171,12 +171,12 @@
 **新建事件：**
 - [ ] `EntitiesExtracted`（`src/domain/events/entity_extraction_events.py`）
   - 继承 `DomainEvent`
-  - 字段: `memory_id: str` — 关联记忆 ID（str 类型，对标 `MemoryChanged` 模式）
+  - 字段: `memory_id: uuid.UUID` — 关联记忆 ID（UUID 类型，与 `DocumentProcessed` 模式一致）
   - `entity_count: int` — 抽取实体数量
   - `relation_count: int` — 抽取关系数量
   - `extraction_type: str` — 抽取类型（"rule_only" / "llm_only" / "hybrid"）
   - 事件类型: `"EntitiesExtracted"`（`field(default="EntitiesExtracted", init=False)`）
-  - `__post_init__` 设置 `aggregate_id = self.memory_id`（str 类型赋值给 `aggregate_id`，与 `MemoryChanged` 模式一致）、`aggregate_type = "EntityExtraction"`
+  - `__post_init__` 设置 `aggregate_id = self.memory_id`（UUID 类型赋值给 `aggregate_id`，与 `DocumentProcessed` 模式一致；使用 `if aggregate_id is None` 保护）、`aggregate_type = "EntityExtraction"`
   - Schema 版本: v1.0.0
   - 通道: `RabbitMQ + Outbox`（业务状态型）
   - 注册于 `src/domain/events/__init__.py` 和 `configs/event_channels.yaml`
@@ -638,7 +638,7 @@
           builtin_dictionary=create_builtin_dictionary(),
       ),
       module="src.infrastructure.external_services.entity_extraction.rule_extractor",
-      lifetime=Lifetime.SCOPED,
+      lifetime=Lifetime.SINGLETON,  # 热更新语义要求词典全局共享
       owner="foundation-team",
       tags=("entity_extraction", "rule", "nlp"),
   )
@@ -687,7 +687,7 @@
       tags=("entity_extraction", "service"),
   )
   ```
-  - 生命周期: SCOPED
+  - 生命周期: `entity_extraction_rule` 为 SINGLETON（热更新语义要求词典全局共享），其余为 SCOPED
   - Owner: foundation-team
   - 注意：RuleBasedExtractor 和 LLMEntityExtractor 各自实现 EntityExtractionPort，分别注册为独立端口。EntityExtractionService 通过 resolver 注入所有依赖。
 

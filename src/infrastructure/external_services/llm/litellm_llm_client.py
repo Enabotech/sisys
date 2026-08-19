@@ -558,6 +558,10 @@ class LitellmLLMClient(LLMClientPort):
                 response_summary=str(response)[:200],
             ) from e
 
+        # API 响应解析成功 → 通知熔断器（与 generate() 第 466 行一致）
+        # Schema 转换失败是独立的业务逻辑错误，不应回滚 API 调用的成功记录
+        self._circuit_breaker.on_success()
+
         # 第 5 步：尝试将解析结果转换为 Schema 对象（含自动重试修复）
         try:
             import json
@@ -598,8 +602,6 @@ class LitellmLLMClient(LLMClientPort):
                     response_summary=llm_response.content[:200] if llm_response.content else "",
                 )
 
-            # 成功 → 通知熔断器
-            self._circuit_breaker.on_success()
             return obj
 
         except (json.JSONDecodeError, TypeError, ValueError, LLMResponseError) as e:
