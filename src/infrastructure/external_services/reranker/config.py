@@ -25,8 +25,8 @@ class RerankerConfig:
     model: str = "BAAI/bge-reranker-v2-m3"
     top_k: int = 20
     timeout: int = 10
-    api_key: str = ""
-    base_url: str = ""
+    api_key: str | None = None
+    base_url: str | None = None
 
     @classmethod
     def from_env(cls) -> RerankerConfig:
@@ -39,8 +39,8 @@ class RerankerConfig:
             model=os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3"),
             top_k=int(os.getenv("RERANKER_TOP_K", "20")),
             timeout=int(os.getenv("RERANKER_TIMEOUT", "10")),
-            api_key=os.getenv("RERANKER_API_KEY", ""),
-            base_url=os.getenv("RERANKER_BASE_URL", ""),
+            api_key=os.getenv("RERANKER_API_KEY"),
+            base_url=os.getenv("RERANKER_BASE_URL"),
         )
 
 

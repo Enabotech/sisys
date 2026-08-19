@@ -6,25 +6,11 @@
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from typing import Any
 
 from src.domain.exceptions import ValidationError
 from src.domain.ports.embedding_service import EmbeddingServicePort
-from src.domain.ports.l3_vector import L3VectorPort
-
-
-class DenseSearchResult(TypedDict):
-    """Dense 检索结果
-
-    Attributes:
-        id: 向量点标识
-        score: 相似度得分
-        payload: 元数据
-    """
-
-    id: str | int
-    score: float
-    payload: dict[str, Any]
+from src.domain.ports.l3_vector import L3VectorPort, SearchResult
 
 
 class DenseSemanticSearchService:
@@ -54,7 +40,7 @@ class DenseSemanticSearchService:
         limit: int = 10,
         tenant_id: str | None = None,
         filter_payload: dict | None = None,
-    ) -> list[DenseSearchResult]:
+    ) -> list[SearchResult]:
         """执行 Dense 语义检索
 
         Args:
@@ -88,7 +74,7 @@ class DenseSemanticSearchService:
             filter_payload=combined_filter,
         )
         return [
-            DenseSearchResult(id=r["id"], score=r["score"], payload=r.get("payload") or {})
+            SearchResult(id=r["id"], score=r["score"], payload=r.get("payload") or {})
             for r in raw_results
             if isinstance(r, dict) and "id" in r and "score" in r
         ]

@@ -116,8 +116,8 @@ class LiteLLMRerankerClient:
             query=query,
             documents=documents,
             top_k=top_k,
-            api_key=self._config.api_key or None,
-            api_base=self._config.base_url or None,
+            api_key=self._config.api_key,
+            api_base=self._config.base_url,
             timeout=self._config.timeout,
         )
 
