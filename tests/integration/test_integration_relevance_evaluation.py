@@ -22,19 +22,35 @@ def _make_search_result(score: float, **payload_extra: Any) -> SearchResult:
     return SearchResult(id="doc-001", score=score, payload=payload)
 
 
+def run_async(coro: Any) -> Any:
+    """在独立事件循环中执行协程并确保循环关闭（避免 get_event_loop 废弃警告与循环泄漏）"""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
 class TestRelevanceEvaluationIntegration:
     """RelevanceEvaluationService + Mock LLMClientPort 集成"""
 
     def test_quick_rule_check_pure_computation(self) -> None:
         """quick_rule_check 为纯计算，不触发 LLM 调用"""
         from src.application.services.relevance_evaluation_service import RelevanceEvaluationService
+        from src.domain.ports.relevance_evaluation import RuleBasedResult
 
         mock_llm = AsyncMock()
         service = RelevanceEvaluationService(llm_client=mock_llm)
         results = [_make_search_result(0.5), _make_search_result(0.7)]
-        result = asyncio.new_event_loop().run_until_complete(
-            service.quick_rule_check(query_text="query", search_results=results)
-        )
+
+        async def _run() -> RuleBasedResult:
+            return await service.quick_rule_check(query_text="query", search_results=results)
+
+        loop = asyncio.new_event_loop()
+        try:
+            result = loop.run_until_complete(_run())
+        finally:
+            loop.close()
 
         assert result["quick_block"] is False
         mock_llm.assert_not_called()
@@ -65,7 +81,15 @@ class TestRelevanceEvaluationIntegration:
         mock_llm.structured_generate.side_effect = mock_structured_generate
         service = RelevanceEvaluationService(llm_client=mock_llm)
         results = [_make_search_result(0.6)]
-        result = asyncio.get_event_loop().run_until_complete(service.evaluate(query_text="query", search_results=results))
+
+        async def _run() -> Any:
+            return await service.evaluate(query_text="query", search_results=results)
+
+        loop = asyncio.new_event_loop()
+        try:
+            result = loop.run_until_complete(_run())
+        finally:
+            loop.close()
 
         mock_llm.structured_generate.assert_called_once()
         assert result.overall_score == (0.8 + 0.7 + 0.9) / 3.0
@@ -104,14 +128,19 @@ class TestSummaryGenerationGuard:
         service = self._make_summary_service(relevance_service)
         results = [_make_search_result(0.15)]
 
-        with pytest.raises(RelevanceEvaluationBlockedError):
-            asyncio.get_event_loop().run_until_complete(
-                service.generate_summary(
-                    query_text="query",
-                    search_results=results,
-                    perspective="financial",
-                )
+        async def _run() -> Any:
+            return await service.generate_summary(
+                query_text="query",
+                search_results=results,
+                perspective="financial",
             )
+
+        loop = asyncio.new_event_loop()
+        try:
+            with pytest.raises(RelevanceEvaluationBlockedError):
+                loop.run_until_complete(_run())
+        finally:
+            loop.close()
 
     def test_guard_degraded_when_llm_fails(self) -> None:
         """LLM 评估调用失败 → 降级跳过评估，直接生成摘要"""
@@ -133,7 +162,7 @@ class TestSummaryGenerationGuard:
         service._llm_client.structured_generate.side_effect = lambda **kwargs: summary_fake
 
         # 摘要生成不应抛异常（评估降级）
-        result = asyncio.get_event_loop().run_until_complete(
+        result = run_async(
             service.generate_summary(
                 query_text="query",
                 search_results=[_make_search_result(0.6)],
@@ -165,7 +194,7 @@ class TestSummaryGenerationGuard:
             relevance_evaluation_service=None,
         )
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = run_async(
             service.generate_summary(
                 query_text="query",
                 search_results=[_make_search_result(0.6)],
@@ -207,7 +236,7 @@ class TestSummaryGenerationGuard:
         summary_fake.confidence_score = 0.8
         service._llm_client.structured_generate.return_value = summary_fake
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = run_async(
             service.generate_summary(
                 query_text="query",
                 search_results=[_make_search_result(0.6)],

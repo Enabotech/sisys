@@ -27,6 +27,7 @@ from src.domain.exceptions import RelevanceEvaluationError
 from src.domain.exceptions.llm_exceptions import LLMAPIError, LLMConfigError, LLMResponseError
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.ports.llm_client import LLMConfig
+from src.domain.ports.relevance_evaluation import RuleBasedResult
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +163,7 @@ class RelevanceEvaluationService:
         self,
         query_text: str,
         search_results: list[SearchResult],
-    ) -> dict[str, Any]:
+    ) -> RuleBasedResult:
         """规则预检：快速过滤明显不足的检索结果
 
         纯计算，无外部调用，P95 < 100ms。
@@ -172,9 +173,10 @@ class RelevanceEvaluationService:
             search_results: 分层检索结果
 
         Returns:
-            RuleBasedResult 的 dict 表示，包含预检结果
+            RuleBasedResult TypedDict，包含预检结果
         """
-        del query_text  # 规则预检不依赖查询文本
+        # 规则预检不依赖查询文本，参数保留以匹配端口契约
+        _ = query_text
 
         # 空结果快速阻断
         if not search_results:
