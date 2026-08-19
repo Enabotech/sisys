@@ -189,8 +189,16 @@ class ArchiveValidityHandler:
             return
 
         payload = dict(existing.get("payload", {}))
-        payload["valid_from"] = event.valid_from.isoformat() if event.valid_from else None
-        payload["valid_until"] = event.valid_until.isoformat() if event.valid_until else None
+        new_valid_from = event.valid_from.isoformat() if event.valid_from else None
+        new_valid_until = event.valid_until.isoformat() if event.valid_until else None
+
+        # 幂等检查：已同步则跳过 upsert（避免 Outbox 重试导致重复 I/O）
+        if payload.get("valid_from") == new_valid_from and payload.get("valid_until") == new_valid_until:
+            logger.info("L3 point %s validity already synced, skip", point_id)
+            return
+
+        payload["valid_from"] = new_valid_from
+        payload["valid_until"] = new_valid_until
 
         vector = existing.get("vector")
         if vector is None:

@@ -257,6 +257,9 @@ class StrategicArchiveService:
             raise ArchiveStorageError(layer="l2", cause=e)
 
         # Step 5: 发布 ArchiveCreated 事件
+        # 异常传播设计：事件发布失败（Outbox 写入失败/部分失败）时抛出 ArchiveStorageError，
+        # 触发 SessionMiddleware 自动回滚事务，保证 L2 变更与事件发布的原子性
+        # （Outbox 与业务数据同一 session 写入，回滚即两者都不落库，避免下游丢失事件）
         if self._event_publisher is not None:
             try:
                 event = ArchiveCreated(
@@ -270,9 +273,14 @@ class StrategicArchiveService:
                 )
                 result: PublishResult = await self._event_publisher.publish(event)
                 if not result.is_success:
-                    logger.warning("ArchiveCreated event publish partial failure: %s", result.partial_error)
+                    raise ArchiveStorageError(
+                        layer="l2",
+                        cause=RuntimeError(f"ArchiveCreated event publish partial failure: {result.partial_error}"),
+                    )
+            except ArchiveStorageError:
+                raise
             except Exception as e:
-                logger.warning("ArchiveCreated event publish failed: %s", e)
+                raise ArchiveStorageError(layer="l2", cause=RuntimeError(f"ArchiveCreated event publish failed: {e}")) from e
 
         return saved
 
@@ -348,8 +356,8 @@ class StrategicArchiveService:
         """设置档案有效期
 
         获取档案，设置有效期，冲突检测，持久化，发布事件。
-        使用 find_for_update() 前置锁定同一 plan_id+archive_type 的所有行，
-        消除 get_by_id 与冲突检测之间的 TOCTOU 窗口期。
+        使用 find_for_update() 两步锁定法消除 TOCTOU 窗口期：先按 archive_id 锁定目标行，
+        再按 plan_id+archive_type 锁定同组行，确保两次查询条件一致。
 
         Args:
             archive_id: 档案 ID
@@ -362,23 +370,31 @@ class StrategicArchiveService:
         Raises:
             ArchiveNotFoundError: 档案不存在时抛出
             ValidityPeriodConflictError: 有效期冲突时抛出
-            ArchiveStorageError: L2 存储失败时抛出
+            ArchiveStorageError: L2 存储失败或事件发布失败时抛出
         """
-        # 获取档案（用于构造查询条件）
-        archive = await self._archive_repo.get_by_id(archive_id)
-        if archive is None:
+        # 两步锁定法（TOCTOU 消除）：
+        # Step 1: 按 archive_id 加 FOR UPDATE 锁读取目标档案，锁定目标行使其 plan_id/archive_type
+        #         无法被并发修改，消除"get_by_id 无锁读取 → find_for_update 有锁读取"窗口期
+        target_query = ArchiveQuery(archive_ids=[archive_id], limit=1)
+        try:
+            locked_target = await self._archive_repo.find_for_update(target_query, skip_locked=False)
+        except AttributeError:
+            # 若 find_for_update 未实现，回退到普通 find
+            locked_target = await self._archive_repo.find(target_query)
+        if not locked_target:
             raise ArchiveNotFoundError(archive_id=archive_id)
+        archive = locked_target[0]
 
-        # 冲突检测：同一 plan_id + 同一 archive_type 下，不同 archive_id 的档案
+        # Step 2: 锁定同一 plan_id + archive_type 组（此时目标行已被当前事务锁定，
+        #          其他事务无法修改其 plan_id/archive_type，两次查询条件必然一致）
         if archive.plan_id is not None:
             query = ArchiveQuery(
                 plan_id=archive.plan_id,
                 archive_type=archive.archive_type,
                 limit=1000,
             )
-            # 使用 find_for_update 悲观锁查询（前置锁定，消除 TOCTOU 窗口期）
             try:
-                existing = await self._archive_repo.find_for_update(query)
+                existing = await self._archive_repo.find_for_update(query, skip_locked=False)
             except AttributeError:
                 # 若 find_for_update 未实现，回退到普通 find
                 existing = await self._archive_repo.find(query)
@@ -415,7 +431,7 @@ class StrategicArchiveService:
             logger.error("L2 save failed for archive %s: %s", archive_id, e)
             raise ArchiveStorageError(layer="l2", cause=e)
 
-        # 发布 ValidityPeriodSet 事件
+        # 发布 ValidityPeriodSet 事件（同 archive_plan 原子性设计：失败即抛异常触发事务回滚）
         if self._event_publisher is not None:
             try:
                 event = ValidityPeriodSet(
@@ -427,9 +443,14 @@ class StrategicArchiveService:
                 )
                 result: PublishResult = await self._event_publisher.publish(event)
                 if not result.is_success:
-                    logger.warning("ValidityPeriodSet event publish partial failure: %s", result.partial_error)
+                    raise ArchiveStorageError(
+                        layer="l2",
+                        cause=RuntimeError(f"ValidityPeriodSet event publish partial failure: {result.partial_error}"),
+                    )
+            except ArchiveStorageError:
+                raise
             except Exception as e:
-                logger.warning("ValidityPeriodSet event publish failed: %s", e)
+                raise ArchiveStorageError(layer="l2", cause=RuntimeError(f"ValidityPeriodSet event publish failed: {e}")) from e
 
         return saved
 
@@ -485,7 +506,7 @@ class StrategicArchiveService:
             )
             try:
                 # find_for_update() 悲观锁：锁定待标记行，避免 TOCTOU 竞态
-                batch = await self._archive_repo.find_for_update(query)
+                batch = await self._archive_repo.find_for_update(query, skip_locked=True)
             except Exception as e:
                 logger.error("L2 query failed while scanning stale archives: %s", e)
                 break
@@ -526,6 +547,9 @@ class StrategicArchiveService:
                 marked.append(saved)
 
                 # 发布 FactBecameStale 事件
+                # 批量操作中事件发布失败不中断整体流程（已标记陈旧的 L2 数据由下次调度兜底），
+                # 但提升日志级别为 ERROR 以便运维发现。L2 mark_stale 已通过条件更新原子写入，
+                # 即使事件丢失，L2 权威数据不变，下次调度因 exclude_staleness=True 不会重复处理。
                 if self._event_publisher is not None:
                     try:
                         event = FactBecameStale(
@@ -538,9 +562,17 @@ class StrategicArchiveService:
                         )
                         result: PublishResult = await self._event_publisher.publish(event)
                         if not result.is_success:
-                            logger.warning("FactBecameStale event publish partial failure: %s", result.partial_error)
+                            logger.error(
+                                "FactBecameStale event publish partial failure for archive %s: %s",
+                                saved.archive_id,
+                                result.partial_error,
+                            )
                     except Exception as e:
-                        logger.warning("FactBecameStale event publish failed for archive %s: %s", saved.archive_id, e)
+                        logger.error(
+                            "FactBecameStale event publish failed for archive %s: %s",
+                            saved.archive_id,
+                            e,
+                        )
 
         return marked
 

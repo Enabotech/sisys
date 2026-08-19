@@ -160,13 +160,17 @@ class ArchiveRepositoryPort(L2RdbPort[StrategicArchive], Protocol):
             符合条件的档案数量
         """
 
-    async def find_for_update(self, query: ArchiveQuery) -> list[StrategicArchive]:
+    async def find_for_update(self, query: ArchiveQuery, skip_locked: bool = False) -> list[StrategicArchive]:
         """按条件查询档案（带 FOR UPDATE 悲观锁）
 
         用于冲突检测等需要并发安全的场景，锁定同一 plan_id+archive_type 的相关行。
 
         Args:
             query: 查询条件（ArchiveQuery 值对象）
+            skip_locked: 跳过已被其他事务锁定的行（默认 False 阻塞等待）。
+                         批量扫描场景（如 mark_stale_archives）传 True 避免并发实例互相阻塞；
+                         冲突检测场景（如 set_validity_period）必须保持 False，
+                         否则被锁定的同组行被跳过会导致冲突漏报。
 
         Returns:
             符合条件的档案列表
