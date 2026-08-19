@@ -9,7 +9,7 @@
 # from src.domain.ports.vector_storage import VectorStorage  # deprecated
 
 from src.domain.ports.agent_engine import AgentEnginePort
-from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
+from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort, ValidityStatus
 from src.domain.ports.connection_manager import ConnectionManager
 from src.domain.ports.crawler_client import CrawlerClientPort
 from src.domain.ports.dead_letter_queue import DeadLetterQueue
@@ -76,6 +76,7 @@ __all__ = [
     "AgentEnginePort",
     "ArchiveQuery",
     "ArchiveRepositoryPort",
+    "ValidityStatus",
     "ConnectionManager",
     "CrawlerClientPort",
     "DataAccessPattern",

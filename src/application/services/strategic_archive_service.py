@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+from src.application.services.staleness_weight_service import StalenessWeightService
 from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
 from src.domain.events.archive_events import ArchiveCreated, FactBecameStale, ValidityPeriodSet
 from src.domain.exceptions import EntityValidationError
@@ -43,7 +44,7 @@ class StrategicArchiveService:
         object_storage: L4ObjectPort | None = None,
         graph_storage: L5GraphPort | None = None,
         event_publisher: EventPublisher | None = None,
-        staleness_service: Any | None = None,
+        staleness_service: StalenessWeightService | None = None,
     ) -> None:
         """初始化战略档案编排服务
 
@@ -92,8 +93,6 @@ class StrategicArchiveService:
         Raises:
             ArchiveStorageError: L2 或 L4 存储失败时抛出
         """
-        from datetime import UTC, datetime
-
         if plan_type not in ("SP", "BP"):
             raise EntityValidationError(
                 message="plan_type must be 'SP' or 'BP'",
@@ -547,10 +546,10 @@ class StrategicArchiveService:
 
 
 def _intervals_overlap(
-    a_from: Any,
-    a_until: Any,
-    b_from: Any,
-    b_until: Any,
+    a_from: datetime | None,
+    a_until: datetime | None,
+    b_from: datetime | None,
+    b_until: datetime | None,
 ) -> bool:
     """检测两个半开区间 [valid_from, valid_until) 是否有重叠
 

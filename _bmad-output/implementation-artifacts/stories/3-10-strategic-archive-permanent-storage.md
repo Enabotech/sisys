@@ -98,13 +98,13 @@
 **Given** 档案管理过程中可能发生多种错误
 **When** 定义档案异常类
 **Then** 继承 `BusinessException` 层次结构
-**And** 分配唯一异常编码（新增 `archive` 子域 280-289）
+**And** 分配唯一异常编码（新增 `archive` 子域 282-289）
 
 **验证标准/Validation Criteria:**
-- [ ] `ArchiveNotFoundError`（EXCEPTION_280）— 继承 `NotFoundError`，档案不存在
-- [ ] `ArchiveConflictError`（EXCEPTION_281）— 继承 `ConflictError`，档案重复/冲突
-- [ ] `ArchiveStorageError`（EXCEPTION_282）— 继承 `BusinessException`，存储层协同失败
-- [ ] 异常编码在 `_code_ranges.py` 注册 `archive` 子域 (280, 289)，无碰撞
+- [ ] `ArchiveNotFoundError`（EXCEPTION_282）— 继承 `NotFoundError`，档案不存在
+- [ ] `ArchiveConflictError`（EXCEPTION_283）— 继承 `ConflictError`，档案重复/冲突
+- [ ] `ArchiveStorageError`（EXCEPTION_284）— 继承 `BusinessException`，存储层协同失败
+- [ ] 异常编码在 `_code_ranges.py` 注册 `archive` 子域 (282, 289)，无碰撞
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册（404/409/500）
 - [ ] 新增异常文件 `src/domain/exceptions/archive_exceptions.py`
 
@@ -281,19 +281,19 @@
 #### 领域异常契约 (Domain Exception Contract)
 
 **新建异常：**
-- [ ] `ArchiveNotFoundError`（EXCEPTION_280）— `src/domain/exceptions/archive_exceptions.py`，继承 `NotFoundError`
+- [ ] `ArchiveNotFoundError`（EXCEPTION_282）— `src/domain/exceptions/archive_exceptions.py`，继承 `NotFoundError`
   - 构造参数：`archive_id: UUID`，`message: str | None = None`，`cause: Exception | None = None`
   - `message` 默认构造：`f"Archive not found: {archive_id}"`
   - `context` 暴露 `archive_id`（`context={"archive_id": str(archive_id)}`）
-- [ ] `ArchiveConflictError`（EXCEPTION_281）— 继承 `ConflictError`
+- [ ] `ArchiveConflictError`（EXCEPTION_283）— 继承 `ConflictError`
   - 构造参数：`archive_id: UUID`，`message: str | None = None`，`cause: Exception | None = None`
   - `message` 默认构造：`f"Archive conflict: {archive_id}"`
   - `context` 暴露 `archive_id`（`context={"archive_id": str(archive_id)}`）
-- [ ] `ArchiveStorageError`（EXCEPTION_282）— 继承 `BusinessException`
+- [ ] `ArchiveStorageError`（EXCEPTION_284）— 继承 `BusinessException`
   - 构造参数：`layer: str`（指示失败存储层：l2/l3/l4/l5），`message: str | None = None`，`cause: Exception | None = None`
   - `message` 默认构造：`f"Archive storage error at layer {layer}"`
   - `context` 暴露 `layer`（`context={"layer": layer}`）
-- [ ] 编码分配：`archive` 子域 (280, 289)，已在 `_code_ranges.py` 预留 `# 档案子域（280-289）`
+- [ ] 编码分配：`archive` 子域 (282, 289)，已在 `_code_ranges.py` 预留 `# 档案子域（282-289）`
 - [ ] 异常在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 注册
 - [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册（404/409/500）
 - [ ] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试
@@ -819,7 +819,7 @@ tests/
 **应用到本故事/Applied to This Story:**
 - [ ] `ArchiveRepositoryPort` 遵循单一职责，包含 `save()`/`get_by_id()`/`find()`/`list_by_plan()` 等方法
 - [ ] `ArchiveQuery` frozen dataclass 用于多字段组合查询
-- [ ] 异常编码 280-282 在 `_code_ranges.py` 注册，`grep -r "EXCEPTION_28"` 验证无碰撞
+- [ ] 异常编码 282-284 在 `_code_ranges.py` 注册，`grep -r "EXCEPTION_28"` 验证无碰撞
 - [ ] `ArchiveCreated` 事件同时更新 `event_channels.yaml` 和 `DEFAULT_MAPPINGS`
 - [ ] 仓储和服务的生命周期为 SCOPED
 - [ ] L3/L5 存储使用 `resolve_optional()` 实现优雅降级
@@ -896,13 +896,13 @@ register_port(
 
 | 异常类 | 编码 | 继承 | 描述 |
 |--------|------|------|------|
-| ArchiveNotFoundError | EXCEPTION_280 | NotFoundError | 档案不存在 |
-| ArchiveConflictError | EXCEPTION_281 | ConflictError | 档案重复/冲突 |
-| ArchiveStorageError | EXCEPTION_282 | BusinessException | 存储层协同失败 |
+| ArchiveNotFoundError | EXCEPTION_282 | NotFoundError | 档案不存在 |
+| ArchiveConflictError | EXCEPTION_283 | ConflictError | 档案重复/冲突 |
+| ArchiveStorageError | EXCEPTION_284 | BusinessException | 存储层协同失败 |
 
 **`_code_ranges.py` 注册：**
 ```python
-"archive": (280, 289),
+"archive": (282, 289),
 ```
 
 **`_CLASS_TO_SUBDOMAIN` 注册：**

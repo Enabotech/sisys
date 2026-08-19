@@ -248,12 +248,14 @@
 - [ ] `ArchiveQuery` 新增 `staleness_status: str | None = None` 字段 — 按陈旧状态过滤（"stale"/"fresh"/None）
 - [ ] `__post_init__` 验证 `staleness_status` 取值必须为 `"stale"`、`"fresh"` 或 `None`，非法值抛 `EntityValidationError`（自动映射为 HTTP 400，API 路由层无须额外校验）
 - [ ] `ArchiveQuery` 新增 `archive_ids: list[UUID] | None = None` 可选字段 — 支持按 ID 列表批量查询（供 `StalenessWeightService` 兜底链使用，避免 N+1 问题）
-- [ ] 向后兼容：新增字段为可选，默认 None，不影响现有查询
+- [ ] `ArchiveQuery` 新增 `exclude_staleness: bool = False` 字段 — 排除已标记陈旧的档案（幂等保证，供 `mark_stale_archives()` 使用）
+- [ ] `ArchiveQuery` 新增 `stale_before: datetime | None = None` 字段 — 仅查询满足陈旧判定条件的档案（valid_until 早于该时间，或无有效期且 archived_at 早于该时间前 365 天，供 `mark_stale_archives()` 使用）
+- [ ] 向后兼容：新增字段为可选，默认 None/False，不影响现有查询
 
 #### 统一端口定义注册与管理 (Port Contract)
 
 **已有端口（无需新增端口，复用已有端口）：**
-- `ArchiveRepositoryPort` — 档案仓储（已有 `find`、`find_for_update`、`get_by_id`、`save`）— **需扩展 `_apply_filters()` 支持 `staleness_status` 和 `archive_ids` 过滤**
+- `ArchiveRepositoryPort` — 档案仓储（已有 `find`、`find_for_update`、`get_by_id`、`save`、`mark_stale`）— **需扩展 `_apply_filters()` 支持 `staleness_status`、`archive_ids`、`exclude_staleness`、`stale_before` 过滤**
 - `L3VectorPort` — 向量存储（已有 `upsert_points`、`get_point`、`search`、`delete_points`）— **L3 payload 更新通过 `get_point` → 合并字段 → `upsert_points` 三步骤实现，不新增 `update_payload` 方法**
 - `L5GraphPort` — 图存储（已有 `create_entity`、`execute_write_query`、`delete_entity`）— **L5 属性更新通过 `execute_write_query` 执行 Cypher SET 子句实现，不新增 `update_entity_properties` 方法**
 - `LayeredRetrievalPort` — 分层检索（已有 `search_top_down`、`search_bottom_up`）
