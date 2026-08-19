@@ -29,8 +29,8 @@ from src.domain.ports.reranker import RerankerPort
 
 logger = logging.getLogger(__name__)
 
-# 默认三路权重 [dense, sparse, graph]
-_DEFAULT_WEIGHTS: list[float] = [1.0, 1.0, 0.5]
+# 默认三路权重 [dense, sparse, graph]（不可变元组，避免模块级列表被误修改）
+_DEFAULT_WEIGHTS: tuple[float, ...] = (1.0, 1.0, 0.5)
 
 
 class HybridSearchService:
@@ -63,7 +63,7 @@ class HybridSearchService:
         self._sparse = sparse_search
         self._graph = graph_search
         self._fuse = fuse
-        self._weights = list(weights) if weights else list(_DEFAULT_WEIGHTS)
+        self._weights = list(weights) if weights is not None else list(_DEFAULT_WEIGHTS)
         self._reranker = reranker
 
     async def search(
@@ -116,10 +116,10 @@ class HybridSearchService:
         dense_raw, sparse_raw = results[0], results[1]
         graph_raw = results[2] if len(results) > 2 else None
 
-        # 降级判断
-        dense_failed = isinstance(dense_raw, Exception)
-        sparse_failed = isinstance(sparse_raw, Exception)
-        graph_failed = graph_raw is not None and isinstance(graph_raw, Exception)
+        # 降级判断：使用 isinstance 类型守卫而非 assert（assert 在 -O 模式下被禁用）
+        dense_failed = not isinstance(dense_raw, list)
+        sparse_failed = not isinstance(sparse_raw, list)
+        graph_failed = graph_raw is not None and not isinstance(graph_raw, list)
 
         # 三路均失败 → HybridSearchError（替换 RuntimeError 历史违规）
         if dense_failed and sparse_failed and (graph_failed or self._graph is None):
@@ -128,29 +128,25 @@ class HybridSearchService:
         # 确定有效结果列表
         result_lists: list[list[SearchResult]] = []
 
-        if not dense_failed:
-            assert not isinstance(dense_raw, Exception)
+        if not dense_failed and isinstance(dense_raw, list):
             result_lists.append(dense_raw)
-        if not sparse_failed:
-            assert not isinstance(sparse_raw, Exception)
+        if not sparse_failed and isinstance(sparse_raw, list):
             result_lists.append(sparse_raw)
-        if graph_raw is not None and not graph_failed:
-            assert not isinstance(graph_raw, Exception)
+        if graph_raw is not None and not graph_failed and isinstance(graph_raw, list):
             result_lists.append(graph_raw)
 
         # 降级：Dense + Sparse 均失败 → 单路 Graph 结果
-        if dense_failed and sparse_failed and graph_raw is not None and not graph_failed:
-            assert not isinstance(graph_raw, Exception)
+        if dense_failed and sparse_failed and graph_raw is not None and not graph_failed and isinstance(graph_raw, list):
             logger.warning("Dense 和 Sparse 检索通道均失败，降级为 Graph-only 结果")
             return graph_raw[:limit]
 
-        # 降级：单路失败 → 记录日志
+        # 降级：单路失败 → 记录日志（仅记录异常类型与摘要，避免完整异常串带来的日志注入风险）
         if dense_failed:
-            logger.warning("Dense 检索通道失败，降级为两路融合: %s", dense_raw)
+            logger.warning("Dense 检索通道失败，降级为两路融合: %s: %s", type(dense_raw).__name__, str(dense_raw)[:200])
         if sparse_failed:
-            logger.warning("Sparse 检索通道失败，降级为两路融合: %s", sparse_raw)
+            logger.warning("Sparse 检索通道失败，降级为两路融合: %s: %s", type(sparse_raw).__name__, str(sparse_raw)[:200])
         if graph_failed:
-            logger.warning("Graph 检索通道失败，降级为两路融合: %s", graph_raw)
+            logger.warning("Graph 检索通道失败，降级为两路融合: %s: %s", type(graph_raw).__name__, str(graph_raw)[:200])
 
         # 应用有效权重（按通道索引映射，而非前缀截断）
         all_weights = weights or self._weights
@@ -161,7 +157,7 @@ class HybridSearchService:
         ]
         effective_weights = [w for w, active in zip(all_weights, channel_active) if active]
 
-        # RRF 融合
+        # RRF 融合（单路时 fuse 内部直接透传，跳过融合）
         fused = self._fuse(*result_lists, weights=effective_weights)
 
         # 可选重排序
@@ -228,10 +224,11 @@ class HybridSearchService:
         filter_payload: dict | None,
     ) -> list[SearchResult] | Exception:
         """安全执行 Graph 检索"""
-        assert self._graph is not None
-        graph_service: Any = self._graph
+        if self._graph is None:
+            # 防御性检查：该分支仅在 Graph 通道未注入时触发（正常路径在调用前已过滤）
+            return HybridSearchError("Graph 检索服务未注入")
         try:
-            result: list[SearchResult] | Exception = await graph_service.search(
+            result: list[SearchResult] | Exception = await self._graph.search(
                 collection, query_text, limit, tenant_id, filter_payload
             )
             return result

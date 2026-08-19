@@ -21,7 +21,9 @@ def _make_mock_dense_service(
     side_effect: Exception | None = None,
 ) -> AsyncMock:
     """构造 mock DenseSemanticSearchService"""
-    mock = AsyncMock()
+    from src.application.services.dense_search_service import DenseSemanticSearchService
+
+    mock = AsyncMock(spec=DenseSemanticSearchService)
     if side_effect:
         mock.search.side_effect = side_effect
     else:
@@ -34,7 +36,9 @@ def _make_mock_sparse_service(
     side_effect: Exception | None = None,
 ) -> AsyncMock:
     """构造 mock Bm25SparseSearchService"""
-    mock = AsyncMock()
+    from src.application.services.sparse_search_service import Bm25SparseSearchService
+
+    mock = AsyncMock(spec=Bm25SparseSearchService)
     if side_effect:
         mock.search.side_effect = side_effect
     else:
@@ -47,7 +51,9 @@ def _make_mock_graph_service(
     side_effect: Exception | None = None,
 ) -> AsyncMock:
     """构造 mock GraphSearchService"""
-    mock = AsyncMock()
+    from src.application.services.graph_search_service import GraphSearchService
+
+    mock = AsyncMock(spec=GraphSearchService)
     if side_effect:
         mock.search.side_effect = side_effect
     else:
@@ -177,6 +183,20 @@ class TestHybridSearchServiceValidation:
             await service.search("test_collection", "")
 
     @pytest.mark.asyncio
+    async def test_raises_on_whitespace_query(self) -> None:
+        """纯空白查询文本应抛出 ValidationError"""
+        service = _make_hybrid_service()
+        with pytest.raises(ValidationError, match="查询文本不能为空"):
+            await service.search("test_collection", "   ")
+
+    @pytest.mark.asyncio
+    async def test_raises_on_whitespace_collection(self) -> None:
+        """纯空白 collection 名称应抛出 ValidationError"""
+        service = _make_hybrid_service()
+        with pytest.raises(ValidationError, match="Collection 名称不能为空"):
+            await service.search("   ", "查询文本")
+
+    @pytest.mark.asyncio
     async def test_raises_on_empty_collection(self) -> None:
         """空 collection 名称应抛出 ValidationError"""
         service = _make_hybrid_service()
@@ -189,6 +209,13 @@ class TestHybridSearchServiceValidation:
         service = _make_hybrid_service()
         with pytest.raises(ValidationError, match="limit 必须为正整数"):
             await service.search("test_collection", "查询文本", limit=0)
+
+    @pytest.mark.asyncio
+    async def test_raises_on_negative_limit(self) -> None:
+        """负数 limit 应抛出 ValidationError"""
+        service = _make_hybrid_service()
+        with pytest.raises(ValidationError, match="limit 必须为正整数"):
+            await service.search("test_collection", "查询文本", limit=-1)
 
 
 class TestHybridSearchServiceDegradation:
