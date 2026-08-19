@@ -2054,7 +2054,7 @@ def bootstrap() -> None:
         impl=lambda resolver: StrategicArchiveService(
             archive_repo=resolver.resolve("archive_repository"),
             vector_storage=resolver.resolve_optional("l3_vector"),
-            object_storage=resolver.resolve("l4_object"),
+            object_storage=resolver.resolve_optional("l4_object"),
             graph_storage=resolver.resolve_optional("l5_graph"),
             event_publisher=resolver.resolve("event_publisher"),
             staleness_service=resolver.resolve_optional("staleness_weight_service"),
