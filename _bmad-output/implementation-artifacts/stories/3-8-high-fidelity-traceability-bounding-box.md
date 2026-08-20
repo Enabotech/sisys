@@ -429,22 +429,22 @@
 
 **关联 AC:** AC-1
 
-> **目的：** 定义 Citation 和 BoundingBox 值对象，为溯源服务提供数据结构基础。
+> **目的：** 定义 Citation 值对象（复用已有 BoundingBox），为溯源服务提供数据结构基础。
 
 #### TDD 循环 [A]：Citation 值对象
 
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_citation.py`（值对象创建/序列化/反序列化） |
-| 🟢 绿 | 实现 `Citation`、`BoundingBox` dataclass 最小代码 |
+| 🟢 绿 | 实现 `Citation` dataclass（复用 `parsed_document.py` 中已有的 `BoundingBox`） |
 | 🔄 重构 | 优化代码，添加 docstring |
 
 - [ ] Subtask 1.1: 🔴 红 — 编写 `Citation` 值对象失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 `Citation`、`BoundingBox` dataclass
+- [ ] Subtask 1.2: 🟢 绿 — 实现 `Citation` dataclass（复用已有 `BoundingBox`）
 - [ ] Subtask 1.3: 🔄 重构 — 优化值对象代码
 
 **完成标准/Definition of Done:**
-- [ ] `Citation`、`BoundingBox` 值对象实现完成
+- [ ] `Citation` 值对象实现完成（`BoundingBox` 复用已有定义，无重复代码）
 - [ ] TDD 循环全部通过
 - [ ] 覆盖率 ≥ 90%（领域层）
 
@@ -777,7 +777,7 @@
 - `_bmad-output/implementation-artifacts/stories/3-8-high-fidelity-traceability-bounding-box.md`
 
 **待创建的文件/To Be Created (Dev Story 实施):**
-- `src/domain/value_objects/citation.py` - Citation, BoundingBox 值对象
+- `src/domain/value_objects/citation.py` - Citation 值对象（复用 parsed_document.py 中的 BoundingBox）
 - `src/domain/ports/traceability.py` - TraceabilityPort 端口
 - `src/domain/exceptions/traceability_exceptions.py` - 溯源异常
 - `src/application/services/traceability_service.py` - TraceabilityService 溯源服务
