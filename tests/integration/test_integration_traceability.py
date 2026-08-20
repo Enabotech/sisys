@@ -4,8 +4,9 @@
 以及 TraceabilityPort 端口解析、异常路径降级。
 
 两种子模式：
-1. Mock 工厂：AsyncMock(spec=ProtocolClass) + _make_*() 工厂函数
-2. 真实服务（Schema 隔离）：不适用（溯源不涉及数据库持久化）
+1. Mock 工厂：AsyncMock(spec=LayeredRetrievalPort) + _make_*() 工厂函数
+   （溯源不涉及数据库持久化，基础设施端口用 Mock 替代）
+2. 端口解析真实验证：通过 Resolver 验证 DI 容器解析出真实 TraceabilityService 实例
 """
 
 from __future__ import annotations
@@ -18,6 +19,8 @@ import pytest
 
 from src.domain.exceptions import TraceabilityError
 from src.domain.ports.l3_vector import SearchResult
+from src.domain.ports.layered_retrieval import LayeredRetrievalPort
+from src.domain.ports.traceability import TraceabilityPort
 
 
 def _make_search_result(
@@ -50,7 +53,7 @@ def _make_search_result(
 
 def _make_mock_retrieval(results: list[SearchResult] | None = None) -> AsyncMock:
     """构造 Mock LayeredRetrievalPort"""
-    mock = AsyncMock()
+    mock = AsyncMock(spec=LayeredRetrievalPort)
 
     async def mock_search_top_down(
         query_text: str,
@@ -127,7 +130,7 @@ class TestIntegrationTraceErrors:
     @pytest.mark.asyncio
     async def test_retrieval_exception_wraps_traceability_error(self) -> None:
         """检索异常包装为 TraceabilityError"""
-        mock = AsyncMock()
+        mock = AsyncMock(spec=LayeredRetrievalPort)
         mock.search_top_down.side_effect = Exception("Qdrant 连接超时")
         service = _make_service(mock)
         with pytest.raises(TraceabilityError):
@@ -161,11 +164,12 @@ class TestIntegrationPortResolver:
 
     @pytest.mark.asyncio
     async def test_traceability_service_resolves_from_registry(self) -> None:
-        """traceability_service 端口可从注册中心解析"""
+        """traceability_service 端口可从注册中心解析为真实实例"""
         from src.domain.ports.resolver import Resolver
 
         resolver = Resolver()
         service = resolver.resolve("traceability_service")
+        assert isinstance(service, TraceabilityPort)
         assert hasattr(service, "trace")
         assert hasattr(service, "get_citation_detail")
         assert hasattr(service, "get_citation_by_document")
