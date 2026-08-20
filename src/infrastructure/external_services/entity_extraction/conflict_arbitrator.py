@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from src.domain.ports.entity_extraction import (
@@ -14,6 +15,8 @@ from src.domain.ports.entity_extraction import (
     ExtractedRelation,
     ExtractionResult,
 )
+
+logger = logging.getLogger(__name__)
 
 # 默认权重配置
 _DEFAULT_RULE_WEIGHT = 0.6
@@ -189,6 +192,14 @@ class ConflictArbitrator(EntityArbitratorPort):
                 source = (
                     "hybrid" if rule_entity.extraction_source != llm_entity.extraction_source else rule_entity.extraction_source
                 )
+                # 实体类型冲突时记录警告日志，便于排查和调试
+                if rule_entity.entity_type != llm_entity.entity_type:
+                    logger.warning(
+                        "实体类型冲突: name=%s, rule_type=%s, llm_type=%s, 使用 rule_type",
+                        name,
+                        rule_entity.entity_type,
+                        llm_entity.entity_type,
+                    )
                 result.append(
                     ExtractedEntity(
                         name=rule_entity.name,
