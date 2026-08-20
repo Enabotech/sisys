@@ -49,6 +49,27 @@ class Citation:
     bbox: BoundingBox | None = None
     confidence: float = 1.0
 
+    def __post_init__(self) -> None:
+        """校验不变量：确保值对象处于有效状态
+
+        校验规则：
+        - citation_id: 非空字符串
+        - start_offset: >= 0
+        - end_offset: > start_offset
+        - page_number: >= 1
+        - confidence: [0.0, 1.0]
+        """
+        if not isinstance(self.citation_id, str) or not self.citation_id.strip():
+            raise ValueError("citation_id 必须为非空字符串")
+        if self.start_offset < 0:
+            raise ValueError(f"start_offset 必须 >= 0，实际值: {self.start_offset}")
+        if self.end_offset <= self.start_offset:
+            raise ValueError(f"end_offset 必须 > start_offset，start_offset={self.start_offset}, end_offset={self.end_offset}")
+        if self.page_number < 1:
+            raise ValueError(f"page_number 必须 >= 1，实际值: {self.page_number}")
+        if not (0.0 <= self.confidence <= 1.0):
+            raise ValueError(f"confidence 必须在 [0.0, 1.0] 范围内，实际值: {self.confidence}")
+
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典
 

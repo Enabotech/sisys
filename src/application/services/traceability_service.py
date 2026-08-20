@@ -202,8 +202,7 @@ class TraceabilityService:
         citation = self._citation_cache.get(citation_id)
         if citation is None:
             raise TraceabilityNotFoundError(
-                claim=self._cache_claim,
-                min_confidence=0.7,
+                citation_id=citation_id,
                 message=f"未找到引文: {citation_id}",
             )
         return citation
@@ -229,8 +228,7 @@ class TraceabilityService:
         citations = self._citations_by_document.get(document_id, [])
         if not citations:
             raise TraceabilityNotFoundError(
-                claim=self._cache_claim,
-                min_confidence=0.7,
+                document_id=str(document_id),
                 message=f"未找到文档 {document_id} 的引文",
             )
         return citations

@@ -254,12 +254,15 @@ class TestGetCitationDetail:
 
     @pytest.mark.asyncio
     async def test_get_citation_detail_raises_not_found(self) -> None:
-        """未找到引文时抛出 TraceabilityNotFoundError"""
+        """未找到引文时抛出 TraceabilityNotFoundError，context 含 citation_id"""
         from src.domain.exceptions.traceability_exceptions import TraceabilityNotFoundError
 
         service = _make_service(_make_mock_retrieval([]))
-        with pytest.raises(TraceabilityNotFoundError):
+        with pytest.raises(TraceabilityNotFoundError) as exc_info:
             await service.get_citation_detail(citation_id="not-exists")
+        assert exc_info.value.context["citation_id"] == "not-exists"
+        assert "claim" not in exc_info.value.context
+        assert "min_confidence" not in exc_info.value.context
 
 
 class TestGetCitationByDocument:
@@ -280,9 +283,12 @@ class TestGetCitationByDocument:
 
     @pytest.mark.asyncio
     async def test_get_citations_by_document_raises_not_found(self) -> None:
-        """无引文时抛出 TraceabilityNotFoundError"""
+        """无引文时抛出 TraceabilityNotFoundError，context 含 document_id"""
         from src.domain.exceptions.traceability_exceptions import TraceabilityNotFoundError
 
         service = _make_service(_make_mock_retrieval([]))
-        with pytest.raises(TraceabilityNotFoundError):
+        with pytest.raises(TraceabilityNotFoundError) as exc_info:
             await service.get_citation_by_document(document_id=_TEST_DOCUMENT_ID)
+        assert exc_info.value.context["document_id"] == str(_TEST_DOCUMENT_ID)
+        assert "claim" not in exc_info.value.context
+        assert "min_confidence" not in exc_info.value.context

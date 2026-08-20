@@ -157,3 +157,171 @@ class TestCitationBoundingBoxReuse:
 
         source = inspect.getsource(citation_module)
         assert "class BoundingBox" not in source
+
+
+class TestCitationInvariants:
+    """Citation 值对象不变量校验测试"""
+
+    def test_empty_citation_id_raises_value_error(self) -> None:
+        """空 citation_id 抛出 ValueError"""
+        with pytest.raises(ValueError, match="citation_id 必须为非空字符串"):
+            Citation(
+                citation_id="",
+                document_id=_TEST_DOCUMENT_ID,
+                chunk_id="chunk-001",
+                text="test",
+                start_offset=0,
+                end_offset=10,
+                page_number=1,
+            )
+
+    def test_whitespace_citation_id_raises_value_error(self) -> None:
+        """纯空白 citation_id 抛出 ValueError"""
+        with pytest.raises(ValueError, match="citation_id 必须为非空字符串"):
+            Citation(
+                citation_id="   ",
+                document_id=_TEST_DOCUMENT_ID,
+                chunk_id="chunk-001",
+                text="test",
+                start_offset=0,
+                end_offset=10,
+                page_number=1,
+            )
+
+    def test_start_offset_greater_than_end_offset_raises_value_error(self) -> None:
+        """start_offset > end_offset 抛出 ValueError"""
+        with pytest.raises(ValueError, match="end_offset 必须 > start_offset"):
+            Citation(
+                citation_id="chunk-001-cit",
+                document_id=_TEST_DOCUMENT_ID,
+                chunk_id="chunk-001",
+                text="test",
+                start_offset=20,
+                end_offset=10,
+                page_number=1,
+            )
+
+    def test_start_offset_equals_end_offset_raises_value_error(self) -> None:
+        """start_offset == end_offset 抛出 ValueError"""
+        with pytest.raises(ValueError, match="end_offset 必须 > start_offset"):
+            Citation(
+                citation_id="chunk-001-cit",
+                document_id=_TEST_DOCUMENT_ID,
+                chunk_id="chunk-001",
+                text="test",
+                start_offset=10,
+                end_offset=10,
+                page_number=1,
+            )
+
+    def test_negative_start_offset_raises_value_error(self) -> None:
+        """负 start_offset 抛出 ValueError"""
+        with pytest.raises(ValueError, match="start_offset 必须 >= 0"):
+            Citation(
+                citation_id="chunk-001-cit",
+                document_id=_TEST_DOCUMENT_ID,
+                chunk_id="chunk-001",
+                text="test",
+                start_offset=-1,
+                end_offset=10,
+                page_number=1,
+            )
+
+    def test_page_number_less_than_one_raises_value_error(self) -> None:
+        """page_number < 1 抛出 ValueError"""
+        with pytest.raises(ValueError, match="page_number 必须 >= 1"):
+            Citation(
+                citation_id="chunk-001-cit",
+                document_id=_TEST_DOCUMENT_ID,
+                chunk_id="chunk-001",
+                text="test",
+                start_offset=0,
+                end_offset=10,
+                page_number=0,
+            )
+
+    def test_negative_page_number_raises_value_error(self) -> None:
+        """负 page_number 抛出 ValueError"""
+        with pytest.raises(ValueError, match="page_number 必须 >= 1"):
+            Citation(
+                citation_id="chunk-001-cit",
+                document_id=_TEST_DOCUMENT_ID,
+                chunk_id="chunk-001",
+                text="test",
+                start_offset=0,
+                end_offset=10,
+                page_number=-1,
+            )
+
+    def test_confidence_below_zero_raises_value_error(self) -> None:
+        """confidence < 0 抛出 ValueError"""
+        with pytest.raises(ValueError, match="confidence 必须在 \\[0.0, 1.0\\] 范围内"):
+            Citation(
+                citation_id="chunk-001-cit",
+                document_id=_TEST_DOCUMENT_ID,
+                chunk_id="chunk-001",
+                text="test",
+                start_offset=0,
+                end_offset=10,
+                page_number=1,
+                confidence=-0.1,
+            )
+
+    def test_confidence_above_one_raises_value_error(self) -> None:
+        """confidence > 1 抛出 ValueError"""
+        with pytest.raises(ValueError, match="confidence 必须在 \\[0.0, 1.0\\] 范围内"):
+            Citation(
+                citation_id="chunk-001-cit",
+                document_id=_TEST_DOCUMENT_ID,
+                chunk_id="chunk-001",
+                text="test",
+                start_offset=0,
+                end_offset=10,
+                page_number=1,
+                confidence=1.1,
+            )
+
+    def test_valid_values_no_exception(self) -> None:
+        """合法值不抛异常"""
+        citation = Citation(
+            citation_id="valid-citation-id",
+            document_id=_TEST_DOCUMENT_ID,
+            chunk_id="chunk-001",
+            text="合法文本",
+            start_offset=0,
+            end_offset=10,
+            page_number=1,
+            confidence=0.5,
+        )
+        assert citation.citation_id == "valid-citation-id"
+        assert citation.start_offset == 0
+        assert citation.end_offset == 10
+        assert citation.page_number == 1
+        assert citation.confidence == 0.5
+
+    def test_boundary_values_valid(self) -> None:
+        """边界值测试：confidence=0.0 和 1.0，page_number=1"""
+        citation = Citation(
+            citation_id="boundary-citation",
+            document_id=_TEST_DOCUMENT_ID,
+            chunk_id="chunk-001",
+            text="边界测试",
+            start_offset=0,
+            end_offset=1,
+            page_number=1,
+            confidence=0.0,
+        )
+        assert citation.confidence == 0.0
+        assert citation.page_number == 1
+
+        citation2 = Citation(
+            citation_id="boundary-citation-2",
+            document_id=_TEST_DOCUMENT_ID,
+            chunk_id="chunk-001",
+            text="边界测试",
+            start_offset=0,
+            end_offset=100,
+            page_number=1,
+            confidence=1.0,
+        )
+        assert citation2.confidence == 1.0
