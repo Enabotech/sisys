@@ -77,11 +77,14 @@ class TraceabilityNotFoundError(BusinessException):
     继承 BusinessException，HTTP 映射至 404 Not Found
     （与 NotFoundError 一致，资源不存在属于业务规则违反）。
 
+    支持多种查询场景的上下文：
+    - get_citation_detail(citation_id): context 包含 citation_id
+    - get_citation_by_document(document_id): context 包含 document_id
+    - 溯源阶段（向后兼容）: context 包含 claim / min_confidence
+
     Attributes:
         code: EXCEPTION_371
         message: 默认消息
-        claim: 结论文本（截断至 100 字符）
-        min_confidence: 最小置信度阈值
     """
 
     code = "EXCEPTION_371"
@@ -89,23 +92,33 @@ class TraceabilityNotFoundError(BusinessException):
 
     def __init__(
         self,
-        claim: str,
-        min_confidence: float,
+        *,
+        citation_id: str | None = None,
+        document_id: str | None = None,
+        claim: str | None = None,
+        min_confidence: float | None = None,
         message: str | None = None,
         cause: Exception | None = None,
     ) -> None:
         """初始化引文查询未找到错误
 
         Args:
-            claim: 结论文本（截断至 100 字符）
-            min_confidence: 最小置信度阈值
+            citation_id: 引文唯一标识（get_citation_detail 场景）
+            document_id: 文档唯一标识（get_citation_by_document 场景）
+            claim: 结论文本，截断至 100 字符（溯源阶段向后兼容）
+            min_confidence: 最小置信度阈值（溯源阶段向后兼容）
             message: 错误描述
             cause: 原始异常
         """
-        context: dict[str, str | float] = {
-            "claim": claim[:100],
-            "min_confidence": min_confidence,
-        }
+        context: dict[str, str | float] = {}
+        if citation_id is not None:
+            context["citation_id"] = citation_id
+        if document_id is not None:
+            context["document_id"] = document_id
+        if claim is not None:
+            context["claim"] = claim[:100]
+        if min_confidence is not None:
+            context["min_confidence"] = min_confidence
         super().__init__(message=message, cause=cause, context=context)
 
 

@@ -94,7 +94,7 @@ class TestTraceabilityNotFoundError:
         assert exc.message == "未找到溯源引文"
 
     def test_constructor_with_claim_and_confidence(self) -> None:
-        """构造器接受 claim 和 min_confidence 参数"""
+        """构造器接受 claim 和 min_confidence 参数（向后兼容）"""
         from src.domain.exceptions import TraceabilityNotFoundError
 
         exc = TraceabilityNotFoundError(claim="测试", min_confidence=0.7)
@@ -125,3 +125,38 @@ class TestTraceabilityNotFoundError:
         from src.domain.exceptions import BusinessException, TraceabilityNotFoundError
 
         assert issubclass(TraceabilityNotFoundError, BusinessException)
+
+    def test_constructor_with_citation_id(self) -> None:
+        """构造器接受 citation_id 参数（get_citation_detail 场景）"""
+        from src.domain.exceptions import TraceabilityNotFoundError
+
+        exc = TraceabilityNotFoundError(citation_id="chunk-001-cit")
+        assert exc.context["citation_id"] == "chunk-001-cit"
+        assert "claim" not in exc.context
+        assert "min_confidence" not in exc.context
+        assert "document_id" not in exc.context
+
+    def test_constructor_with_document_id(self) -> None:
+        """构造器接受 document_id 参数（get_citation_by_document 场景）"""
+        from src.domain.exceptions import TraceabilityNotFoundError
+
+        exc = TraceabilityNotFoundError(document_id="12345678-1234-5678-1234-567812345678")
+        assert exc.context["document_id"] == "12345678-1234-5678-1234-567812345678"
+        assert "claim" not in exc.context
+        assert "min_confidence" not in exc.context
+        assert "citation_id" not in exc.context
+
+    def test_constructor_with_citation_id_and_claim(self) -> None:
+        """构造器可同时传入 citation_id 和 claim（组合场景）"""
+        from src.domain.exceptions import TraceabilityNotFoundError
+
+        exc = TraceabilityNotFoundError(citation_id="cit-1", claim="测试结论")
+        assert exc.context["citation_id"] == "cit-1"
+        assert exc.context["claim"] == "测试结论"
+
+    def test_constructor_no_params_produces_empty_context(self) -> None:
+        """无参数时 context 为空字典"""
+        from src.domain.exceptions import TraceabilityNotFoundError
+
+        exc = TraceabilityNotFoundError()
+        assert exc.context == {}
