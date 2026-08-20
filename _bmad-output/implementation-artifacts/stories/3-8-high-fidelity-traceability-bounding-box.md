@@ -58,13 +58,9 @@
   - `page_number: int` — 页码
   - `bbox: BoundingBox | None` — Bounding Box 坐标（可选，当有版面信息时填充）
   - `confidence: float` — 引用置信度（0-1）
-- [ ] `BoundingBox` dataclass 定义在 `src/domain/value_objects/citation.py`
-  - `x: float` — 左上角 x 坐标
-  - `y: float` — 左上角 y 坐标
-  - `width: float` — 宽度
-  - `height: float` — 高度
+- [ ] `BoundingBox` **复用** `src/domain/value_objects/parsed_document.py` 已有的定义（frozen dataclass：x/y/width/height/**page** + `to_dict()`），**不在 `citation.py` 中重复定义**
 - [ ] 支持序列化为 dict（用于 API 响应和缓存）
-- [ ] 支持从 dict 反序列化（用于从存储恢复）
+- [ ] 支持 `from_dict()` 类方法反序列化（用于从存储恢复）
 - [ ] 领域层零外部依赖（仅使用 Python 标准库 + uuid）
 
 ### AC-2: Traceability 端口契约
@@ -79,10 +75,10 @@
 - [ ] `TraceabilityPort` 定义于 `src/domain/ports/traceability.py`（Protocol，`@runtime_checkable`）
 - [ ] `Citation` 从 `src/domain/value_objects/citation.py` 导入
 - [ ] 方法签名：
-  - `async trace(claim: str, top_k: int = 10, min_confidence: float = 0.7) -> TraceabilityResult` — 执行溯源，返回引文列表
+  - `async def trace(claim: str, top_k: int = 10, min_confidence: float = 0.7) -> Any` — 执行溯源，返回 `TraceabilityResult` TypedDict（与既有端口一致，返回类型声明为 Any）
     - 返回 `TraceabilityResult`（TypedDict）
-  - `async get_citation_detail(citation_id: str) -> Citation | None` — 获取单个引文详情
-  - `async get_citation_by_document(document_id: uuid.UUID) -> list[Citation]` — 按文档 ID 获取所有引文
+  - `async def get_citation_detail(citation_id: str) -> Citation | None` — 获取单个引文详情
+  - `async def get_citation_by_document(document_id: uuid.UUID) -> list[Citation]` — 按文档 ID 获取所有引文
 - [ ] 结果类型定义：
   - `TraceabilityResult`（TypedDict）：
     - `claim: str` — 原始结论文本
@@ -106,18 +102,18 @@
 - [ ] `TraceabilityService` 位于 `src/application/services/traceability_service.py`
 - [ ] 构造函数注入 `retrieval_port: LayeredRetrievalPort`（分层检索端口）
 - [ ] 实现 `trace()` 方法：
-  1. 调用 `LayeredRetrievalPort.search()` 检索相关文档切片
-  2. 对每个切片计算与结论的余弦相似度作为置信度
+  1. 调用 `LayeredRetrievalPort.search_top_down()` 检索相关文档切片（自顶向下从 L3 向 L4 展开）
+  2. 对每个切片，以检索结果的 `score` 归一化到 [0,1] 区间作为置信度（Qdrant 已计算向量相似度，无需额外余弦相似度计算）
   3. 过滤置信度 < `min_confidence` 的切片
-  4. 构建 `Citation` 对象列表（包含 Bounding Box 坐标）
+  4. 构建 `Citation` 对象列表（从 payload 中提取 Bounding Box 坐标）
   5. 按置信度降序排序
   6. 构建溯源树结构
   7. 返回 `TraceabilityResult`
 - [ ] 实现 `get_citation_detail()` 方法：根据 citation_id 返回单个引文详情
 - [ ] 实现 `get_citation_by_document()` 方法：按文档 ID 返回所有引文
 - [ ] 溯源响应延迟 P95 < 300ms（含检索 + 置信度计算）
-- [ ] 引用置信度基于余弦相似度（0-1）
-- [ ] Bounding Box 坐标从检索结果 payload 中提取（若存在）
+- [ ] 引用置信度基于检索结果的 `score` 字段归一化（0-1）
+- [ ] Bounding Box 坐标从检索结果 payload 中提取（若存在，需先在 `chunk_indexing_handler.py` 中将 bbox 写入 Qdrant payload）
 - [ ] 溯源树结构：`CitationTree` 包含 `root`（原始结论）、`children`（一级引文）、`grandchildren`（二级引文，可选）
 
 ### AC-4: 溯源 Prompt 模板
@@ -154,12 +150,15 @@
 **验证标准/Validation Criteria:**
 - [ ] `TraceabilityError`（EXCEPTION_370）— 继承 `ExternalException`，LLM 评估调用失败
   - 构造器参数：`claim: str`（结论文本，截断至 100 字符）、`citation_count: int`（引文数量）、`message: str | None = None`、`cause: Exception | None = None`
-  - `claim`/`citation_count` 通过 `context` 字典暴露
+  - `claim`/`citation_count` 通过 `context` 字典暴露，`claim[:100]` 显式截断
 - [ ] `TraceabilityNotFoundError`（EXCEPTION_371）— 继承 `BusinessException`，未找到相关引文
   - 构造器参数：`claim: str`（结论文本，截断至 100 字符）、`min_confidence: float`（最小置信度阈值）、`message: str | None = None`、`cause: Exception | None = None`
   - `claim`/`min_confidence` 通过 `context` 字典暴露
-- [ ] 异常编码在 `_code_ranges.py` 注册 `traceability` 子域（370, 379）及 `_CLASS_TO_SUBDOMAIN` 映射
-- [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册
+- [ ] 异常编码在 `_code_ranges.py` 注册 `traceability` 子域（370, 379）及 `_CLASS_TO_SUBDOMAIN` 映射（`TraceabilityError→"traceability"`, `TraceabilityNotFoundError→"traceability"`）
+- [ ] 同步更新 `tests/unit/domain/exceptions/test_code_ranges.py`：
+  - `allowed_child_parent_subdomains` 新增 `("traceability", "external")` 和 `("traceability", "business")` 允许继承对
+  - `nested_subdomains` 新增 `"traceability": "external"` 嵌套子域声明
+- [ ] 异常在 `__init__.py` 导出，在 `EXCEPTION_HTTP_MAP` 注册（`TraceabilityError→500`, `TraceabilityNotFoundError→404`）
 - [ ] 无编码碰撞（`grep -rw "EXCEPTION_37[0-9]" src/` 零输出）
 - [ ] HTTP 映射测试覆盖
 
@@ -172,34 +171,21 @@
 
 **验证标准/Validation Criteria:**
 - [ ] API 路由位于 `src/interfaces/api/traceability.py`（新增文件）
-- [ ] `POST /api/v1/documents/trace` 端点
+- [ ] `POST /api/v1/search/trace` 端点（与 `summary.py` 的 `/api/v1/search/summary` 保持前缀一致）
   - 请求体：`{"claim": str, "top_k": int (默认 10), "min_confidence": float (默认 0.7)}`
   - 响应体：`{"claim": str, "citations": list[Citation], "citation_count": int, "highest_confidence": float, "has_bbox_support": bool}`
-  - **错误处理**：领域异常透传到全局 `ExceptionHandlers`
-- [ ] `GET /api/v1/documents/trace/{document_id}` 端点
+  - **错误处理**：领域异常透传到全局 `ExceptionHandlers`（不捕获为 `HTTPException`）
+- [ ] `GET /api/v1/search/trace/{document_id}` 端点（按文档 ID 查询，与溯源功能同前缀）
   - 路径参数：`document_id: UUID`
   - 响应体：`{"document_id": UUID, "citations": list[Citation], "citation_count": int}`
 - [ ] 在 `src/interfaces/api/app.py` 中通过 `app.include_router()` 注册路由
-- [ ] 更新 `docs/api/openapi.yaml` 添加 `/api/v1/documents/trace` 端点
+- [ ] 更新 `docs/api/openapi.yaml` 添加 `/api/v1/search/trace` 端点
 - [ ] API 契约测试通过（`tests/contracts/test_api_contract_traceability.py`）
-- [ ] 所有 API 路由通过认证中间件
+- [ ] 所有 API 路由通过认证中间件（路由级 `Depends(get_current_user)`）
 
-### AC-7: 溯源与检索集成
+### AC-7: 溯源与检索集成（已删除 — 见下方说明）
 
-**Given** 检索结果已包含引文信息
-**When** 检索结果返回给用户
-**Then** 每个检索结果携带 `citations` 字段
-**And** 引文信息包含 Bounding Box 坐标（若可用）
-
-**验证标准/Validation Criteria:**
-- [ ] `SearchResult` TypedDict 新增可选字段：
-  - `citations: list[Citation] | None` — 关联的引文列表
-  - `has_bbox_support: bool` — 是否有 Bounding Box 坐标支持
-- [ ] `HybridSearchService.search()` 返回结果时自动填充引文信息
-- [ ] 引文信息从检索结果的 payload 中提取（若存在）
-- [ ] 当 payload 中无引文信息时，`citations` 为 None，`has_bbox_support` 为 False
-
----
+> **⚠️ 已删除：** 本 AC 要求修改 `SearchResult` TypedDict 添加 `citations` 和 `has_bbox_support` 字段，但 `SearchResult` 被多个服务（DenseSearchService、SparseSearchService、HybridSearchService、LayeredRetrievalService、SummaryGenerationPort、RelevanceEvaluationPort）引用，修改是破坏性变更。溯源信息通过 `TraceabilityResult` 独立返回，不污染 `SearchResult` 契约。检索与溯源是两个独立步骤：先检索得到 `SearchResult`，再调用 `TraceabilityService.trace()` 获得 `TraceabilityResult`（含 `citations` 列表）。
 
 ## 🏗️ SDD+TDD 融合开发
 
@@ -217,7 +203,7 @@
 
 #### 数据模型 (Data Models)
 - [ ] `Citation` dataclass 定义在 `src/domain/value_objects/citation.py`（领域层，零外部依赖）
-- [ ] `BoundingBox` dataclass 定义在 `src/domain/value_objects/citation.py`（领域层，零外部依赖）
+- [ ] `BoundingBox` **复用已有定义**：从 `src/domain/value_objects/parsed_document.py` 导入（frozen dataclass，含 x/y/width/height/**page** + `to_dict()`），**不重复定义**
 - [ ] `TraceabilityResult` TypedDict 定义在 `src/domain/ports/traceability.py`（领域层，零外部依赖）
 
 #### 统一端口定义注册与管理 (Port Contract)
@@ -233,7 +219,7 @@
 - [ ] 跨模块调用仅依赖抽象接口，不直接依赖实现类
 - [ ] 端口变更配套契约测试与兼容性检查
 - [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
-- [ ] **端口包导出**：`src/domain/ports/__init__.py` 中新增导出 `TraceabilityPort`、`TraceabilityResult`、`Citation`
+- [ ] **端口包导出**：`src/domain/ports/__init__.py` 中新增导出 `TraceabilityPort`、`TraceabilityResult`；`Citation` 值对象导出到 `src/domain/value_objects/__init__.py`（不导出到端口包）
 
 #### 端口契约清单执行约束（强制）
 - [ ] 本模板中的端口清单是唯一事实源（Single Source of Truth）
@@ -263,7 +249,7 @@
 #### API 契约 (API Contract)
 - [ ] 遵循 OpenAPI 标准的 API 契约定义位于 `docs/api/openapi.yaml`
 - [ ] API 契约测试通过（`tests/contracts/test_api_contract_traceability.py`）
-- [ ] API 版本管理正确（`/api/v1/documents/trace`）
+- [ ] API 版本管理正确（`/api/v1/search/trace` — 与 `summary.py` 的 `/api/v1/search/summary` 前缀一致）
 
 #### 六边形架构约束（必须遵守）
 > **执行顺序：** 所有实现 Task 仅可依赖下述层间方向。领域层不得引入任何第三方依赖。
@@ -407,7 +393,7 @@
 | AC-4 | 溯源 Prompt 模板 | Task 2 | Subtask 2.4 | `test_traceability_prompts.py` |
 | AC-5 | 溯源异常体系 | Task 3 | Subtask 3.1-3.3 | `test_traceability_exceptions.py` |
 | AC-6 | 溯源 API 端点 | Task 4 | Subtask 4.1-4.3 | `test_api_contract_traceability.py` |
-| AC-7 | 溯源与检索集成 | Task 4 | Subtask 4.4 | `test_integration_traceability.py` |
+| ~~AC-7~~ | ~~溯源与检索集成（已删除，避免 SearchResult 破坏性变更）~~ | — | — | — |
 
 ---
 
@@ -525,11 +511,13 @@
 
 ---
 
-### Task 4: 溯源 API 端点与集成
+### Task 4: 溯源 API 端点
 
-**关联 AC:** AC-6, AC-7
+**关联 AC:** AC-6
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
+>
+> **注意：** AC-7（溯源与检索集成）已删除，避免 `SearchResult` 破坏性变更。溯源信息通过 `TraceabilityResult` 独立返回，不污染 `SearchResult` 契约。不再需要修改 `SearchResult` TypedDict 或 `HybridSearchService`。
 
 #### TDD 循环 [A]：API 路由实现
 
@@ -543,23 +531,23 @@
 - [ ] Subtask 4.2: 🟢 绿 — 实现 API 路由
 - [ ] Subtask 4.3: 🔄 重构 — 优化 API 路由
 
-#### TDD 循环 [B]：检索与溯源集成
+#### TDD 循环 [B]：集成测试
 
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_integration_traceability.py`（检索→溯源完整流程） |
-| 🟢 绿 | 更新 `SearchResult` TypedDict，填充引文信息 |
+| 🟢 绿 | 实现 `TraceabilityService` 集成测试 |
 | 🔄 重构 | 优化集成代码 |
 
 - [ ] Subtask 4.4: 🔴 红 — 编写集成测试
-- [ ] Subtask 4.5: 🟢 绿 — 更新 `SearchResult`，填充引文信息
+- [ ] Subtask 4.5: 🟢 绿 — 实现集成测试
 - [ ] Subtask 4.6: 🔄 重构 — 优化集成代码
 
 **完成标准/Definition of Done:**
 - [ ] API 路由实现完成
-- [ ] 检索与溯源集成完成
+- [ ] 集成测试覆盖检索→溯源完整流程
 - [ ] 所有 TDD 循环测试通过
-- [ ] 覆盖率 ≥ 75%（基础设施层）
+- [ ] 覆盖率 ≥ 75%
 
 ---
 
@@ -586,7 +574,7 @@
 
 ### Task 6: 开发结束验收测试
 
-**关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7
+**关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-5, AC-6
 
 > **性质说明：** 本 Task 不是功能实现，而是对 Story 收尾阶段的交付物与完成清单进行最终验收。
 > 它验证 `src` 以及 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 的完成清单是否已逐项确认，确保 Story 进入 `done` 之前没有遗漏。
@@ -609,6 +597,40 @@
 - [ ] `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单已逐项验证确认
 - [ ] 开发结束验收测试通过
 - [ ] Story 可进入 `done`
+
+---
+
+## 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
+
+> 本 Story 经过 5 轮多视角（架构/检索层/异常体系/API/验收测试）审查，以下汇总所有修复项。
+
+### Round 1 审查发现
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | **BoundingBox 重复定义**：`src/domain/value_objects/parsed_document.py` 第131行已存在 `BoundingBox` frozen dataclass（x, y, width, height, page + to_dict），文档要求重新定义在 `citation.py` 中，导致重复定义 | **P0** | **统一引用已有 BoundingBox**：`Citation` 值对象从 `parsed_document.py` 导入 `BoundingBox`，不再在 `citation.py` 中重复定义。注意已有 BoundingBox 包含 `page` 字段，文档第62-65行缺少 `page` 字段——这是已有值对象的标准字段，必须保留。 |
+| 2 | **LayeredRetrievalPort 无 `search()` 方法**：实际端口只有 `search_top_down()` 和 `search_bottom_up()` 两个方法，文档 AC-3 要求 `TraceabilityService` 注入 `LayeredRetrievalPort` 并调用 `search()`——该方法不存在 | **P0** | **修正为调用 `search_top_down()`**：TraceabilityService 使用 `search_top_down(query_text, target_level="L4", ...)` 获取相关切片，因为溯源场景是「从结论出发，向低层级展开搜索切片」，语义上符合自顶向下遍历。 |
+| 3 | **SearchResult 修改为破坏性变更**：AC-7 要求向 `SearchResult` TypedDict（`l3_vector.py`）添加 `citations` 和 `has_bbox_support` 字段。`SearchResult` 被多个服务（DenseSearchService, SparseSearchService, HybridSearchService, LayeredRetrievalService, SummaryGenerationPort, RelevanceEvaluationPort）引用，修改是破坏性变更 | **P0** | **不修改 SearchResult**：溯源信息通过 `TraceabilityResult` 独立返回，不污染 `SearchResult` 契约。检索与溯源是两个独立步骤：先检索得到 `SearchResult`，再调用 `TraceabilityService.trace()` 获得 `TraceabilityResult`（含 `citations` 列表）。删除 AC-7（溯源与检索集成）及 Task 4 中的 TDD 循环 [B]。 |
+| 4 | **异常体系注册缺失**：文档 AC-5 要求新增 `TraceabilityError(370)` 和 `TraceabilityNotFoundError(371)`，但 `_code_ranges.py` 中未注册 `traceability` 子域，`_CLASS_TO_SUBDOMAIN` 无映射，`test_code_ranges.py` 的 `allowed_child_parent_subdomains` 和 `nested_subdomains` 无条目，`EXCEPTION_HTTP_MAP` 无映射。这 5 项缺失将直接导致 CI 全部失败 | **P0** | **完善异常注册流程**：在 `_code_ranges.py` 新增 `"traceability": (370, 379)` 子域及 `_CLASS_TO_SUBDOMAIN` 映射；`test_code_ranges.py` 新增 `("traceability", "external")` 和 `("traceability", "business")` 允许继承对；`EXCEPTION_HTTP_MAP` 注册 `TraceabilityError→500` 和 `TraceabilityNotFoundError→404`；`__init__.py` 导入导出。 |
+| 5 | **API 路由前缀不一致**：文档 AC-6 使用 `POST /api/v1/documents/trace`，但现有路由模式统一使用功能域前缀（如 `/api/v1/search`、`/api/v1/archive`），且 Epic 文档指定 `GET /documents/{id}/trace`。`/api/v1/documents/trace` 既不符合 pattern 也不符合 Epic 要求 | **P0** | **统一路由前缀为 `/api/v1/search`**：`POST /api/v1/search/trace`（溯源主端点）和 `GET /api/v1/search/trace/{document_id}`（按文档查询），与 `summary.py` 的 `/api/v1/search/summary` 保持一致。 |
+| 6 | **端口 __init__.py 导出位置错误**：文档 SDD 规范要求将 `Citation` 导出到 `src/domain/ports/__init__.py`，但 `Citation` 是值对象（位于 `domain/value_objects/`），不是端口 | **P1** | **修正导出位置**：`Citation` 导出到 `src/domain/value_objects/__init__.py`；`TraceabilityPort`、`TraceabilityResult` 导出到 `src/domain/ports/__init__.py`。 |
+| 7 | **置信度计算逻辑不准确**：文档 AC-3 要求「基于余弦相似度计算引文置信度」，但检索结果 `SearchResult.score` 已经是 Qdrant 返回的向量相似度分数，再次计算余弦相似度是冗余的 | **P1** | **置信度 = SearchResult.score 归一化**：直接使用检索结果的 `score` 字段作为引文置信度（归一化到 [0,1] 区间），无需额外余弦相似度计算。`score` 已经是 Qdrant 的向量相似度（cosine distance），自然反映引文与结论的相关性。 |
+| 8 | **BoundingBox 坐标不可用**：文档假设检索结果 payload 中包含 BoundingBox 坐标，但实际 `chunk_indexing_handler.py` 和 Qdrant payload 中不包含 bbox 字段。`bbox` 仅在 `semantic_chunking_service.py` 中用于构建 `SemanticChunk`，但未写入向量存储的 payload | **P1** | **添加 bbox 写入 Qdrant payload**：在 `chunk_indexing_handler.py` 中，为每个 Child 块的 payload 添加 `bbox` 字段（从 `SemanticChunk` 的文档元素中提取）。这是 Story 3.8 的前置基础设施变更，应在 Task 0 中完成。 |
+| 9 | **from_dict 反序列化缺失**：文档 AC-1 要求「支持从 dict 反序列化」，但现有值对象（如 `BoundingBox`、`ParsedElement`）只有 `to_dict()` 方法，没有 `from_dict()` 模式 | **P2** | **添加 `from_dict()` 类方法**：为 `Citation` 和 `BoundingBox` 添加 `@classmethod from_dict()` 方法，支持从存储恢复。 |
+| 10 | **TraceabilityResult 使用 TypedDict 但返回类型为 Any**：文档封闭端口使用 TypedDict，但已有 SummaryGenerationPort 和 RelevanceEvaluationPort 的返回类型为 `Any`（因 Pydantic @computed_field 无法精确表达） | **P2** | **保持 TypedDict 但返回类型声明为 Any**：与已有模式一致，端口方法声明 `-> Any`，但实际返回 `TraceabilityResult` TypedDict。 |
+
+### 文档修复执行
+
+- [x] 修复项 1 — BoundingBox 统一引用已有定义，不再重复定义
+- [x] 修复项 2 — TraceabilityService 改用 `search_top_down()` 方法
+- [x] 修复项 3 — 删除 AC-7，删除 Task 4 的 TDD 循环 [B]，SearchResult 保持不变
+- [x] 修复项 4 — 完善异常注册流程说明
+- [x] 修复项 5 — 统一 API 路由前缀为 `/api/v1/search/trace`
+- [x] 修复项 6 — 修正导出位置
+- [x] 修复项 7 — 修正置信度计算逻辑
+- [x] 修复项 8 — 添加 bbox 写入 Qdrant payload 说明
+- [x] 修复项 9 — 添加 from_dict() 方法说明
+- [x] 修复项 10 — 返回类型对齐为 Any
 
 ---
 
@@ -702,11 +724,12 @@
 - BDD 步骤函数必须使用 `event_loop.run_until_complete()`，禁止 `@pytest.mark.asyncio`
 
 **应用到本故事/Applied to This Story:**
-- [ ] Citation 值对象使用 `dataclass(frozen=True)`（不可变值对象）
+- [ ] Citation 值对象使用 `dataclass(frozen=True)`（不可变值对象），**复用** `parsed_document.py` 中已有的 `BoundingBox`
 - [ ] 溯源异常分两类：`TraceabilityError`（ExternalException，LLM 评估失败 → 降级）和 `TraceabilityNotFoundError`（BusinessException，未找到引文 → 不降级）
 - [ ] 端口注册包含完整的 5 个必需参数（name, version, interface, impl, module）
 - [ ] BDD 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试
 - [ ] Prompt 模板使用 f-string 格式，支持动态注入
+- [ ] TraceabilityPort 返回类型使用 `-> Any`（与 SummaryGenerationPort、RelevanceEvaluationPort 保持一致，因 TypedDict 无法精确表达 @computed_field 行为）
 
 ---
 
