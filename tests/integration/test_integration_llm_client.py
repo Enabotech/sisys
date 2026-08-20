@@ -322,6 +322,48 @@ class TestIntegrationLLMClient:
         assert result.summary == "摘要"
         assert result.score == 0.9
 
+    async def test_structured_generate_invalid_json_raises_response_error(
+        self, mock_llm_server: tuple[MockLLMHandler, int], client: LitellmLLMClient
+    ) -> None:
+        """验证 structured_generate 接收非法 JSON 时抛出 LLMResponseError"""
+
+        class TestSchema(BaseModel):
+            title: str = ""
+
+        handler, _ = mock_llm_server
+        handler.set_success(content="not valid json {{{")
+
+        with pytest.raises(LLMResponseError):
+            await client.structured_generate("test", TestSchema)
+
+    async def test_structured_generate_non_dict_response(
+        self, mock_llm_server: tuple[MockLLMHandler, int], client: LitellmLLMClient
+    ) -> None:
+        """验证 structured_generate 接收非 dict 类型 JSON 响应时抛出 LLMResponseError"""
+
+        class TestSchema(BaseModel):
+            title: str = ""
+
+        handler, _ = mock_llm_server
+        handler.set_success(content='["array", "response"]')
+
+        with pytest.raises(LLMResponseError):
+            await client.structured_generate("test", TestSchema)
+
+    async def test_structured_generate_schema_validation_failure(
+        self, mock_llm_server: tuple[MockLLMHandler, int], client: LitellmLLMClient
+    ) -> None:
+        """验证 structured_generate Schema 字段不匹配时抛出 LLMResponseError"""
+
+        class TestSchema(BaseModel):
+            required_field: str
+
+        handler, _ = mock_llm_server
+        handler.set_success(content='{"wrong_field": "value"}')
+
+        with pytest.raises(LLMResponseError):
+            await client.structured_generate("test", TestSchema)
+
     async def test_empty_response_choices_raises_response_error(
         self, mock_llm_server: tuple[MockLLMHandler, int], client: LitellmLLMClient
     ) -> None:

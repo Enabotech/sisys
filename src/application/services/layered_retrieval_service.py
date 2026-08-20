@@ -284,6 +284,9 @@ class LayeredRetrievalService:
                 for r in raw_results
                 if "id" in r and "score" in r
             ]
+        except SystemException:
+            # 基础设施故障（Qdrant 不可用、网络超时等）：必须传播，不能包装为业务异常
+            raise
         except Exception as e:
             # 依赖异常统一为领域契约：包装为 LayeredRetrievalError 向上传播
             logger.error("L3 直接检索失败: %s", e)
@@ -333,6 +336,9 @@ class LayeredRetrievalService:
                 for r in raw_results
                 if "id" in r and "score" in r
             ]
+        except SystemException:
+            # 基础设施故障（Qdrant 不可用、网络超时等）：必须传播，不能包装为业务异常
+            raise
         except Exception as e:
             # 依赖异常统一为领域契约：包装为 LayeredRetrievalError 向上传播
             logger.error("L4 直接检索失败: %s", e)
@@ -494,6 +500,9 @@ class LayeredRetrievalService:
         # 1. 嵌入查询向量一次，L3 检索与后续 Child 展开复用
         try:
             query_vector = await self._embedding_service.embed_query(query_text)
+        except SystemException:
+            # 基础设施故障：必须传播，不能包装为业务异常
+            raise
         except Exception as e:
             logger.error("L3 查询嵌入失败: %s", e)
             raise LayeredRetrievalError(
@@ -510,6 +519,9 @@ class LayeredRetrievalService:
                 limit=min(limit, _MAX_EXPAND_PARENTS),  # 限制展开 Parent 数，避免 N+1 问题
                 filter_payload=parent_filter,
             )
+        except SystemException:
+            # 基础设施故障：必须传播，不能包装为业务异常
+            raise
         except Exception as e:
             logger.error("L3 检索失败，无法展开 L4: %s", e)
             raise LayeredRetrievalError(
@@ -697,6 +709,9 @@ class LayeredRetrievalService:
             if not await self._l3_vector.collection_exists(collection):
                 logger.warning("摘要 collection %s 不存在，降级返回空列表", collection)
                 return []
+        except SystemException:
+            # 基础设施故障（Qdrant 不可用）：必须传播，不能静默降级
+            raise
         except Exception as e:
             logger.warning("检查摘要 collection %s 失败，降级返回空列表: %s", collection, e)
             return []
@@ -709,6 +724,9 @@ class LayeredRetrievalService:
                 tenant_id=tenant_id,
                 filter_payload=filter_payload,
             )
+        except SystemException:
+            # 基础设施故障：必须传播，不能静默降级
+            raise
         except Exception as e:
             # 摘要不可用时静默降级保证检索可用性（与 L3/L4 的 raise 不同）
             logger.warning("摘要检索失败，降级返回空列表: %s", e)
