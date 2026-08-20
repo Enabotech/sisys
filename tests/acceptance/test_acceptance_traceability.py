@@ -17,6 +17,7 @@ import pytest
 from pytest_bdd import given, scenario, then, when
 
 from src.domain.ports.l3_vector import SearchResult
+from src.domain.ports.layered_retrieval import LayeredRetrievalPort
 
 scenarios_path = "test_acceptance_traceability.feature"
 
@@ -51,7 +52,7 @@ def context() -> dict[str, Any]:
 @pytest.fixture
 def mock_layered_retrieval() -> AsyncMock:
     """Mock LayeredRetrievalPort 实例（返回含 bbox 的检索结果）"""
-    mock = AsyncMock()
+    mock = AsyncMock(spec=LayeredRetrievalPort)
 
     async def mock_search_top_down(
         query_text: str,
@@ -113,7 +114,7 @@ def mock_layered_retrieval() -> AsyncMock:
 @pytest.fixture
 def mock_layered_retrieval_no_bbox() -> AsyncMock:
     """Mock LayeredRetrievalPort 实例（返回无 bbox 的检索结果）"""
-    mock = AsyncMock()
+    mock = AsyncMock(spec=LayeredRetrievalPort)
 
     async def mock_search_top_down(
         query_text: str,
@@ -147,7 +148,7 @@ def mock_layered_retrieval_no_bbox() -> AsyncMock:
 @pytest.fixture
 def mock_layered_retrieval_empty() -> AsyncMock:
     """Mock LayeredRetrievalPort 实例（返回空结果，模拟低置信度场景）"""
-    mock = AsyncMock()
+    mock = AsyncMock(spec=LayeredRetrievalPort)
 
     async def mock_search_top_down(
         query_text: str,

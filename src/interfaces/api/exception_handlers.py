@@ -19,7 +19,6 @@ from src.domain.exceptions import (
     ArchiveNotFoundError,
     ArchiveStorageError,
     AuthenticationError,
-    BaseException,
     BucketNameValidationError,
     BucketNotFoundError,
     BusinessException,
@@ -36,6 +35,7 @@ from src.domain.exceptions import (
     DictionaryNotFoundError,
     DictionaryVersionConflictError,
     DocumentVersionConflictError,
+    DomainError,
     EntityBusinessRuleError,
     EntityExtractionError,
     EntityStateTransitionError,
@@ -90,7 +90,7 @@ logger = logging.getLogger(__name__)
 
 
 # 异常类型 → HTTP 状态码映射表
-EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
+EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     # 三层基类
     SystemException: status.HTTP_500_INTERNAL_SERVER_ERROR,
     BusinessException: status.HTTP_400_BAD_REQUEST,
@@ -180,7 +180,7 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
 }
 
 
-def _get_http_status(exc: BaseException) -> int:
+def _get_http_status(exc: DomainError) -> int:
     """获取异常对应的 HTTP 状态码，优先使用具体异常映射
 
     Args:
@@ -225,7 +225,7 @@ class ExceptionHandlers:
         """注册所有异常处理器到 FastAPI 应用"""
         self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)
         self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)
-        self._app.add_exception_handler(BaseException, self._handle_exception)
+        self._app.add_exception_handler(DomainError, self._handle_exception)
         self._app.add_exception_handler(Exception, self._handle_unexpected_error)
 
     def _record(self, exc: Exception) -> None:
@@ -236,7 +236,7 @@ class ExceptionHandlers:
         """
         if self._metrics is None:
             return
-        code = getattr(exc, "code", None) if isinstance(exc, BaseException) else None
+        code = getattr(exc, "code", None) if isinstance(exc, DomainError) else None
         self._metrics.record_exception(type(exc).__name__, code)
 
     async def _handle_exception(self, request: Request, exc: Exception) -> JSONResponse:
@@ -249,7 +249,7 @@ class ExceptionHandlers:
         Returns:
             JSON 格式的错误响应
         """
-        if not isinstance(exc, BaseException):
+        if not isinstance(exc, DomainError):
             return await self._handle_unexpected_error(request, exc)
         request_id = getattr(request.state, "request_id", None) or "unknown"
 
