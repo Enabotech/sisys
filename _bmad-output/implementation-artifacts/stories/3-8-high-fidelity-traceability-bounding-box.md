@@ -78,7 +78,7 @@
 - [ ] 方法签名：
   - `async def trace(claim: str, top_k: int = 10, min_confidence: float = 0.7) -> Any` — 执行溯源，返回 `TraceabilityResult` TypedDict（与既有端口一致，返回类型声明为 Any）
     - 返回 `TraceabilityResult`（TypedDict）
-  - `async def get_citation_detail(citation_id: str) -> Citation | None` — 获取单个引文详情
+  - `async def get_citation_detail(citation_id: str) -> Citation | None` — 获取单个引文详情（缓存未命中抛出 `TraceabilityNotFoundError`）
   - `async def get_citation_by_document(document_id: uuid.UUID) -> list[Citation]` — 按文档 ID 获取所有引文
 - [ ] 结果类型定义：
   - `TraceabilityResult`（TypedDict）：
@@ -111,8 +111,8 @@
   5. 按置信度降序排序
   6. 构建溯源树结构
   7. 返回 `TraceabilityResult`
-- [ ] 实现 `get_citation_detail()` 方法：根据 citation_id 从当次溯源缓存中返回单个引文详情（缓存不存在则返回 None）
-- [ ] 实现 `get_citation_by_document()` 方法：按文档 ID 从当次溯源缓存中返回所有引文（MVP 不持久化）
+- [ ] 实现 `get_citation_detail()` 方法：根据 citation_id 从当次溯源缓存中返回单个引文详情（缓存不存在则抛出 `TraceabilityNotFoundError`）
+- [ ] 实现 `get_citation_by_document()` 方法：按文档 ID 从当次溯源缓存中返回所有引文（MVP 不持久化，结果为空时抛出 `TraceabilityNotFoundError`）
 - [ ] 溯源响应延迟 P95 < 300ms（含检索 + 置信度计算）
 - [ ] 引用置信度基于检索结果的 `score` 字段归一化（0-1）
 - [ ] Bounding Box 坐标从检索结果 payload 中提取（若存在，需先在 `chunk_indexing_handler.py` 中将 bbox 写入 Qdrant payload）
@@ -153,9 +153,10 @@
 - [ ] `TraceabilityError`（EXCEPTION_370）— 继承 `ExternalException`，LLM 评估调用失败
   - 构造器参数：`claim: str`（结论文本，截断至 100 字符）、`citation_count: int`（引文数量）、`message: str | None = None`、`cause: Exception | None = None`
   - `claim`/`citation_count` 通过 `context` 字典暴露，`claim[:100]` 显式截断
-- [ ] `TraceabilityNotFoundError`（EXCEPTION_371）— 继承 `BusinessException`，未找到相关引文
+- [ ] `TraceabilityNotFoundError`（EXCEPTION_371）— 继承 `BusinessException`，**按 ID/文档查询引文时未找到**（`get_citation_detail()`/`get_citation_by_document()` 查询无结果时抛出）
   - 构造器参数：`claim: str`（结论文本，截断至 100 字符）、`min_confidence: float`（最小置信度阈值）、`message: str | None = None`、`cause: Exception | None = None`
   - `claim`/`min_confidence` 通过 `context` 字典暴露
+  - **语义澄清**：`trace()` 主流程在置信度 < min_confidence 时**返回空 citations 列表**（正常业务结果，不抛异常）；`TraceabilityNotFoundError` 仅用于**查询类方法**（`get_citation_detail`/`get_citation_by_document`）找不到目标引文时抛出
 - [ ] 异常编码在 `_code_ranges.py` 注册 `traceability` 子域（370, 379）及 `_CLASS_TO_SUBDOMAIN` 映射（`TraceabilityError→"traceability"`, `TraceabilityNotFoundError→"traceability"`）
 - [ ] 同步更新 `tests/unit/domain/exceptions/test_code_ranges.py`：
   - `allowed_child_parent_subdomains` 新增 `("traceability", "external")` 和 `("traceability", "business")` 允许继承对
@@ -622,6 +623,7 @@
 | 10 | **TraceabilityResult 使用 TypedDict 但返回类型为 Any**：文档封闭端口使用 TypedDict，但已有 SummaryGenerationPort 和 RelevanceEvaluationPort 的返回类型为 `Any`（因 Pydantic @computed_field 无法精确表达） | **P2** | **保持 TypedDict 但返回类型声明为 Any**：与已有模式一致，端口方法声明 `-> Any`，但实际返回 `TraceabilityResult` TypedDict。 |
 | 11 | **Citation 无唯一标识**：`get_citation_detail(citation_id)` 需要按 ID 查询，但 Citation 值对象没有 `citation_id` 字段，无法实现查询 | **P1** | **添加 `citation_id` 字段**：由 `chunk_id`（或其 SHA256 哈希）生成，MVP 阶段从当次溯源缓存返回。 |
 | 12 | **get_citation_detail/get_citation_by_document 无数据源**：TraceabilityService 若不持久化引文，这两个方法无法跨请求工作 | **P1** | **MVP 用当次缓存**：trace() 执行时缓存本次结果到 `TraceabilityService` 实例，按 citation_id/document_id 查询；明确不持久化，跨请求持久化留给后续 Story。 |
+| 13 | **TraceabilityNotFoundError 语义不清晰**：AC-5 定义为「未找到相关引文」，与 AC-3 的「置信度不足 → 返回空列表」矛盾——空列表是正常业务结果，不应抛异常 | **P1** | **语义澄清**：`TraceabilityNotFoundError`（371）仅用于查询类方法（`get_citation_detail`/`get_citation_by_document`）找不到目标引文时抛出；`trace()` 主流程置信度不足时返回空 `citations` 列表（正常结果）。 |
 
 ### 文档修复执行
 
@@ -637,6 +639,7 @@
 - [x] 修复项 10 — 返回类型对齐为 Any
 - [x] 修复项 11 — Citation 添加 citation_id 字段
 - [x] 修复项 12 — 明确 MVP 缓存策略，不持久化
+- [x] 修复项 13 — 澄清 TraceabilityNotFoundError 语义（查询类方法专属，trace() 主流程返回空列表）
 
 ---
 
@@ -731,7 +734,7 @@
 
 **应用到本故事/Applied to This Story:**
 - [ ] Citation 值对象使用 `dataclass(frozen=True)`（不可变值对象），**复用** `parsed_document.py` 中已有的 `BoundingBox`
-- [ ] 溯源异常分两类：`TraceabilityError`（ExternalException，LLM 评估失败 → 降级）和 `TraceabilityNotFoundError`（BusinessException，未找到引文 → 不降级）
+- [ ] 溯源异常分两类：`TraceabilityError`（ExternalException，LLM 评估失败 → 降级）和 `TraceabilityNotFoundError`（BusinessException，查询类方法未找到引文 → 不降级；trace() 主流程置信度不足时返回空列表，不抛异常）
 - [ ] 端口注册包含完整的 5 个必需参数（name, version, interface, impl, module）
 - [ ] BDD 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试
 - [ ] Prompt 模板使用 f-string 格式，支持动态注入
