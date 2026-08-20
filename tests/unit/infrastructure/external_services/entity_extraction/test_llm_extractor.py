@@ -62,6 +62,41 @@ class TestLLMEntityExtractor:
         assert result.relations[0].extraction_source == "llm"
 
     @pytest.mark.asyncio
+    async def test_normalized_name_passed_to_extracted_entity(
+        self, extractor: LLMEntityExtractor, mock_llm_client: AsyncMock
+    ) -> None:
+        """验证 LLM 返回的 normalized_name 正确传递到 ExtractedEntity"""
+        mock_llm_client.structured_generate.return_value = MockExtractionSchema(
+            entities=[
+                MockEntitySchema(
+                    name="BLM",
+                    entity_type="CONCEPT",
+                    confidence=0.95,
+                    normalized_name="blm_lower",
+                ),
+            ],
+            relations=[],
+        )
+        result = await extractor.extract_entities("BLM 模型")
+        assert len(result.entities) == 1
+        assert result.entities[0].normalized_name == "blm_lower"
+
+    @pytest.mark.asyncio
+    async def test_normalized_name_empty_when_not_provided(
+        self, extractor: LLMEntityExtractor, mock_llm_client: AsyncMock
+    ) -> None:
+        """验证 LLM 未返回 normalized_name 时默认为空字符串"""
+        mock_llm_client.structured_generate.return_value = MockExtractionSchema(
+            entities=[
+                MockEntitySchema(name="BLM", entity_type="CONCEPT", confidence=0.95),
+            ],
+            relations=[],
+        )
+        result = await extractor.extract_entities("BLM 模型")
+        assert len(result.entities) == 1
+        assert result.entities[0].normalized_name == ""
+
+    @pytest.mark.asyncio
     async def test_extraction_metadata_contains_llm_strategy(
         self, extractor: LLMEntityExtractor, mock_llm_client: AsyncMock
     ) -> None:
