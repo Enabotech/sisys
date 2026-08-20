@@ -32,7 +32,7 @@
 - Story 2.3（版面信息保留 ✅ 已实现）— 提供 DocLayNet 格式文档元素坐标（x, y, width, height）
 - Story 3.1a（Dense 语义检索 ✅ 已实现）— 提供 `SearchResult` 统一检索结果类型
 - Story 3.4（RRF 融合排序 ✅ 已实现）— 提供 `HybridSearchService` 三路检索编排
-- Story 3.5（分层检索 L1-L4 ✅ 已实现）— 提供 `LayeredRetrievalPort` 分层检索
+- Story 3.5（分层检索 L1-L4 ✅ 已实现）— 提供 `LayeredRetrievalPort`（`search_top_down()`/`search_bottom_up()`）
 
 **后续依赖:** Story 6.7（溯源树展示）、Story 6.5b（PDF 报告生成 + 引文索引）
 
@@ -98,7 +98,7 @@
 **When** 实现 `TraceabilityService`
 **Then** 注入 `LayeredRetrievalPort` 用于检索相关文档切片
 **And** 计算引文置信度（基于检索结果 score 归一化）
-**And** 构建溯源树结构
+**And** 构建溯源树结构（MVP 仅 children 层级）
 
 **验证标准/Validation Criteria:**
 - [ ] `TraceabilityService` 位于 `src/application/services/traceability_service.py`
@@ -678,7 +678,7 @@
 |   ├── domain/                     # 领域层
 |   │   ├── __init__.py             # 模块导出
 |   │   ├── value_objects/              # 值对象集合
-|   │   │   └── citation.py             # Citation, BoundingBox
+|   │   │   └── citation.py             # Citation（复用 parsed_document.py 的 BoundingBox）
 |   │   ├── ports/                      # 领域端口目录
 |   │   │   ├── traceability.py         # TraceabilityPort
 |   │   │   ├── registry.py             # 端口注册中心
@@ -929,8 +929,9 @@
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-08-20
 **最后更新/Last Updated:** 2026-08-20
 **更新说明/Description:**
+- v1.1.0: 5 轮多视角审查修订 — 修复 BoundingBox 复用/端口方法名/API 路由前缀/SearchResult 破坏性变更/异常注册/Citation 唯一标识 等 12 项问题
 - v1.0.0: 创建故事文件，基于 Epic 3 Story 3.8 (FR-SR-08) 需求
