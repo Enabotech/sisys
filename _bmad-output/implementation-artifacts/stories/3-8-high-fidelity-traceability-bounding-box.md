@@ -50,6 +50,7 @@
 **验证标准/Validation Criteria:**
 - [ ] `Citation` dataclass 定义在 `src/domain/value_objects/citation.py`（领域层，零外部依赖）
 - [ ] 字段包含：
+  - `citation_id: str` — 引文唯一标识（由 `chunk_id` 或其哈希生成，用于 `get_citation_detail()` 查询）
   - `document_id: uuid.UUID` — 文档 ID
   - `chunk_id: str` — 切片 ID
   - `text: str` — 引文文本片段
@@ -86,6 +87,7 @@
     - `citation_count: int` — 引文总数
     - `highest_confidence: float` — 最高置信度
     - `has_bbox_support: bool` — 是否有 Bounding Box 坐标支持
+- [ ] `get_citation_detail()`/`get_citation_by_document()` 数据来源：MVP 阶段从**当次检索结果内存缓存**中直接返回（不持久化引文；`trace()` 执行时缓存本次结果，按 `citation_id` 查询）；如需跨请求持久化，后续 Story 再引入引文存储端口
 - [ ] 端口注册于 `composition_root.py`，通过 `register_port()` 注册为 `traceability_service` 端口
 - [ ] 端口具备唯一名称、版本、interface、impl、module（必填五参数）及 owner、兼容策略（可选元数据）
 - [ ] 端口契约测试通过（`tests/contracts/test_port_contract_traceability.py`）
@@ -95,7 +97,7 @@
 **Given** 溯源端口契约已定义
 **When** 实现 `TraceabilityService`
 **Then** 注入 `LayeredRetrievalPort` 用于检索相关文档切片
-**And** 计算引文置信度（基于余弦相似度）
+**And** 计算引文置信度（基于检索结果 score 归一化）
 **And** 构建溯源树结构
 
 **验证标准/Validation Criteria:**
@@ -109,12 +111,12 @@
   5. 按置信度降序排序
   6. 构建溯源树结构
   7. 返回 `TraceabilityResult`
-- [ ] 实现 `get_citation_detail()` 方法：根据 citation_id 返回单个引文详情
-- [ ] 实现 `get_citation_by_document()` 方法：按文档 ID 返回所有引文
+- [ ] 实现 `get_citation_detail()` 方法：根据 citation_id 从当次溯源缓存中返回单个引文详情（缓存不存在则返回 None）
+- [ ] 实现 `get_citation_by_document()` 方法：按文档 ID 从当次溯源缓存中返回所有引文（MVP 不持久化）
 - [ ] 溯源响应延迟 P95 < 300ms（含检索 + 置信度计算）
 - [ ] 引用置信度基于检索结果的 `score` 字段归一化（0-1）
 - [ ] Bounding Box 坐标从检索结果 payload 中提取（若存在，需先在 `chunk_indexing_handler.py` 中将 bbox 写入 Qdrant payload）
-- [ ] 溯源树结构：`CitationTree` 包含 `root`（原始结论）、`children`（一级引文）、`grandchildren`（二级引文，可选）
+- [ ] 溯源树结构：`CitationTree` 包含 `root`（原始结论）、`children`（一级引文，直接检索命中的切片）、`grandchildren`（二级引文，可选——一级引文的展开子切片）。MVP 仅实现 `children` 层级，`grandchildren` 为预留字段
 
 ### AC-4: 溯源 Prompt 模板
 
@@ -618,6 +620,8 @@
 | 8 | **BoundingBox 坐标不可用**：文档假设检索结果 payload 中包含 BoundingBox 坐标，但实际 `chunk_indexing_handler.py` 和 Qdrant payload 中不包含 bbox 字段。`bbox` 仅在 `semantic_chunking_service.py` 中用于构建 `SemanticChunk`，但未写入向量存储的 payload | **P1** | **添加 bbox 写入 Qdrant payload**：在 `chunk_indexing_handler.py` 中，为每个 Child 块的 payload 添加 `bbox` 字段（从 `SemanticChunk` 的文档元素中提取）。这是 Story 3.8 的前置基础设施变更，应在 Task 0 中完成。 |
 | 9 | **from_dict 反序列化缺失**：文档 AC-1 要求「支持从 dict 反序列化」，但现有值对象（如 `BoundingBox`、`ParsedElement`）只有 `to_dict()` 方法，没有 `from_dict()` 模式 | **P2** | **添加 `from_dict()` 类方法**：为 `Citation` 和 `BoundingBox` 添加 `@classmethod from_dict()` 方法，支持从存储恢复。 |
 | 10 | **TraceabilityResult 使用 TypedDict 但返回类型为 Any**：文档封闭端口使用 TypedDict，但已有 SummaryGenerationPort 和 RelevanceEvaluationPort 的返回类型为 `Any`（因 Pydantic @computed_field 无法精确表达） | **P2** | **保持 TypedDict 但返回类型声明为 Any**：与已有模式一致，端口方法声明 `-> Any`，但实际返回 `TraceabilityResult` TypedDict。 |
+| 11 | **Citation 无唯一标识**：`get_citation_detail(citation_id)` 需要按 ID 查询，但 Citation 值对象没有 `citation_id` 字段，无法实现查询 | **P1** | **添加 `citation_id` 字段**：由 `chunk_id`（或其 SHA256 哈希）生成，MVP 阶段从当次溯源缓存返回。 |
+| 12 | **get_citation_detail/get_citation_by_document 无数据源**：TraceabilityService 若不持久化引文，这两个方法无法跨请求工作 | **P1** | **MVP 用当次缓存**：trace() 执行时缓存本次结果到 `TraceabilityService` 实例，按 citation_id/document_id 查询；明确不持久化，跨请求持久化留给后续 Story。 |
 
 ### 文档修复执行
 
@@ -631,6 +635,8 @@
 - [x] 修复项 8 — 添加 bbox 写入 Qdrant payload 说明
 - [x] 修复项 9 — 添加 from_dict() 方法说明
 - [x] 修复项 10 — 返回类型对齐为 Any
+- [x] 修复项 11 — Citation 添加 citation_id 字段
+- [x] 修复项 12 — 明确 MVP 缓存策略，不持久化
 
 ---
 
