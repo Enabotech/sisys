@@ -37,7 +37,8 @@ def mock_event_publisher() -> AsyncMock:
 def mock_embedding_service() -> MagicMock:
     """Mock EmbeddingService 避免 GPU 模型加载"""
     service = MagicMock()
-    service.embed_documents = MagicMock(return_value=[[0.1] * 1024])
+    # embed_documents 必须是 awaitable（asyncio.gather 需要协程）
+    service.embed_documents = AsyncMock(return_value=[[0.1] * 1024])
     return service
 
 
