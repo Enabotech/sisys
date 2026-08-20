@@ -6,10 +6,12 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 from fastapi import FastAPI, status
 from fastapi.testclient import TestClient
+
+from src.domain.ports.traceability import TraceabilityResult
+from src.domain.value_objects.citation import Citation
 
 
 class TestTraceAPIEndpoint:
@@ -154,13 +156,12 @@ class MockTraceService:
         claim: str,
         top_k: int = 10,
         min_confidence: float = 0.7,
-    ) -> dict[str, Any]:
-        from src.domain.value_objects.citation import Citation
+    ) -> TraceabilityResult:
         from src.domain.value_objects.parsed_document import BoundingBox
 
-        return {
-            "claim": claim,
-            "citations": [
+        return TraceabilityResult(
+            claim=claim,
+            citations=[
                 Citation(
                     citation_id="citation-001",
                     document_id=uuid.uuid4(),
@@ -173,12 +174,12 @@ class MockTraceService:
                     confidence=0.92,
                 ),
             ],
-            "citation_count": 1,
-            "highest_confidence": 0.92,
-            "has_bbox_support": True,
-        }
+            citation_count=1,
+            highest_confidence=0.92,
+            has_bbox_support=True,
+        )
 
-    async def get_citation_detail(self, citation_id: str) -> Any:
+    async def get_citation_detail(self, citation_id: str) -> Citation:
         raise NotImplementedError("API 契约测试不需要实现此方法")
 
     async def get_citation_by_document(self, document_id: uuid.UUID) -> list:

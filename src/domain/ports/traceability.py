@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Protocol, TypedDict, runtime_checkable
+from typing import Protocol, TypedDict, runtime_checkable
 
 from src.domain.value_objects.citation import Citation
 
@@ -51,7 +51,7 @@ class TraceabilityPort(Protocol):
         claim: str,
         top_k: int = 10,
         min_confidence: float = 0.7,
-    ) -> Any:
+    ) -> TraceabilityResult:
         """执行溯源，返回引文列表
 
         从结论文本出发，通过 LayeredRetrievalPort.search_top_down() 检索相关文档切片，
@@ -74,7 +74,7 @@ class TraceabilityPort(Protocol):
     async def get_citation_detail(
         self,
         citation_id: str,
-    ) -> Citation | None:
+    ) -> Citation:
         """获取单个引文的详细信息
 
         根据 citation_id 从当次溯源缓存中返回单个引文详情。
@@ -84,7 +84,7 @@ class TraceabilityPort(Protocol):
             citation_id: 引文唯一标识
 
         Returns:
-            Citation 实例，未找到时抛出 TraceabilityNotFoundError
+            Citation 实例
 
         Raises:
             TraceabilityNotFoundError: 未找到指定引文时抛出

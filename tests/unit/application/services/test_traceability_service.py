@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.domain.ports.l3_vector import SearchResult
+from src.domain.ports.layered_retrieval import LayeredRetrievalPort
 from src.domain.value_objects.parsed_document import BoundingBox
 
 _TEST_DOCUMENT_ID = uuid.UUID("12345678-1234-5678-1234-567812345678")
@@ -46,7 +47,7 @@ def _make_search_result(
 
 def _make_mock_retrieval(results: list[SearchResult] | None = None) -> AsyncMock:
     """构造 Mock LayeredRetrievalPort"""
-    mock = AsyncMock()
+    mock = AsyncMock(spec=LayeredRetrievalPort)
 
     async def mock_search_top_down(
         query_text: str,
@@ -229,7 +230,7 @@ class TestTraceErrors:
         """检索失败包装为 TraceabilityError"""
         from src.domain.exceptions.traceability_exceptions import TraceabilityError
 
-        mock = AsyncMock()
+        mock = AsyncMock(spec=LayeredRetrievalPort)
         mock.search_top_down.side_effect = Exception("Qdrant 连接超时")
         service = _make_service(mock)
         with pytest.raises(TraceabilityError) as exc_info:

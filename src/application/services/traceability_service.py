@@ -21,6 +21,7 @@ from typing import Any
 from src.domain.exceptions import TraceabilityError, TraceabilityNotFoundError
 from src.domain.exceptions.llm_exceptions import LLMAPIError, LLMResponseError
 from src.domain.ports.l3_vector import SearchResult
+from src.domain.ports.traceability import TraceabilityResult
 from src.domain.value_objects.citation import Citation
 from src.domain.value_objects.parsed_document import BoundingBox
 
@@ -57,7 +58,7 @@ class TraceabilityService:
         claim: str,
         top_k: int = 10,
         min_confidence: float = 0.7,
-    ) -> dict[str, Any]:
+    ) -> TraceabilityResult:
         """执行溯源，返回引文列表
 
         从结论文本出发，通过 LayeredRetrievalPort.search_top_down() 检索相关文档切片，
@@ -158,6 +159,12 @@ class TraceabilityService:
         # 3. 按置信度降序排序
         citations.sort(key=lambda c: c.confidence, reverse=True)
 
+        # TODO: [P1-5] LLM-as-a-Judge 评估 — MVP 裁剪
+        # 当前引文置信度仅基于检索 score 归一化，未调用 LLM 进行多维评估。
+        # 后续迭代需通过 traceability_prompts.build_traceability_prompt() 构建评估 Prompt，
+        # 调用 LLM 端口对引文进行 relevance / completeness / accuracy 三维评分，
+        # 并将 LLM 评估结果合并到 Citation.confidence 中。
+
         # 4. 缓存本次结果
         self._citation_cache = {c.citation_id: c for c in citations}
         self._citations_by_document = {}
@@ -177,7 +184,7 @@ class TraceabilityService:
     async def get_citation_detail(
         self,
         citation_id: str,
-    ) -> Citation | None:
+    ) -> Citation:
         """获取单个引文的详细信息
 
         根据 citation_id 从当次溯源缓存中返回单个引文详情。
@@ -187,7 +194,10 @@ class TraceabilityService:
             citation_id: 引文唯一标识
 
         Returns:
-            Citation 实例，未找到时抛出 TraceabilityNotFoundError
+            Citation 实例
+
+        Raises:
+            TraceabilityNotFoundError: 未找到指定引文时抛出
         """
         citation = self._citation_cache.get(citation_id)
         if citation is None:
