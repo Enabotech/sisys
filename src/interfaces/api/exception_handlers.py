@@ -76,6 +76,8 @@ from src.domain.exceptions import (
     SystemException,
     ThirdPartyError,
     TimeoutError,
+    TraceabilityError,
+    TraceabilityNotFoundError,
     TransferNotApprovedError,
     TransferNotFoundError,
     UnknownError,
@@ -171,6 +173,9 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     # 摘要生成异常
     SummaryGenerationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 290 — 摘要生成失败
     SummaryPerspectiveNotSupportedError: status.HTTP_400_BAD_REQUEST,  # 291 — 不支持的视角
+    # 溯源异常
+    TraceabilityError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 370 — 溯源评估调用失败（精确注册，避免回退 502）
+    TraceabilityNotFoundError: status.HTTP_404_NOT_FOUND,  # 371 — 按 ID/文档查询引文未找到（精确注册，避免回退 400）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

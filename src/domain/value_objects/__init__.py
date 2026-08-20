@@ -16,6 +16,7 @@ from src.domain.value_objects.backup_result import (
     BackupType,
     RestoreResult,
 )
+from src.domain.value_objects.citation import Citation
 from src.domain.value_objects.compliance_result import ComplianceResult
 from src.domain.value_objects.container_security_result import (
     EscapeAttempt,
@@ -88,6 +89,7 @@ __all__ = [
     "BackupType",
     "BoundingBox",
     "BoundingBoxResult",
+    "Citation",
     "ChunkBoundaryType",
     "ChunkingConfig",
     "CHUNKED_UPLOAD_TTL",

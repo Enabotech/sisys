@@ -82,6 +82,8 @@ from src.domain.exceptions import (
     SystemException,
     ThirdPartyError,
     TimeoutError,
+    TraceabilityError,
+    TraceabilityNotFoundError,
     TransferNotApprovedError,
     TransferNotFoundError,
     UnknownError,
@@ -246,6 +248,9 @@ class TestExceptionHttpMap:
             # 摘要生成异常
             SummaryGenerationError,
             SummaryPerspectiveNotSupportedError,
+            # 溯源异常
+            TraceabilityError,
+            TraceabilityNotFoundError,
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

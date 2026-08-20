@@ -207,19 +207,13 @@ class TestInMemoryOutboxRepositoryMarkPending:
         return InMemoryOutboxRepository()
 
     @pytest.fixture
-    def saved_event_id(self, repository: InMemoryOutboxRepository) -> str:
+    async def saved_event_id(self, repository: InMemoryOutboxRepository) -> str:
         """保存一个事件并返回其 event_id（str 形态）"""
-
-        async def _save() -> str:
-            DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
-            event = DomainEvent(event_type="TestEventForOutbox", source="test")
-            await repository.save(event)
-            unpublished = await repository.get_unpublished(limit=10)
-            return str(unpublished[0].event_id)
-
-        import asyncio
-
-        return asyncio.get_event_loop().run_until_complete(_save())
+        DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
+        event = DomainEvent(event_type="TestEventForOutbox", source="test")
+        await repository.save(event)
+        unpublished = await repository.get_unpublished(limit=10)
+        return str(unpublished[0].event_id)
 
     async def test_mark_pending_restores_failed_event(self, repository: InMemoryOutboxRepository, saved_event_id: str) -> None:
         """失败事件调用 mark_pending() 后应恢复为待发布状态"""

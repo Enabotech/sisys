@@ -58,6 +58,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "reranker": (350, 359),
     # 检索相关性评估子域（360-369）
     "relevance": (360, 369),
+    # 溯源子域（370-379）
+    "traceability": (370, 379),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -162,6 +164,9 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     # summary_exceptions.py
     "SummaryGenerationError": "summary",
     "SummaryPerspectiveNotSupportedError": "summary",
+    # traceability_exceptions.py
+    "TraceabilityError": "traceability",
+    "TraceabilityNotFoundError": "traceability",
 }
 
 
