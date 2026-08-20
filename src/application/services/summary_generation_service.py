@@ -281,7 +281,10 @@ class SummaryGenerationService:
         try:
             summary_text = getattr(summary, "summary_text", query_text)
             vectors = await self._embedding_service.embed_documents([summary_text])
-            vector = vectors[0] if vectors else [0.0] * DEFAULT_EMBEDDING_DIMENSION
+            if not vectors:
+                logger.warning("摘要向量生成返回空列表，跳过存储")
+                return
+            vector = vectors[0]
         except Exception as e:
             logger.error("摘要向量生成失败，跳过存储: %s", e)
             return
