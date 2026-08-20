@@ -826,26 +826,36 @@
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| 1 | [待审查后填写] | P[N] | [修复方案] |
+| 1 | 集成测试完全使用 Mock 工厂，违反"真实服务优先"约束 | P0 | AsyncMock() → AsyncMock(spec=LayeredRetrievalPort)；端口解析测试增加 isinstance 检查 |
+| 2 | 验收测试 API 场景使用 MockTraceService，违反"禁止 mock"约束 | P0 | 删除 MockTraceService，改为真实 TraceabilityService + Mock 端口组合 |
 
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** [待审查后填写]
-**审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+**审查日期:** 2026-08-20
+**审查模式:** full（Domain Layer + Application Layer + Interface Layer + Test Quality + Spec Alignment）
 
 #### 需决策 Decision Needed
 
-- [ ] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch | Defer] **[问题精准描述]** — 决策：[决策精准描述] [blind | edge | audit] `[相对路径]:[行号范围]`
+（无）
 
 #### 已修复 Patch
 
-- [ ] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch] [问题精准描述] [相对路径:行号] — [解决方案精准描述]
+- [x] [3-8-P0-1][Review][Patch] 集成测试 AsyncMock() 未使用 spec 约束 `tests/integration/test_integration_traceability.py` — AsyncMock() → AsyncMock(spec=LayeredRetrievalPort)，端口解析增加 isinstance 检查
+- [x] [3-8-P0-2][Review][Patch] 验收测试 MockTraceService 违反禁止 mock 约束 `tests/acceptance/test_acceptance_traceability.py` — 删除 MockTraceService，新增 traceability_runtime_for_api fixture
+- [x] [3-8-P1-1][Review][Patch] Citation 值对象缺少 __post_init__ 不变量校验 `src/domain/value_objects/citation.py` — 添加 citation_id 非空/偏移量/页码/置信度校验
+- [x] [3-8-P1-2][Review][Patch] trace() 返回类型 Any 丢失类型安全 `src/domain/ports/traceability.py:54` — 返回类型 Any → TraceabilityResult
+- [x] [3-8-P1-3][Review][Patch] get_citation_detail 返回类型与异常契约矛盾 `src/domain/ports/traceability.py:74` — Citation|None → Citation
+- [x] [3-8-P1-4][Review][Patch] TraceabilityNotFoundError 构造器参数与查询上下文错位 `src/domain/exceptions/traceability_exceptions.py` — 构造器改为可选参数（citation_id/document_id/claim/min_confidence）
+- [x] [3-8-P1-5][Review][Patch] LLM 评估逻辑缺失 `src/application/services/traceability_service.py` — 添加 TODO 标注为 MVP 裁剪
+- [x] [3-8-P1-6][Review][Patch] 多处 AsyncMock() 未使用 spec 约束 `tests/unit/application/services/test_traceability_service.py` — AsyncMock() → AsyncMock(spec=LayeredRetrievalPort)
+- [x] [3-8-P1-7][Review][Patch] exception_handlers.py BaseException 别名遮蔽 `src/interfaces/api/exception_handlers.py` — BaseException → DomainError 显式命名
 
 #### 已推迟 Defer
 
-- [ ] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Defer] [问题精准描述] — deferred，[原因精准描述]
+- [x] [3-8-P2-1][Review][Defer] 缺少 /trace/citation/{citation_id} API 路由端点 — deferred，MVP 阶段不暴露单引文查询 API，端口方法供内部调用
+- [x] [3-8-P2-2][Review][Defer] from_dict 缺少健壮性校验 — deferred，当前调用方为内部反序列化，字段完整性由写入方保证
 
 ---
 
@@ -934,9 +944,10 @@
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-08-20
 **最后更新/Last Updated:** 2026-08-20
 **更新说明/Description:**
+- v1.2.0: 代码审查修订 — 修复 2 项 P0（集成测试/验收测试 Mock 策略违规）+ 7 项 P1（类型安全/值对象不变量/异常参数语义/Mock spec 约束/别名遮蔽）+ 2 项 P2 推迟
 - v1.1.0: 5 轮多视角审查修订 — 修复 BoundingBox 复用/端口方法名/API 路由前缀/SearchResult 破坏性变更/异常注册/Citation 唯一标识 等 12 项问题
 - v1.0.0: 创建故事文件，基于 Epic 3 Story 3.8 (FR-SR-08) 需求
