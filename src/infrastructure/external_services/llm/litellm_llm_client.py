@@ -666,7 +666,8 @@ class LitellmLLMClient(LLMClientPort):
             # 第 2 步：清除队列中尚未被 worker 出队的协程
             queue = getattr(GLOBAL_LOGGING_WORKER, "_queue", None)
             if queue is not None:
-                for _ in range(200):  # 与 litellm MAX_ITERATIONS_TO_CLEAR_QUEUE 一致
+                max_clear = 10000  # 安全上限，防止无限循环
+                for _ in range(max_clear):
                     try:
                         item = queue.get_nowait()
                         coroutine = item.get("coroutine")

@@ -348,27 +348,23 @@ def create_document_dictionary_router(
 
     @router.delete(
         "/entries/{term}",
-        response_model=NotificationResponse,
-        status_code=status.HTTP_200_OK,
+        status_code=status.HTTP_204_NO_CONTENT,
+        response_model=None,
         summary="删除词条",
     )
     async def delete_entry(
         term: str,
         current_user: TokenPayload = Depends(get_current_user),
-    ) -> NotificationResponse:
+    ) -> None:
         """删除词条
 
         Args:
             term: 要删除的词条名
             current_user: 当前用户
-
-        Returns:
-            删除通知
         """
         del current_user  # 仅认证
         service = _get_service()
         await service.delete_entry(term, trigger="api")
-        return NotificationResponse(message=f"词条 '{term}' 已删除")
 
     @router.post(
         "/refresh",

@@ -177,15 +177,14 @@ class TestDeleteEntry:
     """删除词条测试"""
 
     def test_delete_entry_success(self) -> None:
-        """正常删除返回 200"""
+        """正常删除返回 204 No Content"""
         client, service = _make_app()
         service.delete_entry = AsyncMock()
 
         resp = client.delete("/api/v1/documents/dictionary/entries/BLM")
 
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "已删除" in data["message"]
+        assert resp.status_code == 204
+        assert not resp.content  # 204 无响应体
 
     def test_delete_entry_not_found(self) -> None:
         """删除不存在的词条返回 404"""
