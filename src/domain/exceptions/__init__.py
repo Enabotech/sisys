@@ -112,6 +112,10 @@ from src.domain.exceptions.system_exceptions import (
     StorageError,
     SystemException,
 )
+from src.domain.exceptions.traceability_exceptions import (
+    TraceabilityError,
+    TraceabilityNotFoundError,
+)
 from src.domain.exceptions.transfer_exceptions import (
     TransferNotApprovedError,
     TransferNotFoundError,
@@ -214,4 +218,7 @@ __all__ = [
     # 摘要生成异常
     "SummaryGenerationError",
     "SummaryPerspectiveNotSupportedError",
+    # 溯源异常
+    "TraceabilityError",
+    "TraceabilityNotFoundError",
 ]

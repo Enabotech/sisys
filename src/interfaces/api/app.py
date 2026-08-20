@@ -59,8 +59,10 @@ def create_app() -> FastAPI:
     from src.interfaces.api.relevance_evaluation import evaluate_router
     from src.interfaces.api.strategic_archive import archive_router
     from src.interfaces.api.summary import summary_router
+    from src.interfaces.api.traceability import trace_router
 
     app.include_router(archive_router)
     app.include_router(summary_router)
     app.include_router(evaluate_router)
+    app.include_router(trace_router)
     return app

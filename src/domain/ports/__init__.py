@@ -68,6 +68,7 @@ from src.domain.ports.table_enhancer import TableSemanticEnhancerPort
 from src.domain.ports.table_extractor import (
     TableExtractorPort,  # deprecated: 使用 TableDetectorPort + TableSemanticEnhancerPort 替代
 )
+from src.domain.ports.traceability import TraceabilityPort, TraceabilityResult
 from src.domain.ports.udmr_policy import UdmrPolicyPort
 from src.domain.ports.unified_storage import UnifiedStoragePort
 from src.domain.ports.unit_of_work import UnitOfWork
@@ -137,6 +138,8 @@ __all__ = [
     "TableDetectorPort",
     "TableSemanticEnhancerPort",
     "TableExtractorPort",
+    "TraceabilityPort",
+    "TraceabilityResult",
     "UnifiedStoragePort",
     "UnitOfWork",
     "UdmrPolicyPort",

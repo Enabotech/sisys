@@ -1847,6 +1847,23 @@ def bootstrap() -> None:
         tags=("search", "layered", "indexing"),
     )
 
+    # === Story 3-8: Traceability (High-Fidelity Bounding Box) Port ===
+    from src.application.services.traceability_service import TraceabilityService
+    from src.domain.ports.traceability import TraceabilityPort
+
+    register_port(
+        name="traceability_service",
+        version="v1.0.0",
+        interface=TraceabilityPort,
+        impl=lambda resolver: TraceabilityService(
+            retrieval_port=resolver.resolve("layered_retrieval_service"),
+        ),
+        module="src.application.services.traceability_service",
+        lifetime=Lifetime.SCOPED,
+        owner="search-team",
+        tags=("search", "traceability", "bounding-box"),
+    )
+
     # === ArchiveValidityHandler — 档案有效期事件处理器（Story 3.11/3.12）===
     from src.application.event_handlers.archive_handlers import ArchiveValidityHandler
 

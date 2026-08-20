@@ -1,6 +1,6 @@
 # Story 3.8: 高保真溯源（Bounding Box 级）
 
-**Status:** `backlog`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -413,12 +413,12 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。这是 SDD 规范驱动的基础。
 
-- [ ] Subtask 0.1: 定义 `TraceabilityPort` 端口契约（`src/domain/ports/traceability.py`）
-- [ ] Subtask 0.2: 定义 `TraceabilityResult` 结果类型（`src/domain/ports/traceability.py`）
-- [ ] Subtask 0.3: 编写端口契约测试（`tests/contracts/test_port_contract_traceability.py`）
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_traceability.feature`
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_traceability.py`
-- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义 `TraceabilityPort` 端口契约（`src/domain/ports/traceability.py`）
+- [x] Subtask 0.2: 定义 `TraceabilityResult` 结果类型（`src/domain/ports/traceability.py`）
+- [x] Subtask 0.3: 编写端口契约测试（`tests/contracts/test_port_contract_traceability.py`）
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_traceability.feature`
+- [x] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_traceability.py`
+- [x] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕
@@ -440,9 +440,9 @@
 | 🟢 绿 | 实现 `Citation` dataclass（复用 `parsed_document.py` 中已有的 `BoundingBox`） |
 | 🔄 重构 | 优化代码，添加 docstring |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 `Citation` 值对象失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 `Citation` dataclass（复用已有 `BoundingBox`）
-- [ ] Subtask 1.3: 🔄 重构 — 优化值对象代码
+- [x] Subtask 1.1: 🔴 红 — 编写 `Citation` 值对象失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 `Citation` dataclass（复用已有 `BoundingBox`）
+- [x] Subtask 1.3: 🔄 重构 — 优化值对象代码
 
 **完成标准/Definition of Done:**
 - [ ] `Citation` 值对象实现完成（`BoundingBox` 复用已有定义，无重复代码）
@@ -465,9 +465,9 @@
 | 🟢 绿 | 实现 `TraceabilityService` 最小代码 |
 | 🔄 重构 | 优化代码，添加类型注解 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 `TraceabilityService` 失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 `TraceabilityService`
-- [ ] Subtask 2.3: 🔄 重构 — 优化 `TraceabilityService` 代码
+- [x] Subtask 2.1: 🔴 红 — 编写 `TraceabilityService` 失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 `TraceabilityService`
+- [x] Subtask 2.3: 🔄 重构 — 优化 `TraceabilityService` 代码
 
 #### TDD 循环 [B]：溯源 Prompt 模板
 
@@ -477,9 +477,9 @@
 | 🟢 绿 | 实现 `traceability_prompts.py` 最小代码 |
 | 🔄 重构 | 优化 Prompt 模板 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写溯源 Prompt 模板失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 实现溯源 Prompt 模板
-- [ ] Subtask 2.6: 🔄 重构 — 优化 Prompt 模板
+- [x] Subtask 2.4: 🔴 红 — 编写溯源 Prompt 模板失败测试
+- [x] Subtask 2.5: 🟢 绿 — 实现溯源 Prompt 模板
+- [x] Subtask 2.6: 🔄 重构 — 优化 Prompt 模板
 
 **完成标准/Definition of Done:**
 - [ ] `TraceabilityService` 和 Prompt 模板全部实现
@@ -502,9 +502,9 @@
 | 🟢 绿 | 实现 `TraceabilityError`、`TraceabilityNotFoundError` 异常类 |
 | 🔄 重构 | 优化异常定义 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写溯源异常失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现 `TraceabilityError`、`TraceabilityNotFoundError`
-- [ ] Subtask 3.3: 🔄 重构 — 优化异常定义
+- [x] Subtask 3.1: 🔴 红 — 编写溯源异常失败测试
+- [x] Subtask 3.2: 🟢 绿 — 实现 `TraceabilityError`、`TraceabilityNotFoundError`
+- [x] Subtask 3.3: 🔄 重构 — 优化异常定义
 
 **完成标准/Definition of Done:**
 - [ ] 溯源异常类实现完成
@@ -530,9 +530,9 @@
 | 🟢 绿 | 实现 `src/interfaces/api/traceability.py` 最小代码 |
 | 🔄 重构 | 优化 API 路由 |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写 API 契约测试
-- [ ] Subtask 4.2: 🟢 绿 — 实现 API 路由
-- [ ] Subtask 4.3: 🔄 重构 — 优化 API 路由
+- [x] Subtask 4.1: 🔴 红 — 编写 API 契约测试
+- [x] Subtask 4.2: 🟢 绿 — 实现 API 路由
+- [x] Subtask 4.3: 🔄 重构 — 优化 API 路由
 
 #### TDD 循环 [B]：集成测试
 
@@ -542,9 +542,9 @@
 | 🟢 绿 | 实现 `TraceabilityService` 集成测试 |
 | 🔄 重构 | 优化集成代码 |
 
-- [ ] Subtask 4.4: 🔴 红 — 编写集成测试
-- [ ] Subtask 4.5: 🟢 绿 — 实现集成测试
-- [ ] Subtask 4.6: 🔄 重构 — 优化集成代码
+- [x] Subtask 4.4: 🔴 红 — 编写集成测试
+- [x] Subtask 4.5: 🟢 绿 — 实现集成测试
+- [x] Subtask 4.6: 🔄 重构 — 优化集成代码
 
 **完成标准/Definition of Done:**
 - [ ] API 路由实现完成
@@ -563,10 +563,10 @@
 
 #### 架构验证测试实现
 
-- [ ] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_traceability.py`
-- [ ] Subtask 5.2: 实现依赖方向验证器（验证领域层零依赖）
-- [ ] Subtask 5.3: 实现端口契约验证器（验证端口注册完整性）
-- [ ] Subtask 5.4: 运行完整测试套件并生成报告
+- [x] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_traceability.py`
+- [x] Subtask 5.2: 实现依赖方向验证器（验证领域层零依赖）
+- [x] Subtask 5.3: 实现端口契约验证器（验证端口注册完整性）
+- [x] Subtask 5.4: 运行完整测试套件并生成报告
 
 **完成标准/Definition of Done:**
 - [ ] 所有架构/约束测试通过
@@ -590,10 +590,10 @@
 | 🟢 绿 | 编写 `tests/acceptance/test_acceptance_traceability.py` 的 BDD 步骤实现 |
 | 🔄 重构 | 收敛场景命名、统一断言表达、保持步骤函数可维护性 |
 
-- [ ] Subtask 6.1: 场景 1 — 验证 `src` 完成清单的逐项确认
-- [ ] Subtask 6.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
-- [ ] Subtask 6.3: 运行开发结束验收测试并确认通过
-- [ ] Subtask 6.4: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
+- [x] Subtask 6.1: 场景 1 — 验证 `src` 完成清单的逐项确认
+- [x] Subtask 6.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
+- [x] Subtask 6.3: 运行开发结束验收测试并确认通过
+- [x] Subtask 6.4: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
 
 **完成标准/Definition of Done:**
 - [ ] `src` 完成清单已逐项验证确认
@@ -851,10 +851,12 @@
 
 ### 下一步 Next Steps
 
-- [ ] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
-- [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
+- [x] Story created with `ready-for-dev` status
+- [x] Story status updated to `review`
+- [x] All tasks completed with TDD red-green-refactor cycles
+- [x] All acceptance criteria satisfied
+- [x] Code quality checks passed (ruff check, mypy, pytest)
+- [x] Architecture constraint verification tests passed
 
 ---
 
