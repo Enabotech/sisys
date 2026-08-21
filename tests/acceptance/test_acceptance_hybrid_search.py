@@ -464,7 +464,9 @@ def when_index_document(
     collection_manager: QdrantCollectionManager,
     event_loop,
 ) -> None:
-    """真实执行 index_document.fn()（使用真实 resolver 获取 l3_vector）"""
+    """真实执行 index_document.fn()（mock resolver 避免 SINGLETON event loop 绑定问题）"""
+    from unittest.mock import MagicMock, patch
+
     from src.infrastructure.workflow.tasks.document_tasks import index_document
 
     # 创建 "documents" Collection（index_document.fn() 硬编码此名称）
@@ -475,7 +477,15 @@ def when_index_document(
     # 注册到清理列表
     context.setdefault("created_collections", []).append("documents")
 
-    result = event_loop.run_until_complete(index_document.fn(context["embedding_obj"]))
+    # mock resolver 提供当前 event loop 创建的 l3_vector，避免 SINGLETON qdrant_client
+    # 绑定到已关闭的 event loop（AsyncQdrantClient 的 httpx.AsyncClient 连接池绑定创建时的 loop）
+    mock_resolver = MagicMock()
+    mock_resolver.resolve.side_effect = lambda n: {
+        "l3_vector": vector_storage,
+    }[n]
+
+    with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
+        result = event_loop.run_until_complete(index_document.fn(context["embedding_obj"]))
 
     context["index_result"] = result
 
