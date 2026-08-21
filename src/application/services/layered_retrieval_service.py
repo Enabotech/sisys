@@ -5,7 +5,7 @@
 
 降级策略：
 - L4 检索失败 → 透明降级为普通 L3 检索，WARNING 日志
-- L2/L1 当前为骨架实现（返回空列表），完整实现依赖 Story 3.6
+- L2/L1 当前为已实现（Story 3.6 填充 — _search_summaries 真实 Dense 检索）
 
 依赖注入：
 - DenseSemanticSearchService（外部构造，用于执行 Dense 语义检索）
@@ -101,8 +101,8 @@ class LayeredRetrievalService:
         """自顶向下遍历检索
 
         从高层级向低层级展开。根据 target_level 决定执行哪个层级检索：
-        - L1：跨文档摘要（骨架，返回空列表）
-        - L2：文档摘要（骨架，返回空列表）
+        - L1：跨文档摘要（已实现，Story 3.6 填充）
+        - L2：文档摘要（已实现，Story 3.6 填充）
         - L3：文档切片层检索（常规 Dense 检索）
         - L4：L3→L4 展开（命中 Parent 的 Top-3 Child 展开）
 
@@ -176,7 +176,7 @@ class LayeredRetrievalService:
         从低层级向高层级回溯。根据 target_level 决定执行哪个层级检索：
         - L4：L4 层直接检索（Child 块检索）
         - L3：L4→L3 回溯（命中 Child → 回溯 Parent）
-        - L2/L1：骨架（返回空列表）
+        - L2/L1：已实现（Story 3.6 填充 — _search_summaries 真实 Dense 检索）
 
         Args:
             query_text: 查询文本

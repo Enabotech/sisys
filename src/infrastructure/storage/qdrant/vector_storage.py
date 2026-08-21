@@ -194,7 +194,19 @@ class QdrantVectorStorage(L3VectorPort):
         if filter_payload:
             conditions: list[Any] = []
             for key, value in filter_payload.items():
-                conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
+                if isinstance(value, str | bool):
+                    conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
+                elif isinstance(value, int | float) and not isinstance(value, bool):
+                    conditions.append(FieldCondition(key=key, match=MatchValue(value=int(value))))
+                elif isinstance(value, dict) and "gte" in value and "lte" in value:
+                    conditions.append(
+                        FieldCondition(
+                            key=key,
+                            range=Range(gte=value["gte"], lte=value["lte"]),
+                        )
+                    )
+                else:
+                    conditions.append(FieldCondition(key=key, match=MatchValue(value=str(value))))
             if conditions:
                 query_filter = Filter(must=conditions)
 
