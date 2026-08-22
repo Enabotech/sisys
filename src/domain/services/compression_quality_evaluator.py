@@ -29,7 +29,7 @@ _COVERAGE_WEIGHT: float = 0.40
 _REDUNDANCY_WEIGHT: float = 0.20
 
 # 质量门禁阈值
-_QUALITY_THRESHOLD: float = 0.70
+QUALITY_THRESHOLD: float = 0.70
 
 # n-gram 分析参数
 _NGRAM_SIZE: int = 3
@@ -171,6 +171,15 @@ class CompressionQualityEvaluator:
         # 重复率 = 1 - (唯一 n-gram 数 / 总 n-gram 数)
         repeat_ratio = 1.0 - (unique_count / total)
 
+        # 边界情况：文本长度等于 n-gram 大小时仅生成 1 个 n-gram，
+        # 无法检测重复。此时回退到字符级重复检测（全字符唯一则低冗余，
+        # 否则视为高冗余）。
+        if len(ngrams) == 1:
+            char_freq = Counter(text)
+            if len(char_freq) == len(text):
+                return 1.0
+            return 0.0
+
         # 评分 = 1 - 重复率（归一化），重复率超过阈值时线性降分
         if repeat_ratio <= _NGRAM_REPEAT_THRESHOLD:
             return 1.0
@@ -179,5 +188,5 @@ class CompressionQualityEvaluator:
 
 __all__ = [
     "CompressionQualityEvaluator",
-    "_QUALITY_THRESHOLD",
+    "QUALITY_THRESHOLD",
 ]

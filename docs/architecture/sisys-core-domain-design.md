@@ -550,6 +550,7 @@ class CompressionQualityEvaluator:
         4. 综合评分：0.40*熵 + 0.40*覆盖率 + 0.20*冗余度
         """
         ...
+```
 
 **验收标准：**
 

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
@@ -25,8 +26,13 @@ from src.domain.exceptions import EntityValidationError
 from src.domain.ports.l1_cache import L1CachePort
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.ports.llm_client import LLMClientPort, LLMConfig
-from src.domain.services.compression_quality_evaluator import CompressionQualityEvaluator
+from src.domain.services.compression_quality_evaluator import (
+    QUALITY_THRESHOLD,
+    CompressionQualityEvaluator,
+)
 from src.domain.services.persistent_note_taker import PersistentNote, PersistentNoteTaker
+
+logger = logging.getLogger(__name__)
 
 # 压缩配置常量
 _COMPRESSION_RATIO_TARGET: float = 0.70
@@ -37,6 +43,7 @@ _LLM_TIMEOUT: float = 60.0
 _KEY_ENTITY_LIMIT: int = 20
 _DOCUMENT_CONTEXT_LIMIT: int = 20
 _DOCUMENT_PREVIEW_CHARS: int = 500
+_MIN_QUALITY_SCORE: float = QUALITY_THRESHOLD
 
 # 压缩上下文缓存 TTL（24 小时，复用 L1 缓存）
 _COMPRESSED_CACHE_TTL: int = 86400
@@ -146,29 +153,31 @@ class ContextCompressor:
         # 构建上下文
         context = self._build_context(summary_text, query)
 
-        # 2. 压缩率验证
+        # 2. 压缩率验证 + 质量评估
         compressed_tokens = self._estimate_chars_tokens(context)
-        compression_ratio = 1.0 - (compressed_tokens / max(original_token_count, 1))
+        compression_ratio = max(0.0, 1.0 - (compressed_tokens / max(original_token_count, 1)))
         rerun_count = 0
 
         if compression_ratio < _COMPRESSION_RATIO_TARGET:
             # 压缩率不足，触发二次压缩
             context = await self._recompress(context, query)
             compressed_tokens = self._estimate_chars_tokens(context)
-            compression_ratio = 1.0 - (compressed_tokens / max(original_token_count, 1))
+            compression_ratio = max(0.0, 1.0 - (compressed_tokens / max(original_token_count, 1)))
             rerun_count = 1
 
         # 3. 质量评估
-        quality_score = 0.8  # 默认评分（未注入评估器时）
+        quality_score = 1.0  # 默认评分（未注入评估器时，1.0 表示"无评估，视同合格"）
         if self._quality_evaluator is not None:
             quality_score = await self._quality_evaluator.evaluate(
                 compressed_context=context,
                 original_docs=retrieved_docs,
                 key_entities=key_entities,
             )
-            if quality_score < 0.7:
+            if quality_score < _MIN_QUALITY_SCORE:
                 # 质量不足，触发二次生成
                 context = await self._regenerate(context, query)
+                compressed_tokens = self._estimate_chars_tokens(context)
+                compression_ratio = max(0.0, 1.0 - (compressed_tokens / max(original_token_count, 1)))
                 quality_score = await self._quality_evaluator.evaluate(
                     compressed_context=context,
                     original_docs=retrieved_docs,
@@ -199,6 +208,9 @@ class ContextCompressor:
 
         Returns:
             摘要文本
+
+        Raises:
+            EntityValidationError: LLM 返回空内容时
         """
         result = await self._llm_client.generate(
             prompt=prompt,
@@ -214,7 +226,13 @@ class ContextCompressor:
                 "请直接输出摘要正文，不要包含任何额外的解释或格式标记。"
             ),
         )
-        return result.content.strip()
+        summary = result.content.strip()
+        if not summary:
+            raise EntityValidationError(
+                message="LLM 摘要生成返回空内容",
+                context={"service": "ContextCompressor"},
+            )
+        return summary
 
     async def _recompress(self, context: str, query: str) -> str:
         """二次压缩（压缩率不足时触发）
@@ -229,14 +247,18 @@ class ContextCompressor:
         prompt = (
             f"请对以下内容进行更强的压缩，在保留核心信息的前提下进一步减少篇幅。\n\n"
             f"原始查询：{query}\n\n"
-            f"内容：{context[:4000]}\n\n"
+            f"内容：{context[:_CONTEXT_SIZE_LIMIT]}\n\n"
             f"请直接输出压缩后的正文，不要包含解释或格式标记。"
         )
-        result = await self._llm_client.generate(
-            prompt=prompt,
-            config=LLMConfig(temperature=0.2, max_tokens=1500, timeout=_LLM_TIMEOUT),
-        )
-        return self._truncate_context(result.content)
+        try:
+            result = await self._llm_client.generate(
+                prompt=prompt,
+                config=LLMConfig(temperature=0.2, max_tokens=1500, timeout=_LLM_TIMEOUT),
+            )
+            return self._truncate_context(result.content)
+        except Exception:
+            logger.warning("二次压缩失败，降级返回原始上下文")
+            return self._truncate_context(context)
 
     async def _regenerate(self, context: str, query: str) -> str:
         """二次生成（质量不足时触发）
@@ -251,14 +273,18 @@ class ContextCompressor:
         prompt = (
             f"请重新生成以下内容的摘要，确保覆盖所有关键实体、数据点和推理链。\n\n"
             f"原始查询：{query}\n\n"
-            f"内容：{context[:4000]}\n\n"
+            f"内容：{context[:_CONTEXT_SIZE_LIMIT]}\n\n"
             f"请直接输出重新生成的摘要正文，不要包含解释或格式标记。"
         )
-        result = await self._llm_client.generate(
-            prompt=prompt,
-            config=LLMConfig(temperature=0.4, max_tokens=_LLM_MAX_TOKENS, timeout=_LLM_TIMEOUT),
-        )
-        return self._truncate_context(result.content)
+        try:
+            result = await self._llm_client.generate(
+                prompt=prompt,
+                config=LLMConfig(temperature=0.4, max_tokens=_LLM_MAX_TOKENS, timeout=_LLM_TIMEOUT),
+            )
+            return self._truncate_context(result.content)
+        except Exception:
+            logger.warning("二次生成失败，降级返回原始上下文")
+            return self._truncate_context(context)
 
     async def _cache_compressed(self, note_id: UUID, context: str) -> None:
         """缓存压缩结果
@@ -268,6 +294,7 @@ class ContextCompressor:
             context: 压缩上下文
         """
         if self._l1_cache is None:
+            logger.debug("L1 缓存未注入，压缩结果缓存降级跳过")
             return
         try:
             await self._l1_cache.set(
@@ -277,6 +304,7 @@ class ContextCompressor:
             )
         except Exception:
             # 缓存失败降级跳过（不影响主流程）
+            logger.warning("压缩结果写入 L1 缓存失败", exc_info=True)
             return
 
     @staticmethod
@@ -330,7 +358,7 @@ class ContextCompressor:
         Returns:
             格式化的上下文文本（截断至 _CONTEXT_SIZE_LIMIT）
         """
-        return "".join([f"查询：{query}\n\n", summary_text])[:_CONTEXT_SIZE_LIMIT]
+        return f"查询：{query}\n\n{summary_text}"[:_CONTEXT_SIZE_LIMIT]
 
     @staticmethod
     def _truncate_context(context: str) -> str:
@@ -349,6 +377,8 @@ class ContextCompressor:
         """估算文档 token 总数
 
         按 4 字符/token 粗略估算（CJK 密度更高，此处取保守值）。
+        注意：仅统计 _build_compress_prompt 实际使用的前 _DOCUMENT_CONTEXT_LIMIT
+        个文档，确保压缩率估算与 LLM 实际输入一致。
 
         Args:
             docs: 检索结果列表
@@ -357,14 +387,15 @@ class ContextCompressor:
             估算的 token 数
         """
         total_chars = 0
-        for r in docs:
+        for r in docs[:_DOCUMENT_CONTEXT_LIMIT]:
             if not isinstance(r, dict):
                 continue
             payload = r.get("payload", {})
             if not isinstance(payload, dict):
                 continue
+            # 与 _build_compress_prompt 截断一致：仅取前 _DOCUMENT_PREVIEW_CHARS 字符
             content = payload.get("content") or payload.get("summary_text") or ""
-            total_chars += len(str(content))
+            total_chars += min(len(str(content)), _DOCUMENT_PREVIEW_CHARS)
         return max(total_chars // 4, 1)
 
     @staticmethod
