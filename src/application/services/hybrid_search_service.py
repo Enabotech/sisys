@@ -21,11 +21,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Callable
+from typing import Callable
 
 from src.domain.exceptions import HybridSearchError, ValidationError
+from src.domain.ports.hybrid_search import HybridSearchPort
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.ports.reranker import RerankerPort
+from src.domain.ports.search_service import DenseSearchPort, GraphSearchPort, SparseSearchPort
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_WEIGHTS: tuple[float, ...] = (1.0, 1.0, 0.5)
 
 
-class HybridSearchService:
+class HybridSearchService(HybridSearchPort):
     """混合检索编排服务
 
     注入 DenseSemanticSearchService、Bm25SparseSearchService、GraphSearchService
@@ -42,10 +44,10 @@ class HybridSearchService:
 
     def __init__(
         self,
-        dense_search: Any,
-        sparse_search: Any,
+        dense_search: DenseSearchPort,
+        sparse_search: SparseSearchPort,
         fuse: Callable[..., list[SearchResult]],
-        graph_search: Any | None = None,
+        graph_search: GraphSearchPort | None = None,
         weights: list[float] | None = None,
         reranker: RerankerPort | None = None,
     ) -> None:

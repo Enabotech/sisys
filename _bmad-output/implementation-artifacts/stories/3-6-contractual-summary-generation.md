@@ -916,6 +916,27 @@ docs/
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
 5. [x] Sprint status synced to `ready-for-dev`
+6. [x] **R1/R2 端口层次对齐（2026-08-22）**：
+   - [x] `SummaryGenerationService` 构造函数类型从 `Any` 修正为具体端口类型
+   - [x] `RelevanceEvaluationService` 构造函数类型从 `Any` 修正为 `LLMClientPort`
+   - [x] `TraceabilityService` 构造函数类型从 `Any` 修正为 `LayeredRetrievalPort`
+   - [x] 完整构造函数类型映射见下：
+
+   | 服务 | 参数 | 变更前 | 变更后 |
+   |------|------|--------|--------|
+   | SummaryGenerationService | llm_client | `Any` | `LLMClientPort` |
+   | SummaryGenerationService | layered_retrieval | `Any` | `LayeredRetrievalPort` |
+   | SummaryGenerationService | embedding_service | `Any` | `EmbeddingServicePort` |
+   | SummaryGenerationService | l3_vector | `Any` | `L3VectorPort` |
+   | SummaryGenerationService | relevance_evaluation_service | `Any \| None` | `RelevanceEvaluationPort \| None` |
+   | SummaryGenerationService | archive_repo | `Any \| None` | `ArchiveRepositoryPort \| None` |
+   | RelevanceEvaluationService | llm_client | `Any` | `LLMClientPort` |
+   | TraceabilityService | retrieval_port | `Any` | `LayeredRetrievalPort` |
+   | SemanticCacheMiddleware | search_service | `HybridSearchService` | `HybridSearchPort` |
+2. [x] All acceptance criteria specified 所有验收标准已定义
+3. [x] Architecture constraints extracted 架构约束已提取
+4. [x] Previous story learnings integrated 前一个故事学习经验已整合
+5. [x] Sprint status synced to `ready-for-dev`
 
 ---
 

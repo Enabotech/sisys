@@ -30,7 +30,8 @@ from src.domain.exceptions.layered_retrieval_exceptions import (
 )
 from src.domain.exceptions.system_exceptions import SystemException
 from src.domain.ports.embedding_service import EmbeddingServicePort
-from src.domain.ports.l3_vector import SearchResult
+from src.domain.ports.hybrid_search import HybridSearchPort
+from src.domain.ports.l3_vector import L3VectorPort, SearchResult
 from src.domain.ports.layered_retrieval import LAYERED_RETRIEVAL_LEVELS
 
 logger = logging.getLogger(__name__)
@@ -79,8 +80,8 @@ class LayeredRetrievalService:
 
     def __init__(
         self,
-        hybrid_search: Any,
-        l3_vector: Any,
+        hybrid_search: HybridSearchPort,
+        l3_vector: L3VectorPort,
         embedding_service: EmbeddingServicePort,
     ) -> None:
         """初始化分层检索服务

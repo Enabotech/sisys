@@ -26,7 +26,7 @@ from src.application.services.relevance_schemas import RelevanceEvaluation
 from src.domain.exceptions import RelevanceEvaluationError
 from src.domain.exceptions.llm_exceptions import LLMAPIError, LLMConfigError, LLMResponseError
 from src.domain.ports.l3_vector import SearchResult
-from src.domain.ports.llm_client import LLMConfig
+from src.domain.ports.llm_client import LLMClientPort, LLMConfig
 from src.domain.ports.relevance_evaluation import RuleBasedResult
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ class RelevanceEvaluationService:
 
     def __init__(
         self,
-        llm_client: Any,
+        llm_client: LLMClientPort,
     ) -> None:
         """初始化相关性评估服务
 

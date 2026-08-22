@@ -228,102 +228,115 @@ class DataQualityAssessor:
 
 #### 17.1.5 向量化与检索层（混合检索架构）
 
-**领域层接口定义（零外部依赖）：**
+**端口层次设计（R1/R2 架构规则）：**
+
+```
+R1: 领域层统一抽象基础端口
+    SearchServicePort（基础检索端口）
+    ├── DenseSearchPort（Dense 语义检索）
+    ├── SparseSearchPort（BM25 稀疏检索）
+    └── GraphSearchPort（Graph 图检索）
+
+R2: 应用层组合/继承领域层端口
+    └── HybridSearchPort（组合三路检索，RRF 融合 + 重排序）
+```
+
+**领域层端口定义（零外部依赖，仅 Protocol）：**
 
 ```python
-class RAGService(Protocol):
-    """RAG 服务接口 - 领域层定义（零外部依赖）"""
+@runtime_checkable
+class SearchServicePort(Protocol):
+    """R1: 基础检索端口 — 统一检索签名"""
 
-    async def retrieve(self, query: str, top_k: int = 100) -> List[Document]:
-        """
-        混合检索接口
-
-        Args:
-            query: 检索查询
-            top_k: 返回文档数量
-
-        Returns:
-            相关文档列表（按相关性排序）
-        """
+    async def search(
+        self,
+        collection: str,
+        query_text: str,
+        limit: int = 10,
+        tenant_id: str | None = None,
+        filter_payload: dict | None = None,
+    ) -> list[SearchResult]:
         ...
 
-    async def index(self, document: ParsedDocument) -> None:
-        """索引文档到向量存储"""
+@runtime_checkable
+class DenseSearchPort(SearchServicePort, Protocol):
+    """Dense 语义检索端口（继承基础检索端口）"""
+    pass
+
+@runtime_checkable
+class SparseSearchPort(SearchServicePort, Protocol):
+    """BM25 稀疏检索端口（继承基础检索端口）"""
+    pass
+
+@runtime_checkable
+class GraphSearchPort(SearchServicePort, Protocol):
+    """Graph 图检索端口（继承基础检索端口）"""
+    pass
+
+@runtime_checkable
+class HybridSearchPort(Protocol):
+    """R2: 混合检索端口 — 组合 Dense+Sparse+Graph 三路 RRF 融合"""
+    async def search(
+        self,
+        collection: str,
+        query_text: str,
+        limit: int = 10,
+        tenant_id: str | None = None,
+        filter_payload: dict | None = None,
+        weights: list[float] | None = None,
+    ) -> list[SearchResult]:
         ...
 ```
 
-**基础设施层实现（第 13.4.3 节）：**
+**文件位置：**
+- `src/domain/ports/search_service.py` — SearchServicePort / DenseSearchPort / SparseSearchPort / GraphSearchPort
+- `src/domain/ports/hybrid_search.py` — HybridSearchPort
 
-> **注意**：`HybridRetriever` 具体实现已移至基础设施层（`src/infrastructure/retrieval/hybrid_retriever.py`），遵循领域层零外部依赖原则。
-
-基础设施层实现摘要：
+**应用层实现（实现端口，注入领域层端口）：**
 
 ```python
-# 文件位置：src/infrastructure/retrieval/hybrid_retriever.py
-# 依赖：qdrant-client, neo4j, colbert
+class DenseSemanticSearchService(DenseSearchPort):
+    """编排 EmbeddingServicePort（文本→向量）和 L3VectorPort（向量→检索）"""
+    def __init__(self, embedding_service: EmbeddingServicePort, vector_storage: L3VectorPort) -> None:
+        ...
 
-class HybridRetriever(RAGService):
-    """混合检索器基础设施实现 - 三路召回 + RRF 融合"""
+class Bm25SparseSearchService(SparseSearchPort):
+    """编排 EmbeddingServicePort（文本→稀疏向量）和 L3VectorPort（稀疏向量→检索）"""
+    def __init__(self, embedding_service: EmbeddingServicePort, vector_storage: L3VectorPort) -> None:
+        ...
 
+class GraphSearchService(GraphSearchPort):
+    """通过 L5GraphPort 搜索实体关联，作为第三路检索信号"""
+    def __init__(self, l5_graph: L5GraphPort) -> None:
+        ...
+
+class HybridSearchService(HybridSearchPort):
+    """三路并行检索 → RRF 融合 → 可选重排序
+
+    降级策略：
+    - 三路均成功 → 三路加权 RRF 融合
+    - Graph 失败 → 两路（Dense + Sparse）RRF 融合
+    - Dense + Sparse 均失败 → 单路 Graph 结果
+    - 三路均失败 → HybridSearchError
+    """
     def __init__(
         self,
-        qdrant_client: QdrantClient,      # 基础设施依赖
-        neo4j_driver: neo4j.Driver,        # 基础设施依赖
-        embedding_model: EmbeddingModel,   # 基础设施依赖
-        colbert_reranker: ColBERTReranker  # 基础设施依赖
-    ):
-        self.qdrant = qdrant_client
-        self.neo4j = neo4j_driver
-        self.embedding_model = embedding_model
-        self.colbert_reranker = colbert_reranker
-
-    async def retrieve(self, query: str, top_k: int = 100) -> List[Document]:
-        # 1. Dense 检索（BGE-M3 稠密向量）
-        query_embedding = await self.embedding_model.encode(query)
-        dense_results = await self.qdrant.search(
-            collection="documents",
-            query_vector=query_embedding,
-            limit=top_k
-        )
-
-        # 2. Sparse 检索（BM25 关键词）
-        sparse_results = await self.qdrant.search(
-            collection="documents",
-            query_text=query,  # BM25
-            limit=top_k
-        )
-
-        # 3. Graph 检索（知识图谱关联）
-        entities = await self.extract_entities(query)
-        graph_results = await self.neo4j.search_related(entities, limit=top_k)
-
-        # 4. RRF 融合排序（Reciprocal Rank Fusion）
-        fused_results = self.rrf_fusion(
-            [dense_results, sparse_results, graph_results],
-            k=60  # RRF 参数
-        )
-
-        # 5. ColBERT-v2 重排序（Top-100 → Top-20）
-        reranked = await self.colbert_reranker.rerank(query, fused_results[:100])
-
-        return reranked[:20]
-
-    def rrf_fusion(self, result_lists: List[List[Document]], k: int = 60) -> List[Document]:
-        """RRF 融合排序"""
-        scores = defaultdict(float)
-
-        for results in result_lists:
-            for rank, doc in enumerate(results):
-                scores[doc.id] += 1.0 / (k + rank)
-
-        sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        return [self.get_doc(doc_id) for doc_id, _ in sorted_docs]
+        dense_search: DenseSearchPort,
+        sparse_search: SparseSearchPort,
+        fuse: Callable[..., list[SearchResult]],
+        graph_search: GraphSearchPort | None = None,
+        weights: list[float] | None = None,
+        reranker: RerankerPort | None = None,
+    ) -> None:
+        ...
 ```
 
-**架构说明**：
-- ✅ **领域层**：`RAGService` 接口定义（零外部依赖）
-- ✅ **基础设施层**：`HybridRetriever` 实现（依赖 Qdrant/Neo4j/ColBERT）
-- ✅ **依赖注入**：应用层通过依赖注入容器将基础设施实现注入到领域服务
+**架构说明：**
+- ✅ **领域层**：`SearchServicePort` 基础端口定义（零外部依赖，R1 规则）
+- ✅ **领域层**：`HybridSearchPort` 组合端口定义（R2 规则，组合三路检索）
+- ✅ **应用层**：`Dense/Sparse/Graph/HybridSearchService` 实现端口（注入领域层端口）
+- ✅ **基础设施层**：`QdrantAdapter` 实现 `L3VectorPort`，`EmbeddingAPIClient` 实现 `EmbeddingServicePort`
+- ✅ **依赖注入**：`composition_root.py` 统一注册，通过 `Resolver` 自动装配
 
 #### 17.1.5.1 检索 - 压缩循环机制（Retrieval-Compression Loop）
 
@@ -379,199 +392,164 @@ class HybridRetriever(RAGService):
 **持久化笔记详细实现（压缩前必须执行）：**
 
 ```python
+# 文件位置：src/domain/services/persistent_note_taker.py
+
+@dataclass(frozen=True)
+class PersistentNote:
+    """持久化笔记值对象
+
+    检索-压缩循环中，压缩前必须完成持久化的笔记数据。
+
+    Attributes:
+        note_id: 笔记唯一标识
+        query: 原始查询文本
+        user_id: 发起用户 ID
+        session_id: 会话 ID
+        entities: 提取的关键实体（Top-20，序列化 dict 列表）
+        lineage: 检索血缘记录
+        summary: 结构化摘要
+        persisted: 是否已完成持久化（压缩前校验必须为 True）
+        persisted_at: 持久化完成时间
+    """
+    note_id: UUID = field(default_factory=uuid4)
+    query: str = ""
+    user_id: str = ""
+    session_id: str = ""
+    entities: list[dict[str, Any]] = field(default_factory=list)
+    extraction_result: ExtractionResult = field(default_factory=...)
+    lineage: dict[str, Any] = field(default_factory=dict)
+    summary: dict[str, Any] = field(default_factory=dict)
+    persisted: bool = False
+    persisted_at: datetime | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def to_dict(self) -> dict[str, Any]:
+        """序列化为 dict（用于 L1 缓存存储）"""
+        ...
+
+
 class PersistentNoteTaker:
-    """持久化笔记记录器 - 压缩前必须调用"""
+    """持久化笔记记录器 - 压缩前必须调用
+
+    注入：EntityExtractionPort + AuditServicePort + L1CachePort
+    """
 
     async def take_notes(
         self,
         query: str,
-        retrieved_docs: List[Document],
+        retrieved_docs: list[SearchResult],
         user_id: str,
-        session_id: str
+        session_id: str,
     ) -> PersistentNote:
         """
         执行持久化笔记步骤
 
-        步骤：
-        1. 提取关键实体与关系 → 写入 StrategicArchive（L0-L5 六层存储）
-        2. 生成结构化摘要（JSON Schema 强制）→ 写入 PostgreSQL
-        3. 记录检索血缘 → 审计日志
-
-        验收标准：持久化完成后才允许压缩
+        流程：
+        1. 提取关键实体与关系 → EntityExtractionPort（失败降级为空实体列表）
+        2. 构建检索血缘（query/top_k/document_ids/user_id/session_id/timestamp）
+        3. 记录检索血缘 → AuditServicePort（L2+L4 双存储，失败降级跳过）
+        4. 持久化完成标记（persisted=True）+ 序列化至 L1 缓存（TTL 30 天）
         """
-        note = PersistentNote(
-            note_id=uuid4(),
-            query=query,
-            session_id=session_id,
-            user_id=user_id,
-            timestamp= datetime.now(UTC)
-        )
+        ...
 
-        # 1. 提取关键实体与关系 → 写入 StrategicArchive（L0-L5 六层存储）
-        entities = await self.entity_extractor.extract(retrieved_docs)
-        note.entities = entities
-        await self.strategic_archive.save_entities(entities)
-
-        # 2. 生成结构化摘要（JSON Schema 强制）→ 写入 PostgreSQL（L2 关系存储）
-        summary = await self.summary_generator.generate(
-            retrieved_docs,
-            schema=RetrievalSummarySchema  # Pydantic V2 强制
-        )
-        note.summary = summary
-        await self.postgres_repo.save_summary(summary)
-
-        # 3. 记录检索血缘 → 审计日志（L2+L4 双存储）
-        lineage = RetrievalLineage(
-            query=query,
-            top_k=len(retrieved_docs),
-            document_ids=[doc.id for doc in retrieved_docs],
-            user_id=user_id,
-            session_id=session_id,
-            timestamp= datetime.now(UTC)
-        )
-        note.lineage = lineage
-        await self.audit_log.save(lineage)
-        await self.worm_storage.archive(lineage)  # WORM 归档 7 年
-
-        # 4. 持久化完成标记
-        note.persisted = True
-        note.persisted_at =  datetime.now(UTC)
-
-        # 5. 持久化笔记序列化至 Redis（L1 高速缓存，TTL 30 天）
-        await self.redis.setex(
-            f"note:{note.note_id}",
-            ttl=30 * 24 * 3600,  # 30 天
-            value=note.serialize()
-        )
-
-        return note
-
-    def verify_persisted(self, note: PersistentNote) -> bool:
+    @staticmethod
+    def verify_persisted(note: PersistentNote) -> bool:
         """验证持久化是否完成（压缩前检查）"""
-        if not note.persisted:
-            raise CompressionError("压缩前必须执行持久化笔记步骤")
-        if not note.entities or not note.summary or not note.lineage:
-            raise CompressionError("持久化笔记内容不完整")
-        return True
+        return note.persisted and note.persisted_at is not None
 ```
 
 **压缩算法详细实现：**
 
 ```python
-class ContextCompressor:
-    """上下文压缩器 - 遵循系统公理二"""
+# 文件位置：src/domain/services/context_compressor.py
 
-    COMPRESSION_RATIO_TARGET = 0.70  # 压缩率≥70%
-    CONTEXT_SIZE_LIMIT = 2000  # 压缩后~2K tokens
+@dataclass(frozen=True)
+class CompressedContext:
+    """压缩上下文值对象
+
+    Attributes:
+        context: 压缩后的上下文文本（~2K tokens）
+        compression_ratio: 压缩率（≥0.70）
+        quality_score: 质量评分（0-1，<0.7 触发二次生成）
+        token_count: 压缩后 token 数（估算）
+        original_token_count: 原始 token 数（估算）
+        persistent_note_ref: 关联的持久化笔记 ID
+        query: 原始查询文本
+        key_entities: 输入的关键实体列表
+        rerun_count: 重试次数（首次为 0，二次生成为 1）
+    """
+    context: str = ""
+    compression_ratio: float = 0.0
+    quality_score: float = 0.0
+    token_count: int = 0
+    original_token_count: int = 0
+    persistent_note_ref: str = ""
+    query: str = ""
+    key_entities: list[dict[str, Any]] = field(default_factory=list)
+    rerun_count: int = 0
+
+
+class ContextCompressor:
+    """上下文压缩器 - 遵循系统公理二
+
+    注入：LLMClientPort + PersistentNoteTaker + CompressionQualityEvaluator（可选）+ L1CachePort（可选）
+    """
+
+    COMPRESSION_RATIO_TARGET = 0.70
+    CONTEXT_SIZE_LIMIT = 2000
 
     async def compress(
         self,
-        retrieved_docs: List[Document],
+        retrieved_docs: list[SearchResult],
         query: str,
-        persistent_note: PersistentNote
+        persistent_note: PersistentNote,
     ) -> CompressedContext:
         """
         压缩检索结果至 LLM 上下文
 
         前置条件：persistent_note 已验证（压缩前必须持久化）
+        流程：
+        1. verify_persisted() 前置检查（失败抛出 EntityValidationError）
+        2. LLM 摘要生成（Temperature=0.3，低温度保证稳定性）
+        3. 压缩率验证（≥70%，不足触发二次压缩 _recompress()）
+        4. 质量评估（信息熵 + 实体覆盖率 + 冗余度，<0.7 触发二次生成 _regenerate()）
+        5. 压缩结果缓存至 L1（TTL 24 小时，失败降级跳过）
         """
-        # 0. 验证持久化已完成
-        if not self.note_taker.verify_persisted(persistent_note):
-            raise CompressionError("压缩前必须执行持久化笔记步骤")
-
-        # 1. 提取关键信息（基于持久化笔记中的实体）
-        key_entities = persistent_note.entities[:20]  # Top-20 关键实体
-
-        # 2. LLM 摘要生成（Temperature=0.3 低温度保证稳定性）
-        prompt = self._build_compress_prompt(
-            retrieved_docs=retrieved_docs,
-            query=query,
-            key_entities=key_entities,
-            max_tokens=2500
-        )
-        summary = await self.llm.generate(
-            prompt=prompt,
-            temperature=0.3,
-            max_tokens=2500
-        )
-
-        # 3. 关键信息抽取（结构化 JSON Schema 强制）
-        extracted_info = await self.info_extractor.extract(
-            summary,
-            schema=CompressedContextSchema  # Pydantic V2 强制
-        )
-
-        # 4. 压缩率验证
-        original_tokens = sum(len(doc.tokens) for doc in retrieved_docs)
-        compressed_tokens = len(extracted_info.tokens)
-        compression_ratio = 1 - (compressed_tokens / original_tokens)
-
-        if compression_ratio < self.COMPRESSION_RATIO_TARGET:
-            # 压缩率不足，触发二次压缩
-            extracted_info = await self._recompress(extracted_info, query)
-
-        # 5. 质量评估（信息熵 + 关键实体覆盖率）
-        quality_score = await self.quality_evaluator.evaluate(
-            compressed_context=extracted_info,
-            original_docs=retrieved_docs,
-            key_entities=key_entities
-        )
-
-        if quality_score < 0.7:
-            # 质量不足，触发二次生成
-            extracted_info = await self._regenerate(extracted_info, query)
-
-        return CompressedContext(
-            context=extracted_info,
-            compression_ratio=compression_ratio,
-            quality_score=quality_score,
-            token_count=compressed_tokens,
-            persistent_note_ref=persistent_note.note_id
-        )
+        ...
 ```
 
 **质量评估器（压缩后验证）：**
 
 ```python
+# 文件位置：src/domain/services/compression_quality_evaluator.py
+
 class CompressionQualityEvaluator:
-    """压缩质量评估器 - 信息熵 + 关键实体覆盖率"""
+    """压缩质量评估器 - 信息熵 + 关键实体覆盖率 + 冗余度
+
+    评分维度：
+    1. 信息熵（40%）：基于字符分布多样性的 Shannon 熵
+    2. 关键实体覆盖率（40%）：Top-20 关键实体保留比例
+    3. 冗余度（20%）：基于 n-gram 重复检测
+
+    评分 < 0.7 触发二次生成。
+    纯计算，无外部调用（P95 < 50ms），领域层零外部依赖。
+    """
 
     async def evaluate(
         self,
-        compressed_context: CompressedContext,
-        original_docs: List[Document],
-        key_entities: List[Entity]
+        compressed_context: str,
+        original_docs: list[SearchResult],
+        key_entities: list[dict[str, Any]],
     ) -> float:
         """
         评估压缩质量
 
-        评分维度：
-        1. 信息熵（40%）：压缩后信息密度
-        2. 关键实体覆盖率（40%）：Top-20 关键实体保留比例
-        3. 冗余度（20%）：重复内容比例
+        1. 信息熵评分：_calculate_entropy() → Shannon 熵归一化
+        2. 关键实体覆盖率：_calculate_coverage() → 实体在文本中出现比例
+        3. 冗余度评分：_calculate_redundancy() → n-gram 重复检测
+        4. 综合评分：0.40*熵 + 0.40*覆盖率 + 0.20*冗余度
         """
-        # 1. 信息熵评分
-        entropy_score = self._calculate_entropy(compressed_context.context)
-
-        # 2. 关键实体覆盖率
-        covered_entities = sum(
-            1 for entity in key_entities
-            if entity.name in compressed_context.context
-        )
-        coverage_score = covered_entities / len(key_entities)
-
-        # 3. 冗余度评分
-        redundancy_score = 1.0 - self._calculate_redundancy(compressed_context.context)
-
-        # 4. 综合评分
-        total_score = (
-            0.40 * entropy_score +
-            0.40 * coverage_score +
-            0.20 * redundancy_score
-        )
-
-        return total_score
-```
+        ...
 
 **验收标准：**
 

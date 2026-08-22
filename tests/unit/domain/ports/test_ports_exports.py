@@ -57,6 +57,36 @@ class TestPortsExport:
 
         assert DataAccessPattern is not None
 
+    def test_search_service_port_exported(self) -> None:
+        """SearchServicePort 应从 ports 模块导出"""
+        from src.domain.ports import SearchServicePort
+
+        assert SearchServicePort is not None
+
+    def test_dense_search_port_exported(self) -> None:
+        """DenseSearchPort 应从 ports 模块导出"""
+        from src.domain.ports import DenseSearchPort
+
+        assert DenseSearchPort is not None
+
+    def test_sparse_search_port_exported(self) -> None:
+        """SparseSearchPort 应从 ports 模块导出"""
+        from src.domain.ports import SparseSearchPort
+
+        assert SparseSearchPort is not None
+
+    def test_graph_search_port_exported(self) -> None:
+        """GraphSearchPort 应从 ports 模块导出"""
+        from src.domain.ports import GraphSearchPort
+
+        assert GraphSearchPort is not None
+
+    def test_hybrid_search_port_exported(self) -> None:
+        """HybridSearchPort 应从 ports 模块导出"""
+        from src.domain.ports import HybridSearchPort
+
+        assert HybridSearchPort is not None
+
 
 class TestStorageEnumsValues:
     """验证存储枚举值"""

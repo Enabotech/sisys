@@ -18,6 +18,7 @@ from typing import Any
 
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.ports.l5_graph import L5GraphPort
+from src.domain.ports.search_service import GraphSearchPort
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ _TYPE_WEIGHTS: dict[str, float] = {
 _DEFAULT_TYPE_WEIGHT: float = 0.5
 
 
-class GraphSearchService:
+class GraphSearchService(GraphSearchPort):
     """Graph 检索服务（第三路检索信号）
 
     通过 L5GraphPort 检索实体关联关系，输出兼容 SearchResult 的结果列表。

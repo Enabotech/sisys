@@ -15,9 +15,10 @@ from typing import Any, cast
 from src.domain.exceptions import ValidationError
 from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.l3_vector import L3VectorPort, SearchResult
+from src.domain.ports.search_service import SparseSearchPort
 
 
-class Bm25SparseSearchService:
+class Bm25SparseSearchService(SparseSearchPort):
     """BM25 稀疏检索服务
 
     编排 embedding_service（文本→稀疏向量）和 l3_vector（稀疏向量→检索）两个端口。

@@ -1201,6 +1201,35 @@ def perform_dense_search(context, dense_search_service, event_loop):
 
 ---
 
+### 架构更新日志（2026-08-22）
+
+**变更：R1 基础检索端口层次新增**
+
+本 Story 的 `DenseSemanticSearchService` 已按照 R1 设计规则重构为 `DenseSearchPort` 的实现类：
+
+| 项目 | 变更前 | 变更后 |
+|------|--------|--------|
+| 类声明 | `class DenseSemanticSearchService:` | `class DenseSemanticSearchService(DenseSearchPort):` |
+| 端口定义 | 无（类直接注册到 DI 容器） | `src/domain/ports/search_service.py` 新增 `SearchServicePort` / `DenseSearchPort` |
+| 构造函数类型 | `embedding_service: Any, vector_storage: Any` | `embedding_service: EmbeddingServicePort, vector_storage: L3VectorPort` |
+| 端口层次 | 无 | SearchServicePort → DenseSearchPort（R1 基础端口） |
+
+**端口层次关系：**
+```
+src/domain/ports/search_service.py
+  SearchServicePort（基础检索端口，统一 search 签名）
+    └── DenseSearchPort（Story 3.1a）
+    └── SparseSearchPort（Story 3.1b）
+    └── GraphSearchPort（Story 3.4）
+
+src/domain/ports/hybrid_search.py
+  HybridSearchPort（R2 组合端口，组合三路检索）
+
+src/domain/ports/__init__.py
+  ✅ 新增 6 个导出：SearchServicePort, DenseSearchPort, SparseSearchPort,
+     GraphSearchPort, HybridSearchPort
+```
+
 **故事版本/Story Version:** v2.0.0
 **创建日期/Created:** 2026-06-01
 **最后更新/Last Updated:** 2026-06-03

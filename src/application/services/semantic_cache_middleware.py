@@ -22,15 +22,12 @@ import json
 import logging
 import struct
 import time
-from typing import TYPE_CHECKING
 
 from src.application.ports.cache_metrics_port import CacheMetricsPort
 from src.application.ports.semantic_cache import SemanticCache
 from src.domain.ports.embedding_service import EmbeddingServicePort
+from src.domain.ports.hybrid_search import HybridSearchPort
 from src.domain.ports.l3_vector import SearchResult
-
-if TYPE_CHECKING:
-    from src.application.services.hybrid_search_service import HybridSearchService
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +51,7 @@ class SemanticCacheMiddleware:
 
     def __init__(
         self,
-        search_service: HybridSearchService,
+        search_service: HybridSearchPort,
         cache: SemanticCache,
         embedding_service: EmbeddingServicePort,
         threshold: float = 0.9,
@@ -65,7 +62,7 @@ class SemanticCacheMiddleware:
         """初始化语义缓存中间件
 
         Args:
-            search_service: 被包装的检索服务（HybridSearchService 实例）
+            search_service: 被包装的检索服务（HybridSearchPort 实例）
             cache: 语义缓存存储（SemanticCache 端口实现）
             embedding_service: 嵌入服务（生成查询向量作为缓存键）
             threshold: 缓存命中相似度阈值（默认 0.9）

@@ -34,9 +34,12 @@ from src.domain.exceptions import (
     ValidationError,
 )
 from src.domain.exceptions.llm_exceptions import LLMAPIError, LLMConfigError, LLMResponseError
-from src.domain.ports.archive_repository import ArchiveQuery
-from src.domain.ports.l3_vector import SearchResult
-from src.domain.ports.llm_client import LLMConfig
+from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
+from src.domain.ports.embedding_service import EmbeddingServicePort
+from src.domain.ports.l3_vector import L3VectorPort, SearchResult
+from src.domain.ports.layered_retrieval import LayeredRetrievalPort
+from src.domain.ports.llm_client import LLMClientPort, LLMConfig
+from src.domain.ports.relevance_evaluation import RelevanceEvaluationPort
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +63,12 @@ class SummaryGenerationService:
 
     def __init__(
         self,
-        llm_client: Any,
-        layered_retrieval: Any,
-        embedding_service: Any,
-        l3_vector: Any,
-        relevance_evaluation_service: Any | None = None,
-        archive_repo: Any | None = None,
+        llm_client: LLMClientPort,
+        layered_retrieval: LayeredRetrievalPort,
+        embedding_service: EmbeddingServicePort,
+        l3_vector: L3VectorPort,
+        relevance_evaluation_service: RelevanceEvaluationPort | None = None,
+        archive_repo: ArchiveRepositoryPort | None = None,
     ) -> None:
         """初始化摘要生成服务
 

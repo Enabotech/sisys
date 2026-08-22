@@ -819,6 +819,9 @@
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
 5. [x] Sprint status synced to `ready-for-dev`
+6. [x] **R1/R2 构造函数类型对齐（2026-08-22）**：
+   - [x] `TraceabilityService` 构造函数 `retrieval_port: Any` → `retrieval_port: LayeredRetrievalPort`
+   - [x] 端口实现 `TraceabilityService` 已对齐 `TraceabilityPort`（`src/domain/ports/traceability.py`）
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 

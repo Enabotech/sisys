@@ -11,9 +11,10 @@ from typing import Any
 from src.domain.exceptions import ValidationError
 from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.l3_vector import L3VectorPort, SearchResult
+from src.domain.ports.search_service import DenseSearchPort
 
 
-class DenseSemanticSearchService:
+class DenseSemanticSearchService(DenseSearchPort):
     """Dense 语义检索服务
 
     编排 embedding_service（文本→向量）和 l3_vector（向量→检索）两个端口
