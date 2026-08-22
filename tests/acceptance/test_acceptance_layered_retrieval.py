@@ -1,6 +1,6 @@
 """Story 3.5 分层检索（L1-L4）验收测试
 
-使用真实 DenseSemanticSearchService + 真实 LayeredRetrievalService。
+使用真实 HybridSearchService + 真实 LayeredRetrievalService。
 L3VectorPort 使用 Mock（Qdrant 为重型基础设施依赖）。
 LayeredRetrievalService 使用真实实例。
 
@@ -119,15 +119,25 @@ def mock_embedding_service() -> AsyncMock:
 def layered_retrieval_service(mock_l3_vector: AsyncMock, mock_embedding_service: AsyncMock):
     """构建 LayeredRetrievalService 实例"""
     from src.application.services.dense_search_service import DenseSemanticSearchService
+    from src.application.services.hybrid_search_service import HybridSearchService
     from src.application.services.layered_retrieval_service import LayeredRetrievalService
+    from src.application.services.sparse_search_service import Bm25SparseSearchService
+    from src.domain.services.rrf_fusion import fuse
 
     dense_search = DenseSemanticSearchService(
         embedding_service=mock_embedding_service,
         vector_storage=mock_l3_vector,
     )
+    sparse_mock = AsyncMock(spec=Bm25SparseSearchService)
+    sparse_mock.search.return_value = []
+    hybrid_search = HybridSearchService(
+        dense_search=dense_search,
+        sparse_search=sparse_mock,
+        fuse=fuse,
+    )
 
     return LayeredRetrievalService(
-        dense_search=dense_search,
+        hybrid_search=hybrid_search,
         l3_vector=mock_l3_vector,
         embedding_service=mock_embedding_service,
     )
@@ -299,7 +309,9 @@ def results_sorted_by_child_score(context: dict[str, Any]):
 def no_child_match(context: dict[str, Any], event_loop):
     """没有 Child 块匹配"""
     from src.application.services.dense_search_service import DenseSemanticSearchService
+    from src.application.services.hybrid_search_service import HybridSearchService
     from src.application.services.layered_retrieval_service import LayeredRetrievalService
+    from src.domain.services.rrf_fusion import fuse
 
     empty_vector = AsyncMock()
     empty_vector.search.return_value = []
@@ -309,9 +321,14 @@ def no_child_match(context: dict[str, Any], event_loop):
         embedding_service=empty_vector,
         vector_storage=empty_vector,
     )
+    empty_hybrid = HybridSearchService(
+        dense_search=empty_dense,
+        sparse_search=empty_vector,
+        fuse=fuse,
+    )
 
     service = LayeredRetrievalService(
-        dense_search=empty_dense,
+        hybrid_search=empty_hybrid,
         l3_vector=empty_vector,
         embedding_service=empty_vector,
     )
@@ -433,7 +450,9 @@ def result_has_id_score_payload(context: dict[str, Any]):
 def l4_search_fails(context: dict[str, Any], event_loop):
     """L4 检索失败，触发降级"""
     from src.application.services.dense_search_service import DenseSemanticSearchService
+    from src.application.services.hybrid_search_service import HybridSearchService
     from src.application.services.layered_retrieval_service import LayeredRetrievalService
+    from src.domain.services.rrf_fusion import fuse
 
     l3_vector = AsyncMock()
 
@@ -464,9 +483,20 @@ def l4_search_fails(context: dict[str, Any], event_loop):
         embedding_service=embedding,
         vector_storage=l3_vector,
     )
+    sparse_mock = AsyncMock()
+
+    async def _sparse_fail(*args, **kwargs):
+        raise RuntimeError("Sparse 检索失败")
+
+    sparse_mock.search.side_effect = _sparse_fail
+    hybrid_search = HybridSearchService(
+        dense_search=dense_search,
+        sparse_search=sparse_mock,
+        fuse=fuse,
+    )
 
     degrade_service = LayeredRetrievalService(
-        dense_search=dense_search,
+        hybrid_search=hybrid_search,
         l3_vector=l3_vector,
         embedding_service=embedding,
     )

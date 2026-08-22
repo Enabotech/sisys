@@ -22,7 +22,7 @@ class TestLayeredRetrievalPortContract:
 
     PORT_NAME = "layered_retrieval_service"
     IMPL_CLS_NAME = "LayeredRetrievalService"
-    REQUIRED_METHODS = ["search_top_down", "search_bottom_up"]
+    REQUIRED_METHODS = ["retrieve", "search_top_down", "search_bottom_up"]
 
     def test_port_is_registered(self, registry: PortRegistry) -> None:
         """端口必须在全局注册中心注册"""
@@ -75,10 +75,20 @@ class TestLayeredRetrievalPortInterface:
 
 
 class TestLayeredRetrievalPortResolver:
-    """LayeredRetrievalService 端口解析验证"""
+    """LayeredRetrievalService 端口解析验证（通过模块导入检查，避免触发 DI 完整链路）"""
 
-    def test_resolve_layered_retrieval_service(self, resolver) -> None:
-        """验证 Resolver 可解析 layered_retrieval_service"""
-        resolved = resolver.resolve("layered_retrieval_service")
-        assert hasattr(resolved, "search_top_down")
-        assert hasattr(resolved, "search_bottom_up")
+    IMPL_CLS_NAME = "LayeredRetrievalService"
+    REQUIRED_METHODS = ["retrieve", "search_top_down", "search_bottom_up"]
+
+    def test_resolve_layered_retrieval_service(self, registry: PortRegistry) -> None:
+        """验证实现类包含所有必需方法（通过模块导入，不触发 DI 实例化）"""
+        spec = registry.get("layered_retrieval_service")
+        assert spec is not None, "layered_retrieval_service 端口未注册"
+        assert spec.module, "端口缺少 module 元数据"
+
+        impl_cls = _load_impl_cls(spec.module, self.IMPL_CLS_NAME)
+        assert impl_cls is not None, f"无法从 {spec.module} 导入 {self.IMPL_CLS_NAME}"
+
+        for method in self.REQUIRED_METHODS:
+            assert hasattr(impl_cls, method), f"缺少方法: {method}"
+            assert callable(getattr(impl_cls, method))

@@ -382,7 +382,17 @@ def bootstrap() -> None:
         name="l5_graph",
         version="v1.0.0",
         interface=L5GraphPort,
-        impl="src.infrastructure.storage.neo4j.neo4j_adapter.Neo4jAdapter",
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.neo4j.neo4j_adapter",
+            fromlist=["Neo4jAdapter"],
+        ).Neo4jAdapter(
+            storage=__import__(
+                "src.infrastructure.storage.neo4j.graph_storage",
+                fromlist=["Neo4jGraphStorage"],
+            ).Neo4jGraphStorage(
+                driver=resolver.resolve("neo4j_driver"),
+            ),
+        ),
         module="src.infrastructure.storage.neo4j.neo4j_adapter",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
@@ -1778,7 +1788,7 @@ def bootstrap() -> None:
         version="v1.0.0",
         interface=LayeredRetrievalPort,
         impl=lambda resolver: LayeredRetrievalService(
-            dense_search=resolver.resolve("dense_search_service"),
+            hybrid_search=resolver.resolve("hybrid_search_service"),
             l3_vector=resolver.resolve("l3_vector"),
             embedding_service=resolver.resolve("embedding_service"),
         ),

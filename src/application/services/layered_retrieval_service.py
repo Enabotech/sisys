@@ -1,14 +1,18 @@
 """Story 3.5 分层检索应用服务
 
-编排 Dense 语义检索 + L3VectorPort 提供 L1-L4 分层检索能力。
+编排 HybridSearchService（三路 RRF 融合）+ L3VectorPort 提供 L1-L4 分层检索能力。
+Story 3.5 声明依赖 Story 3.4（RRF 融合排序），因此 L3/L4/L1/L2 检索复用
+HybridSearchService（Dense + Sparse + Graph 三路 + RRF 融合 + 可选重排序），
+而非直接注入 DenseSemanticSearchService 单通道。
+
 支持自底向上（L4→L3 回溯）和自顶向下（L3→L4 展开）两种遍历策略。
 
 降级策略：
 - L4 检索失败 → 透明降级为普通 L3 检索，WARNING 日志
-- L2/L1 当前为已实现（Story 3.6 填充 — _search_summaries 真实 Dense 检索）
+- L2/L1 已实现（Story 3.6 填充 — 经 HybridSearchService 检索摘要 collection）
 
 依赖注入：
-- DenseSemanticSearchService（外部构造，用于执行 Dense 语义检索）
+- HybridSearchService（外部构造，用于执行三路 RRF 融合检索）
 - EmbeddingServicePort（用于查询向量嵌入，自顶向下展开时复用）
 - L3VectorPort（用于按 ID 回溯和按 payload 过滤检索）
 """
@@ -63,31 +67,58 @@ _MAX_LIMIT = 200
 class LayeredRetrievalService:
     """分层检索编排服务
 
-    编排 DenseSemanticSearchService + EmbeddingServicePort + L3VectorPort 实现 L1-L4 分层检索。
+    编排 HybridSearchService + EmbeddingServicePort + L3VectorPort 实现 L1-L4 分层检索。
     支持自底向上（L4→L3 回溯）和自顶向下（L3→L4 展开）双向遍历。
+    L3/L4/L1/L2 检索通过 HybridSearchService 执行三路 Dense+Sparse+Graph RRF 融合。
 
     Attributes:
-        _dense_search: Dense 语义检索服务
+        _hybrid_search: 混合检索服务（三路 RRF 融合）
         _embedding_service: 嵌入服务端口（自顶向下展开时复用查询向量）
         _l3_vector: L3 向量存储端口
     """
 
     def __init__(
         self,
-        dense_search: Any,
+        hybrid_search: Any,
         l3_vector: Any,
         embedding_service: EmbeddingServicePort,
     ) -> None:
         """初始化分层检索服务
 
         Args:
-            dense_search: DenseSemanticSearchService 实例
+            hybrid_search: HybridSearchService 实例（三路 RRF 融合检索）
             l3_vector: L3VectorPort 实例（用于按 payload 过滤回溯和按 ID 获取）
             embedding_service: EmbeddingServicePort 实例（用于查询向量嵌入）
         """
-        self._dense_search = dense_search
+        self._hybrid_search = hybrid_search
         self._l3_vector = l3_vector
         self._embedding_service = embedding_service
+
+    async def retrieve(
+        self,
+        query: str,
+        top_k: int = 20,
+        tenant_id: str | None = None,
+    ) -> list[SearchResult]:
+        """统一检索入口（便捷方法，对齐架构 §17.1.5 RAGService.retrieve()）
+
+        默认走 L4 最小粒度（实体级片段），经 HybridSearchService 三路 RRF 融合。
+        委托给 search_top_down(target_level="L4")，复用其输入校验与降级逻辑。
+
+        Args:
+            query: 检索查询文本
+            top_k: 返回结果数量上限，默认 20
+            tenant_id: 租户 ID（用于多租户隔离）
+
+        Returns:
+            按相关性降序排列的检索结果列表
+        """
+        return await self.search_top_down(
+            query_text=query,
+            target_level="L4",
+            limit=top_k,
+            tenant_id=tenant_id,
+        )
 
     async def search_top_down(
         self,
@@ -101,8 +132,8 @@ class LayeredRetrievalService:
         """自顶向下遍历检索
 
         从高层级向低层级展开。根据 target_level 决定执行哪个层级检索：
-        - L1：跨文档摘要（已实现，Story 3.6 填充）
-        - L2：文档摘要（已实现，Story 3.6 填充）
+        - L1：跨文档摘要（已实现，Story 3.6 填充 — 通过 HybridSearchService 检索 cross_document_summaries）
+        - L2：文档摘要（已实现，Story 3.6 填充 — 通过 HybridSearchService 检索 document_summaries）
         - L3：文档切片层检索（常规 Dense 检索）
         - L4：L3→L4 展开（命中 Parent 的 Top-3 Child 展开）
 
@@ -174,9 +205,9 @@ class LayeredRetrievalService:
         """自底向上遍历检索
 
         从低层级向高层级回溯。根据 target_level 决定执行哪个层级检索：
-        - L4：L4 层直接检索（Child 块检索）
+        - L4：L4 层直接检索（Child 块检索，经 HybridSearchService 三路融合）
         - L3：L4→L3 回溯（命中 Child → 回溯 Parent）
-        - L2/L1：已实现（Story 3.6 填充 — _search_summaries 真实 Dense 检索）
+        - L2/L1：已实现（Story 3.6 填充 — 经 HybridSearchService 检索摘要 collection）
 
         Args:
             query_text: 查询文本
@@ -265,7 +296,7 @@ class LayeredRetrievalService:
         """
         parent_filter = self._merge_filter(filter_payload, {"index_level": "parent"})
         try:
-            raw_results = await self._dense_search.search(
+            raw_results = await self._hybrid_search.search(
                 collection=collection,
                 query_text=query_text,
                 limit=limit,
@@ -322,7 +353,7 @@ class LayeredRetrievalService:
         """
         child_filter = self._merge_filter(filter_payload, {"index_level": "child"})
         try:
-            raw_results = await self._dense_search.search(
+            raw_results = await self._hybrid_search.search(
                 collection=collection,
                 query_text=query_text,
                 limit=limit,
@@ -375,7 +406,7 @@ class LayeredRetrievalService:
         # 1. L4 层 Dense 检索
         child_filter = self._merge_filter(filter_payload, {"index_level": "child"})
         try:
-            l4_results = await self._dense_search.search(
+            l4_results = await self._hybrid_search.search(
                 collection=collection,
                 query_text=query_text,
                 limit=limit,
@@ -687,7 +718,7 @@ class LayeredRetrievalService:
 
         在指定摘要 collection 中执行 Dense 语义检索。
         不传递 index_level 过滤条件（摘要 collection 中的所有点均为摘要，无需额外过滤）。
-        复用 self._dense_search.search() 端到端 Dense 检索模式。
+        复用 self._hybrid_search.search() 端到端混合检索模式（Dense+Sparse+Graph RRF 融合）。
 
         降级策略（独立 try/except，与 L3/L4 的 raise LayeredRetrievalError 不同）：
         - 摘要 collection 不存在时降级为骨架（返回空列表，WARNING 日志）
@@ -717,7 +748,7 @@ class LayeredRetrievalService:
             return []
 
         try:
-            raw_results = await self._dense_search.search(
+            raw_results = await self._hybrid_search.search(
                 collection=collection,
                 query_text=query_text,
                 limit=limit,

@@ -77,9 +77,9 @@ OrchestrationService (1.18a) → 路由 task_type
 PrefectEngine (1.18a) → 包装 Prefect SDK
        ↓ submit_flow
 DocumentProcessingFlow (1.18a)
-  ├── parse_document (@task)
-  ├── generate_embedding (@task)
-  └── index_document (@task)
+  ├── parse_document (@task)          # 真实解析
+  ⚠️ 索引已迁移事件驱动：DocumentProcessed → SemanticChunking → RAGIndexed → ChunkIndexingHandler
+  （generate_embedding / index_document 已废弃，见 Epic 3 架构对齐重构）
        ↓ 完成
 EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/RabbitMQ
 
@@ -128,8 +128,9 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 **Given** PrefectEngine 已初始化
 **When** 通过 `submit_flow("DocumentProcessing", {"document_id": ..., "file_path": ...})` 提交文档处理请求
-**Then** Prefect Flow 执行：parse_document → generate_embedding → index_document 作为顺序 Prefect tasks
-**And** 成功完成后通过 EventPublisher 发布 `DocumentProcessed` 事件（构造时传入 `document_id`、`parse_result`、`embedding` 等字段；EventPublisher.publish() 返回 `PublishResult`，需检查 `is_full_failure` 并记录警告日志）
+**Then** Prefect Flow 执行 parse_document（真实解析）
+**And** 索引由事件驱动链承担：DocumentProcessed → SemanticChunkingService → RAGIndexed → ChunkIndexingHandler
+**And** 成功完成后通过 EventPublisher 发布 `DocumentProcessed` 事件（构造时传入 `document_id`、`parse_result` 等字段；EventPublisher.publish() 返回 `PublishResult`，需检查 `is_full_failure` 并记录警告日志）
 **And** 任务失败时 Prefect 内置重试机制激活（可配置重试次数）
 **And** 工作流执行延迟 P95 < 500ms（mock 任务，测量编排开销）
 
@@ -293,12 +294,11 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
   - get_flow_status(): 映射 Prefect 状态到 FlowStatus 枚举
 - [ ] DocumentProcessingFlow（`src/infrastructure/workflow/flows/document_processing_flow.py`）
   - Prefect @flow 装饰器
-  - 顺序执行：parse_document → generate_embedding → index_document
+  - 执行 parse_document（真实解析）；索引已迁移事件驱动链，flow 不再直接 embed/index
   - 完成回调：通过 EventPublisher 发布 DocumentProcessed 事件
 - [ ] document_tasks（`src/infrastructure/workflow/tasks/document_tasks.py`）
-  - parse_document (@task, retries=2)
-  - generate_embedding (@task, retries=2)
-  - index_document (@task, retries=2)
+  - parse_document (@task, retries=2) — 真实解析
+  - ⚠️ generate_embedding / index_document 已废弃（Epic 3 架构对齐重构，索引由 ChunkIndexingHandler 事件链承担）
 
 #### 应用层 Schema (Application Services)
 - [ ] OrchestrationService（`src/application/services/orchestration_service.py`）
@@ -741,8 +741,8 @@ submit_flow("DocumentProcessing", {"document_id": uuid, "file_path": "..."})
   ↓
 DocumentProcessingFlow (@flow)
   ├── parse_document(document_id, file_path)  → ParseResult   (@task, retries=2)
-  ├── generate_embedding(parse_result)         → EmbeddingResult (@task, retries=2)
-  └── index_document(embedding_result)         → IndexResult    (@task, retries=2)
+  ⚠️ generate_embedding / index_document 已废弃 — 索引由事件驱动链承担
+  （DocumentProcessed → SemanticChunking → RAGIndexed → ChunkIndexingHandler）
   ↓ 完成回调
 EventPublisher.publish(DocumentProcessed)
   ↓

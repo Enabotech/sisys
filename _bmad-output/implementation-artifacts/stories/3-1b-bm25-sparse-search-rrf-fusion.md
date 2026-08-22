@@ -602,6 +602,11 @@ RRF_score(d) = Σ w_i / (k + rank_i(d))
 > 本 Task 扩展管线以支持稀疏向量生成和 Qdrant 双向量 upsert。
 > **关键级联变更：** `generate_embedding` 返回类型从 `list[float]` 变更为 `EmbeddingResult` TypedDict，
 > 需同步更新 `index_document` 签名和 `document_processing_flow.py` 调用链。
+>
+> ⚠️ **2026-08-21 Epic 3 架构对齐重构说明**：`generate_embedding`/`index_document` 已从 `document_tasks.py` 删除。
+> 文档向量索引统一由事件驱动链承担（`DocumentProcessed → SemanticChunking → RAGIndexed → ChunkIndexingHandler`）。
+> 本 Task 的历史实现（EmbeddingResult TypedDict、双向量 upsert 逻辑）已迁移至 `ChunkIndexingHandler`。
+> 以下 TDD 循环为历史记录保留，新代码禁止调用这些函数。
 
 #### TDD 循环 A：generate_embedding 扩展
 

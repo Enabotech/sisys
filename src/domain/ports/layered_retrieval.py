@@ -2,10 +2,12 @@
 
 定义分层检索（L1-L4 检索粒度）的统一抽象端口契约。
 支持自顶向下（从高层级向低层级展开）与自底向上（从低层级向高层级回溯）双向遍历检索。
+另提供 retrieve() 便捷方法作为统一检索入口（对齐架构 §17.1.5 RAGService 语义）。
 
 设计决策：
 - 端口统一返回 `SearchResult`（与现有 Dense/Sparse/Hybrid 检索服务签名对齐）
 - `target_level` 为检索目标粒度层级字符串（"L1"/"L2"/"L3"/"L4"），默认 "L4"
+- `retrieve()` 默认走 L4 粒度 + HybridSearchService 三路 RRF 融合
 - 领域层零外部依赖（仅使用 Python 标准库 + SearchResult）
 """
 
@@ -23,10 +25,34 @@ LAYERED_RETRIEVAL_LEVELS: frozenset[str] = frozenset({"L1", "L2", "L3", "L4"})
 class LayeredRetrievalPort(Protocol):
     """分层检索端口契约
 
-    支持不同查询粒度在 L1-L4 层之间双向遍历检索：
-    - 自顶向下（search_top_down）：从高层级向低层级展开（如 L3→L4）
-    - 自底向上（search_bottom_up）：从低层级向高层级回溯（如 L4→L3）
+    支持不同查询粒度在 L1-L4 层之间双向遍历检索，
+    同时提供统一检索入口 retrieve() 对齐架构 RAGService 语义。
     """
+
+    async def retrieve(
+        self,
+        query: str,
+        top_k: int = 20,
+        tenant_id: str | None = None,
+    ) -> list[SearchResult]:
+        """统一检索入口（便捷方法）
+
+        默认走 L4 最小粒度（实体级片段），经 HybridSearchService 三路 RRF 融合。
+        相当于 search_top_down(query_text=query, target_level="L4", limit=top_k, tenant_id=tenant_id)。
+
+        对齐架构设计 §17.1.5 RAGService.retrieve() 语义：
+        输入 query + top_k → 返回按相关性排序的相关文档列表。
+        是分层检索能力的"快路径"，供 RAG 管线/用例直接调用，无需感知 L1-L4 层级语义。
+
+        Args:
+            query: 检索查询文本
+            top_k: 返回结果数量上限，默认 20
+            tenant_id: 租户 ID（用于多租户隔离）
+
+        Returns:
+            按相关性降序排列的检索结果列表
+        """
+        ...
 
     async def search_top_down(
         self,

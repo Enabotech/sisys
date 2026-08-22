@@ -1,6 +1,6 @@
 """Story 3.5 分层检索集成测试
 
-验证真实 DenseSemanticSearchService + 真实 LayeredRetrievalService 协作。
+验证真实 HybridSearchService + 真实 LayeredRetrievalService 协作。
 L3VectorPort 使用 Mock（Qdrant 为重型基础设施依赖），
 EmbeddingService 使用 Mock（外部 API）。
 
@@ -17,10 +17,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.application.services.dense_search_service import DenseSemanticSearchService
+from src.application.services.hybrid_search_service import HybridSearchService
 from src.application.services.layered_retrieval_service import LayeredRetrievalService
 from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.l3_vector import L3VectorPort
+from src.domain.services.rrf_fusion import fuse
 
 
 def _make_child_result(score: float, parent_id: str) -> dict:
@@ -77,23 +78,40 @@ class TestLayeredRetrievalIntegration:
         return mock
 
     @pytest.fixture
-    def dense_search(self, embedding_service: AsyncMock, l3_vector: AsyncMock) -> DenseSemanticSearchService:
-        """真实 DenseSemanticSearchService（注入 mock 端口）"""
-        return DenseSemanticSearchService(
+    def sparse_search(self, embedding_service: AsyncMock, l3_vector: AsyncMock) -> AsyncMock:
+        """Mock Bm25SparseSearchService（Sparse 通道信号）"""
+        return AsyncMock(return_value=[])
+
+    @pytest.fixture
+    def hybrid_search(
+        self,
+        embedding_service: AsyncMock,
+        l3_vector: AsyncMock,
+        sparse_search: AsyncMock,
+    ) -> HybridSearchService:
+        """真实 HybridSearchService（注入 mock 端口）"""
+        from src.application.services.dense_search_service import DenseSemanticSearchService
+
+        dense_search = DenseSemanticSearchService(
             embedding_service=embedding_service,
             vector_storage=l3_vector,
+        )
+        return HybridSearchService(
+            dense_search=dense_search,
+            sparse_search=sparse_search,
+            fuse=fuse,
         )
 
     @pytest.fixture
     def service(
         self,
-        dense_search: DenseSemanticSearchService,
+        hybrid_search: HybridSearchService,
         l3_vector: AsyncMock,
         embedding_service: AsyncMock,
     ) -> LayeredRetrievalService:
-        """真实 LayeredRetrievalService（注入真实 Dense + mock L3Vector + mock Embedding）"""
+        """真实 LayeredRetrievalService（注入真实 Hybrid + mock L3Vector + mock Embedding）"""
         return LayeredRetrievalService(
-            dense_search=dense_search,
+            hybrid_search=hybrid_search,
             l3_vector=l3_vector,
             embedding_service=embedding_service,
         )
@@ -209,7 +227,12 @@ class TestLayeredRetrievalIntegration:
         l3_vector: AsyncMock,
         embedding_service: AsyncMock,
     ) -> None:
-        """L4 检索失败 → 降级为 L3 检索"""
+        """L4 层混合检索全通道失败 → 降级为 L3 检索
+
+        HybridSearchService 对单通道失败会内部降级（Dense 失败 → Sparse 兜底），
+        因此本测试让 Dense + Sparse 双通道均失败，触发 HybridSearchError 上抛，
+        由 LayeredRetrievalService 捕获并降级为 L3 直接检索。
+        """
         parent_id = str(uuid.uuid4())
 
         async def _search(
@@ -236,12 +259,32 @@ class TestLayeredRetrievalIntegration:
 
         l3_vector.search.side_effect = _search
 
+        from src.application.services.dense_search_service import DenseSemanticSearchService
+        from src.application.services.sparse_search_service import Bm25SparseSearchService
+
         dense_search = DenseSemanticSearchService(
             embedding_service=embedding_service,
             vector_storage=l3_vector,
         )
-        service = LayeredRetrievalService(
+        sparse_mock = AsyncMock(spec=Bm25SparseSearchService)
+
+        async def _sparse_fail(
+            collection: str,
+            query_text: str,
+            limit: int = 10,
+            tenant_id: str | None = None,
+            filter_payload: dict | None = None,
+        ) -> list:
+            raise RuntimeError("L4 Sparse 检索失败")
+
+        sparse_mock.search.side_effect = _sparse_fail
+        hybrid_search = HybridSearchService(
             dense_search=dense_search,
+            sparse_search=sparse_mock,
+            fuse=fuse,
+        )
+        service = LayeredRetrievalService(
+            hybrid_search=hybrid_search,
             l3_vector=l3_vector,
             embedding_service=embedding_service,
         )
