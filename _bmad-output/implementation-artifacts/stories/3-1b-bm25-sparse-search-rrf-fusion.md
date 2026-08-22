@@ -1031,3 +1031,23 @@ tests/
   - P2: 依赖方向矩阵 interfaces 行修正/模板版本更新至 v2.8.0
   - P2: RRF payload 取首次出现行为修正/Elasticsearch rank_constant 声明修正
 - v1.0.0: 创建故事文件（遵循 SDD+TDD 融合模式模板 v2.7.0）
+
+---
+
+### 架构更新日志（2026-08-22）
+
+**变更：R1 基础检索端口层次新增**
+
+| 项目 | 变更前 | 变更后 |
+|------|--------|--------|
+| `Bm25SparseSearchService` 类声明 | `class Bm25SparseSearchService:` | `class Bm25SparseSearchService(SparseSearchPort):` |
+| 构造函数类型 | `embedding_service: Any, vector_storage: Any` | `embedding_service: EmbeddingServicePort, vector_storage: L3VectorPort` |
+| 端口层次 | 无 | SearchServicePort → SparseSearchPort（R1 基础端口） |
+
+**`HybridSearchService` 变更：**
+
+| 项目 | 变更前 | 变更后 |
+|------|--------|--------|
+| 类声明 | `class HybridSearchService:` | `class HybridSearchService(HybridSearchPort):` |
+| 构造函数类型 | `dense_search: Any, sparse_search: Any, graph_search: Any \| None` | `dense_search: DenseSearchPort, sparse_search: SparseSearchPort, graph_search: GraphSearchPort \| None` |
+| 端口类型 | 无 | HybridSearchPort（R2 组合端口，位于 `src/domain/ports/hybrid_search.py`） |

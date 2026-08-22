@@ -772,6 +772,9 @@ tests/
 6. [x] **Epic 3 架构对齐重构（2026-08-21）**：
    - [x] `LayeredRetrievalService` 注入 `HybridSearchService` 替代 `DenseSemanticSearchService`，正确复用 Story 3.4 RRF 融合能力
    - [x] `LayeredRetrievalPort` 新增 `retrieve()` 便捷方法，对齐架构 §17.1.5 RAGService 语义
+7. [x] **R1/R2 端口层次对齐（2026-08-22）**：
+   - [x] `LayeredRetrievalService` 构造函数类型从 `hybrid_search: Any, l3_vector: Any` 修正为 `hybrid_search: HybridSearchPort, l3_vector: L3VectorPort`
+   - [x] 构造函数类型精确化，消除 `Any` 类型
    - [x] 双轨索引消除：`generate_embedding`/`index_document` 废弃，索引统一为事件驱动链（`DocumentProcessed → SemanticChunking → RAGIndexed → ChunkIndexingHandler`）
    - [x] `document_processing_flow` 仅执行解析阶段，索引委托事件驱动链
    - [x] 所有测试 41 项通过，lint/mypy 通过

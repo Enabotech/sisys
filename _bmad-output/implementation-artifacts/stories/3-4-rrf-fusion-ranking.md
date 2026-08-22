@@ -1147,6 +1147,10 @@ export RERANKER_BASE_URL=...                      # 重排序 API 端点
 5. [x] Sprint status synced to `ready-for-dev`
 6. [x] **Epic 3 架构对齐重构（2026-08-21）**：
    - [x] `HybridSearchService` 成为生产检索链路核心 — `LayeredRetrievalService`（Story 3.5）注入其作为 L3/L4/L1/L2 检索实现
+7. [x] **R1/R2 端口层次对齐（2026-08-22）**：
+   - [x] `GraphSearchService` 实现 `GraphSearchPort`（`src/domain/ports/search_service.py`）
+   - [x] `HybridSearchService` 实现 `HybridSearchPort`（`src/domain/ports/hybrid_search.py`）
+   - [x] 构造函数类型从 `Any` 修正为具体端口类型
    - [x] 三路 RRF 融合能力经 `LayeredRetrievalService.retrieve()` 统一入口对外暴露
 
 ### 下一步 Next Steps

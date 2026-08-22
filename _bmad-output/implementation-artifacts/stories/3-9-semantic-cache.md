@@ -888,6 +888,9 @@
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（Story 3.4）
 5. [x] Sprint status synced to `ready-for-dev`
+6. [x] **R1/R2 构造函数类型对齐（2026-08-22）**：
+   - [x] `SemanticCacheMiddleware` 构造函数 `search_service: HybridSearchService` → `search_service: HybridSearchPort`
+   - [x] 被包装的检索服务类型从具体类提升为端口抽象（依赖倒置，便于替换 Mock 实现）
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING
 
 import redis.asyncio as aioredis
 
@@ -17,9 +16,6 @@ from src.domain.ports.registry import (
     _global_registry,
     register_port,
 )
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -2091,6 +2087,55 @@ def bootstrap() -> None:
         owner="foundation-team",
         tags=("archive", "service", "application"),
         compatibility=("v1.0.0",),
+    )
+
+    # === 检索-压缩循环（系统公理二：压缩前必须持久化）===
+    # 实现 PersistentNoteTaker → ContextCompressor → CompressionQualityEvaluator 链路
+    # 注册顺序：必须先注册 persistent_note_taker（ContextCompressor 依赖 verify_persisted）
+    from src.domain.services.compression_quality_evaluator import CompressionQualityEvaluator
+    from src.domain.services.context_compressor import ContextCompressor
+    from src.domain.services.persistent_note_taker import PersistentNoteTaker
+
+    register_port(
+        name="persistent_note_taker",
+        version="v1.0.0",
+        interface=PersistentNoteTaker,
+        impl=lambda resolver: PersistentNoteTaker(
+            entity_extractor=resolver.resolve("entity_extraction_service"),
+            audit_service=resolver.resolve_optional("audit_service"),
+            l1_cache=resolver.resolve_optional("redis_adapter"),
+        ),
+        module="src.domain.services.persistent_note_taker",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("retrieval", "compression", "domain"),
+    )
+
+    register_port(
+        name="compression_quality_evaluator",
+        version="v1.0.0",
+        interface=CompressionQualityEvaluator,
+        impl=lambda resolver: CompressionQualityEvaluator(),
+        module="src.domain.services.compression_quality_evaluator",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("retrieval", "compression", "domain"),
+    )
+
+    register_port(
+        name="context_compressor",
+        version="v1.0.0",
+        interface=ContextCompressor,
+        impl=lambda resolver: ContextCompressor(
+            llm_client=resolver.resolve("llm_client"),
+            note_taker=resolver.resolve("persistent_note_taker"),
+            quality_evaluator=resolver.resolve_optional("compression_quality_evaluator"),
+            l1_cache=resolver.resolve_optional("redis_adapter"),
+        ),
+        module="src.domain.services.context_compressor",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("retrieval", "compression", "domain"),
     )
 
     # === 事件处理器注册（register_handlers）===

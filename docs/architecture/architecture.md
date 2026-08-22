@@ -108,7 +108,7 @@ completedAt: '2026-02-26'
 **关键机制：**
 - **战略档案库**：第 9 章 StrategicArchive 实体（六层存储协同）
 - **上下文压缩**：LLM 上下文仅保留当前任务必需的压缩信息（压缩率≥70%）
-- **检索 - 压缩循环**：第 17.1.5 节 混合检索（Dense+Sparse+Graph→RRF 融合→ColBERT 重排序）
+- **检索 - 压缩循环**：第 17.1.5 节 混合检索（Dense+Sparse+Graph→RRF 融合→重排序）→ 持久化笔记（PersistentNoteTaker）→ 压缩（ContextCompressor）→ 质量评估（CompressionQualityEvaluator）。端口层次：R1 SearchServicePort → R2 HybridSearchPort
 - **持久化笔记**：压缩前必须执行持久化（第 8.2.1 节 CheckpointSnapshot 序列化）
 - **L0 记忆入口**：MEMORY.md 作为统一入口，索引驱动各层存储访问
 
@@ -277,7 +277,7 @@ graph TB
         end
 
         subgraph "领域服务接口"
-            RAGService["RAG 服务接口<br/>Dense+Sparse+Graph"]
+            RAGService["RAG 检索端口层次<br/>SearchServicePort 基础端口<br/>Dense/Sparse/Graph/Hybrid"]
             ToolService["工具箱服务接口<br/>CLI+Skills"]
             AgentService["Agent 服务接口<br/>EIP 执行"]
             PlanningService["规划服务接口<br/>BLM/BEM 状态机"]
@@ -394,12 +394,12 @@ graph TB
     Outbox -- "28. 等待用户反馈" --> EventListener
     EventListener -- "29. 恢复执行" --> PlanningUC
 
-    %% 流程 30-34: RAG 混合检索流程（增强）
+    %% 流程 30-34: RAG 混合检索流程（SearchServicePort 端口层次）
     QueryHandler -- "30. 检索请求" --> RAGService
-    RAGService -- "31. Dense 检索" --> Vector_Storage
-    RAGService -- "32. Sparse 检索" --> Vector_Storage
-    RAGService -- "33. Graph 检索" --> Graph_Storage
-    RAGService -- "34. RRF 融合+ 重排序" --> QueryHandler
+    RAGService -- "31. Dense 检索（DenseSearchPort）" --> Vector_Storage
+    RAGService -- "32. Sparse 检索（SparseSearchPort）" --> Vector_Storage
+    RAGService -- "33. Graph 检索（GraphSearchPort）" --> Graph_Storage
+    RAGService -- "34. RRF 融合+ 重排序（HybridSearchPort）" --> QueryHandler
 
     %% 流程 35-38: 结果生成与六层存储协同
     PlanningUC -- "35. 生成 PDF 报告" --> PrefectEngine
@@ -2342,7 +2342,7 @@ sisys/
 | `src/infrastructure/agent_orch/agents/` | 7 角色 Agent 实现 | Epic 4 |
 | `src/infrastructure/agent_orch/graphs/` | 多种状态图（BLM/BEM/协作） | Epic 4 |
 | `src/infrastructure/mcp/` | MCP 外部生态接口 | V2+ |
-| `src/infrastructure/retrieval/` | 混合检索器 | Epic 3 |
+| `src/infrastructure/retrieval/` | 混合检索器（已实现：DenseSearchPort/SparseSearchPort/GraphSearchPort/HybridSearchPort） | Epic 3 |
 
 ---
 
@@ -2478,7 +2478,7 @@ buckets/
 
 | NFR | 架构支撑 | 文件位置 |
 |-----|---------|---------|
-| 检索延迟 P95<800ms | 混合检索 + RRF 融合 | `src/infrastructure/persistence/vector_store.py` |
+| 检索延迟 P95<800ms | 混合检索（Dense+Sparse+Graph 三路 RRF 融合）+ 重排序 | `src/domain/ports/search_service.py`（SearchServicePort 基础端口）<br/>`src/domain/ports/hybrid_search.py`（HybridSearchPort 组合端口）<br/>`src/application/services/hybrid_search_service.py` |
 | 路由延迟 P95<50ms | UDMR 三层决策 | `src/domain/services/routing_service.py` |
 | 事件可靠性 | Outbox 模式 | `src/infrastructure/messaging/outbox/` |
 | 7 年审计存储 | WORM 对象存储 | `src/infrastructure/external_services/file_storage/minio_adapter.py` |

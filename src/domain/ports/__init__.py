@@ -30,6 +30,7 @@ from src.domain.ports.entity_extraction import (
 )
 from src.domain.ports.event_listener import EventListener, EventListenerAsync
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
+from src.domain.ports.hybrid_search import HybridSearchPort
 from src.domain.ports.index_manager import IndexManagerPort
 from src.domain.ports.l0_storage import L0StoragePort
 from src.domain.ports.l1_cache import L1CachePort
@@ -57,6 +58,12 @@ from src.domain.ports.relevance_evaluation import (
 from src.domain.ports.reranker import RerankerPort
 from src.domain.ports.saga import SagaRepositoryProtocol, SagaStep
 from src.domain.ports.sandbox_executor import SandboxExecutor
+from src.domain.ports.search_service import (
+    DenseSearchPort,
+    GraphSearchPort,
+    SearchServicePort,
+    SparseSearchPort,
+)
 from src.domain.ports.semantic_chunker import SemanticChunkerPort
 from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
 from src.domain.ports.session_storage import SessionStorage
@@ -84,6 +91,7 @@ __all__ = [
     "DataAccessPattern",
     "BaseRepository",
     "DeadLetterQueue",
+    "DenseSearchPort",
     "DictionaryConsumerPort",
     "DictionaryEntry",
     "DictionaryQuery",
@@ -97,7 +105,9 @@ __all__ = [
     "ExtractionResult",
     "EventListener",
     "EventListenerAsync",
+    "GraphSearchPort",
     "HashRouterProtocol",
+    "HybridSearchPort",
     "IndexManagerPort",
     "L0StoragePort",
     "L1CachePort",
@@ -130,8 +140,10 @@ __all__ = [
     "SemanticChunkerPort",
     "SemanticRouterProtocol",
     "SessionStorage",
+    "SearchServicePort",
     "SnapshotRepositoryProtocol",
     "SparseEmbedding",
+    "SparseSearchPort",
     "StorageLayer",
     "StorageTier",
     "SummaryGenerationPort",

@@ -995,6 +995,10 @@ docs/
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
 5. [x] Sprint status synced to `ready-for-dev`
+6. [x] **R1/R2 构造函数类型对齐（2026-08-22）**：
+   - [x] `RelevanceEvaluationService` 构造函数 `llm_client: Any` → `llm_client: LLMClientPort`
+   - [x] `SummaryGenerationService` 注入 `relevance_evaluation_service` 类型从 `Any | None` → `RelevanceEvaluationPort | None`
+   - [x] 端口实现 `RelevanceEvaluationService` 已对齐 `RelevanceEvaluationPort`（`src/domain/ports/relevance_evaluation.py`）
 
 ---
 

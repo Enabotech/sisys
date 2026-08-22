@@ -1,4 +1,4 @@
-# sisys — 从战略规划到业务执行的智能闭环
+# sisys — 战略管理智能体系统
 
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](./LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)

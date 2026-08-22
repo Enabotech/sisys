@@ -16,11 +16,11 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any
 
 from src.domain.exceptions import TraceabilityError, TraceabilityNotFoundError
 from src.domain.exceptions.llm_exceptions import LLMAPIError, LLMResponseError
 from src.domain.ports.l3_vector import SearchResult
+from src.domain.ports.layered_retrieval import LayeredRetrievalPort
 from src.domain.ports.traceability import TraceabilityResult
 from src.domain.value_objects.citation import Citation
 from src.domain.value_objects.parsed_document import BoundingBox
@@ -41,7 +41,7 @@ class TraceabilityService:
 
     def __init__(
         self,
-        retrieval_port: Any,
+        retrieval_port: LayeredRetrievalPort,
     ) -> None:
         """初始化溯源服务
 
