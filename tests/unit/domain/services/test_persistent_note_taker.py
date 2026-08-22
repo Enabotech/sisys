@@ -130,7 +130,7 @@ class TestPersistentNoteTaker:
 
         assert note.persisted is True, "实体抽取失败不应阻断持久化"
         assert note.entities == [], "实体抽取失败时 entities 应为空列表"
-        assert note.extraction_result.extraction_metadata.get("strategy") == "rule"
+        assert note.extraction_result.extraction_metadata.get("strategy") == "failed"
 
     async def test_audit_service_not_injected(self) -> None:
         """审计服务未注入时降级跳过"""

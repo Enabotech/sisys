@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 from src.domain.services.compression_quality_evaluator import (
-    _QUALITY_THRESHOLD,
+    QUALITY_THRESHOLD,
     CompressionQualityEvaluator,
 )
 
@@ -140,7 +140,7 @@ class TestCompressionQualityEvaluator:
 
     async def test_quality_threshold_constant(self) -> None:
         """质量门禁阈值为 0.7"""
-        assert _QUALITY_THRESHOLD == 0.70
+        assert QUALITY_THRESHOLD == 0.70
 
 
 class TestCompressionQualityEvaluatorEntropy:

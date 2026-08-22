@@ -173,4 +173,4 @@ poetry run uvicorn src.interfaces.api.main:app --reload --port 8000
 
 ---
 
-**© 2026 sisys** · 从战略规划到业务执行的智能闭环
+**© 2026 sisys** · 战略管理智能体系统

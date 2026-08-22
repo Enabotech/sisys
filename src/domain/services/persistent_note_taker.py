@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -25,6 +26,8 @@ from src.domain.ports.audit_service import AuditServicePort
 from src.domain.ports.entity_extraction import EntityExtractionPort, ExtractionResult
 from src.domain.ports.l1_cache import L1CachePort
 from src.domain.ports.l3_vector import SearchResult
+
+logger = logging.getLogger(__name__)
 
 # 笔记 Redis 缓存 TTL（30 天，与设计文档 §17.1.5.1 对齐）
 _NOTE_CACHE_TTL_SECONDS = 30 * 24 * 3600
@@ -82,6 +85,11 @@ class PersistentNote:
             "user_id": self.user_id,
             "session_id": self.session_id,
             "entities": self.entities,
+            "extraction_result": {
+                "entity_count": len(self.extraction_result.entities),
+                "relation_count": len(self.extraction_result.relations),
+                "strategy": self.extraction_result.extraction_metadata.get("strategy", "none"),
+            },
             "lineage": self.lineage,
             "summary": self.summary,
             "persisted": self.persisted,
@@ -150,6 +158,21 @@ class PersistentNoteTaker:
                 context={"service": "PersistentNoteTaker", "field": "query"},
             )
 
+        if retrieved_docs is None:
+            retrieved_docs = []
+
+        if not user_id or not user_id.strip():
+            raise EntityValidationError(
+                message="user_id must not be empty",
+                context={"service": "PersistentNoteTaker", "field": "user_id"},
+            )
+
+        if not session_id or not session_id.strip():
+            raise EntityValidationError(
+                message="session_id must not be empty",
+                context={"service": "PersistentNoteTaker", "field": "session_id"},
+            )
+
         note = PersistentNote(
             query=query,
             user_id=user_id,
@@ -213,11 +236,12 @@ class PersistentNoteTaker:
                 ][:_ENTITY_LIMIT],
             )
         except Exception:
-            # 实体抽取失败降级：空实体列表（不阻断持久化）
+            # 实体抽取失败降级：空实体列表（不阻断持久化），标记 strategy=failed
+            logger.warning("实体抽取失败，降级为空实体列表", exc_info=True)
             object.__setattr__(
                 note,
                 "extraction_result",
-                ExtractionResult(extraction_metadata={"strategy": "rule", "entity_count": 0}),
+                ExtractionResult(extraction_metadata={"strategy": "failed", "entity_count": 0}),
             )
             object.__setattr__(note, "entities", [])
 
@@ -252,6 +276,7 @@ class PersistentNoteTaker:
             note: 持久化笔记
         """
         if self._l1_cache is None:
+            logger.debug("L1 缓存未注入，持久化笔记缓存降级跳过")
             return
         try:
             await self._l1_cache.set(
@@ -261,6 +286,7 @@ class PersistentNoteTaker:
             )
         except Exception:
             # 缓存失败降级跳过
+            logger.warning("持久化笔记写入 L1 缓存失败", exc_info=True)
             return
 
     @staticmethod
@@ -296,6 +322,8 @@ class PersistentNoteTaker:
             if content:
                 parts.append(str(content))
         merged = "\n".join(parts)
+        if not merged:
+            logger.debug("检索结果未提取到可用内容，实体抽取将跳过")
         return merged[:_ENTITY_EXTRACTION_CONTENT_LIMIT]
 
 
