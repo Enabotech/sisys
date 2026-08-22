@@ -121,20 +121,19 @@ class TestServicePlacement:
 
 
 class TestChunkLevelIndexing:
-    """分块级索引重构架构验证"""
+    """分块级索引重构架构验证
 
-    def test_index_document_payload_contains_index_level(self) -> None:
-        """document_tasks.py index_document 的 payload 包含 index_level 字段"""
-        src_path = Path("src/infrastructure/workflow/tasks/document_tasks.py")
-        source = src_path.read_text()
-        assert "index_level" in source, "index_document payload 应包含 index_level"
-        assert '"document"' in source, "文档级索引 index_level 值应为 'document'"
+    ⚠️ 索引已统一迁移至事件驱动链（generate_embedding/index_document 已删除），
+    分块级 payload 由 ChunkIndexingHandler 承担。
+    """
 
-    def test_index_document_payload_contains_parent_chunk_id(self) -> None:
-        """document_tasks.py index_document 的 payload 包含 parent_chunk_id 字段"""
-        src_path = Path("src/infrastructure/workflow/tasks/document_tasks.py")
+    def test_chunk_indexing_handler_applies_chunk_level_payload(self) -> None:
+        """ChunkIndexingHandler 的 payload 应包含 index_level=parent/child 分块字段"""
+        src_path = Path("src/application/event_handlers/chunk_indexing_handler.py")
         source = src_path.read_text()
-        assert "parent_chunk_id" in source, "index_document payload 应包含 parent_chunk_id"
+        assert '"parent"' in source, "ChunkIndexingHandler payload 应包含 parent 层级"
+        assert '"child"' in source, "ChunkIndexingHandler payload 应包含 child 层级"
+        assert "parent_chunk_id" in source, "ChunkIndexingHandler payload 应包含 parent_chunk_id"
 
     def test_chunk_indexing_handler_in_application(self) -> None:
         """ChunkIndexingHandler 在 application/event_handlers 中定义"""

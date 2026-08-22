@@ -769,6 +769,12 @@ tests/
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
 5. [x] Sprint status synced to `ready-for-dev`
+6. [x] **Epic 3 架构对齐重构（2026-08-21）**：
+   - [x] `LayeredRetrievalService` 注入 `HybridSearchService` 替代 `DenseSemanticSearchService`，正确复用 Story 3.4 RRF 融合能力
+   - [x] `LayeredRetrievalPort` 新增 `retrieve()` 便捷方法，对齐架构 §17.1.5 RAGService 语义
+   - [x] 双轨索引消除：`generate_embedding`/`index_document` 废弃，索引统一为事件驱动链（`DocumentProcessed → SemanticChunking → RAGIndexed → ChunkIndexingHandler`）
+   - [x] `document_processing_flow` 仅执行解析阶段，索引委托事件驱动链
+   - [x] 所有测试 41 项通过，lint/mypy 通过
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
@@ -833,9 +839,10 @@ tests/
 
 - [x] Story created with `ready-for-dev` status
 - [x] Round 1 代码审查已完成（注入EmbeddingServicePort + 修复P1/P2/P3问题）
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
-- [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
+- [x] 运行 `dev-story` 开始实施
+- [x] **Epic 3 架构对齐重构（2026-08-21）**：注入 HybridSearchService + retrieve() 统一入口 + 事件驱动索引单轨化
+- [x] 运行 `code-review` 进行代码审查
+- [x] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
@@ -926,12 +933,18 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-08-12
-**最后更新/Last Updated:** 2026-08-13
+**最后更新/Last Updated:** 2026-08-21
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 分层检索（L1-L4）完整定义
 - v1.1.0: 文档审查 Round 1 修复（命名统一/回溯机制修正/Qdrant payload 扩展/异常 7 步流程/架构引用修正/延迟预算标注/测试路径修正/module 参数补充）
 - v1.2.0: 文档审查 Round 2 修复（索引粒度重构/待更新文件清单/AC-5 增强/用语统一/测试分类表去重/SDD 清单分组）
 - v1.3.0: 文档审查 Round 4 修复（融合延迟指标/集成测试覆盖率≥75%/向量复用方案/分块管道集成方案/多级遍历限制/Parent-Child 层级测试/嵌入保护/事件冲突消除）
 - v1.3.1: dev-story 实施修正 — retrieval 子域范围 (280,289) 修正为 (280,281)（Story 3.9/3.10 新增 archive 子域占用 282-289 所致）
+- v1.4.0: Epic 3 架构对齐重构 — 检索链路统一 + 索引单轨化
+  - LayeredRetrievalService 注入 HybridSearchService（复用 Story 3.4 三路 RRF 融合），替换 DenseSemanticSearchService 直连
+  - LayeredRetrievalPort 新增 retrieve() 便捷方法（对齐架构 §17.1.5 RAGService.retrieve 语义）
+  - 双轨索引消除：generate_embedding/index_document 废弃，索引统一由 ChunkIndexingHandler 事件驱动链承担
+  - document_processing_flow 仅执行解析阶段
+  - 测试适配：41 项通过（含 ChunkIndexingHandler 等价验证），lint/mypy 通过

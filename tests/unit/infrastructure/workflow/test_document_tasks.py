@@ -1,18 +1,18 @@
 """索引管线任务单元测试
 
-验证 generate_embedding 双向量生成和 index_document 真实 Qdrant upsert。
-使用 mock 隔离 embedding_service / document_repository / Qdrant client。
+验证事件驱动分块索引（ChunkIndexingHandler）。
+⚠️ 全文索引轨（generate_embedding/index_document）已废弃删除，
+索引统一由 ChunkIndexingHandler 消费 RAGIndexed 事件执行。
 """
 
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from src.domain.ports.embedding_service import SparseEmbedding
-from src.infrastructure.workflow.tasks.document_tasks import EmbeddingResult
 
 
 @pytest.fixture
@@ -54,180 +54,93 @@ def mock_resolver(mock_embedding_service: MagicMock, mock_document_repository: A
     return resolver
 
 
-class TestGenerateEmbeddingExtended:
-    """generate_embedding 双向量生成"""
-
-    @pytest.mark.asyncio
-    async def test_generate_embedding_returns_embedding_result(self, mock_resolver: MagicMock) -> None:
-        """generate_embedding.fn() 应返回 EmbeddingResult TypedDict"""
-        from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-        parse_result = {
-            "status": "completed",
-            "document_id": str(uuid.uuid4()),
-            "tenant_id": "test-tenant",
-        }
-
-        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            result = await generate_embedding.fn(parse_result)
-
-        assert isinstance(result, dict)
-        assert "dense_vectors" in result
-        assert "sparse_vectors" in result
-        assert isinstance(result["dense_vectors"], list)
-        assert isinstance(result["sparse_vectors"], list)
-
-    @pytest.mark.asyncio
-    async def test_generate_embedding_calls_embed_documents(
-        self, mock_resolver: MagicMock, mock_embedding_service: MagicMock
-    ) -> None:
-        """generate_embedding 应调用 embed_documents"""
-        from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-        parse_result = {
-            "status": "completed",
-            "document_id": str(uuid.uuid4()),
-            "tenant_id": "test-tenant",
-        }
-
-        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            await generate_embedding.fn(parse_result)
-
-        mock_embedding_service.embed_documents.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_generate_embedding_calls_embed_sparse(
-        self, mock_resolver: MagicMock, mock_embedding_service: MagicMock
-    ) -> None:
-        """generate_embedding 应调用 embed_sparse"""
-        from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-        parse_result = {
-            "status": "completed",
-            "document_id": str(uuid.uuid4()),
-            "tenant_id": "test-tenant",
-        }
-
-        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            await generate_embedding.fn(parse_result)
-
-        mock_embedding_service.embed_sparse.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_generate_embedding_sparse_failure_degrades(
-        self, mock_resolver: MagicMock, mock_embedding_service: MagicMock
-    ) -> None:
-        """embed_sparse 失败时降级 — sparse_vectors 为空列表，dense 正常"""
-        from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-        mock_embedding_service.embed_sparse.side_effect = RuntimeError("Sparse API 不可用")
-
-        parse_result = {
-            "status": "completed",
-            "document_id": str(uuid.uuid4()),
-            "tenant_id": "test-tenant",
-        }
-
-        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            result = await generate_embedding.fn(parse_result)
-
-        assert result["sparse_vectors"] == []
-        assert len(result["dense_vectors"]) > 0
-
-    @pytest.mark.asyncio
-    async def test_generate_embedding_failed_parse_returns_empty(self, mock_resolver: MagicMock) -> None:
-        """解析失败时返回空 EmbeddingResult"""
-        from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-        parse_result = {"status": "failed", "document_id": str(uuid.uuid4())}
-
-        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            result = await generate_embedding.fn(parse_result)
-
-        assert result["dense_vectors"] == []
-        assert result["sparse_vectors"] == []
-
-
-class TestIndexDocumentReal:
-    """index_document 真实 Qdrant upsert"""
-
-    def _make_mock_l3_vector(self) -> AsyncMock:
-        """构造 mock L3VectorPort"""
-        mock = AsyncMock()
-        mock.upsert_points = AsyncMock(return_value=True)
-        return mock
+class TestChunkIndexingHandler:
+    """ChunkIndexingHandler 分块索引事件处理器（索引唯一入口）"""
 
     @pytest.mark.asyncio
     async def test_index_document_accepts_embedding_result(self) -> None:
-        """index_document 应接受 EmbeddingResult 参数（非原 list[float]）"""
-        from src.infrastructure.workflow.tasks.document_tasks import index_document
+        """ChunkIndexingHandler 接受 RAGIndexed 事件（替代 index_document 的 EmbeddingResult 参数）"""
+        from src.application.event_handlers.chunk_indexing_handler import ChunkIndexingHandler
 
-        embedding_result: EmbeddingResult = {
-            "dense_vectors": [[0.1] * 1024],
-            "sparse_vectors": [SparseEmbedding(indices=[0, 5], values=[1.0, 0.5])],
-        }
-
-        with patch("src.domain.ports.resolver.get_resolver", return_value=MagicMock()):
-            result = await index_document.fn(embedding_result)
-
-        assert isinstance(result, dict)
-        assert "indexed" in result
+        assert hasattr(ChunkIndexingHandler, "handle_chunk_indexed"), "ChunkIndexingHandler 应包含 handle_chunk_indexed 方法"
 
     @pytest.mark.asyncio
     async def test_index_document_calls_upsert_points(self) -> None:
-        """index_document 应调用 l3_vector.upsert_points"""
-        from src.infrastructure.workflow.tasks.document_tasks import index_document
+        """ChunkIndexingHandler.handle_chunk_indexed 调用 l3_vector.upsert_points"""
+        from unittest.mock import AsyncMock, MagicMock
 
-        mock_vector = self._make_mock_l3_vector()
-        mock_resolver = MagicMock()
-        mock_resolver.resolve.return_value = mock_vector
+        from src.application.event_handlers.chunk_indexing_handler import ChunkIndexingHandler
+        from src.domain.events.workflow_events import RAGIndexed
 
-        embedding_result: EmbeddingResult = {
-            "dense_vectors": [[0.1] * 1024],
-            "sparse_vectors": [SparseEmbedding(indices=[0, 5], values=[1.0, 0.5])],
-        }
+        mock_l3 = AsyncMock()
+        mock_l3.upsert_points = AsyncMock(return_value=True)
+        mock_embedding = AsyncMock()
+        mock_embedding.embed_documents.return_value = [[0.1] * 1024]
+        mock_repo = AsyncMock()
+        mock_repo.find.return_value = MagicMock(
+            metadata={"chunks": [{"chunk_id": "c1", "content": "块1", "index_level": "parent", "parent_chunk_id": None}]}
+        )
 
-        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            await index_document.fn(embedding_result)
+        handler = ChunkIndexingHandler(
+            embedding_service=mock_embedding,
+            l3_vector=mock_l3,
+            document_repository=mock_repo,
+        )
+        event = RAGIndexed(document_id=MagicMock(), chunk_count=1, tenant_id="test")
+        await handler.handle_chunk_indexed(event)
 
-        mock_vector.upsert_points.assert_called()
+        mock_l3.upsert_points.assert_called()
 
     @pytest.mark.asyncio
     async def test_index_document_passes_sparse_vector_to_upsert(self) -> None:
-        """index_document 应在 upsert 的点中包含 sparse_vector 字段"""
-        from src.infrastructure.workflow.tasks.document_tasks import index_document
+        """ChunkIndexingHandler 的 upsert 点包含 sparse_vector 字段"""
+        from unittest.mock import AsyncMock, MagicMock
 
-        mock_vector = self._make_mock_l3_vector()
-        mock_resolver = MagicMock()
-        mock_resolver.resolve.return_value = mock_vector
+        from src.application.event_handlers.chunk_indexing_handler import ChunkIndexingHandler
+        from src.domain.events.workflow_events import RAGIndexed
 
-        embedding_result: EmbeddingResult = {
-            "dense_vectors": [[0.1] * 1024],
-            "sparse_vectors": [SparseEmbedding(indices=[0, 5], values=[1.0, 0.5])],
-        }
+        mock_l3 = AsyncMock()
+        mock_l3.upsert_points = AsyncMock(return_value=True)
 
-        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            await index_document.fn(embedding_result)
+        async def _embed_sparse(texts: list[str]) -> list[dict]:
+            return [{"indices": [0, 5], "values": [1.0, 0.5]} for _ in texts]
 
-        # 验证传给 upsert_points 的点包含 sparse_vector
-        call_args = mock_vector.upsert_points.call_args
-        points = call_args[0][1]  # 第二个位置参数
+        mock_embedding = AsyncMock()
+        mock_embedding.embed_documents.return_value = [[0.1] * 1024]
+        mock_embedding.embed_sparse = _embed_sparse
+        mock_repo = AsyncMock()
+        mock_repo.find.return_value = MagicMock(
+            metadata={"chunks": [{"chunk_id": "c1", "content": "块1", "index_level": "parent", "parent_chunk_id": None}]}
+        )
+
+        handler = ChunkIndexingHandler(
+            embedding_service=mock_embedding,
+            l3_vector=mock_l3,
+            document_repository=mock_repo,
+        )
+        event = RAGIndexed(document_id=MagicMock(), chunk_count=1, tenant_id="test")
+        await handler.handle_chunk_indexed(event)
+
+        call_args = mock_l3.upsert_points.call_args
+        points = call_args[0][1]
         assert len(points) == 1
         assert "sparse_vector" in points[0], f"point 缺少 sparse_vector: {points[0].keys()}"
-        assert points[0]["sparse_vector"]["indices"] == [0, 5]
-        assert points[0]["sparse_vector"]["values"] == [1.0, 0.5]
 
     @pytest.mark.asyncio
     async def test_index_document_empty_vectors_returns_false(self) -> None:
-        """空向量列表时返回 indexed=False"""
-        from src.infrastructure.workflow.tasks.document_tasks import index_document
+        """空 chunk_count 时 ChunkIndexingHandler 跳过索引"""
+        from unittest.mock import AsyncMock, MagicMock
 
-        embedding_result: EmbeddingResult = {
-            "dense_vectors": [],
-            "sparse_vectors": [],
-        }
+        from src.application.event_handlers.chunk_indexing_handler import ChunkIndexingHandler
+        from src.domain.events.workflow_events import RAGIndexed
 
-        result = await index_document.fn(embedding_result)
+        mock_l3 = AsyncMock()
+        handler = ChunkIndexingHandler(
+            embedding_service=MagicMock(),
+            l3_vector=mock_l3,
+            document_repository=MagicMock(),
+        )
+        event = RAGIndexed(document_id=MagicMock(), chunk_count=0, tenant_id="test")
+        await handler.handle_chunk_indexed(event)
 
-        assert result["indexed"] is False
-        assert result["chunk_count"] == 0
+        mock_l3.upsert_points.assert_not_called()

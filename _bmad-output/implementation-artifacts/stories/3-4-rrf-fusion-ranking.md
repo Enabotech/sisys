@@ -1145,20 +1145,28 @@ export RERANKER_BASE_URL=...                      # 重排序 API 端点
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
 5. [x] Sprint status synced to `ready-for-dev`
+6. [x] **Epic 3 架构对齐重构（2026-08-21）**：
+   - [x] `HybridSearchService` 成为生产检索链路核心 — `LayeredRetrievalService`（Story 3.5）注入其作为 L3/L4/L1/L2 检索实现
+   - [x] 三路 RRF 融合能力经 `LayeredRetrievalService.retrieve()` 统一入口对外暴露
 
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
-- [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
+- [x] 运行 `dev-story` 开始实施
+- [x] **Epic 3 架构对齐重构（2026-08-21）**：HybridSearchService 接入生产检索链路（被 LayeredRetrievalService 消费）
+- [x] 运行 `code-review` 进行代码审查
+- [x] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.2.1
 **创建日期/Created:** 2026-08-10
-**最后更新/Last Updated:** 2026-08-11
+**最后更新/Last Updated:** 2026-08-21
 **更新说明/Description:**
+- v1.2.1: Epic 3 架构对齐重构 — HybridSearchService 接入生产检索链路
+  - LayeredRetrievalService（Story 3.5）注入 HybridSearchService，L3/L4/L1/L2 检索经三路 RRF 融合
+  - LayeredRetrievalService.retrieve() 统一检索入口暴露三路能力
+  - SemanticCacheMiddleware 包装的 HybridSearchService 获得生产消费者
 - v1.2.0: 第3轮审查修复（异常契约表补全 + AC追溯矩阵修正 + 编码注册细节完善）
   - 异常契约表新增 HybridSearchError(EXCEPTION_209) 行
   - AC-5 追溯矩阵 Subtask 引用修正（1.4-1.6→1.7-1.9）

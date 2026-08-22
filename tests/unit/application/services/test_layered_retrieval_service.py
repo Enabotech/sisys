@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -23,18 +24,18 @@ from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.l3_vector import L3VectorPort, SearchResult
 
 
-def _make_dense_search(
+def _make_hybrid_search(
     search_results: list[SearchResult] | None = None,
     search_side_effect: Exception | None = None,
 ) -> AsyncMock:
-    """构造 Dense 检索服务 mock
+    """构造 HybridSearchService mock
 
     Args:
         search_results: search() 返回的结果列表
         search_side_effect: search() 抛出的异常
 
     Returns:
-        带 search() 方法的 mock 服务
+        带 search() 方法的 mock 服务（签名对齐 HybridSearchService.search()）
     """
     mock = AsyncMock()
     if search_side_effect is not None:
@@ -140,7 +141,7 @@ def _make_parent_result(
 def service() -> LayeredRetrievalService:
     """构建 LayeredRetrievalService 实例（空依赖）"""
     return LayeredRetrievalService(
-        dense_search=_make_dense_search(),
+        hybrid_search=_make_hybrid_search(),
         l3_vector=_make_l3_vector(),
         embedding_service=_make_embedding_service(),
     )
@@ -157,7 +158,7 @@ class TestBottomUpL4ToL3:
     async def test_bottom_up_l4_to_l3_basic(self) -> None:
         """基本 L4→L3 回溯"""
         parent_id = str(uuid.uuid4())
-        dense_search = _make_dense_search(
+        hybrid_search = _make_hybrid_search(
             search_results=[
                 _make_child_result(0.85, parent_id),
                 _make_child_result(0.72, parent_id),
@@ -176,7 +177,7 @@ class TestBottomUpL4ToL3:
             }
         )
         service = LayeredRetrievalService(
-            dense_search=dense_search,
+            hybrid_search=hybrid_search,
             l3_vector=l3_vector,
             embedding_service=_make_embedding_service(),
         )
@@ -199,9 +200,9 @@ class TestBottomUpL4ToL3:
     async def test_bottom_up_dedup_multiple_children(self) -> None:
         """同一 Parent 的多个 Child 命中合并为一条结果"""
         parent_id = str(uuid.uuid4())
-        dense_search = _make_dense_search(search_results=[_make_child_result(0.9, parent_id) for _ in range(3)])
+        hybrid_search = _make_hybrid_search(search_results=[_make_child_result(0.9, parent_id) for _ in range(3)])
         service = LayeredRetrievalService(
-            dense_search=dense_search,
+            hybrid_search=hybrid_search,
             l3_vector=_make_l3_vector(
                 points={parent_id: {"id": parent_id, "payload": {"content": "父块内容", "index_level": "parent"}}}
             ),
@@ -210,14 +211,14 @@ class TestBottomUpL4ToL3:
         """合并后结果按最高 Child 分数降序排列"""
         parent1 = str(uuid.uuid4())
         parent2 = str(uuid.uuid4())
-        dense_search = _make_dense_search(
+        hybrid_search = _make_hybrid_search(
             search_results=[
                 _make_child_result(0.5, parent1),
                 _make_child_result(0.95, parent2),
             ]
         )
         service = LayeredRetrievalService(
-            dense_search=dense_search,
+            hybrid_search=hybrid_search,
             l3_vector=_make_l3_vector(
                 points={
                     parent1: {"id": parent1, "payload": {"content": "父块1", "index_level": "parent"}},
@@ -241,7 +242,7 @@ class TestBottomUpL4ToL3:
     async def test_bottom_up_no_match_returns_empty(self) -> None:
         """无 Child 匹配时返回空列表"""
         service = LayeredRetrievalService(
-            dense_search=_make_dense_search(search_results=[]),
+            hybrid_search=_make_hybrid_search(search_results=[]),
             l3_vector=_make_l3_vector(),
             embedding_service=_make_embedding_service(),
         )
@@ -281,7 +282,7 @@ class TestTopDownL3ToL4:
         Returns:
             配置好的 LayeredRetrievalService
         """
-        dense_search = _make_dense_search()
+        hybrid_search = _make_hybrid_search()
         l3_vector = _make_l3_vector(
             search_results=[
                 {
@@ -320,7 +321,7 @@ class TestTopDownL3ToL4:
 
         l3_vector.search.side_effect = _child_search
         return LayeredRetrievalService(
-            dense_search=dense_search,
+            hybrid_search=hybrid_search,
             l3_vector=l3_vector,
             embedding_service=_make_embedding_service(),
         )
@@ -358,7 +359,7 @@ class TestTopDownL3ToL4:
     async def test_top_down_combined_score_sort(self) -> None:
         """结果按 Parent 分数 × Child 分数降序排列"""
         parent_id = str(uuid.uuid4())
-        dense_search = _make_dense_search()
+        hybrid_search = _make_hybrid_search()
         l3_vector = _make_l3_vector(
             search_results=[
                 {
@@ -400,7 +401,7 @@ class TestTopDownL3ToL4:
 
         l3_vector.search.side_effect = _search
         service = LayeredRetrievalService(
-            dense_search=dense_search,
+            hybrid_search=hybrid_search,
             l3_vector=l3_vector,
             embedding_service=_make_embedding_service(),
         )
@@ -418,7 +419,7 @@ class TestTopDownL3ToL4:
     async def test_top_down_parent_content_preview(self) -> None:
         """结果 payload 包含 parent_content 截断摘要（前 200 字符）"""
         parent_id = str(uuid.uuid4())
-        dense_search = _make_dense_search()
+        hybrid_search = _make_hybrid_search()
         l3_vector = _make_l3_vector(
             search_results=[
                 {
@@ -447,7 +448,7 @@ class TestTopDownL3ToL4:
             }
         ]
         service = LayeredRetrievalService(
-            dense_search=dense_search,
+            hybrid_search=hybrid_search,
             l3_vector=l3_vector,
             embedding_service=_make_embedding_service(),
         )
@@ -464,7 +465,7 @@ class TestTopDownL3ToL4:
         """L3 无匹配时自顶向下返回空列表"""
         l3_vector = _make_l3_vector(search_results=[])
         service = LayeredRetrievalService(
-            dense_search=_make_dense_search(),
+            hybrid_search=_make_hybrid_search(),
             l3_vector=l3_vector,
             embedding_service=_make_embedding_service(),
         )
@@ -591,10 +592,10 @@ class TestLayeredRetrievalService:
                 raise RuntimeError("L4 检索失败")
             return [_make_parent_result(str(uuid.uuid4()), score=0.8)]
 
-        dense_search = AsyncMock()
-        dense_search.search.side_effect = _search
+        hybrid_search = AsyncMock()
+        hybrid_search.search.side_effect = _search
         service = LayeredRetrievalService(
-            dense_search=dense_search,
+            hybrid_search=hybrid_search,
             l3_vector=_make_l3_vector(),
             embedding_service=_make_embedding_service(),
         )
@@ -621,10 +622,10 @@ class TestLayeredRetrievalService:
         ):
             raise StorageError("Qdrant 不可用")
 
-        dense_search = _make_dense_search()
-        dense_search.search.side_effect = _search
+        hybrid_search = _make_hybrid_search()
+        hybrid_search.search.side_effect = _search
         service = LayeredRetrievalService(
-            dense_search=dense_search,
+            hybrid_search=hybrid_search,
             l3_vector=_make_l3_vector(),
             embedding_service=_make_embedding_service(),
         )
@@ -639,9 +640,9 @@ class TestLayeredRetrievalService:
 
     async def test_l3_direct_search_failure_raises_layered_retrieval_error(self) -> None:
         """L3 直接检索失败抛出 LayeredRetrievalError"""
-        dense_search = _make_dense_search(search_side_effect=RuntimeError("Dense 不可用"))
+        hybrid_search = _make_hybrid_search(search_side_effect=RuntimeError("混合检索不可用"))
         service = LayeredRetrievalService(
-            dense_search=dense_search,
+            hybrid_search=hybrid_search,
             l3_vector=_make_l3_vector(),
             embedding_service=_make_embedding_service(),
         )
@@ -665,7 +666,7 @@ class TestLayeredRetrievalService:
         """get_point 返回 None 时 _fetch_parent 返回 None"""
         l3_vector = _make_l3_vector(points={})
         service = LayeredRetrievalService(
-            dense_search=_make_dense_search(),
+            hybrid_search=_make_hybrid_search(),
             l3_vector=l3_vector,
             embedding_service=_make_embedding_service(),
         )
@@ -681,7 +682,7 @@ class TestLayeredRetrievalService:
         l3_vector = AsyncMock(spec=L3VectorPort)
         l3_vector.get_point.side_effect = RuntimeError("Qdrant 不可用")
         service = LayeredRetrievalService(
-            dense_search=_make_dense_search(),
+            hybrid_search=_make_hybrid_search(),
             l3_vector=l3_vector,
             embedding_service=_make_embedding_service(),
         )
@@ -749,3 +750,77 @@ class TestL2L1Skeleton:
         from src.domain.ports.l3_vector import SearchResult as SearchResultType
 
         assert sorted(SearchResultType.__annotations__.keys()) == ["id", "payload", "score"]
+
+
+# ===================================================================
+# retrieve() 统一检索入口（对齐架构 §17.1.5 RAGService.retrieve()）
+# ===================================================================
+
+
+class TestRetrieveUnifiedEntry:
+    """retrieve() 统一检索入口测试"""
+
+    async def test_retrieve_delegates_to_search_top_down_l4(self) -> None:
+        """retrieve() 委托给 search_top_down(target_level='L4')，返回检索结果"""
+        # L4 路径需要 l3_vector.search 先返回 parent 结果，再返回 child 结果
+        parent_id = str(uuid.uuid4())
+        child_id = str(uuid.uuid4())
+        call_count = 0
+
+        async def _search(
+            collection: str,
+            query_vector: list[float],
+            limit: int = 10,
+            filter_payload: dict | None = None,
+        ) -> list[dict]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # 第一次调用：L3 parent 检索
+                return [{"id": parent_id, "score": 0.85, "payload": {"index_level": "parent", "content": "父块内容"}}]
+            # 后续调用：child 展开
+            return [{"id": child_id, "score": 0.7, "payload": {"index_level": "child", "parent_chunk_id": parent_id}}]
+
+        l3_vector = AsyncMock(spec=L3VectorPort)
+        l3_vector.search.side_effect = _search
+        l3_vector.get_point = AsyncMock(return_value=None)
+
+        service = LayeredRetrievalService(
+            hybrid_search=_make_hybrid_search(),
+            l3_vector=l3_vector,
+            embedding_service=_make_embedding_service(),
+        )
+        results = await service.retrieve(query="测试查询", top_k=10)
+        assert len(results) > 0, "retrieve() 应返回检索结果"
+        assert results[0]["payload"]["index_level"] == "child"
+        assert "parent_chunk_id" in results[0]["payload"]
+
+    async def test_retrieve_passes_tenant_id(self) -> None:
+        """retrieve() 透传 tenant_id 到 search_top_down（最终到达 filter_payload）"""
+        captured: dict[str, Any] = {}
+        call_count = 0
+
+        async def _search(
+            collection: str,
+            query_vector: list[float],
+            limit: int = 10,
+            filter_payload: dict | None = None,
+        ) -> list[dict]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                captured.update({"limit": limit, "filter_payload": filter_payload})
+            return []
+
+        l3_vector = AsyncMock(spec=L3VectorPort)
+        l3_vector.search.side_effect = _search
+        l3_vector.get_point = AsyncMock(return_value=None)
+
+        service = LayeredRetrievalService(
+            hybrid_search=_make_hybrid_search(),
+            l3_vector=l3_vector,
+            embedding_service=_make_embedding_service(),
+        )
+        await service.retrieve(query="市场分析", top_k=15, tenant_id="tenant-1")
+        if captured.get("filter_payload"):
+            assert captured["filter_payload"].get("tenant_id") == "tenant-1"

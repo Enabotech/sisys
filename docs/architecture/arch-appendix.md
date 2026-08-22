@@ -5260,7 +5260,14 @@ class SaveMetadataStep(SagaStep):
         return "保存文档元数据到关系数据库 (PostgreSQL)"
 
 class GenerateEmbeddingStep(SagaStep):
-    """步骤 3: 生成嵌入向量并保存到向量数据库"""
+    """步骤 3: 生成嵌入向量并保存到向量数据库（Saga 示例保留）
+
+    ⚠️ 注意（2026-08-21 Epic 3 架构对齐重构）：
+    文档向量索引已统一迁移至事件驱动链（DocumentProcessed → SemanticChunking →
+    RAGIndexed → ChunkIndexingHandler 分块级 upsert）。
+    本文保留 GenerateEmbeddingStep 作为 Saga 模式示例（流程编排参考），
+    生产文档索引不再直接调用 generate_embedding/index_document Prefect tasks。
+    """
 
     def __init__(self, embedding_service: Any, vector_store: Any):
         super().__init__("generate_embedding", timeout=180)

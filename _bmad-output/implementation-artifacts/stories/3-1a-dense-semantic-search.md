@@ -917,12 +917,18 @@ EMBEDDING_MODEL_DIMENSION=1024
 | `EmbeddingModelProtocol` | `src/infrastructure/routing/semantic_router.py` | 设计参考（本 Story 不直接使用） |
 | `EmbeddingConfig` (测试) | `tests/environments.py` | 测试环境已有配置；**注意**：`tests/environments.py` 和 `src/infrastructure/config/embedding.py` 各自维护独立的 `EmbeddingConfig` dataclass，需手动同步字段变更 |
 
-### generate_embedding MVP 占位
+### generate_embedding MVP 占位（⚠️ 已废弃）
 
-**文件：** `src/infrastructure/workflow/tasks/document_tasks.py` 第 58-71 行
+**文件：** `src/infrastructure/workflow/tasks/document_tasks.py`
+
+> **⚠️ 2026-08-21 Epic 3 架构对齐重构**：`generate_embedding`/`index_document` 已从 `document_tasks.py` 删除。
+> 文档向量索引统一由事件驱动链承担：
+> `DocumentProcessed → SemanticChunkingService → RAGIndexed → ChunkIndexingHandler`（分块级 Dense+Sparse upsert）。
+> 嵌入能力仍通过 `EmbeddingServicePort.embed_documents()/embed_sparse()` 直接使用（检索场景走 DenseSearchService）。
+> 以下为历史 MVP 占位代码参考，不再适用。
 
 ```python
-# 替换后：通过 resolver 获取真实 EmbeddingService
+# 历史 MVP 占位（已废弃）：通过 resolver 获取真实 EmbeddingService 整文嵌入
 # 注意：parse_document task 返回精简 dict {status, document_id, tenant_id, pages(数量)}，
 # 不含文本内容。需通过 DocumentRepository + DocumentQuery 获取完整文档的 metadata["parse_result"]。
 async def generate_embedding(parse_result: dict[str, Any]) -> list[float]:

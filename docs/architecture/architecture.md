@@ -1844,7 +1844,7 @@ src/infrastructure/
 │   │   # TODO: rag_pipeline, batch_analysis, report_generation, quality_control
 │   └── tasks/                                             # 任务定义（MVP 占位）
 │       ├── __init__.py
-│       └── document_tasks.py                              # ⚠️ MVP: parse/embed/index 返回 mock 数据
+│       └── document_tasks.py                              # parse_document 真实解析；⚠️ generate_embedding/index_document 已废弃（索引由事件驱动链承担）
 │
 ├── agent_orch/                                             # LangGraph Agent 编排引擎（实际目录名）
 │   # 注：文档中曾命名为 agent_orchestration/，实际代码为 agent_orch/

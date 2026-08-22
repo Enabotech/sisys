@@ -72,10 +72,41 @@ class TestLayeredRetrievalPort:
         assert inspect.iscoroutinefunction(LayeredRetrievalPort.search_top_down), "search_top_down 必须是 async 方法"
         assert inspect.iscoroutinefunction(LayeredRetrievalPort.search_bottom_up), "search_bottom_up 必须是 async 方法"
 
+    def test_retrieve_signature(self) -> None:
+        """验证 retrieve 方法签名（对齐架构 §17.1.5 RAGService.retrieve）"""
+        sig = inspect.signature(LayeredRetrievalPort.retrieve)
+        params = {p.name: p for p in sig.parameters.values()}
+
+        assert "self" in params, "缺少 self 参数"
+        assert "query" in params, "缺少 query 参数"
+        assert "top_k" in params, "缺少 top_k 参数"
+        assert "tenant_id" in params, "缺少 tenant_id 参数"
+
+        # top_k 默认值为 20
+        assert params["top_k"].default == 20, f"top_k 默认值应为 20, 实际 {params['top_k'].default}"
+
+        # tenant_id 默认为 None
+        assert params["tenant_id"].default is None, "tenant_id 默认应为 None"
+
+        return_annotation = str(sig.return_annotation)
+        assert "list[SearchResult]" in return_annotation, f"返回类型应为 list[SearchResult], 实际 {return_annotation}"
+
+    def test_retrieve_is_async(self) -> None:
+        """验证 retrieve 是 async 方法"""
+        assert inspect.iscoroutinefunction(LayeredRetrievalPort.retrieve), "retrieve 必须是 async 方法"
+
     def test_struct_validates_with_protocol(self) -> None:
         """验证实现类可通过 Protocol 结构检查"""
 
         class MockLayeredRetrieval:
+            async def retrieve(
+                self,
+                query: str,
+                top_k: int = 20,
+                tenant_id: str | None = None,
+            ) -> list[SearchResult]:
+                return []
+
             async def search_top_down(
                 self,
                 query_text: str,

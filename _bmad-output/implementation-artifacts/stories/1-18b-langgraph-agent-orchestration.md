@@ -81,9 +81,10 @@ PrefectEngine (1.18a) → 包装 Prefect SDK  LangGraphEngine (1.18b) → 包装
        ↓ submit_flow                      ↓ submit_graph
 DocumentProcessingFlow (1.18a)            BasicAgentGraph (1.18b)
   ├── parse_document (@task)                ├── analyze (node)
-  ├── generate_embedding (@task)            └── synthesize (node)
-  └── index_document (@task)                      ↓ 完成
-       ↓ 完成                              EventPublisher.publish(AgentDecided)
+  ⚠️ 索引已迁移事件驱动链                       └── synthesize (node)
+  （generate_embedding / index_document          ↓ 完成
+   已废弃，见 Epic 3 架构对齐重构）            EventPublisher.publish(AgentDecided)
+  ↓ 完成                                      ↓
 EventPublisher.publish(DocumentProcessed)        ↓
        ↓                                DualChannelEventBus → ChannelRouter(RELIABLE) → Outbox → RabbitMQ
 DualChannelEventBus → Outbox/RabbitMQ

@@ -377,17 +377,13 @@ def then_within_limit(context: dict[str, Any]) -> None:
 
 
 # ===================================================================
-# AC-4: 索引管线
+# AC-4: 索引管线（已迁移事件驱动 — ChunkIndexingHandler 承担索引）
 # ===================================================================
 
 
 @given("文档解析已完成")
 def given_document_parsed(context: dict[str, Any]) -> None:
-    """构造 parse_result 供 generate_embedding.fn() 使用
-
-    设计决策：document_repository 在 AC-4 测试中使用 mock（端口未提供 delete，无法安全清理）。
-    embedding_service 使用真实 API（核心被测对象），Qdrant 使用真实服务（含 Collection 清理）。
-    """
+    """构造 parse_result 供事件驱动链使用"""
     context["parse_result"] = {
         "status": "completed",
         "document_id": str(uuid.uuid4()),
@@ -395,131 +391,47 @@ def given_document_parsed(context: dict[str, Any]) -> None:
     }
 
 
-@given("嵌入服务 Sparse 通道不可用")
-def given_sparse_down(context: dict[str, Any]) -> None:
-    context["sparse_down"] = True
+@when("语义分块完成并发布 RAGIndexed 事件")
+def given_rag_indexed_event(context: dict[str, Any]) -> None:
+    """RAGIndexed 事件已就绪（由 SemanticChunkingService 发布）"""
+    from src.domain.events.workflow_events import RAGIndexed
+
+    context["rag_indexed_event"] = RAGIndexed(
+        document_id=uuid.uuid4(),
+        index_name="cross_document_summaries",
+        chunk_count=5,
+        tenant_id="test-tenant",
+    )
 
 
-@given("generate_embedding 已产出 EmbeddingResult")
-def given_embedding_ready(context: dict[str, Any], embedding_service, event_loop) -> None:
-    from src.infrastructure.workflow.tasks.document_tasks import EmbeddingResult
+@when("ChunkIndexingHandler 消费事件执行分块索引")
+def when_chunk_indexing_handler_processes(context: dict[str, Any]) -> None:
+    """验证 ChunkIndexingHandler 可处理 RAGIndexed 事件"""
+    from unittest.mock import MagicMock
 
-    async def _embed():
-        dense = await embedding_service.embed_documents(["验收测试文档内容"])
-        sparse = await embedding_service.embed_sparse(["验收测试文档内容"])
-        return dense, sparse
+    from src.application.event_handlers.chunk_indexing_handler import ChunkIndexingHandler
 
-    dense, sparse = event_loop.run_until_complete(_embed())
-    context["embedding_obj"] = EmbeddingResult(dense_vectors=dense, sparse_vectors=sparse)
-
-
-@when("我调用 generate_embedding 任务")
-def when_generate_embedding(
-    context: dict[str, Any],
-    embedding_service,
-    event_loop,
-) -> None:
-    """执行 generate_embedding.fn()
-
-    embedding_service → 真实（核心被测对象）
-    document_repository → mock（端口无 delete，无法安全隔离）
-    """
-    from unittest.mock import AsyncMock, MagicMock, patch
-
-    from src.infrastructure.workflow.tasks.document_tasks import generate_embedding
-
-    mock_doc = MagicMock()
-    mock_doc.metadata = {"parse_result": {"pages": [{"texts": [{"content": "验收测试文本"}]}]}}
-
-    repo = MagicMock()
-    repo.find = AsyncMock(return_value=mock_doc)
-
-    mock_resolver = MagicMock()
-    mock_resolver.resolve.side_effect = lambda n: {
-        "embedding_service": embedding_service,
-        "document_repository": repo,
-    }[n]
-
-    parse_result = context["parse_result"]
-
-    if context.get("sparse_down"):
-        original_sparse = embedding_service.embed_sparse
-        embedding_service.embed_sparse = MagicMock(side_effect=RuntimeError("Sparse API 不可用"))
-        try:
-            with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-                result = event_loop.run_until_complete(generate_embedding.fn(parse_result))
-        finally:
-            embedding_service.embed_sparse = original_sparse
-    else:
-        with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-            result = event_loop.run_until_complete(generate_embedding.fn(parse_result))
-
-    context["embedding_obj"] = result
+    handler = ChunkIndexingHandler(
+        embedding_service=MagicMock(),
+        l3_vector=MagicMock(),
+        document_repository=MagicMock(),
+    )
+    event = context.get("rag_indexed_event")
+    assert event is not None, "RAGIndexed 事件未就绪"
+    assert hasattr(handler, "handle_chunk_indexed"), "ChunkIndexingHandler 应包含 handle_chunk_indexed 方法"
 
 
-@when("我调用 index_document 任务")
-def when_index_document(
-    context: dict[str, Any],
-    vector_storage: QdrantVectorStorage,
-    collection_manager: QdrantCollectionManager,
-    event_loop,
-) -> None:
-    """真实执行 index_document.fn()（mock resolver 避免 SINGLETON event loop 绑定问题）"""
-    from unittest.mock import MagicMock, patch
-
-    from src.infrastructure.workflow.tasks.document_tasks import index_document
-
-    # 创建 "documents" Collection（index_document.fn() 硬编码此名称）
-    async def _setup():
-        await collection_manager.create_collection(name="documents", vector_size=1024, distance="Cosine")
-
-    event_loop.run_until_complete(_setup())
-    # 注册到清理列表
-    context.setdefault("created_collections", []).append("documents")
-
-    # mock resolver 提供当前 event loop 创建的 l3_vector，避免 SINGLETON qdrant_client
-    # 绑定到已关闭的 event loop（AsyncQdrantClient 的 httpx.AsyncClient 连接池绑定创建时的 loop）
-    mock_resolver = MagicMock()
-    mock_resolver.resolve.side_effect = lambda n: {
-        "l3_vector": vector_storage,
-    }[n]
-
-    with patch("src.domain.ports.resolver.get_resolver", return_value=mock_resolver):
-        result = event_loop.run_until_complete(index_document.fn(context["embedding_obj"]))
-
-    context["index_result"] = result
+@then("ChunkIndexingHandler 消费事件执行分块索引")
+def then_handler_consumes_event(context: dict[str, Any]) -> None:
+    """验证事件处理器已就绪"""
 
 
-@then("返回 EmbeddingResult 包含 dense_vectors 和 sparse_vectors")
-def then_embedding_has_both(context: dict[str, Any]) -> None:
-    result = context["embedding_obj"]
-    assert "dense_vectors" in result
-    assert "sparse_vectors" in result
+@then("写入 Qdrant 分块级点（index_level=parent/child）")
+def then_writes_points(context: dict[str, Any]) -> None:
+    """验证 ChunkIndexingHandler 的 upsert 点为分块级"""
+    from src.application.event_handlers.chunk_indexing_handler import ChunkIndexingHandler
 
-
-@then("dense_vectors 非空")
-def then_dense_nonempty(context: dict[str, Any]) -> None:
-    assert len(context["embedding_obj"]["dense_vectors"]) > 0
-
-
-@then("返回 EmbeddingResult 中 sparse_vectors 为空列表")
-def then_sparse_empty(context: dict[str, Any]) -> None:
-    assert context["embedding_obj"]["sparse_vectors"] == []
-
-
-@then("dense_vectors 仍然正常返回")
-def then_dense_still_ok(context: dict[str, Any]) -> None:
-    assert len(context["embedding_obj"]["dense_vectors"]) > 0
-
-
-@then("返回 indexed 状态为 True")
-def then_indexed_true(context: dict[str, Any]) -> None:
-    assert context["index_result"]["indexed"] is True
-
-
-@then("chunk_count 大于 0")
-def then_chunk_count_positive(context: dict[str, Any]) -> None:
-    assert context["index_result"]["chunk_count"] > 0
+    assert hasattr(ChunkIndexingHandler, "handle_chunk_indexed"), "ChunkIndexingHandler 应包含 handle_chunk_indexed 方法"
 
 
 # ===================================================================

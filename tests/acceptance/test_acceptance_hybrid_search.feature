@@ -45,27 +45,14 @@
     并且 结果数量不超过指定的 limit
 
   # ============================================================================
-  # AC-4: 稀疏向量索引管线
+  # AC-4: 稀疏向量索引管线（已迁移事件驱动 — ChunkIndexingHandler 承担索引）
   # ============================================================================
 
-  场景: AC-4 - generate_embedding 返回双向量 EmbeddingResult
+  场景: AC-4 - chunk 索引由事件驱动链承担
     假如 文档解析已完成
-    当 我调用 generate_embedding 任务
-    那么 返回 EmbeddingResult 包含 dense_vectors 和 sparse_vectors
-    并且 dense_vectors 非空
-
-  场景: AC-4 - Sparse 嵌入失败降级为仅 Dense 索引
-    假如 文档解析已完成
-    并且 嵌入服务 Sparse 通道不可用
-    当 我调用 generate_embedding 任务
-    那么 返回 EmbeddingResult 中 sparse_vectors 为空列表
-    并且 dense_vectors 仍然正常返回
-
-  场景: AC-4 - index_document 接受 EmbeddingResult 参数
-    假如 generate_embedding 已产出 EmbeddingResult
-    当 我调用 index_document 任务
-    那么 返回 indexed 状态为 True
-    并且 chunk_count 大于 0
+    当 语义分块完成并发布 RAGIndexed 事件
+    那么 ChunkIndexingHandler 消费事件执行分块索引
+    并且 写入 Qdrant 分块级点（index_level=parent/child）
 
   # ============================================================================
   # AC-5: Composition Root 注册
