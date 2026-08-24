@@ -368,7 +368,43 @@ def bootstrap() -> None:
         name="l4_object",
         version="v1.0.0",
         interface=L4ObjectPort,
-        impl="src.infrastructure.storage.minio.minio_adapter.MinIOAdapter",
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.minio.minio_adapter",
+            fromlist=["MinIOAdapter"],
+        ).MinIOAdapter(
+            repository=__import__(
+                "src.infrastructure.storage.minio.minio_repository",
+                fromlist=["MinIORepository"],
+            ).MinIORepository(
+                bucket_manager=__import__(
+                    "src.infrastructure.storage.minio.bucket_manager",
+                    fromlist=["BucketManager"],
+                ).BucketManager(
+                    config=__import__(
+                        "src.infrastructure.config.minio",
+                        fromlist=["MinIOConfig"],
+                    ).MinIOConfig.from_env(),
+                ),
+                object_operations=__import__(
+                    "src.infrastructure.storage.minio.object_operations",
+                    fromlist=["ObjectOperations"],
+                ).ObjectOperations(
+                    config=__import__(
+                        "src.infrastructure.config.minio",
+                        fromlist=["MinIOConfig"],
+                    ).MinIOConfig.from_env(),
+                ),
+                worm_manager=__import__(
+                    "src.infrastructure.storage.minio.worm_lifecycle",
+                    fromlist=["WORMManager"],
+                ).WORMManager(
+                    config=__import__(
+                        "src.infrastructure.config.minio",
+                        fromlist=["MinIOConfig"],
+                    ).MinIOConfig.from_env(),
+                ),
+            ),
+        ),
         module="src.infrastructure.storage.minio.minio_adapter",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
@@ -1044,7 +1080,12 @@ def bootstrap() -> None:
         name="document_storage",
         version="v1.0.0",
         interface=DocumentStoragePort,
-        impl="src.infrastructure.storage.minio.minio_document_storage.MinIODocumentStorage",
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.minio.minio_document_storage",
+            fromlist=["MinIODocumentStorage"],
+        ).MinIODocumentStorage(
+            adapter=resolver.resolve("l4_object"),
+        ),
         module="src.infrastructure.storage.minio.minio_document_storage",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
