@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from src.application.ports.session_cache_port import SessionCachePort
 from src.infrastructure.storage.redis.key_builder import build_key
@@ -47,6 +47,32 @@ class RedisSessionCache(SessionCachePort):
 
     async def set_with_ttl(self, key: str, value: str, ttl: int) -> bool:
         return await self._adapter.set_with_ttl(key, value, ttl)
+
+    async def set_nx(self, key: str, value: str, ttl: int) -> bool:
+        """SET NX 原子写入（委派底层适配器实现）
+
+        Args:
+            key: 缓存键
+            value: 待存储的值
+            ttl: TTL 秒数
+
+        Returns:
+            键不存在且写入成功返回 True，键已存在返回 False
+        """
+        return await self._adapter.set_nx(key, value, ttl)
+
+    async def eval(self, script: str, keys: list[str], args: list[str]) -> Any:
+        """执行 Lua 脚本（委派底层适配器实现）
+
+        Args:
+            script: Lua 脚本代码
+            keys: Redis key 参数
+            args: 脚本参数
+
+        Returns:
+            Lua 脚本返回值
+        """
+        return await self._adapter.eval(script, keys, args)
 
     # === SessionCachePort session-specific methods ===
 

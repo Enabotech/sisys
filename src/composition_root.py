@@ -1354,6 +1354,7 @@ def bootstrap() -> None:
         interface=SemanticChunkingHandler,
         impl=lambda resolver: SemanticChunkingHandler(
             semantic_chunking_service=resolver.resolve("semantic_chunking_service"),
+            event_listener=resolver.resolve("event_listener"),
         ),
         module="src.application.event_handlers.semantic_chunking_handler",
         lifetime=Lifetime.SINGLETON,
@@ -2146,6 +2147,7 @@ def bootstrap() -> None:
     handler_names = [
         "document_version_handler",
         "chunk_indexing_handler",
+        "semantic_chunking_handler",
         "archive_validity_handler",
     ]
     resolver = get_resolver()

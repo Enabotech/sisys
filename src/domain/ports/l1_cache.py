@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -81,4 +81,30 @@ class L1CachePort(Protocol):
 
         Returns:
             成功返回 True
+        """
+
+    async def set_nx(self, key: str, value: str, ttl: int) -> bool:
+        """仅当键不存在时写入（SET NX 语义）
+
+        用于分布式锁等场景，保证原子性。
+
+        Args:
+            key: 缓存键
+            value: 待存储的值
+            ttl: TTL 秒数（必填，避免死锁）
+
+        Returns:
+            键不存在且写入成功返回 True，键已存在返回 False
+        """
+
+    async def eval(self, script: str, keys: list[str], args: list[str]) -> Any:
+        """执行 Lua 脚本（原子操作用）
+
+        Args:
+            script: Lua 脚本代码
+            keys: Redis key 参数
+            args: 脚本参数
+
+        Returns:
+            Lua 脚本返回值
         """

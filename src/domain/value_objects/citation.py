@@ -17,6 +17,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+from src.domain.exceptions import EntityValidationError
 from src.domain.value_objects.parsed_document import BoundingBox
 
 
@@ -60,15 +61,17 @@ class Citation:
         - confidence: [0.0, 1.0]
         """
         if not isinstance(self.citation_id, str) or not self.citation_id.strip():
-            raise ValueError("citation_id 必须为非空字符串")
+            raise EntityValidationError("citation_id 必须为非空字符串")
         if self.start_offset < 0:
-            raise ValueError(f"start_offset 必须 >= 0，实际值: {self.start_offset}")
+            raise EntityValidationError(f"start_offset 必须 >= 0，实际值: {self.start_offset}")
         if self.end_offset <= self.start_offset:
-            raise ValueError(f"end_offset 必须 > start_offset，start_offset={self.start_offset}, end_offset={self.end_offset}")
+            raise EntityValidationError(
+                f"end_offset 必须 > start_offset，start_offset={self.start_offset}, end_offset={self.end_offset}"
+            )
         if self.page_number < 1:
-            raise ValueError(f"page_number 必须 >= 1，实际值: {self.page_number}")
+            raise EntityValidationError(f"page_number 必须 >= 1，实际值: {self.page_number}")
         if not (0.0 <= self.confidence <= 1.0):
-            raise ValueError(f"confidence 必须在 [0.0, 1.0] 范围内，实际值: {self.confidence}")
+            raise EntityValidationError(f"confidence 必须在 [0.0, 1.0] 范围内，实际值: {self.confidence}")
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为 JSON 可存储字典

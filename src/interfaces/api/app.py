@@ -56,6 +56,7 @@ def create_app() -> FastAPI:
     # 注册统一异常处理器
     register_exception_handlers(app)
     # 注册路由
+    from src.interfaces.api.document_upload import document_upload_router
     from src.interfaces.api.domain_dictionary import document_dictionary_router
     from src.interfaces.api.relevance_evaluation import evaluate_router
     from src.interfaces.api.strategic_archive import archive_router
@@ -67,4 +68,5 @@ def create_app() -> FastAPI:
     app.include_router(evaluate_router)
     app.include_router(trace_router)
     app.include_router(document_dictionary_router)
+    app.include_router(document_upload_router)
     return app

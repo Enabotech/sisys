@@ -132,6 +132,10 @@ class TestOnnxLayoutDetectorDetect:
             11: "Title",
         }
         detector._confidence_threshold = 0.5
+        # Letterbox 反变换参数：mock 场景假设原始图像为 640x640（正方形，与模型输入尺寸一致），
+        # 此时 scale=1.0, offset=0，反变换后坐标与旧版直接除以 640 结果一致，保证测试向后兼容
+        detector._orig_width = 640
+        detector._orig_height = 640
         # mock _preprocess 返回合法 numpy array，避免 PIL 解码失败
         # 通过 object.__setattr__ 设置 mock，绕过类型检查器对方法签名的严格校验
         object.__setattr__(

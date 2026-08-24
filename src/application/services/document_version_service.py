@@ -133,6 +133,7 @@ class DocumentVersionService:
 
         new_version = current_version + 1
         document.version = new_version
+        document.updated_at = datetime.now(UTC)
         await self._repository.save_with_version_check(
             document=document,
             expected_version=current_version,

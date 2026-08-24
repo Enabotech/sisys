@@ -1,7 +1,7 @@
 """基础设施层分片上传状态管理器
 
 通过 L1CachePort（Redis）管理分片上传状态，支持断点续传。
-JSON 序列化存储结构化状态，asyncio.Lock 保证并发安全。
+JSON 序列化存储结构化状态，Redis 分布式锁保证跨进程并发安全。
 """
 
 from __future__ import annotations
@@ -9,14 +9,19 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
 
 from src.domain.exceptions import ConflictError, NotFoundError
 from src.domain.ports.l1_cache import L1CachePort
 from src.domain.value_objects.upload_limits import CHUNKED_UPLOAD_TTL, get_chunk_size
 
+_T = TypeVar("_T")
+
 # Redis key 前缀
 _CHUNKED_UPLOAD_PREFIX = "chunked_upload:"
+_LOCK_PREFIX = "chunked_upload_lock:"
+_LOCK_TTL = 30  # 分布式锁 TTL（秒）
 
 
 class ChunkedUploadState:
@@ -75,18 +80,69 @@ class ChunkedUploadManager:
     """分片上传状态管理器
 
     通过 L1CachePort 操作 Redis，使用 JSON 序列化存储分片状态。
-    asyncio.Lock 保证同一 upload_id 的分片状态串行更新。
+    Redis 分布式锁保证跨进程并发安全（多 Worker 部署）。
     """
 
-    _locks: dict[str, asyncio.Lock] = {}
+    # 进程内协程锁仅用于保护 _lock_owners 字典写入，避免 asyncio 竞态
+    _owner_lock: asyncio.Lock = asyncio.Lock()
+    _lock_owners: dict[str, str] = {}
 
     def __init__(self, cache: L1CachePort) -> None:
         self._cache = cache
 
-    def _get_lock(self, upload_id: str) -> asyncio.Lock:
-        if upload_id not in self._locks:
-            self._locks[upload_id] = asyncio.Lock()
-        return self._locks[upload_id]
+    async def _acquire_lock(self, upload_id: str) -> bool:
+        """获取 Redis 分布式锁（SET NX）
+
+        Returns:
+            True 表示成功获取锁，False 表示锁已被其他进程持有
+        """
+        lock_key = f"{_LOCK_PREFIX}{upload_id}"
+        owner = uuid.uuid4().hex
+        acquired = await self._cache.set_nx(lock_key, owner, ttl=_LOCK_TTL)
+        if acquired:
+            async with self._owner_lock:
+                self._lock_owners[upload_id] = owner
+        return acquired
+
+    async def _release_lock(self, upload_id: str) -> None:
+        """释放 Redis 分布式锁（仅释放自己的锁，避免误删）"""
+        async with self._owner_lock:
+            owner = self._lock_owners.pop(upload_id, None)
+        if owner is None:
+            return
+        lock_key = f"{_LOCK_PREFIX}{upload_id}"
+        # Lua 脚本确保原子释放：仅当 owner 匹配时删除
+        lua_script = """
+        if redis.call("GET", KEYS[1]) == ARGV[1] then
+            return redis.call("DEL", KEYS[1])
+        end
+        return 0
+        """
+        await self._cache.eval(lua_script, keys=[lock_key], args=[owner])
+
+    async def _run_locked(self, upload_id: str, fn: Callable[[], Awaitable[_T]]) -> _T:
+        """在分布式锁保护下执行操作
+
+        使用 Redis SET NX 实现分布式锁，超时重试机制保证可用性。
+
+        Args:
+            upload_id: 上传会话 ID
+            fn: 需要加锁执行的异步函数
+
+        Returns:
+            fn 的返回值
+        """
+        retries = 3
+        for attempt in range(retries):
+            if await self._acquire_lock(upload_id):
+                try:
+                    return await fn()
+                finally:
+                    await self._release_lock(upload_id)
+            else:
+                if attempt < retries - 1:
+                    await asyncio.sleep(0.1 * (attempt + 1))
+        raise ConflictError(message=f"upload_id {upload_id} 正被其他进程处理，请稍后重试")
 
     def _redis_key(self, upload_id: str) -> str:
         return f"{_CHUNKED_UPLOAD_PREFIX}{upload_id}"
@@ -140,7 +196,9 @@ class ChunkedUploadManager:
         }
 
     async def upload_part(self, upload_id: str, part_number: int, etag: str) -> dict[str, Any]:
-        """记录已上传的分片
+        """记录已上传的分片（支持幂等重试）
+
+        分布式锁保护 + 幂等检查：客户端重试已成功的分片不会报错。
 
         Args:
             upload_id: 上传会话 ID
@@ -151,15 +209,21 @@ class ChunkedUploadManager:
             {"uploaded_parts": int}
 
         Raises:
-            NotFoundError: upload_id 不存在、分片乱序、或分片重复
+            NotFoundError: upload_id 不存在
+            ConflictError: 锁冲突，其他进程正在处理
         """
-        lock = self._get_lock(upload_id)
-        async with lock:
+
+        async def _do_upload_part() -> dict[str, Any]:
             state = await self._get_state(upload_id)
             if state is None:
                 raise NotFoundError(message=f"upload_id {upload_id} 不存在或已过期")
 
-            # 校验分片顺序：下一个分片编号必须是已上传分片数 + 1
+            # 幂等检查：如果 part_number 已存在，直接返回成功
+            for p in state.uploaded_parts:
+                if p["part_number"] == part_number:
+                    return {"uploaded_parts": len(state.uploaded_parts)}
+
+            # 校验分片顺序：next 必须是已上传分片数 + 1
             expected_next = len(state.uploaded_parts) + 1
             if part_number != expected_next:
                 raise ConflictError(message=f"分片乱序：期望第 {expected_next} 个分片，实际收到第 {part_number} 个")
@@ -170,11 +234,12 @@ class ChunkedUploadManager:
                 state.to_json(),
                 ttl=CHUNKED_UPLOAD_TTL,
             )
+            return {"uploaded_parts": len(state.uploaded_parts)}
 
-        return {"uploaded_parts": len(state.uploaded_parts)}
+        return await self._run_locked(upload_id, _do_upload_part)
 
     async def complete_upload(self, upload_id: str) -> ChunkedUploadState:
-        """完成分片上传
+        """完成分片上传（分布式锁保护）
 
         Args:
             upload_id: 上传会话 ID
@@ -185,12 +250,16 @@ class ChunkedUploadManager:
         Raises:
             NotFoundError: upload_id 不存在
         """
-        state = await self._get_state(upload_id)
-        if state is None:
-            raise NotFoundError(message=f"upload_id {upload_id} 不存在或已过期")
 
-        await self._cache.delete(self._redis_key(upload_id))
-        return state
+        async def _do_complete() -> ChunkedUploadState:
+            state = await self._get_state(upload_id)
+            if state is None:
+                raise NotFoundError(message=f"upload_id {upload_id} 不存在或已过期")
+
+            await self._cache.delete(self._redis_key(upload_id))
+            return state
+
+        return await self._run_locked(upload_id, _do_complete)
 
     async def resume_upload(self, upload_id: str) -> dict[str, Any] | None:
         """查询分片上传状态（断点续传）

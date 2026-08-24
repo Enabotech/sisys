@@ -106,6 +106,10 @@ class OnnxLayoutDetector:
             self._output_names,
         )
 
+        # 记录原始图像尺寸（在 _preprocess 中设置），用于 Letterbox 归一化
+        self._orig_width: int = 0
+        self._orig_height: int = 0
+
     def close(self) -> None:
         """释放 ONNX InferenceSession 资源
 
@@ -149,7 +153,10 @@ class OnnxLayoutDetector:
         return self._postprocess(outputs, page_number)
 
     def _preprocess(self, image_bytes: bytes) -> Any:
-        """预处理图像字节为模型输入格式
+        """预处理图像字节为模型输入格式（Letterbox 保持宽高比）
+
+        将原始图像等比缩放至 _MODEL_INPUT_SIZE 边界内，剩余空间使用均值填充，
+        避免直接拉伸导致宽高比失真。记录原始尺寸供 _postprocess 坐标反归一化使用。
 
         Args:
             image_bytes: 原始图像字节
@@ -164,8 +171,25 @@ class OnnxLayoutDetector:
 
         pil_image: Image.Image = Image.open(io.BytesIO(image_bytes))
         pil_image = pil_image.convert("RGB")
-        # 调整到模型期望的输入尺寸
-        pil_image = pil_image.resize((640, 640))
+        self._orig_width, self._orig_height = pil_image.size
+
+        # Letterbox: 等比缩放至 640 边界内，保持宽高比（避免拉伸失真）
+        width, height = pil_image.size
+        if width == 0 or height == 0:
+            # 退化图像：直接缩放到目标尺寸
+            pil_image = pil_image.resize((_MODEL_INPUT_SIZE, _MODEL_INPUT_SIZE))
+        else:
+            scale = min(_MODEL_INPUT_SIZE / width, _MODEL_INPUT_SIZE / height)
+            new_w, new_h = max(1, round(width * scale)), max(1, round(height * scale))
+            pil_image = pil_image.resize((new_w, new_h))
+
+            # 创建均值填充画布并居中粘贴，保持输入尺寸恒定
+            canvas = Image.new("RGB", (_MODEL_INPUT_SIZE, _MODEL_INPUT_SIZE), (114, 114, 114))
+            offset_x = (_MODEL_INPUT_SIZE - new_w) // 2
+            offset_y = (_MODEL_INPUT_SIZE - new_h) // 2
+            canvas.paste(pil_image, (offset_x, offset_y))
+            pil_image = canvas
+
         img_array = np.array(pil_image, dtype=np.float32) / 255.0
         # NCHW 格式: [1, 3, H, W]
         img_array = np.transpose(img_array, (2, 0, 1))
@@ -175,9 +199,13 @@ class OnnxLayoutDetector:
     def _postprocess(self, outputs: list[Any], page_number: int) -> list[BoundingBoxResult]:
         """后处理模型输出，转换为 BoundingBoxResult 列表
 
-        将 ONNX 输出的 xyxy 像素坐标转换为 BoundingBox 的 xywh 格式，
-        归一化到 [0, 1] 页面坐标空间（除以模型输入尺寸 _MODEL_INPUT_SIZE），
-        并过滤低于置信度阈值的结果。
+        将 ONNX 输出的 xyxy 像素坐标转换为 BoundingBox 的 xywh 格式。
+
+        坐标反归一化策略（Letterbox 反变换）：
+        - 模型输出坐标位于 640x640 的填充画布坐标系
+        - 需先裁剪掉填充偏移（offset_x/offset_y），再除以缩放比例 scale
+        - 还原到原始图像像素坐标后，除以原始宽/高归一化到 [0, 1]
+        该逻辑保证与 PDFParser 的 bbox 页面坐标空间一致，不受宽高比影响。
 
         Args:
             outputs: ONNX 模型原始输出 [boxes, labels, scores]
@@ -205,6 +233,15 @@ class OnnxLayoutDetector:
                 len(scores),
             )
 
+        # Letterbox 反变换参数（与 _preprocess 保持一致）
+        orig_w = max(self._orig_width, 1)
+        orig_h = max(self._orig_height, 1)
+        scale = min(_MODEL_INPUT_SIZE / orig_w, _MODEL_INPUT_SIZE / orig_h)
+        new_w = max(1, round(orig_w * scale))
+        new_h = max(1, round(orig_h * scale))
+        offset_x = (_MODEL_INPUT_SIZE - new_w) / 2.0
+        offset_y = (_MODEL_INPUT_SIZE - new_h) / 2.0
+
         for i in range(n):
             score = float(scores[i])
             if score < self._confidence_threshold:
@@ -213,19 +250,25 @@ class OnnxLayoutDetector:
             box = boxes[i]
             x1, y1, x2, y2 = float(box[0]), float(box[1]), float(box[2]), float(box[3])
 
-            # xyxy → xywh 转换，防御性 clamp 防止负值
-            width = max(0.0, x2 - x1)
-            height = max(0.0, y2 - y1)
+            # Letterbox 反向映射到原始图像像素坐标
+            x1_orig = (x1 - offset_x) / scale
+            y1_orig = (y1 - offset_y) / scale
+            x2_orig = (x2 - offset_x) / scale
+            y2_orig = (y2 - offset_y) / scale
+
+            # xyxy → xywh 转换，防御性 clamp 防止负值与越界
+            width = max(0.0, x2_orig - x1_orig)
+            height = max(0.0, y2_orig - y1_orig)
             if width == 0.0 or height == 0.0:
                 logger.warning("检测坐标异常 (x1=%.2f, y1=%.2f, x2=%.2f, y2=%.2f)，跳过", x1, y1, x2, y2)
                 continue
 
             # 归一化到 [0, 1] 页面坐标空间（与 PDFParser bbox 坐标系一致）
             bbox = BoundingBox(
-                x=x1 / _MODEL_INPUT_SIZE,
-                y=y1 / _MODEL_INPUT_SIZE,
-                width=width / _MODEL_INPUT_SIZE,
-                height=height / _MODEL_INPUT_SIZE,
+                x=max(0.0, min(1.0, x1_orig / orig_w)),
+                y=max(0.0, min(1.0, y1_orig / orig_h)),
+                width=max(0.0, min(1.0, width / orig_w)),
+                height=max(0.0, min(1.0, height / orig_h)),
                 page=page_number,
             )
 
