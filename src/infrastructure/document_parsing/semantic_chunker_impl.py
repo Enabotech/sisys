@@ -613,6 +613,10 @@ class SemanticChunkerImpl:
             # 在语义边界处切分
             if segment_end < len(text):
                 segment_end = self._find_safe_split_point(text, segment_end)
+                # 防御：切分点必须严格前进，防止切分点恰好在 i 处（如边界字符
+                # 位于 i-1 时 _find_safe_split_point 返回 i）导致死循环
+                if segment_end <= i:
+                    segment_end = i + 1
             segments.append(text[i:segment_end])
             i = segment_end
         return segments

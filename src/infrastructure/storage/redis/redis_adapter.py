@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from src.domain.ports.l1_cache import L1CachePort
 
@@ -77,6 +77,33 @@ class RedisAdapter(L1CachePort):
     async def set_with_ttl(self, key: str, value: str, ttl: int) -> bool:
         await self._redis.setex(key, ttl, value)
         return True
+
+    async def set_nx(self, key: str, value: str, ttl: int) -> bool:
+        """SET NX 原子写入（分布式锁用）
+
+        Args:
+            key: Redis 键
+            value: 锁持有者标识
+            ttl: TTL 秒数（必填，避免死锁）
+
+        Returns:
+            键不存在且写入成功返回 True，键已存在返回 False
+        """
+        result = await self._redis.set(key, value, nx=True, ex=ttl)
+        return result is not None
+
+    async def eval(self, script: str, keys: list[str], args: list[str]) -> Any:
+        """执行 Lua 脚本（分布式锁释放用）
+
+        Args:
+            script: Lua 脚本代码
+            keys: Redis key 参数
+            args: 脚本参数
+
+        Returns:
+            Lua 脚本返回值
+        """
+        return await self._redis.eval(script, len(keys), *(keys + args))
 
     @property
     def raw_client(self) -> aioredis.Redis:

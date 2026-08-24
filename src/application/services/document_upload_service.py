@@ -120,12 +120,20 @@ class DocumentUploadService:
         """
         self._validate_upload(filename, mime_type, file_size_bytes)
 
+        try:
+            doc_type = DocumentType(document_type)
+        except ValueError as e:
+            raise ValidationError(
+                message=f"不支持的文档类型: {document_type}",
+                context={"document_type": document_type, "filename": filename},
+            ) from e
+
         doc = Document(
             document_id=uuid.uuid4(),
             filename=filename,
             mime_type=mime_type,
             file_size_bytes=file_size_bytes,
-            document_type=DocumentType(document_type),
+            document_type=doc_type,
             parse_status=ParseStatus.PENDING,
             tenant_id=tenant_id,
             uploaded_by=uploaded_by,
@@ -285,12 +293,20 @@ class DocumentUploadService:
         """
         self._validate_upload(filename, mime_type, file_size_bytes)
 
+        try:
+            doc_type = DocumentType(document_type)
+        except ValueError as e:
+            raise ValidationError(
+                message=f"不支持的文档类型: {document_type}",
+                context={"document_type": document_type, "filename": filename},
+            ) from e
+
         doc = Document(
             document_id=uuid.uuid4(),
             filename=filename,
             mime_type=mime_type,
             file_size_bytes=file_size_bytes,
-            document_type=DocumentType(document_type),
+            document_type=doc_type,
             parse_status=ParseStatus.PENDING,
             tenant_id=tenant_id,
             uploaded_by=uploaded_by,
