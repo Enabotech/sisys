@@ -100,6 +100,7 @@ from src.domain.exceptions.storage_exceptions import (
     MemoryVersionConflictError,
     MetadataValidationError,
     MinIOConnectionError,
+    UploadSessionExpiredError,
 )
 from src.domain.exceptions.summary_exceptions import (
     SummaryGenerationError,
@@ -164,6 +165,7 @@ __all__ = [
     "MinIOConnectionError",
     "BucketNameValidationError",
     "MemoryAccessDeniedError",
+    "UploadSessionExpiredError",
     # 角色管理异常
     "RoleAlreadyExistsError",
     "RoleNotFoundError",

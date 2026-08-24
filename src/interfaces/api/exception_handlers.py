@@ -81,6 +81,7 @@ from src.domain.exceptions import (
     TransferNotApprovedError,
     TransferNotFoundError,
     UnknownError,
+    UploadSessionExpiredError,
     ValidationError,
     ValidityPeriodConflictError,
     VersionError,
@@ -104,6 +105,7 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     # 业务级具体异常
     ValidationError: status.HTTP_400_BAD_REQUEST,
     NotFoundError: status.HTTP_404_NOT_FOUND,
+    UploadSessionExpiredError: status.HTTP_410_GONE,
     ConflictError: status.HTTP_409_CONFLICT,
     PermissionDeniedError: status.HTTP_403_FORBIDDEN,
     AuthenticationError: status.HTTP_401_UNAUTHORIZED,

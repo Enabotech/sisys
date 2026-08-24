@@ -10,6 +10,7 @@ import uuid
 
 import pytest
 
+from src.domain.exceptions import EntityValidationError
 from src.domain.value_objects.citation import Citation
 from src.domain.value_objects.parsed_document import BoundingBox
 
@@ -164,7 +165,7 @@ class TestCitationInvariants:
 
     def test_empty_citation_id_raises_value_error(self) -> None:
         """空 citation_id 抛出 ValueError"""
-        with pytest.raises(ValueError, match="citation_id 必须为非空字符串"):
+        with pytest.raises(EntityValidationError, match="citation_id 必须为非空字符串"):
             Citation(
                 citation_id="",
                 document_id=_TEST_DOCUMENT_ID,
@@ -177,7 +178,7 @@ class TestCitationInvariants:
 
     def test_whitespace_citation_id_raises_value_error(self) -> None:
         """纯空白 citation_id 抛出 ValueError"""
-        with pytest.raises(ValueError, match="citation_id 必须为非空字符串"):
+        with pytest.raises(EntityValidationError, match="citation_id 必须为非空字符串"):
             Citation(
                 citation_id="   ",
                 document_id=_TEST_DOCUMENT_ID,
@@ -190,7 +191,7 @@ class TestCitationInvariants:
 
     def test_start_offset_greater_than_end_offset_raises_value_error(self) -> None:
         """start_offset > end_offset 抛出 ValueError"""
-        with pytest.raises(ValueError, match="end_offset 必须 > start_offset"):
+        with pytest.raises(EntityValidationError, match="end_offset 必须 > start_offset"):
             Citation(
                 citation_id="chunk-001-cit",
                 document_id=_TEST_DOCUMENT_ID,
@@ -203,7 +204,7 @@ class TestCitationInvariants:
 
     def test_start_offset_equals_end_offset_raises_value_error(self) -> None:
         """start_offset == end_offset 抛出 ValueError"""
-        with pytest.raises(ValueError, match="end_offset 必须 > start_offset"):
+        with pytest.raises(EntityValidationError, match="end_offset 必须 > start_offset"):
             Citation(
                 citation_id="chunk-001-cit",
                 document_id=_TEST_DOCUMENT_ID,
@@ -216,7 +217,7 @@ class TestCitationInvariants:
 
     def test_negative_start_offset_raises_value_error(self) -> None:
         """负 start_offset 抛出 ValueError"""
-        with pytest.raises(ValueError, match="start_offset 必须 >= 0"):
+        with pytest.raises(EntityValidationError, match="start_offset 必须 >= 0"):
             Citation(
                 citation_id="chunk-001-cit",
                 document_id=_TEST_DOCUMENT_ID,
@@ -229,7 +230,7 @@ class TestCitationInvariants:
 
     def test_page_number_less_than_one_raises_value_error(self) -> None:
         """page_number < 1 抛出 ValueError"""
-        with pytest.raises(ValueError, match="page_number 必须 >= 1"):
+        with pytest.raises(EntityValidationError, match="page_number 必须 >= 1"):
             Citation(
                 citation_id="chunk-001-cit",
                 document_id=_TEST_DOCUMENT_ID,
@@ -242,7 +243,7 @@ class TestCitationInvariants:
 
     def test_negative_page_number_raises_value_error(self) -> None:
         """负 page_number 抛出 ValueError"""
-        with pytest.raises(ValueError, match="page_number 必须 >= 1"):
+        with pytest.raises(EntityValidationError, match="page_number 必须 >= 1"):
             Citation(
                 citation_id="chunk-001-cit",
                 document_id=_TEST_DOCUMENT_ID,
@@ -255,7 +256,7 @@ class TestCitationInvariants:
 
     def test_confidence_below_zero_raises_value_error(self) -> None:
         """confidence < 0 抛出 ValueError"""
-        with pytest.raises(ValueError, match="confidence 必须在 \\[0.0, 1.0\\] 范围内"):
+        with pytest.raises(EntityValidationError, match="confidence 必须在 \\[0.0, 1.0\\] 范围内"):
             Citation(
                 citation_id="chunk-001-cit",
                 document_id=_TEST_DOCUMENT_ID,
@@ -269,7 +270,7 @@ class TestCitationInvariants:
 
     def test_confidence_above_one_raises_value_error(self) -> None:
         """confidence > 1 抛出 ValueError"""
-        with pytest.raises(ValueError, match="confidence 必须在 \\[0.0, 1.0\\] 范围内"):
+        with pytest.raises(EntityValidationError, match="confidence 必须在 \\[0.0, 1.0\\] 范围内"):
             Citation(
                 citation_id="chunk-001-cit",
                 document_id=_TEST_DOCUMENT_ID,

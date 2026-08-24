@@ -184,6 +184,10 @@ def call_detect_method(context: dict[str, Any]) -> None:
         11: "Title",
     }
     detector._confidence_threshold = 0.5
+    # Letterbox 反变换参数：mock 场景假设原始图像为 640x640（正方形），
+    # 此时 scale=1.0, offset=0，坐标归一化与旧版直接除以 640 结果一致
+    detector._orig_width = 640
+    detector._orig_height = 640
     # 通过 object.__setattr__ 设置 mock，绕过类型检查器对方法签名的严格校验
     object.__setattr__(
         detector,

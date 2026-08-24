@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
 
-from src.domain.exceptions import ConflictError, NotFoundError
+from src.domain.exceptions import ConflictError, UploadSessionExpiredError
 from src.domain.ports.l1_cache import L1CachePort
 from src.domain.value_objects.upload_limits import CHUNKED_UPLOAD_TTL, get_chunk_size
 
@@ -216,7 +216,7 @@ class ChunkedUploadManager:
         async def _do_upload_part() -> dict[str, Any]:
             state = await self._get_state(upload_id)
             if state is None:
-                raise NotFoundError(message=f"upload_id {upload_id} 不存在或已过期")
+                raise UploadSessionExpiredError(upload_id=upload_id, message=f"upload_id {upload_id} 不存在或已过期")
 
             # 幂等检查：如果 part_number 已存在，直接返回成功
             for p in state.uploaded_parts:
@@ -254,7 +254,7 @@ class ChunkedUploadManager:
         async def _do_complete() -> ChunkedUploadState:
             state = await self._get_state(upload_id)
             if state is None:
-                raise NotFoundError(message=f"upload_id {upload_id} 不存在或已过期")
+                raise UploadSessionExpiredError(upload_id=upload_id, message=f"upload_id {upload_id} 不存在或已过期")
 
             await self._cache.delete(self._redis_key(upload_id))
             return state

@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Form, Header, HTTPException, UploadFile,
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
-from src.domain.exceptions import NotFoundError
+from src.domain.exceptions import NotFoundError, UploadSessionExpiredError
 from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
 from src.domain.value_objects.document_format import get_mime_type
 from src.domain.value_objects.token_payload import TokenPayload
@@ -348,9 +348,9 @@ def create_document_upload_router(
 
         info = await mgr.get_multipart_info(upload_id)
         if info is None:
-            raise NotFoundError(
-                "Upload session expired",
-                context={"upload_id": upload_id},
+            raise UploadSessionExpiredError(
+                upload_id=upload_id,
+                message="Upload session expired",
             )
 
         data = await part.read()
