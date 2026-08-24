@@ -1,6 +1,6 @@
 # Story 2-1: 文档上传（17 种格式）
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1016,7 +1016,7 @@ tests/
 | **Story ID** | 2.1 |
 | **Story Key** | 2-1-document-upload-17-formats |
 | **File** | `_bmad-output/implementation-artifacts/stories/2-1-document-upload-17-formats.md` |
-| **Status** | `ready-for-dev` |
+| **Status** | `ready-for-dev` → `done` |
 | **Epic** | Epic 2: 文档与数据管理 |
 | **价值组** | 文档全生命周期管理 |
 | **优先级** | P0-1（Epic 2 第一个 Story，文档处理流水线入口） |

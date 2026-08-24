@@ -1014,7 +1014,7 @@ else:
 | **Story ID** | 2.7 |
 | **Story Key** | 2-7-metadata-validation |
 | **File** | `_bmad-output/implementation-artifacts/stories/2-7-metadata-validation.md` |
-| **Status** | `backlog` → `ready-for-dev` |
+| **Status** | `backlog` → `ready-for-dev` → `done` |
 | **Epic** | Epic 2: 文档与数据管理 |
 | **价值组** | 文档全生命周期管理 |
 | **优先级** | P0（MVP），内部执行优先级 P1-7 |

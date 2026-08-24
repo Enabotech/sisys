@@ -281,8 +281,8 @@ class TestChunkedUpload:
 
         assert resp.status_code == 404
 
-    def test_chunked_expired_part_returns_404(self) -> None:
-        """过期分片上传返回 404"""
+    def test_chunked_expired_part_returns_410(self) -> None:
+        """过期分片上传返回 410 Gone"""
         client, _, manager, _ = _make_app()
         manager.get_multipart_info = AsyncMock(return_value=None)
 
@@ -292,7 +292,7 @@ class TestChunkedUpload:
             headers={"X-Tenant-ID": "t1"},
         )
 
-        assert resp.status_code == 404
+        assert resp.status_code == 410
 
 
 class TestDocumentQuery:

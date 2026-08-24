@@ -11,6 +11,7 @@ from src.domain.exceptions import ConflictError, NotFoundError
 from src.domain.value_objects.upload_limits import CHUNKED_UPLOAD_TTL, MEDIUM_PART_SIZE
 from src.infrastructure.storage.redis.chunked_upload_manager import (
     _CHUNKED_UPLOAD_PREFIX,
+    _LOCK_PREFIX,
     ChunkedUploadManager,
     ChunkedUploadState,
 )
@@ -192,16 +193,18 @@ class TestChunkedUploadManagerUploadPart:
         with pytest.raises(NotFoundError, match="不存在或已过期"):
             await manager.upload_part("bad-id", 1, "etag")
 
-    async def test_upload_part_duplicate_raises(self) -> None:
-        """重复分片编号抛出 ValueError（由顺序校验拦截）"""
+    async def test_upload_part_duplicate_is_idempotent(self) -> None:
+        """重复分片幂等处理：返回成功而非报错"""
         cache = _make_cache()
         manager = ChunkedUploadManager(cache)
 
         state_json = _make_state_json(uploaded_parts=[{"part_number": 1, "etag": "etag-001"}])
         cache.get = AsyncMock(return_value=state_json)
+        cache.set_nx = AsyncMock(return_value=True)
+        cache.eval = AsyncMock(return_value=1)
 
-        with pytest.raises(ConflictError, match="分片乱序"):
-            await manager.upload_part("abc123", 1, "etag-001-again")
+        result = await manager.upload_part("abc123", 1, "etag-001-again")
+        assert result["uploaded_parts"] == 1
 
     async def test_upload_part_persists_updated_state(self) -> None:
         """上传分片后应持久化更新后的状态"""
@@ -339,23 +342,72 @@ class TestChunkedUploadManagerResumeUpload:
 
 
 class TestChunkedUploadManagerConcurrency:
-    """验证并发安全性（asyncio.Lock）"""
+    """验证分布式锁（SET NX + Lua）"""
+
+    async def test_acquire_lock_returns_true_when_available(self) -> None:
+        """锁未被占用时 acquire 返回 True"""
+        cache = _make_cache()
+        cache.set_nx = AsyncMock(return_value=True)
+        manager = ChunkedUploadManager(cache)
+        acquired = await manager._acquire_lock("id-1")
+        assert acquired is True
+        cache.set_nx.assert_called_once()
+        key = cache.set_nx.call_args[0][0]
+        assert key.startswith(_LOCK_PREFIX)
+        assert key.endswith("id-1")
+
+    async def test_acquire_lock_returns_false_when_held(self) -> None:
+        """锁已被其他进程持有时 acquire 返回 False"""
+        cache = _make_cache()
+        cache.set_nx = AsyncMock(return_value=False)
+        manager = ChunkedUploadManager(cache)
+        acquired = await manager._acquire_lock("id-1")
+        assert acquired is False
 
     async def test_lock_per_upload_id(self) -> None:
         """不同 upload_id 使用不同的锁"""
         cache = _make_cache()
+        cache.set_nx = AsyncMock(return_value=True)
+        cache.eval = AsyncMock(return_value=1)
         manager = ChunkedUploadManager(cache)
-        lock1 = manager._get_lock("id-1")
-        lock2 = manager._get_lock("id-2")
-        assert lock1 is not lock2
+        acq1 = await manager._acquire_lock("id-1")
+        acq2 = await manager._acquire_lock("id-2")
+        assert acq1 is True
+        assert acq2 is True
 
     async def test_same_upload_id_reuses_lock(self) -> None:
-        """相同 upload_id 复用锁"""
+        """相同 upload_id 获取锁后再次获取返回 False（锁已被持有）"""
+        cache = _make_cache()
+        cache.set_nx = AsyncMock(return_value=True)
+        cache.eval = AsyncMock(return_value=1)
+        manager = ChunkedUploadManager(cache)
+        acq1 = await manager._acquire_lock("id-1")
+        assert acq1 is True
+        # 再次获取同一 id 的锁，set_nx 返回 False（锁已被持有）
+        cache.set_nx.return_value = False
+        acq2 = await manager._acquire_lock("id-1")
+        assert acq2 is False
+
+    async def test_release_lock_clears_owner(self) -> None:
+        """release_lock 清除本地 owner 记录"""
+        cache = _make_cache()
+        cache.set_nx = AsyncMock(return_value=True)
+        cache.eval = AsyncMock(return_value=1)
+        manager = ChunkedUploadManager(cache)
+
+        await manager._acquire_lock("id-1")
+        assert "id-1" in manager._lock_owners
+
+        await manager._release_lock("id-1")
+        assert "id-1" not in manager._lock_owners
+        cache.eval.assert_called_once()
+
+    async def test_release_lock_noop_when_not_owner(self) -> None:
+        """未持有锁时 release_lock 不执行任何操作"""
         cache = _make_cache()
         manager = ChunkedUploadManager(cache)
-        lock1 = manager._get_lock("id-1")
-        lock2 = manager._get_lock("id-1")
-        assert lock1 is lock2
+        await manager._release_lock("id-1")
+        assert not hasattr(cache, "eval") or cache.eval.call_count == 0
 
 
 class TestChunkedUploadManagerGetMultipartInfo:

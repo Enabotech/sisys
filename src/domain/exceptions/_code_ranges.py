@@ -101,6 +101,7 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "DocumentVersionConflictError": "storage",
     "MetadataValidationError": "storage",
     "ChunkingError": "storage",
+    "UploadSessionExpiredError": "storage",
     # role_exceptions.py
     "RoleNotFoundError": "role",
     "RoleAlreadyExistsError": "role",

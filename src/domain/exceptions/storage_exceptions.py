@@ -246,6 +246,42 @@ class ChunkingError(BusinessRuleViolationError):
         super().__init__(message, cause=cause, context=merged_context)
 
 
+class UploadSessionExpiredError(NotFoundError):
+    """上传会话过期异常
+
+    当分片上传会话 TTL 到期后，客户端尝试查询/恢复/完成时抛出。
+    HTTP 语义：410 Gone — 资源曾经存在但已过期，与 404（资源从未存在）区分。
+
+    Attributes:
+        code: 异常编码 EXCEPTION_219
+        upload_id: 过期的上传会话 ID
+    """
+
+    code = "EXCEPTION_219"
+
+    def __init__(
+        self,
+        upload_id: str,
+        message: str | None = None,
+        cause: Exception | None = None,
+        context: dict | None = None,
+    ) -> None:
+        """初始化上传会话过期异常
+
+        Args:
+            upload_id: 过期的上传会话 ID
+            message: 异常消息，默认使用标准格式
+            cause: 导致此异常的原因
+            context: 额外上下文信息
+        """
+        self.upload_id = upload_id
+        if message is None:
+            message = f"upload_id 已过期: {upload_id}"
+        merged_context = dict(context or {})
+        merged_context["upload_id"] = upload_id
+        super().__init__(message, cause=cause, context=merged_context)
+
+
 __all__ = [
     "ChunkingError",
     "DocumentVersionConflictError",
