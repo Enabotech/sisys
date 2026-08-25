@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, DateTime, Integer, String
+from sqlalchemy import BigInteger, DateTime, Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,6 +34,10 @@ class DocumentModel(Base):
     """
 
     __tablename__ = "documents"
+    __table_args__ = (
+        # 复合索引：高频 list() 查询按 tenant_id + 过滤条件组合命中
+        Index("idx_documents_tenant_filter", "tenant_id", "parse_status", "document_type", "uploaded_by"),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     tenant_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
