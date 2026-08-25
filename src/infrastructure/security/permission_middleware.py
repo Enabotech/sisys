@@ -8,10 +8,10 @@ from __future__ import annotations
 from typing import Callable
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from typing_extensions import Annotated
 
-from src.domain.exceptions import ConfigurationError, PermissionDeniedError
+from src.domain.exceptions import AuthenticationError, ConfigurationError, PermissionDeniedError
 from src.domain.ports.permission_service import PermissionServicePort
 from src.domain.value_objects.token_payload import TokenPayload
 from src.infrastructure.security.jwt_service import JWTService
@@ -34,26 +34,23 @@ def get_current_user(
         HTTPException: token 无效或缺失
     """
     if authorization is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authorization header",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise AuthenticationError(
+            "Missing authorization header",
+            context={"reason": "missing_header"},
         )
 
     # 处理空字符串authorization
     if not authorization.strip():
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise AuthenticationError(
+            "Invalid authorization header format",
+            context={"reason": "empty_header"},
         )
 
     parts = authorization.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise AuthenticationError(
+            "Invalid authorization header format",
+            context={"reason": "invalid_format"},
         )
 
     token = parts[1]
@@ -64,10 +61,9 @@ def get_current_user(
         payload: TokenPayload = jwt_service.verify_token(token)
         return payload
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise AuthenticationError(
+            "Invalid or expired token",
+            context={"reason": "token_verification_failed"},
         )
 
 
@@ -205,7 +201,7 @@ class CurrentUser:
 
         try:
             return get_current_user(authorization, jwt_service)
-        except HTTPException:
+        except AuthenticationError:
             return None
 
     @staticmethod

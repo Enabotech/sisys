@@ -17,6 +17,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.domain.entities.strategic_archive import ArchiveType
+from src.domain.exceptions import EntityValidationError
 from src.domain.ports.archive_repository import ArchiveQuery, ValidityStatus
 from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
 from src.domain.value_objects.token_payload import TokenPayload
@@ -288,16 +289,16 @@ def create_archive_router(
             try:
                 parsed_archive_type = ArchiveType(archive_type)
             except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Invalid archive_type: {archive_type}",
+                raise EntityValidationError(
+                    message=f"Invalid archive_type: {archive_type}",
+                    context={"entity": "query", "field": "archive_type", "value": archive_type},
                 )
         try:
             parsed_plan_id = uuid.UUID(plan_id) if plan_id else None
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid plan_id: {plan_id}",
+            raise EntityValidationError(
+                message=f"Invalid plan_id: {plan_id}",
+                context={"entity": "query", "field": "plan_id", "value": plan_id},
             )
         # 显式解析有效期查询参数（ISO 8601）
         parsed_valid_from = _parse_datetime_param(valid_from, "valid_from")
@@ -348,9 +349,9 @@ def create_archive_router(
         try:
             parsed_id = uuid.UUID(archive_id)
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid archive_id: {archive_id}",
+            raise EntityValidationError(
+                message=f"Invalid archive_id: {archive_id}",
+                context={"entity": "path", "field": "archive_id", "value": archive_id},
             )
         service = _get_service()
         archive = await service.set_validity_period(
@@ -404,9 +405,9 @@ def create_archive_router(
         try:
             parsed_id = uuid.UUID(archive_id)
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid archive_id: {archive_id}",
+            raise EntityValidationError(
+                message=f"Invalid archive_id: {archive_id}",
+                context={"entity": "path", "field": "archive_id", "value": archive_id},
             )
         archive = await service.get_archive(parsed_id)
         return _to_archive_response(archive)
@@ -437,16 +438,16 @@ def create_archive_router(
             try:
                 evidence_blob = base64.b64decode(payload.evidence_blob, validate=True)
             except Exception:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid base64 encoded evidence_blob",
+                raise EntityValidationError(
+                    message="Invalid base64 encoded evidence_blob",
+                    context={"entity": "request", "field": "evidence_blob"},
                 )
         try:
             archive_type = ArchiveType(payload.archive_type)
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid archive_type: {payload.archive_type}",
+            raise EntityValidationError(
+                message=f"Invalid archive_type: {payload.archive_type}",
+                context={"entity": "request", "field": "archive_type", "value": payload.archive_type},
             )
         service = _get_service()
         archive = await service.archive_plan(
@@ -483,9 +484,9 @@ def create_archive_router(
         try:
             parsed_plan_id = uuid.UUID(plan_id)
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid plan_id: {plan_id}",
+            raise EntityValidationError(
+                message=f"Invalid plan_id: {plan_id}",
+                context={"entity": "path", "field": "plan_id", "value": plan_id},
             )
         query = ArchiveQuery(plan_id=parsed_plan_id, limit=1000)
         service = _get_service()
@@ -539,21 +540,21 @@ def _parse_datetime_param(value: str | None, name: str) -> datetime | None:
         解析后的 datetime 对象（已转换为 UTC），None 表示未传参
 
     Raises:
-        HTTPException: 解析失败时返回 400
+        EntityValidationError: 解析失败时返回 400
     """
     if value is None:
         return None
     try:
         parsed = datetime.fromisoformat(value)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid {name}: {value}",
+        raise EntityValidationError(
+            message=f"Invalid {name}: {value}",
+            context={"entity": "query", "field": name, "value": value},
         )
     if parsed.tzinfo is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"{name} must be timezone-aware (UTC): {value}",
+        raise EntityValidationError(
+            message=f"{name} must be timezone-aware (UTC): {value}",
+            context={"entity": "query", "field": name, "value": value},
         )
     # 非 UTC 时区自动转换为 UTC
     if parsed.utcoffset() is not None and parsed.utcoffset() != timedelta(0):
@@ -571,16 +572,16 @@ def _parse_validity_status(value: str | None):
         ValidityStatus 枚举或 None
 
     Raises:
-        HTTPException: 非法值时返回 400
+        EntityValidationError: 非法值时返回 400
     """
     if value is None:
         return None
     try:
         return ValidityStatus(value)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid validity_status: {value} (must be 'valid' or 'expired')",
+        raise EntityValidationError(
+            message=f"Invalid validity_status: {value} (must be 'valid' or 'expired')",
+            context={"entity": "query", "field": "validity_status", "value": value},
         )
 
 
