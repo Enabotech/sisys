@@ -302,10 +302,16 @@ class ExceptionHandlers:
 
         self._record(exc)
 
+        headers: dict[str, str] = {"X-Error-Code": str(getattr(exc, "code", "EXCEPTION_999") or "EXCEPTION_999")}
+        # OAuth2 安全机制要求 401 响应携带 WWW-Authenticate header：
+        # 供认证依赖（Bearer token 提取）与客户端正确触发重新认证流程
+        if _get_http_status(exc) == status.HTTP_401_UNAUTHORIZED:
+            headers["WWW-Authenticate"] = "Bearer"
+
         return JSONResponse(
             status_code=_get_http_status(exc),
             content=content,
-            headers={"X-Error-Code": str(getattr(exc, "code", "EXCEPTION_999") or "EXCEPTION_999")},
+            headers=headers,
         )
 
     async def _handle_validation_error(self, request: Request, exc: Exception) -> JSONResponse:

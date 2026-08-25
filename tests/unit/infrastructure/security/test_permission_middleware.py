@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
 
+from src.domain.exceptions import AuthenticationError
 from src.domain.value_objects.token_payload import TokenPayload
 from src.infrastructure.security.permission_middleware import (
     CurrentUser,
@@ -21,27 +21,27 @@ class TestGetCurrentUser:
 
     def test_missing_authorization_header(self):
         """Missing authorization header raises 401."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AuthenticationError) as exc_info:
             get_current_user(authorization=None)
 
-        assert exc_info.value.status_code == 401
-        assert "Missing authorization header" in str(exc_info.value.detail)
+        assert exc_info.value.code == "EXCEPTION_205"
+        assert "Missing authorization header" in str(exc_info.value.message)
 
     def test_invalid_authorization_header_format(self):
         """Invalid format raises 401."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AuthenticationError) as exc_info:
             get_current_user(authorization="InvalidFormat")
 
-        assert exc_info.value.status_code == 401
-        assert "Invalid authorization header format" in str(exc_info.value.detail)
+        assert exc_info.value.code == "EXCEPTION_205"
+        assert "Invalid authorization header format" in str(exc_info.value.message)
 
     def test_invalid_authorization_header_not_bearer(self):
         """Non-Bearer auth raises 401."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AuthenticationError) as exc_info:
             get_current_user(authorization="Basic sometoken")
 
-        assert exc_info.value.status_code == 401
-        assert "Invalid authorization header format" in str(exc_info.value.detail)
+        assert exc_info.value.code == "EXCEPTION_205"
+        assert "Invalid authorization header format" in str(exc_info.value.message)
 
     def test_missing_jwt_service(self):
         """Missing jwt_service raises ConfigurationError."""
@@ -54,38 +54,38 @@ class TestGetCurrentUser:
 
     def test_empty_string_authorization_header(self):
         """Empty string authorization header raises 401."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AuthenticationError) as exc_info:
             get_current_user(authorization="")
 
-        assert exc_info.value.status_code == 401
-        assert "Invalid authorization header format" in str(exc_info.value.detail)
+        assert exc_info.value.code == "EXCEPTION_205"
+        assert "Invalid authorization header format" in str(exc_info.value.message)
 
     def test_whitespace_only_authorization_header(self):
         """Whitespace-only authorization header raises 401."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AuthenticationError) as exc_info:
             get_current_user(authorization="   ")
 
-        assert exc_info.value.status_code == 401
-        assert "Invalid authorization header format" in str(exc_info.value.detail)
+        assert exc_info.value.code == "EXCEPTION_205"
+        assert "Invalid authorization header format" in str(exc_info.value.message)
 
     def test_bearer_with_empty_token(self):
         """Bearer with empty token raises 401."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AuthenticationError) as exc_info:
             get_current_user(authorization="Bearer ")
 
-        assert exc_info.value.status_code == 401
-        assert "Invalid authorization header format" in str(exc_info.value.detail)
+        assert exc_info.value.code == "EXCEPTION_205"
+        assert "Invalid authorization header format" in str(exc_info.value.message)
 
     def test_invalid_token(self):
         """Invalid token raises 401."""
         mock_jwt = MagicMock()
         mock_jwt.verify_token.side_effect = Exception("Invalid token")
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AuthenticationError) as exc_info:
             get_current_user(authorization="Bearer invalidtoken", jwt_service=mock_jwt)
 
-        assert exc_info.value.status_code == 401
-        assert "Invalid or expired token" in str(exc_info.value.detail)
+        assert exc_info.value.code == "EXCEPTION_205"
+        assert "Invalid or expired token" in str(exc_info.value.message)
 
     def test_valid_token_returns_payload(self):
         """Valid token returns TokenPayload."""
@@ -128,10 +128,10 @@ class TestCurrentUser:
 
     def test_required_missing_authorization_raises(self):
         """Required user with no auth raises 401."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AuthenticationError) as exc_info:
             CurrentUser.required(authorization=None)
 
-        assert exc_info.value.status_code == 401
+        assert exc_info.value.code == "EXCEPTION_205"
 
     def test_required_valid_token_returns_user(self):
         """Required user with valid token returns payload."""

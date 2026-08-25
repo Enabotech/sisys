@@ -186,65 +186,56 @@ def create_summary_router(
         """
         del current_user  # 仅认证
 
-        try:
-            summary_service = _get_summary_service()
+        summary_service = _get_summary_service()
 
-            # 非跨文档模式：先执行检索获取上下文
-            search_results: list[dict[str, Any]] = []
-            if not request.cross_document:
-                try:
-                    layered_retrieval = _get_layered_retrieval()
-                    search_results = await layered_retrieval.search_top_down(
-                        query_text=request.query_text,
-                        target_level="L4",
-                        collection="documents",
-                        limit=request.top_k,
-                        tenant_id=request.tenant_id,
-                        filter_payload=None,
-                    )
-                except Exception as e:
-                    # 检索失败降级为空结果继续生成摘要，但记录 error 供运维观测
-                    logger.error("检索上下文获取失败，将使用空检索结果: %s", e)
-
-            result = await summary_service.generate_summary(
-                query_text=request.query_text,
-                search_results=search_results,
-                perspective=request.perspective,
-                tenant_id=request.tenant_id,
-                cross_document=request.cross_document,
-                limit=request.top_k,
-            )
-
-            # 提取来源文档 ID（保留检索顺序去重）
-            source_documents = list(
-                dict.fromkeys(
-                    str(r.get("payload", {}).get("document_id", ""))
-                    for r in search_results
-                    if isinstance(r, dict) and r.get("payload", {}).get("document_id")
+        # 非跨文档模式：先执行检索获取上下文
+        search_results: list[dict[str, Any]] = []
+        if not request.cross_document:
+            try:
+                layered_retrieval = _get_layered_retrieval()
+                search_results = await layered_retrieval.search_top_down(
+                    query_text=request.query_text,
+                    target_level="L4",
+                    collection="documents",
+                    limit=request.top_k,
+                    tenant_id=request.tenant_id,
+                    filter_payload=None,
                 )
+            except Exception as e:
+                # 检索失败降级为空结果继续生成摘要，但记录 error 供运维观测
+                logger.error("检索上下文获取失败，将使用空检索结果: %s", e)
+
+        result = await summary_service.generate_summary(
+            query_text=request.query_text,
+            search_results=search_results,
+            perspective=request.perspective,
+            tenant_id=request.tenant_id,
+            cross_document=request.cross_document,
+            limit=request.top_k,
+        )
+
+        # 提取来源文档 ID（保留检索顺序去重）
+        source_documents = list(
+            dict.fromkeys(
+                str(r.get("payload", {}).get("document_id", ""))
+                for r in search_results
+                if isinstance(r, dict) and r.get("payload", {}).get("document_id")
             )
-            summary_dict = {}
-            confidence_score = 0.0
+        )
+        summary_dict = {}
+        confidence_score = 0.0
 
-            if hasattr(result, "model_dump"):
-                summary_dict = result.model_dump()
-                confidence_score = summary_dict.get("confidence_score", 0.0)
+        if hasattr(result, "model_dump"):
+            summary_dict = result.model_dump()
+            confidence_score = summary_dict.get("confidence_score", 0.0)
 
-            return SummaryResponse(
-                summary=summary_dict,
-                query_text=request.query_text,
-                perspective=request.perspective,
-                confidence_score=confidence_score,
-                source_documents=source_documents,
-            )
-        except Exception as e:
-            from src.domain.exceptions import BaseException
-            from src.interfaces.api.exception_handlers import _get_http_status
-
-            if isinstance(e, BaseException):
-                http_status = _get_http_status(e)
-                raise HTTPException(status_code=http_status, detail=str(e))
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        return SummaryResponse(
+            summary=summary_dict,
+            query_text=request.query_text,
+            perspective=request.perspective,
+            confidence_score=confidence_score,
+            source_documents=source_documents,
+        )
 
     return router
 

@@ -441,11 +441,13 @@ class TestDomainExceptionHttpIntegration:
         resp = client.get("/test")
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_authentication_error_returns_401(self):
-        """验证 AuthenticationError 返回 401."""
+    def test_authentication_error_returns_401_with_www_authenticate(self):
+        """验证 AuthenticationError 返回 401（含 WWW-Authenticate header）。"""
         client = self._make_app_with_exc(AuthenticationError("bad credentials"))
         resp = client.get("/test")
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
+        assert resp.headers.get("www-authenticate", "").lower() == "bearer"
+        assert resp.headers.get("x-error-code", "") == "EXCEPTION_205"
 
     def test_conflict_returns_409(self):
         """验证 ConflictError 返回 409."""
