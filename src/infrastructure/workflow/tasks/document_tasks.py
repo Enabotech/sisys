@@ -32,7 +32,7 @@ class EmbeddingResult(TypedDict):
     sparse_vectors: list[SparseEmbedding]
 
 
-@task(retries=2)
+@task(retries=2, retry_delay_seconds=30)
 async def parse_document(document_id: uuid.UUID, file_path: str, tenant_id: str = "") -> dict[str, Any]:
     """解析文档任务
 
@@ -46,6 +46,9 @@ async def parse_document(document_id: uuid.UUID, file_path: str, tenant_id: str 
 
     Returns:
         解析结果字典
+
+    Raises:
+        RuntimeError: 可恢复的基础设施异常，触发 Prefect 重试
     """
     from src.domain.ports.resolver import get_resolver
 

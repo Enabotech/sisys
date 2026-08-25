@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import BigInteger, DateTime, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -39,7 +39,7 @@ class DocumentModel(Base):
     tenant_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     mime_type: Mapped[str] = mapped_column(String(100), nullable=False, default="")
-    file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     document_type: Mapped[str] = mapped_column(String(50), nullable=False, default="other")
     parse_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     uploaded_by: Mapped[str] = mapped_column(String(100), nullable=False, default="")

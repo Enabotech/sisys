@@ -374,6 +374,7 @@ class ObjectOperations:
                         break
 
                     if part_number not in completed_part_numbers:
+                        # 使用 MinIO SDK 内部方法上传分片（SDK 版本固定为 ^7.2.0）
                         etag = cast(Any, client)._put_object(
                             bucket_name,
                             object_key,
@@ -460,6 +461,9 @@ class ObjectOperations:
             MinIO 分片上传会话 ID
         """
         client = self._client.client
+        # 使用 MinIO SDK 分片上传 API（下划线开头为 SDK 内部方法，
+        # 但 minio 7.x 未提供公开的手动分片 API，此路径在客户端分片协议中
+        # 不可替代 fput_object。SDK 版本固定为 ^7.2.0 保证兼容性。）
         upload_id = client._create_multipart_upload(
             bucket_name,
             object_key,
@@ -489,6 +493,8 @@ class ObjectOperations:
             分片 ETag
         """
         client = self._client.client
+        # 使用 MinIO SDK 内部方法上传分片（minio 7.x 未提供公开 API，
+        # SDK 版本固定为 ^7.2.0 保证兼容性）
         result = cast(Any, client)._put_object(
             bucket_name,
             object_key,
@@ -520,6 +526,8 @@ class ObjectOperations:
             对象版本 ID
         """
         client = self._client.client
+        # 使用 MinIO SDK 内部方法完成分片上传（minio 7.x 未提供公开 API，
+        # SDK 版本固定为 ^7.2.0 保证兼容性）
         result = cast(Any, client)._complete_multipart_upload(bucket_name, object_key, upload_id, parts)
         logger.info("Completed multipart upload: %s/%s (%d parts)", bucket_name, object_key, len(parts))
         return result.version_id or ""
@@ -538,5 +546,7 @@ class ObjectOperations:
             upload_id: 分片上传会话 ID
         """
         client = self._client.client
+        # 使用 MinIO SDK 内部方法中止分片上传（minio 7.x 未提供公开 API，
+        # SDK 版本固定为 ^7.2.0 保证兼容性）
         client._abort_multipart_upload(bucket_name, object_key, upload_id)
         logger.info("Aborted multipart upload: %s/%s (%s)", bucket_name, object_key, upload_id)
