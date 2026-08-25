@@ -376,7 +376,8 @@ class ContextCompressor:
     def _estimate_tokens(docs: list[SearchResult]) -> int:
         """估算文档 token 总数
 
-        按 4 字符/token 粗略估算（CJK 密度更高，此处取保守值）。
+        CJK 感知估算：对 CJK 字符按 1.5 字符/token，其他字符按 4 字符/token。
+        中文文本平均约 1.5-2 字符/token，英文约 3-4 字符/token。
         注意：仅统计 _build_compress_prompt 实际使用的前 _DOCUMENT_CONTEXT_LIMIT
         个文档，确保压缩率估算与 LLM 实际输入一致。
 
@@ -387,6 +388,7 @@ class ContextCompressor:
             估算的 token 数
         """
         total_chars = 0
+        total_cjk_chars = 0
         for r in docs[:_DOCUMENT_CONTEXT_LIMIT]:
             if not isinstance(r, dict):
                 continue
@@ -395,12 +397,19 @@ class ContextCompressor:
                 continue
             # 与 _build_compress_prompt 截断一致：仅取前 _DOCUMENT_PREVIEW_CHARS 字符
             content = payload.get("content") or payload.get("summary_text") or ""
-            total_chars += min(len(str(content)), _DOCUMENT_PREVIEW_CHARS)
-        return max(total_chars // 4, 1)
+            text = str(content)[:_DOCUMENT_PREVIEW_CHARS]
+            total_chars += len(text)
+            total_cjk_chars += sum(1 for c in text if "一" <= c <= "鿿" or "　" <= c <= "〿" or "＀" <= c <= "￯")
+        # CJK 字符按 1.5 字符/token，其余按 4 字符/token
+        non_cjk_chars = max(total_chars - total_cjk_chars, 0)
+        estimated = int(total_cjk_chars / 1.5 + non_cjk_chars / 4)
+        return max(estimated, 1)
 
     @staticmethod
     def _estimate_chars_tokens(text: str) -> int:
         """估算文本 token 数
+
+        CJK 感知估算：对 CJK 字符按 1.5 字符/token，其他字符按 4 字符/token。
 
         Args:
             text: 文本
@@ -408,7 +417,12 @@ class ContextCompressor:
         Returns:
             估算的 token 数
         """
-        return max(len(text) // 4, 1)
+        if not text:
+            return 1
+        cjk_count = sum(1 for c in text if "一" <= c <= "鿿" or "　" <= c <= "〿" or "＀" <= c <= "￯")
+        non_cjk = max(len(text) - cjk_count, 0)
+        estimated = int(cjk_count / 1.5 + non_cjk / 4)
+        return max(estimated, 1)
 
 
 __all__ = [

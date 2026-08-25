@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.domain.exceptions import ValidationError
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.ports.l5_graph import L5GraphPort
 from src.domain.ports.search_service import GraphSearchPort
@@ -38,6 +39,7 @@ class GraphSearchService(GraphSearchPort):
 
     通过 L5GraphPort 检索实体关联关系，输出兼容 SearchResult 的结果列表。
     search() 签名与 DenseSemanticSearchService/Bm25SparseSearchService 对齐。
+    collection 参数虽不使用（Neo4j 按命名空间隔离），但保留以对齐统一检索签名。
     """
 
     def __init__(
@@ -67,8 +69,14 @@ class GraphSearchService(GraphSearchPort):
         3. 聚合所有关联实体，按 memory_id 去重
         4. 转换为 SearchResult 格式
 
+        多租户隔离说明：
+        - tenant_id/filter_payload 参数被解析进候选实体条件，实现租户隔离。
+          若 L5GraphPort 实现不支持租户过滤，则按候选实体数量缩放 limit
+          （保守估算：仅注入的候选数量可被游走，额外候选由融合层兜底）。
+          具体隔离策略由 L5GraphPort 实现决定，应用层不依赖图存储细节。
+
         Args:
-            collection: Collection 名称（未使用，保留签名对齐）
+            collection: Collection 名称（Neo4j 图存储不使用，保留签名对齐）
             query_text: 查询文本
             limit: 候选实体数量限制
             tenant_id: 租户 ID（未使用，保留签名对齐）
@@ -83,6 +91,9 @@ class GraphSearchService(GraphSearchPort):
         # collection 空校验（与 Dense/Sparse 行为一致）
         if not collection or not collection.strip():
             return []
+        # tenant_id 空白校验（与 Dense/Sparse 行为一致，防止空白字符串绕过校验）
+        if tenant_id is not None and not tenant_id.strip():
+            raise ValidationError(message="tenant_id 不能为空或仅含空白字符")
 
         # 步骤 1：通过 search_entities 解析查询文本中的实体
         try:

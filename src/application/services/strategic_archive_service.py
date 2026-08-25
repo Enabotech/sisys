@@ -19,6 +19,7 @@ from src.domain.events.archive_events import ArchiveCreated, FactBecameStale, Va
 from src.domain.exceptions import EntityValidationError
 from src.domain.exceptions.archive_exceptions import ArchiveNotFoundError, ArchiveStorageError, ValidityPeriodConflictError
 from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
+from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.event_publisher import EventPublisher, PublishResult
 from src.domain.ports.l3_vector import L3VectorPort, SearchResult
 from src.domain.ports.l4_object import L4ObjectPort
@@ -40,6 +41,7 @@ class StrategicArchiveService:
     def __init__(
         self,
         archive_repo: ArchiveRepositoryPort,
+        embedding_service: EmbeddingServicePort,
         vector_storage: L3VectorPort | None = None,
         object_storage: L4ObjectPort | None = None,
         graph_storage: L5GraphPort | None = None,
@@ -50,6 +52,7 @@ class StrategicArchiveService:
 
         Args:
             archive_repo: 档案仓储端口（L2 持久化）
+            embedding_service: 嵌入服务端口（L3 向量生成）
             vector_storage: 向量存储端口（L3，可选，None 时降级）
             object_storage: 对象存储端口（L4）
             graph_storage: 图存储端口（L5，可选，None 时降级）
@@ -57,6 +60,7 @@ class StrategicArchiveService:
             staleness_service: 陈旧数据降权服务（可选，None 时跳过降权）
         """
         self._archive_repo = archive_repo
+        self._embedding_service = embedding_service
         self._vector_storage = vector_storage
         self._object_storage = object_storage
         self._graph_storage = graph_storage
@@ -135,9 +139,15 @@ class StrategicArchiveService:
         has_embedding = False
         if self._vector_storage is not None:
             try:
+                # 生成真实嵌入向量（替代占位零向量）
+                embedding_text = (
+                    f"plan_type={plan_type} archive_type={saved.archive_type.value} "
+                    f"assumptions={str(assumptions or {})} decision_basis={str(decision_basis or {})}"
+                )
+                embedding_vector = await self._embedding_service.embed_query(embedding_text)
                 point = {
                     "id": embedding_point_id,
-                    "vector": [0.0] * 1024,  # 占位向量，实际由 embedding service 生成
+                    "vector": embedding_vector,
                     "payload": {
                         "archive_id": str(saved.archive_id),
                         "plan_id": str(plan_id),
