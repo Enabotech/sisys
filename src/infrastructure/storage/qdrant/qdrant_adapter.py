@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
+from src.domain.exceptions import ConfigurationError
 from src.domain.ports.l3_vector import L3VectorPort
 
 if TYPE_CHECKING:
@@ -185,7 +186,7 @@ class QdrantAdapter(L3VectorPort):
             RuntimeError: CollectionManager 未配置时抛出
         """
         if self._collection_manager is None:
-            raise RuntimeError("CollectionManager not configured")
+            raise ConfigurationError("CollectionManager not configured")
         params = vector_params or {}
         distance = params.pop("distance", "Cosine")
         return cast(
@@ -214,7 +215,7 @@ class QdrantAdapter(L3VectorPort):
             RuntimeError: CollectionManager 未配置时抛出
         """
         if self._collection_manager is None:
-            raise RuntimeError("CollectionManager not configured")
+            raise ConfigurationError("CollectionManager not configured")
         return cast("bool", await self._collection_manager.delete_collection(collection))
 
     async def collection_exists(
@@ -233,7 +234,7 @@ class QdrantAdapter(L3VectorPort):
             RuntimeError: CollectionManager 未配置时抛出
         """
         if self._collection_manager is None:
-            raise RuntimeError("CollectionManager not configured")
+            raise ConfigurationError("CollectionManager not configured")
         return cast("bool", await self._collection_manager.collection_exists(collection))
 
     async def list_collections(
@@ -248,5 +249,5 @@ class QdrantAdapter(L3VectorPort):
             RuntimeError: CollectionManager 未配置时抛出
         """
         if self._collection_manager is None:
-            raise RuntimeError("CollectionManager not configured")
+            raise ConfigurationError("CollectionManager not configured")
         return cast("list[str]", await self._collection_manager.list_collections())

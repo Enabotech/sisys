@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
-from src.domain.exceptions import ValidationError
+from src.domain.exceptions import StorageError, ValidationError
 from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
 from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.utils import json_dumps, json_loads
@@ -125,7 +125,7 @@ class RedisSnapshotStore(SnapshotRepositoryProtocol):
 
         except Exception as e:
             logger.error("Failed to save snapshot: session_id=%s error=%s", snapshot.session_id, e)
-            raise RuntimeError(f"Failed to save snapshot: {e}") from e
+            raise StorageError(f"Failed to save snapshot: {e}") from e
 
     async def load(self, session_id: str) -> CheckpointSnapshot | None:
         """加载会话的最新快照
@@ -175,7 +175,7 @@ class RedisSnapshotStore(SnapshotRepositoryProtocol):
 
         except Exception as e:
             logger.error("Failed to delete snapshot: session_id=%s error=%s", session_id, e)
-            raise RuntimeError(f"Failed to delete snapshot: {e}") from e
+            raise StorageError(f"Failed to delete snapshot: {e}") from e
 
     async def exists(self, session_id: str) -> bool:
         """检查快照是否存在

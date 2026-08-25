@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
-from src.domain.exceptions import ValidationError
+from src.domain.exceptions import StorageError, ValidationError
 from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
 from src.infrastructure.storage.redis.redis_snapshot_store import RedisSnapshotStore
 
@@ -130,7 +130,7 @@ class TestRedisSnapshotStore:
             state_data={"key": "value"},
         )
 
-        with pytest.raises(RuntimeError) as exc_info:
+        with pytest.raises(StorageError) as exc_info:
             await store.save(snapshot)
 
         assert "Failed to save snapshot" in str(exc_info.value)
@@ -149,7 +149,7 @@ class TestRedisSnapshotStore:
         store = RedisSnapshotStore(adapter=mock_adapter)
         mock_adapter.delete = AsyncMock(side_effect=Exception("redis error"))
 
-        with pytest.raises(RuntimeError) as exc_info:
+        with pytest.raises(StorageError) as exc_info:
             await store.delete("test-session")
 
         assert "Failed to delete snapshot" in str(exc_info.value)

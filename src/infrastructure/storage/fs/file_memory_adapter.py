@@ -13,6 +13,7 @@ from typing import cast
 
 import aiofiles
 
+from src.domain.exceptions import NotFoundError
 from src.domain.ports.l0_storage import L0StoragePort
 from src.infrastructure.config.memory import MemoryConfig
 
@@ -82,7 +83,7 @@ class FileMemoryAdapter(L0StoragePort):
         """
         file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
         if not file_path.exists():
-            raise FileNotFoundError(f"Memory file not found: {file_path}")
+            raise NotFoundError(f"Memory file not found: {file_path}")
         async with aiofiles.open(file_path, encoding="utf-8") as f:
             content: str = await f.read()
             return cast(str, content)
@@ -179,7 +180,7 @@ class FileMemoryAdapter(L0StoragePort):
         """
         file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
         if not file_path.exists():
-            raise FileNotFoundError(f"Memory file not found: {file_path}")
+            raise NotFoundError(f"Memory file not found: {file_path}")
         return file_path.read_text(encoding="utf-8")
 
     def update_index(self, entries: list[dict]) -> None:

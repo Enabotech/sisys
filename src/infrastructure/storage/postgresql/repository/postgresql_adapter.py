@@ -12,6 +12,7 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.exceptions import InvalidStateError
 from src.domain.ports.l2_rdb import L2RdbPort
 from src.infrastructure.storage.postgresql.models import Base
 from src.infrastructure.storage.postgresql.session_context import get_session
@@ -57,7 +58,7 @@ class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
         try:
             return get_session()
         except RuntimeError:
-            raise RuntimeError(
+            raise InvalidStateError(
                 f"{self.__class__.__name__} requires an active AsyncSession. "
                 f"Ensure SessionMiddleware or session_context() is active."
             ) from None

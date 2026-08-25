@@ -23,6 +23,7 @@ from unittest.mock import MagicMock
 import pytest
 import redis
 
+from src.domain.exceptions import NotFoundError
 from src.domain.ports.l0_storage import L0StoragePort
 from src.domain.ports.l1_cache import L1CachePort
 from src.infrastructure.storage.fs.memory_index import MemoryIndex
@@ -208,16 +209,16 @@ class TestL0FileSystem:
         deleted = await l0_storage.delete(memory_id, memory_type)
         assert deleted is True
 
-        # Verify deleted - FileNotFoundError raised for missing file
-        with pytest.raises(FileNotFoundError):
+        # Verify deleted - NotFoundError raised for missing file
+        with pytest.raises(NotFoundError):
             await l0_storage.read(memory_id, memory_type)
 
     async def test_l0_storage_raises_on_missing_file(self, l0_storage: L0StoragePort, temp_memory_dir: Path):
-        """Verify L0 storage read raises FileNotFoundError for missing file."""
+        """Verify L0 storage read raises NotFoundError for missing file."""
         memory_id = str(uuid.uuid4())
         memory_type = "user"
 
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(NotFoundError):
             await l0_storage.read(memory_id, memory_type)
 
     async def test_l0_storage_delete_nonexistent_returns_false(self, l0_storage: L0StoragePort, temp_memory_dir: Path):

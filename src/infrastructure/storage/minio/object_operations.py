@@ -14,6 +14,7 @@ from typing import Any, cast
 import redis.asyncio as aioredis
 from minio.error import S3Error
 
+from src.domain.exceptions import NotFoundError
 from src.infrastructure.config.minio import MinIOConfig
 from src.infrastructure.storage.minio.minio_manager import MinioManager
 
@@ -349,7 +350,7 @@ class ObjectOperations:
         # 从 Redis 读取状态
         state_data = await redis_client.get(state_key)
         if state_data is None:
-            raise KeyError(f"No multipart upload state found for upload_id: {upload_id}")
+            raise NotFoundError(f"No multipart upload state found for upload_id: {upload_id}")
 
         state = json.loads(state_data)
         file_path = state["file_path"]

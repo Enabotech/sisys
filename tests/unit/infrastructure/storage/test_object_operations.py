@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.domain.exceptions import NotFoundError
 from src.infrastructure.config.minio import MinIOConfig
 from src.infrastructure.storage.minio.object_operations import (
     ObjectOperations,
@@ -255,7 +256,7 @@ class TestResumeMultipartUpload:
         mock_redis = AsyncMock()
         mock_redis.get.return_value = None
 
-        with pytest.raises(KeyError, match="No multipart upload state"):
+        with pytest.raises(NotFoundError, match="No multipart upload state"):
             await ops.resume_multipart_upload(
                 "sisys-raw-docs-tenant1",
                 "test/file.pdf",
