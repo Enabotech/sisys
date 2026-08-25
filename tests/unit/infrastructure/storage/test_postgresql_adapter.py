@@ -10,6 +10,7 @@ from unittest import mock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.exceptions import InvalidStateError
 from src.infrastructure.storage.postgresql.models import UserModel
 from src.infrastructure.storage.postgresql.repository.postgresql_adapter import PostgreSQLAdapter
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
@@ -145,13 +146,13 @@ class TestSessionContextFriendlyError:
     def test_session_not_set_contains_repository_name(self):
         """验证错误信息包含具体仓库名"""
         repo = _TestUserAdapter(UserModel)
-        with pytest.raises(RuntimeError, match="_TestUserAdapter requires an active AsyncSession"):
+        with pytest.raises(InvalidStateError, match="_TestUserAdapter requires an active AsyncSession"):
             _ = repo._session
 
     def test_session_not_set_contains_fix_suggestion(self):
         """验证错误信息包含修复建议"""
         repo = _TestUserAdapter(UserModel)
-        with pytest.raises(RuntimeError, match="SessionMiddleware or session_context"):
+        with pytest.raises(InvalidStateError, match="SessionMiddleware or session_context"):
             _ = repo._session
 
     async def test_session_set_works_normally(self, mock_session):

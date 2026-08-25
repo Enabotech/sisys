@@ -9,6 +9,7 @@ import uuid
 
 import pytest
 
+from src.domain.exceptions import NotFoundError
 from src.infrastructure.config.memory import MemoryConfig
 from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 
@@ -92,7 +93,7 @@ class TestFileMemoryAdapterRead:
         """验证读取不存在的文件抛出异常"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
 
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(NotFoundError):
             await adapter.read(str(uuid.uuid4()), "user")
 
 
