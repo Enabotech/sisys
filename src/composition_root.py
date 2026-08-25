@@ -2118,6 +2118,7 @@ def bootstrap() -> None:
         interface=StrategicArchiveService,
         impl=lambda resolver: StrategicArchiveService(
             archive_repo=resolver.resolve("archive_repository"),
+            embedding_service=resolver.resolve("embedding_service"),
             vector_storage=resolver.resolve_optional("l3_vector"),
             object_storage=resolver.resolve_optional("l4_object"),
             graph_storage=resolver.resolve_optional("l5_graph"),

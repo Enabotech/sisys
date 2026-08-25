@@ -542,13 +542,14 @@ class LayeredRetrievalService:
                 context={"collection": collection, "target_level": "L4", "tenant_id": tenant_id},
             ) from e
 
-        # 2. L3 层 Dense 检索（直接传向量，避免二次嵌入）
+        # 2. L3 层混合检索（对齐 _search_l3_direct 使用 HybridSearchService 三路 RRF 融合）
         parent_filter = self._merge_filter_with_tenant(filter_payload, {"index_level": "parent"}, tenant_id)
         try:
-            l3_raw = await self._l3_vector.search(
+            l3_raw = await self._hybrid_search.search(
                 collection=collection,
-                query_vector=query_vector,
-                limit=min(limit, _MAX_EXPAND_PARENTS),  # 限制展开 Parent 数，避免 N+1 问题
+                query_text=query_text,
+                limit=min(limit, _MAX_EXPAND_PARENTS),
+                tenant_id=tenant_id,
                 filter_payload=parent_filter,
             )
         except SystemException:
@@ -562,9 +563,13 @@ class LayeredRetrievalService:
             ) from e
 
         l3_results = [
-            SearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {}))
+            SearchResult(
+                id=r["id"],
+                score=r["score"],
+                payload=self._normalize_payload(r.get("payload", {}), "parent"),
+            )
             for r in l3_raw
-            if isinstance(r, dict) and "id" in r and "score" in r
+            if "id" in r and "score" in r
         ]
         if not l3_results:
             return []

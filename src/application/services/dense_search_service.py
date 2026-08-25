@@ -6,8 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
+from src.application.services._filter_utils import build_search_filter
 from src.domain.exceptions import ValidationError
 from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.l3_vector import L3VectorPort, SearchResult
@@ -66,7 +65,7 @@ class DenseSemanticSearchService(DenseSearchPort):
 
         query_vector = await self._embedding.embed_query(query_text)
 
-        combined_filter = self._build_filter(tenant_id, filter_payload)
+        combined_filter = build_search_filter(tenant_id, filter_payload)
 
         raw_results = await self._vector.search(
             collection=collection,
@@ -80,30 +79,7 @@ class DenseSemanticSearchService(DenseSearchPort):
             if isinstance(r, dict) and "id" in r and "score" in r
         ]
 
-    def _build_filter(
-        self,
-        tenant_id: str | None,
-        filter_payload: dict | None,
-    ) -> dict | None:
-        """构建组合过滤条件
 
-        Args:
-            tenant_id: 租户 ID
-            filter_payload: 原始过滤条件
-
-        Returns:
-            组合后的过滤条件
-        """
-        if tenant_id is None and filter_payload is None:
-            return None
-
-        combined: dict[str, Any] = {}
-        if filter_payload:
-            safe_payload = {k: v for k, v in filter_payload.items() if k != "tenant_id"}
-            combined.update(safe_payload)
-        if tenant_id is not None:
-            safe_tid = tenant_id.strip()
-            if not safe_tid:
-                raise ValidationError(message="tenant_id 不能为空或仅含空白字符")
-            combined["tenant_id"] = safe_tid
-        return combined if combined else None
+__all__ = [
+    "DenseSemanticSearchService",
+]
