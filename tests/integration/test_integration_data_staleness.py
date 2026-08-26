@@ -121,7 +121,7 @@ def _service() -> tuple[StrategicArchiveService, PostgreSQLArchiveRepository, In
     repo = PostgreSQLArchiveRepository()
     outbox = InMemoryOutboxRepository()
     publisher = RabbitMQEventBus(outbox_repository=outbox, router=ChannelRouter())
-    return StrategicArchiveService(archive_repo=repo, event_publisher=publisher), repo, outbox
+    return StrategicArchiveService(archive_repo=repo, embedding_service=None, event_publisher=publisher), repo, outbox
 
 
 class TestDataStalenessPostgreSQL:

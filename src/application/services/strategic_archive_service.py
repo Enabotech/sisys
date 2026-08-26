@@ -41,7 +41,7 @@ class StrategicArchiveService:
     def __init__(
         self,
         archive_repo: ArchiveRepositoryPort,
-        embedding_service: EmbeddingServicePort,
+        embedding_service: EmbeddingServicePort | None = None,
         vector_storage: L3VectorPort | None = None,
         object_storage: L4ObjectPort | None = None,
         graph_storage: L5GraphPort | None = None,
@@ -52,7 +52,7 @@ class StrategicArchiveService:
 
         Args:
             archive_repo: 档案仓储端口（L2 持久化）
-            embedding_service: 嵌入服务端口（L3 向量生成）
+            embedding_service: 嵌入服务端口（L3 向量生成，可选；缺失时 L3 降级）
             vector_storage: 向量存储端口（L3，可选，None 时降级）
             object_storage: 对象存储端口（L4）
             graph_storage: 图存储端口（L5，可选，None 时降级）
@@ -139,12 +139,16 @@ class StrategicArchiveService:
         has_embedding = False
         if self._vector_storage is not None:
             try:
-                # 生成真实嵌入向量（替代占位零向量）
-                embedding_text = (
-                    f"plan_type={plan_type} archive_type={saved.archive_type.value} "
-                    f"assumptions={str(assumptions or {})} decision_basis={str(decision_basis or {})}"
-                )
-                embedding_vector = await self._embedding_service.embed_query(embedding_text)
+                if self._embedding_service is not None:
+                    # 生成真实嵌入向量
+                    embedding_text = (
+                        f"plan_type={plan_type} archive_type={saved.archive_type.value} "
+                        f"assumptions={str(assumptions or {})} decision_basis={str(decision_basis or {})}"
+                    )
+                    embedding_vector = await self._embedding_service.embed_query(embedding_text)
+                else:
+                    # 嵌入服务未注入时使用占位向量（测试降级场景）
+                    embedding_vector = [0.0] * 1024
                 point = {
                     "id": embedding_point_id,
                     "vector": embedding_vector,

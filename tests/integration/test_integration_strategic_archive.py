@@ -213,6 +213,7 @@ class TestArchiveServiceIntegration:
 
         service = StrategicArchiveService(
             archive_repo=PostgreSQLArchiveRepository(),
+            embedding_service=None,
             vector_storage=AsyncMock(spec=L3VectorPort),
             object_storage=AsyncMock(spec=L4ObjectPort),
             graph_storage=AsyncMock(spec=L5GraphPort),

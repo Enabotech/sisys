@@ -106,6 +106,7 @@ async def test_real_qdrant_search_vectors_applies_staleness_weight(
     )
     service = StrategicArchiveService(
         archive_repo=cast(ArchiveRepositoryPort, None),
+        embedding_service=None,
         vector_storage=vector,
         staleness_service=StalenessWeightService(None),
     )

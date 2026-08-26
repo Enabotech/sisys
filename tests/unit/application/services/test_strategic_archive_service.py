@@ -19,6 +19,7 @@ from src.domain.exceptions import ArchiveNotFoundError
 from src.domain.exceptions.archive_exceptions import ArchiveStorageError as ArchiveStoreErr
 from src.domain.exceptions.archive_exceptions import ValidityPeriodConflictError
 from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
+from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.l3_vector import L3VectorPort
 from src.domain.ports.l4_object import L4ObjectPort
@@ -72,6 +73,13 @@ def _make_publisher() -> Any:
     return AsyncMock(spec=EventPublisher)
 
 
+def _make_embedding() -> Any:
+    """创建 Mock 嵌入服务"""
+    mock = AsyncMock(spec=EmbeddingServicePort)
+    mock.embed_query.return_value = [0.1] * 1024
+    return mock
+
+
 def _make_staleness_service() -> Any:
     """创建 Mock 降权服务"""
     from src.application.services.staleness_weight_service import StalenessWeightService
@@ -89,6 +97,7 @@ class TestArchivePlan:
         """创建 Mock 服务实例"""
         return StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, _make_repo()),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, _make_vector()),
             object_storage=cast(L4ObjectPort, _make_object_storage()),
             graph_storage=cast(L5GraphPort, _make_graph()),
@@ -185,6 +194,7 @@ class TestArchivePlan:
         repo.save.side_effect = RuntimeError("db down")
         service = StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, repo),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, _make_vector()),
             object_storage=cast(L4ObjectPort, _make_object_storage()),
             graph_storage=cast(L5GraphPort, _make_graph()),
@@ -229,6 +239,7 @@ class TestDegradation:
         vector.upsert_points.side_effect = RuntimeError("qdrant down")
         service = StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, repo),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, vector),
             object_storage=cast(L4ObjectPort, obj),
             graph_storage=cast(L5GraphPort, graph),
@@ -258,6 +269,7 @@ class TestDegradation:
         graph.create_entity.side_effect = RuntimeError("neo4j down")
         service = StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, repo),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, vector),
             object_storage=cast(L4ObjectPort, obj),
             graph_storage=cast(L5GraphPort, graph),
@@ -284,6 +296,7 @@ class TestDegradation:
         vector.upsert_points.return_value = False
         service = StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, repo),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, vector),
             object_storage=cast(L4ObjectPort, _make_object_storage()),
             graph_storage=cast(L5GraphPort, _make_graph()),
@@ -311,6 +324,7 @@ class TestDegradation:
         graph.create_entity.return_value = False
         service = StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, repo),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, vector),
             object_storage=cast(L4ObjectPort, obj),
             graph_storage=cast(L5GraphPort, graph),
@@ -342,6 +356,7 @@ class TestDegradation:
         )
         service = StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, repo),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, vector),
             object_storage=cast(L4ObjectPort, obj),
             graph_storage=cast(L5GraphPort, graph),
@@ -368,6 +383,7 @@ class TestDegradation:
         publisher.publish.side_effect = RuntimeError("broker unreachable")
         service = StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, repo),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, vector),
             object_storage=cast(L4ObjectPort, obj),
             graph_storage=cast(L5GraphPort, graph),
@@ -391,6 +407,7 @@ class TestQuery:
         """创建 Mock 服务实例"""
         return StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, _make_repo()),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, _make_vector()),
             object_storage=cast(L4ObjectPort, _make_object_storage()),
             graph_storage=cast(L5GraphPort, _make_graph()),
@@ -714,6 +731,7 @@ class TestSearchVectors:
         """创建带降权服务的 Mock 服务实例"""
         return StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, _make_repo()),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, _make_vector()),
             object_storage=cast(L4ObjectPort, _make_object_storage()),
             graph_storage=cast(L5GraphPort, _make_graph()),
@@ -754,6 +772,7 @@ class TestSearchVectors:
         """staleness_service 为 None 时跳过降权（透明降级）"""
         svc = StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, _make_repo()),
+            embedding_service=_make_embedding(),
             vector_storage=cast(L3VectorPort, _make_vector()),
             object_storage=cast(L4ObjectPort, _make_object_storage()),
             graph_storage=cast(L5GraphPort, _make_graph()),
@@ -820,6 +839,7 @@ class TestSearchVectors:
         """L3 未注入时抛出 ArchiveStorageError"""
         svc = StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, _make_repo()),
+            embedding_service=_make_embedding(),
             vector_storage=None,
             object_storage=cast(L4ObjectPort, _make_object_storage()),
             graph_storage=cast(L5GraphPort, _make_graph()),
