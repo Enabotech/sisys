@@ -37,6 +37,16 @@ class RedisConfig:
     retry_on_timeout: bool = True
     default_ttl: int = 86400  # 24 小时
 
+    def __repr__(self) -> str:
+        """脱敏表示：不暴露 password 明文"""
+        passwd_repr = "***" if self.password else "None"
+        return (
+            f"RedisConfig(host={self.host!r}, port={self.port!r}, db={self.db!r}, "
+            f"password={passwd_repr}, max_connections={self.max_connections!r}, "
+            f"socket_timeout={self.socket_timeout!r}, retry_on_timeout={self.retry_on_timeout!r}, "
+            f"default_ttl={self.default_ttl!r})"
+        )
+
     @classmethod
     def from_env(cls) -> RedisConfig:
         """从环境变量加载配置

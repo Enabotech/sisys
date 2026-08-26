@@ -39,6 +39,16 @@ class PostgreSQLConfig:
     pool_recycle: int = 3600
     echo: bool = False
 
+    def __repr__(self) -> str:
+        """脱敏表示：不暴露 password 明文"""
+        passwd_repr = "***" if self.password else "None"
+        return (
+            f"PostgreSQLConfig(host={self.host!r}, port={self.port!r}, database={self.database!r}, "
+            f"username={self.username!r}, password={passwd_repr}, pool_size={self.pool_size!r}, "
+            f"max_overflow={self.max_overflow!r}, pool_timeout={self.pool_timeout!r}, "
+            f"pool_recycle={self.pool_recycle!r}, echo={self.echo!r})"
+        )
+
     @classmethod
     def from_env(cls) -> PostgreSQLConfig:
         """从环境变量加载配置

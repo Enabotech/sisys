@@ -37,6 +37,16 @@ class RabbitMQConfig:
     prefetch_count: int = 10
     heartbeat: int = 60
 
+    def __repr__(self) -> str:
+        """脱敏表示：不暴露 password 明文"""
+        passwd_repr = "***" if self.password else "None"
+        return (
+            f"RabbitMQConfig(host={self.host!r}, port={self.port!r}, virtual_host={self.virtual_host!r}, "
+            f"username={self.username!r}, password={passwd_repr}, exchange_name={self.exchange_name!r}, "
+            f"exchange_type={self.exchange_type!r}, prefetch_count={self.prefetch_count!r}, "
+            f"heartbeat={self.heartbeat!r})"
+        )
+
     @classmethod
     def from_env(cls) -> RabbitMQConfig:
         """从环境变量加载配置
