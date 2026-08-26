@@ -46,6 +46,19 @@ class Neo4jConfig:
         """
         return f"bolt://{self.host}:{self.bolt_port}"
 
+    def __repr__(self) -> str:
+        """脱敏表示：不暴露 password 明文
+
+        默认 dataclass __repr__ 会输出 password 明文，可能导致凭据泄露到日志。
+        """
+        passwd_repr = "***" if self.password else "None"
+        return (
+            f"Neo4jConfig(host={self.host!r}, bolt_port={self.bolt_port!r}, "
+            f"username={self.username!r}, password={passwd_repr}, database={self.database!r}, "
+            f"max_connection_pool_size={self.max_connection_pool_size!r}, "
+            f"connection_timeout={self.connection_timeout!r}, max_retry_time={self.max_retry_time!r})"
+        )
+
     @classmethod
     def from_env(cls) -> Neo4jConfig:
         """从环境变量加载配置

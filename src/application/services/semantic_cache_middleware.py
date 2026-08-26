@@ -22,6 +22,7 @@ import json
 import logging
 import struct
 import time
+from typing import Any
 
 from src.application.ports.cache_metrics_port import CacheMetricsPort
 from src.application.ports.semantic_cache import SemanticCache
@@ -113,6 +114,26 @@ class SemanticCacheMiddleware:
             return f"vec:{vector_id}:w{weights_hash}"
 
         return f"vec:{vector_id}"
+
+    def _weights_match(self, cached_weights: Any, request_weights: list[float] | None) -> bool:
+        """检查缓存值的 weights 是否与当前请求一致
+
+        weights 隔离：相同查询文本 + 不同 weights 不能命中彼此的缓存。
+        由于 KNN 语义搜索基于嵌入向量（不包含 weights），命中后需额外校验
+        weights 参数是否一致。不一致时视为伪命中，降级为未命中重新检索。
+
+        Args:
+            cached_weights: 缓存值中存储的 weights（可能为 None）
+            request_weights: 当前请求的 weights
+
+        Returns:
+            一致返回 True，否则返回 False
+        """
+        if request_weights is None:
+            return cached_weights is None
+        if not isinstance(cached_weights, list):
+            return False
+        return list(cached_weights) == list(request_weights)
 
     def _serialize_results(self, results: list[SearchResult], query_text: str, weights: list[float] | None) -> dict:
         """序列化检索结果为缓存值格式
@@ -228,10 +249,17 @@ class SemanticCacheMiddleware:
             latency = time.monotonic() - start_time
 
             if cached is not None:
-                # 缓存命中
+                # 缓存命中：校验 weights 隔离（KNN 搜索基于嵌入向量，命中后需确认 weights 一致）
+                cached_weights = cached.get(_WEIGHTS_KEY)
+                if not self._weights_match(cached_weights, weights):
+                    logger.debug("缓存命中但 weights 不一致，视为未命中: query=%s", query_text[:50])
+                    if self._metrics:
+                        self._metrics.record_cache_miss()
+                    cached = None
+            if cached is not None:
+                # 有效缓存命中
                 results = self._deserialize_results(cached)
                 if results is not None:
-                    # 有效缓存命中
                     if self._metrics:
                         self._metrics.record_cache_hit()
                         self._metrics.record_cache_latency(latency)
@@ -263,16 +291,19 @@ class SemanticCacheMiddleware:
             weights=weights,
         )
 
-        # 步骤 4: 自动写入缓存（不传 cache_key，由 RedisSemanticCache 内部基于 embedding 构建键）
+        # 步骤 4: 自动写入缓存（weights 感知键：不同 weights 写入不同缓存键，KNN 检索按向量相似度命中）
         if embedding is not None:
             try:
                 cache_value = self._serialize_results(result_list, query_text, weights)
                 doc_ids = self._extract_doc_ids(result_list)
+                # 权重影响 RRF 融合结果，因此不同 weights 必须映射到不同缓存键
+                write_key = self._build_cache_key(embedding, weights)
                 await self._cache.set(
                     embedding,
                     cache_value,
                     ttl=self._ttl,
                     doc_ids=doc_ids if doc_ids else None,
+                    cache_key=write_key,
                 )
                 logger.debug("缓存写入成功: query=%s, docs=%d", query_text[:50], len(doc_ids))
             except Exception as e:

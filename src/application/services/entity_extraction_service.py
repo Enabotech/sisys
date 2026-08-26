@@ -81,14 +81,14 @@ def _map_extraction_type(result: ExtractionResult) -> str:
         return "rule_only"
     if has_llm:
         return "llm_only"
-    # 无实体时回退到仲裁器策略或默认值
+    # 无实体时回退到仲裁器策略
     if strategy == "hybrid":
         return "hybrid"
     if strategy == "llm":
         return "llm_only"
-    if strategy == "rule":
-        return "rule_only"
-    return "unknown"
+    # 无实体且策略未知（如 "none"/"failed"）：回退到 rule_only 保持契约合法值
+    # （事件规范仅允许 rule_only / llm_only / hybrid，不接受 "unknown"）
+    return "rule_only"
 
 
 class EntityExtractionService:

@@ -364,7 +364,11 @@ class LayeredRetrievalService:
             if not raw_results:
                 return []
             return [
-                SearchResult(id=r["id"], score=r["score"], payload=r.get("payload", {}))
+                SearchResult(
+                    id=r["id"],
+                    score=r["score"],
+                    payload=self._normalize_payload(r.get("payload", {}), "child"),
+                )
                 for r in raw_results
                 if "id" in r and "score" in r
             ]
@@ -459,7 +463,7 @@ class LayeredRetrievalService:
             *[self._fetch_parent(collection, pid, inf) for pid, inf in parent_info.items()],
             return_exceptions=True,
         )
-        merged_results: list[SearchResult] = [r for r in fetch_results if not isinstance(r, BaseException) and r is not None]
+        merged_results: list[SearchResult] = [r for r in fetch_results if r is not None and not isinstance(r, BaseException)]
 
         # 4. 按最高 Child 分数降序排列（分数相同时按 id 确保确定性）
         merged_results.sort(key=lambda r: (-r["score"], r["id"]))

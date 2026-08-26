@@ -88,12 +88,11 @@ class GraphSearchService(GraphSearchPort):
         Returns:
             SearchResult 格式的结果列表，按 score 降序排列
         """
-        # 空查询直接返回空列表（与 Dense/Sparse 行为一致）
+        # 空查询/空 collection 抛出 ValidationError（与 Dense/Sparse 一致，对齐端口契约）
         if not query_text or not query_text.strip():
-            return []
-        # collection 空校验（与 Dense/Sparse 行为一致）
+            raise ValidationError(message="查询文本不能为空")
         if not collection or not collection.strip():
-            return []
+            raise ValidationError(message="Collection 名称不能为空")
         # tenant_id 空白校验（与 Dense/Sparse 行为一致，防止空白字符串绕过校验）
         if tenant_id is not None and not tenant_id.strip():
             raise ValidationError(message="tenant_id 不能为空或仅含空白字符")
