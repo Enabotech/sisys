@@ -28,6 +28,17 @@ class RerankerConfig:
     api_key: str | None = None
     base_url: str | None = None
 
+    def __repr__(self) -> str:
+        """脱敏表示：不暴露 api_key 明文
+
+        默认 dataclass __repr__ 会输出 api_key 明文，可能导致凭据泄露到日志。
+        """
+        api_key_repr = "***" if self.api_key else "None"
+        return (
+            f"RerankerConfig(model={self.model!r}, top_k={self.top_k!r}, "
+            f"timeout={self.timeout!r}, api_key={api_key_repr}, base_url={self.base_url!r})"
+        )
+
     @classmethod
     def from_env(cls) -> RerankerConfig:
         """从环境变量加载配置

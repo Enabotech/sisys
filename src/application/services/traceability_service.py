@@ -120,17 +120,21 @@ class TraceabilityService:
                 except (TypeError, ValueError, KeyError):
                     logger.debug("BoundingBox 构造失败，忽略 bbox 字段")
 
-            # 提取文档 ID
-            doc_id_str = payload.get("document_id", "")
-            try:
-                document_id = uuid.UUID(doc_id_str) if doc_id_str else uuid.uuid4()
-            except ValueError:
-                document_id = uuid.uuid4()
-
             # 提取文本和页码
             text = payload.get("content", "")
             page_start = payload.get("page_start", 1)
             chunk_id = payload.get("chunk_id", str(result.get("id", "")))
+
+            # 提取文档 ID（无合法 UUID 时基于 chunk_id 确定性派生，避免同文档 chunk 被拆分为随机 ID）
+            doc_id_str = payload.get("document_id", "")
+            try:
+                document_id = uuid.UUID(doc_id_str) if doc_id_str else None
+            except ValueError:
+                document_id = None
+            if document_id is None:
+                # 无合法 document_id：基于 chunk_id 派生确定性 UUID，保证同文档内稳定归并
+                id_seed = str(chunk_id)
+                document_id = uuid.uuid5(uuid.NAMESPACE_DNS, id_seed)
 
             # 置信度 = 检索结果 score 归一化（0-1）
             score = result.get("score", 0.0) if isinstance(result, dict) else 0.0
@@ -140,8 +144,8 @@ class TraceabilityService:
             if confidence < min_confidence:
                 continue
 
-            # 构造 citation_id（由 chunk_id 生成）
-            citation_id = f"{chunk_id}-cit"
+            # 构造 citation_id（纳入 document_id 前缀，避免跨文档 chunk_id 碰撞）
+            citation_id = f"{document_id}:{chunk_id}-cit"
 
             citation = Citation(
                 citation_id=citation_id,

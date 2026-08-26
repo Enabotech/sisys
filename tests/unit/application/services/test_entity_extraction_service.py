@@ -345,7 +345,7 @@ class TestEntityExtractionService:
         )
         published_event = event_publisher.publish.call_args[0][0]
         # 仲裁器：rule 空 + llm 空 → 返回 llm 结果（strategy=llm）→ 映射为 llm_only
-        assert published_event.extraction_type in ("rule_only", "llm_only", "unknown")
+        assert published_event.extraction_type in ("rule_only", "llm_only", "hybrid")
 
     # --- Edge Case: LLM 抽取器抛出异常 ---
 

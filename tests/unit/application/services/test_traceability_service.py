@@ -214,12 +214,13 @@ class TestTraceCitationFields:
 
     @pytest.mark.asyncio
     async def test_citation_id_generation(self) -> None:
-        """citation_id 由 chunk_id 生成"""
+        """citation_id 由 document_id + chunk_id 生成"""
         results = [_make_search_result("chunk-001", 0.92)]
         service = _make_service(_make_mock_retrieval(results))
         result = await service.trace(claim=_TEST_CLAIM)
         citation = result["citations"][0]
-        assert citation.citation_id.startswith("chunk-001")
+        assert citation.citation_id.endswith("chunk-001-cit")
+        assert ":" in citation.citation_id
 
 
 class TestTraceErrors:
@@ -248,7 +249,9 @@ class TestGetCitationDetail:
         results = [_make_search_result("chunk-001", 0.92)]
         service = _make_service(_make_mock_retrieval(results))
         await service.trace(claim=_TEST_CLAIM)
-        citation = await service.get_citation_detail(citation_id="chunk-001-cit")
+        # citation_id 现在包含 document_id 前缀
+        expected_id = f"{_TEST_DOCUMENT_ID}:chunk-001-cit"
+        citation = await service.get_citation_detail(citation_id=expected_id)
         assert citation is not None
         assert citation.chunk_id == "chunk-001"
 

@@ -138,13 +138,14 @@ class TestGraphSearchServiceEdgeCases:
 
     @pytest.mark.asyncio
     async def test_empty_query_returns_empty(self) -> None:
-        """空查询文本返回空列表"""
+        """空查询文本抛出 ValidationError（与 Dense/Sparse 契约一致）"""
+        from src.domain.exceptions import ValidationError
+
         port = _make_graph_port(entities=[])
         service = _make_service(port)
 
-        results = await service.search("test_collection", "")
-
-        assert results == []
+        with pytest.raises(ValidationError):
+            await service.search("test_collection", "")
 
     @pytest.mark.asyncio
     async def test_graph_port_exception_returns_empty(self) -> None:

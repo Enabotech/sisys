@@ -35,6 +35,18 @@ class QdrantConfig:
     timeout: float = 30.0
     max_retries: int = 3
 
+    def __repr__(self) -> str:
+        """脱敏表示：不暴露 api_key 明文
+
+        默认 dataclass __repr__ 会输出 api_key 明文，可能导致凭据泄露到日志。
+        """
+        api_key_repr = "***" if self.api_key else "None"
+        return (
+            f"QdrantConfig(host={self.host!r}, port={self.port!r}, grpc_port={self.grpc_port!r}, "
+            f"api_key={api_key_repr}, https={self.https!r}, timeout={self.timeout!r}, "
+            f"max_retries={self.max_retries!r})"
+        )
+
     @classmethod
     def from_env(cls) -> QdrantConfig:
         """从环境变量加载配置
