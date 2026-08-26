@@ -222,6 +222,33 @@ class TestTraceCitationFields:
         assert citation.citation_id.endswith("chunk-001-cit")
         assert ":" in citation.citation_id
 
+    @pytest.mark.asyncio
+    async def test_missing_document_id_derives_deterministic_uuid(self) -> None:
+        """无合法 document_id 时基于 chunk_id 确定性派生 UUID（同 chunk 稳定归并）"""
+        # document_id 为空
+        result_without_doc = _make_search_result("chunk-001", 0.92, document_id="")
+        service = _make_service(_make_mock_retrieval([result_without_doc]))
+        result = await service.trace(claim=_TEST_CLAIM)
+        citation = result["citations"][0]
+        assert citation.document_id is not None
+        derived_id = citation.document_id
+
+        # 再次 trace 相同 chunk → 相同派生 UUID（确定性）
+        result2 = await service.trace(claim=_TEST_CLAIM)
+        citation2 = result2["citations"][0]
+        assert citation2.document_id == derived_id
+
+    @pytest.mark.asyncio
+    async def test_invalid_document_id_derives_deterministic_uuid(self) -> None:
+        """非法 document_id（非 UUID 字符串）时确定性派生"""
+        result_invalid = _make_search_result("chunk-002", 0.8, document_id="not-a-uuid")
+        service = _make_service(_make_mock_retrieval([result_invalid]))
+        result = await service.trace(claim=_TEST_CLAIM)
+        citation = result["citations"][0]
+        assert citation.document_id is not None
+        # citation_id 纳入 document_id 前缀，且不包含非法字符串
+        assert "not-a-uuid" not in citation.citation_id
+
 
 class TestTraceErrors:
     """异常行为测试"""

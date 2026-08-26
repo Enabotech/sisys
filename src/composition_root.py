@@ -789,7 +789,6 @@ def bootstrap() -> None:
 
     # === Application Layer Ports ===
     # semantic_cache 从 SCOPED 升级为 SINGLETON（缓存实例全局共享）
-    _global_registry.unregister("semantic_cache")
     register_port(
         name="semantic_cache",
         version="v1.1.0",
@@ -1689,21 +1688,6 @@ def bootstrap() -> None:
         tags=("search", "sparse", "bm25"),
     )
 
-    register_port(
-        name="hybrid_search_service",
-        version="v1.0.0",
-        interface=HybridSearchService,
-        impl=lambda resolver: HybridSearchService(
-            dense_search=resolver.resolve("dense_search_service"),
-            sparse_search=resolver.resolve("sparse_search_service"),
-            fuse=fuse,
-        ),
-        module="src.application.services.hybrid_search_service",
-        lifetime=Lifetime.SCOPED,
-        owner="search-team",
-        tags=("search", "hybrid", "rrf"),
-    )
-
     # === Story 3-4: Graph Search + Reranker + 升级 HybridSearchService ===
     from src.application.services.graph_search_service import GraphSearchService
     from src.domain.ports.reranker import RerankerPort
@@ -1743,7 +1727,6 @@ def bootstrap() -> None:
     # 升级 HybridSearchService 注册（三路注入 + 可配置权重 + 重排序）
     # v1.0.0 → v1.1.0：先 unregister 旧端口再 register
     # unregister 对不存在的名字是静默 no-op，无需异常防护
-    _global_registry.unregister("hybrid_search_service")
     register_port(
         name="hybrid_search_service",
         version="v1.1.0",
@@ -2111,7 +2094,6 @@ def bootstrap() -> None:
 
     # 注册 StrategicArchiveService 应用服务（注入 L2-L5 各层存储 + 事件发布 + 降权服务）
     # L3/L5 使用 resolve_optional 实现优雅降级（依赖缺失时自动降级为 None）
-    _global_registry.unregister("strategic_archive_service")
     register_port(
         name="strategic_archive_service",
         version="v1.1.0",

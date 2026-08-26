@@ -364,6 +364,45 @@ class TestSemanticCacheMiddleware:
         assert "cache_key" in set_call_kwargs, "cache.set() 应包含 cache_key 参数"
         assert "w" in str(set_call_kwargs["cache_key"]), "cache_key 应包含 weights 哈希后缀"
 
+    async def test_weights_mismatch_treated_as_miss(self) -> None:
+        """KNN 命中但缓存值 weights 与请求不一致 → 视为伪命中 → 降级未命中 + 重新检索"""
+        middleware, cache, search_service, _ = _make_middleware()
+        # 缓存命中（cached 非 None），但其 weights 与请求不一致
+        cache.get.return_value = {
+            "results": [dict(r) for r in _sample_results()],
+            "query_text": "企业战略规划",
+            "weights": [1.0, 1.0, 0.5],
+        }
+
+        results = await middleware.search(
+            collection="test_coll",
+            query_text="企业战略规划",
+            limit=5,
+            weights=[0.2, 0.8],
+        )
+        # weights 不一致 → 伪命中降级 → 应执行完整检索
+        assert search_service.search.call_count == 1
+        assert len(results) == 3
+
+    async def test_weights_match_returns_cached(self) -> None:
+        """KNN 命中且缓存值 weights 与请求一致 → 直接返回缓存"""
+        middleware, cache, search_service, _ = _make_middleware()
+        cache.get.return_value = {
+            "results": [dict(r) for r in _sample_results()],
+            "query_text": "企业战略规划",
+            "weights": [0.2, 0.8],
+        }
+
+        results = await middleware.search(
+            collection="test_coll",
+            query_text="企业战略规划",
+            limit=5,
+            weights=[0.2, 0.8],
+        )
+        # weights 一致 → 直接命中缓存，不执行检索
+        assert search_service.search.call_count == 0
+        assert len(results) == 3
+
 
 class TestSemanticCacheMiddlewareMetrics:
     """指标采集验证"""

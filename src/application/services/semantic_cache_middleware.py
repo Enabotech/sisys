@@ -253,8 +253,7 @@ class SemanticCacheMiddleware:
                 cached_weights = cached.get(_WEIGHTS_KEY)
                 if not self._weights_match(cached_weights, weights):
                     logger.debug("缓存命中但 weights 不一致，视为未命中: query=%s", query_text[:50])
-                    if self._metrics:
-                        self._metrics.record_cache_miss()
+                    # 伪命中不额外计数（后续统一按未命中计 1 次，避免命中率指标偏低）
                     cached = None
             if cached is not None:
                 # 有效缓存命中
@@ -271,7 +270,7 @@ class SemanticCacheMiddleware:
                     if self._metrics:
                         self._metrics.record_cache_miss()
             else:
-                # 缓存未命中
+                # 缓存未命中（含伪命中降级与缓存损坏，统一计 1 次）
                 if self._metrics:
                     self._metrics.record_cache_miss()
                 logger.debug("缓存未命中: query=%s", query_text[:50])

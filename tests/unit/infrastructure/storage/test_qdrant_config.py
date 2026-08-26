@@ -47,6 +47,19 @@ class TestQdrantConfig:
         assert config.timeout == 60.0
         assert config.max_retries == 5
 
+    def test_repr_masks_api_key(self):
+        """测试 __repr__ 不泄露 api_key 明文"""
+        config = QdrantConfig(api_key="super-secret-key")  # pragma: allowlist secret
+        repr_str = repr(config)
+        assert "super-secret-key" not in repr_str
+        assert "***" in repr_str
+
+    def test_repr_masks_api_key_none(self):
+        """测试 api_key 为空时 __repr__ 显示 None"""
+        config = QdrantConfig()
+        repr_str = repr(config)
+        assert "api_key=None" in repr_str
+
     @patch.dict(os.environ, {}, clear=True)
     def test_from_env_defaults(self):
         """测试从环境变量加载配置的默认行为"""

@@ -214,3 +214,16 @@ class TestRerankerConfig:
         config = RerankerConfig()
         with pytest.raises(dataclasses.FrozenInstanceError):
             setattr(config, "model", "other-model")
+
+    def test_repr_masks_api_key(self) -> None:
+        """测试 __repr__ 不泄露 api_key 明文"""
+        config = RerankerConfig(api_key="super-secret-key")  # pragma: allowlist secret
+        repr_str = repr(config)
+        assert "super-secret-key" not in repr_str
+        assert "***" in repr_str
+
+    def test_repr_masks_api_key_none(self) -> None:
+        """测试 api_key 为空时 __repr__ 显示 None"""
+        config = RerankerConfig()
+        repr_str = repr(config)
+        assert "api_key=None" in repr_str

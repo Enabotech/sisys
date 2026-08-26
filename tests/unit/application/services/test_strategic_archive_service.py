@@ -229,6 +229,37 @@ class TestDegradation:
     """优雅降级测试"""
 
     @pytest.mark.asyncio
+    async def test_l3_skipped_when_embedding_service_none(self) -> None:
+        """embedding_service=None 时跳过 L3 写入（无占位零向量），embedding_ref 为 None"""
+        repo = _make_repo()
+        vector = _make_vector()
+        obj = _make_object_storage()
+        graph = _make_graph()
+        publisher = _make_publisher()
+        service = StrategicArchiveService(
+            archive_repo=cast(ArchiveRepositoryPort, repo),
+            embedding_service=None,
+            vector_storage=cast(L3VectorPort, vector),
+            object_storage=cast(L4ObjectPort, obj),
+            graph_storage=cast(L5GraphPort, graph),
+            event_publisher=cast(EventPublisher, publisher),
+        )
+        archive = await service.archive_plan(
+            plan_id=uuid.uuid4(),
+            plan_type="SP",
+            assumptions={},
+            decision_basis={},
+            execution_deviation={},
+            evidence_blob=b"evidence",
+        )
+        # embedding_service=None → 不调用 upsert_points，embedding_ref 保持 None
+        assert vector.upsert_points.call_count == 0
+        assert archive.embedding_ref is None
+        assert repo.save.called
+        assert obj.archive.called
+        assert publisher.publish.called
+
+    @pytest.mark.asyncio
     async def test_l3_failure_degrades(self) -> None:
         """L3 失败时 embedding_ref 为 None，主流程继续"""
         repo = _make_repo()

@@ -254,6 +254,28 @@ class TestRrfFusionSingleList:
         assert len(result) == 2
         assert result == dense  # 原样返回
 
+    def test_single_list_weights_length_mismatch_raises(self) -> None:
+        """单路直通时 weights 长度不匹配应抛 ValidationError（契约校验不因单路绕过）"""
+        from src.domain.exceptions import ValidationError
+
+        dense = [_make_result("doc1", 0.95)]
+        with pytest.raises(ValidationError):
+            fuse(dense, weights=[1.0, 1.0, 0.5])
+
+    def test_single_list_negative_weight_raises(self) -> None:
+        """单路直通时负权重应抛 ValidationError"""
+        from src.domain.exceptions import ValidationError
+
+        dense = [_make_result("doc1", 0.95)]
+        with pytest.raises(ValidationError):
+            fuse(dense, weights=[-1.0])
+
+    def test_single_list_valid_weight_passthrough(self) -> None:
+        """单路直通时合法权重（长度 1 且非负）正常通过"""
+        dense = [_make_result("doc1", 0.95)]
+        result = fuse(dense, weights=[1.0])
+        assert len(result) == 1
+
     def test_empty_input_no_lists(self) -> None:
         """无输入 — 返回空列表"""
         result = fuse()
