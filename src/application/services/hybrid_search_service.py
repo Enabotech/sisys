@@ -151,7 +151,9 @@ class HybridSearchService(HybridSearchPort):
             logger.warning("Graph 检索通道失败，降级为两路融合: %s: %s", type(graph_raw).__name__, str(graph_raw)[:200])
 
         # 应用有效权重（按通道索引映射，而非前缀截断）
-        all_weights = weights or self._weights
+        # 显式 is None 判空：weights=[]（空覆盖）不再静默回退默认权重，
+        # 由下游 fuse 的权重长度校验显式拒绝不匹配场景
+        all_weights = self._weights if weights is None else weights
         channel_active = [
             not dense_failed,  # dense 通道状态
             not sparse_failed,  # sparse 通道状态

@@ -43,6 +43,19 @@ class AuthConfig:
     lockout_duration_minutes: int = 30
     session_timeout_minutes: int = 30
 
+    def __repr__(self) -> str:
+        """脱敏表示：不暴露 jwt_secret_key 明文"""
+        secret_repr = "***" if self.jwt_secret_key else "None"
+        return (
+            f"AuthConfig(jwt_secret_key={secret_repr}, jwt_algorithm={self.jwt_algorithm!r}, "
+            f"jwt_expiration_hours={self.jwt_expiration_hours!r}, "
+            f"jwt_refresh_expiration_days={self.jwt_refresh_expiration_days!r}, "
+            f"password_min_length={self.password_min_length!r}, "
+            f"max_login_attempts={self.max_login_attempts!r}, "
+            f"lockout_duration_minutes={self.lockout_duration_minutes!r}, "
+            f"session_timeout_minutes={self.session_timeout_minutes!r})"
+        )
+
     @classmethod
     def from_env(cls) -> AuthConfig:
         """从环境变量加载配置

@@ -37,6 +37,17 @@ class MinIOConfig:
     connect_timeout: float = 5.0
     read_timeout: float = 30.0
 
+    def __repr__(self) -> str:
+        """脱敏表示：不暴露 access_key/secret_key 明文"""
+        access_repr = "***" if self.access_key else "None"
+        secret_repr = "***" if self.secret_key else "None"
+        return (
+            f"MinIOConfig(host={self.host!r}, port={self.port!r}, "
+            f"access_key={access_repr}, secret_key={secret_repr}, secure={self.secure!r}, "
+            f"bucket_prefix={self.bucket_prefix!r}, connect_timeout={self.connect_timeout!r}, "
+            f"read_timeout={self.read_timeout!r})"
+        )
+
     @property
     def endpoint(self) -> str:
         """返回 host:port 格式的 endpoint
