@@ -141,9 +141,12 @@ class TestIntegrationTraceErrors:
         """trace() 后通过 get_citation_detail 获取引文"""
         results = [_make_search_result("chunk-001", 0.92)]
         service = _make_service(_make_mock_retrieval(results))
-        await service.trace(claim="测试结论")
-        citation = await service.get_citation_detail("chunk-001-cit")
+        result = await service.trace(claim="测试结论")
+        # citation_id 现在包含 document_id 前缀（Round 3 修复，避免跨文档 chunk_id 碰撞）
+        citation_id = result["citations"][0].citation_id
+        citation = await service.get_citation_detail(citation_id)
         assert citation is not None
+        assert citation.chunk_id == "chunk-001"
 
     @pytest.mark.asyncio
     async def test_get_citation_by_document_after_trace(self) -> None:
