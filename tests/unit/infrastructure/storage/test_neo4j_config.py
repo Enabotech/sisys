@@ -52,6 +52,19 @@ class TestNeo4jConfig:
         assert config.connection_timeout == 60.0
         assert config.max_retry_time == 45.0
 
+    def test_repr_masks_password(self):
+        """测试 __repr__ 不泄露 password 明文"""
+        config = Neo4jConfig(password="super-secret")  # pragma: allowlist secret
+        repr_str = repr(config)
+        assert "super-secret" not in repr_str
+        assert "***" in repr_str
+
+    def test_repr_masks_password_none(self):
+        """测试空密码时 __repr__ 显示 None"""
+        config = Neo4jConfig()
+        repr_str = repr(config)
+        assert "password=None" in repr_str
+
     @patch.dict(os.environ, {}, clear=True)
     def test_from_env_defaults(self):
         """测试从环境变量加载配置的默认行为"""

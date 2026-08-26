@@ -68,13 +68,13 @@ def fuse(
     if not result_lists:
         return []
 
-    # 权重校验
+    # 权重校验（必须在单路直通之前执行，确保单路场景也遵守契约）
     if weights is not None and len(weights) != len(result_lists):
         raise ValidationError(f"weights 长度({len(weights)})与 result_lists 长度({len(result_lists)})不匹配")
     if weights is not None and any(w < 0 for w in weights):
         raise ValidationError(f"weights 元素必须为非负数，当前值: {weights}")
 
-    # 单路直通 — 跳过融合（无需计算 RRF）
+    # 单路直通 — 跳过融合（无需计算 RRF，但已通过上方权重校验）
     if len(result_lists) == 1:
         return list(result_lists[0])
 
