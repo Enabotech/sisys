@@ -137,18 +137,14 @@ class StrategicArchiveService:
 
         # Step 2: L3 向量存储（可降级）
         has_embedding = False
-        if self._vector_storage is not None:
+        if self._vector_storage is not None and self._embedding_service is not None:
             try:
-                if self._embedding_service is not None:
-                    # 生成真实嵌入向量
-                    embedding_text = (
-                        f"plan_type={plan_type} archive_type={saved.archive_type.value} "
-                        f"assumptions={str(assumptions or {})} decision_basis={str(decision_basis or {})}"
-                    )
-                    embedding_vector = await self._embedding_service.embed_query(embedding_text)
-                else:
-                    # 嵌入服务未注入时使用占位向量（测试降级场景）
-                    embedding_vector = [0.0] * 1024
+                # 生成真实嵌入向量
+                embedding_text = (
+                    f"plan_type={plan_type} archive_type={saved.archive_type.value} "
+                    f"assumptions={str(assumptions or {})} decision_basis={str(decision_basis or {})}"
+                )
+                embedding_vector = await self._embedding_service.embed_query(embedding_text)
                 point = {
                     "id": embedding_point_id,
                     "vector": embedding_vector,

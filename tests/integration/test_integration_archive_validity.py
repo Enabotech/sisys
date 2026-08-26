@@ -164,9 +164,11 @@ def _make_event_publisher() -> RabbitMQEventBus:
 
 def _make_service(event_publisher: EventPublisher | None = None) -> StrategicArchiveService:
     """创建真实仓储 + 真实 EventPublisher + Mock 外部存储层的服务"""
+    embedding = AsyncMock()
+    embedding.embed_query.return_value = [0.1] * 1024
     return StrategicArchiveService(
         archive_repo=PostgreSQLArchiveRepository(),
-        embedding_service=None,
+        embedding_service=embedding,
         vector_storage=AsyncMock(spec=L3VectorPort),
         object_storage=AsyncMock(spec=L4ObjectPort),
         graph_storage=AsyncMock(spec=L5GraphPort),

@@ -141,9 +141,11 @@ def _build_service(event_loop, db_engine: PostgreSQLManager) -> dict[str, Any]:
     )
     handler.register_handlers()
 
+    embedding = AsyncMock()
+    embedding.embed_query.return_value = [0.1] * 1024
     service = StrategicArchiveService(
         archive_repo=cast(ArchiveRepositoryPort, repo),
-        embedding_service=None,
+        embedding_service=embedding,
         vector_storage=cast(L3VectorPort, vector),
         object_storage=cast(L4ObjectPort, obj),
         graph_storage=cast(L5GraphPort, graph),
@@ -494,9 +496,11 @@ def when_vector_search(event_loop, context: dict[str, Any]) -> None:
             },
         },
     ]
+    embedding = AsyncMock()
+    embedding.embed_query.return_value = [0.1] * 1024
     service = StrategicArchiveService(
         archive_repo=cast(ArchiveRepositoryPort, ctx["repo"]),
-        embedding_service=None,
+        embedding_service=embedding,
         vector_storage=cast(L3VectorPort, vector),
         object_storage=cast(L4ObjectPort, ctx["obj"]),
         graph_storage=cast(L5GraphPort, ctx["graph"]),

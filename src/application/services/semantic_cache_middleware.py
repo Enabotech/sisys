@@ -221,12 +221,10 @@ class SemanticCacheMiddleware:
             )
             return fallback_results
 
-        # 步骤 2: 查询语义缓存
+        # 步骤 2: 查询语义缓存（不传 cache_key，使用 KNN 语义搜索而非精确 HGET）
         try:
-            # 生成含 weights 哈希后缀的缓存键（weights 隔离：不同 weights 不命中彼此的缓存）
-            query_cache_key = self._build_cache_key(embedding, weights)
             start_time = time.monotonic()
-            cached = await self._cache.get(embedding, threshold=self._threshold, cache_key=query_cache_key)
+            cached = await self._cache.get(embedding, threshold=self._threshold)
             latency = time.monotonic() - start_time
 
             if cached is not None:
@@ -265,19 +263,16 @@ class SemanticCacheMiddleware:
             weights=weights,
         )
 
-        # 步骤 4: 自动写入缓存
+        # 步骤 4: 自动写入缓存（不传 cache_key，由 RedisSemanticCache 内部基于 embedding 构建键）
         if embedding is not None:
             try:
                 cache_value = self._serialize_results(result_list, query_text, weights)
                 doc_ids = self._extract_doc_ids(result_list)
-                # 生成含 weights 哈希后缀的缓存键，确保不同 weights 产生不同缓存键
-                cache_key = self._build_cache_key(embedding, weights)
                 await self._cache.set(
                     embedding,
                     cache_value,
                     ttl=self._ttl,
                     doc_ids=doc_ids if doc_ids else None,
-                    cache_key=cache_key,
                 )
                 logger.debug("缓存写入成功: query=%s, docs=%d", query_text[:50], len(doc_ids))
             except Exception as e:

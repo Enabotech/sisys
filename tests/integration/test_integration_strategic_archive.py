@@ -211,9 +211,11 @@ class TestArchiveServiceIntegration:
             PostgreSQLArchiveRepository,
         )
 
+        embedding = AsyncMock()
+        embedding.embed_query.return_value = [0.1] * 1024
         service = StrategicArchiveService(
             archive_repo=PostgreSQLArchiveRepository(),
-            embedding_service=None,
+            embedding_service=embedding,
             vector_storage=AsyncMock(spec=L3VectorPort),
             object_storage=AsyncMock(spec=L4ObjectPort),
             graph_storage=AsyncMock(spec=L5GraphPort),

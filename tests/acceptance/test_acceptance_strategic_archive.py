@@ -124,10 +124,12 @@ def _build_service(event_loop):
     graph = AsyncMock(spec=L5GraphPort)
     graph.create_entity.return_value = True
     event_bus = InMemoryEventBus()
+    embedding = AsyncMock()
+    embedding.embed_query.return_value = [0.1] * 1024
 
     service = StrategicArchiveService(
         archive_repo=cast(ArchiveRepositoryPort, repo),
-        embedding_service=None,
+        embedding_service=embedding,
         vector_storage=cast(L3VectorPort, vector),
         object_storage=cast(L4ObjectPort, obj),
         graph_storage=cast(L5GraphPort, graph),
