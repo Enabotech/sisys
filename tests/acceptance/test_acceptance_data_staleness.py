@@ -143,6 +143,7 @@ def _build_service(event_loop, db_engine: PostgreSQLManager) -> dict[str, Any]:
 
     service = StrategicArchiveService(
         archive_repo=cast(ArchiveRepositoryPort, repo),
+        embedding_service=None,
         vector_storage=cast(L3VectorPort, vector),
         object_storage=cast(L4ObjectPort, obj),
         graph_storage=cast(L5GraphPort, graph),
@@ -495,6 +496,7 @@ def when_vector_search(event_loop, context: dict[str, Any]) -> None:
     ]
     service = StrategicArchiveService(
         archive_repo=cast(ArchiveRepositoryPort, ctx["repo"]),
+        embedding_service=None,
         vector_storage=cast(L3VectorPort, vector),
         object_storage=cast(L4ObjectPort, ctx["obj"]),
         graph_storage=cast(L5GraphPort, ctx["graph"]),

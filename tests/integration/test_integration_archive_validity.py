@@ -166,6 +166,7 @@ def _make_service(event_publisher: EventPublisher | None = None) -> StrategicArc
     """创建真实仓储 + 真实 EventPublisher + Mock 外部存储层的服务"""
     return StrategicArchiveService(
         archive_repo=PostgreSQLArchiveRepository(),
+        embedding_service=None,
         vector_storage=AsyncMock(spec=L3VectorPort),
         object_storage=AsyncMock(spec=L4ObjectPort),
         graph_storage=AsyncMock(spec=L5GraphPort),

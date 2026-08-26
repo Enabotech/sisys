@@ -282,21 +282,17 @@ class TestTopDownL3ToL4:
         Returns:
             配置好的 LayeredRetrievalService
         """
-        hybrid_search = _make_hybrid_search()
-        l3_vector = _make_l3_vector(
-            search_results=[
-                {
-                    "id": parent_id,
-                    "score": score,
-                    "payload": {
-                        "chunk_id": parent_id,
-                        "document_id": str(uuid.uuid4()),
-                        "index_level": "parent",
-                        "content": f"L3 Parent 块内容（分数 {score}）",
-                    },
-                }
-            ]
-        )
+        parent_payload = {
+            "chunk_id": parent_id,
+            "document_id": str(uuid.uuid4()),
+            "index_level": "parent",
+            "content": f"L3 Parent 块内容（分数 {score}）",
+        }
+        parent_result = SearchResult(id=parent_id, score=score, payload=parent_payload)
+
+        # HybridSearchService 返回 L3 Parent 检索结果
+        hybrid_search = AsyncMock()
+        hybrid_search.search.return_value = [parent_result]
 
         def _child_search(
             collection: str,
@@ -310,15 +306,11 @@ class TestTopDownL3ToL4:
                 {
                     "id": parent_id,
                     "score": score,
-                    "payload": {
-                        "chunk_id": parent_id,
-                        "document_id": str(uuid.uuid4()),
-                        "index_level": "parent",
-                        "content": f"L3 Parent 块内容（分数 {score}）",
-                    },
+                    "payload": parent_payload,
                 }
             ]
 
+        l3_vector = _make_l3_vector()
         l3_vector.search.side_effect = _child_search
         return LayeredRetrievalService(
             hybrid_search=hybrid_search,
@@ -359,21 +351,16 @@ class TestTopDownL3ToL4:
     async def test_top_down_combined_score_sort(self) -> None:
         """结果按 Parent 分数 × Child 分数降序排列"""
         parent_id = str(uuid.uuid4())
-        hybrid_search = _make_hybrid_search()
-        l3_vector = _make_l3_vector(
-            search_results=[
-                {
-                    "id": parent_id,
-                    "score": 0.8,
-                    "payload": {
-                        "chunk_id": parent_id,
-                        "document_id": str(uuid.uuid4()),
-                        "index_level": "parent",
-                        "content": "L3 Parent 块内容",
-                    },
-                }
-            ]
-        )
+        parent_payload = {
+            "chunk_id": parent_id,
+            "document_id": str(uuid.uuid4()),
+            "index_level": "parent",
+            "content": "L3 Parent 块内容",
+        }
+        parent_result = SearchResult(id=parent_id, score=0.8, payload=parent_payload)
+        hybrid_search = AsyncMock()
+        hybrid_search.search.return_value = [parent_result]
+        l3_vector = _make_l3_vector()
 
         def _search(
             collection: str,
@@ -390,12 +377,7 @@ class TestTopDownL3ToL4:
                 {
                     "id": parent_id,
                     "score": 0.8,
-                    "payload": {
-                        "chunk_id": parent_id,
-                        "document_id": str(uuid.uuid4()),
-                        "index_level": "parent",
-                        "content": "L3 Parent 块内容",
-                    },
+                    "payload": parent_payload,
                 }
             ]
 
@@ -419,32 +401,22 @@ class TestTopDownL3ToL4:
     async def test_top_down_parent_content_preview(self) -> None:
         """结果 payload 包含 parent_content 截断摘要（前 200 字符）"""
         parent_id = str(uuid.uuid4())
-        hybrid_search = _make_hybrid_search()
-        l3_vector = _make_l3_vector(
-            search_results=[
-                {
-                    "id": parent_id,
-                    "score": 0.8,
-                    "payload": {
-                        "chunk_id": parent_id,
-                        "document_id": str(uuid.uuid4()),
-                        "index_level": "parent",
-                        "content": "长" * 300,
-                    },
-                }
-            ]
-        )
+        parent_payload = {
+            "chunk_id": parent_id,
+            "document_id": str(uuid.uuid4()),
+            "index_level": "parent",
+            "content": "长" * 300,
+        }
+        parent_result = SearchResult(id=parent_id, score=0.8, payload=parent_payload)
+        hybrid_search = AsyncMock()
+        hybrid_search.search.return_value = [parent_result]
+        l3_vector = _make_l3_vector()
 
         l3_vector.search.return_value = [
             {
                 "id": parent_id,
                 "score": 0.8,
-                "payload": {
-                    "chunk_id": parent_id,
-                    "document_id": str(uuid.uuid4()),
-                    "index_level": "parent",
-                    "content": "长" * 300,
-                },
+                "payload": parent_payload,
             }
         ]
         service = LayeredRetrievalService(
@@ -762,9 +734,12 @@ class TestRetrieveUnifiedEntry:
 
     async def test_retrieve_delegates_to_search_top_down_l4(self) -> None:
         """retrieve() 委托给 search_top_down(target_level='L4')，返回检索结果"""
-        # L4 路径需要 l3_vector.search 先返回 parent 结果，再返回 child 结果
         parent_id = str(uuid.uuid4())
         child_id = str(uuid.uuid4())
+        parent_payload = {"index_level": "parent", "content": "父块内容"}
+        parent_result = SearchResult(id=parent_id, score=0.85, payload=parent_payload)
+        hybrid_search = AsyncMock()
+        hybrid_search.search.return_value = [parent_result]
         call_count = 0
 
         async def _search(
@@ -775,10 +750,7 @@ class TestRetrieveUnifiedEntry:
         ) -> list[dict]:
             nonlocal call_count
             call_count += 1
-            if call_count == 1:
-                # 第一次调用：L3 parent 检索
-                return [{"id": parent_id, "score": 0.85, "payload": {"index_level": "parent", "content": "父块内容"}}]
-            # 后续调用：child 展开
+            # 对 L3→L4 展开时的 child 搜索
             return [{"id": child_id, "score": 0.7, "payload": {"index_level": "child", "parent_chunk_id": parent_id}}]
 
         l3_vector = AsyncMock(spec=L3VectorPort)
@@ -786,7 +758,7 @@ class TestRetrieveUnifiedEntry:
         l3_vector.get_point = AsyncMock(return_value=None)
 
         service = LayeredRetrievalService(
-            hybrid_search=_make_hybrid_search(),
+            hybrid_search=hybrid_search,
             l3_vector=l3_vector,
             embedding_service=_make_embedding_service(),
         )

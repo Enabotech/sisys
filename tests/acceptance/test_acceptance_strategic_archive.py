@@ -127,6 +127,7 @@ def _build_service(event_loop):
 
     service = StrategicArchiveService(
         archive_repo=cast(ArchiveRepositoryPort, repo),
+        embedding_service=None,
         vector_storage=cast(L3VectorPort, vector),
         object_storage=cast(L4ObjectPort, obj),
         graph_storage=cast(L5GraphPort, graph),
