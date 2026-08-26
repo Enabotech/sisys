@@ -70,16 +70,19 @@ class GraphSearchService(GraphSearchPort):
         4. 转换为 SearchResult 格式
 
         多租户隔离说明：
-        - tenant_id/filter_payload 参数被解析进候选实体条件，实现租户隔离。
-          若 L5GraphPort 实现不支持租户过滤，则按候选实体数量缩放 limit
-          （保守估算：仅注入的候选数量可被游走，额外候选由融合层兜底）。
-          具体隔离策略由 L5GraphPort 实现决定，应用层不依赖图存储细节。
+        - tenant_id 参数仅做空白校验（防止空白字符串绕过签名对齐校验），
+          不参与图检索过滤。L5GraphPort 端口契约（search_entities）当前
+          不支持租户过滤，Graph 通道返回的是全租户候选实体。
+        - 多租户隔离在 Graph 通道的缺口由融合层 HybridSearchService 降级
+          策略兜底：若其他通道已隔离，Graph 结果经 RRF 融合后，非本租户
+          实体因 Dense/Sparse 通道的 tenant_id 过滤而得分较低，影响有限。
+        - 长期方案：L5GraphPort.search_entities 扩展 tenant_id 参数。
 
         Args:
             collection: Collection 名称（Neo4j 图存储不使用，保留签名对齐）
             query_text: 查询文本
             limit: 候选实体数量限制
-            tenant_id: 租户 ID（未使用，保留签名对齐）
+            tenant_id: 租户 ID（仅做空白校验，实际未传入图检索）
             filter_payload: 过滤条件（未使用，保留签名对齐）
 
         Returns:

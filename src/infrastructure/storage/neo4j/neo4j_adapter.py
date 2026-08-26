@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING, Any, cast
 
@@ -14,6 +15,8 @@ from src.domain.ports.l5_graph import L5GraphPort
 
 if TYPE_CHECKING:
     pass
+
+logger = logging.getLogger(__name__)
 
 # Neo4j relationship type: uppercase letters, digits, underscores
 _REL_TYPE_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
@@ -291,6 +294,77 @@ class Neo4jAdapter(L5GraphPort):
             )
         # 多跳：使用 find_related 的语义遍历
         return await self.find_related(memory_id, max_depth=max_depth, relationship_type=edge_type)
+
+    async def search_entities(
+        self,
+        query_text: str,
+        limit: int = 10,
+    ) -> list[dict]:
+        """按实体名模糊匹配搜索实体
+
+        通过 Neo4j 全文索引以实体 name 属性进行不区分大小写的模糊匹配，
+        返回候选实体列表。若全文索引不存在，降级为 Cypher CONTAINS 子串匹配。
+
+        Args:
+            query_text: 查询文本（按实体名模糊匹配）
+            limit: 最多返回的候选实体数量
+
+        Returns:
+            候选实体列表 [{memory_id, type, properties, ...}, ...]
+        """
+        if not query_text or not query_text.strip():
+            return []
+
+        params: dict[str, Any] = {}
+        # 优先使用全文索引（若存在）
+        fuzzy_search = f"""
+        CALL db.index.fulltext.queryNodes('entity_names', $query_text)
+        YIELD node, score
+        RETURN node.id AS memory_id, node.type AS type, properties(node) AS properties, score
+        ORDER BY score DESC
+        LIMIT {int(limit)}
+        """
+        params["query_text"] = query_text.strip()
+
+        try:
+            result = await self._storage.execute_query(fuzzy_search, params)
+            if result:
+                return [
+                    {
+                        "memory_id": r.get("memory_id"),
+                        "type": r.get("type"),
+                        "properties": r.get("properties", {}),
+                        "score": r.get("score", 0.0),
+                    }
+                    for r in result
+                    if r.get("memory_id")
+                ]
+        except Exception:
+            # 全文索引不存在，降级为 CONTAINS 子串匹配
+            logger.debug("全文索引不可用，降级为 CONTAINS 子串匹配")
+
+        # 降级方案：Cypher CONTAINS 子串匹配
+        contains_search = f"""
+        MATCH (n)
+        WHERE n.name CONTAINS $query_text
+        RETURN n.id AS memory_id, n.type AS type, properties(n) AS properties
+        LIMIT {int(limit)}
+        """
+        try:
+            result = await self._storage.execute_query(contains_search, params)
+        except Exception as e:
+            logger.warning("search_entities CONTAINS 降级查询失败: %s", e)
+            return []
+
+        return [
+            {
+                "memory_id": r.get("memory_id"),
+                "type": r.get("type"),
+                "properties": r.get("properties", {}),
+            }
+            for r in result
+            if r.get("memory_id")
+        ]
 
 
 def _validate_rel_type(rel_type: str) -> None:
