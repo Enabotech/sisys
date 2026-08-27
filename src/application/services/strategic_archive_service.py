@@ -16,8 +16,9 @@ from uuid import UUID
 from src.application.services.staleness_weight_service import StalenessWeightService
 from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
 from src.domain.events.archive_events import ArchiveCreated, FactBecameStale, ValidityPeriodSet
-from src.domain.exceptions import EntityValidationError
+from src.domain.exceptions import ConfigurationError, EntityValidationError
 from src.domain.exceptions.archive_exceptions import ArchiveNotFoundError, ArchiveStorageError, ValidityPeriodConflictError
+from src.domain.exceptions.event_exceptions import EventPublishError
 from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
 from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.event_publisher import EventPublisher, PublishResult
@@ -285,12 +286,12 @@ class StrategicArchiveService:
                 if not result.is_success:
                     raise ArchiveStorageError(
                         layer="l2",
-                        cause=RuntimeError(f"ArchiveCreated event publish partial failure: {result.partial_error}"),
+                        cause=EventPublishError(event_type="ArchiveCreated", cause=RuntimeError(result.partial_error)),
                     )
             except ArchiveStorageError:
                 raise
             except Exception as e:
-                raise ArchiveStorageError(layer="l2", cause=RuntimeError(f"ArchiveCreated event publish failed: {e}")) from e
+                raise ArchiveStorageError(layer="l2", cause=EventPublishError(event_type="ArchiveCreated", cause=e)) from e
 
         return saved
 
@@ -345,7 +346,10 @@ class StrategicArchiveService:
             ArchiveStorageError: L3 向量存储未注入（None）时抛出
         """
         if self._vector_storage is None:
-            raise ArchiveStorageError(layer="l3", cause=RuntimeError("l3_vector not injected"))
+            raise ConfigurationError(
+                message="L3 向量存储端口未注入（None），请检查依赖注入配置",
+                context={"layer": "l3", "service": "StrategicArchiveService"},
+            )
         raw = await self._vector_storage.search(
             collection=self.L3_COLLECTION,
             query_vector=query_vector,
@@ -455,12 +459,12 @@ class StrategicArchiveService:
                 if not result.is_success:
                     raise ArchiveStorageError(
                         layer="l2",
-                        cause=RuntimeError(f"ValidityPeriodSet event publish partial failure: {result.partial_error}"),
+                        cause=EventPublishError(event_type="ValidityPeriodSet", cause=RuntimeError(result.partial_error)),
                     )
             except ArchiveStorageError:
                 raise
             except Exception as e:
-                raise ArchiveStorageError(layer="l2", cause=RuntimeError(f"ValidityPeriodSet event publish failed: {e}")) from e
+                raise ArchiveStorageError(layer="l2", cause=EventPublishError(event_type="ValidityPeriodSet", cause=e)) from e
 
         return saved
 

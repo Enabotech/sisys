@@ -45,7 +45,7 @@ from src.domain.exceptions.embedding_exceptions import (
     ModelInferenceError,
 )
 from src.domain.exceptions.entity_extraction_exceptions import EntityExtractionError
-from src.domain.exceptions.event_exceptions import VersionError
+from src.domain.exceptions.event_exceptions import EventPublishError, VersionError
 from src.domain.exceptions.external_exceptions import (
     ExternalException,
     ServiceUnavailableError,
@@ -204,6 +204,7 @@ __all__ = [
     # 权限异常
     "InsufficientTokenError",
     # 事件异常
+    "EventPublishError",
     "VersionError",
     # 跨境传输异常
     "TransferNotFoundError",

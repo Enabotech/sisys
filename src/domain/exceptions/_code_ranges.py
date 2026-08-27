@@ -114,6 +114,7 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     # permission_exceptions.py
     "InsufficientTokenError": "permission",
     # event_exceptions.py
+    "EventPublishError": "system",
     "VersionError": "event",
     # transfer_exceptions.py
     "TransferNotFoundError": "transfer",
