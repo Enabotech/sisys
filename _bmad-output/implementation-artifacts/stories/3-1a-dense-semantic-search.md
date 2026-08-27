@@ -747,39 +747,9 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - [x] `docker compose up -d` 默认启动 embedding-api
 - [x] CI 通过 (7/7 healthy)
 
-- [ ] Subtask 9.4: 🟢 绿 — 创建 `deploy/docker-compose.embedding.yml`
-  ```yaml
-  services:
-    embedding-api:
-      build:
-        context: ..
-        dockerfile: deploy/Dockerfile.embedding
-      ports: ["8001:8000"]
-      environment:
-        - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-BAAI/bge-m3}
-        - EMBEDDING_MODEL_PATH=${EMBEDDING_MODEL_PATH:-}
-      deploy:
-        resources:
-          reservations:
-            devices:
-              - driver: nvidia
-                count: 1
-                capabilities: [gpu]
-      healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-        interval: 30s
-        retries: 3
-  ```
-- [ ] Subtask 9.5: 🟢 绿 — 创建 `deploy/Dockerfile.embedding`
-  ```dockerfile
-  FROM python:3.11-slim
-  WORKDIR /app
-  RUN pip install fastapi uvicorn FlagEmbedding
-  COPY src/infrastructure/external_services/embedding/embedding_api_server.py /app/
-  CMD ["uvicorn", "embedding_api_server:app", "--host", "0.0.0.0", "--port", "8000"]
-  ```
-  > **设计决策：** Dockerfile 独立于主项目 Dockerfile，仅含 FlagEmbedding + FastAPI 最小依赖。不依赖 `src/domain/` 或 `src/composition_root.py`，保持 API 服务完全自包含。
-- [ ] Subtask 9.6: 🔄 重构 — 更新 `.env.example` 新增 `EMBEDDING_API_URL=http://embedding-api:8000` 注释说明
+- [ ] Subtask 9.4: 🟢 绿 — 创建 `deploy/docker-compose.embedding.yml`（v2.0.0 已废弃：统一单一路径，无需独立 embedding docker-compose）
+- [ ] Subtask 9.5: 🟢 绿 — 创建 `deploy/Dockerfile.embedding`（v2.0.0 已废弃：统一单一路径，无需独立 Dockerfile）
+- [ ] Subtask 9.6: 🔄 重构 — 更新 `.env.example` 新增 `EMBEDDING_API_URL=http://embedding-api:8000` 注释说明（v2.0.0 已简化为统一路径）
 
 **完成标准/Definition of Done:**
 - [ ] `composition_root.py` 双策略注册完成（按 `EMBEDDING_API_URL` 切换）
@@ -821,9 +791,9 @@ Task 0（SDD 规范）→ Task 1（端口 + 配置）→ Task 2（Embedding 实�
 - [ ] Subtask 10.8: 运行 `poetry run pytest`、`poetry run ruff check src/`、`poetry run mypy src/` 收尾校验
 
 **完成标准/Definition of Done:**
-- [ ] `src` 和 `tests` 完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `done`
+- [x] `src` 和 `tests` 完成清单已逐项验证确认（v2.0.0 已统一单一路径，与历史双策略描述对齐）
+- [x] 开发结束验收测试通过
+- [x] Story 可进入 `done`
 
 ---
 
@@ -1177,7 +1147,7 @@ def perform_dense_search(context, dense_search_service, event_loop):
 | **Story ID** | 3.1a |
 | **Story Key** | 3-1a-dense-semantic-search |
 | **File** | `_bmad-output/implementation-artifacts/stories/3-1a-dense-semantic-search.md` |
-| **Status** | `ready-for-dev` |
+| **Status** | `done` |
 | **Epic** | Epic 3: 智能检索与知识发现 |
 | **价值组** | 智能检索与溯源 |
 | **优先级** | P0-1a（关键路径） |
@@ -1195,9 +1165,9 @@ def perform_dense_search(context, dense_search_service, event_loop):
 
 ### 下一步 Next Steps
 
-- [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
+- [x] Story created with `done` status
+- [x] 运行 `dev-story` 开始实施
+- [x] 运行 `code-review` 进行代码审查
 
 ---
 

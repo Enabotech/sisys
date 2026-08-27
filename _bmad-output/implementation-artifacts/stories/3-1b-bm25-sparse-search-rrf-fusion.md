@@ -110,7 +110,7 @@ BM25Builder（TF-IDF）作为降级方案 [Source: src/infrastructure/storage/qd
 - [ ] 构造函数注入 `DenseSemanticSearchService`、`Bm25SparseSearchService`、RRF 融合函数（`fuse` 作为可调用对象直接注入）
 - [ ] `search()` 方法使用 `asyncio.gather()` 并行执行两路检索
 - [ ] 一路检索失败时降级为单路结果（WARNING 日志 + 不中断）
-- [ ] 两路均失败时抛出 `RuntimeError("Dense 和 Sparse 检索通道均失败")`（无可用信号，基础设施级异常）
+- [x] 两路均失败时抛出 `HybridSearchError("三路检索通道均失败")`（EXCEPTION_209，业务级异常，对齐 Hard Constraints）
 
 ### AC-4: 稀疏向量索引管线
 
@@ -159,7 +159,7 @@ BM25Builder（TF-IDF）作为降级方案 [Source: src/infrastructure/storage/qd
 **验证标准/Validation Criteria:**
 - [ ] Sparse 检索异常时 `HybridSearchService.search()` 降级为 Dense-only 结果
 - [ ] Dense 检索异常时降级为 Sparse-only 结果
-- [ ] 两路均异常时抛出 `RuntimeError("Dense 和 Sparse 检索通道均失败")`
+- [x] 两路均异常时抛出 `HybridSearchError("三路检索通道均失败")`（EXCEPTION_209）
 - [ ] 降级事件日志包含异常类型和通道名称
 - [ ] 注意：`QdrantVectorStorage.search_sparse()` 异常时静默返回空列表（不抛异常），`Bm25SparseSearchService` 需将空结果视为"通道可用但无匹配"而非降级场景 [Source: src/infrastructure/storage/qdrant/vector_storage.py:210-212]
 
