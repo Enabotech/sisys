@@ -343,6 +343,35 @@ development_status:
   epic-20-retrospective: optional
 
   # ===========================================================================
+  # Epic 21: 三页面驾驶舱 — 决策舱（🆕 MVP P0） - 📋 待开始
+  # ===========================================================================
+  epic-21: backlog
+  21-1-deck-overview-dashboard: backlog
+  21-2-triple-confidence-score: backlog
+  21-3-decision-card-system: backlog
+  21-4-physics-simulation-slider: backlog
+  21-5-ai-compensation-engine: backlog
+  21-6-sp-bp-decode-ribbon: backlog
+  21-7-decision-card-linkage-resort: backlog
+  21-8-strategy-map-bsc-waterfall: backlog
+  21-9-shortcuts-mobile-responsive: backlog
+  epic-21-retrospective: optional
+
+  # ===========================================================================
+  # Epic 22: 三页面驾驶舱 — 工作台完整交互（🆕 V1 P1） - 📋 待开始
+  # ===========================================================================
+  epic-22: backlog
+  22-1-workbench-evidence-tree-sandbox-debate: backlog
+  22-2-decision-process-visualization: backlog
+  22-3-branch-management: backlog
+  22-4-checkpoint-recovery-mode-select: backlog
+  22-5-multi-language-interface: backlog
+  22-6-debate-consensus-tracking: backlog
+  22-7-checkpoint-summary-param-recovery: backlog
+  22-8-three-page-architecture-role-adaptive: backlog
+  epic-22-retrospective: optional
+
+  # ===========================================================================
   # Epic 90: 重大重构 (epic文档不追踪) - ✅ 已完成
   # ===========================================================================
   epic-90: done
@@ -359,8 +388,8 @@ development_status:
 # =============================================================================
 # Summary: (verified 2026-08-27 by code + tests + story files + retrospectives)
 # =============================================================================
-# Total Epics: 22 (Epic 0-20 + Epic 90; Epic 0 含 Iteration 0 / Iteration 1)
-# Total Stories (excluding retrospectives): 176
+# Total Epics: 24 (Epic 0-20 + Epic 21 + Epic 22 + Epic 90; Epic 0 含 Iteration 0 / Iteration 1)
+# Total Stories (excluding retrospectives): 193
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 📋 3 ready-for-dev)
 #   - Epic 1: 23 stories (✅ done)
@@ -373,8 +402,9 @@ development_status:
 #   - Epic 8: 6 stories (📋 backlog)
 #   - Epic 9-14: 38 stories (📋 backlog, V1)
 #   - Epic 15-20: 24 stories (📋 backlog, V2)
+#   - Epic 21: 9 stories (📋 backlog, MVP P0)
+#   - Epic 22: 8 stories (📋 backlog, V1 P1)
 #   - Epic 90: 8 stories (✅ done)
-# 注：epics_v1.0.md 另含 Epic 21 (9 stories) / Epic 22 (8 stories)，尚未纳入本文件追踪
 #
 # Status Summary:
 #   Stories:
@@ -382,14 +412,14 @@ development_status:
 #     - Ready for Dev: 3 (0-17, 0-18, 0-30)
 #     - In Progress: 0
 #     - Review: 0
-#     - Backlog: 107
+#     - Backlog: 124
 #   Epics:
 #     - Done: 4 (Epic 1, Epic 2, Epic 3, Epic 90)
 #     - In Progress: 1 (Epic 0 — Iteration 1 剩余 0-17/0-18/0-30)
-#     - Backlog: 17 (Epic 4-20)
+#     - Backlog: 19 (Epic 4-20, Epic 21, Epic 22)
 #   Retrospectives:
 #     - Done: 3 (Epic 1, Epic 2, Epic 3)
-#     - Optional: 20
+#     - Optional: 22
 #
 # Next Steps:
 #   1. Option A: Complete Epic 0 Iteration 1 remaining stories (0-17 / 0-18 / 0-30)
