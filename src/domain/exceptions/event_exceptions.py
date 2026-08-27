@@ -12,11 +12,13 @@ from src.domain.exceptions.system_exceptions import MessageBusError
 class EventPublishError(MessageBusError):
     """事件发布失败异常
 
-    继承 MessageBusError（EXCEPTION_104，SystemException）。
+    继承 MessageBusError（SystemException，消息总线故障子域）。
     用于 Outbox/RabbitMQ 事件发布失败场景。
+    独立编码 EXCEPTION_107：避免与父类 MessageBusError 共用 EXCEPTION_104，
+    保证领域异常编码全局唯一（test_error_code_uniqueness 强制约束）。
     """
 
-    code = "EXCEPTION_104"
+    code = "EXCEPTION_107"
     message = "Event publish failed"
 
     def __init__(

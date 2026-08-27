@@ -46,6 +46,7 @@ from src.domain.exceptions import (
     EntityExtractionError,
     EntityStateTransitionError,
     EntityValidationError,
+    EventPublishError,
     ExecutionError,
     ExternalException,
     HybridSearchError,
@@ -172,6 +173,7 @@ class TestExceptionHttpMap:
             NetworkError,
             StorageError,
             MessageBusError,
+            EventPublishError,
             MinIOConnectionError,
             # 业务级具体异常
             NotFoundError,
