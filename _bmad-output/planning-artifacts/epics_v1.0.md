@@ -13,7 +13,7 @@ userName: 'Agimtech'
 date: '2026-02-28'
 documentStatus: 'sync-implementation-2026-08-27'
 lastUpdated: '2026-08-27'
-updateReason: '技术手段验证实现完成度后同步：Epic 2 全部 9 Story ✅ done（retro 2026-08-04）；Epic 3 全部 14 Story ✅ done（retro 2026-08-21）；验收测试 253 passed；sprint-status.yaml 同步'
+updateReason: 'Epic 4-8 展开：Mermaid 图从聚合节点拆分为 45 个 Story 节点，补充完整内部依赖 + 跨 Epic 依赖（Epic 1→4-8、Epic 2/3→Epic 6、Epic 4→Epic 5/6、Epic 5→Epic 6、Epic 7→Epic 8）'
 ---
 
 # sisys - Epic Breakdown
@@ -3111,7 +3111,7 @@ So that **确保 MVP 无高危漏洞**。
 3. **Epic 3 已完成** - 全部 14 个 Story Done（retro 2026-08-21），验收测试全覆盖；关键跨 Epic 依赖 Story 2.3（版面信息）已完成
 4. **MVP P0 Story 无跨 Epic 循环依赖** - 依赖方向单一（Epic 1 → Epic 2/3/21）；Epic 2 Story 2.3 → Epic 3 Story 3.8 为唯一跨 Epic 强依赖
 5. **关键路径已识别** - Story 2.2a → Story 2.3 → Epic 3 Story 3.8（版面信息→高保真溯源）
-6. **并行策略已规划** - Story 2.2a 完成后可并行推进 Story 2.3 和 Epic 3 Story 3.1a；Epic 21（决策舱 P0）可与 Epic 2-6 并行开发，仅依赖 Story 1.7 + Story 3.8
+6. **并行策略已规划** — Story 2.2a 完成后可并行推进 Story 2.3 和 Epic 3 Story 3.1a；Epic 21（决策舱 P0）可与 Epic 2-6 并行开发，仅依赖 Story 1.7 + Story 3.8
 7. **🆕 Epic 21 为 MVP 关键路径新增项** - 决策舱 9 个 Story 可与现有 Epic 2-6 并行推进，不阻塞原有 MVP 交付节奏
 8. **Epic 1 依赖细节已存档** - 详见 [epic_1.md](epic_1.md)
 9. **NFR 完整覆盖** - Story 7.5（NFR-ACC-01）、Story 7.6（NFR-INT-05）、Story 1.13（NFR-SCALE-03）、Story 21.1~21.9（NFR-IF-01~07 接口性能）
@@ -3119,17 +3119,18 @@ So that **确保 MVP 无高危漏洞**。
 11. **Epic 2/3 可独立交付价值** - Epic 2 完成后用户可上传管理文档；Epic 3 完成后用户可检索溯源
 12. **🆕 Epic 21 可独立交付（MVP P0）** - 依赖仅 Epic 1 Story 1.7 + Epic 3 Story 3.8，决策舱核心价值（高管推演决策）可先行交付，纳入 MVP 验收范围
 13. **🆕 Epic 22 为 V1 P1 交付项** - 工作台依赖 Epic 21（决策证据沉淀）+ Epic 9（多 Agent 协作），排在 V1 阶段交付
+14. **🆕 Epic 4-8 展开详细依赖** - Mermaid 图从聚合节点拆分为 45 个 Story 节点，补充完整内部依赖 + 跨 Epic 依赖；关键路径：Epic 4→Epic 5→Epic 6（工具→Agent→BLM 流程）
 
 ### 关键依赖路径图
 
-**文档版本:** 2.2.0
+**文档版本:** 2.3.0
 **更新日期:** 2026-08-27
 **编制依据:** PRD v1.1.0 (145 FR) + UX Spec v2.0.0 + HTML 样机 v2.1 + sprint-status.yaml (2026-08-27)
 
 #### 总体依赖关系 (Mermaid 可视化)
 
 **更新时间：** 2026-08-27
-**更新说明：** 技术手段验证同步 — Epic 2 全部 9 Story ✅ done（retro 2026-08-04）；Epic 3 全部 14 Story ✅ done（retro 2026-08-21）；验收测试 253 passed；Mermaid 图/关键路径/阶段表格/依赖矩阵全量同步
+**更新说明：** Epic 4-8 展开详细 Story 级依赖 — Mermaid 图从聚合节点拆分为 45 个 Story 节点 + 完整内部/跨 Epic 依赖箭头
 
 ```mermaid
 graph TD
@@ -3215,13 +3216,74 @@ graph TD
         S3_12["Story 3.12<br/>数据陈旧标记<br/>✅ Done"]
     end
 
-    %% ========== Epic 4-8 (待开始) ==========
-    subgraph "Epic 4-8 📋 (待开始 - 48 Stories)"
-        E4["Epic 4<br/>战略工具箱<br/>9 Stories<br/>📋 Backlog"]
-        E5["Epic 5<br/>Agent 协作<br/>12 Stories<br/>📋 Backlog"]
-        E6["Epic 6<br/>战略规划流程<br/>12 Stories<br/>📋 Backlog"]
-        E7["Epic 7<br/>用户界面与 API<br/>9 Stories<br/>📋 Backlog"]
-        E8["Epic 8<br/>权限与审计<br/>6 Stories<br/>📋 Backlog"]
+    %% ========== Epic 4 (待开始) ==========
+    subgraph "Epic 4 📋 (待开始 - 9 Stories)"
+        direction TB
+        S4_1["Story 4.1<br/>战略工具注册 23 种<br/>📋 Backlog 🔑入口"]
+        S4_2["Story 4.2<br/>工具链编排 DAG<br/>📋 Backlog"]
+        S4_3["Story 4.3<br/>工具 Schema 校验<br/>📋 Backlog"]
+        S4_4["Story 4.4<br/>Docker 沙箱执行<br/>📋 Backlog"]
+        S4_5["Story 4.5<br/>红蓝辩论基础<br/>📋 Backlog"]
+        S4_6["Story 4.6<br/>工具版本管理<br/>📋 Backlog"]
+        S4_7["Story 4.7<br/>Validation 闭环<br/>📋 Backlog"]
+        S4_8["Story 4.8<br/>SAP 协议支持<br/>📋 Backlog"]
+        S4_9["Story 4.9<br/>财务建模基础<br/>📋 Backlog"]
+    end
+
+    %% ========== Epic 5 (待开始) ==========
+    subgraph "Epic 5 📋 (待开始 - 10 Stories)"
+        direction TB
+        S5_1["Story 5.1<br/>CEO Agent 实例化<br/>📋 Backlog 🔑入口"]
+        S5_2["Story 5.2<br/>Agent 身份档案加载<br/>📋 Backlog"]
+        S5_3["Story 5.3<br/>单 Agent 工作流<br/>📋 Backlog 🔑Epic 6 依赖"]
+        S5_4["Story 5.4<br/>EIP 弹性隔离<br/>📋 Backlog"]
+        S5_5["Story 5.5<br/>三重硬隔离<br/>📋 Backlog"]
+        S5_6["Story 5.6<br/>隔离切换日志<br/>📋 Backlog"]
+        S5_7["Story 5.7<br/>Phoenix Evaluation<br/>📋 Backlog 🔑"]
+        S5_8["Story 5.8<br/>Agent 质量评估<br/>📋 Backlog"]
+        S5_9["Story 5.9<br/>CUSUM 漂移检测<br/>📋 Backlog"]
+        S5_10["Story 5.10<br/>Checkpoint+评估集成<br/>📋 Backlog"]
+    end
+
+    %% ========== Epic 6 (待开始) ==========
+    subgraph "Epic 6 📋 (待开始 - 12 Stories)"
+        direction TB
+        S6_1["Story 6.1<br/>BLM 前两阶段<br/>📋 Backlog 🔑入口"]
+        S6_2["Story 6.2<br/>市场洞察六子步骤<br/>📋 Backlog"]
+        S6_3["Story 6.3<br/>Checkpoint 快照<br/>📋 Backlog 🔑"]
+        S6_4["Story 6.4<br/>JSON 思维链<br/>📋 Backlog"]
+        S6_5a["Story 6.5a<br/>Markdown 报告<br/>📋 Backlog"]
+        S6_5b["Story 6.5b<br/>PDF 报告+引文<br/>📋 Backlog"]
+        S6_6["Story 6.6<br/>Checkpoint 恢复<br/>📋 Backlog"]
+        S6_7["Story 6.7<br/>溯源树展示<br/>📋 Backlog"]
+        S6_8["Story 6.8<br/>高管简化视图<br/>📋 Backlog"]
+        S6_9["Story 6.9<br/>分析师视图<br/>📋 Backlog"]
+        S6_10["Story 6.10<br/>顾问视图<br/>📋 Backlog"]
+        S6_11["Story 6.11<br/>白标报告基础<br/>📋 Backlog"]
+    end
+
+    %% ========== Epic 7 (待开始) ==========
+    subgraph "Epic 7 📋 (待开始 - 8 Stories)"
+        direction TB
+        S7_1["Story 7.1<br/>CLI 命令行接口<br/>📋 Backlog 🔑入口"]
+        S7_2["Story 7.2<br/>REST API 接口<br/>📋 Backlog 🔑入口"]
+        S7_3["Story 7.3<br/>API Gateway<br/>📋 Backlog"]
+        S7_4["Story 7.4<br/>健康度仪表盘<br/>📋 Backlog"]
+        S7_5["Story 7.5<br/>无障碍设计 WCAG<br/>📋 Backlog"]
+        S7_6["Story 7.6<br/>API 契约测试<br/>📋 Backlog"]
+        S7_7["Story 7.7<br/>API E2E 测试<br/>📋 Backlog"]
+        S7_8["Story 7.8<br/>骨架屏加载<br/>📋 Backlog"]
+    end
+
+    %% ========== Epic 8 (待开始) ==========
+    subgraph "Epic 8 📋 (待开始 - 6 Stories)"
+        direction TB
+        S8_1["Story 8.1<br/>审计日志多维检索<br/>📋 Backlog"]
+        S8_2["Story 8.2<br/>修正分级判定<br/>📋 Backlog 🔑入口"]
+        S8_3["Story 8.3<br/>自动固化流水线<br/>📋 Backlog"]
+        S8_4["Story 8.4<br/>数据主权隔离<br/>📋 Backlog 🔑"]
+        S8_5["Story 8.5<br/>ShieldCortex 防御<br/>📋 Backlog 🔑"]
+        S8_6["Story 8.6<br/>渗透测试漏洞扫描<br/>📋 Backlog 🔑"]
     end
 
     %% ========== Epic 21 (🆕 MVP P0 — 三页面驾驶舱·决策舱) ==========
@@ -3329,21 +3391,89 @@ graph TD
     S3_10 --> S3_11
     S3_11 --> S3_12
 
+    %% ========== Epic 4 内部依赖 (战略工具链) ==========
+    S4_1 --> S4_2
+    S4_1 --> S4_3
+    S4_1 --> S4_5
+    S4_3 --> S4_4
+    S4_3 --> S4_7
+    S4_1 --> S4_9
+    S4_3 --> S4_9
+    S1_3 --> S4_8
+
+    %% ========== Epic 5 内部依赖 (Agent 协作) ==========
+    S5_1 --> S5_2
+    S5_2 --> S5_3
+    S5_1 --> S5_4
+    S5_4 --> S5_5
+    S5_4 --> S5_6
+    S5_3 --> S5_7
+    S5_7 --> S5_8
+    S5_8 --> S5_9
+    S5_8 --> S5_10
+
+    %% ========== Epic 6 内部依赖 (BLM 流程) ==========
+    S6_1 --> S6_2
+    S6_2 --> S6_3
+    S6_1 --> S6_4
+    S6_3 --> S6_5a
+    S6_5a --> S6_5b
+    S6_3 --> S6_6
+    S6_5a --> S6_8
+    S6_1 --> S6_7
+    S6_1 --> S6_9
+    S6_5b --> S6_10
+    S6_5a --> S6_11
+
+    %% ========== Epic 7 内部依赖 (用户界面) ==========
+    S7_1 -.-> S7_5
+    S7_2 --> S7_3
+    S7_1 -.-> S7_5
+    S7_2 --> S7_6
+    S7_2 --> S7_7
+    S1_16 --> S7_7
+
+    %% ========== Epic 8 内部依赖 (安全合规) ==========
+    S8_2 --> S8_3
+    S8_2 --> S8_4
+    S8_1 --> S8_5
+    S8_1 --> S8_6
+
+    %% ========== 跨 Epic 依赖 ==========
     %% Epic 1 → Epic 4-8
-    S1_1 --> E4
-    S1_1 --> E5
-    S1_1 --> E6
-    S1_1 --> E7
-    S1_1 --> E8
+    S1_1 --> S4_1
+    S1_1 --> S5_1
+    S1_1 --> S6_1
+    S1_1 --> S7_1
+    S1_1 --> S7_2
+    S1_9 --> S7_3
+    S1_10 --> S8_1
+    S1_9 --> S8_4
+    S1_11 --> S8_4
+    S1_12 --> S8_6
+
+    %% Epic 2/3 → Epic 6
+    S2_2a --> S6_1
+    S2_3 --> S6_7
+    S3_8 --> S6_7
+    S3_1a --> S6_1
+
+    %% Epic 4 → Epic 5 (Story 4.1 可选依赖)
+    S4_1 -. "可选：TOOLS.md 元数据" .-> S5_3
+
+    %% Epic 4 → Epic 6 (工具调用)
+    S4_1 --> S6_1
+
+    %% Epic 5 → Epic 6 (Agent 编排)
+    S5_3 --> S6_1
+    S5_10 --> S6_3
+
+    %% Epic 4/7 → Epic 8 (渗透测试需 API)
+    S7_2 -.-> S8_6
 
     %% Epic 1 + Epic 3 → Epic 21 (🆕 决策舱 MVP)
     S1_7 -. "L2 存储层" .-> E21
     S3_8 -. "高保真溯源接口" .-> E21
-
-    S1_3 --> E5
-
-    S1_9 --> E7
-    S1_10 --> E8
 
     %% 样式定义
     classDef done fill:#4CAF50,color:white,stroke:#2E7D32,stroke-width:2px;
@@ -3358,7 +3488,11 @@ graph TD
     class S1_1,S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_9,S1_10,S1_11,S1_12,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_15b,S1_16,S1_17,S1_18a,S1_18b,S1_19 done;
     class S2_1,S2_2a,S2_2b,S2_3,S2_4,S2_5,S2_6,S2_7,S2_8 done;
     class S3_1a,S3_1b,S3_2a,S3_2b,S3_3,S3_4,S3_5,S3_6,S3_7,S3_8,S3_9,S3_10,S3_11,S3_12 done;
-    class E4,E5,E6,E7,E8 backlog;
+    class S4_1,S4_2,S4_3,S4_4,S4_5,S4_6,S4_7,S4_8,S4_9 backlog;
+    class S5_1,S5_2,S5_3,S5_4,S5_5,S5_6,S5_7,S5_8,S5_9,S5_10 backlog;
+    class S6_1,S6_2,S6_3,S6_4,S6_5a,S6_5b,S6_6,S6_7,S6_8,S6_9,S6_10,S6_11 backlog;
+    class S7_1,S7_2,S7_3,S7_4,S7_5,S7_6,S7_7,S7_8 backlog;
+    class S8_1,S8_2,S8_3,S8_4,S8_5,S8_6 backlog;
 ```
 
 #### 关键路径识别
@@ -3594,7 +3728,18 @@ Epic 21 (📋 待开始 · 可与 Epic 2-6 并行)
 **完成情况:**
 - **Epic 2 全部 9 个 Story 已完成** ✅（retro 2026-08-04）
 - **Epic 3 全部 14 个 Story 已完成** ✅（retro 2026-08-21）
-- **下一步:** 启动 Epic 4（战略工具箱）或 Epic 21（决策舱 P0，依赖 Story 1.7 + Story 3.8 均已完成）
+
+**阶段 5: Epic 4-8 待开发（2026-08-28 ~ ）🔄 准备启动**
+
+**关键路径：** Epic 4 (战略工具箱) → Epic 5 (Agent 协作) → Epic 6 (BLM 流程)；Epic 7 (UI/API) 可并行
+
+| 优先级 | Epic | 核心 Story | 依赖前置 | 并行机会 |
+|--------|------|-----------|---------|---------|
+| P0-1 | Epic 4 | 4.1 (工具注册) → 4.3 (Schema 校验) → 4.4 (沙箱) | Epic 1 Story 1.1 ✅ | 4.2/4.5 可并行 |
+| P0-2 | Epic 5 | 5.1 (Agent 实例化) → 5.3 (单 Agent 工作流) | Epic 1 Story 1.4 ✅, LangGraph 1.18b ✅ | 5.4-5.6 可并行 |
+| P0-3 | Epic 6 | 6.1 (BLM 流程) → 6.3 (Checkpoint) → 6.5a (报告) | Epic 4 Story 4.1 + Epic 5 Story 5.3 + Epic 2/3 | 6.7/6.8/6.9 可并行 |
+| P0-4 | Epic 7 | 7.1 (CLI) ∥ 7.2 (REST API) → 7.3 (Gateway) | Epic 1 Story 1.1/1.9 ✅ | 7.1 ∥ 7.2 并行 |
+| P0-5 | Epic 8 | 8.2 (修正分级) → 8.4 (数据主权) → 8.5/8.6 (安全) | Epic 1 Story 1.9/1.10/1.12 ✅ | 可独立启动 |
 
 **并行策略 (已完成):**
 - **波次 1**: ✅ Story 2.1 → 2.2a (已完成)
@@ -3702,7 +3847,8 @@ Epic 21 (📋 待开始 · 可与 Epic 2-6 并行)
 | **阶段 1** (Epic 0 Iteration 1) | 12 个 Story 100% 完成，集成测试通过 | 验收测试报告 |
 | **阶段 2** (Epic 1 价值组 2/3) | 10 个 Story 100% 完成，架构评审通过 | 架构评审报告 + 测试报告 |
 | **阶段 3** (Epic 1 价值组 4/5/6) | 12 个 Story 100% 完成，性能基准达标 | 性能基准测试报告 |
-| **阶段 4** (Epic 2-8 核心能力) | 文档管理/智能检索/战略工具/Agent/BLM流程/CLI-API/合规 全部交付 | 各 Epic 验收报告 |
+| **阶段 4a** (Epic 2-3 文档与检索) | 23 个 Story 100% 完成，验收测试 253 passed | retro 2026-08-04/2026-08-21 |
+| **阶段 4b** (Epic 4-8 核心能力) | 45 个 Story 100% 完成：战略工具/Agent/BLM/CLI-API/合规 | 各 Epic 验收报告 |
 | **🆕 阶段 5** (Epic 21 决策舱 MVP) | 9 个 Story 100% 完成：总览仪表盘+三重评分+决策卡片+物理滑块+AI代偿+解码追溯+BSC战略地图+响应式适配 | 决策舱验收报告 + NFR-IF-01~07 性能基准 |
 
 **整体成功标准**
