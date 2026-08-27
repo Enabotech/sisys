@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-08-20
+last_updated: 2026-08-27
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -98,7 +98,7 @@ development_status:
   epic-1-retrospective: done
 
   # ===========================================================================
-  # Epic 2: 文档与数据管理 - 📋 待开始
+  # Epic 2: 文档与数据管理 - ✅ 已完成
   # ===========================================================================
   epic-2: done
   2-1-document-upload-17-formats: done
@@ -113,9 +113,9 @@ development_status:
   epic-2-retrospective: done
 
   # ===========================================================================
-  # Epic 3: 智能检索与知识发现 - 🔄 进行中
+  # Epic 3: 智能检索与知识发现 - ✅ 已完成
   # ===========================================================================
-  epic-3: in-progress
+  epic-3: done
   3-1a-dense-semantic-search: done
   3-1b-bm25-sparse-search-rrf-fusion: done
   3-2a-llm-client-infrastructure: done
@@ -357,15 +357,15 @@ development_status:
   epic-90-retrospective: optional
 
 # =============================================================================
-# Summary:
+# Summary: (verified 2026-08-27 by code + tests + story files + retrospectives)
 # =============================================================================
-# Total Epics: 22 (Epic 0-20 + Epic 90, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
-# Total Stories (excluding retrospectives): 175
+# Total Epics: 22 (Epic 0-20 + Epic 90; Epic 0 含 Iteration 0 / Iteration 1)
+# Total Stories (excluding retrospectives): 176
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 📋 3 ready-for-dev)
 #   - Epic 1: 23 stories (✅ done)
-#   - Epic 2: 9 stories (📋 backlog)
-#   - Epic 3: 13 stories (📋 backlog)
+#   - Epic 2: 9 stories (✅ done) — 验收测试 9 文件全覆盖，retro 2026-08-04
+#   - Epic 3: 14 stories (✅ done) — 验收测试 13 文件全覆盖，retro 2026-08-21
 #   - Epic 4: 9 stories (📋 backlog, 含 4 个 P1 V1 扩展)
 #   - Epic 5: 10 stories (📋 backlog)
 #   - Epic 6: 12 stories (📋 backlog)
@@ -374,23 +374,25 @@ development_status:
 #   - Epic 9-14: 38 stories (📋 backlog, V1)
 #   - Epic 15-20: 24 stories (📋 backlog, V2)
 #   - Epic 90: 8 stories (✅ done)
+# 注：epics_v1.0.md 另含 Epic 21 (9 stories) / Epic 22 (8 stories)，尚未纳入本文件追踪
 #
 # Status Summary:
 #   Stories:
-#     - Done: 47
-#     - Ready for Dev: 4 (0-17, 0-18, 0-30, 3-2a-llm-client-infrastructure)
+#     - Done: 66  (Epic 0:12 + Epic 1:23 + Epic 2:9 + Epic 3:14 + Epic 90:8)
+#     - Ready for Dev: 3 (0-17, 0-18, 0-30)
 #     - In Progress: 0
 #     - Review: 0
-#     - Backlog: 139
+#     - Backlog: 107
 #   Epics:
-#     - Done: 2 (Epic 1, Epic 90)
-#     - In Progress: 3 (Epic 0, Epic 2, Epic 3)
+#     - Done: 4 (Epic 1, Epic 2, Epic 3, Epic 90)
+#     - In Progress: 1 (Epic 0 — Iteration 1 剩余 0-17/0-18/0-30)
 #     - Backlog: 17 (Epic 4-20)
 #   Retrospectives:
-#     - Done: 1 (Epic 1)
-#     - Optional: 23
+#     - Done: 3 (Epic 1, Epic 2, Epic 3)
+#     - Optional: 20
 #
 # Next Steps:
-#   2. Option A: Complete Epic 0 Iteration 1 remaining stories (0-17/18/30)
-#   3. Option B: Start Epic 2 — create story file for 2-1-document-upload-17-formats
+#   1. Option A: Complete Epic 0 Iteration 1 remaining stories (0-17 / 0-18 / 0-30)
+#   2. Option B: Start Epic 4 — create story file for 4-1-strategic-tool-registration-23-tools
+#   3. Option C: Start Epic 21 (决策舱 P0) — 可与 Epic 4-6 并行，依赖 Story 1.7 + Story 3.8 均已完成
 # =============================================================================
