@@ -18,6 +18,7 @@ from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
 from src.domain.exceptions import ArchiveNotFoundError
 from src.domain.exceptions.archive_exceptions import ArchiveStorageError as ArchiveStoreErr
 from src.domain.exceptions.archive_exceptions import ValidityPeriodConflictError
+from src.domain.exceptions.system_exceptions import ConfigurationError
 from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
 from src.domain.ports.embedding_service import EmbeddingServicePort
 from src.domain.ports.event_publisher import EventPublisher
@@ -867,7 +868,7 @@ class TestSearchVectors:
 
     @pytest.mark.asyncio
     async def test_search_vectors_l3_not_injected_raises(self) -> None:
-        """L3 未注入时抛出 ArchiveStorageError"""
+        """L3 未注入时抛出 ConfigurationError"""
         svc = StrategicArchiveService(
             archive_repo=cast(ArchiveRepositoryPort, _make_repo()),
             embedding_service=_make_embedding(),
@@ -876,5 +877,5 @@ class TestSearchVectors:
             graph_storage=cast(L5GraphPort, _make_graph()),
             event_publisher=cast(EventPublisher, _make_publisher()),
         )
-        with pytest.raises(ArchiveStoreErr):
+        with pytest.raises(ConfigurationError):
             await svc.search_vectors(query_vector=[0.1] * 1024)

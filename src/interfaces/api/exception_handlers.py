@@ -40,6 +40,7 @@ from src.domain.exceptions import (
     EntityExtractionError,
     EntityStateTransitionError,
     EntityValidationError,
+    EventPublishError,
     ExecutionError,
     ExternalException,
     HybridSearchError,
@@ -101,6 +102,7 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     NetworkError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     StorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     MessageBusError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    EventPublishError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     # 存储层具体异常
     MinIOConnectionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 106
     # 业务级具体异常

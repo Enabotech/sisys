@@ -45,6 +45,16 @@ class CloudModelConfig:
     price_per_input_1k_tokens: float = 0.02
     price_per_output_1k_tokens: float = 0.02
 
+    def __repr__(self) -> str:
+        """脱敏输出，避免 api_key 明文泄露"""
+        return (
+            f"CloudModelConfig(api_type={self.api_type!r}, endpoint={self.endpoint!r}, "
+            f"api_key={'***' if self.api_key else ''!r}, model={self.model!r}, "
+            f"enabled={self.enabled!r}, max_tokens={self.max_tokens!r}, "
+            f"temperature={self.temperature!r}, price_per_input_1k_tokens={self.price_per_input_1k_tokens!r}, "
+            f"price_per_output_1k_tokens={self.price_per_output_1k_tokens!r})"
+        )
+
 
 @dataclass(frozen=True)
 class UDMRConfig:
