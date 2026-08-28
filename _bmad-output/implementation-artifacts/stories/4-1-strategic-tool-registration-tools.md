@@ -205,12 +205,18 @@
 
 > **Gherkin 语言：** 使用中文 Gherkin（`# language: zh-CN`），遵循项目现有验收测试模式。
 > **参考文件：** `tests/acceptance/test_acceptance_archive_validity.feature`（中文 Gherkin 示例）
+> **框架：** 使用 `pytest-bdd` 框架，禁止在 BDD 步骤中使用 `@pytest.mark.asyncio`，统一使用 `event_loop.run_until_complete()`
+> **状态共享：** 使用 `context` dict 在 Given/When/Then 之间传递状态
+> **文件命名：** Feature 文件 `test_acceptance_<feature_name>.feature`，步骤实现文件 `test_acceptance_<feature_name>.py`
 
 - [ ] 功能测试文件：`tests/acceptance/test_acceptance_strategic_tool_registration.feature`
 - [ ] 步骤实现文件：`tests/acceptance/test_acceptance_strategic_tool_registration.py`
 - [ ] 所有场景覆盖（AC-1 ~ AC-4 的 Happy Path + Edge Cases）
 - [ ] Edge Cases 包含：工具不存在（ToolNotFoundError）、重复注册（ToolAlreadyExistsError）、分类查询空结果
 - [ ] 使用中文 Gherkin 关键词：`功能:`、`场景:`、`假如`、`当`、`那么`、`并且`
+- [ ] 使用 `scenarios()` 批量绑定或 `@scenario` 逐个绑定模式
+- [ ] 步骤函数接收 `context: dict[str, Any]` 参数
+- [ ] 异步操作使用 `event_loop.run_until_complete()` 包装
 
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
@@ -781,6 +787,7 @@ src/
 - [x] Round 2 修正：验收测试 Gherkin 中文化说明
 - [x] Round 2 修正：inmemory 目录不存在说明
 - [x] Round 3 修正：架构文档一致性验证（23 种工具分类对齐）
+- [x] Round 4 修正：验收测试模式深度调研（pytest-bdd/context dict/event_loop 模式）
 
 ### 文件清单 File List
 
@@ -867,10 +874,11 @@ src/
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-08-27
 **最后更新/Last Updated:** 2026-08-28
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 战略工具注册，Epic 4 首个 P0 故事
 - v1.1.0: Round 1 审查修正 — 异常编码冲突修复 + ToolCategory 分类说明 + 端口注册统计更新
 - v1.2.0: Round 2-3 审查修正 — 验收测试 Gherkin 中文化 + inmemory 目录说明 + 架构文档一致性验证
+- v1.3.0: Round 4 审查修正 — 验收测试模式深度调研（pytest-bdd/context dict/event_loop 模式）
