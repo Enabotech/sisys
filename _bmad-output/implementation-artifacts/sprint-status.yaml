@@ -135,8 +135,9 @@ development_status:
   # ===========================================================================
   # Epic 4: 战略工具箱 - 📋 待开始
   # ===========================================================================
-  epic-4: backlog
-  4-1-strategic-tool-registration-23-tools: backlog
+  epic-4: in-progress
+  4-1-strategic-tool-registration-23-tools: ready-for-dev
+  4-1a-strategic-tool-impl: ready-for-dev
   4-2-toolchain-orchestration-dag: backlog
   4-3-tool-io-schema-validation: backlog
   4-4-docker-sandbox-execution: backlog
@@ -144,8 +145,6 @@ development_status:
   # 价值组扩展: V1 P1 工具箱增强
   4-6-tool-version-management: backlog
   4-7-validation-feedback-loop: backlog
-  4-8-sap-protocol-support: backlog
-  4-9-financial-modeling-valuation: backlog
   epic-4-retrospective: optional
 
   # ===========================================================================
@@ -162,6 +161,9 @@ development_status:
   5-8-agent-output-quality-evaluation: backlog
   5-9-cusum-drift-detection-recalibration: backlog
   5-10-checkpoint-with-evaluation-integration: backlog
+  # 迁移自 Epic 4: SAP 协议 + 财务建模
+  5-11-sap-protocol-support: backlog
+  5-12-financial-modeling-valuation: backlog
   epic-5-retrospective: optional
 
   # ===========================================================================
@@ -393,10 +395,10 @@ development_status:
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 📋 3 ready-for-dev)
 #   - Epic 1: 23 stories (✅ done)
-#   - Epic 2: 9 stories (✅ done) — 验收测试 9 文件全覆盖，retro 2026-08-04
-#   - Epic 3: 14 stories (✅ done) — 验收测试 13 文件全覆盖，retro 2026-08-21
-#   - Epic 4: 9 stories (📋 backlog, 含 4 个 P1 V1 扩展)
-#   - Epic 5: 10 stories (📋 backlog)
+#   - Epic 2: 9 stories (✅ done)
+#   - Epic 3: 14 stories (✅ done)
+#   - Epic 4: 8 stories (📋 backlog, 含 4.1a 补充，Story 4.8/4.9 已迁移至 Epic 5)
+#   - Epic 5: 12 stories (📋 backlog, 含 5.11 SAP 协议 + 5.12 财务建模迁移)
 #   - Epic 6: 12 stories (📋 backlog)
 #   - Epic 7: 8 stories (📋 backlog)
 #   - Epic 8: 6 stories (📋 backlog)
@@ -409,14 +411,14 @@ development_status:
 # Status Summary:
 #   Stories:
 #     - Done: 66  (Epic 0:12 + Epic 1:23 + Epic 2:9 + Epic 3:14 + Epic 90:8)
-#     - Ready for Dev: 3 (0-17, 0-18, 0-30)
+#     - Ready for Dev: 5 (0-17, 0-18, 0-30, 4-1)
 #     - In Progress: 0
 #     - Review: 0
-#     - Backlog: 124
+#     - Backlog: 125
 #   Epics:
 #     - Done: 4 (Epic 1, Epic 2, Epic 3, Epic 90)
-#     - In Progress: 1 (Epic 0 — Iteration 1 剩余 0-17/0-18/0-30)
-#     - Backlog: 19 (Epic 4-20, Epic 21, Epic 22)
+#     - In Progress: 1 (Epic 0 — Iteration 1 剩余 0-17/0-18/0-30; Epic 4 — Story 4.1 ready-for-dev)
+#     - Backlog: 19 (Epic 5-20, Epic 21, Epic 22)
 #   Retrospectives:
 #     - Done: 3 (Epic 1, Epic 2, Epic 3)
 #     - Optional: 22
