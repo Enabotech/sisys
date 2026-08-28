@@ -1,4 +1,4 @@
-# Story 4.1: 战略工具注册（23 种）
+# Story 4.1: 战略工具注册
 
 **Status:** `ready-for-dev`
 
@@ -768,7 +768,7 @@ src/
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
-- `_bmad-output/implementation-artifacts/stories/4-1-strategic-tool-registration-23-tools.md`
+- `_bmad-output/implementation-artifacts/stories/4-1-strategic-tool-registration-tools.md`
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/domain/entities/strategic_tool_catalog.py` - 23 种工具元数据常量
@@ -794,8 +794,8 @@ src/
 | 配置项 | 值 |
 |--------|-----|
 | **Story ID** | 4.1 |
-| **Story Key** | 4-1-strategic-tool-registration-23-tools |
-| **File** | `_bmad-output/implementation-artifacts/stories/4-1-strategic-tool-registration-23-tools.md` |
+| **Story Key** | 4-1-strategic-tool-registration-tools |
+| **File** | `_bmad-output/implementation-artifacts/stories/4-1-strategic-tool-registration-tools.md` |
 | **Status** | `backlog` → `ready-for-dev` → `in-progress` → `done` |
 | **Epic** | Epic 4: 战略工具箱 |
 | **价值组** | 战略工具执行能力 |
@@ -854,4 +854,4 @@ src/
 **创建日期/Created:** 2026-08-27
 **最后更新/Last Updated:** 2026-08-27
 **更新说明/Description:**
-- v1.0.0: 创建故事文件 — 战略工具注册（23 种），Epic 4 首个 P0 故事
+- v1.0.0: 创建故事文件 — 战略工具注册，Epic 4 首个 P0 故事
