@@ -485,8 +485,8 @@ updateReason: 'Epic 4-8 展开：Mermaid 图从聚合节点拆分为 45 个 Stor
 | FR-UI-23 | 键盘快捷键+移动端响应式适配 | Epic 21 | Story 21.9 | P0 |
 | **接口与协议 (IF) - 4 项** |
 | FR-IF-01 | CLI 七原则合规 | Epic 7 | Story 7.1b | P0 |
-| FR-IF-02 | Skills 三级渐进式加载 | Epic 5 | Story 5.2b | P0 |
-| FR-IF-03 | SAP 消息 Schema 定义 | Epic 5 | Story 5.1b | P0 |
+| FR-IF-02 | Skills 三级渐进式加载 | Epic 4 | Story 4.1a | P0 |
+| FR-IF-03 | SAP 消息 Schema 定义 | Epic 5 | Story 5.3 | P0 |
 | FR-IF-04 | 10 种领域事件监听+双通道分发 | Epic 1 | Story 1.2b | P0 |
 | **战略档案库 (SA) - 3 项** |
 | FR-SA-01 | 永久存储 | Epic 1 | Story 1.15b | P0 |
@@ -516,8 +516,8 @@ updateReason: 'Epic 4-8 展开：Mermaid 图从聚合节点拆分为 45 个 Stor
 | **战略工具箱 (ST) - 4 项** |
 | FR-ST-06 | 工具版本管理 | Epic 4 | Story 4.6 | P1 |
 | FR-ST-07 | Validation Feedback 闭环 | Epic 4 | Story 4.7 | P1 |
-| FR-ST-08 | SAP 协议支持 | Epic 4 | Story 4.8 | P1 |
-| FR-ST-09 | 财务建模与估值基础 | Epic 4 | Story 4.9 | P1 |
+| FR-ST-08 | SAP 协议支持 | Epic 5 | Story 5.11 | P1 |
+| FR-ST-09 | 财务建模与估值基础 | Epic 5 | Story 5.12 | P1 |
 | **Agent 协作 (AC) - 8 项** |
 | FR-AC-07 | 多 Agent 任务分解 | Epic 9 | Story 9.1 | P1 |
 | FR-AC-08 | 协作依赖图生成 | Epic 9 | Story 9.2 | P1 |
@@ -681,7 +681,7 @@ updateReason: 'Epic 4-8 展开：Mermaid 图从聚合节点拆分为 45 个 Stor
 | Epic 1 | **企业级架构基础与合规** | P0 | AR-01~04, SC-01/02/03/07/08, CP-01/04, SA-01, IF-04 | 24 | 系统稳定性、性能、安全、合规（等保 2.0） |
 | Epic 2 | 文档与数据管理 | P0 | DM-01~08 | 9 | 用户可以上传和管理 17 种格式文档 |
 | Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 14 | 用户可以检索文档并溯源至原始坐标点 |
-| Epic 4 | 战略工具箱 | P0 | ST-01~05 | 9 | 用户可以执行 23 种战略工具分析（含 ST-06~09 P1 V1 扩展） |
+| Epic 4 | 战略工具箱 | P0 | ST-01~07 | 8 | 用户可以执行 23 种战略工具分析（含 ST-06~07 P1 V1 扩展） |
 | Epic 5 | Agent 协作系统 | P0 | AC-01~06, EV-01/02, IF-02/03 | 12 | 用户可以通过 CEO Agent 执行战略规划（含 EV-03/04 P1 扩展） |
 | Epic 6 | 战略规划流程 (BLM 前两阶段) | P0 | SP-01~04, UI-11 | 12 | 用户可以生成战略规划并审批 |
 | Epic 7 | **多触点用户界面与 API 集成** | P0 | UI-01/02/03, CP-03, IF-01 | 9 | 用户可以通过 CLI/API/仪表盘操作系统 |
@@ -755,30 +755,31 @@ Epic 3 ✅ 已完成，详见[Epic 3: 智能检索与知识发现](epic_3.md)
 
 ## Epic 4: 战略工具箱
 
-**目标：** 实现 23 种战略工具的注册、执行、工具链编排、沙箱隔离、版本管理、验证闭环与财务建模基础。
+**目标：** 实现 23 种战略工具的注册、执行、工具链编排、沙箱隔离、Skills SOP、Schema 验证、版本管理与验证闭环。
 
-**包含 FR：** ST-01, ST-02, ST-03, ST-04, ST-05, ST-06, ST-07, ST-08, ST-09
+**包含 FR：** ST-01, ST-02, ST-03, ST-04, ST-05, ST-06, ST-07
 
 **📦 价值组：战略工具执行能力**
 > 用户可以执行 23 种战略工具分析
 
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
-| Story 4.1 | 战略工具注册（23 种） | Agent 可以调用这些工具执行分析 | 依赖 Epic 1 Story 1.1（架构骨架） | P0-1 |
-| Story 4.2 | 工具链编排（DAG） | 支持复杂分析任务的自动化执行 | 依赖 Story 4.1, Story 1.18a（Prefect 工作流引擎） | P1-2 |
-| Story 4.3 | 工具输入/输出 Schema 验证 | 工具输出符合预期格式，防止模型漂移 | 依赖 Story 4.1 | P0-3 |
-| Story 4.4 | Docker 沙箱执行 | 防止代码执行带来的安全风险 | 依赖 Epic 1 Story 1.7（MinIO 存储日志） | P0-4 |
-| Story 4.5 | 红蓝辩论机制基础 | MVP 阶段支持基础的多视角分析 | 依赖 Story 4.1 | P1-5 |
-| Story 4.6 | 工具版本管理（灰度发布与回滚） | 工具可安全迭代，异常版本可快速恢复 | 依赖 Story 4.1, Story 4.3 | P1-6（V1） |
-| Story 4.7 | Validation Feedback 闭环 | 工具执行失败可自动恢复或明确标记 | 依赖 Story 4.3, Story 4.4 | P1-7（V1） |
-| Story 4.8 | SAP 协议支持（内部 Agent 通信） | 多 Agent 协作可通过统一协议通信 | 依赖 Story 1.3（事件总线）, Story 5.3 | P1-8（V1） |
-| Story 4.9 | 财务建模与估值基础 | 战略规划财务量化分析可自动计算 | 依赖 Story 4.1, Story 4.3, Story 3.1a | P1-9（V1） |
+| Story 4.1 | 战略工具注册（23 种） | Agent 可以发现 23 种战略工具 | 依赖 Epic 1 Story 1.1（架构骨架） | P0-1 |
+| **Story 4.1a** | **战略工具实现** | **Tool 聚合根、ToolService、执行引擎、Skills SOP、用例编排** | **依赖 Story 4.1、Story 1.1（端口注册）** | **P0-1a（补充交付）** |
+| Story 4.2 | 工具链编排（DAG） | 支持复杂分析任务的自动化执行 | 依赖 Story 4.1a, Story 1.18a（Prefect 工作流引擎） | **P0-2** |
+| Story 4.3 | 工具输入/输出 Schema 验证 | 工具输出符合预期格式，防止模型漂移 | 依赖 Story 4.1a | P0-3 |
+| Story 4.4 | Docker 沙箱执行 | 防止代码执行带来的安全风险 | 依赖 Epic 1 Story 1.7, **Story 4.1a**（替换 mock） | P0-4 |
+| Story 4.5 | 红蓝辩论机制基础 | MVP 阶段支持基础的多视角分析 | 依赖 Story 4.1a | **P0-5** |
+| Story 4.6 | 工具版本管理（灰度发布与回滚） | 工具可安全迭代，异常版本可快速恢复 | 依赖 Story 4.1a, Story 4.3 | P1-6（V1） |
+| Story 4.7 | Validation Feedback 闭环增强 | 工具执行失败可自动恢复或明确标记 | 依赖 Story 4.3, Story 4.4, Story 4.1a | P1-7（V1） |
+| ~~Story 4.8~~ | ~~SAP 协议支持~~ | **已迁移至 Epic 5 Story 5.11** | — | — |
+| ~~Story 4.9~~ | ~~财务建模与估值基础~~ | **已迁移至 Epic 5 Story 5.12** | — | — |
 
 **✅ 依赖关系验证：**
 - Epic 4 依赖 Epic 1 的架构骨架（Story 1.1）和存储层（Story 1.7）
-- Epic 4 内部故事依赖均为**顺序依赖**（工具注册→验证→执行）
+- Epic 4 内部故事依赖：4.1 → 4.1a → 4.2/4.3/4.4/4.5/4.6/4.7；4.3 与 4.4 完成后进入 Validation Feedback 增强
 - Epic 4 可独立交付价值（用户执行工具分析）
-- 不依赖 Epic 2-3/5-8
+- **不依赖 Epic 2-3/5-8**；SAP 协议和财务建模已迁移至 Epic 5
 
 ### Story 4.1: 战略工具注册（23 种）
 
@@ -821,6 +822,73 @@ So that **Agent 可以调用这些工具执行分析**。
 **When** 系统加载工具注册表
 **Then** 23 种战略工具全部注册，每个工具有唯一标识、输入/输出 Schema、执行逻辑模板
 **And** 所有工具通过 Pydantic V2 契约测试
+
+### Story 4.1a: 战略工具实现
+
+As a **工具工程师**,
+I want **将已注册的 23 种战略工具从"目录条目"转化为"可执行工具"——实现领域模型、执行引擎、Skills SOP 和完整调用链路**,
+So that **Agent 可以按照 Think→Code→Execute→Observe→Validate 标准工作流调用工具完成战略分析**。
+
+**业务价值：** Story 4.1 仅注册工具元数据，本 Story 补齐 Tool 聚合根、ToolService、ToolExecutionEngine、StrategicAnalysisUseCase 和 Skills 三级系统。
+
+**Acceptance Criteria:**
+
+1. **Tool 聚合根与状态机**
+   - [ ] Tool 增强：`rule_version`、`reliability_score`、`execution_count` 字段
+   - [ ] Tool 状态机：idle → planning → executing → validating → completed/failed
+   - [ ] 不变量校验使用已有领域异常
+
+2. **ToolService 领域服务接口**
+   - [ ] `src/domain/services/tool_service.py` 定义 ToolService Protocol
+   - [ ] 方法：`execute(tool_id, tool_call, context) -> ToolResult`
+   - [ ] 方法：`get_tool(tool_id)`、`list_tools()`、`list_tools_by_category(category)`
+
+3. **ToolCall / ToolResult 值对象**
+   - [ ] `src/domain/value_objects/tool_execution.py` 定义 frozen dataclass
+   - [ ] ToolResult.status 枚举：success/failed/invalid/insufficient_data
+   - [ ] 证据包：input_hash、rule_version、citations、confidence
+
+4. **ToolExecutionEngine 标准工作流**
+   - [ ] Think→Code→Execute→Observe→Validate 五阶段循环
+   - [ ] Think/Code：依赖 LLMClientPort（已实现）
+   - [ ] Execute：依赖 SandboxExecutor（已实现端口，MVP mock）
+   - [ ] 失败重试最多 3 次，超出返回 failed
+   - [ ] 证据打包：plan + code + result + observation + validation + confidence + citations
+
+5. **StrategicAnalysisUseCase 用例编排**
+   - [ ] `src/application/use_cases/strategic_analysis.py`
+   - [ ] tool_name 查询 → Skill 加载 → ToolService.execute → ToolExecuted 事件发布
+   - [ ] 依赖通过端口注入，不导入 infrastructure 具体实现
+
+6. **Skills 三级渐进式加载**
+   - [ ] L1 `TOOLS.md`：23 个工具元数据，<200 tokens
+   - [ ] L2 `SKILL.md`：23 份 SOP，<500 行/个，含适用场景、负向触发、输入/输出字段、步骤、input_examples
+   - [ ] L3 `scripts/` + `references/`：按需加载
+   - [ ] `skill_manifest.py`：tool_id ↔ slug 双向映射
+
+7. **端口注册与架构约束**
+   - [ ] `composition_root.py` 注册 `tool_service`、`tool_execution_engine` 端口
+   - [ ] 六边形架构：domain 零外部依赖、依赖方向矩阵合规
+
+**TDD 测试要求:**
+
+- [ ] 领域实体测试：`tests/unit/domain/entities/test_tool.py` — 状态机、不变量
+- [ ] 值对象测试：`tests/unit/domain/value_objects/test_tool_execution_values.py`
+- [ ] 端口契约测试：`tests/contracts/test_port_contract_tool_service.py`
+- [ ] 引擎单元测试：`tests/unit/application/services/test_tool_execution_engine.py`
+- [ ] 用例单元测试：`tests/unit/application/use_cases/test_strategic_analysis_usecase.py`
+- [ ] Skills 测试：`tests/unit/application/skills/test_skills_loader.py`
+- [ ] 架构测试：`tests/unit/architecture/test_arch_strategic_tool_impl.py`
+- [ ] 集成测试：`tests/integration/test_integration_strategic_tool_impl.py`
+- [ ] 验收测试：`tests/acceptance/test_acceptance_strategic_tool_impl.feature`
+
+**Given** Story 4.1 已注册 23 种工具，LLM 和沙箱端口可用
+**When** StrategicAnalysisUseCase 接收 tool_name + input_data
+**Then** Skill 加载 → ToolService.execute → Tool 状态变更 → ToolExecuted 事件发布
+**And** ToolExecutionEngine 执行 Think→Code→Execute→Observe→Validate 循环
+**And** 返回 ToolResult 包含 status、output、evidence_package
+
+---
 
 ### Story 4.2: 工具链编排（DAG）
 
@@ -1035,18 +1103,20 @@ So that **工具可以安全迭代，异常版本可快速恢复**。
 ### Story 4.7: Validation Feedback 闭环
 
 As a **质量保障工程师**,
-I want **系统执行 Validation Feedback 闭环，最大重试 3 次，失败标记不可行**,
+I want **系统执行 Validation Feedback 闭环，增强重试机制并标记不可行任务**,
 So that **工具执行失败可自动恢复或明确标记，保证任务可靠完成**。
+
+**前置条件：** Story 4.1a 已实现 ToolExecutionEngine 基础 3 次重试。本 Story 在此基础上增强：修复代码生成、错误分析、STDERR 捕获、不可行标记和演进日志。
 
 **Acceptance Criteria:**
 
 **TDD 测试要求:**
 
 1. **架构测试**
-   - [ ] 重试机制测试 - 验证最大重试次数 3 次
+   - [ ] 重试增强测试 - 验证 STDERR 捕获与修复建议生成
    - [ ] 失败标记测试 - 验证 3 次失败后标记"不可行"
    - [ ] 幂等性测试 - 验证重复执行不产生副作用
-   - [ ] STDERR 捕获测试 - 验证错误日志捕获与修复建议生成
+   - [ ] 演进日志测试 - 验证失败历史记录可追溯
 
 2. **性能要求**
    - [ ] 单次重试延迟 P95<5s
@@ -1069,109 +1139,30 @@ So that **工具执行失败可自动恢复或明确标记，保证任务可靠�
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
-**Given** 工具执行结果验证失败
-**When** 触发 Validation Feedback 闭环
-**Then** 自动重试（最多 3 次），每次捕获 STDERR 并生成修复建议
-**And** 3 次重试均失败后标记任务为"不可行"并记录演进日志
+**Given** 工具执行结果验证失败，ToolExecutionEngine 基础重试已耗尽
+**When** 触发 Validation Feedback 闭环增强
+**Then** 捕获 STDERR 并生成修复建议，辅助 LLM 修正代码
+**And** 3 次增强重试均失败后标记任务为"不可行"并记录演进日志
 
 ---
 
 ### Story 4.8: SAP 协议支持（内部 Agent 通信）
 
-As a **系统架构师**,
-I want **系统实现 SAP（sisys Agent Protocol）协议，支持 Agent 间标准消息通信**,
-So that **多 Agent 协作可通过统一协议进行辩论、裁决、公共黑板交互**。
-
-**Acceptance Criteria:**
-
-**TDD 测试要求:**
-
-1. **架构测试**
-   - [ ] SAP 消息 Schema 测试 - 验证 SAPMessage Pydantic 模型字段完整性
-   - [ ] 消息类型测试 - 验证 REQUEST/RESPONSE/NOTIFICATION/BROADCAST/DEBATE 五种类型
-   - [ ] 优先级测试 - 验证 LOW/NORMAL/HIGH/URGENT 四级优先级
-   - [ ] 隔离等级测试 - 验证 isolation_level 字段（L1-L4）
-
-2. **性能要求**
-   - [ ] SAP 消息传递延迟 P95<200ms（V1 目标）
-   - [ ] 消息序列化/反序列化延迟 P95<50ms
-   - [ ] 并发消息处理≥50
-
-3. **覆盖率要求**
-   - [ ] 应用层覆盖率≥85%
-   - [ ] 集成测试覆盖率≥75%
-
-4. **代码质量**
-   - [ ] Ruff 检查通过
-   - [ ] MyPy 类型检查通过
-   - [ ] 架构约束验证
-
-5. **测试文件**
-   - [ ] `tests/unit/architecture/test_sap_protocol.py` - 单元测试
-   - [ ] `tests/integration/test_sap_integration.py` - 集成测试
-
-**实施指南:**
-参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
-参考 `src/interfaces/sap/` 目录结构（接口层骨架已存在）
-
-**Given** 多 Agent 协作场景
-**When** Agent 间需要通信（辩论/裁决/公共黑板）
-**Then** 通过 SAP 协议发送标准消息（包含 message_id/conversation_id/sender_id/receiver_id/message_type/priority/content/correlation_id/isolation_level/blackboard_visible）
-**And** 公共黑板支持 MVCC（多版本并发控制）
+> **已迁移至 Epic 5 Story 5.11。** SAP 协议是多 Agent 协作基础设施，与 Epic 5 Agent 协作系统职责对齐，不再属于 Epic 4 战略工具箱范畴。
 
 ---
 
 ### Story 4.9: 财务建模与估值基础
 
-As a **财务分析师**,
-I want **系统支持财务建模与估值基础（DCF/可比公司/先例交易三种方法）**,
-So that **战略规划中的财务量化分析可自动计算并验证**。
-
-**Acceptance Criteria:**
-
-**TDD 测试要求:**
-
-1. **架构测试**
-   - [ ] DCF 计算测试 - 验证现金流折现模型计算准确率 100%（与 Excel 对齐）
-   - [ ] 可比公司测试 - 验证倍数法估值逻辑
-   - [ ] 先例交易测试 - 验证交易对价参考逻辑
-   - [ ] 输入 Schema 测试 - 验证财务数据输入契约
-
-2. **性能要求**
-   - [ ] 单次估值计算延迟 P95<5s
-   - [ ] 计算精度与 Excel 基准对齐（误差 < 0.01%）
-   - [ ] 并发估值请求≥10
-
-3. **覆盖率要求**
-   - [ ] 应用层覆盖率≥85%
-   - [ ] 集成测试覆盖率≥75%
-
-4. **代码质量**
-   - [ ] Ruff 检查通过
-   - [ ] MyPy 类型检查通过
-   - [ ] 数值精度校验（金融计算禁止浮点误差）
-
-5. **测试文件**
-   - [ ] `tests/unit/architecture/test_financial_modeling.py` - 单元测试
-   - [ ] `tests/integration/test_financial_modeling_integration.py` - 集成测试
-   - [ ] `tests/fixtures/financial_test_cases.json` - 财务计算测试用例
-
-**实施指南:**
-参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
-参考 `src/interfaces/api/v1/schemas/financial_schemas.py`（Schema 骨架已存在）
-
-**Given** 企业财务数据已上传解析
-**When** 执行财务建模分析
-**Then** 输出 DCF/可比公司/先例交易三种估值结果
-**And** 计算准确率 100%（NPV/IRR 与 Excel 公式对齐）
+> **已迁移至 Epic 5 Story 5.12。** 财务建模依赖 LLM 推理和领域知识，是独立能力，与 Epic 5 Agent 协作系统对齐，不再属于 Epic 4 战略工具箱范畴。
 
 ---
 
 ## Epic 5: Agent 协作系统
 
-**目标：** 实现单 Agent 执行、EIP 弹性隔离、隔离切换审计、Agent 评估与可观测性，以及 SAP 协议 Schema 定义（IF-03）和 Skills 三级渐进式加载（IF-02）。
+**目标：** 实现单 Agent 执行、EIP 弹性隔离、隔离切换审计、Agent 评估与可观测性，以及 SAP 协议 Schema 定义（IF-03）、财务建模（FR-ST-09）和 SAP 协议实现（FR-ST-08）。
 
-**包含 FR：** AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, EV-01, EV-02, IF-02, IF-03
+**包含 FR：** AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, EV-01, EV-02, IF-03, ST-08, ST-09
 
 **新增 FR（评估与可观测性 - EV 系列）：**
 - FR-EV-01: Phoenix Evaluation Harness 全链路追踪
@@ -1194,12 +1185,14 @@ So that **战略规划中的财务量化分析可自动计算并验证**。
 | Story 5.8 | Agent 输出质量评估 | 幻觉检测、上下文相关性、置信度校准 | 依赖 Story 5.7 | P0-8 |
 | Story 5.9 | CUSUM 漂移检测与触发重校准 | 自动检测模型性能漂移并触发重校准 | 依赖 Story 5.8 | P1-9 |
 | Story 5.10 | CheckpointWithEvaluation 集成 | 评估历史存入 Checkpoint，支持漂移趋势追踪 | 依赖 Story 5.8, Epic 6 Story 6.3 | P1-10 |
+| **Story 5.11** | **SAP 协议支持（内部 Agent 通信）** | **从 Epic 4 Story 4.8 迁移，支持 Agent 间标准消息通信** | **依赖 Story 5.3, Story 1.3（事件总线）** | **P1-11** |
+| **Story 5.12** | **财务建模与估值基础** | **从 Epic 4 Story 4.9 迁移，DCF/可比公司/先例交易三种方法** | **依赖 Story 4.1a, Story 4.3, Story 3.2a（LLM 客户端）** | **P1-12** |
 
 **✅ 依赖关系验证：**
 - Epic 5 依赖 Epic 1 的缓存层（Story 1.4）和审计日志（Story 1.10）
 - Epic 5 内部故事依赖均为**顺序依赖**（Agent 实例化→加载→执行→隔离）
 - Epic 5 可独立交付价值（用户通过 CEO Agent 执行战略规划）
-- 不依赖 Epic 2-4/6-8
+- **Story 5.11/5.12 依赖 Epic 4 Story 4.1a 和 Story 4.3**（工具执行能力与 Schema 验证），需在 Epic 4 完成后执行
 
 ### Story 5.1: CEO Agent 实例化（MVP 单 Agent）
 
@@ -1646,6 +1639,101 @@ So that **支持评估历史追踪和漂移趋势分析**。
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
+---
+
+### Story 5.11: SAP 协议支持（内部 Agent 通信）
+
+> **从 Epic 4 Story 4.8 迁移。** SAP 协议是多 Agent 协作基础设施，与本 Epic Agent 协作系统职责对齐。
+
+As a **系统架构师**,
+I want **系统实现 SAP（sisys Agent Protocol）协议，支持 Agent 间标准消息通信**,
+So that **多 Agent 协作可通过统一协议进行辩论、裁决、公共黑板交互**。
+
+**Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] SAP 消息 Schema 测试 - 验证 SAPMessage Pydantic 模型字段完整性
+   - [ ] 消息类型测试 - 验证 REQUEST/RESPONSE/NOTIFICATION/BROADCAST/DEBATE 五种类型
+   - [ ] 优先级测试 - 验证 LOW/NORMAL/HIGH/URGENT 四级优先级
+   - [ ] 隔离等级测试 - 验证 isolation_level 字段（L1-L4）
+
+2. **性能要求**
+   - [ ] SAP 消息传递延迟 P95<200ms（V1 目标）
+   - [ ] 消息序列化/反序列化延迟 P95<50ms
+   - [ ] 并发消息处理≥50
+
+3. **覆盖率要求**
+   - [ ] 应用层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_sap_protocol.py` - 单元测试
+   - [ ] `tests/integration/test_sap_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+参考 `src/interfaces/sap/` 目录结构（接口层骨架已存在）
+
+**Given** 多 Agent 协作场景
+**When** Agent 间需要通信（辩论/裁决/公共黑板）
+**Then** 通过 SAP 协议发送标准消息（包含 message_id/conversation_id/sender_id/receiver_id/message_type/priority/content/correlation_id/isolation_level/blackboard_visible）
+**And** 公共黑板支持 MVCC（多版本并发控制）
+
+---
+
+### Story 5.12: 财务建模与估值基础
+
+> **从 Epic 4 Story 4.9 迁移。** 财务建模依赖 LLM 推理和领域知识，是独立能力，与本 Epic Agent 协作系统对齐。
+
+As a **财务分析师**,
+I want **系统支持财务建模与估值基础（DCF/可比公司/先例交易三种方法）**,
+So that **战略规划中的财务量化分析可自动计算并验证**。
+
+**Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] DCF 计算测试 - 验证现金流折现模型计算准确率 100%（与 Excel 对齐）
+   - [ ] 可比公司测试 - 验证倍数法估值逻辑
+   - [ ] 先例交易测试 - 验证交易对价参考逻辑
+   - [ ] 输入 Schema 测试 - 验证财务数据输入契约
+
+2. **性能要求**
+   - [ ] 单次估值计算延迟 P95<5s
+   - [ ] 计算精度与 Excel 基准对齐（误差 < 0.01%）
+   - [ ] 并发估值请求≥10
+
+3. **覆盖率要求**
+   - [ ] 应用层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 数值精度校验（金融计算禁止浮点误差）
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_financial_modeling.py` - 单元测试
+   - [ ] `tests/integration/test_financial_modeling_integration.py` - 集成测试
+   - [ ] `tests/fixtures/financial_test_cases.json` - 财务计算测试用例
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+参考 `src/interfaces/api/v1/schemas/financial_schemas.py`（Schema 骨架已存在）
+
+**Given** 企业财务数据已上传解析
+**When** 执行财务建模分析
+**Then** 输出 DCF/可比公司/先例交易三种估值结果
+**And** 计算准确率 100%（NPV/IRR 与 Excel 公式对齐）
 
 ---
 
@@ -3081,7 +3169,7 @@ So that **确保 MVP 无高危漏洞**。
 | **Epic 2: 文档与数据管理** ✅ | 文档全生命周期管理 | Story 1.6/1.7/1.3 | - | - | - | - | 顺序依赖（流水线） | ✅ 是 | 9 |
 | **Epic 3: 智能检索与知识发现** ✅ | 智能检索与溯源 | Story 1.5/1.6/1.7 | **Story 2.3（关键路径）** | - | - | - | 顺序依赖（流水线） | ✅ 是 | 14 |
 | **Epic 4: 战略工具箱** | 战略工具执行能力 | Story 1.1/1.7/1.18b | - | - | - | - | 顺序依赖（工具链+Agent编排） | ✅ 是 | 5 |
-| **Epic 5: Agent 协作系统** | 单 Agent 战略规划能力 | Story 1.4/1.10/1.18b | - | - | *Story 4.1（可选，TOOLS.md 元数据）* | - | 顺序依赖（工作流） | ✅ 是 | 10 |
+| **Epic 5: Agent 协作系统** | 单 Agent 战略规划能力 | Story 1.4/1.10/1.18b | - | - | *Story 4.1（可选，TOOLS.md 元数据）* | - | 顺序依赖（工作流） | ✅ 是 | **12** |
 | **Epic 6: 战略规划流程** | 战略规划与审批能力<br/>UX 三页面驾驶舱（分析师/顾问视图）<br/>**白标报告基础** | Story 1.4/1.7/1.18b | Story 2.2a/2.3 | Story 3.8 | **Story 4.1**（6.2/6.9 工具调用） | **Story 5.3** | 顺序依赖（BLM 流程） | ✅ 是 | **12** |
 | **Epic 7: 多触点用户界面与 API 集成** | 多触点操作与监控能力<br/>NFR 覆盖<br/>测试 Story<br/>**骨架屏加载** | Story 1.1/1.9/1.12/1.16 | - | - | *Story 5.3（CLI Agent 模式）* | 并行依赖 | ✅ 是 | 8 |
 | **Epic 8: 用户权限管理与审计合规** | 安全与合规 | Story 1.5/1.7/1.9/1.10/1.12 | - | - | *Story 7.2/7.3（渗透测试需 API 端点）* | 顺序依赖（安全测试） | ✅ 是 | 6 |
@@ -3094,8 +3182,8 @@ So that **确保 MVP 无高危漏洞**。
 - Epic 1: 24 个（Story 1.1-1.19 + IF-04 事件监听扩展）
 - Epic 2: 9 个（Story 2.1-2.8，Story 2.2 拆分为 2.2a/2.2b）
 - Epic 3: 14 个（Story 3.1-3.12，Story 3.1 拆分为 3.1a/3.1b，Story 3.2 拆分为 3.2a/3.2b）
-- Epic 4: 9 个（含 ST-06~09 P1 V1 扩展）
-- Epic 5: 12 个（Story 5.1-5.10 + IF-02/03 SAP 协议扩展）
+- Epic 4: 8 个（含 ST-06~07 P1 V1 扩展，Story 4.8/4.9 已迁移至 Epic 5）
+- Epic 5: 12 个（Story 5.1-5.10 + 5.11 SAP 协议 + 5.12 财务建模）
 - Epic 6: 12 个（Story 6.1-6.11，Story 6.5 拆分为 6.5a/6.5b）
 - Epic 7: 9 个（新增 Story 7.5-7.8 + IF-01 CLI 七原则）
 - Epic 8: 6 个
@@ -3217,21 +3305,20 @@ graph TD
     end
 
     %% ========== Epic 4 (待开始) ==========
-    subgraph "Epic 4 📋 (待开始 - 9 Stories)"
+    subgraph "Epic 4 📋 (待开始 - 8 Stories)"
         direction TB
         S4_1["Story 4.1<br/>战略工具注册 23 种<br/>📋 Backlog 🔑入口"]
+        S4_1a["Story 4.1a<br/>战略工具实现<br/>📋 Backlog 🔑"]
         S4_2["Story 4.2<br/>工具链编排 DAG<br/>📋 Backlog"]
         S4_3["Story 4.3<br/>工具 Schema 校验<br/>📋 Backlog"]
         S4_4["Story 4.4<br/>Docker 沙箱执行<br/>📋 Backlog"]
         S4_5["Story 4.5<br/>红蓝辩论基础<br/>📋 Backlog"]
         S4_6["Story 4.6<br/>工具版本管理<br/>📋 Backlog"]
-        S4_7["Story 4.7<br/>Validation 闭环<br/>📋 Backlog"]
-        S4_8["Story 4.8<br/>SAP 协议支持<br/>📋 Backlog"]
-        S4_9["Story 4.9<br/>财务建模基础<br/>📋 Backlog"]
+        S4_7["Story 4.7<br/>Validation 闭环增强<br/>📋 Backlog"]
     end
 
     %% ========== Epic 5 (待开始) ==========
-    subgraph "Epic 5 📋 (待开始 - 10 Stories)"
+    subgraph "Epic 5 📋 (待开始 - 12 Stories)"
         direction TB
         S5_1["Story 5.1<br/>CEO Agent 实例化<br/>📋 Backlog 🔑入口"]
         S5_2["Story 5.2<br/>Agent 身份档案加载<br/>📋 Backlog"]
@@ -3243,6 +3330,8 @@ graph TD
         S5_8["Story 5.8<br/>Agent 质量评估<br/>📋 Backlog"]
         S5_9["Story 5.9<br/>CUSUM 漂移检测<br/>📋 Backlog"]
         S5_10["Story 5.10<br/>Checkpoint+评估集成<br/>📋 Backlog"]
+        S5_11["Story 5.11<br/>SAP 协议支持<br/>📋 Backlog (from 4.8)"]
+        S5_12["Story 5.12<br/>财务建模基础<br/>📋 Backlog (from 4.9)"]
     end
 
     %% ========== Epic 6 (待开始) ==========
@@ -3392,14 +3481,14 @@ graph TD
     S3_11 --> S3_12
 
     %% ========== Epic 4 内部依赖 (战略工具链) ==========
-    S4_1 --> S4_2
-    S4_1 --> S4_3
-    S4_1 --> S4_5
-    S4_3 --> S4_4
+    S4_1 --> S4_1a
+    S4_1a --> S4_2
+    S4_1a --> S4_3
+    S4_1a --> S4_5
+    S4_1a --> S4_4
+    S4_1a --> S4_7
     S4_3 --> S4_7
-    S4_1 --> S4_9
-    S4_3 --> S4_9
-    S1_3 --> S4_8
+    S4_3 --> S4_6
 
     %% ========== Epic 5 内部依赖 (Agent 协作) ==========
     S5_1 --> S5_2
@@ -3411,6 +3500,8 @@ graph TD
     S5_7 --> S5_8
     S5_8 --> S5_9
     S5_8 --> S5_10
+    S5_3 --> S5_11
+    S5_11 --> S5_12
 
     %% ========== Epic 6 内部依赖 (BLM 流程) ==========
     S6_1 --> S6_2
@@ -3488,8 +3579,8 @@ graph TD
     class S1_1,S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_9,S1_10,S1_11,S1_12,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_15b,S1_16,S1_17,S1_18a,S1_18b,S1_19 done;
     class S2_1,S2_2a,S2_2b,S2_3,S2_4,S2_5,S2_6,S2_7,S2_8 done;
     class S3_1a,S3_1b,S3_2a,S3_2b,S3_3,S3_4,S3_5,S3_6,S3_7,S3_8,S3_9,S3_10,S3_11,S3_12 done;
-    class S4_1,S4_2,S4_3,S4_4,S4_5,S4_6,S4_7,S4_8,S4_9 backlog;
-    class S5_1,S5_2,S5_3,S5_4,S5_5,S5_6,S5_7,S5_8,S5_9,S5_10 backlog;
+    class S4_1,S4_1a,S4_2,S4_3,S4_4,S4_5,S4_6,S4_7 backlog;
+    class S5_1,S5_2,S5_3,S5_4,S5_5,S5_6,S5_7,S5_8,S5_9,S5_10,S5_11,S5_12 backlog;
     class S6_1,S6_2,S6_3,S6_4,S6_5a,S6_5b,S6_6,S6_7,S6_8,S6_9,S6_10,S6_11 backlog;
     class S7_1,S7_2,S7_3,S7_4,S7_5,S7_6,S7_7,S7_8 backlog;
     class S8_1,S8_2,S8_3,S8_4,S8_5,S8_6 backlog;
