@@ -136,7 +136,7 @@ development_status:
   # Epic 4: 战略工具箱 - 📋 待开始
   # ===========================================================================
   epic-4: in-progress
-  4-1-strategic-tool-registration-23-tools: ready-for-dev
+  4-1-strategic-tool-registration-tools: ready-for-dev
   4-1a-strategic-tool-impl: ready-for-dev
   4-2-toolchain-orchestration-dag: backlog
   4-3-tool-io-schema-validation: backlog
@@ -425,6 +425,6 @@ development_status:
 #
 # Next Steps:
 #   1. Option A: Complete Epic 0 Iteration 1 remaining stories (0-17 / 0-18 / 0-30)
-#   2. Option B: Start Epic 4 — create story file for 4-1-strategic-tool-registration-23-tools
+#   2. Option B: Start Epic 4 — create story file for 4-1-strategic-tool-registration-tools
 #   3. Option C: Start Epic 21 (决策舱 P0) — 可与 Epic 4-6 并行，依赖 Story 1.7 + Story 3.8 均已完成
 # =============================================================================
