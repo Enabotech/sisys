@@ -202,10 +202,15 @@
 | **infrastructure** | ✓ 允许 | ✓ 允许 | ✗ 禁止 | — |
 
 #### 验收标准 Gherkin (Acceptance Tests)
+
+> **Gherkin 语言：** 使用中文 Gherkin（`# language: zh-CN`），遵循项目现有验收测试模式。
+> **参考文件：** `tests/acceptance/test_acceptance_archive_validity.feature`（中文 Gherkin 示例）
+
 - [ ] 功能测试文件：`tests/acceptance/test_acceptance_strategic_tool_registration.feature`
 - [ ] 步骤实现文件：`tests/acceptance/test_acceptance_strategic_tool_registration.py`
 - [ ] 所有场景覆盖（AC-1 ~ AC-4 的 Happy Path + Edge Cases）
 - [ ] Edge Cases 包含：工具不存在（ToolNotFoundError）、重复注册（ToolAlreadyExistsError）、分类查询空结果
+- [ ] 使用中文 Gherkin 关键词：`功能:`、`场景:`、`假如`、`当`、`那么`、`并且`
 
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
@@ -680,10 +685,12 @@ src/
 │       └── tool_registry_service.py    # ToolRegistryService 实现（本 Story 新建）
 ├── infrastructure/
 │   └── storage/
-│       └── inmemory/
+│       └── inmemory/                   # 新建目录（MVP 阶段轻量级实现）
 │           └── tool_repository.py      # InMemoryToolRepository（本 Story 新建）
 └── composition_root.py                 # 端口注册（本 Story 修改）
 ```
+
+> **目录说明：** `src/infrastructure/storage/inmemory/` 目录当前不存在，需在本 Story 中新建。项目现有存储实现位于 `src/infrastructure/storage/` 下的 `fs/`、`minio/`、`neo4j/`、`postgresql/`、`qdrant/`、`redis/` 子目录，inmemory 作为 MVP 阶段的轻量级实现，不依赖外部存储服务。
 
 ### 23 种战略工具完整清单
 
@@ -767,7 +774,10 @@ src/
 - [x] 项目结构对齐统一规范
 - [x] 23 种工具清单与架构文档一致
 - [x] 端口契约清单与 PortSpec 模式对齐
-- [x] 领域异常编码分配完成（EXCEPTION_250/251）
+- [x] 领域异常编码分配完成（EXCEPTION_380/381）
+- [x] Round 1 修正：异常编码冲突修复（EXCEPTION_250/251 → 380/381）
+- [x] Round 1 修正：ToolCategory 分类说明（业务领域 vs 功能类型）
+- [x] Round 1 修正：端口注册统计更新（132 个端口）
 
 ### 文件清单 File List
 
@@ -854,8 +864,9 @@ src/
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-08-27
-**最后更新/Last Updated:** 2026-08-27
+**最后更新/Last Updated:** 2026-08-28
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 战略工具注册，Epic 4 首个 P0 故事
+- v1.1.0: Round 1 审查修正 — 异常编码冲突修复 + ToolCategory 分类说明 + 端口注册统计更新
