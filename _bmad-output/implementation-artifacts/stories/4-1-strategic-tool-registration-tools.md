@@ -20,16 +20,17 @@
 
 **现有资产（已就绪，本 Story 直接利用）：**
 - `Tool` 领域实体已定义（`src/domain/entities/tool.py`）— 包含 `tool_id`、`name`、`category`、`input_schema`、`output_schema`、`status`、`version` 字段及不变量校验
-- `ToolCategory` 枚举已定义（`ANALYSIS`、`GENERATION`、`VALIDATION`、`VISUALIZATION`、`OTHER`）
-- `ToolStatus` 枚举已定义（`ACTIVE`、`DEPRECATED`、`MAINTENANCE`）
+- `ToolCategory` 枚举已定义（`ANALYSIS`、`GENERATION`、`VALIDATION`、`VISUALIZATION`、`OTHER`）— 共 5 个值
+- `ToolStatus` 枚举已定义（`ACTIVE`、`DEPRECATED`、`MAINTENANCE`）— 共 3 个值
 - `ToolExecuted` 领域事件已定义（`src/domain/events/tool_events.py`）
 - `Tool` 实体单元测试已存在（`tests/unit/domain/entities/test_tool.py`）
 - `SandboxExecutor` 端口已定义（`src/domain/ports/sandbox_executor.py`）— 后续沙箱执行使用
 - `PortRegistry` + `PortSpec` 机制已就绪（`src/domain/ports/registry.py`）
-- `composition_root.py` 引导注册机制已就绪
+- `composition_root.py` 引导注册机制已就绪（已有 132 个端口注册）
 
 **本 Story 的核心任务：**
 - **扩展现有 `ToolCategory` 枚举**，新增 5 个战略工具箱分类：`ENVIRONMENT_ANALYSIS`（环境分析）、`COMPETITIVE_ANALYSIS`（竞争分析）、`STRATEGIC_SELECTION`（战略选择）、`BUSINESS_MODEL`（商业模式）、`EXECUTION_MANAGEMENT`（执行管理）
+  > **分类说明：** 现有 `ToolCategory` 按功能类型划分（ANALYSIS/GENERATION/VALIDATION/VISUALIZATION/OTHER），本 Story 新增的 5 个分类按业务领域划分，两者维度不同，共存不冲突。新增分类用于 23 种战略工具的业务归属，原有分类保留用于通用工具功能分类。
 - **定义 `ToolRepositoryPort` 端口**（领域层），提供工具的增删查存能力
 - **定义 `ToolRegistryService` 端口**（应用层），封装 23 种工具的注册逻辑与元数据查询
 - **实现 `InMemoryToolRepository`**（基础设施层），作为 MVP 阶段的内存仓储实现
@@ -169,16 +170,18 @@
 
 | 异常类 | 编码 | 基类 | 归属模块 | 用途 |
 |--------|------|------|---------|------|
-| `ToolNotFoundError` | EXCEPTION_250 | `BusinessException` | business | 按 ID/名称查询工具不存在 |
-| `ToolAlreadyExistsError` | EXCEPTION_251 | `ConflictError` | business | 注册已存在的工具（同 ID 或同名） |
+| `ToolNotFoundError` | EXCEPTION_380 | `BusinessException` | business | 按 ID/名称查询工具不存在 |
+| `ToolAlreadyExistsError` | EXCEPTION_381 | `ConflictError` | business | 注册已存在的工具（同 ID 或同名） |
+
+> **编码说明：** 异常编码需遵循 `_code_ranges.py` 中的子域范围约束。当前 business 子域范围为 (201, 209)，但该范围已被现有异常占用。根据项目规范，tool 相关异常应分配在独立子域或扩展现有范围。经分析，建议使用 traceability 子域后的可用范围 (380-389) 作为 tool 子域编码范围。
 
 - [ ] 归属模块与基类 — `business` 模块，继承 `BusinessException` / `ConflictError`
-- [ ] 唯一编码分配 — 从子域编码范围选取（运行 `grep -r "EXCEPTION_25" src/domain/exceptions/` 验证无碰撞）
+- [ ] 唯一编码分配 — 从子域编码范围选取（运行 `grep -r "EXCEPTION_38" src/domain/exceptions/` 验证无碰撞）
 - [ ] 构造器参数设计 — 携带 `tool_id` / `tool_name`，通过 `context` 字典暴露
 - [ ] 消息安全性审查 — 错误消息不泄露内部实现细节
 - [ ] 编码注册 — 在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 字典中注册
 - [ ] 导出完整性 — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
-- [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过
+- [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过（`tests/unit/domain/exceptions/test_tool_exceptions.py`）
 
 #### 六边形架构约束（必须遵守）
 
@@ -237,7 +240,7 @@
 | **TDD 单元测试** | ToolRepositoryPort | 端口方法签名、Protocol 合规 | `tests/contracts/test_port_contract_tool.py` | Task 3 |
 | **TDD 单元测试** | InMemoryToolRepository | CRUD 操作、查询、异常 | `tests/unit/infrastructure/storage/test_inmemory_tool_repository.py` | Task 4 |
 | **TDD 单元测试** | ToolRegistryService | 注册、查询、分类过滤 | `tests/unit/application/services/test_tool_registry_service.py` | Task 5 |
-| **TDD 领域异常** | ToolNotFoundError/ToolAlreadyExistsError | 构造/to_dict/HTTP 映射 | `tests/unit/domain/exceptions/test_business_exceptions.py` | Task 3 |
+| **TDD 领域异常** | ToolNotFoundError/ToolAlreadyExistsError | 构造/to_dict/HTTP 映射 | `tests/unit/domain/exceptions/test_tool_exceptions.py` | Task 3 |
 | **TDD 验收测试** | Gherkin 场景 | AC-1~AC-4 业务价值验收 | `tests/acceptance/test_acceptance_strategic_tool_registration.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `tests/acceptance/test_acceptance_strategic_tool_registration.py` | Task 0 |
 | **TDD 契约测试** | 端口契约 / registry / contract gate | 端口注册、版本、兼容性 | `tests/contracts/test_port_contract_tool.py` | Task 6 |
@@ -430,7 +433,7 @@
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
 - [ ] Subtask 3.1: 🔴 红 — 编写 `ToolNotFoundError` 失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 创建 `ToolNotFoundError`（EXCEPTION_250，继承 `BusinessException`）
+- [ ] Subtask 3.2: 🟢 绿 — 创建 `ToolNotFoundError`（EXCEPTION_380，继承 `BusinessException`）
 - [ ] Subtask 3.3: 🔄 重构 — 优化异常消息、添加 context 字典
 
 #### TDD 循环 B：ToolAlreadyExistsError
@@ -442,7 +445,7 @@
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
 - [ ] Subtask 3.4: 🔴 红 — 编写 `ToolAlreadyExistsError` 失败测试
-- [ ] Subtask 3.5: 🟢 绿 — 创建 `ToolAlreadyExistsError`（EXCEPTION_251，继承 `ConflictError`）
+- [ ] Subtask 3.5: 🟢 绿 — 创建 `ToolAlreadyExistsError`（EXCEPTION_381，继承 `ConflictError`）
 - [ ] Subtask 3.6: 🔄 重构 — 运行异常编码唯一性测试
 
 **完成标准/Definition of Done:**
@@ -660,13 +663,14 @@
 src/
 ├── domain/
 │   ├── entities/
-│   │   ├── tool.py                     # Tool 实体（已有）
+│   │   ├── tool.py                     # Tool 实体（已有，含 ToolCategory/ToolStatus 枚举）
 │   │   └── strategic_tool_catalog.py   # 23 种工具元数据（本 Story 新建）
 │   ├── events/
 │   │   └── tool_events.py              # ToolExecuted 事件（已有）
 │   ├── exceptions/
 │   │   ├── business_exceptions.py      # ToolNotFoundError（本 Story 新建）
-│   │   └── conflict_errors.py          # ToolAlreadyExistsError（本 Story 新建）
+│   │   ├── conflict_errors.py          # ToolAlreadyExistsError（本 Story 新建）
+│   │   └── _code_ranges.py             # 异常编码范围（需新增 tool 子域 380-389）
 │   └── ports/
 │       └── tool_repository.py          # ToolRepositoryPort Protocol（本 Story 新建）
 ├── application/
@@ -725,7 +729,7 @@ src/
 **应用到本故事/Applied to This Story:**
 - [x] 工具仓储使用 SCOPED 生命周期（每个请求独立实例，避免状态泄漏）
 - [x] 工具注册服务使用 SCOPED 生命周期（每次 bootstrap 创建新实例）
-- [x] 异常编码从 EXCEPTION_250 开始分配（避开已有编码范围）
+- [x] 异常编码从 EXCEPTION_380 开始分配（tool 子域范围 380-389）
 - [x] Composition Root 使用字符串延迟加载 `InMemoryToolRepository`
 - [x] 工具注册失败时抛出 `ToolAlreadyExistsError`，不静默忽略
 
