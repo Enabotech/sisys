@@ -764,7 +764,7 @@ src/
 | **前一个 Story** | `_bmad-output/implementation-artifacts/stories/3-9-semantic-cache.md` |
 | **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
 
-### 完成清单 Completion Notes List
+**完成清单 Completion Notes List**
 
 - [x] 故事需求从 `epics_v1.0.md` 提取
 - [x] 架构约束从 `architecture.md` 和 `sisys-core-domain-design.md` 提取
@@ -778,6 +778,9 @@ src/
 - [x] Round 1 修正：异常编码冲突修复（EXCEPTION_250/251 → 380/381）
 - [x] Round 1 修正：ToolCategory 分类说明（业务领域 vs 功能类型）
 - [x] Round 1 修正：端口注册统计更新（132 个端口）
+- [x] Round 2 修正：验收测试 Gherkin 中文化说明
+- [x] Round 2 修正：inmemory 目录不存在说明
+- [x] Round 3 修正：架构文档一致性验证（23 种工具分类对齐）
 
 ### 文件清单 File List
 
@@ -864,9 +867,10 @@ src/
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-08-27
 **最后更新/Last Updated:** 2026-08-28
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 战略工具注册，Epic 4 首个 P0 故事
 - v1.1.0: Round 1 审查修正 — 异常编码冲突修复 + ToolCategory 分类说明 + 端口注册统计更新
+- v1.2.0: Round 2-3 审查修正 — 验收测试 Gherkin 中文化 + inmemory 目录说明 + 架构文档一致性验证
