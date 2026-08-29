@@ -1,0 +1,3 @@
+# RapidOCR 本地运行时参数
+RAPIDOCR_MODEL_DIR=/opt/models/rapidocr
+RAPIDOCR_MAX_CONCURRENCY=1

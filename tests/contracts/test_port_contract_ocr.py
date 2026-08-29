@@ -30,11 +30,11 @@ class TestOCRPortContract:
         assert spec is not None
         assert spec.version == "v1.0.0"
 
-    def test_port_lifetime_is_scoped(self) -> None:
-        """验证端口生命周期为 SCOPED"""
+    def test_port_lifetime_is_singleton(self) -> None:
+        """验证本地 OCR 模型实例按单例生命周期管理"""
         spec = _global_registry.get("ocr")
         assert spec is not None
-        assert spec.lifetime == Lifetime.SCOPED
+        assert spec.lifetime == Lifetime.SINGLETON
 
     def test_port_owner_is_epic2(self) -> None:
         """验证端口归属为 epic-2"""

@@ -654,7 +654,7 @@ tests/
 5. **`repo.save()` 是全量更新** — 没有部分更新方法。版面检测结果通过 `document.metadata["parse_result"] = parsed_doc.to_dict()` 完整覆盖
 6. **事件双注册** — 如遇新增事件，必须同时更新 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`（本 Story 不新增事件）
 7. **领域层零依赖** — DocLayNet 是 ML 模型（依赖 onnxruntime/numpy），必须完全封装在 infrastructure 层。领域层只定义 Protocol 和值对象
-8. **测试 mock 策略** — OCR 测试通过 mock pytesseract 进行。本 Story 中的 ONNX 推理同样通过 mock `InferenceSession` 进行单元测试，不依赖真实模型文件
+8. **测试 mock 策略** — OCR 测试通过 mock RapidOCR 引擎进行。本 Story 中的 ONNX 推理同样通过 mock `InferenceSession` 进行单元测试，不依赖真实模型文件
 9. **P0 审查修复模式** — Story 2-2b 经历 3 轮文档审查（17+11+10=38 项问题修复），关键教训：AC 要精确描述实际行为、旧版格式返回友好拒绝而非异常、性能指标要区分 OCR/非 OCR 场景
 10. **Contract Gate 版本** — Story 2-2b 展示了版本升级的完整流程（v1.0.0 → v1.1.0：PortSpec version/Composition Root 注册/契约测试断言 三处同步更新）
 

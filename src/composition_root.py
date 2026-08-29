@@ -1120,6 +1120,21 @@ def bootstrap() -> None:
         owner="doc-team",
     )
 
+    # === OCR Port (Story 2-5) ===
+    # 必须在 document_parser 之前注册，以便 ImageParser 可以通过 resolver 获取 OCR 实例
+    from src.domain.ports.ocr import OCRPort
+
+    register_port(
+        name="ocr",
+        version="v1.0.0",
+        interface=OCRPort,
+        impl="src.infrastructure.document_parsing.rapidocr_adapter.RapidOCRAdapter",
+        module="src.infrastructure.document_parsing.rapidocr_adapter",
+        lifetime=Lifetime.SINGLETON,
+        owner="epic-2",
+        tags=("ocr", "rapidocr", "local"),
+    )
+
     # DocumentParser — 文档解析（MIME 路由组合模式）
     from src.domain.ports.document_parser import DocumentParserPort
 
@@ -1267,20 +1282,6 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED,
         owner="epic-2",
         tags=("table", "semantic", "document"),
-    )
-
-    # === OCR Port (Story 2-5) ===
-    # 必须在 document_parser 之前注册，以便 ImageParser 可以通过 resolver 获取 OCR 实例
-    from src.domain.ports.ocr import OCRPort
-
-    register_port(
-        name="ocr",
-        version="v1.0.0",
-        interface=OCRPort,
-        impl="src.infrastructure.document_parsing.paddleocr_vl_adapter.PaddleOCRVLAdapter",
-        module="src.infrastructure.document_parsing.paddleocr_vl_adapter",
-        lifetime=Lifetime.SCOPED,
-        owner="epic-2",
     )
 
     # DocumentParsingService — 应用层文档解析编排

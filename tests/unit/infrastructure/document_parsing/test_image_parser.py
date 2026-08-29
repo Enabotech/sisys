@@ -1,6 +1,6 @@
 """图像文档解析器单元测试
 
-TDD 红阶段：测试 ImageParser 的元数据提取、OCR 文本、GIF 第一帧、Tesseract 降级。
+TDD 红阶段：测试 ImageParser 的元数据提取、OCR 文本、GIF 第一帧、OCR 不可用降级。
 使用 Pillow 创建 fixture 图像文件。
 """
 
@@ -110,20 +110,18 @@ class TestImageParserGif:
             os.unlink(path)
 
 
-class TestImageParserTesseractFallback:
-    """Tesseract 降级测试"""
+class TestImageParserOCRUnavailableFallback:
+    """OCR 端口不可用时降级测试"""
 
-    def test_tesseract_unavailable_graceful_degradation(self) -> None:
-        """Tesseract 不可用时优雅降级，仅返回元数据"""
-        from unittest import mock
+    def test_ocr_port_unavailable_graceful_degradation(self) -> None:
+        """OCR 端口不可用时优雅降级，仅返回元数据"""
 
         from src.infrastructure.document_parsing.image_parser import ImageParser
 
         path = _create_image_file("PNG")
         try:
             parser = ImageParser()
-            with mock.patch("pytesseract.image_to_string", side_effect=ImportError("tesseract not installed")):
-                result = parser.parse(path, "image/png")
+            result = parser.parse(path, "image/png")
 
             assert result.is_completed(), "即使 OCR 不可用，仍应返回元数据"
             images = [i for p in result.pages for i in p.images]

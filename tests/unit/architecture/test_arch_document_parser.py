@@ -25,7 +25,6 @@ class TestDomainLayerPurity:
                         "pypdf",
                         "docx",
                         "openpyxl",
-                        "pytesseract",
                         "pillow",
                         "prefect",
                         "fastapi",

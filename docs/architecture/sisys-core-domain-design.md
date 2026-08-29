@@ -63,7 +63,7 @@
 | **表格类** | XLS, XLSX, CSV | OpenPyXL + Pandas | 合并单元格语义还原 |
 | **文本类** | TXT, Markdown | 原生解析 | 编码自动检测 |
 | **网页类** | HTML | BeautifulSoup | DOM 树解析 + 正文提取 |
-| **图像类** | JPEG, PNG, GIF | Tesseract OCR + CLIP | 图文联合嵌入 |
+| **图像类** | JPEG, PNG, GIF | RapidOCR + Pillow | 图文提取 |
 | **压缩包** | ZIP, TAR | 原生解压 | 递归解析内部文件 |
 | **音视频** | 转录文本 | 外部 API 对接 | 时间戳对齐 |
 
@@ -156,8 +156,8 @@ class OCRProcessor:
     CONFIDENCE_THRESHOLD = 0.85
 
     async def process(self, image: ImageDocument) -> OCRResult:
-        # 1. OCR 识别
-        ocr_result = await self.tesseract.recognize(image)
+        # 1. OCR 识别（本地 RapidOCR，基础设施层封装）
+        ocr_result = await self.ocr_engine.recognize(image)
 
         # 2. 置信度标注
         low_confidence_regions = []

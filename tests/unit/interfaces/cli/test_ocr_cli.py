@@ -102,15 +102,15 @@ class TestBuildParser:
         args = parser.parse_args(["test.pdf", "-o", "result.json"])
         assert args.output == "result.json"
 
-    def test_url_option(self) -> None:
+    def test_model_dir_option(self) -> None:
         parser = build_parser()
-        args = parser.parse_args(["test.pdf", "--url", "http://ocr:8080"])
-        assert args.url == "http://ocr:8080"
+        args = parser.parse_args(["test.pdf", "--model-dir", "/models/rapidocr"])
+        assert args.model_dir == "/models/rapidocr"
 
-    def test_timeout_option(self) -> None:
+    def test_max_concurrency_option(self) -> None:
         parser = build_parser()
-        args = parser.parse_args(["test.pdf", "--timeout", "60"])
-        assert args.timeout == 60.0  # argparse type=float
+        args = parser.parse_args(["test.pdf", "--max-concurrency", "2"])
+        assert args.max_concurrency == 2
 
 
 class TestFormatAsMarkdown:

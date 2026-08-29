@@ -1,7 +1,7 @@
 """领域层 OCR 端口
 
 定义 OCR 识别端口的 Protocol 接口，接收文件路径和页码列表，返回 OCR 识别结果。
-实现类通过 HTTP 调用 PaddleOCR-VL 服务化 API 进行 OCR 识别。
+具体引擎（当前为 RapidOCR）完全封装在 infrastructure 层。
 
 置信度阈值常量定义在此文件，作为领域层契约的一部分。
 """
@@ -28,8 +28,7 @@ class OCRPort(Protocol):
     统一的 OCR 识别接口，接收文件路径和可选的页码列表，
     返回指定页面的 OCR 识别结果列表。
 
-    实现类（PaddleOCRVLAdapter）通过 HTTP 调用 PaddleOCR-VL 服务化 API，
-    使用 httpx.AsyncClient 进行异步 HTTP 通信。
+    具体实现使用本地 RapidOCR 推理，但该技术不泄漏到领域契约。
 
     Methods:
         recognize: 对指定文件执行 OCR 识别
