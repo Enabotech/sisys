@@ -114,7 +114,7 @@ class TestDocumentParsingServiceOCR:
             assert result[0].pages[1].texts[0].confidence == 0.95
 
             # 验证 OCR 元数据已返回
-            assert result[1]["ocr_engine"] == "paddleocr-vl"
+            assert result[1]["ocr_engine"] == "rapidocr"
             assert result[1]["ocr_scanned_pages"] == [2]
             assert result[1]["ocr_processed_pages"] == [2]
 

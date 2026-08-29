@@ -1,10 +1,10 @@
 """Story 2-5: OCR 集成测试
 
-使用真实 PaddleOCR-VL 服务（localhost:8080）进行端到端集成测试。
-PaddleOCR-VL 服务不可用时 pytest.skip() 动态跳过。
+使用真实 OCR 服务进行端到端集成测试。
+OCR 服务不可用时 pytest.skip() 动态跳过。
 
 遵循集成测试规范：
-- 真实服务优先（PaddleOCR-VL 已在 Docker 中运行）
+- 真实服务优先（OCR 已在本地环境运行）
 - 自包含生命周期：创建临时文件 → 调用 OCR → 清理
 - 服务不可用时动态跳过，禁止 @pytest.mark.skip 写死
 """
@@ -15,27 +15,23 @@ import asyncio
 import os
 import tempfile
 
-import httpx
 import pytest
 
 from src.domain.value_objects.ocr_result import OCRPageResult
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedElement, ParsedPage
-from src.infrastructure.document_parsing.paddleocr_vl_adapter import PaddleOCRVLAdapter
-from tests.environments import get_test_env
 
 # ===================================================================
 # Helpers
 # ===================================================================
 
-_PADDLEOCR_VL_URL = get_test_env().paddleocr.api_url
 
-
-def _paddleocr_vl_available() -> bool:
-    """检查 PaddleOCR-VL API 是否可用"""
+def _ocr_adapter_available() -> bool:
+    """检查本地 RapidOCR 引擎是否可用"""
     try:
-        resp = httpx.get(f"{_PADDLEOCR_VL_URL}/health", timeout=5.0)
-        return resp.status_code == 200
-    except (httpx.ConnectError, httpx.TimeoutException):
+        from rapidocr import RapidOCR  # noqa: F401
+
+        return True
+    except ImportError:
         return False
 
 
@@ -101,89 +97,31 @@ def event_loop():
 # ===================================================================
 
 
-class TestPaddleOCRVLRealAPI:
-    """PaddleOCR-VL 真实 API 集成测试
+class TestRapidOCRAdapterIntegration:
+    """RapidOCR 本地适配器集成测试
 
-    使用真实 PaddleOCR-VL 服务（Docker 中运行），测试 OCR 端到端流程。
+    使用本地 RapidOCR 引擎，通过 OCRPort 接口测试端到端流程。
     """
 
     @pytest.mark.asyncio
-    async def test_health_check(self) -> None:
-        """PaddleOCR-VL 健康检查"""
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{_PADDLEOCR_VL_URL}/health", timeout=10)
-            assert resp.status_code == 200
-            data = resp.json()
-            assert data.get("errorCode") == 0
-
-    @pytest.mark.asyncio
-    async def test_ocr_blank_pdf(self) -> None:
-        """OCR 空白 PDF → 返回结果（可能为空 elements）"""
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
-
-        adapter = PaddleOCRVLAdapter(base_url=_PADDLEOCR_VL_URL, timeout=120.0)
-        pdf_path = _create_blank_pdf(1)
-        try:
-            results = await adapter.recognize(pdf_path)
-            assert len(results) >= 1
-            # 空白 PDF 可能返回空结果，但不应抛出异常
-            assert isinstance(results[0], OCRPageResult)
-        finally:
-            await adapter.close()
-            _cleanup(pdf_path)
-
-    @pytest.mark.asyncio
-    async def test_ocr_adapter_works_with_real_service(self) -> None:
-        """PaddleOCRVLAdapter 通过真实 PaddleOCR-VL API 工作"""
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
-
-        adapter = PaddleOCRVLAdapter(base_url=_PADDLEOCR_VL_URL, timeout=120.0)
-        pdf_path = _create_blank_pdf(1)
-        try:
-            results = await adapter.recognize(pdf_path)
-            assert len(results) >= 1
-            result = results[0]
-            assert result.page_number == 1
-            # 验证每个元素的结构
-            for elem in result.elements:
-                assert isinstance(elem, ParsedElement)
-                assert 0.0 <= elem.confidence <= 1.0
-        finally:
-            await adapter.close()
-            _cleanup(pdf_path)
-
-    @pytest.mark.asyncio
-    async def test_ocr_image_file(self) -> None:
-        """OCR 图像文件"""
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
+    async def test_image_ocr(self) -> None:
+        """RapidOCR 识别图像"""
+        if not _ocr_adapter_available():
+            pytest.skip("RapidOCR 不可用")
 
         from PIL import Image
 
-        # 创建简单测试图像
+        from src.infrastructure.document_parsing.rapidocr_adapter import RapidOCRAdapter
+
+        adapter = RapidOCRAdapter()
         img_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
         try:
             img = Image.new("RGB", (100, 30), color="white")
             img.save(img_path)
 
-            async with httpx.AsyncClient() as client:
-                import base64
-
-                with open(img_path, "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode("ascii")
-                resp = await client.post(
-                    f"{_PADDLEOCR_VL_URL}/layout-parsing",
-                    json={"file": b64, "fileType": 1},
-                    timeout=120.0,
-                )
-                assert resp.status_code == 200
-                data = resp.json()
-                assert "result" in data
+            results = await adapter.recognize(img_path)
+            assert len(results) == 1
+            assert isinstance(results[0], OCRPageResult)
         finally:
             _cleanup(img_path)
 
@@ -191,20 +129,21 @@ class TestPaddleOCRVLRealAPI:
 class TestOCRServiceIntegration:
     """OCR 在 DocumentParsingService 中的集成测试
 
-    使用真实 PaddleOCR-VL 服务，通过 DocumentParsingService._apply_ocr() 测试编排流程。
+    使用真实 RapidOCR 引擎，通过 DocumentParsingService._apply_ocr() 测试编排流程。
     """
 
     @pytest.mark.asyncio
-    async def test_apply_ocr_with_real_service(self) -> None:
-        """_apply_ocr() 使用真实 PaddleOCR-VL 服务"""
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
+    async def test_apply_ocr_with_real_engine(self) -> None:
+        """_apply_ocr() 使用真实 RapidOCR 引擎"""
+        if not _ocr_adapter_available():
+            pytest.skip("RapidOCR 不可用")
 
         from unittest.mock import MagicMock
 
         from src.application.services.document_parsing_service import DocumentParsingService
+        from src.infrastructure.document_parsing.rapidocr_adapter import RapidOCRAdapter
 
-        ocr_adapter = PaddleOCRVLAdapter(base_url=_PADDLEOCR_VL_URL, timeout=120.0)
+        ocr_adapter = RapidOCRAdapter()
         service = DocumentParsingService(
             document_repository=MagicMock(),
             document_storage=MagicMock(),
@@ -231,7 +170,7 @@ class TestOCRServiceIntegration:
 
             result = await service._apply_ocr(doc, pdf_path, "application/pdf")
 
-            # 验证 OCR 已执行：第 1 页内容被替换（即使 PaddleOCR-VL 可能返回空结果）
+            # 验证 OCR 已执行：第 1 页内容被替换（即使 RapidOCR 可能返回空结果）
             assert result[0] is not doc  # OCR 已执行，返回新文档
 
             # 验证置信度标记
@@ -239,14 +178,11 @@ class TestOCRServiceIntegration:
                 for elem in page.texts:
                     assert 0.0 <= elem.confidence <= 1.0
         finally:
-            await ocr_adapter.close()
             _cleanup(pdf_path)
 
     @pytest.mark.asyncio
     async def test_ocr_high_density_text_page_skipped(self) -> None:
         """高密度文本页跳过 OCR"""
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
 
         from unittest.mock import AsyncMock, MagicMock
 

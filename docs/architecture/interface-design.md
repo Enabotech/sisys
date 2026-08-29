@@ -444,7 +444,7 @@ sisys document upload --file <path> [options]
 sisys document parse --id <doc-id> [options]
   --output-format <json|markdown|text>
   --extract-tables          # 提取表格语义
-  --ocr                     # 启用 OCR（扫描件）
+  --ocr                     # 启用本地 RapidOCR 扫描件识别
 
 sisys document search --query <text> [options]
   --top-k <n>               # 返回结果数

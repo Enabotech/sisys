@@ -1,6 +1,6 @@
 """图像文档解析器
 
-使用 Pillow 提取图像元数据，pytesseract 执行 OCR 文本提取的解析器实现。
+使用 Pillow 提取图像元数据，并通过注入的 OCRPort 执行 OCR。
 """
 
 from __future__ import annotations
@@ -29,20 +29,20 @@ logger = logging.getLogger(__name__)
 class ImageParser(DocumentParserPort):
     """图像文档解析器
 
-    使用 Pillow 提取元数据，pytesseract 执行 OCR，支持：
+    使用 Pillow 提取元数据，通过注入的 OCRPort 执行 RapidOCR，支持：
     - 图像元数据提取（format/size/mode）
-    - OCR 文本提取（中英双语，可选 PaddleOCR-VL 注入）
+    - OCR 文本提取（中英双语）
     - GIF 仅处理第一帧
-    - Tesseract 不可用时优雅降级
+    - OCR 不可用时优雅降级
     - 文件大小上限保护
-    - 可选 OCR 端口注入（PaddleOCR-VL 替换 pytesseract）
+    - 可选 OCR 端口注入
     """
 
     def __init__(self, ocr: "OCRPort | None" = None) -> None:
         """初始化图像解析器
 
         Args:
-            ocr: 可选的 OCR 端口实例（注入 PaddleOCR-VL 时替换 pytesseract）
+            ocr: 可选的 OCR 端口实例（通常为 RapidOCRAdapter）
         """
         self._ocr = ocr
 
@@ -111,34 +111,16 @@ class ImageParser(DocumentParserPort):
                 texts: list[ParsedElement] = []
                 try:
                     if self._ocr is not None:
-                        # PaddleOCR-VL 注入路径：使用 asyncio.run() 桥接 sync/async
+                        # RapidOCR 端口为异步契约，同步解析器在调用线程中桥接
                         ocr_results = asyncio.run(self._ocr.recognize(file_path))
                         if ocr_results and ocr_results[0].elements:
                             texts = ocr_results[0].elements
                         else:
-                            logger.info("PaddleOCR-VL 返回空结果，保持图像元数据")
+                            logger.info("RapidOCR 返回空结果，保持图像元数据")
                     else:
-                        import pytesseract
-
-                        ocr_text = pytesseract.image_to_string(img, lang="chi_sim+eng")
-                        if ocr_text.strip():
-                            # 获取置信度
-                            try:
-                                data = pytesseract.image_to_data(img, lang="chi_sim+eng", output_type=pytesseract.Output.DICT)
-                                confidences = [int(c) for c in data.get("conf", []) if c != "-1"]
-                                avg_confidence = sum(confidences) / len(confidences) / 100.0 if confidences else 0.5
-                            except Exception:
-                                avg_confidence = 0.5
-
-                            texts.append(
-                                ParsedElement(
-                                    content=ocr_text.strip(),
-                                    confidence=round(avg_confidence, 4),
-                                    metadata={"source": "ocr"},
-                                )
-                            )
+                        logger.debug("OCR 端口未注入，跳过图像文字提取")
                 except ImportError:
-                    logger.warning("pytesseract 未安装且无 OCR 端口注入，跳过 OCR 文本提取")
+                    logger.warning("RapidOCR 运行时不可用，跳过 OCR 文本提取")
                 except Exception:
                     logger.warning("OCR 文本提取失败，继续返回图像元数据", exc_info=True)
 

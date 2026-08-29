@@ -41,7 +41,7 @@ def detect_scanned_pages(
         需要 OCR 的页码列表（1-indexed，与 ParsedPage.page_number 一致）
 
     Raises:
-        ValueError: 环境变量 SISYS_SCANNED_PAGE_THRESHOLD 非数字
+        OCRProcessingError: 环境变量 SISYS_SCANNED_PAGE_THRESHOLD 不是整数。
     """
     if not pages:
         return []

@@ -6,7 +6,7 @@
 架构约束：
 - 位于 interfaces 层，不得直接 import infrastructure 层
 - 通过 composition_root 的 resolve("ocr") 获取适配器实例
-- 适配器参数通过环境变量传递（PADDLEOCR_VL_API_URL / PADDLEOCR_VL_API_TIMEOUT）
+- 适配器参数通过环境变量传递（RAPIDOCR_MODEL_DIR / RAPIDOCR_MAX_CONCURRENCY）
 
 运行方式：
     sisys-ocr <file> [options]
@@ -16,8 +16,8 @@
     file            PDF 或图像文件路径（位置参数）
     -p, --pages     页码范围，如 "1-5,10,20-30"（默认全部）
     -o, --output    输出文件路径（默认 stdout）
-    --url           PaddleOCR-VL API 地址（默认 http://localhost:8080）
-    --timeout       超时时间（默认 300s）
+    --model-dir     RapidOCR 模型目录（默认 RAPIDOCR_MODEL_DIR）
+    --max-concurrency  最大并发推理数（默认 RAPIDOCR_MAX_CONCURRENCY）
     -q, --quiet     静默模式（仅输出 JSON，不输出日志到 stderr）
 
 示例：
@@ -267,19 +267,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--url",
+        "--model-dir",
         type=str,
         default=None,
-        metavar="URL",
-        help="PaddleOCR-VL API 地址（默认 http://localhost:8080 或 PADDLEOCR_VL_API_URL 环境变量）",
+        metavar="DIR",
+        help="RapidOCR 模型目录（默认使用 RAPIDOCR_MODEL_DIR 或包默认模型）",
     )
 
     parser.add_argument(
-        "--timeout",
-        type=float,
+        "--max-concurrency",
+        type=int,
         default=None,
-        metavar="SECONDS",
-        help="HTTP 请求超时时间（默认 300s 或 PADDLEOCR_VL_API_TIMEOUT 环境变量）",
+        metavar="N",
+        help="RapidOCR 最大并发推理数（默认使用 RAPIDOCR_MAX_CONCURRENCY）",
     )
 
     parser.add_argument(
@@ -336,10 +336,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     # 通过环境变量传递适配器参数（composition_root resolve 机制）
-    if args.url:
-        os.environ["PADDLEOCR_VL_API_URL"] = args.url
-    if args.timeout:
-        os.environ["PADDLEOCR_VL_API_TIMEOUT"] = str(args.timeout)
+    if args.model_dir:
+        os.environ["RAPIDOCR_MODEL_DIR"] = args.model_dir
+    if args.max_concurrency:
+        os.environ["RAPIDOCR_MAX_CONCURRENCY"] = str(args.max_concurrency)
 
     # 初始化端口注册表
     bootstrap()

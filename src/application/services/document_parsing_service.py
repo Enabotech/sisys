@@ -813,7 +813,7 @@ class DocumentParsingService:
 
             # 构建 OCR 元数据（用于持久化到 Document.metadata["parse_result"]）
             ocr_metadata: dict = {
-                "ocr_engine": "paddleocr-vl",
+                "ocr_engine": "rapidocr",
                 "ocr_scanned_pages": scanned_pages,
                 "ocr_processed_pages": list(page_map.keys()),
             }

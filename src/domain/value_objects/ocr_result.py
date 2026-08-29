@@ -21,7 +21,7 @@ class OCRConfidenceMark:
 
     记录单个元素的置信度评估结果，用于 _mark_low_confidence() 方法内部标记逻辑。
     与 ParsedElement.confidence: float = 1.0 类型对齐，
-    OCR 场景下若无法获取置信度则使用默认值 0.5（与 ImageParser pytesseract 降级模式一致）。
+    OCR 场景下若无法获取置信度则使用默认值 0.5。
 
     Attributes:
         element_index: 元素在页面列表中的索引
@@ -49,12 +49,12 @@ class OCRPageResult:
     包含指定页面的 OCR 识别结果，用于 OCRPort.recognize() 的返回类型。
     每个元素为 ParsedElement（含 content、confidence、metadata 字段），
     其中 confidence 为 OCR 引擎返回的置信度（0.0~1.0），
-    无法获取置信度时默认使用 0.5（与 ImageParser pytesseract 降级模式对齐）。
+    无法获取置信度时默认使用 0.5。
 
     Attributes:
         page_number: 页码（1-indexed）
         elements: OCR 识别后的 ParsedElement 列表，每个元素含 confidence
-        raw_response: PaddleOCR-VL 原始响应（调试用，不序列化到持久化结果）
+        raw_response: OCR 引擎原始响应（调试用，不序列化到持久化结果）
         markdown_text: 页面级 Markdown 文本（含公式 LaTeX 和图片占位符）
         markdown_images: Markdown 图片相对路径到 base64/URL 的映射
     """

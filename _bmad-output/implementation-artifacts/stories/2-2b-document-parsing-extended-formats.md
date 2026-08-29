@@ -76,7 +76,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 **Given** 用户上传的图像文档已存入 MinIO
 **When** 系统触发解析流程
 **Then** 使用 `Pillow` 提取图像元数据（尺寸/格式/模式）
-**And** 使用 `pytesseract` 执行 OCR 文本提取（中/英双语）
+**And** 使用注入的 `OCRPort` 执行 RapidOCR 本地 OCR 文本提取（中/英双语）
 **And** 输出结构化 JSON（图像信息存入 images 数组，OCR 文本存入 texts 数组）
 
 **验证标准/Validation Criteria:**
@@ -85,7 +85,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 - [x] OCR 置信度评分填充 `confidence` 字段
 - [x] GIF 仅处理第一帧
 - [x] 无法 OCR 的图像（纯图形）返回元数据，文本为空
-- [x] Tesseract 未安装时优雅降级（返回元数据，OCR 跳过并记录警告）
+- [x] RapidOCR 运行时不可用时优雅降级（返回元数据，OCR 跳过并记录警告）
 
 ### AC-5: HTML 文档解析
 
@@ -203,7 +203,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 
 **领域层零依赖原则**
 - 领域层（`src/domain/`）仅使用 Python 标准库
-- 禁止导入：包括且不限于 langgraph, prefect, fastapi, pydantic, sqlalchemy, typer, redis, qdrant, minio, neo4j, aio_pika, litellm, instructor, requests, httpx, docker, psycopg2, python-pptx, openpyxl, pillow, pytesseract, beautifulsoup4, lxml, striprtf
+- 禁止导入：包括且不限于 langgraph, prefect, fastapi, pydantic, sqlalchemy, typer, redis, qdrant, minio, neo4j, aio_pika, litellm, instructor, requests, httpx, docker, psycopg2, python-pptx, openpyxl, pillow, RapidOCR, beautifulsoup4, lxml, striprtf
 
 **依赖方向矩阵**
 | 起点 \ 终点         | domain | application | interfaces | infrastructure |
@@ -301,7 +301,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 |---------|------|---------|
 | **事务隔离** | 集成测试使用 transaction rollback | 数据泄漏导致随机失败 |
 | **资源唯一性** | 测试数据使用 UUID 等唯一标识符 | ID 冲突或状态污染 |
-| **外部服务隔离** | OCR/Tesseract 测试前检查可用性或 mock | 环境不一致 |
+| **外部服务隔离** | OCR 引擎测试前检查可用性或使用注入的 engine factory | 环境不一致 |
 | **并行隔离** | 并行测试使用 UUID 前缀隔离资源 | 资源冲突导致并行失败 |
 | **BDD async 配合** | BDD 步骤函数不用 @pytest.mark.asyncio | 直接用会导致 BDD context 数据丢失 |
 | **asyncio.run 使用** | pytest-xdist 并行测试中 BDD 步骤函数用 event_loop fixture | asyncio.run() 创建新循环，并行测试时可能关闭错误循环 |
@@ -474,12 +474,12 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_image_parser.py`（元数据/OCR/置信度/GIF/Tesseract 不可用降级） |
-| 🟢 绿 | 实现 `image_parser.py`（Pillow + pytesseract） |
+| 🔴 红 | 编写 `test_image_parser.py`（元数据/OCR/置信度/GIF/OCR 不可用降级） |
+| 🟢 绿 | 实现 `image_parser.py`（Pillow + RapidOCR） |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [x] Subtask 4.1: 🔴 红 — 编写 ImageParser 失败测试
-- [x] Subtask 4.2: 🟢 绿 — 实现 ImageParser（Pillow + pytesseract + 优雅降级）
+- [x] Subtask 4.2: 🟢 绿 — 实现 ImageParser（Pillow + RapidOCR + 优雅降级）
 - [x] Subtask 4.3: 🔄 重构 — ruff ✅ / mypy ✅
 
 **完成标准/Definition of Done:**
@@ -669,7 +669,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 - **架构模式:** 六边形架构（Ports & Adapters），组合模式（CompositeDocumentParser MIME 路由）
 - **设计约束:** 领域层零依赖、依赖方向严格、端口统一注册、Composition Root 装配
 - **接口治理:** 统一端口注册、PortSpec 元数据、Registry/Resolver/ContractGate、Composition Root 装配
-- **技术栈:** Python 3.11+ / python-pptx ^1.0 / openpyxl ^3.1.2 / Pillow ^12.1.1 / pytesseract ^0.3.10 / beautifulsoup4 (间接依赖) / lxml (间接依赖)
+- **技术栈:** Python 3.11+ / python-pptx ^1.0 / openpyxl ^3.1.2 / Pillow ^12.1.1 / RapidOCR ^3.9.2 / beautifulsoup4 (间接依赖) / lxml (间接依赖)
 
 ### 关键架构决策
 
@@ -690,7 +690,7 @@ Epic 2 文档与数据管理的扩展格式支持。在 Story 2-2a 基础格式�
 | XLSX | `openpyxl` (read_only=True) | 已安装，内存友好，支持公式计算值 |
 | XLS | 返回不支持 | 旧格式，xlrd 需额外依赖且处于维护模式，与 PPT→PPTX 策略一致 |
 | CSV | 标准库 `csv` + `csv.Sniffer` | 零依赖，功能足够 |
-| 图像 | `Pillow` + `pytesseract` | 已安装，元数据+OCR 双能力 |
+| 图像 | `Pillow` + `RapidOCR` | 已安装，元数据+OCR 双能力 |
 | HTML | `BeautifulSoup` + `lxml` | 间接已安装，性能最佳组合 |
 | Markdown | 标准库正则 | 零依赖，标题/段落/表格正则足够 |
 | RTF | `striprtf` | 轻量，需新增依赖；不可用时降级 |
@@ -779,17 +779,17 @@ src/
 - [ ] Composition Root lambda 工厂正确注入所有新解析器
 - [ ] 单元测试使用本地 fixture 文件（非 MinIO 下载）
 - [ ] 集成测试使用 TestTenant 进行租户隔离
-- [ ] OCR 测试 mock pytesseract 以确保无 Tesseract 环境也可测试
+- [ ] OCR 测试 mock RapidOCR 以确保无引擎环境也可测试
 
 ### OCR 实现注意事项
 
 **来源:** 架构文档 + 代码调研
 
-- `pytesseract` 是 Tesseract-OCR 的 Python 包装器，**需要系统安装 Tesseract-OCR 二进制**
-- 中文支持需要 `tesseract-ocr-chi-sim` 语言包
+- `RapidOCR` 是基于 ONNX Runtime 的本地 OCR 引擎，**需要安装 `rapidocr` Python 包**
+- 中文支持为默认能力，其他语言需查阅模型列表
 - 推荐 OCR 前预处理：灰度化（`img.convert('L')`）
-- `pytesseract.image_to_data()` 返回置信度信息，可用于填充 `confidence` 字段
-- **Tesseract 未安装时优雅降级**：catch `TesseractNotFoundError`，记录警告日志，返回元数据但 OCR 文本为空
+- RapidOCR 返回 `boxes/texts/scores`，可用于填充 `confidence` 字段
+- **RapidOCR 不可用时优雅降级**：catch `ImportError` / `OCRConnectionError`，记录警告日志，返回元数据但 OCR 文本为空
 
 ### 合规性与安全性注意事项
 
@@ -804,7 +804,7 @@ src/
 | python-pptx | ^1.0 | 已安装 | PPTX 解析 |
 | openpyxl | ^3.1.2 | 已安装 | XLSX 解析 |
 | Pillow | ^12.1.1 | 已安装 | 图像处理 |
-| pytesseract | ^0.3.10 | 已安装 | OCR |
+| RapidOCR | ^3.9.2 | 已安装 | OCR |
 | beautifulsoup4 | ^4.12 | **间接依赖（已安装，建议提升为直接依赖）** | HTML 解析 |
 | lxml | ^6.0 | **间接依赖（已安装，建议提升为直接依赖）** | HTML/XML 解析 |
 | pandas | ^2.1.3 | 已安装（可选使用） | CSV/Excel 数据处理 |
@@ -920,7 +920,7 @@ src/
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
 | 1 | AC-8 未注册 MIME 类型返回 `ValueError` — 与实际 CompositeDocumentParser 行为矛盾（实际返回 `ParsedDocument(parse_status=failed)`） | P0 | 修正 AC-8 和 Subtask 8.1，改为 "返回 `parse_status=failed` 的 `ParsedDocument`（不抛异常）" |
-| 2 | AC-8 解析性能 P95 < 500ms 与 OCR（pytesseract 2-5s）不可调和 | P0 | 分拆为非 OCR 格式 P95 < 500ms + OCR 格式 P95 < 5s |
+| 2 | AC-8 解析性能 P95 < 500ms 与 OCR（RapidOCR 2-5s）不可调和 | P0 | 分拆为非 OCR 格式 P95 < 500ms + OCR 格式 P95 < 5s |
 | 3 | XLS 格式处理策略模糊（"用 xlrd 或返回拒绝"），xlrd 不在依赖中 | P0 | 确定为 "返回友好拒绝消息，建议转换 XLSX"（与 PPT→PPTX 策略一致） |
 | 4 | beautifulsoup4/lxml 标注为 "间接依赖已安装"，但非直接依赖存在移除风险 | P0 | 更新状态为 "间接依赖（建议提升为直接依赖）"，标注版本号 |
 | 5 | striprtf 缺失 `poetry add` 步骤 — Task 7 无依赖安装前置 | P0 | Subtask 7.2 新增前置步骤 `poetry add striprtf` |

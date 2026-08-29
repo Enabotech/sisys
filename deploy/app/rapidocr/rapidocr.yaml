@@ -1,0 +1,14 @@
+# RapidOCR 本地部署参考模板
+# RapidOCR 在 SISYS 应用进程内运行，不需要独立 OCR API/vLLM 服务。
+# 模型由应用镜像构建阶段预置，或通过受控只读卷挂载。
+services:
+  sisys-app:
+    environment:
+      RAPIDOCR_MODEL_DIR: ${RAPIDOCR_MODEL_DIR:-/opt/models/rapidocr}
+      RAPIDOCR_MAX_CONCURRENCY: ${RAPIDOCR_MAX_CONCURRENCY:-1}
+    volumes:
+      - ${RAPIDOCR_MODEL_VOLUME:-rapidocr_models}:/opt/models/rapidocr:ro
+
+volumes:
+  rapidocr_models:
+    driver: local

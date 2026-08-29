@@ -12,6 +12,7 @@ from .embedding import EmbeddingConfig
 from .langgraph import LangGraphConfig
 from .neo4j import Neo4jConfig
 from .rabbitmq import RabbitMQConfig
+from .rapidocr import RapidOCRConfig
 from .redis import RedisConfig
 from .udmr import CloudModelConfig, UDMRConfig
 
@@ -19,6 +20,7 @@ __all__ = [
     "EmbeddingConfig",
     "LangGraphConfig",
     "Neo4jConfig",
+    "RapidOCRConfig",
     "RedisConfig",
     "RabbitMQConfig",
     "AutoTriggerConfig",

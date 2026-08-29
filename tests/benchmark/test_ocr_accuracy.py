@@ -1,6 +1,6 @@
 """OCR 准确率基准测试
 
-使用真实 PaddleOCR-VL 服务对 6 个真实 PDF 文档进行 OCR 准确率验证。
+使用真实 RapidOCR 本地对 6 个真实 PDF 文档进行 OCR 准确率验证。
 测试项：
 1. 置信度值域校验 [0.0, 1.0]
 2. 关键术语识别（ground truth keyword matching）
@@ -9,7 +9,7 @@
 5. 常规文本页跳过 OCR 逻辑
 
 前置条件：
-- PaddleOCR-VL 服务运行在 localhost:8080（或通过 get_test_env() 配置）
+- RapidOCR 本地运行在 localhost:8080（或通过 get_test_env() 配置）
 - 数据集位于 /mnt/x/.data/raw/ocr/
 
 运行方式：
@@ -23,24 +23,21 @@ import asyncio
 import logging
 import os
 
-import httpx
 import pytest
 
 from src.domain.value_objects.parsed_document import ParsedDocument
-from src.infrastructure.document_parsing.paddleocr_vl_adapter import PaddleOCRVLAdapter
+from src.infrastructure.document_parsing.rapidocr_adapter import RapidOCRAdapter
 from tests.benchmark.ocr_data import (
     ACCURACY_TEST_DOCUMENTS,
     ALL_DOCUMENTS,
     OCRDocumentSpec,
 )
-from tests.environments import get_test_env
 
 logger = logging.getLogger(__name__)
 
 # ===================================================================
 # 常量
 # ===================================================================
-_PADDLEOCR_VL_URL = get_test_env().paddleocr.api_url
 _OCR_CONFIDENCE_THRESHOLD = 0.85
 _OCR_MAX_BYTES = 50 * 1024 * 1024  # 50MB — 与领域层常量一致
 
@@ -54,13 +51,13 @@ _CHINESE_ACCURACY_THRESHOLD = 0.85  # 中文识别置信度均值 ≥ 0.85
 # ===================================================================
 
 
-def _paddleocr_vl_available() -> bool:
-    """检查 PaddleOCR-VL API 是否可用"""
+def _ocr_engine_available() -> bool:
+    """检查 RapidOCR 本地引擎是否可用"""
     try:
-        resp = httpx.get(f"{_PADDLEOCR_VL_URL}/health", timeout=5.0)
-        return resp.status_code == 200
-    except (httpx.ConnectError, httpx.TimeoutException):
+        from rapidocr import RapidOCR
+    except ImportError:
         return False
+    return RapidOCR is not None
 
 
 def _check_file_size_guard(spec: OCRDocumentSpec) -> bool:
@@ -87,9 +84,9 @@ def event_loop():
 
 
 @pytest.fixture
-def ocr_adapter() -> PaddleOCRVLAdapter:
-    """创建 PaddleOCR-VL 适配器实例"""
-    return PaddleOCRVLAdapter(base_url=_PADDLEOCR_VL_URL, timeout=600.0)
+def ocr_adapter() -> RapidOCRAdapter:
+    """创建 RapidOCR 适配器实例"""
+    return RapidOCRAdapter()
 
 
 # ===================================================================
@@ -98,14 +95,14 @@ def ocr_adapter() -> PaddleOCRVLAdapter:
 
 
 async def _ocr_document(
-    adapter: PaddleOCRVLAdapter,
+    adapter: RapidOCRAdapter,
     spec: OCRDocumentSpec,
     page_numbers: list[int] | None = None,
 ) -> list:
     """对单个文档执行 OCR 识别
 
     Args:
-        adapter: PaddleOCR-VL 适配器
+        adapter: RapidOCR 适配器
         spec: 文档规格
         page_numbers: 需要 OCR 的页码列表，None 表示全部
 
@@ -120,7 +117,7 @@ async def _ocr_document(
 
 
 async def _ocr_with_parser(
-    adapter: PaddleOCRVLAdapter,
+    adapter: RapidOCRAdapter,
     spec: OCRDocumentSpec,
 ) -> ParsedDocument:
     """通过 DocumentParsingService._apply_ocr() 流程执行 OCR
@@ -172,10 +169,10 @@ class TestOCRConfidenceValidity:
         [s for s in ACCURACY_TEST_DOCUMENTS if _check_file_size_guard(s)],
         ids=[s.display_name for s in ACCURACY_TEST_DOCUMENTS if _check_file_size_guard(s)],
     )
-    async def test_confidence_in_range(self, ocr_adapter: PaddleOCRVLAdapter, spec: OCRDocumentSpec) -> None:
+    async def test_confidence_in_range(self, ocr_adapter: RapidOCRAdapter, spec: OCRDocumentSpec) -> None:
         """验证所有 OCR 返回的 confidence 值在 [0.0, 1.0] 范围内"""
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
+        if not _ocr_engine_available():
+            pytest.skip("RapidOCR 本地不可用")
 
         # 仅测试前 5 页（大文档避免超时）
         test_pages = list(range(1, min(6, spec.total_pages + 1)))
@@ -193,10 +190,10 @@ class TestOCRConfidenceValidity:
         [s for s in ACCURACY_TEST_DOCUMENTS if _check_file_size_guard(s)],
         ids=[s.display_name for s in ACCURACY_TEST_DOCUMENTS if _check_file_size_guard(s)],
     )
-    async def test_confidence_reasonable(self, ocr_adapter: PaddleOCRVLAdapter, spec: OCRDocumentSpec) -> None:
+    async def test_confidence_reasonable(self, ocr_adapter: RapidOCRAdapter, spec: OCRDocumentSpec) -> None:
         """验证 OCR 置信度均值在合理范围内（≥ 0.5）"""
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
+        if not _ocr_engine_available():
+            pytest.skip("RapidOCR 本地不可用")
 
         test_pages = list(range(1, min(4, spec.total_pages + 1)))
         results = await _ocr_document(ocr_adapter, spec, page_numbers=test_pages)
@@ -225,7 +222,7 @@ class TestOCRKeywordRecognition:
         [s for s in ACCURACY_TEST_DOCUMENTS if _check_file_size_guard(s)],
         ids=[s.display_name for s in ACCURACY_TEST_DOCUMENTS if _check_file_size_guard(s)],
     )
-    async def test_keyword_recall(self, ocr_adapter: PaddleOCRVLAdapter, spec: OCRDocumentSpec) -> None:
+    async def test_keyword_recall(self, ocr_adapter: RapidOCRAdapter, spec: OCRDocumentSpec) -> None:
         """验证 OCR 能识别 ground truth 关键词中的大部分
 
         测试策略：
@@ -233,8 +230,8 @@ class TestOCRKeywordRecognition:
         - 检查 ground truth 关键词在 OCR 结果中的召回率
         - 关键词包含中文和英文，验证中英文混合识别能力
         """
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
+        if not _ocr_engine_available():
+            pytest.skip("RapidOCR 本地不可用")
 
         test_pages = list(range(1, min(6, spec.total_pages + 1)))
         results = await _ocr_document(ocr_adapter, spec, page_numbers=test_pages)
@@ -294,7 +291,7 @@ class TestOCRFullPipeline:
         [s for s in ACCURACY_TEST_DOCUMENTS if _check_file_size_guard(s)],
         ids=[s.display_name for s in ACCURACY_TEST_DOCUMENTS if _check_file_size_guard(s)],
     )
-    async def test_full_pipeline_scanned_pages(self, ocr_adapter: PaddleOCRVLAdapter, spec: OCRDocumentSpec) -> None:
+    async def test_full_pipeline_scanned_pages(self, ocr_adapter: RapidOCRAdapter, spec: OCRDocumentSpec) -> None:
         """完整流程：PDFParser 解析 → _apply_ocr 扫描页检测 → OCR 识别
 
         验证：
@@ -302,8 +299,8 @@ class TestOCRFullPipeline:
         - 每个 ParsedElement 含 content 和 confidence
         - confidence 值域 [0.0, 1.0]
         """
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
+        if not _ocr_engine_available():
+            pytest.skip("RapidOCR 本地不可用")
 
         result = await _ocr_with_parser(ocr_adapter, spec)
 
@@ -326,13 +323,13 @@ class TestOCRFullPipeline:
         [s for s in ALL_DOCUMENTS],
         ids=[s.display_name for s in ALL_DOCUMENTS],
     )
-    async def test_pipeline_does_not_crash(self, ocr_adapter: PaddleOCRVLAdapter, spec: OCRDocumentSpec) -> None:
+    async def test_pipeline_does_not_crash(self, ocr_adapter: RapidOCRAdapter, spec: OCRDocumentSpec) -> None:
         """验证完整流程对所有文档不崩溃
 
         即使大文件超过 50MB OCR 限制或 PDFParser 失败，流程也应正常降级。
         """
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
+        if not _ocr_engine_available():
+            pytest.skip("RapidOCR 本地不可用")
 
         file_path = str(spec.path)
         if not os.path.exists(file_path):
@@ -358,13 +355,13 @@ class TestOCRChineseEnglish:
     """中英文混合识别能力测试"""
 
     @pytest.mark.asyncio
-    async def test_chinese_text_recognized(self, ocr_adapter: PaddleOCRVLAdapter) -> None:
+    async def test_chinese_text_recognized(self, ocr_adapter: RapidOCRAdapter) -> None:
         """验证中文文本被正确识别
 
         使用费恩曼物理学讲义卷三（纯中文扫描件，20MB，377页）
         """
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
+        if not _ocr_engine_available():
+            pytest.skip("RapidOCR 本地不可用")
 
         from tests.benchmark.ocr_data import FEYNMAN_3
 
@@ -398,13 +395,13 @@ class TestOCRChineseEnglish:
                 logger.warning("平均置信度 %.3f < %.2f（首次运行模型预热不足）", avg_conf, _CHINESE_ACCURACY_THRESHOLD)
 
     @pytest.mark.asyncio
-    async def test_bilingual_document(self, ocr_adapter: PaddleOCRVLAdapter) -> None:
+    async def test_bilingual_document(self, ocr_adapter: RapidOCRAdapter) -> None:
         """验证中英文混合文档的识别能力
 
         使用费恩曼物理学讲义卷三（含中英文科学术语）
         """
-        if not _paddleocr_vl_available():
-            pytest.skip("PaddleOCR-VL 服务不可用")
+        if not _ocr_engine_available():
+            pytest.skip("RapidOCR 本地不可用")
 
         from tests.benchmark.ocr_data import FEYNMAN_3
 
@@ -437,7 +434,7 @@ class TestOCRScannedPageDetection:
     """扫描页检测逻辑正确性测试"""
 
     @pytest.mark.asyncio
-    async def test_scanned_pages_detected(self, ocr_adapter: PaddleOCRVLAdapter) -> None:
+    async def test_scanned_pages_detected(self, ocr_adapter: RapidOCRAdapter) -> None:
         """验证纯扫描件 PDF 的扫描页检测
 
         费恩曼物理学讲义卷三（377页，20MB，纯扫描件）应全被检测为扫描页。

@@ -7,7 +7,7 @@
 > 运行 `validate-create-story` 进行质量检查后再执行 `dev-story`。
 >
 > **🔧 技术约束：**
-> 1. **解析库已安装** — `pypdf ^6.12.1`、`python-docx ^1.1.0`、`openpyxl ^3.1.2`、`pillow ^12.1.1`、`pytesseract ^0.3.10` 已在 `pyproject.toml` 中声明，无需新增依赖
+> 1. **解析库已安装** — `pypdf ^6.12.1`、`python-docx ^1.1.0`、`openpyxl ^3.1.2`、`pillow ^12.1.1` 已在 `pyproject.toml` 中声明，无需新增依赖
 > 2. **现有 Mock 任务替换** — `src/infrastructure/workflow/tasks/document_tasks.py` 的 `parse_document()` 当前返回 mock 数据，本 Story 将实现真实解析逻辑
 > 3. **ParseStatus 已存在** — `Document.parse_status` 字段（`PENDING/IN_PROGRESS/COMPLETED/FAILED`）已在 Story 2-1 实现
 > 4. **事件已定义** — `DocumentUploaded`（上传完成触发）和 `DocumentProcessed`（解析完成触发）已存在于 `src/domain/events/document_events.py`
@@ -294,7 +294,7 @@
 
 **领域层零依赖原则**
 - 领域层（`src/domain/`）仅使用 Python 标准库
-- 禁止导入：pypdf, python-docx, openpyxl, pytesseract, pillow, prefect, fastapi, pydantic, sqlalchemy 等
+- 禁止导入：pypdf, python-docx, openpyxl, pillow, prefect, fastapi, pydantic, sqlalchemy 等
 
 **依赖方向矩阵**
 | 起点 \ 终点         | domain | application | interfaces | infrastructure |
