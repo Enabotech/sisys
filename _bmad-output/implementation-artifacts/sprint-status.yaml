@@ -137,7 +137,7 @@ development_status:
   # ===========================================================================
   epic-4: in-progress
   4-1-strategic-tool-registration-tools: ready-for-dev
-  4-1a-strategic-tool-impl: ready-for-dev
+  4-1a-strategic-tool-impl: backlog
   4-2-toolchain-orchestration-dag: backlog
   4-3-tool-io-schema-validation: backlog
   4-4-docker-sandbox-execution: backlog
