@@ -53,6 +53,7 @@
 - Story 1.7（MinIO 对象层 ✅ 已实现）— 后续工具执行日志存储（本 Story 不直接依赖）
 
 **后续依赖:**
+- **Story 4.1a（战略工具实现）** — 依赖本 Story 注册的工具元数据，实现 Tool 聚合根增强、ToolService、ToolExecutionEngine、Skills 三级加载
 - Story 4.2（工具链编排 DAG）— 依赖本 Story 注册的工具元数据
 - Story 4.3（工具 Schema 验证）— 依赖本 Story 定义的 input/output schema
 - Story 4.4（Docker 沙箱执行）— 依赖本 Story 注册的工具标识
@@ -871,6 +872,7 @@ src/
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
+- [ ] Story 4.1a (战略工具实现) 已创建 — 依赖 Story 4.1 完成后执行
 
 ---
 
