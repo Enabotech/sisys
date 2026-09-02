@@ -117,8 +117,8 @@
 - [ ] Think 阶段调用 `LLMClientPort.generate()` 生成执行计划
 - [ ] Code 阶段调用 `LLMClientPort.generate()` 生成 Python 代码
 - [ ] Execute 阶段调用 `SandboxExecutor.execute_code()` 执行代码
-- [ ] Observe 阶段解析执行结果
-- [ ] Validate 阶段验证结果与 output_schema 的匹配度
+- [ ] Observe 阶段产出 `observed_output: dict`（标准化执行结果）
+- [ ] Validate 阶段产出 `validation_result: {match: bool, issues: list[str]}`，并可据此决定 completed/failed
 - [ ] 失败重试最多 3 次，超出返回 `ToolResult(status=failed)`
 - [ ] 证据打包包含 plan、code、result、observation、validation、confidence、citations
 - [ ] 工具状态机转换：idle→planning→executing→validating→completed/failed
@@ -134,8 +134,9 @@
 **验证标准/Validation Criteria:**
 - [ ] `StrategicAnalysisUseCase` 接受 `tool_name: str`、`parameters: dict`、`context: dict` 参数
 - [ ] 通过 `ToolRegistryServicePort.get_tool(tool_name)` 查询工具
-- [ ] 通过 `ToolService.execute()` 执行工具
-- [ ] 执行完成后发布 `ToolExecuted` 领域事件
+- [ ] 通过 `ToolService.execute()` 执行工具并获得 `ToolResult`
+- [ ] 若 `ToolResult.status != success`，不发布 `ToolExecuted`，改为记录失败证据并向上抛出领域异常
+- [ ] 若 `ToolResult.status == success`，发布 `ToolExecuted` 领域事件，事件至少包含 `tool_id` 与 `execution_result`
 - [ ] 依赖通过构造器注入（`tool_registry`、`tool_service`、`event_publisher`）
 - [ ] 不导入 infrastructure 具体实现类
 
@@ -495,7 +496,7 @@
 
 **关联 AC:** AC-4
 
-> **目的：** 实现 Think→Code→Execute→Observe→Validate 五阶段循环。
+> **目的：** 实现 Think→Code→Execute→Observe→Validate 五阶段循环，并输出标准化执行结果与质量判定。
 
 #### TDD 循环 A：ToolExecutionEngine 基础结构
 
@@ -520,14 +521,16 @@
 - [ ] Subtask 4.4: 🟢 绿 — 实现 `think()` 调用 LLMClientPort.generate()
 - [ ] Subtask 4.5: 🟢 绿 — 实现 `code()` 调用 LLMClientPort.generate()
 - [ ] Subtask 4.6: 🟢 绿 — 实现 `execute()` 调用 SandboxExecutor.execute_code()
-- [ ] Subtask 4.7: 🟢 绿 — 实现 `observe()` 解析执行结果
-- [ ] Subtask 4.8: 🟢 绿 — 实现 `validate()` 验证 output_schema 匹配度
+- [ ] Subtask 4.7: 🟢 绿 — 实现 `observe()`，产出 `observed_output`、`anomalies`、`trends`
+- [ ] Subtask 4.8: 🟢 绿 — 实现 `validate()`，产出 `validation_result`、`issues`、`confidence`
 - [ ] Subtask 4.9: 🔄 重构 — 实现重试逻辑（最多 3 次）+ 证据打包
 
 **完成标准/Definition of Done:**
 - [ ] `ToolExecutionEngine` 实现 `ToolService` Protocol
 - [ ] 五阶段循环完整实现
-- [ ] 失败重试最多 3 次
+- [ ] observe 输出标准化结果（`observed_output/anomalies/trends`）
+- [ ] validate 输出标准化判定（`validation_result/issues/confidence`）
+- [ ] 失败重试最多 3 次，质量不达标（issues 非空或 confidence 低于阈值）可触发 failed
 - [ ] 证据打包完整
 - [ ] 覆盖率 >= 85%
 
@@ -537,7 +540,7 @@
 
 **关联 AC:** AC-5, AC-7
 
-> **目的：** 实现战略分析用例编排，并在组合根完成端口注册与注入。
+> **目的：** 实现战略分析用例编排，明确成功/失败路径判定与依赖注入契约。
 
 #### TDD 循环 A：StrategicAnalysisUseCase
 
@@ -553,6 +556,7 @@
 
 **完成标准/Definition of Done:**
 - [ ] `StrategicAnalysisUseCase` 用例编排完成
+- [ ] 成功路径仅发布 `ToolExecuted` 事件；失败路径抛出领域异常并记录证据
 - [ ] 依赖通过构造器注入
 - [ ] 不导入 infrastructure 具体实现
 - [ ] 覆盖率 >= 85%
@@ -816,6 +820,9 @@ src/
 | 5 | Round 1 | coverage 门禁描述分散，易误导实现优先级 | P0 | 在 Test Requirements 中明确 `scripts/check_coverage_gates.py` 为分层门禁判定源，CI 同时执行 `--fail-under=80` |
 | 6 | Round 2 | Skill 加载系统缺少可测端口定义 | P0 | 新增 `SkillLoaderPort`（application port）并补充 `load_skill_summary/load_skill_full` 接口 |
 | 7 | Round 2 | ToolExecuted 事件字段扩展范围不清晰 | P0 | 明确“本 Story 不修改事件 schema”，ToolEvidence 仅用于 ToolResult 本地证据包 |
+| 8 | Round 3 | observe/validate 输出未标准化 | P0 | 统一 observe 输出（observed_output/anomalies/trends），validate 输出（validation_result/issues/confidence） |
+| 9 | Round 3 | AC-5 事件发布语义含糊 | P0 | 明确“仅 success 路径发布事件，失败路径抛异常；失败结果记录在证据包” |
+| 10 | Round 3 | Task5 依赖清单不完整 | P0 | 构造器显式声明 tool_registry/tool_service/skill_loader/event_publisher 四端口 |
 
 ---
 
