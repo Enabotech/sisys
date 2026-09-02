@@ -140,22 +140,22 @@
 - [ ] 依赖通过构造器注入（`tool_registry`、`tool_service`、`event_publisher`）
 - [ ] 不导入 infrastructure 具体实现类
 
-### AC-6: Skills 三级渐进式加载
+### AC-6: Skills 三级渐进式加载（MVP）
 
 **Given** StrategicAnalysisUseCase 已实现
 **When** 实现 Skills 加载系统
-**Then** L1 TOOLS.md：23 个工具元数据，<200 tokens
-**And** L2 SKILL.md：23 份 SOP，<500 行/个
-**And** L3 scripts/ + references/：按需加载
-**And** skill_manifest.py：tool_id ↔ slug 双向映射
+**Then** L1 TOOLS.md：23 个工具元数据摘要，总 token < 200
+**And** L2 SKILL.md：至少 3 份完整 SOP（PESTEL/SWOT/波特五力），其余可用结构化模板占位，每份 < 500 行
+**And** L3 scripts/ + references/：目录存在，允许空文件或最小 stub，按需扩展
+**And** skill_manifest.py：tool_id ↔ slug 双向映射完整覆盖 23 种工具
 
 **验证标准/Validation Criteria:**
 - [ ] `src/application/skills/` 目录结构包含 L1/L2/L3 三级
 - [ ] L1 TOOLS.md 文件包含 23 种工具元数据摘要，总 token < 200
-- [ ] L2 SKILL.md 文件（23 份）每份 < 500 行，包含 Think→Code→Execute→Observe→Validate SOP
-- [ ] L3 scripts/ 和 references/ 目录存在，按需加载
-- [ ] `skill_manifest.py` 实现 `tool_id` ↔ `slug` 双向映射
-- [ ] `SkillLoader` 类实现三级加载逻辑
+- [ ] L2 SKILL.md 至少 3 份完整 SOP（PESTEL/SWOT/波特五力），其余为结构化模板（必须包含五阶段占位）
+- [ ] L3 scripts/ 和 references/ 目录存在；MVP 允许空文件或最小 stub
+- [ ] `skill_manifest.py` 实现 `tool_id` ↔ `slug` 双向映射（23 项全覆盖）
+- [ ] `SkillLoader` 类实现三级加载逻辑，并通过 `SkillLoaderPort` 暴露接口
 
 ### AC-7: 端口注册与架构约束
 
@@ -166,9 +166,9 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `tool_service` 端口已注册（SCOPED 生命周期，tool-team 负责）
-- [ ] `tool_execution_engine` 端口已注册（SCOPED 生命周期，tool-team 负责）
+- [ ] `skill_loader` 端口已注册（SCOPED 生命周期，tool-team 负责）
 - [ ] `PortRegistry.get("tool_service")` 返回非空 `PortSpec`
-- [ ] `PortRegistry.get("tool_execution_engine")` 返回非空 `PortSpec`
+- [ ] `PortRegistry.get("skill_loader")` 返回非空 `PortSpec`
 - [ ] domain 层零外部依赖（无 pydantic/sqlalchemy/redis 等导入）
 - [ ] 依赖方向矩阵合规（application→domain 允许，infrastructure→domain 允许）
 
@@ -591,13 +591,14 @@
 - [ ] Subtask 6.3: 🔴 红 — 编写 SkillLoader 失败测试
 - [ ] Subtask 6.4: 🟢 绿 — 实现 `SkillLoader`（L1 TOOLS.md / L2 SKILL.md / L3 scripts+references）
 - [ ] Subtask 6.5: 创建 L1 `TOOLS.md`（23 种工具元数据摘要，<200 tokens）
-- [ ] Subtask 6.6: 创建 L2 `skills/` 目录（23 份 SKILL.md，<500 行/个）
-- [ ] Subtask 6.7: 创建 L3 `scripts/` + `references/` 目录结构
+- [ ] Subtask 6.6: 创建 L2 `skills/` 目录（至少 3 份完整 SOP，其余结构化模板占位）
+- [ ] Subtask 6.7: 创建 L3 `scripts/` + `references/` 目录结构（MVP 允许 stub）
 
 **完成标准/Definition of Done:**
-- [ ] `skill_manifest.py` 双向映射完成
-- [ ] `SkillLoader` 三级加载完成
+- [ ] `skill_manifest.py` 双向映射完成（23 项全覆盖）
+- [ ] `SkillLoader` 三级加载完成，并通过 `SkillLoaderPort` 暴露接口
 - [ ] L1/L2/L3 目录结构完整
+- [ ] L2 至少 3 份完整 SOP，其余模板符合五阶段占位规范
 - [ ] 覆盖率 >= 85%
 
 ---
@@ -617,7 +618,7 @@
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
 - [ ] Subtask 7.1: 🔴 红 — 编写端口注册失败测试
-- [ ] Subtask 7.2: 🟢 绿 — 在 `composition_root.py` 中注册 `tool_service` 和 `tool_execution_engine`
+- [ ] Subtask 7.2: 🟢 绿 — 在 `composition_root.py` 中注册 `tool_service` 与 `skill_loader`
 - [ ] Subtask 7.3: 🔄 重构 — 优化注册顺序、添加注释
 
 #### SDD 架构验证测试
@@ -629,7 +630,7 @@
 
 **完成标准/Definition of Done:**
 - [ ] `tool_service` 端口已注册
-- [ ] `tool_execution_engine` 端口已注册
+- [ ] `skill_loader` 端口已注册
 - [ ] 所有架构约束测试通过
 - [ ] 覆盖率 >= 85%
 
@@ -823,6 +824,8 @@ src/
 | 8 | Round 3 | observe/validate 输出未标准化 | P0 | 统一 observe 输出（observed_output/anomalies/trends），validate 输出（validation_result/issues/confidence） |
 | 9 | Round 3 | AC-5 事件发布语义含糊 | P0 | 明确“仅 success 路径发布事件，失败路径抛异常；失败结果记录在证据包” |
 | 10 | Round 3 | Task5 依赖清单不完整 | P0 | 构造器显式声明 tool_registry/tool_service/skill_loader/event_publisher 四端口 |
+| 11 | Round 4 | AC-6 23 份完整 SOP 不符合 MVP 可执行性 | P0 | 改为“至少 3 份完整 SOP + 其余模板占位”，降低首版交付风险 |
+| 12 | Round 4 | AC-7/Task7 端口名仍引用 tool_execution_engine | P0 | 统一为 tool_service + skill_loader 双端口注册 |
 
 ---
 
