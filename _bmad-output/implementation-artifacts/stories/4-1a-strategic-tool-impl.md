@@ -32,12 +32,12 @@
 
 **本 Story 的核心任务：**
 - **增强 Tool 实体**：新增 `rule_version`、`reliability_score`、`execution_count`、`execution_state` 字段 + 状态机枚举 `ToolExecutionState`
-- **定义 ToolService 领域服务**（`src/domain/services/tool_service.py`）— Protocol 定义 `execute`、`get_tool`、`list_tools`、`list_tools_by_category`
+- **定义 ToolService 领域服务**（`src/domain/services/tool_service.py`）— Protocol 定义 `execute`、`get_tool`、`list_all_tools`、`get_tools_by_category`
 - **定义 ToolCall / ToolResult 值对象**（`src/domain/value_objects/tool_execution.py`）— frozen dataclass
 - **实现 ToolExecutionEngine**（`src/application/services/tool_execution_engine.py`）— Think→Code→Execute→Observe→Validate 五阶段循环
 - **实现 StrategicAnalysisUseCase**（`src/application/use_cases/strategic_analysis.py`）— 用例编排
-- **实现 Skills 三级加载系统**（`src/application/skills/`）— L1 TOOLS.md / L2 SKILL.md / L3 scripts+references
-- **在 `composition_root.py` 中注册新端口**，完成依赖注入
+- **实现 Skills 三级加载系统**（`src/application/skills/`）— SkillLoaderPort + skill_manifest + L1/L2/L3 MVP
+- **在 `composition_root.py` 中注册新端口（`tool_service` + `skill_loader`）**，完成依赖注入
 
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 4: 战略工具箱，Story 4.1a
 
@@ -134,10 +134,11 @@
 **验证标准/Validation Criteria:**
 - [ ] `StrategicAnalysisUseCase` 接受 `tool_name: str`、`parameters: dict`、`context: dict` 参数
 - [ ] 通过 `ToolRegistryServicePort.get_tool(tool_name)` 查询工具
+- [ ] 通过 `SkillLoaderPort.load_skill_summary(tool_name)` 加载 Skill 摘要并注入 context
 - [ ] 通过 `ToolService.execute()` 执行工具并获得 `ToolResult`
 - [ ] 若 `ToolResult.status != success`，不发布 `ToolExecuted`，改为记录失败证据并向上抛出领域异常
 - [ ] 若 `ToolResult.status == success`，发布 `ToolExecuted` 领域事件，事件至少包含 `tool_id` 与 `execution_result`
-- [ ] 依赖通过构造器注入（`tool_registry`、`tool_service`、`event_publisher`）
+- [ ] 依赖通过构造器注入（`tool_registry`、`tool_service`、`skill_loader`、`event_publisher`）
 - [ ] 不导入 infrastructure 具体实现类
 
 ### AC-6: Skills 三级渐进式加载（MVP）
@@ -161,7 +162,7 @@
 
 **Given** 所有组件已实现
 **When** 在 composition_root.py 中注册新端口
-**Then** tool_service、tool_execution_engine 端口正确注册
+**Then** tool_service、skill_loader 端口正确注册
 **And** 六边形架构：domain 零外部依赖、依赖方向矩阵合规
 
 **验证标准/Validation Criteria:**
@@ -826,6 +827,9 @@ src/
 | 10 | Round 3 | Task5 依赖清单不完整 | P0 | 构造器显式声明 tool_registry/tool_service/skill_loader/event_publisher 四端口 |
 | 11 | Round 4 | AC-6 23 份完整 SOP 不符合 MVP 可执行性 | P0 | 改为“至少 3 份完整 SOP + 其余模板占位”，降低首版交付风险 |
 | 12 | Round 4 | AC-7/Task7 端口名仍引用 tool_execution_engine | P0 | 统一为 tool_service + skill_loader 双端口注册 |
+| 13 | Round 5 | 文档核心任务仍列出 list_tools/list_tools_by_category | P0 | 全文统一为 list_all_tools/get_tools_by_category，消除术语漂移 |
+| 14 | Round 5 | AC-5 缺少 SkillLoaderPort 调用链路 | P0 | 补充 skill_loader 在 use case 中的调用与注入规则 |
+| 15 | Round 5 | AC-7 THEN 描述未与端口表闭合 | P0 | 将 tool_execution_engine 替换为 skill_loader，保持一致性 |
 
 ---
 
