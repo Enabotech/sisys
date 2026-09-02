@@ -76,14 +76,14 @@
 **When** 定义 ToolService 领域服务
 **Then** `src/domain/services/tool_service.py` 定义 ToolService Protocol
 **And** 方法：`execute(tool_id, tool_call, context) -> ToolResult`
-**And** 方法：`get_tool(tool_id)`、`list_tools()`、`list_tools_by_category(category)`
+**And** 方法：`get_tool(tool_id)`、`list_all_tools()`、`get_tools_by_category(category)`
 
 **验证标准/Validation Criteria:**
 - [ ] `ToolService` 是 `@runtime_checkable Protocol`
 - [ ] `execute()` 方法接受 `tool_id: uuid.UUID`、`tool_call: ToolCall`、`context: dict` 参数，返回 `ToolResult`
 - [ ] `get_tool()` 方法接受 `tool_id: uuid.UUID`，返回 `Tool`
-- [ ] `list_tools()` 方法返回 `list[Tool]`
-- [ ] `list_tools_by_category()` 方法接受 `category: ToolCategory`，返回 `list[Tool]`
+- [ ] `list_all_tools()` 方法返回 `list[Tool]`
+- [ ] `get_tools_by_category()` 方法接受 `category: ToolCategory`，返回 `list[Tool]`
 - [ ] 领域层零外部依赖
 
 ### AC-3: ToolCall / ToolResult 值对象
@@ -202,7 +202,9 @@
 | 端口名称 | 版本 | 接口 | 实现模块 | 生命周期 | Owner | 状态 |
 |---------|------|------|---------|---------|-------|------|
 | `tool_service` | v1.0.0 | `ToolService` | `src.application.services.tool_execution_engine.ToolExecutionEngine` | SCOPED | tool-team | 新建 |
-| `tool_execution_engine` | v1.0.0 | `ToolExecutionEngine` | `src.application.services.tool_execution_engine.ToolExecutionEngine` | SCOPED | tool-team | 新建 |
+| `tool_execution_engine` | v1.0.0 | `ToolService` | `src.application.services.tool_execution_engine.ToolExecutionEngine` | SCOPED | tool-team | 新建 |
+
+> **实现说明：** `tool_service` 是当前可执行化阶段的领域服务端口，`tool_execution_engine` 是后续独立实现的引擎端口；若两者最终由同一类实现，则保留双注册以支持契约分离。
 
 - [ ] 端口契约定义位于 `src/domain/services/tool_service.py`
 - [ ] 端口注册中心位于 `src/domain/ports/registry.py`，所有端口登记为 `PortSpec`
@@ -290,6 +292,7 @@
 - [ ] **应用层覆盖率 ≥85%**（`pytest --cov=src/application`）- **P1 阻断门禁**
 - [ ] **基础设施层覆盖率 ≥75%**（`pytest --cov=src/infrastructure`）- **P1 阻断门禁**
 - [ ] **集成测试覆盖率 ≥70%**
+- [ ] **分层门禁判定源**：以 `scripts/check_coverage_gates.py` 为准，CI 同时执行 `--fail-under=80` 作为整体兜底
 
 > ⚠️ **骨架 Story 覆盖率豁免：** 如果本 Story 为架构骨架（Skeleton），大量代码为空接口/占位类/`__init__.py`，
 > 无法达到上述覆盖率指标。**请将覆盖率要求临时调整为：整体≥30%，对应层≥50%。**
@@ -300,6 +303,7 @@
 - [ ] **MyPy 类型检查通过**（`poetry run mypy src/`）
 - [ ] **无 P0/P1 级别问题**
 - [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
+- [ ] **架构约束门禁通过**（`poetry run lint-imports`，必须为零违规）
 
 #### 测试隔离约束
 
@@ -462,9 +466,9 @@
 
 ### Task 3: ToolService 领域服务 Protocol
 
-**关联 AC:** AC-2
+**关联 AC:** AC-2, AC-7
 
-> **目的：** 定义 ToolService 领域服务端口。
+> **目的：** 定义 ToolService 领域服务端口，并确保端口对齐实现层已有方法。
 
 #### TDD 循环 A：ToolService Protocol
 
@@ -475,7 +479,7 @@
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
 - [ ] Subtask 3.1: 🔴 红 — 编写 `ToolService` 契约测试
-- [ ] Subtask 3.2: 🟢 绿 — 创建 `ToolService` Protocol（execute、get_tool、list_tools、list_tools_by_category）
+- [ ] Subtask 3.2: 🟢 绿 — 创建 `ToolService` Protocol（execute、get_tool、list_all_tools、get_tools_by_category）
 - [ ] Subtask 3.3: 🔄 重构 — 优化方法签名、添加 docstring
 
 **完成标准/Definition of Done:**
@@ -530,9 +534,9 @@
 
 ### Task 5: StrategicAnalysisUseCase 用例编排
 
-**关联 AC:** AC-5
+**关联 AC:** AC-5, AC-7
 
-> **目的：** 实现战略分析用例编排。
+> **目的：** 实现战略分析用例编排，并在组合根完成端口注册与注入。
 
 #### TDD 循环 A：StrategicAnalysisUseCase
 
@@ -616,6 +620,7 @@
 - [ ] Subtask 7.4: 创建 `tests/unit/architecture/test_arch_strategic_tool_impl.py`
 - [ ] Subtask 7.5: 实现依赖方向验证（domain 层无外部依赖）
 - [ ] Subtask 7.6: 实现端口注册验证（所有端口在 composition_root.py 中注册）
+- [ ] Subtask 7.7: 实现 `poetry run lint-imports` 零违规验证（架构契约强制校验）
 
 **完成标准/Definition of Done:**
 - [ ] `tool_service` 端口已注册
@@ -799,9 +804,13 @@ src/
 
 ### 🔧 文档审查修复 Docs Review Fixes
 
-| # | 问题 | 严重度 | 修复方案 |
-|---|------|--------|----------|
-| - | - | - | - |
+| # | 轮次 | 问题 | 严重度 | 修复方案 |
+|---|------|------|--------|----------|
+| 1 | Round 1 | AC-2/AC-5 方法名与现有 `ToolRegistryServicePort` 实现不一致 | P0 | 将 `list_tools()` → `list_all_tools()`，`list_tools_by_category()` → `get_tools_by_category()`，保持实现源一致性 |
+| 2 | Round 1 | 端口表 `tool_execution_engine` 的 interface 与 impl 混同为同一个类 | P0 | 明确 interface 为 `ToolService` Protocol（domain），impl 为 `ToolExecutionEngine`（application） |
+| 3 | Round 1 | 组合根注册说明缺少方法/接口对齐 | P0 | 在 Task 7 补充 `composition_root.py` 注册时必须对齐 `list_all_tools/get_tools_by_category` |
+| 4 | Round 1 | 缺少 import-linter 与 CI 合规约束说明 | P0 | 新增“架构门禁”约束：实现 Task 7 后必须执行 `poetry run lint-imports` 并在文档 DoD 中登记 |
+| 5 | Round 1 | coverage 门禁描述分散，易误导实现优先级 | P0 | 在 Test Requirements 中明确 `scripts/check_coverage_gates.py` 为分层门禁判定源，CI 同时执行 `--fail-under=80` |
 
 ---
 
