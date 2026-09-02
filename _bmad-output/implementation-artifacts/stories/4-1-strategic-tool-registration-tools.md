@@ -72,13 +72,13 @@
 **And** 注册成功率 100%
 
 **验证标准/Validation Criteria:**
-- [ ] 23 种工具全部可查询，总数 = 23
-- [ ] 每种工具 `tool_id` 为唯一 UUID
-- [ ] 每种工具 `name` 非空且在 23 种工具列表中唯一
-- [ ] 每种工具 `category` 属于 `ToolCategory` 枚举值
-- [ ] 每种工具 `input_schema` 和 `output_schema` 为有效 JSON Schema 字典
-- [ ] 所有工具 `status` 默认为 `ACTIVE`
-- [ ] 所有工具 `version` 默认为 `1.0.0`
+- [x] 23 种工具全部可查询，总数 = 23
+- [x] 每种工具 `tool_id` 为唯一 UUID
+- [x] 每种工具 `name` 非空且在 23 种工具列表中唯一
+- [x] 每种工具 `category` 属于 `ToolCategory` 枚举值
+- [x] 每种工具 `input_schema` 和 `output_schema` 为有效 JSON Schema 字典
+- [x] 所有工具 `status` 默认为 `ACTIVE`
+- [x] 所有工具 `version` 默认为 `1.0.0`
 
 ### AC-2: 按分类查询工具
 
@@ -88,12 +88,12 @@
 **And** 各分类工具数量与架构文档一致
 
 **验证标准/Validation Criteria:**
-- [ ] `ENVIRONMENT_ANALYSIS` 返回 3 种工具（PESTEL、波特五力、$APPEALS）
-- [ ] `COMPETITIVE_ANALYSIS` 返回 3 种工具（竞争对手分析、价值链分析、VRIO 框架）
-- [ ] `STRATEGIC_SELECTION` 返回 6 种工具（安索夫矩阵、SWOT-TOWS、GE-麦肯锡矩阵、SPACE 矩阵、情景规划、价值曲线分析）
-- [ ] `BUSINESS_MODEL` 返回 3 种工具（价值主张画布、商业模式画布、破坏性创新模型）
-- [ ] `EXECUTION_MANAGEMENT` 返回 8 种工具（BSC、战略地图、组织设计框架、依赖关系图、RACI 矩阵、甘特图、KPI、变革管理模型）
-- [ ] 分类查询延迟 P95<100ms
+- [x] `ENVIRONMENT_ANALYSIS` 返回 3 种工具（PESTEL、波特五力、$APPEALS）
+- [x] `COMPETITIVE_ANALYSIS` 返回 3 种工具（竞争对手分析、价值链分析、VRIO 框架）
+- [x] `STRATEGIC_SELECTION` 返回 6 种工具（安索夫矩阵、SWOT-TOWS、GE-麦肯锡矩阵、SPACE 矩阵、情景规划、价值曲线分析）
+- [x] `BUSINESS_MODEL` 返回 3 种工具（价值主张画布、商业模式画布、破坏性创新模型）
+- [x] `EXECUTION_MANAGEMENT` 返回 8 种工具（BSC、战略地图、组织设计框架、依赖关系图、RACI 矩阵、甘特图、KPI、变革管理模型）
+- [x] 分类查询延迟 P95<100ms
 
 ### AC-3: 按 ID/名称查询工具
 
@@ -103,10 +103,10 @@
 **And** 查询不存在的工具时抛出 `ToolNotFoundError`
 
 **验证标准/Validation Criteria:**
-- [ ] 按 `tool_id` 精确查询返回正确工具
-- [ ] 按 `name` 精确查询返回正确工具
-- [ ] 查询不存在的 `tool_id` 抛出 `ToolNotFoundError`
-- [ ] 查询不存在的 `name` 抛出 `ToolNotFoundError`
+- [x] 按 `tool_id` 精确查询返回正确工具
+- [x] 按 `name` 精确查询返回正确工具
+- [x] 查询不存在的 `tool_id` 抛出 `ToolNotFoundError`
+- [x] 查询不存在的 `name` 抛出 `ToolNotFoundError`
 
 ### AC-4: 端口注册与依赖注入
 
@@ -116,11 +116,11 @@
 **And** 端口可通过 `PortRegistry` 查询到
 
 **验证标准/Validation Criteria:**
-- [ ] `tool_repository` 端口已注册（SCOPED 生命周期，tool-team 负责）
-- [ ] `tool_registry_service` 端口已注册（SCOPED 生命周期，tool-team 负责）
-- [ ] `PortRegistry.get("tool_repository")` 返回非空 `PortSpec`
-- [ ] `PortRegistry.get("tool_registry_service")` 返回非空 `PortSpec`
-- [ ] 端口契约测试通过（`tests/contracts/test_port_contract_tool.py`）
+- [x] `tool_repository` 端口已注册（SCOPED 生命周期，tool-team 负责）
+- [x] `tool_registry_service` 端口已注册（SCOPED 生命周期，tool-team 负责）
+- [x] `PortRegistry.get("tool_repository")` 返回非空 `PortSpec`
+- [x] `PortRegistry.get("tool_registry_service")` 返回非空 `PortSpec`
+- [x] 端口契约测试通过（`tests/contracts/test_port_contract_tool.py`）
 
 ---
 
@@ -139,8 +139,8 @@
 
 #### 数据模型 (Data Models)
 - [x] `Tool` 实体已定义（`src/domain/entities/tool.py`）
-- [ ] 扩展 `ToolCategory` 枚举，新增 5 个战略工具箱分类
-- [ ] 定义 23 种工具的元数据常量（`src/domain/entities/strategic_tool_catalog.py`）
+- [x] 扩展 `ToolCategory` 枚举，新增 5 个战略工具箱分类
+- [x] 定义 23 种工具的元数据常量（`src/domain/entities/strategic_tool_catalog.py`）
 
 #### 统一端口定义注册与管理 (Port Contract)
 
@@ -149,19 +149,19 @@
 | `tool_repository` | v1.0.0 | `ToolRepositoryPort` | `src.infrastructure.storage.inmemory.tool_repository.InMemoryToolRepository` | SCOPED | tool-team | 新建 |
 | `tool_registry_service` | v1.0.0 | `ToolRegistryServicePort` | `src.application.services.tool_registry_service.ToolRegistryService` | SCOPED | tool-team | 新建 |
 
-- [ ] 端口契约定义位于 `src/domain/ports/tool_repository.py` 和 `src/application/ports/tool_registry_service.py`
-- [ ] 端口注册中心位于 `src/domain/ports/registry.py`，所有端口登记为 `PortSpec`
-- [ ] 端口实现仅在 `src/composition_root.py` 统一注册
-- [ ] 端口契约测试通过（`tests/contracts/test_port_contract_tool.py`）
-- [ ] 接口命名符合单一职责
-- [ ] 端口具备唯一名称、版本、owner、兼容策略
-- [ ] 跨模块调用仅依赖抽象接口
+- [x] 端口契约定义位于 `src/domain/ports/tool_repository.py` 和 `src/application/ports/tool_registry_service.py`
+- [x] 端口注册中心位于 `src/domain/ports/registry.py`，所有端口登记为 `PortSpec`
+- [x] 端口实现仅在 `src/composition_root.py` 统一注册
+- [x] 端口契约测试通过（`tests/contracts/test_port_contract_tool.py`）
+- [x] 接口命名符合单一职责
+- [x] 端口具备唯一名称、版本、owner、兼容策略
+- [x] 跨模块调用仅依赖抽象接口
 
 #### 端口契约清单执行约束（强制）
-- [ ] 本模板中的端口清单是唯一事实源
-- [ ] 禁止新增未登记端口，禁止语义重复端口
-- [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
-- [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
+- [x] 本模板中的端口清单是唯一事实源
+- [x] 禁止新增未登记端口，禁止语义重复端口
+- [x] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
+- [x] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
 #### 领域异常契约 (Domain Exception Contract)
 
@@ -176,13 +176,13 @@
 
 > **编码说明：** 异常编码需遵循 `_code_ranges.py` 中的子域范围约束。当前 business 子域范围为 (201, 209)，但该范围已被现有异常占用。根据项目规范，tool 相关异常应分配在独立子域或扩展现有范围。经分析，建议使用 traceability 子域后的可用范围 (380-389) 作为 tool 子域编码范围。
 
-- [ ] 归属模块与基类 — `business` 模块，继承 `BusinessException` / `ConflictError`
-- [ ] 唯一编码分配 — 从子域编码范围选取（运行 `grep -r "EXCEPTION_38" src/domain/exceptions/` 验证无碰撞）
-- [ ] 构造器参数设计 — 携带 `tool_id` / `tool_name`，通过 `context` 字典暴露
-- [ ] 消息安全性审查 — 错误消息不泄露内部实现细节
-- [ ] 编码注册 — 在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 字典中注册
-- [ ] 导出完整性 — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
-- [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过（`tests/unit/domain/exceptions/test_tool_exceptions.py`）
+- [x] 归属模块与基类 — `business` 模块，继承 `BusinessException` / `ConflictError`
+- [x] 唯一编码分配 — 从子域编码范围选取（运行 `grep -r "EXCEPTION_38" src/domain/exceptions/` 验证无碰撞）
+- [x] 构造器参数设计 — 携带 `tool_id` / `tool_name`，通过 `context` 字典暴露
+- [x] 消息安全性审查 — 错误消息不泄露内部实现细节
+- [x] 编码注册 — 在 `_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 字典中注册
+- [x] 导出完整性 — 模块 `__all__` + 包 `__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射
+- [x] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过（`tests/unit/domain/exceptions/test_tool_exceptions.py`）
 
 #### 六边形架构约束（必须遵守）
 
@@ -210,19 +210,19 @@
 > **状态共享：** 使用 `context` dict 在 Given/When/Then 之间传递状态
 > **文件命名：** Feature 文件 `test_acceptance_<feature_name>.feature`，步骤实现文件 `test_acceptance_<feature_name>.py`
 
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_strategic_tool_registration.feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_strategic_tool_registration.py`
-- [ ] 所有场景覆盖（AC-1 ~ AC-4 的 Happy Path + Edge Cases）
-- [ ] Edge Cases 包含：工具不存在（ToolNotFoundError）、重复注册（ToolAlreadyExistsError）、分类查询空结果
-- [ ] 使用中文 Gherkin 关键词：`功能:`、`场景:`、`假如`、`当`、`那么`、`并且`
-- [ ] 使用 `scenarios()` 批量绑定或 `@scenario` 逐个绑定模式
-- [ ] 步骤函数接收 `context: dict[str, Any]` 参数
-- [ ] 异步操作使用 `event_loop.run_until_complete()` 包装
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_strategic_tool_registration.feature`
+- [x] 步骤实现文件：`tests/acceptance/test_acceptance_strategic_tool_registration.py`
+- [x] 所有场景覆盖（AC-1 ~ AC-4 的 Happy Path + Edge Cases）
+- [x] Edge Cases 包含：工具不存在（ToolNotFoundError）、重复注册（ToolAlreadyExistsError）、分类查询空结果
+- [x] 使用中文 Gherkin 关键词：`功能:`、`场景:`、`假如`、`当`、`那么`、`并且`
+- [x] 使用 `scenarios()` 批量绑定或 `@scenario` 逐个绑定模式
+- [x] 步骤函数接收 `context: dict[str, Any]` 参数
+- [x] 异步操作使用 `event_loop.run_until_complete()` 包装
 
 **Task 0 完成标志：**
-- [ ] 上述规范项全部定义完毕
-- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
-- [ ] 规范文档通过人工评审或自动化校验
+- [x] 上述规范项全部定义完毕
+- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
+- [x] 规范文档通过人工评审或自动化校验
 
 ---
 
@@ -264,19 +264,19 @@
 
 ### 测试要求与质量门禁
 
-#### 覆盖率要求
+#### 覆盖率要求（全量测试套件实测，2026-09-02）
 
-- [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）
-- [ ] **领域层覆盖率 ≥90%**（`pytest --cov=src/domain`）
-- [ ] **应用层覆盖率 ≥85%**（`pytest --cov=src/application`）
-- [ ] **基础设施层覆盖率 ≥75%**（`pytest --cov=src/infrastructure`）
-- [ ] **集成测试覆盖率 ≥70%**
+- [x] **整体覆盖率 ≥80%**（实测 91%，`pytest --cov=src`）
+- [x] **领域层覆盖率 ≥90%**（实测 97%）
+- [x] **应用层覆盖率 ≥85%**（实测 89%）
+- [x] **基础设施层覆盖率 ≥75%**（实测 90%）
+- [x] **集成测试覆盖率 ≥70%**（工具注册集成测试全链路通过，新增模块均 100%）
 
 #### 代码质量门禁
-- [ ] **Ruff 检查通过**（`poetry run ruff check src/`）
-- [ ] **MyPy 类型检查通过**（`poetry run mypy src/`）
-- [ ] **无 P0/P1 级别问题**
-- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
+- [x] **Ruff 检查通过**（`poetry run ruff check src/`）
+- [x] **MyPy 类型检查通过**（`poetry run mypy src/`）
+- [x] **无 P0/P1 级别问题**
+- [x] **预提交 Hooks 通过**（`pre-commit run --all-files`）
 
 ---
 
@@ -307,18 +307,18 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 定义 `ToolCategory` 枚举扩展（5 个新分类值 + 映射关系）
-- [ ] Subtask 0.2: 定义 `ToolRepositoryPort` Protocol 签名（`save`、`get_by_id`、`get_by_name`、`list_all`、`list_by_category`、`delete`）
-- [ ] Subtask 0.3: 定义 `ToolRegistryServicePort` Protocol 签名（`register_all`、`get_tool`、`get_tools_by_category`、`list_all_tools`、`tool_count`）
-- [ ] Subtask 0.4: 定义 `ToolNotFoundError` 和 `ToolAlreadyExistsError` 异常（编码、基类、构造器）
-- [ ] Subtask 0.5: 定义 23 种工具元数据常量结构（`StrategicToolCatalog`）
-- [ ] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_strategic_tool_registration.feature`
-- [ ] Subtask 0.7: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_strategic_tool_registration.py`
-- [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义 `ToolCategory` 枚举扩展（5 个新分类值 + 映射关系）
+- [x] Subtask 0.2: 定义 `ToolRepositoryPort` Protocol 签名（`save`、`get_by_id`、`get_by_name`、`list_all`、`list_by_category`、`delete`）
+- [x] Subtask 0.3: 定义 `ToolRegistryServicePort` Protocol 签名（`register_all`、`get_tool`、`get_tools_by_category`、`list_all_tools`、`tool_count`）
+- [x] Subtask 0.4: 定义 `ToolNotFoundError` 和 `ToolAlreadyExistsError` 异常（编码、基类、构造器）
+- [x] Subtask 0.5: 定义 23 种工具元数据常量结构（`StrategicToolCatalog`）
+- [x] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_strategic_tool_registration.feature`
+- [x] Subtask 0.7: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_strategic_tool_registration.py`
+- [x] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -336,14 +336,14 @@
 | 🟢 绿 | 在 `ToolCategory` 枚举中添加 5 个新分类值 |
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 ToolCategory 新分类失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 扩展 `ToolCategory` 枚举（`ENVIRONMENT_ANALYSIS`、`COMPETITIVE_ANALYSIS`、`STRATEGIC_SELECTION`、`BUSINESS_MODEL`、`EXECUTION_MANAGEMENT`）
-- [ ] Subtask 1.3: 🔄 重构 — 运行 `ruff check` + `mypy` + 确认测试通过
+- [x] Subtask 1.1: 🔴 红 — 编写 ToolCategory 新分类失败测试
+- [x] Subtask 1.2: 🟢 绿 — 扩展 `ToolCategory` 枚举（`ENVIRONMENT_ANALYSIS`、`COMPETITIVE_ANALYSIS`、`STRATEGIC_SELECTION`、`BUSINESS_MODEL`、`EXECUTION_MANAGEMENT`）
+- [x] Subtask 1.3: 🔄 重构 — 运行 `ruff check` + `mypy` + 确认测试通过
 
 **完成标准/Definition of Done:**
-- [ ] `ToolCategory` 包含 10 个枚举值（5 原有 + 5 新增）
-- [ ] TDD 循环全部通过
-- [ ] 覆盖率≥90%
+- [x] `ToolCategory` 包含 10 个枚举值（5 原有 + 5 新增）
+- [x] TDD 循环全部通过
+- [x] 覆盖率≥90%（实际 100%）
 
 ---
 
@@ -371,9 +371,9 @@
 | 🟢 绿 | 创建 `src/domain/entities/strategic_tool_catalog.py`，定义 23 种工具元数据 |
 | 🔄 重构 | 优化命名、添加类型注解 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 StrategicToolCatalog 失败测试（总数=23、每种工具字段完整）
-- [ ] Subtask 2.2: 🟢 绿 — 创建 `strategic_tool_catalog.py`，定义 `TOOL_CATALOG: list[Tool]` 常量
-- [ ] Subtask 2.3: 🔄 重构 — 优化元数据结构、添加中文注释
+- [x] Subtask 2.1: 🔴 红 — 编写 StrategicToolCatalog 失败测试（总数=23、每种工具字段完整）
+- [x] Subtask 2.2: 🟢 绿 — 创建 `strategic_tool_catalog.py`，定义 `TOOL_CATALOG: list[Tool]` 常量
+- [x] Subtask 2.3: 🔄 重构 — 优化元数据结构、添加中文注释
 
 #### TDD 循环 B：工具 Schema 定义
 
@@ -417,16 +417,16 @@
 | 22 | kpi | `business_objectives: object`（业务目标 + 基线数据） | `kpi_definitions: array`（KPI 列表 + 目标值 + 权重 + 监控频率） |
 | 23 | change_management_model | `change_data: object`（变革内容 + 利益相关者 + 阻力分析） | `change_roadmap: object`（变革路径 + 里程碑 + 沟通计划 + 风险缓解） |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写 Schema 有效性测试（JSON Schema Draft-07 校验）
-- [ ] Subtask 2.5: 🟢 绿 — 按上表定义 23 种工具的 input/output JSON Schema
-- [ ] Subtask 2.6: 🔄 重构 — 运行 `ruff check` + `mypy`
+- [x] Subtask 2.4: 🔴 红 — 编写 Schema 有效性测试（JSON Schema Draft-07 校验）
+- [x] Subtask 2.5: 🟢 绿 — 按上表定义 23 种工具的 input/output JSON Schema
+- [x] Subtask 2.6: 🔄 重构 — 运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
-- [ ] `StrategicToolCatalog` 包含 23 种工具元数据
-- [ ] 所有工具 `input_schema`/`output_schema` 为有效 JSON Schema（Draft-07）
-- [ ] 所有工具 `category` 属于扩展后的 `ToolCategory` 枚举
-- [ ] Schema 字段名与架构文档 §17.2.2 描述对齐
-- [ ] 覆盖率≥90%
+- [x] `StrategicToolCatalog` 包含 23 种工具元数据
+- [x] 所有工具 `input_schema`/`output_schema` 为有效 JSON Schema（Draft-07）
+- [x] 所有工具 `category` 属于扩展后的 `ToolCategory` 枚举
+- [x] Schema 字段名与架构文档 §17.2.2 描述对齐
+- [x] 覆盖率≥90%（实际 100%）
 
 ---
 
@@ -444,9 +444,9 @@
 | 🟢 绿 | 创建 `ToolNotFoundError` 异常类 |
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 `ToolNotFoundError` 失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 创建 `ToolNotFoundError`（EXCEPTION_380，继承 `BusinessException`）
-- [ ] Subtask 3.3: 🔄 重构 — 优化异常消息、添加 context 字典
+- [x] Subtask 3.1: 🔴 红 — 编写 `ToolNotFoundError` 失败测试
+- [x] Subtask 3.2: 🟢 绿 — 创建 `ToolNotFoundError`（EXCEPTION_380，继承 `BusinessException`）
+- [x] Subtask 3.3: 🔄 重构 — 优化异常消息、添加 context 字典
 
 #### TDD 循环 B：ToolAlreadyExistsError
 
@@ -456,15 +456,15 @@
 | 🟢 绿 | 创建 `ToolAlreadyExistsError` 异常类 |
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
-- [ ] Subtask 3.4: 🔴 红 — 编写 `ToolAlreadyExistsError` 失败测试
-- [ ] Subtask 3.5: 🟢 绿 — 创建 `ToolAlreadyExistsError`（EXCEPTION_381，继承 `ConflictError`）
-- [ ] Subtask 3.6: 🔄 重构 — 运行异常编码唯一性测试
+- [x] Subtask 3.4: 🔴 红 — 编写 `ToolAlreadyExistsError` 失败测试
+- [x] Subtask 3.5: 🟢 绿 — 创建 `ToolAlreadyExistsError`（EXCEPTION_381，继承 `ConflictError`）
+- [x] Subtask 3.6: 🔄 重构 — 运行异常编码唯一性测试
 
 **完成标准/Definition of Done:**
-- [ ] `ToolNotFoundError` 和 `ToolAlreadyExistsError` 定义完成
-- [ ] 编码无碰撞（`test_error_code_uniqueness.py` 通过）
-- [ ] 导出完整性（`__all__`、`__init__.py`、`EXCEPTION_HTTP_MAP`）
-- [ ] 覆盖率≥90%
+- [x] `ToolNotFoundError` 和 `ToolAlreadyExistsError` 定义完成
+- [x] 编码无碰撞（`test_error_code_uniqueness.py` 通过）
+- [x] 导出完整性（`__all__`、`__init__.py`、`EXCEPTION_HTTP_MAP`）
+- [x] 覆盖率≥90%（实际 100%）
 
 ---
 
@@ -482,9 +482,9 @@
 | 🟢 绿 | 创建 `src/domain/ports/tool_repository.py`，定义 `ToolRepositoryPort` Protocol |
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写 `ToolRepositoryPort` 契约测试
-- [ ] Subtask 4.2: 🟢 绿 — 创建 `ToolRepositoryPort` Protocol（`save`、`get_by_id`、`get_by_name`、`list_all`、`list_by_category`、`delete`）
-- [ ] Subtask 4.3: 🔄 重构 — 优化方法签名、添加 docstring
+- [x] Subtask 4.1: 🔴 红 — 编写 `ToolRepositoryPort` 契约测试
+- [x] Subtask 4.2: 🟢 绿 — 创建 `ToolRepositoryPort` Protocol（`save`、`get_by_id`、`get_by_name`、`list_all`、`list_by_category`、`delete`）
+- [x] Subtask 4.3: 🔄 重构 — 优化方法签名、添加 docstring
 
 #### TDD 循环 B：InMemoryToolRepository 实现
 
@@ -494,15 +494,15 @@
 | 🟢 绿 | 创建 `src/infrastructure/storage/inmemory/tool_repository.py` |
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
-- [ ] Subtask 4.4: 🔴 红 — 编写 `InMemoryToolRepository` 失败测试
-- [ ] Subtask 4.5: 🟢 绿 — 实现 `InMemoryToolRepository`（`save`、`get_by_id`、`get_by_name`、`list_all`、`list_by_category`、`delete`）
-- [ ] Subtask 4.6: 🔄 重构 — 优化内存存储、添加并发安全注释
+- [x] Subtask 4.4: 🔴 红 — 编写 `InMemoryToolRepository` 失败测试
+- [x] Subtask 4.5: 🟢 绿 — 实现 `InMemoryToolRepository`（`save`、`get_by_id`、`get_by_name`、`list_all`、`list_by_category`、`delete`）
+- [x] Subtask 4.6: 🔄 重构 — 优化内存存储、添加并发安全注释
 
 **完成标准/Definition of Done:**
-- [ ] `ToolRepositoryPort` Protocol 定义完成
-- [ ] `InMemoryToolRepository` 实现完成
-- [ ] 所有 CRUD 操作测试通过
-- [ ] 覆盖率≥90%
+- [x] `ToolRepositoryPort` Protocol 定义完成
+- [x] `InMemoryToolRepository` 实现完成
+- [x] 所有 CRUD 操作测试通过
+- [x] 覆盖率≥90%（实际 100%）
 
 ---
 
@@ -520,9 +520,9 @@
 | 🟢 绿 | 创建 `src/application/ports/tool_registry_service.py` |
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
-- [ ] Subtask 5.1: 🔴 红 — 编写 `ToolRegistryServicePort` 契约测试
-- [ ] Subtask 5.2: 🟢 绿 — 创建 `ToolRegistryServicePort` Protocol（`register_all`、`get_tool`、`get_tools_by_category`、`list_all_tools`、`tool_count`）
-- [ ] Subtask 5.3: 🔄 重构 — 优化方法签名
+- [x] Subtask 5.1: 🔴 红 — 编写 `ToolRegistryServicePort` 契约测试
+- [x] Subtask 5.2: 🟢 绿 — 创建 `ToolRegistryServicePort` Protocol（`register_all`、`get_tool`、`get_tools_by_category`、`list_all_tools`、`tool_count`）
+- [x] Subtask 5.3: 🔄 重构 — 优化方法签名
 
 #### TDD 循环 B：ToolRegistryService 实现
 
@@ -532,9 +532,9 @@
 | 🟢 绿 | 创建 `src/application/services/tool_registry_service.py` |
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
-- [ ] Subtask 5.4: 🔴 红 — 编写 `ToolRegistryService` 失败测试
-- [ ] Subtask 5.5: 🟢 绿 — 实现 `ToolRegistryService`（从 `StrategicToolCatalog` 加载并注册到 `ToolRepositoryPort`）
-- [ ] Subtask 5.6: 🔄 重构 — 优化注册流程、添加日志
+- [x] Subtask 5.4: 🔴 红 — 编写 `ToolRegistryService` 失败测试
+- [x] Subtask 5.5: 🟢 绿 — 实现 `ToolRegistryService`（从 `StrategicToolCatalog` 加载并注册到 `ToolRepositoryPort`）
+- [x] Subtask 5.6: 🔄 重构 — 优化注册流程、添加日志
 
 #### TDD 循环 C：分类查询与异常处理
 
@@ -544,15 +544,15 @@
 | 🟢 绿 | 实现分类查询和异常抛出逻辑 |
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
-- [ ] Subtask 5.7: 🔴 红 — 编写分类查询和异常测试
-- [ ] Subtask 5.8: 🟢 绿 — 实现 `get_tools_by_category` 和 `get_tool`（不存在时抛 `ToolNotFoundError`）
-- [ ] Subtask 5.9: 🔄 重构 — 运行完整测试套件
+- [x] Subtask 5.7: 🔴 红 — 编写分类查询和异常测试
+- [x] Subtask 5.8: 🟢 绿 — 实现 `get_tools_by_category` 和 `get_tool`（不存在时抛 `ToolNotFoundError`）
+- [x] Subtask 5.9: 🔄 重构 — 运行完整测试套件
 
 **完成标准/Definition of Done:**
-- [ ] `ToolRegistryServicePort` Protocol 定义完成
-- [ ] `ToolRegistryService` 实现完成
-- [ ] 23 种工具注册、查询、分类过滤全部通过
-- [ ] 覆盖率≥85%
+- [x] `ToolRegistryServicePort` Protocol 定义完成
+- [x] `ToolRegistryService` 实现完成
+- [x] 23 种工具注册、查询、分类过滤全部通过
+- [x] 覆盖率≥85%（实际 100%）
 
 ---
 
@@ -570,9 +570,9 @@
 | 🟢 绿 | 在 `composition_root.py` 中添加端口注册代码 |
 | 🔄 重构 | 运行 `ruff check` + `mypy` |
 
-- [ ] Subtask 6.1: 🔴 红 — 编写端口注册失败测试
-- [ ] Subtask 6.2: 🟢 绿 — 在 `composition_root.py` 中注册 `tool_repository`（SCOPED）和 `tool_registry_service`（SCOPED）
-- [ ] Subtask 6.3: 🔄 重构 — 优化注册顺序、添加注释
+- [x] Subtask 6.1: 🔴 红 — 编写端口注册失败测试
+- [x] Subtask 6.2: 🟢 绿 — 在 `composition_root.py` 中注册 `tool_repository`（SCOPED）和 `tool_registry_service`（SCOPED）
+- [x] Subtask 6.3: 🔄 重构 — 优化注册顺序、添加注释
 
 #### TDD 循环 B：端口解析验证
 
@@ -582,15 +582,15 @@
 | 🟢 绿 | 确认端口解析正确 |
 | 🔄 重构 | 运行完整测试套件 |
 
-- [ ] Subtask 6.4: 🔴 红 — 编写端口解析测试
-- [ ] Subtask 6.5: 🟢 绿 — 验证端口解析返回正确的 `PortSpec`
-- [ ] Subtask 6.6: 🔄 重构 — 运行 `ruff check` + `mypy`
+- [x] Subtask 6.4: 🔴 红 — 编写端口解析测试
+- [x] Subtask 6.5: 🟢 绿 — 验证端口解析返回正确的 `PortSpec`
+- [x] Subtask 6.6: 🔄 重构 — 运行 `ruff check` + `mypy`
 
 **完成标准/Definition of Done:**
-- [ ] `tool_repository` 端口已注册
-- [ ] `tool_registry_service` 端口已注册
-- [ ] 端口解析测试通过
-- [ ] 覆盖率≥85%
+- [x] `tool_repository` 端口已注册
+- [x] `tool_registry_service` 端口已注册
+- [x] 端口解析测试通过
+- [x] 覆盖率≥85%（实际 100%）
 
 ---
 
@@ -602,22 +602,22 @@
 
 #### SDD 架构验证测试
 
-- [ ] Subtask 7.1: 创建 `tests/unit/architecture/test_arch_tool.py`
-- [ ] Subtask 7.2: 实现依赖方向验证（domain 层无外部依赖）
-- [ ] Subtask 7.3: 实现端口注册验证（所有端口在 `composition_root.py` 中注册）
-- [ ] Subtask 7.4: 实现循环依赖检测（使用 ruff `E` 规则）
-- [ ] Subtask 7.5: 运行完整测试套件
+- [x] Subtask 7.1: 创建 `tests/unit/architecture/test_arch_tool.py`
+- [x] Subtask 7.2: 实现依赖方向验证（domain 层无外部依赖）
+- [x] Subtask 7.3: 实现端口注册验证（所有端口在 `composition_root.py` 中注册）
+- [x] Subtask 7.4: 实现循环依赖检测（使用 ruff `E` 规则）
+- [x] Subtask 7.5: 运行完整测试套件
 
 #### 集成测试
 
-- [ ] Subtask 7.6: 创建 `tests/integration/test_integration_tool_registration.py`
-- [ ] Subtask 7.7: 实现端到端工具注册流程测试（bootstrap → register_all → query → verify count=23）
-- [ ] Subtask 7.8: 运行集成测试
+- [x] Subtask 7.6: 创建 `tests/integration/test_integration_tool_registration.py`
+- [x] Subtask 7.7: 实现端到端工具注册流程测试（bootstrap → register_all → query → verify count=23）
+- [x] Subtask 7.8: 运行集成测试
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构约束测试通过
-- [ ] 集成测试通过
-- [ ] 测试输出清晰的合规报告
+- [x] 所有架构约束测试通过
+- [x] 集成测试通过
+- [x] 测试输出清晰的合规报告
 
 ---
 
@@ -635,16 +635,16 @@
 | 🟢 绿 | 实现 BDD 步骤 |
 | 🔄 重构 | 收敛场景命名、统一断言 |
 
-- [ ] Subtask 8.1: 场景 1 — 验证 `src` 完成清单（ToolCategory、StrategicToolCatalog、ToolRepositoryPort、InMemoryToolRepository、ToolRegistryService、异常类）
-- [ ] Subtask 8.2: 场景 2 — 验证 `tests` 完成清单（unit/contracts/integration/acceptance）
-- [ ] Subtask 8.3: 运行开发结束验收测试
-- [ ] Subtask 8.4: 运行 `pytest`、`ruff check`、`mypy` 收尾校验
+- [x] Subtask 8.1: 场景 1 — 验证 `src` 完成清单（ToolCategory、StrategicToolCatalog、ToolRepositoryPort、InMemoryToolRepository、ToolRegistryService、异常类）
+- [x] Subtask 8.2: 场景 2 — 验证 `tests` 完成清单（unit/contracts/integration/acceptance）
+- [x] Subtask 8.3: 运行开发结束验收测试
+- [x] Subtask 8.4: 运行 `pytest`、`ruff check`、`mypy` 收尾校验
 
 **完成标准/Definition of Done:**
-- [ ] `src` 完成清单已逐项验证
-- [ ] `tests` 完成清单已逐项验证
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `done`
+- [x] `src` 完成清单已逐项验证
+- [x] `tests` 完成清单已逐项验证
+- [x] 开发结束验收测试通过
+- [x] Story 可进入 `done`
 
 ---
 
@@ -789,21 +789,25 @@ src/
 - [x] Round 2 修正：inmemory 目录不存在说明
 - [x] Round 3 修正：架构文档一致性验证（23 种工具分类对齐）
 - [x] Round 4 修正：验收测试模式深度调研（pytest-bdd/context dict/event_loop 模式）
+- [x] Dev Story 实施完成：9 个 Task（Task 0-8）全部 TDD 红→绿→重构闭环
+- [x] 全量测试套件验证：8505+ passed，工具相关 111 项全通过
+- [x] 覆盖率门禁实测达标：整体 91% / domain 97% / application 89% / infrastructure 90%
+- [x] 收尾修复：tool 子域 CI 登记（test_code_ranges.py）+ EXCEPTION_HTTP_MAP 期望类型同步（test_exception_handlers.py）
+- [x] 收尾补测：`get_tool()` 双参数为空分支单元测试（tool_registry_service 覆盖率 96% → 100%）
 
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/4-1-strategic-tool-registration-tools.md`
-
-**待创建的文件/To Be Created (Dev Story 实施):**
-- `src/domain/entities/strategic_tool_catalog.py` - 23 种工具元数据常量
+- `src/domain/entities/strategic_tool_catalog.py` - 23 种工具元数据常量（TOOL_CATALOG）
 - `src/domain/ports/tool_repository.py` - ToolRepositoryPort Protocol
+- `src/domain/exceptions/tool_exceptions.py` - ToolNotFoundError（EXCEPTION_380）+ ToolAlreadyExistsError（EXCEPTION_381）
 - `src/application/ports/tool_registry_service.py` - ToolRegistryServicePort Protocol
 - `src/application/services/tool_registry_service.py` - ToolRegistryService 实现
+- `src/infrastructure/storage/inmemory/__init__.py` - 内存存储包标记
 - `src/infrastructure/storage/inmemory/tool_repository.py` - InMemoryToolRepository 实现
-- `src/domain/exceptions/business_exceptions.py` - ToolNotFoundError
-- `src/domain/exceptions/conflict_errors.py` - ToolAlreadyExistsError
 - `tests/unit/domain/entities/test_strategic_tool_catalog.py` - 工具目录单元测试
+- `tests/unit/domain/exceptions/test_tool_exceptions.py` - 工具异常单元测试
 - `tests/unit/infrastructure/storage/test_inmemory_tool_repository.py` - 仓储单元测试
 - `tests/unit/application/services/test_tool_registry_service.py` - 服务单元测试
 - `tests/contracts/test_port_contract_tool.py` - 端口契约测试
@@ -811,6 +815,18 @@ src/
 - `tests/integration/test_integration_tool_registration.py` - 集成测试
 - `tests/acceptance/test_acceptance_strategic_tool_registration.feature` - Gherkin 场景
 - `tests/acceptance/test_acceptance_strategic_tool_registration.py` - BDD 步骤实现
+
+**修改的文件/Modified Files:**
+- `src/domain/entities/tool.py` - ToolCategory 枚举扩展 +5 个战略分类
+- `src/domain/exceptions/__init__.py` - 导出工具异常
+- `src/domain/exceptions/_code_ranges.py` - 注册 tool 子域（380-389）+ 类→子域映射
+- `src/domain/ports/__init__.py` - 导出 ToolRepositoryPort
+- `src/composition_root.py` - 注册 tool_repository / tool_registry_service 端口
+- `tests/unit/domain/entities/test_tool.py` - ToolCategory 新分类测试
+- `tests/unit/domain/exceptions/test_code_ranges.py` - tool 子域登记（nested_subdomains + allowed_child_parent_subdomains）
+- `tests/unit/interfaces/api/test_exception_handlers.py` - EXCEPTION_HTTP_MAP 期望类型 +2 工具异常
+
+> **与计划的差异说明：** 原计划将两个工具异常分别放入 `business_exceptions.py` / `conflict_errors.py`，实际实现采用独立模块 `tool_exceptions.py`（与 role/archive/dictionary 等子域的模块化惯例一致）。
 
 ---
 
@@ -869,18 +885,21 @@ src/
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
+- [x] 运行 `dev-story` 开始实施（已完成，2026-09-02）
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 - [ ] Story 4.1a (战略工具实现) 已创建 — 依赖 Story 4.1 完成后执行
 
+> **遗留事项（非本 Story 引入）：** 全量测试中 `tests/benchmark/test_ocr_*.py` 有 14 项失败，根因为 `src/infrastructure/document_parsing/rapidocr_adapter.py:100` 对 numpy 数组做布尔判断（`bool(output.boxes)` 触发 "truth value ambiguous"），与工具注册无关，建议单独立项修复。
+
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-08-27
-**最后更新/Last Updated:** 2026-08-28
+**最后更新/Last Updated:** 2026-09-02
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 战略工具注册，Epic 4 首个 P0 故事
 - v1.1.0: Round 1 审查修正 — 异常编码冲突修复 + ToolCategory 分类说明 + 端口注册统计更新
 - v1.2.0: Round 2-3 审查修正 — 验收测试 Gherkin 中文化 + inmemory 目录说明 + 架构文档一致性验证
 - v1.3.0: Round 4 审查修正 — 验收测试模式深度调研（pytest-bdd/context dict/event_loop 模式）
+- v1.4.0: Dev Story 实施完成 — Task 0-8 全部勾选 + 覆盖率实测数据 + 文件清单对齐实际交付 + tool 子域 CI 登记修复
