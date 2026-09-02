@@ -60,6 +60,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "relevance": (360, 369),
     # 溯源子域（370-379）
     "traceability": (370, 379),
+    # 工具子域（380-389）
+    "tool": (380, 389),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -169,6 +171,9 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     # traceability_exceptions.py
     "TraceabilityError": "traceability",
     "TraceabilityNotFoundError": "traceability",
+    # tool_exceptions.py
+    "ToolNotFoundError": "tool",
+    "ToolAlreadyExistsError": "tool",
 }
 
 

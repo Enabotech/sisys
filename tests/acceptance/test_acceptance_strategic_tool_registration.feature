@@ -1,0 +1,60 @@
+# language: zh-CN
+功能: 战略工具注册
+  作为工具工程师
+  我希望系统注册 23 种战略工具
+  以便 Agent 可以调用这些工具执行战略分析
+
+  场景: 23 种战略工具全部注册成功
+    假如 系统已启动，工具注册服务已初始化
+    当 执行工具注册引导流程
+    那么 23 种战略工具全部注册成功
+    并且 每种工具有唯一 tool_id
+    并且 每种工具 name 非空且唯一
+    并且 每种工具 category 属于 ToolCategory 枚举值
+    并且 每种工具 input_schema 和 output_schema 为有效 JSON Schema 字典
+    并且 所有工具 status 默认为 ACTIVE
+    并且 所有工具 version 默认为 1.0.0
+
+  场景: 按分类查询工具返回正确数量
+    假如 23 种战略工具已注册
+    当 按分类 ENVIRONMENT_ANALYSIS 查询
+    那么 返回 3 种工具
+    当 按分类 COMPETITIVE_ANALYSIS 查询
+    那么 返回 3 种工具
+    当 按分类 STRATEGIC_SELECTION 查询
+    那么 返回 6 种工具
+    当 按分类 BUSINESS_MODEL 查询
+    那么 返回 3 种工具
+    当 按分类 EXECUTION_MANAGEMENT 查询
+    那么 返回 8 种工具
+
+  场景: 按 ID 查询工具
+    假如 23 种战略工具已注册
+    当 按 tool_id 查询 PESTEL 分析
+    那么 返回完整工具元数据
+    并且 工具名称为 PESTEL 分析
+    并且 工具分类为 ENVIRONMENT_ANALYSIS
+
+  场景: 按名称查询工具
+    假如 23 种战略工具已注册
+    当 按 name 查询 波特五力
+    那么 返回完整工具元数据
+    并且 工具名称为 波特五力
+    并且 工具分类为 ENVIRONMENT_ANALYSIS
+
+  场景: 查询不存在的工具抛出 ToolNotFoundError
+    假如 23 种战略工具已注册
+    当 按 tool_id 查询不存在的工具
+    那么 抛出 ToolNotFoundError
+
+  场景: 查询不存在的工具名称抛出 ToolNotFoundError
+    假如 23 种战略工具已注册
+    当 按 name 查询不存在的工具
+    那么 抛出 ToolNotFoundError
+
+  场景: 端口注册验证
+    假如 应用启动时执行 composition_root.bootstrap()
+    那么 tool_repository 端口已注册
+    并且 tool_registry_service 端口已注册
+    并且 PortRegistry.get("tool_repository") 返回非空 PortSpec
+    并且 PortRegistry.get("tool_registry_service") 返回非空 PortSpec

@@ -22,13 +22,29 @@ class ToolStatus(str, Enum):
 
 
 class ToolCategory(str, Enum):
-    """工具分类枚举"""
+    """工具分类枚举
 
+    两维度分类体系：
+    - 原有分类：按功能类型划分
+      （ANALYSIS/GENERATION/VALIDATION/VISUALIZATION/OTHER）
+    - 新增战略分类：按业务领域划分
+      （ENVIRONMENT_ANALYSIS/COMPETITIVE_ANALYSIS/STRATEGIC_SELECTION/
+       BUSINESS_MODEL/EXECUTION_MANAGEMENT）
+    两者维度不同，共存不冲突。
+    """
+
+    # 原有功能分类
     ANALYSIS = "analysis"
     GENERATION = "generation"
     VALIDATION = "validation"
     VISUALIZATION = "visualization"
     OTHER = "other"
+    # 战略工具箱业务领域分类
+    ENVIRONMENT_ANALYSIS = "environment_analysis"
+    COMPETITIVE_ANALYSIS = "competitive_analysis"
+    STRATEGIC_SELECTION = "strategic_selection"
+    BUSINESS_MODEL = "business_model"
+    EXECUTION_MANAGEMENT = "execution_management"
 
 
 @dataclass

@@ -5,7 +5,7 @@ from typing import cast
 
 import pytest
 
-from src.domain.entities.tool import Tool, ToolStatus
+from src.domain.entities.tool import Tool, ToolCategory, ToolStatus
 from src.domain.exceptions import EntityValidationError
 
 
@@ -30,6 +30,47 @@ class TestToolCreation:
         assert tool.status == ToolStatus.ACTIVE
         assert tool.input_schema == {}
         assert tool.output_schema == {}
+
+
+class TestToolCategory:
+    """Test ToolCategory enum extension for strategic tools."""
+
+    def test_original_categories_exist(self):
+        """Original 5 categories remain intact."""
+        assert ToolCategory.ANALYSIS == "analysis"
+        assert ToolCategory.GENERATION == "generation"
+        assert ToolCategory.VALIDATION == "validation"
+        assert ToolCategory.VISUALIZATION == "visualization"
+        assert ToolCategory.OTHER == "other"
+
+    def test_strategic_categories_exist(self):
+        """5 new strategic categories exist."""
+        assert ToolCategory.ENVIRONMENT_ANALYSIS == "environment_analysis"
+        assert ToolCategory.COMPETITIVE_ANALYSIS == "competitive_analysis"
+        assert ToolCategory.STRATEGIC_SELECTION == "strategic_selection"
+        assert ToolCategory.BUSINESS_MODEL == "business_model"
+        assert ToolCategory.EXECUTION_MANAGEMENT == "execution_management"
+
+    def test_total_category_count(self):
+        """ToolCategory has exactly 10 values (5 original + 5 strategic)."""
+        assert len(ToolCategory) == 10
+
+    def test_all_categories_are_unique(self):
+        """All category values are unique."""
+        values = [cat.value for cat in ToolCategory]
+        assert len(values) == len(set(values))
+
+    def test_strategic_categories_do_not_collide_with_original(self):
+        """Strategic categories do not overlap with original categories."""
+        original = {"analysis", "generation", "validation", "visualization", "other"}
+        strategic = {
+            "environment_analysis",
+            "competitive_analysis",
+            "strategic_selection",
+            "business_model",
+            "execution_management",
+        }
+        assert original.isdisjoint(strategic)
 
 
 class TestToolValidation:

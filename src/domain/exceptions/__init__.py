@@ -113,6 +113,10 @@ from src.domain.exceptions.system_exceptions import (
     StorageError,
     SystemException,
 )
+from src.domain.exceptions.tool_exceptions import (
+    ToolAlreadyExistsError,
+    ToolNotFoundError,
+)
 from src.domain.exceptions.traceability_exceptions import (
     TraceabilityError,
     TraceabilityNotFoundError,
@@ -224,4 +228,7 @@ __all__ = [
     # 溯源异常
     "TraceabilityError",
     "TraceabilityNotFoundError",
+    # 工具异常
+    "ToolNotFoundError",
+    "ToolAlreadyExistsError",
 ]
