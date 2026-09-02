@@ -115,6 +115,13 @@ class TestToolRegistryServiceGetTool:
         with pytest.raises(ToolNotFoundError):
             service.get_tool(tool_name="Non-existent Tool")
 
+    def test_get_tool_without_id_or_name(self):
+        """Get tool without id or name raises ToolNotFoundError."""
+        repo = InMemoryToolRepository()
+        service = ToolRegistryService(repository=repo)
+        with pytest.raises(ToolNotFoundError):
+            service.get_tool()
+
 
 class TestToolRegistryServiceCategoryQuery:
     """Test ToolRegistryService.get_tools_by_category."""

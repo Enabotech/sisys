@@ -83,6 +83,8 @@ from src.domain.exceptions import (
     SystemException,
     ThirdPartyError,
     TimeoutError,
+    ToolAlreadyExistsError,
+    ToolNotFoundError,
     TraceabilityError,
     TraceabilityNotFoundError,
     TransferNotApprovedError,
@@ -255,6 +257,9 @@ class TestExceptionHttpMap:
             # 溯源异常
             TraceabilityError,
             TraceabilityNotFoundError,
+            # 工具异常
+            ToolNotFoundError,
+            ToolAlreadyExistsError,
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

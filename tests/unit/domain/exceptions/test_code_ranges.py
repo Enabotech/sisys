@@ -153,6 +153,8 @@ def test_subclass_code_in_same_subdomain_as_parent() -> None:
         # 溯源子域 → external 基类 / business 基类
         ("traceability", "external"),
         ("traceability", "business"),
+        # 工具子域 → business 基类（工具注册）
+        ("tool", "business"),
         # 兜底 → external 基类
         ("fallback", "external"),
     }
@@ -286,6 +288,7 @@ def test_all_subdomain_ranges_are_valid() -> None:
         "reranker": "external",
         "relevance": "external",
         "traceability": "external",
+        "tool": "external",
     }
 
     for subdomain, (start, end) in CODE_RANGES.items():
