@@ -77,6 +77,8 @@ from src.domain.exceptions import (
     SystemException,
     ThirdPartyError,
     TimeoutError,
+    ToolAlreadyExistsError,
+    ToolNotFoundError,
     TraceabilityError,
     TraceabilityNotFoundError,
     TransferNotApprovedError,
@@ -181,6 +183,9 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     # 溯源异常
     TraceabilityError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 370 — 溯源评估调用失败（精确注册，避免回退 502）
     TraceabilityNotFoundError: status.HTTP_404_NOT_FOUND,  # 371 — 按 ID/文档查询引文未找到（精确注册，避免回退 400）
+    # 工具异常
+    ToolNotFoundError: status.HTTP_404_NOT_FOUND,  # 380 — 工具不存在
+    ToolAlreadyExistsError: status.HTTP_409_CONFLICT,  # 381 — 工具已存在（同 ID 或同名）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

@@ -136,7 +136,7 @@ development_status:
   # Epic 4: 战略工具箱 - 📋 待开始
   # ===========================================================================
   epic-4: in-progress
-  4-1-strategic-tool-registration-tools: ready-for-dev
+  4-1-strategic-tool-registration-tools: done
   4-1a-strategic-tool-impl: backlog
   4-2-toolchain-orchestration-dag: backlog
   4-3-tool-io-schema-validation: backlog

@@ -2164,6 +2164,40 @@ def bootstrap() -> None:
         tags=("retrieval", "compression", "domain"),
     )
 
+    # === Strategic Toolbox Ports (Story 4.1) ===
+    from src.application.ports.tool_registry_service import ToolRegistryServicePort
+    from src.domain.ports.tool_repository import ToolRepositoryPort
+
+    register_port(
+        name="tool_repository",
+        version="v1.0.0",
+        interface=ToolRepositoryPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.inmemory.tool_repository",
+            fromlist=["InMemoryToolRepository"],
+        ).InMemoryToolRepository(),
+        module="src.infrastructure.storage.inmemory.tool_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "repository", "inmemory"),
+    )
+
+    register_port(
+        name="tool_registry_service",
+        version="v1.0.0",
+        interface=ToolRegistryServicePort,
+        impl=lambda resolver: __import__(
+            "src.application.services.tool_registry_service",
+            fromlist=["ToolRegistryService"],
+        ).ToolRegistryService(
+            repository=resolver.resolve("tool_repository"),
+        ),
+        module="src.application.services.tool_registry_service",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "registry", "service"),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线
