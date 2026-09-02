@@ -863,22 +863,48 @@ src/
 
 ### 🔍 代码审查发现 Review Findings
 
-> 待代码审查后填写
+**审查日期:** 2026-09-03
+**审查模式:** full（5个Agent并行：领域层 / 应用层 / 基础设施层 / 测试架构 / 文档一致性）
+**审查目标:** 聚焦科学性、合理性、正确性、一致性、可行性
 
-**审查日期:** -
-**审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+#### Round 1 发现汇总
+
+5个Agent并行调研完成，共识别 **10 个 P0 问题 + 1 个 P1 信息核对问题**：
+
+| # | 维度 | 问题 | 严重度 |
+|---|------|------|--------|
+| P0-1 | 应用层 | `get_tool()` 空参数抛 `ToolNotFoundError` 语义错位（应抛 `EntityValidationError`） | P0 |
+| P0-2 | 领域层 | `ToolNotFoundError` 直接继承 `BusinessException`，违反 `NotFoundError` 中间层惯例 | P0 |
+| P0-3 | 测试层 | `test_code_ranges.py:nested_subdomains` 残留 `"tool": "external"` 与继承链矛盾 | P0 |
+| P0-4 | 应用层 | `tool_count()` 为 O(N) 扫描，仓储缺 `count()` 方法违反 OCP | P0 |
+| P0-5 | 应用层 | `register_all` 静默吞 `ToolAlreadyExistsError` 无日志，违反可观测性 | P0 |
+| P0-6 | 基础设施层 | `InMemoryToolRepository` 缺并发安全保护（与同类 InMemory 实现严重不一致） | P0 |
+| P0-7 | 基础设施层 | `save()` 未调用 `Tool.validate()`，数据完整性下沉到上游 | P0 |
+| P0-8 | 测试层 | 单元测试 17 处违反 Mock 原则使用真实仓储 | P0 |
+| P0-9 | 测试层 | 验收测试未覆盖 `ToolAlreadyExistsError` 重复注册路径 | P0 |
+| P0-10 | 测试层 | 架构测试 docstring 声称"循环依赖检测"但实际未实现 | P0 |
+| P1-1 | 文档层 | Story 声称"132 端口注册"实际为 134 个（信息核对问题） | P1 |
 
 #### 需决策 Decision Needed
 
-- [ ] - 待填写
+- [ ] **R1-1 异常语义修正**：`get_tool()` 空参数异常类型从 `ToolNotFoundError` → `EntityValidationError`
+- [ ] **R1-2 异常继承修正**：`ToolNotFoundError` 基类从 `BusinessException` → `NotFoundError`
+- [ ] **R1-3 清理残留**：移除 `test_code_ranges.py:291` 的 `"tool": "external"`
+- [ ] **R1-4 仓储 count() O(1)**：在 `ToolRepositoryPort` 添加 `count()` 方法
+- [ ] **R1-5 register_all 日志**：添加 `logger.debug` 记录幂等跳过
 
-#### 已修复 Patch
+#### 已修复 Patch（本轮）
 
-- [ ] - 待填写
+- [ ] - 待 Round 1 C4 完成
 
-#### 已推迟 Defer
+#### 已推迟 Defer（本轮不处理，留待 Round 2-5）
 
-- [ ] - 待填写
+- [ ] P0-6 并发安全保护 → Round 2 聚焦基础设施层
+- [ ] P0-7 `save()` 调用 `validate()` → Round 2 聚焦数据完整性
+- [ ] P0-8 单元测试 Mock 化 → Round 3 聚焦测试架构
+- [ ] P0-9 验收测试重复注册覆盖 → Round 3 聚焦测试盲区
+- [ ] P0-10 架构测试循环依赖 → Round 4 聚焦架构测试
+- [ ] P1-1 端口注册数信息核对 → Round 4 文档一致性
 
 ---
 
@@ -894,12 +920,13 @@ src/
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-08-27
-**最后更新/Last Updated:** 2026-09-02
+**最后更新/Last Updated:** 2026-09-03
 **更新说明/Description:**
 - v1.0.0: 创建故事文件 — 战略工具注册，Epic 4 首个 P0 故事
 - v1.1.0: Round 1 审查修正 — 异常编码冲突修复 + ToolCategory 分类说明 + 端口注册统计更新
 - v1.2.0: Round 2-3 审查修正 — 验收测试 Gherkin 中文化 + inmemory 目录说明 + 架构文档一致性验证
 - v1.3.0: Round 4 审查修正 — 验收测试模式深度调研（pytest-bdd/context dict/event_loop 模式）
 - v1.4.0: Dev Story 实施完成 — Task 0-8 全部勾选 + 覆盖率实测数据 + 文件清单对齐实际交付 + tool 子域 CI 登记修复
+- v1.5.0: Round 1 代码审查修订 — 5 Agent 并行调研完成，识别 10 个 P0 + 1 个 P1 问题，规划 5 项修复（R1-1~R1-5）

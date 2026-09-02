@@ -15,6 +15,7 @@ from pytest_bdd import given, scenarios, then, when
 
 from src.application.services.tool_registry_service import ToolRegistryService
 from src.domain.entities.tool import ToolCategory
+from src.domain.exceptions import EntityValidationError
 from src.domain.exceptions.tool_exceptions import ToolNotFoundError
 from src.domain.ports.registry import _global_registry
 from src.infrastructure.storage.inmemory.tool_repository import InMemoryToolRepository
@@ -259,6 +260,30 @@ def then_tool_name_porters(context: dict[str, Any]) -> None:
 def then_tool_not_found_error(context: dict[str, Any]) -> None:
     """验证抛出 ToolNotFoundError"""
     assert isinstance(context.get("query_error"), ToolNotFoundError)
+
+
+@when("不传任何参数查询工具")
+def when_query_without_params(context: dict[str, Any]) -> None:
+    """不传任何参数查询工具（参数验证失败路径）"""
+    try:
+        context["service"].get_tool()
+        context["query_error"] = None
+    except EntityValidationError as exc:
+        context["query_error"] = exc
+
+
+@then("抛出 EntityValidationError")
+def then_entity_validation_error(context: dict[str, Any]) -> None:
+    """验证抛出 EntityValidationError"""
+    assert isinstance(context.get("query_error"), EntityValidationError)
+
+
+@then("错误码为 EXCEPTION_242")
+def then_error_code_242(context: dict[str, Any]) -> None:
+    """验证错误码为 EXCEPTION_242"""
+    err = context.get("query_error")
+    assert err is not None
+    assert err.code == "EXCEPTION_242"
 
 
 # ===================================================================

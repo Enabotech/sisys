@@ -57,6 +57,10 @@ class TestToolRepositoryPortProtocol:
         """ToolRepositoryPort has delete method."""
         assert hasattr(ToolRepositoryPort, "delete")
 
+    def test_has_count_method(self):
+        """ToolRepositoryPort has count method."""
+        assert hasattr(ToolRepositoryPort, "count")
+
     def test_implements_protocol(self):
         """InMemoryToolRepository implements ToolRepositoryPort."""
         assert isinstance(InMemoryToolRepository(), ToolRepositoryPort)
@@ -159,3 +163,34 @@ class TestInMemoryToolRepositoryCRUD:
         repo = InMemoryToolRepository()
         assert repo.list_all() == []
         assert repo.list_by_category(ToolCategory.ANALYSIS) == []
+
+
+class TestInMemoryToolRepositoryCount:
+    """Test InMemoryToolRepository.count O(1) 行为."""
+
+    def test_count_empty_repository(self):
+        """空仓储 count 返回 0."""
+        repo = InMemoryToolRepository()
+        assert repo.count() == 0
+
+    def test_count_after_single_save(self):
+        """单次保存后 count 返回 1."""
+        repo = InMemoryToolRepository()
+        repo.save(_make_tool())
+        assert repo.count() == 1
+
+    def test_count_after_multiple_saves(self):
+        """多次保存后 count 返回累计数量."""
+        repo = InMemoryToolRepository()
+        for i in range(5):
+            repo.save(_make_tool(name=f"Tool {i}"))
+        assert repo.count() == 5
+
+    def test_count_after_delete(self):
+        """删除后 count 减少."""
+        repo = InMemoryToolRepository()
+        tool = _make_tool()
+        repo.save(tool)
+        assert repo.count() == 1
+        repo.delete(tool.tool_id)
+        assert repo.count() == 0

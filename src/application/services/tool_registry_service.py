@@ -6,13 +6,16 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from src.domain.entities.strategic_tool_catalog import TOOL_CATALOG
 from src.domain.entities.tool import Tool, ToolCategory
-from src.domain.exceptions import ToolNotFoundError
+from src.domain.exceptions import EntityValidationError
 from src.domain.exceptions.tool_exceptions import ToolAlreadyExistsError
 from src.domain.ports.tool_repository import ToolRepositoryPort
+
+logger = logging.getLogger(__name__)
 
 
 class ToolRegistryService:
@@ -34,14 +37,17 @@ class ToolRegistryService:
         """注册所有战略工具（从 StrategicToolCatalog 加载）
 
         每次调用会从 TOOL_CATALOG 常量加载 23 种工具元数据，
-        通过 repository.save() 持久化。
+        通过 repository.save() 持久化。重复注册时记录 debug 日志并跳过。
         """
         for tool in TOOL_CATALOG:
             try:
                 self._repository.save(tool)
-            except ToolAlreadyExistsError:
-                # 已存在则跳过（幂等性）
-                pass
+            except ToolAlreadyExistsError as exc:
+                logger.debug(
+                    "工具已注册，跳过: id=%s name=%s",
+                    exc.context.get("tool_id"),
+                    exc.context.get("tool_name"),
+                )
 
     def get_tool(
         self,
@@ -58,13 +64,16 @@ class ToolRegistryService:
             工具实体
 
         Raises:
-            ToolNotFoundError: 工具不存在
+            EntityValidationError: 参数缺失（tool_id 与 tool_name 同时为空）
         """
         if tool_id is not None:
             return self._repository.get_by_id(tool_id)
         if tool_name is not None:
             return self._repository.get_by_name(tool_name)
-        raise ToolNotFoundError(message="Either tool_id or tool_name must be provided")
+        raise EntityValidationError(
+            message="Either tool_id or tool_name must be provided",
+            context={"parameter": "tool_id|tool_name"},
+        )
 
     def get_tools_by_category(
         self,
@@ -92,6 +101,6 @@ class ToolRegistryService:
         """获取已注册工具总数
 
         Returns:
-            工具总数
+            工具总数（委托仓储 O(1) 接口）
         """
-        return len(self._repository.list_all())
+        return self._repository.count()

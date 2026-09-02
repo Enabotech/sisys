@@ -6,11 +6,14 @@
 
 from __future__ import annotations
 
-from src.domain.exceptions.business_exceptions import BusinessException, ConflictError
+from src.domain.exceptions.business_exceptions import ConflictError, NotFoundError
 
 
-class ToolNotFoundError(BusinessException):
+class ToolNotFoundError(NotFoundError):
     """按 ID/名称查询工具不存在
+
+    继承自 NotFoundError（EXCEPTION_202），保持 HTTP 404 映射。
+    通过 code 属性覆写为 EXCEPTION_380 以纳入 tool 子域（380-389）。
 
     Attributes:
         code: 错误码 EXCEPTION_380

@@ -67,6 +67,14 @@ class ToolRepositoryPort(Protocol):
         """
         ...
 
+    def count(self) -> int:
+        """获取已注册工具总数
+
+        Returns:
+            工具总数（O(1) 操作）
+        """
+        ...
+
     def list_by_category(self, category: ToolCategory) -> list[Tool]:
         """按分类列出工具
 
