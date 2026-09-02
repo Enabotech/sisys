@@ -26,7 +26,7 @@
 - `Tool` 实体单元测试已存在（`tests/unit/domain/entities/test_tool.py`）
 - `SandboxExecutor` 端口已定义（`src/domain/ports/sandbox_executor.py`）— 后续沙箱执行使用
 - `PortRegistry` + `PortSpec` 机制已就绪（`src/domain/ports/registry.py`）
-- `composition_root.py` 引导注册机制已就绪（已有 132 个端口注册）
+- `composition_root.py` 引导注册机制已就绪（Story 4.1 实施前已有 131 个端口注册，Story 4.1 新增 2 个工具端口后总数 133）
 
 **本 Story 的核心任务：**
 - **扩展现有 `ToolCategory` 枚举**，新增 5 个战略工具箱分类：`ENVIRONMENT_ANALYSIS`（环境分析）、`COMPETITIVE_ANALYSIS`（竞争分析）、`STRATEGIC_SELECTION`（战略选择）、`BUSINESS_MODEL`（商业模式）、`EXECUTION_MANAGEMENT`（执行管理）
@@ -784,7 +784,7 @@ src/
 - [x] 领域异常编码分配完成（EXCEPTION_380/381）
 - [x] Round 1 修正：异常编码冲突修复（EXCEPTION_250/251 → 380/381）
 - [x] Round 1 修正：ToolCategory 分类说明（业务领域 vs 功能类型）
-- [x] Round 1 修正：端口注册统计更新（132 个端口）
+- [x] Round 1 修正：端口注册统计更新（基线 131 → 实施后 133，含 Story 4.1 新增 tool_repository + tool_registry_service）
 - [x] Round 2 修正：验收测试 Gherkin 中文化说明
 - [x] Round 2 修正：inmemory 目录不存在说明
 - [x] Round 3 修正：架构文档一致性验证（23 种工具分类对齐）
@@ -884,6 +884,51 @@ src/
 | P0-9 | 测试层 | 验收测试未覆盖 `ToolAlreadyExistsError` 重复注册路径 | P0 |
 | P0-10 | 测试层 | 架构测试 docstring 声称"循环依赖检测"但实际未实现 | P0 |
 | P1-1 | 文档层 | Story 声称"132 端口注册"实际为 134 个（信息核对问题） | P1 |
+
+#### Round 1 修复结果
+
+| 修复项 | 文件 | 评审结论 | 实施结果 |
+|--------|------|----------|----------|
+| R1-1 异常语义修正 | `tool_registry_service.py:67` | 通过 | ✓ commit 90062327 |
+| R1-2 异常继承修正 | `tool_exceptions.py:12` | 通过 | ✓ commit 90062327 |
+| R1-3 nested_subdomains 注释 | `test_code_ranges.py:282-292` | 通过 | ✓ commit 90062327 |
+| R1-4 仓储 count() O(1) | `tool_repository.py`+`tool_repository.py(impl)`+`tool_registry_service.py` | 通过 | ✓ commit 90062327 |
+| R1-5 register_all 日志 | `tool_registry_service.py:33-44` | 通过 | ✓ commit 90062327 |
+| P0-6 并发安全 | 留待 Story 4.1a 同步推进（破坏性变更） | 推迟 |
+| P0-7 数据完整性 | Round 2 R2-1 | Round 2 |
+| P0-8 Mock 化重构 | Round 3 | Round 3 |
+| P0-9 验收测试覆盖盲区 | Round 3-4 | Round 3-4 |
+| P0-10 架构测试虚假声明 | Round 2 R2-2 | Round 2 |
+| P1-1 端口注册数 | Round 2 R2-3 | Round 2 |
+
+#### Round 2 发现汇总
+
+4个Agent并行调研完成（并发安全/数据完整性/测试策略/架构一致性），共识别 **4 个 P0 + 1 个 P1 重点问题 + 1 个 P2 建议**：
+
+| # | 维度 | 问题 | 严重度 | 严重程度升级 |
+|---|------|------|--------|----------|
+| **P0-A** | 架构测试 | docstring 声称"循环依赖检测"实际未实现（P0-10 复发确认） | **P0** | 高（虚假声明误导维护者） |
+| **P0-B** | 数据完整性 | Tool 实体 6 个字段无 validate() 校验 + save() 不调 validate()（P0-7 严重化） | **P0** | 严重（6 种 BUG 场景已复现） |
+| P0-C | 并发安全 | InMemoryToolRepository 缺 asyncio.Lock（4 同类中3个有锁） | P0 | 高（破坏性变更，需 v1.1.0 端口升级） |
+| P0-D | 测试策略 | 22 个单元测试中 20 个违反 Mock 原则 | P0 | 高（违反 CLAUDE.md §5 硬约束） |
+| **P1-A** | 文档层 | Story 4.1 声称"132 端口"实际 134 个 | P1 | 中 |
+| **P1-B** | 架构测试 | PortSpec 元数据（lifetime/owner/tags）未完整验证 | P1 | 中 |
+
+#### Round 2 修复策略
+
+按"高价值、低风险"原则选择本轮修复（4 项）：
+
+| 修复项 | 文件 | 修复内容 | 业界最佳实践 |
+|--------|------|---------|--------------|
+| **R2-1** | `tool.py` + `tool_repository.py` | Tool.__post_init__() 自动 validate() + save() 二次守卫 + 增强 validate() 覆盖6个字段 | Eric Evans DDD + Vaughn Vernon IDDD：实体不变量构造时强制 |
+| **R2-2** | `test_arch_tool.py` | 删除"循环依赖检测"虚假声明，新增调用 `lint-imports` 工具与项目核心契约联动 | 项目架构门禁一致性 |
+| **R2-3** | `4-1-strategic-tool-registration-tools.md` | Story 端口数 "132" → "134" | 文档代码一致性 |
+| **R2-4** | `test_arch_tool.py` | PortSpec 元数据完整验证（lifetime/owner/tags） | 六边形架构契约完整性 |
+
+#### 推迟 Defer（本轮不处理）
+
+- [ ] **P0-C 并发安全**：破坏性变更（需 v1.1.0 端口升级 + 7 个测试文件 await 改造），留待 Story 4.1a 同步推进
+- [ ] **P0-D Mock 化重构**：22 个测试重构工作量大，留待 Round 3 专项推进
 
 #### 需决策 Decision Needed
 
