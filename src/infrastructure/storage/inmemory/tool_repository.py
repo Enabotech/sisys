@@ -30,12 +30,19 @@ class InMemoryToolRepository:
     def save(self, tool: Tool) -> None:
         """保存工具
 
+        仓储层二次守卫：Tool 实体的 __post_init__ 已保证构造期合法，
+        此处 validate() 用于防御构造后被外部 mutation 的脏数据
+        （Tool 是非 frozen dataclass，需保留运行时校验边界）。
+
         Args:
             tool: 工具实体
 
         Raises:
+            EntityValidationError: 工具实体违反不变量约束
             ToolAlreadyExistsError: 工具已存在（同 ID 或同名）
         """
+        # 不变量校验前置：先验数据合法性，再验重复，避免"非法且重名"被误判为冲突
+        tool.validate()
         # 检查 ID 冲突
         if tool.tool_id in self._tools_by_id:
             raise ToolAlreadyExistsError(

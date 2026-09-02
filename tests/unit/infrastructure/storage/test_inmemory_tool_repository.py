@@ -5,6 +5,7 @@ import uuid
 import pytest
 
 from src.domain.entities.tool import Tool, ToolCategory
+from src.domain.exceptions import EntityValidationError
 from src.domain.exceptions.tool_exceptions import (
     ToolAlreadyExistsError,
     ToolNotFoundError,
@@ -194,3 +195,56 @@ class TestInMemoryToolRepositoryCount:
         assert repo.count() == 1
         repo.delete(tool.tool_id)
         assert repo.count() == 0
+
+
+class TestInMemoryToolRepositorySaveGuard:
+    """Test InMemoryToolRepository.save() 仓储层二次守卫."""
+
+    def test_save_rejects_invalid_category(self):
+        """save() 拒绝 category 非枚举值（__post_init__ 在构造期已阻止，但 mutation 场景由仓储层兜底）."""
+        from typing import cast
+
+        from src.domain.entities.tool import ToolCategory
+
+        repo = InMemoryToolRepository()
+        # 绕过 __post_init__ 直接构造（模拟 mutation）
+        tool = _make_tool()
+        object.__setattr__(
+            tool,
+            "category",
+            cast(ToolCategory, "analysis"),
+        )
+        with pytest.raises(EntityValidationError, match="category 必须为 ToolCategory 枚举值"):
+            repo.save(tool)
+
+    def test_save_rejects_invalid_status(self):
+        """save() 拒绝 status 非枚举值."""
+        from typing import cast
+
+        from src.domain.entities.tool import ToolStatus
+
+        repo = InMemoryToolRepository()
+        tool = _make_tool()
+        object.__setattr__(tool, "status", cast(ToolStatus, "active"))
+        with pytest.raises(EntityValidationError, match="status 必须为 ToolStatus 枚举值"):
+            repo.save(tool)
+
+    def test_save_validates_before_duplicate_check(self):
+        """save() 校验前置：非法工具优先抛 EntityValidationError 而非 ToolAlreadyExistsError."""
+        from typing import cast
+
+        repo = InMemoryToolRepository()
+        # 第一个 tool 正常保存
+        tool1 = _make_tool()
+        repo.save(tool1)
+        # 第二个 tool 同名同 ID，但 category 被 mutation 为非法
+        tool2 = _make_tool(name=tool1.name)
+        object.__setattr__(tool2, "tool_id", tool1.tool_id)
+        object.__setattr__(
+            tool2,
+            "category",
+            cast(ToolCategory, "invalid"),
+        )
+        # 期望：抛 EntityValidationError 而非 ToolAlreadyExistsError（校验在前）
+        with pytest.raises(EntityValidationError):
+            repo.save(tool2)

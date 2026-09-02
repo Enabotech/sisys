@@ -164,3 +164,29 @@ class TestToolSchemaValidity:
         }
         for name in expected_names:
             assert name in names, f"Expected tool '{name}' not found in catalog"
+
+
+class TestCatalogImportSafety:
+    """Test TOOL_CATALOG 导入期安全性（__post_init__ 自动校验）。"""
+
+    def test_catalog_import_does_not_raise(self):
+        """TOOL_CATALOG 模块导入期不抛 EntityValidationError."""
+        from src.domain.entities.strategic_tool_catalog import TOOL_CATALOG
+
+        assert len(TOOL_CATALOG) == 23
+
+    def test_all_tools_have_valid_timestamps(self):
+        """所有工具的 created_at/updated_at 都是 timezone-aware 且时序合法."""
+        from src.domain.entities.strategic_tool_catalog import TOOL_CATALOG
+
+        for tool in TOOL_CATALOG:
+            assert tool.created_at.tzinfo is not None, f"Tool '{tool.name}' created_at is naive"
+            assert tool.updated_at.tzinfo is not None, f"Tool '{tool.name}' updated_at is naive"
+            assert tool.updated_at >= tool.created_at, f"Tool '{tool.name}' updated_at < created_at"
+
+    def test_all_tools_have_valid_version(self):
+        """所有工具的 version 符合 SemVer X.Y.Z 格式."""
+        from src.domain.entities.strategic_tool_catalog import TOOL_CATALOG
+
+        for tool in TOOL_CATALOG:
+            assert tool.validate(), f"Tool '{tool.name}' failed validate()"

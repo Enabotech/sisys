@@ -27,6 +27,7 @@ class ToolRepositoryPort(Protocol):
             tool: 工具实体
 
         Raises:
+            EntityValidationError: 工具实体违反不变量约束
             ToolAlreadyExistsError: 工具已存在（同 ID 或同名）
         """
         ...
