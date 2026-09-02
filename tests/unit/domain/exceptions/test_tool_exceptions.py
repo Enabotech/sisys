@@ -54,8 +54,14 @@ class TestToolNotFoundError:
         assert result["message"] == "Tool not found"
         assert result["context"]["tool_id"] == "tool-123"
 
-    def test_is_business_exception(self):
-        """ToolNotFoundError 继承 BusinessException."""
+    def test_is_not_found_error(self):
+        """ToolNotFoundError 继承 NotFoundError，保持 HTTP 404 映射."""
+        from src.domain.exceptions.business_exceptions import NotFoundError
+
+        assert issubclass(ToolNotFoundError, NotFoundError)
+
+    def test_is_business_exception_via_not_found(self):
+        """ToolNotFoundError 通过 NotFoundError 间接继承 BusinessException."""
         from src.domain.exceptions.business_exceptions import BusinessException
 
         assert issubclass(ToolNotFoundError, BusinessException)

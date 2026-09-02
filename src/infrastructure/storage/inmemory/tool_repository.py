@@ -93,6 +93,14 @@ class InMemoryToolRepository:
         """
         return list(self._tools_by_id.values())
 
+    def count(self) -> int:
+        """获取已注册工具总数（O(1)）
+
+        Returns:
+            工具总数
+        """
+        return len(self._tools_by_id)
+
     def list_by_category(self, category: ToolCategory) -> list[Tool]:
         """按分类列出工具
 

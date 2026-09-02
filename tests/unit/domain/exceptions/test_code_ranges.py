@@ -278,6 +278,9 @@ def test_all_subdomain_ranges_are_valid() -> None:
     violations: list[str] = []
 
     # 构建子域嵌套关系：子域 → 父域
+    # 说明：以下子域的编码范围物理嵌套于父域 external (301-399) 内，
+    # 必须在 nested_subdomains 中显式声明以跳过范围重叠检测。
+    # 子域语义归属（如 tool → business）由 allowed_child_parent_subdomains 管理。
     # embedding 和 sandbox 是 external 的二级子域，允许嵌套
     nested_subdomains: dict[str, str] = {
         "embedding": "external",
