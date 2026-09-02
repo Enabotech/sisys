@@ -184,7 +184,7 @@
 #### 领域事件 Schema (Domain Events)
 - [ ] 事件定义位于 `src/domain/events/`
 - [ ] `ToolExecuted` 已定义（`src/domain/events/tool_events.py`），本 Story 复用
-- [ ] 本 Story 新增 `ToolExecuted` 事件扩展：添加 `execution_state`、`reliability_score` 字段（可选扩展，不破坏现有 schema）
+- [ ] 本 Story 不修改事件 schema；工具执行证据（evidence）仅承载于 `ToolResult` 值对象内，不扩散至领域事件
 
 #### 数据模型 (Data Models)
 - [ ] `Tool` 实体增强（`src/domain/entities/tool.py`）：新增 `rule_version`、`reliability_score`、`execution_count`、`execution_state`
@@ -196,15 +196,16 @@
 - [ ] 禁止新增未登记端口，禁止语义重复端口，禁止未同步更新 registry / resolver / contract test
 - [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
 - [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
+- [ ] Skills 加载必须抽象为 application 层端口（`SkillLoaderPort`），禁止 use case 直接操作文件系统
 
 #### 统一端口定义注册与管理 (Port Contract)
 
 | 端口名称 | 版本 | 接口 | 实现模块 | 生命周期 | Owner | 状态 |
 |---------|------|------|---------|---------|-------|------|
 | `tool_service` | v1.0.0 | `ToolService` | `src.application.services.tool_execution_engine.ToolExecutionEngine` | SCOPED | tool-team | 新建 |
-| `tool_execution_engine` | v1.0.0 | `ToolService` | `src.application.services.tool_execution_engine.ToolExecutionEngine` | SCOPED | tool-team | 新建 |
+| `skill_loader` | v1.0.0 | `SkillLoaderPort` | `src.application.skills.skill_loader.SkillLoader` | SCOPED | tool-team | 新建 |
 
-> **实现说明：** `tool_service` 是当前可执行化阶段的领域服务端口，`tool_execution_engine` 是后续独立实现的引擎端口；若两者最终由同一类实现，则保留双注册以支持契约分离。
+> **实现说明：** 采用单端口注册策略（`tool_service`），避免“禁止语义重复端口”违规；`ToolExecutionEngine` 作为实现类注入 `tool_service` 端口，后续可按需升级接口。
 
 - [ ] 端口契约定义位于 `src/domain/services/tool_service.py`
 - [ ] 端口注册中心位于 `src/domain/ports/registry.py`，所有端口登记为 `PortSpec`
@@ -692,6 +693,8 @@ src/
 │   └── events/
 │       └── tool_events.py              # ToolExecuted 事件（复用）
 ├── application/
+│   ├── ports/
+│   │   └── skill_loader_port.py        # SkillLoaderPort（本 Story 新建）
 │   ├── services/
 │   │   └── tool_execution_engine.py    # ToolExecutionEngine（本 Story 新建）
 │   ├── use_cases/
@@ -719,9 +722,9 @@ src/
 **应用到本故事:**
 - [ ] Tool 实体增强使用 object.__setattr__ 绕过 frozen dataclass 限制（如需）
 - [ ] ToolExecutionEngine 使用 SCOPED 生命周期（每次请求独立实例）
-- [ ] 新端口在 composition_root.py 中注册，遵循现有注册模式
+- [ ] 新端口在 composition_root.py 中注册，遵循现有注册模式（单端口 `tool_service` + `skill_loader`）
 - [ ] 领域层零外部依赖，ToolService Protocol 定义在 domain 层
-- [ ] Skills 文件系统操作在 infrastructure 层实现，application 层仅定义加载逻辑
+- [ ] Skills 加载抽象为 application port（`SkillLoaderPort`），L3 脚本执行仍走 SandboxExecutor
 
 ---
 
@@ -811,6 +814,8 @@ src/
 | 3 | Round 1 | 组合根注册说明缺少方法/接口对齐 | P0 | 在 Task 7 补充 `composition_root.py` 注册时必须对齐 `list_all_tools/get_tools_by_category` |
 | 4 | Round 1 | 缺少 import-linter 与 CI 合规约束说明 | P0 | 新增“架构门禁”约束：实现 Task 7 后必须执行 `poetry run lint-imports` 并在文档 DoD 中登记 |
 | 5 | Round 1 | coverage 门禁描述分散，易误导实现优先级 | P0 | 在 Test Requirements 中明确 `scripts/check_coverage_gates.py` 为分层门禁判定源，CI 同时执行 `--fail-under=80` |
+| 6 | Round 2 | Skill 加载系统缺少可测端口定义 | P0 | 新增 `SkillLoaderPort`（application port）并补充 `load_skill_summary/load_skill_full` 接口 |
+| 7 | Round 2 | ToolExecuted 事件字段扩展范围不清晰 | P0 | 明确“本 Story 不修改事件 schema”，ToolEvidence 仅用于 ToolResult 本地证据包 |
 
 ---
 
