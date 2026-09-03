@@ -32,6 +32,9 @@ from src.domain.ports.entity_extraction import (
 )
 from src.domain.ports.l5_graph import L5GraphPort
 from src.domain.ports.llm_client import LLMConfig
+from tests.acceptance.conftest import (
+    probe_llm_endpoint_reachable as _probe_endpoint_reachable,
+)
 
 scenarios("test_acceptance_entity_extraction.feature")
 
@@ -42,29 +45,37 @@ scenarios("test_acceptance_entity_extraction.feature")
 
 
 def _get_udmr_cloud_config() -> tuple[LLMConfig, bool]:
-    """从 UDMRConfig 读取真实云端 LLM 配置
+    """从 UDMRConfig 读取真实云端 LLM 配置.
+
+    可用性判定三重门：
+    1. cloud.enabled 为 True
+    2. cloud.api_key 已设置
+    3. cloud.endpoint TCP 可达（防止内网不可达 IP 导致测试卡死）
 
     Returns:
         (LLMConfig, is_available) 元组
     """
     from src.infrastructure.config.udmr import UDMRConfig
 
-    udmr = UDMRConfig.from_env()
-    for cloud in udmr.cloud_configs:
-        if cloud.enabled and cloud.api_key:
-            llm_config = LLMConfig(
-                api_type=cloud.api_type,
-                model=cloud.model,
-                endpoint=cloud.endpoint,
-                api_key=cloud.api_key,
-                temperature=cloud.temperature,
-                max_tokens=cloud.max_tokens,
-                timeout=float(udmr.llm_timeout),
-            )
-            return llm_config, True
+    try:
+        udmr = UDMRConfig.from_env()
+        for cloud in udmr.cloud_configs:
+            if cloud.enabled and cloud.api_key and _probe_endpoint_reachable(cloud.endpoint):
+                llm_config = LLMConfig(
+                    api_type=cloud.api_type,
+                    model=cloud.model,
+                    endpoint=cloud.endpoint,
+                    api_key=cloud.api_key,
+                    temperature=cloud.temperature,
+                    max_tokens=cloud.max_tokens,
+                    timeout=float(udmr.llm_timeout),
+                )
+                return llm_config, True
+    except Exception:
+        pass
     # 回退：从 LLM_* 环境变量读取
     env_cfg = LLMConfig.from_env()
-    if env_cfg.api_key:
+    if env_cfg.api_key and _probe_endpoint_reachable(env_cfg.endpoint):
         return env_cfg, True
     return LLMConfig(), False
 

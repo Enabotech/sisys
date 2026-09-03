@@ -28,6 +28,12 @@ from src.domain.ports.llm_client import LLMConfig, LLMResponse
 from src.infrastructure.config.udmr import UDMRConfig
 from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
 from src.infrastructure.external_services.llm.litellm_llm_client import LitellmLLMClient
+from tests.acceptance.conftest import (
+    probe_llm_endpoint_reachable as _probe_endpoint_reachable,
+)
+from tests.acceptance.conftest import (
+    run_with_bdd_timeout as _run_with_timeout,
+)
 
 scenarios("test_acceptance_llm_client.feature")
 
@@ -44,6 +50,10 @@ class _TestSchema(BaseModel):
 # UDMR 真实云端 LLM 配置
 # ===================================================================
 
+# 端点可达性探测与 BDD 硬超时 helper 已迁移到 tests/acceptance/conftest.py
+# - probe_llm_endpoint_reachable: 3s TCP 探测
+# - run_with_bdd_timeout: min(cfg.timeout, 30s) 强制保护
+
 
 def _get_udmr_cloud_config() -> tuple[LLMConfig, bool]:
     """从 UDMRConfig 读取真实云端 LLM 配置
@@ -54,12 +64,17 @@ def _get_udmr_cloud_config() -> tuple[LLMConfig, bool]:
 
     返回 (LLMConfig, is_available)：
     - LLMConfig：从 UDMR 云端配置构建的领域值对象
-    - is_available：云端 LLM 是否可用（有 API Key）
+    - is_available：云端 LLM 是否真正可用（API Key + 端点 TCP 可达）
+
+    可用性判定三重门：
+    1. cloud.enabled 为 True
+    2. cloud.api_key 已设置
+    3. cloud.endpoint TCP 可达（防止 endpoint 是不可达内网 IP 导致测试卡死）
     """
     try:
         udmr = UDMRConfig.from_env()
         for cloud in udmr.cloud_configs:
-            if cloud.enabled and cloud.api_key:
+            if cloud.enabled and cloud.api_key and _probe_endpoint_reachable(cloud.endpoint):
                 llm_config = LLMConfig(
                     api_type=cloud.api_type,
                     model=cloud.model,
@@ -74,7 +89,7 @@ def _get_udmr_cloud_config() -> tuple[LLMConfig, bool]:
         pass
     # 回退：从 LLM_* 环境变量读取（由 _sync_config_to_environ() 同步）
     env_cfg = LLMConfig.from_env()
-    if env_cfg.api_key:
+    if env_cfg.api_key and _probe_endpoint_reachable(env_cfg.endpoint):
         return env_cfg, True
     return LLMConfig(), False
 
@@ -140,8 +155,10 @@ def llm_client_configured(context: dict[str, Any], udmr_config: LLMConfig):
 @when("调用 generate 生成文本")
 def call_generate(context: dict[str, Any], real_client: LitellmLLMClient, event_loop):
     try:
-        context["result"] = event_loop.run_until_complete(
-            real_client.generate(prompt="请用一句话自我介绍", config=context["config"])
+        context["result"] = _run_with_timeout(
+            event_loop,
+            real_client.generate(prompt="请用一句话自我介绍", config=context["config"]),
+            cfg_timeout=context["config"].timeout,
         )
         context["generate_success"] = True
     except Exception as e:
@@ -190,7 +207,8 @@ def define_schema(context: dict[str, Any]):
 @when("调用 structured_generate 生成结构化输出")
 def call_structured_generate(context: dict[str, Any], real_client: LitellmLLMClient, event_loop):
     try:
-        context["structured_result"] = event_loop.run_until_complete(
+        context["structured_result"] = _run_with_timeout(
+            event_loop,
             real_client.structured_generate(
                 prompt=(
                     "请生成一个 JSON 对象，包含 title（标题）、summary（摘要）、score（0-1 分数）。"
@@ -198,7 +216,8 @@ def call_structured_generate(context: dict[str, Any], real_client: LitellmLLMCli
                 ),
                 response_schema=context["schema"],
                 config=context["config"],
-            )
+            ),
+            cfg_timeout=context["config"].timeout,
         )
         context["structured_success"] = True
     except Exception as e:

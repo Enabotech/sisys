@@ -65,6 +65,12 @@ src/
   - **`import-untyped` 修复**：第三方库缺少类型注解（无 `py.typed`、无 types-* 包）时，**禁止**用 `ignore_missing_imports=true` 豁免。必须在 `stubs/<package>/__init__.pyi` 创建 PEP 561 类型存根，仅覆盖项目实际使用的 API 面
 - **验收/集成测试禁止 mock**：必须尽量用真实服务调用验证真实代码行为，`mock`仅限单元测试
 - **异常是领域契约** 禁止 raise ValueError、手动 raise HTTPException、继承内置 Exception，所有异常必须走 src/domain/exceptions/ 体系 + ExceptionHandlers 自动映射，提交前三条 grep 自查必须零输出。必须遵守 `docs/architecture/sisys-uni-exception-design.md`
+  - **新增异常完整性 Checklist（强制 4 项）**：每个新增异常类必须**同时**完成以下注册，缺一项即视为违反异常契约：
+    1. **定义文件**：在 `src/domain/exceptions/<subdomain>_exceptions.py`（或对应子域模块）定义新异常类
+    2. **`_code_ranges.py` 子域映射**：在 `src/domain/exceptions/_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 字典中注册 `{"<ClassName>": "<subdomain>"}`（**这是历史遗漏最多的步骤**，未注册会触发 `test_code_ranges` 失败）
+    3. **`__init__.py` 暴露**：在 `src/domain/exceptions/__init__.py` 的 `__all__` 列表中导出类名
+    4. **子域码段校验**：异常 code 必须在 `_code_ranges.CODE_RANGES["<subdomain>"]` 范围内（如 tool 子域 380-389）
+  - **Story 异常契约文档**：在 Story 的"领域异常契约"小节必须包含新增异常的 code、parent class、触发场景（详见 `bmad-create-story` workflow）
 - **禁止** 绕过 pre-commit hooks（`--no-verify`），提交必须通过预提交钩子检查
 - **禁止** git commit 信息中包含任何 AI 辅助署名（如 `Co-Authored-By: Claude`、`anthropic.com` 等），提交信息保持纯净
 - **禁止** 修改 `.importlinter` 中已合入的架构依赖规则
