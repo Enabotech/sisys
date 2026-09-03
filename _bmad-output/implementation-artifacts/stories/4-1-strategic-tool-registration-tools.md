@@ -938,18 +938,30 @@ src/
 - [ ] **R1-4 仓储 count() O(1)**：在 `ToolRepositoryPort` 添加 `count()` 方法
 - [ ] **R1-5 register_all 日志**：添加 `logger.debug` 记录幂等跳过
 
-#### 已修复 Patch（本轮）
+#### 已修复 Patch（Round 1-4 汇总）
 
-- [ ] - 待 Round 1 C4 完成
+| Round | 修复项 | 文件 | Commit |
+|-------|--------|------|--------|
+| R1-1 | `get_tool()` 空参异常语义修正 | `tool_registry_service.py:67` | 90062327 |
+| R1-2 | `ToolNotFoundError` 继承 `NotFoundError` | `tool_exceptions.py:12` | 90062327 |
+| R1-3 | `nested_subdomains` 注释补充 | `test_code_ranges.py:282` | 90062327 |
+| R1-4 | 仓储 `count()` O(1) | `tool_repository.py` + 实现 | 90062327 |
+| R1-5 | `register_all` debug 日志 | `tool_registry_service.py:33` | 90062327 |
+| R2-1 | Tool 不变量双层守卫（`__post_init__` + `save()` 校验） | `tool.py` + `tool_repository.py` | fa1b8664 |
+| R2-2 | 架构测试虚假声明修复（删除"循环依赖检测"） | `test_arch_tool.py` | fa1b8664 |
+| R2-3 | 端口注册统计订正（基线 131 → 实施后 133） | 本 Story 文件 | fa1b8664 |
+| R2-4 | PortSpec 元数据完整验证（lifetime/owner/tags/interface） | `test_arch_tool.py` | fa1b8664 |
+| R3-1 | 单元测试 Mock 化重构（19 处违规修复） | `test_tool_registry_service.py` | 8b4904ff |
+| R3-4 | 契约测试 11 维度全覆盖 | `test_port_contract_tool.py` | 8b4904ff |
+| R4-1 | 集成测试 docstring 增强（消除误判） | `test_integration_tool_registration.py` | 2edca387 |
+| R4-2 | 验收测试新增 AC-5/6/7/8 共 4 个场景 | feature + .py | 2edca387 |
 
-#### 已推迟 Defer（本轮不处理，留待 Round 2-5）
+#### 已推迟 Defer（本 Story 不处理）
 
-- [ ] P0-6 并发安全保护 → Round 2 聚焦基础设施层
-- [ ] P0-7 `save()` 调用 `validate()` → Round 2 聚焦数据完整性
-- [ ] P0-8 单元测试 Mock 化 → Round 3 聚焦测试架构
-- [ ] P0-9 验收测试重复注册覆盖 → Round 3 聚焦测试盲区
-- [ ] P0-10 架构测试循环依赖 → Round 4 聚焦架构测试
-- [ ] P1-1 端口注册数信息核对 → Round 4 文档一致性
+- [x] **P0-C InMemoryToolRepository 缺 asyncio.Lock** → 正式推迟到 Story 4.1a（需 v1.1.0 端口升级 + 7 个测试文件 await 改造，避免破坏性变更）
+- [x] **P0-F ToolCategory 双维度分类（功能 vs 业务）** → 接受现状（实体 docstring 已说明，架构文档已加注）
+- [x] **业务归类边界模糊**（$APPEALS / 价值曲线 / VRIO）→ 接受现状 + 架构文档加注（详见 v1.6.0 §17.2.2）
+- [x] **OCR 测试 14 项失败**（与本 Story 无关）→ 单独立项修复
 
 ---
 
@@ -965,7 +977,7 @@ src/
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-08-27
 **最后更新/Last Updated:** 2026-09-03
 **更新说明/Description:**
@@ -975,3 +987,4 @@ src/
 - v1.3.0: Round 4 审查修正 — 验收测试模式深度调研（pytest-bdd/context dict/event_loop 模式）
 - v1.4.0: Dev Story 实施完成 — Task 0-8 全部勾选 + 覆盖率实测数据 + 文件清单对齐实际交付 + tool 子域 CI 登记修复
 - v1.5.0: Round 1 代码审查修订 — 5 Agent 并行调研完成，识别 10 个 P0 + 1 个 P1 问题，规划 5 项修复（R1-1~R1-5）
+- v1.6.0: Round 2-4 修复汇总 + 文档归一 — 数据完整性双层守卫 + 架构测试真实性 + 单元测试 Mock 化 + 契约测试 11 维度 + 集成测试 docstring + 验收测试 4 个新场景 + 业务归类澄清 + 架构文档一致性（详见 §代码审查发现）

@@ -2600,7 +2600,9 @@ buckets/
 
 **设计哲学：** 23 种战略工具通过 CLI + Skills 暴露给 Agent 调用。
 
-**工具分类：** 环境分析（PESTEL/波特五力/$APPEALS）| 战略选择（安索夫/SWOT/GE矩阵）| 商业模式（价值主张/商业模式画布）| 执行管理（BSC/KPI/战略地图）。
+**工具分类：** 环境分析（PESTEL/波特五力/$APPEALS）| 竞争分析（竞争对手/价值链/VRIO）| 战略选择（安索夫/SWOT/GE矩阵/SPACE/情景/价值曲线）| 商业模式（价值主张/商业模式画布/破坏性创新）| 执行管理（BSC/战略地图/KPI/组织/甘特/RACI/依赖图/变革）。
+
+> **业务归类为 MVP 设计（Story 4.1 v1.6.0）：** 部分工具存在跨分类边界（如 $APPEALS、VRIO、价值曲线），已确认接受当前归类，详见 [sisys-core-domain-design.md §17.2.2](sisys-core-domain-design.md#1722-23-种战略工具完整清单) 加注。
 
 **执行循环：** Think→Code→Execute→Observe→Validate，支持持久化 Jupyter Kernel 沙箱、Pydantic V2 Schema 强制、一致性校验仲裁、DSPy 提示词优化。
 
