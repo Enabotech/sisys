@@ -14,9 +14,9 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from src.application.services.tool_registry_service import ToolRegistryService
-from src.domain.entities.tool import ToolCategory
+from src.domain.entities.tool import Tool, ToolCategory
 from src.domain.exceptions import EntityValidationError
-from src.domain.exceptions.tool_exceptions import ToolNotFoundError
+from src.domain.exceptions.tool_exceptions import ToolAlreadyExistsError, ToolNotFoundError
 from src.domain.ports.registry import _global_registry
 from src.infrastructure.storage.inmemory.tool_repository import InMemoryToolRepository
 
@@ -262,6 +262,12 @@ def then_tool_not_found_error(context: dict[str, Any]) -> None:
     assert isinstance(context.get("query_error"), ToolNotFoundError)
 
 
+@then("抛出 ToolAlreadyExistsError")
+def then_tool_already_exists_error(context: dict[str, Any]) -> None:
+    """验证抛出 ToolAlreadyExistsError"""
+    assert isinstance(context.get("query_error"), ToolAlreadyExistsError)
+
+
 @when("不传任何参数查询工具")
 def when_query_without_params(context: dict[str, Any]) -> None:
     """不传任何参数查询工具（参数验证失败路径）"""
@@ -284,6 +290,14 @@ def then_error_code_242(context: dict[str, Any]) -> None:
     err = context.get("query_error")
     assert err is not None
     assert err.code == "EXCEPTION_242"
+
+
+@then("错误码为 EXCEPTION_381")
+def then_error_code_381(context: dict[str, Any]) -> None:
+    """验证错误码为 EXCEPTION_381（ToolAlreadyExistsError）"""
+    err = context.get("query_error")
+    assert err is not None
+    assert err.code == "EXCEPTION_381"
 
 
 # ===================================================================
@@ -321,3 +335,164 @@ def then_tool_registry_service_port_spec_not_empty() -> None:
     assert spec is not None
     assert spec.name == "tool_registry_service"
     assert spec.version == "v1.0.0"
+
+
+# ===================================================================
+# AC-5: 重复注册 ToolAlreadyExistsError
+# ===================================================================
+
+
+@given("工具仓储为空（独立 AC-5）", target_fixture="context")
+def given_empty_repository_for_ac5(context: dict[str, Any]) -> dict[str, Any]:
+    """AC-5 场景：独立空仓储（不使用 Background 预注册的 23 工具）."""
+    repo = InMemoryToolRepository()
+    service = ToolRegistryService(repository=repo)
+    context.clear()
+    context["repo"] = repo
+    context["service"] = service
+    return context
+
+
+@when('直接通过仓储保存名为 "PESTEL 分析" 的工具')
+def when_save_pestel_directly(context: dict[str, Any]) -> None:
+    """首次直接保存 PESTEL 分析（绕过 service.register_all 静默吞异常路径）."""
+    tool = _build_tool_for_catalog("PESTEL 分析")
+    context["repo"].save(tool)
+
+
+@when('直接通过仓储保存另一名为 "PESTEL 分析" 的工具')
+def when_save_duplicate_pestel(context: dict[str, Any]) -> None:
+    """同名不同 ID 触发 ToolAlreadyExistsError."""
+    duplicate = Tool(
+        tool_id=uuid.uuid4(),
+        name="PESTEL 分析",
+        category=ToolCategory.ENVIRONMENT_ANALYSIS,
+    )
+    try:
+        context["repo"].save(duplicate)
+        context["query_error"] = None
+    except ToolAlreadyExistsError as exc:
+        context["query_error"] = exc
+
+
+@when("直接通过仓储保存指定 tool_id 的工具")
+def when_save_with_specific_id(context: dict[str, Any]) -> None:
+    """首次保存指定 tool_id."""
+    specific_id = uuid.UUID("00000000-0000-0000-0000-000000000099")
+    tool = Tool(
+        tool_id=specific_id,
+        name="测试工具 A",
+        category=ToolCategory.ANALYSIS,
+    )
+    context["_duplicate_id"] = specific_id
+    context["repo"].save(tool)
+
+
+@when("直接通过仓储保存相同 tool_id 的另一工具")
+def when_save_with_same_id(context: dict[str, Any]) -> None:
+    """同 ID 不同名称触发 ToolAlreadyExistsError."""
+    duplicate = Tool(
+        tool_id=context["_duplicate_id"],
+        name="另一工具",
+        category=ToolCategory.ANALYSIS,
+    )
+    try:
+        context["repo"].save(duplicate)
+        context["query_error"] = None
+    except ToolAlreadyExistsError as exc:
+        context["query_error"] = exc
+
+
+def _build_tool_for_catalog(name: str) -> Tool:
+    """从 TOOL_CATALOG 按 name 查找并复制 Tool 实体."""
+    from src.domain.entities.strategic_tool_catalog import TOOL_CATALOG
+
+    for tool in TOOL_CATALOG:
+        if tool.name == name:
+            return Tool(
+                tool_id=tool.tool_id,
+                name=tool.name,
+                description=tool.description,
+                category=tool.category,
+                input_schema=dict(tool.input_schema),
+                output_schema=dict(tool.output_schema),
+                status=tool.status,
+                version=tool.version,
+                created_at=tool.created_at,
+                updated_at=tool.updated_at,
+            )
+    raise ValueError(f"Tool {name!r} not found in catalog")
+
+
+# ===================================================================
+# AC-6: register_all 幂等性
+# ===================================================================
+
+
+@when("再次执行工具注册引导流程")
+def when_register_all_again(context: dict[str, Any]) -> None:
+    """二次调用 register_all（验证幂等性，不抛异常）."""
+    context["service"].register_all()
+
+
+@then("工具总数仍为 23")
+def then_tool_count_still_23(context: dict[str, Any]) -> None:
+    """验证幂等性：总数仍为 23."""
+    assert context["service"].tool_count() == 23
+
+
+# ===================================================================
+# AC-7: 空分类查询
+# ===================================================================
+
+
+@when("按分类 ANALYSIS 查询")
+def when_query_analysis_empty(context: dict[str, Any]) -> None:
+    """按功能分类 ANALYSIS 查询（23 种战略工具均不在此分类，应返回空列表）."""
+    context["query_result"] = context["service"].get_tools_by_category(
+        ToolCategory.ANALYSIS,
+    )
+
+
+@then("返回空列表")
+def then_returns_empty_list_for_analysis(context: dict[str, Any]) -> None:
+    """验证按分类查询返回空列表."""
+    assert context["query_result"] == []
+
+
+# ===================================================================
+# AC-8: JSON Schema Draft-07 结构校验
+# ===================================================================
+
+
+@when("对所有工具执行 JSON Schema Draft-07 结构校验")
+def when_validate_all_schemas_draft7(context: dict[str, Any]) -> None:
+    """对 23 种工具的 46 个 schema（input + output）执行 Draft-07 结构校验."""
+    from jsonschema import Draft7Validator
+
+    tools = context["service"].list_all_tools()
+    validation_errors: list[tuple[str, str, str]] = []
+    for tool in tools:
+        try:
+            Draft7Validator.check_schema(tool.input_schema)
+        except Exception as exc:  # noqa: BLE001  # Draft7 校验收集所有错误
+            validation_errors.append((tool.name, "input_schema", str(exc)))
+        try:
+            Draft7Validator.check_schema(tool.output_schema)
+        except Exception as exc:  # noqa: BLE001
+            validation_errors.append((tool.name, "output_schema", str(exc)))
+    context["validation_errors"] = validation_errors
+
+
+@then("所有 23 个工具的 input_schema 校验通过")
+def then_all_input_schemas_valid(context: dict[str, Any]) -> None:
+    """验证所有 23 个工具的 input_schema 通过 Draft-07 校验."""
+    errors = [e for e in context["validation_errors"] if e[1] == "input_schema"]
+    assert errors == [], f"input_schema 校验失败: {errors}"
+
+
+@then("所有 23 个工具的 output_schema 校验通过")
+def then_all_output_schemas_valid(context: dict[str, Any]) -> None:
+    """验证所有 23 个工具的 output_schema 通过 Draft-07 校验."""
+    errors = [e for e in context["validation_errors"] if e[1] == "output_schema"]
+    assert errors == [], f"output_schema 校验失败: {errors}"

@@ -1,6 +1,21 @@
 """集成测试：工具注册全链路
 
-验证端口→服务→仓储→实体的完整注册流程。
+验证端口 → 服务 → 仓储 → 实体的完整注册流程。
+
+服务实例说明（MVP 阶段）：
+- ToolRegistryService: 真实应用层服务（src/application/services/）
+- InMemoryToolRepository: 真实基础设施层实现（src/infrastructure/storage/inmemory/），
+  是 composition_root.py 实际注册的生产代码路径（lazy import 字符串形式）。
+  Story 4.1 Dev Notes 明确该实现为 MVP 阶段 9/10 推荐方案。
+
+测试策略选择：
+- 本测试符合 CLAUDE.md §5 "集成测试真实服务优先" 原则（真实服务子模式）
+- 不使用 Mock/AsyncMock，因 InMemoryToolRepository 本身就是生产代码
+- 与单元测试的 InMemoryToolRepository 测试（test_inmemory_tool_repository.py）
+  视角不同：集成测试验证端到端链路，单元测试验证单仓储行为
+
+Story 4.1a 引入 ToolExecutionEngine 后，将扩展为：
+- test_integration_tool_registration_execution.py（验证执行链路）
 """
 
 from __future__ import annotations
