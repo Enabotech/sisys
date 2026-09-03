@@ -206,6 +206,8 @@ exclude = [
     "*.egg-info/",
     ".venv/",
     "venv/",
+    "*.feature",
+    "*.feature.local",
 ]
 
 [tool.ruff.lint]

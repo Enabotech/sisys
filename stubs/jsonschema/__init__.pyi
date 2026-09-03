@@ -23,4 +23,5 @@ class Draft7Validator:
 
 class SchemaError(Exception):
     """Schema 结构错误异常."""
+
     ...
