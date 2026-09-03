@@ -705,6 +705,19 @@ class CitationTracer:
 | | KPI | 业务目标 | 关键绩效指标 | P0 |
 | | 变革管理模型 | 变革数据 | 变革路径图 | P2 |
 
+> **业务归类澄清（MVP 设计，Story 4.1 v1.6.0）：**
+>
+> 本表 5 大分类按战略管理流程（环境→竞争→选择→模式→执行）划分，存在以下边界模糊情况，已确认"接受现状"：
+>
+> 1. **$APPEALS（环境分析）**：实质为客户需求九维度分析（GE 原始分类属竞争分析）。本项目归入环境分析（外部因素），如需调整可在 Story 4.1a 重构。
+> 2. **价值曲线分析（战略选择）**：蓝海战略差异化诊断工具。本项目归入战略选择类（辅助定位决策），如需归入竞争分析可在 Story 4.1a 调整。
+> 3. **VRIO 框架（竞争分析）**：聚焦内部资源能力评估。本项目归入竞争分析（竞争位势内生基础），如需独立为 INTERNAL_ANALYSIS 子域可在 Story 4.1a 扩展 ToolCategory 枚举。
+> 4. **战略地图（执行管理）**：与 BSC 配套使用，归入执行管理类合理，无需澄清。
+>
+> **MVP 范围说明：** 本清单未含 BCG 矩阵（GE/McKinsey 已覆盖组合分析）。如需补充，请在 Story 4.1a 添加。
+>
+> **ToolCategory 双维度说明：** ToolCategory 枚举采用双维度——5 个原有功能分类（ANALYSIS/GENERATION/VALIDATION/VISUALIZATION/OTHER）+ 5 个新增业务分类（ENVIRONMENT_ANALYSIS/COMPETITIVE_ANALYSIS/STRATEGIC_SELECTION/BUSINESS_MODEL/EXECUTION_MANAGEMENT）。两者维度不同共存不冲突，23 种战略工具均使用业务维度分类。
+
 #### 17.2.3 工具标准工作流（Think→Code→Execute→Observe→Validate）
 
 ```python
