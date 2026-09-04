@@ -579,32 +579,78 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 
 ### 5.1 三级渐进式披露
 
-借鉴 Claude Code 的三级加载机制：
+**对标 Anthropic Claude Code Skills Hub-and-Spoke 范式：**
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Skills 三级渐进式披露                          │
+│                    Skills 三级渐进式披露（Anthropic Hub-and-Spoke）│
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Level 1: 元数据（Metadata）                                     │
+│  Level 1: 元数据（Metadata）—— YAML frontmatter 聚合            │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │  • 位置: TOOLS.md（Skill 元数据清单）                     │   │
-│  │  • 大小: < 200 tokens（~100 行）                          │   │
-│  │  • 加载时机: Agent 实例化时                               │   │
-│  │  • 内容: name + description + when + tags + version      │   │
-│  │  • 用途: Skill 匹配与推荐                                 │   │
+│  │  • 大小: MVP ≤1.2K tokens / V1 ≤800 / V2 ≤500            │   │
+│  │  • 加载时机: Agent 启动时全量预加载到系统提示              │   │
+│  │  • 缓存: Redis Hash `skill:l1:metadata`，TTL 300s         │   │
+│  │  • 内容: name + description + when + tags + version +     │   │
+│  │          allowed_agents + applicable_blm/bem_stages +     │   │
+│  │          negative_triggers + accuracy + false_positive_rate │   │
+│  │  • 用途: 模型基于 description 自主判断（Anthropic 风格）   │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                          │                                      │
-│                          ▼ 触发匹配                               │
-│  Level 2: SOP 主体                                               │
+│                          ▼ 触发匹配（LLM 自决）                  │
+│  Level 2: SKILL.md 主体（Hub-and-Spoke 路由表）                  │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │  • 位置: skills/<tool-id>/SKILL.md                       │   │
-│  │  • 大小: < 500 行（~3000 tokens）                         │   │
-│  │  • 加载时机: 任务执行时触发                                │   │
-│  │  • 内容: IDENTITY + TRIGGER + SOP + FAILURE + SCHEMA    │   │
-│  │  • 用途: 完整操作流程                                     │   │
+│  │  • 大小: 路由表 ≤30 行（强制）/ 总长 ≤500 行（含示例）     │   │
+│  │  • 加载时机: 模型判断相关时通过 Read 工具按需加载         │   │
+│  │  • 结构: Overview / When to Use / When NOT to Use /       │   │
+│  │          Quick Start / Core Workflow / Examples /           │   │
+│  │          Gotchas / References                              │   │
+│  │  • 详细规范下沉到 references/*.md（Hub-and-Spoke）         │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                          │                                      │
+│                          ▼ 触发调用                              │
+│  Level 3: 资源（Scripts/References/Assets）                      │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  • 位置: skills/<tool-id>/{scripts,references,assets}/     │   │
+│  │  • 加载时机: 按需链式读取（Anthropic "Hub-and-Spoke" 末梢）│   │
+│  │  • 沙箱: DockerSandboxAdapter 执行 scripts/                │   │
+│  │  • 策略: SkillSandboxPolicy（timeout/memory/network/      │   │
+│  │          transaction_mode）                              │   │
+│  │  • 安全: 路径穿越校验 + iptables 白名单                  │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 5.1.1 三级衔接强约束规则（强制）
+
+| 依赖关系 | 强制约束 | 失效后果 |
+|---------|---------|---------|
+| **L1 → L2** | L2 加载必须先验证 slug 存在且 status=ACTIVE | 加载失败：SkillNotFoundError |
+| **L2 → L3** | L3 加载必须在 L2 已加载前提下 | 加载失败：SkillContextMissingError |
+| **L3 → L1/L2** | L3 执行结果通过 SkillExecuted 事件回流，更新 L1 元数据 accuracy | 不强制 |
+
+#### 5.1.2 L2 缓存链路（强制）
+
+| 层级 | 缓存位置 | TTL | 失效机制 |
+|------|---------|-----|---------|
+| L1 (TOOLS.md) | Redis Hash `skill:l1:{version}` | 24h | `SkillMetadataChanged` 事件 → DEL |
+| L2 (SKILL.md) | 进程内 LRU（max 23 项） | 同 Session | Session 结束自动释放 |
+| L3 (scripts) | 临时文件系统 `/tmp/sisys/skill/{slug}/` | 60min | TTL 过期 + 引用计数=0 |
+
+#### 5.1.3 上下文释放规则（强制）
+
+- **L1**：永不释放（Agent 整个生命周期持有）
+- **L2**：Skill 执行完毕后保留 5 分钟（支持短时间内的重复调用），超出后释放
+- **L3**：脚本执行完毕后立即释放（沙箱容器销毁）
+
+> ⚠️ **P0-1（架构师视角）**：Hub-and-Spoke 量化 — SKILL.md 路由表必须 ≤30 行，详细规范全部下沉到 references/。这是 Anthropic Claude Code Skills 范式的核心约束，违反将导致上下文爆炸和触发准确率下降。
+>
+> ⚠️ **P0-4（架构师视角）**：三级衔接强约束 — L1→L2→L3 单向依赖，反向加载会导致脚本上下文缺失。
+
+                          │
 │                          ▼ 按需调用                               │
 │  Level 3: 捆绑资源                                               │
 │  ┌─────────────────────────────────────────────────────────┐   │
@@ -653,40 +699,65 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 
 ### 5.3 L2 SOP 主体：SKILL.md
 
+> **⚠️ P0-2（架构师视角）**：SKILL.md 必须严格遵循 Anthropic Hub-and-Spoke 范式：
+> 1. **frontmatter 字段强制**（见 §5.3.1 字段规范）
+> 2. **路由表 ≤30 行**（强制约束，详见 §5.1 量化）
+> 3. **必含章节**：`## When to Use` + `## When NOT to Use` + `## Examples` + `## Gotchas` + `## References`（Anthropic 强制）
+
+#### 5.3.1 SKILL.md frontmatter 字段规范（强制）
+
+| 字段 | 类型 | 必填 | 约束 | 默认值 |
+|------|------|------|------|--------|
+| `name` | string | ✅ | 1-64 字符，kebab-case（Anthropic） | - |
+| `description` | string | ✅ | 1-1024 字符，**必须含 "Use when..." 短语**（Anthropic） | - |
+| `version` | string | ✅ | SemVer X.Y.Z | "1.0.0" |
+| `allowed_agents` | list[enum] | ✅ | CEO/CFO/CMO/CTO/COO/CHO/AUD 子集 | `["AUD"]` |
+| `applicable_blm_stages` | list[enum] | ❌ | GAP_ANALYSIS/MARKET_INSIGHT/STRATEGIC_INTENT/INNOVATION_FOCUS/BUSINESS_DESIGN/KEY_TASKS | `[]` |
+| `applicable_bem_stages` | list[enum] | ❌ | STRATEGY_DECODE/ANNUAL_PLANNING/ORG_ALIGNMENT/OPERATIONS_EXECUTION/PERFORMANCE_MGMT/RETROSPECTIVE | `[]` |
+| `negative_triggers` | list[string] | ✅ | 每条 1-200 字符，**至少 1 条** | - |
+| `accuracy` | float | ❌ | 0-1.0，description-based A/B 评测埋点 | `null` |
+| `false_positive_rate` | float | ❌ | 0-1.0，负向触发评测埋点 | `null` |
+
+> ⚠️ **P1-1（架构师视角）**：以上字段约束在 L1 加载时强制 Schema 校验。校验失败抛 `SkillValidationError`（EXCEPTION_424，skill 子域）。
+
+#### 5.3.2 SKILL.md 完整模板（Hub-and-Spoke，路由表 ≤30 行）
+
 ```markdown
 ---
 name: pestel
-version: "1.0"
+description: "Analyze macro-environmental factors (Political, Economic, Social, Technological, Environmental, Legal). Use when evaluating external business environment or strategic market entry decisions."
+version: "1.0.0"
+allowed_agents: [CEO, CFO, CMO, CTO, AUD]
+applicable_blm_stages: [MARKET_INSIGHT, STRATEGIC_INTENT]
+applicable_bem_stages: [STRATEGY_DECODE, ANNUAL_PLANNING]
+negative_triggers: ["single dimension analysis", "internal capability evaluation", "industry competitive structure"]
+accuracy: null
+false_positive_rate: null
 ---
 
 # PESTEL 宏观环境分析
 
-## IDENTITY
-PESTEL 分析工具，用于评估政治、经济、社会、技术、环境、法律六大外部维度
-对战略目标的影响。
+## Overview
+PESTEL 分析工具，评估政治/经济/社会/技术/环境/法律六大外部维度对战略目标的影响。
+详细规范见 references/ 目录（SOP、INPUT SCHEMA、FAILURE HANDLING 全部下沉）。
 
-## TRIGGER
-
-### 应触发（正向条件，满足任一即触发）
+## When to Use
 - 用户明确要求"宏观环境分析"、"PESTEL 分析"
 - BLM 市场洞察阶段"看趋势"子步骤
 - 任务描述包含"政策趋势"、"经济环境"、"社会变化"
-- 上期战略更新后需要重新评估外部环境
 
-### 不应触发（负向条件，任一满足即不触发）
+## When NOT to Use
 - 仅分析单一维度（如只看政策）→ 使用专项分析
 - 内部能力评估 → 使用 SWOT
 - 行业竞争结构分析 → 使用波特五力
 
-## INPUT SCHEMA
-```yaml
-target_market: string      # 目标市场名称
-dimensions: [string]       # 分析维度（默认全部 6 个）
-data_sources: [string]     # 数据源文件路径
-time_horizon: string       # 时间范围（如"2026-2030"）
-```
+## Quick Start
+详见 [references/pestel_quickstart.md](references/pestel_quickstart.md)（≤5 步最小可运行流程）
 
-## INPUT EXAMPLES
+## Core Workflow
+详见 [references/pestel_workflow.md](references/pestel_workflow.md)（L1 强制 / L2 推荐 / L3 可选 SOP）
+
+## Examples
 
 ### 示例 1: 新市场进入分析（完整场景）
 ```yaml
@@ -703,29 +774,36 @@ dimensions: ["political", "legal"]
 data_sources: ["docs/policy/carbon_tax_2027.txt"]
 ```
 
-## SOP
+## Gotchas
+- ⚠️ **数据不足陷阱**：6 维度必须每个都有数据支撑，否则触发 FR-SR-12 补救机制
+- ⚠️ **时间窗口对齐陷阱**：PESTEL 与 BLM Stage 1（差距分析）输出时间必须对齐（≤7 天）
+- ⚠️ **维度优先级陷阱**：法律/政策维度优先级 > 经济/社会（合规优先）
+- ⚠️ **缓存失效陷阱**：L1 元数据更新后必须发布 `SkillMetadataChanged` 事件
 
-### L1 强制步骤（不可跳过）
-1. **读取输入数据**
-   ```bash
-   sisys document search --query "${target_market}" --top-k 5
-   ```
-2. **校验数据完整性**
-   - 检查 6 个维度是否有数据支撑
-   - 数据不足时触发 FR-SR-12 补救机制
-3. **执行分析**
-   ```bash
-   sisys tool run pestel --input input.json --output output.json
-   ```
-4. **验证输出**
-   - 检查输出符合 PESTEL-Analysis-v1 Schema
-   - 验证失败重试最多 3 次
+## References
+- [references/pestel_quickstart.md](references/pestel_quickstart.md) - 5 步最小流程
+- [references/pestel_workflow.md](references/pestel_workflow.md) - L1/L2/L3 SOP 详细
+- [references/pestel_input_schema.md](references/pestel_input_schema.md) - JSON Schema
+- [references/pestel_failure_handling.md](references/pestel_failure_handling.md) - 失败兜底
+- [scripts/analyze.py](scripts/analyze.py) - L3 确定性计算脚本
+```
 
-### L2 推荐步骤（可跳过）
-5. **对比上期结果**
-   - 从档案库加载上期 PESTEL 分析
-   - 标注新增/消失/变化的因素
-6. **生成差异摘要**
+#### 5.3.3 SKILL.md 强制章节检查清单
+
+实施 SKILL.md 时必须满足：
+
+- [ ] **frontmatter** 完整（11 个字段含必填项）
+- [ ] **Overview** 章节（≤200 字符一段话说明）
+- [ ] **When to Use** 章节（≥1 条正向触发条件）
+- [ ] **When NOT to Use** 章节（≥1 条负向触发条件）—— **P6 强制**
+- [ ] **Quick Start** 章节（≤5 步最小流程）
+- [ ] **Core Workflow** 章节（L1 强制 / L2 推荐 / L3 可选）
+- [ ] **Examples** 章节（≥1-5 个典型用例）—— **P0-2 新增强制**
+- [ ] **Gotchas** 章节（≥3-10 条常见陷阱）—— **P0-2 新增强制**
+- [ ] **References** 章节（指向 references/*.md，Hub-and-Spoke 末）
+- [ ] **路由表 ≤30 行**（Hub-and-Spoke 强制约束）—— **P0-1 新增量化**
+- [ ] **总行数 ≤500 行**（含 Examples + Gotchas + References 链接）
+- [ ] **命令式写作**（动词开头，Anthropic 风格）
    - 输出变化项的置信度评分
 
 ### L3 可选步骤
