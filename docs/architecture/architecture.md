@@ -174,22 +174,26 @@ completedAt: '2026-02-26'
 | **成本** | 云端模型路由占比 | ≥60% | ≥80% | ≥85% | 路由日志 |
 | | Token 成本节省 | ≥30% | ≥50% | ≥60% | 成本分析 |
 | **接口** | CLI 命令响应延迟 P95 | <1s | <500ms | <200ms | OpenTelemetry |
-| | Skills 加载上下文 | <500 tokens | <300 tokens | <200 tokens | 日志分析 |
+| | Skills L1 元数据加载（启动） | ≤1.2K tokens（23 工具 ≈1150 tokens） | ≤800 tokens（工具分组加载） | ≤500 tokens（按角色懒加载） | tiktoken cl100k_base |
+| | Skill 触发准确率 | ≥85% | ≥90% | ≥95% | description-based A/B 评测 |
+| | Skill 误触发率 | <5% | <3% | <1% | 负向触发评测集 |
 | | SAP 消息传递延迟 P95 | <500ms | <200ms | <100ms | 链路追踪 |
 | | 事件监听处理成功率 | ≥99% | ≥99.5% | ≥99.9% | 事件总线监控 |
+| **Skills 状态** | Skills 系统实现度 | 0%（设计 100%） | 100%（Epic 5） | 100%+ 演进 | §19.7 验证矩阵 |
 
 ### 1.5 CLI+Skills 核心设计原则
 
-**设计哲学：CLI + Skills 为内核，MCP 为外延**（基于行业共识：钉钉/飞书 CLI 化改造 + Claude Code 渐进式披露 + MCP vs CLI benchmark）
+**设计哲学：CLI + Skills 为内核，MCP 为外延**（基于行业共识：钉钉/飞书 CLI 化改造 + Anthropic Claude Code Skills 渐进式披露 + MCP vs CLI benchmark）
 
 | 编号 | 原则 | 描述 | 验收标准 |
 |------|------|------|---------|
 | **P1** | CLI 是 LLM 的母语 | 系统内部所有能力优先通过 CLI 暴露，Agent 通过 CLI 调用内部工具 | 内部工具 100% 有 CLI 入口 |
-| **P2** | Skills = 渐进式披露 | Agent 启动只加载元数据（< 200 tokens），按需加载完整 SOP | Agent 启动上下文 < 500 tokens |
-| **P3** | Skill = SOP + Examples | 不仅定义工具签名，还定义操作流程、失败处理、兜底策略 + 1-5 个典型输入示例 | 23 种工具各有完整 SOP + input_examples，工具调用准确率 ≥ 90% |
+| **P2** | Skills = 渐进式披露（Anthropic 风格） | L1 元数据（≤1.2K tokens）启动注入系统提示 → L2 SKILL.md（≤500 行）按需加载 → L3 scripts/references（按场景链式读取） | L1 ≤1.2K / L2 ≤500 行 / L3 按需 |
+| **P3** | Skill = SOP + Examples（Hub-and-Spoke） | SKILL.md 为路由，详细规范在 references/；不仅定义工具签名，还定义操作流程、失败处理、负向触发 + 1-5 个典型输入示例 | 23 种工具各有完整 SKILL.md + references/，工具调用准确率 ≥ 90% |
 | **P4** | MCP 退居生态层 | MVP/V1 不启用 MCP，V2+ 按需用于外部 Agent 集成 | MVP 阶段 MCP 代码量 = 0 |
-| **P5** | Less scaffolding, more model | 依赖模型自身推理进行工具路由，避免硬编码分类器（SOP 是必要 scaffolding，不违反此原则） | 工具选择准确率 ≥ 85% |
-| **P6** | 负向触发条件 | 明确"何时不应触发"Skill，避免误激活 | 误触发率 < 5% |
+| **P5** | Less scaffolding, more model（description 即触发器） | Skill 触发由 LLM 基于 L1 description 自主判断（Anthropic 风格），不引入硬编码关键词/embedding 权重选择器；必要 scaffolding 仅限 allowed-tools 权限控制 | 工具选择准确率 ≥ 85%（依赖 L1 description 质量） |
+| **P6** | 负向触发条件（强制章节） | SKILL.md 必须含 "When NOT to Use" 章节；frontmatter 含 `negative_triggers: list[str]` 字段 | 误触发率 < 5% |
+| **P7** | 代码优先于 Prompt | 确定性任务（数据校验、文件格式转换、排序）必须迁出 SKILL.md 到 `scripts/*.py` | 23 个 Skill 中 ≥10 个含 scripts/ |
 
 ### 1.6 四层映射架构（DDD + EDA + CLI+Skills 统一）
 
@@ -201,7 +205,7 @@ completedAt: '2026-02-26'
 |------|------|------|
 | **规则 1** | CLI→用例→领域服务→领域事件完整链路 | `sisys tool run pestel` → CLI 解析 → StrategicAnalysisUseCase → Skill 加载 → ToolService.execute → Tool 聚合根状态变更 → ToolExecuted 事件 |
 | **规则 2** | CLI 命令到应用层用例的精确映射 | `sisys document`→DocumentProcessingUseCase / `sisys tool`→StrategicAnalysisUseCase / `sisys agent`→AgentCollaborationUseCase / `sisys plan`→PlanningGenerationUseCase / `sisys system`→SystemOperationsUseCase |
-| **规则 3** | Skills 在 DDD 架构中的精确位置 | L1 TOOLS.md（应用层元数据清单，Agent 实例化时加载）→ L2 SKILL.md（应用层操作手册，任务匹配后加载）→ L3 scripts/references（基础设施层资源，按需加载） |
+| **规则 3** | Skills 在 DDD 架构中的精确位置（Anthropic 渐进披露） | L1 TOOLS.md（应用层元数据清单，YAML frontmatter 聚合，Agent 启动时全量预加载到系统提示）→ L2 SKILL.md × 23（应用层操作手册，Hub-and-Spoke 结构，LLM 基于 description 触发后按需加载）→ L3 scripts/references/assets（基础设施层资源，Hub-and-Spoke 末梢按场景链式读取） |
 | **规则 4** | CLI 同步响应与事件异步处理协调 | CLI 响应不阻塞下游事件处理；`--wait-for-events` 参数可选等待特定事件完成（超时默认 30 秒，V1 可选增强，MVP 不实现） |
 | **规则 5** | 系统公理一与 CLI 的关系 | CLI 是"点火开关"（外部触发器），领域事件是"引擎血液"（内部触发器），auto-trigger→auto-route→auto-execute 是"引擎运转逻辑" |
 
@@ -1813,9 +1817,26 @@ src/application/
 │   ├── document_storage_port.py                           # 文档存储端口
 │   └── text_extractor_service.py                          # 文本提取服务端口
 │
-├── skills/                                                # ⚠️ TODO: Skills 系统（V1/V2 规划）
-│   # 规划：23 种工具的 L1/L2/L3 渐进式操作手册
-│   # 当前状态：未实现
+├── skills/                                                # ❌ 未实现（Epic 5 规划，Story 4.1a ready-for-dev）
+│   # 规划：23 种工具的 L1/L2/L3 渐进式操作手册（对标 Anthropic Claude Code Skills）
+│   # 当前状态：0% 实现率；设计完成度 100%（详见 §17.3 + Epic 5 蓝图）
+│   #
+│   # 目标目录结构（设计示意）：
+│   # skills/
+│   # ├── TOOLS.md                                          # L1 元数据（YAML frontmatter 聚合，≤1.2K tokens）
+│   # ├── pestel/                                           # 23 个 SOP 目录之一（kebab-case 命名）
+│   # │   ├── SKILL.md                                       # L2 SOP 主体（≤500 行，Hub-and-Spoke 结构）
+│   # │   ├── scripts/                                       # L3 确定性脚本（Anthropic "代码优先"原则）
+│   # │   │   └── pestel_validate.py
+│   # │   ├── references/                                    # L3 长篇规范（按需链式读取）
+│   # │   │   └── pestel_methodology.md
+│   # │   └── assets/                                        # L3 模板/示例
+│   # │       └── pestel_report.template
+│   # ├── porter-five-forces/
+│   # ├── swot-tows/
+│   # ├── bsc/
+│   # ├── kpi/
+│   # └── ...（共 23 个，对应 §17.3 战略工具分类）
 │
 ├── commands/                                              # ⚠️ TODO: CQRS 命令侧（V1/V2 规划）
 │   # 当前状态：未实现，应用层使用 services + use_cases 模式
@@ -2598,11 +2619,39 @@ buckets/
 
 ### 17.3 工具箱架构
 
-**设计哲学：** 23 种战略工具通过 CLI + Skills 暴露给 Agent 调用。
+**⚠️ 当前状态（2026-09-04）：** 23 种战略工具**元数据已注册**（`src/domain/entities/strategic_tool_catalog.py`，包含 `name` / `description` / `category` / `input_schema` / `output_schema`），但 **SKILL.md × 23 SOP 文件**与 **TOOLS.md L1 聚合文件**均**未创建**。Skills 系统实现率 0%，详见 Epic 5 蓝图。
 
-**工具分类：** 环境分析（PESTEL/波特五力/$APPEALS）| 竞争分析（竞争对手/价值链/VRIO）| 战略选择（安索夫/SWOT/GE矩阵/SPACE/情景/价值曲线）| 商业模式（价值主张/商业模式画布/破坏性创新）| 执行管理（BSC/战略地图/KPI/组织/甘特/RACI/依赖图/变革）。
+**设计哲学：** 23 种战略工具将**通过 CLI + Skills（Anthropic Claude Code 风格）**暴露给 Agent 调用：
+- **L1 元数据（TOOLS.md）**：启动时全量预加载到系统提示（≤1.2K tokens），模型基于 `description` 字段自主判断
+- **L2 SKILL.md**：按需加载（≤500 行，Hub-and-Spoke 结构），含 IDENTITY/When to Use/When NOT to Use/SOP/FAILURE HANDLING/SCHEMA/EVIDENCE
+- **L3 资源（scripts/ + references/ + assets/）**：确定性任务用脚本（Anthropic "代码优先"），长篇规范放 references/
+
+**工具分类（已注册元数据，对应 ToolCategory 五分类）：**
+- **环境分析**（3）：PESTEL、波特五力、$APPEALS
+- **竞争分析**（3）：竞争对手分析、价值链分析、VRIO
+- **战略选择**（6）：安索夫矩阵、SWOT-TOWS、GE-麦肯锡矩阵、SPACE 矩阵、情景规划、价值曲线
+- **商业模式**（4）：价值主张画布、商业模式画布、破坏性创新模型、（补）
+- **执行管理**（7）：BSC 平衡计分卡、战略地图、KPI 体系、组织设计框架、依赖关系图、RACI 矩阵、变革管理模型
 
 > **业务归类为 MVP 设计（Story 4.1 v1.6.0）：** 部分工具存在跨分类边界（如 $APPEALS、VRIO、价值曲线），已确认接受当前归类，详见 [sisys-core-domain-design.md §17.2.2](sisys-core-domain-design.md#1722-23-种战略工具完整清单) 加注。
+
+**Agent 角色 × 工具分类映射（Epic 5 Skill 白名单基础）：**
+
+| Agent 角色 | 主要工具分类 | 典型 Skill 调用 | 设计意图 |
+|-----------|------------|--------------|---------|
+| **CEO** | 战略选择 + 商业模式 | SWOT-TOWS / 商业模式画布 / 价值曲线 | 高层战略意图与商业模式 |
+| **CFO** | 环境分析 + 执行管理 | PESTEL / VRIO / BSC / KPI | 财务视角的宏观与执行 |
+| **CMO** | 环境分析 + 竞争分析 | 波特五力 / $APPEALS / 价值曲线 | 市场与竞争情报 |
+| **CTO** | 环境分析 + 商业模式 | $APPEALS / 价值主张画布 / 破坏性创新 | 技术驱动的创新 |
+| **COO** | 执行管理 | BSC / RACI / 甘特图 / 依赖关系图 | 运营落地 |
+| **CHO** | 执行管理 + 竞争分析 | 组织设计框架 / VRIO / 变革管理模型 | 组织能力建设 |
+| **AUD** | 全 23 工具 | 所有 Skill（含审计专用脚本） | 全面审计场景 |
+
+**工具调用决策原则（Anthropic 风格，对标 Claude Code Skills）：**
+1. **description 自动触发**（P5 + Anthropic）：LLM 基于 L1 description 中的"Use when..."短语自主判断
+2. **角色白名单过滤**（`allowed_agents` 字段）：Skill 仅对授权角色可见可调
+3. **阶段适配过滤**（`applicable_blm_stages` + `applicable_bem_stages`）：Skill 标注适用的 BLM/BEM 阶段
+4. **负向触发**（P6 + Anthropic）：SKILL.md "When NOT to Use" 章节 + frontmatter `negative_triggers` 字段
 
 **执行循环：** Think→Code→Execute→Observe→Validate，支持持久化 Jupyter Kernel 沙箱、Pydantic V2 Schema 强制、一致性校验仲裁、DSPy 提示词优化。
 
@@ -2626,6 +2675,34 @@ buckets/
 **设计哲学：** 严格遵守 BLM 与 BEM 模型流程，输出五年滚动 SP 和年度 BP。
 
 **BLM 六阶段：** 业绩差距分析 → 市场洞察（六子步骤）→ 战略意图 → 创新焦点 → 业务设计 → 执行设计。每阶段完成后创建 Checkpoint 供用户确认。
+
+**BEM 六阶段：** 战略解码 → 年度计划 → 组织对齐 → 运营执行 → 绩效管理 → 复盘迭代。
+
+**BLM 阶段 × 工具分类映射（Epic 5 Skill `applicable_blm_stages` 字段基础）：**
+
+| 工具分类 | GAP_ANALYSIS | MARKET_INSIGHT | STRATEGIC_INTENT | INNOVATION_FOCUS | BUSINESS_DESIGN | KEY_TASKS |
+|----------|:---:|:---:|:---:|:---:|:---:|:---:|
+| 环境分析（PESTEL/五力/$APPEALS） | △ | ✅ | ✅ | △ | △ | — |
+| 竞争分析（竞品/价值链/VRIO） | ✅ | ✅ | ✅ | — | △ | — |
+| 战略选择（SWOT/安索夫/GE/SPACE/情景） | △ | ✅ | ✅ | ✅ | △ | — |
+| 商业模式（价值主张/商业模式画布） | — | △ | — | ✅ | ✅ | — |
+| 执行管理（BSC/战略地图/KPI/RACI/甘特） | — | — | — | — | △ | ✅ |
+
+> ✅ = 主要适用 / △ = 次要适用 / — = 不适用
+
+**BEM 阶段 × 工具分类映射（Epic 5 Skill `applicable_bem_stages` 字段基础）：**
+
+| 工具分类 | STRATEGY_DECODE | ANNUAL_PLANNING | ORG_ALIGNMENT | OPERATIONS_EXECUTION | PERFORMANCE_MGMT | RETROSPECTIVE |
+|----------|:---:|:---:|:---:|:---:|:---:|:---:|
+| 环境分析 | ✅ | ✅ | — | △ | ✅ | ✅ |
+| 竞争分析 | ✅ | ✅ | — | △ | ✅ | ✅ |
+| 战略选择 | ✅ | ✅ | — | — | △ | △ |
+| 商业模式 | ✅ | ✅ | △ | △ | — | △ |
+| 执行管理 | △ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+> 完整 23×6+6 = 276 格应用映射见 Epic 5 Story 5-3 蓝图（`/home/agimtech/.review_cache/round1_skills_blueprint.md` §7）。
+
+**实施路径：** Skills 系统实现详见 Epic 5（Story 4.1a ready-for-dev + Story 5-x 完整分解），总工作量 85 人天 / 8 周 / 4.5 人团队。
 
 > 详见 [sisys-core-domain-design.md §17.4](sisys-core-domain-design.md#174-战略规划架构设计) 和 [sisys-checkpoint-timetravel-design.md](sisys-checkpoint-timetravel-design.md)
 
@@ -3005,7 +3082,9 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | **GAP-CRITICAL-05** | RAG 混合检索服务未实现 | §17.1.5 | ❌ 仅 Qdrant 存储层 | Epic 3 |
 | **GAP-CRITICAL-06** | BLM/BEM 状态机未实现 | §17.4 | ❌ 无 Graph | Epic 4 |
 | **GAP-CRITICAL-07** | 23 种战略工具未实现 | §17.2 | ❌ 仅实体定义 | Epic 5 |
-| **GAP-CRITICAL-08** | Skills SOP 目录未创建 | §17.2 | ❌ 无目录 | Epic 5 |
+| **GAP-CRITICAL-08** | Skills SOP 目录未创建 | §17.2 | ❌ 无目录 | Epic 5 Story 5-3（蓝图 85 人天 / 8 周） |
+| **GAP-CRITICAL-08a** | L1 TOOLS.md 元数据聚合文件未创建 | §17.3 | ❌ 无文件 | Epic 5 Story 5-3 |
+| **GAP-CRITICAL-08b** | SkillSelector 硬编码选择器违反 P5（"Less scaffolding"）| §17.3 | ❌ 设计偏差 | Epic 5 Story 5-2（删除硬编码，模型自决） |
 | **GAP-CRITICAL-09** | 辩论质量评估器未实现 | §7.3 | ❌ 无代码 | Epic 4 |
 
 #### 19.4.2 设计完整性差距（次要）
@@ -3104,7 +3183,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | 异常处理 | 100% | 100% | 三层异常层次 + 28 种异常类型已实现 |
 | Agent 推理 | 100% | 20% | ⚠️ LangGraph 骨架已实现，节点为 MVP 占位（返回硬编码字符串） |
 | Workflow | 100% | 30% | ⚠️ Prefect 骨架已实现，任务为 Mock 数据 |
-| Skills 系统 | 100% | 0% | ⚠️ 设计规划完成，未实现（Epic 5） |
+| Skills 系统 | 100% | 0% | ⚠️ 设计规划完成，**未实现（Epic 5 Story 4.1a + 5-x，85 人天 / 8 周 / 4.5 人团队）**；详见 Epic 5 蓝图（对标 Anthropic Claude Code Skills 渐进披露 + Hub-and-Spoke） |
 | CQRS | 100% | 0% | ⚠️ 设计规划完成，未实现，应用层使用 services+use_cases 模式 |
 
 #### 19.7.2 关键优势
