@@ -650,20 +650,6 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 >
 > ⚠️ **P0-4（架构师视角）**：三级衔接强约束 — L1→L2→L3 单向依赖，反向加载会导致脚本上下文缺失。
 
-                          │
-│                          ▼ 按需调用                               │
-│  Level 3: 捆绑资源                                               │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  • 位置: skills/<tool-id>/scripts/ + references/        │   │
-│  │  • 大小: 动态（按需加载）                                 │   │
-│  │  • 加载时机: SOP 执行中明确需要                           │   │
-│  │  • 内容: 脚本/理论参考/模板/示例                         │   │
-│  │  • 用途: 确定性计算/复杂规范/模板渲染                     │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
 ### 5.2 L1 元数据：TOOLS.md
 
 ```markdown
@@ -704,21 +690,53 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 > 2. **路由表 ≤30 行**（强制约束，详见 §5.1 量化）
 > 3. **必含章节**：`## When to Use` + `## When NOT to Use` + `## Examples` + `## Gotchas` + `## References`（Anthropic 强制）
 
-#### 5.3.1 SKILL.md frontmatter 字段规范（强制）
+#### 5.3.1 SKILL.md frontmatter 字段规范（强制，13 字段标准）
+
+> **⚠️ P0-1（Round 2 D1 发现）**：跨文档字段清单不一致问题已解决——本节为权威定义。
 
 | 字段 | 类型 | 必填 | 约束 | 默认值 |
 |------|------|------|------|--------|
-| `name` | string | ✅ | 1-64 字符，kebab-case（Anthropic） | - |
-| `description` | string | ✅ | 1-1024 字符，**必须含 "Use when..." 短语**（Anthropic） | - |
-| `version` | string | ✅ | SemVer X.Y.Z | "1.0.0" |
-| `allowed_agents` | list[enum] | ✅ | CEO/CFO/CMO/CTO/COO/CHO/AUD 子集 | `["AUD"]` |
+| **核心标识（4）** |||||
+| `skill_id` | UUID v4 string | ✅（系统生成） | 内部唯一标识 | - |
+| `slug` | string | ✅ | 1-64 字符，kebab-case，**必须匹配父目录名**（Anthropic） | - |
+| `name` | string | ✅ | 1-64 字符，kebab-case | - |
+| `description` | string | ✅ | 1-1024 字符，**必须以动词开头 + 含 "Use when..." + 可选 "Do not use when..."**（Anthropic，正则校验） | - |
+| **版本与 SOP（4）** |||||
+| `version` | string | ✅ | SemVer 2.0.0（**支持 pre-release** 如 `1.0.0-rc.1`） | "1.0.0" |
+| `sop_path` | string | ✅ | 相对项目根路径（如 `skills/pestel/SKILL.md`） | - |
+| `sop_line_count` | int | ✅（CI 自动统计） | 1-500（含 Examples + Gotchas + References 链接） | - |
+| `sop_summary` | string | ❌ | ≤1500 字符，用于 L1 元数据展示 | `null` |
+| **触发控制（5）** |||||
+| `allowed_agents` | list[enum] | ✅ | CEO/CFO/CMO/CTO/COO/CHO/AUD 子集，**至少 1 项** | `["AUD"]` |
 | `applicable_blm_stages` | list[enum] | ❌ | GAP_ANALYSIS/MARKET_INSIGHT/STRATEGIC_INTENT/INNOVATION_FOCUS/BUSINESS_DESIGN/KEY_TASKS | `[]` |
 | `applicable_bem_stages` | list[enum] | ❌ | STRATEGY_DECODE/ANNUAL_PLANNING/ORG_ALIGNMENT/OPERATIONS_EXECUTION/PERFORMANCE_MGMT/RETROSPECTIVE | `[]` |
-| `negative_triggers` | list[string] | ✅ | 每条 1-200 字符，**至少 1 条** | - |
-| `accuracy` | float | ❌ | 0-1.0，description-based A/B 评测埋点 | `null` |
-| `false_positive_rate` | float | ❌ | 0-1.0，负向触发评测埋点 | `null` |
+| `trigger_words` | list[string] | ❌ | description 关键词兜底（每条 1-200 字符） | `[]` |
+| `negative_triggers` | list[string] | ✅ | 每条 1-200 字符，**至少 1 条**（P6 强制） | - |
+| **评测埋点（3，可选）** |||||
+| `model` | string | ❌ | haiku / sonnet / opus / inherit（Anthropic `model` 字段对标） | `inherit` |
+| `accuracy` | object | ❌ | `{value: 0-1.0, sample_count: int, last_updated: ISO8601}` | `{value: null, sample_count: 0, last_updated: null}` |
+| `false_positive_rate` | object | ❌ | `{value: 0-1.0, sample_count: int, last_updated: ISO8601}` | `{value: null, sample_count: 0, last_updated: null}` |
 
-> ⚠️ **P1-1（架构师视角）**：以上字段约束在 L1 加载时强制 Schema 校验。校验失败抛 `SkillValidationError`（EXCEPTION_424，skill 子域）。
+> **⚠️ P0-1**：以上 13 字段为权威定义（统一 §5.3.1 / §5.3.3 / 蓝图 §3.3 三处文档）。
+>
+> **⚠️ P0-2（Round 2 D1 发现）**：`description` 字段强制正则校验（落地时）：
+> ```python
+> import re
+> _DESCRIPTION_PATTERN = re.compile(
+>     r'^(?:[A-Z][a-z]+(?:[ -][a-z]+)*\s+)+'  # 动词开头（"Analyze ", "Generate "）
+>     r'.{20,1000}'  # 主体 20-1000 字符
+>     r'\.\s*Use when [^.]+\.'  # 必须含 "Use when..." 完整句子
+>     r'(?:\s*Do not use when [^.]+\.)?',  # 可选 "Do not use when..." 句子
+>     re.MULTILINE | re.IGNORECASE
+> )
+> ```
+>
+> **⚠️ P0-3（Round 2 D1 发现）**：`applicable_blm_stages` 与 `applicable_bem_stages` 一致性约束（落地时）：
+> - **规则 1**：至少 1 个阶段绑定（BLM 或 BEM 之一非空）
+> - **规则 2**：避免单一 Skill 覆盖所有 12 阶段（粒度过粗将导致误触发）
+> - **规则 3**：BLM 战略类（M1-M3）+ BEM 执行类（P4-P6）不应同时覆盖（语义矛盾）
+>
+> **L1 缓存键统一规范**：统一为 `skill:l1:{slug}:{version}`（Hash，TTL 24h，SkillMetadataChanged 事件触发 DEL）。
 
 #### 5.3.2 SKILL.md 完整模板（Hub-and-Spoke，路由表 ≤30 行）
 
