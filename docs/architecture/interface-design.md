@@ -775,6 +775,54 @@ PESTEL 分析工具，评估政治/经济/社会/技术/环境/法律六大外�
 ## Core Workflow
 详见 [references/pestel_workflow.md](references/pestel_workflow.md)（L1 强制 / L2 推荐 / L3 可选 SOP）
 
+## SOP
+
+### L1 强制步骤（不可跳过）
+1. **读取输入数据**
+   ```bash
+   sisys document search --query "${target_market}" --top-k 5
+   ```
+2. **校验数据完整性**
+   - 检查 6 个维度是否有数据支撑
+   - 数据不足时触发 FR-SR-12 补救机制
+3. **执行分析**
+   ```bash
+   sisys tool run pestel --input input.json --output output.json
+   ```
+4. **验证输出**
+   - 检查输出符合 PESTEL-Analysis-v1 Schema
+   - 验证失败重试最多 3 次
+
+### L2 推荐步骤（可跳过）
+5. **对比上期结果**
+   - 从档案库加载上期 PESTEL 分析
+   - 标注新增/消失/变化的因素
+6. **生成差异摘要**
+   - 输出变化项的置信度评分
+
+### L3 可选步骤
+7. **关联其他工具**
+   - 如与波特五力结果交叉验证
+8. **生成综合洞察**
+   - 输出战略建议
+
+## FAILURE HANDLING
+
+| 失败类型 | 处理策略 | 重试次数 | 降级方案 |
+|---------|---------|---------|---------|
+| 数据不足 | 触发 FR-SR-12 补救 | 1 | 标注"数据缺口" |
+| 验证失败 | 重试 + 记录日志 | 3 | 降级为基础分析 |
+| 超时 > 30s | 中断执行 | 0 | 返回部分结果 |
+| Schema 不匹配 | 报告错误 | 0 | 终止并提示用户 |
+
+## OUTPUT SCHEMA
+引用: `schemas/pestel_analysis_v1.json`
+
+## EVIDENCE PACKAGE
+- 分析结果 JSON
+- 数据源引用列表（文档 ID + 切片 ID + 置信度）
+- 成本审计信息（Token 消耗 + 估算 USD）
+
 ## Examples
 
 ### 示例 1: 新市场进入分析（完整场景）
@@ -804,6 +852,13 @@ data_sources: ["docs/policy/carbon_tax_2027.txt"]
 - [references/pestel_input_schema.md](references/pestel_input_schema.md) - JSON Schema
 - [references/pestel_failure_handling.md](references/pestel_failure_handling.md) - 失败兜底
 - [scripts/analyze.py](scripts/analyze.py) - L3 确定性计算脚本
+
+**设计要点**：
+- SKILL.md 控制在 **500 行以内**
+- SOP 分三级：L1 强制 / L2 推荐 / L3 可选
+- 必须包含 input_examples（1-5 个典型用例）
+- 必须包含负向触发条件
+- 必须包含失败处理表
 ```
 
 #### 5.3.3 SKILL.md 强制章节检查清单
@@ -822,38 +877,6 @@ data_sources: ["docs/policy/carbon_tax_2027.txt"]
 - [ ] **路由表 ≤30 行**（Hub-and-Spoke 强制约束）—— **P0-1 新增量化**
 - [ ] **总行数 ≤500 行**（含 Examples + Gotchas + References 链接）
 - [ ] **命令式写作**（动词开头，Anthropic 风格）
-   - 输出变化项的置信度评分
-
-### L3 可选步骤
-7. **关联其他工具**
-   - 如与波特五力结果交叉验证
-8. **生成综合洞察**
-   - 输出战略建议
-
-## FAILURE HANDLING
-
-| 失败类型 | 处理策略 | 重试次数 | 降级方案 |
-|---------|---------|---------|---------|
-| 数据不足 | 触发 FR-SR-12 补救 | 1 | 标注"数据缺口" |
-| 验证失败 | 重试 + 记录日志 | 3 | 降级为基础分析 |
-| 超时 > 30s | 中断执行 | 0 | 返回部分结果 |
-| Schema 不匹配 | 报告错误 | 0 | 终止并提示用户 |
-
-## OUTPUT SCHEMA
-引用: `schemas/pestel_analysis_v1.json`
-
-## EVIDENCE PACKAGE
-- 分析结果 JSON
-- 数据源引用列表（文档 ID + 切片 ID + 置信度）
-- 成本审计信息（Token 消耗 + 估算 USD）
-```
-
-**设计要点**：
-- SKILL.md 控制在 **500 行以内**
-- SOP 分三级：L1 强制 / L2 推荐 / L3 可选
-- 必须包含 input_examples（1-5 个典型用例）
-- 必须包含负向触发条件
-- 必须包含失败处理表
 
 ### 5.4 L3 捆绑资源
 
