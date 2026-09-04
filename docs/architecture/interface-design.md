@@ -301,34 +301,43 @@ MCP ──→ 外部 Agent 发现/调用工具箱（V2+ 启用）
 | `sisys archive query/diff/timeline` | 跨用例（通过 ApplicationService 聚合） | - |
 | `sisys system auth/monitor/route` | SystemOperationsUseCase | or.md 1.3(5) |
 
-#### 规则 3：Skills 在 DDD 架构中的精确位置
+#### 规则 3：Skills 在 DDD 架构中的精确位置（对标 Anthropic Claude Code Skills）
+
+**核心原则：Skills 不是领域服务、不是用例，而是"操作手册"（Anthropic Hub-and-Spoke 模式）。**
 
 ```
-Skills 不是领域服务，不是用例，是"操作手册"
+Skills 三级架构与 DDD 层对应（对标 Anthropic Claude Code Skills）
 
-┌─────────────────────────────────────────────────────────────┐
-│  Skills 的三层架构与 DDD 层的对应关系                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  L1: TOOLS.md (< 200 tokens)                                │
-│  → 接口层的工具元数据清单                                     │
-│  → 用于 SkillSelector 推荐                                   │
-│  → 不依赖任何领域逻辑                                        │
-│                                                             │
-│  L2: SKILL.md (< 500 行)                                    │
-│  → 应用层的操作流程手册                                       │
-│  → 定义"如何调用领域服务"                                     │
-│  → 包含 SOP、失败处理、输入输出 Schema                        │
-│  → 不实现领域逻辑，只定义调用流程                              │
-│                                                             │
-│  L3: scripts/references                                     │
-│  → 基础设施层的确定性计算                                     │
-│  → scripts/ 中的 Python 脚本执行数值计算、数据验证             │
-│  → references/ 中的 Markdown 提供理论参考                    │
-│  → 通过沙箱执行，不直接访问领域层                             │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  L1: TOOLS.md（应用层元数据清单，YAML frontmatter 聚合）        │
+│  ├─ 大小：MVP ≤1.2K tokens / V1 ≤800 tokens / V2 ≤500 tokens   │
+│  ├─ 加载时机：Agent 启动时全量预加载到系统提示                  │
+│  ├─ 字段：name / description / version / allowed_agents /         │
+│  │       applicable_blm_stages / applicable_bem_stages /          │
+│  │       negative_triggers                                       │
+│  └─ 触发机制：LLM 基于 description 中的 "Use when..."            │
+│              短语自主判断（Anthropic "description 即触发器"）     │
+│                                                                 │
+│  L2: SKILL.md（应用层操作手册，Hub-and-Spoke 结构）             │
+│  ├─ 大小：≤500 行（超长规范拆分到 references/*.md）            │
+│  ├─ 加载时机：模型判断相关时通过 Read 工具按需加载               │
+│  ├─ 章节：Overview / When to Use / When NOT to Use /             │
+│  │       Quick Start / Core Workflow / Examples /                │
+│  │       Gotchas / References                                    │
+│  ├─ 必含："When NOT to Use" 负向触发章节（P6 + Anthropic 强制） │
+│  └─ 不实现领域逻辑，只定义调用流程（与 sisys Tool/Agent 解耦）   │
+│                                                                 │
+│  L3: scripts/ + references/ + assets/（基础设施层 + 应用层辅助）│
+│  ├─ scripts/：确定性计算（数据校验/格式转换/排序）              │
+│  │   Python 脚本在沙箱中执行（Anthropic "代码优先于 Prompt"）    │
+│  ├─ references/：长篇规范（按需链式读取，Hub-and-Spoke 末梢）   │
+│  ├─ assets/：模板与示例资源                                    │
+│  └─ 通过 SandboxExecutor 端口执行，不直接访问领域层              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+**实现状态（2026-09-04）：** Skills 系统**未实现**（设计 100%，实现 0%），详见 `architecture.md §17.3` + Epic 5 蓝图。
 
 #### 规则 4：CLI 同步响应与事件异步处理的协调
 
@@ -429,7 +438,7 @@ sisys system     # 系统管理（辅助：用户/权限/监控）
 sisys config     # 配置管理（辅助：环境/路由/隔离）
 ```
 
-### 3.3 完整命令清单
+### 4.3 完整命令清单
 
 #### 3.3.1 文档管理（sisys document）
 
@@ -539,7 +548,7 @@ sisys archive timeline --plan-id <id>  # 时间轴演进查询
 sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 ```
 
-### 3.4 Agent 专用参数规范
+### 4.4 Agent 专用参数规范
 
 所有命令必须支持以下 Agent 模式参数：
 
@@ -552,7 +561,7 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 | `--cost-budget <amount>` | 成本预算上限 | 系统默认 | 用于成本控制 |
 | `--timeout <seconds>` | 执行超时 | 300 | 防止无限等待 |
 
-### 3.5 输出格式规范
+### 4.5 输出格式规范
 
 所有命令必须支持以下输出格式：
 
@@ -566,9 +575,9 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 
 ---
 
-## 4. Skills 渐进式加载机制
+## 5. Skills 渐进式加载机制（⚠️ 设计示意，未实现 Epic 5）
 
-### 4.1 三级渐进式披露
+### 5.1 三级渐进式披露
 
 借鉴 Claude Code 的三级加载机制：
 
@@ -609,7 +618,7 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 L1 元数据：TOOLS.md
+### 5.2 L1 元数据：TOOLS.md
 
 ```markdown
 # TOOLS.md - Agent 可用工具清单
@@ -642,7 +651,7 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 - `description` 必须包含明确触发词（借鉴 Claude Code "pushy" 原则）
 - 必须包含负向触发条件（"不应在...时使用"）
 
-### 4.3 L2 SOP 主体：SKILL.md
+### 5.3 L2 SOP 主体：SKILL.md
 
 ```markdown
 ---
@@ -750,7 +759,7 @@ data_sources: ["docs/policy/carbon_tax_2027.txt"]
 - 必须包含负向触发条件
 - 必须包含失败处理表
 
-### 4.4 L3 捆绑资源
+### 5.4 L3 捆绑资源
 
 ```
 skills/pestel/
@@ -765,76 +774,103 @@ skills/pestel/
     └── template.md       # 输出模板
 ```
 
-### 4.5 Skill 选择器（SkillSelector）
+### 5.5 Skill 选择器（SkillSelector）—— ⚠️ 设计示意，未实现（Epic 5 Story 5-2）
+
+**关键设计决策（对标 Anthropic Claude Code Skills）：**
+
+> **不实现硬编码关键词/embedding 权重选择器**。原因：
+> 1. **违反 P5 原则**（"Less scaffolding, more model"）：硬编码选择器是典型的 scaffolding
+> 2. **双重 scaffolding**：关键词权重（40%/60%）+ auto:N 阈值 = 双重不必要复杂度
+> 3. **触发准确率依赖 L1 description 质量**，而非算法权重
+> 4. **Anthropic Claude Code Skills 范式**：模型基于 description 自主判断（description 即触发器）
+
+**SkillSelector 仅作为辅助查询接口：**
 
 ```python
 class SkillSelector:
     """
-    Skill 选择器：根据任务描述推荐应加载的 Skills
+    Skill 辅助查询接口（不是选择器）
 
-    借鉴 Claude Code 的工具搜索机制（auto:N 阈值）
+    实际 Skill 触发由 Agent LLM 基于 L1 description 自主判断（Anthropic 风格）。
+    本接口仅提供基于 BLM/BEM 阶段 + 角色白名单的过滤查询，
+    返回候选 Skill 列表供 LLM 二次筛选。
     """
 
-    def __init__(self, threshold: str = "auto:10"):
-        self.threshold = threshold  # auto:5（激进）/ auto:10（默认）/ auto:20（保守）
-        self.skill_metadata = load_tools_manifest()  # 加载 TOOLS.md
+    def __init__(self, repository: SkillRepositoryPort):
+        self._repository = repository
 
-    def recommend(self, task_description: str, top_k: int = 3) -> List[str]:
+    def list_candidates(
+        self,
+        blm_stage: BLMStage | None = None,
+        bem_stage: BEMStage | None = None,
+        agent_role: str | None = None,
+    ) -> list[Skill]:
         """
-        根据任务描述推荐 Skills
+        列出候选 Skill（按 BLM/BEM 阶段 + 角色白名单过滤）
 
-        流程：
-        1. 关键词匹配（tags 比对）
-        2. 语义相似度（task embedding vs skill description）
-        3. 返回 Top-K 候选
+        返回结果供 Agent LLM 二次筛选（基于 L1 description 语义匹配）。
+
+        Args:
+            blm_stage: 当前 BLM 阶段（可选）
+            bem_stage: 当前 BEM 阶段（可选）
+            agent_role: Agent 角色（CEO/CFO/CMO/CTO/COO/CHO/AUD）
+
+        Returns:
+            list[Skill]: 候选 Skill 列表（已按 allowed_agents/applicable_*_stages 过滤）
         """
-        # 1. 关键词匹配
-        keyword_scores = self._keyword_match(task_description)
+        candidates = self._repository.list_all()
 
-        # 2. 语义相似度
-        semantic_scores = self._semantic_similarity(task_description)
+        # BLM 阶段过滤
+        if blm_stage is not None:
+            candidates = [s for s in candidates if s.is_applicable_to_blm_stage(blm_stage)]
 
-        # 3. 融合排序
-        combined_scores = self._rank_scores(keyword_scores, semantic_scores)
+        # BEM 阶段过滤
+        if bem_stage is not None:
+            candidates = [s for s in candidates if s.is_applicable_to_bem_stage(bem_stage)]
 
-        # 4. 阈值过滤
-        threshold = self._parse_threshold()
-        candidates = [s for s in combined_scores if s.score >= threshold]
+        # 角色白名单过滤
+        if agent_role is not None:
+            candidates = [s for s in candidates if s.is_allowed_for_agent(agent_role)]
 
-        return candidates[:top_k]
+        # 仅返回 ACTIVE 状态的 Skill
+        candidates = [s for s in candidates if s.status == SkillStatus.ACTIVE]
 
-    def _keyword_match(self, task: str) -> Dict[str, float]:
-        """关键词匹配：检查任务描述是否包含 Skill 触发词"""
-        scores = {}
-        for skill in self.skill_metadata:
-            trigger_words = skill.get("trigger_words", [])
-            count = sum(1 for word in trigger_words if word in task.lower())
-            scores[skill["id"]] = count / max(len(trigger_words), 1)
-        return scores
-
-    def _semantic_similarity(self, task: str) -> Dict[str, float]:
-        """语义相似度：task embedding vs skill description embedding"""
-        task_embedding = embed(task)
-        scores = {}
-        for skill in self.skill_metadata:
-            skill_embedding = embed(skill["description"])
-            scores[skill["id"]] = cosine_similarity(task_embedding, skill_embedding)
-        return scores
-
-    def _rank_scores(self, keyword: dict, semantic: dict) -> List[SkillScore]:
-        """融合排序：关键词 40% + 语义 60%"""
-        results = []
-        all_ids = set(keyword.keys()) | set(semantic.keys())
-        for skill_id in all_ids:
-            combined = (
-                keyword.get(skill_id, 0) * 0.4 +
-                semantic.get(skill_id, 0) * 0.6
-            )
-            results.append(SkillScore(skill_id=skill_id, score=combined))
-        return sorted(results, key=lambda x: x.score, reverse=True)
+        return candidates
 ```
 
-### 4.6 Agent 上下文加载流程
+**完整 Skill 触发决策树：**
+
+```
+1. Agent LLM 接收任务描述
+   ↓
+2. LLM 基于系统提示中的 L1 TOOLS.md（description 字段含 "Use when..."）自主判断
+   ↓
+3. LLM 决定调用 1+ 个 Skill（按 description 语义匹配 + 负向触发回避）
+   ↓
+4. 工具调用前 LLM 可调用 SkillSelector.list_candidates(blm_stage, bem_stage, agent_role) 做预过滤
+   ↓
+5. SkillLoader.load_l2_skill(slug) 加载 SKILL.md
+   ↓
+6. SkillLoader.load_l3_resource(slug, file) 按需加载 scripts/references
+   ↓
+7. 执行 SOP（结合领域服务）
+   ↓
+8. 发布 SkillExecuted 事件（埋点：accuracy / false_positive_rate）
+```
+
+**对比硬编码选择器（已删除）的优势：**
+
+| 维度 | 硬编码选择器（已废弃） | Anthropic 模型自决 |
+|------|-------------------|-------------------|
+| 触发准确性 | 依赖权重调参（人工） | 依赖 L1 description 质量（人工写好即可） |
+| 维护成本 | 需调参 + 调阈值 | 仅需维护 L1 description |
+| 适配新 Skill | 需重新调参 | 仅需补充 L1 description |
+| 解释性 | 黑盒分数 | LLM 可解释决策过程 |
+| 评测方式 | 准确率 vs 阈值 | description-based A/B 评测 |
+
+> **实施路径：** Epic 5 Story 5-2 SkillSelector 实现 + Story 5-9 验收测试（AC-8 准确率 ≥85% / 误触发率 ≤5%）。
+
+### 5.6 Agent 上下文加载流程
 
 ```
 Agent 启动
@@ -892,7 +928,7 @@ Agent 启动
 
 ## 5. MCP 外部生态接口
 
-### 5.1 定位与启用时机
+### 6.1 定位与启用时机
 
 | 版本 | MCP 角色 | 启用场景 | 理由 |
 |------|---------|---------|------|
@@ -901,7 +937,7 @@ Agent 启动
 | **V2+** | ✅ 可选启用 | 外部 Agent 生态集成 | 企业级统一权限管控 |
 | **V3+** | ✅ 建议启用 | 跨系统工具平台对接 | 与用友/金蝶/华为云集成 |
 
-### 5.2 MCP Registry 设计
+### 6.2 MCP Registry 设计
 
 ```yaml
 # mcp/registry.yaml - MCP 工具注册表
@@ -931,10 +967,16 @@ tools:
   # ... 共 23 种工具
 ```
 
-### 5.3 MCP Server 实现
+### 6.3 MCP Server 实现 —— ⚠️ MVP 不启用（MVP 代码量 = 0，P4 原则）
 
-```python
-# mcp/server.py - MCP 服务器实现
+> **重要声明（与 §5.1 一致）：** MVP 阶段 MCP 代码量必须为 0（P4 原则）。完整 MCP Server 实现迁移至附录 `appendix-mcp.md`，仅 V1+ 启用。
+>
+> 本节仅作为 V1/V2+ 的**设计参考**（不进入 MVP 实现）。
+
+```text
+# === 以下示例仅作 V1+ 设计参考，MVP 不会提交此实现 ===
+
+# mcp/server.py - MCP 服务器实现（设计示意）
 from mcp.server import Server
 from mcp.types import Tool, TextContent
 
@@ -943,30 +985,31 @@ app = Server("sisys-toolbox")
 @app.list_tools()
 async def list_tools() -> list[Tool]:
     """暴露 sisys 工具箱能力"""
-    registry = load_mcp_registry()  # 加载 mcp/registry.yaml
-    return [
-        Tool(
-            name=tool["tool_id"],
-            description=tool["description"],
-            inputSchema=load_json_schema(tool["input_schema"]),
-        )
-        for tool in registry["tools"]
-    ]
+    # 注：V1+ 才实现，MVP 阶段此文件不应存在
+    ...
 
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """处理外部 Agent 的工具调用"""
-    # 1. 鉴权（mTLS + OAuth 2.1）
-    await authenticate_request()
-
-    # 2. 调用内部 ToolService（复用 CLI 同一入口）
-    result = await tool_service.execute(name, arguments)
-
-    # 3. 返回结果
-    return [TextContent(type="text", text=json.dumps(result))]
+    # 注：V1+ 才实现，MVP 阶段此文件不应存在
+    ...
 ```
 
-### 5.4 MCP 与 CLI 的关系
+**MVP 阶段约束验证（pre-commit hook）：**
+
+```bash
+# 此 grep 在 MVP 阶段必须零输出
+grep -rn "from mcp\|import mcp" src/ 2>/dev/null
+# 预期输出：（空）
+
+# pyproject.toml 中 mcp 依赖声明应被删除
+grep -rn "^mcp" pyproject.toml 2>/dev/null
+# 预期输出：（空）
+```
+
+> **详见 §5.1** 启用时机表：V1 启用 Read-only MCP 工具桥（预计 2027Q2）；V2 启用 Write MCP 工具桥（预计 2028Q1）。
+
+### 6.4 MCP 与 CLI 的关系
 
 ```
 同一个工具实现，两种暴露方式：
@@ -998,7 +1041,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 ## 6. sisys Agent 间通信协议（SAP - Sysys Agent Protocol）
 
-### 6.1 协议定位
+### 7.1 协议定位
 
 SAP（sisys Agent Protocol）是 sisys 内部 Agent 间的专用通信协议。
 
@@ -1015,7 +1058,7 @@ SAP（sisys Agent Protocol）是 sisys 内部 Agent 间的专用通信协议。
 - Skills 是单 Agent 的操作手册，不包含跨 Agent 交互逻辑
 - 外部 Agent 协议（如 Google A2A）面向跨系统任务委派，不覆盖 sisys 的多视角辩论、SYS 裁决、公共黑板等核心场景
 
-### 6.2 为什么 CLI+Skills 不可替代？
+### 7.2 为什么 CLI+Skills 不可替代？
 
 **核心结论：SAP 有 CLI+Skills 无法替代的独特价值，但 MVP 阶段不应实现完整协议。**
 
@@ -1119,7 +1162,7 @@ class CEOSkill:
             ))
 ```
 
-### 6.3 SAP 启用时机
+### 7.3 SAP 启用时机
 
 | 版本 | SAP 角色 | 交付物 | 理由 |
 |------|---------|-------|------|
@@ -1127,7 +1170,7 @@ class CEOSkill:
 | **V1** | ✅ 实现核心功能 | 辩论机制 + SYS 裁决 + 公共黑板 | 多 Agent 协作核心差异化能力 |
 | **V2+** | ✅ 完整实现 | EIP 协作态 + 隔离切换 + mTLS | 企业级多 Agent 协作必需 |
 
-### 6.4 消息格式定义
+### 7.4 消息格式定义
 
 ```python
 class MessageType(str, Enum):
@@ -1161,7 +1204,7 @@ class SAPMessage(BaseModel):
     blackboard_visible: bool = False  # 是否对公共黑板可见
 ```
 
-### 6.5 SAP 通信流程
+### 7.5 SAP 通信流程
 
 ```
 CEO Agent                    CFO Agent
@@ -1181,7 +1224,7 @@ CEO Agent                    CFO Agent
     │                           │
 ```
 
-### 6.6 安全要求
+### 7.6 安全要求
 
 | 安全机制 | 描述 | 实现版本 |
 |---------|------|---------|
@@ -1194,13 +1237,13 @@ CEO Agent                    CFO Agent
 
 ## 7. REST API 集成接口
 
-### 7.1 API 总体设计
+### 8.1 API 总体设计
 
 ```
 Base URL: /api/v1
 ```
 
-### 7.2 完整业务端点清单
+### 8.2 完整业务端点清单
 
 #### 7.2.1 文档管理
 
@@ -1282,7 +1325,7 @@ Base URL: /api/v1
 | `/system/health` | GET | 健康检查 | P0 |
 | `/system/metrics` | GET | 监控指标查询 | P0 |
 
-### 7.3 API Gateway 要求
+### 8.3 API Gateway 要求
 
 | 功能 | 实现 | 要求 |
 |------|------|------|
@@ -1509,7 +1552,6 @@ applicable_stages: ["market-insight", "strategic-analysis"]
 ```json
 {{output_schema}}
 ```
-```
 
 ### 10.3 Prompt 版本管理
 
@@ -1667,44 +1709,9 @@ async def execute_tool(tool_id: str, input_data: Dict):
 
 ---
 
-## 14. 实施路线图
+## 14. 事件监听适配器规范
 
-### 14.1 MVP 阶段（P0）
-
-| 任务 | 交付物 | Story 关联 | 工作量 |
-|------|-------|-----------|-------|
-| 定义 sisys CLI 6 个服务模块 | `cli/commands/` 骨架 | Story 7.1 | 2 周 |
-| 实现 CLI 基础框架 | typer 0.24+ 类型注解驱动 | Story 7.1 | 1 周 |
-| 设计 TOOLS.md 元数据清单 | `agents/ceo/TOOLS.md` | Story 5.2 | 1 周 |
-| 编写 3 个 Pilot SKILL.md | pestel/swot/five-forces | Story 4.1 | 2 周 |
-| 实现 SkillSelector | 关键词 + 语义推荐 | Story 5.3 | 2 周 |
-| 定义 LLMRequest/LLMResponse | `domain/llm/protocol.py` | Story 1.14b | 1 周 |
-| 实现 LLM Adapter（LiteLLM） | `infrastructure/llm/` | Story 1.14b | 2 周 |
-| 定义 ToolCallRequest/Response | `domain/tool/protocol.py` | Story 4.3 | 1 周 |
-
-### 14.2 V1 阶段（P1）
-
-| 任务 | 交付物 | Story 关联 |
-|------|-------|-----------|
-| 补全 20 个 SKILL.md | `skills/` 完整 | Story 4.x |
-| 实现 SAP 协议 | `domain/agent/sap.py` | Story 9.x |
-| 实现多 Agent 协作 | SYS Agent 裁决 | Story 9.6 |
-| 实现 Skill 版本管理 | 版本注册 + 回滚 | Story 4.6 |
-
-### 14.3 V2+ 阶段（P2）
-
-| 任务 | 交付物 | Story 关联 |
-|------|-------|-----------|
-| 实现 MCP Registry | `mcp/registry.yaml` | Story 4.8 |
-| 实现 MCP Server | `mcp/server.py` | Story 4.8 |
-| 外部 Agent 集成测试 | 跨系统工具调用 | Story 16.x |
-| 企业级统一权限 | OAuth 2.1 + mTLS | Story 16.x |
-
----
-
-## 12. 事件监听适配器规范
-
-### 12.1 设计原则
+### 14.1 设计原则
 
 **or.md 1.4.1(3) 原文：**
 > 事件监听适配器：支持 RabbitMQ 事件消费者，监听领域事件（文档处理完成、工具执行完成、AGENT 决策完成、隔离等级切换、Checkpoint 恢复、路由决策），触发下游应用层用例
@@ -1714,7 +1721,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 - 转换为 ApplicationCommand 触发下游用例
 - 保证事件处理幂等性，支持重放与失败重试
 
-### 12.2 事件监听架构
+### 14.2 事件监听架构
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1744,7 +1751,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 12.3 10 种领域事件监听映射
+### 14.3 10 种领域事件监听映射
 
 | 领域事件 | 监听器 | 触发的下游用例 | or.md 事件流转 |
 |---------|--------|---------------|---------------|
@@ -1759,7 +1766,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 | CheckpointRecovered | CheckpointRecoveredListener | 战略档案库版本更新用例、分支管理用例 | [6] Checkpoint 恢复事件流转 |
 | RoutingDecided | RoutingDecidedListener | 路由决策日志存储用例、成本监控用例 | [7] 路由决策事件流转 |
 
-### 12.4 事件处理幂等性保证
+### 14.4 事件处理幂等性保证
 
 ```python
 class EventListener:
@@ -1802,16 +1809,16 @@ class EventListener:
 
 ---
 
-## 13. Web 前端接口规范
+## 15. Web 前端接口规范
 
-### 13.1 设计原则
+### 15.1 设计原则
 
 **or.md 1.4.1(4)-(6) 原文：**
 > 无障碍设计适配器：遵循 WCAG 2.1 AA 标准
 > 多语言界面适配器：支持中文与英文界面切换
 > 分支管理界面适配器：支持创建分支、切换分支、删除分支、分支差异对比视图
 
-### 13.2 三视图架构
+### 15.2 三视图架构
 
 | 视图 | 目标用户 | 核心功能 | 对应 FR |
 |------|---------|---------|-------|
@@ -1819,7 +1826,7 @@ class EventListener:
 | **分析师视图** | 战略管理部人员 | 专业工具执行、溯源树展示、报告生成 | FR-UI-06, FR-UI-09 |
 | **企业战略与市场人员视图** | 企业战略与市场体系人员 | 流程标准化执行、Checkpoint 管理、证据包打包 | FR-UI-05, FR-UI-10 |
 
-### 13.3 REST API 端点设计
+### 15.3 REST API 端点设计
 
 ```
 # 文档管理
@@ -1855,7 +1862,7 @@ GET    /api/v1/system/health                # 健康检查
 GET    /api/v1/system/metrics               # 监控指标
 ```
 
-### 13.4 无障碍设计要求（WCAG 2.1 AA）
+### 15.4 无障碍设计要求（WCAG 2.1 AA）
 
 | 要求 | 描述 | 验收标准 |
 |------|------|---------|
@@ -1865,7 +1872,7 @@ GET    /api/v1/system/metrics               # 监控指标
 | **对比度** | 文本与背景对比度 ≥ 4.5:1 | WCAG AA 标准 |
 | **焦点可见** | 键盘焦点元素有明确边框 | 焦点环 2px 以上 |
 
-### 13.5 多语言设计要求
+### 15.5 多语言设计要求
 
 | 要求 | 描述 | 验收标准 |
 |------|------|---------|
@@ -1875,45 +1882,9 @@ GET    /api/v1/system/metrics               # 监控指标
 
 ---
 
-## 14. 接口版本管理与兼容性
+## 16. 安全与权限控制
 
-### 14.1 版本策略
-
-| 接口 | 版本格式 | 兼容性要求 |
-|------|---------|-----------|
-| **CLI** | `sisys v1.0.0` | 向后兼容 2 个主版本 |
-| **REST API** | `/api/v1/` | URL 路径包含版本号 |
-| **Skills** | `SKILL.md` frontmatter `version` | 向后兼容 1 个主版本 |
-| **MCP** | `registry.yaml` version | 向后兼容 1-2 个版本 |
-| **SAP** | 消息头 `protocol_version` | 向后兼容 1 个版本 |
-| **LLM Adapter** | LiteLLM 版本 | 跟随 LiteLLM 升级 |
-| **领域事件** | `event_schema_version` | 向后兼容 1-2 个版本 |
-
-### 14.2 破坏性变更流程
-
-```
-提出变更 → 影响评估 → 设计兼容层 → 测试验证 → 发布迁移指南 → 部署
-   │           │           │           │           │           │
-   ▼           ▼           ▼           ▼           ▼           ▼
-  RFC 文档   FR/NFR 影响  兼容适配器  契约测试   用户通知    灰度发布
-```
-
-### 14.3 契约测试
-
-| 契约类型 | 工具 | 验证内容 | 通过率要求 |
-|---------|------|---------|-----------|
-| **CLI 契约** | typer 测试框架 | 命令解析 + 输出格式 | 100% |
-| **API 契约** | Schemathesis | OpenAPI 3.1 验证 | 100% |
-| **Skill 契约** | jsonschema | SKILL.md Schema 验证 | 100% |
-| **MCP 契约** | jsonschema | 工具输入/输出 Schema | 100% |
-| **SAP 契约** | Pydantic 模型 | 消息格式验证 | 100% |
-| **事件契约** | Pydantic 模型 | 领域事件 Schema | 100% |
-
----
-
-## 15. 安全与权限控制
-
-### 15.1 安全分层
+### 16.1 安全分层
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1948,7 +1919,7 @@ GET    /api/v1/system/metrics               # 监控指标
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 15.2 CLI 安全参数
+### 16.2 CLI 安全参数
 
 | 参数 | 描述 | 安全级别 |
 |------|------|---------|
@@ -1957,7 +1928,7 @@ GET    /api/v1/system/metrics               # 监控指标
 | `--cost-budget` | 成本上限 | Agent 模式必须设置 |
 | `--timeout` | 超时时间 | 防止无限等待 |
 
-### 15.3 Skill 权限控制
+### 16.3 Skill 权限控制
 
 ```yaml
 # SKILL.md 权限声明
@@ -1970,55 +1941,6 @@ data_access:
 cost_limit:
   max_usd_per_call: 0.10
   max_tokens_per_call: 50000
-```
-
----
-
-## 16. 可观测性与监控
-
-### 16.1 统一追踪 ID
-
-```python
-# 每个请求携带 trace_id，贯穿所有接口层
-class TraceContext:
-    trace_id: str          # 分布式追踪 ID
-    span_id: str           # 当前 Span ID
-    parent_span_id: str    # 父 Span ID
-    session_id: str        # 会话 ID
-    task_id: str           # 任务 ID
-```
-
-### 16.2 关键监控指标
-
-| 指标类别 | 指标 | 告警阈值 | 测量方式 |
-|---------|------|---------|---------|
-| **性能** | CLI 命令响应延迟 | P95 > 1s | OpenTelemetry |
-| **性能** | Skill 加载延迟 | P95 > 500ms | 日志分析 |
-| **性能** | LLM 调用延迟 | P95 > 10s | LiteLLM metrics |
-| **质量** | Skill 触发准确率 | < 85% | 测试集验证 |
-| **质量** | 工具调用准确率 | < 90% | 日志分析 |
-| **成本** | 单次任务成本 | > 预算 200% | 成本聚合 |
-| **安全** | 提示注入检测 | 准确率 < 95% | ShieldCortex |
-| **可用性** | CLI 可用性 | < 99% | 健康检查 |
-| **事件** | 事件处理成功率 | < 99% | 事件总线监控 |
-| **事件** | 事件处理延迟 | P95 > 5s | 事件总线监控 |
-
-### 16.3 OpenTelemetry 集成
-
-```python
-from opentelemetry import trace, metrics
-
-# 所有接口调用自动创建 Span
-@tracer.start_as_current_span("sisys.tool.execute")
-async def execute_tool(tool_id: str, input_data: Dict):
-    span.set_attribute("tool.id", tool_id)
-    span.set_attribute("tool.input_hash", hash(input_data))
-
-    result = await tool_service.execute(tool_id, input_data)
-
-    span.set_attribute("tool.output_size", len(result))
-    span.set_attribute("tool.cost_usd", result.cost)
-    return result
 ```
 
 ---
@@ -2053,12 +1975,12 @@ async def execute_tool(tool_id: str, input_data: Dict):
 
 ### 17.3 V2+ 阶段（P2）
 
-| 任务 | 交付物 | Story 关联 | or.md 追溯 |
-|------|-------|-----------|-----------|
-| 实现 MCP Registry | `mcp/registry.yaml` | Story 4.8 | or.md 1.2.2(3) |
-| 实现 MCP Server | `mcp/server.py` | Story 4.8 | or.md 1.4.2(2) |
-| 外部 Agent 集成测试 | 跨系统工具调用 | Story 16.x | or.md 1.4.1(3) |
-| 企业级统一权限 | OAuth 2.1 + mTLS | Story 16.x | or.md 1.4.1(2) |
+| 任务 | 交付物 | Story 关联 |
+|------|-------|-----------|
+| 实现 MCP Registry | `mcp/registry.yaml` | Story 4.8 |
+| 实现 MCP Server | `mcp/server.py` | Story 4.8 |
+| 外部 Agent 集成测试 | 跨系统工具调用 | Story 16.x |
+| 企业级统一权限 | OAuth 2.1 + mTLS | Story 16.x |
 
 ---
 
