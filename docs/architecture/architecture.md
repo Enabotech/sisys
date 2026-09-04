@@ -2655,6 +2655,60 @@ buckets/
 
 **执行循环：** Think→Code→Execute→Observe→Validate，支持持久化 Jupyter Kernel 沙箱、Pydantic V2 Schema 强制、一致性校验仲裁、DSPy 提示词优化。
 
+#### 17.3.1 L3 沙箱事务边界（Anthropic "代码优先" 对标）
+
+**⚠️ P0-3（架构师视角）**：L3 scripts/ 在 SandboxExecutor 中执行，必须满足以下事务性约束：
+
+| 约束 | 默认值 | 强制要求 |
+|------|--------|---------|
+| **timeout_seconds** | 30 | P95 < 5s，超时抛 `SkillExecutionError`（EXCEPTION_423） |
+| **max_memory_mb** | 512 | OOM 抛 `SkillPolicyViolationError` |
+| **max_cpu_percent** | 50 | 持续超限自动 kill |
+| **network_whitelist** | [] | 默认无网络（Anthropic 风格），仅允许通过 nsenter 注入白名单 |
+| **filesystem_readonly_paths** | ["/app/skills/{slug}", "/app/references"] | 防 path traversal 攻击 |
+| **filesystem_writable_paths** | ["/tmp/sisys/skill/{slug}"] | 仅沙箱临时目录可写 |
+| **transaction_mode** | "rollback" | 脚本失败时自动回滚写入（L3 仅读取时设为 "none"）|
+
+**事务模式说明：**
+- `none`：纯计算脚本（如数据校验），无副作用
+- `rollback`：失败回滚所有写入（默认）
+- `compensable`：需应用层显式补偿（事务补偿模式）
+
+**Side effect 边界：**
+- L3 脚本不得直接修改 PostgreSQL / Redis / Neo4j（必须通过 Outbox 事件）
+- L3 脚本的产出物（output.json）通过 SkillExecuted 事件回流到领域层
+
+**资源加载安全：**
+- 路径白名单：`SAFE_ROOT = "/app/skills/{slug}"`，所有 L3 资源必须在此目录下
+- Path traversal 防护：`safe_join_skill_path(slug, relative)` 中 `Path.resolve() + is_relative_to()` 校验
+- 异常代码：`PathTraversalError`（EXCEPTION_422，skill 子域）
+
+#### 17.3.2 工具调用决策原则（Anthropic 风格）
+
+**SOP（决策树）：**
+
+```
+1. Agent LLM 接收任务描述
+   ↓
+2. 启动时已加载 L1 TOOLS.md（含 23 Skill description + negative_triggers）
+   ↓
+3. LLM 基于 description 中的 "Use when..." 短语自主判断（无硬编码选择器）
+   ↓
+4. 命中正向触发 → 检查 negative_triggers 回避
+   ↓
+5. 通过 → 调用 SkillSelector.list_candidates(blm_stage, bem_stage, agent_role) 做预过滤
+   ↓
+6. LLM 从候选中确认目标 Skill（≤3 个）
+   ↓
+7. SkillLoader.load_l2_skill(slug) → 加载 SKILL.md（≤500 行，Hub-and-Spoke）
+   ↓
+8. 按需加载 references/*.md
+   ↓
+9. 执行 SOP → 领域服务调用
+   ↓
+10. 发布 SkillExecuted 事件（埋点：accuracy / false_positive_rate / latency_ms）
+```
+
 > 详见 [sisys-core-domain-design.md §17.2](sisys-core-domain-design.md#172-工具箱架构设计)
 
 ### 17.4 AGENT 架构
