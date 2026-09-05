@@ -14,10 +14,10 @@ completedAt: '2026-02-26'
 
 # SISYS - 企业战略智能系统架构设计文档
 
-**版本：** 8.3.3（架构决策与实现分离优化版）
-**状态：** 架构决策主文档 ~3300 行，实现细节迁移至子设计文档
-**评审日期：** 2026-05-23
-**审核依据：**对标业界最佳实践（Arc42/C4/ADR），将 §8/§17/§18 实现代码迁移至独立子设计文档，架构主文档聚焦决策与规则
+**版本：** 8.4.0（Round 1 审查修订版 - 异常契约/依赖方向/Skills 对标）
+**状态：** 架构决策主文档 ~3500 行，实现细节迁移至子设计文档
+**评审日期：** 2026-09-05
+**审核依据：**对标业界最佳实践（Arc42/C4/ADR + Anthropic Claude Code Skills 渐进式披露），将 §8/§17/§18 实现代码迁移至独立子设计文档，架构主文档聚焦决策与规则
 
 [重要说明]本架构设计包含有部分重要模块的详细设计、项目参考目录树与关键代码实现示例，这类型内容仅供开发参考，执行[EPIC]-[STORY]-[编码]等开发任务时按需调整并及时更新本文档即可！
 
@@ -152,7 +152,12 @@ completedAt: '2026-02-26'
 | **domain**         | —      | ✗ 禁止      | ✗ 禁止     | ✗ 禁止         |
 | **application**    | ✓ 允许 | —           | ✗ 禁止     | ✗ 禁止         |
 | **interfaces**     | ✓ 允许 | ✓ 允许      | —          | ✗ 禁止         |
-| **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
+| **infrastructure** | ✓ 允许 | △ **仅通过 DI 注入**（不 import application 模块） | ✗ 禁止     | —              |
+
+**关键说明（六边形架构依赖倒置）：**
+- `infrastructure` 不通过模块 import 依赖 `application`，而是通过 `src/composition_root.py` 中 `resolve()` 注入 application 层定义的 Protocol（端口）
+- 这种依赖倒置保证领域逻辑与技术实现完全隔离（CLAUDE.md §3 架构约束）
+- import-linter 配置严格校验：禁止 `infrastructure/**/import application/**`
 
 ![系统架构](../images/architecture.svg)
 
@@ -2273,6 +2278,61 @@ docs/
 
 ---
 
+### 13.11 Skills 系统目录结构 (src/application/skills/)
+
+> **说明：** Skills 系统实现路径详见 Epic 5 蓝图（Story 5-2 ~ 5-9）。本节描述 Epic 5 落地后的目标目录结构。
+
+```
+src/application/skills/
+├── __init__.py                                            # Skills 包初始化
+│
+├── registry/                                              # Skill 注册表（基础设施层实现于 composition_root）
+│   ├── __init__.py
+│   ├── loader.py                                          # SkillLoader（按需加载 L2/L3）
+│   └── selector.py                                        # SkillSelector（仅返回 ACTIVE 列表，无硬编码过滤）
+│
+├── l1/                                                    # L1 元数据聚合
+│   ├── __init__.py
+│   └── tools.md                                           # TOOLS.md（23 工具 ≤1.2K tokens 聚合）
+│
+├── l2/                                                    # L2 SKILL.md（Hub-and-Spoke 路由表）
+│   ├── __init__.py
+│   ├── pestel/
+│   │   ├── SKILL.md                                       # ≤500 行 SOP 主体
+│   │   ├── references/                                    # 长篇规范按需加载
+│   │   │   ├── pestel_workflow.md
+│   │   │   ├── pestel_quickstart.md
+│   │   │   └── pestel_failure_handling.md
+│   │   └── assets/                                        # 静态资源（模板/示例）
+│   ├── swot/
+│   │   ├── SKILL.md
+│   │   ├── references/
+│   │   └── assets/
+│   ├── five-forces/
+│   │   ├── SKILL.md
+│   │   ├── references/
+│   │   └── assets/
+│   └── ...（共 23 个 Skill 目录）
+│
+└── l3/                                                    # L3 scripts（确定性任务，Anthropic "代码优先"）
+    ├── __init__.py
+    ├── pestel/
+    │   ├── validate_input.py                              # 数据校验脚本
+    │   └── transform_output.py                            # 格式转换脚本
+    ├── swot/
+    │   └── ...
+    └── shared/                                            # 跨 Skill 共享脚本
+        ├── table_extractor.py
+        └── data_normalizer.py
+```
+
+**关键约束（Anthropic Claude Code Skills 对标）：**
+- **L1 元数据**：≤1.2K tokens（MVP），启动时全量预加载
+- **L2 SKILL.md**：≤500 行（含 Overview/When to Use/When NOT to Use/Quick Start/Core Workflow/SOP/FAILURE HANDLING/Examples/Gotchas/References）
+- **L3 scripts**：沙箱执行（Docker/gVisor），遵循 [§17.3.1 L3 沙箱事务边界](#1731-l3-沙箱事务边界anthropic-代码优先-对标) 7 项约束（timeout/memory/cpu/network/fs/transaction/side-effect）
+
+---
+
 ### 13.12 Gitea Actions 目录结构 (.gitea/workflows/)
 
 ```
@@ -3428,6 +3488,9 @@ pytest tests/unit/domain/
 | 8.2.0 | 2026-02-26 | **重复内容合并**：删除第 17.3.5 节重复的 DebateEvaluator 实现，保留第 7.3 节作为唯一实现，17.3.5 改为描述集成方式 | 架构团队 |
 | 8.3.0 | 2026-02-26 | **架构一致性修复**：①领域层零依赖原则修复（HybridRetriever 移至基础设施层）②存储层循环依赖修复（单向依赖链 + 异步缓存更新）③Override 模式同步机制完善（双触发策略 + 惰性同步） | 架构团队 |
 | 8.3.1 | 2026-04-08 | 附录独立章节编号不变 | 架构团队 |
+| 8.3.2 | 2026-05-23 | 审查修订版 - 正确性/一致性/可行性校验 | 架构团队 |
+| 8.3.3 | 2026-09-05 | **Skills 系统对标 Anthropic Claude Code 完善**：①Skills 三级渐进式披露深化（L1/L2/L3 边界量化）②负向触发章节强制 + description 质量强化 ③L3 沙箱事务边界（Anthropic "代码优先" 对标） | 架构团队 |
+| 8.4.0 | 2026-09-05 | **Round 1 文档审查修订**：①依赖方向矩阵修正（infrastructure→application 仅通过 DI 注入）②SAPMessage/datetime.utcnow/raise ValueError 三处异常契约红线修复 ③SKILL.md frontmatter 精减（13 字段→7 字段，删除硬编码 scaffolding）④Skills L1 token 预算统一（消除 200 vs 1200 tokens 矛盾）⑤§13 章节跳号 §13.11 补充 ⑥失效链接 appendix-mcp.md 删除 | 架构团队 |
 
 ---
 
@@ -3437,10 +3500,10 @@ pytest tests/unit/domain/
 |------|------|
 | **总行数** | 约 7,900 行 |
 | **子设计文档** | 7 份（event-bus/storage/transaction/port-management/exception/workflow-agent/auto-invocation） |
-| **核心章节** | 27 章 |
-| **附录章节** | 5 章（H-L） |
+| **核心章节** | 20 章（§1-§20） |
+| **附录章节** | 12 章（A-L，§21-§32，详见 arch-appendix.md） |
 | **总章节数** | 32 章 |
-| **版本** | 8.3.2（审查修订版 - 正确性/一致性/可行性校验） |
-| **最后更新** | 2026-05-23 |
+| **版本** | 8.4.0（Round 1 审查修订版 - 异常契约/依赖方向/Skills 对标） |
+| **最后更新** | 2026-09-05 |
 
 **所有附录 A~L 单独成章节，编号保持不变，作为主架构文档的详细展开。**
