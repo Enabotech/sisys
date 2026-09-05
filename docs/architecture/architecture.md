@@ -1059,10 +1059,15 @@ Agent 工作目录（Agent 配置集）
 
 **L2 PostgreSQL 表设计**：
 ```sql
+-- 多租户隔离（CLAUDE.md §4 PG schema per tenant 物理隔离）：
+-- 部署在独立 schema tenant_{tenant_uuid}，配合 search_path 动态切换
+-- SET search_path TO tenant_{tenant_uuid}, public;
+
 -- 记忆元数据索引（当前状态快照）
 CREATE TABLE memory_metadata (
     memory_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),  -- 主键使用 memory_id 而非 id
-    user_id VARCHAR(255),  -- 多租户隔离：用户标识
+    tenant_id UUID NOT NULL,  -- 多租户标识（与 schema 同源；行级冗余用于审计追溯）
+    user_id VARCHAR(255),  -- 用户标识
     name VARCHAR(255) NOT NULL,
     description TEXT,
     type VARCHAR(50) NOT NULL,  -- 'user'/'feedback'/'project'/'reference'
