@@ -2609,7 +2609,7 @@ buckets/
 
 **当前 MVP 状态（Epic 0-1 已完成）：**
 - 六边形架构框架（domain/application/infrastructure/interfaces 四层）
-- 端口注册与依赖注入（~80 端口，composition_root 统一装配）
+- 端口注册与依赖注入（**51 Protocol 定义 + 79 注册**，composition_root 统一装配，权威数据见 §19.7.1）
 - 双通道事件总线（Redis realtime + RabbitMQ reliable + Outbox，26 个事件映射：MVP 10 + V1/V2 16 计划扩展）
 - 六层存储子系统（L0-L5，UnifiedStorageGateway 统一入口）
 - 统一异常层次（System/Business/External 三层，28 种异常类型）
@@ -2871,7 +2871,7 @@ BaseException（抽象根类）
 
 | 规范 | 说明 |
 |------|------|
-| **依赖注入** | 自研 PortRegistry + Resolver（~80 端口），三种生命周期：SINGLETON/SCOPED/TRANSIENT |
+| **依赖注入** | 自研 PortRegistry + Resolver（**51 Protocol 定义 + 79 注册**，权威口径见 §19.7.1），三种生命周期：SINGLETON/SCOPED/TRANSIENT |
 | **配置管理** | `pydantic_settings.BaseSettings` + `.env` |
 | **数据库迁移** | Alembic，已合入的 migration 禁止修改 |
 | **异步规范** | 全 async/await，禁止 `time.sleep`/同步 IO |

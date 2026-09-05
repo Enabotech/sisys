@@ -298,7 +298,8 @@ MCP ──→ 外部 Agent 发现/调用工具箱（V2+ 启用）
 | `sisys agent arbitrate` | AgentCollaborationUseCase + SystemOperationsUseCase | or.md 1.3(3) + 1.3(5) |
 | `sisys plan generate/export/review` | PlanningGenerationUseCase | or.md 1.3(4) |
 | `sisys checkpoint recover/list/show` | PlanningGenerationUseCase | or.md 1.3(4) |
-| `sisys archive query/diff/timeline` | 跨用例（通过 ApplicationService 聚合） | - |
+| `sisys archive query/diff/timeline` | SystemOperationsUseCase（调用 `ArchiveReadModelPort` CQRS 读模型，跨 Plan/Checkpoint 聚合根投影） | or.md 1.3(5) |
+| `sisys archive link/branch/create` | SystemOperationsUseCase（操作 Archive 聚合根，发布 `ArchiveCreated/Linked/Branched` 事件） | or.md 1.3(5) |
 | `sisys system auth/monitor/route` | SystemOperationsUseCase | or.md 1.3(5) |
 
 #### 规则 3：Skills 在 DDD 架构中的精确位置（对标 Anthropic Claude Code Skills）
@@ -549,6 +550,30 @@ sisys archive query [options]
 
 sisys archive timeline --plan-id <id>  # 时间轴演进查询
 sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
+```
+
+#### 4.3.7 系统管理（sisys system）
+
+```bash
+sisys system auth login --user <name> --password-file <path>  # 凭据登录
+sisys system auth logout --token <token>                      # 注销
+sisys system auth status                                      # 当前会话状态
+sisys system monitor [--metric <name>] [--format json|table]  # 监控指标查询
+sisys system route [--model <name>] [--format json]           # UDMR 路由决策查询
+sisys system health [--format json|table|pretty]              # 健康检查
+sisys system config show <key>                                # 配置项查看
+sisys system audit query [--tenant <id>] [--time-range <s:e>] # 审计日志查询
+```
+
+#### 4.3.8 配置管理（sisys config）
+
+```bash
+sisys config get <key> [--format json|yaml|raw]              # 获取配置
+sisys config set <key> <value> [--scope user|project|system] # 设置配置
+sisys config list [--scope <scope>] [--format json|yaml]     # 列出配置
+sisys config env [--format json|table]                       # 环境变量查看
+sisys config isolate [--tenant <id>] [--mode soft|hard]      # 多租户隔离切换
+sisys config reload                                           # 热更新配置
 ```
 
 ### 4.4 Agent 专用参数规范
@@ -1347,11 +1372,43 @@ Base URL: /api/v1
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
 | `/documents` | POST | 单个文档上传 | P0 |
-| `/documents/batch` | POST | **批量上传 100 个 BP/报告** | **P0** |
+| `/documents/batch` | POST | **批量上传 100 个 BP/报告**（异步任务，返回 `job_id`） | **P0** |
+| `/documents/batch/{job_id}` | GET | 批量任务进度查询（`processed`/`failed`/`total`） | **P0** |
+| `/documents/batch/{job_id}/results` | GET | 批量任务结果明细 | **P0** |
+| `/documents/batch/{job_id}/webhook` | POST | 批量任务完成回调 URL 注册 | P1 |
+| `/documents/batch/{job_id}/retry` | POST | 批量任务失败重试 | P1 |
 | `/documents/{id}` | GET | 查询文档元数据 | P0 |
 | `/documents/{id}/parse` | POST | 触发文档解析 | P0 |
 | `/documents/{id}/versions` | GET | 版本历史 | P1 |
 | `/documents/{id}/trace` | GET | **高保真溯源（Bounding Box 坐标）** | **P0** |
+
+> **异步任务契约（避免 P95>1s 告警）：** 同步端点仅支持单文档，批量强制走异步任务；任务状态查询、结果下载、回调注册、重试端点配套提供，避免客户端长轮询。
+
+##### 8.2.1.1 异步任务契约示例
+
+```yaml
+# POST /documents/batch 响应（202 Accepted）
+HTTP/1.1 202 Accepted
+Location: /api/v1/documents/batch/{job_id}
+{
+  "job_id": "uuid",
+  "status": "queued",
+  "total": 100,
+  "estimated_completion_at": "ISO8601"
+}
+
+# GET /documents/batch/{job_id} 响应
+{
+  "job_id": "uuid",
+  "status": "running|completed|failed|partial",
+  "total": 100,
+  "processed": 73,
+  "failed": 2,
+  "progress_pct": 73.0,
+  "started_at": "ISO8601",
+  "completed_at": "ISO8601|null"
+}
+```
 
 #### 8.2.2 工具执行
 
