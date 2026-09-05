@@ -81,7 +81,7 @@ completedAt: '2026-02-26'
 | **execute** | - | - | 会话命名空间（Docker/gVisor 沙箱） | 状态快照→Redis（TTL 24h-30d） |
 
 **实现章节：**
-- trigger：第 10 章 事件驱动架构设计（10 种领域事件 + 双通道总线）
+- trigger：第 10 章 事件驱动架构设计（MVP 10 种 + V1/V2 扩展 16 种 = **26 总数** + 双通道总线）
 - route：第 4 章 统一动态模型路由框架（UDMR 三层决策）
 - execute：第 8 章 Checkpoint 机制（状态持久化与中断恢复）、第 17.3.2 节 Agent 标准工作流
 
@@ -827,7 +827,7 @@ BLM/BEM 阶段完成 → 持久化笔记（必须先执行）→ 上下文压缩
 | **DocumentProcessed** | 文档处理完成 | Redis + RabbitMQ | WORM 归档 | 双通道：Redis 实时通知 + RabbitMQ 审计归档 |
 | **ToolExecuted** | 工具执行完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
 | **AgentDecided** | Agent 决策完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
-| **RoutingDecided** | 路由决策完成 | Redis Pub/Sub | 不持久化 | ⚠️ 实时通知型（允许丢失） |
+| **RoutingDecided** | 路由决策完成 | Redis Pub/Sub + RabbitMQ + WORM | Redis 实时通知 / RabbitMQ 7 年归档（与 §8.5 路由决策日志 WORM 一致） | 审计合规型（双通道） |
 | **CheckpointReached** | 检查点到达 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
 | **CorrectionApproved** | 修正审批完成 | RabbitMQ + Outbox | 7 年存储 | 业务状态型（已实现） |
 | **IsolationLevelSwitched** | 隔离等级切换 | RabbitMQ + Outbox | WORM 归档 | 业务状态型 |
@@ -927,7 +927,7 @@ CREATE TABLE event_outbox (
 
 **设计原则：双通道监听（Redis Pub/Sub 实时 + RabbitMQ 持久化）、幂等性保证、下游用例自动触发**
 
-**10 种领域事件监听映射：**
+**11 种领域事件监听映射（MVP 10 种 + MemoryChanged 补充）：**
 
 | 领域事件 | 监听器 | 触发的下游用例 | 事件流转链 |
 |---------|--------|---------------|-----------|
@@ -1624,7 +1624,7 @@ _session_ctx: ContextVar[AsyncSession | None] = ContextVar("pg_session", default
 | | Web 框架 | FastAPI | 0.111+ | ✅ 低 |
 | | API Gateway | Kong/Traefik | 最新 | ✅ 低 |
 | **应用层** | 编排服务 | 自定义 | - | 🟡 中 |
-| **领域层** | 数据验证 | Pydantic | 2.4+ | ✅ 低 |
+| **领域层** | 数据验证 | Python `dataclasses(frozen=True)` + `typing` | 3.11+ | ✅ 低（**领域层零外部依赖**，CLAUDE.md §5 硬约束） |
 | **基础设施** | 工作流引擎 | Prefect | 3.6.16+ | 🟡 中 |
 | | Agent 编排 | LangGraph | 1.0.9+ | 🟡 中 |
 | | 消息总线 | Redis+RabbitMQ | 7.0+/3.12+ | ✅ 低 |
@@ -1906,7 +1906,7 @@ src/infrastructure/
 │   ├── __init__.py
 │   ├── adapters/                                          # 适配器
 │   ├── dual_channel_event_bus.py                          # 双通道事件总线（Redis + RabbitMQ）
-│   ├── channel_router.py                                  # 事件通道路由（27 种事件映射）
+│   ├── channel_router.py                                  # 事件通道路由（26 种事件映射，MVP 10 + V1/V2 16）
 │   ├── event_bus_factory.py                               # 事件总线工厂（测试用）
 │   ├── error_mapper.py                                    # 外部 SDK 错误映射
 │   ├── event_bus_config_loader.py                         # 事件总线 YAML 配置加载
@@ -2278,58 +2278,30 @@ docs/
 
 ---
 
-### 13.11 Skills 系统目录结构 (src/application/skills/)
+### 13.11 Skills 系统目录结构（与 §13.3 对齐说明）
 
-> **说明：** Skills 系统实现路径详见 Epic 5 蓝图（Story 5-2 ~ 5-9）。本节描述 Epic 5 落地后的目标目录结构。
+> **说明：** Skills 系统实现路径详见 Epic 5 蓝图（Story 5-2 ~ 5-9）。Skills 目录结构以 [§13.3 应用层目录结构](#133-应用层目录结构-srcapplication) 中的注释行 `skills/` 为权威源（Hub-and-Spoke 单根范式，对标 Anthropic Claude Code Skills）。本节仅补充 §13.3 未涵盖的**辅助模块**。
 
 ```
 src/application/skills/
 ├── __init__.py                                            # Skills 包初始化
 │
-├── registry/                                              # Skill 注册表（基础设施层实现于 composition_root）
+├── registry/                                              # Skill 注册与加载基础设施（不属于 Skill 目录结构本身）
 │   ├── __init__.py
-│   ├── loader.py                                          # SkillLoader（按需加载 L2/L3）
+│   ├── loader.py                                          # SkillLoader（按需加载 SKILL.md + references/*.md）
 │   └── selector.py                                        # SkillSelector（仅返回 ACTIVE 列表，无硬编码过滤）
 │
-├── l1/                                                    # L1 元数据聚合
-│   ├── __init__.py
-│   └── tools.md                                           # TOOLS.md（23 工具 ≤1.2K tokens 聚合）
-│
-├── l2/                                                    # L2 SKILL.md（Hub-and-Spoke 路由表）
-│   ├── __init__.py
-│   ├── pestel/
-│   │   ├── SKILL.md                                       # ≤500 行 SOP 主体
-│   │   ├── references/                                    # 长篇规范按需加载
-│   │   │   ├── pestel_workflow.md
-│   │   │   ├── pestel_quickstart.md
-│   │   │   └── pestel_failure_handling.md
-│   │   └── assets/                                        # 静态资源（模板/示例）
-│   ├── swot/
-│   │   ├── SKILL.md
-│   │   ├── references/
-│   │   └── assets/
-│   ├── five-forces/
-│   │   ├── SKILL.md
-│   │   ├── references/
-│   │   └── assets/
-│   └── ...（共 23 个 Skill 目录）
-│
-└── l3/                                                    # L3 scripts（确定性任务，Anthropic "代码优先"）
+└── validators/                                            # Skills 系统校验器
     ├── __init__.py
-    ├── pestel/
-    │   ├── validate_input.py                              # 数据校验脚本
-    │   └── transform_output.py                            # 格式转换脚本
-    ├── swot/
-    │   └── ...
-    └── shared/                                            # 跨 Skill 共享脚本
-        ├── table_extractor.py
-        └── data_normalizer.py
+    ├── frontmatter_validator.py                           # 校验 SKILL.md frontmatter 7 字段（详见 §5.3.1）
+    └── line_count_validator.py                            # CI 校验 SKILL.md ≤500 行
 ```
 
 **关键约束（Anthropic Claude Code Skills 对标）：**
-- **L1 元数据**：≤1.2K tokens（MVP），启动时全量预加载
-- **L2 SKILL.md**：≤500 行（含 Overview/When to Use/When NOT to Use/Quick Start/Core Workflow/SOP/FAILURE HANDLING/Examples/Gotchas/References）
-- **L3 scripts**：沙箱执行（Docker/gVisor），遵循 [§17.3.1 L3 沙箱事务边界](#1731-l3-沙箱事务边界anthropic-代码优先-对标) 7 项约束（timeout/memory/cpu/network/fs/transaction/side-effect）
+- **L1 元数据**（`skills/TOOLS.md`）：≤1.2K tokens（MVP），启动时全量预加载到系统提示
+- **L2 SKILL.md**（`skills/<slug>/SKILL.md`）：≤500 行（含 Overview/When to Use/When NOT to Use/Quick Start/Core Workflow/SOP/FAILURE HANDLING/Examples/Gotchas/References）
+- **L3 scripts**（`skills/<slug>/scripts/*.py`）：沙箱执行（Docker/gVisor），遵循 [§17.3.1 L3 沙箱事务边界](#1731-l3-沙箱事务边界anthropic-代码优先-对标) 7 项约束（timeout/memory/cpu/network/fs/transaction/side-effect）
+- **单根 Hub-and-Spoke**：所有 Skill 资源（SKILL.md/scripts/references/assets）以 `skills/<slug>/` 为单根目录，不引入 `l1/l2/l3/` 三层物理分离（避免与 Anthropic 范式分裂）
 
 ---
 
@@ -2638,7 +2610,7 @@ buckets/
 **当前 MVP 状态（Epic 0-1 已完成）：**
 - 六边形架构框架（domain/application/infrastructure/interfaces 四层）
 - 端口注册与依赖注入（~80 端口，composition_root 统一装配）
-- 双通道事件总线（Redis realtime + RabbitMQ reliable + Outbox，27 个事件映射）
+- 双通道事件总线（Redis realtime + RabbitMQ reliable + Outbox，26 个事件映射：MVP 10 + V1/V2 16 计划扩展）
 - 六层存储子系统（L0-L5，UnifiedStorageGateway 统一入口）
 - 统一异常层次（System/Business/External 三层，28 种异常类型）
 - 双引擎工作流骨架（Prefect 数据管道 + LangGraph Agent 推理，节点为 MVP 占位）
@@ -2708,10 +2680,10 @@ buckets/
 | **AUD** | 全 23 工具 | 所有 Skill（含审计专用脚本） | 全面审计场景 |
 
 **工具调用决策原则（Anthropic 风格，对标 Claude Code Skills）：**
-1. **description 自动触发**（P5 + Anthropic）：LLM 基于 L1 description 中的"Use when..."短语自主判断
-2. **角色白名单过滤**（`allowed_agents` 字段）：Skill 仅对授权角色可见可调
-3. **阶段适配过滤**（`applicable_blm_stages` + `applicable_bem_stages`）：Skill 标注适用的 BLM/BEM 阶段
-4. **负向触发**（P6 + Anthropic）：SKILL.md "When NOT to Use" 章节 + frontmatter `negative_triggers` 字段
+1. **description 自动触发**（P5 + Anthropic）：LLM 基于 L1 description 中的"Use when..."与"Do not use when..."短语自主判断（Less scaffolding）
+2. ~~**角色白名单过滤**（`allowed_agents` 字段）~~：**已删除**（Round 1 修订 P5 原则），角色语义已合并到 `description` 中的 "Use when acting as CEO or CMO"
+3. ~~**阶段适配过滤**（`applicable_blm_stages` + `applicable_bem_stages`）~~：**已删除**（Round 1 修订 P5 原则），阶段语义已合并到 `description` 中的 "Use during MARKET_INSIGHT stage"
+4. **负向触发**（P6 + Anthropic）：SKILL.md `## When NOT to Use` 章节 + `description` 中的 "Do not use when..." 子句
 
 **执行循环：** Think→Code→Execute→Observe→Validate，支持持久化 Jupyter Kernel 沙箱、Pydantic V2 Schema 强制、一致性校验仲裁、DSPy 提示词优化。
 
@@ -2756,7 +2728,7 @@ buckets/
    ↓
 4. 命中正向触发 → 检查 negative_triggers 回避
    ↓
-5. 通过 → 调用 SkillSelector.list_candidates(blm_stage, bem_stage, agent_role) 做预过滤
+5. 通过 → （可选）调用 SkillSelector.list_active_skills() 获取全量 ACTIVE 列表（无硬编码过滤，仅作参考）→ LLM 自主确认目标 Skill
    ↓
 6. LLM 从候选中确认目标 Skill（≤3 个）
    ↓
@@ -2780,7 +2752,7 @@ buckets/
 - **EIP 四级隔离：** L4 硬隔离（默认）→ L3 软隔离 → L2 协作态 → L1 融合态
 - **SYS AGENT 裁决：** 五维评分（事实准确性35%+逻辑一致性25%+风险可控性20%+资源可行性15%+战略对齐度5%）
 - **SAP 通信协议：** 内部 Agent 间标准消息格式（MessageType/Priority/EIP 隔离信息）
-- **Agent 评估：** Phoenix (Arize) 开源方案 + CUSUM 漂移检测
+- **Agent 评估：** 开源可观测性方案（Phoenix/Arize 等，详见基础设施层 `infrastructure/monitoring/` 子设计文档）+ CUSUM 漂移检测
 
 > 详见 [sisys-core-domain-design.md §17.3](sisys-core-domain-design.md#173-agent-架构设计)
 
