@@ -312,11 +312,12 @@ Skills 三级架构与 DDD 层对应（对标 Anthropic Claude Code Skills）
 │  L1: TOOLS.md（应用层元数据清单，YAML frontmatter 聚合）        │
 │  ├─ 大小：MVP ≤1.2K tokens / V1 ≤800 tokens / V2 ≤500 tokens   │
 │  ├─ 加载时机：Agent 启动时全量预加载到系统提示                  │
-│  ├─ 字段：name / description / version / allowed_agents /         │
-│  │       applicable_blm_stages / applicable_bem_stages /          │
-│  │       negative_triggers                                       │
-│  └─ 触发机制：LLM 基于 description 中的 "Use when..."            │
-│              短语自主判断（Anthropic "description 即触发器"）     │
+│  ├─ 字段：name / description（合并角色/阶段/触发词/负向触发语义）│
+│  │       version / sop_path / sop_line_count + accuracy /        │
+│  │       false_positive_rate                                    │
+│  └─ 触发机制：LLM 基于 description 中的 "Use when..." +          │
+│              "Do not use when..." 短语自主判断                    │
+│              （Anthropic "description 即触发器"）                  │
 │                                                                 │
 │  L2: SKILL.md（应用层操作手册，Hub-and-Spoke 结构）             │
 │  ├─ 大小：≤500 行（超长规范拆分到 references/*.md）            │
@@ -369,10 +370,12 @@ Skills 三级架构与 DDD 层对应（对标 Anthropic Claude Code Skills）
 │  注意：T4 的事件发布不阻塞 CLI 响应                           │
 │  下游用例对事件的处理是异步的，与 CLI 响应解耦                  │
 │                                                             │
-│  如果用户需要等待下游事件处理完成：                            │
-│  → 使用 --wait-for-events 参数                              │
+│  如果用户需要等待下游事件处理完成（MVP 不实现，V1+ 可选增强）： │
+│  → 使用 --wait-for-events <event-pattern-set>                │
+│    --wait-timeout <seconds>（默认 30 秒）参数                  │
 │  → CLI 订阅事件总线，等待特定事件完成                         │
-│  → 超时默认 30 秒                                            │
+│  → MVP 阶段 CLI 采用 fire-and-forget 模式（与 architecture.md │
+│    §1.6 规则 4 一致）                                          │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -552,14 +555,27 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 
 所有命令必须支持以下 Agent 模式参数：
 
-| 参数 | 描述 | 默认值 | Agent 模式 |
-|------|------|-------|-----------|
-| `--yes` | 跳过交互式确认 | false | 必须设置为 true |
-| `--dry-run` | 预览不执行 | false | 用于测试/调试 |
-| `--mock` | 使用模拟数据 | false | 用于开发调试 |
-| `--session <id>` | 会话命名空间 | 自动生成 | 用于状态持久化 |
-| `--cost-budget <amount>` | 成本预算上限 | 系统默认 | 用于成本控制 |
-| `--timeout <seconds>` | 执行超时 | 300 | 防止无限等待 |
+| 参数 | 描述 | 默认值 | Agent 模式必填 | Agent 模式用途 |
+|------|------|-------|--------------|--------------|
+| `--yes` | 跳过交互式确认 | false | **是** | Agent 调用时必须设 true，否则拒绝执行 |
+| `--cost-budget <amount>` | 成本预算上限（**硬上限**，见 §4.4.1） | $1.00 USD/任务 | **是** | Agent 调用时必须显式设置，未设置 → 拒绝执行 |
+| `--dry-run` | 预览不执行 | false | 否 | 测试/调试 |
+| `--mock` | 使用模拟数据 | false | 否 | 开发调试 |
+| `--session <id>` | 会话命名空间 | 自动生成 UUID | 否 | 状态持久化/审计追踪 |
+| `--timeout <seconds>` | 执行超时 | 300 | 否 | 防止无限等待 |
+
+#### 4.4.1 `--cost-budget` 硬上限语义（MVP 强制）
+
+```text
+# 默认值：$1.00 USD/任务（项目硬编码，见 config/cost_defaults.yaml）
+# Agent 模式：必须显式设置（--cost-budget 缺失 → 拒绝执行并提示）
+
+# 触发规则（成本三级熔断）：
+# Level 1 (80% of budget): soft warn + 输出 warning 但继续执行
+# Level 2 (100% of budget): hard stop + 中断当前 LLM 调用 + 返回部分结果 + 发布 CostBudgetExceeded 事件
+# Level 3 (200% of budget): 触发 §16.1 监控告警 + 写入异常审计日志（不可变存储）
+# 注：MVP 不实现 auto-degrade（V1+ 可选增强：自动切换 lite 模型 + 续跑）
+```
 
 ### 4.5 输出格式规范
 
@@ -848,7 +864,7 @@ data_sources: ["docs/policy/carbon_tax_2027.txt"]
 
 实施 SKILL.md 时必须满足：
 
-- [ ] **frontmatter** 完整（11 个字段含必填项）
+- [ ] **frontmatter** 完整（7 个字段：5 必填 + 2 可选评测埋点）
 - [ ] **Overview** 章节（≤200 字符一段话说明）
 - [ ] **When to Use** 章节（≥1 条正向触发条件）
 - [ ] **When NOT to Use** 章节（≥1 条负向触发条件）—— **P6 强制**
@@ -1267,7 +1283,7 @@ class MessagePriority(str, Enum):
 class SAPMessage(BaseModel):
     message_id: UUID = Field(default_factory=uuid4)
     conversation_id: UUID          # 会话 ID
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))  # noqa: ERA001
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 # 顶部需导入：
 # from datetime import UTC, datetime
@@ -1530,7 +1546,7 @@ class ToolChainExecutor:
 
         # 2. 有效性校验（检测循环依赖）
         if not dag.is_valid():
-            raise InvalidDAGException("Invalid DAG: circular dependency detected")  # noqa: ERA001
+            raise InvalidDAGException("Invalid DAG: circular dependency detected")
 
 # 顶部需导入：
 # from sisys.domain.exceptions import InvalidDAGException  # 走 sisys 统一异常体系（CLAUDE.md §5 红线）
@@ -1801,7 +1817,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 > 事件监听适配器：支持 RabbitMQ 事件消费者，监听领域事件（文档处理完成、工具执行完成、AGENT 决策完成、隔离等级切换、Checkpoint 恢复、路由决策），触发下游应用层用例
 
 **关键职责：**
-- 监听 10 种领域事件（or.md 1.2.3）
+- 监听 11 种领域事件（MVP 10 种 + MemoryChanged 补充，与 architecture.md §10.4 对齐；事件总数 26 = MVP 10 + V1/V2 16 扩展）
 - 转换为 ApplicationCommand 触发下游用例
 - 保证事件处理幂等性，支持重放与失败重试
 
@@ -1835,7 +1851,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 12.3 10 种领域事件监听映射
+### 12.3 11 种领域事件监听映射（MVP 10 + MemoryChanged）
 
 | 领域事件 | 监听器 | 触发的下游用例 | or.md 事件流转 |
 |---------|--------|---------------|---------------|
@@ -1976,10 +1992,10 @@ GET    /api/v1/system/metrics               # 监控指标
 | 实现 CLI 基础框架 | typer 0.24+ 类型注解驱动 | Story 7.1 | 1 周 | or.md 1.4.1(1) |
 | 设计 TOOLS.md 元数据清单 | `agents/ceo/TOOLS.md` | Story 5.2 | 1 周 | or.md 1.1.3(2) |
 | 编写 3 个 Pilot SKILL.md | pestel/swot/five-forces | Story 4.1 | 2 周 | or.md 1.2.2(3) |
-| 实现 SkillSelector | 关键词 + 语义推荐 | Story 5.3 | 2 周 | or.md 1.1.3(1) |
-| 定义 LLMRequest/LLMResponse | `domain/llm/protocol.py` | Story 1.14b | 1 周 | or.md 1.5.2(2) |
+| 实现 SkillSelector | `list_active_skills()` 列表查询（无硬编码过滤） | Story 5.3 | 2 周 | or.md 1.1.3(1) |
+| 定义 LLMRequest/LLMResponse | `domain/llm/protocol.py`（**`@dataclass(frozen=True)` 端口契约**，CLAUDE.md §5 领域层零依赖） + `application/llm/dto.py`（Pydantic DTO 序列化） | Story 1.14b | 1 周 | or.md 1.5.2(2) |
 | 实现 LLM Adapter（LiteLLM） | `infrastructure/llm/` | Story 1.14b | 2 周 | or.md 1.5.2(2) |
-| 定义 ToolCallRequest/Response | `domain/tool/protocol.py` | Story 4.3 | 1 周 | or.md 1.2.2(3) |
+| 定义 ToolCallRequest/Response | `domain/tool/protocol.py`（**`@dataclass(frozen=True)` 端口契约**） + `interfaces/api/v1/schemas/tool_schemas.py`（FastAPI Pydantic） | Story 4.3 | 1 周 | or.md 1.2.2(3) |
 | 实现事件监听适配器 | RabbitMQ Consumer | Story 1.2 | 2 周 | or.md 1.4.1(3) |
 | 实现 Command Translator | CLI → ApplicationCommand | Story 7.1 | 1 周 | or.md 1.3 |
 
@@ -1988,7 +2004,7 @@ GET    /api/v1/system/metrics               # 监控指标
 | 任务 | 交付物 | Story 关联 | or.md 追溯 |
 |------|-------|-----------|-----------|
 | 补全 20 个 SKILL.md | `skills/` 完整 | Story 4.x | or.md 1.2.2(3) |
-| 实现 SAP 协议 | `domain/agent/sap.py` | Story 9.x | or.md 1.3(3) |
+| 实现 SAP 协议（三层） | `domain/agent/sap/protocol.py`（端口契约 `@dataclass(frozen=True)`） + `application/agent/sap_use_case.py`（用例编排） + `interfaces/sap/`（HTTP/mTLS 适配层） | Story 9.x | or.md 1.3(3) |
 | 实现多 Agent 协作 | SYS Agent 裁决 | Story 9.6 | or.md 1.3(3) |
 | 实现 Skill 版本管理 | 版本注册 + 回滚 | Story 4.6 | or.md 1.2.1(2) |
 | 实现 Web 前端三视图 | 高管/分析师/战略人员视图 | Story 6.9/6.10 | or.md 1.4.1(4)-(6) |
@@ -2014,7 +2030,7 @@ GET    /api/v1/system/metrics               # 监控指标
 | **Claude Code Skills** | Anthropic 官方文档 | 三级渐进式披露 |
 | **Claude Code CLAUDE.md** | GitHub 最佳实践 | 路由文件 < 150 行 |
 | **MCP vs CLI Benchmark** | ScaleKit | Token 成本对比数据 |
-| **sisys or.md** | 项目需求规格 | 系统公理一/二、DDD 四层、10 种领域事件、8 种事件流转 |
+| **sisys or.md** | 项目需求规格 | 系统公理一/二、DDD 四层、MVP 10 种领域事件（MVP 实现，总数 26 含 V1/V2 扩展）、8 种事件流转 |
 | **sisys architecture.md** | 项目架构设计 | 六边形架构 + UDMR + EIP |
 | **sisys epics_v1.0.md** | Epic 分解 | FR 溯源矩阵 |
 
