@@ -49,7 +49,7 @@ sisys 采用 **"CLI + Skills 为内核，MCP 为外延"** 的接口架构哲学�
 | 编号 | 原则 | 描述 | 验收标准 |
 |------|------|------|---------|
 | **P1** | CLI 是 LLM 的母语 | 系统内部所有能力优先通过 CLI 暴露，Agent 通过 CLI 调用内部工具 | 内部工具 100% 有 CLI 入口 |
-| **P2** | Skills = 渐进式披露 | Agent 启动只加载元数据（< 200 tokens），按需加载完整 SOP | Agent 启动上下文 < 500 tokens |
+| **P2** | Skills = 渐进式披露 | Agent 启动加载 L1 元数据聚合（≤1.2K tokens，23 工具 ≈1150 tokens，Anthropic 风格），按需加载完整 SOP | L1 启动注入 ≤1.2K tokens / L2 ≤500 行 |
 | **P3** | Skill = SOP | 不仅定义工具签名，还定义操作流程、失败处理、兜底策略 | 23 种工具各有完整 SOP |
 | **P4** | MCP 退居生态层 | MVP/V1 不启用 MCP，V2+ 按需用于外部 Agent 集成 | MVP 阶段 MCP 代码量 = 0 |
 | **P5** | Less scaffolding, more model | 依赖模型自身推理进行工具路由，避免硬编码分类器 | 工具选择准确率 ≥ 85% |
@@ -210,7 +210,7 @@ MCP ──→ 外部 Agent 发现/调用工具箱（V2+ 启用）
 │  │  ┌────────────────────────▼───────────────────────────────────┐  │  │
 │  │  │ Skills 层 (操作手册，非用例，非领域服务)                      │  │  │
 │  │  │ ┌────────────────────────────────────────────────────────┐│  │  │
-│  │  │ │ L1: TOOLS.md (< 200 tokens) - 工具元数据清单            ││  │  │
+│  │  │ │ L1: TOOLS.md (≤1.2K tokens) - 23 工具元数据聚合         ││  │  │
 │  │  │ │ L2: SKILL.md × 23 (< 500 行) - SOP 完整定义            ││  │  │
 │  │  │ │ L3: scripts/references - 按需加载资源                   ││  │  │
 │  │  │ │                                                        ││  │  │
@@ -440,7 +440,7 @@ sisys config     # 配置管理（辅助：环境/路由/隔离）
 
 ### 4.3 完整命令清单
 
-#### 3.3.1 文档管理（sisys document）
+#### 4.3.1 文档管理（sisys document）
 
 ```bash
 sisys document upload --file <path> [options]
@@ -466,7 +466,7 @@ sisys document version snapshot --id <doc-id> --version <v>
 sisys document delete --id <doc-id> --confirm  # 需要确认
 ```
 
-#### 3.3.2 工具箱（sisys tool）
+#### 4.3.2 工具箱（sisys tool）
 
 ```bash
 sisys tool list [options]
@@ -490,7 +490,7 @@ sisys tool chain run <chain-id> --config <path> [options]
 sisys tool schema <tool-id> --format <json|pretty>  # 查看工具 Schema
 ```
 
-#### 3.3.3 Agent 协作（sisys agent）
+#### 4.3.3 Agent 协作（sisys agent）
 
 ```bash
 sisys agent run <role> --task <text> [options]
@@ -509,7 +509,7 @@ sisys agent arbitrate --session <session-id> [options]
   # SYS Agent 裁决入口
 ```
 
-#### 3.3.4 战略规划（sisys plan）
+#### 4.3.4 战略规划（sisys plan）
 
 ```bash
 sisys plan generate <type> [options]
@@ -524,7 +524,7 @@ sisys plan export --type <SP|BP> --format <pdf|markdown|json>
 sisys plan review --id <plan-id>  # 人工审批入口
 ```
 
-#### 3.3.5 Checkpoint 管理（sisys checkpoint）
+#### 4.3.5 Checkpoint 管理（sisys checkpoint）
 
 ```bash
 sisys checkpoint list --plan-id <id>
@@ -536,7 +536,7 @@ sisys checkpoint recover --id <cp-id> [options]
   --dry-run
 ```
 
-#### 3.3.6 战略档案（sisys archive）
+#### 4.3.6 战略档案（sisys archive）
 
 ```bash
 sisys archive query [options]
@@ -679,7 +679,7 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 ```
 
 **设计要点**：
-- 整个 TOOLS.md 控制在 **200 tokens 以内**
+- 整个 TOOLS.md 控制在 **≤1.2K tokens 以内**（MVP 23 工具聚合约 1150 tokens）
 - `description` 必须包含明确触发词（借鉴 Claude Code "pushy" 原则）
 - 必须包含负向触发条件（"不应在...时使用"）
 
@@ -690,49 +690,40 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 > 2. **路由表 ≤30 行**（强制约束，详见 §5.1 量化）
 > 3. **必含章节**：`## When to Use` + `## When NOT to Use` + `## Examples` + `## Gotchas` + `## References`（Anthropic 强制）
 
-#### 5.3.1 SKILL.md frontmatter 字段规范（强制，13 字段标准）
+#### 5.3.1 SKILL.md frontmatter 字段规范（精减，7 字段标准）
 
-| 字段 | 类型 | 必填 | 约束 | 默认值 |
-|------|------|------|------|--------|
-| **核心标识（4）** |||||
-| `skill_id` | UUID v4 string | ✅（系统生成） | 内部唯一标识 | - |
-| `slug` | string | ✅ | 1-64 字符，kebab-case，**必须匹配父目录名**（Anthropic） | - |
-| `name` | string | ✅ | 1-64 字符，kebab-case | - |
-| `description` | string | ✅ | 1-1024 字符，**必须以动词开头 + 含 "Use when..." + 可选 "Do not use when..."**（Anthropic，正则校验） | - |
-| **版本与 SOP（4）** |||||
-| `version` | string | ✅ | SemVer 2.0.0（**支持 pre-release** 如 `1.0.0-rc.1`） | "1.0.0" |
-| `sop_path` | string | ✅ | 相对项目根路径（如 `skills/pestel/SKILL.md`） | - |
-| `sop_line_count` | int | ✅（CI 自动统计） | 1-500（含 Examples + Gotchas + References 链接） | - |
-| `sop_summary` | string | ❌ | ≤1500 字符，用于 L1 元数据展示 | `null` |
-| **触发控制（5）** |||||
-| `allowed_agents` | list[enum] | ✅ | CEO/CFO/CMO/CTO/COO/CHO/AUD 子集，**至少 1 项** | `["AUD"]` |
-| `applicable_blm_stages` | list[enum] | ❌ | GAP_ANALYSIS/MARKET_INSIGHT/STRATEGIC_INTENT/INNOVATION_FOCUS/BUSINESS_DESIGN/KEY_TASKS | `[]` |
-| `applicable_bem_stages` | list[enum] | ❌ | STRATEGY_DECODE/ANNUAL_PLANNING/ORG_ALIGNMENT/OPERATIONS_EXECUTION/PERFORMANCE_MGMT/RETROSPECTIVE | `[]` |
-| `trigger_words` | list[string] | ❌ | description 关键词兜底（每条 1-200 字符） | `[]` |
-| `negative_triggers` | list[string] | ✅ | 每条 1-200 字符，**至少 1 条**（P6 强制） | - |
-| **评测埋点（3，可选）** |||||
-| `model` | string | ❌ | haiku / sonnet / opus / inherit（Anthropic `model` 字段对标） | `inherit` |
-| `accuracy` | object | ❌ | `{value: 0-1.0, sample_count: int, last_updated: ISO8601}` | `{value: null, sample_count: 0, last_updated: null}` |
-| `false_positive_rate` | object | ❌ | `{value: 0-1.0, sample_count: int, last_updated: ISO8601}` | `{value: null, sample_count: 0, last_updated: null}` |
+> **修订原则（对标 Anthropic Claude Code Skills）：** 严格区分 **Anthropic 标准字段**（`name` + `description`）与 **sisys 项目扩展字段**（其余 5 个）。原"13 字段标准"过度扩展了硬编码 scaffolding，违反 P5 "Less scaffolding, more model" 原则——本节精减为 7 字段，将角色/阶段/触发词语义合并到 `description` 字段，由 LLM 自主判断。
 
-> 以上 13 字段为权威定义（统一 §5.3.1 / §5.3.3 / 蓝图 §3.3 三处文档）。
-> `description` 字段强制正则校验（落地时）：
-> ```python
-> import re
-> _DESCRIPTION_PATTERN = re.compile(
->     r'^(?:[A-Z][a-z]+(?:[ -][a-z]+)*\s+)+'  # 动词开头（"Analyze ", "Generate "）
->     r'.{20,1000}'  # 主体 20-1000 字符
->     r'\.\s*Use when [^.]+\.'  # 必须含 "Use when..." 完整句子
->     r'(?:\s*Do not use when [^.]+\.)?',  # 可选 "Do not use when..." 句子
->     re.MULTILINE | re.IGNORECASE
-> )
+| 字段 | 类型 | 必填 | 来源 | 约束 | 默认值 |
+|------|------|------|------|------|--------|
+| **Anthropic 标准字段（2）** ||||||
+| `name` | string | ✅ | Anthropic | 1-64 字符，kebab-case，**必须匹配父目录名** | - |
+| `description` | string | ✅ | Anthropic | 1-1024 字符，**动词开头 + "Use when..." + "Do not use when..."**（Anthropic 推荐结构，非强制正则） | - |
+| **sisys 项目扩展（3）** ||||||
+| `version` | string | ✅ | sisys | SemVer 2.0.0（**支持 pre-release** 如 `1.0.0-rc.1`） | "1.0.0" |
+| `sop_path` | string | ✅ | sisys | 相对项目根路径（如 `skills/pestel/SKILL.md`） | - |
+| `sop_line_count` | int | ✅（CI 自动统计） | sisys | 1-500（含 Examples + Gotchas + References 链接），由 `scripts/check_skill_line_count.py` 自动统计并校验 | - |
+| **评测埋点（2，可选）** ||||||
+| `accuracy` | object | ❌ | sisys | `{value: 0-1.0, sample_count: int, last_updated: ISO8601}` | `{value: null, sample_count: 0, last_updated: null}` |
+| `false_positive_rate` | object | ❌ | sisys | `{value: 0-1.0, sample_count: int, last_updated: ISO8601}` | `{value: null, sample_count: 0, last_updated: null}` |
+
+> **字段精减理由（P5 Less scaffolding）：**
+> 1. **`allowed_agents` / `applicable_blm_stages` / `applicable_bem_stages` / `trigger_words` 已删除**：原 4 个字段为硬编码 scaffolding，违反 P5 原则。这 4 类语义全部合并到 `description` 字段：
+>    - 角色白名单 → description 中写明 "Use when acting as CEO or CFO"
+>    - 阶段适配 → description 中写明 "Use during MARKET_INSIGHT stage"
+>    - 触发词 → description 中自然包含触发短语
+> 2. **`negative_triggers` 已删除**：负向触发由 SKILL.md 强制章节 `## When NOT to Use` 承载（避免双重负向机制冗余）。
+> 3. **`skill_id` / `slug` / `sop_summary` / `model` 已删除**：`skill_id` 由系统生成无需写在 frontmatter；`slug` 与 `name` 同源重复；`sop_summary` 是 `description` 的子集；`model` 与 sisys 多模型路由（UDMR）设计冲突。
+> 4. **`sop_line_count` 保留**：作为 CI 校验依据（独立 pre-commit 钩子），不依赖正则约束 description。
+
+> **`description` 字段推荐结构（非强制正则）：**
+> ```text
+> <动词> <核心功能描述>. Use when <正向触发场景（角色/阶段/任务）>. Do not use when <负向触发场景>.
 > ```
+> 示例：`Analyze macro-environmental factors (Political, Economic, Social, Technological, Environmental, Legal). Use when evaluating external business environment during MARKET_INSIGHT stage as CEO or CMO. Do not use when performing single-dimension analysis, internal capability evaluation, or industry competitive structure assessment.`
 >
-> `applicable_blm_stages` 与 `applicable_bem_stages` 一致性约束（落地时）：
-> - **规则 1**：至少 1 个阶段绑定（BLM 或 BEM 之一非空）
-> - **规则 2**：避免单一 Skill 覆盖所有 12 阶段（粒度过粗将导致误触发）
-> - **规则 3**：BLM 战略类（M1-M3）+ BEM 执行类（P4-P6）不应同时覆盖（语义矛盾）
->
+> **不强制正则**：仅作为编写建议模板，避免限制作者自然语言表达力。
+
 > **L1 缓存键统一规范**：统一为 `skill:l1:{slug}:{version}`（Hash，TTL 24h，SkillMetadataChanged 事件触发 DEL）。
 
 #### 5.3.2 SKILL.md 完整模板（Hub-and-Spoke，路由表 ≤30 行）
@@ -740,14 +731,9 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 ```markdown
 ---
 name: pestel
-description: "Analyze macro-environmental factors (Political, Economic, Social, Technological, Environmental, Legal). Use when evaluating external business environment or strategic market entry decisions."
+description: "Analyze macro-environmental factors (Political, Economic, Social, Technological, Environmental, Legal). Use when evaluating external business environment during MARKET_INSIGHT stage as CEO or CMO. Do not use when performing single-dimension analysis, internal capability evaluation, or industry competitive structure assessment."
 version: "1.0.0"
-allowed_agents: [CEO, CFO, CMO, CTO, AUD]
-applicable_blm_stages: [MARKET_INSIGHT, STRATEGIC_INTENT]
-applicable_bem_stages: [STRATEGY_DECODE, ANNUAL_PLANNING]
-negative_triggers: ["single dimension analysis", "internal capability evaluation", "industry competitive structure"]
-accuracy: null
-false_positive_rate: null
+sop_path: "skills/pestel/SKILL.md"
 ---
 
 # PESTEL 宏观环境分析
@@ -915,43 +901,19 @@ class SkillSelector:
     def __init__(self, repository: SkillRepositoryPort):
         self._repository = repository
 
-    def list_candidates(
-        self,
-        blm_stage: BLMStage | None = None,
-        bem_stage: BEMStage | None = None,
-        agent_role: str | None = None,
-    ) -> list[Skill]:
+    def list_active_skills(self) -> list[Skill]:
         """
-        列出候选 Skill（按 BLM/BEM 阶段 + 角色白名单过滤）
+        列出所有 ACTIVE 状态的 Skill（不过滤任何角色/阶段字段）。
 
-        返回结果供 Agent LLM 二次筛选（基于 L1 description 语义匹配）。
+        实际 Skill 触发由 Agent LLM 基于 L1 description 自主判断（Anthropic 风格）。
+        本接口不进行任何硬编码过滤——避免违反 P5 "Less scaffolding, more model"。
+        仅返回 ACTIVE 状态 Skill；其他维度的过滤（如角色/阶段）已合并到 description 字段，
+        由 LLM 在触发决策时自主完成。
 
-        Args:
-            blm_stage: 当前 BLM 阶段（可选）
-            bem_stage: 当前 BEM 阶段（可选）
-            agent_role: Agent 角色（CEO/CFO/CMO/CTO/COO/CHO/AUD）
-
-        Returns:
-            list[Skill]: 候选 Skill 列表（已按 allowed_agents/applicable_*_stages 过滤）
-        """
-        candidates = self._repository.list_all()
-
-        # BLM 阶段过滤
-        if blm_stage is not None:
-            candidates = [s for s in candidates if s.is_applicable_to_blm_stage(blm_stage)]
-
-        # BEM 阶段过滤
-        if bem_stage is not None:
-            candidates = [s for s in candidates if s.is_applicable_to_bem_stage(bem_stage)]
-
-        # 角色白名单过滤
-        if agent_role is not None:
-            candidates = [s for s in candidates if s.is_allowed_for_agent(agent_role)]
-
-        # 仅返回 ACTIVE 状态的 Skill
-        candidates = [s for s in candidates if s.status == SkillStatus.ACTIVE]
-
-        return candidates
+    Returns:
+        list[Skill]: 所有 ACTIVE 状态的 Skill 列表（无额外过滤）。
+    """
+        return [s for s in self._repository.list_all() if s.status == SkillStatus.ACTIVE]
 ```
 
 **完整 Skill 触发决策树：**
@@ -963,7 +925,7 @@ class SkillSelector:
    ↓
 3. LLM 决定调用 1+ 个 Skill（按 description 语义匹配 + 负向触发回避）
    ↓
-4. 工具调用前 LLM 可调用 SkillSelector.list_candidates(blm_stage, bem_stage, agent_role) 做预过滤
+4. （可选）LLM 调用 SkillSelector.list_active_skills() 获取全量 ACTIVE 列表做参考
    ↓
 5. SkillLoader.load_l2_skill(slug) 加载 SKILL.md
    ↓
@@ -1005,7 +967,7 @@ Agent 启动
                    │
                    ▼
 ┌─────────────────────────────────────┐
-│ Step 3: 加载 TOOLS.md (< 200 tokens)│
+│ Step 3: 加载 TOOLS.md (≤1.2K tokens)│
 │         23 种工具元数据清单           │
 └──────────────────┬──────────────────┘
                    │
@@ -1017,8 +979,8 @@ Agent 启动
                    │
                    ▼
 ┌─────────────────────────────────────┐
-│ Step 5: SkillSelector 推荐 Top-K    │
-│         关键词匹配 + 语义相似度        │
+│ Step 5: LLM 自主判断候选 Skill       │
+│        （基于 L1 description + When NOT）│
 └──────────────────┬──────────────────┘
                    │
                    ▼
@@ -1042,7 +1004,7 @@ Agent 启动
 
 ---
 
-## 5. MCP 外部生态接口
+## 6. MCP 外部生态接口
 
 ### 6.1 定位与启用时机
 
@@ -1085,7 +1047,7 @@ tools:
 
 ### 6.3 MCP Server 实现 —— ⚠️ MVP 不启用（MVP 代码量 = 0，P4 原则）
 
-> **重要声明（与 §5.1 一致）：** MVP 阶段 MCP 代码量必须为 0（P4 原则）。完整 MCP Server 实现迁移至附录 `appendix-mcp.md`，仅 V1+ 启用。
+> **重要声明（与 §5.1 一致）：** MVP 阶段 MCP 代码量必须为 0（P4 原则）。完整 MCP Server 实现迁移至 V1+ 启用阶段（MCP 规范尚未稳定，过早绑定有架构漂移风险）。
 >
 > 本节仅作为 V1/V2+ 的**设计参考**（不进入 MVP 实现）。
 
@@ -1155,7 +1117,7 @@ grep -rn "^mcp" pyproject.toml 2>/dev/null
 
 ---
 
-## 6. sisys Agent 间通信协议（SAP - Sysys Agent Protocol）
+## 7. sisys Agent 间通信协议（SAP - Sysys Agent Protocol）
 
 ### 7.1 协议定位
 
@@ -1305,7 +1267,10 @@ class MessagePriority(str, Enum):
 class SAPMessage(BaseModel):
     message_id: UUID = Field(default_factory=uuid4)
     conversation_id: UUID          # 会话 ID
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))  # noqa: ERA001
+
+# 顶部需导入：
+# from datetime import UTC, datetime
     sender_id: str                 # 发送 Agent ID
     receiver_id: str               # 接收 Agent ID，广播时为"broadcast"
     message_type: MessageType
@@ -1351,7 +1316,7 @@ CEO Agent                    CFO Agent
 
 ---
 
-## 7. REST API 集成接口
+## 8. REST API 集成接口
 
 ### 8.1 API 总体设计
 
@@ -1361,7 +1326,7 @@ Base URL: /api/v1
 
 ### 8.2 完整业务端点清单
 
-#### 7.2.1 文档管理
+#### 8.2.1 文档管理
 
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
@@ -1372,7 +1337,7 @@ Base URL: /api/v1
 | `/documents/{id}/versions` | GET | 版本历史 | P1 |
 | `/documents/{id}/trace` | GET | **高保真溯源（Bounding Box 坐标）** | **P0** |
 
-#### 7.2.2 工具执行
+#### 8.2.2 工具执行
 
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
@@ -1380,7 +1345,7 @@ Base URL: /api/v1
 | `/tools/{id}/schema` | GET | 查看工具输入/输出 Schema | P0 |
 | `/tool-chains/{id}/execute` | POST | 执行工具链（DAG 编排） | P1 |
 
-#### 7.2.3 Agent 协作
+#### 8.2.3 Agent 协作
 
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
@@ -1388,14 +1353,14 @@ Base URL: /api/v1
 | `/agents/{role}/status` | GET | 查询 Agent 执行状态 | P0 |
 | `/agents/arbitrate` | POST | SYS Agent 裁决 | P1 |
 
-#### 7.2.4 财务量化分析（P0 新增）
+#### 8.2.4 财务量化分析（P0 新增）
 
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
 | `/financial/analyze` | POST | **财务量化分析（NPV/IRR/现金流）** | **P0** |
 | `/financial/sensitivity` | POST | **敏感性分析（单变量/多变量龙卷风图）** | **P0** |
 
-#### 7.2.5 战略规划
+#### 8.2.5 战略规划
 
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
@@ -1404,7 +1369,7 @@ Base URL: /api/v1
 | `/plans/{id}/compare` | GET | **情景对比（3 方案并排对比）** | **P0** |
 | `/plans/{id}/export` | POST | 导出规划（PDF/Markdown/JSON） | P0 |
 
-#### 7.2.6 Checkpoint 管理
+#### 8.2.6 Checkpoint 管理
 
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
@@ -1412,7 +1377,7 @@ Base URL: /api/v1
 | `/checkpoints/{id}` | GET | 查询 Checkpoint 详情 | P0 |
 | `/checkpoints/{id}/recover` | POST | 恢复 Checkpoint（Replay/Override） | P0 |
 
-#### 7.2.7 战略档案
+#### 8.2.7 战略档案
 
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
@@ -1420,20 +1385,20 @@ Base URL: /api/v1
 | `/archive/timeline` | GET | 时间轴演进 | P1 |
 | `/archive/diff` | GET | 分支差异对比 | P1 |
 
-#### 7.2.8 报告生成（P1 新增）
+#### 8.2.8 报告生成（P1 新增）
 
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
 | `/reports/whitelabel` | POST | **白标品牌定制（Logo/配色/字体）** | **P1** |
 | `/reports/regulatory` | POST | **监管报告导出（银保监会 1104/EAST）** | **P1** |
 
-#### 7.2.9 风险可视化（P1 新增）
+#### 8.2.9 风险可视化（P1 新增）
 
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
 | `/risk/heatmap` | GET | **风险热力图（高管视图核心）** | **P1** |
 
-#### 7.2.10 系统管理
+#### 8.2.10 系统管理
 
 | 端点 | 方法 | 用户场景 | 优先级 |
 |------|------|---------|-------|
@@ -1452,9 +1417,9 @@ Base URL: /api/v1
 
 ---
 
-## 8. LLM 接入协议
+## 9. LLM 接入协议
 
-### 8.1 统一请求格式
+### 9.1 统一请求格式
 
 ```python
 class LLMRequest(BaseModel):
@@ -1468,7 +1433,7 @@ class LLMRequest(BaseModel):
     metadata: Dict                 # 追踪用（session_id/task_id/cost_budget）
 ```
 
-### 8.2 统一响应格式
+### 9.2 统一响应格式
 
 ```python
 class LLMResponse(BaseModel):
@@ -1482,7 +1447,7 @@ class LLMResponse(BaseModel):
     trace_id: str                 # 分布式追踪 ID
 ```
 
-### 8.3 UDMR 路由集成
+### 9.3 UDMR 路由集成
 
 ```
 LLM 请求
@@ -1525,9 +1490,9 @@ LLM 请求
 
 ---
 
-## 9. 工具间调用协议
+## 10. 工具间调用协议
 
-### 9.1 内部调用格式（不走 MCP）
+### 10.1 内部调用格式（不走 MCP）
 
 ```python
 class ToolCallRequest(BaseModel):
@@ -1549,7 +1514,7 @@ class ToolCallResponse(BaseModel):
     caller_trace: List[str]       # 调用链溯源
 ```
 
-### 9.2 DAG 编排执行
+### 10.2 DAG 编排执行
 
 ```python
 class ToolChainExecutor:
@@ -1565,7 +1530,10 @@ class ToolChainExecutor:
 
         # 2. 有效性校验（检测循环依赖）
         if not dag.is_valid():
-            raise ValueError("Invalid DAG: circular dependency detected")
+            raise InvalidDAGException("Invalid DAG: circular dependency detected")  # noqa: ERA001
+
+# 顶部需导入：
+# from sisys.domain.exceptions import InvalidDAGException  # 走 sisys 统一异常体系（CLAUDE.md §5 红线）
 
         # 3. 按拓扑顺序执行
         results = {}
@@ -1588,9 +1556,9 @@ class ToolChainExecutor:
 
 ---
 
-## 10. Prompt 模板协议
+## 11. Prompt 模板协议
 
-### 10.1 Prompt 加载流程
+### 11.1 Prompt 加载流程
 
 ```
 Agent 构建 Prompt
@@ -1634,7 +1602,7 @@ Agent 构建 Prompt
            组合为完整 Prompt 发送 LLM
 ```
 
-### 10.2 Prompt 模板结构
+### 11.2 Prompt 模板结构
 
 ```markdown
 ---
@@ -1669,7 +1637,7 @@ applicable_stages: ["market-insight", "strategic-analysis"]
 {{output_schema}}
 ```
 
-### 10.3 Prompt 版本管理
+### 11.3 Prompt 版本管理
 
 | 要求 | 描述 |
 |------|------|
@@ -1680,9 +1648,9 @@ applicable_stages: ["market-insight", "strategic-analysis"]
 
 ---
 
-## 11. 接口版本管理与兼容性
+## 14. 接口版本管理与兼容性
 
-### 11.1 版本策略
+### 14.1 版本策略
 
 | 接口 | 版本格式 | 兼容性要求 |
 |------|---------|-----------|
@@ -1693,7 +1661,7 @@ applicable_stages: ["market-insight", "strategic-analysis"]
 | **SAP** | 消息头 `protocol_version` | 向后兼容 1 个版本 |
 | **LLM Adapter** | LiteLLM 版本 | 跟随 LiteLLM 升级 |
 
-### 11.2 破坏性变更流程
+### 14.2 破坏性变更流程
 
 ```
 提出变更 → 影响评估 → 设计兼容层 → 测试验证 → 发布迁移指南 → 部署
@@ -1702,7 +1670,7 @@ applicable_stages: ["market-insight", "strategic-analysis"]
   RFC 文档   FR/NFR 影响  兼容适配器  契约测试   用户通知    灰度发布
 ```
 
-### 11.3 契约测试
+### 14.3 契约测试
 
 | 契约类型 | 工具 | 验证内容 | 通过率要求 |
 |---------|------|---------|-----------|
@@ -1715,9 +1683,9 @@ applicable_stages: ["market-insight", "strategic-analysis"]
 
 ---
 
-## 12. 安全与权限控制
+## 15. 安全与权限控制
 
-### 12.1 安全分层
+### 15.1 安全分层
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1752,7 +1720,7 @@ applicable_stages: ["market-insight", "strategic-analysis"]
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 12.2 CLI 安全参数
+### 15.2 CLI 安全参数
 
 | 参数 | 描述 | 安全级别 |
 |------|------|---------|
@@ -1761,7 +1729,7 @@ applicable_stages: ["market-insight", "strategic-analysis"]
 | `--cost-budget` | 成本上限 | Agent 模式必须设置 |
 | `--timeout` | 超时时间 | 防止无限等待 |
 
-### 12.3 Skill 权限控制
+### 15.3 Skill 权限控制
 
 ```yaml
 # SKILL.md 权限声明
@@ -1778,9 +1746,9 @@ cost_limit:
 
 ---
 
-## 13. 可观测性与监控
+## 16. 可观测性与监控
 
-### 13.1 统一追踪 ID
+### 16.1 统一追踪 ID
 
 ```python
 # 每个请求携带 trace_id，贯穿所有接口层
@@ -1792,7 +1760,7 @@ class TraceContext:
     task_id: str           # 任务 ID
 ```
 
-### 13.2 关键监控指标
+### 16.2 关键监控指标
 
 | 指标类别 | 指标 | 告警阈值 | 测量方式 |
 |---------|------|---------|---------|
@@ -1805,7 +1773,7 @@ class TraceContext:
 | **安全** | 提示注入检测 | 准确率 < 95% | ShieldCortex |
 | **可用性** | CLI 可用性 | < 99% | 健康检查 |
 
-### 13.3 OpenTelemetry 集成
+### 16.3 OpenTelemetry 集成
 
 ```python
 from opentelemetry import trace, metrics
@@ -1825,9 +1793,9 @@ async def execute_tool(tool_id: str, input_data: Dict):
 
 ---
 
-## 14. 事件监听适配器规范
+## 12. 事件监听适配器规范
 
-### 14.1 设计原则
+### 12.1 设计原则
 
 **or.md 1.4.1(3) 原文：**
 > 事件监听适配器：支持 RabbitMQ 事件消费者，监听领域事件（文档处理完成、工具执行完成、AGENT 决策完成、隔离等级切换、Checkpoint 恢复、路由决策），触发下游应用层用例
@@ -1837,7 +1805,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 - 转换为 ApplicationCommand 触发下游用例
 - 保证事件处理幂等性，支持重放与失败重试
 
-### 14.2 事件监听架构
+### 12.2 事件监听架构
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1867,7 +1835,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 14.3 10 种领域事件监听映射
+### 12.3 10 种领域事件监听映射
 
 | 领域事件 | 监听器 | 触发的下游用例 | or.md 事件流转 |
 |---------|--------|---------------|---------------|
@@ -1882,7 +1850,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 | CheckpointRecovered | CheckpointRecoveredListener | 战略档案库版本更新用例、分支管理用例 | [6] Checkpoint 恢复事件流转 |
 | RoutingDecided | RoutingDecidedListener | 路由决策日志存储用例、成本监控用例 | [7] 路由决策事件流转 |
 
-### 14.4 事件处理幂等性保证
+### 12.4 事件处理幂等性保证
 
 ```python
 class EventListener:
@@ -1925,16 +1893,16 @@ class EventListener:
 
 ---
 
-## 15. Web 前端接口规范
+## 13. Web 前端接口规范
 
-### 15.1 设计原则
+### 13.1 设计原则
 
 **or.md 1.4.1(4)-(6) 原文：**
 > 无障碍设计适配器：遵循 WCAG 2.1 AA 标准
 > 多语言界面适配器：支持中文与英文界面切换
 > 分支管理界面适配器：支持创建分支、切换分支、删除分支、分支差异对比视图
 
-### 15.2 三视图架构
+### 13.2 三视图架构
 
 | 视图 | 目标用户 | 核心功能 | 对应 FR |
 |------|---------|---------|-------|
@@ -1942,7 +1910,7 @@ class EventListener:
 | **分析师视图** | 战略管理部人员 | 专业工具执行、溯源树展示、报告生成 | FR-UI-06, FR-UI-09 |
 | **企业战略与市场人员视图** | 企业战略与市场体系人员 | 流程标准化执行、Checkpoint 管理、证据包打包 | FR-UI-05, FR-UI-10 |
 
-### 15.3 REST API 端点设计
+### 13.3 REST API 端点设计
 
 ```
 # 文档管理
@@ -1978,7 +1946,7 @@ GET    /api/v1/system/health                # 健康检查
 GET    /api/v1/system/metrics               # 监控指标
 ```
 
-### 15.4 无障碍设计要求（WCAG 2.1 AA）
+### 13.4 无障碍设计要求（WCAG 2.1 AA）
 
 | 要求 | 描述 | 验收标准 |
 |------|------|---------|
@@ -1988,76 +1956,13 @@ GET    /api/v1/system/metrics               # 监控指标
 | **对比度** | 文本与背景对比度 ≥ 4.5:1 | WCAG AA 标准 |
 | **焦点可见** | 键盘焦点元素有明确边框 | 焦点环 2px 以上 |
 
-### 15.5 多语言设计要求
+### 13.5 多语言设计要求
 
 | 要求 | 描述 | 验收标准 |
 |------|------|---------|
 | **术语表统一** | 战略领域术语中英文对照 | 术语表覆盖 100% 领域概念 |
 | **界面切换** | 中/英文一键切换 | 切换延迟 < 100ms |
 | **翻译准确率** | 专业术语翻译准确率 ≥ 95% | 领域专家审核 |
-
----
-
-## 16. 安全与权限控制
-
-### 16.1 安全分层
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    安全分层架构                               │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  第一层：隔离                                                │
-│  • Prompt 隔离（每个 Agent 独立系统提示）                    │
-│  • 工具隔离（RBAC 最小权限）                                 │
-│  • 数据隔离（多租户 Schema per Tenant）                      │
-│                                                             │
-│  第二层：执行                                                │
-│  • Docker 沙箱（代码执行隔离）                               │
-│  • 网络白名单（仅允许可信 API）                              │
-│  • 资源限制（CPU/内存/超时）                                 │
-│                                                             │
-│  第三层：检测                                                │
-│  • ShieldCortex 提示注入检测                                 │
-│  • 视角越界检测（跨角色关键词频率 > 5%）                     │
-│  • 幻觉累积检测                                              │
-│                                                             │
-│  第四层：审计                                                │
-│  • 不可变存储（WORM）                                       │
-│  • 完整操作日志                                             │
-│  • 7 年保留期限（SOX 合规）                                  │
-│                                                             │
-│  第五层：熔断                                                │
-│  • 辩论过热保护                                             │
-│  • 成本三级熔断                                             │
-│  • 批量熔断（防止 Agent 失控）                               │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 16.2 CLI 安全参数
-
-| 参数 | 描述 | 安全级别 |
-|------|------|---------|
-| `--dry-run` | 预览不执行 | 所有有副作用的命令必须支持 |
-| `--confirm` | 需要确认 | 删除/覆盖操作必须要求 |
-| `--cost-budget` | 成本上限 | Agent 模式必须设置 |
-| `--timeout` | 超时时间 | 防止无限等待 |
-
-### 16.3 Skill 权限控制
-
-```yaml
-# SKILL.md 权限声明
-allowed_tools:
-  - "pestel"
-  - "document_search"
-data_access:
-  read: ["docs/*", "archive/*"]
-  write: ["output/*", "evidence/*"]
-cost_limit:
-  max_usd_per_call: 0.10
-  max_tokens_per_call: 50000
-```
 
 ---
 
