@@ -692,8 +692,6 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 
 #### 5.3.1 SKILL.md frontmatter 字段规范（强制，13 字段标准）
 
-> **⚠️ P0-1（Round 2 D1 发现）**：跨文档字段清单不一致问题已解决——本节为权威定义。
-
 | 字段 | 类型 | 必填 | 约束 | 默认值 |
 |------|------|------|------|--------|
 | **核心标识（4）** |||||
@@ -717,9 +715,8 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 | `accuracy` | object | ❌ | `{value: 0-1.0, sample_count: int, last_updated: ISO8601}` | `{value: null, sample_count: 0, last_updated: null}` |
 | `false_positive_rate` | object | ❌ | `{value: 0-1.0, sample_count: int, last_updated: ISO8601}` | `{value: null, sample_count: 0, last_updated: null}` |
 
-> **⚠️ P0-1**：以上 13 字段为权威定义（统一 §5.3.1 / §5.3.3 / 蓝图 §3.3 三处文档）。
->
-> **⚠️ P0-2（Round 2 D1 发现）**：`description` 字段强制正则校验（落地时）：
+> 以上 13 字段为权威定义（统一 §5.3.1 / §5.3.3 / 蓝图 §3.3 三处文档）。
+> `description` 字段强制正则校验（落地时）：
 > ```python
 > import re
 > _DESCRIPTION_PATTERN = re.compile(
@@ -731,7 +728,7 @@ sisys archive diff --branch-a <id> --branch-b <id>  # 分支差异对比
 > )
 > ```
 >
-> **⚠️ P0-3（Round 2 D1 发现）**：`applicable_blm_stages` 与 `applicable_bem_stages` 一致性约束（落地时）：
+> `applicable_blm_stages` 与 `applicable_bem_stages` 一致性约束（落地时）：
 > - **规则 1**：至少 1 个阶段绑定（BLM 或 BEM 之一非空）
 > - **规则 2**：避免单一 Skill 覆盖所有 12 阶段（粒度过粗将导致误触发）
 > - **规则 3**：BLM 战略类（M1-M3）+ BEM 执行类（P4-P6）不应同时覆盖（语义矛盾）
