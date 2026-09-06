@@ -122,6 +122,36 @@
 2. 避免 tool 子域码位被无意义的新增异常占据
 3. 该异常的 from_status/to_status 模式（`business_exceptions.py:110-134`）天然适配 ToolExecutionState 迁移
 
+### 异常登记确认（Task 0 必做项，Round 3 Agent F 关键发现）
+
+> **背景：** `docs/architecture/sisys-uni-exception-design.md` §3.3.2 子域编码范围表当前**严重过时**——缺失 11 个子域（包括 tool 子域 380-389）。本期必须补登记 tool 子域，并交叉验证 5 项 CI 校验规则。
+
+**Task 0 必须完成的 3 项异常登记动作：**
+
+1. **§3.3.2 表补登记 tool 子域**（`docs/architecture/sisys-uni-exception-design.md` line 716-734）
+   - 在 `sandbox` 行与 `fallback` 行之间插入：
+     ```markdown
+     | `tool` | 380–389 | ToolNotFoundError, ToolAlreadyExistsError, ToolExecutionFailedError, ToolExecutionRetryExhaustedError, ToolExecutionTimeoutError, EvidenceValidationFailedError, SkillNotFoundError, SkillLoadError, ToolResultValidationError 等（战略性工具异常，独立于 external） |
+     ```
+
+2. **CI 5 项规则交叉验证**（参考 §3.3.3 规则 R1-R5）
+   - R1 子域范围：所有 tool 子域异常 code ∈ [380, 389] ✅
+   - R2 继承链一致性：tool 子域异常继承 `business`/`external` 基类 → 允许 ✅
+   - R3 预留保护：tool 子域不使用 000/1XX/2XX/3XX 占位符 ✅
+   - R4 注册覆盖：`_CLASS_TO_SUBDOMAIN` 覆盖 7 个新异常类（Task 0 必须）✅
+   - R5 范围有效性：tool (380-389) 与 external (301-399) 部分重叠 → **需确认不重叠**（实际 380-389 ⊂ 301-399 子集，需在 §3.3.2 标注"tool 物理范围在 external 内但语义独立"）
+
+3. **更新 `_code_ranges.py` 注释**（`src/domain/exceptions/_code_ranges.py` line 64）
+   - 在 `tool: (380, 389)` 行后追加 `# Story 4.1a: 新增 7 个异常 EXCEPTION_382/383/385/386/387/388/389`，EXCEPTION_384 复用 EntityStateTransitionError 不占码位`
+
+**4 项 Checklist 自查（CLAUDE.md §5）：**
+- [ ] Task 0 完成时 `grep -rn "EXCEPTION_382\|EXCEPTION_383\|EXCEPTION_385\|EXCEPTION_386\|EXCEPTION_387\|EXCEPTION_388\|EXCEPTION_389" src/domain/exceptions/` 全部有定义
+- [ ] `_CLASS_TO_SUBDOMAIN` 表覆盖 7 个新异常类
+- [ ] `src/domain/exceptions/__init__.py` 导入并 `__all__` 暴露 7 个新异常
+- [ ] `tests/unit/domain/exceptions/test_code_ranges.py` 子域码段校验通过
+- [ ] `tests/unit/domain/exceptions/test_error_code_uniqueness.py` 编码唯一性校验通过
+- [ ] `sisys-uni-exception-design.md §3.3.2` 表补登记 tool 子域
+
 ---
 
 ## 🎯 测试隔离约束（CLAUDE.md §5 + template.md §4.4）
@@ -313,10 +343,162 @@
 **验证标准/Validation Criteria:**
 - [ ] ToolExecutionRepositoryPort 定义在 `src/domain/ports/`（非应用层）
 - [ ] 查询方法使用 ToolExecutionQuery frozen dataclass（CLAUDE.md §4 决策规则）
-- [ ] InMemoryToolExecutionRepository 实现完整（dict[UUID, ToolExecution] + 乐观锁）
+- [ ] InMemoryToolExecutionRepository 实现完整（dict[UUID, ToolExecution] + 乐观锁 + asyncio.Lock 类变量）
 - [ ] 端口契约测试 `tests/contracts/test_port_contract_tool_execution_repository.py` 11 维度覆盖
 - [ ] `composition_root.py` 注册 `tool_execution_repository` 端口（lifetime=SCOPED，与 tool_repository 对齐）
-- [ ] Alembic migration `tool_executions` 表创建（UUID 主键 + tenant_id + state + state_version 等字段）
+- [ ] Alembic migration `deploy/postgresql/alembic/versions/011_tool_executions.py` 创建（含 4 索引 + 3 CHECK 约束）
+- [ ] L2/L4 双轨存储边界明确（结构化字段 → L2_rdb / 大文本 → L4_object）
+
+#### InMemoryToolExecutionRepository 实现样板（CLAUDE.md §6 类变量约束）
+
+```python
+"""内存工具执行仓储 — 实现 ToolExecutionRepositoryPort 接口。
+
+遵循 CLAUDE.md §6 Gotchas：asyncio.Lock 声明为类变量而非实例变量。
+"""
+
+import asyncio
+import uuid
+from typing import Dict, List
+
+from src.domain.entities.tool_execution import ToolExecution, ToolExecutionState
+from src.domain.exceptions.tool_exceptions import (
+    ToolExecutionNotFoundError, ToolExecutionAlreadyExistsError,
+)
+from src.domain.exceptions import EntityStateTransitionError
+
+
+class InMemoryToolExecutionRepository:
+    """内存工具执行仓储（实现 ToolExecutionRepositoryPort）。"""
+
+    # CLAUDE.md §6 Gotchas：类变量而非实例变量
+    _lock: asyncio.Lock = asyncio.Lock()
+
+    def __init__(self) -> None:
+        self._executions: Dict[uuid.UUID, ToolExecution] = {}
+
+    def save(self, execution: ToolExecution) -> None:
+        with self._lock:
+            execution.validate()  # 二次守卫（防外部脏数据）
+            if execution.execution_id in self._executions:
+                raise ToolExecutionAlreadyExistsError(
+                    execution_id=str(execution.execution_id),
+                    tool_id=str(execution.tool_id),
+                )
+            self._executions[execution.execution_id] = execution
+
+    def get_by_id(self, execution_id: uuid.UUID) -> ToolExecution:
+        execution = self._executions.get(execution_id)
+        if execution is None:
+            raise ToolExecutionNotFoundError(execution_id=str(execution_id))
+        return execution
+
+    def list_by_query(self, query: "ToolExecutionQuery") -> List[ToolExecution]:
+        results = [e for e in self._executions.values() if e.tenant_id == query.tenant_id]
+        if query.tool_id is not None:
+            results = [e for e in results if e.tool_id == query.tool_id]
+        if query.state is not None:
+            results = [e for e in results if e.state == query.state]
+        results.sort(key=lambda e: e.started_at, reverse=True)
+        return results[query.offset : query.offset + query.limit]
+
+    def save_with_state_version(
+        self, execution: ToolExecution, expected_state_version: int,
+    ) -> ToolExecution:
+        """乐观锁 CAS（参考 Document_repository.py:226-280 save_with_version_check 模式）。"""
+        with self._lock:
+            current = self._executions.get(execution.execution_id)
+            if current is None:
+                raise ToolExecutionNotFoundError(execution_id=str(execution.execution_id))
+            if current.state_version != expected_state_version:
+                raise EntityStateTransitionError(
+                    entity_type="ToolExecution",
+                    entity_id=str(execution.execution_id),
+                    from_status=current.state.name,
+                    to_status=execution.state.name,
+                    reason=f"Optimistic lock conflict: expected={expected_state_version}, actual={current.state_version}",
+                )
+            execution.validate()
+            self._executions[execution.execution_id] = execution
+            return execution
+```
+
+#### PostgreSQL migration 011_tool_executions.py 样板
+
+**关键设计决策**：
+- `tool_id` 使用**ID-only 弱引用**（无 FOREIGN KEY 约束），等 Story X 持久化 Tool 后再补强 FK
+- L2/L4 双轨存储边界：**结构化字段 → L2_rdb** / **大文本 → L4_object**（`evidence_storage_key` 引用）
+
+```python
+"""Add tool_executions table for Tool execution aggregate persistence.
+
+Revision ID: 011 | Revises: 010 | Create Date: 2026-09-06
+CLAUDE.md §5 硬约束：已合入 migration 禁止修改，本期只允许新增。
+"""
+from alembic import op
+import sqlalchemy as sa
+
+revision = "011"
+down_revision = "010"
+
+
+def upgrade() -> None:
+    op.create_table(
+        "tool_executions",
+        sa.Column("execution_id", sa.UUID(), primary_key=True),
+        sa.Column("tenant_id", sa.UUID(), nullable=False),
+        sa.Column("tool_id", sa.UUID(), nullable=False),  # ID-only 弱引用（推迟 FK）
+        sa.Column("tool_version", sa.String(50), nullable=False),
+        sa.Column("state", sa.String(20), nullable=False, server_default="IDLE"),
+        sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("retry_count", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("failure_reason", sa.String(1000), nullable=True),
+        # 证据包结构化字段（L2_rdb）
+        sa.Column("input_hash", sa.String(64), nullable=True),
+        sa.Column("rule_version", sa.String(50), nullable=True),
+        sa.Column("confidence", sa.Float(), nullable=True),
+        # L4 MinIO 引用
+        sa.Column("evidence_storage_key", sa.String(500), nullable=True),
+        # 乐观锁
+        sa.Column("state_version", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("metadata", sa.JSON(), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("NOW()")),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("NOW()")),
+        sa.CheckConstraint(
+            "state IN ('IDLE', 'PLANNING', 'EXECUTING', 'VALIDATING', 'COMPLETED', 'FAILED')",
+            name="ck_tool_executions_state",
+        ),
+        sa.CheckConstraint("retry_count >= 0", name="ck_tool_executions_retry_count"),
+        sa.CheckConstraint("state_version >= 0", name="ck_tool_executions_state_version"),
+    )
+    # 4 索引：租户基线 + 复合 + 时间 + 部分索引
+    op.create_index("ix_tool_executions_tenant_id", "tool_executions", ["tenant_id"])
+    op.create_index("ix_tool_executions_tenant_tool_state", "tool_executions", ["tenant_id", "tool_id", "state"])
+    op.create_index("ix_tool_executions_tenant_started_at", "tool_executions", ["tenant_id", "started_at"])
+    op.create_index(
+        "ix_tool_executions_terminal_state", "tool_executions", ["tenant_id", "state"],
+        postgresql_where=sa.text("state IN ('COMPLETED', 'FAILED')"),
+    )
+
+
+def downgrade() -> None:
+    op.drop_index("ix_tool_executions_terminal_state", table_name="tool_executions")
+    op.drop_index("ix_tool_executions_tenant_started_at", table_name="tool_executions")
+    op.drop_index("ix_tool_executions_tenant_tool_state", table_name="tool_executions")
+    op.drop_index("ix_tool_executions_tenant_id", table_name="tool_executions")
+    op.drop_table("tool_executions")
+```
+
+#### L2/L4 双轨存储边界（AC-4 证据包强约束）
+
+| 字段类型 | 具体字段 | 存储层 | 理由 |
+|---------|---------|--------|------|
+| 结构化字段 | `input_hash`, `rule_version`, `confidence`, `citations` | **L2_rdb** PostgreSQL | 可索引、可过滤、可 JOIN |
+| 大文本字段 | `plan`, `code`, `result`, `observation`, `validation` | **L4_object** MinIO blob | 单条可达 MB 级，避免 PG 行膨胀 |
+| L4 引用 | `evidence_storage_key` | **L2_rdb** VARCHAR(500) | 反查 L4 对象键 |
+
+**ToolExecution 聚合根不直接持有巨型文本**——序列化整包为 EvidencePackage 存 L4，结构化摘要存 L2_rdb。
 
 ---
 
@@ -963,6 +1145,43 @@
    - **Round 2 P0-A（架构测试循环依赖检测真实实现）**：Story 4.1 R2-2 docstring 虚假声明，本 Story Task 7 架构测试必须真实实现循环依赖检测（通过 `lint-imports` 命令调用）
    - **Round 2 P0-B（Tool 实体 6 字段校验严重化）**：本 Story AC-1 新增字段必须立即加入 `Tool.validate()` 方法（不延后到 save()）
 
+### 端口契约测试样板参考（Round 3 Agent F 调研）
+
+**已有样板：** `tests/contracts/test_port_contract_tool.py`（258 行，11 维度全覆盖）
+
+**Task 2 / Task 7 新增端口契约测试时**直接复用以下样板：
+
+1. **类级常量模板**：
+   ```python
+   class TestToolExecutionServicePortContract:
+       PORT_NAME = "tool_execution_service"
+       IMPL_CLS_NAME = "ToolExecutionService"
+       MODULE_PATH = "src.application.services.tool_execution_service"
+       EXPECTED_TAGS = ("tool", "execution", "service")
+       EXPECTED_OWNER = "tool-team"
+       REQUIRED_METHODS = ["execute", "get_tool_metadata", "list_tools_metadata"]
+   ```
+
+2. **`_DummyResolver` 模板**（解决 impl 工厂依赖注入）：
+   ```python
+   class _DummyResolver:
+       def resolve(self, name: str) -> Any:
+           if name == "tool_registry_service":
+               return ToolRegistryService(InMemoryToolRepository())
+           if name == "tool_execution_engine":
+               return ToolExecutionEngine()
+           raise KeyError(name)
+   ```
+
+3. **11 维度测试方法名清单**：
+   `test_dimension_1_port_is_registered` / `_2_port_name` / `_3_port_version` / `_4_port_interface_type` / `_5_port_lifetime` / `_6_port_owner` / `_7_port_module` / `_8_port_tags` / `_9_impl_is_callable` / `_9_impl_factory_produces_port_instance` / `_10_implementation_has_required_methods` / `_11_protocol_is_runtime_checkable`
+
+4. **runtime_checkable Protocol 校验模式**（维度 9 + 维度 11）：
+   ```python
+   instance = spec.impl(_DummyResolver())
+   assert isinstance(instance, ToolExecutionServicePort)
+   ```
+
 ### 已有代码模式参考
 
 **Tool 实体:** `src/domain/entities/tool.py`
@@ -1045,6 +1264,139 @@
 | **集成测试** | `tests/integration/test_integration_strategic_tool_impl.py` | Task 7 | **真实服务 Schema 隔离模式**（TestTenant + savepoint rollback） |
 | **验收测试（BDD）** | `tests/acceptance/test_acceptance_strategic_tool_impl.feature` | Task 0 | Gherkin 7 scenario |
 | **验收测试（BDD）** | `tests/acceptance/test_acceptance_strategic_tool_impl.py` | Task 8 | **禁止 mock** + 真实服务（InMemorySkillLoader + InMemoryToolRepository + ToolRegistryService + ToolExecutionService + TestTenant） |
+
+---
+
+## 🧪 测试分类与归属（template.md §4.3 强制 13 行表格）
+
+> 严格对齐 `template.md v2.9.0` line 167-184 测试分类规范。覆盖 6 大类：**TDD 单元测试 / TDD 验收测试 / TDD 契约测试 / TDD 领域异常测试 / SDD 架构验证 / 集成测试**。
+
+| # | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
+|---|---------|------|----------|----------|-----------|
+| 1 | **TDD 单元测试** | Tool 实体增强 | 4 新字段（rule_version/reliability_score/execution_count/slug）+ 23 个 TOOL_CATALOG 不破坏 | `tests/unit/domain/entities/test_tool_41a.py` | Task 1 |
+| 2 | **TDD 单元测试** | ToolExecution 聚合根 + 5 状态机 | 12 字段完整、6 状态迁移、终态必有 completed_at、乐观锁 | `tests/unit/domain/entities/test_tool_execution.py` | Task 1 |
+| 3 | **TDD 单元测试** | ToolCall / ToolResult / ExecutionContext 值对象 | frozen dataclass 不变性、4 值边界、EvidencePackage 8 字段 | `tests/unit/domain/value_objects/test_tool_execution_values.py` | Task 3 |
+| 4 | **TDD 单元测试** | ToolExecutionEngine 五阶段工作流 | 五阶段端口映射、RetryPolicy 重试、Session 生命周期 | `tests/unit/application/services/test_tool_execution_engine.py` | Task 4 |
+| 5 | **TDD 单元测试** | StrategicAnalysisUseCase | tool_name 查询→Skill 加载→execute→事件发布 | `tests/unit/application/use_cases/test_strategic_analysis_usecase.py` | Task 5 |
+| 6 | **TDD 单元测试** | Skills 加载器 | TOOLS.md/SKILL.md ×23 + manifest 双向映射 | `tests/unit/application/skills/test_skills_loader.py` | Task 6 |
+| 7 | **TDD 验收测试** | Gherkin 场景 | AC-1 ~ AC-7 业务价值验收（7 AC + Edge Cases） | `tests/acceptance/test_acceptance_strategic_tool_impl.feature` | Task 0 |
+| 8 | **TDD 验收测试** | BDD 步骤实现 | 中文 Gherkin step 函数 + `event_loop.run_until_complete()` | `tests/acceptance/test_acceptance_strategic_tool_impl.py` | Task 0 |
+| 9 | **TDD 验收测试** | 收尾验收场景 | src + tests 完成清单断言 | `tests/acceptance/test_acceptance_strategic_tool_impl.feature` | Task 8 |
+| 10 | **TDD 契约测试** | ToolExecutionService 端口契约 | Protocol 11 维度 + Query Object 模式 | `tests/contracts/test_port_contract_tool_execution_service.py` | Task 2 |
+| 11 | **TDD 契约测试** | ToolExecutionRepository 端口契约 | Protocol 11 维度 + 乐观锁 + 租户隔离 | `tests/contracts/test_port_contract_tool_execution_repository.py` | Task 7 |
+| 12 | **TDD 契约测试** | SkillLoader 端口契约 | Protocol 11 维度 + L1/L2/L3 三级加载 | `tests/contracts/test_port_contract_skill_loader.py` | Task 6 |
+| 13 | **TDD 契约测试** | ToolExecuted 事件契约 | 字段必填/序列化/双通道投递验证 | `tests/contracts/test_event_contract_tool_executed.py` | Task 5 |
+| 14 | **TDD 领域异常测试** | tool 子域 7 新异常 | 构造/to_dict/HTTP 映射/继承链/cause 链（每个异常 11 维度） | `tests/unit/domain/exceptions/test_tool_exceptions.py` | Task 0 |
+| 15 | **TDD 领域异常测试** | EXCEPTION_HTTP_MAP 映射 | 异常 → HTTP 状态码（500/502/504/422/404/500/400） | `tests/unit/interfaces/api/test_exception_handlers.py` | Task 0 |
+| 16 | **TDD 领域异常测试** | 编码唯一性 | 7 个新异常 code 无碰撞（自动反射扫描） | `tests/unit/domain/exceptions/test_error_code_uniqueness.py` | Task 0 |
+| 17 | **TDD 领域异常测试** | 子域码段校验 | 子域范围/继承链/预留保护/注册覆盖 | `tests/unit/domain/exceptions/test_code_ranges.py` | Task 0 |
+| 18 | **SDD 架构验证** | 六边形架构约束 | domain→ports 依赖方向、零外部依赖、循环依赖真实检测（lint-imports 调用） | `tests/unit/architecture/test_arch_strategic_tool_impl.py` | Task 7 |
+| 19 | **集成测试** | 工具执行全链路 | Tool→SkillLoader→Engine→EvidencePackage→ToolExecuted 事件（真实服务 Schema 隔离模式） | `tests/integration/test_integration_strategic_tool_impl.py` | Task 7 |
+
+> **关键差异点（vs Story 4.1）：** 4-1a 因涉及 7 个新异常 + ToolExecution 聚合根 + SkillLoader 端口 + ToolExecuted 事件双通道，相比 4.1 的 12 行测试类型扩展至 19 行。
+
+---
+
+## 📂 项目结构说明 Project Structure（template.md §4.6 强制）
+
+> 严格对齐 `template.md v2.9.0` line 431-502 项目结构规范。标注本 Story 新建/复用文件。
+
+```
+src/
+├── domain/                                       # 领域层（零外部依赖，import-linter 强制）
+│   ├── entities/
+│   │   ├── tool.py                              # Story 4.1 已有（本 Story 增强 4 字段）
+│   │   ├── strategic_tool_catalog.py            # Story 4.1 已有（同步 23 个 slug 字段）
+│   │   └── tool_execution.py                    # [本 Story 新建] ToolExecution 聚合根 + ToolExecutionState
+│   ├── value_objects/
+│   │   └── tool_execution.py                    # [本 Story 新建] ToolCall / ExecutionContext / ToolResult / EvidencePackage
+│   ├── events/
+│   │   └── tool_events.py                       # Story 4.1 已有（本 Story 扩展 execution_id + aggregate_type="ToolExecution"）
+│   ├── exceptions/
+│   │   ├── tool_exceptions.py                   # Story 4.1 + 本 Story（新增 7 个异常 EXCEPTION_382/383/385/386/387/388/389）
+│   │   └── _code_ranges.py                      # Story 4.1 已有（tool 子域 380-389）
+│   ├── ports/
+│   │   ├── tool_repository.py                   # Story 4.1 已有
+│   │   └── tool_execution_repository.py         # [本 Story 新建] ToolExecutionRepositoryPort + ToolExecutionQuery
+│   └── services/
+│       └── tool_execution_engine.py             # [本 Story 新建] 五阶段执行引擎
+│
+├── application/                                 # 应用层
+│   ├── ports/
+│   │   ├── tool_registry_service.py             # Story 4.1 已有
+│   │   ├── tool_execution_service.py            # [本 Story 新建] ToolExecutionServicePort
+│   │   └── skill_loader.py                      # [本 Story 新建] SkillLoaderPort Protocol
+│   ├── services/
+│   │   ├── tool_registry_service.py             # Story 4.1 已有
+│   │   ├── tool_execution_service.py            # [本 Story 新建] ToolExecutionService 实现
+│   │   └── tool_execution_engine.py             # [本 Story 新建] 五阶段执行引擎
+│   ├── use_cases/
+│   │   └── strategic_analysis.py                # [本 Story 新建] StrategicAnalysisUseCase
+│   └── skills/                                  # [本 Story 新建子树]
+│       ├── __init__.py
+│       ├── TOOLS.md                             # L1 元数据（<200 tokens）
+│       ├── skill_manifest.py                    # tool_id ↔ slug 双向映射
+│       ├── loader.py                            # SkillLoaderPort 实现
+│       ├── validators/
+│       │   ├── token_count_validator.py
+│       │   └── frontmatter_validator.py
+│       └── <slug>/                              # 23 个工具子目录
+│           ├── SKILL.md                         # L2 SOP（<500 行）
+│           ├── scripts/                         # L3 脚本（占位）
+│           └── references/                      # L3 参考（占位）
+│
+├── infrastructure/                              # 基础设施层
+│   ├── storage/
+│   │   └── inmemory/
+│   │       ├── tool_repository.py               # Story 4.1 已有（本 Story 补 asyncio.Lock 类变量）
+│   │       └── tool_execution_repository.py     # [本 Story 新建] InMemoryToolExecutionRepository
+│   ├── storage/
+│   │   └── postgresql/
+│   │       ├── models/tool_execution.py         # [本 Story 新建] ToolExecutionModel ORM
+│   │       └── repository/tool_execution_repository.py  # [本 Story 新建] PostgreSQLToolExecutionRepository
+│   └── messaging/
+│       └── channel_router.py                    # Story 4.1 已有（本 Story 升级 ToolExecuted 双通道）
+│
+└── composition_root.py                          # 注册 tool_execution_repository / tool_execution_service / tool_execution_engine / skill_loader
+
+deploy/postgresql/alembic/versions/
+├── 001_initial.py                               # 已有
+├── ...
+├── 010_archive_validity_period.py               # 已有
+└── 011_tool_executions.py                       # [本 Story 新建] tool_executions 表 + 4 索引 + 3 CHECK
+
+configs/
+└── event_channels.yaml                          # 已有（本 Story 添加 ToolExecuted realtime 通道）
+
+src/interfaces/api/exception_handlers.py         # 已有（本 Story 注册 7 个新异常的 EXCEPTION_HTTP_MAP）
+
+tests/
+├── unit/
+│   ├── domain/entities/test_tool_41a.py         # [本 Story 新建] Tool 字段增强
+│   ├── domain/entities/test_tool_execution.py   # [本 Story 新建] 状态机 + 乐观锁
+│   ├── domain/value_objects/test_tool_execution_values.py  # [本 Story 新建] 值对象
+│   ├── domain/exceptions/test_tool_exceptions.py            # Story 4.1 已有（扩展 7 个新异常）
+│   ├── application/services/test_tool_execution_engine.py   # [本 Story 新建] 五阶段工作流
+│   ├── application/use_cases/test_strategic_analysis_usecase.py  # [本 Story 新建] 用例编排
+│   ├── application/skills/test_skills_loader.py             # [本 Story 新建] Skills 加载器
+│   └── architecture/test_arch_strategic_tool_impl.py        # [本 Story 新建] 架构约束 + 循环依赖真实检测
+├── contracts/
+│   ├── test_port_contract_tool_execution_service.py      # [本 Story 新建] 11 维度
+│   ├── test_port_contract_tool_execution_repository.py   # [本 Story 新建] 11 维度
+│   ├── test_port_contract_skill_loader.py                # [本 Story 新建] 11 维度
+│   └── test_event_contract_tool_executed.py              # [本 Story 新建] 事件契约
+├── integration/
+│   └── test_integration_strategic_tool_impl.py           # [本 Story 新建] 真实服务全链路
+└── acceptance/
+    ├── test_acceptance_strategic_tool_impl.feature       # [本 Story 新建] Gherkin
+    └── test_acceptance_strategic_tool_impl.py            # [本 Story 新建] BDD 步骤实现
+```
+
+> **目录说明**：
+> - `src/application/skills/` 子树当前为空（仅 `__pycache__` 残留），本 Story 从零创建
+> - 现有 `tests/unit/architecture/test_arch_tool.py`（Story 4.1）需扩展为 `test_arch_strategic_tool_impl.py` 覆盖新增模块
+> - 现有 `tests/contracts/test_port_contract_tool.py`（Story 4.1）保持不变
+> - 现有 `tests/integration/test_integration_tool_registration.py`（Story 4.1）保持不变
 
 ---
 
@@ -1272,12 +1624,53 @@ tests/
 - ✅ Dev Notes 新增"Story 4.1 推迟到本 Story 同步推进的 P0 项"（4 项）
 - ✅ 明确 asyncio.Lock 类变量（CLAUDE.md §6）、save() 二次守卫、循环依赖检测真实实现、Tool.validate() 立即校验
 
-**未修复（Round 3+ 继续）：**
-- ⏳ 测试分类与归属 13 行表格（Agent A）
-- ⏳ 项目结构说明完整目录树（Agent A）
-- ⏳ sisys-uni-exception-design.md §3.3.2 补登记 tool 子域（Agent A）
-- ⏳ ToolExecutionRepositoryPort InMemory 实现 + PostgreSQL migration 详细设计（Agent C）
-- ⏳ 端口契约测试样板代码片段（Agent D）
-- ⏳ 骨架 Story 覆盖率豁免条款应用（Agent A）
+**下一步：** Round 4 - D1 四次调研遗漏点，启动新一轮审查。
 
-**下一步：** Round 3 - D1 三次调研遗漏点，启动新一轮审查。
+---
+
+## 📌 Round 3 文档审查修复（基于 Agent E-G D1 调研）
+
+**修复项 1（Agent E）：测试分类与归属 13 行表格补全**
+- ✅ 新增"🧪 测试分类与归属"小节（template.md §4.3 强制）
+- ✅ 19 行覆盖 6 大类（TDD 单元/验收/契约/异常 + SDD 架构 + 集成）
+- ✅ 每个测试文件 + 对应 Task + 验证内容明确
+
+**修复项 2（Agent E）：项目结构说明完整目录树**
+- ✅ 新增"📂 项目结构说明"小节（template.md §4.6 强制）
+- ✅ src/ + tests/ 全目录树标注 [本 Story 新建]/[Story 4.1 已有]
+- ✅ alembic migration 路径 + event_channels.yaml 配置文件
+- ✅ 子树创建说明（skills/ 从零创建）
+
+**修复项 3（Agent F）：异常登记确认（Task 0 必做项）**
+- ✅ 在"领域异常契约"末尾新增"异常登记确认"小节
+- ✅ §3.3.2 表补登记 tool 子域的具体内容（line 716-734）
+- ✅ CI 5 项规则交叉验证清单（R1-R5）
+- ✅ `_code_ranges.py` line 64 注释更新
+
+**修复项 4（Agent G）：InMemoryToolExecutionRepository 实现样板**
+- ✅ AC-1.5 末尾新增完整实现样板（含 asyncio.Lock 类变量 + save_with_state_version 乐观锁 CAS）
+- ✅ ToolExecutionQuery dataclass Query Object 模式
+
+**修复项 5（Agent G）：PostgreSQL migration 011 完整样板**
+- ✅ AC-1.5 末尾新增 `011_tool_executions.py` 完整代码
+- ✅ 4 索引 + 3 CHECK 约束 + ID-only 弱引用决策
+- ✅ CLAUDE.md §5 硬约束声明（已合入 migration 禁止修改）
+
+**修复项 6（Agent G）：L2/L4 双轨存储边界明确**
+- ✅ AC-1.5 末尾新增 L2/L4 字段映射表
+- ✅ 结构化字段 → L2_rdb / 大文本 → L4_object / L4 引用 → L2_rdb VARCHAR
+- ✅ ToolExecution 聚合根不直接持有巨型文本（序列化整包为 EvidencePackage 存 L4）
+
+**修复项 7（Agent F）：端口契约测试样板引用**
+- ✅ Dev Notes 新增"端口契约测试样板参考"小节
+- ✅ 类级常量模板 + _DummyResolver 模板 + 11 维度测试方法名清单
+- ✅ runtime_checkable Protocol 校验模式
+
+**未修复（Round 4+ 继续）：**
+- ⏳ template.md line 205-207 骨架 Story 豁免条款评估（Agent F：4-1a 非骨架 Story，应达标准覆盖率，无需豁免）
+- ⏳ §3.3.2 表完整补登记 11 个子域（Agent F：建议 Round 4 一次性补全以消除技术债）
+- ⏳ 项目结构说明中部分模块详细接口签名（如 SkillLoader.load_metadata 返回类型）
+- ⏳ Story 4.1 推迟的 4 项 P0 在 Task 7 的具体执行步骤（已有策略，缺具体代码片段）
+- ⏳ 代码审查发现 Review Findings（需 code-review skill 执行后填充）
+
+**下一步：** Round 4 - D1 四次调研遗漏点，启动新一轮审查。
