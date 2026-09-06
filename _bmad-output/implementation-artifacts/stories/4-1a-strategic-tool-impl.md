@@ -217,7 +217,7 @@
 ### 内部端口契约（非 HTTP）
 
 - `ToolExecutionServicePort.execute(tool_id, tool_call, context) -> ToolResult`（应用层端口）
-- `ToolExecutionRepositoryPort.save(execution)`、`list_by_query(query)`（领域层仓储端口）
+- `ToolExecutionRepositoryPort.save(execution)`、`list_by_query(query)`（领域层仓储端口，继承 `L2RdbPort[ToolExecution]`）
 - `SkillLoaderPort.load_metadata / load_sop / load_references`（应用层端口）
 
 ### 契约测试文件
@@ -319,7 +319,8 @@
 **Then**
 
 - **路径**：`src/domain/ports/tool_execution_repository.py`（**领域层**，非应用层——仓储模式遵循 DDD 惯例）
-- **基类**：直接定义 `ToolExecutionRepositoryPort(Protocol)`（**不引入不存在的基类**——`document_repository.py` 实际仅 `DocumentRepositoryPort`，无 `L2RdbPort` 通用基类；本 Story 自定义仓储端口模式参考 `DocumentRepositoryPort`（`src/domain/ports/document_repository.py:17-145`）
+- **基类**：**继承** `L2RdbPort[ToolExecution]`（`src/domain/ports/l2_rdb.py:20` 泛型 async CRUD 基座）+ 添加领域扩展方法（`list_by_query` / `count` / `save_with_state_version`）
+- **同步/异步一致性**：L2RdbPort 是 async 基类（`async def get_by_id/save/delete/list_all`），所有方法必须 `async def`；早期 InMemoryToolExecutionRepository 样板是 sync 实现，Task 7 实施时必须统一为 async 接口
 - **查询方法使用 Query Object 模式**（CLAUDE.md §4 端口查询参数决策规则）：
   ```python
   @dataclass(frozen=True)
@@ -332,10 +333,21 @@
 
   @runtime_checkable
   class ToolExecutionRepositoryPort(L2RdbPort[ToolExecution], Protocol):
-      def save(self, execution: ToolExecution) -> None: ...
-      def get_by_id(self, execution_id: UUID) -> ToolExecution: ...
-      def list_by_query(self, query: ToolExecutionQuery) -> list[ToolExecution]: ...
-      def count(self, query: ToolExecutionQuery) -> int: ...
+      """继承 L2RdbPort[T]（async CRUD 基座）+ 领域扩展方法
+
+      L2RdbPort 继承契约（async）：
+      - async def get_by_id(self, id: UUID) -> ToolExecution | None
+      - async def save(self, entity: ToolExecution) -> ToolExecution
+      - async def delete(self, id: UUID) -> None
+      - async def list_all(self) -> list[ToolExecution]
+
+      领域扩展契约（async）：
+      - async def list_by_query(self, query: ToolExecutionQuery) -> list[ToolExecution]
+      - async def count(self, query: ToolExecutionQuery) -> int
+      - async def save_with_state_version(
+          self, execution: ToolExecution, expected_state_version: int,
+      ) -> ToolExecution
+      """
   ```
 - **InMemory 实现**：`src/infrastructure/storage/inmemory/tool_execution_repository.py`（参考 `InMemoryToolRepository` `src/infrastructure/storage/inmemory/tool_repository.py:18-122`）
 - **乐观锁**：实现 `save_with_state_version()` 防并发覆盖（参考 `Document_repository.py:127-145` `save_with_version_check` 模式）
@@ -350,27 +362,34 @@
 - [ ] Alembic migration `deploy/postgresql/alembic/versions/011_tool_executions.py` 创建（含 4 索引 + 3 CHECK 约束）
 - [ ] L2/L4 双轨存储边界明确（结构化字段 → L2_rdb / 大文本 → L4_object）
 
-#### InMemoryToolExecutionRepository 实现样板（CLAUDE.md §6 类变量约束）
+#### InMemoryToolExecutionRepository 实现样板（CLAUDE.md §6 类变量约束 + L2RdbPort async 一致性）
 
 ```python
 """内存工具执行仓储 — 实现 ToolExecutionRepositoryPort 接口。
 
 遵循 CLAUDE.md §6 Gotchas：asyncio.Lock 声明为类变量而非实例变量。
+继承 L2RdbPort[ToolExecution]（`src/domain/ports/l2_rdb.py:20`）泛型 async CRUD 基座，
+所有方法必须 async。
 """
 
 import asyncio
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from src.domain.entities.tool_execution import ToolExecution, ToolExecutionState
-from src.domain.exceptions.tool_exceptions import (
-    ToolNotFoundError, ToolAlreadyExistsError,
-)
 from src.domain.exceptions import EntityStateTransitionError
+from src.domain.ports.l2_rdb import L2RdbPort
 
 
-class InMemoryToolExecutionRepository:
-    """内存工具执行仓储（实现 ToolExecutionRepositoryPort）。"""
+class InMemoryToolExecutionRepository(L2RdbPort[ToolExecution]):
+    """内存工具执行仓储（继承 L2RdbPort[ToolExecution]，实现 ToolExecutionRepositoryPort）
+
+    关键设计：
+    - 继承 L2RdbPort 获得 get_by_id/save/delete/list_all async 接口
+    - get_by_id 遵循 L2RdbPort 契约：返回 T | None（不抛错），由应用层 Service 转换为 ToolNotFoundError
+    - save 遵循 L2RdbPort 契约：返回 T
+    - 新增领域扩展：list_by_query（Query Object 模式）/ count / save_with_state_version（乐观锁 CAS）
+    """
 
     # CLAUDE.md §6 Gotchas：类变量而非实例变量
     _lock: asyncio.Lock = asyncio.Lock()
@@ -378,25 +397,31 @@ class InMemoryToolExecutionRepository:
     def __init__(self) -> None:
         self._executions: Dict[uuid.UUID, ToolExecution] = {}
 
-    def save(self, execution: ToolExecution) -> None:
-        with self._lock:
-            execution.validate()  # 二次守卫（防外部脏数据）
-            if execution.execution_id in self._executions:
-                raise ToolAlreadyExistsError(
-                    tool_id=str(execution.tool_id),
-                    context_extra={"execution_id": str(execution.execution_id)},
-                )
-            self._executions[execution.execution_id] = execution
+    # ---- L2RdbPort 继承方法（async 覆写） ----
 
-    def get_by_id(self, execution_id: uuid.UUID) -> ToolExecution:
-        execution = self._executions.get(execution_id)
-        if execution is None:
-            raise ToolNotFoundError(
-                context_extra={"execution_id": str(execution_id), "lookup_type": "execution"}
-            )
-        return execution
+    async def get_by_id(self, id: uuid.UUID) -> ToolExecution | None:
+        """遵循 L2RdbPort 契约：返回 T | None，由应用层 Service 转换为 ToolNotFoundError."""
+        async with self._lock:
+            return self._executions.get(id)
 
-    def list_by_query(self, query: "ToolExecutionQuery") -> List[ToolExecution]:
+    async def save(self, entity: ToolExecution) -> ToolExecution:
+        """遵循 L2RdbPort 契约：返回保存后的实体（含 DB 生成的字段如 timestamps）."""
+        entity.validate()  # 二次守卫（防外部脏数据）
+        async with self._lock:
+            self._executions[entity.execution_id] = entity
+            return entity
+
+    async def delete(self, id: uuid.UUID) -> None:
+        async with self._lock:
+            self._executions.pop(id, None)
+
+    async def list_all(self) -> List[ToolExecution]:
+        async with self._lock:
+            return list(self._executions.values())
+
+    # ---- 领域扩展方法 ----
+
+    async def list_by_query(self, query: "ToolExecutionQuery") -> List[ToolExecution]:
         results = [e for e in self._executions.values() if e.tenant_id == query.tenant_id]
         if query.tool_id is not None:
             results = [e for e in results if e.tool_id == query.tool_id]
@@ -405,15 +430,35 @@ class InMemoryToolExecutionRepository:
         results.sort(key=lambda e: e.started_at, reverse=True)
         return results[query.offset : query.offset + query.limit]
 
-    def save_with_state_version(
+    async def count(self, query: "ToolExecutionQuery") -> int:
+        all_results = await self.list_by_query(
+            ToolExecutionQuery(
+                tenant_id=query.tenant_id,
+                tool_id=query.tool_id,
+                state=query.state,
+                offset=0,
+                limit=10**9,
+            )
+        )
+        return len(all_results)
+
+    async def save_with_state_version(
         self, execution: ToolExecution, expected_state_version: int,
     ) -> ToolExecution:
-        """乐观锁 CAS（参考 Document_repository.py:226-280 save_with_version_check 模式）。"""
-        with self._lock:
+        """乐观锁 CAS（参考 document_repository.py:127-145 save_with_version_check 模式）。
+
+        Raises:
+            EntityStateTransitionError: state_version 不匹配（CAS 失败）
+        """
+        async with self._lock:
             current = self._executions.get(execution.execution_id)
             if current is None:
-                raise ToolNotFoundError(
-                    context_extra={"execution_id": str(execution.execution_id), "lookup_type": "execution"}
+                raise EntityStateTransitionError(
+                    entity_type="ToolExecution",
+                    entity_id=str(execution.execution_id),
+                    from_status="UNKNOWN",
+                    to_status=execution.state.name,
+                    reason="execution not found in repository",
                 )
             if current.state_version != expected_state_version:
                 raise EntityStateTransitionError(
@@ -421,11 +466,22 @@ class InMemoryToolExecutionRepository:
                     entity_id=str(execution.execution_id),
                     from_status=current.state.name,
                     to_status=execution.state.name,
-                    reason=f"Optimistic lock conflict: expected={expected_state_version}, actual={current.state_version}",
+                    reason=(
+                        f"Optimistic lock conflict: expected state_version={expected_state_version}, "
+                        f"actual={current.state_version}"
+                    ),
                 )
             execution.validate()
             self._executions[execution.execution_id] = execution
             return execution
+```
+
+> **⚠️ 设计决策记录（Round 5 修正）：**
+> 1. L2RdbPort 是 **async** 基座（`src/domain/ports/l2_rdb.py:20`），所有仓储方法必须 `async def`
+> 2. L2RdbPort.get_by_id 签名是 `async def get_by_id(id) -> T | None`，**不抛错**——与 InMemoryToolRepository（Story 4.1）的"抛 ToolNotFoundError"惯例不一致
+> 3. **应用层 Service 转换**：应用层 ToolExecutionService 调用 `await repository.get_by_id(id)` → 若返回 None 则抛 `ToolNotFoundError`
+> 4. **早期样板已修正**：`InMemoryToolExecutionRepository` 实现样板从 sync 改为 async + 继承 L2RdbPort
+> 5. **DocumentRepositoryPort 设计差异**：DocumentRepositoryPort 独立实现不继承 L2RdbPort（`src/domain/ports/document_repository.py:17-145`），这是项目内"两种仓储模式并存"的现状——本 Story 选 L2RdbPort 继承路径
 ```
 
 #### PostgreSQL migration 011_tool_executions.py 样板
