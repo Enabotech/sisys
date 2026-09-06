@@ -94,25 +94,33 @@
 
 ### 候选新增异常（本 Story Task 0 评估）
 
-| 候选异常 | 触发场景 | 建议 code | 子域 | 4项 Checklist 计划 |
-|----------|----------|-----------|------|--------------------|
-| `ToolExecutionFailedError` | ToolExecutionEngine 五阶段任一阶段失败（不可重试） | EXCEPTION_382 | tool (380-389) | Task 0 实现 |
-| `ToolExecutionRetryExhaustedError` | 重试 3 次后仍失败 | EXCEPTION_383 | tool (380-389) | Task 0 实现 |
-| `ToolExecutionStateTransitionError` | ToolExecutionState 非法迁移（如 IDLE→COMPLETED 跳过中间态） | EXCEPTION_384 | tool (380-389) | Task 0 实现 |
-| `ToolExecutionTimeoutError` | Tool 执行超过 `RetryPolicy.max_total_duration_sec` | EXCEPTION_385 | tool (380-389) | Task 0 实现 |
-| `EvidenceValidationFailedError` | EvidencePackage 完整性校验失败（缺 plan/code/confidence 等必填字段） | EXCEPTION_386 | tool (380-389) | Task 0 实现 |
-| `SkillNotFoundError` | 通过 tool_name 查不到对应 SKILL.md（skill_manifest.py 缺失映射） | EXCEPTION_387 | tool (380-389) | Task 0 实现 |
-| `SkillLoadError` | SKILL.md 文件读取/解析失败（IO 错误、YAML frontmatter 格式错误） | EXCEPTION_388 | tool (380-389) | Task 0 实现 |
-| `ToolResultValidationError` | ToolResult.status=invalid 需附加上下文（与 `EntityBusinessRuleError` 区分） | EXCEPTION_389 | tool (380-389) | Task 0 实现 |
+| 候选异常 | 触发场景 | parent class | 建议 code | 子域 | HTTP 映射 | 4项 Checklist |
+|----------|----------|--------------|-----------|------|------------|---------------|
+| `ToolExecutionFailedError` | ToolExecutionEngine 五阶段任一阶段失败（不可重试） | `BusinessException` | EXCEPTION_382 | tool (380-389) | 500 | Task 0 |
+| `ToolExecutionRetryExhaustedError` | 重试 3 次后仍失败 | `BusinessException` | EXCEPTION_383 | tool (380-389) | 502 | Task 0 |
+| `ToolExecutionTimeoutError` | Tool 执行超过 `RetryPolicy.max_total_duration_sec` | `TimeoutError` (EXCEPTION_304) | EXCEPTION_385 | tool (380-389) | 504（继承父类） | Task 0 |
+| `EvidenceValidationFailedError` | EvidencePackage 完整性校验失败（缺 plan/code/confidence 等必填字段） | `MetadataValidationError` (EXCEPTION_217) | EXCEPTION_386 | tool (380-389) | 422（继承父类） | Task 0 |
+| `SkillNotFoundError` | 通过 tool_name 查不到对应 SKILL.md（skill_manifest.py 缺失映射） | `NotFoundError` (EXCEPTION_202) | EXCEPTION_387 | tool (380-389) | 404（继承父类） | Task 0 |
+| `SkillLoadError` | SKILL.md 文件读取/解析失败（IO 错误、YAML frontmatter 格式错误） | `ConfigurationError` (EXCEPTION_103) | EXCEPTION_388 | tool (380-389) | 500（继承父类） | Task 0 |
+| `ToolResultValidationError` | ToolResult.status=invalid 需附加上下文（与 `EntityBusinessRuleError` 区分） | `ValidationError` (EXCEPTION_201) | EXCEPTION_389 | tool (380-389) | 400（继承父类） | Task 0 |
 
-**tool 子域（380-389）剩余码位**：8 个码位全部使用，新增异常不应超出此范围。
+**tool 子域（380-389）剩余码位**：EXCEPTION_382/383/385/386/387/388/389 共 7 个新增（EXCEPTION_384 已复用现有异常，不占码位），剩余 1 个码位（384）保留。
 
 **复用现有异常（非新增）：**
 - `ToolNotFoundError` (EXCEPTION_380) 复用：Skill slug 查不到对应 Tool 元数据
-- `EntityValidationError` (EXCEPTION_242) 复用：ToolExecutionState 不变量校验
+- `ToolAlreadyExistsError` (EXCEPTION_381) 复用：Tool 元数据重复注册
+- `EntityStateTransitionError` (EXCEPTION_243) 复用：**ToolExecutionState 非法迁移**（如 IDLE→COMPLETED 跳过中间态、PLANNING→IDLE 反向）——复用项目统一的迁移守卫异常，与 `Agent` / `Checkpoint` / `StrategicPlan` 模式一致（`/home/agimtech/sisys/src/domain/entities/agent.py:99-108`）
+- `EntityValidationError` (EXCEPTION_242) 复用：ToolExecution 字段不变量校验（终态必有 completed_at、retry_count ≥ 0）
+- `EntityBusinessRuleError` (EXCEPTION_244) 复用：业务规则违反（如 Tool ACTIVE 状态下才允许执行）
 - `LLMAPIError` (EXCEPTION_330) 复用：Think/Code 阶段 LLM 调用失败（可重试异常）
 - `LLMResponseError` (EXCEPTION_331) 复用：LLM 响应格式错误（可重试异常）
 - `SandboxExecutionError` (EXCEPTION_311) 复用：Execute 阶段沙箱执行失败（可重试异常）
+- `TimeoutError` (EXCEPTION_304) 复用：阶段级超时（ToolExecutionTimeoutError 仅在聚合级超时使用）
+
+**⚠️ 重要决策（Round 2 D1 Agent C 调研结论）：** ToolExecutionState 迁移守卫**不新增** `ToolExecutionStateTransitionError`，**复用项目统一** `EntityStateTransitionError` (EXCEPTION_243)。理由：
+1. 项目内 `Agent` / `Checkpoint` / `StrategicPlan` 全部复用 `EntityStateTransitionError`，是项目惯例
+2. 避免 tool 子域码位被无意义的新增异常占据
+3. 该异常的 from_status/to_status 模式（`business_exceptions.py:110-134`）天然适配 ToolExecutionState 迁移
 
 ---
 
@@ -158,6 +166,57 @@
 
 ---
 
+## 🌐 API 契约（template.md §4.1.6 强制）
+
+> 本 Story 主要交付应用层用例 + 引擎实现，**不直接暴露 HTTP 端点**。但 ToolExecuted 事件订阅契约影响下游订阅者，需在 API 契约小节明确。
+
+### 事件契约（ToolExecuted）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `event_type` | `str` | 固定为 `"ToolExecuted"` |
+| `execution_id` | `UUID` | **新增字段**（Round 2 修正），ToolExecution 聚合根主键 |
+| `tool_id` | `UUID` | 关联 Tool 聚合根 ID |
+| `tool_version` | `str` | 工具版本快照 |
+| `aggregate_id` | `UUID` | **修正为** `execution_id`（原为 tool_id） |
+| `aggregate_type` | `str` | **修正为** `"ToolExecution"`（原为 `"Tool"`） |
+| `execution_result` | `dict` | ToolResult 序列化（output + evidence_package） |
+| `cost_audit` | `dict` | 成本审计（LLM token、sandbox 时长） |
+| `tenant_id` | `UUID` | 多租户隔离 |
+
+### 内部端口契约（非 HTTP）
+
+- `ToolExecutionServicePort.execute(tool_id, tool_call, context) -> ToolResult`（应用层端口）
+- `ToolExecutionRepositoryPort.save(execution)`、`list_by_query(query)`（领域层仓储端口）
+- `SkillLoaderPort.load_metadata / load_sop / load_references`（应用层端口）
+
+### 契约测试文件
+
+- `tests/contracts/test_event_contract_tool_executed.py`（事件契约：字段必填 + 序列化 + 通道双投递）
+- `tests/contracts/test_port_contract_tool_execution_service.py`（端口契约 11 维度）
+- `tests/contracts/test_port_contract_tool_execution_repository.py`（端口契约 11 维度）
+- `tests/contracts/test_port_contract_skill_loader.py`（端口契约 11 维度）
+
+---
+
+## 📊 Story Details（template.md §4.6 强制）
+
+| 字段 | 值 |
+|------|-----|
+| Story ID | `4.1a` |
+| Story Key | `4-1a-strategic-tool-impl` |
+| File | `_bmad-output/implementation-artifacts/stories/4-1a-strategic-tool-impl.md` |
+| Status | `ready-for-dev` |
+| Epic | Epic 4: 战略工具箱 |
+| 价值组 | 战略决策智能（Executive Decision Intelligence） |
+| 优先级 | P0（Epic 4 战略工具箱核心 Story） |
+| 估算工作量 | 7-10 人天（含 8 个新异常 4 项 Checklist + Skills 系统骨架） |
+| 覆盖 FR | FR-AR-01（领域零依赖）/ FR-AR-04（仓储模式）/ FR-IF-02（Skills 三级加载骨架） |
+| 前置 Story | 4-1-strategic-tool-registration-tools（已 done, v1.6.0） |
+| 后续 Story | 4-2-toolchain-orchestration-dag / 4-3-tool-io-schema-validation / 4-7-tool-execution-auto-invocation / 5-2-skill-selector |
+
+---
+
 ## ✅ Acceptance Criteria 验收标准
 
 ### AC-1: Tool 聚合根元数据字段增强 + ToolExecution 聚合根与状态机
@@ -177,20 +236,89 @@
 
 **Part B - 新建 ToolExecution 聚合根与状态机**：
 - 新建 `src/domain/entities/tool_execution.py`
-- 新建 `ToolExecutionState` 枚举：`IDLE → PLANNING → EXECUTING → VALIDATING → COMPLETED|FAILED`
-- ToolExecution 聚合根字段：`execution_id`、`tool_id`、`state`、`started_at`、`completed_at`、`plan`、`code`、`result`、`evidence_package`、`retry_count`
-- 状态机迁移矩阵：仅允许正向迁移（IDLE→PLANNING→EXECUTING→VALIDATING→COMPLETED|FAILED），反向迁移抛 `ToolExecutionStateTransitionError` (EXCEPTION_384)
-- 状态机迁移在 `__post_init__` + 显式 `transition_to(new_state)` 方法中校验
+- 新建 `ToolExecutionState` 枚举：**6 个状态**（`IDLE / PLANNING / EXECUTING / VALIDATING / COMPLETED / FAILED`）
+- **状态机实际结构**：6 状态、5 条主链边（IDLE→PLANNING→EXECUTING→VALIDATING→{COMPLETED|FAILED}），PLANNING/EXECUTING/VALIDATING 三阶段均可转 FAILED
+- ToolExecution 聚合根字段（11 项 + 乐观锁）：
+  - `execution_id: UUID`
+  - `tenant_id: UUID`
+  - `tool_id: UUID`（仅 ID 引用，不持有 Tool 对象，符合"聚合之间通过 ID-only 引用"原则）
+  - `tool_version: str`（执行启动时快照）
+  - `state: ToolExecutionState`
+  - `started_at: datetime`
+  - `completed_at: datetime | None`（终态时必填，非终态必为 None）
+  - `retry_count: int`（本次执行内尝试次数）
+  - `failure_reason: str | None`
+  - `plan`、`code`、`result`、`observation`、`validation`（5 阶段产物，可空）
+  - `evidence_package: EvidencePackage | None`
+  - `state_version: int`（乐观锁版本号）
+- **状态机迁移矩阵**（沿用 SagaStatus `dict[state, set[state]]` 模式，参考 `src/domain/ports/saga_status.py:26-33`）：
+  ```python
+  valid_transitions: dict[ToolExecutionState, set[ToolExecutionState]] = {
+      ToolExecutionState.IDLE: {ToolExecutionState.PLANNING},
+      ToolExecutionState.PLANNING: {ToolExecutionState.EXECUTING, ToolExecutionState.FAILED},
+      ToolExecutionState.EXECUTING: {ToolExecutionState.VALIDATING, ToolExecutionState.FAILED},
+      ToolExecutionState.VALIDATING: {ToolExecutionState.COMPLETED, ToolExecutionState.FAILED},
+      ToolExecutionState.COMPLETED: set(),  # 终态
+      ToolExecutionState.FAILED: set(),  # 终态
+  }
+  ```
+- **状态机迁移实现**：显式 `transition_to(new_state)` 方法 + `can_transition_to(new_state)` 校验（参考 SagaContext 模式 `src/infrastructure/saga/saga_context.py:23-56`）
+- **非法迁移异常**：复用 `EntityStateTransitionError` (EXCEPTION_243) 携带 `from_status` / `to_status` / `execution_id`，**不新增** `ToolExecutionStateTransitionError`（与 `Agent` / `Checkpoint` / `StrategicPlan` 项目惯例一致）
+- **重试语义**：重试创建**新 attempt**（新 ToolExecution 实例或新 attempt_number），**不允许终态反向**迁移
+- **`__post_init__` 职责**：仅做类型、跨字段不变量校验（终态必有 completed_at、retry_count ≥ 0）；**合法迁移**由 `transition_to()` 保证，**不要求**重新水合必须从 IDLE 开始
+- **乐观锁**：使用 `state_version` 实现条件更新（参考 `Document_repository.py:226-280` `save_with_version_check` 模式），防止并发覆盖
 
 **验证标准/Validation Criteria:**
-- [ ] Tool 实体 3 个新字段定义完整（rule_version, reliability_score, execution_count）
+- [ ] Tool 实体 3 个新字段定义完整（rule_version, reliability_score, execution_count）+ slug 字段
 - [ ] Tool 实体 23 个 TOOL_CATALOG 实例不破坏（向后兼容）
-- [ ] ToolExecution 聚合根新建，字段完整
+- [ ] ToolExecution 聚合根新建，12 字段完整（含 tenant_id、tool_version 快照、state_version 乐观锁）
 - [ ] ToolExecutionState 枚举 6 个值（IDLE/PLANNING/EXECUTING/VALIDATING/COMPLETED/FAILED）
-- [ ] 状态机迁移矩阵正确（仅正向）
-- [ ] 非法迁移抛 `ToolExecutionStateTransitionError` (EXCEPTION_384)
-- [ ] 使用已有领域异常 + 候选新增异常 4 项 Checklist 通过
+- [ ] 状态机迁移矩阵正确（5 条主链边 + PLANNING/EXECUTING/VALIDATING 可转 FAILED）
+- [ ] 非法迁移抛 `EntityStateTransitionError` (EXCEPTION_243) 复用（**不新增** tool 子域异常）
+- [ ] 重试创建新 attempt（不允许终态反向迁移）
+- [ ] 终态必有 completed_at、非终态 completed_at 为 None（不变量）
+- [ ] 使用已有领域异常 + 7 个候选新增异常 4 项 Checklist 通过（EXCEPTION_382/383/385/386/387/388/389）
 - [ ] domain 层零依赖验证通过（`poetry run lint-imports`）
+- [ ] ToolExecutionRepositoryPort 新建（`src/domain/ports/tool_execution_repository.py`），使用 Query Object 模式（CLAUDE.md §4）
+
+### AC-1.5: ToolExecutionRepository 端口（六边形仓储模式）
+
+**Given** ToolExecution 是独立聚合根，需要持久化状态、重试、证据、历史
+**When** 创建 ToolExecutionRepositoryPort（领域层仓储端口）
+**Then**
+
+- **路径**：`src/domain/ports/tool_execution_repository.py`（**领域层**，非应用层——仓储模式遵循 DDD 惯例）
+- **基类**：`L2RdbPort[ToolExecution]`（参考 `src/domain/ports/document_repository.py:17-39` L2RdbPort 模式）
+- **查询方法使用 Query Object 模式**（CLAUDE.md §4 端口查询参数决策规则）：
+  ```python
+  @dataclass(frozen=True)
+  class ToolExecutionQuery:
+      tenant_id: UUID | None = None
+      tool_id: UUID | None = None
+      state: ToolExecutionState | None = None
+      offset: int = 0
+      limit: int = 100
+
+  @runtime_checkable
+  class ToolExecutionRepositoryPort(L2RdbPort[ToolExecution], Protocol):
+      def save(self, execution: ToolExecution) -> None: ...
+      def get_by_id(self, execution_id: UUID) -> ToolExecution: ...
+      def list_by_query(self, query: ToolExecutionQuery) -> list[ToolExecution]: ...
+      def count(self, query: ToolExecutionQuery) -> int: ...
+  ```
+- **InMemory 实现**：`src/infrastructure/storage/inmemory/tool_execution_repository.py`（参考 `InMemoryToolRepository` `src/infrastructure/storage/inmemory/tool_repository.py:18-58`）
+- **乐观锁**：实现 `save_with_state_version()` 防并发覆盖（参考 `Document_repository.py:226-280` `save_with_version_check` 模式）
+- **PostgreSQL 注意事项**：`tool_executions` 表需独立 alembic migration；`tool_id` 外键需等待 Tool PostgreSQL 持久化（Story 4.1 仅 InMemoryToolRepository），本期**仅用应用层** `ToolRepositoryPort` 校验
+
+**验证标准/Validation Criteria:**
+- [ ] ToolExecutionRepositoryPort 定义在 `src/domain/ports/`（非应用层）
+- [ ] 查询方法使用 ToolExecutionQuery frozen dataclass（CLAUDE.md §4 决策规则）
+- [ ] InMemoryToolExecutionRepository 实现完整（dict[UUID, ToolExecution] + 乐观锁）
+- [ ] 端口契约测试 `tests/contracts/test_port_contract_tool_execution_repository.py` 11 维度覆盖
+- [ ] `composition_root.py` 注册 `tool_execution_repository` 端口（lifetime=SCOPED，与 tool_repository 对齐）
+- [ ] Alembic migration `tool_executions` 表创建（UUID 主键 + tenant_id + state + state_version 等字段）
+
+---
 
 ### AC-2: ToolExecutionService 应用层服务接口
 
@@ -297,9 +425,16 @@
   - `async load_sop(tool_name: str) -> SkillDocument`（L2）
   - `async load_references(tool_name: str, ref_name: str) -> bytes`（L3）
 - **Skill 加载失败异常路径**：复用 `ToolNotFoundError` (EXCEPTION_380) 携带 slug 上下文 / 新增 `SkillNotFoundError` (EXCEPTION_387)
-- **事件双通道配置**：ToolExecuted 事件**已存在**（`src/domain/events/tool_events.py:15-37`），当前仅 reliable 单通道（`configs/event_channels.yaml:84-87`）。本 Story 同步更新为**双通道**（realtime Redis pub/sub + reliable RabbitMQ）：
-  - 更新 `configs/event_channels.yaml:84-87` 添加 `redis_channel: sisys.events.realtime.tool_executed`
-  - 更新 `ChannelRouter.DEFAULT_MAPPINGS` (`src/infrastructure/messaging/channel_router.py:132-137`) 添加 realtime 通道
+- **事件双通道配置 + 事件归属修正**：ToolExecuted 事件**已存在**（`src/domain/events/tool_events.py:15-37`），当前 `aggregate_type="Tool"` 且 `aggregate_id` 未明确。本 Story 同步修正 + 双通道升级：
+  - **事件归属修正**（Round 2 D1 Agent C 关键发现）：ToolExecution 才是执行聚合根，事件归属必须修正：
+    - 增加 `execution_id: UUID` 字段（必填）
+    - `aggregate_id = execution_id`（不是 tool_id）
+    - `aggregate_type = "ToolExecution"`（不是 "Tool"）
+    - `tool_id` 继续作为关联 ID
+  - **双通道升级**（Round 1 发现）：当前仅 reliable 单通道（`configs/event_channels.yaml:84-87`），本 Story 升级为 realtime + reliable：
+    - 更新 `configs/event_channels.yaml:84-87` 添加 `redis_channel: sisys.events.realtime.tool_executed`
+    - 更新 `ChannelRouter.DEFAULT_MAPPINGS` (`src/infrastructure/messaging/channel_router.py:132-137`) 添加 realtime 通道
+  - **可靠性评分异步更新**：Tool 的 `reliability_score` 和 `execution_count` 由 `ToolExecuted` 事件异步更新（最终一致投影），不阻塞执行链路
 
 **验证标准/Validation Criteria:**
 - [ ] StrategicAnalysisUseCase 实现位于 `src/application/use_cases/`
@@ -822,6 +957,12 @@
    - Story 4.1 已实现的 `tool_id | tool_name` 双查询入口（`get_tool(tool_id=None, tool_name=None)`），本 Story AC-2 的 ToolExecutionService.get_tool_metadata 应直接委托，避免重写查询逻辑
    - Story 4.1 的事件发布（`ToolExecuted`）当前**单通道配置**与 CLAUDE.md §4 双通道约束冲突，本 Story AC-5 Task 5 应升级为双通道
 
+8. **Story 4.1 推迟到本 Story 同步推进的 P0 项**（必须在 4.1a 完成）：
+   - **P0-6（InMemoryToolRepository 并发安全）**：Story 4.1 R2-2 决定并发安全（asyncio.Lock）推迟到 4.1a。本 Story Task 7 必须为 `InMemoryToolRepository` 添加 `asyncio.Lock` 类变量保护，遵循 CLAUDE.md §6 Gotchas（asyncio.Lock 必须声明为类变量而非实例变量）
+   - **P0-7（Tool 实体 save() 二次守卫）**：Story 4.1 R2-1 已修复 `__post_init__` + `save()` 二次守卫 + 6 字段校验。本 Story AC-1 新增字段（rule_version/reliability_score/execution_count/slug）必须沿用同一双层守卫模式
+   - **Round 2 P0-A（架构测试循环依赖检测真实实现）**：Story 4.1 R2-2 docstring 虚假声明，本 Story Task 7 架构测试必须真实实现循环依赖检测（通过 `lint-imports` 命令调用）
+   - **Round 2 P0-B（Tool 实体 6 字段校验严重化）**：本 Story AC-1 新增字段必须立即加入 `Tool.validate()` 方法（不延后到 save()）
+
 ### 已有代码模式参考
 
 **Tool 实体:** `src/domain/entities/tool.py`
@@ -1081,4 +1222,62 @@ tests/
 17. ✅ AC-6 三级加载触发逻辑未定义 → L1 启动缓存 / L2 LRU / L3 无缓存
 18. ✅ 缺 Task 8 开发结束验收测试 → 新增 Task 8
 
-**下一步：** Round 2 - D1 二次调研遗漏点，启动新一轮审查。
+**下一步：** Round 3 - D1 三次调研遗漏点，启动新一轮审查。
+
+---
+
+## 🔍 代码审查发现 Review Findings（template.md §4.7 必选）
+
+> 当前 Story 处于 `ready-for-dev` 状态，未启动 `dev-story` 实现。代码审查发现将在 `dev-story` 完成后由 `code-review` skill 填充。
+
+| 审查日期 | 模式 | 发现项 | 严重度 | 状态 | 备注 |
+|----------|------|--------|--------|------|------|
+| 待 `dev-story` 后 | - | - | - | 待填充 | 由 `code-review` 自动检测 |
+
+---
+
+## 📌 Round 2 文档审查修复（基于 Agent A-D D1 调研）
+
+**修复项 1（Agent A）：template.md v2.9.0 强制小节补全**
+- ✅ 新增"API 契约"小节（ToolExecuted 事件契约 + 内部端口契约 + 契约测试文件清单）
+- ✅ 新增"Story Details"表格（ID/Key/File/Status/Epic/价值组/优先级/估算工作量/覆盖 FR/前置 Story/后续 Story）
+
+**修复项 2（Agent C）：AC-1 状态机深化（最大改动）**
+- ✅ 6 状态 5 主链边（PLANNING/EXECUTING/VALIDATING 可转 FAILED）
+- ✅ ToolExecution 12 字段（含 tenant_id、tool_version 快照、state_version）
+- ✅ 重试创建新 attempt（不允许终态反向）
+- ✅ `__post_init__` 仅做字段不变量校验，迁移由 transition_to() 保证
+- ✅ 乐观锁 state_version
+
+**修复项 3（Agent C + D）：异常契约修正**
+- ✅ 移除 EXCEPTION_384 (ToolExecutionStateTransitionError) 新增计划
+- ✅ 复用 `EntityStateTransitionError` (EXCEPTION_243)（与 Agent/Checkpoint/StrategicPlan 项目惯例一致）
+- ✅ 8 个新异常（EXCEPTION_382/383/385/386/387/388/389）parent class 重新设计
+- ✅ tool 子域从 8 码位占用降至 7 码位（剩 384 保留）
+
+**修复项 4（Agent C）：ToolExecutionRepositoryPort 新增**
+- ✅ 在 AC-1.5 新增 ToolExecutionRepository 端口章节
+- ✅ 路径 `src/domain/ports/tool_execution_repository.py`（领域层，非应用层）
+- ✅ 查询方法使用 ToolExecutionQuery frozen dataclass（CLAUDE.md §4 决策规则）
+- ✅ 乐观锁 save_with_state_version()
+- ✅ PostgreSQL 注意事项（Tool 无持久化 → 外键推迟）
+
+**修复项 5（Agent C）：事件归属修正**
+- ✅ ToolExecuted 事件新增 execution_id 字段
+- ✅ aggregate_id = execution_id
+- ✅ aggregate_type = "ToolExecution"
+- ✅ reliability_score / execution_count 异步更新（最终一致投影）
+
+**修复项 6（Agent A）：Story 4.1 推迟项处理**
+- ✅ Dev Notes 新增"Story 4.1 推迟到本 Story 同步推进的 P0 项"（4 项）
+- ✅ 明确 asyncio.Lock 类变量（CLAUDE.md §6）、save() 二次守卫、循环依赖检测真实实现、Tool.validate() 立即校验
+
+**未修复（Round 3+ 继续）：**
+- ⏳ 测试分类与归属 13 行表格（Agent A）
+- ⏳ 项目结构说明完整目录树（Agent A）
+- ⏳ sisys-uni-exception-design.md §3.3.2 补登记 tool 子域（Agent A）
+- ⏳ ToolExecutionRepositoryPort InMemory 实现 + PostgreSQL migration 详细设计（Agent C）
+- ⏳ 端口契约测试样板代码片段（Agent D）
+- ⏳ 骨架 Story 覆盖率豁免条款应用（Agent A）
+
+**下一步：** Round 3 - D1 三次调研遗漏点，启动新一轮审查。
