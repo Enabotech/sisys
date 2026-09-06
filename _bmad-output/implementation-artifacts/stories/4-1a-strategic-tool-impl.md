@@ -32,10 +32,10 @@
 7. Skills 静态资产骨架（TOOLS.md + 23 份 SKILL.md + skill_manifest.py）+ SkillsLoader Port
 
 **不在本 Story 范围（拆分到其他 Story）：**
-- **SkillSelector**（基于 L1 元数据推荐 Top-K）→ **Story 5.2**（epics_v1.0.md:1287）
-- **ToolExecutorAutoInvocation**（Auto-Invoke Pipeline 集成）→ **Story 4.7**（epics_v1.0.md:774）
-- **Skills 准确性 ≥85% / 误触发 ≤5% 验收** → **Story 5.9**（epics_v1.0.md:2358）
-- **Tool Execution Engine 的生产级沙箱集成**（Jupyter Kernel 持久化）→ **Story 4.8**（architecture.md §17.2.4）
+- **SkillSelector**（基于 L1 元数据推荐 Top-K）→ **Story 5.2**（epics_v1.0.md:1287，Agent 身份档案加载）
+- **工具执行反馈闭环增强**（Auto-Invoke Pipeline 集成）→ **Story 4.7**（epics_v1.0.md:1103，Validation Feedback 闭环增强）
+- **Skills 准确性 ≥85% / 误触发 ≤5% 验收** → 后续 Story 待定（**注**：epics_v1.0.md:1186 当前 Story 5.9 已定义为"CUSUM 漂移检测与触发重校准"，Skills 准确性验收不在 5.9 范围内；本 Story 4.1a 暂不声明归属，由后续 PM/Architect 评估）
+- **Tool Execution Engine 的生产级沙箱集成**（Jupyter Kernel 持久化）→ 已迁移到 **Story 5.11**（epics_v1.0.md:1149, 1188，原 Story 4.8 已废弃；architecture.md §17.2.4 设计保留）
 
 **架构文档依据：** `docs/architecture/architecture.md:2286-2296` 明确"Skills 系统实现路径详见 Epic 5 蓝图（Story 5-2 ~ 5-9）"——本 Story 仅完成 Skills 系统骨架，避免与 Story 5.2 SkillSelector 职责冲突。
 
@@ -240,7 +240,7 @@
 | Epic | Epic 4: 战略工具箱 |
 | 价值组 | 战略决策智能（Executive Decision Intelligence） |
 | 优先级 | P0（Epic 4 战略工具箱核心 Story） |
-| 估算工作量 | 7-10 人天（含 8 个新异常 4 项 Checklist + Skills 系统骨架） |
+| 估算工作量 | **20-30 人天**（Round 4 终审修正，含 7 个新异常 4 项 Checklist + ToolExecution 12 字段聚合根 + 五阶段引擎 + RetryPolicy + Skills 23 份 SOP 骨架 + 4 端口注册 + Alembic migration 011 + 19 行测试类型 + 4 端口契约测试 + 架构测试；Skills 内容生成为最大瓶颈） |
 | 覆盖 FR | FR-AR-01（领域零依赖）/ FR-AR-04（仓储模式）/ FR-IF-02（Skills 三级加载骨架） |
 | 前置 Story | 4-1-strategic-tool-registration-tools（已 done, v1.6.0） |
 | 后续 Story | 4-2-toolchain-orchestration-dag / 4-3-tool-io-schema-validation / 4-7-tool-execution-auto-invocation / 5-2-skill-selector |
@@ -259,6 +259,7 @@
 - Tool 实体新增 `rule_version: str`（业务规则版本，如 "BLM-v3.2"）
 - Tool 实体新增 `reliability_score: float`（取值 [0.0, 1.0]，基于历史执行成功率）
 - Tool 实体新增 `execution_count: int`（单调递增计数，初始 0）
+- Tool 实体新增 **`slug: str`**（kebab-case 命名，如 `pestel-analysis`，与 Skills 系统双向映射，**与 AC-6 联动**——`slug` 字段在 AC-1 引入，AC-6 使用）
 - 新增字段均有不变量校验（`__post_init__` → `validate()`）
 - 不变量校验失败抛 `EntityValidationError`（EXCEPTION_242）
 - **保持现有 `ToolStatus` 3 值不变**（ACTIVE/DEPRECATED/MAINTENANCE 表示工具生命周期）
@@ -292,14 +293,14 @@
       ToolExecutionState.FAILED: set(),  # 终态
   }
   ```
-- **状态机迁移实现**：显式 `transition_to(new_state)` 方法 + `can_transition_to(new_state)` 校验（参考 SagaContext 模式 `src/infrastructure/saga/saga_context.py:23-56`）
+- **状态机迁移实现**：显式 `transition_to(new_state)` 方法 + `can_transition_to(new_state)` 校验（参考 SagaStatus 模式 `src/domain/ports/saga_status.py:28-32` `valid_transitions` dict + SagaContext 实现 `src/infrastructure/saga/saga_context.py:23-122`）
 - **非法迁移异常**：复用 `EntityStateTransitionError` (EXCEPTION_243) 携带 `from_status` / `to_status` / `execution_id`，**不新增** `ToolExecutionStateTransitionError`（与 `Agent` / `Checkpoint` / `StrategicPlan` 项目惯例一致）
 - **重试语义**：重试创建**新 attempt**（新 ToolExecution 实例或新 attempt_number），**不允许终态反向**迁移
 - **`__post_init__` 职责**：仅做类型、跨字段不变量校验（终态必有 completed_at、retry_count ≥ 0）；**合法迁移**由 `transition_to()` 保证，**不要求**重新水合必须从 IDLE 开始
 - **乐观锁**：使用 `state_version` 实现条件更新（参考 `Document_repository.py:226-280` `save_with_version_check` 模式），防止并发覆盖
 
 **验证标准/Validation Criteria:**
-- [ ] Tool 实体 3 个新字段定义完整（rule_version, reliability_score, execution_count）+ slug 字段
+- [ ] Tool 实体 **4 个**新字段定义完整（rule_version, reliability_score, execution_count, slug）
 - [ ] Tool 实体 23 个 TOOL_CATALOG 实例不破坏（向后兼容）
 - [ ] ToolExecution 聚合根新建，12 字段完整（含 tenant_id、tool_version 快照、state_version 乐观锁）
 - [ ] ToolExecutionState 枚举 6 个值（IDLE/PLANNING/EXECUTING/VALIDATING/COMPLETED/FAILED）
@@ -318,7 +319,7 @@
 **Then**
 
 - **路径**：`src/domain/ports/tool_execution_repository.py`（**领域层**，非应用层——仓储模式遵循 DDD 惯例）
-- **基类**：`L2RdbPort[ToolExecution]`（参考 `src/domain/ports/document_repository.py:17-39` L2RdbPort 模式）
+- **基类**：直接定义 `ToolExecutionRepositoryPort(Protocol)`（**不引入不存在的基类**——`document_repository.py` 实际仅 `DocumentRepositoryPort`，无 `L2RdbPort` 通用基类；本 Story 自定义仓储端口模式参考 `DocumentRepositoryPort`（`src/domain/ports/document_repository.py:17-145`）
 - **查询方法使用 Query Object 模式**（CLAUDE.md §4 端口查询参数决策规则）：
   ```python
   @dataclass(frozen=True)
@@ -336,8 +337,8 @@
       def list_by_query(self, query: ToolExecutionQuery) -> list[ToolExecution]: ...
       def count(self, query: ToolExecutionQuery) -> int: ...
   ```
-- **InMemory 实现**：`src/infrastructure/storage/inmemory/tool_execution_repository.py`（参考 `InMemoryToolRepository` `src/infrastructure/storage/inmemory/tool_repository.py:18-58`）
-- **乐观锁**：实现 `save_with_state_version()` 防并发覆盖（参考 `Document_repository.py:226-280` `save_with_version_check` 模式）
+- **InMemory 实现**：`src/infrastructure/storage/inmemory/tool_execution_repository.py`（参考 `InMemoryToolRepository` `src/infrastructure/storage/inmemory/tool_repository.py:18-122`）
+- **乐观锁**：实现 `save_with_state_version()` 防并发覆盖（参考 `Document_repository.py:127-145` `save_with_version_check` 模式）
 - **PostgreSQL 注意事项**：`tool_executions` 表需独立 alembic migration；`tool_id` 外键需等待 Tool PostgreSQL 持久化（Story 4.1 仅 InMemoryToolRepository），本期**仅用应用层** `ToolRepositoryPort` 校验
 
 **验证标准/Validation Criteria:**
@@ -547,8 +548,9 @@ def downgrade() -> None:
   - `failed`：执行失败（沙箱/LLM/校验失败，已重试 3 次）
   - `invalid`：输入参数不符合 Tool.input_schema（DDL 校验失败，**不进入**重试）
   - `insufficient_data`：输入数据不充分（如 LLM 反馈缺关键信息，可重试）
-- **EvidencePackage 字段**（8 字段统一）：`input_hash`、`rule_version`、`plan`、`code`、`result`、`observation`、`validation`、`confidence`、`citations`
+- **EvidencePackage 字段**（**9 字段**统一）：`input_hash`、`rule_version`、`plan`、`code`、`result`、`observation`、`validation`、`confidence`、`citations`
   - 与 AC-1 字段对齐（plan/code/observation/validation 来自 ToolExecutionEngine 五阶段）
+  - **完整字段定义**：`{input_hash, rule_version, plan, code, result, observation, validation, confidence, citations}` 共 9 项（Round 4 终审统一）
 
 **验证标准/Validation Criteria:**
 - [ ] ToolCall / ExecutionContext / ToolResult 三个值对象定义完整（frozen dataclass）
@@ -721,12 +723,13 @@ def downgrade() -> None:
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
 | AC-1 | Tool 字段增强 + ToolExecution 聚合根与状态机 | Task 1 | Tool 字段 + ToolExecution 实体 + ToolExecutionState 状态机 | `tests/unit/domain/entities/test_tool_41a.py` |
+| AC-1.5 | ToolExecutionRepository 端口（六边形仓储模式）| Task 7（**与 AC-7 合并**）| 仓储端口 + InMemory 实现 + PostgreSQL migration 011 + 4 端口注册 | `tests/contracts/test_port_contract_tool_execution_repository.py` |
 | AC-2 | ToolExecutionService 应用层服务接口 | Task 2 | ToolExecutionService + Port 抽象 | `tests/contracts/test_port_contract_tool_execution_service.py` |
 | AC-3 | ToolCall / ToolResult / ExecutionContext 值对象 | Task 3 | 值对象创建 + 4 项 Checklist | `tests/unit/domain/value_objects/test_tool_execution_values.py` |
 | AC-4 | ToolExecutionEngine 标准工作流 | Task 4 | 五阶段工作流 + RetryPolicy + 证据包 | `tests/unit/application/services/test_tool_execution_engine.py` |
 | AC-5 | StrategicAnalysisUseCase 用例编排 | Task 5 | 用例编排 + SkillLoaderPort + 事件双通道 | `tests/unit/application/use_cases/test_strategic_analysis_usecase.py` |
 | AC-6 | Skills 三级渐进式加载（仅骨架） | Task 6 | TOOLS.md + SKILL.md ×23 + skill_manifest.py + Loader | `tests/unit/application/skills/test_skills_loader.py` |
-| AC-7 | 端口注册与架构约束 | Task 7 | 端口注册 + PortSpec 元数据 + lint-imports | `tests/unit/architecture/test_arch_strategic_tool_impl.py` |
+| AC-7 | 端口注册与架构约束 | Task 7 | **4 端口注册**（tool_execution_repository / service / engine / skill_loader） + PortSpec 元数据 + lint-imports | `tests/unit/architecture/test_arch_strategic_tool_impl.py` |
 | **AC-1~AC-7 收尾** | **开发结束验收测试** | **Task 8** | **src + tests 完成清单断言 + 收尾校验** | `tests/acceptance/test_acceptance_strategic_tool_impl.py` |
 
 ---
