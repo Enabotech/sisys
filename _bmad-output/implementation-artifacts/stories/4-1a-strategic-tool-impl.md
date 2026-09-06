@@ -16,7 +16,7 @@
 
 ### 业务价值
 
-**业务价值：** Story 4.1 仅注册工具元数据，本 Story 补齐 ToolExecution 聚合根、ToolExecutionService（应用层）、ToolExecutionEngine、StrategicAnalysisUseCase 和 Skills 静态资源骨架（TOOLS.md + SKILL.md ×23 + skill_manifest）。
+**业务价值：** Story 4.1 仅注册工具元数据，本 Story 补齐 ToolExecution 聚合根（含 6 状态执行态机）、ToolExecutionService（应用层）、ToolExecutionEngine、StrategicAnalysisUseCase 和 Skills 静态资源骨架（TOOLS.md + SKILL.md ×23 + skill_manifest）。
 
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 4: 战略工具箱
 
@@ -63,7 +63,7 @@
 
 1. **定义文件**：在 `src/domain/exceptions/tool_exceptions.py`（或其他子域文件）创建异常类
 2. **`_code_ranges.py` 子域映射**：在 `_CLASS_TO_SUBDOMAIN` 注册 class → 子域对应
-4. **`__init__.py` 暴露**：在 `src/domain/exceptions/__init__.py` 导入并加入 `__all__`
+3. **`__init__.py` 暴露**：在 `src/domain/exceptions/__init__.py` 导入并加入 `__all__`
 4. **子域码段校验**：异常 `code` 在子域分配范围内（如 tool 子域 380-389）
 
 ### 抑制告警禁止
@@ -98,13 +98,13 @@
 |----------|----------|--------------|-----------|------|------------|---------------|
 | `ToolExecutionFailedError` | ToolExecutionEngine 五阶段任一阶段失败（不可重试） | `BusinessException` | EXCEPTION_382 | tool (380-389) | 500 | Task 0 |
 | `ToolExecutionRetryExhaustedError` | 重试 3 次后仍失败 | `BusinessException` | EXCEPTION_383 | tool (380-389) | 502 | Task 0 |
-| `ToolExecutionTimeoutError` | Tool 执行超过 `RetryPolicy.max_total_duration_sec` | `TimeoutError` (EXCEPTION_304) | EXCEPTION_385 | tool (380-389) | 504（继承父类） | Task 0 |
-| `EvidenceValidationFailedError` | EvidencePackage 完整性校验失败（缺 plan/code/confidence 等必填字段） | `MetadataValidationError` (EXCEPTION_217) | EXCEPTION_386 | tool (380-389) | 422（继承父类） | Task 0 |
+| `ToolExecutionTimeoutError` | Tool 执行超过 `RetryPolicy.max_total_duration_sec` | `TimeoutError` (EXCEPTION_302) | EXCEPTION_385 | tool (380-389) | 504（继承父类） | Task 0 |
+| `EvidenceValidationFailedError` | EvidencePackage 完整性校验失败（缺 plan/code/confidence 等必填字段） | `ValidationError` (EXCEPTION_201, business 子域) | EXCEPTION_386 | tool (380-389) | 400（继承父类，自定义 evidence 字段） | Task 0 |
 | `SkillNotFoundError` | 通过 tool_name 查不到对应 SKILL.md（skill_manifest.py 缺失映射） | `NotFoundError` (EXCEPTION_202) | EXCEPTION_387 | tool (380-389) | 404（继承父类） | Task 0 |
-| `SkillLoadError` | SKILL.md 文件读取/解析失败（IO 错误、YAML frontmatter 格式错误） | `ConfigurationError` (EXCEPTION_103) | EXCEPTION_388 | tool (380-389) | 500（继承父类） | Task 0 |
+| `SkillLoadError` | SKILL.md 文件读取/解析失败（IO 错误、YAML frontmatter 格式错误） | `ConfigurationError` (EXCEPTION_101) | EXCEPTION_388 | tool (380-389) | 500（继承父类） | Task 0 |
 | `ToolResultValidationError` | ToolResult.status=invalid 需附加上下文（与 `EntityBusinessRuleError` 区分） | `ValidationError` (EXCEPTION_201) | EXCEPTION_389 | tool (380-389) | 400（继承父类） | Task 0 |
 
-**tool 子域（380-389）剩余码位**：EXCEPTION_382/383/385/386/387/388/389 共 7 个新增（EXCEPTION_384 已复用现有异常，不占码位），剩余 1 个码位（384）保留。
+**tool 子域（380-389）剩余码位**：EXCEPTION_382/383/385/386/387/388/389 共 7 个新增（EXCEPTION_384 保留未占用，ToolExecutionState 迁移守卫复用 EXCEPTION_243 EntityStateTransitionError），剩余 1 个码位（384）保留。
 
 **复用现有异常（非新增）：**
 - `ToolNotFoundError` (EXCEPTION_380) 复用：Skill slug 查不到对应 Tool 元数据
@@ -114,8 +114,8 @@
 - `EntityBusinessRuleError` (EXCEPTION_244) 复用：业务规则违反（如 Tool ACTIVE 状态下才允许执行）
 - `LLMAPIError` (EXCEPTION_330) 复用：Think/Code 阶段 LLM 调用失败（可重试异常）
 - `LLMResponseError` (EXCEPTION_331) 复用：LLM 响应格式错误（可重试异常）
-- `SandboxExecutionError` (EXCEPTION_311) 复用：Execute 阶段沙箱执行失败（可重试异常）
-- `TimeoutError` (EXCEPTION_304) 复用：阶段级超时（ToolExecutionTimeoutError 仅在聚合级超时使用）
+- `ExecutionError` (EXCEPTION_313) 复用：Execute 阶段沙箱执行失败（可重试异常）
+- `TimeoutError` (EXCEPTION_302) 复用：阶段级超时（ToolExecutionTimeoutError 仅在聚合级超时使用）
 
 **⚠️ 重要决策（Round 2 D1 Agent C 调研结论）：** ToolExecutionState 迁移守卫**不新增** `ToolExecutionStateTransitionError`，**复用项目统一** `EntityStateTransitionError` (EXCEPTION_243)。理由：
 1. 项目内 `Agent` / `Checkpoint` / `StrategicPlan` 全部复用 `EntityStateTransitionError`，是项目惯例
@@ -142,7 +142,7 @@
    - R5 范围有效性：tool (380-389) 与 external (301-399) 部分重叠 → **需确认不重叠**（实际 380-389 ⊂ 301-399 子集，需在 §3.3.2 标注"tool 物理范围在 external 内但语义独立"）
 
 3. **更新 `_code_ranges.py` 注释**（`src/domain/exceptions/_code_ranges.py` line 64）
-   - 在 `tool: (380, 389)` 行后追加 `# Story 4.1a: 新增 7 个异常 EXCEPTION_382/383/385/386/387/388/389`，EXCEPTION_384 复用 EntityStateTransitionError 不占码位`
+   - 在 `tool: (380, 389)` 行后追加 `# Story 4.1a: 新增 7 个异常 EXCEPTION_382/383/385/386/387/388/389，EXCEPTION_384 保留未占用，ToolExecutionState 迁移守卫复用 EXCEPTION_243 (EntityStateTransitionError)`
 
 **4 项 Checklist 自查（CLAUDE.md §5）：**
 - [ ] Task 0 完成时 `grep -rn "EXCEPTION_382\|EXCEPTION_383\|EXCEPTION_385\|EXCEPTION_386\|EXCEPTION_387\|EXCEPTION_388\|EXCEPTION_389" src/domain/exceptions/` 全部有定义
@@ -363,7 +363,7 @@ from typing import Dict, List
 
 from src.domain.entities.tool_execution import ToolExecution, ToolExecutionState
 from src.domain.exceptions.tool_exceptions import (
-    ToolExecutionNotFoundError, ToolExecutionAlreadyExistsError,
+    ToolNotFoundError, ToolAlreadyExistsError,
 )
 from src.domain.exceptions import EntityStateTransitionError
 
@@ -381,16 +381,18 @@ class InMemoryToolExecutionRepository:
         with self._lock:
             execution.validate()  # 二次守卫（防外部脏数据）
             if execution.execution_id in self._executions:
-                raise ToolExecutionAlreadyExistsError(
-                    execution_id=str(execution.execution_id),
+                raise ToolAlreadyExistsError(
                     tool_id=str(execution.tool_id),
+                    context_extra={"execution_id": str(execution.execution_id)},
                 )
             self._executions[execution.execution_id] = execution
 
     def get_by_id(self, execution_id: uuid.UUID) -> ToolExecution:
         execution = self._executions.get(execution_id)
         if execution is None:
-            raise ToolExecutionNotFoundError(execution_id=str(execution_id))
+            raise ToolNotFoundError(
+                context_extra={"execution_id": str(execution_id), "lookup_type": "execution"}
+            )
         return execution
 
     def list_by_query(self, query: "ToolExecutionQuery") -> List[ToolExecution]:
@@ -409,7 +411,9 @@ class InMemoryToolExecutionRepository:
         with self._lock:
             current = self._executions.get(execution.execution_id)
             if current is None:
-                raise ToolExecutionNotFoundError(execution_id=str(execution.execution_id))
+                raise ToolNotFoundError(
+                    context_extra={"execution_id": str(execution.execution_id), "lookup_type": "execution"}
+                )
             if current.state_version != expected_state_version:
                 raise EntityStateTransitionError(
                     entity_type="ToolExecution",
@@ -670,10 +674,11 @@ def downgrade() -> None:
 ### AC-7: 端口注册与架构约束
 
 **Given** 所有组件需要注册到 composition_root
-**When** 注册 tool_execution_service、tool_execution_engine、skill_loader 端口
+**When** 注册 4 个新端口（tool_execution_repository / tool_execution_service / tool_execution_engine / skill_loader）
 **Then**
 
-- **`composition_root.py` 注册清单**：
+- **`composition_root.py` 注册清单**（**4 个新端口**，含 AC-1.5 的仓储端口）：
+  - `tool_execution_repository`：name=`tool_execution_repository`, version=`v1.0.0`, interface=`ToolExecutionRepositoryPort`, impl=`InMemoryToolExecutionRepository`, lifetime=`SCOPED`, owner=`tool-team`, tags=`("tool", "execution", "repository")`
   - `tool_execution_service`：name=`tool_execution_service`, version=`v1.0.0`, interface=`ToolExecutionServicePort`, impl=`ToolExecutionService`, lifetime=`SCOPED`, owner=`tool-team`, tags=`("tool", "execution", "service")`
   - `tool_execution_engine`：name=`tool_execution_engine`, version=`v1.0.0`, interface=`ToolExecutionEnginePort`, impl=`ToolExecutionEngine`, lifetime=`SCOPED`, owner=`tool-team`, tags=`("tool", "execution", "engine")`
   - `skill_loader`：name=`skill_loader`, version=`v1.0.0`, interface=`SkillLoaderPort`, impl=`InMemorySkillLoader`, lifetime=`SCOPED`, owner=`tool-team`, tags=`("skills", "loader", "inmemory")`
@@ -682,9 +687,9 @@ def downgrade() -> None:
 - **依赖方向矩阵合规**：domain 零依赖 → application → infrastructure → interfaces
 
 **验证标准/Validation Criteria:**
-- [ ] 三个新端口注册完整（tool_execution_service / tool_execution_engine / skill_loader）
+- [ ] **4 个**新端口注册完整（**tool_execution_repository / tool_execution_service / tool_execution_engine / skill_loader**）
 - [ ] PortSpec 元数据完整（name/version/interface/impl/lifetime/owner/tags 七字段）
-- [ ] lifetime 决策合理（三个端口均为 SCOPED，与 ToolRegistryService 对齐）
+- [ ] lifetime 决策合理（4 个端口均为 SCOPED，与 ToolRegistryService 对齐）
 - [ ] 端口命名空间与现有 tool_repository / tool_registry_service 无冲突
 - [ ] 依赖注入正确（impl 字符串延迟加载）
 - [ ] 架构约束验证通过（`poetry run lint-imports`）
@@ -739,7 +744,7 @@ def downgrade() -> None:
 > **目的：** 在进入代码实现前，明确 Schema、接口契约、验收标准、异常契约。这是 SDD 规范驱动的基础。
 
 - [ ] Subtask: 定义 Tool 聚合根新字段 Schema（rule_version, reliability_score, execution_count）
-- [ ] Subtask: 定义 ToolExecution 聚合根 + ToolExecutionState 5 状态机 Schema
+- [ ] Subtask: 定义 ToolExecution 聚合根 + ToolExecutionState 6 状态机 Schema（IDLE/PLANNING/EXECUTING/VALIDATING/COMPLETED/FAILED，5 条主链边）
 - [ ] Subtask: 定义 ToolExecutionServicePort Protocol 接口
 - [ ] Subtask: 定义 ToolCall / ExecutionContext / ToolResult / ToolResultStatus / EvidencePackage 值对象
 - [ ] Subtask: 定义 ToolExecutionEngine 五阶段工作流 + RetryPolicy
@@ -781,7 +786,7 @@ def downgrade() -> None:
 
 | 阶段 | 动作 | 完成标志 |
 |------|------|----------|
-| 🔴 红 | 编写 `test_tool_41a.py`（验证 ToolExecution 聚合根 + 5 状态机转换：IDLE→PLANNING→EXECUTING→VALIDATING→COMPLETED/FAILED） | `pytest` 失败 |
+| 🔴 红 | 编写 `test_tool_41a.py`（验证 ToolExecution 聚合根 + 6 状态机转换：IDLE→PLANNING→EXECUTING→VALIDATING→COMPLETED/FAILED，5 条主链边） | `pytest` 失败 |
 | 🟢 绿 | 在 `src/domain/entities/tool_execution.py` 实现 ToolExecution + ToolExecutionState | `pytest` 通过 |
 | 🔄 重构 | 添加状态迁移矩阵、不变量验证、`transition_to()` 方法 | `ruff check + mypy + pytest` 全部通过 |
 
@@ -793,7 +798,7 @@ def downgrade() -> None:
 - [ ] Tool 实体 3 个新字段完整（不破坏 23 个 TOOL_CATALOG 实例）
 - [ ] ToolExecution 聚合根 + ToolExecutionState 6 值（IDLE/PLANNING/EXECUTING/VALIDATING/COMPLETED/FAILED）
 - [ ] 状态机迁移矩阵正确（仅正向）
-- [ ] 非法迁移抛 `ToolExecutionStateTransitionError` (EXCEPTION_384)
+- [ ] 非法迁移抛 `EntityStateTransitionError` (EXCEPTION_243)（复用业务异常，不占 tool 子域码位）
 - [ ] domain 层零依赖验证通过
 - [ ] 所有测试通过
 - [ ] 覆盖率 ≥90%（domain 层）
@@ -919,7 +924,7 @@ def downgrade() -> None:
 |------|------|----------|
 | 🔴 红 | 编写 `test_strategic_analysis_usecase.py`（验证完整流程：tool_name 查询→Skill 加载→ToolExecutionService.execute→ToolExecuted 事件） | `pytest` 失败 |
 | 🟢 绿 | 在 `src/application/use_cases/strategic_analysis.py` 实现用例 | `pytest` 通过 |
-| 🔄 重func | 添加错误处理、日志、事件发布 | `ruff check + mypy + pytest` 全部通过 |
+| 🔄 重构 | 添加错误处理、日志、事件发布 | `ruff check + mypy + pytest` 全部通过 |
 
 - [ ] Subtask: 🔴 红 — 编写用例失败测试
 - [ ] Subtask: 🟢 绿 — 实现用例
@@ -1274,7 +1279,7 @@ def downgrade() -> None:
 | # | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---|---------|------|----------|----------|-----------|
 | 1 | **TDD 单元测试** | Tool 实体增强 | 4 新字段（rule_version/reliability_score/execution_count/slug）+ 23 个 TOOL_CATALOG 不破坏 | `tests/unit/domain/entities/test_tool_41a.py` | Task 1 |
-| 2 | **TDD 单元测试** | ToolExecution 聚合根 + 5 状态机 | 12 字段完整、6 状态迁移、终态必有 completed_at、乐观锁 | `tests/unit/domain/entities/test_tool_execution.py` | Task 1 |
+| 2 | **TDD 单元测试** | ToolExecution 聚合根 + 6 状态机 | 12 字段完整、6 状态迁移、终态必有 completed_at、乐观锁 | `tests/unit/domain/entities/test_tool_execution.py` | Task 1 |
 | 3 | **TDD 单元测试** | ToolCall / ToolResult / ExecutionContext 值对象 | frozen dataclass 不变性、4 值边界、EvidencePackage 8 字段 | `tests/unit/domain/value_objects/test_tool_execution_values.py` | Task 3 |
 | 4 | **TDD 单元测试** | ToolExecutionEngine 五阶段工作流 | 五阶段端口映射、RetryPolicy 重试、Session 生命周期 | `tests/unit/application/services/test_tool_execution_engine.py` | Task 4 |
 | 5 | **TDD 单元测试** | StrategicAnalysisUseCase | tool_name 查询→Skill 加载→execute→事件发布 | `tests/unit/application/use_cases/test_strategic_analysis_usecase.py` | Task 5 |
@@ -1474,79 +1479,6 @@ tests/
 [ ] 覆盖率门禁达标
 [ ] 代码质量门禁通过
 [ ] 端口注册完整
-```
-
-### 文件清单（To Be Created 标准模板）
-
-待 `dev-story` 完成后填充：
-
-```
-src/
-├── domain/
-│   ├── entities/
-│   │   ├── tool.py (增强 3 字段 + slug)
-│   │   └── tool_execution.py (新建)
-│   ├── exceptions/
-│   │   └── tool_exceptions.py (新增 8 异常)
-│   ├── ports/
-│   │   └── (无新增)
-│   ├── services/
-│   │   └── (无新增，应用层服务)
-│   └── value_objects/
-│       └── tool_execution.py (新建)
-├── application/
-│   ├── ports/
-│   │   ├── tool_execution_service.py (新建)
-│   │   └── skill_loader.py (新建)
-│   ├── services/
-│   │   ├── tool_registry_service.py (复用)
-│   │   ├── tool_execution_service.py (新建)
-│   │   └── tool_execution_engine.py (新建)
-│   ├── use_cases/
-│   │   └── strategic_analysis.py (新建)
-│   └── skills/
-│       ├── __init__.py (新建)
-│       ├── TOOLS.md (新建)
-│       ├── loader.py (新建)
-│       ├── manifest.py (新建)
-│       ├── validators/
-│       │   ├── token_count_validator.py (新建)
-│       │   └── frontmatter_validator.py (新建)
-│       └── <slug>/
-│           ├── SKILL.md × 23 (新建)
-│           ├── scripts/ (新建占位)
-│           └── references/ (新建占位)
-├── infrastructure/
-│   └── messaging/
-│       └── channel_router.py (升级 ToolExecuted 双通道)
-└── composition_root.py (注册 3 个新端口)
-
-configs/
-└── event_channels.yaml (升级 ToolExecuted 双通道)
-
-tests/
-├── unit/
-│   ├── domain/
-│   │   ├── entities/
-│   │   │   └── test_tool_41a.py (新建)
-│   │   └── value_objects/
-│   │       └── test_tool_execution_values.py (新建)
-│   ├── application/
-│   │   ├── services/
-│   │   │   └── test_tool_execution_engine.py (新建)
-│   │   ├── use_cases/
-│   │   │   └── test_strategic_analysis_usecase.py (新建)
-│   │   └── skills/
-│   │       └── test_skills_loader.py (新建)
-│   └── architecture/
-│       └── test_arch_strategic_tool_impl.py (新建)
-├── contracts/
-│   └── test_port_contract_tool_execution_service.py (新建)
-├── integration/
-│   └── test_integration_strategic_tool_impl.py (新建)
-└── acceptance/
-    ├── test_acceptance_strategic_tool_impl.feature (新建)
-    └── test_acceptance_strategic_tool_impl.py (新建)
 ```
 
 ---
