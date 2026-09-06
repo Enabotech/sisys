@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-08-27
+last_updated: 2026-09-06
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -137,7 +137,7 @@ development_status:
   # ===========================================================================
   epic-4: in-progress
   4-1-strategic-tool-registration-tools: done
-  4-1a-strategic-tool-impl: backlog
+  4-1a-strategic-tool-impl: ready-for-dev
   4-2-toolchain-orchestration-dag: backlog
   4-3-tool-io-schema-validation: backlog
   4-4-docker-sandbox-execution: backlog
@@ -411,8 +411,8 @@ development_status:
 # Status Summary:
 #   Stories:
 #     - Done: 66  (Epic 0:12 + Epic 1:23 + Epic 2:9 + Epic 3:14 + Epic 90:8)
-#     - Ready for Dev: 5 (0-17, 0-18, 0-30, 4-1)
-#     - In Progress: 0
+#     - Ready for Dev: 6 (0-17, 0-18, 0-30, 4-1, 4-1a)
+#     - In Progress: 1 (Epic 4 — Story 4.1a ready-for-dev)
 #     - Review: 0
 #     - Backlog: 125
 #   Epics:
@@ -425,6 +425,6 @@ development_status:
 #
 # Next Steps:
 #   1. Option A: Complete Epic 0 Iteration 1 remaining stories (0-17 / 0-18 / 0-30)
-#   2. Option B: Start Epic 4 — create story file for 4-1-strategic-tool-registration-tools
+#   2. Option B: Start Epic 4 — Story 4-1a-strategic-tool-impl is ready-for-dev
 #   3. Option C: Start Epic 21 (决策舱 P0) — 可与 Epic 4-6 并行，依赖 Story 1.7 + Story 3.8 均已完成
 # =============================================================================
