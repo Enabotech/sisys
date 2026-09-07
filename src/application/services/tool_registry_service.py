@@ -104,3 +104,41 @@ class ToolRegistryService:
             工具总数（委托仓储 O(1) 接口）
         """
         return self._repository.count()
+
+    def update_tool_statistics(
+        self,
+        tool_id: uuid.UUID,
+        success: bool = True,
+    ) -> Tool:
+        """更新工具可靠性评分和执行计数（Beta 分布衰减加权）
+
+        Story 4.1a AC-5: ToolExecuted 事件订阅者异步更新 Tool statistics。
+
+        算法（业界最佳实践 Beta 分布衰减加权）：
+        - reliability_score = old * 0.9 + (1.0 if success else 0.0) * 0.1
+        - execution_count += 1
+        - 钳位到 [0.0, 1.0] 范围
+
+        实现说明：直接 in-place mutation，不调用 _repository.save()。
+        原因：InMemoryToolRepository.save() 拒绝更新已存在 ID；
+        InMemory 模式下 mutation 即持久化。
+        PostgreSQL 真实实现需要单独的 update_statistics 方法（后续 Story 补充）。
+
+        Args:
+            tool_id: 工具唯一标识
+            success: 本次执行是否成功
+
+        Returns:
+            更新后的 Tool 实体
+
+        Raises:
+            ToolNotFoundError: 工具不存在
+        """
+        tool = self.get_tool(tool_id=tool_id)
+        old_score = tool.reliability_score
+        outcome = 1.0 if success else 0.0
+        new_score = old_score * 0.9 + outcome * 0.1
+        # In-place mutation（Tool 是非 frozen dataclass）
+        tool.reliability_score = max(0.0, min(1.0, new_score))
+        tool.execution_count = tool.execution_count + 1
+        return tool
