@@ -21,7 +21,11 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from src.domain.entities.tool import Tool
-from src.domain.entities.tool_execution import ToolExecution, ToolExecutionState
+from src.domain.entities.tool_execution import (
+    TERMINAL_STATES,
+    ToolExecution,
+    ToolExecutionState,
+)
 from src.domain.exceptions import (
     ExecutionError,
     LLMAPIError,
@@ -33,6 +37,7 @@ from src.domain.exceptions import (
 )
 from src.domain.ports.llm_client import LLMClientPort
 from src.domain.ports.sandbox_executor import SandboxExecutor
+from src.domain.ports.tool_execution_repository import ToolExecutionRepositoryPort
 from src.domain.value_objects.tool_execution import (
     EvidencePackage,
     ExecutionContext,
@@ -91,6 +96,7 @@ class ToolExecutionEngine:
         llm_client: LLMClientPort,
         sandbox: SandboxExecutor,
         retry_policy: RetryPolicy | None = None,
+        tool_execution_repository: ToolExecutionRepositoryPort | None = None,
     ) -> None:
         """初始化引擎
 
@@ -98,10 +104,12 @@ class ToolExecutionEngine:
             llm_client: LLM 客户端端口
             sandbox: 沙箱执行器端口
             retry_policy: 重试策略（默认使用 RetryPolicy 默认值）
+            tool_execution_repository: ToolExecution 仓储端口（可选，注入后自动持久化）
         """
         self._llm = llm_client
         self._sandbox = sandbox
         self._retry = retry_policy or RetryPolicy()
+        self._tool_execution_repository = tool_execution_repository
 
     async def execute(
         self,
@@ -191,7 +199,7 @@ class ToolExecutionEngine:
             # 构造 EvidencePackage
             evidence = self._build_evidence(execution, tool, tool_call)
 
-            return ToolResult(
+            tool_result = ToolResult(
                 tool_id=tool_id,
                 status=ToolResultStatus.SUCCESS,
                 output={"plan": plan, "result": result},
@@ -200,19 +208,31 @@ class ToolExecutionEngine:
                 completed_at=execution.completed_at,
             )
 
+            # 持久化 ToolExecution（如果注入了仓储）
+            if self._tool_execution_repository is not None:
+                await self._tool_execution_repository.save(execution)
+
+            return tool_result
+
         except ToolExecutionRetryExhaustedError:
-            execution.transition_to(ToolExecutionState.FAILED)
-            execution.completed_at = datetime.now(UTC)
+            # 状态机守卫：仅在非终态时迁移到 FAILED
+            if execution.state not in TERMINAL_STATES:
+                execution.transition_to(ToolExecutionState.FAILED)
+                execution.completed_at = datetime.now(UTC)
             raise
         except ToolExecutionTimeoutError:
-            execution.transition_to(ToolExecutionState.FAILED)
-            execution.completed_at = datetime.now(UTC)
+            # 状态机守卫：仅在非终态时迁移到 FAILED（避免 COMPLETED → FAILED 非法迁移）
+            if execution.state not in TERMINAL_STATES:
+                execution.transition_to(ToolExecutionState.FAILED)
+                execution.completed_at = datetime.now(UTC)
             raise
         except Exception as exc:
-            logger.exception("工具执行失败: tool_id=%s exc=%s", tool_id, exc)
-            execution.transition_to(ToolExecutionState.FAILED)
-            execution.completed_at = datetime.now(UTC)
-            execution.failure_reason = str(exc)
+            # 状态机守卫：仅在非终态时迁移到 FAILED
+            if execution.state not in TERMINAL_STATES:
+                logger.exception("工具执行失败: tool_id=%s exc=%s", tool_id, exc)
+                execution.transition_to(ToolExecutionState.FAILED)
+                execution.completed_at = datetime.now(UTC)
+                execution.failure_reason = str(exc)
             raise ToolExecutionFailedError(
                 execution_id=str(execution.execution_id),
                 tool_id=str(tool_id),
