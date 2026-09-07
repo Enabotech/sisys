@@ -82,9 +82,10 @@ event_channels:
     description: "审计事件"
 
   ToolExecuted:
+    redis_channel: "sisys:rt:tool_executed"
     rabbitmq_routing_key: "sisys.events.reliable.tool_executed"
     delivery_mode: "reliable"
-    description: "工具执行完成"
+    description: "工具执行完成（双通道：realtime + reliable）"
 
   AgentDecided:
     rabbitmq_routing_key: "sisys.events.reliable.agent_decided"

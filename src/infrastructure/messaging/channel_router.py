@@ -131,9 +131,10 @@ class ChannelRouter:
         ),
         "ToolExecuted": ChannelMapping(
             event_type="ToolExecuted",
+            redis_channel="sisys:rt:tool_executed",
             rabbitmq_routing_key="sisys.events.reliable.tool_executed",
             delivery_mode=DeliveryMode.RELIABLE,
-            description="工具执行完成",
+            description="工具执行完成（双通道：realtime + reliable）",
         ),
         "AgentDecided": ChannelMapping(
             event_type="AgentDecided",

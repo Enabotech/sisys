@@ -41,6 +41,7 @@ from src.domain.exceptions import (
     EntityStateTransitionError,
     EntityValidationError,
     EventPublishError,
+    EvidenceValidationFailedError,
     ExecutionError,
     ExternalException,
     HybridSearchError,
@@ -71,6 +72,8 @@ from src.domain.exceptions import (
     RoleNotFoundError,
     SandboxError,
     ServiceUnavailableError,
+    SkillLoadError,
+    SkillNotFoundError,
     StorageError,
     SummaryGenerationError,
     SummaryPerspectiveNotSupportedError,
@@ -78,7 +81,11 @@ from src.domain.exceptions import (
     ThirdPartyError,
     TimeoutError,
     ToolAlreadyExistsError,
+    ToolExecutionFailedError,
+    ToolExecutionRetryExhaustedError,
+    ToolExecutionTimeoutError,
     ToolNotFoundError,
+    ToolResultValidationError,
     TraceabilityError,
     TraceabilityNotFoundError,
     TransferNotApprovedError,
@@ -186,6 +193,13 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     # 工具异常
     ToolNotFoundError: status.HTTP_404_NOT_FOUND,  # 380 — 工具不存在
     ToolAlreadyExistsError: status.HTTP_409_CONFLICT,  # 381 — 工具已存在（同 ID 或同名）
+    ToolExecutionFailedError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 382 — 工具执行失败（不可重试）
+    ToolExecutionRetryExhaustedError: status.HTTP_502_BAD_GATEWAY,  # 383 — 重试耗尽
+    ToolExecutionTimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,  # 385 — 工具执行超时
+    EvidenceValidationFailedError: status.HTTP_400_BAD_REQUEST,  # 386 — 证据包校验失败
+    SkillNotFoundError: status.HTTP_404_NOT_FOUND,  # 387 — 技能未找到
+    SkillLoadError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 388 — 技能加载失败
+    ToolResultValidationError: status.HTTP_400_BAD_REQUEST,  # 389 — 工具结果校验失败
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

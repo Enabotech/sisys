@@ -2198,6 +2198,76 @@ def bootstrap() -> None:
         tags=("tool", "registry", "service"),
     )
 
+    # === Strategic Toolbox Ports (Story 4.1a) ===
+    from src.application.ports.skill_loader import SkillLoaderPort
+    from src.application.ports.tool_execution_service import ToolExecutionServicePort
+    from src.domain.ports.tool_execution_repository import ToolExecutionRepositoryPort
+
+    register_port(
+        name="tool_execution_repository",
+        version="v1.0.0",
+        interface=ToolExecutionRepositoryPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.inmemory.tool_execution_repository",
+            fromlist=["InMemoryToolExecutionRepository"],
+        ).InMemoryToolExecutionRepository(),
+        module="src.infrastructure.storage.inmemory.tool_execution_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "execution", "repository"),
+    )
+
+    register_port(
+        name="tool_execution_engine",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.tool_execution_service",
+            fromlist=["ToolExecutionServicePort"],
+        ).ToolExecutionServicePort,
+        impl=lambda resolver: __import__(
+            "src.application.services.tool_execution_engine",
+            fromlist=["ToolExecutionEngine", "RetryPolicy"],
+        ).ToolExecutionEngine(
+            llm_client=resolver.resolve("llm_client"),
+            sandbox=resolver.resolve("sandbox_executor"),
+        ),
+        module="src.application.services.tool_execution_engine",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "execution", "engine"),
+    )
+
+    register_port(
+        name="tool_execution_service",
+        version="v1.0.0",
+        interface=ToolExecutionServicePort,
+        impl=lambda resolver: __import__(
+            "src.application.services.tool_execution_service",
+            fromlist=["ToolExecutionService"],
+        ).ToolExecutionService(
+            registry=resolver.resolve("tool_registry_service"),
+            engine=resolver.resolve("tool_execution_engine"),
+        ),
+        module="src.application.services.tool_execution_service",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "execution", "service"),
+    )
+
+    register_port(
+        name="skill_loader",
+        version="v1.0.0",
+        interface=SkillLoaderPort,
+        impl=lambda resolver: __import__(
+            "src.application.skills.loader",
+            fromlist=["InMemorySkillLoader"],
+        ).InMemorySkillLoader(),
+        module="src.application.skills.loader",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("skills", "loader", "inmemory"),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线

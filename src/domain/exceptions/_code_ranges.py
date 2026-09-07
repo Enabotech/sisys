@@ -60,7 +60,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "relevance": (360, 369),
     # 溯源子域（370-379）
     "traceability": (370, 379),
-    # 工具子域（380-389）
+    # 工具子域（380-389）—— Story 4.1a: 新增 7 个异常 EXCEPTION_382/383/385/386/387/388/389，
+    # EXCEPTION_384 保留未占用，ToolExecutionState 迁移守卫复用 EXCEPTION_243 (EntityStateTransitionError)
     "tool": (380, 389),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
@@ -171,9 +172,16 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     # traceability_exceptions.py
     "TraceabilityError": "traceability",
     "TraceabilityNotFoundError": "traceability",
-    # tool_exceptions.py
+    # tool_exceptions.py (Story 4.1a 新增 7 个异常)
     "ToolNotFoundError": "tool",
     "ToolAlreadyExistsError": "tool",
+    "ToolExecutionFailedError": "tool",
+    "ToolExecutionRetryExhaustedError": "tool",
+    "ToolExecutionTimeoutError": "tool",
+    "EvidenceValidationFailedError": "tool",
+    "SkillNotFoundError": "tool",
+    "SkillLoadError": "tool",
+    "ToolResultValidationError": "tool",
 }
 
 
