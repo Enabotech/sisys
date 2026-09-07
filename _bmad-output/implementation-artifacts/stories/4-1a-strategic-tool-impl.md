@@ -300,7 +300,7 @@
 - **乐观锁**：使用 `state_version` 实现条件更新（参考 `Document_repository.py:226-280` `save_with_version_check` 模式），防止并发覆盖
 
 **验证标准/Validation Criteria:**
-- [ ] Tool 实体 **4 个**新字段定义完整（rule_version, reliability_score, execution_count, slug）
+- Tool 实体新增 **4 个**新字段（rule_version, reliability_score, execution_count, slug）
 - [ ] Tool 实体 23 个 TOOL_CATALOG 实例不破坏（向后兼容）
 - [ ] ToolExecution 聚合根新建，12 字段完整（含 tenant_id、tool_version 快照、state_version 乐观锁）
 - [ ] ToolExecutionState 枚举 6 个值（IDLE/PLANNING/EXECUTING/VALIDATING/COMPLETED/FAILED）
@@ -611,7 +611,7 @@ def downgrade() -> None:
 **验证标准/Validation Criteria:**
 - [ ] ToolCall / ExecutionContext / ToolResult 三个值对象定义完整（frozen dataclass）
 - [ ] ToolResultStatus 枚举 4 值边界文档化
-- [ ] EvidencePackage 8 字段统一（与 AC-1 + AC-4 一致）
+- [ ] EvidencePackage 9 字段统一（与 AC-1 + AC-4 一致）
 - [ ] ToolResult 完整性校验（必填字段缺失抛 `EvidenceValidationFailedError` EXCEPTION_386）
 - [ ] `test_tool_execution_values.py` 单元测试完整覆盖 3 个值对象
 
@@ -802,23 +802,24 @@ def downgrade() -> None:
 
 > **目的：** 在进入代码实现前，明确 Schema、接口契约、验收标准、异常契约。这是 SDD 规范驱动的基础。
 
-- [ ] Subtask: 定义 Tool 聚合根新字段 Schema（rule_version, reliability_score, execution_count）
+- [ ] Subtask: 定义 Tool 聚合根新字段 Schema（rule_version, reliability_score, execution_count, slug）
 - [ ] Subtask: 定义 ToolExecution 聚合根 + ToolExecutionState 6 状态机 Schema（IDLE/PLANNING/EXECUTING/VALIDATING/COMPLETED/FAILED，5 条主链边）
 - [ ] Subtask: 定义 ToolExecutionServicePort Protocol 接口
+- [ ] Subtask: 定义 ToolExecutionEnginePort Protocol 接口（五阶段工作流签名）
 - [ ] Subtask: 定义 ToolCall / ExecutionContext / ToolResult / ToolResultStatus / EvidencePackage 值对象
 - [ ] Subtask: 定义 ToolExecutionEngine 五阶段工作流 + RetryPolicy
 - [ ] Subtask: 定义 StrategicAnalysisUseCase + SkillLoaderPort
 - [ ] Subtask: 定义 Skills 三级加载 Schema（TOOLS.md / SKILL.md / skill_manifest.py）
-- [ ] Subtask: 定义 PortSpec 元数据清单（tool_execution_service / tool_execution_engine / skill_loader）
-- [ ] Subtask: **新增异常 8 项 Checklist 实施**（ToolExecutionFailedError / ToolExecutionRetryExhaustedError / ToolExecutionStateTransitionError / ToolExecutionTimeoutError / EvidenceValidationFailedError / SkillNotFoundError / SkillLoadError / ToolResultValidationError）
-- [ ] Subtask: **复用异常确认**（ToolNotFoundError / EntityValidationError / LLMAPIError / LLMResponseError / SandboxExecutionError）
+- [ ] Subtask: 定义 PortSpec 元数据清单（tool_execution_repository / tool_execution_service / tool_execution_engine / skill_loader）
+- [ ] Subtask: **新增异常 7 项 Checklist 实施**（ToolExecutionFailedError / ToolExecutionRetryExhaustedError / ToolExecutionTimeoutError / EvidenceValidationFailedError / SkillNotFoundError / SkillLoadError / ToolResultValidationError）
+- [ ] Subtask: **复用异常确认**（ToolNotFoundError / ToolAlreadyExistsError / EntityStateTransitionError / EntityValidationError / EntityBusinessRuleError / LLMAPIError / LLMResponseError / ExecutionError / TimeoutError）
 - [ ] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_strategic_tool_impl.feature`
 - [ ] Subtask: 编写 Gherkin 验收测试 `.py` 步骤实现 `tests/acceptance/test_acceptance_strategic_tool_impl.py`
 - [ ] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕
-- [ ] 8 个新增异常 4 项 Checklist 通过（grep 自查零输出）
+- [ ] 7 个新增异常 4 项 Checklist 通过（grep 自查零输出）
 - [ ] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
@@ -854,7 +855,8 @@ def downgrade() -> None:
 - [ ] Subtask: 🔄 重构 — 添加状态迁移矩阵验证
 
 **完成标准/Definition of Done:**
-- [ ] Tool 实体 3 个新字段完整（不破坏 23 个 TOOL_CATALOG 实例）
+- [ ] Tool 实体 4 个新字段完整（rule_version, reliability_score, execution_count, slug）
+- [ ] Tool 实体 23 个 TOOL_CATALOG 实例同步更新 slug 字段（不破坏现有功能）
 - [ ] ToolExecution 聚合根 + ToolExecutionState 6 值（IDLE/PLANNING/EXECUTING/VALIDATING/COMPLETED/FAILED）
 - [ ] 状态机迁移矩阵正确（仅正向）
 - [ ] 非法迁移抛 `EntityStateTransitionError` (EXCEPTION_243)（复用业务异常，不占 tool 子域码位）
@@ -1324,6 +1326,9 @@ def downgrade() -> None:
 | **单元测试** | `tests/unit/application/use_cases/test_strategic_analysis_usecase.py` | Task 5 | Mock Service + EventBus |
 | **单元测试** | `tests/unit/application/skills/test_skills_loader.py` | Task 6 | Mock 文件 IO |
 | **端口契约测试** | `tests/contracts/test_port_contract_tool_execution_service.py` | Task 2 | 真实服务（InMemorySkillLoader） |
+| **端口契约测试** | `tests/contracts/test_port_contract_tool_execution_repository.py` | Task 7 | 真实服务（InMemoryToolExecutionRepository） |
+| **端口契约测试** | `tests/contracts/test_port_contract_tool_execution_engine.py` | Task 4 | 真实服务（ToolExecutionEngine） |
+| **端口契约测试** | `tests/contracts/test_port_contract_skill_loader.py` | Task 6 | 真实服务（InMemorySkillLoader） |
 | **架构约束测试** | `tests/unit/architecture/test_arch_strategic_tool_impl.py` | Task 7 | lint-imports + ruff --select E |
 | **集成测试** | `tests/integration/test_integration_strategic_tool_impl.py` | Task 7 | **真实服务 Schema 隔离模式**（TestTenant + savepoint rollback） |
 | **验收测试（BDD）** | `tests/acceptance/test_acceptance_strategic_tool_impl.feature` | Task 0 | Gherkin 7 scenario |
@@ -1565,7 +1570,21 @@ tests/
 17. ✅ AC-6 三级加载触发逻辑未定义 → L1 启动缓存 / L2 LRU / L3 无缓存
 18. ✅ 缺 Task 8 开发结束验收测试 → 新增 Task 8
 
-**下一步：** Round 3 - D1 三次调研遗漏点，启动新一轮审查。
+**Round 1 D2 调研发现（7 个新 P0 问题）：**
+
+19. ✅ Task 0 异常 Checklist 数量 8→7（ToolExecutionStateTransitionError 不新增）
+20. ✅ Task 0 复用异常清单遗漏（补充 EntityStateTransitionError / EntityBusinessRuleError / ExecutionError / TimeoutError）
+21. ✅ EvidencePackage 字段数 8→9（全文统一）
+22. ✅ Task 7 端口注册数量 3→4（补充 tool_execution_repository）
+23. ✅ ToolExecutionEngine 路径冲突（移除 domain/services/ 下的重复定义）
+24. ✅ Tool 字段数 3→4（Task 1 完成标准补充 slug）
+25. ✅ 交付物清单补充（ToolExecutionRepositoryPort + InMemoryToolExecutionRepository + migration 011 + 端口契约测试）
+26. ✅ 测试文件清单补充（4 个异常相关测试文件）
+27. ✅ 端口契约测试行数 10→14（补充 repository / engine / skill_loader / event 契约）
+28. ✅ ToolExecutionEnginePort Protocol 缺失 → Task 0 新增定义
+29. ✅ Composition Root 注册遗漏 tool_execution_repository → 交付物清单修正
+
+**下一步：** Round 2 - D1 二次调研遗漏点，启动新一轮审查。
 
 ---
 
