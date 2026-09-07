@@ -20,6 +20,9 @@ python-multipart = "^0.0.22"
 # CLI
 typer = "^0.24.0"
 
+# YAML parsing（Skills 元数据 frontmatter）
+pyyaml = "^6.0.1"
+
 # L1 Caching
 redis = "^5.0.1"
 redis-om = "^0.3.0"

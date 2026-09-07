@@ -49,3 +49,72 @@ def get_slug(tool_id: uuid.UUID) -> str | None:
 def get_tool_id(slug: str) -> uuid.UUID | None:
     """根据 slug 查询 tool_id"""
     return SLUG_TO_TOOL_ID.get(slug)
+
+
+# ============================================================
+# 路由查询辅助函数（业界最佳实践：capability-based / tag-based）
+# ============================================================
+
+
+def get_metadata(slug: str) -> dict | None:
+    """查询 Skill 元数据 dict（向后兼容 stub）。
+
+    Returns:
+        包含 slug/tool_id/name 的 dict，或 None（slug 不存在）
+    """
+    if slug not in SLUG_TO_TOOL_ID:
+        return None
+    return {
+        "slug": slug,
+        "tool_id": str(SLUG_TO_TOOL_ID[slug]),
+        "name": slug,
+    }
+
+
+def get_all_slugs() -> list[str]:
+    """列出所有 23 个 Skill slugs。"""
+    return list(SLUG_TO_TOOL_ID.keys())
+
+
+def get_slugs_by_category(category: str) -> list[str]:
+    """根据分类返回 slugs 列表（静态映射）。"""
+    category_prefixes = {
+        "environment_analysis": ("pestel", "porters", "appeals"),
+        "competitive_analysis": ("competitor", "value-chain", "vrio"),
+        "strategic_selection": (
+            "ansoff",
+            "swot",
+            "ge-mckinsey",
+            "space",
+            "scenario",
+            "value-curve",
+        ),
+        "business_model": (
+            "value-proposition",
+            "business-model",
+            "disruptive",
+        ),
+        "execution_management": (
+            "bsc",
+            "strategy-map",
+            "org-design",
+            "dependency",
+            "raci",
+            "gantt",
+            "kpi",
+            "change-management",
+        ),
+    }
+    prefixes = category_prefixes.get(category, ())
+    return [slug for slug in SLUG_TO_TOOL_ID if any(slug.startswith(p) for p in prefixes)]
+
+
+__all__ = [
+    "TOOL_ID_TO_SLUG",
+    "SLUG_TO_TOOL_ID",
+    "get_slug",
+    "get_tool_id",
+    "get_metadata",
+    "get_all_slugs",
+    "get_slugs_by_category",
+]
