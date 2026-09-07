@@ -293,8 +293,8 @@
       ToolExecutionState.FAILED: set(),  # 终态
   }
   ```
-- **状态机迁移实现**：显式 `transition_to(new_state)` 方法 + `can_transition_to(new_state)` 校验（参考 SagaStatus 模式 `src/domain/ports/saga_status.py:28-32` `valid_transitions` dict + SagaContext 实现 `src/infrastructure/saga/saga_context.py:23-122`）
-- **非法迁移异常**：复用 `EntityStateTransitionError` (EXCEPTION_243) 携带 `from_status` / `to_status` / `execution_id`，**不新增** `ToolExecutionStateTransitionError`（与 `Agent` / `Checkpoint` / `StrategicPlan` 项目惯例一致）
+- **状态机迁移实现**：显式 `transition_to(new_state)` 方法 + `can_transition_to(new_state)` 校验（参考 SagaStatus 模式 `src/domain/ports/saga_status.py:28-32` `valid_transitions` dict + Agent 意图方法模式 `src/domain/entities/agent.py:99-108`）
+- **非法迁移异常**：复用 `EntityStateTransitionError` (EXCEPTION_243) 携带 `from_status` / `to_status` / `entity_type` / `entity_id`，**不新增** `ToolExecutionStateTransitionError`（与 `Agent` / `Checkpoint` / `StrategicPlan` 项目惯例一致）
 - **重试语义**：重试创建**新 attempt**（新 ToolExecution 实例或新 attempt_number），**不允许终态反向**迁移
 - **`__post_init__` 职责**：仅做类型、跨字段不变量校验（终态必有 completed_at、retry_count ≥ 0）；**合法迁移**由 `transition_to()` 保证，**不要求**重新水合必须从 IDLE 开始
 - **乐观锁**：使用 `state_version` 实现条件更新（参考 `Document_repository.py:226-280` `save_with_version_check` 模式），防止并发覆盖
@@ -1120,7 +1120,7 @@ def downgrade() -> None:
 
 ### Task 7: 端口注册与架构约束验证
 
-**关联 AC:** AC-7
+**关联 AC:** AC-7, AC-1.5
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
 
@@ -1128,8 +1128,8 @@ def downgrade() -> None:
 
 | 阶段 | 动作 | 完成标志 |
 |------|------|----------|
-| 🔴 红 | 编写 `test_arch_strategic_tool_impl.py`（验证 3 个新端口注册元数据：name/version/interface/impl/lifetime/owner/tags 七字段） | `pytest` 失败 |
-| 🟢 绿 | 在 `src/composition_root.py` 注册 tool_execution_service / tool_execution_engine / skill_loader | `pytest` 通过 |
+| 🔴 红 | 编写 `test_arch_strategic_tool_impl.py`（验证 4 个新端口注册元数据：name/version/interface/impl/lifetime/owner/tags 七字段） | `pytest` 失败 |
+| 🟢 绿 | 在 `src/composition_root.py` 注册 tool_execution_repository / tool_execution_service / tool_execution_engine / skill_loader | `pytest` 通过 |
 | 🔄 重构 | 验证端口注册元数据完整性 + impl 字符串延迟加载 | `ruff check + mypy + pytest` 全部通过 |
 
 - [ ] Subtask: 🔴 红 — 编写端口注册失败测试
@@ -1148,11 +1148,39 @@ def downgrade() -> None:
 - [ ] Subtask: 🟢 绿 — 验证架构约束通过
 - [ ] Subtask: 🔄 重构 — 添加架构约束文档
 
+#### TDD 循环 C：ToolExecutionRepository 端口契约测试（11 维度）
+
+| 阶段 | 动作 | 完成标志 |
+|------|------|----------|
+| 🔴 红 | 编写 `test_port_contract_tool_execution_repository.py`（11 维度覆盖 + ToolExecutionQuery frozen dataclass + 乐观锁） | `pytest` 失败 |
+| 🟢 绿 | 确认 InMemoryToolExecutionRepository 实现满足所有维度 | `pytest` 通过 |
+| 🔄 重构 | 补充 asyncio.Lock 类变量测试 + save_with_state_version 乐观锁 CAS 测试 | `ruff check + mypy + pytest` 全部通过 |
+
+- [ ] Subtask: 🔴 红 — 编写 Repository 端口契约失败测试
+- [ ] Subtask: 🟢 绿 — 验证 InMemoryToolExecutionRepository 实现
+- [ ] Subtask: 🔄 重构 — 补充 asyncio.Lock + 乐观锁 CAS 测试
+
+#### TDD 循环 D：Alembic migration 011 + InMemoryToolRepository asyncio.Lock 修复
+
+| 阶段 | 动作 | 完成标志 |
+|------|------|----------|
+| 🔴 红 | 编写 migration 011 测试（验证 tool_executions 表结构 + 4 索引 + 3 CHECK 约束）+ 编写 InMemoryToolRepository 并发安全测试（多协程并发 save/get） | `pytest` 失败 |
+| 🟢 绿 | 创建 `deploy/postgresql/alembic/versions/011_tool_executions.py` + 为 InMemoryToolRepository 添加 asyncio.Lock 类变量 | `pytest` 通过 |
+| 🔄 重构 | 验证 migration downgrade 可回滚 + asyncio.Lock 保护所有方法 | `ruff check + mypy + pytest` 全部通过 |
+
+- [ ] Subtask: 🔴 红 — 编写 migration + 并发安全失败测试
+- [ ] Subtask: 🟢 绿 — 创建 migration 011 + InMemoryToolRepository asyncio.Lock
+- [ ] Subtask: 🔄 重构 — 验证 migration 回滚 + Lock 保护
+
 **完成标准/Definition of Done:**
-- [ ] 三个新端口注册完整（tool_execution_service / tool_execution_engine / skill_loader）
+- [ ] **4 个**新端口注册完整（tool_execution_repository / tool_execution_service / tool_execution_engine / skill_loader）
 - [ ] PortSpec 元数据七字段完整
 - [ ] 依赖注入正确
 - [ ] 架构约束验证通过（`lint-imports` + `ruff --select E`）
+- [ ] ToolExecutionRepositoryPort 端口契约测试 11 维度通过
+- [ ] InMemoryToolExecutionRepository asyncio.Lock 类变量验证通过
+- [ ] Alembic migration 011 创建（含 4 索引 + 3 CHECK 约束）
+- [ ] InMemoryToolRepository asyncio.Lock 修复（Story 4.1 遗留 P0-6）
 - [ ] 所有测试通过
 
 ---
@@ -1174,6 +1202,7 @@ def downgrade() -> None:
 - [ ] Subtask: 🔴 红 — 编写完成清单断言失败测试
 - [ ] Subtask: 🟢 绿 — 运行所有测试套件
 - [ ] Subtask: 🔄 重构 — 收尾校验（pytest + ruff + mypy + lint-imports）
+- [ ] Subtask: 🔄 重构 — pyproject.toml 添加 `--cov-fail-under=80` 覆盖率门禁
 
 **完成标准/Definition of Done:**
 - [ ] src/ 完成清单断言通过（所有新建文件存在）
@@ -1183,6 +1212,7 @@ def downgrade() -> None:
 - [ ] `mypy` 通过
 - [ ] `lint-imports` 通过
 - [ ] 覆盖率门禁达标（domain ≥90% / application ≥85% / 整体 ≥80%）
+- [ ] pyproject.toml `[tool.pytest.ini_options]` addopts 添加 `--cov-fail-under=80`
 
 ---
 
