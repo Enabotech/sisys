@@ -31,7 +31,7 @@ from src.domain.value_objects.tool_execution import (
 
 def _make_execution_context(**kwargs) -> ExecutionContext:
     """工厂函数：构造测试 ExecutionContext"""
-    defaults = {
+    defaults: dict = {
         "tenant_id": uuid.uuid4(),
         "user_id": uuid.uuid4(),
         "session_id": "sess-1",
@@ -44,7 +44,7 @@ def _make_execution_context(**kwargs) -> ExecutionContext:
 
 def _make_evidence_package(**kwargs) -> EvidencePackage:
     """工厂函数：构造测试 EvidencePackage"""
-    defaults = {
+    defaults: dict = {
         "input_hash": "abc123",
         "rule_version": "BLM-v3.2",
         "plan": "step 1: ...",
@@ -81,7 +81,7 @@ class TestToolCall:
     def test_frozen_dataclass(self) -> None:
         call = ToolCall(tool_id=uuid.uuid4())
         with pytest.raises(FrozenInstanceError):
-            call.arguments = {"y": 2}  # type: ignore[misc]
+            setattr(call, "arguments", {"y": 2})
 
 
 class TestExecutionContext:
@@ -104,7 +104,7 @@ class TestExecutionContext:
     def test_frozen_dataclass(self) -> None:
         ctx = _make_execution_context()
         with pytest.raises(FrozenInstanceError):
-            ctx.session_id = "other"  # type: ignore[misc]
+            setattr(ctx, "session_id", "other")
 
 
 class TestToolResultStatus:

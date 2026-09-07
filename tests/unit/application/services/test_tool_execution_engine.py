@@ -32,7 +32,7 @@ from src.domain.value_objects.tool_execution import (
 
 
 def _make_tool(**kwargs) -> Tool:
-    defaults = {
+    defaults: dict = {
         "tool_id": uuid.uuid4(),
         "name": "Test Tool",
         "category": ToolCategory.ANALYSIS,
@@ -45,7 +45,7 @@ def _make_tool(**kwargs) -> Tool:
 
 
 def _make_context(**kwargs) -> ExecutionContext:
-    defaults = {
+    defaults: dict = {
         "tenant_id": uuid.uuid4(),
         "user_id": uuid.uuid4(),
         "session_id": "sess-1",
