@@ -862,7 +862,7 @@ def downgrade() -> None:
 
 | 阶段 | 动作 | 完成标志 |
 |------|------|----------|
-| 🔴 红 | 编写 `test_tool_41a.py`（验证 rule_version, reliability_score, execution_count 字段） | `pytest tests/unit/domain/entities/test_tool_41a.py` 失败 |
+| 🔴 红 | 编写 `test_tool_41a.py`（验证 rule_version, reliability_score, execution_count, slug 字段 + slug kebab-case 校验） | `pytest tests/unit/domain/entities/test_tool_41a.py` 失败 |
 | 🟢 绿 | 增强 `src/domain/entities/tool.py` 添加新字段（Optional/default_factory） | `pytest tests/unit/domain/entities/test_tool_41a.py` 通过 |
 | 🔄 重构 | 添加类型注解、docstring、不变量验证 | `ruff check + mypy + pytest` 全部通过 |
 
@@ -1311,7 +1311,7 @@ def downgrade() -> None:
 **Tool 实体:** `src/domain/entities/tool.py`
 - ToolCategory 枚举已定义 10 种（5 功能分类 + 5 战略分类）
 - ToolStatus 枚举已定义 3 值（ACTIVE/DEPRECATED/MAINTENANCE，**生命周期状态**，本 Story 不修改）
-- Tool 实体已存在，需要增强 3 个新字段（rule_version/reliability_score/execution_count）
+- Tool 实体已存在，需要增强 4 个新字段（rule_version/reliability_score/execution_count/slug）
 
 **ToolRepositoryPort:** `src/domain/ports/tool_repository.py`
 - Protocol 已定义，包含 7 个 CRUD 方法
@@ -1402,7 +1402,7 @@ def downgrade() -> None:
 |---|---------|------|----------|----------|-----------|
 | 1 | **TDD 单元测试** | Tool 实体增强 | 4 新字段（rule_version/reliability_score/execution_count/slug）+ 23 个 TOOL_CATALOG 不破坏 | `tests/unit/domain/entities/test_tool_41a.py` | Task 1 |
 | 2 | **TDD 单元测试** | ToolExecution 聚合根 + 6 状态机 | 12 字段完整、6 状态迁移、终态必有 completed_at、乐观锁 | `tests/unit/domain/entities/test_tool_execution.py` | Task 1 |
-| 3 | **TDD 单元测试** | ToolCall / ToolResult / ExecutionContext 值对象 | frozen dataclass 不变性、4 值边界、EvidencePackage 8 字段 | `tests/unit/domain/value_objects/test_tool_execution_values.py` | Task 3 |
+| 3 | **TDD 单元测试** | ToolCall / ToolResult / ExecutionContext 值对象 | frozen dataclass 不变性、4 值边界、EvidencePackage 9 字段 | `tests/unit/domain/value_objects/test_tool_execution_values.py` | Task 3 |
 | 4 | **TDD 单元测试** | ToolExecutionEngine 五阶段工作流 | 五阶段端口映射、RetryPolicy 重试、Session 生命周期 | `tests/unit/application/services/test_tool_execution_engine.py` | Task 4 |
 | 5 | **TDD 单元测试** | StrategicAnalysisUseCase | tool_name 查询→Skill 加载→execute→事件发布 | `tests/unit/application/use_cases/test_strategic_analysis_usecase.py` | Task 5 |
 | 6 | **TDD 单元测试** | Skills 加载器 | TOOLS.md/SKILL.md ×23 + manifest 双向映射 | `tests/unit/application/skills/test_skills_loader.py` | Task 6 |
@@ -1545,8 +1545,8 @@ tests/
 | **skill_manifest.py** | `src/application/skills/skill_manifest.py` | **待新建** |
 | **token_count_validator** | `src/application/skills/validators/token_count_validator.py` | **待新建** |
 | **frontmatter_validator** | `src/application/skills/validators/frontmatter_validator.py` | **待新建** |
-| **8 个新增异常** | `src/domain/exceptions/tool_exceptions.py` | Task 0 新增 |
-| **端口注册** | `src/composition_root.py` | 注册 tool_execution_service / tool_execution_engine / skill_loader |
+| **7 个新增异常** | `src/domain/exceptions/tool_exceptions.py` | Task 0 新增 |
+| **端口注册** | `src/composition_root.py` | 注册 tool_execution_repository / tool_execution_service / tool_execution_engine / skill_loader |
 | **事件双通道配置** | `configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py` | 升级 ToolExecuted 为双通道 |
 
 ---
@@ -1569,9 +1569,9 @@ tests/
 - [ ] 所有测试通过（单元测试、集成测试、契约测试、架构测试、验收测试）
 - [ ] 覆盖率满足要求（整体≥80%，领域层≥90%，应用层≥85%）
 - [ ] 代码质量门禁通过（Ruff、MyPy、import-linter、pre-commit）
-- [ ] 端口注册完整（tool_execution_service / tool_execution_engine / skill_loader）
+- [ ] 端口注册完整（tool_execution_repository / tool_execution_service / tool_execution_engine / skill_loader）
 - [ ] 架构约束验证通过（`poetry run lint-imports`）
-- [ ] 8 个新增异常 4 项 Checklist 通过（grep 自查零输出）
+- [ ] 7 个新增异常 4 项 Checklist 通过（grep 自查零输出）
 - [ ] ToolExecuted 事件升级为双通道（realtime + reliable）
 - [ ] Commit 信息无 AI 辅助署名（Co-Authored-By: Claude / anthropic.com）
 - [ ] 文档更新完成（CLAUDE.md / architecture.md 同步更新）
@@ -1673,7 +1673,7 @@ tests/
 **修复项 3（Agent C + D）：异常契约修正**
 - ✅ 移除 EXCEPTION_384 (ToolExecutionStateTransitionError) 新增计划
 - ✅ 复用 `EntityStateTransitionError` (EXCEPTION_243)（与 Agent/Checkpoint/StrategicPlan 项目惯例一致）
-- ✅ 8 个新异常（EXCEPTION_382/383/385/386/387/388/389）parent class 重新设计
+- ✅ 7 个新异常（EXCEPTION_382/383/385/386/387/388/389）parent class 重新设计
 - ✅ tool 子域从 8 码位占用降至 7 码位（剩 384 保留）
 
 **修复项 4（Agent C）：ToolExecutionRepositoryPort 新增**
