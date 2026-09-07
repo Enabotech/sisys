@@ -23,8 +23,8 @@
 ### ⚠️ Story 范围澄清（重要）
 
 **本 Story 范围（4.1a）：**
-1. Tool 聚合根元数据字段增强（rule_version, reliability_score, execution_count）
-2. **新建 ToolExecution 聚合根**（含 ToolExecutionState 5 状态机），与 Tool 生命周期字段解耦
+1. Tool 聚合根元数据字段增强（rule_version, reliability_score, execution_count, slug）
+2. **新建 ToolExecution 聚合根**（含 ToolExecutionState 6 状态机），与 Tool 生命周期字段解耦
 3. ToolExecutionService（应用层）+ Port 抽象（避免与 ToolRegistryService 命名冲突）
 4. ToolCall / ToolResult / ExecutionContext 值对象
 5. ToolExecutionEngine 五阶段工作流（Think→Code→Execute→Observe→Validate）
@@ -947,7 +947,7 @@ def downgrade() -> None:
 |------|------|----------|
 | 🔴 红 | 编写 `test_tool_execution_values.py`（验证 ToolResult + EvidencePackage + ToolResultStatus 4 值） | `pytest` 失败 |
 | 🟢 绿 | 在 `src/domain/value_objects/tool_execution.py` 定义 ToolResult + EvidencePackage + ToolResultStatus | `pytest` 通过 |
-| 🔄 重构 | 添加 8 字段统一、完整性校验、文档化 ToolResultStatus 4 值边界 | `ruff check + mypy + pytest` 全部通过 |
+| 🔄 重构 | 添加 9 字段统一、完整性校验、文档化 ToolResultStatus 4 值边界 | `ruff check + mypy + pytest` 全部通过 |
 
 - [ ] Subtask: 🔴 红 — 编写 ToolResult 失败测试
 - [ ] Subtask: 🟢 绿 — 实现 ToolResult + EvidencePackage + ToolResultStatus
@@ -956,7 +956,7 @@ def downgrade() -> None:
 **完成标准/Definition of Done:**
 - [ ] ToolCall / ExecutionContext / ToolResult 三个值对象定义完整
 - [ ] ToolResultStatus 枚举 4 值边界文档化
-- [ ] EvidencePackage 8 字段统一（与 AC-1 + AC-4 一致）
+- [ ] EvidencePackage 9 字段统一（与 AC-1 + AC-4 一致）
 - [ ] 所有测试通过
 
 ---
@@ -1415,8 +1415,6 @@ src/
 │   ├── ports/
 │   │   ├── tool_repository.py                   # Story 4.1 已有
 │   │   └── tool_execution_repository.py         # [本 Story 新建] ToolExecutionRepositoryPort + ToolExecutionQuery
-│   └── services/
-│       └── tool_execution_engine.py             # [本 Story 新建] 五阶段执行引擎
 │
 ├── application/                                 # 应用层
 │   ├── ports/
@@ -1606,7 +1604,16 @@ tests/
 33. ⏳ RetryPolicy 中 SandboxExecutionError 实际为 ExecutionError → 文档已修正
 34. ⏳ ToolExecutionQuery 缺少 started_after/started_before 时间范围过滤 → 补充到 Query Object
 
-**下一步：** Round 3 - D1 三次调研遗漏点，启动新一轮审查。
+**Round 3 D2 调研发现（6 个新 P0 问题）：**
+
+35. ✅ Task 1 TDD 循环 B 补充终态反向迁移测试（COMPLETED/FAILED → IDLE 抛 EntityStateTransitionError）
+36. ✅ Task 1 TDD 循环 B 补充终态 completed_at 不变量校验测试
+37. ✅ Task 7 TDD 循环 A 修正为 4 端口注册（补充 tool_execution_repository）
+38. ✅ Task 7 新增 TDD 循环 C：ToolExecutionRepository 端口契约测试（11 维度）
+39. ✅ Task 7 TDD 循环 B 补充 InMemoryToolExecutionRepository + ToolExecutionQuery 实现验证
+40. ✅ Task 3 EvidencePackage 字段数 8→9（全文统一修正）
+
+**下一步：** Round 4 - D1 四次调研遗漏点，启动新一轮审查。
 
 ---
 
