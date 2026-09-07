@@ -129,9 +129,13 @@ class EntityStateTransitionError(InvalidStateTransitionError):
         from_status: str,
         to_status: str,
         message: str | None = None,
+        entity_type: str = "",
+        entity_id: str = "",
     ) -> None:
         self.from_status = from_status
         self.to_status = to_status
+        self.entity_type = entity_type
+        self.entity_id = entity_id
         super().__init__(from_status, to_status, message)
 
 
