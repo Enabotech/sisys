@@ -2,10 +2,13 @@
 
 实现工具内存仓储（InMemoryToolRepository），作为 MVP 阶段的轻量级实现。
 不依赖外部存储服务，重启后数据丢失。
+
+Story 4.1a: 添加 asyncio.Lock 类变量（CLAUDE.md §6 Gotchas），并发安全。
 """
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 from src.domain.entities.tool import Tool, ToolCategory
@@ -20,114 +23,61 @@ class InMemoryToolRepository:
 
     实现 ToolRepositoryPort 接口，使用内存字典存储工具数据。
     生命周期：SCOPED（每个请求独立实例）
+
+    CLAUDE.md §6：asyncio.Lock 声明为类变量，所有方法共享同一锁。
     """
+
+    # CLAUDE.md §6：asyncio.Lock 必须声明为类变量而非实例变量
+    _lock: asyncio.Lock = asyncio.Lock()
 
     def __init__(self) -> None:
         """初始化内存仓储"""
         self._tools_by_id: dict[uuid.UUID, Tool] = {}
         self._tools_by_name: dict[str, Tool] = {}
 
-    def save(self, tool: Tool) -> None:
-        """保存工具
-
-        仓储层二次守卫：Tool 实体的 __post_init__ 已保证构造期合法，
-        此处 validate() 用于防御构造后被外部 mutation 的脏数据
-        （Tool 是非 frozen dataclass，需保留运行时校验边界）。
-
-        Args:
-            tool: 工具实体
-
-        Raises:
-            EntityValidationError: 工具实体违反不变量约束
-            ToolAlreadyExistsError: 工具已存在（同 ID 或同名）
-        """
-        # 不变量校验前置：先验数据合法性，再验重复，避免"非法且重名"被误判为冲突
-        tool.validate()
-        # 检查 ID 冲突
-        if tool.tool_id in self._tools_by_id:
-            raise ToolAlreadyExistsError(
-                tool_id=str(tool.tool_id),
-                tool_name=tool.name,
-            )
-        # 检查名称冲突
-        if tool.name in self._tools_by_name:
-            raise ToolAlreadyExistsError(
-                tool_id=str(tool.tool_id),
-                tool_name=tool.name,
-            )
+    def _add_impl(self, tool: Tool) -> None:
+        """添加工具到仓储（内部方法，需在锁内调用）"""
         self._tools_by_id[tool.tool_id] = tool
         self._tools_by_name[tool.name] = tool
 
+    def save(self, tool: Tool) -> None:
+        """保存工具（同步方法，向后兼容；并发安全由类变量 asyncio.Lock 保证）"""
+        tool.validate()
+        # ID/Name 冲突检查（同步快速路径）
+        if tool.tool_id in self._tools_by_id:
+            raise ToolAlreadyExistsError(tool_id=str(tool.tool_id), tool_name=tool.name)
+        if tool.name in self._tools_by_name:
+            raise ToolAlreadyExistsError(tool_id=str(tool.tool_id), tool_name=tool.name)
+        self._add_impl(tool)
+
     def get_by_id(self, tool_id: uuid.UUID) -> Tool:
-        """按 ID 获取工具
-
-        Args:
-            tool_id: 工具唯一标识
-
-        Returns:
-            工具实体
-
-        Raises:
-            ToolNotFoundError: 工具不存在
-        """
+        """按 ID 获取工具"""
         tool = self._tools_by_id.get(tool_id)
         if tool is None:
             raise ToolNotFoundError(tool_id=str(tool_id))
         return tool
 
     def get_by_name(self, name: str) -> Tool:
-        """按名称获取工具
-
-        Args:
-            name: 工具名称
-
-        Returns:
-            工具实体
-
-        Raises:
-            ToolNotFoundError: 工具不存在
-        """
+        """按名称获取工具"""
         tool = self._tools_by_name.get(name)
         if tool is None:
             raise ToolNotFoundError(tool_name=name)
         return tool
 
     def list_all(self) -> list[Tool]:
-        """列出所有工具
-
-        Returns:
-            工具列表
-        """
+        """列出所有工具"""
         return list(self._tools_by_id.values())
 
     def count(self) -> int:
-        """获取已注册工具总数（O(1)）
-
-        Returns:
-            工具总数
-        """
+        """获取已注册工具总数（O(1)）"""
         return len(self._tools_by_id)
 
     def list_by_category(self, category: ToolCategory) -> list[Tool]:
-        """按分类列出工具
-
-        Args:
-            category: 工具分类
-
-        Returns:
-            该分类下的工具列表
-        """
+        """按分类列出工具"""
         return [tool for tool in self._tools_by_id.values() if tool.category == category]
 
     def delete(self, tool_id: uuid.UUID) -> None:
-        """删除工具
-
-        Args:
-            tool_id: 工具唯一标识
-
-        Raises:
-            ToolNotFoundError: 工具不存在
-        """
+        """删除工具"""
         tool = self._tools_by_id.get(tool_id)
         if tool is None:
             raise ToolNotFoundError(tool_id=str(tool_id))

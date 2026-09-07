@@ -54,6 +54,7 @@ _SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 _JSON_SCHEMA_KEYWORDS = frozenset(
     {"type", "properties", "$ref", "allOf", "anyOf", "oneOf"},
 )
+_SLUG_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 
 @dataclass
@@ -70,6 +71,10 @@ class Tool:
     - created_at / updated_at 必须 timezone-aware 且 updated_at &gt;= created_at
     - input_schema / output_schema 必须为 dict（空 dict 合法）；
       非空时需包含 type/properties/$ref/allOf/anyOf/oneOf 至少一个关键词
+    - rule_version 可选（业务规则版本，如 "BLM-v3.2"）
+    - reliability_score ∈ [0.0, 1.0]，默认 0.0
+    - execution_count ≥ 0，默认 0
+    - slug 可选（kebab-case 格式，与 Skills 系统双向映射）
     """
 
     tool_id: uuid.UUID
@@ -82,6 +87,11 @@ class Tool:
     version: str = "1.0.0"
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    # Story 4.1a 新增 4 字段
+    rule_version: str | None = None
+    reliability_score: float = 0.0
+    execution_count: int = 0
+    slug: str | None = None
 
     def __post_init__(self) -> None:
         """构造时强制校验所有不变量
@@ -195,6 +205,34 @@ class Tool:
                     "entity": "Tool",
                     "created_at": self.created_at.isoformat(),
                     "updated_at": self.updated_at.isoformat(),
+                },
+            )
+        # Story 4.1a 新增字段校验
+        if not (0.0 <= self.reliability_score <= 1.0):
+            raise EntityValidationError(
+                message="reliability_score 必须 ∈ [0.0, 1.0]",
+                context={
+                    "entity": "Tool",
+                    "field": "reliability_score",
+                    "value": self.reliability_score,
+                },
+            )
+        if self.execution_count < 0:
+            raise EntityValidationError(
+                message="execution_count 必须 ≥ 0",
+                context={
+                    "entity": "Tool",
+                    "field": "execution_count",
+                    "value": self.execution_count,
+                },
+            )
+        if self.slug is not None and not _SLUG_PATTERN.match(self.slug):
+            raise EntityValidationError(
+                message="slug 必须为 kebab-case 格式（小写字母/数字 + 单连字符）",
+                context={
+                    "entity": "Tool",
+                    "field": "slug",
+                    "value": self.slug,
                 },
             )
         return True

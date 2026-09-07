@@ -39,12 +39,16 @@ class TestToolExecuted:
     def test_create_event(self):
         """Can create ToolExecuted event."""
         tool_id = uuid.uuid4()
+        execution_id = uuid.uuid4()
         event = ToolExecuted(
             tool_id=tool_id,
+            execution_id=execution_id,
             execution_result={"output": "success"},
         )
         assert event.event_type == "ToolExecuted"
-        assert event.aggregate_id == tool_id
+        # Story 4.1a: aggregate_id = execution_id（不是 tool_id）
+        assert event.aggregate_id == execution_id
+        assert event.aggregate_type == "ToolExecution"
 
 
 class TestAgentDecided:

@@ -114,8 +114,15 @@ from src.domain.exceptions.system_exceptions import (
     SystemException,
 )
 from src.domain.exceptions.tool_exceptions import (
+    EvidenceValidationFailedError,
+    SkillLoadError,
+    SkillNotFoundError,
     ToolAlreadyExistsError,
+    ToolExecutionFailedError,
+    ToolExecutionRetryExhaustedError,
+    ToolExecutionTimeoutError,
     ToolNotFoundError,
+    ToolResultValidationError,
 )
 from src.domain.exceptions.traceability_exceptions import (
     TraceabilityError,
@@ -231,4 +238,11 @@ __all__ = [
     # 工具异常
     "ToolNotFoundError",
     "ToolAlreadyExistsError",
+    "ToolExecutionFailedError",
+    "ToolExecutionRetryExhaustedError",
+    "ToolExecutionTimeoutError",
+    "EvidenceValidationFailedError",
+    "SkillNotFoundError",
+    "SkillLoadError",
+    "ToolResultValidationError",
 ]

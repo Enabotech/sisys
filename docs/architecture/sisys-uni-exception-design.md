@@ -731,6 +731,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | `external` | 301–399 | ThirdPartyError, TimeoutError, ServiceUnavailableError（父域） |
 | `embedding` | 306–308 | EmbeddingAPIError 等（嵌套在 external 内） |
 | `sandbox` | 309–319 | SandboxError 等（嵌套在 external 内） |
+| `tool` | 380–389 | ToolNotFoundError, ToolAlreadyExistsError, ToolExecutionFailedError, ToolExecutionRetryExhaustedError, ToolExecutionTimeoutError, EvidenceValidationFailedError, SkillNotFoundError, SkillLoadError, ToolResultValidationError 等（战略性工具异常，物理范围 380-389 嵌套在 external 301-399 内但语义独立；EXCEPTION_384 保留未占用） |
 | `fallback` | 999 | UnknownError（兜底，独立于所有子域） |
 
 #### 3.3.3 CI 校验规则

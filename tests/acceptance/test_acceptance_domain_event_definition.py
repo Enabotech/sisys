@@ -186,14 +186,23 @@ def create_document_processed_event(events_context: dict):
 
 @when("创建 ToolExecuted 事件携带工具 ID、执行结果、成本审计信息")
 def create_tool_executed_event(events_context: dict):
-    """创建 ToolExecuted 事件。"""
+    """创建 ToolExecuted 事件。
+
+    Story 4.1a AC-5 Round 2 修正：aggregate_id = execution_id（不是 tool_id），
+    aggregate_type = "ToolExecution"。本 step 显式传入 execution_id 以匹配新契约。
+    """
+    import uuid
+
     tool_id = events_context["tool_id"]
+    execution_id = uuid.uuid4()
     event = ToolExecuted(
+        execution_id=execution_id,
         tool_id=tool_id,
         execution_result={"output": "success"},
         cost_audit={"cost_usd": 0.05},
     )
     events_context["events_created"]["ToolExecuted"] = event
+    events_context["execution_id"] = execution_id
 
 
 @when("创建 AgentDecided 事件携带 Agent ID、决策结果、置信度评分")
@@ -327,9 +336,11 @@ def check_tool_event_type(events_context: dict):
 
 @then("aggregate_id 等于 tool_id")
 def check_aggregate_id_tool(events_context: dict):
-    """验证 aggregate_id 等于 tool_id。"""
+    """验证 aggregate_id 等于 execution_id（Story 4.1a AC-5 Round 2 修正）。"""
     event = events_context["events_created"]["ToolExecuted"]
-    assert event.aggregate_id == event.tool_id
+    # Story 4.1a AC-5：aggregate_id = execution_id（不是 tool_id）
+    assert event.aggregate_id == event.execution_id
+    assert event.aggregate_type == "ToolExecution"
 
 
 @then("payload 包含执行结果和成本审计信息")
