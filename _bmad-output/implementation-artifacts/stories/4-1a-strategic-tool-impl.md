@@ -328,6 +328,8 @@
       tenant_id: UUID | None = None
       tool_id: UUID | None = None
       state: ToolExecutionState | None = None
+      started_after: datetime | None = None
+      started_before: datetime | None = None
       offset: int = 0
       limit: int = 100
 
@@ -621,7 +623,7 @@ def downgrade() -> None:
 **When** 实现 ToolExecutionEngine
 **Then**
 
-- **路径**：`src/application/services/tool_execution_engine.py`
+- **路径**：`src/application/services/tool_execution_engine.py`（应用层编排，负责五阶段执行 + 证据打包 + 事件发布）
 - **五阶段工作流**：Think → Code → Execute → Observe → Validate
 - **五阶段端口映射**：
 
@@ -629,9 +631,15 @@ def downgrade() -> None:
 |------|----------|------|------|------------|
 | **Think** | `LLMClientPort.structured_generate(prompt, response_schema=PlanSchema)` | SKILL.md + ToolCall.arguments | `plan: str` | ✅（LLMAPIError/LLMResponseError） |
 | **Code** | `LLMClientPort.structured_generate(prompt, response_schema=CodeSchema)` | plan + input_schema | `code: str` | ✅（LLMAPIError/LLMResponseError） |
-| **Execute** | `SandboxExecutorPort.execute_code(session_id, code)` | session_id + code | `result: str` | ✅（SandboxExecutionError/TimeoutError） |
-| **Observe** | `SandboxExecutorPort.execute_code(session_id, observation_code)` | session_id | `observation: str` | ✅（SandboxExecutionError） |
+| **Execute** | `SandboxExecutor.execute_code(session_id, code)` | session_id + code | `result: str` | ✅（ExecutionError/TimeoutError） |
+| **Observe** | `SandboxExecutor.execute_code(session_id, observation_code)` | result（Execute 阶段输出） | `observation: str` | ✅（ExecutionError） |
 | **Validate** | `LLMClientPort.structured_generate(prompt, response_schema=ValidationSchema)` | result + observation + output_schema | `validation: ValidationResult` | ✅（LLMAPIError） |
+
+- **Observe 阶段详细设计**：
+  - 输入：`result`（Execute 阶段输出的执行结果）
+  - 输出：`observation: str`（执行观察报告，如资源使用、输出格式校验）
+  - `observation_code` 由引擎内部生成（基于 result 构造观察脚本）
+  - 失败处理：可重试（ExecutionError）
 
 - **RetryPolicy**（frozen dataclass）：
   - `max_attempts: int = 3`
@@ -639,8 +647,8 @@ def downgrade() -> None:
   - `initial_delay_sec: float = 1.0`
   - `max_delay_sec: float = 30.0`
   - `max_total_duration_sec: float = 120.0`
-  - `retryable_exceptions: tuple[type[Exception], ...] = (LLMAPIError, LLMResponseError, SandboxExecutionError, TimeoutError)`
-- **Session 管理**：通过 `SandboxExecutorPort.start_container(session_id)` / `stop_container(session_id)` 生命周期管理
+  - `retryable_exceptions: tuple[type[Exception], ...] = (LLMAPIError, LLMResponseError, ExecutionError, TimeoutError)`
+- **Session 管理**：通过 `SandboxExecutor.start_container(session_id)` / `stop_container(session_id)` 生命周期管理
 - **证据包双轨存储**：
   - 结构化字段（input_hash, rule_version, confidence, citations）→ L2_rdb PostgreSQL
   - 大文本字段（plan, code, result, observation, validation）→ L4_object MinIO
@@ -664,10 +672,28 @@ def downgrade() -> None:
 - **路径**：`src/application/use_cases/strategic_analysis.py`
 - **编排流程**：`tool_name 查询 → Skill 加载 → ToolExecutionService.execute → ToolExecuted 事件发布`
 - **依赖注入**：通过 `composition_root.py` 注入 `ToolRegistryServicePort`、`SkillLoaderPort`、`ToolExecutionService`、`EventBusPort`
+- **路径**：`src/application/skills/loader.py`
 - **SkillLoaderPort 抽象**（六边形约束）：`src/application/ports/skill_loader.py`
   - `async load_metadata(tool_name: str) -> ToolMetadata`（L1）
   - `async load_sop(tool_name: str) -> SkillDocument`（L2）
   - `async load_references(tool_name: str, ref_name: str) -> bytes`（L3）
+- **SkillLoaderPort 返回类型定义**：
+  ```python
+  @dataclass(frozen=True)
+  class ToolMetadata:
+      tool_name: str
+      slug: str
+      category: str
+      input_schema: dict
+      output_schema: dict
+
+  @dataclass(frozen=True)
+  class SkillDocument:
+      tool_name: str
+      slug: str
+      content: str
+      token_count: int
+  ```
 - **Skill 加载失败异常路径**：复用 `ToolNotFoundError` (EXCEPTION_380) 携带 slug 上下文 / 新增 `SkillNotFoundError` (EXCEPTION_387)
 - **事件双通道配置 + 事件归属修正**：ToolExecuted 事件**已存在**（`src/domain/events/tool_events.py:15-37`），当前 `aggregate_type="Tool"` 且 `aggregate_id` 未明确。本 Story 同步修正 + 双通道升级：
   - **事件归属修正**（Round 2 D1 Agent C 关键发现）：ToolExecution 才是执行聚合根，事件归属必须修正：
@@ -719,6 +745,8 @@ def downgrade() -> None:
 - L3（scripts/references）：按需（references 名称查询时加载，无缓存）
 
 **多租户隔离**：L1/L2/L3 **不按 tenant_id 隔离**（Skills 是跨租户共享的业务知识）
+
+**⚠️ 六边形架构定位说明**：Skills 是应用层静态资源（SKILL.md 文件读取），非基础设施存储。因此 `InMemorySkillLoader` 放在 `src/application/skills/` 而非 `src/infrastructure/`，与 `InMemoryToolRepository`（基础设施存储）的定位不同。
 
 **验证标准/Validation Criteria:**
 - [ ] TOOLS.md 格式正确（<200 tokens，验证用 tiktoken）
@@ -1570,21 +1598,15 @@ tests/
 17. ✅ AC-6 三级加载触发逻辑未定义 → L1 启动缓存 / L2 LRU / L3 无缓存
 18. ✅ 缺 Task 8 开发结束验收测试 → 新增 Task 8
 
-**Round 1 D2 调研发现（7 个新 P0 问题）：**
+**Round 2 D2 调研发现（5 个新 P0 问题）：**
 
-19. ✅ Task 0 异常 Checklist 数量 8→7（ToolExecutionStateTransitionError 不新增）
-20. ✅ Task 0 复用异常清单遗漏（补充 EntityStateTransitionError / EntityBusinessRuleError / ExecutionError / TimeoutError）
-21. ✅ EvidencePackage 字段数 8→9（全文统一）
-22. ✅ Task 7 端口注册数量 3→4（补充 tool_execution_repository）
-23. ✅ ToolExecutionEngine 路径冲突（移除 domain/services/ 下的重复定义）
-24. ✅ Tool 字段数 3→4（Task 1 完成标准补充 slug）
-25. ✅ 交付物清单补充（ToolExecutionRepositoryPort + InMemoryToolExecutionRepository + migration 011 + 端口契约测试）
-26. ✅ 测试文件清单补充（4 个异常相关测试文件）
-27. ✅ 端口契约测试行数 10→14（补充 repository / engine / skill_loader / event 契约）
-28. ✅ ToolExecutionEnginePort Protocol 缺失 → Task 0 新增定义
-29. ✅ Composition Root 注册遗漏 tool_execution_repository → 交付物清单修正
+30. ✅ EntityStateTransitionError 构造签名不匹配（entity_type/entity_id 参数） → 已修复 business_exceptions.py 扩展签名
+31. ⏳ ToolRepositoryPort sync vs ToolExecutionRepositoryPort async 不一致 → 记录技术债，后续 Story 统一
+32. ⏳ SandboxExecutorPort 实际类名 SandboxExecutor（无 Port 后缀） → 文档已修正为 SandboxExecutor
+33. ⏳ RetryPolicy 中 SandboxExecutionError 实际为 ExecutionError → 文档已修正
+34. ⏳ ToolExecutionQuery 缺少 started_after/started_before 时间范围过滤 → 补充到 Query Object
 
-**下一步：** Round 2 - D1 二次调研遗漏点，启动新一轮审查。
+**下一步：** Round 3 - D1 三次调研遗漏点，启动新一轮审查。
 
 ---
 
