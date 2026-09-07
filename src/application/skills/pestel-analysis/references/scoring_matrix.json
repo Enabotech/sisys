@@ -1,0 +1,32 @@
+{
+  "P": {
+    "name": "政治 (Political)",
+    "weight": 0.20,
+    "indicators": ["政策稳定性", "税收政策", "贸易政策", "政府监管", "政治稳定性"]
+  },
+  "E": {
+    "name": "经济 (Economic)",
+    "weight": 0.20,
+    "indicators": ["GDP增长", "通胀率", "汇率", "利率", "失业率", "消费信心"]
+  },
+  "S": {
+    "name": "社会 (Social)",
+    "weight": 0.15,
+    "indicators": ["人口结构", "消费习惯", "文化趋势", "教育水平", "城镇化率"]
+  },
+  "T": {
+    "name": "技术 (Technological)",
+    "weight": 0.15,
+    "indicators": ["技术成熟度", "R&D 投入", "数字化程度", "AI 应用", "专利数量"]
+  },
+  "En": {
+    "name": "环境 (Environmental)",
+    "weight": 0.15,
+    "indicators": ["碳排放", "可持续性", "气候变化", "环保法规", "ESG 评级"]
+  },
+  "L": {
+    "name": "法律 (Legal)",
+    "weight": 0.15,
+    "indicators": ["合规要求", "知识产权", "数据隐私", "反垄断", "劳动法"]
+  }
+}
