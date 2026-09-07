@@ -25,7 +25,7 @@ from src.domain.exceptions import (
 
 def _make_tool(**kwargs) -> Tool:
     """工厂函数：构造测试 Tool 实体"""
-    defaults = {
+    defaults: dict = {
         "tool_id": uuid.uuid4(),
         "name": "Test Tool",
         "description": "Test description",
@@ -138,7 +138,7 @@ def _make_tool_execution(**kwargs) -> ToolExecution:
     """工厂函数：构造测试 ToolExecution 实体"""
     state = kwargs.get("state", ToolExecutionState.IDLE)
     is_terminal = state in {ToolExecutionState.COMPLETED, ToolExecutionState.FAILED}
-    defaults = {
+    defaults: dict = {
         "execution_id": uuid.uuid4(),
         "tenant_id": uuid.uuid4(),
         "tool_id": uuid.uuid4(),
