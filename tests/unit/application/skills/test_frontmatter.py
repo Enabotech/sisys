@@ -25,7 +25,7 @@ from src.application.skills.frontmatter import (
 
 def _make_valid_frontmatter(**overrides: object) -> str:
     """构造有效 frontmatter 文本（可覆盖字段）。"""
-    base = {
+    base: dict = {
         "slug": "test-skill",
         "name": "测试工具",
         "version": "1.0.0",

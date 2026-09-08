@@ -307,7 +307,7 @@ class TestPersistentNoteTaker:
         """PersistentNote 是 frozen dataclass"""
         note = PersistentNote(query="测试")
         with pytest.raises(AttributeError):
-            note.query = "修改"  # type: ignore[misc]
+            setattr(note, "query", "修改")
 
     async def test_extraction_entity_limit(self) -> None:
         """实体数量限制为 Top-20"""
