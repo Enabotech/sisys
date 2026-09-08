@@ -95,13 +95,17 @@ def redis_subscriber() -> RedisEventSubscriber:
 
 @pytest.fixture
 async def pg_pool() -> Any:
-    """真实 PostgreSQL 连接池（localhost:5432）"""
+    """真实 PostgreSQL 连接池（localhost:5432）
+
+    优先使用 POSTGRES_USERNAME（实际数据库用户），
+    回退到 POSTGRES_USER（.env 中常见的命名）。
+    """
     import asyncpg
 
     pool = await asyncpg.create_pool(
         host=os.getenv("POSTGRES_HOST", "localhost"),
         port=int(os.getenv("POSTGRES_PORT", "5432")),
-        user=os.getenv("POSTGRES_USER", "postgres"),
+        user=os.getenv("POSTGRES_USERNAME") or os.getenv("POSTGRES_USER") or "postgres",
         password=os.getenv("POSTGRES_PASSWORD", ""),
         database=os.getenv("POSTGRES_DB", "sisys"),
         min_size=1,
