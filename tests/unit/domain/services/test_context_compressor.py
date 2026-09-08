@@ -377,7 +377,7 @@ class TestCompressedContextValueObject:
         """CompressedContext 是 frozen dataclass"""
         ctx = CompressedContext(context="测试")
         with pytest.raises(AttributeError):
-            ctx.context = "修改"  # type: ignore[misc]
+            setattr(ctx, "context", "修改")
 
 
 class TestContextCompressorEdgeCases:

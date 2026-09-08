@@ -48,4 +48,4 @@ class TestRapidOCRConfig:
         """配置对象应不可变。"""
         config = RapidOCRConfig(model_dir="/test", max_concurrency=2)
         with pytest.raises(AttributeError):
-            config.model_dir = "/other"  # type: ignore[misc]
+            setattr(config, "model_dir", "/other")

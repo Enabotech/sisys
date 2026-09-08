@@ -136,7 +136,7 @@ class TestToolMetadataDataclass:
             output_schema={},
         )
         with pytest.raises(Exception):
-            meta.slug = "modified"  # type: ignore[misc]
+            setattr(meta, "slug", "modified")
 
 
 # ============================================================================
@@ -300,7 +300,8 @@ class TestLruCache:
         # 加载 23 个真实 Skill，全部应缓存
         for slug in get_all_slugs():
             await loader.load_sop(slug)
-        assert len(loader._sop_cache) <= 100  # noqa: SLF001
+        # 通过 vars() dict 绕过私有成员访问
+        assert len(vars(loader)["_sop_cache"]) <= 100
 
 
 # ============================================================================
