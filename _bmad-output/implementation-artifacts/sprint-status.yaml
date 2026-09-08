@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-09-06
+last_updated: 2026-09-10
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -138,6 +138,10 @@ development_status:
   epic-4: in-progress
   4-1-strategic-tool-registration-tools: done
   4-1a-strategic-tool-impl: ready-for-dev
+  4-1b-skills-feat-enhancement: backlog
+  4-1c-skills-data-collection-integration: backlog
+  4-1d-skills-framework-enhancement: backlog
+  4-1e-skills-internal-framework: backlog
   4-2-toolchain-orchestration-dag: backlog
   4-3-tool-io-schema-validation: backlog
   4-4-docker-sandbox-execution: backlog
@@ -414,7 +418,7 @@ development_status:
 #     - Ready for Dev: 6 (0-17, 0-18, 0-30, 4-1, 4-1a)
 #     - In Progress: 1 (Epic 4 — Story 4.1a ready-for-dev)
 #     - Review: 0
-#     - Backlog: 125
+#     - Backlog: 129 (+4 for Story 4-1b/4-1c/4-1d/4-1e)
 #   Epics:
 #     - Done: 4 (Epic 1, Epic 2, Epic 3, Epic 90)
 #     - In Progress: 1 (Epic 0 — Iteration 1 剩余 0-17/0-18/0-30; Epic 4 — Story 4.1 ready-for-dev)
