@@ -2656,7 +2656,26 @@ buckets/
 
 ### 17.3 工具箱架构
 
-**⚠️ 当前状态（2026-09-04）：** 23 种战略工具**元数据已注册**（`src/domain/entities/strategic_tool_catalog.py`，包含 `name` / `description` / `category` / `input_schema` / `output_schema`），但 **SKILL.md × 23 SOP 文件**与 **TOOLS.md L1 聚合文件**均**未创建**。Skills 系统实现率 0%，详见 Epic 5 蓝图。
+**✅ 当前状态（2026-09-09）：**
+
+- ✅ **Story 4.1 已完成**：23 种战略工具元数据已注册
+- ✅ **Story 4.1a 已完成**（P0-1a 补充交付）：
+  - Tool 聚合根 + ToolExecution 6 状态机
+  - ToolExecutionEngine 五阶段工作流（Think→Code→Execute→Observe→Validate）
+  - StrategicAnalysisUseCase 用例编排
+  - Skills 三级加载骨架（L1 TOOLS.md + L2 SKILL.md × 23 + L3 scripts/references）
+  - YAML frontmatter 真实解析
+  - 端到端集成测试（真实 Redis + PG）
+- 📋 **Story 4.1b backlog**（P0-5）：Skills 数据采集基础设施（Reuters 已替换为 NewsAPI）
+  - DataSourcePort + 6 个数据源适配器（World Bank / IMF / Tavily / USPTO / IPCC / NewsAPI）
+  - Engine.Execute 阶段 `$DATA_SOURCE` 标记解析
+  - 5 个核心 Skills 已重新分配到 4.1c/4.1d/4.1e（见下）
+- 📋 **Story 4.1c backlog**（P0-6）：6 个外部数据型 Skills 复用 4.1b 完善
+  - pestel-analysis（从 4.1b 转入）/ porters-five-forces / appeals-analysis / competitor-analysis / scenario-planning / disruptive-innovation
+- 📋 **Story 4.1d backlog**（P0-7）：10 个混合数据型 Skills 增强（外部+内部数据）
+  - swot-tows（从 4.1b 转入）/ ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management-model（从 4.1b 转入）
+- 📋 **Story 4.1e backlog**（P0-8）：7 个纯内部框架 Skills 增强（用户输入 + Schema 模板）
+  - value-proposition-canvas（从 4.1b 转入）/ business-model-canvas（从 4.1b 转入）/ org-design-framework / dependency-graph / raci-matrix / gantt-chart / strategy-map（从 4.1b 转入）
 
 **设计哲学：** 23 种战略工具将**通过 CLI + Skills（Anthropic Claude Code 风格）**暴露给 Agent 调用：
 - **L1 元数据（TOOLS.md）**：启动时全量预加载到系统提示（≤1.2K tokens），模型基于 `description` 字段自主判断
@@ -2793,7 +2812,7 @@ buckets/
 
 > 完整 23×6+6 = 276 格应用映射见 Epic 5 Story 5-3 蓝图（`/home/agimtech/.review_cache/round1_skills_blueprint.md` §7）。
 
-**实施路径：** Skills 系统实现详见 Epic 5（Story 4.1a ready-for-dev + Story 5-x 完整分解），总工作量 85 人天 / 8 周 / 4.5 人团队。
+**实施路径：** Skills 系统实现详见 Epic 4（Story 4.1a ready-for-dev + Story 4.1b/4.1c/4.1d/4.1e 增量增强），总工作量约 40 人天 / 2-3 周 / 4.5 人团队。
 
 > 详见 [sisys-core-domain-design.md §17.4](sisys-core-domain-design.md#174-战略规划架构设计) 和 [sisys-checkpoint-timetravel-design.md](sisys-checkpoint-timetravel-design.md)
 
@@ -3274,7 +3293,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | 异常处理 | 100% | 100% | 三层异常层次 + 28 种异常类型已实现 |
 | Agent 推理 | 100% | 20% | ⚠️ LangGraph 骨架已实现，节点为 MVP 占位（返回硬编码字符串） |
 | Workflow | 100% | 30% | ⚠️ Prefect 骨架已实现，任务为 Mock 数据 |
-| Skills 系统 | 100% | 0% | ⚠️ 设计规划完成，**未实现（Epic 5 Story 4.1a + 5-x，85 人天 / 8 周 / 4.5 人团队）**；详见 Epic 5 蓝图（对标 Anthropic Claude Code Skills 渐进披露 + Hub-and-Spoke） |
+| Skills 系统 | 100% | 0% | ⚠️ Story 4.1a 骨架完成（100%）/ 数据采集与 5 Skills 增强 backlog（Story 4.1b ~40 人天）；详见 Epic 4 蓝图（对标 Anthropic Claude Code Skills 渐进披露 + Hub-and-Spoke） |
 | CQRS | 100% | 0% | ⚠️ 设计规划完成，未实现，应用层使用 services+use_cases 模式 |
 
 #### 19.7.2 关键优势

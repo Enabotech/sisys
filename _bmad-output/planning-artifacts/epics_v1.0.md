@@ -765,19 +765,21 @@ Epic 3 ✅ 已完成，详见[Epic 3: 智能检索与知识发现](epic_3.md)
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
 | Story 4.1 | 战略工具注册 | Agent 可以发现 23 种战略工具 | 依赖 Epic 1 Story 1.1（架构骨架） | P0-1 |
-| **Story 4.1a** | **战略工具实现** | **Tool 聚合根、ToolService、执行引擎、Skills SOP、用例编排** | **依赖 Story 4.1、Story 1.1（端口注册）** | **P0-1a（补充交付）** |
-| Story 4.2 | 工具链编排（DAG） | 支持复杂分析任务的自动化执行 | 依赖 Story 4.1a, Story 1.18a（Prefect 工作流引擎） | **P0-2** |
+| Story 4.1a | 战略工具实现 | Tool 聚合根、ToolService、执行引擎、Skills SOP、用例编排 | 依赖 Story 4.1、Story 1.1（端口注册） | P0-1a（补充交付）✅ Done |
+| Story 4.1b | Skills 数据采集基础设施 | DataSourcePort + 8 个数据源适配器（World Bank / IMF / Tavily / USPTO / IPCC / NewsAPI / **Eurostat** / **中国国家统计局**（用 crawler 插件）） | 依赖 Story 4.1a、Story 4.4 | P0-5（数据采集基础） |
+| Story 4.1c | Skills 数据采集集成（6 个外部数据型） | pestel-analysis / porters-five-forces / appeals-analysis / competitor-analysis / scenario-planning / disruptive-innovation 复用 4.1b 数据采集 | 依赖 Story 4.1b | P0-6 |
+| Story 4.1d | Skills 混合数据增强（10 个） | swot-tows / ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management-model 达到可实用分析成熟度 | 依赖 Story 4.1b | P0-7 |
+| Story 4.1e | Skills 内部框架增强（7 个） | value-proposition-canvas / business-model-canvas / org-design-framework / dependency-graph / raci-matrix / gantt-chart / strategy-map 达到可实用分析成熟度 | 依赖 Story 4.1a | P0-8 |
+| Story 4.2 | 工具链编排（DAG） | 支持复杂分析任务的自动化执行 | 依赖 Story 4.1a, Story 1.18a（Prefect 工作流引擎） | P0-2 |
 | Story 4.3 | 工具输入/输出 Schema 验证 | 工具输出符合预期格式，防止模型漂移 | 依赖 Story 4.1a | P0-3 |
-| Story 4.4 | Docker 沙箱执行 | 防止代码执行带来的安全风险 | 依赖 Epic 1 Story 1.7, **Story 4.1a**（替换 mock） | P0-4 |
-| Story 4.5 | 红蓝辩论机制基础 | MVP 阶段支持基础的多视角分析 | 依赖 Story 4.1a | **P0-5** |
+| Story 4.4 | Docker 沙箱执行 | 防止代码执行带来的安全风险 | 依赖 Epic 1 Story 1.7, Story 4.1a（替换 mock） | P0-4 |
+| Story 4.5 | 红蓝辩论机制基础 | MVP 阶段支持基础的多视角分析 | 依赖 Story 4.1a | P0-5 |
 | Story 4.6 | 工具版本管理（灰度发布与回滚） | 工具可安全迭代，异常版本可快速恢复 | 依赖 Story 4.1a, Story 4.3 | P1-6（V1） |
 | Story 4.7 | Validation Feedback 闭环增强 | 工具执行失败可自动恢复或明确标记 | 依赖 Story 4.3, Story 4.4, Story 4.1a | P1-7（V1） |
-| ~~Story 4.8~~ | ~~SAP 协议支持~~ | **已迁移至 Epic 5 Story 5.11** | — | — |
-| ~~Story 4.9~~ | ~~财务建模与估值基础~~ | **已迁移至 Epic 5 Story 5.12** | — | — |
 
 **✅ 依赖关系验证：**
 - Epic 4 依赖 Epic 1 的架构骨架（Story 1.1）和存储层（Story 1.7）
-- Epic 4 内部故事依赖：4.1 → 4.1a → 4.2/4.3/4.4/4.5/4.6/4.7；4.3 与 4.4 完成后进入 Validation Feedback 增强
+- Epic 4 内部故事依赖：4.1 → 4.1a~e → 4.2/4.3/4.4/4.5/4.6/4.7；4.3 与 4.4 完成后进入 Validation Feedback 增强
 - Epic 4 可独立交付价值（用户执行工具分析）
 - **不依赖 Epic 2-3/5-8**；SAP 协议和财务建模已迁移至 Epic 5
 
@@ -887,6 +889,201 @@ So that **Agent 可以按照 Think→Code→Execute→Observe→Validate 标准�
 **Then** Skill 加载 → ToolService.execute → Tool 状态变更 → ToolExecuted 事件发布
 **And** ToolExecutionEngine 执行 Think→Code→Execute→Observe→Validate 循环
 **And** 返回 ToolResult 包含 status、output、evidence_package
+
+---
+
+### Story 4.1b: Skills 数据采集基础设施
+
+As a **工具工程师**,
+I want **Skills 系统具备完整的数据采集基础设施（DataSourcePort + 6 个真实数据源适配器）**,
+So that **后续 Skills 完善 Story（4.1c/4.1d/4.1e）可复用统一的数据采集通道，无需各自实现外部 API 集成**。
+
+**业务价值：** Story 4.1a 已完成 Skills 系统骨架（23 个 Skill 元数据 + L1/L2/L3 三级加载），本 Story 提供完整的数据采集基础设施，作为 Skills 数据驱动分析的公共底座。
+
+**Acceptance Criteria:**
+
+1. **DataSourcePort 端口定义**
+   - [ ] `src/domain/ports/data_source.py` 定义 DataSourcePort Protocol
+   - [ ] DataSourceRef dataclass（name / url / ttl_seconds / required_fields / api_type）
+   - [ ] ToolMetadata.data_sources 字段扩展（向后兼容，默认空 tuple）
+
+2. **数据源适配器（业界最佳实践对标，Reuters 已替换为免费方案，PoC v1/v2 已验证）**
+   - [ ] WorldBankAdapter（GDP / Governance Indicators）—— ✅ 100% 公开免费
+   - [ ] IMFAdapter（World Economic Outlook）—— ⚠️ 需验证
+   - [ ] TavilyAdapter（Web 搜索 + 新闻聚合）—— ⚠️ 需 API Key
+   - [ ] USPTOAdapter（专利数据库）—— ✅ 100% 公开免费
+   - [ ] IPCCAdapter（环境数据）—— ⚠️ 主要 CSV 下载
+   - [ ] NewsAPIAdapter（实时新闻流，替代 Reuters Connect 付费 API）—— ⚠️ 免费 100 次/天
+   - [ ] **EurostatAdapter（欧盟 27 国 + EFTA 国家 SDMX REST API）—— ✅ PoC v1 验证完全可用（HTTP 200，42KB JSON 响应）**
+   - [ ] **中国国家统计局 Adapter（基于现有 plugins/crawler 爬虫插件）—— ⚠️ HTTP 403 反爬拒绝，需用 crawler 插件 HTML 解析（参考 sisys-web-crawler-design.md）**
+   - [ ] ⚠️ Reuters Connect API 已排除（年费数千美元）
+   - [ ] ⚠️ UNSD（联合国统计司）暂缓：PoC v2 验证 HTTP 500（服务异常），推迟到后续 Story
+   - [ ] ⚠️ OECD（经合组织）暂缓：PoC v2 验证 metadata 端点可用 + data 端点 404（需进一步查 dataflow ID），推迟到后续 Story
+
+3. **数据缓存层**
+   - [ ] Redis 缓存集成（按 ttl_seconds 自动失效）
+   - [ ] 数据新鲜度评分（source_timestamp / freshness_decay）
+
+4. **Engine.Execute 阶段增强**
+   - [ ] 识别沙箱代码中的 `$DATA_SOURCE(name, query)` 标记
+   - [ ] 并发调用白名单数据源
+   - [ ] 数据注入沙箱执行上下文
+   - [ ] 输出含 source / freshness / confidence 元数据
+
+5. **PoC 验证（已完成，结果参考 tests/integration/manual/test_data_source_poc_validation.py + test_data_source_poc_v2.py）**
+   - [x] **PoC v1 已完成**：Eurostat 完全可用（HTTP 200，42KB JSON）；UNSD/OECD/中国国统局初步探查
+   - [x] **PoC v2 已完成**：OECD metadata 可用 + data 404（推迟）；UNSD HTTP 500（推迟）；中国国统局 HTTP 403（推迟到 crawler 方案）
+   - [x] **结论**：Story 4.1b 集成 8 个数据源（Eurostat 新增 + 中国国统局用现有 crawler 插件）；UNSD/OECD 推迟到后续 Story
+
+**TDD 测试要求:**
+
+- [ ] 端口契约测试：`tests/contracts/test_port_contract_data_source.py`
+- [ ] 适配器单元测试：`tests/unit/infrastructure/external_services/data_sources/test_*_adapter.py`
+- [ ] 中国国家统计局爬虫集成测试：`tests/integration/external_services/data_sources/test_china_nbs_crawler.py`
+- [ ] 引擎集成测试：`tests/integration/application/test_data_source_execution.py`
+- [ ] 缓存层测试：`tests/unit/infrastructure/storage/test_data_source_cache.py`
+- [ ] 架构测试：`tests/unit/architecture/test_arch_data_source.py`
+
+**Given** Story 4.1a 已完成 Skills 系统骨架
+**When** 调用 Skills 需要外部数据时
+**Then** Engine.Execute 阶段识别 `$DATA_SOURCE` 标记，自动调用对应数据源
+**And** 数据注入沙箱执行上下文，LLM 可直接分析结构化数据
+**And** 输出含 source / freshness / confidence 元数据，支持溯源
+
+---
+
+### Story 4.1c: Skills 数据采集集成（外部数据型 Skills 完善）
+
+As a **工具工程师**,
+I want **6 个外部数据驱动型 Skills 复用 Story 4.1b 的 DataSourcePort 基础设施，实现自动外部数据获取**,
+So that **Agent 调用 pestel-analysis / porters-five-forces / appeals-analysis / competitor-analysis / scenario-planning / disruptive-innovation 时能自动从权威数据源获取高质量、可靠、新鲜的信息，无需用户手工填入数据**。
+
+**业务价值：** Story 4.1b 已实现 DataSourcePort + 8 个数据源适配器（World Bank / IMF / Tavily / USPTO / IPCC / NewsAPI / Eurostat / 中国国家统计局（用 crawler 插件））和 Engine.Execute 阶段的 `$DATA_SOURCE` 标记解析。本 Story 让 6 个外部数据驱动型 Skills 复用该基础设施，从框架定义升级到自动数据采集的完整分析工具。
+
+**Acceptance Criteria:**
+
+1. **数据采集 SOP 编写（每个 Skill 1-2 人天，对标业界最佳实践）**
+   - [ ] **pestel-analysis**（从 4.1b 转移）：data_sources（World Bank + IMF + **Eurostat**（欧洲维度） + IPCC + NewsAPI + **中国国统局**（中国维度，crawler））+ SOP 六维度扫描 + 工作坊
+   - [ ] **porters-five-forces**：data_sources（NewsAPI + World Bank + **Eurostat**（欧盟行业） 行业数据）+ SOP 五力评分 + 行业问卷
+   - [ ] **appeals-analysis**：data_sources（Tavily + NewsAPI + **中国国统局** 顾客洞察）+ SOP 8 维度评估 + 顾客问卷
+   - [ ] **competitor-analysis**：data_sources（NewsAPI + USPTO + Tavily + **中国国统局** 竞品对标）+ SOP 竞品对标矩阵 + 竞品调研
+   - [ ] **scenario-planning**：data_sources（Tavily + IPCC 趋势 + **Eurostat** 欧盟情景）+ SOP 4 情景剧本 + 情景工作坊
+   - [ ] **disruptive-innovation**：data_sources（USPTO 专利 + Tavily 颠覆性技术）+ SOP 技术成熟度 + 专家访谈
+
+2. **Skill 单元结构（对标 Anthropic Claude Code Skills 规范）**
+   - [ ] 每个 Skill 含：SKILL.md + templates/ + references/ + data_sources.yaml
+   - [ ] input_schema 严格定义（JSON Schema + Pydantic）
+   - [ ] 资源靠近 Skill（脚本、模板、参考文档）
+
+3. **集成到 Engine 五阶段工作流**
+   - [ ] 6 个 Skills 在 Think 阶段生成数据采集计划
+   - [ ] Code 阶段生成 `$DATA_SOURCE(name, query)` 标记
+   - [ ] Execute 阶段并发调用数据源
+   - [ ] 输出含 source / freshness / confidence 元数据
+
+4. **集成测试**
+   - [ ] `tests/integration/application/test_skill_data_collection_4_1c.py`
+   - [ ] 验证 6 个 Skills 各自调用至少 1 个数据源
+   - [ ] 多源三角化验证（每个指标 ≥3 个独立来源）
+   - [ ] 数据新鲜度评分（source_timestamp / freshness_decay）
+
+**TDD 测试要求:**
+
+- [ ] Skills SOP 单元测试：`tests/unit/application/skills/test_*_4_1c.py`（6 个 Skills 各 1 个）
+- [ ] 集成测试：`tests/integration/application/test_skill_data_collection_4_1c.py`
+- [ ] 架构测试：`tests/unit/architecture/test_arch_skill_data_collection_4_1c.py`
+
+**Given** Story 4.1b 数据采集基础设施已就绪
+**When** Agent 调用 6 个外部数据型 Skills
+**Then** Skills 自动通过 DataSourcePort 获取外部权威数据
+**And** LLM 基于真实数据生成结构化分析输出
+**And** 输出含 source / freshness / confidence 元数据
+
+---
+
+### Story 4.1d: Skills 混合数据增强（外部+内部混合数据型 Skills 完善）
+
+As a **工具工程师**,
+I want **10 个混合数据型 Skills 达到可实用分析成熟度（Schema 模板 + 工作坊方法论 + 部分外部数据）**,
+So that **Agent 调用 Ansoff / Value Curve / GE-McKinsey / SPACE / SWOT-TOWS / Value Chain / VRIO / BSC / KPI / Change Management 时基于结构化 Schema 模板 + 内部数据 + 行业基准，输出可执行的分析结果**。
+
+**业务价值：** 10 个混合数据型 Skills 同时需要外部行业基准（World Bank / IMF）和企业内部数据。Story 4.1d 复用 Story 4.1b 的部分数据源（仅外部基准）+ 内部 Schema 模板 + 工作坊方法论（业界咨询公司标准做法）。
+
+**Acceptance Criteria:**
+
+1. **混合数据 Skills SOP 编写（10 个，每个 1-1.5 人天）**
+   - [ ] **swot-tows**：data_sources（NewsAPI + Tavily 外部）+ 内部优势/劣势 + 战略工作坊
+   - [ ] **ansoff-matrix**：data_sources（行业增长率）+ 内部产品 × 市场 + 战略工作坊
+   - [ ] **value-curve-analysis**：data_sources（行业基准）+ 内部产品价值要素 + 客户调研
+   - [ ] **ge-mckinsey-matrix**：data_sources（World Bank 行业吸引力）+ 业务单元数据 + 高管访谈
+   - [ ] **space-matrix**：data_sources（行业标准）+ 4 维度评分 + 问卷打分 + 专家访谈
+   - [ ] **value-chain-analysis**：data_sources（行业基准）+ 内部活动 + ERP 导出 + 流程访谈
+   - [ ] **vrio-framework**：data_sources（行业能力）+ 内部资源 + 内部审计 + 高管访谈
+   - [ ] **bsc-scorecard**：data_sources（行业基准）+ 内部 KPI + 战略规划文件 + 高管工作坊
+   - [ ] **kpi-tree**：data_sources（行业基准）+ 内部 KPI + 数据仓库导出
+   - [ ] **change-management-model**：data_sources（NewsAPI + Tavily 行业变革趋势）+ 内部变革数据 + 利益相关者访谈
+
+2. **Schema 模板与工作坊方法论**
+   - [ ] 10 个 Skills 各自配套 Excel 模板（input_schema → 模板字段一一对应）
+   - [ ] 工作坊引导文档（如何召开 2-4 小时结构化工作坊采集数据）
+   - [ ] 评分锚点说明（1-5 分或 1-10 分的具体含义）
+
+3. **集成测试**
+   - [ ] `tests/integration/application/test_skill_mixed_data_4_1d.py`
+   - [ ] 验证 10 个 Skills 各自加载 Schema 模板
+   - [ ] 验证外部数据基准 + 内部数据融合逻辑
+
+**TDD 测试要求:**
+
+- [ ] Skills SOP 单元测试：`tests/unit/application/skills/test_*_4_1d.py`（10 个 Skills 各 1 个）
+- [ ] Schema 模板测试：`tests/unit/application/skills/test_schema_templates_4_1d.py`
+- [ ] 集成测试：`tests/integration/application/test_skill_mixed_data_4_1d.py`
+- [ ] 架构测试：`tests/unit/architecture/test_arch_skill_mixed_data_4_1d.py`
+
+**Given** Story 4.1a Skills 骨架 + Story 4.1b 部分数据源已就绪
+**When** Agent 调用 10 个混合数据型 Skills
+**Then** Skills 通过 Schema 模板收集内部数据 + 部分通过 DataSourcePort 获取外部基准
+**And** LLM 融合内外数据生成结构化分析输出
+
+---
+
+### Story 4.1e: Skills 内部框架增强（内部用户输入型 Skills 完善）
+
+As a **工具工程师**,
+I want **7 个纯内部框架 Skills 达到可实用分析成熟度（结构化用户输入模板 + 框架逻辑引导）**,
+So that **Agent 调用 Value Proposition Canvas / Business Model Canvas / Org Design Framework / Dependency Graph / RACI Matrix / Gantt Chart / Strategy Map 时基于用户输入的内部业务信息输出结构化分析结果**。
+
+**业务价值：** 7 个纯内部用户输入 Skills 不依赖外部数据采集，主要基于用户输入的内部业务信息。Story 4.1e 复用 Story 4.1a 的 Skills 骨架，强化 Schema 模板与框架逻辑。
+
+**Acceptance Criteria:**
+
+1. **内部框架 Skills SOP 编写（7 个，每个 0.8 人天）**
+   - [ ] **value-proposition-canvas**：9 块匹配分析 + 用户输入客户/价值信息
+   - [ ] **business-model-canvas**：9 块业务模型 + 用户输入业务信息
+   - [ ] **org-design-framework**：Galbraith 5 维度评估 + 用户输入组织结构
+   - [ ] **dependency-graph**：DAG 节点 + 箭头 + 用户输入任务依赖
+   - [ ] **raci-matrix**：角色 × 任务 + 用户输入角色任务
+   - [ ] **gantt-chart**：时间线 + 里程碑 + 用户输入项目时间
+   - [ ] **strategy-map**：BSC 四维度因果链 + 用户输入战略主题
+
+2. **Schema 模板与单元测试**
+   - [ ] 7 个 Skills 各自配套用户输入模板
+   - [ ] 框架逻辑引导文档（如何系统化思考 + 填写）
+
+3. **单元测试**
+   - [ ] `tests/unit/application/skills/test_skill_framework_4_1e.py`
+   - [ ] 7 个 Skills 每个 1-2 个单元测试（验证 SOP 路径）
+
+**TDD 测试要求:**
+
+- [ ] Skills SOP 单元测试：`tests/unit/application/skills/test_*_4_1e.py`（7 个 Skills 各 1 个）
+- [ ] Schema 模板测试：`tests/unit/application/skills/test_schema_templates_4_1e.py`
+- [ ] 架构测试：`tests/unit/architecture/test_arch_skill_framework_4_1e.py`
+
+**Given** Story 4.1a Skills 骨架已就绪
+**When** Agent 调用 7 个内部框架 Skills
+**Then** Skills 通过 Schema 模板引导用户输入内部业务信息
+**And** LLM 基于框架逻辑生成结构化分析输出
 
 ---
 
@@ -1185,8 +1382,8 @@ So that **工具执行失败可自动恢复或明确标记，保证任务可靠�
 | Story 5.8 | Agent 输出质量评估 | 幻觉检测、上下文相关性、置信度校准 | 依赖 Story 5.7 | P0-8 |
 | Story 5.9 | CUSUM 漂移检测与触发重校准 | 自动检测模型性能漂移并触发重校准 | 依赖 Story 5.8 | P1-9 |
 | Story 5.10 | CheckpointWithEvaluation 集成 | 评估历史存入 Checkpoint，支持漂移趋势追踪 | 依赖 Story 5.8, Epic 6 Story 6.3 | P1-10 |
-| **Story 5.11** | **SAP 协议支持（内部 Agent 通信）** | **从 Epic 4 Story 4.8 迁移，支持 Agent 间标准消息通信** | **依赖 Story 5.3, Story 1.3（事件总线）** | **P1-11** |
-| **Story 5.12** | **财务建模与估值基础** | **从 Epic 4 Story 4.9 迁移，DCF/可比公司/先例交易三种方法** | **依赖 Story 4.1a, Story 4.3, Story 3.2a（LLM 客户端）** | **P1-12** |
+| Story 5.11 | SAP 协议支持（内部 Agent 通信） | 从 Epic 4 Story 4.8 迁移，支持 Agent 间标准消息通信 | 依赖 Story 5.3, Story 1.3（事件总线） | P1-11** |
+| Story 5.12 | 财务建模与估值基础 | 从 Epic 4 Story 4.9 迁移，DCF/可比公司/先例交易三种方法 | 依赖 Story 4.1a, Story 4.3, Story 3.2a（LLM 客户端） | P1-12** |
 
 **✅ 依赖关系验证：**
 - Epic 5 依赖 Epic 1 的缓存层（Story 1.4）和审计日志（Story 1.10）
