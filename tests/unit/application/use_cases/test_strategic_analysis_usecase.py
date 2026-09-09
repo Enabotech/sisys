@@ -19,6 +19,7 @@ import pytest
 
 from src.application.ports.skill_loader import SkillLoaderPort
 from src.application.ports.tool_execution_service import ToolExecutionServicePort
+from src.application.ports.tool_registry_service import ToolRegistryServicePort
 from src.application.use_cases.strategic_analysis import (
     StrategicAnalysisRequest,
     StrategicAnalysisUseCase,
@@ -26,7 +27,6 @@ from src.application.use_cases.strategic_analysis import (
 from src.domain.entities.tool import Tool, ToolCategory, ToolStatus
 from src.domain.events.tool_events import ToolExecuted
 from src.domain.ports.event_publisher import EventPublisher
-from src.domain.ports.tool_repository import ToolRepositoryPort
 from src.domain.value_objects.tool_execution import (
     ToolResult,
     ToolResultStatus,
@@ -88,7 +88,7 @@ class TestStrategicAnalysisUseCase:
     @pytest.fixture
     def mock_registry(self) -> MagicMock:
         """模拟 ToolRegistryServicePort"""
-        mock = MagicMock(spec=ToolRepositoryPort)
+        mock = MagicMock(spec=ToolRegistryServicePort)
         return mock
 
     @pytest.fixture

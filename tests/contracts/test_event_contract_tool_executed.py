@@ -77,28 +77,28 @@ class TestToolExecutedEventSerialization:
         )
 
     def test_to_dict_includes_execution_id(self) -> None:
-        """to_dict 应包含 execution_id。"""
+        """to_dict 应包含 execution_id（在 payload 中）。"""
         event = self._make_event()
         data = event.to_dict()
-        assert "execution_id" in data
+        assert "execution_id" in data["payload"]
 
     def test_to_dict_includes_tool_id(self) -> None:
-        """to_dict 应包含 tool_id。"""
+        """to_dict 应包含 tool_id（在 payload 中）。"""
         event = self._make_event()
         data = event.to_dict()
-        assert "tool_id" in data
+        assert "tool_id" in data["payload"]
 
     def test_to_dict_includes_execution_result(self) -> None:
-        """to_dict 应包含 execution_result。"""
+        """to_dict 应包含 execution_result（在 payload 中）。"""
         event = self._make_event()
         data = event.to_dict()
-        assert "execution_result" in data
+        assert "execution_result" in data["payload"]
 
     def test_to_dict_includes_cost_audit(self) -> None:
-        """to_dict 应包含 cost_audit。"""
+        """to_dict 应包含 cost_audit（在 payload 中）。"""
         event = self._make_event()
         data = event.to_dict()
-        assert "cost_audit" in data
+        assert "cost_audit" in data["payload"]
 
     def test_from_dict_roundtrip(self) -> None:
         """to_dict -> from_dict -> to_dict 应等值。"""
@@ -106,7 +106,9 @@ class TestToolExecutedEventSerialization:
         data = event.to_dict()
         restored = ToolExecuted.from_dict(data)
         assert isinstance(restored, ToolExecuted), f"from_dict 应返回 ToolExecuted 实例，实际: {type(restored).__name__}"
-        assert restored.execution_id == event.execution_id
+        # aggregate_id 是 execution_id（to_dict 序列化为 str 字符串）
+        assert str(restored.aggregate_id) == data["aggregate_id"]
+        assert restored.aggregate_id == event.execution_id
         assert restored.tool_id == event.tool_id
         assert restored.execution_result == event.execution_result
         assert restored.cost_audit == event.cost_audit
