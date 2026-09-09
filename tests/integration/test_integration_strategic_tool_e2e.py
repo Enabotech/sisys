@@ -99,28 +99,37 @@ async def pg_pool() -> Any:
 
     优先使用 POSTGRES_USERNAME（实际数据库用户），
     回退到 POSTGRES_USER（.env 中常见的命名）。
+
+    PG 不可用（密码错、网络不通）时动态 pytest.skip()，
+    符合 CLAUDE.md §5「pytest.skip() 动态跳过」约束。
     """
     import asyncpg
 
-    pool = await asyncpg.create_pool(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=int(os.getenv("POSTGRES_PORT", "5432")),
-        user=os.getenv("POSTGRES_USERNAME") or os.getenv("POSTGRES_USER") or "postgres",
-        password=os.getenv("POSTGRES_PASSWORD", ""),
-        database=os.getenv("POSTGRES_DB", "sisys"),
-        min_size=1,
-        max_size=5,
-    )
+    try:
+        pool = await asyncpg.create_pool(
+            host=os.getenv("POSTGRES_HOST", "localhost"),
+            port=int(os.getenv("POSTGRES_PORT", "5432")),
+            user=os.getenv("POSTGRES_USERNAME") or os.getenv("POSTGRES_USER") or "postgres",
+            password=os.getenv("POSTGRES_PASSWORD", ""),
+            database=os.getenv("POSTGRES_DB", "sisys"),
+            min_size=1,
+            max_size=5,
+        )
+    except Exception as exc:
+        pytest.skip(f"PostgreSQL 不可用，跳过集成测试: {type(exc).__name__}: {exc}")
     yield pool
     await pool.close()
 
 
 @pytest.fixture
-def real_outbox_repo(pg_session) -> PostgreSQLOutboxRepository:
-    """PostgreSQLOutboxRepository（依赖 session_context fixture，由项目 conftest 提供 pg_session mock）
+def real_outbox_repo() -> PostgreSQLOutboxRepository:
+    """PostgreSQLOutboxRepository（不依赖 pg_session，避免 ContextVar 跨进程问题）
 
     实际存储使用 mock session（受限于项目现有 session_context 架构）。
     集成测试重点验证 UseCase → Outbox 调用链路是否触发。
+
+    原版本依赖 conftest 的 pg_session，但该 fixture 在 xdist worker 中
+    reset_session() 会抛 ValueError。改为直接构造，简化 fixture 链。
     """
     return PostgreSQLOutboxRepository()
 
@@ -142,15 +151,30 @@ def real_dual_channel_bus(
 async def pg_tool_execution_repository(
     pg_pool,
 ) -> AsyncGenerator[PostgreSQLToolExecutionRepository, None]:
-    """真实 PostgreSQLToolExecutionRepository（asyncpg 直连）"""
-    # 强制清理（在 fixture 创建前）
+    """真实 PostgreSQLToolExecutionRepository（asyncpg 直连）
+
+    表不存在时动态 pytest.skip()（migration 011 未应用场景），
+    符合 CLAUDE.md §5「pytest.skip() 动态跳过」约束。
+    """
+    import asyncpg
+
+    # 检查表是否存在（migration 011 是否已应用）
     async with pg_pool.acquire() as conn:
+        table_exists = await conn.fetchval(
+            "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tool_executions'"
+        )
+        if not table_exists:
+            pytest.skip("PostgreSQL 表 tool_executions 不存在（migration 011 未应用），跳过集成测试")
+        # 强制清理（在 fixture 创建前）
         await conn.execute("DELETE FROM tool_executions")
     repo = PostgreSQLToolExecutionRepository(pool=pg_pool, schema="public")
     yield repo
-    # 测试后清理
-    async with pg_pool.acquire() as conn:
-        await conn.execute("DELETE FROM tool_executions")
+    # 测试后清理（表存在时才有意义）
+    try:
+        async with pg_pool.acquire() as conn:
+            await conn.execute("DELETE FROM tool_executions")
+    except asyncpg.UndefinedTableError:
+        pass  # 表在测试过程中被删除，忽略清理错误
 
 
 @pytest.fixture
