@@ -105,6 +105,7 @@ class TestToolExecutedEventSerialization:
         event = self._make_event()
         data = event.to_dict()
         restored = ToolExecuted.from_dict(data)
+        assert isinstance(restored, ToolExecuted), f"from_dict 应返回 ToolExecuted 实例，实际: {type(restored).__name__}"
         assert restored.execution_id == event.execution_id
         assert restored.tool_id == event.tool_id
         assert restored.execution_result == event.execution_result

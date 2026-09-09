@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.domain.ports.registry import Lifetime, PortSpec
+from src.domain.ports.registry import Lifetime
 from src.domain.ports.tool_execution_repository import ToolExecutionRepositoryPort
 
 
@@ -55,7 +55,7 @@ class TestToolExecutionRepositoryPortContract:
         "save_with_state_version",
     ]
 
-    def _spec(self) -> PortSpec | None:
+    def _spec(self) -> Any:
         from src.domain.ports.registry import _global_registry
 
         return _global_registry.get(self.PORT_NAME)

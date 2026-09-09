@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.application.ports.skill_loader import SkillLoaderPort
-from src.domain.ports.registry import Lifetime, PortSpec
+from src.domain.ports.registry import Lifetime
 
 
 class _DummyResolver:
@@ -49,7 +49,7 @@ class TestSkillLoaderPortContract:
         "match_by_trigger",
     ]
 
-    def _spec(self) -> PortSpec | None:
+    def _spec(self) -> Any:
         from src.domain.ports.registry import _global_registry
 
         return _global_registry.get(self.PORT_NAME)

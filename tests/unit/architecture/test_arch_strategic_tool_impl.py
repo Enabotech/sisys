@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -234,7 +235,7 @@ class TestStrategicToolImplementations:
         """ToolExecutionService 应实现 ToolExecutionServicePort。"""
         from src.application.ports.tool_execution_service import ToolExecutionServicePort
 
-        spec = _global_registry.get("tool_execution_service")
+        spec: Any = _global_registry.get("tool_execution_service")
         assert spec is not None
 
         # 创建实例（使用 DummyResolver）
@@ -245,7 +246,7 @@ class TestStrategicToolImplementations:
         """InMemorySkillLoader 应实现 SkillLoaderPort。"""
         from src.application.ports.skill_loader import SkillLoaderPort
 
-        spec = _global_registry.get("skill_loader")
+        spec: Any = _global_registry.get("skill_loader")
         assert spec is not None
 
         # 创建实例
@@ -256,7 +257,7 @@ class TestStrategicToolImplementations:
         """ToolExecutionEngine 应实现 ToolExecutionEnginePort。"""
         from src.application.ports.tool_execution_engine import ToolExecutionEnginePort
 
-        spec = _global_registry.get("tool_execution_engine")
+        spec: Any = _global_registry.get("tool_execution_engine")
         assert spec is not None
 
         # 创建实例（使用 DummyResolver）
@@ -267,7 +268,7 @@ class TestStrategicToolImplementations:
         """InMemoryToolExecutionRepository 应实现 ToolExecutionRepositoryPort。"""
         from src.domain.ports.tool_execution_repository import ToolExecutionRepositoryPort
 
-        spec = _global_registry.get("tool_execution_repository")
+        spec: Any = _global_registry.get("tool_execution_repository")
         assert spec is not None
 
         # 创建实例
@@ -289,8 +290,7 @@ class TestToolExecutionEngineDependencyDirection:
         """ToolExecutionEngine 应仅依赖 domain 层端口，不依赖 infrastructure。"""
         imports = _extract_imports(SRC_ROOT / "application" / "services" / "tool_execution_engine.py")
 
-        # 允许的依赖：domain 层、Python 标准库
-        allowed_prefixes = {"domain", "typing", "datetime", "uuid", "dataclasses", "logging", "asyncio", "time"}
+        # 禁止依赖：infrastructure / interfaces 层（违反六边形架构）
         forbidden_prefixes = {"infrastructure", "interfaces"}
 
         violations = [imp for imp in imports if any(imp.startswith(fp) for fp in forbidden_prefixes)]
