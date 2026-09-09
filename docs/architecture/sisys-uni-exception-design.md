@@ -696,6 +696,16 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_310 | ContainerStartError | SandboxError | 502 |
 | EXCEPTION_311 | ExecutionError | SandboxError | 502 |
 | EXCEPTION_312 | ContainerStopError | SandboxError | 502 |
+| EXCEPTION_380 | ToolNotFoundError | NotFoundError | 404 |（Story 4.1，工具元数据查询）|
+| EXCEPTION_381 | ToolAlreadyExistsError | ConflictError | 409 |（Story 4.1，工具重复注册）|
+| EXCEPTION_382 | ToolExecutionFailedError | BusinessException | 500 |（Story 4.1a，五阶段任一阶段失败）|
+| EXCEPTION_383 | ToolExecutionRetryExhaustedError | BusinessException | 502 |（Story 4.1a，重试 3 次耗尽）|
+| EXCEPTION_384 | （保留未占用）| — | — |（保留给未来 tool 子域扩展）|
+| EXCEPTION_385 | ToolExecutionTimeoutError | BusinessException | 504 |（Story 4.1a，超过 max_total_duration_sec）|
+| EXCEPTION_386 | EvidenceValidationFailedError | ValidationError | 400 |（Story 4.1a，证据包完整性校验失败）|
+| EXCEPTION_387 | SkillNotFoundError | NotFoundError | 404 |（Story 4.1a，Skill slug 查不到对应 SKILL.md）|
+| EXCEPTION_388 | SkillLoadError | BusinessException | 500 |（Story 4.1a，SKILL.md IO/YAML 解析失败）|
+| EXCEPTION_389 | ToolResultValidationError | ValidationError | 400 |（Story 4.1a，ToolResult.status=invalid 上下文）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 ### 3.3 编码分配策略：人工编码 + CI 自动校验

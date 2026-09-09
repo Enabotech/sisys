@@ -315,6 +315,15 @@ exclude_lines = [
 ]
 show_missing = true
 
+# 分层覆盖率门禁（Story 4.1a AC-7 要求）
+[[tool.coverage.report.overrides]]
+path = "src/domain/"
+fail_under = 90
+
+[[tool.coverage.report.overrides]]
+path = "src/application/"
+fail_under = 85
+
 # Bandit Configuration (Security Scanning)
 [tool.bandit]
 exclude_dirs = ["tests", ".venv", "venv"]

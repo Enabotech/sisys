@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import uuid
@@ -86,6 +87,8 @@ class InMemorySkillLoader(SkillLoaderPort):
             return
 
         try:
+            # 同步方法内直接调用 read_text，无需 asyncio.to_thread 绕道
+            # （_init_metadata_cache 在 __init__ 同步上下文中调用，本身不能 await）
             content = tools_md.read_text(encoding="utf-8")
         except OSError as exc:
             logger.error("TOOLS.md 读取失败: %s", exc)
@@ -167,7 +170,7 @@ class InMemorySkillLoader(SkillLoaderPort):
             raise SkillNotFoundError(tool_name=tool_name, slug=slug)
 
         try:
-            raw_text = skill_path.read_text(encoding="utf-8")
+            raw_text = await asyncio.to_thread(skill_path.read_text, encoding="utf-8")
         except OSError as exc:
             raise SkillLoadError(slug=slug, file_path=str(skill_path), cause=exc)
 
@@ -266,7 +269,7 @@ class InMemorySkillLoader(SkillLoaderPort):
             raise SkillNotFoundError(tool_name=tool_name, slug=slug)
 
         try:
-            return ref_path.read_bytes()
+            return await asyncio.to_thread(ref_path.read_bytes)
         except OSError as exc:
             raise SkillLoadError(slug=slug, file_path=str(ref_path), cause=exc)
 
@@ -293,7 +296,7 @@ class InMemorySkillLoader(SkillLoaderPort):
             raise SkillNotFoundError(tool_name=tool_name, slug=slug)
 
         try:
-            return script_path.read_bytes()
+            return await asyncio.to_thread(script_path.read_bytes)
         except OSError as exc:
             raise SkillLoadError(slug=slug, file_path=str(script_path), cause=exc)
 
