@@ -125,8 +125,11 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 **子域嵌套声明**（重要，Task 0 必须执行）：
 - `toolchain: (390, 399)` ⊂ `external: (301, 399)`（与 `tool: (380, 389)` 同处理方式）
 - 物理上 `toolchain` 码位处于 `external` 父范围之内，但语义上独立
-- 必须在 `_code_ranges.py` 的 `nested_subdomains` 注册：`"toolchain": "external"`
-- 必须在 `sisys-uni-exception-design.md §3.3.2` 表标注"嵌套于 external（语义独立）"
+- **实际嵌套声明方式**（参考 `docs/architecture/sisys-uni-exception-design.md:744` tool 子域处理惯例）：
+  - 在 `_code_ranges.py` 的 `CODE_RANGES` dict 中追加 `"toolchain": (390, 399)`（数值范围自然嵌套于 `external: (301, 399)` 内）
+  - 在 `tests/unit/domain/exceptions/test_code_ranges.py:285-295` 的 `nested_subdomains` 测试 fixture 中显式注册 `"toolchain": "external"`（用于范围重叠检测跳过）
+  - 在 `sisys-uni-exception-design.md §3.3.2` 表标注"嵌套于 external（语义独立）"
+- **避免误解**：`_code_ranges.py` 文件本身**无**运行时 `nested_subdomains` 字段（项目惯例是 flat CODE_RANGES dict）；注册位置是测试 fixture，而非 `_code_ranges.py`
 
 **新增 4 个异常（4 项 Checklist 强制）：**
 
@@ -137,7 +140,7 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 | `ToolChainNodeNotFoundError` | DAG 边引用的上游节点不存在（如 `B 依赖 X`，但 X 未在 nodes 列表中） | `BusinessException` | EXCEPTION_392 | toolchain (390-399) | 404 |
 | `ToolChainExecutionFailedError` | 工具链执行整体失败（FAIL_FAST 策略下首个节点失败后整链终止） | `BusinessException` | EXCEPTION_393 | toolchain (390-399) | 500 |
 
-**HTTP 状态码映射登记**（CLAUDE.md §5 红线延伸）：Task 0 必须在 `ExceptionHandler._http_status_map` 表追加上述 4 个异常的映射（422/422/404/500）。
+**HTTP 状态码映射登记**（CLAUDE.md §5 红线延伸）：Task 0 必须在 `src/interfaces/api/exception_handlers.py:104` 的模块级常量 `EXCEPTION_HTTP_MAP` 表追加上述 4 个异常的映射（422/422/404/500）。
 
 **toolchain 子域（390-399）剩余码位**：EXCEPTION_394-399 共 6 个码位预留，供后续 Story（4.7 Validation Feedback / 5.x 多 Agent 协作）扩展。
 
@@ -171,7 +174,7 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 - [ ] `tests/unit/domain/exceptions/test_code_ranges.py` 子域码段校验通过（`toolchain` ∈ [390, 399] 且 nested_subdomains 注册）
 - [ ] `tests/unit/domain/exceptions/test_error_code_uniqueness.py` 编码唯一性校验通过
 - [ ] `sisys-uni-exception-design.md §3.3.2` 表补登记 toolchain 子域（含嵌套关系说明）
-- [ ] **第 5 项（Round 1 新增）**：`ExceptionHandler._http_status_map` 表追加 4 个新异常的 HTTP 映射（422/422/404/500）
+- [ ] **第 5 项（Round 1 新增）**：`EXCEPTION_HTTP_MAP` 表（`src/interfaces/api/exception_handlers.py:104` 模块级常量）追加 4 个新异常的 HTTP 映射（422/422/404/500）
 - [ ] **第 5 项补充**：测试覆盖在 `tests/unit/domain/exceptions/test_tool_exceptions.py` 或新增 `tests/unit/domain/exceptions/test_tool_chain_exceptions.py`（按项目按异常模块命名惯例），断言 4 个新异常的 parent class（MRO chain 含 `BusinessException`）
 
 ---
@@ -248,7 +251,8 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 - `tests/contracts/test_event_contract_tool_chain_executed.py`（事件契约：字段必填 + 序列化 + 通道双投递）
 - `tests/contracts/test_port_contract_tool_chain_service.py`（端口契约 11 维度）
 - `tests/contracts/test_port_contract_tool_chain_repository.py`（端口契约 11 维度）
-- `tests/contracts/test_port_contract_tool_chain_dag_validator.py`（领域校验器契约）
+- `tests/contracts/test_port_contract_tool_chain_orchestrator.py`（端口契约 11 维度）
+- **不**创建 `tests/contracts/test_port_contract_tool_chain_dag_validator.py`（Validator 是领域服务，纯函数测试在 `tests/unit/domain/services/test_tool_chain_dag_validator_42.py`）
 
 ---
 
@@ -325,7 +329,7 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 - **3 项校验规则**（**顺序敏感**，前项失败立即抛错）：
   1. **节点唯一性**：所有 `node_id` 不重复（重复抛 `ToolChainDuplicateNodeError` EXCEPTION_391）
   2. **依赖节点存在性**：所有 `depends_on` 引用的 `node_id` 必须在 `nodes` 列表中存在（缺失抛 `ToolChainNodeNotFoundError` EXCEPTION_392）
-  3. **无环检测（含自依赖）**：使用 **stdlib `graphlib.TopologicalSorter`**（Kahn 算法 BFS 实现）做拓扑排序 + 环检测；自依赖作为长度为 1 的环被统一捕获；如发现环，使用 DFS 单点调用提取环路径（发现环抛 `ToolChainCycleDetectedError` EXCEPTION_390）
+  3. **无环检测（含自依赖）**：使用 **stdlib `graphlib.TopologicalSorter`**（Kahn 算法 BFS 实现）做拓扑排序 + 环检测；自依赖作为长度为 1 的环被统一捕获；如发现环，**`CycleError.args[1]` 仅返回参与环的节点集合（frozenset），不含路径顺序**，需要单点 DFS 提取环路径（发现环抛 `ToolChainCycleDetectedError` EXCEPTION_390）
 - **算法复杂度**：O(V + E)（V = 节点数，E = 边数）
 - **业界参考**：Apache Airflow 用 Kahn + 单独 `nx.find_cycle()` 报路径；Python `graphlib.TopologicalSorter`（3.9+）提供零依赖 Kahn 实现
 - **异常上下文**：携带失败详情
@@ -405,6 +409,7 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
   - `COMPLETED`：全部节点成功
   - `COMPLETED_WITH_ERRORS`：部分节点失败但策略允许继续
   - `FAILED`：DAG 级别失败（FAIL_FAST 触发或全部节点失败）
+- **与 ToolExecutionState 关系**：ToolChainRunState（5 值，链级抽象）与 4.1a 的 ToolExecutionState（6 值 IDLE/PLANNING/EXECUTING/VALIDATING/COMPLETED/FAILED，工具级抽象）是**独立的状态机**，抽象层级不同（DAG 级 vs 单工具五阶段）；两者均无 CANCELLED 是**独立决策**（均无业务触发器），不构成"对齐"
 - **状态机迁移矩阵**（沿用 Story 4.1a ToolExecution 模式）：
   ```python
   VALID_TRANSITIONS: dict[ToolChainRunState, set[ToolChainRunState]] = {
@@ -448,8 +453,9 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
   ```
 - **状态机迁移实现**：`transition_to(new_state)` 方法 + `can_transition_to(new_state)` 校验（复用 4.1a 模式）
 - **非法迁移异常**：复用 `EntityStateTransitionError` (EXCEPTION_243)
-- **`CostAudit` 强类型值对象**（替换原 `dict[str, Any]`）：
+- **`CostAudit` 强类型值对象**（**保留**原 `dict[str, Any]` 以兼容 4.1a `ToolExecuted.cost_audit`，新增 `CostAudit` 作为 Orchestrator 内部强类型计算结果，最终序列化为 `dict[str, Any]` 写入 ToolChainRun.cost_audit）：
   ```python
+  # Orchestrator 内部强类型（计算用）
   @dataclass(frozen=True)
   class CostAudit:
       llm_prompt_tokens: int = 0
@@ -460,7 +466,15 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
       parallel_speedup_ratio: float | None = None
       critical_path_sec: float | None = None
       wall_clock_sec: float | None = None
+
+      def to_dict(self) -> dict[str, Any]:
+          """序列化为 dict（事件载荷 + 持久化用）"""
+          return asdict(self)
+
+  # ToolChainRun.cost_audit: dict[str, Any]  # 沿用 4.1a 惯例
+  # ToolChainExecuted.cost_audit: dict[str, Any]  # 沿用 4.1a 惯例
   ```
+  **原因**：避免下游订阅者同时处理 `ToolExecuted`（dict）与 `ToolChainExecuted`（CostAudit 对象）两套反序列化逻辑。**不**替换 4.1a 既有契约。
 
 **验证标准/Validation Criteria:**
 - [ ] `ToolChainRun` 聚合根 + `ToolChainRunState` 5 值（PENDING/RUNNING/COMPLETED/COMPLETED_WITH_ERRORS/FAILED；CANCELLED 已删除）
@@ -496,7 +510,9 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
   5. **变量插值**：节点 `arguments_template` 中的 `${upstream_node.output.field}` 引用上游节点结果
      - 实现：**stdlib `string.Template` 自定义 delimiter**（`delimiter="${"` + `idpattern=r"[a-zA-Z_][a-zA-Z0-9_.]*"` 限制合法变量名）
      - **禁止** `re.sub(r'\$\{([^}]+)\}', ...)` 正则方案（无法处理嵌套、转义、字符串字面量误匹配）
-     - 上游节点未完成 → 引用失败抛 `EntityBusinessRuleError` (EXCEPTION_244)
+     - **两层错误处理语义边界**（重要）：
+       - Layer 1（`safe_substitute()` 模式）：变量名拼写错误 / 未声明占位符 → 保留原文本，不抛错
+       - Layer 2（**Orchestrator 守卫**）：上游节点未在 `completed_node_ids` 中 → 抛 `EntityBusinessRuleError` (EXCEPTION_244)；`safe_substitute` 不处理此语义
      - 语法规范：
        - ✅ 支持：`${upstream.output.field}`、`${upstream.output.nested.field}`（最多 3 层嵌套属性）
        - ✅ 支持：`safe_substitute()` 模式（未知变量保留原文本，不抛错）
@@ -509,9 +525,12 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
      - 终态：设置 completed_at + 计算 total_duration_sec + parallel_speedup_ratio
 
 - **失败策略实施**：
-  - **FAIL_FAST**：节点失败立即抛 `ToolChainExecutionFailedError` (EXCEPTION_393)，终止剩余 wave（**关键**：使用 `raise ... from original` 保留 `ToolExecutionFailedError` 的 `__cause__` 异常链，context 同时保留 `original_error_code`）
+  - **FAIL_FAST**：节点失败立即抛 `ToolChainExecutionFailedError` (EXCEPTION_393)，终止剩余 wave（**关键**：使用 `raise ... from original` 保留 `ToolExecutionFailedError` 的 `__cause__` 异常链，context 同时保留 `original_error_code` 与 `original_stage`）
+    - 实现细节：`ToolChainExecutionFailedError.__init__` 必须支持 `cause: Exception | None = None` 参数（与 `ToolExecutionFailedError.__init__(cause=...)` 签名对齐，参考 `strategic_archive_service.py:294` 惯例）
+    - `original_stage`（如 `SANDBOX_START` / `EXECUTION`）透传便于运维定位失败阶段
   - **CONTINUE_ON_ERROR**：节点失败标记 `NodeRunStatus.FAILED`，继续后续 wave
   - **SKIP_DOWNSTREAM**：节点失败时 BFS 遍历 `_reverse_adj`（**DAG 构建时 O(V+E) 预计算**，见 AC-1）查找所有下游节点，标记为 `NodeRunStatus.SKIPPED`，跳过执行
+    - **stage 决策参考**（可选实现，P2 优先级）：`SANDBOX_START` 阶段失败可考虑不 skip 下游（沙箱启动失败是环境问题，不影响下游工具可用性）；`EXECUTION` 阶段失败必须 skip 下游
   - **复杂度实测**：反向邻接表预计算 O(V+E) 一次性；运行时 BFS 下游标记 O(downstream_size)（非 O(F·(V+E))）
 
 - **并发控制**：`max_concurrency` 限制（默认 5）
@@ -621,27 +640,30 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 ### AC-8: 端口注册与架构约束
 
 **Given** 所有组件需要注册到 composition_root
-**When** 注册 4 个新端口（tool_chain_repository / tool_chain_dag_validator / tool_chain_orchestrator / tool_chain_service）+ 1 个 ToolChainExecuted 事件通道（非 Port，独立维度）+ 验证架构约束
+**When** 注册 3 个新端口（tool_chain_repository / tool_chain_orchestrator / tool_chain_service）+ 1 个 ToolChainExecuted 事件通道（非 Port，独立维度）+ 验证架构约束
 **Then**
 
-- **`composition_root.py` 注册清单**（**4 个新端口**）：
+- **`composition_root.py` 注册清单**（**3 个新端口**）：
   - `tool_chain_repository`：name=`tool_chain_repository`, version=`v1.0.0`, interface=`ToolChainRepositoryPort`, impl=`InMemoryToolChainRepository`, lifetime=`SCOPED`, owner=`tool-team`, tags=`("tool", "chain", "repository")`
-  - `tool_chain_dag_validator`：name=`tool_chain_dag_validator`, version=`v1.0.0`, interface=`ToolChainDagValidatorProtocol`, impl=`ToolChainDagValidator`, lifetime=`SINGLETON`（**纯函数无状态**）, owner=`tool-team`, tags=`("tool", "chain", "validator")`
   - `tool_chain_orchestrator`：name=`tool_chain_orchestrator`, version=`v1.0.0`, interface=`ToolChainOrchestratorProtocol`, impl=`ToolChainOrchestrator`, lifetime=`SCOPED`, owner=`tool-team`, tags=`("tool", "chain", "orchestrator")`
   - `tool_chain_service`：name=`tool_chain_service`, version=`v1.0.0`, interface=`ToolChainServicePort`, impl=`ToolChainService`, lifetime=`SCOPED`, owner=`tool-team`, tags=`("tool", "chain", "service")`
-- **`ToolChainDagValidatorProtocol`**（领域层校验器协议）：
+- **`ToolChainDagValidator` Python 类设计**（领域层纯函数，**非** Protocol）：
   ```python
-  @runtime_checkable
-  class ToolChainDagValidatorProtocol(Protocol):
-      """DAG 校验器协议（领域层）"""
+  class ToolChainDagValidator:
+      """DAG 校验器（领域层纯函数服务，**无状态、无依赖**）
 
-      def validate(self, dag: ToolChainDag) -> None:
+      使用 stdlib graphlib.TopologicalSorter（Kahn 算法 BFS）做拓扑排序 + 环检测；
+      自依赖作为长度为 1 的环被统一捕获；环路径提取通过单独 DFS 调用（graphlib.CycleError 仅返回节点集合，不含路径）。
+      """
+
+      @staticmethod
+      def validate(dag: ToolChainDag) -> None:
           """校验 DAG 合法性（无环 + 节点唯一 + 依赖存在）
 
           Raises:
-              ToolChainCycleDetectedError: 循环依赖
               ToolChainDuplicateNodeError: 节点重复
               ToolChainNodeNotFoundError: 依赖节点不存在
+              ToolChainCycleDetectedError: 循环依赖（含自依赖）
           """
           ...
   ```
@@ -650,9 +672,10 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 - **依赖方向矩阵合规**：domain 零依赖 → application → infrastructure → interfaces
 
 **验证标准/Validation Criteria:**
-- [ ] **4 个**新端口注册完整（tool_chain_repository / tool_chain_dag_validator / tool_chain_orchestrator / tool_chain_service）
+- [ ] **3 个**新端口注册完整（tool_chain_repository / tool_chain_orchestrator / tool_chain_service）；**ToolChainDagValidator 为领域服务（非端口），不通过 composition_root 注册**
+- [ ] **3 个**新端口契约测试通过：`tests/contracts/test_port_contract_tool_chain_repository.py` + `tests/contracts/test_port_contract_tool_chain_service.py` + `tests/contracts/test_port_contract_tool_chain_orchestrator.py`（**Validator 不走端口契约测试**，单元测试在 `tests/unit/domain/services/test_tool_chain_dag_validator_42.py`）
 - [ ] PortSpec 元数据十字段完整（name/version/interface/impl/module/lifetime/owner/**compatibility/tags/deprecated**）；其中 `compatibility=()` 表示向后兼容版本元组、`deprecated=False` 表示未废弃（参考 `src/domain/ports/registry.py:27-53`）
-- [ ] lifetime 决策合理（validator = SINGLETON，其余 = SCOPED）
+- [ ] lifetime 决策合理（3 个端口均 = SCOPED；ToolChainDagValidator 不走端口注入）
 - [ ] 端口命名空间与现有 tool_repository / tool_execution_repository 无冲突
 - [ ] 依赖注入正确（impl 字符串延迟加载）
 - [ ] 架构约束验证通过（`poetry run lint-imports`）
@@ -690,7 +713,7 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 | AC-5 | ToolChainOrchestrator 拓扑排序 + 并行调度 | Task 4 | Kahn 算法 + asyncio.gather + 失败策略 | `tests/unit/application/services/test_tool_chain_orchestrator.py` |
 | AC-6 | ToolChainService 应用层服务接口 | Task 6 | ToolChainServicePort + ToolChainService 实现 | `tests/contracts/test_port_contract_tool_chain_service.py` |
 | AC-7 | RunToolChainUseCase + Skill 加载 + 事件双通道 | Task 7 | 用例编排 + ToolChainExecuted 事件 | `tests/unit/application/use_cases/test_run_tool_chain_usecase.py` |
-| AC-8 | 端口注册与架构约束 | Task 8 | 4 端口注册 + PortSpec 元数据 + lint-imports | `tests/unit/architecture/test_arch_tool_chain_orchestration_dag.py` |
+| AC-8 | 端口注册与架构约束 | Task 8 | **3 端口**注册（不含 Validator）+ PortSpec 元数据 + lint-imports | `tests/unit/architecture/test_arch_tool_chain_orchestration_dag.py` |
 | **AC-1~AC-8 收尾** | **开发结束验收测试** | **Task 9** | **src + tests 完成清单断言 + 收尾校验** | `tests/acceptance/test_acceptance_tool_chain_orchestration_dag.py` |
 
 ---
@@ -716,7 +739,7 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 - [ ] Subtask: 定义 `ToolChainDagValidatorProtocol` Protocol 接口（领域层纯函数校验器）
 - [ ] Subtask: 定义 `ToolChainOrchestratorProtocol` Protocol 接口（6 步流程：校验 → 拓扑排序 → 波次构建 → 并行执行 → 变量插值 → 状态更新）
 - [ ] Subtask: 定义 `ToolChainExecuted` 领域事件 Schema（10 字段，含 chain_run_id / chain_id / failure_strategy）
-- [ ] Subtask: 定义 PortSpec 元数据清单（4 个新端口：tool_chain_repository / tool_chain_dag_validator / tool_chain_orchestrator / tool_chain_service）
+- [ ] Subtask: 定义 PortSpec 元数据清单（**3 个新端口**：tool_chain_repository / tool_chain_orchestrator / tool_chain_service；ToolChainDagValidator 为领域服务，**不**注册端口）
 - [ ] Subtask: **新增异常 4 项 Checklist 实施**（ToolChainCycleDetectedError EXCEPTION_390 / ToolChainDuplicateNodeError EXCEPTION_391 / ToolChainNodeNotFoundError EXCEPTION_392 / ToolChainExecutionFailedError EXCEPTION_393）
 - [ ] Subtask: **新增 toolchain 子域 390-399**（更新 `_code_ranges.py` + `sisys-uni-exception-design.md §3.3.2`）
 - [ ] Subtask: **复用异常确认**（ToolNotFoundError / ToolExecutionFailedError / ToolExecutionRetryExhaustedError / EntityValidationError / EntityBusinessRuleError / EntityStateTransitionError）
@@ -1056,7 +1079,7 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 
 | 阶段 | 动作 | 完成标志 |
 |------|------|----------|
-| 🔴 红 | 编写 `test_arch_tool_chain_orchestration_dag.py`（验证 4 个新端口注册元数据：name/version/interface/impl/module/lifetime/owner/compatibility/tags/deprecated 十字段） | `pytest` 失败 |
+| 🔴 红 | 编写 `test_arch_tool_chain_orchestration_dag.py`（验证 **3 个**新端口注册元数据：name/version/interface/impl/module/lifetime/owner/compatibility/tags/deprecated 十字段；**ToolChainDagValidator 非端口，不注册**） | `pytest` 失败 |
 | 🟢 绿 | 在 `src/composition_root.py` 注册 tool_chain_repository / tool_chain_dag_validator / tool_chain_orchestrator / tool_chain_service | `pytest` 通过 |
 | 🔄 重构 | 验证端口注册元数据完整性 + impl 字符串延迟加载 | `ruff check + mypy + pytest` 全部通过 |
 
@@ -1125,7 +1148,7 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
 - [ ] `ruff check` 通过
 - [ ] `mypy` 通过
 - [ ] `lint-imports` 通过
-- [ ] **覆盖率门禁达标 + CI 强制阻断**（Task 0 已配置 `pyproject.toml [tool.coverage.report] fail_under = 80` + `--cov-fail-under=80`）：domain ≥90% / application ≥85% / 整体 ≥80%
+- [ ] **覆盖率门禁达标 + CI 强制阻断**（实际门禁位于 `.gitea/workflows/ci.yaml:248,252` + `scripts/check_coverage_gates.py` + `Makefile:271,275`，非 `pyproject.toml fail_under`）：domain ≥90% / application ≥85% / 整体 ≥80%（Task 9 运行 `poetry run python scripts/check_coverage_gates.py` 验证）
 
 ---
 
@@ -1304,7 +1327,7 @@ src/
 | `tests/unit/architecture/test_arch_tool_chain_orchestration_dag.py` | 架构验证测试 |
 | `tests/contracts/test_port_contract_tool_chain_service.py` | Service 端口契约 |
 | `tests/contracts/test_port_contract_tool_chain_repository.py` | Repository 端口契约 |
-| `tests/contracts/test_port_contract_tool_chain_dag_validator.py` | Validator 端口契约 |
+| `tests/contracts/test_port_contract_tool_chain_dag_validator.py` | ~~**不创建**~~（Validator 是领域服务，纯函数测试） |
 | `tests/contracts/test_event_contract_tool_chain_executed.py` | 事件契约 |
 | `tests/integration/test_integration_tool_chain_orchestration_dag.py` | 集成测试 |
 | `tests/acceptance/test_acceptance_tool_chain_orchestration_dag.feature` | Gherkin 验收场景 |
