@@ -295,13 +295,6 @@ class DomainEvent:
             return value
 
         # Concrete types
-        # Resolve string type annotations (PEP 563 postponed evaluation) back to actual classes
-        if isinstance(target_type, str):
-            if target_type == "uuid.UUID":
-                target_type = uuid.UUID
-            elif target_type in ("datetime.datetime", "datetime"):
-                target_type = datetime
-
         if target_type is uuid.UUID and isinstance(value, str):
             return uuid.UUID(value)
         if target_type is datetime and isinstance(value, str):

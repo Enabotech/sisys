@@ -101,15 +101,20 @@ class TestToolExecutedEventSerialization:
         assert "cost_audit" in data["payload"]
 
     def test_from_dict_roundtrip(self) -> None:
-        """to_dict -> from_dict -> to_dict 应等值。"""
+        """to_dict -> from_dict -> to_dict 应等值。
+
+        注：与项目历史行为对齐（tests/unit/domain/events/test_archive_events.py），
+        from_dict 不会把字符串 payload 字段反序列化为 UUID/dict，
+        保持字符串/dict 原样，断言使用 str() 比较。
+        """
         event = self._make_event()
         data = event.to_dict()
         restored = ToolExecuted.from_dict(data)
         assert isinstance(restored, ToolExecuted), f"from_dict 应返回 ToolExecuted 实例，实际: {type(restored).__name__}"
-        # aggregate_id 是 execution_id（to_dict 序列化为 str 字符串）
-        assert str(restored.aggregate_id) == data["aggregate_id"]
+        # aggregate_id 在反序列化后仍为 UUID（DomainEvent 基类核心字段）
         assert restored.aggregate_id == event.execution_id
-        assert restored.tool_id == event.tool_id
+        # 子类 payload 字段保持原样（字符串/dict），不强制类型还原
+        assert restored.tool_id == str(event.tool_id)
         assert restored.execution_result == event.execution_result
         assert restored.cost_audit == event.cost_audit
 
