@@ -35,7 +35,7 @@
 - **SkillSelector**（基于 L1 元数据推荐 Top-K）→ **Story 5.2**（epics_v1.0.md:1287，Agent 身份档案加载）
 - **工具执行反馈闭环增强**（Auto-Invoke Pipeline 集成）→ **Story 4.7**（epics_v1.0.md:1103，Validation Feedback 闭环增强）
 - **Skills 准确性 ≥85% / 误触发 ≤5% 验收** → 后续 Story 待定（**注**：epics_v1.0.md:1186 当前 Story 5.9 已定义为"CUSUM 漂移检测与触发重校准"，Skills 准确性验收不在 5.9 范围内；本 Story 4.1a 暂不声明归属，由后续 PM/Architect 评估）
-- **Tool Execution Engine 的生产级沙箱集成**（Jupyter Kernel 持久化）→ 已迁移到 **Story 5.11**（epics_v1.0.md:1149, 1188，原 Story 4.8 已废弃；architecture.md §17.2.4 设计保留）
+- **Tool Execution Engine 的生产级沙箱集成**（Jupyter Kernel 持久化）→ 已迁移到 **Story 5.11**（epics_v1.0.md:1149, 1188，原 Story 4.8 已废弃；architecture.md §17.3.1 设计保留）
 
 **架构文档依据：** `docs/architecture/architecture.md:2286-2296` 明确"Skills 系统实现路径详见 Epic 5 蓝图（Story 5-2 ~ 5-9）"——本 Story 仅完成 Skills 系统骨架，避免与 Story 5.2 SkillSelector 职责冲突。
 
@@ -103,6 +103,16 @@
 | `SkillNotFoundError` | 通过 tool_name 查不到对应 SKILL.md（skill_manifest.py 缺失映射） | `NotFoundError` (EXCEPTION_202) | EXCEPTION_387 | tool (380-389) | 404（继承父类） | Task 0 |
 | `SkillLoadError` | SKILL.md 文件读取/解析失败（IO 错误、YAML frontmatter 格式错误） | `ConfigurationError` (EXCEPTION_101) | EXCEPTION_388 | tool (380-389) | 500（继承父类） | Task 0 |
 | `ToolResultValidationError` | ToolResult.status=invalid 需附加上下文（与 `EntityBusinessRuleError` 区分） | `ValidationError` (EXCEPTION_201) | EXCEPTION_389 | tool (380-389) | 400（继承父类） | Task 0 |
+
+**⚠️ Round 3 文档对齐说明（Code Review Round 3 发现）：**
+
+| 字段 | Story 描述 | 实际代码（tool_exceptions.py） | 偏差说明 |
+|------|-----------|------------------------------|---------|
+| `ToolExecutionTimeoutError` | 父类 `TimeoutError` (EXCEPTION_302) | 父类 `BusinessException` | HTTP 504 来自 `exception_handlers.py` 显式注册,非继承父类 |
+| `SkillLoadError` | 父类 `ConfigurationError` (EXCEPTION_101) | 父类 `BusinessException` | 跨子域继承(system → business),HTTP 500 来自显式注册 |
+| `ToolExecution.evidence_package` | `EvidencePackage \| None` | `dict \| None` | 字段类型不一致,需手动从 dict 还原 EvidencePackage |
+| `ToolExecution` 字段数 | 12 字段 | 16 字段 | Story 未包含 evidence_package/state_version 等完整字段描述 |
+| `SkillLoaderPort.ToolMetadata` | 5 字段 | 17 字段（向后兼容扩展） | 实现包含 capabilities/tags/description 等 12 扩展字段 |
 
 **tool 子域（380-389）剩余码位**：EXCEPTION_382/383/385/386/387/388/389 共 7 个新增（EXCEPTION_384 保留未占用，ToolExecutionState 迁移守卫复用 EXCEPTION_243 EntityStateTransitionError），剩余 1 个码位（384）保留。
 
@@ -1220,7 +1230,7 @@ def downgrade() -> None:
 
 ### 相关架构模式和约束 Architecture Patterns & Constraints
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
+**来源:** [`architecture.md`](../../../docs/architecture/architecture.md)
 
 - **架构模式:** Hexagonal Architecture（六边形架构）
 - **设计约束:**
@@ -1231,7 +1241,7 @@ def downgrade() -> None:
 
 ### 关键架构决策
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 ADR-001
+**来源:** [`architecture.md`](../../../docs/architecture/architecture.md) - 决策 ADR-001
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
@@ -1553,7 +1563,7 @@ tests/
 
 ## 📚 参考文档
 
-- [architecture.md](../../_bmad-output/planning-artifacts/architecture.md) - 架构设计文档
+- [architecture.md](../../../docs/architecture/architecture.md) - 架构设计文档
 - [epics_v1.0.md](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 和 Story 定义
 - [sisys-core-domain-design.md](../../docs/architecture/sisys-core-domain-design.md) - 核心领域架构详细设计
 - [sisys-implementation-patterns.md](../../docs/architecture/sisys-implementation-patterns.md) - 实现模式参考手册

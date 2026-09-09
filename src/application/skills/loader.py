@@ -125,7 +125,7 @@ class InMemorySkillLoader(SkillLoaderPort):
         cells = [c.strip() for c in row.split("|") if c.strip()]
         if len(cells) < 8:
             # 兼容旧版（5 列）TOOLS.md，仅填充核心字段
-            cells = cells + ["", "", ""] * (8 - len(cells))
+            cells = cells + [""] * (8 - len(cells))
 
         return ToolMetadata(
             tool_name=cells[1],
