@@ -97,26 +97,25 @@ def redis_subscriber() -> RedisEventSubscriber:
 async def pg_pool() -> Any:
     """真实 PostgreSQL 连接池（localhost:5432）
 
-    优先使用 POSTGRES_USERNAME（实际数据库用户），
-    回退到 POSTGRES_USER（.env 中常见的命名）。
-
-    PG 不可用（密码错、网络不通）时动态 pytest.skip()，
-    符合 CLAUDE.md §5「pytest.skip() 动态跳过」约束。
+    参考 test_integration_postgresql_real.py 模式：使用 get_test_env() 自动加载 .env，
+    三层配置覆盖链（环境检测预设 → .env 文件 → os.environ）确保凭据正确。
     """
     import asyncpg
 
-    try:
-        pool = await asyncpg.create_pool(
-            host=os.getenv("POSTGRES_HOST", "localhost"),
-            port=int(os.getenv("POSTGRES_PORT", "5432")),
-            user=os.getenv("POSTGRES_USERNAME") or os.getenv("POSTGRES_USER") or "postgres",
-            password=os.getenv("POSTGRES_PASSWORD", ""),
-            database=os.getenv("POSTGRES_DB", "sisys"),
-            min_size=1,
-            max_size=5,
-        )
-    except Exception as exc:
-        pytest.skip(f"PostgreSQL 不可用，跳过集成测试: {type(exc).__name__}: {exc}")
+    from tests.environments import get_test_env
+
+    env_config = get_test_env()
+    pg_cfg = env_config.postgres
+
+    pool = await asyncpg.create_pool(
+        host=pg_cfg.host,
+        port=pg_cfg.port,
+        user=pg_cfg.username,
+        password=pg_cfg.password,
+        database=pg_cfg.database,
+        min_size=1,
+        max_size=5,
+    )
     yield pool
     await pool.close()
 
