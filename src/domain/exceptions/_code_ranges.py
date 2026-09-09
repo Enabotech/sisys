@@ -60,8 +60,17 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     "relevance": (360, 369),
     # 溯源子域（370-379）
     "traceability": (370, 379),
-    # 工具子域（380-389）—— Story 4.1a: 新增 7 个异常 EXCEPTION_382/383/385/386/387/388/389，
-    # EXCEPTION_384 保留未占用，ToolExecutionState 迁移守卫复用 EXCEPTION_243 (EntityStateTransitionError)
+    # 工具子域（380-389）—— Story 4.1/4.1a 累计注册 9 个异常:
+    # EXCEPTION_380 ToolNotFoundError (Story 4.1)
+    # EXCEPTION_381 ToolAlreadyExistsError (Story 4.1)
+    # EXCEPTION_382 ToolExecutionFailedError (Story 4.1a)
+    # EXCEPTION_383 ToolExecutionRetryExhaustedError (Story 4.1a)
+    # EXCEPTION_385 ToolExecutionTimeoutError (Story 4.1a)
+    # EXCEPTION_386 EvidenceValidationFailedError (Story 4.1a)
+    # EXCEPTION_387 SkillNotFoundError (Story 4.1a, Skill 子域归属 tool)
+    # EXCEPTION_388 SkillLoadError (Story 4.1a, Skill 子域归属 tool)
+    # EXCEPTION_389 ToolResultValidationError (Story 4.1a)
+    # EXCEPTION_384 保留未占用；ToolExecutionState 迁移守卫复用 EXCEPTION_243 (EntityStateTransitionError)
     "tool": (380, 389),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),

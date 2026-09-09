@@ -2221,15 +2221,16 @@ def bootstrap() -> None:
         name="tool_execution_engine",
         version="v1.0.0",
         interface=__import__(
-            "src.application.ports.tool_execution_service",
-            fromlist=["ToolExecutionServicePort"],
-        ).ToolExecutionServicePort,
+            "src.application.ports.tool_execution_engine",
+            fromlist=["ToolExecutionEnginePort"],
+        ).ToolExecutionEnginePort,
         impl=lambda resolver: __import__(
             "src.application.services.tool_execution_engine",
             fromlist=["ToolExecutionEngine", "RetryPolicy"],
         ).ToolExecutionEngine(
             llm_client=resolver.resolve("llm_client"),
             sandbox=resolver.resolve("sandbox_executor"),
+            tool_execution_repository=resolver.resolve("tool_execution_repository"),
         ),
         module="src.application.services.tool_execution_engine",
         lifetime=Lifetime.SCOPED,
