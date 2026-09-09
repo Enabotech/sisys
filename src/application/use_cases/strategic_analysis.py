@@ -96,6 +96,9 @@ class StrategicAnalysisUseCase:
         except ToolNotFoundError:
             logger.warning("工具不存在: tool_name=%s", request.tool_name)
             raise
+        if tool is None:
+            # 仓储端口契约：get_tool 在工具不存在时返回 None，由应用层转换为 ToolNotFoundError
+            raise ToolNotFoundError(tool_name=request.tool_name)
 
         # 2. 通过 SkillLoaderPort 加载技能元数据（L1/L2）
         # 注：L1/L2 加载可能失败，但不应阻断执行链路（可选增强）

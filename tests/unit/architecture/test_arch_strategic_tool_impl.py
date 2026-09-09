@@ -14,6 +14,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -344,7 +345,11 @@ class TestToolSubdomainExceptionCodes:
 
 
 class _DummyResolver:
-    """测试用最小 Resolver 占位符。"""
+    """测试用最小 Resolver 占位符。
+
+    对已注册的 InMemory 仓储返回真实实例，对 LLM/Sandbox 等外部依赖返回 AsyncMock。
+    架构测试只需验证 impl factory 能产出满足 Protocol 的实例，不验证实际功能。
+    """
 
     def resolve(self, name: str) -> object:
         from src.infrastructure.storage.inmemory.tool_execution_repository import InMemoryToolExecutionRepository
@@ -358,9 +363,5 @@ class _DummyResolver:
             from src.application.services.tool_registry_service import ToolRegistryService
 
             return ToolRegistryService(InMemoryToolRepository())
-        if name == "llm_client":
-            raise NotImplementedError("LLM client not available in tests")
-        if name == "sandbox_executor":
-            raise NotImplementedError("Sandbox executor not available in tests")
-
-        raise KeyError(f"未知端口: {name}")
+        # LLM/Sandbox 等外部依赖返回 AsyncMock（架构测试不验证其功能）
+        return AsyncMock()
