@@ -438,7 +438,7 @@ Story 4.2 在 Story 4.1a 已实现的 `ToolExecutionEngine` 单工具五阶段�
   - `critical_path_sec: float | None`（关键路径长度，最长路径上各节点耗时求和，理论最大加速比上限）
   - `parallel_speedup_ratio: float | None`（Amdahl 加速比 = `total_work_sec / total_duration_sec`，"相比完全串行加速多少倍"）
   - `failure_strategy: FailureStrategy`（运行时使用的策略快照）
-  - `cost_audit: CostAudit`（强类型成本审计，见下方）
+  - `cost_audit: dict[str, Any]`（成本审计，**沿用** 4.1a `ToolExecuted.cost_audit: dict[str, Any]` 惯例，Orchestrator 内部用强类型 `CostAudit` 计算后通过 `asdict()` 序列化）
   - `state_version: int`（乐观锁版本号）
 - **`NodeRunStatus` 值对象**：
   ```python
