@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -34,10 +35,10 @@ from src.domain.value_objects.tool_execution import (
 
 def _make_tool(**kwargs: object) -> Tool:
     """工厂函数：创建 Tool 实体"""
-    defaults = {
+    defaults: dict = {
         "tool_id": uuid.uuid4(),
-        "tool_name": "pestel-analysis",
-        "category": ToolCategory.EXTERNAL_ANALYSIS,
+        "name": "pestel-analysis",
+        "category": ToolCategory.ENVIRONMENT_ANALYSIS,
         "status": ToolStatus.ACTIVE,
         "description": "PESTEL 宏观环境分析",
         "input_schema": {"type": "object", "properties": {}},
@@ -115,7 +116,7 @@ class TestStrategicAnalysisUseCase:
     ) -> StrategicAnalysisUseCase:
         """创建 StrategicAnalysisUseCase 实例"""
         return StrategicAnalysisUseCase(
-            registry=mock_registry,
+            tool_registry=mock_registry,
             execution_service=mock_execution_service,
             skill_loader=mock_skill_loader,
             event_publisher=mock_event_publisher,
@@ -139,8 +140,8 @@ class TestStrategicAnalysisUseCase:
             status=ToolResultStatus.SUCCESS,
             output={"result": "analysis complete"},
             evidence_package=None,
-            started_at=None,
-            completed_at=None,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
         )
 
         request = StrategicAnalysisRequest(
@@ -198,8 +199,8 @@ class TestStrategicAnalysisUseCase:
             status=ToolResultStatus.SUCCESS,
             output={},
             evidence_package=None,
-            started_at=None,
-            completed_at=None,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
         )
 
         request = StrategicAnalysisRequest(
@@ -232,8 +233,8 @@ class TestStrategicAnalysisUseCase:
             status=ToolResultStatus.SUCCESS,
             output={"result": "done"},
             evidence_package=None,
-            started_at=None,
-            completed_at=None,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
         )
 
         request = StrategicAnalysisRequest(
@@ -266,8 +267,8 @@ class TestStrategicAnalysisUseCase:
             status=ToolResultStatus.SUCCESS,
             output={},
             evidence_package=None,
-            started_at=None,
-            completed_at=None,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
         )
 
         request = StrategicAnalysisRequest(
@@ -298,7 +299,7 @@ class TestStrategicAnalysisUseCase:
         mock_execution_service.execute.side_effect = ToolExecutionFailedError(
             execution_id=str(uuid.uuid4()),
             stage="Think",
-            reason="LLM 调用失败",
+            message="LLM 调用失败",
         )
 
         request = StrategicAnalysisRequest(
