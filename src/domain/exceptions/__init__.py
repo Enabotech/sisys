@@ -131,6 +131,12 @@ from src.domain.exceptions.tool_exceptions import (
     ToolNotFoundError,
     ToolResultValidationError,
 )
+from src.domain.exceptions.tool_schema_exceptions import (
+    ToolInputSchemaValidationError,
+    ToolOutputSchemaValidationError,
+    ToolSchemaCompatibilityError,
+    ToolSchemaMissingError,
+)
 from src.domain.exceptions.traceability_exceptions import (
     TraceabilityError,
     TraceabilityNotFoundError,
@@ -258,4 +264,9 @@ __all__ = [
     "ToolChainNodeNotFoundError",
     "ToolChainExecutionFailedError",
     "ToolChainNotFoundError",
+    # 工具 Schema 验证异常
+    "ToolInputSchemaValidationError",
+    "ToolOutputSchemaValidationError",
+    "ToolSchemaCompatibilityError",
+    "ToolSchemaMissingError",
 ]
