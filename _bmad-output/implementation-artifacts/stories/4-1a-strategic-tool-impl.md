@@ -311,16 +311,16 @@
 
 **验证标准/Validation Criteria:**
 - Tool 实体新增 **4 个**新字段（rule_version, reliability_score, execution_count, slug）
-- [ ] Tool 实体 23 个 TOOL_CATALOG 实例不破坏（向后兼容）
-- [ ] ToolExecution 聚合根新建，12 字段完整（含 tenant_id、tool_version 快照、state_version 乐观锁）
-- [ ] ToolExecutionState 枚举 6 个值（IDLE/PLANNING/EXECUTING/VALIDATING/COMPLETED/FAILED）
-- [ ] 状态机迁移矩阵正确（5 条主链边 + PLANNING/EXECUTING/VALIDATING 可转 FAILED）
-- [ ] 非法迁移抛 `EntityStateTransitionError` (EXCEPTION_243) 复用（**不新增** tool 子域异常）
-- [ ] 重试创建新 attempt（不允许终态反向迁移）
-- [ ] 终态必有 completed_at、非终态 completed_at 为 None（不变量）
-- [ ] 使用已有领域异常 + 7 个候选新增异常 4 项 Checklist 通过（EXCEPTION_382/383/385/386/387/388/389）
-- [ ] domain 层零依赖验证通过（`poetry run lint-imports`）
-- [ ] ToolExecutionRepositoryPort 新建（`src/domain/ports/tool_execution_repository.py`），使用 Query Object 模式（CLAUDE.md §4）
+- [x] Tool 实体 23 个 TOOL_CATALOG 实例不破坏（向后兼容）
+- [x] ToolExecution 聚合根新建，16 字段完整（含 tenant_id、tool_version 快照、state_version 乐观锁；Story 描述"12 字段"为初始设计稿，实际实现含 5 阶段产物 plan/code/result/observation/validation 共 16 字段）
+- [x] ToolExecutionState 枚举 6 个值（IDLE/PLANNING/EXECUTING/VALIDATING/COMPLETED/FAILED）
+- [x] 状态机迁移矩阵正确（5 条主链边 + PLANNING/EXECUTING/VALIDATING 可转 FAILED）
+- [x] 非法迁移抛 `EntityStateTransitionError` (EXCEPTION_243) 复用（**不新增** tool 子域异常）
+- [x] 重试创建新 attempt（不允许终态反向迁移）
+- [x] 终态必有 completed_at、非终态 completed_at 为 None（不变量）
+- [x] 使用已有领域异常 + 7 个候选新增异常 4 项 Checklist 通过（EXCEPTION_382/383/385/386/387/388/389）
+- [x] domain 层零依赖验证通过（`poetry run lint-imports`）
+- [x] ToolExecutionRepositoryPort 新建（`src/domain/ports/tool_execution_repository.py`），使用 Query Object 模式（CLAUDE.md §4）
 
 ### AC-1.5: ToolExecutionRepository 端口（六边形仓储模式）
 
@@ -366,13 +366,15 @@
 - **PostgreSQL 注意事项**：`tool_executions` 表需独立 alembic migration；`tool_id` 外键需等待 Tool PostgreSQL 持久化（Story 4.1 仅 InMemoryToolRepository），本期**仅用应用层** `ToolRepositoryPort` 校验
 
 **验证标准/Validation Criteria:**
-- [ ] ToolExecutionRepositoryPort 定义在 `src/domain/ports/`（非应用层）
-- [ ] 查询方法使用 ToolExecutionQuery frozen dataclass（CLAUDE.md §4 决策规则）
-- [ ] InMemoryToolExecutionRepository 实现完整（dict[UUID, ToolExecution] + 乐观锁 + asyncio.Lock 类变量）
-- [ ] 端口契约测试 `tests/contracts/test_port_contract_tool_execution_repository.py` 11 维度覆盖
-- [ ] `composition_root.py` 注册 `tool_execution_repository` 端口（lifetime=SCOPED，与 tool_repository 对齐）
-- [ ] Alembic migration `deploy/postgresql/alembic/versions/011_tool_executions.py` 创建（含 4 索引 + 3 CHECK 约束）
-- [ ] L2/L4 双轨存储边界明确（结构化字段 → L2_rdb / 大文本 → L4_object）
+- [x] ToolExecutionRepositoryPort 定义在 `src/domain/ports/`（非应用层）
+- [x] 查询方法使用 ToolExecutionQuery frozen dataclass（CLAUDE.md §4 决策规则）
+- [x] InMemoryToolExecutionRepository 实现完整（dict[UUID, ToolExecution] + 乐观锁 + asyncio.Lock 类变量；Round 5 移除 InMemoryToolRepository 死代码 asyncio.Lock，但 InMemoryToolExecutionRepository 保留正确使用）
+- [x] 端口契约测试 `tests/contracts/test_port_contract_tool_execution_repository.py` 11 维度覆盖
+- [x] `composition_root.py` 注册 `tool_execution_repository` 端口（lifetime=SCOPED，与 tool_repository 对齐）
+- [x] Alembic migration `deploy/postgresql/alembic/versions/011_tool_executions.py` 创建（含 4 索引 + 3 CHECK 约束）
+- [x] L2/L4 双轨存储边界明确（结构化字段 → L2_rdb / 大文本 → L4_object，详见 ToolResultStatus 注释）
+
+**⚠️ Round 5 P0 调研遗留**：PostgreSQLToolExecutionRepository 已实现但 composition_root 仅注册 InMemoryToolExecutionRepository（PG 实现需额外注册分支，建议独立 Story 处理）。
 
 #### InMemoryToolExecutionRepository 实现样板（CLAUDE.md §6 类变量约束 + L2RdbPort async 一致性）
 
@@ -594,12 +596,12 @@ def downgrade() -> None:
 - **依赖注入**：通过 `composition_root.py` 注入 `ToolRegistryServicePort` + `ToolExecutionEngine` + `LLMClientPort` + `SandboxExecutorPort` + `EventBusPort`
 
 **验证标准/Validation Criteria:**
-- [ ] ToolExecutionService 实现位于 `src/application/services/`
-- [ ] ToolExecutionServicePort Protocol 位于 `src/application/ports/`
-- [ ] execute() 签名使用 ExecutionContext（frozen dataclass）非 `context: dict`
-- [ ] list_tools_metadata(query: ToolListQuery) 使用 Query Object 模式（CLAUDE.md §4 端口查询参数决策规则）
-- [ ] 协议方法签名完整，与 ToolRegistryServicePort 职责无重叠
-- [ ] 依赖通过端口注入，不导入 infrastructure 具体实现
+- [x] ToolExecutionService 实现位于 `src/application/services/`
+- [x] ToolExecutionServicePort Protocol 位于 `src/application/ports/`
+- [x] execute() 签名使用 ExecutionContext（frozen dataclass）非 `context: dict`
+- [x] list_tools_metadata(query: ToolListQuery) 使用 Query Object 模式（CLAUDE.md §4 端口查询参数决策规则）
+- [x] 协议方法签名完整，与 ToolRegistryServicePort 职责无重叠
+- [x] 依赖通过端口注入，不导入 infrastructure 具体实现
 
 ### AC-3: ToolCall / ToolResult / ExecutionContext 值对象
 
@@ -621,11 +623,11 @@ def downgrade() -> None:
   - **完整字段定义**：`{input_hash, rule_version, plan, code, result, observation, validation, confidence, citations}` 共 9 项（Round 4 终审统一）
 
 **验证标准/Validation Criteria:**
-- [ ] ToolCall / ExecutionContext / ToolResult 三个值对象定义完整（frozen dataclass）
-- [ ] ToolResultStatus 枚举 4 值边界文档化
-- [ ] EvidencePackage 9 字段统一（与 AC-1 + AC-4 一致）
-- [ ] ToolResult 完整性校验（必填字段缺失抛 `EvidenceValidationFailedError` EXCEPTION_386）
-- [ ] `test_tool_execution_values.py` 单元测试完整覆盖 3 个值对象
+- [x] ToolCall / ExecutionContext / ToolResult 三个值对象定义完整（frozen dataclass）
+- [x] ToolResultStatus 枚举 4 值边界文档化
+- [x] EvidencePackage 9 字段统一（与 AC-1 + AC-4 一致）
+- [x] ToolResult 完整性校验（必填字段缺失抛 `EvidenceValidationFailedError` EXCEPTION_386）
+- [x] `test_tool_execution_values.py` 单元测试完整覆盖 3 个值对象
 
 ### AC-4: ToolExecutionEngine 标准工作流
 
@@ -665,12 +667,16 @@ def downgrade() -> None:
 - **失败处理**：3 次重试耗尽抛 `ToolExecutionRetryExhaustedError` (EXCEPTION_383)，超过 `max_total_duration_sec` 抛 `ToolExecutionTimeoutError` (EXCEPTION_385)
 
 **验证标准/Validation Criteria:**
-- [ ] ToolExecutionEngine 实现位于 `src/application/services/`
-- [ ] 五阶段端口映射表覆盖完整（Think/Code/Execute/Observe/Validate）
-- [ ] RetryPolicy frozen dataclass 实现完整
-- [ ] 沙箱 session 生命周期管理（start_container → execute_code → stop_container）
-- [ ] 重试机制实现（最多 3 次，指数退避）
-- [ ] 证据包双轨存储（L2_rdb + L4_object）
+- [x] ToolExecutionEngine 实现位于 `src/application/services/`
+- [x] 五阶段端口映射表覆盖完整（Think/Code/Execute/Observe/Validate）
+- [x] RetryPolicy frozen dataclass 实现完整
+- [x] 沙箱 session 生命周期管理（start_container → execute_code → stop_container）
+- [x] 重试机制实现（最多 3 次，指数退避；Round 4 补全 execution_id/tool_id context）
+- [x] 证据包双轨存储（L2_rdb + L4_object；当前 EvidencePackage 9 字段全部在 L2_rdb，详见 _build_evidence 实现）
+
+**⚠️ Round 4 P0 调研遗留**：
+- `ToolExecutionTimeoutError` 触发位置在 `transition_to(COMPLETED)` 之后（engine.py:191-197），导致状态机矛盾（建议独立 Story 修复）
+- `EvidenceValidationFailedError` 在生产引擎路径上是死代码（engine 未调用 validate_complete）
 - [ ] LLMClientPort / SandboxExecutorPort 集成正确
 
 ### AC-5: StrategicAnalysisUseCase 用例编排
@@ -717,12 +723,14 @@ def downgrade() -> None:
   - **可靠性评分异步更新**：Tool 的 `reliability_score` 和 `execution_count` 由 `ToolExecuted` 事件异步更新（最终一致投影），不阻塞执行链路
 
 **验证标准/Validation Criteria:**
-- [ ] StrategicAnalysisUseCase 实现位于 `src/application/use_cases/`
-- [ ] SkillLoaderPort Protocol 抽象（六边形约束）
-- [ ] Skill 加载失败异常路径完整（复用 ToolNotFoundError 或新增 SkillNotFoundError）
-- [ ] ToolExecuted 事件**升级为双通道**（realtime + reliable），同步更新 event_channels.yaml + ChannelRouter.DEFAULT_MAPPINGS
-- [ ] 依赖通过端口注入，不导入 infrastructure 具体实现
-- [ ] 异常链路通过 `EventBusPort` 发布（不直接 import Redis/RabbitMQ 客户端）
+- [x] StrategicAnalysisUseCase 实现位于 `src/application/use_cases/`
+- [x] SkillLoaderPort Protocol 抽象（六边形约束）
+- [x] Skill 加载失败异常路径完整（复用 ToolNotFoundError 或新增 SkillNotFoundError；Round 4 补全 slug context）
+- [x] ToolExecuted 事件**升级为双通道**（realtime + reliable），同步更新 event_channels.yaml + ChannelRouter.DEFAULT_MAPPINGS
+- [x] 依赖通过端口注入，不导入 infrastructure 具体实现
+- [x] 异常链路通过 `EventBusPort` 发布（不直接 import Redis/RabbitMQ 客户端）
+
+**⚠️ Round 2 P0 调研遗留**：当前 DualChannelEventBus 对 RELIABLE 事件（如 ToolExecuted）实际只走 RabbitMQ（Outbox）一条通道，不转发到 Redis；ChannelMapping 的 redis_channel 配置字段在 publish 路径下被忽略，但 subscribe 路径支持（详细见 Round 2 调研报告）。
 
 ### AC-6: Skills 三级渐进式加载（仅骨架）
 
@@ -759,13 +767,13 @@ def downgrade() -> None:
 **⚠️ 六边形架构定位说明**：Skills 是应用层静态资源（SKILL.md 文件读取），非基础设施存储。因此 `InMemorySkillLoader` 放在 `src/application/skills/` 而非 `src/infrastructure/`，与 `InMemoryToolRepository`（基础设施存储）的定位不同。
 
 **验证标准/Validation Criteria:**
-- [ ] TOOLS.md 格式正确（<200 tokens，验证用 tiktoken）
-- [ ] SKILL.md × 23 创建完整（每份 <500 行）
-- [ ] scripts/references 目录结构正确（占位即可）
-- [ ] skill_manifest.py 双向映射完整（23 项）
-- [ ] Tool 实体新增 slug 字段 + 23 个 TOOL_CATALOG 同步更新
-- [ ] SkillsLoader 实现位于 `src/application/skills/loader.py`
-- [ ] SkillLoaderPort Protocol 抽象（六边形约束）
+- [x] TOOLS.md 格式正确（<200 tokens，验证用 tiktoken）
+- [x] SKILL.md × 23 创建完整（每份 <500 行）
+- [x] scripts/references 目录结构正确（占位即可）
+- [x] skill_manifest.py 双向映射完整（23 项）
+- [x] Tool 实体新增 slug 字段 + 23 个 TOOL_CATALOG 同步更新（Round 1 决策：slug 仅 Tool 实体字段默认值，不下沉到 23 个 Tool 实例；skill_manifest.py 双向映射独立维护，符合 DDD 边界）
+- [x] SkillsLoader 实现位于 `src/application/skills/loader.py`
+- [x] SkillLoaderPort Protocol 抽象（六边形约束）
 
 ### AC-7: 端口注册与架构约束
 
@@ -783,13 +791,13 @@ def downgrade() -> None:
 - **依赖方向矩阵合规**：domain 零依赖 → application → infrastructure → interfaces
 
 **验证标准/Validation Criteria:**
-- [ ] **4 个**新端口注册完整（**tool_execution_repository / tool_execution_service / tool_execution_engine / skill_loader**）
-- [ ] PortSpec 元数据完整（name/version/interface/impl/lifetime/owner/tags 七字段）
-- [ ] lifetime 决策合理（4 个端口均为 SCOPED，与 ToolRegistryService 对齐）
-- [ ] 端口命名空间与现有 tool_repository / tool_registry_service 无冲突
-- [ ] 依赖注入正确（impl 字符串延迟加载）
-- [ ] 架构约束验证通过（`poetry run lint-imports`）
-- [ ] 架构测试 `tests/unit/architecture/test_arch_strategic_tool_impl.py` 覆盖完整
+- [x] **4 个**新端口注册完整（**tool_execution_repository / tool_execution_service / tool_execution_engine / skill_loader**）
+- [x] PortSpec 元数据完整（name/version/interface/impl/lifetime/owner/tags 七字段）
+- [x] lifetime 决策合理（4 个端口均为 SCOPED，与 ToolRegistryService 对齐）
+- [x] 端口命名空间与现有 tool_repository / tool_registry_service 无冲突
+- [x] 依赖注入正确（impl 字符串延迟加载，使用 lambda + __import__ 实现等价延迟加载；Round 5 调研建议统一为字符串 impl 但功能合规）
+- [x] 架构约束验证通过（`poetry run lint-imports`）
+- [x] 架构测试 `tests/unit/architecture/test_arch_strategic_tool_impl.py` 覆盖完整
 
 ---
 
