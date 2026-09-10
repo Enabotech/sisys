@@ -2255,6 +2255,41 @@ def bootstrap() -> None:
         tags=("tool", "execution", "service"),
     )
 
+    # === Story 4.3 — Tool IO Schema Validation Ports ===
+    register_port(
+        name="schema_validator",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.schema_validator",
+            fromlist=["SchemaValidatorPort"],
+        ).SchemaValidatorPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.validation.jsonschema_validator",
+            fromlist=["JsonSchemaValidatorImpl"],
+        ).JsonSchemaValidatorImpl(),
+        module="src.infrastructure.validation.jsonschema_validator",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "schema", "validator"),
+    )
+
+    register_port(
+        name="schema_validation_record_repository",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.ports.schema_validation_record_repository",
+            fromlist=["SchemaValidationRecordRepositoryPort"],
+        ).SchemaValidationRecordRepositoryPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.inmemory.schema_validation_record_repository",
+            fromlist=["InMemorySchemaValidationRecordRepository"],
+        ).InMemorySchemaValidationRecordRepository(),
+        module="src.infrastructure.storage.inmemory.schema_validation_record_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "schema", "repository"),
+    )
+
     register_port(
         name="skill_loader",
         version="v1.0.0",

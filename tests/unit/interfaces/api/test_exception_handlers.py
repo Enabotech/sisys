@@ -95,8 +95,12 @@ from src.domain.exceptions import (
     ToolExecutionFailedError,
     ToolExecutionRetryExhaustedError,
     ToolExecutionTimeoutError,
+    ToolInputSchemaValidationError,
     ToolNotFoundError,
+    ToolOutputSchemaValidationError,
     ToolResultValidationError,
+    ToolSchemaCompatibilityError,
+    ToolSchemaMissingError,
     TraceabilityError,
     TraceabilityNotFoundError,
     TransferNotApprovedError,
@@ -285,6 +289,10 @@ class TestExceptionHttpMap:
             ToolChainNodeNotFoundError,
             ToolChainExecutionFailedError,
             ToolChainNotFoundError,  # 394 — Round 1 审查新增
+            ToolInputSchemaValidationError,  # 395 — Story 4.3 工具入参 Schema 校验失败
+            ToolOutputSchemaValidationError,  # 396 — Story 4.3 工具出参 Schema 校验失败
+            ToolSchemaCompatibilityError,  # 397 — Story 4.3 Schema 版本兼容性冲突
+            ToolSchemaMissingError,  # 398 — Story 4.3 Schema 缺失配置错误
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

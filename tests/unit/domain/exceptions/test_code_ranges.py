@@ -155,6 +155,9 @@ def test_subclass_code_in_same_subdomain_as_parent() -> None:
         ("traceability", "business"),
         # 工具子域 → business 基类（工具注册）
         ("tool", "business"),
+        # 工具链子域 → business / system 基类（工具链编排 + Schema 验证，Story 4.2/4.3）
+        ("toolchain", "business"),
+        ("toolchain", "system"),
         # 兜底 → external 基类
         ("fallback", "external"),
     }

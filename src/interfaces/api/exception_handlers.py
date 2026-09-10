@@ -89,8 +89,12 @@ from src.domain.exceptions import (
     ToolExecutionFailedError,
     ToolExecutionRetryExhaustedError,
     ToolExecutionTimeoutError,
+    ToolInputSchemaValidationError,
     ToolNotFoundError,
+    ToolOutputSchemaValidationError,
     ToolResultValidationError,
+    ToolSchemaCompatibilityError,
+    ToolSchemaMissingError,
     TraceabilityError,
     TraceabilityNotFoundError,
     TransferNotApprovedError,
@@ -211,6 +215,11 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     ToolChainNodeNotFoundError: status.HTTP_404_NOT_FOUND,  # 392 — DAG 边引用不存在的节点
     ToolChainExecutionFailedError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 393 — 工具链整体执行失败
     ToolChainNotFoundError: status.HTTP_404_NOT_FOUND,  # 394 — 工具链定义不存在（Round 1 审查新增）
+    # 工具 Schema 验证异常（Story 4.3 — JSON Schema 契约验证）
+    ToolInputSchemaValidationError: status.HTTP_400_BAD_REQUEST,  # 395 — 工具入参 Schema 校验失败
+    ToolOutputSchemaValidationError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 396 — 工具出参 Schema 校验失败
+    ToolSchemaCompatibilityError: status.HTTP_409_CONFLICT,  # 397 — Schema 版本兼容性冲突
+    ToolSchemaMissingError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 398 — Schema 缺失配置错误
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
