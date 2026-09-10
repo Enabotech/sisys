@@ -81,7 +81,7 @@ class ToolChainDagValidator:
             )
 
         # === Step 3: 无环检测（Kahn 算法 BFS） ===
-        graph: dict[str, list[str]] = {}
+        graph: dict[str, list[str] | tuple[str, ...]] = {}
         # TopologicalSorter 要求所有节点都作为 key 出现，即使没有出边
         for node in dag.nodes:
             graph[node.node_id] = list(node.depends_on)
@@ -93,7 +93,8 @@ class ToolChainDagValidator:
         except CycleError as e:
             # CycleError.args = (msg, frozenset[node_ids in cycle])
             # 仅返回环上节点集合，不含路径；需 DFS 提取环路径
-            cycle_nodes: frozenset[str] = e.args[1]  # type: ignore[assignment]
+            # 类型通过 stubs/graphlib/__init__.pyi 精确化（PEP 561），无需 type: ignore
+            cycle_nodes: frozenset[str] = e.args[1]
             cycle_path = ToolChainDagValidator._extract_cycle_path(dag, cycle_nodes)
             raise ToolChainCycleDetectedError(
                 message=f"DAG 包含循环依赖，环路径: {' -> '.join(cycle_path)}",

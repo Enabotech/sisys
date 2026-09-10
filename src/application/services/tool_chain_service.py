@@ -17,7 +17,7 @@ from typing import Any
 from src.application.ports.tool_chain_orchestrator import ToolChainOrchestratorProtocol
 from src.domain.entities.tool_chain import ToolChainDag
 from src.domain.entities.tool_chain_run import ToolChainRun
-from src.domain.exceptions import ToolNotFoundError
+from src.domain.exceptions import ToolChainNotFoundError
 from src.domain.ports.tool_chain_repository import (
     ToolChainDagQuery,
     ToolChainRepositoryPort,
@@ -83,11 +83,11 @@ class ToolChainService:
             工具链 DAG 聚合根
 
         Raises:
-            ToolNotFoundError: chain_id 不存在（通过 ToolNotFoundError 复用）
+            ToolChainNotFoundError: chain_id 不存在（EXCEPTION_394，toolchain 子域）
         """
         dag = await self._repository.get_by_id(chain_id)
         if dag is None:
-            raise ToolNotFoundError(tool_id=str(chain_id))
+            raise ToolChainNotFoundError(chain_id=str(chain_id))
         return dag
 
     async def list_chain_definitions(self, query: ToolChainDagQuery) -> list[ToolChainDag]:

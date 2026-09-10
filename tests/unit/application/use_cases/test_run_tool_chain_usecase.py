@@ -26,7 +26,7 @@ from src.domain.entities.tool_chain import (
     ToolChainNode,
 )
 from src.domain.entities.tool_chain_run import ToolChainRun, ToolChainRunState
-from src.domain.exceptions import ToolNotFoundError
+from src.domain.exceptions import ToolChainNotFoundError
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.tool_chain_repository import ToolChainRepositoryPort
 from src.domain.value_objects.tool_execution import ExecutionContext
@@ -158,8 +158,8 @@ async def test_find_dag_by_name_uses_list_by_query() -> None:
 
 
 @pytest.mark.asyncio
-async def test_chain_not_found_raises_tool_not_found() -> None:
-    """chain_name 不存在抛 ToolNotFoundError"""
+async def test_chain_not_found_raises_tool_chain_not_found() -> None:
+    """chain_name 不存在抛 ToolChainNotFoundError（EXCEPTION_394，toolchain 子域）"""
     repo = AsyncMock(spec=ToolChainRepositoryPort)
     repo.list_by_query = AsyncMock(return_value=[])
 
@@ -174,7 +174,7 @@ async def test_chain_not_found_raises_tool_not_found() -> None:
         event_publisher=publisher,
     )
 
-    with pytest.raises(ToolNotFoundError):
+    with pytest.raises(ToolChainNotFoundError):
         await use_case.execute("nonexistent", {}, _make_context())
 
 

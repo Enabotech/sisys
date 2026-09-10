@@ -140,9 +140,38 @@ class ToolChainExecutionFailedError(BusinessException):
         super().__init__(message=message, cause=cause, context=context)
 
 
+class ToolChainNotFoundError(BusinessException):
+    """工具链定义（DAG）不存在
+
+    父类 BusinessException → HTTP 404（资源缺失）。
+    区别于 ToolChainNodeNotFoundError (EXCEPTION_392)：前者是整个 DAG 找不到，后者是 DAG 边引用的节点找不到。
+
+    Attributes:
+        code: 错误码 EXCEPTION_394
+        message: 默认消息
+    """
+
+    code = "EXCEPTION_394"
+    message = "ToolChain DAG not found"
+
+    def __init__(
+        self,
+        message: str | None = None,
+        chain_id: str | None = None,
+        chain_name: str | None = None,
+    ) -> None:
+        context: dict = {}
+        if chain_id is not None:
+            context["chain_id"] = chain_id
+        if chain_name is not None:
+            context["chain_name"] = chain_name
+        super().__init__(message=message, context=context)
+
+
 __all__ = [
     "ToolChainCycleDetectedError",
     "ToolChainDuplicateNodeError",
     "ToolChainNodeNotFoundError",
     "ToolChainExecutionFailedError",
+    "ToolChainNotFoundError",
 ]

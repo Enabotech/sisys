@@ -118,6 +118,7 @@ from src.domain.exceptions.tool_chain_exceptions import (
     ToolChainDuplicateNodeError,
     ToolChainExecutionFailedError,
     ToolChainNodeNotFoundError,
+    ToolChainNotFoundError,
 )
 from src.domain.exceptions.tool_exceptions import (
     EvidenceValidationFailedError,
@@ -256,4 +257,5 @@ __all__ = [
     "ToolChainDuplicateNodeError",
     "ToolChainNodeNotFoundError",
     "ToolChainExecutionFailedError",
+    "ToolChainNotFoundError",
 ]
