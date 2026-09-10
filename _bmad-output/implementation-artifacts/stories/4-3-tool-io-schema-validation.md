@@ -296,6 +296,7 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 - [ ] 嵌套对象递归校验(properties 嵌套)
 - [ ] domain 层零依赖验证通过(`poetry run lint-imports`)
 - [ ] 单元测试覆盖:正常 / 类型错误 / required 缺失 / enum 越界 / items 类型错误 / 嵌套对象 / 空 schema
+- [ ] **`SchemaValidator._sanitize_actual(value: Any)`** 完整实现(Round 3 新增):处理 datetime/UUID/Decimal/bytes/嵌套 dict/嵌套 list/Pydantic 模型/fallback(NaN/Inf → None),用于 `SchemaViolation.to_dict()` 序列化前置脱敏(防 PostgreSQL JSONB 写入失败)
 
 ### AC-2: SchemaValidatorPort 应用层端口(jsonschema 库委托)
 
@@ -346,6 +347,85 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 - [ ] `composition_root.py` 注册 `schema_validator` 端口(name=`schema_validator`, version=`v1.0.0`, interface=`SchemaValidatorPort`, impl=`JsonSchemaValidatorImpl`, lifetime=`SCOPED`, owner=`tool-team`, tags=`("tool", "schema", "validator")`,compatibility=`()`,deprecated=`False`)
 - [ ] jsonschema 库 PEP 561 stubs **扩展**(4.1a 已建 `check_schema`/`SchemaError`,本 Story 扩展 `iter_errors`/`ValidationError`)
 - [ ] 端口契约测试 `tests/contracts/test_port_contract_schema_validator.py` 11 维度覆盖
+- [ ] **`BreakingChange` / `NonBreakingChange` / `SchemaCompatibilityResult` 值对象完整定义**(Round 3 补充)
+- [ ] **`validate_schema_compatibility` 完整规则清单**(Round 3 补充):12 条规则覆盖 8 类破坏性 + 4 类非破坏性
+
+**`BreakingChange` 值对象定义**(对标 Avro BACKWARD 模式 + Confluent Schema Registry + oasdiff 分类):
+
+```python
+class ChangeType(str, Enum):
+    """破坏性变更类型(强类型,便于 4.6 灰度策略匹配)"""
+    REQUIRED_FIELD_ADDED = "required_field_added"           # 新增必填字段
+    REQUIRED_FIELD_REMOVED = "required_field_removed"        # 删除必填字段/字段完全删除
+    FIELD_TYPE_NARROWED = "field_type_narrowed"             # 类型收窄(integer → string)
+    FIELD_TYPE_CHANGED = "field_type_changed"               # 类型完全变更(string → object/array/boolean)
+    ENUM_VALUE_REMOVED = "enum_value_removed"                # 枚举值删除(enum 缩小)
+    ADDITIONAL_PROPERTIES_RESTRICTED = "additional_props_restricted"  # true → false
+    NESTED_SCHEMA_TIGHTENED = "nested_schema_tightened"      # 嵌套 schema 收紧(递归)
+    MIN_VALUE_INCREASED = "min_value_increased"             # minimum/minLength 增大
+
+@dataclass(frozen=True)
+class BreakingChange:
+    """破坏性变更值对象"""
+    change_type: ChangeType
+    path: str                          # JSON Pointer (RFC 6901),如 "/properties/name/type"
+    old_value: Any | None              # 旧 schema 该位置的值
+    new_value: Any | None              # 新 schema 该位置的值
+    description: str                   # 人类可读描述
+    severity: Literal["critical", "major", "minor"] = "major"
+    remediation: str | None = None     # 修复建议
+```
+
+**`NonBreakingChange` 值对象定义**(7 字段):
+
+```python
+class NonBreakingChangeType(str, Enum):
+    OPTIONAL_FIELD_ADDED = "optional_field_added"           # 新增可选字段
+    FIELD_TYPE_WIDENED = "field_type_widened"              # 类型放宽(integer → number)
+    ENUM_VALUE_ADDED = "enum_value_added"                   # 枚举值增加
+    ADDITIONAL_PROPERTIES_RELAXED = "additional_props_relaxed"  # false → true
+    DEFAULT_ADDED = "default_added"                         # 添加 default 值
+    DESCRIPTION_UPDATED = "description_updated"
+    PATTERN_RELAXED = "pattern_relaxed"
+
+@dataclass(frozen=True)
+class NonBreakingChange:
+    change_type: NonBreakingChangeType
+    path: str
+    old_value: Any | None
+    new_value: Any | None
+    description: str
+```
+
+**`SchemaCompatibilityResult` 值对象定义**(5 字段):
+
+```python
+@dataclass(frozen=True)
+class SchemaCompatibilityResult:
+    """Schema 兼容性检测结果值对象(对标 Avro SchemaValidatorResult)"""
+    is_compatible: bool                                          # 是否完全兼容
+    compatibility_level: Literal["BACKWARD", "FULL"] = "BACKWARD"  # 对标 Avro 4 类
+    breaking_changes: tuple[BreakingChange, ...] = ()
+    non_breaking_changes: tuple[NonBreakingChange, ...] = ()
+    schema_diff: dict[str, Any] = field(default_factory=dict)   # 完整 diff 摘要(供 UI 渲染)
+```
+
+**`validate_schema_compatibility` 完整规则清单**(12 条):
+
+| # | 规则 | 类型 | ChangeType |
+|---|------|------|-----------|
+| 1 | `new.required ⊃ old.required`(新增必填) | BREAKING | REQUIRED_FIELD_ADDED |
+| 2 | `new.required ⊆ old.required`(删除必填) | BREAKING | REQUIRED_FIELD_REMOVED |
+| 3 | 字段完全删除(`path ∈ old.properties 但 ∉ new.properties`) | BREAKING | REQUIRED_FIELD_REMOVED |
+| 4 | 枚举值减少(`new.enum ⊂ old.enum`) | BREAKING | ENUM_VALUE_REMOVED |
+| 5 | 类型完全变更(`string → object/array/boolean`) | BREAKING | FIELD_TYPE_CHANGED |
+| 6 | 类型收窄(`integer → string` / `number → integer`) | BREAKING | FIELD_TYPE_NARROWED |
+| 7 | `additionalProperties: true → false` | BREAKING | ADDITIONAL_PROPERTIES_RESTRICTED |
+| 8 | 嵌套 schema 收紧(递归 properties 单独检查) | BREAKING | NESTED_SCHEMA_TIGHTENED |
+| 9 | `minimum` / `minLength` 增大 | BREAKING | MIN_VALUE_INCREASED |
+| 10 | 类型放宽(`integer → number`) | NON_BREAKING | FIELD_TYPE_WIDENED |
+| 11 | 字段新增(非 required) | NON_BREAKING | OPTIONAL_FIELD_ADDED |
+| 12 | `additionalProperties: false → true` | NON_BREAKING | ADDITIONAL_PROPERTIES_RELAXED |
 
 ### AC-3: ToolInputValidator + ToolOutputValidator 装饰器(横切关注点)
 
@@ -537,8 +617,10 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 - [ ] Alembic migration `013_schema_validation_records.py` 创建(含 4 索引)
 - [ ] L2_rdb 存储边界(violations JSONB → L2_rdb;无 L4 依赖)
 - [ ] 端口契约测试 `tests/contracts/test_port_contract_schema_validation_record_repository.py` 11 维度覆盖
-
-### AC-6: ToolSchemaValidationFailed 领域事件 + 双通道配置
+- [ ] **`InMemorySchemaValidationRecordRepository._lock` 类变量声明**(Round 3 补充):`_lock: lock = lock()` 作为**类变量**(非 `__init__` 内 self._lock),CLAUDE.md §6 Gotchas 强制
+- [ ] **并发 save 无数据丢失测试**(Round 3 补充):`asyncio.gather` 触发 100 并发 `save()`,断言 `list_all()` 返回 100 条记录
+- [ ] **跨实例锁共享反例测试**(Round 3 补充):验证 `_records: dict` 是**实例变量**(非类变量),与 `_lock` 类变量对比,防止未来误改造成全局共享状态
+- [ ] **持久化时机矩阵**(Round 3 补充):INPUT 成功/失败、OUTPUT 成功/中间重试/耗尽、COMPATIBILITY 破坏 均持久化;LLM 调用异常**不**持久化(由 ToolExecutionError 处理)
 
 **Given** Schema 验证失败需异步通知下游订阅者(4.7 Validation Feedback / 监控 / 可靠性评分更新)
 **When** 新建 `ToolSchemaValidationFailed` 领域事件 + **realtime 通道本期启用 / reliable 通道 4.7 时启用**
@@ -630,13 +712,86 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 - **依赖方向矩阵合规**:domain 零依赖 → application → infrastructure → interfaces
 
 **验证标准/Validation Criteria:**
-- [ ] **2 个**新端口注册完整(`schema_validator` / `schema_validation_record_repository`);**`SchemaValidator` 领域服务**(**非** Protocol,**不**通过 composition_root 注册);**`ToolInputValidator` / `ToolOutputValidator` 是应用层服务**(**不**通过 composition_root 注册,作为可注入组件由 composition_root 装配到 `ToolExecutionEngine`)
+- [ ] **2 个**新端口注册完整(`schema_validator` / `schema_validation_record_repository`);**`SchemaValidator` 领域服务**(**非** Protocol,**不**通过 composition_root 注册);**`ToolInputValidator` / `ToolOutputValidator` 是应用层服务**(**不**通过 composition_root 注册,作为可注入组件由 composition_root 装配到 `ToolExecutionService`,**非** Engine)
 - [ ] PortSpec 元数据十字段完整(name/version/interface/impl/module/lifetime/owner/compatibility/tags/deprecated);`compatibility=()` 表示向后兼容版本元组,`deprecated=False` 表示未废弃
 - [ ] lifetime 决策合理(2 个端口均 = SCOPED)
 - [ ] 端口命名空间与现有 tool_repository / tool_execution_repository / tool_chain_repository 无冲突
 - [ ] 依赖注入正确(impl 字符串延迟加载)
 - [ ] 架构约束验证通过(`poetry run lint-imports`)
 - [ ] 架构测试 `tests/unit/architecture/test_arch_tool_io_schema_validation.py` 覆盖完整
+- [ ] **`ToolExecutionService.__init__` 接收 `ToolExecutionEnginePort` Protocol 而非类**(Round 3 关键决策):保持 4.1a 既有测试 0 FAIL(`ToolExecutionEngine` 类隐式实现 Protocol),同时允许 `ToolOutputValidator` 装饰器实例注入(PEP 544 structural subtyping)
+- [ ] **装饰器 Liskov Substitution 契约测试**(Round 3 关键):`isinstance(ToolOutputValidator(wrapped=engine, ...), ToolExecutionEnginePort)` 为 True;`execute()` 方法签名与 Protocol 完全一致
+
+**`composition_root.py` 装配样板**(Round 3 关键决策):
+
+```python
+# src/composition_root.py 现有 tool_execution_service 注册(line 2255 附近)替换为:
+
+register_port(
+    name="tool_execution_service",
+    version="v1.1.0",  # 升级(Protocol 参数 + 装饰器装配)
+    interface=ToolExecutionServicePort,
+    impl=lambda resolver: ToolExecutionService(
+        registry=resolver.resolve("tool_registry_service"),
+        # ToolOutputValidator 包裹 Engine(纯外包,AC-3 + AC-7 一致)
+        engine=ToolOutputValidator(
+            wrapped=resolver.resolve("tool_execution_engine"),
+            schema_validator=resolver.resolve("schema_validator"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+    ),
+    module="src.application.services.tool_execution_service",
+    lifetime=Lifetime.SCOPED,
+    owner="tool-team",
+    tags=("tool", "execution", "service", "decorated"),
+    compatibility=("v1.0.0",),  # 向后兼容 v1.0.0(ToolExecutionEngine 类仍可传入)
+    deprecated=False,
+)
+
+# ToolInputValidator 不通过 composition_root 注册,仅在 use case 层组合(可选 strict/lenient 策略)
+```
+
+**`_call_with_retry` 工具函数完整签名**(Round 3 关键):
+
+```python
+# src/application/services/retry_helpers.py
+from typing import Awaitable, Callable, Literal, ParamSpec, TypeVar
+
+T = TypeVar("T")
+P = ParamSpec("P")
+OnFailureCallback = Callable[[Exception, int, int, bool], Awaitable[None]]
+"""失败回调协议: (exception, current_attempt, max_attempts, will_retry) -> awaitable None"""
+
+async def _call_with_retry(
+    func: Callable[[], Awaitable[T]],
+    retry_policy: RetryPolicy,
+    on_failure_callback: OnFailureCallback | None = None,
+    *,
+    execution_id: str | None = None,
+    tool_id: uuid.UUID | None = None,
+    op_name: str = "retry_call",
+) -> T:
+    """带指数退避的重试调用(共享工具函数)
+
+    Args:
+        func: 无参异步函数,返回 T
+        retry_policy: 4.1a 既有 RetryPolicy (max_attempts + backoff_strategy + retryable_exceptions)
+        on_failure_callback: 失败回调(异常 + 当前 attempt + max + will_retry);**异常吞噬不传播**
+        execution_id: 透传到 ToolExecutionRetryExhaustedError context
+        tool_id: 透传到 ToolExecutionRetryExhaustedError context
+        op_name: 操作名(用于日志 + metrics)
+    """
+```
+
+**`on_failure_callback` 契约**(Round 3 关键):
+
+| 时机 | 调用? | 参数 |
+|------|------|------|
+| 第 N 次失败(N < max_attempts) | ✅ | `(exc, N, max_attempts, will_retry=True)` |
+| 第 max_attempts 次失败(最后一次) | ✅ | `(exc, max_attempts, max_attempts, will_retry=False)` |
+| 重试后成功 | ❌(不调用) | — |
+| 非 retryable 异常立即抛出 | ❌(不调用) | — |
+| callback 自身抛异常 | ✅ 吞噬不传播,`logger.exception()` 记录 | — |
 
 ---
 
@@ -1058,6 +1213,56 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 
 > ⚠️ **收尾验证 Task:** 全部实现 Task 完成后,进行最终验收。
 
+#### Gherkin Scenario 清单(Round 3 新增)
+
+> **背景(Background)**:战略工具执行服务已初始化(真实 `InMemoryToolRepository` + `ToolRegistryService` + `SchemaValidator` + `SchemaValidationRecordRepository` + Mock LLM/Sandbox 端口适配器)
+
+| # | Scenario | 关联 AC |
+|---|----------|---------|
+| 1 | INPUT 校验通过 → ToolResult.status=SUCCESS | AC-1 |
+| 2 | INPUT strict 校验失败 → 抛 EXCEPTION_395 + 事件发布 1 次(is_final=True) | AC-1 + AC-3 |
+| 3 | INPUT lenient 校验失败 → 记录 warning + 继续执行 | AC-3 |
+| 4 | 入参 type 校验失败 → violations.path = JSON Pointer | AC-1 |
+| 5 | 入参 additionalProperties 拦截未声明字段 → violation | AC-1(Round 1) |
+| 6 | 空 schema 向后兼容 → is_valid=True(4.1a 回归) | AC-1 |
+| 7 | 嵌套对象递归校验 → violations.path 嵌套 | AC-1 |
+| 8 | OUTPUT 重试成功 → 验证 prompt 注入上轮 violations | AC-3 |
+| 9 | OUTPUT 重试耗尽 → ToolResult.status=FAILED + 抛 EXCEPTION_389 + 事件发布 N 次(仅最后一次 is_final=True) | AC-3 + AC-4 |
+| 10 | Schema 兼容性检测破坏(required 新增) → is_compatible=False | AC-2 |
+| 11 | Schema 兼容性检测兼容(类型放宽) → is_compatible=True + non_breaking_changes 非空 | AC-2 |
+| 12 | SchemaValidationRecord 持久化(INPUT 失败) → list_by_query 可查 | AC-5 |
+| 13 | 双租户隔离 → tenant_A 不可查 tenant_B 记录 | AC-5 |
+| 14 | 事件双通道(realtime only) → 投递 1 次,reliable 不触发 | AC-6 |
+| 15 | 覆盖率门禁达标 → domain ≥90% / application ≥85% / 整体 ≥80% | Task 9 |
+
+#### BDD Mock 边界决策表(Round 3 新增)
+
+| 组件 | 真实 / Mock | 理由 |
+|------|------------|------|
+| `InMemoryToolRepository` | **真实** | 4.1a 已建,无安全清理风险 |
+| `ToolRegistryService` | **真实** | 纯 Python 域服务 |
+| `ToolExecutionEngine` | **真实** | 核心执行引擎,严禁 Mock |
+| `LLMClientPort` | **Mock** (`AsyncMock`) | 外部 API + 成本 + 非确定性输出 |
+| `SandboxExecutor` | **Mock** (`AsyncMock`) | 容器化,无本地清理能力 |
+| `SchemaValidatorPort` | **真实** (`JsonSchemaValidatorImpl`) | 验证逻辑是核心交付 |
+| `SchemaValidationRecordRepository` | **真实** (InMemory/PG) | 聚合根持久化 |
+| `EventPublisher` | **真实** (InMemory pub/sub) | 事件契约是核心交付 |
+| `TestTenant` fixture | **真实** | UUID 前缀隔离,自清理 |
+| `SchemaValidator` 领域服务 | **真实** | 零依赖纯函数 |
+
+#### pytest.skip() 触发条件清单(Round 3 新增)
+
+```python
+@pytest.fixture(autouse=True)
+def skip_if_services_unavailable():
+    if not _is_postgres_available():
+        pytest.skip("PostgreSQL 不可用,跳过真实 PG 集成验收测试")
+    if not _is_redis_available():
+        pytest.skip("Redis 不可用,跳过 realtime 通道验收测试")
+    if not _is_rabbitmq_available():
+        pytest.skip("RabbitMQ 不可用(reliable 通道本期不启用,跳过)")
+```
+
 #### TDD 循环:src + tests 完成清单断言 + 收尾校验
 
 | 阶段 | 动作 | 完成标志 |
@@ -1327,7 +1532,7 @@ src/
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-09-10
 **最后更新/Last Updated:** 2026-09-10
 **更新说明/Description:**
@@ -1345,6 +1550,14 @@ src/
   - 事件双通道策略调整为本期仅 realtime(reliable 延后 4.7)
   - 事件字段增加 tenant_id / schema_version / is_final(简化 4.7 订阅者去重)
   - 工作量估算 18-25 → 27-35 人天(含首次装饰器引入 + 4.1a 回归修复)
+- v1.3.0 (Round 3 修订):
+  - AC-2 补充 `BreakingChange` / `NonBreakingChange` / `SchemaCompatibilityResult` 值对象完整定义
+  - AC-2 补充 `validate_schema_compatibility` 12 条规则清单(8 类破坏性 + 4 类非破坏性)
+  - AC-1 验证清单新增 `SchemaValidator._sanitize_actual()` 完整实现(datetime/UUID/Decimal/bytes 脱敏)
+  - AC-5 验证清单新增 5 条并发安全断言(asyncio.Lock 类变量 + 100 并发 save + 跨实例锁共享反例)
+  - AC-8 补充 `composition_root.py` 装配样板 + `ToolExecutionService` 接收 `ToolExecutionEnginePort` Protocol 决策 + Liskov Substitution 契约测试
+  - 补充 `_call_with_retry` 工具函数完整签名 + `on_failure_callback` 调用契约
+  - Task 9 补充 15 个 Gherkin Scenario 清单 + BDD Mock 边界决策表 + pytest.skip() 触发条件
 - v1.2.0 (Round 2 修订):
   - Task 7 全部改造为"ToolOutputValidator 纯外包 Engine"模式(AC-3 + AC-7 + Task 7 一致)
   - 文件清单新增 `src/application/services/retry_helpers.py`
