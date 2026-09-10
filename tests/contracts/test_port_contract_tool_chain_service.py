@@ -33,7 +33,7 @@ from src.domain.entities.tool_chain import (
     ToolChainNode,
 )
 from src.domain.entities.tool_chain_run import ToolChainRun, ToolChainRunState
-from src.domain.exceptions import ToolNotFoundError
+from src.domain.exceptions import ToolChainNotFoundError
 from src.domain.ports.tool_chain_repository import ToolChainDagQuery
 from src.domain.value_objects.tool_execution import ExecutionContext
 
@@ -190,13 +190,13 @@ async def test_get_chain_definition_returns_dag() -> None:
 
 @pytest.mark.asyncio
 async def test_get_chain_definition_raises_when_missing() -> None:
-    """get_chain_definition 不存在抛 ToolNotFoundError"""
+    """get_chain_definition 不存在抛 ToolChainNotFoundError（EXCEPTION_394，toolchain 子域）"""
     repo = AsyncMock()
     repo.get_by_id = AsyncMock(return_value=None)
     orchestrator = AsyncMock(spec=ToolChainOrchestratorProtocol)
 
     service = ToolChainService(repository=repo, orchestrator=orchestrator)
-    with pytest.raises(ToolNotFoundError):
+    with pytest.raises(ToolChainNotFoundError):
         await service.get_chain_definition(uuid.uuid4())
 
 

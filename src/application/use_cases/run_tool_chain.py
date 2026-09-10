@@ -24,7 +24,7 @@ from src.application.ports.tool_chain_service import ToolChainServicePort
 from src.domain.entities.tool_chain import ToolChainDag
 from src.domain.entities.tool_chain_run import ToolChainRun
 from src.domain.events.tool_chain_events import ToolChainExecuted
-from src.domain.exceptions import ToolNotFoundError
+from src.domain.exceptions import ToolChainNotFoundError
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.tool_chain_repository import ToolChainRepositoryPort
 from src.domain.value_objects.tool_execution import ExecutionContext
@@ -85,13 +85,13 @@ class RunToolChainUseCase:
             ToolChainRun 运行时实例
 
         Raises:
-            ToolNotFoundError: chain_name 不存在
+            ToolChainNotFoundError: chain_name 不存在（EXCEPTION_394，toolchain 子域）
             ToolChainExecutionFailedError: FAIL_FAST 触发
         """
         # 1. 通过 chain_name 查询 ToolChainDag
         dag = await self._find_dag_by_name(chain_name, context.tenant_id)
         if dag is None:
-            raise ToolNotFoundError(tool_name=chain_name)
+            raise ToolChainNotFoundError(chain_name=chain_name)
 
         # 2. 节点级 Skill 预预加载（按 tool_slug 调用 load_metadata）
         # 多节点元数据使用 asyncio.gather 并发预加载

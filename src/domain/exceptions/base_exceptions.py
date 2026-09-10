@@ -37,19 +37,30 @@ class DomainError(Exception):
         super().__init__(self.message)
 
     def to_dict(self) -> dict:
-        """转换为字典格式，便于序列化和日志记录"""
+        """转换为字典格式，便于序列化和日志记录。
+
+        异常链路解析顺序（优先级递减）：
+        1. self.cause — 显式 cause 参数（如 ToolChainExecutionFailedError(cause=e)）
+        2. self.__cause__ — `raise X from Y` 设置的隐式 cause（PEP 3134）
+        3. self.__context__ — 异常处理期间自动捕获的隐式 context
+
+        升级原因：原实现仅读 self.cause，导致仅 `raise X from Y` 的异常链路
+        在 to_dict() 输出中丢失，SRE 监控系统看不到根因编码。
+        """
         result = {
             "code": self.code,
             "message": self.message,
             "context": self.context,
         }
-        if self.cause:
-            if isinstance(self.cause, DomainError):
-                result["cause"] = self.cause.to_dict()
+        # 优先取显式 cause，降级到 __cause__（raise X from Y），最后 __context__
+        cause_chain = self.cause or self.__cause__ or self.__context__
+        if cause_chain:
+            if isinstance(cause_chain, DomainError):
+                result["cause"] = cause_chain.to_dict()
             else:
                 result["cause"] = {
-                    "type": type(self.cause).__name__,
-                    "message": str(self.cause),
+                    "type": type(cause_chain).__name__,
+                    "message": str(cause_chain),
                 }
         return result
 

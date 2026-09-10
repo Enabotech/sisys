@@ -85,6 +85,7 @@ from src.domain.exceptions import (
     ToolChainDuplicateNodeError,
     ToolChainExecutionFailedError,
     ToolChainNodeNotFoundError,
+    ToolChainNotFoundError,
     ToolExecutionFailedError,
     ToolExecutionRetryExhaustedError,
     ToolExecutionTimeoutError,
@@ -209,6 +210,7 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     ToolChainDuplicateNodeError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 391 — DAG 节点重复
     ToolChainNodeNotFoundError: status.HTTP_404_NOT_FOUND,  # 392 — DAG 边引用不存在的节点
     ToolChainExecutionFailedError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 393 — 工具链整体执行失败
+    ToolChainNotFoundError: status.HTTP_404_NOT_FOUND,  # 394 — 工具链定义不存在（Round 1 审查新增）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
