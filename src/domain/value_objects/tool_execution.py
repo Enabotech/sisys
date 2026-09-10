@@ -4,10 +4,10 @@
 - ToolCall: 工具调用（arguments + tenant_id）
 - ExecutionContext: 执行上下文（tenant_id/user_id/session_id/trace_id/timeout_sec）
 - ToolResultStatus: 工具结果状态枚举（4 值）
-- ToolResult: 工具执行结果（含 output + evidence_package）
+- ToolResult: 工具执行结果（含 output + evidence_package + validation_violations + retry_count）
 - EvidencePackage: 证据包（9 字段统一）
 
-设计依据：Story 4.1a AC-3
+设计依据：Story 4.1a AC-3 + Story 4.3 AC-4 扩展
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from src.domain.exceptions import (
     EntityValidationError,
     EvidenceValidationFailedError,
 )
+from src.domain.services.schema_validator import SchemaViolation
 
 
 class ToolResultStatus(str, Enum):
@@ -97,7 +98,7 @@ class EvidencePackage:
     - code: Code 阶段产物
     - result: Execute 阶段产物
     - observation: Observe 阶段产物
-    - validation: Validate 阶段产物
+    - validation: Validate 阶段产物(Story 4.3 扩展:接受 str | dict 存储 violations)
     - confidence: 置信度 ∈ [0.0, 1.0]
     - citations: 引用列表
     """
@@ -108,7 +109,7 @@ class EvidencePackage:
     code: str = ""
     result: str = ""
     observation: str = ""
-    validation: str = ""
+    validation: str | dict = ""
     confidence: float = 0.0
     citations: list[str] = field(default_factory=list)
 
@@ -134,7 +135,14 @@ class EvidencePackage:
             missing.append("result")
         if not self.observation:
             missing.append("observation")
-        if not self.validation:
+        # validation 可为 str (向后兼容) 或 dict (Story 4.3 结构化)
+        if isinstance(self.validation, str):
+            if not self.validation:
+                missing.append("validation")
+        elif isinstance(self.validation, dict):
+            if "passed" not in self.validation:
+                missing.append("validation.passed")
+        else:
             missing.append("validation")
         if missing:
             raise EvidenceValidationFailedError(
@@ -151,15 +159,17 @@ class EvidencePackage:
 
 @dataclass(frozen=True)
 class ToolResult:
-    """工具执行结果值对象（frozen dataclass）
+    """工具执行结果值对象（frozen dataclass,Story 4.3 扩展 8 字段）
 
     Attributes:
         tool_id: 工具唯一标识
         status: 结果状态
         output: 输出字典
-        evidence_package: 证据包
+        evidence_package: 证据包(向后兼容默认 None)
         started_at: 启动时间
         completed_at: 完成时间
+        validation_violations: Schema 验证违规列表(Story 4.3 新增)
+        retry_count: 重试次数(Story 4.3 新增,供下游区分原始/重试结果)
     """
 
     tool_id: uuid.UUID
@@ -168,9 +178,11 @@ class ToolResult:
     evidence_package: EvidencePackage | None = None
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    validation_violations: tuple[SchemaViolation, ...] = ()
+    retry_count: int = 0
 
     def __post_init__(self) -> None:
-        """构造时校验不变量"""
+        """构造时校验不变量(向后兼容 4.1a:不强制 INVALID 状态必填 violations/output)"""
         if not isinstance(self.tool_id, uuid.UUID):
             raise EntityValidationError(
                 message="tool_id must be a valid UUID",
@@ -209,4 +221,5 @@ __all__ = [
     "ToolResultStatus",
     "ToolResult",
     "EvidencePackage",
+    "SchemaViolation",
 ]

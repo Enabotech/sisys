@@ -279,7 +279,19 @@ class ToolResultValidationError(ValidationError):
         tool_id: str | None = None,
         execution_id: str | None = None,
         reason: str | None = None,
+        schema_violations: list[dict] | None = None,
     ) -> None:
+        """初始化工具结果验证异常。
+
+        Args:
+            message: 异常消息。
+            tool_id: 工具 ID。
+            execution_id: 执行 ID。
+            reason: 失败原因(人类可读)。
+            schema_violations: Schema 验证违规详情列表(Story 4.3 扩展,向后兼容默认 None)。
+                每个元素为 dict,包含字段路径 + 期望类型 + 实际值,供下游消费者
+                重试或调试时直接使用。
+        """
         context: dict = {}
         if tool_id is not None:
             context["tool_id"] = tool_id
@@ -287,6 +299,8 @@ class ToolResultValidationError(ValidationError):
             context["execution_id"] = execution_id
         if reason is not None:
             context["reason"] = reason
+        if schema_violations is not None:
+            context["schema_violations"] = schema_violations
         super().__init__(message=message, context=context)
 
 
