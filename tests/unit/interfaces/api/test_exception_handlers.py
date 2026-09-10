@@ -91,6 +91,7 @@ from src.domain.exceptions import (
     ToolChainDuplicateNodeError,
     ToolChainExecutionFailedError,
     ToolChainNodeNotFoundError,
+    ToolChainNotFoundError,
     ToolExecutionFailedError,
     ToolExecutionRetryExhaustedError,
     ToolExecutionTimeoutError,
@@ -283,6 +284,7 @@ class TestExceptionHttpMap:
             ToolChainDuplicateNodeError,
             ToolChainNodeNotFoundError,
             ToolChainExecutionFailedError,
+            ToolChainNotFoundError,  # 394 — Round 1 审查新增
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types
