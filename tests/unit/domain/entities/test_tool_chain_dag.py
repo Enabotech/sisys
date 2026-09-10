@@ -100,8 +100,8 @@ def test_failure_strategy_is_str_enum() -> None:
 # ============================================================================
 
 
-def test_tool_chain_node_has_seven_fields() -> None:
-    """ToolChainNode 实体必须 7 init 字段"""
+def test_tool_chain_node_has_six_fields() -> None:
+    """ToolChainNode 实体必须 6 init 字段（Round 2 移除 retry_override）"""
     field_names = {f.name for f in fields(ToolChainNode) if f.init}
     expected = {
         "node_id",
@@ -109,7 +109,6 @@ def test_tool_chain_node_has_seven_fields() -> None:
         "depends_on",
         "arguments_template",
         "failure_strategy",
-        "retry_override",
         "skip_on_upstream_failure",
     }
     assert field_names == expected
@@ -123,7 +122,6 @@ def test_tool_chain_node_default_values() -> None:
     assert node.depends_on == ()
     assert node.arguments_template == {}
     assert node.failure_strategy is None
-    assert node.retry_override is None
     assert node.skip_on_upstream_failure is True
 
 
