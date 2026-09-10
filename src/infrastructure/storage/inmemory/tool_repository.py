@@ -8,7 +8,6 @@ Story 4.1a: 添加 asyncio.Lock 类变量（CLAUDE.md §6 Gotchas），并发安
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 
 from src.domain.entities.tool import Tool, ToolCategory
@@ -24,11 +23,10 @@ class InMemoryToolRepository:
     实现 ToolRepositoryPort 接口，使用内存字典存储工具数据。
     生命周期：SCOPED（每个请求独立实例）
 
-    CLAUDE.md §6：asyncio.Lock 声明为类变量，所有方法共享同一锁。
+    并发安全：所有方法为同步 def（CPython GIL 保证 dict mutation 原子性，
+    单事件循环内 OrderedDict/set/dict 操作安全）。
+    如需跨事件循环或多线程安全，需将方法改造为 async 并添加 asyncio.Lock。
     """
-
-    # CLAUDE.md §6：asyncio.Lock 必须声明为类变量而非实例变量
-    _lock: asyncio.Lock = asyncio.Lock()
 
     def __init__(self) -> None:
         """初始化内存仓储"""
