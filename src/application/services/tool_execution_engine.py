@@ -12,16 +12,15 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import logging
 import time
 import uuid
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any
 
+from src.application.services.retry_helpers import RetryPolicy, _call_with_retry
 from src.domain.entities.tool import Tool
 from src.domain.entities.tool_execution import (
     TERMINAL_STATES,
@@ -29,10 +28,6 @@ from src.domain.entities.tool_execution import (
     ToolExecutionState,
 )
 from src.domain.exceptions import (
-    ExecutionError,
-    LLMAPIError,
-    LLMResponseError,
-    TimeoutError,
     ToolExecutionFailedError,
     ToolExecutionRetryExhaustedError,
     ToolExecutionTimeoutError,
@@ -49,32 +44,6 @@ from src.domain.value_objects.tool_execution import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class RetryPolicy:
-    """重试策略 frozen dataclass
-
-    Attributes:
-        max_attempts: 最大尝试次数（默认 3）
-        backoff_strategy: 退避策略（exponential/linear/constant）
-        initial_delay_sec: 初始延迟秒数（默认 1.0）
-        max_delay_sec: 最大延迟秒数（默认 30.0）
-        max_total_duration_sec: 总时长上限秒数（默认 120.0）
-        retryable_exceptions: 可重试异常类型元组
-    """
-
-    max_attempts: int = 3
-    backoff_strategy: Literal["exponential", "linear", "constant"] = "exponential"
-    initial_delay_sec: float = 1.0
-    max_delay_sec: float = 30.0
-    max_total_duration_sec: float = 120.0
-    retryable_exceptions: tuple[type[Exception], ...] = (
-        LLMAPIError,
-        LLMResponseError,
-        ExecutionError,
-        TimeoutError,
-    )
 
 
 class ToolExecutionEngine:
@@ -339,12 +308,15 @@ class ToolExecutionEngine:
         execution_id: str | None = None,
         tool_id: uuid.UUID | None = None,
     ) -> Any:
-        """带指数退避的重试调用
+        """带指数退避的重试调用(Story 4.3 重构为薄壳,委托 _call_with_retry)
+
+        保留 4.1a 既有 API,内部委托给 retry_helpers._call_with_retry 共享工具函数。
+        Engine 与 ToolOutputValidator 装饰器共享同一重试语义。
 
         Args:
             fn: 异步可调用对象
-            execution_id: 当前执行标识（session_id 或 execution_id str，用于异常 context，可选）
-            tool_id: 工具 ID（用于异常 context，可选）
+            execution_id: 当前执行标识(透传到 ToolExecutionRetryExhaustedError context)
+            tool_id: 工具 ID(透传到异常 context)
 
         Returns:
             调用结果
@@ -352,39 +324,20 @@ class ToolExecutionEngine:
         Raises:
             ToolExecutionRetryExhaustedError: 重试耗尽
         """
-        last_exc: Exception | None = None
-        for attempt in range(1, self._retry.max_attempts + 1):
-            try:
-                return await fn()
-            except self._retry.retryable_exceptions as exc:
-                last_exc = exc
-                if attempt >= self._retry.max_attempts:
-                    break
-                delay = self._compute_backoff(attempt)
-                logger.warning(
-                    "重试 %d/%d after %.2fs: %s",
-                    attempt,
-                    self._retry.max_attempts,
-                    delay,
-                    exc,
-                )
-                await asyncio.sleep(delay)
-        raise ToolExecutionRetryExhaustedError(
-            retry_count=self._retry.max_attempts,
+        return await _call_with_retry(
+            fn,
+            self._retry,
+            on_failure_callback=None,
             execution_id=execution_id,
-            tool_id=str(tool_id) if tool_id is not None else None,
-            cause=last_exc,
+            tool_id=tool_id,
+            op_name="tool_engine",
         )
 
     def _compute_backoff(self, attempt: int) -> float:
-        """计算退避延迟"""
-        if self._retry.backoff_strategy == "exponential":
-            delay: float = self._retry.initial_delay_sec * (2 ** (attempt - 1))
-        elif self._retry.backoff_strategy == "linear":
-            delay = self._retry.initial_delay_sec * attempt
-        else:  # constant
-            delay = self._retry.initial_delay_sec
-        return min(delay, self._retry.max_delay_sec)
+        """计算退避延迟(薄壳,委托给 retry_helpers._compute_backoff 保持 API 兼容)"""
+        from src.application.services.retry_helpers import _compute_backoff
+
+        return _compute_backoff(self._retry, attempt)
 
     # ===== 证据包组装 =====
 
@@ -430,4 +383,4 @@ class ToolExecutionEngine:
         return f"验证工具 {tool.name} 输出: result={result}, observation={observation}"
 
 
-__all__ = ["ToolExecutionEngine", "RetryPolicy"]
+__all__ = ["ToolExecutionEngine"]
