@@ -81,6 +81,10 @@ from src.domain.exceptions import (
     ThirdPartyError,
     TimeoutError,
     ToolAlreadyExistsError,
+    ToolChainCycleDetectedError,
+    ToolChainDuplicateNodeError,
+    ToolChainExecutionFailedError,
+    ToolChainNodeNotFoundError,
     ToolExecutionFailedError,
     ToolExecutionRetryExhaustedError,
     ToolExecutionTimeoutError,
@@ -200,6 +204,11 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     SkillNotFoundError: status.HTTP_404_NOT_FOUND,  # 387 — 技能未找到
     SkillLoadError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 388 — 技能加载失败
     ToolResultValidationError: status.HTTP_400_BAD_REQUEST,  # 389 — 工具结果校验失败
+    # 工具链异常（Story 4.2 — DAG 工具链编排）
+    ToolChainCycleDetectedError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 390 — DAG 循环依赖
+    ToolChainDuplicateNodeError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 391 — DAG 节点重复
+    ToolChainNodeNotFoundError: status.HTTP_404_NOT_FOUND,  # 392 — DAG 边引用不存在的节点
+    ToolChainExecutionFailedError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 393 — 工具链整体执行失败
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

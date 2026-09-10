@@ -113,6 +113,12 @@ from src.domain.exceptions.system_exceptions import (
     StorageError,
     SystemException,
 )
+from src.domain.exceptions.tool_chain_exceptions import (
+    ToolChainCycleDetectedError,
+    ToolChainDuplicateNodeError,
+    ToolChainExecutionFailedError,
+    ToolChainNodeNotFoundError,
+)
 from src.domain.exceptions.tool_exceptions import (
     EvidenceValidationFailedError,
     SkillLoadError,
@@ -245,4 +251,9 @@ __all__ = [
     "SkillNotFoundError",
     "SkillLoadError",
     "ToolResultValidationError",
+    # 工具链异常
+    "ToolChainCycleDetectedError",
+    "ToolChainDuplicateNodeError",
+    "ToolChainNodeNotFoundError",
+    "ToolChainExecutionFailedError",
 ]

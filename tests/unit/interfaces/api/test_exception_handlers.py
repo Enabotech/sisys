@@ -87,6 +87,10 @@ from src.domain.exceptions import (
     ThirdPartyError,
     TimeoutError,
     ToolAlreadyExistsError,
+    ToolChainCycleDetectedError,
+    ToolChainDuplicateNodeError,
+    ToolChainExecutionFailedError,
+    ToolChainNodeNotFoundError,
     ToolExecutionFailedError,
     ToolExecutionRetryExhaustedError,
     ToolExecutionTimeoutError,
@@ -274,6 +278,11 @@ class TestExceptionHttpMap:
             SkillNotFoundError,
             SkillLoadError,
             ToolResultValidationError,
+            # 工具链异常（Story 4.2 — DAG 工具链编排）
+            ToolChainCycleDetectedError,
+            ToolChainDuplicateNodeError,
+            ToolChainNodeNotFoundError,
+            ToolChainExecutionFailedError,
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types
