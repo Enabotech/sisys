@@ -72,13 +72,17 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # EXCEPTION_389 ToolResultValidationError (Story 4.1a)
     # EXCEPTION_384 保留未占用；ToolExecutionState 迁移守卫复用 EXCEPTION_243 (EntityStateTransitionError)
     "tool": (380, 389),
-    # 工具链子域（390-399）—— Story 4.2 注册 5 个异常:
-    # EXCEPTION_390 ToolChainCycleDetectedError
-    # EXCEPTION_391 ToolChainDuplicateNodeError
-    # EXCEPTION_392 ToolChainNodeNotFoundError
-    # EXCEPTION_393 ToolChainExecutionFailedError
-    # EXCEPTION_394 ToolChainNotFoundError（Round 1 审查修订新增）
-    # 子域物理嵌套于 external (301-399)，但语义独立
+    # 工具链子域（390-399）—— Story 4.2 注册 5 个异常 + Story 4.3 注册 4 个异常:
+    # EXCEPTION_390 ToolChainCycleDetectedError (Story 4.2)
+    # EXCEPTION_391 ToolChainDuplicateNodeError (Story 4.2)
+    # EXCEPTION_392 ToolChainNodeNotFoundError (Story 4.2)
+    # EXCEPTION_393 ToolChainExecutionFailedError (Story 4.2)
+    # EXCEPTION_394 ToolChainNotFoundError (Story 4.2,Round 1 审查修订新增)
+    # EXCEPTION_395 ToolInputSchemaValidationError (Story 4.3)
+    # EXCEPTION_396 ToolOutputSchemaValidationError (Story 4.3)
+    # EXCEPTION_397 ToolSchemaCompatibilityError (Story 4.3)
+    # EXCEPTION_398 ToolSchemaMissingError (Story 4.3)
+    # 子域物理嵌套于 external (301-399)，但语义独立；EXCEPTION_399 预留供 Story 4.7 扩展
     "toolchain": (390, 399),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
@@ -205,6 +209,11 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ToolChainNodeNotFoundError": "toolchain",
     "ToolChainExecutionFailedError": "toolchain",
     "ToolChainNotFoundError": "toolchain",
+    # tool_schema_exceptions.py (Story 4.3 新增 4 个异常)
+    "ToolInputSchemaValidationError": "toolchain",
+    "ToolOutputSchemaValidationError": "toolchain",
+    "ToolSchemaCompatibilityError": "toolchain",
+    "ToolSchemaMissingError": "toolchain",
 }
 
 
