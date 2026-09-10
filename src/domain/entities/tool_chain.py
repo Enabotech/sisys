@@ -49,7 +49,6 @@ class ToolChainNode:
         depends_on: 依赖的上游节点 node_id 列表
         arguments_template: 参数模板，支持 ${upstream_node.output.field} 变量插值
         failure_strategy: 节点级覆盖策略；None 时使用 DAG 级别策略
-        retry_override: 节点级重试策略覆盖
         skip_on_upstream_failure: 上游失败时是否跳过本节点
     """
 
@@ -58,7 +57,6 @@ class ToolChainNode:
     depends_on: tuple[str, ...] = ()
     arguments_template: dict[str, Any] = field(default_factory=dict)
     failure_strategy: FailureStrategy | None = None
-    retry_override: dict[str, Any] | None = None
     skip_on_upstream_failure: bool = True
 
     def __post_init__(self) -> None:
@@ -109,11 +107,6 @@ class ToolChainNode:
                     "field": "failure_strategy",
                     "value": self.failure_strategy,
                 },
-            )
-        if self.retry_override is not None and not isinstance(self.retry_override, dict):
-            raise EntityValidationError(
-                message="retry_override 必须为 dict 或 None",
-                context={"entity": "ToolChainNode", "field": "retry_override"},
             )
         return True
 
