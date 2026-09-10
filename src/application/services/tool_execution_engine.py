@@ -171,11 +171,11 @@ class ToolExecutionEngine:
 
             # === Execute 阶段 ===
             execution.transition_to(ToolExecutionState.EXECUTING)
-            result = await self._execute_stage(session_id, code)
+            result = await self._execute_stage(session_id, code, tool)
             execution.result = result
 
             # === Observe 阶段 ===
-            observation = await self._observe_stage(session_id, result)
+            observation = await self._observe_stage(session_id, result, tool)
 
             # === Validate 阶段 ===
             execution.transition_to(ToolExecutionState.VALIDATING)
@@ -269,7 +269,9 @@ class ToolExecutionEngine:
             lambda: self._llm.structured_generate(
                 prompt=prompt,
                 response_schema=str,
-            )
+            ),
+            execution_id=context.session_id,
+            tool_id=tool.tool_id,
         )
         return str(response)
 
@@ -285,16 +287,22 @@ class ToolExecutionEngine:
             lambda: self._llm.structured_generate(
                 prompt=prompt,
                 response_schema=str,
-            )
+            ),
+            execution_id=context.session_id,
+            tool_id=tool.tool_id,
         )
         return str(response)
 
-    async def _execute_stage(self, session_id: str, code: str) -> str:
+    async def _execute_stage(self, session_id: str, code: str, tool: Tool) -> str:
         """Execute 阶段：调用 SandboxExecutor.execute_code 产出 result"""
-        result = await self._retry_call(lambda: self._sandbox.execute_code(session_id, code))
+        result = await self._retry_call(
+            lambda: self._sandbox.execute_code(session_id, code),
+            execution_id=session_id,
+            tool_id=tool.tool_id,
+        )
         return str(result.get("output", ""))
 
-    async def _observe_stage(self, session_id: str, result: str) -> str:
+    async def _observe_stage(self, session_id: str, result: str, tool: Tool) -> str:
         """Observe 阶段：调用 SandboxExecutor.execute_code 产出 observation"""
         observation_code = self._build_observation_code(result)
         observation = await self._retry_call(lambda: self._sandbox.execute_code(session_id, observation_code))
@@ -319,11 +327,18 @@ class ToolExecutionEngine:
 
     # ===== 重试机制 =====
 
-    async def _retry_call(self, fn) -> Any:
+    async def _retry_call(
+        self,
+        fn,
+        execution_id: str | None = None,
+        tool_id: uuid.UUID | None = None,
+    ) -> Any:
         """带指数退避的重试调用
 
         Args:
             fn: 异步可调用对象
+            execution_id: 当前执行标识（session_id 或 execution_id str，用于异常 context，可选）
+            tool_id: 工具 ID（用于异常 context，可选）
 
         Returns:
             调用结果
@@ -350,6 +365,8 @@ class ToolExecutionEngine:
                 await asyncio.sleep(delay)
         raise ToolExecutionRetryExhaustedError(
             retry_count=self._retry.max_attempts,
+            execution_id=execution_id,
+            tool_id=str(tool_id) if tool_id is not None else None,
             cause=last_exc,
         )
 

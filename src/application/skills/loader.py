@@ -158,7 +158,7 @@ class InMemorySkillLoader(SkillLoaderPort):
         """
         slug = self._resolve_slug(tool_name)
         if slug is None:
-            raise SkillNotFoundError(tool_name=tool_name)
+            raise SkillNotFoundError(tool_name=tool_name, slug=tool_name)
 
         # LRU 缓存命中（命中时 move_to_end 刷新位置）
         if slug in self._sop_cache:
@@ -235,7 +235,7 @@ class InMemorySkillLoader(SkillLoaderPort):
         """
         slug = self._resolve_slug(tool_name)
         if slug is None:
-            raise SkillNotFoundError(tool_name=tool_name)
+            raise SkillNotFoundError(tool_name=tool_name, slug=tool_name)
 
         meta = self._metadata_cache.get(slug)
         if meta is None:
@@ -262,7 +262,7 @@ class InMemorySkillLoader(SkillLoaderPort):
         """
         slug = self._resolve_slug(tool_name)
         if slug is None:
-            raise SkillNotFoundError(tool_name=tool_name)
+            raise SkillNotFoundError(tool_name=tool_name, slug=tool_name)
 
         ref_path = self._skills_root / slug / "references" / ref_name
         if not ref_path.exists():
@@ -289,7 +289,7 @@ class InMemorySkillLoader(SkillLoaderPort):
         """
         slug = self._resolve_slug(tool_name)
         if slug is None:
-            raise SkillNotFoundError(tool_name=tool_name)
+            raise SkillNotFoundError(tool_name=tool_name, slug=tool_name)
 
         script_path = self._skills_root / slug / "scripts" / script_name
         if not script_path.exists():
