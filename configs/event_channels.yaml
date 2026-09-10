@@ -93,6 +93,11 @@ event_channels:
     delivery_mode: "reliable"
     description: "工具链执行完成（双通道：realtime + reliable）"
 
+  ToolSchemaValidationFailed:
+    redis_channel: "sisys:rt:tool_schema_validation_failed"
+    delivery_mode: "realtime"
+    description: "工具 Schema 验证失败（Story 4.3,本期仅 realtime,reliable 4.7 启用）"
+
   AgentDecided:
     rabbitmq_routing_key: "sisys.events.reliable.agent_decided"
     delivery_mode: "reliable"
