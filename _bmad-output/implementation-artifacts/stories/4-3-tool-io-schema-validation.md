@@ -198,13 +198,15 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 | `event_type` | `str` | 固定为 `"ToolSchemaValidationFailed"`(**新增**) |
 | `execution_id` | `UUID` | 关联 ToolExecution 聚合根 ID |
 | `tool_id` | `UUID` | 工具 ID |
-| `tenant_id` | `UUID` | 多租户隔离 |
+| `tenant_id` | `UUID` | 多租户隔离(**Round 1 补充**,工具事件 baseline 必填) |
 | `aggregate_id` | `UUID` | = `execution_id` |
 | `aggregate_type` | `str` | `"ToolExecution"` |
 | `validation_phase` | `str` | `"INPUT"` / `"OUTPUT"` / `"COMPATIBILITY"` |
 | `schema_violations` | `list[dict]` | 字段路径 + 期望类型 + 实际值 |
 | `retry_attempt` | `int` | 当前重试次数(1-based) |
 | `failed_at` | `datetime` | 失败时间戳(ISO 8601) |
+| `schema_version` | `str` | **Round 1 新增**,Tool.version 快照(校验发起时),4.6 兼容性追踪用 |
+| `is_final` | `bool` | **Round 1 新增**,是否终止事件(INPUT 失败 = True;OUTPUT 重试 N 次仅最后一次 = True),简化 4.7 订阅者去重 |
 
 ### 内部端口契约(非 HTTP)
 
@@ -232,7 +234,7 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 | Epic | Epic 4: 战略工具箱 |
 | 价值组 | 战略工具质量保障(Tool Quality Assurance) |
 | 优先级 | P0(Epic 4 战略工具箱核心 Story) |
-| 估算工作量 | **27-35 人天**(含 SchemaValidator **6 类验证** + 4 端口契约测试 + 1 领域 SchemaValidator 服务 + 2 装饰器 + RetryExecutor 抽离 + 1 聚合根 + 5 类事件 + Alembic migration 013 + 集成测试 + 4.1a ToolResult 字段回归修复 + TDD 完整循环 +30% 缓冲)。**较 18-25 人天原估算上调**:首次引入装饰器学习成本 + RetryExecutor 抽离 + PEP 561 stubs 扩展 + 6 项校验规则扩展(含 additionalProperties)+ 4.1a 23种 Tool 测试回归修复 |
+| 估算工作量 | **27-35 人天**(含 SchemaValidator **6 类验证** + 4 端口契约测试 + 1 领域 SchemaValidator 服务 + 2 装饰器 + RetryExecutor 抽离 + 1 聚合根 + 1 类事件(13 字段)+ Alembic migration 013 + 集成测试 + 4.1a ToolResult 字段回归修复 + TDD 完整循环 +30% 缓冲)。**较 18-25 人天原估算上调**:首次引入装饰器学习成本 + RetryExecutor 抽离 + PEP 561 stubs 扩展 + 6 项校验规则扩展(含 additionalProperties)+ 4.1a 23种 Tool 测试回归修复 |
 | 覆盖 FR | FR-ST-03(工具输入/输出 Schema 验证) |
 | 前置 Story | 4-1a-strategic-tool-impl(已 ready-for-dev)/ 4-2-toolchain-orchestration-dag(可选 — DAG 节点执行复用 Schema 验证) |
 | 后续 Story | 4-6-tool-version-management(灰度发布需 Schema 兼容性检查)/ 4-7-validation-feedback-loop(Schema 失败自动重试/降级) |
@@ -548,8 +550,8 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
   - 事件定义:新建 `src/domain/events/tool_schema_events.py`
   - 双通道配置:`configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py:54`(`ChannelRouter.DEFAULT_MAPPINGS`)
 - **事件 Schema**(**13 字段**,较原 10 字段扩展):
-  - 10 原字段(execution_id / tool_id / tenant_id / aggregate_id / aggregate_type / validation_phase / schema_violations / retry_attempt / failed_at)
-  - **新增字段**: `tenant_id`(原遗漏,工具事件 baseline 必填) + `schema_version`(4.6 兼容性追踪用) + `is_final: bool`(最后一次重试时 True,**简化 4.7 订阅者去重逻辑**)
+  - **10 原字段**:event_type(继承 DomainEvent) + execution_id / tool_id / tenant_id / aggregate_id / aggregate_type / validation_phase / schema_violations / retry_attempt / failed_at
+  - **3 新增字段**: `tenant_id`(原遗漏,工具事件 baseline 必填) + `schema_version`(4.6 兼容性追踪用) + `is_final: bool`(最后一次重试时 True,**简化 4.7 订阅者去重逻辑**)
   - 完整字段定义见上方"API 契约"节
 - **事件触发点**:
   - `ToolInputValidator.execute()`:入参校验失败时发布(`validation_phase = "INPUT"`,**is_final=True** 因 INPUT 不重试)
@@ -613,7 +615,7 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
   class SchemaValidator:
       """JSON Schema 核心子集校验器(领域层纯函数服务,无状态、无依赖)
 
-      实现 5 项校验规则(类型 / required / enum / items / properties),
+      实现 **6** 项校验规则(类型 / required / enum / items / properties),
       完整 Draft 7+ 验证能力委托 SchemaValidatorPort(应用层)。
       """
 
@@ -661,13 +663,13 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | SchemaValidator 领域服务(纯函数 JSON Schema 校验) | Task 1 | SchemaValidator + SchemaValidationResult + SchemaViolation + 5 项校验规则 | `tests/unit/domain/services/test_schema_validator.py` |
+| AC-1 | SchemaValidator 领域服务(纯函数 JSON Schema 校验) | Task 1 | SchemaValidator + SchemaValidationResult + SchemaViolation + **6** 项校验规则 | `tests/unit/domain/services/test_schema_validator.py` |
 | AC-2 | SchemaValidatorPort 应用层端口(jsonschema 库委托) | Task 2 | SchemaValidatorPort Protocol + JsonSchemaValidatorImpl + schema_compatibility | `tests/contracts/test_port_contract_schema_validator.py` |
 | AC-3 | ToolInputValidator + ToolOutputValidator 装饰器 | Task 3 | 装饰器实现 + strict/lenient + 重试机制 | `tests/unit/application/services/test_tool_input_validator.py` + `test_tool_output_validator.py` |
 | AC-4 | ToolResult 状态扩展(status=invalid 语义完善) | Task 4 | ToolResult 新增 validation_violations / retry_count + EvidencePackage.validation 升级 + ToolResultValidationError 扩展 | `tests/unit/domain/value_objects/test_tool_result_validation_43.py` |
 | AC-5 | SchemaValidationRecord 聚合根 + 仓储端口 | Task 5 | SchemaValidationRecord + Query + Repository + InMemory + migration 013 | `tests/contracts/test_port_contract_schema_validation_record_repository.py` |
 | AC-6 | ToolSchemaValidationFailed 领域事件 + 双通道配置 | Task 6 | ToolSchemaValidationFailed event + event_channels.yaml + ChannelRouter.DEFAULT_MAPPINGS | `tests/contracts/test_event_contract_tool_schema_validation_failed.py` |
-| AC-7 | 与 ToolExecutionEngine 集成(Validate 阶段增强) | Task 7 | Engine __init__ 注入 output_validator + 重试 prompt 注入 violations + 向后兼容 | `tests/integration/test_integration_tool_io_schema_validation.py` |
+| AC-7 | 与 ToolExecutionEngine 集成(Validate 阶段增强) | Task 7 | **ToolOutputValidator(engine) 纯外包装饰** + _call_with_retry 重试 + violations 注入 prompt + Engine 源码不变 | `tests/integration/test_integration_tool_io_schema_validation.py` |
 | AC-8 | 端口注册与架构约束 | Task 8 | **2 端口**注册(不含 SchemaValidator 领域服务) + PortSpec 元数据 + lint-imports | `tests/unit/architecture/test_arch_tool_io_schema_validation.py` |
 | **AC-1~AC-8 收尾** | **开发结束验收测试** | **Task 9** | **src + tests 完成清单断言 + 收尾校验** | `tests/acceptance/test_acceptance_tool_io_schema_validation.py` |
 
@@ -691,10 +693,10 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 - [ ] Subtask: 定义 `SchemaValidationRecord` 聚合根 Schema(11 字段)+ `SchemaValidationRecordQuery` Query 值对象
 - [ ] Subtask: 定义 `SchemaValidationRecordRepositoryPort` Protocol 接口(继承 `L2RdbPort[SchemaValidationRecord]` + 扩展 list_by_query / count)
 - [ ] Subtask: 定义 `ToolInputValidator` + `ToolOutputValidator` 装饰器接口(strict/lenient 策略 + retry_count)
-- [ ] Subtask: 定义 `ToolSchemaValidationFailed` 领域事件 Schema(10 字段)
+- [ ] Subtask: 定义 `ToolSchemaValidationFailed` 领域事件 Schema(13 字段)
 - [ ] Subtask: 定义 PortSpec 元数据清单(**2 个新端口**:schema_validator / schema_validation_record_repository;SchemaValidator 领域服务、ToolInputValidator/ToolOutputValidator 应用服务**不**注册端口)
 - [ ] Subtask: **新增异常 4 项 Checklist 实施**(ToolInputSchemaValidationError **EXCEPTION_395** / ToolOutputSchemaValidationError EXCEPTION_396 / ToolSchemaCompatibilityError EXCEPTION_397 / ToolSchemaMissingError **EXCEPTION_398**)
-- [ ] Subtask: **复用 toolchain 子域 394-397**(更新 `_code_ranges.py` 注释 + `sisys-uni-exception-design.md §3.3.2` 表)
+- [ ] Subtask: **复用 toolchain 子域 395-398**(更新 `_code_ranges.py` 注释 + `sisys-uni-exception-design.md §3.3.2` 表)
 - [ ] Subtask: **扩展 ToolResultValidationError**(EXCEPTION_389 增加 `schema_violations` 参数,向后兼容)
 - [ ] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_tool_io_schema_validation.feature`
 - [ ] Subtask: 编写 Gherkin 步骤实现 `tests/acceptance/test_acceptance_tool_io_schema_validation.py`
@@ -725,21 +727,21 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 - [ ] Subtask: 🟢 绿 — 实现值对象
 - [ ] Subtask: 🔄 重构 — 类型注解 + docstring
 
-#### TDD 循环 B:SchemaValidator 5 项校验规则
+#### TDD 循环 B:SchemaValidator **6** 项校验规则
 
 | 阶段 | 动作 | 完成标志 |
 |------|------|----------|
-| 🔴 红 | 编写 `test_schema_validator.py`(5 项规则测试:类型 / required / enum / items / properties) | `pytest` 失败 |
+| 🔴 红 | 编写 `test_schema_validator.py`(6 项规则测试:类型 / required / enum / items / properties) | `pytest` 失败 |
 | 🟢 绿 | 在 `src/domain/services/schema_validator.py` 实现 `SchemaValidator.validate_arguments` + `validate_output`(纯函数) | `pytest` 通过 |
 | 🔄 重构 | 嵌套对象递归校验 + 空 schema 兼容 + path JSON Pointer 生成 | `ruff check + mypy + pytest` 全部通过 |
 
-- [ ] Subtask: 🔴 红 — 编写 5 项校验规则失败测试
+- [ ] Subtask: 🔴 红 — 编写 **6** 项校验规则失败测试
 - [ ] Subtask: 🟢 绿 — 实现 SchemaValidator 静态方法
 - [ ] Subtask: 🔄 重构 — 嵌套对象递归 + path 生成
 
 **完成标准/Definition of Done:**
 - [ ] SchemaValidator 实现位于 `src/domain/services/`(**纯函数**,无外部依赖)
-- [ ] 5 项校验规则完整(类型 / required / enum / items / properties)
+- [ ] **6** 项校验规则完整(类型 / required / enum / items / properties)
 - [ ] SchemaValidationResult 含 is_valid / violations / validated_at 三字段
 - [ ] SchemaViolation 含 path / expected / actual / message 四字段
 - [ ] 空 schema 返回 is_valid=True(向后兼容)
@@ -820,7 +822,7 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 |------|------|----------|
 | 🔴 红 | 编写 `test_tool_output_validator.py`(重试 3 次 / violations 反馈 / 最终失败抛错) | `pytest` 失败 |
 | 🟢 绿 | 在 `src/application/services/tool_output_validator.py` 实现装饰器 | `pytest` 通过 |
-| 🔄 重构 | 重试时 violations 注入 LLM prompt + 复用 ToolExecutionEngine._retry_call | `ruff check + mypy + pytest` 全部通过 |
+| 🔄 重构 | 重试时 violations 注入 LLM prompt + 抽离的 `_call_with_retry` 工具函数(不依赖 Engine 私有 `_retry_call`) | `ruff check + mypy + pytest` 全部通过 |
 
 - [ ] Subtask: 🔴 红 — 编写重试失败测试
 - [ ] Subtask: 🟢 绿 — 实现 ToolOutputValidator
@@ -923,7 +925,7 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 
 | 阶段 | 动作 | 完成标志 |
 |------|------|----------|
-| 🔴 红 | 编写 `test_tool_schema_validation_failed_event.py`(10 字段 + 序列化) | `pytest` 失败 |
+| 🔴 红 | 编写 `test_tool_schema_validation_failed_event.py`(13 字段 + 序列化) | `pytest` 失败 |
 | 🟢 绿 | 在 `src/domain/events/tool_schema_events.py` 实现事件 dataclass | `pytest` 通过 |
 | 🔄 重构 | 添加类型注解、docstring、frozen dataclass | `ruff check + mypy + pytest` 全部通过 |
 
@@ -944,7 +946,7 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 - [ ] Subtask: 🔄 重构 — 双通道投递验证
 
 **完成标准/Definition of Done:**
-- [ ] ToolSchemaValidationFailed 事件定义完整(10 字段)
+- [ ] ToolSchemaValidationFailed 事件定义完整(13 字段)
 - [ ] configs/event_channels.yaml + ChannelRouter.DEFAULT_MAPPINGS 同步更新
 - [ ] ToolInputValidator + ToolOutputValidator 在校验失败时通过 **EventPublisher** 发布事件
 - [ ] 事件契约测试覆盖(字段必填 + 序列化 + 通道双投递)
@@ -961,17 +963,17 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 >
 > **依赖关系:** 依赖 Task 1-6 全部完成。
 
-#### TDD 循环 A:ToolExecutionEngine 装饰器集成
+#### TDD 循环 A:ToolOutputValidator 装饰 Engine(纯外包模式)
 
 | 阶段 | 动作 | 完成标志 |
 |------|------|----------|
-| 🔴 红 | 编写 `test_tool_execution_engine_with_validator.py`(output_validator 注入 + 返回前 validate + 重试 + 向后兼容) | `pytest` 失败 |
-| 🟢 绿 | 在 `src/application/services/tool_execution_engine.py` __init__ 增加 output_validator 参数 + execute 末尾调用 validator | `pytest` 通过 |
-| 🔄 重构 | _build_validate_prompt 注入上轮 violations + 复用 _retry_call | `ruff check + mypy + pytest` 全部通过 |
+| 🔴 红 | 编写 `test_tool_output_validator_with_engine.py`(Engine 包裹 + 调用 _call_with_retry + violations 反馈 + 4.1a 向后兼容) | `pytest` 失败 |
+| 🟢 绿 | 在 `src/application/services/tool_output_validator.py` 实现 `ToolOutputValidator(wrapped=engine, ...)`;**ToolExecutionEngine.__init__ 源码不变** | `pytest` 通过 |
+| 🔄 重构 | 通过 `_call_with_retry(func, retry_policy, on_failure_callback)` 工具函数触发重试;Engine `_retry_call` 重构为薄壳;_build_validate_prompt 注入上轮 violations | `ruff check + mypy + pytest` 全部通过 |
 
-- [ ] Subtask: 🔴 红 — 编写 Engine 集成失败测试
-- [ ] Subtask: 🟢 绿 — 实现 Engine 装饰器注入
-- [ ] Subtask: 🔄 重构 — violations 注入 prompt + retry 复用
+- [ ] Subtask: 🔴 红 — 编写 ToolOutputValidator 包裹 Engine 失败测试
+- [ ] Subtask: 🟢 绿 — 实现 ToolOutputValidator 装饰器(纯外包,**不修改 Engine 源码**)
+- [ ] Subtask: 🔄 重构 — 抽离 `_call_with_retry` 工具函数 + Engine `_retry_call` 薄壳化 + violations 注入 prompt
 
 #### TDD 循环 B:集成测试(端到端 Tool 调用 + Schema 验证)
 
@@ -986,12 +988,12 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 - [ ] Subtask: 🔄 重构 — 真实服务 Schema 隔离
 
 **完成标准/Definition of Done:**
-- [ ] ToolExecutionEngine.__init__ 增加 output_validator: ToolOutputValidator | None = None 参数
-- [ ] ToolExecutionEngine.execute 在返回 ToolResult 前调用 output_validator.validate(tool_result)
-- [ ] 重试机制复用 _retry_call,不在 Engine 内重复
-- [ ] 重试 prompt 附加上一次 violations
+- [ ] **`ToolExecutionEngine.__init__` 不修改**(保持 4 字段签名,**4.1a 23 种 Tool 既有测试 0 FAIL**)
+- [ ] `ToolOutputValidator(engine)` 在 `composition_root.py` 装配时**替代 engine** 注入到 `ToolExecutionService`
+- [ ] 重试机制通过 `_call_with_retry` 共享工具函数(`retry_helpers.py`),**Engine `_retry_call` 重构为薄壳**
+- [ ] 重试 prompt 附加上一次 violations(`Engine._build_validate_prompt` 注入 `last_violations` 可选参数)
 - [ ] 集成测试:Tool.output_schema 严格 → LLM 输出不符合 → 重试 → 最终通过 / 最终失败
-- [ ] 向后兼容:未注入 output_validator 时既有 4.1a 测试全部通过
+- [ ] 向后兼容:`ToolExecutionEngine(llm, sandbox, retry_policy, repository)` 4 字段调用全部通过
 - [ ] 所有测试通过
 
 ---
@@ -1145,10 +1147,11 @@ src/
 │   │   ├── tool_chain_orchestrator.py # 既有(4.2)
 │   │   └── schema_validator.py        # 新建 SchemaValidatorPort Protocol(4.3)
 │   ├── services/
-│   │   ├── tool_execution_engine.py   # 既有(4.1a)+ 增加 output_validator 可选注入(4.3)
+│   │   ├── tool_execution_engine.py   # 既有(4.1a)+ **不修改**(4.3);**`_retry_call` 重构为薄壳**调用 `_call_with_retry`(4.1a 既有 API 兼容)
 │   │   ├── tool_execution_service.py  # 既有(4.1a)
-│   │   ├── tool_input_validator.py    # 新建 ToolInputValidator 装饰器(4.3)
-│   │   └── tool_output_validator.py   # 新建 ToolOutputValidator 装饰器(4.3)
+│   │   ├── retry_helpers.py           # **新建**(4.3)`_call_with_retry` 共享工具函数(Engine + 装饰器共享)
+│   │   ├── tool_input_validator.py    # 新建 ToolInputValidator 装饰器(4.3,包裹 ToolExecutionService)
+│   │   └── tool_output_validator.py   # 新建 ToolOutputValidator 装饰器(4.3,**纯外包 Engine** + composition_root 装配时替代 engine 注入 Service)
 │   └── use_cases/
 │       ├── strategic_analysis.py      # 既有(4.1a)
 │       └── run_tool_chain.py          # 既有(4.2)
@@ -1175,7 +1178,7 @@ src/
 
 **关键学习点:**
 
-1. **toolchain 子域嵌套声明惯例**:Story 4.2 R1 决策"新增 toolchain 子域(390-399),嵌套于 external 但语义独立"(`4-2-toolchain-orchestration-dag.md:124-132`)。本 Story 4.3 复用**同一子域**继续分配 394-397(节省码位,延续子域语义边界),不新增 `tool_schema` 子域。
+1. **toolchain 子域嵌套声明惯例**:Story 4.2 R1 决策"新增 toolchain 子域(390-399),嵌套于 external 但语义独立"(`4-2-toolchain-orchestration-dag.md:124-132`)。本 Story 4.3 复用**同一子域**继续分配 395-398(节省码位,延续子域语义边界),不新增 `tool_schema` 子域。
 
 2. **5 项 Checklist 异常体系**(CLAUDE.md §5):Story 4.2 已建立"定义文件 + _code_ranges.py + __init__.py + 子域码段校验 + EXCEPTION_HTTP_MAP 表 5 项"模式。本 Story 4.3 **完全沿用此模式**,新增 4 异常仅需复用 5 项 Checklist。
 
@@ -1185,7 +1188,7 @@ src/
 
 5. **InMemory Repository asyncio.Lock 类变量**:Story 4.2 AC-3 + CLAUDE.md §6 Gotchas 明确"asyncio.Lock 必须声明为类变量"(`4-2-toolchain-orchestration-dag.md:248`)。本 Story 4.3 `InMemorySchemaValidationRecordRepository` 严格遵循。
 
-6. **ToolExecutionEngine 五阶段 + _retry_call 重试机制**:Story 4.1a 实现 `ToolExecutionEngine._retry_call`(`tool_execution_engine.py:336`)。本 Story 4.3 `ToolOutputValidator` 装饰器**复用此机制**而非重新实现,避免重复代码 + 保持重试语义一致性。
+6. **ToolExecutionEngine 五阶段 + 重试机制共享**:Story 4.1a 实现 `ToolExecutionEngine._retry_call`(`tool_execution_engine.py:336`)。本 Story 4.3 抽离 `_call_with_retry(func, retry_policy, on_failure_callback)` 共享工具函数(`retry_helpers.py`),**Engine `_retry_call` 重构为薄壳**(4.1a 既有 API 兼容),**装饰器与 Engine 共享重试逻辑而非重复实现**,避免代码重复 + 保持重试语义一致性。
 
 7. **事件双通道配置模式**:Story 4.2 AC-7 决策"ToolChainExecuted 新事件默认为双通道,同步更新 configs/event_channels.yaml + ChannelRouter.DEFAULT_MAPPINGS"(`4-2-toolchain-orchestration-dag.md:1053-1058`)。本 Story 4.3 `ToolSchemaValidationFailed` 沿用此模式。
 
@@ -1227,14 +1230,14 @@ src/
 ### 完成清单 Completion Notes List
 
 - [x] 故事需求从 `epics_v1.0.md` 提取(FR-ST-03 / Story 4.3)
-- [x] 架构约束从 `architecture.md` 提取(六边形 + Decorator + L2Rdb + EventBus)
+- [x] 架构约束从 `architecture.md` 提取(六边形 + Decorator + L2Rdb + EventPublisher)
 - [x] 前一个故事(4.2)学习经验整合(10 项关键学习 + 避免重蹈覆辙)
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
-- [x] toolchain 子域复用 394-397 共 4 个新异常 5 项 Checklist 定义完毕
+- [x] toolchain 子域复用 395-398 共 4 个新异常 6 项 Checklist 定义完毕
 - [x] 2 个新端口契约定义(schema_validator / schema_validation_record_repository)+ ToolSchemaValidationFailed 事件通道定义
-- [x] 5 项 JSON Schema 校验规则(类型 / required / enum / items / properties)+ jsonschema 库委托应用层端口
+- [x] 6 项 JSON Schema 校验规则(类型 / required / enum / items / properties)+ jsonschema 库委托应用层端口
 - [x] Decorator 模式(ToolInputValidator / ToolOutputValidator)边界明确
 
 ### 文件清单 File List
@@ -1246,14 +1249,15 @@ src/
 
 | 路径 | 描述 |
 |------|------|
-| `src/domain/services/schema_validator.py` | SchemaValidator 领域服务(纯函数 + 5 项校验规则) |
+| `src/domain/services/schema_validator.py` | SchemaValidator 领域服务(纯函数 + **6** 项校验规则) |
 | `src/domain/entities/schema_validation_record.py` | SchemaValidationRecord 聚合根 + SchemaValidationRecordQuery |
 | `src/domain/events/tool_schema_events.py` | ToolSchemaValidationFailed 领域事件 |
 | `src/domain/exceptions/tool_schema_exceptions.py` | 4 个新异常(**EXCEPTION_395/396/397/398**) |
 | `src/domain/ports/schema_validation_record_repository.py` | SchemaValidationRecordRepositoryPort Protocol + Query |
 | `src/application/ports/schema_validator.py` | SchemaValidatorPort Protocol |
-| `src/application/services/tool_input_validator.py` | ToolInputValidator 装饰器(strict/lenient) |
-| `src/application/services/tool_output_validator.py` | ToolOutputValidator 装饰器(自动重试 + violations 反馈) |
+| `src/application/services/retry_helpers.py` | **_call_with_retry(func, retry_policy, on_failure_callback)** 共享工具函数(Engine `_retry_call` 重构为薄壳) |
+| `src/application/services/tool_input_validator.py` | ToolInputValidator 装饰器(strict/lenient,注入 tool_registry + event_publisher) |
+| `src/application/services/tool_output_validator.py` | ToolOutputValidator 装饰器(**纯外包 Engine** + 调用 _call_with_retry + 注入 event_publisher) |
 | `src/infrastructure/validation/jsonschema_validator.py` | JsonSchemaValidatorImpl(jsonschema Draft 7) |
 | `src/infrastructure/storage/inmemory/schema_validation_record_repository.py` | InMemorySchemaValidationRecordRepository |
 | `deploy/postgresql/alembic/versions/013_schema_validation_records.py` | migration 013 |
@@ -1323,11 +1327,12 @@ src/
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-09-10
 **最后更新/Last Updated:** 2026-09-10
 **更新说明/Description:**
-- v1.0.0: 创建故事文件(基于 Story 4.2 设计模式 + 4 项 Checklist 异常体系 + 2 端口契约 + Decorator 模式 + jsonschema 库应用层委托 + **6 项 Schema 校验规则**)
+- v1.0.0: 创建故事文件(基于 Story 4.2 设计模式 + 4 项 Checklist 异常体系 + 2 端口契约 + Decorator 模式 + jsonschema 库应用层委托 + 5 项 Schema 校验规则)
+- v1.1.0 (Round 1 修订):
 - v1.1.0 (Round 1 修订):
   - 修正 EXCEPTION_394 → EXCEPTION_395-398(因 394 已被 4.2 R1 ToolChainNotFoundError 占用)
   - 修正 EventBusPort → EventPublisher(实际类名)
@@ -1340,3 +1345,13 @@ src/
   - 事件双通道策略调整为本期仅 realtime(reliable 延后 4.7)
   - 事件字段增加 tenant_id / schema_version / is_final(简化 4.7 订阅者去重)
   - 工作量估算 18-25 → 27-35 人天(含首次装饰器引入 + 4.1a 回归修复)
+- v1.2.0 (Round 2 修订):
+  - Task 7 全部改造为"ToolOutputValidator 纯外包 Engine"模式(AC-3 + AC-7 + Task 7 一致)
+  - 文件清单新增 `src/application/services/retry_helpers.py`
+  - 项目结构补 retry_helpers.py + Engine 注释修订
+  - API 契约表格补 `schema_version` + `is_final` 字段(13 字段完整)
+  - 子域范围 394-397 → 395-398 全面统一(3 处)
+  - `_retry_call` 描述 → `_call_with_retry` 工具函数(多处)
+  - "EventBus" 残留 → "EventPublisher"(Completion Notes)
+  - 工作量估算 "5 类事件" → "1 类事件(13 字段)"
+  - v1.0.0 changelog 修正 "6 项" → "5 项" Schema 校验规则
