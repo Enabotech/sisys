@@ -1615,12 +1615,11 @@ src/
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.4.1
 **创建日期/Created:** 2026-09-10
 **最后更新/Last Updated:** 2026-09-10
 **更新说明/Description:**
 - v1.0.0: 创建故事文件(基于 Story 4.2 设计模式 + 4 项 Checklist 异常体系 + 2 端口契约 + Decorator 模式 + jsonschema 库应用层委托 + 5 项 Schema 校验规则)
-- v1.1.0 (Round 1 修订):
 - v1.1.0 (Round 1 修订):
   - 修正 EXCEPTION_394 → EXCEPTION_395-398(因 394 已被 4.2 R1 ToolChainNotFoundError 占用)
   - 修正 EventBusPort → EventPublisher(实际类名)
@@ -1633,22 +1632,6 @@ src/
   - 事件双通道策略调整为本期仅 realtime(reliable 延后 4.7)
   - 事件字段增加 tenant_id / schema_version / is_final(简化 4.7 订阅者去重)
   - 工作量估算 18-25 → 27-35 人天(含首次装饰器引入 + 4.1a 回归修复)
-- v1.4.0 (Round 4 修订):
-  - toolchain 子域 4.7 异常预留策略升级为决策矩阵(方案 A 扩 400-409 推荐)
-  - 4.7 异常需求预测(ValidationFeedbackRetryExhaustedError + FallbackFailedError + HumanReviewTimeoutError + CanaryConflictError)
-  - tenant_id baseline 措辞修订:"4.2 起的 toolchain 事件 baseline 必填;4.1a 历史遗留待 4.6 决策"
-  - AC-6 验证清单新增 is_final 在 4.7 订阅契约(去重键 + 终止超时 + at-most-once)
-  - AC-6 验证清单新增事件 payload 大小门禁(总条数 ≤10 + path 深度 ≤10 + 总大小 ≤16KB)
-  - ChannelRouter 行号容差修订(±10 行)
-  - 新增 "4.6/4.7 架构演进路径" 小节(API 依赖契约 + 反馈闭环示意图)
-- v1.3.0 (Round 3 修订):
-  - AC-2 补充 `BreakingChange` / `NonBreakingChange` / `SchemaCompatibilityResult` 值对象完整定义
-  - AC-2 补充 `validate_schema_compatibility` 12 条规则清单(8 类破坏性 + 4 类非破坏性)
-  - AC-1 验证清单新增 `SchemaValidator._sanitize_actual()` 完整实现(datetime/UUID/Decimal/bytes 脱敏)
-  - AC-5 验证清单新增 5 条并发安全断言(asyncio.Lock 类变量 + 100 并发 save + 跨实例锁共享反例)
-  - AC-8 补充 `composition_root.py` 装配样板 + `ToolExecutionService` 接收 `ToolExecutionEnginePort` Protocol 决策 + Liskov Substitution 契约测试
-  - 补充 `_call_with_retry` 工具函数完整签名 + `on_failure_callback` 调用契约
-  - Task 9 补充 15 个 Gherkin Scenario 清单 + BDD Mock 边界决策表 + pytest.skip() 触发条件
 - v1.2.0 (Round 2 修订):
   - Task 7 全部改造为"ToolOutputValidator 纯外包 Engine"模式(AC-3 + AC-7 + Task 7 一致)
   - 文件清单新增 `src/application/services/retry_helpers.py`
@@ -1659,3 +1642,20 @@ src/
   - "EventBus" 残留 → "EventPublisher"(Completion Notes)
   - 工作量估算 "5 类事件" → "1 类事件(13 字段)"
   - v1.0.0 changelog 修正 "6 项" → "5 项" Schema 校验规则
+- v1.3.0 (Round 3 修订):
+  - AC-2 补充 `BreakingChange` / `NonBreakingChange` / `SchemaCompatibilityResult` 值对象完整定义
+  - AC-2 补充 `validate_schema_compatibility` 12 条规则清单(8 类破坏性 + 4 类非破坏性)
+  - AC-1 验证清单新增 `SchemaValidator._sanitize_actual()` 完整实现(datetime/UUID/Decimal/bytes 脱敏)
+  - AC-5 验证清单新增 5 条并发安全断言(asyncio.Lock 类变量 + 100 并发 save + 跨实例锁共享反例)
+  - AC-8 补充 `composition_root.py` 装配样板 + `ToolExecutionService` 接收 `ToolExecutionEnginePort` Protocol 决策 + Liskov Substitution 契约测试
+  - 补充 `_call_with_retry` 工具函数完整签名 + `on_failure_callback` 调用契约
+  - Task 9 补充 15 个 Gherkin Scenario 清单 + BDD Mock 边界决策表 + pytest.skip() 触发条件
+- v1.4.0 (Round 4 修订):
+  - toolchain 子域 4.7 异常预留策略升级为决策矩阵(方案 A 扩 400-409 推荐)
+  - 4.7 异常需求预测(ValidationFeedbackRetryExhaustedError + FallbackFailedError + HumanReviewTimeoutError + CanaryConflictError)
+  - tenant_id baseline 措辞修订:"4.2 起的 toolchain 事件 baseline 必填;4.1a 历史遗留待 4.6 决策"
+  - AC-6 验证清单新增 is_final 在 4.7 订阅契约(去重键 + 终止超时 + at-most-once)
+  - AC-6 验证清单新增事件 payload 大小门禁(总条数 ≤10 + path 深度 ≤10 + 总大小 ≤16KB)
+  - ChannelRouter 行号容差修订(±10 行)
+  - 新增 "4.6/4.7 架构演进路径" 小节(API 依赖契约 + 反馈闭环示意图)
+- v1.4.1 (Round 5 终态):变更日志时序正向化(1.0.0→1.1.0→1.2.0→1.3.0→1.4.0)+ 移除 v1.1.0 标题重复;Round 5 终态质量审计完成,**可以进入 dev-story 阶段**
