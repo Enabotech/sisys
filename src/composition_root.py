@@ -2269,6 +2269,78 @@ def bootstrap() -> None:
         tags=("skills", "loader", "inmemory"),
     )
 
+    # === Strategic Toolbox Ports (Story 4.2 — ToolChain DAG Orchestration) ===
+    from src.application.ports.tool_chain_orchestrator import (
+        ToolChainOrchestratorProtocol,
+    )
+    from src.application.ports.tool_chain_service import ToolChainServicePort
+    from src.application.use_cases.run_tool_chain import RunToolChainUseCase
+    from src.domain.ports.tool_chain_repository import ToolChainRepositoryPort
+    from src.infrastructure.storage.inmemory.tool_chain_repository import (
+        InMemoryToolChainRepository,
+    )
+
+    register_port(
+        name="tool_chain_repository",
+        version="v1.0.0",
+        interface=ToolChainRepositoryPort,
+        impl=lambda resolver: InMemoryToolChainRepository(),
+        module="src.infrastructure.storage.inmemory.tool_chain_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "chain", "repository"),
+    )
+
+    register_port(
+        name="tool_chain_orchestrator",
+        version="v1.0.0",
+        interface=ToolChainOrchestratorProtocol,
+        impl=lambda resolver: __import__(
+            "src.application.services.tool_chain_orchestrator",
+            fromlist=["ToolChainOrchestrator"],
+        ).ToolChainOrchestrator(
+            tool_execution_service=resolver.resolve("tool_execution_service"),
+            tool_registry_service=resolver.resolve("tool_registry_service"),
+        ),
+        module="src.application.services.tool_chain_orchestrator",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "chain", "orchestrator"),
+    )
+
+    register_port(
+        name="tool_chain_service",
+        version="v1.0.0",
+        interface=ToolChainServicePort,
+        impl=lambda resolver: __import__(
+            "src.application.services.tool_chain_service",
+            fromlist=["ToolChainService"],
+        ).ToolChainService(
+            repository=resolver.resolve("tool_chain_repository"),
+            orchestrator=resolver.resolve("tool_chain_orchestrator"),
+        ),
+        module="src.application.services.tool_chain_service",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "chain", "service"),
+    )
+
+    register_port(
+        name="run_tool_chain_use_case",
+        version="v1.0.0",
+        interface=RunToolChainUseCase,
+        impl=lambda resolver: RunToolChainUseCase(
+            repository=resolver.resolve("tool_chain_repository"),
+            service=resolver.resolve("tool_chain_service"),
+            skill_loader=resolver.resolve("skill_loader"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.use_cases.run_tool_chain",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "chain", "usecase"),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线

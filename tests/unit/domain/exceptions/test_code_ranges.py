@@ -292,6 +292,7 @@ def test_all_subdomain_ranges_are_valid() -> None:
         "relevance": "external",
         "traceability": "external",
         "tool": "external",
+        "toolchain": "external",
     }
 
     for subdomain, (start, end) in CODE_RANGES.items():

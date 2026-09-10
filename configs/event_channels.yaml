@@ -87,6 +87,12 @@ event_channels:
     delivery_mode: "reliable"
     description: "工具执行完成（双通道：realtime + reliable）"
 
+  ToolChainExecuted:
+    redis_channel: "sisys:rt:tool_chain_executed"
+    rabbitmq_routing_key: "sisys.events.reliable.tool_chain_executed"
+    delivery_mode: "reliable"
+    description: "工具链执行完成（双通道：realtime + reliable）"
+
   AgentDecided:
     rabbitmq_routing_key: "sisys.events.reliable.agent_decided"
     delivery_mode: "reliable"

@@ -72,6 +72,13 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # EXCEPTION_389 ToolResultValidationError (Story 4.1a)
     # EXCEPTION_384 保留未占用；ToolExecutionState 迁移守卫复用 EXCEPTION_243 (EntityStateTransitionError)
     "tool": (380, 389),
+    # 工具链子域（390-399）—— Story 4.2 注册 4 个异常:
+    # EXCEPTION_390 ToolChainCycleDetectedError
+    # EXCEPTION_391 ToolChainDuplicateNodeError
+    # EXCEPTION_392 ToolChainNodeNotFoundError
+    # EXCEPTION_393 ToolChainExecutionFailedError
+    # 子域物理嵌套于 external (301-399)，但语义独立
+    "toolchain": (390, 399),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -191,6 +198,11 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "SkillNotFoundError": "tool",
     "SkillLoadError": "tool",
     "ToolResultValidationError": "tool",
+    # tool_chain_exceptions.py (Story 4.2 新增 4 个异常)
+    "ToolChainCycleDetectedError": "toolchain",
+    "ToolChainDuplicateNodeError": "toolchain",
+    "ToolChainNodeNotFoundError": "toolchain",
+    "ToolChainExecutionFailedError": "toolchain",
 }
 
 
