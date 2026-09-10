@@ -119,7 +119,17 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 
 **HTTP 状态码映射登记**(CLAUDE.md §5 红线延伸):Task 0 必须在 `src/interfaces/api/exception_handlers.py:109` 的模块级常量 `EXCEPTION_HTTP_MAP` 表追加上述 4 个异常的映射(400/422/409/500)。
 
-**toolchain 子域(390-399)剩余码位**:EXCEPTION_399 共 **1 个码位预留**,供后续 Story(4.7 Validation Feedback)扩展。**风险**:若 4.7 需 ≥2 个新异常,须申请新子域(如 `toolchain_feedback` 400-409,或复用 tool 子域的 EXCEPTION_384 保留位)。
+**toolchain 子域(390-399)剩余码位**:EXCEPTION_399 共 **1 个码位预留**,供后续 Story(4.7 Validation Feedback)扩展。**风险与决策矩阵**:若 4.7 需 ≥2 个新异常,以下三选一(推荐 **方案 A**):
+
+| 方案 | 操作 | 优点 | 缺点 |
+|------|------|------|------|
+| **方案 A** (推荐) | 扩 `toolchain` 子域到 400-409 | 对称,语义延续,4.7 异常可集中在新子域 | CODE_RANGES 改动 + _CLASS_TO_SUBDOMAIN 调整 |
+| **方案 B** | 复用 tool 子域的 EXCEPTION_384 保留位 | 零架构改动 | 语义混杂(toolchain 异常混进 tool 子域) |
+| **方案 C** | 申请全新 `toolchain_feedback` 子域(410-419) | 语义最干净 | 子域颗粒度过细 + CODE_RANGES 双重改动 |
+
+**4.7 异常需求预测**:预计新增 2 个异常(沿用 4.2 子域嵌套惯例):
+- `ValidationFeedbackRetryExhaustedError`(继承 `BusinessException`, EXCEPTION_399 + 子域预留码位)
+- `ValidationFeedbackFallbackFailedError`(继承 `BusinessException`, 子域预留码位)
 
 **复用现有异常(非新增):**
 - `EntityValidationError` (EXCEPTION_242) 复用:SchemaValidator 输入数据非 dict / Schema 字段非 dict
@@ -198,7 +208,7 @@ Story 4.1a 已在 `Tool` 聚合根声明 `input_schema / output_schema` 字段(J
 | `event_type` | `str` | 固定为 `"ToolSchemaValidationFailed"`(**新增**) |
 | `execution_id` | `UUID` | 关联 ToolExecution 聚合根 ID |
 | `tool_id` | `UUID` | 工具 ID |
-| `tenant_id` | `UUID` | 多租户隔离(**Round 1 补充**,工具事件 baseline 必填) |
+| `tenant_id` | `UUID` | 多租户隔离(**Round 1 补充**,**4.2 起的 toolchain 事件 baseline 必填**;4.1a ToolExecuted 是历史遗留未带 tenant_id,**4.6 工具版本管理 Story 需决策是否统一回填**) |
 | `aggregate_id` | `UUID` | = `execution_id` |
 | `aggregate_type` | `str` | `"ToolExecution"` |
 | `validation_phase` | `str` | `"INPUT"` / `"OUTPUT"` / `"COMPATIBILITY"` |
@@ -630,10 +640,10 @@ class SchemaCompatibilityResult:
 
 - **路径**:
   - 事件定义:新建 `src/domain/events/tool_schema_events.py`
-  - 双通道配置:`configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py:54`(`ChannelRouter.DEFAULT_MAPPINGS`)
+  - 双通道配置:`configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py:54`(约 line 60,`ChannelRouter.DEFAULT_MAPPINGS` 字典定义起点,±10 行容差)
 - **事件 Schema**(**13 字段**,较原 10 字段扩展):
   - **10 原字段**:event_type(继承 DomainEvent) + execution_id / tool_id / tenant_id / aggregate_id / aggregate_type / validation_phase / schema_violations / retry_attempt / failed_at
-  - **3 新增字段**: `tenant_id`(原遗漏,工具事件 baseline 必填) + `schema_version`(4.6 兼容性追踪用) + `is_final: bool`(最后一次重试时 True,**简化 4.7 订阅者去重逻辑**)
+  - **3 新增字段**: `tenant_id`(原遗漏,**4.2 起的 toolchain 事件 baseline 必填**;4.1a 历史遗留待 4.6 决策) + `schema_version`(4.6 兼容性追踪用) + `is_final: bool`(最后一次重试时 True,**简化 4.7 订阅者去重逻辑**)
   - 完整字段定义见上方"API 契约"节
 - **事件触发点**:
   - `ToolInputValidator.execute()`:入参校验失败时发布(`validation_phase = "INPUT"`,**is_final=True** 因 INPUT 不重试)
@@ -652,6 +662,8 @@ class SchemaCompatibilityResult:
 - [ ] `ToolInputValidator` + `ToolOutputValidator` 在校验失败时通过 `EventPublisher.publish()` 发布事件
 - [ ] 事件契约测试 `tests/contracts/test_event_contract_tool_schema_validation_failed.py` 覆盖(字段必填 + 序列化 + 通道单投递)
 - [ ] 单元测试覆盖:INPUT 阶段发布 1 次 is_final=True / OUTPUT 阶段重试 N 次发布 N 次(仅最后一次 is_final=True) / violations 序列化正确
+- [ ] **`is_final` 字段在 4.7 订阅契约**(Round 4 新增):去重键 = `(execution_id, validation_phase)` 复合键 + 终止确认超时(如 60s 未收到 is_final=True 视作异常) + realtime at-most-once 兼容性说明(订阅者需幂等处理重复事件)
+- [ ] **事件 payload 大小门禁**(Round 4 新增):`schema_violations` 总条数上限 10 条 + `path` 深度截断 ≤10 + 事件总大小 ≤16KB(超出触发 `ToolOutputSchemaValidationError` + payload 截断标记)
 
 ### AC-7: 与 ToolExecutionEngine 集成(Validate 阶段增强)
 
@@ -1523,6 +1535,77 @@ src/
 
 ---
 
+## 🔁 4.6/4.7 架构演进路径(Round 4 新增)
+
+> **演进关系**:4.3 交付的 Schema 验证能力是 **4.6 工具版本管理** 与 **4.7 Validation Feedback 闭环** 的前置依赖。
+
+### 4.6 Tool 版本管理(灰度发布/canary/blue-green)
+
+**4.6 对 4.3 的 API 依赖契约**:
+
+| 4.3 交付 API | 4.6 使用方式 |
+|---|---|
+| `SchemaValidatorPort.validate_schema_compatibility(old_schema, new_schema) -> SchemaCompatibilityResult` | 4.6 Tool 注册新版本前调用,根据 `is_compatible` 决定是否允许灰度 |
+| `SchemaCompatibilityResult.breaking_changes[].severity: Literal["critical", "major", "minor"]` | 4.6 灰度策略分级:`major` 强制 canary、`minor` 直接发布、`critical` 拒绝注册 |
+| `ChangeType` 枚举(8 类破坏性 + 7 类非破坏性) | 4.6 针对 `REQUIRED_FIELD_ADDED` vs `FIELD_TYPE_NARROWED` 触发不同 rollout 策略 |
+| `ToolSchemaValidationFailed.schema_version` | 4.6 查询"特定 Tool 的最近校验记录"高频路径(已建 `migration 013` `(tenant_id, tool_id, validated_at DESC)` 索引) |
+| `SchemaValidationRecordRepositoryPort.list_by_query(query)` | 4.6 按 `(tool_id, schema_version)` 查历史 violations,做兼容性影响面分析 |
+
+**4.6 Story 创建时需补充的 API**(可选 P2):
+- `SchemaCompatibilityResult.dry_run: bool` 标志位(发布前 dry-run,不实际修改 Tool)
+- `SchemaValidatorPort.validate_compatibility_batch(versions: list[tuple[dict, dict]])` 批量校验(灰度发布前批量评估历史版本兼容性)
+
+### 4.7 Validation Feedback 闭环(自动重试/降级/人工审核)
+
+**4.7 对 4.3 的事件订阅契约**:
+
+| 4.3 事件字段 | 4.7 消费方式 |
+|---|---|
+| `execution_id` + `validation_phase` | **去重键**(复合键),避免重复触发相同 execution 的反馈逻辑 |
+| `is_final: bool` | **终止事件标记**(INPUT 失败 = True;OUTPUT 仅最后一次 = True);4.7 需实现 60s 终止确认超时机制 |
+| `schema_version: str` | 4.7 重试时按 version 选择对应 schema 重新校验,**避免版本漂移** |
+| `schema_violations: list[dict]` | 4.7 反馈给 LLM(自动重试)/ 人工审核(降级到人工)时直接使用 `path` + `expected` + `actual` + `message` |
+| `tool_id` + ` tenant_id` | 4.7 按 (tool_id, tenant_id) 查询 `SchemaValidationRecord` 历史做可靠性评分更新 |
+
+**4.7 异常需求预测**(占用 toolchain 子域预留码位):
+
+| 异常类 | parent class | 用途 |
+|---|---|---|
+| `ValidationFeedbackRetryExhaustedError` (EXCEPTION_399) | `BusinessException` | 4.7 自动重试耗尽,降级到人工审核 |
+| `ValidationFeedbackFallbackFailedError` (子域预留码位) | `BusinessException` | 4.7 备选 Tool 替换策略也失败 |
+| `ValidationFeedbackHumanReviewTimeoutError` (子域预留码位) | `BusinessException` | 4.7 人工审核 SLA 超时 |
+| `ValidationFeedbackCanaryConflictError` (子域预留码位) | `BusinessException` | 4.7 与 4.6 灰度 canary 策略冲突 |
+
+> **决策**:4.7 启动时,若 ≥2 个新异常需扩展 `toolchain` 子域到 **400-409**(Round 4 决策矩阵方案 A)。
+
+### 4.3 → 4.6 → 4.7 反馈闭环示意
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 4.3 ToolOutputValidator                                          │
+│   └─ OUTPUT 校验失败                                              │
+│       └─ _call_with_retry 重试 N 次                                │
+│           └─ on_failure_callback → EventPublisher                 │
+│               └─ ToolSchemaValidationFailed (realtime, is_final=N)│
+└──────────────────────────┬───────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 4.7 ValidationFeedbackService 订阅                                │
+│   └─ 去重键 (execution_id, validation_phase)                       │
+│   └─ 检查 is_final,60s 超时兜底                                    │
+│   └─ 触发自动重试/降级/人工审核                                     │
+│       └─ 重试回到 4.3 Engine (或 4.6 新版本 Tool)                  │
+└──────────────────────────┬───────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 4.6 ToolRegistry (中间层)                                         │
+│   └─ 灰度策略选择(canary/blue-green),按 severity 分级             │
+│   └─ 必要时调用 validate_schema_compatibility 拦截破坏性发布        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
@@ -1532,7 +1615,7 @@ src/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-09-10
 **最后更新/Last Updated:** 2026-09-10
 **更新说明/Description:**
@@ -1550,6 +1633,14 @@ src/
   - 事件双通道策略调整为本期仅 realtime(reliable 延后 4.7)
   - 事件字段增加 tenant_id / schema_version / is_final(简化 4.7 订阅者去重)
   - 工作量估算 18-25 → 27-35 人天(含首次装饰器引入 + 4.1a 回归修复)
+- v1.4.0 (Round 4 修订):
+  - toolchain 子域 4.7 异常预留策略升级为决策矩阵(方案 A 扩 400-409 推荐)
+  - 4.7 异常需求预测(ValidationFeedbackRetryExhaustedError + FallbackFailedError + HumanReviewTimeoutError + CanaryConflictError)
+  - tenant_id baseline 措辞修订:"4.2 起的 toolchain 事件 baseline 必填;4.1a 历史遗留待 4.6 决策"
+  - AC-6 验证清单新增 is_final 在 4.7 订阅契约(去重键 + 终止超时 + at-most-once)
+  - AC-6 验证清单新增事件 payload 大小门禁(总条数 ≤10 + path 深度 ≤10 + 总大小 ≤16KB)
+  - ChannelRouter 行号容差修订(±10 行)
+  - 新增 "4.6/4.7 架构演进路径" 小节(API 依赖契约 + 反馈闭环示意图)
 - v1.3.0 (Round 3 修订):
   - AC-2 补充 `BreakingChange` / `NonBreakingChange` / `SchemaCompatibilityResult` 值对象完整定义
   - AC-2 补充 `validate_schema_compatibility` 12 条规则清单(8 类破坏性 + 4 类非破坏性)
