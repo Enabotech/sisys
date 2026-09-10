@@ -632,6 +632,8 @@ class SchemaCompatibilityResult:
 - [ ] **跨实例锁共享反例测试**(Round 3 补充):验证 `_records: dict` 是**实例变量**(非类变量),与 `_lock` 类变量对比,防止未来误改造成全局共享状态
 - [ ] **持久化时机矩阵**(Round 3 补充):INPUT 成功/失败、OUTPUT 成功/中间重试/耗尽、COMPATIBILITY 破坏 均持久化;LLM 调用异常**不**持久化(由 ToolExecutionError 处理)
 
+### AC-6: ToolSchemaValidationFailed 领域事件 + 双通道配置
+
 **Given** Schema 验证失败需异步通知下游订阅者(4.7 Validation Feedback / 监控 / 可靠性评分更新)
 **When** 新建 `ToolSchemaValidationFailed` 领域事件 + **realtime 通道本期启用 / reliable 通道 4.7 时启用**
 **Then**
