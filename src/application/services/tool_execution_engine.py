@@ -13,6 +13,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import time
 import uuid
@@ -305,7 +307,11 @@ class ToolExecutionEngine:
     async def _observe_stage(self, session_id: str, result: str, tool: Tool) -> str:
         """Observe 阶段：调用 SandboxExecutor.execute_code 产出 observation"""
         observation_code = self._build_observation_code(result)
-        observation = await self._retry_call(lambda: self._sandbox.execute_code(session_id, observation_code))
+        observation = await self._retry_call(
+            lambda: self._sandbox.execute_code(session_id, observation_code),
+            execution_id=session_id,
+            tool_id=tool.tool_id,
+        )
         return str(observation.get("output", ""))
 
     async def _validate_stage(
@@ -389,9 +395,6 @@ class ToolExecutionEngine:
         tool_call: ToolCall,
     ) -> EvidencePackage:
         """组装 EvidencePackage（9 字段统一）"""
-        import hashlib
-        import json
-
         args_str = json.dumps(tool_call.arguments, sort_keys=True, default=str)
         input_hash = hashlib.sha256(args_str.encode()).hexdigest()[:16]
 
