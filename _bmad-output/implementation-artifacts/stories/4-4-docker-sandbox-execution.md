@@ -25,7 +25,7 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 5. **错误捕获**：STDERR 自动捕获，支撑 Story 4.7 Validation Feedback 闭环（最大重试 3 次）
 6. **可观测**：容器启动延迟 P95 < 5s、并发 ≥ 10、沙箱逃逸 0 次
 
-**业务定位：** Epic 4 战略工具箱的 **安全执行层**，位于工具执行（4.1a）之上、Validation Feedback 闭环（4.7）与 Skills 数据采集（4.1b）之下。
+**业务定位：** Epic 4 战略工具箱的 **安全执行层**，位于工具执行（4.1a）之上、Validation Feedback 闭环（4.7）与 Skills 数据采集（4.1c）之下。
 
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 4: 战略工具箱，FR-ST-04
 **前置依赖:** Story 4.1a（✅ done，ToolExecutionEngine 已注入 `SandboxExecutor` mock）/ Story 1.7（✅ done，L4 MinIO 对象层）/ Story 1.18a（✅ done，Prefect 工作流引擎）
@@ -36,14 +36,14 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 **本 Story 范围（4.4）：**
 
 1. **替换 mock 实现**：将 `DockerSandboxAdapter`（mock）替换为基于 `aiodocker` 的真实 Docker 容器管理 `AioDockerSandboxAdapter`；采用**删除 mock + 替换 impl 字符串**策略（不保留 fallback，避免 CLAUDE.md §5 mock 滥用）；CI/本地无 Docker 环境通过 `SISYS_USE_TEST_PORTS=1` 切换（CLAUDE.md §6 既有约定）
-2. **`ContainerSpec` 值对象**（领域层）：CPU/内存/网络模式/镜像 digest/seccomp profile/ulimits/pids-limit 等约束的不可变描述（**13 字段**，详见 AC-1）
+2. **`ContainerSpec` 值对象**（领域层）：CPU/内存/网络模式/镜像 digest/seccomp profile/ulimits/pids-limit 等约束的不可变描述（**12 字段**：1 必填 `image` + 11 项默认值；详见 AC-1）
 3. **5 个新领域异常**（EXCEPTION_315~319）：`SandboxImagePullError` / `SandboxTimeoutError` / `SandboxResourceLimitExceededError` / `SandboxQuotaExceededError` / `SandboxConfigurationError`
 4. **`SandboxExecutor` 端口扩展**：保持向后兼容（4.1a 既有 4 方法签名不变），通过**默认参数**新增可选 `ContainerSpec` / `timeout_sec` 入参 + 新增 `health_check()` 方法
 5. **应用层安全编排**：新增 `SandboxSecurityDecorator` 包裹类（**非 Python `@decorator` 语法**，仅借用设计模式术语），在 `ToolExecutionEngine` 装配层注入超时 + 重试 + 配额 + session_id 注入防御；**不修改** `ToolExecutionEngine.__init__`
 6. **30 分钟空闲清理**：新增**独立应用层服务** `SandboxSessionReaper`，基于 `SandboxSessionRepositoryPort.list_idle_sessions()` 实现；**不修改** `SessionNamespaceManager`（既有 4.1a 实现无 TTL 机制）
 7. **集成测试基础设施**：`testcontainers-python` 真实 Docker daemon + pytest-bdd 验收
 8. **架构验证测试**：`tests/unit/architecture/test_docker_sandbox.py`（**注意：epics_v1.0.md:1204 硬要求此路径，不带 `_arch_` 前缀**）验证域层零依赖 + PortSpec 10 字段元数据完整性
-9. **Alembic migration 014**：`down_revision = "013_schema_validation_records"`，记录沙箱会话（便于审计 + 配额统计）
+9. **Alembic migration 014**：`down_revision = "013"`（**关键**：既有 11 个 migration 的 `revision` 字段都是数字 ID 如 `"013"`/`"012"`/`"011"`，**不是文件名**；详见 `deploy/postgresql/alembic/versions/013_schema_validation_records.py:30`），记录沙箱会话（便于审计 + 配额统计）
 
 **不在本 Story 范围（拆分到其他 Story）：**
 
@@ -64,7 +64,7 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
   - `SandboxExecutor` Protocol 新增可选 `spec: ContainerSpec | None = None`（start_container）+ `timeout_sec: float | None = None`（execute_code）+ 新方法 `health_check() -> bool`
   - 调用点零修改（4.1a 既有调用通过默认参数沿用旧行为）
 - **R3 新建**（4.4 从零创建）：
-  - `ContainerSpec` 值对象（领域层，13 字段）
+  - `ContainerSpec` 值对象（领域层，**12 字段**：1 必填 `image` + 11 项默认值）
   - `SandboxSession` 聚合根（领域层，10 字段）
   - `SandboxSessionQuery` Query 值对象（领域层，frozen dataclass）
   - `SandboxSessionRepositoryPort` Protocol（领域层，**不继承 L2RdbPort**，因主键为字符串 `session_id`，与 L2RdbPort 的 UUID 主键约束不兼容，详见 AC-4 修订说明）
@@ -385,7 +385,7 @@ class ContainerSpec:
         userns_mode: user namespace 模式（默认 "host"）
         timeout_sec: 代码执行超时（秒，默认 30，上限 300）
 
-    字段总数：13 项（含 image 必填 + 12 项默认值）
+    字段总数：**12 项**（含 image 必填 + **11 项**默认值）
     """
     image: str
     mem_limit_mb: int = 512
@@ -493,7 +493,7 @@ class SandboxSessionStarted(DomainEvent):
   - `port_module`（新增断言 `spec.module` 路径正确）
 - `tests/contracts/test_port_contract_sandbox_session_repository.py`（**新建**）：11 维度全量覆盖（直接对齐样板，无既有扩展负担）
 - `tests/contracts/test_event_contract_sandbox_events.py`（**新建**）：事件契约（字段必填 + 序列化 + 通道双投递 + 继承 DomainEvent 基类）
-- `tests/contracts/test_value_object_contract_container_spec.py`（**新建**）：13 字段值对象契约（不变量校验）
+- `tests/contracts/test_value_object_contract_container_spec.py`（**新建**）：**12 字段**值对象契约（不变量校验）
 
 **PortSpec 实际 10 字段**（`src/domain/ports/registry.py:44-53`）：
 `name / version / interface / impl / module / lifetime / owner / compatibility / tags / deprecated`
@@ -512,7 +512,7 @@ class SandboxSessionStarted(DomainEvent):
 | Epic | Epic 4: 战略工具箱 |
 | 价值组 | 战略决策智能（Executive Decision Intelligence） |
 | 优先级 | P0（Epic 4 战略工具箱核心安全能力） |
-| 估算工作量 | **25-35 人天**（含 5 项 Checklist 异常体系 + aiodocker 集成 + 11 维度端口契约测试（含既有 8→11 维度扩展）+ ContainerSpec 13 字段不变量 + 30 分钟 TTL 清理 + Seccomp profile 配置 + testcontainers 集成测试 + 架构验证测试 + alembic migration 014 + BDD 验收 +30% 缓冲） |
+| 估算工作量 | **25-35 人天**（含 5 项 Checklist 异常体系 + aiodocker 集成 + 11 维度端口契约测试（含既有 8→11 维度扩展）+ ContainerSpec **12 字段**不变量 + 30 分钟 TTL 清理 + Seccomp profile 配置 + testcontainers 集成测试 + 架构验证测试 + alembic migration 014 + BDD 验收 +30% 缓冲） |
 | 覆盖 FR | FR-ST-04（Docker 沙箱执行）/ FR-ST-07（Validation Feedback 闭环前置） |
 | 前置 Story | 4-1a-strategic-tool-impl（✅ done）/ 1-7-minio-object-layer（✅ done）/ 1-18a-prefect-workflow-integration（✅ done） |
 | 后续 Story | **4-1c-skills-data-collection-integration**（**注**：原文档误标 4-1b，实际 sprint-status.yaml 中 4-1b 是 skills-feat-enhancement，4-1c 才是数据采集集成） / 4-7-validation-feedback-loop |
@@ -549,7 +549,7 @@ class SandboxSessionStarted(DomainEvent):
 **验证标准/Validation Criteria:**
 
 - [ ] `ContainerSpec` 位于 `src/domain/value_objects/container_spec.py`（**领域层**，非应用层）
-- [ ] **13 字段**完整（按上文列表）
+- [ ] **12 字段**完整（按上文列表）
 - [ ] `__post_init__` 触发 **6 项**不变量校验（失败抛 `EntityValidationError` EXCEPTION_242）
 - [ ] 禁止 `:latest` 镜像（必须 digest 或 minor tag）
 - [ ] 默认 `network_mode="none"` + `read_only_rootfs=True` + `cap_drop=("ALL",)`
@@ -664,7 +664,7 @@ class SandboxSessionStarted(DomainEvent):
   - **路径**：`src/infrastructure/storage/inmemory/sandbox_session_repository.py`
   - **模式复用 4.1a**：`dict[str, SandboxSession]`（**按 session_id 字符串索引，非 UUID**） + `asyncio.Lock` **类变量** + frozen dataclass
 - **Alembic migration 014**：`deploy/postgresql/alembic/versions/014_sandbox_sessions.py`
-  - **关键**：`down_revision = "013_schema_validation_records"`（参考 011/012/013 既有命名约定）
+  - **关键**：`down_revision = "013"`（参考 `013_schema_validation_records.py:30` 实际 `revision = "013"`）
   - `sandbox_sessions` 表 + 4 索引：tenant_id / (tenant_id, state) / (state, last_activity_at) / container_id UNIQUE
   - **主键**：`session_id VARCHAR(64) PRIMARY KEY`（字符串主键，不使用 UUID）
 
@@ -676,7 +676,7 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] 查询方法使用 `SandboxSessionQuery` frozen dataclass（CLAUDE.md §4 决策规则）
 - [ ] `InMemorySandboxSessionRepository` 使用 `asyncio.Lock` **类变量**（CLAUDE.md §6 Gotcha）
 - [ ] 端口契约测试 `tests/contracts/test_port_contract_sandbox_session_repository.py` **11 维度**覆盖
-- [ ] Alembic migration `014_sandbox_sessions.py` 创建（**`down_revision = "013_schema_validation_records"`** + 4 索引 + UNIQUE container_id + VARCHAR(64) 主键）
+- [ ] Alembic migration `014_sandbox_sessions.py` 创建（**`down_revision = "013"`** + 4 索引 + UNIQUE container_id + VARCHAR(64) 主键）
 - [ ] `composition_root.py` 注册 `sandbox_session_repository` 端口（**line 102 附近 import + line 821 之后新增 register_port**，lifetime=SCOPED，owner="sandbox-team"）
 
 ### AC-5: AioDockerSandboxAdapter 实现（替换 mock）
@@ -1222,18 +1222,18 @@ class SandboxSessionStarted(DomainEvent):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/value_objects/test_container_spec.py`（13 字段 + 6 项不变量失败测试） |
+| 🔴 红 | 编写 `tests/unit/domain/value_objects/test_container_spec.py`（**12 字段** + 6 项不变量失败测试） |
 | 🟢 绿 | 实现 `ContainerSpec` 最小代码（`@dataclass(frozen=True)` + `__post_init__`） |
 | 🔄 重构 | 优化不变量校验（提取 `_validate_field()` 私有方法，提升可读性） |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 `ContainerSpec` 失败测试（**13 字段** + **6 项**不变量）
+- [ ] Subtask 1.1: 🔴 红 — 编写 `ContainerSpec` 失败测试（**12 字段** + 6 项不变量）
 - [ ] Subtask 1.2: 🟢 绿 — 实现 `ContainerSpec` 最小代码
 - [ ] Subtask 1.3: 🔄 重构 — 优化不变量校验代码
 - [ ] Subtask 1.4: 契约测试 `tests/contracts/test_value_object_contract_container_spec.py` 通过
 
 **完成标准/Definition of Done:**
 
-- [ ] `ContainerSpec` 实现完成（**13 字段** + **6 项**不变量）
+- [ ] `ContainerSpec` 实现完成（**12 字段** + 6 项不变量）
 - [ ] TDD 循环全部通过
 - [ ] 域层覆盖率 ≥ 90%
 - [ ] 域层零依赖验证通过（`poetry run lint-imports`）
@@ -1270,7 +1270,7 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] Subtask 2.5: 🟢 绿 — 实现 Repository 端口 + InMemory 实现
 - [ ] Subtask 2.6: 🔄 重构 — 优化并发安全
 - [ ] Subtask 2.7: 契约测试 `tests/contracts/test_port_contract_sandbox_session_repository.py` 11 维度
-- [ ] Subtask 2.8: Alembic migration `014_sandbox_sessions.py`（**`down_revision = "013_schema_validation_records"`** + 4 索引 + UNIQUE container_id + `session_id VARCHAR(64) PRIMARY KEY`）
+- [ ] Subtask 2.8: Alembic migration `014_sandbox_sessions.py`（**`down_revision = "013"`** + 4 索引 + UNIQUE container_id + `session_id VARCHAR(64) PRIMARY KEY`）
 
 **完成标准/Definition of Done:**
 
