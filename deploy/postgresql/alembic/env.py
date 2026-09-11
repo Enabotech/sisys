@@ -1,16 +1,33 @@
 """Alembic 环境配置。
 
 自动从基础设施层收集 SQLAlchemy 模型 metadata，支持异步迁移。
+
+环境变量加载顺序：
+1. 显式环境变量（最高优先级）
+2. 项目根目录 .env 文件（load_dotenv 自动加载）
 """
 
 from __future__ import annotations
 
 import os
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
+
+# 自动加载项目根目录的 .env 文件（如有），便于 make db-upgrade 直接调用
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_DOTENV_PATH = _PROJECT_ROOT / ".env"
+if _DOTENV_PATH.exists():
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(_DOTENV_PATH, override=False)
+    except ImportError:
+        # python-dotenv 未安装时跳过（生产环境通常通过环境变量注入）
+        pass
 
 # Alembic Config object
 config = context.config
