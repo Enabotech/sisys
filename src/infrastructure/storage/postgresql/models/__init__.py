@@ -30,6 +30,11 @@ from src.infrastructure.storage.postgresql.models.rbac_association import (
     user_roles_table,
 )
 from src.infrastructure.storage.postgresql.models.role import RoleModel
+from src.infrastructure.storage.postgresql.models.schema_validation import (
+    SchemaValidationRecordModel,
+)
+from src.infrastructure.storage.postgresql.models.tool_chain import ToolChainModel
+from src.infrastructure.storage.postgresql.models.tool_execution import ToolExecutionModel
 from src.infrastructure.storage.postgresql.models.user import UserModel
 
 __all__ = [
@@ -50,6 +55,9 @@ __all__ = [
     "MemoryMetadataModel",
     "MemoryChangeHistoryModel",
     "LoginAttemptModel",
+    "ToolChainModel",
+    "ToolExecutionModel",
+    "SchemaValidationRecordModel",
     "user_roles_table",
     "role_permissions_table",
     "pg_registry",
