@@ -839,8 +839,9 @@ def then_spec_name(context: dict[str, Any]) -> None:
 
 @then('PortSpec.version == "v1.0.0"')
 def then_spec_version(context: dict[str, Any]) -> None:
-    """PortSpec.version 校验。"""
-    assert context["spec"].version == "v1.0.0"
+    """PortSpec.version 校验(Story 4.3 后续技术债清理后升级到 v1.1.0)。"""
+    # Story 4.3 后续技术债清理:tool_execution_repository 从 InMemory v1.0.0 升级到 PostgreSQL ORM v1.1.0
+    assert context["spec"].version == "v1.1.0"
 
 
 @then("PortSpec.lifetime == SCOPED")
@@ -859,5 +860,6 @@ def then_spec_owner(context: dict[str, Any]) -> None:
 
 @then('PortSpec.tags 包含 ("tool", "execution", "repository")')
 def then_spec_tags(context: dict[str, Any]) -> None:
-    """PortSpec.tags 校验。"""
-    assert set(context["spec"].tags) == {"tool", "execution", "repository"}
+    """PortSpec.tags 校验(Story 4.3 后续技术债清理后含 postgresql/sqlalchemy)。"""
+    # Story 4.3 后续技术债清理:tool_execution_repository 升级到 PostgreSQL ORM
+    assert set(context["spec"].tags) == {"tool", "execution", "repository", "postgresql", "sqlalchemy"}

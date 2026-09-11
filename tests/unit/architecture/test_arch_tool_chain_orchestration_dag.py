@@ -28,7 +28,8 @@ def test_tool_chain_repository_registered() -> None:
     spec = _global_registry.get("tool_chain_repository")
     assert spec is not None
     assert spec.name == "tool_chain_repository"
-    assert spec.version == "v1.0.0"
+    # Story 4.3 后续技术债清理:tool_chain_repository 从 InMemory v1.0.0 升级到 PostgreSQL ORM v1.1.0
+    assert spec.version == "v1.1.0"
     assert spec.lifetime == Lifetime.SCOPED
 
 
