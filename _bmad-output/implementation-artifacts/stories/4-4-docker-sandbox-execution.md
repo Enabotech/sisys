@@ -242,12 +242,20 @@ class SandboxTimeoutError(ExecutionError):
 - `AioDockerSandboxAdapter._lock: asyncio.Lock = asyncio.Lock()`（**类变量**，非实例变量）
 - `InMemorySandboxSessionRepository._lock: asyncio.Lock = asyncio.Lock()`（**类变量**，非实例变量）
 
-### BDD 步骤函数（CLAUDE.md §5）
+### BDD 步骤函数（CLAUDE.md §5 + Story 4.3 commit `099423f1` 经验）
 
-- **统一使用 pytest-asyncio auto 模式**（项目既有约定）：`asyncio_mode = "auto"`（pyproject.toml 已配置），step 函数直接 `async def` + `@given/@when/@then` 装饰器
-- **禁用** `@pytest.mark.asyncio` 装饰 BDD step 函数（避免与 auto 模式冲突）
-- **禁用** `event_loop.run_until_complete(coro)` 旧模式（与 pytest-bdd 8.x + pytest-asyncio 1.x 不兼容）
-- BDD context 通过 `context: dict[str, Any]` 跨步骤传递
+**项目既有 BDD 模式**（52/52 acceptance 文件遵循）：
+
+- **Step 函数形态**：**同步 `def`**（不是 `async def`）— pytest-bdd 8.x 限制
+- **异步代码调度**：通过 `event_loop.run_until_complete(coro)` 驱动（不是 pytest-asyncio auto 模式）
+  - **Pattern A**：自建 module 级 `event_loop` fixture（`test_acceptance_relevance_evaluation.py:35-40` 等 10+ 文件）
+  - **Pattern B**：直接消费 pytest-asyncio 内建 `event_loop` fixture（`test_acceptance_hybrid_search_3_4.py:90, 96, 120, 128`）
+- **`@pytest.mark.asyncio`**：**禁止**用于 BDD step 函数（CLAUDE.md §5 红线；会导致 context data 丢失）
+  - 项目 8 处 `@pytest.mark.asyncio` 均在 `async def` fixture 或 `async def` 测试函数上，**不在 step 函数本体**
+- **Context 传递**：`context: dict[str, Any]` fixture（100% 统一）
+- **`asyncio_mode = "auto"`**：全局开启（pyproject.toml:274），**仅用于非 BDD 的 async fixture/test 函数**，**不驱动 BDD step**
+
+**Round 1 修订错误更正**：Round 1 描述"step 函数使用 `async def` + pytest-asyncio auto 模式"与项目实际惯例冲突。Round 2 修订为同步 `def` + `event_loop.run_until_complete()` 模式（对齐 `test_acceptance_strategic_tool_impl.py:424-430` `_run_async()` helper 模式）。
 
 ### 真实服务优先（CLAUDE.md §5）
 
@@ -830,7 +838,7 @@ class SandboxSessionStarted(DomainEvent):
 **When** 创建集成测试套件
 **Then**
 
-- **路径**：`tests/integration/test_integration_docker_sandbox.py`
+- **路径**：`tests/integration/test_docker_sandbox_integration.py`（**epics AC 5 要求路径**，非 `test_integration_docker_sandbox.py`）
 - **核心测试场景**：
   1. **容器启动 + 代码执行 + 停止** 完整生命周期（自包含：testcontainers 上下文管理器）
   2. **网络隔离验证**：`network_mode="none"` 容器内 `curl https://api.example.com` 应失败（连接超时）
@@ -900,28 +908,53 @@ class SandboxSessionStarted(DomainEvent):
     7. **场景 7 — 30 分钟空闲清理**：创建空闲会话，等待 TTL 触发清理
 - **BDD step 文件**：`tests/acceptance/test_acceptance_docker_sandbox.py`
   - 使用 pytest-bdd（`scenarios()` 批量绑定）
-  - **统一使用 pytest-asyncio auto 模式**（**关键 P0-4 修正**：项目 `pyproject.toml` 已配置 `asyncio_mode = "auto"` + `pytest-asyncio = "^0.24.0"` + `pytest-bdd = "^8.0.0"`，统一使用 modern 模式，避免 `event_loop.run_until_complete()` 旧模式与 pytest-bdd 8.x 不兼容）
-  - step 函数示例：
+  - **Step 函数形态**：**同步 `def`**（不是 `async def`）— pytest-bdd 8.x 限制
+  - **异步代码调度**：通过 `event_loop.run_until_complete(coro)` 驱动（项目 52/52 acceptance 文件模式）
+    - 推荐 Pattern A：自建 module 级 `event_loop` fixture + `_run_async()` helper（参考 `test_acceptance_strategic_tool_impl.py:424-430`）
+    - 或 Pattern B：直接消费 pytest-asyncio 内建 `event_loop` fixture
+  - **step 函数示例**（同步 def + 异步调度）：
     ```python
+    import asyncio
+    from typing import Any
+    import pytest
     from pytest_bdd import scenarios, given, when, then
 
     scenarios("./test_acceptance_docker_sandbox.feature")
 
+    @pytest.fixture(scope="module")
+    def event_loop():
+        """模块级事件循环，用于 run_until_complete()"""
+        loop = asyncio.new_event_loop()
+        yield loop
+        loop.close()
+
+    def _run_async(coro: Any) -> Any:
+        """同步调度异步协程。"""
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+
     @given("启动沙箱会话")
-    async def start_session(context: dict, docker_daemon: DockerClient) -> None:
-        context["session_id"] = "test-session-001"
-        # 真实 Docker daemon 调用
-        ...
+    def start_session(context: dict[str, Any], event_loop: Any) -> None:
+        async def _start() -> None:
+            context["session_id"] = "test-session-001"
+            # 真实 Docker daemon 调用
+            ...
+        _run_async(_start())
     ```
   - context 通过 `context: dict[str, Any]` 跨步骤传递
   - 使用真实 Docker daemon（`pytest.skip()` 若不可用，**禁止 mock**）
+  - **`@pytest.mark.asyncio` 禁止用于 step 函数**（CLAUDE.md §5 红线 + Story 4.3 commit `099423f1` 经验）
 
 **验证标准/Validation Criteria:**
 
 - [ ] `tests/acceptance/test_acceptance_docker_sandbox.feature` 包含 7 项场景
 - [ ] Gherkin 关键字使用中文（`功能:` / `场景:` / `假如` / `当` / `那么` / `并且`，**沿用项目既有约定**）
 - [ ] `tests/acceptance/test_acceptance_docker_sandbox.py` 实现所有 step 函数
-- [ ] step 函数使用 `async def` + pytest-asyncio auto 模式（**不**使用 `@pytest.mark.asyncio`，**不**使用 `event_loop.run_until_complete()` 旧模式）
+- [ ] step 函数使用 **同步 `def`**（不是 `async def`），通过 `event_loop.run_until_complete()` 调度异步代码（**关键**：对齐 `test_acceptance_strategic_tool_impl.py:424-430` 样板）
+- [ ] **`@pytest.mark.asyncio` 禁止用于 step 函数**（CLAUDE.md §5 红线）
 - [ ] **禁止 mock**（CLAUDE.md §5 验收测试真实服务原则）
 - [ ] 7 项场景全部通过（包含异常路径）
 
@@ -940,7 +973,7 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] 事件定义位于 `src/domain/events/sandbox_events.py`
 - [ ] 使用标准库 `dataclass(frozen=True)` 实现领域事件校验，**禁止在领域层依赖 Pydantic**
 - [ ] 事件命名符合规范：`SandboxSessionStarted` / `SandboxSessionTerminated` / `SandboxExecutionFailed`
-- [ ] 事件字段含 `event_id: UUID` + `occurred_at: datetime`（CLAUDE.md §4 领域事件标准）
+- [ ] 事件继承 `DomainEvent` 基类，使用基类 `event_id: UUID` + `timestamp: datetime`（**注意**：基类字段名为 `timestamp`，不是 `occurred_at`；参考 `src/domain/events/base.py:42-69` 12 字段基类契约）
 - [ ] 在 `configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS` 同步注册双通道映射
 
 #### 数据模型 (Data Models)
@@ -1019,8 +1052,12 @@ class SandboxSessionStarted(DomainEvent):
 
 **BDD 步骤实现约束：**
 
-- **统一使用 pytest-asyncio auto 模式**：项目 `pyproject.toml` 已配置 `asyncio_mode = "auto"` + `pytest-asyncio = "^0.24.0"` + `pytest-bdd = "^8.0.0"`，step 函数直接使用 `async def` + `@given/@when/@then` 装饰器即可，无需 `@pytest.mark.asyncio`
-- **禁用旧模式**：不使用 `event_loop.run_until_complete()` 模式（与 pytest-bdd 8.x + pytest-asyncio 1.x 不兼容）
+- **Step 函数形态**：**同步 `def`**（不是 `async def`）— pytest-bdd 8.x 限制（项目 52/52 acceptance 文件遵循）
+- **异步代码调度**：通过 `event_loop.run_until_complete(coro)` 驱动
+  - Pattern A（推荐）：自建 module 级 `event_loop` fixture + `_run_async()` helper（参考 `test_acceptance_strategic_tool_impl.py:424-430`）
+  - Pattern B：直接消费 pytest-asyncio 内建 `event_loop` fixture
+- **`@pytest.mark.asyncio` 禁止用于 step 函数**（CLAUDE.md §5 红线 + Story 4.3 commit `099423f1` 经验，会导致 context data 丢失）
+- **`asyncio_mode = "auto"`** 全局开启（pyproject.toml:274），**仅用于非 BDD 的 async fixture/test 函数**，**不驱动 BDD step**
 - 同一中文文本可能需要同时支持 given/when 装饰器
 - **Edge Cases 必须包含异常路径** — 至少覆盖：资源不存在（404 → 容器未启动 404）、权限不足（403 → 配置错误 403）、资源冲突（409 → 并发配额 503），响应体验证 `error.code` + `error.message` + `request_id`
 
@@ -1107,7 +1144,7 @@ class SandboxSessionStarted(DomainEvent):
 | **容器清理** | testcontainers-python 上下文管理器自动清理（**禁止** `docker rm -f`） | 孤儿容器污染 daemon |
 | **Schema 隔离** | `sandbox_sessions` 表按 tenant_id 隔离 + savepoint rollback | 数据污染 |
 | **asyncio 上下文** | `asyncio.Lock` 类变量；处理 thread.ident 为 None | 锁失效 |
-| **BDD async 配合** | BDD 步骤函数使用 pytest-asyncio auto 模式（`async def`），**禁止** `@pytest.mark.asyncio` + 旧 `event_loop.run_until_complete()` | context 数据丢失 / 模式冲突 |
+| **BDD async 配合** | BDD 步骤函数使用**同步 `def`** + `event_loop.run_until_complete()` 调度异步代码（项目 52/52 acceptance 文件模式）；**禁止** `@pytest.mark.asyncio` 用于 step 函数（CLAUDE.md §5 红线） | context 数据丢失 / 模式冲突 |
 | **外部服务隔离** | Docker daemon 测试用 testcontainers；CI runner 需预装 Docker | 测试失败 |
 | **动态跳过** | Docker daemon 不可用时 `pytest.skip()` | 写死 `@pytest.mark.skip` 导致无 Daemon 环境永远失败 |
 
@@ -1133,16 +1170,16 @@ class SandboxSessionStarted(DomainEvent):
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | ContainerSpec 值对象 + 不变量校验 | Task 1 | 1.1 - 1.3 | `test_container_spec.py` |
-| AC-2 | 5 个新沙箱异常（EXCEPTION_315-319） | Task 3 | 3.1 - 3.4 | `test_sandbox_exceptions.py` |
-| AC-3 | SandboxExecutor 端口向后兼容扩展 | Task 4 | 4.1 - 4.3 | `test_sandbox_executor_port.py`（既有扩展） |
-| AC-4 | SandboxSession 聚合根 + Repository 端口 | Task 2 | 2.1 - 2.4 | `test_sandbox_session.py` / `test_sandbox_session_repository.py` |
-| AC-5 | AioDockerSandboxAdapter 实现 | Task 5 | 5.1 - 5.6 | `test_aiodocker_sandbox_adapter.py` |
-| AC-6 | 30 分钟空闲清理 + 孤儿容器回收 | Task 6 | 6.1 - 6.3 | `test_sandbox_session_reaper.py` |
-| AC-7 | SandboxSecurityDecorator 应用层 | Task 7 | 7.1 - 7.4 | `test_sandbox_security_decorator.py` |
-| AC-8 | 集成测试（testcontainers） | Task 8 | 8.1 - 8.4 | `test_docker_sandbox_integration.py` |
-| AC-9 | 性能 + 安全架构验证测试 | Task 9 | 9.1 - 9.3 | `test_docker_sandbox.py` / `test_performance_docker_sandbox.py` |
-| AC-10 | BDD 验收测试（Gherkin 中文） | Task 0 + Task 10 | 0.5 + 10.1 - 10.3 | `test_acceptance_docker_sandbox.feature` / `.py` |
+| AC-1 | ContainerSpec 值对象 + 不变量校验 | Task 1 | **1.1 - 1.4**（含 1.4 契约测试） | `test_container_spec.py` / `test_value_object_contract_container_spec.py` |
+| AC-2 | 5 个新沙箱异常（EXCEPTION_315-319） | Task 3 | **3.1 - 3.5**（含 3.5 测试运行验证） | `test_sandbox_exceptions.py` |
+| AC-3 | SandboxExecutor 端口向后兼容扩展 | Task 4 | **4.1 - 4.4**（含 4.4 契约测试 8→11 维度扩展） | `test_sandbox_executor_port.py`（既有扩展） |
+| AC-4 | SandboxSession 聚合根 + Repository 端口 | Task 2 | **2.1 - 2.8**（含 TDD 循环 [A] 2.1-2.3 + TDD 循环 [B] 2.4-2.8） | `test_sandbox_session.py` / `test_sandbox_session_repository.py` / `test_port_contract_sandbox_session_repository.py` / `014_sandbox_sessions.py` |
+| AC-5 | AioDockerSandboxAdapter 实现 | Task 5 | **5.1 - 5.6** | `test_aiodocker_sandbox_adapter.py` |
+| AC-6 | 30 分钟空闲清理 + 孤儿容器回收 | Task 6 | **6.1 - 6.4**（含 6.4 composition_root 注册） | `test_sandbox_session_reaper.py` |
+| AC-7 | SandboxSecurityDecorator 应用层 | Task 7 | **7.1 - 7.4** | `test_sandbox_security_decorator.py` |
+| AC-8 | 集成测试（testcontainers） | Task 8 | **8.1 - 8.4** | `test_docker_sandbox_integration.py` |
+| AC-9 | 性能 + 安全架构验证测试 | Task 9 | **9.1 - 9.7**（含 9.5 性能基准 + 9.6 循环依赖 + 9.7 完整测试） | `test_docker_sandbox.py` / `test_performance_docker_sandbox.py` |
+| AC-10 | BDD 验收测试（Gherkin 中文） | Task 0 + Task 10 | **0.5-0.7 + 10.1-10.5** | `test_acceptance_docker_sandbox.feature` / `.py` |
 
 ---
 
@@ -1426,7 +1463,7 @@ class SandboxSessionStarted(DomainEvent):
 
 #### 架构验证测试实现
 
-- [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_arch_docker_sandbox.py`（4 项规则：域层零依赖 + 依赖方向 + 无循环 + PortSpec 元数据）
+- [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_docker_sandbox.py`（**epics_v1.0.md:1204 硬要求路径，无 `_arch_` 前缀**；4 项规则：域层零依赖 + 依赖方向 + 无循环 + PortSpec 元数据）
 - [ ] Subtask 9.2: 实现 `test_domain_zero_dependencies()`（验证 domain 不依赖 aiodocker）
 - [ ] Subtask 9.3: 实现 `test_dependency_direction()`（验证 4 层依赖方向）
 - [ ] Subtask 9.4: 实现 `test_port_spec_metadata()`（验证 3 个端口的 7 字段完整性）
@@ -1488,7 +1525,7 @@ class SandboxSessionStarted(DomainEvent):
   - BDD 步骤函数禁用 `@pytest.mark.asyncio`，使用 `event_loop.run_until_complete()`
   - asyncio.Lock 必须为**类变量**（CLAUDE.md §6 Gotcha）
   - 端口契约测试 11 维度（既有模式）
-- **接口治理**: PortSpec 7 字段（name / version / interface / impl / lifetime / owner / tags）
+- **接口治理**: PortSpec **10 字段**（name / version / interface / impl / module / lifetime / owner / compatibility / tags / deprecated）
 - **技术栈**: Python 3.11+ / aiodocker 0.21.0 / testcontainers-python 4.13.0 / FastAPI 0.104+ / SQLAlchemy 2.0+ / pytest 7+
 
 ### 关键架构决策
@@ -1533,7 +1570,6 @@ class SandboxSessionStarted(DomainEvent):
 │   │   └── external_services/
 │   │       └── sandbox/
 │   │           ├── aiodocker_sandbox_adapter.py          # 新增（Task 5）
-│   │           ├── docker_sandbox_adapter.py             # 既有（mock fallback）
 │   │           ├── container_spec_builder.py             # 新增（Task 5）
 │   │           ├── seccomp_profile_loader.py             # 新增（Task 5）
 │   │           └── session_namespace_manager.py          # 既有（Story 4.1a）
@@ -1567,7 +1603,7 @@ class SandboxSessionStarted(DomainEvent):
     │   │   ├── storage/test_sandbox_session_repository.py    # 新增（Task 2）
     │   │   └── external_services/sandbox/
     │   │       └── test_aiodocker_sandbox_adapter.py         # 新增（Task 5）
-    │   └── architecture/test_arch_docker_sandbox.py          # 新增（Task 9）
+    │   └── architecture/test_docker_sandbox.py               # 新增（Task 9，epics AC 5 硬要求无 _arch_ 前缀）
     ├── integration/
     │   ├── test_docker_sandbox_integration.py                # 新增（Task 8）
     │   └── test_performance_docker_sandbox.py                # 新增（Task 9）
@@ -1592,7 +1628,7 @@ class SandboxSessionStarted(DomainEvent):
 - **三层 grep 自查零输出**：4-1a / 4-2 / 4-3 均执行 `grep -rn "raise ValueError\|raise HTTPException\|class.*Exception\b" src/` 零输出，Story 4.4 沿用
 - **`_call_with_retry` 抽取（4.3 经验）**：Story 4.3 将 `ToolExecutionEngine._retry_call` 抽取为 `retry_helpers.py` 共享工具，Story 4.4 的 `SandboxSecurityDecorator` 复用此工具
 - **DDD Query Object 模式**：CLAUDE.md §4 端口查询参数决策规则（多字段组合 + 分页 → frozen dataclass Query VO），Story 4.4 `SandboxSessionQuery` 沿用
-- **PortSpec 7 字段完整性**：name / version / interface / impl / lifetime / owner / tags（4-1a / 4-2 / 4-3 一致模式）
+- **PortSpec 10 字段完整性**：name / version / interface / impl / module / lifetime / owner / compatibility / tags / deprecated（4-1a / 4-2 / 4-3 一致模式，`src/domain/ports/registry.py:27-53`）
 - **契约测试 11 维度**：既有 4 个 Story 一致（name/version/lifetime/owner/tags/compatibility/deprecated + Protocol runtime_checkable + isinstance + 方法签名 + async + DI + 错误路径 + 边界条件 + resolver 行为）
 - **exception_handlers HTTP 映射**：4-1a / 4-2 / 4-3 均在 `src/interfaces/api/exception_handlers.py` 注册新异常，Story 4.4 沿用
 
@@ -1689,7 +1725,7 @@ class SandboxSessionStarted(DomainEvent):
 - `tests/unit/infrastructure/external_services/sandbox/test_aiodocker_sandbox_adapter.py` - 适配器单元测试（Task 5）
 - `tests/unit/application/services/test_sandbox_session_reaper.py` - Reaper 单元测试（Task 6）
 - `tests/unit/application/services/test_sandbox_security_decorator.py` - Decorator 单元测试（Task 7）
-- `tests/unit/architecture/test_arch_docker_sandbox.py` - 架构验证测试（Task 9）
+- `tests/unit/architecture/test_docker_sandbox.py` - 架构验证测试（Task 9，**epics AC 5 硬要求路径，无 `_arch_` 前缀**）
 
 **契约测试：**
 - `tests/contracts/test_port_contract_sandbox_executor.py` - 既有扩展 11 维度（Task 4）
