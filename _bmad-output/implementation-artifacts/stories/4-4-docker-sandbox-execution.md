@@ -108,7 +108,7 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 
 - **禁止** `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释
 - **禁止** mypy 配置 `ignore_missing_imports=true` 豁免
-- `aiodocker` **无 `py.typed`**：**必须**创建 PEP 561 stubs（`stubs/aiodocker/__init__.pyi`），覆盖实际使用的接口（`Docker` / `containers.run` / `containers.get` / `exec_create` / `exec_start` / `containers.delete`）
+- `aiodocker` **无 `py.typed`**：**必须**创建 PEP 561 stubs（`stubs/aiodocker/__init__.pyi`），覆盖实际使用的 **9 个 API 面**（`Docker.pull` / `Docker.ping` / `Docker.containers.run` / `Docker.containers.get` / `Docker.containers.list` / `Docker.containers.delete` / `Container.exec_create` / `Container.exec_start` / `Container.stats`）
 
 ### Commit & Push 规范
 
@@ -131,7 +131,7 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 
 ## 🎯 领域异常契约（CLAUDE.md §5 强制）
 
-> 本 Story 涉及的所有异常必须在 Task 0 完成前完成 4 项 Checklist。
+> 本 Story 涉及的所有异常必须在 Task 0 完成前完成 **5 项 Checklist**（含 1 项 EXCEPTION_HTTP_MAP 注册，详见硬约束章节）。
 
 ### 已存在异常复用（来自 Story 4.1a sandbox_exceptions.py）
 
@@ -198,7 +198,7 @@ class SandboxTimeoutError(ExecutionError):
 
 - `SandboxTimeoutError` 继承 `ExecutionError`（而非直接继承 `SandboxError`）—— 因为"超时"是"执行失败"的一种特定场景，语义层次清晰；与 line 174 反模式警告"❌ 复用 `ExecutionError` 直接抛 timeout（缺乏超时上下文）"区分：本 Story 通过**独立异常类** `SandboxTimeoutError` 携带超时上下文，**不是**简单抛 `ExecutionError(timeout_msg)`
 - `SandboxConfigurationError` 与 `EntityValidationError` (EXCEPTION_242) 边界划分：
-  - `EntityValidationError`：领域层静态字段不变量校验（如 `ContainerSpec.__post_init__` 7 项不变量），HTTP 400
+  - `EntityValidationError`：领域层静态字段不变量校验（如 `ContainerSpec.__post_init__` **6 项**不变量），HTTP 400
   - `SandboxConfigurationError`：基础设施层运行时配置错误（如 seccomp profile 文件加载失败、容器名长度超 Docker 64 字符上限），HTTP 502
 
 **禁止设计反模式（CLAUDE.md §5 + 异常 5 轮审查经验）**：
@@ -1011,7 +1011,7 @@ class SandboxSessionStarted(DomainEvent):
 #### API 契约 (API Contract)
 
 - [ ] `SandboxExecutor` Protocol 扩展签名确定（向后兼容）
-- [ ] 容器名格式 `sisys-sandbox-{tenant_id}-{session_id}` 确定
+- [ ] 容器名格式 `sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}` 确定（**总长度 ≤ 56 字符**，在 Docker 64 字符上限内；tenant_id 取 UUID 前 8 字符，session_id 截前 32 字符）
 - [ ] 安全配置字典（aiodocker kwargs）确定
 - [ ] 无新增 HTTP 端点（沙箱执行通过 ToolExecutionEngine 间接调用）
 
@@ -1286,7 +1286,7 @@ class SandboxSessionStarted(DomainEvent):
 
 **关联 AC:** AC-2
 
-> **职责：** 扩展 `sandbox_exceptions.py` 新增 5 个异常类（EXCEPTION_315~319），完成 4 项 Checklist。
+> **职责：** 扩展 `sandbox_exceptions.py` 新增 5 个异常类（EXCEPTION_315~319），完成 **5 项 Checklist**（含 1 项 EXCEPTION_HTTP_MAP 注册）。
 
 #### TDD 循环 [A]：5 个新异常类
 
@@ -1306,7 +1306,7 @@ class SandboxSessionStarted(DomainEvent):
 
 - [ ] 5 个新异常类实现完成
 - [ ] TDD 循环全部通过
-- [ ] 4 项 Checklist 全部完成
+- [ ] **5 项 Checklist**全部完成（含 EXCEPTION_HTTP_MAP 注册）
 - [ ] 三条 grep 自查零输出
 
 ---
@@ -1412,7 +1412,7 @@ class SandboxSessionStarted(DomainEvent):
 | 🟢 绿 | 实现 `SandboxSecurityDecorator` 最小代码（4 项防护） |
 | 🔄 重构 | 复用 `_call_with_retry`（`retry_helpers.py`）+ 优化重试策略 |
 
-- [ ] Subtask 7.1: 🔴 红 — 编写 Decorator 失败测试
+- [ ] Subtask 7.1: 🔴 红 — 编写 `SandboxSecurityDecorator`（**包裹类**，对齐 `ToolOutputValidator` 样板 `src/application/services/tool_output_validator.py:35-44`）失败测试，验证超时 / 重试 / 配额 / session_id 校验 4 项防护
 - [ ] Subtask 7.2: 🟢 绿 — 实现 `SandboxSecurityDecorator` 主体
 - [ ] Subtask 7.3: 🔄 重构 — 复用 `_call_with_retry`
 - [ ] Subtask 7.4: `composition_root.py` 装配装饰器（`tool_execution_engine` impl 切换）
@@ -1466,9 +1466,9 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_docker_sandbox.py`（**epics_v1.0.md:1204 硬要求路径，无 `_arch_` 前缀**；4 项规则：域层零依赖 + 依赖方向 + 无循环 + PortSpec 元数据）
 - [ ] Subtask 9.2: 实现 `test_domain_zero_dependencies()`（验证 domain 不依赖 aiodocker）
 - [ ] Subtask 9.3: 实现 `test_dependency_direction()`（验证 4 层依赖方向）
-- [ ] Subtask 9.4: 实现 `test_port_spec_metadata()`（验证 3 个端口的 7 字段完整性）
+- [ ] Subtask 9.4: 实现 `test_port_spec_metadata()`（验证 3 个端口的 **10 字段**完整性，含 `module` 必填位置参数 + `compatibility` tuple + `deprecated` bool）
 - [ ] Subtask 9.5: 创建 `tests/integration/test_performance_docker_sandbox.py`（启动延迟 P95 < 5s + 并发 ≥ 10 + 沙箱逃逸 0）
-- [ ] Subtask 9.6: 实现循环依赖检测（**使用 ruff 的 `E` 规则或 `isort --check-only`，不引入 pylint**）
+- [ ] Subtask 9.6: 实现循环依赖检测（**复用既有 `lint-imports`（基于 importlinter）+ `from __future__ import annotations` + AST 静态分析脚本（基于 `ast` 模块遍历 import 图）；ruff E 规则不包含循环依赖检测能力，不能仅用 `ruff --select E`**）
 - [ ] Subtask 9.7: 运行完整测试套件并生成报告
 
 **完成标准/Definition of Done:**
@@ -1620,7 +1620,7 @@ class SandboxSessionStarted(DomainEvent):
 
 - **R1 复用 `SandboxExecutor` 端口 + 既有 mock 实现**：Story 4.4 不重新定义端口，而是基于 4.1a 既有 `SandboxExecutor` Protocol 向后兼容扩展（默认参数 + 新增方法），避免破坏 `ToolExecutionEngine.__init__` 既有签名
 - **R2 装饰器模式经验（4.3）**：4.3 拒绝修改 `ToolExecutionEngine.__init__`（会破坏 4.1a 向后兼容），改用纯装饰器包裹。Story 4.4 复用此模式，新增 `SandboxSecurityDecorator` 包裹 `ToolExecutionEngine`
-- **R3 既有 `SandboxSession` / `ContainerSecurityService` 复用**：4.1a 已定义 `ContainerSecurityService` 端口 + `IsolationVerificationResult` / `ResourceLimitsStatus` / `EscapeAttempt` / `NetworkIsolationResult` 值对象（位于 `src/domain/value_objects/container_security_result.py`），Story 4.4 复用这些值对象作为 ContainerSpecBuilder 输入
+- **R3 既有 `ContainerSecurityService` 复用**（**注**：SandboxSession 是 Story 4.4 新建，非 4.1a 既有复用，详见 AC-4）：4.1a 已定义 `ContainerSecurityService` 端口 + `IsolationVerificationResult` / `ResourceLimitsStatus` / `EscapeAttempt` / `NetworkIsolationResult` 值对象（位于 `src/domain/value_objects/container_security_result.py`），Story 4.4 复用这些值对象作为 ContainerSpecBuilder 输入
 - **asyncio.Lock 类变量**：4.1a `InMemoryToolExecutionRepository._lock: asyncio.Lock = asyncio.Lock()`（**类变量**），Story 4.4 的 `InMemorySandboxSessionRepository` 严格沿用
 - **Alembic migration 编号延续**：4-1a → 011、4-2 → 012、4-3 → 013，Story 4.4 → 014（每 Story +1）
 - **三层 Mock/Fake/Real 策略**：单元测试 mock 端口（`AsyncMock(spec=SandboxExecutor)`），集成测试真实服务（testcontainers），验收测试真实 Docker daemon + 动态 `pytest.skip()`
@@ -1681,7 +1681,7 @@ class SandboxSessionStarted(DomainEvent):
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成（Task 0 + 10 个 Task，每个含完整 TDD 循环）
 - [x] 项目结构对齐统一规范（六边形 4 层 + R1-R5 复用决策）
-- [x] 5 个新沙箱异常 EXCEPTION_315~319 4 项 Checklist 完成
+- [x] 5 个新沙箱异常 EXCEPTION_315~319 **5 项 Checklist** 完成
 - [x] SandboxExecutor 端口向后兼容扩展方案明确（**不修改** 4.1a 既有签名）
 - [x] 装饰器模式应用（SandboxSecurityDecorator 不修改 ToolExecutionEngine）
 - [x] PEP 561 stubs/aiodocker/__init__.pyi 创建要求明确（aiodocker 无 py.typed）
@@ -1831,7 +1831,7 @@ class SandboxSessionStarted(DomainEvent):
 3. **向后兼容**：不修改 4.1a `SandboxExecutor` 既有 4 方法签名
 4. **装饰器模式**：不修改 4.1a `ToolExecutionEngine.__init__`
 5. **asyncio.Lock 类变量**：所有 InMemory 仓储严格遵守
-6. **异常 4 项 Checklist**：5 个新沙箱异常 EXCEPTION_315~319
+6. **异常 5 项 Checklist**（含 EXCEPTION_HTTP_MAP 注册）：5 个新沙箱异常 EXCEPTION_315~319
 7. **三层 Mock/Fake/Real**：单元 mock / 集成 testcontainers / 验收真实 daemon
 8. **三条 grep 自查**：`grep -rn "raise ValueError\|raise HTTPException\|class.*Exception\b" src/` 零输出
 
