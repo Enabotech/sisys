@@ -35,29 +35,46 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 
 **本 Story 范围（4.4）：**
 
-1. **替换 mock 实现**：将 `DockerSandboxAdapter` 从日志 mock 替换为基于 `aiodocker` 的真实 Docker 容器管理
-2. **ContainerSpec 值对象**（领域层）：CPU/内存/网络模式/镜像 digest/seccomp profile/ulimits/pids-limit 等约束的不可变描述
-3. **5 个新领域异常**（EXCEPTION_315~319）：SandboxImagePullError / SandboxTimeoutError / SandboxResourceLimitExceededError / SandboxQuotaExceededError / SandboxConfigurationError
-4. **SandboxExecutor 端口扩展**：保持向后兼容（4.1a 既有签名），新增可选 `ContainerSpec` 参数
-5. **应用层安全编排**：在 `ToolExecutionEngine.Execute` 与 `Observe` 阶段包裹 `asyncio.wait_for` 超时控制 + 复用 `_call_with_retry` 重试策略
-6. **30 分钟空闲清理**：基于现有 `SessionNamespaceManager` 增加空闲 TTL 回收
+1. **替换 mock 实现**：将 `DockerSandboxAdapter`（mock）替换为基于 `aiodocker` 的真实 Docker 容器管理 `AioDockerSandboxAdapter`；采用**删除 mock + 替换 impl 字符串**策略（不保留 fallback，避免 CLAUDE.md §5 mock 滥用）；CI/本地无 Docker 环境通过 `SISYS_USE_TEST_PORTS=1` 切换（CLAUDE.md §6 既有约定）
+2. **`ContainerSpec` 值对象**（领域层）：CPU/内存/网络模式/镜像 digest/seccomp profile/ulimits/pids-limit 等约束的不可变描述（**13 字段**，详见 AC-1）
+3. **5 个新领域异常**（EXCEPTION_315~319）：`SandboxImagePullError` / `SandboxTimeoutError` / `SandboxResourceLimitExceededError` / `SandboxQuotaExceededError` / `SandboxConfigurationError`
+4. **`SandboxExecutor` 端口扩展**：保持向后兼容（4.1a 既有 4 方法签名不变），通过**默认参数**新增可选 `ContainerSpec` / `timeout_sec` 入参 + 新增 `health_check()` 方法
+5. **应用层安全编排**：新增 `SandboxSecurityDecorator` 包裹类（**非 Python `@decorator` 语法**，仅借用设计模式术语），在 `ToolExecutionEngine` 装配层注入超时 + 重试 + 配额 + session_id 注入防御；**不修改** `ToolExecutionEngine.__init__`
+6. **30 分钟空闲清理**：新增**独立应用层服务** `SandboxSessionReaper`，基于 `SandboxSessionRepositoryPort.list_idle_sessions()` 实现；**不修改** `SessionNamespaceManager`（既有 4.1a 实现无 TTL 机制）
 7. **集成测试基础设施**：`testcontainers-python` 真实 Docker daemon + pytest-bdd 验收
-8. **架构验证测试**：`tests/unit/architecture/test_arch_docker_sandbox.py` 验证域层零依赖 + 11 维度端口契约
-9. **Alembic migration 014**：记录沙箱会话（便于审计 + 配额统计）
+8. **架构验证测试**：`tests/unit/architecture/test_docker_sandbox.py`（**注意：epics_v1.0.md:1204 硬要求此路径，不带 `_arch_` 前缀**）验证域层零依赖 + PortSpec 10 字段元数据完整性
+9. **Alembic migration 014**：`down_revision = "013_schema_validation_records"`，记录沙箱会话（便于审计 + 配额统计）
 
 **不在本 Story 范围（拆分到其他 Story）：**
 
-- **gVisor 用户空间内核隔离**（更高安全等级）→ 后续 V2 Story（`prd.md:1828` FR-ST-10）
+- **gVisor 用户空间内核隔离**（更高安全等级）→ 后续 Epic 18 Story 18.1（`epics_v1.0.md:589`，P2 非 MVP，`prd.md:1828` FR-ST-10）
 - **跨工具链共享 Jupyter Kernel**（持久化变量）→ 后续 Story（`or.md:232` 三.3.[2]），当前仅做"30 分钟空闲销毁"
-- **白名单网关代理服务**（可信财经 API 访问通道）→ 后续基础设施 Story，本 Story 仅留接口 `network_whitelist: tuple[str, ...]` 在 ContainerSpec
+- **白名单网关代理服务**（可信财经 API 访问通道）→ 后续基础设施 Story；本 Story `ContainerSpec.network_mode` 写死为 `"none"`（**删除 `network_whitelist` 字段**，遵循 CLAUDE.md §2 Simplicity First）
 - **资源配额按租户维度控制**（多租户公平调度）→ Story 4.7（Validation Feedback 闭环增强）评估
 - **沙箱执行结果 Schema 强类型化**（`dict[str, Any]` → `SandboxExecutionResult` VO）→ 当前保持 4.1a 既有契约，4.7 升级
 
 **复用决策（依据 R2 规则）：**
 
-- **R1 复用**：`SandboxExecutor`（Story 4.1a，domain 端口）/ `SessionNamespaceManager`（Story 4.1a，session_id → 容器名映射）/ `ContainerSecurityService`（4.1a stub，本期实现）/ `IsolationVerificationResult` / `ResourceLimitsStatus` / `EscapeAttempt` / `NetworkIsolationResult`（4.1a 值对象，本期实现）
-- **R2 扩展**：`SandboxExecutor` Protocol 新增可选 `ContainerSpec` 参数（保持向后兼容，不破坏 4.1a 既有签名）
-- **R3 新建实现**：`AioDockerSandboxAdapter`（替换 mock）+ `ContainerSpecBuilder`（ContainerSpec → aiodocker kwargs）+ `SeccompProfileLoader`（加载仓库内置 seccomp profile）
+- **R1 复用**（既有，不修改）：
+  - `SandboxExecutor` Protocol（4.1a 既有 4 方法）
+  - `SessionNamespaceManager`（4.1a 既有，无 TTL 不扩展）
+  - `ContainerSecurityServicePort`（4.1a 完整 Protocol + 4 个值对象 `IsolationVerificationResult` / `ResourceLimitsStatus` / `EscapeAttempt` / `NetworkIsolationResult` 复用，**非 stub**）
+  - `_call_with_retry`（`src/application/services/retry_helpers.py:62`，4.3 经验）
+- **R2 扩展**（默认参数兼容）：
+  - `SandboxExecutor` Protocol 新增可选 `spec: ContainerSpec | None = None`（start_container）+ `timeout_sec: float | None = None`（execute_code）+ 新方法 `health_check() -> bool`
+  - 调用点零修改（4.1a 既有调用通过默认参数沿用旧行为）
+- **R3 新建**（4.4 从零创建）：
+  - `ContainerSpec` 值对象（领域层，13 字段）
+  - `SandboxSession` 聚合根（领域层，10 字段）
+  - `SandboxSessionQuery` Query 值对象（领域层，frozen dataclass）
+  - `SandboxSessionRepositoryPort` Protocol（领域层，**不继承 L2RdbPort**，因主键为字符串 `session_id`，与 L2RdbPort 的 UUID 主键约束不兼容，详见 AC-4 修订说明）
+  - 3 个领域事件 `SandboxSessionStarted` / `SandboxSessionTerminated` / `SandboxExecutionFailed`（**继承 `DomainEvent` 基类**，使用基类 `event_id`/`timestamp` 字段，业务字段放 `payload` 或保留为事件自有字段）
+  - `AioDockerSandboxAdapter`（基础设施层，替换 mock）
+  - `ContainerSpecBuilder`（基础设施层，ContainerSpec → aiodocker kwargs）
+  - `SeccompProfileLoader`（基础设施层，加载仓库内置 seccomp profile）
+  - `InMemorySandboxSessionRepository`（基础设施层，asyncio.Lock **类变量**）
+  - `SandboxSecurityDecorator`（应用层，包裹 ToolExecutionEngine）
+  - `SandboxSessionReaper`（应用层，30 分钟空闲清理 + 孤儿容器扫描）
 
 ---
 
@@ -79,13 +96,13 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 - **必须** 走 `src/domain/exceptions/` 体系 + `ExceptionHandlers` 自动映射
 - 提交前**三条 grep 自查**必须零输出：`grep -rn "raise ValueError\|raise HTTPException\|class.*Exception\b" src/`
 
-### 新增异常完整性 Checklist（4 项强制）
+### 新增异常完整性 Checklist（**5 项强制**，含 1 项 HTTP 映射注册）
 
 1. **定义文件**：在 `src/domain/exceptions/sandbox_exceptions.py` 新增 5 个异常类（**扩展** 既有 sandbox 子域模块，不新建文件）
-2. **`_code_ranges.py` 子域映射**：在 `_CLASS_TO_SUBDOMAIN` 注册 class → 子域对应（**复用 `sandbox` 子域 311-319**，占用 315-319）
+2. **`_code_ranges.py` 子域映射**：在 `_CLASS_TO_SUBDOMAIN` 注册 class → 子域对应（**复用 `sandbox` 子域 311-319**，新增占用 315-319，**与既有 311-314 共用子域**，不新建子域）
 3. **`__init__.py` 暴露**：在 `src/domain/exceptions/__init__.py` 导入并加入 `__all__`
-4. **子域码段校验**：异常 `code` 在 `sandbox` 子域（311-319）范围内
-5. **`EXCEPTION_HTTP_MAP` 注册**：在 `src/interfaces/api/exception_handlers.py` 增加新异常 → HTTP 状态码映射（默认 502，与既有 SandboxError 一致）
+4. **子域码段校验**：异常 `code` 在 `sandbox` 子域（311-319）范围内（**注意**：本 Story 仅占用 315-319，311-314 已被 4.1a 既有 4 个异常占用）
+5. **`EXCEPTION_HTTP_MAP` 注册**：在 `src/interfaces/api/exception_handlers.py` 增加 5 条新异常 → HTTP 状态码映射（默认 502，`SandboxTimeoutError: 504`，`SandboxQuotaExceededError: 503`；既有 sandbox 注释偏差 `# 309~312` 与实际 `EXCEPTION_311~314` 不一致属于历史 bug，本 Story 不修复）
 
 ### 抑制告警禁止
 
@@ -104,10 +121,11 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 
 - **禁止** 直接调用 `subprocess` 执行用户代码（必须经 Docker 容器）
 - **禁止** 容器内提权（必须 `cap_drop: ["ALL"]` + `security_opt=["no-new-privileges"]`）
-- **禁止** 网络默认开放（必须 `network_mode: "none"`；如需外网走白名单网关，由后续基础设施 Story 提供）
+- **禁止** 网络默认开放（必须 `network_mode: "none"`；本 Story 删除 `network_whitelist` 字段，遵循 CLAUDE.md §2 Simplicity First）
 - **禁止** `image: ":latest"`（必须 pin digest 或 minor tag）
 - **asyncio.Lock 必须为类变量**：`InMemorySandboxSessionRepository._lock: asyncio.Lock = asyncio.Lock()`（CLAUDE.md §6 Gotcha）
-- **session_id 注入防御**：容器名 `f"sisys-sandbox-{session_id}"` 必须校验 session_id 匹配正则 `^[A-Za-z0-9_-]{1,64}$`
+- **session_id 注入防御**：容器名 `f"sisys-sandbox-{tenant_id_short}-{session_id_short}"` 必须校验 session_id 匹配正则 `^[A-Za-z0-9_-]{1,64}$`；tenant_id_short 取 UUID 前 8 字符，session_id_short 截取前 32 字符，**总长度控制在 Docker 上限 64 字符内**
+- **容器命名统一约定**（全文唯一格式）：`sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}`（生产）+ 测试场景追加 `TestTenant UUID` 前缀（tenant_id 已含 UUID 前缀）
 
 ---
 
@@ -128,22 +146,29 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 
 **关键决策：复用 `sandbox` 子域（311-319）**，新增占用 315-319，不新建子域。
 
-| 候选异常 | 触发场景 | parent class | 建议 code | HTTP 映射 | 4项 Checklist |
+| 候选异常 | 触发场景 | parent class | 建议 code | HTTP 映射 | 5 项 Checklist |
 |----------|----------|--------------|-----------|-----------|---------------|
 | `SandboxImagePullError` | 容器镜像拉取失败（digest 不存在 / daemon 拉取权限不足 / 网络超时） | `ContainerStartError` (EXCEPTION_312) | EXCEPTION_315 | 502 | Task 0 |
 | `SandboxTimeoutError` | 代码执行超过 `ContainerSpec.timeout_sec`（默认 30s） | `ExecutionError` (EXCEPTION_313) | EXCEPTION_316 | 504 | Task 0 |
 | `SandboxResourceLimitExceededError` | 容器内存 / CPU / pids 超出 cgroups 限制（OOM kill exit 137） | `ExecutionError` (EXCEPTION_313) | EXCEPTION_317 | 502 | Task 0 |
 | `SandboxQuotaExceededError` | 并发容器数超过 `MAX_CONCURRENT_CONTAINERS`（默认 50） | `SandboxError` (EXCEPTION_311) | EXCEPTION_318 | 503 | Task 0 |
-| `SandboxConfigurationError` | ContainerSpec 字段不合法（镜像 digest 缺失 / mem_limit 越界 / seccomp profile 加载失败） | `SandboxError` (EXCEPTION_311) | EXCEPTION_319 | 500 | Task 0 |
+| `SandboxConfigurationError` | ContainerSpec 字段不合法（镜像 digest 缺失 / mem_limit 越界 / seccomp profile 加载失败 / 容器名超长） | `SandboxError` (EXCEPTION_311) | EXCEPTION_319 | 502 | Task 0 |
 
-**新增异常构造器统一规范**：
+**HTTP 映射决策说明**：
+
+- `SandboxConfigurationError` 采用 **502**（与父类 `SandboxError` 一致，标记为上游服务错误），**不采用 500**（500 适用于本系统内部错误，与"配置错误由调用方负责"的语义不符）
+- `SandboxTimeoutError` 采用 **504**（与 `TimeoutError` (EXCEPTION_3XX) 子域约定一致，504 Gateway Timeout）
+- `SandboxQuotaExceededError` 采用 **503**（与 `ServiceUnavailableError` (EXCEPTION_3XX) 一致，503 Service Unavailable）
+
+**新增异常构造器统一规范**（与 `DomainError.__init__(message, cause, context)` 三参数契约一致）：
 
 ```python
 class SandboxTimeoutError(ExecutionError):
     """EXCEPTION_316 — 代码执行超时
 
     Attributes:
-        context: dict 含 session_id / timeout_sec / execution_id / docker_exit_code
+        code: 异常编码 EXCEPTION_316
+        message: 异常描述 "Sandbox execution timeout"
     """
 
     code = "EXCEPTION_316"
@@ -169,11 +194,19 @@ class SandboxTimeoutError(ExecutionError):
         )
 ```
 
+**继承层次设计说明**：
+
+- `SandboxTimeoutError` 继承 `ExecutionError`（而非直接继承 `SandboxError`）—— 因为"超时"是"执行失败"的一种特定场景，语义层次清晰；与 line 174 反模式警告"❌ 复用 `ExecutionError` 直接抛 timeout（缺乏超时上下文）"区分：本 Story 通过**独立异常类** `SandboxTimeoutError` 携带超时上下文，**不是**简单抛 `ExecutionError(timeout_msg)`
+- `SandboxConfigurationError` 与 `EntityValidationError` (EXCEPTION_242) 边界划分：
+  - `EntityValidationError`：领域层静态字段不变量校验（如 `ContainerSpec.__post_init__` 7 项不变量），HTTP 400
+  - `SandboxConfigurationError`：基础设施层运行时配置错误（如 seccomp profile 文件加载失败、容器名长度超 Docker 64 字符上限），HTTP 502
+
 **禁止设计反模式（CLAUDE.md §5 + 异常 5 轮审查经验）**：
 
-- ❌ 复用 `ExecutionError` 直接抛 timeout（缺乏超时上下文，违反"异常携带领域上下文"原则）
-- ❌ 将镜像拉取失败归类为 `ContainerStartError`（无法精确区分"启动配置错误" vs "镜像拉取失败"，监控无法精确告警）
+- ❌ 复用 `ExecutionError` 直接抛 timeout（缺乏超时上下文，违反"异常携带领域上下文"原则）→ 修复：必须新建独立 `SandboxTimeoutError` 类
+- ❌ 将镜像拉取失败归类为 `ContainerStartError`（无法精确区分"启动配置错误" vs "镜像拉取失败"，监控无法精确告警）→ 修复：必须新建独立 `SandboxImagePullError` 类
 - ❌ 新建 `SandboxStateTransitionError`（沙箱容器无状态机概念；如需状态追踪走 `EntityStateTransitionError` EXCEPTION_243）
+- ❌ 把"运行时配置错误"归类为 `EntityValidationError`（语义层次不符，`EntityValidationError` 专用于领域层静态不变量）→ 修复：必须新建 `SandboxConfigurationError` 类
 
 ### 复用既有异常
 
@@ -186,11 +219,11 @@ class SandboxTimeoutError(ExecutionError):
 ### 登记确认动作（Task 0 必做）
 
 - [ ] 在 `src/domain/exceptions/sandbox_exceptions.py` 新增 5 个异常类
-- [ ] 在 `src/domain/exceptions/_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 字典增加 5 行 `("SandboxImagePullError", "sandbox")` 等
+- [ ] 在 `src/domain/exceptions/_code_ranges.py` 的 `_CLASS_TO_SUBDOMAIN` 字典增加 5 行 `("SandboxImagePullError", "sandbox")` 等（与既有 sandbox 子域共用 311-319 范围）
 - [ ] 在 `src/domain/exceptions/__init__.py` 导入并加入 `__all__`
-- [ ] 在 `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 注册 5 条新映射（`SandboxTimeoutError: 504`，其余 502 / 503）
-- [ ] 运行 `poetry run pytest tests/unit/domain/exceptions/test_code_ranges.py -v`（必须包含新增异常的子域范围校验）
-- [ ] 运行 `poetry run pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v`（必须无碰撞）
+- [ ] 在 `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 注册 5 条新映射（`SandboxTimeoutError: 504`、`SandboxQuotaExceededError: 503`、其余默认 502）
+- [ ] 运行 `poetry run pytest tests/unit/domain/exceptions/test_code_ranges.py -v`（既有测试，必须包含新增异常的子域范围校验）
+- [ ] 运行 `poetry run pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v`（既有测试，必须无碰撞）
 
 ---
 
@@ -211,8 +244,9 @@ class SandboxTimeoutError(ExecutionError):
 
 ### BDD 步骤函数（CLAUDE.md §5）
 
-- **禁止** `@pytest.mark.asyncio` 装饰 BDD step 函数
-- BDD step 内部 async 调用使用 `event_loop.run_until_complete(coro)` 模式
+- **统一使用 pytest-asyncio auto 模式**（项目既有约定）：`asyncio_mode = "auto"`（pyproject.toml 已配置），step 函数直接 `async def` + `@given/@when/@then` 装饰器
+- **禁用** `@pytest.mark.asyncio` 装饰 BDD step 函数（避免与 auto 模式冲突）
+- **禁用** `event_loop.run_until_complete(coro)` 旧模式（与 pytest-bdd 8.x + pytest-asyncio 1.x 不兼容）
 - BDD context 通过 `context: dict[str, Any]` 跨步骤传递
 
 ### 真实服务优先（CLAUDE.md §5）
@@ -237,23 +271,25 @@ class SandboxTimeoutError(ExecutionError):
 
 ### 外部端口契约：SandboxExecutor（向后兼容扩展）
 
-**位置：** `src/domain/ports/sandbox_executor.py`
+**位置：** `src/domain/ports/sandbox_executor.py`（**既有文件扩展**，非新建）
 
-**向后兼容原则：** 不修改 `start_container` / `execute_code` / `stop_container` / `is_container_running` 4 个既有方法签名；通过**默认参数 + 新方法**扩展。
+**向后兼容原则：** 不破坏 4.1a 既有 4 方法的**调用行为**（既有调用点零修改），通过**默认参数**扩展入参签名（注：`@runtime_checkable` Protocol 不验证默认参数；`inspect.signature()` 会反映参数扩展，但既有调用点按位置参数调用不受影响）
 
 ```python
 @runtime_checkable
 class SandboxExecutor(Protocol):
     """沙箱执行协议端口（Story 4.4 扩展，向后兼容 4.1a 既有签名）
 
-    新增可选 ContainerSpec 参数（默认 None → 沿用既有默认配置）
-    新增方法 health_check() 用于监控与熔断器集成
+    调用行为保持不变：
+    - 既有 4 方法位置参数调用不受影响
+    - 新增可选 ContainerSpec 参数（默认 None → 沿用既有默认配置）
+    - 新增方法 health_check() 用于监控与熔断器集成
     """
 
     async def start_container(
         self,
         session_id: str,
-        spec: ContainerSpec | None = None,  # 新增可选参数，向后兼容
+        spec: ContainerSpec | None = None,  # 新增可选参数（默认 None），向后兼容
     ) -> None: ...
 
     async def execute_code(
@@ -261,7 +297,7 @@ class SandboxExecutor(Protocol):
         session_id: str,
         code: str,
         *,
-        timeout_sec: float | None = None,  # 新增可选参数，向后兼容
+        timeout_sec: float | None = None,  # 新增可选 keyword-only 参数（默认 None），向后兼容
     ) -> dict[str, Any]: ...
 
     async def stop_container(self, session_id: str) -> None: ...
@@ -278,24 +314,41 @@ class SandboxExecutor(Protocol):
         ...
 ```
 
-**4.1a 既有签名约束：** `ToolExecutionEngine.__init__(self, sandbox: SandboxExecutor)` 不修改（4.3 装饰器模式经验），所有调用点通过新参数默认 `None` 沿用旧行为。
+**4.1a 既有调用点零修改约束：** `ToolExecutionEngine.__init__(self, sandbox: SandboxExecutor)` 既有签名不修改（4.3 装饰器模式经验），所有既有调用点（如 `session_namespace_manager.py:51` / `:73`）通过新参数默认 `None` 沿用旧行为。本 Story 在 `composition_root.py:2220-2239` 的 `tool_execution_engine` lambda impl 处嵌套 `SandboxSecurityDecorator` 包裹（详见 AC-7 修订示例）。
 
 ### 内部端口契约：SandboxSessionRepository（新增）
 
 **位置：** `src/domain/ports/sandbox_session_repository.py`
 
+**⚠️ 设计决策（关键 P0 修正）：**
+
+**SandboxSessionRepositoryPort 不继承 `L2RdbPort`**，原因如下：
+
+- `L2RdbPort[T]` 基类主键约束为 `UUID`（`src/domain/ports/l2_rdb.py:26`：`async def get_by_id(self, id: UUID) -> T | None`）
+- `SandboxSession` 聚合根业务主键设计为字符串 `session_id: str`（匹配 `^[A-Za-z0-9_-]{1,64}$`），与 L2RdbPort 的 UUID 主键约束**类型不兼容**
+- 若强行继承，会导致：
+  - mypy 严格模式下 `save(entity)` 调用时无法映射字符串主键到 UUID 入参
+  - InMemory 实现违反 Liskov 替换原则
+  - 与既有项目惯例冲突（既有 4 个 InMemory 仓储的主键都是 UUID）
+
+**正确方案：** 独立定义 `SandboxSessionRepositoryPort(Protocol)`，通过 `SandboxSessionQuery` Query 值对象（frozen dataclass）支持多字段组合查询（CLAUDE.md §4 端口查询参数决策规则）
+
 ```python
 @runtime_checkable
-class SandboxSessionRepositoryPort(L2RdbPort[SandboxSession], Protocol):
+class SandboxSessionRepositoryPort(Protocol):
     """沙箱会话仓储端口（领域层，Story 4.4 新增）
 
-    继承 L2RdbPort[SandboxSession] 泛型 async CRUD 基座：
-    - async def get_by_id(id) -> SandboxSession | None
-    - async def save(entity) -> SandboxSession
-    - async def delete(id) -> None
+    设计决策：**不继承 L2RdbPort**（主键类型冲突，详见上方决策说明）。
+    通过独立 Protocol + SandboxSessionQuery Query 值对象实现多字段组合查询。
+
+    基础 CRUD（按字符串 session_id 索引）：
+    - async def get_by_session_id(session_id: str) -> SandboxSession | None
+    - async def save(session: SandboxSession) -> SandboxSession
+    - async def delete_by_session_id(session_id: str) -> None
     - async def list_all() -> list[SandboxSession]
 
-    领域扩展：
+    领域扩展（多字段查询，CLAUDE.md §4 决策规则）：
+    - async def find_by_query(query: SandboxSessionQuery) -> list[SandboxSession]
     - async def list_idle_sessions(threshold: datetime) -> list[SandboxSession]
     - async def count_active(tenant_id: UUID | None = None) -> int
     """
@@ -314,16 +367,17 @@ class ContainerSpec:
         image: 镜像引用（必须包含 digest 或 minor tag，禁止 :latest）
         mem_limit_mb: 内存限制（MB，默认 512，上限 2048）
         cpu_quota: CPU 配额（默认 1.0 核，cgroups v2 cpu.max）
-        pids_limit: 进程数限制（默认 256）
-        network_mode: 网络模式（默认 "none"，可选 "bridge" + network_whitelist）
+        pids_limit: 进程数限制（默认 256，上限 1024）
+        network_mode: 网络模式（写死 "none"，遵循 CLAUDE.md §2 Simplicity First）
         read_only_rootfs: 是否只读根文件系统（默认 True）
         tmpfs_mounts: tmpfs 挂载点字典（默认 {"/tmp": "100m"}）
         cap_drop: 移除的 Linux capabilities（默认 ["ALL"]）
         security_opt: 安全选项（默认 ["no-new-privileges"]）
         seccomp_profile: seccomp profile 路径（默认仓库内置 hardened profile）
-        userns_mode: user namespace 模式（默认 "host"，可选 "remap"）
+        userns_mode: user namespace 模式（默认 "host"）
         timeout_sec: 代码执行超时（秒，默认 30，上限 300）
-        network_whitelist: 网络白名单（仅 network_mode != "none" 时生效）
+
+    字段总数：13 项（含 image 必填 + 12 项默认值）
     """
     image: str
     mem_limit_mb: int = 512
@@ -337,7 +391,6 @@ class ContainerSpec:
     seccomp_profile: str = "deploy/docker/seccomp/sisys-hardened.json"
     userns_mode: str = "host"
     timeout_sec: float = 30.0
-    network_whitelist: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """字段不变量校验（抛 EntityValidationError EXCEPTION_242）"""
@@ -349,17 +402,23 @@ class ContainerSpec:
             raise EntityValidationError(...)
         if self.timeout_sec <= 0 or self.timeout_sec > 300:
             raise EntityValidationError(...)
-        if self.network_mode not in ("none", "bridge"):
+        if self.network_mode != "none":  # 写死 "none"，未来 V2 扩展时再放宽
             raise EntityValidationError(...)
         if "@sha256:" not in self.image and ":latest" in self.image:
             raise EntityValidationError(...)  # 禁止 latest
-        if self.network_mode == "none" and self.network_whitelist:
-            raise EntityValidationError(...)  # 断网模式不允许白名单
 ```
 
-### 领域事件：SandboxSessionStarted / SandboxSessionTerminated（双通道）
+**注意：** 原文档描述的 `network_whitelist` 字段已**删除**（本 Story 不实现网络白名单网关，遵循 CLAUDE.md §2 Simplicity First），因此 `__post_init__` 不变量校验从原 7 项减少为 **6 项**。
+
+### 领域事件：SandboxSessionStarted / SandboxSessionTerminated（**继承 DomainEvent 基类**）
 
 **位置：** `src/domain/events/sandbox_events.py`
+
+**⚠️ 设计决策（关键 P0 修正）：**
+
+事件必须**继承 `DomainEvent` 基类**（`src/domain/events/base.py:42-69`），使用基类的 `event_id` / `event_type` / `timestamp` / `aggregate_id` / `aggregate_type` 等 12 个标准字段，业务字段（`session_id` / `container_id` 等）保留为事件自有字段或放入 `payload` 字典。
+
+参考 `ToolExecuted(DomainEvent)` 模式（`src/domain/events/tool_events.py:21-46`）。
 
 **通道映射（必须在 `configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS` 同步更新）：**
 
@@ -369,27 +428,68 @@ class ContainerSpec:
 | `SandboxSessionTerminated` | `sisys:rt:sandbox.session.terminated` | `sisys.events.reliable.sandbox.session.terminated` |
 | `SandboxExecutionFailed` | `sisys:rt:sandbox.execution.failed` | `sisys.events.reliable.sandbox.execution.failed` |
 
-**事件 schema 字段：**
+**事件 schema 字段**（继承 DomainEvent 基类）：
 
 ```python
 @dataclass(frozen=True)
-class SandboxSessionStarted:
-    session_id: str
-    tenant_id: UUID
-    container_id: str  # Docker container ID
-    image_digest: str
-    started_at: datetime
-    resource_limits: dict[str, Any]  # 来自 ContainerSpec.to_dict()
-    event_id: UUID
-    occurred_at: datetime
+class SandboxSessionStarted(DomainEvent):
+    """沙箱会话启动事件（继承 DomainEvent 基类）
+
+    基类字段（event_id / event_type / timestamp / source / schema_version /
+    aggregate_id / aggregate_type / version / payload / correlation_id /
+    causation_id / metadata）自动继承。
+
+    Attributes:
+        session_id: 业务标识符（字符串，匹配 ^[A-Za-z0-9_-]{1,64}$）
+        container_id: Docker container ID
+        image_digest: 实际启动的镜像 digest
+        resource_limits: 来自 ContainerSpec.to_dict()
+        event_type: 事件类型，固定为"SandboxSessionStarted"
+    """
+
+    session_id: str = ""
+    container_id: str = ""
+    image_digest: str = ""
+    resource_limits: dict[str, Any] = field(default_factory=dict)
+    event_type: str = field(default="SandboxSessionStarted", init=False)
+
+    def __post_init__(self) -> None:
+        """设置 aggregate_id 和 aggregate_type"""
+        if self.aggregate_id is None:
+            # aggregate_id 是 UUID 类型，与 session_id（字符串）分离
+            # 通过元数据 metadata 传递 session_id 关联
+            object.__setattr__(self, "aggregate_id", uuid.uuid4())
+        if not self.aggregate_type:
+            object.__setattr__(self, "aggregate_type", "SandboxSession")
+        if "session_id" not in self.metadata:
+            object.__setattr__(
+                self, "metadata", {**self.metadata, "session_id": self.session_id}
+            )
 ```
+
+**关键修正点**：
+- 删除原文档中独立的 `event_id: UUID` + `occurred_at: datetime` 字段（基类已提供 `event_id` + `timestamp`）
+- `aggregate_id`（UUID 类型）与 `session_id`（字符串类型）分离，session_id 通过 `metadata` 字典传递
+- 子类通过 `event_type: str = field(default="Xxx", init=False)` 标注具体类型（参考 `ToolExecuted` 模式）
 
 ### 契约测试文件清单
 
-- `tests/contracts/test_port_contract_sandbox_executor.py`（**既有 4.1a**，11 维度，验证向后兼容扩展）
-- `tests/contracts/test_port_contract_sandbox_session_repository.py`（**新增**，11 维度）
-- `tests/contracts/test_event_contract_sandbox_events.py`（**新增**，字段必填 + 序列化 + 通道双投递）
-- `tests/contracts/test_value_object_contract_container_spec.py`（**新增**，不变量校验）
+**⚠️ 重要事实校正（关键 P0 修正）：**
+
+既有 `tests/contracts/test_port_contract_sandbox_executor.py`（4.1a 创建）**实际只有 8 个测试方法**（`test_protocol_is_runtime_checkable` / 4 个 `test_*_method_exists` / `test_start_container_signature` / `test_compliant_implementation` / `test_noncompliant_implementation_fails`），**不是 11 维度**。
+
+本 Story 实施策略：
+- `tests/contracts/test_port_contract_sandbox_executor.py`（**既有扩展**）：从 8 维度扩展到 11 维度（对齐 `test_port_contract_tool_execution_service.py:5-16` 样板），新增 3 个维度：
+  - `port_version`（新增断言 `spec.version` 非空）
+  - `port_owner`（新增断言 `spec.owner == "sandbox-team"`）
+  - `port_module`（新增断言 `spec.module` 路径正确）
+- `tests/contracts/test_port_contract_sandbox_session_repository.py`（**新建**）：11 维度全量覆盖（直接对齐样板，无既有扩展负担）
+- `tests/contracts/test_event_contract_sandbox_events.py`（**新建**）：事件契约（字段必填 + 序列化 + 通道双投递 + 继承 DomainEvent 基类）
+- `tests/contracts/test_value_object_contract_container_spec.py`（**新建**）：13 字段值对象契约（不变量校验）
+
+**PortSpec 实际 10 字段**（`src/domain/ports/registry.py:44-53`）：
+`name / version / interface / impl / module / lifetime / owner / compatibility / tags / deprecated`
+（**注意**：register_port 5 个必填位置参数为 `name / version / interface / impl / module`，其余通过 `**kwargs` 透传；本文原文档"7 字段"表述错误）
 
 ---
 
@@ -404,7 +504,7 @@ class SandboxSessionStarted:
 | Epic | Epic 4: 战略工具箱 |
 | 价值组 | 战略决策智能（Executive Decision Intelligence） |
 | 优先级 | P0（Epic 4 战略工具箱核心安全能力） |
-| 估算工作量 | **25-35 人天**（含 5 项 Checklist 异常体系 + aiodocker 集成 + 11 维度端口契约测试 + ContainerSpec 不变量 + 30 分钟 TTL 清理 + Seccomp profile 配置 + testcontainers 集成测试 + 架构验证测试 + alembic migration 014 + BDD 验收 +30% 缓冲） |
+| 估算工作量 | **25-35 人天**（含 5 项 Checklist 异常体系 + aiodocker 集成 + 11 维度端口契约测试（含既有 8→11 维度扩展）+ ContainerSpec 13 字段不变量 + 30 分钟 TTL 清理 + Seccomp profile 配置 + testcontainers 集成测试 + 架构验证测试 + alembic migration 014 + BDD 验收 +30% 缓冲） |
 | 覆盖 FR | FR-ST-04（Docker 沙箱执行）/ FR-ST-07（Validation Feedback 闭环前置） |
 | 前置 Story | 4-1a-strategic-tool-impl（✅ done）/ 1-7-minio-object-layer（✅ done）/ 1-18a-prefect-workflow-integration（✅ done） |
 | 后续 Story | 4-1b-skills-data-collection-integration / 4-7-validation-feedback-loop |
@@ -420,33 +520,33 @@ class SandboxSessionStarted:
 **Then**
 
 - **路径**：`src/domain/value_objects/container_spec.py`
-- **字段**（14 项，详见上文 ContainerSpec 签名）：
+- **字段**（**13 项**，详见上文 ContainerSpec 签名）：
   - 必填：`image: str`（必须包含 `@sha256:` digest 或 `:X.Y` minor tag，禁止 `:latest`）
   - 默认：`mem_limit_mb: int = 512` / `cpu_quota: float = 1.0` / `pids_limit: int = 256`
   - 默认：`network_mode: str = "none"` / `read_only_rootfs: bool = True`
   - 默认：`tmpfs_mounts: dict[str, str] = {"/tmp": "100m"}` / `cap_drop: tuple[str, ...] = ("ALL",)`
   - 默认：`security_opt: tuple[str, ...] = ("no-new-privileges",)` / `seccomp_profile: str = "<仓库内置>"`
-  - 默认：`userns_mode: str = "host"` / `timeout_sec: float = 30.0` / `network_whitelist: tuple[str, ...] = ()`
+  - 默认：`userns_mode: str = "host"` / `timeout_sec: float = 30.0`
+  - **注意**：`network_whitelist` 字段已删除（CLAUDE.md §2 Simplicity First，本期不实现网络白名单网关）
 - **`__post_init__` 不变量校验**（**违反任一项**抛 `EntityValidationError` EXCEPTION_242）：
   1. `mem_limit_mb ∈ (0, 2048]`
   2. `cpu_quota ∈ (0, 8.0]`
   3. `pids_limit ∈ (0, 1024]`
   4. `timeout_sec ∈ (0, 300]`
-  5. `network_mode ∈ {"none", "bridge"}`
+  5. `network_mode == "none"`（写死，未来 V2 扩展时再放宽）
   6. `image` 必须包含 `@sha256:` digest **或** `:X.Y` minor tag；**禁止** `:latest`
-  7. `network_mode == "none"` 时 `network_whitelist` 必须为空
 - **不可变设计**：`@dataclass(frozen=True)` + 容器规格冻结为不可变值对象
 - **零依赖**：仅 import `dataclass` / `field`（标准库）+ 领域层异常，禁止 import 任何第三方
 
 **验证标准/Validation Criteria:**
 
 - [ ] `ContainerSpec` 位于 `src/domain/value_objects/container_spec.py`（**领域层**，非应用层）
-- [ ] 14 字段完整（按上文列表）
-- [ ] `__post_init__` 触发 7 项不变量校验（失败抛 `EntityValidationError` EXCEPTION_242）
+- [ ] **13 字段**完整（按上文列表）
+- [ ] `__post_init__` 触发 **6 项**不变量校验（失败抛 `EntityValidationError` EXCEPTION_242）
 - [ ] 禁止 `:latest` 镜像（必须 digest 或 minor tag）
 - [ ] 默认 `network_mode="none"` + `read_only_rootfs=True` + `cap_drop=("ALL",)`
 - [ ] 域层零依赖验证通过（`poetry run lint-imports`）
-- [ ] 单元测试覆盖：`_make_container_spec(**overrides)` 工厂函数 + 7 项不变量失败测试 + 默认值验证
+- [ ] 单元测试覆盖：`_make_container_spec(**overrides)` 工厂函数 + **6 项**不变量失败测试 + 默认值验证
 - [ ] 契约测试 `tests/contracts/test_value_object_contract_container_spec.py` 通过
 
 ### AC-2: 5 个新沙箱领域异常（EXCEPTION_315-319）
@@ -518,7 +618,7 @@ class SandboxSessionStarted:
 - **`SandboxSession` 聚合根**：
   - **路径**：`src/domain/entities/sandbox_session.py`
   - **字段**（10 项）：
-    - `session_id: str`（聚合根主键，匹配 `^[A-Za-z0-9_-]{1,64}$`）
+    - `session_id: str`（业务标识符，匹配 `^[A-Za-z0-9_-]{1,64}$`，**非 UUID 主键**）
     - `tenant_id: UUID`（多租户隔离）
     - `container_id: str | None`（Docker container ID，启动后填充）
     - `image_digest: str`（实际启动的镜像 digest）
@@ -532,7 +632,14 @@ class SandboxSessionStarted:
   - **不可变设计**：`@dataclass(frozen=True)`
 - **`SandboxSessionRepositoryPort`**：
   - **路径**：`src/domain/ports/sandbox_session_repository.py`（**领域层**）
-  - **基类**：继承 `L2RdbPort[SandboxSession]` 泛型 async CRUD 基座
+  - **基类**：**独立 Protocol**，**不继承 `L2RdbPort`**（主键类型冲突：L2RdbPort 主键是 UUID，SandboxSession 主键是字符串 session_id）
+  - **基础 CRUD**（按字符串 `session_id` 索引）：
+    ```python
+    async def get_by_session_id(session_id: str) -> SandboxSession | None
+    async def save(session: SandboxSession) -> SandboxSession  # 使用 state_version 乐观锁
+    async def delete_by_session_id(session_id: str) -> None
+    async def list_all() -> list[SandboxSession]
+    ```
   - **查询方法**（使用 Query Object 模式，CLAUDE.md §4）：
     ```python
     @dataclass(frozen=True)
@@ -544,12 +651,14 @@ class SandboxSessionStarted:
         offset: int = 0
         limit: int = 100
     ```
-  - **领域扩展**：`async def list_idle_sessions(threshold: datetime) -> list[SandboxSession]` + `async def count_active(tenant_id: UUID | None = None) -> int`
+  - **领域扩展**：`async def find_by_query(query: SandboxSessionQuery) -> list[SandboxSession]` + `async def list_idle_sessions(threshold: datetime) -> list[SandboxSession]` + `async def count_active(tenant_id: UUID | None = None) -> int`
 - **`InMemorySandboxSessionRepository`**：
   - **路径**：`src/infrastructure/storage/inmemory/sandbox_session_repository.py`
-  - **模式复用 4.1a**：`dict[UUID, SandboxSession]` + `asyncio.Lock` **类变量** + frozen dataclass
+  - **模式复用 4.1a**：`dict[str, SandboxSession]`（**按 session_id 字符串索引，非 UUID**） + `asyncio.Lock` **类变量** + frozen dataclass
 - **Alembic migration 014**：`deploy/postgresql/alembic/versions/014_sandbox_sessions.py`
+  - **关键**：`down_revision = "013_schema_validation_records"`（参考 011/012/013 既有命名约定）
   - `sandbox_sessions` 表 + 4 索引：tenant_id / (tenant_id, state) / (state, last_activity_at) / container_id UNIQUE
+  - **主键**：`session_id VARCHAR(64) PRIMARY KEY`（字符串主键，不使用 UUID）
 
 **验证标准/Validation Criteria:**
 
@@ -558,9 +667,9 @@ class SandboxSessionStarted:
 - [ ] `SandboxSessionRepositoryPort` 定义在 `src/domain/ports/`（领域层，非应用层）
 - [ ] 查询方法使用 `SandboxSessionQuery` frozen dataclass（CLAUDE.md §4 决策规则）
 - [ ] `InMemorySandboxSessionRepository` 使用 `asyncio.Lock` **类变量**（CLAUDE.md §6 Gotcha）
-- [ ] 端口契约测试 `tests/contracts/test_port_contract_sandbox_session_repository.py` 11 维度覆盖
-- [ ] Alembic migration `014_sandbox_sessions.py` 创建（含 4 索引 + UNIQUE container_id）
-- [ ] `composition_root.py` 注册 `sandbox_session_repository` 端口（lifetime=SCOPED，owner="sandbox-team"）
+- [ ] 端口契约测试 `tests/contracts/test_port_contract_sandbox_session_repository.py` **11 维度**覆盖
+- [ ] Alembic migration `014_sandbox_sessions.py` 创建（**`down_revision = "013_schema_validation_records"`** + 4 索引 + UNIQUE container_id + VARCHAR(64) 主键）
+- [ ] `composition_root.py` 注册 `sandbox_session_repository` 端口（**line 102 附近 import + line 821 之后新增 register_port**，lifetime=SCOPED，owner="sandbox-team"）
 
 ### AC-5: AioDockerSandboxAdapter 实现（替换 mock）
 
@@ -568,22 +677,27 @@ class SandboxSessionStarted:
 **When** 实现 `AioDockerSandboxAdapter` 基于 `aiodocker` 真实 Docker daemon 通信
 **Then**
 
-- **路径**：`src/infrastructure/external_services/sandbox/aiodocker_sandbox_adapter.py`（**新增文件**，与既有 mock 文件共存；mock 作为 fallback 用于本地无 Docker 环境）
+- **mock 替换策略**（关键 P1 决策）：
+  - **删除** `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`（mock 不符合生产标准，避免 CLAUDE.md §5 mock 滥用）
+  - 修改 `src/composition_root.py:817` 的 `sandbox_executor` impl 字符串为 `AioDockerSandboxAdapter`
+  - 本地无 Docker 环境：通过 `SISYS_USE_TEST_PORTS=1` 环境变量切换（CLAUDE.md §6 既有约定，不引入 mock fallback）
+- **路径**：`src/infrastructure/external_services/sandbox/aiodocker_sandbox_adapter.py`（**新建文件**）
 - **核心实现**：
   - 构造器接受 `docker_socket: str = "unix:///var/run/docker.sock"` + `max_concurrent: int = 50`
   - `async def start_container(self, session_id, spec: ContainerSpec | None = None)`：
     1. 校验 `session_id` 正则 `^[A-Za-z0-9_-]{1,64}$`（防注入）→ 失败抛 `SandboxConfigurationError` (319)
-    2. 校验并发数（`_running_count < max_concurrent`）→ 超限抛 `SandboxQuotaExceededError` (318)
-    3. 镜像拉取 `await docker.pull(spec.image)` → 失败抛 `SandboxImagePullError` (315)
-    4. 容器启动 `await docker.containers.run(spec.image, ...aiodocker_kwargs)` → 失败抛 `ContainerStartError` (312)
-    5. 保存 `SandboxSession` 到仓储 → `await self._session_repo.save(session)`
-    6. 发布 `SandboxSessionStarted` 事件（双通道）
+    2. 构造容器名 `f"sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}"`（tenant_id 取 UUID 前 8 字符，session_id 截前 32 字符，总长度 ≤ 56 字符 ≤ Docker 64 字符上限）→ 长度超限抛 `SandboxConfigurationError` (319)
+    3. 校验并发数（`_running_count < max_concurrent`）→ 超限抛 `SandboxQuotaExceededError` (318)
+    4. 镜像拉取 `await docker.pull(spec.image)` → 失败抛 `SandboxImagePullError` (315)
+    5. 容器启动 `await docker.containers.run(spec.image, ...aiodocker_kwargs)` → 失败抛 `ContainerStartError` (312)
+    6. 保存 `SandboxSession` 到仓储 → `await self._session_repo.save(session)`
+    7. 发布 `SandboxSessionStarted` 事件（继承 DomainEvent 基类，双通道）
   - `async def execute_code(self, session_id, code, *, timeout_sec=None)`：
     1. `asyncio.wait_for(coro, timeout=timeout_sec)` → 超时抛 `SandboxTimeoutError` (316)
     2. `exec_create` + `exec_start` → 非零退出码 / STDERR 非空抛 `ExecutionError` (313)
     3. OOM kill（exit 137）抛 `SandboxResourceLimitExceededError` (317)
-    4. 更新 `last_activity_at` → `await self._session_repo.save_with_state_version(session, ...)`
-    5. 返回 `dict[str, Any]`（status / output / error / execution_time_ms），**保持 4.1a 既有契约**
+    4. 更新 `last_activity_at` → `await self._session_repo.save(session)`（用 state_version 乐观锁）
+    5. 返回 `dict[str, Any]`（status / output / error / execution_time_ms），**保持 4.1a 既有契约**；强类型化推迟到 4.7
   - `async def stop_container(self, session_id)`：
     1. `docker.containers.get(container_id).delete(force=True)` → 失败抛 `ContainerStopError` (314)
     2. 更新 `SandboxSession.terminated_at` + `state="TERMINATED"`
@@ -600,21 +714,32 @@ class SandboxSessionStarted:
   - `cap_drop=list(spec.cap_drop)`
   - `security_opt=list(spec.security_opt)`
   - `userns_mode=spec.userns_mode`
-  - `name=f"sisys-sandbox-{tenant_id}-{session_id}"`（含 tenant 前缀防冲突）
+  - `name=f"sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}"`（**总长度 ≤ 56 字符**，留 8 字符 buffer 应对 Docker 命名规则）
 - **aiodocker 异常映射**：私有方法 `_map_docker_error(exc, session_id) -> SandboxError`，**不暴露 `str(exc)` 内部实现**
-- **stubs/aiodocker/__init__.pyi**：覆盖 `Docker` / `containers.run` / `containers.get` / `exec_create` / `exec_start` / `containers.delete` 接口面
+- **stubs/aiodocker/__init__.pyi**（PEP 561 stubs）：覆盖以下 9 个 API 面（**注意**：原文档描述只覆盖 6 个，遗漏关键 API 会触发 mypy `attr-defined` 错误）：
+  - `Docker.pull(image)` — 镜像拉取
+  - `Docker.ping()` — daemon 健康检查
+  - `Docker.containers.run(image, **kwargs)` — 容器启动
+  - `Docker.containers.get(container_id)` — 容器查询
+  - `Docker.containers.list(filter=...)` — 孤儿容器扫描
+  - `Docker.containers.delete(force=True)` — 容器删除
+  - `Container.exec_create(cmd, ...)` — 执行命令创建
+  - `Container.exec_start(exec_id, ...)` — 执行命令启动
+  - `Container.stats(stream=False)` — 资源统计（性能基准）
 
 **验证标准/Validation Criteria:**
 
 - [ ] `AioDockerSandboxAdapter` 位于 `src/infrastructure/external_services/sandbox/aiodocker_sandbox_adapter.py`
 - [ ] 实现 `SandboxExecutor` Protocol（既有 4 方法 + 新增 `health_check`）
 - [ ] 5 类异常映射完整（镜像拉取 → 315 / 超时 → 316 / 资源超限 → 317 / 配额 → 318 / 配置 → 319）
-- [ ] 容器名含 tenant 前缀 `sisys-sandbox-{tenant_id}-{session_id}`
+- [ ] 容器名格式统一 `sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}`，总长度 ≤ 56 字符
+- [ ] 旧 `docker_sandbox_adapter.py` mock 文件**已删除**
+- [ ] `composition_root.py:817` impl 字符串已切换至 `AioDockerSandboxAdapter`
 - [ ] `session_id` 正则校验防注入
 - [ ] `execute_code` 通过 `asyncio.wait_for` 实现超时控制
 - [ ] 单元测试覆盖：mock aiodocker.Docker，验证所有方法调用路径 + 异常映射
-- [ ] `stubs/aiodocker/__init__.pyi` 创建（PEP 561）
-- [ ] `pyproject.toml` 新增依赖 `aiodocker = "^0.21.0"`
+- [ ] `stubs/aiodocker/__init__.pyi` 创建（PEP 561，覆盖 9 个 API 面）
+- [ ] `pyproject.toml` **[tool.poetry.dependencies] 主分组** 新增 `aiodocker = "^0.21.0"`
 
 ### AC-6: 30 分钟空闲清理 + 孤儿容器回收
 
@@ -622,61 +747,82 @@ class SandboxSessionStarted:
 **When** 实现空闲 TTL 清理机制
 **Then**
 
+- **重要决策**：**新增独立应用层服务** `SandboxSessionReaper`，**不修改**既有 `SessionNamespaceManager`（4.1a 既有实现无 TTL 机制）
 - **应用层服务**：`src/application/services/sandbox_session_reaper.py`
-  - **核心方法**：`async def reap_idle_sessions(threshold: datetime) -> int`（返回清理数量）
+  - **核心方法**：`async def reap_idle_sessions(threshold: datetime | None = None) -> int`（返回清理数量；`threshold` 默认 `now - settings.SANDBOX_IDLE_TIMEOUT_MINUTES * 60`，避免硬编码 30 分钟）
   - **逻辑**：
-    1. 查询 `list_idle_sessions(threshold=now - 30min)` → 获取空闲会话列表
+    1. 查询 `list_idle_sessions(threshold)` → 获取空闲会话列表
     2. 对每个空闲会话调用 `sandbox.stop_container(session_id)`
     3. 记录清理日志 + 更新 `SandboxSession.state="TERMINATED"`
-    4. 发布 `SandboxSessionTerminated` 事件（reason="idle_timeout"）
-- **孤儿容器回收**：启动时扫描 daemon 上所有 `sisys-sandbox-*` 容器，与本地 `SandboxSession` 仓储对比，差异容器强制清理
-- **不创建新端口**：`sandbox_session_reaper` 是应用层服务，直接通过 `composition_root.py` 注入 `SandboxExecutor` + `SandboxSessionRepository`
-- **注册到 composition_root.py**：`name="sandbox_session_reaper"`（lifetime=SINGLETON，owner="sandbox-team"）
+    4. 发布 `SandboxSessionTerminated` 事件（`metadata={"reason": "idle_timeout"}`）
+- **孤儿容器回收**：启动时扫描 daemon 上所有 `sisys-sandbox-*` 容器（`docker.containers.list(filters={"name": "sisys-sandbox-*"}))`），与本地 `SandboxSession` 仓储对比，差异容器（daemon 有但仓储无）强制清理
+  - **安全边界**：孤儿扫描通配符仅匹配本系统 `sisys-sandbox-` 前缀，**避免误删其他项目容器**
+  - **风险缓解**：同时校验 label `sisys.sandbox.session_id`（启动容器时设置）确保 100% 归属本系统
+- **注册模式**：`sandbox_session_reaper` 作为应用层服务**注册为端口**（与既有 `tool_execution_engine` 模式一致），便于运行时 `resolver.resolve()` 注入调度器
+- **注册到 composition_root.py**：`name="sandbox_session_reaper"`（lifetime=SINGLETON，owner="sandbox-team"，**line 2239 之后新增**）
 
 **验证标准/Validation Criteria:**
 
 - [ ] `SandboxSessionReaper` 位于 `src/application/services/sandbox_session_reaper.py`
-- [ ] `reap_idle_sessions(threshold)` 返回清理数量（int
-- [ ] 启动时孤儿容器清理（`docker ps -a --filter name=sisys-sandbox-*`）
-- [ ] 单元测试覆盖：mock SandboxExecutor + SandboxSessionRepository，验证清理逻辑
-- [ ] 集成测试覆盖：真实 Docker daemon + 模拟 30 分钟空闲（可用 `freezegun` 或缩短 TTL 至测试值）
+- [ ] `reap_idle_sessions(threshold)` 返回清理数量（int），threshold 默认从 settings 读取（**非硬编码**）
+- [ ] 启动时孤儿容器清理（`docker.containers.list(filters={"name": "sisys-sandbox-*"})` + label 校验）
+- [ ] 单元测试覆盖：mock SandboxExecutor + SandboxSessionRepository，验证清理逻辑 + 默认 threshold 行为
+- [ ] 集成测试覆盖：真实 Docker daemon + 模拟 30 分钟空闲（可用 `freezegun` 或通过 settings 缩短 TTL 至测试值）
 - [ ] `composition_root.py` 注册 `sandbox_session_reaper`（lifetime=SINGLETON）
 
-### AC-7: 应用层安全编排（ToolExecutionEngine 装饰器）
+### AC-7: 应用层安全编排（ToolExecutionEngine 包裹器）
 
-**Given** `ToolExecutionEngine` 既有签名 `__init__(self, sandbox: SandboxExecutor)` 必须保持（4.3 装饰器模式经验）
-**When** 实现 `SandboxSecurityDecorator` 包裹 `ToolExecutionEngine`，添加超时 + 重试 + 安全校验
+**Given** `ToolExecutionEngine` 既有签名 `__init__(self, sandbox: SandboxExecutor)` 必须保持（4.3 包裹器模式经验）
+**When** 实现 `SandboxSecurityDecorator`（**包裹类 wrapper**，非 Python `@decorator` 语法）包裹 `ToolExecutionEngine`，添加超时 + 重试 + 安全校验
 **Then**
 
 - **路径**：`src/application/services/sandbox_security_decorator.py`
 - **核心职责**：
-  1. **超时控制**：`asyncio.wait_for(sandbox.execute_code(...), timeout=ContainerSpec.timeout_sec)` → 超时抛 `SandboxTimeoutError` (316)
-  2. **重试机制**：复用 `src/application/services/retry_helpers.py:_call_with_retry`，最大 3 次指数退避（与 or.md 三.3.[3] 一致）
+  1. **超时控制**：`asyncio.wait_for(self.wrapped.sandbox.execute_code(...), timeout=ContainerSpec.timeout_sec)` → 超时抛 `SandboxTimeoutError` (316)
+  2. **重试机制**：复用 `src/application/services/retry_helpers.py:62 _call_with_retry`（4.3 经验抽取），最大 3 次指数退避
   3. **会话配额检查**：执行前校验 `_running_count < MAX_CONCURRENT_CONTAINERS`
   4. **session_id 注入防御**：执行前再次校验 session_id 正则
-  5. **事件发布**：捕获 STDERR 后发布 `SandboxExecutionFailed` 事件（仅失败时）
-- **装饰器模式**（4.3 经验）：**不修改** `ToolExecutionEngine.__init__`，通过 `composition_root.py` 注入装饰器实例
-- **`composition_root.py` 装配**：
+  5. **事件发布**：捕获 STDERR 后发布 `SandboxExecutionFailed` 事件（继承 DomainEvent 基类，仅失败时）
+- **包裹类模式**（4.3 经验）：**不修改** `ToolExecutionEngine.__init__`，通过 `composition_root.py` 注入包裹器实例
+- **`composition_root.py` 装配**（关键 P0-3 修正 — 必须使用 **lambda + `__import__` 延迟加载**模式，保持与既有 `tool_execution_engine:2220-2239` 风格一致，避免破坏 composition_root.py 的 import 时序设计）：
   ```python
   register_port(
       name="tool_execution_engine",
-      impl=lambda resolver: SandboxSecurityDecorator(
-          wrapped=ToolExecutionEngine(...),
+      version="v1.0.0",
+      interface=__import__(
+          "src.application.ports.tool_execution_engine",
+          fromlist=["ToolExecutionEnginePort"],
+      ).ToolExecutionEnginePort,
+      impl=lambda resolver: __import__(
+          "src.application.services.sandbox_security_decorator",
+          fromlist=["SandboxSecurityDecorator"],
+      ).SandboxSecurityDecorator(
+          wrapped=__import__(
+              "src.application.services.tool_execution_engine",
+              fromlist=["ToolExecutionEngine"],
+          ).ToolExecutionEngine(
+              llm_client=resolver.resolve("llm_client"),
+              sandbox=resolver.resolve("sandbox_executor"),
+              tool_execution_repository=resolver.resolve("tool_execution_repository"),
+          ),
           sandbox=resolver.resolve("sandbox_executor"),
-          ...
       ),
-      ...
+      module="src.application.services.sandbox_security_decorator",
+      lifetime=Lifetime.SCOPED,
+      owner="tool-team",
+      tags=("tool", "execution", "engine", "security"),
   )
   ```
 
 **验证标准/Validation Criteria:**
 
-- [ ] `SandboxSecurityDecorator` 位于 `src/application/services/sandbox_security_decorator.py`
-- [ ] **不修改** `ToolExecutionEngine.__init__` 签名（4.3 装饰器经验）
+- [ ] `SandboxSecurityDecorator` 位于 `src/application/services/sandbox_security_decorator.py`（**包裹类，非 `@decorator` 语法**）
+- [ ] **不修改** `ToolExecutionEngine.__init__` 签名（4.3 经验）
 - [ ] 超时控制使用 `asyncio.wait_for`
 - [ ] 重试复用 `_call_with_retry`（最大 3 次指数退避）
 - [ ] 单元测试覆盖：mock SandboxExecutor，验证超时 / 重试 / 配额 / session_id 校验
 - [ ] 集成测试覆盖：真实 Docker daemon + 验证 30s 超时触发
+- [ ] `composition_root.py:2220-2239` 的 `tool_execution_engine` lambda impl **已修改**为嵌套 `SandboxSecurityDecorator`（**注意**：与既有 4.1a 既有 `ToolExecutionEngine` 直接实例化不兼容，需要单独评估向后兼容路径）
 
 ### AC-8: 集成测试（testcontainers-python 真实 Docker daemon）
 
@@ -714,11 +860,11 @@ class SandboxSessionStarted:
 **When** 创建架构验证测试 + 性能基准测试
 **Then**
 
-- **架构验证测试**：`tests/unit/architecture/test_arch_docker_sandbox.py`（epics AC 5 要求路径）
+- **架构验证测试**：`tests/unit/architecture/test_docker_sandbox.py`（**关键 P0-2 修正**：epics_v1.0.md:1204 硬要求此路径，**不带 `_arch_` 前缀**）
   - **域层零依赖**：`poetry run lint-imports` 必须通过（domain 不依赖 aiodocker）
   - **依赖方向矩阵**：`src/domain/` ← `src/application/services/sandbox_security_decorator.py` ← `src/infrastructure/external_services/sandbox/aiodocker_sandbox_adapter.py`
-  - **循环依赖检测**：`ruff --select E` 检测 imports 环
-  - **PortSpec 元数据完整性**：`sandbox_executor` / `sandbox_session_repository` / `sandbox_session_reaper` 三个端口的 7 字段（name/version/interface/impl/lifetime/owner/tags）
+  - **循环依赖检测**：复用既有 `lint-imports`（基于 importlinter）+ `from __future__ import annotations` + AST 静态分析脚本（**注意**：ruff 的 E 规则**不包含**循环依赖检测能力，不能仅用 ruff --select E）
+  - **PortSpec 元数据完整性**（关键 P1-1 修正）：3 个端口（`sandbox_executor` / `sandbox_session_repository` / `sandbox_session_reaper`）的 **10 字段**完整性（`name / version / interface / impl / module / lifetime / owner / compatibility / tags / deprecated`）
   - **异常代码唯一性**：EXCEPTION_315~319 与既有代码无碰撞
 - **性能基准测试**：`tests/integration/test_performance_docker_sandbox.py`
   - **启动延迟**：连续启动 20 个容器，P95 < 5s（使用 `pytest-benchmark`）
@@ -728,8 +874,8 @@ class SandboxSessionStarted:
 
 **验证标准/Validation Criteria:**
 
-- [ ] `tests/unit/architecture/test_docker_sandbox.py`（epics AC 5 要求路径）
-- [ ] 4 项架构验证规则全部通过（域层零依赖 + 依赖方向 + 无循环 + PortSpec 元数据）
+- [ ] `tests/unit/architecture/test_docker_sandbox.py`（**epics AC 5 硬要求路径，无 `_arch_` 前缀**）
+- [ ] 4 项架构验证规则全部通过（域层零依赖 + 依赖方向 + 无循环 + PortSpec 10 字段元数据）
 - [ ] 性能基准测试 P95 < 5s（启动延迟）
 - [ ] 并发 ≥ 10 通过
 - [ ] 沙箱逃逸测试 0 次逃逸
@@ -743,7 +889,7 @@ class SandboxSessionStarted:
 **Then**
 
 - **Feature 文件**：`tests/acceptance/test_acceptance_docker_sandbox.feature`
-  - `# language: zh-CN`
+  - `# language: zh-CN`（**沿用项目既有约定**：所有 10+ 个既有 feature 文件均使用中文 Gherkin 关键字）
   - **核心场景**（覆盖 Happy Path + Edge Cases）：
     1. **场景 1 — Happy Path**：启动容器 → 执行 Python 代码 → 停止容器，验证执行结果
     2. **场景 2 — 网络隔离**：默认配置下执行网络访问代码，验证连接失败
@@ -754,18 +900,28 @@ class SandboxSessionStarted:
     7. **场景 7 — 30 分钟空闲清理**：创建空闲会话，等待 TTL 触发清理
 - **BDD step 文件**：`tests/acceptance/test_acceptance_docker_sandbox.py`
   - 使用 pytest-bdd（`scenarios()` 批量绑定）
-  - **禁止** `@pytest.mark.asyncio`（CLAUDE.md §5）
-  - async 调用通过 `event_loop.run_until_complete(coro)` 模式
+  - **统一使用 pytest-asyncio auto 模式**（**关键 P0-4 修正**：项目 `pyproject.toml` 已配置 `asyncio_mode = "auto"` + `pytest-asyncio = "^0.24.0"` + `pytest-bdd = "^8.0.0"`，统一使用 modern 模式，避免 `event_loop.run_until_complete()` 旧模式与 pytest-bdd 8.x 不兼容）
+  - step 函数示例：
+    ```python
+    from pytest_bdd import scenarios, given, when, then
+
+    scenarios("./test_acceptance_docker_sandbox.feature")
+
+    @given("启动沙箱会话")
+    async def start_session(context: dict, docker_daemon: DockerClient) -> None:
+        context["session_id"] = "test-session-001"
+        # 真实 Docker daemon 调用
+        ...
+    ```
   - context 通过 `context: dict[str, Any]` 跨步骤传递
   - 使用真实 Docker daemon（`pytest.skip()` 若不可用，**禁止 mock**）
 
 **验证标准/Validation Criteria:**
 
 - [ ] `tests/acceptance/test_acceptance_docker_sandbox.feature` 包含 7 项场景
-- [ ] Gherkin 关键字使用中文（`功能:` / `场景:` / `假如` / `当` / `那么` / `并且`）
+- [ ] Gherkin 关键字使用中文（`功能:` / `场景:` / `假如` / `当` / `那么` / `并且`，**沿用项目既有约定**）
 - [ ] `tests/acceptance/test_acceptance_docker_sandbox.py` 实现所有 step 函数
-- [ ] **禁止** `@pytest.mark.asyncio` 装饰 step 函数
-- [ ] async step 通过 `event_loop.run_until_complete(coro)` 执行
+- [ ] step 函数使用 `async def` + pytest-asyncio auto 模式（**不**使用 `@pytest.mark.asyncio`，**不**使用 `event_loop.run_until_complete()` 旧模式）
 - [ ] **禁止 mock**（CLAUDE.md §5 验收测试真实服务原则）
 - [ ] 7 项场景全部通过（包含异常路径）
 
@@ -863,9 +1019,9 @@ class SandboxSessionStarted:
 
 **BDD 步骤实现约束：**
 
-- 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试
+- **统一使用 pytest-asyncio auto 模式**：项目 `pyproject.toml` 已配置 `asyncio_mode = "auto"` + `pytest-asyncio = "^0.24.0"` + `pytest-bdd = "^8.0.0"`，step 函数直接使用 `async def` + `@given/@when/@then` 装饰器即可，无需 `@pytest.mark.asyncio`
+- **禁用旧模式**：不使用 `event_loop.run_until_complete()` 模式（与 pytest-bdd 8.x + pytest-asyncio 1.x 不兼容）
 - 同一中文文本可能需要同时支持 given/when 装饰器
-- **禁止** `@pytest.mark.asyncio`（会导致 context data 丢失）
 - **Edge Cases 必须包含异常路径** — 至少覆盖：资源不存在（404 → 容器未启动 404）、权限不足（403 → 配置错误 403）、资源冲突（409 → 并发配额 503），响应体验证 `error.code` + `error.message` + `request_id`
 
 **Task 0 完成标志：**
@@ -912,7 +1068,7 @@ class SandboxSessionStarted:
 | **TDD 契约测试** | `SandboxSessionRepositoryPort` | 11 维度 | `tests/contracts/test_port_contract_sandbox_session_repository.py` | Task 2 |
 | **TDD 契约测试** | `SandboxEvents` | 字段必填 + 序列化 + 通道双投递 | `tests/contracts/test_event_contract_sandbox_events.py` | Task 0 |
 | **TDD 契约测试** | `ContainerSpec` 值对象 | 不变量校验 | `tests/contracts/test_value_object_contract_container_spec.py` | Task 1 |
-| **SDD 架构验证** | 域层零依赖 + 依赖方向 + 端口元数据 | 4 项规则 | `tests/unit/architecture/test_arch_docker_sandbox.py` | Task 9 |
+| **SDD 架构验证** | 域层零依赖 + 依赖方向 + 端口元数据 | 4 项规则 | `tests/unit/architecture/test_docker_sandbox.py`（epics AC 5 硬要求） | Task 9 |
 | **集成测试** | testcontainers-python 真实 Docker daemon | 7 项场景（启动 / 网络 / 资源 / 只读 / pids / 逃逸 / 并发） | `tests/integration/test_docker_sandbox_integration.py` | Task 8 |
 | **性能基准** | 启动延迟 P95 < 5s + 并发 ≥ 10 + 沙箱逃逸 0 | 3 项基准 | `tests/integration/test_performance_docker_sandbox.py` | Task 9 |
 | **TDD 验收测试** | Gherkin 7 项场景 | Happy Path + Edge Cases | `tests/acceptance/test_acceptance_docker_sandbox.feature` + `.py` | Task 0 + Task 10 |
@@ -947,11 +1103,11 @@ class SandboxSessionStarted:
 
 | 约束类型 | 规则 | 违反后果 |
 |---------|------|---------|
-| **容器命名** | 容器名含 TestTenant UUID 前缀（`sisys-sandbox-{tenant_id}-{session_id}`，tenant_id 含 uuid 前缀） | 容器冲突 / 误删其他测试容器 |
+| **容器命名** | 容器名含 TestTenant UUID 前缀（`sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}`，tenant_id 含 uuid 前缀） | 容器冲突 / 误删其他测试容器 |
 | **容器清理** | testcontainers-python 上下文管理器自动清理（**禁止** `docker rm -f`） | 孤儿容器污染 daemon |
 | **Schema 隔离** | `sandbox_sessions` 表按 tenant_id 隔离 + savepoint rollback | 数据污染 |
 | **asyncio 上下文** | `asyncio.Lock` 类变量；处理 thread.ident 为 None | 锁失效 |
-| **BDD async 配合** | BDD 步骤函数不用 `@pytest.mark.asyncio`，用 `event_loop.run_until_complete()` | context 数据丢失 |
+| **BDD async 配合** | BDD 步骤函数使用 pytest-asyncio auto 模式（`async def`），**禁止** `@pytest.mark.asyncio` + 旧 `event_loop.run_until_complete()` | context 数据丢失 / 模式冲突 |
 | **外部服务隔离** | Docker daemon 测试用 testcontainers；CI runner 需预装 Docker | 测试失败 |
 | **动态跳过** | Docker daemon 不可用时 `pytest.skip()` | 写死 `@pytest.mark.skip` 导致无 Daemon 环境永远失败 |
 
@@ -985,7 +1141,7 @@ class SandboxSessionStarted:
 | AC-6 | 30 分钟空闲清理 + 孤儿容器回收 | Task 6 | 6.1 - 6.3 | `test_sandbox_session_reaper.py` |
 | AC-7 | SandboxSecurityDecorator 应用层 | Task 7 | 7.1 - 7.4 | `test_sandbox_security_decorator.py` |
 | AC-8 | 集成测试（testcontainers） | Task 8 | 8.1 - 8.4 | `test_docker_sandbox_integration.py` |
-| AC-9 | 性能 + 安全架构验证测试 | Task 9 | 9.1 - 9.3 | `test_arch_docker_sandbox.py` / `test_performance_docker_sandbox.py` |
+| AC-9 | 性能 + 安全架构验证测试 | Task 9 | 9.1 - 9.3 | `test_docker_sandbox.py` / `test_performance_docker_sandbox.py` |
 | AC-10 | BDD 验收测试（Gherkin 中文） | Task 0 + Task 10 | 0.5 + 10.1 - 10.3 | `test_acceptance_docker_sandbox.feature` / `.py` |
 
 ---
@@ -1023,24 +1179,24 @@ class SandboxSessionStarted:
 
 **关联 AC:** AC-1
 
-> **职责：** 单一职责，**仅**定义不可变容器规格值对象 + 7 项不变量校验。
+> **职责：** 单一职责，**仅**定义不可变容器规格值对象 + 6 项不变量校验。
 
 #### TDD 循环 [A]：`ContainerSpec` 值对象
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/value_objects/test_container_spec.py`（14 字段 + 7 项不变量失败测试） |
+| 🔴 红 | 编写 `tests/unit/domain/value_objects/test_container_spec.py`（13 字段 + 6 项不变量失败测试） |
 | 🟢 绿 | 实现 `ContainerSpec` 最小代码（`@dataclass(frozen=True)` + `__post_init__`） |
 | 🔄 重构 | 优化不变量校验（提取 `_validate_field()` 私有方法，提升可读性） |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 `ContainerSpec` 失败测试（14 字段 + 7 项不变量）
+- [ ] Subtask 1.1: 🔴 红 — 编写 `ContainerSpec` 失败测试（**13 字段** + **6 项**不变量）
 - [ ] Subtask 1.2: 🟢 绿 — 实现 `ContainerSpec` 最小代码
 - [ ] Subtask 1.3: 🔄 重构 — 优化不变量校验代码
 - [ ] Subtask 1.4: 契约测试 `tests/contracts/test_value_object_contract_container_spec.py` 通过
 
 **完成标准/Definition of Done:**
 
-- [ ] `ContainerSpec` 实现完成（14 字段 + 7 项不变量）
+- [ ] `ContainerSpec` 实现完成（**13 字段** + **6 项**不变量）
 - [ ] TDD 循环全部通过
 - [ ] 域层覆盖率 ≥ 90%
 - [ ] 域层零依赖验证通过（`poetry run lint-imports`）
@@ -1077,7 +1233,7 @@ class SandboxSessionStarted:
 - [ ] Subtask 2.5: 🟢 绿 — 实现 Repository 端口 + InMemory 实现
 - [ ] Subtask 2.6: 🔄 重构 — 优化并发安全
 - [ ] Subtask 2.7: 契约测试 `tests/contracts/test_port_contract_sandbox_session_repository.py` 11 维度
-- [ ] Subtask 2.8: Alembic migration `014_sandbox_sessions.py`（4 索引 + UNIQUE container_id）
+- [ ] Subtask 2.8: Alembic migration `014_sandbox_sessions.py`（**`down_revision = "013_schema_validation_records"`** + 4 索引 + UNIQUE container_id + `session_id VARCHAR(64) PRIMARY KEY`）
 
 **完成标准/Definition of Done:**
 
@@ -1122,7 +1278,7 @@ class SandboxSessionStarted:
 
 **关联 AC:** AC-3
 
-> **职责：** 扩展既有 `SandboxExecutor` Protocol，保持 4.1a 既有签名 + 新增可选参数 + 新增 `health_check()` 方法。
+> **职责：** 扩展既有 `SandboxExecutor` Protocol，保持 4.1a 既有 4 方法**调用行为**（默认参数扩展，`inspect.signature()` 反映但既有调用点零修改）+ 通过默认参数扩展入参 + 新增 `health_check()` 方法。
 
 #### TDD 循环 [A]：Protocol 向后兼容扩展
 
@@ -1135,13 +1291,13 @@ class SandboxSessionStarted:
 - [ ] Subtask 4.1: 🔴 红 — 编写 Protocol 扩展失败测试
 - [ ] Subtask 4.2: 🟢 绿 — 扩展 Protocol（默认参数 + health_check）
 - [ ] Subtask 4.3: 🔄 重构 — 优化 Protocol docstring
-- [ ] Subtask 4.4: 契约测试 `tests/contracts/test_port_contract_sandbox_executor.py` 扩展 11 维度 + 向后兼容验证
+- [ ] Subtask 4.4: 契约测试 `tests/contracts/test_port_contract_sandbox_executor.py` **从既有 8 维度扩展至 11 维度**（新增 port_version / port_owner / port_module）+ 向后兼容验证
 
 **完成标准/Definition of Done:**
 
 - [ ] `SandboxExecutor` Protocol 向后兼容扩展完成
-- [ ] 4 个既有方法签名**完全保持不变**
-- [ ] 既有契约测试 + 既有单元测试**全部通过**（不修改既有测试代码）
+- [ ] 4 个既有方法**调用行为保持不变**（默认参数扩展，`inspect.signature()` 反映但既有调用点零修改）
+- [ ] 既有契约测试 8 维度 + 既有单元测试**全部通过**（不修改既有测试代码）
 - [ ] 域层零依赖验证通过
 
 ---
