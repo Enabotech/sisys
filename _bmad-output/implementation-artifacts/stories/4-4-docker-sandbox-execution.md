@@ -897,29 +897,72 @@ class SandboxSessionStarted(DomainEvent):
 **Then**
 
 - **Feature 文件**：`tests/acceptance/test_acceptance_docker_sandbox.feature`
-  - `# language: zh-CN`（**沿用项目既有约定**：所有 10+ 个既有 feature 文件均使用中文 Gherkin 关键字）
-  - **核心场景**（覆盖 Happy Path + Edge Cases）：
-    1. **场景 1 — Happy Path**：启动容器 → 执行 Python 代码 → 停止容器，验证执行结果
-    2. **场景 2 — 网络隔离**：默认配置下执行网络访问代码，验证连接失败
-    3. **场景 3 — 资源限制**：执行内存密集型代码，验证 OOM kill + `SandboxResourceLimitExceededError`
-    4. **场景 4 — 超时控制**：执行长时间运行代码，验证 `SandboxTimeoutError`
-    5. **场景 5 — 镜像拉取失败**：使用不存在 digest，验证 `SandboxImagePullError`
-    6. **场景 6 — 并发配额**：启动超出配额容器数，验证 `SandboxQuotaExceededError`
-    7. **场景 7 — 30 分钟空闲清理**：创建空闲会话，等待 TTL 触发清理
-- **BDD step 文件**：`tests/acceptance/test_acceptance_docker_sandbox.py`
-  - 使用 pytest-bdd（`scenarios()` 批量绑定）
-  - **Step 函数形态**：**同步 `def`**（不是 `async def`）— pytest-bdd 8.x 限制
-  - **异步代码调度**：通过 `event_loop.run_until_complete(coro)` 驱动（项目 52/52 acceptance 文件模式）
-    - 推荐 Pattern A：自建 module 级 `event_loop` fixture + `_run_async()` helper（参考 `test_acceptance_strategic_tool_impl.py:424-430`）
-    - 或 Pattern B：直接消费 pytest-asyncio 内建 `event_loop` fixture
-  - **step 函数示例**（同步 def + 异步调度）：
-    ```python
-    import asyncio
-    from typing import Any
-    import pytest
-    from pytest_bdd import scenarios, given, when, then
 
-    scenarios("./test_acceptance_docker_sandbox.feature")
+  - 文件结构对齐 `test_acceptance_strategic_tool_impl.feature:1-134` + `test_acceptance_tool_io_schema_validation.feature:1-9` 样板：
+    - 第 1 行：`# language: zh-CN`
+    - 第 2 行：Story 注释（如 `# Story 4.4 — Docker 沙箱执行(BDD 验收场景,完整覆盖 10 条 AC)`）
+    - `功能:` 三段式段落（角色 + 需求 + 目的）
+    - `背景:` 段落（共用前置条件）
+    - 按 AC 编号分组（`# ====` 注释分隔）
+    - **场景命名规范**：`场景: AC-N.M - 中文细分描述`（**对齐 4.1a `AC-1a` 与 4.3 `AC-1.1` 样板**）
+    - **异常断言双行**：场景 `那么 抛出 XXX异常` + `并且 错误码为 EXCEPTION_xxx`
+  - **场景清单**（**完整覆盖 AC-1 ~ AC-10**，对齐 4.1a 5 个 AC + 4.3 8 个 AC 的组织密度）：
+    - **场景组 1: AC-1 ContainerSpec 值对象 + 不变量校验**（6 项不变量场景）
+      - AC-1.1 ~ AC-1.6: 13 字段构造成功 / 6 项不变量失败 / 默认值验证 / 网络模式 / image 正则 / 不可变冻结
+    - **场景组 2: AC-2 5 个新沙箱异常 EXCEPTION_315~319**（5 项异常构造场景）
+      - AC-2.1: `SandboxImagePullError` code == `EXCEPTION_315`
+      - AC-2.2: `SandboxTimeoutError` code == `EXCEPTION_316` + context.timeout_sec
+      - AC-2.3: `SandboxResourceLimitExceededError` code == `EXCEPTION_317` + limit_type="mem"
+      - AC-2.4: `SandboxQuotaExceededError` code == `EXCEPTION_318` + current_count/max_count
+      - AC-2.5: `SandboxConfigurationError` code == `EXCEPTION_319` + field_name
+      - AC-2.6: HTTP 映射（502 / 504 / 503 / 502 / 502）
+    - **场景组 3: AC-3 SandboxExecutor 端口向后兼容扩展**
+      - AC-3.1 ~ AC-3.5: 4 个既有方法签名 + 默认参数 + 新增 `health_check()` + runtime_checkable
+    - **场景组 4: AC-4 SandboxSession + Repository**（场景密度参考 4.1a AC-5）
+      - AC-4.1 ~ AC-4.4: 10 字段构造 / session_id 正则校验 / Repository CRUD / Alembic migration 014
+    - **场景组 5: AC-5 AioDockerSandboxAdapter 实现**（核心安全场景）
+      - AC-5.1: Happy Path 启动 → 执行 → 停止
+      - AC-5.2: 网络隔离（`network_mode=none`）
+      - AC-5.3: 资源限制（OOM kill）
+      - AC-5.4: 只读文件系统
+      - AC-5.5: 进程数限制
+      - AC-5.6: 沙箱逃逸 0 次
+    - **场景组 6: AC-6 30 分钟空闲清理 + 孤儿容器回收**
+      - AC-6.1 ~ AC-6.3: TTL 清理 / 孤儿扫描 / `SandboxSessionReaper.reap_idle_sessions()` 验证
+    - **场景组 7: AC-7 SandboxSecurityDecorator 包裹类**
+      - AC-7.1 ~ AC-7.4: 4 项防护（超时 / 重试 / 配额 / session_id 注入防御）+ 不修改 `ToolExecutionEngine.__init__`
+    - **场景组 8: AC-8 集成测试**（testcontainers 真实 Docker daemon）
+      - AC-8.1 ~ AC-8.4: 启动延迟 P95 < 5s / 并发 ≥ 10 / 沙箱逃逸 0 / testcontainers 自动清理
+    - **场景组 9: AC-9 性能 + 安全架构验证**
+      - AC-9.1 ~ AC-9.3: 性能基准 / 域层零依赖 / PortSpec 10 字段元数据
+    - **场景组 10: AC-10 端口注册**（对齐 4.1a AC-5）
+      - AC-10.1: 3 个新端口已注册（sandbox_executor / sandbox_session_repository / sandbox_session_reaper）
+      - AC-10.2: 端口元数据完整（10 字段：name/version/interface/impl/module/lifetime/owner/compatibility/tags/deprecated）
+
+- **BDD step 文件**：`tests/acceptance/test_acceptance_docker_sandbox.py`
+
+  - 文件结构对齐 `test_acceptance_strategic_tool_impl.py:1-130` 样板：
+    - 文件头 docstring 说明样板 + **6 项关键约定**（**关键**：对齐 4.1a 样板）：
+      1. 步骤函数使用 `@given / @when / @then` 装饰器 + `context: dict[str, Any]` fixture
+      2. 使用**真实服务实例**：`InMemorySandboxSessionRepository` + 真实 `AioDockerSandboxAdapter`（**禁止 mock**，CLAUDE.md §5 红线）
+      3. 步骤**严格按 AC 顺序**（AC-1 ~ AC-10），`# ====` 分隔
+      4. 异常处理：使用 `try/except` 捕获到 `context["query_error"]`，Then 步骤断言 `isinstance + error.code`
+      5. **禁止 mock** 核心域服务（CLAUDE.md §5 红线）；仅允许 mock 端口适配器（与 4.1a 样板一致）
+      6. Docker daemon 不可用时使用 `pytest.skip()` 动态跳过（**禁止**写死 `@pytest.mark.skip`）
+    - `from __future__ import annotations`
+    - 标准库 + pytest + pytest_bdd + domain/infrastructure import
+    - `scenarios("test_acceptance_docker_sandbox.feature")` 一行加载
+  - **共享 fixtures**：
+    ```python
+    @pytest.fixture
+    def context() -> dict[str, Any]:
+        """BDD 步骤间共享状态容器。"""
+        return {}
+
+    @pytest.fixture
+    def sandbox_session_repository() -> InMemorySandboxSessionRepository:
+        """真实 InMemory 沙箱会话仓储（CLAUDE.md §5 真实服务原则）。"""
+        return InMemorySandboxSessionRepository()
 
     @pytest.fixture(scope="module")
     def event_loop():
@@ -929,34 +972,58 @@ class SandboxSessionStarted(DomainEvent):
         loop.close()
 
     def _run_async(coro: Any) -> Any:
-        """同步调度异步协程。"""
+        """同步调度异步协程（参考 test_acceptance_strategic_tool_impl.py:424-430）。"""
         loop = asyncio.new_event_loop()
         try:
             return loop.run_until_complete(coro)
         finally:
             loop.close()
 
-    @given("启动沙箱会话")
-    def start_session(context: dict[str, Any], event_loop: Any) -> None:
-        async def _start() -> None:
-            context["session_id"] = "test-session-001"
-            # 真实 Docker daemon 调用
-            ...
-        _run_async(_start())
+    def _make_sandbox_adapter() -> AioDockerSandboxAdapter:
+        """构造真实 AioDockerSandboxAdapter（连接真实 Docker daemon）。"""
+        # 动态跳过: 若 Docker daemon 不可用, pytest.skip()
+        ...
+    ```
+  - **`@pytest.mark.asyncio` 禁止用于 step 函数**（CLAUDE.md §5 红线 + Story 4.3 commit `099423f1` 经验）
+  - **Step 函数形态**：**同步 `def`**（不是 `async def`）— pytest-bdd 8.x 限制（项目 52/52 acceptance 文件遵循）
+  - **异步代码调度**：通过 `event_loop.run_until_complete(coro)` 驱动（参考 `test_acceptance_strategic_tool_impl.py:424-430` 样板）
+  - **异常断言模式**（对齐 4.1a 样板 `test_acceptance_strategic_tool_impl.py`）：
+    ```python
+    @when("构造 ContainerSpec 内存限制 2049MB")
+    def when_construct_container_spec_invalid(context: dict[str, Any]) -> None:
+        try:
+            ContainerSpec(image="python:3.11-slim@sha256:xxx", mem_limit_mb=2049)
+            context["query_error"] = None
+        except EntityValidationError as e:
+            context["query_error"] = e
+
+    @then("抛出 EntityValidationError")
+    def then_entity_validation_error(context: dict[str, Any]) -> None:
+        assert context["query_error"] is not None
+        assert isinstance(context["query_error"], EntityValidationError)
+
+    @then("错误码为 EXCEPTION_242")
+    def then_error_code_242(context: dict[str, Any]) -> None:
+        assert context["query_error"].code == "EXCEPTION_242"
     ```
   - context 通过 `context: dict[str, Any]` 跨步骤传递
   - 使用真实 Docker daemon（`pytest.skip()` 若不可用，**禁止 mock**）
-  - **`@pytest.mark.asyncio` 禁止用于 step 函数**（CLAUDE.md §5 红线 + Story 4.3 commit `099423f1` 经验）
 
 **验证标准/Validation Criteria:**
 
-- [ ] `tests/acceptance/test_acceptance_docker_sandbox.feature` 包含 7 项场景
+- [ ] `tests/acceptance/test_acceptance_docker_sandbox.feature` 第 1 行 `# language: zh-CN` + 第 2 行 Story 注释
+- [ ] Feature 文件包含 **功能:** 三段式（角色 + 需求 + 目的）+ **背景:** 前置条件
+- [ ] Feature 文件**完整覆盖 10 个 AC 分组**（AC-1 ~ AC-10，每组 ≥ 1 子场景）
+- [ ] 场景命名规范：`场景: AC-N.M - 中文细分描述`（**对齐 4.1a `AC-1a` 与 4.3 `AC-1.1` 样板**）
+- [ ] 异常场景双断言：`那么 抛出 XXX异常` + `并且 错误码为 EXCEPTION_xxx`
 - [ ] Gherkin 关键字使用中文（`功能:` / `场景:` / `假如` / `当` / `那么` / `并且`，**沿用项目既有约定**）
-- [ ] `tests/acceptance/test_acceptance_docker_sandbox.py` 实现所有 step 函数
+- [ ] `tests/acceptance/test_acceptance_docker_sandbox.py` 实现所有 step 函数 + 文件头 docstring **6 项关键约定**
 - [ ] step 函数使用 **同步 `def`**（不是 `async def`），通过 `event_loop.run_until_complete()` 调度异步代码（**关键**：对齐 `test_acceptance_strategic_tool_impl.py:424-430` 样板）
 - [ ] **`@pytest.mark.asyncio` 禁止用于 step 函数**（CLAUDE.md §5 红线）
-- [ ] **禁止 mock**（CLAUDE.md §5 验收测试真实服务原则）
-- [ ] 7 项场景全部通过（包含异常路径）
+- [ ] **异常断言模式**：try/except + `context["query_error"]` + `isinstance + error.code`（对齐 4.1a 样板）
+- [ ] **禁止 mock** 核心域服务（CLAUDE.md §5 红线）；仅允许 mock 端口适配器（对齐 4.1a 样板）
+- [ ] Docker daemon 不可用时 `pytest.skip()`（**禁止**写死 `@pytest.mark.skip`）
+- [ ] 全部场景通过（Happy Path + 异常路径 + 端口注册 + 性能基准）
 
 ---
 
