@@ -12,7 +12,7 @@
 
 **As a** 安全工程师,
 **I want** 系统在 Docker 沙箱中执行工具代码，网络隔离 + 权限最小化 + 资源限制,
-**So that** 防止 LLM 生成代码执行带来的安全风险（数据泄露 / 主机入侵 / 资源耗尽），并支撑 Epic 4 的 Validation Feedback 闭环（Story 4.7）与 Skills 数据采集基础设施（Story 4.1b）。
+**So that** 防止 LLM 生成代码执行带来的安全风险（数据泄露 / 主机入侵 / 资源耗尽），并支撑 Epic 4 的 Validation Feedback 闭环（Story 4.7）与 Skills 数据采集基础设施（Story **4.1c**，**注**：原文档误标 4.1b，实际 sprint-status.yaml 中 4-1b 是 skills-feat-enhancement）。
 
 ### 业务价值
 
@@ -29,7 +29,7 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 4: 战略工具箱，FR-ST-04
 **前置依赖:** Story 4.1a（✅ done，ToolExecutionEngine 已注入 `SandboxExecutor` mock）/ Story 1.7（✅ done，L4 MinIO 对象层）/ Story 1.18a（✅ done，Prefect 工作流引擎）
-**后续依赖:** Story 4.1b（Skills 数据采集基础设施，依赖 4.4 提供安全执行）/ Story 4.7（Validation Feedback 闭环增强，依赖 4.4 捕获 STDERR）
+**后续依赖:** Story **4.1c**（Skills 数据采集基础设施，依赖 4.4 提供安全执行，**注**：原文档误标 4.1b）/ Story 4.7（Validation Feedback 闭环增强，依赖 4.4 捕获 STDERR）
 
 ### ⚠️ Story 范围澄清（重要）
 
@@ -47,7 +47,7 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 
 **不在本 Story 范围（拆分到其他 Story）：**
 
-- **gVisor 用户空间内核隔离**（更高安全等级）→ 后续 Epic 18 Story 18.1（`epics_v1.0.md:589`，P2 非 MVP，`prd.md:1828` FR-ST-10）
+- **gVisor 用户空间内核隔离**（更高安全等级）→ 后续 Epic 18 Story 18.1（`epics_v1.0.md:589`，P2 非 MVP，`prd.md:1828` FR-ST-10；非 MVP，本 Story 不涉及）
 - **跨工具链共享 Jupyter Kernel**（持久化变量）→ 后续 Story（`or.md:232` 三.3.[2]），当前仅做"30 分钟空闲销毁"
 - **白名单网关代理服务**（可信财经 API 访问通道）→ 后续基础设施 Story；本 Story `ContainerSpec.network_mode` 写死为 `"none"`（**删除 `network_whitelist` 字段**，遵循 CLAUDE.md §2 Simplicity First）
 - **资源配额按租户维度控制**（多租户公平调度）→ Story 4.7（Validation Feedback 闭环增强）评估
@@ -515,7 +515,7 @@ class SandboxSessionStarted(DomainEvent):
 | 估算工作量 | **25-35 人天**（含 5 项 Checklist 异常体系 + aiodocker 集成 + 11 维度端口契约测试（含既有 8→11 维度扩展）+ ContainerSpec 13 字段不变量 + 30 分钟 TTL 清理 + Seccomp profile 配置 + testcontainers 集成测试 + 架构验证测试 + alembic migration 014 + BDD 验收 +30% 缓冲） |
 | 覆盖 FR | FR-ST-04（Docker 沙箱执行）/ FR-ST-07（Validation Feedback 闭环前置） |
 | 前置 Story | 4-1a-strategic-tool-impl（✅ done）/ 1-7-minio-object-layer（✅ done）/ 1-18a-prefect-workflow-integration（✅ done） |
-| 后续 Story | 4-1b-skills-data-collection-integration / 4-7-validation-feedback-loop |
+| 后续 Story | **4-1c-skills-data-collection-integration**（**注**：原文档误标 4-1b，实际 sprint-status.yaml 中 4-1b 是 skills-feat-enhancement，4-1c 才是数据采集集成） / 4-7-validation-feedback-loop |
 
 ---
 
@@ -1766,7 +1766,7 @@ class SandboxSessionStarted(DomainEvent):
 | **优先级** | P0（Epic 4 战略工具箱核心安全能力） |
 | **覆盖 FR** | FR-ST-04（Docker 沙箱执行，MVP P0）/ FR-ST-07（Validation Feedback 闭环前置） |
 | **前置 Story** | 4-1a-strategic-tool-impl（✅ done）/ 1-7-minio-object-layer（✅ done）/ 1-18a-prefect-workflow-integration（✅ done） |
-| **后续 Story** | 4-1b-skills-data-collection-integration / 4-7-validation-feedback-loop |
+| **后续 Story** | **4-1c-skills-data-collection-integration**（**注**：原文档误标 4-1b，详见 sprint-status.yaml 修正） / 4-7-validation-feedback-loop |
 
 ### 完成总结 Completion Summary
 
