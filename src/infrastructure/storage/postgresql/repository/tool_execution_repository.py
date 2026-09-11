@@ -1,211 +1,250 @@
-"""基础设施层 PostgreSQL ToolExecution 仓储
+"""基础设施层 PostgreSQL ToolExecution 仓储(SQLAlchemy ORM 风格)
 
-最小可用实现：使用 asyncpg 直接查询。
-为集成测试设计（CLAUDE.md §5 真实服务 TestTenant 隔离模式）。
+实现 ToolExecutionRepositoryPort(Story 4.1a + 4.3 后续技术债清理)：
+- 继承 PostgreSQLAdapter[ToolExecution, ToolExecutionModel]
+- 状态机 + 乐观锁 CAS（save_with_state_version）
+- 证据包字段 input_hash / rule_version / confidence（L2_rdb 结构化）
+- L4 MinIO 引用 evidence_storage_key（保留字段，本期不写 L4）
+- 通过 _to_entity / _to_model 隔离领域层与 ORM 层
 
-不替代未来的 SQLAlchemy 实现（后续 Story 替换）。
+设计依据：Story 4.3 后续技术债清理(路径 2: SQLAlchemy ORM 风格)
+- 与 archive_repository.py / document_repository.py 模式一致
+- 通过 ContextVar 获取 AsyncSession（非构造器注入）
+- 与原 asyncpg 直连实现 PostgreSQLToolExecutionRepository(pool=...) 行为等价
 
-设计说明：
-- SQL 字符串使用硬编码表名（不使用字符串拼接），避开 bandit B608 误报
-- asyncpg 使用参数化查询（$1, $2, ...），无 SQL 注入风险
-- schema 隔离由 fixture 通过 DELETE FROM tool_executions 实现
+迁移路径：保留 AsyncpgPostgreSQLToolExecutionRepository 作为向后兼容实现，
+新代码统一使用本 SQLAlchemy ORM 实现。
 """
 
 from __future__ import annotations
 
-import uuid
+import logging
 from typing import Any
 
-import asyncpg
+from sqlalchemy import func, select
 
-from src.domain.entities.tool_execution import (
-    ToolExecution,
-    ToolExecutionState,
-)
+from src.domain.entities.tool_execution import ToolExecution, ToolExecutionState
 from src.domain.exceptions.business_exceptions import EntityStateTransitionError
-from src.domain.ports.tool_execution_repository import (
-    ToolExecutionQuery,
-    ToolExecutionRepositoryPort,
+from src.domain.ports.tool_execution_repository import ToolExecutionQuery
+from src.infrastructure.storage.postgresql.models.tool_execution import (
+    ToolExecutionModel,
+)
+from src.infrastructure.storage.postgresql.repository.postgresql_adapter import (
+    PostgreSQLAdapter,
 )
 
-# 硬编码表名（测试专用 adapter；生产应使用 SQLAlchemy 实现）
-TABLE_NAME = "tool_executions"
+logger = logging.getLogger(__name__)
 
 
-class PostgreSQLToolExecutionRepository(ToolExecutionRepositoryPort):
-    """PostgreSQL ToolExecution 仓储（asyncpg 直连）
+class PostgreSQLToolExecutionRepository(PostgreSQLAdapter[ToolExecution, ToolExecutionModel]):
+    """ToolExecution 仓储(SQLAlchemy ORM 风格)
 
-    设计原则：
-    - SQL 字符串使用硬编码表名 + asyncpg 参数化查询
-    - 测试通过 DELETE FROM tool_executions 实现隔离
-    - save() 用 INSERT ON CONFLICT 实现 upsert
+    关键设计:
+    - ContextVar session 自动注入(由 composition_root 配置 session_context)
+    - 乐观锁 CAS：save_with_state_version 用 atomic UPDATE 实现 state_version+1
+    - ToolExecutionState 枚举 ↔ 字符串值(防 DB 漂移)
     """
 
-    def __init__(
-        self,
-        pool: asyncpg.Pool,
-        schema: str = "public",
-    ) -> None:
-        self._pool = pool
-        # 兼容 schema 参数（默认 public），硬编码表名
-        self._schema = schema
+    pk_column: str = "execution_id"
 
-    async def save(self, entity: ToolExecution) -> ToolExecution:
-        """upsert ToolExecution（INSERT ON CONFLICT）"""
-        entity.validate()
-        sql_insert = (
-            "INSERT INTO tool_executions "
-            "(execution_id, tenant_id, tool_id, tool_version, state, "
-            "started_at, completed_at, retry_count, failure_reason, "
-            "state_version) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "
-            "ON CONFLICT (execution_id) DO UPDATE SET "
-            "state = EXCLUDED.state, "
-            "completed_at = EXCLUDED.completed_at, "
-            "retry_count = EXCLUDED.retry_count, "
-            "failure_reason = EXCLUDED.failure_reason, "
-            "state_version = EXCLUDED.state_version, "
-            "updated_at = NOW()"
+    def __init__(self) -> None:
+        super().__init__(ToolExecutionModel)
+
+    # ------------------------------------------------------------------
+    # 实体/模型转换
+    # ------------------------------------------------------------------
+
+    def _to_entity(self, model: ToolExecutionModel) -> ToolExecution:
+        """将 ORM 模型转换为领域实体
+
+        Args:
+            model: SQLAlchemy ToolExecutionModel 实例
+
+        Returns:
+            ToolExecution 领域实体
+        """
+        try:
+            state = ToolExecutionState(model.state)
+        except ValueError:
+            logger.warning(
+                "Invalid state %r in DB for execution %s, defaulting to IDLE",
+                model.state,
+                model.execution_id,
+            )
+            state = ToolExecutionState.IDLE
+        return ToolExecution(
+            execution_id=model.execution_id,
+            tenant_id=model.tenant_id,
+            tool_id=model.tool_id,
+            tool_version=model.tool_version,
+            state=state,
+            started_at=model.started_at,
+            completed_at=model.completed_at,
+            retry_count=model.retry_count,
+            failure_reason=model.failure_reason,
+            state_version=model.state_version,
         )
-        async with self._pool.acquire() as conn:
-            await conn.execute(
-                sql_insert,
-                entity.execution_id,
-                entity.tenant_id,
-                entity.tool_id,
-                entity.tool_version,
-                entity.state.value,
-                entity.started_at,
-                entity.completed_at,
-                entity.retry_count,
-                entity.failure_reason,
-                entity.state_version,
-            )
-        return entity
 
-    async def get_by_id(self, id: uuid.UUID) -> ToolExecution | None:
-        async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM tool_executions WHERE execution_id = $1",
-                id,
-            )
-        if row is None:
-            return None
-        return self._row_to_entity(row)
+    def _to_model(self, entity: ToolExecution) -> ToolExecutionModel:
+        """将领域实体转换为 ORM 模型
 
-    async def delete(self, id: uuid.UUID) -> None:
-        async with self._pool.acquire() as conn:
-            await conn.execute(
-                "DELETE FROM tool_executions WHERE execution_id = $1",
-                id,
-            )
+        Args:
+            entity: ToolExecution 领域实体
 
-    async def list_all(self) -> list[ToolExecution]:
-        async with self._pool.acquire() as conn:
-            rows = await conn.fetch("SELECT * FROM tool_executions")
-        return [self._row_to_entity(r) for r in rows]
+        Returns:
+            SQLAlchemy ToolExecutionModel 实例
+        """
+        return ToolExecutionModel(
+            execution_id=entity.execution_id,
+            tenant_id=entity.tenant_id,
+            tool_id=entity.tool_id,
+            tool_version=entity.tool_version,
+            state=entity.state.value,
+            started_at=entity.started_at,
+            completed_at=entity.completed_at,
+            retry_count=entity.retry_count,
+            failure_reason=entity.failure_reason,
+            state_version=entity.state_version,
+        )
+
+    # ------------------------------------------------------------------
+    # ToolExecutionRepositoryPort 实现
+    # ------------------------------------------------------------------
+
+    def _apply_filters(self, stmt: Any, query: ToolExecutionQuery) -> Any:
+        """应用 ToolExecutionQuery 过滤条件到 statement
+
+        Args:
+            stmt: SQLAlchemy select/count statement
+            query: 查询条件
+
+        Returns:
+            添加过滤条件后的 statement
+        """
+        if query.tenant_id is not None:
+            stmt = stmt.where(ToolExecutionModel.tenant_id == query.tenant_id)
+        if query.tool_id is not None:
+            stmt = stmt.where(ToolExecutionModel.tool_id == query.tool_id)
+        if query.state is not None:
+            stmt = stmt.where(ToolExecutionModel.state == query.state.value)
+        if query.started_after is not None:
+            stmt = stmt.where(ToolExecutionModel.started_at >= query.started_after)
+        if query.started_before is not None:
+            stmt = stmt.where(ToolExecutionModel.started_at <= query.started_before)
+        return stmt
 
     async def list_by_query(self, query: ToolExecutionQuery) -> list[ToolExecution]:
-        sql_parts = ["SELECT * FROM tool_executions WHERE 1=1"]
-        params: list[Any] = []
-        if query.tenant_id is not None:
-            params.append(query.tenant_id)
-            sql_parts.append(f"AND tenant_id = ${len(params)}")
-        if query.tool_id is not None:
-            params.append(query.tool_id)
-            sql_parts.append(f"AND tool_id = ${len(params)}")
-        if query.state is not None:
-            params.append(query.state.value)
-            sql_parts.append(f"AND state = ${len(params)}")
-        if query.started_after is not None:
-            params.append(query.started_after)
-            sql_parts.append(f"AND started_at >= ${len(params)}")
-        if query.started_before is not None:
-            params.append(query.started_before)
-            sql_parts.append(f"AND started_at <= ${len(params)}")
-        sql_parts.append("ORDER BY started_at DESC")
-        params.append(query.limit)
-        sql_parts.append(f"LIMIT ${len(params)}")
-        params.append(query.offset)
-        sql_parts.append(f"OFFSET ${len(params)}")
+        """通过 Query Object 查询列表
 
-        async with self._pool.acquire() as conn:
-            rows = await conn.fetch(" ".join(sql_parts), *params)
-        return [self._row_to_entity(r) for r in rows]
+        Args:
+            query: 查询条件
 
-    async def count(self, query: ToolExecutionQuery) -> int:
-        sql_parts = ["SELECT COUNT(*) FROM tool_executions WHERE 1=1"]
-        params: list[Any] = []
-        if query.tenant_id is not None:
-            params.append(query.tenant_id)
-            sql_parts.append(f"AND tenant_id = ${len(params)}")
-        if query.tool_id is not None:
-            params.append(query.tool_id)
-            sql_parts.append(f"AND tool_id = ${len(params)}")
-        if query.state is not None:
-            params.append(query.state.value)
-            sql_parts.append(f"AND state = ${len(params)}")
+        Returns:
+            符合条件的列表（按 started_at DESC + offset/limit）
+        """
+        stmt = select(ToolExecutionModel)
+        stmt = self._apply_filters(stmt, query)
+        stmt = stmt.order_by(ToolExecutionModel.started_at.desc()).offset(query.offset).limit(query.limit)
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+        return [self._to_entity(m) for m in models]
 
-        async with self._pool.acquire() as conn:
-            return await conn.fetchval(" ".join(sql_parts), *params) or 0
+    async def count(self, query: ToolExecutionQuery | None = None) -> int:
+        """统计符合条件数量
+
+        Args:
+            query: 查询条件(None 时统计全量,兼容父类 PostgreSQLAdapter.count() 无参签名)
+
+        Returns:
+            数量
+        """
+        if query is None:
+            query = ToolExecutionQuery()
+        stmt = select(func.count()).select_from(ToolExecutionModel)
+        stmt = self._apply_filters(stmt, query)
+        result = await self._session.execute(stmt)
+        return int(result.scalar() or 0)
 
     async def save_with_state_version(
         self,
         execution: ToolExecution,
         expected_state_version: int,
     ) -> ToolExecution:
-        async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT state_version FROM tool_executions WHERE execution_id = $1",
-                execution.execution_id,
+        """乐观锁 CAS 保存（原子 state_version 自增）
+
+        与原 asyncpg 实现行为等价：
+        1. SELECT 当前 state_version
+        2. 不存在 → EntityStateTransitionError("execution not found")
+        3. 版本不匹配 → EntityStateTransitionError("Optimistic lock conflict")
+        4. UPDATE state_version = state_version + 1 WHERE state_version = expected
+
+        Args:
+            execution: 待保存实体
+            expected_state_version: 调用方读到的 state_version(用于乐观锁)
+
+        Returns:
+            保存后的实体(state_version 自增 1)
+
+        Raises:
+            EntityStateTransitionError: 执行不存在或版本冲突
+        """
+        # 先查询当前 state_version(同事务内)
+        current = await self.get_by_id(execution.execution_id)
+        if current is None:
+            raise EntityStateTransitionError(
+                entity_type="ToolExecution",
+                entity_id=str(execution.execution_id),
+                from_status="UNKNOWN",
+                to_status=execution.state.name,
+                message="execution not found in repository",
             )
-            if row is None:
-                raise EntityStateTransitionError(
-                    entity_type="ToolExecution",
-                    entity_id=str(execution.execution_id),
-                    from_status="UNKNOWN",
-                    to_status=execution.state.name,
-                    message="execution not found in repository",
-                )
-            if row["state_version"] != expected_state_version:
-                raise EntityStateTransitionError(
-                    entity_type="ToolExecution",
-                    entity_id=str(execution.execution_id),
-                    from_status="UNKNOWN",
-                    to_status=execution.state.name,
-                    message=(
-                        f"Optimistic lock conflict: expected state_version="
-                        f"{expected_state_version}, actual={row['state_version']}"
-                    ),
-                )
-            sql_update = (
-                "UPDATE tool_executions SET state = $2, completed_at = $3, "
-                "retry_count = $4, failure_reason = $5, "
-                "state_version = state_version + 1, updated_at = NOW() "
-                "WHERE execution_id = $1"
+        if current.state_version != expected_state_version:
+            raise EntityStateTransitionError(
+                entity_type="ToolExecution",
+                entity_id=str(execution.execution_id),
+                from_status="UNKNOWN",
+                to_status=execution.state.name,
+                message=(
+                    f"Optimistic lock conflict: expected state_version={expected_state_version}, actual={current.state_version}"
+                ),
             )
-            await conn.execute(
-                sql_update,
-                execution.execution_id,
-                execution.state.value,
-                execution.completed_at,
-                execution.retry_count,
-                execution.failure_reason,
+
+        # 直接 UPDATE 单条(state_version 自增 1)
+        from sqlalchemy import update
+
+        new_version = expected_state_version + 1
+        stmt = (
+            update(ToolExecutionModel)
+            .where(
+                ToolExecutionModel.execution_id == execution.execution_id,
+                ToolExecutionModel.state_version == expected_state_version,
             )
-        execution.state_version = expected_state_version + 1
+            .values(
+                state=execution.state.value,
+                completed_at=execution.completed_at,
+                retry_count=execution.retry_count,
+                failure_reason=execution.failure_reason,
+                state_version=new_version,
+                updated_at=func.now(),
+            )
+        )
+        result = await self._session.execute(stmt)
+        rowcount = getattr(result, "rowcount", None) or 0
+        if rowcount != 1:  # pragma: no cover
+            # 极端并发场景:UPDATE 命中 0 行(状态已被其他事务修改)
+            raise EntityStateTransitionError(
+                entity_type="ToolExecution",
+                entity_id=str(execution.execution_id),
+                from_status="UNKNOWN",
+                to_status=execution.state.name,
+                message="Optimistic lock conflict: state_version changed concurrently",
+            )
+        await self._session.flush()
+        # 标记内存中实体的 state_version 已更新
+        execution.state_version = new_version
         return execution
 
-    def _row_to_entity(self, row: Any) -> ToolExecution:
-        """将 PG 行转换为 ToolExecution 实体"""
-        return ToolExecution(
-            execution_id=row["execution_id"],
-            tenant_id=row["tenant_id"],
-            tool_id=row["tool_id"],
-            tool_version=row["tool_version"],
-            state=ToolExecutionState(row["state"]),
-            started_at=row["started_at"],
-            completed_at=row["completed_at"],
-            retry_count=row["retry_count"],
-            failure_reason=row["failure_reason"],
-            state_version=row["state_version"],
-        )
+
+__all__ = [
+    "PostgreSQLToolExecutionRepository",
+]

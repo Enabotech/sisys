@@ -2205,16 +2205,16 @@ def bootstrap() -> None:
 
     register_port(
         name="tool_execution_repository",
-        version="v1.0.0",
+        version="v1.1.0",  # ← 升级:InMemory → PostgreSQL ORM(SQLAlchemy)
         interface=ToolExecutionRepositoryPort,
         impl=lambda resolver: __import__(
-            "src.infrastructure.storage.inmemory.tool_execution_repository",
-            fromlist=["InMemoryToolExecutionRepository"],
-        ).InMemoryToolExecutionRepository(),
-        module="src.infrastructure.storage.inmemory.tool_execution_repository",
+            "src.infrastructure.storage.postgresql.repository.tool_execution_repository",
+            fromlist=["PostgreSQLToolExecutionRepository"],
+        ).PostgreSQLToolExecutionRepository(),
+        module="src.infrastructure.storage.postgresql.repository.tool_execution_repository",
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
-        tags=("tool", "execution", "repository"),
+        tags=("tool", "execution", "repository", "postgresql", "sqlalchemy"),
     )
 
     register_port(
@@ -2275,19 +2275,19 @@ def bootstrap() -> None:
 
     register_port(
         name="schema_validation_record_repository",
-        version="v1.0.0",
+        version="v1.1.0",  # ← 升级:InMemory → PostgreSQL ORM(SQLAlchemy)
         interface=__import__(
             "src.domain.ports.schema_validation_record_repository",
             fromlist=["SchemaValidationRecordRepositoryPort"],
         ).SchemaValidationRecordRepositoryPort,
         impl=lambda resolver: __import__(
-            "src.infrastructure.storage.inmemory.schema_validation_record_repository",
-            fromlist=["InMemorySchemaValidationRecordRepository"],
-        ).InMemorySchemaValidationRecordRepository(),
-        module="src.infrastructure.storage.inmemory.schema_validation_record_repository",
+            "src.infrastructure.storage.postgresql.repository.schema_validation_record_repository",
+            fromlist=["PostgreSQLSchemaValidationRecordRepository"],
+        ).PostgreSQLSchemaValidationRecordRepository(),
+        module="src.infrastructure.storage.postgresql.repository.schema_validation_record_repository",
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
-        tags=("tool", "schema", "repository"),
+        tags=("tool", "schema", "repository", "postgresql", "sqlalchemy"),
     )
 
     register_port(
@@ -2311,19 +2311,19 @@ def bootstrap() -> None:
     from src.application.ports.tool_chain_service import ToolChainServicePort
     from src.application.use_cases.run_tool_chain import RunToolChainUseCase
     from src.domain.ports.tool_chain_repository import ToolChainRepositoryPort
-    from src.infrastructure.storage.inmemory.tool_chain_repository import (
-        InMemoryToolChainRepository,
-    )
 
     register_port(
         name="tool_chain_repository",
-        version="v1.0.0",
+        version="v1.1.0",  # ← 升级:InMemory → PostgreSQL ORM(SQLAlchemy)
         interface=ToolChainRepositoryPort,
-        impl=lambda resolver: InMemoryToolChainRepository(),
-        module="src.infrastructure.storage.inmemory.tool_chain_repository",
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.postgresql.repository.tool_chain_repository",
+            fromlist=["PostgreSQLToolChainRepository"],
+        ).PostgreSQLToolChainRepository(),
+        module="src.infrastructure.storage.postgresql.repository.tool_chain_repository",
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
-        tags=("tool", "chain", "repository"),
+        tags=("tool", "chain", "repository", "postgresql", "sqlalchemy"),
     )
 
     register_port(
