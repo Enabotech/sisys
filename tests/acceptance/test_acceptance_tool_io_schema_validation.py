@@ -428,46 +428,50 @@ def when_create_validation_record(context: dict[str, Any]) -> None:
 
 
 @then("repository.save 持久化成功")
-async def then_repo_save(context: dict[str, Any]) -> None:
-    saved = await context["validation_record_repo"].save(context["record"])
+def then_repo_save(context: dict[str, Any], event_loop) -> None:
+    saved = event_loop.run_until_complete(context["validation_record_repo"].save(context["record"]))
     assert saved.record_id == context["record"].record_id
 
 
 @then("repository.get_by_id 可查回")
-async def then_repo_get(context: dict[str, Any]) -> None:
-    fetched = await context["validation_record_repo"].get_by_id(context["record"].record_id)
+def then_repo_get(context: dict[str, Any], event_loop) -> None:
+    fetched = event_loop.run_until_complete(context["validation_record_repo"].get_by_id(context["record"].record_id))
     assert fetched is not None
 
 
 @when("分别创建 tenantA 和 tenantB 各一条 INPUT 失败记录")
-async def when_two_tenants(context: dict[str, Any]) -> None:
+def when_two_tenants(context: dict[str, Any], event_loop) -> None:
     tool = _make_tool()
     context["tool"] = tool
     tenant_a = uuid.uuid4()
     tenant_b = uuid.uuid4()
     repo = context["validation_record_repo"]
-    await repo.save(
-        SchemaValidationRecord(
-            record_id=uuid.uuid4(),
-            execution_id=uuid.uuid4(),
-            tool_id=tool.tool_id,
-            tenant_id=tenant_a,
-            validation_phase="INPUT",
-            is_valid=False,
-            violations=(_make_violation(),),
-            validated_at=datetime.now(UTC),
+    event_loop.run_until_complete(
+        repo.save(
+            SchemaValidationRecord(
+                record_id=uuid.uuid4(),
+                execution_id=uuid.uuid4(),
+                tool_id=tool.tool_id,
+                tenant_id=tenant_a,
+                validation_phase="INPUT",
+                is_valid=False,
+                violations=(_make_violation(),),
+                validated_at=datetime.now(UTC),
+            )
         )
     )
-    await repo.save(
-        SchemaValidationRecord(
-            record_id=uuid.uuid4(),
-            execution_id=uuid.uuid4(),
-            tool_id=tool.tool_id,
-            tenant_id=tenant_b,
-            validation_phase="INPUT",
-            is_valid=False,
-            violations=(_make_violation(),),
-            validated_at=datetime.now(UTC),
+    event_loop.run_until_complete(
+        repo.save(
+            SchemaValidationRecord(
+                record_id=uuid.uuid4(),
+                execution_id=uuid.uuid4(),
+                tool_id=tool.tool_id,
+                tenant_id=tenant_b,
+                validation_phase="INPUT",
+                is_valid=False,
+                violations=(_make_violation(),),
+                validated_at=datetime.now(UTC),
+            )
         )
     )
     context["tenant_a"] = tenant_a
@@ -475,19 +479,23 @@ async def when_two_tenants(context: dict[str, Any]) -> None:
 
 
 @then("查询 tenantA 仅返回一条")
-async def then_query_tenant_a(context: dict[str, Any]) -> None:
-    results = await context["validation_record_repo"].list_by_query(SchemaValidationRecordQuery(tenant_id=context["tenant_a"]))
+def then_query_tenant_a(context: dict[str, Any], event_loop) -> None:
+    results = event_loop.run_until_complete(
+        context["validation_record_repo"].list_by_query(SchemaValidationRecordQuery(tenant_id=context["tenant_a"]))
+    )
     assert len(results) == 1
 
 
 @then("查询 tenantB 仅返回一条")
-async def then_query_tenant_b(context: dict[str, Any]) -> None:
-    results = await context["validation_record_repo"].list_by_query(SchemaValidationRecordQuery(tenant_id=context["tenant_b"]))
+def then_query_tenant_b(context: dict[str, Any], event_loop) -> None:
+    results = event_loop.run_until_complete(
+        context["validation_record_repo"].list_by_query(SchemaValidationRecordQuery(tenant_id=context["tenant_b"]))
+    )
     assert len(results) == 1
 
 
 @when("并发保存 50 条 SchemaValidationRecord")
-async def when_concurrent_save(context: dict[str, Any]) -> None:
+def when_concurrent_save(context: dict[str, Any], event_loop) -> None:
     tool = _make_tool()
     context["tool"] = tool
     repo = context["validation_record_repo"]
@@ -505,12 +513,12 @@ async def when_concurrent_save(context: dict[str, Any]) -> None:
             )
         )
 
-    await asyncio.gather(*[save_record() for _ in range(50)])
+    event_loop.run_until_complete(asyncio.gather(*[save_record() for _ in range(50)]))
 
 
 @then("list_all 返回 50 条无丢失")
-async def then_concurrent_count(context: dict[str, Any]) -> None:
-    results = await context["validation_record_repo"].list_all()
+def then_concurrent_count(context: dict[str, Any], event_loop) -> None:
+    results = event_loop.run_until_complete(context["validation_record_repo"].list_all())
     assert len(results) == 50
 
 
@@ -548,8 +556,8 @@ def then_event_three_fields(context: dict[str, Any]) -> None:
 
 
 @when("ToolSchemaValidationFailed 事件发布")
-def when_event_publish(context: dict[str, Any]) -> None:
-    """构造事件并设置 realtime publisher mock(本期 realtime only)"""
+def when_event_publish(context: dict[str, Any], event_loop) -> None:
+    """构造事件并通过 AsyncMock publisher 投递(本期 realtime only)"""
     publisher = AsyncMock()
     publisher.publish = AsyncMock(return_value=None)
     event = ToolSchemaValidationFailed(
@@ -562,13 +570,15 @@ def when_event_publish(context: dict[str, Any]) -> None:
         schema_version="1.0.0",
         is_final=True,
     )
+    # 实际触发 realtime 通道投递(reliable 通道本期 disabled)
+    event_loop.run_until_complete(publisher.publish(event))
     context["publisher"] = publisher
     context["event"] = event
     context["event_published"] = True
 
 
 @then("realtime 通道投递 1 次")
-async def then_realtime_delivered(context: dict[str, Any]) -> None:
+def then_realtime_delivered(context: dict[str, Any]) -> None:
     """断言 realtime 通道(publisher.publish)被调用 1 次"""
     assert context["publisher"].publish.call_count == 1
 
@@ -601,8 +611,8 @@ def then_engine_constructed(context: dict[str, Any]) -> None:
 
 
 @then("_retry_call 仍可用")
-async def then_retry_call_works(context: dict[str, Any]) -> None:
-    result = await context["engine"]._retry_call(lambda: asyncio.sleep(0), execution_id="eid")
+def then_retry_call_works(context: dict[str, Any], event_loop) -> None:
+    result = event_loop.run_until_complete(context["engine"]._retry_call(lambda: asyncio.sleep(0), execution_id="eid"))
     assert result is None
 
 
