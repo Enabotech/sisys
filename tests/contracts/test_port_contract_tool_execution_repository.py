@@ -42,8 +42,8 @@ class TestToolExecutionRepositoryPortContract:
 
     PORT_NAME = "tool_execution_repository"
     IMPL_CLS_NAME = "InMemoryToolExecutionRepository"
-    MODULE_PATH = "src.infrastructure.storage.inmemory.tool_execution_repository"
-    EXPECTED_TAGS = ("tool", "execution", "repository")
+    MODULE_PATH = "src.infrastructure.storage.postgresql.repository.tool_execution_repository"
+    EXPECTED_TAGS = ("tool", "execution", "repository", "postgresql", "sqlalchemy")
     EXPECTED_OWNER = "tool-team"
     REQUIRED_METHODS = [
         "get_by_id",

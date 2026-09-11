@@ -148,7 +148,7 @@ class TestStrategicToolPortRegistry:
             "tool_execution_repository",
             Lifetime.SCOPED,
             "tool-team",
-            ("tool", "execution", "repository"),
+            ("tool", "execution", "repository", "postgresql", "sqlalchemy"),
         ),
         (
             "tool_execution_engine",

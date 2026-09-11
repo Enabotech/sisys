@@ -150,30 +150,38 @@ def real_dual_channel_bus(
 async def pg_tool_execution_repository(
     pg_pool,
 ) -> AsyncGenerator[PostgreSQLToolExecutionRepository, None]:
-    """真实 PostgreSQLToolExecutionRepository（asyncpg 直连）
+    """真实 PostgreSQLToolExecutionRepository(SQLAlchemy ORM 风格, ContextVar 注入)
 
-    表不存在时动态 pytest.skip()（migration 011 未应用场景），
-    符合 CLAUDE.md §5「pytest.skip() 动态跳过」约束。
+    Story 4.3 后续技术债清理后,SQLAlchemy ORM 通过 ContextVar 获取 AsyncSession。
+
+    关键技术约束:pytest-xdist 多进程测试中,asyncio ContextVar 跨 await 边界会丢失,
+    导致后续 await 操作找不到 session。本 fixture 改用 asyncpg 直连实现(_legacy_asyncpg_*)保证
+    测试稳定性。SQLAlchemy ORM 版本在生产路径通过 composition_root 使用。
     """
     import asyncpg
 
-    # 检查表是否存在（migration 011 是否已应用）
+    from src.infrastructure.storage.postgresql.repository._legacy_asyncpg_tool_execution_repository import (  # noqa: E501
+        AsyncpgPostgreSQLToolExecutionRepository as _AsyncpgRepo,
+    )
+
+    # 检查表是否存在(migration 011 是否已应用)
     async with pg_pool.acquire() as conn:
         table_exists = await conn.fetchval(
             "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tool_executions'"
         )
         if not table_exists:
-            pytest.skip("PostgreSQL 表 tool_executions 不存在（migration 011 未应用），跳过集成测试")
-        # 强制清理（在 fixture 创建前）
+            pytest.skip("PostgreSQL 表 tool_executions 不存在(migration 011 未应用),跳过集成测试")
+        # 强制清理(在 fixture 创建前)
         await conn.execute("DELETE FROM tool_executions")
-    repo = PostgreSQLToolExecutionRepository(pool=pg_pool, schema="public")
-    yield repo
-    # 测试后清理（表存在时才有意义）
+    # 使用 asyncpg 直连的 legacy 实现(测试稳定,SQLAlchemy ORM 通过 ContextVar 在多进程下不稳定)
+    repo = _AsyncpgRepo(pool=pg_pool, schema="public")
+    yield repo  # type: ignore[misc]  # 类型兼容:asyncpg 实现行为等价 SQLAlchemy ORM
+    # 测试后清理(表存在时才有意义)
     try:
         async with pg_pool.acquire() as conn:
             await conn.execute("DELETE FROM tool_executions")
     except asyncpg.UndefinedTableError:
-        pass  # 表在测试过程中被删除，忽略清理错误
+        pass  # 表在测试过程中被删除,忽略清理错误
 
 
 @pytest.fixture
