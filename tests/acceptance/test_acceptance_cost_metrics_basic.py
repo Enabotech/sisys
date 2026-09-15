@@ -369,7 +369,13 @@ def cost_metrics_handler_process(context: dict[str, Any]) -> None:
     context["metrics_collector"] = metrics
     context["registry"] = registry
 
-    asyncio.get_event_loop().run_until_complete(listener.on_routing_decided(context["routing_event"]))
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(listener.on_routing_decided(context["routing_event"]))
+    finally:
+        asyncio.set_event_loop(None)
+        loop.close()
 
 
 @then("应该调用 TokenEstimatorPort.estimate()")

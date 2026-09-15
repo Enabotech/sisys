@@ -35,11 +35,11 @@ class TestExecuteArchitecture:
 
         assert port_path.exists(), "SandboxExecutor port must exist in domain/ports/"
 
-    def test_docker_sandbox_adapter_in_infrastructure_layer(self) -> None:
-        """DockerSandboxAdapter must be in infrastructure layer."""
-        adapter_path = Path("src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py")
+    def test_aiodocker_sandbox_adapter_in_infrastructure_layer(self) -> None:
+        """AioDockerSandboxAdapter must be in infrastructure layer (Story 4.4 替换 mock)."""
+        adapter_path = Path("src/infrastructure/external_services/sandbox/aiodocker_sandbox_adapter.py")
 
-        assert adapter_path.exists(), "DockerSandboxAdapter must exist in infrastructure/external_services/sandbox/"
+        assert adapter_path.exists(), "AioDockerSandboxAdapter must exist in infrastructure/external_services/sandbox/"
 
     def test_executed_event_in_domain_events(self) -> None:
         """AutoExecuted event must be in domain/events layer."""
@@ -91,11 +91,11 @@ class TestExecuteArchitecture:
 
     def test_infrastructure_implements_ports(self) -> None:
         """Infrastructure layer must implement domain layer ports."""
-        adapter_file = Path("src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py")
+        adapter_file = Path("src/infrastructure/external_services/sandbox/aiodocker_sandbox_adapter.py")
 
         content = adapter_file.read_text()
 
         # Adapter should import from domain layer (hexagonal port pattern)
         assert "from src.domain.ports.sandbox_executor import" in content, (
-            "DockerSandboxAdapter must import from domain.ports.sandbox_executor"
+            "AioDockerSandboxAdapter must import from domain.ports.sandbox_executor"
         )

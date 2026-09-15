@@ -56,6 +56,9 @@ from src.infrastructure.messaging.redis_event_bus import RedisEventBus
 from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 from src.infrastructure.storage.inmemory.tool_repository import InMemoryToolRepository
+from src.infrastructure.storage.postgresql.repository._legacy_asyncpg_tool_execution_repository import (  # noqa: E501
+    AsyncpgPostgreSQLToolExecutionRepository,
+)
 from src.infrastructure.storage.postgresql.repository.tool_execution_repository import (
     PostgreSQLToolExecutionRepository,
 )
@@ -149,7 +152,7 @@ def real_dual_channel_bus(
 @pytest.fixture
 async def pg_tool_execution_repository(
     pg_pool,
-) -> AsyncGenerator[PostgreSQLToolExecutionRepository, None]:
+) -> AsyncGenerator[AsyncpgPostgreSQLToolExecutionRepository, None]:
     """真实 PostgreSQLToolExecutionRepository(SQLAlchemy ORM 风格, ContextVar 注入)
 
     Story 4.3 后续技术债清理后,SQLAlchemy ORM 通过 ContextVar 获取 AsyncSession。
@@ -160,9 +163,7 @@ async def pg_tool_execution_repository(
     """
     import asyncpg
 
-    from src.infrastructure.storage.postgresql.repository._legacy_asyncpg_tool_execution_repository import (  # noqa: E501
-        AsyncpgPostgreSQLToolExecutionRepository as _AsyncpgRepo,
-    )
+    asyncpg_repo = AsyncpgPostgreSQLToolExecutionRepository
 
     # 检查表是否存在(migration 011 是否已应用)
     async with pg_pool.acquire() as conn:
@@ -174,8 +175,8 @@ async def pg_tool_execution_repository(
         # 强制清理(在 fixture 创建前)
         await conn.execute("DELETE FROM tool_executions")
     # 使用 asyncpg 直连的 legacy 实现(测试稳定,SQLAlchemy ORM 通过 ContextVar 在多进程下不稳定)
-    repo = _AsyncpgRepo(pool=pg_pool, schema="public")
-    yield repo  # type: ignore[misc]  # 类型兼容:asyncpg 实现行为等价 SQLAlchemy ORM
+    repo = asyncpg_repo(pool=pg_pool, schema="public")
+    yield repo  # 类型兼容:asyncpg 实现行为等价 SQLAlchemy ORM
     # 测试后清理(表存在时才有意义)
     try:
         async with pg_pool.acquire() as conn:

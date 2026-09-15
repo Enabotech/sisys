@@ -814,10 +814,27 @@ def bootstrap() -> None:
         name="sandbox_executor",
         version="v1.0.0",
         interface=SandboxExecutor,
-        impl="src.infrastructure.external_services.sandbox.docker_sandbox_adapter.DockerSandboxAdapter",
-        module="src.infrastructure.external_services.sandbox.docker_sandbox_adapter",
+        impl="src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter.AioDockerSandboxAdapter",
+        module="src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter",
         lifetime=Lifetime.SCOPED,
         owner="sandbox-team",
+    )
+
+    register_port(
+        name="sandbox_session_repository",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.ports.sandbox_session_repository",
+            fromlist=["SandboxSessionRepositoryPort"],
+        ).SandboxSessionRepositoryPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.inmemory.sandbox_session_repository",
+            fromlist=["InMemorySandboxSessionRepository"],
+        ).InMemorySandboxSessionRepository(),
+        module="src.infrastructure.storage.inmemory.sandbox_session_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="sandbox-team",
+        tags=("sandbox", "session", "repository"),
     )
 
     register_port(
@@ -2215,6 +2232,30 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
         tags=("tool", "execution", "repository", "postgresql", "sqlalchemy"),
+    )
+
+    register_port(
+        name="sandbox_session_reaper",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.services.sandbox_session_reaper",
+            fromlist=["SandboxSessionReaper"],
+        ).SandboxSessionReaper,
+        impl=lambda resolver: __import__(
+            "src.application.services.sandbox_session_reaper",
+            fromlist=["SandboxSessionReaper"],
+        ).SandboxSessionReaper(
+            sandbox=resolver.resolve("sandbox_executor"),
+            session_repository=resolver.resolve("sandbox_session_repository"),
+            config=__import__(
+                "src.application.services.sandbox_config",
+                fromlist=["SandboxConfig"],
+            ).SandboxConfig.from_env(),
+        ),
+        module="src.application.services.sandbox_session_reaper",
+        lifetime=Lifetime.SINGLETON,
+        owner="sandbox-team",
+        tags=("sandbox", "session", "reaper", "cleanup"),
     )
 
     register_port(

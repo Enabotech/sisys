@@ -508,7 +508,7 @@ def start(self) -> None:
 迁移完成后，从 `exception_handlers.py` 中移除：
 
 ```python
-# 删除注册行（含 # type: ignore[arg-type] 注释）
+# 删除注册行
 # self._app.add_exception_handler(ValueError, self._handle_value_error)
 
 # 删除处理器方法

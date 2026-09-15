@@ -3,10 +3,6 @@
 提供 graphlib 官方公开 API 的精确类型签名，弥补 CPython typeshed 中
 CycleError.args 字段类型过于宽松（tuple[Any, ...]）的不足。
 
-CLAUDE.md §5 红线强制：
-- 第三方库缺类型注解时必须创建 PEP 561 stubs
-- 严禁使用 # type: ignore / # noqa 等抑制注释
-
 参考 CPython 源码：Lib/graphlib.py
 """
 

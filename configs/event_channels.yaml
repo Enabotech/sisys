@@ -225,3 +225,24 @@ event_channels:
     rabbitmq_routing_key: "sisys.events.reliable.file_crawled"
     delivery_mode: "reliable"
     description: "单文件爬取完成"
+
+  # =========================================================================
+  # SANDBOX 事件（Story 4.4 — Docker 沙箱执行）
+  # =========================================================================
+  SandboxSessionStarted:
+    redis_channel: "sisys:rt:sandbox.session.started"
+    rabbitmq_routing_key: "sisys.events.reliable.sandbox.session.started"
+    delivery_mode: "reliable"
+    description: "沙箱会话启动（双通道：realtime + reliable）"
+
+  SandboxSessionTerminated:
+    redis_channel: "sisys:rt:sandbox.session.terminated"
+    rabbitmq_routing_key: "sisys.events.reliable.sandbox.session.terminated"
+    delivery_mode: "reliable"
+    description: "沙箱会话终止（双通道：realtime + reliable）"
+
+  SandboxExecutionFailed:
+    redis_channel: "sisys:rt:sandbox.execution.failed"
+    rabbitmq_routing_key: "sisys.events.reliable.sandbox.execution.failed"
+    delivery_mode: "reliable"
+    description: "沙箱代码执行失败（双通道：realtime + reliable，支撑 Story 4.7 Validation Feedback 闭环）"

@@ -273,7 +273,7 @@ def test_run_frozen() -> None:
     """ToolChainRun frozen 不可变"""
     run = _make_run()
     with pytest.raises(FrozenInstanceError):
-        run.state = ToolChainRunState.RUNNING  # type: ignore[misc]
+        setattr(run, "state", ToolChainRunState.RUNNING)
 
 
 def test_negative_state_version_raises() -> None:

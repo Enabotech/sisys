@@ -4,12 +4,6 @@
 - pytest_collection_modifyitems: 自动标记 @pytest.mark.acceptance 及服务依赖
 - acceptance_env_config: session 级环境配置 fixture
 - LLM 端点可达性探测 helper（防止内网不可达 endpoint 导致 fixture 误判可用）
-
-Author:
-    agimtech <agimtech@126.com>
-
-Copyright:
-    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
 """
 
 from __future__ import annotations
@@ -108,6 +102,103 @@ def acceptance_env_config() -> TestEnvConfig:
         TestEnvConfig: 测试环境配置实例
     """
     return get_test_env()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _sandbox_orphan_cleanup() -> Any:
+    """Session 级别孤儿容器清理 + Docker 客户端资源回收 fixture(Story 4.4)。
+
+    根因：每个 AioDockerSandboxAdapter 实例创建新的 aiodocker.Docker()，
+    内部持有 aiohttp.ClientSession。测试结束后未调用 docker.close()，
+    导致 ClientSession 资源泄漏，aiohttp 发出 "Unclosed client session" 警告。
+
+    修复方案：
+    - session start: 清理历史泄漏的容器 + Docker 客户端
+    - session end: 关闭所有 adapter 的 Docker 客户端 + 清理孤儿容器
+
+    工作原理：
+    - session start: 清理所有残留 sisys-sandbox-* 容器
+    - session end: 关闭所有残留 adapter 的 aiohttp session + 清理孤儿容器
+
+    性能影响:每次清理约 0.5-1s(取决于容器数量),不影响测试功能。
+    """
+
+    async def _cleanup_adapters_and_containers() -> int:
+        """异步清理所有 adapter 的 Docker 客户端和孤儿容器。
+
+        根因（Story 4.4 修复）：之前的实现中,本函数创建的临时 `AioDockerSandboxAdapter()`
+        实例在异常路径下未被关闭,内部 aiohttp.UnixConnector 会泄漏到 pytest worker
+        进程,触发 asyncio GC "Unclosed connector" 警告。
+        """
+        try:
+            import aiodocker
+        except ImportError:
+            return 0
+
+        # 1. 关闭可能残留的 adapter Docker 客户端（解决 "Unclosed client session"）
+        # 修复:无论 adapter._docker_client 是否非 None,都调用 adapter.close()
+        # 确保其内部 lazy-init 状态被正确清理
+        try:
+            from src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter import (
+                AioDockerSandboxAdapter,
+            )
+
+            adapter = AioDockerSandboxAdapter()
+            try:
+                # 即使 _docker_client 是 None,也调用 close()(幂等空操作)
+                await adapter.close()
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+        # 2. 清理所有 sisys-sandbox-* 前缀容器
+        cleaned = 0
+        docker = None
+        try:
+            docker = aiodocker.Docker()
+            try:
+                containers = await docker.containers.list(
+                    all=True,
+                    filters={"name": ["sisys-sandbox-"]},
+                )
+                for container in containers:
+                    try:
+                        await container.delete(force=True, v=True)
+                        cleaned += 1
+                    except Exception:
+                        continue
+            finally:
+                # 确保 docker 客户端在所有异常路径下都被关闭,
+                # 释放内部 aiohttp.UnixConnector + ClientSession
+                if docker is not None:
+                    try:
+                        await docker.close()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return cleaned
+
+    # Session start: 清理历史泄漏
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_cleanup_adapters_and_containers())
+    finally:
+        asyncio.set_event_loop(None)
+        loop.close()
+
+    yield  # 运行所有测试
+
+    # Session end: 清理本次产生的所有孤儿 + 关闭所有残留的 Docker 客户端
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_cleanup_adapters_and_containers())
+    finally:
+        asyncio.set_event_loop(None)
+        loop.close()
 
 
 def pytest_collection_modifyitems(config, items):

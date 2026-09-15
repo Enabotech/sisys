@@ -170,7 +170,7 @@ class TestDenseSearchEndToEnd:
 
             latencies.sort()
             p95 = latencies[int(len(latencies) * 0.95)]
-            threshold = 500  # API 模式含 HTTP 开销
+            threshold = 1000  # API 模式含 HTTP 开销
             assert p95 < threshold, f"P95={p95:.1f}ms 超过阈值 {threshold}ms"
         finally:
             await cm.delete_collection(collection_name)

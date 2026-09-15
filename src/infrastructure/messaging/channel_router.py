@@ -149,6 +149,27 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.REALTIME,
             description="工具 Schema 验证失败（Story 4.3,本期仅 realtime,reliable 4.7 启用）",
         ),
+        "SandboxSessionStarted": ChannelMapping(
+            event_type="SandboxSessionStarted",
+            redis_channel="sisys:rt:sandbox.session.started",
+            rabbitmq_routing_key="sisys.events.reliable.sandbox.session.started",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="沙箱会话启动（Story 4.4,双通道：realtime + reliable）",
+        ),
+        "SandboxSessionTerminated": ChannelMapping(
+            event_type="SandboxSessionTerminated",
+            redis_channel="sisys:rt:sandbox.session.terminated",
+            rabbitmq_routing_key="sisys.events.reliable.sandbox.session.terminated",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="沙箱会话终止（Story 4.4,双通道：realtime + reliable）",
+        ),
+        "SandboxExecutionFailed": ChannelMapping(
+            event_type="SandboxExecutionFailed",
+            redis_channel="sisys:rt:sandbox.execution.failed",
+            rabbitmq_routing_key="sisys.events.reliable.sandbox.execution.failed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="沙箱代码执行失败（Story 4.4,双通道：realtime + reliable,支撑 Story 4.7 Validation Feedback 闭环）",
+        ),
         "AgentDecided": ChannelMapping(
             event_type="AgentDecided",
             rabbitmq_routing_key="sisys.events.reliable.agent_decided",

@@ -9,14 +9,14 @@
     假如 Story 1.14a trigger 实现已完成
     假如 Story 1.14b route 实现已完成
     假如 ExecuteService 已实现并配置了事件发布器
-    假如 DockerSandboxAdapter 已配置
+    假如 AioDockerSandboxAdapter 已配置
 
   # =========================================================================
   # AC-1: 会话命名空间隔离
   # =========================================================================
 
   场景: AC-1 - ExecuteService 在沙箱中执行任务
-    假如 沙箱适配器是 DockerSandboxAdapter
+    假如 沙箱适配器是 AioDockerSandboxAdapter
     假如 系统接收到 Routed 事件（session_id: test-session-123）
     当 ExecuteService 处理该 Routed 事件
     那么 应该为 session test-session-123 启动沙箱容器
@@ -112,7 +112,7 @@
     假如 我验证 ExecuteService 源代码
     那么 ExecuteService 不应该导入任何基础设施层模块
     并且 SandboxExecutor 端口应该位于 interfaces 层
-    并且 DockerSandboxAdapter 应该位于 infrastructure 层
+    并且 AioDockerSandboxAdapter 应该位于 infrastructure 层
 
   场景: AC-4 - ExecuteService 使用 Protocol 依赖倒置
     假如 我检查 ExecuteService 实现

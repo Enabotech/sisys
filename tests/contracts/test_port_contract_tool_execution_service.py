@@ -25,6 +25,7 @@ from src.application.services.tool_execution_engine import ToolExecutionEngine
 from src.application.services.tool_registry_service import ToolRegistryService
 from src.domain.ports.llm_client import LLMConfig, LLMResponse
 from src.domain.ports.registry import Lifetime, PortSpec
+from src.domain.value_objects.container_spec import ContainerSpec
 from src.infrastructure.storage.inmemory.tool_repository import InMemoryToolRepository
 
 
@@ -53,18 +54,25 @@ class _DummyLLM:
 
 
 class _DummySandbox:
-    """沙箱执行器存根（满足 SandboxExecutor 接口）"""
+    """沙箱执行器存根（满足 SandboxExecutor 接口）
 
-    async def start_container(self, session_id: str) -> None:
+    Story 4.7 修复:添加 health_check() 方法以满足 SandboxExecutor Protocol
+    (Story 4.4 新增的 Protocol 成员)。
+    """
+
+    async def start_container(self, session_id: str, spec: ContainerSpec | None = None) -> None:
         pass
 
-    async def execute_code(self, session_id: str, code: str) -> dict[str, Any]:
+    async def execute_code(self, session_id: str, code: str, *, timeout_sec: float | None = None) -> dict[str, Any]:
         return {"status": "ok", "output": ""}
 
     async def stop_container(self, session_id: str) -> None:
         pass
 
     async def is_container_running(self, session_id: str) -> bool:
+        return True
+
+    async def health_check(self) -> bool:
         return True
 
 

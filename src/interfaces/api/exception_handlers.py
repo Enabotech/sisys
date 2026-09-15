@@ -70,7 +70,12 @@ from src.domain.exceptions import (
     RerankError,
     RoleAlreadyExistsError,
     RoleNotFoundError,
+    SandboxConfigurationError,
     SandboxError,
+    SandboxImagePullError,
+    SandboxQuotaExceededError,
+    SandboxResourceLimitExceededError,
+    SandboxTimeoutError,
     ServiceUnavailableError,
     SkillLoadError,
     SkillNotFoundError,
@@ -178,6 +183,12 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     ContainerStartError: status.HTTP_502_BAD_GATEWAY,  # 310
     ExecutionError: status.HTTP_502_BAD_GATEWAY,  # 311
     ContainerStopError: status.HTTP_502_BAD_GATEWAY,  # 312
+    # Story 4.4 新增 5 个沙箱异常（EXCEPTION_315-319）HTTP 映射
+    SandboxImagePullError: status.HTTP_502_BAD_GATEWAY,  # 315 — 镜像拉取失败（上游不可达）
+    SandboxTimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,  # 316 — 执行超时
+    SandboxResourceLimitExceededError: status.HTTP_502_BAD_GATEWAY,  # 317 — cgroups 资源超限
+    SandboxQuotaExceededError: status.HTTP_503_SERVICE_UNAVAILABLE,  # 318 — 并发容器数超 MAX_CONCURRENT_CONTAINERS
+    SandboxConfigurationError: status.HTTP_502_BAD_GATEWAY,  # 319 — 运行时配置错误（与父类 SandboxError 一致）
     # OCR 异常
     OCRConnectionError: status.HTTP_504_GATEWAY_TIMEOUT,  # 320 — 连接超时/不可达
     OCRProcessingError: status.HTTP_502_BAD_GATEWAY,  # 321 — 上游返回错误/响应解析失败

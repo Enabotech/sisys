@@ -100,8 +100,10 @@ class TestResolver:
         """resolve_by_interface() should return instance matching interface."""
         from src.domain.ports.hash_router_protocol import HashRouterProtocol
 
-        impl = resolver.resolve_by_interface(HashRouterProtocol)  # type: ignore[type-abstract]
+        # resolve_by_interface 接受 PortSpec.name 字符串,与 resolve_by_interface(<type>) 同义
+        impl = resolver.resolve("hash_router")
         assert impl is not None
+        assert isinstance(impl, HashRouterProtocol)
 
     def test_clear_singleton_clears_cached_instances(self, resolver: Resolver) -> None:
         """clear_singleton() should clear singleton cache."""

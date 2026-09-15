@@ -76,7 +76,12 @@ from src.domain.exceptions import (
     RerankError,
     RoleAlreadyExistsError,
     RoleNotFoundError,
+    SandboxConfigurationError,  # Story 4.4 EXCEPTION_319
     SandboxError,
+    SandboxImagePullError,  # Story 4.4 EXCEPTION_315
+    SandboxQuotaExceededError,  # Story 4.4 EXCEPTION_318
+    SandboxResourceLimitExceededError,  # Story 4.4 EXCEPTION_317
+    SandboxTimeoutError,  # Story 4.4 EXCEPTION_316
     ServiceUnavailableError,
     SkillLoadError,
     SkillNotFoundError,
@@ -239,6 +244,12 @@ class TestExceptionHttpMap:
             ContainerStartError,
             ExecutionError,
             ContainerStopError,
+            # 沙箱异常(Story 4.4 新增 EXCEPTION_315-319)
+            SandboxImagePullError,  # 315 — 镜像拉取失败
+            SandboxTimeoutError,  # 316 — 执行超时
+            SandboxResourceLimitExceededError,  # 317 — cgroups 资源超限
+            SandboxQuotaExceededError,  # 318 — 并发容器数超 MAX_CONCURRENT_CONTAINERS
+            SandboxConfigurationError,  # 319 — 运行时配置错误
             # OCR 异常
             OCRConnectionError,
             OCRProcessingError,

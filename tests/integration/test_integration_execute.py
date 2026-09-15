@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Generator
 from unittest.mock import AsyncMock
 
 import pytest
@@ -12,8 +13,8 @@ from src.application.event_handlers.auto_execute_completed_handler import AutoEx
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.auto_route_events import AutoRouted
+from src.domain.ports.sandbox_executor import SandboxExecutor
 from src.domain.services.auto_execute_service import AutoExecuteService
-from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import DockerSandboxAdapter
 
 
 class TestExecuteIntegration:
@@ -34,14 +35,51 @@ class TestExecuteIntegration:
         return AsyncMock()
 
     @pytest.fixture
-    def sandbox(self):
-        """Create DockerSandboxAdapter for integration testing."""
-        adapter = DockerSandboxAdapter()
+    def sandbox(self) -> Generator[AsyncMock, None, None]:
+        """Create AsyncMock SandboxExecutor for integration testing.
+
+        Story 4.4: 原 DockerSandboxAdapter mock 已删除,改用 AsyncMock(spec=SandboxExecutor)
+                作为端口契约 mock,与 4.3 测试装饰器模式一致。
+        """
+        adapter = AsyncMock(spec=SandboxExecutor)
+
+        # 使用内部状态模拟容器生命周期(对齐原 4.1a DockerSandboxAdapter mock 行为)
+        running_sessions: set[str] = set()
+
+        async def mock_start(session_id: str, spec: object = None) -> None:
+            running_sessions.add(session_id)
+
+        async def mock_stop(session_id: str) -> None:
+            running_sessions.discard(session_id)
+
+        async def mock_is_running(session_id: str) -> bool:
+            return session_id in running_sessions
+
+        async def mock_execute(
+            session_id: str,
+            code: str,
+            *,
+            timeout_sec: float | None = None,
+        ) -> dict[str, object]:
+            return {
+                "status": "completed",
+                "output": "Code executed successfully",
+                "error": None,
+                "execution_time_ms": 100,
+            }
+
+        async def mock_health() -> bool:
+            return True
+
+        adapter.start_container.side_effect = mock_start
+        adapter.stop_container.side_effect = mock_stop
+        adapter.is_container_running.side_effect = mock_is_running
+        adapter.execute_code.side_effect = mock_execute
+        adapter.health_check.side_effect = mock_health
         yield adapter
-        adapter._running_containers.clear()
 
     @pytest.fixture
-    def execute_service(self, sandbox: DockerSandboxAdapter) -> AutoExecuteService:
+    def execute_service(self, sandbox: SandboxExecutor) -> AutoExecuteService:
         """Create AutoExecuteService with sandbox."""
         return AutoExecuteService(sandbox=sandbox, snapshot_repo=None)
 
@@ -80,7 +118,7 @@ class TestExecuteIntegration:
 
     async def test_sandbox_container_lifecycle(
         self,
-        sandbox: DockerSandboxAdapter,
+        sandbox: SandboxExecutor,
     ) -> None:
         """Verify sandbox container start/execute/stop lifecycle."""
         session_id = f"lifecycle-{uuid.uuid4().hex[:8]}"
@@ -99,7 +137,7 @@ class TestExecuteIntegration:
 
     async def test_session_namespace_isolation(
         self,
-        sandbox: DockerSandboxAdapter,
+        sandbox: SandboxExecutor,
     ) -> None:
         """Verify different sessions get isolated containers."""
         session_a = f"isolated-a-{uuid.uuid4().hex[:8]}"
@@ -241,7 +279,7 @@ class TestExecuteIntegration:
 
     async def test_checkpoint_snapshot_creation_with_repo(
         self,
-        sandbox: DockerSandboxAdapter,
+        sandbox: SandboxExecutor,
     ) -> None:
         """Verify AutoExecuteService creates CheckpointSnapshot when repo is configured."""
         # Create mock snapshot repo
@@ -279,7 +317,7 @@ class TestExecuteIntegration:
 
     async def test_restore_snapshot_flow(
         self,
-        sandbox: DockerSandboxAdapter,
+        sandbox: SandboxExecutor,
     ) -> None:
         """Verify snapshot restoration flow."""
         # Create mock snapshot repo with existing snapshot
@@ -313,7 +351,7 @@ class TestExecuteIntegration:
 
     async def test_concurrent_execution_same_session(
         self,
-        sandbox: DockerSandboxAdapter,
+        sandbox: SandboxExecutor,
     ) -> None:
         """Verify concurrent execution requests for same session are handled correctly."""
         session_id = f"concurrent-{uuid.uuid4().hex[:8]}"
@@ -377,7 +415,7 @@ class TestExecuteIntegration:
 
     async def test_execution_creates_new_container_for_new_session(
         self,
-        sandbox: DockerSandboxAdapter,
+        sandbox: SandboxExecutor,
         execute_service: AutoExecuteService,
     ) -> None:
         """Verify new session creates new container, existing session reuses container."""
