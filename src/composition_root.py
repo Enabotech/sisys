@@ -2479,5 +2479,16 @@ async def shutdown() -> None:
     except Exception as e:
         logger.error("Failed to close layout_detector: %s", e)
 
+    # Round 4 P0-3/14 修复:优雅排空 schema 事件(避免 RabbitMQ 已关闭后
+    # fire-and-forget task publish 失败,导致 4.7 Validation Feedback 订阅者
+    # 收不到终止事件 is_final=True)
+    try:
+        from src.application.services.schema_event_helpers import drain_schema_events
+
+        await drain_schema_events(timeout=5.0)
+        logger.info("Drained pending schema validation events")
+    except Exception as e:
+        logger.error("Failed to drain schema events: %s", e)
+
 
 __all__ = ["bootstrap", "shutdown", "_global_registry"]

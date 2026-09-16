@@ -216,6 +216,34 @@ def publish_schema_event_async(
     return task
 
 
+async def drain_schema_events(timeout: float = 5.0) -> None:
+    """优雅排空所有挂起的 schema 事件 task(Round 4 P0-3 修复)
+
+    在 graceful shutdown / 测试 fixture teardown 时调用,
+    等待所有 _background_tasks 完成(或超时),避免事件丢失。
+
+    Args:
+        timeout: 等待超时秒数(默认 5.0)
+    """
+    if not _background_tasks:
+        return
+    pending = list(_background_tasks)
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(*pending, return_exceptions=True),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "drain_schema_events timeout after %.2fs, %d pending tasks cancelled",
+            timeout,
+            len(pending),
+        )
+        for t in pending:
+            if not t.done():
+                t.cancel()
+
+
 __all__ = [
     "TruncatedViolations",
     "EVENT_MAX_VIOLATIONS_DEFAULT",
@@ -224,4 +252,5 @@ __all__ = [
     "truncate_violations_for_event",
     "extract_schema_execution_id",
     "publish_schema_event_async",
+    "drain_schema_events",
 ]
