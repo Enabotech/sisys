@@ -16,7 +16,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Mapping
 
 from src.domain.exceptions import (
     EntityValidationError,
@@ -57,14 +57,15 @@ class ToolCall:
 
 @dataclass(frozen=True)
 class ExecutionContext:
-    """执行上下文值对象（Query Object 模式，CLAUDE.md §4）
+    """执行上下文值对象(Query Object 模式,CLAUDE.md §4)
 
     Attributes:
         tenant_id: 多租户隔离
         user_id: 用户唯一标识
-        session_id: 会话唯一标识（用于沙箱 session）
+        session_id: 会话唯一标识(用于沙箱 session)
         trace_id: 链路追踪 ID
-        timeout_sec: 超时秒数（默认 60.0）
+        timeout_sec: 超时秒数(默认 60.0)
+        extensions: 扩展上下文(Story 4.3 装饰器透传 execution_id 用;frozen dict 模式)
     """
 
     tenant_id: uuid.UUID
@@ -72,6 +73,7 @@ class ExecutionContext:
     session_id: str = ""
     trace_id: str = ""
     timeout_sec: float = 60.0
+    extensions: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """构造时校验不变量"""
@@ -85,6 +87,30 @@ class ExecutionContext:
                 message="timeout_sec 必须 > 0",
                 context={"entity": "ExecutionContext", "field": "timeout_sec"},
             )
+
+    def with_extension(self, key: str, value: Any) -> "ExecutionContext":
+        """返回带扩展项的新实例(frozen 值对象不可变,工厂方法)
+
+        Story 4.3 装饰器(SchemaValidator)用于透传 schema_execution_id 等元数据,
+        避免直接修改 frozen 实例。
+
+        Args:
+            key: 扩展项键
+            value: 扩展项值
+
+        Returns:
+            新的 ExecutionContext 实例
+        """
+        new_extensions: dict[str, Any] = dict(self.extensions)
+        new_extensions[key] = value
+        return ExecutionContext(
+            tenant_id=self.tenant_id,
+            user_id=self.user_id,
+            session_id=self.session_id,
+            trace_id=self.trace_id,
+            timeout_sec=self.timeout_sec,
+            extensions=new_extensions,
+        )
 
 
 @dataclass(frozen=True)

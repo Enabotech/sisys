@@ -290,8 +290,13 @@ class ToolExecutionEngine:
         observation: str,
         context: ExecutionContext,
     ) -> str:
-        """Validate 阶段：调用 LLMClientPort.structured_generate 产出 validation"""
-        prompt = self._build_validate_prompt(tool, result, observation)
+        """Validate 阶段:调用 LLMClientPort.structured_generate 产出 validation
+
+        P0-D 修复:从 context.extensions["schema_last_violations"] 读取上轮 violations,
+        由 ToolOutputValidator 装饰器在重试前注入,实现"重试 prompt 携带 violations"反馈
+        """
+        last_violations = (context.extensions or {}).get("schema_last_violations", ())
+        prompt = self._build_validate_prompt(tool, result, observation, last_violations)
         response = await self._retry_call(
             lambda: self._llm.structured_generate(
                 prompt=prompt,
@@ -379,8 +384,18 @@ class ToolExecutionEngine:
         tool: Tool,
         result: str,
         observation: str,
+        last_violations: tuple = (),
     ) -> str:
-        return f"验证工具 {tool.name} 输出: result={result}, observation={observation}"
+        """构建 Validate 阶段 prompt
+
+        P0-D 修复:可选 last_violations 参数(由 ToolOutputValidator 装饰器注入),
+        实现"重试 prompt 携带上轮 violations"反馈,LLM 可基于 violations 自纠。
+        """
+        base = f"验证工具 {tool.name} 输出: result={result}, observation={observation}"
+        if last_violations:
+            violations_text = "\n".join(f"- path={v.path}, expected={v.expected}, message={v.message}" for v in last_violations)
+            return f"{base}\n\n上轮 Schema 校验失败,请按以下 violations 自纠输出:\n{violations_text}"
+        return base
 
 
 __all__ = ["ToolExecutionEngine"]

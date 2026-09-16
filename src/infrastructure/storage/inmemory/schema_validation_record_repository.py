@@ -75,19 +75,22 @@ class InMemorySchemaValidationRecordRepository(L2RdbPort[SchemaValidationRecord]
         Returns:
             符合条件记录列表（按 validated_at DESC 排序 + offset/limit 分页）
         """
-        results = list(self._records.values())
-        if query.tenant_id is not None:
-            results = [r for r in results if r.tenant_id == query.tenant_id]
-        if query.tool_id is not None:
-            results = [r for r in results if r.tool_id == query.tool_id]
-        if query.execution_id is not None:
-            results = [r for r in results if r.execution_id == query.execution_id]
-        if query.validation_phase is not None:
-            results = [r for r in results if r.validation_phase == query.validation_phase]
-        if query.is_valid is not None:
-            results = [r for r in results if r.is_valid == query.is_valid]
-        results.sort(key=lambda r: r.validated_at, reverse=True)
-        return results[query.offset : query.offset + query.limit]
+        # P0 修复:读路径必须加锁,与 save/get_by_id/delete/list_all 保持一致,
+        # 避免并发 save 期间读到部分写入的视图(数据不一致)。
+        async with self._lock:
+            results = list(self._records.values())
+            if query.tenant_id is not None:
+                results = [r for r in results if r.tenant_id == query.tenant_id]
+            if query.tool_id is not None:
+                results = [r for r in results if r.tool_id == query.tool_id]
+            if query.execution_id is not None:
+                results = [r for r in results if r.execution_id == query.execution_id]
+            if query.validation_phase is not None:
+                results = [r for r in results if r.validation_phase == query.validation_phase]
+            if query.is_valid is not None:
+                results = [r for r in results if r.is_valid == query.is_valid]
+            results.sort(key=lambda r: r.validated_at, reverse=True)
+            return results[query.offset : query.offset + query.limit]
 
     async def count(self, query: SchemaValidationRecordQuery) -> int:
         """统计符合条件记录数量
@@ -98,18 +101,24 @@ class InMemorySchemaValidationRecordRepository(L2RdbPort[SchemaValidationRecord]
         Returns:
             记录总数
         """
-        all_results = await self.list_by_query(
-            SchemaValidationRecordQuery(
-                tenant_id=query.tenant_id,
-                tool_id=query.tool_id,
-                execution_id=query.execution_id,
-                validation_phase=query.validation_phase,
-                is_valid=query.is_valid,
-                offset=0,
-                limit=10**9,
-            )
-        )
-        return len(all_results)
+        # P0+P1 修复:
+        # 1) 同样加锁,与 list_by_query 保持并发一致
+        # 2) 不再调用 list_by_query(limit=10**9) 反模式,直接流式计数(避免 O(N log N) 排序)
+        async with self._lock:
+            count = 0
+            for record in self._records.values():
+                if query.tenant_id is not None and record.tenant_id != query.tenant_id:
+                    continue
+                if query.tool_id is not None and record.tool_id != query.tool_id:
+                    continue
+                if query.execution_id is not None and record.execution_id != query.execution_id:
+                    continue
+                if query.validation_phase is not None and record.validation_phase != query.validation_phase:
+                    continue
+                if query.is_valid is not None and record.is_valid != query.is_valid:
+                    continue
+                count += 1
+            return count
 
 
 __all__ = ["InMemorySchemaValidationRecordRepository"]
