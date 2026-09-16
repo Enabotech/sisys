@@ -24,7 +24,9 @@ from src.infrastructure.external_services.embedding.circuit_breaker import (
 )
 from src.infrastructure.external_services.llm.litellm_llm_client import (
     LitellmLLMClient,
+    _extract_first_json_object,
     _is_retryable_llm_error,
+    _strip_markdown_fence,
 )
 
 # ===================================================================
@@ -637,3 +639,84 @@ class TestMapLLMError:
         error = client._map_llm_error(InternalServerError("500 error", "openai", "test"), llm_config)
         assert isinstance(error, LLMAPIError)
         assert error.context.get("status_code") == 500
+
+
+# ===================================================================
+# JSON 解析鲁棒性辅助函数测试（Round 6 根因修复）
+# 修复 JSONDecodeError: Extra data 场景（LLM 在 JSON 后追加解释文本）
+# ===================================================================
+
+
+class TestStripMarkdownFence:
+    """_strip_markdown_fence 单元测试"""
+
+    def test_no_fence_returns_as_is(self) -> None:
+        """无围栏内容原样返回"""
+        content = '{"key": "value"}'
+        assert _strip_markdown_fence(content) == content
+
+    def test_strips_outer_fence(self) -> None:
+        """剥离外层 ```json ... ``` 围栏"""
+        content = '```json\n{"key": "value"}\n```'
+        assert _strip_markdown_fence(content) == '{"key": "value"}'
+
+    def test_strips_bare_fence(self) -> None:
+        """剥离 ``` ... ```（无语言标记）"""
+        content = '```\n{"key": "value"}\n```'
+        assert _strip_markdown_fence(content) == '{"key": "value"}'
+
+
+class TestExtractFirstJsonObject:
+    """_extract_first_json_object 单元测试（修复 JSONDecodeError: Extra data 根因）"""
+
+    def test_extracts_pure_json(self) -> None:
+        """纯 JSON 字符串正确返回"""
+        content = '{"entities": [{"name": "BLM"}]}'
+        result = _extract_first_json_object(content)
+        assert result == content
+
+    def test_extracts_json_with_trailing_text(self) -> None:
+        """根因场景：JSON 后跟解释文本（触发 JSONDecodeError: Extra data）"""
+        content = '{"entities": [{"name": "BLM"}]}\n\n以上是抽取结果，希望对你有帮助。'
+        result = _extract_first_json_object(content)
+        assert result == '{"entities": [{"name": "BLM"}]}'
+
+    def test_extracts_json_with_leading_text(self) -> None:
+        """JSON 前有引导文本"""
+        content = '下面是抽取结果：\n{"entities": [{"name": "BLM"}]}'
+        result = _extract_first_json_object(content)
+        assert result == '{"entities": [{"name": "BLM"}]}'
+
+    def test_extracts_first_of_multiple_json_blocks(self) -> None:
+        """多个 JSON 对象只取第一个"""
+        content = '{"a": 1}\n{"b": 2}'
+        result = _extract_first_json_object(content)
+        assert result == '{"a": 1}'
+
+    def test_handles_nested_objects(self) -> None:
+        """嵌套对象深度计算正确"""
+        content = '{"a": {"b": {"c": {"d": [1, 2, 3]}}}}'
+        result = _extract_first_json_object(content)
+        assert result == content
+
+    def test_handles_braces_inside_strings(self) -> None:
+        """字符串内的花括号不干扰配对计数（边界测试）"""
+        content = '{"text": "hello {world}", "num": 42}'
+        result = _extract_first_json_object(content)
+        assert result == content
+
+    def test_returns_none_for_no_json(self) -> None:
+        """无 JSON 返回 None"""
+        content = "no json here"
+        assert _extract_first_json_object(content) is None
+
+    def test_returns_none_for_empty_content(self) -> None:
+        """空内容返回 None"""
+        assert _extract_first_json_object("") is None
+        assert _extract_first_json_object(None) is None  # type: ignore[arg-type]
+
+    def test_handles_json_array(self) -> None:
+        """支持 JSON 数组（虽然场景主要是对象）"""
+        content = '[1, 2, {"a": 3}]'
+        result = _extract_first_json_object(content)
+        assert result == content

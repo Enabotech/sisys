@@ -79,6 +79,96 @@ def _is_retryable_llm_error(exception: BaseException) -> bool:
     return False
 
 
+def _strip_markdown_fence(content: str) -> str:
+    """剥离 LLM 输出外的 markdown 代码围栏（```json ... ```）。
+
+    用于 structured_generate 多策略解析：策略 1 失败时尝试此函数。
+    比直接的 startswith/endswith 处理更鲁棒（支持 ```json\\n ... \\n``` 嵌套）。
+
+    Args:
+        content: LLM 原始返回内容
+
+    Returns:
+        剥离围栏后的字符串（如无围栏则原样返回）
+    """
+    content = content.strip()
+    if not content.startswith("```"):
+        return content
+    # 跳过第一行（```json 或 ```）
+    first_newline = content.find("\n")
+    if first_newline == -1:
+        return content
+    body = content[first_newline + 1 :]
+    # 剥离结尾的 ```
+    if body.rstrip().endswith("```"):
+        # 找到最后一个 ``` 的位置
+        last_idx = body.rfind("```")
+        body = body[:last_idx].rstrip()
+    return body
+
+
+def _extract_first_json_object(content: str) -> str | None:
+    """从文本中提取第一个完整的 JSON 对象或数组。
+
+    修复根因：LLM 经常在 JSON 之后追加解释文本（如 "以上是抽取结果..."），
+    导致 json.loads() 抛 JSONDecodeError: Extra data。
+
+    实现：花括号/方括号配对计数 + 字符串边界感知（避免字符串内的括号干扰）。
+    O(n) 单次扫描。
+
+    Args:
+        content: LLM 原始/部分剥离后的内容
+
+    Returns:
+        第一个完整 JSON 对象/数组字符串；找不到返回 None
+    """
+    if not content:
+        return None
+    # 定位首个 JSON 起始字符（跳过前导非 JSON 文本）
+    start_idx = -1
+    open_ch = ""
+    close_ch = ""
+    for i, ch in enumerate(content):
+        if ch == "{":
+            start_idx = i
+            open_ch = "{"
+            close_ch = "}"
+            break
+        if ch == "[":
+            start_idx = i
+            open_ch = "["
+            close_ch = "]"
+            break
+    if start_idx == -1:
+        return None
+
+    # 花括号配对计数 + 字符串边界感知
+    depth = 0
+    in_string = False
+    escape_next = False
+    for end_idx in range(start_idx, len(content)):
+        c = content[end_idx]
+        if escape_next:
+            escape_next = False
+            continue
+        # 处理 JSON 字符串内的转义
+        if c == "\\" and in_string:
+            escape_next = True
+            continue
+        if c == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if c == open_ch:
+            depth += 1
+        elif c == close_ch:
+            depth -= 1
+            if depth == 0:
+                return content[start_idx : end_idx + 1]
+    return None
+
+
 class LitellmLLMClient(LLMClientPort):
     """LiteLLM LLM 客户端
 
@@ -470,7 +560,7 @@ class LitellmLLMClient(LLMClientPort):
     async def structured_generate(
         self,
         prompt: str,
-        response_schema: type[Any],
+        response_schema: type,
         config: LLMConfig | None = None,
         system_prompt: str | None = None,
     ) -> Any:
@@ -567,8 +657,13 @@ class LitellmLLMClient(LLMClientPort):
         try:
             import json
 
-            content = llm_response.content
-            # 清理 Markdown 代码围栏（部分 LLM 在 JSON 输出外包裹 ```json ... ```）
+            raw_content = llm_response.content or ""
+            content = raw_content
+            parsed: Any = None
+            last_error: Exception | None = None
+
+            # 多策略级联解析（修复 JSONDecodeError: Extra data 根因）
+            # 策略 1：剥离 markdown 围栏后直接解析（覆盖 90%+ 场景）
             if content:
                 content = content.strip()
                 if content.startswith("```"):
@@ -579,19 +674,48 @@ class LitellmLLMClient(LLMClientPort):
                     # 移除结尾的 ```
                     if content.endswith("```"):
                         content = content[:-3].rstrip()
-            # 移除 JSON 中的单行注释（部分 LLM 会在 JSON 后追加注释说明）
-            # 使用正则一次性移除所有 // 注释（O(n) 而非 O(n²) 循环）
-            content = re.sub(r'(?<!:)//[^"\n]*', "", content)
+                # 移除 JSON 中的单行注释（部分 LLM 会在 JSON 后追加注释说明）
+                # 使用正则一次性移除所有 // 注释（O(n) 而非 O(n²) 循环）
+                content = re.sub(r'(?<!:)//[^"\n]*', "", content)
 
-            # 尝试解析 JSON 结构
-            parsed = json.loads(content) if content else {}
+            # 策略 1：直接解析（首选，覆盖 90%+ 场景）
+            try:
+                parsed = json.loads(content) if content else {}
+            except json.JSONDecodeError as e:
+                last_error = e
+                # 策略 2：剥离 markdown 围栏后再次尝试（如果策略 1 未剥离干净）
+                stripped = _strip_markdown_fence(raw_content)
+                if stripped != content:
+                    try:
+                        parsed = json.loads(stripped)
+                        content = stripped
+                    except json.JSONDecodeError:
+                        pass
+                # 策略 3：提取首个完整 JSON 对象（修复 "JSON + 额外文本" 场景根因）
+                if parsed is None:
+                    first_json = _extract_first_json_object(content)
+                    if first_json:
+                        try:
+                            parsed = json.loads(first_json)
+                        except json.JSONDecodeError as e:
+                            last_error = e
+
+            if parsed is None:
+                # 全部策略失败，抛出业务异常（context 保留原文摘要便于诊断）
+                raise LLMResponseError(
+                    f"结构化输出解析失败 (JSONDecodeError: {last_error})",
+                    cause=last_error,
+                    model=cfg.model,
+                    response_summary=raw_content[:200],
+                )
+
             if isinstance(parsed, dict):
                 obj = response_schema(**parsed)
             else:
                 raise LLMResponseError(
                     "LLM 返回的 JSON 结构不是预期的对象类型，期望 dict 类型",
                     model=cfg.model,
-                    response_summary=llm_response.content[:200] if llm_response.content else "",
+                    response_summary=raw_content[:200],
                 )
 
             return obj
