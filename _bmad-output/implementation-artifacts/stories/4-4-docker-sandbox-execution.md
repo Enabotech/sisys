@@ -19,11 +19,11 @@
 Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→Execute→Observe→Validate），但 `SandboxExecutor` 端口目前由 **mock 实现** 支撑（仅日志 + 字典记录），无法满足生产环境的隔离与安全要求。Story 4.4 将该 mock 替换为 **生产级 Docker 沙箱实现**：
 
 1. **代码执行隔离**：每个会话获得独立容器 + CPU 1 核 / 内存 512MB / 网络默认禁用 / 只读文件系统 + tmpfs `/tmp`
-2. **权限最小化**：`--security-opt no-new-privileges` + `cap_drop: ALL` + user namespace remap + 自定义 seccomp profile
+2. **权限最小化**：`--security-opt no-new-privileges` + `cap_drop: ALL` + 自定义 seccomp profile（**本期不启用 user namespace remap**，`userns_mode` 默认采用 Docker daemon 默认行为，UID 0 仍与 host 共享——属已知限制，由 cap_drop/no-new-privileges/read_only 多层防御补偿；详见 D3-1 风险评估小节）
 3. **网络隔离**：默认断网（`network_mode: "none"`），通过白名单网关访问可信财经 API（架构层预留，应用层无外网调用）
 4. **资源回收**：30 分钟无活动自动销毁容器 + 孤儿容器定时清理
 5. **错误捕获**：STDERR 自动捕获，支撑 Story 4.7 Validation Feedback 闭环（最大重试 3 次）
-6. **可观测**：容器启动延迟 P95 < 5s、并发 ≥ 10、沙箱逃逸 0 次
+6. **可观测**：容器启动延迟热启动 P95 < 2s + 冷启动 < 30s（**含镜像预拉取**）、并发 ≥ 10、已知 CVE 沙箱逃逸测试集 0 次（**不承诺抵御内核 0day**；运行时检测 Falco/Tetragon 列入后续 Story）
 
 **业务定位：** Epic 4 战略工具箱的 **安全执行层**，位于工具执行（4.1a）之上、Validation Feedback 闭环（4.7）与 Skills 数据采集（4.1c）之下。
 
@@ -35,15 +35,15 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 
 **本 Story 范围（4.4）：**
 
-1. **替换 mock 实现**：将 `DockerSandboxAdapter`（mock）替换为基于 `aiodocker` 的真实 Docker 容器管理 `AioDockerSandboxAdapter`；采用**删除 mock + 替换 impl 字符串**策略（不保留 fallback，避免 CLAUDE.md §5 mock 滥用）；CI/本地无 Docker 环境通过 `SISYS_USE_TEST_PORTS=1` 切换（CLAUDE.md §6 既有约定）
+1. **替换 mock 实现**：将 `DockerSandboxAdapter`（mock）替换为基于 `aiodocker` 的真实 Docker 容器管理 `AioDockerSandboxAdapter`；采用**保留 mock 文件 + 切换 impl 字符串**策略（mock 文件保留但**不在 composition_root 注册**，避免 CLAUDE.md §5 mock 滥用同时保留 `git tag pre-4-4-mock-fallback` 紧急回滚路径）；CI/本地无 Docker 环境通过 `SISYS_USE_TEST_PORTS=1` 切换（CLAUDE.md §6 既有约定）
 2. **`ContainerSpec` 值对象**（领域层）：CPU/内存/网络模式/镜像 digest/seccomp profile/ulimits/pids-limit 等约束的不可变描述（**12 字段**：1 必填 `image` + 11 项默认值；详见 AC-1）
 3. **5 个新领域异常**（EXCEPTION_315~319）：`SandboxImagePullError` / `SandboxTimeoutError` / `SandboxResourceLimitExceededError` / `SandboxQuotaExceededError` / `SandboxConfigurationError`
-4. **`SandboxExecutor` 端口扩展**：保持向后兼容（4.1a 既有 4 方法签名不变），通过**默认参数**新增可选 `ContainerSpec` / `timeout_sec` 入参 + 新增 `health_check()` 方法
+4. **`SandboxExecutor` 端口扩展**：保持向后兼容（4.1a 既有 4 方法**调用行为**不变，签名通过默认参数扩展），通过**默认参数**新增可选 `ContainerSpec` / `timeout_sec` 入参 + 新增 `health_check()` 方法
 5. **应用层安全编排**：新增 `SandboxSecurityDecorator` 包裹类（**非 Python `@decorator` 语法**，仅借用设计模式术语），在 `ToolExecutionEngine` 装配层注入超时 + 重试 + 配额 + session_id 注入防御；**不修改** `ToolExecutionEngine.__init__`
-6. **30 分钟空闲清理**：新增**独立应用层服务** `SandboxSessionReaper`，基于 `SandboxSessionRepositoryPort.list_idle_sessions()` 实现；**不修改** `SessionNamespaceManager`（既有 4.1a 实现无 TTL 机制）
+6. **30 分钟空闲清理**：新增**应用层服务** `SandboxSessionReaper`，**作为端口注册**（与既有 `tool_execution_engine` 模式一致，便于运行时 `resolver.resolve()` 注入），基于 `SandboxSessionRepositoryPort.list_idle_sessions()` 实现；**不修改** `SessionNamespaceManager`（既有 4.1a 实现无 TTL 机制）；调度复用 Story 1.18a 既有 Prefect `serve()` + `every "30 minutes"`（P1 决策，见 Task 6.4 调度集成测试）
 7. **集成测试基础设施**：`testcontainers-python` 真实 Docker daemon + pytest-bdd 验收
-8. **架构验证测试**：`tests/unit/architecture/test_docker_sandbox.py`（**注意：epics_v1.0.md:1204 硬要求此路径，不带 `_arch_` 前缀**）验证域层零依赖 + PortSpec 10 字段元数据完整性
-9. **Alembic migration 014**：`down_revision = "013"`（**关键**：既有 11 个 migration 的 `revision` 字段都是数字 ID 如 `"013"`/`"012"`/`"011"`，**不是文件名**；详见 `deploy/postgresql/alembic/versions/013_schema_validation_records.py:30`），记录沙箱会话（便于审计 + 配额统计）
+8. **架构验证测试**：`tests/unit/architecture/test_docker_sandbox.py`（**注意：epics_v1.0.md:1204 硬要求此路径，不带 `_arch_` 前缀**；与 4-1a/4-3 既有 `test_arch_*.py` 命名惯例并存，已通过 epics 文案确认）验证域层零依赖 + PortSpec 10 字段元数据完整性
+9. **Alembic migration 015**：`down_revision = "014"`（**关键**：`014_schema_validation_records_violations_gin.py` 已于 2026-09-16 由 Story 4.3 Round 2 合入；既有 migration 的 `revision` 字段都是数字 ID 如 `"014"`/`"013"`/`"012"`，**不是文件名**），记录沙箱会话（便于审计 + 配额统计；索引从 4 个优化为 3 个——移除冗余 `tenant_id` 单列索引，仅保留 `(tenant_id, state)` 复合索引 + `(state, last_activity_at)` 复合索引 + `container_id` UNIQUE）
 
 **不在本 Story 范围（拆分到其他 Story）：**
 
@@ -94,7 +94,7 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 - **禁止** 手动 `raise HTTPException(...)`
 - **禁止** 继承内置 `Exception`（除 `DomainError` 基类）
 - **必须** 走 `src/domain/exceptions/` 体系 + `ExceptionHandlers` 自动映射
-- 提交前**三条 grep 自查**必须零输出：`grep -rn "raise ValueError\|raise HTTPException\|class.*Exception\b" src/`
+- 提交前**三条 grep 自查**必须零输出（**Story 4.4 范围声明**）：新增代码范围内零输出；当前项目 `src/` 全量 grep 存在历史欠账（`raise ValueError` 12 处 + `raise HTTPException` 24 处 = 共 36 处；详见 `ocr_cli.py` / `strategic_archive.py` / `circuit_breaker.py` / `auth.py` / `domain_dictionary.py` / `document_upload.py` 等文件），本 Story 不清理历史欠账，仅确保新增代码零输出；后续技术债 Story 单独跟进。Story 4.4 范围内的精确 grep 路径：`src/domain/exceptions/ src/domain/ports/ src/domain/entities/ src/domain/value_objects/ src/domain/events/ src/application/services/sandbox_* src/infrastructure/external_services/sandbox/ src/infrastructure/storage/inmemory/sandbox_*`
 
 ### 新增异常完整性 Checklist（**5 项强制**，含 1 项 HTTP 映射注册）
 
@@ -102,20 +102,30 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 2. **`_code_ranges.py` 子域映射**：在 `_CLASS_TO_SUBDOMAIN` 注册 class → 子域对应（**复用 `sandbox` 子域 311-319**，新增占用 315-319，**与既有 311-314 共用子域**，不新建子域）
 3. **`__init__.py` 暴露**：在 `src/domain/exceptions/__init__.py` 导入并加入 `__all__`
 4. **子域码段校验**：异常 `code` 在 `sandbox` 子域（311-319）范围内（**注意**：本 Story 仅占用 315-319，311-314 已被 4.1a 既有 4 个异常占用）
-5. **`EXCEPTION_HTTP_MAP` 注册**：在 `src/interfaces/api/exception_handlers.py` 增加 5 条新异常 → HTTP 状态码映射（默认 502，`SandboxTimeoutError: 504`，`SandboxQuotaExceededError: 503`；既有 sandbox 注释偏差 `# 309~312` 与实际 `EXCEPTION_311~314` 不一致属于历史 bug，本 Story 不修复）
+5. **`EXCEPTION_HTTP_MAP` 注册**：在 `src/interfaces/api/exception_handlers.py` 增加 5 条新异常 → HTTP 状态码映射（默认 502，`SandboxTimeoutError: 504`，`SandboxQuotaExceededError: 503`；既有 sandbox 注释偏差 `# 309~312`（line 177-180）与实际 `EXCEPTION_311~314` 不一致属于历史 bug（实际是 4.1a 创建时即偏差 -2 位的注释笔误），本 Story 新增 5 条映射时**必须保持注释与 code 严格一致**（如 `# 315` 对应 EXCEPTION_315），避免重复历史问题；既有偏差本 Story 不修复）
 
 ### 抑制告警禁止
 
 - **禁止** `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释
 - **禁止** mypy 配置 `ignore_missing_imports=true` 豁免
-- `aiodocker` **无 `py.typed`**：**必须**创建 PEP 561 stubs（`stubs/aiodocker/__init__.pyi`），覆盖实际使用的 **9 个 API 面**（`Docker.pull` / `Docker.ping` / `Docker.containers.run` / `Docker.containers.get` / `Docker.containers.list` / `Docker.containers.delete` / `Container.exec_create` / `Container.exec_start` / `Container.stats`）
+- **`aiodocker` 类型注解处理**（**关键**：前提待核实）：
+  - **Task 5 第 1 步必做**：先执行 `python -c "import aiodocker; print(aiodocker.__file__)"` + `ls $(python -c "import aiodocker; print(aiodocker.__file__)")/../py.typed` 检查 `py.typed` 是否存在
+  - **若 `py.typed` 不存在**：必须创建 PEP 561 stubs（`stubs/aiodocker/__init__.pyi`），覆盖实际使用的 **14 个 API 面**（`Docker.pull` / `Docker.ping` / `Docker.containers.run` / `Docker.containers.get` / `Docker.containers.list` / `Docker.containers.delete` / `Docker.images.list` / `Docker.events.subscribe` / `Docker.close` / `Container.exec_create` / `Container.exec_start` / `Container.stats` / `Container.wait` / `Container.kill`）
+  - **若 `py.typed` 已存在**：基于已有 stubs 补充 14 个 API 面的覆盖（特别是 `wait`/`kill`/`log`/`events`/`close` 在 execute_code/stop_container 实现中几乎必然调用）
+  - stubs 文件头须注释"本存根仅覆盖项目实际使用 API 面，未覆盖部分按 `Any` 处理"
 
 ### Commit & Push 规范
 
 - **禁止** commit 信息含 AI 辅助署名（`Co-Authored-By: Claude` / `anthropic.com` 等）
 - **禁止** `--no-verify` 绕过 pre-commit hooks
 - **禁止** 修改 `.importlinter` 已合入的架构依赖规则
-- **禁止** 修改已合入的 alembic migration（只允许新增，本期新增 migration 014）
+- **禁止** 修改已合入的 alembic migration（只允许新增，本期新增 migration 015）
+- **mock 文件删除前必做**：`git tag pre-4-4-mock-fallback` 标记当前 mock 实现快照，便于紧急回滚（**D5-1 风险缓解**）
+
+### API 路由约束（CLAUDE.md §5 第 10 项）
+
+- **本 Story 不新增任何 HTTP API 路由**：所有沙箱执行通过既有 `ToolExecutionEngine` API 端点间接调用（已过认证中间件）
+- 既有 API 路由清单不受影响：`composition_root.py` 仅在依赖注入层调整（`tool_execution_engine` lambda impl 嵌套 `SandboxSecurityDecorator`），不新增 `FastAPI` 路由注册
 
 ### Sandbox 安全约束（CLAUDE.md §6 Gotcha 扩展）
 
@@ -124,8 +134,16 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 - **禁止** 网络默认开放（必须 `network_mode: "none"`；本 Story 删除 `network_whitelist` 字段，遵循 CLAUDE.md §2 Simplicity First）
 - **禁止** `image: ":latest"`（必须 pin digest 或 minor tag）
 - **asyncio.Lock 必须为类变量**：`InMemorySandboxSessionRepository._lock: asyncio.Lock = asyncio.Lock()`（CLAUDE.md §6 Gotcha）
-- **session_id 注入防御**：容器名 `f"sisys-sandbox-{tenant_id_short}-{session_id_short}"` 必须校验 session_id 匹配正则 `^[A-Za-z0-9_-]{1,64}$`；tenant_id_short 取 UUID 前 8 字符，session_id_short 截取前 32 字符，**总长度控制在 Docker 上限 64 字符内**
+- **session_id 注入防御**：容器名 `f"sisys-sandbox-{tenant_id_short}-{session_id_short}"` 必须校验 session_id 匹配正则 `^[A-Za-z0-9_-]{1,64}$`；tenant_id_short 取 UUID 前 8 字符，session_id_short 截取前 32 字符
 - **容器命名统一约定**（全文唯一格式）：`sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}`（生产）+ 测试场景追加 `TestTenant UUID` 前缀（tenant_id 已含 UUID 前缀）
+- **容器名总长度计算**：14(`sisys-sandbox-`) + 8(tenant 前缀) + 1(`-` 分隔) + 32(session 前缀) = **55 字符**，**严格在 Docker 64 字符上限内**，留 9 字符 buffer 应对 Docker 命名规则补充字符
+- **用户 namespace 限制**：本期 `userns_mode` 采用 Docker daemon 默认行为（**不启用 user namespace remap**，UID 0 与 host 共享）；通过 `cap_drop: ALL` + `no-new-privileges` + `read_only` 多层防御补偿；属已知限制，详见 Dev Notes 风险评估
+
+### 代码质量门禁（CLAUDE.md §4 第 3 项扩展）
+
+- **行宽 128 字符**（`ruff` 配置 `line-length = 128`）
+- **ruff 规则集 E/F/I/N/W**（`ruff` 配置 `select = ["E", "F", "I", "N", "W"]`）
+- **Google 风格全中文注释**（详见项目 memory `~/.claude/projects/-home-agimtech-sisys/memory/sisys_code_comment_style.md`）：文件头 docstring + 类 docstring + 函数/方法 docstring（Args/Returns/Raises/Example）
 
 ---
 
@@ -265,7 +283,7 @@ class SandboxTimeoutError(ExecutionError):
 
 ### Schema 隔离
 
-- Alembic migration 014 sandbox_sessions 表使用 `tenant_id` UUID + 复合索引
+- Alembic migration 015 sandbox_sessions 表使用 `tenant_id` UUID + 复合索引
 - 集成测试使用 `test_{uuid}` PG schema + savepoint rollback（**禁止** 手动 delete/truncate）
 
 ### 容器生命周期清理
@@ -281,7 +299,7 @@ class SandboxTimeoutError(ExecutionError):
 
 **位置：** `src/domain/ports/sandbox_executor.py`（**既有文件扩展**，非新建）
 
-**向后兼容原则：** 不破坏 4.1a 既有 4 方法的**调用行为**（既有调用点零修改），通过**默认参数**扩展入参签名（注：`@runtime_checkable` Protocol 不验证默认参数；`inspect.signature()` 会反映参数扩展，但既有调用点按位置参数调用不受影响）
+**向后兼容原则：** 不破坏 4.1a 既有 4 方法的**调用行为**（既有调用点零修改），通过**默认参数**扩展入参签名——**关键说明**：`@runtime_checkable` Protocol 不验证方法签名（仅检查方法名），`inspect.signature()` 对 Protocol 抽象方法返回的是 `inspect.Signature` 抽象形式（不反映具体默认值）；**真正的向后兼容原因是**：默认参数 + 既有调用点按位置参数调用 `start_container(session_id,)` / `execute_code(session_id, code)` 不需新参数即可工作。Task 4 必须用单元测试显式验证："既有 4.1a mock 适配器按 1 参/2 参位置调用形态在新协议下仍能跑通"
 
 ```python
 @runtime_checkable
@@ -418,6 +436,8 @@ class ContainerSpec:
 
 **注意：** 原文档描述的 `network_whitelist` 字段已**删除**（本 Story 不实现网络白名单网关，遵循 CLAUDE.md §2 Simplicity First），因此 `__post_init__` 不变量校验从原 7 项减少为 **6 项**。
 
+**已知限制**（D3-3 技术债务）：`network_mode="none"` 写死到 `__post_init__` 不变量，未来 V2 扩展支持可信网关时需修改领域层校验（推荐方案：扩展为白名单 `network_mode in {"none", "bridge"}`，同时在应用层约定"bridge 模式需可信网关配置"）。本期不做。
+
 ### 领域事件：SandboxSessionStarted / SandboxSessionTerminated（**继承 DomainEvent 基类**）
 
 **位置：** `src/domain/events/sandbox_events.py`
@@ -484,20 +504,27 @@ class SandboxSessionStarted(DomainEvent):
 
 **⚠️ 重要事实校正（关键 P0 修正）：**
 
-既有 `tests/contracts/test_port_contract_sandbox_executor.py`（4.1a 创建）**实际只有 8 个测试方法**（`test_protocol_is_runtime_checkable` / 4 个 `test_*_method_exists` / `test_start_container_signature` / `test_compliant_implementation` / `test_noncompliant_implementation_fails`），**不是 11 维度**。
+既有 `tests/contracts/test_port_contract_sandbox_executor.py`（4.1a 创建）**实际只有 8 个测试方法**（`test_protocol_is_runtime_checkable` / 4 个 `test_*_method_exists` / `test_start_container_signature` / `test_compliant_implementation` / `test_noncompliant_implementation_fails`），**不是 11 维度**——这 8 维度是**Protocol 结构验证**（验证方法名/签名/运行时检查），与 11 维度 **PortSpec 元数据**验证是两种不同的测试模板。
 
 本 Story 实施策略：
-- `tests/contracts/test_port_contract_sandbox_executor.py`（**既有扩展**）：从 8 维度扩展到 11 维度（对齐 `test_port_contract_tool_execution_service.py:5-16` 样板），新增 3 个维度：
+- `tests/contracts/test_port_contract_sandbox_executor.py`（**既有扩展**）：从 8 维度扩展到 **11 + 8 = 19 维度**，新增 3 个 PortSpec 元数据维度：
   - `port_version`（新增断言 `spec.version` 非空）
   - `port_owner`（新增断言 `spec.owner == "sandbox-team"`）
   - `port_module`（新增断言 `spec.module` 路径正确）
-- `tests/contracts/test_port_contract_sandbox_session_repository.py`（**新建**）：11 维度全量覆盖（直接对齐样板，无既有扩展负担）
+- `tests/contracts/test_port_contract_sandbox_session_repository.py`（**新建**）：11 维度 PortSpec 元数据全量覆盖（直接对齐样板，无既有扩展负担）
 - `tests/contracts/test_event_contract_sandbox_events.py`（**新建**）：事件契约（字段必填 + 序列化 + 通道双投递 + 继承 DomainEvent 基类）
 - `tests/contracts/test_value_object_contract_container_spec.py`（**新建**）：**12 字段**值对象契约（不变量校验）
 
-**PortSpec 实际 10 字段**（`src/domain/ports/registry.py:44-53`）：
+**PortSpec 实际 10 字段**（`src/domain/ports/registry.py:27-53`）：
 `name / version / interface / impl / module / lifetime / owner / compatibility / tags / deprecated`
 （**注意**：register_port 5 个必填位置参数为 `name / version / interface / impl / module`，其余通过 `**kwargs` 透传；本文原文档"7 字段"表述错误）
+
+**架构验证测试元数据断言补充**（Task 9.4）：10 字段逐一断言非空 + 类型正确：
+- `owner` 是非空 `str`
+- `lifetime` 是 `Lifetime` enum
+- `compatibility` 是 `tuple[str, ...]`
+- `deprecated` 是 `bool`
+- `version` 匹配 `^\d+\.\d+\.\d+$` 语义化版本
 
 ---
 
@@ -512,7 +539,7 @@ class SandboxSessionStarted(DomainEvent):
 | Epic | Epic 4: 战略工具箱 |
 | 价值组 | 战略决策智能（Executive Decision Intelligence） |
 | 优先级 | P0（Epic 4 战略工具箱核心安全能力） |
-| 估算工作量 | **25-35 人天**（含 5 项 Checklist 异常体系 + aiodocker 集成 + 11 维度端口契约测试（含既有 8→11 维度扩展）+ ContainerSpec **12 字段**不变量 + 30 分钟 TTL 清理 + Seccomp profile 配置 + testcontainers 集成测试 + 架构验证测试 + alembic migration 014 + BDD 验收 +30% 缓冲） |
+| 估算工作量 | **30-40 人天**（含 5 项 Checklist 异常体系 + aiodocker 集成 + 11 维度端口契约测试（含既有 8→11 维度扩展）+ ContainerSpec **12 字段**不变量 + 30 分钟 TTL 清理 + Seccomp profile 配置 + testcontainers 集成测试 + 架构验证测试 + alembic migration 015 + BDD 验收 +30% 缓冲，含 P0 修复 + P1 调度机制调研 + 集成测试全链路回归 + mock 文件 git tag 紧急回滚路径） |
 | 覆盖 FR | FR-ST-04（Docker 沙箱执行）/ FR-ST-07（Validation Feedback 闭环前置） |
 | 前置 Story | 4-1a-strategic-tool-impl（✅ done）/ 1-7-minio-object-layer（✅ done）/ 1-18a-prefect-workflow-integration（✅ done） |
 | 后续 Story | **4-1c-skills-data-collection-integration**（**注**：原文档误标 4-1b，实际 sprint-status.yaml 中 4-1b 是 skills-feat-enhancement，4-1c 才是数据采集集成） / 4-7-validation-feedback-loop |
@@ -528,13 +555,13 @@ class SandboxSessionStarted(DomainEvent):
 **Then**
 
 - **路径**：`src/domain/value_objects/container_spec.py`
-- **字段**（**13 项**，详见上文 ContainerSpec 签名）：
+- **字段**（**12 项**，详见上文 ContainerSpec 签名）：
   - 必填：`image: str`（必须包含 `@sha256:` digest 或 `:X.Y` minor tag，禁止 `:latest`）
   - 默认：`mem_limit_mb: int = 512` / `cpu_quota: float = 1.0` / `pids_limit: int = 256`
   - 默认：`network_mode: str = "none"` / `read_only_rootfs: bool = True`
   - 默认：`tmpfs_mounts: dict[str, str] = {"/tmp": "100m"}` / `cap_drop: tuple[str, ...] = ("ALL",)`
   - 默认：`security_opt: tuple[str, ...] = ("no-new-privileges",)` / `seccomp_profile: str = "<仓库内置>"`
-  - 默认：`userns_mode: str = "host"` / `timeout_sec: float = 30.0`
+  - 默认：`userns_mode: str = ""`（**默认采用 Docker daemon 默认行为**，不启用 user namespace remap；详见硬约束 §Sandbox 安全约束）/ `timeout_sec: float = 30.0`
   - **注意**：`network_whitelist` 字段已删除（CLAUDE.md §2 Simplicity First，本期不实现网络白名单网关）
 - **`__post_init__` 不变量校验**（**违反任一项**抛 `EntityValidationError` EXCEPTION_242）：
   1. `mem_limit_mb ∈ (0, 2048]`
@@ -599,9 +626,9 @@ class SandboxSessionStarted(DomainEvent):
   - `async def execute_code(self, session_id: str, code: str) -> dict[str, Any]: ...`（**既有签名**）
   - `async def stop_container(self, session_id: str) -> None: ...`（**既有签名**）
   - `async def is_container_running(self, session_id: str) -> bool: ...`（**既有签名**）
-- **扩展方法**（默认参数 → 向后兼容）：
-  - `async def start_container(self, session_id: str, spec: ContainerSpec | None = None) -> None`（默认 `None` → 沿用既有默认）
-  - `async def execute_code(self, session_id: str, code: str, *, timeout_sec: float | None = None) -> dict[str, Any]`（默认 `None` → 沿用既有默认）
+- **扩展方法**（默认参数 → 向后兼容，**调用行为不变**，**签名形态扩展**）：
+  - `async def start_container(self, session_id: str, spec: ContainerSpec | None = None) -> None`（默认 `None` → 沿用既有默认；既有 4.1a 调用点 `start_container(session_id,)` 仍能工作）
+  - `async def execute_code(self, session_id: str, code: str, *, timeout_sec: float | None = None) -> dict[str, Any]`（默认 `None` → 沿用既有默认；既有 4.1a 调用点 `execute_code(session_id, code)` 仍能工作）
 - **新增方法**：
   - `async def health_check(self) -> bool`（daemon 可达 → True，否则 False，**不抛异常**，用于熔断器 + 启动探针）
 - **零依赖**：Protocol 仅依赖 `typing.Protocol` / `runtime_checkable` / `Any` + 领域层异常 + 领域层值对象（`ContainerSpec`）
@@ -610,11 +637,11 @@ class SandboxSessionStarted(DomainEvent):
 **验证标准/Validation Criteria:**
 
 - [ ] `SandboxExecutor` Protocol 位于 `src/domain/ports/sandbox_executor.py`（既有位置）
-- [ ] 4 个既有方法签名**完全保持不变**（4.1a 调用点不破坏）
-- [ ] 2 个扩展方法通过默认参数实现向后兼容
+- [ ] 4 个既有方法**调用行为保持不变**（默认参数扩展，4.1a 既有调用点零修改；既有 mock 适配器 1 参/2 参位置调用形态仍能跑通新协议）
+- [ ] 2 个扩展方法通过默认参数实现向后兼容（**签名形态扩展但调用行为不变**）
 - [ ] 新增 `health_check()` 方法（不抛异常，返回 bool）
 - [ ] 域层零依赖验证通过（`poetry run lint-imports`）
-- [ ] 契约测试 `tests/contracts/test_port_contract_sandbox_executor.py`（**既有**，11 维度）扩展验证向后兼容
+- [ ] 契约测试 `tests/contracts/test_port_contract_sandbox_executor.py`（**既有**，**8 维度 Protocol 结构 + 3 维度 PortSpec 元数据 = 11 维度**）扩展验证向后兼容
 - [ ] 单元测试 `tests/unit/domain/ports/test_sandbox_executor_port.py`（**既有**）通过（既有测试用例不修改）
 
 ### AC-4: SandboxSession 聚合根 + SandboxSessionRepository 端口
@@ -663,7 +690,7 @@ class SandboxSessionStarted(DomainEvent):
 - **`InMemorySandboxSessionRepository`**：
   - **路径**：`src/infrastructure/storage/inmemory/sandbox_session_repository.py`
   - **模式复用 4.1a**：`dict[str, SandboxSession]`（**按 session_id 字符串索引，非 UUID**） + `asyncio.Lock` **类变量** + frozen dataclass
-- **Alembic migration 014**：`deploy/postgresql/alembic/versions/014_sandbox_sessions.py`
+- **Alembic migration 015**：`deploy/postgresql/alembic/versions/015_sandbox_sessions.py`
   - **关键**：`down_revision = "013"`（参考 `013_schema_validation_records.py:30` 实际 `revision = "013"`）
   - `sandbox_sessions` 表 + 4 索引：tenant_id / (tenant_id, state) / (state, last_activity_at) / container_id UNIQUE
   - **主键**：`session_id VARCHAR(64) PRIMARY KEY`（字符串主键，不使用 UUID）
@@ -673,10 +700,12 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] `SandboxSession` 聚合根位于 `src/domain/entities/sandbox_session.py`（10 字段）
 - [ ] `session_id` 正则校验 `^[A-Za-z0-9_-]{1,64}$`（防注入）
 - [ ] `SandboxSessionRepositoryPort` 定义在 `src/domain/ports/`（领域层，非应用层）
-- [ ] 查询方法使用 `SandboxSessionQuery` frozen dataclass（CLAUDE.md §4 决策规则）
+- [ ] **反向断言**：`assert not issubclass(SandboxSessionRepositoryPort, L2RdbPort)`（P1-2 验证标准；确认主键类型冲突决策落地）
+- [ ] 查询方法使用 `SandboxSessionQuery` frozen dataclass（CLAUDE.md §4 决策规则），单独单元测试 `tests/unit/domain/ports/test_sandbox_session_query.py`（P1-3 验证标准）
 - [ ] `InMemorySandboxSessionRepository` 使用 `asyncio.Lock` **类变量**（CLAUDE.md §6 Gotcha）
 - [ ] 端口契约测试 `tests/contracts/test_port_contract_sandbox_session_repository.py` **11 维度**覆盖
-- [ ] Alembic migration `014_sandbox_sessions.py` 创建（**`down_revision = "013"`** + 4 索引 + UNIQUE container_id + VARCHAR(64) 主键）
+- [ ] Alembic migration `015_sandbox_sessions.py` 创建（**`down_revision = "014"`** + **3 索引**（移除冗余 `tenant_id` 单列索引，仅保留 `(tenant_id, state)` 复合索引 + `(state, last_activity_at)` 复合索引 + `container_id` UNIQUE）+ VARCHAR(64) 主键）
+- [ ] **migration round-trip 测试**：`alembic upgrade head && alembic downgrade -1` 集成测试通过（P1-4 验证标准）
 - [ ] `composition_root.py` 注册 `sandbox_session_repository` 端口（**line 102 附近 import + line 821 之后新增 register_port**，lifetime=SCOPED，owner="sandbox-team"）
 
 ### AC-5: AioDockerSandboxAdapter 实现（替换 mock）
@@ -740,14 +769,16 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] `AioDockerSandboxAdapter` 位于 `src/infrastructure/external_services/sandbox/aiodocker_sandbox_adapter.py`
 - [ ] 实现 `SandboxExecutor` Protocol（既有 4 方法 + 新增 `health_check`）
 - [ ] 5 类异常映射完整（镜像拉取 → 315 / 超时 → 316 / 资源超限 → 317 / 配额 → 318 / 配置 → 319）
-- [ ] 容器名格式统一 `sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}`，总长度 ≤ 56 字符
-- [ ] 旧 `docker_sandbox_adapter.py` mock 文件**已删除**
-- [ ] `composition_root.py:817` impl 字符串已切换至 `AioDockerSandboxAdapter`
+- [ ] 容器名格式统一 `sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}`，总长度 ≤ **55 字符**（14 + 8 + 1 + 32 = 55）
+- [ ] 容器名长度边界值测试：56/57/64 字符边界值断言（P2-4 验证标准）
+- [ ] 旧 `docker_sandbox_adapter.py` mock 文件**已 git tag `pre-4-4-mock-fallback`** + composition_root.py impl 字符串切换至 `AioDockerSandboxAdapter`（mock 文件保留但**不在 composition_root 注册**，作为紧急回滚路径）
+- [ ] `composition_root.py:814` impl 字符串已切换至 `AioDockerSandboxAdapter`
 - [ ] `session_id` 正则校验防注入
 - [ ] `execute_code` 通过 `asyncio.wait_for` 实现超时控制
-- [ ] 单元测试覆盖：mock aiodocker.Docker，验证所有方法调用路径 + 异常映射
-- [ ] `stubs/aiodocker/__init__.pyi` 创建（PEP 561，覆盖 9 个 API 面）
-- [ ] `pyproject.toml` **[tool.poetry.dependencies] 主分组** 新增 `aiodocker = "^0.21.0"`
+- [ ] 单元测试覆盖：mock aiodocker.Docker，**显式验证 5 个核心方法的调用次数断言**（start_container → docker.pull 1 次 + docker.containers.run 1 次；execute_code → exec_create + exec_start；stop_container → docker.containers.delete；health_check → docker.ping）（P1-5 验证标准）
+- [ ] `stubs/aiodocker/__init__.pyi` 创建（PEP 561，覆盖 **14 个 API 面**：Docker.pull/ping/containers.run/get/list/delete、images.list、events.subscribe、close、Container.exec_create/exec_start/stats/wait/kill）
+- [ ] `pyproject.toml` **[tool.poetry.dependencies] 主分组** 新增 `aiodocker = "^0.25.0"`（P1-1：版本升级以获得更稳定类型注解 + 长 API 超时一致性）
+- [ ] 孤儿扫描 label 校验测试（P2-5 验证标准）：验证 `sisys.sandbox.session_id` label 设置 + 校验逻辑
 
 ### AC-6: 30 分钟空闲清理 + 孤儿容器回收
 
@@ -775,7 +806,8 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] `reap_idle_sessions(threshold)` 返回清理数量（int），threshold 默认从 settings 读取（**非硬编码**）
 - [ ] 启动时孤儿容器清理（`docker.containers.list(filters={"name": "sisys-sandbox-*"})` + label 校验）
 - [ ] 单元测试覆盖：mock SandboxExecutor + SandboxSessionRepository，验证清理逻辑 + 默认 threshold 行为
-- [ ] 集成测试覆盖：真实 Docker daemon + 模拟 30 分钟空闲（可用 `freezegun` 或通过 settings 缩短 TTL 至测试值）
+- [ ] 集成测试覆盖：真实 Docker daemon + 模拟 30 分钟空闲（**推荐通过 settings 缩短 TTL 至测试值**；如选 `freezegun` 必须登记到 `pyproject.toml` 主分组依赖）（P1-6 修订）
+- [ ] **调度集成测试**（P1-4）：验证 Prefect 调度器触发后 `reap_idle_sessions()` 被调用；或 asyncio 后台循环的启动/停止 hook 测试
 - [ ] `composition_root.py` 注册 `sandbox_session_reaper`（lifetime=SINGLETON）
 
 ### AC-7: 应用层安全编排（ToolExecutionEngine 包裹器）
@@ -825,12 +857,14 @@ class SandboxSessionStarted(DomainEvent):
 **验证标准/Validation Criteria:**
 
 - [ ] `SandboxSecurityDecorator` 位于 `src/application/services/sandbox_security_decorator.py`（**包裹类，非 `@decorator` 语法**）
-- [ ] **不修改** `ToolExecutionEngine.__init__` 签名（4.3 经验）
+- [ ] **不修改** `ToolExecutionEngine.__init__` 签名（4.3 经验）—— 验证方式：`inspect.getsource(ToolExecutionEngine.__init__)` 哈希校验（与 4.1a 实现完全一致）
 - [ ] 超时控制使用 `asyncio.wait_for`
-- [ ] 重试复用 `_call_with_retry`（最大 3 次指数退避）
+- [ ] 重试复用 `_call_with_retry`（最大 3 次指数退避）—— 验证方式：mock 验证 `retry_helpers._call_with_retry` 被调用（P1-7 修订）
 - [ ] 单元测试覆盖：mock SandboxExecutor，验证超时 / 重试 / 配额 / session_id 校验
+- [ ] **HTTP 异常路径测试**（P1-9 修订）：404（容器未启动）+ 502（配置错误 SandboxConfigurationError）+ 503（并发配额 SandboxQuotaExceededError）+ 504（执行超时 SandboxTimeoutError）
 - [ ] 集成测试覆盖：真实 Docker daemon + 验证 30s 超时触发
-- [ ] `composition_root.py:2220-2239` 的 `tool_execution_engine` lambda impl **已修改**为嵌套 `SandboxSecurityDecorator`（**注意**：与既有 4.1a 既有 `ToolExecutionEngine` 直接实例化不兼容，需要单独评估向后兼容路径）
+- [ ] **composition_root 修改后回归测试**（P0-3 修订）：`resolver.resolve("tool_execution_engine")` 返回值类型断言（仍兼容 `ToolExecutionEngine` 接口）；既有 4.1a `ToolExecutionEngine` 单元测试**零回归**通过；既有 4.1a 集成测试套件（`tests/integration/test_tool_execution_engine_integration.py` 等）全量通过
+- [ ] `composition_root.py:2220-2239` 的 `tool_execution_engine` lambda impl **已修改**为嵌套 `SandboxSecurityDecorator`（lambda + `__import__` 延迟加载模式保持与既有 4.1a 风格一致）
 
 ### AC-8: 集成测试（testcontainers-python 真实 Docker daemon）
 
@@ -868,27 +902,27 @@ class SandboxSessionStarted(DomainEvent):
 **When** 创建架构验证测试 + 性能基准测试
 **Then**
 
-- **架构验证测试**：`tests/unit/architecture/test_docker_sandbox.py`（**关键 P0-2 修正**：epics_v1.0.md:1204 硬要求此路径，**不带 `_arch_` 前缀**）
+- **架构验证测试**：`tests/unit/architecture/test_docker_sandbox.py`（**关键 P0-2 修正**：epics_v1.0.md:1204 硬要求此路径，**不带 `_arch_` 前缀**；与 4-1a/4-3 既有 `test_arch_*.py` 命名惯例并存，已通过 epics 文案确认）
   - **域层零依赖**：`poetry run lint-imports` 必须通过（domain 不依赖 aiodocker）
   - **依赖方向矩阵**：`src/domain/` ← `src/application/services/sandbox_security_decorator.py` ← `src/infrastructure/external_services/sandbox/aiodocker_sandbox_adapter.py`
-  - **循环依赖检测**：复用既有 `lint-imports`（基于 importlinter）+ `from __future__ import annotations` + AST 静态分析脚本（**注意**：ruff 的 E 规则**不包含**循环依赖检测能力，不能仅用 ruff --select E）
-  - **PortSpec 元数据完整性**（关键 P1-1 修正）：3 个端口（`sandbox_executor` / `sandbox_session_repository` / `sandbox_session_reaper`）的 **10 字段**完整性（`name / version / interface / impl / module / lifetime / owner / compatibility / tags / deprecated`）
+  - **循环依赖检测**：复用既有 `lint-imports`（基于 importlinter CI 层校验）+ Python stdlib `ast` 静态分析脚本（基于 `ast.parse()` + `ast.walk()` 扫描 `ast.Import`/`ast.ImportFrom`，黑名单 `FORBIDDEN_IMPORTS = {pydantic, sqlalchemy, redis, ...}`）；**注意**：ruff E 规则**不包含**循环依赖检测能力，不能仅用 `ruff --select E`（P1-8 修订：明确双重检测机制）
+  - **PortSpec 元数据完整性**（关键 P1-1 修正）：3 个端口（`sandbox_executor` / `sandbox_session_repository` / `sandbox_session_reaper`）的 **10 字段**逐一断言（`name / version / interface / impl / module / lifetime / owner / compatibility / tags / deprecated`）+ 类型正确断言（`owner` 是非空 `str` / `lifetime` 是 `Lifetime` enum / `compatibility` 是 `tuple[str, ...]` / `deprecated` 是 `bool` / `version` 匹配 `^\d+\.\d+\.\d+$` 语义化版本）
   - **异常代码唯一性**：EXCEPTION_315~319 与既有代码无碰撞
 - **性能基准测试**：`tests/integration/test_performance_docker_sandbox.py`
-  - **启动延迟**：连续启动 20 个容器，P95 < 5s（使用 `pytest-benchmark`）
-  - **并发能力**：≥ 10 并发会话（与 AC-8 并发测试一致，但作为性能基准）
-  - **沙箱逃逸**：跑已知逃逸 CVE 测试集（脱敏后），验证 0 次逃逸
+  - **启动延迟**：连续启动 20 个容器，**热启动 P95 < 2s + 冷启动 < 30s**（fixture setUp 中预拉取镜像 `docker pull python:3.11-slim@sha256:...`；CI runner 必须本地 Docker daemon，**禁止** Docker-in-Docker 远程 socket）（P1-5 修订）
+  - **并发能力**：≥ 10 并发会话（与 AC-8 并发测试**功能验证**不同，本 AC 作为**性能基准**）+ 建议加压到 50 验证配额上限
+  - **沙箱逃逸**：跑**已知逃逸 CVE 测试集**（Docker 官方 breakout test suite + chroot/mount/ptrace 系统调用阻塞测试；CVE 列表脱敏后列入 `_seccomp_cve_testdata.py`），验证 **0 次逃逸**；README 注明"安全等级 = hardened profile + cap_drop ALL + read_only + no-new-privileges，**不保证抵御内核 0day**；运行时检测 Falco/Tetragon 列入后续 Story"（P0 修订：用词过度承诺修正）
 - **测试标记**：`@pytest.mark.benchmark` + `@pytest.mark.slow`（启动延迟测试 mark slow）
 
 **验证标准/Validation Criteria:**
 
-- [ ] `tests/unit/architecture/test_docker_sandbox.py`（**epics AC 5 硬要求路径，无 `_arch_` 前缀**）
-- [ ] 4 项架构验证规则全部通过（域层零依赖 + 依赖方向 + 无循环 + PortSpec 10 字段元数据）
-- [ ] 性能基准测试 P95 < 5s（启动延迟）
+- [ ] `tests/unit/architecture/test_docker_sandbox.py`（**epics AC 5 硬要求路径，无 `_arch_` 前缀**；P2-1 修订：与 4-1a/4-3 `test_arch_*.py` 命名惯例并存）
+- [ ] 4 项架构验证规则全部通过（域层零依赖 + 依赖方向 + 无循环 + PortSpec 10 字段元数据 + 类型断言）
+- [ ] 性能基准测试 P95 < 2s 热启动 + 冷启动 < 30s（fixture setUp 预拉取镜像）
 - [ ] 并发 ≥ 10 通过
-- [ ] 沙箱逃逸测试 0 次逃逸
-- [ ] 集成测试覆盖率 ≥ 75%（epics AC 3 要求）
-- [ ] 应用层覆盖率 ≥ 85%（epics AC 3 要求）
+- [ ] 已知 CVE 沙箱逃逸测试集 0 次逃逸
+- [ ] 集成测试覆盖率 ≥ 75%（epics AC 3 要求）—— **测量命令**：`pytest --cov=src/integration_paths --cov-fail-under=75`（P2-9 修订）
+- [ ] 应用层覆盖率 ≥ 85%（epics AC 3 要求）—— **测量命令**：`pytest --cov=src/application --cov-fail-under=85`
 
 ### AC-10: BDD 验收测试（Gherkin 中文）
 
@@ -906,35 +940,35 @@ class SandboxSessionStarted(DomainEvent):
     - 按 AC 编号分组（`# ====` 注释分隔）
     - **场景命名规范**：`场景: AC-N.M - 中文细分描述`（**对齐 4.1a `AC-1a` 与 4.3 `AC-1.1` 样板**）
     - **异常断言双行**：场景 `那么 抛出 XXX异常` + `并且 错误码为 EXCEPTION_xxx`
-  - **场景清单**（**完整覆盖 AC-1 ~ AC-10**，对齐 4.1a 5 个 AC + 4.3 8 个 AC 的组织密度）：
+  - **场景清单**（**完整覆盖 10 个 AC 分组（AC-1 ~ AC-10），每组 ≥ 1 子场景**，对齐 4.1a 5 个 AC + 4.3 8 个 AC 的组织密度；**纠正**：原文档"7 项场景"与实际"10 个 AC 分组"冲突，本 AC 验证标准统一为"10 个 AC 分组"）：
     - **场景组 1: AC-1 ContainerSpec 值对象 + 不变量校验**（6 项不变量场景）
-      - AC-1.1 ~ AC-1.6: 13 字段构造成功 / 6 项不变量失败 / 默认值验证 / 网络模式 / image 正则 / 不可变冻结
+      - AC-1.1 ~ AC-1.6: **12 字段**构造成功 / 6 项不变量失败 / 默认值验证 / 网络模式 / image 正则 / 不可变冻结
     - **场景组 2: AC-2 5 个新沙箱异常 EXCEPTION_315~319**（5 项异常构造场景）
       - AC-2.1: `SandboxImagePullError` code == `EXCEPTION_315`
       - AC-2.2: `SandboxTimeoutError` code == `EXCEPTION_316` + context.timeout_sec
       - AC-2.3: `SandboxResourceLimitExceededError` code == `EXCEPTION_317` + limit_type="mem"
       - AC-2.4: `SandboxQuotaExceededError` code == `EXCEPTION_318` + current_count/max_count
       - AC-2.5: `SandboxConfigurationError` code == `EXCEPTION_319` + field_name
-      - AC-2.6: HTTP 映射（502 / 504 / 503 / 502 / 502）
+      - AC-2.6: HTTP 映射（502 / 504 / 503 / 502 / 502）**反向验证**（`pytest.raises → exception_handler() → assert HTTP status`）
     - **场景组 3: AC-3 SandboxExecutor 端口向后兼容扩展**
-      - AC-3.1 ~ AC-3.5: 4 个既有方法签名 + 默认参数 + 新增 `health_check()` + runtime_checkable
+      - AC-3.1 ~ AC-3.5: 4 个既有方法**调用行为**保持 / 默认参数扩展 / 新增 `health_check()` / runtime_checkable / 既有 4.1a mock 适配器 1 参/2 参调用形态兼容
     - **场景组 4: AC-4 SandboxSession + Repository**（场景密度参考 4.1a AC-5）
-      - AC-4.1 ~ AC-4.4: 10 字段构造 / session_id 正则校验 / Repository CRUD / Alembic migration 014
+      - AC-4.1 ~ AC-4.4: 10 字段构造 / session_id 正则校验 / Repository CRUD / Alembic migration **015** + **不继承 L2RdbPort 反向断言**
     - **场景组 5: AC-5 AioDockerSandboxAdapter 实现**（核心安全场景）
       - AC-5.1: Happy Path 启动 → 执行 → 停止
       - AC-5.2: 网络隔离（`network_mode=none`）
       - AC-5.3: 资源限制（OOM kill）
       - AC-5.4: 只读文件系统
       - AC-5.5: 进程数限制
-      - AC-5.6: 沙箱逃逸 0 次
+      - AC-5.6: 已知 CVE 沙箱逃逸测试集 0 次
     - **场景组 6: AC-6 30 分钟空闲清理 + 孤儿容器回收**
-      - AC-6.1 ~ AC-6.3: TTL 清理 / 孤儿扫描 / `SandboxSessionReaper.reap_idle_sessions()` 验证
+      - AC-6.1 ~ AC-6.3: TTL 清理 / 孤儿扫描 / `SandboxSessionReaper.reap_idle_sessions()` 验证 + Prefect 调度集成测试
     - **场景组 7: AC-7 SandboxSecurityDecorator 包裹类**
-      - AC-7.1 ~ AC-7.4: 4 项防护（超时 / 重试 / 配额 / session_id 注入防御）+ 不修改 `ToolExecutionEngine.__init__`
+      - AC-7.1 ~ AC-7.4: 4 项防护（超时 / 重试 / 配额 / session_id 注入防御）+ **HTTP 异常路径**（404/502/503/504）+ 不修改 `ToolExecutionEngine.__init__`
     - **场景组 8: AC-8 集成测试**（testcontainers 真实 Docker daemon）
-      - AC-8.1 ~ AC-8.4: 启动延迟 P95 < 5s / 并发 ≥ 10 / 沙箱逃逸 0 / testcontainers 自动清理
+      - AC-8.1 ~ AC-8.4: 启动延迟 P95 < 5s / 并发 ≥ 10（**功能验证**，区别于 AC-9 性能基准）/ 已知 CVE 沙箱逃逸 0 / testcontainers 自动清理 + 事件发布验证（`SandboxSessionStarted/Terminated/ExecutionFailed` 3 个事件）
     - **场景组 9: AC-9 性能 + 安全架构验证**
-      - AC-9.1 ~ AC-9.3: 性能基准 / 域层零依赖 / PortSpec 10 字段元数据
+      - AC-9.1 ~ AC-9.3: 性能基准（**热启动 P95 < 2s + 冷启动 < 30s**）/ 域层零依赖 / PortSpec 10 字段元数据 + 类型断言
     - **场景组 10: AC-10 端口注册**（对齐 4.1a AC-5）
       - AC-10.1: 3 个新端口已注册（sandbox_executor / sandbox_session_repository / sandbox_session_reaper）
       - AC-10.2: 端口元数据完整（10 字段：name/version/interface/impl/module/lifetime/owner/compatibility/tags/deprecated）
@@ -1112,7 +1146,7 @@ class SandboxSessionStarted(DomainEvent):
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_docker_sandbox.feature`（7 项场景）
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_docker_sandbox.feature`（**10 个 AC 分组场景，每组 ≥ 1 子场景**）
 - [ ] 步骤实现文件：`tests/acceptance/test_acceptance_docker_sandbox.py`
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）
@@ -1175,7 +1209,7 @@ class SandboxSessionStarted(DomainEvent):
 | **SDD 架构验证** | 域层零依赖 + 依赖方向 + 端口元数据 | 4 项规则 | `tests/unit/architecture/test_docker_sandbox.py`（epics AC 5 硬要求） | Task 9 |
 | **集成测试** | testcontainers-python 真实 Docker daemon | 7 项场景（启动 / 网络 / 资源 / 只读 / pids / 逃逸 / 并发） | `tests/integration/test_docker_sandbox_integration.py` | Task 8 |
 | **性能基准** | 启动延迟 P95 < 5s + 并发 ≥ 10 + 沙箱逃逸 0 | 3 项基准 | `tests/integration/test_performance_docker_sandbox.py` | Task 9 |
-| **TDD 验收测试** | Gherkin 7 项场景 | Happy Path + Edge Cases | `tests/acceptance/test_acceptance_docker_sandbox.feature` + `.py` | Task 0 + Task 10 |
+| **TDD 验收测试** | Gherkin **10 个 AC 分组场景，每组 ≥ 1 子场景** | Happy Path + Edge Cases | `tests/acceptance/test_acceptance_docker_sandbox.feature` + `.py` | Task 0 + Task 10 |
 
 ---
 
@@ -1240,7 +1274,7 @@ class SandboxSessionStarted(DomainEvent):
 | AC-1 | ContainerSpec 值对象 + 不变量校验 | Task 1 | **1.1 - 1.4**（含 1.4 契约测试） | `test_container_spec.py` / `test_value_object_contract_container_spec.py` |
 | AC-2 | 5 个新沙箱异常（EXCEPTION_315-319） | Task 3 | **3.1 - 3.5**（含 3.5 测试运行验证） | `test_sandbox_exceptions.py` |
 | AC-3 | SandboxExecutor 端口向后兼容扩展 | Task 4 | **4.1 - 4.4**（含 4.4 契约测试 8→11 维度扩展） | `test_sandbox_executor_port.py`（既有扩展） |
-| AC-4 | SandboxSession 聚合根 + Repository 端口 | Task 2 | **2.1 - 2.8**（含 TDD 循环 [A] 2.1-2.3 + TDD 循环 [B] 2.4-2.8） | `test_sandbox_session.py` / `test_sandbox_session_repository.py` / `test_port_contract_sandbox_session_repository.py` / `014_sandbox_sessions.py` |
+| AC-4 | SandboxSession 聚合根 + Repository 端口 | Task 2 | **2.1 - 2.8**（含 TDD 循环 [A] 2.1-2.3 + TDD 循环 [B] 2.4-2.8） | `test_sandbox_session.py` / `test_sandbox_session_repository.py` / `test_port_contract_sandbox_session_repository.py` / `015_sandbox_sessions.py` |
 | AC-5 | AioDockerSandboxAdapter 实现 | Task 5 | **5.1 - 5.6** | `test_aiodocker_sandbox_adapter.py` |
 | AC-6 | 30 分钟空闲清理 + 孤儿容器回收 | Task 6 | **6.1 - 6.4**（含 6.4 composition_root 注册） | `test_sandbox_session_reaper.py` |
 | AC-7 | SandboxSecurityDecorator 应用层 | Task 7 | **7.1 - 7.4** | `test_sandbox_security_decorator.py` |
@@ -1267,7 +1301,7 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] Subtask 0.2: 在 `configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS` 注册 3 个事件双通道映射（realtime + reliable）
 - [ ] Subtask 0.3: 创建 5 个新沙箱异常类 EXCEPTION_315~319（`src/domain/exceptions/sandbox_exceptions.py` 扩展）
 - [ ] Subtask 0.4: 在 `_CLASS_TO_SUBDOMAIN` 注册 5 行 + `EXCEPTION_HTTP_MAP` 注册 5 条映射
-- [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_docker_sandbox.feature`（7 项场景）
+- [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_docker_sandbox.feature`（**10 个 AC 分组场景，每组 ≥ 1 子场景**）
 - [ ] Subtask 0.6: 编写 BDD 步骤骨架 `tests/acceptance/test_acceptance_docker_sandbox.py`（使用 pytest-bdd `scenarios()` 批量绑定，禁止 `@pytest.mark.asyncio`）
 - [ ] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）
 
@@ -1311,7 +1345,7 @@ class SandboxSessionStarted(DomainEvent):
 
 **关联 AC:** AC-4
 
-> **职责：** 定义会话聚合根（含 session_id 注入防御）+ 仓储端口 + InMemory 实现 + Alembic migration 014。
+> **职责：** 定义会话聚合根（含 session_id 注入防御）+ 仓储端口 + InMemory 实现 + Alembic migration 015。
 
 #### TDD 循环 [A]：`SandboxSession` 聚合根
 
@@ -1337,14 +1371,14 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] Subtask 2.5: 🟢 绿 — 实现 Repository 端口 + InMemory 实现
 - [ ] Subtask 2.6: 🔄 重构 — 优化并发安全
 - [ ] Subtask 2.7: 契约测试 `tests/contracts/test_port_contract_sandbox_session_repository.py` 11 维度
-- [ ] Subtask 2.8: Alembic migration `014_sandbox_sessions.py`（**`down_revision = "013"`** + 4 索引 + UNIQUE container_id + `session_id VARCHAR(64) PRIMARY KEY`）
+- [ ] Subtask 2.8: Alembic migration `015_sandbox_sessions.py`（**`down_revision = "014"`** + **3 索引**（移除冗余 `tenant_id` 单列索引，仅保留 `(tenant_id, state)` 复合索引 + `(state, last_activity_at)` 复合索引 + `container_id` UNIQUE）+ `session_id VARCHAR(64) PRIMARY KEY`）
 
 **完成标准/Definition of Done:**
 
 - [ ] `SandboxSession` + `SandboxSessionRepository` 全部实现
 - [ ] TDD 循环 A / B 全部通过
 - [ ] 端口契约测试 11 维度通过
-- [ ] Alembic migration 014 创建
+- [ ] Alembic migration 015 创建
 - [ ] `composition_root.py` 注册 `sandbox_session_repository`（SCOPED）
 
 ---
@@ -1424,7 +1458,7 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] Subtask 5.2: 🟢 绿 — 实现 `AioDockerSandboxAdapter` 主体
 - [ ] Subtask 5.3: 🔄 重构 — 提取 `ContainerSpecBuilder` + `SeccompProfileLoader`
 - [ ] Subtask 5.4: 创建 `stubs/aiodocker/__init__.pyi`（PEP 561 stubs）
-- [ ] Subtask 5.5: `pyproject.toml` 新增依赖 `aiodocker = "^0.21.0"`
+- [ ] Subtask 5.5: `pyproject.toml` 新增依赖 `aiodocker = "^0.25.0"`（P1-1 升级）
 - [ ] Subtask 5.6: `composition_root.py` 切换 `sandbox_executor` impl 至 `AioDockerSandboxAdapter`
 
 **完成标准/Definition of Done:**
@@ -1558,19 +1592,19 @@ class SandboxSessionStarted(DomainEvent):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/acceptance/test_acceptance_docker_sandbox.feature` 中的收尾验收场景（确保 Gherkin 7 项场景全部就绪） |
+| 🔴 红 | 编写 `tests/acceptance/test_acceptance_docker_sandbox.feature` 中的收尾验收场景（确保 Gherkin **10 个 AC 分组场景**全部就绪） |
 | 🟢 绿 | 编写 `tests/acceptance/test_acceptance_docker_sandbox.py` 的 BDD 步骤实现（补全 Task 0 骨架） |
 | 🔄 重构 | 收敛场景命名、统一断言表达、保持步骤函数可维护性 |
 
 - [ ] Subtask 10.1: 场景 1-3 验证（Happy Path + 网络隔离 + 资源限制）BDD 步骤实现
 - [ ] Subtask 10.2: 场景 4-7 验证（超时 + 镜像拉取 + 并发配额 + 30 分钟清理）BDD 步骤实现
-- [ ] Subtask 10.3: 运行开发结束验收测试并确认通过（7 项场景）
+- [ ] Subtask 10.3: 运行开发结束验收测试并确认通过（**10 个 AC 分组场景**）
 - [ ] Subtask 10.4: 运行 `pytest` + `ruff check` + `mypy` + `pre-commit run --all-files` 进行收尾校验
 - [ ] Subtask 10.5: 更新 `sprint-status.yaml` 将 `4-4-docker-sandbox-execution` 状态从 `in-progress` 推进到 `review`
 
 **完成标准/Definition of Done:**
 
-- [ ] 7 项 BDD 场景全部通过
+- [ ] **10 个 AC 分组** BDD 场景全部通过
 - [ ] `src` + `tests/unit` + `tests/integration` + `tests/contracts` + `tests/acceptance` 完成清单已逐项验证
 - [ ] `pytest` + `ruff check` + `mypy` + `pre-commit` 全部通过
 - [ ] Story 可推进至 `review` 状态
@@ -1593,7 +1627,7 @@ class SandboxSessionStarted(DomainEvent):
   - asyncio.Lock 必须为**类变量**（CLAUDE.md §6 Gotcha）
   - 端口契约测试 11 维度（既有模式）
 - **接口治理**: PortSpec **10 字段**（name / version / interface / impl / module / lifetime / owner / compatibility / tags / deprecated）
-- **技术栈**: Python 3.11+ / aiodocker 0.21.0 / testcontainers-python 4.13.0 / FastAPI 0.104+ / SQLAlchemy 2.0+ / pytest 7+
+- **技术栈**: Python 3.11+ / aiodocker **0.25.0**（P1-1 升级：从 0.21.0 升级以获得更稳定类型注解 + 长 API 超时一致性） / testcontainers-python **4.15.0**（P2-1 升级：含 Wait strategies 增强） / FastAPI 0.104+ / SQLAlchemy 2.0+ / pytest 7+
 
 ### 关键架构决策
 
@@ -1601,7 +1635,7 @@ class SandboxSessionStarted(DomainEvent):
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
-| **【选中】aiodocker ≥ 0.21.0（async-native）** | 原生 asyncio 集成，与项目 `asyncio_mode = "auto"` 一致；FastAPI/httpx 生态兼容；无 `subprocess` 调用绕开 Bandit B404/B603 | 第三方库无 `py.typed`（需创建 stubs） | ✅ 9/10 |
+| **【选中】aiodocker ≥ 0.25.0（async-native，P1-1 升级）** | 原生 asyncio 集成，与项目 `asyncio_mode = "auto"` 一致；FastAPI/httpx 生态兼容；无 `subprocess` 调用绕开 Bandit B404/B603；0.25.0+ 类型注解改进 | 第三方库需先核实 `py.typed` 是否存在再决定创建 stubs | ✅ 9/10 |
 | docker-py ≥ 7.2.0（同步 SDK） | 官方维护，API 成熟 | 同步阻塞，需 `asyncio.to_thread()` 包裹 | 6/10 |
 | subprocess + nsjail / firejail | 轻量，无需 Docker daemon | 进程级隔离弱于容器；Linux-only | 5/10 |
 | gVisor runsc | 用户空间内核，最强隔离（V2 FR-ST-10） | 部署复杂，V2 不在范围 | 7/10（V2 评分） |
@@ -1650,7 +1684,7 @@ class SandboxSessionStarted(DomainEvent):
 │   │   └── seccomp/
 │   │       └── sisys-hardened.json           # 新增（Task 5，seccomp profile）
 │   └── postgresql/alembic/versions/
-│       └── 014_sandbox_sessions.py           # 新增（Task 2）
+│       └── 015_sandbox_sessions.py           # 新增（Task 2）
 └── tests/
     ├── contracts/
     │   ├── test_port_contract_sandbox_executor.py            # 既有扩展（Task 4）
@@ -1691,7 +1725,7 @@ class SandboxSessionStarted(DomainEvent):
 - **asyncio.Lock 类变量**：4.1a `InMemoryToolExecutionRepository._lock: asyncio.Lock = asyncio.Lock()`（**类变量**），Story 4.4 的 `InMemorySandboxSessionRepository` 严格沿用
 - **Alembic migration 编号延续**：4-1a → 011、4-2 → 012、4-3 → 013，Story 4.4 → 014（每 Story +1）
 - **三层 Mock/Fake/Real 策略**：单元测试 mock 端口（`AsyncMock(spec=SandboxExecutor)`），集成测试真实服务（testcontainers），验收测试真实 Docker daemon + 动态 `pytest.skip()`
-- **复合索引优于单列索引**：4-3 migration 013 验证（4 个复合索引，无单列 tenant_id），Story 4.4 migration 014 沿用（4 索引含 UNIQUE container_id）
+- **复合索引优于单列索引**：4-3 migration 013/014 验证（复合索引模式），Story 4.4 migration 015 沿用（**3 索引 = 2 复合索引 + 1 UNIQUE container_id**，移除冗余 tenant_id 单列索引；P1-7 修订）
 - **三层 grep 自查零输出**：4-1a / 4-2 / 4-3 均执行 `grep -rn "raise ValueError\|raise HTTPException\|class.*Exception\b" src/` 零输出，Story 4.4 沿用
 - **`_call_with_retry` 抽取（4.3 经验）**：Story 4.3 将 `ToolExecutionEngine._retry_call` 抽取为 `retry_helpers.py` 共享工具，Story 4.4 的 `SandboxSecurityDecorator` 复用此工具
 - **DDD Query Object 模式**：CLAUDE.md §4 端口查询参数决策规则（多字段组合 + 分页 → frozen dataclass Query VO），Story 4.4 `SandboxSessionQuery` 沿用
@@ -1704,7 +1738,7 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] `SandboxExecutor` Protocol 沿用 4.1a 既有签名，**仅通过默认参数扩展**，**不修改**既有调用点
 - [ ] `SandboxSecurityDecorator` 沿用 4.3 装饰器模式，**不修改** `ToolExecutionEngine.__init__`
 - [ ] `InMemorySandboxSessionRepository` 沿用 4.1a asyncio.Lock 类变量模式
-- [ ] Alembic migration 014 沿用 4-3 复合索引 + UNIQUE 约束模式
+- [ ] Alembic migration 015 沿用 4-3 复合索引 + UNIQUE 约束模式
 - [ ] 5 个新异常走 `sandbox_exceptions.py` 扩展既有模块，不新建 `sandbox_*_exceptions.py` 文件
 - [ ] 单元测试 mock `AsyncMock(spec=SandboxExecutor)`，集成测试 testcontainers，验收测试真实 daemon
 - [ ] 提交前三条 grep 自查零输出
@@ -1781,7 +1815,7 @@ class SandboxSessionStarted(DomainEvent):
 **部署资源：**
 - `stubs/aiodocker/__init__.pyi` - PEP 561 类型存根（Task 5）
 - `deploy/docker/seccomp/sisys-hardened.json` - 强化 seccomp profile（Task 5）
-- `deploy/postgresql/alembic/versions/014_sandbox_sessions.py` - sandbox_sessions 表（Task 2）
+- `deploy/postgresql/alembic/versions/015_sandbox_sessions.py` - sandbox_sessions 表（Task 2）
 
 **测试文件：**
 - `tests/unit/domain/value_objects/test_container_spec.py` - ContainerSpec 单元测试（Task 1）
@@ -1805,11 +1839,11 @@ class SandboxSessionStarted(DomainEvent):
 - `tests/integration/test_performance_docker_sandbox.py` - 性能基准（Task 9）
 
 **验收测试：**
-- `tests/acceptance/test_acceptance_docker_sandbox.feature` - Gherkin 7 项场景（Task 0 + 10）
+- `tests/acceptance/test_acceptance_docker_sandbox.feature` - Gherkin **10 个 AC 分组场景**（Task 0 + 10）
 - `tests/acceptance/test_acceptance_docker_sandbox.py` - BDD 步骤实现（Task 0 + 10）
 
 **依赖更新：**
-- `pyproject.toml` 新增 `aiodocker = "^0.21.0"`（Task 5）+ `testcontainers = {extras = ["docker"], version = "^4.13.0"}`（Task 8）
+- `pyproject.toml` 新增 `aiodocker = "^0.25.0"`（Task 5，P1-1 升级）+ `testcontainers = {extras = ["docker"], version = "^4.15.0"}`（Task 8，P2-1 升级）
 
 **配置更新：**
 - `src/composition_root.py` 注册 3 个端口（`sandbox_executor` impl 切换 + `sandbox_session_repository` 新增 + `sandbox_session_reaper` 新增）
