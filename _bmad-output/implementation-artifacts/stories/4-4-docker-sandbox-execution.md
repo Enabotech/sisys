@@ -253,6 +253,19 @@ class SandboxTimeoutError(ExecutionError):
 
 - 所有测试用容器名 / 卷名 / 网络名加 TestTenant UUID 前缀（`test-{uuid}-sandbox-{session_id}`）
 - 集成测试使用 `testcontainers-python` 创建临时 docker network / volume，测试结束自动销毁（testcontainers 自带 `with` 上下文管理器回收）
+- **容器名集成示例**（**Round 5 P1-7 补充**）：
+  ```python
+  # tests/integration/test_docker_sandbox_integration.py 中
+  from tests.isolation import TestTenant
+
+  def test_container_name_uses_test_tenant_uuid(test_tenant: TestTenant) -> None:
+      """验证容器名集成 TestTenant UUID（12 字符 hex）"""
+      session_id = "test-session-1234567890abcdef"
+      # tenant_id 取 TestTenant 12-char hex 前 8 字符
+      container_name = f"sisys-sandbox-{test_tenant.id[:8]}-{session_id[:32]}"
+      assert len(container_name) == 55  # 14 + 8 + 1 + 32
+      assert container_name.startswith(f"sisys-sandbox-{test_tenant.id[:8]}-")
+  ```
 - **禁止** 集成测试手动 `docker rm` / `docker network rm`（依赖 testcontainers 自清理）
 
 ### asyncio.Lock 类变量（CLAUDE.md §6 Gotcha）
@@ -991,9 +1004,48 @@ register_port(
   5. **进程数限制验证**：`pids_limit=10`，执行 fork bomb 应被 cgroups 杀死
   6. **沙箱逃逸测试**：尝试 `chroot /` / `mount` / `ptrace` 等系统调用应被 seccomp 阻止
   7. **并发测试**：启动 10 个并发会话，验证全部成功（与 AC-9 性能要求一致）
-- **testcontainers 配置**：
-  - 使用 `DockerContainer("python:3.11-slim@sha256:<digest>")` 启动测试用 Python 环境
-  - fixture 上下文管理器自动清理（`with DockerContainer(...) as container:`）
+- **testcontainers 配置**（**Round 5 补充完整样板代码** — 4.4 是项目首个 testcontainers 用例，无既有样板可参考）：
+  - **共享 fixture**（`tests/conftest.py` 或 `tests/integration/test_docker_sandbox_integration.py` 顶部）：
+    ```python
+    import pytest
+    import aiodocker
+    from testcontainers.core.container import DockerContainer
+    from tests.isolation import TestTenant
+
+    @pytest.fixture(autouse=True)
+    async def docker_daemon_available() -> None:
+        """动态检查 Docker daemon 可用性（CLAUDE.md §5 红线）"""
+        client = aiodocker.Docker()
+        try:
+            await client.version()
+        except Exception as e:
+            pytest.skip(f"Docker daemon 不可用: {e}")
+        finally:
+            await client.close()
+
+    @pytest.fixture
+    def test_tenant() -> TestTenant:
+        """TestTenant UUID 隔离（与 4.1a / 4.3 一致模式）"""
+        return TestTenant()
+
+    @pytest.fixture
+    async def python_test_container(test_tenant: TestTenant) -> DockerContainer:
+        """启动测试用 Python 环境（自动清理）"""
+        with DockerContainer(
+            image="python:3.11-slim@sha256:62dad7dd96e602c9e08c7724e50333b1834c4f2b6dbc5f8b7c97c39293fe2bdd"
+        ) as container:
+            yield container
+    ```
+  - 测试用例：
+    ```python
+    @pytest.mark.integration
+    @pytest.mark.docker
+    async def test_sandbox_full_lifecycle(test_tenant: TestTenant) -> None:
+        """AC-8 场景 1：容器启动 + 代码执行 + 停止"""
+        with DockerContainer("python:3.11-slim@sha256:...") as container:
+            # ... 启动 AioDockerSandboxAdapter，执行代码，停止容器
+            # 自动清理 testcontainers 上下文管理器
+    ```
 - **pytest 标记**：`@pytest.mark.integration` + `@pytest.mark.docker`（动态 `pytest.skip()` 若 daemon 不可用）
 
 **验证标准/Validation Criteria:**
