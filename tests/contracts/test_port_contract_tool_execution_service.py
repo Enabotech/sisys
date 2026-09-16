@@ -119,7 +119,7 @@ class TestToolExecutionServicePortContract:
         """维度 3：端口版本"""
         spec = self._spec()
         assert spec is not None
-        assert spec.version == "v1.0.0"
+        assert spec.version == "v1.1.0"
 
     def test_dimension_4_port_interface_type(self) -> None:
         """维度 4：端口接口类型"""

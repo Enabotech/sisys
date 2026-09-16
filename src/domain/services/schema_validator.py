@@ -29,6 +29,37 @@ from typing import Any
 from src.domain.entities.tool import Tool
 from src.domain.exceptions import EntityValidationError
 
+# Round 2 P0-2:PII 敏感字段名黑名单(脱敏)
+# 对标 OWASP Top 10 + GDPR 个人信息 + 业界通用敏感字段命名
+_SENSITIVE_FIELD_NAMES: frozenset[str] = frozenset(
+    {
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "api_key",
+        "apikey",
+        "api-key",
+        "token",
+        "access_token",
+        "refresh_token",
+        "bearer_token",
+        "authorization",
+        "auth",
+        "private_key",
+        "privatekey",
+        "credential",
+        "credentials",
+        "ssn",
+        "social_security_number",
+        "credit_card",
+        "creditcard",
+        "credit_card_number",
+        "cvv",
+        "pin",
+    }
+)
+
 
 class JsonType(str, Enum):
     """JSON Schema 7 个基础类型（与 Draft 7 type keyword 对齐）"""
@@ -82,6 +113,9 @@ class SchemaViolation:
         - Decimal → str
         - bytes → hex 字符串
         - 嵌套 dict / list → 递归处理
+        - set / frozenset → list(Round 2 P0-2:补漏,避免 JSON 序列化失败)
+        - PII 敏感字段值(密码/token/api_key 等) → "***REDACTED***"
+          (Round 2 P0-2:防止 LLM 输出含凭证字段直接落地 PG JSONB)
         - 其他类型 → 保持原样
 
         Args:
@@ -105,8 +139,15 @@ class SchemaViolation:
             return str(value)
         if isinstance(value, bytes):
             return value.hex()
+        # Round 2 P0-2:补 set / frozenset 处理(原 list/tuple 不会命中)
+        if isinstance(value, (set, frozenset)):
+            return [SchemaViolation._sanitize_actual(item) for item in value]
         if isinstance(value, dict):
-            return {k: SchemaViolation._sanitize_actual(v) for k, v in value.items()}
+            return {
+                # 敏感字段值直接脱敏(不递归查看内容)
+                k: ("***REDACTED***" if k.lower() in _SENSITIVE_FIELD_NAMES else SchemaViolation._sanitize_actual(v))
+                for k, v in value.items()
+            }
         if isinstance(value, (list, tuple)):
             return [SchemaViolation._sanitize_actual(item) for item in value]
         if isinstance(value, Enum):
@@ -204,12 +245,25 @@ class SchemaValidator:
             return SchemaValidationResult(is_valid=True)
 
         violations: list[SchemaViolation] = []
-        SchemaValidator._validate_node(schema, instance, path="", violations=violations)
+        # Round 2 P1-3:递归深度防御 + 循环引用检测,防止 LLM 模型漂移输出
+        # 5000 层嵌套 dict 导致 RecursionError
+        seen_ids: set[int] = set()
+        SchemaValidator._validate_node(
+            schema,
+            instance,
+            path="",
+            violations=violations,
+            _depth=0,
+            _seen_ids=seen_ids,
+        )
 
         return SchemaValidationResult(
             is_valid=len(violations) == 0,
             violations=tuple(violations),
         )
+
+    # Round 2 P1-3:递归深度上限(Python 默认 1000,业务上限 32 防御 LLM 模型漂移)
+    _MAX_RECURSION_DEPTH = 32
 
     @staticmethod
     def _validate_node(
@@ -217,6 +271,9 @@ class SchemaValidator:
         instance: Any,
         path: str,
         violations: list[SchemaViolation],
+        *,
+        _depth: int = 0,
+        _seen_ids: set[int] | None = None,
     ) -> None:
         """递归校验单个节点(type/required/additionalProperties/enum/items/properties)
 
@@ -225,7 +282,35 @@ class SchemaValidator:
             instance: 当前节点的数据实例
             path: 当前节点的 JSON Pointer
             violations: 违规列表(就地修改)
+            _depth: 当前递归深度(内部参数,Round 2 P1-3 防御)
+            _seen_ids: 已访问对象 id 集合(内部参数,循环引用检测)
         """
+        # Round 2 P1-3:递归深度限制 + 循环引用检测
+        if _seen_ids is None:
+            _seen_ids = set()
+        instance_id = id(instance)
+        if instance_id in _seen_ids:
+            violations.append(
+                SchemaViolation(
+                    path=path or "/",
+                    expected="non-cyclic object",
+                    actual="<circular reference>",
+                    message=f"检测到循环引用:{path} 节点已被访问过,疑似恶意 schema",
+                ),
+            )
+            return
+        _seen_ids = _seen_ids | {instance_id}  # 不可变集合避免污染调用方
+
+        if _depth > SchemaValidator._MAX_RECURSION_DEPTH:
+            violations.append(
+                SchemaViolation(
+                    path=path or "/",
+                    expected=f"depth <= {SchemaValidator._MAX_RECURSION_DEPTH}",
+                    actual=f"depth={_depth}",
+                    message=f"嵌套深度超过 {SchemaValidator._MAX_RECURSION_DEPTH},疑似恶意 schema 或 LLM 模型漂移",
+                ),
+            )
+            return
         # 规则 1: type 校验
         expected_type = schema.get("type")
         if expected_type is not None:
@@ -278,6 +363,8 @@ class SchemaValidator:
                         instance=instance[prop_key],
                         path=f"{path}/{prop_key}" if path else f"/{prop_key}",
                         violations=violations,
+                        _depth=_depth + 1,
+                        _seen_ids=_seen_ids,
                     )
 
         # 规则 4: enum 校验
@@ -302,6 +389,8 @@ class SchemaValidator:
                     instance=item,
                     path=f"{path}/{idx}" if path else f"/{idx}",
                     violations=violations,
+                    _depth=_depth + 1,
+                    _seen_ids=_seen_ids,
                 )
 
     @staticmethod
