@@ -706,6 +706,16 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_387 | SkillNotFoundError | NotFoundError | 404 |（Story 4.1a，Skill slug 查不到对应 SKILL.md）|
 | EXCEPTION_388 | SkillLoadError | BusinessException | 500 |（Story 4.1a，SKILL.md IO/YAML 解析失败）|
 | EXCEPTION_389 | ToolResultValidationError | ValidationError | 400 |（Story 4.1a，ToolResult.status=invalid 上下文）|
+| EXCEPTION_390 | ToolChainCycleDetectedError | BusinessException | 422 |（Story 4.2，ToolChain DAG 检测到环）|
+| EXCEPTION_391 | ToolChainDuplicateNodeError | BusinessException | 422 |（Story 4.2，ToolChain DAG 重复节点）|
+| EXCEPTION_392 | ToolChainNodeNotFoundError | NotFoundError | 404 |（Story 4.2，ToolChain DAG 节点不存在）|
+| EXCEPTION_393 | ToolChainExecutionFailedError | BusinessException | 500 |（Story 4.2，ToolChain DAG 执行失败）|
+| EXCEPTION_394 | ToolChainNotFoundError | NotFoundError | 404 |（Story 4.2，ToolChain 聚合根不存在）|
+| EXCEPTION_395 | ToolInputSchemaValidationError | ValidationError | 400 |（Story 4.3，Tool.arguments 违反 Tool.input_schema）|
+| EXCEPTION_396 | ToolOutputSchemaValidationError | ValidationError | 422 |（Story 4.3，Tool.output 违反 Tool.output_schema，Round 2 文档化保留）|
+| EXCEPTION_397 | ToolSchemaCompatibilityError | BusinessException | 409 |（Story 4.6 灰度发布拦截，schema 不兼容）|
+| EXCEPTION_398 | ToolSchemaMissingError | ConfigurationError | 500 |（Story 4.7 required_schema 集成）|
+| EXCEPTION_399 | （预留 Story 4.7 ValidationFeedbackRetryExhaustedError）| — | — |（Story 4.7 启动时扩域至 400-409，方案 A）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 ### 3.3 编码分配策略：人工编码 + CI 自动校验
