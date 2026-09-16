@@ -373,9 +373,16 @@ class TestStrategicAnalysisEndToEnd:
         assert ep.rule_version != "", "rule_version 必填"
 
         # 3. ToolExecution 已持久化到 PostgreSQL（真实 PG 验证）
-        all_executions = await pg_tool_execution_repository.list_all()
-        assert len(all_executions) == 1, f"应有 1 个 ToolExecution，实际 {len(all_executions)}"
-        persisted = all_executions[0]
+        # 使用 list_by_query 按 tenant_id 过滤,避免 pytest-xdist 多 worker 并发干扰
+        # (其他 worker 测试可能向 tool_executions 表插入记录,list_all() 会泄漏)
+        # 注意:StrategicAnalysisUseCase.execute 中 context.tenant_id = tool.tool_id(占位)
+        from src.domain.ports.tool_execution_repository import ToolExecutionQuery
+
+        tenant_executions = await pg_tool_execution_repository.list_by_query(
+            ToolExecutionQuery(tenant_id=tool.tool_id),
+        )
+        assert len(tenant_executions) == 1, f"应有 1 个 ToolExecution,实际 {len(tenant_executions)}"
+        persisted = tenant_executions[0]
         assert persisted.tool_id == tool.tool_id
         assert persisted.state == ToolExecutionState.COMPLETED, "终态为 COMPLETED"
         assert persisted.completed_at is not None
