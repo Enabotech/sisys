@@ -1,10 +1,18 @@
 # Story 4.3: 工具输入/输出 Schema 验证
 
-**Status:** `review`
+**Status:** `done` (2026-09-16 完成 5 轮代码审查修订,commit a7845770)
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环,禁止将测试编写与代码实现分离。
 > 运行 `validate-create-story` 进行质量检查后再执行 `dev-story`。
+>
+> **代码审查修订完成**:
+> - Round 1 (commit 62aa71d3): 修复 10 项 P0 问题(composition_root 装配、ValueError 红线、重试异常、violations 注入、execution_id 透传、Repository 加锁、payload 门禁、6 个核心测试文件)+ Round 1.5 评审修复(Task 强引用、二分查找、异常一致性)
+> - Round 2 (commit 3f9913f4): 修复 7 项 P0/P1(LLM 81x 放大、PII 脱敏、ToolResult INVALID、嵌套 schema 兼容性、递归深度限制、EXCEPTION_396 文档化、migration 014 GIN 索引)
+> - Round 3 (commit e25f52ed): 修复 4 项 P0(重试异常传递、execution_id 类型安全、Repository 锁外 sort)+ 53 个 P0/P1 修复测试(PII 24 字段 / 81x 放大 / 嵌套 schema / 递归深度)
+> - Round 4 (commit 91956df8): 修复 P0-3/14 shutdown 排空 schema 事件 + 26 个 4 个新异常测试
+> - Round 5 (commit a7845770): drain_schema_events 函数测试 + 架构文档 §3.3.2 同步 EXCEPTION_390-399
+> - **总测试**:2806 passed(从 402 增加)
 
 ---
 
@@ -1715,3 +1723,10 @@ src/domain/value_objects/tool_execution.py                        # ExecutionCon
   - ChannelRouter 行号容差修订(±10 行)
   - 新增 "4.6/4.7 架构演进路径" 小节(API 依赖契约 + 反馈闭环示意图)
 - v1.4.1 (Round 5 终态):变更日志时序正向化(1.0.0→1.1.0→1.2.0→1.3.0→1.4.0)+ 移除 v1.1.0 标题重复;Round 5 终态质量审计完成,**可以进入 dev-story 阶段**
+- v1.5.0 (代码审查修订完成):5 轮 C1-C5 评审修订(2026-09-16)
+  - Round 1 (commit 62aa71d3):P0-A/B/C/D/F/H/I/J/K + Round 1.5 评审修复
+  - Round 2 (commit 3f9913f4):P0-1/2/3/4 + P1-1/2/3
+  - Round 3 (commit e25f52ed):P0-1/2 + P0-B + 53 个 P0/P1 修复测试
+  - Round 4 (commit 91956df8):P0-3/14 shutdown 排空 + 26 个新异常测试
+  - Round 5 (commit a7845770):drain_schema_events 测试 + 架构文档 §3.3.2 同步
+  - 关键修复 P0 列表:composition_root 装配、ValueError 红线、重试异常类型、violations 注入 prompt、execution_id 透传、Repository 锁、payload 门禁、6 核心测试文件、LLM 81x 放大、PII 脱敏、嵌套 schema 兼容性、shutdown 排空事件
