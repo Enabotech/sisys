@@ -58,7 +58,7 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 - **R1 复用**（既有，不修改）：
   - `SandboxExecutor` Protocol（4.1a 既有 4 方法）
   - `SessionNamespaceManager`（4.1a 既有，无 TTL 不扩展）
-  - `ContainerSecurityServicePort`（4.1a 完整 Protocol + 4 个值对象 `IsolationVerificationResult` / `ResourceLimitsStatus` / `EscapeAttempt` / `NetworkIsolationResult` 复用，**非 stub**）
+  - `ContainerSecurityServicePort`（4.1a 完整 Protocol + 4 个值对象 `IsolationVerificationResult` / `ResourceLimitsStatus` / `EscapeAttempt` / `NetworkIsolationResult` 复用 — **仅复用 Protocol 定义与值对象类型**，**不注册具体实现**；具体实现由 4-4 后续 Stories 单独跟进（**Round 4 P1-5 修订**））
   - `_call_with_retry`（`src/application/services/retry_helpers.py:62`，4.3 经验）
 - **R2 扩展**（默认参数兼容）：
   - `SandboxExecutor` Protocol 新增可选 `spec: ContainerSpec | None = None`（start_container）+ `timeout_sec: float | None = None`（execute_code）+ 新方法 `health_check() -> bool`
@@ -667,11 +667,11 @@ class SandboxSessionStarted(DomainEvent):
 **Then**
 
 - **路径**：`src/domain/ports/sandbox_executor.py`（**既有文件扩展**，非新建）
-- **既有方法签名保持不变**（4.1a 调用点无需修改）：
-  - `async def start_container(self, session_id: str) -> None: ...`（**既有签名**）
-  - `async def execute_code(self, session_id: str, code: str) -> dict[str, Any]: ...`（**既有签名**）
-  - `async def stop_container(self, session_id: str) -> None: ...`（**既有签名**）
-  - `async def is_container_running(self, session_id: str) -> bool: ...`（**既有签名**）
+- **既有方法（4.1a 既有签名，1 参/2 参）**（**Round 4 P1-1 重新组织**）：
+  - `async def start_container(self, session_id: str) -> None: ...` — 1 参数
+  - `async def execute_code(self, session_id: str, code: str) -> dict[str, Any]: ...` — 2 参数
+  - `async def stop_container(self, session_id: str) -> None: ...` — 1 参数
+  - `async def is_container_running(self, session_id: str) -> bool: ...` — 1 参数
 - **扩展方法**（默认参数 → 向后兼容，**调用行为不变**，**签名形态扩展**）：
   - `async def start_container(self, session_id: str, spec: ContainerSpec | None = None) -> None`（默认 `None` → 沿用既有默认；既有 4.1a 调用点 `start_container(session_id,)` 仍能工作）
   - `async def execute_code(self, session_id: str, code: str, *, timeout_sec: float | None = None) -> dict[str, Any]`（默认 `None` → 沿用既有默认；既有 4.1a 调用点 `execute_code(session_id, code)` 仍能工作）
@@ -1003,7 +1003,7 @@ register_port(
 - [ ] 使用 `testcontainers-python` ≥ 4.13.0 真实 Docker daemon
 - [ ] 自包含（testcontainers 上下文管理器自动清理）
 - [ ] 动态 `pytest.skip()` 若 Docker daemon 不可用（不写死 `@pytest.mark.skip`）
-- [ ] `pyproject.toml` 新增依赖 `testcontainers = {extras = ["docker"], version = "^4.13.0"}`
+- [ ] `pyproject.toml` 新增依赖 `testcontainers = {extras = ["docker"], version = "^4.15.0"}`（**Round 4 P0-2 统一** — 与 Dev Notes / Subtask 8.4 版本一致）
 - [ ] **禁止 mock** Docker SDK（CLAUDE.md §5 集成测试真实服务原则）
 
 ### AC-9: 性能 + 安全架构验证测试
@@ -1568,7 +1568,7 @@ register_port(
 - [ ] Subtask 5.2: 🟢 绿 — 实现 `AioDockerSandboxAdapter` 主体
 - [ ] Subtask 5.3: 🔄 重构 — 提取 `ContainerSpecBuilder` + `SeccompProfileLoader`
 - [ ] ~~Subtask 5.4: 创建 `stubs/aiodocker/__init__.pyi`（PEP 561 stubs）~~ — **Round 3 P0-4 取消**：aiodocker 0.25.0 已内置 py.typed，Task 5 第 1 步必做 `python -c "import aiodocker; print(aiodocker.__file__)"` + `ls py.typed` 验证即可
-- [ ] Subtask 5.5: `pyproject.toml` 新增依赖 `aiodocker = "^0.25.0"`（P1-1 升级）
+- [ ] Subtask 5.5: `pyproject.toml` 新增依赖 `aiodocker = "^0.25.0"`（P1-1 升级）；Task 5 第 1 步必做 `python -c "import aiodocker; print(aiodocker.__file__)"` + `ls py.typed` 验证 aiodocker 0.25.0 wheel 内置 `py.typed`（**Round 4 P0-2 强前置**）
 - [ ] Subtask 5.6: `composition_root.py` 切换 `sandbox_executor` impl 至 `AioDockerSandboxAdapter`
 
 **完成标准/Definition of Done:**
@@ -1654,7 +1654,7 @@ register_port(
 - [ ] Subtask 8.1: 🔴 红 — 编写集成测试失败用例
 - [ ] Subtask 8.2: 🟢 绿 — 实现 7 项场景测试
 - [ ] Subtask 8.3: 🔄 重构 — 提取 fixture 工厂函数
-- [ ] Subtask 8.4: `pyproject.toml` 新增依赖 `testcontainers = {extras = ["docker"], version = "^4.13.0"}`
+- [ ] Subtask 8.4: `pyproject.toml` 新增依赖 `testcontainers = {extras = ["docker"], version = "^4.15.0"}` + `pytest-benchmark = "^4.0.0"`（**Round 4 P0-2 统一** — Task 9.5 性能基准测试需要）；同时 `pyproject.toml` `[tool.pytest.ini_options] markers` 列表追加 `"benchmark: 性能基准测试（pytest-benchmark）"` + `"docker: 需要 Docker daemon 的测试"`（**Round 4 P1-3 补充**）
 
 **完成标准/Definition of Done:**
 
