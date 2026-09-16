@@ -783,10 +783,10 @@ class SandboxSessionStarted(DomainEvent):
   - 构造器接受 `docker_socket: str = "unix:///var/run/docker.sock"` + `max_concurrent: int = 50`
   - `async def start_container(self, session_id, spec: ContainerSpec | None = None)`：
     1. 校验 `session_id` 正则 `^[A-Za-z0-9_-]{1,64}$`（防注入）→ 失败抛 `SandboxConfigurationError` (319)
-    2. 构造容器名 `f"sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}"`（tenant_id 取 UUID 前 8 字符，session_id 截前 32 字符，总长度 ≤ 56 字符 ≤ Docker 64 字符上限）→ 长度超限抛 `SandboxConfigurationError` (319)
+    2. 构造容器名 `f"sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}"`（tenant_id 取 UUID 前 8 字符，session_id 截前 32 字符，**总长度 ≤ 55 字符** = 14+8+1+32 ≤ Docker 64 字符上限）→ 长度超限抛 `SandboxConfigurationError` (319)
     3. 校验并发数（`_running_count < max_concurrent`）→ 超限抛 `SandboxQuotaExceededError` (318)
     4. 镜像拉取 `await docker.pull(spec.image)` → 失败抛 `SandboxImagePullError` (315)
-    5. 容器启动 `await docker.containers.run(spec.image, ...aiodocker_kwargs)` → 失败抛 `ContainerStartError` (312)
+    5. 容器启动 `await docker.containers.run(config={"Image": spec.image, "Cmd": [...], "Env": [...], "HostConfig": {...}}, name=container_name)` → 失败抛 `ContainerStartError` (312)（**Round 3 P0-6 修正**：第一参数是 config dict，必填 Image/Cmd/Env/HostConfig/User/WorkingDir 等字段）
     6. 保存 `SandboxSession` 到仓储 → `await self._session_repo.save(session)`
     7. 发布 `SandboxSessionStarted` 事件（继承 DomainEvent 基类，双通道）
   - `async def execute_code(self, session_id, code, *, timeout_sec=None)`：
@@ -800,7 +800,7 @@ class SandboxSessionStarted(DomainEvent):
     2. 更新 `SandboxSession.terminated_at` + `state="TERMINATED"`
     3. 发布 `SandboxSessionTerminated` 事件
   - `async def is_container_running(self, session_id)`：查询 Docker daemon 状态（**不查本地字典**，避免状态漂移）
-  - `async def health_check(self)`：`docker.ping()` 成功返回 True，否则 False（**不抛异常**）
+  - `async def health_check(self)`：`await self._docker.version()` 成功返回 True，否则 False（**不抛异常**；**Round 3 P0-5 修正** — aiodocker 0.25.0 无 `ping()` 方法，统一用 `version()`）
 - **安全配置（aiodocker kwargs）**：
   - `mem_limit=f"{spec.mem_limit_mb}m"` + `memswap_limit=f"{spec.mem_limit_mb}m"`（禁止 swap）
   - `cpu_period=100000` + `cpu_quota=int(spec.cpu_quota * 100000)`
@@ -811,7 +811,7 @@ class SandboxSessionStarted(DomainEvent):
   - `cap_drop=list(spec.cap_drop)`
   - `security_opt=list(spec.security_opt)`
   - `userns_mode=spec.userns_mode`
-  - `name=f"sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}"`（**总长度 ≤ 56 字符**，留 8 字符 buffer 应对 Docker 命名规则）
+  - `name=f"sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}"`（**总长度 ≤ 55 字符** = 14+8+1+32，留 9 字符 buffer 应对 Docker 命名规则）
 - **aiodocker 异常映射**：私有方法 `_map_docker_error(exc, session_id) -> SandboxError`，**不暴露 `str(exc)` 内部实现**
 - **stubs/aiodocker/__init__.pyi**（PEP 561 stubs — **Round 2 P0-1 修正后该工作取消**）：aiodocker 0.25.0 已内置 py.typed marker + `types.py` 类型模块 + 完整源文件（4546 行），无需创建 PEP 561 stubs。**实际 API 签名参照**（Task 5 实现时使用）：
   - `docker.images.pull(repo, **kwargs)` — 镜像拉取
@@ -837,7 +837,7 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] `composition_root.py:814` impl 字符串已切换至 `AioDockerSandboxAdapter`
 - [ ] `session_id` 正则校验防注入
 - [ ] `execute_code` 通过 `asyncio.wait_for` 实现超时控制
-- [ ] 单元测试覆盖：mock aiodocker.Docker，**显式验证 5 个核心方法的调用次数断言**（start_container → docker.pull 1 次 + docker.containers.run 1 次；execute_code → exec_create + exec_start；stop_container → docker.containers.delete；health_check → docker.ping）（P1-5 验证标准）
+- [ ] 单元测试覆盖：mock aiodocker.Docker，**显式验证 5 个核心方法的调用次数断言**（start_container → docker.images.pull 1 次 + docker.containers.run 1 次；execute_code → docker.containers.exec + Exec.start；stop_container → container.delete；health_check → docker.version）（**Round 2 P0-2 修正** — API 签名按 aiodocker 0.25.0 真实接口）
 - [ ] `stubs/aiodocker/__init__.pyi` 创建（PEP 561，覆盖 **14 个 API 面**：Docker.pull/ping/containers.run/get/list/delete、images.list、events.subscribe、close、Container.exec_create/exec_start/stats/wait/kill）
 - [ ] `pyproject.toml` **[tool.poetry.dependencies] 主分组** 新增 `aiodocker = "^0.25.0"`（P1-1：版本升级以获得更稳定类型注解 + 长 API 超时一致性）
 - [ ] 孤儿扫描 label 校验测试（P2-5 验证标准）：验证 `sisys.sandbox.session_id` label 设置 + 校验逻辑
@@ -934,9 +934,32 @@ class SandboxSessionStarted(DomainEvent):
   ```
 - **关键架构修正（P0-4）**：
   - **不修改** 既有 `tool_execution_engine` 端口注册（与 4.3 模式完全一致）
-  - 4.4 新增 `tool_execution_service` 端口 = `SandboxSecurityDecorator(wrapped=tool_execution_engine, ...)`
+  - 4.4 新增 `secure_tool_execution_service` 端口（**Round 3 P0-1 修正** — 避免与既有 4.3 `tool_execution_service` 端口冲突，命名加 `secure_` 前缀；嵌套模式 = `SandboxSecurityDecorator(wrapped=ToolExecutionService(engine=ToolOutputValidator(wrapped=tool_execution_engine)), ...)` 双层包裹 4.3 + 4.4 装饰器） = `SandboxSecurityDecorator(wrapped=tool_execution_service, ...)`
   - 既有 4.1a 调用 `resolver.resolve("tool_execution_engine")` 拿到的实例**类型不变**，单元测试零回归
-  - 4.3 `ToolOutputValidator` 与 4.4 `SandboxSecurityDecorator` 都在更高层 service 端口嵌套，模式统一
+  - 既有 4.3 调用 `resolver.resolve("tool_execution_service")` 拿到的实例**类型不变**，4.3 单元测试零回归
+  - 4.4 新增 `resolver.resolve("secure_tool_execution_service")` 拿到 4.4 装饰器实例（向后兼容 4.7 等下游 Story）
+  - 4.3 `ToolOutputValidator` + 4.4 `SandboxSecurityDecorator` 双层包裹，模式统一
+
+**新端口注册完整代码**（Round 3 P0-1 修正）：
+```python
+# 4.4 新增 secure_tool_execution_service 端口（双层包裹）
+register_port(
+    name="secure_tool_execution_service",
+    version="v1.0.0",
+    interface=__import__("src.application.ports.tool_execution_service", fromlist=["ToolExecutionServicePort"]).ToolExecutionServicePort,
+    impl=lambda resolver: __import__("src.application.services.sandbox_security_decorator", fromlist=["SandboxSecurityDecorator"]).SandboxSecurityDecorator(
+        wrapped=resolver.resolve("tool_execution_service"),  # wrapped 是既有 4.3 端口，已包含 ToolOutputValidator
+        sandbox=resolver.resolve("sandbox_executor"),
+        event_publisher=resolver.resolve("event_publisher"),
+        retry_policy=resolver.resolve("retry_policy", default=None),
+        max_concurrent_containers=resolver.resolve("settings").sandbox_max_concurrent_containers,
+    ),
+    module="src.application.services.sandbox_security_decorator",
+    lifetime=Lifetime.SCOPED,
+    owner="sandbox-team",
+    tags=("tool", "execution", "service", "security"),
+)
+```
       tags=("tool", "execution", "engine", "security"),
   )
   ```
@@ -1199,7 +1222,7 @@ class SandboxSessionStarted(DomainEvent):
 #### API 契约 (API Contract)
 
 - [ ] `SandboxExecutor` Protocol 扩展签名确定（向后兼容）
-- [ ] 容器名格式 `sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}` 确定（**总长度 ≤ 56 字符**，在 Docker 64 字符上限内；tenant_id 取 UUID 前 8 字符，session_id 截前 32 字符）
+- [ ] 容器名格式 `sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}` 确定（**总长度 ≤ 55 字符** = 14+8+1+32，在 Docker 64 字符上限内；tenant_id 取 UUID 前 8 字符，session_id 截前 32 字符）
 - [ ] 安全配置字典（aiodocker kwargs）确定
 - [ ] 无新增 HTTP 端点（沙箱执行通过 ToolExecutionEngine 间接调用）
 
@@ -1544,7 +1567,7 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] Subtask 5.1: 🔴 红 — 编写 `AioDockerSandboxAdapter` 失败测试（5 方法 + 5 异常映射）
 - [ ] Subtask 5.2: 🟢 绿 — 实现 `AioDockerSandboxAdapter` 主体
 - [ ] Subtask 5.3: 🔄 重构 — 提取 `ContainerSpecBuilder` + `SeccompProfileLoader`
-- [ ] Subtask 5.4: 创建 `stubs/aiodocker/__init__.pyi`（PEP 561 stubs）
+- [ ] ~~Subtask 5.4: 创建 `stubs/aiodocker/__init__.pyi`（PEP 561 stubs）~~ — **Round 3 P0-4 取消**：aiodocker 0.25.0 已内置 py.typed，Task 5 第 1 步必做 `python -c "import aiodocker; print(aiodocker.__file__)"` + `ls py.typed` 验证即可
 - [ ] Subtask 5.5: `pyproject.toml` 新增依赖 `aiodocker = "^0.25.0"`（P1-1 升级）
 - [ ] Subtask 5.6: `composition_root.py` 切换 `sandbox_executor` impl 至 `AioDockerSandboxAdapter`
 
@@ -1872,7 +1895,7 @@ class SandboxSessionStarted(DomainEvent):
 - [x] 5 个新沙箱异常 EXCEPTION_315~319 **5 项 Checklist** 完成
 - [x] SandboxExecutor 端口向后兼容扩展方案明确（**不修改** 4.1a 既有签名）
 - [x] 装饰器模式应用（SandboxSecurityDecorator 不修改 ToolExecutionEngine）
-- [x] PEP 561 stubs/aiodocker/__init__.pyi 创建要求明确（aiodocker 无 py.typed）
+- [x] ~~PEP 561 stubs/aiodocker/__init__.pyi 创建要求明确（aiodocker 无 py.typed）~~ — **Round 3 P0-4 取消**：aiodocker 0.25.0 已内置 py.typed，仅需验证实测即可
 
 ### 文件清单 File List
 
@@ -1900,7 +1923,7 @@ class SandboxSessionStarted(DomainEvent):
 - `src/infrastructure/storage/inmemory/sandbox_session_repository.py` - InMemory 仓储（Task 2）
 
 **部署资源：**
-- `stubs/aiodocker/__init__.pyi` - PEP 561 类型存根（Task 5）
+- ~~`stubs/aiodocker/__init__.pyi` - PEP 561 类型存根（Task 5）~~ — **Round 3 P0-4 取消**：aiodocker 0.25.0 已内置 py.typed
 - `deploy/docker/seccomp/sisys-hardened.json` - 强化 seccomp profile（Task 5）
 - `deploy/postgresql/alembic/versions/015_sandbox_sessions.py` - sandbox_sessions 表（Task 2）
 
