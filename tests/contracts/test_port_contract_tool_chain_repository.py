@@ -76,6 +76,15 @@ def test_runtime_checkable_protocol_validation() -> None:
     assert isinstance(repo, ToolChainRepositoryPort)
 
 
+def test_protocol_has_runtime_checkable_marker() -> None:
+    """Protocol 必须具备 _is_runtime_protocol=True 标记（@runtime_checkable 装饰器自动设置）
+
+    业界参考：tests/contracts/test_port_contract_saga.py:17-18 样板
+    """
+    assert hasattr(ToolChainRepositoryPort, "_is_runtime_protocol"), "ToolChainRepositoryPort 缺少 _is_runtime_protocol 标记"
+    assert ToolChainRepositoryPort._is_runtime_protocol is True, "ToolChainRepositoryPort._is_runtime_protocol 必须为 True"
+
+
 def test_protocol_inherits_l2_rdb_port() -> None:
     """ToolChainRepositoryPort 必须继承 L2RdbPort[T] 基座"""
     assert issubclass(ToolChainRepositoryPort, L2RdbPort)

@@ -24,6 +24,7 @@ from graphlib import CycleError, TopologicalSorter
 
 from src.domain.entities.tool_chain import ToolChainDag
 from src.domain.exceptions import (
+    EntityValidationError,
     ToolChainCycleDetectedError,
     ToolChainDuplicateNodeError,
     ToolChainNodeNotFoundError,
@@ -120,14 +121,20 @@ class ToolChainDagValidator:
         # 我们需要从 cycle_nodes 中的某个节点出发，沿 depends_on 边 DFS 找到回路
         reverse_adj = dag._reverse_adj  # 复用预计算的反向邻接表
 
-        # 任选 cycle_nodes 中一个起点，找到该节点的下游中也在环内的节点
-        # 从该下游出发继续 DFS，最终回到起点
-        for start in cycle_nodes:
+        # Round 2 P1-D6 修复：取 sorted 第一个作为起点，保证路径确定性（消除 frozenset 迭代顺序不稳定）
+        for start in sorted(cycle_nodes):
             path = ToolChainDagValidator._dfs_find_cycle(start, start, reverse_adj, cycle_nodes, set())
             if path is not None:
                 return path
-        # 兜底：若 DFS 失败，返回 sorted 列表
-        return sorted(cycle_nodes)
+        # 兜底：若 DFS 失败，抛 EntityValidationError 明确契约违反（避免返回误导性的 sorted list）
+        raise EntityValidationError(
+            message=f"graphlib CycleError 报告环节点 {sorted(cycle_nodes)} 但 DFS 未找到环路径",
+            context={
+                "entity": "ToolChainDag",
+                "field": "cycle_path",
+                "cycle_nodes": sorted(cycle_nodes),
+            },
+        )
 
     @staticmethod
     def _dfs_find_cycle(

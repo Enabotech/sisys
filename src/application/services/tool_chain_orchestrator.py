@@ -47,6 +47,7 @@ from src.domain.entities.tool_chain_run import (
 from src.domain.exceptions import (
     EntityBusinessRuleError,
     EntityStateTransitionError,
+    EntityValidationError,
     ToolChainExecutionFailedError,
     ToolNotFoundError,
 )
@@ -103,6 +104,39 @@ class ToolChainOrchestrator:
         """
         self._execution_service = tool_execution_service
         self._registry_service = tool_registry_service
+
+    def _wrap_fail_fast_exception(
+        self,
+        run: ToolChainRun,
+        dag: ToolChainDag,
+        failed_node_id: str,
+        cause: BaseException | None,
+    ) -> ToolChainExecutionFailedError:
+        """统一构造 FAIL_FAST 异常（保留 cause 链 + 完整标识）
+
+        双路径语义边界（Round 1 V2 修复）：
+        - execute_chain 路径：cause=None（诚实声明无法从 str 恢复原始异常对象）
+        - _execute_wave 路径：cause=first_exc（TaskGroup 内部首个异常对象，PEP 3134 异常链保留）
+
+        Args:
+            run: 当前 ToolChainRun 实例（用于 chain_run_id）
+            dag: 当前 DAG 聚合根（用于 chain_id）
+            failed_node_id: 失败节点 ID
+            cause: 原始异常（仅在 _execute_wave 路径可获得；execute_chain 路径为 None）
+
+        Returns:
+            ToolChainExecutionFailedError 实例（已设置 cause 参数）
+        """
+        cause_exc = cause if isinstance(cause, Exception) else None
+        return ToolChainExecutionFailedError(
+            message=f"工具链 FAIL_FAST 终止于节点 '{failed_node_id}'",
+            chain_run_id=str(run.chain_run_id),
+            chain_id=str(dag.chain_id),
+            failed_node_id=failed_node_id,
+            original_error_code="WRAPPED_ORCHESTRATOR",
+            original_stage="ORCHESTRATION",
+            cause=cause_exc,
+        )
 
     # ============================================================================
     # 公开方法
@@ -165,6 +199,7 @@ class ToolChainOrchestrator:
                 failed_nodes=failed_nodes,
                 node_runs=node_runs,
                 slug_index=slug_index,
+                run=run,
             )
             for node_id, result in wave_results.items():
                 if isinstance(result, ToolResult):
@@ -177,26 +212,16 @@ class ToolChainOrchestrator:
                 completed_at = datetime.now(UTC)
                 try:
                     run = replace(run, state=ToolChainRunState.FAILED, completed_at=completed_at)
-                except EntityStateTransitionError as transition_err:
-                    logger.warning("ToolChainRun %s 状态机冲突: %s", run.chain_run_id, transition_err)
-                # 提取原始异常（从 wave_results 或 node_runs 拿错误码）
-                original_exc = None
-                original_code = "WRAPPED_ORCHESTRATOR"
-                original_stage = "ORCHESTRATION"
-                # node_runs 中若节点 FAILED 状态有 error 字符串，可尝试解码
-                node_run = node_runs.get(failed_node_id)
-                if node_run and node_run.error:
-                    original_exc = RuntimeError(node_run.error)
-                # cause 仅在 original_exc 是 Exception 子类时传递（避免 BaseException 误传）
-                cause_exc = original_exc if isinstance(original_exc, Exception) else None
-                raise ToolChainExecutionFailedError(
-                    message=f"工具链 FAIL_FAST 终止于节点 '{failed_node_id}'",
-                    chain_run_id=str(run.chain_run_id),
-                    chain_id=str(dag.chain_id),
+                # Round 2 P1-A3 修复：捕获 EntityValidationError（如 completed_at < started_at 等不变量违反）
+                except (EntityStateTransitionError, EntityValidationError) as transition_err:
+                    logger.warning("ToolChainRun %s 终态提交冲突: %s", run.chain_run_id, transition_err)
+                # Round 1 V2 修复：双路径语义边界
+                # execute_chain 路径：cause=None（node_runs[].error 仅为 str，无法恢复原始异常对象）
+                raise self._wrap_fail_fast_exception(
+                    run=run,
+                    dag=dag,
                     failed_node_id=failed_node_id,
-                    original_error_code=original_code,
-                    original_stage=original_stage,
-                    cause=cause_exc,
+                    cause=None,
                 )
 
         # 6. 终态判定 + 性能指标（含 critical_path 真实算法）
@@ -498,6 +523,7 @@ class ToolChainOrchestrator:
         failed_nodes: list[str],
         node_runs: dict[str, NodeRunStatus],
         slug_index: dict[str, uuid.UUID],
+        run: ToolChainRun,
     ) -> dict[str, ToolResult | None]:
         """执行单波节点（asyncio.TaskGroup + Semaphore 并发控制 + effective_strategy）
 
@@ -577,6 +603,9 @@ class ToolChainOrchestrator:
                             tool_result=None,
                         )
                         failed_nodes.append(node_id)
+                        # Round 2 P1-A7 修复：FAIL_FAST 策略下重新抛出以触发 TaskGroup 取消兄弟
+                        if effective_strategy == FailureStrategy.FAIL_FAST:
+                            raise
                         results[node_id] = None
                         return
 
@@ -657,16 +686,13 @@ class ToolChainOrchestrator:
             failed_node_id = failed_nodes[-1] if failed_nodes else None
             # 若任一节点 effective_strategy 为 FAIL_FAST → 立即包装为 ToolChainExecutionFailedError
             if failed_node_id is not None and any(effective_strategies[nid] == FailureStrategy.FAIL_FAST for nid in wave):
-                # cause 仅在 first_exc 是 Exception 子类时传递（避免 BaseException 误传）
-                cause_exc = first_exc if isinstance(first_exc, Exception) else None
-                raise ToolChainExecutionFailedError(
-                    message=f"工具链 FAIL_FAST 终止于节点 '{failed_node_id}'",
-                    chain_run_id="",  # 由 execute_chain 补全
-                    chain_id="",
+                # Round 1 V2 修复：双路径语义边界
+                # _execute_wave 路径：cause=first_exc（PEP 3134 异常链保留 + raise from 双重保险）
+                raise self._wrap_fail_fast_exception(
+                    run=run,
+                    dag=dag,
                     failed_node_id=failed_node_id,
-                    original_error_code="WRAPPED_ORCHESTRATOR",
-                    original_stage="ORCHESTRATION",
-                    cause=cause_exc,
+                    cause=first_exc,
                 ) from first_exc
             # 其他策略透传原始异常
             raise first_exc

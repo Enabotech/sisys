@@ -226,8 +226,8 @@ async def test_skill_loading_uses_concurrent_gather() -> None:
 
 
 @pytest.mark.asyncio
-async def test_skill_load_failure_logged_but_not_fatal() -> None:
-    """Skill 加载失败仅记录日志，不阻塞业务执行"""
+async def test_skill_load_failure_fails_fast() -> None:
+    """Round 1 P0-5 V2 + Round 2 P1-A-FAIL 修复后：Skill 加载失败立即抛异常（fail-fast）"""
     dag = _make_dag("chain")
     repo = AsyncMock(spec=ToolChainRepositoryPort)
     repo.list_by_query = AsyncMock(return_value=[dag])
@@ -249,9 +249,9 @@ async def test_skill_load_failure_logged_but_not_fatal() -> None:
     )
 
     context = _make_context(tenant_id=dag.tenant_id)
-    # 不应抛出异常
-    run = await use_case.execute("chain", {}, context)
-    assert run is not None
+    # P0-5 V2 修复后：Skill 加载失败立即抛出，不再静默降级为日志
+    with pytest.raises(RuntimeError, match="load failed"):
+        await use_case.execute("chain", {}, context)
 
 
 # ============================================================================
