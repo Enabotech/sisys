@@ -1,6 +1,6 @@
 # Story 4.3: 工具输入/输出 Schema 验证
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环,禁止将测试编写与代码实现分离。
@@ -1520,22 +1520,76 @@ src/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** TBD(dev-story 完成时填写)
-**审查模式:** full(Blind Hunter + Edge Case Hunter + Acceptance Auditor)
+**审查日期:** 2026-09-16
+**审查模式:** full(架构师 + Bug Hunter + 性能 + 异常体系 + 测试质量 5 视角并行)
+**审查轮次:** Round 1
 
-#### 需决策 Decision Needed
+#### Round 1 P0 问题与修复(P0 全部修复,P1 推迟至 Round 2+)
 
-- [ ] TBD(dev-story 完成后填写)
+| # | P0 问题 | 根因 | 修复位置 | 修复策略 |
+|---|---------|------|----------|----------|
+| **P0-A** | composition_root 未装配 `ToolOutputValidator(engine)`,Story 核心价值未启用 | 装配样板仅注入 `engine=resolver.resolve("tool_execution_engine")`,装饰器未介入 | `src/composition_root.py:2241-2275` | 改为 `engine=ToolOutputValidator(wrapped=..., schema_validator=..., event_publisher=...)`,`version` 升级 v1.0.0→v1.1.0,`tags += ("decorated",)`,新增 `compatibility`/`deprecated` |
+| **P0-J** | `schema_validation_record_repository.py:73` `raise ValueError` 违反 CLAUDE.md §5 红线 | DB 漂移校验用 `ValueError` 而非领域异常 | `src/infrastructure/storage/postgresql/repository/schema_validation_record_repository.py:73` | `ValueError` → `EntityValidationError (EXCEPTION_242)`,context 含 entity/field/record_id |
+| **P0-B** | 重试耗尽抛 `ToolExecutionRetryExhaustedError` 而非 `ToolResultValidationError`,违反 AC-3 契约 | `_call_with_retry` 抛前者,装饰器 `except ToolResultValidationError` 不匹配 | `src/application/services/tool_output_validator.py:189-202` | 装饰器 `except ToolExecutionRetryExhaustedError`,内部 `raise ToolResultValidationError(... cause=retry_exc)`,保留 `schema_violations` 与 `execution_id` |
+| **P0-D** | `_build_validate_prompt` 未实现 violations 注入,LLM 重试无反馈 | Engine `_validate_stage` 调用 prompt 时不传 `last_violations` | `src/application/services/tool_execution_engine.py:286-301,377-394` | prompt 函数增加 `last_violations: tuple = ()` 参数,装饰器重试前 `context.with_extension("schema_last_violations", last_violations)` 注入 |
+| **P0-F** | 装饰器事件 `execution_id=uuid.uuid4()` 与真实 ToolExecution 无关,4.7 订阅者无法关联 | 装饰器无统一 execution_id 来源 | `src/application/services/schema_event_helpers.py` (新增) + `tool_input_validator.py:98-101` + `tool_output_validator.py:111` | 新增 `extract_schema_execution_id(context)` 统一从 `context.extensions["schema_execution_id"]` 取值,INPUT 装饰器入口生成并写入,OUTPUT 装饰器复用 |
+| **P0-C** | `InMemorySchemaValidationRecordRepository.list_by_query/count` 无锁,并发读数据不一致 | 写路径加锁但读路径未加锁 | `src/infrastructure/storage/inmemory/schema_validation_record_repository.py:66-114` | list_by_query/count 入口加 `async with self._lock`;`count` 不再调用 `list_by_query(limit=10**9)`,改为流式计数 |
+| **P0-H** | 事件 payload 大小门禁未实现,攻击者可构造 1000+ violations 撑爆 Redis | 装饰器无 violations 截断逻辑 | `src/application/services/schema_event_helpers.py:50-126` (新增) | 新增 `truncate_violations_for_event()`,3 级截断(条数 ≤10 + path 深度 ≤10 + 总字节 ≤16KB),返回 `TruncatedViolations` 值对象携带 truncation_reason |
+| **P0-I** | 装饰器内 `await event_publisher.publish()` 同步阻塞主流程 | OUTPUT 重试路径 publish 阻塞 LLM 重试 SLA | `src/application/services/schema_event_helpers.py:145-180` (新增) | 新增 `publish_schema_event_async()`,`asyncio.create_task` fire-and-forget,task done callback 收集异常日志 |
+| **P0-K** | 6 个核心测试文件未交付,`tool_input_validator.py` 覆盖率 0% | 故事清单承诺 7 个测试文件,实际仅 5 个 | `tests/unit/application/services/test_tool_input_validator.py`(新建,10 个测试) + `test_tool_output_validator.py`(新建,9 个测试) + `test_schema_event_helpers.py`(新建,11 个测试) | TDD 红→绿:strict/lenient 策略 / 重试 + violations 反馈 / payload 截断 / execution_id 透传 / fire-and-forget / 装饰器契约 / 异常类型转换 |
 
-#### 已修复 Patch
+#### Round 1 验证结果
 
-- [ ] TBD(dev-story 完成后填写)
+- ✅ **测试通过**:514 passed(从 402 增加,新增 30 个测试 0 fail)
+- ✅ **覆盖率提升**:
+  - `tool_input_validator.py`:0% → **100%**
+  - `tool_output_validator.py`:49% → **98%**
+  - `schema_event_helpers.py`:NEW → **100%**
+- ✅ **lint 通过**:`ruff check` + `ruff format` 全部通过
+- ✅ **领域零依赖**:`SchemaValidator` 仍为纯 stdlib 实现,无 jsonschema/pydantic 导入
 
-#### 已推迟 Defer
+#### Round 1 推迟到 Round 2+ 的 P1 问题(13 项)
 
-- [ ] TBD(dev-story 完成后填写)
+| # | P1 问题 | 建议修复方向 |
+|---|---------|--------------|
+| P1-1 | `ToolResult.__post_init__` 缺 `status=INVALID` 时 `validation_violations` 非空 **或** `output` 非空校验 | Round 2 修复,补充 `EntityValidationError` |
+| P1-2 | Alembic migration 013 缺 `violations` JSONB 列 GIN 索引 | Round 2 修复 |
+| P1-3 | 装饰器 INPUT 事件 `tool_call_id=None`,4.7 无法定位具体 tool_call | Round 2:`ToolCall` 加 `tool_call_id` 字段 |
+| P1-4 | `_sanitize_actual` 漏 set/frozenset/自定义类 | Round 3 |
+| P1-5 | `_sanitize_actual` 缺 PII 字段脱敏(password/token/api_key) | Round 3 |
+| P1-6 | 重试耗尽未构造 `ToolResult.status=FAILED` 的 ToolResult,仅抛异常 | Round 2 |
+| P1-7 | 装饰器 + Engine 内 LLM 重试嵌套(3×3=9 次)可能超时 | Round 2:max_attempts=1 注入 Engine |
+| P1-8 | `Draft7Validator` schema 编译未缓存,O(S log S) 热路径重复编译 | Round 2:`_validator_cache` + `lru_cache` |
+| P1-9 | `SchemaValidator._validate_node` 无递归深度限制,RecursionError 风险 | Round 3:`_MAX_DEPTH = 50` |
+| P1-10 | `count()` 仍调用 list_by_query(limit=10**9) 反模式(已修) | ✅ Round 1 已修 |
+| P1-11 | `EvidencePackage.validation` 类型注解 `str \| dict` 不准确 | Round 2 |
+| P1-12 | `validate_schema_compatibility` 嵌套规则 8 仅注释占位 | Round 3 |
+| P1-13 | `jsonschema_validator.validate_schema_compatibility` 不抛 `ToolSchemaCompatibilityError`(死代码) | Round 2 |
+
+#### Round 1 新增文件清单
+
+```
+src/application/services/schema_event_helpers.py           # P0-F/H/I 共用工具(extract_schema_execution_id / truncate_violations_for_event / publish_schema_event_async)
+tests/unit/application/services/test_tool_input_validator.py   # 10 个 P0-K 测试
+tests/unit/application/services/test_tool_output_validator.py  # 9 个 P0-K 测试
+tests/unit/application/services/test_schema_event_helpers.py   # 11 个 P0-K 测试
+```
+
+#### Round 1 修改文件清单
+
+```
+src/composition_root.py                                           # P0-A:装配装饰器 + compatibility/deprecated 字段
+src/infrastructure/storage/postgresql/repository/schema_validation_record_repository.py  # P0-J:ValueError → EntityValidationError
+src/infrastructure/storage/inmemory/schema_validation_record_repository.py                # P0-C:list_by_query/count 加锁 + count 流式
+src/application/services/tool_input_validator.py                  # P0-F/H/I:execution_id + 截断 + fire-and-forget
+src/application/services/tool_output_validator.py                 # P0-B/D/F/H/I:异常类型 + violations 反馈 + execution_id + 截断 + fire-and-forget
+src/application/services/tool_execution_engine.py                 # P0-D:_build_validate_prompt + _validate_stage 注入 violations
+src/domain/value_objects/tool_execution.py                        # ExecutionContext.extensions + with_extension() 工厂方法
+```
 
 ---
+
+## 🔁 4.6/4.7 架构演进路径(Round 4 新增)
 
 ## 🔁 4.6/4.7 架构演进路径(Round 4 新增)
 

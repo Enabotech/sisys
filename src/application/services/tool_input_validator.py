@@ -3,10 +3,14 @@
 定义 ToolInputValidator(应用层服务),包裹 ToolExecutionService,
 在委托前对 arguments 做 JSON Schema 校验。
 
-设计依据：Story 4.3 AC-3 / AC-7
+设计依据:Story 4.3 AC-3 / AC-7
 - 包裹 ToolExecutionService(Service 层做入参校验,通过注入 tool_registry 解决 Tool 元数据获取)
 - 两种策略:strict(默认,抛 ToolInputSchemaValidationError)/ lenient(记录 warning 继续执行)
 - 通过 EventPublisher 在 INPUT 校验失败时发布 ToolSchemaValidationFailed 事件
+- P0-F 修复:在装饰器入口统一生成 execution_id,存入 context.extensions["schema_execution_id"],
+  保证 INPUT 事件与后续 OUTPUT 事件共享同一 execution_id,4.7 订阅者可正确关联
+- P0-H 修复:发布事件前对 violations 列表做 payload 门禁截断(条数 ≤10 + path 深度 ≤10)
+- P0-I 修复:事件发布使用 asyncio.create_task fire-and-forget,不阻塞主流程
 """
 
 from __future__ import annotations
@@ -18,6 +22,11 @@ from typing import Literal
 from src.application.ports.schema_validator import SchemaValidatorPort
 from src.application.ports.tool_execution_service import ToolExecutionServicePort
 from src.application.ports.tool_registry_service import ToolRegistryServicePort
+from src.application.services.schema_event_helpers import (
+    extract_schema_execution_id,
+    publish_schema_event_async,
+    truncate_violations_for_event,
+)
 from src.domain.events.tool_schema_events import ToolSchemaValidationFailed
 from src.domain.exceptions import ToolInputSchemaValidationError
 from src.domain.ports.event_publisher import EventPublisher
@@ -28,6 +37,11 @@ from src.domain.value_objects.tool_execution import (
 )
 
 logger = logging.getLogger(__name__)
+
+# P0-H:事件 payload 大小门禁常量(对标 Story AC-6 验证清单)
+EVENT_MAX_VIOLATIONS = 10
+EVENT_MAX_PATH_DEPTH = 10
+EVENT_MAX_TOTAL_BYTES = 16 * 1024  # 16 KB
 
 
 class ToolInputValidator:
@@ -81,6 +95,11 @@ class ToolInputValidator:
         Raises:
             ToolInputSchemaValidationError: strict 模式下入参校验失败
         """
+        # P0-F 修复:统一生成 execution_id 并存入 context,后续 OUTPUT 装饰器可复用
+        execution_id = extract_schema_execution_id(context) or uuid.uuid4()
+        # ExecutionContext 是 frozen,通过 with_extension 工厂方法返回新实例
+        context = context.with_extension("schema_execution_id", execution_id)
+
         tool = self._tool_registry.get_tool(tool_id=tool_id)
         result = self._schema_validator.validate_arguments(tool, tool_call.arguments)
         if result.is_valid:
@@ -88,27 +107,32 @@ class ToolInputValidator:
 
         # 校验失败:发布事件 + 按策略处理
         if self._event_publisher is not None:
-            try:
-                event = ToolSchemaValidationFailed(
-                    execution_id=uuid.uuid4(),
-                    tool_id=tool_id,
-                    tenant_id=context.tenant_id,
-                    validation_phase="INPUT",
-                    schema_violations=[v.to_dict() for v in result.violations],
-                    retry_attempt=1,
-                    failed_at=result.validated_at,
-                    schema_version=tool.version,
-                    is_final=True,  # INPUT 不重试,直接终止
-                )
-                await self._event_publisher.publish(event)
-            except Exception as pub_exc:  # pragma: no cover
-                logger.warning("ToolSchemaValidationFailed 事件发布失败: %s", pub_exc)
+            # P0-H 修复:截断 violations 防止 DoS(单条超长 / 总数过多 / 事件体超 16KB)
+            truncated = truncate_violations_for_event(
+                violations=result.violations,
+                max_violations=EVENT_MAX_VIOLATIONS,
+                max_path_depth=EVENT_MAX_PATH_DEPTH,
+                max_total_bytes=EVENT_MAX_TOTAL_BYTES,
+            )
+            event = ToolSchemaValidationFailed(
+                execution_id=execution_id,  # P0-F:用统一 ID,4.7 订阅者按 execution_id 关联
+                tool_id=tool_id,
+                tenant_id=context.tenant_id,
+                validation_phase="INPUT",
+                schema_violations=[v.to_dict() for v in truncated.violations],
+                retry_attempt=1,
+                failed_at=result.validated_at,
+                schema_version=tool.version,
+                is_final=True,  # INPUT 不重试,直接终止
+            )
+            # P0-I 修复:fire-and-forget 异步发布,不阻塞主流程
+            publish_schema_event_async(self._event_publisher, event, logger, op_name="tool_input_validator")
 
         if self._failure_policy == "strict":
             raise ToolInputSchemaValidationError(
                 message="Tool arguments schema validation failed",
                 tool_id=str(tool_id),
-                execution_id=None,
+                execution_id=str(execution_id),  # P0-F:与事件 payload 共享 execution_id
                 tool_call_id=None,
                 violations=[v.to_dict() for v in result.violations],
             )

@@ -2240,19 +2240,30 @@ def bootstrap() -> None:
 
     register_port(
         name="tool_execution_service",
-        version="v1.0.0",
+        version="v1.1.0",  # 升级:装配 ToolOutputValidator 装饰器(Story 4.3 交付)
         interface=ToolExecutionServicePort,
         impl=lambda resolver: __import__(
             "src.application.services.tool_execution_service",
             fromlist=["ToolExecutionService"],
         ).ToolExecutionService(
             registry=resolver.resolve("tool_registry_service"),
-            engine=resolver.resolve("tool_execution_engine"),
+            # P0 修复:ToolOutputValidator 装饰器包裹 Engine(纯 Decorator 外包模式,AC-7 + AC-3)
+            # 否则 Story 4.3 核心价值(OUTPUT Schema 校验)在生产装配中完全未被启用
+            engine=__import__(
+                "src.application.services.tool_output_validator",
+                fromlist=["ToolOutputValidator"],
+            ).ToolOutputValidator(
+                wrapped=resolver.resolve("tool_execution_engine"),
+                schema_validator=resolver.resolve("schema_validator"),
+                event_publisher=resolver.resolve("event_publisher"),
+            ),
         ),
         module="src.application.services.tool_execution_service",
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
-        tags=("tool", "execution", "service"),
+        tags=("tool", "execution", "service", "decorated"),
+        compatibility=("v1.0.0",),  # 向后兼容 v1.0.0(ToolExecutionEngine 类仍可传入)
+        deprecated=False,
     )
 
     # === Story 4.3 — Tool IO Schema Validation Ports ===
@@ -2271,6 +2282,8 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
         tags=("tool", "schema", "validator"),
+        compatibility=("v1.0.0",),
+        deprecated=False,
     )
 
     register_port(
@@ -2288,6 +2301,8 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
         tags=("tool", "schema", "repository", "postgresql", "sqlalchemy"),
+        compatibility=("v1.0.0",),
+        deprecated=False,
     )
 
     register_port(

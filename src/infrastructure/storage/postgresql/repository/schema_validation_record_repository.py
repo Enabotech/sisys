@@ -26,6 +26,7 @@ from src.domain.entities.schema_validation_record import (
     SchemaValidationRecord,
     SchemaValidationRecordQuery,
 )
+from src.domain.exceptions import EntityValidationError
 from src.domain.services.schema_validator import SchemaViolation
 from src.infrastructure.storage.postgresql.models.schema_validation import (
     SchemaValidationRecordModel,
@@ -69,10 +70,20 @@ class PostgreSQLSchemaValidationRecordRepository(PostgreSQLAdapter[SchemaValidat
         violations_data: list[dict[str, Any]] = model.violations or []
         violations = tuple(self._deserialize_violation(v) for v in violations_data)
         # validation_phase 严格校验(防 DB 漂移 + CHECK 约束兜底)
+        # 遵守 CLAUDE.md §5 红线(禁止 raise ValueError),改用 EntityValidationError (EXCEPTION_242)
         if model.validation_phase not in _VALID_PHASES:
-            raise ValueError(
-                f"Invalid validation_phase in DB for record {model.record_id}: "
-                f"{model.validation_phase!r} not in {sorted(_VALID_PHASES)}"
+            raise EntityValidationError(
+                message=(
+                    f"Invalid validation_phase in DB for record {model.record_id}: "
+                    f"{model.validation_phase!r} not in {sorted(_VALID_PHASES)}"
+                ),
+                context={
+                    "entity": "SchemaValidationRecord",
+                    "field": "validation_phase",
+                    "record_id": str(model.record_id),
+                    "invalid_value": model.validation_phase,
+                    "allowed_values": sorted(_VALID_PHASES),
+                },
             )
         phase: Any = model.validation_phase  # Literal["INPUT", "OUTPUT", "COMPATIBILITY"]
         return SchemaValidationRecord(
