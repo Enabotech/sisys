@@ -108,11 +108,11 @@ Story 4.1a 已实现 `ToolExecutionEngine` 五阶段工作流（Think→Code→E
 
 - **禁止** `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释
 - **禁止** mypy 配置 `ignore_missing_imports=true` 豁免
-- **`aiodocker` 类型注解处理**（**关键**：前提待核实）：
-  - **Task 5 第 1 步必做**：先执行 `python -c "import aiodocker; print(aiodocker.__file__)"` + `ls $(python -c "import aiodocker; print(aiodocker.__file__)")/../py.typed` 检查 `py.typed` 是否存在
-  - **若 `py.typed` 不存在**：必须创建 PEP 561 stubs（`stubs/aiodocker/__init__.pyi`），覆盖实际使用的 **14 个 API 面**（`Docker.pull` / `Docker.ping` / `Docker.containers.run` / `Docker.containers.get` / `Docker.containers.list` / `Docker.containers.delete` / `Docker.images.list` / `Docker.events.subscribe` / `Docker.close` / `Container.exec_create` / `Container.exec_start` / `Container.stats` / `Container.wait` / `Container.kill`）
-  - **若 `py.typed` 已存在**：基于已有 stubs 补充 14 个 API 面的覆盖（特别是 `wait`/`kill`/`log`/`events`/`close` 在 execute_code/stop_container 实现中几乎必然调用）
-  - stubs 文件头须注释"本存根仅覆盖项目实际使用 API 面，未覆盖部分按 `Any` 处理"
+- **`aiodocker` 类型注解处理**（**重要修正 — Round 2 P0-1**：aiodocker 0.25.0 wheel **已包含 `py.typed` marker + `types.py` 类型定义模块 + 完整源文件**——非"无 py.typed"状态）：
+  - **Task 5 第 1 步必做**：先执行 `python -c "import aiodocker; print(aiodocker.__file__)"` + `ls $(python -c "import aiodocker; print(aiodocker.__file__)")/../py.typed` 验证 py.typed 实际存在
+  - **结论（已实测）**：aiodocker 0.25.0 已内置 `py.typed`，**不需要**创建 PEP 561 stubs；只需在 `pyproject.toml` 正确安装 `aiodocker = "^0.25.0"` 后 mypy 自动获取类型
+  - **若升级到 aiodocker ≥ 0.27.0**：仍包含 py.typed，无需 stubs
+  - **若意外降级到 < 0.22.0（无 py.typed）**：回退方案参见 archived `stubs/aiodocker/__init__.pyi` 模板（不预先创建，避免维护负担）
 
 ### Commit & Push 规范
 
@@ -415,7 +415,7 @@ class ContainerSpec:
     cap_drop: tuple[str, ...] = ("ALL",)
     security_opt: tuple[str, ...] = ("no-new-privileges",)
     seccomp_profile: str = "deploy/docker/seccomp/sisys-hardened.json"
-    userns_mode: str = "host"
+    userns_mode: str = ""  # Round 2 P1-1 统一：采用 Docker daemon 默认行为，不启用 user namespace remap
     timeout_sec: float = 30.0
 
     def __post_init__(self) -> None:
@@ -448,13 +448,59 @@ class ContainerSpec:
 
 参考 `ToolExecuted(DomainEvent)` 模式（`src/domain/events/tool_events.py:21-46`）。
 
-**通道映射（必须在 `configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS` 同步更新）：**
+**通道映射（必须在 `configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS` 同步更新，Round 2 P0-6 补充完整代码示例）：**
 
 | 事件 | realtime (Redis pub/sub) | reliable (RabbitMQ + Outbox) |
 |------|--------------------------|------------------------------|
 | `SandboxSessionStarted` | `sisys:rt:sandbox.session.started` | `sisys.events.reliable.sandbox.session.started` |
 | `SandboxSessionTerminated` | `sisys:rt:sandbox.session.terminated` | `sisys.events.reliable.sandbox.session.terminated` |
 | `SandboxExecutionFailed` | `sisys:rt:sandbox.execution.failed` | `sisys.events.reliable.sandbox.execution.failed` |
+
+**完整配置示例**（`configs/event_channels.yaml` 末尾追加）：
+```yaml
+SandboxSessionStarted:
+  redis_channel: "sisys:rt:sandbox.session.started"
+  rabbitmq_routing_key: "sisys.events.reliable.sandbox.session.started"
+  delivery_mode: "reliable"
+  description: "沙箱会话启动"
+
+SandboxSessionTerminated:
+  redis_channel: "sisys:rt:sandbox.session.terminated"
+  rabbitmq_routing_key: "sisys.events.reliable.sandbox.session.terminated"
+  delivery_mode: "reliable"
+  description: "沙箱会话终止"
+
+SandboxExecutionFailed:
+  redis_channel: "sisys:rt:sandbox.execution.failed"
+  rabbitmq_routing_key: "sisys.events.reliable.sandbox.execution.failed"
+  delivery_mode: "reliable"
+  description: "沙箱执行失败"
+```
+
+**完整代码示例**（`src/infrastructure/messaging/channel_router.py:54` `DEFAULT_MAPPINGS` 字典末尾追加）：
+```python
+"SandboxSessionStarted": ChannelMapping(
+    event_type="SandboxSessionStarted",
+    redis_channel="sisys:rt:sandbox.session.started",
+    rabbitmq_routing_key="sisys.events.reliable.sandbox.session.started",
+    delivery_mode=DeliveryMode.RELIABLE,
+    description="沙箱会话启动",
+),
+"SandboxSessionTerminated": ChannelMapping(
+    event_type="SandboxSessionTerminated",
+    redis_channel="sisys:rt:sandbox.session.terminated",
+    rabbitmq_routing_key="sisys.events.reliable.sandbox.session.terminated",
+    delivery_mode=DeliveryMode.RELIABLE,
+    description="沙箱会话终止",
+),
+"SandboxExecutionFailed": ChannelMapping(
+    event_type="SandboxExecutionFailed",
+    redis_channel="sisys:rt:sandbox.execution.failed",
+    rabbitmq_routing_key="sisys.events.reliable.sandbox.execution.failed",
+    delivery_mode=DeliveryMode.RELIABLE,
+    description="沙箱执行失败",
+),
+```
 
 **事件 schema 字段**（继承 DomainEvent 基类）：
 
@@ -700,7 +746,21 @@ class SandboxSessionStarted(DomainEvent):
 - [ ] `SandboxSession` 聚合根位于 `src/domain/entities/sandbox_session.py`（10 字段）
 - [ ] `session_id` 正则校验 `^[A-Za-z0-9_-]{1,64}$`（防注入）
 - [ ] `SandboxSessionRepositoryPort` 定义在 `src/domain/ports/`（领域层，非应用层）
-- [ ] **反向断言**：`assert not issubclass(SandboxSessionRepositoryPort, L2RdbPort)`（P1-2 验证标准；确认主键类型冲突决策落地）
+- [ ] **反向断言**（Round 2 P0-5 修正 — 完整运行时验证代码）：
+  ```python
+  def test_no_l2_rdb_inheritance() -> None:
+      """验证 SandboxSessionRepositoryPort 不继承 L2RdbPort（主键类型冲突决策）"""
+      # 反向断言：检查 Protocol __mro__ 中无 L2RdbPort
+      assert L2RdbPort not in SandboxSessionRepositoryPort.__mro__
+      # 同时检查 get_by_session_id 而非 get_by_id（主键类型签名差异）
+      sig = inspect.signature(SandboxSessionRepositoryPort.get_by_session_id)
+      assert sig.parameters["session_id"].annotation is str  # 不是 UUID
+      # 同时验证 7 个 CRUD/Query 方法签名
+      for method_name in ("get_by_session_id", "save", "delete_by_session_id",
+                          "list_all", "find_by_query", "list_idle_sessions", "count_active"):
+          assert hasattr(SandboxSessionRepositoryPort, method_name)
+  ```
+  （P0-5 验证标准；`Protocol` 类用 `issubclass` 在某些 Python 版本有运行时限制，使用 `__mro__` 检查更可靠）
 - [ ] 查询方法使用 `SandboxSessionQuery` frozen dataclass（CLAUDE.md §4 决策规则），单独单元测试 `tests/unit/domain/ports/test_sandbox_session_query.py`（P1-3 验证标准）
 - [ ] `InMemorySandboxSessionRepository` 使用 `asyncio.Lock` **类变量**（CLAUDE.md §6 Gotcha）
 - [ ] 端口契约测试 `tests/contracts/test_port_contract_sandbox_session_repository.py` **11 维度**覆盖
@@ -715,7 +775,7 @@ class SandboxSessionStarted(DomainEvent):
 **Then**
 
 - **mock 替换策略**（关键 P1 决策）：
-  - **删除** `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`（mock 不符合生产标准，避免 CLAUDE.md §5 mock 滥用）
+  - **保留** `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`（**不删除**，**Round 2 P1-2 修订** — 与 4.3 `ToolOutputValidator` 不删除既有实现原则一致；mock 文件保留但**不在 composition_root 注册**，作为 `git tag pre-4-4-mock-fallback` 紧急回滚路径，避免 CLAUDE.md §5 mock 滥用）
   - 修改 `src/composition_root.py:817` 的 `sandbox_executor` impl 字符串为 `AioDockerSandboxAdapter`
   - 本地无 Docker 环境：通过 `SISYS_USE_TEST_PORTS=1` 环境变量切换（CLAUDE.md §6 既有约定，不引入 mock fallback）
 - **路径**：`src/infrastructure/external_services/sandbox/aiodocker_sandbox_adapter.py`（**新建文件**）
@@ -753,16 +813,18 @@ class SandboxSessionStarted(DomainEvent):
   - `userns_mode=spec.userns_mode`
   - `name=f"sisys-sandbox-{tenant_id[:8]}-{session_id[:32]}"`（**总长度 ≤ 56 字符**，留 8 字符 buffer 应对 Docker 命名规则）
 - **aiodocker 异常映射**：私有方法 `_map_docker_error(exc, session_id) -> SandboxError`，**不暴露 `str(exc)` 内部实现**
-- **stubs/aiodocker/__init__.pyi**（PEP 561 stubs）：覆盖以下 9 个 API 面（**注意**：原文档描述只覆盖 6 个，遗漏关键 API 会触发 mypy `attr-defined` 错误）：
-  - `Docker.pull(image)` — 镜像拉取
-  - `Docker.ping()` — daemon 健康检查
-  - `Docker.containers.run(image, **kwargs)` — 容器启动
-  - `Docker.containers.get(container_id)` — 容器查询
-  - `Docker.containers.list(filter=...)` — 孤儿容器扫描
-  - `Docker.containers.delete(force=True)` — 容器删除
-  - `Container.exec_create(cmd, ...)` — 执行命令创建
-  - `Container.exec_start(exec_id, ...)` — 执行命令启动
-  - `Container.stats(stream=False)` — 资源统计（性能基准）
+- **stubs/aiodocker/__init__.pyi**（PEP 561 stubs — **Round 2 P0-1 修正后该工作取消**）：aiodocker 0.25.0 已内置 py.typed marker + `types.py` 类型模块 + 完整源文件（4546 行），无需创建 PEP 561 stubs。**实际 API 签名参照**（Task 5 实现时使用）：
+  - `docker.images.pull(repo, **kwargs)` — 镜像拉取
+  - `docker.containers.run(config: dict, *, name=None)` — 容器启动（**注意**：第一参数是 config dict，不是 image str）
+  - `docker.containers.list(filters=None)` — 孤儿容器扫描
+  - `docker.containers.get(container_id)` — 容器查询
+  - `container.delete(**kwargs)` — 容器删除（`containers.py:388`）
+  - `docker.containers.exec(exec_id)` → `Exec.start(detach=False)` — 执行命令创建与启动（`containers.py:135` + `execs.py:63-80`）
+  - `container.stats(...)` — 资源统计（**同步方法**，`containers.py:496`）
+  - `container.wait(...)` — 等待容器退出
+  - `container.kill(...)` — 强制终止容器
+  - `docker.images.list(...)` / `docker.events.subscribe()` / `docker.close()`
+  - **无 `ping()`**：daemon 健康检查用 `docker.version()` 或 `docker.containers.list()`
 
 **验证标准/Validation Criteria:**
 
@@ -824,32 +886,57 @@ class SandboxSessionStarted(DomainEvent):
   4. **session_id 注入防御**：执行前再次校验 session_id 正则
   5. **事件发布**：捕获 STDERR 后发布 `SandboxExecutionFailed` 事件（继承 DomainEvent 基类，仅失败时）
 - **包裹类模式**（4.3 经验）：**不修改** `ToolExecutionEngine.__init__`，通过 `composition_root.py` 注入包裹器实例
-- **`composition_root.py` 装配**（关键 P0-3 修正 — 必须使用 **lambda + `__import__` 延迟加载**模式，保持与既有 `tool_execution_engine:2220-2239` 风格一致，避免破坏 composition_root.py 的 import 时序设计）：
+- **`SandboxSecurityDecorator.__init__` 完整签名**（Round 2 P1-3 修正 — 对齐 4.3 `ToolOutputValidator` 样板）：
   ```python
+  def __init__(
+      self,
+      wrapped: ToolExecutionEnginePort,
+      sandbox: SandboxExecutor,
+      event_publisher: EventPublisher | None = None,
+      retry_policy: RetryPolicy | None = None,
+      max_concurrent_containers: int = 50,
+  ) -> None:
+  ```
+- **`composition_root.py` 装配**（**Round 2 P0-4 修正** — 采用 4.3 `ToolOutputValidator` 模式在更高层 service 注册中嵌套，**保持 `tool_execution_engine` 端口契约完全不变**）：
+  ```python
+  # 既有 4.1a tool_execution_engine 端口注册 — 保持不变
   register_port(
       name="tool_execution_engine",
       version="v1.0.0",
-      interface=__import__(
-          "src.application.ports.tool_execution_engine",
-          fromlist=["ToolExecutionEnginePort"],
-      ).ToolExecutionEnginePort,
-      impl=lambda resolver: __import__(
-          "src.application.services.sandbox_security_decorator",
-          fromlist=["SandboxSecurityDecorator"],
-      ).SandboxSecurityDecorator(
-          wrapped=__import__(
-              "src.application.services.tool_execution_engine",
-              fromlist=["ToolExecutionEngine"],
-          ).ToolExecutionEngine(
-              llm_client=resolver.resolve("llm_client"),
-              sandbox=resolver.resolve("sandbox_executor"),
-              tool_execution_repository=resolver.resolve("tool_execution_repository"),
-          ),
+      interface=__import__("src.application.ports.tool_execution_engine", fromlist=["ToolExecutionEnginePort"]).ToolExecutionEnginePort,
+      impl=lambda resolver: __import__("src.application.services.tool_execution_engine", fromlist=["ToolExecutionEngine"]).ToolExecutionEngine(
+          llm_client=resolver.resolve("llm_client"),
           sandbox=resolver.resolve("sandbox_executor"),
+          tool_execution_repository=resolver.resolve("tool_execution_repository"),
+      ),
+      module="src.application.services.tool_execution_engine",
+      lifetime=Lifetime.SCOPED,
+      owner="tool-team",
+      tags=("tool", "execution", "engine"),
+  )
+
+  # 4.4 新增 tool_execution_service 端口（4.3 模式）在 service 层嵌套 SandboxSecurityDecorator
+  register_port(
+      name="tool_execution_service",
+      version="v1.0.0",
+      interface=__import__("src.application.ports.tool_execution_service", fromlist=["ToolExecutionServicePort"]).ToolExecutionServicePort,
+      impl=lambda resolver: __import__("src.application.services.sandbox_security_decorator", fromlist=["SandboxSecurityDecorator"]).SandboxSecurityDecorator(
+          wrapped=resolver.resolve("tool_execution_engine"),  # wrapped 是既有端口，类型 ToolExecutionEnginePort
+          sandbox=resolver.resolve("sandbox_executor"),
+          event_publisher=resolver.resolve("event_publisher"),
+          retry_policy=resolver.resolve("retry_policy", default=None),
       ),
       module="src.application.services.sandbox_security_decorator",
       lifetime=Lifetime.SCOPED,
-      owner="tool-team",
+      owner="sandbox-team",
+      tags=("tool", "execution", "service", "security"),
+  )
+  ```
+- **关键架构修正（P0-4）**：
+  - **不修改** 既有 `tool_execution_engine` 端口注册（与 4.3 模式完全一致）
+  - 4.4 新增 `tool_execution_service` 端口 = `SandboxSecurityDecorator(wrapped=tool_execution_engine, ...)`
+  - 既有 4.1a 调用 `resolver.resolve("tool_execution_engine")` 拿到的实例**类型不变**，单元测试零回归
+  - 4.3 `ToolOutputValidator` 与 4.4 `SandboxSecurityDecorator` 都在更高层 service 端口嵌套，模式统一
       tags=("tool", "execution", "engine", "security"),
   )
   ```
@@ -1715,7 +1802,7 @@ class SandboxSessionStarted(DomainEvent):
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
 
-**来源:** [Story 4-2-toolchain-orchestration-dag.md](./4-2-toolchain-orchestration-dag.md)（status: review）/ Story 4-1a-strategic-tool-impl.md（status: done）
+**来源:** [Story 4-2-toolchain-orchestration-dag.md](./4-2-toolchain-orchestration-dag.md)（status: **done**，Round 2 P2-3 修正）/ Story 4-1a-strategic-tool-impl.md（status: done）/ Story 4-3-tool-io-schema-validation.md（status: **done**，Round 2 P2-4 修正）
 
 **关键学习/Key Learnings:**
 
@@ -1771,7 +1858,7 @@ class SandboxSessionStarted(DomainEvent):
 | **架构文档** | `_bmad-output/planning-artifacts/architecture.md` + `docs/architecture/sisys-uni-exception-design.md` |
 | **PRD** | `_bmad-output/planning-artifacts/prd.md`（FR-ST-04 line 1816） |
 | **OR 公理** | `_bmad-output/planning-artifacts/or.md`（三.3.[1-3] lines 230-233，三.8.[1,4] lines 252-256） |
-| **前置 Story** | `_bmad-output/implementation-artifacts/stories/4-1a-strategic-tool-impl.md`（done）/ `4-2-toolchain-orchestration-dag.md`（review）/ `4-3-tool-io-schema-validation.md`（ready-for-dev） |
+| **前置 Story** | `_bmad-output/implementation-artifacts/stories/4-1a-strategic-tool-impl.md`（done）/ `4-2-toolchain-orchestration-dag.md`（done）/ `4-3-tool-io-schema-validation.md`（**done**，含 Round 2 GIN 索引迁移）` |
 | **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
 
 ### 完成清单 Completion Notes List
