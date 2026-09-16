@@ -189,13 +189,19 @@ class ToolOutputValidator:
         # 重试主循环:每次执行 + 校验 + 失败时 _call_with_retry 重试
         # ToolResultValidationError 不在 RetryPolicy 默认 retryable_exceptions 内,
         # 故此处显式构造专用 retry_policy 让 ToolResultValidationError 可重试
+        # Round 3 P0-1 修复:retryable_exceptions 联合 ToolExecutionRetryExhaustedError,
+        # 让 Engine 内部 LLM 瞬时错误(LLMAPIError 等)耗尽后抛 ToolExecutionRetryExhaustedError
+        # 也能被外层装饰器捕获并重试,避免 LLM 瞬时错误无法恢复
         retry_policy_for_validation = RetryPolicy(
             max_attempts=retry_policy.max_attempts,
             backoff_strategy=retry_policy.backoff_strategy,
             initial_delay_sec=retry_policy.initial_delay_sec,
             max_delay_sec=retry_policy.max_delay_sec,
             max_total_duration_sec=retry_policy.max_total_duration_sec,
-            retryable_exceptions=(ToolResultValidationError,),
+            retryable_exceptions=(
+                ToolResultValidationError,
+                ToolExecutionRetryExhaustedError,
+            ),
         )
 
         try:

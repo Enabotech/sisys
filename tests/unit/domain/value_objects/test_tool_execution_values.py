@@ -23,6 +23,7 @@ from src.domain.exceptions import (
 from src.domain.value_objects.tool_execution import (
     EvidencePackage,
     ExecutionContext,
+    SchemaViolation,
     ToolCall,
     ToolResult,
     ToolResultStatus,
@@ -220,10 +221,16 @@ class TestToolResult:
         assert result.validate_complete() is True
 
     def test_invalid_status_no_evidence_required(self) -> None:
-        """invalid 状态不强制 evidence_package"""
+        """invalid 状态不强制 evidence_package(Round 2 P1-1:但必须有 violations 或 output)
+
+        Story 4.3 AC-4 契约(Round 2 严格化):status=INVALID 必须有 validation_violations 或 output。
+        这里提供 violations,所以 evidence_package=None 仍可通过。
+        """
         result = ToolResult(
             tool_id=uuid.uuid4(),
             status=ToolResultStatus.INVALID,
             evidence_package=None,
+            output={"partial": "result"},
+            validation_violations=(SchemaViolation(path="/x", expected="string", actual=123, message="bad"),),
         )
         assert result.validate_complete() is True

@@ -445,3 +445,7 @@ __all__ = [
     "SchemaViolation",
     "JsonType",
 ]
+
+
+# 模块级公开常量(便于外部测试与监控)
+MAX_RECURSION_DEPTH = SchemaValidator._MAX_RECURSION_DEPTH

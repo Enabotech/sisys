@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import MagicMock
 
 from src.application.ports.tool_execution_service import ToolExecutionServicePort
 from src.application.services.tool_execution_engine import ToolExecutionEngine
@@ -86,6 +87,10 @@ class _DummyResolver:
             return self._engine
         if name == "tool_repository":
             return self._repo
+        if name == "schema_validator":
+            return MagicMock(spec=["validate_arguments", "validate_output", "validate_schema_compatibility"])
+        if name == "event_publisher":
+            return MagicMock()
         raise KeyError(f"未注册的端口: {name}")
 
 
@@ -95,7 +100,7 @@ class TestToolExecutionServicePortContract:
     PORT_NAME = "tool_execution_service"
     IMPL_CLS_NAME = "ToolExecutionService"
     MODULE_PATH = "src.application.services.tool_execution_service"
-    EXPECTED_TAGS = ("tool", "execution", "service")
+    EXPECTED_TAGS = ("tool", "execution", "service", "decorated")
     EXPECTED_OWNER = "tool-team"
     REQUIRED_METHODS = ["execute", "get_tool_metadata", "list_tools_metadata"]
 

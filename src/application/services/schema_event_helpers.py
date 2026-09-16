@@ -137,19 +137,40 @@ def truncate_violations_for_event(
 
 
 def extract_schema_execution_id(context: ExecutionContext) -> Any | None:
-    """从 ExecutionContext 提取 schema execution_id(P0-F 修复)
+    """从 ExecutionContext 提取 schema execution_id(P0-F 修复 + Round 3 类型安全)
 
     优先级:
     1. context.extensions["schema_execution_id"](装饰器间透传)
-    2. context.session_id(向下兼容既有 session 维度)
+    2. context.session_id(向下兼容既有 session 维度,仅当是合法 UUID 字符串时)
 
     Returns:
-        execution_id(任意可哈希类型),不存在则 None
+        execution_id(uuid.UUID 实例),否则 None
+        (Round 3 P0-2:统一返回 UUID 类型,避免传给 ToolSchemaValidationFailed.execution_id 触发 TypeError)
     """
+    import uuid as _uuid
+
     extensions = getattr(context, "extensions", None) or {}
     if "schema_execution_id" in extensions:
-        return extensions["schema_execution_id"]
-    return getattr(context, "session_id", None)
+        extracted = extensions["schema_execution_id"]
+        if isinstance(extracted, _uuid.UUID):
+            return extracted
+        # 字符串 → 尝试转 UUID,失败则生成新 UUID
+        if isinstance(extracted, str):
+            try:
+                return _uuid.UUID(extracted)
+            except (ValueError, AttributeError):
+                return _uuid.uuid4()
+        return _uuid.uuid4()
+    # session_id fallback:仅当合法 UUID 时才用,否则 None(强制重新生成)
+    session_id = getattr(context, "session_id", None)
+    if isinstance(session_id, _uuid.UUID):
+        return session_id
+    if isinstance(session_id, str) and session_id:
+        try:
+            return _uuid.UUID(session_id)
+        except (ValueError, AttributeError):
+            return None
+    return None
 
 
 def publish_schema_event_async(
