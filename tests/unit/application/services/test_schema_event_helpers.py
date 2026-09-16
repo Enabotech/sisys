@@ -122,17 +122,30 @@ def test_extract_schema_execution_id_priority_extensions() -> None:
     assert extract_schema_execution_id(context) == extensions_id
 
 
-def test_extract_schema_execution_id_fallback_to_session() -> None:
-    """无 extensions 时回退到 session_id"""
+def test_extract_schema_execution_id_fallback_to_session_ignores_string() -> None:
+    """Round 3 P0-2 类型安全:无 extensions 且 session_id 是 str 时,不再回退(防止 str 传给 UUID 类型字段)
+
+    session_id 是字符串时(非 UUID),extract_schema_execution_id 返回 None,
+    强制调用方生成新 UUID,避免 TypeError。
+    """
     context = ExecutionContext(tenant_id=uuid.uuid4(), session_id="fallback-id")
-    assert extract_schema_execution_id(context) == "fallback-id"
+    # 字符串 session_id 不被信任(类型不匹配 UUID),返回 None
+    assert extract_schema_execution_id(context) is None
 
 
-def test_extract_schema_execution_id_returns_empty_session_when_empty() -> None:
-    """extensions 空且 session_id 为空 → 返回 session_id 默认值(空字符串)"""
+def test_extract_schema_execution_id_returns_none_when_no_uuid_source() -> None:
+    """extensions 空且 session_id 为空 → 返回 None(强制生成新 UUID)"""
     context = ExecutionContext(tenant_id=uuid.uuid4())
-    # 默认 session_id 是空字符串(非 None),作为兜底
-    assert extract_schema_execution_id(context) == ""
+    assert extract_schema_execution_id(context) is None
+
+
+def test_extract_schema_execution_id_accepts_valid_uuid_session() -> None:
+    """extensions 空且 session_id 是合法 UUID 字符串时 → 转换为 UUID"""
+    valid_uuid = uuid.uuid4()
+    context = ExecutionContext(tenant_id=uuid.uuid4(), session_id=str(valid_uuid))
+    result = extract_schema_execution_id(context)
+    assert result == valid_uuid
+    assert isinstance(result, uuid.UUID)
 
 
 # ---------------------------------------------------------------------------

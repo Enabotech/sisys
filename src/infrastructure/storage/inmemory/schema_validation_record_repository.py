@@ -73,24 +73,26 @@ class InMemorySchemaValidationRecordRepository(L2RdbPort[SchemaValidationRecord]
             query: 查询条件
 
         Returns:
-            符合条件记录列表（按 validated_at DESC 排序 + offset/limit 分页）
+            符合条件记录列表(按 validated_at DESC 排序 + offset/limit 分页)
         """
-        # P0 修复:读路径必须加锁,与 save/get_by_id/delete/list_all 保持一致,
-        # 避免并发 save 期间读到部分写入的视图(数据不一致)。
+        # Round 3 P0-B 修复:快照复制后锁外排序 + 过滤,避免 O(N log N) sort
+        # 在锁内阻塞所有写入操作
         async with self._lock:
-            results = list(self._records.values())
-            if query.tenant_id is not None:
-                results = [r for r in results if r.tenant_id == query.tenant_id]
-            if query.tool_id is not None:
-                results = [r for r in results if r.tool_id == query.tool_id]
-            if query.execution_id is not None:
-                results = [r for r in results if r.execution_id == query.execution_id]
-            if query.validation_phase is not None:
-                results = [r for r in results if r.validation_phase == query.validation_phase]
-            if query.is_valid is not None:
-                results = [r for r in results if r.is_valid == query.is_valid]
-            results.sort(key=lambda r: r.validated_at, reverse=True)
-            return results[query.offset : query.offset + query.limit]
+            snapshot = list(self._records.values())
+        # 锁外执行 filter + sort + slice(不阻塞 save 等写路径)
+        results = snapshot
+        if query.tenant_id is not None:
+            results = [r for r in results if r.tenant_id == query.tenant_id]
+        if query.tool_id is not None:
+            results = [r for r in results if r.tool_id == query.tool_id]
+        if query.execution_id is not None:
+            results = [r for r in results if r.execution_id == query.execution_id]
+        if query.validation_phase is not None:
+            results = [r for r in results if r.validation_phase == query.validation_phase]
+        if query.is_valid is not None:
+            results = [r for r in results if r.is_valid == query.is_valid]
+        results.sort(key=lambda r: r.validated_at, reverse=True)
+        return results[query.offset : query.offset + query.limit]
 
     async def count(self, query: SchemaValidationRecordQuery) -> int:
         """统计符合条件记录数量
