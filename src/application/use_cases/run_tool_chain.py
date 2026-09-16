@@ -95,16 +95,18 @@ class RunToolChainUseCase:
 
         # 2. 节点级 Skill 预预加载（按 tool_slug 调用 load_metadata）
         # 多节点元数据使用 asyncio.gather 并发预加载
-        metadata_tasks = [self._skill_loader.load_metadata(node.tool_slug) for node in dag.nodes if node.tool_slug]
-        skill_metadata: list[ToolMetadata] = []
-        if metadata_tasks:
-            results = await asyncio.gather(*metadata_tasks, return_exceptions=True)
-            for result in results:
-                if isinstance(result, ToolMetadata):
-                    skill_metadata.append(result)
-                else:
-                    # 加载失败仅记录日志（不阻塞执行）
-                    logger.warning("Skill metadata load failed: %s", result)
+        # Round 1 V2 修复：dict 映射避免 zip 对齐缺陷 + fail-fast 校验
+        metadata_tasks_by_slug: dict[str, str] = {node.tool_slug: node.node_id for node in dag.nodes if node.tool_slug}
+        skill_metadata: dict[str, ToolMetadata] = {}
+        if metadata_tasks_by_slug:
+            slugs = list(metadata_tasks_by_slug.keys())
+            # return_exceptions=False：Skill 加载失败立即抛 ToolNotFoundError（fail-fast）
+            results = await asyncio.gather(
+                *(self._skill_loader.load_metadata(slug) for slug in slugs),
+            )
+            for slug, result in zip(slugs, results):
+                # load_metadata 成功时必为 ToolMetadata（失败时已抛异常）
+                skill_metadata[slug] = result
 
         logger.info("Loaded %d skill metadata for chain '%s'", len(skill_metadata), chain_name)
 
@@ -147,7 +149,7 @@ class RunToolChainUseCase:
                 "parallel_speedup_ratio": run.parallel_speedup_ratio,
             },
             cost_audit=run.cost_audit,
-            failure_strategy=run.failure_strategy.value,
+            failure_strategy=run.failure_strategy,
         )
         try:
             await self._event_publisher.publish(event)

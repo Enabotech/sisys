@@ -189,24 +189,43 @@ def test_transition_pending_to_running() -> None:
 
 
 def test_transition_running_to_completed() -> None:
-    """合法迁移 RUNNING → COMPLETED"""
+    """合法迁移 RUNNING → COMPLETED（Round 2 P1-D9 修复后必须传 completed_at）"""
+    from datetime import UTC, datetime
+
     run = _make_run(state=ToolChainRunState.RUNNING)
-    run.transition_to(ToolChainRunState.COMPLETED)
+    completed_at = datetime.now(UTC)
+    run.transition_to(ToolChainRunState.COMPLETED, completed_at=completed_at)
     assert run.state == ToolChainRunState.COMPLETED
+    assert run.completed_at == completed_at
 
 
 def test_transition_running_to_completed_with_errors() -> None:
-    """合法迁移 RUNNING → COMPLETED_WITH_ERRORS"""
+    """合法迁移 RUNNING → COMPLETED_WITH_ERRORS（Round 2 P1-D9 修复后必须传 completed_at）"""
+    from datetime import UTC, datetime
+
     run = _make_run(state=ToolChainRunState.RUNNING)
-    run.transition_to(ToolChainRunState.COMPLETED_WITH_ERRORS)
+    completed_at = datetime.now(UTC)
+    run.transition_to(ToolChainRunState.COMPLETED_WITH_ERRORS, completed_at=completed_at)
     assert run.state == ToolChainRunState.COMPLETED_WITH_ERRORS
+    assert run.completed_at == completed_at
 
 
 def test_transition_running_to_failed() -> None:
-    """合法迁移 RUNNING → FAILED"""
+    """合法迁移 RUNNING → FAILED（Round 2 P1-D9 修复后必须传 completed_at）"""
+    from datetime import UTC, datetime
+
     run = _make_run(state=ToolChainRunState.RUNNING)
-    run.transition_to(ToolChainRunState.FAILED)
+    completed_at = datetime.now(UTC)
+    run.transition_to(ToolChainRunState.FAILED, completed_at=completed_at)
     assert run.state == ToolChainRunState.FAILED
+    assert run.completed_at == completed_at
+
+
+def test_transition_running_to_completed_without_completed_at_raises() -> None:
+    """终态迁移未传 completed_at 抛 EntityValidationError（Round 2 P1-D9 invariant）"""
+    run = _make_run(state=ToolChainRunState.RUNNING)
+    with pytest.raises(EntityValidationError):
+        run.transition_to(ToolChainRunState.COMPLETED)
 
 
 def test_transition_pending_to_completed_raises() -> None:

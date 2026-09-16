@@ -92,6 +92,15 @@ def test_runtime_checkable_protocol_validation() -> None:
     assert isinstance(service, ToolChainServicePort)
 
 
+def test_protocol_has_runtime_checkable_marker() -> None:
+    """Protocol 必须具备 _is_runtime_protocol=True 标记（@runtime_checkable 装饰器自动设置）
+
+    业界参考：tests/contracts/test_port_contract_saga.py:17-18 样板
+    """
+    assert hasattr(ToolChainServicePort, "_is_runtime_protocol"), "ToolChainServicePort 缺少 _is_runtime_protocol 标记"
+    assert ToolChainServicePort._is_runtime_protocol is True, "ToolChainServicePort._is_runtime_protocol 必须为 True"
+
+
 # ============================================================================
 # 2-4. 端口协议 3 方法
 # ============================================================================

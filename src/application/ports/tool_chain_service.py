@@ -44,7 +44,7 @@ class ToolChainServicePort(Protocol):
             ToolChainRun: 运行时实例
 
         Raises:
-            ToolNotFoundError: chain_id 不存在
+            ToolChainNotFoundError: chain_id 不存在（EXCEPTION_394，toolchain 子域）
             ToolChainCycleDetectedError: DAG 包含循环依赖
             ToolChainDuplicateNodeError: DAG 节点重复
             ToolChainNodeNotFoundError: DAG 边引用不存在的节点
@@ -62,7 +62,7 @@ class ToolChainServicePort(Protocol):
             工具链 DAG 聚合根
 
         Raises:
-            ToolNotFoundError: chain_id 不存在
+            ToolChainNotFoundError: chain_id 不存在（EXCEPTION_394，toolchain 子域）
         """
         ...
 

@@ -7,7 +7,7 @@ GIN 索引 + 4 复合索引由 Alembic migration 创建。
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -75,8 +75,10 @@ class ToolChainModel(Base):
 
     def __init__(
         self,
+        # Round 2 P2-I5：tenant_id 必填，DB nullable=False，禁止 None fallback（数据完整性）
+        # 调用方必须显式传入；应用层不允许静默生成 UUID（租户隔离 P0 级）
+        tenant_id: UUID,
         chain_id: UUID | None = None,
-        tenant_id: UUID | None = None,
         name: str = "",
         description: str = "",
         nodes: list[dict[str, Any]] | None = None,
@@ -85,15 +87,18 @@ class ToolChainModel(Base):
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> None:
+        # Round 2 P2-I5 修复：
+        # 1. tenant_id 必填，类型为 UUID（移除 Optional，租户隔离 P0 级）
+        # 2. datetime.now() → datetime.now(UTC) 保持 timezone-aware
+        self.tenant_id = tenant_id
         self.chain_id = chain_id or uuid4()
-        self.tenant_id = tenant_id or uuid4()
         self.name = name
         self.description = description
         self.nodes = nodes or []
         self.failure_strategy = failure_strategy
         self.max_concurrency = max_concurrency
-        self.created_at = created_at or datetime.now()
-        self.updated_at = updated_at or datetime.now()
+        self.created_at = created_at or datetime.now(UTC)
+        self.updated_at = updated_at or datetime.now(UTC)
 
 
 __all__ = [

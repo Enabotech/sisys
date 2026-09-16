@@ -270,14 +270,21 @@ class ToolChainRun:
         allowed = VALID_TRANSITIONS.get(self.state, set())
         return new_state in allowed
 
-    def transition_to(self, new_state: ToolChainRunState) -> None:
+    def transition_to(
+        self,
+        new_state: ToolChainRunState,
+        *,
+        completed_at: datetime | None = None,
+    ) -> None:
         """显式状态迁移（带乐观锁递增）
 
         Args:
             new_state: 目标状态
+            completed_at: 完成时间（终态迁移必填；非终态必须为 None）
 
         Raises:
             EntityStateTransitionError: 非法迁移（复用 EXCEPTION_243）
+            EntityValidationError: 状态迁移后不变量违反（如终态 completed_at 缺失）
         """
         if not self.can_transition_to(new_state):
             raise EntityStateTransitionError(
@@ -288,6 +295,12 @@ class ToolChainRun:
             )
         object.__setattr__(self, "state", new_state)
         object.__setattr__(self, "state_version", self.state_version + 1)
+        # Round 2 P1-D9 修复：终态迁移同步设置 completed_at
+        if new_state in TERMINAL_STATES and completed_at is not None:
+            object.__setattr__(self, "completed_at", completed_at)
+        # 迁移后重验不变量（DDD 聚合根本原则：每次状态变更必须保持 invariant）
+        # 重点：终态必须设置 completed_at；非终态不能设置 completed_at
+        self.validate()
 
 
 __all__ = [

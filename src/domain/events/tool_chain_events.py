@@ -21,6 +21,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
+from src.domain.entities.tool_chain import FailureStrategy
+
 from .base import DomainEvent
 
 
@@ -35,7 +37,7 @@ class ToolChainExecuted(DomainEvent):
         event_type: 事件类型，固定为 "ToolChainExecuted"
         execution_result: ToolChainRunResult 序列化（node_results + failed_nodes + total_duration_sec）
         cost_audit: 成本审计字典（LLM token / sandbox 时长 / 并行加速比）
-        failure_strategy: FAIL_FAST / CONTINUE_ON_ERROR / SKIP_DOWNSTREAM
+        failure_strategy: 失败策略枚举（Round 2 P1-D8 修复：强类型）
     """
 
     chain_run_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -44,7 +46,7 @@ class ToolChainExecuted(DomainEvent):
     event_type: str = field(default="ToolChainExecuted", init=False)
     execution_result: dict[str, Any] = field(default_factory=dict)
     cost_audit: dict[str, Any] = field(default_factory=dict)
-    failure_strategy: str = ""
+    failure_strategy: FailureStrategy = FailureStrategy.SKIP_DOWNSTREAM
 
     def __post_init__(self) -> None:
         """设置 aggregate_id 和 aggregate_type"""

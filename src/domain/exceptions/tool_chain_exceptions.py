@@ -3,11 +3,12 @@
 定义工具链编排相关的领域异常（DAG 工具链编排，独立于 tool 子域）。
 异常是领域契约的一部分，遵循异常编码范围约束。
 
-toolchain 子域（390-399）共 4 个异常：
-- EXCEPTION_390 ToolChainCycleDetectedError
-- EXCEPTION_391 ToolChainDuplicateNodeError
-- EXCEPTION_392 ToolChainNodeNotFoundError
-- EXCEPTION_393 ToolChainExecutionFailedError
+toolchain 子域（390-399）共 5 个异常：
+- EXCEPTION_390 ToolChainCycleDetectedError（DAG 循环依赖）
+- EXCEPTION_391 ToolChainDuplicateNodeError（DAG 节点重复）
+- EXCEPTION_392 ToolChainNodeNotFoundError（DAG 边引用节点缺失）
+- EXCEPTION_393 ToolChainExecutionFailedError（FAIL_FAST 触发）
+- EXCEPTION_394 ToolChainNotFoundError（DAG 定义缺失）
 
 子域嵌套说明：
 - toolchain (390-399) ⊂ external (301-399)，物理上嵌套但语义独立
