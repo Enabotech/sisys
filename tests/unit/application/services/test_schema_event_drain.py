@@ -37,6 +37,16 @@ def _make_event() -> ToolSchemaValidationFailed:
 class TestDrainSchemaEvents:
     """Round 4 P0-3:shutdown 时优雅排空 schema 事件,避免事件丢失"""
 
+    @pytest.fixture(autouse=True)
+    def _clean_background_tasks(self) -> None:
+        """Round 5 根因修复:每个 test 前清理 _background_tasks
+
+        pytest-asyncio 每个 test 新 event loop,模块级 _background_tasks 中
+        可能含旧 loop 的 stale task。autouse fixture 在 test 开始前清理,
+        避免 cross-loop "future belongs to different loop" ValueError。
+        """
+        _background_tasks.clear()
+
     @pytest.mark.asyncio
     async def test_drain_empty_background_tasks_returns_immediately(self) -> None:
         """_background_tasks 为空时立即返回,不阻塞"""
