@@ -113,17 +113,47 @@ def test_invalid_status_passes_with_violations() -> None:
     assert result.validation_violations == (violation,)
 
 
-def test_invalid_status_passes_without_violations_4_1a_compat() -> None:
-    """status=INVALID + 空 violations + 空 output → 仍通过(向后兼容 4.1a 既有失败路径)
+def test_invalid_status_raises_when_no_violations_and_no_output() -> None:
+    """Round 2 P1-1:AC-4 契约严格化 — status=INVALID 时 validation_violations 与 output 至少一项非空
 
-    Story 4.3 AC-4 向后兼容策略：
-    evidence_package 默认 None 保持不变(不强制必填),
-    4.1a 既有 ToolResult(status=INVALID, evidence_package=None) 调用全部通过。
+    Story 4.3 AC-4 契约(Round 2 修正):
+    status=INVALID 时必须有 validation_violations(Schema 校验失败信息)
+    或 output(LLM 实际输出,但 schema 不匹配)。两者皆空 → EntityValidationError。
+
+    向后兼容说明:4.1a 既有代码路径使用 status=FAILED / status=SUCCESS,
+    不使用 status=INVALID。Story 4.3 引入 status=INVALID 必须携带违规信息,
+    否则下游 4.7 Validation Feedback 订阅者无法区分"INVALID(可重试)"
+    与"FAILED(纯执行失败)"语义。
     """
+    from src.domain.exceptions import EntityValidationError
+
+    with pytest.raises(EntityValidationError) as exc_info:
+        _make_minimal_result(
+            status=ToolResultStatus.INVALID,
+            evidence_package=None,
+            output={},
+            validation_violations=(),
+        )
+    assert "validation_violations|output" in str(exc_info.value.context.get("sub_field", ""))
+
+
+def test_invalid_status_passes_when_has_violations() -> None:
+    """status=INVALID + 有 violations → 通过校验(Round 2 P1-1)"""
     result = _make_minimal_result(
         status=ToolResultStatus.INVALID,
         evidence_package=None,
         output={},
+        validation_violations=(SchemaViolation(path="/x", expected="string", actual=123, message="bad"),),
+    )
+    assert result.status == ToolResultStatus.INVALID
+
+
+def test_invalid_status_passes_when_has_output() -> None:
+    """status=INVALID + 有 output → 通过校验(Round 2 P1-1)"""
+    result = _make_minimal_result(
+        status=ToolResultStatus.INVALID,
+        evidence_package=None,
+        output={"partial": "result"},
         validation_violations=(),
     )
     assert result.status == ToolResultStatus.INVALID

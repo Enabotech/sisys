@@ -111,6 +111,23 @@ class ToolOutputValidator:
         execution_id = extract_schema_execution_id(context) or uuid.uuid4()
         # 通过 with_extension 工厂方法透传(ExecutionContext frozen 不可变)
 
+        # Round 2 P0-1:装饰器重试期间临时禁用 Engine 内部重试,防止 81x LLM 调用放大
+        # 默认 Engine._retry.max_attempts=3,装饰器再重试 3 次 = 27x;
+        # 加 litellm tenacity 默认 3 次 = 81x LLM 调用,触发 max_total_duration_sec 超时
+        # 修复:装饰器重试期间把 Engine 临时改为 max_attempts=1,只重试 Validate 阶段
+        # 而非整个 5 阶段,完成后恢复原值
+        original_wrapped_retry = getattr(self._wrapped, "_retry", None)
+        retry_policy_for_engine = RetryPolicy(
+            max_attempts=1,
+            backoff_strategy=retry_policy.backoff_strategy,
+            initial_delay_sec=retry_policy.initial_delay_sec,
+            max_delay_sec=retry_policy.max_delay_sec,
+            max_total_duration_sec=retry_policy.max_total_duration_sec,
+            retryable_exceptions=retry_policy.retryable_exceptions,
+        )
+        if hasattr(self._wrapped, "_retry"):
+            self._wrapped._retry = retry_policy_for_engine  # type: ignore[attr-defined]
+
         async def execute_with_retry() -> ToolResult:
             """单次执行 + 校验 + 失败时通过异常触发 _call_with_retry 重试"""
             nonlocal retry_count, last_violations
@@ -190,6 +207,9 @@ class ToolOutputValidator:
                 op_name="tool_output_validator",
             )
         except ToolExecutionRetryExhaustedError as retry_exc:
+            # Round 2 P0-1:重试耗尽时,先恢复 Engine 原始 _retry,避免污染 Engine 后续使用
+            if hasattr(self._wrapped, "_retry") and original_wrapped_retry is not None:
+                self._wrapped._retry = original_wrapped_retry  # type: ignore[attr-defined]
             # P0-B 修复:_call_with_retry 在重试耗尽时抛 ToolExecutionRetryExhaustedError,
             # 但 AC-3 + AC-7 契约明确要求装饰器对外抛 ToolResultValidationError(EXCEPTION_389),
             # 4.7 Validation Feedback 订阅契约按 ToolResultValidationError 类型做处理。
@@ -201,6 +221,10 @@ class ToolOutputValidator:
                 reason=f"retries exhausted: {retry_count}; cause: {retry_exc.cause}",
                 schema_violations=[v.to_dict() for v in last_violations],
             ) from retry_exc
+        finally:
+            # Round 2 P0-1:无论成功或失败,恢复 Engine 原始 _retry(防御性编程)
+            if hasattr(self._wrapped, "_retry") and original_wrapped_retry is not None:
+                self._wrapped._retry = original_wrapped_retry  # type: ignore[attr-defined]
 
 
 __all__ = ["ToolOutputValidator"]

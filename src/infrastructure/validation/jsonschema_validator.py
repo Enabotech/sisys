@@ -288,7 +288,17 @@ class JsonSchemaValidatorImpl(SchemaValidatorPort):
                 )
             )
 
-        # 规则 8: 嵌套 schema 收紧(递归 properties 单独检查 - 简化处理:已通过上面 loop 处理)
+        # 规则 8: 嵌套 schema 收紧(Round 2 P0-3:递归 properties 子字段 type/enum/required/additionalProperties 单独检查)
+        # 上面 loop 仅检查顶层 properties 的 type/enum/required,但嵌套层
+        # (如 properties.user.properties.email.type 改变)漏报
+        # 新增递归检查 + required / enum / additionalProperties 嵌套层检测
+        self._check_nested_schema_changes(
+            old_props,
+            new_props,
+            breaking_changes,
+            non_breaking_changes,
+        )
+
         # 规则 9: minimum / minLength 增大
         for key in old_keys & new_keys:
             old_sub = old_props[key]
@@ -326,6 +336,142 @@ class JsonSchemaValidatorImpl(SchemaValidatorPort):
             non_breaking_changes=tuple(non_breaking_changes),
             schema_diff=schema_diff,
         )
+
+    @staticmethod
+    def _check_nested_schema_changes(
+        old_props: dict[str, Any],
+        new_props: dict[str, Any],
+        breaking_changes: list[BreakingChange],
+        non_breaking_changes: list[NonBreakingChange],
+        _path_prefix: str = "/properties",
+    ) -> None:
+        """Round 2 P0-3:递归检查嵌套 schema 变化
+
+        对嵌套 properties 子字段(type/enum/required/additionalProperties)做兼容性检测,
+        避免顶层 loop 只检查 first-level 漏报嵌套层破坏性变更。
+
+        Args:
+            old_props: 旧 schema 的 properties dict
+            new_props: 新 schema 的 properties dict
+            breaking_changes: 累计 breaking_changes(就地修改)
+            non_breaking_changes: 累计 non_breaking_changes(就地修改)
+            _path_prefix: 当前递归路径前缀(内部参数)
+        """
+        old_keys = set(old_props.keys())
+        new_keys = set(new_props.keys())
+
+        # 递归检查共同 keys 的 type/enum/required 变化
+        for key in old_keys & new_keys:
+            old_sub = old_props[key]
+            new_sub = new_props[key]
+            if not isinstance(old_sub, dict) or not isinstance(new_sub, dict):
+                continue
+
+            old_type = old_sub.get("type")
+            new_type = new_sub.get("type")
+            if old_type != new_type:
+                # 嵌套层 type 变化 → 调用 _classify_type_change 复用顶层逻辑(break / non_break)
+                if old_type is not None and new_type is not None:
+                    nested_breaking: list = []
+                    nested_non_breaking: list = []
+                    JsonSchemaValidatorImpl._classify_type_change(
+                        key,
+                        old_type,
+                        new_type,
+                        nested_breaking,
+                        nested_non_breaking,
+                    )
+                    # 将顶层 BreakingChange 转 NESTED_SCHEMA_TIGHTENED 标记(嵌套层语义)
+                    for bc in nested_breaking:
+                        breaking_changes.append(
+                            BreakingChange(
+                                change_type=ChangeType.NESTED_SCHEMA_TIGHTENED,
+                                path=f"{_path_prefix}/{key}/type",
+                                old_value=old_type,
+                                new_value=new_type,
+                                description=f"嵌套字段 {key} type 收窄:{bc.description}",
+                                severity=bc.severity,
+                                remediation=bc.remediation,
+                            ),
+                        )
+                    # 非破坏性变更(类型放宽)→ 直接加入 non_breaking_changes
+                    for nbc in nested_non_breaking:
+                        non_breaking_changes.append(
+                            NonBreakingChange(
+                                change_type=NonBreakingChangeType.FIELD_TYPE_WIDENED,
+                                path=f"{_path_prefix}/{key}/type",
+                                old_value=old_type,
+                                new_value=new_type,
+                                description=f"嵌套字段 {key} type 放宽:{nbc.description}",
+                            ),
+                        )
+
+            # 嵌套 enum 缩小
+            old_enum = old_sub.get("enum")
+            new_enum = new_sub.get("enum")
+            if old_enum and new_enum:
+                removed = set(old_enum) - set(new_enum)
+                if removed:
+                    breaking_changes.append(
+                        BreakingChange(
+                            change_type=ChangeType.NESTED_SCHEMA_TIGHTENED,
+                            path=f"{_path_prefix}/{key}/enum",
+                            old_value=old_enum,
+                            new_value=new_enum,
+                            description=f"嵌套字段 {key} enum 删除值:{removed}",
+                            severity="major",
+                        ),
+                    )
+
+            # 嵌套 required 增加
+            old_req = set(old_sub.get("required", []))
+            new_req = set(new_sub.get("required", []))
+            if new_req - old_req:
+                breaking_changes.append(
+                    BreakingChange(
+                        change_type=ChangeType.NESTED_SCHEMA_TIGHTENED,
+                        path=f"{_path_prefix}/{key}/required",
+                        old_value=sorted(old_req),
+                        new_value=sorted(new_req),
+                        description=f"嵌套字段 {key} 新增 required:{sorted(new_req - old_req)}",
+                        severity="major",
+                    ),
+                )
+
+            # 嵌套 additionalProperties 收紧
+            old_ap = old_sub.get("additionalProperties", True)
+            new_ap = new_sub.get("additionalProperties", True)
+            if old_ap is True and new_ap is False:
+                breaking_changes.append(
+                    BreakingChange(
+                        change_type=ChangeType.NESTED_SCHEMA_TIGHTENED,
+                        path=f"{_path_prefix}/{key}/additionalProperties",
+                        old_value=True,
+                        new_value=False,
+                        description=f"嵌套字段 {key} additionalProperties 由 true 收紧到 false",
+                        severity="major",
+                    ),
+                )
+
+            # 递归到嵌套 properties
+            nested_old_props = old_sub.get("properties")
+            nested_new_props = new_sub.get("properties")
+            if isinstance(nested_old_props, dict) and isinstance(nested_new_props, dict):
+                JsonSchemaValidatorImpl._check_nested_schema_changes(
+                    nested_old_props,
+                    nested_new_props,
+                    breaking_changes,
+                    non_breaking_changes,
+                    _path_prefix=f"{_path_prefix}/{key}/properties",
+                )
+
+    @staticmethod
+    def _classify_type_severity(old_type: str, new_type: str) -> str:
+        """分类 type 变化的破坏性程度(breaking / non_breaking)"""
+        # 类型完全变更(数字家族外):breaking
+        if {old_type, new_type} <= {"integer", "number"}:
+            return "non_breaking"  # 数字家族互转:放宽
+        return "breaking"
 
     @staticmethod
     def _classify_type_change(

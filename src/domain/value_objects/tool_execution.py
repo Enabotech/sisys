@@ -224,6 +224,19 @@ class ToolResult:
                 message="completed_at 不能早于 started_at",
                 context={"entity": "ToolResult"},
             )
+        # Round 2 P1-1:AC-4 契约 — status=INVALID 时 validation_violations 非空 或 output 非空
+        # 4.7 Validation Feedback 订阅者依赖此语义区分"INVALID(可重试/有 violations)"
+        # 与"FAILED(无 violations,纯执行失败)"
+        if self.status == ToolResultStatus.INVALID:
+            if not self.validation_violations and not self.output:
+                raise EntityValidationError(
+                    message="status=INVALID 时 validation_violations 与 output 至少一项非空",
+                    context={
+                        "entity": "ToolResult",
+                        "field": "status",
+                        "sub_field": "validation_violations|output",
+                    },
+                )
 
     def validate_complete(self) -> bool:
         """完整性校验（success 状态必须有 evidence_package）

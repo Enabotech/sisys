@@ -79,8 +79,11 @@ class ToolOutputSchemaValidationError(ValidationError):
 
     继承自 ValidationError（EXCEPTION_201）→ HTTP 422（语义错误）。
     触发场景：LLM 模型漂移（model drift）导致输出不符合契约。
-    该异常在 INPUT 校验通过但 OUTPUT 校验失败的场景下抛出，
-    与 ToolInputSchemaValidationError (EXCEPTION_395) 区别在于阶段语义不同。
+
+    Round 2 P0-3 修正:Story 4.3 AC-3 当前实现路径下,OUTPUT 校验失败重试耗尽
+    抛 ToolResultValidationError (EXCEPTION_389, 含 schema_violations 上下文)。
+    EXCEPTION_396 保留作为工具调用边界异常契约(若未来工具直接抛出或
+    OUTPUT 校验在更细粒度失败时使用),当前 Story 4.3 dev 阶段未直接 raise。
 
     Attributes:
         code: 错误码 EXCEPTION_396
