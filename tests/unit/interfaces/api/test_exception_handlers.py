@@ -76,7 +76,12 @@ from src.domain.exceptions import (
     RerankError,
     RoleAlreadyExistsError,
     RoleNotFoundError,
+    SandboxConfigurationError,
     SandboxError,
+    SandboxImagePullError,
+    SandboxQuotaExceededError,
+    SandboxResourceLimitExceededError,
+    SandboxTimeoutError,
     ServiceUnavailableError,
     SkillLoadError,
     SkillNotFoundError,
@@ -239,6 +244,12 @@ class TestExceptionHttpMap:
             ContainerStartError,
             ExecutionError,
             ContainerStopError,
+            # Story 4.4 — Docker 沙箱执行新增 5 个异常
+            SandboxImagePullError,  # 315
+            SandboxTimeoutError,  # 316
+            SandboxResourceLimitExceededError,  # 317
+            SandboxQuotaExceededError,  # 318
+            SandboxConfigurationError,  # 319
             # OCR 异常
             OCRConnectionError,
             OCRProcessingError,

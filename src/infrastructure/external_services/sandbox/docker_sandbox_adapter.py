@@ -33,11 +33,15 @@ class DockerSandboxAdapter(SandboxExecutor):
     def __init__(self) -> None:
         self._running_containers: dict[str, bool] = {}
 
-    async def start_container(self, session_id: str) -> None:
+    async def start_container(self, session_id: str, spec: object = None) -> None:
         """启动指定会话的 Docker 容器
+
+        注意:spec 参数仅对齐 Story 4.4 SandboxExecutor Protocol 签名,mock
+        实现忽略此参数(保留 git tag pre-4-4-mock-fallback 紧急回滚路径)。
 
         Args:
             session_id: 会话唯一标识符
+            spec: 容器规格(Story 4.4 Protocol 扩展参数,mock 忽略)
 
         Raises:
             ContainerStartError: 容器启动失败时抛出
@@ -66,7 +70,8 @@ class DockerSandboxAdapter(SandboxExecutor):
             logger.error("Failed to start container for session %s: %s", session_id, e)
             raise ContainerStartError(f"Failed to start container: {e}") from e
 
-    async def execute_code(self, session_id: str, code: str) -> dict[str, Any]:
+    async def execute_code(self, session_id: str, code: str, *, timeout_sec: float | None = None) -> dict[str, Any]:
+        """在 Docker 沙箱中执行代码(mock 实现,忽略 timeout_sec)"""
         """在 Docker 沙箱中执行代码
 
         Args:
@@ -135,3 +140,10 @@ class DockerSandboxAdapter(SandboxExecutor):
             正在运行返回 True，否则返回 False
         """
         return self._running_containers.get(session_id, False)
+
+    async def health_check(self) -> bool:
+        """Docker daemon 健康检查(mock 实现始终返回 True)
+
+        Story 4.4 Protocol 扩展方法,mock 实现用于对齐 Protocol 签名。
+        """
+        return True

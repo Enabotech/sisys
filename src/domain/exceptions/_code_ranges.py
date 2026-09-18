@@ -159,6 +159,12 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ContainerStartError": "sandbox",
     "ContainerStopError": "sandbox",
     "ExecutionError": "sandbox",
+    # Story 4.4 新增 5 个沙箱异常
+    "SandboxImagePullError": "sandbox",
+    "SandboxTimeoutError": "sandbox",
+    "SandboxResourceLimitExceededError": "sandbox",
+    "SandboxQuotaExceededError": "sandbox",
+    "SandboxConfigurationError": "sandbox",
     # ocr_exceptions.py
     "OCRConnectionError": "ocr",
     "OCRProcessingError": "ocr",

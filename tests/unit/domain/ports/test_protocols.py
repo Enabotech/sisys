@@ -80,13 +80,19 @@ class TestSandboxExecutor:
     """SandboxExecutor 结构化类型测试"""
 
     def test_runtime_checkable_with_compatible_class(self) -> None:
-        """实现所有四个方法的类应通过 isinstance 检查"""
+        """实现所有四个方法 + health_check 的类应通过 isinstance 检查"""
 
         class CompatibleExecutor:
-            async def start_container(self, session_id: str) -> None:
+            async def start_container(self, session_id: str, spec: object | None = None) -> None:
                 pass
 
-            async def execute_code(self, session_id: str, code: str) -> dict[str, Any]:
+            async def execute_code(
+                self,
+                session_id: str,
+                code: str,
+                *,
+                timeout_sec: float | None = None,
+            ) -> dict[str, Any]:
                 return {"status": "ok"}
 
             async def stop_container(self, session_id: str) -> None:
@@ -94,6 +100,9 @@ class TestSandboxExecutor:
 
             async def is_container_running(self, session_id: str) -> bool:
                 return False
+
+            async def health_check(self) -> bool:
+                return True
 
         instance = CompatibleExecutor()
         assert isinstance(instance, SandboxExecutor)
