@@ -2,11 +2,12 @@
 
 本文件定义 acceptance 测试目录的专属 fixture 和 pytest hook：
 - pytest_collection_modifyitems: 自动标记 @pytest.mark.acceptance 及服务依赖
+- pytest_sessionfinish: session 结束清理遗留的 sisys-sandbox-* 容器
 - acceptance_env_config: session 级环境配置 fixture
 - LLM 端点可达性探测 helper（防止内网不可达 endpoint 导致 fixture 误判可用）
 
 Author:
-    agimtech <agimtech@126.com>
+    agimtech <enabotech@126.com>
 
 Copyright:
     Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
@@ -16,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import socket
-from collections.abc import Generator
 from typing import Any
 from urllib.parse import urlparse
 
@@ -134,30 +134,21 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(marker)
 
 
-@pytest.fixture(autouse=True)
-def _cleanup_sandbox_containers(request: pytest.FixtureRequest) -> Generator[None, None, None]:
-    """测试结束后强制清理遗留的 sisys-sandbox-* 容器(防止测试中断导致容器泄漏).
+def pytest_sessionfinish(session, exitstatus) -> None:
+    """pytest session 结束时强制清理遗留的 sisys-sandbox-* 容器.
 
-    根因:某些 acceptance 测试在异常/超时分支中未调用 stop_container,导致容器泄漏。
-    修复:每次测试结束(无论成功/失败)都执行 daemon 级别批量清理。
-    仅清理前缀为 sisys-sandbox- 的容器(避免误删其他项目)。
+    pytest_sessionfinish 在整个 session 退出前调用,包括 xdist worker 销毁之后。
+    这确保即使测试在 finally 块未调 stop_container,容器也被 docker rm 清理。
+    仅清理 sisys-sandbox- 前缀(避免误删其他项目)。
     """
-    yield
-
     import subprocess
 
     try:
         result = subprocess.run(
-            [
-                "docker",
-                "ps",
-                "-aq",
-                "--filter",
-                "name=sisys-sandbox-",
-            ],
+            ["docker", "ps", "-aq", "--filter", "name=sisys-sandbox-"],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=30,
         )
         if result.returncode == 0 and result.stdout.strip():
             container_ids = result.stdout.strip().split("\n")
@@ -168,4 +159,4 @@ def _cleanup_sandbox_containers(request: pytest.FixtureRequest) -> Generator[Non
                     timeout=10,
                 )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        pass  # daemon 不可用 - 静默失败(测试已完成)
+        pass  # daemon 不可用 - 静默失败
