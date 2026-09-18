@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import socket
+from collections.abc import Generator
 from typing import Any
 from urllib.parse import urlparse
 
@@ -131,3 +132,40 @@ def pytest_collection_modifyitems(config, items):
         for keyword, marker in _SERVICE_MARKERS.items():
             if keyword in filename:
                 item.add_marker(marker)
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_sandbox_containers(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """测试结束后强制清理遗留的 sisys-sandbox-* 容器(防止测试中断导致容器泄漏).
+
+    根因:某些 acceptance 测试在异常/超时分支中未调用 stop_container,导致容器泄漏。
+    修复:每次测试结束(无论成功/失败)都执行 daemon 级别批量清理。
+    仅清理前缀为 sisys-sandbox- 的容器(避免误删其他项目)。
+    """
+    yield
+
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "ps",
+                "-aq",
+                "--filter",
+                "name=sisys-sandbox-",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            container_ids = result.stdout.strip().split("\n")
+            for cid in container_ids:
+                subprocess.run(
+                    ["docker", "rm", "-f", cid],
+                    capture_output=True,
+                    timeout=10,
+                )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass  # daemon 不可用 - 静默失败(测试已完成)
