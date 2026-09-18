@@ -87,18 +87,38 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         self._lock: asyncio.Lock | None = None
         # 当前 event loop 引用(用于检测 client 是否需要重建)
         self._loop: Any = None
-        # 保存所有创建过的 connectors(在 __del__ 时统一关闭,避免 Unclosed 警告)
+        # 保存所有创建过的 connectors(供 aclose 时同步关闭)
         self._connectors: list[Any] = []
 
     def __del__(self) -> None:
-        """析构时同步关闭所有 connectors(避免 Unclosed connector 警告).
+        """析构时跳过主动清理 - 真正修复在 step 函数 finally 块中同步 stop_container.
 
-        这种方法有效是因为:
-        - UnixConnector.close() 是**同步**方法(底层只是 close OS 文件描述符)
-        - Python 解释器退出时,所有 adapter 实例被 GC,触发 __del__
-        - __del__ 中同步关闭所有 connector,释放 OS fd
-        - 此时即使旧 event loop 已关闭,close() 仍能安全执行(只是 OS fd 操作)
+        aiohttp 3.14 + aiodocker 0.21 组合下,在 xdist worker 退出 context 中
+        同步调用 session.close()/connector.close() 会触发 KeyError。
+        真正解决:让测试 step 函数在 finally 中 await self._docker.close(),
+        跨 loop 容器清理由 daemon label 保证安全(见 session_repo + Reaper)。
         """
+        # 不做主动清理 - 由测试 step finally 块负责
+        pass
+
+    async def aclose(self) -> None:
+        """显式关闭当前 docker 客户端(测试 step finally 块调用).
+
+        在**当前 loop** 中关闭 aiodocker.Docker:
+        1) await docker.close() 触发内部 session.close()
+        2) 然后同步关闭 connector(防止 Unclosed connector 警告)
+
+        注意:必须在当前 loop 调用(因 await),避免跨 loop 同步驱动导致 xdist worker crash。
+        """
+        if self._docker is not None:
+            try:
+                # 先关闭 docker client(触发 session close)
+                await self._docker.close()
+            except Exception:
+                pass
+            self._docker = None
+            self._loop = None
+        # 然后同步关闭所有 connector(防止 OS fd 泄漏触发 Unclosed connector 警告)
         for connector in self._connectors:
             try:
                 if connector is not None and not connector.closed:
@@ -110,20 +130,18 @@ class AioDockerSandboxAdapter(SandboxExecutor):
     async def _ensure_docker(self) -> Any:
         """延迟初始化 aiodocker.Docker 客户端,自动检测 event loop 变更.
 
-        真正根本修复(无告警抑制):
-        1) 旧 client 引用置空(由 __del__ 统一关闭其 connector)
-        2) 旧 client 持有的 connector 保存到 self._connectors(由 __del__ 关闭)
-        3) 新 client 创建,新 connector 也保存到 _connectors
-        4) 进程退出时 __del__ 同步关闭所有 connector(UnixConnector.close() 同步)
+        关键修复(无告警抑制):
+        - 旧 client 保存到 _connectors(close 时同步关闭所有 connector)
+        - 新 client 创建后 connector 也加入 _connectors
+        - aclose() 方法中在当前 loop 同步关闭 session + connector
         """
         import aiodocker  # 基础设施层允许导入第三方库
 
         current_loop = asyncio.get_running_loop()
         if self._docker is None or self._loop is not current_loop:
-            # 1) 断开旧 client 引用(__del__ 会关闭其 connector)
+            # 1) 断开旧 client 引用
             if self._docker is not None:
                 old_docker = self._docker
-                # 保存旧 connector(由 __del__ 统一关闭)
                 old_session = getattr(old_docker, "session", None)
                 if old_session is not None:
                     old_connector = getattr(old_session, "_connector", None)
@@ -131,9 +149,8 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                         self._connectors.append(old_connector)
                 self._docker = None
                 del old_docker
-            # 2) 创建新 client(每次新建避免跨 loop 问题)
+            # 2) 创建新 client
             self._docker = aiodocker.Docker(url=self._docker_socket)
-            # 3) 保存新 connector 到清理列表(由 __del__ 统一关闭)
             new_session = getattr(self._docker, "session", None)
             if new_session is not None:
                 new_connector = getattr(new_session, "_connector", None)
@@ -141,28 +158,6 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                     self._connectors.append(new_connector)
             self._loop = current_loop
         return self._docker
-
-    async def aclose(self) -> None:
-        """显式关闭 docker 客户端(由 caller 负责在正确的 loop 内调用)."""
-        if self._docker is not None:
-            try:
-                # 仅关闭 session(不直接 docker.close(),后者会一并关闭 connector)
-                old_session = getattr(self._docker, "session", None)
-                if old_session is not None and not old_session.closed:
-                    await old_session.close()
-            except Exception:
-                pass
-            try:
-                # 同步关闭 connector(UnixConnector.close() 是 sync 方法)
-                old_session = getattr(self._docker, "session", None) if self._docker else None
-                if old_session is not None:
-                    old_connector = getattr(old_session, "_connector", None)
-                    if old_connector is not None and not old_connector.closed:
-                        old_connector.close()
-            except Exception:
-                pass
-            self._docker = None
-            self._loop = None
 
     def _ensure_lock(self) -> asyncio.Lock:
         """延迟初始化 asyncio.Lock(每次调用都关联当前 event loop)"""
