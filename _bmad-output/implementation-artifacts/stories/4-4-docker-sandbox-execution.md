@@ -973,9 +973,6 @@ register_port(
     tags=("tool", "execution", "service", "security"),
 )
 ```
-      tags=("tool", "execution", "engine", "security"),
-  )
-  ```
 
 **验证标准/Validation Criteria:**
 

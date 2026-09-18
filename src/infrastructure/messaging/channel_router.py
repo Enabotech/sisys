@@ -149,6 +149,28 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.REALTIME,
             description="工具 Schema 验证失败（Story 4.3,本期仅 realtime,reliable 4.7 启用）",
         ),
+        # SANDBOX 事件（Story 4.4 — Docker 沙箱执行）
+        "SandboxSessionStarted": ChannelMapping(
+            event_type="SandboxSessionStarted",
+            redis_channel="sisys:rt:sandbox.session.started",
+            rabbitmq_routing_key="sisys.events.reliable.sandbox.session.started",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="沙箱会话启动",
+        ),
+        "SandboxSessionTerminated": ChannelMapping(
+            event_type="SandboxSessionTerminated",
+            redis_channel="sisys:rt:sandbox.session.terminated",
+            rabbitmq_routing_key="sisys.events.reliable.sandbox.session.terminated",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="沙箱会话终止",
+        ),
+        "SandboxExecutionFailed": ChannelMapping(
+            event_type="SandboxExecutionFailed",
+            redis_channel="sisys:rt:sandbox.execution.failed",
+            rabbitmq_routing_key="sisys.events.reliable.sandbox.execution.failed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="沙箱执行失败",
+        ),
         "AgentDecided": ChannelMapping(
             event_type="AgentDecided",
             rabbitmq_routing_key="sisys.events.reliable.agent_decided",

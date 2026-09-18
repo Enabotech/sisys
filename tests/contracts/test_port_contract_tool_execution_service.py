@@ -56,16 +56,28 @@ class _DummyLLM:
 class _DummySandbox:
     """沙箱执行器存根（满足 SandboxExecutor 接口）"""
 
-    async def start_container(self, session_id: str) -> None:
+    async def start_container(self, session_id: str, spec: object = None) -> None:
+        """Story 4.4 Protocol 扩展:spec 默认 None 保持 4.1a 既有调用兼容"""
         pass
 
-    async def execute_code(self, session_id: str, code: str) -> dict[str, Any]:
+    async def execute_code(
+        self,
+        session_id: str,
+        code: str,
+        *,
+        timeout_sec: float | None = None,
+    ) -> dict[str, Any]:
+        """Story 4.4 Protocol 扩展:timeout_sec keyword-only 参数"""
         return {"status": "ok", "output": ""}
 
     async def stop_container(self, session_id: str) -> None:
         pass
 
     async def is_container_running(self, session_id: str) -> bool:
+        return True
+
+    async def health_check(self) -> bool:
+        """Story 4.4 SandboxExecutor Protocol 扩展方法."""
         return True
 
 

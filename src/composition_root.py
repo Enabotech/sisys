@@ -812,12 +812,60 @@ def bootstrap() -> None:
 
     register_port(
         name="sandbox_executor",
-        version="v1.0.0",
+        version="1.0.0",
         interface=SandboxExecutor,
-        impl="src.infrastructure.external_services.sandbox.docker_sandbox_adapter.DockerSandboxAdapter",
-        module="src.infrastructure.external_services.sandbox.docker_sandbox_adapter",
+        # Story 4.4 — 切换 impl 至 aiodocker 实现(mock 已 git tag 保留紧急回滚)
+        # lambda 工厂注入 session_repo,确保 is_container_running / execute_code 能查询 container_id
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter",
+            fromlist=["AioDockerSandboxAdapter"],
+        ).AioDockerSandboxAdapter(
+            session_repo=resolver.resolve("sandbox_session_repository"),
+        ),
+        module="src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter",
         lifetime=Lifetime.SCOPED,
         owner="sandbox-team",
+        tags=("sandbox", "docker", "execution"),
+    )
+
+    # Story 4.4 — SandboxSession 仓储(Postgres 实现,与既有 3/4 仓储惯例一致)
+    register_port(
+        name="sandbox_session_repository",
+        version="1.0.0",
+        interface=__import__(
+            "src.domain.ports.sandbox_session_repository",
+            fromlist=["SandboxSessionRepositoryPort"],
+        ).SandboxSessionRepositoryPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.postgresql.repository.sandbox_session_repository",
+            fromlist=["PostgreSQLSandboxSessionRepository"],
+        ).PostgreSQLSandboxSessionRepository(),
+        module="src.infrastructure.storage.postgresql.repository.sandbox_session_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="sandbox-team",
+        tags=("sandbox", "repository", "postgresql"),
+    )
+
+    # Story 4.4 — SandboxSessionReaper(30 分钟空闲清理 + 孤儿扫描)
+    register_port(
+        name="sandbox_session_reaper",
+        version="1.0.0",
+        interface=__import__(
+            "src.application.services.sandbox_session_reaper",
+            fromlist=["SandboxSessionReaper"],
+        ).SandboxSessionReaper,
+        impl=lambda resolver: __import__(
+            "src.application.services.sandbox_session_reaper",
+            fromlist=["SandboxSessionReaper"],
+        ).SandboxSessionReaper(
+            sandbox=resolver.resolve("sandbox_executor"),
+            session_repo=resolver.resolve("sandbox_session_repository"),
+            idle_timeout_minutes=30,
+        ),
+        module="src.application.services.sandbox_session_reaper",
+        lifetime=Lifetime.SINGLETON,
+        owner="sandbox-team",
+        tags=("sandbox", "reaper", "ttl"),
     )
 
     register_port(

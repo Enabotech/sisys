@@ -30,6 +30,7 @@ from src.infrastructure.storage.postgresql.models.rbac_association import (
     user_roles_table,
 )
 from src.infrastructure.storage.postgresql.models.role import RoleModel
+from src.infrastructure.storage.postgresql.models.sandbox_session import SandboxSessionModel
 from src.infrastructure.storage.postgresql.models.schema_validation import (
     SchemaValidationRecordModel,
 )
@@ -58,6 +59,7 @@ __all__ = [
     "ToolChainModel",
     "ToolExecutionModel",
     "SchemaValidationRecordModel",
+    "SandboxSessionModel",
     "user_roles_table",
     "role_permissions_table",
     "pg_registry",

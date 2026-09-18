@@ -83,7 +83,12 @@ from src.domain.exceptions.sandbox_exceptions import (
     ContainerStartError,
     ContainerStopError,
     ExecutionError,
+    SandboxConfigurationError,
     SandboxError,
+    SandboxImagePullError,
+    SandboxQuotaExceededError,
+    SandboxResourceLimitExceededError,
+    SandboxTimeoutError,
 )
 from src.domain.exceptions.service_exceptions import (
     AuditError,
@@ -200,6 +205,12 @@ __all__ = [
     "ContainerStartError",
     "ExecutionError",
     "ContainerStopError",
+    # Sandbox 扩展异常（Story 4.4 — Docker 沙箱执行）
+    "SandboxImagePullError",
+    "SandboxTimeoutError",
+    "SandboxResourceLimitExceededError",
+    "SandboxQuotaExceededError",
+    "SandboxConfigurationError",
     # 嵌入服务异常
     "EmbeddingAPIError",
     "EmbeddingResponseError",
