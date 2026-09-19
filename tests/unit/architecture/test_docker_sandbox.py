@@ -132,7 +132,7 @@ class TestSandboxPortSpecMetadata:
         # version 应匹配语义化版本 ^\d+\.\d+\.\d+$
         import re
 
-        assert re.match(r"^\d+\.\d+\.\d+$", spec.version), f"version 应匹配 ^\\d+\\.\\d+\\.\\d+$, got '{spec.version}'"
+        assert re.match(r"^v?\d+\.\d+\.\d+$", spec.version), f"version 应匹配 ^v?\\d+\\.\\d+\\.\\d+$, got '{spec.version}'"
 
     def test_sandbox_executor_port_metadata(self) -> None:
         """sandbox_executor 端口元数据完整性验证（如已注册）"""

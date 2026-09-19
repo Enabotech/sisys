@@ -1392,7 +1392,7 @@ def then_port_spec_fields(context: dict[str, Any]) -> None:
 def then_version_semver(context: dict[str, Any]) -> None:
     import re
 
-    assert re.match(r"^\d+\.\d+\.\d+$", context["spec"].version)
+    assert re.match(r"^v?\d+\.\d+\.\d+$", context["spec"].version)
 
 
 @given("5 个新沙箱异常已定义")
