@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import uuid
 from typing import Any
 
 from src.application.ports.tool_execution_engine import ToolExecutionEnginePort
@@ -74,17 +75,51 @@ class SandboxSecurityDecorator:
                 reason_detail="regex mismatch",
             )
 
-    async def execute(self, *args: Any, **kwargs: Any) -> Any:
-        """委托执行到 wrapped 引擎,应用 4 项防护
+    async def execute(
+        self,
+        tool_id: uuid.UUID,
+        tool: Any,
+        tool_call: Any,
+        context: Any,
+    ) -> Any:
+        """委托执行到 wrapped 引擎,应用安全防护
+
+        在五阶段工作流执行前:
+        1. session_id 注入防御(从 context.session_id 提取并校验)
+        2. 并发容器配额检查(从 session_repo 查询活跃数)
+
+        超时控制由 AioDockerSandboxAdapter.execute_code 内部的
+        asyncio.wait_for 实现,此处不重复包装。
 
         Args:
-            *args: 透传给 wrapped.execute()
-            **kwargs: 透传给 wrapped.execute()
+            tool_id: 工具 ID
+            tool: 工具实体
+            tool_call: 工具调用请求
+            context: 执行上下文(含 session_id)
 
         Returns:
             wrapped.execute() 的结果
+
+        Raises:
+            SandboxConfigurationError: session_id 非法
+            SandboxQuotaExceededError: 并发容器数超配额
         """
-        return await self._wrapped.execute(*args, **kwargs)
+        # 防护 1: session_id 注入防御
+        session_id = getattr(context, "session_id", "")
+        if session_id:
+            self._validate_session_id(session_id)
+
+        # 防护 2: 配额检查
+        if self._session_repo is not None:
+            active_count = await self._session_repo.count_active()
+            if active_count >= self._max_concurrent_containers:
+                raise SandboxQuotaExceededError(
+                    "concurrent container limit reached",
+                    current_count=active_count,
+                    max_count=self._max_concurrent_containers,
+                )
+
+        return await self._wrapped.execute(tool_id, tool, tool_call, context)
 
     async def execute_code_with_protection(
         self,

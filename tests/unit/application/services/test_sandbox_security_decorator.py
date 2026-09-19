@@ -150,9 +150,19 @@ class TestWrappedEngineDelegation:
     """验证包裹类模式:execute() 委托到 wrapped.execute()"""
 
     async def test_execute_delegates_to_wrapped(self, decorator: SandboxSecurityDecorator, wrapped: MagicMock) -> None:
-        """execute() 委托到 wrapped.execute() 不修改签名"""
-        result = await decorator.execute("arg1", kwarg1="val1")
-        wrapped.execute.assert_called_once_with("arg1", kwarg1="val1")
+        """execute() 委托到 wrapped.execute() 并应用安全防护"""
+        import uuid as _uuid
+
+        from src.domain.entities.tool import Tool
+        from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall
+
+        tool_id = _uuid.uuid4()
+        tool = MagicMock(spec=Tool)
+        tool_call = MagicMock(spec=ToolCall)
+        context = ExecutionContext(tenant_id=_uuid.uuid4(), session_id="valid-session-001")
+
+        result = await decorator.execute(tool_id, tool, tool_call, context)
+        wrapped.execute.assert_called_once_with(tool_id, tool, tool_call, context)
         assert result == {"result": "ok"}
 
 
