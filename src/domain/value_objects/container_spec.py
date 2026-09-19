@@ -11,6 +11,7 @@ Story 4.4 — Docker 沙箱执行。
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from src.domain.exceptions import EntityValidationError
@@ -130,8 +131,6 @@ class ContainerSpec:
         # 接受任一: @sha256: digest 或 :X.Y 格式 minor tag (如 python:3.11)
         has_digest = "@sha256:" in self.image
         # 提取最后一个 : 之后的内容作为 tag 部分(必须形如 X.Y 或 X.Y.Z)
-        import re
-
         tag_match = re.search(r":(\d+\.\d+(?:\.\d+)?)(?:@|$)", self.image)
         has_minor_tag = tag_match is not None
         if not (has_digest or has_minor_tag):

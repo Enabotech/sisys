@@ -275,6 +275,7 @@
   当 启动 → 执行 → 停止完整生命周期
   那么 SandboxSessionStarted 事件被发布
   并且 SandboxSessionTerminated 事件被发布
+  并且 SandboxExecutionFailed 事件被发布
 
 # =============================================================================
 # AC-9 性能 + 安全架构验证

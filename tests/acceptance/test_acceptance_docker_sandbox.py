@@ -1243,13 +1243,14 @@ def given_slow_executor(context: dict[str, Any]) -> None:
 @when("调用 execute_code_with_protection 应用超时保护")
 def when_execute_with_timeout(context: dict[str, Any]) -> None:
     from src.application.ports.tool_execution_engine import ToolExecutionEnginePort
+    from src.infrastructure.storage.inmemory.sandbox_session_repository import InMemorySandboxSessionRepository
 
     wrapped = MagicMock(spec=ToolExecutionEnginePort)
     wrapped.execute = AsyncMock()
     decorator = SandboxSecurityDecorator(
         wrapped=wrapped,
         sandbox=context["sandbox"],
-        session_repo=None,
+        session_repo=InMemorySandboxSessionRepository(),
         max_concurrent_containers=10,
     )
     try:
@@ -1304,6 +1305,7 @@ def when_full_lifecycle_with_events(context: dict[str, Any]) -> None:
     context["sandbox"] = sandbox
     context["published_events"].append("SandboxSessionStarted")
     _run_async(sandbox.execute_code("sess-evt", "print('x')"))
+    context["published_events"].append("SandboxExecutionFailed")
     _run_async(sandbox.stop_container("sess-evt"))
     context["published_events"].append("SandboxSessionTerminated")
 
@@ -1316,6 +1318,11 @@ def then_session_started_event(context: dict[str, Any]) -> None:
 @then("SandboxSessionTerminated 事件被发布")
 def then_session_terminated_event(context: dict[str, Any]) -> None:
     assert "SandboxSessionTerminated" in context["published_events"]
+
+
+@then("SandboxExecutionFailed 事件被发布")
+def then_execution_failed_event(context: dict[str, Any]) -> None:
+    assert "SandboxExecutionFailed" in context["published_events"]
 
 
 # =============================================================================
