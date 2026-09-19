@@ -812,7 +812,7 @@ def bootstrap() -> None:
 
     register_port(
         name="sandbox_executor",
-        version="1.0.0",
+        version="v1.0.0",
         interface=SandboxExecutor,
         # Story 4.4 — 切换 impl 至 aiodocker 实现(mock 已 git tag 保留紧急回滚)
         # lambda 工厂注入 session_repo,确保 is_container_running / execute_code 能查询 container_id
@@ -831,7 +831,7 @@ def bootstrap() -> None:
     # Story 4.4 — SandboxSession 仓储(Postgres 实现,与既有 3/4 仓储惯例一致)
     register_port(
         name="sandbox_session_repository",
-        version="1.0.0",
+        version="v1.0.0",
         interface=__import__(
             "src.domain.ports.sandbox_session_repository",
             fromlist=["SandboxSessionRepositoryPort"],
@@ -849,7 +849,7 @@ def bootstrap() -> None:
     # Story 4.4 — SandboxSessionReaper(30 分钟空闲清理 + 孤儿扫描)
     register_port(
         name="sandbox_session_reaper",
-        version="1.0.0",
+        version="v1.0.0",
         interface=__import__(
             "src.application.services.sandbox_session_reaper",
             fromlist=["SandboxSessionReaper"],
@@ -2288,22 +2288,31 @@ def bootstrap() -> None:
 
     register_port(
         name="tool_execution_service",
-        version="v1.1.0",  # 升级:装配 ToolOutputValidator 装饰器(Story 4.3 交付)
+        version="v1.2.0",  # 升级:装配 SandboxSecurityDecorator(Story 4.4) + ToolOutputValidator(Story 4.3)
         interface=ToolExecutionServicePort,
         impl=lambda resolver: __import__(
             "src.application.services.tool_execution_service",
             fromlist=["ToolExecutionService"],
         ).ToolExecutionService(
             registry=resolver.resolve("tool_registry_service"),
-            # P0 修复:ToolOutputValidator 装饰器包裹 Engine(纯 Decorator 外包模式,AC-7 + AC-3)
-            # 否则 Story 4.3 核心价值(OUTPUT Schema 校验)在生产装配中完全未被启用
+            # Story 4.4 P0 修复:SandboxSecurityDecorator 包裹 ToolOutputValidator 包裹 Engine
+            # 装饰器层叠: SandboxSecurityDecorator(最外层,安全防护) > ToolOutputValidator(Schema 校验) > Engine(五阶段)
+            # 否则 Story 4.4 核心价值(session_id 注入防御 + 并发配额检查)在生产装配中完全未被启用
             engine=__import__(
-                "src.application.services.tool_output_validator",
-                fromlist=["ToolOutputValidator"],
-            ).ToolOutputValidator(
-                wrapped=resolver.resolve("tool_execution_engine"),
-                schema_validator=resolver.resolve("schema_validator"),
-                event_publisher=resolver.resolve("event_publisher"),
+                "src.application.services.sandbox_security_decorator",
+                fromlist=["SandboxSecurityDecorator"],
+            ).SandboxSecurityDecorator(
+                wrapped=__import__(
+                    "src.application.services.tool_output_validator",
+                    fromlist=["ToolOutputValidator"],
+                ).ToolOutputValidator(
+                    wrapped=resolver.resolve("tool_execution_engine"),
+                    schema_validator=resolver.resolve("schema_validator"),
+                    event_publisher=resolver.resolve("event_publisher"),
+                ),
+                sandbox=resolver.resolve("sandbox_executor"),
+                session_repo=resolver.resolve("sandbox_session_repository"),
+                max_concurrent_containers=50,
             ),
         ),
         module="src.application.services.tool_execution_service",
