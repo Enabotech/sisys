@@ -44,7 +44,7 @@ class SandboxSessionStarted(DomainEvent):
             object.__setattr__(self, "aggregate_id", uuid.uuid4())
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "SandboxSession")
-        if "session_id" not in self.metadata:
+        if "session_id" not in self.metadata and self.session_id:
             object.__setattr__(
                 self,
                 "metadata",
@@ -76,7 +76,7 @@ class SandboxSessionTerminated(DomainEvent):
             object.__setattr__(self, "aggregate_id", uuid.uuid4())
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "SandboxSession")
-        if "session_id" not in self.metadata:
+        if "session_id" not in self.metadata and self.session_id:
             object.__setattr__(
                 self,
                 "metadata",
@@ -110,7 +110,7 @@ class SandboxExecutionFailed(DomainEvent):
             object.__setattr__(self, "aggregate_id", uuid.uuid4())
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "SandboxSession")
-        if "session_id" not in self.metadata:
+        if "session_id" not in self.metadata and self.session_id:
             object.__setattr__(
                 self,
                 "metadata",

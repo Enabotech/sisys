@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -112,18 +112,7 @@ class SandboxSession:
             新的 SandboxSession 实例（不可变,frozen 模式）
         """
         new_at = at or datetime.now(UTC)
-        return SandboxSession(
-            session_id=self.session_id,
-            tenant_id=self.tenant_id,
-            container_id=self.container_id,
-            image_digest=self.image_digest,
-            started_at=self.started_at,
-            last_activity_at=new_at,
-            terminated_at=self.terminated_at,
-            resource_limits=self.resource_limits,
-            state=self.state,
-            state_version=self.state_version + 1,
-        )
+        return replace(self, last_activity_at=new_at, state_version=self.state_version + 1)
 
     def with_terminated(self, at: datetime | None = None) -> "SandboxSession":
         """返回新的 SandboxSession 实例,标记为已终止
@@ -135,15 +124,10 @@ class SandboxSession:
             新的 SandboxSession 实例,state="TERMINATED",terminated_at 已设置
         """
         new_at = at or datetime.now(UTC)
-        return SandboxSession(
-            session_id=self.session_id,
-            tenant_id=self.tenant_id,
-            container_id=self.container_id,
-            image_digest=self.image_digest,
-            started_at=self.started_at,
+        return replace(
+            self,
             last_activity_at=new_at,
             terminated_at=new_at,
-            resource_limits=self.resource_limits,
             state="TERMINATED",
             state_version=self.state_version + 1,
         )

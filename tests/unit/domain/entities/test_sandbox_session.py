@@ -1,4 +1,4 @@
-"""Story 4.4: SandboxSession 聚合根单元测试
+"""SandboxSession 聚合根单元测试
 
 验证 SandboxSession 10 字段 + session_id 正则 + 终态不变量。
 """
