@@ -103,6 +103,13 @@ class _DummyResolver:
             return MagicMock(spec=["validate_arguments", "validate_output", "validate_schema_compatibility"])
         if name == "event_publisher":
             return MagicMock()
+        # Story 4.4 新增端口依赖
+        if name == "sandbox_executor":
+            return MagicMock()
+        if name == "sandbox_session_repository":
+            return MagicMock()
+        if name == "sandbox_session_reaper":
+            return MagicMock()
         raise KeyError(f"未注册的端口: {name}")
 
 
@@ -136,7 +143,7 @@ class TestToolExecutionServicePortContract:
         """维度 3：端口版本"""
         spec = self._spec()
         assert spec is not None
-        assert spec.version == "v1.1.0"
+        assert spec.version == "v1.2.0"  # Story 4.4 升级: SandboxSecurityDecorator + ToolOutputValidator
 
     def test_dimension_4_port_interface_type(self) -> None:
         """维度 4：端口接口类型"""
