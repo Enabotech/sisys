@@ -273,7 +273,7 @@ def test_query_object_is_frozen() -> None:
 
     query = ToolChainDagQuery()
     with pytest.raises(FrozenInstanceError):
-        query.limit = 200  # type: ignore[misc]
+        setattr(query, "limit", 200)
 
 
 def test_query_object_has_six_init_fields() -> None:

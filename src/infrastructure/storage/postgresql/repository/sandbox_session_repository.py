@@ -25,7 +25,7 @@ from typing import Any, cast
 
 from sqlalchemy import func, select
 
-from src.domain.entities.sandbox_session import SandboxSession
+from src.domain.entities.sandbox_session import SandboxSession, SandboxSessionState
 from src.domain.exceptions import EntityStateTransitionError, InvalidStateError
 from src.domain.ports.sandbox_session_repository import (
     SandboxSessionQuery,
@@ -80,9 +80,10 @@ class PostgreSQLSandboxSessionRepository(SandboxSessionRepositoryPort):
                 model.state,
                 model.session_id,
             )
-            state_str: str = "RUNNING"
+            state_str: SandboxSessionState = "RUNNING"
         else:
-            state_str = model.state
+            # ORM model.state is str; validated by SandboxSession.__post_init__
+            state_str = cast("SandboxSessionState", model.state)
         # state 字段为 Literal["RUNNING", "TERMINATED", "FAILED"]
         return SandboxSession(
             session_id=model.session_id,
@@ -93,7 +94,7 @@ class PostgreSQLSandboxSessionRepository(SandboxSessionRepositoryPort):
             last_activity_at=model.last_activity_at,
             terminated_at=model.terminated_at,
             resource_limits=model.resource_limits or {},
-            state=state_str,  # type: ignore[arg-type]
+            state=state_str,
             state_version=model.state_version,
         )
 

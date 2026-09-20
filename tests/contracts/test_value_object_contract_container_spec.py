@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import dataclasses
+from typing import Any
 
 import pytest
 
@@ -17,11 +18,11 @@ class TestContainerSpecContract:
     """ContainerSpec 值对象契约测试"""
 
     def _make_spec(self, **overrides: object) -> ContainerSpec:
-        defaults: dict[str, object] = {
+        defaults: dict[str, Any] = {
             "image": "python:3.11-slim@sha256:62dad7dd96e602c9e08c7724e50333b1834c4f2b6dbc5f8b7c97c39293fe2bdd"
         }
         defaults.update(overrides)
-        return ContainerSpec(**defaults)  # type: ignore[arg-type]
+        return ContainerSpec(**defaults)
 
     def test_is_frozen_dataclass(self) -> None:
         """ContainerSpec 应为 frozen dataclass"""
@@ -29,7 +30,7 @@ class TestContainerSpecContract:
         # 通过实例化后修改验证 frozen
         spec = self._make_spec()
         with pytest.raises((AttributeError, dataclasses.FrozenInstanceError)):
-            spec.image = "modified"  # type: ignore[misc]
+            setattr(spec, "image", "modified")
 
     def test_total_fields_is_12(self) -> None:
         """总字段数应为 12"""

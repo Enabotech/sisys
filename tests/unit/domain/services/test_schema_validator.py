@@ -102,7 +102,7 @@ def test_schema_violation_frozen() -> None:
         message="m",
     )
     with pytest.raises(Exception):  # FrozenInstanceError
-        violation.path = "/y"  # type: ignore[misc]
+        setattr(violation, "path", "/y")
 
 
 # ============================================================================

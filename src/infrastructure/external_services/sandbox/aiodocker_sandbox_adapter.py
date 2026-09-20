@@ -369,7 +369,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 }
 
             result = await asyncio.wait_for(_run_code(), timeout=effective_timeout)
-            return result  # type: ignore[return-value]
+            return result
         except asyncio.TimeoutError as timeout_exc:
             raise SandboxTimeoutError(
                 f"execution timeout after {effective_timeout}s",

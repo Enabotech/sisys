@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
@@ -21,13 +22,13 @@ from src.infrastructure.storage.postgresql.repository.sandbox_session_repository
 
 
 def _make_session(**overrides: object) -> SandboxSession:
-    defaults: dict[str, object] = {
+    defaults: dict[str, Any] = {
         "session_id": f"sess-{uuid.uuid4().hex[:12]}",
         "tenant_id": uuid.uuid4(),
         "image_digest": "python:3.11-slim@sha256:abc",
     }
     defaults.update(overrides)
-    return SandboxSession(**defaults)  # type: ignore[arg-type]
+    return SandboxSession(**defaults)
 
 
 def _make_model_from_entity(session: SandboxSession) -> MagicMock:

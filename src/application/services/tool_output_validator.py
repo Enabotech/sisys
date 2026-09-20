@@ -126,7 +126,7 @@ class ToolOutputValidator:
             retryable_exceptions=retry_policy.retryable_exceptions,
         )
         if hasattr(self._wrapped, "_retry"):
-            self._wrapped._retry = retry_policy_for_engine  # type: ignore[attr-defined]
+            self._wrapped._retry = retry_policy_for_engine
 
         async def execute_with_retry() -> ToolResult:
             """单次执行 + 校验 + 失败时通过异常触发 _call_with_retry 重试"""
@@ -215,7 +215,7 @@ class ToolOutputValidator:
         except ToolExecutionRetryExhaustedError as retry_exc:
             # Round 2 P0-1:重试耗尽时,先恢复 Engine 原始 _retry,避免污染 Engine 后续使用
             if hasattr(self._wrapped, "_retry") and original_wrapped_retry is not None:
-                self._wrapped._retry = original_wrapped_retry  # type: ignore[attr-defined]
+                self._wrapped._retry = original_wrapped_retry
             # P0-B 修复:_call_with_retry 在重试耗尽时抛 ToolExecutionRetryExhaustedError,
             # 但 AC-3 + AC-7 契约明确要求装饰器对外抛 ToolResultValidationError(EXCEPTION_389),
             # 4.7 Validation Feedback 订阅契约按 ToolResultValidationError 类型做处理。
@@ -230,7 +230,7 @@ class ToolOutputValidator:
         finally:
             # Round 2 P0-1:无论成功或失败,恢复 Engine 原始 _retry(防御性编程)
             if hasattr(self._wrapped, "_retry") and original_wrapped_retry is not None:
-                self._wrapped._retry = original_wrapped_retry  # type: ignore[attr-defined]
+                self._wrapped._retry = original_wrapped_retry
 
 
 __all__ = ["ToolOutputValidator"]

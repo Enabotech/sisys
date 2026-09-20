@@ -224,7 +224,7 @@ def given_constructed_container_spec(context: dict[str, Any]) -> None:
 @when("修改 image 字段")
 def when_modify_image_field(context: dict[str, Any]) -> None:
     try:
-        context["spec"].image = "modified"  # type: ignore[misc]
+        context["spec"].image = "modified"
         context["query_error"] = None
     except (AttributeError, Exception) as exc:  # FrozenInstanceError
         context["query_error"] = exc

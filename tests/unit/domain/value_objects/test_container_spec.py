@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from src.domain.exceptions import EntityValidationError
@@ -14,11 +16,11 @@ from src.domain.value_objects.container_spec import ContainerSpec
 
 def _make_container_spec(**overrides: object) -> ContainerSpec:
     """工厂函数:创建 ContainerSpec 默认实例,可覆盖任意字段"""
-    defaults: dict[str, object] = {
+    defaults: dict[str, Any] = {
         "image": "python:3.11-slim@sha256:62dad7dd96e602c9e08c7724e50333b1834c4f2b6dbc5f8b7c97c39293fe2bdd",
     }
     defaults.update(overrides)
-    return ContainerSpec(**defaults)  # type: ignore[arg-type]
+    return ContainerSpec(**defaults)
 
 
 class TestContainerSpecFields:
@@ -185,7 +187,7 @@ class TestContainerSpecImmutability:
         """ContainerSpec 应为 frozen dataclass"""
         spec = _make_container_spec()
         with pytest.raises((AttributeError, Exception)):
-            spec.image = "modified"  # type: ignore[misc]
+            setattr(spec, "image", "modified")
 
 
 class TestContainerSpecEntityValidationErrorCode:

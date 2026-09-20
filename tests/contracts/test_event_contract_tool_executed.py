@@ -132,7 +132,7 @@ class TestToolExecutedEventInvariants:
             cost_audit={},
         )
         with pytest.raises(AttributeError):
-            event.execution_id = uuid.uuid4()  # type: ignore[misc]
+            setattr(event, "execution_id", uuid.uuid4())
 
     def test_event_is_domain_event_subclass(self) -> None:
         """事件应为 DomainEvent 子类。"""
