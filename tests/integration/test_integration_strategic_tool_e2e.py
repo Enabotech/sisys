@@ -44,6 +44,7 @@ from src.application.use_cases.strategic_analysis import (
 )
 from src.domain.entities.tool_execution import ToolExecutionState
 from src.domain.events.tool_events import ToolExecuted
+from src.domain.ports.tool_execution_repository import ToolExecutionRepositoryPort
 from src.domain.value_objects.tool_execution import ToolResultStatus
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.messaging.channel_router import ChannelRouter
@@ -149,7 +150,7 @@ def real_dual_channel_bus(
 @pytest.fixture
 async def pg_tool_execution_repository(
     pg_pool,
-) -> AsyncGenerator[PostgreSQLToolExecutionRepository, None]:
+) -> AsyncGenerator[ToolExecutionRepositoryPort, None]:
     """真实 PostgreSQLToolExecutionRepository(SQLAlchemy ORM 风格, ContextVar 注入)
 
     Story 4.3 后续技术债清理后,SQLAlchemy ORM 通过 ContextVar 获取 AsyncSession。
@@ -175,7 +176,7 @@ async def pg_tool_execution_repository(
         await conn.execute("DELETE FROM tool_executions")
     # 使用 asyncpg 直连的 legacy 实现(测试稳定,SQLAlchemy ORM 通过 ContextVar 在多进程下不稳定)
     repo = _AsyncpgRepo(pool=pg_pool, schema="public")
-    yield repo  # type: ignore[misc]  # 类型兼容:asyncpg 实现行为等价 SQLAlchemy ORM
+    yield repo  # 类型兼容:asyncpg 实现行为等价 SQLAlchemy ORM
     # 测试后清理(表存在时才有意义)
     try:
         async with pg_pool.acquire() as conn:

@@ -713,7 +713,7 @@ class TestExtractFirstJsonObject:
     def test_returns_none_for_empty_content(self) -> None:
         """空内容返回 None"""
         assert _extract_first_json_object("") is None
-        assert _extract_first_json_object(None) is None  # type: ignore[arg-type]
+        assert _extract_first_json_object(None) is None
 
     def test_handles_json_array(self) -> None:
         """支持 JSON 数组（虽然场景主要是对象）"""

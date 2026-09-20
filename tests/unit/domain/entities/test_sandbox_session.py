@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 
@@ -22,13 +23,13 @@ from src.domain.exceptions import (
 
 def _make_sandbox_session(**overrides: object) -> SandboxSession:
     """工厂函数:创建 SandboxSession 默认实例"""
-    defaults: dict[str, object] = {
+    defaults: dict[str, Any] = {
         "session_id": "sess-abc123def456",
         "tenant_id": uuid.uuid4(),
         "image_digest": "python:3.11-slim@sha256:abc",
     }
     defaults.update(overrides)
-    return SandboxSession(**defaults)  # type: ignore[arg-type]
+    return SandboxSession(**defaults)
 
 
 class TestSandboxSessionFields:

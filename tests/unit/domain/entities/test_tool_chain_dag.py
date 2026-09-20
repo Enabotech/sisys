@@ -36,16 +36,18 @@ def _make_node(
     tool_slug: str = "pestel",
     depends_on: tuple[str, ...] = (),
     arguments_template: dict | None = None,
-    failure_strategy: FailureStrategy | None = None,
+    failure_strategy: FailureStrategy | None | str = None,
     skip_on_upstream_failure: bool = True,
 ) -> ToolChainNode:
     """构造 ToolChainNode 测试实例"""
+    from typing import cast
+
     return ToolChainNode(
         node_id=node_id,
         tool_slug=tool_slug,
         depends_on=depends_on,
         arguments_template=arguments_template if arguments_template is not None else {},
-        failure_strategy=failure_strategy,
+        failure_strategy=cast("FailureStrategy | None", failure_strategy),
         skip_on_upstream_failure=skip_on_upstream_failure,
     )
 
@@ -54,22 +56,24 @@ def _make_dag(
     nodes: tuple[ToolChainNode, ...] | None = None,
     name: str = "test-dag",
     description: str = "测试用 DAG",
-    failure_strategy: FailureStrategy = FailureStrategy.SKIP_DOWNSTREAM,
+    failure_strategy: FailureStrategy | str = FailureStrategy.SKIP_DOWNSTREAM,
     max_concurrency: int = 5,
-    chain_id: uuid.UUID | None = None,
+    chain_id: uuid.UUID | None | str = None,
     tenant_id: uuid.UUID | None = None,
 ) -> ToolChainDag:
     """构造 ToolChainDag 测试实例"""
+    from typing import cast
+
     if nodes is None:
         nodes = (_make_node(),)
     now = datetime.now(UTC)
     return ToolChainDag(
-        chain_id=chain_id or uuid.uuid4(),
+        chain_id=cast("uuid.UUID", chain_id or uuid.uuid4()),
         tenant_id=tenant_id or uuid.uuid4(),
         name=name,
         description=description,
         nodes=nodes,
-        failure_strategy=failure_strategy,
+        failure_strategy=cast("FailureStrategy", failure_strategy),
         max_concurrency=max_concurrency,
         created_at=now,
         updated_at=now,
@@ -129,7 +133,7 @@ def test_tool_chain_node_frozen() -> None:
     """ToolChainNode frozen 不可变"""
     node = _make_node()
     with pytest.raises(FrozenInstanceError):
-        node.node_id = "other"  # type: ignore[misc]
+        setattr(node, "node_id", "other")
 
 
 def test_tool_chain_node_empty_node_id_raises() -> None:
@@ -149,7 +153,7 @@ def test_tool_chain_node_empty_tool_slug_raises() -> None:
 def test_tool_chain_node_invalid_failure_strategy_raises() -> None:
     """failure_strategy 非法值（非枚举）触发不变量违反"""
     with pytest.raises(EntityValidationError):
-        _make_node(failure_strategy="INVALID")  # type: ignore[arg-type]
+        _make_node(failure_strategy="INVALID")
 
 
 # ============================================================================
@@ -189,7 +193,7 @@ def test_tool_chain_dag_frozen() -> None:
     """ToolChainDag frozen 不可变（nodes 是 tuple 也保护不可变）"""
     dag = _make_dag()
     with pytest.raises(FrozenInstanceError):
-        dag.name = "new"  # type: ignore[misc]
+        setattr(dag, "name", "new")
 
 
 def test_tool_chain_dag_nodes_is_tuple() -> None:
@@ -222,14 +226,14 @@ def test_tool_chain_dag_invalid_max_concurrency_raises() -> None:
 def test_tool_chain_dag_invalid_chain_id_raises() -> None:
     """chain_id 非 UUID 触发 EntityValidationError"""
     with pytest.raises(EntityValidationError) as exc_info:
-        _make_dag(chain_id="not-a-uuid")  # type: ignore[arg-type]
+        _make_dag(chain_id="not-a-uuid")
     assert exc_info.value.context["field"] == "chain_id"
 
 
 def test_tool_chain_dag_invalid_failure_strategy_raises() -> None:
     """failure_strategy 非法值触发 EntityValidationError"""
     with pytest.raises(EntityValidationError):
-        _make_dag(failure_strategy="INVALID")  # type: ignore[arg-type]
+        _make_dag(failure_strategy="INVALID")
 
 
 # ============================================================================

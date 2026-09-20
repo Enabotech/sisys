@@ -14,12 +14,14 @@ import asyncio
 import uuid
 from dataclasses import FrozenInstanceError, fields
 from datetime import UTC, datetime
+from typing import cast
 
 import pytest
 
 from src.domain.entities.schema_validation_record import (
     SchemaValidationRecord,
     SchemaValidationRecordQuery,
+    ValidationPhase,
 )
 from src.domain.exceptions import EntityValidationError
 from src.domain.ports.l2_rdb import L2RdbPort
@@ -38,7 +40,7 @@ def _make_record(
     tenant_id: uuid.UUID | None = None,
     tool_id: uuid.UUID | None = None,
     execution_id: uuid.UUID | None = None,
-    validation_phase: str = "INPUT",
+    validation_phase: ValidationPhase | str = "INPUT",
     retry_attempt: int = 1,
 ) -> SchemaValidationRecord:
     """构造测试用 SchemaValidationRecord
@@ -57,7 +59,7 @@ def _make_record(
         execution_id=execution_id or uuid.uuid4(),
         tool_id=tool_id or uuid.uuid4(),
         tenant_id=tenant_id or uuid.uuid4(),
-        validation_phase=validation_phase,  # type: ignore[arg-type]
+        validation_phase=cast("ValidationPhase", validation_phase),
         is_valid=is_valid,
         violations=violations,
         retry_attempt=retry_attempt,
@@ -173,7 +175,7 @@ def test_query_object_is_frozen() -> None:
     """SchemaValidationRecordQuery 是 frozen dataclass"""
     query = SchemaValidationRecordQuery()
     with pytest.raises(FrozenInstanceError):
-        query.limit = 200  # type: ignore[misc]
+        setattr(query, "limit", 200)
 
 
 def test_query_default_offset_limit() -> None:

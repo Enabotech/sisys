@@ -107,7 +107,7 @@ def _strip_markdown_fence(content: str) -> str:
     return body
 
 
-def _extract_first_json_object(content: str) -> str | None:
+def _extract_first_json_object(content: str | None) -> str | None:
     """从文本中提取第一个完整的 JSON 对象或数组。
 
     修复根因：LLM 经常在 JSON 之后追加解释文本（如 "以上是抽取结果..."），

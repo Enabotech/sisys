@@ -78,7 +78,7 @@ class TestSandboxSessionStartedEventSchema:
         """frozen dataclass 应不可变"""
         event = self._make_event()
         with pytest.raises(AttributeError):
-            event.session_id = "modified"  # type: ignore[misc]
+            setattr(event, "session_id", "modified")
 
 
 class TestSandboxSessionTerminatedEventSchema:
