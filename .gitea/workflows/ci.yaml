@@ -339,7 +339,7 @@ jobs:
           print(f'CUDA  : {is_cuda}')
           print(f'Torch : {version}')
 
-          if not is_cuda:
+          if [not is_cuda]; then
               print('❌ 错误: GPU_ENABLED 为 true，但 CUDA 不可用！')
               print('💡 请检查 Runner 是否配置了 --gpus all 及 NVIDIA 驱动。')
           else
