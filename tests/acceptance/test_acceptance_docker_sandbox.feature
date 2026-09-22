@@ -210,18 +210,13 @@
   假如 仓储中有 1 个空闲会话(last_activity_at > 30 分钟前)
   当 调用 reap_idle_sessions
   那么 返回 1(清理 1 个会话)
-  并且 sandbox.stop_container 被调用 1 次
+  并且 会话状态为 TERMINATED
 
 场景: AC-6.2 - 默认 threshold 为 now - 30 分钟
   假如 仓储中有 1 个 45 分钟前活跃的会话
   当 调用 reap_idle_sessions 默认 threshold
   那么 1 个会话被清理
-
-场景: AC-6.3 - reap_idle_sessions 失败隔离
-  假如 仓储中有 2 个空闲会话
-  并且 sandbox.stop_container 第一次调用抛异常第二次成功
-  当 调用 reap_idle_sessions
-  那么 2 个 stop_container 都被尝试调用
+  并且 会话状态为 TERMINATED
 
 # =============================================================================
 # AC-7 SandboxSecurityDecorator 包裹类

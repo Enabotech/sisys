@@ -78,11 +78,14 @@ class SandboxExecutor(Protocol):
         """
         ...
 
-    async def stop_container(self, session_id: str) -> None:
+    async def stop_container(self, session_id: str, *, reason: str = "explicit_stop") -> None:
         """停止并清理沙箱容器
 
         Args:
             session_id: 会话标识
+            reason: 终止原因(可选 keyword-only,默认 "explicit_stop";
+                用于 SandboxSessionTerminated.termination_reason 事件字段,
+                如 idle_timeout / explicit_stop / timeout_abort)
 
         Raises:
             ContainerStopError: 容器停止失败

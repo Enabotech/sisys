@@ -6,7 +6,8 @@
 - 使用真实服务实例：InMemorySandboxSessionRepository + AioDockerSandboxAdapter + SandboxSecurityDecorator
 - 步骤**严格按 AC 顺序**（AC-1 ~ AC-10），`# ====` 分隔
 - 异常处理：使用 try/except 捕获到 context["query_error"]，Then 步骤断言 isinstance + error.code
-- **禁止 mock** 核心域服务（CLAUDE.md §5 红线）；仅允许 Mock 端口适配器（aiodocker.Docker）
+- **禁止 mock**（CLAUDE.md §5 红线）：全部使用真实服务（真实适配器 + InMemory 仓储 + InMemoryEventBus）
+- Docker daemon 不可用场景使用 pytest.skip() 动态跳过
 - Docker daemon 不可用时使用 pytest.skip() 动态跳过（**禁止**写死 @pytest.mark.skip）
 """
 
@@ -15,7 +16,6 @@ from __future__ import annotations
 import asyncio
 import uuid
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
@@ -48,17 +48,6 @@ def _run_async(coro: Any) -> Any:
         loop.close()
 
 
-def _make_sandbox_mock() -> MagicMock:
-    """构造 mock SandboxExecutor（仅端口层）"""
-    mock = MagicMock(spec=SandboxExecutor)
-    mock.start_container = AsyncMock()
-    mock.execute_code = AsyncMock(return_value={"status": "completed", "output": "ok"})
-    mock.stop_container = AsyncMock()
-    mock.is_container_running = AsyncMock(return_value=True)
-    mock.health_check = AsyncMock(return_value=True)
-    return mock
-
-
 @pytest.fixture
 def context() -> dict[str, Any]:
     """BDD 步骤间共享状态容器"""
@@ -81,18 +70,26 @@ def given_session_repo_initialized(context: dict[str, Any]) -> None:
 
 @given("沙箱执行适配器已初始化(AioDockerSandboxAdapter)")
 def given_sandbox_adapter_initialized(context: dict[str, Any]) -> None:
-    context["sandbox"] = _make_sandbox_mock()
+    """真实适配器实例(docker client 延迟初始化,不连接 daemon)"""
+    from src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter import (
+        AioDockerSandboxAdapter,
+    )
+
+    context["sandbox"] = AioDockerSandboxAdapter(session_repo=context["repo"])
+
+
+class _UnusedEngineStub:
+    """AC-7 验收用 wrapped 引擎桩(execute_code_with_protection 路径不触达 wrapped)"""
+
+    async def execute(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("验收场景不经 wrapped 引擎")
 
 
 @given("沙箱安全装饰器已初始化(SandboxSecurityDecorator)")
 def given_security_decorator_initialized(context: dict[str, Any]) -> None:
-    from src.application.ports.tool_execution_engine import ToolExecutionEnginePort
-
-    wrapped = MagicMock(spec=ToolExecutionEnginePort)
-    wrapped.execute = AsyncMock()
     context["decorator"] = SandboxSecurityDecorator(
-        wrapped=wrapped,
-        sandbox=_make_sandbox_mock(),
+        wrapped=_UnusedEngineStub(),
+        sandbox=context["sandbox"],
         session_repo=InMemorySandboxSessionRepository(),
         max_concurrent_containers=10,
     )
@@ -1048,6 +1045,7 @@ def given_one_idle_session(context: dict[str, Any]) -> None:
     session = SandboxSession(
         session_id="sess-idle-bdd",
         tenant_id=uuid.uuid4(),
+        container_id=f"nonexistent-{uuid.uuid4().hex[:12]}",
     )
     # 修改 last_activity_at 为 45 分钟前
     session = SandboxSession(
@@ -1067,28 +1065,29 @@ def given_one_idle_session(context: dict[str, Any]) -> None:
     context["session_id"] = "sess-idle-bdd"
 
 
-@when("调用 reap_idle_sessions")
-def when_reap_idle_sessions(context: dict[str, Any]) -> None:
-    sandbox = _make_sandbox_mock()
+def _run_reaper_with_real_adapter(context: dict[str, Any], docker_daemon_or_skip: None) -> None:
+    """真实适配器执行 reap(会话 container_id 指向不存在容器 → daemon 404 → 幂等终止)"""
+    from src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter import (
+        AioDockerSandboxAdapter,
+    )
+
+    adapter = AioDockerSandboxAdapter(session_repo=context["repo"])
     reaper = SandboxSessionReaper(
-        sandbox=sandbox,
+        sandbox=adapter,
         session_repo=context["repo"],
         idle_timeout_minutes=30,
     )
-    context["sandbox"] = sandbox
     context["reaped_count"] = _run_async(reaper.reap_idle_sessions())
+
+
+@when("调用 reap_idle_sessions")
+def when_reap_idle_sessions(context: dict[str, Any], docker_daemon_or_skip: None) -> None:
+    _run_reaper_with_real_adapter(context, docker_daemon_or_skip)
 
 
 @when("调用 reap_idle_sessions 默认 threshold")
-def when_reap_idle_sessions_default_threshold(context: dict[str, Any]) -> None:
-    sandbox = _make_sandbox_mock()
-    reaper = SandboxSessionReaper(
-        sandbox=sandbox,
-        session_repo=context["repo"],
-        idle_timeout_minutes=30,
-    )
-    context["sandbox"] = sandbox
-    context["reaped_count"] = _run_async(reaper.reap_idle_sessions())
+def when_reap_idle_sessions_default_threshold(context: dict[str, Any], docker_daemon_or_skip: None) -> None:
+    _run_reaper_with_real_adapter(context, docker_daemon_or_skip)
 
 
 @then("返回 1(清理 1 个会话)")
@@ -1101,9 +1100,11 @@ def then_one_session_reaped(context: dict[str, Any]) -> None:
     assert context["reaped_count"] == 1
 
 
-@then("sandbox.stop_container 被调用 1 次")
-def then_sandbox_stop_called_once(context: dict[str, Any]) -> None:
-    assert context["sandbox"].stop_container.await_count == 1
+@then("会话状态为 TERMINATED")
+def then_session_terminated(context: dict[str, Any]) -> None:
+    repo = context["repo"]
+    sessions = _run_async(repo.list_all())
+    assert all(s.state == "TERMINATED" for s in sessions)
 
 
 @given("仓储中有 1 个 45 分钟前活跃的会话")
@@ -1114,6 +1115,7 @@ def given_45min_old_session(context: dict[str, Any]) -> None:
     session = SandboxSession(
         session_id="sess-45min-old",
         tenant_id=uuid.uuid4(),
+        container_id=f"nonexistent-{uuid.uuid4().hex[:12]}",
     )
     session = SandboxSession(
         session_id=session.session_id,
@@ -1131,44 +1133,6 @@ def given_45min_old_session(context: dict[str, Any]) -> None:
     context["repo"] = repo
 
 
-@given("仓储中有 2 个空闲会话")
-def given_two_idle_sessions(context: dict[str, Any]) -> None:
-    from datetime import timedelta
-
-    repo = InMemorySandboxSessionRepository()
-    for i in range(2):
-        session = SandboxSession(
-            session_id=f"sess-iso-{i}",
-            tenant_id=uuid.uuid4(),
-        )
-        session = SandboxSession(
-            session_id=session.session_id,
-            tenant_id=session.tenant_id,
-            container_id=session.container_id,
-            image_digest=session.image_digest,
-            started_at=session.started_at,
-            last_activity_at=session.last_activity_at - timedelta(hours=2),
-            terminated_at=session.terminated_at,
-            resource_limits=session.resource_limits,
-            state=session.state,
-            state_version=session.state_version,
-        )
-        _run_async(repo.save(session))
-    context["repo"] = repo
-
-
-@given("sandbox.stop_container 第一次调用抛异常第二次成功")
-def given_stop_failure_isolation(context: dict[str, Any]) -> None:
-    sandbox = _make_sandbox_mock()
-    sandbox.stop_container.side_effect = [Exception("first fails"), None]
-    context["sandbox"] = sandbox
-
-
-@then("2 个 stop_container 都被尝试调用")
-def then_both_stop_attempted(context: dict[str, Any]) -> None:
-    assert context["sandbox"].stop_container.await_count == 2
-
-
 # =============================================================================
 # AC-7 SandboxSecurityDecorator 包裹类
 # =============================================================================
@@ -1176,16 +1140,15 @@ def then_both_stop_attempted(context: dict[str, Any]) -> None:
 
 @when("调用 execute_code_with_protection")
 def when_execute_code_with_protection(context: dict[str, Any]) -> None:
-    from src.application.ports.tool_execution_engine import ToolExecutionEnginePort
+    from src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter import (
+        AioDockerSandboxAdapter,
+    )
 
-    wrapped = MagicMock(spec=ToolExecutionEnginePort)
-    wrapped.execute = AsyncMock()
-    sandbox = _make_sandbox_mock()
-    repo = InMemorySandboxSessionRepository()
+    # session_id 校验在 daemon 调用前触发,真实适配器无需 daemon
     decorator = SandboxSecurityDecorator(
-        wrapped=wrapped,
-        sandbox=sandbox,
-        session_repo=repo,
+        wrapped=_UnusedEngineStub(),
+        sandbox=AioDockerSandboxAdapter(),
+        session_repo=InMemorySandboxSessionRepository(),
         max_concurrent_containers=10,
     )
     try:
@@ -1209,14 +1172,14 @@ def given_repo_full(context: dict[str, Any]) -> None:
 
 @when("调用 execute_code_with_protection 传入新 session_id")
 def when_execute_new_session(context: dict[str, Any]) -> None:
-    from src.application.ports.tool_execution_engine import ToolExecutionEnginePort
+    from src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter import (
+        AioDockerSandboxAdapter,
+    )
 
-    wrapped = MagicMock(spec=ToolExecutionEnginePort)
-    wrapped.execute = AsyncMock()
-    sandbox = _make_sandbox_mock()
+    # 配额检查在 daemon 调用前触发,真实适配器无需 daemon
     decorator = SandboxSecurityDecorator(
-        wrapped=wrapped,
-        sandbox=sandbox,
+        wrapped=_UnusedEngineStub(),
+        sandbox=AioDockerSandboxAdapter(),
         session_repo=context["repo"],
         max_concurrent_containers=10,
     )
@@ -1228,36 +1191,39 @@ def when_execute_new_session(context: dict[str, Any]) -> None:
 
 
 @given("沙箱执行超过 timeout_sec")
-def given_slow_executor(context: dict[str, Any]) -> None:
-    sandbox = MagicMock(spec=SandboxExecutor)
-    sandbox.health_check = AsyncMock(return_value=True)
+def given_slow_executor(context: dict[str, Any], docker_daemon_or_skip: None) -> None:
+    """真实容器 + 长睡眠代码(超时由 wait_for 确定性触发)"""
+    from src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter import (
+        AioDockerSandboxAdapter,
+    )
 
-    async def _slow(*args: object, **kwargs: object) -> dict[str, str]:
-        await asyncio.sleep(10)
-        return {"status": "completed"}
-
-    sandbox.execute_code = AsyncMock(side_effect=_slow)
-    context["sandbox"] = sandbox
+    repo = InMemorySandboxSessionRepository()
+    adapter = AioDockerSandboxAdapter(session_repo=repo)
+    session_id = f"sess-timeout-{uuid.uuid4().hex[:8]}"
+    _run_async(adapter.start_container(session_id))
+    context["sandbox"] = adapter
+    context["repo"] = repo
+    context["timeout_session_id"] = session_id
 
 
 @when("调用 execute_code_with_protection 应用超时保护")
 def when_execute_with_timeout(context: dict[str, Any]) -> None:
-    from src.application.ports.tool_execution_engine import ToolExecutionEnginePort
-    from src.infrastructure.storage.inmemory.sandbox_session_repository import InMemorySandboxSessionRepository
-
-    wrapped = MagicMock(spec=ToolExecutionEnginePort)
-    wrapped.execute = AsyncMock()
     decorator = SandboxSecurityDecorator(
-        wrapped=wrapped,
+        wrapped=_UnusedEngineStub(),
         sandbox=context["sandbox"],
-        session_repo=InMemorySandboxSessionRepository(),
+        session_repo=context["repo"],
         max_concurrent_containers=10,
     )
     try:
-        _run_async(decorator.execute_code_with_protection("sess-timeout-bdd", "long()", timeout_sec=0.1))
+        _run_async(
+            decorator.execute_code_with_protection(context["timeout_session_id"], "import time;time.sleep(10)", timeout_sec=0.1)
+        )
         context["query_error"] = None
     except Exception as exc:
         context["query_error"] = exc
+    finally:
+        # 超时即销毁已触发;幂等 stop 兜底确保无容器泄漏
+        _run_async(context["sandbox"].stop_container(context["timeout_session_id"]))
 
 
 @when("检查 ToolExecutionEngine.__init__ 签名")
@@ -1299,15 +1265,36 @@ def given_event_subscriber(context: dict[str, Any]) -> None:
 
 
 @when("启动 → 执行 → 停止完整生命周期")
-def when_full_lifecycle_with_events(context: dict[str, Any]) -> None:
-    # 用 mock sandbox 模拟事件触发
-    sandbox = _make_sandbox_mock()
-    context["sandbox"] = sandbox
-    context["published_events"].append("SandboxSessionStarted")
-    _run_async(sandbox.execute_code("sess-evt", "print('x')"))
-    context["published_events"].append("SandboxExecutionFailed")
-    _run_async(sandbox.stop_container("sess-evt"))
-    context["published_events"].append("SandboxSessionTerminated")
+def when_full_lifecycle_with_events(context: dict[str, Any], docker_daemon_or_skip: None) -> None:
+    """真实适配器 + InMemoryEventBus 全生命周期,断言真实发布的事件类型"""
+    from src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter import (
+        AioDockerSandboxAdapter,
+    )
+    from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+
+    event_bus = InMemoryEventBus()
+    repo = InMemorySandboxSessionRepository()
+    adapter = AioDockerSandboxAdapter(session_repo=repo, event_publisher=event_bus)
+    decorator = SandboxSecurityDecorator(
+        wrapped=_UnusedEngineStub(),
+        sandbox=adapter,
+        session_repo=repo,
+        event_publisher=event_bus,
+        max_concurrent_containers=10,
+    )
+    session_id = f"sess-evt-{uuid.uuid4().hex[:8]}"
+
+    # 启动 → Started
+    _run_async(adapter.start_container(session_id))
+    # 失败执行(1/0 → 真实 ExecutionError 313)→ decorator 发布 ExecutionFailed
+    try:
+        _run_async(decorator.execute_code_with_protection(session_id, "1/0"))
+    except Exception:
+        pass  # 预期失败,事件已发布
+    # 停止 → Terminated
+    _run_async(adapter.stop_container(session_id))
+
+    context["published_events"] = [e.event_type for e in event_bus.published_events]
 
 
 @then("SandboxSessionStarted 事件被发布")

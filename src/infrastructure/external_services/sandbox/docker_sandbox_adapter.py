@@ -107,11 +107,12 @@ class DockerSandboxAdapter(SandboxExecutor):
             logger.error("Execution failed: session_id=%s error=%s", session_id, e)
             raise ExecutionError(f"Execution failed: {e}") from e
 
-    async def stop_container(self, session_id: str) -> None:
+    async def stop_container(self, session_id: str, *, reason: str = "explicit_stop") -> None:
         """停止并移除 Docker 容器
 
         Args:
             session_id: 会话标识符
+            reason: 终止原因(可选 keyword-only,Story 4.4 事件字段对齐)
 
         Raises:
             ContainerStopError: 容器停止失败时抛出

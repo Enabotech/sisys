@@ -355,6 +355,8 @@ class SandboxExecutor(Protocol):
 
 **4.1a 既有调用点零修改约束：** `ToolExecutionEngine.__init__(self, sandbox: SandboxExecutor)` 既有签名不修改（4.3 装饰器模式经验），所有既有调用点（如 `session_namespace_manager.py:51` / `:73`）通过新参数默认 `None` 沿用旧行为。本 Story 在 `composition_root.py:2220-2239` 的 `tool_execution_engine` lambda impl 处嵌套 `SandboxSecurityDecorator` 包裹（详见 AC-7 修订示例）。
 
+> **⚠️ 已废止（Round 7 审查修订）**：本句装配位置描述失效（行号与目标 lambda 均已过期），实际装配为 `tool_execution_service` v1.2.0 就地嵌套（engine=SandboxSecurityDecorator→ToolOutputValidator→Engine），详见文末 Round 7 修订记录。
+
 ### 内部端口契约：SandboxSessionRepository（新增）
 
 **位置：** `src/domain/ports/sandbox_session_repository.py`
@@ -947,13 +949,13 @@ class SandboxSessionStarted(DomainEvent):
   ```
 - **关键架构修正（P0-4）**：
   - **不修改** 既有 `tool_execution_engine` 端口注册（与 4.3 模式完全一致）
-  - 4.4 新增 `secure_tool_execution_service` 端口（**Round 3 P0-1 修正** — 避免与既有 4.3 `tool_execution_service` 端口冲突，命名加 `secure_` 前缀；嵌套模式 = `SandboxSecurityDecorator(wrapped=ToolExecutionService(engine=ToolOutputValidator(wrapped=tool_execution_engine)), ...)` 双层包裹 4.3 + 4.4 装饰器） = `SandboxSecurityDecorator(wrapped=tool_execution_service, ...)`
+  - ~~4.4 新增 `secure_tool_execution_service` 端口~~（**Round 3 P0-1 修正 — 已于 Round 7 废止**：样例接口 `ToolExecutionServicePort.execute(tool_id, tool_call, context)` 与装饰器 engine 签名 `execute(tool_id, tool, tool_call, context)` 不兼容，照做运行期必 TypeError；且 `resolve("tool_execution_service")` 唯一生产消费方在 tool_chain_orchestrator 装配处，新端口无人解析即成死代码。实际方案：就地嵌套至 `tool_execution_service` v1.2.0，详见文末 Round 7 修订记录）
   - 既有 4.1a 调用 `resolver.resolve("tool_execution_engine")` 拿到的实例**类型不变**，单元测试零回归
   - 既有 4.3 调用 `resolver.resolve("tool_execution_service")` 拿到的实例**类型不变**，4.3 单元测试零回归
-  - 4.4 新增 `resolver.resolve("secure_tool_execution_service")` 拿到 4.4 装饰器实例（向后兼容 4.7 等下游 Story）
+  - ~~4.4 新增 `resolver.resolve("secure_tool_execution_service")`~~（**Round 7 废止**：死端口风险，见上条）
   - 4.3 `ToolOutputValidator` + 4.4 `SandboxSecurityDecorator` 双层包裹，模式统一
 
-**新端口注册完整代码**（Round 3 P0-1 修正）：
+**新端口注册完整代码**（~~Round 3 P0-1 修正~~ **Round 7 已废止，勿照抄**：样例引用不存在的 `resolver.resolve("settings")` 端口与 `resolver.resolve(..., default=None)` 虚构 API；真实 Resolver 可选解析用 `resolve_optional`）：
 ```python
 # 4.4 新增 secure_tool_execution_service 端口（双层包裹）
 register_port(
@@ -984,7 +986,7 @@ register_port(
 - [ ] **HTTP 异常路径测试**（P1-9 修订）：404（容器未启动）+ 502（配置错误 SandboxConfigurationError）+ 503（并发配额 SandboxQuotaExceededError）+ 504（执行超时 SandboxTimeoutError）
 - [ ] 集成测试覆盖：真实 Docker daemon + 验证 30s 超时触发
 - [ ] **composition_root 修改后回归测试**（P0-3 修订）：`resolver.resolve("tool_execution_engine")` 返回值类型断言（仍兼容 `ToolExecutionEngine` 接口）；既有 4.1a `ToolExecutionEngine` 单元测试**零回归**通过；既有 4.1a 集成测试套件（`tests/integration/test_tool_execution_engine_integration.py` 等）全量通过
-- [ ] `composition_root.py:2220-2239` 的 `tool_execution_engine` lambda impl **已修改**为嵌套 `SandboxSecurityDecorator`（lambda + `__import__` 延迟加载模式保持与既有 4.1a 风格一致）
+- [ ] ~~`composition_root.py:2220-2239` 的 `tool_execution_engine` lambda impl 已修改为嵌套~~（**Round 7 废止**：行号与目标错误；实际为 `tool_execution_service` v1.2.0 就地嵌套，装配形态以 Round 7 修订记录为准）
 
 ### AC-8: 集成测试（testcontainers-python 真实 Docker daemon）
 
@@ -2145,3 +2147,41 @@ register_port(
 ### 已知版本基线差异
 
 - `pyproject.toml` 实际钉 `aiodocker = "^0.21.0"`（story AC-5 原文要求 `^0.25.0`）；本轮全部 API 验证（`Message` / `_ExecParser` / `DockerError.status` / `delete(force=True)`）基于 0.21.0 实测。若后续升级 0.25，需复验 `read_out` / `exec` API 兼容性。
+
+---
+
+## 📝 Round 7 审查修订记录（代码审查 Round 2, 2026-09-22）
+
+> 事件发布闭环 + 重试语义修复 + 装配决策更正 + 配置化 + 验收 mock 清零。双评审终审 [优秀] 后实施。
+
+### 装配决策更正（就地嵌套保留，废止 secure_tool_execution_service）
+
+- **废止理由（两条实证）**：(a) Round 3 P0-1 样例的 `interface=ToolExecutionServicePort`（`execute(tool_id, tool_call, context)` 三参）与 `SandboxSecurityDecorator.execute(tool_id, tool, tool_call, context)` 四参签名不兼容，照做运行期必 TypeError；(b) `resolve("tool_execution_service")` 唯一生产消费方为 `tool_chain_orchestrator` 装配（composition_root.py:2409），新建独立端口无人解析即成死代码。
+- **实际装配**：`tool_execution_service` v1.2.0 就地嵌套 `ToolExecutionService(engine=SandboxSecurityDecorator(wrapped=ToolOutputValidator(wrapped=Engine)))`，契约/装配测试零改动。
+- **虚构 API 更正**：Round 3 样例中的 `resolver.resolve("settings")`（无 settings 端口）与 `resolver.resolve("retry_policy", default=None)`（resolve 无 default 形参，可选解析应用 `resolve_optional`）均不可执行，勿照抄。
+- 就地废止位置：line 356 / line 950-975（P0-1 段与代码块）/ line 987（AC-7 验收勾选项）。
+
+### 事件发布闭环（Started/Terminated/ExecutionFailed 从死配置变为真实发布）
+
+- **单一发布点原则**：`AioDockerSandboxAdapter` 是 `SandboxSessionStarted`/`SandboxSessionTerminated` 唯一发布点；`SandboxSessionReaper` 不再自行发布，改调 `stop_container(session_id, reason="idle_timeout")`（根除 adapter 发 explicit_stop + reaper 发 idle_timeout 的双发矛盾）。
+- **端口扩展**：`SandboxExecutor.stop_container` 新增 keyword-only `reason: str = "explicit_stop"`（默认参数向后兼容，对齐本 Story R2 扩展惯例；mock 适配器已同步对齐）。
+- **发布位置**：Started 在 session save 块之后（防 Saga 补偿窗口产生孤儿 Started）；Terminated 在类锁临界区外发布（避免锁内 PG outbox 写入串行化全部并发 stop）；`_destroy_after_abort` 的 timeout_abort 发布固定为末位语句；全部 best-effort（失败仅 logger.warning）。
+- **SandboxExecutionFailed**：发布点在 `SandboxSecurityDecorator`——`execute()` 异常分支沿因果链（基类判级顺序 `cause → __cause__ → __context__`，命中即停保留 316/317 分类）解包 ExecutionError 家族（313/316/317）后发布；`execute_code_with_protection` 直调路径同。318/319 属执行前守卫拒绝，不发布执行失败事件。
+- **重试耗尽边界**：`ToolExecutionRetryExhaustedError` 在装饰器边界解包 cause 发布事件后原样上浮（不重映射为沙箱异常）。
+- **事件基数提示**：engine 每次工具执行 finally 都 stop_container → 每次执行固定产生 Started+Terminated 各一条 RELIABLE outbox 记录，Story 4.7 消费方应知情。
+
+### 重试语义修复（生产活 bug）
+
+- **活 bug**：`ToolExecutionEngine` 默认 `RetryPolicy` 白名单含 `ExecutionError`（retry_helpers.py:54-59）→ 沙箱确定性失败（313/316/317，均其子类）被错误重试 3 次；且与 Round 6"超时即销毁"契约直接冲突（重试时容器已被销毁，必然二次失败）。
+- **修复**：composition_root `tool_execution_engine` 装配注入收窄策略 `RetryPolicy(retryable_exceptions=(LLMAPIError, LLMResponseError, TimeoutError))`（领域 TimeoutError=LLM 超时保留重试；engine 既有 `retry_policy` 形参，签名零变更）。
+- **如实标注**：`execute_code_with_protection` 的 `_call_with_retry`（白名单 `(ContainerStartError,)`）当前零生产调用方，属 AC-7 验证脚手架；生产重试行为由 engine 层策略决定。
+
+### 配置化 + 回滚 + 验收红线清零
+
+- **SandboxConfig**（`src/infrastructure/config/sandbox.py`，frozen dataclass + from_env，对齐 RedisConfig 先例）：`SANDBOX_IDLE_TIMEOUT_MINUTES=30` / `SANDBOX_MAX_CONCURRENT_CONTAINERS=50`，三处硬编码（adapter max_concurrent / decorator max_concurrent_containers / reaper idle_timeout_minutes）全部改消费配置。
+- **git tag `pre-4-4-mock-fallback` → e31291c5**（037f249c 直接父提交，mock 适配器最后注册状态；兑现 composition_root 注释承诺）。
+- **验收 mock 红线清零**（§5）：`_make_sandbox_mock` 工厂已删除；AC-6.1/6.2 改真实适配器 + daemon 404 幂等终止路径（断言会话 TERMINATED）；AC-6.3 失败隔离场景移至单元层（`test_reap_failure_isolation` 已有等价覆盖，feature 已同步移除）；AC-7.1/7.2 真实适配器（校验/配额在 daemon 调用前触发）；AC-7.3 真实容器 `time.sleep` + `timeout_sec=0.1` 触发真实 316；AC-8.4 改 InMemoryEventBus + 真实适配器全生命周期断言三个事件真实发布。
+
+### 验证结果
+
+- 单元/契约测试全绿（adapter 44 + decorator 16 + reaper 8 + config 4 + 契约/装配零回归）；验收 42 场景全绿（真实 Docker daemon，0 skip）；ruff/mypy 零违规。

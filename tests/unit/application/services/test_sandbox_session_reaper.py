@@ -88,7 +88,7 @@ class TestReapIdleSessions:
         )
         count = await reaper.reap_idle_sessions()
         assert count == 1
-        sandbox.stop_container.assert_called_once_with(idle.session_id)
+        sandbox.stop_container.assert_called_once_with(idle.session_id, reason="idle_timeout")
 
     async def test_reap_with_explicit_threshold(
         self,
@@ -111,7 +111,7 @@ class TestReapIdleSessions:
         count = await reaper.reap_idle_sessions(threshold=threshold)
 
         assert count == 1
-        sandbox.stop_container.assert_called_once_with(idle.session_id)
+        sandbox.stop_container.assert_called_once_with(idle.session_id, reason="idle_timeout")
 
     async def test_reap_failure_isolation(
         self,

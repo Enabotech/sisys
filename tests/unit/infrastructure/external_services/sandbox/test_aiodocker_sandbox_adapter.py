@@ -620,3 +620,115 @@ class TestHealthCheck:
 
         result = await adapter.health_check()
         assert result is False
+
+
+class TestEventPublishing:
+    """沙箱生命周期事件发布测试(Round 2 审查修订: adapter 为 Started/Terminated 唯一发布点)"""
+
+    @patch("aiodocker.Docker")
+    async def test_start_container_publishes_started_event(
+        self, mock_docker_cls: MagicMock, repo: InMemorySandboxSessionRepository
+    ) -> None:
+        """start_container 成功发布 SandboxSessionStarted(best-effort,不以 session_repo 为条件)"""
+        from src.domain.events.sandbox_events import SandboxSessionStarted
+        from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+
+        event_bus = InMemoryEventBus()
+        adapter = AioDockerSandboxAdapter(session_repo=repo, event_publisher=event_bus)
+        mock_docker = _make_docker_mock()
+        mock_docker_cls.return_value = mock_docker
+
+        await adapter.start_container("sess-event-start")
+
+        started = [e for e in event_bus.published_events if isinstance(e, SandboxSessionStarted)]
+        assert len(started) == 1
+        assert started[0].session_id == "sess-event-start"
+
+    @patch("aiodocker.Docker")
+    async def test_stop_container_publishes_terminated_event(
+        self, mock_docker_cls: MagicMock, repo: InMemorySandboxSessionRepository
+    ) -> None:
+        """stop_container 真实迁移发布 SandboxSessionTerminated(termination_reason=explicit_stop)"""
+        from src.domain.entities.sandbox_session import SandboxSession
+        from src.domain.events.sandbox_events import SandboxSessionTerminated
+        from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+
+        await repo.save(
+            SandboxSession(
+                session_id="sess-event-stop",
+                tenant_id=__import__("uuid").uuid4(),
+                container_id="container-xyz",
+            )
+        )
+        event_bus = InMemoryEventBus()
+        adapter = AioDockerSandboxAdapter(session_repo=repo, event_publisher=event_bus)
+        mock_docker = _make_docker_mock()
+        mock_docker.containers.get.return_value = _make_container_mock()
+        mock_docker_cls.return_value = mock_docker
+
+        await adapter.stop_container("sess-event-stop")
+
+        terminated = [e for e in event_bus.published_events if isinstance(e, SandboxSessionTerminated)]
+        assert len(terminated) == 1
+        assert terminated[0].termination_reason == "explicit_stop"
+
+    @patch("aiodocker.Docker")
+    async def test_stop_container_idempotent_no_duplicate_event(
+        self, mock_docker_cls: MagicMock, repo: InMemorySandboxSessionRepository
+    ) -> None:
+        """幂等早退路径不发布事件(防双发)"""
+        from src.domain.entities.sandbox_session import SandboxSession
+        from src.domain.events.sandbox_events import SandboxSessionTerminated
+        from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+
+        session = SandboxSession(
+            session_id="sess-event-idem",
+            tenant_id=__import__("uuid").uuid4(),
+            container_id="container-xyz",
+        )
+        await repo.save(session.with_terminated())
+        event_bus = InMemoryEventBus()
+        adapter = AioDockerSandboxAdapter(session_repo=repo, event_publisher=event_bus)
+        mock_docker = _make_docker_mock()
+        mock_docker_cls.return_value = mock_docker
+
+        await adapter.stop_container("sess-event-idem")
+
+        terminated = [e for e in event_bus.published_events if isinstance(e, SandboxSessionTerminated)]
+        assert terminated == []
+
+    @patch("aiodocker.Docker")
+    async def test_timeout_publishes_timeout_abort_event(
+        self, mock_docker_cls: MagicMock, repo: InMemorySandboxSessionRepository
+    ) -> None:
+        """超时销毁后发布 SandboxSessionTerminated(termination_reason=timeout_abort)"""
+        from src.domain.entities.sandbox_session import SandboxSession
+        from src.domain.events.sandbox_events import SandboxSessionTerminated
+        from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+
+        await repo.save(
+            SandboxSession(
+                session_id="sess-event-timeout",
+                tenant_id=__import__("uuid").uuid4(),
+                container_id="container-xyz",
+            )
+        )
+        event_bus = InMemoryEventBus()
+        adapter = AioDockerSandboxAdapter(session_repo=repo, event_publisher=event_bus)
+        mock_docker = _make_docker_mock()
+        mock_container = _make_container_mock()
+
+        async def _hang(*args: Any, **kwargs: Any) -> Any:
+            await asyncio.sleep(10)
+            return None
+
+        mock_container.exec.side_effect = _hang
+        mock_docker.containers.get.return_value = mock_container
+        mock_docker_cls.return_value = mock_docker
+
+        with pytest.raises(SandboxTimeoutError):
+            await adapter.execute_code("sess-event-timeout", "long_running()", timeout_sec=0.1)
+
+        terminated = [e for e in event_bus.published_events if isinstance(e, SandboxSessionTerminated)]
+        assert len(terminated) == 1
+        assert terminated[0].termination_reason == "timeout_abort"

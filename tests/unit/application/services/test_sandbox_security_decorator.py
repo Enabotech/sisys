@@ -183,3 +183,137 @@ class TestDecoratorDoesNotModifyToolExecutionEngine:
         # 验证源码包含关键字 llm_client（4.1a 既有契约）
         assert "llm_client" in source
         assert "sandbox" in source
+
+
+class TestRetryMechanism:
+    """重试机制测试(AC-7 职责 2, Round 2 审查修订)"""
+
+    async def test_retry_on_container_start_error(
+        self,
+        wrapped: MagicMock,
+        sandbox: MagicMock,
+        repo: InMemorySandboxSessionRepository,
+    ) -> None:
+        """ContainerStartError(瞬时启动故障)白名单内可重试,第二次成功"""
+        from src.domain.exceptions import ContainerStartError
+
+        sandbox.execute_code = AsyncMock(
+            side_effect=[ContainerStartError("daemon transient"), {"status": "completed", "output": "ok"}]
+        )
+        decorator = SandboxSecurityDecorator(wrapped=wrapped, sandbox=sandbox, session_repo=repo)
+
+        result = await decorator.execute_code_with_protection("sess-retry-001", "print('hi')")
+
+        assert result["status"] == "completed"
+        assert sandbox.execute_code.await_count == 2
+
+    async def test_no_retry_on_execution_error(
+        self,
+        wrapped: MagicMock,
+        sandbox: MagicMock,
+        repo: InMemorySandboxSessionRepository,
+    ) -> None:
+        """ExecutionError(313 确定性失败)不在白名单,不重试直接上浮"""
+        from src.domain.exceptions import ExecutionError
+
+        sandbox.execute_code = AsyncMock(side_effect=ExecutionError("user code failed"))
+        decorator = SandboxSecurityDecorator(wrapped=wrapped, sandbox=sandbox, session_repo=repo)
+
+        with pytest.raises(ExecutionError):
+            await decorator.execute_code_with_protection("sess-noretry-001", "print('hi')")
+        assert sandbox.execute_code.await_count == 1
+
+
+class TestExecutionFailedEvent:
+    """SandboxExecutionFailed 事件发布测试(AC-7 职责 5, Round 2 审查修订)"""
+
+    async def test_publish_on_execution_error(
+        self,
+        wrapped: MagicMock,
+        sandbox: MagicMock,
+        repo: InMemorySandboxSessionRepository,
+    ) -> None:
+        """execute_code_with_protection 失败(313)发布 SandboxExecutionFailed"""
+        from src.domain.events.sandbox_events import SandboxExecutionFailed
+        from src.domain.exceptions import ExecutionError
+        from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+
+        event_bus = InMemoryEventBus()
+        sandbox.execute_code = AsyncMock(side_effect=ExecutionError("boom"))
+        decorator = SandboxSecurityDecorator(wrapped=wrapped, sandbox=sandbox, session_repo=repo, event_publisher=event_bus)
+
+        with pytest.raises(ExecutionError):
+            await decorator.execute_code_with_protection("sess-fail-001", "print('hi')")
+
+        failed_events = [e for e in event_bus.published_events if isinstance(e, SandboxExecutionFailed)]
+        assert len(failed_events) == 1
+        assert failed_events[0].error_code == "EXCEPTION_313"
+        assert failed_events[0].session_id == "sess-fail-001"
+
+    async def test_publish_unwraps_cause_chain_in_execute(
+        self,
+        wrapped: MagicMock,
+        sandbox: MagicMock,
+        repo: InMemorySandboxSessionRepository,
+    ) -> None:
+        """execute() 从 ToolExecutionFailedError.cause 解包 316 并发布事件"""
+        import uuid as _uuid
+
+        from src.domain.entities.tool import Tool
+        from src.domain.events.sandbox_events import SandboxExecutionFailed
+        from src.domain.exceptions import SandboxTimeoutError, ToolExecutionFailedError
+        from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall
+        from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+
+        cause = SandboxTimeoutError("timeout", session_id="valid-session-001", timeout_sec=30.0)
+        wrapped.execute = AsyncMock(side_effect=ToolExecutionFailedError("stage failed", cause=cause))
+
+        event_bus = InMemoryEventBus()
+        decorator = SandboxSecurityDecorator(wrapped=wrapped, sandbox=sandbox, session_repo=repo, event_publisher=event_bus)
+
+        tool_id = _uuid.uuid4()
+        tool = MagicMock(spec=Tool)
+        tool_call = MagicMock(spec=ToolCall)
+        context = ExecutionContext(tenant_id=_uuid.uuid4(), session_id="valid-session-001")
+
+        with pytest.raises(ToolExecutionFailedError):
+            await decorator.execute(tool_id, tool, tool_call, context)
+
+        failed_events = [e for e in event_bus.published_events if isinstance(e, SandboxExecutionFailed)]
+        assert len(failed_events) == 1
+        assert failed_events[0].error_code == "EXCEPTION_316"
+
+    async def test_no_publish_on_quota_exceeded(
+        self,
+        wrapped: MagicMock,
+        sandbox: MagicMock,
+        repo: InMemorySandboxSessionRepository,
+    ) -> None:
+        """318 配额拒绝(执行前守卫)不发布执行失败事件"""
+        import uuid as _uuid
+
+        from src.domain.entities.sandbox_session import SandboxSession
+        from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+
+        for _ in range(3):
+            await repo.save(
+                SandboxSession(
+                    session_id=f"sess-{_uuid.uuid4().hex[:8]}",
+                    tenant_id=_uuid.uuid4(),
+                    image_digest="python:3.11-slim@sha256:abc",
+                )
+            )
+
+        event_bus = InMemoryEventBus()
+        decorator = SandboxSecurityDecorator(
+            wrapped=wrapped,
+            sandbox=sandbox,
+            session_repo=repo,
+            event_publisher=event_bus,
+            max_concurrent_containers=3,
+        )
+
+        with pytest.raises(SandboxQuotaExceededError):
+            await decorator.execute_code_with_protection("sess-quota-001", "print('hi')")
+
+        assert event_bus.published_events == []
