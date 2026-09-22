@@ -344,6 +344,7 @@ jobs:
               print('💡 请检查 Runner 是否配置了 --gpus all 及 NVIDIA 驱动。')
           else
               print('✅ GPU 验证通过')
+          fi
           "
 
       - name: 检测模型
