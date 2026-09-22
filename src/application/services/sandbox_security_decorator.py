@@ -161,7 +161,7 @@ class SandboxSecurityDecorator:
 
         try:
             return await asyncio.wait_for(
-                self._sandbox.execute_code(session_id, code),
+                self._sandbox.execute_code(session_id, code, timeout_sec=timeout_sec),
                 timeout=effective_timeout,
             )
         except asyncio.TimeoutError as exc:

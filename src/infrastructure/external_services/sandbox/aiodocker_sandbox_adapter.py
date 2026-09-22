@@ -16,14 +16,16 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 import uuid
 from typing import Any
+
+from aiodocker.exceptions import DockerError
 
 from src.domain.entities.sandbox_session import SandboxSession
 from src.domain.exceptions import (
     ContainerStartError,
     ContainerStopError,
-    EntityValidationError,
     ExecutionError,
     SandboxConfigurationError,
     SandboxImagePullError,
@@ -61,8 +63,10 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         _running_count: 当前运行容器数(类变量级跟踪)
     """
 
-    # 类变量级并发计数(避免实例间不一致)
+    # 类变量级并发计数 + 互斥锁(CLAUDE.md §6: asyncio.Lock 必须为类变量,协程间共享;
+    # Python 3.10+ Lock 无争用 acquire 不绑定 event loop,多 loop 测试场景安全)
     _running_count: int = 0
+    _lock: asyncio.Lock = asyncio.Lock()
     # 模块级共享 aiohttp.UnixConnector(所有 adapter 实例 + 所有 event loop 共享,避免 Unclosed connector 警告)
     _module_shared_connector: Any = None
 
@@ -83,8 +87,6 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         self._max_concurrent = max_concurrent
         self._session_repo = session_repo
         self._docker: Any = None  # 延迟初始化 aiodocker.Docker
-        # 实例级 asyncio.Lock(避免跨 event loop 冲突)
-        self._lock: asyncio.Lock | None = None
         # 当前 event loop 引用(用于检测 client 是否需要重建)
         self._loop: Any = None
         # 保存所有创建过的 connectors(供 aclose 时同步关闭)
@@ -159,12 +161,6 @@ class AioDockerSandboxAdapter(SandboxExecutor):
             self._loop = current_loop
         return self._docker
 
-    def _ensure_lock(self) -> asyncio.Lock:
-        """延迟初始化 asyncio.Lock(每次调用都关联当前 event loop)"""
-        if self._lock is None:
-            self._lock = asyncio.Lock()
-        return self._lock
-
     @staticmethod
     def _validate_session_id(session_id: str) -> None:
         """session_id 注入防御(正则校验)
@@ -200,8 +196,8 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         # 校验 session_id
         self._validate_session_id(session_id)
 
-        # 校验并发配额
-        async with self._ensure_lock():
+        # 校验并发配额(类变量锁保护,check+increment 临界区)
+        async with self._lock:
             if AioDockerSandboxAdapter._running_count >= self._max_concurrent:
                 raise SandboxQuotaExceededError(
                     "concurrent container limit reached",
@@ -215,6 +211,8 @@ class AioDockerSandboxAdapter(SandboxExecutor):
             image="python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534"
         )
 
+        container: Any = None
+        container_name = ""
         try:
             docker = await self._ensure_docker()
             tenant_id = uuid.uuid4()  # 生产应从 context 注入
@@ -236,6 +234,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 else:
                     await docker.images.pull(image_ref)
             except Exception as pull_exc:
+                logger.debug("镜像拉取失败 session=%s image=%s: %s", session_id, spec.image, pull_exc)
                 raise SandboxImagePullError(
                     f"failed to pull image {spec.image}",
                     image=spec.image,
@@ -259,7 +258,8 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 # aiodocker DockerContainer 提供 .id 属性
                 container_id = container.id
             except Exception as run_exc:
-                raise ContainerStartError(f"failed to run container {container_name}: {run_exc}") from run_exc
+                logger.debug("容器启动失败 session=%s name=%s: %s", session_id, container_name, run_exc)
+                raise ContainerStartError(f"failed to run container {container_name}") from run_exc
 
             # 持久化会话
             if self._session_repo is not None:
@@ -276,20 +276,25 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 )
                 await self._session_repo.save(session)
 
-            # 发布事件(此处简化:实际应用层应有 event_publisher)
             logger.info(
                 "Started container for session %s: %s",
                 session_id,
                 container_name,
             )
-        except (SandboxImagePullError, ContainerStartError, EntityValidationError):
-            # 失败时回滚计数
-            async with self._ensure_lock():
-                AioDockerSandboxAdapter._running_count -= 1
-            raise
         except Exception:
-            async with self._ensure_lock():
-                AioDockerSandboxAdapter._running_count -= 1
+            # Saga 补偿: 容器已创建时 best-effort 删除,避免孤儿容器(pull 阶段失败无容器,不补偿)
+            if container is not None:
+                try:
+                    await container.delete(force=True)
+                except Exception:
+                    logger.warning(
+                        "Saga 补偿删除容器失败 session=%s container=%s",
+                        session_id,
+                        container_name,
+                    )
+            # 失败时回滚计数
+            async with self._lock:
+                AioDockerSandboxAdapter._running_count = max(0, AioDockerSandboxAdapter._running_count - 1)
             raise
 
     async def execute_code(
@@ -327,106 +332,180 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         if not container_id:
             raise ExecutionError(f"No running container for session: {session_id}")
 
+        container = await docker.containers.get(container_id)
         try:
-            container = await docker.containers.get(container_id)
-
-            async def _run_code() -> dict[str, Any]:
-                exec_instance = await container.exec(
-                    cmd=["python", "-c", code],
-                    stdout=True,
-                    stderr=True,
-                )
-                output_data: bytes | None = None
-                stream_exc: Exception | None = None
-                try:
-                    async with exec_instance.start(detach=False) as stream:
-                        output_bytes = await stream.read_out()
-                        # aiodocker 0.21 中 output_bytes.data 可能为 None(OOM kill)
-                        if output_bytes is not None:
-                            output_data = getattr(output_bytes, "data", None)
-                except Exception as exc:
-                    stream_exc = exc
-                # OOM 检测:aiodocker 0.21 inspect 现在能正确返回 ExitCode=137
-                try:
-                    inspect_data = await exec_instance.inspect()
-                    exit_code = inspect_data.get("ExitCode", 0)
-                except Exception:
-                    exit_code = 0
-                # 综合判定 OOM:ExitCode=137 或 stream 异常
-                if exit_code == 137 or (exit_code != 0 and output_data is None):
-                    raise SandboxResourceLimitExceededError(
-                        f"container OOM killed (exit_code={exit_code}, stream_exc={stream_exc})",
-                        session_id=session_id,
-                        limit_type="mem",
-                        docker_exit_code=exit_code or 137,
-                    )
-                output_str = output_data.decode("utf-8") if output_data else ""
-                return {
-                    "status": "completed",
-                    "output": output_str,
-                    "error": None,
-                    "execution_time_ms": 0,
-                }
-
-            result = await asyncio.wait_for(_run_code(), timeout=effective_timeout)
-            return result
+            return await asyncio.wait_for(
+                self._run_code(container, session_id, code),
+                timeout=effective_timeout,
+            )
         except asyncio.TimeoutError as timeout_exc:
+            # 超时即销毁(Round 6 增补契约): 防止容器内进程泄漏累积至 pids_limit
+            await self._destroy_after_abort(container, session_id)
             raise SandboxTimeoutError(
                 f"execution timeout after {effective_timeout}s",
                 session_id=session_id,
                 timeout_sec=effective_timeout,
             ) from timeout_exc
+        except asyncio.CancelledError:
+            # 外层 wait_for 取消路径(装饰器双保险): CancelledError 是 BaseException,
+            # 不被 except Exception 捕获,必须显式清理后裸 raise 保取消语义
+            await self._destroy_after_abort(container, session_id)
+            raise
+        except ExecutionError:
+            # 领域异常(313/317)原样上浮,不二次包装
+            raise
         except Exception as exc:
-            error_msg = str(exc)
-            # OOM kill exit 137 → SandboxResourceLimitExceededError
-            if "137" in error_msg or "out of memory" in error_msg.lower():
-                raise SandboxResourceLimitExceededError(
-                    f"container OOM: {error_msg}",
-                    session_id=session_id,
-                    limit_type="mem",
-                    docker_exit_code=137,
-                ) from exc
-            raise ExecutionError(f"Execution failed: {error_msg}") from exc
+            logger.debug("沙箱执行异常 session=%s: %s", session_id, exc)
+            raise ExecutionError("sandbox execution failed") from exc
         finally:
-            # 更新 last_activity_at
+            # 仅 RUNNING 会话更新活动时间(避免覆盖超时销毁后的终态、或推迟 reaper 重试)
             if self._session_repo is not None:
                 session = await self._session_repo.get_by_session_id(session_id)
-                if session is not None:
+                if session is not None and session.state == "RUNNING":
                     await self._session_repo.save(session.with_activity_updated())
 
+    async def _run_code(self, container: Any, session_id: str, code: str) -> dict[str, Any]:
+        """在容器内执行代码并收集 stdout/stderr
+
+        aiodocker 协议层(_ExecParser)已解析 Docker 8 字节多路复用帧头,
+        read_out() 返回已解复用的 Message(stream, data),EOF 时返回 None。
+
+        失败判定(对齐 AC-5,顺序不可调换): exit_code==137 → SandboxResourceLimitExceededError(317);
+        其余非零退出码或 stderr 非空 → ExecutionError(313)。
+
+        Args:
+            container: aiodocker DockerContainer 实例
+            session_id: 会话 ID(用于异常上下文)
+            code: 待执行的 Python 代码
+
+        Returns:
+            执行结果字典 {status, output, error, execution_time_ms}
+
+        Raises:
+            SandboxResourceLimitExceededError: OOM kill(exit 137)
+            ExecutionError: 非零退出码或 stderr 非空
+        """
+        started = time.monotonic()
+        exec_instance = await container.exec(
+            cmd=["python", "-c", code],
+            stdout=True,
+            stderr=True,
+        )
+        stdout_chunks: list[bytes] = []
+        stderr_chunks: list[bytes] = []
+        async with exec_instance.start(detach=False) as stream:
+            # 循环读取至 EOF(read_out 返回 None); 流中途异常上浮由调用方映射为 313
+            while True:
+                msg = await stream.read_out()
+                if msg is None:
+                    break
+                if msg.stream == 2:
+                    stderr_chunks.append(msg.data)
+                else:
+                    stdout_chunks.append(msg.data)
+        try:
+            inspect_data = await exec_instance.inspect()
+            exit_code = inspect_data.get("ExitCode", 0)
+        except Exception:
+            exit_code = 0  # inspect 失败兜底按成功处理
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+
+        if exit_code == 137:
+            raise SandboxResourceLimitExceededError(
+                "container resource limit exceeded (OOM kill)",
+                session_id=session_id,
+                limit_type="mem",
+                docker_exit_code=137,
+            )
+        stdout_str = b"".join(stdout_chunks).decode("utf-8", errors="replace")
+        stderr_str = b"".join(stderr_chunks).decode("utf-8", errors="replace")
+        if exit_code != 0 or stderr_str:
+            logger.debug(
+                "沙箱执行失败 session=%s exit_code=%s stderr=%s",
+                session_id,
+                exit_code,
+                stderr_str[:500],
+            )
+            raise ExecutionError(f"execution failed (exit_code={exit_code})")
+        return {
+            "status": "completed",
+            "output": stdout_str,
+            "error": None,
+            "execution_time_ms": elapsed_ms,
+        }
+
+    async def _destroy_after_abort(self, container: Any, session_id: str) -> None:
+        """超时/取消后销毁容器并释放配额(全部 best-effort,不掩盖原始异常)
+
+        仅 delete 确认成功后才回滚计数 + 标记会话终态;
+        delete 失败时会话保持 RUNNING,交由 SandboxSessionReaper 重试清理。
+
+        Args:
+            container: aiodocker DockerContainer 实例
+            session_id: 会话 ID
+        """
+        try:
+            await container.delete(force=True)
+        except Exception:
+            logger.warning("超时/取消后销毁容器失败 session=%s", session_id)
+            return
+        async with self._lock:
+            AioDockerSandboxAdapter._running_count = max(0, AioDockerSandboxAdapter._running_count - 1)
+        session_repo = self._session_repo
+        if session_repo is not None:
+            try:
+                session = await session_repo.get_by_session_id(session_id)
+                if session is not None and session.state == "RUNNING":
+                    await session_repo.save(session.with_terminated())
+            except Exception:
+                logger.warning("超时/取消后更新会话终态失败 session=%s", session_id)
+
     async def stop_container(self, session_id: str) -> None:
-        """停止并移除 Docker 容器
+        """停止并移除 Docker 容器(幂等)
+
+        语义(Round 6 增补契约):
+        - 会话已 TERMINATED → 直接返回(幂等)
+        - 容器已不存在(daemon 404) → 按成功处理(标记终止 + 回滚计数)
+        - 其余删除失败 → 抛 ContainerStopError,不动状态/计数
 
         Args:
             session_id: 会话 ID
 
         Raises:
-            ContainerStopError: 容器停止失败
+            ContainerStopError: 容器停止失败(非 404)
         """
         self._validate_session_id(session_id)
         docker = await self._ensure_docker()
 
-        container_id: str | None = None
-        if self._session_repo is not None:
-            session = await self._session_repo.get_by_session_id(session_id)
+        # 类锁包裹"读状态→删容器→标终态→减计数"临界区,防并发双停双重减计数
+        session_repo = self._session_repo
+        async with self._lock:
+            session = None
+            if session_repo is not None:
+                session = await session_repo.get_by_session_id(session_id)
+                if session is not None and session.state == "TERMINATED":
+                    logger.debug("Session already terminated, skip stop: %s", session_id)
+                    return
             container_id = session.container_id if session else None
-        if not container_id:
-            logger.debug("No container to stop for session: %s", session_id)
-            return
+            if not container_id:
+                logger.debug("No container to stop for session: %s", session_id)
+                return
 
-        try:
-            container = await docker.containers.get(container_id)
-            await container.delete(force=True)
-        except Exception as exc:
-            raise ContainerStopError(f"failed to stop container {container_id}: {exc}") from exc
-        finally:
-            # 更新会话状态 + 计数回滚
-            if self._session_repo is not None:
-                session = await self._session_repo.get_by_session_id(session_id)
-                if session is not None:
-                    await self._session_repo.save(session.with_terminated())
-            async with self._ensure_lock():
-                AioDockerSandboxAdapter._running_count = max(0, AioDockerSandboxAdapter._running_count - 1)
+            try:
+                container = await docker.containers.get(container_id)
+                await container.delete(force=True)
+            except DockerError as docker_exc:
+                if docker_exc.status != 404:
+                    raise ContainerStopError(f"failed to stop container {container_id}") from docker_exc
+                # 容器已不存在,按成功处理
+                logger.info("Container already gone (404), treat as stopped: session=%s", session_id)
+            except Exception as exc:
+                raise ContainerStopError(f"failed to stop container {container_id}") from exc
+
+            # 仅真实 RUNNING→TERMINATED 迁移时更新状态 + 回滚计数
+            if session is not None and session_repo is not None:
+                await session_repo.save(session.with_terminated())
+            AioDockerSandboxAdapter._running_count = max(0, AioDockerSandboxAdapter._running_count - 1)
 
     async def is_container_running(self, session_id: str) -> bool:
         """检查指定会话的容器是否正在运行(查询 Docker daemon,非本地字典)"""

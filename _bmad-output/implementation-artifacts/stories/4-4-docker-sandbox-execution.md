@@ -2116,3 +2116,32 @@ register_port(
 **最后更新/Last Updated:** 2026-09-11
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md FR-ST-04 + 4-1a/4-2/4-3 一致模式 + R1-R5 复用决策）
+
+---
+
+## 📝 Round 6 审查修订记录（代码审查 Round 1, 2026-09-22）
+
+> 基于四视角并行调研（安全/架构合规/正确性/代码质量）+ 双评审终审（[优秀]）后的修复决策。以下契约变更为对 AC-5 的**增补决策**（非原文），特此标注。
+
+### 增补契约（对 AC-5 的补充）
+
+1. **超时即销毁**：`execute_code` 超时（`asyncio.TimeoutError`）或外层取消（`asyncio.CancelledError`，装饰器双保险路径）后，best-effort `container.delete(force=True)` 销毁容器；仅 delete 确认成功才回滚配额计数（`max(0, n-1)` 钳制）+ 标记会话终态；delete 失败保持 RUNNING 交 `SandboxSessionReaper` 重试。防止容器内进程泄漏累积至 `pids_limit` 造成自我 DoS。
+2. **`stop_container` 幂等**：会话已 `TERMINATED` 直接返回；daemon 返回 404（容器已不存在，精确匹配 `aiodocker.DockerError.status == 404`）按成功处理；其余失败抛 `ContainerStopError` 且不动状态/计数。"读状态→删容器→标终态→减计数"整体置于类变量锁临界区，仅真实 `RUNNING→TERMINATED` 迁移减一次计数（防并发双停双重减计数）。
+3. **失败语义精确化**（对齐 AC-5:807 原文"非零退出码/STDERR 非空抛 ExecutionError"）：判定顺序固定为 `exit_code==137 → 317` 优先，其余非零退出码或 stderr 非空 → 313；删除 `"137" in error_msg` 子串启发式（误匹配风险）；`execution_time_ms` 真实计时（`time.monotonic()`）。
+4. **stdout/stderr 解复用**：aiodocker 0.21 协议层（`_ExecParser`）已解析 Docker 8 字节多路复用帧头，`read_out()` 返回 `Message(stream, data)`（stream=1 stdout / 2 stderr），EOF 返回 None；适配器循环读取至 EOF（同时修复既有"只读一帧丢输出"缺陷）。**不自行解析帧头**。
+
+### 红线与规范修复
+
+5. **异常红线**：`container_spec_builder.py` 容器名超长分支 `raise ValueError` → `SandboxConfigurationError`（EXCEPTION_319，既有异常无需新增 Checklist）。
+6. **asyncio.Lock 类变量**（CLAUDE.md §6 强制，优先级高于代码内工作注释）：适配器 `_lock` 由实例级延迟初始化改为类变量；Python 3.10+ Lock 无争用 acquire 不绑定 event loop（stdlib `locks.py` 验证），多 loop 测试场景安全；`InMemorySandboxSessionRepository` 已有先例。
+7. **装饰器 timeout 透传**：`SandboxSecurityDecorator.execute_code_with_protection` 将 `timeout_sec` 透传至 `sandbox.execute_code(...)`，消除内外层超时语义不一致。
+8. **Saga 补偿**：`start_container` 在 `containers.run` 成功后的失败路径（如 session save 失败）best-effort 删除已创建容器；pull 阶段失败无容器不补偿；合并重复 except 块。
+9. **信息泄漏收敛**：`ContainerStartError` 等 message 不再拼接 docker 内部异常原文，细节仅进 `logger.debug`。
+
+### 验证结果
+
+- 单元/契约测试 76 passed；验收测试 43 passed（真实 Docker daemon）；ruff / mypy 零违规；三条 grep 自查（4.4 范围）零输出。
+
+### 已知版本基线差异
+
+- `pyproject.toml` 实际钉 `aiodocker = "^0.21.0"`（story AC-5 原文要求 `^0.25.0`）；本轮全部 API 验证（`Message` / `_ExecParser` / `DockerError.status` / `delete(force=True)`）基于 0.21.0 实测。若后续升级 0.25，需复验 `read_out` / `exec` API 兼容性。
