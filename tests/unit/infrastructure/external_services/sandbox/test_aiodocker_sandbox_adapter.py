@@ -15,6 +15,8 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from aiodocker.exceptions import DockerError
+from aiodocker.stream import Message
 
 from src.domain.exceptions import (
     ContainerStartError,
@@ -61,7 +63,12 @@ def _make_docker_mock() -> MagicMock:
 
 
 def _make_container_mock(show_running: bool = True) -> MagicMock:
-    """构造 mock Container 对象"""
+    """构造 mock Container 对象
+
+    read_out mock 对齐 aiodocker 0.21 真实协议:
+    协议层(_ExecParser)已解析多路复用帧头,read_out 返回 Message(stream, data),
+    EOF 返回 None(stream=1 stdout / stream=2 stderr)。
+    """
     container = MagicMock()
     container.delete = AsyncMock(return_value=True)
     container.show = AsyncMock(return_value={"State": {"Running": show_running}})
@@ -72,11 +79,12 @@ def _make_container_mock(show_running: bool = True) -> MagicMock:
 
     async def _start_cm(detach: bool = False) -> Any:
         stream = MagicMock()
-        stream.read_out = AsyncMock(return_value=MagicMock(data=b"hello\n"))
+        stream.read_out = AsyncMock(side_effect=[Message(1, b"hello\n"), None])
         return stream
 
     exec_instance.start.return_value.__aenter__ = AsyncMock(side_effect=_start_cm)
     exec_instance.start.return_value.__aexit__ = AsyncMock(return_value=None)
+    exec_instance.inspect = AsyncMock(return_value={"ExitCode": 0})
     container.exec = AsyncMock(return_value=exec_instance)
     return container
 
@@ -172,6 +180,27 @@ class TestStartContainer:
             assert exc_info.value.context["max_count"] == 50
         finally:
             AioDockerSandboxAdapter._running_count = 0
+
+    @patch("aiodocker.Docker")
+    async def test_start_container_saga_compensation_on_save_failure(
+        self, mock_docker_cls: MagicMock, adapter: AioDockerSandboxAdapter, repo: InMemorySandboxSessionRepository
+    ) -> None:
+        """run 成功后 session save 失败: Saga 补偿删除已创建容器,避免孤儿"""
+        mock_docker = _make_docker_mock()
+        mock_container = _make_container_id_mock()
+        mock_container.delete = AsyncMock(return_value=True)
+        mock_docker.containers.run = AsyncMock(return_value=mock_container)
+        mock_docker_cls.return_value = mock_docker
+
+        broken_repo = AsyncMock(spec=InMemorySandboxSessionRepository)
+        broken_repo.save.side_effect = Exception("pg connection lost")
+        adapter._session_repo = broken_repo
+
+        with pytest.raises(Exception, match="pg connection lost"):
+            await adapter.start_container("sess-saga-test")
+
+        # Saga 补偿: 已创建容器被 best-effort 删除
+        assert mock_container.delete.await_count == 1
 
 
 class TestContainerNameLength:
@@ -277,6 +306,8 @@ class TestExecuteCode:
             await adapter.execute_code("sess-timeout-test", "long_running()", timeout_sec=0.1)
         assert exc_info.value.code == "EXCEPTION_316"
         assert exc_info.value.context["timeout_sec"] == 0.1
+        # 超时即销毁(Round 6 增补契约): 容器被 best-effort 删除
+        assert mock_container.delete.await_count == 1
 
     @patch("aiodocker.Docker")
     async def test_execute_code_oom(
@@ -295,7 +326,16 @@ class TestExecuteCode:
 
         mock_docker = _make_docker_mock()
         mock_container = _make_container_mock()
-        mock_container.exec.side_effect = Exception("container killed (exit 137): out of memory")
+        # OOM: read_out 无数据(OOM kill 截断),inspect 返回 ExitCode=137
+        exec_instance = mock_container.exec.return_value
+
+        async def _oom_start_cm(detach: bool = False) -> Any:
+            stream = MagicMock()
+            stream.read_out = AsyncMock(side_effect=[None])
+            return stream
+
+        exec_instance.start.return_value.__aenter__ = AsyncMock(side_effect=_oom_start_cm)
+        exec_instance.inspect = AsyncMock(return_value={"ExitCode": 137})
         mock_docker.containers.get.return_value = mock_container
         mock_docker_cls.return_value = mock_docker
 
@@ -303,6 +343,98 @@ class TestExecuteCode:
             await adapter.execute_code("sess-oom-test", "x = [1]*10**9")
         assert exc_info.value.code == "EXCEPTION_317"
         assert exc_info.value.context["limit_type"] == "mem"
+        assert exc_info.value.context["docker_exit_code"] == 137
+
+    @patch("aiodocker.Docker")
+    async def test_execute_code_nonzero_exit_raises(
+        self, mock_docker_cls: MagicMock, adapter: AioDockerSandboxAdapter, repo: InMemorySandboxSessionRepository
+    ) -> None:
+        """非零退出码 + stderr 非空抛 ExecutionError(EXCEPTION_313),不得吞错返回 completed"""
+        from src.domain.entities.sandbox_session import SandboxSession
+
+        await repo.save(
+            SandboxSession(
+                session_id="sess-fail-test",
+                tenant_id=__import__("uuid").uuid4(),
+                container_id="container-xyz",
+            )
+        )
+
+        mock_docker = _make_docker_mock()
+        mock_container = _make_container_mock()
+        exec_instance = mock_container.exec.return_value
+
+        async def _fail_start_cm(detach: bool = False) -> Any:
+            stream = MagicMock()
+            stream.read_out = AsyncMock(side_effect=[Message(2, b"boom"), None])
+            return stream
+
+        exec_instance.start.return_value.__aenter__ = AsyncMock(side_effect=_fail_start_cm)
+        exec_instance.inspect = AsyncMock(return_value={"ExitCode": 3})
+        mock_docker.containers.get.return_value = mock_container
+        mock_docker_cls.return_value = mock_docker
+
+        with pytest.raises(ExecutionError) as exc_info:
+            await adapter.execute_code("sess-fail-test", "sys.exit(3)")
+        assert exc_info.value.code == "EXCEPTION_313"
+
+    @patch("aiodocker.Docker")
+    async def test_execute_code_stderr_nonempty_raises(
+        self, mock_docker_cls: MagicMock, adapter: AioDockerSandboxAdapter, repo: InMemorySandboxSessionRepository
+    ) -> None:
+        """exit 0 但 stderr 非空抛 ExecutionError(AC-5: STDERR 非空即失败)"""
+        from src.domain.entities.sandbox_session import SandboxSession
+
+        await repo.save(
+            SandboxSession(
+                session_id="sess-stderr-test",
+                tenant_id=__import__("uuid").uuid4(),
+                container_id="container-xyz",
+            )
+        )
+
+        mock_docker = _make_docker_mock()
+        mock_container = _make_container_mock()
+        exec_instance = mock_container.exec.return_value
+
+        async def _stderr_start_cm(detach: bool = False) -> Any:
+            stream = MagicMock()
+            stream.read_out = AsyncMock(side_effect=[Message(1, b"ok\n"), Message(2, b"warning!"), None])
+            return stream
+
+        exec_instance.start.return_value.__aenter__ = AsyncMock(side_effect=_stderr_start_cm)
+        exec_instance.inspect = AsyncMock(return_value={"ExitCode": 0})
+        mock_docker.containers.get.return_value = mock_container
+        mock_docker_cls.return_value = mock_docker
+
+        with pytest.raises(ExecutionError) as exc_info:
+            await adapter.execute_code("sess-stderr-test", "print('ok')")
+        assert exc_info.value.code == "EXCEPTION_313"
+
+    @patch("aiodocker.Docker")
+    async def test_execute_code_execution_time_measured(
+        self, mock_docker_cls: MagicMock, adapter: AioDockerSandboxAdapter, repo: InMemorySandboxSessionRepository
+    ) -> None:
+        """execution_time_ms 真实计时(非恒 0 硬编码)"""
+        from src.domain.entities.sandbox_session import SandboxSession
+
+        await repo.save(
+            SandboxSession(
+                session_id="sess-timing-test",
+                tenant_id=__import__("uuid").uuid4(),
+                container_id="container-xyz",
+            )
+        )
+
+        mock_docker = _make_docker_mock()
+        mock_docker.containers.get.return_value = _make_container_mock()
+        mock_docker_cls.return_value = mock_docker
+
+        result = await adapter.execute_code("sess-timing-test", "print('hi')")
+
+        assert result["status"] == "completed"
+        assert isinstance(result["execution_time_ms"], int)
+        assert result["execution_time_ms"] >= 0
 
     async def test_execute_code_no_container(self, adapter: AioDockerSandboxAdapter) -> None:
         """无运行容器抛 ExecutionError(EXCEPTION_313)"""
@@ -365,6 +497,52 @@ class TestStopContainer:
         with pytest.raises(ContainerStopError) as exc_info:
             await adapter.stop_container("sess-stop-fail-test")
         assert exc_info.value.code == "EXCEPTION_314"
+
+    @patch("aiodocker.Docker")
+    async def test_stop_container_idempotent_when_terminated(
+        self, mock_docker_cls: MagicMock, adapter: AioDockerSandboxAdapter, repo: InMemorySandboxSessionRepository
+    ) -> None:
+        """会话已 TERMINATED 时 stop 幂等返回(Round 6 增补契约),不再访问 daemon"""
+        from src.domain.entities.sandbox_session import SandboxSession
+
+        session = SandboxSession(
+            session_id="sess-stopped-test",
+            tenant_id=__import__("uuid").uuid4(),
+            container_id="container-xyz",
+        )
+        await repo.save(session.with_terminated())
+
+        mock_docker = _make_docker_mock()
+        mock_docker_cls.return_value = mock_docker
+
+        await adapter.stop_container("sess-stopped-test")  # 不抛异常
+
+        assert mock_docker.containers.get.await_count == 0
+
+    @patch("aiodocker.Docker")
+    async def test_stop_container_404_treated_as_success(
+        self, mock_docker_cls: MagicMock, adapter: AioDockerSandboxAdapter, repo: InMemorySandboxSessionRepository
+    ) -> None:
+        """容器已不存在(daemon 404)按成功处理: 标记终止 + 不抛 314"""
+        from src.domain.entities.sandbox_session import SandboxSession
+
+        await repo.save(
+            SandboxSession(
+                session_id="sess-stop-404-test",
+                tenant_id=__import__("uuid").uuid4(),
+                container_id="container-xyz",
+            )
+        )
+
+        mock_docker = _make_docker_mock()
+        mock_docker.containers.get.side_effect = DockerError(404, {"message": "No such container"})
+        mock_docker_cls.return_value = mock_docker
+
+        await adapter.stop_container("sess-stop-404-test")  # 不抛异常
+
+        updated = await repo.get_by_session_id("sess-stop-404-test")
+        assert updated is not None
+        assert updated.state == "TERMINATED"
 
 
 class TestIsContainerRunning:

@@ -14,6 +14,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from src.domain.exceptions import SandboxConfigurationError
 from src.domain.value_objects.container_spec import ContainerSpec
 
 
@@ -57,13 +58,18 @@ class ContainerSpecBuilder:
             Docker 容器名称,总长度 ≤ 55 字符
 
         Raises:
-            ValueError: 容器名长度超 Docker 64 字符上限（理论上不会发生）
+            SandboxConfigurationError: 容器名长度超 Docker 64 字符上限（理论上不会发生）
         """
         tenant_short = str(tenant_id).replace("-", "")[:8]
         session_short = session_id[:32]
         container_name = f"sisys-sandbox-{tenant_short}-{session_short}"
         if len(container_name) > 64:
-            raise ValueError(f"container_name too long: {len(container_name)} > 64 chars")
+            raise SandboxConfigurationError(
+                f"container_name too long: {len(container_name)} > 64 chars",
+                field_name="container_name",
+                field_value=container_name,
+                reason_detail="exceeds Docker 64-char limit",
+            )
         return container_name
 
 
