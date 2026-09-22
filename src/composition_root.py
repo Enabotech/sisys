@@ -122,6 +122,7 @@ def bootstrap() -> None:
     # === Storage Layer ===
     from src.infrastructure.config.auto_route import AutoRouteConfig
     from src.infrastructure.config.redis import RedisConfig
+    from src.infrastructure.config.sandbox import SandboxConfig
     from src.infrastructure.external_services.sandbox.session_namespace_manager import (
         SessionNamespaceManager,
     )
@@ -816,11 +817,14 @@ def bootstrap() -> None:
         interface=SandboxExecutor,
         # Story 4.4 — 切换 impl 至 aiodocker 实现(mock 已 git tag 保留紧急回滚)
         # lambda 工厂注入 session_repo,确保 is_container_running / execute_code 能查询 container_id
+        # Round 2 审查修订: 注入 event_publisher(生命周期事件发布) + SandboxConfig(配额配置化)
         impl=lambda resolver: __import__(
             "src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter",
             fromlist=["AioDockerSandboxAdapter"],
         ).AioDockerSandboxAdapter(
+            max_concurrent=SandboxConfig.from_env().max_concurrent_containers,
             session_repo=resolver.resolve("sandbox_session_repository"),
+            event_publisher=resolver.resolve("event_publisher"),
         ),
         module="src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter",
         lifetime=Lifetime.SCOPED,
@@ -860,7 +864,7 @@ def bootstrap() -> None:
         ).SandboxSessionReaper(
             sandbox=resolver.resolve("sandbox_executor"),
             session_repo=resolver.resolve("sandbox_session_repository"),
-            idle_timeout_minutes=30,
+            idle_timeout_minutes=SandboxConfig.from_env().idle_timeout_minutes,
         ),
         module="src.application.services.sandbox_session_reaper",
         lifetime=Lifetime.SINGLETON,
@@ -2272,12 +2276,25 @@ def bootstrap() -> None:
             "src.application.ports.tool_execution_engine",
             fromlist=["ToolExecutionEnginePort"],
         ).ToolExecutionEnginePort,
+        # Round 2 审查修订: 注入收窄重试策略 — 默认白名单含 ExecutionError 会把
+        # 沙箱确定性失败(313/316/317)错误重试 3 次并与"超时即销毁"契约冲突;
+        # 仅 LLM 瞬时故障(API/响应/领域超时)可重试
         impl=lambda resolver: __import__(
             "src.application.services.tool_execution_engine",
             fromlist=["ToolExecutionEngine", "RetryPolicy"],
         ).ToolExecutionEngine(
             llm_client=resolver.resolve("llm_client"),
             sandbox=resolver.resolve("sandbox_executor"),
+            retry_policy=__import__(
+                "src.application.services.retry_helpers",
+                fromlist=["RetryPolicy"],
+            ).RetryPolicy(
+                retryable_exceptions=(
+                    __import__("src.domain.exceptions", fromlist=["LLMAPIError"]).LLMAPIError,
+                    __import__("src.domain.exceptions", fromlist=["LLMResponseError"]).LLMResponseError,
+                    __import__("src.domain.exceptions", fromlist=["TimeoutError"]).TimeoutError,
+                )
+            ),
             tool_execution_repository=resolver.resolve("tool_execution_repository"),
         ),
         module="src.application.services.tool_execution_engine",
@@ -2312,7 +2329,8 @@ def bootstrap() -> None:
                 ),
                 sandbox=resolver.resolve("sandbox_executor"),
                 session_repo=resolver.resolve("sandbox_session_repository"),
-                max_concurrent_containers=50,
+                event_publisher=resolver.resolve("event_publisher"),
+                max_concurrent_containers=SandboxConfig.from_env().max_concurrent_containers,
             ),
         ),
         module="src.application.services.tool_execution_service",

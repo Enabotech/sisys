@@ -5,8 +5,8 @@ Story 4.4 — 30 分钟空闲 TTL 清理 + 孤儿容器回收。
 应用层服务 SandboxSessionReaper:
 - 不修改既有 SessionNamespaceManager(4.1a 既有实现无 TTL)
 - 通过 SandboxSessionRepositoryPort.list_idle_sessions(threshold) 获取空闲会话
-- 对每个空闲会话调用 sandbox.stop_container(session_id)
-- 发布 SandboxSessionTerminated 事件 (metadata.reason="idle_timeout")
+- 对每个空闲会话调用 sandbox.stop_container(session_id, reason="idle_timeout")
+- SandboxSessionTerminated 事件由适配器统一发布(单一发布点,termination_reason="idle_timeout")
 
 注册为端口: name="sandbox_session_reaper", lifetime=SINGLETON
 """
@@ -67,7 +67,7 @@ class SandboxSessionReaper:
         reaped_count = 0
         for session in idle_sessions:
             try:
-                await self._sandbox.stop_container(session.session_id)
+                await self._sandbox.stop_container(session.session_id, reason="idle_timeout")
                 reaped_count += 1
                 logger.info(
                     "Reaped idle session: session_id=%s last_activity_at=%s",

@@ -68,6 +68,17 @@ class TestSandboxExecutorContract:
         """Story 4.4 新增:health_check 方法存在"""
         method = getattr(SandboxExecutor, "health_check")
         assert callable(method)
+
+    def test_stop_container_reason_signature(self) -> None:
+        """Round 2 审查修订:stop_container 接受 keyword-only reason(默认 explicit_stop)"""
+        method = getattr(SandboxExecutor, "stop_container")
+        sig = inspect.signature(method)
+        params = list(sig.parameters.keys())
+        assert "session_id" in params
+        assert "reason" in params
+        reason_param = sig.parameters["reason"]
+        assert reason_param.kind == inspect.Parameter.KEYWORD_ONLY
+        assert reason_param.default == "explicit_stop"
         assert inspect.iscoroutinefunction(method)
 
     def test_compliant_implementation(self) -> None:

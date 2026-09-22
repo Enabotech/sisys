@@ -23,6 +23,10 @@ from typing import Any
 from aiodocker.exceptions import DockerError
 
 from src.domain.entities.sandbox_session import SandboxSession
+from src.domain.events.sandbox_events import (
+    SandboxSessionStarted,
+    SandboxSessionTerminated,
+)
 from src.domain.exceptions import (
     ContainerStartError,
     ContainerStopError,
@@ -33,6 +37,7 @@ from src.domain.exceptions import (
     SandboxResourceLimitExceededError,
     SandboxTimeoutError,
 )
+from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.sandbox_executor import SandboxExecutor
 from src.domain.ports.sandbox_session_repository import SandboxSessionRepositoryPort
 from src.domain.value_objects.container_spec import ContainerSpec
@@ -75,6 +80,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         docker_socket: str = "unix:///var/run/docker.sock",
         max_concurrent: int = 50,
         session_repo: SandboxSessionRepositoryPort | None = None,
+        event_publisher: EventPublisher | None = None,
     ) -> None:
         """初始化适配器
 
@@ -82,15 +88,36 @@ class AioDockerSandboxAdapter(SandboxExecutor):
             docker_socket: Docker daemon socket 地址
             max_concurrent: 最大并发容器数(默认 50)
             session_repo: SandboxSession 仓储端口(可选,用于持久化会话)
+            event_publisher: 事件发布端口(可选,注入后发布沙箱生命周期事件;
+                基础设施层注入先例: composition_root PrefectEngine/LangGraphEngine)
         """
         self._docker_socket = docker_socket
         self._max_concurrent = max_concurrent
         self._session_repo = session_repo
+        self._event_publisher = event_publisher
         self._docker: Any = None  # 延迟初始化 aiodocker.Docker
         # 当前 event loop 引用(用于检测 client 是否需要重建)
         self._loop: Any = None
         # 保存所有创建过的 connectors(供 aclose 时同步关闭)
         self._connectors: list[Any] = []
+
+    async def _publish_event(self, event: Any, session_id: str) -> None:
+        """best-effort 发布沙箱生命周期事件(失败仅记日志,不影响主流程)
+
+        Args:
+            event: 领域事件实例
+            session_id: 会话 ID(用于日志上下文)
+        """
+        if self._event_publisher is None:
+            return
+        try:
+            await self._event_publisher.publish(event)
+        except Exception:
+            logger.warning(
+                "发布沙箱事件失败 type=%s session=%s",
+                getattr(event, "event_type", type(event).__name__),
+                session_id,
+            )
 
     def __del__(self) -> None:
         """析构时跳过主动清理 - 真正修复在 step 函数 finally 块中同步 stop_container.
@@ -276,6 +303,21 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 )
                 await self._session_repo.save(session)
 
+            # 发布 SandboxSessionStarted(session save 块之后,best-effort 不触发 Saga 补偿;
+            # 不以 session_repo 存在为条件,保证无仓储部署下事件流对称)
+            await self._publish_event(
+                SandboxSessionStarted(
+                    session_id=session_id,
+                    container_id=container_id,
+                    image_digest=spec.image,
+                    resource_limits={
+                        "mem_limit_mb": spec.mem_limit_mb,
+                        "cpu_quota": spec.cpu_quota,
+                        "pids_limit": spec.pids_limit,
+                    },
+                ),
+                session_id,
+            )
             logger.info(
                 "Started container for session %s: %s",
                 session_id,
@@ -452,24 +494,43 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         async with self._lock:
             AioDockerSandboxAdapter._running_count = max(0, AioDockerSandboxAdapter._running_count - 1)
         session_repo = self._session_repo
+        terminated_session = None
         if session_repo is not None:
             try:
                 session = await session_repo.get_by_session_id(session_id)
                 if session is not None and session.state == "RUNNING":
-                    await session_repo.save(session.with_terminated())
+                    terminated_session = session.with_terminated()
+                    await session_repo.save(terminated_session)
             except Exception:
                 logger.warning("超时/取消后更新会话终态失败 session=%s", session_id)
+        # 末位语句: 发布 timeout_abort 终止事件(CancelledError 路径中 publish 若被二次取消,
+        # 取消语义保留仅丢本次事件;其后不得再有清理代码)
+        if terminated_session is not None:
+            terminated_at = terminated_session.terminated_at
+            duration = (terminated_at - terminated_session.started_at).total_seconds() if terminated_at else 0.0
+            await self._publish_event(
+                SandboxSessionTerminated(
+                    session_id=session_id,
+                    container_id=terminated_session.container_id or "",
+                    termination_reason="timeout_abort",
+                    duration_sec=duration,
+                ),
+                session_id,
+            )
 
-    async def stop_container(self, session_id: str) -> None:
+    async def stop_container(self, session_id: str, *, reason: str = "explicit_stop") -> None:
         """停止并移除 Docker 容器(幂等)
 
         语义(Round 6 增补契约):
-        - 会话已 TERMINATED → 直接返回(幂等)
+        - 会话已 TERMINATED → 直接返回(幂等,不发布事件)
         - 容器已不存在(daemon 404) → 按成功处理(标记终止 + 回滚计数)
         - 其余删除失败 → 抛 ContainerStopError,不动状态/计数
+        - 仅真实 RUNNING→TERMINATED 迁移时在锁释放后发布 SandboxSessionTerminated
+          (adapter 是该事件的唯一发布点,reaper 经 reason="idle_timeout" 复用本路径)
 
         Args:
             session_id: 会话 ID
+            reason: 终止原因(explicit_stop / idle_timeout,写入事件 termination_reason)
 
         Raises:
             ContainerStopError: 容器停止失败(非 404)
@@ -477,6 +538,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         self._validate_session_id(session_id)
         docker = await self._ensure_docker()
 
+        terminated_session = None
         # 类锁包裹"读状态→删容器→标终态→减计数"临界区,防并发双停双重减计数
         session_repo = self._session_repo
         async with self._lock:
@@ -504,8 +566,23 @@ class AioDockerSandboxAdapter(SandboxExecutor):
 
             # 仅真实 RUNNING→TERMINATED 迁移时更新状态 + 回滚计数
             if session is not None and session_repo is not None:
-                await session_repo.save(session.with_terminated())
+                terminated_session = session.with_terminated()
+                await session_repo.save(terminated_session)
             AioDockerSandboxAdapter._running_count = max(0, AioDockerSandboxAdapter._running_count - 1)
+
+        # 锁外发布(避免类锁临界区内 PG outbox 写入串行化所有并发 stop)
+        if terminated_session is not None:
+            terminated_at = terminated_session.terminated_at
+            duration = (terminated_at - terminated_session.started_at).total_seconds() if terminated_at else 0.0
+            await self._publish_event(
+                SandboxSessionTerminated(
+                    session_id=session_id,
+                    container_id=terminated_session.container_id or "",
+                    termination_reason=reason,
+                    duration_sec=duration,
+                ),
+                session_id,
+            )
 
     async def is_container_running(self, session_id: str) -> bool:
         """检查指定会话的容器是否正在运行(查询 Docker daemon,非本地字典)"""
