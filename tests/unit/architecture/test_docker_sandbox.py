@@ -145,9 +145,46 @@ class TestSandboxPortSpecMetadata:
         if spec is None:
             pytest.skip("sandbox_executor 端口尚未注册到 composition_root")
 
+        # 10 字段元数据完整性验证(与 sandbox_session_repository 同构)
         assert spec.name == "sandbox_executor"
         assert spec.version, "version 应非空"
         assert spec.interface is not None, "interface 应存在"
+        assert spec.impl is not None, "impl 应存在"
+        assert spec.module, "module 应非空"
+        assert spec.lifetime is not None, "lifetime 应为 Lifetime enum"
+        assert isinstance(spec.owner, str) and spec.owner, "owner 应为非空 str"
+        assert isinstance(spec.compatibility, tuple), "compatibility 应为 tuple[str, ...]"
+        assert isinstance(spec.tags, tuple), "tags 应为 tuple[str, ...]"
+        assert isinstance(spec.deprecated, bool), "deprecated 应为 bool"
+        import re
+
+        assert re.match(r"^v?\d+\.\d+\.\d+$", spec.version), f"version 应匹配语义化版本, got '{spec.version}'"
+
+    def test_sandbox_session_reaper_port_metadata(self) -> None:
+        """sandbox_session_reaper 端口元数据完整性验证（如已注册,Round 5 补齐）"""
+        try:
+            from src.domain.ports.registry import _global_registry
+        except ImportError:
+            pytest.skip("registry 不可用")
+
+        spec = _global_registry.get("sandbox_session_reaper")
+        if spec is None:
+            pytest.skip("sandbox_session_reaper 端口尚未注册到 composition_root")
+
+        # 10 字段元数据完整性验证
+        assert spec.name == "sandbox_session_reaper"
+        assert spec.version, "version 应非空"
+        assert spec.interface is not None, "interface 应存在"
+        assert spec.impl is not None, "impl 应存在"
+        assert spec.module, "module 应非空"
+        assert spec.lifetime is not None, "lifetime 应为 Lifetime enum"
+        assert isinstance(spec.owner, str) and spec.owner, "owner 应为非空 str"
+        assert isinstance(spec.compatibility, tuple), "compatibility 应为 tuple[str, ...]"
+        assert isinstance(spec.tags, tuple), "tags 应为 tuple[str, ...]"
+        assert isinstance(spec.deprecated, bool), "deprecated 应为 bool"
+        import re
+
+        assert re.match(r"^v?\d+\.\d+\.\d+$", spec.version), f"version 应匹配语义化版本, got '{spec.version}'"
 
 
 class TestSandboxExceptionCodesUniqueness:

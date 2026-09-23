@@ -986,6 +986,7 @@ def then_zero_escapes(context: dict[str, Any]) -> None:
 @when("连续启动 20 个容器并测量延迟")
 def when_start_20_containers_measure_latency(context: dict[str, Any], docker_daemon_or_skip: None) -> None:
     """AC-8.1 性能基准:连续启动 20 个容器测量 P95 延迟"""
+    import statistics
     import time
 
     from src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter import (
@@ -993,27 +994,23 @@ def when_start_20_containers_measure_latency(context: dict[str, Any], docker_dae
     )
 
     adapter = AioDockerSandboxAdapter()
+    # warmup: 1 次 start/stop 不计入样本(消除首样本镜像 pull 污染)
+    _run_async(adapter.start_container("sess-perf-warmup"))
+    _run_async(adapter.stop_container("sess-perf-warmup"))
     latencies = []
     for i in range(20):
-        sid = f"sess-perf-{i:02d}-xxxx"
+        sid = f"sess-perf-{i:02d}-{uuid.uuid4().hex[:6]}"
         t0 = time.perf_counter()
         _run_async(adapter.start_container(sid))
         latencies.append((time.perf_counter() - t0) * 1000)  # ms
         _run_async(adapter.stop_container(sid))
-    latencies.sort()
-    p95_index = int(len(latencies) * 0.95)
-    context["p95_ms"] = latencies[p95_index]
+    # N=20 样本 P95: quantiles(n=20)[18] 恰为第 19/20 分位(修正原 latencies[19]=P100 口径)
+    context["p95_ms"] = statistics.quantiles(latencies, n=20)[18]
 
 
 @then("热启动 P95 小于 2 秒")
 def then_p95_less_2s(context: dict[str, Any]) -> None:
     assert context["p95_ms"] < 2000, f"P95 {context['p95_ms']:.1f}ms 应小于 2000ms"
-
-
-@then("冷启动 小于 30 秒(含镜像预拉取)")
-def then_cold_start_less_30s(context: dict[str, Any]) -> None:
-    """已通过预热,验证 fixture setUp 预拉取流程(<30s)"""
-    pass  # 已在 docker_daemon_or_skip fixture 中验证
 
 
 @when("并发启动 10 个会话")

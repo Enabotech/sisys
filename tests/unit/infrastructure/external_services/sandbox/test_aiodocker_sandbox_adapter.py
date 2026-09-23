@@ -38,9 +38,10 @@ from src.infrastructure.storage.inmemory.sandbox_session_repository import (
 
 
 def _make_container_id_mock() -> MagicMock:
-    """构造 mock DockerContainer 对象(返回 .id 属性)."""
+    """构造 mock DockerContainer 对象(返回 .id 属性 + show 镜像信息)."""
     container = MagicMock()
     container.id = "container-abc123"
+    container.show = AsyncMock(return_value={"Image": "sha256:9534e5a8"})
     return container
 
 
@@ -537,7 +538,7 @@ class TestStopContainer:
         )
 
         mock_docker = _make_docker_mock()
-        mock_docker.containers.get.side_effect = DockerError(404, {"message": "No such container"})
+        mock_docker.containers.get.side_effect = DockerError(404, "No such container")
         mock_docker_cls.return_value = mock_docker
 
         await adapter.stop_container("sess-stop-404-test")  # 不抛异常

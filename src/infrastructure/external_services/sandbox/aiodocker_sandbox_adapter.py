@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import time
 import uuid
 import weakref
@@ -24,7 +23,7 @@ from typing import Any
 
 from aiodocker.exceptions import DockerError
 
-from src.domain.entities.sandbox_session import SandboxSession
+from src.domain.entities.sandbox_session import SESSION_ID_REGEX, SandboxSession
 from src.domain.events.sandbox_events import (
     SandboxSessionStarted,
     SandboxSessionTerminated,
@@ -52,7 +51,8 @@ from src.infrastructure.external_services.sandbox.seccomp_profile_loader import 
 
 logger = logging.getLogger(__name__)
 
-SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+# 单源化: 正则定义在 domain 层 SESSION_ID_REGEX,此处保留别名兼容既有引用
+SESSION_ID_PATTERN = SESSION_ID_REGEX
 
 
 class AioDockerSandboxAdapter(SandboxExecutor):
@@ -63,7 +63,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
     - read_only: True (只读根文件系统)
     - cap_drop: ["ALL"] (移除所有 Linux capabilities)
     - security_opt: ["no-new-privileges"] (禁止提权)
-    - tmpfs: {"/tmp": "100m"} (临时写入)
+    - tmpfs: {"/sandbox-tmp": "size=100m,uid=1000"} (临时写入)
     - 资源限制: CPU + 内存 + pids (cgroups)
 
     Attributes:
@@ -276,6 +276,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
 
         container: Any = None
         container_name = ""
+        image_id = spec.image
         try:
             # seccomp profile fail-fast(319 于镜像拉取前抛出,不产生容器,无需 Saga 补偿)
             seccomp_inline = load_seccomp_profile(spec.seccomp_profile)
@@ -285,21 +286,19 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 tenant_id = uuid.uuid4()
             container_name = ContainerSpecBuilder.build_container_name(tenant_id, session_id)
 
-            # 镜像拉取(分离 name:tag 与 digest 避免 aiodocker 解析错误)
+            # 镜像拉取(digest 内容寻址比对 + 完整引用拉取 + 超时保护)
             try:
-                # Docker daemon 通常有本地缓存 image,run() 会自动复用
-                # 这里只在 image 不在本地时才显式 pull
                 image_ref = spec.image
                 if "@sha256:" in image_ref:
-                    # 拆为 name:tag + digest,让 aiodocker 正确处理
-                    name_tag, digest = image_ref.rsplit("@", 1)
-                    # 检查本地是否已有此 image(避免重复 pull)
+                    _name_tag, digest = image_ref.rsplit("@", 1)
+                    # RepoDigests 两种形态(python@sha256:... / python:tag@sha256:...)均取 @ 后缀比对
                     local_images = await docker.images.list()
-                    local_digests = {img.get("Id", "") for img in local_images}
+                    local_digests = {rd.rsplit("@", 1)[-1] for img in local_images for rd in (img.get("RepoDigests") or [])}
                     if digest not in local_digests:
-                        await docker.images.pull(name_tag)
+                        # 完整 name@digest 引用拉取(杜绝拉可变 tag),timeout 防 registry 挂起
+                        await docker.images.pull(image_ref, timeout=120.0)
                 else:
-                    await docker.images.pull(image_ref)
+                    await docker.images.pull(image_ref, timeout=120.0)
             except Exception as pull_exc:
                 logger.debug("镜像拉取失败 session=%s image=%s: %s", session_id, spec.image, pull_exc)
                 raise SandboxImagePullError(
@@ -333,13 +332,16 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 logger.debug("容器启动失败 session=%s name=%s: %s", session_id, container_name, run_exc)
                 raise ContainerStartError(f"failed to run container {container_name}") from run_exc
 
+            # 回填 daemon 实际 Image ID(非引用串),供审计/配额统计
+            image_id = (await container.show()).get("Image", spec.image)
+
             # 持久化会话
             if session_repo is not None:
                 session = SandboxSession(
                     session_id=session_id,
                     tenant_id=tenant_id,
                     container_id=container_id,
-                    image_digest=spec.image,
+                    image_digest=image_id,
                     resource_limits={
                         "mem_limit_mb": spec.mem_limit_mb,
                         "cpu_quota": spec.cpu_quota,
@@ -354,7 +356,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 SandboxSessionStarted(
                     session_id=session_id,
                     container_id=container_id,
-                    image_digest=spec.image,
+                    image_digest=image_id,
                     resource_limits={
                         "mem_limit_mb": spec.mem_limit_mb,
                         "cpu_quota": spec.cpu_quota,

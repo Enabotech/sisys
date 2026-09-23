@@ -19,12 +19,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import uuid
 from typing import Any
 
 from src.application.ports.tool_execution_engine import ToolExecutionEnginePort
 from src.application.services.retry_helpers import RetryPolicy, _call_with_retry
+from src.domain.entities.sandbox_session import SESSION_ID_REGEX
 from src.domain.events.sandbox_events import SandboxExecutionFailed
 from src.domain.exceptions import (
     ContainerStartError,
@@ -39,7 +39,8 @@ from src.domain.ports.sandbox_session_repository import SandboxSessionRepository
 
 logger = logging.getLogger(__name__)
 
-SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+# 单源化: 正则定义在 domain 层(domain/entities/sandbox_session.py)
+SESSION_ID_PATTERN = SESSION_ID_REGEX
 
 # AC-7 职责 2 重试白名单: 仅容器启动/镜像拉取等瞬时 daemon 故障可重试;
 # 排除 ExecutionError 全族(313 用户代码失败/316 超时/317 OOM 均为确定性失败,

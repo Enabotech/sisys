@@ -1069,7 +1069,7 @@ register_port(
   - **循环依赖检测**：复用既有 `lint-imports`（基于 importlinter CI 层校验）+ Python stdlib `ast` 静态分析脚本（基于 `ast.parse()` + `ast.walk()` 扫描 `ast.Import`/`ast.ImportFrom`，黑名单 `FORBIDDEN_IMPORTS = {pydantic, sqlalchemy, redis, ...}`）；**注意**：ruff E 规则**不包含**循环依赖检测能力，不能仅用 `ruff --select E`（P1-8 修订：明确双重检测机制）
   - **PortSpec 元数据完整性**（关键 P1-1 修正）：3 个端口（`sandbox_executor` / `sandbox_session_repository` / `sandbox_session_reaper`）的 **10 字段**逐一断言（`name / version / interface / impl / module / lifetime / owner / compatibility / tags / deprecated`）+ 类型正确断言（`owner` 是非空 `str` / `lifetime` 是 `Lifetime` enum / `compatibility` 是 `tuple[str, ...]` / `deprecated` 是 `bool` / `version` 匹配 `^\d+\.\d+\.\d+$` 语义化版本）
   - **异常代码唯一性**：EXCEPTION_315~319 与既有代码无碰撞
-- **性能基准测试**：`tests/integration/test_performance_docker_sandbox.py`
+- **性能基准测试**：`tests/benchmark/test_performance_docker_sandbox.py`
   - **启动延迟**：连续启动 20 个容器，**热启动 P95 < 2s + 冷启动 < 30s**（fixture setUp 中预拉取镜像 `docker pull python:3.11-slim@sha256:...`；CI runner 必须本地 Docker daemon，**禁止** Docker-in-Docker 远程 socket）（P1-5 修订）
   - **并发能力**：≥ 10 并发会话（与 AC-8 并发测试**功能验证**不同，本 AC 作为**性能基准**）+ 建议加压到 50 验证配额上限
   - **沙箱逃逸**：跑**已知逃逸 CVE 测试集**（Docker 官方 breakout test suite + chroot/mount/ptrace 系统调用阻塞测试；CVE 列表脱敏后列入 `_seccomp_cve_testdata.py`），验证 **0 次逃逸**；README 注明"安全等级 = hardened profile + cap_drop ALL + read_only + no-new-privileges，**不保证抵御内核 0day**；运行时检测 Falco/Tetragon 列入后续 Story"（P0 修订：用词过度承诺修正）
@@ -1369,7 +1369,7 @@ register_port(
 | **TDD 契约测试** | `ContainerSpec` 值对象 | 不变量校验 | `tests/contracts/test_value_object_contract_container_spec.py` | Task 1 |
 | **SDD 架构验证** | 域层零依赖 + 依赖方向 + 端口元数据 | 4 项规则 | `tests/unit/architecture/test_docker_sandbox.py`（epics AC 5 硬要求） | Task 9 |
 | **集成测试** | testcontainers-python 真实 Docker daemon | 7 项场景（启动 / 网络 / 资源 / 只读 / pids / 逃逸 / 并发） | `tests/integration/test_docker_sandbox_integration.py` | Task 8 |
-| **性能基准** | 启动延迟 P95 < 5s + 并发 ≥ 10 + 沙箱逃逸 0 | 3 项基准 | `tests/integration/test_performance_docker_sandbox.py` | Task 9 |
+| **性能基准** | 启动延迟 P95 < 5s + 并发 ≥ 10 + 沙箱逃逸 0 | 3 项基准 | `tests/benchmark/test_performance_docker_sandbox.py` | Task 9 |
 | **TDD 验收测试** | Gherkin **10 个 AC 分组场景，每组 ≥ 1 子场景** | Happy Path + Edge Cases | `tests/acceptance/test_acceptance_docker_sandbox.feature` + `.py` | Task 0 + Task 10 |
 
 ---
@@ -1729,7 +1729,7 @@ register_port(
 - [ ] Subtask 9.2: 实现 `test_domain_zero_dependencies()`（验证 domain 不依赖 aiodocker）
 - [ ] Subtask 9.3: 实现 `test_dependency_direction()`（验证 4 层依赖方向）
 - [ ] Subtask 9.4: 实现 `test_port_spec_metadata()`（验证 3 个端口的 **10 字段**完整性，含 `module` 必填位置参数 + `compatibility` tuple + `deprecated` bool）
-- [ ] Subtask 9.5: 创建 `tests/integration/test_performance_docker_sandbox.py`（启动延迟 P95 < 5s + 并发 ≥ 10 + 沙箱逃逸 0）
+- [ ] Subtask 9.5: 创建 `tests/benchmark/test_performance_docker_sandbox.py`（启动延迟 P95 < 5s + 并发 ≥ 10 + 沙箱逃逸 0）
 - [ ] Subtask 9.6: 实现循环依赖检测（**复用既有 `lint-imports`（基于 importlinter）+ `from __future__ import annotations` + AST 静态分析脚本（基于 `ast` 模块遍历 import 图）；ruff E 规则不包含循环依赖检测能力，不能仅用 `ruff --select E`**）
 - [ ] Subtask 9.7: 运行完整测试套件并生成报告
 
@@ -1997,7 +1997,7 @@ register_port(
 
 **集成测试：**
 - `tests/integration/test_docker_sandbox_integration.py` - 7 项场景集成测试（Task 8）
-- `tests/integration/test_performance_docker_sandbox.py` - 性能基准（Task 9）
+- `tests/benchmark/test_performance_docker_sandbox.py` - 性能基准（Task 9）
 
 **验收测试：**
 - `tests/acceptance/test_acceptance_docker_sandbox.feature` - Gherkin **10 个 AC 分组场景**（Task 0 + 10）
@@ -2231,7 +2231,7 @@ register_port(
 - **定位修正**：AC-8 七场景验收层已真实覆盖，集成层不重复建设；本文件聚焦验收层未覆盖的集成缺口——daemon 侧状态一致性（容器真实消失断言）、真实容器 TTL reap（`idle_timeout_minutes=0` 阈值收缩 + 默认 30min 反向断言）、idle_timeout 事件、孤儿回收（手工制造 label 孤儿 + 非本系统容器对照组）、stop 幂等 + 外部强删 404 语义、并发 10、label 追溯、**RELIABLE outbox 落库**（真实 PG schema 隔离 + savepoint rollback + `set_session` ContextVar 接线，断言 Started/Terminated 双事件 pending 落库）。
 - **不引入 testcontainers/pytest-benchmark**：testcontainers 4.15 无 docker extra（core 已含），adapter 自管容器生命周期；perf_counter 手写满足 AC-9 断言（CLAUDE.md §2）。story AC-8 中 `testcontainers = {extras=["docker"], ...}` 文本按过期处理。
 
-### 性能基准重建（`tests/integration/test_performance_docker_sandbox.py`，4 用例）
+### 性能基准重建（`tests/benchmark/test_performance_docker_sandbox.py`，4 用例）
 
 - **修正验收层口径缺陷**：验收 AC-8.1 的 `latencies[19]` 实为 P100 冒充 P95，冷启动 Then 为空断言（伪覆盖）；本文件 P95 用 `statistics.quantiles(n=20)[18]` 正确分位 + 1 次 warmup 不计入样本；冷启动真实 `rmi` + 计时（含 pull）< 30s。
 - **并行安全**：冷启动用例 xdist 并行环境自动 skip（`PYTEST_XDIST_WORKER` 检测，防 rmi 与并行 worker 容器引用冲突假性失败）；CI 新增独立串行步骤 `-n 0 -m benchmark`（ci.yaml integration-tests job）；配额边界用例动态 `max_concurrent=baseline+2`（类变量 `_running_count` 基线漂移免疫）。
@@ -2245,3 +2245,29 @@ register_port(
 ### Round 9 补充：锁实现修正（Round 6 第 6 条 Amendment）
 
 单一类变量 Lock 在争用时永久绑定首个 event loop（Python 3.10+ `_LoopBoundMixin`），xdist 多 loop 顺序复用同一 worker 进程时触发 `RuntimeError: bound to a different event loop`（本轮集成压测实证暴露）。修正为**按 event loop 分桶的类变量锁**（`WeakKeyDictionary[loop, Lock]`）：仍为类变量（§6 合规、跨实例共享），生产单 loop 退化为单锁语义不变。
+
+---
+
+## 📝 Round 10 审查修订记录（代码审查 Round 5, 2026-09-24）
+
+> P2 收尾 + aiodocker 升级 + 测试缺口补齐。评审终审 [优秀]。
+
+### 依赖与 adapter 收尾
+
+- **aiodocker ^0.21.0 → ^0.25.0**（story AC-5 版本约定兑现；lock diff 仅 aiodocker 单包，单测 54 + 验收 42 全绿）。
+- **pull 链路修复**：本地缓存判定改用 `RepoDigests` @ 后缀比对（原 `img["Id"]` config digest 与 manifest digest 永不命中，每次必 pull）；pull 改用完整 `name@digest` 引用（杜绝拉可变 tag）+ `timeout=120s`（0.25 原生参数，防 registry 挂起）。
+- **HostConfig 纵深补充**：`Init: true`（docker-init 回收僵尸进程，本机实测可用；CI runner 合入后需复验一轮）+ `LogConfig json-file max-size=10m max-file=3`（日志 rotation 上限）。
+- **image_digest 回填**：session 持久化与 Started 事件改用 `container.show()["Image"]` 实际 Image ID（原为引用串）。
+- **SESSION_ID 正则单源化**：domain `SESSION_ID_REGEX` 为唯一来源，decorator/adapter 改 import + 别名兼容。
+- **tmpfs docstring 漂移**两处修正（`/sandbox-tmp`）。
+
+### 测试缺口补齐与口径修正
+
+- 验收 AC-8.1：P95 改 `statistics.quantiles(n=20)[18]`（原 `latencies[19]` 实为 P100）+ warmup 不计样本；冷启动空断言删除（诚实形态：由 `tests/benchmark/test_performance_docker_sandbox.py::test_cold_start_under_30s` 覆盖，feature 注释注明）。
+- 新增 `tests/unit/domain/ports/test_sandbox_session_query.py`（AC-4 P1-3 验证项）。
+- 架构测试补齐：`sandbox_executor` 10 字段 + `sandbox_session_reaper` 元数据断言（原仅 3 字段 + reaper 零覆盖）。
+- 新增 `tests/integration/test_migration_015_sandbox_sessions.py` 静态断言（revision 链/3 索引/round-trip 语句，对齐 001 先例）；执行型 round-trip 登记后续改进（可复用 `ensure_alembic_migration` fixture）。
+
+### 外部变更确认
+
+- `tests/benchmark/test_performance_docker_sandbox.py`（用户移至 benchmark 目录，与 OCR 基准同处）+ CI 基准步骤回退——尊重该决策，文中路径引用已同步更新。**已知缺口**：基准测试当前不在 CI 流水线执行，需本地/手动 `pytest tests/benchmark/test_performance_docker_sandbox.py -n 0` 运行。

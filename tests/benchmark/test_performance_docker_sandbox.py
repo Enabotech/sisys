@@ -5,7 +5,7 @@
 **执行约束**: 冷启动用例会 rmi 钉版镜像,与并行 worker 的容器引用冲突——
 xdist 并行环境(-n auto)下该用例自动 skip。完整基准请独立执行:
 
-    pytest tests/integration/test_performance_docker_sandbox.py -n 0 -m benchmark
+    pytest tests/benchmark/test_performance_docker_sandbox.py -n 0 -m benchmark
 
 Docker daemon 不可用时动态 pytest.skip。
 """
@@ -89,7 +89,7 @@ class TestColdStart:
         os.environ.get("PYTEST_XDIST_WORKER") is not None,
         reason=(
             "rmi 与并行 worker 容器引用冲突;"
-            "独立执行: pytest tests/integration/test_performance_docker_sandbox.py -n 0 -m benchmark"
+            "独立执行: pytest tests/benchmark/test_performance_docker_sandbox.py -n 0 -m benchmark"
         ),
     )
     async def test_cold_start_under_30s(self, adapter: AioDockerSandboxAdapter) -> None:

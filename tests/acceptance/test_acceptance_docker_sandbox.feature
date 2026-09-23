@@ -253,7 +253,7 @@
   假如 Docker daemon 可用
   当 连续启动 20 个容器并测量延迟
   那么 热启动 P95 小于 2 秒
-  并且 冷启动 小于 30 秒(含镜像预拉取)
+  # 冷启动 < 30s 由集成层真实基准覆盖: tests/integration/test_performance_docker_sandbox.py::test_cold_start_under_30s
 
 场景: AC-8.2 - 并发 ≥ 10
   假如 Docker daemon 可用
