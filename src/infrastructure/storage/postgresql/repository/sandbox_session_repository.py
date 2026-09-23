@@ -127,16 +127,16 @@ class PostgreSQLSandboxSessionRepository(SandboxSessionRepositoryPort):
     async def save(self, session: SandboxSession) -> SandboxSession:
         """保存会话（insert or update，乐观锁 CAS）
 
-        若已存在 session_id 且 state_version 回退（新 < 旧），抛 EntityStateTransitionError。
+        若已存在 session_id 且 state_version 冲突（新 <= 旧，含并发 lost update），抛 EntityStateTransitionError。
         state_version 自增（with_activity_updated/with_terminated 内部 +1）视为合法状态变更。
         """
         existing = await self.get_by_session_id(session.session_id)
-        if existing is not None and existing.state_version > session.state_version:
+        if existing is not None and existing.state_version >= session.state_version:
             raise EntityStateTransitionError(
                 from_status=f"v{existing.state_version}",
                 to_status=f"v{session.state_version}",
                 message=(
-                    f"state_version regression for session {session.session_id} "
+                    f"state_version conflict for session {session.session_id} "
                     f"(existing=v{existing.state_version}, new=v{session.state_version})"
                 ),
                 entity_type="SandboxSession",

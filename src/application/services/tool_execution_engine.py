@@ -119,7 +119,7 @@ class ToolExecutionEngine:
         # 启动沙箱 session
         session_id = context.session_id or f"sess-{execution.execution_id}"
         try:
-            await self._sandbox.start_container(session_id)
+            await self._sandbox.start_container(session_id, tenant_id=context.tenant_id)
         except Exception as exc:
             logger.error("沙箱启动失败: %s", exc)
             execution.transition_to(ToolExecutionState.FAILED)

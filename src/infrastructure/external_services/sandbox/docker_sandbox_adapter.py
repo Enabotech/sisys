@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from collections.abc import Collection
 from typing import Any
 
 from src.domain.ports.sandbox_executor import (
@@ -33,15 +35,22 @@ class DockerSandboxAdapter(SandboxExecutor):
     def __init__(self) -> None:
         self._running_containers: dict[str, bool] = {}
 
-    async def start_container(self, session_id: str, spec: object = None) -> None:
+    async def start_container(
+        self,
+        session_id: str,
+        spec: object = None,
+        *,
+        tenant_id: uuid.UUID | None = None,
+    ) -> None:
         """启动指定会话的 Docker 容器
 
-        注意:spec 参数仅对齐 Story 4.4 SandboxExecutor Protocol 签名,mock
+        注意:spec/tenant_id 参数仅对齐 Story 4.4 SandboxExecutor Protocol 签名,mock
         实现忽略此参数(保留 git tag pre-4-4-mock-fallback 紧急回滚路径)。
 
         Args:
             session_id: 会话唯一标识符
             spec: 容器规格(Story 4.4 Protocol 扩展参数,mock 忽略)
+            tenant_id: 租户 ID(Round 3 Protocol 扩展参数,mock 忽略)
 
         Raises:
             ContainerStartError: 容器启动失败时抛出
@@ -71,12 +80,12 @@ class DockerSandboxAdapter(SandboxExecutor):
             raise ContainerStartError(f"Failed to start container: {e}") from e
 
     async def execute_code(self, session_id: str, code: str, *, timeout_sec: float | None = None) -> dict[str, Any]:
-        """在 Docker 沙箱中执行代码(mock 实现,忽略 timeout_sec)"""
         """在 Docker 沙箱中执行代码
 
         Args:
             session_id: 会话标识符
             code: 待执行的 Python 代码
+            timeout_sec: 超时秒数(Story 4.4 Protocol 扩展参数,mock 忽略)
 
         Returns:
             执行结果字典，包含 status/output/error/execution_time_ms
@@ -148,3 +157,16 @@ class DockerSandboxAdapter(SandboxExecutor):
         Story 4.4 Protocol 扩展方法,mock 实现用于对齐 Protocol 签名。
         """
         return True
+
+    async def reap_orphan_containers(self, known_session_ids: Collection[str]) -> int:
+        """清理孤儿容器(mock 实现返回 0)
+
+        Round 3 Protocol 扩展方法,mock 无真实容器可清理,恒返回 0。
+
+        Args:
+            known_session_ids: 仓储中已知的 session_id 集合(mock 忽略)
+
+        Returns:
+            恒为 0
+        """
+        return 0

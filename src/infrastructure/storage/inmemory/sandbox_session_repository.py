@@ -52,14 +52,14 @@ class InMemorySandboxSessionRepository(SandboxSessionRepositoryPort):
         """
         async with self._lock:
             existing = self._sessions.get(session.session_id)
-            if existing is not None and existing.state_version > session.state_version:
-                # 现有版本 > 待保存版本 = 外部并发修改覆盖(不允许回退)
+            if existing is not None and existing.state_version >= session.state_version:
+                # 现有版本 >= 待保存版本 = 并发冲突(lost update)或版本回退,均拒绝
                 from src.domain.exceptions import EntityStateTransitionError
 
                 raise EntityStateTransitionError(
                     from_status=f"v{existing.state_version}",
                     to_status=f"v{session.state_version}",
-                    message=f"state_version regression for session {session.session_id}",
+                    message=f"state_version conflict for session {session.session_id}",
                     entity_type="SandboxSession",
                     entity_id=session.session_id,
                 )

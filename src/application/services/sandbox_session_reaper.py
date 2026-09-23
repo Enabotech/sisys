@@ -79,7 +79,10 @@ class SandboxSessionReaper:
         return reaped_count
 
     async def reap_orphan_containers(self) -> int:
-        """启动时清理孤儿容器(daemon 上有但仓储无的 sisys-sandbox-* 容器)
+        """启动时清理孤儿容器(daemon 上有但仓储无的本系统沙箱容器)
+
+        通过 managed-by=sisys-sandbox label 精确识别归属(避免误删非本系统容器),
+        与仓储 list_all() 对比后委托端口清理。
 
         Returns:
             清理的孤儿容器数量
@@ -88,9 +91,12 @@ class SandboxSessionReaper:
         if not await self._sandbox.health_check():
             logger.warning("Docker daemon unavailable, skip orphan reaping")
             return 0
-        # 实际孤儿清理逻辑依赖 aiodocker 客户端,与本抽象端口解耦
-        # 此处仅占位,真实实现位于 AioDockerSandboxAdapter._reap_orphan_containers()
-        return 0
+        sessions = await self._session_repo.list_all()
+        known_session_ids = {session.session_id for session in sessions}
+        reaped = await self._sandbox.reap_orphan_containers(known_session_ids)
+        if reaped:
+            logger.info("Reaped orphan containers: count=%d", reaped)
+        return reaped
 
 
 __all__ = ["SandboxSessionReaper"]

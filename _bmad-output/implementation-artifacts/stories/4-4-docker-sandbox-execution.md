@@ -2185,3 +2185,37 @@ register_port(
 ### 验证结果
 
 - 单元/契约测试全绿（adapter 44 + decorator 16 + reaper 8 + config 4 + 契约/装配零回归）；验收 42 场景全绿（真实 Docker daemon，0 skip）；ruff/mypy 零违规。
+
+---
+
+## 📝 Round 8 审查修订记录（代码审查 Round 3, 2026-09-23）
+
+> seccomp 落地 + 孤儿回收真实化 + tenant 注入 + 乐观锁修复。评审终审 [优秀]（含 3 条实现期强制约束已落实）。
+
+### 端口扩展（SandboxExecutor 累计 6 方法 + 2 个 kw-only 参数）
+
+- `start_container(session_id, spec=None, *, tenant_id: UUID | None = None)`：tenant_id 从 `ExecutionContext.tenant_id` 注入（engine 调用点已接线）；无租户上下文调用方（auto_execute_service / session_namespace_manager）回退随机生成 + debug 日志。
+- `reap_orphan_containers(known_session_ids: Collection[str]) -> int`：新增端口方法（孤儿回收）；回滚 impl `DockerSandboxAdapter` 已同步对齐（返回 0）。
+
+### seccomp 强化落地（兑现 AC-5 承诺，消除幽灵文件）
+
+- `deploy/docker/seccomp/sisys-hardened.json` 落盘：defaultAction SCMP_ACT_ERRNO(EPERM) 白名单（233 syscall）+ clone MASKED_EQ 禁 CLONE_NEW* + clone3 ENOSYS 回退；剔除 ptrace/process_vm_*/socket/mount/bpf/keyctl 等；本机 daemon 29.3.0 实测功能面（python/threading/subprocess/asyncio/multiprocessing）全 PASS。
+- `SeccompProfileLoader`（infrastructure 层，`Path(__file__)` 锚定仓库根，lru_cache）：失败抛 SandboxConfigurationError(319)；内联格式 `seccomp=<紧凑JSON>` 经 Engine API 实证。
+- `ContainerSpecBuilder.build_host_config(spec, *, seccomp_inline)` 必填 kw 扩展；adapter start_container 于镜像拉取前 fail-fast 加载。
+- **AC-5.6/AC-8.3 探针加严**：ctypes 直调 syscall + errno==EPERM 显式断言（修掉"命令不存在/静默 -1"水分）；新增 socket(41) 差异化探针（默认 profile 放行、hardened 拒绝，不受 cap_drop 掩护）+ 容器外 SecurityOpt seccomp= 断言（双重强证明接线生效）；断言改为 == 全部尝试数；修复 AC-8.3 stop-in-finally 假阳性。
+
+### 孤儿容器回收真实化（AC-6 兑现）
+
+- 容器创建打 Labels（managed-by=sisys-sandbox / sisys.session-id / sisys.tenant-id）；adapter 经 `clean_filters({"label": ...})` 扫描 + label session-id 精确比对 + 异常隔离；reaper 委托端口方法（repo.list_all → known 集合）。
+- **已知限制登记**：多 schema 并行时 known 集合仅覆盖当前 schema（单部署假设）；label 精确比对已防误删非本系统容器。
+
+### 乐观锁 lost update 修复（InMemory + PG）
+
+- save 判定从 `>` 改为 `>=`（相等版本即并发冲突）；PG 侧同步。
+- **配套幂等守卫**：start_container 同 session_id RUNNING 早退（先于配额计数，防幂等调用白占配额）；终态会话先 `delete_by_session_id` 再重建（v0 插入否则撞 `>=`）；并发双 start 竞赛负方由 Saga 补偿兜底。
+
+### 其他
+
+- 两个无 @patch 单测修复（真实 aiodocker client 泄漏 + Unclosed session 警告消除）。
+- mock 适配器 execute_code 死 docstring 清除。
+- 验证：单元/契约/仓储/引擎套件 87+1995 全绿；验收 42 场景全绿（真实 Docker，seccomp 接线双证明）；ruff/mypy 零违规。

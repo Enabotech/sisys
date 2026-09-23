@@ -22,14 +22,16 @@ class ContainerSpecBuilder:
     """ContainerSpec → aiodocker 容器配置 dict 转换器"""
 
     @staticmethod
-    def build_host_config(spec: ContainerSpec) -> dict[str, Any]:
+    def build_host_config(spec: ContainerSpec, *, seccomp_inline: str) -> dict[str, Any]:
         """将 ContainerSpec 转换为 aiodocker HostConfig dict
 
         Args:
             spec: 容器规格值对象
+            seccomp_inline: seccomp profile 内联字符串("seccomp=<紧凑JSON>",
+                由 SeccompProfileLoader 加载;builder 不做 I/O)
 
         Returns:
-            aiodocker HostConfig 字典(含 mem_limit / cpu_quota / network_mode 等)
+            aiodocker HostConfig 字典(含 mem_limit / cpu_quota / network_mode / seccomp 等)
         """
         return {
             # aiodocker 0.21 HostConfig 字段名:Memory/MemorySwap(字节)
@@ -43,7 +45,7 @@ class ContainerSpecBuilder:
             # tmpfs 格式：{"path": "options"} 字典(Docker daemon HostConfig.Tmpfs 类型)
             "Tmpfs": dict(spec.tmpfs_mounts),
             "CapDrop": list(spec.cap_drop),
-            "SecurityOpt": list(spec.security_opt),
+            "SecurityOpt": [*spec.security_opt, seccomp_inline],
         }
 
     @staticmethod
