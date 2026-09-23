@@ -107,6 +107,7 @@ class TestAdapterSeccompAndLabels:
         mock_docker.images.list = AsyncMock(return_value=[])
         container = MagicMock()
         container.id = "container-abc"
+        container.show = AsyncMock(return_value={"Image": "sha256:9534e5a8"})
         mock_docker.containers.run = AsyncMock(return_value=container)
         mock_docker_cls.return_value = mock_docker
 

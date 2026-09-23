@@ -46,6 +46,10 @@ class ContainerSpecBuilder:
             "Tmpfs": dict(spec.tmpfs_mounts),
             "CapDrop": list(spec.cap_drop),
             "SecurityOpt": [*spec.security_opt, seccomp_inline],
+            # docker-init(tini) 作为 PID 1 回收僵尸子进程(sleep infinity 不回收)
+            "Init": True,
+            # json-file 日志 rotation 上限(防恶意输出写满宿主磁盘)
+            "LogConfig": {"Type": "json-file", "Config": {"max-size": "10m", "max-file": "3"}},
         }
 
     @staticmethod

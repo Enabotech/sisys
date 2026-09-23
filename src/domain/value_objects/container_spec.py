@@ -28,7 +28,7 @@ class ContainerSpec:
         pids_limit: 进程数限制,默认 256,上限 1024
         network_mode: 网络模式（写死 "none"）
         read_only_rootfs: 是否只读根文件系统,默认 True
-        tmpfs_mounts: tmpfs 挂载点字典,默认 {"/tmp": "100m"}
+        tmpfs_mounts: tmpfs 挂载点字典,默认 {"/sandbox-tmp": "size=100m,uid=1000"}
         cap_drop: 移除的 Linux capabilities,默认 ("ALL",)
         security_opt: 安全选项,默认 ("no-new-privileges",)
         seccomp_profile: seccomp profile 路径,默认仓库内置 hardened profile
