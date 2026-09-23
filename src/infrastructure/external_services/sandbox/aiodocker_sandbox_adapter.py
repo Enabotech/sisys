@@ -18,6 +18,7 @@ import logging
 import re
 import time
 import uuid
+import weakref
 from collections.abc import Collection
 from typing import Any
 
@@ -72,10 +73,12 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         _running_count: 当前运行容器数(类变量级跟踪)
     """
 
-    # 类变量级并发计数 + 互斥锁(CLAUDE.md §6: asyncio.Lock 必须为类变量,协程间共享;
-    # Python 3.10+ Lock 无争用 acquire 不绑定 event loop,多 loop 测试场景安全)
+    # 类变量级并发计数 + 按 event loop 分桶的类变量锁(CLAUDE.md §6: 类变量协程间共享)
+    # 分桶原因: 单一类锁在争用时永久绑定首个 loop(Python 3.10+ _LoopBoundMixin),
+    # 测试场景多 loop 顺序复用同一进程会触发 "bound to a different event loop";
+    # 生产单 loop 下分桶退化为单锁,语义不变
     _running_count: int = 0
-    _lock: asyncio.Lock = asyncio.Lock()
+    _locks: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = weakref.WeakKeyDictionary()
     # 模块级共享 aiohttp.UnixConnector(所有 adapter 实例 + 所有 event loop 共享,避免 Unclosed connector 警告)
     _module_shared_connector: Any = None
 
@@ -192,6 +195,16 @@ class AioDockerSandboxAdapter(SandboxExecutor):
             self._loop = current_loop
         return self._docker
 
+    @classmethod
+    def _get_lock(cls) -> asyncio.Lock:
+        """获取当前 event loop 对应的类级互斥锁(无则创建)"""
+        loop = asyncio.get_running_loop()
+        lock = cls._locks.get(loop)
+        if lock is None:
+            lock = asyncio.Lock()
+            cls._locks[loop] = lock
+        return lock
+
     @staticmethod
     def _validate_session_id(session_id: str) -> None:
         """session_id 注入防御(正则校验)
@@ -247,7 +260,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 await session_repo.delete_by_session_id(session_id)
 
         # 校验并发配额(类变量锁保护,check+increment 临界区)
-        async with self._lock:
+        async with self._get_lock():
             if AioDockerSandboxAdapter._running_count >= self._max_concurrent:
                 raise SandboxQuotaExceededError(
                     "concurrent container limit reached",
@@ -367,7 +380,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                         container_name,
                     )
             # 失败时回滚计数
-            async with self._lock:
+            async with self._get_lock():
                 AioDockerSandboxAdapter._running_count = max(0, AioDockerSandboxAdapter._running_count - 1)
             raise
 
@@ -523,7 +536,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         except Exception:
             logger.warning("超时/取消后销毁容器失败 session=%s", session_id)
             return
-        async with self._lock:
+        async with self._get_lock():
             AioDockerSandboxAdapter._running_count = max(0, AioDockerSandboxAdapter._running_count - 1)
         session_repo = self._session_repo
         terminated_session = None
@@ -573,7 +586,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         terminated_session = None
         # 类锁包裹"读状态→删容器→标终态→减计数"临界区,防并发双停双重减计数
         session_repo = self._session_repo
-        async with self._lock:
+        async with self._get_lock():
             session = None
             if session_repo is not None:
                 session = await session_repo.get_by_session_id(session_id)

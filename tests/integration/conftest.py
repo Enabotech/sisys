@@ -62,6 +62,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         "minio": "minio",
         "neo4j": "neo4j",
         "rabbitmq": "database",
+        "docker": "docker",
     }
 
     for item in items:
@@ -402,3 +403,35 @@ async def real_neo4j_driver():
     yield wrapper
 
     wrapper.close()
+
+
+# ===================================================================
+# Story 4.4 — 沙箱容器清理安全网(对齐 tests/acceptance/conftest.py 先例)
+# ===================================================================
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """会话结束后强制清理残留 sisys-sandbox-* 容器(CI runner 防泄漏安全网)
+
+    按容器名前缀精确过滤,不影响非本系统容器;daemon 不可用时静默跳过。
+    xdist 下每 worker/controller 各触发一次,docker rm -f 幂等无害。
+    """
+    import os
+    import subprocess
+
+    # xdist 下仅 controller 进程执行(worker 提前结束会误删其他 worker 在用容器)
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return
+
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "-aq", "--filter", "name=sisys-sandbox-"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        container_ids = [cid for cid in result.stdout.split() if cid]
+        if container_ids:
+            subprocess.run(["docker", "rm", "-f", *container_ids], capture_output=True, timeout=30)
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass  # daemon 不可用静默跳过
