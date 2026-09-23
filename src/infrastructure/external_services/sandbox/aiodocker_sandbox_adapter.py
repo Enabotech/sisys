@@ -18,6 +18,7 @@ import logging
 import re
 import time
 import uuid
+from collections.abc import Collection
 from typing import Any
 
 from aiodocker.exceptions import DockerError
@@ -43,6 +44,9 @@ from src.domain.ports.sandbox_session_repository import SandboxSessionRepository
 from src.domain.value_objects.container_spec import ContainerSpec
 from src.infrastructure.external_services.sandbox.container_spec_builder import (
     ContainerSpecBuilder,
+)
+from src.infrastructure.external_services.sandbox.seccomp_profile_loader import (
+    load_seccomp_profile,
 )
 
 logger = logging.getLogger(__name__)
@@ -207,21 +211,40 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         self,
         session_id: str,
         spec: ContainerSpec | None = None,
+        *,
+        tenant_id: uuid.UUID | None = None,
     ) -> None:
-        """启动指定会话的 Docker 容器
+        """启动指定会话的 Docker 容器(幂等)
+
+        幂等契约(对齐 4.1a mock 适配器): 同 session_id 的 RUNNING 会话直接早退;
+        终态会话先删除仓储记录再重建。并发同 session_id 双 start 的竞赛负方
+        在仓储 save 时撞乐观锁抛 EntityStateTransitionError,由 Saga 补偿兜底删容器。
 
         Args:
             session_id: 会话 ID(匹配 ^[A-Za-z0-9_-]{1,64}$)
             spec: 容器规格(默认 None → 使用安全默认 ContainerSpec)
+            tenant_id: 租户 ID(可选 keyword-only;None 回退随机生成,
+                用于无租户上下文调用方 auto_execute_service / session_namespace_manager)
 
         Raises:
-            SandboxConfigurationError: session_id 非法
+            SandboxConfigurationError: session_id 非法 / seccomp profile 加载失败
             SandboxQuotaExceededError: 并发容器数超配额
             SandboxImagePullError: 镜像拉取失败
             ContainerStartError: 容器启动失败(其他原因)
         """
         # 校验 session_id
         self._validate_session_id(session_id)
+
+        # 幂等守卫(必须先于配额计数,否则幂等调用白占配额)
+        session_repo = self._session_repo
+        if session_repo is not None:
+            existing = await session_repo.get_by_session_id(session_id)
+            if existing is not None:
+                if existing.state == "RUNNING":
+                    logger.debug("Session already running, idempotent skip: %s", session_id)
+                    return
+                # 终态会话: 删除仓储记录(否则乐观锁拒绝 v0 重建)后走正常新建流程
+                await session_repo.delete_by_session_id(session_id)
 
         # 校验并发配额(类变量锁保护,check+increment 临界区)
         async with self._lock:
@@ -241,8 +264,12 @@ class AioDockerSandboxAdapter(SandboxExecutor):
         container: Any = None
         container_name = ""
         try:
+            # seccomp profile fail-fast(319 于镜像拉取前抛出,不产生容器,无需 Saga 补偿)
+            seccomp_inline = load_seccomp_profile(spec.seccomp_profile)
             docker = await self._ensure_docker()
-            tenant_id = uuid.uuid4()  # 生产应从 context 注入
+            if tenant_id is None:
+                logger.debug("tenant_id 未注入,回退随机生成 session=%s", session_id)
+                tenant_id = uuid.uuid4()
             container_name = ContainerSpecBuilder.build_container_name(tenant_id, session_id)
 
             # 镜像拉取(分离 name:tag 与 digest 避免 aiodocker 解析错误)
@@ -269,12 +296,17 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                     docker_error=str(pull_exc),
                 ) from pull_exc
 
-            # 容器启动
-            host_config = ContainerSpecBuilder.build_host_config(spec)
+            # 容器启动(Labels 供孤儿容器回收精确识别归属,避免误删非本系统容器)
+            host_config = ContainerSpecBuilder.build_host_config(spec, seccomp_inline=seccomp_inline)
             config = {
                 "Image": spec.image,
                 "Cmd": ["sleep", "infinity"],
                 "Env": [f"SESSION_ID={session_id}"],
+                "Labels": {
+                    "managed-by": "sisys-sandbox",
+                    "sisys.session-id": session_id,
+                    "sisys.tenant-id": str(tenant_id),
+                },
                 "HostConfig": host_config,
             }
             try:
@@ -289,7 +321,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 raise ContainerStartError(f"failed to run container {container_name}") from run_exc
 
             # 持久化会话
-            if self._session_repo is not None:
+            if session_repo is not None:
                 session = SandboxSession(
                     session_id=session_id,
                     tenant_id=tenant_id,
@@ -301,7 +333,7 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                         "pids_limit": spec.pids_limit,
                     },
                 )
-                await self._session_repo.save(session)
+                await session_repo.save(session)
 
             # 发布 SandboxSessionStarted(session save 块之后,best-effort 不触发 Saga 补偿;
             # 不以 session_repo 存在为条件,保证无仓储部署下事件流对称)
@@ -583,6 +615,40 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 ),
                 session_id,
             )
+
+    async def reap_orphan_containers(self, known_session_ids: Collection[str]) -> int:
+        """清理孤儿容器(daemon 上存在但不在已知会话集合中的本系统沙箱容器)
+
+        通过 label 精确识别归属(managed-by=sisys-sandbox + sisys.session-id),
+        避免误删非本系统容器。仅当容器 label 的 session-id 不在已知集合中时删除。
+
+        已知限制(单部署/schema 假设): 多 schema 并行时 known_session_ids 仅覆盖
+        当前 schema,其他 schema 的活容器会被判孤儿——生产单部署形态下成立。
+
+        Args:
+            known_session_ids: 仓储中已知的 session_id 集合
+
+        Returns:
+            清理的容器数量
+        """
+        from aiodocker.utils import clean_filters  # 基础设施层允许第三方库
+
+        docker = await self._ensure_docker()
+        known = set(known_session_ids)
+        containers = await docker.containers.list(all=True, filters=clean_filters({"label": ["managed-by=sisys-sandbox"]}))
+        reaped = 0
+        for container in containers:
+            labels = container._container.get("Labels") or {}
+            session_label = labels.get("sisys.session-id", "")
+            if session_label in known:
+                continue
+            try:
+                await container.delete(force=True)
+                reaped += 1
+                logger.info("清理孤儿容器: id=%s session=%s", container.id, session_label)
+            except Exception:
+                logger.warning("孤儿容器删除失败: id=%s session=%s", container.id, session_label)
+        return reaped
 
     async def is_container_running(self, session_id: str) -> bool:
         """检查指定会话的容器是否正在运行(查询 Docker daemon,非本地字典)"""

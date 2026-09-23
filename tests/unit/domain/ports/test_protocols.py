@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from typing import Any
 
 import pytest
@@ -103,6 +104,9 @@ class TestSandboxExecutor:
 
             async def health_check(self) -> bool:
                 return True
+
+            async def reap_orphan_containers(self, known_session_ids: Collection[str]) -> int:
+                return 0
 
         instance = CompatibleExecutor()
         assert isinstance(instance, SandboxExecutor)

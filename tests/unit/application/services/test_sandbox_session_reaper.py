@@ -35,6 +35,7 @@ def sandbox() -> MagicMock:
     mock = MagicMock()
     mock.stop_container = AsyncMock()
     mock.health_check = AsyncMock(return_value=True)
+    mock.reap_orphan_containers = AsyncMock(return_value=0)
     return mock
 
 
@@ -158,13 +159,16 @@ class TestReapOrphanContainers:
         count = await reaper.reap_orphan_containers()
         assert count == 0
 
-    async def test_reap_orphan_daemon_available_placeholder(
+    async def test_reap_orphan_delegates_to_sandbox_port(
         self,
         repo: InMemorySandboxSessionRepository,
         sandbox: MagicMock,
     ) -> None:
-        """Docker daemon 可达返回 0（占位）"""
+        """daemon 可达时委托端口清理,传入仓储已知 session_id 集合(Round 3 真实化)"""
         sandbox.health_check.return_value = True
+        sandbox.reap_orphan_containers = AsyncMock(return_value=2)
+        session = _make_session()
+        await repo.save(session)
 
         reaper = SandboxSessionReaper(
             sandbox=sandbox,
@@ -172,7 +176,9 @@ class TestReapOrphanContainers:
             idle_timeout_minutes=30,
         )
         count = await reaper.reap_orphan_containers()
-        assert count == 0  # 占位实现
+
+        assert count == 2
+        sandbox.reap_orphan_containers.assert_awaited_once_with({session.session_id})
 
 
 class TestReaperConfiguration:

@@ -71,14 +71,13 @@ class TestInMemorySandboxSessionRepositoryCRUD:
         result = await repo.get_by_session_id("nonexistent")
         assert result is None
 
-    async def test_save_with_matching_state_version_ok(self, repo: InMemorySandboxSessionRepository) -> None:
-        """save 时 state_version 匹配应直接覆盖"""
+    async def test_save_with_equal_state_version_raises(self, repo: InMemorySandboxSessionRepository) -> None:
+        """save 时 state_version 相等视为并发冲突(lost update),抛 EntityStateTransitionError(Round 3 修订)"""
         session = _make_session()
         await repo.save(session)
-        # 重新保存相同版本号
-        await repo.save(session)
-        fetched = await repo.get_by_session_id(session.session_id)
-        assert fetched is session
+        # 相同版本号重复保存 = 两个并发流同读 v0 的 lost update 场景
+        with pytest.raises(EntityStateTransitionError):
+            await repo.save(session)
 
     async def test_save_with_state_version_regression_raises(self, repo: InMemorySandboxSessionRepository) -> None:
         """save 时新版本低于已存版本(版本回退)抛 EntityStateTransitionError"""

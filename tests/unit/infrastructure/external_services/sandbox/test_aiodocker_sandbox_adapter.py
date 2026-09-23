@@ -436,8 +436,10 @@ class TestExecuteCode:
         assert isinstance(result["execution_time_ms"], int)
         assert result["execution_time_ms"] >= 0
 
-    async def test_execute_code_no_container(self, adapter: AioDockerSandboxAdapter) -> None:
+    @patch("aiodocker.Docker")
+    async def test_execute_code_no_container(self, mock_docker_cls: MagicMock, adapter: AioDockerSandboxAdapter) -> None:
         """无运行容器抛 ExecutionError(EXCEPTION_313)"""
+        mock_docker_cls.return_value = _make_docker_mock()
         with pytest.raises(ExecutionError):
             await adapter.execute_code("sess-noexist-test-xyz", "print('hi')")
 
@@ -592,8 +594,10 @@ class TestIsContainerRunning:
         result = await adapter.is_container_running("sess-abc123")
         assert result is False
 
-    async def test_is_container_running_no_session(self, adapter: AioDockerSandboxAdapter) -> None:
+    @patch("aiodocker.Docker")
+    async def test_is_container_running_no_session(self, mock_docker_cls: MagicMock, adapter: AioDockerSandboxAdapter) -> None:
         """无 session 记录返回 False(不抛异常)"""
+        mock_docker_cls.return_value = _make_docker_mock()
         result = await adapter.is_container_running("sess-noexist")
         assert result is False
 
@@ -732,3 +736,58 @@ class TestEventPublishing:
         terminated = [e for e in event_bus.published_events if isinstance(e, SandboxSessionTerminated)]
         assert len(terminated) == 1
         assert terminated[0].termination_reason == "timeout_abort"
+
+
+class TestReapOrphanContainers:
+    """reap_orphan_containers 测试(Round 3 端口扩展)"""
+
+    @patch("aiodocker.Docker")
+    async def test_reap_orphan_deletes_unknown_labelled_containers(
+        self, mock_docker_cls: MagicMock, adapter: AioDockerSandboxAdapter
+    ) -> None:
+        """label 归属本系统但 session-id 未知的容器被删除,已知会话保留"""
+        mock_docker = _make_docker_mock()
+
+        orphan = MagicMock()
+        orphan._container = {"Labels": {"managed-by": "sisys-sandbox", "sisys.session-id": "sess-orphan"}}
+        orphan.delete = AsyncMock(return_value=True)
+        orphan.id = "container-orphan"
+
+        known = MagicMock()
+        known._container = {"Labels": {"managed-by": "sisys-sandbox", "sisys.session-id": "sess-known"}}
+        known.delete = AsyncMock(return_value=True)
+        known.id = "container-known"
+
+        mock_docker.containers.list = AsyncMock(return_value=[orphan, known])
+        mock_docker_cls.return_value = mock_docker
+
+        reaped = await adapter.reap_orphan_containers({"sess-known"})
+
+        assert reaped == 1
+        assert orphan.delete.await_count == 1
+        assert known.delete.await_count == 0
+
+    @patch("aiodocker.Docker")
+    async def test_reap_orphan_delete_failure_continues(
+        self, mock_docker_cls: MagicMock, adapter: AioDockerSandboxAdapter
+    ) -> None:
+        """单个删除失败不影响其他孤儿清理(异常隔离)"""
+        mock_docker = _make_docker_mock()
+
+        failing = MagicMock()
+        failing._container = {"Labels": {"managed-by": "sisys-sandbox", "sisys.session-id": "sess-fail"}}
+        failing.delete = AsyncMock(side_effect=Exception("daemon error"))
+        failing.id = "container-fail"
+
+        ok = MagicMock()
+        ok._container = {"Labels": {"managed-by": "sisys-sandbox", "sisys.session-id": "sess-ok"}}
+        ok.delete = AsyncMock(return_value=True)
+        ok.id = "container-ok"
+
+        mock_docker.containers.list = AsyncMock(return_value=[failing, ok])
+        mock_docker_cls.return_value = mock_docker
+
+        reaped = await adapter.reap_orphan_containers(set())
+
+        assert reaped == 1
+        assert ok.delete.await_count == 1

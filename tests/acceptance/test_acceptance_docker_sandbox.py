@@ -899,44 +899,88 @@ def then_fork_bomb_killed(context: dict[str, Any]) -> None:
     assert context.get("fork_error") is not None
 
 
-@when("执行 chroot mount ptrace 逃逸尝试")
-def when_escape_attempts(context: dict[str, Any], docker_daemon_or_skip: None) -> None:
+def _eperm_probe(syscall_nr: int, *args: int) -> str:
+    """构造 EPERM 断言探针: 被 seccomp/cap 拦截(exit 0) vs 未被拦截(exit 1)
+
+    ctypes 直调 syscall,显式断言返回 -1 且 errno==EPERM——
+    杜绝"命令不存在/静默 -1"混过的假阳性(Round 3 审查修订)。
+    """
+    arg_list = ",".join(str(a) for a in args) or "0"
+    return (
+        "import ctypes,errno,sys; l=ctypes.CDLL(None,use_errno=True); "
+        "l.syscall.restype=ctypes.c_long; "
+        f"r=l.syscall({syscall_nr},{arg_list}); "
+        "sys.exit(0 if (r==-1 and ctypes.get_errno()==errno.EPERM) else 1)"
+    )
+
+
+# x86_64 syscall 编号: chroot=161, mount=165, ptrace=101, socket=41
+# socket(41): Docker 默认 profile 放行而 hardened profile 拒绝——差异化探针,
+# 直接证明 seccomp 接线生效(不受 cap_drop ALL 掩护)
+_ESCAPE_PROBES = [
+    _eperm_probe(161, 0),  # chroot( NULL 路径 )
+    _eperm_probe(165, 0, 0, 0, 0, 0),  # mount
+    _eperm_probe(101, 0, 0, 0, 0),  # ptrace
+    _eperm_probe(41, 2, 1, 0),  # socket(AF_INET, SOCK_STREAM)
+]
+
+
+def _run_escape_probes(context: dict[str, Any], session_prefix: str, docker_daemon_or_skip: None) -> None:
+    """启动真实容器执行全部探针,统计被拦截数(seccomp 接线强证明 + EPERM 断言)"""
+    import aiodocker
+    from aiodocker.utils import clean_filters
+
     from src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter import (
         AioDockerSandboxAdapter,
     )
 
     repo = InMemorySandboxSessionRepository()
     adapter = AioDockerSandboxAdapter(session_repo=repo)
-    session_id = f"sess-esc-{uuid.uuid4().hex[:8]}"
+    session_id = f"{session_prefix}-{uuid.uuid4().hex[:8]}"
     _run_async(adapter.start_container(session_id))
-    escape_codes = [
-        "import os; os.chroot('/')",
-        "import os; os.system('mount')",
-        "import ctypes; ctypes.CDLL(None).ptrace(0, 0, 0, 0)",
-    ]
-    failures = []
-    for code in escape_codes:
-        try:
-            result = _run_async(adapter.execute_code(session_id, code))
-            # ai exec 返回 status=completed, 即使内部 exit_code != 0
-            # 检查 output 是否包含 PermissionError / Operation not permitted
-            output = result.get("output", "") if result else ""
-            if "PermissionError" in output or "Operation not permitted" in output or "OSError" in output:
-                failures.append(code)
-        except Exception:
-            failures.append(code)
-    context["escape_failures"] = len(failures)
-    _run_async(adapter.stop_container(session_id))
+    try:
+        # 强证明 1: 容器外断言 HostConfig.SecurityOpt 含 seccomp= 内联(daemon 侧确认接线)
+        async def _assert_seccomp_wired() -> None:
+            client = aiodocker.Docker()
+            try:
+                containers = await client.containers.list(filters=clean_filters({"label": [f"sisys.session-id={session_id}"]}))
+                assert containers, f"未找到 session={session_id} 的沙箱容器"
+                info = await containers[0].show()
+                opts = info.get("HostConfig", {}).get("SecurityOpt") or []
+                assert any(o.startswith("seccomp=") for o in opts), "SecurityOpt 缺 seccomp 内联"
+            finally:
+                await client.close()
+
+        _run_async(_assert_seccomp_wired())
+
+        # 强证明 2: 探针 EPERM 断言(exit 0=拦截成功计入, exit 1=未拦截)
+        blocked = 0
+        for code in _ESCAPE_PROBES:
+            try:
+                result = _run_async(adapter.execute_code(session_id, code))
+                if result.get("status") == "completed":
+                    blocked += 1
+            except Exception:
+                pass  # exit != 0 = 未被拦截,不计入
+        context["escape_failures"] = blocked
+        context["escape_total"] = len(_ESCAPE_PROBES)
+    finally:
+        _run_async(adapter.stop_container(session_id))
+
+
+@when("执行 chroot mount ptrace 逃逸尝试")
+def when_escape_attempts(context: dict[str, Any], docker_daemon_or_skip: None) -> None:
+    _run_escape_probes(context, "sess-esc", docker_daemon_or_skip)
 
 
 @then("所有逃逸尝试均失败(seccomp profile 阻止)")
 def then_all_escape_attempts_failed(context: dict[str, Any]) -> None:
-    assert context["escape_failures"] >= 1
+    assert context["escape_failures"] == context["escape_total"]
 
 
 @then("0 次逃逸(seccomp profile + cap_drop ALL 阻止)")
 def then_zero_escapes(context: dict[str, Any]) -> None:
-    assert context["escape_failures"] >= 1  # 至少 1 次失败
+    assert context["escape_failures"] == context["escape_total"]
 
 
 @when("连续启动 20 个容器并测量延迟")
@@ -1002,34 +1046,8 @@ def then_10_all_started(context: dict[str, Any]) -> None:
 
 @when("执行 chroot mount ptrace 系统调用")
 def when_escape_attempts_v2(context: dict[str, Any], docker_daemon_or_skip: None) -> None:
-    """AC-8.3 简化版:复用 AC-5.6 的 escape 检测"""
-    from src.infrastructure.external_services.sandbox.aiodocker_sandbox_adapter import (
-        AioDockerSandboxAdapter,
-    )
-
-    repo = InMemorySandboxSessionRepository()
-    adapter = AioDockerSandboxAdapter(session_repo=repo)
-    session_id = f"sess-esc8-{uuid.uuid4().hex[:8]}"
-    _run_async(adapter.start_container(session_id))
-    escape_codes = [
-        "import os; os.chroot('/')",
-        "import os; os.system('mount')",
-    ]
-    failures = 0
-    for code in escape_codes:
-        try:
-            result = _run_async(adapter.execute_code(session_id, code))
-            output = result.get("output", "") if result else ""
-            if "PermissionError" in output or "Operation not permitted" in output or "OSError" in output:
-                failures += 1
-        except Exception:
-            failures += 1
-        finally:
-            try:
-                _run_async(adapter.stop_container(session_id))
-            except Exception:
-                pass
-    context["escape_failures"] = failures
+    """AC-8.3:复用 AC-5.6 探针(Round 3 修复 stop-in-finally 假阳性)"""
+    _run_escape_probes(context, "sess-esc8", docker_daemon_or_skip)
 
 
 # =============================================================================

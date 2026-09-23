@@ -10,6 +10,8 @@ Story 4.4 扩展:
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Collection
 from typing import Any, Protocol, runtime_checkable
 
 from src.domain.exceptions.sandbox_exceptions import (
@@ -44,12 +46,16 @@ class SandboxExecutor(Protocol):
         self,
         session_id: str,
         spec: ContainerSpec | None = None,
+        *,
+        tenant_id: uuid.UUID | None = None,
     ) -> None:
         """为指定会话启动沙箱容器
 
         Args:
             session_id: 会话唯一标识
             spec: 容器规格(可选,默认 None → 沿用实现默认配置)
+            tenant_id: 租户 ID(可选 keyword-only,默认 None → 实现侧回退策略;
+                用于容器命名/仓储归属/孤儿回收 label)
 
         Raises:
             ContainerStartError: 容器启动失败
@@ -108,5 +114,16 @@ class SandboxExecutor(Protocol):
 
         Returns:
             daemon 可达返回 True,否则 False(**不抛异常**,由调用方决定熔断)
+        """
+        ...
+
+    async def reap_orphan_containers(self, known_session_ids: Collection[str]) -> int:
+        """清理孤儿容器(daemon 上存在但不在已知会话集合中的本系统沙箱容器)
+
+        Args:
+            known_session_ids: 仓储中已知的 session_id 集合
+
+        Returns:
+            清理的容器数量
         """
         ...

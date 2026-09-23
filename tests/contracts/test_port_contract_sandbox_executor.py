@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Collection
 
 from src.domain.ports.sandbox_executor import SandboxExecutor
 
@@ -97,6 +98,9 @@ class TestSandboxExecutorContract:
 
             async def health_check(self) -> bool:
                 return True
+
+            async def reap_orphan_containers(self, known_session_ids: Collection[str]) -> int:
+                return 0
 
         executor = MockExecutor()
         assert isinstance(executor, SandboxExecutor)
