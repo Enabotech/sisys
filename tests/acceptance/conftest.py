@@ -141,7 +141,12 @@ def pytest_sessionfinish(session, exitstatus) -> None:
     这确保即使测试在 finally 块未调 stop_container,容器也被 docker rm 清理。
     仅清理 sisys-sandbox- 前缀(避免误删其他项目)。
     """
+    import os
     import subprocess
+
+    # xdist 下仅 controller 进程执行(worker 提前结束会误删其他 worker 在用容器)
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return
 
     try:
         result = subprocess.run(

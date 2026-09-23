@@ -2219,3 +2219,29 @@ register_port(
 - 两个无 @patch 单测修复（真实 aiodocker client 泄漏 + Unclosed session 警告消除）。
 - mock 适配器 execute_code 死 docstring 清除。
 - 验证：单元/契约/仓储/引擎套件 87+1995 全绿；验收 42 场景全绿（真实 Docker，seccomp 接线双证明）；ruff/mypy 零违规。
+
+---
+
+## 📝 Round 9 审查修订记录（代码审查 Round 4, 2026-09-23）
+
+> AC-8/AC-9 集成与性能测试载体重建（此前仅存 __pycache__ 残骸，实为未交付）。评审终审 [优秀]。
+
+### 集成测试重建（`tests/integration/test_docker_sandbox_integration.py`，8 用例全绿）
+
+- **定位修正**：AC-8 七场景验收层已真实覆盖，集成层不重复建设；本文件聚焦验收层未覆盖的集成缺口——daemon 侧状态一致性（容器真实消失断言）、真实容器 TTL reap（`idle_timeout_minutes=0` 阈值收缩 + 默认 30min 反向断言）、idle_timeout 事件、孤儿回收（手工制造 label 孤儿 + 非本系统容器对照组）、stop 幂等 + 外部强删 404 语义、并发 10、label 追溯、**RELIABLE outbox 落库**（真实 PG schema 隔离 + savepoint rollback + `set_session` ContextVar 接线，断言 Started/Terminated 双事件 pending 落库）。
+- **不引入 testcontainers/pytest-benchmark**：testcontainers 4.15 无 docker extra（core 已含），adapter 自管容器生命周期；perf_counter 手写满足 AC-9 断言（CLAUDE.md §2）。story AC-8 中 `testcontainers = {extras=["docker"], ...}` 文本按过期处理。
+
+### 性能基准重建（`tests/integration/test_performance_docker_sandbox.py`，4 用例）
+
+- **修正验收层口径缺陷**：验收 AC-8.1 的 `latencies[19]` 实为 P100 冒充 P95，冷启动 Then 为空断言（伪覆盖）；本文件 P95 用 `statistics.quantiles(n=20)[18]` 正确分位 + 1 次 warmup 不计入样本；冷启动真实 `rmi` + 计时（含 pull）< 30s。
+- **并行安全**：冷启动用例 xdist 并行环境自动 skip（`PYTEST_XDIST_WORKER` 检测，防 rmi 与并行 worker 容器引用冲突假性失败）；CI 新增独立串行步骤 `-n 0 -m benchmark`（ci.yaml integration-tests job）；配额边界用例动态 `max_concurrent=baseline+2`（类变量 `_running_count` 基线漂移免疫）。
+
+### 基建与修复
+
+- pyproject markers 注册 `docker`/`benchmark`（--strict-markers 硬约束）；integration conftest 追加 `docker` 关键词 marker + `pytest_sessionfinish` 容器清理钩子；**两个 conftest（acceptance + integration）清理钩子加 xdist worker 门控**（修复 worker 提前结束误删其他 worker 在用容器的 409 竞态——本轮实测暴露）。
+- 删除 `tests/integration/__pycache__/` 陈旧 pyc 残骸。
+- 验证：集成 8/8 + 性能 4/4（独立串行）+ 并行模式 3 passed/1 skipped（冷启动正确降级）+ 验收 42 全绿。
+
+### Round 9 补充：锁实现修正（Round 6 第 6 条 Amendment）
+
+单一类变量 Lock 在争用时永久绑定首个 event loop（Python 3.10+ `_LoopBoundMixin`），xdist 多 loop 顺序复用同一 worker 进程时触发 `RuntimeError: bound to a different event loop`（本轮集成压测实证暴露）。修正为**按 event loop 分桶的类变量锁**（`WeakKeyDictionary[loop, Lock]`）：仍为类变量（§6 合规、跨实例共享），生产单 loop 退化为单锁语义不变。
