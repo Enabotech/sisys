@@ -386,7 +386,7 @@ class DataSourceResolverPort(Protocol):
 **Given** Story 4.1a 已完成 Skills 系统骨架
 **When** Skills 调用需要外部数据
 **Then** Engine.Execute 阶段识别 `$DATA_SOURCE` 标记自动采集并注入，输出含 source/freshness/confidence 元数据支持溯源
-**And** Edge Cases 覆盖：数据源不存在（白名单外）、数据源不可用（降级/部分失败）、缓存命中、限流 429
+**And** Edge Cases 覆盖:数据源不存在(白名单外)、数据源不可用(降级/部分失败)、缓存命中、限流 429、**响应解析失败(413)、配置缺失(ConfigurationError 101)、缓存失效(TTL 过期)**
 
 **验证标准/Validation Criteria:**
 - [ ] `tests/acceptance/test_acceptance_data_source.feature`（`# language: zh-CN`，按 AC 分节）
@@ -466,12 +466,12 @@ class DataSourceResolverPort(Protocol):
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_acceptance_data_source.feature`（`# language: zh-CN`）
 - [ ] 步骤实现文件：`tests/acceptance/test_acceptance_data_source.py`
-- [ ] Happy Path + Edge Cases 全覆盖（白名单外数据源/不可用降级/缓存命中/429 限流）
+- [ ] Happy Path + Edge Cases 全覆盖(白名单外数据源/不可用降级/缓存命中/429 限流/**响应解析失败 413/配置缺失 101/缓存失效 TTL** 共 7 个 Edge Cases)
 
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async（禁止 `@pytest.mark.asyncio`）
 - 同一中文文本可能需要同时支持 given/when 装饰器
-- Edge Cases 必须包含异常路径：白名单违规（207）、数据源不可用（411）、限流（412），断言 `error.code` + `error.message`
+- Edge Cases 必须包含异常路径:白名单违规(207)、数据源不可用(411)、限流(412)、**响应解析失败(413)、配置缺失(101)**,断言 `error.code` + `error.message`
 
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
@@ -580,7 +580,10 @@ class DataSourceResolverPort(Protocol):
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_data_source.feature`（Happy Path + 4 个 Edge Cases）
 - [ ] Subtask 0.6: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_data_source.py`
 - [ ] Subtask 0.7: 编写端口契约测试骨架 `tests/contracts/test_port_contract_data_source.py`（11 维度，此时实现不存在）
-- [ ] Subtask 0.8: 运行验收测试 + 契约测试，确认失败（🔴 红阶段验证，失败原因 = ModuleNotFoundError/端口未注册）
+- [ ] Subtask 0.8: 运行验收测试 + 契约测试,确认失败(🔴 红阶段验证,失败原因 = ModuleNotFoundError/端口未注册);**具体命令**:
+  - `poetry run pytest tests/acceptance/test_acceptance_data_source.py -v --tb=short` (预期 ModuleNotFoundError)
+  - `poetry run pytest tests/contracts/test_port_contract_data_source.py -v --tb=short` (预期 KeyError: 端口未注册)
+  - `poetry run pytest tests/contracts/test_port_contract_data_source_resolver.py -v --tb=short` (预期同上)
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕（端口/值对象/异常/事件/契约清单）
@@ -911,13 +914,16 @@ class DataSourceResolverPort(Protocol):
 | 🟢 绿 | 完成 `tests/acceptance/test_acceptance_data_source.py` 全部步骤（真实服务 + AsyncMock 仅限 LLM/Sandbox/外部HTTP） |
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 10.1: 场景 1 — Happy Path：Skill 代码含 `$DATA_SOURCE` → 采集 → 注入 → 输出含 source/freshness/confidence
-- [ ] Subtask 10.2: 场景 2 — Edge：白名单外数据源 → BusinessRuleViolationError(207)，断言 error.code + error.message
-- [ ] Subtask 10.3: 场景 3 — Edge：数据源不可用 → 部分失败收敛 + DataSourceFetchFailed 事件
-- [ ] Subtask 10.4: 场景 4 — Edge：缓存命中（二次执行 cache_hit=True，外部调用次数不增）
-- [ ] Subtask 10.5: 场景 5 — Edge：429 限流 → DataSourceRateLimitError(412)
+- [ ] Subtask 10.1: 场景 1 — Happy Path:Skill 代码含 `$DATA_SOURCE` → 采集 → 注入 → 输出含 source/freshness/confidence
+- [ ] Subtask 10.2: 场景 2 — Edge:白名单外数据源 → BusinessRuleViolationError(207),断言 error.code + error.message
+- [ ] Subtask 10.3: 场景 3 — Edge:数据源不可用 → 部分失败收敛 + DataSourceFetchFailed 事件
+- [ ] Subtask 10.4: 场景 4 — Edge:缓存命中(二次执行 cache_hit=True,外部调用次数不增)
+- [ ] Subtask 10.5: 场景 5 — Edge:429 限流 → DataSourceRateLimitError(412)
+- [ ] Subtask 10.5a: 场景 6 — Edge:**响应解析失败** → DataSourceResponseError(413),断言 error.code + 验证不重试(外部调用次数 = 1,tenacity 白名单排除 413)
+- [ ] Subtask 10.5b: 场景 7 — Edge:**配置缺失(无 API Key)** → ConfigurationError(101),断言 error.code + 异常消息不包含 Key 字串 + 验证优雅降级(Resolver 内 `Mapping.get(name)` 返回 None,白名单校验不命中)
+- [ ] Subtask 10.5c: 场景 8 — Edge:**缓存失效(TTL 过期)** → DataFreshness.is_stale() 返回 True + 二次调用触发重新采集(外部调用次数从 0 增到 1)
 - [ ] Subtask 10.6: 运行开发结束验收测试并确认通过
-- [ ] Subtask 10.7: 运行 `pytest`、`ruff check`、`mypy` 收尾校验 + 完成清单逐项确认（src + tests/unit + tests/integration + tests/contracts + tests/acceptance）
+- [ ] Subtask 10.7: 运行 `pytest`、`ruff check`、`mypy` 收尾校验 + 完成清单逐项确认(src + tests/unit + tests/integration + tests/contracts + tests/acceptance)
 
 **完成标准/Definition of Done:**
 - [ ] 全部 Gherkin 场景通过
@@ -1104,7 +1110,7 @@ tests/
 | **覆盖 FR** | Epic 4 增量补充（无独立 FR 编号；支撑 FR-ST-01 工具分析数据驱动化 + FR-IF-02 Skills 渐进式加载增强） |
 | **前置 Story** | 4-1a-strategic-tool-impl（✅ done）/ 4-4-docker-sandbox-execution（✅ done）/ 1-4 Redis 缓存层（✅ done） |
 | **后续 Story** | 4-1c-skills-data-collection-integration / 4-1d-skills-framework-enhancement / 4-1e-skills-internal-framework |
-| **估算工作量** | **18-25 人天**（端口与值对象 2 + 异常事件 1.5 + 适配器 8×1~1.5 + Resolver 2 + Engine 集成 2 + 集成/架构/验收测试 4 + 30% 缓冲） |
+| **估算工作量** | **25-35 人天**（Round 2 调整,对齐 4.1a 实际 20-30 人天量级;Task 0 SDD 1.5 + 端口与值对象 2 + 异常事件 1.5 + 适配器 8×1.5~2 = 12-16 + Resolver 2 + Engine 集成 2 + 集成/架构/验收测试 5 + 30% 缓冲） |
 
 ### 完成总结 Completion Summary
 
