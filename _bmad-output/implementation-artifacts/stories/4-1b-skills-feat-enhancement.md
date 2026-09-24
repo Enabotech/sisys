@@ -300,6 +300,7 @@ class DataSourceResolverPort(Protocol):
 - [ ] 8 个适配器单元测试（httpx.MockTransport 注入模式，全项目唯一先例 `tests/unit/infrastructure/crawler/test_http_crawler_client.py:44-62`）覆盖：成功/超时/5xx 重试耗尽/429 限流/响应解析失败/熔断断开
 - [ ] 异常映射断言：`DataSourceUnavailableError`(411)/`DataSourceRateLimitError`(412)/`DataSourceResponseError`(413)/`TimeoutError`(302)
 - [ ] 8 个适配器全部注册到 composition_root（`data_source_<name>` 命名，SINGLETON 生命周期）
+- [ ] **冷启动容错（关键决策）**：需 Key 的适配器（Tavily/NewsAPI）沿用 Story 3-4 Reranker 模式（`composition_root.py:1765-1778` `reranker_enabled = os.getenv(...)` 条件注册 + `resolve_optional` 优雅降级,line 1793），避免 dev/CI 环境无 Key 时阻断 Resolver 注册 → 影响 4.1a/4.4 既有 `ToolExecutionEngine` 服务可用性；具体：`data_source_tavily_enabled = os.getenv("TAVILY_API_KEY") is not None` → 条件 `register_port("data_source_tavily", ...)` + Resolver 内 `Mapping.get("tavily")` 返回 None（白名单校验仍以 `ToolMetadata.data_sources` 为准，Key 缺失的适配器不在 Tool 声明列表即可）
 - [ ] 配置缺失（无 API Key）抛 `ConfigurationError`(101) 且消息不泄露密钥
 - [ ] **CircuitBreaker 差异化配置**：8 个适配器按数据源故障特征差异显式定义熔断参数（`failure_threshold` / `recovery_timeout`）— WorldBank/Eurostat/USPTO 默认 `5/30s`；NewsAPI 早断开 `2/600s`（免费 100 次/天配额敏感）；IPCC 立即熔断 `2/120s`（大文件传输失败代价高）；ChinaNBS 放宽 `10/120s`（爬虫失败率天然高）；Tavily/IMF 默认 `5/30s`
 
@@ -308,7 +309,7 @@ class DataSourceResolverPort(Protocol):
 **Given** 外部数据源有配额限制且数据有时效性
 **When** `DataSourceResolverService` 采集数据
 **Then**
-- 复用 `L1CachePort`（Redis，禁止新建缓存端口），缓存键 `build_key("cache:datasource", tenant, source, query_hash)`，按 `DataSourceRef.ttl_seconds` 自动失效
+- 复用 `L1CachePort`（Redis，禁止新建缓存端口），**缓存键 `build_key("cache", "datasource", tenant, source, query_hash)`**（拆 namespace 为双段避免与 `sisys:cache:*` 跨 namespace 误清理，对齐 `key_builder.py:11` `namespace, *parts` 设计语义,生成 `sisys:cache:datasource:tenant:source:query_hash`），按 `DataSourceRef.ttl_seconds` 自动失效
 - 缓存命中直接返回（`cache_hit=True`），不消耗外部配额
 - 新鲜度评分：`DataFreshness.score()` 指数衰减 ∈ [0,1]，超过 ttl 标记 stale
 - 缓存故障降级：Redis 不可用时直接透传采集（不阻断主流程），记录告警
@@ -368,6 +369,7 @@ class DataSourceResolverPort(Protocol):
 - [ ] `tests/integration/application/test_data_source_execution.py` 通过
 - [ ] `tests/integration/external_services/data_sources/test_china_nbs_crawler.py` 通过或动态 skip
 - [ ] `pytest -n 8` 并行通过，连续 5 次无随机失败
+- [ ] **xdist 分组串行**：新增 `xdist_group("data-source-cache")`(独立于 `sandbox-daemon`),新集成测试文件 `pytestmark` 列表首行显式声明(`pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cache")]`),避免与 `real_redis` 跨用例共享键冲突;沿用 `test_docker_sandbox_integration.py:31` list 形式而非单字符串形式
 
 ### AC-7: SDD 架构验证测试
 
@@ -524,6 +526,7 @@ class DataSourceResolverPort(Protocol):
 - [ ] **应用层 ≥85%**（Resolver/标记解析器/Engine 增强路径）
 - [ ] **基础设施层 ≥75%**（8 适配器含异常分支）
 - [ ] **关键路径 100%**：白名单校验、缓存命中/降级、标记解析、异常映射所有分支
+- [ ] **覆盖率分层门禁配套实现（关键）**：当前 `pyproject.toml:281-319` 缺 `[tool.coverage.paths]` + `fail_under`,Makefile 仅单一 `--cov-fail-under=80`;需在 Task 0 新增 `.coveragerc` 多 section 配置(domain/application/infrastructure)或 Makefile 多命令(`test-cov-domain` `--cov=src.domain --cov-fail-under=90` 等 4 个独立命令),否则新增 8 适配器 0% 覆盖率不会触发 CI 失败
 
 #### 代码质量门禁
 - [ ] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
@@ -862,7 +865,7 @@ class DataSourceResolverPort(Protocol):
 - [ ] Subtask 8.2: 🟢 绿 — 本地服务器 fixture + 断言链路行为（重试次数/熔断状态转换）
 - [ ] Subtask 8.3: 🔴 红 — 编写 `tests/integration/application/test_data_source_execution.py`（真实 Engine + Resolver + 真实 Redis 测试端口 + TestTenant 前缀 + AsyncMock LLM/Sandbox：`$DATA_SOURCE` 全链路 + 缓存命中二次执行 + 租户隔离）
 - [ ] Subtask 8.4: 🟢 绿 — 全链路集成测试通过
-- [ ] Subtask 8.5: 编写 `tests/integration/external_services/data_sources/test_china_nbs_crawler.py`（crawler 服务可达时真实任务提交验证；不可达 `pytest.skip()` 动态跳过）
+- [ ] Subtask 8.5: 编写 `tests/integration/external_services/data_sources/test_china_nbs_crawler.py`(crawler 服务可达时真实任务提交验证;不可达 `pytest.skip()` 动态跳过);**关键修正**:`CrawlerClientPort` 实际**无 `health_check` 方法**(`src/domain/ports/crawler_client.py:13-71` 仅含 `submit_task/get_task_status/cancel_task/list_supported_formats`),需在 `tests/integration/conftest.py` 新建 `real_crawler` fixture,使用 `list_supported_formats()` 轻量调用探活(不消耗任务配额),参照 `real_redis` close + skip 模式(`conftest.py:194-220`)而非 `real_postgres_engine` skip 漏 close 模式(`conftest.py:255-286`)
 - [ ] Subtask 8.6: 🔄 重构 — `pytest -n 8` 并行验证 + 连续 5 次无随机失败
 
 **完成标准/Definition of Done:**
@@ -880,7 +883,7 @@ class DataSourceResolverPort(Protocol):
 
 #### 架构验证测试实现
 
-- [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_arch_data_source.py`（常量区：新文件清单 + FORBIDDEN_IMPORTS 黑名单）
+- [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_arch_data_source.py`(常量区:新文件清单 + **FORBIDDEN_IMPORTS 黑名单显式含 `httpx`/`tenacity`(对齐故事硬约束 line 60-62;现有 `test_arch_strategic_tool_impl.py:50-66` 15 项黑名单缺这两项,新建文件独立定义避免污染通用黑名单)**)
 - [ ] Subtask 9.2: 实现 domain 零依赖校验（AST 扫描 data_source.py/data_source_exceptions.py/data_source_events.py/value_objects）
 - [ ] Subtask 9.3: 实现端口注册完整性校验（PortSpec 10 字段 + 8 适配器 + resolver 全注册 + SINGLETON 生命周期）
 - [ ] Subtask 9.4: 实现依赖方向校验（application 新文件不 import infrastructure；实现类 isinstance Protocol）
