@@ -285,7 +285,7 @@ addopts = [
     "--cov=src",
     "--cov-report=term-missing:skip-covered",
     "-n", "auto",
-    "--dist", "loadscope",
+    "--dist", "loadgroup",
 ]
 
 # 过滤器

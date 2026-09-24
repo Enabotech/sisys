@@ -179,13 +179,15 @@ def create_memory(
     # 写入 L0 文件
     content = "---\nname: test-memory\ndescription: 测试记忆\ntype: user\n---\n这是测试记忆内容。"
     event_loop.run_until_complete(file_adapter.write(memory_id, "user", content))
-    # 写入 L1 Redis 缓存
+    # 写入 L1 Redis 缓存(键名唯一化: build_redis_key 不含 memory_id,
+    # 固定名会被并行场景共享,UUID 后缀保证场景级键隔离)
     owner_id = "test-user"
-    redis_key = build_redis_key(memory_id, owner_id, False, None, "test-memory")
+    unique_name = f"test-memory-{uuid.uuid4().hex[:8]}"
+    redis_key = build_redis_key(memory_id, owner_id, False, None, unique_name)
     redis_client.setex(redis_key, 86400, content)
     # 设置上下文
     test_context.current_memory_id = memory_id
-    test_context.current_memory_name = "test-memory"
+    test_context.current_memory_name = unique_name
     test_context.current_memory_owner = owner_id
     test_context.current_memory_is_group = False
     test_context.current_memory_group_id = None

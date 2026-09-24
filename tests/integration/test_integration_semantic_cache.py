@@ -71,14 +71,15 @@ async def real_redis():
 
 @pytest.fixture
 async def cache(real_redis):
-    """RedisSemanticCache 实例（测试隔离 key 前缀 + RediSearch 索引维度一致）"""
-    from src.infrastructure.storage.redis.semantic_cache import _build_index_name
+    """RedisSemanticCache 实例（每测试唯一命名空间 + 唯一 RediSearch 索引）
 
-    # 清理可能存在的旧 RediSearch 索引（维度不一致会导致查询报错）
-    try:
-        await real_redis.execute_command("FT.DROPINDEX", _build_index_name(3))
-    except Exception:
-        pass  # 索引不存在时忽略
+    测试隔离(CLAUDE.md §4 TestTenant 原则): 索引名与 key 前缀均含 UUID 后缀,
+    并发调度(loadgroup per-test 分发)下同维度索引/缓存键互不共享,
+    根除 fixture teardown/invalidate_all 删全局索引导致的 "no such index" 竞态。
+    """
+    import uuid as _uuid
+
+    from src.infrastructure.storage.redis.semantic_cache import _INDEX_NAME_PREFIX
 
     metrics = EventMetricsCollector()
     cache = RedisSemanticCache(
@@ -86,6 +87,10 @@ async def cache(real_redis):
         embedding_dim=3,
         metrics_collector=metrics,
     )
+    # 实例级隔离: 唯一命名空间 + 唯一索引名(生产类属性默认值不受影响)
+    suffix = _uuid.uuid4().hex[:8]
+    cache._NAMESPACE = f"cache:semantic:{suffix}"
+    cache._index_name = f"{_INDEX_NAME_PREFIX}:3:{suffix}"
     yield cache
 
     # 清理测试数据 + 清理索引
@@ -100,7 +105,7 @@ async def cache(real_redis):
         if cursor == 0:
             break
     try:
-        await real_redis.execute_command("FT.DROPINDEX", _build_index_name(3))
+        await real_redis.execute_command("FT.DROPINDEX", cache._index_name)
     except Exception:
         pass
 

@@ -54,6 +54,10 @@ def context() -> dict[str, Any]:
     return {}
 
 
+# 全部场景归入 sandbox-daemon 组: 与其他沙箱容器测试在同一 worker 串行执行
+# (根因修复 daemon 全域操作与并行沙箱测试的竞态,孤儿回收/冷启动恢复默认覆盖)
+pytestmark = pytest.mark.xdist_group("sandbox-daemon")
+
 # 加载 feature 文件
 scenarios("test_acceptance_docker_sandbox.feature")
 

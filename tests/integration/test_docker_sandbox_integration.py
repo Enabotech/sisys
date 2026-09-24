@@ -13,7 +13,6 @@ Docker daemon / PG 不可用时动态 pytest.skip(禁止写死 @pytest.mark.skip
 from __future__ import annotations
 
 import asyncio
-import os
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -29,7 +28,7 @@ from src.infrastructure.storage.inmemory.sandbox_session_repository import (
 # 与 adapter 默认 spec 一致的钉版镜像(digest 锁定)
 _PINNED_IMAGE = "python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534"
 
-pytestmark = [pytest.mark.integration, pytest.mark.docker, pytest.mark.slow]
+pytestmark = [pytest.mark.integration, pytest.mark.docker, pytest.mark.slow, pytest.mark.xdist_group("sandbox-daemon")]
 
 
 @pytest.fixture
@@ -148,13 +147,6 @@ class TestIdleTtlReap:
 class TestOrphanReap:
     """孤儿容器回收(label 归属校验)"""
 
-    @pytest.mark.skipif(
-        os.environ.get("PYTEST_XDIST_WORKER") is not None,
-        reason=(
-            "孤儿回收是全 daemon 域操作,与并行 worker 在用容器冲突;"
-            "独立执行: pytest tests/integration/test_docker_sandbox_integration.py -n 0 -k reap_orphan"
-        ),
-    )
     async def test_reap_orphan_containers(self, docker_daemon_or_skip: None) -> None:
         import aiodocker
         from aiodocker.utils import clean_filters
