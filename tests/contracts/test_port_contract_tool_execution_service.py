@@ -18,6 +18,8 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Collection
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -26,6 +28,7 @@ from src.application.services.tool_execution_engine import ToolExecutionEngine
 from src.application.services.tool_registry_service import ToolRegistryService
 from src.domain.ports.llm_client import LLMConfig, LLMResponse
 from src.domain.ports.registry import Lifetime, PortSpec
+from src.domain.value_objects.container_spec import ContainerSpec
 from src.infrastructure.storage.inmemory.tool_repository import InMemoryToolRepository
 
 
@@ -56,8 +59,14 @@ class _DummyLLM:
 class _DummySandbox:
     """沙箱执行器存根（满足 SandboxExecutor 接口）"""
 
-    async def start_container(self, session_id: str, spec: object = None) -> None:
-        """Story 4.4 Protocol 扩展:spec 默认 None 保持 4.1a 既有调用兼容"""
+    async def start_container(
+        self,
+        session_id: str,
+        spec: ContainerSpec | None = None,
+        *,
+        tenant_id: uuid.UUID | None = None,
+    ) -> None:
+        """Story 4.4 Protocol 扩展:spec 默认 None + tenant_id keyword-only 参数"""
         pass
 
     async def execute_code(
@@ -70,7 +79,8 @@ class _DummySandbox:
         """Story 4.4 Protocol 扩展:timeout_sec keyword-only 参数"""
         return {"status": "ok", "output": ""}
 
-    async def stop_container(self, session_id: str) -> None:
+    async def stop_container(self, session_id: str, *, reason: str = "explicit_stop") -> None:
+        """Story 4.4 Protocol 扩展:reason keyword-only 参数"""
         pass
 
     async def is_container_running(self, session_id: str) -> bool:
@@ -79,6 +89,10 @@ class _DummySandbox:
     async def health_check(self) -> bool:
         """Story 4.4 SandboxExecutor Protocol 扩展方法."""
         return True
+
+    async def reap_orphan_containers(self, known_session_ids: Collection[str]) -> int:
+        """Story 4.4 SandboxExecutor Protocol 扩展方法:孤儿容器清理"""
+        return 0
 
 
 class _DummyResolver:
