@@ -70,15 +70,16 @@ Story 4.1a 已完成 Skills 系统骨架（23 个 Skill 元数据 + L1/L2/L3 三
   - `grep -rn "raise HTTPException" src/`
   - `grep -rn "class.*Exception)" src/domain/exceptions/ | grep -v "DomainError\|BaseException\|SystemException\|BusinessException\|ExternalException\|ThirdPartyError\|Error)"`
 
-### 新增异常完整性 Checklist（4 项强制）
+### 新增异常完整性 Checklist（5 项强制，对齐 Story 4.4）
 
 1. **定义文件**：`src/domain/exceptions/data_source_exceptions.py`（Google 风格全中文注释）
 2. **子域映射**：`_code_ranges.py` 新增 `data_source: (410, 419)` 子域 + `_CLASS_TO_SUBDOMAIN` 注册 4 个新异常类
 3. **包导出**：`src/domain/exceptions/__init__.py` 导入 + `__all__` 暴露
-4. **HTTP 映射**：`src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 注册映射
-5. **设计文档同步**：更新 `docs/architecture/sisys-uni-exception-design.md` §3.3.2 编码分配表
+4. **子域码段校验**：运行 `tests/unit/domain/exceptions/test_code_ranges.py` 与 `test_error_code_uniqueness.py` 全绿（CLAUDE.md §5 强制 4 项之一）
+5. **HTTP 映射注册**：`src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 注册 4 项映射（4-4 实战新增的第 5 项，对齐 Story 4.4 line 99）
+6. **设计文档同步**：更新 `docs/architecture/sisys-uni-exception-design.md` §3.3.2 编码分配表（独立项，不与 Checklist 并列；CLAUDE.md §5 异常体系硬约束）
 
-> **编码段决策（Task 0 验证）：** external 子域（301-399）已满（304/305/384 零散空位不足以成段，399 预留 Story 4.7），新增 `data_source: (410, 419)` 子域段（"只追加"原则允许新增段）。`DataSourceError` 直接继承 `ExternalException`（抽象基类占位码 EXCEPTION_3XX，`test_subclass_code_in_same_subdomain_as_parent` 对占位码父类跳过校验，无需在 `allowed_child_parent_subdomains` 注册）。架构文档 §17.3.1 预留的 skill 子域 42x 段（EXCEPTION_422/423）不受影响。Task 0 必须运行 `grep -rn "EXCEPTION_41[0-9]" src/` 确认零碰撞。
+> **编码段决策（Task 0 验证）：** external 子域（301-399）已满（304/305/384 零散空位不足以成段，399 预留 Story 4.7），新增 `data_source: (410, 419)` 子域段（"只追加"原则允许新增段）。`DataSourceError` 直接继承 `ExternalException`（抽象基类占位码 EXCEPTION_3XX，`test_subclass_code_in_same_subdomain_as_parent` 对**抽象基类父类跳过校验**——`test_code_ranges.py:119` `abstract_names = {"DomainError", "BaseException", "SystemException", "BusinessException", "ExternalException"}` + line 185 `if parent_name in abstract_names: continue`），无需在 `allowed_child_parent_subdomains` 注册。`docs/architecture/architecture.md §17.3.1`（line 2720/2740）预留的 skill 子域 42x 段（EXCEPTION_422/423）不受影响（数值为 `[422, 423]`，与 data_source `[410, 419]` 不重叠）。Task 0 必须运行 `grep -rn "EXCEPTION_41[0-9]" src/` 确认零碰撞。
 
 ### 抑制告警禁止
 
@@ -151,7 +152,7 @@ Story 4.1a 已完成 Skills 系统骨架（23 个 Skill 元数据 + L1/L2/L3 三
 
 ### 外部服务测试策略
 
-- **单元测试**：`httpx.MockTransport` 注入模式（范本 `tests/unit/infrastructure/crawler/test_http_crawler_client.py:44-62`），禁止真实外网调用
+- **单元测试**：`httpx.MockTransport` 注入模式（**仅 crawler 测试使用此模式**，范本 `tests/unit/infrastructure/crawler/test_http_crawler_client.py:44-62`）；embedding/llm 测试使用 `unittest.mock.patch()` + `MagicMock`（范本 `tests/unit/infrastructure/external_services/embedding/test_embedding_api_client.py`）；禁止真实外网调用
 - **集成测试**：本地 aiohttp 真实 HTTP 服务器模拟外部 API（范本 `tests/integration/test_integration_llm_client.py`——不 mock 客户端本身，验证完整 HTTP 链路）；真实 Redis 用测试端口 + 租户前缀
 - **中国国家统计局集成测试**：crawler 服务不可用时 `pytest.skip()` 动态跳过（**禁止** `@pytest.mark.skip` 写死），范本 `tests/integration/conftest.py:215` 系列 skip 模式
 - **真实外网探活测试**（可选 smoke）：动态 skip，不进 CI 默认门禁
@@ -201,11 +202,11 @@ class DataSourcePort(Protocol):
 
 | 值对象 | 关键字段 | 不变量 |
 |--------|---------|--------|
-| `DataSourceRef` | `name: str` / `url: str` / `ttl_seconds: int = 86400` / `required_fields: tuple[str, ...] = ()` / `api_type: DataSourceApiType` | name 非空且 kebab-case；ttl_seconds ∈ [60, 2592000]（参考 `checkpoint_snapshot.py:37` TTL 边界先例）；url 必须 http(s) |
+| `DataSourceRef` | `name: str` / `url: str` / `ttl_seconds: int = 86400` / `required_fields: tuple[str, ...] = ()` / `api_type: DataSourceApiType` | name 非空且 kebab-case；ttl_seconds ∈ [60, 2592000]（参考 `src/infrastructure/storage/redis/redis_snapshot_store.py:98` 运行时强制校验先例，`checkpoint_snapshot.py:28` docstring 注释范围 [86400, 2592000]）；url 必须 http(s) |
 | `DataSourceApiType` | StrEnum：`REST_JSON` / `SDMX_JSON` / `CSV_DOWNLOAD` / `CRAWLER` | — |
 | `DataSourceQuery`（Query Object，定义在端口文件） | `source_name: str` / `query: str` / `parameters: tuple[tuple[str, str], ...] = ()` / `tenant_id: UUID \| None = None` | query 非空；source_name 非空 |
-| `DataSourceResult` | `source_name` / `payload: str`（JSON 字符串）/ `source_timestamp: datetime` / `fetched_at: datetime` / `freshness: DataFreshness` / `confidence: float` / `cache_hit: bool = False` | confidence ∈ [0,1]（参考 EvidencePackage 校验先例 `tool_execution.py:172`）；payload 非空 |
-| `DataFreshness` | `source_timestamp: datetime` / `ttl_seconds: int` / `half_life_seconds: int = 604800` | `score(at: datetime) -> float` 指数衰减 ∈ [0,1]；`is_stale(at) -> bool`（age > ttl_seconds） |
+| `DataSourceResult` | `source_name` / `payload: str`（JSON 字符串）/ `source_timestamp: datetime` / `fetched_at: datetime` / `freshness: DataFreshness` / `confidence: float` / `cache_hit: bool = False` | confidence ∈ [0,1]（参考 `EvidencePackage.validate_complete()` 校验先例 `src/domain/value_objects/tool_execution.py:178-182`）；payload 非空 |
+| `DataFreshness` | `source_timestamp: datetime` / `ttl_seconds: int` / `half_life_seconds: int = 604800`（**新增字段，参考业界指数衰减惯例：Prometheus staleness / Facebook TAO stale-while-revalidate / CDN stale-while-revalidate 协议；7 天半衰期适配 World Bank/IMF 年度数据场景**） | `score(at: datetime) -> float` 指数衰减 ∈ [0,1]；`is_stale(at) -> bool`（age > ttl_seconds） |
 
 ### ToolMetadata 字段扩展（向后兼容）
 
@@ -243,8 +244,8 @@ class DataSourceResolverPort(Protocol):
 
 | 事件 | event_type | aggregate_type | payload 关键字段 | 通道 |
 |------|-----------|----------------|-----------------|------|
-| `DataSourceFetched` | `data_source.fetched` | `ToolExecution` | source_name/query/freshness_score/confidence/cache_hit/latency_ms | realtime（Redis）+ reliable（RabbitMQ+Outbox） |
-| `DataSourceFetchFailed` | `data_source.fetch_failed` | `ToolExecution` | source_name/query/error_code/error_message | reliable 为主 |
+| `DataSourceFetched` | `DataSourceFetched` | `ToolExecution` | execution_id（aggregate_id）/source_name/query/freshness_score/confidence/cache_hit/latency_ms | realtime（Redis）+ reliable（RabbitMQ+Outbox） |
+| `DataSourceFetchFailed` | `DataSourceFetchFailed` | `ToolExecution` | execution_id（aggregate_id）/source_name/query/error_code/error_message | reliable 为主 |
 
 **强制同步**：`configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS`（`src/infrastructure/messaging/channel_router.py:54`）两处同步新增（优先级 yaml > DEFAULT_MAPPINGS，`channel_router.py:50-53` 注释明示）。
 
@@ -265,7 +266,7 @@ class DataSourceResolverPort(Protocol):
 - `DataSourcePort` 为 `@runtime_checkable` Protocol，含 `fetch`/`get_metadata`/`health_check` 三方法，零外部依赖
 - `DataSourceRef`（name/url/ttl_seconds/required_fields/api_type）+ `DataSourceQuery` + `DataSourceResult` + `DataFreshness` 值对象完备，不变量经领域异常校验
 - `ToolMetadata.data_sources: tuple[DataSourceRef, ...] = ()` 扩展向后兼容（既有 23 个 SKILL.md 解析不受影响）
-- 端口在 `composition_root.py` 注册（PortSpec 七字段：name/version/interface/impl/lifetime/owner/tags），契约测试 11 维度通过
+- 端口在 `composition_root.py` 注册（PortSpec 10 字段 dataclass：`name/version/interface/impl/module/lifetime/owner/compatibility/tags/deprecated`；常用注册 8 字段含 `module`），契约测试 11 维度通过
 
 **验证标准/Validation Criteria:**
 - [ ] `DataSourcePort` runtime_checkable + 三方法签名契约测试通过
@@ -290,7 +291,7 @@ class DataSourceResolverPort(Protocol):
 - 配置走 dataclass + `from_env()` 模式（参考 `EmbeddingConfig.from_env()` `src/infrastructure/config/embedding.py:31`），API Key 脱敏
 
 **验证标准/Validation Criteria:**
-- [ ] 8 个适配器单元测试（httpx.MockTransport 模式）覆盖：成功/超时/5xx 重试耗尽/429 限流/响应解析失败/熔断断开
+- [ ] 8 个适配器单元测试（httpx.MockTransport 注入模式，全项目唯一先例 `tests/unit/infrastructure/crawler/test_http_crawler_client.py:44-62`）覆盖：成功/超时/5xx 重试耗尽/429 限流/响应解析失败/熔断断开
 - [ ] 异常映射断言：`DataSourceUnavailableError`(411)/`DataSourceRateLimitError`(412)/`DataSourceResponseError`(413)/`TimeoutError`(302)
 - [ ] 8 个适配器全部注册到 composition_root（`data_source_<name>` 命名，SINGLETON 生命周期）
 - [ ] 配置缺失（无 API Key）抛 `ConfigurationError`(101) 且消息不泄露密钥
@@ -333,7 +334,7 @@ class DataSourceResolverPort(Protocol):
 
 ### AC-5: 领域异常与事件契约
 
-**Given** 异常是领域契约，新增异常必须完成 4 项完整性 Checklist
+**Given** 异常是领域契约，新增异常必须完成 5 项完整性 Checklist
 **When** 定义 data_source 子域 4 个新异常（410-413）+ 2 个领域事件
 **Then**
 - `data_source: (410, 419)` 子域段注册，4 个异常构造/to_dict()/HTTP 映射/编码唯一性/子域范围测试全绿
@@ -367,7 +368,7 @@ class DataSourceResolverPort(Protocol):
 **When** 运行 `tests/unit/architecture/test_arch_data_source.py`
 **Then**
 - domain 层新文件零外部依赖（AST 黑名单扫描，范本 `test_arch_strategic_tool_impl.py`）
-- 端口注册完整性（PortSpec 七字段 + 8 适配器 + resolver 全注册）
+- 端口注册完整性（PortSpec 10 字段 dataclass + 8 适配器 + resolver 全注册）
 - 实现类 isinstance Protocol 校验
 - 依赖方向校验（application 不 import infrastructure，适配器仅经 composition_root 注册）
 
@@ -408,7 +409,7 @@ class DataSourceResolverPort(Protocol):
 #### 统一端口定义注册与管理 (Port Contract)
 - [ ] `DataSourcePort` 定义于 `src/domain/ports/data_source.py`（R1 领域层统一抽象）
 - [ ] `DataSourceResolverPort` 定义于 `src/application/ports/data_source_resolver.py`（R2 组合注入）
-- [ ] 所有端口经 `register_port()` 在 `src/composition_root.py` 统一注册，PortSpec 七字段完备（name/version/interface/impl/lifetime=Lifetime.SINGLETON/owner/tags）
+- [ ] 所有端口经 `register_port()` 在 `src/composition_root.py` 统一注册，PortSpec 10 字段完备（name/version/interface/impl/module/lifetime=Lifetime.SINGLETON/owner/tags/deprecated）
 - [ ] 8 适配器以 `data_source_<name>` 命名注册（worldbank/imf/eurostat/uspto/ipcc/newsapi/tavily/china-nbs）
 - [ ] 禁止业务代码直接实例化适配器，仅经 `resolver.resolve()`
 - [ ] 端口契约测试通过（`tests/contracts/test_port_contract_data_source.py` + `test_port_contract_data_source_resolver.py`）
@@ -466,7 +467,7 @@ class DataSourceResolverPort(Protocol):
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
 - [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
-- [ ] 异常契约登记完成（4 项 Checklist）
+- [ ] 异常契约登记完成（5 项 Checklist）
 - [ ] 规范文档通过人工评审或自动化校验
 
 ---
@@ -565,7 +566,7 @@ class DataSourceResolverPort(Protocol):
 - [ ] Subtask 0.1: 定义领域事件 Schema（`DataSourceFetched`/`DataSourceFetchFailed`，含 payload 字段与双通道登记计划）
 - [ ] Subtask 0.2: 定义数据模型（5 个值对象字段级签名 + DataSourceQuery + ToolMetadata/EvidencePackage 扩展方案）
 - [ ] Subtask 0.3: 定义端口契约（DataSourcePort / DataSourceResolverPort 方法签名 + 8 个适配器 PortSpec 元数据表：name/version/owner/tags）
-- [ ] Subtask 0.4: 异常契约登记（4 项 Checklist：410-413 零碰撞 grep 验证 + `_code_ranges.py` 子域段 + 设计文档 §3.3.2 同步计划）
+- [ ] Subtask 0.4: 异常契约登记（5 项 Checklist：定义文件 + `_code_ranges.py` 子域段 + `__init__.py` 导出 + `EXCEPTION_HTTP_MAP` 注册 + 设计文档 §3.3.2 同步计划）
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_data_source.feature`（Happy Path + 4 个 Edge Cases）
 - [ ] Subtask 0.6: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_data_source.py`
 - [ ] Subtask 0.7: 编写端口契约测试骨架 `tests/contracts/test_port_contract_data_source.py`（11 维度，此时实现不存在）
@@ -638,7 +639,7 @@ class DataSourceResolverPort(Protocol):
 | 🔄 重构 | 运行异常全套测试（唯一性/子域范围/HTTP 映射） |
 
 - [ ] Subtask 2.1: 🔴 红 — 编写异常失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 4 个异常 + 4 项完整性 Checklist 登记
+- [ ] Subtask 2.2: 🟢 绿 — 实现 4 个异常 + 5 项完整性 Checklist 登记
 - [ ] Subtask 2.3: 🔄 重构 — `pytest tests/unit/domain/exceptions/ tests/unit/interfaces/api/test_exception_handlers.py` 全绿
 - [ ] Subtask 2.4: 同步 `sisys-uni-exception-design.md` §3.3.2 编码分配表
 
@@ -655,7 +656,7 @@ class DataSourceResolverPort(Protocol):
 - [ ] Subtask 2.7: 🔄 重构 — 事件注册/反序列化回归全绿
 
 **完成标准/Definition of Done:**
-- [ ] 异常 4 项 Checklist 完成，编码零碰撞
+- [ ] 异常 5 项 Checklist 完成，编码零碰撞
 - [ ] 事件双通道配置一致（yaml 与 DEFAULT_MAPPINGS）
 - [ ] 异常/事件测试全绿
 
@@ -831,7 +832,7 @@ class DataSourceResolverPort(Protocol):
 #### TDD 循环 [C]：EvidencePackage.data_sources 扩展
 
 - [ ] Subtask 7.7: 🔴 红 — 编写 EvidencePackage 扩展失败测试（默认空 tuple 向后兼容/DataSourceMeta 校验）
-- [ ] Subtask 7.8: 🟢 绿 — 扩展 `src/domain/entities/tool_execution.py` EvidencePackage + Validate 阶段挂载元数据
+- [ ] Subtask 7.8: 🟢 绿 — 扩展 `src/domain/value_objects/tool_execution.py` EvidencePackage + Validate 阶段挂载元数据
 - [ ] Subtask 7.9: 🔄 重构 — 既有 EvidencePackage 测试全绿
 - [ ] Subtask 7.10: composition_root 中 `tool_execution_engine` 注册注入 `resolver.resolve_optional("data_source_resolver")`（保持装饰器栈不变）
 
@@ -874,7 +875,7 @@ class DataSourceResolverPort(Protocol):
 
 - [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_arch_data_source.py`（常量区：新文件清单 + FORBIDDEN_IMPORTS 黑名单）
 - [ ] Subtask 9.2: 实现 domain 零依赖校验（AST 扫描 data_source.py/data_source_exceptions.py/data_source_events.py/value_objects）
-- [ ] Subtask 9.3: 实现端口注册完整性校验（PortSpec 七字段 + 8 适配器 + resolver 全注册 + SINGLETON 生命周期）
+- [ ] Subtask 9.3: 实现端口注册完整性校验（PortSpec 10 字段 + 8 适配器 + resolver 全注册 + SINGLETON 生命周期）
 - [ ] Subtask 9.4: 实现依赖方向校验（application 新文件不 import infrastructure；实现类 isinstance Protocol）
 - [ ] Subtask 9.5: 实现异常码段校验（410-413 ∈ data_source 子域）
 - [ ] Subtask 9.6: 运行完整测试套件并生成合规报告
@@ -1016,7 +1017,7 @@ tests/
 **来源:** [Story 4.1a](./4-1a-strategic-tool-impl.md) + [Story 4.4](./4-4-docker-sandbox-execution.md)
 
 **关键学习/Key Learnings（4.1a，源自 4.1）：**
-- PortSpec 七字段元数据规范（name/version/interface/impl/lifetime/owner/tags），composition_root 声明式注册
+- PortSpec 10 字段元数据规范（name/version/interface/impl/module/lifetime/owner/compatibility/tags/deprecated），composition_root 声明式注册
 - TOOL_CATALOG 常量作为元数据单一数据源（避免数据漂移）——本 Story 8 个数据源的 DataSourceRef 同样集中定义
 - asyncio.Lock 必须类变量（P0-6 教训）
 - 事件双通道：yaml + DEFAULT_MAPPINGS 两处同步（4.1 单通道教训）
@@ -1025,13 +1026,13 @@ tests/
 - 装饰器层叠模式（ToolOutputValidator/SandboxSecurityDecorator）+ ExecutionContext.extensions 透传先例（schema_last_violations）
 - 第三方库版本钉死（aiodocker 0.25 升级教训）
 - xdist 分组串行（sandbox-daemon 组）+ 动态 skip（禁止写死 @pytest.mark.skip）
-- 新增异常 4 项 Checklist 实战（含 _code_ranges 子域注册）
+- 新增异常 5 项 Checklist 实战（含 _code_ranges 子域注册）
 - 重试白名单收窄先例：沙箱确定性失败不可重试——本 Story 数据源 4xx/解析失败同样不重试
 
 **应用到本故事/Applied to This Story:**
 - [ ] 8 个 DataSourceRef 集中定义（单一数据源原则），适配器注册引用同一常量
 - [ ] 新事件双通道两处同步登记 + 一致性测试
-- [ ] 异常 4 项 Checklist 在 Task 0/2 完成，编码零碰撞 grep 验证
+- [ ] 异常 5 项 Checklist 在 Task 0/2 完成，编码零碰撞 grep 验证
 - [ ] 数据源 4xx/解析失败（413）不重试，仅 5xx/超时/传输错误重试（对齐 4.4 重试收窄先例）
 - [ ] crawler 集成测试动态 skip，xdist 分组隔离外部资源
 
