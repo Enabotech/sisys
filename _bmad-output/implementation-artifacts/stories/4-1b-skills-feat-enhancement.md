@@ -548,16 +548,53 @@ class DataSourceResolverPort(Protocol):
 
 ## 📊 AC → Task → Subtask 追溯矩阵
 
-| AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
-|----|-------------|-----------|-------------|----------|
-| AC-1 | DataSourcePort 端口 + 值对象 + ToolMetadata 扩展 | Task 1 | 全部 | `test_data_source.py` / `test_data_source_port.py` / `test_port_contract_data_source.py` |
-| AC-2 | 8 个数据源适配器 | Task 3/4/5 | 各适配器 TDD 循环 | `test_*_adapter.py` ×8 |
-| AC-3 | 缓存层 + 新鲜度评分 | Task 1（DataFreshness）/ Task 6（Resolver 缓存集成） | 1.2 / 6.x | `test_data_source.py` / `test_data_source_resolver.py` |
-| AC-4 | Engine.Execute $DATA_SOURCE 增强 | Task 7 | 全部 | `test_data_source_marker.py` / `test_tool_execution_engine_datasource.py` |
-| AC-5 | 异常与事件契约 | Task 2 | 全部 | `test_data_source_exceptions.py` / `test_code_ranges.py` |
-| AC-6 | 集成测试 | Task 8 | 全部 | `test_data_source_execution.py` / `test_china_nbs_crawler.py` / `test_adapters_http_chain.py` |
-| AC-7 | 架构验证测试 | Task 9 | 全部 | `test_arch_data_source.py` |
-| AC-8 | BDD 验收测试 | Task 0（红）/ Task 10（绿） | 0.4-0.6 / 10.x | `test_acceptance_data_source.feature` / `.py` |
+| AC | 验收标准描述 | 关联 Task | 负责 Subtask(精确化) | 测试文件 |
+|----|-------------|-----------|---------------------|----------|
+| AC-1 | DataSourcePort 端口 + 值对象 + ToolMetadata 扩展 | Task 1 | 全部 (1.1-1.9) | `test_data_source.py` / `test_data_source_port.py` / `test_port_contract_data_source.py` |
+| AC-2 | 8 个数据源适配器 | Task 3/4/5 | 3.1-3.10 + 4.1-4.13 + 5.1-5.4 (共 27 个) | `test_*_adapter.py` ×8 |
+| AC-3 | 缓存层 + 新鲜度评分 | Task 1 (DataFreshness) / Task 6 (Resolver 缓存集成) | **1.2 / 6.4 / 6.5 / 6.6** (精确化,原"6.x"含糊) | `test_data_source.py` / `test_data_source_resolver.py` |
+| AC-4 | Engine.Execute $DATA_SOURCE 增强 | Task 7 | 全部 (7.1-7.10) | `test_data_source_marker.py` / `test_tool_execution_engine_datasource.py` |
+| AC-5 | 异常与事件契约 | Task 2 | 全部 (2.1-2.8) | `test_data_source_exceptions.py` / `test_code_ranges.py` |
+| AC-6 | 集成测试 | Task 8 | 全部 (8.1-8.6) | `test_data_source_execution.py` / `test_china_nbs_crawler.py` / `test_adapters_http_chain.py` |
+| AC-7 | 架构验证测试 | Task 9 | 全部 (9.1-9.6) | `test_arch_data_source.py` |
+| AC-8 | BDD 验收测试 | Task 0 (红) / Task 10 (绿) | **0.5 / 0.6 / 0.8 / 10.1-10.5c / 10.6** (修正原"0.4-0.6"不准) | `test_acceptance_data_source.feature` / `.py` |
+
+---
+
+## ⚠️ 风险与缓解策略(Risk Register)
+
+> **新增必要性(Round 5 评审):** Story 4-1b 涉及 8 适配器 × 5 端口 × 4 新异常 × Engine 集成 × 沙箱不变量保护,风险敞口显著大于均值。8 项核心风险散落于硬约束/SDD 决策表/测试隔离约束等多个章节,集中登记便于 dev-story 代理实时对照 + 风险触发时快速定位缓解方案。
+
+| ID | 风险描述 | 等级 | 触发条件 | 缓解策略 | 关联 Subtask | 关联文件:行号 |
+|----|---------|------|---------|---------|------------|------------|
+| **R1** | PoC UNSD/OECD 数据源不可用 | 高 | 4.1c/4.1d 阶段需要接入 | line 48 已推迟 + 端口名占位 + Task 0 决策表标注"PoC v2 不可用" | Subtask 0.3 | line 48 |
+| **R2** | API Key 缺失冷启动阻断 | 高 | dev/CI 无 `TAVILY_API_KEY`/`NEWSAPI_API_KEY` | 沿用 Story 3-4 Reranker 模式(`composition_root.py:1765-1778`):`os.getenv()` 条件注册 + Resolver 内 `Mapping.get()` 返回 None + 白名单以 `ToolMetadata.data_sources` 为准 | Subtask 4.2 / 4.5 / 10.5b | line 303 |
+| **R3** | Engine 集成破坏 Story 4.4 BDD AC-7.4 | **P0** | `ToolExecutionEngine.__init__` 参数数量变化 | `set_resolver()` 后注入(不修改 `__init__`)+ `_data_source_resolver` 默认 None + composition_root 调用顺序约束 | Subtask 7.5 / 7.6 | line 237-243 |
+| **R4** | 沙箱 `network_mode="none"` 不变量被破坏 | **P0** | 数据采集在沙箱内执行 / Engine 注入打开网络 | 强制宿主机侧采集(Engine Execute 前置)+ preamble 字面量内联 + 架构测试 `httpx` 黑名单 + AST 扫描 domain 文件 | Subtask 7.5 / 9.2 / 9.3 | line 97 / 889 |
+| **R5** | 8 适配器异常映射遗漏(411/412/413/302/207/201 路径) | 高 | 适配器内联 except 链漏写分支 | 适配器统一范本(`EmbeddingAPIClient`)+ tenacity `_is_retryable_xxx_error` 白名单显式排除 413 + 32 路径单元测试 | Subtask 3.x / 4.x / 5.x | line 295 |
+| **R6** | 配置漂移(yaml vs `ChannelRouter.DEFAULT_MAPPINGS`) | 中 | `configs/event_channels.yaml` 一处更新一处遗漏 | Task 2 实施前新增 Subtask 2.8 diff 校验 + 双通道一致性单元测试 + 优先级注释(`yaml > DEFAULT_MAPPINGS`) | Subtask 0.1 / 2.6 / **新增 2.8** | line 255 / 410 / 664 |
+| **R7** | 中国局 crawler 服务不可用 | 中 | dev/CI 未运行 crawler daemon | 沿用 `real_redis` close + skip 模式(`conftest.py:194-220`)+ 新建 `real_crawler` fixture 用 `list_supported_formats()` 轻量探活(`CrawlerClientPort` 无 `health_check` 方法已修正) | Subtask 8.5 | line 871 |
+| **R8** | 并行测试 flake | 中 | `pytest -n 8` 共享 Redis key 冲突 / event_loop 跨 worker 泄漏 | 独立 `xdist_group("data-source-cache")`(区别于 `sandbox-daemon`)+ TestTenant UUID 前缀 + `pytestmark` list 形式 + asyncio.Lock 类变量 | Subtask 6.4 / 6.6 / 8.6 / 10.7 | line 168 / 372 |
+
+**风险等级分布:** P0 = 2(R3/R4,集成前必验证)/ 高 = 3(R1/R2/R5,需 dev-story 启动前复核)/ 中 = 3(R6/R7/R8,实施期监控)
+
+**总缓解项:** 22 项(平均每风险 2.75 项)
+
+---
+
+## 📚 配套架构文档同步(Round 5 评审)
+
+> **文档同步硬约束(Task 0/2/10 收尾):** Story 4-1b 完成时必须同步更新以下架构文档,避免决策依据丢失。
+
+| Task | 文档同步动作 | 文档 | 锚定位置 |
+|------|------------|------|---------|
+| Task 0 Subtask 0.4 | `sisys-uni-exception-design.md §3.3.2` 子域范围表追加 `data_source (410, 419)` | sisys-uni-exception-design.md | line 740-755 表格 |
+| Task 0 Subtask 0.4 | `_code_ranges.py` CODE_RANGES 追加 `"data_source": (410, 419)` + 4 个 `_CLASS_TO_SUBDOMAIN` 注册 | _code_ranges.py | line 74 后,line 211 后 |
+| Task 2 Subtask 2.4 | `sisys-uni-exception-design.md §3.3.2` 完整编码分配表追加 EXCEPTION_410-413 共 4 行 | sisys-uni-exception-design.md | line 718-719 后 |
+| Task 2 Subtask 2.4 | `sisys-uni-exception-design.md` 最后修订日期更新 `2026-06-05` → `2026-09-24` | sisys-uni-exception-design.md | line 5 |
+| **Task 10 收尾** | **`architecture.md §17.3.3` 章节新增**(8 决策表 + 端口契约 + Resolver 编排 + Engine 集成 + 8 适配器 + 双通道事件) | architecture.md | line 2740 后(§17.3.1 与 §17.3.2 之间) |
+| **Task 10 收尾** | **`architecture.md` 修订历史表 v8.5.0 行追加** | architecture.md | line 3489 后 |
+| **Task 10 收尾** | `architecture.md` 文档统计信息版本号更新 8.4.0 → 8.5.0 + 最后更新日期 2026-09-05 → 2026-09-24 | architecture.md | line 3502-3503 |
 
 ---
 
@@ -584,6 +621,8 @@ class DataSourceResolverPort(Protocol):
   - `poetry run pytest tests/acceptance/test_acceptance_data_source.py -v --tb=short` (预期 ModuleNotFoundError)
   - `poetry run pytest tests/contracts/test_port_contract_data_source.py -v --tb=short` (预期 KeyError: 端口未注册)
   - `poetry run pytest tests/contracts/test_port_contract_data_source_resolver.py -v --tb=short` (预期同上)
+
+- [ ] Subtask 0.9: 🔴 红 — **API 契约决策登记**(关键决策:本 Story 不新增 REST 端点,无 `openapi.yaml` 变更;端口契约 `DataSourcePort`/`DataSourceResolverPort` 即为内部 API 契约;记录决策理由:纯内部基础设施 + Engine Execute 前置采集)
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕（端口/值对象/异常/事件/契约清单）
@@ -667,6 +706,7 @@ class DataSourceResolverPort(Protocol):
 - [ ] Subtask 2.5: 🔴 红 — 编写事件失败测试
 - [ ] Subtask 2.6: 🟢 绿 — 实现 2 个事件 + 双通道登记
 - [ ] Subtask 2.7: 🔄 重构 — 事件注册/反序列化回归全绿
+- [ ] Subtask 2.8: 🔄 重构 — **yaml vs `ChannelRouter.DEFAULT_MAPPINGS` diff 校验**(防 R6 配置漂移:`diff <(yq '.event_channels | keys' configs/event_channels.yaml) <(python -c "from src.infrastructure.messaging.channel_router import ChannelRouter; print(sorted(ChannelRouter.DEFAULT_MAPPINGS.keys()))")` 预期零 diff)
 
 **完成标准/Definition of Done:**
 - [ ] 异常 5 项 Checklist 完成，编码零碰撞
@@ -817,6 +857,14 @@ class DataSourceResolverPort(Protocol):
 ### Task 7: Engine.Execute $DATA_SOURCE 集成
 
 **关联 AC:** AC-4
+
+> **关注点边界(Round 5 评审声明):** Task 7 包含 4 个独立关注点,通过 Subtask 7.1-7.10 自然分隔;**不拆分 Task**。
+> - ① 标记解析器(7.1-7.3,独立应用服务 `src/application/services/data_source_marker.py`)
+> - ② Engine 集成(7.4-7.6,依赖 ①)
+> - ③ EvidencePackage 扩展(7.7-7.9,依赖 ②)
+> - ④ composition_root 注册(7.10,依赖 ②③)
+>
+> **依赖方向严格单向:** ① ← ② ← ③ ← ④
 
 #### TDD 循环 [A]：标记解析器（data_source_marker.py）
 
