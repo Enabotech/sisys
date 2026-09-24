@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Generator
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -38,9 +39,28 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def context() -> dict[str, Any]:
-    """BDD 步骤间共享状态"""
-    return {}
+def context(event_loop) -> Generator[dict[str, Any], None, None]:
+    """BDD 步骤间共享状态(场景级唯一后缀 + teardown 清理自身索引/键)
+
+    测试隔离(CLAUDE.md §4): 命名空间与 RediSearch 索引名均含 UUID 后缀,
+    并发调度(loadgroup per-test 分发)下场景间互不共享,
+    根除共享全局索引/全局清理导致的并行竞态。
+    """
+    import uuid as _uuid
+
+    ctx: dict[str, Any] = {"_isolation_suffix": _uuid.uuid4().hex[:8]}
+    yield ctx
+
+    # teardown: 仅清理本场景的索引与键
+    redis_client = ctx.get("redis_client")
+    if redis_client is not None:
+        cache = ctx.get("cache_instance")
+        if cache is not None:
+            try:
+                event_loop.run_until_complete(redis_client.execute_command("FT.DROPINDEX", cache._index_name))
+            except Exception:
+                pass
+        event_loop.run_until_complete(_cleanup_redis_keys(redis_client, f"sisys:cache:semantic:{ctx['_isolation_suffix']}:"))
 
 
 # Real Redis 客户端（function scope，每个测试独立）
@@ -99,21 +119,6 @@ async def _cleanup_redis_keys(client, prefix: str) -> None:
             break
 
 
-async def _reset_semantic_index(client) -> None:
-    """删除旧 RediSearch 索引（维度不一致会导致 FT.SEARCH 报错）
-
-    集成测试使用 embedding_dim=3，验收测试使用 embedding_dim=4，
-    共享固定索引名 idx:sisys_semantic_cache 时会产生维度冲突。
-    初始化前删除旧索引，确保 FT.CREATE 重建时使用当前维度。
-    """
-    from src.infrastructure.storage.redis.semantic_cache import _build_index_name
-
-    try:
-        await client.execute_command("FT.DROPINDEX", _build_index_name(4))
-    except Exception:
-        pass  # 索引不存在时忽略
-
-
 # ===================================================================
 # 背景步骤
 # ===================================================================
@@ -159,9 +164,7 @@ def given_middleware_initialized(context: dict[str, Any], event_loop) -> None:
     redis_client = context["redis_client"]
     fake_embeddings = context["fake_embeddings"]
 
-    # 清理旧的缓存数据 + 删除旧索引（避免维度冲突）
-    event_loop.run_until_complete(_cleanup_redis_keys(redis_client, "sisys:cache:semantic:"))
-    event_loop.run_until_complete(_reset_semantic_index(redis_client))
+    # 场景级唯一命名空间/索引(无需全局清理,并发场景互不干扰)
 
     # Mock 检索服务
     mock_search = AsyncMock()
@@ -173,11 +176,15 @@ def given_middleware_initialized(context: dict[str, Any], event_loop) -> None:
     context["metrics"] = metrics
 
     # 真实 Redis 缓存（RediSearch 已加载）
+    from src.infrastructure.storage.redis.semantic_cache import _INDEX_NAME_PREFIX
+
     cache = RedisSemanticCache(
         redis_client=redis_client,
         embedding_dim=4,
         metrics_collector=metrics,
     )
+    cache._NAMESPACE = f"cache:semantic:{context['_isolation_suffix']}"
+    cache._index_name = f"{_INDEX_NAME_PREFIX}:4:{context['_isolation_suffix']}"
     context["cache_instance"] = cache
 
     # 中间件
@@ -464,8 +471,7 @@ def given_middleware_with_metrics(context: dict[str, Any], event_loop) -> None:
     redis_client = context["redis_client"]
     fake_embeddings = context["fake_embeddings"]
 
-    event_loop.run_until_complete(_cleanup_redis_keys(redis_client, "sisys:cache:semantic:"))
-    event_loop.run_until_complete(_reset_semantic_index(redis_client))
+    # 场景级唯一命名空间/索引(无需全局清理,并发场景互不干扰)
 
     mock_search = AsyncMock()
     mock_search.search.return_value = _sample_results()
@@ -474,11 +480,15 @@ def given_middleware_with_metrics(context: dict[str, Any], event_loop) -> None:
     metrics = EventMetricsCollector()
     context["metrics"] = metrics
 
+    from src.infrastructure.storage.redis.semantic_cache import _INDEX_NAME_PREFIX
+
     cache = RedisSemanticCache(
         redis_client=redis_client,
         embedding_dim=4,
         metrics_collector=metrics,
     )
+    cache._NAMESPACE = f"cache:semantic:{context['_isolation_suffix']}"
+    cache._index_name = f"{_INDEX_NAME_PREFIX}:4:{context['_isolation_suffix']}"
     context["cache_instance"] = cache
 
     middleware = SemanticCacheMiddleware(

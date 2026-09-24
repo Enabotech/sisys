@@ -403,10 +403,15 @@ class TestChunkedUploadManagerConcurrency:
         cache.eval.assert_called_once()
 
     async def test_release_lock_noop_when_not_owner(self) -> None:
-        """未持有锁时 release_lock 不执行任何操作"""
+        """未持有锁时 release_lock 不执行任何操作
+
+        使用唯一锁 ID: _lock_owners 是类变量(跨测试共享),复用 "id-1"
+        会受其他用例泄漏的 owner 影响产生顺序依赖(loadgroup per-test
+        分发下用例顺序不再固定),唯一 ID 保证确定性 noop。
+        """
         cache = _make_cache()
         manager = ChunkedUploadManager(cache)
-        await manager._release_lock("id-1")
+        await manager._release_lock("id-noop-unique")
         assert not hasattr(cache, "eval") or cache.eval.call_count == 0
 
 

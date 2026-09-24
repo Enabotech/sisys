@@ -103,8 +103,20 @@ def session_storage(redis_client: aioredis.Redis) -> RedisSessionStorage:
 
 @pytest.fixture
 def semantic_cache(redis_client: aioredis.Redis) -> RedisSemanticCache:
-    """Semantic cache instance with real Redis."""
-    return RedisSemanticCache(redis_client=redis_client, embedding_dim=3)
+    """Semantic cache instance with real Redis.
+
+    测试隔离: 每测试唯一命名空间 + 唯一 RediSearch 索引名(UUID 后缀),
+    并发调度(loadgroup per-test 分发)下场景间索引/缓存键互不共享。
+    """
+    import uuid as _uuid
+
+    from src.infrastructure.storage.redis.semantic_cache import _INDEX_NAME_PREFIX
+
+    cache = RedisSemanticCache(redis_client=redis_client, embedding_dim=3)
+    suffix = _uuid.uuid4().hex[:8]
+    cache._NAMESPACE = f"cache:semantic:{suffix}"
+    cache._index_name = f"{_INDEX_NAME_PREFIX}:3:{suffix}"
+    return cache
 
 
 @pytest.fixture

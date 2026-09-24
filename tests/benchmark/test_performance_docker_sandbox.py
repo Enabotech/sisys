@@ -2,10 +2,9 @@
 
 热启动 P95 < 2s + 冷启动 < 30s + 并发 ≥ 10 + 配额边界。
 
-**执行约束**: 冷启动用例会 rmi 钉版镜像,与并行 worker 的容器引用冲突——
-xdist 并行环境(-n auto)下该用例自动 skip。完整基准请独立执行:
-
-    pytest tests/benchmark/test_performance_docker_sandbox.py -n 0 -m benchmark
+**调度约束**: 本模块全部用例标记 `xdist_group("sandbox-daemon")`,
+与所有沙箱容器测试在同一 worker 串行执行(根因修复 daemon 全域操作竞态,
+冷启动 rmi 可安全运行于默认套件)。
 
 Docker daemon 不可用时动态 pytest.skip。
 """
@@ -13,7 +12,6 @@ Docker daemon 不可用时动态 pytest.skip。
 from __future__ import annotations
 
 import asyncio
-import os
 import statistics
 import time
 import uuid
@@ -32,7 +30,13 @@ from src.infrastructure.storage.inmemory.sandbox_session_repository import (
 _PINNED_IMAGE = "python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534"
 _PINNED_NAME_TAG = "python:3.11-slim"
 
-pytestmark = [pytest.mark.integration, pytest.mark.docker, pytest.mark.benchmark, pytest.mark.slow]
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.docker,
+    pytest.mark.benchmark,
+    pytest.mark.slow,
+    pytest.mark.xdist_group("sandbox-daemon"),
+]
 
 
 @pytest.fixture
@@ -85,13 +89,6 @@ class TestWarmStartLatency:
 class TestColdStart:
     """冷启动 < 30s(含镜像拉取,AC-9;验收层空断言伪覆盖的真实化)"""
 
-    @pytest.mark.skipif(
-        os.environ.get("PYTEST_XDIST_WORKER") is not None,
-        reason=(
-            "rmi 与并行 worker 容器引用冲突;"
-            "独立执行: pytest tests/benchmark/test_performance_docker_sandbox.py -n 0 -m benchmark"
-        ),
-    )
     async def test_cold_start_under_30s(self, adapter: AioDockerSandboxAdapter) -> None:
         import aiodocker
 
