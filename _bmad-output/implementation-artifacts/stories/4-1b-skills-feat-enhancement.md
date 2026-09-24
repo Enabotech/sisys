@@ -234,8 +234,13 @@ class DataSourceResolverPort(Protocol):
 
 ### Engine.Execute 集成契约
 
-- `ToolExecutionEngine.__init__` 新增可选参数 `data_source_resolver: DataSourceResolverPort | None = None`（**None 时行为完全不变**，向后兼容）
-- Execute 阶段前置处理（`_execute_stage`，`src/application/services/tool_execution_engine.py:267`）：解析生成代码中的 `$DATA_SOURCE(name, "query")` 标记 → `resolver.fetch_many` 并发采集 → 数据以 Python 字面量前言（preamble）形式内联注入代码（如 `DATA_SOURCES = {"world-bank": {...json...}}`）→ 沙箱执行注入后的代码
+> **集成方案决策（关键抉择）**：采用 **`set_resolver()` 后注入方法**（非 `__init__` 参数）以避免破坏 Story 4.4 AC-7.4 BDD 断言（`test_acceptance_docker_sandbox.feature:243-247` 显式断言 `ToolExecutionEngine.__init__` 参数数量 = 5，**未增加**）。此决策保证两 Story 同时合入 main 分支时不破坏 4.4 既有 BDD 测试。
+
+- `ToolExecutionEngine.__init__` **签名保持不变**（与 Story 4.4 AC-7.4 BDD 一致）
+- 新增可选 setter `set_data_source_resolver(resolver: DataSourceResolverPort | None) -> None`（None 时撤销注入,等同未注入）
+- Engine 内部新增私有属性 `_data_source_resolver: DataSourceResolverPort | None = None`（默认 None，零行为变化）
+- composition_root 调用顺序:`tool_execution_engine = ToolExecutionEngine(...)` → `tool_execution_engine.set_data_source_resolver(resolver.resolve_optional("data_source_resolver"))`（后注入模式）
+- Execute 阶段前置处理（`_execute_stage`,`src/application/services/tool_execution_engine.py:267`）：当 `_data_source_resolver is not None` 时解析代码中 `$DATA_SOURCE(name, "query")` 标记 → `resolver.fetch_many` 并发采集 → 数据以 Python 字面量前言（preamble）形式内联注入代码（如 `DATA_SOURCES = {"world-bank": {...json...}}`）→ 沙箱执行注入后的代码；当 `_data_source_resolver is None` 时**直接跳过**前置处理,完全保持 4.4 既有行为
 - 输出元数据：`EvidencePackage` 扩展可选字段 `data_sources: tuple[DataSourceMeta, ...] = ()`（`DataSourceMeta` 值对象：source_name/source_timestamp/freshness_score/confidence），支撑溯源
 
 ### 领域事件（新增，双通道）
@@ -287,14 +292,16 @@ class DataSourceResolverPort(Protocol):
 - `NewsAPIAdapter`（REST_JSON + `NEWSAPI_API_KEY`，实时新闻流，免费 100 次/天）
 - `TavilyAdapter`（REST_JSON + `TAVILY_API_KEY`，Web 搜索 + 新闻聚合）
 - `ChinaNBSAdapter`（CRAWLER，复用 `CrawlerClientPort` 经 crawler 插件提交任务，禁止直连抓取）
-- 每个适配器：httpx.AsyncClient + tenacity 重试（3 次指数退避，仅 5xx/超时/传输错误可重试）+ 复用自研 `CircuitBreaker`（`src/infrastructure/external_services/embedding/circuit_breaker.py:51`）+ 内联 except 链错误映射到 data_source 子域异常
-- 配置走 dataclass + `from_env()` 模式（参考 `EmbeddingConfig.from_env()` `src/infrastructure/config/embedding.py:31`），API Key 脱敏
+- 每个适配器：httpx.AsyncClient + tenacity 重试（3 次指数退避，仅 5xx/超时/传输错误可重试，项目惯例 `retry_if_exception(_is_retryable_xxx_error)` 白名单函数模式 `src/infrastructure/external_services/embedding/embedding_api_client.py:51-66`）+ 复用自研 `CircuitBreaker`（`src/infrastructure/external_services/embedding/circuit_breaker.py:51`）+ 内联 except 链错误映射到 data_source 子域异常
+- 配置走 dataclass + `from_env()` 模式（参考 `EmbeddingConfig.from_env()` `src/infrastructure/config/embedding.py:31`），API Key 脱敏；**关键安全约束**：Tavily 等 Key 在 URL query 的 API,**except 块必须显式剥除 URL query 中的 key 后再构造异常消息与 `context` 字典**(参考 `LLMConfig.__repr__` 脱敏 `src/infrastructure/config/llm_client.py:97-109`),否则 `cause=e` 异常链可能通过 `str(e)` / 日志 dump 泄露 URL 含 key;异常 `to_dict()` 输出断言零 Key 泄露
+- 配置拆分：每端口独立配置文件(`worldbank.py` / `imf.py` / `eurostat.py` / `uspto.py` / `ipcc.py` / `newsapi.py` / `tavily.py` / `china_nbs.py`),对齐项目 11 个 config 文件单一职责惯例(参考 `src/infrastructure/config/embedding.py`/`redis.py`/`llm_client.py`),非单文件聚合
 
 **验证标准/Validation Criteria:**
 - [ ] 8 个适配器单元测试（httpx.MockTransport 注入模式，全项目唯一先例 `tests/unit/infrastructure/crawler/test_http_crawler_client.py:44-62`）覆盖：成功/超时/5xx 重试耗尽/429 限流/响应解析失败/熔断断开
 - [ ] 异常映射断言：`DataSourceUnavailableError`(411)/`DataSourceRateLimitError`(412)/`DataSourceResponseError`(413)/`TimeoutError`(302)
 - [ ] 8 个适配器全部注册到 composition_root（`data_source_<name>` 命名，SINGLETON 生命周期）
 - [ ] 配置缺失（无 API Key）抛 `ConfigurationError`(101) 且消息不泄露密钥
+- [ ] **CircuitBreaker 差异化配置**：8 个适配器按数据源故障特征差异显式定义熔断参数（`failure_threshold` / `recovery_timeout`）— WorldBank/Eurostat/USPTO 默认 `5/30s`；NewsAPI 早断开 `2/600s`（免费 100 次/天配额敏感）；IPCC 立即熔断 `2/120s`（大文件传输失败代价高）；ChinaNBS 放宽 `10/120s`（爬虫失败率天然高）；Tavily/IMF 默认 `5/30s`
 
 ### AC-3: 数据缓存层与新鲜度评分
 
@@ -616,7 +623,7 @@ class DataSourceResolverPort(Protocol):
 | 🔄 重构 | 运行既有 skill_loader 全套测试确认零回归 |
 
 - [ ] Subtask 1.7: 🔴 红 — 编写扩展失败测试
-- [ ] Subtask 1.8: 🟢 绿 — 实现 ToolMetadata 扩展 + frontmatter 解析
+- [ ] Subtask 1.8: 🟢 绿 — 实现 ToolMetadata 扩展 + frontmatter 解析（**关键：`src/application/skills/frontmatter.py:32-41` `LIST_FIELDS` 追加 `"data_sources"`；`frontmatter.py:170-188` `normalize_metadata` 追加 `data_sources=meta.get("data_sources", ())`，否则 YAML 中添加 `data_sources:` 会被静默丢弃**）
 - [ ] Subtask 1.9: 🔄 重构 — 回归验证（`pytest tests/unit/application/skills/ tests/unit/application/ports/`）
 
 **完成标准/Definition of Done:**
@@ -974,7 +981,7 @@ src/
 │   ├── external_services/
 │   │   └── datasources/                        # [新增] 适配器包
 │   │       ├── __init__.py
-│   │       ├── base.py                         # [新增] 公共 httpx+tenacity+熔断 骨架（仅当真实重复出现）
+│   │       ├── _http_helpers.py                # [可选] 纯函数 helper(_build_retry_decorator / _build_default_circuit_breaker / _sanitize_url_query);**禁止预先抽 base.py 抽象类**(8 适配器中仅 6 个 REST_JSON 真正能复用模板,SDMX/CSV/Crawler 三类差异显著;严格遵守 CLAUDE.md §2 Simplicity First 与 Story 977"仅当真实重复出现时";先抽纯函数,不引入强制继承层级;现有 embedding/llm 已重复未抽 base 是先例)
 │   │       ├── worldbank_adapter.py
 │   │       ├── imf_adapter.py
 │   │       ├── eurostat_adapter.py
