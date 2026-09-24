@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-09-10
+last_updated: 2026-09-24
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -138,7 +138,7 @@ development_status:
   epic-4: in-progress
   4-1-strategic-tool-registration-tools: done
   4-1a-strategic-tool-impl: done
-  4-1b-skills-feat-enhancement: backlog
+  4-1b-skills-feat-enhancement: ready-for-dev
   4-1c-skills-data-collection-integration: backlog
   4-1d-skills-framework-enhancement: backlog
   4-1e-skills-internal-framework: backlog
