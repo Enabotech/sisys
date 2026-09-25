@@ -21,6 +21,7 @@ from .compliance_events import (
     SensitiveDataDetected,
 )
 from .correction_events import CorrectionApproved
+from .data_source_events import DataSourceFetched, DataSourceFetchFailed
 from .dictionary_events import DictionaryUpdated
 from .document_events import DocumentProcessed, DocumentUploaded, DocumentVersionSnapshotCreated
 from .entity_extraction_events import EntitiesExtracted
@@ -73,4 +74,6 @@ __all__ = [
     "WorkflowSubmitted",
     "ValidityPeriodSet",
     "FactBecameStale",
+    "DataSourceFetched",
+    "DataSourceFetchFailed",
 ]

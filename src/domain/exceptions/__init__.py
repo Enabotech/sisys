@@ -32,6 +32,12 @@ from src.domain.exceptions.business_exceptions import (
     PermissionDeniedError,
     ValidationError,
 )
+from src.domain.exceptions.data_source_exceptions import (
+    DataSourceError,
+    DataSourceRateLimitError,
+    DataSourceResponseError,
+    DataSourceUnavailableError,
+)
 from src.domain.exceptions.dictionary_exceptions import (
     DictionaryEntryConflictError,
     DictionaryNotFoundError,
@@ -248,6 +254,11 @@ __all__ = [
     "DictionaryNotFoundError",
     "DictionaryEntryConflictError",
     "DictionaryVersionConflictError",
+    # 数据源异常（Story 4.1b）
+    "DataSourceError",
+    "DataSourceUnavailableError",
+    "DataSourceRateLimitError",
+    "DataSourceResponseError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

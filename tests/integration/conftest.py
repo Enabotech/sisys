@@ -14,6 +14,7 @@ Use pytest markers to select which fixtures to use:
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Generator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -435,3 +436,29 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             subprocess.run(["docker", "rm", "-f", *container_ids], capture_output=True, timeout=30)
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass  # daemon 不可用静默跳过
+
+
+@pytest.fixture
+async def real_crawler() -> AsyncGenerator[Any, None]:
+    """真实 Crawler 服务客户端（Story 4.1b — 中国国家统计局适配器集成测试）
+
+    探活方式：list_supported_formats() 轻量调用（CrawlerClientPort 无 health_check 方法，
+    该调用不消耗任务配额）。crawler 服务不可用时 pytest.skip() 动态跳过
+    （禁止写死 @pytest.mark.skip）。
+    """
+    import os
+
+    from src.infrastructure.crawler.http_crawler_client import HttpCrawlerClient
+
+    base_url = os.getenv("CRAWLER_SERVICE_URL", "http://localhost:8900")
+    client = HttpCrawlerClient(base_url=base_url)
+    try:
+        await client.list_supported_formats()
+    except Exception as e:
+        await client.close()
+        pytest.skip(f"Crawler 服务不可用 ({base_url}): {e}")
+
+    yield client
+
+    # Cleanup: 关闭连接（对齐 real_redis close 模式）
+    await client.close()

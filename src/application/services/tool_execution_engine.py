@@ -20,6 +20,11 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from src.application.ports.data_source_resolver import DataSourceResolverPort
+from src.application.services.data_source_marker import (
+    inject_data_sources,
+    parse_data_source_markers,
+)
 from src.application.services.retry_helpers import RetryPolicy, _call_with_retry
 from src.domain.entities.tool import Tool
 from src.domain.entities.tool_execution import (
@@ -28,13 +33,17 @@ from src.domain.entities.tool_execution import (
     ToolExecutionState,
 )
 from src.domain.exceptions import (
+    BusinessRuleViolationError,
+    DataSourceError,
     ToolExecutionFailedError,
     ToolExecutionRetryExhaustedError,
     ToolExecutionTimeoutError,
+    ValidationError,
 )
 from src.domain.ports.llm_client import LLMClientPort
 from src.domain.ports.sandbox_executor import SandboxExecutor
 from src.domain.ports.tool_execution_repository import ToolExecutionRepositoryPort
+from src.domain.value_objects.data_source import DataSourceMeta
 from src.domain.value_objects.tool_execution import (
     EvidencePackage,
     ExecutionContext,
@@ -81,6 +90,21 @@ class ToolExecutionEngine:
         self._sandbox = sandbox
         self._retry = retry_policy or RetryPolicy()
         self._tool_execution_repository = tool_execution_repository
+        # Story 4.1b：数据源解析器（默认 None 零行为变化；set_data_source_resolver 后注入，
+        # 保护 Story 4.4 AC-7.4 BDD 对 __init__ 参数数量的断言）
+        self._data_source_resolver: DataSourceResolverPort | None = None
+
+    def set_data_source_resolver(self, resolver: DataSourceResolverPort | None) -> None:
+        """后注入数据源解析器（Story 4.1b）
+
+        Args:
+            resolver: DataSourceResolverPort 实现或 None（None 撤销注入，恢复 4.4 既有行为）
+
+        Note:
+            采用 setter 后注入而非 __init__ 参数，避免破坏 Story 4.4 AC-7.4 对
+            构造函数签名的 BDD 断言（两 Story 并行合入 main 的兼容约束）。
+        """
+        self._data_source_resolver = resolver
 
     async def execute(
         self,
@@ -142,6 +166,8 @@ class ToolExecutionEngine:
 
             # === Execute 阶段 ===
             execution.transition_to(ToolExecutionState.EXECUTING)
+            # Story 4.1b：宿主机侧解析 $DATA_SOURCE 标记并注入采集数据（沙箱无网络不变量）
+            code, data_source_metas = await self._resolve_data_sources(code, context, execution)
             result = await self._execute_stage(session_id, code, tool)
             execution.result = result
 
@@ -168,7 +194,7 @@ class ToolExecutionEngine:
                 )
 
             # 构造 EvidencePackage
-            evidence = self._build_evidence(execution, tool, tool_call)
+            evidence = self._build_evidence(execution, tool, tool_call, data_sources=data_source_metas)
 
             tool_result = ToolResult(
                 tool_id=tool_id,
@@ -197,6 +223,14 @@ class ToolExecutionEngine:
                 execution.transition_to(ToolExecutionState.FAILED)
                 execution.completed_at = datetime.now(UTC)
             raise
+        except (BusinessRuleViolationError, ValidationError, DataSourceError) as exc:
+            # Story 4.1b：数据采集相关的领域异常不包装直传（调用方/策略/数据语义错误，
+            # 区别于执行失败 ToolExecutionFailedError）
+            if execution.state not in TERMINAL_STATES:
+                execution.transition_to(ToolExecutionState.FAILED)
+                execution.completed_at = datetime.now(UTC)
+                execution.failure_reason = str(exc)
+            raise
         except Exception as exc:
             # 状态机守卫：仅在非终态时迁移到 FAILED
             if execution.state not in TERMINAL_STATES:
@@ -216,6 +250,64 @@ class ToolExecutionEngine:
                 await self._sandbox.stop_container(session_id)
             except Exception as cleanup_exc:
                 logger.warning("沙箱清理失败: %s", cleanup_exc)
+
+    # ===== 数据源采集（Story 4.1b）=====
+
+    async def _resolve_data_sources(
+        self,
+        code: str,
+        context: ExecutionContext,
+        execution: ToolExecution,
+    ) -> tuple[str, tuple[DataSourceMeta, ...]]:
+        """Execute 阶段前置：解析 $DATA_SOURCE 标记 → 白名单校验 → 并发采集 → preamble 注入
+
+        沙箱 network_mode="none" 为领域不变量（ContainerSpec），外部数据采集必须在
+        宿主机侧完成并以 Python 字面量前言内联注入。
+
+        Args:
+            code: Code 阶段产出的沙箱代码
+            context: 执行上下文（extensions["tool_metadata"] 携带白名单依据）
+            execution: ToolExecution 聚合根（事件 aggregate_id 关联）
+
+        Returns:
+            (注入后的代码, DataSourceMeta 溯源元数据元组)
+
+        Raises:
+            BusinessRuleViolationError: 标记存在但无 tool_metadata（无白名单依据），
+                或数据源未在白名单声明（EXCEPTION_207）
+            ValidationError: 标记语法错误（EXCEPTION_201）
+            DataSourceError: 全部数据源采集失败（412/413/411 等不包装直传）
+        """
+        if self._data_source_resolver is None:
+            return code, ()
+
+        markers = parse_data_source_markers(code)
+        if not markers:
+            return code, ()
+
+        metadata = (context.extensions or {}).get("tool_metadata")
+        if metadata is None:
+            raise BusinessRuleViolationError(
+                message="代码含 $DATA_SOURCE 标记但执行上下文缺少 tool_metadata（无白名单依据）",
+                context={"stage": "resolve_data_sources", "marker_count": len(markers)},
+            )
+
+        results = await self._data_source_resolver.fetch_many(
+            metadata,
+            markers,
+            tenant_id=context.tenant_id,
+            execution_id=execution.execution_id,
+        )
+        metas = tuple(
+            DataSourceMeta(
+                source_name=r.source_name,
+                source_timestamp=r.source_timestamp,
+                freshness_score=r.freshness.score(datetime.now(UTC)),
+                confidence=r.confidence,
+            )
+            for r in results
+        )
+        return inject_data_sources(code, results), metas
 
     # ===== 五阶段端口方法 =====
 
@@ -351,8 +443,9 @@ class ToolExecutionEngine:
         execution: ToolExecution,
         tool: Tool,
         tool_call: ToolCall,
+        data_sources: tuple[DataSourceMeta, ...] = (),
     ) -> EvidencePackage:
-        """组装 EvidencePackage（9 字段统一）"""
+        """组装 EvidencePackage（9 字段统一 + Story 4.1b 数据源溯源元数据）"""
         args_str = json.dumps(tool_call.arguments, sort_keys=True, default=str)
         input_hash = hashlib.sha256(args_str.encode()).hexdigest()[:16]
 
@@ -366,6 +459,7 @@ class ToolExecutionEngine:
             validation=execution.validation or "",
             confidence=tool.reliability_score,
             citations=[],
+            data_sources=data_sources,
         )
 
     # ===== Prompt 构建 =====

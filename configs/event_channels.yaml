@@ -93,6 +93,17 @@ event_channels:
     delivery_mode: "reliable"
     description: "工具链执行完成（双通道：realtime + reliable）"
 
+  DataSourceFetched:
+    redis_channel: "sisys:rt:data_source_fetched"
+    rabbitmq_routing_key: "sisys.events.reliable.data_source_fetched"
+    delivery_mode: "reliable"
+    description: "数据采集成功（Story 4.1b，双通道：realtime + reliable）"
+
+  DataSourceFetchFailed:
+    rabbitmq_routing_key: "sisys.events.reliable.data_source_fetch_failed"
+    delivery_mode: "reliable"
+    description: "数据采集失败（Story 4.1b，reliable 为主）"
+
   ToolSchemaValidationFailed:
     redis_channel: "sisys:rt:tool_schema_validation_failed"
     delivery_mode: "realtime"

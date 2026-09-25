@@ -365,3 +365,10 @@ class _DummyResolver:
             return ToolRegistryService(InMemoryToolRepository())
         # LLM/Sandbox 等外部依赖返回 AsyncMock（架构测试不验证其功能）
         return AsyncMock()
+
+    def resolve_optional(self, name: str, **_kwargs: object) -> object:
+        """Story 4.1b 兼容：tool_execution_engine 工厂经 resolve_optional 注入数据源解析器。
+
+        架构测试不验证数据源编排功能，统一返回 None（等同未注入，零行为变化）。
+        """
+        return None

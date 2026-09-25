@@ -143,6 +143,20 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="工具链执行完成（双通道：realtime + reliable）",
         ),
+        # Story 4.1b — Skills 数据采集基础设施（双通道，与 configs/event_channels.yaml 同步）
+        "DataSourceFetched": ChannelMapping(
+            event_type="DataSourceFetched",
+            redis_channel="sisys:rt:data_source_fetched",
+            rabbitmq_routing_key="sisys.events.reliable.data_source_fetched",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="数据采集成功（Story 4.1b，双通道：realtime + reliable）",
+        ),
+        "DataSourceFetchFailed": ChannelMapping(
+            event_type="DataSourceFetchFailed",
+            rabbitmq_routing_key="sisys.events.reliable.data_source_fetch_failed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="数据采集失败（Story 4.1b，reliable 为主）",
+        ),
         "ToolSchemaValidationFailed": ChannelMapping(
             event_type="ToolSchemaValidationFailed",
             redis_channel="sisys:rt:tool_schema_validation_failed",

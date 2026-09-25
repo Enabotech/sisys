@@ -23,6 +23,7 @@ import yaml
 
 from src.application.ports.skill_loader import ToolMetadata
 from src.domain.exceptions.base_exceptions import DomainError
+from src.domain.value_objects.data_source import DataSourceApiType, DataSourceRef
 
 FRONTMATTER_DELIMITER = "---"
 SLUG_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -150,6 +151,69 @@ def parse_frontmatter(raw_text: str) -> tuple[dict[str, Any], str]:
     return meta, body
 
 
+def _parse_data_source_refs(raw: Any) -> tuple[DataSourceRef, ...]:
+    """将 frontmatter data_sources 键（YAML list of dict）转换为 DataSourceRef 元组。
+
+    Args:
+        raw: YAML 解析后的原始值（期望 list[dict]，空值归一化为空元组）
+
+    Returns:
+        DataSourceRef 元组
+
+    Raises:
+        FrontmatterParseError: 项缺必需字段 / api_type 非法 / 结构类型错误
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, list | tuple):
+        raise FrontmatterParseError(
+            message="data_sources 必须是 list",
+            context={"stage": "normalize_data_sources", "field": "data_sources", "actual_type": type(raw).__name__},
+        )
+    refs: list[DataSourceRef] = []
+    for idx, item in enumerate(raw):
+        field_path = f"data_sources[{idx}]"
+        if not isinstance(item, dict):
+            raise FrontmatterParseError(
+                message=f"{field_path} 必须是 dict",
+                context={"stage": "normalize_data_sources", "field": field_path, "actual_type": type(item).__name__},
+            )
+        missing = {"name", "url", "api_type"} - set(item.keys())
+        if missing:
+            raise FrontmatterParseError(
+                message=f"{field_path} 缺少必需字段: {sorted(missing)}",
+                context={"stage": "normalize_data_sources", "field": field_path, "missing": sorted(missing)},
+            )
+        try:
+            api_type = DataSourceApiType(item["api_type"])
+        except ValueError as exc:
+            raise FrontmatterParseError(
+                message=f"{field_path}.api_type 非法: {item['api_type']!r}",
+                context={"stage": "normalize_data_sources", "field": f"{field_path}.api_type"},
+                cause=exc,
+            ) from exc
+        required_fields = item.get("required_fields", ())
+        if isinstance(required_fields, list):
+            required_fields = tuple(required_fields)
+        try:
+            refs.append(
+                DataSourceRef(
+                    name=item["name"],
+                    url=item["url"],
+                    api_type=api_type,
+                    ttl_seconds=item.get("ttl_seconds", 86400),
+                    required_fields=required_fields,
+                )
+            )
+        except DomainError as exc:
+            raise FrontmatterParseError(
+                message=f"{field_path} 值对象校验失败: {exc.message}",
+                context={"stage": "normalize_data_sources", "field": field_path},
+                cause=exc,
+            ) from exc
+    return tuple(refs)
+
+
 def normalize_metadata(
     meta: dict[str, Any],
     fallback_category: str = "",
@@ -185,6 +249,7 @@ def normalize_metadata(
         token_budget_l2=meta.get("token_budget_l2", 0),
         depends_on=meta.get("depends_on", ()),
         triggers=meta.get("triggers", ()),
+        data_sources=_parse_data_source_refs(meta.get("data_sources")),
     )
 
 
