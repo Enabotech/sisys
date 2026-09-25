@@ -23,6 +23,7 @@ from src.domain.exceptions import (
     EvidenceValidationFailedError,
 )
 from src.domain.services.schema_validator import SchemaViolation
+from src.domain.value_objects.data_source import DataSourceMeta
 
 
 class ToolResultStatus(str, Enum):
@@ -127,6 +128,7 @@ class EvidencePackage:
     - validation: Validate 阶段产物(Story 4.3 扩展:接受 str | dict 存储 violations)
     - confidence: 置信度 ∈ [0.0, 1.0]
     - citations: 引用列表
+    - data_sources: 数据源溯源元数据（Story 4.1b 扩展，$DATA_SOURCE 采集产出的 source/freshness/confidence）
     """
 
     input_hash: str = ""
@@ -138,6 +140,8 @@ class EvidencePackage:
     validation: str | dict = ""
     confidence: float = 0.0
     citations: list[str] = field(default_factory=list)
+    # Story 4.1b 扩展（向后兼容默认空 tuple）
+    data_sources: tuple[DataSourceMeta, ...] = ()
 
     def validate_complete(self) -> bool:
         """完整性校验（必填字段缺失抛 EvidenceValidationFailedError）

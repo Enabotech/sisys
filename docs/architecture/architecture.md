@@ -14,9 +14,9 @@ completedAt: '2026-02-26'
 
 # SISYS - 企业战略智能系统架构设计文档
 
-**版本：** 8.4.0（Round 1 审查修订版 - 异常契约/依赖方向/Skills 对标）
+**版本：** 8.5.0（Story 4.1b 实现同步 - Skills 数据采集基础设施 §17.3.3）
 **状态：** 架构决策主文档 ~3500 行，实现细节迁移至子设计文档
-**评审日期：** 2026-09-05
+**评审日期：** 2026-09-24
 **审核依据：**对标业界最佳实践（Arc42/C4/ADR + Anthropic Claude Code Skills 渐进式披露），将 §8/§17/§18 实现代码迁移至独立子设计文档，架构主文档聚焦决策与规则
 
 [重要说明]本架构设计包含有部分重要模块的详细设计、项目参考目录树与关键代码实现示例，这类型内容仅供开发参考，执行[EPIC]-[STORY]-[编码]等开发任务时按需调整并及时更新本文档即可！
@@ -2767,6 +2767,51 @@ buckets/
 
 > 详见 [sisys-core-domain-design.md §17.2](sisys-core-domain-design.md#172-工具箱架构设计)
 
+#### 17.3.3 Skills 数据采集基础设施（Story 4.1b ✅ 已实现 2026-09-24）
+
+> **状态：** ✅ 已实现（Story 4.1b，DataSourcePort + 8 适配器 + Redis 缓存 + Engine.Execute `$DATA_SOURCE` 集成）
+
+**设计背景：** 沙箱 `network_mode="none"` 为领域不变量（§17.3.1 / ContainerSpec），沙箱代码无法自行访问外部数据 API——数据采集必须在宿主机侧（应用层/引擎）完成并注入沙箱执行上下文。本节定义 Skills 数据驱动分析的公共底座，供 Story 4.1c/4.1d/4.1e 复用。
+
+**四层交付物（六边形映射）：**
+
+| 层次 | 交付物 | 路径 |
+|------|--------|------|
+| domain | `DataSourcePort`（runtime_checkable Protocol：fetch/get_metadata/health_check）+ `DataSourceQuery`（Query Object）+ 值对象（DataSourceRef/DataFreshness/DataSourceResult/DataSourceMeta/DataSourceApiType）+ 异常（410-413）+ 事件（DataSourceFetched/DataSourceFetchFailed） | `src/domain/ports/data_source.py` / `src/domain/value_objects/data_source.py` / `src/domain/exceptions/data_source_exceptions.py` / `src/domain/events/data_source_events.py` |
+| application | `DataSourceResolverPort`/`DataSourceResolverService`（白名单 + 缓存 + 并发 + 新鲜度 + 事件编排）+ `$DATA_SOURCE` 标记解析器（tokenize 掩码 + ast.literal_eval）+ Engine.Execute 集成 + ToolMetadata.data_sources 扩展 | `src/application/ports|services/data_source_resolver.py` / `src/application/services/data_source_marker.py` |
+| infrastructure | 8 个数据源适配器 + 独立配置文件 + 共享 HTTP 韧性纯函数（`_http_helpers.py`） | `src/infrastructure/external_services/datasources/` / `src/infrastructure/config/` |
+| interfaces | `EXCEPTION_HTTP_MAP` +4 映射（410→502/411→503/412→429/413→502），无新 REST 端点 | `src/interfaces/api/exception_handlers.py` |
+
+**8 个数据源适配器（PoC v1/v2 验证选型，Reuters 已替换为 NewsAPI，UNSD/OECD 推迟）：**
+
+| 适配器 | API 类型 | 关键约束 |
+|--------|---------|---------|
+| WorldBankAdapter | REST_JSON（无 Key） | 默认熔断 5/30s |
+| IMFAdapter | SDMX_JSON（DataMapper API） | 默认熔断 5/30s |
+| EurostatAdapter | SDMX_JSON（JSON-stat 2.0） | 默认熔断 5/30s |
+| USPTOAdapter | REST_JSON（PatentsView） | 默认熔断 5/30s |
+| IPCCAdapter | CSV_DOWNLOAD | 立即熔断 2/120s（大文件代价高） |
+| NewsAPIAdapter | REST_JSON + Key（X-Api-Key 头） | 早断开 2/600s（免费 100 次/天配额敏感）；条件注册（NEWSAPI_API_KEY） |
+| TavilyAdapter | REST_JSON + Key（请求体） | 默认熔断 5/30s；条件注册（TAVILY_API_KEY） |
+| ChinaNBSAdapter | CRAWLER（复用 CrawlerClientPort） | 禁止直连（PoC v2 验证 403）；熔断放宽语义由轮询超时兜底 |
+
+**关键架构决策（8 项）：**
+
+| # | 决策点 | 选中方案 | 依据 |
+|---|--------|---------|------|
+| 1 | DataSourcePort 归属层 | domain/ports | LLMClientPort/SandboxExecutor/CrawlerClientPort 外部能力网关均归 domain |
+| 2 | 缓存方案 | 复用 L1CachePort（禁止新建缓存端口） | `set_with_ttl` 现成；缓存键 `sisys:cache:datasource:{tenant}:{source}:{sha256(query)[:16]}` |
+| 3 | Engine 集成方式 | `set_data_source_resolver()` 后注入（__init__ 签名不变） | 保护 Story 4.4 AC-7.4 BDD 对构造函数参数数量的断言；None 时零行为变化 |
+| 4 | 数据注入方式 | Python 字面量 preamble 单行 JSON 内联 | 沙箱无网络不变量不可破坏；可审计；原始标记行保留 |
+| 5 | HTTP 适配器模式 | httpx + tenacity（白名单重试：仅 5xx/超时/传输错误）+ 自研 CircuitBreaker 复用 + 内联异常映射 | EmbeddingAPIClient 现行惯例；纯函数 helper 不抽 base 类（Simplicity First） |
+| 6 | 国家局采集 | 复用 CrawlerClientPort（robots/UA 轮换/限速合规） | PoC v2 直连 HTTP 403 反爬拒绝 |
+| 7 | 异常编码段 | 新增 data_source (410, 419) 子域 | external 301-399 已满；399 预留 Story 4.7；超时/配置/白名单复用 302/101/207（禁止同义异常） |
+| 8 | 白名单语义 | fetch_many 前置统一校验（207 立即抛出）；部分失败收敛 + DataSourceFetchFailed；全部失败抛首个异常 | Engine 依此区分"策略违规"与"数据不可用"；413 解析失败不可重试 |
+
+**执行语义（Engine.Execute 前置）：** Code 产物含 `$DATA_SOURCE(name, "query")` 标记 → 标记解析器提取（字符串字面量内文本不触发，tokenize 掩码）→ 白名单校验（`context.extensions["tool_metadata"]` 的 data_sources）→ `fetch_many` 并发采集（asyncio.gather 部分成功收敛）→ preamble 内联注入 → 沙箱执行 → `EvidencePackage.data_sources` 溯源元数据（source/freshness/confidence）。数据采集领域异常（207/201/410-413）不包装直传，区别于 `ToolExecutionFailedError`。
+
+**新鲜度模型：** `DataFreshness.score(at) = 0.5^(age/half_life)` 指数衰减（默认半衰期 7 天，适配年度统计数据）；`is_stale(at)`（age > ttl_seconds）触发重采；缓存故障降级透传不阻断主流程。
+
 ### 17.4 AGENT 架构
 
 **设计哲学：** 7 类高管角色 Agent（CEO/CFO/CMO/CTO/COO/CHO/AUD）+ 1 SYS AGENT，通过 EIP 弹性隔离协议协作。
@@ -3487,6 +3532,7 @@ pytest tests/unit/domain/
 | 8.3.2 | 2026-05-23 | 审查修订版 - 正确性/一致性/可行性校验 | 架构团队 |
 | 8.3.3 | 2026-09-05 | **Skills 系统对标 Anthropic Claude Code 完善**：①Skills 三级渐进式披露深化（L1/L2/L3 边界量化）②负向触发章节强制 + description 质量强化 ③L3 沙箱事务边界（Anthropic "代码优先" 对标） | 架构团队 |
 | 8.4.0 | 2026-09-05 | **Round 1 文档审查修订**：①依赖方向矩阵修正（infrastructure→application 仅通过 DI 注入）②SAPMessage/datetime.utcnow/raise ValueError 三处异常契约红线修复 ③SKILL.md frontmatter 精减（13 字段→7 字段，删除硬编码 scaffolding）④Skills L1 token 预算统一（消除 200 vs 1200 tokens 矛盾）⑤§13 章节跳号 §13.11 补充 ⑥失效链接 appendix-mcp.md 删除 | 架构团队 |
+| 8.5.0 | 2026-09-24 | **Story 4.1b Skills 数据采集基础设施实现**：①新增 §17.3.3（DataSourcePort + 8 适配器 + Redis 缓存 + Engine.Execute `$DATA_SOURCE` 集成，8 项架构决策表）②data_source 异常子域（410-419）③DataSourceFetched/DataSourceFetchFailed 双通道事件 | 架构团队 |
 
 ---
 
@@ -3499,7 +3545,7 @@ pytest tests/unit/domain/
 | **核心章节** | 20 章（§1-§20） |
 | **附录章节** | 12 章（A-L，§21-§32，详见 arch-appendix.md） |
 | **总章节数** | 32 章 |
-| **版本** | 8.4.0（Round 1 审查修订版 - 异常契约/依赖方向/Skills 对标） |
-| **最后更新** | 2026-09-05 |
+| **版本** | 8.5.0（Story 4.1b 实现同步 - Skills 数据采集基础设施） |
+| **最后更新** | 2026-09-24 |
 
 **所有附录 A~L 单独成章节，编号保持不变，作为主架构文档的详细展开。**

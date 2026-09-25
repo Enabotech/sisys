@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 import redis.asyncio as aioredis
 
@@ -2269,22 +2270,19 @@ def bootstrap() -> None:
         tags=("tool", "execution", "repository", "postgresql", "sqlalchemy"),
     )
 
-    register_port(
-        name="tool_execution_engine",
-        version="v1.0.0",
-        interface=__import__(
-            "src.application.ports.tool_execution_engine",
-            fromlist=["ToolExecutionEnginePort"],
-        ).ToolExecutionEnginePort,
-        # Round 2 审查修订: 注入收窄重试策略 — 默认白名单含 ExecutionError 会把
-        # 沙箱确定性失败(313/316/317)错误重试 3 次并与"超时即销毁"契约冲突;
-        # 仅 LLM 瞬时故障(API/响应/领域超时)可重试
-        impl=lambda resolver: __import__(
+    # Story 4.1b：Engine 后注入数据源解析器（set_data_source_resolver 模式，
+    # __init__ 签名不变以保护 Story 4.4 AC-7.4 BDD 断言）
+    def _build_tool_execution_engine(resolver: Any) -> Any:
+        engine_cls_module = __import__(
             "src.application.services.tool_execution_engine",
             fromlist=["ToolExecutionEngine", "RetryPolicy"],
-        ).ToolExecutionEngine(
+        )
+        engine = engine_cls_module.ToolExecutionEngine(
             llm_client=resolver.resolve("llm_client"),
             sandbox=resolver.resolve("sandbox_executor"),
+            # Round 2 审查修订: 注入收窄重试策略 — 默认白名单含 ExecutionError 会把
+            # 沙箱确定性失败(313/316/317)错误重试 3 次并与"超时即销毁"契约冲突;
+            # 仅 LLM 瞬时故障(API/响应/领域超时)可重试
             retry_policy=__import__(
                 "src.application.services.retry_helpers",
                 fromlist=["RetryPolicy"],
@@ -2296,11 +2294,23 @@ def bootstrap() -> None:
                 )
             ),
             tool_execution_repository=resolver.resolve("tool_execution_repository"),
-        ),
+        )
+        engine.set_data_source_resolver(resolver.resolve_optional("data_source_resolver"))
+        return engine
+
+    register_port(
+        name="tool_execution_engine",
+        version="v1.1.0",  # 升级: Story 4.1b 数据源采集后注入（set_data_source_resolver）
+        interface=__import__(
+            "src.application.ports.tool_execution_engine",
+            fromlist=["ToolExecutionEnginePort"],
+        ).ToolExecutionEnginePort,
+        impl=_build_tool_execution_engine,
         module="src.application.services.tool_execution_engine",
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
         tags=("tool", "execution", "engine"),
+        compatibility=("v1.0.0",),
     )
 
     register_port(
@@ -2339,6 +2349,185 @@ def bootstrap() -> None:
         tags=("tool", "execution", "service", "decorated"),
         compatibility=("v1.0.0",),  # 向后兼容 v1.0.0(ToolExecutionEngine 类仍可传入)
         deprecated=False,
+    )
+
+    # === Story 4.1b — Skills 数据采集基础设施：数据源适配器端口（A 组：免 Key 统计类）===
+    from src.domain.ports.data_source import DataSourcePort
+    from src.infrastructure.config.eurostat import EurostatConfig
+    from src.infrastructure.config.imf import IMFConfig
+    from src.infrastructure.config.worldbank import WorldBankConfig
+
+    register_port(
+        name="data_source_worldbank",
+        version="v1.0.0",
+        interface=DataSourcePort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.datasources.worldbank_adapter",
+            fromlist=["WorldBankAdapter"],
+        ).WorldBankAdapter(config=WorldBankConfig.from_env()),
+        module="src.infrastructure.external_services.datasources.worldbank_adapter",
+        lifetime=Lifetime.SINGLETON,
+        owner="tool-team",
+        tags=("data-source", "worldbank", "statistics"),
+    )
+
+    register_port(
+        name="data_source_imf",
+        version="v1.0.0",
+        interface=DataSourcePort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.datasources.imf_adapter",
+            fromlist=["IMFAdapter"],
+        ).IMFAdapter(config=IMFConfig.from_env()),
+        module="src.infrastructure.external_services.datasources.imf_adapter",
+        lifetime=Lifetime.SINGLETON,
+        owner="tool-team",
+        tags=("data-source", "imf", "statistics"),
+    )
+
+    register_port(
+        name="data_source_eurostat",
+        version="v1.0.0",
+        interface=DataSourcePort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.datasources.eurostat_adapter",
+            fromlist=["EurostatAdapter"],
+        ).EurostatAdapter(config=EurostatConfig.from_env()),
+        module="src.infrastructure.external_services.datasources.eurostat_adapter",
+        lifetime=Lifetime.SINGLETON,
+        owner="tool-team",
+        tags=("data-source", "eurostat", "statistics"),
+    )
+
+    # === Story 4.1b — Skills 数据采集基础设施：数据源适配器端口（B 组）===
+    from src.infrastructure.config.ipcc import IPCCConfig
+    from src.infrastructure.config.uspto import USPTOConfig
+
+    register_port(
+        name="data_source_uspto",
+        version="v1.0.0",
+        interface=DataSourcePort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.datasources.uspto_adapter",
+            fromlist=["USPTOAdapter"],
+        ).USPTOAdapter(config=USPTOConfig.from_env()),
+        module="src.infrastructure.external_services.datasources.uspto_adapter",
+        lifetime=Lifetime.SINGLETON,
+        owner="tool-team",
+        tags=("data-source", "uspto", "patent"),
+    )
+
+    register_port(
+        name="data_source_ipcc",
+        version="v1.0.0",
+        interface=DataSourcePort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.datasources.ipcc_adapter",
+            fromlist=["IPCCAdapter"],
+        ).IPCCAdapter(config=IPCCConfig.from_env()),
+        module="src.infrastructure.external_services.datasources.ipcc_adapter",
+        lifetime=Lifetime.SINGLETON,
+        owner="tool-team",
+        tags=("data-source", "ipcc", "environment"),
+    )
+
+    # 需 API Key 的适配器：条件注册（Story 3-4 Reranker 模式），Key 缺失时优雅降级
+    # （Resolver 内 Mapping.get(name) 返回 None；白名单校验以 ToolMetadata.data_sources 为准）
+    newsapi_enabled = os.getenv("NEWSAPI_API_KEY") is not None
+    if newsapi_enabled:
+        from src.infrastructure.config.newsapi import NewsAPIConfig
+
+        register_port(
+            name="data_source_newsapi",
+            version="v1.0.0",
+            interface=DataSourcePort,
+            impl=lambda resolver: __import__(
+                "src.infrastructure.external_services.datasources.newsapi_adapter",
+                fromlist=["NewsAPIAdapter"],
+            ).NewsAPIAdapter(config=NewsAPIConfig.from_env()),
+            module="src.infrastructure.external_services.datasources.newsapi_adapter",
+            lifetime=Lifetime.SINGLETON,
+            owner="tool-team",
+            tags=("data-source", "newsapi", "news"),
+        )
+
+    tavily_enabled = os.getenv("TAVILY_API_KEY") is not None
+    if tavily_enabled:
+        from src.infrastructure.config.tavily import TavilyConfig
+
+        register_port(
+            name="data_source_tavily",
+            version="v1.0.0",
+            interface=DataSourcePort,
+            impl=lambda resolver: __import__(
+                "src.infrastructure.external_services.datasources.tavily_adapter",
+                fromlist=["TavilyAdapter"],
+            ).TavilyAdapter(config=TavilyConfig.from_env()),
+            module="src.infrastructure.external_services.datasources.tavily_adapter",
+            lifetime=Lifetime.SINGLETON,
+            owner="tool-team",
+            tags=("data-source", "tavily", "web-search"),
+        )
+
+    # 中国国家统计局适配器：复用 CrawlerClientPort（禁止直连抓取，PoC v2 验证 403）
+    register_port(
+        name="data_source_china_nbs",
+        version="v1.0.0",
+        interface=DataSourcePort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.datasources.china_nbs_adapter",
+            fromlist=["ChinaNBSAdapter"],
+        ).ChinaNBSAdapter(
+            crawler_client=resolver.resolve("crawler_client"),
+            config=__import__(
+                "src.infrastructure.config.china_nbs",
+                fromlist=["ChinaNBSConfig"],
+            ).ChinaNBSConfig.from_env(),
+        ),
+        module="src.infrastructure.external_services.datasources.china_nbs_adapter",
+        lifetime=Lifetime.SINGLETON,
+        owner="tool-team",
+        tags=("data-source", "china-nbs", "crawler"),
+    )
+
+    # 数据源解析编排服务（R2 组合注入：聚合 data_source_* 适配器 + L1 缓存 + 事件发布）
+    # Key 缺失的适配器（newsapi/tavily）未注册 → resolve_optional 返回 None → 映射中不含（优雅降级）
+    from src.application.ports.data_source_resolver import DataSourceResolverPort
+
+    def _build_data_source_adapters(resolver: Any) -> dict[str, Any]:
+        """聚合已注册的 data_source_* 适配器（未注册项跳过）"""
+        adapters: dict[str, Any] = {}
+        for port_name, source_name in (
+            ("data_source_worldbank", "world-bank"),
+            ("data_source_imf", "imf"),
+            ("data_source_eurostat", "eurostat"),
+            ("data_source_uspto", "uspto"),
+            ("data_source_ipcc", "ipcc"),
+            ("data_source_newsapi", "newsapi"),
+            ("data_source_tavily", "tavily"),
+            ("data_source_china_nbs", "china-nbs"),
+        ):
+            adapter = resolver.resolve_optional(port_name)
+            if adapter is not None:
+                adapters[source_name] = adapter
+        return adapters
+
+    register_port(
+        name="data_source_resolver",
+        version="v1.0.0",
+        interface=DataSourceResolverPort,
+        impl=lambda resolver: __import__(
+            "src.application.services.data_source_resolver",
+            fromlist=["DataSourceResolverService"],
+        ).DataSourceResolverService(
+            adapters=_build_data_source_adapters(resolver),
+            cache=resolver.resolve("redis_adapter"),
+            event_publisher=resolver.resolve_optional("event_publisher"),
+        ),
+        module="src.application.services.data_source_resolver",
+        lifetime=Lifetime.SINGLETON,
+        owner="tool-team",
+        tags=("data-source", "resolver", "service"),
     )
 
     # === Story 4.3 — Tool IO Schema Validation Ports ===

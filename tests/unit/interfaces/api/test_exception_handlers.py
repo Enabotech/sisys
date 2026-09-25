@@ -38,6 +38,10 @@ from src.domain.exceptions import (
     ConflictError,
     ContainerStartError,
     ContainerStopError,
+    DataSourceError,
+    DataSourceRateLimitError,
+    DataSourceResponseError,
+    DataSourceUnavailableError,
     DictionaryEntryConflictError,
     DictionaryNotFoundError,
     DictionaryVersionConflictError,
@@ -304,6 +308,10 @@ class TestExceptionHttpMap:
             ToolOutputSchemaValidationError,  # 396 — Story 4.3 工具出参 Schema 校验失败
             ToolSchemaCompatibilityError,  # 397 — Story 4.3 Schema 版本兼容性冲突
             ToolSchemaMissingError,  # 398 — Story 4.3 Schema 缺失配置错误
+            DataSourceError,  # 410 — Story 4.1b 数据源通用错误
+            DataSourceUnavailableError,  # 411 — Story 4.1b 数据源不可用
+            DataSourceRateLimitError,  # 412 — Story 4.1b 数据源限流
+            DataSourceResponseError,  # 413 — Story 4.1b 响应解析失败
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

@@ -84,6 +84,13 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # EXCEPTION_398 ToolSchemaMissingError (Story 4.3)
     # 子域物理嵌套于 external (301-399)，但语义独立；EXCEPTION_399 预留供 Story 4.7 扩展
     "toolchain": (390, 399),
+    # 数据源子域（410-419）—— Story 4.1b 注册 4 个异常:
+    # EXCEPTION_410 DataSourceError (Story 4.1b, 数据源通用错误基类)
+    # EXCEPTION_411 DataSourceUnavailableError (Story 4.1b, 数据源不可用/重试耗尽)
+    # EXCEPTION_412 DataSourceRateLimitError (Story 4.1b, 数据源 429 限流)
+    # EXCEPTION_413 DataSourceResponseError (Story 4.1b, 响应解析失败，不可重试)
+    # 子域语义归属 external（ExternalException 子类），物理段独立于 301-399（external 已满）
+    "data_source": (410, 419),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -220,6 +227,11 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ToolOutputSchemaValidationError": "toolchain",
     "ToolSchemaCompatibilityError": "toolchain",
     "ToolSchemaMissingError": "toolchain",
+    # data_source_exceptions.py (Story 4.1b 新增 4 个异常)
+    "DataSourceError": "data_source",
+    "DataSourceUnavailableError": "data_source",
+    "DataSourceRateLimitError": "data_source",
+    "DataSourceResponseError": "data_source",
 }
 
 

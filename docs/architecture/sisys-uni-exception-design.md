@@ -2,7 +2,7 @@
 
 **状态：** 已实现
 **创建日期：** 2026-05-10
-**最后修订日期：** 2026-06-05
+**最后修订日期：** 2026-09-24
 **作者：** Agimtech
 **评审状态：** 已评审
 
@@ -716,6 +716,10 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_397 | ToolSchemaCompatibilityError | BusinessException | 409 |（Story 4.6 灰度发布拦截，schema 不兼容）|
 | EXCEPTION_398 | ToolSchemaMissingError | ConfigurationError | 500 |（Story 4.7 required_schema 集成）|
 | EXCEPTION_399 | （预留 Story 4.7 ValidationFeedbackRetryExhaustedError）| — | — |（Story 4.7 启动时扩域至 400-409，方案 A）|
+| EXCEPTION_410 | DataSourceError | ExternalException | 502 |（Story 4.1b，数据源通用错误基类）|
+| EXCEPTION_411 | DataSourceUnavailableError | DataSourceError | 503 |（Story 4.1b，数据源 5xx/连接失败/熔断断开，重试耗尽后）|
+| EXCEPTION_412 | DataSourceRateLimitError | DataSourceError | 429 |（Story 4.1b，数据源 429 限流）|
+| EXCEPTION_413 | DataSourceResponseError | DataSourceError | 502 |（Story 4.1b，响应解析失败/required_fields 缺失，不可重试）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 ### 3.3 编码分配策略：人工编码 + CI 自动校验
@@ -752,6 +756,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | `embedding` | 306–308 | EmbeddingAPIError 等（嵌套在 external 内） |
 | `sandbox` | 309–319 | SandboxError 等（嵌套在 external 内） |
 | `tool` | 380–389 | ToolNotFoundError, ToolAlreadyExistsError, ToolExecutionFailedError, ToolExecutionRetryExhaustedError, ToolExecutionTimeoutError, EvidenceValidationFailedError, SkillNotFoundError, SkillLoadError, ToolResultValidationError 等（战略性工具异常，物理范围 380-389 嵌套在 external 301-399 内但语义独立；EXCEPTION_384 保留未占用） |
+| `data_source` | 410–419 | DataSourceError, DataSourceUnavailableError, DataSourceRateLimitError, DataSourceResponseError（Story 4.1b Skills 数据采集；语义归属 external，物理段独立于 301-399——external 已满且 399 预留 Story 4.7） |
 | `fallback` | 999 | UnknownError（兜底，独立于所有子域） |
 
 #### 3.3.3 CI 校验规则

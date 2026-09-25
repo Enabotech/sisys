@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Protocol, runtime_checkable
 
+from src.domain.value_objects.data_source import DataSourceRef
+
 
 @dataclass(frozen=True)
 class ToolMetadata:
@@ -45,6 +47,7 @@ class ToolMetadata:
         token_budget_l2: L2 SKILL.md token 预算（按需加载）
         depends_on: 依赖的其他 Skills（用于组合）
         triggers: 触发短语（用于 LLM-based routing）
+        data_sources: 声明的外部数据源白名单（Story 4.1b，Engine.Execute $DATA_SOURCE 采集依据）
     """
 
     tool_name: str
@@ -65,6 +68,8 @@ class ToolMetadata:
     token_budget_l2: int = 0
     depends_on: tuple[str, ...] = ()
     triggers: tuple[str, ...] = ()
+    # Story 4.1b 扩展（向后兼容默认空 tuple）
+    data_sources: tuple[DataSourceRef, ...] = ()
 
 
 @dataclass(frozen=True)
