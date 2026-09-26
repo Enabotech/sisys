@@ -52,7 +52,7 @@ def build_data_source_cache_key(tenant_id: uuid.UUID | str | None, source_name: 
         应用层禁止跨层 import infrastructure，此处内联构造保持依赖方向合规）
     """
     tenant = str(tenant_id) if tenant_id is not None else "global"
-    query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
+    query_hash = hashlib.sha256(query.encode()).hexdigest()
     return f"sisys:cache:datasource:{tenant}:{source_name}:{query_hash}"
 
 
@@ -244,7 +244,11 @@ class DataSourceResolverService:
         latency_ms: float = 0.0,
         execution_id: uuid.UUID | None = None,
     ) -> None:
-        """发布 DataSourceFetched 事件（event_publisher 为 None 时跳过）"""
+        """发布 DataSourceFetched 事件（event_publisher 为 None 时跳过）
+
+        使用 with_execution_id 工厂方法绑定 execution_id，保留 event 的
+        frozen immutability 语义（避免 object.__setattr__ 绕过）。
+        """
         if self._event_publisher is None:
             return
         event = DataSourceFetched(
@@ -256,8 +260,7 @@ class DataSourceResolverService:
             latency_ms=latency_ms,
         )
         if execution_id is not None:
-            object.__setattr__(event, "execution_id", execution_id)
-            object.__setattr__(event, "aggregate_id", execution_id)
+            event = event.with_execution_id(execution_id)
         await self._event_publisher.publish(event)
 
     async def _publish_failed(
@@ -278,8 +281,7 @@ class DataSourceResolverService:
             error_message=str(error_message),
         )
         if execution_id is not None:
-            object.__setattr__(event, "execution_id", execution_id)
-            object.__setattr__(event, "aggregate_id", execution_id)
+            event = event.with_execution_id(execution_id)
         await self._event_publisher.publish(event)
 
 

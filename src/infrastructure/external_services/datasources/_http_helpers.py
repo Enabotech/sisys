@@ -29,6 +29,7 @@ from tenacity import (
 )
 
 from src.domain.exceptions import (
+    ConfigurationError,
     DataSourceRateLimitError,
     DataSourceResponseError,
     DataSourceUnavailableError,
@@ -127,6 +128,14 @@ async def request_json_with_resilience(
                     raise DataSourceRateLimitError(
                         message=f"数据源 {source_name} 触发限流（HTTP 429）",
                         context={"source_name": source_name, "status_code": 429},
+                    )
+                # Round 2 P1-infra-4: 401/403 是 API Key 凭证问题（ConfigurationError 101），
+                # 不归"响应解析失败"413，避免运维误判为响应格式问题。
+                # 构造时 ConfigurationError message 不含 Key 实际值，仅含字段名（防泄露）
+                if resp.status_code in (401, 403):
+                    raise ConfigurationError(
+                        message=f"数据源 {source_name} API Key 无效或未授权（HTTP {resp.status_code}）",
+                        context={"source_name": source_name, "status_code": resp.status_code},
                     )
                 if 400 <= resp.status_code < 500:
                     raise DataSourceResponseError(
