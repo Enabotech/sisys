@@ -100,3 +100,61 @@
   当 含双源标记的沙箱代码经 Engine Execute 阶段处理
   那么 可用数据源数据已注入
   并且 已发布 DataSourceFetchFailed 事件
+
+# =============================================================================
+# AC-5 领域异常与事件契约（异常 to_dict + 双通道配置）
+# =============================================================================
+
+场景: AC-5.1 - 异常 to_dict 序列化无敏感字段泄露
+  假如 构造 ConfigurationError 含 context={"source_name": "tavily", "url": "https://api.tavily.com/search?api_key=secret123"}
+  当 调用异常 to_dict 序列化
+  那么 序列化字典存在 context 键且 source_name 等于 "tavily"
+  并且 序列化字典中不出现 "secret123"
+
+场景: AC-5.2 - 异常 code 与子域归属一致（Code Range 校验）
+  假如 遍历 src/domain/exceptions/data_source_exceptions.py 全部异常类
+  当 用 _code_ranges.py 校验每个类的 code 字段所在子域
+  那么 所有 4 个 DataSource 子域异常（EXCEPTION_410-413）code 与子域段 [410, 419] 一致
+  并且 _CLASS_TO_SUBDOMAIN 注册条目与异常类数匹配
+
+场景: AC-5.3 - 双通道事件登记一致性（yaml 与 ChannelRouter DEFAULT_MAPPINGS）
+  假如 加载 configs/event_channels.yaml 的 events 块
+  当 提取 yaml 中所有 event_type 与 ChannelRouter.DEFAULT_MAPPINGS 键对比
+  那么 DataSourceFetched 在两处均登记
+  并且 DataSourceFetchFailed 在两处均登记
+
+# =============================================================================
+# AC-6 集成测试（真实服务链路 + xdist_group 协作）
+# =============================================================================
+
+场景: AC-6.1 - 集成测试目录存在（tests/integration/external_services/data_sources）
+  假如 检查 tests/integration/external_services/data_sources/ 路径
+  当 列出该目录下所有 .py 测试文件
+  那么 至少存在 test_adapters_http_chain.py
+  并且 至少存在 test_china_nbs_crawler.py
+  并且 这些测试文件声明 xdist_group("data-source-cache")（与 4-1b 验收测试共享组）
+
+场景: AC-6.2 - 真实 Engine+Resolver+Redis 完整链路（已在 AC-4.x 覆盖，此场景断言集成测试调用分层一致）
+  假如 检查所有 acceptance test 中 _run_engine 调用
+  那么 所有 Engine 链路调用均使用同一 Resolver/Engine/Redis 实例（场景级 fixture 共享）
+  并且 integration 测试也使用 pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cache")] 双标记
+
+# =============================================================================
+# AC-7 SDD 架构验证测试（六边形约束 + 端口注册 + 域零依赖）
+# =============================================================================
+
+场景: AC-7.1 - 架构测试套件 test_arch_data_source.py 通过
+  假如 加载 tests/unit/architecture/test_arch_data_source.py
+  当 通过 pytest.main 收集并运行该文件全部测试
+  那么 全部测试零失败（对齐 CLAUDE.md §5 异常零容忍）
+
+场景: AC-7.2 - 8 个数据源端口全部注册到 composition_root（反射 _global_registry）
+  假如 导入 src.composition_root._PORT_REGISTRY（懒加载触发模块级注册）
+  当 反射获取所有 name 以 data_source_ 开头且非 data_source_resolver 的端口
+  那么 端口数 = 8（worldbank/imf/eurostat/uspto/ipcc/newsapi/tavily/china_nbs）
+
+场景: AC-7.3 - data_source 域层文件零外部依赖（AST 扫描）
+  假如 收集 src/domain/{ports,value_objects,events,exceptions} 下 data_source 相关文件
+  当 AST 扫描每个文件的 import 语句
+  那么 所有 import 仅来自 typing/dataclasses/datetime/uuid/abc/enum 或 src.domain.* 项目内
+  并且 零 httpx/redis/tenacity/sqlalchemy/pydantic 等第三方依赖

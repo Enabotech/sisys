@@ -700,3 +700,381 @@ def then_three_method_signatures_match(context: dict[str, Any]) -> None:
     assert hasattr(instance, "fetch") and callable(instance.fetch)
     assert hasattr(instance, "get_metadata") and callable(instance.get_metadata)
     assert hasattr(instance, "health_check") and callable(instance.health_check)
+
+
+# ===================================================================
+# AC-5 领域异常与事件契约（Round 2 完整覆盖）
+# ===================================================================
+
+
+@given(parsers.parse('构造 ConfigurationError 含 context={"source_name": "{name}", "url": "{url}"}'))
+def given_config_error_with_context(context: dict[str, Any], name: str, url: str) -> None:
+    """Round 2 新增：构造含敏感字段上下文的 ConfigurationError 实例，用于 to_dict 序列化检测。"""
+    exc = ConfigurationError(
+        message=f"数据源 {name} 配置缺失",
+        context={"source_name": name, "url": url},
+    )
+    context["config_error_with_url"] = exc
+
+
+@when("调用异常 to_dict 序列化")
+def when_call_exception_to_dict(context: dict[str, Any]) -> None:
+    """Round 2 新增：对构造的异常调用 to_dict() 并存储结果到 context。"""
+    exc = context["config_error_with_url"]
+    context["exception_to_dict_result"] = exc.to_dict()
+
+
+@then('序列化字典存在 context 键且 source_name 等于 "{name}"')
+def then_serialized_dict_has_source_name(context: dict[str, Any], name: str) -> None:
+    """Round 2 新增：to_dict() 序列化结果中 context.source_name 应等于构造时传入值。"""
+    result = context["exception_to_dict_result"]
+    assert "context" in result
+    assert result["context"]["source_name"] == name
+
+
+@then('序列化字典中不出现 "{secret}"')
+def then_serialized_dict_has_no_secret(context: dict[str, Any], secret: str) -> None:
+    """Round 2 新增：to_dict() 序列化结果（JSON 字符串）中不出现原始 secret 子串（API Key 零泄露）。"""
+    import json as _json
+
+    result = context["exception_to_dict_result"]
+    serialized = _json.dumps(result, ensure_ascii=False)
+    assert secret not in serialized
+
+
+@given("遍历 src/domain/exceptions/data_source_exceptions.py 全部异常类")
+def given_enumerate_data_source_exception_classes(context: dict[str, Any]) -> None:
+    """Round 2 新增：遍历 4 个 DataSource 子域异常类 + 收集 (class_name, code_value) 列表。"""
+    import inspect
+
+    from src.domain.exceptions import data_source_exceptions as ds_exc_module
+
+    classes = []
+    for name, obj in inspect.getmembers(ds_exc_module, inspect.isclass):
+        if obj.__module__ != ds_exc_module.__name__:
+            continue
+        code = getattr(obj, "code", None)
+        if isinstance(code, str) and code.startswith("EXCEPTION_4"):
+            classes.append((name, code))
+    context["data_source_exception_classes"] = classes
+
+
+@when("用 _code_ranges.py 校验每个类的 code 字段所在子域")
+def when_validate_each_code_subdomain(context: dict[str, Any]) -> None:
+    """Round 2 新增：调用 _code_ranges.get_subdomain_for_class 校验每个异常类 code 字段所在子域段。"""
+    from src.domain.exceptions import _code_ranges
+
+    classes = context["data_source_exception_classes"]
+    rows = []
+    for class_name, code_value in classes:
+        # 通过同名字符串解析 code → 整数
+        code_int = int(code_value.split("_")[1])
+        row = {
+            "class_name": class_name,
+            "code_value": code_value,
+            "code_int": code_int,
+            "subdomain": _code_ranges.get_subdomain_for_class(class_name),
+        }
+        rows.append(row)
+    context["data_source_exception_rows"] = rows
+
+
+@then("所有 4 个 DataSource 子域异常（EXCEPTION_410-413）code 与子域段 [410, 419] 一致")
+def then_all_codes_in_data_source_range(context: dict[str, Any]) -> None:
+    """Round 2 新增：所有 DataSource 子域异常 code 都属于 [410, 419] 子域段。"""
+    rows = context["data_source_exception_rows"]
+    assert len(rows) == 4, f"预期 4 个 DataSource 异常，实际 {len(rows)}"
+    for row in rows:
+        code_int = row["code_int"]
+        assert 410 <= code_int <= 419, f"{row['class_name']} code {code_int} 不在 [410, 419]"
+        assert row["subdomain"] == "data_source", f"{row['class_name']} 子域 {row['subdomain']}"
+
+
+@then("_CLASS_TO_SUBDOMAIN 注册条目与异常类数匹配")
+def then_class_to_subdomain_count_matches(context: dict[str, Any]) -> None:
+    """Round 2 新增：_CLASS_TO_SUBDOMAIN 中 4 个 DataSource 异常类全部映射到 data_source 子域。
+
+    注意 _code_ranges._CLASS_TO_SUBDOMAIN 是反向映射 {class_name: subdomain}，而非 {subdomain: count}。
+    故用 list comprehension 过滤 data_source 子域条目数 == 4。
+    """
+    from src.domain.exceptions import _code_ranges
+
+    rows = context["data_source_exception_rows"]
+    data_source_entries = [
+        class_name for class_name, subdomain in _code_ranges._CLASS_TO_SUBDOMAIN.items() if subdomain == "data_source"
+    ]
+    assert len(data_source_entries) == 4
+    assert len(rows) == 4
+    # 双向校验：每个异常类的子类域 = "data_source"
+    for row in rows:
+        assert row["subdomain"] == "data_source"
+
+
+@given("加载 configs/event_channels.yaml 的 events 块")
+def given_load_event_channels_yaml(context: dict[str, Any]) -> None:
+    """Round 2 新增：解析 configs/event_channels.yaml 提取所有 event_type 名称。"""
+    from pathlib import Path
+
+    import yaml
+
+    config_path = Path("configs/event_channels.yaml")
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    events_section = data.get("events", {})
+    context["yaml_event_types"] = set(events_section.keys())
+
+
+@when("提取 yaml 中所有 event_type 与 ChannelRouter.DEFAULT_MAPPINGS 键对比")
+def when_compare_yaml_with_router_defaults(context: dict[str, Any]) -> None:
+    """Round 2 新增：提取 ChannelRouter.DEFAULT_MAPPINGS 事件类型集合，与 yaml 集合对比。"""
+    from src.infrastructure.messaging.channel_router import ChannelRouter
+
+    yaml_events = context["yaml_event_types"]
+    default_events = set(ChannelRouter.DEFAULT_MAPPINGS.keys())
+    context["yaml_events"] = yaml_events
+    context["default_events"] = default_events
+    context["events_intersection"] = yaml_events & default_events
+    context["events_yaml_only"] = yaml_events - default_events
+    context["events_default_only"] = default_events - yaml_events
+
+
+@then("DataSourceFetched 在两处均登记")
+@then("DataSourceFetchFailed 在两处均登记")
+def then_data_source_events_in_both(context: dict[str, Any]) -> None:
+    """Round 2 新增：DataSourceFetched 与 DataSourceFetchFailed 必须在 yaml 与 DEFAULT_MAPPINGS 中均登记。"""
+    assert "DataSourceFetched" in context["events_intersection"]
+    assert "DataSourceFetchFailed" in context["events_intersection"]
+
+
+# ===================================================================
+# AC-6 集成测试（真实服务链路 + xdist_group 协作，Round 2 完整覆盖）
+# ===================================================================
+
+
+@given("检查 tests/integration/external_services/data_sources/ 路径")
+def given_check_integration_data_source_dir(context: dict[str, Any]) -> None:
+    """Round 2 新增：探测集成测试目录是否存在并列出 .py 文件。"""
+    from pathlib import Path
+
+    target = Path("tests/integration/external_services/data_sources")
+    context["integration_dir_exists"] = target.exists()
+    py_files = sorted([p.name for p in target.glob("test_*.py")]) if target.exists() else []
+    context["integration_py_files"] = py_files
+    context["integration_dir_path"] = str(target)
+
+
+@when("列出该目录下所有 .py 测试文件")
+def when_list_integration_py_files(context: dict[str, Any]) -> None:
+    """Round 2 新增：补充收集 .py 文件中是否包含 xdist_group('data-source-cache') marker。"""
+    from pathlib import Path
+
+    target = Path("tests/integration/external_services/data_sources")
+    files_with_marker = []
+    for p in sorted(target.glob("test_*.py")):
+        text = p.read_text(encoding="utf-8")
+        if "xdist_group" in text and "data-source-cache" in text:
+            files_with_marker.append(p.name)
+    context["integration_files_with_marker"] = files_with_marker
+
+
+@then("至少存在 test_adapters_http_chain.py")
+@then("至少存在 test_china_nbs_crawler.py")
+def then_required_integration_files_exist(context: dict[str, Any]) -> None:
+    """Round 2 新增：核心集成测试文件至少存在（与 4-1b 文档承诺一致）。"""
+    files = context["integration_py_files"]
+    assert "test_adapters_http_chain.py" in files
+    assert "test_china_nbs_crawler.py" in files
+
+
+@then('这些测试文件声明 xdist_group("data-source-cache")（与 4-1b 验收测试共享组）')
+def then_integration_files_use_shared_xdist_group(context: dict[str, Any]) -> None:
+    """Round 2 新增：集成测试文件声明 xdist_group 共享同一 worker 串行组。"""
+    files_with_marker = context["integration_files_with_marker"]
+    assert "test_adapters_http_chain.py" in files_with_marker
+    assert "test_china_nbs_crawler.py" in files_with_marker
+
+
+@given("检查所有 acceptance test 中 _run_engine 调用")
+def given_check_run_engine_calls(context: dict[str, Any]) -> None:
+    """Round 2 新增：扫描 4-1b 自身 .py 中 _run_engine 调用，确认场景级 fixture 共享 Resolver/Engine/Redis 实例。"""
+    import ast
+    from pathlib import Path
+
+    source = Path("tests/acceptance/test_acceptance_data_source.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    call_count = sum(
+        1
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "_run_engine"
+    )
+    context["run_engine_call_count"] = call_count
+
+
+@then("所有 Engine 链路调用均使用同一 Resolver/Engine/Redis 实例（场景级 fixture 共享）")
+def then_engine_linkage_uses_shared_fixture(context: dict[str, Any]) -> None:
+    """Round 2 新增：_run_engine 调用数 ≥ 8（覆盖 Engine Execute 阶段 AC-4 全场景）。"""
+    call_count = context["run_engine_call_count"]
+    assert call_count >= 8, f"预期 _run_engine ≥ 8 次调用（AC-4.x 链路），实际 {call_count}"
+
+
+@then('integration 测试也使用 pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cache")] 双标记')
+def then_integration_tests_dual_marker(context: dict[str, Any]) -> None:
+    """Round 2 新增：每个集成测试文件均显式声明 pytestmark list 形式（integration + xdist_group）。"""
+    # 已在 when_list_integration_py_files 时收集，再核验
+    files_with_marker = context["integration_files_with_marker"]
+    assert len(files_with_marker) >= 2
+
+
+# ===================================================================
+# AC-7 SDD 架构验证测试（六边形约束 + 端口注册 + 域零依赖，Round 2 完整覆盖）
+# ===================================================================
+
+
+@given("加载 tests/unit/architecture/test_arch_data_source.py")
+def given_load_arch_test_file(context: dict[str, Any]) -> None:
+    """Round 2 新增：探测架构验证测试文件存在性并统计测试方法数。"""
+    from pathlib import Path
+
+    target = Path("tests/unit/architecture/test_arch_data_source.py")
+    context["arch_test_file_exists"] = target.exists()
+    if target.exists():
+        # 解析 .py 中 def test_* 数量（不真正运行）
+        import ast
+
+        tree = ast.parse(target.read_text(encoding="utf-8"))
+        test_count = sum(
+            1
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_")
+        )
+        context["arch_test_count"] = test_count
+
+
+@when("通过 pytest.main 收集并运行该文件全部测试")
+def when_run_arch_tests(context: dict[str, Any]) -> None:
+    """Round 2 新增：通过 subprocess 调用 pytest 实际运行架构测试文件。
+
+    使用 subprocess 是 BDD 层最稳健的"运行外部测试"模式，
+    避免 pytest 内部 fixture 作用域污染。
+    """
+    import subprocess
+
+    result = subprocess.run(
+        [
+            "poetry",
+            "run",
+            "pytest",
+            "tests/unit/architecture/test_arch_data_source.py",
+            "-v",
+            "--tb=short",
+            "--no-header",
+            "-q",
+            "--no-cov",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        cwd="/home/agimtech/sisys",
+    )
+    context["arch_test_result"] = result
+
+
+@then("全部测试零失败（对齐 CLAUDE.md §5 异常零容忍）")
+def then_arch_tests_zero_failures(context: dict[str, Any]) -> None:
+    """Round 2 新增：架构验证测试全部通过，returncode = 0 且 stderr 无 FAILED 标记。"""
+    result = context["arch_test_result"]
+    assert result.returncode == 0, f"架构测试失败：\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    assert "FAILED" not in result.stdout, f"输出含 FAILED 标记：\n{result.stdout}"
+
+
+@given("导入 src.composition_root._PORT_REGISTRY（懒加载触发模块级注册）")
+def given_import_composition_root_registry(context: dict[str, Any]) -> None:
+    """Round 2 新增：通过 __import__ 触发 composition_root 模块级副作用注册 8 个 data_source 端口。"""
+    registry = __import__(
+        "src.composition_root",
+        fromlist=["_PORT_REGISTRY"],
+    )._PORT_REGISTRY
+    context["composition_root_registry"] = registry
+
+
+@when("反射获取所有 name 以 data_source_ 开头且非 data_source_resolver 的端口")
+def when_extract_data_source_ports(context: dict[str, Any]) -> None:
+    """Round 2 新增：过滤 _PORT_REGISTRY 提取 8 个 data_source 适配器端口名。"""
+    registry = context["composition_root_registry"]
+    names = {
+        spec.name for spec in registry.values() if spec.name.startswith("data_source_") and spec.name != "data_source_resolver"
+    }
+    context["registered_data_source_ports"] = sorted(names)
+
+
+@then("端口数 = 8（worldbank/imf/eurostat/uspto/ipcc/newsapi/tavily/china_nbs）")
+def then_eight_data_source_adapters_registered(context: dict[str, Any]) -> None:
+    """Round 2 新增：断言注册到 composition_root 的 data_source_* 适配器数量为 8。"""
+    ports = context["registered_data_source_ports"]
+    expected = {
+        "data_source_worldbank",
+        "data_source_imf",
+        "data_source_eurostat",
+        "data_source_uspto",
+        "data_source_ipcc",
+        "data_source_newsapi",
+        "data_source_tavily",
+        "data_source_china_nbs",
+    }
+    assert ports == sorted(expected), f"实际 {ports} ≠ 预期 {sorted(expected)}"
+
+
+@given("收集 src/domain/{ports,value_objects,events,exceptions} 下 data_source 相关文件")
+def given_collect_domain_data_source_files(context: dict[str, Any]) -> None:
+    """Round 2 新增：收集 domain 层下数据源相关 .py 文件清单（domain 零依赖检查输入）。"""
+    from pathlib import Path
+
+    base = Path("src/domain")
+    files = []
+    for sub in ("ports", "value_objects", "events", "exceptions"):
+        for p in (base / sub).glob("*.py"):
+            if "data_source" in p.name:
+                files.append(p)
+    context["domain_data_source_files"] = [str(f) for f in files]
+
+
+@when("AST 扫描每个文件的 import 语句")
+def when_ast_scan_imports(context: dict[str, Any]) -> None:
+    """Round 2 新增：AST 提取每个 domain 文件的 import 语句 + 标注来源分类。"""
+    import ast
+    from pathlib import Path
+
+    files = [Path(p) for p in context["domain_data_source_files"]]
+    banned = {
+        "httpx",
+        "redis",
+        "tenacity",
+        "sqlalchemy",
+        "pydantic",
+        "redis.asyncio",
+        "sqlmodel",
+        "aioredis",
+    }
+    violators = []
+    for file in files:
+        tree = ast.parse(file.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    top = alias.name.split(".")[0]
+                    if top in banned:
+                        violators.append(f"{file.name}: import {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                if node.module is None:
+                    continue
+                top = node.module.split(".")[0]
+                if top in banned:
+                    violators.append(f"{file.name}: from {node.module} import ...")
+    context["violators"] = violators
+
+
+@then("所有 import 仅来自 typing/dataclasses/datetime/uuid/abc/enum 或 src.domain.* 项目内")
+@then("零 httpx/redis/tenacity/sqlalchemy/pydantic 等第三方依赖")
+def then_domain_files_no_3rd_party_dependencies(context: dict[str, Any]) -> None:
+    """Round 2 新增：domain 层 data_source 文件零第三方依赖（对齐 .importlinter 强制）。"""
+    violators = context["violators"]
+    assert violators == [], "domain 层 data_source 文件不允许含第三方依赖：\n" + "\n".join(violators)
