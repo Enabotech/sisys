@@ -972,6 +972,23 @@ def with_error_mapping(
     return decorator
 ```
 
+#### 3.4.1 数据源 HTTP 韧性映射契约（Story 4.1b）
+
+详见 `src/infrastructure/external_services/datasources/_http_helpers.py` 模块级 docstring 与 `is_retryable_http_error()` 实现。
+
+| 输入 | 输出 | 编码 | 重试 | 熔断 | 触发场景 |
+|------|------|------|------|------|----------|
+| HTTP 429 | DataSourceRateLimitError | 412 | ✗ | ✓ | API Key 限流（NewsAPI 免费 100/天 等） |
+| HTTP 401 / 403 | ConfigurationError | 101 | ✗ | ✗ | API Key 无效 / 未授权 / 配额超限（Round 2 修复：明确凭证语义，避免归"响应解析失败"误导运维） |
+| HTTP 其他 4xx | DataSourceResponseError | 413 | ✗ | ✗ | 客户端确定性错误（400/404/422 等） |
+| HTTP 5xx（重试耗尽） | DataSourceUnavailableError | 411 | ✓ | ✓ | 服务端瞬时故障（500/502/503/504） |
+| `httpx.TimeoutException` | TimeoutError | 302 | ✓ | ✓ | 网络抖动超时（与全项目 embedding/llm 共用） |
+| `httpx.TransportError` | DataSourceUnavailableError | 411 | ✓ | ✓ | DNS 失败 / 连接拒绝 / TLS 握手失败 |
+| JSON 解析失败 | DataSourceResponseError | 413 | ✗ | ✗ | 响应 schema 不符（不计入熔断统计） |
+| `CircuitBreakerOpenError` | DataSourceUnavailableError | 411 | — | — | 熔断器已断开（fast-fail，避免重试浪费配额） |
+
+**差异化熔断配置**（Story 4.1b AC-2）：WorldBank/Eurostat/USPTO 默认 `5/30s`；NewsAPI 早断开 `2/600s`（免费配额敏感）；IPCC 立即熔断 `2/120s`（大文件传输代价高）；ChinaNBS 放宽 `10/120s`（爬虫失败率天然高）。
+
 ### 3.5 结构化日志集成
 
 ```python

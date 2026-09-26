@@ -208,7 +208,13 @@ class DataSourceResolverService:
             source_ts = datetime.fromisoformat(entry["source_timestamp"])
             fetched_at = datetime.fromisoformat(entry["fetched_at"])
         except (KeyError, ValueError, TypeError) as e:
-            logger.warning("数据源缓存条目损坏（按未命中处理）: %s", type(e).__name__)
+            # Round 3 P2-app-1: 主动清理损坏条目，避免同 key 重复 deserialize 失败
+            # + 日志噪音 + Redis 重复 IO（cache-aside pattern：Caffeine/Spring/redis-py 官方示例）
+            logger.warning("数据源缓存条目损坏（按未命中处理 + 主动清理）: %s", type(e).__name__)
+            try:
+                await self._cache.delete(cache_key)
+            except Exception:
+                pass  # 清理失败不影响"按未命中处理"主流程
             return None
 
         freshness = DataFreshness(source_timestamp=source_ts, ttl_seconds=ref.ttl_seconds)
