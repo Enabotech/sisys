@@ -1083,6 +1083,7 @@ def when_run_arch_tests(context: dict[str, Any]) -> None:
     避免 pytest 内部 fixture 作用域污染。
     """
     import subprocess
+    from pathlib import Path
 
     result = subprocess.run(
         [
@@ -1099,7 +1100,8 @@ def when_run_arch_tests(context: dict[str, Any]) -> None:
         capture_output=True,
         text=True,
         timeout=120,
-        cwd="/home/agimtech/sisys",
+        # 从当前文件推导仓库根（tests/acceptance/ 上溯两级），禁止硬编码绝对路径（CI/容器环境路径不同）
+        cwd=Path(__file__).resolve().parents[2],
     )
     context["arch_test_result"] = result
 
