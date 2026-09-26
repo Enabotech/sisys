@@ -1,0 +1,354 @@
+# =============================================================================
+# Story 4.1c — 6 个外部数据型 Skills input_schema / output_schema 契约（Task 0.2 SSOT）
+#
+# 本文件是 6 个 SKILL.md frontmatter `input_schema`/`output_schema` 字段级定义的
+# 唯一事实源（Single Source of Truth）。Task 2-7 TDD 红阶段以本文件为断言输入，
+# 实施内容必须与本文件逐字一致（required 集合 / properties 键 / type / description），
+# 禁止实施期临时增删字段；如需变更必须先修订本文件。
+#
+# 载体决策（D6）：frontmatter `input_schema`/`output_schema` 键（JSON Schema dict），
+# 运行时 Pydantic 强制校验属 Story 4.3 范畴，本 Story 仅定义契约。
+# =============================================================================
+
+version: "1.0.0"
+story: 4-1c-skills-data-collection-integration
+
+skills:
+
+  # ---------------------------------------------------------------------------
+  # PESTEL 分析（6 源：world-bank / imf / eurostat / ipcc / newsapi / china-nbs）
+  # ---------------------------------------------------------------------------
+  pestel-analysis:
+    input_schema:
+      type: object
+      required: [industry, region_scope, time_horizon_years]
+      properties:
+        industry:
+          type: string
+          description: 目标行业（如 "新能源汽车"）
+        region_scope:
+          type: string
+          description: 地域范围（如 "global" / "china" / "eu"）
+        time_horizon_years:
+          type: integer
+          description: 分析年限（1-10 年）
+        focus_dimensions:
+          type: array
+          description: 可选聚焦维度子集（缺省全六维度）
+          items:
+            type: string
+            enum: [P, E, S, T, En, L]
+    output_schema:
+      type: object
+      required: [pestel_dimensions, weighted_total, score_grade, data_sources]
+      properties:
+        pestel_dimensions:
+          type: array
+          description: 六维度评估结果（每维度含评分/指标/来源）
+          items:
+            type: object
+            required: [dimension, score, indicators, sources]
+            properties:
+              dimension:
+                type: string
+                enum: [P, E, S, T, En, L]
+                description: 维度代码
+              score:
+                type: number
+                description: 维度评分（0-1，机会趋 1 威胁趋 0）
+              indicators:
+                type: array
+                description: 关键指标观测值列表
+                items:
+                  type: object
+              sources:
+                type: array
+                description: 该维度数据来源（≥3 独立来源三角化）
+                items:
+                  type: string
+        weighted_total:
+          type: number
+          description: 加权总分（权重见 references/scoring_matrix.json）
+        score_grade:
+          type: string
+          enum: [机会主导, 中性, 威胁主导]
+          description: 综合评级（≥0.7 机会 / ≤0.4 威胁 / 其余中性）
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # 波特五力（3 源：newsapi / world-bank / eurostat）
+  # ---------------------------------------------------------------------------
+  porters-five-forces:
+    input_schema:
+      type: object
+      required: [industry, region_scope]
+      properties:
+        industry:
+          type: string
+          description: 目标行业
+        region_scope:
+          type: string
+          description: 地域范围
+        incumbent_players:
+          type: array
+          description: 可选已知在位企业清单
+          items:
+            type: string
+    output_schema:
+      type: object
+      required: [five_forces, overall_attractiveness, data_sources]
+      properties:
+        five_forces:
+          type: array
+          description: 五力评估结果（每力含评分/证据/来源）
+          items:
+            type: object
+            required: [force, score, evidence, sources]
+            properties:
+              force:
+                type: string
+                enum: [现有竞争, 新进入者威胁, 替代品威胁, 供应商议价力, 购买者议价力]
+                description: 五力名称
+              score:
+                type: number
+                description: 力量强度评分（0-1，越大压力越强）
+              evidence:
+                type: array
+                description: 支撑证据列表
+                items:
+                  type: string
+              sources:
+                type: array
+                description: 数据来源
+                items:
+                  type: string
+        overall_attractiveness:
+          type: string
+          enum: [高, 中, 低]
+          description: 行业综合吸引力评级
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # $APPEALS 分析（3 源：tavily / newsapi / china-nbs）
+  # ---------------------------------------------------------------------------
+  appeals-analysis:
+    input_schema:
+      type: object
+      required: [product_category, target_segment]
+      properties:
+        product_category:
+          type: string
+          description: 产品类别（如 "智能手表"）
+        target_segment:
+          type: string
+          description: 目标客群细分市场
+        region_scope:
+          type: string
+          description: 地域范围（缺省 china）
+    output_schema:
+      type: object
+      required: [appeals_dimensions, overall_score, data_sources]
+      properties:
+        appeals_dimensions:
+          type: array
+          description: $APPEALS 八维度评估（价格/可获得性/包装/性能/易用性/保证程度/生命周期成本/社会接受度）
+          items:
+            type: object
+            required: [dimension, score, customer_evidence, sources]
+            properties:
+              dimension:
+                type: string
+                enum: [价格, 可获得性, 包装, 性能, 易用性, 保证程度, 生命周期成本, 社会接受度]
+                description: 维度名称
+              score:
+                type: number
+                description: 维度评分（0-1）
+              customer_evidence:
+                type: array
+                description: 顾客洞察证据列表
+                items:
+                  type: string
+              sources:
+                type: array
+                description: 数据来源
+                items:
+                  type: string
+        overall_score:
+          type: number
+          description: 综合顾客价值评分（0-1）
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # 竞争对手分析（4 源：newsapi / uspto / tavily / china-nbs）
+  # ---------------------------------------------------------------------------
+  competitor-analysis:
+    input_schema:
+      type: object
+      required: [industry, competitors]
+      properties:
+        industry:
+          type: string
+          description: 目标行业
+        competitors:
+          type: array
+          description: 竞品企业清单（≥1 家）
+          items:
+            type: string
+        analysis_dimensions:
+          type: array
+          description: 可选对标维度子集（缺省全维度）
+          items:
+            type: string
+    output_schema:
+      type: object
+      required: [competitor_profiles, benchmark_matrix, data_sources]
+      properties:
+        competitor_profiles:
+          type: array
+          description: 竞品画像列表
+          items:
+            type: object
+            required: [name, strategy_summary, patent_signals, sources]
+            properties:
+              name:
+                type: string
+                description: 竞品企业名称
+              strategy_summary:
+                type: string
+                description: 战略动向摘要
+              patent_signals:
+                type: array
+                description: 专利技术信号（USPTO）
+                items:
+                  type: string
+              sources:
+                type: array
+                description: 数据来源
+                items:
+                  type: string
+        benchmark_matrix:
+          type: object
+          description: 竞品对标矩阵（维度 × 企业评分）
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # 情景规划（3 源：tavily / ipcc / eurostat）
+  # ---------------------------------------------------------------------------
+  scenario-planning:
+    input_schema:
+      type: object
+      required: [focal_issue, time_horizon_years]
+      properties:
+        focal_issue:
+          type: string
+          description: 核心议题（如 "2035 年欧洲能源结构"）
+        time_horizon_years:
+          type: integer
+          description: 情景年限（5-30 年）
+        region_scope:
+          type: string
+          description: 地域范围（缺省 global）
+    output_schema:
+      type: object
+      required: [scenarios, uncertainty_matrix, data_sources]
+      properties:
+        scenarios:
+          type: array
+          description: 情景剧本列表（2×2 矩阵四情景）
+          items:
+            type: object
+            required: [name, driving_forces, narrative, indicators]
+            properties:
+              name:
+                type: string
+                description: 情景名称
+              driving_forces:
+                type: array
+                description: 关键驱动因素
+                items:
+                  type: string
+              narrative:
+                type: string
+                description: 情景叙事
+              indicators:
+                type: array
+                description: 先行指标观测值
+                items:
+                  type: object
+        uncertainty_matrix:
+          type: object
+          description: 不确定性矩阵（双关键不确定性轴定义）
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # 破坏性创新模型（2 源：uspto / tavily，双源交叉验证 — 决策 D4）
+  # ---------------------------------------------------------------------------
+  disruptive-innovation:
+    input_schema:
+      type: object
+      required: [technology_domain]
+      properties:
+        technology_domain:
+          type: string
+          description: 技术领域（如 "固态电池"）
+        incumbent_industry:
+          type: string
+          description: 可选在位行业（评估颠覆对象）
+    output_schema:
+      type: object
+      required: [disruption_signals, technology_maturity, innovation_assessment, data_sources]
+      properties:
+        disruption_signals:
+          type: array
+          description: 颠覆信号清单（专利/市场/技术信号）
+          items:
+            type: object
+            required: [signal_type, description, strength, sources]
+            properties:
+              signal_type:
+                type: string
+                enum: [专利信号, 市场信号, 技术信号]
+                description: 信号类型
+              description:
+                type: string
+                description: 信号描述
+              strength:
+                type: number
+                description: 信号强度（0-1）
+              sources:
+                type: array
+                description: 数据来源（双源交叉验证）
+                items:
+                  type: string
+        technology_maturity:
+          type: string
+          enum: [萌芽期, 成长期, 成熟期, 衰退期]
+          description: 技术成熟度评级
+        innovation_assessment:
+          type: string
+          description: 颠覆性创新综合评估结论
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object

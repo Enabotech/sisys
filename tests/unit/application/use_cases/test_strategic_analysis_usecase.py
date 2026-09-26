@@ -158,7 +158,8 @@ class TestStrategicAnalysisUseCase:
         # 验证
         assert result.status == ToolResultStatus.SUCCESS
         mock_registry.get_tool.assert_called_once_with(tool_name="pestel-analysis")
-        mock_skill_loader.load_metadata.assert_called_once_with("pestel-analysis")
+        # Story 4.1c 接线：load_metadata(L1) → load_sop(L2, 含 data_sources 白名单)
+        mock_skill_loader.load_sop.assert_called_once_with("pestel-analysis")
         mock_execution_service.execute.assert_called_once()
         mock_event_publisher.publish.assert_called_once()
 

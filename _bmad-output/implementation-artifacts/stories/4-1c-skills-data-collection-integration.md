@@ -1,6 +1,6 @@
 # Story 4.1c: Skills 数据采集集成（外部数据型 Skills 完善）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -118,8 +118,8 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 
 ### 登记确认动作（Task 0 必做）
 
-- [ ] `grep -rn "EXCEPTION_41[4-9]" src/` 确认 414-419 空闲但**本 Story 不使用**（防止实施中临时新增异常）
-- [ ] BDD 异常路径场景纳入 Edge Cases（207/411/412 断言 `error.code` + `error.message`）
+- [x] `grep -rn "EXCEPTION_41[4-9]" src/` 确认 414-419 空闲但**本 Story 不使用**（防止实施中临时新增异常）
+- [x] BDD 异常路径场景纳入 Edge Cases（207/411/412 断言 `error.code` + `error.message`）
 
 ---
 
@@ -270,11 +270,11 @@ context = ExecutionContext(
 - 17 个非目标 Skill 的 `data_sources` 保持空 tuple（不被误填）
 
 **验证标准/Validation Criteria:**
-- [ ] 6 个 Skills 单元测试（`test_<slug>_4_1c.py`）断言白名单解析结果 == SSOT 表
-- [ ] **frontmatter data_sources 全字段**（name/api_type/ttl_seconds/url/required_fields）逐字等于 SSOT 表（Round 2 P2-1）
-- [ ] **跨循环一致性（C 循环，Round 2 P0-1）**：SOP body 中所有 `$DATA_SOURCE("name", "query")` 标记提取的 name 集合 == frontmatter.data_sources name 集合（双向断言：白名单过宽/过窄均失败）
-- [ ] 声明 url ↔ 适配器 url 一致性断言通过
-- [ ] 23 Skills 全量解析回归通过（含 17 个未触碰 Skill 空 tuple 断言）
+- [x] 6 个 Skills 单元测试（`test_<slug>_4_1c.py`）断言白名单解析结果 == SSOT 表
+- [x] **frontmatter data_sources 全字段**（name/api_type/ttl_seconds/url/required_fields）逐字等于 SSOT 表（Round 2 P2-1）
+- [x] **跨循环一致性（C 循环，Round 2 P0-1）**：SOP body 中所有 `$DATA_SOURCE("name", "query")` 标记提取的 name 集合 == frontmatter.data_sources name 集合（双向断言：白名单过宽/过窄均失败）
+- [x] 声明 url ↔ 适配器 url 一致性断言通过
+- [x] 23 Skills 全量解析回归通过（含 17 个未触碰 Skill 空 tuple 断言）
 
 ### AC-2: 生产链路接线（StrategicAnalysisUseCase 注入 tool_metadata）
 
@@ -288,11 +288,11 @@ context = ExecutionContext(
 - 未成熟化的 17 个 Skill（data_sources 空 tuple）代码含标记时抛 207（白名单为空，安全失败）
 
 **验证标准/Validation Criteria:**
-- [ ] **StrategicAnalysisUseCase** 单元测试 4 场景（load_sop 注入 / 加载失败容错 / 无标记零行为变化 / 空白名单 207）
-- [ ] **RunToolChainUseCase** 单元测试 3 场景（多节点并发 load_sop + 任一节点 metadata 注入 / 全部 load_sop 失败时 extensions = {} / 无节点零行为变化）— Round 1 D2 新增
-- [ ] `ToolExecutionEngine.__init__` 签名不变（4.4 BDD AC-7.4 回归全绿）
-- [ ] 既有 `test_acceptance_strategic_tool_impl` / `test_acceptance_docker_sandbox` 回归全绿
-- [ ] **既有 tool_chain 链路验收测试** 零回归（双入口改动影响范围可控）
+- [x] **StrategicAnalysisUseCase** 单元测试 4 场景（load_sop 注入 / 加载失败容错 / 无标记零行为变化 / 空白名单 207）
+- [x] **RunToolChainUseCase** 单元测试 3 场景（多节点并发 load_sop + 任一节点 metadata 注入 / 全部 load_sop 失败时 extensions = {} / 无节点零行为变化）— Round 1 D2 新增
+- [x] `ToolExecutionEngine.__init__` 签名不变（4.4 BDD AC-7.4 回归全绿）
+- [x] 既有 `test_acceptance_strategic_tool_impl` / `test_acceptance_docker_sandbox` 回归全绿
+- [x] **既有 tool_chain 链路验收测试** 零回归（双入口改动影响范围可控）
 
 ### AC-3: SOP 成熟化（6 个 Skills 内容升级，对标 Anthropic Skills 规范）
 
@@ -307,10 +307,10 @@ context = ExecutionContext(
 - **newsapi/tavily Key 缺失降级行为在 SOP 失败处理章节文档化**（适配器未注册 → 411 "未注册" 语义 → LLM 应基于其余源继续分析并标注数据缺口）
 
 **验证标准/Validation Criteria:**
-- [ ] 6 个 Skills 单元测试断言 SOP 必备章节存在 + input_examples 非 placeholder + 行数 ≤500
-- [ ] frontmatter input_schema/output_schema 含 required 字段断言
-- [ ] references/templates 文件存在性断言
-- [ ] pestel 既有 references/scripts 资产引用断言（不破坏既有 L3 加载测试）
+- [x] 6 个 Skills 单元测试断言 SOP 必备章节存在 + input_examples 非 placeholder + 行数 ≤500
+- [x] frontmatter input_schema/output_schema 含 required 字段断言
+- [x] references/templates 文件存在性断言
+- [x] pestel 既有 references/scripts 资产引用断言（不破坏既有 L3 加载测试）
 
 ### AC-4: 集成测试（真实服务 + 多源三角化 + 新鲜度）
 
@@ -325,9 +325,9 @@ context = ExecutionContext(
 - Key 缺失场景（newsapi/tavily 未注册）：声明含这两个源的 Skill 部分失败收敛，其余源正常注入
 
 **验证标准/Validation Criteria:**
-- [ ] 集成测试全绿（真实 Redis 不可用时 `pytest.skip()` 动态跳过）
-- [ ] 三角化断言：5 个 Skill 注入源数 == 声明源数；disruptive-innovation == 2
-- [ ] `pytest -n 8` 并行通过（`xdist_group("data-source-cache")`），连续 5 次无随机失败
+- [x] 集成测试全绿（真实 Redis 不可用时 `pytest.skip()` 动态跳过）
+- [x] 三角化断言：5 个 Skill 注入源数 == 声明源数；disruptive-innovation == 2
+- [x] `pytest -n 8` 并行通过（`xdist_group("data-source-cache")`），连续 5 次无随机失败
 
 ### AC-5: SDD 架构验证测试
 
@@ -348,9 +348,9 @@ context = ExecutionContext(
 **And** Edge Cases 覆盖：白名单外数据源（207）、数据源不可用部分失败收敛、Key 缺失降级（411 语义）、缓存命中、三角化源数断言、未成熟化 Skill 空白名单 207
 
 **验证标准/Validation Criteria:**
-- [ ] `tests/acceptance/test_acceptance_skill_data_collection_4_1c.feature`（`# language: zh-CN`，按 AC 分节）
-- [ ] `tests/acceptance/test_acceptance_skill_data_collection_4_1c.py`（scenarios() + context dict + 共享 event_loop + 真实服务 + Fake 仅限适配器/LLM/Sandbox）
-- [ ] 全部场景通过
+- [x] `tests/acceptance/test_acceptance_skill_data_collection_4_1c.feature`（`# language: zh-CN`，按 AC 分节）
+- [x] `tests/acceptance/test_acceptance_skill_data_collection_4_1c.py`（scenarios() + context dict + 共享 event_loop + 真实服务 + Fake 仅限适配器/LLM/Sandbox）
+- [x] 全部场景通过
 
 ---
 
@@ -363,33 +363,33 @@ context = ExecutionContext(
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 #### 领域事件 Schema (Domain Events)
-- [ ] 本 Story 不新增领域事件（复用 `DataSourceFetched`/`DataSourceFetchFailed`），Task 0 显式登记该决策
+- [x] 本 Story 不新增领域事件（复用 `DataSourceFetched`/`DataSourceFetchFailed`），Task 0 显式登记该决策
 
 #### 数据模型 (Data Models)
-- [ ] 本 Story 不新增值对象/实体（复用 `DataSourceRef`/`ToolMetadata.data_sources`/`EvidencePackage.data_sources`）
-- [ ] **6 个 Skills 的 `input_schema`/`output_schema` JSON Schema 字段级定义文档固化**（产出物：`tests/acceptance/contracts/skill_io_schemas_4_1c.yaml` 或 Story 文档独立子表）：
+- [x] 本 Story 不新增值对象/实体（复用 `DataSourceRef`/`ToolMetadata.data_sources`/`EvidencePackage.data_sources`）
+- [x] **6 个 Skills 的 `input_schema`/`output_schema` JSON Schema 字段级定义文档固化**（产出物：`tests/acceptance/contracts/skill_io_schemas_4_1c.yaml` 或 Story 文档独立子表）：
   - 每个 Skill 的 `input_schema.required` 字段（如 pestel-analysis 需 `industry` / `region_scope` / `time_horizon_years` 等）
   - 每个 Skill 的 `output_schema.required` 字段（如 `pestel_dimensions[]` / 各维度指标对象）
   - 字段类型（string / number / enum）+ description
-- [ ] 字段级定义作为各 Skill TDD 红阶段断言输入（Task 2-7 [A] 循环断言 input_schema 含 required 字段）
+- [x] 字段级定义作为各 Skill TDD 红阶段断言输入（Task 2-7 [A] 循环断言 input_schema 含 required 字段）
 
 #### 统一端口定义注册与管理 (Port Contract)
-- [ ] 本 Story 不新增端口（显式决策）；复用 `DataSourcePort`/`DataSourceResolverPort`/`SkillLoaderPort`
-- [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
-- [ ] 既有端口契约测试回归全绿（`test_port_contract_data_source*.py`）
+- [x] 本 Story 不新增端口（显式决策）；复用 `DataSourcePort`/`DataSourceResolverPort`/`SkillLoaderPort`
+- [x] 禁止在服务文件中本地定义 Protocol / Port 抽象
+- [x] 既有端口契约测试回归全绿（`test_port_contract_data_source*.py`）
 
 #### 端口契约清单执行约束（强制）
-- [ ] 本 Story「端口与数据契约」节是唯一事实源（含 6 Skills 数据源声明 SSOT 表）
-- [ ] 禁止新增未登记端口；禁止语义重复端口
-- [ ] 6 Skills 声明与 SSOT 表逐字一致，实施期增删源必须先修订本 Story 文档
+- [x] 本 Story「端口与数据契约」节是唯一事实源（含 6 Skills 数据源声明 SSOT 表）
+- [x] 禁止新增未登记端口；禁止语义重复端口
+- [x] 6 Skills 声明与 SSOT 表逐字一致，实施期增删源必须先修订本 Story 文档
 
 #### 领域异常契约 (Domain Exception Contract)
-- [ ] 见「🎯 领域异常契约」节：不新增异常（显式决策），复用 201/207/101/302/411/412/413 + FrontmatterParseError + 387/388
-- [ ] `grep -rn "EXCEPTION_41[4-9]" src/` 确认本 Story 零新增
-- [ ] BDD 异常路径场景纳入 Edge Cases（207/411/412）
+- [x] 见「🎯 领域异常契约」节：不新增异常（显式决策），复用 201/207/101/302/411/412/413 + FrontmatterParseError + 387/388
+- [x] `grep -rn "EXCEPTION_41[4-9]" src/` 确认本 Story 零新增
+- [x] BDD 异常路径场景纳入 Edge Cases（207/411/412）
 
 #### API 契约 (API Contract)
-- [ ] 本 Story 不新增 REST 端点，无 `openapi.yaml` 变更（纯 Skills 内容 + 内部接线）
+- [x] 本 Story 不新增 REST 端点，无 `openapi.yaml` 变更（纯 Skills 内容 + 内部接线）
 
 #### 六边形架构约束（必须遵守）
 
@@ -412,9 +412,9 @@ context = ExecutionContext(
 | **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_skill_data_collection_4_1c.feature`（`# language: zh-CN`）
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_skill_data_collection_4_1c.py`
-- [ ] Happy Path + Edge Cases 全覆盖（白名单外 207 / 部分失败收敛 / Key 缺失降级 / 缓存命中 / 三角化断言 / 空白名单 207 共 6 个 Edge Cases）
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_skill_data_collection_4_1c.feature`（`# language: zh-CN`）
+- [x] 步骤实现文件：`tests/acceptance/test_acceptance_skill_data_collection_4_1c.py`
+- [x] Happy Path + Edge Cases 全覆盖（白名单外 207 / 部分失败收敛 / Key 缺失降级 / 缓存命中 / 三角化断言 / 空白名单 207 共 6 个 Edge Cases）
 
 **BDD 步骤实现约束：**
 - 步骤函数使用场景级共享 `event_loop` + `run_until_complete()`（禁止 `@pytest.mark.asyncio`）
@@ -422,9 +422,9 @@ context = ExecutionContext(
 - Edge Cases 必须包含异常路径断言 `error.code` + `error.message`
 
 **Task 0 完成标志：**
-- [ ] 规范项全部定义完毕（6 Skills Schema 契约 + 声明 SSOT 表固化 + 接线方案评审）
-- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
-- [ ] "不新增端口/异常/事件"三项显式决策已登记
+- [x] 规范项全部定义完毕（6 Skills Schema 契约 + 声明 SSOT 表固化 + 接线方案评审）
+- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
+- [x] "不新增端口/异常/事件"三项显式决策已登记
 
 ---
 
@@ -461,13 +461,13 @@ context = ExecutionContext(
 
 #### 覆盖率要求
 
-- [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
-- [ ] **应用层 ≥85%**（`make test-cov-application`，4-1b Round 1 已建分层门禁 `Makefile:278-291`）——本 Story 应用层改动仅限 `strategic_analysis.py` 接线 + 纯资源文件，接线分支（成功/容错/None）覆盖率 100%
-- [ ] **关键路径 100%**：use case 接线全分支（load_sop 成功/失败容错/extensions 有无注入）
+- [x] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
+- [x] **应用层 ≥85%**（`make test-cov-application`，4-1b Round 1 已建分层门禁 `Makefile:278-291`）——本 Story 应用层改动仅限 `strategic_analysis.py` 接线 + 纯资源文件，接线分支（成功/容错/None）覆盖率 100%
+- [x] **关键路径 100%**：use case 接线全分支（load_sop 成功/失败容错/extensions 有无注入）
 
 #### 代码质量门禁
-- [ ] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
-- [ ] **MyPy 类型检查通过**（`poetry run mypy src/`）
+- [x] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
+- [x] **MyPy 类型检查通过**（`poetry run mypy src/`）
 - [ ] **无 P0/P1 级别问题**（代码审查）
 - [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
 
@@ -476,10 +476,10 @@ context = ExecutionContext(
 > 见「🎯 测试隔离约束」节全文。核心：TestTenant UUID 前缀、真实 Redis 测试端口 + delete_pattern 租户级清理、适配器一律 Stub/Fake、BDD 禁 @pytest.mark.asyncio、`xdist_group("data-source-cache")` 复用。
 
 **验证要求：**
-- [ ] 并行测试 `pytest tests/ -n 8` 通过
-- [ ] 连续 5 次运行无随机失败
-- [ ] `poetry run ruff check` 通过
-- [ ] `poetry run mypy` 通过
+- [x] 并行测试 `pytest tests/ -n 8` 通过
+- [x] 连续 5 次运行无随机失败
+- [x] `poetry run ruff check` 通过
+- [x] `poetry run mypy` 通过
 
 ---
 
@@ -537,18 +537,18 @@ context = ExecutionContext(
 
 > **目的：** 在进入内容实施前，固化 6 Skills 数据源声明 SSOT、input/output Schema 契约、接线方案、Gherkin 验收场景与"三不新增"决策登记。
 
-- [ ] Subtask 0.1: 登记三项显式决策（不新增端口 / 不新增异常 / 不新增事件）+ 决策 D1（frontmatter SSOT，不建 data_sources.yaml）+ 决策 D4（三角化务实定义）
-- [ ] Subtask 0.2: 定义 6 个 Skills 的 `input_schema`/`output_schema` JSON Schema 契约（字段级：required/properties/类型），作为 Task 2-7 红阶段断言输入
-- [ ] Subtask 0.3: 评审接线方案（`strategic_analysis.py` load_sop + extensions 注入），确认 `load_metadata` 原调用点无其他副作用依赖
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_skill_data_collection_4_1c.feature`（Happy Path + 6 个 Edge Cases）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_skill_data_collection_4_1c.py`（scenarios() + context + 共享 event_loop + Fake 适配器）
-- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证，失败原因 = 白名单声明未填写/接线未实施）
-- [ ] Subtask 0.7: 确认 6 个声明源的 url 与适配器 `get_metadata().url` 实际值（逐一解析 8 个适配器，固化进 SSOT 表"适配器 url/api_type/ttl/confidence 对齐表" — Round 1 D1-C 视角已固化，**Round 2 P2-2 行号复核**：`composition_root.py` 实测当前 newsapi/tavily 行号仍为 2438/2456；如漂移则同步修订 line 872、980）
+- [x] Subtask 0.1: 登记三项显式决策（不新增端口 / 不新增异常 / 不新增事件）+ 决策 D1（frontmatter SSOT，不建 data_sources.yaml）+ 决策 D4（三角化务实定义）
+- [x] Subtask 0.2: 定义 6 个 Skills 的 `input_schema`/`output_schema` JSON Schema 契约（字段级：required/properties/类型），作为 Task 2-7 红阶段断言输入
+- [x] Subtask 0.3: 评审接线方案（`strategic_analysis.py` load_sop + extensions 注入），确认 `load_metadata` 原调用点无其他副作用依赖
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_skill_data_collection_4_1c.feature`（Happy Path + 6 个 Edge Cases）
+- [x] Subtask 0.5: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_skill_data_collection_4_1c.py`（scenarios() + context + 共享 event_loop + Fake 适配器）
+- [x] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证，失败原因 = 白名单声明未填写/接线未实施）
+- [x] Subtask 0.7: 确认 6 个声明源的 url 与适配器 `get_metadata().url` 实际值（逐一解析 8 个适配器，固化进 SSOT 表"适配器 url/api_type/ttl/confidence 对齐表" — Round 1 D1-C 视角已固化，**Round 2 P2-2 行号复核**：`composition_root.py` 实测当前 newsapi/tavily 行号仍为 2438/2456；如漂移则同步修订 line 872、980）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕（Schema 契约 + SSOT 表 + 接线方案 + 三项决策登记）
-- [ ] **SSOT 表 url/api_type/ttl/confidence 四列均已从 8 个适配器 `get_metadata()` 实际值固化**（含 pestel-analysis 6 源、porters 3 源、appeals 3 源、competitor 4 源、scenario 3 源、disruptive-innovation 2 源的 url 对齐）
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕（Schema 契约 + SSOT 表 + 接线方案 + 三项决策登记）
+- [x] **SSOT 表 url/api_type/ttl/confidence 四列均已从 8 个适配器 `get_metadata()` 实际值固化**（含 pestel-analysis 6 源、porters 3 源、appeals 3 源、competitor 4 源、scenario 3 源、disruptive-innovation 2 源的 url 对齐）
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -567,8 +567,8 @@ context = ExecutionContext(
 | 🟢 绿 | 修改 `src/application/use_cases/strategic_analysis.py`（`load_metadata` → `load_sop` + extensions 注入，容错对齐既有先例） |
 | 🔄 重构 | 回归既有用例测试 + 4.1a/4.4 验收测试全绿，ruff + mypy |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 StrategicAnalysisUseCase 接线失败测试（4 场景）
-- [ ] Subtask 1.2: 🟢 绿 — 实现 StrategicAnalysisUseCase 接线（最小改动，不动 Engine/Loader 接口）
+- [x] Subtask 1.1: 🔴 红 — 编写 StrategicAnalysisUseCase 接线失败测试（4 场景）
+- [x] Subtask 1.2: 🟢 绿 — 实现 StrategicAnalysisUseCase 接线（最小改动，不动 Engine/Loader 接口）
 
 #### TDD 循环 [B]：RunToolChainUseCase.load_sop + extensions 注入（Round 1 新增）
 
@@ -578,15 +578,15 @@ context = ExecutionContext(
 | 🟢 绿 | 修改 `src/application/use_cases/run_tool_chain.py`（line 99-109 `skill_metadata` dict 改为 `load_sop` 调用收集，并基于当前节点 ToolMetadata 通过 `dataclasses.replace()` 注入 `context.extensions["tool_metadata"]` 再委托 `execute_chain`） |
 | 🔄 重构 | 工具链既有验收测试 `test_acceptance_strategic_tool_impl` / `test_acceptance_docker_sandbox` 全量回归，ruff + mypy |
 
-- [ ] Subtask 1.3: 🔴 红 — 编写 RunToolChainUseCase 接线失败测试（3 场景：每节点 metadata 注入 / 失败容错 / 无节点零变化）
-- [ ] Subtask 1.4: 🟢 绿 — 实现 RunToolChainUseCase 接线（`load_sop` 替换 `load_metadata` + 扩展注入，最小改动，不动 `ToolChainService` 内部接口）
-- [ ] Subtask 1.5: 🔄 重构 — 全量回归（`pytest tests/unit/application/use_cases/ tests/acceptance/`）
-- [ ] Subtask 1.6: 验证 `ToolExecutionEngine.__init__` 签名不变（4.4 BDD AC-7.4 回归）
+- [x] Subtask 1.3: 🔴 红 — 编写 RunToolChainUseCase 接线失败测试（3 场景：每节点 metadata 注入 / 失败容错 / 无节点零变化）
+- [x] Subtask 1.4: 🟢 绿 — 实现 RunToolChainUseCase 接线（`load_sop` 替换 `load_metadata` + 扩展注入，最小改动，不动 `ToolChainService` 内部接口）
+- [x] Subtask 1.5: 🔄 重构 — 全量回归（`pytest tests/unit/application/use_cases/ tests/acceptance/`）
+- [x] Subtask 1.6: 验证 `ToolExecutionEngine.__init__` 签名不变（4.4 BDD AC-7.4 回归）
 
 **完成标准/Definition of Done:**
-- [ ] 双入口接线实现完成，7 场景单测全绿
-- [ ] 4.1a/4.4 既有测试零回归
-- [ ] 应用层覆盖率 ≥85%（接线分支 100%）
+- [x] 双入口接线实现完成，7 场景单测全绿
+- [x] 4.1a/4.4 既有测试零回归
+- [x] 应用层覆盖率 ≥85%（接线分支 100%）
 
 ---
 
@@ -621,18 +621,18 @@ context = ExecutionContext(
 | 🟢 绿 | 调整 SKILL.md 内容使两集合一致 |
 | 🔄 重构 | Task 9.3 架构测试新增 cross-consistency 断言（正则 `\$DATA_SOURCE\(\s*["']([\w-]+)["']` 提取 SOP body 调用集合） |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 frontmatter 声明失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
-- [ ] Subtask 2.3: 🔴 红 — 编写 SOP 内容失败测试
-- [ ] Subtask 2.4: 🟢 绿 — 编写 SOP + references + templates（整合既有 scoring_matrix/aggregate_scores 引用）
-- [ ] Subtask 2.5: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
-- [ ] Subtask 2.6: 🟢 绿 — 调整 SOP body `$DATA_SOURCE` 标记集合与 frontmatter 对齐
-- [ ] Subtask 2.7: 🔄 重构 — 行数 ≤500 + cross-consistency 回归全绿
+- [x] Subtask 2.1: 🔴 红 — 编写 frontmatter 声明失败测试
+- [x] Subtask 2.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
+- [x] Subtask 2.3: 🔴 红 — 编写 SOP 内容失败测试
+- [x] Subtask 2.4: 🟢 绿 — 编写 SOP + references + templates（整合既有 scoring_matrix/aggregate_scores 引用）
+- [x] Subtask 2.5: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
+- [x] Subtask 2.6: 🟢 绿 — 调整 SOP body `$DATA_SOURCE` 标记集合与 frontmatter 对齐
+- [x] Subtask 2.7: 🔄 重构 — 行数 ≤500 + cross-consistency 回归全绿
 
 **完成标准/Definition of Done:**
-- [ ] pestel-analysis 声明与 SOP 成熟化完成，单测全绿
-- [ ] 既有 L3 资产测试零回归
-- [ ] [C] 跨循环一致性 100% 覆盖（pestel 6 源 ↔ SOP body 6 标记一一对应）
+- [x] pestel-analysis 声明与 SOP 成熟化完成，单测全绿
+- [x] 既有 L3 资产测试零回归
+- [x] [C] 跨循环一致性 100% 覆盖（pestel 6 源 ↔ SOP body 6 标记一一对应）
 
 ---
 
@@ -645,18 +645,18 @@ context = ExecutionContext(
 
 #### TDD 循环 [A]/[B]：同 Task 2 结构（frontmatter 声明 → SOP 内容）
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 `test_porters_five_forces_4_1c.py` 声明失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
-- [ ] Subtask 3.3: 🔴 红 — 编写 SOP 内容失败测试
-- [ ] Subtask 3.4: 🟢 绿 — 编写 SOP + references（五力评分锚点/三角化规范/工作坊引导）+ templates（行业问卷）
-- [ ] Subtask 3.5: 🔄 重构 — 行数 ≤500 + 回归全绿
-- [ ] Subtask 3.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试（端口 3 源 ↔ SOP body 3 标记对齐；详见 Task 2 [C] 循环范本）
+- [x] Subtask 3.1: 🔴 红 — 编写 `test_porters_five_forces_4_1c.py` 声明失败测试
+- [x] Subtask 3.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
+- [x] Subtask 3.3: 🔴 红 — 编写 SOP 内容失败测试
+- [x] Subtask 3.4: 🟢 绿 — 编写 SOP + references（五力评分锚点/三角化规范/工作坊引导）+ templates（行业问卷）
+- [x] Subtask 3.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [x] Subtask 3.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试（端口 3 源 ↔ SOP body 3 标记对齐；详见 Task 2 [C] 循环范本）
 
 **完成标准/Definition of Done:**
-- [ ] porters-five-forces Skill 声明与 SOP 成熟化完成，单测全绿
-- [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
-- [ ] 23 Skills 解析回归零失败
-- [ ] [C] 跨循环一致性：frontmatter 3 源 ↔ SOP body 3 标记一一对应
+- [x] porters-five-forces Skill 声明与 SOP 成熟化完成，单测全绿
+- [x] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
+- [x] 23 Skills 解析回归零失败
+- [x] [C] 跨循环一致性：frontmatter 3 源 ↔ SOP body 3 标记一一对应
 
 ---
 
@@ -667,18 +667,18 @@ context = ExecutionContext(
 > **数据源（SSOT）：** `tavily` + `newsapi` + `china-nbs`（3 源）
 > **SOP 核心：** $APPEALS 8 维度评估 + 顾客问卷模板；Key 缺失降级话术（tavily/newsapi）
 
-- [ ] Subtask 4.1: 🔴 红 — 编写 `test_appeals_analysis_4_1c.py` 声明失败测试
-- [ ] Subtask 4.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
-- [ ] Subtask 4.3: 🔴 红 — 编写 SOP 内容失败测试
-- [ ] Subtask 4.4: 🟢 绿 — 编写 SOP + references（8 维度评分锚点/工作坊引导）+ templates（顾客问卷）
-- [ ] Subtask 4.5: 🔄 重构 — 行数 ≤500 + 回归全绿
-- [ ] Subtask 4.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
+- [x] Subtask 4.1: 🔴 红 — 编写 `test_appeals_analysis_4_1c.py` 声明失败测试
+- [x] Subtask 4.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
+- [x] Subtask 4.3: 🔴 红 — 编写 SOP 内容失败测试
+- [x] Subtask 4.4: 🟢 绿 — 编写 SOP + references（8 维度评分锚点/工作坊引导）+ templates（顾客问卷）
+- [x] Subtask 4.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [x] Subtask 4.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
 
 **完成标准/Definition of Done:**
-- [ ] appeals-analysis Skill 声明与 SOP 成熟化完成，单测全绿
-- [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
-- [ ] 23 Skills 解析回归零失败
-- [ ] [C] 跨循环一致性覆盖（详见 Task 2 [C] 循环范本）
+- [x] appeals-analysis Skill 声明与 SOP 成熟化完成，单测全绿
+- [x] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
+- [x] 23 Skills 解析回归零失败
+- [x] [C] 跨循环一致性覆盖（详见 Task 2 [C] 循环范本）
 
 ---
 
@@ -689,18 +689,18 @@ context = ExecutionContext(
 > **数据源（SSOT）：** `newsapi` + `uspto` + `tavily` + `china-nbs`（4 源）
 > **SOP 核心：** 竞品对标矩阵 + 竞品调研方法论；专利维度（USPTO）采集引导
 
-- [ ] Subtask 5.1: 🔴 红 — 编写 `test_competitor_analysis_4_1c.py` 声明失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
-- [ ] Subtask 5.3: 🔴 红 — 编写 SOP 内容失败测试
-- [ ] Subtask 5.4: 🟢 绿 — 编写 SOP + references（对标矩阵评分锚点/竞品调研工作坊）+ templates（竞品对标矩阵）
-- [ ] Subtask 5.5: 🔄 重构 — 行数 ≤500 + 回归全绿
-- [ ] Subtask 5.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
+- [x] Subtask 5.1: 🔴 红 — 编写 `test_competitor_analysis_4_1c.py` 声明失败测试
+- [x] Subtask 5.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
+- [x] Subtask 5.3: 🔴 红 — 编写 SOP 内容失败测试
+- [x] Subtask 5.4: 🟢 绿 — 编写 SOP + references（对标矩阵评分锚点/竞品调研工作坊）+ templates（竞品对标矩阵）
+- [x] Subtask 5.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [x] Subtask 5.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
 
 **完成标准/Definition of Done:**
-- [ ] competitor-analysis Skill 声明与 SOP 成熟化完成，单测全绿
-- [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
-- [ ] 23 Skills 解析回归零失败
-- [ ] [C] 跨循环一致性覆盖
+- [x] competitor-analysis Skill 声明与 SOP 成熟化完成，单测全绿
+- [x] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
+- [x] 23 Skills 解析回归零失败
+- [x] [C] 跨循环一致性覆盖
 
 ---
 
@@ -711,18 +711,18 @@ context = ExecutionContext(
 > **数据源（SSOT）：** `tavily` + `ipcc` + `eurostat`（3 源）
 > **SOP 核心：** 4 情景剧本方法论 + 情景工作坊引导；气候情景维度（IPCC）采集引导
 
-- [ ] Subtask 6.1: 🔴 红 — 编写 `test_scenario_planning_4_1c.py` 声明失败测试
-- [ ] Subtask 6.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
-- [ ] Subtask 6.3: 🔴 红 — 编写 SOP 内容失败测试
-- [ ] Subtask 6.4: 🟢 绿 — 编写 SOP + references（情景构建方法论/不确定性矩阵锚点）+ templates（情景剧本框架）
-- [ ] Subtask 6.5: 🔄 重构 — 行数 ≤500 + 回归全绿
-- [ ] Subtask 6.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
+- [x] Subtask 6.1: 🔴 红 — 编写 `test_scenario_planning_4_1c.py` 声明失败测试
+- [x] Subtask 6.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
+- [x] Subtask 6.3: 🔴 红 — 编写 SOP 内容失败测试
+- [x] Subtask 6.4: 🟢 绿 — 编写 SOP + references（情景构建方法论/不确定性矩阵锚点）+ templates（情景剧本框架）
+- [x] Subtask 6.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [x] Subtask 6.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
 
 **完成标准/Definition of Done:**
-- [ ] scenario-plning Skill 声明与 SOP 成熟化完成，单测全绿
-- [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
-- [ ] 23 Skills 解析回归零失败
-- [ ] [C] 跨循环一致性覆盖
+- [x] scenario-plning Skill 声明与 SOP 成熟化完成，单测全绿
+- [x] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
+- [x] 23 Skills 解析回归零失败
+- [x] [C] 跨循环一致性覆盖
 
 ---
 
@@ -733,18 +733,18 @@ context = ExecutionContext(
 > **数据源（SSOT）：** `uspto` + `tavily`（2 源，双源交叉验证 — 决策 D4；Epic AC-4 ≥3 源字面偏差由 Epic owner 签收）
 > **SOP 核心：** 技术成熟度评估 + 专家访谈引导；颠覆性技术专利信号（USPTO）采集引导
 
-- [ ] Subtask 7.1: 🔴 红 — 编写 `test_disruptive_innovation_4_1c.py` 声明失败测试
-- [ ] Subtask 7.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
-- [ ] Subtask 7.3: 🔴 红 — 编写 SOP 内容失败测试
-- [ ] Subtask 7.4: 🟢 绿 — 编写 SOP + references（技术成熟度锚点/颠覆信号清单/专家访谈提纲）+ templates（技术评估矩阵）
-- [ ] Subtask 7.5: 🔄 重构 — 行数 ≤500 + 回归全绿
-- [ ] Subtask 7.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
+- [x] Subtask 7.1: 🔴 红 — 编写 `test_disruptive_innovation_4_1c.py` 声明失败测试
+- [x] Subtask 7.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
+- [x] Subtask 7.3: 🔴 红 — 编写 SOP 内容失败测试
+- [x] Subtask 7.4: 🟢 绿 — 编写 SOP + references（技术成熟度锚点/颠覆信号清单/专家访谈提纲）+ templates（技术评估矩阵）
+- [x] Subtask 7.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [x] Subtask 7.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
 
 **完成标准/Definition of Done:**
-- [ ] disruptive-innovation Skill 声明与 SOP 成熟化完成，单测全绿
-- [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
-- [ ] 23 Skills 解析回归零失败（特别注意，本 Skill 2 源覆盖 D4 双源交叉验证语义）
-- [ ] [C] 跨循环一致性覆盖（frontmatter 2 源 ↔ SOP body 2 标记一一对应）
+- [x] disruptive-innovation Skill 声明与 SOP 成熟化完成，单测全绿
+- [x] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
+- [x] 23 Skills 解析回归零失败（特别注意，本 Skill 2 源覆盖 D4 双源交叉验证语义）
+- [x] [C] 跨循环一致性覆盖（frontmatter 2 源 ↔ SOP body 2 标记一一对应）
 
 ---
 
@@ -756,18 +756,18 @@ context = ExecutionContext(
 
 #### 集成测试实现
 
-- [ ] Subtask 8.1: 🔴 红 — 编写 `tests/integration/application/test_skill_data_collection_4_1c.py` 骨架（`pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cache")]` + 租户隔离 fixture + Stub 适配器工厂 + AsyncMock LLM 按 Skill 生成含标记代码）
-- [ ] Subtask 8.2: 🟢 绿 — 6 个 Skills 全链路用例（每 Skill ≥1 源采集 + EvidencePackage.data_sources 溯源元数据断言）
-- [ ] Subtask 8.3: 🟢 绿 — 三角化断言（5 个 ≥3 源 Skill 注入源数 == 声明源数 + 每源 call_count == 1；disruptive-innovation == 2）+ 新鲜度评分 ∈ [0,1] + 缓存命中二次执行外部调用不增
-- [ ] Subtask 8.4: 🟢 绿 — Key 缺失降级用例（adapters Mapping 缺 newsapi/tavily 时部分失败收敛，其余源正常注入）
-- [ ] Subtask 8.5: 🔄 重构 — **Marker 字符级扫描专项测试收敛（4-1b 推迟项）**：扩充 `tests/unit/application/services/test_data_source_marker.py`（未闭合字符串降级/三引号字符串字面量扫描/转义字符边界/字符串字面量内伪标记不触发）+ 同步更新 `src/application/services/data_source_marker.py:_string_literal_spans` 文档注释对齐 4-1b P0-5 修复范围
-- [ ] Subtask 8.6: 🔄 重构 — `pytest -n 8` 并行验证 + 连续 5 次无随机失败
+- [x] Subtask 8.1: 🔴 红 — 编写 `tests/integration/application/test_skill_data_collection_4_1c.py` 骨架（`pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cache")]` + 租户隔离 fixture + Stub 适配器工厂 + AsyncMock LLM 按 Skill 生成含标记代码）
+- [x] Subtask 8.2: 🟢 绿 — 6 个 Skills 全链路用例（每 Skill ≥1 源采集 + EvidencePackage.data_sources 溯源元数据断言）
+- [x] Subtask 8.3: 🟢 绿 — 三角化断言（5 个 ≥3 源 Skill 注入源数 == 声明源数 + 每源 call_count == 1；disruptive-innovation == 2）+ 新鲜度评分 ∈ [0,1] + 缓存命中二次执行外部调用不增
+- [x] Subtask 8.4: 🟢 绿 — Key 缺失降级用例（adapters Mapping 缺 newsapi/tavily 时部分失败收敛，其余源正常注入）
+- [x] Subtask 8.5: 🔄 重构 — **Marker 字符级扫描专项测试收敛（4-1b 推迟项）**：扩充 `tests/unit/application/services/test_data_source_marker.py`（未闭合字符串降级/三引号字符串字面量扫描/转义字符边界/字符串字面量内伪标记不触发）+ 同步更新 `src/application/services/data_source_marker.py:_string_literal_spans` 文档注释对齐 4-1b P0-5 修复范围
+- [x] Subtask 8.6: 🔄 重构 — `pytest -n 8` 并行验证 + 连续 5 次无随机失败
 
 **完成标准/Definition of Done:**
-- [ ] 集成测试全绿（真实 Redis 不可用时动态 skip）
-- [ ] 三角化/新鲜度/缓存/降级断言全部通过
-- [ ] Marker 专项测试收敛（4-1b 推迟项清零）
-- [ ] 并行稳定（-n 8 连续 5 次零随机失败）
+- [x] 集成测试全绿（真实 Redis 不可用时动态 skip）
+- [x] 三角化/新鲜度/缓存/降级断言全部通过
+- [x] Marker 专项测试收敛（4-1b 推迟项清零）
+- [x] 并行稳定（-n 8 连续 5 次零随机失败）
 
 ---
 
@@ -779,16 +779,16 @@ context = ExecutionContext(
 
 #### 架构验证测试实现
 
-- [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_arch_skill_data_collection_4_1c.py`（常量区：6 Skills slug 清单 + SSOT 声明表 + 8 适配器映射）
-- [ ] Subtask 9.2: 实现三方一致性校验（SSOT 表 ↔ 6 个 SKILL.md frontmatter data_sources ↔ 适配器 `get_metadata()` name/url/api_type）
-- [ ] Subtask 9.3: 实现依赖方向校验（`strategic_analysis.py` 不 import infrastructure；本 Story 零 domain 改动声明校验）+ `ToolExecutionEngine.__init__` 签名锁定（inspect.signature）
-- [ ] Subtask 9.4: 实现 Skills 内容约束校验（6 个 SKILL.md ≤500 行 + frontmatter 必需字段 + 17 个非目标 Skill data_sources 空 tuple）
-- [ ] Subtask 9.5: 运行完整测试套件并生成合规报告
+- [x] Subtask 9.1: 创建 `tests/unit/architecture/test_arch_skill_data_collection_4_1c.py`（常量区：6 Skills slug 清单 + SSOT 声明表 + 8 适配器映射）
+- [x] Subtask 9.2: 实现三方一致性校验（SSOT 表 ↔ 6 个 SKILL.md frontmatter data_sources ↔ 适配器 `get_metadata()` name/url/api_type）
+- [x] Subtask 9.3: 实现依赖方向校验（`strategic_analysis.py` 不 import infrastructure；本 Story 零 domain 改动声明校验）+ `ToolExecutionEngine.__init__` 签名锁定（inspect.signature）
+- [x] Subtask 9.4: 实现 Skills 内容约束校验（6 个 SKILL.md ≤500 行 + frontmatter 必需字段 + 17 个非目标 Skill data_sources 空 tuple）
+- [x] Subtask 9.5: 运行完整测试套件并生成合规报告
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构约束测试通过
-- [ ] 任何违规导致测试失败（三方漂移/签名变更/行数超限均已验证可检出）
-- [ ] 循环依赖检测使用 ruff/isort（不引入额外工具）
+- [x] 所有架构约束测试通过
+- [x] 任何违规导致测试失败（三方漂移/签名变更/行数超限均已验证可检出）
+- [x] 循环依赖检测使用 ruff/isort（不引入额外工具）
 
 ---
 
@@ -806,21 +806,21 @@ context = ExecutionContext(
 | 🟢 绿 | 完成 `tests/acceptance/test_acceptance_skill_data_collection_4_1c.py` 全部步骤（真实服务 + Fake 仅限适配器/LLM/Sandbox） |
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 10.1: 场景 1 — Happy Path：pestel-analysis 全链路（6 源并发采集 + 注入 + 溯源元数据）
-- [ ] Subtask 10.2: 场景 2 — Happy Path：其余 5 个 Skills 各自采集链路参数化验证
-- [ ] Subtask 10.3: 场景 3 — Edge：白名单外数据源 → BusinessRuleViolationError(207)，断言 error.code + error.message
-- [ ] Subtask 10.4: 场景 4 — Edge：数据源不可用 → 部分失败收敛 + DataSourceFetchFailed 事件
-- [ ] Subtask 10.5: 场景 5 — Edge：Key 缺失降级（newsapi/tavily 未注册 → 411 语义部分失败，其余源正常）
-- [ ] Subtask 10.6: 场景 6 — Edge：缓存命中（二次执行 cache_hit=True，外部调用次数不增）+ 新鲜度元数据
-- [ ] Subtask 10.7: 场景 7 — Edge：未成熟化 Skill（data_sources 空 tuple）含标记 → 207（安全失败）
-- [ ] Subtask 10.8: 场景 8 — 三角化断言：≥3 源 Skill 注入源数 ≥3，disruptive-innovation == 2
-- [ ] Subtask 10.9: 运行开发结束验收测试并确认通过 + 配套文档同步（architecture.md §17.3 状态 + §17.3.3 追加 + 修订历史）+ 完成清单逐项确认（src + tests 各层）
-- [ ] Subtask 10.10: 运行 `pytest`、`ruff check`、`mypy` 收尾校验
+- [x] Subtask 10.1: 场景 1 — Happy Path：pestel-analysis 全链路（6 源并发采集 + 注入 + 溯源元数据）
+- [x] Subtask 10.2: 场景 2 — Happy Path：其余 5 个 Skills 各自采集链路参数化验证
+- [x] Subtask 10.3: 场景 3 — Edge：白名单外数据源 → BusinessRuleViolationError(207)，断言 error.code + error.message
+- [x] Subtask 10.4: 场景 4 — Edge：数据源不可用 → 部分失败收敛 + DataSourceFetchFailed 事件
+- [x] Subtask 10.5: 场景 5 — Edge：Key 缺失降级（newsapi/tavily 未注册 → 411 语义部分失败，其余源正常）
+- [x] Subtask 10.6: 场景 6 — Edge：缓存命中（二次执行 cache_hit=True，外部调用次数不增）+ 新鲜度元数据
+- [x] Subtask 10.7: 场景 7 — Edge：未成熟化 Skill（data_sources 空 tuple）含标记 → 207（安全失败）
+- [x] Subtask 10.8: 场景 8 — 三角化断言：≥3 源 Skill 注入源数 ≥3，disruptive-innovation == 2
+- [x] Subtask 10.9: 运行开发结束验收测试并确认通过 + 配套文档同步（architecture.md §17.3 状态 + §17.3.3 追加 + 修订历史）+ 完成清单逐项确认（src + tests 各层）
+- [x] Subtask 10.10: 运行 `pytest`、`ruff check`、`mypy` 收尾校验
 
 **完成标准/Definition of Done:**
-- [ ] 全部 Gherkin 场景通过（8 场景）
-- [ ] 配套文档同步完成
-- [ ] 完成清单逐项验证确认
+- [x] 全部 Gherkin 场景通过（8 场景）
+- [x] 配套文档同步完成
+- [x] 完成清单逐项验证确认
 - [ ] Story 可进入 `done`
 
 ---
@@ -900,11 +900,11 @@ tests/
 - **Key 安全**：异常消息/日志/to_dict 零 API Key 泄露（SOP 文档编写同样禁止写入真实 Key 示例）
 
 **应用到本故事/Applied to This Story:**
-- [ ] 接线改动不触碰 Engine `__init__`，复用 4-1b 既定 extensions 契约
-- [ ] 5 个声明含 newsapi/tavily 的 Skill 在 SOP 失败处理章节文档化 Key 缺失降级话术
-- [ ] BDD/集成测试沿用 4-1b 基建（共享 event_loop、xdist_group、租户前缀 delete_pattern、_FakeDataSourceAdapter 范本）
-- [ ] Marker 字符级扫描专项测试在 Task 8.5 收敛（4-1b 推迟项清零）
-- [ ] Task 10 同步 architecture.md（§17.3 状态 + §17.3.3 追加 + 修订历史），对齐 4-1b 文档同步先例
+- [x] 接线改动不触碰 Engine `__init__`，复用 4-1b 既定 extensions 契约
+- [x] 5 个声明含 newsapi/tavily 的 Skill 在 SOP 失败处理章节文档化 Key 缺失降级话术
+- [x] BDD/集成测试沿用 4-1b 基建（共享 event_loop、xdist_group、租户前缀 delete_pattern、_FakeDataSourceAdapter 范本）
+- [x] Marker 字符级扫描专项测试在 Task 8.5 收敛（4-1b 推迟项清零）
+- [x] Task 10 同步 architecture.md（§17.3 状态 + §17.3.3 追加 + 修订历史），对齐 4-1b 文档同步先例
 
 ---
 
@@ -942,22 +942,74 @@ tests/
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
 
+### Dev Story 实施完成记录（2026-09-26）
+
+**TDD 执行摘要（Task 0-10 全量红→绿→重构）：**
+- ✅ Task 0：三不新增决策登记 + IO Schema 契约（`skill_io_schemas.yaml`）+ BDD 红阶段确认（10 failed 预期原因 = 白名单未填写 207，2 passed 安全失败不变量）
+- ✅ Task 1：双入口接线 7 场景单测全绿（strategic_analysis 4 场景 + run_tool_chain 3 场景）；既有用例测试 4 项对齐新契约（load_metadata→load_sop；fail-fast→容错 D7 语义变更）；4.1a/4.1b/4.4 验收回归全绿（49+61 passed）；Engine `__init__` 签名锁定不变
+- ✅ Task 2-7：6 个 Skills 成熟化（pestel 6 源/porters 3/appeals 3/competitor 4/scenario 3/disruptive 2），共享断言库 + [C] 跨循环一致性双向断言；23 Skills 回归 + 17 非目标空 tuple 不变量全绿（81 passed）；porters/appeals/competitor 由 3 个并行 Agent 实施，scenario/disruptive 由主会话实施
+- ✅ Task 8：集成测试 11/11（真实 Engine+Resolver+Redis+load_sop；三角化/缓存命中/Key 缺失降级/部分失败收敛）；Marker 字符级扫描专项 8 场景补齐（4-1b 推迟项清零，25/25）
+- ✅ Task 9：架构验证 49 项（三方一致性/依赖方向/签名锁定/行数/空 tuple/domain 零改动）全绿
+- ✅ Task 10：BDD 12/12 全绿；文档同步完成（architecture.md v8.6.0 + 异常设计文档 §3.3.2 复用声明）
+
+**实施期关键决策与偏差登记：**
+- D7 契约变更副作用：`run_tool_chain.py` Skill 加载由 fail-fast 改为容错（对齐 strategic_analysis 先例 + Story 场景 2 语义），既有 `test_skill_load_failure_fails_fast` 重写为 `test_skill_load_failure_tolerated_not_blocking`
+- 验收测试 Redis 客户端改为**场景级独立创建**（探针实测 session 级共享客户端跨场景复用抛 RuntimeError "Event loop is closed"——连接池绑定已关闭循环；4-1b 同款隐患建议后续收敛）
+- `RunToolChainUseCase` 接线采用 `ExecutionContext.with_extension()` 官方工厂（Story 4.3 先例），保留既有 extensions 键，优于裸 `dataclasses.replace` 全量覆盖
+- 用户约束「禁止使用故事编号命名」：全部交付文件功能性命名（无 `_4_1c` 后缀），Story 文档原文件名表述以 File List 实际交付为准
+- 既有接口层 `raise ValueError/HTTPException`（strategic_archive/auth/document_upload/ocr_cli）为本 Story 范围外历史遗留，未触碰
+
+
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/4-1c-skills-data-collection-integration.md`
 
+**Dev Story 实施交付（2026-09-26）：**
+
+源码（修改）：
+- `src/application/use_cases/strategic_analysis.py` — load_metadata→load_sop + `extensions["tool_metadata"]` 注入（Task 1 [A]）
+- `src/application/use_cases/run_tool_chain.py` — load_sop 容错收集 + `with_extension("tool_metadata")` 注入（Task 1 [B]）
+- `src/application/services/data_source_marker.py` — 模块 docstring 对齐 4-1b P0-5 字符级扫描修复范围（Task 8.5）
+- `src/application/skills/pestel-analysis/SKILL.md` — frontmatter 6 源声明 + IO Schema + SOP 成熟化（Task 2）
+- `src/application/skills/porters-five-forces/SKILL.md` — 3 源（Task 3）
+- `src/application/skills/appeals-analysis/SKILL.md` — 3 源（Task 4）
+- `src/application/skills/competitor-analysis/SKILL.md` — 4 源（Task 5）
+- `src/application/skills/scenario-planning/SKILL.md` — 3 源（Task 6）
+- `src/application/skills/disruptive-innovation/SKILL.md` — 2 源（Task 7）
+
+源码（新增资源）：
+- `src/application/skills/<slug>/references/triangulation.md` ×6 — 三角化规范
+- `src/application/skills/<slug>/references/scoring_anchors.md` ×6 — 评分锚点
+- `src/application/skills/<slug>/references/workshop_guide.md` ×6 — 工作坊引导
+- `src/application/skills/<slug>/templates/*.md` ×6 — 采集问卷/矩阵模板（pestel 既有 scoring_matrix.json + aggregate_scores.py 保留）
+
+测试（新增）：
+- `tests/unit/application/use_cases/test_strategic_analysis_datasource.py` — 接线 4 场景（Task 1 [A]）
+- `tests/unit/application/use_cases/test_run_tool_chain_datasource.py` — 接线 3 场景（Task 1 [B]）
+- `tests/unit/application/skills/skill_data_collection_contracts.py` — 6 Skills 共享契约断言库
+- `tests/unit/application/skills/test_<slug>_data_collection.py` ×6 — Skills 内容单元测试（Task 2-7）
+- `tests/unit/architecture/test_arch_skill_data_collection.py` — 三方一致/依赖方向/签名锁定/行数（Task 9）
+- `tests/integration/application/test_skill_data_collection.py` — 6 Skills 全链路集成（Task 8）
+- `tests/acceptance/contracts/skill_io_schemas.yaml` — IO Schema 契约 SSOT（Task 0.2）
+- `tests/acceptance/test_acceptance_skill_data_collection.feature` + `.py` — BDD 8 场景（Task 0/10）
+
+测试（修改）：
+- `tests/unit/application/use_cases/test_strategic_analysis_usecase.py` — load_metadata→load_sop 断言对齐
+- `tests/unit/application/use_cases/test_run_tool_chain_usecase.py` — load_sop + 容错语义对齐（D7 契约变更）
+- `tests/unit/application/services/test_data_source_marker.py` — 字符级扫描边界专项 8 场景（Task 8.5，4-1b 推迟项清零）
+
+文档（同步）：
+- `docs/architecture/architecture.md` — §17.3 状态块 + §17.3.3 4.1c 集成说明 + 决策表 6 项 + v8.6.0 修订历史
+- `docs/architecture/sisys-uni-exception-design.md` — §3.3.2 编码表后追加 4-1c 零新增复用声明
+
+> **命名规范说明**：实施期用户明确约束「禁止使用故事编号命名」，全部交付文件采用功能性命名
+> （无 `_4_1c` 后缀），与 4-1b 既有先例（test_frontmatter_data_sources.py 等）一致；
+> 本 Story 文件「测试分类与归属」「项目结构说明」节中的 `_4_1c` 文件名为规范前原始表述，
+> 以本 File List 为实际交付准。
+
 **待创建的文件/To Be Created (Dev Story 实施):**
-- `src/application/skills/<slug>/SKILL.md` ×6 — [修改] frontmatter 声明 + SOP 成熟化
-- `src/application/skills/<slug>/references/*.md` ×6 组 — [新增] 三角化规范/评分锚点/工作坊引导
-- `src/application/skills/<slug>/templates/*` ×6 组 — [新增] 采集问卷/矩阵模板
-- `src/application/use_cases/strategic_analysis.py` — [修改] 唯一应用层代码改动（load_sop + extensions 注入）
-- `tests/unit/application/skills/test_<slug>_4_1c.py` ×6 — Skills 内容单元测试
-- `tests/unit/application/use_cases/test_strategic_analysis_datasource.py` — 接线单元测试
-- `tests/unit/application/services/test_data_source_marker.py` — [修改] 字符级扫描专项扩充
-- `tests/unit/architecture/test_arch_skill_data_collection_4_1c.py` — 架构验证测试
-- `tests/integration/application/test_skill_data_collection_4_1c.py` — 集成测试
-- `tests/acceptance/test_acceptance_skill_data_collection_4_1c.feature` + `.py` — BDD 验收测试
+- 无（全部交付完毕）
 
 ---
 
@@ -1033,7 +1085,7 @@ tests/
 #### 已推迟 Defer
 
 - [ ] P2-domain-1：异常 `to_dict()` 自动脱敏（Story 5.x 安全专项）
-- [ ] Marker 字符级扫描专项测试扩展（Task 8.5 收敛）
+- [x] Marker 字符级扫描专项测试扩展（Task 8.5 收敛）
 - [ ] `ToolChainService.execute_chain` 内部节点级 extensions 注入（Story 4.2 工具链编排范畴）
 
 ---
@@ -1043,7 +1095,7 @@ tests/
 - [x] Story created with `ready-for-dev` status
 - [x] Story Round 1 文档审查完成（D1-D2 D2 评审 + D3 系统修订 17 项修复）
 - [ ] Epic owner 签收 D8 决策
-- [ ] 运行 `dev-story` 开始实施
+- [x] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 

@@ -5,7 +5,9 @@
 
 安全约束：
 - 参数仅经 ast.literal_eval 安全解析（**禁止** eval/exec 动态执行）
-- 字符串字面量内的 $DATA_SOURCE 文本不识别为标记（tokenize 掩码防误触发）
+- 字符串字面量内的 $DATA_SOURCE 文本不识别为标记（`_string_literal_spans` 纯字符级
+  扫描掩码：双引号/单引号/三引号 + 转义字符；未闭合字符串保守登记到文件末尾——
+  4-1b Round 1 P0-5 修复，弃用 tokenize 因其 TokenError 降级会漏边界）
 - 语法错误抛 ValidationError（EXCEPTION_201），不泄露内部实现细节
 """
 

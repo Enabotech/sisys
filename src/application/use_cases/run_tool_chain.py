@@ -93,30 +93,53 @@ class RunToolChainUseCase:
         if dag is None:
             raise ToolChainNotFoundError(chain_name=chain_name)
 
-        # 2. 节点级 Skill 预预加载（按 tool_slug 调用 load_metadata）
-        # 多节点元数据使用 asyncio.gather 并发预加载
-        # Round 1 V2 修复：dict 映射避免 zip 对齐缺陷 + fail-fast 校验
+        # 2. 节点级 Skill L2 SOP 预加载（frontmatter 含 data_sources 白名单）
+        # Story 4.1c 接线：load_metadata(L1, data_sources 恒为空) → load_sop(L2, 含白名单)。
+        # 容错对齐 strategic_analysis 先例：单个 Skill SOP 加载失败不阻断链路，
+        # 全部失败时 extensions 不含 tool_metadata 键（含标记时 Engine 按 4.1b 语义抛 207，
+        # 安全失败方向正确）。
         metadata_tasks_by_slug: dict[str, str] = {node.tool_slug: node.node_id for node in dag.nodes if node.tool_slug}
         skill_metadata: dict[str, ToolMetadata] = {}
         if metadata_tasks_by_slug:
             slugs = list(metadata_tasks_by_slug.keys())
-            # return_exceptions=False：Skill 加载失败立即抛 ToolNotFoundError（fail-fast）
             results = await asyncio.gather(
-                *(self._skill_loader.load_metadata(slug) for slug in slugs),
+                *(self._load_sop_tolerantly(slug) for slug in slugs),
             )
             for slug, result in zip(slugs, results):
-                # load_metadata 成功时必为 ToolMetadata（失败时已抛异常）
-                skill_metadata[slug] = result
+                if result is not None:
+                    skill_metadata[slug] = result
 
         logger.info("Loaded %d skill metadata for chain '%s'", len(skill_metadata), chain_name)
 
-        # 3. 委托 ToolChainService.execute_chain 执行
-        run = await self._service.execute_chain(chain_id=dag.chain_id, parameters=parameters, context=context)
+        # 3. 注入链路共享单 ToolMetadata（白名单依据）后委托 ToolChainService.execute_chain
+        # Story 4.1c D7：链路全程共用首节点 metadata（非字典），节点级 metadata 切换属 Story 4.2。
+        node_metadata = skill_metadata.get(dag.nodes[0].tool_slug) if dag.nodes else None
+        exec_context = context.with_extension("tool_metadata", node_metadata) if node_metadata is not None else context
+        run = await self._service.execute_chain(chain_id=dag.chain_id, parameters=parameters, context=exec_context)
 
         # 4. 发布 ToolChainExecuted 事件（双通道：realtime + reliable）
         await self._publish_tool_chain_executed(run, dag)
 
         return run
+
+    async def _load_sop_tolerantly(self, slug: str) -> ToolMetadata | None:
+        """容错加载 Skill L2 SOP frontmatter（Story 4.1c）
+
+        单个 Skill SOP 加载失败不阻断工具链执行（对齐 StrategicAnalysisUseCase
+        容错先例）；失败返回 None，由调用方决定 extensions 注入语义。
+
+        Args:
+            slug: Skill slug
+
+        Returns:
+            ToolMetadata（含 data_sources 白名单）；加载失败返回 None
+        """
+        try:
+            skill_doc = await self._skill_loader.load_sop(slug)
+            return skill_doc.frontmatter
+        except Exception as exc:
+            logger.warning("技能 SOP 加载失败（不阻断工具链执行）: slug=%s exc=%s", slug, exc)
+            return None
 
     async def _find_dag_by_name(self, chain_name: str, tenant_id: uuid.UUID) -> ToolChainDag | None:
         """通过 chain_name + tenant_id 查找 ToolChainDag"""

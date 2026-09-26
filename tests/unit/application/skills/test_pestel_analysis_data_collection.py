@@ -1,0 +1,104 @@
+"""Story 4.1c Task 2: pestel-analysis Skill 成熟化单元测试
+
+TDD 循环覆盖（AC-1 / AC-3）：
+- [A] frontmatter 声明契约：data_sources 全字段 == SSOT 6 源集合 + IO Schema 契约
+- [B] SOP 成熟化：必备章节 / input_examples 非 placeholder / ≤500 行 / references+templates
+- [C] 跨循环一致性：SOP body $DATA_SOURCE 标记集合 == frontmatter 声明集合（双向）
+- 既有资产整合：references/scoring_matrix.json + scripts/aggregate_scores.py 保留并被 SOP 引用
+- 23 Skills 全量解析回归 + 17 个非目标 Skill data_sources 空 tuple 不变量
+
+真实加载真实 SKILL.md（InMemorySkillLoader，范本 test_skills_loader.py），禁止 mock。
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from src.application.skills.loader import InMemorySkillLoader
+from tests.unit.application.skills.skill_data_collection_contracts import (
+    SKILL_DATA_SOURCES,
+    SKILLS_ROOT,
+    assert_cross_consistency,
+    assert_data_sources_contract,
+    assert_io_schema_contract,
+    assert_sop_maturity,
+)
+
+SLUG = "pestel-analysis"
+
+# 17 个非目标 Skill（23 全量 − 6 个本 Story 目标）：data_sources 必须保持空 tuple
+NON_TARGET_SLUGS: tuple[str, ...] = (
+    "ansoff-matrix",
+    "bsc-scorecard",
+    "business-model-canvas",
+    "change-management",
+    "dependency-graph",
+    "gantt-chart",
+    "ge-mckinsey-matrix",
+    "kpi-tree",
+    "org-design-framework",
+    "raci-matrix",
+    "space-matrix",
+    "strategy-map",
+    "swot-tows",
+    "value-chain-analysis",
+    "value-curve-analysis",
+    "value-proposition-canvas",
+    "vrio-framework",
+)
+
+
+@pytest.fixture
+async def document():  # type: ignore[no-untyped-def]
+    """真实加载 pestel-analysis 的 L2 SkillDocument"""
+    loader = InMemorySkillLoader()
+    return await loader.load_sop(SLUG)
+
+
+class TestFrontmatterDataSources:
+    """[A] frontmatter data_sources 白名单声明契约"""
+
+    async def test_data_sources_match_ssot(self, document) -> None:  # type: ignore[no-untyped-def]
+        assert_data_sources_contract(SLUG, document.frontmatter)
+
+    async def test_io_schema_match_contract(self, document) -> None:  # type: ignore[no-untyped-def]
+        assert_io_schema_contract(SLUG, document.frontmatter)
+
+
+class TestSopMaturity:
+    """[B] SOP 内容成熟化"""
+
+    async def test_sop_sections_and_resources(self, document) -> None:  # type: ignore[no-untyped-def]
+        assert_sop_maturity(SLUG, document)
+
+    async def test_existing_assets_preserved_and_referenced(self, document) -> None:  # type: ignore[no-untyped-def]
+        """既有资产整合：scoring_matrix.json + aggregate_scores.py 保留且被新 SOP 引用"""
+        skill_dir = SKILLS_ROOT / SLUG
+        assert (skill_dir / "references" / "scoring_matrix.json").is_file()
+        assert (skill_dir / "scripts" / "aggregate_scores.py").is_file()
+        assert "scoring_matrix.json" in document.body
+        assert "aggregate_scores.py" in document.body
+
+
+class TestCrossConsistency:
+    """[C] 跨循环一致性（白名单 ↔ SOP 标记双向断言）"""
+
+    async def test_markers_match_declared_sources(self, document) -> None:  # type: ignore[no-untyped-def]
+        assert_cross_consistency(SLUG, document)
+
+
+class TestAllSkillsRegression:
+    """23 Skills 全量解析回归 + 17 个非目标 Skill 空 tuple 不变量（AC-1）"""
+
+    async def test_all_23_skills_parse_regression(self) -> None:
+        loader = InMemorySkillLoader()
+        for slug in (*SKILL_DATA_SOURCES.keys(), *NON_TARGET_SLUGS):
+            document = await loader.load_sop(slug)
+            assert document.frontmatter.slug == slug
+            assert isinstance(document.frontmatter.data_sources, tuple)
+
+    async def test_non_target_skills_empty_data_sources(self) -> None:
+        loader = InMemorySkillLoader()
+        for slug in NON_TARGET_SLUGS:
+            document = await loader.load_sop(slug)
+            assert document.frontmatter.data_sources == (), f"非目标 Skill {slug} 的 data_sources 被误填"

@@ -96,6 +96,62 @@ class TestParseMarkers:
         assert exc_info.value.code == "EXCEPTION_201"
 
 
+class TestStringLiteralSpanBoundaries:
+    """Story 4.1c Task 8.5 — _string_literal_spans 字符级扫描边界专项（4-1b 推迟项收敛）
+
+    覆盖 4-1b Round 1 P0-5 修复（tokenize → 纯字符级扫描）的四类边界场景：
+    未闭合字符串降级 / 三引号字面量 / 转义字符边界 / 字符串字面量内伪标记不触发。
+    """
+
+    def test_unterminated_string_swallows_following_marker(self) -> None:
+        """未闭合字符串保守登记到文件末尾：其后标记文本被吞（不误识别、不抛错）。"""
+        code = 'text = \'未闭合\n$DATA_SOURCE("world-bank", "GDP")\n'
+        assert parse_data_source_markers(code) == ()
+
+    def test_marker_before_unterminated_string_parsed(self) -> None:
+        """未闭合字符串之前的合法标记不受影响（降级不扩大误伤）。"""
+        code = '$DATA_SOURCE("world-bank", "GDP")\ntext = \'未闭合\n'
+        markers = parse_data_source_markers(code)
+        assert len(markers) == 1
+        assert markers[0].source_name == "world-bank"
+
+    def test_marker_inside_triple_double_quotes_not_matched(self) -> None:
+        """三引号（双）字符串字面量内的标记文本不触发。"""
+        code = 'doc = """\n$DATA_SOURCE("world-bank", "GDP")\n"""\nprint(doc)'
+        assert parse_data_source_markers(code) == ()
+
+    def test_marker_inside_triple_single_quotes_not_matched(self) -> None:
+        """三引号（单）字符串字面量内的标记文本不触发。"""
+        code = "doc = '''\n$DATA_SOURCE(\"world-bank\", \"GDP\")\n'''\nprint(doc)"
+        assert parse_data_source_markers(code) == ()
+
+    def test_marker_after_triple_quoted_string_parsed(self) -> None:
+        """三引号字符串闭合后的合法标记正常解析。"""
+        code = 'doc = """说明"""\n$DATA_SOURCE("imf", "WEO")'
+        markers = parse_data_source_markers(code)
+        assert len(markers) == 1
+        assert markers[0].source_name == "imf"
+
+    def test_escaped_quote_in_query(self) -> None:
+        """query 内转义引号经 ast.literal_eval 正确还原。"""
+        code = '$DATA_SOURCE("newsapi", "He said \\"hi\\" loudly")'
+        markers = parse_data_source_markers(code)
+        assert len(markers) == 1
+        assert markers[0].query == 'He said "hi" loudly'
+
+    def test_escaped_backslash_before_closing_quote(self) -> None:
+        """转义反斜杠结尾的字符串：闭合引号边界判定正确，后续标记不受影响。"""
+        code = 'path = "C:\\\\data\\\\"\n$DATA_SOURCE("imf", "WEO")'
+        markers = parse_data_source_markers(code)
+        assert len(markers) == 1
+        assert markers[0].source_name == "imf"
+
+    def test_marker_inside_single_quoted_string_not_matched(self) -> None:
+        """单引号字符串字面量内的伪标记不触发（既有仅覆盖双引号场景）。"""
+        code = 'text = \'$DATA_SOURCE("a", "b")\'\nprint(text)'
+        assert parse_data_source_markers(code) == ()
+
+
 class TestInjectDataSources:
     def test_inject_preamble_single_line(self) -> None:
         code = '$DATA_SOURCE("world-bank", "GDP")\nprint(DATA_SOURCES)'

@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.application.ports.skill_loader import SkillLoaderPort, ToolMetadata
+from src.application.ports.skill_loader import SkillDocument, SkillLoaderPort, ToolMetadata
 from src.application.ports.tool_chain_service import ToolChainServicePort
 from src.application.use_cases.run_tool_chain import RunToolChainUseCase
 from src.domain.entities.tool_chain import (
@@ -117,6 +117,18 @@ async def test_execute_full_flow() -> None:
     assert run is expected_run
 
 
+def _make_skill_document(slug: str) -> SkillDocument:
+    """工厂函数：load_sop 返回的 SkillDocument（frontmatter 为 ToolMetadata）"""
+    return SkillDocument(
+        tool_name=slug,
+        slug=slug,
+        content="# SOP",
+        token_count=10,
+        frontmatter=ToolMetadata(tool_name=slug, slug=slug, category="x", input_schema={}, output_schema={}),
+        body="# SOP",
+    )
+
+
 # ============================================================================
 # 2. chain_name 查询
 # ============================================================================
@@ -194,15 +206,7 @@ async def test_skill_loading_uses_concurrent_gather() -> None:
     service.execute_chain = AsyncMock(return_value=_make_run())
 
     skill_loader = AsyncMock(spec=SkillLoaderPort)
-    skill_loader.load_metadata = AsyncMock(
-        side_effect=lambda slug: ToolMetadata(
-            tool_name=slug,
-            slug=slug,
-            category="x",
-            input_schema={},
-            output_schema={},
-        )
-    )
+    skill_loader.load_sop = AsyncMock(side_effect=_make_skill_document)
 
     publisher = AsyncMock(spec=EventPublisher)
     publisher.publish = AsyncMock()
@@ -217,17 +221,22 @@ async def test_skill_loading_uses_concurrent_gather() -> None:
     context = _make_context(tenant_id=dag.tenant_id)
     await use_case.execute("chain", {}, context)
 
-    # 验证 load_metadata 被调用 2 次（每个节点 tool_slug）
-    assert skill_loader.load_metadata.await_count == 2
-    call_args_list = skill_loader.load_metadata.await_args_list
+    # Story 4.1c 接线：load_metadata(L1) → load_sop(L2)，验证 load_sop 被调用 2 次（每个节点 tool_slug）
+    assert skill_loader.load_sop.await_count == 2
+    call_args_list = skill_loader.load_sop.await_args_list
     slugs_called = [c.args[0] for c in call_args_list]
     assert "pestel" in slugs_called
     assert "porter" in slugs_called
 
 
 @pytest.mark.asyncio
-async def test_skill_load_failure_fails_fast() -> None:
-    """Round 1 P0-5 V2 + Round 2 P1-A-FAIL 修复后：Skill 加载失败立即抛异常（fail-fast）"""
+async def test_skill_load_failure_tolerated_not_blocking() -> None:
+    """Story 4.1c D7 契约变更：Skill SOP 加载失败容错不阻断（原 fail-fast 语义废止）
+
+    旧语义（Round 1 P0-5 V2 fail-fast）由 Story 4.1c 显式取代：load_sop 失败时
+    extensions 不含 tool_metadata 键，链路继续委托 execute_chain（含标记时 Engine
+    侧按 4.1b 既定语义抛 207，安全失败方向正确）。
+    """
     dag = _make_dag("chain")
     repo = AsyncMock(spec=ToolChainRepositoryPort)
     repo.list_by_query = AsyncMock(return_value=[dag])
@@ -236,7 +245,7 @@ async def test_skill_load_failure_fails_fast() -> None:
     service.execute_chain = AsyncMock(return_value=_make_run())
 
     skill_loader = AsyncMock(spec=SkillLoaderPort)
-    skill_loader.load_metadata = AsyncMock(side_effect=RuntimeError("load failed"))
+    skill_loader.load_sop = AsyncMock(side_effect=RuntimeError("load failed"))
 
     publisher = AsyncMock(spec=EventPublisher)
     publisher.publish = AsyncMock()
@@ -249,9 +258,12 @@ async def test_skill_load_failure_fails_fast() -> None:
     )
 
     context = _make_context(tenant_id=dag.tenant_id)
-    # P0-5 V2 修复后：Skill 加载失败立即抛出，不再静默降级为日志
-    with pytest.raises(RuntimeError, match="load failed"):
-        await use_case.execute("chain", {}, context)
+    # Story 4.1c 容错语义：加载失败不抛出，extensions 不含 tool_metadata 键，正常委托执行
+    run = await use_case.execute("chain", {}, context)
+
+    assert run is not None
+    delegated_context = service.execute_chain.await_args.kwargs["context"]
+    assert "tool_metadata" not in delegated_context.extensions
 
 
 # ============================================================================
@@ -272,15 +284,7 @@ async def test_execute_chain_delegates_to_service() -> None:
     service.execute_chain = AsyncMock(return_value=expected_run)
 
     skill_loader = AsyncMock(spec=SkillLoaderPort)
-    skill_loader.load_metadata = AsyncMock(
-        return_value=ToolMetadata(
-            tool_name="t",
-            slug="t",
-            category="t",
-            input_schema={},
-            output_schema={},
-        )
-    )
+    skill_loader.load_sop = AsyncMock(side_effect=_make_skill_document)
 
     publisher = AsyncMock(spec=EventPublisher)
     publisher.publish = AsyncMock()
@@ -296,15 +300,13 @@ async def test_execute_chain_delegates_to_service() -> None:
     await use_case.execute("chain", {"x": 1}, context)
 
     call_args = service.execute_chain.await_args
-    # 使用 kwargs（兼容位置参数）
-    if call_args.kwargs:
-        assert call_args.kwargs["chain_id"] == dag.chain_id
-        assert call_args.kwargs["parameters"] == {"x": 1}
-        assert call_args.kwargs["context"] is context
-    else:
-        assert call_args.args[0] == dag.chain_id
-        assert call_args.args[1] == {"x": 1}
-        assert call_args.args[2] is context
+    # Story 4.1c 接线：context 经 with_extension 注入 tool_metadata 后为新实例，
+    # 断言委托参数语义（chain_id/parameters 一致，context 字段一致且含 tool_metadata）
+    assert call_args.kwargs["chain_id"] == dag.chain_id
+    assert call_args.kwargs["parameters"] == {"x": 1}
+    delegated_context = call_args.kwargs["context"]
+    assert delegated_context.tenant_id == context.tenant_id
+    assert "tool_metadata" in delegated_context.extensions
 
 
 # ============================================================================
