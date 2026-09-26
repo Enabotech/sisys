@@ -985,6 +985,8 @@ tests/
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（4.1b 五轮审查 + 4.4 + 4.1a）
 5. [x] Sprint status synced to `ready-for-dev`
 
+---
+
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
 > 本 Story 经过 `bmad-doc-review` 5 轮 D1-D5 迭代审查，记录所有对故事文件的修复项。
@@ -1047,7 +1049,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-09-26
 **最后更新/Last Updated:** 2026-09-26
 **更新说明/Description:**
@@ -1058,3 +1060,38 @@ tests/
   - **Round 3 D1+D2 综合验证**：验证 Round 1+2 D3 修订稳定性，发现 2 项 P1 残留 + 1 项 P2（line 50 '字典' 措辞漏修 / 决策表缺 D7 / Task 1 DoD Subtask 1.6 覆盖）
   - **Round 4 D3 收敛**：4 项修复（line 50 "字典" → "链路共享单数 ToolMetadata" / 决策表追加 D7 / 文档同步清单标注 "D7 Round 4 已登记" / D-R2-P1 修复记录更新为 "line 39 + line 50 两处"）
   - **Story 可进入 `ready-for-dev`**：27 项累积修订（P0×3 + P1×17 + P2×7），结构性稳定，无新增 P0 风险
+- v1.4.0: bmad-doc-review Round 5 完成（5 轮循环收尾）：
+  - **重复章节清理**：`🔍 代码审查发现` 与 `🔧 文档审查修复` 节顺序重新对齐（前者记录本 Story `dev-story` 阶段 Review Findings 现状保持 "待实施"；后者完整 22 项累积修订记录，已保持）
+  - **Story 最终交付状态**：`ready-for-dev`（26 项累积修订全部 commit + push 至 origin main；含 3 项 P0 + 17 项 P1 + 6 项 P2 修复）
+
+---
+
+## 🎯 5 轮 D1-D5 循环总览
+
+| 轮次 | D1 调研 | D2 评审 | D3 系统修订 | D4 Commit |
+|------|---------|---------|-------------|-----------|
+| Round 1 | 3 Agent 并行（StrategicAnalysisUseCase 接线 / Skills 系统现状 / 4-1b 资产与异常继承）| 3 Agent 并行（叙事一致性 / 科学性可行性 / CLAUDE.md 合规性）| 17 项（含 P0-1 RunToolChainUseCase + 14 项 P1 + 4 项 P2）| `1870a58d` ✓ |
+| Round 2 | 综述 Agent 验证 Round 1 D3 无回归 | 发现 1 项新 P0 + 3 项 P1 + 1 项 P2 | 5 项（P0 跨循环一致性 [C] 循环 + 3 项 P1 + 1 项 P2）| `3df9b025` ✓ |
+| Round 3 | D1+D2 验证稳定性（无修订）| 发现 2 项 P1 残留 + 1 项 P2 | 0 项（D1+D2 综述验证）| （跳过）|
+| Round 4 | 0（基于 Round 3 残留修复）| 0（D3 自主评审）| 4 项（P1×2 + 交叉引用 1 项 + 元数据 1 项）| `26851b12` ✓ |
+| Round 5 | 收尾：重复章节清理 + Story 最终状态 | — | 元数据更新（Story Version v1.3.0 → v1.4.0；状态保持 `ready-for-dev`）| （本轮）|
+
+**累计修订统计：**
+- 26 项系统修订（P0×3 + P1×17 + P2×6）
+- 3 个独立 commit（1870a58d / 3df9b025 / 26851b12）
+- 全部推送至 origin main
+
+**Story 关键决策：**
+- D1：SKILL.md frontmatter 唯一事实源（不建 data_sources.yaml）
+- D2：use case 调 load_sop 注入 extensions["tool_metadata"]
+- D3：L2 load_sop().frontmatter 数据源声明来源
+- D4：≥3 源 Skill 全声明源覆盖；2 源 Skill 双源交叉验证
+- D5：三不新增（端口/异常/事件）
+- D6：input_schema/output_schema JSON Schema dict
+- D7：**StrategicAnalysisUseCase + RunToolChainUseCase 双入口同步注入**（Round 4 登记）
+
+**Story 当前可执行性：**
+- ✅ ready-for-dev 状态稳定
+- ✅ 27 项文档修订全部 commit + push
+- ✅ Dev Story 阶段可立即启动 Task 0 SDD 规范定义
+- ⚠️ **Decision D8 待 Epic owner 签收**：disruptive-innovation 2 源与 Epic AC-4 字面偏差
