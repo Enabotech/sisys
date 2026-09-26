@@ -139,16 +139,6 @@ _SERVICE_MARKERS: dict[str, str] = {
 }
 
 
-@pytest.fixture(scope="session")
-def acceptance_env_config() -> TestEnvConfig:
-    """Acceptance 测试 session 级环境配置
-
-    Returns:
-        TestEnvConfig: 测试环境配置实例
-    """
-    return get_test_env()
-
-
 def pytest_collection_modifyitems(config, items):
     """自动为 acceptance 目录下的测试添加 marker
 
