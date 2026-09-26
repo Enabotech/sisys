@@ -47,7 +47,7 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 - **10 个混合数据型 / 7 个内部框架 Skills** → Story 4.1d / 4.1e
 - **数据源治理（配额管理/成本追踪/降级策略编排）** → 后续 Story
 - **newsapi/tavily 适配器代码修改** → 无（Key 缺失降级行为仅在 SOP 中文档化）
-- **`ToolChainService.execute_chain` 内部节点级 extensions 注入** → 本 Story 由 `RunToolChainUseCase` 调用点前置注入 ToolMetadata 字典后委托，避免侵入 Service 内部循环；如未来节点级独立 metadata 需求浮现则 Story 4.2 收敛
+- **`ToolChainService.execute_chain` 内部节点级 extensions 注入** → 本 Story 由 `RunToolChainUseCase` 调用点前置注入 ToolMetadata（链路共享单数，**非字典 — 见 line 39 已修正术语**）后委托，避免侵入 Service 内部循环；如未来节点级独立 metadata 需求浮现则 Story 4.2 收敛
 
 ---
 
@@ -519,7 +519,7 @@ context = ExecutionContext(
 |------|------------|------|---------|
 | Task 10 收尾 | `architecture.md` §17.3 状态块：`📋 Story 4.1c backlog` → `✅ Story 4.1c 已完成` | architecture.md | line 2674-2675 附近 |
 | Task 10 收尾 | `architecture.md` §17.3.3 末尾追加 4.1c 集成说明（6 Skills 声明 + 生产链路双入口接线 + 决策 D1/D2/D4） | architecture.md | §17.3.3 末尾 |
-| Task 10 收尾 | `architecture.md` §17.3.3 关键架构决策表追加 6 项新决策（D1 frontmatter SSOT / D2 双入口注入 / D3 L1 vs L2 / D4 三角化务实 / D6 Schema 载体 / D7 双 UseCase 同步接线） | architecture.md | 决策表末尾 |
+| Task 10 收尾 | `architecture.md` §17.3.3 关键架构决策表追加 6 项新决策（D1 frontmatter SSOT / D2 双入口注入 / D3 L1 vs L2 / D4 三角化务实 / D6 Schema 载体 / D7 双 UseCase 同步接线 — **D7 Round 4 已登记至 Story 决策表 line 851 后**） | architecture.md | 决策表末尾 |
 | Task 10 收尾 | `sisys-uni-exception-design.md` §3.3.2 追加 4-1c 复用声明段落（**Round 2 P1-3 改造**：与 Story line 109-117 异常契约表共享 single-source-of-truth，段落引用而非重新列举，避免异常列表双维护漂移；具体段落草稿见 line 109-117 表格） | sisys-uni-exception-design.md | §3.3.2 末尾或独立段落 |
 | Task 10 收尾 | `architecture.md` 修订历史表追加新版本行 + 文档统计版本号/日期更新 | architecture.md | 文末修订历史 |
 
@@ -849,6 +849,7 @@ context = ExecutionContext(
 | D4: 三角化定义 | ✅ **≥3 源 Skill 全声明源并发覆盖；2 源 Skill 双源交叉验证**（9/10） | 强制 disruptive-innovation 增至 3 源（5/10，无合适第三源） | Epic "每指标 ≥3 源"为质量愿景；disruptive-innovation 数据源选型（USPTO+Tavily）经 4.1b PoC 验证，强行加源降低数据质量 |
 | D5: 新异常/端口/事件 | ✅ **三不新增**（10/10） | 新增 Skill 数据采集异常（2/10） | 全部失败路径已被 201/207/101/302/411/412/413 覆盖；同义异常/端口重复定义是红线 |
 | D6: input_schema 载体 | ✅ **frontmatter `input_schema`/`output_schema` 键（JSON Schema dict）**（9/10） | Pydantic 模型类（3/10） | `normalize_metadata` 已支持该键（`frontmatter.py:238-239`）；运行时 Schema 强制验证属 Story 4.3 范畴；domain 禁 pydantic |
+| D7: 生产链路双 UseCase 同步接线（Round 4 登记） | ✅ **StrategicAnalysisUseCase + RunToolChainUseCase 双入口同步注入 `extensions["tool_metadata"]`（链路共享单 ToolMetadata，非字典）**（10/10） | 仅 StrategicAnalysisUseCase（5/10，run_tool_chain.py 仍抛 207 缺口） / 推迟 RunToolChainUseCase 到 Story 4.2（3/10） | Round 1 D2-A/D2-可行性 + D1-A 三视角独立发现 `RunToolChainUseCase`（`run_tool_chain.py:99-109`）存在同类 wiring 缺口；双入口同步接线避免 Story 完成后多节点链路仍抛 207；节点级 metadata 切换属 Story 4.2 范畴本 Story 显式不收敛 |
 
 ### 项目结构说明 Project Structure（本 Story 新增/修改）
 
@@ -1005,7 +1006,7 @@ tests/
 | **D-R1-P1** | **R3 风险描述与实际改动层不一致** | P1 | 重写为"use case 层双入口 wiring 改变 ExecutionContext.extensions 语义 + load_metadata → load_sop I/O 增量" |
 | **D-R1-P1** | **R1 风险等级应降为中** | P1 | 评估 Story 缓解完整 + 生产 Key 属 CI/CD 范畴，降级"高" → "中" |
 | **D-R1-P1** | **disruptive-innovation 2 源与 Epic AC-4 字面偏差需 Epic owner 签收** | P1 | R4 决策依据补充 + SSOT 表行末标注"Epic AC-4 字面偏差由 Epic owner 签收" |
-| **D-R2-P1** | **Task 1 [B] 链路"字典"语义偏差 — 链路全程共用单 ToolMetadata 非字典** | P1 | line 50 + 文档范围澄清节修正："ToolMetadata 字典" → "ToolMetadata（链路共享单数）"；Story 显式不收敛节点级 metadata 切换（属 Story 4.2） |
+| **D-R2-P1** | **Task 1 [B] 链路"字典"语义偏差 — 链路全程共用单 ToolMetadata 非字典** | P1 | line 39（已修）+ line 50（Round 4 D-R3-P1-1 完成）+ Story 显式不收敛节点级 metadata 切换（属 Story 4.2） |
 | **D-R2-P1** | **§3.3.2 段落双维护漂移风险（异常列表）** | P1 | 文档同步清单 line 521 段落草稿改为引用 Story line 109-117 异常契约表而非重新列举 |
 | **D-R2-P1** | **composition_root 行号 D3 修订前实测确认** | P1 | Subtask 0.7 行末追加 Round 2 P2-2 实测要求，确保 line 872、980 引用不漂移 |
 | **D-R1-P2** | **6 个目标 Skill references/templates 目录全空 vs Story 描述** | P2 | Story 范围澄清节追加"当前 5 个非 pestel 目标 Skill 的 references/scripts 为空目录、templates 全无，本 Story Task 2-7 实施期新建" |
@@ -1046,13 +1047,14 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-09-26
 **最后更新/Last Updated:** 2026-09-26
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md Story 4.1c + 4-1b 完成资产 + 3 视角并行代码调研 + 生产链路缺口核实）
 - v1.1.0: bmad-doc-review Round 1 完成（17 项系统修订）
-- v1.2.0: bmad-doc-review Round 2 完成（5 项收敛修订）：
-  - **D1+D2 综述**：3 Agent 验证 D3 修订无回归 + 1 项新 P0（跨循环一致性 [C] 循环缺失）+ 3 项 P1（单 metadata vs 字典语义 / composition_root 行号 D3 前实测 / §3.3.2 段落双维护）+ 1 项 P2（AC-1 验证标准扩字段对齐）
-  - **D3 修订**：Task 2-7 各 Skill 新增 [C] 循环 + AC-1 验证标准追加 cross-consistency 行 + range 澄清节"字典→单数 ToolMetadata"修正 + §3.3.2 段落交叉引用改造 + Subtask 0.7 行号实测补强
-  - **关键新增**：跨循环一致性 [C] 循环（frontmatter.data_sources 集合 vs SOP body `$DATA_SOURCE` 调用集合双向断言）—— 真实质量缺口（白名单漂移），不修复 Skill 不可用场景无回归保护
+- v1.2.0: bmad-doc-review Round 2 完成（5 项收敛修订：跨循环一致性 [C] 循环正式落地、Task 1 [B] 单 metadata 语义、§3.3.2 段落引用改造、AC-1 扩字段对齐）
+- v1.3.0: bmad-doc-review Round 3+4 完成：
+  - **Round 3 D1+D2 综合验证**：验证 Round 1+2 D3 修订稳定性，发现 2 项 P1 残留 + 1 项 P2（line 50 '字典' 措辞漏修 / 决策表缺 D7 / Task 1 DoD Subtask 1.6 覆盖）
+  - **Round 4 D3 收敛**：4 项修复（line 50 "字典" → "链路共享单数 ToolMetadata" / 决策表追加 D7 / 文档同步清单标注 "D7 Round 4 已登记" / D-R2-P1 修复记录更新为 "line 39 + line 50 两处"）
+  - **Story 可进入 `ready-for-dev`**：27 项累积修订（P0×3 + P1×17 + P2×7），结构性稳定，无新增 P0 风险
