@@ -14,9 +14,9 @@ completedAt: '2026-02-26'
 
 # SISYS - 企业战略智能系统架构设计文档
 
-**版本：** 8.5.0（Story 4.1b 实现同步 - Skills 数据采集基础设施 §17.3.3）
+**版本：** 8.6.0（Story 4.1c 实现同步 - 6 个外部数据型 Skills 数据采集集成 §17.3.3）
 **状态：** 架构决策主文档 ~3500 行，实现细节迁移至子设计文档
-**评审日期：** 2026-09-24
+**评审日期：** 2026-09-26
 **审核依据：**对标业界最佳实践（Arc42/C4/ADR + Anthropic Claude Code Skills 渐进式披露），将 §8/§17/§18 实现代码迁移至独立子设计文档，架构主文档聚焦决策与规则
 
 [重要说明]本架构设计包含有部分重要模块的详细设计、项目参考目录树与关键代码实现示例，这类型内容仅供开发参考，执行[EPIC]-[STORY]-[编码]等开发任务时按需调整并及时更新本文档即可！
@@ -2670,7 +2670,7 @@ buckets/
   - DataSourcePort + 6 个数据源适配器（World Bank / IMF / Tavily / USPTO / IPCC / NewsAPI）
   - Engine.Execute 阶段 `$DATA_SOURCE` 标记解析
   - 5 个核心 Skills 已重新分配到 4.1c/4.1d/4.1e（见下）
-- 📋 **Story 4.1c backlog**（P0-6）：6 个外部数据型 Skills 复用 4.1b 完善
+- ✅ **Story 4.1c 已完成**（P0-6，2026-09-26）：6 个外部数据型 Skills 复用 4.1b 完善（详见 §17.3.3 末尾 4.1c 集成说明）
   - pestel-analysis（从 4.1b 转入）/ porters-five-forces / appeals-analysis / competitor-analysis / scenario-planning / disruptive-innovation
 - 📋 **Story 4.1d backlog**（P0-7）：10 个混合数据型 Skills 增强（外部+内部数据）
   - swot-tows（从 4.1b 转入）/ ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management-model（从 4.1b 转入）
@@ -2813,6 +2813,19 @@ buckets/
 **执行语义（Engine.Execute 前置）：** Code 产物含 `$DATA_SOURCE(name, "query")` 标记 → 标记解析器提取（字符串字面量内文本不触发，tokenize 掩码）→ 白名单校验（`context.extensions["tool_metadata"]` 的 data_sources）→ `fetch_many` 并发采集（asyncio.gather 部分成功收敛）→ preamble 内联注入 → 沙箱执行 → `EvidencePackage.data_sources` 溯源元数据（source/freshness/confidence）。数据采集领域异常（207/201/410-413）不包装直传，区别于 `ToolExecutionFailedError`。
 
 **新鲜度模型：** `DataFreshness.score(at) = 0.5^(age/half_life)` 指数衰减（默认半衰期 7 天，适配年度统计数据）；`is_stale(at)`（age > ttl_seconds）触发重采；缓存故障降级透传不阻断主流程。
+
+**Story 4.1c 集成说明（✅ 已实现 2026-09-26）：** 6 个外部数据型 Skills（pestel-analysis 6 源 / porters-five-forces 3 源 / appeals-analysis 3 源 / competitor-analysis 4 源 / scenario-planning 3 源 / disruptive-innovation 2 源）完成数据采集集成：① SKILL.md frontmatter 填充 `data_sources` 白名单 + `input_schema`/`output_schema`（JSON Schema dict，运行时 Pydantic 强制校验属 Story 4.3）；② 生产链路双入口接线——`StrategicAnalysisUseCase` 与 `RunToolChainUseCase` 均由 `load_metadata`(L1) 改为 `load_sop`(L2) 并将 `ToolMetadata` 注入 `extensions["tool_metadata"]`（load_sop 失败容错不阻断，extensions 缺键时含标记按 4.1b 语义抛 207 安全失败）；③ 每个 Skill 补齐 `references/`（三角化规范/评分锚点/工作坊引导）与 `templates/`（采集问卷/矩阵模板）；④ 质量验证——声明 ≥3 源的 5 个 Skill 全声明源并发覆盖三角化，disruptive-innovation 双源交叉验证（决策 D4）。
+
+**Story 4.1c 关键架构决策（6 项追加）：**
+
+| # | 决策点 | 选中方案 | 依据 |
+|---|--------|---------|------|
+| D1 | 数据源声明载体 | SKILL.md frontmatter 唯一事实源（不建 data_sources.yaml） | 4-1b 已建 frontmatter → ToolMetadata.data_sources 解析链路；双写必漂移；Anthropic "SKILL.md 自包含"风格 |
+| D2 | 白名单生效链路 | use case 调 load_sop 注入 extensions["tool_metadata"] | Engine 白名单依据契约既定；use case 是编排层天然注入点；不触碰 Engine __init__（4.4 BDD 保护） |
+| D3 | L1 vs L2 元数据来源 | L2 load_sop().frontmatter（含 data_sources） | L1 `_parse_table_row` 不解析 data_sources 且受 ≤1.2K tokens 预算约束 |
+| D4 | 三角化定义 | ≥3 源 Skill 全声明源并发覆盖；2 源 Skill 双源交叉验证 | disruptive-innovation（USPTO+Tavily）经 4.1b PoC 验证，强行加源降低数据质量（Epic AC-4 字面偏差由 Epic owner 签收） |
+| D6 | input_schema 载体 | frontmatter `input_schema`/`output_schema` 键（JSON Schema dict） | `normalize_metadata` 已支持该键；运行时 Schema 强制验证属 Story 4.3；domain 禁 pydantic |
+| D7 | 生产链路接线范围 | StrategicAnalysisUseCase + RunToolChainUseCase 双入口同步注入（链路共享单 ToolMetadata） | 仅接 StrategicAnalysisUseCase 时多节点链路仍抛 207；节点级 metadata 切换属 Story 4.2 范畴 |
 
 ### 17.4 AGENT 架构
 
@@ -3535,6 +3548,7 @@ pytest tests/unit/domain/
 | 8.3.3 | 2026-09-05 | **Skills 系统对标 Anthropic Claude Code 完善**：①Skills 三级渐进式披露深化（L1/L2/L3 边界量化）②负向触发章节强制 + description 质量强化 ③L3 沙箱事务边界（Anthropic "代码优先" 对标） | 架构团队 |
 | 8.4.0 | 2026-09-05 | **Round 1 文档审查修订**：①依赖方向矩阵修正（infrastructure→application 仅通过 DI 注入）②SAPMessage/datetime.utcnow/raise ValueError 三处异常契约红线修复 ③SKILL.md frontmatter 精减（13 字段→7 字段，删除硬编码 scaffolding）④Skills L1 token 预算统一（消除 200 vs 1200 tokens 矛盾）⑤§13 章节跳号 §13.11 补充 ⑥失效链接 appendix-mcp.md 删除 | 架构团队 |
 | 8.5.0 | 2026-09-24 | **Story 4.1b Skills 数据采集基础设施实现**：①新增 §17.3.3（DataSourcePort + 8 适配器 + Redis 缓存 + Engine.Execute `$DATA_SOURCE` 集成，8 项架构决策表）②data_source 异常子域（410-419）③DataSourceFetched/DataSourceFetchFailed 双通道事件 | 架构团队 |
+| 8.6.0 | 2026-09-26 | **Story 4.1c Skills 数据采集集成实现**：①6 个外部数据型 Skills frontmatter `data_sources` 白名单 + IO Schema 成熟化 ②生产链路双入口接线（StrategicAnalysisUseCase + RunToolChainUseCase 注入 `extensions["tool_metadata"]`，load_metadata→load_sop）③§17.3.3 追加 4.1c 集成说明与 6 项架构决策（D1-D4/D6/D7） | 架构团队 |
 
 ---
 

@@ -17,7 +17,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from src.application.ports.skill_loader import SkillLoaderPort
+from src.application.ports.skill_loader import SkillLoaderPort, ToolMetadata
 from src.application.ports.tool_execution_service import ToolExecutionServicePort
 from src.application.ports.tool_registry_service import ToolRegistryServicePort
 from src.domain.entities.tool import Tool
@@ -100,24 +100,31 @@ class StrategicAnalysisUseCase:
             # 仓储端口契约：get_tool 在工具不存在时返回 None，由应用层转换为 ToolNotFoundError
             raise ToolNotFoundError(tool_name=request.tool_name)
 
-        # 2. 通过 SkillLoaderPort 加载技能元数据（L1/L2）
-        # 注：L1/L2 加载可能失败，但不应阻断执行链路（可选增强）
+        # 2. 通过 SkillLoaderPort 加载 L2 SOP（frontmatter 含 data_sources 白名单）
+        # Story 4.1c 接线：load_metadata(L1, data_sources 恒为空) → load_sop(L2, 含白名单)，
+        # 将 ToolMetadata 注入 extensions["tool_metadata"] 作为 Engine 白名单校验依据。
+        # 注：L2 加载可能失败，但不应阻断执行链路（容错对齐既有 load_metadata 先例）；
+        # metadata 为 None 时 extensions 不含该键——代码无标记时零影响，含标记时按
+        # 4.1b 既定语义抛 BusinessRuleViolationError(207)（安全失败方向正确）。
+        tool_metadata: ToolMetadata | None = None
         try:
-            await self._skill_loader.load_metadata(request.tool_name)
+            skill_doc = await self._skill_loader.load_sop(request.tool_name)
+            tool_metadata = skill_doc.frontmatter
         except Exception as exc:
             logger.warning(
-                "技能元数据加载失败（不阻断执行）: tool_name=%s exc=%s",
+                "技能 SOP 加载失败（不阻断执行）: tool_name=%s exc=%s",
                 request.tool_name,
                 exc,
             )
 
-        # 3. 构造 ExecutionContext + ToolCall
+        # 3. 构造 ExecutionContext + ToolCall（注入 tool_metadata 作为白名单依据）
         context = ExecutionContext(
             tenant_id=tool.tool_id,  # 简化：用 tool_id 作为 tenant_id 占位
             user_id=request.user_id,
             session_id=request.session_id,
             trace_id=request.trace_id,
             timeout_sec=60.0,
+            extensions={"tool_metadata": tool_metadata} if tool_metadata is not None else {},
         )
         tool_call = ToolCall(
             tool_id=tool.tool_id,

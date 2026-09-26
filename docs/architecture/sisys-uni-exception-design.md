@@ -722,6 +722,12 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_413 | DataSourceResponseError | DataSourceError | 502 |（Story 4.1b，响应解析失败/required_fields 缺失，不可重试）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
+> **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——
+> 全部失败路径复用上表既有编码（201/207/101/302/387/388/411/412/413），显式决策依据与
+> 场景↔异常映射表以 Story 文件「🎯 领域异常契约」节为 single-source-of-truth
+> （`_bmad-output/implementation-artifacts/stories/4-1c-skills-data-collection-integration.md`），
+> 本节仅登记复用事实，不重复列举，避免双维护漂移。data_source 子域 414-419 保持空闲。
+
 ### 3.3 编码分配策略：人工编码 + CI 自动校验
 
 #### 3.3.1 设计原则
