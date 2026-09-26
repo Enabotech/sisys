@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass(frozen=True)
 class ChinaNBSConfig:
@@ -29,13 +31,32 @@ class ChinaNBSConfig:
 
     @classmethod
     def from_env(cls) -> ChinaNBSConfig:
-        """从环境变量加载配置"""
+        """从环境变量加载配置
+
+        Raises:
+            ConfigurationError: 数值类型环境变量解析失败时（禁止 ValueError 透传）
+        """
+        interval_raw = os.getenv("CHINA_NBS_POLL_INTERVAL_SEC", str(cls.poll_interval_sec))
+        timeout_raw = os.getenv("CHINA_NBS_POLL_TIMEOUT_SEC", str(cls.poll_timeout_sec))
+        ttl_raw = os.getenv("CHINA_NBS_TTL_SECONDS", str(cls.ttl_seconds))
+        try:
+            poll_interval_sec = float(interval_raw)
+        except (ValueError, TypeError):
+            raise ConfigurationError(message=f"CHINA_NBS_POLL_INTERVAL_SEC 值非法: {interval_raw!r}") from None
+        try:
+            poll_timeout_sec = float(timeout_raw)
+        except (ValueError, TypeError):
+            raise ConfigurationError(message=f"CHINA_NBS_POLL_TIMEOUT_SEC 值非法: {timeout_raw!r}") from None
+        try:
+            ttl_seconds = int(ttl_raw)
+        except (ValueError, TypeError):
+            raise ConfigurationError(message=f"CHINA_NBS_TTL_SECONDS 值非法: {ttl_raw!r}（需要整数）") from None
         return cls(
             base_url=os.getenv("CHINA_NBS_BASE_URL", cls.base_url),
             domain=os.getenv("CHINA_NBS_DOMAIN", cls.domain),
-            poll_interval_sec=float(os.getenv("CHINA_NBS_POLL_INTERVAL_SEC", str(cls.poll_interval_sec))),
-            poll_timeout_sec=float(os.getenv("CHINA_NBS_POLL_TIMEOUT_SEC", str(cls.poll_timeout_sec))),
-            ttl_seconds=int(os.getenv("CHINA_NBS_TTL_SECONDS", str(cls.ttl_seconds))),
+            poll_interval_sec=poll_interval_sec,
+            poll_timeout_sec=poll_timeout_sec,
+            ttl_seconds=ttl_seconds,
         )
 
 

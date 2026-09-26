@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass(frozen=True)
 class NewsAPIConfig:
@@ -28,12 +30,26 @@ class NewsAPIConfig:
 
     @classmethod
     def from_env(cls) -> NewsAPIConfig:
-        """从环境变量加载配置（NEWSAPI_API_KEY 等）"""
+        """从环境变量加载配置（NEWSAPI_API_KEY 等）
+
+        Raises:
+            ConfigurationError: 数值类型环境变量解析失败时（禁止 ValueError 透传）
+        """
+        timeout_raw = os.getenv("NEWSAPI_TIMEOUT", str(cls.timeout))
+        ttl_raw = os.getenv("NEWSAPI_TTL_SECONDS", str(cls.ttl_seconds))
+        try:
+            timeout = float(timeout_raw)
+        except (ValueError, TypeError):
+            raise ConfigurationError(message=f"NEWSAPI_TIMEOUT 值非法: {timeout_raw!r}（需要数值）") from None
+        try:
+            ttl_seconds = int(ttl_raw)
+        except (ValueError, TypeError):
+            raise ConfigurationError(message=f"NEWSAPI_TTL_SECONDS 值非法: {ttl_raw!r}（需要整数）") from None
         return cls(
             api_key=os.getenv("NEWSAPI_API_KEY", ""),
             api_url=os.getenv("NEWSAPI_API_URL", cls.api_url),
-            timeout=float(os.getenv("NEWSAPI_TIMEOUT", str(cls.timeout))),
-            ttl_seconds=int(os.getenv("NEWSAPI_TTL_SECONDS", str(cls.ttl_seconds))),
+            timeout=timeout,
+            ttl_seconds=ttl_seconds,
         )
 
 

@@ -157,14 +157,11 @@ class DataSourceResolverService:
             if isinstance(outcome, DataSourceResult):
                 results.append(outcome)
                 continue
-            # asyncio.gather(return_exceptions=True) 返回 BaseException（含 CancelledError）
-            if isinstance(outcome, Exception):
-                error = outcome
-            else:
-                error = DataSourceUnavailableError(
-                    message=f"数据源 {req.source_name} 采集被中断（{type(outcome).__name__}）",
-                    context={"source_name": req.source_name},
-                )
+            # BaseException 子类（含 CancelledError / KeyboardInterrupt / SystemExit）
+            # 必须传播，不得包装为 DataSourceUnavailableError —— 否则父任务取消语义被吞
+            if not isinstance(outcome, Exception):
+                raise outcome
+            error = outcome
             if first_error is None:
                 first_error = error
             await self._publish_failed(req, error, execution_id=execution_id)

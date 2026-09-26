@@ -2433,7 +2433,9 @@ def bootstrap() -> None:
 
     # 需 API Key 的适配器：条件注册（Story 3-4 Reranker 模式），Key 缺失时优雅降级
     # （Resolver 内 Mapping.get(name) 返回 None；白名单校验以 ToolMetadata.data_sources 为准）
-    newsapi_enabled = os.getenv("NEWSAPI_API_KEY") is not None
+    # 安全修复：bool() 同时拒绝 None 与空字符串，与 Twelve-Factor App "空串视为未配置" 语义一致
+    # 避免 export VAR="" 时被 is not None 误判为已配置、延迟到首次请求才暴露配置错误
+    newsapi_enabled = bool(os.getenv("NEWSAPI_API_KEY"))
     if newsapi_enabled:
         from src.infrastructure.config.newsapi import NewsAPIConfig
 
@@ -2451,7 +2453,7 @@ def bootstrap() -> None:
             tags=("data-source", "newsapi", "news"),
         )
 
-    tavily_enabled = os.getenv("TAVILY_API_KEY") is not None
+    tavily_enabled = bool(os.getenv("TAVILY_API_KEY"))
     if tavily_enabled:
         from src.infrastructure.config.tavily import TavilyConfig
 

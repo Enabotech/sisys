@@ -12,10 +12,8 @@
 from __future__ import annotations
 
 import ast
-import io
 import json
 import re
-import tokenize
 from datetime import UTC, datetime
 
 from src.domain.exceptions import ValidationError
@@ -30,25 +28,50 @@ _MARKER_HEAD = "$DATA_SOURCE("
 
 
 def _string_literal_spans(code: str) -> list[tuple[int, int]]:
-    """返回代码中所有字符串字面量的绝对偏移区间（tokenize 实现，容错 ERRORTOKEN）
+    """返回代码中所有字符串字面量的绝对偏移区间（纯字符级扫描，不依赖 tokenize 完整性）
 
-    $DATA_SOURCE 含非法 Python 字符 `$`，tokenize 将其标记为 ERRORTOKEN 并继续，
-    不影响字符串字面量区间的提取。
+    为什么不使用 tokenize：未闭合字符串（如 code = '"abc' 单引号风格）会触发 tokenize.TokenError，
+    在 except 分支降级返回部分区间，会导致字符串内的 $DATA_SOURCE 文本误识别为标记。
+    本函数手写三种引号（双引号、单引号、三引号双/单）+ 转义字符解析，
+    即使 tokenize 失败也能给出完整稳健的边界集合。
     """
     spans: list[tuple[int, int]] = []
-    line_offsets = [0]
-    for line in code.splitlines(keepends=True):
-        line_offsets.append(line_offsets[-1] + len(line))
-    try:
-        tokens = tokenize.generate_tokens(io.StringIO(code).readline)
-        for tok in tokens:
-            if tok.type == tokenize.STRING:
-                start = line_offsets[tok.start[0] - 1] + tok.start[1]
-                end = line_offsets[tok.end[0] - 1] + tok.end[1]
-                spans.append((start, end))
-    except tokenize.TokenError:
-        # 未闭合字符串等词法错误：返回已提取区间（后续语法校验兜底）
-        pass
+    i = 0
+    n = len(code)
+    while i < n:
+        c = code[i]
+        if c in ('"', "'"):
+            # 优先匹配三引号（Python 允许三引号在源码中独立成字符串）
+            triple = c * 3
+            if code[i : i + 3] == triple:
+                quote = triple
+                step = 3
+            else:
+                quote = c
+                step = 1
+            start = i
+            i += step
+            end = i
+            # 在 code 中寻找匹配的结束引号序列
+            matched = False
+            while i < n:
+                if code[i] == "\\" and i + step < n:
+                    i += 2  # 跳过转义序列
+                    continue
+                if code[i : i + step] == quote:
+                    i += step
+                    end = i
+                    spans.append((start, end))
+                    matched = True
+                    break
+                i += 1
+            if not matched:
+                # 未闭合的字符串字面量：保守登记到文件末尾
+                # 下游 _MARKER_HEAD 后置校验会兜底标记语法错误
+                spans.append((start, n))
+                break
+        else:
+            i += 1
     return spans
 
 
@@ -69,6 +92,9 @@ def parse_data_source_markers(code: str) -> tuple[DataSourceQuery, ...]:
     Raises:
         ValidationError: 标记语法错误（EXCEPTION_201：缺参数/缺引号/未闭合/多余参数/空值）
     """
+    # 字符串边界识别走纯字符级扫描（_string_literal_spans），不依赖 tokenize 完整性
+    # 即使代码含未闭合字符串（语法错误），spans 集合仍可正确反映已识别的字面量边界，
+    # 由下游 _MARKER_HEAD 后置校验兜底标记语法错误 → ValidationError
     spans = _string_literal_spans(code)
 
     markers: list[DataSourceQuery] = []
