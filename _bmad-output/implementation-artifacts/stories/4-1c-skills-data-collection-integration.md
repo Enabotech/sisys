@@ -34,9 +34,9 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 - 6 个 SKILL.md frontmatter `data_sources` 白名单声明 + `input_schema`/`output_schema` JSON Schema 定义
 - 6 个 SKILL.md body SOP 成熟化（≤500 行硬约束，Hub-and-Spoke 拆分至 references/）
 - 6 个 Skill 的 `references/` + `templates/` 资源文件（当前 5 个非 pestel 目标的 `references/`/`scripts/` 为空目录、`templates/` 全无 — 本 Story Task 2-7 实施期新建）
-- **生产链路接线（关键缺口修复 — 双入口）**：
+- **生产链路接线（关键缺口修复 — 双入口，链路共享单 ToolMetadata）**：
   - `StrategicAnalysisUseCase` 注入 `extensions["tool_metadata"]`（单 Skill 调用入口）
-  - **`RunToolChainUseCase` 注入 `extensions["tool_metadata"]`（多 Skill 链路入口 — Round 1 D2 评审发现 RunToolChainUseCase 存在同类缺口）**
+  - **`RunToolChainUseCase` 注入 `extensions["tool_metadata"]`**（**链路共享单 ToolMetadata** — UseCase 入口注入当前节点 metadata 委托 `execute_chain`，**链路全程共用同一 metadata 非字典，节点级 metadata 切换属 Story 4.2 工具链编排范畴，本 Story 显式不收敛；Round 2 P1-1 修正 line 50 "字典" 措辞为单数 ToolMetadata**）
 - Skills SOP 单元测试 ×6 + 集成测试 + 架构验证测试 + BDD 验收测试
 - 4-1b 推迟项收敛：Marker 字符级扫描专项测试（`data_source_marker._string_literal_spans` 边界场景）
 
@@ -271,6 +271,8 @@ context = ExecutionContext(
 
 **验证标准/Validation Criteria:**
 - [ ] 6 个 Skills 单元测试（`test_<slug>_4_1c.py`）断言白名单解析结果 == SSOT 表
+- [ ] **frontmatter data_sources 全字段**（name/api_type/ttl_seconds/url/required_fields）逐字等于 SSOT 表（Round 2 P2-1）
+- [ ] **跨循环一致性（C 循环，Round 2 P0-1）**：SOP body 中所有 `$DATA_SOURCE("name", "query")` 标记提取的 name 集合 == frontmatter.data_sources name 集合（双向断言：白名单过宽/过窄均失败）
 - [ ] 声明 url ↔ 适配器 url 一致性断言通过
 - [ ] 23 Skills 全量解析回归通过（含 17 个未触碰 Skill 空 tuple 断言）
 
@@ -518,7 +520,7 @@ context = ExecutionContext(
 | Task 10 收尾 | `architecture.md` §17.3 状态块：`📋 Story 4.1c backlog` → `✅ Story 4.1c 已完成` | architecture.md | line 2674-2675 附近 |
 | Task 10 收尾 | `architecture.md` §17.3.3 末尾追加 4.1c 集成说明（6 Skills 声明 + 生产链路双入口接线 + 决策 D1/D2/D4） | architecture.md | §17.3.3 末尾 |
 | Task 10 收尾 | `architecture.md` §17.3.3 关键架构决策表追加 6 项新决策（D1 frontmatter SSOT / D2 双入口注入 / D3 L1 vs L2 / D4 三角化务实 / D6 Schema 载体 / D7 双 UseCase 同步接线） | architecture.md | 决策表末尾 |
-| Task 10 收尾 | `sisys-uni-exception-design.md` §3.3.2 追加 4-1c 复用声明段落："本 Story 复用 4-1b 既定 410-413/101/302/207/201 + FrontmatterParseError + 387/388 共 9 个异常编码，无新异常编码段（与 line 116 Task 0 grep EXCEPTION_41[4-9] 零碰撞验证对齐）" | sisys-uni-exception-design.md | §3.3.2 末尾或独立段落 |
+| Task 10 收尾 | `sisys-uni-exception-design.md` §3.3.2 追加 4-1c 复用声明段落（**Round 2 P1-3 改造**：与 Story line 109-117 异常契约表共享 single-source-of-truth，段落引用而非重新列举，避免异常列表双维护漂移；具体段落草稿见 line 109-117 表格） | sisys-uni-exception-design.md | §3.3.2 末尾或独立段落 |
 | Task 10 收尾 | `architecture.md` 修订历史表追加新版本行 + 文档统计版本号/日期更新 | architecture.md | 文末修订历史 |
 
 ---
@@ -541,7 +543,7 @@ context = ExecutionContext(
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_skill_data_collection_4_1c.feature`（Happy Path + 6 个 Edge Cases）
 - [ ] Subtask 0.5: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_skill_data_collection_4_1c.py`（scenarios() + context + 共享 event_loop + Fake 适配器）
 - [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证，失败原因 = 白名单声明未填写/接线未实施）
-- [ ] Subtask 0.7: 确认 6 个声明源的 url 与适配器 `get_metadata().url` 实际值（逐一解析 8 个适配器，固化进 SSOT 表"适配器 url/api_type/ttl/confidence 对齐表" — Round 1 D1-C 视角已固化）
+- [ ] Subtask 0.7: 确认 6 个声明源的 url 与适配器 `get_metadata().url` 实际值（逐一解析 8 个适配器，固化进 SSOT 表"适配器 url/api_type/ttl/confidence 对齐表" — Round 1 D1-C 视角已固化，**Round 2 P2-2 行号复核**：`composition_root.py` 实测当前 newsapi/tavily 行号仍为 2438/2456；如漂移则同步修订 line 872、980）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕（Schema 契约 + SSOT 表 + 接线方案 + 三项决策登记）
@@ -611,15 +613,26 @@ context = ExecutionContext(
 | 🟢 绿 | 编写 SKILL.md body + references/（三角化规范 triangulation.md + 六维度评分锚点 + 工作坊引导）+ templates/（PESTEL 采集矩阵模板） |
 | 🔄 重构 | 行数校验通过，内容评审 |
 
+#### TDD 循环 [C]：跨循环一致性（Round 2 P0-1 新增）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写断言：解析 SKILL.md body 中所有 `$DATA_SOURCE("name", "query")` 标记 → 提取 name 集合；断言 == frontmatter.data_sources.name 集合；双向：白名单过宽（frontmatter 含 SOP 未用源）或过窄（SOP 用 frontmatter 未声明源）均失败 |
+| 🟢 绿 | 调整 SKILL.md 内容使两集合一致 |
+| 🔄 重构 | Task 9.3 架构测试新增 cross-consistency 断言（正则 `\$DATA_SOURCE\(\s*["']([\w-]+)["']` 提取 SOP body 调用集合） |
+
 - [ ] Subtask 2.1: 🔴 红 — 编写 frontmatter 声明失败测试
 - [ ] Subtask 2.2: 🟢 绿 — 填充 frontmatter（data_sources/Schema）
 - [ ] Subtask 2.3: 🔴 红 — 编写 SOP 内容失败测试
 - [ ] Subtask 2.4: 🟢 绿 — 编写 SOP + references + templates（整合既有 scoring_matrix/aggregate_scores 引用）
-- [ ] Subtask 2.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [ ] Subtask 2.5: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
+- [ ] Subtask 2.6: 🟢 绿 — 调整 SOP body `$DATA_SOURCE` 标记集合与 frontmatter 对齐
+- [ ] Subtask 2.7: 🔄 重构 — 行数 ≤500 + cross-consistency 回归全绿
 
 **完成标准/Definition of Done:**
 - [ ] pestel-analysis 声明与 SOP 成熟化完成，单测全绿
 - [ ] 既有 L3 资产测试零回归
+- [ ] [C] 跨循环一致性 100% 覆盖（pestel 6 源 ↔ SOP body 6 标记一一对应）
 
 ---
 
@@ -637,11 +650,13 @@ context = ExecutionContext(
 - [ ] Subtask 3.3: 🔴 红 — 编写 SOP 内容失败测试
 - [ ] Subtask 3.4: 🟢 绿 — 编写 SOP + references（五力评分锚点/三角化规范/工作坊引导）+ templates（行业问卷）
 - [ ] Subtask 3.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [ ] Subtask 3.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试（端口 3 源 ↔ SOP body 3 标记对齐；详见 Task 2 [C] 循环范本）
 
 **完成标准/Definition of Done:**
 - [ ] porters-five-forces Skill 声明与 SOP 成熟化完成，单测全绿
 - [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
 - [ ] 23 Skills 解析回归零失败
+- [ ] [C] 跨循环一致性：frontmatter 3 源 ↔ SOP body 3 标记一一对应
 
 ---
 
@@ -657,11 +672,13 @@ context = ExecutionContext(
 - [ ] Subtask 4.3: 🔴 红 — 编写 SOP 内容失败测试
 - [ ] Subtask 4.4: 🟢 绿 — 编写 SOP + references（8 维度评分锚点/工作坊引导）+ templates（顾客问卷）
 - [ ] Subtask 4.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [ ] Subtask 4.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
 
 **完成标准/Definition of Done:**
 - [ ] appeals-analysis Skill 声明与 SOP 成熟化完成，单测全绿
 - [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
 - [ ] 23 Skills 解析回归零失败
+- [ ] [C] 跨循环一致性覆盖（详见 Task 2 [C] 循环范本）
 
 ---
 
@@ -677,11 +694,13 @@ context = ExecutionContext(
 - [ ] Subtask 5.3: 🔴 红 — 编写 SOP 内容失败测试
 - [ ] Subtask 5.4: 🟢 绿 — 编写 SOP + references（对标矩阵评分锚点/竞品调研工作坊）+ templates（竞品对标矩阵）
 - [ ] Subtask 5.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [ ] Subtask 5.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
 
 **完成标准/Definition of Done:**
 - [ ] competitor-analysis Skill 声明与 SOP 成熟化完成，单测全绿
 - [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
 - [ ] 23 Skills 解析回归零失败
+- [ ] [C] 跨循环一致性覆盖
 
 ---
 
@@ -697,11 +716,13 @@ context = ExecutionContext(
 - [ ] Subtask 6.3: 🔴 红 — 编写 SOP 内容失败测试
 - [ ] Subtask 6.4: 🟢 绿 — 编写 SOP + references（情景构建方法论/不确定性矩阵锚点）+ templates（情景剧本框架）
 - [ ] Subtask 6.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [ ] Subtask 6.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
 
 **完成标准/Definition of Done:**
-- [ ] scenario-planning Skill 声明与 SOP 成熟化完成，单测全绿
+- [ ] scenario-plning Skill 声明与 SOP 成熟化完成，单测全绿
 - [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
 - [ ] 23 Skills 解析回归零失败
+- [ ] [C] 跨循环一致性覆盖
 
 ---
 
@@ -717,11 +738,13 @@ context = ExecutionContext(
 - [ ] Subtask 7.3: 🔴 红 — 编写 SOP 内容失败测试
 - [ ] Subtask 7.4: 🟢 绿 — 编写 SOP + references（技术成熟度锚点/颠覆信号清单/专家访谈提纲）+ templates（技术评估矩阵）
 - [ ] Subtask 7.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+- [ ] Subtask 7.6: 🔴 红 — 编写跨循环一致性 [C] 循环失败测试
 
 **完成标准/Definition of Done:**
 - [ ] disruptive-innovation Skill 声明与 SOP 成熟化完成，单测全绿
 - [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
 - [ ] 23 Skills 解析回归零失败（特别注意，本 Skill 2 源覆盖 D4 双源交叉验证语义）
+- [ ] [C] 跨循环一致性覆盖（frontmatter 2 源 ↔ SOP body 2 标记一一对应）
 
 ---
 
@@ -963,12 +986,13 @@ tests/
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
-> 本 Story 经过 `bmad-review-adversarial-general` 5 轮 D1-D5 迭代审查，记录所有对故事文件的修复项。
+> 本 Story 经过 `bmad-doc-review` 5 轮 D1-D5 迭代审查，记录所有对故事文件的修复项。
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|---------|
 | **D-R1-P0** | **RunToolChainUseCase 同类接线缺口未修补** | **P0** | Story 范围澄清节显式登记 + Task 1 扩展为 TDD [A]+[B] 双循环 + AC-2 验证标准追加 3 场景 + DoD 双入口覆盖 + R3 风险描述重写为"双入口接线" |
-| **D-R1-P0** | **Task 3-7 缺 DoD 节** | P1 | 每个 Skill Task 末尾追加统一模板 DoD 节（行数约束 + 单测全绿 + 23 Skills 回归零失败） |
+| **D-R2-P0** | **跨循环一致性 [C] 循环缺失（frontmatter.data_sources 集合 vs SOP body `$DATA_SOURCE` 调用集合）** | **P0** | Task 2-7 各 Task 新增 [C] 循环（TDD 红→绿→重构范本）+ Task 9.3 架构测试新增 cross-consistency 断言（正则提取 SOP body 调用集合）+ AC-1 验证标准追加双向断言（白名单过宽/过窄均失败） |
+| **D-R1-P1** | **Task 3-7 缺 DoD 节** | P1 | 每个 Skill Task 末尾追加统一模板 DoD 节（行数约束 + 单测全绿 + 23 Skills 回归零失败） |
 | **D-R1-P1** | **SSOT 表缺 url 列** | P1 | 新增"适配器 url/api_type/ttl/confidence 对齐表"作为 SSOT 主体（含 8 适配器实测值，含 IPCC 用 `csv_base_url`、ChinaNBS 用 `base_url` 的字段差异注释） |
 | **D-R1-P1** | **input_schema/output_schema 契约粒度不足** | P1 | Subtask 0.2 扩展产出物：字段级 JSON Schema 定义文档（`tests/acceptance/contracts/skill_io_schemas_4_1c.yaml`）含每个 Skill 的 required 字段 + 类型 + description |
 | **D-R1-P1** | **Subtask 0.7 DoD 未明列 url 列固化** | P1 | DoD 追加 "SSOT 表 url/api_type/ttl/confidence 四列均已从 8 适配器 get_metadata() 实测值固化" |
@@ -981,9 +1005,13 @@ tests/
 | **D-R1-P1** | **R3 风险描述与实际改动层不一致** | P1 | 重写为"use case 层双入口 wiring 改变 ExecutionContext.extensions 语义 + load_metadata → load_sop I/O 增量" |
 | **D-R1-P1** | **R1 风险等级应降为中** | P1 | 评估 Story 缓解完整 + 生产 Key 属 CI/CD 范畴，降级"高" → "中" |
 | **D-R1-P1** | **disruptive-innovation 2 源与 Epic AC-4 字面偏差需 Epic owner 签收** | P1 | R4 决策依据补充 + SSOT 表行末标注"Epic AC-4 字面偏差由 Epic owner 签收" |
+| **D-R2-P1** | **Task 1 [B] 链路"字典"语义偏差 — 链路全程共用单 ToolMetadata 非字典** | P1 | line 50 + 文档范围澄清节修正："ToolMetadata 字典" → "ToolMetadata（链路共享单数）"；Story 显式不收敛节点级 metadata 切换（属 Story 4.2） |
+| **D-R2-P1** | **§3.3.2 段落双维护漂移风险（异常列表）** | P1 | 文档同步清单 line 521 段落草稿改为引用 Story line 109-117 异常契约表而非重新列举 |
+| **D-R2-P1** | **composition_root 行号 D3 修订前实测确认** | P1 | Subtask 0.7 行末追加 Round 2 P2-2 实测要求，确保 line 872、980 引用不漂移 |
 | **D-R1-P2** | **6 个目标 Skill references/templates 目录全空 vs Story 描述** | P2 | Story 范围澄清节追加"当前 5 个非 pestel 目标 Skill 的 references/scripts 为空目录、templates 全无，本 Story Task 2-7 实施期新建" |
 | **D-R1-P2** | **frontmatter 示例 required_fields 缺字段来源注释** | P2 | 示例下方添加"对齐 4-1b DataSourceRef.required_fields" 注释 |
 | **D-R1-P2** | **D1 决策依据未附文件:行号** | P2 | 决策表 D1 依据补充"4.1a TOOL_CATALOG 单一数据源原则 — `_bmad-output/implementation-artifacts/stories/4-1a-strategic-tool-impl.md`" |
+| **D-R2-P2** | **AC-1 验证标准第 1 条扩字段对齐（Round 2 P2-1）** | P2 | line 273 改为"frontmatter data_sources 全字段（name/api_type/ttl_seconds/url/required_fields）与 SSOT 表逐字一致" |
 
 ---
 
@@ -1018,14 +1046,13 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-09-26
 **最后更新/Last Updated:** 2026-09-26
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md Story 4.1c + 4-1b 完成资产 + 3 视角并行代码调研 + 生产链路缺口核实）
-- v1.1.0: bmad-doc-review Round 1 完成：
-  - **D1 调研**：3 Agent 并行（StrategicAnalysisUseCase 接线 / Skills 系统现状与ACES 规范 / 4-1b 资产与异常继承）
-  - **D2 评审**：3 Agent 并行（叙事一致性 + 科学性可行性 + CLAUDE.md 合规性）
-  - **D3 系统修订**：17 项修复（含 P0-1 双入口接线缺口 / P0-2 跨循环一致性 / 14 项 P1 修复 / 4 项 P2 修订）
-  - **关键发现**：`RunToolChainUseCase`（`run_tool_chain.py:104-106`）存在同类 wiring 缺口，被 3 Agent 独立发现（最高优先级 P0 修复）
-  - 验证：ruff 全绿 + 三条红线零输出（CLAUDE.md §5）+ 文档内 line 引用全部基于 D1 实测（composition_root 行号偏差已修正）
+- v1.1.0: bmad-doc-review Round 1 完成（17 项系统修订）
+- v1.2.0: bmad-doc-review Round 2 完成（5 项收敛修订）：
+  - **D1+D2 综述**：3 Agent 验证 D3 修订无回归 + 1 项新 P0（跨循环一致性 [C] 循环缺失）+ 3 项 P1（单 metadata vs 字典语义 / composition_root 行号 D3 前实测 / §3.3.2 段落双维护）+ 1 项 P2（AC-1 验证标准扩字段对齐）
+  - **D3 修订**：Task 2-7 各 Skill 新增 [C] 循环 + AC-1 验证标准追加 cross-consistency 行 + range 澄清节"字典→单数 ToolMetadata"修正 + §3.3.2 段落交叉引用改造 + Subtask 0.7 行号实测补强
+  - **关键新增**：跨循环一致性 [C] 循环（frontmatter.data_sources 集合 vs SOP body `$DATA_SOURCE` 调用集合双向断言）—— 真实质量缺口（白名单漂移），不修复 Skill 不可用场景无回归保护
