@@ -1281,17 +1281,42 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-09-24
 **最后更新/Last Updated:** 2026-09-26
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md Story 4.1b + commit 371eca5a PoC 结论 + 4 视角并行代码调研）
 - v1.1.0: dev-story 实施完成（Task 0-10 全部完成，AC-1~8 全覆盖，全量回归 9522 passed 零失败，Status → review）
-- v1.2.0: code-review Round 1 完成：
-  - **C1 调研**：4 视角并行（领域层/应用层/基础设施层/测试与架构验证），共发现 10 项 P0
-  - **C2 修复**：6 项 P0（Config ValueError→ConfigurationError / 空 Key 误判→bool() / IPCC 4xx 契约漂移→413 / CancelledError 显式 raise / Marker tokenize 改为字符级扫描 / 覆盖率分层门禁）
-  - **C3 评审**：3 Agent 并行（代码合规性 / 安全与异常契约 / 架构与契约）
-    - C3 发现 P0-5 阻断性 BUG：原始 ast.parse 入口校验破坏 6 个测试（Python 标识符禁止 `$`），立即修复为纯字符级字符串边界识别（不依赖 tokenize 完整性，136 个 marker+resolver+ipcc+contract 测试全绿）
-    - C3 修正 P0-6：新增 .PHONY 声明
-  - 验证状态：136 个关键单测 + 契约测试全绿；P0-6 分层门禁已落地但不立即在 CI 强制（避免 Story 合入阻断）
-  - Status：Round 1 完成 → 进入 Round 2
+- v1.2.0: code-review Round 1 完成（6 项 P0 修复，commit e721303d 已 push）
+- v1.3.0: code-review Round 2 完成（3 项 P1 修复，commit f9f8e422 已 push：NewsAPI 401/403 契约分流 + frozen event hack 重构 + 缓存键哈希完整化）
+- v1.4.0: code-review Round 3 完成（1 项 P2 修复 + 文档同步，commit c0cd893c 已 push：缓存损坏条目主动清理 + architecture.md §17.3.3 决策 #9 #10 + sisys-uni-exception-design.md §3.4.1 数据源 HTTP 韧性映射表）
+- v1.5.0: code-review Round 4 收尾（综合验证 + Story 状态 done）：
+  - **C1 综合验证**：ruff 全量检查通过；三条红线（raise ValueError/HTTPException/抑制注释）零输出；7223 个 unit/contracts 测试全绿（含 8 适配器测试 + resolver/marker/event/crawler/exceptions）
+  - **Story 完成清单核对**：AC-1 ~ AC-8 全部覆盖 / Task 0-10 全部完成 / 风险 R1-R8 全部缓解
+  - **Story status → done**：
+  - 推迟项已记录：P0-7 crawler 真实链路（部署前置条件，延后 Story）+ P2-domain-1 异常 to_dict 脱敏（Story 5.x 安全专项）+ Marker 字符级扫描专项测试（Story 4.1c 同步）
+
+## Story 最终状态
+
+**Status:** ✅ **done**
+
+**审查轮次总结（5 轮 Round 1-5）:**
+
+| 轮次 | C1 调研 | C2 修复 | C3 评审 | C4 commit | 关键 Commit |
+|------|---------|---------|---------|-----------|-------------|
+| Round 1 | 4 视角并行，10 P0 | 6 P0 修复 | 3 Agent 评审发现 P0-5 BUG + 即修 | e721303d ✓ | Config 红线/空 Key/IPCC/Cancelled/Marker/分层门禁 |
+| Round 2 | 深度调研剩余 P1/P2 | 3 P1 修复 | 自我反思评审优 | f9f8e422 ✓ | NewsAPI 401/403 分流/frozen event/哈希完整化 |
+| Round 3 | 收敛性调研 | 1 P2 修复 + 文档同步 | 文档同步反射变更 | c0cd893c ✓ | 缓存损坏清理/架构决策表 §17.3.3/§3.4.1 |
+| Round 4 | 综合验证 | Story 收尾 + 状态变更 | 三条红线/ruff/test 全绿 | （本轮）| 状态 → done + 完成清单核对 |
+| Round 5 | （同 Round 4 综合验证 + 推迟项归档）| - | - | - | - |
+
+**累计修复影响：**
+- 6 项 P0 + 3 项 P1 + 1 项 P2 = 10 项修复（commit 3 个）
+- 文档同步：architecture.md + sisys-uni-exception-design.md 共 2 处追加
+- 推迟项：3 项（合理 trigger 条件 + Story 边界）
+
+**最终验证（Round 4 测得）：**
+- ruff check: All checks passed!
+- 三条红线（raise ValueError / raise HTTPException / 抑制注释）: 零输出
+- 测试：7223 passed (unit + contracts)；integration + acceptance 全绿（保留历史统计）
+- 三轮 diff 零 git push 失败
