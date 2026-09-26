@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from src.domain.exceptions import ConfigurationError
+
 
 @dataclass(frozen=True)
 class USPTOConfig:
@@ -25,11 +27,25 @@ class USPTOConfig:
 
     @classmethod
     def from_env(cls) -> USPTOConfig:
-        """从环境变量加载配置"""
+        """从环境变量加载配置
+
+        Raises:
+            ConfigurationError: 数值类型环境变量解析失败时（禁止 ValueError 透传）
+        """
+        timeout_raw = os.getenv("USPTO_TIMEOUT", str(cls.timeout))
+        ttl_raw = os.getenv("USPTO_TTL_SECONDS", str(cls.ttl_seconds))
+        try:
+            timeout = float(timeout_raw)
+        except (ValueError, TypeError):
+            raise ConfigurationError(message=f"USPTO_TIMEOUT 值非法: {timeout_raw!r}（需要数值）") from None
+        try:
+            ttl_seconds = int(ttl_raw)
+        except (ValueError, TypeError):
+            raise ConfigurationError(message=f"USPTO_TTL_SECONDS 值非法: {ttl_raw!r}（需要整数）") from None
         return cls(
             api_url=os.getenv("USPTO_API_URL", cls.api_url),
-            timeout=float(os.getenv("USPTO_TIMEOUT", str(cls.timeout))),
-            ttl_seconds=int(os.getenv("USPTO_TTL_SECONDS", str(cls.ttl_seconds))),
+            timeout=timeout,
+            ttl_seconds=ttl_seconds,
         )
 
 
