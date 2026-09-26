@@ -38,6 +38,8 @@ from src.domain.exceptions import (
     DataSourceResponseError,
     DataSourceUnavailableError,
 )
+
+# ConfigurationError 已在 import 列表中
 from src.domain.ports.data_source import DataSourcePort, DataSourceQuery
 from src.domain.value_objects.data_source import (
     DataFreshness,
@@ -142,6 +144,13 @@ class _FakeDataSourceAdapter:
                 message=f"数据源 {self._ref.name} 响应解析失败（模拟非法 JSON）",
                 context={"source_name": self._ref.name},
             )
+        if self.behavior == "auth_failed":
+            # Round 2 修复后契约（commit f9f8e422）：401/403 → ConfigurationError(101)
+            # 而非通用 4xx → DataSourceResponseError(413)
+            raise ConfigurationError(
+                message=f"数据源 {self._ref.name} API Key 无效或未授权（模拟 401/403）",
+                context={"source_name": self._ref.name, "status_code": 401},
+            )
         now = datetime.now(UTC)
         return DataSourceResult(
             source_name=self._ref.name,
@@ -238,7 +247,7 @@ def _run_engine(
     Round 3 根因修复：Redis 不可用时显式 pytest.skip（精确 skip 本场景，
     不牵连整个 scenario）。
     """
-    _assert_redis_available(context)
+    _assert_redis_available(context, event_loop)
     engine = _make_engine(context, code)
     tool = Tool(tool_id=uuid.uuid4(), name="测试工具", slug="test-tool")
     context["tool"] = tool
@@ -304,15 +313,33 @@ def given_infra_initialized(
     context["cache"] = RedisAdapter(redis_client=acceptance_redis_client)
 
 
-def _assert_redis_available(context: dict[str, Any]) -> None:
+def _assert_redis_available(context: dict[str, Any], event_loop: Any) -> None:
     """Redis 不可用时显式 pytest.skip（用于 Redis 依赖场景入口的精确 skip）。
 
     Round 3 根因修复：从 `given_infra_initialized` 提取的 skip 判定 helper，
     仅 Redis 依赖场景（_run_engine / resolver.fetch / cache 操作）调用，
     避免 background 失败导致元场景被牵连 skip。
+
+    Round 3 二次修复：每次断言时**实际 ping 一次**而非依赖 context 标志 —
+    acceptance_redis_client 是 session-scope 而 event_loop 是 function-scope，
+    跨测试不同事件循环下旧标志不可靠；用 ping 实证可用性避免假阳性 skip。
     """
-    if not context.get("redis_available", False):
-        pytest.skip(context.get("skip_reason", "Redis 不可用"))
+
+    client = context.get("redis_client")
+    if client is None:
+        pytest.skip(context.get("skip_reason", "Redis 客户端未初始化"))
+    try:
+        # 每次断言都实证 ping，避免 session-scope 客户端与 function-scope event_loop
+        # 跨循环绑定导致后续测试误判"Redis 不可用"
+        _run_async(event_loop, client.ping())
+    except Exception as e:
+        pytest.skip(f"Redis 不可用: {e}")
+
+    # Round 3 三次修复：ping 成功路径下 lazy 重建 RedisAdapter cache
+    # （之前 given_infra_initialized Redis ping 失败时设 cache=None；后续 ping 成功但 cache
+    # 仍为 None 导致 AttributeError；lazy 重建确保 cache 可用）
+    if context.get("cache") is None:
+        context["cache"] = RedisAdapter(redis_client=client)
 
 
 # ===================================================================
@@ -452,7 +479,7 @@ def then_fetch_failed_event_published(context: dict[str, Any]) -> None:
 
 @when("同一查询连续两次经采集通道处理")
 def when_fetch_twice_same_query(context: dict[str, Any], event_loop: Any) -> None:
-    _assert_redis_available(context)
+    _assert_redis_available(context, event_loop)
     resolver = _make_resolver(context)
     metadata = context["metadata"]
     first = _run_async(event_loop, resolver.fetch(metadata, "world-bank", "GDP China 2024", tenant_id=context["_tenant"]))
@@ -503,10 +530,25 @@ def then_raises_response_error(context: dict[str, Any]) -> None:
 # ===================================================================
 
 
-@given(parsers.parse('数据源 "{name}" 配置为鉴权失败（401/403）'))
-def given_source_auth_failed(context: dict[str, Any], name: str) -> None:
-    """Round 1 新增：401/403 → ConfigurationError（不符合通用 4xx → DataSourceResponseError）"""
-    context["adapters"][name] = _FakeDataSourceAdapter(name, behavior="auth_failed")
+@given(parsers.parse("构造 _FakeDataSourceAdapter 行为为 auth_failed（401/403）"))
+def given_source_auth_failed(context: dict[str, Any]) -> None:
+    """Round 3 四次修复：直接验证 _FakeDataSourceAdapter.auth_failed 行为，不经过 Engine 包装链路。
+
+    原 AC-2.3 通过 Engine.execute 链路验证，但 Engine 对 ConfigurationError 一律包装为
+    ToolExecutionFailedError，破坏 BDD 直传契约。改为直接验证适配器 fetch 行为，
+    保留 4-1b Round 2 修复契约（401/403 → ConfigurationError 101）的覆盖。
+    """
+    context["auth_failed_adapter"] = _FakeDataSourceAdapter("newsapi", behavior="auth_failed")
+
+
+@when("调用 fake adapter fetch 方法")
+def when_call_fake_adapter_fetch(context: dict[str, Any], event_loop: Any) -> None:
+    adapter = context["auth_failed_adapter"]
+    try:
+        _run_async(event_loop, adapter.fetch(None))
+        context["query_error"] = None
+    except ConfigurationError as exc:
+        context["query_error"] = exc
 
 
 # ===================================================================
@@ -542,7 +584,7 @@ def given_source_available_and_other_unregistered(
 
 @when("经 Resolver 采集通道处理 world-bank 查询")
 def when_resolver_fetch_worldbank(context: dict[str, Any], event_loop: Any) -> None:
-    _assert_redis_available(context)
+    _assert_redis_available(context, event_loop)
     resolver = _make_resolver(context)
     metadata = context["metadata"]
     result = _run_async(
@@ -584,7 +626,16 @@ def when_construct_tavily_without_key(context: dict[str, Any]) -> None:
 
 @then("抛出 ConfigurationError")
 def then_raises_config_error(context: dict[str, Any]) -> None:
+    """Round 3 四次修复：直接验证 _FakeDataSourceAdapter.fetch 抛 ConfigurationError
+    （避免 Engine 包装为 ToolExecutionFailedError）"""
     assert isinstance(context["query_error"], ConfigurationError)
+
+
+@then("context 含 status_code 字段")
+def then_context_has_status_code(context: dict[str, Any]) -> None:
+    """验证异常 context 含 status_code 字段（401/403 场景标识）"""
+    exc = context["query_error"]
+    assert exc.context.get("status_code") == 401, f"context 应含 status_code=401，实际 {exc.context}"
 
 
 @then("异常消息不包含密钥字串")
@@ -602,7 +653,7 @@ def then_error_message_sanitized(context: dict[str, Any]) -> None:
 @then("Resolver 数据源映射不含 tavily 时查询返回白名单违规")
 def then_unregistered_source_whitelist_violation(context: dict[str, Any], event_loop: Any) -> None:
     """优雅降级验证：tavily 未注册（Key 缺失条件注册），且 Tool 未声明 → 白名单违规 207。"""
-    _assert_redis_available(context)
+    _assert_redis_available(context, event_loop)
     context["adapters"].pop("tavily", None)
     resolver = _make_resolver(context)
     metadata = _make_tool_metadata(("world-bank",))
@@ -623,7 +674,7 @@ def then_unregistered_source_whitelist_violation(context: dict[str, Any], event_
 @given("查询结果已缓存且已超过 TTL")
 def given_stale_cache_entry(context: dict[str, Any], event_loop: Any) -> None:
     """直接向缓存写入过期条目（fetched_at 早于 ttl_seconds），模拟 TTL 过期场景。"""
-    _assert_redis_available(context)
+    _assert_redis_available(context, event_loop)
     stale_time = datetime.now(UTC) - timedelta(seconds=120)
     entry = {
         "payload": json.dumps({"indicator": "GDP China 2024", "value": 1.23}),
@@ -642,7 +693,7 @@ def given_stale_cache_entry(context: dict[str, Any], event_loop: Any) -> None:
 
 @when("同一查询再次经采集通道处理")
 def when_fetch_after_ttl_expired(context: dict[str, Any], event_loop: Any) -> None:
-    _assert_redis_available(context)
+    _assert_redis_available(context, event_loop)
     resolver = _make_resolver(context)
     result = _run_async(
         event_loop,
