@@ -33,19 +33,21 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 
 - 6 个 SKILL.md frontmatter `data_sources` 白名单声明 + `input_schema`/`output_schema` JSON Schema 定义
 - 6 个 SKILL.md body SOP 成熟化（≤500 行硬约束，Hub-and-Spoke 拆分至 references/）
-- 6 个 Skill 的 `references/` + `templates/` 资源文件
-- **生产链路接线（关键缺口修复）**：`StrategicAnalysisUseCase` 注入 `extensions["tool_metadata"]`
+- 6 个 Skill 的 `references/` + `templates/` 资源文件（当前 5 个非 pestel 目标的 `references/`/`scripts/` 为空目录、`templates/` 全无 — 本 Story Task 2-7 实施期新建）
+- **生产链路接线（关键缺口修复 — 双入口）**：
+  - `StrategicAnalysisUseCase` 注入 `extensions["tool_metadata"]`（单 Skill 调用入口）
+  - **`RunToolChainUseCase` 注入 `extensions["tool_metadata"]`（多 Skill 链路入口 — Round 1 D2 评审发现 RunToolChainUseCase 存在同类缺口）**
 - Skills SOP 单元测试 ×6 + 集成测试 + 架构验证测试 + BDD 验收测试
 - 4-1b 推迟项收敛：Marker 字符级扫描专项测试（`data_source_marker._string_literal_spans` 边界场景）
 
 **不在本 Story 范围（明确划出）：**
 
-- **新增数据源适配器 / UNSD / OECD** → 后续 Story（PoC v2 已验证不可用）
+- **新增数据源适配器 / UNSD / OECD** → 后续 Story（PoC v2 已验证不可用，故 disruptive-innovation 第 3 源 WIPO/EPO 推迟到 Story 4.1d 之后）
 - **工具输出 Schema 强制验证执行（Pydantic 运行时校验）** → Story 4.3（本 Story 仅定义 frontmatter JSON Schema 契约，不实现运行时校验器）
 - **10 个混合数据型 / 7 个内部框架 Skills** → Story 4.1d / 4.1e
 - **数据源治理（配额管理/成本追踪/降级策略编排）** → 后续 Story
 - **newsapi/tavily 适配器代码修改** → 无（Key 缺失降级行为仅在 SOP 中文档化）
-- **run_tool_chain.py 链路接线** → Story 4.2（工具链编排范畴）
+- **`ToolChainService.execute_chain` 内部节点级 extensions 注入** → 本 Story 由 `RunToolChainUseCase` 调用点前置注入 ToolMetadata 字典后委托，避免侵入 Service 内部循环；如未来节点级独立 metadata 需求浮现则 Story 4.2 收敛
 
 ---
 
@@ -72,6 +74,8 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 
 - 提交信息**禁止**任何 AI 辅助署名（Co-Authored-By: Claude 等）
 - **禁止** `--no-verify` 绕过 pre-commit hooks
+- **禁止** 修改 `.importlinter` 中已合入的架构依赖规则（CLAUDE.md §5）
+- **禁止** 修改已合入的 alembic migration（CLAUDE.md §5，本 Story 不新增 alembic migration）
 - 直接在 main 分支开发（项目约定）
 
 ### Skills 内容约束（Anthropic Claude Code Skills 对标）
@@ -81,6 +85,7 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 - **负向触发章节强制**（架构原则 P6）：`when_not_to_use` + body「负向触发」章节
 - **数据源声明合法值**：`data_sources[].name` 仅限 8 个注册源（kebab-case）：`world-bank` / `imf` / `eurostat` / `uspto` / `ipcc` / `newsapi` / `tavily` / `china-nbs`；`api_type` 仅限 `rest_json` / `sdmx_json` / `csv_download` / `crawler`（`DataSourceApiType` 枚举值）；`ttl_seconds ∈ [60, 2592000]`
 - **沙箱无网络不变量**：SOP 引导 LLM 生成的沙箱代码通过 `$DATA_SOURCE("name", "query")` 标记采集数据，**禁止**引导任何形式的沙箱内网络访问；注入数据经全局 `DATA_SOURCES` dict 读取（`data_source_marker.py` 注入协议）
+- **SOP `input_examples` 章节禁止写入真实 API Key 字符串**：必须使用环境变量引用形式（如 `api_key=os.environ['TAVILY_API_KEY']` 或占位符 `<TAVILY_API_KEY>`），与配置类 `__repr__` 脱敏先例（`src/infrastructure/config/redis.py:40-48`）保持一致；CLAUDE.md §5 Key 安全红线扩展
 
 ### 代码质量门禁
 
@@ -154,7 +159,7 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 |------|----|------|--------------|
 | `DataSourcePort` | domain | `src/domain/ports/data_source.py:52` | 8 适配器实现（4-1b 已交付） |
 | `DataSourceResolverPort` | application | `src/application/ports/data_source_resolver.py:20` | Engine 白名单编排（4-1b 已交付） |
-| `SkillLoaderPort` | application | `src/application/ports/skill_loader.py:107` | **本 Story 新增消费点**：use case 调 `load_sop` 取 L2 ToolMetadata |
+| `SkillLoaderPort` | application | `src/application/ports/skill_loader.py:94` | **本 Story 新增消费点**：use case 调 `load_sop` 取 L2 ToolMetadata |
 
 ### 数据契约（本 Story 核心 SSOT）：6 个 Skills 数据源白名单声明表
 
@@ -167,7 +172,26 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 | `appeals-analysis` | `tavily` + `newsapi` + `china-nbs` | 顾客洞察 Web 搜索（Tavily）、市场舆情（NewsAPI）、中国消费统计（国统局） | ✅ 3 源 |
 | `competitor-analysis` | `newsapi` + `uspto` + `tavily` + `china-nbs` | 竞品动态（NewsAPI）、竞品专利（USPTO）、竞品 Web 情报（Tavily）、中国行业对标（国统局） | ✅ 4 源 |
 | `scenario-planning` | `tavily` + `ipcc` + `eurostat` | 趋势 Web 搜索（Tavily）、气候情景（IPCC）、欧盟情景数据（Eurostat） | ✅ 3 源 |
-| `disruptive-innovation` | `uspto` + `tavily` | 颠覆性技术专利（USPTO）、颠覆性技术 Web 情报（Tavily） | ⚠️ 2 源（双源交叉验证，见决策 D4） |
+| `disruptive-innovation` | `uspto` + `tavily` | 颠覆性技术专利（USPTO）、颠覆性技术 Web 情报（Tavily） | ⚠️ 2 源（双源交叉验证，见决策 D4；Epic AC-4 字面 ≥3 源偏差由 Epic owner 签收） |
+
+**适配器 url/api_type/ttl/confidence 对齐表**（4-1b 8 个适配器 `get_metadata()` 实测，Round 1 D1-C 视角固化）：
+
+| 数据源（name） | url（适配器 `_config` 默认值） | api_type | ttl_seconds | confidence |
+|----------------|-------------------------------|----------|-------------|------------|
+| `world-bank` | `https://api.worldbank.org/v2` | rest_json | 604800（7d） | 0.95 |
+| `imf` | `https://www.imf.org/external/datamapper/api/v1` | sdmx_json | 604800（7d） | 0.95 |
+| `eurostat` | `https://ec.europa.eu/eurostat/api/dissemination` | sdmx_json | 604800（7d） | 0.95 |
+| `uspto` | `https://search.patentsview.org` | rest_json | 2592000（30d） | 0.90 |
+| `ipcc` | `https://www.ipcc.ch/data`（注：`csv_base_url` 字段） | csv_download | 2592000（30d） | 0.85 |
+| `newsapi` | `https://newsapi.org` | rest_json | 21600（6h） | 0.75 |
+| `tavily` | `https://api.tavily.com` | rest_json | 86400（1d） | 0.70 |
+| `china-nbs` | `https://www.stats.gov.cn`（注：`base_url` 字段） | crawler | 86400（1d） | 0.90 |
+
+> **三方对齐契约（Task 9.2 架构测试断言）**：
+> 1. frontmatter `data_sources[].name` ⊆ 上述 8 集合
+> 2. frontmatter `data_sources[].url` 字面值 == 适配器 `get_metadata().url`
+> 3. frontmatter `data_sources[].api_type` ∈ `DataSourceApiType` 枚举（rest_json/sdmx_json/csv_download/crawler）
+> 4. frontmatter `data_sources[].ttl_seconds ∈ [60, 2592000]`
 
 **DataSourceRef 字段规则（frontmatter 声明格式）：**
 
@@ -176,30 +200,23 @@ data_sources:
   - name: world-bank            # 必须与适配器 get_metadata().name 一致（kebab-case）
     url: https://...            # 必须与对应适配器 get_metadata().url 一致（Task 0 契约断言防漂移）
     api_type: rest_json         # DataSourceApiType 枚举值（小写）
-    ttl_seconds: 604800         # 对齐适配器配置默认 TTL（见下表）；范围 [60, 2592000]
+    ttl_seconds: 604800         # 对齐"适配器 url/api_type/ttl/confidence 对齐表"；范围 [60, 2592000]
     required_fields:            # 可选，该 Skill 消费此源时必需的 payload 字段
       - indicator
       - value
 ```
 
-**TTL 对齐表（与 4-1b 适配器配置一致，`src/infrastructure/config/*.py`）：**
+`required_fields` 字段对齐 4-1b `DataSourceRef.required_fields: tuple[str, ...] = ()`（`src/domain/value_objects/data_source.py`），YAML list → tuple 转换由 `_parse_data_source_refs` 完成（`src/application/skills/frontmatter.py:154`）。
 
-| 数据源 | 适配器默认 TTL | 建议声明 ttl_seconds | confidence（适配器内定） |
-|--------|---------------|---------------------|------------------------|
-| world-bank | 604800（7d） | 604800 | 0.95 |
-| imf | 604800（7d） | 604800 | 0.95 |
-| eurostat | 604800（7d） | 604800 | 0.95 |
-| uspto | 2592000（30d） | 2592000 | 0.90 |
-| ipcc | 2592000（30d） | 2592000 | 0.85 |
-| newsapi | 21600（6h） | 21600 | 0.75 |
-| tavily | 86400（1d） | 86400 | 0.70 |
-| china-nbs | 86400（1d） | 86400 | 0.90 |
+**TTL/confidence 对齐表（与 4-1b 适配器配置一致，`src/infrastructure/config/*.py`）：** 见上方"适配器 url/api_type/ttl/confidence 对齐表"。
 
 ### 生产链路接线契约（关键缺口修复）
 
-**现状缺口（调研确认）：** `StrategicAnalysisUseCase.execute()`（`src/application/use_cases/strategic_analysis.py:85-133`）仅调用 `load_metadata()`（L1，`data_sources` 恒为空 tuple，`loader.py:119-139` `_parse_table_row` 不解析 data_sources），且构造 `ExecutionContext` 时**未注入 `extensions["tool_metadata"]`**。Engine `_resolve_data_sources`（`tool_execution_engine.py:288-293`）在代码含标记但缺 metadata 时抛 `BusinessRuleViolationError(207)`——即生产链路白名单永远不会命中，6 个 Skills 的声明形同虚设。
+**现状缺口（调研确认 — Round 1 D1-A 视角证实）：** `StrategicAnalysisUseCase.execute()`（`src/application/use_cases/strategic_analysis.py:85-138`）仅调用 `load_metadata()`（L1，`data_sources` 恒为空 tuple，`loader.py:119-138` `_parse_table_row` 不解析 data_sources），且构造 `ExecutionContext` 时**未注入 `extensions["tool_metadata"]`**。Engine `_resolve_data_sources`（`tool_execution_engine.py:288-293`）在代码含标记但缺 metadata 时抛 `BusinessRuleViolationError(207)`——即生产链路白名单永远不会命中，6 个 Skills 的声明形同虚设。
 
-**接线方案（本 Story 唯一应用层代码改动）：**
+**Round 1 D2 评审新增（同类缺口）：** `RunToolChainUseCase.execute()`（`src/application/use_cases/run_tool_chain.py:99-114`）同样调用 `load_metadata()` 预加载 ToolMetadata 用于节点映射，但 line 114 `_service.execute_chain(..., context=context)` 透传**原始** context（未注入 extensions）。多 Skill 工具链调用路径下，Engine `_resolve_data_sources` 在每个节点都会抛 207。本 Story 双入口同步接线（Task 1 循环 [B]）。
+
+**接线方案（本 Story 唯一应用层代码改动 — 双入口）：**
 
 ```python
 # strategic_analysis.py 步骤 2 替换（load_metadata → load_sop + extensions 注入）
@@ -218,11 +235,14 @@ context = ExecutionContext(
 )
 ```
 
+`run_tool_chain.py` 同步：line 99-109 `skill_metadata` dict 改为 `load_sop` 调用收集；line 114 前基于当前节点 `slug` 的 `ToolMetadata` 通过 `dataclasses.replace(context, extensions={"tool_metadata": node_metadata})` 委托 `execute_chain(context=context)`。`_service.execute_chain` 内部节点循环由 Story 4.2 收敛；本 Story 仅保证 UseCase 入口调用点已正确注入。
+
 **接线语义约束：**
 - `load_sop` 失败**不阻断执行**（对齐既有 `load_metadata` 容错先例 `strategic_analysis.py:103-112`），metadata 为 None 时 extensions 不含该键——Engine 侧行为：代码无标记时零影响；代码含标记时按 4-1b 既定语义抛 207（白名单无依据，安全失败方向正确）
 - **禁止**改动 `ToolExecutionEngine.__init__` 签名（Story 4.4 AC-7.4 BDD 断言保护）
 - **禁止**改动 `SkillLoaderPort` 接口（`load_sop` 已返回含 ToolMetadata 的 SkillDocument，无需扩接口）
-- `load_metadata` 调用点（步骤 2 原调用）若被 `load_sop` 替代，需确认无其他消费者依赖该调用的副作用（`run_tool_chain.py:105` 独立使用 `load_metadata`，不受影响）
+- 双入口接线独立性：StrategicAnalysisUseCase 与 RunToolChainUseCase 互不依赖，分别独立单测覆盖
+- `SkillLoaderPort.load_sop` 真实文件路径在 BDD/集成测试 fixture 中需固定 `skills_root` 或用 `tmp_path` 复制（CI 环境稳定性，Round 1 D2-可行性建议）
 
 ### 领域事件（本 Story 不新增事件）
 
@@ -266,9 +286,11 @@ context = ExecutionContext(
 - 未成熟化的 17 个 Skill（data_sources 空 tuple）代码含标记时抛 207（白名单为空，安全失败）
 
 **验证标准/Validation Criteria:**
-- [ ] 用例单元测试：load_sop 注入 / 加载失败容错 / 无标记零行为变化 / 空白名单 207
+- [ ] **StrategicAnalysisUseCase** 单元测试 4 场景（load_sop 注入 / 加载失败容错 / 无标记零行为变化 / 空白名单 207）
+- [ ] **RunToolChainUseCase** 单元测试 3 场景（多节点并发 load_sop + 任一节点 metadata 注入 / 全部 load_sop 失败时 extensions = {} / 无节点零行为变化）— Round 1 D2 新增
 - [ ] `ToolExecutionEngine.__init__` 签名不变（4.4 BDD AC-7.4 回归全绿）
 - [ ] 既有 `test_acceptance_strategic_tool_impl` / `test_acceptance_docker_sandbox` 回归全绿
+- [ ] **既有 tool_chain 链路验收测试** 零回归（双入口改动影响范围可控）
 
 ### AC-3: SOP 成熟化（6 个 Skills 内容升级，对标 Anthropic Skills 规范）
 
@@ -343,7 +365,11 @@ context = ExecutionContext(
 
 #### 数据模型 (Data Models)
 - [ ] 本 Story 不新增值对象/实体（复用 `DataSourceRef`/`ToolMetadata.data_sources`/`EvidencePackage.data_sources`）
-- [ ] 6 个 Skills 的 `input_schema`/`output_schema` JSON Schema 契约在 Task 0 完成字段级定义（作为各 Skill TDD 红阶段测试输入）
+- [ ] **6 个 Skills 的 `input_schema`/`output_schema` JSON Schema 字段级定义文档固化**（产出物：`tests/acceptance/contracts/skill_io_schemas_4_1c.yaml` 或 Story 文档独立子表）：
+  - 每个 Skill 的 `input_schema.required` 字段（如 pestel-analysis 需 `industry` / `region_scope` / `time_horizon_years` 等）
+  - 每个 Skill 的 `output_schema.required` 字段（如 `pestel_dimensions[]` / 各维度指标对象）
+  - 字段类型（string / number / enum）+ description
+- [ ] 字段级定义作为各 Skill TDD 红阶段断言输入（Task 2-7 [A] 循环断言 input_schema 含 required 字段）
 
 #### 统一端口定义注册与管理 (Port Contract)
 - [ ] 本 Story 不新增端口（显式决策）；复用 `DataSourcePort`/`DataSourceResolverPort`/`SkillLoaderPort`
@@ -472,9 +498,9 @@ context = ExecutionContext(
 
 | ID | 风险描述 | 等级 | 触发条件 | 缓解策略 | 关联 Task |
 |----|---------|------|---------|---------|----------|
-| **R1** | newsapi/tavily Key 缺失导致声明源 411（"未注册"） | 高 | dev/CI 无 `NEWSAPI_API_KEY`/`TAVILY_API_KEY`（6 个 Skills 中 5 个声明含二者之一） | SOP 失败处理章节文档化降级话术；集成测试用 Stub 适配器注入 adapters Mapping（不依赖条件注册）；BDD Edge Case 显式覆盖部分失败收敛 | Task 2-7 / 8 / 10 |
+| **R1** | newsapi/tavily Key 缺失导致声明源未注册 + 部分失败收敛（冷启动 composition_root 不注册；运行时 Resolver "未注册 411"） | **中**（Round 1 D2 降级评估） | dev/CI 无 `NEWSAPI_API_KEY`/`TAVILY_API_KEY`（6 个 Skills 中 5 个声明含二者之一）；真实生产 Key 配置属 CI/CD secrets 范畴 | ① **冷启动**：`composition_root` `bool(os.getenv())` 条件注册不通过 → 冷启动阶段抛 ConfigurationError(101)（配置层）；② **运行时**：Resolver `Mapping.get()` 返回 None → 抛 `DataSourceUnavailableError(411)`（运行时层）；③ SOP 失败处理章节显式登记两段分流；④ 集成测试用 Stub 适配器注入 adapters Mapping（不依赖条件注册）；⑤ BDD Edge Case 显式覆盖部分失败收敛 | Task 2-7 / 8 / 10 |
 | **R2** | SKILL.md SOP 成熟化超 500 行硬约束 | 中 | SOP + 工作坊方法论内容膨胀 | Hub-and-Spoke 拆分：SKILL.md 仅路由+摘要，详情入 references/；Task 2-7 每个循环含行数断言 + Task 9.4 架构测试兜底（`line_count_validator` 未实现，不依赖 CI） | Task 2-7 / 9 |
-| **R3** | 生产链路接线破坏 4.1a/4.4 既有行为 | **P0** | `load_metadata` → `load_sop` 替换引入副作用 / extensions 注入改变无标记链路 | 无标记时 Engine 零行为变化（4-1b 既定 `_resolve_data_sources` 前置判断）；load_sop 失败容错不阻断；既有验收测试全量回归（strategic_tool_impl + docker_sandbox） | Task 1 |
+| **R3** | 生产链路双入口接线改变 `ExecutionContext.extensions` 语义 + load_metadata → load_sop I/O 增量 | **P0** | `load_metadata` → `load_sop` 替换引入额外 I/O（每次执行多读一次 SKILL.md，LRU 100 项缓存可缓解）；extensions 从"总是空"变成"可能含 tool_metadata"，下游 logging/审计消费方如有"必空"假设则破坏 | 无标记时 Engine 零行为变化（4-1b 既定 `_resolve_data_sources` 前置判断）；load_sop 失败容错不阻断；既有验收测试全量回归（strategic_tool_impl + docker_sandbox + tool_chain 链路测试） | Task 1 |
 | **R4** | 三角化 ≥3 源与 disruptive-innovation 仅 2 源冲突 | 中 | Epic AC-4 字面"每个指标 ≥3 独立来源" | 决策 D4 务实化：≥3 源 Skill 断言全声明源覆盖；2 源 Skill 双源交叉验证；偏差显式登记 | Task 0 / 8 |
 | **R5** | china-nbs crawler 服务不可用 | 中 | dev/CI 未运行 crawler daemon | 集成测试用 Stub 适配器（不依赖真实 crawler）；真实 crawler 链路属 4-1b 推迟项 P0-7，不在本 Story 收敛 | Task 8 |
 | **R6** | frontmatter 声明与适配器 `get_metadata()` 漂移（url/api_type 不一致） | 中 | 适配器配置变更未同步 SKILL.md | Task 0 固化 SSOT 表；Task 9 架构测试三方一致性断言（声明 ↔ SKILL.md ↔ 适配器） | Task 0 / 9 |
@@ -490,7 +516,9 @@ context = ExecutionContext(
 | Task | 文档同步动作 | 文档 | 锚定位置 |
 |------|------------|------|---------|
 | Task 10 收尾 | `architecture.md` §17.3 状态块：`📋 Story 4.1c backlog` → `✅ Story 4.1c 已完成` | architecture.md | line 2674-2675 附近 |
-| Task 10 收尾 | `architecture.md` §17.3.3 末尾追加 4.1c 集成说明（6 Skills 声明 + 生产链路接线 + 决策 D1/D4） | architecture.md | §17.3.3 末尾 |
+| Task 10 收尾 | `architecture.md` §17.3.3 末尾追加 4.1c 集成说明（6 Skills 声明 + 生产链路双入口接线 + 决策 D1/D2/D4） | architecture.md | §17.3.3 末尾 |
+| Task 10 收尾 | `architecture.md` §17.3.3 关键架构决策表追加 6 项新决策（D1 frontmatter SSOT / D2 双入口注入 / D3 L1 vs L2 / D4 三角化务实 / D6 Schema 载体 / D7 双 UseCase 同步接线） | architecture.md | 决策表末尾 |
+| Task 10 收尾 | `sisys-uni-exception-design.md` §3.3.2 追加 4-1c 复用声明段落："本 Story 复用 4-1b 既定 410-413/101/302/207/201 + FrontmatterParseError + 387/388 共 9 个异常编码，无新异常编码段（与 line 116 Task 0 grep EXCEPTION_41[4-9] 零碰撞验证对齐）" | sisys-uni-exception-design.md | §3.3.2 末尾或独立段落 |
 | Task 10 收尾 | `architecture.md` 修订历史表追加新版本行 + 文档统计版本号/日期更新 | architecture.md | 文末修订历史 |
 
 ---
@@ -513,21 +541,23 @@ context = ExecutionContext(
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_skill_data_collection_4_1c.feature`（Happy Path + 6 个 Edge Cases）
 - [ ] Subtask 0.5: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_skill_data_collection_4_1c.py`（scenarios() + context + 共享 event_loop + Fake 适配器）
 - [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证，失败原因 = 白名单声明未填写/接线未实施）
-- [ ] Subtask 0.7: 确认 6 个声明源的 url 与适配器 `get_metadata().url` 实际值（逐一解析 8 个适配器，固化进 SSOT 表）
+- [ ] Subtask 0.7: 确认 6 个声明源的 url 与适配器 `get_metadata().url` 实际值（逐一解析 8 个适配器，固化进 SSOT 表"适配器 url/api_type/ttl/confidence 对齐表" — Round 1 D1-C 视角已固化）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕（Schema 契约 + SSOT 表 + 接线方案 + 三项决策登记）
+- [ ] **SSOT 表 url/api_type/ttl/confidence 四列均已从 8 个适配器 `get_metadata()` 实际值固化**（含 pestel-analysis 6 源、porters 3 源、appeals 3 源、competitor 4 源、scenario 3 源、disruptive-innovation 2 源的 url 对齐）
 - [ ] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
-### Task 1: 生产链路接线（StrategicAnalysisUseCase 注入 tool_metadata）
+### Task 1: 生产链路接线（双入口：StrategicAnalysisUseCase + RunToolChainUseCase 注入 tool_metadata）
 
 **关联 AC:** AC-2
 
 > ⚠️ **本 Task 是唯一应用层代码改动，风险 R3（P0）集中在此时收敛。**
+> **Round 1 D2 评审新增**：原 Story 仅覆盖 `StrategicAnalysisUseCase`，D2-可行性 + D1-A 独立发现 `RunToolChainUseCase`（`src/application/use_cases/run_tool_chain.py:104-106`）存在同类接线缺口——多 Skill 工具链调用路径下，Engine `_resolve_data_sources` 仍会因缺 `extensions["tool_metadata"]` 抛 207。本 Task 扩展为双入口同步接线。
 
-#### TDD 循环 [A]：load_sop + extensions 注入
+#### TDD 循环 [A]：StrategicAnalysisUseCase.load_sop + extensions 注入
 
 | 阶段 | 动作 |
 |------|------|
@@ -535,13 +565,24 @@ context = ExecutionContext(
 | 🟢 绿 | 修改 `src/application/use_cases/strategic_analysis.py`（`load_metadata` → `load_sop` + extensions 注入，容错对齐既有先例） |
 | 🔄 重构 | 回归既有用例测试 + 4.1a/4.4 验收测试全绿，ruff + mypy |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写用例接线失败测试（4 场景）
-- [ ] Subtask 1.2: 🟢 绿 — 实现接线（最小改动，不动 Engine/Loader 接口）
-- [ ] Subtask 1.3: 🔄 重构 — 全量回归（`pytest tests/unit/application/use_cases/ tests/acceptance/test_acceptance_strategic_tool_impl.py tests/acceptance/test_acceptance_docker_sandbox.py`）
-- [ ] Subtask 1.4: 验证 `ToolExecutionEngine.__init__` 签名不变（4.4 BDD AC-7.4 回归）
+- [ ] Subtask 1.1: 🔴 红 — 编写 StrategicAnalysisUseCase 接线失败测试（4 场景）
+- [ ] Subtask 1.2: 🟢 绿 — 实现 StrategicAnalysisUseCase 接线（最小改动，不动 Engine/Loader 接口）
+
+#### TDD 循环 [B]：RunToolChainUseCase.load_sop + extensions 注入（Round 1 新增）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/application/use_cases/test_run_tool_chain_datasource.py`（多节点并发 load_sop + 任一节点 metadata 注入 / 全部 load_sop 失败时扩展 = {} / 无节点时零行为变化） |
+| 🟢 绿 | 修改 `src/application/use_cases/run_tool_chain.py`（line 99-109 `skill_metadata` dict 改为 `load_sop` 调用收集，并基于当前节点 ToolMetadata 通过 `dataclasses.replace()` 注入 `context.extensions["tool_metadata"]` 再委托 `execute_chain`） |
+| 🔄 重构 | 工具链既有验收测试 `test_acceptance_strategic_tool_impl` / `test_acceptance_docker_sandbox` 全量回归，ruff + mypy |
+
+- [ ] Subtask 1.3: 🔴 红 — 编写 RunToolChainUseCase 接线失败测试（3 场景：每节点 metadata 注入 / 失败容错 / 无节点零变化）
+- [ ] Subtask 1.4: 🟢 绿 — 实现 RunToolChainUseCase 接线（`load_sop` 替换 `load_metadata` + 扩展注入，最小改动，不动 `ToolChainService` 内部接口）
+- [ ] Subtask 1.5: 🔄 重构 — 全量回归（`pytest tests/unit/application/use_cases/ tests/acceptance/`）
+- [ ] Subtask 1.6: 验证 `ToolExecutionEngine.__init__` 签名不变（4.4 BDD AC-7.4 回归）
 
 **完成标准/Definition of Done:**
-- [ ] 接线实现完成，4 场景单测全绿
+- [ ] 双入口接线实现完成，7 场景单测全绿
 - [ ] 4.1a/4.4 既有测试零回归
 - [ ] 应用层覆盖率 ≥85%（接线分支 100%）
 
@@ -597,6 +638,11 @@ context = ExecutionContext(
 - [ ] Subtask 3.4: 🟢 绿 — 编写 SOP + references（五力评分锚点/三角化规范/工作坊引导）+ templates（行业问卷）
 - [ ] Subtask 3.5: 🔄 重构 — 行数 ≤500 + 回归全绿
 
+**完成标准/Definition of Done:**
+- [ ] porters-five-forces Skill 声明与 SOP 成熟化完成，单测全绿
+- [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
+- [ ] 23 Skills 解析回归零失败
+
 ---
 
 ### Task 4: appeals-analysis Skill 成熟化
@@ -611,6 +657,11 @@ context = ExecutionContext(
 - [ ] Subtask 4.3: 🔴 红 — 编写 SOP 内容失败测试
 - [ ] Subtask 4.4: 🟢 绿 — 编写 SOP + references（8 维度评分锚点/工作坊引导）+ templates（顾客问卷）
 - [ ] Subtask 4.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+
+**完成标准/Definition of Done:**
+- [ ] appeals-analysis Skill 声明与 SOP 成熟化完成，单测全绿
+- [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
+- [ ] 23 Skills 解析回归零失败
 
 ---
 
@@ -627,6 +678,11 @@ context = ExecutionContext(
 - [ ] Subtask 5.4: 🟢 绿 — 编写 SOP + references（对标矩阵评分锚点/竞品调研工作坊）+ templates（竞品对标矩阵）
 - [ ] Subtask 5.5: 🔄 重构 — 行数 ≤500 + 回归全绿
 
+**完成标准/Definition of Done:**
+- [ ] competitor-analysis Skill 声明与 SOP 成熟化完成，单测全绿
+- [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
+- [ ] 23 Skills 解析回归零失败
+
 ---
 
 ### Task 6: scenario-planning Skill 成熟化
@@ -642,13 +698,18 @@ context = ExecutionContext(
 - [ ] Subtask 6.4: 🟢 绿 — 编写 SOP + references（情景构建方法论/不确定性矩阵锚点）+ templates（情景剧本框架）
 - [ ] Subtask 6.5: 🔄 重构 — 行数 ≤500 + 回归全绿
 
+**完成标准/Definition of Done:**
+- [ ] scenario-planning Skill 声明与 SOP 成熟化完成，单测全绿
+- [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
+- [ ] 23 Skills 解析回归零失败
+
 ---
 
 ### Task 7: disruptive-innovation Skill 成熟化
 
 **关联 AC:** AC-1, AC-3
 
-> **数据源（SSOT）：** `uspto` + `tavily`（2 源，双源交叉验证 — 决策 D4）
+> **数据源（SSOT）：** `uspto` + `tavily`（2 源，双源交叉验证 — 决策 D4；Epic AC-4 ≥3 源字面偏差由 Epic owner 签收）
 > **SOP 核心：** 技术成熟度评估 + 专家访谈引导；颠覆性技术专利信号（USPTO）采集引导
 
 - [ ] Subtask 7.1: 🔴 红 — 编写 `test_disruptive_innovation_4_1c.py` 声明失败测试
@@ -656,6 +717,11 @@ context = ExecutionContext(
 - [ ] Subtask 7.3: 🔴 红 — 编写 SOP 内容失败测试
 - [ ] Subtask 7.4: 🟢 绿 — 编写 SOP + references（技术成熟度锚点/颠覆信号清单/专家访谈提纲）+ templates（技术评估矩阵）
 - [ ] Subtask 7.5: 🔄 重构 — 行数 ≤500 + 回归全绿
+
+**完成标准/Definition of Done:**
+- [ ] disruptive-innovation Skill 声明与 SOP 成熟化完成，单测全绿
+- [ ] 行数 ≤500 约束验证通过（Task 9.4 架构测试兜底）
+- [ ] 23 Skills 解析回归零失败（特别注意，本 Skill 2 源覆盖 D4 双源交叉验证语义）
 
 ---
 
@@ -671,7 +737,7 @@ context = ExecutionContext(
 - [ ] Subtask 8.2: 🟢 绿 — 6 个 Skills 全链路用例（每 Skill ≥1 源采集 + EvidencePackage.data_sources 溯源元数据断言）
 - [ ] Subtask 8.3: 🟢 绿 — 三角化断言（5 个 ≥3 源 Skill 注入源数 == 声明源数 + 每源 call_count == 1；disruptive-innovation == 2）+ 新鲜度评分 ∈ [0,1] + 缓存命中二次执行外部调用不增
 - [ ] Subtask 8.4: 🟢 绿 — Key 缺失降级用例（adapters Mapping 缺 newsapi/tavily 时部分失败收敛，其余源正常注入）
-- [ ] Subtask 8.5: 🔄 重构 — **Marker 字符级扫描专项测试收敛（4-1b 推迟项）**：扩充 `tests/unit/application/services/test_data_source_marker.py`（未闭合字符串/三引号/转义字符/字符串字面量内伪标记不触发/字符级扫描稳健登记至文件末尾）
+- [ ] Subtask 8.5: 🔄 重构 — **Marker 字符级扫描专项测试收敛（4-1b 推迟项）**：扩充 `tests/unit/application/services/test_data_source_marker.py`（未闭合字符串降级/三引号字符串字面量扫描/转义字符边界/字符串字面量内伪标记不触发）+ 同步更新 `src/application/services/data_source_marker.py:_string_literal_spans` 文档注释对齐 4-1b P0-5 修复范围
 - [ ] Subtask 8.6: 🔄 重构 — `pytest -n 8` 并行验证 + 连续 5 次无随机失败
 
 **完成标准/Definition of Done:**
@@ -803,7 +869,7 @@ tests/
 
 **关键学习/Key Learnings:**
 - **Engine 集成保护**：`ToolExecutionEngine.__init__` 签名是 4.4 BDD 断言对象，任何引擎相关改动禁止触碰构造函数（本 Story 接线走 use case 层，天然规避）
-- **条件注册冷启动容错**：newsapi/tavily Key 缺失时不注册（`composition_root.py:2436` `bool(os.getenv())`），Resolver 端表现为"未注册 411"——Skills 声明这两个源必须在 SOP 文档化降级行为
+- **条件注册冷启动容错**：newsapi/tavily Key 缺失时不注册（`composition_root.py:2438` `newsapi_enabled = bool(os.getenv())` / `2456` `tavily_enabled = bool(os.getenv())`，Round 1 D1-C 视角实测修正），Resolver 端表现为"未注册 411"——Skills 声明这两个源必须在 SOP 文档化降级行为
 - **事件循环绑定**：BDD 验收测试必须场景级共享 event_loop（aioredis/asyncio.Lock 首次使用绑定循环），禁止 @pytest.mark.asyncio
 - **xdist 分组**：共享 Redis 缓存键的测试复用 `xdist_group("data-source-cache")`（4-1b 已建分组），pytestmark 用 list 形式
 - **配置/异常红线**：from_env 包 try/except 抛 ConfigurationError；三条 grep 自查零输出；推迟项必须显式登记（本 Story 收敛 Marker 字符级扫描专项）
@@ -897,43 +963,69 @@ tests/
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
-> 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有对故事文件的修复项。
+> 本 Story 经过 `bmad-review-adversarial-general` 5 轮 D1-D5 迭代审查，记录所有对故事文件的修复项。
 
 | # | 问题 | 严重度 | 修复方案 |
-|---|------|--------|----------|
-| - | 无（首次创建，待审查） | - | - |
+|---|------|--------|---------|
+| **D-R1-P0** | **RunToolChainUseCase 同类接线缺口未修补** | **P0** | Story 范围澄清节显式登记 + Task 1 扩展为 TDD [A]+[B] 双循环 + AC-2 验证标准追加 3 场景 + DoD 双入口覆盖 + R3 风险描述重写为"双入口接线" |
+| **D-R1-P0** | **Task 3-7 缺 DoD 节** | P1 | 每个 Skill Task 末尾追加统一模板 DoD 节（行数约束 + 单测全绿 + 23 Skills 回归零失败） |
+| **D-R1-P1** | **SSOT 表缺 url 列** | P1 | 新增"适配器 url/api_type/ttl/confidence 对齐表"作为 SSOT 主体（含 8 适配器实测值，含 IPCC 用 `csv_base_url`、ChinaNBS 用 `base_url` 的字段差异注释） |
+| **D-R1-P1** | **input_schema/output_schema 契约粒度不足** | P1 | Subtask 0.2 扩展产出物：字段级 JSON Schema 定义文档（`tests/acceptance/contracts/skill_io_schemas_4_1c.yaml`）含每个 Skill 的 required 字段 + 类型 + description |
+| **D-R1-P1** | **Subtask 0.7 DoD 未明列 url 列固化** | P1 | DoD 追加 "SSOT 表 url/api_type/ttl/confidence 四列均已从 8 适配器 get_metadata() 实测值固化" |
+| **D-R1-P1** | **Task 8.5 "字符级扫描稳健登记至文件末尾"表述模糊** | P1 | 改写为"扩充 test_data_source_marker.py + 同步更新 _string_literal_spans 文档注释对齐 4-1b P0-5 修复范围" |
+| **D-R1-P1** | **Commit 规范漏 2 条 CLAUDE.md 红线** | P1 | 追加"禁止修改 .importlinter 已合入规则" + "禁止修改既有 alembic migration" |
+| **D-R1-P1** | **Key 安全 SKILL.md body 维度未显式** | P1 | 追加"SOP input_examples 禁止真实 API Key 字符串，使用环境变量引用形式" |
+| **D-R1-P1** | **文档同步清单漏 architecture.md 决策表 + 异常设计文档** | P1 | 扩展至 5 条（含 §17.3.3 决策表追加 6 新决策 + sisys-uni-exception-design.md §3.3.2 追加 4-1c 复用声明） |
+| **D-R1-P1** | **401/403 vs 未注册语义分流未在 SOP 显式** | P1 | R1 风险缓解策略重写：冷启动 → ConfigurationError(101)；运行时未注册 → DataSourceUnavailableError(411) |
+| **D-R1-P1** | **composition_root 行号偏差** | P1 | 2436 → 2438（newsapi）/ 2456（tavily），Round 1 D1-C 实测修正 |
+| **D-R1-P1** | **R3 风险描述与实际改动层不一致** | P1 | 重写为"use case 层双入口 wiring 改变 ExecutionContext.extensions 语义 + load_metadata → load_sop I/O 增量" |
+| **D-R1-P1** | **R1 风险等级应降为中** | P1 | 评估 Story 缓解完整 + 生产 Key 属 CI/CD 范畴，降级"高" → "中" |
+| **D-R1-P1** | **disruptive-innovation 2 源与 Epic AC-4 字面偏差需 Epic owner 签收** | P1 | R4 决策依据补充 + SSOT 表行末标注"Epic AC-4 字面偏差由 Epic owner 签收" |
+| **D-R1-P2** | **6 个目标 Skill references/templates 目录全空 vs Story 描述** | P2 | Story 范围澄清节追加"当前 5 个非 pestel 目标 Skill 的 references/scripts 为空目录、templates 全无，本 Story Task 2-7 实施期新建" |
+| **D-R1-P2** | **frontmatter 示例 required_fields 缺字段来源注释** | P2 | 示例下方添加"对齐 4-1b DataSourceRef.required_fields" 注释 |
+| **D-R1-P2** | **D1 决策依据未附文件:行号** | P2 | 决策表 D1 依据补充"4.1a TOOL_CATALOG 单一数据源原则 — `_bmad-output/implementation-artifacts/stories/4-1a-strategic-tool-impl.md`" |
 
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-> 待 code-review 阶段填写。
+> 待 dev-story 实施后填写。
 
 #### 需决策 Decision Needed
 
-- [ ] 无（待审查）
+- [ ] **Decision D8（待 Epic owner 签收）**：disruptive-innovation 2 源（USPTO + Tavily）与 Epic AC-4 "每个指标 ≥3 独立来源" 字面偏差——本 Story 选择务实双源交叉验证（D4 决策），需 Epic owner 显式签收或追加 WIPO/EPO 适配器到下个 Story
 
 #### 已修复 Patch
 
-- [ ] 无（待审查）
+- [ ] 无（待 dev-story 实施）
 
 #### 已推迟 Defer
 
-- [ ] 无（待审查）
+- [ ] P2-domain-1：异常 `to_dict()` 自动脱敏（Story 5.x 安全专项）
+- [ ] Marker 字符级扫描专项测试扩展（Task 8.5 收敛）
+- [ ] `ToolChainService.execute_chain` 内部节点级 extensions 注入（Story 4.2 工具链编排范畴）
 
 ---
 
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
+- [x] Story Round 1 文档审查完成（D1-D2 D2 评审 + D3 系统修订 17 项修复）
+- [ ] Epic owner 签收 D8 决策
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-09-26
 **最后更新/Last Updated:** 2026-09-26
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md Story 4.1c + 4-1b 完成资产 + 3 视角并行代码调研 + 生产链路缺口核实）
+- v1.1.0: bmad-doc-review Round 1 完成：
+  - **D1 调研**：3 Agent 并行（StrategicAnalysisUseCase 接线 / Skills 系统现状与ACES 规范 / 4-1b 资产与异常继承）
+  - **D2 评审**：3 Agent 并行（叙事一致性 + 科学性可行性 + CLAUDE.md 合规性）
+  - **D3 系统修订**：17 项修复（含 P0-1 双入口接线缺口 / P0-2 跨循环一致性 / 14 项 P1 修复 / 4 项 P2 修订）
+  - **关键发现**：`RunToolChainUseCase`（`run_tool_chain.py:104-106`）存在同类 wiring 缺口，被 3 Agent 独立发现（最高优先级 P0 修复）
+  - 验证：ruff 全绿 + 三条红线零输出（CLAUDE.md §5）+ 文档内 line 引用全部基于 D1 实测（composition_root 行号偏差已修正）
