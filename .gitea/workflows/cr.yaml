@@ -111,7 +111,7 @@ jobs:
   # ===========================================================================
   setup:
     name: "🔧 环境准备"
-    runs-on: gpu
+    runs-on: [actions]
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
       options: --user root
@@ -193,10 +193,11 @@ jobs:
   # ===========================================================================
   regression:
     name: "🔥 持续回归"
-    runs-on: gpu
+    runs-on: [actions]
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
-      options: --user root --gpus all --add-host=host.docker.internal:host-gateway
+      # options: --user root --gpus all --add-host=host.docker.internal:host-gateway
+      options: --user root --add-host=host.docker.internal:host-gateway
     needs: [setup]
     timeout-minutes: 720
 
@@ -433,7 +434,7 @@ jobs:
   # ===========================================================================
   report:
     name: "📊 测试报告"
-    runs-on: gpu
+    runs-on: [actions]
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
       options: --user root
