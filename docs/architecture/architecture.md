@@ -2800,13 +2800,15 @@ buckets/
 | # | 决策点 | 选中方案 | 依据 |
 |---|--------|---------|------|
 | 1 | DataSourcePort 归属层 | domain/ports | LLMClientPort/SandboxExecutor/CrawlerClientPort 外部能力网关均归 domain |
-| 2 | 缓存方案 | 复用 L1CachePort（禁止新建缓存端口） | `set_with_ttl` 现成；缓存键 `sisys:cache:datasource:{tenant}:{source}:{sha256(query)[:16]}` |
+| 2 | 缓存方案 | 复用 L1CachePort（禁止新建缓存端口） | `set_with_ttl` 现成；缓存键 `sisys:cache:datasource:{tenant}:{source}:{sha256(query)}`（完整 128bit，Round 2 优化碰撞概率） |
 | 3 | Engine 集成方式 | `set_data_source_resolver()` 后注入（__init__ 签名不变） | 保护 Story 4.4 AC-7.4 BDD 对构造函数参数数量的断言；None 时零行为变化 |
 | 4 | 数据注入方式 | Python 字面量 preamble 单行 JSON 内联 | 沙箱无网络不变量不可破坏；可审计；原始标记行保留 |
 | 5 | HTTP 适配器模式 | httpx + tenacity（白名单重试：仅 5xx/超时/传输错误）+ 自研 CircuitBreaker 复用 + 内联异常映射 | EmbeddingAPIClient 现行惯例；纯函数 helper 不抽 base 类（Simplicity First） |
 | 6 | 国家局采集 | 复用 CrawlerClientPort（robots/UA 轮换/限速合规） | PoC v2 直连 HTTP 403 反爬拒绝 |
 | 7 | 异常编码段 | 新增 data_source (410, 419) 子域 | external 301-399 已满；399 预留 Story 4.7；超时/配置/白名单复用 302/101/207（禁止同义异常） |
 | 8 | 白名单语义 | fetch_many 前置统一校验（207 立即抛出）；部分失败收敛 + DataSourceFetchFailed；全部失败抛首个异常 | Engine 依此区分"策略违规"与"数据不可用"；413 解析失败不可重试 |
+| 9 | NewsAPI 401/403 契约分流 | `_http_helpers` 显式 `if status in (401, 403)` → ConfigurationError(EXCEPTION_101)，区别于通用 4xx → 413 | Round 2 修复：API Key 无效/未授权是凭证问题（ConfigurationError），不应归"响应解析失败"413 误导运维误判；message 仅含 source_name/status_code（防 Key 泄露） |
+| 10 | DOM 标识别 FS 不依赖 tokenize | `_string_literal_spans` 采用纯字符级扫描（双引号/单引号/三引号 + 转义字符） | Round 1 P0-5 修复：未闭合字符串场景下 tokenize.TokenError 降级返回部分区间，导致字符串内 `$DATA_SOURCE` 误识别为标记；字符级扫描在此场景稳健登记至文件末尾 |
 
 **执行语义（Engine.Execute 前置）：** Code 产物含 `$DATA_SOURCE(name, "query")` 标记 → 标记解析器提取（字符串字面量内文本不触发，tokenize 掩码）→ 白名单校验（`context.extensions["tool_metadata"]` 的 data_sources）→ `fetch_many` 并发采集（asyncio.gather 部分成功收敛）→ preamble 内联注入 → 沙箱执行 → `EvidencePackage.data_sources` 溯源元数据（source/freshness/confidence）。数据采集领域异常（207/201/410-413）不包装直传，区别于 `ToolExecutionFailedError`。
 
