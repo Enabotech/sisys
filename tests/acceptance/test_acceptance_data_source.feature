@@ -38,11 +38,11 @@
   并且 外部采集次数为 1
 
 场景: AC-2.3 - 401/403 鉴权失败归 ConfigurationError
-  假如 工具元数据声明数据源 "newsapi"
-  并且 数据源 "newsapi" 配置为鉴权失败（401/403）
-  当 含标记的沙箱代码经 Engine Execute 阶段处理
+  假如 构造 _FakeDataSourceAdapter 行为为 auth_failed（401/403）
+  当 调用 fake adapter fetch 方法
   那么 抛出 ConfigurationError
   并且 错误码为 EXCEPTION_101
+  并且 context 含 status_code 字段
   并且 异常消息不包含密钥字串
 
 场景: AC-2.4 - TAVILY_API_KEY 缺失时条件注册跳过，Resolver 服务仍可用
