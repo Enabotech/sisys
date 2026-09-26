@@ -51,6 +51,28 @@ class DataSourceFetched(DomainEvent):
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "ToolExecution")
 
+    def with_execution_id(self, execution_id: uuid.UUID) -> "DataSourceFetched":
+        """绑定 execution_id（返回新实例，保留 frozen immutability 语义）。
+
+        数据源采集时 execution_id 可能尚未生成（ad-hoc 调用场景），
+        由 service 层在发布前调用本方法显式绑定到当前 execution_id，
+        避免 Resolver 内部使用 object.__setattr__ 绕过 frozen。
+
+        Returns:
+            新的 DataSourceFetched 实例，execution_id/aggregate_id 已绑定
+        """
+        return DataSourceFetched(
+            execution_id=execution_id,
+            aggregate_id=execution_id,
+            aggregate_type=self.aggregate_type,
+            source_name=self.source_name,
+            query=self.query,
+            freshness_score=self.freshness_score,
+            confidence=self.confidence,
+            cache_hit=self.cache_hit,
+            latency_ms=self.latency_ms,
+        )
+
 
 @dataclass(frozen=True)
 class DataSourceFetchFailed(DomainEvent):
@@ -78,6 +100,21 @@ class DataSourceFetchFailed(DomainEvent):
             object.__setattr__(self, "aggregate_id", self.execution_id)
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "ToolExecution")
+
+    def with_execution_id(self, execution_id: uuid.UUID) -> "DataSourceFetchFailed":
+        """绑定 execution_id（返回新实例，保留 frozen immutability 语义）。
+
+        详见 DataSourceFetched.with_execution_id 文档。
+        """
+        return DataSourceFetchFailed(
+            execution_id=execution_id,
+            aggregate_id=execution_id,
+            aggregate_type=self.aggregate_type,
+            source_name=self.source_name,
+            query=self.query,
+            error_code=self.error_code,
+            error_message=self.error_message,
+        )
 
 
 __all__ = ["DataSourceFetched", "DataSourceFetchFailed"]

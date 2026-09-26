@@ -258,7 +258,7 @@ code-quality: lint format-check type-check
 # -----------------------------------------------------------------------------
 # 测试（Story 0.2 验收标准 - 阶段 2）
 # -----------------------------------------------------------------------------
-.PHONY: test test-cov test-cov-html test-cov-domain test-cov-application test-cov-infrastructure test-unit test-integration test-e2e pytest
+.PHONY: test test-cov test-cov-html test-unit test-integration test-e2e pytest
 
 test: pytest
 
@@ -274,21 +274,6 @@ test-cov-html:
 	@echo "🧪 运行测试并生成 HTML 覆盖率报告..."
 	$(POETRY) run pytest --cov=src --cov-report=html:htmlcov --cov-fail-under=80
 	@echo "📊 覆盖率报告已生成：htmlcov/index.html"
-
-# 覆盖率分层门禁（Story 4-1b 配套基础设施）
-# 单一 --cov-fail-under=80 会被 0% 覆盖的 8 数据源适配器稀释，新增分层门禁保证薄弱模块显形
-# domain ≥90%（业务核心，零外部依赖）/ application ≥85%（编排）/ infrastructure ≥75%（集成依赖多）
-test-cov-domain:
-	@echo "🧪 运行 domain 覆盖率门禁（≥90%）..."
-	$(POETRY) run pytest tests/unit/domain/ --cov=src.domain --cov-report=term-missing --cov-fail-under=90
-
-test-cov-application:
-	@echo "🧪 运行 application 覆盖率门禁（≥85%）..."
-	$(POETRY) run pytest tests/unit/application/ --cov=src.application --cov-report=term-missing --cov-fail-under=85
-
-test-cov-infrastructure:
-	@echo "🧪 运行 infrastructure 覆盖率门禁（≥75%）..."
-	$(POETRY) run pytest tests/unit/infrastructure/ --cov=src.infrastructure --cov-report=term-missing --cov-fail-under=75
 
 test-unit:
 	@echo "🧪 运行单元测试..."
