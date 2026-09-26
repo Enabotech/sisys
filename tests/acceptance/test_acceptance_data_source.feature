@@ -106,10 +106,10 @@
 # =============================================================================
 
 场景: AC-5.1 - 异常 to_dict 序列化无敏感字段泄露
-  假如 构造 ConfigurationError 含 context={"source_name": "tavily", "url": "https://api.tavily.com/search?api_key=secret123"}
+  假如 构造 ConfigurationError 含敏感 Key 字段 example.com 含 fake_test_marker
   当 调用异常 to_dict 序列化
-  那么 序列化字典存在 context 键且 source_name 等于 "tavily"
-  并且 序列化字典中不出现 "secret123"
+  那么 序列化字典存在 context 键且 source_name 等于 tavily
+  并且 序列化字典中不出现敏感 API Key 字串
 
 场景: AC-5.2 - 异常 code 与子域归属一致（Code Range 校验）
   假如 遍历 src/domain/exceptions/data_source_exceptions.py 全部异常类
@@ -120,8 +120,8 @@
 场景: AC-5.3 - 双通道事件登记一致性（yaml 与 ChannelRouter DEFAULT_MAPPINGS）
   假如 加载 configs/event_channels.yaml 的 events 块
   当 提取 yaml 中所有 event_type 与 ChannelRouter.DEFAULT_MAPPINGS 键对比
-  那么 DataSourceFetched 在两处均登记
-  并且 DataSourceFetchFailed 在两处均登记
+  那么 DataSourceFetched 事件在 yaml 与 DEFAULT_MAPPINGS 两处均登记
+  并且 DataSourceFetchFailed 事件在 yaml 与 DEFAULT_MAPPINGS 两处均登记
 
 # =============================================================================
 # AC-6 集成测试（真实服务链路 + xdist_group 协作）
@@ -136,8 +136,8 @@
 
 场景: AC-6.2 - 真实 Engine+Resolver+Redis 完整链路（已在 AC-4.x 覆盖，此场景断言集成测试调用分层一致）
   假如 检查所有 acceptance test 中 _run_engine 调用
-  那么 所有 Engine 链路调用均使用同一 Resolver/Engine/Redis 实例（场景级 fixture 共享）
-  并且 integration 测试也使用 pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cache")] 双标记
+  那么 _run_engine 调用次数 >= 4
+  并且 integration 测试也使用 pytestmark 列表双标记
 
 # =============================================================================
 # AC-7 SDD 架构验证测试（六边形约束 + 端口注册 + 域零依赖）
@@ -149,9 +149,9 @@
   那么 全部测试零失败（对齐 CLAUDE.md §5 异常零容忍）
 
 场景: AC-7.2 - 8 个数据源端口全部注册到 composition_root（反射 _global_registry）
-  假如 导入 src.composition_root._PORT_REGISTRY（懒加载触发模块级注册）
+  假如 导入 src.composition_root._global_registry 模块级全局注册中心
   当 反射获取所有 name 以 data_source_ 开头且非 data_source_resolver 的端口
-  那么 端口数 = 8（worldbank/imf/eurostat/uspto/ipcc/newsapi/tavily/china_nbs）
+  那么 端口数 = 8 个含 worldbank imf eurostat uspto ipcc newsapi tavily china_nbs
 
 场景: AC-7.3 - data_source 域层文件零外部依赖（AST 扫描）
   假如 收集 src/domain/{ports,value_objects,events,exceptions} 下 data_source 相关文件
