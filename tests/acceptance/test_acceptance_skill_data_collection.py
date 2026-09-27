@@ -22,6 +22,7 @@ Task 2-7 填充声明后转绿。
 
 from __future__ import annotations
 
+import ast
 import json
 import uuid
 from collections.abc import Generator
@@ -289,7 +290,8 @@ def _injected_data_sources(context: dict[str, Any]) -> dict[str, Any]:
     for code in codes:
         first_line = code.split("\n", 1)[0]
         if first_line.startswith("DATA_SOURCES = "):
-            injected: dict[str, Any] = json.loads(first_line.removeprefix("DATA_SOURCES = "))
+            # 前言为 repr Python 字面量（R2-P0-1 修复：json.dumps → repr，ast.literal_eval 可逆）
+            injected: dict[str, Any] = ast.literal_eval(first_line.removeprefix("DATA_SOURCES = "))
             return injected
     raise AssertionError(f"缺少 DATA_SOURCES 数据前言: {codes[-1].splitlines()[0][:80]}")
 

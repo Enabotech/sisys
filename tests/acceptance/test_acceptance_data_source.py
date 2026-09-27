@@ -532,11 +532,11 @@ def then_raises_response_error(context: dict[str, Any]) -> None:
 
 @given(parsers.parse("构造 _FakeDataSourceAdapter 行为为 auth_failed（401/403）"))
 def given_source_auth_failed(context: dict[str, Any]) -> None:
-    """Round 3 四次修复：直接验证 _FakeDataSourceAdapter.auth_failed 行为，不经过 Engine 包装链路。
+    """直接验证 _FakeDataSourceAdapter.auth_failed 行为（编排层透传契约）。
 
-    原 AC-2.3 通过 Engine.execute 链路验证，但 Engine 对 ConfigurationError 一律包装为
-    ToolExecutionFailedError，破坏 BDD 直传契约。改为直接验证适配器 fetch 行为，
-    保留 4-1b Round 2 修复契约（401/403 → ConfigurationError 101）的覆盖。
+    历史上 Engine 曾将 ConfigurationError 包装为 ToolExecutionFailedError，本场景改为
+    直接验证适配器行为绕开包装；R2-P1-7 修复后 Engine 已恢复 101 直传（经 Engine 链路的
+    单元级覆盖见 test_tool_execution_engine_datasource.py），此场景保留适配器行为验证定位。
     """
     context["auth_failed_adapter"] = _FakeDataSourceAdapter("newsapi", behavior="auth_failed")
 
@@ -626,8 +626,8 @@ def when_construct_tavily_without_key(context: dict[str, Any]) -> None:
 
 @then("抛出 ConfigurationError")
 def then_raises_config_error(context: dict[str, Any]) -> None:
-    """Round 3 四次修复：直接验证 _FakeDataSourceAdapter.fetch 抛 ConfigurationError
-    （避免 Engine 包装为 ToolExecutionFailedError）"""
+    """直接验证 _FakeDataSourceAdapter.fetch 抛 ConfigurationError
+    （R2-P1-7 修复后 Engine 已恢复 101 直传，本断言定位适配器行为）"""
     assert isinstance(context["query_error"], ConfigurationError)
 
 

@@ -38,21 +38,38 @@ from src.domain.value_objects.data_source import (
 logger = logging.getLogger(__name__)
 
 
-def build_data_source_cache_key(tenant_id: uuid.UUID | str | None, source_name: str, query: str) -> str:
-    """构建数据源缓存键（租户前缀隔离 + 查询哈希化）
+def _as_aware_utc(value: datetime) -> datetime:
+    """naive 时间戳按 UTC 归一（aware 输入原样返回）"""
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def build_data_source_cache_key(
+    tenant_id: uuid.UUID | str | None,
+    source_name: str,
+    query: str,
+    parameters: tuple[tuple[str, str], ...] = (),
+) -> str:
+    """构建数据源缓存键（租户前缀隔离 + 查询与参数哈希化）
 
     Args:
         tenant_id: 租户标识（None 归一化为 "global"）
         source_name: 数据源名称
         query: 查询表达式（SHA256 哈希化，避免原始 query 直接进入键）
+        parameters: 附加查询参数（非空时按 canonical 排序与 query 一并哈希，
+            防止同 (tenant, name, query) 不同参数组合互相污染缓存——R2-P1-1 修复；
+            空 parameters 保持历史哈希输入，旧缓存条目零失效）
 
     Returns:
-        格式：sisys:cache:datasource:{tenant}:{source}:{query_hash16}
+        格式：sisys:cache:datasource:{tenant}:{source}:{query_hash}
         （命名空间格式与 infrastructure/storage/redis/key_builder.build_key 输出一致；
         应用层禁止跨层 import infrastructure，此处内联构造保持依赖方向合规）
     """
     tenant = str(tenant_id) if tenant_id is not None else "global"
-    query_hash = hashlib.sha256(query.encode()).hexdigest()
+    if parameters:
+        hash_input = json.dumps([query, sorted(parameters)], ensure_ascii=False)
+    else:
+        hash_input = query
+    query_hash = hashlib.sha256(hash_input.encode()).hexdigest()
     return f"sisys:cache:datasource:{tenant}:{source_name}:{query_hash}"
 
 
@@ -89,13 +106,14 @@ class DataSourceResolverService:
         tool_metadata: ToolMetadata,
         name: str,
         query: str,
+        parameters: tuple[tuple[str, str], ...] = (),
         *,
         tenant_id: uuid.UUID | str | None = None,
         execution_id: uuid.UUID | None = None,
     ) -> DataSourceResult:
         """单源采集（白名单 → 缓存 → 适配器 → 写缓存 → 事件）"""
         allowed = self._check_whitelist(tool_metadata, name)
-        cache_key = build_data_source_cache_key(tenant_id, name, query)
+        cache_key = build_data_source_cache_key(tenant_id, name, query, parameters)
 
         # 第 1 步：缓存读（故障降级：异常时按未命中处理）
         cached = await self._read_cache(cache_key, allowed)
@@ -103,7 +121,7 @@ class DataSourceResolverService:
             await self._publish_fetched(cached, query, execution_id=execution_id)
             return cached
 
-        # 第 2 步：适配器采集
+        # 第 2 步：适配器采集（parameters 透传——R2-P1-1 修复，不再静默丢弃）
         adapter = self._adapters.get(name)
         if adapter is None:
             raise DataSourceUnavailableError(
@@ -111,7 +129,7 @@ class DataSourceResolverService:
                 context={"source_name": name},
             )
         started = time.monotonic()
-        result = await adapter.fetch(DataSourceQuery(source_name=name, query=query, tenant_id=tenant_id))
+        result = await adapter.fetch(DataSourceQuery(source_name=name, query=query, parameters=parameters, tenant_id=tenant_id))
         latency_ms = (time.monotonic() - started) * 1000
 
         # 第 3 步：写缓存（故障降级：异常仅告警）
@@ -128,8 +146,13 @@ class DataSourceResolverService:
         *,
         tenant_id: uuid.UUID | str | None = None,
         execution_id: uuid.UUID | None = None,
-    ) -> tuple[DataSourceResult, ...]:
-        """并发采集（白名单前置校验 + gather 部分成功收敛 + 全失败抛首个异常）"""
+    ) -> tuple[DataSourceResult | None, ...]:
+        """并发采集（白名单前置校验 + gather 部分成功收敛 + 全失败抛首个异常）
+
+        Returns:
+            与 requests 等长对齐的结果元组（失败位 None 占位——R2 第二周期修复：
+            紧凑化会丢失结果↔请求对应关系，导致注入键错位静默污染数据）
+        """
         # 白名单前置校验：任一违规立即抛出，不采集任何源
         for req in requests:
             self._check_whitelist(tool_metadata, req.source_name)
@@ -143,6 +166,7 @@ class DataSourceResolverService:
                     tool_metadata,
                     req.source_name,
                     req.query,
+                    req.parameters,
                     tenant_id=req.tenant_id or tenant_id,
                     execution_id=execution_id,
                 )
@@ -151,7 +175,7 @@ class DataSourceResolverService:
             return_exceptions=True,
         )
 
-        results: list[DataSourceResult] = []
+        results: list[DataSourceResult | None] = []
         first_error: Exception | None = None
         for req, outcome in zip(requests, outcomes, strict=True):
             if isinstance(outcome, DataSourceResult):
@@ -165,8 +189,9 @@ class DataSourceResolverService:
             if first_error is None:
                 first_error = error
             await self._publish_failed(req, error, execution_id=execution_id)
+            results.append(None)
 
-        if first_error is not None and not results:
+        if first_error is not None and not any(results):
             # 全部失败：抛首个异常（Engine 依此传播 412/413 等到调用方）
             raise first_error
         return tuple(results)
@@ -204,11 +229,18 @@ class DataSourceResolverService:
         if raw is None:
             return None
         try:
+            # 整条解析段纳入统一 try（R2-P0-2 修复：payload 提取/confidence 转换/
+            # freshness 比较内置 KeyError/TypeError 不得逃逸降级路径）；
+            # naive 时间戳按 UTC 归一（历史写入方不规范条目的合理解释）
             entry = json.loads(raw)
-            source_ts = datetime.fromisoformat(entry["source_timestamp"])
-            fetched_at = datetime.fromisoformat(entry["fetched_at"])
-        except (KeyError, ValueError, TypeError) as e:
-            # Round 3 P2-app-1: 主动清理损坏条目，避免同 key 重复 deserialize 失败
+            source_ts = _as_aware_utc(datetime.fromisoformat(entry["source_timestamp"]))
+            fetched_at = _as_aware_utc(datetime.fromisoformat(entry["fetched_at"]))
+            payload = entry["payload"]
+            confidence = float(entry.get("confidence", 0.5))
+            freshness = DataFreshness(source_timestamp=source_ts, ttl_seconds=ref.ttl_seconds)
+            stale = freshness.is_stale(datetime.now(UTC))
+        except Exception as e:
+            # 主动清理损坏条目，避免同 key 重复 deserialize 失败
             # + 日志噪音 + Redis 重复 IO（cache-aside pattern：Caffeine/Spring/redis-py 官方示例）
             logger.warning("数据源缓存条目损坏（按未命中处理 + 主动清理）: %s", type(e).__name__)
             try:
@@ -217,16 +249,15 @@ class DataSourceResolverService:
                 pass  # 清理失败不影响"按未命中处理"主流程
             return None
 
-        freshness = DataFreshness(source_timestamp=source_ts, ttl_seconds=ref.ttl_seconds)
-        if freshness.is_stale(datetime.now(UTC)):
+        if stale:
             return None  # stale → 触发重采
         return DataSourceResult(
             source_name=ref.name,
-            payload=entry["payload"],
+            payload=payload,
             source_timestamp=source_ts,
             fetched_at=fetched_at,
             freshness=freshness,
-            confidence=float(entry.get("confidence", 0.5)),
+            confidence=confidence,
             cache_hit=True,
         )
 
