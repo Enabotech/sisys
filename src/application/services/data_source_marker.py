@@ -13,14 +13,23 @@
   降级会漏边界；第二周期 R2-P1-3 修复补注释识别，注释撇号不再吞掉后续标记）
 - 注入产物恒为合法 Python：preamble 用 repr 序列化（ast.literal_eval 可逆，
   杜绝 json.dumps 的 null/true/false NameError）；标记原位替换（杜绝 `$`
-  非法字符 SyntaxError）——第二周期 R2-P0-1 修复
+  非法字符 SyntaxError）——第二周期 R2-P0-1 修复；payload 非有限浮点
+  （NaN/Infinity 字面量与 1e999 溢出通道）统一清洗为字面串
 - 语法错误抛 ValidationError（EXCEPTION_201），不泄露内部实现细节
+
+已知边界（有意接受的收窄，文档化防误用）：
+- f-string 表达式槽（如 f'{$DATA_SOURCE(...)}'）被整体掩码不识别——3.11 中
+  槽内是真实代码，该形态的 `$` 在沙箱才报 SyntaxError（概率极低，LLM 生成
+  代码未见此形态；如需闭合可在调用方对无标记代码做宿主侧 compile 预检）
+- inject_data_sources 的 markers 必须来自同一份 code 的 parse_data_source_markers
+  （调用方解析一次传入）；传入不一致 markers 时未覆盖的标记文本保守保留不替换
 """
 
 from __future__ import annotations
 
 import ast
 import json
+import math
 import re
 from datetime import UTC, datetime
 
@@ -93,6 +102,24 @@ def _string_literal_spans(code: str) -> list[tuple[int, int]]:
 def _inside_span(offset: int, spans: list[tuple[int, int]]) -> bool:
     """判断偏移是否落在任一掩码区间（字符串字面量/行注释）内"""
     return any(start <= offset < end for start, end in spans)
+
+
+def _sanitize_non_finite(value: object) -> object:
+    """递归清洗非有限浮点（inf/-inf/nan → repr 字面串），保证 repr 序列化恒为合法 Python 字面量
+
+    闭合合法 JSON 数值溢出通道（如 1e999 解析为 float('inf')，绕过 json.loads
+    parse_constant 字面量拦截）——repr(inf) 是可编译的 Name 但执行时 NameError
+    （R2-2-P1-2）。清洗后 '"inf"'/'"-inf"'/'"nan"' 为显式字面串，语义降级但可执行。
+    输入为 json.loads 产物（仅 dict/list/str/int/float/bool/None），递归深度与
+    json 解析深度同阶（RecursionError 由调用方纳入降级）。
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else repr(value)
+    if isinstance(value, dict):
+        return {k: _sanitize_non_finite(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_non_finite(item) for item in value]
+    return value
 
 
 def _masked_code(code: str, spans: list[tuple[int, int]]) -> str:
@@ -202,10 +229,11 @@ def inject_data_sources(
             continue
         payload: object
         try:
-            # parse_constant 将 NaN/Infinity/-Infinity（非标准 JSON 扩展）映射为字面字符串，
-            # 杜绝 repr 产出 inf/nan 非法名称导致沙箱 NameError（R2-P0-1 边界闭合）
-            payload = json.loads(result.payload, parse_constant=lambda constant: constant)
-        except ValueError:
+            # parse_constant 将 NaN/Infinity/-Infinity 字面量（非标准 JSON 扩展）映射为字面字符串；
+            # 合法数值溢出通道（1e999 → inf，绕过 parse_constant 拦截）由 _sanitize_non_finite
+            # 递归清洗闭合（R2-2-P1-2）；极深嵌套 RecursionError 一并降级原串
+            payload = _sanitize_non_finite(json.loads(result.payload, parse_constant=lambda constant: constant))
+        except (ValueError, RecursionError):
             payload = result.payload
         data[key_of[pair]] = {
             "payload": payload,

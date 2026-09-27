@@ -2734,6 +2734,28 @@ async def shutdown() -> None:
     except Exception as e:
         logger.error("Failed to close llm_client: %s", e)
 
+    # 关闭数据源适配器 httpx 连接池（Story 4.1b R2-2-B1 修复）
+    # 仅用 peek_singleton 清理**已实例化**的单例——resolve() 会对未使用过的端口
+    # 现场懒实例化（在 shutdown 路径是危险副作用：适配器构造读 env 可能抛
+    # ConfigurationError）；未注册（条件注册的 newsapi/tavily）/未实例化统一跳过。
+    # china_nbs 无自持 httpx 客户端（复用 CrawlerClientPort），不在清理列表。
+    for port_name in (
+        "data_source_worldbank",
+        "data_source_imf",
+        "data_source_eurostat",
+        "data_source_uspto",
+        "data_source_ipcc",
+        "data_source_newsapi",
+        "data_source_tavily",
+    ):
+        try:
+            adapter = resolver.peek_singleton(port_name)
+            if adapter is not None:
+                await adapter.close()
+                logger.info("Closed %s", port_name)
+        except Exception as e:  # 单端口关闭失败不阻断其余端口清理
+            logger.error("Failed to close %s: %s", port_name, e)
+
     # 关闭 ONNX 版面检测模型会话（释放 GPU/CPU 推理资源）
     try:
         layout_detector = resolver.resolve("layout_detector")

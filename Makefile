@@ -258,7 +258,7 @@ code-quality: lint format-check type-check
 # -----------------------------------------------------------------------------
 # 测试（Story 0.2 验收标准 - 阶段 2）
 # -----------------------------------------------------------------------------
-.PHONY: test test-cov test-cov-html test-unit test-integration test-e2e pytest
+.PHONY: test test-cov test-cov-html test-cov-domain test-cov-application test-cov-infrastructure test-cov-gates test-unit test-integration test-e2e pytest
 
 test: pytest
 
@@ -274,6 +274,31 @@ test-cov-html:
 	@echo "🧪 运行测试并生成 HTML 覆盖率报告..."
 	$(POETRY) run pytest --cov=src --cov-report=html:htmlcov --cov-fail-under=80
 	@echo "📊 覆盖率报告已生成：htmlcov/index.html"
+
+# 覆盖率分层门禁（Story 4-1b 配套基础设施，R2 第二周期恢复）
+# 注意：禁止 --cov=src.<layer> --cov-fail-under 形式（pyproject [tool.coverage.run]
+# source=["src"] 会覆盖 --cov 指定，TOTAL 恒为全 src 导致门禁必红）。
+# 正确形式：先生成全量覆盖数据，再用 coverage report --include 分层判定
+# （与 CI 的 scripts/check_coverage_gates.py 同一机制）。
+test-cov-domain:
+	@echo "🧪 运行 domain 覆盖率门禁（≥90%）..."
+	$(POETRY) run pytest tests/unit/ --cov=src -q
+	$(POETRY) run coverage report --include="src/domain/*" --fail-under=90
+
+test-cov-application:
+	@echo "🧪 运行 application 覆盖率门禁（≥85%）..."
+	$(POETRY) run pytest tests/unit/ --cov=src -q
+	$(POETRY) run coverage report --include="src/application/*" --fail-under=85
+
+test-cov-infrastructure:
+	@echo "🧪 运行 infrastructure 覆盖率门禁（≥75%）..."
+	$(POETRY) run pytest tests/unit/ --cov=src -q
+	$(POETRY) run coverage report --include="src/infrastructure/*" --fail-under=75
+
+test-cov-gates:
+	@echo "🧪 运行全部分层覆盖率门禁（domain≥90/application≥85/infrastructure≥75/overall≥80）..."
+	$(POETRY) run pytest tests/unit/ --cov=src -q
+	$(POETRY) run python scripts/check_coverage_gates.py
 
 test-unit:
 	@echo "🧪 运行单元测试..."
@@ -858,6 +883,8 @@ help:
 	@echo "  make test          - 运行所有测试"
 	@echo "  make test-cov      - 运行测试并生成覆盖率（终端）"
 	@echo "  make test-cov-html - 运行测试并生成覆盖率（HTML）"
+	@echo "  make test-cov-domain/application/infrastructure - 分层覆盖率门禁（90/85/75）"
+	@echo "  make test-cov-gates - 全部分层覆盖率门禁（含 overall≥80）"
 	@echo "  make test-unit     - 运行单元测试"
 	@echo "  make test-integration - 运行集成测试"
 	@echo "  make test-e2e      - 运行 E2E 测试"

@@ -43,6 +43,23 @@ class Resolver:
         self._instances: dict[str, Any] = {}
         self._scoped_context: dict[str, Any] = {}
 
+    def peek_singleton(self, port_name: str) -> Any | None:
+        """返回已实例化的单例（不触发懒实例化）
+
+        用于 shutdown 等资源清理路径：`resolve()` 对未实例化的 SINGLETON 端口会现场
+        创建实例（在清理路径上是危险的副作用——如数据源适配器构造读 env 可能抛
+        ConfigurationError），本方法纯读取实例缓存，零副作用。
+
+        Args:
+            port_name: 端口名称
+
+        Returns:
+            已实例化的单例；以下四种情形统一返回 None：
+            未注册 / 已注册但未实例化 / 非 SINGLETON 生命周期 / override 注入实例
+            （overrides 仅测试路径使用，生产 shutdown 无 overrides，语义可接受）
+        """
+        return self._instances.get(port_name)
+
     @overload
     def resolve(self, port_name: str) -> Any: ...
 

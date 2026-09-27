@@ -101,7 +101,7 @@ EXPECTED_EXCEPTION_CODES = {
 
 
 def _extract_imports(file_path: Path) -> list[str]:
-    """从 Python 文件中提取所有 import 语句的模块名。"""
+    """从 Python 文件中提取所有 import 语句的完整点分模块路径（ast.walk 天然覆盖函数内延迟 import）。"""
     if not file_path.exists():
         return []
     source = file_path.read_text(encoding="utf-8")
@@ -110,11 +110,16 @@ def _extract_imports(file_path: Path) -> list[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                imports.append(alias.name.split(".")[0])
+                imports.append(alias.name)  # 完整路径，不截断（截断会使跨层断言对 src.* 前缀失效）
         elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                imports.append(node.module.split(".")[0])
+            if node.module and node.level == 0:  # 跳过相对 import（同包内，无跨层语义）
+                imports.append(node.module)
     return imports
+
+
+def _top_layer(module_path: str) -> str:
+    """剥离可选 src. 前缀后的顶层包名（兼容 bare import 与 src. 前缀两种项目写法）。"""
+    return module_path.removeprefix("src.").split(".")[0]
 
 
 # ============================================================
@@ -137,7 +142,7 @@ class TestDomainLayerConstraints:
         """domain 禁止导入 application/interfaces/infrastructure 层。"""
         imports = _extract_imports(file_path)
         for imp in imports:
-            assert not imp.startswith(("application", "interfaces", "infrastructure")), f"{file_path.name} 跨层导入: {imp}"
+            assert _top_layer(imp) not in ("application", "interfaces", "infrastructure"), f"{file_path.name} 跨层导入: {imp}"
 
 
 # ============================================================
@@ -226,7 +231,7 @@ class TestDependencyDirection:
         assert file_path.exists()
         imports = _extract_imports(file_path)
         for imp in imports:
-            assert not imp.startswith("infrastructure"), f"{file_path.name} 导入 infrastructure: {imp}"
+            assert _top_layer(imp) != "infrastructure", f"{file_path.name} 导入 infrastructure: {imp}"
 
     def test_data_source_resolver_has_no_infrastructure_dependency(self) -> None:
         """data_source_resolver 全文件禁止 import infrastructure（依赖方向强制）。
@@ -237,7 +242,28 @@ class TestDependencyDirection:
         file_path = SRC_ROOT / "application" / "services" / "data_source_resolver.py"
         imports = _extract_imports(file_path)
         for imp in imports:
-            assert not imp.startswith("infrastructure"), f"data_source_resolver 导入 infrastructure: {imp}"
+            assert _top_layer(imp) != "infrastructure", f"data_source_resolver 导入 infrastructure: {imp}"
+
+    def test_cross_layer_assertion_mutation_guard(self, tmp_path: Path) -> None:
+        """变异验证（R2-2-C3 空断言防护）：跨层违规 import 必须被判定逻辑捕获。
+
+        历史上 _extract_imports 截断模块路径（split(".")[0] 恒为 "src"），
+        跨层断言对 src.* 前缀 import 永不命中（空断言）。本用例用含违规 import
+        的临时文件做阳性对照，钉死断言判别力。
+        """
+        violating = tmp_path / "violating_service.py"
+        violating.write_text(
+            "from src.infrastructure.storage.redis import key_builder\n"
+            "from src.domain.ports.data_source import DataSourcePort\n",
+            encoding="utf-8",
+        )
+        imports = _extract_imports(violating)
+        assert any(_top_layer(imp) == "infrastructure" for imp in imports), (
+            "变异验证失败：含 src.infrastructure 导入未被跨层判定捕获（断言空转回归）"
+        )
+        clean = tmp_path / "clean_service.py"
+        clean.write_text("from src.domain.ports.data_source import DataSourcePort\n", encoding="utf-8")
+        assert all(_top_layer(imp) != "infrastructure" for imp in _extract_imports(clean))
 
     def test_engine_resolve_delegates_to_marker_and_resolver(self) -> None:
         """Engine 复杂度控制：Execute 前置逻辑委托标记解析器 + Resolver（引擎本体仅编排）。"""
