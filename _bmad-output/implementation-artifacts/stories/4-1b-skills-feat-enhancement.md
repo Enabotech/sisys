@@ -1351,11 +1351,65 @@ tests/
 
 **留 Round 2+**：R2-P1-5（shutdown）、R2-P1-6（IPCC 上限）、R2-P1-11/12/13（测试基建）、全部 P2 观察项
 
+#### Round 2 — C1 调研发现（回归核查 + 基础设施深挖 + 测试基建设计，3 视角并行）
+
+**回归核查（Round 1 修复自身破口，全部实测复现）：**
+
+| # | 级别 | 标题 | 证据 |
+|---|------|------|------|
+| R2-2-P1-1 | P1 | `_read_cache` 统一 try 漏罩 `DataSourceResult` 构造：损坏条目（confidence=5.0 / payload="" 等合法 JSON 但违反值对象不变量）→ `EntityValidationError(242)` 逃逸且**条目不清理**（缓存毒丸：同 key 永久失能至 TTL 过期） | `data_source_resolver.py:254-262`（构造在 try 外） |
+| R2-2-P1-2 | P1 | payload 数值溢出 `1e999` 绕过 parse_constant（合法 JSON 数值直接溢出为 `float('inf')`）→ repr 产出 `inf` → 沙箱 NameError（compile 闸门测不出，exec 才炸） | `data_source_marker.py:207,238` |
+| R2-2-P1-3 | P1 | Engine 直传元组 101/302 **零 Engine 级测试覆盖**（回退元组全部测试仍绿）；Round 1 AC-2.3 注释声称的覆盖不存在（已随本轮补测修正） | `tool_execution_engine.py:228` vs `test_tool_execution_engine_datasource.py` |
+| R2-2-P2-1 | P2 | f-string 表达式槽盲点：`f'{$DATA_SOURCE(...)}'` 整体掩码放行但沙箱 SyntaxError——「SyntaxError 全部前置」承诺失守（收窄文档承诺） | `data_source_marker.py` 扫描器 |
+| R2-2-P2-2 | P2 | naive 时间戳测试不具判别力（靠 stale 而非 naive 触发重采，删掉 `_as_aware_utc` 测试照样绿）；docstring 与归一化语义相反 | `test_data_source_resolver.py:360` |
+| R2-2-P2-3 | P2 | **Makefile 分层门禁目标实际未进入 Round 1 提交**（pre-commit 失败重提交过程中丢失，git 实证 cd46d1ce 不含 Makefile）→ 本轮重做 | Makefile |
+| R2-2-P3-1 | P3 | 缓存键跨分支理论碰撞（query 文本恰为 `[\"a\", []]` JSON 包络 vs 空参分支）→ 参数分支加域分隔标签收窄 | `data_source_resolver.py:68-72` |
+| R2-2-P3-2 | P3 | inject 对不一致 markers 静默保留标记（与「产物恒合法」承诺矛盾）→ docstring 收窄契约 | `data_source_marker.py` |
+
+**基础设施深挖结论（修复设计已立项，本轮实施 P1 两项）：**
+
+| # | 级别 | 项 | 设计要点 |
+|---|------|----|---------|
+| R2-2-B1 | P1 | shutdown() 未关闭 7 个适配器 httpx 连接池 | `Resolver` 新增 `peek_singleton()`（不触发懒实例化——`resolve` 会在 shutdown 现场 new 出未用过的适配器再关，newsapi 构造还可能在 shutdown 路径抛 101）；shutdown 遍历 7 端口逐个 close |
+| R2-2-B2 | P1 | IPCC 无界响应读取 | `IPCCConfig.max_bytes`（默认 10MiB）+ `client.stream` + `aiter_bytes` 累计上限（超限 → 413 不重试不计熔断）+ Content-Type `text/html` 显式拒绝（防 HTML 错误页静默解析为垃圾数据） |
+| R2-2-B3~B8 | P2 | ChinaNBS 轮询未知终态/抖动容忍、8 config 数值范围校验、naive/aware 三处统一（eurostat `replace(tzinfo)` 不换算为现行正确性 bug）、URL 路径段 quote、3xx 显式映射 413、ttl 白名单单一权威 | 留 Round 3 |
+
+**测试基建设计结论（本轮实施判别力修复，留项 Round 3-4）：**
+
+| # | 级别 | 项 | 决策 |
+|---|------|----|------|
+| R2-2-C3 | P1 | 架构测试 `_extract_imports` 跨层断言空断言（`split(".")[0]` 恒为 "src"） | 本轮修：完整路径 + `_top_layer` 归一化 + 变异验证用例 |
+| R2-2-C1/C2/C4/C5/C6 | P1/P2 | AC-5.1 脱敏空转三断言、session→场景级 Redis（方案 B 内联 context fixture）、AC-7.2 第三态确定性断言、AC-2.4 子进程探针、AC-2.5 金丝雀 | 留 Round 3-4 |
+| R2-2-C7/C8/C9/C10 | P2 | 事件 error_message URL 脱敏、fetch 失败事件上移（防双发）、fetch_many 信号量、real_crawler 死 fixture 删除 | 留 Round 3-4 |
+
+#### Round 2 — C2 修复方案
+
+**G1 `_read_cache` 闭环（R2-2-P1-1）**：`DataSourceResult` 构造移入统一 try（值对象不变量违反同样走「清理 + 重采」降级契约——缓存内容是不可信输入，构造失败语义与反序列化失败一致）
+**G2 非有限浮点清洗（R2-2-P1-2）**：inject payload 解析后递归清洗（dict/list/tuple 遍历，非有限 float → `repr` 字面串如 `"inf"`），闭合 `1e999` 溢出通道；补 exec 级回归用例（嵌套 `[-1e999, {"a": 2e500}]`）
+**G3 Engine 直传覆盖（R2-2-P1-3）**：`test_tool_execution_engine_datasource.py` 补 2 用例（adapter 抛 101/302 → execute() 原样传播不包装）
+**G4 Makefile 门禁重做（R2-2-P2-3）**：重新应用薄壳目标（内容与 Round 1 方案一致），提交信息如实记录补交原因
+**G5 判别力与文档收窄（R2-2-P2-1/2 + P3-1/2）**：marker docstring 注明 f-string 表达式槽盲点与 markers 一致性契约；resolver naive 测试改为「新鲜 naive 条目 → cache_hit=True」判别用例 + 原用例 docstring 修正；缓存键参数分支加 `"p"` 域分隔标签
+**G6 shutdown 连接池清理（R2-2-B1）**：`Resolver.peek_singleton()` + shutdown 遍历 7 个 data_source_* 端口 close（resolve_optional 会懒实例化未使用适配器，peek 是唯一语义正确方案）
+**G7 IPCC 流式上限 + Content-Type（R2-2-B2）**：`max_bytes` config（env `IPCC_MAX_BYTES`，范围校验）+ stream/aiter_bytes 累计超限 413 + `text/html` 拒绝 413（同函数同 commit）
+
 #### 已推迟 Defer（第二周期）
 
 （Round 1 无新增；上周期 P0-7 crawler 真实链路维持 deferred）
 
-#### 已修复 Patch（第二周期 Round 1，TDD 红→绿）
+#### 已修复 Patch（第二周期 Round 2，TDD 红→绿）
+
+| # | 修复 | 文件 | 验证 |
+|---|------|------|------|
+| G1 | `_read_cache` 解析+重建段全量入 try（stale 分支与 `DataSourceResult` 构造一并纳入，EntityValidationError 不再逃逸 + 缓存毒丸闭合） | `data_source_resolver.py` | 新增不变量违反降级用例（重采 + 二次命中防毒丸） |
+| G2 | `_sanitize_non_finite` 递归清洗（1e999 溢出通道闭合）；except 扩为 `(ValueError, RecursionError)` 降级原串 | `data_source_marker.py` | exec 级闸门用例（嵌套 `[-1e999, {"a": 2e500}]` → `["-inf", {"a": "inf"}]`） |
+| G3 | Engine 101/302 直传 2 用例（回退元组必变红的判别性经异常层次核验） | `test_tool_execution_engine_datasource.py` | 10 项引擎测试全绿 |
+| G4 | Makefile 薄壳目标重做（Round 1 pre-commit 失败重提交时丢失，本轮补交并如实记录） | `Makefile` | `test-cov-gates` 实测四项全过 |
+| G5 | marker docstring 收窄（f-string 槽盲点 + markers 一致性契约）；naive 判别用例（新鲜 naive → cache_hit=True + 条目未误删）；缓存键带参分支加 `"p"` 域分隔标签（F4→G5 间带参条目一次性失效，4-1b 未上生产可接受） | `data_source_marker.py` / `data_source_resolver.py` / 2 测试文件 | 61 项 marker/resolver 测试全绿 |
+| G6 | `Resolver.peek_singleton()`（四类 None 语义文档化，不触发懒实例化）+ shutdown() 遍历 7 个 data_source_* 端口逐端口异常隔离 close（插入 llm_client 块之后） | `src/domain/ports/resolver.py` / `src/composition_root.py` | 新增 8 项测试（关闭/不懒实例化/未注册跳过/异常隔离/peek 四语义） |
+| G7 | IPCC 流式改造：`max_bytes` config（env 校验，默认 10MiB）+ `client.stream` 整段嵌 `with attempt`（缓冲区每 attempt 重初始化）+ 超限 413 不重试不计熔断 + `text/html` 拒绝 413 + charset 头解码（失去 charset_normalizer 兜底的行为收窄已声明） | `config/ipcc.py` / `ipcc_adapter.py` | 新增 6 项测试（超限/边界等号/HTML 拒绝/config 三态）；92 项适配器测试全绿 |
+| C3 | 架构测试 `_extract_imports` 完整路径 + `_top_layer` 归一化（修复 `split(".")[0]` 恒为 "src" 的空断言）+ tmp_path 变异验证阳性对调用例 | `test_arch_data_source.py` | 528 项架构测试全绿 |
+
+**C3 评审结论（Round 2）**：G1/G2/G5 视角「良好→必修 1 项（G2 RecursionError 缺口）已纳入」；G6/G7 视角「良好→5 项实现精度已全部写入方案」。评审准入条件满足后修码。
 
 | # | 修复 | 文件 | 验证 |
 |---|------|------|------|
@@ -1363,9 +1417,8 @@ tests/
 | F2 | 标记解析器：`#` 行注释识别（注释区间纳入掩码）；后置校验改等长掩码坐标系 + 裸 `$` 收紧（有意行为收紧，沙箱 SyntaxError 前置为 201） | `data_source_marker.py` | TestCommentHandling 5 项新测（撇号/注释内标记/注释内裸 $/字符串内 #/坐标系回归） |
 | F3 | `_read_cache` 整条解析段统一 try + naive 时间戳 UTC 归一 + confidence 转换纳入降级 | `data_source_resolver.py` | TestCorruptedCacheEntry 3 项新测（缺 payload/naive/非数值 confidence） |
 | F4 | `fetch`/`fetch_many` 透传 parameters；缓存键空参保持历史哈希（旧条目零失效）、非空 canonical 排序入哈希 | `data_source_resolver.py` / `ports/data_source_resolver.py` | TestParameters 5 项新测（透传/键区分/顺序归一/空参兼容） |
-| F5 | 分层覆盖率门禁恢复（纠正形式）：`check_coverage_gates.py` 补 infrastructure≥75；Makefile 新增 `test-cov-domain/application/infrastructure/test-cov-gates` 薄壳（`coverage report --include` 形式，禁用被 pyproject 覆盖的 `--cov=src.<layer>` 形式） | `scripts/check_coverage_gates.py` / `Makefile` | 全量单测 + 门禁脚本实测（见 C4 验证记录） |
-| F6 | Engine 直传元组补 `ConfigurationError`(101) + 领域 `TimeoutError`(302)（注释说明捕获领域 302）；NewsAPI 补 401/403 MockTransport 参数化单测（101 + to_dict 零 Key 泄露）；AC-2.3/2.4 过时注释更新 | `tool_execution_engine.py` / `test_newsapi_adapter.py` / `test_acceptance_data_source.py` | 2 项参数化新测；79 resolver/marker/engine/契约测试全绿 |
-| F7 | 文档一致性：Story 状态三处统一 review；AC-2 ChinaNBS 熔断决策记录；AC-6 真实 crawler 链路标注 deferred | Story 文件 | — |
+| F5 | 分层覆盖率门禁恢复（纠正形式）：`check_coverage_gates.py` 补 infrastructure≥75（Makefile 薄壳目标在提交过程中丢失——pre-commit 失败重提交时漏 add，git 实证 cd46d1ce 不含 Makefile，R2-2-P2-3 记录，Round 2 G4 重做） | `scripts/check_coverage_gates.py` | 全量单测 + 门禁脚本实测四项全过（96.0/87.0/85.0/88.0） |
+| F6 | Engine 直传元组补 `ConfigurationError`(101) + 领域 `TimeoutError`(302)（注释说明捕获领域 302）；NewsAPI 补 401/403 MockTransport 参数化单测（101 + to_dict 零 Key 泄露）；AC-2.3/2.4 过时注释更新 | `tool_execution_engine.py` / `test_newsapi_adapter.py` / `test_acceptance_data_source.py` | 2 项参数化新测；79 resolver/marker/engine/契约测试全绿 || F7 | 文档一致性：Story 状态三处统一 review；AC-2 ChinaNBS 熔断决策记录；AC-6 真实 crawler 链路标注 deferred | Story 文件 | — |
 | F8/F9 | 测试改写：marker 单测 preamble 解析 `ast.literal_eval` + 替换形态断言；resolver 部分成功断言改等长对齐；4-1c 验收 `:292` `ast.literal_eval`；engine metas 过滤 None 位 | 3 个测试文件 + `tool_execution_engine.py` | 31 项 4-1b+4-1c 验收全绿 |
 
 ### 下一步 Next Steps

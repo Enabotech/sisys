@@ -357,27 +357,64 @@ class TestCorruptedCacheEntry:
         assert "payload" in entry
 
     @pytest.mark.asyncio
-    async def test_naive_timestamp_degrades_to_refetch_and_cleanup(self) -> None:
-        """naive 时间戳条目 → 按未命中重采（不抛内置 TypeError）。"""
+    async def test_naive_timestamp_normalized_and_cache_hit(self) -> None:
+        """新鲜 naive 时间戳条目 → UTC 归一后正常命中（cache_hit=True），条目不被误清理。
+
+        判别性：删掉 _as_aware_utc 归一后，aware-naive 比较抛 TypeError 走降级重采，
+        本用例变红（钉住归一化语义而非"naive 即损坏"）。
+        """
         stub = _StubAdapter("world-bank")
         cache = _InMemoryCache()
         service, _ = _make_service(adapters={"world-bank": stub}, cache=cache)
         metadata = _make_metadata("world-bank")
         key = build_data_source_cache_key("t-1", "world-bank", "GDP")
+        fresh_naive = datetime.now(UTC).replace(tzinfo=None).isoformat()  # 新鲜但 naive
         await cache.set_with_ttl(
             key,
             json.dumps(
                 {
                     "payload": '{"v": 1}',
-                    "source_timestamp": "2026-09-27T00:00:00",  # naive（无 tzinfo）
-                    "fetched_at": "2026-09-27T00:00:00",
+                    "source_timestamp": fresh_naive,
+                    "fetched_at": fresh_naive,
                     "confidence": 0.5,
                 }
             ),
             3600,
         )
         result = await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
+        assert result.cache_hit is True
+        assert stub.call_count == 0
+        # 归一化命中而非损坏清理：条目应仍在（后续命中路径一致）
+        assert await cache.get(key) is not None
+
+    @pytest.mark.asyncio
+    async def test_invariant_violating_entry_degrades_to_refetch_and_cleanup(self) -> None:
+        """合法 JSON 但违反值对象不变量（confidence 越界）→ EntityValidationError 不逃逸，
+        走「清理 + 重采」降级（缓存毒丸防护：同 key 不得重复抛错至 TTL 过期）。"""
+        stub = _StubAdapter("world-bank")
+        cache = _InMemoryCache()
+        service, _ = _make_service(adapters={"world-bank": stub}, cache=cache)
+        metadata = _make_metadata("world-bank")
+        key = build_data_source_cache_key("t-1", "world-bank", "GDP")
+        now = datetime.now(UTC)
+        await cache.set_with_ttl(
+            key,
+            json.dumps(
+                {
+                    "payload": '{"v": 1}',
+                    "source_timestamp": now.isoformat(),
+                    "fetched_at": now.isoformat(),
+                    "confidence": 5.0,  # 越界（值对象不变量 [0,1]）
+                }
+            ),
+            3600,
+        )
+        result = await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
         assert result.cache_hit is False
+        assert stub.call_count == 1
+        # 第二次调用同样重采成功（毒丸已清理，不再抛错）
+        result2 = await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
+        assert result2.cache_hit is True  # 首轮重采已写入新条目
         assert stub.call_count == 1
 
     @pytest.mark.asyncio

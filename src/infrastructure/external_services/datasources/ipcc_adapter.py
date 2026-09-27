@@ -152,22 +152,49 @@ class IPCCAdapter:
                 reraise=True,
             ):
                 with attempt:
-                    resp = await self._client.get(url)
-                    # 与 _http_helpers.request_json_with_resilience 契约对齐：
+                    # R2-2-B2/G7 流式改造：整段（含字节累计缓冲区）必须位于 with attempt 内
+                    # 且每次 attempt 重新初始化——否则 mid-stream 超时重试会跨重试累计字节，
+                    # 413 超限误判。status_code 在进入 stream 上下文（headers 到达）后即可用，
+                    # 429/4xx 分流契约与 _http_helpers.request_json_with_resilience 对齐：
                     # 429 → DataSourceRateLimitError(412)、其他 4xx → DataSourceResponseError(413)
                     # 不走 resp.raise_for_status → httpx.HTTPStatusError → 411 错误路由
-                    if resp.status_code == 429:
-                        raise DataSourceRateLimitError(
-                            message="数据源 ipcc 触发限流（HTTP 429）",
-                            context={"source_name": "ipcc", "status_code": 429},
-                        )
-                    if 400 <= resp.status_code < 500:
-                        raise DataSourceResponseError(
-                            message=f"数据源 ipcc 返回客户端错误（HTTP {resp.status_code}）",
-                            context={"source_name": "ipcc", "status_code": resp.status_code},
-                        )
-                    resp.raise_for_status()
-                    text = resp.text
+                    chunks: list[bytes] = []
+                    total = 0
+                    async with self._client.stream("GET", url) as resp:
+                        if resp.status_code == 429:
+                            raise DataSourceRateLimitError(
+                                message="数据源 ipcc 触发限流（HTTP 429）",
+                                context={"source_name": "ipcc", "status_code": 429},
+                            )
+                        if 400 <= resp.status_code < 500:
+                            raise DataSourceResponseError(
+                                message=f"数据源 ipcc 返回客户端错误（HTTP {resp.status_code}）",
+                                context={"source_name": "ipcc", "status_code": resp.status_code},
+                            )
+                        resp.raise_for_status()
+                        # Content-Type 拒绝式校验（非白名单——CSV 端点 Content-Type 实务多样，
+                        # 只拒绝明确错误信号）：CDN/反爬/WAF 的 HTML 错误页（HTTP 200）若放行，
+                        # csv.DictReader 会静默解析为结构合法的垃圾行数据（数据污染而非报错）
+                        content_type = resp.headers.get("content-type", "")
+                        if content_type.startswith("text/html"):
+                            raise DataSourceResponseError(
+                                message="数据源 ipcc 返回 HTML 错误页而非 CSV",
+                                context={"source_name": "ipcc", "content_type": content_type, "url_path": resp.url.path},
+                            )
+                        # 流式累计 + 字节上限（无界读取 OOM 面修复；超限为确定性响应错误
+                        # → 413 不重试（白名单外）不计熔断（非 httpx 异常），与 JSON 解析失败先例一致）
+                        async for chunk in resp.aiter_bytes(65536):
+                            total += len(chunk)
+                            if total > self._config.max_bytes:
+                                raise DataSourceResponseError(
+                                    message=f"数据源 ipcc 响应超过大小上限（{self._config.max_bytes} 字节）",
+                                    context={"source_name": "ipcc", "max_bytes": self._config.max_bytes},
+                                )
+                            chunks.append(chunk)
+                    # 流式路径无法访问 resp.text（ResponseNotRead）；解码以 charset 头为准，
+                    # 缺省 utf-8（行为收窄：不再走 charset_normalizer 内容探测——
+                    # IPCC CSV 实际均为 utf-8/ascii，可接受）
+                    text = b"".join(chunks).decode(resp.charset_encoding or "utf-8", errors="replace")
         except httpx.TimeoutException as e:
             self._circuit_breaker.on_failure()
             raise TimeoutError(

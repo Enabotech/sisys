@@ -272,6 +272,19 @@ class TestInjectDataSources:
         assert 'note = "$DATA_SOURCE(语法示例"' in injected
         compile(injected, "<sandbox>", "exec")
 
+    def test_inject_overflow_float_sanitized_executable(self) -> None:
+        """R2-2-P1-2：合法 JSON 数值溢出（1e999 → inf）绕过 parse_constant 字面通道，
+        注入前递归清洗非有限浮点为字面串（exec 级闸门——compile 测不出 NameError）。"""
+        code = 'v = $DATA_SOURCE("imf", "WEO")\nprint(v)'
+        markers = parse_data_source_markers(code)
+        payload = '[-1e999, {"a": 2e500}]'  # 合法 JSON，解析后为 [-inf, {"a": inf}]
+        injected = inject_data_sources(code, markers, (_make_result("imf", payload=payload),))
+        namespace: dict[str, object] = {}
+        exec(compile(injected, "<sandbox>", "exec"), namespace)  # 测试沙箱语义验证
+        data = namespace["DATA_SOURCES"]
+        assert isinstance(data, dict)
+        assert data["imf"]["payload"] == ["-inf", {"a": "inf"}]
+
     def test_inject_empty_markers_returns_code(self) -> None:
         code = "print(1)"
         assert inject_data_sources(code, (), ()) == code

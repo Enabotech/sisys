@@ -15,6 +15,7 @@ import httpx
 import pytest
 
 from src.domain.exceptions import (
+    ConfigurationError,
     DataSourceRateLimitError,
     DataSourceResponseError,
     DataSourceUnavailableError,
@@ -27,8 +28,8 @@ from src.infrastructure.external_services.datasources.ipcc_adapter import IPCCAd
 _CSV_URL = "https://www.ipcc.ch/data"
 
 
-def _make_adapter(handler: httpx.MockTransport | None = None, max_rows: int = 1000) -> IPCCAdapter:
-    config = IPCCConfig(csv_base_url=_CSV_URL, timeout=5.0)
+def _make_adapter(handler: httpx.MockTransport | None = None, max_rows: int = 1000, max_bytes: int = 1_048_576) -> IPCCAdapter:
+    config = IPCCConfig(csv_base_url=_CSV_URL, timeout=5.0, max_bytes=max_bytes)
     transport = handler or httpx.MockTransport(lambda req: httpx.Response(200, text="col\n1\n"))
     return IPCCAdapter(
         config=config,
@@ -41,6 +42,74 @@ def _make_adapter(handler: httpx.MockTransport | None = None, max_rows: int = 10
 
 def _ok_handler(request: httpx.Request) -> httpx.Response:
     return httpx.Response(200, text="year,value\n2020,1.1\n2021,1.2\n")
+
+
+class TestIPCCResponseBounds:
+    """R2-2-B2/G7：流式大小上限 + Content-Type 校验（无界读取 OOM 面与 HTML 静默污染修复）。"""
+
+    @pytest.mark.asyncio
+    async def test_response_exceeding_max_bytes_raises_413_no_retry(self) -> None:
+        """响应超过 max_bytes → DataSourceResponseError(413)，确定性错误不重试。"""
+        calls = {"n": 0}
+        big_csv = "col\n" + "x" * 4096
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(200, text=big_csv)
+
+        adapter = _make_adapter(httpx.MockTransport(handler), max_bytes=1024)
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="ipcc", query="big"))
+        assert exc_info.value.code == "EXCEPTION_413"
+        assert calls["n"] == 1  # 不重试
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_response_exactly_max_bytes_passes(self) -> None:
+        """恰好等于 max_bytes 的响应正常通过（边界含等号）。"""
+        # header "c\n" = 2 字节 + body 1022 字节 = 恰好 1024
+        body = "c\n" + "x" * 1022
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, text=body)), max_bytes=1024)
+        result = await adapter.fetch(DataSourceQuery(source_name="ipcc", query="edge"))
+        assert result.source_name == "ipcc"
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_html_error_page_rejected_as_413(self) -> None:
+        """HTTP 200 + text/html（CDN/反爬错误页）→ 413 拒绝（防静默解析为垃圾数据）。"""
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(200, text="<html><body>Access Denied</body></html>", headers={"content-type": "text/html"})
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="ipcc", query="ar6"))
+        assert exc_info.value.code == "EXCEPTION_413"
+        assert calls["n"] == 1
+        await adapter.close()
+
+
+class TestIPCCConfigMaxBytes:
+    """IPCC_MAX_BYTES 环境变量解析与范围校验。"""
+
+    def test_from_env_invalid_max_bytes_raises_101(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("IPCC_MAX_BYTES", "abc")
+        with pytest.raises(ConfigurationError) as exc_info:
+            IPCCConfig.from_env()
+        assert exc_info.value.code == "EXCEPTION_101"
+
+    def test_from_env_non_positive_max_bytes_raises_101(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("IPCC_MAX_BYTES", "-1")
+        with pytest.raises(ConfigurationError) as exc_info:
+            IPCCConfig.from_env()
+        assert exc_info.value.code == "EXCEPTION_101"
+
+    def test_from_env_valid_max_bytes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("IPCC_MAX_BYTES", "2097152")
+        config = IPCCConfig.from_env()
+        assert config.max_bytes == 2_097_152
 
 
 class TestIPCCAdapterSuccess:

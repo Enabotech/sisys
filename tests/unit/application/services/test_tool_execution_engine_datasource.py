@@ -28,8 +28,10 @@ from src.application.services.tool_execution_engine import ToolExecutionEngine
 from src.domain.entities.tool import Tool
 from src.domain.exceptions import (
     BusinessRuleViolationError,
+    ConfigurationError,
     DataSourceRateLimitError,
     DataSourceUnavailableError,
+    TimeoutError,
 )
 from src.domain.ports.data_source import DataSourceQuery
 from src.domain.value_objects.data_source import (
@@ -248,6 +250,55 @@ class TestEngineWithResolver:
         with pytest.raises(BusinessRuleViolationError) as exc_info:
             await _run_engine(engine, None)  # 无 tool_metadata → 无白名单依据
         assert exc_info.value.code == "EXCEPTION_207"
+
+    @pytest.mark.asyncio
+    async def test_configuration_error_propagates_unwrapped(self) -> None:
+        """R2-2-P1-3：适配器抛 ConfigurationError(101)（如 401/403 鉴权失败）经 Engine 不包装直传。
+
+        回归锁：except 直传元组若回退掉 ConfigurationError，本用例必须变红。
+        """
+        code = '$DATA_SOURCE("newsapi", "tech")\nprint(1)'
+        sandbox_codes: list[str] = []
+        engine = _make_engine(code, sandbox_codes)
+        resolver = DataSourceResolverService(
+            adapters={
+                "newsapi": _StubAdapter(
+                    "newsapi",
+                    error=ConfigurationError(
+                        message="数据源 newsapi 鉴权失败（HTTP 401）",
+                        context={"source_name": "newsapi", "status_code": 401},
+                    ),
+                )
+            },
+            cache=_NullCache(),
+            event_publisher=InMemoryEventBus(),
+        )
+        engine.set_data_source_resolver(resolver)
+        with pytest.raises(ConfigurationError) as exc_info:
+            await _run_engine(engine, _make_metadata("newsapi"))
+        assert exc_info.value.code == "EXCEPTION_101"
+        assert not sandbox_codes  # 未进入沙箱执行
+
+    @pytest.mark.asyncio
+    async def test_domain_timeout_error_propagates_unwrapped(self) -> None:
+        """R2-2-P1-3：适配器抛领域 TimeoutError(302)（采集超时）经 Engine 不包装直传。"""
+        code = '$DATA_SOURCE("world-bank", "GDP")\nprint(1)'
+        sandbox_codes: list[str] = []
+        engine = _make_engine(code, sandbox_codes)
+        resolver = DataSourceResolverService(
+            adapters={
+                "world-bank": _StubAdapter(
+                    "world-bank",
+                    error=TimeoutError(message="数据源 world-bank 请求超时", context={"source_name": "world-bank"}),
+                )
+            },
+            cache=_NullCache(),
+            event_publisher=InMemoryEventBus(),
+        )
+        engine.set_data_source_resolver(resolver)
+        with pytest.raises(TimeoutError) as exc_info:
+            await _run_engine(engine, _make_metadata("world-bank"))
+        assert exc_info.value.code == "EXCEPTION_302"
 
     @pytest.mark.asyncio
     async def test_all_failed_raises_first_error_unwrapped(self) -> None:

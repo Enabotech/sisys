@@ -66,7 +66,10 @@ def build_data_source_cache_key(
     """
     tenant = str(tenant_id) if tenant_id is not None else "global"
     if parameters:
-        hash_input = json.dumps([query, sorted(parameters)], ensure_ascii=False)
+        # "p" 域分隔标签：收窄空参分支（历史哈希输入为裸 query 文本）与带参分支
+        # JSON 包络文本的理论碰撞窗（空参分支受旧条目零失效约束无法加标签，
+        # 残留碰撞需 query 文本精确等于带参包络，现实不可达）
+        hash_input = json.dumps(["p", query, sorted(parameters)], ensure_ascii=False)
     else:
         hash_input = query
     query_hash = hashlib.sha256(hash_input.encode()).hexdigest()
@@ -229,8 +232,10 @@ class DataSourceResolverService:
         if raw is None:
             return None
         try:
-            # 整条解析段纳入统一 try（R2-P0-2 修复：payload 提取/confidence 转换/
-            # freshness 比较内置 KeyError/TypeError 不得逃逸降级路径）；
+            # 整条解析+重建段纳入统一 try（R2-P0-2 + R2-2-P1-1 修复：payload 提取/
+            # confidence 转换/freshness 比较/值对象构造的内置 KeyError/TypeError
+            # 与领域 EntityValidationError 均不得逃逸降级路径——缓存内容是不可信输入，
+            # 构造失败语义与反序列化失败一致，走同一「清理 + 重采」契约，防缓存毒丸）；
             # naive 时间戳按 UTC 归一（历史写入方不规范条目的合理解释）
             entry = json.loads(raw)
             source_ts = _as_aware_utc(datetime.fromisoformat(entry["source_timestamp"]))
@@ -238,7 +243,17 @@ class DataSourceResolverService:
             payload = entry["payload"]
             confidence = float(entry.get("confidence", 0.5))
             freshness = DataFreshness(source_timestamp=source_ts, ttl_seconds=ref.ttl_seconds)
-            stale = freshness.is_stale(datetime.now(UTC))
+            if freshness.is_stale(datetime.now(UTC)):
+                return None  # stale → 触发重采
+            return DataSourceResult(
+                source_name=ref.name,
+                payload=payload,
+                source_timestamp=source_ts,
+                fetched_at=fetched_at,
+                freshness=freshness,
+                confidence=confidence,
+                cache_hit=True,
+            )
         except Exception as e:
             # 主动清理损坏条目，避免同 key 重复 deserialize 失败
             # + 日志噪音 + Redis 重复 IO（cache-aside pattern：Caffeine/Spring/redis-py 官方示例）
@@ -248,18 +263,6 @@ class DataSourceResolverService:
             except Exception:
                 pass  # 清理失败不影响"按未命中处理"主流程
             return None
-
-        if stale:
-            return None  # stale → 触发重采
-        return DataSourceResult(
-            source_name=ref.name,
-            payload=payload,
-            source_timestamp=source_ts,
-            fetched_at=fetched_at,
-            freshness=freshness,
-            confidence=confidence,
-            cache_hit=True,
-        )
 
     async def _write_cache(self, cache_key: str, result: DataSourceResult, ttl_seconds: int) -> None:
         """写缓存（故障仅告警，不阻断主流程）"""
