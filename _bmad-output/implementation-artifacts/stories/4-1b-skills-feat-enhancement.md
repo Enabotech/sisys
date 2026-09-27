@@ -302,7 +302,7 @@ class DataSourceResolverPort(Protocol):
 - [ ] 8 个适配器全部注册到 composition_root（`data_source_<name>` 命名，SINGLETON 生命周期）
 - [ ] **冷启动容错（关键决策）**：需 Key 的适配器（Tavily/NewsAPI）沿用 Story 3-4 Reranker 模式（`composition_root.py:1765-1778` `reranker_enabled = os.getenv(...)` 条件注册 + `resolve_optional` 优雅降级,line 1793），避免 dev/CI 环境无 Key 时阻断 Resolver 注册 → 影响 4.1a/4.4 既有 `ToolExecutionEngine` 服务可用性；具体：`data_source_tavily_enabled = os.getenv("TAVILY_API_KEY") is not None` → 条件 `register_port("data_source_tavily", ...)` + Resolver 内 `Mapping.get("tavily")` 返回 None（白名单校验仍以 `ToolMetadata.data_sources` 为准，Key 缺失的适配器不在 Tool 声明列表即可）
 - [ ] 配置缺失（无 API Key）抛 `ConfigurationError`(101) 且消息不泄露密钥
-- [ ] **CircuitBreaker 差异化配置**：8 个适配器按数据源故障特征差异显式定义熔断参数（`failure_threshold` / `recovery_timeout`）— WorldBank/Eurostat/USPTO 默认 `5/30s`；NewsAPI 早断开 `2/600s`（免费 100 次/天配额敏感）；IPCC 立即熔断 `2/120s`（大文件传输失败代价高）；ChinaNBS 放宽 `10/120s`（爬虫失败率天然高）；Tavily/IMF 默认 `5/30s`
+- [ ] **CircuitBreaker 差异化配置**：8 个适配器按数据源故障特征差异显式定义熔断参数（`failure_threshold` / `recovery_timeout`）— WorldBank/Eurostat/USPTO 默认 `5/30s`；NewsAPI 早断开 `2/600s`（免费 100 次/天配额敏感）；IPCC 立即熔断 `2/120s`（大文件传输失败代价高）；Tavily/IMF 默认 `5/30s`。**ChinaNBS 不内置熔断器**（R2-P1-9 决策记录 2026-09-27：故障语义由 crawler 服务侧管理——crawler 自身有任务超时/取消/状态查询机制，适配器侧叠加熔断会产生双重故障状态机；轮询超时 → `TimeoutError(302)`、crawler 客户端故障 → `DataSourceUnavailableError(411)` 已有完整异常映射）
 
 ### AC-3: 数据缓存层与新鲜度评分
 
@@ -362,7 +362,7 @@ class DataSourceResolverPort(Protocol):
 **Then**
 - 本地 aiohttp HTTP 服务器模拟外部 API（不 mock 客户端本身），验证 httpx + tenacity + 熔断完整链路
 - 真实 Redis（测试端口 + TestTenant 前缀）验证缓存命中/失效
-- 中国国家统计局 crawler 集成测试：crawler 服务可达时真实提交任务验证，不可达时 `pytest.skip()` 动态跳过
+- 中国国家统计局 crawler 集成测试：crawler 服务可达时真实提交任务验证，不可达时 `pytest.skip()` 动态跳过。**（⏸️ deferred — 上周期 P0-7：当前实现为本地 aiohttp 模拟服务器验证核心契约；真实 crawler daemon 链路需 dev/CI 部署可达，留后续 Story 落地。`tests/integration/conftest.py` 的 `real_crawler` fixture 已备好待启用）**
 - 引擎端到端：真实 Engine + 真实 Resolver + 真实 Redis + Mock LLM/Sandbox（按 4-1a 验收先例），验证 `$DATA_SOURCE` 全链路
 
 **验证标准/Validation Criteria:**
@@ -1272,11 +1272,108 @@ tests/
 
 ---
 
+---
+
+### 🔍 代码审查发现 Review Findings — 第二审查周期（2026-09-27，5 轮循环）
+
+**审查日期:** 2026-09-27
+**审查模式:** bmad-code-review（C1 5 视角并行调研：对抗性正确性 / 适配器边界猎手 / 验收审计员 / 架构合规 / 测试质量；全部 P0/P1 经独立复现验证）
+**审查范围:** `git diff b3e056cd~1..bdcc5881`（68 代码/测试文件，+8847 行）+ Makefile + 文档一致性
+
+#### Round 1 — P0 发现（4 项，全部实测复现）
+
+| # | 标题 | 证据 | 复现 |
+|---|------|------|------|
+| R2-P0-1 | **注入产物非法 Python（双根因）**：(a) preamble 用 `json.dumps` → payload/元数据含 `null`/`true`/`false` → 沙箱 `NameError`（`cache_hit` bool 字段恒存在，**必现**）；(b) 标记行 `$DATA_SOURCE(...)` 原样保留注入沙箱 → `SyntaxError`（`$` 非法字符，**必现**）。全链路 122+19 测试绿灯放行（沙箱全部 mock，无任何测试对注入产物做 compile/exec 校验） | `data_source_marker.py:169,177-178`；`test_data_source_marker.py:170` 断言标记行保留 | `exec` 复现 NameError + SyntaxError |
+| R2-P0-2 | **损坏缓存条目逃逸降级路径**：`entry["payload"]`（:225）与 `is_stale()`（:220）在 try 块外 → 缺 payload 键抛内置 `KeyError`、naive 时间戳抛内置 `TypeError`，违反"异常是领域契约"红线 + `_read_cache` 自述降级契约 | `data_source_resolver.py:206-231` | 桩缓存实测复现 |
+| R2-P0-3 | **Makefile 分层覆盖率门禁静默丢失**：e721303d（上周期 R1）新增的 `test-cov-domain/application/infrastructure` 三目标被 f9f8e422（上周期 R2）整体回退（commit message 未提及），Story v1.2.0 记录失真 | `Makefile:261` vs `git show f9f8e422 -- Makefile` | git diff 实证 |
+| R2-P0-4 | **401/403→ConfigurationError(101) 生产分支零真实覆盖**：8 适配器单测无 401/403 用例；验收 AC-2.3 用 `_FakeDataSourceAdapter` 硬编码 raise 自证（删生产分支测试照样绿）；且 Engine 将 101/302 包装为 `ToolExecutionFailedError`，抵消上周期 R2 分流意图 | `_http_helpers.py:135-140`；`tool_execution_engine.py:226,234`；`test_acceptance_data_source.py:533-551` | grep + 链路分析 |
+
+#### Round 1 — P1 发现（去重后 13 项）
+
+| # | 标题 | 位置 |
+|---|------|------|
+| R2-P1-1 | Resolver 静默丢弃 `DataSourceQuery.parameters`（fetch/fetch_many 均不透传）+ 缓存键不含 parameters（修复透传后必缓存污染，两处须同修） | `data_source_resolver.py:41-56,114,142-149` |
+| R2-P1-2 | 标记语法后置校验坐标系错位（residual 坐标 vs 原 code spans），有效标记在前时字符串内标记文本被误报语法错误 | `data_source_marker.py:125-136` |
+| R2-P1-3 | 字符级扫描器不识别 `#` 注释：注释撇号（don't）吞掉后续全部真实标记（静默丢采集） | `data_source_marker.py:32-77` |
+| R2-P1-4 | 同源异 query 注入以 `source_name` 为键互相覆盖（双份采集消耗配额，先采结果静默消失） | `data_source_marker.py:162` |
+| R2-P1-5 | shutdown() 遗漏 7 个 SINGLETON 适配器的 httpx 连接池关闭（各自有 close() 无调用方） | `composition_root.py:2683` |
+| R2-P1-6 | IPCC CSV 响应体无大小上限整 body 读入内存（OOM 面） | `ipcc_adapter.py:170` |
+| R2-P1-7 | Engine 直传清单缺 `ConfigurationError`(101)/`TimeoutError`(302)，与端口契约"不包装直传"语义不一致 | `tool_execution_engine.py:226` vs `ports/data_source_resolver.py:55` |
+| R2-P1-8 | Story 状态字段三处不一致（header=review / footer=done / sprint-status=review） | Story + sprint-status.yaml:141 |
+| R2-P1-9 | ChinaNBS 无熔断器与 AC-2 验证标准文本（"放宽 10/120s"）字面不符（实现决策合理，文档未同步） | `china_nbs_adapter.py:44-46` vs Story line 305 |
+| R2-P1-10 | AC-6 真实 crawler 链路未实现（real_crawler fixture 零引用），AC 文本未标注 deferred | `tests/integration/conftest.py:441-464` |
+| R2-P1-11 | AC-5.1 脱敏断言空转（构造的 context 不含敏感串，`"abc" not in serialized` 恒真） | `test_acceptance_data_source.py:795-837` |
+| R2-P1-12 | session 级共享 Redis 客户端 × function 级事件循环（项目记忆记载的反模式重现，跨循环失败被 ping 吞为 skip） | `tests/acceptance/conftest.py:108-131` |
+| R2-P1-13 | 架构测试跨层依赖断言对 `from src.xxx` 导入风格失效（`split(".")[0]` 恒为 "src"，空断言） | `test_arch_data_source.py:103-117,136-140,224-240` |
+
+#### Round 1 — C2 修复方案 v2（C3 首轮评审后修订，纳入两评审组全部最小修改清单）
+
+> C3 首轮评审结论：正确性视角「良好」+ 兼容性视角「合格」，均未达「优秀」准入线。v2 纳入：① fetch_many 等长对齐返回（消除结果↔请求错位）；② 部分失败源标记替换 `None`（保 SOP 降级语义）；③ inf/nan 闭合；④ compile 闸门测试；⑤ F5 恢复形式纠正（原 `--cov=src.<layer>` 形式被 pyproject `source=["src"]` 覆盖，实测必红——这很可能就是上周期 R2 回退的真实根因）。
+
+**F1 注入管线重构（R2-P0-1 + R2-P1-4）** — `data_source_marker.py` + `data_source_resolver.py` + `tool_execution_engine.py`：
+- **对齐机制（阻断项）**：`fetch_many` 返回改为与 requests **等长对齐**的 `tuple[DataSourceResult | None, ...]`（失败位 None，全失败仍抛首个异常——既有契约保留），消除部分成功时结果元组紧凑化导致的键错位（静默数据污染面）；`DataSourceResolverPort` 契约同步
+- **inject 签名**：`inject_data_sources(code, markers, results)`（engine 已 parse 一次，传入 markers 杜绝二次扫描漂移；len(markers)==len(results) 对齐）
+- **preamble**：`json.dumps` → `repr(data)`；payload 解析 `json.loads(..., parse_constant=拒绝)` 闭合 inf/nan（非有限浮点 → ValueError → 走既有原串 fallback）
+- **标记原位替换**：有效标记（字符串/注释掩码外）替换为 `DATA_SOURCES[<json.dumps(key)>]`（JSON 字符串字面量是合法 Python 子集）；**部分失败位标记替换为 `None`**（赋值形态 `gdp = None` 安全，保 SOP「部分失败不中断分析」降级语义，失败信息已由 DataSourceFetchFailed 事件承载）
+- **键分配**：按去重后 (name, query) 出现次序，首个 `name`、同源第 k 个不同 query `name#k`，同一 (name, query) 全部出现共享同键；单源场景键为裸 name（向后兼容 4-1c SOP `DATA_SOURCES["name"]["payload"]` 约定与验收断言）
+- **闸门测试（根因防护）**：新增注入产物 `compile(injected, "<sandbox>", "exec")` 单测（happy path + 部分失败 + 含 null/bool/unicode payload），堵住「122+19 测试绿灯但零执行校验」盲区
+- 文档化：跨行标记替换后沙箱 traceback 行号偏移（`execution.code` 已存注入前版本，审计无影响）
+
+**F2 标记解析器修复（R2-P1-2 + R2-P1-3）**：
+- `_string_literal_spans` 识别 `#` 行注释（字符串外跳至行尾；三引号/单引号字符串内 `#` 按串内容消费——与 Python 词法规范一致），**注释区间纳入返回集合**
+- 后置语法校验：构造等长掩码串（有效标记区间 + 字符串区间 + 注释区间 → 空格、保留 `\n`），残留模式升级为 `\$DATA_SOURCE\s*\(`（覆盖 `$DATA_SOURCE (` 空白变体），命中即 `ValidationError(201)`
+
+**F3 缓存损坏降级闭环（R2-P0-2）**：整条解析段（json/两时间戳/payload/confidence float 转换/freshness/is_stale）纳入统一 try；naive 时间戳 `replace(tzinfo=UTC)` 归一；统一走「主动清理 + None 重采」；`except Exception` 不捕获 CancelledError（3.8+ BaseException）取消语义安全
+
+**F4 parameters 透传 + 缓存键完整性（R2-P1-1）**：`fetch`/`fetch_many` 透传 parameters（keyword 默认 `()`，14 处既有调用零影响）；Protocol 签名同步；缓存键：**空 parameters 保持 `sha256(query)` 不变（旧条目零失效）**，非空时 `sha256(json.dumps([query, sorted(parameters)], ensure_ascii=False))`
+
+**F5 Makefile 分层门禁恢复 — 纠正形式（R2-P0-3）**：**禁止**原样恢复 `--cov=src.<layer> --cov-fail-under` 形式（pyproject `[tool.coverage.run] source=["src"]` 覆盖 `--cov`，实测 TOTAL 恒为全 src → 必红，疑为上周期 R2 回退真实根因）。正确形式：`scripts/check_coverage_gates.py` 补 infrastructure≥75 分层；Makefile 新增三薄壳目标委托该脚本（先 `pytest tests/unit/ --cov=src` 生成数据，再分层 `coverage report --include`）；恢复 help 文本；实测分层覆盖率 domain 96.1%/application 87.4%/infrastructure 85.1% 全部达标
+
+**F6 Engine 直传 + 401/403 真实覆盖（R2-P0-4 + R2-P1-7）**：
+- 直传元组补 `ConfigurationError`(101) + 领域 `TimeoutError`(302)（附注释说明捕获领域 302 非内置；重试包装器使语义变化实际仅限 `_resolve_data_sources` 路径；HTTP 映射 101→500/302→504 已齐备，无 500 逃逸面；全 src 无 `except ToolExecutionFailedError` 特定捕获，无漏接）
+- 任一走 `_http_helpers` 的适配器补 `httpx.MockTransport` 401/403 单测（断言 101 + 消息零 Key 泄露）；更新 AC-2.3/2.4 过时的「Engine 包装绕道」注释（F6 后恢复经 Engine 链路语义）
+
+**F7 文档一致性（R2-P1-8/9/10）**：状态字段统一为 review（本周期发现 P0，Round 5 收敛后统一 done）；AC-2 文本同步 ChinaNBS 熔断决策；AC-6 标注 deferred
+
+**F8 既有测试改写清单（F1/F4 必需的测试修正）**：
+- `test_data_source_marker.py:156-170`：`json.loads` → `ast.literal_eval`；`lines[1] == code` 标记行保留断言 → 断言替换形态（含 `DATA_SOURCES["world-bank"]`、不含 `$DATA_SOURCE`）；文件头「单行 JSON 字面量」注释同步；`test_inject_empty_results_no_preamble` 补三参签名 `markers`
+- `test_data_source_resolver.py:271-289 test_partial_success_converges`：紧凑语义断言 → 等长对齐语义（`len(results) == 2 and results[0].source_name == "world-bank" and results[1] is None`）
+- `tests/acceptance/test_acceptance_skill_data_collection.py:292`（4-1c 验收）：`json.loads` → `ast.literal_eval`
+- 部分成功场景断言（`"eurostat" not in preamble` 等）兼容新语义，无需改
+
+**F9 实施规约补充（C3 复审两条一句话补充 + 有意收紧声明）**：
+- engine 构建 `DataSourceMeta` 时过滤 None 位，仅成功源进入证据包溯源（`tool_execution_engine.py` L301-309）
+- F2 残留校验采用裸 `\$` 模式（有意收紧：Python 中字符串/注释外的 `$` 恒为 SyntaxError，全部前置为宿主机 `ValidationError(201)`，覆盖 `$DATA_SOURCE` 无括号/拼写错误变体）
+- 4-1c SKILL.md 失败源判空消费约定（`.get()` 防御性读取）→ 留 Round 2 处理
+
+> **C3 复审结论（第二轮）**：正确性视角「**优秀**」（准予修码，两条补充已并入 F9）；兼容性视角「良好→补上 F8 resolver 单测改写即达优秀」（已并入 F8）。评审准入条件满足，进入修码阶段。
+
+**留 Round 2+**：R2-P1-5（shutdown）、R2-P1-6（IPCC 上限）、R2-P1-11/12/13（测试基建）、全部 P2 观察项
+
+#### 已推迟 Defer（第二周期）
+
+（Round 1 无新增；上周期 P0-7 crawler 真实链路维持 deferred）
+
+#### 已修复 Patch（第二周期 Round 1，TDD 红→绿）
+
+| # | 修复 | 文件 | 验证 |
+|---|------|------|------|
+| F1 | 注入管线重构：preamble `json.dumps`→`repr`（parse_constant 映射 NaN/Infinity 为字面串）；标记原位替换 `DATA_SOURCES["name"]`（同源 `name#k`）；失败位替换 `None`；inject 改收 `(code, markers, results)`；`fetch_many` 等长对齐 `tuple[DataSourceResult \| None, ...]` | `data_source_marker.py` / `data_source_resolver.py` / `tool_execution_engine.py` / `ports/data_source_resolver.py` | 新增 compile 闸门 + null/bool/unicode exec + 部分失败 + name#k 共 7 项单测；38 marker 测试全绿 |
+| F2 | 标记解析器：`#` 行注释识别（注释区间纳入掩码）；后置校验改等长掩码坐标系 + 裸 `$` 收紧（有意行为收紧，沙箱 SyntaxError 前置为 201） | `data_source_marker.py` | TestCommentHandling 5 项新测（撇号/注释内标记/注释内裸 $/字符串内 #/坐标系回归） |
+| F3 | `_read_cache` 整条解析段统一 try + naive 时间戳 UTC 归一 + confidence 转换纳入降级 | `data_source_resolver.py` | TestCorruptedCacheEntry 3 项新测（缺 payload/naive/非数值 confidence） |
+| F4 | `fetch`/`fetch_many` 透传 parameters；缓存键空参保持历史哈希（旧条目零失效）、非空 canonical 排序入哈希 | `data_source_resolver.py` / `ports/data_source_resolver.py` | TestParameters 5 项新测（透传/键区分/顺序归一/空参兼容） |
+| F5 | 分层覆盖率门禁恢复（纠正形式）：`check_coverage_gates.py` 补 infrastructure≥75；Makefile 新增 `test-cov-domain/application/infrastructure/test-cov-gates` 薄壳（`coverage report --include` 形式，禁用被 pyproject 覆盖的 `--cov=src.<layer>` 形式） | `scripts/check_coverage_gates.py` / `Makefile` | 全量单测 + 门禁脚本实测（见 C4 验证记录） |
+| F6 | Engine 直传元组补 `ConfigurationError`(101) + 领域 `TimeoutError`(302)（注释说明捕获领域 302）；NewsAPI 补 401/403 MockTransport 参数化单测（101 + to_dict 零 Key 泄露）；AC-2.3/2.4 过时注释更新 | `tool_execution_engine.py` / `test_newsapi_adapter.py` / `test_acceptance_data_source.py` | 2 项参数化新测；79 resolver/marker/engine/契约测试全绿 |
+| F7 | 文档一致性：Story 状态三处统一 review；AC-2 ChinaNBS 熔断决策记录；AC-6 真实 crawler 链路标注 deferred | Story 文件 | — |
+| F8/F9 | 测试改写：marker 单测 preamble 解析 `ast.literal_eval` + 替换形态断言；resolver 部分成功断言改等长对齐；4-1c 验收 `:292` `ast.literal_eval`；engine metas 过滤 None 位 | 3 个测试文件 + `tool_execution_engine.py` | 31 项 4-1b+4-1c 验收全绿 |
+
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `dev-story` 开始实施
+- [x] 运行 `code-review` 进行代码审查（第一周期 Round 1-5，2026-09-26 完成）
+- [ ] 第二审查周期 Round 1-5（2026-09-27 启动，C1 完成，C2 方案已立项）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
@@ -1298,9 +1395,11 @@ tests/
 
 ## Story 最终状态
 
-**Status:** ✅ **done**
+**Status:** 🔄 **review**（第二审查周期进行中）
 
-**审查轮次总结（5 轮 Round 1-5）:**
+> 状态说明：第一审查周期（2026-09-26，Round 1-5）曾收敛为 ✅ done；**第二审查周期（2026-09-27 启动）C1 五视角调研发现 4 项 P0**（注入产物非法 Python / 缓存损坏内置异常逃逸 / 覆盖率门禁回退 / 401-403 分支零真实覆盖），状态依 BMAD 规则回退为 `review`（与 header、sprint-status.yaml 一致，R2-P1-8 修复），Round 5 收敛后恢复 done。
+
+**第一周期审查轮次总结（Round 1-5，2026-09-26）:**
 
 | 轮次 | C1 调研 | C2 修复 | C3 评审 | C4 commit | 关键 Commit |
 |------|---------|---------|---------|-----------|-------------|

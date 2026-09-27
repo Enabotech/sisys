@@ -33,6 +33,7 @@ class DataSourceResolverPort(Protocol):
         tool_metadata: ToolMetadata,
         name: str,
         query: str,
+        parameters: tuple[tuple[str, str], ...] = (),
         *,
         tenant_id: uuid.UUID | str | None = None,
     ) -> DataSourceResult:
@@ -42,6 +43,7 @@ class DataSourceResolverPort(Protocol):
             tool_metadata: 工具元数据（白名单依据）
             name: 数据源名称
             query: 查询表达式
+            parameters: 附加查询参数（透传适配器并纳入缓存键，默认空）
             tenant_id: 租户隔离标识（缓存键前缀）
 
         Returns:
@@ -63,7 +65,7 @@ class DataSourceResolverPort(Protocol):
         *,
         tenant_id: uuid.UUID | str | None = None,
         execution_id: uuid.UUID | None = None,
-    ) -> tuple[DataSourceResult, ...]:
+    ) -> tuple[DataSourceResult | None, ...]:
         """并发采集（asyncio.gather + return_exceptions 部分成功收敛）
 
         语义：
@@ -78,7 +80,8 @@ class DataSourceResolverPort(Protocol):
             execution_id: ToolExecution 聚合根 ID（事件 aggregate_id 关联，可选）
 
         Returns:
-            成功源的 DataSourceResult 元组（保持请求顺序中的成功项）
+            与 requests **等长对齐**的元组（成功位 DataSourceResult，失败位 None——
+            保持结果↔请求对应关系，供调用方按位置消费）
 
         Raises:
             BusinessRuleViolationError: 任一 name 未声明（207）

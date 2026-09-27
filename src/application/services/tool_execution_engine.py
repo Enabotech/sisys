@@ -34,7 +34,9 @@ from src.domain.entities.tool_execution import (
 )
 from src.domain.exceptions import (
     BusinessRuleViolationError,
+    ConfigurationError,
     DataSourceError,
+    TimeoutError,
     ToolExecutionFailedError,
     ToolExecutionRetryExhaustedError,
     ToolExecutionTimeoutError,
@@ -223,9 +225,11 @@ class ToolExecutionEngine:
                 execution.transition_to(ToolExecutionState.FAILED)
                 execution.completed_at = datetime.now(UTC)
             raise
-        except (BusinessRuleViolationError, ValidationError, DataSourceError) as exc:
+        except (BusinessRuleViolationError, ValidationError, DataSourceError, ConfigurationError, TimeoutError) as exc:
             # Story 4.1b：数据采集相关的领域异常不包装直传（调用方/策略/数据语义错误，
-            # 区别于执行失败 ToolExecutionFailedError）
+            # 区别于执行失败 ToolExecutionFailedError）。R2-P1-7 修复：补 ConfigurationError(101)
+            # 与领域 TimeoutError(302)（非内置同名类——端口契约声明的传播异常；
+            # 重试包装器使语义变化实际仅限 _resolve_data_sources 路径）
             if execution.state not in TERMINAL_STATES:
                 execution.transition_to(ToolExecutionState.FAILED)
                 execution.completed_at = datetime.now(UTC)
@@ -298,6 +302,8 @@ class ToolExecutionEngine:
             tenant_id=context.tenant_id,
             execution_id=execution.execution_id,
         )
+        # 溯源元数据仅收录成功源（过滤等长对齐元组的 None 失败位——失败信息由
+        # DataSourceFetchFailed 事件承载）
         metas = tuple(
             DataSourceMeta(
                 source_name=r.source_name,
@@ -306,8 +312,9 @@ class ToolExecutionEngine:
                 confidence=r.confidence,
             )
             for r in results
+            if r is not None
         )
-        return inject_data_sources(code, results), metas
+        return inject_data_sources(code, markers, results), metas
 
     # ===== 五阶段端口方法 =====
 

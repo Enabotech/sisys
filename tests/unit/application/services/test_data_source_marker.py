@@ -2,13 +2,17 @@
 
 验证 data_source_marker 模块：
 - parse：单标记/多标记/嵌套引号/参数空白/重复标记去重/大小写敏感
-- parse：语法错误 → ValidationError(201)（缺引号/缺参数/多余参数/未闭合括号）
-- inject：preamble 单行 JSON 字面量内联 + 原始代码保留
+- parse：语法错误 → ValidationError(201)（缺引号/缺参数/多余参数/未闭合括号/裸 `$`）
+- parse：注释识别（注释撇号不吞后续标记、注释内标记文本忽略）
+- inject：preamble 单行 Python 字面量（repr，ast.literal_eval 可逆）+ 标记原位替换
+  为 DATA_SOURCES["name"] 表达式（注入产物必须 compile 可执行——R2-P0-1 闸门）
+- inject：部分失败位标记替换 None（保 SOP 部分失败降级语义）
 - 安全：参数经 ast.literal_eval 安全解析（禁止 eval/exec 动态执行）
 """
 
 from __future__ import annotations
 
+import ast
 import json
 from datetime import UTC, datetime
 
@@ -25,11 +29,11 @@ from src.domain.value_objects.data_source import (
 )
 
 
-def _make_result(source_name: str, value: float = 1.0) -> DataSourceResult:
+def _make_result(source_name: str, value: float = 1.0, payload: str | None = None) -> DataSourceResult:
     now = datetime.now(UTC)
     return DataSourceResult(
         source_name=source_name,
-        payload=json.dumps({"value": value}),
+        payload=payload if payload is not None else json.dumps({"value": value}),
         source_timestamp=now,
         fetched_at=now,
         freshness=DataFreshness(source_timestamp=now, ttl_seconds=3600),
@@ -88,12 +92,49 @@ class TestParseMarkers:
             '$DATA_SOURCE("a", "b", "c")',  # 多余参数
             '$DATA_SOURCE("", "b")',  # 空 name
             '$DATA_SOURCE("a", "")',  # 空 query
+            '$DATA_SOURCE ("a", "b")',  # 标记名与括号间空白（有意收紧：显式报错而非静默忽略）
+            "$DATA_SRC",  # 裸 $ 拼写错误（沙箱 SyntaxError 前置为宿主机 201）
+            "price = $100",  # 裸 $ 非标记场景（Python 非法字符前置拦截）
         ],
     )
     def test_syntax_error_raises_validation_error(self, bad_code: str) -> None:
         with pytest.raises(ValidationError) as exc_info:
             parse_data_source_markers(bad_code)
         assert exc_info.value.code == "EXCEPTION_201"
+
+
+class TestCommentHandling:
+    """注释识别专项（R2-P1-3：注释撇号吞标记 / 注释内标记文本误报）"""
+
+    def test_apostrophe_in_comment_does_not_swallow_marker(self) -> None:
+        """注释中未闭合撇号（don't）不影响后续真实标记解析。"""
+        code = '# don\'t fetch twice\nx = $DATA_SOURCE("world-bank", "GDP")\nprint(x)'
+        markers = parse_data_source_markers(code)
+        assert len(markers) == 1
+        assert markers[0].source_name == "world-bank"
+
+    def test_marker_text_in_comment_ignored(self) -> None:
+        """注释内的标记文本不识别为标记、不触发语法校验。"""
+        code = '# $DATA_SOURCE("a", "b") 示例\nx = 1'
+        assert parse_data_source_markers(code) == ()
+
+    def test_dollar_in_comment_ignored(self) -> None:
+        """注释内的裸 $（如价格说明）不触发语法校验。"""
+        code = "# 价格 $100 起步\nx = 1"
+        assert parse_data_source_markers(code) == ()
+
+    def test_hash_inside_string_not_treated_as_comment(self) -> None:
+        """字符串内的 # 不作为注释起点（其后的撇号仍在字符串内）。"""
+        code = 'text = "a # don\'t"\n$DATA_SOURCE("imf", "WEO")'
+        markers = parse_data_source_markers(code)
+        assert len(markers) == 1
+
+    def test_coordinate_regression_marker_before_string_mention(self) -> None:
+        """R2-P1-2 坐标系回归：有效标记在前时，字符串内的标记文本不误报语法错误。"""
+        code = 'x = $DATA_SOURCE("world-bank", "gdp")\nnote = "see $DATA_SOURCE( syntax"\n'
+        markers = parse_data_source_markers(code)
+        assert len(markers) == 1
+        assert markers[0].source_name == "world-bank"
 
 
 class TestStringLiteralSpanBoundaries:
@@ -153,25 +194,87 @@ class TestStringLiteralSpanBoundaries:
 
 
 class TestInjectDataSources:
-    def test_inject_preamble_single_line(self) -> None:
-        code = '$DATA_SOURCE("world-bank", "GDP")\nprint(DATA_SOURCES)'
+    def test_inject_preamble_python_literal_and_marker_replaced(self) -> None:
+        """preamble 为 repr Python 字面量（ast.literal_eval 可逆）；标记原位替换为 DATA_SOURCES 引用。"""
+        code = 'gdp = $DATA_SOURCE("world-bank", "GDP")\nprint(gdp)'
+        markers = parse_data_source_markers(code)
         results = (_make_result("world-bank", 2.5),)
-        injected = inject_data_sources(code, results)
+        injected = inject_data_sources(code, markers, results)
         lines = injected.split("\n", 1)
         assert lines[0].startswith("DATA_SOURCES = ")
-        # 前言是合法 Python 字面量（单行 JSON）
-        prefix = "DATA_SOURCES = "
-        data = json.loads(lines[0][len(prefix) :])
+        data = ast.literal_eval(lines[0][len("DATA_SOURCES = ") :])
         assert "world-bank" in data
-        assert data["world-bank"]["payload"]  # payload 内嵌
+        assert data["world-bank"]["payload"] == {"value": 2.5}
         assert data["world-bank"]["freshness_score"] > 0
         assert data["world-bank"]["confidence"] == 0.9
-        # 原始代码保留（含标记行）
-        assert lines[1] == code
+        # 标记原位替换（不再保留 $DATA_SOURCE 文本）
+        assert "$DATA_SOURCE" not in lines[1]
+        assert 'gdp = DATA_SOURCES["world-bank"]' in lines[1]
+        # 闸门：注入产物必须是可编译的合法 Python（R2-P0-1 根因防护）
+        compile(injected, "<sandbox>", "exec")
 
-    def test_inject_empty_results_no_preamble(self) -> None:
+    def test_inject_payload_with_null_bool_unicode_executable(self) -> None:
+        """payload 含 null/bool/unicode 时注入产物可执行且 DATA_SOURCES 可取（json.dumps NameError 回归）。"""
+        code = 'v = $DATA_SOURCE("imf", "WEO")\nprint(v)'
+        markers = parse_data_source_markers(code)
+        payload = json.dumps({"value": None, "ok": True, "name": "中国"}, ensure_ascii=False)
+        injected = inject_data_sources(code, markers, (_make_result("imf", payload=payload),))
+        namespace: dict[str, object] = {}
+        exec(compile(injected, "<sandbox>", "exec"), namespace)  # 测试沙箱语义验证
+        data = namespace["DATA_SOURCES"]
+        assert isinstance(data, dict)
+        assert data["imf"]["payload"] == {"value": None, "ok": True, "name": "中国"}
+        assert namespace["v"] == data["imf"]
+
+    def test_inject_non_finite_float_payload_mapped_to_literal_string(self) -> None:
+        """payload 含 NaN/Infinity（非标准 JSON 扩展）时映射为字面字符串（杜绝 repr 非法名称）。"""
+        code = 'v = $DATA_SOURCE("imf", "WEO")'
+        markers = parse_data_source_markers(code)
+        injected = inject_data_sources(code, markers, (_make_result("imf", payload='{"v": NaN}'),))
+        compile(injected, "<sandbox>", "exec")
+        data = ast.literal_eval(injected.split("\n", 1)[0][len("DATA_SOURCES = ") :])
+        assert data["imf"]["payload"] == {"v": "NaN"}
+
+    def test_inject_partial_failure_replaces_none(self) -> None:
+        """部分失败位标记替换为 None，成功源正常注入；产物可编译（保 SOP 降级语义）。"""
+        code = 'a = $DATA_SOURCE("world-bank", "GDP")\nb = $DATA_SOURCE("eurostat", "EU")\nprint(a, b)'
+        markers = parse_data_source_markers(code)
+        results = (_make_result("world-bank", 1.0), None)  # eurostat 采集失败
+        injected = inject_data_sources(code, markers, results)
+        assert "eurostat" not in injected.split("\n", 1)[0]  # preamble 不含失败源键
+        assert "b = None" in injected
+        namespace: dict[str, object] = {}
+        exec(compile(injected, "<sandbox>", "exec"), namespace)  # 测试沙箱语义验证
+        assert namespace["b"] is None
+        data = namespace["DATA_SOURCES"]
+        assert isinstance(data, dict)
+        assert namespace["a"] == data["world-bank"]
+
+    def test_inject_same_name_different_query_numbered_keys(self) -> None:
+        """同源异 query 按去重出现次序分配 name / name#2 键（零数据覆盖）。"""
+        code = 'g = $DATA_SOURCE("imf", "WEO GDP")\nc = $DATA_SOURCE("imf", "WEO CPI")'
+        markers = parse_data_source_markers(code)
+        results = (_make_result("imf", 1.0), _make_result("imf", 2.0))
+        injected = inject_data_sources(code, markers, results)
+        data = ast.literal_eval(injected.split("\n", 1)[0][len("DATA_SOURCES = ") :])
+        assert set(data.keys()) == {"imf", "imf#2"}
+        assert data["imf"]["payload"] == {"value": 1.0}
+        assert data["imf#2"]["payload"] == {"value": 2.0}
+        assert 'g = DATA_SOURCES["imf"]' in injected
+        assert 'c = DATA_SOURCES["imf#2"]' in injected
+        compile(injected, "<sandbox>", "exec")
+
+    def test_inject_marker_inside_string_not_replaced(self) -> None:
+        """字符串字面量内的标记文本不替换（掩码保护）。"""
+        code = 'note = "$DATA_SOURCE(语法示例"\ng = $DATA_SOURCE("imf", "WEO")'
+        markers = parse_data_source_markers(code)
+        injected = inject_data_sources(code, markers, (_make_result("imf", 1.0),))
+        assert 'note = "$DATA_SOURCE(语法示例"' in injected
+        compile(injected, "<sandbox>", "exec")
+
+    def test_inject_empty_markers_returns_code(self) -> None:
         code = "print(1)"
-        assert inject_data_sources(code, ()) == code
+        assert inject_data_sources(code, (), ()) == code
 
     def test_no_eval_no_exec(self) -> None:
         """安全审查：注入产物不含 eval/exec 调用，参数仅经 ast.literal_eval 安全解析。"""

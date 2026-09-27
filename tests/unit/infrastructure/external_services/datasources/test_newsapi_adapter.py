@@ -91,6 +91,21 @@ class TestNewsAPIAdapterSuccess:
 
 class TestNewsAPIAdapterFailures:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("status_code", [401, 403])
+    async def test_401_403_raises_configuration_error_without_key_leak(self, status_code: int) -> None:
+        """401/403 → ConfigurationError(101)（凭证问题分流，R2-P0-4 真实分支覆盖）；
+        异常消息零 API Key 泄露。"""
+        adapter = _make_adapter(
+            httpx.MockTransport(lambda req: httpx.Response(status_code, json={"message": "invalid api key"}))
+        )
+        with pytest.raises(ConfigurationError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="newsapi", query="q"))
+        assert exc_info.value.code == "EXCEPTION_101"
+        assert _SENTINEL_KEY not in str(exc_info.value)
+        assert _SENTINEL_KEY not in str(exc_info.value.to_dict())
+        await adapter.close()
+
+    @pytest.mark.asyncio
     async def test_429_raises_rate_limit(self) -> None:
         """免费 100 次/天限额场景：429 → EXCEPTION_412。"""
         adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(429, json={"message": "rate limited"})))

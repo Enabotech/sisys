@@ -4,10 +4,15 @@
     按模块分层检查代码覆盖率，执行差异化门禁：
     - domain: ≥90%（核心业务逻辑，零容忍未测试路径）
     - application: ≥85%（用例编排，高价值业务流）
+    - infrastructure: ≥75%（集成依赖多，容忍外部适配边界）
     - overall: ≥80%（系统级质量基线）
 
 使用：
     poetry run python scripts/check_coverage_gates.py
+
+依赖：
+    需先运行带覆盖率的测试生成 .coverage 数据
+    （如 poetry run pytest tests/unit/ --cov=src）
 
 Author:
     agimtech <agimtech@126.com>
@@ -61,6 +66,7 @@ def main():
     checks = [
         ("src/domain", 90, "核心业务逻辑"),
         ("src/application", 85, "用例编排"),
+        ("src/infrastructure", 75, "基础设施适配"),
         ("src", 80, "系统整体"),
     ]
 

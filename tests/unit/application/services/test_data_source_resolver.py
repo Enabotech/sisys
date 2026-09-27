@@ -56,6 +56,7 @@ class _StubAdapter:
         )
         self.call_count = 0
         self._error = error
+        self.last_query: DataSourceQuery | None = None
 
     def get_metadata(self) -> DataSourceRef:
         return self._ref
@@ -65,6 +66,7 @@ class _StubAdapter:
 
     async def fetch(self, query: DataSourceQuery) -> DataSourceResult:
         self.call_count += 1
+        self.last_query = query
         if self._error is not None:
             raise self._error
         now = datetime.now(UTC)
@@ -282,8 +284,9 @@ class TestFetchManyAndEvents:
                 DataSourceQuery(source_name="eurostat", query="b"),
             ),
         )
-        assert len(results) == 1
-        assert results[0].source_name == "world-bank"
+        assert len(results) == 2  # 等长对齐（R2 第二周期：失败位 None 占位，杜绝紧凑化错位）
+        assert results[0] is not None and results[0].source_name == "world-bank"
+        assert results[1] is None  # eurostat 采集失败位
         failed_events = [e for e in bus.published_events if isinstance(e, DataSourceFetchFailed)]
         assert len(failed_events) == 1
         assert failed_events[0].source_name == "eurostat"
@@ -322,6 +325,142 @@ class TestFetchManyAndEvents:
         assert stub.call_count == 1
         fetched = [e for e in bus.published_events if isinstance(e, DataSourceFetched)]
         assert fetched[-1].cache_hit is True
+
+
+# ===================================================================
+# 损坏缓存条目降级（R2-P0-2：内置 KeyError/TypeError 不得逃逸）
+# ===================================================================
+
+
+class TestCorruptedCacheEntry:
+    @pytest.mark.asyncio
+    async def test_missing_payload_key_degrades_to_refetch_and_cleanup(self) -> None:
+        """缓存条目缺 payload 键 → 按未命中重采 + 主动清理（不抛内置 KeyError）。"""
+        stub = _StubAdapter("world-bank")
+        cache = _InMemoryCache()
+        service, _ = _make_service(adapters={"world-bank": stub}, cache=cache)
+        metadata = _make_metadata("world-bank")
+        key = build_data_source_cache_key("t-1", "world-bank", "GDP")
+        now = datetime.now(UTC)
+        await cache.set_with_ttl(
+            key,
+            json.dumps({"source_timestamp": now.isoformat(), "fetched_at": now.isoformat(), "confidence": 0.5}),
+            3600,
+        )
+        result = await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
+        assert result.cache_hit is False
+        assert stub.call_count == 1
+        # 损坏条目已被主动清理（后续写入的是新采集条目）
+        raw = await cache.get(key)
+        assert raw is not None
+        entry = json.loads(raw)
+        assert "payload" in entry
+
+    @pytest.mark.asyncio
+    async def test_naive_timestamp_degrades_to_refetch_and_cleanup(self) -> None:
+        """naive 时间戳条目 → 按未命中重采（不抛内置 TypeError）。"""
+        stub = _StubAdapter("world-bank")
+        cache = _InMemoryCache()
+        service, _ = _make_service(adapters={"world-bank": stub}, cache=cache)
+        metadata = _make_metadata("world-bank")
+        key = build_data_source_cache_key("t-1", "world-bank", "GDP")
+        await cache.set_with_ttl(
+            key,
+            json.dumps(
+                {
+                    "payload": '{"v": 1}',
+                    "source_timestamp": "2026-09-27T00:00:00",  # naive（无 tzinfo）
+                    "fetched_at": "2026-09-27T00:00:00",
+                    "confidence": 0.5,
+                }
+            ),
+            3600,
+        )
+        result = await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
+        assert result.cache_hit is False
+        assert stub.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_non_numeric_confidence_degrades_to_refetch(self) -> None:
+        """confidence 非数值 → 按未命中重采（float 转换纳入降级契约）。"""
+        stub = _StubAdapter("world-bank")
+        cache = _InMemoryCache()
+        service, _ = _make_service(adapters={"world-bank": stub}, cache=cache)
+        metadata = _make_metadata("world-bank")
+        key = build_data_source_cache_key("t-1", "world-bank", "GDP")
+        now = datetime.now(UTC)
+        await cache.set_with_ttl(
+            key,
+            json.dumps(
+                {
+                    "payload": '{"v": 1}',
+                    "source_timestamp": now.isoformat(),
+                    "fetched_at": now.isoformat(),
+                    "confidence": "high",
+                }
+            ),
+            3600,
+        )
+        result = await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
+        assert result.cache_hit is False
+        assert stub.call_count == 1
+
+
+# ===================================================================
+# parameters 透传与缓存键完整性（R2-P1-1）
+# ===================================================================
+
+
+class TestParameters:
+    @pytest.mark.asyncio
+    async def test_fetch_passes_parameters_to_adapter(self) -> None:
+        """fetch 透传 parameters 到适配器（不再静默丢弃）。"""
+        stub = _StubAdapter("world-bank")
+        service, _ = _make_service(adapters={"world-bank": stub})
+        metadata = _make_metadata("world-bank")
+        params = (("country", "CN"), ("year", "2025"))
+        await service.fetch(metadata, "world-bank", "GDP", params, tenant_id="t-1")
+        assert stub.last_query is not None
+        assert stub.last_query.parameters == params
+
+    @pytest.mark.asyncio
+    async def test_fetch_many_passes_parameters_to_adapter(self) -> None:
+        """fetch_many 透传每个请求的 parameters（不再重建时丢弃）。"""
+        stub = _StubAdapter("world-bank")
+        service, _ = _make_service(adapters={"world-bank": stub})
+        metadata = _make_metadata("world-bank")
+        params = (("country", "DE"),)
+        await service.fetch_many(metadata, (DataSourceQuery(source_name="world-bank", query="GDP", parameters=params),))
+        assert stub.last_query is not None
+        assert stub.last_query.parameters == params
+
+    @pytest.mark.asyncio
+    async def test_cache_key_distinguishes_parameters(self) -> None:
+        """同 (tenant, name, query) 不同 parameters → 不同缓存键（防互相污染）。"""
+        stub = _StubAdapter("world-bank")
+        service, _ = _make_service(adapters={"world-bank": stub})
+        metadata = _make_metadata("world-bank")
+        await service.fetch(metadata, "world-bank", "GDP", (("country", "CN"),), tenant_id="t-1")
+        result = await service.fetch(metadata, "world-bank", "GDP", (("country", "US"),), tenant_id="t-1")
+        assert result.cache_hit is False
+        assert stub.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_cache_hit_with_same_parameters(self) -> None:
+        """同 parameters（含顺序不同）→ 缓存命中（canonical 排序归一）。"""
+        stub = _StubAdapter("world-bank")
+        service, _ = _make_service(adapters={"world-bank": stub})
+        metadata = _make_metadata("world-bank")
+        await service.fetch(metadata, "world-bank", "GDP", (("a", "1"), ("b", "2")), tenant_id="t-1")
+        result = await service.fetch(metadata, "world-bank", "GDP", (("b", "2"), ("a", "1")), tenant_id="t-1")
+        assert result.cache_hit is True
+        assert stub.call_count == 1
+
+    def test_empty_parameters_keeps_legacy_key(self) -> None:
+        """空 parameters 缓存键与历史格式一致（旧条目零失效）。"""
+        assert build_data_source_cache_key("t-1", "world-bank", "GDP") == build_data_source_cache_key(
+            "t-1", "world-bank", "GDP", ()
+        )
 
 
 # ===================================================================
