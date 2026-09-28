@@ -728,6 +728,14 @@ def register_exception_handlers(app: FastAPI) -> None:
 > （`_bmad-output/implementation-artifacts/stories/4-1c-skills-data-collection-integration.md`），
 > 本节仅登记复用事实，不重复列举，避免双维护漂移。data_source 子域 414-419 保持空闲。
 
+> **Story 4.1d 复用声明（2026-09-28）：** Story 4.1d（Skills 混合数据增强，纯内容成熟化零
+> Python 生产代码改动）**零新增异常**——全部失败路径复用上表既有编码
+> （201 标记语法 / 207 白名单违规 / 101 配置缺失 / 302 数据源超时 / 387-388 Skill 加载 /
+> 411 不可用与未注册 / 412 限流 / 413 解析失败），场景↔异常映射表以 Story 文件
+> 「🎯 领域异常契约」节为 single-source-of-truth
+> （`_bmad-output/implementation-artifacts/stories/4-1d-skills-framework-enhancement.md`），
+> 本节仅登记复用事实，不重复列举。data_source 子域 414-419 保持空闲。
+
 ### 3.3 编码分配策略：人工编码 + CI 自动校验
 
 #### 3.3.1 设计原则

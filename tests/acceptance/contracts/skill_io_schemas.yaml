@@ -1,17 +1,30 @@
 # =============================================================================
-# Story 4.1c — 6 个外部数据型 Skills input_schema / output_schema 契约（Task 0.2 SSOT）
+# Skills input_schema / output_schema 契约（IO SSOT）
 #
-# 本文件是 6 个 SKILL.md frontmatter `input_schema`/`output_schema` 字段级定义的
-# 唯一事实源（Single Source of Truth）。Task 2-7 TDD 红阶段以本文件为断言输入，
-# 实施内容必须与本文件逐字一致（required 集合 / properties 键 / type / description），
-# 禁止实施期临时增删字段；如需变更必须先修订本文件。
+# 本文件是 16 个 SKILL.md frontmatter `input_schema`/`output_schema` 字段级定义的
+# 唯一事实源（Single Source of Truth）：
+#   - Story 4.1c（Task 0.2）：6 个外部数据型 Skills（pestel-analysis 等）
+#   - Story 4.1d（Task 0.2）：10 个混合数据型 Skills（swot-tows 等，本批追加）
+# TDD 红阶段以本文件为断言输入，实施内容必须与本文件逐字一致
+# （required 集合 / properties 键 / type / description），禁止实施期临时增删字段；
+# 如需变更必须先修订本文件。
 #
-# 载体决策（D6）：frontmatter `input_schema`/`output_schema` 键（JSON Schema dict），
-# 运行时 Pydantic 强制校验属 Story 4.3 范畴，本 Story 仅定义契约。
+# 载体决策（4-1c D6）：frontmatter `input_schema`/`output_schema` 键（JSON Schema
+# dict），运行时 Pydantic 强制校验属 Story 4.3 范畴，仅定义契约。
+#
+# 4-1d 契约设计基准（Task 0.2）：
+#   - input_schema 以 src/domain/entities/strategic_tool_catalog.py 既有
+#     Tool.input_schema 为基础按混合数据场景增强（嵌套 required + 叶子字段
+#     description），禁止删除 catalog 已有 required 字段
+#   - output_schema 以 catalog 既有为基础补全 required（必含 data_sources，
+#     对齐 4-1c 六条目「工具输出自带溯源元数据」惯例）
+#   - 模板叶子键展开约定（AC-3）：templates 采集字段 == input_schema 递归展开的
+#     叶子键集合（末端 properties 键；array 展开 items.properties；顶层键以模板
+#     分区标题承载）
 # =============================================================================
 
-version: "1.0.0"
-story: 4-1c-skills-data-collection-integration
+version: "1.1.0"
+story: [4-1c-skills-data-collection-integration, 4-1d-skills-framework-enhancement]
 
 skills:
 
@@ -347,6 +360,567 @@ skills:
         innovation_assessment:
           type: string
           description: 颠覆性创新综合评估结论
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # SWOT-TOWS（2 源：newsapi / tavily；双 Key 敏感）
+  # 模板叶子键（AC-3）：strengths / weaknesses / opportunities / threats
+  # ---------------------------------------------------------------------------
+  swot-tows:
+    input_schema:
+      type: object
+      required: [internal_factors, external_factors]
+      properties:
+        internal_factors:
+          type: object
+          description: 内部因素（工作坊采集：优势/劣势清单，模板 swot_factors_collection.md）
+          required: [strengths, weaknesses]
+          properties:
+            strengths:
+              type: array
+              description: 内部优势清单（资源/能力维度）
+              items:
+                type: string
+            weaknesses:
+              type: array
+              description: 内部劣势清单（短板维度）
+              items:
+                type: string
+        external_factors:
+          type: object
+          description: 外部因素（机会/威胁，经 NewsAPI/Tavily 外部基准印证）
+          required: [opportunities, threats]
+          properties:
+            opportunities:
+              type: array
+              description: 外部机会清单（行业时政/竞争情报印证）
+              items:
+                type: string
+            threats:
+              type: array
+              description: 外部威胁清单（行业时政/竞争情报印证）
+              items:
+                type: string
+    output_schema:
+      type: object
+      required: [tows_matrix, data_sources]
+      properties:
+        tows_matrix:
+          type: object
+          description: TOWS 策略矩阵（内外因素交叉匹配战略）
+          required: [so_strategies, wo_strategies, st_strategies, wt_strategies, priority]
+          properties:
+            so_strategies:
+              type: array
+              description: SO 战略（优势×机会：增长型）
+              items:
+                type: string
+            wo_strategies:
+              type: array
+              description: WO 战略（劣势×机会：扭转型）
+              items:
+                type: string
+            st_strategies:
+              type: array
+              description: ST 战略（优势×威胁：多元化）
+              items:
+                type: string
+            wt_strategies:
+              type: array
+              description: WT 战略（劣势×威胁：防御型）
+              items:
+                type: string
+            priority:
+              type: array
+              description: 战略优先级排序（含依据）
+              items:
+                type: string
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # 安索夫矩阵（2 源：world-bank / imf；免 Key）
+  # 模板叶子键（AC-3）：existing_products / new_products / existing_markets / new_markets
+  # ---------------------------------------------------------------------------
+  ansoff-matrix:
+    input_schema:
+      type: object
+      required: [market_product_data]
+      properties:
+        market_product_data:
+          type: object
+          description: 市场/产品数据（工作坊采集：产品 × 市场现有位置，模板 ansoff_product_market_matrix.md）
+          required: [existing_products, new_products, existing_markets, new_markets]
+          properties:
+            existing_products:
+              type: array
+              description: 现有产品清单
+              items:
+                type: string
+            new_products:
+              type: array
+              description: 拟开发新产品清单
+              items:
+                type: string
+            existing_markets:
+              type: array
+              description: 现有市场清单
+              items:
+                type: string
+            new_markets:
+              type: array
+              description: 拟进入新市场清单
+              items:
+                type: string
+    output_schema:
+      type: object
+      required: [growth_strategy, data_sources]
+      properties:
+        growth_strategy:
+          type: object
+          description: 增长战略建议（四象限定位 + 风险评估）
+          required: [quadrant_position, recommended_strategy, risk_assessment]
+          properties:
+            quadrant_position:
+              type: string
+              description: 当前所处象限（市场渗透/市场开发/产品延伸/多样化）
+            recommended_strategy:
+              type: string
+              description: 推荐增长战略
+            risk_assessment:
+              type: object
+              description: 风险等级评估（增长率基准：WB GDP 指标 + IMF WEO 展望对照）
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # 价值曲线分析（2 源：tavily / newsapi；双 Key 敏感）
+  # 模板叶子键（AC-3）：competitors / value_factors
+  # ---------------------------------------------------------------------------
+  value-curve-analysis:
+    input_schema:
+      type: object
+      required: [competition_data]
+      properties:
+        competition_data:
+          type: object
+          description: 竞争数据（客户调研 + 竞品情报，模板 value_curve_factors_grid.md）
+          required: [competitors, value_factors]
+          properties:
+            competitors:
+              type: array
+              description: 竞品清单（行业战略轮廓绘制对象）
+              items:
+                type: string
+            value_factors:
+              type: object
+              description: 价值要素水平（要素名 → 我方当前水平/目标值，三列网格采集）
+    output_schema:
+      type: object
+      required: [value_curve, data_sources]
+      properties:
+        value_curve:
+          type: object
+          description: 价值曲线分析结果（行业轮廓 + 四行动框架）
+          required: [curves, innovation_opportunities]
+          properties:
+            curves:
+              type: object
+              description: 各主体价值曲线（行业/竞品/我方当前/我方目标）
+            innovation_opportunities:
+              type: array
+              description: 消除-减少-增加-创造四行动机会点
+              items:
+                type: string
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # GE-麦肯锡矩阵（2 源：world-bank / tavily；tavily Key 敏感）
+  # 模板叶子键（AC-3）：name / industry_attractiveness / competitive_strength
+  # ---------------------------------------------------------------------------
+  ge-mckinsey-matrix:
+    input_schema:
+      type: object
+      required: [business_units]
+      properties:
+        business_units:
+          type: array
+          description: 业务单元列表（高管访谈评分表采集，模板 ge_business_unit_scoresheet.md）
+          items:
+            type: object
+            required: [name, industry_attractiveness, competitive_strength]
+            properties:
+              name:
+                type: string
+                description: 业务单元名称
+              industry_attractiveness:
+                type: number
+                description: 行业吸引力评分（1-10，外部基准支撑：WB 宏观指标 + Tavily 市场情报）
+              competitive_strength:
+                type: number
+                description: 业务实力评分（1-10，内部数据：市场份额/利润率）
+    output_schema:
+      type: object
+      required: [portfolio_map, data_sources]
+      properties:
+        portfolio_map:
+          type: object
+          description: 业务组合图谱（九宫格定位 + 投资建议）
+          required: [grid_position, recommendation]
+          properties:
+            grid_position:
+              type: object
+              description: 各业务单元九宫格坐标定位
+            recommendation:
+              type: string
+              description: 投资优先级建议（投资/选择性发展/收割/退出）
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # SPACE 矩阵（2 源：world-bank / imf；免 Key）
+  # 模板叶子键（AC-3）：financial_strength / competitive_advantage / industry_strength / environmental_stability
+  # ---------------------------------------------------------------------------
+  space-matrix:
+    input_schema:
+      type: object
+      required: [strategic_factors]
+      properties:
+        strategic_factors:
+          type: object
+          description: 四维度因子评分（问卷打分 + 专家访谈，模板 space_dimension_scoring.md）
+          required: [financial_strength, competitive_advantage, industry_strength, environmental_stability]
+          properties:
+            financial_strength:
+              type: number
+              description: FS 财务实力评分（内部数据）
+            competitive_advantage:
+              type: number
+              description: CA 竞争优势评分（内部数据）
+            industry_strength:
+              type: number
+              description: IS 产业实力评分（外部基准：IMF WEO 产业展望）
+            environmental_stability:
+              type: number
+              description: ES 环境稳定性评分（外部基准：WB 治理/通胀指标）
+    output_schema:
+      type: object
+      required: [space_positioning, data_sources]
+      properties:
+        space_positioning:
+          type: object
+          description: SPACE 定位结果（坐标定向 + 战略姿态）
+          required: [position, strategic_posture, recommendations]
+          properties:
+            position:
+              type: string
+              description: 坐标定向结果（进取/保守/防御/竞争）
+            strategic_posture:
+              type: string
+              description: 战略姿态描述
+            recommendations:
+              type: array
+              description: 行动建议清单
+              items:
+                type: string
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # 价值链分析（2 源：tavily / china-nbs；tavily Key 敏感 + china-nbs crawler）
+  # 模板叶子键（AC-3）：primary_activities / support_activities / cost_structure
+  # ---------------------------------------------------------------------------
+  value-chain-analysis:
+    input_schema:
+      type: object
+      required: [enterprise_data]
+      properties:
+        enterprise_data:
+          type: object
+          description: 企业内部数据（ERP 导出 + 流程访谈，模板 value_chain_activities_inventory.md）
+          required: [primary_activities, support_activities, cost_structure]
+          properties:
+            primary_activities:
+              type: array
+              description: 主要活动清单（进料储运/生产/发货/营销/服务）
+              items:
+                type: string
+            support_activities:
+              type: array
+              description: 支持活动清单（采购/技术开发/人力资源/企业基础设施）
+              items:
+                type: string
+            cost_structure:
+              type: object
+              description: 成本归属（活动 → 成本金额/占比）
+    output_schema:
+      type: object
+      required: [value_chain_analysis, data_sources]
+      properties:
+        value_chain_analysis:
+          type: object
+          description: 价值链分析结果（价值贡献 + 竞争优势定位）
+          required: [value_contribution, competitive_advantages]
+          properties:
+            value_contribution:
+              type: object
+              description: 各活动价值贡献度
+            competitive_advantages:
+              type: array
+              description: 竞争优势环节清单（对照行业基准）
+              items:
+                type: string
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # VRIO 框架（2 源：uspto / tavily；tavily Key 敏感）
+  # 模板叶子键（AC-3）：name / value / rarity / imitability / organization
+  # ---------------------------------------------------------------------------
+  vrio-framework:
+    input_schema:
+      type: object
+      required: [resources]
+      properties:
+        resources:
+          type: array
+          description: 资源/能力清单（内部审计 + 高管访谈，模板 vrio_resources_checklist.md）
+          items:
+            type: object
+            required: [name, vrio_scores]
+            properties:
+              name:
+                type: string
+                description: 资源/能力名称
+              vrio_scores:
+                type: object
+                description: V-R-I-O 四维度判定（0-1）
+                required: [value, rarity, imitability, organization]
+                properties:
+                  value:
+                    type: number
+                    description: 价值性 V（是否抓住机会/化解威胁）
+                  rarity:
+                    type: number
+                    description: 稀缺性 R（对照行业专利/能力密度基准）
+                  imitability:
+                    type: number
+                    description: 可模仿性 I（获取难度，对照行业情报）
+                  organization:
+                    type: number
+                    description: 组织利用能力 O（组织是否支持利用）
+    output_schema:
+      type: object
+      required: [vrio_assessment, data_sources]
+      properties:
+        vrio_assessment:
+          type: object
+          description: VRIO 评估结果（分类 + 可持续性判定）
+          required: [classification, sustainability]
+          properties:
+            classification:
+              type: object
+              description: 各资源分类结果（竞争优势/暂时优势/竞争均势/竞争劣势）
+            sustainability:
+              type: string
+              description: 持续竞争优势综合判定
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # BSC 平衡计分卡（2 源：china-nbs / world-bank；免 Key + china-nbs crawler）
+  # 模板叶子键（AC-3）：financial / customer / internal_process / learning_growth
+  # ---------------------------------------------------------------------------
+  bsc-scorecard:
+    input_schema:
+      type: object
+      required: [strategic_objectives]
+      properties:
+        strategic_objectives:
+          type: object
+          description: 战略目标（高管工作坊采集：四维度目标/KPI 现值，模板 bsc_kpi_scorecard.md）
+          required: [financial, customer, internal_process, learning_growth]
+          properties:
+            financial:
+              type: array
+              description: 财务维度目标与 KPI 现值
+              items:
+                type: string
+            customer:
+              type: array
+              description: 客户维度目标与 KPI 现值
+              items:
+                type: string
+            internal_process:
+              type: array
+              description: 内部流程维度目标与 KPI 现值
+              items:
+                type: string
+            learning_growth:
+              type: array
+              description: 学习成长维度目标与 KPI 现值
+              items:
+                type: string
+    output_schema:
+      type: object
+      required: [bsc_metrics, data_sources]
+      properties:
+        bsc_metrics:
+          type: object
+          description: BSC 指标体系（KPI/目标值/权重/行动计划）
+          required: [kpi_indicators, target_values, weights, action_plans]
+          properties:
+            kpi_indicators:
+              type: array
+              description: KPI 指标清单（含因果链假设）
+              items:
+                type: string
+            target_values:
+              type: object
+              description: 目标值（KPI → 目标，行业统计对标参照）
+            weights:
+              type: object
+              description: 权重分配（维度/指标 → 权重）
+            action_plans:
+              type: array
+              description: 行动计划清单
+              items:
+                type: string
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # KPI 树（2 源：china-nbs / newsapi；newsapi Key 敏感）
+  # 模板叶子键（AC-3）：objectives / baseline_data
+  # ---------------------------------------------------------------------------
+  kpi-tree:
+    input_schema:
+      type: object
+      required: [business_objectives]
+      properties:
+        business_objectives:
+          type: object
+          description: 业务目标（战略规划文件 + 数据仓库导出，模板 kpi_tree_decomposition.md）
+          required: [objectives, baseline_data]
+          properties:
+            objectives:
+              type: array
+              description: 战略目标分解链（战略 → 部门 → 个人）
+              items:
+                type: string
+            baseline_data:
+              type: object
+              description: KPI 现值基线（指标 → 现值，数据仓库导出）
+    output_schema:
+      type: object
+      required: [kpi_definitions, data_sources]
+      properties:
+        kpi_definitions:
+          type: array
+          description: KPI 定义列表（含口径/目标/权重/监控频率）
+          items:
+            type: object
+            required: [name, target_value, weight, monitoring_frequency]
+            properties:
+              name:
+                type: string
+                description: KPI 名称（含指标口径定义）
+              target_value:
+                type: number
+                description: 目标值（行业指标统计参照）
+              weight:
+                type: number
+                description: 权重（分解树层级）
+              monitoring_frequency:
+                type: string
+                description: 监控频率（日/周/月/季/年）
+        data_sources:
+          type: array
+          description: 溯源元数据（source/freshness/confidence）
+          items:
+            type: object
+
+  # ---------------------------------------------------------------------------
+  # 变革管理模型（2 源：newsapi / tavily；双 Key 敏感；slug 无 -model 后缀）
+  # 模板叶子键（AC-3）：change_content / stakeholders / resistance_analysis
+  # ---------------------------------------------------------------------------
+  change-management:
+    input_schema:
+      type: object
+      required: [change_data]
+      properties:
+        change_data:
+          type: object
+          description: 变革数据（访谈采集：变革内容 + 利益相关者立场，模板 change_stakeholder_assessment.md）
+          required: [change_content, stakeholders, resistance_analysis]
+          properties:
+            change_content:
+              type: string
+              description: 变革内容描述（范围/目标/驱动因素）
+            stakeholders:
+              type: array
+              description: 利益相关者清单及立场评估
+              items:
+                type: string
+            resistance_analysis:
+              type: object
+              description: 阻力分析（阻力来源 → 强度/根因）
+    output_schema:
+      type: object
+      required: [change_roadmap, data_sources]
+      properties:
+        change_roadmap:
+          type: object
+          description: 变革路线图（Kotter 8 步路径 + 里程碑 + 沟通计划）
+          required: [path, milestones, communication_plan, risk_mitigation]
+          properties:
+            path:
+              type: array
+              description: 变革路径（Kotter 8 步裁剪适配）
+              items:
+                type: string
+            milestones:
+              type: array
+              description: 里程碑清单（含时间点）
+              items:
+                type: string
+            communication_plan:
+              type: object
+              description: 沟通计划（对象/渠道/频率/责任人）
+            risk_mitigation:
+              type: array
+              description: 风险缓解措施清单
+              items:
+                type: string
         data_sources:
           type: array
           description: 溯源元数据（source/freshness/confidence）

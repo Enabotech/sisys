@@ -7,8 +7,9 @@
 3. 依赖方向：strategic_analysis.py / run_tool_chain.py 不 import infrastructure；
    ToolExecutionEngine.__init__ 签名锁定（Story 4.4 AC-7.4 BDD 断言保护）；
    跨循环一致性（SOP body $DATA_SOURCE 标记集合 == frontmatter 声明集合）
-4. Skills 内容约束：6 个 SKILL.md ≤500 行 + frontmatter 必需字段 + 17 个非目标
-   Skill data_sources 空 tuple
+4. Skills 内容约束：6 个 SKILL.md ≤500 行 + frontmatter 必需字段 + 7 个非目标
+   Skill data_sources 空 tuple（4-1d Task 1.4 预调整 17 → 7：10 个混合数据型
+   Skill 移出非目标清单，其声明守护由 4-1d 契约库与架构测试承载）
 
 注：原 test_domain_layer_untouched_by_story（git status 工作区检查）与
 TestComplianceReport.test_all_constraints_checked（恒真自证）已于 4-1c 代码审查
@@ -53,23 +54,13 @@ TARGET_SLUGS: tuple[str, ...] = (
 )
 
 NON_TARGET_SLUGS: tuple[str, ...] = (
-    "ansoff-matrix",
-    "bsc-scorecard",
     "business-model-canvas",
-    "change-management",
     "dependency-graph",
     "gantt-chart",
-    "ge-mckinsey-matrix",
-    "kpi-tree",
     "org-design-framework",
     "raci-matrix",
-    "space-matrix",
     "strategy-map",
-    "swot-tows",
-    "value-chain-analysis",
-    "value-curve-analysis",
     "value-proposition-canvas",
-    "vrio-framework",
 )
 
 # SSOT 常量：import contracts 模块唯一来源（R2-F3 统一——期望数据不按测试层分化，
@@ -204,7 +195,7 @@ class TestDependencyDirection:
 
 
 class TestSkillContentConstraints:
-    """6 个 SKILL.md 行数/必需字段 + 17 个非目标 Skill 空 tuple 不变量"""
+    """6 个 SKILL.md 行数/必需字段 + 7 个非目标 Skill 空 tuple 不变量（4-1d Task 1.4 预调整）"""
 
     @pytest.mark.parametrize("slug", TARGET_SLUGS)
     def test_skill_md_line_count_within_500(self, slug: str) -> None:
@@ -226,7 +217,7 @@ class TestSkillContentConstraints:
 
     @pytest.mark.parametrize("slug", NON_TARGET_SLUGS)
     async def test_non_target_skills_untouched(self, slug: str) -> None:
-        """17 个非目标 Skill 未被误改（data_sources 保持空 tuple）"""
+        """7 个非目标 Skill（4-1e 目标）未被误改（data_sources 保持空 tuple）"""
         loader = InMemorySkillLoader()
         document = await loader.load_sop(slug)
         assert document.frontmatter.data_sources == (), f"非目标 Skill {slug} 的 data_sources 被误填"

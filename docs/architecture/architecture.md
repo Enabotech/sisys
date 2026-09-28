@@ -14,7 +14,7 @@ completedAt: '2026-02-26'
 
 # SISYS - 企业战略智能系统架构设计文档
 
-**版本：** 8.6.1（Story 4.1c 实现同步 + 代码审查修订：6 个外部数据型 Skills 数据采集集成 §17.3.3；D7 已知限制补记 + 测试判别力修复）
+**版本：** 8.7.0（Story 4.1d 实现同步：10 个混合数据型 Skills 成熟化——双源外部基准声明 + 内部 Schema 模板 + 工作坊方法论，§17.3.3 追加 4.1d 集成说明与 8 项架构决策）
 **状态：** 架构决策主文档 ~3500 行，实现细节迁移至子设计文档
 **评审日期：** 2026-09-26
 **审核依据：**对标业界最佳实践（Arc42/C4/ADR + Anthropic Claude Code Skills 渐进式披露），将 §8/§17/§18 实现代码迁移至独立子设计文档，架构主文档聚焦决策与规则
@@ -2672,8 +2672,8 @@ buckets/
   - 5 个核心 Skills 已重新分配到 4.1c/4.1d/4.1e（见下）
 - ✅ **Story 4.1c 已完成**（P0-6，2026-09-26）：6 个外部数据型 Skills 复用 4.1b 完善（详见 §17.3.3 末尾 4.1c 集成说明）
   - pestel-analysis（从 4.1b 转入）/ porters-five-forces / appeals-analysis / competitor-analysis / scenario-planning / disruptive-innovation
-- 📋 **Story 4.1d backlog**（P0-7）：10 个混合数据型 Skills 增强（外部+内部数据）
-  - swot-tows（从 4.1b 转入）/ ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management-model（从 4.1b 转入）
+- ✅ **Story 4.1d 已完成**（P0-7，2026-09-28）：10 个混合数据型 Skills 成熟化（外部+内部数据，详见 §17.3.3 末尾 4.1d 集成说明）
+  - swot-tows（从 4.1b 转入）/ ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management（从 4.1b 转入；实际 slug 无 -model 后缀）
 - 📋 **Story 4.1e backlog**（P0-8）：7 个纯内部框架 Skills 增强（用户输入 + Schema 模板）
   - value-proposition-canvas（从 4.1b 转入）/ business-model-canvas（从 4.1b 转入）/ org-design-framework / dependency-graph / raci-matrix / gantt-chart / strategy-map（从 4.1b 转入）
 
@@ -2826,6 +2826,21 @@ buckets/
 | D4 | 三角化定义 | ≥3 源 Skill 全声明源并发覆盖；2 源 Skill 双源交叉验证 | disruptive-innovation（USPTO+Tavily）经 4.1b PoC 验证，强行加源降低数据质量（Epic AC-4 字面偏差已签收：D8 路径 A，2026-09-28——2 源终态，不追加第三源） |
 | D6 | input_schema 载体 | frontmatter `input_schema`/`output_schema` 键（JSON Schema dict） | `normalize_metadata` 已支持该键；运行时 Schema 强制验证属 Story 4.3；domain 禁 pydantic |
 | D7 | 生产链路接线范围 | StrategicAnalysisUseCase + RunToolChainUseCase 双入口同步注入（链路共享单 ToolMetadata） | 仅接 StrategicAnalysisUseCase 时多节点链路仍抛 207；节点级 metadata 切换属 Story 4.2 范畴。已知限制（4-1c 代码审查补记，双向）：误拒——节点 B 声明源不在共享白名单时抛 207；旁路——后续节点可采集仅首节点（声明序 nodes[0]）声明、自身未声明的源（「声明即授权」链级放宽为「首节点声明即全链授权」），两方向均待 Story 4.2 节点级切换收敛 |
+
+**Story 4.1d 集成说明（✅ 已实现 2026-09-28）：** 10 个混合数据型 Skills（swot-tows / ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management）完成混合数据成熟化：① SKILL.md frontmatter 填充 `data_sources` 统一 2 源外部基准声明（+ `input_schema`/`output_schema`，契约固化于 `tests/acceptance/contracts/skill_io_schemas.yaml`，16 条目单一 SSOT）；② 每 Skill 配套 `references/` 三件套（data_fusion.md 内外数据融合规范——替代 4-1c triangulation.md 角色 / scoring_anchors.md 评分锚点 / workshop_guide.md 2-4 小时工作坊引导）与 `templates/` 内部数据采集模板（四段式微格式，采集字段 == input_schema 递归叶子键双向断言）；③ 零 Python 生产代码改动——生产链路（frontmatter 解析 / 双入口接线 / 白名单校验 / 标记采集注入）均为 4-1b/4-1c 交付物，声明即生效；④ 内部数据经 `ToolCall.arguments` 进入 Think prompt 既有语义（与外部基准 `DATA_SOURCES` 注入双通道并存，集成/验收测试双向断言）。
+
+**Story 4.1d 关键架构决策（8 项追加，引用 Story 4.1d 决策表）：**
+
+| # | 决策点 | 选中方案 | 依据 |
+|---|--------|---------|------|
+| D1 | 内部模板载体 | Markdown 模板（templates/*.md，表格形式） | 4-1c 先例；L3 渐进加载；文本资产可断言（双向断言依赖）；git diff 友好；Epic 字面「Excel」偏差留痕签收 |
+| D2 | 外部数据源策略 | 统一 2 源双源交叉验证（10/10 Skill） | 混合数据型内部数据是主体、外部源仅行业基准参照；对齐 4-1c disruptive-innovation 2 源终态先例 |
+| D3 | references 三件套语义 | data_fusion.md（内外数据融合规范）替代 triangulation.md | 交叉验证主轴是「外部基准 ↔ 内部数据」而非「外部多源」；含冲突处理与内外权重 |
+| D4 | 新异常/端口/事件 | 三不新增 + 零 Python 生产代码改动 | 纯内容 Story；全部失败路径已被 201/207/101/302/411/412/413 覆盖；同义重复定义是红线 |
+| D5 | 内部数据执行期通道 | 不新增 INTERNAL_DATA 注入机制 | 模板是「采集期」工具非「执行期」通道；arguments 进 Think prompt 既有语义已满足 |
+| D6 | SSOT 契约库组织 | 新建 skill_mixed_data_contracts.py，跨 Story 共享常量一律 import 4-1c 库 | 4-1c 库语义绑定「外部数据型 6 Skill」；跨 Story 稳定事实单一来源（防 4-1e 第三次复制） |
+| D7 | IO 契约 SSOT 载体 | 扩充既有 skill_io_schemas.yaml（追加 10 条目，16 条目单一 SSOT，按 slug 索引） | 单一契约文件一处可查；新建则双文件漂移 |
+| D8 | 回归网调整机制 | Task 1.4 一次性预调整（NON_TARGET_SLUGS 17→7 两处 + test_frontmatter_data_sources.py 中间态安全化重构：物理非空者必 ∈ SSOT 并集 16） | 先调网再并行，消除并行期红窗口与多 Agent 并发编辑冲突面；最终态 16 全非空由架构测试闭环 |
 
 ### 17.4 AGENT 架构
 
@@ -3550,6 +3565,7 @@ pytest tests/unit/domain/
 | 8.5.0 | 2026-09-24 | **Story 4.1b Skills 数据采集基础设施实现**：①新增 §17.3.3（DataSourcePort + 8 适配器 + Redis 缓存 + Engine.Execute `$DATA_SOURCE` 集成，8 项架构决策表）②data_source 异常子域（410-419）③DataSourceFetched/DataSourceFetchFailed 双通道事件 | 架构团队 |
 | 8.6.0 | 2026-09-26 | **Story 4.1c Skills 数据采集集成实现**：①6 个外部数据型 Skills frontmatter `data_sources` 白名单 + IO Schema 成熟化 ②生产链路双入口接线（StrategicAnalysisUseCase + RunToolChainUseCase 注入 `extensions["tool_metadata"]`，load_metadata→load_sop）③§17.3.3 追加 4.1c 集成说明与 6 项架构决策（D1-D4/D6/D7） | 架构团队 |
 | 8.6.1 | 2026-09-28 | **Story 4.1c 代码审查修订**：①D7 决策行补记已知限制（双向：误拒——节点 B 声明源不在共享白名单时抛 207；旁路——后续节点可采集仅声明序首节点声明、自身未声明的源，待 Story 4.2 节点级切换收敛）②测试判别力修复（411 语义断言/租户交叉缓存隔离/接线首节点钉住/SSOT 契约统一 contracts 唯一来源） | 架构团队 |
+| 8.7.0 | 2026-09-28 | **Story 4.1d 混合数据型 Skills 成熟化实现**：①10 个 Skills frontmatter `data_sources` 统一 2 源声明 + IO Schema（skill_io_schemas.yaml 扩至 16 条目单一 SSOT）②references 三件套（data_fusion/scoring_anchors/workshop_guide）+ templates 内部采集模板（字段 ↔ Schema 叶子键双向断言）③零 Python 生产代码改动（声明即生效）④§17.3.3 追加 4.1d 集成说明与 8 项架构决策（D1-D8） | 架构团队 |
 
 ---
 
@@ -3562,7 +3578,7 @@ pytest tests/unit/domain/
 | **核心章节** | 20 章（§1-§20） |
 | **附录章节** | 12 章（A-L，§21-§32，详见 arch-appendix.md） |
 | **总章节数** | 32 章 |
-| **版本** | 8.5.0（Story 4.1b 实现同步 - Skills 数据采集基础设施） |
-| **最后更新** | 2026-09-24 |
+| **版本** | 8.7.0（Story 4.1d 实现同步 - 混合数据型 Skills 成熟化） |
+| **最后更新** | 2026-09-28 |
 
 **所有附录 A~L 单独成章节，编号保持不变，作为主架构文档的详细展开。**
