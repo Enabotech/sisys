@@ -126,6 +126,11 @@ class IPCCAdapter:
             return False  # 熔断快速失败（不发请求）
         try:
             resp = await self._client.head(self._config.csv_base_url)
+        except httpx.UnsupportedProtocol:
+            # URL 协议缺失：确定性配置错误不计熔断（R3-4 K1v2——对齐 fetch 侧口径，
+            # 防配置漂移经探活打 open 熔断而 fetch 从不计失败的观测分裂）
+            logger.warning("IPCC 探活失败: UnsupportedProtocol")
+            return False
         except httpx.RequestError as e:
             # 传输类故障（超时/连接失败等，InvalidURL ⊄ RequestError 由兜底覆盖）
             self._circuit_breaker.on_failure()
@@ -266,6 +271,14 @@ class IPCCAdapter:
             self._circuit_breaker.on_ignored()
             raise ConfigurationError(
                 message="数据源 ipcc API 地址配置非法（URL 格式错误）",
+                context={"source_name": "ipcc"},
+                cause=e,
+            ) from e
+        except httpx.UnsupportedProtocol as e:
+            # URL 协议缺失：确定性配置错误（R3-4 K1 镜像，对齐 InvalidURL 101 口径）
+            self._circuit_breaker.on_ignored()
+            raise ConfigurationError(
+                message="数据源 ipcc API 地址协议非法（缺少 http/https scheme）",
                 context={"source_name": "ipcc"},
                 cause=e,
             ) from e

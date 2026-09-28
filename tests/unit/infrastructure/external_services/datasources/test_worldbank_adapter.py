@@ -304,3 +304,36 @@ class TestWorldBankAdapterFailures:
         assert result.source_name == "world-bank"
         assert cb.state == CircuitState.CLOSED
         await adapter.close()
+
+
+class TestUnsupportedProtocolClassification:
+    """URL scheme 缺失的确定性口径（R3-4 K1：修复前被白名单重试且计熔断——与
+    InvalidURL 的 101 确定性口径分裂）"""
+
+    def test_whitelist_excludes_unsupported_protocol(self) -> None:
+        """白名单分类：UnsupportedProtocol 不可重试（确定性配置错误）"""
+        from src.infrastructure.external_services.datasources._http_helpers import is_retryable_http_error
+
+        exc = httpx.UnsupportedProtocol("Request URL is missing an 'http://' or 'https://' protocol.")
+        assert is_retryable_http_error(exc) is False
+        # 对照：传输类瞬时故障仍可重试（白名单语义未被误伤）
+        assert is_retryable_http_error(httpx.ConnectError("conn refused")) is True
+
+    @pytest.mark.asyncio
+    async def test_unsupported_protocol_raises_config_error_no_retry(self) -> None:
+        """URL scheme 缺失 → ConfigurationError(101) 不重试不计熔断（对齐 InvalidURL；
+        修复前：重试 3 次后 411 + on_failure 计熔断）"""
+        from src.domain.exceptions import ConfigurationError
+
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            raise httpx.UnsupportedProtocol("Request URL is missing an 'http://' or 'https://' protocol.")
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        with pytest.raises(ConfigurationError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="world-bank", query="GDP"))
+        assert exc_info.value.code == "EXCEPTION_101"
+        assert calls["n"] == 1  # 确定性错误不重试（修复前 = 3）
+        await adapter.close()

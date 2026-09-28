@@ -120,14 +120,45 @@ class TestFrontmatterDataSourcesParsing:
 
 
 class TestExistingSkillsRegression:
-    """既有 23 个 SKILL.md 解析零回归（未声明 data_sources → 默认空 tuple）。"""
+    """既有 23 个 SKILL.md 解析零回归。
+
+    R3-4 K3v2：锚点改 frontmatter/L2 路径（load_metadata 走 L1/TOOLS.md 表，
+    结构性不携带 data_sources——原 isinstance 断言恒真且测错层；白名单的真实
+    消费链路是 load_sop(slug).frontmatter）。
+    """
+
+    # 已声明 data_sources 的 6 个 Skill（frontmatter 声明清单，与生产 SKILL.md 对齐）
+    DECLARING_SLUGS = (
+        "pestel-analysis",
+        "competitor-analysis",
+        "disruptive-innovation",
+        "appeals-analysis",
+        "porters-five-forces",
+        "scenario-planning",
+    )
+
+    @pytest.mark.asyncio
+    async def test_declaring_skills_frontmatter_carries_data_sources(self) -> None:
+        """声明 data_sources 的 Skill 经 L2 frontmatter 路径携带合法白名单（name/ttl）"""
+        from src.application.skills.loader import InMemorySkillLoader
+
+        loader = InMemorySkillLoader()
+        for slug in self.DECLARING_SLUGS:
+            doc = await loader.load_sop(slug)
+            refs = doc.frontmatter.data_sources
+            assert len(refs) >= 1, f"{slug} 声明的 data_sources 未经 frontmatter 路径解析"
+            for ref in refs:
+                assert ref.name and ref.ttl_seconds >= 60, f"{slug}.{ref.name} 值对象校验失效"
 
     @pytest.mark.asyncio
     async def test_all_23_skills_parse_without_data_sources(self) -> None:
+        """未声明的 Skill frontmatter 默认空 tuple（锁死「其余 skill 零误声明」语义）"""
         from src.application.skills.loader import InMemorySkillLoader
         from src.application.skills.skill_manifest import SLUG_TO_TOOL_ID
 
         loader = InMemorySkillLoader()
         for tool_name in SLUG_TO_TOOL_ID:
-            metadata = await loader.load_metadata(tool_name)
-            assert isinstance(metadata.data_sources, tuple)
+            doc = await loader.load_sop(tool_name)
+            if tool_name in self.DECLARING_SLUGS:
+                continue  # 已声明组由上一用例覆盖
+            assert doc.frontmatter.data_sources == (), f"{tool_name} 意外携带 data_sources 声明"

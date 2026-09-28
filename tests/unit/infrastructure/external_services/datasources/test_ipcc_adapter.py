@@ -288,3 +288,25 @@ class TestHealthCheckCircuitBreakerIntegration:
         assert await adapter.health_check() is False
         assert cb.state == CircuitState.OPEN  # 两次 5xx 探活打开熔断
         await adapter.close()
+
+
+class TestUnsupportedProtocolClassification:
+    """ipcc 镜像（R3-4 K1：_request_csv 内联链同构修复）"""
+
+    @pytest.mark.asyncio
+    async def test_unsupported_protocol_raises_config_error_no_retry(self) -> None:
+        """URL scheme 缺失 → 101 不重试（对齐 InvalidURL 口径）"""
+        from src.domain.exceptions import ConfigurationError
+
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            raise httpx.UnsupportedProtocol("missing protocol")
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        with pytest.raises(ConfigurationError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="ipcc", query="ar6-wg1-spm"))
+        assert exc_info.value.code == "EXCEPTION_101"
+        assert calls["n"] == 1
+        await adapter.close()
