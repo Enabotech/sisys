@@ -42,7 +42,7 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 
 **不在本 Story 范围（明确划出）：**
 
-- **新增数据源适配器 / UNSD / OECD** → 后续 Story（PoC v2 已验证不可用，故 disruptive-innovation 第 3 源 WIPO/EPO 推迟到 Story 4.1d 之后）
+- **新增数据源适配器 / UNSD / OECD** → 后续 Story（PoC v2 已验证不可用；disruptive-innovation 第 3 源诉求已随 D8 签收关闭——2026-09-28 Epic owner 签收 2 源终态，不追加）
 - **工具输出 Schema 强制验证执行（Pydantic 运行时校验）** → Story 4.3（本 Story 仅定义 frontmatter JSON Schema 契约，不实现运行时校验器）
 - **10 个混合数据型 / 7 个内部框架 Skills** → Story 4.1d / 4.1e
 - **数据源治理（配额管理/成本追踪/降级策略编排）** → 后续 Story
@@ -172,7 +172,7 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 | `appeals-analysis` | `tavily` + `newsapi` + `china-nbs` | 顾客洞察 Web 搜索（Tavily）、市场舆情（NewsAPI）、中国消费统计（国统局） | ✅ 3 源 |
 | `competitor-analysis` | `newsapi` + `uspto` + `tavily` + `china-nbs` | 竞品动态（NewsAPI）、竞品专利（USPTO）、竞品 Web 情报（Tavily）、中国行业对标（国统局） | ✅ 4 源 |
 | `scenario-planning` | `tavily` + `ipcc` + `eurostat` | 趋势 Web 搜索（Tavily）、气候情景（IPCC）、欧盟情景数据（Eurostat） | ✅ 3 源 |
-| `disruptive-innovation` | `uspto` + `tavily` | 颠覆性技术专利（USPTO）、颠覆性技术 Web 情报（Tavily） | ⚠️ 2 源（双源交叉验证，见决策 D4；Epic AC-4 字面 ≥3 源偏差由 Epic owner 签收） |
+| `disruptive-innovation` | `uspto` + `tavily` | 颠覆性技术专利（USPTO）、颠覆性技术 Web 情报（Tavily） | ✅ 2 源（双源交叉验证，见决策 D4；Epic AC-4 字面 ≥3 源偏差**已签收**——D8，2026-09-28） |
 
 **适配器 url/api_type/ttl/confidence 对齐表**（4-1b 8 个适配器 `get_metadata()` 实测，Round 1 D1-C 视角固化）：
 
@@ -730,7 +730,7 @@ context = ExecutionContext(
 
 **关联 AC:** AC-1, AC-3
 
-> **数据源（SSOT）：** `uspto` + `tavily`（2 源，双源交叉验证 — 决策 D4；Epic AC-4 ≥3 源字面偏差由 Epic owner 签收）
+> **数据源（SSOT）：** `uspto` + `tavily`（2 源，双源交叉验证 — 决策 D4；Epic AC-4 ≥3 源字面偏差已签收：D8，2026-09-28）
 > **SOP 核心：** 技术成熟度评估 + 专家访谈引导；颠覆性技术专利信号（USPTO）采集引导
 
 - [x] Subtask 7.1: 🔴 红 — 编写 `test_disruptive_innovation_4_1c.py` 声明失败测试
@@ -1167,7 +1167,7 @@ tests/
 **Round 4 发现（1 项 P2，合并 Round 5 收敛）**：
 - **R4-F1**：Story Version v1.4.0 停在文档审查周期——其后的 dev-story 交付（676f4396）、状态流转（ready-for-dev→review）、代码审查周期 3 个 commit（56a23bb1 / 6cd2c2bc / d59766ca）均未入版本历史，`Last Updated: 2026-09-26` 陈旧。**处置：合并至 Round 5**（与状态流转/DoD 勾选/v1.5.0 changelog 同批收尾，避免同文件两轮重复编辑）。
 
-**Round 5 收尾清单（D4-A 遗留盘点固化）**：① `pre-commit run --all-files` 实跑留痕 → 勾选 DoD L472；② DoD L471「无 P0/P1」勾选（三重取证支撑）；③ changelog v1.5.0 + Last Updated 更新（R4-F1）+ v1.4.0「保持待实施」表述勘正；④ L1198「运行 code-review」勾选；⑤ 状态 `review → done`（Story frontmatter + sprint-status.yaml:142）+ L824「Story 可进入 done」勾选；⑥ D8 保持待 Epic owner 签收显式登记（外部依赖不阻断 done——Epic 层遗留）。
+**Round 5 收尾清单（D4-A 遗留盘点固化）**：① `pre-commit run --all-files` 实跑留痕 → 勾选 DoD L472；② DoD L471「无 P0/P1」勾选（三重取证支撑）；③ changelog v1.5.0 + Last Updated 更新（R4-F1）+ v1.4.0「保持待实施」表述勘正；④ L1198「运行 code-review」勾选；⑤ 状态 `review → done`（Story frontmatter + sprint-status.yaml:142）+ L824「Story 可进入 done」勾选；⑥ D8 保持待 Epic owner 签收显式登记（外部依赖不阻断 done——Epic 层遗留）。【v1.5.1 勘正：⑥ 已闭环——2026-09-28 签收（路径 A）】
 
 #### Round 5 收敛终审（独立取证，2026-09-28）
 
@@ -1177,13 +1177,13 @@ tests/
 
 **留项归属（台账+Defer 双登记）**：节点级注入（旁路+误拒双向）→ Story 4.2；Schema 字段级化+命名对齐→ Story 4.3；StrategicAnalysisUseCase 入口注册（FR-IF-01 锚点）→ 入口 Story（Epic 排期）；异常 to_dict() 脱敏→ Story 5.x；required_fields/ttl 类型校验（R1-P2-10/11）→ 4-1b 审查周期或 4.1d 前；test_sandbox_session_query.py:38 既有 ignore→ 归属 Story（4-4 遗留）。
 
-**D8（Epic 2 源偏差签收）为外部依赖，显式登记于 Decision Needed，不阻断 done（Epic 层遗留）。**
+**D8（Epic 2 源偏差签收）已于 2026-09-28 由 Epic owner（项目负责人）签收：确认 epics_v1.0.md line 971 的具体源规划（USPTO + Tavily）优先于 AC-4 通用条款（line 987），2 源双源交叉验证为终态，不追加第三源。**
 
 #### 需决策 Decision Needed
 
 
 
-- [ ] **Decision D8（待 Epic owner 签收）**：disruptive-innovation 2 源（USPTO + Tavily）与 Epic AC-4 "每个指标 ≥3 独立来源" 字面偏差——本 Story 选择务实双源交叉验证（D4 决策），需 Epic owner 显式签收或追加 WIPO/EPO 适配器到下个 Story
+- [x] **Decision D8（已签收 2026-09-28）**：disruptive-innovation 2 源（USPTO + Tavily）与 Epic AC-4 "每个指标 ≥3 独立来源" 字面偏差——本 Story 选择务实双源交叉验证（D4 决策）。**签收结论（路径 A）**：Epic owner（项目负责人）确认 `epics_v1.0.md:971` 的具体源规划（USPTO 专利 + Tavily 颠覆性技术）优先于 AC-4 通用条款（line 987），2 源双源交叉验证为终态，**不追加第三源**（WIPO/EPO 适配器排期取消，Defer 项关闭）；偏差处置与理由链（8 已注册源无第三语义匹配源 / PoC v2 候选统计源实测不可用 / 同质凑数源违背三角化本意）见审查周期答复记录
 
 #### 已修复 Patch
 
@@ -1215,14 +1215,14 @@ tests/
 
 - [x] Story created with `ready-for-dev` status
 - [x] Story Round 1 文档审查完成（D1-D2 D2 评审 + D3 系统修订 17 项修复）
-- [ ] Epic owner 签收 D8 决策
+- [x] Epic owner 签收 D8 决策【2026-09-28 签收：2 源终态（路径 A），不追加第三源】
 - [x] 运行 `dev-story` 开始实施
 - [x] 运行 `code-review` 进行代码审查【5 轮 C1~C5 循环完成：Round 1 红线+判别力修复 → Round 2 P2 收敛批 → Round 3/4 回归核查与稳定性验证 → Round 5 独立收敛终审（可流转 done）】
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.5.1
 **创建日期/Created:** 2026-09-26
 **最后更新/Last Updated:** 2026-09-28
 **更新说明/Description:**
@@ -1241,7 +1241,10 @@ tests/
   - **Round 2**（`6cd2c2bc`）：P2 收敛批 6 项（缓存测试判别力三重加固 + captured 死参数 + SSOT 统一 contracts 唯一来源 + run_tool_chain 清理三合一 + 文档批 + v8.6.1）
   - **Round 3**（`d59766ca`）：台账重复行清理 + FR-IF-01 归属锚点 + 双视角收敛取证登记（AC-1~6 全满足判定）
   - **Round 4**（`f97ae447`）：稳定性验证轮（三态复核 215 passed，零代码发现，R4-F1 登记）
-  - **Round 5**：独立收敛终审（159 passed / 红线零输出 / 抽验 3/3 / 周期闭合）→ **零 P0/P1 残留，Story 流转 `done`**；留项全部双登记（台账 + Defer 节）各归 Story 4.2/4.3/4.1d/5.x/入口 Story；D8 保持 Epic owner 签收（不阻断）
+  - **Round 5**：独立收敛终审（159 passed / 红线零输出 / 抽验 3/3 / 周期闭合）→ **零 P0/P1 残留，Story 流转 `done`**；留项全部双登记（台账 + Defer 节）各归 Story 4.2/4.3/4.1d/5.x/入口 Story；D8 保持 Epic owner 签收（不阻断）——**2026-09-28 已签收（路径 A：2 源终态），见 v1.5.1**
+- v1.5.1: **Decision D8 签收落地**（2026-09-28，Epic owner/项目负责人）：
+  - 签收结论（路径 A）：`epics_v1.0.md:971` 具体源规划（USPTO 专利 + Tavily 颠覆性技术）优先于 AC-4 通用条款（line 987），disruptive-innovation **2 源双源交叉验证为终态，不追加第三源**（WIPO/EPO 适配器排期取消）
+  - 全文 10 处引用同步（SSOT 表行 / Task 7 / 范围澄清 / 收敛声明 / Decision Needed / Next Steps / 可执行性等 ⚠️→✅）+ architecture.md D4 决策行——**2026-09-28 已签收（路径 A：2 源终态），见 v1.5.1**
 
 ---
 
@@ -1273,4 +1276,4 @@ tests/
 - ✅ ready-for-dev 状态稳定
 - ✅ 27 项文档修订全部 commit + push
 - ✅ Dev Story 阶段可立即启动 Task 0 SDD 规范定义
-- ⚠️ **Decision D8 待 Epic owner 签收**：disruptive-innovation 2 源与 Epic AC-4 字面偏差
+- ✅ **Decision D8 已签收**（2026-09-28）：disruptive-innovation 2 源终态（USPTO + Tavily，路径 A），不追加第三源
