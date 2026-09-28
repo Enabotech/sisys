@@ -13,6 +13,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 
@@ -85,6 +86,44 @@ class TestDataSourceRef:
     def test_invalid_url_raises(self, bad_url: str) -> None:
         with pytest.raises(EntityValidationError):
             _make_ref(url=bad_url)
+
+    @pytest.mark.parametrize(
+        ("field", "bad_value"),
+        [
+            ("name", 123),  # name: 123 → 原 re.match 抛原生 TypeError 逃逸
+            ("url", 123),  # url: 123 → 原 startswith 抛原生 AttributeError 逃逸
+            ("ttl_seconds", "604800"),  # YAML 引号字符串 → 原比较抛原生 TypeError 逃逸
+            ("ttl_seconds", None),  # YAML 空值 → 原 int<=None 抛原生 TypeError 逃逸
+            ("ttl_seconds", 60.5),  # float 混入
+        ],
+    )
+    def test_scalar_type_confusion_rejected(self, field: str, bad_value: Any) -> None:
+        """SKILL.md frontmatter 标量类型混淆在 VO 构造侧拦截（R3-2 G3：YAML
+        编排错误原以原生 TypeError/AttributeError 逃逸领域异常体系——红线破口）。
+
+        bad_value 为 Any：本用例的语义就是「故意传错误类型验证 VO 门禁」，
+        Any 是对该意图的诚实类型表达（非性能或省事）。
+        """
+        kwargs: dict[str, Any] = {field: bad_value}
+        with pytest.raises(EntityValidationError, match="必须为"):
+            DataSourceRef(
+                name=kwargs.get("name", "world-bank"),
+                url=kwargs.get("url", "https://x.local/api"),
+                api_type=DataSourceApiType.REST_JSON,
+                ttl_seconds=kwargs.get("ttl_seconds", 86400),
+            )
+
+    def test_required_fields_scalar_and_non_str_elements_rejected(self) -> None:
+        """required_fields 标量（str 透传 → 子串匹配退化）与非 str 元素（tuple[int,...]）拦截"""
+        bad_values: list[Any] = ["indicator", (1, 2)]  # Any 语义同上：故意破坏类型验证门禁
+        for bad_value in bad_values:
+            with pytest.raises(EntityValidationError, match="tuple"):
+                DataSourceRef(
+                    name="world-bank",
+                    url="https://x.local/api",
+                    api_type=DataSourceApiType.REST_JSON,
+                    required_fields=bad_value,
+                )
 
     def test_frozen(self) -> None:
         ref = _make_ref()

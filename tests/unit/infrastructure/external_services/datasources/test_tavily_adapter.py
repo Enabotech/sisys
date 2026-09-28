@@ -22,6 +22,7 @@ from src.domain.exceptions import (
     DataSourceResponseError,
     DataSourceUnavailableError,
     TimeoutError,
+    ValidationError,
 )
 from src.domain.ports.data_source import DataSourcePort, DataSourceQuery
 from src.infrastructure.config.tavily import TavilyConfig
@@ -91,6 +92,17 @@ class TestTavilyAdapterSuccess:
 
 
 class TestTavilyAdapterFailures:
+    @pytest.mark.asyncio
+    async def test_non_integer_max_results_raises_validation_error(self) -> None:
+        """max_results 非整数 → ValidationError(201)（R3-2 G4：内置 ValueError 逃逸
+        领域异常体系的前置拦截——参数错误归 201 且在发请求前拦截）"""
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json={"results": []})))
+        with pytest.raises(ValidationError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="tavily", query="q", parameters=(("max_results", "10.5"),)))
+        assert exc_info.value.code == "EXCEPTION_201"
+        assert exc_info.value.context.get("field") == "max_results"
+        await adapter.close()
+
     @pytest.mark.asyncio
     async def test_429_raises_rate_limit(self) -> None:
         adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(429, json={})))

@@ -95,6 +95,9 @@ class TestParseMarkers:
             '$DATA_SOURCE ("a", "b")',  # 标记名与括号间空白（有意收紧：显式报错而非静默忽略）
             "$DATA_SRC",  # 裸 $ 拼写错误（沙箱 SyntaxError 前置为宿主机 201）
             "price = $100",  # 裸 $ 非标记场景（Python 非法字符前置拦截）
+            r"$DATA_SOURCE('\u12', 'q')",  # 截断 \uXXXX 转义（R3-2 G2：literal_eval 内部
+            # compile 抛 SyntaxError unicodeescape truncated，未包裹时绕过裸 $ 后置防线逃逸）
+            '$DATA_SOURCE("a", "\\x")',  # 截断 \xXX 转义（同通道变体）
         ],
     )
     def test_syntax_error_raises_validation_error(self, bad_code: str) -> None:
@@ -194,6 +197,25 @@ class TestStringLiteralSpanBoundaries:
 
 
 class TestInjectDataSources:
+    def test_length_mismatch_raises_validation_error(self) -> None:
+        """results 与 markers 长度不一致 → ValidationError(201)（R3-2 G1：公开 API
+        契约防御——内置 zip(strict=True) 的 ValueError 逃逸领域异常体系是红线破口）"""
+        code = 'gdp = $DATA_SOURCE("world-bank", "GDP")\nprint(gdp)'
+        markers = parse_data_source_markers(code)  # 1 个标记
+        with pytest.raises(ValidationError) as exc_info:
+            inject_data_sources(code, markers, ())  # 0 个结果
+        assert exc_info.value.code == "EXCEPTION_201"
+        assert exc_info.value.context.get("marker_count") == 1
+        assert exc_info.value.context.get("result_count") == 0
+
+    def test_length_mismatch_empty_markers_with_results_raises(self) -> None:
+        """markers=() 而 results 非空同样违约（校验位于 if not markers 早退之前——
+        早退分支静默吞不等长是 zip strict 语义的漏网变体）"""
+        with pytest.raises(ValidationError) as exc_info:
+            inject_data_sources("print(1)", (), (_make_result("world-bank", 1.0),))
+        assert exc_info.value.context.get("marker_count") == 0
+        assert exc_info.value.context.get("result_count") == 1
+
     def test_inject_preamble_python_literal_and_marker_replaced(self) -> None:
         """preamble 为 repr Python 字面量（ast.literal_eval 可逆）；标记原位替换为 DATA_SOURCES 引用。"""
         code = 'gdp = $DATA_SOURCE("world-bank", "GDP")\nprint(gdp)'

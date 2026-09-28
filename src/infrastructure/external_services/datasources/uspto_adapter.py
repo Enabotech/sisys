@@ -28,6 +28,7 @@ from src.domain.value_objects.data_source import (
 )
 from src.infrastructure.config.uspto import USPTOConfig
 from src.infrastructure.external_services.datasources._http_helpers import (
+    parse_int_param,
     request_json_with_resilience,
 )
 from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
@@ -81,10 +82,11 @@ class USPTOAdapter:
             DataSourceResponseError: 响应缺少 patents 字段
         """
         params_dict = dict(query.parameters)
+        page_size = parse_int_param(params_dict, "page_size", 10, source_name="uspto")
         body: dict[str, Any] = {
             "q": {"_text_any": {"patent_title": query.query}},
             "f": ["patent_id", "patent_title", "patent_date", "assignees"],
-            "o": {"size": int(params_dict.get("page_size", "10"))},
+            "o": {"size": page_size},
         }
         # X-Api-Key 鉴权头（R3-P1-3）：bool() 真值判定（空串=未配置，与组合根
         # 条件注册口径一致，防 USPTO_API_KEY="" 时注册但裸发请求产生批量 401）

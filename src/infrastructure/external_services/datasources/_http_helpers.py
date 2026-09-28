@@ -50,6 +50,7 @@ from src.domain.exceptions import (
     DataSourceResponseError,
     DataSourceUnavailableError,
     TimeoutError,
+    ValidationError,
 )
 from src.infrastructure.external_services.embedding.circuit_breaker import (
     CircuitBreaker,
@@ -83,6 +84,43 @@ def quote_path_segment(segment: str) -> str:
             context={"segment": segment[:100]},
         )
     return quote(segment, safe="")
+
+
+def parse_int_param(
+    params_dict: dict[str, str],
+    key: str,
+    default: int,
+    *,
+    source_name: str,
+) -> int:
+    """从查询参数字典解析整型参数（R3-2 红线组 G4：内置 ValueError 前置为 ValidationError）
+
+    DataSourceQuery.parameters 类型注解 tuple[tuple[str, str], ...]——"abc"/"10.5"
+    是合法 str 输入，裸 int() 会抛内置 ValueError 逃逸领域异常体系（红线破口）。
+    参数属调用方输入错误（非响应解析失败），归 ValidationError(201)——语义为
+    HTTP 400 且在发起外部请求前抛出（零配额消耗、不重试、不污染熔断）。
+
+    Args:
+        params_dict: 查询参数字典（DataSourceQuery.parameters 转换而来）
+        key: 参数名（如 "page_size"/"max_results"）
+        default: 参数缺失时的回退默认值
+        source_name: 数据源名称（异常 context，便于按源定位）
+
+    Returns:
+        解析后的整型值（缺失回退 default）
+
+    Raises:
+        ValidationError: 参数值非整数（EXCEPTION_201，不消耗外部配额）
+    """
+    raw = params_dict.get(key, str(default))
+    try:
+        return int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(
+            message=f"查询参数 {key} 必须为整数，实际 {raw!r}",
+            context={"source_name": source_name, "field": key, "value": str(raw)},
+            cause=exc,
+        ) from exc
 
 
 def is_retryable_http_error(exception: BaseException) -> bool:
@@ -261,4 +299,10 @@ async def request_json_with_resilience(
     return data
 
 
-__all__ = ["RETRYABLE_STATUS_CODES", "is_retryable_http_error", "quote_path_segment", "request_json_with_resilience"]
+__all__ = [
+    "RETRYABLE_STATUS_CODES",
+    "is_retryable_http_error",
+    "parse_int_param",
+    "quote_path_segment",
+    "request_json_with_resilience",
+]

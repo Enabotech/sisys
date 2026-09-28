@@ -95,6 +95,29 @@ class TestFrontmatterDataSourcesParsing:
         with pytest.raises(FrontmatterParseError):
             normalize_metadata(parse_frontmatter(raw)[0])
 
+    @pytest.mark.parametrize(
+        ("field", "yaml_value"),
+        [
+            ("name", "123"),  # YAML 整数 → VO re.match 原生 TypeError
+            ("url", "123"),  # → startswith 原生 AttributeError
+            ("ttl_seconds", '"604800"'),  # YAML 引号字符串 → 比较原生 TypeError
+            ("ttl_seconds", ""),  # YAML 空值 None → int<=None 原生 TypeError
+        ],
+    )
+    def test_scalar_type_confusion_wrapped_as_frontmatter_error(self, field: str, yaml_value: str) -> None:
+        """data_sources 子字段标量类型混淆 → FrontmatterParseError（R3-2 G3：
+        VO 构造侧 isinstance 门禁后，原以原生 TypeError/AttributeError 逃逸
+        load_sop 的 YAML 编排错误统一收敛为领域异常——EntityValidationError ⊂
+        DomainError 被 frontmatter 既有 except 自动包裹）"""
+        item_lines = {"name": "world-bank", "url": "https://x.local/api", "api_type": "rest_json"}
+        item_lines[field] = yaml_value
+        raw = _frontmatter_with_data_sources(
+            "data_sources:\n  - " + "\n    ".join(f"{k}: {v}" for k, v in item_lines.items()) + "\n"
+        )
+        with pytest.raises(FrontmatterParseError) as exc_info:
+            normalize_metadata(parse_frontmatter(raw)[0])
+        assert exc_info.value.context.get("field") == "data_sources[0]"
+
 
 class TestExistingSkillsRegression:
     """既有 23 个 SKILL.md 解析零回归（未声明 data_sources → 默认空 tuple）。"""

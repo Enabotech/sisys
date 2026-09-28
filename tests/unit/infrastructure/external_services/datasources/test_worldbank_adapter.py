@@ -228,17 +228,29 @@ class TestWorldBankAdapterFailures:
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_opens_after_threshold(self) -> None:
+        """连续失败达阈值后熔断打开，后续调用快速失败不再发起 HTTP
+
+        熔断计数语义（R3-2 G0 判别力修复）：on_failure 按 fetch 计（tenacity
+        3 次重试在外层 except 收敛后仅计 1 次）——threshold=5 需 **5 次 fetch**
+        才打开（原 range(2) 从未打开，第三次调用仍发 3 次真实 HTTP，「快速失败」
+        断言与真失败不可判别）；第 6 次调用 transport 计数保持不变才是真快速失败。
+        """
+        calls = {"n": 0}
+
         def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
             return httpx.Response(503, json={})
 
         adapter = _make_adapter(httpx.MockTransport(handler))
-        # 默认熔断阈值 5 次连续失败 → 两次 fetch（各 3 次重试）后熔断
-        for _ in range(2):
+        # 5 次 fetch（各 3 次重试 = 15 次 HTTP，各计 1 次 on_failure）→ 熔断打开
+        for _ in range(5):
             with pytest.raises(DataSourceUnavailableError):
                 await adapter.fetch(DataSourceQuery(source_name="world-bank", query="GDP"))
-        # 第三次调用：熔断器已断开，快速失败（不再发起 HTTP）
+        assert calls["n"] == 15
+        # 第 6 次调用：熔断器已断开，快速失败——transport 计数保持 15（不再发起 HTTP）
         with pytest.raises(DataSourceUnavailableError):
             await adapter.fetch(DataSourceQuery(source_name="world-bank", query="GDP"))
+        assert calls["n"] == 15
         await adapter.close()
 
     @pytest.mark.asyncio
@@ -246,11 +258,13 @@ class TestWorldBankAdapterFailures:
         """半开探测命中确定性错误（429）后熔断器不楔死，服务恢复即自愈（R3-P0-1
         端到端回归：修复前探测槽位耗尽后永久 411，后端健康也不恢复）
 
-        场景：5xx ×2 打开熔断 → recovery 窗口后探测请求恰遇 429（配额限流）→
-        on_ignored 释放探测槽 → 下一次请求作为新探测放行 → 服务已恢复 200 →
-        熔断闭合采集成功。熔断器注入短 recovery_timeout（0.05s + sleep）加速窗口。
+        场景：5xx ×5 打开熔断（按 fetch 计数）→ recovery 窗口后探测请求恰遇
+        429（配额限流）→ on_ignored 释放探测槽 → 下一次请求作为新探测放行 →
+        服务已恢复 200 → 熔断闭合采集成功。阶段间显式状态断言（OPEN/HALF_OPEN/
+        槽位归零）消除时序假设（R3-2 G0 判别锚点修复：原 range(2) 从未打开熔断，
+        回退 on_ignored 实现该用例仍全绿——零判别假锚点）。
         """
-        from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
+        from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker, CircuitState
 
         state = {"phase": "down"}  # down → probe_429 → up
 
@@ -264,24 +278,29 @@ class TestWorldBankAdapterFailures:
             )
 
         config = WorldBankConfig(api_url=_API_URL, timeout=5.0)
+        cb = CircuitBreaker(failure_threshold=5, recovery_timeout=0.05, name="test-wb")
         adapter = WorldBankAdapter(
             config=config,
             client=httpx.AsyncClient(base_url=_API_URL, transport=httpx.MockTransport(handler), timeout=5.0),
-            circuit_breaker=CircuitBreaker(failure_threshold=5, recovery_timeout=0.05, name="test-wb"),
+            circuit_breaker=cb,
             retry_min_wait=0.01,
             retry_max_wait=0.02,
         )
-        # 阶段 1：连续 5xx → 熔断打开
-        for _ in range(2):
+        # 阶段 1：5 次 fetch（各计 1 次 on_failure）→ 熔断真打开（显式状态锚点）
+        for _ in range(5):
             with pytest.raises(DataSourceUnavailableError):
                 await adapter.fetch(DataSourceQuery(source_name="world-bank", query="GDP"))
+        assert cb.state == CircuitState.OPEN
         # 阶段 2：recovery 窗口后探测请求命中 429（确定性错误释放探测槽——修复前此后永久 411）
         await asyncio.sleep(0.06)
         state["phase"] = "probe_429"
         with pytest.raises(DataSourceRateLimitError):
             await adapter.fetch(DataSourceQuery(source_name="world-bank", query="GDP"))
+        assert cb.state == CircuitState.HALF_OPEN
+        assert cb._half_open_calls == 0  # on_ignored 已释放探测槽（无墙钟依赖的判别锚点）
         # 阶段 3：服务恢复 → 下一次请求可探测且成功（楔死实现在此抛 411「熔断器已断开」）
         state["phase"] = "up"
         result = await adapter.fetch(DataSourceQuery(source_name="world-bank", query="GDP"))
         assert result.source_name == "world-bank"
+        assert cb.state == CircuitState.CLOSED
         await adapter.close()

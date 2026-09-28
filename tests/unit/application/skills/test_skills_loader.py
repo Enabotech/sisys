@@ -277,6 +277,63 @@ class TestYamlFrontmatterParsing:
         assert "environment_analysis" in doc.frontmatter.capabilities
 
 
+class TestDataSourcesFrontmatterFailFast:
+    """声明 data_sources 的 frontmatter 解析失败 fail-fast（R3-2 G5）。
+
+    静默回退会抹掉白名单（data_sources=()）→ 运行期以「declared=[]」误导性 207
+    暴雷；该键的存在说明工具依赖采集，须在加载期响亮失败。无声明的保持回退。
+    注意：用既有 slug（pestel-analysis）+ 临时 skills_root（新造 slug 会先抛
+    SkillNotFoundError 到不了 frontmatter 解析）。
+    """
+
+    @pytest.mark.asyncio
+    async def test_broken_yaml_with_data_sources_declaration_fails_fast(self, tmp_path: Path) -> None:
+        """坏 YAML + 含顶层 data_sources 键 → SkillLoadError(388)，cause 链保真"""
+        from src.application.skills.frontmatter import FrontmatterParseError
+        from src.domain.exceptions import SkillLoadError
+
+        skill_dir = tmp_path / "pestel-analysis"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: PESTEL\ndata_sources:\n  - name: world-bank\n    url: [unclosed\n", encoding="utf-8"
+        )
+        loader = InMemorySkillLoader(skills_root=tmp_path)
+        with pytest.raises(SkillLoadError) as exc_info:
+            await loader.load_sop("pestel-analysis")
+        assert exc_info.value.code == "EXCEPTION_388"
+        assert "data_sources" in exc_info.value.message
+        assert isinstance(exc_info.value.__cause__, FrontmatterParseError)
+
+    @pytest.mark.asyncio
+    async def test_broken_yaml_without_declaration_keeps_fallback(self, tmp_path: Path) -> None:
+        """坏 YAML + 无 data_sources 声明 → 既有静默回退（基础元数据，向后兼容）"""
+        skill_dir = tmp_path / "pestel-analysis"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("---\nname: [unclosed\n", encoding="utf-8")
+        loader = InMemorySkillLoader(skills_root=tmp_path)
+        doc = await loader.load_sop("pestel-analysis")
+        assert doc.frontmatter.data_sources == ()  # 基础元数据回退（无白名单声明可丢）
+
+    @pytest.mark.asyncio
+    async def test_nested_data_sources_key_not_treated_as_declaration(self, tmp_path: Path) -> None:
+        """嵌套 data_sources 键（如 output_schema 内缩进）不误判为顶层声明 → 保持回退
+        （列 0 锚定：YAML 根键必在列 0，嵌套键缩进不命中）"""
+        skill_dir = tmp_path / "pestel-analysis"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("---\nname: PESTEL\noutput_schema:\n  data_sources: [unclosed\n", encoding="utf-8")
+        loader = InMemorySkillLoader(skills_root=tmp_path)
+        doc = await loader.load_sop("pestel-analysis")
+        assert doc.frontmatter.data_sources == ()
+
+    @pytest.mark.asyncio
+    async def test_valid_frontmatter_with_data_sources_loads_normally(self) -> None:
+        """合法 frontmatter + data_sources 声明 → 正常加载回归（6 个生产 SKILL.md 代表）"""
+        loader = InMemorySkillLoader()
+        doc = await loader.load_sop("pestel-analysis")
+        assert doc.frontmatter.data_sources != ()  # 真实声明正常加载
+        assert len(doc.frontmatter.data_sources) == 6
+
+
 # ============================================================================
 # TestLruCache: 真实 LRU 淘汰
 # ============================================================================
