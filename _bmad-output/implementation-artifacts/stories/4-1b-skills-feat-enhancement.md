@@ -1,6 +1,6 @@
 # Story 4.1b: Skills 数据采集基础设施（DataSourcePort + 8 数据源适配器）
 
-**Status:** `done`（第二审查周期 Round 1-5 收敛，2026-09-28）
+**Status:** `done`（第三审查周期 Round 1-5 收敛，2026-09-28）
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1745,6 +1745,28 @@ tests/
 
 **Round 4 验证汇总**：全量 unit+contracts **8270 passed** 零失败（新增 7 项：K1×3 + K2×2 断言面 + K3 改写强化 + K4×1）+ 验收 18 passed + ruff All checks passed + mypy 1386 文件零问题 + 红线自查零新增违规
 
+#### Round 5 — C1 收敛取证 + C2 收敛修复（J1-J3）
+
+**C1 收敛评审结论（独立 Agent 取证）**：四轮 28 项修复代码面**全部真实落地零半成品**（判别力抽查 5 处突变视角全红 / MRO 前提运行时实证 / 500 项抽样测试实跑全绿）；**未收敛，差 2 项**：
+
+| # | 级 | 发现 | 处置 |
+|---|----|------|------|
+| R5-1 | P1 | **R3-P1-9（AC-2.3 验收自证）跨四轮静默泄漏**：Round 1 发现表登记但 F1-F9 仅映射 8 项 P1，Round 2-4 零提及零 defer——正是本 Story F8v2-⑤ 警示的「R5-1 式跨轮遗忘」模式重演；场景对 `_FakeDataSourceAdapter(behavior="auth_failed")` 直接调用自证，删除生产 401/403→101 映射仍全绿 | **J1 修复** |
+| R5-2 | P2 | K1「模块头映射表同步」子项台账虚记：`_http_helpers` 模块 docstring 与 §3.4.1 均无 UnsupportedProtocol 行 | **J2 修复** |
+| R5-3 | P3 | Story 元数据停更（v1.6.0 第二周期 done 状态，第三周期四轮未入版本历史） | **J3 更新**（v1.7.0） |
+| R5-4 | P3 | Round 1 P2 组 6 项无显式处置行（golden fixture / half_life 缓存重建丢失 / .env.example 缺 USPTO_API_KEY / event_channels 描述漂移 / china-nbs 300s 超引擎预算 / importlinter 已静默闭合） | **本轮显式登记**：golden fixture→4-1c 契约稳定后；half_life 重建丢失→无行为影响（全适配器默认值）记观察；.env.example→随部署 Story；event_channels 描述→4.7；china-nbs 预算→4.x Engine 专项（H 组 defer 同域）；importlinter 项已闭合 |
+
+**J1 修复（AC-2.3 重写为生产链路驱动）**：given/when 改真实 `NewsAPIAdapter` + `MockTransport(401)`（驱动 `_http_helpers` 生产 101 分流；mock 仅限外部 HTTP 传输层，对齐项目范本）；.feature 步骤文本锁步同步。
+**J2 修复**：`_http_helpers` 模块头映射契约 + `sisys-uni-exception-design.md` §3.4.1 各补 UnsupportedProtocol 行（对齐 InvalidURL 口径叙述）。
+**J3 更新**：Story v1.7.0 + 第三周期汇总 + 状态确认 done。
+
+#### 第三审查周期收敛判定（Round 5，2026-09-28）
+
+- **P0 残留：0；P1 残留：0**（R5-1/J1 已修复；R5-2/J2 已补）→ **收敛达成**
+- 累计修复：1 P0（熔断器半开楔死）+ 9 P1 + 24 P2/判别力项 + 台账 defer 5 项（single-flight/采集预算/execution_id 默认/tenant_id/5xx 消息）+ Deferred→4.7 清单 2 项
+- 关键提交：75c3bbe5（R1）→ 0d550dda（R2）→ 2c743d97（R3）→ f6a8d629（R4）→ 本轮（R5）
+- 最终验证：全量 unit+contracts 8270 passed + 验收/集成 31 passed + ruff/mypy 1386 文件全绿 + 红线 grep 零新增 + import-linter 4/5 KEPT（1 BROKEN 为 HEAD 既有非本 Story 引入）+ 覆盖率分层门禁四项全过（application 88% / infrastructure 86% / overall 89% / domain ≥90%）
+
 | # | 修复 | 文件 | 验证 |
 |---|------|------|------|
 | F1 | 注入管线重构：preamble `json.dumps`→`repr`（parse_constant 映射 NaN/Infinity 为字面串）；标记原位替换 `DATA_SOURCES["name"]`（同源 `name#k`）；失败位替换 `None`；inject 改收 `(code, markers, results)`；`fetch_many` 等长对齐 `tuple[DataSourceResult \| None, ...]` | `data_source_marker.py` / `data_source_resolver.py` / `tool_execution_engine.py` / `ports/data_source_resolver.py` | 新增 compile 闸门 + null/bool/unicode exec + 部分失败 + name#k 共 7 项单测；38 marker 测试全绿 |
@@ -1761,11 +1783,12 @@ tests/
 - [x] 运行 `dev-story` 开始实施
 - [x] 运行 `code-review` 进行代码审查（第一周期 Round 1-5，2026-09-26 完成）
 - [x] 第二审查周期 Round 1-5 循环完成（2026-09-28 收敛，Status → done）
+- [x] 第三审查周期 Round 1-5 循环完成（2026-09-28 收敛，Status → done；1 P0 + 9 P1 + 24 P2/判别力项）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.6.0
+**故事版本/Story Version:** v1.7.0
 **创建日期/Created:** 2026-09-24
 **最后更新/Last Updated:** 2026-09-28
 **更新说明/Description:**
@@ -1780,6 +1803,12 @@ tests/
   - **R3**（10 P2）：ChinaNBS 轮询状态机 / 8 config 范围校验 / naive-aware 双分支 / quote_path_segment / 3xx→413 / ttl 白名单权威 / 事件脱敏 / 失败事件唯一发布 / fetch_many 信号量 / real_crawler 删除
   - **R4**（验收基建 5 项）：AC-5.1 三断言 / session→场景级 Redis / AC-7.2 确定性断言 / AC-2.4 子进程探针 / AC-2.5 金丝雀；I6 超长整数改判不落码
   - **R5**（收敛）：J1 六个 SKILL.md SOP 同步注入语义（.get() 防御性读取 + name#k + 失败源 None）；J2 孤儿步骤清理 + 游离提交 730e1cb4 补记；零 P0/P1 残留收敛 → Status done
+- v1.7.0: 第三审查周期 Round 1-5 循环收敛（2026-09-28，commit 75c3bbe5→f6a8d629→本轮）：
+  - **R1**（1 P0 + 8 P1，F1-F9）：熔断器半开楔死双修（on_ignored 释放探测槽 + 超时再武装，实测复现的永久 411）/ 缓存 stale 基准改 fetched_at（三视角独立发现三重印证——WorldBank/IMF 年度数据缓存结构性永不命中）/ USPTO PatentsView v1 X-Api-Key 条件注册 / with_execution_id 改 dataclasses.replace（九字段保留）/ tz-awareness 门禁 / httpx 异常链归并（DecodingError→413）/ 6 个 SKILL.md query 机器码契约 / publish 可观测性 / WorldBank message 判别器
+  - **R2**（判别锚点 + G1-G6 红线闭合）：F1 假锚点修复（熔断按 fetch 计数 range(2) 从未打开）/ zip 长度校验 / literal_eval 畸形转义前置（实测 SyntaxError 主通道）/ DataSourceRef 类型门禁（YAML 标量混淆原生异常逃逸收敛）/ parse_int_param / loader data_sources fail-fast(388) / resolver=None 101 fail-fast
+  - **R3**（H1-H8 行为增强）：Engine 失败路径持久化（6 处 + 沙箱死分支 PLANNING 前置——IDLE→FAILED 非法迁移掩码）/ china_nbs 段编码 / IPCC health_check 熔断集成 / tavily 类型校验 / validate_score 类型门禁 + 事件校验 / EvidencePackage 门禁 / 测试租户 UUID 线程化（Redis 键泄漏闭合）/ 黑名单 18 项对齐
+  - **R4**（K1-K4 判别力收敛）：UnsupportedProtocol 101 口径对齐（真 bug：确定性配置错误被重试且计熔断）/ 事件→聚合绑定 E2E（仓储捕获取证，原删除 wiring 不变红）/ 恒真断言收紧 5 处 / keyed 端口元数据子进程断言；台账 defer 2 项
+  - **R5**（收敛）：J1 AC-2.3 重写为生产链路驱动（R3-P1-9 跨四轮泄漏闭合）；J2 K1 文档映射行补齐；J3 元数据 v1.7.0；零 P0/P1 残留收敛 → Status done
 - v1.5.0: code-review Round 4 收尾（综合验证 + Story 状态 done）：
   - **C1 综合验证**：ruff 全量检查通过；三条红线（raise ValueError/HTTPException/抑制注释）零输出；7223 个 unit/contracts 测试全绿（含 8 适配器测试 + resolver/marker/event/crawler/exceptions）
   - **Story 完成清单核对**：AC-1 ~ AC-8 全部覆盖 / Task 0-10 全部完成 / 风险 R1-R8 全部缓解
@@ -1788,9 +1817,9 @@ tests/
 
 ## Story 最终状态
 
-**Status:** ✅ **done**（第二审查周期 Round 5 收敛，2026-09-28）
+**Status:** ✅ **done**（第三审查周期 Round 5 收敛，2026-09-28）
 
-> 状态说明：第一审查周期（2026-09-26）收敛 done 后，第二审查周期（2026-09-27~28，Round 1-5）发现并修复 4 P0 + 9 P1 + 14 P2 + 验收基建 5 项 + 6 个 SKILL.md SOP 契约同步；Round 5 独立收敛评审确认零 P0/P1 残留后恢复 done（header/sprint-status.yaml 同步）。
+> 状态说明：第一（2026-09-26）/第二（2026-09-27~28）审查周期收敛 done 后，第三审查周期（2026-09-28，Round 1-5）发现并修复 1 P0（熔断器半开楔死——实测复现的永久不可用）+ 9 P1（缓存结构性失效三重印证/SOP-适配器契约断裂/USPTO 鉴权缺失/异常红线破口组/Engine 失败持久化等）+ 24 P2/判别力项；Round 5 独立收敛取证确认四轮 28 项修复全部落地、零 P0/P1 残留后恢复 done。累计三周期：11 P0 + 21 P1 + 39 P2/判别力项修复，测试从 7996 增至 8270+（unit/contracts），全部门禁（ruff/mypy/红线/import-linter/覆盖率分层）持续全绿。
 
 **第一周期审查轮次总结（Round 1-5，2026-09-26）:**
 

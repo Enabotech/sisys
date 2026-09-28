@@ -10,6 +10,8 @@
 - httpx.DecodingError → DataSourceResponseError（EXCEPTION_413，响应体解码失败属确定性错误，
   不重试不计熔断——对齐「响应解析类问题不计熔断」契约）
 - httpx.InvalidURL → ConfigurationError（EXCEPTION_101，URL 配置错误属确定性错误，不重试不计熔断）
+- httpx.UnsupportedProtocol → ConfigurationError（EXCEPTION_101，URL scheme 缺失属确定性配置错误，
+  不重试不计熔断——R3-4 K1：原 ⊂ TransportError 被白名单重试且计熔断，已对齐 InvalidURL 口径）
 - httpx.RequestError（其余传输类：TransportError 子类/TooManyRedirects 等）→
   DataSourceUnavailableError（EXCEPTION_411，重试耗尽后，计熔断）
 - HTTP 5xx → 可重试，耗尽后 DataSourceUnavailableError（EXCEPTION_411）

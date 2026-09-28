@@ -38,8 +38,8 @@
   并且 外部采集次数为 1
 
 场景: AC-2.3 - 401/403 鉴权失败归 ConfigurationError
-  假如 构造 _FakeDataSourceAdapter 行为为 auth_failed（401/403）
-  当 调用 fake adapter fetch 方法
+  假如 真实 NewsAPI 适配器收到 401（HTTP 层 mock，鉴权分流验证）
+  当 调用该适配器 fetch 并捕获鉴权异常
   那么 抛出 ConfigurationError
   并且 错误码为 EXCEPTION_101
   并且 context 含 status_code 字段
