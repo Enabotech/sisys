@@ -27,6 +27,7 @@ from src.domain.value_objects.data_source import (
 )
 from src.infrastructure.config.tavily import TavilyConfig
 from src.infrastructure.external_services.datasources._http_helpers import (
+    parse_int_param,
     request_json_with_resilience,
 )
 from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
@@ -103,7 +104,7 @@ class TavilyAdapter:
         body: dict[str, Any] = {
             "api_key": self._config.api_key,
             "query": query.query,
-            "max_results": int(params_dict.get("max_results", "5")),
+            "max_results": parse_int_param(params_dict, "max_results", 5, source_name="tavily"),
         }
         data = await request_json_with_resilience(
             self._client,

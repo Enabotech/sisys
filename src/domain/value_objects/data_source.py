@@ -79,6 +79,31 @@ class DataSourceRef:
 
     def __post_init__(self) -> None:
         """字段不变量校验（抛 EntityValidationError EXCEPTION_242）"""
+        # 类型门禁（R3-2 红线组 G3：SKILL.md frontmatter 标量类型混淆的前置拦截——
+        # name: 123 / url: 123 / ttl_seconds: "604800" / ttl_seconds: 空值 None /
+        # required_fields 标量等 YAML 编排错误在未拦截时以原生 TypeError/
+        # AttributeError 逃逸领域异常体系；构造侧全量拦截后应用层既有
+        # except DomainError 包裹自动收敛，无需扩展异常清单）
+        if not isinstance(self.name, str):
+            raise EntityValidationError(
+                message=f"name 必须为 str，实际 {type(self.name).__name__}",
+                context={"entity": "DataSourceRef", "field": "name", "value": str(self.name)},
+            )
+        if not isinstance(self.url, str):
+            raise EntityValidationError(
+                message=f"url 必须为 str，实际 {type(self.url).__name__}",
+                context={"entity": "DataSourceRef", "field": "url", "value": str(self.url)},
+            )
+        if not isinstance(self.ttl_seconds, int):
+            raise EntityValidationError(
+                message=f"ttl_seconds 必须为 int，实际 {type(self.ttl_seconds).__name__}",
+                context={"entity": "DataSourceRef", "field": "ttl_seconds", "value": str(self.ttl_seconds)},
+            )
+        if not isinstance(self.required_fields, tuple) or not all(isinstance(f, str) for f in self.required_fields):
+            raise EntityValidationError(
+                message="required_fields 必须为 tuple[str, ...]（标量/含非 str 元素均拒绝）",
+                context={"entity": "DataSourceRef", "field": "required_fields", "value": str(self.required_fields)},
+            )
         if not self.name or not _NAME_PATTERN.match(self.name):
             raise EntityValidationError(
                 message=f"name 必须为非空 kebab-case，实际 {self.name!r}",

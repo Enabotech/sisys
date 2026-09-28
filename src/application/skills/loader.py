@@ -29,6 +29,7 @@ from src.application.ports.skill_loader import (
     ToolMetadata,
 )
 from src.application.skills.frontmatter import (
+    FRONTMATTER_DELIMITER,
     FrontmatterParseError,
     normalize_metadata,
     parse_frontmatter,
@@ -44,6 +45,34 @@ logger = logging.getLogger(__name__)
 _LRU_CAPACITY = 100
 _TOOLS_MD_FILENAME = "TOOLS.md"
 _TABLE_ROW_PATTERN = re.compile(r"^\|\s*([a-z0-9][a-z0-9\-]*)\s*\|")
+# frontmatter 顶层 data_sources 键行（列 0 锚定——YAML 根键必在列 0；
+# 嵌套同名键（如 output_schema 内缩进的 data_sources:）与注释/列表项不命中）
+_DATA_SOURCES_KEY_RE = re.compile(r"^data_sources\s*:")
+
+
+def _frontmatter_declares_data_sources(raw_text: str) -> bool:
+    """判定首个 `---` 区间内是否声明顶层 data_sources 键（行级探测）
+
+    YAML 已解析失败的降级探测（R3-2 G5：声明存在时 frontmatter 解析失败须
+    fail-fast 而非静默回退抹掉白名单）。边界语义：首行非 `---`（无 frontmatter）
+    或无结束 `---`（未闭合）→ False——无合法 frontmatter 即无声明，走既有回退；
+    探测严格限定在首区间内，防止扫描面溢出到 body 的 data_sources 文档行。
+
+    Args:
+        raw_text: SKILL.md 原始文本
+
+    Returns:
+        首个 frontmatter 区间内是否存在顶层 data_sources 声明
+    """
+    lines = raw_text.split("\n")
+    if not lines or lines[0].strip() != FRONTMATTER_DELIMITER:
+        return False
+    for line in lines[1:]:
+        if line.strip() == FRONTMATTER_DELIMITER:
+            return False  # frontmatter 区间结束，未发现声明
+        if _DATA_SOURCES_KEY_RE.match(line):
+            return True
+    return False  # 未闭合（无结束分隔符）——按无声明处理
 
 
 class InMemorySkillLoader(SkillLoaderPort):
@@ -176,7 +205,20 @@ class InMemorySkillLoader(SkillLoaderPort):
 
         try:
             meta_dict, body = parse_frontmatter(raw_text)
-        except FrontmatterParseError:
+        except FrontmatterParseError as exc:
+            # 声明了 data_sources 的 frontmatter 解析失败必须 fail-fast（R3-2 G5）：
+            # 静默回退会抹掉白名单（data_sources=()）且 description/when_to_use 全部
+            # 重置，运行期以「declared=[]」的误导性 207 暴雷（真实根因 YAML 解析失败
+            # 只存在于 warning 日志）。该键的存在说明工具依赖采集，白名单丢失必然
+            # 运行期失败——fail-fast 使配置错误在加载期响亮暴露。
+            # 无 data_sources 声明的既有 SKILL.md 保持静默回退（向后兼容）。
+            if _frontmatter_declares_data_sources(raw_text):
+                raise SkillLoadError(
+                    message=f"SKILL.md frontmatter 解析失败且声明了 data_sources（白名单不可静默丢弃）: {exc.message}",
+                    slug=slug,
+                    file_path=str(skill_path),
+                    cause=exc,
+                ) from exc
             # 解析失败时回退到基础元数据（向后兼容 + 容错）
             logger.warning(
                 "SKILL.md frontmatter 解析失败，使用基础元数据: %s",

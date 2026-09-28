@@ -280,14 +280,24 @@ class ToolExecutionEngine:
             BusinessRuleViolationError: 标记存在但无 tool_metadata（无白名单依据），
                 或数据源未在白名单声明（EXCEPTION_207）
             ValidationError: 标记语法错误（EXCEPTION_201）
+            ConfigurationError: 代码含标记但引擎未注入数据源解析器（EXCEPTION_101
+                fail-fast——R3-2 G6：resolver 缺失时含标记代码原样进沙箱必然
+                SyntaxError，被误包装为 ToolExecutionFailedError 掩盖装配缺失根因）
             DataSourceError: 全部数据源采集失败（412/413/411 等不包装直传）
         """
-        if self._data_source_resolver is None:
-            return code, ()
-
+        # 标记解析前置（R3-2 G6）：干净代码（$ 仅在字符串/注释内 → 掩码 → markers=()）
+        # 与 resolver 是否注入完全正交，保持 4.4 零行为变化；含未掩码标记 +
+        # resolver 缺失（组合根未注册数据源端口等部署漂移）→ 101 fail-fast，
+        # 而非沙箱 SyntaxError 误导排障方向
         markers = parse_data_source_markers(code)
         if not markers:
             return code, ()
+
+        if self._data_source_resolver is None:
+            raise ConfigurationError(
+                message="代码含 $DATA_SOURCE 标记但引擎未注入数据源解析器（需 set_data_source_resolver 配置采集链路）",
+                context={"stage": "resolve_data_sources", "marker_count": len(markers)},
+            )
 
         metadata = (context.extensions or {}).get("tool_metadata")
         if metadata is None:

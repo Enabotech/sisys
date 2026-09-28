@@ -135,6 +135,19 @@ class TestUSPTOTimestampNormalization:
 
 class TestUSPTOAdapterFailures:
     @pytest.mark.asyncio
+    async def test_non_integer_page_size_raises_validation_error(self) -> None:
+        """page_size 非整数 → ValidationError(201)（R3-2 G4：内置 ValueError 逃逸
+        领域异常体系的前置拦截——参数错误归 201 且在发请求前拦截）"""
+        from src.domain.exceptions import ValidationError
+
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json={"patents": []})))
+        with pytest.raises(ValidationError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="uspto", query="q", parameters=(("page_size", "xyz"),)))
+        assert exc_info.value.code == "EXCEPTION_201"
+        assert exc_info.value.context.get("field") == "page_size"
+        await adapter.close()
+
+    @pytest.mark.asyncio
     async def test_5xx_retry_exhausted_raises_unavailable(self) -> None:
         calls = {"n": 0}
 

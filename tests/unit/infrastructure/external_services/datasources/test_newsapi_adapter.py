@@ -22,6 +22,7 @@ from src.domain.exceptions import (
     DataSourceResponseError,
     DataSourceUnavailableError,
     TimeoutError,
+    ValidationError,
 )
 from src.domain.ports.data_source import DataSourcePort, DataSourceQuery
 from src.infrastructure.config.newsapi import NewsAPIConfig
@@ -117,6 +118,18 @@ class TestNewsAPITimestampNormalization:
 
 
 class TestNewsAPIAdapterFailures:
+    @pytest.mark.asyncio
+    async def test_non_integer_page_size_raises_validation_error(self) -> None:
+        """page_size 非整数 → ValidationError(201)（R3-2 G4：原裸 int() 抛内置
+        ValueError 逃逸领域异常体系；参数错误归 201 且在发请求前拦截——零配额消耗）"""
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json={"articles": []})))
+        with pytest.raises(ValidationError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="newsapi", query="q", parameters=(("page_size", "abc"),)))
+        assert exc_info.value.code == "EXCEPTION_201"
+        assert exc_info.value.context.get("field") == "page_size"
+        assert exc_info.value.context.get("source_name") == "newsapi"
+        await adapter.close()
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("status_code", [401, 403])
     async def test_401_403_raises_configuration_error_without_key_leak(self, status_code: int) -> None:

@@ -11,6 +11,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
@@ -31,11 +32,16 @@ class TestSandboxSessionQuery:
         assert query.limit == 100
 
     def test_frozen_immutable(self) -> None:
-        """frozen dataclass: 字段赋值抛 FrozenInstanceError"""
-        query = SandboxSessionQuery()
+        """frozen dataclass: 字段赋值抛 FrozenInstanceError
+
+        赋值视图声明为 Any：本用例语义是「故意违反静态类型契约、验证运行时
+        frozen 保护」，Any 是对该意图的诚实类型表达（mypy 对 frozen 字段赋值
+        报 read-only 属静态层拦截，运行时行为须绕过静态视图验证）。
+        """
+        query: Any = SandboxSessionQuery()
 
         with pytest.raises(FrozenInstanceError):
-            query.offset = 5  # type: ignore[misc]
+            query.offset = 5
 
     def test_combined_fields(self) -> None:
         """多字段组合构造"""

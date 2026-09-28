@@ -168,33 +168,74 @@ async def _run_engine(
 
 
 class TestEngineWithoutResolver:
-    """resolver=None 零行为变化（Story 4.4 回归保护）。"""
+    """resolver=None 语义（R3-2 G6 重写：含标记代码 fail-fast 101，干净代码零行为变化）。
+
+    原「标记代码直通沙箱」语义已废弃——resolver 缺失 + 含标记 = 组合根装配漂移，
+    fail-fast ConfigurationError(101) 远优于沙箱 SyntaxError 被误包装为
+    ToolExecutionFailedError（排障方向误导）。
+    """
 
     @pytest.mark.asyncio
-    async def test_no_resolver_marker_code_passes_through(self) -> None:
+    async def test_no_resolver_marker_code_fails_fast(self) -> None:
+        """含未掩码标记 + resolver 未注入 → 101 fail-fast，代码永不达沙箱"""
+        from src.domain.exceptions import ConfigurationError
+
         code = '$DATA_SOURCE("world-bank", "GDP")\nprint(1)'
+        sandbox_codes: list[str] = []
+        engine = _make_engine(code, sandbox_codes)
+        with pytest.raises(ConfigurationError) as exc_info:
+            await _run_engine(engine, _make_metadata("world-bank"))
+        assert exc_info.value.code == "EXCEPTION_101"
+        assert exc_info.value.context.get("marker_count") == 1
+        assert sandbox_codes == []  # 快速失败：含标记代码不进沙箱（原语义会 SyntaxError 白烧沙箱）
+
+    @pytest.mark.asyncio
+    async def test_clean_code_without_resolver_passes_through(self) -> None:
+        """干净代码（无标记）+ resolver 未注入 → 4.4 零行为变化（直通成功）"""
+        code = "print(1)"
         sandbox_codes: list[str] = []
         engine = _make_engine(code, sandbox_codes)
         result = await _run_engine(engine, _make_metadata("world-bank"))
         assert result.status == ToolResultStatus.SUCCESS
-        # 代码原样送沙箱（无 preamble 注入）
         assert sandbox_codes[0] == code
-        # 证据包无数据源元数据
         assert result.evidence_package is not None
         assert result.evidence_package.data_sources == ()
 
     @pytest.mark.asyncio
-    async def test_set_resolver_none_revokes_injection(self) -> None:
-        code = '$DATA_SOURCE("world-bank", "GDP")\nprint(1)'
+    async def test_dollar_inside_string_without_resolver_passes_through(self) -> None:
+        """字符串字面量内的 $DATA_SOURCE 文本（掩码后 markers=()）+ resolver 未注入 →
+        直通成功（锁死「干净代码与 resolver 注入正交」边界，防 fail-fast 误伤）"""
+        code = 'print("$DATA_SOURCE(x)")\nprint(1)'
         sandbox_codes: list[str] = []
         engine = _make_engine(code, sandbox_codes)
+        result = await _run_engine(engine, _make_metadata("world-bank"))
+        assert result.status == ToolResultStatus.SUCCESS
+        assert sandbox_codes[0] == code
+
+    @pytest.mark.asyncio
+    async def test_malformed_marker_without_resolver_raises_201_before_101(self) -> None:
+        """畸形标记 + resolver 未注入 → 标记解析在前，201 先于 101（语法错误是根因）"""
+        from src.domain.exceptions import ValidationError
+
+        code = '$DATA_SOURCE("world-bank")\nprint(1)'  # 缺第二参数
+        engine = _make_engine(code, [])
+        with pytest.raises(ValidationError):
+            await _run_engine(engine, _make_metadata("world-bank"))
+
+    @pytest.mark.asyncio
+    async def test_set_resolver_none_revokes_injection(self) -> None:
+        """setter 撤销注入生效：撤销后干净代码成功且无注入（4.4 setter 契约保护）"""
+        clean_code = "print(1)"
+        sandbox_codes: list[str] = []
+        engine = _make_engine(clean_code, sandbox_codes)
         resolver = DataSourceResolverService(
             adapters={"world-bank": _StubAdapter("world-bank")}, cache=_NullCache(), event_publisher=InMemoryEventBus()
         )
         engine.set_data_source_resolver(resolver)
         engine.set_data_source_resolver(None)  # 撤销注入
-        await _run_engine(engine, _make_metadata("world-bank"))
-        assert sandbox_codes[0] == code
+        result = await _run_engine(engine, _make_metadata("world-bank"))
+        assert result.status == ToolResultStatus.SUCCESS
+        assert sandbox_codes[0] == clean_code  # 撤销后干净代码直通、无 preamble 注入
 
 
 class TestEngineWithResolver:

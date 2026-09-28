@@ -27,6 +27,7 @@ from src.domain.value_objects.data_source import (
 )
 from src.infrastructure.config.newsapi import NewsAPIConfig
 from src.infrastructure.external_services.datasources._http_helpers import (
+    parse_int_param,
     request_json_with_resilience,
 )
 from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
@@ -94,13 +95,14 @@ class NewsAPIAdapter:
             DataSourceResponseError: 响应缺少 articles 字段
         """
         params_dict = dict(query.parameters)
+        page_size = parse_int_param(params_dict, "page_size", 10, source_name="newsapi")
         data = await request_json_with_resilience(
             self._client,
             "GET",
             "/v2/everything",
             source_name="newsapi",
             circuit_breaker=self._circuit_breaker,
-            params={"q": query.query, "pageSize": int(params_dict.get("page_size", "10")), "sortBy": "publishedAt"},
+            params={"q": query.query, "pageSize": page_size, "sortBy": "publishedAt"},
             headers={"X-Api-Key": self._config.api_key},
             max_attempts=self._retry_max_attempts,
             min_wait=self._retry_min_wait,

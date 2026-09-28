@@ -1610,6 +1610,65 @@ tests/
 | D1 | outbox 写入依赖请求作用域 session：非 HTTP 上下文（CLI/LangGraph/Prefect）事件 100% 静默丢弃 + HTTP 全失败场景随事务回滚丢事件——需独立 session scope 或 rollback 后补偿发布 | R3-P1-7 / F8 最小闭环之外的结构性修复 |
 | D2 | shutdown 中 `drain_schema_events` 位于 rabbitmq/redis 关闭之后，排空期 in-flight publish 撞已关闭连接 | R5-5（第二周期遗留） |
 
+#### Round 2 — C1 调研发现（三视角：回归核查 + 异常红线破口组 + 行为增强组）
+
+**回归核查（Round 1 修复自身破口）：**
+
+| # | 级别 | 发现 | 处置 |
+|---|------|------|------|
+| R3-2-P1-1 | **P1** | **F1「适配器端到端自愈回归」假锚点**：`test_half_open_probe_with_deterministic_error_recovers` 用 `failure_threshold=5` 但阶段 1 只 2 次 fetch（熔断按每请求计 on_failure，tenacity 重试不计）→ failure_count=2 < 5，**熔断从未打开**，phase 2 的 429 在 CLOSED 态 on_ignored 为 no-op，phase 3 平凡成功——回退 F1（on_ignored 改 no-op）该测试**仍全绿**，`_http_helpers`/ipcc 的 on_ignored 调用点零判别覆盖；既有 `test_circuit_breaker_opens_after_threshold` 同前提错误（第三次调用仍发 3 次真实 HTTP，503 真失败与快速失败不可判别） | **G0 修复**（本轮） |
+| R3-2-P2-1 | P2 | 半开态确定性错误连续放行无退避（429 → on_ignored → 槽位立即可用 → 逐个放行继续吃 429）——§3.4.1「429 不计熔断」契约的直接推论（CLOSED 态 429 同样不开闸），resilience4j ignored exceptions 语义一致，串行单发 + 信号量 4 不构成风暴 | 登记台账（后续评估：429 半开态记失败或放行间隔） |
+| R3-2-P2-2 | P2 | CLOSED 世代迟到 on_ignored 可超发一个探测槽（长存活请求跨 OPEN 窗口后回调减掉不属于自己的槽位；对称既有问题：迟到 on_success 提前推 CLOSED）——超发有界 | 登记台账（世代 token 方案备选） |
+| R3-2-P2-3 | P2 | `UnsupportedProtocol ⊂ TransportError` 被 tenacity 白名单视为可重试 → 协议配置错误徒劳重试 ×3 后 411，与 InvalidURL 的 101 确定性口径相反 | 登记台账（白名单排除对齐 101） |
+
+**其余 8 项 Round 1 修复（F2-F9）回归全部通过**（三处 ttl 白名单权威统一核验 / naive 归一在构造前 / replace 实测九字段保留 / 异常链无子类遮蔽 / health_check 不经 _extract_rows 语义正确 / 全局无遗漏调用点）。
+
+**异常红线破口组（6 项全部确认，详设完成）：** ① `inject_data_sources` 的 `zip(strict=True)` 内置 ValueError 逃逸（公开 API 契约，树内暂不可触发）；② `ast.literal_eval` 畸形转义——**实测抛 SyntaxError（非 ValueError，unicodeescape truncated）**，parse 侧主通道绕过 P0-5 裸 `$` 防线；③ `_parse_data_source_refs` 标量类型混淆（name:123→TypeError / url:123→AttributeError / ttl_seconds:"604800"→TypeError / api_type:[list]→unhashable TypeError **新通道**——VO 根因修复方案）；④ 三适配器 `int(params_dict.get(...))` 内置 ValueError（适配器层抛 201 否决 413——请求参数语义）；⑤ loader 静默回退抹掉白名单 → declared=[] 误导 207（含 data_sources 声明的 frontmatter 失败 fail-fast SkillLoadError 388）；⑥ resolver=None 时含标记代码进沙箱 SyntaxError 误导（标记解析前置 + ConfigurationError 101 fail-fast；2 个既有测试需同步重写）。全部零新增异常类。
+
+**行为增强组裁决（8 实施 + 5 defer）：** 实施——Engine 失败路径持久化（**6 处**不 save，含 COMPLETED-超时隐藏路径）、china_nbs seed_url 段编码、IPCC health_check 修语义+接熔断、tavily results 类型校验、事件分值/source_name 校验、EvidencePackage 元素门禁、测试 Redis 键泄漏（双文件租户 UUID 归一）、AC 黑名单对齐 18 项。Defer——single-flight（parse 已单执行去重 + 跨执行同 query 概率极低 → 4-1c query 结构化时）、采集超时预算（取消语义复杂 + 观测未触发 → 4.x Engine 专项）、execution_id 默认值（event_store `aggregate_id NOT NULL` 硬约束 + 4.1a 全域占位模式 → 4.7）、tenant_id 弱类型（无现实跨形态调用方 → 4-1c）、5xx 非白名单消息（罕见纯文案 → 下次 _http_helpers 变更顺手）。**留 Round 3 实施。**
+
+#### Round 2 — C2 修复方案（G0-G6，异常契约收敛主题）
+
+**G0 F1 判别锚点修复（R3-2-P1-1）** — `test_worldbank_adapter.py`：
+- 端到端用例阶段 1 改 `range(5)`（5 次 fetch × 每次 1 计数 = failure_count 5 ≥ threshold 5 → 真打开），阶段 1 后显式断言 `adapter._circuit_breaker.state == CircuitState.OPEN`、阶段 2 后断言 `HALF_OPEN`（状态锚点取代时序假设）；回退 F1（on_ignored no-op 子类）该用例必红（phase 2 后熔断楔死 HALF_OPEN，phase 3 抛 411）
+- 既有 `test_circuit_breaker_opens_after_threshold` 以 transport 调用计数修复判别力（第三次调用 HTTP 计数为 0 才是真快速失败）
+
+**G1 zip 长度前置校验（201）** — `data_source_marker.py::inject_data_sources`：早退分支之前插入 `len(markers) != len(results)` → `ValidationError(201, context 含两计数值)`；保留 `strict=True` 作不变量哨兵；docstring 补 Raises；2 项新测（含 markers=() + results 非 () 边界）
+
+**G2 literal_eval 安全包裹（201）** — `data_source_marker.py`：新增 `_eval_marker_literal` 助手 `except (ValueError, SyntaxError)` → ValidationError(201, context 含 literal)；**必须双捕（实测主通道是 SyntaxError unicodeescape）**；替换 parse 侧 2 处 + inject 侧 2 处调用点；测试用原始字符串构造 `r"$DATA_SOURCE('\u12', 'q')"` 断言 201（含 `'\x'` 变体）
+
+**G3 DataSourceRef isinstance 门禁（VO 根因）+ api_type except 扩 TypeError** — `value_objects/data_source.py::DataSourceRef.__post_init__`：name/url isinstance str、ttl_seconds `isinstance(bool) or not isinstance(int)`（bool 单列防 `ttl_seconds: true` 混入）、required_fields tuple[str,...] 校验（消除标量 str 透传）——全部 EntityValidationError(242)；`frontmatter.py:189` `except ValueError` → `except (TypeError, ValueError)`（api_type unhashable 在枚举构造、VO 之前）；EntityValidationError ⊂ DomainError 使 frontmatter:208 既有包裹自动收敛，应用层零扩展；frontmatter 标量混淆组 + VO 4 项拦截测试
+
+**G4 parse_int_param 助手（201）** — `_http_helpers.py` 新增（三适配器共享）：缺失回退 default、`except (TypeError, ValueError)` → ValidationError(201, context 含 source_name/field)；newsapi/tavily/uspto 三调用点替换；文件头契约注释补 201 行；每适配器 1 例非法值 + 1 例默认回归
+
+**G5 loader data_sources 声明 fail-fast（388）** — `loader.py`：新增 `_frontmatter_declares_data_sources(raw_text)` 行级探测（首个 `---` 区间内 `^\s*data_sources\s*:`）；`except FrontmatterParseError` 分支：声明存在 → `SkillLoadError(388, cause 链)` raise，无声明 → 既有静默回退（向后兼容）；3 项新测（fail-fast/回退/合法回归）；两用例容错层不动（语义更诚实：207「缺少 tool_metadata」替代 declared=[] 误导）
+
+**G6 标记解析前置 + resolver=None fail-fast（101）** — `tool_execution_engine.py::_resolve_data_sources`：`parse_data_source_markers(code)` 提到 resolver 判空之前；markers 非空且 resolver None → `ConfigurationError(101, context 含 marker_count)`（已在直传白名单，无包装）；干净代码零行为变化（掩码后 markers=() 直通）；2 个既有直通测试重写为 fail-fast 断言 + 新增字符串内 `$` 直通锁边界 + 畸形标记 201 用例
+
+**C3 评审结论（Round 2，两视角：正确性实证 / 回归面与判别力；组1「良好—有条件准予」+ 组2「未发现方案性错误，G1-G6 全通过」）。v2 修订清单（全部纳入）：**
+
+1. **G3v2**：① api_type unhashable TypeError 前提**不可复现**（Python 3.11.15 实测 `DataSourceApiType([list])` 抛 ValueError，既有 `except ValueError` 已覆盖；unhashable 行为属 ≤3.10）——frontmatter except 扩宽**删除**（死分支违反「不为不可能场景写防御」），测试锚点迁至 name/url/ttl_seconds 三处**真实破口**（实测 TypeError/AttributeError/TypeError 逃逸成立）；② ttl_seconds bool 单列子句删除（实测 `True==1` 已被范围检查 `[60,2592000]` 拦截，bool 子句只改消息不改行为）；③ required_fields 补元素级校验 `all(isinstance(x, str))`（YAML `[1,2]` 归一化后 tuple[int,int] 仅查类型仍透传）；④ 6 文件零回归实证（required_fields 全 str 块列表经 list→tuple 归一、ttl 全裸 int、name/url 全 str；全仓 17 处 DataSourceRef 构造点逐一核对无违规形态）；附带修复 `ttl_seconds:`（空值 None→原生 TypeError）逃逸通道
+2. **G5v2**：① 探测正则收严 `^data_sources\s*:`（**列 0 锚定**——`^\s*` 版实测误命中 pestel frontmatter 内 output_schema 嵌套键 line 131；6 个真实顶层声明实测全在列 0 命中）；② 缺起始 `---` 或无结束 `---` → 显式 return False（无合法 frontmatter 即无声明——防扫描面溢出到 body 的 `data_sources:` 文档行）；③ 新测用**既有 slug**（pestel-analysis 等）+ 临时 skills_root（新造 slug 会先抛 SkillNotFoundError 到不了 frontmatter）；④ 双路径异常分叉注明（语法坏→新 SkillLoadError(388)；语法好但值非法→既有 FrontmatterParseError 直传）
+3. **G0v2**：① 既有 `test_circuit_breaker_opens_after_threshold` **同步**改 `range(5)` 并断言**第 6 次**调用 transport 计数保持 15（熔断按 fetch 计数——tenacity 重试不计；实测 fetch#5 内 on_failure 达 5 → OPEN，第 6 次快速失败 delta=0；按原文本「第三次」写会对正确代码伪失败或校准成无判别）；② 端到端用例阶段 2 断言后追加 `cb._half_open_calls == 0`（消除 50ms 墙钟依赖——回退 F1 且停顿 ≥ recovery_timeout 时再武装会假绿；测试自建实例读私有属性可接受）；③ 文本「第三次调用」残留修正为第 6 次
+4. **G2v2**：畸形转义变体并入既有 `test_syntax_error_raises_validation_error` 参数化列表（`r"$DATA_SOURCE('\u12', 'q')"` + `"\x"` 变体；注意 `'\q'` 合法勿用）
+5. **G6v2**：重写用例改名（`test_no_resolver_marker_code_fails_fast` 等，旧名 passes_through/revokes 与新断言相悖）+ 保留一条 setter 契约保护断言（撤销后干净代码路径成功且无注入）
+
+**回归面实证汇总（组 2 全量核对）**：G3 零红（归一化在位 + 17 构造点合规）；G6 圈定完整（11 用例中仅方案已列 2 个需重写；4.1a arch 测试无 execute() 调用零影响；4-1c 验收 8 场景无条件注入 resolver 零影响；全仓 11 个 engine 测试文件无非注入场景）；G5 零红（无测试断言静默回退；23 个 SKILL.md 实测全部解析成功）；G1/G2/G4 零红。判别力：ValidationError MRO 无 ValueError → 前置校验撤回时原生 ValueError 不被 raises 捕获必红（G1/G4 同理论证）；markers=()+results 非空边界锁校验位置。
+
+#### 已修复 Patch（第三周期 Round 2，C3 评审 v2 准入后 TDD 实施）
+
+| # | 修复 | 文件 | 验证 |
+|---|------|------|------|
+| G0 | F1 判别锚点修复：端到端用例阶段 1 改 `range(5)`（熔断按 fetch 计数——tenacity 重试不计，实测 fetch#5 内 on_failure 达 5 → OPEN）+ 阶段间显式状态断言（OPEN/HALF_OPEN/`_half_open_calls==0` 无墙钟判别锚点）+ 成功后 CLOSED；既有 opens_after_threshold 同步 `range(5)` + 第 6 次调用 transport 计数保持 15（真快速失败判别） | `test_worldbank_adapter.py` | 16 项 worldbank 测试全绿；回退 on_ignored 实现必红（阶段 2 后槽位不归零 + 阶段 3 抛 411） |
+| G1 | `inject_data_sources` 前置长度校验：`len(markers) != len(results)` → ValidationError(201, context 含两计数值)；校验位于 `if not markers` 早退之前（markers=()+results 非空变体覆盖）；保留 strict=True 作不变量哨兵 | `data_source_marker.py` | 2 项新测（不等长 + 早退边界）——ValidationError MRO 无 ValueError，撤回校验时原生 ValueError 不被捕获必红 |
+| G2 | `_eval_marker_literal` 助手：`except (ValueError, SyntaxError)` → ValidationError(201, context 含 literal)；替换 parse 侧 2 处 + inject 侧 2 处；cast 表达「正则捕获组恒为字符串字面量」契约 | `data_source_marker.py` | 2 个畸形转义变体（`'\u12'`/`'\x'`，实测均抛 SyntaxError unicodeescape）并入既有 201 参数化 |
+| G3 | `DataSourceRef.__post_init__` 类型门禁：name/url isinstance str / ttl_seconds isinstance int / required_fields tuple + 元素级 all(isinstance str)——全部 EntityValidationError(242)；frontmatter 零改动（EntityValidationError ⊂ DomainError 既有包裹自动收敛；api_type unhashable 前提被 3.11 实测证伪——ValueError 已被既有 except 覆盖，不扩死分支） | `value_objects/data_source.py` | VO 5 项标量混淆参数化 + required_fields 标量/非 str 元素 2 项；frontmatter 4 项参数化（FrontmatterParseError 含 field 路径）；零既有红（frontmatter list→tuple 归一化在位） |
+| G4 | `_http_helpers.parse_int_param`（三适配器共享）：缺失回退 default / `except (TypeError, ValueError)` → ValidationError(201, context 含 source_name/field/value)——请求参数错误归 201（非 413 响应错误），发请求前拦截零配额消耗 | `_http_helpers.py` + newsapi/tavily/uspto 三适配器 | 3 项新测（各适配器非法参数 201 + context 断言）；__all__ 导出更新 |
+| G5 | loader fail-fast：`_frontmatter_declares_data_sources` 行级探测（列 0 锚定 `^data_sources\s*:`——嵌套键不命中；缺起/止 `---` → False 防扫描溢出 body）；有声明 + 解析失败 → SkillLoadError(388, cause 链)；无声明保持静默回退（向后兼容） | `loader.py` | 4 项新测（fail-fast 388 + cause 链 / 无声明回退 / 嵌套键不误判 / 合法加载回归 6 源）；既有 slug + tmp_path 模式 |
+| G6 | 标记解析前置 + resolver=None fail-fast：`parse_data_source_markers` 提到判空之前；markers 非空且 resolver None → ConfigurationError(101, context 含 marker_count)（直传白名单已含 101）；干净代码（含字符串内 `$` 掩码后 markers=()）与 resolver 注入正交零行为变化 | `tool_execution_engine.py` | 5 用例：fail-fast 101（含 sandbox_codes==[] 代码不达沙箱）/ 干净代码直通 / 字符串内 `$` 直通锁边界 / 畸形标记 201 先于 101 / setter 撤销契约保护 |
+
+**Round 2 验证汇总**：全量 unit+contracts **8242 passed** 零失败（新增 24 项：G0 判别 2 + G1×2 + G2 参数化 2 + G3×11 + G4×3 + G5×4 + G6 重写 5）+ ruff All checks passed + mypy 603 文件零问题 + 红线自查零新增违规 + 行为组 8 项（H 组）留 Round 3
+
 | # | 修复 | 文件 | 验证 |
 |---|------|------|------|
 | F1 | 注入管线重构：preamble `json.dumps`→`repr`（parse_constant 映射 NaN/Infinity 为字面串）；标记原位替换 `DATA_SOURCES["name"]`（同源 `name#k`）；失败位替换 `None`；inject 改收 `(code, markers, results)`；`fetch_many` 等长对齐 `tuple[DataSourceResult \| None, ...]` | `data_source_marker.py` / `data_source_resolver.py` / `tool_execution_engine.py` / `ports/data_source_resolver.py` | 新增 compile 闸门 + null/bool/unicode exec + 部分失败 + name#k 共 7 项单测；38 marker 测试全绿 |

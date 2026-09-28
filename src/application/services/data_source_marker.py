@@ -32,6 +32,7 @@ import json
 import math
 import re
 from datetime import UTC, datetime
+from typing import cast
 
 from src.domain.exceptions import ValidationError
 from src.domain.ports.data_source import DataSourceQuery
@@ -136,6 +137,37 @@ def _masked_code(code: str, spans: list[tuple[int, int]]) -> str:
     return "".join(chars)
 
 
+def _eval_marker_literal(literal: str) -> str:
+    """ast.literal_eval 安全解析标记参数字面量（内置异常前置为 ValidationError）
+
+    闭合畸形转义逃逸通道（R3-2 红线组）：LLM 生成截断转义（如 `'\\u12'`/`'\\x'`）时
+    literal_eval 内部 compile 抛 SyntaxError（unicodeescape truncated，实测主通道）
+    或 ValueError（malformed node，文档化契约）——未包裹时内置异常逃逸，绕过
+    P0-5 建立的「裸 $ 语法错误前置为 201」防线（正则已完整匹配标记，掩码后
+    无残留 `$` 可供后置校验捕获）。
+
+    Args:
+        literal: 正则捕获的参数字面量文本
+
+    Returns:
+        解析后的字符串值
+
+    Raises:
+        ValidationError: 字面量畸形（EXCEPTION_201，context 携带原文本便于定位；
+            标记文本非凭证，execution.code 存证同源数据，无泄露面）
+    """
+    try:
+        # literal_eval 签名返回 Any；正则捕获组恒为引号包裹的字符串字面量，
+        # 解析产物按契约恒为 str（cast 表达该约束，非类型抑制）
+        return cast("str", ast.literal_eval(literal))
+    except (ValueError, SyntaxError) as exc:
+        raise ValidationError(
+            message="$DATA_SOURCE 标记参数字面量解析失败（期望合法 Python 字符串字面量，转义序列畸形）",
+            context={"stage": "parse_marker", "literal": literal},
+            cause=exc,
+        ) from exc
+
+
 def parse_data_source_markers(code: str) -> tuple[DataSourceQuery, ...]:
     """解析代码中的全部 $DATA_SOURCE 标记（去重，保序）
 
@@ -160,8 +192,8 @@ def parse_data_source_markers(code: str) -> tuple[DataSourceQuery, ...]:
     for match in _MARKER_PATTERN.finditer(code):
         if _inside_span(match.start(), spans):
             continue  # 字符串字面量/行注释内的文本不识别为标记
-        name = ast.literal_eval(match.group(1))
-        query = ast.literal_eval(match.group(2))
+        name = _eval_marker_literal(match.group(1))
+        query = _eval_marker_literal(match.group(2))
         if not name or not name.strip():
             raise ValidationError(
                 message="$DATA_SOURCE 标记 name 参数不能为空",
@@ -208,7 +240,18 @@ def inject_data_sources(
         单源场景键为裸 name，向后兼容 4-1c SKILL.md 消费约定）；失败位标记替换为
         `None`（保 SOP「部分失败不中断分析」降级语义，失败信息由 DataSourceFetchFailed
         事件承载）。注入产物恒为可编译的合法 Python（R2-P0-1 修复闸门）。
+
+    Raises:
+        ValidationError: results 与 markers 长度不一致（EXCEPTION_201——本函数为
+            公开 API，须与 DataSourceResolverPort.fetch_many 的等长对齐契约一致；
+            树内唯一调用方 engine 传等长元组，校验为契约防御面）
     """
+    if len(markers) != len(results):
+        raise ValidationError(
+            message=f"results 与 markers 长度不一致（markers={len(markers)}, results={len(results)}），"
+            "须与 DataSourceResolverPort.fetch_many 的等长对齐契约一致",
+            context={"stage": "inject_data_sources", "marker_count": len(markers), "result_count": len(results)},
+        )
     if not markers:
         return code
     now = datetime.now(UTC)
@@ -251,7 +294,7 @@ def inject_data_sources(
     for match in _MARKER_PATTERN.finditer(code):
         if _inside_span(match.start(), spans):
             continue
-        pair = (ast.literal_eval(match.group(1)), ast.literal_eval(match.group(2)))
+        pair = (_eval_marker_literal(match.group(1)), _eval_marker_literal(match.group(2)))
         key = key_of.get(pair)
         if key is None:
             continue  # 与传入 markers 不一致的标记（理论不可达）保守保留
