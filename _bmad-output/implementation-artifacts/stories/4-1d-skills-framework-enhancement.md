@@ -285,7 +285,7 @@ data_sources:
 
 - 本 Story 无新端口 → **无新端口契约测试文件**
 - 数据源声明一致性契约断言并入架构测试 `tests/unit/architecture/test_arch_skill_mixed_data.py`（声明 SSOT ↔ 10 个 SKILL.md frontmatter ↔ 适配器 `get_metadata()` 三方一致）
-- 既有契约测试回归：`test_port_contract_data_source.py` / `test_port_contract_data_source_resolver.py` 全绿（零修改）；`test_frontmatter_data_sources.py` 含 `DECLARING_SLUGS` 6→16 调整（Round 1 D1-A 勘正——原稿「零修改」与其 `:154-164` 非声明组空 tuple 断言冲突，详见范围澄清节）
+- 既有契约测试回归：`test_port_contract_data_source.py` / `test_port_contract_data_source_resolver.py` 全绿（零修改）；`test_frontmatter_data_sources.py` 含测试语义中间态安全化重构（Task 1.4——Round 1 曾勘正为「DECLARING_SLUGS 6→16 扩清单」、Round 2 证伪重写为中间态安全化，详见范围澄清节）
 
 ---
 
@@ -307,7 +307,7 @@ data_sources:
 - [ ] 10 个 Skills 单元测试（`test_<slug>_mixed_data.py`）断言白名单解析结果 == SSOT 表（全字段：name/api_type/ttl_seconds/url/required_fields）
 - [ ] 跨循环一致性（[C] 循环）：SOP body 中所有 `$DATA_SOURCE("name", "query")` 标记提取的 name 集合 == frontmatter.data_sources name 集合（双向断言：白名单过宽/过窄均失败）
 - [ ] 声明 url ↔ 适配器 url 一致性断言通过
-- [ ] 23 Skills 全量解析回归通过（含 7 个未触碰 Skill 空 tuple 断言）
+- [ ] 23 Skills 全量解析回归通过（7 个 4-1e 目标经「物理非空者必 ∈ SSOT 并集」语义守护——误填即 ∉ 并集红，Round 3 措辞勘正）
 - [ ] 4-1c 既有 6 Skill 契约断言零回归
 
 ### AC-2: SOP 成熟化（10 个 Skills 内容升级，9 章节对齐 4-1c 契约）
@@ -353,7 +353,7 @@ data_sources:
 - **每个 Skill 的 2 个声明源均被采集**（每源 `call_count == 1`，去重语义），注入 `DATA_SOURCES` dict 键集合 == 声明集合
 - **内外数据融合语义验证**：Engine 构造的 Think prompt 携带 arguments（内部数据），LLM Stub 按 Skill 分派 Code 阶段标记代码（外部基准）——断言 Think prompt 含 arguments repr 子串且 DATA_SOURCES 注入成功（双通道并存；断言机制见 Subtask 12.1/14.8 三要素）
 - **新鲜度评分**：`EvidencePackage.data_sources[].freshness_score ∈ [0,1]`，缓存命中二次执行时外部调用次数不增
-- Key 缺失场景（**单敏感源 Skill 限定**，Round 2 R2-D1B 勘正——原稿「声明含 newsapi/tavily 的 Skill，adapters Mapping 物理缺源」对双敏感 Skill（swot/value-curve/change-management 两源全敏感）不可满足：fetch_many 全失败直传首个异常（`data_source_resolver.py:238-240`），不会得到「SUCCESS + 部分收敛」）：**用 kpi-tree（缺 newsapi 留 china-nbs）或 ge-mckinsey/value-chain/vrio 任一单敏感 Skill，物理缺其中 1 个敏感源** → 部分失败收敛（SUCCESS + `DataSourceFetchFailed` 事件且 `error_code == "EXCEPTION_411"`），分析基于内部数据 + 其余源 + 标注数据缺口继续；**双敏感全缺语义**（2 源全失败 → 411 直传不收敛）作为对照用例显式断言（锁死 fetch_many 全失败契约）
+- Key 缺失场景（**单敏感源 Skill 限定**，Round 2 R2-D1B 勘正——原稿「声明含 newsapi/tavily 的 Skill，adapters Mapping 物理缺源」对双敏感 Skill（swot/value-curve/change-management 两源全敏感）不可满足：fetch_many 全失败直传首个异常（`data_source_resolver.py:233-235`，Round 3 行号勘正），不会得到「SUCCESS + 部分收敛」）：**用 kpi-tree（缺 newsapi 留 china-nbs）或 ge-mckinsey/value-chain/vrio 任一单敏感 Skill，物理缺其中 1 个敏感源** → 部分失败收敛（SUCCESS + `DataSourceFetchFailed` 事件且 `error_code == "EXCEPTION_411"`），分析基于内部数据 + 其余源 + 标注数据缺口继续；**双敏感全缺语义**（2 源全失败 → 411 直传不收敛）作为对照用例显式断言（锁死 fetch_many 全失败契约）
 - 跨租户缓存隔离（双租户交叉断言：tenant_b 二次执行 `call_count == first + 1`）
 
 **验证标准/Validation Criteria:**
@@ -1127,7 +1127,7 @@ tests/
 测试（修改，回归网三处，Task 1.4 一次性预调整）：
 - `tests/unit/application/skills/test_pestel_analysis_data_collection.py` — `NON_TARGET_SLUGS` 17→7 + docstring「17 个」字样
 - `tests/unit/architecture/test_arch_skill_data_collection.py` — `NON_TARGET_SLUGS` 17→7 + docstring「17 个」字样
-- `tests/unit/application/skills/test_frontmatter_data_sources.py` — `DECLARING_SLUGS` 6→16（Round 1 D1-A 勘正补）
+- `tests/unit/application/skills/test_frontmatter_data_sources.py` — 测试语义中间态安全化重构（Task 1.4；Round 3 勘正：原记「6→16 扩清单」方案已被 Round 2 证伪重写）
 
 文档（同步，Task 14.9）：
 - `docs/architecture/architecture.md` — §17.3 状态块 + §17.3.3 追加 + 决策表 + 修订历史
@@ -1167,7 +1167,7 @@ tests/
 
 > 本 Story 经 5 轮 D1~D5 循环文档审查（2026-09-28 起），逐轮记录修复项。
 
-#### Round 1（D1 四视角调研 + D2 双视角审查，P1×8 + P2×17 全修）
+#### Round 1（D1 四视角调研 + D2 双视角审查，P1×8 + P2×24 全修——Round 3 对账勘正计数）
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
@@ -1188,13 +1188,24 @@ tests/
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
 | D-R2-P1-1 | **Round 1 修复「DECLARING_SLUGS 6→16 前置扩充」经回归核查证伪（设计级）**：`test_declaring_skills_frontmatter_carries_data_sources:141-149` 对清单成员断言**非空**，Task 1.4 扩清单后 10 个未填 Skill 必红、红窗口贯穿整个并行期——R1-P1-6 要消除的死锁被搬家而非消除（两个 P1 修复组合时未交叉核对） | **P1** | Subtask 1.4 设计重写为**测试语义中间态安全化重构**：非声明组空 tuple 断言 → 「物理非空者必 ∈ SSOT 并集 16（动态派生）」；非空断言改「凡声明必合法」；最终态 16 全非空由 Task 13.4 闭环；各 Skill Task 零触碰共享文件（消除并发编辑冲突）。全文 7 处「6→16」表述同步重写 |
-| D-R2-P1-2 | **场景 5「Key 缺失降级」对双敏感 Skill 不可满足**：swot/value-curve/change-management 两源全敏感，adapters 物理缺源 → fetch_many 全失败直传 411（resolver:238-240），不会得到「SUCCESS + 部分收敛」 | **P1** | AC-4/12.4/14.5 钉死单敏感 Skill（kpi-tree 缺 newsapi 留 china-nbs；集成参数化限定 4 个单敏感 Skill）+ 补「双敏感全缺 → 411 直传」对照断言（锁死全失败契约） |
+| D-R2-P1-2 | **场景 5「Key 缺失降级」对双敏感 Skill 不可满足**：swot/value-curve/change-management 两源全敏感，adapters 物理缺源 → fetch_many 全失败直传 411（resolver:233-235，Round 3 行号勘正），不会得到「SUCCESS + 部分收敛」 | **P1** | AC-4/12.4/14.5 钉死单敏感 Skill（kpi-tree 缺 newsapi 留 china-nbs；集成参数化限定 4 个单敏感 Skill）+ 补「双敏感全缺 → 411 直传」对照断言（锁死全失败契约） |
 | D-R2-P1-3 | Round 1 修复传播漏网：Task 2 标题「（含回归网调整）」+ [A] 重构行「回归网调整落地（两处）」残留——实施者照做重新引入 D8 死锁 | P1 | 两处清除（标题改「Task 2-11 实施范本」；重构行改「零触碰共享回归文件」） |
 | D-R2-P1-4 | Round 1 修复传播漏网：Task 2 [D] 循环红行仍写「properties 键集合」——Round 1 自己定性为「必然失败」的原稿表述，写出来永远无法转绿 | P1 | 改「递归叶子键集合」并注 swot 四叶子键示例 |
 | D-R2-P1-5 | R3 风险行仍写「Task 2 调整回归网」旧时序 | P1 | 更新为 Task 1.4 + 中间态安全化语义 + Task 13.4 闭环 |
 | D-R2-P2 批 | 12 项：归属表 properties 残留；修复表「17 项」vs 实际枚举 24 项对账（v1.1.0 changelog 同步勘正）；场景 2 Examples 列未定（钉死 slug 单列）；场景 8 观测机制未给（三要素：prompt 捕获/「规划执行步骤」识别串/**repr 陷阱**——Engine f-string 注入 dict repr 单引号，断言 json.dumps 子串必假红）；12.1 断言机制 + per-slug arguments fixture 来源未定（钉死：yaml required 程序化构造）；AC-4 措辞概念错位（Stub 是 prompt 接收方非构造方）；Task 3-11 无范本显式引用 + TDD 节奏两套无解释；D7「按 story 字段区分」事实错误（实际按 slug 索引，story 字段无消费方）+ 其值未定（钉死 `[4-1c, 4-1d]` 列表）；output_schema 基准缺失（catalog 无 required 需补全 + data_sources 字段惯例未明说）；required_fields 逐源 SSOT 空洞（钉死全源统一 `[indicator, value]` 对齐 4-1c）；version 升版无断言（钉死保持 1.0.0）；input_examples query 混入 arguments JSON 的歧义（钉死独立标记行呈现） | P2 | 逐项钉死（详见各节 Round 2 勘正注记） |
 
 **Round 2 调研确认**：Round 1 修订事实锚点质量极高（抽查 11 项 P2 + 8 处 file:line 全部实证命中、零虚构）；表格列数/Markdown 语法零破坏；R5 全部 catalog 行号命中；Task 0.6 红绿拆分与 fetch_many 语义自洽。
+
+#### Round 3（Round 2 修订回归核查 + 设计独立推演，P1×1 + P2×3 修复）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| D-R3-P1-1 | Round 2 修复传播漏网：契约测试清单（:288）与 File List（:1130）两处「DECLARING_SLUGS 6→16」**活性指令**残留（非勘正注记）——实施者照 File List 操作会重新引入 Round 2 已证伪的并行期必红死锁；D-R2-P1-1 声称「全文 7 处同步重写」不完备（实为 9 处） | **P1** | 两处改写为「测试语义中间态安全化重构（Task 1.4）」口径 |
+| D-R3-P2-1 | 「P2×17」计数残留 ×2（修复表表头 + Next Steps）与 Round 2 对账后的「P2×24」矛盾 | P2 | 统一改 P2×24 |
+| D-R3-P2-2 | resolver 全失败判定行号错误：3 处写 `:238-240`，实测正确锚点 `:233-235`（`if first_error is not None and not any(results): raise first_error`） | P2 | 行号勘正 |
+| D-R3-P2-3 | AC-1 验证标准「7 个未触碰 Skill 空 tuple 断言」为重构前旧机制措辞（重构后空 tuple 断言已被并集语义包含） | P2 | 改「经『物理非空者必 ∈ SSOT 并集』语义守护——误填即 ∉ 并集红」 |
+
+**Round 3 设计独立推演确认（不轻信 Round 2 论证）**：中间态安全化重构在 Task 1.4/Task 5/Task 11 后三个时间点**无红窗口**（实测推演）；场景 5 kpi-tree 部分收敛 SUCCESS 可达（fetch_many gather return_exceptions + `any(results)` 实测 :233-235）；场景 8 三要素命中（Engine f-string 实测 ：521-522）；守护无损（7 个 4-1e 空守护被并集语义包含且更强）；全部契约锚点抽查命中（story 字段/load_io_contract/required_fields 21 处/version 1.0.0）。**结论：三轮全部设计级风险已真实消除，本轮修完 4 项传播层问题即达收敛条件。**
 
 ---
 
@@ -1224,7 +1235,7 @@ tests/
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [x] 文档审查 Round 1 完成（D1 四视角 + D2 双视角，P1×8 + P2×17 修复）
+- [x] 文档审查 Round 1 完成（D1 四视角 + D2 双视角，P1×8 + P2×24 修复）
 - [ ] 运行 `validate-create-story` 进行质量检查（可选）
 - [ ] 运行 `dev-story` 开始实施（Task 2-11 可多 Agent 并行）
 - [ ] 运行 `code-review` 进行代码审查
@@ -1232,7 +1243,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-09-28
 **最后更新/Last Updated:** 2026-09-28
 **更新说明/Description:**
@@ -1243,3 +1254,6 @@ tests/
 - v1.2.0: 文档审查 Round 2 完成（D1A Round 1 修订回归核查 + D1B 残留深挖）：
   - **P1×5 修复**：① **Round 1「DECLARING_SLUGS 扩清单」方案证伪重写**（非空断言致并行期必红——死锁被搬家而非消除；改为测试语义中间态安全化重构 + Task 13.4 最终态闭环）② 场景 5 钉死单敏感 Skill（双敏感全缺会 411 直传而非部分收敛——原场景不可满足）③④⑤ Round 1 修复传播漏网清除（Task 2 标题/[A] 重构行/[D] 红行/R3 风险行）
   - **P2×12 修正**：场景 8 repr 陷阱与观测机制三要素/arguments fixture SSOT/AC-4 概念错位/Task 3 范本引用/D7 slug 索引事实勘正/output_schema 基准 + data_sources 惯例/required_fields 逐源 SSOT/version 锁定 1.0.0/input_examples query 形态等
+- v1.3.0: 文档审查 Round 3 完成（Round 2 修订回归核查 + 设计独立推演）：
+  - Round 2 设计级重写经独立推演与代码实测**全部成立**（中间态三时间点无红窗口/场景 5 SUCCESS 可达/三要素命中/守护无损/锚点全对）——三轮设计级风险全部真实消除
+  - **P1×1 + P2×3 传播层修复**：6→16 活性指令残留 ×2（契约清单 + File List）/P2×17→24 计数残留 ×2/resolver 行号 233-235 勘正/AC-1 旧机制措辞
