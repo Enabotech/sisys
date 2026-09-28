@@ -1160,7 +1160,18 @@ tests/
 
 **Round 3 修复（2 项，纯文档）**：R3-F1 台账重复行删除 + R3-F2 归属锚点补记。
 
+#### Round 4 发现（稳定性验证轮，2026-09-28）
+
+**D4-A Round 3 修复回归 + 第三态稳定性终验**：R3 修复零偏差兑现（台账 14 行/锚点/勘正值/节标题全过）；4-1c 全量套件 **215 passed**（与 R3 取证 198+17 完全一致，第三态复核）+ ruff 全过 + mypy 603 文件零问题；4-1b 并行改动（75c3bbe5）未引入任何破口。**收敛判据（无 P0/P1、门禁三绿、台账闭合）第三轮持续成立**。
+
+**Round 4 发现（1 项 P2，合并 Round 5 收敛）**：
+- **R4-F1**：Story Version v1.4.0 停在文档审查周期——其后的 dev-story 交付（676f4396）、状态流转（ready-for-dev→review）、代码审查周期 3 个 commit（56a23bb1 / 6cd2c2bc / d59766ca）均未入版本历史，`Last Updated: 2026-09-26` 陈旧。**处置：合并至 Round 5**（与状态流转/DoD 勾选/v1.5.0 changelog 同批收尾，避免同文件两轮重复编辑）。
+
+**Round 5 收尾清单（D4-A 遗留盘点固化）**：① `pre-commit run --all-files` 实跑留痕 → 勾选 DoD L472；② DoD L471「无 P0/P1」勾选（三重取证支撑）；③ changelog v1.5.0 + Last Updated 更新（R4-F1）+ v1.4.0「保持待实施」表述勘正；④ L1198「运行 code-review」勾选；⑤ 状态 `review → done`（Story frontmatter + sprint-status.yaml:142）+ L824「Story 可进入 done」勾选；⑥ D8 保持待 Epic owner 签收显式登记（外部依赖不阻断 done——Epic 层遗留）。
+
 #### 需决策 Decision Needed
+
+
 
 - [ ] **Decision D8（待 Epic owner 签收）**：disruptive-innovation 2 源（USPTO + Tavily）与 Epic AC-4 "每个指标 ≥3 独立来源" 字面偏差——本 Story 选择务实双源交叉验证（D4 决策），需 Epic owner 显式签收或追加 WIPO/EPO 适配器到下个 Story
 
