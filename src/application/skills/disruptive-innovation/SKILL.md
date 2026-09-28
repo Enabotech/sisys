@@ -149,8 +149,11 @@ Think 阶段必须先输出**颠覆信号 → 数据源**映射计划，再生�
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
    - 每个声明源至少一个标记；query 为自然语言指标描述（含技术领域上下文）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
-   - 采集结果经全局 `DATA_SOURCES` dict 注入读取：`DATA_SOURCES["uspto"]["payload"]`，
-     每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`
+   - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
+     每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
+     **部分失败语义**：采集失败的源其键**不在** `DATA_SOURCES` 中（对应标记位注入 `None`）——
+     读取返回 `None` 时按 §7 降级话术处理，禁止直接下标（`["payload"]` 会 KeyError 中断）。
+     **同源多 query**：同一数据源的多个不同 query 依次分配 `"<name>"` / `"<name>#2"` 键
 4. **Execute**：宿主机侧并发采集并注入 preamble，沙箱执行分析代码
 5. **Observe/Validate**：基于注入数据完成信号强度评级与技术成熟度判定
    （锚点见 `references/scoring_anchors.md`）
@@ -165,7 +168,7 @@ patents = $DATA_SOURCE("uspto", "固态电池 专利申请趋势 核心专利布
 market = $DATA_SOURCE("tavily", "固态电池 创业公司 融资 商业化进展")
 
 # 采集后通过注入的 DATA_SOURCES dict 读取
-uspto_payload = DATA_SOURCES["uspto"]["payload"]
+uspto_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
 ```
 
 ## 7. 失败处理

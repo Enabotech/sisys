@@ -1118,35 +1118,12 @@ def then_integration_tests_dual_marker(context: dict[str, Any]) -> None:
 
 # ===================================================================
 # AC-7 SDD 架构验证测试（六边形约束 + 端口注册 + 域零依赖，Round 2 完整覆盖）
+#
+# 历史注记：AC-7.1「subprocess 运行架构测试套件」场景已随游离提交 730e1cb4 删除
+# （其 when 步骤依赖 PATH 中 poetry 二进制，CI venv 直跑不成立）；架构套件由
+# CI（.gitea/workflows/ci.yaml test 阶段）与本地 `make test-unit` 直跑覆盖。
+# 下列步骤保留 AC-7.2/7.3（注册完整性与 domain 零依赖，进程内反射断言）。
 # ===================================================================
-
-
-@given("加载 tests/unit/architecture/test_arch_data_source.py")
-def given_load_arch_test_file(context: dict[str, Any]) -> None:
-    """Round 2 新增：探测架构验证测试文件存在性并统计测试方法数。"""
-    from pathlib import Path
-
-    target = Path("tests/unit/architecture/test_arch_data_source.py")
-    context["arch_test_file_exists"] = target.exists()
-    if target.exists():
-        # 解析 .py 中 def test_* 数量（不真正运行）
-        import ast
-
-        tree = ast.parse(target.read_text(encoding="utf-8"))
-        test_count = sum(
-            1
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_")
-        )
-        context["arch_test_count"] = test_count
-
-
-@then("全部测试零失败（对齐 CLAUDE.md §5 异常零容忍）")
-def then_arch_tests_zero_failures(context: dict[str, Any]) -> None:
-    """Round 2 新增：架构验证测试全部通过，returncode = 0 且 stderr 无 FAILED 标记。"""
-    result = context["arch_test_result"]
-    assert result.returncode == 0, f"架构测试失败：\nstdout: {result.stdout}\nstderr: {result.stderr}"
-    assert "FAILED" not in result.stdout, f"输出含 FAILED 标记：\n{result.stdout}"
 
 
 @given("导入 src.composition_root._PORT_REGISTRY（懒加载触发模块级注册）")

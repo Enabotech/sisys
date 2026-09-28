@@ -157,8 +157,11 @@ Think 阶段必须先输出**维度 → 顾客洞察指标 → 数据源**映射
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
    - 每个声明源恰好一个标记；query 为自然语言指标描述（含产品类别/目标客群/地域上下文）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
-   - 采集结果经全局 `DATA_SOURCES` dict 注入读取：`DATA_SOURCES["tavily"]["payload"]`，
-     每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`
+   - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
+     每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
+     **部分失败语义**：采集失败的源其键**不在** `DATA_SOURCES` 中（对应标记位注入 `None`）——
+     读取返回 `None` 时按 §7 降级话术处理，禁止直接下标（`["payload"]` 会 KeyError 中断）。
+     **同源多 query**：同一数据源的多个不同 query 依次分配 `"<name>"` / `"<name>#2"` 键
 4. **Execute**：宿主机侧并发采集并注入 preamble，沙箱执行分析代码
 5. **Observe/Validate**：基于注入数据完成八维度评分（评分锚点见 `references/scoring_anchors.md`）
 6. **聚合评分**：计算八维度等权均值得出 `overall_score`（确定性算术，代码优先）
@@ -172,7 +175,7 @@ market_sentiment = $DATA_SOURCE("newsapi", "智能手表 消费者 口碑 舆情
 cn_consumption = $DATA_SOURCE("china-nbs", "中国居民消费支出结构 智能穿戴 零售统计")
 
 # 采集后通过注入的 DATA_SOURCES dict 读取
-tavily_payload = DATA_SOURCES["tavily"]["payload"]
+tavily_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
 ```
 
 ## 7. 失败处理
