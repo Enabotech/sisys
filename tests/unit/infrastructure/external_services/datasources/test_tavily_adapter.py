@@ -179,3 +179,17 @@ class TestTavilyAdapterFailures:
         with pytest.raises(DataSourceUnavailableError):
             await adapter.fetch(DataSourceQuery(source_name="tavily", query="q"))
         await adapter.close()
+
+
+class TestResultsTypeValidation:
+    """results 类型校验（R3-3 H4：非 list 形态静默透传是数据毒丸面）"""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("results_value", [{"unexpected": "dict"}, "not-a-list"])
+    async def test_non_list_results_raises_response_error(self, results_value: object) -> None:
+        """results 为 dict/str 形态 → 413（结构非法即拒绝，对齐 newsapi/uspto 先例）"""
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json={"results": results_value})))
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="tavily", query="q"))
+        assert exc_info.value.code == "EXCEPTION_413"
+        await adapter.close()

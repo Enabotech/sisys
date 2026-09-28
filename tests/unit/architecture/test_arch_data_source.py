@@ -44,6 +44,8 @@ APPLICATION_FILES = [
 # domain 层禁止导入的外部包黑名单（独立定义，显式含 httpx/tenacity——
 # 对齐 Story 4.1b 硬约束 line 60-62；现有 4.1a 黑名单 15 项缺这两项，
 # 新建文件独立定义避免污染通用黑名单）
+# 与验收测试 test_acceptance_data_source 的 banned 集保持同步（18 项，R3-3 H8v2；
+# sqlmodel/aioredis/instructor 属「domain 层已知诱惑库」防御性条目，非当前依赖）
 FORBIDDEN_IMPORTS = {
     "pydantic",
     "sqlalchemy",
@@ -62,6 +64,7 @@ FORBIDDEN_IMPORTS = {
     "aioredis",
     "httpx",  # 数据源 HTTP 仅允许在 infrastructure 适配器层
     "tenacity",  # 重试库仅允许在 infrastructure 适配器层
+    "sqlmodel",  # 防御性条目（ORM 诱惑库，对齐验收侧同集）
 }
 
 # 无条件注册的适配器端口清单（免 Key 统计类）

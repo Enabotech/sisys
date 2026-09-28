@@ -143,6 +143,19 @@ class EvidencePackage:
     # Story 4.1b 扩展（向后兼容默认空 tuple）
     data_sources: tuple[DataSourceMeta, ...] = ()
 
+    def __post_init__(self) -> None:
+        """元素类型门禁（R3-3 H6v2：容器 tuple + 元素 DataSourceMeta 双验）
+
+        对齐同文件 ExecutionContext/ToolResult 的构造时校验先例——完整性校验
+        留在 validate_complete()（分层一致），本门禁只封类型注解缺口（不可信
+        输入构造 list[dict] 时消费方访问 m.freshness_score 抛 AttributeError）。
+        """
+        if not isinstance(self.data_sources, tuple) or not all(isinstance(m, DataSourceMeta) for m in self.data_sources):
+            raise EntityValidationError(
+                message="data_sources 必须为 tuple[DataSourceMeta, ...]",
+                context={"entity": "EvidencePackage", "field": "data_sources"},
+            )
+
     def validate_complete(self) -> bool:
         """完整性校验（必填字段缺失抛 EvidenceValidationFailedError）
 

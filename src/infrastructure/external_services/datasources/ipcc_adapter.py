@@ -108,13 +108,41 @@ class IPCCAdapter:
         )
 
     async def health_check(self) -> bool:
-        """探活（HEAD 基础地址）"""
+        """探活（HEAD 基础地址，经熔断器——R3-3 H3v2）
+
+        原 `< 500` 判定使 403/404（端点迁移/反爬/WAF）恒报健康且完全绕过熔断器
+        （对照 7 个兄弟适配器 health_check 均经 request_json_with_resilience）。
+        本端点为 CSV（HEAD 返回 text/html），不可复用 JSON helper（resp.json()
+        会 ValueError→413 误报）——手动集成熔断器，回调契约对齐：
+        2xx/3xx → on_success（CDN apex 301 属正常）；5xx → on_failure（瞬时故障
+        计熔断——服务雪崩时探活须能打开熔断，对齐 fetch 契约）；其他 4xx →
+        on_ignored（确定性错误不计熔断）；传输类异常 → on_failure。
+        """
+        from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreakerOpenError
+
+        try:
+            self._circuit_breaker.before_call()
+        except CircuitBreakerOpenError:
+            return False  # 熔断快速失败（不发请求）
         try:
             resp = await self._client.head(self._config.csv_base_url)
-            return resp.status_code < 500
-        except Exception as e:
+        except httpx.RequestError as e:
+            # 传输类故障（超时/连接失败等，InvalidURL ⊄ RequestError 由兜底覆盖）
+            self._circuit_breaker.on_failure()
             logger.warning("IPCC 探活失败: %s", type(e).__name__)
             return False
+        except Exception as e:
+            # 兜底（InvalidURL 等确定性配置错误——不计熔断）
+            logger.warning("IPCC 探活失败: %s", type(e).__name__)
+            return False
+        if resp.status_code < 400:
+            self._circuit_breaker.on_success()
+            return True
+        if resp.status_code >= 500:
+            self._circuit_breaker.on_failure()
+            return False
+        self._circuit_breaker.on_ignored()  # 4xx 确定性错误
+        return False
 
     async def _request_csv(self, url: str) -> str:
         """带韧性（重试 + 熔断）的 CSV 文本请求（异常映射契约与 _http_helpers 一致）"""

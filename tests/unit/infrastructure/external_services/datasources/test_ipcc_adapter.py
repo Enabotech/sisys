@@ -234,3 +234,57 @@ class TestIPCCAdapterFailures:
         with pytest.raises(DataSourceUnavailableError):
             await adapter.fetch(DataSourceQuery(source_name="ipcc", query="q"))
         await adapter.close()
+
+
+class TestHealthCheckCircuitBreakerIntegration:
+    """health_check 熔断集成（R3-3 H3v2：原 `< 500` 使 403/404 恒报健康且绕过熔断器）"""
+
+    @pytest.mark.asyncio
+    async def test_200_healthy(self) -> None:
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200)))
+        assert await adapter.health_check() is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [403, 404, 503])
+    async def test_error_statuses_unhealthy(self, status: int) -> None:
+        """403/404（原恒报健康）与 503 均判不健康"""
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(status)))
+        assert await adapter.health_check() is False
+
+    @pytest.mark.asyncio
+    async def test_breaker_open_short_circuits_without_request(self) -> None:
+        """熔断打开 → False 且不发请求（before_call 快速失败）"""
+        from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
+
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(200)
+
+        adapter = IPCCAdapter(
+            config=IPCCConfig(),
+            client=httpx.AsyncClient(transport=httpx.MockTransport(handler), timeout=5.0),
+            circuit_breaker=CircuitBreaker(failure_threshold=2, recovery_timeout=60.0, name="test-ipcc-hc"),
+        )
+        adapter._circuit_breaker.on_failure()
+        adapter._circuit_breaker.on_failure()  # 手动打开熔断（不跑慢速真实失败）
+        assert await adapter.health_check() is False
+        assert calls["n"] == 0  # 未发请求
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_5xx_records_failure_to_breaker(self) -> None:
+        """5xx 探活计熔断（H3v2-②：服务雪崩时探活须能打开熔断，对齐 fetch 契约）"""
+        from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker, CircuitState
+
+        cb = CircuitBreaker(failure_threshold=2, recovery_timeout=60.0, name="test-ipcc-5xx")
+        adapter = IPCCAdapter(
+            config=IPCCConfig(),
+            client=httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(503)), timeout=5.0),
+            circuit_breaker=cb,
+        )
+        assert await adapter.health_check() is False
+        assert await adapter.health_check() is False
+        assert cb.state == CircuitState.OPEN  # 两次 5xx 探活打开熔断
+        await adapter.close()

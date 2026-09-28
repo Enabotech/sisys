@@ -12,6 +12,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, cast
 
+import pytest
 import yaml
 
 from src.domain.events.base import DomainEvent
@@ -182,3 +183,44 @@ class TestDualChannelConsistency:
         assert mapping.rabbitmq_routing_key == "sisys.events.reliable.data_source_fetch_failed"
         assert yaml_cfg["rabbitmq_routing_key"] == mapping.rabbitmq_routing_key
         assert mapping.delivery_mode is DeliveryMode.RELIABLE
+
+
+class TestEventFieldValidation:
+    """事件字段不变量校验（R3-3 H5v2：跨进程序列化 + from_dict 回放重建重触发
+    __post_init__——比 VO 更暴露的不可信契约面）"""
+
+    def test_fetched_out_of_range_score_rejected(self) -> None:
+        """freshness_score/confidence 越界 → 242（原可静默构造并污染下游聚合看板）"""
+        from src.domain.exceptions import EntityValidationError
+
+        with pytest.raises(EntityValidationError, match="freshness_score"):
+            DataSourceFetched(source_name="world-bank", freshness_score=9.9)
+        with pytest.raises(EntityValidationError, match="confidence"):
+            DataSourceFetched(source_name="world-bank", confidence=-3.0)
+
+    def test_fetched_non_numeric_score_rejected(self) -> None:
+        """非数值分值（str/None/bool——from_dict 回放畸形消息形态）→ 242（H5v2-①：
+        原在数值比较抛内置 TypeError 逃逸领域异常体系）"""
+
+        from src.domain.exceptions import EntityValidationError
+
+        for bad_score in ["0.5", None, True]:
+            kwargs: dict[str, Any] = {"source_name": "world-bank", "freshness_score": bad_score}
+            with pytest.raises(EntityValidationError, match="必须为数值"):
+                DataSourceFetched(**kwargs)
+
+    def test_empty_source_name_rejected(self) -> None:
+        """空 source_name → 242（两事件同构）"""
+        from src.domain.exceptions import EntityValidationError
+
+        with pytest.raises(EntityValidationError, match="source_name"):
+            DataSourceFetched(source_name="  ")
+        with pytest.raises(EntityValidationError, match="source_name"):
+            DataSourceFetchFailed(source_name="  ", error_code="EXCEPTION_411", error_message="x")
+
+    def test_from_dict_roundtrip_valid_event(self) -> None:
+        """合法事件 to_dict → from_dict 回放回归（新校验不破坏回放链路）"""
+        event = DataSourceFetched(source_name="imf", query="NGDP_RPCH", freshness_score=0.8, confidence=0.7)
+        rebuilt = DataSourceFetched.from_dict(event.to_dict())
+        assert isinstance(rebuilt, DataSourceFetched)
+        assert rebuilt.source_name == "imf"

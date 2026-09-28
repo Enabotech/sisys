@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.application.ports.skill_loader import ToolMetadata
-from src.application.services.data_source_resolver import DataSourceResolverService
+from src.application.services.data_source_resolver import DataSourceResolverService, build_data_source_cache_key
 from src.application.services.tool_execution_engine import ToolExecutionEngine
 from src.domain.entities.tool import Tool
 from src.domain.ports.data_source import DataSourceQuery
@@ -70,11 +70,17 @@ class _StubAdapter:
 
 @pytest.fixture
 async def redis_tenant_cache(real_redis: Any) -> AsyncGenerator[tuple[RedisAdapter, str], None]:
-    """真实 Redis 缓存 + 测试级租户前缀（teardown 仅清理本测试键）"""
-    tenant = f"it-{uuid.uuid4().hex[:8]}"
+    """真实 Redis 缓存 + 测试级租户前缀（teardown 仅清理本测试键，含隔离用例第二租户）
+
+    租户为标准 UUID 字符串形态（R3-3 H7v2：engine 的 ExecutionContext.tenant_id
+    必须引用同一租户——原随机 uuid4() 与 fixture 前缀不同值，engine 路径缓存键
+    永不被 teardown 清理，24h 泄漏共享 Redis）。
+    """
+    tenant = str(uuid.uuid4())
     cache = RedisAdapter(redis_client=real_redis)
     yield cache, tenant
     await cache.delete_pattern(f"sisys:cache:datasource:{tenant}:*")
+    await cache.delete_pattern(f"sisys:cache:datasource:{tenant}-other:*")
 
 
 def _make_metadata(*names: str) -> ToolMetadata:
@@ -134,7 +140,7 @@ class TestDataSourceExecutionIntegration:
             tool=tool,
             tool_call=ToolCall(tool_id=tool.tool_id, arguments={}),
             context=ExecutionContext(
-                tenant_id=uuid.uuid4(),
+                tenant_id=uuid.UUID(tenant),  # 线程化为 fixture 同一租户（H7v2：防缓存键泄漏）
                 session_id=f"sess-{uuid.uuid4().hex[:8]}",
                 extensions={"tool_metadata": _make_metadata("world-bank")},
             ),
@@ -148,6 +154,10 @@ class TestDataSourceExecutionIntegration:
         assert len(result.evidence_package.data_sources) == 1
         assert result.evidence_package.data_sources[0].source_name == "world-bank"
         assert stub.call_count == 1
+        # 判别锚点（H7v2-③）：engine 路径缓存键落在 fixture 租户命名空间——
+        # 回退修复（engine 用随机 tenant）该键缺失必红，泄漏修复从不可验证变可锁
+        engine_cache_key = build_data_source_cache_key(tenant, "world-bank", "GDP China")
+        assert await cache.get(engine_cache_key) is not None
 
     @pytest.mark.asyncio
     async def test_second_run_cache_hit_no_refetch(self, redis_tenant_cache: tuple[RedisAdapter, str]) -> None:

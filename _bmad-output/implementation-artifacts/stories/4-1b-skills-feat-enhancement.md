@@ -1669,6 +1669,48 @@ tests/
 
 **Round 2 验证汇总**：全量 unit+contracts **8242 passed** 零失败（新增 24 项：G0 判别 2 + G1×2 + G2 参数化 2 + G3×11 + G4×3 + G5×4 + G6 重写 5）+ ruff All checks passed + mypy 603 文件零问题 + 红线自查零新增违规 + 行为组 8 项（H 组）留 Round 3
 
+#### Round 3 — C2 修复方案（H1-H8 行为增强组，C1 详设已在 Round 2 三视角调研完成）
+
+**H1 Engine 失败路径持久化** — `tool_execution_engine.py`：新增 `_persist_execution(execution)` 私有助手（repository None 直接返回；`try: save() except Exception: warning` 不吞 CancelledError）；5 处调用点各 1 行（沙箱启动失败分支 raise 前 + 4 个 except 分支状态迁移后；Timeout 分支不加终态守卫——COMPLETED 超时也持久化）；RetryExhausted/Timeout 分支补 `execution.failure_reason = str(exc)`；save 为 upsert（INSERT FAILED 行，无乐观锁问题），与 outbox 行同事务提交修复聚合-事件原子性。测试 5 项（全源失败 FAILED 落库 + failure_reason / 沙箱启动失败 / RetryExhausted / COMPLETED-超时 / save 异常不掩盖原始异常）
+
+**H2 china_nbs seed_url 段编码** — `china_nbs_adapter.py`：fetch 开头改 ipcc 同款 `"/".join(quote_path_segment(seg) for seg in query.query.split("/"))`（`..` 段由 helper 抛 413）。测试 3 项（`../admin` 拒绝 / `sj/zxfb` 原样 / 特殊字符段编码）
+
+**H3 IPCC health_check 修语义** — `ipcc_adapter.py`：改 `before_call()` 熔断快速失败（CircuitBreakerOpenError→False）；HEAD 异常→`on_failure()`→False；`<400`（2xx/3xx）→`on_success()`→True；≥400→`on_ignored()`→False。不可复用 request_json_with_resilience（CSV 端点 HEAD 返回 text/HTML，resp.json() 会 ValueError→413 误报）。测试 4 项（200 True / 403·404·503 False / 熔断 open False 不发请求）
+
+**H4 tavily results 类型校验** — `tavily_adapter.py::_extract_payload`：补 newsapi 同款二段校验（`results = data["results"]; not isinstance(results, list) → 413 含 actual_type`）。测试 1 项（dict/str 形态 → 413）
+
+**H5 事件分值/source_name 校验** — `data_source_events.py` + `value_objects/data_source.py`：`_validate_score` 改公开 `validate_score`（模块内 3 调用点同步）；两事件 `__post_init__` 各加 source_name 非空 + Fetched 的 freshness_score/confidence 校验（EntityValidationError 242）。测试 4 项（越界分值 ×2 / 空 source_name ×2 / from_dict 回放回归）
+
+**H6 EvidencePackage 元素门禁** — `value_objects/tool_execution.py::__post_init__`：遍历 data_sources 非 DataSourceMeta 实例 → 242 含 actual_type（空 tuple 自然通过）。测试 2 项（list[dict] 拒绝 / 合法 tuple 通过）
+
+**H7 测试 Redis 键泄漏修复** — `test_data_source_execution.py` + `test_acceptance_data_source.py`：租户统一 UUID 形态（integration fixture `tenant = str(uuid.uuid4())` + engine 调用 `uuid.UUID(tenant)`；验收同构）。`str(UUID(x))` 恒规范小写，teardown 前缀/缓存键全部兼容，断言零变化
+
+**H8 AC 黑名单对齐** — `test_acceptance_data_source.py` banned 集改 unit 17 项 ∪ {sqlmodel} = 18 项（删冗余 `redis.asynciio`）；unit `test_arch_data_source.py` 同步补 sqlmodel；两处加「保持同步」注释
+
+**C3 评审结论（Round 3，两视角：正确性实证 / 回归面与判别力；组1「合格—6 必修」+ 组2「4 阻断项」，交叉印证三处双重发现）。v2 修订清单（全部纳入）：**
+
+1. **H1v2-① 沙箱启动失败分支死代码修复**：`transition_to(FAILED)` 从 IDLE 触发（VALID_TRANSITIONS[IDLE]={PLANNING}）先抛 EntityStateTransitionError(243) 掩盖 ToolExecutionFailedError——修复采用「`transition_to(PLANNING)` 提到 start_container 之前」（不改状态矩阵——领域层不放宽，组 2 推荐方案）；② 沙箱分支补 `execution.completed_at = datetime.now(UTC)`（缺它则真实 PG 落库被 entity.validate() 拦截后静默丢弃）；③ `_persist_execution` 内 `except Exception: warning` 自吞噬（防顶替在途领域异常，PostgreSQLAdapter.save 无 session 时抛 InvalidStateError）；④ Timeout 分支 failure_reason **无条件赋值**（COMPLETED+failure_reason 记录「完成但超预算」，TERMINAL_STATES 守卫恒 False 是死代码）；⑤ 事务边界描述修正为「失败态可观测性补齐」（save 是独立 upsert，与 outbox 行无事务关联——HTTP 路径经 SessionMiddleware commit 存活 / 后台 session_context 路径随异常回滚丢失，outbox 独立 session 已 defer 4.7）；⑥ e2e 补真实落库断言（Mock 仓储锁不住 validate 失败——按 tenant 查询确认 FAILED 行存在）；⑦ 新测归属：沙箱/RetryExhausted/COMPLETED-超时/save 异常落 test_tool_execution_engine.py（4.4 域），全源失败落 datasource 测试文件；COMPLETED-超时用 `RetryPolicy(max_total_duration_sec=0)` 确定性触发
+2. **H5v2**：`validate_score` 前置 `isinstance(value, (int, float)) and not isinstance(value, bool)` 门禁 → EntityValidationError（闭合 str/None 输入原生 TypeError 逃逸——from_dict 回放不可信边界正是 H5 自称保护面，G 组同型破口）；公开化加入 `__all__`
+3. **H7v2**：① `ExecutionContext(tenant_id=...)` **线程化为 fixture 同一租户**（仅改格式不治泄漏——两处随机 UUID 与 fixture 租户是不同值，泄漏原样存在）；② teardown 追加 `delete_pattern(f"...:{tenant}-other:*")`（隔离用例第二租户键现形态即泄漏）；③ 一行判别锚点（engine 执行后断言 fixture 租户的缓存键存在——回退 H7 必红）
+4. **H3v2**：① 保留 `except Exception: return False` 兜底（InvalidURL ⊄ RequestError，实测）；② 5xx 探活单列 `on_failure()`（对齐 fetch 契约「瞬时故障计熔断」——服务雪崩时探活须能打开熔断；4xx 维持 on_ignored 确定性）；③ 补 404/405→False 显式测试；④ 熔断 open 用例注入 CircuitBreaker 手动 on_failure×2（不跑慢速真实失败）
+5. **H6v2**：门禁先验 `isinstance(self.data_sources, tuple)` 再验元素（一条判断封死容器注解缺口）
+6. **H8v2**：sqlmodel 加法方向维持（与 aioredis/instructor 防御性死条目先例一致，Story 注明非真实依赖）；删验收侧 `redis.asyncio` 死条目（顶层段比对永不命中）
+
+#### 已修复 Patch（第三周期 Round 3，C3 评审 v2 准入后 TDD 实施）
+
+| # | 修复 | 文件 | 验证 |
+|---|------|------|------|
+| H1 | Engine 失败路径持久化 + 沙箱死分支修复：① `transition_to(PLANNING)` 提前至 start_container 之前（原 IDLE→FAILED 直迁被状态矩阵拒绝抛 243 掩盖 ToolExecutionFailedError——死分支；不改矩阵，领域层不放宽）；② 沙箱分支补 `completed_at`（原缺它真实 PG 落库被 validate 拦截静默丢弃）；③ `_persist_execution` 助手（repository None no-op + except Exception warning 自吞噬防顶替在途异常）+ 5 处调用（沙箱失败/4 个 except 分支）；④ RetryExhausted/Timeout 补 failure_reason（Timeout 无条件赋值——「完成但超预算」也记录）；⑤ 主流程删除重复 PLANNING 迁移 | `tool_execution_engine.py` | 4 项新测：沙箱失败 FAILED 落库（含 completed_at+failure_reason）/ RetryExhausted FAILED / COMPLETED-超时（`RetryPolicy(max_total_duration_sec=0)` 确定性触发）/ save 异常不掩盖原始错误；12 项 engine 测试全绿 |
+| H2 | china_nbs seed_url 逐段编码：`"/".join(quote_path_segment(seg) for seg in query.query.split("/"))`（`..` 段 413 拒绝；对齐 ipcc 先例，闭合 8 适配器唯一注入缺口） | `china_nbs_adapter.py` | 3 项新测（`../admin` 413 / `sj/zxfb` 恒等回归 / 空格问号段编码） |
+| H3 | IPCC health_check 熔断集成：before_call 快速失败 / `<400` on_success True（CDN 301 正常）/ 5xx on_failure（对齐 fetch 契约——服务雪崩时探活须能打开熔断）/ 4xx on_ignored / RequestError on_failure / InvalidURL 等兜底 False 不计熔断 | `ipcc_adapter.py` | 6 项新测（200 True / 403·404·503 False / 熔断 open 零请求 / 5xx×2 打开熔断状态断言） |
+| H4 | tavily `_extract_payload` 二段校验（results 非 list → 413 含 actual_type，对齐 newsapi/uspto 先例） | `tavily_adapter.py` | 参数化 2 变体（dict/str）→ 413 |
+| H5 | `validate_score` 公开化 + 类型门禁：isinstance(bool)/(int,float) 前置（闭合 str/None/bool 输入原生 TypeError 逃逸——from_dict 回放不可信边界）；两事件 `__post_init__` 补 source_name 非空 + Fetched 双分值校验；`__all__` 导出 | `value_objects/data_source.py` + `data_source_events.py` | 4 项新测（越界 ×2 / 非数值参数化 / 空 source_name 两事件 / from_dict 回放回归）；89 项 events+VO 测试全绿 |
+| H6 | EvidencePackage `__post_init__` 容器+元素双验（tuple + all(isinstance DataSourceMeta) → 242） | `value_objects/tool_execution.py` | 2 项新测（默认空 tuple + 合法通过 / list[dict] 与 list[Meta] 容器违规拒绝） |
+| H7 | 测试 Redis 键泄漏修复：集成 fixture 租户改标准 UUID 字符串 + `ExecutionContext(tenant_id=uuid.UUID(tenant))` 线程化（原随机 UUID 与 fixture 不同值，engine 路径键 24h 泄漏）+ teardown 增清 `{tenant}-other:*`（隔离用例第二租户键）+ engine 后断言 fixture 租户缓存键存在（判别锚点）；验收 `_tenant` 改 `str(uuid.uuid4())` + `_run_engine` 同构线程化 | `test_data_source_execution.py` + `test_acceptance_data_source.py` | 31 项验收/集成全绿（断言零变化，仅键命名空间归一） |
+| H8 | AC-7.3 黑名单对齐 18 项（unit 17 ∪ {sqlmodel}，删验收侧 `redis.asyncio` 死条目；两侧加「保持同步」注释；sqlmodel 为防御性条目注明） | `test_acceptance_data_source.py` + `test_arch_data_source.py` | 架构测试全绿 |
+
+**Round 3 验证汇总**：全量 unit+contracts **8263 passed** 零失败（新增 21 项）+ 验收/集成 31 passed + ruff All checks passed + mypy **1386 文件**（src+tests）零问题 + 红线自查零新增违规
+
 | # | 修复 | 文件 | 验证 |
 |---|------|------|------|
 | F1 | 注入管线重构：preamble `json.dumps`→`repr`（parse_constant 映射 NaN/Infinity 为字面串）；标记原位替换 `DATA_SOURCES["name"]`（同源 `name#k`）；失败位替换 `None`；inject 改收 `(code, markers, results)`；`fetch_many` 等长对齐 `tuple[DataSourceResult \| None, ...]` | `data_source_marker.py` / `data_source_resolver.py` / `tool_execution_engine.py` / `ports/data_source_resolver.py` | 新增 compile 闸门 + null/bool/unicode exec + 部分失败 + name#k 共 7 项单测；38 marker 测试全绿 |

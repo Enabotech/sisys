@@ -99,7 +99,10 @@ def context(
         decode_responses=True,
     )
     ctx: dict[str, Any] = {
-        "_tenant": f"acc-{uuid.uuid4().hex[:8]}",
+        # 标准 UUID 字符串形态（R3-3 H7v2：engine 的 ExecutionContext.tenant_id
+        # 须可从本值解析（uuid.UUID），并与 resolver 直取路径同命名空间——
+        # 原 acc- 前缀形态与 engine 随机 UUID 不同值，缓存键泄漏 teardown 之外）
+        "_tenant": str(uuid.uuid4()),
         "_loop": event_loop,
         "_redis_client": client,
     }
@@ -266,7 +269,7 @@ def _run_engine(
     tool = Tool(tool_id=uuid.uuid4(), name="测试工具", slug="test-tool")
     context["tool"] = tool
     exec_context = ExecutionContext(
-        tenant_id=uuid.uuid4(),
+        tenant_id=uuid.UUID(context["_tenant"]),  # 线程化为场景租户（H7v2：防缓存键泄漏）
         session_id=f"sess-{uuid.uuid4().hex[:8]}",
         extensions={"tool_metadata": context["metadata"]},
     )
@@ -1209,15 +1212,28 @@ def when_ast_scan_imports(context: dict[str, Any]) -> None:
     from pathlib import Path
 
     files = [Path(p) for p in context["domain_data_source_files"]]
+    # 黑名单与 unit 架构测试 test_arch_data_source.FORBIDDEN_IMPORTS 保持同步
+    # （18 项；R3-3 H8v2：原 8 项比 unit 17 项窄一半，未来新增 domain 文件可裸穿。
+    # sqlmodel/aioredis/instructor 属「domain 层已知诱惑库」防御性条目，非当前依赖）
     banned = {
-        "httpx",
-        "redis",
-        "tenacity",
-        "sqlalchemy",
         "pydantic",
-        "redis.asyncio",
-        "sqlmodel",
+        "sqlalchemy",
+        "redis",
+        "fastapi",
+        "typer",
+        "langgraph",
+        "prefect",
+        "qdrant",
+        "minio",
+        "neo4j",
+        "aio_pika",
+        "litellm",
+        "instructor",
+        "asyncpg",
         "aioredis",
+        "httpx",
+        "tenacity",
+        "sqlmodel",
     }
     violators = []
     for file in files:

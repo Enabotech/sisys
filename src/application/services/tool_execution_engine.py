@@ -142,14 +142,21 @@ class ToolExecutionEngine:
         )
         start_time = time.monotonic()
 
-        # 启动沙箱 session
+        # 启动沙箱 session（R3-3 H1v2-①：先迁移 PLANNING 再启动——原 IDLE→FAILED
+        # 直迁被状态矩阵拒绝（VALID_TRANSITIONS[IDLE]={PLANNING}）抛
+        # EntityStateTransitionError(243) 掩盖 ToolExecutionFailedError，该分支为死代码）
         session_id = context.session_id or f"sess-{execution.execution_id}"
+        execution.transition_to(ToolExecutionState.PLANNING)
         try:
             await self._sandbox.start_container(session_id, tenant_id=context.tenant_id)
         except Exception as exc:
             logger.error("沙箱启动失败: %s", exc)
             execution.transition_to(ToolExecutionState.FAILED)
+            execution.completed_at = datetime.now(UTC)
             execution.failure_reason = f"sandbox_start_failed: {exc}"
+            # 失败态可观测性（R3-3 H1v2：失败路径 best-effort 持久化——save 为
+            # upsert，自吞噬异常防顶替在途的 ToolExecutionFailedError）
+            await self._persist_execution(execution)
             raise ToolExecutionFailedError(
                 execution_id=str(execution.execution_id),
                 tool_id=str(tool_id),
@@ -158,8 +165,7 @@ class ToolExecutionEngine:
             )
 
         try:
-            # === Think 阶段 ===
-            execution.transition_to(ToolExecutionState.PLANNING)
+            # === Think 阶段 ===（PLANNING 迁移已提前至沙箱启动前——R3-3 H1v2-①）
             plan = await self._think_stage(tool, tool_call, context)
 
             # === Code 阶段 ===
@@ -213,17 +219,23 @@ class ToolExecutionEngine:
 
             return tool_result
 
-        except ToolExecutionRetryExhaustedError:
+        except ToolExecutionRetryExhaustedError as exc:
             # 状态机守卫：仅在非终态时迁移到 FAILED
             if execution.state not in TERMINAL_STATES:
                 execution.transition_to(ToolExecutionState.FAILED)
                 execution.completed_at = datetime.now(UTC)
+                execution.failure_reason = str(exc)
+            await self._persist_execution(execution)
             raise
-        except ToolExecutionTimeoutError:
-            # 状态机守卫：仅在非终态时迁移到 FAILED（避免 COMPLETED → FAILED 非法迁移）
+        except ToolExecutionTimeoutError as exc:
+            # 状态机守卫：仅在非终态时迁移到 FAILED（避免 COMPLETED → FAILED 非法迁移）；
+            # failure_reason 无条件赋值（R3-3 H1v2-④：raise 点在 COMPLETED 迁移之后，
+            # 守卫恒 False——「完成但超预算」也须记录原因并持久化 COMPLETED 态）
             if execution.state not in TERMINAL_STATES:
                 execution.transition_to(ToolExecutionState.FAILED)
                 execution.completed_at = datetime.now(UTC)
+            execution.failure_reason = str(exc)
+            await self._persist_execution(execution)
             raise
         except (BusinessRuleViolationError, ValidationError, DataSourceError, ConfigurationError, TimeoutError) as exc:
             # Story 4.1b：数据采集相关的领域异常不包装直传（调用方/策略/数据语义错误，
@@ -234,6 +246,7 @@ class ToolExecutionEngine:
                 execution.transition_to(ToolExecutionState.FAILED)
                 execution.completed_at = datetime.now(UTC)
                 execution.failure_reason = str(exc)
+            await self._persist_execution(execution)
             raise
         except Exception as exc:
             # 状态机守卫：仅在非终态时迁移到 FAILED
@@ -242,6 +255,7 @@ class ToolExecutionEngine:
                 execution.transition_to(ToolExecutionState.FAILED)
                 execution.completed_at = datetime.now(UTC)
                 execution.failure_reason = str(exc)
+            await self._persist_execution(execution)
             raise ToolExecutionFailedError(
                 execution_id=str(execution.execution_id),
                 tool_id=str(tool_id),
@@ -254,6 +268,29 @@ class ToolExecutionEngine:
                 await self._sandbox.stop_container(session_id)
             except Exception as cleanup_exc:
                 logger.warning("沙箱清理失败: %s", cleanup_exc)
+
+    async def _persist_execution(self, execution: ToolExecution) -> None:
+        """失败/超预算路径的 best-effort 持久化（R3-3 H1v2-③）
+
+        修复「失败可观测性为零」：save 仅在成功路径（execute 主流程尾部）调用，
+        6 处失败路径（沙箱启动/重试耗尽/超时/领域异常组/兜底）迁移 FAILED 后
+        均不落库——`list_by_query(state=FAILED)` 永远空集，且 DataSourceFetchFailed
+        事件（outbox）的 aggregate_id 指向不存在的聚合行，事件溯源断链。
+
+        事务边界说明：save 为独立 upsert（无 outbox 事务关联）——HTTP 路径经
+        SessionMiddleware commit 存活；后台 session_context 路径随异常回滚丢失
+        （outbox 独立 session 的结构性修复 defer Story 4.7）。
+
+        异常语义：自吞噬（except Exception → warning）——本方法运行于 except
+        分支内，抛出会顶替正在传播的原始领域/执行异常；CancelledError 属
+        BaseException 不被捕获，取消语义安全。
+        """
+        if self._tool_execution_repository is None:
+            return
+        try:
+            await self._tool_execution_repository.save(execution)
+        except Exception as e:
+            logger.warning("ToolExecution 失败态持久化失败（best-effort，不影响在途异常传播）: %s", type(e).__name__)
 
     # ===== 数据源采集（Story 4.1b）=====
 

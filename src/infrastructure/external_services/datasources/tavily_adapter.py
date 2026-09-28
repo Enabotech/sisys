@@ -146,13 +146,23 @@ class TavilyAdapter:
             return False
 
     def _extract_payload(self, data: Any) -> dict[str, Any]:
-        """提取 results/answer 字段（缺 results 抛 DataSourceResponseError）"""
+        """提取 results/answer 字段（结构非法抛 DataSourceResponseError）
+
+        二段校验（R3-3 H4，对齐 newsapi/uspto 先例）：results 非 list 时静默透传
+        会对端结构变化——污染 payload 进缓存（毒丸）与沙箱 preamble（LLM 可见）。
+        """
         if not isinstance(data, dict) or "results" not in data:
             raise DataSourceResponseError(
                 message="Tavily 响应缺少 'results' 字段",
                 context={"source_name": "tavily", "actual_type": type(data).__name__},
             )
-        return {"results": data["results"], "answer": data.get("answer", "")}
+        results = data["results"]
+        if not isinstance(results, list):
+            raise DataSourceResponseError(
+                message="Tavily 响应 'results' 字段非列表",
+                context={"source_name": "tavily", "actual_type": type(results).__name__},
+            )
+        return {"results": results, "answer": data.get("answer", "")}
 
     async def close(self) -> None:
         """关闭自持的 httpx 客户端（注入客户端由调用方管理）"""
