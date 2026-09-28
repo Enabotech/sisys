@@ -1452,6 +1452,33 @@ tests/
 | H9 | `max_concurrency=4` keyword-only（<1 → ValidationError 201）；实例属性 Semaphore 仅包 fetch_many gather | 2 项新测（峰值 ≤2 探针/非法值 201） |
 | H10 | `real_crawler` 死 fixture 删除（24 行）；AC-6 deferred 注记同步修订 | 集成收集健康 |
 
+#### Round 4 — C2 修复方案（验收测试基建组 + P3 留档收口）
+
+**I1 AC-5.1 脱敏断言真实化（R2-2-C1）**：given 构造 context url 带假 key（`api_key=test1234fake`，低熵不触发 detect-secrets）；Then 升级三断言（原串不存在 + `***REDACTED***` 存在阳性对照 + 非敏感参数 `query=gdp` 原样保留防过度脱敏）
+**I2 session→场景级 Redis（R2-2-C2，方案 B）**：删除 `tests/acceptance/conftest.py` 共享 `acceptance_redis_client`（唯一消费者即 data_source 验收文件，共享前提已被证伪——conftest docstring 所称多文件共享为过时错误陈述）；客户端创建内联进 `context` fixture（function scope + 同循环 `aclose()`，对齐 `test_acceptance_skill_data_collection.py` 范本）；`_assert_redis_available` 双 ping 保留（真实可用性探针）但更新过时注释
+**I3 AC-7.2 第三态确定性断言（R2-2-C4）**：按进程环境 KEY 推导期望注册集合（`bool(os.getenv)` 与 composition_root 语义一致），`len==8 or len==6` 改为确定性相等（合法态 {6,7,8}）；删除冗余 superset/subset 断言
+**I4 AC-2.4 子进程探针（R2-2-C5）**：注册发生于 session 级 bootstrap，进程内 monkeypatch 为时已晚——改 subprocess scrub env 探针（复用 AC-7.1 先例：干净子进程 pop KEY → bootstrap → 断言 tavily 未注册且 worldbank 已注册）
+**I5 AC-2.5 金丝雀（R2-2-C6）**：when 步骤 `monkeypatch.setenv` 注入固定假 Key（`fake-tavily-key-test1234`，避免 tvly- 真实前缀触发密钥扫描）；Then 无条件断言 + 阳性对照（金丝雀未注入即失败）
+**I6 P3 超长整数通道收口（Round 2 留档）→ 改判不落码**：C3 评审否定性发现——CPython 3.11 位数限制**对称**（str→int 同样受限），`json.loads` 解析超 4300 位整数直接抛 ValueError，已被既有 `except (ValueError, RecursionError)` 降级覆盖（全仓零处 `set_int_max_str_digits` 调用，通道不可达）；且「转字面串」技术上不可实现（str/repr/format 对超限 int 全部抛 ValueError）。按「不为不可能场景写防御」准则收口：记录闭合事实，不加码
+
+**C3 评审结论（Round 4，良好 → 5 项最小修改全部纳入后达准入）**：
+1. **I1**：`.feature:109` step 文字锁步同步（pytest-bdd strict-equal 匹配，漏改即 ScenarioNotFound）；删 `expected_secret="abc"`/`note` 占位，断言直接锚 `test1234fake` 字面量
+2. **I2**：`given_infra_initialized`（:285）改读 `context["_redis_client"]`；同 commit 清 conftest.py:6/:94 与 `_assert_redis_available` :323-333 过时注释（lazy 重建分支保留作 belt-and-braces）
+3. **I3**：同 commit 改写 given docstring :1120-1122（注册来自 `tests/conftest.py:20-27` session autouse `_bootstrap_once`，非 `__import__` 模块级副作用——原叙述与事实相反）
+4. **I4**：探针脚本显式调用 `bootstrap()`（仅 `__import__` 不注册）；env 用 `os.environ.copy()+pop` 保留其余变量；补 with-Key 阳性对照（防探针恒报未注册的假阴性）+ timeout=120s；用 `sys.executable` 优于 `poetry run`（不依赖 PATH 有 poetry）
+5. **I5**：新场景 `.feature` 同步；金丝雀断言无条件化（删 `if env_key:` 条件形态）
+
+#### 已修复 Patch（第二周期 Round 4，TDD）
+
+| # | 修复 | 验证 |
+|---|------|------|
+| I1 | AC-5.1 脱敏断言真实化（`api_key=test1234fake` + 三断言：原串不存在/REDACTED 阳性对照/`query=gdp` 保留防过度脱敏）；.feature step 锁步；删占位变量 | AC-5.1 场景复跑 |
+| I2 | 删 conftest 共享 `acceptance_redis_client`（共享前提证伪）；客户端内联 context fixture（function scope + 同循环 aclose + teardown 先 delete_pattern 后关闭）；conftest/docstring 过时注释清理 | 验收套件复跑（xdist 组内无跨循环错误） |
+| I3 | AC-7.2 确定性相等断言（按进程 env 推导期望集合，兼容 {6,7,8} 态）；given docstring 机制叙述纠偏 | 三种 KEY 环境语义 |
+| I4 | AC-2.4 子进程探针（scrub env → 显式 bootstrap → 断言 tavily 未注册且核心已注册）+ with-Key 阳性对照 + timeout=120s + sys.executable | 探针双向实证 |
+| I5 | AC-2.5 金丝雀（monkeypatch.setenv 假 Key 链 + 无条件零泄露断言）；.feature 同步 | 场景复跑 |
+| I6 | 不落码（通道已被 json.loads 对称限制 + 既有 except 降级双闭合，评审实证不可达） | Story 记录 |
+
 | # | 修复 | 文件 | 验证 |
 |---|------|------|------|
 | F1 | 注入管线重构：preamble `json.dumps`→`repr`（parse_constant 映射 NaN/Infinity 为字面串）；标记原位替换 `DATA_SOURCES["name"]`（同源 `name#k`）；失败位替换 `None`；inject 改收 `(code, markers, results)`；`fetch_many` 等长对齐 `tuple[DataSourceResult \| None, ...]` | `data_source_marker.py` / `data_source_resolver.py` / `tool_execution_engine.py` / `ports/data_source_resolver.py` | 新增 compile 闸门 + null/bool/unicode exec + 部分失败 + name#k 共 7 项单测；38 marker 测试全绿 |

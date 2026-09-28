@@ -69,6 +69,9 @@ def _run_async(event_loop: Any, coro: Any) -> Any:
 # 全部场景归入 data-source-cache 组: 与共享缓存键的测试在同一 worker 串行执行
 pytestmark = pytest.mark.xdist_group("data-source-cache")
 
+# AC-2.5 金丝雀假 Key（低熵、无 tvly- 真实前缀，detect-secrets 实测零误报——R2-2-C6/I5）
+_FAKE_TAVILY_KEY = "fake-tavily-key-test1234"
+
 
 # ===================================================================
 # Fixtures
@@ -78,25 +81,36 @@ pytestmark = pytest.mark.xdist_group("data-source-cache")
 @pytest.fixture
 def context(
     event_loop: Any,
-    acceptance_redis_client: Any,
+    acceptance_env_config: Any,
 ) -> Generator[dict[str, Any], None, None]:
     """BDD 步骤间共享状态容器（场景级 UUID 租户前缀 + 场景级共享事件循环 + teardown 清理本场景缓存键）
 
-    acceptance_redis_client 由 tests/acceptance/conftest.py session-scope 提供，
-    避免每个测试文件重复建连（4-1b 与 semantic_cache 原各自内联同款 fixture，
-    Round 1 重构提取为共享 fixture）。
+    R2-2-C2/I2：Redis 客户端场景级独立创建并在**同一事件循环**内关闭——
+    原 conftest session-scope 共享客户端的连接池绑定首个使用它的 function-scope
+    循环，跨场景报 "Event loop is closed"（对齐 test_acceptance_skill_data_collection.py
+    范本；共享前提经 grep 证伪——唯一消费者即本文件）。
     """
+    import redis.asyncio as aioredis
+
+    client = aioredis.Redis(
+        host=acceptance_env_config.redis.host,
+        port=acceptance_env_config.redis.port,
+        password=acceptance_env_config.redis.password,
+        decode_responses=True,
+    )
     ctx: dict[str, Any] = {
         "_tenant": f"acc-{uuid.uuid4().hex[:8]}",
         "_loop": event_loop,
-        "_redis_client": acceptance_redis_client,
+        "_redis_client": client,
     }
-    yield ctx
-
-    # teardown: 仅清理本场景创建的缓存键（delete_pattern 限定租户前缀）
-    cache = ctx.get("cache")
-    if cache is not None:
-        _run_async(event_loop, cache.delete_pattern(f"sisys:cache:datasource:{ctx['_tenant']}:*"))
+    try:
+        yield ctx
+    finally:
+        # teardown: 先清理本场景缓存键（delete_pattern 限定租户前缀），再同循环关闭客户端
+        cache = ctx.get("cache")
+        if cache is not None:
+            _run_async(event_loop, cache.delete_pattern(f"sisys:cache:datasource:{ctx['_tenant']}:*"))
+        _run_async(event_loop, client.close())  # 对齐范本 close()（redis-py 5.x 与 aclose 等价；aclose 泛型标注 mypy 不识别）
 
 
 # ===================================================================
@@ -282,7 +296,6 @@ def _run_engine(
 def given_infra_initialized(
     context: dict[str, Any],
     event_loop: Any,
-    acceptance_redis_client: Any,
 ) -> None:
     """初始化采集基础设施（优雅降级）：InMemoryEventBus + 空适配器映射 + Redis 连接尽力初始化。
 
@@ -294,14 +307,18 @@ def given_infra_initialized(
       （不抛 pytest.skip），元场景正常执行
     - Redis 依赖场景在 _run_engine / resolver.fetch 入口通过 _assert_redis_available()
       helper 显式 skip，命中 CLAUDE.md §5 "运行时动态 skip（禁止写死 @pytest.mark.skip）"
+
+    R2-2-C2/I2：客户端来自 context fixture 的场景级实例（同循环创建/关闭），
+    不再依赖 conftest session-scope 共享客户端。
     """
-    context["redis_client"] = acceptance_redis_client
+    client = context["_redis_client"]
+    context["redis_client"] = client
     context["adapters"] = {}
     context["query_error"] = None
     context["event_bus"] = InMemoryEventBus()
 
     try:
-        _run_async(event_loop, acceptance_redis_client.ping())
+        _run_async(event_loop, client.ping())
     except Exception as e:
         # 优雅降级：标记 Redis 不可用，让非依赖场景继续运行
         context["redis_available"] = False
@@ -310,7 +327,7 @@ def given_infra_initialized(
         return
 
     context["redis_available"] = True
-    context["cache"] = RedisAdapter(redis_client=acceptance_redis_client)
+    context["cache"] = RedisAdapter(redis_client=client)
 
 
 def _assert_redis_available(context: dict[str, Any], event_loop: Any) -> None:
@@ -320,24 +337,19 @@ def _assert_redis_available(context: dict[str, Any], event_loop: Any) -> None:
     仅 Redis 依赖场景（_run_engine / resolver.fetch / cache 操作）调用，
     避免 background 失败导致元场景被牵连 skip。
 
-    Round 3 二次修复：每次断言时**实际 ping 一次**而非依赖 context 标志 —
-    acceptance_redis_client 是 session-scope 而 event_loop 是 function-scope，
-    跨测试不同事件循环下旧标志不可靠；用 ping 实证可用性避免假阳性 skip。
+    R2-2-C2/I2 后客户端为场景级实例（与本场景 event_loop 同循环创建），
+    ping 实证保留作为真实可用性探针（belt-and-braces）；lazy 重建分支
+    同样保留（background ping 失败 → 场景级 ping 成功的恢复路径）。
     """
 
     client = context.get("redis_client")
     if client is None:
         pytest.skip(context.get("skip_reason", "Redis 客户端未初始化"))
     try:
-        # 每次断言都实证 ping，避免 session-scope 客户端与 function-scope event_loop
-        # 跨循环绑定导致后续测试误判"Redis 不可用"
         _run_async(event_loop, client.ping())
     except Exception as e:
         pytest.skip(f"Redis 不可用: {e}")
 
-    # Round 3 三次修复：ping 成功路径下 lazy 重建 RedisAdapter cache
-    # （之前 given_infra_initialized Redis ping 失败时设 cache=None；后续 ping 成功但 cache
-    # 仍为 None 导致 AttributeError；lazy 重建确保 cache 可用）
     if context.get("cache") is None:
         context["cache"] = RedisAdapter(redis_client=client)
 
@@ -557,11 +569,50 @@ def when_call_fake_adapter_fetch(context: dict[str, Any], event_loop: Any) -> No
 
 
 @given(parsers.parse("TAVILY_API_KEY 未配置（composition_root 条件注册跳过）"))
-def given_tavily_key_unset() -> None:
-    """Round 1 新增：模拟 TAVILY_API_KEY 环境变量缺失场景，
-    composition_root 不会注册 data_source_tavily（条件注册跳过）。
-    本步骤仅为语义标识，实际"未注册"由 context["adapters"] 显式控制。
+def given_tavily_key_unset(context: dict[str, Any]) -> None:
+    """R2-2-C5/I4 子进程实证条件注册（原实现为空语义标识步骤）。
+
+    注册发生于 `bootstrap()`（本进程 session 启动时已执行），进程内 delenv
+    无法回滚——起干净子进程验证：scrub KEY → 显式 bootstrap → 断言
+    tavily 未注册且核心适配器已注册；with-Key 阳性对照防探针恒报未注册的假阴性。
+    bootstrap 全为惰性 lambda 注册（纯 dict 操作），无 DB/Redis 依赖，秒级完成。
     """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    script_tpl = (
+        "import os;"
+        "os.environ.pop('TAVILY_API_KEY', None);"
+        "os.environ.pop('NEWSAPI_API_KEY', None);"
+        "{with_key_line}"
+        "from src.composition_root import bootstrap;"
+        "from src.domain.ports.registry import _global_registry;"
+        "bootstrap();"
+        "ports = sorted(s.name for s in _global_registry.list_all() if s.name.startswith('data_source_'));"
+        "assert _global_registry.get('data_source_tavily') is {tavily_expect}, 'tavily 注册态与 KEY 配置不符: ' + str(ports);"
+        "assert _global_registry.get('data_source_worldbank') is not None, '核心适配器应无条件注册';"
+        "print('PORTS=' + ','.join(ports))"
+    )
+    # 反向对照：注入假 Key 时 tavily 应注册（防探针恒报未注册）；
+    # 值经 f-string 插值（复用模块级低熵假 Key 常量，字面赋值形态会触发 detect-secrets）
+    with_key = script_tpl.format(
+        with_key_line=f"os.environ['TAVILY_API_KEY'] = '{_FAKE_TAVILY_KEY}';",
+        tavily_expect="not None",
+    )
+    without_key = script_tpl.format(with_key_line="", tavily_expect="None")
+    repo_root = Path(__file__).resolve().parents[2]
+    for script in (without_key, with_key):
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=repo_root,
+        )
+        assert result.returncode == 0, f"条件注册探针失败:\n{result.stdout}\n{result.stderr}"
+        assert "PORTS=" in result.stdout
+    context["tavily_conditional_registration_verified"] = True
 
 
 @given(parsers.parse('工具元数据仅声明 "{name}"'))
@@ -616,7 +667,12 @@ def then_resolver_available_for_other_sources(context: dict[str, Any]) -> None:
 
 
 @when("以缺失 API Key 构造 TavilyAdapter")
-def when_construct_tavily_without_key(context: dict[str, Any]) -> None:
+def when_construct_tavily_without_key(context: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    """R2-2-C6/I5 金丝雀：进程内注入固定假 Key——证明即使环境中存在 Key 材料，
+    空配置构造失败路径的 message/context/序列化也零插值泄露。
+    （TavilyAdapter 构造不读 env，读取在 TavilyConfig.from_env——金丝雀模拟
+    "环境有 Key 材料但配置显式为空"的失败路径）"""
+    monkeypatch.setenv("TAVILY_API_KEY", _FAKE_TAVILY_KEY)
     try:
         context["tavily_adapter"] = TavilyAdapter(config=TavilyConfig(api_key=""))
         context["query_error"] = None
@@ -631,6 +687,17 @@ def then_raises_config_error(context: dict[str, Any]) -> None:
     assert isinstance(context["query_error"], ConfigurationError)
 
 
+@then("401 异常消息不含密钥材料")
+def then_auth_error_message_no_key_material(context: dict[str, Any]) -> None:
+    """AC-2.3 专属：401/403 异常消息为固定文案（仅含 source_name 与 status_code，零密钥材料）。"""
+    exc = context["query_error"]
+    assert exc is not None
+    message = str(exc)
+    assert "api_key" not in message.lower().replace("api key 无效", "")  # 仅允许固定文案中的字段名
+    for material in ("key=", "token=", "secret=", "Bearer "):
+        assert material not in message
+
+
 @then("context 含 status_code 字段")
 def then_context_has_status_code(context: dict[str, Any]) -> None:
     """验证异常 context 含 status_code 字段（401/403 场景标识）"""
@@ -640,14 +707,14 @@ def then_context_has_status_code(context: dict[str, Any]) -> None:
 
 @then("异常消息不包含密钥字串")
 def then_error_message_sanitized(context: dict[str, Any]) -> None:
+    """R2-2-C6/I5 无条件断言（原 if env_key: 条件形态在无 Key 环境恒空转）。"""
     import os
 
     exc = context["query_error"]
     assert exc is not None
-    env_key = os.getenv("TAVILY_API_KEY")
-    if env_key:  # 环境存在真实 Key 时必须零泄露
-        assert env_key not in str(exc)
-        assert env_key not in json.dumps(exc.to_dict(), ensure_ascii=False)
+    assert os.getenv("TAVILY_API_KEY") == _FAKE_TAVILY_KEY, "金丝雀未注入（断言将空转）"
+    assert _FAKE_TAVILY_KEY not in str(exc)
+    assert _FAKE_TAVILY_KEY not in json.dumps(exc.to_dict(), ensure_ascii=False)
 
 
 @then("Resolver 数据源映射不含 tavily 时查询返回白名单违规")
@@ -794,21 +861,19 @@ def then_three_method_signatures_match(context: dict[str, Any]) -> None:
 
 @given("构造 ConfigurationError 含敏感 Key 字段 example.com 含 fake_test_marker")
 def given_config_error_with_context(context: dict[str, Any]) -> None:
-    """Round 3 根因修复：构造固定测试场景的 ConfigurationError（避免参数化 pattern 与 .feature step text 不匹配）。
+    """构造 context.url 含 api_key 参数的 ConfigurationError（R2-2-C1/I1 真实化）。
 
-    使用固定示例数据（name=tavily, url 含伪造 token 标记）确保 .feature step text 与
-    .py 装饰器精确字面匹配（pytest-bdd step matching 默认 strict equal）。
+    url 携带低熵假 Key（test1234fake，detect-secrets 实测零误报），
+    使脱敏断言具备真实判别力（原实现 url 不含任何敏感串，断言恒真）。
+    .feature step text 与装饰器精确字面匹配（pytest-bdd strict equal）。
     """
     name = "tavily"
-    # 不使用含 ?token=KEY= 的高熵 URL（避免 detect-secrets 误判）；
-    # 改用 explicit context 字段存放 + 单独 expected_secret 字段构造对照字串
-    url = "https://example.test/api"
+    url = "https://api.example.test/search?api_key=test1234fake&query=gdp"
     exc = ConfigurationError(
         message=f"数据源 {name} 配置缺失",
-        context={"source_name": name, "url": url, "note": "placeholder for redaction test"},
+        context={"source_name": name, "url": url},
     )
     context["config_error_with_url"] = exc
-    context["expected_secret"] = "abc"
 
 
 @when("调用异常 to_dict 序列化")
@@ -828,13 +893,14 @@ def then_serialized_dict_has_source_name(context: dict[str, Any]) -> None:
 
 @then("序列化字典中不出现敏感 API Key 字串")
 def then_serialized_dict_has_no_secret(context: dict[str, Any]) -> None:
-    """Round 3 根因修复：to_dict() 序列化结果中不含敏感 API Key 子串（API Key 零泄露）。"""
+    """R2-2-C1/I1 三断言（原串消失 + 阳性对照 + 防过度脱敏）。"""
     import json as _json
 
     result = context["exception_to_dict_result"]
     serialized = _json.dumps(result, ensure_ascii=False)
-    expected_secret = context["expected_secret"]
-    assert expected_secret not in serialized, "to_dict 序列化结果含敏感字段（API Key 泄露）"
+    assert "test1234fake" not in serialized, "to_dict 序列化结果含敏感字段（API Key 泄露）"
+    assert "***REDACTED***" in serialized, "脱敏未真实发生（阳性对照缺失，断言可能空转）"
+    assert "query=gdp" in serialized, "非敏感参数应原样保留（防过度脱敏）"
 
 
 @given("遍历 src/domain/exceptions/data_source_exceptions.py 全部异常类")
@@ -1086,8 +1152,11 @@ def then_arch_tests_zero_failures(context: dict[str, Any]) -> None:
 @given("导入 src.composition_root._PORT_REGISTRY（懒加载触发模块级注册）")
 @given("导入 src.composition_root._global_registry 模块级全局注册中心")
 def given_import_composition_root_registry(context: dict[str, Any]) -> None:
-    """Round 3 根因修复：实际全局注册中心变量是 `_global_registry`（src/domain/ports/registry.py:129），
-    通过 __import__ 触发 composition_root 模块级副作用注册 8 个 data_source 端口。
+    """获取全局注册中心（`_global_registry`，src/domain/ports/registry.py）。
+
+    R2-2-C4/I3 机制纠偏：注册并非 __import__ 模块级副作用，而是
+    `bootstrap()` 函数体内执行——由 tests/conftest.py 的 session autouse
+    `_bootstrap_once` 在会话启动时调用一次；本步骤仅取回该注册中心实例。
     """
     registry = __import__(
         "src.composition_root",
@@ -1113,12 +1182,15 @@ def when_extract_data_source_ports(context: dict[str, Any]) -> None:
 
 @then("端口数 = 8 个含 worldbank imf eurostat uspto ipcc newsapi tavily china_nbs")
 def then_eight_data_source_adapters_registered(context: dict[str, Any]) -> None:
-    """Round 2 新增：断言注册到 composition_root 的 data_source_* 适配器数量为 8。"""
-    ports = context["registered_data_source_ports"]
-    # Round 3 根因修复：newsapi/tavily 依赖 TAVILY_API_KEY/NEWSAPI_API_KEY 环境变量做条件注册
-    # （4-1b Round 1 P0-3 修复）。无条件 KEY 时仅 6 个 adapter 注册；环境有 KEY 时 8 个
-    # （CLAUDE.md §5 "禁止写死 @pytest.mark.skip" — 此断言兼容两种场景）
-    ports_set = set(ports)
+    """R2-2-C4/I3：按进程环境 KEY 确定性推导期望注册集合（兼容 {6,7,8} 态）。
+
+    newsapi/tavily 条件注册独立判定（composition_root `bool(os.getenv(...))`，
+    空串视为未配置），原 `len==8 or len==6` 断言在单 KEY 配置（7 端口）时误失败；
+    测试进程 env 与 session 级 bootstrap 决策天然一致。
+    """
+    import os
+
+    ports_set = set(context["registered_data_source_ports"])
     core_required = {
         "data_source_worldbank",
         "data_source_imf",
@@ -1127,18 +1199,15 @@ def then_eight_data_source_adapters_registered(context: dict[str, Any]) -> None:
         "data_source_ipcc",
         "data_source_china_nbs",
     }
-    optional_key_dependent = {
-        "data_source_newsapi",
-        "data_source_tavily",
-    }
-    full_expected = core_required | optional_key_dependent
-    assert ports_set.issuperset(core_required), (
-        f"核心 6 个 adapter 必须全部注册，实际 {ports}，缺少 {core_required - ports_set}"
-    )
-    assert ports_set.issubset(full_expected), f"实际端口 {ports_set - full_expected} 不在预期集合"
-    assert len(ports) == len(full_expected) or len(ports) == len(core_required), (
-        f"实际端口数 {len(ports)} 应为 6（无 KEY）或 8（含 KEY），禁止其他状态"
-    )
+    expected = set(core_required)
+    # 判定语义与 composition_root 条件注册逐字一致（bool() 拒 None 与空串）
+    for port_name, env_key in (
+        ("data_source_newsapi", "NEWSAPI_API_KEY"),
+        ("data_source_tavily", "TAVILY_API_KEY"),
+    ):
+        if bool(os.getenv(env_key)):
+            expected.add(port_name)
+    assert ports_set == expected, f"注册集合 {sorted(ports_set)} 与按环境 KEY 推导的期望 {sorted(expected)} 不一致"
 
 
 @given("收集 src/domain/{ports,value_objects,events,exceptions} 下 data_source 相关文件")

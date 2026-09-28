@@ -43,7 +43,7 @@
   那么 抛出 ConfigurationError
   并且 错误码为 EXCEPTION_101
   并且 context 含 status_code 字段
-  并且 异常消息不包含密钥字串
+  并且 401 异常消息不含密钥材料
 
 场景: AC-2.4 - TAVILY_API_KEY 缺失时条件注册跳过，Resolver 服务仍可用
   假如 TAVILY_API_KEY 未配置（composition_root 条件注册跳过）
