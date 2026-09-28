@@ -18,8 +18,8 @@ import pytest
 
 from src.application.ports.skill_loader import SkillDocument
 from src.application.skills.loader import InMemorySkillLoader
+from src.application.skills.skill_manifest import SLUG_TO_TOOL_ID
 from tests.unit.application.skills.skill_data_collection_contracts import (
-    SKILL_DATA_SOURCES,
     SKILLS_ROOT,
     assert_cross_consistency,
     assert_data_sources_contract,
@@ -85,8 +85,10 @@ class TestAllSkillsRegression:
     """23 Skills 全量解析回归 + 7 个非目标 Skill 空 tuple 不变量（AC-1；4-1d Task 1.4 预调整）"""
 
     async def test_all_23_skills_parse_regression(self) -> None:
+        """23 Skills 全量解析回归（R1-F6 名实恢复：枚举源改 SLUG_TO_TOOL_ID 生产 SSOT——
+        NON_TARGET_SLUGS 缩水不再静默缩减覆盖面，新 Story 成熟化即自动纳入回归）。"""
         loader = InMemorySkillLoader()
-        for slug in (*SKILL_DATA_SOURCES.keys(), *NON_TARGET_SLUGS):
+        for slug in SLUG_TO_TOOL_ID:
             document = await loader.load_sop(slug)
             assert document.frontmatter.slug == slug
             assert isinstance(document.frontmatter.data_sources, tuple)

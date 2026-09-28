@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import ast
 import inspect
-import re
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -29,7 +28,10 @@ from src.application.skills.loader import InMemorySkillLoader
 from src.domain.ports.data_source import DataSourcePort
 from tests.unit.application.skills.skill_data_collection_contracts import (
     ADAPTER_SSOT,
+    DATA_SOURCE_MARKER_PATTERN,
     SKILL_DATA_SOURCES,
+    SKILL_MD_MAX_LINES,
+    SKILLS_ROOT,
 )
 from tests.unit.application.skills.skill_mixed_data_contracts import MIXED_SKILL_DATA_SOURCES
 
@@ -39,7 +41,8 @@ from tests.unit.application.skills.skill_mixed_data_contracts import MIXED_SKILL
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SRC_ROOT = REPO_ROOT / "src"
-SKILLS_ROOT = SRC_ROOT / "application" / "skills"
+# SKILLS_ROOT / SKILL_MD_MAX_LINES / DATA_SOURCE_MARKER_PATTERN 一律 import 4-1c
+# 契约库单一来源（R1-F9：消除本文件出生时的常量复制，D6/R2-F3 政策收尾）
 
 # 10 个 4-1d 目标（顺序 = 契约库 MIXED_SKILL_DATA_SOURCES key 顺序）
 TARGET_SLUGS: tuple[str, ...] = tuple(MIXED_SKILL_DATA_SOURCES.keys())
@@ -65,9 +68,6 @@ WIRING_FILES: tuple[Path, ...] = (
     SRC_ROOT / "application" / "use_cases" / "run_tool_chain.py",
     SRC_ROOT / "application" / "services" / "tool_execution_engine.py",
 )
-
-SKILL_MD_MAX_LINES = 500
-DATA_SOURCE_MARKER_PATTERN = re.compile(r"\$DATA_SOURCE\(\s*[\"']([\w-]+)[\"']")
 
 
 def _extract_imports(path: Path) -> set[str]:

@@ -55,6 +55,11 @@ SKILL_DATA_SOURCES: dict[str, tuple[str, ...]] = {
 # 声明含 Key 敏感源（newsapi/tavily）的 Skill —— SOP 失败处理章节必须文档化 Key 缺失降级
 KEY_SENSITIVE_SOURCES = ("newsapi", "tavily")
 
+# 全部 16 个声明 Skill 的 DataSourceRef.required_fields 统一期望值（源级语义，跨 Story 共享）
+# 4.1b 声明性元数据约定：payload 必含 indicator/value 两字段（16 Skill × 全部声明源实测一致）。
+# 4-1d 代码审查 R1-F5 收紧断言引入（原先仅非空断言）；4.3 data_sources.items 字段级化时并入 ADAPTER_SSOT。
+EXPECTED_REQUIRED_FIELDS: tuple[str, ...] = ("indicator", "value")
+
 # SOP body 中 $DATA_SOURCE 标记提取正则（Task 9.3 跨循环一致性同款）
 DATA_SOURCE_MARKER_PATTERN = re.compile(r"\$DATA_SOURCE\(\s*[\"']([\w-]+)[\"']")
 

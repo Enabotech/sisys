@@ -47,6 +47,7 @@ from src.domain.value_objects.data_source import (
 from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall, ToolResultStatus
 from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
+from tests.unit.application.skills.skill_data_collection_contracts import KEY_SENSITIVE_SOURCES
 from tests.unit.application.skills.skill_mixed_data_contracts import (
     MIXED_SKILL_DATA_SOURCES,
     build_min_arguments,
@@ -56,13 +57,11 @@ pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cach
 
 # 数据契约 SSOT：import contracts 模块唯一来源（R2-F3 统一）
 
-# Key 敏感源（import 4-1c 契约库同源常量语义）对应的单敏感 Skill 参数化集：
-# 声明含恰好 1 个敏感源的 4-1d Skill（物理缺该敏感源 → 部分失败收敛可满足）
-SINGLE_SENSITIVE_SLUGS: tuple[str, ...] = (
-    "ge-mckinsey-matrix",
-    "value-chain-analysis",
-    "vrio-framework",
-    "kpi-tree",
+# 单敏感 Skill 参数化集（R1-F8：从两 SSOT 表派生，消除字面复制）：
+# 声明含恰好 1 个 Key 敏感源（KEY_SENSITIVE_SOURCES，import 4-1c 契约库同源常量）
+# 的 4-1d Skill——物理缺该敏感源 → 部分失败收敛可满足（留 1 个免 Key 源）
+SINGLE_SENSITIVE_SLUGS: tuple[str, ...] = tuple(
+    slug for slug, sources in MIXED_SKILL_DATA_SOURCES.items() if len(set(sources) & set(KEY_SENSITIVE_SOURCES)) == 1
 )
 
 
@@ -205,7 +204,7 @@ def _injected_source_names(prompts_result: Any) -> set[str]:
 def _assert_arguments_in_think_prompt(arguments: dict[str, Any], prompts: list[str]) -> None:
     """内外融合双通道断言之一：Think prompt 含 arguments 的 Python repr 子串。
 
-    Think 阶段识别特征串「规划执行步骤」（tool_execution_engine.py:521，
+    Think 阶段识别特征串「规划执行步骤」（tool_execution_engine.py:522，
     Engine 以 f-string 注入 dict repr——断言 json 序列化子串必假红）。
     """
     think_prompts = [p for p in prompts if "规划执行步骤" in p]
@@ -301,8 +300,7 @@ class TestKeyMissingDegradation:
         cache, tenant, _tenant_b = redis_tenant_cache
         event_bus = InMemoryEventBus()
         declared = MIXED_SKILL_DATA_SOURCES[slug]
-        sensitive = ("newsapi", "tavily")
-        missing = [name for name in declared if name in sensitive]
+        missing = [name for name in declared if name in KEY_SENSITIVE_SOURCES]
         assert len(missing) == 1, f"{slug} 应为单敏感 Skill（恰好 1 个敏感源），实际 {missing}"
         # 物理缺敏感源（模拟 Key 缺失被条件注册排除）
         present = tuple(name for name in declared if name not in missing)

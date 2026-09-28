@@ -25,6 +25,7 @@ from src.application.ports.skill_loader import SkillDocument, ToolMetadata
 from tests.unit.application.skills.skill_data_collection_contracts import (
     ADAPTER_SSOT,
     DATA_SOURCE_MARKER_PATTERN,
+    EXPECTED_REQUIRED_FIELDS,
     KEY_SENSITIVE_SOURCES,
     REQUIRED_SOP_SECTIONS,
     SKILL_MD_MAX_LINES,
@@ -35,6 +36,7 @@ from tests.unit.application.skills.skill_data_collection_contracts import (
 __all__ = [
     "ADAPTER_SSOT",
     "DATA_SOURCE_MARKER_PATTERN",
+    "EXPECTED_REQUIRED_FIELDS",
     "KEY_SENSITIVE_SOURCES",
     "REQUIRED_SOP_SECTIONS",
     "SKILLS_ROOT",
@@ -49,6 +51,7 @@ __all__ = [
     "load_io_contract",
     "load_io_contract_keys",
     "schema_leaf_keys",
+    "schema_top_level_container_keys",
     "extract_template_fields",
     "build_min_arguments",
     "assert_data_sources_contract",
@@ -137,6 +140,16 @@ def load_io_contract_keys() -> tuple[str, ...]:
 # =============================================================================
 
 
+def _is_object_container(node: dict[str, Any]) -> bool:
+    """嵌套对象容器判定（叶子展开与顶层容器键提取共用判定式，防两份语义漂移）。"""
+    return node.get("type") == "object" and bool(node.get("properties"))
+
+
+def _is_array_of_objects(node: dict[str, Any]) -> bool:
+    """对象数组容器判定（共用判定式，同上）。"""
+    return node.get("type") == "array" and isinstance(node.get("items"), dict) and bool(node["items"].get("properties"))
+
+
 def schema_leaf_keys(schema: dict[str, Any]) -> dict[str, bool]:
     """递归展开 input_schema 的叶子键集合（叶子键 → 是否必填）。
 
@@ -147,29 +160,70 @@ def schema_leaf_keys(schema: dict[str, Any]) -> dict[str, bool]:
     - 平铺 Schema（无嵌套 properties）退化为顶层键即叶子键
     - 必填判定 = 叶子出现在其直接容器的 required 列表中（JSON Schema 语义：
       父级容器自身的 required 使容器必填，不使容器内全部子字段必填）
+
+    结构守卫（R1-F4：扁平微格式无法表达的归属歧义显式红，防静默误分类）：
+    - 含 properties 但未声明 type: object 的节点 → 断言失败（否则子键被吞、
+      该节点被误当叶子——模板两侧同漏的假一致）
+    - 跨容器重名叶子 → 断言失败（否则 last-wins 覆盖某容器的 required 语义）
     """
     leaves: dict[str, bool] = {}
+    leaf_paths: dict[str, str] = {}
 
-    def _walk(node: dict[str, Any]) -> None:
+    def _walk(node: dict[str, Any], path: str) -> None:
         required = node.get("required") if isinstance(node.get("required"), list) else None
         for key, sub in node.get("properties", {}).items():
+            key_path = f"{path}.{key}" if path else key
             is_required = required is not None and key in required
-            if sub.get("type") == "object" and sub.get("properties"):
+            if _is_object_container(sub):
                 # 嵌套对象：容器键不进比对集（分区标题承载），递归展开
-                _walk(sub)
-            elif sub.get("type") == "array" and isinstance(sub.get("items"), dict) and sub["items"].get("properties"):
+                _walk(sub, key_path)
+            elif _is_array_of_objects(sub):
                 # array of object：展开 items.properties（容器键不进比对集）
-                _walk(sub["items"])
+                _walk(sub["items"], key_path)
             else:
+                if sub.get("properties") is not None:
+                    assert False, (
+                        f"Schema 节点 {key_path} 含 properties 但未声明 type: object——"
+                        "子键归属无法以扁平微格式表达，须显式声明容器类型或改为叶子"
+                    )
+                assert key not in leaves, (
+                    f"Schema 叶子键跨容器重名: {key_path} 与 {leaf_paths[key]}——"
+                    "扁平微格式无法区分同名叶子的容器归属，须改名区分"
+                )
                 leaves[key] = is_required
+                leaf_paths[key] = key_path
 
-    _walk(schema)
+    _walk(schema, "")
     return leaves
+
+
+def schema_top_level_container_keys(schema: dict[str, Any]) -> tuple[str, ...]:
+    """提取 input_schema 顶层容器键（递归展开、以模板分区标题承载的顶层键）。
+
+    仅取顶层：模板 `###` 分区标题只承载顶层容器键（vrio/ge 的二层嵌套容器
+    resources[].vrio_scores 等不设独立分区）；判定式与 schema_leaf_keys 共用。
+    """
+    return tuple(
+        key for key, sub in schema.get("properties", {}).items() if _is_object_container(sub) or _is_array_of_objects(sub)
+    )
 
 
 # =============================================================================
 # 模板字段提取器（Markdown 表格字段列 + 「（必填）」后缀剥离）
 # =============================================================================
+
+
+def _collection_section(template_text: str) -> str | None:
+    """截取「采集表格」区文本（到下一个二级标题为止；缺段返回 None）。
+
+    字段提取与分区标题提取共用同一段截取逻辑（R1-F3，防两份区域边界漂移）。
+    """
+    match = re.search(r"^##\s*采集表格\s*$", template_text, re.MULTILINE)
+    if match is None:
+        return None
+    after = template_text[match.end() :]
+    next_section = re.search(r"^##\s", after, re.MULTILINE)
+    return after[: next_section.start()] if next_section else after
 
 
 def extract_template_fields(template_text: str) -> dict[str, bool]:
@@ -178,7 +232,8 @@ def extract_template_fields(template_text: str) -> dict[str, bool]:
     微格式契约（Task 0.2 钉死）：
     - 仅「采集表格」区（`## 采集表格` 到下一个二级标题之间）的表格行参与提取；
       「基本信息」区表格字段不进比对集
-    - 三级标题（`### xxx`）= 嵌套顶层键分区标题，不进比对集
+    - 三级标题（`### xxx`）= 嵌套顶层键分区标题，不进比对集（由
+      schema_top_level_container_keys 双向断言另行承载）
     - 表格数据行首列 = 字段名，带「（必填）」后缀表示 required（剥离后缀取纯字段名）
     - 表头行与分隔行（`| --- |` 形态）跳过
     - 同字段多行（逐条因素一行的形态）时必填标注须全行一致：all 聚合——
@@ -187,13 +242,9 @@ def extract_template_fields(template_text: str) -> dict[str, bool]:
     """
     field_marks: dict[str, list[bool]] = {}
 
-    # 截取「采集表格」区（到下一个二级标题为止）
-    match = re.search(r"^##\s*采集表格\s*$", template_text, re.MULTILINE)
-    if match is None:
+    section = _collection_section(template_text)
+    if section is None:
         return {}
-    after = template_text[match.end() :]
-    next_section = re.search(r"^##\s", after, re.MULTILINE)
-    section = after[: next_section.start()] if next_section else after
 
     for line in section.splitlines():
         stripped = line.strip()
@@ -260,7 +311,9 @@ def assert_data_sources_contract(slug: str, metadata: ToolMetadata) -> None:
     """frontmatter data_sources 全字段（name/url/api_type/ttl_seconds/required_fields）== SSOT 表
 
     混合数据语义：声明源查 MIXED_SKILL_DATA_SOURCES（本 Story SSOT），
-    逐源 url/api_type/ttl 与 ADAPTER_SSOT（import 4-1c 库）逐字对齐。
+    逐源 url/api_type/ttl 与 ADAPTER_SSOT（import 4-1c 库）逐字对齐；
+    required_fields 与 EXPECTED_REQUIRED_FIELDS（import 4-1c 库，R1-F5 收紧）
+    逐字对齐——「全字段」断言名实相符。
     """
     expected_names = MIXED_SKILL_DATA_SOURCES[slug]
     actual = metadata.data_sources
@@ -274,7 +327,9 @@ def assert_data_sources_contract(slug: str, metadata: ToolMetadata) -> None:
         assert ref.api_type.value == api_type, f"{slug}/{ref.name}: api_type 漂移 {ref.api_type.value} != {api_type}"
         assert ref.ttl_seconds == ttl, f"{slug}/{ref.name}: ttl_seconds 漂移 {ref.ttl_seconds} != {ttl}"
         assert 60 <= ref.ttl_seconds <= 2592000
-        assert ref.required_fields, f"{slug}/{ref.name}: required_fields 不能为空（AC-1 全字段断言）"
+        assert tuple(ref.required_fields) == EXPECTED_REQUIRED_FIELDS, (
+            f"{slug}/{ref.name}: required_fields 漂移 {tuple(ref.required_fields)} != {EXPECTED_REQUIRED_FIELDS}"
+        )
 
 
 def assert_io_schema_contract(slug: str, metadata: ToolMetadata) -> None:
@@ -349,6 +404,8 @@ def assert_template_schema_alignment(slug: str, document: SkillDocument) -> None
     - 数据缺口登记区表头存在
     - 模板采集字段集合 == input_schema 递归展开叶子键集合（双向：多余=失败，缺失=失败）
     - required 叶子键标注「（必填）」后缀（有/无后缀与 required 链严格一致）
+    - 采集表格区 `###` 分区标题集合 == input_schema 顶层容器键集合（双向，
+      R1-F3：Story「分区标题字面值 == 顶层键名」契约的断言闭环）
     """
     template_path = SKILLS_ROOT / slug / "templates" / TEMPLATE_FILES[slug]
     assert template_path.is_file(), f"{slug}: 模板文件不存在 {template_path}"
@@ -376,4 +433,15 @@ def assert_template_schema_alignment(slug: str, document: SkillDocument) -> None
     assert not mismatched, (
         f"{slug}: 必填标注与 required 链不一致的字段: {sorted(mismatched)}"
         f"（required 叶子须带「{REQUIRED_SUFFIX}」后缀，非 required 不得带）"
+    )
+
+    # 分区标题 ↔ 顶层容器键双向断言（Story「内部数据契约」：分区标题字面值 == 顶层键名）
+    collection = _collection_section(template_text)
+    assert collection is not None, f"{slug}: 模板缺少「采集表格」区（四段式断言已保证存在，此处防御）"
+    section_titles = re.findall(r"^###\s+(.+?)\s*$", collection, re.MULTILINE)
+    container_keys = schema_top_level_container_keys(document.frontmatter.input_schema)
+    extra_titles = sorted(set(section_titles) - set(container_keys))
+    missing_keys = sorted(set(container_keys) - set(section_titles))
+    assert set(section_titles) == set(container_keys), (
+        f"{slug}: 模板分区标题与 Schema 顶层容器键不一致 — 标题多余: {extra_titles} / 容器键缺失: {missing_keys}"
     )
