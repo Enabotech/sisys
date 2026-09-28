@@ -195,8 +195,11 @@ Think 阶段必须先输出**维度 → 指标 → 数据源**映射计划，再
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
    - 每个声明源至少一个标记；query 为自然语言指标描述（含行业/地域/年限上下文）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
-   - 采集结果经全局 `DATA_SOURCES` dict 注入读取：`DATA_SOURCES["world-bank"]["payload"]`，
-     每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`
+   - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
+     每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
+     **部分失败语义**：采集失败的源其键**不在** `DATA_SOURCES` 中（对应标记位注入 `None`）——
+     读取返回 `None` 时按 §7 降级话术处理，禁止直接下标（`["payload"]` 会 KeyError 中断）。
+     **同源多 query**：同一数据源的多个不同 query 依次分配 `"<name>"` / `"<name>#2"` 键
 4. **Execute**：宿主机侧并发采集并注入 preamble，沙箱执行分析代码
 5. **Observe/Validate**：基于注入数据完成六维度评分（评分锚点见 `references/scoring_anchors.md`）
 6. **聚合评分**：调用 `scripts/aggregate_scores.py`（确定性任务，代码优先），
@@ -213,8 +216,8 @@ climate = $DATA_SOURCE("ipcc", "IPCC AR6 排放情景数据")
 news = $DATA_SOURCE("newsapi", "新能源汽车 政策 法规 最新动态")
 cn_stats = $DATA_SOURCE("china-nbs", "中国社会消费品零售 人口统计")
 
-# 采集后通过注入的 DATA_SOURCES dict 读取
-wb_payload = DATA_SOURCES["world-bank"]["payload"]
+# 采集后通过注入的 DATA_SOURCES dict 防御性读取（失败源键不存在 → None → 按 §7 降级）
+wb_payload = (DATA_SOURCES.get("world-bank") or {}).get("payload")
 ```
 
 ## 7. 失败处理

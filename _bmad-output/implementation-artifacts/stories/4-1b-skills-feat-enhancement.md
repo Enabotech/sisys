@@ -1,6 +1,6 @@
 # Story 4.1b: Skills 数据采集基础设施（DataSourcePort + 8 数据源适配器）
 
-**Status:** `review`
+**Status:** `done`（第二审查周期 Round 1-5 收敛，2026-09-28）
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1457,7 +1457,7 @@ tests/
 **I1 AC-5.1 脱敏断言真实化（R2-2-C1）**：given 构造 context url 带假 key（`api_key=test1234fake`，低熵不触发 detect-secrets）；Then 升级三断言（原串不存在 + `***REDACTED***` 存在阳性对照 + 非敏感参数 `query=gdp` 原样保留防过度脱敏）
 **I2 session→场景级 Redis（R2-2-C2，方案 B）**：删除 `tests/acceptance/conftest.py` 共享 `acceptance_redis_client`（唯一消费者即 data_source 验收文件，共享前提已被证伪——conftest docstring 所称多文件共享为过时错误陈述）；客户端创建内联进 `context` fixture（function scope + 同循环 `aclose()`，对齐 `test_acceptance_skill_data_collection.py` 范本）；`_assert_redis_available` 双 ping 保留（真实可用性探针）但更新过时注释
 **I3 AC-7.2 第三态确定性断言（R2-2-C4）**：按进程环境 KEY 推导期望注册集合（`bool(os.getenv)` 与 composition_root 语义一致），`len==8 or len==6` 改为确定性相等（合法态 {6,7,8}）；删除冗余 superset/subset 断言
-**I4 AC-2.4 子进程探针（R2-2-C5）**：注册发生于 session 级 bootstrap，进程内 monkeypatch 为时已晚——改 subprocess scrub env 探针（复用 AC-7.1 先例：干净子进程 pop KEY → bootstrap → 断言 tavily 未注册且 worldbank 已注册）
+**I4 AC-2.4 子进程探针（R2-2-C5）**：注册发生于 session 级 bootstrap，进程内 monkeypatch 为时已晚——改 subprocess scrub env 探针（干净子进程 pop KEY → bootstrap → 断言 tavily 未注册且 worldbank 已注册；`sys.executable` 直跑不依赖 PATH 中 poetry——原 AC-7.1 先例已随游离提交 730e1cb4 删除，R5 补记）
 **I5 AC-2.5 金丝雀（R2-2-C6）**：when 步骤 `monkeypatch.setenv` 注入固定假 Key（`fake-tavily-key-test1234`，避免 tvly- 真实前缀触发密钥扫描）；Then 无条件断言 + 阳性对照（金丝雀未注入即失败）
 **I6 P3 超长整数通道收口（Round 2 留档）→ 改判不落码**：C3 评审否定性发现——CPython 3.11 位数限制**对称**（str→int 同样受限），`json.loads` 解析超 4300 位整数直接抛 ValueError，已被既有 `except (ValueError, RecursionError)` 降级覆盖（全仓零处 `set_int_max_str_digits` 调用，通道不可达）；且「转字面串」技术上不可实现（str/repr/format 对超限 int 全部抛 ValueError）。按「不为不可能场景写防御」准则收口：记录闭合事实，不加码
 
@@ -1479,6 +1479,29 @@ tests/
 | I5 | AC-2.5 金丝雀（monkeypatch.setenv 假 Key 链 + 无条件零泄露断言）；.feature 同步 | 场景复跑 |
 | I6 | 不落码（通道已被 json.loads 对称限制 + 既有 except 降级双闭合，评审实证不可达） | Story 记录 |
 
+#### Round 5 — C1 收敛验证 + C2 收敛修复（J1/J2）
+
+**C1 收敛评审结论（独立 Agent 取证）**：四轮修复全部落地无半成品（注入三件套/ChinaNBS 状态机/IPCC 流式上限深查与声明逐条吻合；抽检 4 项测试全真判别）；**未收敛，差 2 项**：
+
+| # | 级 | 发现 | 处置 |
+|---|----|------|------|
+| R5-1 | P1 | **F9 留项被遗忘**（「4-1c SKILL.md 失败源判空消费约定 → 留 Round 2」跨三轮静默丢弃）：6 个 SKILL.md 教学直接下标 `DATA_SOURCES["src"]["payload"]`——部分失败时键不存在 → 沙箱 KeyError 中断，SOP「部分失败不中断分析」降级承诺端到端断裂（无 Key 环境下声明 newsapi/tavily 的 5/6 技能确定性命中）；同源多 query 的 `name#2` 键未文档化（静默错数据面） | **J1 修复**（本轮） |
+| R5-2 | P2 | **游离提交 730e1cb4（"update"）无记录删除验收场景 AC-7.1**（动机可推断：其步骤依赖 PATH 有 poetry）并遗留 2 个孤儿步骤函数（`given_load_arch_test_file` / `then_arch_tests_zero_failures` 读永不可达的 context 键） | **J2 修复**（本轮）：孤儿清理 + 本节补记 + I4 文字引用纠偏 |
+| R5-3 | P3 | 第一周期观察项两件未核销（`_check_whitelist` 快照固化「Round 2 重评」未发生——现实现 O(≤8) 遍历影响可忽略，**本轮显式关闭**；`DataSourceRateLimitError` 缺 retry_after → **显式 defer 至 Story 5.x 安全/遥测专项**） | 显式处置 |
+| R5-4 | P3 | Story 元数据停更（v1.5.0/2026-09-26，第二周期四轮未升版）；Next Steps 过时 | **本轮更新**（v1.6.0） |
+| R5-5 | P3 | 盲区观察（第一周期遗留非本周期引入）：shutdown 中 `drain_schema_events` 位于 rabbitmq/redis 关闭之后，排空期 in-flight publish 撞已关闭连接 | 显式 defer（Story 4.7 事件基础设施域） |
+| R5-6 | P3 | `name#k` 键与含 `#` 源名字面冲突无消歧（8 个白名单源名均不含 `#`，理论残留） | 显式 defer |
+
+**J1 修复（6 个 SKILL.md SOP 同步 Round 1 注入语义）**：§6「采集结果读取」条目改写为 `.get()` 防御性读取 + 部分失败语义（失败源键不存在/标记位 None → 按 §7 降级）+ `name#k` 同源多 query 键说明；骨架示例行改 `(DATA_SOURCES.get("src") or {}).get("payload")` 形态；grep 验证 6 文件零直接下标残留。
+**J2 修复**：删 2 个孤儿步骤函数（`arch_test_result` 永不可达死代码）；AC-7 小节头补历史注记（AC-7.1 删除动机与覆盖替代：CI 直跑 + I4 探针重建同类能力）；I4 方案文字引用纠偏。
+
+#### 第二审查周期收敛判定（Round 5，2026-09-28）
+
+- **P0 残留：0；P1 残留：0**（R5-1/J1 已修复）→ **收敛达成**
+- 累计修复：4 P0 + 9 P1 + 14 P2 + 验收基建 5 项 + SOP 契约同步 6 文件 + 改判不落码 1 项（I6）
+- 最终验证：7233 单测 + 24 集成 + 30 验收（4-1b+4-1c）全绿；分层覆盖率门禁 domain≥90/application≥85/infrastructure≥75/overall≥80 四项全过（88-96% 区间实测）；ruff/mypy 全绿；红线 grep 零输出
+- 关键提交：cd46d1ce（R1）→ 290f8835（R2）→ 3735f192（R3）→ 65fd7f5e（R4）→ 本轮（R5）
+
 | # | 修复 | 文件 | 验证 |
 |---|------|------|------|
 | F1 | 注入管线重构：preamble `json.dumps`→`repr`（parse_constant 映射 NaN/Infinity 为字面串）；标记原位替换 `DATA_SOURCES["name"]`（同源 `name#k`）；失败位替换 `None`；inject 改收 `(code, markers, results)`；`fetch_many` 等长对齐 `tuple[DataSourceResult \| None, ...]` | `data_source_marker.py` / `data_source_resolver.py` / `tool_execution_engine.py` / `ports/data_source_resolver.py` | 新增 compile 闸门 + null/bool/unicode exec + 部分失败 + name#k 共 7 项单测；38 marker 测试全绿 |
@@ -1494,20 +1517,26 @@ tests/
 - [x] Story created with `ready-for-dev` status
 - [x] 运行 `dev-story` 开始实施
 - [x] 运行 `code-review` 进行代码审查（第一周期 Round 1-5，2026-09-26 完成）
-- [ ] 第二审查周期 Round 1-5（2026-09-27 启动，C1 完成，C2 方案已立项）
+- [x] 第二审查周期 Round 1-5 循环完成（2026-09-28 收敛，Status → done）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-09-24
-**最后更新/Last Updated:** 2026-09-26
+**最后更新/Last Updated:** 2026-09-28
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md Story 4.1b + commit 371eca5a PoC 结论 + 4 视角并行代码调研）
 - v1.1.0: dev-story 实施完成（Task 0-10 全部完成，AC-1~8 全覆盖，全量回归 9522 passed 零失败，Status → review）
 - v1.2.0: code-review Round 1 完成（6 项 P0 修复，commit e721303d 已 push）
 - v1.3.0: code-review Round 2 完成（3 项 P1 修复，commit f9f8e422 已 push：NewsAPI 401/403 契约分流 + frozen event hack 重构 + 缓存键哈希完整化）
 - v1.4.0: code-review Round 3 完成（1 项 P2 修复 + 文档同步，commit c0cd893c 已 push：缓存损坏条目主动清理 + architecture.md §17.3.3 决策 #9 #10 + sisys-uni-exception-design.md §3.4.1 数据源 HTTP 韧性映射表）
+- v1.6.0: 第二审查周期 Round 1-5 循环收敛（2026-09-28，commit cd46d1ce→本轮）：
+  - **R1**（4 P0 + 4 P1）：注入产物非法 Python 双根因修复（json.dumps→repr + 标记原位替换 + 等长对齐）/ 缓存损坏降级闭环 / Makefile 分层门禁恢复（纠正形式）/ 401-403 真实覆盖 + Engine 直传 101/302
+  - **R2**（3 P1 回归破口 + 2 P1 基础设施）：_read_cache 构造入 try（缓存毒丸）/ 1e999 溢出清洗 / Engine 直传判别测试 / shutdown peek_singleton 连接池清理 / IPCC 流式上限 + Content-Type
+  - **R3**（10 P2）：ChinaNBS 轮询状态机 / 8 config 范围校验 / naive-aware 双分支 / quote_path_segment / 3xx→413 / ttl 白名单权威 / 事件脱敏 / 失败事件唯一发布 / fetch_many 信号量 / real_crawler 删除
+  - **R4**（验收基建 5 项）：AC-5.1 三断言 / session→场景级 Redis / AC-7.2 确定性断言 / AC-2.4 子进程探针 / AC-2.5 金丝雀；I6 超长整数改判不落码
+  - **R5**（收敛）：J1 六个 SKILL.md SOP 同步注入语义（.get() 防御性读取 + name#k + 失败源 None）；J2 孤儿步骤清理 + 游离提交 730e1cb4 补记；零 P0/P1 残留收敛 → Status done
 - v1.5.0: code-review Round 4 收尾（综合验证 + Story 状态 done）：
   - **C1 综合验证**：ruff 全量检查通过；三条红线（raise ValueError/HTTPException/抑制注释）零输出；7223 个 unit/contracts 测试全绿（含 8 适配器测试 + resolver/marker/event/crawler/exceptions）
   - **Story 完成清单核对**：AC-1 ~ AC-8 全部覆盖 / Task 0-10 全部完成 / 风险 R1-R8 全部缓解
@@ -1516,9 +1545,9 @@ tests/
 
 ## Story 最终状态
 
-**Status:** 🔄 **review**（第二审查周期进行中）
+**Status:** ✅ **done**（第二审查周期 Round 5 收敛，2026-09-28）
 
-> 状态说明：第一审查周期（2026-09-26，Round 1-5）曾收敛为 ✅ done；**第二审查周期（2026-09-27 启动）C1 五视角调研发现 4 项 P0**（注入产物非法 Python / 缓存损坏内置异常逃逸 / 覆盖率门禁回退 / 401-403 分支零真实覆盖），状态依 BMAD 规则回退为 `review`（与 header、sprint-status.yaml 一致，R2-P1-8 修复），Round 5 收敛后恢复 done。
+> 状态说明：第一审查周期（2026-09-26）收敛 done 后，第二审查周期（2026-09-27~28，Round 1-5）发现并修复 4 P0 + 9 P1 + 14 P2 + 验收基建 5 项 + 6 个 SKILL.md SOP 契约同步；Round 5 独立收敛评审确认零 P0/P1 残留后恢复 done（header/sprint-status.yaml 同步）。
 
 **第一周期审查轮次总结（Round 1-5，2026-09-26）:**
 

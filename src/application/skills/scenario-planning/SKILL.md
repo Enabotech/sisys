@@ -155,8 +155,11 @@ eurostat + 趋势情报 tavily），禁止仅凭单一来源构建情景轴；�
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
    - 每个声明源至少一个标记；query 为自然语言指标描述（含议题/年限上下文）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
-   - 采集结果经全局 `DATA_SOURCES` dict 注入读取：`DATA_SOURCES["ipcc"]["payload"]`，
-     每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`
+   - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
+     每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
+     **部分失败语义**：采集失败的源其键**不在** `DATA_SOURCES` 中（对应标记位注入 `None`）——
+     读取返回 `None` 时按 §7 降级话术处理，禁止直接下标（`["payload"]` 会 KeyError 中断）。
+     **同源多 query**：同一数据源的多个不同 query 依次分配 `"<name>"` / `"<name>#2"` 键
 4. **Execute**：宿主机侧并发采集并注入 preamble，沙箱执行分析代码
 5. **Observe/Validate**：基于注入数据完成驱动因素影响度 × 不确定性评分
    （锚点见 `references/scoring_anchors.md`），选出双关键不确定性轴
@@ -172,7 +175,7 @@ climate = $DATA_SOURCE("ipcc", "IPCC AR6 SSP 排放情景数据")
 eu_energy = $DATA_SOURCE("eurostat", "欧盟 能源结构 可再生能源占比")
 
 # 采集后通过注入的 DATA_SOURCES dict 读取
-ipcc_payload = DATA_SOURCES["ipcc"]["payload"]
+ipcc_payload = (DATA_SOURCES.get("ipcc") or {}).get("payload")
 ```
 
 ## 7. 失败处理
