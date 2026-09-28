@@ -1171,7 +1171,7 @@ tests/
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| D-R1-P1-1 | **第三处回归调整点未识别**：`test_frontmatter_data_sources.py:131-164` `DECLARING_SLUGS` 硬编码 6 + 非声明组空 tuple 断言，10 Skill 填声明后必红——与故事「零修改」承诺直接矛盾 | **P1** | 范围澄清/AC-1/契约测试清单/归属表/File List 五处补第三处调整（DECLARING_SLUGS 6→16，Task 1.4 执行位） |
+| D-R1-P1-1 | **第三处回归调整点未识别**：`test_frontmatter_data_sources.py:131-164` `DECLARING_SLUGS` 硬编码 6 + 非声明组空 tuple 断言，10 Skill 填声明后必红——与故事「零修改」承诺直接矛盾 | **P1** | 范围澄清/AC-1/契约测试清单/归属表/File List 五处补第三处调整（DECLARING_SLUGS 6→16，Task 1.4 执行位）〔**Round 2 勘正尾注**：本方案经 Round 2 回归核查证伪重写为「测试语义中间态安全化重构」（非空断言致并行期必红），终态见 D-R2-P1-1 / D-R3-P1-1〕 |
 | D-R1-P1-2 | **嵌套 Schema ↔ 模板字段映射约定缺失**：swot-tows catalog `input_schema` 为嵌套结构（`internal_factors.{strengths,...}`），按原稿「模板字段 == properties 顶层键」断言必然失败或倒逼拍平 Schema（违反 catalog 兼容强制），首个 Skill 即卡壳 | **P1** | 「内部数据契约」节固化**嵌套展开约定**：比对粒度 = 递归叶子键集合，顶层键以模板分区标题承载；AC-3/Task 0.2/1.2/[D] 循环同步 |
 | D-R1-P1-3 | 复用异常表缺 EXCEPTION_302 行，与 Task 0 checklist / D4 决策「复用 302」自相矛盾，且将传播至架构文档 | **P1** | 异常表补「数据源超时 \| TimeoutError \| EXCEPTION_302」行 |
 | D-R1-P1-4 | 共享常量（KEY_SENSITIVE_SOURCES/DATA_SOURCE_MARKER_PATTERN/REQUIRED_SOP_SECTIONS/SKILL_MD_MAX_LINES）列为新库自定义——复制违反 R2-F3 单一来源教训（4-1e 将第三次复制） | **P1** | Task 1.2/D6 决策收窄：新库仅自定义混合数据特有常量（MIXED_SKILL_DATA_SOURCES/TEMPLATE_REQUIRED_SECTIONS）+ 断言函数，五共享常量一律 import 4-1c 库 |
@@ -1202,10 +1202,20 @@ tests/
 |---|------|--------|----------|
 | D-R3-P1-1 | Round 2 修复传播漏网：契约测试清单（:288）与 File List（:1130）两处「DECLARING_SLUGS 6→16」**活性指令**残留（非勘正注记）——实施者照 File List 操作会重新引入 Round 2 已证伪的并行期必红死锁；D-R2-P1-1 声称「全文 7 处同步重写」不完备（实为 9 处） | **P1** | 两处改写为「测试语义中间态安全化重构（Task 1.4）」口径 |
 | D-R3-P2-1 | 「P2×17」计数残留 ×2（修复表表头 + Next Steps）与 Round 2 对账后的「P2×24」矛盾 | P2 | 统一改 P2×24 |
-| D-R3-P2-2 | resolver 全失败判定行号错误：3 处写 `:238-240`，实测正确锚点 `:233-235`（`if first_error is not None and not any(results): raise first_error`） | P2 | 行号勘正 |
+| D-R3-P2-2 | resolver 全失败判定行号错误：3 处写 `:238-240`，实测正确锚点 `:233-235`（`if first_error is not None and not any(results): raise first_error`）〔**Round 4 勘正尾注**：实测 be8a806a 仅 2 处（:356/:1191），本行「3 处」计数有误——R3 正在修计数错误时自犯同类错误，特此留痕〕 | P2 | 行号勘正（2 处） |
 | D-R3-P2-3 | AC-1 验证标准「7 个未触碰 Skill 空 tuple 断言」为重构前旧机制措辞（重构后空 tuple 断言已被并集语义包含） | P2 | 改「经『物理非空者必 ∈ SSOT 并集』语义守护——误填即 ∉ 并集红」 |
 
 **Round 3 设计独立推演确认（不轻信 Round 2 论证）**：中间态安全化重构在 Task 1.4/Task 5/Task 11 后三个时间点**无红窗口**（实测推演）；场景 5 kpi-tree 部分收敛 SUCCESS 可达（fetch_many gather return_exceptions + `any(results)` 实测 :233-235）；场景 8 三要素命中（Engine f-string 实测 ：521-522）；守护无损（7 个 4-1e 空守护被并集语义包含且更强）；全部契约锚点抽查命中（story 字段/load_io_contract/required_fields 21 处/version 1.0.0）。**结论：三轮全部设计级风险已真实消除，本轮修完 4 项传播层问题即达收敛条件。**
+
+#### Round 4（稳定性验证轮，2026-09-28）
+
+**核查结论**：Round 3 修订 4 项全部正确落地（`:288`/`:1130`/`:356`/`:310` 行号与内容逐一吻合，resolver :233-235 独立实测命中）；三轮修复表历史层叠清晰可追溯（R1 表保留被证伪方案原文 + R2/R3 表交叉点名，正文各处仅陈述终态方案）；changelog v1.1.0/v1.2.0/v1.3.0 与三轮修复表三对全一致；关键断言关键词全文一致（「并集 16」算术自洽 /「叶子键」19 处同口径 /「单敏感 4 + 双敏感 3 = 7 个 Key 敏感」交叉核算通过 /「repr」5 处统一）；旧指令残留零活性命中；**实施可行性终验（Task 0→14 走查）无阻塞性残留**——Task 1.4 重构指令与场景 8 三要素均可直接照写。
+
+**本轮修复（记录级 2 项）**：① `:1174` D-R1-P1-1 补勘正尾注（清除全文最后一处无注记的 6→16 表述）；② D-R3-P2-2「3 处」计数勘正为 2 处（R3 自犯计数错误的留痕）+ Next Steps 增补 Round 2-4 进度行。
+
+**勘正密度决策登记（Round 4 固化，不动正文）**：正文区勘正标记 57 处 / 1164 行 ≈ 每 20 行一处——**评估为可接受、不做瘦身**。理由：均为附着于规范内容的括号注记而非独立段落，不阻断实施；收敛前大规模删注的回归风险 > 可读性收益；与 4-1b 五轮审查全留痕先例一致。
+
+**收敛判定**：v1.3.0 态无新 P1/P2（仅本轮 2 项记录级），**具备 Round 5 收敛终审条件**。
 
 ---
 
@@ -1236,6 +1246,9 @@ tests/
 
 - [x] Story created with `ready-for-dev` status
 - [x] 文档审查 Round 1 完成（D1 四视角 + D2 双视角，P1×8 + P2×24 修复）
+- [x] 文档审查 Round 2 完成（修订回归核查 + 残留深挖，P1×5 + P2×12——含 Round 1 方案证伪重写）
+- [x] 文档审查 Round 3 完成（回归核查 + 设计独立推演，P1×1 + P2×3——设计级风险全部消除）
+- [x] 文档审查 Round 4 完成（稳定性验证轮，记录级 2 项——实施可行性终验无阻塞）
 - [ ] 运行 `validate-create-story` 进行质量检查（可选）
 - [ ] 运行 `dev-story` 开始实施（Task 2-11 可多 Agent 并行）
 - [ ] 运行 `code-review` 进行代码审查
@@ -1243,7 +1256,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-09-28
 **最后更新/Last Updated:** 2026-09-28
 **更新说明/Description:**
@@ -1257,3 +1270,6 @@ tests/
 - v1.3.0: 文档审查 Round 3 完成（Round 2 修订回归核查 + 设计独立推演）：
   - Round 2 设计级重写经独立推演与代码实测**全部成立**（中间态三时间点无红窗口/场景 5 SUCCESS 可达/三要素命中/守护无损/锚点全对）——三轮设计级风险全部真实消除
   - **P1×1 + P2×3 传播层修复**：6→16 活性指令残留 ×2（契约清单 + File List）/P2×17→24 计数残留 ×2/resolver 行号 233-235 勘正/AC-1 旧机制措辞
+- v1.4.0: 文档审查 Round 4 完成（稳定性验证轮）：
+  - Round 3 修订 4 项全部落地；三轮修复表层叠可追溯；关键断言关键词全文一致；Task 0→14 实施走查无阻塞；勘正密度评估为可接受（57/1164 ≈ 每 20 行，决策登记不瘦身）
+  - 记录级 2 项：D-R1-P1-1 补勘正尾注（清除最后一处无注记 6→16）/ D-R3-P2-2 计数勘正（3→2 处）+ Next Steps 进度增补
