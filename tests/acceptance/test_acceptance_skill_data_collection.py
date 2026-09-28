@@ -1,37 +1,42 @@
-"""Story 4.1c — Skills 数据采集集成验收测试（BDD 步骤实现）
+"""Story 4.1c — Skills 数据采集集成验收测试（BDD 场景步骤实现）。
 
-6 个外部数据型 Skills（pestel-analysis / porters-five-forces / appeals-analysis /
-competitor-analysis / scenario-planning / disruptive-innovation）复用 Story 4.1b
-数据采集基础设施的端到端验收。
+6 个外部数据型 Skills 复用 Story 4.1b 数据采集基础设施的端到端验收：
+真实 InMemorySkillLoader（加载真实 SKILL.md）+ 真实 DataSourceResolverService +
+真实 Redis 缓存 + 真实 ToolExecutionEngine；Mock 仅限端口替身
+（_FakeDataSourceAdapter 数据源 / LLM 客户端 / 沙箱）。
 
-遵循项目验收测试规范（范本 test_acceptance_data_source.py，Story 4.1b）：
-- 步骤函数使用 @given / @when / @then 装饰器 + context: dict[str, Any] fixture
-- 真实服务优先：真实 InMemorySkillLoader（加载真实 SKILL.md）+ 真实
-  DataSourceResolverService + 真实 Redis（RedisAdapter）+ 真实 ToolExecutionEngine
-- Mock 仅限端口适配器：外部数据源（_FakeDataSourceAdapter 测试替身）、LLM 客户端、沙箱
-- 步骤严格按 feature 场景编号顺序排列（场景 1 → 场景 8）
-- 异常处理：try/except 捕获到 context["query_error"]，Then 步骤断言 isinstance + error.code
-- Redis 不可用时通过 pytest.skip() 动态跳过（禁止写死 @pytest.mark.skip）
-- BDD 步骤函数**禁止** @pytest.mark.asyncio，使用 _run_async helper（场景级共享 event_loop）
+结构范本：test_acceptance_postgresql_relational_layer.py（显式 @scenario 场景绑定 +
+按 AC 分节 + Background 服务可用性动态 skip）；
+领域基建范本：test_acceptance_data_source.py（Story 4.1b）。
 
-红阶段说明（Task 0.6）：6 个目标 SKILL.md 的 frontmatter `data_sources` 尚未填写，
-load_sop 解析出的 ToolMetadata.data_sources 为空 tuple，白名单校验抛
-BusinessRuleViolationError(207) —— Happy Path 场景预期失败（红），
-Task 2-7 填充声明后转绿。
+Run with:
+    poetry run pytest tests/acceptance/test_acceptance_skill_data_collection.py -v
+
+Prerequisites:
+    - Redis 服务可用（默认 localhost:6379，可通过 SISYS_TEST_REDIS_* 环境变量覆盖；
+      不可用时场景在 Background 步骤 pytest.skip() 动态跳过，禁止写死 skip）
+
+测试隔离（TestTenant）:
+    - 场景级 UUID 租户前缀，teardown 仅 delete_pattern 本租户缓存键，禁止全库 flush
+    - 场景级独立 Redis 客户端 + 场景级共享 event_loop（session 客户端跨场景复用
+      会抛 "Event loop is closed"，4-1b 探针实测教训）
+    - BDD 步骤函数禁止 @pytest.mark.asyncio（context 数据丢失），统一 _run_async 调度
+    - xdist_group("data-source-cache")：与共享缓存键的测试同 worker 串行
 """
 
 from __future__ import annotations
 
 import ast
+import asyncio
 import json
 import uuid
-from collections.abc import Generator
+from collections.abc import Coroutine, Generator
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
 from src.application.services.data_source_resolver import DataSourceResolverService
 from src.application.services.tool_execution_engine import ToolExecutionEngine
@@ -56,42 +61,26 @@ from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
 from tests.unit.application.skills.skill_data_collection_contracts import SKILL_DATA_SOURCES
 
-scenarios("test_acceptance_skill_data_collection.feature")
+FEATURE = "test_acceptance_skill_data_collection.feature"
 
 # 全部场景归入 data-source-cache 组: 与共享缓存键的测试在同一 worker 串行执行
 pytestmark = pytest.mark.xdist_group("data-source-cache")
 
-
-# =============================================================================
-# 数据契约 SSOT：import contracts 模块唯一来源（R2-F3 统一，见顶部 import）
-# =============================================================================
-
-
-def _run_async(event_loop: Any, coro: Any) -> Any:
-    """同步调度异步协程（BDD 步骤函数禁止 @pytest.mark.asyncio）。
-
-    使用场景级共享事件循环（pytest-asyncio function-scope fixture）：
-    aioredis/asyncio.Lock 等对象在首次使用时绑定事件循环，
-    每次新建循环会导致 "Event loop is closed" 跨循环错误。
-    """
-    return event_loop.run_until_complete(coro)
-
-
-# =============================================================================
+# ===================================================================
 # Fixtures
-# =============================================================================
+# ===================================================================
 
 
 @pytest.fixture
 def context(
-    event_loop: Any,
+    event_loop: asyncio.AbstractEventLoop,
     acceptance_env_config: Any,
 ) -> Generator[dict[str, Any], None, None]:
-    """BDD 步骤间共享状态容器（场景级 UUID 租户 + 场景级共享事件循环 + 场景级独立 Redis 客户端）
+    """BDD 步骤间共享状态容器（场景级 UUID 租户 + 场景级共享事件循环 + 场景级独立 Redis 客户端）。
 
     Redis 客户端必须场景级独立创建（不用 session 级共享 fixture）：session 客户端的
     连接池持有前一场景已关闭事件循环的连接，跨场景复用会抛 RuntimeError
-    "Event loop is closed"（探针实测复现）。场景级创建 + 同循环 teardown 关闭
+    "Event loop is closed"（4-1b 探针实测复现）。场景级创建 + 同循环 teardown 关闭
     彻底规避跨循环连接污染；teardown 仅清理本场景租户前缀缓存键。
     """
     import redis.asyncio as aioredis
@@ -116,9 +105,9 @@ def context(
     _run_async(event_loop, redis_client.close())
 
 
-# =============================================================================
+# ===================================================================
 # 测试替身（Mock 仅限外部数据源端口适配器）
-# =============================================================================
+# ===================================================================
 
 
 class _FakeDataSourceAdapter:
@@ -173,13 +162,23 @@ class _FakeDataSourceAdapter:
         )
 
 
-# =============================================================================
+# ===================================================================
 # 辅助函数
-# =============================================================================
+# ===================================================================
+
+
+def _run_async(event_loop: asyncio.AbstractEventLoop, coro: Coroutine[Any, Any, Any]) -> Any:
+    """在场景级共享事件循环上同步调度协程。
+
+    BDD 步骤函数禁止 @pytest.mark.asyncio（context 数据丢失）；
+    aioredis/asyncio.Lock 等对象在首次使用时绑定事件循环，
+    必须复用同一循环，否则抛 "Event loop is closed" 跨循环错误。
+    """
+    return event_loop.run_until_complete(coro)
 
 
 def _declared_sources(context: dict[str, Any]) -> tuple[str, ...]:
-    """当前场景技能的声明源集合（SSOT 表，用于构造标记代码与适配器）。"""
+    """当前场景技能的声明源有序集合（SSOT 表，用于构造标记代码与适配器）。"""
     return SKILL_DATA_SOURCES[context["slug"]]
 
 
@@ -282,35 +281,14 @@ def _injected_data_sources(context: dict[str, Any]) -> dict[str, Any]:
     for code in codes:
         first_line = code.split("\n", 1)[0]
         if first_line.startswith("DATA_SOURCES = "):
-            # 前言为 repr Python 字面量（R2-P0-1 修复：json.dumps → repr，ast.literal_eval 可逆）
+            # 前言为 repr Python 字面量（4-1b R2-P0-1 修复：json.dumps → repr，ast.literal_eval 可逆）
             injected: dict[str, Any] = ast.literal_eval(first_line.removeprefix("DATA_SOURCES = "))
             return injected
     raise AssertionError(f"缺少 DATA_SOURCES 数据前言: {codes[-1].splitlines()[0][:80]}")
 
 
-# =============================================================================
-# 背景 Background Steps
-# =============================================================================
-
-
-@given("数据采集基础设施已初始化（真实 DataSourceResolverService + 可编程数据源适配器 + 真实缓存 + InMemoryEventBus）")
-def given_infra_initialized(context: dict[str, Any]) -> None:
-    """初始化真实缓存与事件总线（优雅降级：Redis ping 失败仅标记，执行入口二次实证 skip）。
-
-    范本 test_acceptance_data_source.py Round 3 根因修复：session-scope Redis 客户端
-    与 function-scope event_loop 存在跨循环绑定问题，单次 ping 结果不可靠，
-    Redis 可用性以 _assert_redis_available 执行时实证为准。
-    """
-    context["event_bus"] = InMemoryEventBus()
-    try:
-        _run_async(context["_loop"], context["_redis_client"].ping())
-        context["cache"] = RedisAdapter(redis_client=context["_redis_client"])
-    except Exception:
-        context["cache"] = None
-
-
 def _assert_redis_available(context: dict[str, Any]) -> None:
-    """Redis 不可用时显式 pytest.skip（每次实证 ping + lazy 重建 cache，防跨循环误判）。"""
+    """执行入口二次实证 Redis 可用性（Background 首道检查的防御性补充，防中途掉线）。"""
     client = context.get("_redis_client")
     if client is None:
         pytest.skip("Redis 客户端未初始化")
@@ -318,13 +296,68 @@ def _assert_redis_available(context: dict[str, Any]) -> None:
         _run_async(context["_loop"], client.ping())
     except Exception as exc:
         pytest.skip(f"Redis 不可用: {exc}")
-    if context.get("cache") is None:
-        context["cache"] = RedisAdapter(redis_client=client)
 
 
-# =============================================================================
-# Given Steps（技能元数据加载 + 适配器行为编排）
-# =============================================================================
+# ===================================================================
+# Background Steps
+# ===================================================================
+
+
+@given("数据采集基础设施已初始化")
+def given_infra_initialized(context: dict[str, Any]) -> None:
+    """初始化场景级事件总线与真实 Redis 缓存适配器。"""
+    context["event_bus"] = InMemoryEventBus()
+    context["cache"] = RedisAdapter(redis_client=context["_redis_client"])
+
+
+@given("Redis 缓存服务可用")
+def given_redis_service_available(context: dict[str, Any]) -> None:
+    """验证 Redis 服务可用（不可用时场景整体动态跳过，对齐范本 Background 模式）。"""
+    try:
+        _run_async(context["_loop"], context["_redis_client"].ping())
+    except Exception as exc:
+        pytest.skip(f"Redis not available: {exc}")
+
+
+# ===================================================================
+# AC-4: 六个外部数据型 Skills 全链路并发采集
+# ===================================================================
+
+
+@scenario(FEATURE, "pestel-analysis 六源并发采集全链路")
+def test_pestel_analysis_full_chain(context: dict[str, Any]) -> None:
+    """pestel-analysis 六源并发采集 + 注入 + 溯源元数据完备。"""
+    pass
+
+
+@scenario(FEATURE, "porters-five-forces 三源并发采集链路")
+def test_porters_five_forces_full_chain(context: dict[str, Any]) -> None:
+    """porters-five-forces 三源并发采集链路。"""
+    pass
+
+
+@scenario(FEATURE, "appeals-analysis 三源并发采集链路")
+def test_appeals_analysis_full_chain(context: dict[str, Any]) -> None:
+    """appeals-analysis 三源并发采集链路。"""
+    pass
+
+
+@scenario(FEATURE, "competitor-analysis 四源并发采集链路")
+def test_competitor_analysis_full_chain(context: dict[str, Any]) -> None:
+    """competitor-analysis 四源并发采集链路。"""
+    pass
+
+
+@scenario(FEATURE, "scenario-planning 三源并发采集链路")
+def test_scenario_planning_full_chain(context: dict[str, Any]) -> None:
+    """scenario-planning 三源并发采集链路。"""
+    pass
+
+
+@scenario(FEATURE, "disruptive-innovation 双源交叉验证采集链路")
+def test_disruptive_innovation_full_chain(context: dict[str, Any]) -> None:
+    """disruptive-innovation 双源交叉验证采集链路。"""
+    pass
 
 
 @given(parsers.parse('加载技能 "{slug}" 的 L2 技能元数据'))
@@ -339,62 +372,19 @@ def given_load_skill_metadata(context: dict[str, Any], slug: str) -> None:
 
 @given("全部声明数据源适配器行为正常")
 def given_all_adapters_ok(context: dict[str, Any]) -> None:
+    """按当前技能声明源构建全部行为正常的 Fake 适配器。"""
     _make_adapters(context)
-
-
-@given(parsers.parse('数据源 "{source}" 配置为不可用，其余声明源行为正常'))
-def given_source_unavailable(context: dict[str, Any], source: str) -> None:
-    _make_adapters(context, behavior_by_source={source: "unavailable"})
-
-
-@given(parsers.parse('数据源 "{source_a}" 与 "{source_b}" 未注册（模拟 API Key 缺失），其余声明源行为正常'))
-def given_sources_unregistered(context: dict[str, Any], source_a: str, source_b: str) -> None:
-    _make_adapters(context, behavior_by_source={source_a: "unregistered", source_b: "unregistered"})
-
-
-# =============================================================================
-# When Steps（Engine 执行驱动）
-# =============================================================================
 
 
 @when("该技能全部声明数据源标记经 Engine Execute 阶段处理")
 def when_run_all_declared_markers(context: dict[str, Any]) -> None:
+    """生成含全部声明源标记的沙箱代码并驱动真实 Engine 执行。"""
     _run_engine(context, _code_with_markers(_declared_sources(context)))
-
-
-@when("该技能全部声明数据源标记连续两次经 Engine Execute 阶段处理")
-def when_run_all_declared_markers_twice(context: dict[str, Any]) -> None:
-    code = _code_with_markers(_declared_sources(context))
-    _run_engine(context, code)
-    assert context["query_error"] is None, f"第一次执行失败: {context['query_error']}"
-    context["first_result"] = context["tool_result"]
-    context["first_call_counts"] = {name: adp.call_count for name, adp in context["adapters"].items()}
-    # 首轮绝对计数守卫（R2-F1/GAP-1）：标记代码必须真实送达，防相对断言被 0==0 伪满足
-    first_counts = context["first_call_counts"]
-    assert first_counts and all(count >= 1 for count in first_counts.values()), (
-        f"首轮零外部采集（标记代码未送达 Sandbox）: {first_counts}"
-    )
-    _run_engine(context, code)
-
-
-@when(parsers.parse('沙箱代码引用白名单外数据源 "{source}"'))
-def when_run_whitelist_out_marker(context: dict[str, Any], source: str) -> None:
-    _run_engine(context, _code_with_markers((source,)))
-
-
-@when("含数据源标记的沙箱代码经 Engine Execute 阶段处理")
-def when_run_generic_marker(context: dict[str, Any]) -> None:
-    # 未成熟化 Skill 场景：引用任一已注册源标记（白名单为空时应安全失败 207）
-    _run_engine(context, _code_with_markers(("world-bank",)))
-
-
-# =============================================================================
-# Then Steps（断言）
-# =============================================================================
 
 
 @then("每个声明数据源恰好采集 1 次")
 def then_each_source_fetched_once(context: dict[str, Any]) -> None:
+    """并发去重语义：每个声明源恰好采集 1 次，执行结果 SUCCESS。"""
     assert context["query_error"] is None, f"执行失败: {context['query_error']}"
     assert context["tool_result"].status == ToolResultStatus.SUCCESS
     for name in _declared_sources(context):
@@ -403,12 +393,14 @@ def then_each_source_fetched_once(context: dict[str, Any]) -> None:
 
 @then("注入 DATA_SOURCES 字典键集合等于声明数据源集合")
 def then_injected_keys_match_declared(context: dict[str, Any]) -> None:
+    """沙箱收到的 DATA_SOURCES 前言键集合与声明源集合双向一致。"""
     injected = _injected_data_sources(context)
     assert set(injected.keys()) == set(_declared_sources(context))
 
 
 @then("输出元数据含 source 与 freshness 与 confidence")
 def then_evidence_metadata_complete(context: dict[str, Any]) -> None:
+    """EvidencePackage.data_sources 溯源元数据完备（源名/新鲜度/置信度）。"""
     result = context["tool_result"]
     assert result is not None and result.evidence_package is not None
     metas = result.evidence_package.data_sources
@@ -419,8 +411,26 @@ def then_evidence_metadata_complete(context: dict[str, Any]) -> None:
         assert 0.0 <= meta.confidence <= 1.0
 
 
+# ===================================================================
+# AC-6: 异常路径与安全失败不变量（Edge Cases）
+# ===================================================================
+
+
+@scenario(FEATURE, "沙箱代码引用白名单外数据源安全失败")
+def test_whitelist_violation_safety_failure(context: dict[str, Any]) -> None:
+    """白名单外数据源标记 → BusinessRuleViolationError(207) 安全失败。"""
+    pass
+
+
+@when(parsers.parse('沙箱代码引用白名单外数据源 "{source}"'))
+def when_run_whitelist_out_marker(context: dict[str, Any], source: str) -> None:
+    """生成仅含白名单外数据源标记的沙箱代码并驱动 Engine 执行。"""
+    _run_engine(context, _code_with_markers((source,)))
+
+
 @then("抛出 BusinessRuleViolationError")
 def then_raise_business_rule_violation(context: dict[str, Any]) -> None:
+    """断言捕获的异常为 BusinessRuleViolationError。"""
     assert isinstance(context["query_error"], BusinessRuleViolationError), (
         f"期望 BusinessRuleViolationError，实际: {context['query_error']!r}"
     )
@@ -428,6 +438,7 @@ def then_raise_business_rule_violation(context: dict[str, Any]) -> None:
 
 @then(parsers.parse("错误码为 EXCEPTION_{code:d}"))
 def then_error_code(context: dict[str, Any], code: int) -> None:
+    """断言领域异常编码与消息（error.code + error.message 非空）。"""
     error = context["query_error"]
     assert error is not None, "未捕获到异常"
     expected = f"EXCEPTION_{code}"
@@ -435,8 +446,21 @@ def then_error_code(context: dict[str, Any], code: int) -> None:
     assert error.message, "异常消息不能为空"
 
 
+@scenario(FEATURE, "数据源不可用部分失败收敛")
+def test_source_unavailable_partial_convergence(context: dict[str, Any]) -> None:
+    """单源不可用 → 其余源正常注入 + DataSourceFetchFailed 事件。"""
+    pass
+
+
+@given(parsers.parse('数据源 "{source}" 配置为不可用，其余声明源行为正常'))
+def given_source_unavailable(context: dict[str, Any], source: str) -> None:
+    """将指定数据源适配器配置为不可用行为（模拟 5xx）。"""
+    _make_adapters(context, behavior_by_source={source: "unavailable"})
+
+
 @then("可用数据源数据已注入")
 def then_available_sources_injected(context: dict[str, Any]) -> None:
+    """部分失败收敛：仅行为正常的源注入，失败源不出现且注入集合非空。"""
     assert context["query_error"] is None, f"部分失败应收敛不抛出，实际: {context['query_error']}"
     injected = _injected_data_sources(context)
     expected = {name for name in _declared_sources(context) if name in context["adapters"]}
@@ -448,15 +472,50 @@ def then_available_sources_injected(context: dict[str, Any]) -> None:
 
 @then("已发布 DataSourceFetchFailed 事件")
 def then_fetch_failed_event_published(context: dict[str, Any]) -> None:
+    """失败事件携带 EXCEPTION_411 语义（源不可用与 Key 缺失未注册均为 411，4-1c R1-P1-1）。"""
     events = context["event_bus"].published_events
-    # 场景 4（源不可用）与场景 5（Key 缺失未注册）失败语义均为 411（R1-P1-1）
     assert any(isinstance(evt, DataSourceFetchFailed) and evt.error_code == "EXCEPTION_411" for evt in events), (
         "未发布 error_code=EXCEPTION_411 的 DataSourceFetchFailed 事件"
     )
 
 
+@scenario(FEATURE, "Key 缺失未注册降级部分失败收敛")
+def test_key_missing_unregistered_partial_convergence(context: dict[str, Any]) -> None:
+    """Key 缺失未注册（411 语义）→ 其余源正常注入 + 失败事件。"""
+    pass
+
+
+@given(parsers.parse('数据源 "{source_a}" 与 "{source_b}" 未注册（模拟 API Key 缺失），其余声明源行为正常'))
+def given_sources_unregistered(context: dict[str, Any], source_a: str, source_b: str) -> None:
+    """将两个 Key 敏感源从适配器映射物理移除（模拟 API Key 缺失未注册）。"""
+    _make_adapters(context, behavior_by_source={source_a: "unregistered", source_b: "unregistered"})
+
+
+@scenario(FEATURE, "缓存命中二次执行不重复采集")
+def test_cache_hit_second_run_no_refetch(context: dict[str, Any]) -> None:
+    """同租户二次执行命中缓存：外部采集次数不增 + 新鲜度元数据完备。"""
+    pass
+
+
+@when("该技能全部声明数据源标记连续两次经 Engine Execute 阶段处理")
+def when_run_all_declared_markers_twice(context: dict[str, Any]) -> None:
+    """连续两次驱动 Engine 执行同标记代码，记录首轮计数与绝对守卫。"""
+    code = _code_with_markers(_declared_sources(context))
+    _run_engine(context, code)
+    assert context["query_error"] is None, f"第一次执行失败: {context['query_error']}"
+    context["first_result"] = context["tool_result"]
+    context["first_call_counts"] = {name: adp.call_count for name, adp in context["adapters"].items()}
+    # 首轮绝对计数守卫（4-1c R2-F1/GAP-1）：标记代码必须真实送达，防相对断言被 0==0 伪满足
+    first_counts = context["first_call_counts"]
+    assert first_counts and all(count >= 1 for count in first_counts.values()), (
+        f"首轮零外部采集（标记代码未送达 Sandbox）: {first_counts}"
+    )
+    _run_engine(context, code)
+
+
 @then("第二次执行外部采集次数不增加")
 def then_second_run_no_new_fetch(context: dict[str, Any]) -> None:
+    """缓存命中断言：二次执行每源采集计数与首轮相等（相对断言已有首轮守卫保护）。"""
     assert context["query_error"] is None, f"第二次执行失败: {context['query_error']}"
     for name, adapter in context["adapters"].items():
         assert adapter.call_count == context["first_call_counts"][name], f"数据源 {name} 缓存未命中：第二次执行产生新外部采集"
@@ -464,14 +523,34 @@ def then_second_run_no_new_fetch(context: dict[str, Any]) -> None:
 
 @then("输出元数据 freshness 评分在 0 到 1 之间")
 def then_freshness_in_range(context: dict[str, Any]) -> None:
+    """EvidencePackage.data_sources[].freshness_score ∈ [0, 1]。"""
     result = context["tool_result"]
     assert result is not None and result.evidence_package is not None
     for meta in result.evidence_package.data_sources:
         assert 0.0 <= meta.freshness_score <= 1.0
 
 
+@scenario(FEATURE, "未成熟化 Skill 空白名单安全失败")
+def test_unmatured_skill_empty_whitelist_safety_failure(context: dict[str, Any]) -> None:
+    """未成熟化 Skill（data_sources 空 tuple）含标记 → 207 安全失败。"""
+    pass
+
+
+@when("含数据源标记的沙箱代码经 Engine Execute 阶段处理")
+def when_run_generic_marker(context: dict[str, Any]) -> None:
+    """引用任一已注册源标记（空白名单下应安全失败 207）。"""
+    _run_engine(context, _code_with_markers(("world-bank",)))
+
+
+@scenario(FEATURE, "多源三角化全声明源覆盖")
+def test_triangulation_full_coverage(context: dict[str, Any]) -> None:
+    """≥3 源 Skill（competitor-analysis 四源）注入源数 ≥3 且全声明源覆盖。"""
+    pass
+
+
 @then("注入数据源数量大于等于 3")
 def then_triangulation_source_count(context: dict[str, Any]) -> None:
+    """三角化断言：注入源数 ≥3（D4 决策：全声明源并发覆盖）。"""
     assert context["query_error"] is None, f"执行失败: {context['query_error']}"
     injected = _injected_data_sources(context)
     assert len(injected) >= 3, f"三角化要求注入源数 >= 3，实际 {len(injected)}"
