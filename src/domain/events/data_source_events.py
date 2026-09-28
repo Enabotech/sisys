@@ -18,6 +18,8 @@ import uuid
 from dataclasses import dataclass, field, replace
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import EntityValidationError
+from src.domain.value_objects.data_source import validate_score
 
 
 @dataclass(frozen=True)
@@ -45,11 +47,23 @@ class DataSourceFetched(DomainEvent):
     event_type: str = field(default="DataSourceFetched", init=False)
 
     def __post_init__(self) -> None:
-        """设置 aggregate_id 和 aggregate_type（对齐 ToolExecuted 模式）"""
+        """设置 aggregate_id/aggregate_type + 字段不变量校验
+
+        校验（R3-3 H5v2）：事件跨进程序列化（Redis pub/sub + RabbitMQ）且
+        from_dict 回放重建会重触发本方法——比 VO 更暴露的不可信契约面，
+        越界分值/非数值将污染下游聚合看板。
+        """
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.execution_id)
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "ToolExecution")
+        if not self.source_name or not self.source_name.strip():
+            raise EntityValidationError(
+                message="source_name 不能为空",
+                context={"entity": "DataSourceFetched", "field": "source_name"},
+            )
+        validate_score(self.freshness_score, "freshness_score", "DataSourceFetched")
+        validate_score(self.confidence, "confidence", "DataSourceFetched")
 
     def with_execution_id(self, execution_id: uuid.UUID) -> "DataSourceFetched":
         """绑定 execution_id（返回新实例，保留 frozen immutability 语义）。
@@ -92,11 +106,16 @@ class DataSourceFetchFailed(DomainEvent):
     event_type: str = field(default="DataSourceFetchFailed", init=False)
 
     def __post_init__(self) -> None:
-        """设置 aggregate_id 和 aggregate_type（对齐 ToolExecuted 模式）"""
+        """设置 aggregate_id/aggregate_type + source_name 非空校验（R3-3 H5v2）"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.execution_id)
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "ToolExecution")
+        if not self.source_name or not self.source_name.strip():
+            raise EntityValidationError(
+                message="source_name 不能为空",
+                context={"entity": "DataSourceFetchFailed", "field": "source_name"},
+            )
 
     def with_execution_id(self, execution_id: uuid.UUID) -> "DataSourceFetchFailed":
         """绑定 execution_id（返回新实例，保留 frozen immutability 语义）。

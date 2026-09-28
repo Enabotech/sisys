@@ -234,3 +234,33 @@ class TestToolResult:
             validation_violations=(SchemaViolation(path="/x", expected="string", actual=123, message="bad"),),
         )
         assert result.validate_complete() is True
+
+
+class TestEvidencePackageDataSourceGate:
+    """EvidencePackage.data_sources 元素类型门禁（R3-3 H6v2）"""
+
+    def test_valid_tuple_and_default_pass(self) -> None:
+        """合法 tuple[DataSourceMeta,...] 与默认空 tuple 通过"""
+        from src.domain.value_objects.data_source import DataSourceMeta
+
+        package = EvidencePackage()
+        assert package.data_sources == ()
+        meta = DataSourceMeta(source_name="world-bank", source_timestamp=datetime.now(UTC), freshness_score=0.5, confidence=0.9)
+        gated = EvidencePackage(data_sources=(meta,))
+        assert gated.data_sources == (meta,)
+
+    def test_non_meta_elements_rejected(self) -> None:
+        """不可信输入构造 list[dict]（消费方访问 m.freshness_score 会 AttributeError）→ 242；
+        合法元素但非法容器（list 而非 tuple）一并封死"""
+        from typing import Any
+
+        from src.domain.value_objects.data_source import DataSourceMeta
+
+        # 故意破坏类型验证门禁（list[dict] 与 list[Meta]）——Any 表达该测试意图
+        bad_values: list[Any] = [
+            [{"source_name": "x"}],
+            [DataSourceMeta(source_name="x", source_timestamp=datetime.now(UTC), freshness_score=0.5, confidence=0.9)],
+        ]
+        for bad in bad_values:
+            with pytest.raises(EntityValidationError, match="data_sources"):
+                EvidencePackage(data_sources=bad)

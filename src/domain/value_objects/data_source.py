@@ -46,8 +46,26 @@ class DataSourceApiType(str, Enum):
     CRAWLER = "crawler"
 
 
-def _validate_score(value: float, field_name: str, entity: str) -> None:
-    """校验评分字段 ∈ [0.0, 1.0]（confidence/freshness_score 共用）。"""
+def validate_score(value: float, field_name: str, entity: str) -> None:
+    """校验评分字段 ∈ [0.0, 1.0]（confidence/freshness_score 共用，领域事件复用）。
+
+    类型门禁（R3-3 H5v2）：str/None 输入（from_dict 回放不可信边界等）在数值比较
+    抛原生 TypeError 逃逸领域异常体系——前置 isinstance 拦截（bool 单列：YAML
+    `true` 是 int 子类实例，语义上非评分）。
+
+    Args:
+        value: 评分数值
+        field_name: 字段名（异常 context 定位）
+        entity: 所属实体/事件名
+
+    Raises:
+        EntityValidationError: 值非数值或越界（EXCEPTION_242）
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise EntityValidationError(
+            message=f"{field_name} 必须为数值，实际 {type(value).__name__}",
+            context={"entity": entity, "field": field_name, "value": str(value)},
+        )
     if not (0.0 <= value <= 1.0):
         raise EntityValidationError(
             message=f"{field_name} 必须 ∈ [0.0, 1.0]，实际 {value}",
@@ -258,7 +276,7 @@ class DataSourceResult:
                 message="fetched_at 必须带时区信息（tz-aware，UTC 推荐）",
                 context={"entity": "DataSourceResult", "field": "fetched_at"},
             )
-        _validate_score(self.confidence, "confidence", "DataSourceResult")
+        validate_score(self.confidence, "confidence", "DataSourceResult")
 
 
 @dataclass(frozen=True)
@@ -284,8 +302,8 @@ class DataSourceMeta:
                 message="source_name 不能为空",
                 context={"entity": "DataSourceMeta", "field": "source_name"},
             )
-        _validate_score(self.freshness_score, "freshness_score", "DataSourceMeta")
-        _validate_score(self.confidence, "confidence", "DataSourceMeta")
+        validate_score(self.freshness_score, "freshness_score", "DataSourceMeta")
+        validate_score(self.confidence, "confidence", "DataSourceMeta")
 
 
 __all__ = [
@@ -294,4 +312,5 @@ __all__ = [
     "DataSourceMeta",
     "DataSourceRef",
     "DataSourceResult",
+    "validate_score",
 ]

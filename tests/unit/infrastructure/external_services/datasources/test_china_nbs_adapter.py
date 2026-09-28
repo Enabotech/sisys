@@ -196,3 +196,37 @@ class TestChinaNBSAdapterFailures:
         crawler.list_supported_formats = AsyncMock(side_effect=ConnectionError("down"))
         adapter = _make_adapter(crawler)
         assert await adapter.health_check() is False
+
+
+class TestSeedUrlPathEncoding:
+    """seed_url 逐段编码（R3-3 H2：8 适配器中唯一未走 quote_path_segment 的
+    LLM 不可信输入注入缺口——".." 穿越拒绝 + 特殊字符段编码）"""
+
+    @pytest.mark.asyncio
+    async def test_dotdot_path_rejected_413(self) -> None:
+        """路径含 ".." 段 → 413（防站内路径穿越）"""
+        crawler = _make_crawler_mock([_completed_status()])
+        adapter = _make_adapter(crawler)
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="../admin"))
+        assert exc_info.value.code == "EXCEPTION_413"
+
+    @pytest.mark.asyncio
+    async def test_legitimate_path_unchanged(self) -> None:
+        """合法路径（sj/zxfb，unreserved 字符）恒等通过（回归保护）"""
+        crawler = _make_crawler_mock([_completed_status()])
+        adapter = _make_adapter(crawler)
+        await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))
+        submit_kwargs = crawler.submit_task.await_args.kwargs
+        assert submit_kwargs["seed_urls"] == ["https://www.stats.gov.cn/sj/zxfb"]
+
+    @pytest.mark.asyncio
+    async def test_special_characters_encoded_per_segment(self) -> None:
+        """含空格/特殊字符的段被 percent 编码（段间 / 保留）"""
+        crawler = _make_crawler_mock([_completed_status()])
+        adapter = _make_adapter(crawler)
+        await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/a b?c"))
+        submit_kwargs = crawler.submit_task.await_args.kwargs
+        seed = submit_kwargs["seed_urls"][0]
+        assert seed.endswith("/sj/a%20b%3Fc")
+        assert " " not in seed.rsplit("/sj/", 1)[-1]

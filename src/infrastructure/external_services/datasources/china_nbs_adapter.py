@@ -32,6 +32,7 @@ from src.domain.value_objects.data_source import (
     DataSourceResult,
 )
 from src.infrastructure.config.china_nbs import ChinaNBSConfig
+from src.infrastructure.external_services.datasources._http_helpers import quote_path_segment
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,8 @@ class ChinaNBSAdapter:
         """经 crawler 插件采集国家局数据
 
         Args:
-            query: DataSourceQuery（query=站点相对路径，如 "sj/zxfb"）
+            query: DataSourceQuery（query=站点相对路径，如 "sj/zxfb"——多段路径按
+                "/" 分隔逐段编码，合法段（sj/zxfb）恒等通过）
 
         Returns:
             DataSourceResult（payload 为采集页面 JSON 字符串）
@@ -88,9 +90,12 @@ class ChinaNBSAdapter:
         Raises:
             DataSourceUnavailableError: crawler 服务故障/任务失败（EXCEPTION_411）
             TimeoutError: 轮询超时（EXCEPTION_302，超时后自动取消任务）
-            DataSourceResponseError: 结果结构非法（EXCEPTION_413）
+            DataSourceResponseError: 结果结构非法/路径段含 ".."（EXCEPTION_413）
         """
-        seed_url = f"{self._config.base_url}/{query.query}"
+        # 逐段编码（R3-3 H2：对齐 ipcc 先例——8 适配器中唯一未走 quote_path_segment
+        # 的 LLM 不可信输入注入缺口；".." 段由 helper 抛 413 防站内路径穿越）
+        encoded_path = "/".join(quote_path_segment(seg) for seg in query.query.split("/"))
+        seed_url = f"{self._config.base_url}/{encoded_path}"
         try:
             task_id = await self._crawler.submit_task(
                 domains=[self._config.domain],
