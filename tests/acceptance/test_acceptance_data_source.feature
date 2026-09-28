@@ -143,11 +143,6 @@
 # AC-7 SDD 架构验证测试（六边形约束 + 端口注册 + 域零依赖）
 # =============================================================================
 
-场景: AC-7.1 - 架构测试套件 test_arch_data_source.py 通过
-  假如 加载 tests/unit/architecture/test_arch_data_source.py
-  当 通过 pytest.main 收集并运行该文件全部测试
-  那么 全部测试零失败（对齐 CLAUDE.md §5 异常零容忍）
-
 场景: AC-7.2 - 8 个数据源端口全部注册到 composition_root（反射 _global_registry）
   假如 导入 src.composition_root._global_registry 模块级全局注册中心
   当 反射获取所有 name 以 data_source_ 开头且非 data_source_resolver 的端口

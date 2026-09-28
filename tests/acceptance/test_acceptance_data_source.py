@@ -1075,37 +1075,6 @@ def given_load_arch_test_file(context: dict[str, Any]) -> None:
         context["arch_test_count"] = test_count
 
 
-@when("通过 pytest.main 收集并运行该文件全部测试")
-def when_run_arch_tests(context: dict[str, Any]) -> None:
-    """Round 2 新增：通过 subprocess 调用 pytest 实际运行架构测试文件。
-
-    使用 subprocess 是 BDD 层最稳健的"运行外部测试"模式，
-    避免 pytest 内部 fixture 作用域污染。
-    """
-    import subprocess
-    from pathlib import Path
-
-    result = subprocess.run(
-        [
-            "poetry",
-            "run",
-            "pytest",
-            "tests/unit/architecture/test_arch_data_source.py",
-            "-v",
-            "--tb=short",
-            "--no-header",
-            "-q",
-            "--no-cov",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=120,
-        # 从当前文件推导仓库根（tests/acceptance/ 上溯两级），禁止硬编码绝对路径（CI/容器环境路径不同）
-        cwd=Path(__file__).resolve().parents[2],
-    )
-    context["arch_test_result"] = result
-
-
 @then("全部测试零失败（对齐 CLAUDE.md §5 异常零容忍）")
 def then_arch_tests_zero_failures(context: dict[str, Any]) -> None:
     """Round 2 新增：架构验证测试全部通过，returncode = 0 且 stderr 无 FAILED 标记。"""
