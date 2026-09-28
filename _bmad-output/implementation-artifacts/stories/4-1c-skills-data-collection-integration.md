@@ -1103,10 +1103,8 @@ tests/
 | R1-P2-10 | frontmatter `required_fields` 无类型校验（YAML 标量静默透传） | `frontmatter.py:195-197` | 留项（4-1b 解析链路既有行为，本 Story 未声明收敛；归属 4-1b 审查周期或 4.1d 前收敛） |
 | R1-P2-11 | `ttl_seconds` 类型级输入（YAML 字符串 `"86400"`）触发内置 `TypeError` 绕过 `FrontmatterParseError` 契约（最终被用例容错，方向 fail-safe） | `data_source.py:76-102` `__post_init__` | 留项（同上，4-1b 既有边界） |
 | R1-P2-12 | File List 未列 `sprint-status.yaml`（commit 含 2 行改动） | 本文件 File List 节 | ✅ Round 2 R2-F5 收敛（File List 补记） |
-| R1-P2-13 | **StrategicAnalysisUseCase 无 composition_root 注册、无接口层调用方**（Round 1 C3 评审补登）：`grep strategic src/composition_root.py` 零命中（仅 `run_tool_chain_use_case` 注册于 :2650，Round 2 行号勘正），`src/interfaces/` 无构造/resolve 点，`project-context.md:914` 规划的 `sisys tool` CLI 未实现——双入口接线的 strategic 半边暂无生产调用方，接线代码是入口落地后的必要前置但「生产链路生效」对该半边尚未端到端兑现 | `composition_root.py:2650` | P2 已知限制，**显式 Defer 至入口注册 Story**（本轮补 DI+入口属范围蔓延且无法端到端验证），不落码 |
+| R1-P2-13 | **StrategicAnalysisUseCase 无 composition_root 注册、无接口层调用方**（Round 1 C3 评审补登）：`grep strategic src/composition_root.py` 零命中（仅 `run_tool_chain_use_case` 注册于 :2650，Round 2 行号勘正），`src/interfaces/` 无构造/resolve 点，`project-context.md:914` 规划的 `sisys tool` CLI 未实现——双入口接线的 strategic 半边暂无生产调用方，接线代码是入口落地后的必要前置但「生产链路生效」对该半边尚未端到端兑现。归属锚点：FR-IF-01「内部工具 100% 有 CLI 入口」（epics_v1.0.md:92，R3-F2 补记；具体承接 Story 待 Epic 层排期） | `composition_root.py:2650` | P2 已知限制，**显式 Defer 至入口注册 Story**（本轮补 DI+入口属范围蔓延且无法端到端验证），不落码 |
 | R1-P2-14 | 跨 Story 备注：`tests/unit/domain/ports/test_sandbox_session_query.py:38`（Round 2 行号勘正，原记 line 1）存在 1 处既有 `# type: ignore[misc]`（Story 4-4 / commit 12740b14 遗留）——本 Story 不越界修，留归属 Story 收敛（防未来「全仓 grep 零输出」声明被证伪） | 该文件 line 38 | 跨 Story 留痕，不在本 Story 收敛 |
-| R1-P2-13 | **StrategicAnalysisUseCase 无 composition_root 注册、无接口层调用方**（Round 1 C3 评审补登）：`grep strategic src/composition_root.py` 零命中（仅 `run_tool_chain_use_case` 注册于 :2645），`src/interfaces/` 无构造/resolve 点，`project-context.md:914` 规划的 `sisys tool` CLI 未实现——双入口接线的 strategic 半边暂无生产调用方，接线代码是入口落地后的必要前置但「生产链路生效」对该半边尚未端到端兑现 | `composition_root.py:2645` | P2 已知限制，**显式 Defer 至入口注册 Story**（本轮补 DI+入口属范围蔓延且无法端到端验证），不落码 |
-| R1-P2-14 | 跨 Story 备注：`tests/unit/domain/ports/test_sandbox_session_query.py:1` 存在 1 处既有 `# type: ignore`（Story 4-4 / commit 12740b14 遗留）——本 Story 不越界修，留归属 Story 收敛（防未来「全仓 grep 零输出」声明被证伪） | 该文件 line 1 | 跨 Story 留痕，不在本 Story 收敛 |
 
 **P1/P2 划分标准（Round 1 C3 评审固化）**：守护 AC 运行时行为承诺的判别力缺陷（错误码语义回退静默放行 / 节点选择未钉住）= P1；文档与内容检查的弱判别（子串伪满足 / 恒真合规报告）= P2。
 
@@ -1146,6 +1144,21 @@ tests/
 | R2-F5 | Story 文档批 | 台账计数 12→14、R1-P2-1/4 处置列核销、P2-14 行号 line 1→38、P2-13 行号 2645→2650、P2-7 Story 3 处措辞（line 39/238/578「当前节点」→「声明序首节点」）、P2-12 File List 补 sprint-status.yaml、feature 头注释收敛为实际覆盖范围、R1-P2-6 改判登记 | 零 |
 | R2-F6 | architecture.md | 修订历史补 v8.6.1 行（D7 已知限制补记） | 零 |
 | R2-F7 | — | skill_io_schemas data_sources 字段级化 **留项 Story 4.3**（与 D6「运行时 Schema 验证属 4.3」决策边界一致） | — |
+
+#### Round 3 发现（回归核查 + 收敛取证，2026-09-28）
+
+**D3-A Round 2 修复回归核查**：7 项修复 6 项零回归（F4 等价性逐行推演 + mypy/实跑双证、F3 SSOT 值级逐值比对、F1 新测试断言逻辑、F2 零残留、feature/architecture.md 自洽），全量单元 7251 passed。**1 项 P2 新破口（本轮已收敛）**：
+- **R3-F1**：R2-F5 对 R1-P2-13/14 的行号勘误为「追加而非替换」——旧行（`:2645`/`line 1`）未删除，台账物理 16 行 vs 表头「14 项」（恰复现 R2-F5 自称修复的问题类别）。本轮删除旧行修正（16→14）。
+
+**D3-B 收敛独立取证（不轻信 Story 自身记录）**：
+- **红线终检**：4-1c 范围 54 文件（双态：6cd2c2bc 与 75c3bbe5 各扫一次）代码红线零残留；`sisys-uni-exception-design.md:123` 的 `# noqa` 为 162949cb1（2026-06-04）历史遗留非本 Story 引入
+- **测试实跑**：4-1c 指定套件 198 passed + 既有 usecase 对齐 17 passed（真实 Redis，0 skipped）
+- **AC-1~AC-6 逐条判定：全部满足**（每条有测试实存 + 实跑绿证据）
+- **「无 P0/P1 级别问题」DoD：达成**（两轮修复全核销 + 三重独立取证零新发现）
+- **4-1b 并行会话冲突面**：75c3bbe5 与 4-1c 文件集交集 8 文件，4-1b 仅改 SOP body query 格式化（frontmatter 零改动），4-1c 架构测试三方一致断言在共存态 47 passed 实证无冲突
+- 弱归属提示（本轮已收敛）：R1-P2-13 补 FR-IF-01 归属锚点（epics_v1.0.md:92，具体承接 Story 待 Epic 排期）
+
+**Round 3 修复（2 项，纯文档）**：R3-F1 台账重复行删除 + R3-F2 归属锚点补记。
 
 #### 需决策 Decision Needed
 
