@@ -2825,7 +2825,7 @@ buckets/
 | D3 | L1 vs L2 元数据来源 | L2 load_sop().frontmatter（含 data_sources） | L1 `_parse_table_row` 不解析 data_sources 且受 ≤1.2K tokens 预算约束 |
 | D4 | 三角化定义 | ≥3 源 Skill 全声明源并发覆盖；2 源 Skill 双源交叉验证 | disruptive-innovation（USPTO+Tavily）经 4.1b PoC 验证，强行加源降低数据质量（Epic AC-4 字面偏差由 Epic owner 签收） |
 | D6 | input_schema 载体 | frontmatter `input_schema`/`output_schema` 键（JSON Schema dict） | `normalize_metadata` 已支持该键；运行时 Schema 强制验证属 Story 4.3；domain 禁 pydantic |
-| D7 | 生产链路接线范围 | StrategicAnalysisUseCase + RunToolChainUseCase 双入口同步注入（链路共享单 ToolMetadata） | 仅接 StrategicAnalysisUseCase 时多节点链路仍抛 207；节点级 metadata 切换属 Story 4.2 范畴 |
+| D7 | 生产链路接线范围 | StrategicAnalysisUseCase + RunToolChainUseCase 双入口同步注入（链路共享单 ToolMetadata） | 仅接 StrategicAnalysisUseCase 时多节点链路仍抛 207；节点级 metadata 切换属 Story 4.2 范畴。已知限制（4-1c 代码审查补记，双向）：误拒——节点 B 声明源不在共享白名单时抛 207；旁路——后续节点可采集仅首节点（声明序 nodes[0]）声明、自身未声明的源（「声明即授权」链级放宽为「首节点声明即全链授权」），两方向均待 Story 4.2 节点级切换收敛 |
 
 ### 17.4 AGENT 架构
 

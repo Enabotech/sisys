@@ -228,8 +228,10 @@ class TestSkillDataCollectionIntegration:
         # 仅可用源注入溯源元数据
         injected_names = {meta.source_name for meta in result.evidence_package.data_sources}
         assert injected_names == {"china-nbs"}
-        # 部分失败发布 DataSourceFetchFailed 事件
-        assert any(isinstance(evt, DataSourceFetchFailed) for evt in event_bus.published_events)
+        # 部分失败发布 DataSourceFetchFailed 事件（Key 缺失未注册 → 411 语义，R1-P1-1）
+        assert any(
+            isinstance(evt, DataSourceFetchFailed) and evt.error_code == "EXCEPTION_411" for evt in event_bus.published_events
+        )
 
     async def test_triangulation_competitor_four_sources(self, redis_tenant_cache: Any) -> None:
         """三角化：competitor-analysis（4 源）注入源数 ≥3（实际 == 4 全声明覆盖）"""
@@ -268,4 +270,7 @@ class TestSkillDataCollectionIntegration:
         assert result.status == ToolResultStatus.SUCCESS
         injected_names = {meta.source_name for meta in result.evidence_package.data_sources}
         assert injected_names == {"newsapi", "world-bank"}
-        assert any(isinstance(evt, DataSourceFetchFailed) for evt in event_bus.published_events)
+        # 源不可用（behavior=unavailable → DataSourceUnavailableError）同为 411 语义（R1-P1-1 对称收敛）
+        assert any(
+            isinstance(evt, DataSourceFetchFailed) and evt.error_code == "EXCEPTION_411" for evt in event_bus.published_events
+        )

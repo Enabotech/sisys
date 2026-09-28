@@ -131,10 +131,10 @@ def assert_sop_maturity(slug: str, document: SkillDocument) -> None:
     # input_examples 非 placeholder
     assert "placeholder" not in body.lower(), f"{slug}: input_examples 仍为 placeholder"
 
-    # 失败处理章节含降级语义（411/412/413）
+    # 失败处理章节含降级语义（411/412/413）——词边界正则防数字子串伪满足（R1-P2-4）
     failure_section = body.split("失败处理", 1)[-1]
     for keyword in ("411", "412", "413"):
-        assert keyword in failure_section, f"{slug}: 失败处理章节缺少 {keyword} 降级语义"
+        assert re.search(rf"\b{keyword}\b", failure_section), f"{slug}: 失败处理章节缺少 {keyword} 降级语义"
 
     # 声明含 Key 敏感源的 Skill 必须文档化 Key 缺失降级话术
     declared = set(SKILL_DATA_SOURCES[slug])

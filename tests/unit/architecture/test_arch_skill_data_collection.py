@@ -9,7 +9,12 @@
    跨循环一致性（SOP body $DATA_SOURCE 标记集合 == frontmatter 声明集合）
 4. Skills 内容约束：6 个 SKILL.md ≤500 行 + frontmatter 必需字段 + 17 个非目标
    Skill data_sources 空 tuple
-5. 合规报告：全部约束通过即架构合规
+
+注：原 test_domain_layer_untouched_by_story（git status 工作区检查）与
+TestComplianceReport.test_all_constraints_checked（恒真自证）已于 4-1c 代码审查
+Round 1 删除（R1-P1-2 / R1-P2-1）：前者在 CI 干净 checkout 恒真无判别力
+（「零 domain 改动」历史事实由审查取证 + import-linter 依赖方向规则持续守护），
+后者仅断言测试类非空不校验任何约束。
 """
 
 from __future__ import annotations
@@ -17,7 +22,6 @@ from __future__ import annotations
 import ast
 import inspect
 import re
-import subprocess
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -25,6 +29,7 @@ import pytest
 
 from src.application.services.tool_execution_engine import ToolExecutionEngine
 from src.application.skills.loader import InMemorySkillLoader
+from src.domain.ports.data_source import DataSourcePort
 
 # =============================================================================
 # 1. 常量区
@@ -106,7 +111,7 @@ def _extract_imports(path: Path) -> set[str]:
     return modules
 
 
-def _build_adapters() -> dict[str, object]:
+def _build_adapters() -> dict[str, DataSourcePort]:
     """实例化 8 个适配器（Key 敏感源用测试占位 Key，禁止真实外网调用）"""
     from src.infrastructure.config.china_nbs import ChinaNBSConfig
     from src.infrastructure.config.eurostat import EurostatConfig
@@ -150,7 +155,7 @@ class TestThreeWayConsistency:
         adapters = _build_adapters()
         assert set(adapters.keys()) == set(ADAPTER_SSOT.keys())
         for name, adapter in adapters.items():
-            ref = adapter.get_metadata()  # type: ignore[attr-defined]
+            ref = adapter.get_metadata()
             url, api_type, ttl = ADAPTER_SSOT[name]
             assert ref.name == name
             assert ref.url == url, f"{name}: 适配器 url 漂移 {ref.url} != {url}"
@@ -207,17 +212,6 @@ class TestDependencyDirection:
         params = list(inspect.signature(ToolExecutionEngine.__init__).parameters)
         assert params == ["self", "llm_client", "sandbox", "retry_policy", "tool_execution_repository"]
 
-    def test_domain_layer_untouched_by_story(self) -> None:
-        """本 Story 零 domain 改动声明校验：工作区 src/domain 无未提交改动"""
-        result = subprocess.run(
-            ["git", "status", "--porcelain", "src/domain/"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        assert result.stdout.strip() == "", f"本 Story 禁止改动 domain 层:\n{result.stdout}"
-
 
 # =============================================================================
 # 4. Skills 内容约束
@@ -251,23 +245,3 @@ class TestSkillContentConstraints:
         loader = InMemorySkillLoader()
         document = await loader.load_sop(slug)
         assert document.frontmatter.data_sources == (), f"非目标 Skill {slug} 的 data_sources 被误填"
-
-
-# =============================================================================
-# 5. 合规报告
-# =============================================================================
-
-
-class TestComplianceReport:
-    """架构合规汇总（全部约束通过即合规）"""
-
-    def test_all_constraints_checked(self) -> None:
-        """合规清单：三方一致性 / 依赖方向 / 签名锁定 / 行数 / 空 tuple 均由本文件覆盖"""
-        test_classes = (
-            TestThreeWayConsistency,
-            TestDependencyDirection,
-            TestSkillContentConstraints,
-        )
-        for cls in test_classes:
-            methods = [m for m in dir(cls) if m.startswith("test_")]
-            assert methods, f"{cls.__name__} 无测试方法"

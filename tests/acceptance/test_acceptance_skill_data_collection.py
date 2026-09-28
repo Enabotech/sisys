@@ -452,7 +452,10 @@ def then_available_sources_injected(context: dict[str, Any]) -> None:
 @then("已发布 DataSourceFetchFailed 事件")
 def then_fetch_failed_event_published(context: dict[str, Any]) -> None:
     events = context["event_bus"].published_events
-    assert any(isinstance(evt, DataSourceFetchFailed) for evt in events), "未发布 DataSourceFetchFailed 事件"
+    # 场景 4（源不可用）与场景 5（Key 缺失未注册）失败语义均为 411（R1-P1-1）
+    assert any(isinstance(evt, DataSourceFetchFailed) and evt.error_code == "EXCEPTION_411" for evt in events), (
+        "未发布 error_code=EXCEPTION_411 的 DataSourceFetchFailed 事件"
+    )
 
 
 @then("第二次执行外部采集次数不增加")

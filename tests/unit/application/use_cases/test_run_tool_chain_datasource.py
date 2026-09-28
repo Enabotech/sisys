@@ -51,7 +51,7 @@ def _make_dag(name: str = "test-chain") -> ToolChainDag:
         description="",
         nodes=(
             ToolChainNode(node_id="a", tool_slug="pestel-analysis"),
-            ToolChainNode(node_id="b", tool_slug="porters", depends_on=("a",)),
+            ToolChainNode(node_id="b", tool_slug="porters-five-forces", depends_on=("a",)),
         ),
         failure_strategy=FailureStrategy.SKIP_DOWNSTREAM,
         max_concurrency=5,
@@ -149,12 +149,25 @@ class TestRunToolChainDataSourceWiring:
 
     @pytest.mark.asyncio
     async def test_node_metadata_injected_into_extensions(self) -> None:
-        """场景 1：多节点并发 load_sop，当前节点 ToolMetadata 注入 extensions"""
+        """场景 1：多节点并发 load_sop，声明序首节点（nodes[0]）ToolMetadata 注入 extensions
+
+        两个 slug 分派不同的 data_sources——钉住「注入的是声明序首节点 metadata」
+        （若实现改选 nodes[1] 或按完成序选取，断言即失败，R1-P1-4 判别力修复）。
+        """
         dag = _make_dag("pestel-porter")
-        metadata = _make_metadata("pestel-analysis", "world-bank", "imf")
+        first_metadata = _make_metadata("pestel-analysis", "world-bank", "imf")
+        second_metadata = _make_metadata("porters-five-forces", "newsapi", "eurostat")
+        docs_by_slug: dict[str, SkillDocument] = {
+            "pestel-analysis": _make_skill_document(first_metadata),
+            "porters-five-forces": _make_skill_document(second_metadata),
+        }
 
         skill_loader = AsyncMock(spec=SkillLoaderPort)
-        skill_loader.load_sop = AsyncMock(return_value=_make_skill_document(metadata))
+
+        def _dispatch(slug: str) -> SkillDocument:
+            return docs_by_slug[slug]
+
+        skill_loader.load_sop = AsyncMock(side_effect=_dispatch)
 
         use_case, service, _ = _make_use_case(dag, skill_loader)
         context = _make_context(dag.tenant_id)
@@ -162,12 +175,14 @@ class TestRunToolChainDataSourceWiring:
         run = await use_case.execute("pestel-porter", {}, context)
 
         assert run is not None
-        # 每个 tool_slug 节点均并发调用 load_sop
+        # 每个 tool_slug 节点均并发调用 load_sop（分派表直接索引：漏配 slug 会 KeyError 显性失败）
         assert skill_loader.load_sop.await_count == 2
+        assert {call.args[0] for call in skill_loader.load_sop.await_args_list} == set(docs_by_slug)
         # execute_chain 收到的 context 注入了 tool_metadata（链路共享单 ToolMetadata）
         delegated_context = service.execute_chain.call_args[1]["context"]
         assert delegated_context.extensions.get("tool_metadata") is not None
         injected: ToolMetadata = delegated_context.extensions["tool_metadata"]
+        assert injected.slug == "pestel-analysis"
         assert tuple(ref.name for ref in injected.data_sources) == ("world-bank", "imf")
 
     @pytest.mark.asyncio
