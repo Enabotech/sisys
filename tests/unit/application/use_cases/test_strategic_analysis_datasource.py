@@ -180,19 +180,16 @@ class _StubCache:
         return None
 
 
-def _make_real_engine_side_effect(code: str, adapters: dict[str, _StubDataSourceAdapter], captured: dict[str, Any]) -> Any:
+def _make_real_engine_side_effect(code: str, adapters: dict[str, _StubDataSourceAdapter]) -> Any:
     """构造 execution_service.execute 的 side_effect：以真实 Engine 驱动传入的 context。
 
-    LLM mock 按调用顺序响应（第 2 次 Code 阶段返回预设 code），Resolver 真实
-    （白名单校验真实生效），缓存 Stub（始终未命中）。
+    LLM mock 内容分派（Code 阶段 prompt 含「生成代码」特征串时返回预设 code），
+    Resolver 真实（白名单校验真实生效），缓存 Stub（始终未命中）。
     """
 
     async def _execute(tool_id: uuid.UUID, tool_call: Any, context: ExecutionContext) -> ToolResult:
-        llm_call_count = {"n": 0}
-
         async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
-            llm_call_count["n"] += 1
-            if llm_call_count["n"] == 2:
+            if "生成代码" in prompt:
                 return code
             return "ok"
 
@@ -208,7 +205,6 @@ def _make_real_engine_side_effect(code: str, adapters: dict[str, _StubDataSource
         resolver = DataSourceResolverService(adapters=adapters, cache=_StubCache(), event_publisher=None)
         engine.set_data_source_resolver(resolver)
 
-        captured["engine"] = engine
         tool = _make_tool(tool_id=tool_id)
         return await engine.execute(tool_id=tool_id, tool=tool, tool_call=tool_call, context=context)
 
@@ -331,11 +327,9 @@ class TestStrategicAnalysisDataSourceWiring:
         mock_skill_loader.load_sop.return_value = _make_skill_document(metadata)
 
         adapters = {"world-bank": _StubDataSourceAdapter("world-bank")}
-        captured: dict[str, Any] = {}
         mock_execution_service.execute.side_effect = _make_real_engine_side_effect(
             code='result = {"analysis": "no marker"}',
             adapters=adapters,
-            captured=captured,
         )
 
         result = await use_case.execute(_make_request())
@@ -359,11 +353,9 @@ class TestStrategicAnalysisDataSourceWiring:
         mock_skill_loader.load_sop.return_value = _make_skill_document(_make_metadata())
 
         adapters = {"world-bank": _StubDataSourceAdapter("world-bank")}
-        captured: dict[str, Any] = {}
         mock_execution_service.execute.side_effect = _make_real_engine_side_effect(
             code='data = $DATA_SOURCE("world-bank", "GDP China")',
             adapters=adapters,
-            captured=captured,
         )
 
         with pytest.raises(BusinessRuleViolationError) as exc_info:

@@ -45,18 +45,11 @@ from src.domain.value_objects.data_source import (
 from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall, ToolResultStatus
 from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
+from tests.unit.application.skills.skill_data_collection_contracts import SKILL_DATA_SOURCES
 
 pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cache")]
 
-# 数据契约 SSOT（与 Story 「6 个 Skills 数据源白名单声明表」逐字一致）
-SKILL_DATA_SOURCES: dict[str, tuple[str, ...]] = {
-    "pestel-analysis": ("world-bank", "imf", "eurostat", "ipcc", "newsapi", "china-nbs"),
-    "porters-five-forces": ("newsapi", "world-bank", "eurostat"),
-    "appeals-analysis": ("tavily", "newsapi", "china-nbs"),
-    "competitor-analysis": ("newsapi", "uspto", "tavily", "china-nbs"),
-    "scenario-planning": ("tavily", "ipcc", "eurostat"),
-    "disruptive-innovation": ("uspto", "tavily"),
-}
+# 数据契约 SSOT：import contracts 模块唯一来源（R2-F3 统一，值与 Story 声明表逐字一致）
 
 
 class _StubAdapter:
@@ -98,11 +91,18 @@ class _StubAdapter:
 
 @pytest.fixture
 async def redis_tenant_cache(real_redis: Any) -> Any:
-    """租户隔离缓存（teardown 仅清本租户前缀键，禁止全库 flush）"""
+    """租户隔离缓存（teardown 仅清本测试租户前缀键，禁止全库 flush）
+
+    双租户形态：第二租户供跨租户缓存隔离测试使用（R2-F1），
+    teardown 对两个前缀都执行 delete_pattern（不存在的模式零成本），
+    保证断言中途失败也不泄漏键（ipcc ttl 2592000s = 30 天）。
+    """
     tenant = uuid.uuid4()
+    tenant_b = uuid.uuid4()
     cache = RedisAdapter(redis_client=real_redis)
-    yield cache, tenant
+    yield cache, tenant, tenant_b
     await cache.delete_pattern(f"sisys:cache:datasource:{tenant}:*")
+    await cache.delete_pattern(f"sisys:cache:datasource:{tenant_b}:*")
 
 
 def _make_adapters(names: tuple[str, ...], unavailable: tuple[str, ...] = ()) -> dict[str, _StubAdapter]:
@@ -116,12 +116,15 @@ def _code_with_markers(sources: tuple[str, ...]) -> str:
 
 
 def _make_engine(code: str, adapters: dict[str, _StubAdapter], cache: Any, event_bus: Any) -> ToolExecutionEngine:
-    """构建真实 Engine（Mock LLM/Sandbox 端口 + 真实 Resolver 后注入）"""
-    llm_call_count = {"n": 0}
+    """构建真实 Engine（Mock LLM/Sandbox 端口 + 真实 Resolver 后注入）
+
+    LLM 内容分派（对齐 4-1b 集成范本 test_data_source_execution.py）：Code 阶段
+    prompt 固定含「生成代码」特征串，按内容而非调用序分派——对阶段重排/重试
+    稳健（R2-F1：序数分派依赖「每执行恰好第 2 次调用是 Code」的脆弱假设）。
+    """
 
     async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
-        llm_call_count["n"] += 1
-        if llm_call_count["n"] == 2:
+        if "生成代码" in prompt:
             return code
         return "ok"
 
@@ -173,7 +176,7 @@ class TestSkillDataCollectionIntegration:
     @pytest.mark.parametrize("slug", list(SKILL_DATA_SOURCES.keys()))
     async def test_skill_full_chain_all_sources(self, slug: str, redis_tenant_cache: Any) -> None:
         """每 Skill 全声明源并发采集 + 溯源元数据完备（source/freshness/confidence）"""
-        cache, tenant = redis_tenant_cache
+        cache, tenant, _tenant_b = redis_tenant_cache
         declared = SKILL_DATA_SOURCES[slug]
         adapters = _make_adapters(declared)
         event_bus = InMemoryEventBus()
@@ -194,7 +197,7 @@ class TestSkillDataCollectionIntegration:
 
     async def test_cache_hit_second_run_no_new_fetch(self, redis_tenant_cache: Any) -> None:
         """缓存命中：二次执行外部调用次数不增 + 新鲜度评分 ∈ [0,1]"""
-        cache, tenant = redis_tenant_cache
+        cache, tenant, _tenant_b = redis_tenant_cache
         slug = "scenario-planning"
         declared = SKILL_DATA_SOURCES[slug]
         adapters = _make_adapters(declared)
@@ -204,6 +207,11 @@ class TestSkillDataCollectionIntegration:
         first = await _run_skill(slug, code, adapters, cache, tenant, event_bus)
         assert first.status == ToolResultStatus.SUCCESS
         first_counts = {name: adp.call_count for name, adp in adapters.items()}
+        # 首轮绝对计数守卫（R2-F1）：标记代码必须真实送达——若 LLM 分派错位导致
+        # 零采集，second == first 相对断言会被 0==0 伪满足（空转通道）
+        assert first_counts and all(count >= 1 for count in first_counts.values()), (
+            f"首轮零外部采集（标记代码未送达 Sandbox）: {first_counts}"
+        )
 
         second = await _run_skill(slug, code, adapters, cache, tenant, event_bus)
         assert second.status == ToolResultStatus.SUCCESS
@@ -212,9 +220,36 @@ class TestSkillDataCollectionIntegration:
         for meta in second.evidence_package.data_sources:
             assert 0.0 <= meta.freshness_score <= 1.0
 
+    async def test_tenant_isolation_cross_tenant_no_cache_share(self, redis_tenant_cache: Any) -> None:
+        """跨租户缓存隔离（R2-F1）：租户 B 执行同标记代码不得命中租户 A 的缓存
+
+        守护 context.tenant_id 经 Engine 全链路（frontmatter 白名单 → Engine →
+        Resolver → Redis 键）的传递接线：若缓存键丢失租户前缀（坍缩为 global:*）
+        或 Engine 丢失 tenant_id，租户 B 会错误命中 A 的采集结果（B 零采集）。
+        """
+        cache, tenant, tenant_b = redis_tenant_cache
+        slug = "scenario-planning"
+        declared = SKILL_DATA_SOURCES[slug]
+        adapters = _make_adapters(declared)
+        event_bus = InMemoryEventBus()
+        code = _code_with_markers(declared)
+
+        first = await _run_skill(slug, code, adapters, cache, tenant, event_bus)
+        assert first.status == ToolResultStatus.SUCCESS
+        first_counts = {name: adp.call_count for name, adp in adapters.items()}
+        assert all(count >= 1 for count in first_counts.values())
+
+        second = await _run_skill(slug, code, adapters, cache, tenant_b, event_bus)
+        assert second.status == ToolResultStatus.SUCCESS
+        # 租户 B 全新缓存前缀：每个声明源都应产生 1 次新采集（first + 1，绝对断言）
+        for name in declared:
+            assert adapters[name].call_count == first_counts[name] + 1, (
+                f"{name} 租户 B 错误命中租户 A 缓存（跨租户数据泄漏风险）"
+            )
+
     async def test_key_missing_partial_failure_convergence(self, redis_tenant_cache: Any) -> None:
         """Key 缺失降级：adapters 缺 newsapi/tavily（模拟未注册）→ 部分失败收敛，其余源正常注入"""
-        cache, tenant = redis_tenant_cache
+        cache, tenant, _tenant_b = redis_tenant_cache
         slug = "appeals-analysis"
         declared = SKILL_DATA_SOURCES[slug]
         # 模拟 Key 缺失：adapters 映射不含 tavily/newsapi（Resolver 抛 411 未注册语义）
@@ -235,7 +270,7 @@ class TestSkillDataCollectionIntegration:
 
     async def test_triangulation_competitor_four_sources(self, redis_tenant_cache: Any) -> None:
         """三角化：competitor-analysis（4 源）注入源数 ≥3（实际 == 4 全声明覆盖）"""
-        cache, tenant = redis_tenant_cache
+        cache, tenant, _tenant_b = redis_tenant_cache
         slug = "competitor-analysis"
         declared = SKILL_DATA_SOURCES[slug]
         adapters = _make_adapters(declared)
@@ -247,7 +282,7 @@ class TestSkillDataCollectionIntegration:
 
     async def test_disruptive_innovation_dual_source(self, redis_tenant_cache: Any) -> None:
         """双源交叉验证：disruptive-innovation（2 源，决策 D4）注入源数 == 2"""
-        cache, tenant = redis_tenant_cache
+        cache, tenant, _tenant_b = redis_tenant_cache
         slug = "disruptive-innovation"
         declared = SKILL_DATA_SOURCES[slug]
         adapters = _make_adapters(declared)
@@ -259,7 +294,7 @@ class TestSkillDataCollectionIntegration:
 
     async def test_source_unavailable_partial_convergence(self, redis_tenant_cache: Any) -> None:
         """数据源不可用：porters（3 源）eurostat 故障 → 其余 2 源正常注入 + 失败事件"""
-        cache, tenant = redis_tenant_cache
+        cache, tenant, _tenant_b = redis_tenant_cache
         slug = "porters-five-forces"
         declared = SKILL_DATA_SOURCES[slug]
         adapters = _make_adapters(declared, unavailable=("eurostat",))
