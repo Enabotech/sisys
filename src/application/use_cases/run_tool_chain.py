@@ -37,7 +37,7 @@ class RunToolChainUseCase:
 
     编排流程：
     1. chain_name 查询 ToolChainDag（Repository.list_by_name 或 list_by_query）
-    2. 加载 Skill（SkillLoaderPort.load_metadata，按 tool_slug）
+    2. 加载 Skill（SkillLoaderPort.load_sop，按 tool_slug，Story 4.1c L2 白名单接线）
     3. 委托 ToolChainService.execute_chain 执行
     4. 发布 ToolChainExecuted 事件（双通道）
 
@@ -98,10 +98,9 @@ class RunToolChainUseCase:
         # 容错对齐 strategic_analysis 先例：单个 Skill SOP 加载失败不阻断链路，
         # 全部失败时 extensions 不含 tool_metadata 键（含标记时 Engine 按 4.1b 语义抛 207，
         # 安全失败方向正确）。
-        metadata_tasks_by_slug: dict[str, str] = {node.tool_slug: node.node_id for node in dag.nodes if node.tool_slug}
+        slugs = list(dict.fromkeys(node.tool_slug for node in dag.nodes if node.tool_slug))
         skill_metadata: dict[str, ToolMetadata] = {}
-        if metadata_tasks_by_slug:
-            slugs = list(metadata_tasks_by_slug.keys())
+        if slugs:
             results = await asyncio.gather(
                 *(self._load_sop_tolerantly(slug) for slug in slugs),
             )
@@ -112,7 +111,8 @@ class RunToolChainUseCase:
         logger.info("Loaded %d skill metadata for chain '%s'", len(skill_metadata), chain_name)
 
         # 3. 注入链路共享单 ToolMetadata（白名单依据）后委托 ToolChainService.execute_chain
-        # Story 4.1c D7：链路全程共用首节点 metadata（非字典），节点级 metadata 切换属 Story 4.2。
+        # Story 4.1c D7：链路全程共用声明序首节点（dag.nodes[0]）metadata（非字典），
+        # 节点级 metadata 切换属 Story 4.2。
         node_metadata = skill_metadata.get(dag.nodes[0].tool_slug) if dag.nodes else None
         exec_context = context.with_extension("tool_metadata", node_metadata) if node_metadata is not None else context
         run = await self._service.execute_chain(chain_id=dag.chain_id, parameters=parameters, context=exec_context)

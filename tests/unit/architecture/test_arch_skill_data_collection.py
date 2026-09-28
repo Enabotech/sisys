@@ -30,6 +30,10 @@ import pytest
 from src.application.services.tool_execution_engine import ToolExecutionEngine
 from src.application.skills.loader import InMemorySkillLoader
 from src.domain.ports.data_source import DataSourcePort
+from tests.unit.application.skills.skill_data_collection_contracts import (
+    ADAPTER_SSOT,
+    SKILL_DATA_SOURCES,
+)
 
 # =============================================================================
 # 1. 常量区
@@ -68,27 +72,8 @@ NON_TARGET_SLUGS: tuple[str, ...] = (
     "vrio-framework",
 )
 
-# SSOT：6 个 Skills 数据源白名单声明表（与 Story 数据契约逐字一致）
-SKILL_DATA_SOURCES: dict[str, tuple[str, ...]] = {
-    "pestel-analysis": ("world-bank", "imf", "eurostat", "ipcc", "newsapi", "china-nbs"),
-    "porters-five-forces": ("newsapi", "world-bank", "eurostat"),
-    "appeals-analysis": ("tavily", "newsapi", "china-nbs"),
-    "competitor-analysis": ("newsapi", "uspto", "tavily", "china-nbs"),
-    "scenario-planning": ("tavily", "ipcc", "eurostat"),
-    "disruptive-innovation": ("uspto", "tavily"),
-}
-
-# SSOT：8 个适配器元数据对齐表（name → (url, api_type, ttl_seconds)）
-ADAPTER_SSOT: dict[str, tuple[str, str, int]] = {
-    "world-bank": ("https://api.worldbank.org/v2", "rest_json", 604800),
-    "imf": ("https://www.imf.org/external/datamapper/api/v1", "sdmx_json", 604800),
-    "eurostat": ("https://ec.europa.eu/eurostat/api/dissemination", "sdmx_json", 604800),
-    "uspto": ("https://search.patentsview.org", "rest_json", 2592000),
-    "ipcc": ("https://www.ipcc.ch/data", "csv_download", 2592000),
-    "newsapi": ("https://newsapi.org", "rest_json", 21600),
-    "tavily": ("https://api.tavily.com", "rest_json", 86400),
-    "china-nbs": ("https://www.stats.gov.cn", "crawler", 86400),
-}
+# SSOT 常量：import contracts 模块唯一来源（R2-F3 统一——期望数据不按测试层分化，
+# 三方一致性断言 = contracts SSOT ↔ 真实 SKILL.md frontmatter ↔ 适配器 get_metadata()）
 
 WIRING_FILES: tuple[Path, ...] = (
     SRC_ROOT / "application" / "use_cases" / "strategic_analysis.py",

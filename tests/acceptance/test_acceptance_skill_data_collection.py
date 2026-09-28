@@ -54,6 +54,7 @@ from src.domain.value_objects.data_source import (
 from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall, ToolResultStatus
 from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
+from tests.unit.application.skills.skill_data_collection_contracts import SKILL_DATA_SOURCES
 
 scenarios("test_acceptance_skill_data_collection.feature")
 
@@ -62,17 +63,8 @@ pytestmark = pytest.mark.xdist_group("data-source-cache")
 
 
 # =============================================================================
-# 数据契约 SSOT（与 Story 「6 个 Skills 数据源白名单声明表」逐字一致）
+# 数据契约 SSOT：import contracts 模块唯一来源（R2-F3 统一，见顶部 import）
 # =============================================================================
-
-SKILL_DATA_SOURCES: dict[str, tuple[str, ...]] = {
-    "pestel-analysis": ("world-bank", "imf", "eurostat", "ipcc", "newsapi", "china-nbs"),
-    "porters-five-forces": ("newsapi", "world-bank", "eurostat"),
-    "appeals-analysis": ("tavily", "newsapi", "china-nbs"),
-    "competitor-analysis": ("newsapi", "uspto", "tavily", "china-nbs"),
-    "scenario-planning": ("tavily", "ipcc", "eurostat"),
-    "disruptive-innovation": ("uspto", "tavily"),
-}
 
 
 def _run_async(event_loop: Any, coro: Any) -> Any:
@@ -377,6 +369,11 @@ def when_run_all_declared_markers_twice(context: dict[str, Any]) -> None:
     assert context["query_error"] is None, f"第一次执行失败: {context['query_error']}"
     context["first_result"] = context["tool_result"]
     context["first_call_counts"] = {name: adp.call_count for name, adp in context["adapters"].items()}
+    # 首轮绝对计数守卫（R2-F1/GAP-1）：标记代码必须真实送达，防相对断言被 0==0 伪满足
+    first_counts = context["first_call_counts"]
+    assert first_counts and all(count >= 1 for count in first_counts.values()), (
+        f"首轮零外部采集（标记代码未送达 Sandbox）: {first_counts}"
+    )
     _run_engine(context, code)
 
 

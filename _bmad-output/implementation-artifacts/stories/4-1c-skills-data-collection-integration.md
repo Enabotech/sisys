@@ -36,7 +36,7 @@ Story 4.1b 已交付完整数据采集基础设施（DataSourcePort + 8 适配�
 - 6 个 Skill 的 `references/` + `templates/` 资源文件（当前 5 个非 pestel 目标的 `references/`/`scripts/` 为空目录、`templates/` 全无 — 本 Story Task 2-7 实施期新建）
 - **生产链路接线（关键缺口修复 — 双入口，链路共享单 ToolMetadata）**：
   - `StrategicAnalysisUseCase` 注入 `extensions["tool_metadata"]`（单 Skill 调用入口）
-  - **`RunToolChainUseCase` 注入 `extensions["tool_metadata"]`**（**链路共享单 ToolMetadata** — UseCase 入口注入当前节点 metadata 委托 `execute_chain`，**链路全程共用同一 metadata 非字典，节点级 metadata 切换属 Story 4.2 工具链编排范畴，本 Story 显式不收敛；Round 2 P1-1 修正 line 50 "字典" 措辞为单数 ToolMetadata**）
+  - **`RunToolChainUseCase` 注入 `extensions["tool_metadata"]`**（**链路共享单 ToolMetadata** — UseCase 入口注入声明序首节点（`dag.nodes[0]`）metadata 委托 `execute_chain`，**链路全程共用同一 metadata 非字典，节点级 metadata 切换属 Story 4.2 工具链编排范畴，本 Story 显式不收敛；Round 2 P1-1 修正 line 50 "字典" 措辞为单数 ToolMetadata**）
 - Skills SOP 单元测试 ×6 + 集成测试 + 架构验证测试 + BDD 验收测试
 - 4-1b 推迟项收敛：Marker 字符级扫描专项测试（`data_source_marker._string_literal_spans` 边界场景）
 
@@ -235,7 +235,7 @@ context = ExecutionContext(
 )
 ```
 
-`run_tool_chain.py` 同步：line 99-109 `skill_metadata` dict 改为 `load_sop` 调用收集；line 114 前基于当前节点 `slug` 的 `ToolMetadata` 通过 `dataclasses.replace(context, extensions={"tool_metadata": node_metadata})` 委托 `execute_chain(context=context)`。`_service.execute_chain` 内部节点循环由 Story 4.2 收敛；本 Story 仅保证 UseCase 入口调用点已正确注入。
+`run_tool_chain.py` 同步：line 99-109 `skill_metadata` dict 改为 `load_sop` 调用收集；line 114 前基于声明序首节点（`dag.nodes[0]`）`slug` 的 `ToolMetadata` 通过 `dataclasses.replace(context, extensions={"tool_metadata": node_metadata})` 委托 `execute_chain(context=context)`。`_service.execute_chain` 内部节点循环由 Story 4.2 收敛；本 Story 仅保证 UseCase 入口调用点已正确注入。
 
 **接线语义约束：**
 - `load_sop` 失败**不阻断执行**（对齐既有 `load_metadata` 容错先例 `strategic_analysis.py:103-112`），metadata 为 None 时 extensions 不含该键——Engine 侧行为：代码无标记时零影响；代码含标记时按 4-1b 既定语义抛 207（白名单无依据，安全失败方向正确）
@@ -575,7 +575,7 @@ context = ExecutionContext(
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/application/use_cases/test_run_tool_chain_datasource.py`（多节点并发 load_sop + 任一节点 metadata 注入 / 全部 load_sop 失败时扩展 = {} / 无节点时零行为变化） |
-| 🟢 绿 | 修改 `src/application/use_cases/run_tool_chain.py`（line 99-109 `skill_metadata` dict 改为 `load_sop` 调用收集，并基于当前节点 ToolMetadata 通过 `dataclasses.replace()` 注入 `context.extensions["tool_metadata"]` 再委托 `execute_chain`） |
+| 🟢 绿 | 修改 `src/application/use_cases/run_tool_chain.py`（line 99-109 `skill_metadata` dict 改为 `load_sop` 调用收集，并基于声明序首节点（`dag.nodes[0]`）ToolMetadata 通过 `dataclasses.replace()` 注入 `context.extensions["tool_metadata"]` 再委托 `execute_chain`） |
 | 🔄 重构 | 工具链既有验收测试 `test_acceptance_strategic_tool_impl` / `test_acceptance_docker_sandbox` 全量回归，ruff + mypy |
 
 - [x] Subtask 1.3: 🔴 红 — 编写 RunToolChainUseCase 接线失败测试（3 场景：每节点 metadata 注入 / 失败容错 / 无节点零变化）
@@ -1002,6 +1002,7 @@ tests/
 文档（同步）：
 - `docs/architecture/architecture.md` — §17.3 状态块 + §17.3.3 4.1c 集成说明 + 决策表 6 项 + v8.6.0 修订历史
 - `docs/architecture/sisys-uni-exception-design.md` — §3.3.2 编码表后追加 4-1c 零新增复用声明
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — 状态 ready-for-dev → review（R1-P2-12 Round 2 补记）
 
 > **命名规范说明**：实施期用户明确约束「禁止使用故事编号命名」，全部交付文件采用功能性命名
 > （无 `_4_1c` 后缀），与 4-1b 既有先例（test_frontmatter_data_sources.py 等）一致；
@@ -1086,22 +1087,24 @@ tests/
 | R1-P1-3 | P1 | D7 决策只记录了「误拒」方向（B 节点声明源不在 A 白名单 → 207），**「旁路」方向未记录**：链路共享单 metadata 下，后续节点可采集仅首节点声明、自身未声明的源——「frontmatter 声明即授权」治理契约在链级放宽为「首节点声明即全链授权」（改造前链路不注入 metadata，任何标记一律 207，本 Story 接线后此放行面为新引入） | Story D7 行（本文件）+ `architecture.md:2828` D7 行均无旁路风险记录；实现于 `run_tool_chain.py:116`（`dag.nodes[0]` 声明序 metadata）| D7 行（Story + architecture.md）补记旁路方向已知限制 + 显式留项 Story 4.2 节点级切换收敛；不改代码（D7 决策本身有意，风险在治理文档留痕） |
 | R1-P1-4 | P1 | 接线测试场景 1 对两个 slug 返回**同一** SkillDocument（`return_value` 单值 mock）——「注入的是声明序首节点 metadata」这一行为未被钉住（改选 nodes[1] 或 dict 任意序测试仍绿）；且 `_make_dag` 节点 b 用不存在的假 slug `"porters"`（真实 slug 为 `porters-five-forces`） | `test_run_tool_chain_datasource.py:157`（单值 return_value）、`:54`（假 slug） | 场景 1 改 `side_effect` 按 slug 分派两个**不同** data_sources 的 SkillDocument，断言注入集合 == nodes[0]（pestel-analysis）的声明 → 钉住首节点选择；假 slug 改真实 slug |
 
-**Round 1 P2 台账（12 项，逐轮核销）：**
+**Round 1 P2 台账（14 项含 C3 评审补登 2 项，逐轮核销——Round 2 已核销 8 项）：**
 
 | # | 问题 | 证据 | 处置 |
 |---|------|------|------|
-| R1-P2-1 | `test_all_constraints_checked` 恒真断言（仅 `assert methods`，自证式合规报告） | arch 测试 `:264-273` | 留 Round 2+ 评估删除或改真实清点 |
-| R1-P2-2 | 缓存命中测试检不出「租户键缺失」缺陷（同租户两次执行，删 tenant 键仍绿），需双租户交叉断言 | 集成 `:195-213` / 验收场景 6 | 留 Round 2+ |
-| R1-P2-3 | `captured` 死参数（写入传入但全程无读取断言） | `test_strategic_analysis_datasource.py:183-215,334-339,363-367` | 留 Round 2+ |
-| R1-P2-4 | SOP 成熟化断言裸子串匹配（`"411" in text` 可被 "14112" 伪满足） | `skill_data_collection_contracts.py:132,136-137` | 留 Round 2+（改 `"EXCEPTION_411"` 或词边界正则） |
-| R1-P2-5 | SSOT 常量四处复制（arch/contracts/集成/验收各一份），契约变更需 4 处手改 | 4 文件 `SKILL_DATA_SOURCES` | 留 Round 2+（contracts 模块作唯一来源被其余 3 处 import） |
-| R1-P2-6 | `test_no_eval_no_exec` 是源码文本扫描非行为验证（可被字符串拼接绕过） | `test_data_source_marker.py:292-300` | 留项（纵深绊线可保留，记录局限） |
-| R1-P2-7 | `dag.nodes[0]` 是**声明序**首个而非执行序首个（Kahn 波次独立排序），代码注释「首节点」与 Story「当前节点」措辞均不精确 | `tool_chain.py:135` / `run_tool_chain.py:115` 注释 | 留 Round 2+（注释措辞校正，无行为差异） |
-| R1-P2-8 | `run_tool_chain.py:41` 类 docstring 陈旧（仍写 `load_metadata`，已切换 `load_sop`） | `run_tool_chain.py:41` | 留 Round 2+ |
-| R1-P2-9 | `metadata_tasks_by_slug` 变量名误导（值实为 slug→node_id 但 node_id 从未使用，旧 fail-fast 残留） | `run_tool_chain.py:101` | 留 Round 2+ |
-| R1-P2-10 | frontmatter `required_fields` 无类型校验（YAML 标量静默透传） | `frontmatter.py:195-197` | 留项（4-1b 解析链路既有行为，本 Story 未声明收敛） |
+| R1-P2-1 | `test_all_constraints_checked` 恒真断言（仅 `assert methods`，自证式合规报告） | arch 测试 `:264-273` | ✅ Round 1 顺带修复（同提交，Patch 节已勾选） |
+| R1-P2-2 | 缓存命中测试检不出「租户键缺失」缺陷（同租户两次执行，删 tenant 键仍绿），需双租户交叉断言 | 集成 `:195-213` / 验收场景 6 | ✅ Round 2 R2-F1 收敛（集成+验收双侧：首轮绝对守卫 + 独立租户交叉测试；守护面为 Engine 全链路 tenant_id 传递接线——resolver 级租户覆盖 4-1b 已有） |
+| R1-P2-3 | `captured` 死参数（写入传入但全程无读取断言） | `test_strategic_analysis_datasource.py:183-215,334-339,363-367` | ✅ Round 2 R2-F2 收敛（6 处删除） |
+| R1-P2-4 | SOP 成熟化断言裸子串匹配（`"411" in text` 可被 "14112" 伪满足） | `skill_data_collection_contracts.py:132,136-137` | ✅ Round 1 顺带修复（词边界正则，同提交） |
+| R1-P2-5 | SSOT 常量四处复制（arch/contracts/集成/验收各一份），契约变更需 4 处手改 | 4 文件 `SKILL_DATA_SOURCES` | ✅ Round 2 R2-F3 收敛（SKILL_DATA_SOURCES + ADAPTER_SSOT 两常量统一 import contracts 唯一来源） |
+| R1-P2-6 | `test_no_eval_no_exec` 是源码文本扫描非行为验证（可被字符串拼接绕过） | `test_data_source_marker.py:292-300` | ✅ Round 2 改判不修（一方代码纵深绊线保留，局限已记录即终态） |
+| R1-P2-7 | `dag.nodes[0]` 是**声明序**首个而非执行序首个（Kahn 波次独立排序），代码注释「首节点」与 Story「当前节点」措辞均不精确 | `run_tool_chain.py:115` 注释（Round 2 勘正：原证 `tool_chain.py:135` 失准，src 全仓「首节点」仅 run_tool_chain.py 一处）+ Story 3 处 | ✅ Round 2 R2-F4/F5 收敛（代码注释 + Story line 39/238/578 措辞统一） |
+| R1-P2-8 | `run_tool_chain.py:41` 类 docstring 陈旧（仍写 `load_metadata`，已切换 `load_sop`） | `run_tool_chain.py:41` | ✅ Round 2 R2-F4 收敛 |
+| R1-P2-9 | `metadata_tasks_by_slug` 变量名误导（值实为 slug→node_id 但 node_id 从未使用，旧 fail-fast 残留） | `run_tool_chain.py:101` | ✅ Round 2 R2-F4 收敛（简化为 `dict.fromkeys` slug 去重，等价重构） |
+| R1-P2-10 | frontmatter `required_fields` 无类型校验（YAML 标量静默透传） | `frontmatter.py:195-197` | 留项（4-1b 解析链路既有行为，本 Story 未声明收敛；归属 4-1b 审查周期或 4.1d 前收敛） |
 | R1-P2-11 | `ttl_seconds` 类型级输入（YAML 字符串 `"86400"`）触发内置 `TypeError` 绕过 `FrontmatterParseError` 契约（最终被用例容错，方向 fail-safe） | `data_source.py:76-102` `__post_init__` | 留项（同上，4-1b 既有边界） |
-| R1-P2-12 | File List 未列 `sprint-status.yaml`（commit 含 2 行改动） | 本文件 File List 节 | 留 Round 2+ 补记 |
+| R1-P2-12 | File List 未列 `sprint-status.yaml`（commit 含 2 行改动） | 本文件 File List 节 | ✅ Round 2 R2-F5 收敛（File List 补记） |
+| R1-P2-13 | **StrategicAnalysisUseCase 无 composition_root 注册、无接口层调用方**（Round 1 C3 评审补登）：`grep strategic src/composition_root.py` 零命中（仅 `run_tool_chain_use_case` 注册于 :2650，Round 2 行号勘正），`src/interfaces/` 无构造/resolve 点，`project-context.md:914` 规划的 `sisys tool` CLI 未实现——双入口接线的 strategic 半边暂无生产调用方，接线代码是入口落地后的必要前置但「生产链路生效」对该半边尚未端到端兑现 | `composition_root.py:2650` | P2 已知限制，**显式 Defer 至入口注册 Story**（本轮补 DI+入口属范围蔓延且无法端到端验证），不落码 |
+| R1-P2-14 | 跨 Story 备注：`tests/unit/domain/ports/test_sandbox_session_query.py:38`（Round 2 行号勘正，原记 line 1）存在 1 处既有 `# type: ignore[misc]`（Story 4-4 / commit 12740b14 遗留）——本 Story 不越界修，留归属 Story 收敛（防未来「全仓 grep 零输出」声明被证伪） | 该文件 line 38 | 跨 Story 留痕，不在本 Story 收敛 |
 | R1-P2-13 | **StrategicAnalysisUseCase 无 composition_root 注册、无接口层调用方**（Round 1 C3 评审补登）：`grep strategic src/composition_root.py` 零命中（仅 `run_tool_chain_use_case` 注册于 :2645），`src/interfaces/` 无构造/resolve 点，`project-context.md:914` 规划的 `sisys tool` CLI 未实现——双入口接线的 strategic 半边暂无生产调用方，接线代码是入口落地后的必要前置但「生产链路生效」对该半边尚未端到端兑现 | `composition_root.py:2645` | P2 已知限制，**显式 Defer 至入口注册 Story**（本轮补 DI+入口属范围蔓延且无法端到端验证），不落码 |
 | R1-P2-14 | 跨 Story 备注：`tests/unit/domain/ports/test_sandbox_session_query.py:1` 存在 1 处既有 `# type: ignore`（Story 4-4 / commit 12740b14 遗留）——本 Story 不越界修，留归属 Story 收敛（防未来「全仓 grep 零输出」声明被证伪） | 该文件 line 1 | 跨 Story 留痕，不在本 Story 收敛 |
 
@@ -1117,6 +1120,33 @@ tests/
 - 变异 1：resolver 未注册分支 `DataSourceUnavailableError(411)` → `DataSourceRateLimitError(412)`，`test_key_missing_partial_failure_convergence`（集成）与验收场景 5 **双双变红**（`AssertionError: 未发布 error_code=EXCEPTION_411 的 DataSourceFetchFailed 事件`）——R1-P1-1 修复前该变异静默通过，判别力实证达成后已还原。
 - 变异 2：`run_tool_chain.py` `dag.nodes[0]` → `dag.nodes[1]`，接线场景 1 精确变红（`assert 'porters-five-forces' == 'pestel-analysis'`）——R1-P1-4 钉住首节点选择实证达成后已还原（`git status src/` 零改动确认）。
 
+#### Round 2 发现（回归核查 + 深挖 + 台账核销，2026-09-28）
+
+**D2-A 回归核查**：Round 1 七项修复（56a23bb1）**全部无回归**（类型注解/411 断言/删测试/接线分派/词边界正则逐项实证，142+12 passed 实跑）。发现 3 项 P2 文档级不自洽（本轮 R2-F5/F6 收敛）：
+- Story P2 台账表头「12 项」vs 实际 14 行（P2-13/14 系 C3 评审补登未同步计数）
+- R1-P2-1/R1-P2-4 台账处置列「留 Round 2+」与同提交 Patch 节勾选矛盾
+- architecture.md 修订历史漏登记本轮 D7 补记（应补 v8.6.1 行）
+
+**D2-B 未覆盖面深挖**：零 P0/P1。实质发现（P2）：
+- **缓存测试空转通道**（本轮 R2-F1 收敛）：`test_cache_hit_second_run_no_new_fetch` 仅相对断言（second == first，0==0 可过）且 `_llm_dispatch` 序数分派背离自称的 4-1b 集成范本（范本为内容分派+绝对计数守卫）——LLM 分派错位时测试空转通过
+- skill_io_schemas.yaml `data_sources.items` 为裸 `type: object` 未字段级定义 + description 用词 `source/freshness` 与运行时 `source_name/freshness_score` 命名漂移（**留项 Story 4.3**：字段级化需同步改 6 个 SKILL.md frontmatter（`assert_io_schema_contract` 逐字相等锁定），运行时字段已有 BDD/集成双兜底，且 Schema 运行时校验本属 4.3 范畴）
+- feature 头注释「覆盖 AC-1~AC-6」过宽（BDD 实际覆盖 AC-2/4/6 行为面；AC-1/3/5 由单测+架构测试承载）（本轮 R2-F5 顺手修正）
+- 其余核实的自证疑点全部排除（场景 4 真实 207 / 场景 8 真实断言 / marker 8 场景↔实现全对应 / preamble 契约↔6 SKILL.md 一字不差 / Marker 扩充 +56 行属实）
+
+**D2-C 台账核销**：R1-P2-6 改判不修（绊线保留+局限已记录即终态）；R1-P2-10/11 维持留项（跨 Story，4-1b/4.1d 收敛）；R1-P2-13/14 免动作。
+
+**Round 2 修复方案（P2 收敛批，7 项）**：
+
+| # | 修复 | 内容 | 风险 |
+|---|------|------|------|
+| R2-F1 | 缓存测试判别力 | 集成缓存测试补首轮绝对计数守卫（`first_counts[name] >= 1`，堵 LLM 分派错位空转通道）+ 租户交叉断言（tenant_b 二次执行 `call_count == first + 1`，补全仓数据源缓存测试零覆盖的租户维度） | 纯测试增量 |
+| R2-F2 | captured 死参数清理 | 删 `test_strategic_analysis_datasource.py` 的 `captured` 参数与写入（6 处，无断言读取） | 零（删后仍绿） |
+| R2-F3 | SSOT 统一 | arch/集成/验收 3 处 `SKILL_DATA_SOURCES`（arch 另含 `ADAPTER_SSOT`）改为 import contracts 模块唯一来源 | 低（值与序已核实一致） |
+| R2-F4 | run_tool_chain.py 清理三合一 | 类 docstring `load_metadata`→`load_sop`（R1-P2-8）+ 注释「首节点」→「声明序首节点（dag.nodes[0]）」（R1-P2-7 代码侧）+ `metadata_tasks_by_slug` 简化为 slug 去重（R1-P2-9，node_id 从未使用） | 行为零变（等价重构） |
+| R2-F5 | Story 文档批 | 台账计数 12→14、R1-P2-1/4 处置列核销、P2-14 行号 line 1→38、P2-13 行号 2645→2650、P2-7 Story 3 处措辞（line 39/238/578「当前节点」→「声明序首节点」）、P2-12 File List 补 sprint-status.yaml、feature 头注释收敛为实际覆盖范围、R1-P2-6 改判登记 | 零 |
+| R2-F6 | architecture.md | 修订历史补 v8.6.1 行（D7 已知限制补记） | 零 |
+| R2-F7 | — | skill_io_schemas data_sources 字段级化 **留项 Story 4.3**（与 D6「运行时 Schema 验证属 4.3」决策边界一致） | — |
+
 #### 需决策 Decision Needed
 
 - [ ] **Decision D8（待 Epic owner 签收）**：disruptive-innovation 2 源（USPTO + Tavily）与 Epic AC-4 "每个指标 ≥3 独立来源" 字面偏差——本 Story 选择务实双源交叉验证（D4 决策），需 Epic owner 显式签收或追加 WIPO/EPO 适配器到下个 Story
@@ -1130,6 +1160,11 @@ tests/
 - [x] R1-P1-4（接线场景 1 双 slug 分派不同 metadata + `injected.slug` 身份断言 + 假 slug 改 `porters-five-forces`；变异演示实证判别力）
 - [x] R1-P2-1（同文件顺带：删除 `TestComplianceReport` 恒真合规报告，架构测试 48→47）
 - [x] R1-P2-4（同族顺带：contracts 失败处理断言裸子串 → `\b411\b` 词边界正则）
+- [x] **Round 2** R2-F1（缓存测试判别力：`_llm_dispatch` 序数→内容分派（对齐 4-1b 范本）+ 集成首轮绝对守卫 + 独立 `test_tenant_isolation_cross_tenant_no_cache_share`（fixture 扩双租户 + 双前缀 teardown）+ 验收场景 6 首轮绝对守卫（GAP-1）；变异演示实证：缓存键租户坍缩 → 租户交叉断言红）
+- [x] **Round 2** R2-F2（`captured` 死参数 6 处删除）
+- [x] **Round 2** R2-F3（SSOT 统一：`SKILL_DATA_SOURCES` + `ADAPTER_SSOT` 两常量 import contracts 唯一来源，arch/集成/验收 3 文件）
+- [x] **Round 2** R2-F4（run_tool_chain.py 清理三合一：docstring `load_metadata`→`load_sop` + 注释「首节点」→「声明序首节点（dag.nodes[0]）」+ `metadata_tasks_by_slug` 简化为 `dict.fromkeys` slug 去重——行为零变，3 场景接线单测 + usecase 既有测试 + 集成套件实跑全绿为门禁证据）
+- [x] **Round 2** R2-F5/F6（Story 文档批：台账计数/核销/勘误 + 措辞统一 + File List 补记 + feature 头注释对齐 + architecture.md v8.6.1 修订行）
 
 #### 已推迟 Defer
 
@@ -1137,6 +1172,7 @@ tests/
 - [x] Marker 字符级扫描专项测试扩展（Task 8.5 收敛）
 - [ ] `ToolChainService.execute_chain` 内部节点级 extensions 注入（Story 4.2 工具链编排范畴）——**Round 1 R1-P1-3 补记**：含白名单旁路方向（后续节点可采集仅首节点声明的源）与误拒方向（B 声明源不在 A 白名单 → 207），两方向均需节点级切换收敛
 - [ ] StrategicAnalysisUseCase 的 composition_root 注册 + 接口层入口（R1-P2-13，入口注册 Story 收敛）
+- [ ] `skill_io_schemas.yaml` `data_sources.items` 字段级定义 + description 命名对齐运行时字段名（`source/freshness` → `source_name/freshness_score`）——**Round 2 R2-F7 登记**：字段级化需 yaml + 6 个 SKILL.md frontmatter 7 文件协同（`assert_io_schema_contract` 逐字相等锁定），且 Schema 运行时强制验证属 Story 4.3 范畴（epics_v1.0.md:774）；运行时字段已有 BDD/集成双兜底
 
 ---
 

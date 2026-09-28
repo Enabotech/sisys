@@ -14,7 +14,7 @@ completedAt: '2026-02-26'
 
 # SISYS - 企业战略智能系统架构设计文档
 
-**版本：** 8.6.0（Story 4.1c 实现同步 - 6 个外部数据型 Skills 数据采集集成 §17.3.3）
+**版本：** 8.6.1（Story 4.1c 实现同步 + 代码审查修订：6 个外部数据型 Skills 数据采集集成 §17.3.3；D7 已知限制补记 + 测试判别力修复）
 **状态：** 架构决策主文档 ~3500 行，实现细节迁移至子设计文档
 **评审日期：** 2026-09-26
 **审核依据：**对标业界最佳实践（Arc42/C4/ADR + Anthropic Claude Code Skills 渐进式披露），将 §8/§17/§18 实现代码迁移至独立子设计文档，架构主文档聚焦决策与规则
@@ -3549,6 +3549,7 @@ pytest tests/unit/domain/
 | 8.4.0 | 2026-09-05 | **Round 1 文档审查修订**：①依赖方向矩阵修正（infrastructure→application 仅通过 DI 注入）②SAPMessage/datetime.utcnow/raise ValueError 三处异常契约红线修复 ③SKILL.md frontmatter 精减（13 字段→7 字段，删除硬编码 scaffolding）④Skills L1 token 预算统一（消除 200 vs 1200 tokens 矛盾）⑤§13 章节跳号 §13.11 补充 ⑥失效链接 appendix-mcp.md 删除 | 架构团队 |
 | 8.5.0 | 2026-09-24 | **Story 4.1b Skills 数据采集基础设施实现**：①新增 §17.3.3（DataSourcePort + 8 适配器 + Redis 缓存 + Engine.Execute `$DATA_SOURCE` 集成，8 项架构决策表）②data_source 异常子域（410-419）③DataSourceFetched/DataSourceFetchFailed 双通道事件 | 架构团队 |
 | 8.6.0 | 2026-09-26 | **Story 4.1c Skills 数据采集集成实现**：①6 个外部数据型 Skills frontmatter `data_sources` 白名单 + IO Schema 成熟化 ②生产链路双入口接线（StrategicAnalysisUseCase + RunToolChainUseCase 注入 `extensions["tool_metadata"]`，load_metadata→load_sop）③§17.3.3 追加 4.1c 集成说明与 6 项架构决策（D1-D4/D6/D7） | 架构团队 |
+| 8.6.1 | 2026-09-28 | **Story 4.1c 代码审查修订**：①D7 决策行补记已知限制（双向：误拒——节点 B 声明源不在共享白名单时抛 207；旁路——后续节点可采集仅声明序首节点声明、自身未声明的源，待 Story 4.2 节点级切换收敛）②测试判别力修复（411 语义断言/租户交叉缓存隔离/接线首节点钉住/SSOT 契约统一 contracts 唯一来源） | 架构团队 |
 
 ---
 

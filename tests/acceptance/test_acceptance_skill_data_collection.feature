@@ -1,5 +1,7 @@
 # language: zh-CN
-# Story 4.1c — Skills 数据采集集成（6 个外部数据型 Skills，BDD 验收场景，覆盖 AC-1 ~ AC-6）
+# Story 4.1c — Skills 数据采集集成（6 个外部数据型 Skills，BDD 验收场景）
+# 行为验收覆盖：AC-2/AC-4/AC-6 的端到端链路（白名单接线/采集三角化/降级与缓存）；
+# AC-1 声明解析与 AC-3 SOP 成熟化由单元测试承载、AC-5 架构约束由架构测试承载（R2-F5 对齐）
 
 功能: Skills 数据采集集成（外部数据型 Skills 完善）
   作为工具工程师
@@ -12,7 +14,7 @@
     假如 数据采集基础设施已初始化（真实 DataSourceResolverService + 可编程数据源适配器 + 真实缓存 + InMemoryEventBus）
 
   # ===========================================================================
-  # Happy Path：6 个 Skills 全链路采集（AC-1 / AC-4 / AC-6）
+  # Happy Path：6 个 Skills 全链路采集（AC-4 / AC-6 行为面）
   # ===========================================================================
 
   场景: 场景 1 - pestel-analysis 六源并发采集全链路（Happy Path）
