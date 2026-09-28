@@ -11,10 +11,15 @@
 from __future__ import annotations
 
 import inspect
+from dataclasses import replace
 from typing import Any
+
+import pytest
 
 import tests.unit.application.skills.skill_data_collection_contracts as contracts_41c
 import tests.unit.application.skills.skill_mixed_data_contracts as contracts_41d
+from src.application.ports.skill_loader import SkillDocument
+from src.application.skills.loader import InMemorySkillLoader
 
 # Story 4.1d「端口与数据契约」SSOT 声明表逐字基准（独立副本，与契约库比对）
 STORY_SSOT: dict[str, tuple[str, ...]] = {
@@ -225,6 +230,77 @@ class TestSchemaLeafKeysExtraction:
         assert set(leaves) == {"name", "value", "rarity", "imitability"}
         assert leaves["value"] is True and leaves["imitability"] is False
 
+    def test_typeless_properties_node_rejected(self) -> None:
+        """守卫 1（R1-F4）：含 properties 但未声明 type: object 的节点 → 断言失败。
+
+        防静默误分类：无守卫时该节点落入叶子分支被当叶子比对（子键被吞），
+        模板两侧同漏即假一致。消息须含键路径（定位漂移节点）。
+        """
+        typeless = {
+            "type": "object",
+            "properties": {
+                "container": {"properties": {"x": {"type": "string"}}, "required": ["x"]},
+            },
+        }
+        with pytest.raises(AssertionError, match=r"container.*含 properties 但未声明 type: object"):
+            contracts_41d.schema_leaf_keys(typeless)
+
+    def test_duplicate_leaf_across_containers_rejected(self) -> None:
+        """守卫 2（R1-F4）：跨容器重名叶子 → 断言失败（防 last-wins 覆盖 required 语义）。"""
+        duplicated = {
+            "type": "object",
+            "properties": {
+                "c1": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {"name": {"type": "string"}},
+                },
+                "c2": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                },
+            },
+        }
+        with pytest.raises(AssertionError, match=r"跨容器重名.*c2\.name.*与.*c1\.name"):
+            contracts_41d.schema_leaf_keys(duplicated)
+
+    def test_top_level_container_keys_extraction(self) -> None:
+        """顶层容器键提取（R1-F3）：仅顶层、与叶子展开判定式共用。
+
+        - swot 形态：双 object 容器均取
+        - vrio 形态：二层嵌套容器（resources[].vrio_scores）不取——模板 `###` 只承载顶层
+        - 平铺 Schema：无容器键
+        """
+        swot_like = {
+            "type": "object",
+            "properties": {
+                "internal_factors": {"type": "object", "properties": {"strengths": {"type": "array"}}},
+                "external_factors": {"type": "object", "properties": {"opportunities": {"type": "array"}}},
+            },
+        }
+        assert contracts_41d.schema_top_level_container_keys(swot_like) == ("internal_factors", "external_factors")
+
+        vrio_like = {
+            "type": "object",
+            "properties": {
+                "resources": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "vrio_scores": {"type": "object", "properties": {"value": {"type": "number"}}},
+                        },
+                    },
+                },
+                "note": {"type": "string"},
+            },
+        }
+        assert contracts_41d.schema_top_level_container_keys(vrio_like) == ("resources",)
+
+        flat = {"type": "object", "properties": {"a": {"type": "string"}}}
+        assert contracts_41d.schema_top_level_container_keys(flat) == ()
+
 
 class TestTemplateFieldExtractor:
     """模板字段提取器（Markdown 表格字段列 + 「（必填）」后缀剥离）。"""
@@ -330,6 +406,83 @@ class TestTemplateFieldExtractor:
         fields = contracts_41d.extract_template_fields(template)
         assert fields == {"objectives": True, "baseline_data": False}
 
+    def test_inconsistent_multi_row_required_marks_aggregate_false(self) -> None:
+        """边界（R1-F1）：同字段多行必填标注不一致 → all 聚合计非必填。
+
+        docstring 明文的聚合语义（任一行缺「（必填）」即非必填，防末行覆盖漏检）
+        此前无测试锁定——本用例补判别力回归保护。
+        """
+        template = """# 模板
+
+## 基本信息
+
+## 采集表格
+
+### data
+
+| 字段 | 描述 |
+| --- | --- |
+| strengths（必填） | 优势一 |
+| strengths | 优势二（漏标必填）
+
+## 评分锚点
+
+见 references/scoring_anchors.md。
+
+## 数据缺口登记
+
+| 字段 | 缺口描述 | 替代来源 |
+| --- | --- |
+"""
+        fields = contracts_41d.extract_template_fields(template)
+        assert fields == {"strengths": False}, "不一致双行须聚合为非必填（后续与 required 链比对即红）"
+
+    def test_missing_collection_section_returns_empty(self) -> None:
+        """边界（R1-F1）：缺「## 采集表格」段 → 返回空 dict（后续双向比对必红，非崩溃）。"""
+        template = """# 模板
+
+## 基本信息
+
+| 字段 | 说明 |
+| --- | --- |
+| 分析对象 | 目标企业 |
+"""
+        assert contracts_41d.extract_template_fields(template) == {}
+
+    def test_gap_register_fields_not_collected(self) -> None:
+        """边界（R1-F1）：数据缺口登记区的裸字段名不进比对集（区域截断防污染）。
+
+        缺口区含与叶子键撞名的裸字段（swot 真实模板 opportunities/weaknesses 形态）
+        ——若区域截取正则被破坏（如只认 ### 分区），缺口区字段会静默并入比对集
+        使断言恒红或掩盖真实漂移。本用例锁定截断边界。
+        """
+        template = """# 模板
+
+## 基本信息
+
+## 采集表格
+
+### data
+
+| 字段 | 描述 |
+| --- | --- |
+| strengths（必填） | 优势 |
+
+## 评分锚点
+
+见 references/scoring_anchors.md。
+
+## 数据缺口登记
+
+| 字段 | 缺口描述 | 替代来源 |
+| --- | --- | --- |
+| opportunities | 行业机会对标数据缺口 | 外部 Agent 采集 |
+| weaknesses | 内部劣势证据缺口 | 工作坊补采 |
+"""
+        fields = contracts_41d.extract_template_fields(template)
+        assert fields == {"strengths": True}, "缺口登记区字段不得进入比对集"
+        assert "opportunities" not in fields and "weaknesses" not in fields
+
 
 class TestAssertionFunctions:
     """契约断言函数存在性与签名（10 个 Skill 单测统一 import 入口）。"""
@@ -347,3 +500,70 @@ class TestAssertionFunctions:
             assert callable(func), f"缺少断言函数 {func_name}"
             params = tuple(inspect.signature(func).parameters)
             assert params in (("slug", "metadata"), ("slug", "document")), f"{func_name} 签名异常: {params}"
+
+
+class TestAssertionFailurePaths:
+    """断言函数失败路径（R1-F1：判别力回归保护——函数被掏空或语义弱化即红）。
+
+    全部基于真实加载的 swot-tows document/metadata 构造漂移副本
+    （dataclasses.replace 构造 frozen dataclass 新实例，零 mock、零副作用），
+    match= 钉死目标断言消息——防「因错误的原因变绿」的空洞通过。
+    """
+
+    @pytest.fixture
+    async def document(self) -> SkillDocument:
+        """真实加载 swot-tows 的 L2 SkillDocument（漂移副本的构造基线）。"""
+        loader = InMemorySkillLoader()
+        return await loader.load_sop("swot-tows")
+
+    async def test_data_sources_drift_detected(self, document: SkillDocument) -> None:
+        """[A] 删源漂移：声明源被删 → name 集合断言红。"""
+        drifted = replace(document.frontmatter, data_sources=document.frontmatter.data_sources[:1])
+        with pytest.raises(AssertionError, match="name 集合与 SSOT 不一致"):
+            contracts_41d.assert_data_sources_contract("swot-tows", drifted)
+
+    async def test_data_sources_required_fields_drift_detected(self, document: SkillDocument) -> None:
+        """[A] required_fields 漂移（R1-F5 判别力证明）：改值 → 逐字断言红（原仅非空断言不红）。"""
+        first_ref = document.frontmatter.data_sources[0]
+        drifted_ref = replace(first_ref, required_fields=("indicator",))
+        drifted = replace(document.frontmatter, data_sources=(drifted_ref, *document.frontmatter.data_sources[1:]))
+        with pytest.raises(AssertionError, match="required_fields 漂移"):
+            contracts_41d.assert_data_sources_contract("swot-tows", drifted)
+
+    async def test_io_schema_drift_detected(self, document: SkillDocument) -> None:
+        """[A] Schema 漂移：input_schema 与契约文件不等 → 逐字断言红。"""
+        drifted_schema = {**document.frontmatter.input_schema, "required": []}
+        drifted = replace(document.frontmatter, input_schema=drifted_schema)
+        with pytest.raises(AssertionError, match="input_schema 与契约文件不一致"):
+            contracts_41d.assert_io_schema_contract("swot-tows", drifted)
+
+    async def test_sop_missing_section_detected(self, document: SkillDocument) -> None:
+        """[B] 章节缺失：失败处理章节标题被改名 → 必备章节断言红。"""
+        drifted = replace(document, body=document.body.replace("失败处理", "故障处理", 1))
+        with pytest.raises(AssertionError, match="SOP 缺少必备章节"):
+            contracts_41d.assert_sop_maturity("swot-tows", drifted)
+
+    async def test_cross_consistency_undeclared_marker_detected(self, document: SkillDocument) -> None:
+        """[C] 未声明标记：body 追加白名单外源标记 → 双向断言红。"""
+        drifted = replace(document, body=document.body + '\n$DATA_SOURCE("world-bank", "外部基准查询")\n')
+        with pytest.raises(AssertionError, match="跨循环一致性破坏"):
+            contracts_41d.assert_cross_consistency("swot-tows", drifted)
+
+    async def test_template_leaf_key_drift_detected(self, document: SkillDocument) -> None:
+        """[D] 叶子键漂移：Schema 删整个容器 → 叶子缺失方向断言红。"""
+        schema = document.frontmatter.input_schema
+        drifted_props = {k: v for k, v in schema["properties"].items() if k != "external_factors"}
+        drifted_meta = replace(document.frontmatter, input_schema={**schema, "properties": drifted_props})
+        with pytest.raises(AssertionError, match="模板字段与 Schema 叶子键不一致"):
+            contracts_41d.assert_template_schema_alignment("swot-tows", replace(document, frontmatter=drifted_meta))
+
+    async def test_template_section_title_drift_detected(self, document: SkillDocument) -> None:
+        """[D] 分区标题漂移（R1-F3 判别力证明）：仅改顶层容器键名（叶子集不变、
+        必填标注不变）→ 分区标题双向断言红（此前该漂移方向全绿）。"""
+        schema = document.frontmatter.input_schema
+        drifted_props = {
+            ("internal-factors" if key == "internal_factors" else key): value for key, value in schema["properties"].items()
+        }
+        drifted_meta = replace(document.frontmatter, input_schema={**schema, "properties": drifted_props})
+        with pytest.raises(AssertionError, match="分区标题与 Schema 顶层容器键不一致"):
+            contracts_41d.assert_template_schema_alignment("swot-tows", replace(document, frontmatter=drifted_meta))

@@ -89,7 +89,7 @@
     并且 输出元数据 freshness 评分在 0 到 1 之间
 
   场景: 未成熟化 Skill 空白名单安全失败
-    假如 加载技能 "swot-tows" 的 L2 技能元数据
+    假如 加载技能 "business-model-canvas" 的 L2 技能元数据
     当 含数据源标记的沙箱代码经 Engine Execute 阶段处理
     那么 抛出 BusinessRuleViolationError
     并且 错误码为 EXCEPTION_207

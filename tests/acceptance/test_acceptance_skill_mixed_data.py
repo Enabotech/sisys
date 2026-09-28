@@ -161,11 +161,17 @@ def execution() -> _SkillExecution:
 
 
 @pytest.fixture
-def redis_client(event_loop, acceptance_env_config) -> Generator[Any, None, None]:
-    """场景级独立 Redis 客户端（连接池绑定本场景事件循环，teardown 同循环关闭）。
+def redis_client(event_loop, acceptance_env_config, tenant_id: uuid.UUID) -> Generator[Any, None, None]:
+    """场景级独立 Redis 客户端（连接池绑定本场景事件循环，teardown 清理租户缓存后同循环关闭）。
 
     必须场景级独立创建：session 级共享客户端的连接池持有前一场景已关闭
     事件循环的连接，跨场景复用抛 RuntimeError "Event loop is closed"。
+
+    Teardown（R1-F2，对齐 4-1c 范本条件清理）：仅 delete_pattern 本场景租户
+    前缀缓存键（ping 守卫——Redis 不可用场景已被背景步骤 pytest.skip 跳过，
+    无键可清，不得把合法 skip 变成 teardown ERROR）；close 无条件执行
+    （不依赖服务端存活）。场景级真实断言均在场景体内先行抛出，不受此处
+    异常兜底影响。
     """
     import redis.asyncio as aioredis
 
@@ -176,6 +182,13 @@ def redis_client(event_loop, acceptance_env_config) -> Generator[Any, None, None
         decode_responses=True,
     )
     yield client
+    try:
+        if _run_async(event_loop, client.ping()):
+            cache = RedisAdapter(redis_client=client)
+            _run_async(event_loop, cache.delete_pattern(f"sisys:cache:datasource:{tenant_id}:*"))
+    except Exception:
+        # Redis 不可用：场景已 skip、无本租户缓存键可清（清理对象不存在，非掩盖告警）
+        pass
     _run_async(event_loop, client.close())
 
 
@@ -569,7 +582,7 @@ def verify_arguments_in_think_prompt(execution: _SkillExecution):
     """断言 Think prompt 含 arguments 的 Python repr 子串（内部数据通道）。
 
     Engine 以 f-string 注入 dict repr（单引号形态，非 json.dumps）；
-    Think 阶段识别特征串「规划执行步骤」（tool_execution_engine.py:521）。
+    Think 阶段识别特征串「规划执行步骤」（tool_execution_engine.py:522）。
     """
     think_prompts = [p for p in execution.prompts if "规划执行步骤" in p]
     assert think_prompts, f"未捕获到 Think 阶段提示词（捕获 {len(execution.prompts)} 条）"

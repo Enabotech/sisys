@@ -137,7 +137,7 @@ Story 4.1b 已交付数据采集基础设施（DataSourcePort + 8 适配器 + Re
 
 ### TestTenant UUID 前缀
 
-- 集成/验收测试缓存键带租户前缀：`sisys:cache:datasource:{tenant}:{source}:{query_hash}`，租户 = `f"it-{uuid.uuid4().hex[:8]}"` / `f"acc-{uuid.uuid4().hex[:8]}"`
+- 集成/验收测试缓存键带租户前缀：`sisys:cache:datasource:{tenant}:{source}:{query_hash}`，租户 = `uuid.uuid4()` 完整 UUID（`it-`/`sess-` 等短前缀仅用于 session_id，非租户键——R1-F12 勘正）
 - teardown 仅 `delete_pattern` 清理本测试租户前缀键（多租户场景清理全部创建的前缀），禁止全库 flush
 - 范本：`tests/integration/application/test_skill_data_collection.py`（4-1c 交付，双租户形态）
 
@@ -227,7 +227,7 @@ data_sources:
 
 ### 内部数据契约（本 Story 特有）
 
-**内部数据流转（既有语义，零代码改动）：** `StrategicAnalysisRequest.arguments` → `ToolCall.arguments: dict`（语义「符合 Tool.input_schema」）→ Engine `_build_think_prompt`（`tool_execution_engine.py:521`，arguments 进入 Think prompt 文本）→ LLM 结合外部基准（`DATA_SOURCES` dict）与内部数据（prompt）生成分析。`ToolResultStatus.INSUFFICIENT_DATA` 状态可用于内部数据不足语义（SOP 失败处理章节引导）。
+**内部数据流转（既有语义，零代码改动）：** `StrategicAnalysisRequest.arguments` → `ToolCall.arguments: dict`（语义「符合 Tool.input_schema」）→ Engine `_build_think_prompt`（`tool_execution_engine.py:522`，arguments 进入 Think prompt 文本）→ LLM 结合外部基准（`DATA_SOURCES` dict）与内部数据（prompt）生成分析。`ToolResultStatus.INSUFFICIENT_DATA` 状态可用于内部数据不足语义（SOP 失败处理章节引导）。
 
 **内部 Schema 模板契约（AC-3 核心）：**
 
@@ -497,15 +497,15 @@ data_sources:
 
 #### 覆盖率要求
 
-- [ ] **整体覆盖率 ≥80%**（`make test-cov`）- **P0 阻断门禁**
-- [ ] **应用层 ≥85%**（`make test-cov-application`）——本 Story 应用层零 Python 改动，既有覆盖率不降（新增纯资源文件不计入分母恶化）
+- [x] **整体覆盖率 ≥80%**（`make test-cov`）- **P0 阻断门禁**（代码审查 R1-F10 补跑实测：unit 全量 7476 passed，`coverage report --fail-under=80` 整体 **89%** 通过）
+- [x] **应用层 ≥85%**（`make test-cov-application`）——本 Story 应用层零 Python 改动，既有覆盖率不降（新增纯资源文件不计入分母恶化）（R1-F10 补跑实测：`coverage report --include="src/application/*"` **88%** 通过）
 - [x] **关键路径 100%**：本 Story 无代码分支新增，以契约断言覆盖代偿（声明/模板/Schema 三向对应全断言）
 
 #### 代码质量门禁
 - [x] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
 - [x] **MyPy 类型检查通过**（`poetry run mypy src/`）
-- [ ] **无 P0/P1 级别问题**（代码审查）
-- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
+- [x] **无 P0/P1 级别问题**（代码审查）（Round 1：C1 四视角调研 P0×0、P1×2——R1-F1/F2 已修复并全量验证；ruff check+format 全绿、mypy 零错误独立复跑）
+- [x] **预提交 Hooks 通过**（`pre-commit run --all-files`）（R1-F10 如实注明：本会话授权限制无法独立预跑 `pre-commit run`——以 C4 提交时钩子自动运行实证 Passed + ruff check/format 与 mypy 独立复跑全绿替代，非虚报全仓执行）
 - [x] 测试文件类型注解完备（fixture 返回类型 + 测试参数注解，4-1c R1-P0-1 教训：禁止 `# type: ignore`）
 
 #### 测试隔离约束
@@ -952,12 +952,12 @@ data_sources:
 - [x] Subtask 14.5: 场景 5 — Edge：Key 缺失降级（**限定单敏感源 Skill：kpi-tree 物理缺 newsapi 留 china-nbs**——Round 2 勘正：双敏感 Skill 全缺会 411 直传而非部分收敛；断言 SUCCESS + `DataSourceFetchFailed` `error_code == "EXCEPTION_411"` + 内部数据继续分析 + 数据缺口标注——混合数据型特有降级路径；可另加「双敏感全缺 → 411 直传」对照断言锁死全失败契约）
 - [x] Subtask 14.6: 场景 6 — Edge：缓存命中（二次执行 cache_hit=True，外部调用次数不增）+ 新鲜度元数据
 - [x] Subtask 14.7: 场景 7 — Edge：未成熟化 Skill（4-1e 目标，data_sources 空 tuple）含标记 → 207（安全失败）
-- [x] Subtask 14.8: 场景 8 — Edge：内外数据融合双通道并存（arguments 内部数据进入 Think prompt + 外部基准 DATA_SOURCES 注入同时成立；**观测机制三要素（Round 2 钉死）**：① Fake LLM `_llm_dispatch` 内 append `context["llm_prompts"]` 捕获全部 prompt；② Think 阶段识别特征串「规划执行步骤」（对齐 4-1c 用「生成代码」识别 Code 阶段的先例，`tool_execution_engine.py:521`）；③ 断言 Think prompt 含 arguments 的 **Python repr 子串**（Engine 以 f-string 注入 dict repr 单引号形态，**非 json.dumps**——断言 json 序列化子串必假红）+ 断言注入代码 preamble 含 `DATA_SOURCES`。场景分工：场景 1 = 链路 Happy（swot 全链路），场景 8 = 双通道并存专项断言；模板字段↔Schema 对应由 `test_schema_template_alignment.py` 单元层承载，不入 BDD）
+- [x] Subtask 14.8: 场景 8 — Edge：内外数据融合双通道并存（arguments 内部数据进入 Think prompt + 外部基准 DATA_SOURCES 注入同时成立；**观测机制三要素（Round 2 钉死）**：① Fake LLM `_llm_dispatch` 内 append `context["llm_prompts"]` 捕获全部 prompt；② Think 阶段识别特征串「规划执行步骤」（对齐 4-1c 用「生成代码」识别 Code 阶段的先例，`tool_execution_engine.py:522`）；③ 断言 Think prompt 含 arguments 的 **Python repr 子串**（Engine 以 f-string 注入 dict repr 单引号形态，**非 json.dumps**——断言 json 序列化子串必假红）+ 断言注入代码 preamble 含 `DATA_SOURCES`。场景分工：场景 1 = 链路 Happy（swot 全链路），场景 8 = 双通道并存专项断言；模板字段↔Schema 对应由 `test_schema_template_alignment.py` 单元层承载，不入 BDD）
 - [x] Subtask 14.9: 运行开发结束验收测试并确认通过 + 配套文档同步（architecture.md §17.3 状态 + §17.3.3 追加 + 决策表 + 修订历史 + sisys-uni-exception-design.md §3.3.2 复用声明）+ 完成清单逐项确认
 - [x] Subtask 14.10: 运行 `pytest`、`ruff check`、`mypy`、**`pre-commit run --all-files`** 收尾校验（Round 1 D2-B 勘正补定：原稿收尾清单缺 pre-commit；DoD 勾选证据形态 = 逐提交 hooks 全项 Passed + 收尾 all-files 实跑输出或等效独立复跑证据，4-1c Round 5 教训前置承接）
 
 **完成标准/Definition of Done:**
-- [x] 全部 Gherkin 场景通过（8 场景）
+- [x] 全部 Gherkin 场景通过（8 类场景，16 个平铺场景）
 - [x] 配套文档同步完成
 - [x] 完成清单逐项验证确认
 - [ ] Story 可进入 `done`
@@ -1033,7 +1033,7 @@ tests/
 └── acceptance/
     ├── contracts/
     │   └── skill_io_schemas.yaml                     # [修改] 追加 10 条目（16 Skill 单一 SSOT）
-    ├── test_acceptance_skill_mixed_data.feature      # [新增] 8 场景
+    ├── test_acceptance_skill_mixed_data.feature      # [新增] 8 类场景（16 个平铺场景）
     └── test_acceptance_skill_mixed_data.py           # [新增] BDD 步骤
 ```
 
@@ -1105,7 +1105,7 @@ tests/
 - [x] **Task 3-11 其余 9 Skill 并行完成**（3 并行 Agent × 3 Skill，每组照 swot 范本 [A]-[D] 循环）：ansoff(203)/space(198)/bsc(212)/value-curve(200)/vrio(218)/change-management(222)/ge(207)/value-chain(220)/kpi-tree(218) 行全部 ≤500；三件套 30-46 行/文件；模板叶子键程序化验证后编写；免 Key 组无「未注册」话术（7 敏感 Skill 均有 + china-nbs crawler 降级话术 3 个）；version 1.0.0 全部保持。各组交付后主会话交叉验证：单元 23+21 项全绿
 - [x] **Task 12 集成测试完成**：18 items 全绿（10-slug 参数化双源 call_count==1 + 溯源元数据 + arguments repr 内外融合断言 + 缓存首轮绝对守卫/二次不增 + 跨租户 first+1 + 单敏感 4-slug 参数化 411 error_code 部分收敛 + 双敏感全缺 411 直传对照 + 不可用收敛）；12.6 `test_schema_template_alignment.py` 20 items 全绿；12.7 **连续 5 次 34 passed 零随机失败**
 - [x] **Task 13 架构验证测试完成**：三方一致性（6 涉及源真实实例化 + 10-slug frontmatter ↔ SSOT ↔ 适配器）+ wiring 三文件特征串回归 + 签名锁定 + 16 Skill 最终态全量断言 + version 1.0.0 不变 + SSOT 单一来源启发式自检
-- [x] **Task 14 BDD 验收 + 文档同步完成**：**16 items 全绿**（8 场景：Happy×2 + Edge×6 含双通道并存三要素观测——prompt 捕获 +「规划执行步骤」识别 + repr 子串 + DATA_SOURCES 前言）；文档同步：architecture.md §17.3 状态块/§17.3.3 4.1d 集成说明 + D1-D8 决策表/修订历史 8.7.0/统计信息 + sisys-uni-exception-design.md §3.3.2 复用声明（引用式）
+- [x] **Task 14 BDD 验收 + 文档同步完成**：**16 items 全绿**（8 类场景：Happy×2 + Edge×6 含双通道并存三要素观测——prompt 捕获 +「规划执行步骤」识别 + repr 子串 + DATA_SOURCES 前言）；文档同步：architecture.md §17.3 状态块/§17.3.3 4.1d 集成说明 + D1-D8 决策表/修订历史 8.7.0/统计信息 + sisys-uni-exception-design.md §3.3.2 复用声明（引用式）
 - [x] **验收测试风格修正（用户反馈，2026-09-28）**：初版按 4-1c 模式（scenarios() + context dict）被用户指出违反项目规范与已有代码风格（参考 test_acceptance_postgresql_relational_layer.py）→ **重写为范本风格**：`@scenario` 显式绑定（每场景一个 test_* 函数）+ 具名 fixture 参数注入（领域对象直接作步骤参数）+ 步骤产物经 `target_fixture` 传递（NamedTuple `_EngineOutcome`，无裸 dict）+ 场景名无编号纯业务描述 + AC 分节注释 + 背景服务可用性检查（无 pass 占位）；红/绿拆分保持（14 failed + 2 passed → 全绿后 16 passed）
 - [x] **实施期发现与修复**：① catalog 实际路径 `src/domain/entities/strategic_tool_catalog.py`（非 registry/ 下）；② 提取器 all 聚合缺口（见 Task 2）；③ @scenario 模式下无 adapters given 的场景 fixture 解析错误 → 增加默认空映射 fixture 由 target_fixture 覆盖
 
@@ -1146,7 +1146,7 @@ tests/
 - `tests/unit/application/skills/test_schema_template_alignment.py` — 模板↔Schema 叶子键双向断言（Task 12.6）
 - `tests/unit/architecture/test_arch_skill_mixed_data.py` — 三方一致/签名锁定/行数/回归网（Task 13）
 - `tests/integration/application/test_skill_mixed_data.py` — 10 Skills 全链路集成（Task 12）
-- `tests/acceptance/test_acceptance_skill_mixed_data.feature` + `.py` — BDD 8 场景（Task 0/14）
+- `tests/acceptance/test_acceptance_skill_mixed_data.feature` + `.py` — BDD 8 类场景 16 平铺（Task 0/14）
 
 测试（修改，回归网三处，Task 1.4 一次性预调整）：
 - `tests/unit/application/skills/test_pestel_analysis_data_collection.py` — `NON_TARGET_SLUGS` 17→7 + docstring「17 个」字样
@@ -1251,21 +1251,40 @@ tests/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** （待 dev-story 完成后填写）
-**审查模式:** （待填写）
+**审查日期:** 2026-09-29
+**审查模式:** C1~C5 循环审查（Round 1）— C1 四视角并行调研（契约一致性 / 测试有效性 / 回归影响 / AC 符合性，全部结论经主会话独立复核）→ C2 triage 修复方案 → C3 评审门禁后落码
+
+**Round 1 汇总:** P0×0 P1×2 P2×7 P3×11（去重合并后：P1×2 P2×6 P3×9，另 2 项 P3 有据 dismiss、2 项 defer）。四视角实跑全绿（单元 203+113 / 架构 576 / 集成 18 / 验收 16+28，Redis 真实服务）；三方契约本体经生产解析器 + 独立遍历双重复核全部真实成立；AC-1~6 全部满足、File List 75/75 对齐、范围边界全部守住。
 
 #### 需决策 Decision Needed
 
-- [ ] （待填写）
+- [ ] （无——Round 1 无需用户决策项）
+
+#### Round 1 修复方案（C3 评审通过后落码）
+
+> **C3 双评审员裁决（2026-09-29）**：评审员 1（正确性/回归风险）——9 项优秀、4 项需修订（F2 补 Redis 不可用守卫防 skip→ERROR、F6 清孤儿 import、F11 范围重定 5 处、F13 撤销错误 resolver 锚点改动）；评审员 2（对抗性/组合交互）——整体可落码 + 3 处修订（F2 条件清理机制、F5 常量落位决策=定义进 4-1c 契约库、F9 删孤儿 import + 架构测试同类常量复制一并收敛）+ F3/F4 三条实施约束（仅取顶层容器键/共用判定式/消息含路径）。全部修订已采纳落码；两评审员事实冲突处（resolver 行号）经主会话实测裁决（:233-235 正确保留）。
+
+- [x] **R1-F1 [P1] 契约库自检补负例**：TestAssertionFailurePaths 7 个坏数据用例（dataclasses.replace 构造漂移副本 + match= 钉死目标断言——含 F5 required_fields 漂移与 F3 分区标题漂移两个新断言的判别力证明）+ 提取器三边界负例（不一致双行聚合 False / 缺「## 采集表格」段返回 {} / 缺口登记区字段不进比对集）+ 守卫两红测 + 容器键提取正例，共 13 个新用例
+- [x] **R1-F2 [P1] 验收测试补租户缓存清理**：redis_client fixture 增 tenant_id 依赖，teardown ping 守卫 + delete_pattern 本租户前缀（Redis 不可用场景已 skip 无键可清，try/except 镜像 resolver_cache 先例 + 注释注明，不把合法 skip 变 teardown ERROR）+ close 无条件
+- [x] **R1-F3 [P2] 分区标题契约断言**：新函数 `schema_top_level_container_keys`（仅顶层容器键，与叶子展开共用 `_is_object_container`/`_is_array_of_objects` 判定式）+ `assert_template_schema_alignment` 第 6 条断言（采集表格区 `###` 标题集合 ↔ 顶层容器键双向；区域截取与字段提取共用 `_collection_section`，零第二份正则）
+- [x] **R1-F4 [P2] schema_leaf_keys 两守卫**：含 properties 但无 type: object 节点 → 红（消息含键路径）；跨容器重名叶子 → 红（消息含两路径）；现行 16 schema 零触发零误伤（评审员全调用位穷举 + 真实数据模拟推演证实）
+- [x] **R1-F5 [P2] required_fields 期望值断言收紧**：常量定义进 4-1c 契约库 `EXPECTED_REQUIRED_FIELDS = ("indicator", "value")`（跨 Story 共享事实归源头，KEY_SENSITIVE_SOURCES 先例同位；4-1d 库 import + re-export），`assert_data_sources_contract` 逐字断言——AC-1「全字段」名实相符
+- [x] **R1-F6 [P2] 「23 全量解析中心」测试名实恢复**：循环改 `SLUG_TO_TOOL_ID` 生产 SSOT 全量枚举（评审员程序化验证 == 三集合并集），同步删孤儿 import `SKILL_DATA_SOURCES`（ruff F401），NON_TARGET_SLUGS 保留（空 tuple 不变量用例仍引用）
+- [x] **R1-F7 [P2] 旧 4-1c 验收场景语义迁移**：feature 场景 slug swot-tows → business-model-canvas（真空白名单，「空白名单安全失败」差异化语义恢复），.py 场景 docstring 补滚动锚点规则（4-1e 成熟化该 Skill 时两处 feature 同步迁移）
+- [x] **R1-F8 [P3] 集成测试敏感源常量收敛**：`SINGLE_SENSITIVE_SLUGS` 改从 `MIXED_SKILL_DATA_SOURCES × KEY_SENSITIVE_SOURCES` 派生（评审员验证派生序==原序），`sensitive` 字面量改 import——注释「同源常量」由不实变真实
+- [x] **R1-F9 [P3] 路径/常量 import 化**：alignment 文件 `SKILLS_ROOT` import（删孤儿 `Path`）；架构测试文件出生时复制的 `SKILLS_ROOT`/`SKILL_MD_MAX_LINES`/`DATA_SOURCE_MARKER_PATTERN` 三常量一并 import 4-1c 契约库（删孤儿 `import re`）——D6/R2-F3 单一来源政策收尾
+- [x] **R1-F10 [P2] DoD 门禁勾选自洽**：补跑实测——unit 全量 7476 passed，整体覆盖率 89%（≥80 ✓）、应用层 88%（≥85 ✓）已勾；「无 P0/P1」已勾（P1×2 已修复）；pre-commit 勾选处如实注明（授权限制无法独立预跑，以 C4 提交钩子实证 + ruff/mypy 独立复跑替代）
+- [x] **R1-F11~F13 [P3] 文档勘正**：「8 场景」→「8 类场景（16 平铺）」终态描述 4 处（:960/:1036/:1108/:1149；:1098 为 Dev 过程记录保留历史真实性）；租户键格式勘正（:140）；engine 锚点 :521→:522（story :230/:955 + 两处测试注释；resolver :233-235 经实测正确保留不动）
 
 #### 已修复 Patch
 
-- [ ] （待填写）
+- [x] R1-F1 ~ R1-F13 全部落码并全量验证：单元+架构 792 passed / 集成 18 passed / 验收 28 passed（两套，真实 Redis）/ unit 全量含覆盖率 7476 passed（整体 89%、应用层 88%，门禁全过）/ ruff check+format 全绿 / mypy 零错误（改动文件）
 
 #### 已推迟 Defer
 
 - [ ] 节点级注入（旁路+误拒双向）→ Story 4.2（4-1c 既定留项，本 Story 不收敛）
-- [ ] `skill_io_schemas.yaml` data_sources.items 字段级化 + description 命名对齐 → Story 4.3（4-1c R2-F7 既定留项；本 Story 新增条目沿用现行粒度）
+- [ ] `skill_io_schemas.yaml` data_sources.items 字段级化 + description 命名对齐 → Story 4.3（4-1c R2-F7 既定留项；本 Story 新增条目沿用现行粒度；**R1-D1 并入**：yaml 各条目头部 data_sources 注释是第三份人工维护副本（当前与 SSOT 逐字一致已核实，无机器校验）——4.3 结构化进 yaml 并让契约库改从 yaml 加载，一并消除注释副本）
+- [ ] `len(ssot_union)==16` 硬编码锚点 + 7 项 4-1e 非目标清单 3 处重复（NON_TARGET_SLUGS ×2 + 架构测试 ×1）→ Story 4-1e 落地时收敛进契约库单一来源（R1-D2，docstring 已注明 4-1e 语义，属有意预置调整点）
 - [ ] StrategicAnalysisUseCase 的 composition_root 注册 + 接口层入口 → 入口 Story（4-1c R1-P2-13 既定留项，FR-IF-01 锚点）
 - [ ] 异常 `to_dict()` 自动脱敏 → Story 5.x 安全专项
 - [ ] `tests/unit/domain/ports/test_sandbox_session_query.py:38` 既有 `# type: ignore[misc]` → 归属 Story（4-4 遗留，4-1c R1-P2-14 留痕）
