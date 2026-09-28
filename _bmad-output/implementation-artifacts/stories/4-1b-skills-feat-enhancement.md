@@ -362,7 +362,7 @@ class DataSourceResolverPort(Protocol):
 **Then**
 - 本地 aiohttp HTTP 服务器模拟外部 API（不 mock 客户端本身），验证 httpx + tenacity + 熔断完整链路
 - 真实 Redis（测试端口 + TestTenant 前缀）验证缓存命中/失效
-- 中国国家统计局 crawler 集成测试：crawler 服务可达时真实提交任务验证，不可达时 `pytest.skip()` 动态跳过。**（⏸️ deferred — 上周期 P0-7：当前实现为本地 aiohttp 模拟服务器验证核心契约；真实 crawler daemon 链路需 dev/CI 部署可达，留后续 Story 落地。`tests/integration/conftest.py` 的 `real_crawler` fixture 已备好待启用）**
+- 中国国家统计局 crawler 集成测试：crawler 服务可达时真实提交任务验证，不可达时 `pytest.skip()` 动态跳过。**（⏸️ deferred — 上周期 P0-7：当前实现为本地 aiohttp 模拟服务器验证核心契约；真实 crawler daemon 链路需 dev/CI 部署可达，留后续 Story 落地。原 `real_crawler` 备用 fixture 已经 R2-2-C10 作为零引用投机代码删除，启用时从 git 历史恢复）**
 - 引擎端到端：真实 Engine + 真实 Resolver + 真实 Redis + Mock LLM/Sandbox（按 4-1a 验收先例），验证 `$DATA_SOURCE` 全链路
 
 **验证标准/Validation Criteria:**
@@ -1410,6 +1410,47 @@ tests/
 | C3 | 架构测试 `_extract_imports` 完整路径 + `_top_layer` 归一化（修复 `split(".")[0]` 恒为 "src" 的空断言）+ tmp_path 变异验证阳性对调用例 | `test_arch_data_source.py` | 528 项架构测试全绿 |
 
 **C3 评审结论（Round 2）**：G1/G2/G5 视角「良好→必修 1 项（G2 RecursionError 缺口）已纳入」；G6/G7 视角「良好→5 项实现精度已全部写入方案」。评审准入条件满足后修码。
+
+#### Round 3 — C2 修复方案（Round 2 立项留项：生产代码组 + 事件/并发组）
+
+> C1 调研已在 Round 2 完成（3 视角产出全部详设），本轮直接立项。留 Round 4：验收测试基建组（C1 AC-5.1 三断言 / C2 session→场景级 Redis / C4 AC-7.2 / C5 AC-2.4 子进程 / C6 AC-2.5 金丝雀）+ P3 超长整数 repr 通道留档评估。
+
+**H1 ChinaNBS 轮询健壮性（R2-2-B3）**：`_poll_until_terminal` 增设 `_KNOWN_PENDING` 已知中间态集合 + 连续未知状态容忍 3 次 → `DataSourceResponseError(413)`（对端契约违反）+ 状态查询异常连续容忍 3 次 → `DataSourceUnavailableError(411)`（成功即清零，吸收瞬时抖动）
+**H2 8 config 数值范围校验（R2-2-B4）**：全部 from_env 解析后追加范围校验（timeout>0 / ttl_seconds>0；china_nbs 另加 poll_interval>0、poll_timeout>0、interval<timeout 关系校验），对齐 embedding.py 既有内联模式（不抽 helper）
+**H3 naive/aware 三处统一（R2-2-B5）**：newsapi（naive→UTC 归一防 TypeError 逃逸）/ eurostat + uspto（aware 改 `astimezone(UTC)` 换算——`replace(tzinfo=UTC)` 不重解释不换算为 eurostat 现行正确性 bug）
+**H4 URL 路径段编码（R2-2-B6）**：worldbank/imf/eurostat/ipcc 四处 f-string 路径插值统一 `urllib.parse.quote(segment, safe="")`（防空格/`/`/`?` 注入与路径穿越）
+**H5 3xx 显式映射（R2-2-B7）**：`_http_helpers` 与 ipcc 内联块在 4xx 分支前插入 3xx → `DataSourceResponseError(413)`（确定性配置漂移语义，不重试不计熔断；**禁用** follow_redirects——跨域转发会泄露 header/body 内 Key）
+**H6 ttl 白名单单一权威（R2-2-B8）**：resolver `fetch` 适配器返回后、写缓存前以白名单 ttl 重建 freshness（`dataclasses.replace`），消除事件 freshness_score 与缓存窗口语义分裂
+**H7 事件 error_message URL 脱敏（R2-2-C7）**：`base_exceptions.py` 新增公开 `redact_url_sensitive_params(text)`（不要求 http 前缀，正则锚定 `[?&]param=`）；`_publish_failed` 先脱敏后截断（防截断点切开密文残留半段）
+**H8 fetch 失败事件上移（R2-2-C8）**：失败事件唯一发布点上移至 `fetch` 内 adapter 调用段（含未注册 411）；`fetch_many` 删除收敛循环的 `_publish_failed` 调用（结构性防双发）；白名单违规不发布（非采集失败语义）
+**H9 fetch_many 并发上限（R2-2-C9）**：`__init__` 新增 keyword-only `max_concurrency=4`（<1 抛 ValidationError 走领域体系），实例属性 `asyncio.Semaphore`（SINGLETON 服务实例属性为正确位置，不违反 CLAUDE.md Gotcha 精神）
+**H10 real_crawler 死 fixture 删除（R2-2-C10）**：零引用投机代码删除（24 行；未来需要时 git 历史可恢复）；**同步修订 AC-6 deferred 注记**（「fixture 已备好待启用」改为指引从 git 历史恢复）
+
+**C3 评审结论（Round 3，良好+良好 → 9 项修订全部纳入后达准入）**：
+1. **H1**：`_KNOWN_PENDING = frozenset({"pending", "running"})`（出处 `plugins/crawler/core/value_objects.py:16-17` CrawlStatus 枚举）；`"cancelled"` 并入 failed 终态分支 → 411；413 仅留真正未知 status；异常容忍分支补 deadline 硬上界检查
+2. **H3**：三处统一双分支（naive→`replace(tzinfo=UTC)` / aware→`astimezone(UTC)`），**禁止**无条件 astimezone（naive 按宿主本地时区换算引入新 bug 且现有断言测不出）；「现行正确性 bug」改记为「防御性加固」（取证：eurostat updated / uspto patent_date 均为 date-only naive）
+3. **H4**：ipcc 按段 quote（`"/".join(quote(seg, safe="") for seg in query.split("/"))`）保留相对路径键契约；`_http_helpers` 新增 `quote_path_segment`（显式拒绝 `..` 段 → 413——quote 对点号零防护，LLM 不可信输入需显式拒绝）；逐段清单含 worldbank/imf 的 country 段
+4. **H5**：location 仅入 context 禁入 message + 截断 ≤200 字符；`sisys-uni-exception-design.md` §3.4.1 补 3xx 映射行
+5. **H6**：口径修正为「is_stale 判定权威统一」（score 与 ttl 无关）；实现用 `dataclasses.replace(result.freshness, ttl_seconds=...)` 保留 half_life 扩展面
+6. **H7**：`base_exceptions.py __all__` + `src/domain/exceptions/__init__.py` 双导出；`_redact_url_value` str 分支内部委托新 helper（杜绝正则双份维护）
+7. **H8**：`except Exception`（不得捕获 BaseException，保取消语义）；「发布异常掩盖原始异常」取舍写入 docstring
+8. **H9**：信号量只包 fetch_many 的 gather 协程（不进 fetch，不改单采语义）
+9. **H10**：同 commit 修订 AC-6 deferred 注记
+
+#### 已修复 Patch（第二周期 Round 3，TDD）
+
+| # | 修复 | 验证 |
+|---|------|------|
+| H1 | ChinaNBS 轮询：`_KNOWN_PENDING={pending,running}`（CrawlStatus 枚举出处）；cancelled 并入失败终态 → 411；未知×3 → 413；查询抖动×3 → 411（成功清零）；deadline 硬上界覆盖异常分支 | 6 项新测（pending 长驻/cancelled/未知×3 快速失败/清零/抖动容忍/耗尽） |
+| H2 | 8 config 数值范围校验（timeout>0/ttl>0；china_nbs poll 正值+关系校验；ipcc 补 timeout/ttl） | 24 项参数化新测（`test_data_source_config_ranges.py`） |
+| H3 | naive/aware 双分支统一（newsapi TypeError 逃逸闭合；eurostat/uspto aware 改 astimezone 换算——防御性加固，双分支禁无条件 astimezone 陷阱） | 4 项新测（eurostat/uspto 偏移换算时刻相等、newsapi 混合比较、naive 保持） |
+| H4 | `_http_helpers.quote_path_segment`（quote(safe="") + 显式 `..` 拒绝 413）；worldbank/imf/eurostat/ipcc 逐段应用；ipcc 按段编码保留相对路径键契约 | 7 项新测（合法代码回归/注入编码/`..` 拒绝/IPCC 嵌套键保留） |
+| H5 | 3xx → 413 显式映射（`_http_helpers` + ipcc 内联块；location 仅入 context ≤200 字符禁入 message；follow_redirects 禁止注释声明）；§3.4.1 映射表补 3xx 行 | worldbank 301 用例（不重试/不泄漏）；`sisys-uni-exception-design.md` 同步 |
+| H6 | freshness ttl 白名单单一权威（`dataclasses.replace` 保留 half_life 扩展面；口径：is_stale 判定统一） | 1 项新测（适配器 7200 vs 白名单 3600 → 3600） |
+| H7 | `redact_url_sensitive_params` 公开 helper（domain 双导出，`_redact_url_value` 委托复用）；`_publish_failed` 先脱敏后截断 | 1 项新测（api_key 脱敏 + REDACTED 存在 + 非敏感参数保留） |
+| H8 | 失败事件唯一发布点上移 fetch adapter 段（含未注册 411）；fetch_many 收敛循环不再发布（结构性防双发）；白名单违规不发布 | 3 项新测（单 fetch 恰好 1 条/fetch_many 防双发锁/白名单零事件） |
+| H9 | `max_concurrency=4` keyword-only（<1 → ValidationError 201）；实例属性 Semaphore 仅包 fetch_many gather | 2 项新测（峰值 ≤2 探针/非法值 201） |
+| H10 | `real_crawler` 死 fixture 删除（24 行）；AC-6 deferred 注记同步修订 | 集成收集健康 |
 
 | # | 修复 | 文件 | 验证 |
 |---|------|------|------|

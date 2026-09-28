@@ -37,6 +37,13 @@ logger = logging.getLogger(__name__)
 
 _TERMINAL_SUCCESS = "completed"
 _TERMINAL_FAILED = "failed"
+_TERMINAL_CANCELLED = "cancelled"
+# 已知中间态（出处：plugins/crawler/core/value_objects.py CrawlStatus 枚举
+# {PENDING, RUNNING, COMPLETED, FAILED, CANCELLED}——pending 排队态在 crawler
+# 并发下是常态，缺失会导致确定性误判回归）
+_KNOWN_PENDING = frozenset({"pending", "running"})
+# 连续未知状态/连续查询异常容忍次数（吸收 crawler 侧短暂中间态与网络抖动）
+_TOLERANCE = 3
 
 
 class ChinaNBSAdapter:
@@ -120,31 +127,52 @@ class ChinaNBSAdapter:
             return False
 
     async def _poll_until_terminal(self, task_id: str) -> dict[str, Any]:
-        """轮询任务状态直至终态（completed/failed）或超时
+        """轮询任务状态直至终态（completed/failed/cancelled）或超时
+
+        R2-2-B3/H1 健壮性：未知状态不再空转至超时（连续 3 次 → 413 对端契约违反）；
+        状态查询瞬时抖动连续容忍 3 次（成功即清零，耗尽 → 411）；poll_timeout 为
+        硬上界（异常容忍分支同样检查 deadline）。
 
         Raises:
             TimeoutError: 超过 poll_timeout_sec（超时后自动取消任务回收资源）
-            DataSourceUnavailableError: 任务失败或状态查询故障
+            DataSourceUnavailableError: 任务失败/被取消或状态查询故障（411）
+            DataSourceResponseError: 连续未知状态（413，对端契约违反）
         """
         deadline = time.monotonic() + self._config.poll_timeout_sec
+        consecutive_unknown = 0
+        consecutive_errors = 0
         while True:
             try:
                 status = await self._crawler.get_task_status(task_id)
+                consecutive_errors = 0
             except Exception as e:
-                raise DataSourceUnavailableError(
-                    message="中国国家统计局采集任务状态查询失败",
-                    context={"source_name": "china-nbs", "task_id": task_id},
-                    cause=e,
-                ) from e
-
-            state = status.get("status")
-            if state == _TERMINAL_SUCCESS:
-                return status
-            if state == _TERMINAL_FAILED:
-                raise DataSourceUnavailableError(
-                    message="中国国家统计局采集任务失败",
-                    context={"source_name": "china-nbs", "task_id": task_id, "error": str(status.get("error", ""))[:200]},
-                )
+                consecutive_errors += 1
+                if consecutive_errors >= _TOLERANCE:
+                    raise DataSourceUnavailableError(
+                        message="中国国家统计局采集任务状态查询失败（连续抖动耗尽容忍）",
+                        context={"source_name": "china-nbs", "task_id": task_id},
+                        cause=e,
+                    ) from e
+                logger.warning("ChinaNBS 状态查询抖动(%d/%d)，下轮重试: %s", consecutive_errors, _TOLERANCE, type(e).__name__)
+            else:
+                state = status.get("status")
+                if state == _TERMINAL_SUCCESS:
+                    return status
+                if state in (_TERMINAL_FAILED, _TERMINAL_CANCELLED):
+                    reason = "被取消" if state == _TERMINAL_CANCELLED else "失败"
+                    raise DataSourceUnavailableError(
+                        message=f"中国国家统计局采集任务{reason}",
+                        context={"source_name": "china-nbs", "task_id": task_id, "error": str(status.get("error", ""))[:200]},
+                    )
+                if state in _KNOWN_PENDING:
+                    consecutive_unknown = 0
+                else:
+                    consecutive_unknown += 1
+                    if consecutive_unknown >= _TOLERANCE:
+                        raise DataSourceResponseError(
+                            message=f"中国国家统计局采集任务状态非法（连续 {consecutive_unknown} 次未知状态 {state!r}）",
+                            context={"source_name": "china-nbs", "task_id": task_id, "status": state},
+                        )
             if time.monotonic() > deadline:
                 # 资源回收：超时后取消任务
                 try:

@@ -26,6 +26,7 @@ from src.domain.value_objects.data_source import (
 )
 from src.infrastructure.config.eurostat import EurostatConfig
 from src.infrastructure.external_services.datasources._http_helpers import (
+    quote_path_segment,
     request_json_with_resilience,
 )
 from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
@@ -87,7 +88,7 @@ class EurostatAdapter:
         data = await request_json_with_resilience(
             self._client,
             "GET",
-            f"/statistics/1.0/data/{query.query}",
+            f"/statistics/1.0/data/{quote_path_segment(query.query)}",
             source_name="eurostat",
             circuit_breaker=self._circuit_breaker,
             params=params,
@@ -142,9 +143,13 @@ class EurostatAdapter:
         raw = data.get("updated")
         if isinstance(raw, str):
             try:
-                return datetime.fromisoformat(raw).replace(tzinfo=UTC)
+                ts = datetime.fromisoformat(raw)
             except ValueError:
                 logger.warning("Eurostat updated 字段解析失败: %r（回退当前时间）", raw)
+            else:
+                # naive/aware 双分支归一（R2-2-B5：naive 按 UTC 解释——date-only 数据
+                # 现状；aware 换算到 UTC——防御性加固防未来带偏移格式被 replace 重解释）
+                return ts.replace(tzinfo=UTC) if ts.tzinfo is None else ts.astimezone(UTC)
         return datetime.now(UTC)
 
     async def close(self) -> None:

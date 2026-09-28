@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -66,6 +67,25 @@ class TestUSPTOAdapterSuccess:
     async def test_health_check(self) -> None:
         adapter = _make_adapter(httpx.MockTransport(_ok_handler))
         assert await adapter.health_check() is True
+        await adapter.close()
+
+
+class TestUSPTOTimestampNormalization:
+    """R2-2-B5/H3 naive/aware 双分支归一。"""
+
+    @pytest.mark.asyncio
+    async def test_aware_offset_converted_to_utc_instant(self) -> None:
+        """带偏移 patent_date 换算到 UTC 同一时刻。"""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={"patents": [{"patent_id": "10000001", "patent_title": "T", "patent_date": "2025-06-01T08:00:00+08:00"}]},
+            )
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        result = await adapter.fetch(DataSourceQuery(source_name="uspto", query="battery"))
+        assert result.source_timestamp == datetime(2025, 6, 1, 0, 0, tzinfo=UTC)
         await adapter.close()
 
 

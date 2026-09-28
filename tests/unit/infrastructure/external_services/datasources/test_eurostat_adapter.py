@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -75,6 +76,39 @@ class TestEurostatAdapterSuccess:
     async def test_health_check(self) -> None:
         adapter = _make_adapter(httpx.MockTransport(_ok_handler))
         assert await adapter.health_check() is True
+        await adapter.close()
+
+
+class TestEurostatTimestampNormalization:
+    """R2-2-B5/H3 naive/aware 双分支归一（防御性加固）。"""
+
+    @pytest.mark.asyncio
+    async def test_aware_offset_converted_to_utc_instant(self) -> None:
+        """带偏移时间（+02:00）换算到 UTC 同一时刻（防 replace 重解释复活）。"""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "value": {"0": 99.5},
+                    "dimension": {"geo": {"category": {"index": {"DE": 0}}}},
+                    "id": ["geo"],
+                    "size": [1],
+                    "updated": "2025-09-01T12:00:00+02:00",
+                },
+            )
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        result = await adapter.fetch(DataSourceQuery(source_name="eurostat", query="nama_10_gdp"))
+        assert result.source_timestamp == datetime(2025, 9, 1, 10, 0, tzinfo=UTC)  # 换算而非重解释
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_naive_date_interpreted_as_utc(self) -> None:
+        """date-only naive（现状格式）按 UTC 解释（既有行为保持）。"""
+        adapter = _make_adapter(httpx.MockTransport(_ok_handler))
+        result = await adapter.fetch(DataSourceQuery(source_name="eurostat", query="nama_10_gdp"))
+        assert result.source_timestamp == datetime(2025, 9, 1, tzinfo=UTC)
         await adapter.close()
 
 

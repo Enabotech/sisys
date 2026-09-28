@@ -28,6 +28,7 @@ from src.domain.value_objects.data_source import (
 )
 from src.infrastructure.config.worldbank import WorldBankConfig
 from src.infrastructure.external_services.datasources._http_helpers import (
+    quote_path_segment,
     request_json_with_resilience,
 )
 from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
@@ -104,7 +105,7 @@ class WorldBankAdapter:
         data = await request_json_with_resilience(
             self._client,
             "GET",
-            f"/country/{country}/indicator/{query.query}",
+            f"/country/{quote_path_segment(country)}/indicator/{quote_path_segment(query.query)}",
             source_name="world-bank",
             circuit_breaker=self._circuit_breaker,
             params={"format": "json", "per_page": 100},

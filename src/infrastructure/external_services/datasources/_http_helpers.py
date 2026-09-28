@@ -8,16 +8,21 @@
 - httpx.TimeoutException → TimeoutError（EXCEPTION_302，重试耗尽后）
 - httpx.TransportError → DataSourceUnavailableError（EXCEPTION_411，重试耗尽后）
 - HTTP 5xx → 可重试，耗尽后 DataSourceUnavailableError（EXCEPTION_411）
+- HTTP 3xx → DataSourceResponseError（EXCEPTION_413，端点迁移/配置漂移，确定性错误不重试不计熔断）
 - HTTP 429 → DataSourceRateLimitError（EXCEPTION_412，不重试）
 - HTTP 其他 4xx → DataSourceResponseError（EXCEPTION_413，确定性错误不重试）
 - JSON 解析失败 → DataSourceResponseError（EXCEPTION_413，不重试、不计熔断）
 - CircuitBreakerOpenError → DataSourceUnavailableError（EXCEPTION_411，快速失败）
+
+安全约束：客户端禁止开启 follow_redirects——newsapi/tavily 等 Key 走 header/body，
+跨域重定向转发会造成 Key 泄露面（httpx 仅对 Authorization 头做跨域降级保护）。
 """
 
 from __future__ import annotations
 
 import logging
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from tenacity import (
@@ -44,6 +49,29 @@ logger = logging.getLogger(__name__)
 
 # 可恢复的服务端 HTTP 状态码（瞬时故障可自行恢复）
 RETRYABLE_STATUS_CODES = frozenset({500, 502, 503, 504})
+
+
+def quote_path_segment(segment: str) -> str:
+    """URL 路径段安全编码（R2-2-B6/H4：LLM 不可信输入注入防护）
+
+    quote(safe="") 编码全部保留字符（含 / ? # 空格），防空格/分隔符注入；
+    显式拒绝 ".." 段（quote 对点号零防护——点为 RFC 3986 unreserved）防路径穿越。
+
+    Args:
+        segment: 单个路径段（禁止含 /——多段路径由调用方 split 后逐段编码）
+
+    Returns:
+        percent-encoded 路径段（合法指标代码如 NY.GDP.MKTP.CD / nama_10_gdp 原样通过）
+
+    Raises:
+        DataSourceResponseError: 段含 ".."（EXCEPTION_413，确定性错误）
+    """
+    if ".." in segment:
+        raise DataSourceResponseError(
+            message="数据源查询路径段含非法穿越序列（..）",
+            context={"segment": segment[:100]},
+        )
+    return quote(segment, safe="")
 
 
 def is_retryable_http_error(exception: BaseException) -> bool:
@@ -137,6 +165,18 @@ async def request_json_with_resilience(
                         message=f"数据源 {source_name} API Key 无效或未授权（HTTP {resp.status_code}）",
                         context={"source_name": source_name, "status_code": resp.status_code},
                     )
+                # R2-2-B7/H5: 3xx 是端点迁移/配置漂移（确定性错误），非瞬时服务端故障——
+                # 不重试不计熔断；location 仅入 context（经 to_dict 脱敏）禁入 message
+                # （message 直发事件通道），截断防签名 URL 长 token 落日志
+                if 300 <= resp.status_code < 400:
+                    raise DataSourceResponseError(
+                        message=f"数据源 {source_name} 返回重定向（HTTP {resp.status_code}），请检查 API 地址配置",
+                        context={
+                            "source_name": source_name,
+                            "status_code": resp.status_code,
+                            "location": resp.headers.get("location", "")[:200],
+                        },
+                    )
                 if 400 <= resp.status_code < 500:
                     raise DataSourceResponseError(
                         message=f"数据源 {source_name} 返回客户端错误（HTTP {resp.status_code}）",
@@ -178,4 +218,4 @@ async def request_json_with_resilience(
     return data
 
 
-__all__ = ["RETRYABLE_STATUS_CODES", "is_retryable_http_error", "request_json_with_resilience"]
+__all__ = ["RETRYABLE_STATUS_CODES", "is_retryable_http_error", "quote_path_segment", "request_json_with_resilience"]

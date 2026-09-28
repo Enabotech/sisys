@@ -17,7 +17,11 @@ from src.domain.exceptions.archive_exceptions import (
     ArchiveStorageError,
     ValidityPeriodConflictError,
 )
-from src.domain.exceptions.base_exceptions import BaseException, DomainError  # BaseException 是向后兼容别名
+from src.domain.exceptions.base_exceptions import (  # BaseException 是向后兼容别名
+    BaseException,
+    DomainError,
+    redact_url_sensitive_params,
+)
 from src.domain.exceptions.business_exceptions import (
     AuthenticationError,
     BusinessException,
@@ -161,6 +165,7 @@ __all__ = [
     # 抽象根类
     "DomainError",
     "BaseException",  # 向后兼容别名
+    "redact_url_sensitive_params",  # URL 敏感 query 参数脱敏（事件/日志自由文本通道）
     # 系统级异常
     "SystemException",
     "ConfigurationError",

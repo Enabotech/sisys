@@ -50,6 +50,10 @@ class IPCCConfig:
             raise ConfigurationError(message=f"IPCC_MAX_BYTES 值非法: {max_bytes_raw!r}（需要整数）") from None
         if max_bytes <= 0:
             raise ConfigurationError(message=f"IPCC_MAX_BYTES 必须为正整数，当前值: {max_bytes}")
+        if timeout <= 0:
+            raise ConfigurationError(message=f"IPCC_TIMEOUT 必须为正数，当前值: {timeout}")
+        if ttl_seconds <= 0:
+            raise ConfigurationError(message=f"IPCC_TTL_SECONDS 必须为正整数，当前值: {ttl_seconds}")
         return cls(
             csv_base_url=os.getenv("IPCC_CSV_BASE_URL", cls.csv_base_url),
             timeout=timeout,

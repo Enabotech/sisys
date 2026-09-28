@@ -15,6 +15,16 @@ _REDACT_URL_PARAM_RE = re.compile(r"([?&](?:api[-_]?key|token|apikey|secret|pass
 _REDACT_URL_PARAM_REPLACEMENT = r"\1***REDACTED***"
 
 
+def redact_url_sensitive_params(text: str) -> str:
+    """脱敏任意文本中 URL 敏感 query 参数（?api_key=xxx → ?api_key=***REDACTED***）
+
+    与 _redact_url_value 的差异：不要求整串以 http(s):// 开头——正则锚定
+    [?&]param= 结构，对嵌入文本中的 URL 同样安全（用于事件 error_message 等
+    自由文本通道，R2-2-C7/H7）。与 to_dict() 共用同一编译正则（脱敏策略 SSOT）。
+    """
+    return _REDACT_URL_PARAM_RE.sub(_REDACT_URL_PARAM_REPLACEMENT, text)
+
+
 def _redact_url_value(value: Any) -> Any:
     """递归脱敏字典中所有 URL 字符串字段（移除 ?api_key=xxx 等敏感 query 参数）。
 
@@ -24,7 +34,7 @@ def _redact_url_value(value: Any) -> Any:
     """
     if isinstance(value, str):
         if value.startswith(("http://", "https://")):
-            return _REDACT_URL_PARAM_RE.sub(_REDACT_URL_PARAM_REPLACEMENT, value)
+            return redact_url_sensitive_params(value)
         return value
     if isinstance(value, dict):
         return {k: _redact_url_value(v) for k, v in value.items()}
@@ -98,4 +108,4 @@ class DomainError(Exception):
 # 向后兼容别名：旧代码可使用 BaseException 引用 DomainError
 BaseException = DomainError
 
-__all__ = ["DomainError", "BaseException"]
+__all__ = ["DomainError", "BaseException", "redact_url_sensitive_params"]

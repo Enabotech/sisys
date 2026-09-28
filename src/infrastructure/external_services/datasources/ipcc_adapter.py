@@ -27,6 +27,7 @@ from src.domain.value_objects.data_source import (
     DataSourceResult,
 )
 from src.infrastructure.config.ipcc import IPCCConfig
+from src.infrastructure.external_services.datasources._http_helpers import quote_path_segment
 from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
@@ -91,7 +92,10 @@ class IPCCAdapter:
             DataSourceResponseError: CSV 为空/无表头/解析失败（不重试）
             DataSourceUnavailableError/TimeoutError/DataSourceRateLimitError: HTTP 层故障
         """
-        text = await self._request_csv(f"{self._config.csv_base_url}/{query.query}.csv")
+        # 按段编码保留相对路径键契约（query 合法含 "/"，如嵌套数据集键 a/b——
+        # 整段 quote(safe="") 会把合法 / 编码为 %2F 静默收窄契约）
+        encoded_key = "/".join(quote_path_segment(seg) for seg in query.query.split("/"))
+        text = await self._request_csv(f"{self._config.csv_base_url}/{encoded_key}.csv")
         rows, truncated = self._parse_csv(text)
         now = datetime.now(UTC)
         return DataSourceResult(
@@ -165,6 +169,16 @@ class IPCCAdapter:
                             raise DataSourceRateLimitError(
                                 message="数据源 ipcc 触发限流（HTTP 429）",
                                 context={"source_name": "ipcc", "status_code": 429},
+                            )
+                        # 3xx：端点迁移/配置漂移（确定性错误不重试不计熔断），与 _http_helpers 契约对齐
+                        if 300 <= resp.status_code < 400:
+                            raise DataSourceResponseError(
+                                message=f"数据源 ipcc 返回重定向（HTTP {resp.status_code}），请检查 API 地址配置",
+                                context={
+                                    "source_name": "ipcc",
+                                    "status_code": resp.status_code,
+                                    "location": resp.headers.get("location", "")[:200],
+                                },
                             )
                         if 400 <= resp.status_code < 500:
                             raise DataSourceResponseError(

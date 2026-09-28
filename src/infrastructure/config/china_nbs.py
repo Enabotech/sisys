@@ -51,6 +51,19 @@ class ChinaNBSConfig:
             ttl_seconds = int(ttl_raw)
         except (ValueError, TypeError):
             raise ConfigurationError(message=f"CHINA_NBS_TTL_SECONDS 值非法: {ttl_raw!r}（需要整数）") from None
+        if poll_interval_sec <= 0:
+            raise ConfigurationError(message=f"CHINA_NBS_POLL_INTERVAL_SEC 必须为正数，当前值: {poll_interval_sec}")
+        if poll_timeout_sec <= 0:
+            raise ConfigurationError(message=f"CHINA_NBS_POLL_TIMEOUT_SEC 必须为正数，当前值: {poll_timeout_sec}")
+        if poll_interval_sec >= poll_timeout_sec:
+            raise ConfigurationError(
+                message=(
+                    f"CHINA_NBS_POLL_INTERVAL_SEC({poll_interval_sec}) 必须小于 "
+                    f"POLL_TIMEOUT_SEC({poll_timeout_sec})（否则首轮即超时）"
+                )
+            )
+        if ttl_seconds <= 0:
+            raise ConfigurationError(message=f"CHINA_NBS_TTL_SECONDS 必须为正整数，当前值: {ttl_seconds}")
         return cls(
             base_url=os.getenv("CHINA_NBS_BASE_URL", cls.base_url),
             domain=os.getenv("CHINA_NBS_DOMAIN", cls.domain),

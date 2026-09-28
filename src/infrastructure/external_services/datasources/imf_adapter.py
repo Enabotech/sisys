@@ -26,6 +26,7 @@ from src.domain.value_objects.data_source import (
 )
 from src.infrastructure.config.imf import IMFConfig
 from src.infrastructure.external_services.datasources._http_helpers import (
+    quote_path_segment,
     request_json_with_resilience,
 )
 from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
@@ -83,7 +84,8 @@ class IMFAdapter:
             DataSourceResponseError: 响应缺少 values 字段
         """
         country = dict(query.parameters).get("country", "")
-        path = f"/{query.query}/{country}" if country else f"/{query.query}"
+        indicator = quote_path_segment(query.query)
+        path = f"/{indicator}/{quote_path_segment(country)}" if country else f"/{indicator}"
         data = await request_json_with_resilience(
             self._client,
             "GET",

@@ -112,6 +112,33 @@ class TestIPCCConfigMaxBytes:
         assert config.max_bytes == 2_097_152
 
 
+class TestIPCCPathEncoding:
+    """R2-2-B6/H4 按段编码（保留相对路径键契约）。"""
+
+    @pytest.mark.asyncio
+    async def test_nested_path_key_preserved(self) -> None:
+        """嵌套相对路径键（a/b）的 / 分隔保留、各段独立编码。"""
+        captured: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured.append(str(request.url))
+            return httpx.Response(200, text="col\n1\n")
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        await adapter.fetch(DataSourceQuery(source_name="ipcc", query="ar6 wg1/spm ch1"))
+        assert "/ar6%20wg1/spm%20ch1.csv" in captured[0]  # 段内空格编码、段间 / 保留
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_dotdot_key_rejected_413(self) -> None:
+        """穿越序列键显式拒绝 → 413。"""
+        adapter = _make_adapter()
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="ipcc", query="../secrets"))
+        assert exc_info.value.code == "EXCEPTION_413"
+        await adapter.close()
+
+
 class TestIPCCAdapterSuccess:
     @pytest.mark.asyncio
     async def test_fetch_success(self) -> None:
