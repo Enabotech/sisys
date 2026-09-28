@@ -658,10 +658,19 @@ def then_worldbank_fetched_successfully(context: dict[str, Any]) -> None:
 
 
 @then("Resolver 仍可解析其他已注册数据源")
-def then_resolver_available_for_other_sources(context: dict[str, Any]) -> None:
-    """断言：成功采集后 adapters 仍保持单一 world-bank 注册，Resolver Mapping.get("tavily") = None 时调用应抛 207"""
-    assert "world-bank" in context["adapters"]
-    assert "tavily" not in context["adapters"]
+def then_resolver_available_for_other_sources(context: dict[str, Any], event_loop: Any) -> None:
+    """真实行为断言（R3-4 K3 重写）：同一 Resolver 实例再次解析（不同 query，独立
+    缓存键）仍成功——服务可用性未因 tavily 缺 Key 条件注册跳过而降级。
+    原 fixture dict 自省（"world-bank" in adapters）与被测系统零交互，零判别力。"""
+    _assert_redis_available(context, event_loop)
+    resolver = context["resolver"]
+    result = _run_async(
+        event_loop,
+        resolver.fetch(context["metadata"], "world-bank", "GDP USA 2023", tenant_id=context["_tenant"]),
+    )
+    assert result.source_name == "world-bank"
+    assert result.cache_hit is False  # 新查询键未命中，真实走采集链路
+    assert context["adapters"]["world-bank"].call_count == 2  # 两次真实采集
 
 
 # ===================================================================
@@ -754,8 +763,10 @@ def given_stale_cache_entry(context: dict[str, Any], event_loop: Any) -> None:
     }
     key = build_data_source_cache_key(context["_tenant"], "world-bank", "GDP China 2024")
     context["stale_source_timestamp"] = stale_time
-    # 缓存条目本身写入成功（Redis TTL 是上限保鲜，stale 判定由 DataFreshness 负责）
-    _run_async(event_loop, context["cache"].set_with_ttl(key, json.dumps(entry), 3600))
+    # 前置条件落实（R3-4 K3：写失败即红——原返回值被忽略，重采可能来自「未命中」
+    # 而非「stale 判定」，场景恒绿空转）
+    written = _run_async(event_loop, context["cache"].set_with_ttl(key, json.dumps(entry), 3600))
+    assert written is True, "预置过期条目写入失败——后续 stale 断言失去前提"
     # 替换为短 TTL 元数据（60s，值为不变量下界），使 120s 前的条目必然 stale
     context["adapters"]["world-bank"] = _FakeDataSourceAdapter("world-bank", ttl_seconds=60)
     context["metadata"] = _make_tool_metadata(("world-bank",), ttl_seconds=60)
@@ -764,6 +775,9 @@ def given_stale_cache_entry(context: dict[str, Any], event_loop: Any) -> None:
 @when("同一查询再次经采集通道处理")
 def when_fetch_after_ttl_expired(context: dict[str, Any], event_loop: Any) -> None:
     _assert_redis_available(context, event_loop)
+    # fetch 前捕获键存活态（R3-4 K3：_write_cache 会覆写条目，必须在 fetch 前取）
+    key = build_data_source_cache_key(context["_tenant"], "world-bank", "GDP China 2024")
+    context["stale_key_alive"] = _run_async(event_loop, context["cache"].exists(key))
     resolver = _make_resolver(context)
     result = _run_async(
         event_loop,
@@ -774,8 +788,12 @@ def when_fetch_after_ttl_expired(context: dict[str, Any], event_loop: Any) -> No
 
 @then("数据新鲜度判定为 stale")
 def then_stale_detected(context: dict[str, Any]) -> None:
-    freshness = DataFreshness(source_timestamp=context["stale_source_timestamp"], ttl_seconds=60)
-    assert freshness.is_stale(datetime.now(UTC)) is True
+    """stale 判定真实生效的判别锚点（R3-4 K3 重写）：Redis 条目存活（非 Redis TTL
+    过期）但未被复用——重采只能归因于 resolver 条目年龄判定（fetched_at 距今 >
+    白名单 ttl）；且重采结果的 freshness ttl 为白名单权威值（H6 单一权威路径）。"""
+    assert context["stale_key_alive"] is True, "预置过期条目不存在——重采来自未命中而非 stale 判定"
+    assert context["refetch_result"].cache_hit is False
+    assert context["refetch_result"].freshness.ttl_seconds == 60  # 白名单 ttl 权威（非适配器默认）
 
 
 @then("外部采集次数增加 1")

@@ -134,8 +134,7 @@ class TestChinaNBSAdapterSuccess:
 
     @pytest.mark.asyncio
     async def test_implements_port(self) -> None:
-        assert isinstance(_make_adapter(crawler := _make_crawler_mock([_completed_status()])), DataSourcePort)
-        assert crawler is not None
+        assert isinstance(_make_adapter(_make_crawler_mock([_completed_status()])), DataSourcePort)
 
     def test_get_metadata(self) -> None:
         ref = _make_adapter(_make_crawler_mock([])).get_metadata()

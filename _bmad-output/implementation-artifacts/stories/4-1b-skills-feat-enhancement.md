@@ -1711,6 +1711,40 @@ tests/
 
 **Round 3 验证汇总**：全量 unit+contracts **8263 passed** 零失败（新增 21 项）+ 验收/集成 31 passed + ruff All checks passed + mypy **1386 文件**（src+tests）零问题 + 红线自查零新增违规
 
+#### Round 4 — C2 修复方案（K1-K4 判别力收敛 + 台账处置，详设经运行时实证）
+
+**K1 UnsupportedProtocol 101 口径对齐（真 bug）** — `_http_helpers.py` + `ipcc_adapter.py`：`UnsupportedProtocol ⊂ TransportError` 被白名单视为可重试（实测 `is_retryable_http_error(...) == True`）→ URL scheme 缺失的确定性配置错误被重试 ×3 后落 RequestError 分支 411 + on_failure **计熔断**（配置漂移可单独打 open 熔断器）——与 InvalidURL 的 101+on_ignored 确定性口径正相反。修复：白名单 TransportError 分支前置 UnsupportedProtocol 排除；except 链 InvalidURL 分支后插同构分支（101 + on_ignored）；ipcc `_request_csv` 镜像；模块头映射表补行。测试：worldbank 用例断言 101 + `calls["n"] == 1`（修复前 = 3，今日红锚点）+ 白名单分类单测 + ipcc 镜像用例
+
+**K2 事件→聚合绑定 E2E 锁定** — `test_tool_execution_engine_datasource.py`：全仓证据——`with_execution_id` 唯一 wiring 在 resolver :347/:388（仅 execution_id 非 None 时），engine :350 唯一传参点，但 engine 测试 7 处创建 bus 零处读 published_events、resolver 单测全文 0 处 execution_id——**删除 wiring 全套件不变红**。execution_id 无外部暴露面（ToolResult/EvidencePackage/领域异常均不带）——经仓储端口 Mock 捕获 `save(execution)` 取证。详设：`_make_engine` 加可选 repo 参数；成功路径用例断言 `DataSourceFetched.execution_id/aggregate_id == saved.execution_id`；既有全失败用例尾部追加 FetchFailed 同构断言
+
+**K3 恒真断言收紧包（5 处）**：① AC-3.2 `then_stale_detected` 重写为真判别（given 落实 set_with_ttl 返回值断言 + when 前捕获 `exists(key)` 存活态——原重采可能来自「未命中」而非「stale 判定」，then 断言条目存活且 cache_hit=False）；② AC-2.4 `then_resolver_available_for_other_sources` 重写为同 resolver 实例第二次真实采集（原 fixture dict 自省）；③ exceptions retry_after/missing_fields 改 to_dict 序列化断言（穿透 code 绑定+脱敏管线）；④ frontmatter tuple 恒真改 `== ()`（锁死 23 skill 零声明语义）；⑤ china_nbs `crawler is not None` 删除（walrus 一行化）
+
+**K4 keyed 端口元数据子进程断言** — `test_port_contract_data_source.py`：契约文件 docstring :11 承诺「Key 存在→完整元数据」实际未实现（维度 2-8 无 Key 时短路）；monkeypatch 不可行（注册在 session bootstrap 定格）——复用 acceptance AC-2.4 子进程探针模式，单子进程设 3 假 Key 后 bootstrap 断言 8 端口全字段（name/version/interface/lifetime/owner/module/tags，SSOT 复用 ADAPTER_PORT_SPECS）
+
+**K5 台账显式 defer（零代码）**：4a 半开 429 连续放行（resilience4j ignored exceptions 行业默认语义 + 暴露有界等价 CLOSED 态 429 + 429 本身证明可达——未来 revisit 方向 honour Retry-After）；4b 迟到回调世代超发（超发 ≤1 槽自限 + 修复需共享类 API 破坏性改动——归入熔断器 v2 统一重构）
+
+**C3 评审结论（Round 4，聚焦对抗评审——详设经运行时实证后复核；「有条件准入」2 必修 + 6 建议全纳 v2）：**
+
+1. **K3-④v2**：放弃 `== ()`（原方案测错层——该用例走 `load_metadata` L1/TOOLS.md 路径，结构性不携带 data_sources 恒真；且 5 个 SKILL.md 已声明前提失效）——锚点改 frontmatter/L2 路径：5 个已声明 skill 经 `load_sop(slug).frontmatter` 断言 `len(data_sources) >= 1` 且 name/ttl 合法；未声明 skill 保留默认 () 断言
+2. **K2v2**：事件断言必须「与 repo.save 捕获的 execution.execution_id 比较」——`aggregate_id == execution_id` 自反式恒真（`__post_init__` 无条件设 aggregate_id = execution_id，未绑定也成立）；test_all_failed 的 bus 内联构造拿不到——提升为局部变量 + 注入 repo
+3. **K1v2**：白名单排除分支必须在 `isinstance(TransportError)` **之前**（插后即死代码）；health_check 的 RequestError 分支前补 UnsupportedProtocol 直返 False（fetch 新口径 101+on_ignored vs 探活 on_failure 分裂）
+4. **K3-①v2**：then 重写避免与 :783 既有断言同义反复——改断言 `refetch_result.freshness.ttl_seconds == 60`（白名单 ttl 权威化路径）；then 加 event_loop 形参
+5. **K3-②v2**：重写体加 `_assert_redis_available` + event_loop 形参（对齐文件惯例）
+6. **K3-③v2**：至少一条用例 context 含 `?api_key=xxx` URL 断言 REDACTED 出现（镜像验收三断言）
+7. **K4v2**：tags 经 repr 字面量传输（JSON 会 tuple→list）；假 Key 用 f-string 插值常量模式（detect-secrets KeywordDetector 对字面赋值形态拦截）
+
+#### 已修复 Patch（第三周期 Round 4，C3 评审 v2 准入后 TDD 实施）
+
+| # | 修复 | 文件 | 验证 |
+|---|------|------|------|
+| K1 | UnsupportedProtocol 101 口径对齐（真 bug）：白名单排除分支置于 TransportError 检查**之前**（插后即死代码）；except 链 InvalidURL 后插同构分支（101 + on_ignored 不计熔断）；ipcc `_request_csv` 镜像 + health_check 补 UnsupportedProtocol 直返 False（防 fetch/探活观测分裂）；模块头映射表同步 | `_http_helpers.py` / `ipcc_adapter.py` | 3 项新测：白名单分类（False + ConnectError 对照 True）/ worldbank 101+calls==1（修复前 =3 今日红锚点）/ ipcc 镜像 |
+| K2 | 事件→聚合绑定 E2E：`_make_engine` 加 repo 参数；成功路径新用例断言 `DataSourceFetched.execution_id/aggregate_id == saved.execution_id`（仓储 Mock 捕获聚合根取证——自反式断言恒真，必须与捕获值比较）；全失败用例提升 bus 为局部变量 + 注入 repo 追加 FetchFailed 同构断言 | `test_tool_execution_engine_datasource.py` | 2 处新断言面——删除 resolver 发布路径 with_execution_id 调用必红（原全仓零覆盖） |
+| K3 | 恒真断言收紧 5 处：① AC-3.2 given 落实 set_with_ttl 返回值断言 + when 前捕获 exists 存活态 + then 重写（条目存活+cache_hit False+ttl 白名单权威 60）——原重采可能来自「未命中」空转；② AC-2.4 重写为同 resolver 第二次真实采集（cache_hit False + call_count==2）；③ exceptions 改 to_dict 断言 + api_key URL REDACTED 三断言（原 dict 直读零判别）；④ frontmatter 锚点改 L2 路径（6 个声明 skill 断言 len>=1+name/ttl 合法；其余断言 ==()——原 L1 路径恒真且前提失效）；⑤ china_nbs 删 walrus 恒真断言 | 4 个测试文件 | 46 项相关测试全绿 + 验收 18 全绿（.feature 文本零改动 strict 匹配安全） |
+| K4 | keyed 端口元数据子进程断言：单子进程设 3 假 Key（f-string 插值防 detect-secrets）→ bootstrap → 8 端口全字段断言（version/interface/lifetime/owner/module/tags，repr 字面量传输保 tuple 形态；`python -c` 分号序列禁复合语句改双层推导） | `test_port_contract_data_source.py` | 1 项新测（闭合维度 2-8 无 Key 短路缺口，兑现文件 docstring 承诺）；97 项契约测试全绿 |
+| K5 | 台账显式 defer：4a 半开 429 连续放行（resilience4j 行业默认 + 暴露有界；revisit 方向 honour Retry-After）；4b 迟到回调世代超发（≤1 槽自限 + API 破坏性改动不成比例——归熔断器 v2） | Story 文件 | 零代码登记 |
+
+**Round 4 验证汇总**：全量 unit+contracts **8270 passed** 零失败（新增 7 项：K1×3 + K2×2 断言面 + K3 改写强化 + K4×1）+ 验收 18 passed + ruff All checks passed + mypy 1386 文件零问题 + 红线自查零新增违规
+
 | # | 修复 | 文件 | 验证 |
 |---|------|------|------|
 | F1 | 注入管线重构：preamble `json.dumps`→`repr`（parse_constant 映射 NaN/Infinity 为字面串）；标记原位替换 `DATA_SOURCES["name"]`（同源 `name#k`）；失败位替换 `None`；inject 改收 `(code, markers, results)`；`fetch_many` 等长对齐 `tuple[DataSourceResult \| None, ...]` | `data_source_marker.py` / `data_source_resolver.py` / `tool_execution_engine.py` / `ports/data_source_resolver.py` | 新增 compile 闸门 + null/bool/unicode exec + 部分失败 + name#k 共 7 项单测；38 marker 测试全绿 |

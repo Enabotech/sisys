@@ -26,6 +26,7 @@ from src.application.ports.skill_loader import ToolMetadata
 from src.application.services.data_source_resolver import DataSourceResolverService
 from src.application.services.tool_execution_engine import ToolExecutionEngine
 from src.domain.entities.tool import Tool
+from src.domain.events.data_source_events import DataSourceFetchFailed
 from src.domain.exceptions import (
     BusinessRuleViolationError,
     ConfigurationError,
@@ -34,6 +35,7 @@ from src.domain.exceptions import (
     TimeoutError,
 )
 from src.domain.ports.data_source import DataSourceQuery
+from src.domain.ports.tool_execution_repository import ToolExecutionRepositoryPort
 from src.domain.value_objects.data_source import (
     DataFreshness,
     DataSourceApiType,
@@ -123,8 +125,9 @@ def _make_metadata(*names: str) -> ToolMetadata:
 def _make_engine(
     code: str,
     sandbox_codes: list[str],
+    tool_execution_repository: Any = None,
 ) -> ToolExecutionEngine:
-    """构建真实 Engine（Mock LLM/Sandbox 端口适配器）。"""
+    """构建真实 Engine（Mock LLM/Sandbox 端口适配器；仓储可选注入——R3-4 K2）。"""
 
     async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
         if "生成代码" in prompt:
@@ -143,7 +146,7 @@ def _make_engine(
     sandbox.execute_code = AsyncMock(side_effect=_sandbox_execute)
     sandbox.stop_container = AsyncMock()
 
-    return ToolExecutionEngine(llm_client=llm, sandbox=sandbox)
+    return ToolExecutionEngine(llm_client=llm, sandbox=sandbox, tool_execution_repository=tool_execution_repository)
 
 
 async def _run_engine(
@@ -239,6 +242,37 @@ class TestEngineWithoutResolver:
 
 
 class TestEngineWithResolver:
+    @pytest.mark.asyncio
+    async def test_fetched_event_bound_to_execution_aggregate(self) -> None:
+        """事件 aggregate_id == engine 内部 ToolExecution.execution_id（R3-4 K2 端到端绑定）
+
+        execution_id 由 engine 内部生成不外露——经仓储端口 Mock 捕获 save(execution)
+        取证。断言锚点：事件字段与捕获的聚合根比较（execution_id/aggregate_id 的
+        自反式断言恒真——`__post_init__` 无条件设 aggregate_id=execution_id）。
+        删除 resolver 发布路径的 with_execution_id 调用（事件回落自生成 uuid4）
+        本用例必红——原全仓零覆盖。
+        """
+        from src.domain.events.data_source_events import DataSourceFetched
+        from src.domain.ports.tool_execution_repository import ToolExecutionRepositoryPort
+
+        code = '$DATA_SOURCE("world-bank", "GDP")\nprint(DATA_SOURCES)'
+        sandbox_codes: list[str] = []
+        repo = AsyncMock(spec=ToolExecutionRepositoryPort)
+        engine = _make_engine(code, sandbox_codes, tool_execution_repository=repo)
+        bus = InMemoryEventBus()
+        resolver = DataSourceResolverService(
+            adapters={"world-bank": _StubAdapter("world-bank")}, cache=_NullCache(), event_publisher=bus
+        )
+        engine.set_data_source_resolver(resolver)
+        result = await _run_engine(engine, _make_metadata("world-bank"))
+        assert result.status == ToolResultStatus.SUCCESS
+        saved = repo.save.call_args.args[0]  # 成功路径持久化的聚合根（save 恰 1 次）
+        fetched = [e for e in bus.published_events if isinstance(e, DataSourceFetched)]
+        assert len(fetched) == 1
+        assert fetched[0].execution_id == saved.execution_id  # 与聚合根比较（非自反）
+        assert fetched[0].aggregate_id == saved.execution_id
+        assert fetched[0].aggregate_type == "ToolExecution"
+
     @pytest.mark.asyncio
     async def test_preamble_injected_and_metadata_attached(self) -> None:
         code = '$DATA_SOURCE("world-bank", "GDP")\nprint(DATA_SOURCES)'
@@ -345,7 +379,9 @@ class TestEngineWithResolver:
     async def test_all_failed_raises_first_error_unwrapped(self) -> None:
         code = '$DATA_SOURCE("newsapi", "tech")\nprint(1)'
         sandbox_codes: list[str] = []
-        engine = _make_engine(code, sandbox_codes)
+        bus = InMemoryEventBus()
+        repo = AsyncMock(spec=ToolExecutionRepositoryPort)
+        engine = _make_engine(code, sandbox_codes, tool_execution_repository=repo)
         resolver = DataSourceResolverService(
             adapters={
                 "newsapi": _StubAdapter(
@@ -353,12 +389,19 @@ class TestEngineWithResolver:
                 )
             },
             cache=_NullCache(),
-            event_publisher=InMemoryEventBus(),
+            event_publisher=bus,
         )
         engine.set_data_source_resolver(resolver)
         with pytest.raises(DataSourceRateLimitError) as exc_info:
             await _run_engine(engine, _make_metadata("newsapi"))
         assert exc_info.value.code == "EXCEPTION_412"
+        # R3-4 K2：失败事件与 FAILED 聚合根绑定（resolver 发布在先、engine except
+        # 分支 save 在后——与捕获的 execution.execution_id 比较方有判别力）
+        failed = [e for e in bus.published_events if isinstance(e, DataSourceFetchFailed)]
+        assert len(failed) == 1
+        saved = repo.save.call_args.args[0]
+        assert failed[0].execution_id == saved.execution_id
+        assert failed[0].aggregate_id == saved.execution_id
 
     @pytest.mark.asyncio
     async def test_partial_failure_injects_success_only(self) -> None:

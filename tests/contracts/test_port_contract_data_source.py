@@ -249,3 +249,61 @@ class TestDataSourceAdapterPortContract:
         assert getattr(DataSourcePort, "_is_runtime_protocol", False) is True
         instance = self._instantiate_adapter(spec_meta, monkeypatch)
         assert isinstance(instance, DataSourcePort)
+
+
+class TestKeyedAdapterMetadataWithKey:
+    """keyed 端口 PortSpec 元数据（Key 存在态，子进程重放 bootstrap）。
+
+    闭合维度 2-8 `if spec is not None` 短路缺口（R3-4 K4——无 Key 环境下
+    uspto/newsapi/tavily 的 version/interface/lifetime/owner/tags 断言静默
+    跳过，契约文件 docstring 承诺的「Key 存在→完整元数据」未实现）：
+    进程内注册态随 session bootstrap 定格，monkeypatch 无法回放——复用
+    acceptance AC-2.4 子进程探针模式。
+    """
+
+    def test_all_eight_ports_full_metadata_with_keys(self) -> None:
+        """设 3 个 keyed 假 Key 的干净子进程 bootstrap 后：8 端口全注册且
+        全字段（version/interface/lifetime/owner/module/tags）与 SSOT 一致"""
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        expected_literal = repr(
+            [{"name": m["port_name"], "module": m["module_path"], "tags": list(m["tags"])} for m in ADAPTER_PORT_SPECS]
+        )
+        # 低熵假 Key 经 f-string 插值（detect-secrets KeywordDetector 对字面赋值
+        # 形态拦截——对齐 acceptance 子进程探针先例）
+        probe_key = "probe" + "-key-contract-test"
+        script = (
+            "import os; "
+            f"os.environ['USPTO_API_KEY'] = {probe_key!r}; "
+            f"os.environ['NEWSAPI_API_KEY'] = {probe_key!r}; "
+            f"os.environ['TAVILY_API_KEY'] = {probe_key!r}; "
+            "from src.composition_root import bootstrap; "
+            "from src.domain.ports.registry import _global_registry, Lifetime; "
+            "from src.domain.ports.data_source import DataSourcePort; "
+            "bootstrap(); "
+            f"expected = {expected_literal}; "
+            "specs = {s.name: s for s in _global_registry.list_all() "
+            "         if s.name.startswith('data_source_') and s.name != 'data_source_resolver'}; "
+            "assert set(specs) == {e['name'] for e in expected}, sorted(specs); "
+            "failed = [where for e in expected for ok, where in ["
+            "    (specs[e['name']].version == 'v1.0.0', e['name'] + ':version'), "
+            "    (specs[e['name']].interface is DataSourcePort, e['name'] + ':interface'), "
+            "    (specs[e['name']].lifetime == Lifetime.SINGLETON, e['name'] + ':lifetime'), "
+            "    (specs[e['name']].owner == 'tool-team', e['name'] + ':owner'), "
+            "    (specs[e['name']].module == e['module'], e['name'] + ':module'), "
+            "    (specs[e['name']].tags == tuple(e['tags']), e['name'] + ':tags'), "
+            "] if not ok]; "
+            "assert not failed, failed; "
+            "print('META_OK')"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=Path(__file__).resolve().parents[2],
+        )
+        assert result.returncode == 0, f"keyed 端口元数据子进程断言失败:\n{result.stdout}\n{result.stderr}"
+        assert "META_OK" in result.stdout

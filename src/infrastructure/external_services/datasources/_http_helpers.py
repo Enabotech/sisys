@@ -134,6 +134,10 @@ def is_retryable_http_error(exception: BaseException) -> bool:
     """
     if isinstance(exception, httpx.TimeoutException):
         return True
+    # URL scheme 缺失/不支持：确定性配置错误（对齐 InvalidURL 101 口径，R3-4 K1）——
+    # UnsupportedProtocol ⊂ TransportError，排除分支必须位于 TransportError 检查之前
+    if isinstance(exception, httpx.UnsupportedProtocol):
+        return False
     if isinstance(exception, httpx.TransportError):
         return True
     if isinstance(exception, httpx.HTTPStatusError):
@@ -265,6 +269,16 @@ async def request_json_with_resilience(
         circuit_breaker.on_ignored()
         raise ConfigurationError(
             message=f"数据源 {source_name} API 地址配置非法（URL 格式错误）",
+            context={"source_name": source_name},
+            cause=e,
+        ) from e
+    except httpx.UnsupportedProtocol as e:
+        # URL 协议缺失（如 base_url 无 http:// scheme）：确定性配置错误（R3-4 K1——
+        # 修复前 ⊂ TransportError 被白名单重试 3 次且 on_failure 计熔断，配置漂移
+        # 可单独打 open 熔断器；对齐 InvalidURL 101 口径）
+        circuit_breaker.on_ignored()
+        raise ConfigurationError(
+            message=f"数据源 {source_name} API 地址协议非法（缺少 http/https scheme）",
             context={"source_name": source_name},
             cause=e,
         ) from e
