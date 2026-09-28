@@ -219,20 +219,24 @@ class TestCache:
 
     @pytest.mark.asyncio
     async def test_stale_entry_triggers_refetch(self) -> None:
+        """条目年龄过期触发重采（R3-P1-1 改写：双时间戳分离判别——
+        source_timestamp 取历史年份数据（2020 年），fetched_at 为 120s 前；
+        判定基准是条目年龄 fetched_at（非源端数据年龄），条目过期 → 重采）"""
         stub = _StubAdapter("world-bank")
         cache = _InMemoryCache()
         service, _ = _make_service(adapters={"world-bank": stub}, cache=cache)
         metadata = _make_metadata("world-bank", ttl_seconds=60)
-        # 预置过期缓存条目（fetched_at 120s 前 > ttl 60s）
-        stale = datetime.now(UTC) - timedelta(seconds=120)
+        # 预置过期条目：fetched_at 120s 前 > ttl 60s（条目过期）
+        # source_timestamp 为 2020 年年度数据（远旧于 ttl——修复前以 source_timestamp
+        # 判定时该场景与条目过期不可区分，本用例在新基准下语义唯一）
         key = build_data_source_cache_key("t-1", "world-bank", "GDP")
         await cache.set_with_ttl(
             key,
             json.dumps(
                 {
                     "payload": '{"old": true}',
-                    "source_timestamp": stale.isoformat(),
-                    "fetched_at": stale.isoformat(),
+                    "source_timestamp": datetime(2020, 1, 1, tzinfo=UTC).isoformat(),
+                    "fetched_at": (datetime.now(UTC) - timedelta(seconds=120)).isoformat(),
                     "confidence": 0.5,
                 }
             ),
@@ -241,6 +245,34 @@ class TestCache:
         result = await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
         assert result.cache_hit is False
         assert stub.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_old_source_data_with_fresh_entry_hits_cache(self) -> None:
+        """源端数据陈旧但条目新鲜 → 缓存命中（R3-P1-1 判别锚点：年度统计数据
+        source_timestamp 取数据年份 1 月 1 日，任何合法 ttl 下数据年龄恒超限——
+        修复前以 source_timestamp 判 stale，WorldBank/IMF 生产缓存永不命中、
+        每次穿透重采；修复后以条目年龄（fetched_at）判定 → 命中省配额）"""
+        stub = _StubAdapter("world-bank")
+        cache = _InMemoryCache()
+        service, _ = _make_service(adapters={"world-bank": stub}, cache=cache)
+        metadata = _make_metadata("world-bank", ttl_seconds=604800)
+        key = build_data_source_cache_key("t-1", "world-bank", "GDP")
+        await cache.set_with_ttl(
+            key,
+            json.dumps(
+                {
+                    "payload": '{"year": 2024}',
+                    "source_timestamp": datetime(2024, 1, 1, tzinfo=UTC).isoformat(),
+                    "fetched_at": datetime.now(UTC).isoformat(),
+                    "confidence": 0.9,
+                }
+            ),
+            604800,
+        )
+        result = await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
+        assert result.cache_hit is True
+        assert stub.call_count == 0  # 未打外部 API（配额保护生效）
+        assert result.freshness.score(datetime.now(UTC)) < 1.0  # 评分仍按数据年龄衰减
 
     @pytest.mark.asyncio
     async def test_tenant_isolation(self) -> None:
@@ -327,6 +359,34 @@ class TestFetchManyAndEvents:
         assert stub.call_count == 1
         fetched = [e for e in bus.published_events if isinstance(e, DataSourceFetched)]
         assert fetched[-1].cache_hit is True
+
+    @pytest.mark.asyncio
+    async def test_publish_failure_logs_warning_without_breaking_flow(self, caplog: pytest.LogCaptureFixture) -> None:
+        """publish 返回失败（is_success=False）→ warning 日志 + 主流程不受影响
+        （R3-P1-7 可观测性最小闭环：非 HTTP 上下文 outbox session 缺失时事件
+        静默丢弃是反模式——修复前 publish 返回值被完全忽略，零日志零痕迹）"""
+        from src.domain.events.publish_result import PublishResult
+
+        class _FailingPublisher:
+            """发布失败桩（模拟 reliable 通道 outbox 写入失败的 PublishResult）"""
+
+            async def publish(self, event: Any) -> PublishResult:
+                return PublishResult(event_id=str(event.event_id), results=())
+
+        stub = _StubAdapter("world-bank")
+        service = DataSourceResolverService(
+            adapters={"world-bank": stub},
+            cache=_InMemoryCache(),
+            event_publisher=_FailingPublisher(),
+        )
+        metadata = _make_metadata("world-bank")
+        with caplog.at_level("WARNING", logger="src.application.services.data_source_resolver"):
+            # 主流程不受发布失败影响：采集正常返回
+            result = await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-10")
+        assert result.source_name == "world-bank"
+        warnings = [r for r in caplog.records if "事件发布失败" in r.message]
+        assert len(warnings) == 1  # DataSourceFetched 发布失败 warning 恰好一条
+        assert "world-bank" in warnings[0].message
 
 
 # ===================================================================

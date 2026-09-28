@@ -162,7 +162,12 @@ Think 阶段必须先输出**五力 → 指标 → 数据源**映射计划，再
 2. **Think**：输出五力 → 指标 → 数据源映射（§5），声明各力采集目标
 3. **Code**：生成含 `$DATA_SOURCE` 标记的采集代码。**标记使用规范**：
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
-   - 每个声明源恰好一个标记；query 为自然语言指标描述（含行业/地域上下文）
+   - 每个声明源恰好一个标记；**query 必须为该源的规范格式**（统计类适配器将 query
+     作为机器码拼接 API URL，自然语言描述会确定性失败，R3-P1-2 契约对齐）：
+     - `newsapi`：检索关键词（自然语言关键词为**正确**格式，含行业/地域上下文）
+     - `world-bank`：World Bank 指标码（点分格式，如 `"NV.IND.MANF.CD"`=制造业增加值；
+       指标语义在 Think 阶段由 LLM 映射，勿凭空构造）
+     - `eurostat`：数据集代码（下划线格式，如 `"sbs_sc_sca_r2"`=结构企业统计）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
    - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
      每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
@@ -179,8 +184,8 @@ Think 阶段必须先输出**五力 → 指标 → 数据源**映射计划，再
 
 ```python
 industry_news = $DATA_SOURCE("newsapi", "动力电池 行业竞争 并购 价格战 新进入者 最新动态")
-macro_indicators = $DATA_SOURCE("world-bank", "中国 制造业增加值 固定资产投资 营商便利度指标")
-eu_industry_stats = $DATA_SOURCE("eurostat", "欧盟 制造业 结构企业统计 行业营业额与企业数")
+macro_indicators = $DATA_SOURCE("world-bank", "NV.IND.MANF.CD")  # 制造业增加值（现价美元）
+eu_industry_stats = $DATA_SOURCE("eurostat", "sbs_sc_sca_r2")    # 结构企业统计
 
 # 采集后通过注入的 DATA_SOURCES dict 读取
 news_payload = (DATA_SOURCES.get("newsapi") or {}).get("payload")

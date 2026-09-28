@@ -2812,7 +2812,7 @@ buckets/
 
 **执行语义（Engine.Execute 前置）：** Code 产物含 `$DATA_SOURCE(name, "query")` 标记 → 标记解析器提取（字符串字面量内文本不触发，tokenize 掩码）→ 白名单校验（`context.extensions["tool_metadata"]` 的 data_sources）→ `fetch_many` 并发采集（asyncio.gather 部分成功收敛）→ preamble 内联注入 → 沙箱执行 → `EvidencePackage.data_sources` 溯源元数据（source/freshness/confidence）。数据采集领域异常（207/201/410-413）不包装直传，区别于 `ToolExecutionFailedError`。
 
-**新鲜度模型：** `DataFreshness.score(at) = 0.5^(age/half_life)` 指数衰减（默认半衰期 7 天，适配年度统计数据）；`is_stale(at)`（age > ttl_seconds）触发重采；缓存故障降级透传不阻断主流程。
+**新鲜度模型：** `DataFreshness.score(at) = 0.5^(age/half_life)` 指数衰减（默认半衰期 7 天，适配年度统计数据）；缓存过期以「条目年龄」判定（`fetched_at` 距今 > ttl_seconds，R3-P1-1 修复——原以源端 `source_timestamp` 判定，年度数据结构性恒 stale 导致缓存永不命中；`source_timestamp` 仅用于 score() 衰减评分）；缓存故障降级透传不阻断主流程。
 
 **Story 4.1c 集成说明（✅ 已实现 2026-09-26）：** 6 个外部数据型 Skills（pestel-analysis 6 源 / porters-five-forces 3 源 / appeals-analysis 3 源 / competitor-analysis 4 源 / scenario-planning 3 源 / disruptive-innovation 2 源）完成数据采集集成：① SKILL.md frontmatter 填充 `data_sources` 白名单 + `input_schema`/`output_schema`（JSON Schema dict，运行时 Pydantic 强制校验属 Story 4.3）；② 生产链路双入口接线——`StrategicAnalysisUseCase` 与 `RunToolChainUseCase` 均由 `load_metadata`(L1) 改为 `load_sop`(L2) 并将 `ToolMetadata` 注入 `extensions["tool_metadata"]`（load_sop 失败容错不阻断，extensions 缺键时含标记按 4.1b 语义抛 207 安全失败）；③ 每个 Skill 补齐 `references/`（三角化规范/评分锚点/工作坊引导）与 `templates/`（采集问卷/矩阵模板）；④ 质量验证——声明 ≥3 源的 5 个 Skill 全声明源并发覆盖三角化，disruptive-innovation 双源交叉验证（决策 D4）。
 

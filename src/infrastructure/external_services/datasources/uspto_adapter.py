@@ -1,7 +1,9 @@
 """基础设施层 USPTO 数据源适配器（Story 4.1b）
 
-USPTO PatentsView API（专利数据库，公开免费）：
+USPTO PatentsView API（专利数据库，v1 端点强制 API Key 鉴权）：
 - 端点：POST {base}/api/v1/patent/（JSON 查询体）
+- 鉴权：X-Api-Key 请求头（env USPTO_API_KEY；v0 旧端点「公开免费」结论已过期，
+  R3-P1-3 修正——无 Key 时组合根不注册本适配器）
 - 响应：{"patents": [{patent_id, patent_title, patent_date, ...}]}
 
 实现 DataSourcePort。容错：tenacity + CircuitBreaker（5 次/30s 默认档）。
@@ -84,6 +86,9 @@ class USPTOAdapter:
             "f": ["patent_id", "patent_title", "patent_date", "assignees"],
             "o": {"size": int(params_dict.get("page_size", "10"))},
         }
+        # X-Api-Key 鉴权头（R3-P1-3）：bool() 真值判定（空串=未配置，与组合根
+        # 条件注册口径一致，防 USPTO_API_KEY="" 时注册但裸发请求产生批量 401）
+        headers: dict[str, str] | None = {"X-Api-Key": self._config.api_key} if self._config.api_key else None
         data = await request_json_with_resilience(
             self._client,
             "POST",
@@ -91,6 +96,7 @@ class USPTOAdapter:
             source_name="uspto",
             circuit_breaker=self._circuit_breaker,
             json_body=body,
+            headers=headers,
             max_attempts=self._retry_max_attempts,
             min_wait=self._retry_min_wait,
             max_wait=self._retry_max_wait,
@@ -109,6 +115,7 @@ class USPTOAdapter:
     async def health_check(self) -> bool:
         """探活（最小专利查询）"""
         try:
+            headers: dict[str, str] | None = {"X-Api-Key": self._config.api_key} if self._config.api_key else None
             await request_json_with_resilience(
                 self._client,
                 "POST",
@@ -116,6 +123,7 @@ class USPTOAdapter:
                 source_name="uspto",
                 circuit_breaker=self._circuit_breaker,
                 json_body={"q": {"patent_id": "10000001"}, "f": ["patent_id"], "o": {"size": 1}},
+                headers=headers,
                 max_attempts=1,
             )
             return True

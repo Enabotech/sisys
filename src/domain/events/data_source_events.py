@@ -15,7 +15,7 @@ aggregate_id = execution_id，aggregate_type = "ToolExecution"。
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from src.domain.events.base import DomainEvent
 
@@ -58,20 +58,17 @@ class DataSourceFetched(DomainEvent):
         由 service 层在发布前调用本方法显式绑定到当前 execution_id，
         避免 Resolver 内部使用 object.__setattr__ 绕过 frozen。
 
+        使用 dataclasses.replace（R3-P1-4 修复）：基类全部字段（event_id/
+        timestamp/correlation_id/causation_id/metadata/version/source/
+        schema_version/payload）原样保留——手工逐字段重建会令其回落默认值，
+        追踪链静默断裂（event_id 重新生成、timestamp 漂移为 rebind 时刻）；
+        event_type 为 init=False 字段不参与 replace（走类默认值，安全）。
+
         Returns:
-            新的 DataSourceFetched 实例，execution_id/aggregate_id 已绑定
+            新的 DataSourceFetched 实例，execution_id/aggregate_id 已绑定，
+            其余字段与原实例逐字段相等
         """
-        return DataSourceFetched(
-            execution_id=execution_id,
-            aggregate_id=execution_id,
-            aggregate_type=self.aggregate_type,
-            source_name=self.source_name,
-            query=self.query,
-            freshness_score=self.freshness_score,
-            confidence=self.confidence,
-            cache_hit=self.cache_hit,
-            latency_ms=self.latency_ms,
-        )
+        return replace(self, execution_id=execution_id, aggregate_id=execution_id)
 
 
 @dataclass(frozen=True)
@@ -104,17 +101,10 @@ class DataSourceFetchFailed(DomainEvent):
     def with_execution_id(self, execution_id: uuid.UUID) -> "DataSourceFetchFailed":
         """绑定 execution_id（返回新实例，保留 frozen immutability 语义）。
 
-        详见 DataSourceFetched.with_execution_id 文档。
+        详见 DataSourceFetched.with_execution_id 文档（dataclasses.replace
+        保留基类全部字段，R3-P1-4 修复）。
         """
-        return DataSourceFetchFailed(
-            execution_id=execution_id,
-            aggregate_id=execution_id,
-            aggregate_type=self.aggregate_type,
-            source_name=self.source_name,
-            query=self.query,
-            error_code=self.error_code,
-            error_message=self.error_message,
-        )
+        return replace(self, execution_id=execution_id, aggregate_id=execution_id)
 
 
 __all__ = ["DataSourceFetched", "DataSourceFetchFailed"]

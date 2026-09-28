@@ -2401,21 +2401,26 @@ def bootstrap() -> None:
 
     # === Story 4.1b — Skills 数据采集基础设施：数据源适配器端口（B 组）===
     from src.infrastructure.config.ipcc import IPCCConfig
-    from src.infrastructure.config.uspto import USPTOConfig
 
-    register_port(
-        name="data_source_uspto",
-        version="v1.0.0",
-        interface=DataSourcePort,
-        impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.datasources.uspto_adapter",
-            fromlist=["USPTOAdapter"],
-        ).USPTOAdapter(config=USPTOConfig.from_env()),
-        module="src.infrastructure.external_services.datasources.uspto_adapter",
-        lifetime=Lifetime.SINGLETON,
-        owner="tool-team",
-        tags=("data-source", "uspto", "patent"),
-    )
+    # USPTO 条件注册（R3-P1-3）：PatentsView v1 端点强制 X-Api-Key，无 Key 时注册
+    # 只会必然 403——条件注册使配置缺失显式化（对齐下方 newsapi/tavily 模式）
+    uspto_enabled = bool(os.getenv("USPTO_API_KEY"))
+    if uspto_enabled:
+        from src.infrastructure.config.uspto import USPTOConfig
+
+        register_port(
+            name="data_source_uspto",
+            version="v1.0.0",
+            interface=DataSourcePort,
+            impl=lambda resolver: __import__(
+                "src.infrastructure.external_services.datasources.uspto_adapter",
+                fromlist=["USPTOAdapter"],
+            ).USPTOAdapter(config=USPTOConfig.from_env()),
+            module="src.infrastructure.external_services.datasources.uspto_adapter",
+            lifetime=Lifetime.SINGLETON,
+            owner="tool-team",
+            tags=("data-source", "uspto", "patent"),
+        )
 
     register_port(
         name="data_source_ipcc",
@@ -2493,7 +2498,7 @@ def bootstrap() -> None:
     )
 
     # 数据源解析编排服务（R2 组合注入：聚合 data_source_* 适配器 + L1 缓存 + 事件发布）
-    # Key 缺失的适配器（newsapi/tavily）未注册 → resolve_optional 返回 None → 映射中不含（优雅降级）
+    # Key 缺失的适配器（uspto/newsapi/tavily）未注册 → resolve_optional 返回 None → 映射中不含（优雅降级）
     from src.application.ports.data_source_resolver import DataSourceResolverPort
 
     def _build_data_source_adapters(resolver: Any) -> dict[str, Any]:

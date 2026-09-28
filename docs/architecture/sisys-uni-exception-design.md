@@ -719,7 +719,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_410 | DataSourceError | ExternalException | 502 |（Story 4.1b，数据源通用错误基类）|
 | EXCEPTION_411 | DataSourceUnavailableError | DataSourceError | 503 |（Story 4.1b，数据源 5xx/连接失败/熔断断开，重试耗尽后）|
 | EXCEPTION_412 | DataSourceRateLimitError | DataSourceError | 429 |（Story 4.1b，数据源 429 限流）|
-| EXCEPTION_413 | DataSourceResponseError | DataSourceError | 502 |（Story 4.1b，响应解析失败/required_fields 缺失，不可重试）|
+| EXCEPTION_413 | DataSourceResponseError | DataSourceError | 502 |（Story 4.1b，响应解析失败/结构不符，不可重试）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——
@@ -989,10 +989,14 @@ def with_error_mapping(
 | HTTP 3xx | DataSourceResponseError | 413 | ✗ | ✗ | 端点迁移 / 配置漂移（确定性错误；location 仅入 context 经 to_dict 脱敏，禁入 message——R2-2-B7 修复，禁止开启 follow_redirects 防跨域转发泄露 header 内 Key） |
 | HTTP 其他 4xx | DataSourceResponseError | 413 | ✗ | ✗ | 客户端确定性错误（400/404/422 等） |
 | HTTP 5xx（重试耗尽） | DataSourceUnavailableError | 411 | ✓ | ✓ | 服务端瞬时故障（500/502/503/504） |
-| `httpx.TimeoutException` | TimeoutError | 302 | ✓ | ✓ | 网络抖动超时（与全项目 embedding/llm 共用） |
-| `httpx.TransportError` | DataSourceUnavailableError | 411 | ✓ | ✓ | DNS 失败 / 连接拒绝 / TLS 握手失败 |
+| `httpx.TimeoutException` | TimeoutError | 302 | ✓ | ✓ | 网络抖动超时（与全项目 embedding/llm 共用；TimeoutException 是 TransportError 子类，except 顺序硬约束在最前） |
+| `httpx.DecodingError` | DataSourceResponseError | 413 | ✗ | ✗ | 响应体解码失败（截断 gzip/不支持的 content-encoding）——确定性错误（R3-P1-6 修复：原穿透为原始异常 500 兜底） |
+| `httpx.InvalidURL` | ConfigurationError | 101 | ✗ | ✗ | API 地址配置畸形（env/配置类 URL 格式错误）——确定性配置错误（R3-P1-6 修复） |
+| `httpx.RequestError`（其余传输类） | DataSourceUnavailableError | 411 | ✓ | ✓ | DNS 失败 / 连接拒绝 / TLS 握手失败 / TooManyRedirects 等（R3-P1-6：TransportError 放宽为 RequestError，闭合 DecodingError 等非传输子类穿透缺口——DecodingError/InvalidURL 已前置分流） |
 | JSON 解析失败 | DataSourceResponseError | 413 | ✗ | ✗ | 响应 schema 不符（不计入熔断统计） |
 | `CircuitBreakerOpenError` | DataSourceUnavailableError | 411 | — | — | 熔断器已断开（fast-fail，避免重试浪费配额） |
+
+> **熔断器探测槽位语义（R3-P0-1 修复）：** 全部确定性错误路径（429/401/403/3xx/4xx/DecodingError/InvalidURL/JSON 解析失败）经 `on_ignored()` 释放半开探测槽位（不计熔断统计）；熔断器 `before_call()` 半开分支带超时再武装（探测回调缺失时经 recovery_timeout 自愈，杜绝半开拒绝态永久楔死）。
 
 **差异化熔断配置**（Story 4.1b AC-2）：WorldBank/Eurostat/USPTO 默认 `5/30s`；NewsAPI 早断开 `2/600s`（免费配额敏感）；IPCC 立即熔断 `2/120s`（大文件传输代价高）；ChinaNBS 放宽 `10/120s`（爬虫失败率天然高）。
 

@@ -10,6 +10,16 @@
   Open ──(等待 recovery_timeout)──→ Half-Open
   Half-Open ──(探测成功 ≥ success_threshold)──→ Closed
   Half-Open ──(探测失败)──→ Open
+  Half-Open ──(探测超时 recovery_timeout 未完成)──→ 重新放行探测（再武装）
+  Half-Open ──(on_ignored 释放探测槽)──→ 允许新探测（不推进状态机）
+
+半开探测槽位语义（防楔死，R3-P0-1 修复）：
+- 探测请求以确定性错误结束（拿到 HTTP 响应但不计入熔断统计）时，
+  调用方应调用 on_ignored() 释放探测槽位——对齐 resilience4j
+  ignored exceptions（不推进统计但释放 permits）；
+- 任何原因导致探测回调缺失（既无 on_success/on_failure 也无
+  on_ignored）时，before_call() 在超过 recovery_timeout 后重新
+  放行探测（再武装兜底），熔断器不会永久停留在半开拒绝态。
 
 线程安全：使用 threading.Lock 保护所有状态变更。
 """
@@ -83,6 +93,7 @@ class CircuitBreaker:
         self._failure_count = 0
         self._last_failure_time = 0.0
         self._half_open_calls = 0
+        self._half_open_probe_start = 0.0
         self._lock = threading.Lock()
 
     @property
@@ -112,16 +123,28 @@ class CircuitBreaker:
         self._state = CircuitState.OPEN
         self._failure_count = 0
         self._half_open_calls = 0
+        self._half_open_probe_start = 0.0
         logger.warning(
             "熔断器 [%s] 已断开 (Open)，将在 %.0fs 后尝试半开探测",
             self._name,
             self._recovery_timeout,
         )
 
+    def _admit_probe(self) -> None:
+        """放行一个半开探测请求（0→1 或再武装后重新计数时调用）
+
+        统一刷新 _half_open_probe_start（R3-P0-1 修复）：再武装判定基准是
+        「本探测代际的放行时刻」——若不刷新，首个窗口过期后每次 before_call
+        都满足再武装条件，half_open_max_calls 并发上限被完全击穿。
+        """
+        self._half_open_calls += 1
+        self._half_open_probe_start = self._now()
+
     def _transition_to_half_open(self) -> None:
         """Open → Half-Open"""
         self._state = CircuitState.HALF_OPEN
         self._half_open_calls = 0
+        self._half_open_probe_start = 0.0
         logger.info("熔断器 [%s] 进入半开状态 (Half-Open)，允许探测请求", self._name)
 
     def _transition_to_closed(self) -> None:
@@ -144,8 +167,8 @@ class CircuitBreaker:
             if self._state == CircuitState.OPEN:
                 if self._should_half_open():
                     self._transition_to_half_open()
-                    # 转为半开时消耗一个探测配额
-                    self._half_open_calls = 1
+                    # 转为半开时消耗一个探测配额（_admit_probe 刷新探测起点）
+                    self._admit_probe()
                     return  # 允许当前请求通过作为探测
                 raise CircuitBreakerOpenError(
                     f"熔断器 [{self._name}] 已断开",
@@ -155,7 +178,14 @@ class CircuitBreaker:
             # Half-Open 状态：限制并发探测数
             if self._state == CircuitState.HALF_OPEN:
                 if self._half_open_calls < self._half_open_max_calls:
-                    self._half_open_calls += 1
+                    self._admit_probe()
+                    return
+                # 再武装兜底（R3-P0-1）：探测请求经 recovery_timeout 仍未完成
+                # （回调缺失——既无 on_success/on_failure 也无 on_ignored）时，
+                # 重新放行探测，防止半开拒绝态永久楔死
+                if self._now() - self._half_open_probe_start >= self._recovery_timeout:
+                    self._half_open_calls = 0
+                    self._admit_probe()
                     return
                 raise CircuitBreakerOpenError(
                     f"熔断器 [{self._name}] 半开状态，探测请求已达上限",
@@ -169,6 +199,24 @@ class CircuitBreaker:
                 self._transition_to_closed()
             elif self._state == CircuitState.CLOSED:
                 self._failure_count = 0  # 连续失败计数清零
+
+    def on_ignored(self) -> None:
+        """调用以"确定性错误"结束时记录（不推进熔断统计，仅释放半开探测槽位）
+
+        适用场景：请求已收到确定性响应（HTTP 429/4xx/3xx、JSON 解析失败、
+        URL 配置错误等）——服务可连通，不属于熔断器要保护的瞬时故障，
+        不计入失败统计；但半开状态下该探测槽位已消耗，必须释放，
+        否则探测槽位耗尽后熔断器楔死在半开拒绝态（R3-P0-1）。
+        对齐 resilience4j ignored exceptions 语义：不推进统计但释放 permits。
+
+        状态语义：
+        - CLOSED：无操作（不重置失败计数——确定性错误与可用性无关）
+        - HALF_OPEN：释放一个探测槽位（后续请求可作为新探测放行）
+        - OPEN：无操作（槽位计数恒为 0）
+        """
+        with self._lock:
+            if self._state == CircuitState.HALF_OPEN:
+                self._half_open_calls = max(0, self._half_open_calls - 1)
 
     def on_failure(self) -> None:
         """调用外部服务失败时记录"""
@@ -192,6 +240,7 @@ class CircuitBreaker:
             self._failure_count = 0
             self._last_failure_time = 0.0
             self._half_open_calls = 0
+            self._half_open_probe_start = 0.0
             logger.info("熔断器 [%s] 已手动重置为 Closed", self._name)
 
     def __repr__(self) -> str:

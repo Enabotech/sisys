@@ -180,6 +180,21 @@ class TestDataFreshness:
         with pytest.raises(EntityValidationError):
             DataFreshness(source_timestamp=_now(), ttl_seconds=60, half_life_seconds=0)
 
+    def test_naive_source_timestamp_rejected(self) -> None:
+        """naive source_timestamp 构造拒绝（R3-P1-5：tz-awareness 门禁——naive 输入
+        在 score()/is_stale() 与 aware 时刻混算抛原生 TypeError，必须构造侧拦截）"""
+        with pytest.raises(EntityValidationError, match="tz-aware"):
+            DataFreshness(source_timestamp=datetime(2024, 1, 1), ttl_seconds=60)
+
+    def test_naive_at_rejected_by_score_and_is_stale(self) -> None:
+        """naive 评估时刻 at 在 score()/is_stale() 入口拒绝（调用侧闭环——
+        抛 EntityValidationError 而非原生 TypeError 逃逸领域契约）"""
+        f = DataFreshness(source_timestamp=_now(), ttl_seconds=60)
+        with pytest.raises(EntityValidationError, match="tz-aware"):
+            f.score(datetime(2025, 1, 1))
+        with pytest.raises(EntityValidationError, match="tz-aware"):
+            f.is_stale(datetime(2025, 1, 1))
+
 
 # ===================================================================
 # DataSourceResult
@@ -207,6 +222,28 @@ class TestDataSourceResult:
         r = _make_result()
         assert r.cache_hit is False
         assert r.confidence == 0.9
+
+    def test_naive_timestamps_rejected(self) -> None:
+        """naive source_timestamp / fetched_at 构造拒绝（R3-P1-5，同 DataFreshness）"""
+        aware_ts = _now()
+        with pytest.raises(EntityValidationError, match="tz-aware"):
+            DataSourceResult(
+                source_name="world-bank",
+                payload='{"v": 1}',
+                source_timestamp=datetime(2024, 1, 1),  # naive
+                fetched_at=aware_ts,
+                freshness=DataFreshness(source_timestamp=aware_ts, ttl_seconds=60),
+                confidence=0.9,
+            )
+        with pytest.raises(EntityValidationError, match="tz-aware"):
+            DataSourceResult(
+                source_name="world-bank",
+                payload='{"v": 1}',
+                source_timestamp=aware_ts,
+                fetched_at=datetime(2024, 1, 1),  # naive
+                freshness=DataFreshness(source_timestamp=aware_ts, ttl_seconds=60),
+                confidence=0.9,
+            )
 
     def test_empty_payload_raises(self) -> None:
         with pytest.raises(EntityValidationError):

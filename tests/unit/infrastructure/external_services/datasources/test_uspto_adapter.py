@@ -1,7 +1,8 @@
 """Story 4.1b — USPTOAdapter 单元测试
 
-验证 USPTO 数据源适配器（REST_JSON，专利数据库，公开免费）：
+验证 USPTO 数据源适配器（REST_JSON，专利数据库，PatentsView v1 强制 X-Api-Key）：
 - 成功采集（POST /api/v1/patent/，PatentsView 结构解析）
+- X-Api-Key 鉴权头（R3-P1-3：配置 api_key 时携带；空/None 不携带）
 - 5xx → 411 / 超时 → 302 / 429 → 412 / 解析失败 → 413（不重试）/ 熔断 → 411
 
 测试模式：httpx.MockTransport 注入。
@@ -10,6 +11,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 import httpx
@@ -28,8 +30,8 @@ from src.infrastructure.external_services.datasources.uspto_adapter import USPTO
 _API_URL = "https://search.patentsview.org"
 
 
-def _make_adapter(handler: httpx.MockTransport | None = None) -> USPTOAdapter:
-    config = USPTOConfig(api_url=_API_URL, timeout=5.0)
+def _make_adapter(handler: httpx.MockTransport | None = None, api_key: str | None = None) -> USPTOAdapter:
+    config = USPTOConfig(api_url=_API_URL, timeout=5.0, api_key=api_key)
     transport = handler or httpx.MockTransport(lambda req: httpx.Response(200, json={"patents": []}))
     return USPTOAdapter(
         config=config,
@@ -44,6 +46,48 @@ def _ok_handler(request: httpx.Request) -> httpx.Response:
         200,
         json={"patents": [{"patent_id": "10000001", "patent_title": "Battery Tech", "patent_date": "2025-06-01"}]},
     )
+
+
+class TestUSPTOApiKeyAuth:
+    """X-Api-Key 鉴权头（R3-P1-3：PatentsView v1 端点强制鉴权）"""
+
+    @pytest.mark.asyncio
+    async def test_api_key_sent_in_header_when_configured(self) -> None:
+        """配置 api_key 时请求携带 X-Api-Key 头（bool 真值判定）"""
+        captured: list[httpx.Request] = []
+
+        def capture_handler(request: httpx.Request) -> httpx.Response:
+            captured.append(request)
+            return httpx.Response(200, json={"patents": []})
+
+        adapter = _make_adapter(httpx.MockTransport(capture_handler), api_key="test-key-123")
+        await adapter.fetch(DataSourceQuery(source_name="uspto", query="battery"))
+        assert captured[0].headers.get("X-Api-Key") == "test-key-123"
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_empty_api_key_omits_header(self) -> None:
+        """api_key 为空串/None 时不发送鉴权头（空串=未配置，与组合根 bool() 口径一致——
+        防止 USPTO_API_KEY="" 时裸发空 Key 产生批量 401）"""
+
+        def make_capture_handler(store: list[httpx.Request]) -> Callable[[httpx.Request], httpx.Response]:
+            def handler(request: httpx.Request) -> httpx.Response:
+                store.append(request)
+                return httpx.Response(200, json={"patents": []})
+
+            return handler
+
+        for empty_key in ("", None):
+            captured: list[httpx.Request] = []
+            adapter = _make_adapter(httpx.MockTransport(make_capture_handler(captured)), api_key=empty_key)
+            await adapter.fetch(DataSourceQuery(source_name="uspto", query="battery"))
+            assert "X-Api-Key" not in captured[0].headers
+            await adapter.close()
+
+    def test_config_repr_redacts_api_key(self) -> None:
+        """USPTOConfig __repr__ 不泄露 api_key（硬约束：配置类脱敏，对齐 newsapi/tavily）"""
+        config = USPTOConfig(api_key="sk-super-secret-999")
+        assert "sk-super-secret-999" not in repr(config)
 
 
 class TestUSPTOAdapterSuccess:

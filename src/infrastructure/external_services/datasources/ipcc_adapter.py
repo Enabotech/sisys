@@ -127,6 +127,7 @@ class IPCCAdapter:
         )
 
         from src.domain.exceptions import (
+            ConfigurationError,
             DataSourceRateLimitError,
             DataSourceUnavailableError,
             TimeoutError,
@@ -209,14 +210,40 @@ class IPCCAdapter:
                     # 缺省 utf-8（行为收窄：不再走 charset_normalizer 内容探测——
                     # IPCC CSV 实际均为 utf-8/ascii，可接受）
                     text = b"".join(chunks).decode(resp.charset_encoding or "utf-8", errors="replace")
+        except (DataSourceRateLimitError, DataSourceResponseError):
+            # 确定性错误路径单点收敛（R3-P0-1）：429/3xx/4xx/HTML 错误页/超限/
+            # charset 解码路径在 with attempt 块内已转换的领域异常在此统一释放
+            # 半开探测槽位（请求已收到确定性结果，不计熔断统计）。
+            # 本函数 on_ignored 调用点之一（其余：下方 DecodingError/InvalidURL 分支）
+            self._circuit_breaker.on_ignored()
+            raise
         except httpx.TimeoutException as e:
+            # TimeoutException 是 TransportError 子类——本分支必须在前（顺序硬约束）
             self._circuit_breaker.on_failure()
             raise TimeoutError(
                 message="数据源 ipcc 请求超时",
                 context={"source_name": "ipcc"},
                 cause=e,
             ) from e
-        except httpx.TransportError as e:
+        except httpx.DecodingError as e:
+            # 响应体解码失败：确定性错误，不计熔断仅释放探测槽位（R3-P1-6 + R3-P0-1）
+            self._circuit_breaker.on_ignored()
+            raise DataSourceResponseError(
+                message="数据源 ipcc 响应体解码失败（内容编码异常）",
+                context={"source_name": "ipcc"},
+                cause=e,
+            ) from e
+        except httpx.InvalidURL as e:
+            # URL 配置畸形：确定性配置错误，不计熔断统计（R3-P1-6）
+            self._circuit_breaker.on_ignored()
+            raise ConfigurationError(
+                message="数据源 ipcc API 地址配置非法（URL 格式错误）",
+                context={"source_name": "ipcc"},
+                cause=e,
+            ) from e
+        except httpx.RequestError as e:
+            # 其余传输类故障（TransportError 子类/TooManyRedirects 等）：
+            # 瞬时故障计熔断（R3-P1-6：TransportError 放宽为 RequestError）
             self._circuit_breaker.on_failure()
             raise DataSourceUnavailableError(
                 message="数据源 ipcc 连接失败（重试耗尽）",

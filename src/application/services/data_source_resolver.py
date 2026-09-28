@@ -278,9 +278,17 @@ class DataSourceResolverService:
             fetched_at = _as_aware_utc(datetime.fromisoformat(entry["fetched_at"]))
             payload = entry["payload"]
             confidence = float(entry.get("confidence", 0.5))
+            # 缓存过期以「条目年龄」（fetched_at 距今 > ttl）判定（R3-P1-1 修复：
+            # 原以 source_timestamp〔源端数据时间〕判定——WorldBank/IMF 年度数据
+            # source_timestamp 取数据年份 1 月 1 日，任何合法 ttl 下恒 stale →
+            # 缓存结构性永不命中，AC-3 配额保护落空；对齐 HTTP 缓存 Age /
+            # expireAfterWrite 语义：缓存条目过期 = 写入后经过的时间）。
+            # 与 Redis set_with_ttl 双口径非冗余：白名单 ttl 收紧时（R2-2-B8 权威），
+            # Redis 旧 ttl 条目仍存活，本判定是收紧生效的唯一通道；source_timestamp
+            # 保留给 DataFreshness.score() 衰减评分（其唯一正确用途）
+            if (datetime.now(UTC) - fetched_at).total_seconds() > ref.ttl_seconds:
+                return None  # 条目过期 → 触发重采
             freshness = DataFreshness(source_timestamp=source_ts, ttl_seconds=ref.ttl_seconds)
-            if freshness.is_stale(datetime.now(UTC)):
-                return None  # stale → 触发重采
             return DataSourceResult(
                 source_name=ref.name,
                 payload=payload,
@@ -337,7 +345,19 @@ class DataSourceResolverService:
         )
         if execution_id is not None:
             event = event.with_execution_id(execution_id)
-        await self._event_publisher.publish(event)
+        # 发布可观测性（R3-P1-7 最小闭环）：publish 端口契约「错误内部消化返回
+        # PublishResult(False)」——非 HTTP 上下文（CLI/LangGraph/Prefect）无请求
+        # session 时 reliable 通道 outbox 写入失败即静默丢弃；此处检查返回值记
+        # warning（仅日志，不改变控制流——发布失败不得影响采集主流程）。
+        # outbox 独立 session scope 的结构性修复 defer Story 4.7（事件基础设施域）
+        publish_result = await self._event_publisher.publish(event)
+        if not publish_result.is_success:
+            logger.warning(
+                "DataSourceFetched 事件发布失败（source_name=%s, event_id=%s, 首个失败通道: %s）",
+                event.source_name,
+                event.event_id,
+                publish_result.partial_error,
+            )
 
     async def _publish_failed(
         self,
@@ -366,7 +386,17 @@ class DataSourceResolverService:
         )
         if execution_id is not None:
             event = event.with_execution_id(execution_id)
-        await self._event_publisher.publish(event)
+        # 发布可观测性（R3-P1-7 最小闭环，语义同 _publish_fetched；error_code
+        # 记录领域异常编码便于按码聚合检索）
+        publish_result = await self._event_publisher.publish(event)
+        if not publish_result.is_success:
+            logger.warning(
+                "DataSourceFetchFailed 事件发布失败（source_name=%s, error_code=%s, event_id=%s, 首个失败通道: %s）",
+                event.source_name,
+                event.error_code,
+                event.event_id,
+                publish_result.partial_error,
+            )
 
 
 __all__ = ["DataSourceResolverService", "build_data_source_cache_key"]

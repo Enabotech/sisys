@@ -161,7 +161,10 @@ Think 阶段必须先输出**对标维度 → 关键指标 → 数据源**映射
 2. **Think**：输出对标维度 → 指标 → 数据源映射（§5），声明各维度采集目标
 3. **Code**：生成含 `$DATA_SOURCE` 标记的采集代码。**标记使用规范**：
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
-   - 每个声明源恰好一个标记；query 为自然语言指标描述（含行业/竞品名/时间上下文）
+   - 每个声明源恰好一个标记；**query 必须为该源的规范格式**（R3-P1-2 契约对齐）：
+     - `newsapi` / `tavily`：检索关键词（自然语言关键词为**正确**格式，含行业/竞品名/时间上下文）
+     - `uspto`：**英文**检索关键词（匹配 patent_title 全文，如 `"electric vehicle battery"`）
+     - `china-nbs`：站点相对路径（如 `"sj/zxfb"`=数据发布；非自然语言描述）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
    - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
      每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
@@ -178,9 +181,9 @@ Think 阶段必须先输出**对标维度 → 关键指标 → 数据源**映射
 
 ```python
 news = $DATA_SOURCE("newsapi", "新能源汽车 比亚迪 特斯拉 战略动态 市场份额 最新报道")
-patents = $DATA_SOURCE("uspto", "BYD Tesla 电动汽车 电池技术 专利申请趋势")
+patents = $DATA_SOURCE("uspto", "electric vehicle battery")  # 英文关键词匹配 patent_title
 web_intel = $DATA_SOURCE("tavily", "比亚迪 特斯拉 产品组合 定价策略 竞品分析")
-cn_stats = $DATA_SOURCE("china-nbs", "中国新能源汽车 行业产销量 企业市场份额统计")
+cn_stats = $DATA_SOURCE("china-nbs", "sj/zxfb")              # 国家局数据发布
 
 # 采集后通过注入的 DATA_SOURCES dict 读取
 uspto_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
@@ -191,7 +194,7 @@ uspto_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
 | 异常 | 语义 | LLM 应对话术 |
 |------|------|-------------|
 | 411 数据源不可用 | 5xx/连接失败/熔断 | 「数据源 X 暂不可用，本次对标基于其余 N-1 个来源完成，该维度结论置信度下调并标注」 |
-| 411 未注册（Key 缺失） | newsapi/tavily 未配置 API Key，冷启动未注册 | 「数据源 X 因 API Key 未配置未注册，相应维度基于其余来源完成，**输出中显式标注数据缺口**：竞品舆情/Web 情报维度缺失实时印证」 |
+| 411 未注册（Key 缺失） | newsapi/tavily/uspto 未配置 API Key，冷启动未注册（uspto 自 R3 起条件注册） | 「数据源 X 因 API Key 未配置未注册，相应维度基于其余来源完成，**输出中显式标注数据缺口**：竞品舆情/Web 情报/专利维度缺失实时印证」 |
 | 412 限流 | 429 配额耗尽 | 「数据源 X 触发限流，使用缓存快照（freshness_score 已折算）并标注数据时效」 |
 | 413 解析失败 | 响应格式异常（不可重试） | 「数据源 X 响应解析失败，跳过该源并在 sources 字段中剔除，禁止编造观测值」 |
 | 207 白名单违规 | 标记引用未声明数据源 | 不发生（本 SOP 标记严格使用白名单内 4 源）；若出现说明代码生成偏离 SOP，重新按 §6 生成 |

@@ -54,7 +54,7 @@ class DataSourceRateLimitError(DataSourceError):
 
 
 class DataSourceResponseError(DataSourceError):
-    """数据源响应解析失败（非法 JSON/required_fields 缺失/schema 不符，不可重试）
+    """数据源响应解析失败（非法 JSON/响应结构不符/message 错误形态，不可重试）
 
     Attributes:
         code: 错误码 EXCEPTION_413

@@ -64,26 +64,30 @@ FORBIDDEN_IMPORTS = {
     "tenacity",  # 重试库仅允许在 infrastructure 适配器层
 }
 
-# 8 个适配器端口 + resolver 端口注册清单
+# 无条件注册的适配器端口清单（免 Key 统计类）
 ADAPTER_PORT_NAMES = (
     "data_source_worldbank",
     "data_source_imf",
     "data_source_eurostat",
-    "data_source_uspto",
     "data_source_ipcc",
     "data_source_china_nbs",
 )
 
-# 需 API Key 的适配器（条件注册，Key 缺失时不注册——冷启动容错设计）
-KEYED_ADAPTER_PORT_NAMES = ("data_source_newsapi", "data_source_tavily")
+# 需 API Key 的适配器（条件注册，Key 缺失时不注册——冷启动容错设计；
+# uspto 自 R3-P1-3 起条件注册：PatentsView v1 端点强制 X-Api-Key 鉴权）
+KEYED_ADAPTER_PORT_NAMES = ("data_source_uspto", "data_source_newsapi", "data_source_tavily")
 
-ADAPTER_IMPL_CLASSES = {
-    "data_source_worldbank": "WorldBankAdapter",
-    "data_source_imf": "IMFAdapter",
-    "data_source_eurostat": "EurostatAdapter",
-    "data_source_uspto": "USPTOAdapter",
-    "data_source_ipcc": "IPCCAdapter",
-    "data_source_china_nbs": "ChinaNBSAdapter",
+# 端口 → (适配器模块名, 实现类名) 静态映射（条件注册端口无 Key 时不注册——
+# 实现类合规校验不依赖运行时注册状态，R3-P1-3 同步）
+ADAPTER_IMPL_MODULES = {
+    "data_source_worldbank": ("worldbank_adapter", "WorldBankAdapter"),
+    "data_source_imf": ("imf_adapter", "IMFAdapter"),
+    "data_source_eurostat": ("eurostat_adapter", "EurostatAdapter"),
+    "data_source_uspto": ("uspto_adapter", "USPTOAdapter"),
+    "data_source_ipcc": ("ipcc_adapter", "IPCCAdapter"),
+    "data_source_newsapi": ("newsapi_adapter", "NewsAPIAdapter"),
+    "data_source_tavily": ("tavily_adapter", "TavilyAdapter"),
+    "data_source_china_nbs": ("china_nbs_adapter", "ChinaNBSAdapter"),
 }
 
 # 数据源异常码段（data_source 子域 410-419）
@@ -175,15 +179,19 @@ class TestDataSourcePortRegistry:
         assert spec.owner == "tool-team"
 
     def test_keyed_adapters_conditional_registration(self) -> None:
-        """需 Key 的适配器按条件注册（有 Key 注册 / 无 Key 不注册，两者均为合法状态）。"""
+        """需 Key 的适配器按条件注册（有 Key 注册 / 无 Key 不注册，两者均为合法状态）。
+
+        uspto 自 R3-P1-3 起加入条件注册（PatentsView v1 强制 X-Api-Key）。
+        """
         import os
 
         for port_name, env_key in (
+            ("data_source_uspto", "USPTO_API_KEY"),
             ("data_source_newsapi", "NEWSAPI_API_KEY"),
             ("data_source_tavily", "TAVILY_API_KEY"),
         ):
             spec = _global_registry.get(port_name)
-            if os.getenv(env_key) is None:
+            if not bool(os.getenv(env_key)):
                 assert spec is None, f"{env_key} 缺失时 {port_name} 不应注册"
             else:
                 assert spec is not None, f"{env_key} 存在时 {port_name} 应注册"
@@ -206,13 +214,14 @@ class TestImplementationCompliance:
         service = DataSourceResolverService(adapters={}, cache=cache_stub)
         assert isinstance(service, DataSourceResolverPort)
 
-    @pytest.mark.parametrize("port_name,cls_name", list(ADAPTER_IMPL_CLASSES.items()))
-    def test_adapter_class_has_port_methods(self, port_name: str, cls_name: str) -> None:
+    @pytest.mark.parametrize("port_name,impl_pair", list(ADAPTER_IMPL_MODULES.items()))
+    def test_adapter_class_has_port_methods(self, port_name: str, impl_pair: tuple[str, str]) -> None:
+        """实现类合规校验经静态模块映射加载（R3-P1-3 同步：条件注册端口在无 Key
+        环境未注册——`_global_registry.get` 返回 None 会使校验误红，改不依赖注册状态）"""
         import importlib
 
-        spec = _global_registry.get(port_name)
-        assert spec is not None
-        mod = importlib.import_module(spec.module)
+        module_name, cls_name = impl_pair
+        mod = importlib.import_module(f"src.infrastructure.external_services.datasources.{module_name}")
         impl_cls = getattr(mod, cls_name)
         for method in ("fetch", "get_metadata", "health_check"):
             assert callable(getattr(impl_cls, method, None)), f"{cls_name} 缺少方法 {method}"
