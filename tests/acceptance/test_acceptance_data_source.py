@@ -545,22 +545,41 @@ def then_raises_response_error(context: dict[str, Any]) -> None:
 # ===================================================================
 
 
-@given(parsers.parse("构造 _FakeDataSourceAdapter 行为为 auth_failed（401/403）"))
+@given(parsers.parse("真实 NewsAPI 适配器收到 401（HTTP 层 mock，鉴权分流验证）"))
 def given_source_auth_failed(context: dict[str, Any]) -> None:
-    """直接验证 _FakeDataSourceAdapter.auth_failed 行为（编排层透传契约）。
+    """构造真实 NewsAPIAdapter + MockTransport 401（R3-5 J1 重写）。
 
-    历史上 Engine 曾将 ConfigurationError 包装为 ToolExecutionFailedError，本场景改为
-    直接验证适配器行为绕开包装；R2-P1-7 修复后 Engine 已恢复 101 直传（经 Engine 链路的
-    单元级覆盖见 test_tool_execution_engine_datasource.py），此场景保留适配器行为验证定位。
+    原场景对 `_FakeDataSourceAdapter(behavior="auth_failed")` 直接调用自证——
+    删除生产 401/403→101 映射（_http_helpers）该场景仍全绿，属 R3-P1-9 红线
+    破口（验收测试替身自证）。重写后驱动生产映射链路（真实适配器 →
+    request_json_with_resilience → 101 分流）；mock 仅限外部 HTTP 传输层
+    （对齐项目「mock 仅限外部数据源替身」范本）。
     """
-    context["auth_failed_adapter"] = _FakeDataSourceAdapter("newsapi", behavior="auth_failed")
+    import httpx
+
+    from src.infrastructure.config.newsapi import NewsAPIConfig
+    from src.infrastructure.external_services.datasources.newsapi_adapter import NewsAPIAdapter
+
+    adapter = NewsAPIAdapter(
+        config=NewsAPIConfig(api_key="acc-test-auth-key", api_url="https://mock.local", timeout=5.0),
+        client=httpx.AsyncClient(
+            base_url="https://mock.local",
+            transport=httpx.MockTransport(lambda req: httpx.Response(401, json={"message": "invalid key"})),
+            timeout=5.0,
+        ),
+        retry_min_wait=0.01,
+        retry_max_wait=0.02,
+    )
+    context["auth_failed_adapter"] = adapter
 
 
-@when("调用 fake adapter fetch 方法")
+@when("调用该适配器 fetch 并捕获鉴权异常")
 def when_call_fake_adapter_fetch(context: dict[str, Any], event_loop: Any) -> None:
+    from src.domain.ports.data_source import DataSourceQuery
+
     adapter = context["auth_failed_adapter"]
     try:
-        _run_async(event_loop, adapter.fetch(None))
+        _run_async(event_loop, adapter.fetch(DataSourceQuery(source_name="newsapi", query="test")))
         context["query_error"] = None
     except ConfigurationError as exc:
         context["query_error"] = exc

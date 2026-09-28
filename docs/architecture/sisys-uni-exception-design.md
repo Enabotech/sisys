@@ -992,6 +992,7 @@ def with_error_mapping(
 | `httpx.TimeoutException` | TimeoutError | 302 | ✓ | ✓ | 网络抖动超时（与全项目 embedding/llm 共用；TimeoutException 是 TransportError 子类，except 顺序硬约束在最前） |
 | `httpx.DecodingError` | DataSourceResponseError | 413 | ✗ | ✗ | 响应体解码失败（截断 gzip/不支持的 content-encoding）——确定性错误（R3-P1-6 修复：原穿透为原始异常 500 兜底） |
 | `httpx.InvalidURL` | ConfigurationError | 101 | ✗ | ✗ | API 地址配置畸形（env/配置类 URL 格式错误）——确定性配置错误（R3-P1-6 修复） |
+| `httpx.UnsupportedProtocol` | ConfigurationError | 101 | ✗ | ✗ | URL scheme 缺失（如 base_url 无 http:// 前缀）——确定性配置错误（R3-4 K1 修复：原 ⊂ TransportError 被白名单重试且计熔断） |
 | `httpx.RequestError`（其余传输类） | DataSourceUnavailableError | 411 | ✓ | ✓ | DNS 失败 / 连接拒绝 / TLS 握手失败 / TooManyRedirects 等（R3-P1-6：TransportError 放宽为 RequestError，闭合 DecodingError 等非传输子类穿透缺口——DecodingError/InvalidURL 已前置分流） |
 | JSON 解析失败 | DataSourceResponseError | 413 | ✗ | ✗ | 响应 schema 不符（不计入熔断统计） |
 | `CircuitBreakerOpenError` | DataSourceUnavailableError | 411 | — | — | 熔断器已断开（fast-fail，避免重试浪费配额） |
