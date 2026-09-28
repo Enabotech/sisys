@@ -50,7 +50,10 @@ ADAPTER_PORT_SPECS: tuple[dict[str, Any], ...] = (
         "impl_cls_name": "USPTOAdapter",
         "module_path": "src.infrastructure.external_services.datasources.uspto_adapter",
         "tags": ("data-source", "uspto", "patent"),
-        "env_key": None,
+        # R3-P1-3：PatentsView v1 端点强制 X-Api-Key，uspto 转条件注册（对齐 newsapi/tavily）
+        "env_key": "USPTO_API_KEY",
+        "config_module": "src.infrastructure.config.uspto",
+        "config_cls": "USPTOConfig",
     },
     {
         "port_name": "data_source_ipcc",

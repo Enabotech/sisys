@@ -142,11 +142,22 @@ class WorldBankAdapter:
             return False
 
     def _extract_rows(self, data: Any) -> list[dict[str, Any]]:
-        """解析 [meta, rows] 结构（非法结构抛 DataSourceResponseError）"""
+        """解析 [meta, rows] 结构（非法结构抛 DataSourceResponseError）
+
+        World Bank 真实错误形态（无效指标码等）：`[{"message": [...]}, []]`——
+        meta 位是含 "message" 键的 dict（正常响应 meta 含 page/pages 等分页字段，
+        永不含 message 键）。若不识别，该形态会经结构校验返回空 rows，
+        产出「高置信度空 payload 成功结果」并进缓存（R3-P1-8 修复）。
+        """
         if not isinstance(data, list) or len(data) != 2 or not isinstance(data[1], list):
             raise DataSourceResponseError(
                 message="World Bank 响应结构非法（期望 [meta, rows] 列表）",
                 context={"source_name": "world-bank", "actual_type": type(data).__name__},
+            )
+        if isinstance(data[0], dict) and "message" in data[0]:
+            raise DataSourceResponseError(
+                message="World Bank 返回错误响应（message 错误形态，常见于指标码无效）",
+                context={"source_name": "world-bank"},
             )
         return [row for row in data[1] if isinstance(row, dict) and row.get("value") is not None]
 

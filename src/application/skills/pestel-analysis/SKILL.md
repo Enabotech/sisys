@@ -193,7 +193,15 @@ Think 阶段必须先输出**维度 → 指标 → 数据源**映射计划，再
 2. **Think**：输出维度 → 指标 → 数据源映射（§5），声明各维度采集目标
 3. **Code**：生成含 `$DATA_SOURCE` 标记的采集代码。**标记使用规范**：
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
-   - 每个声明源至少一个标记；query 为自然语言指标描述（含行业/地域/年限上下文）
+   - 每个声明源至少一个标记；**query 必须为该源的规范格式**（统计类适配器将 query
+     作为机器码/路径拼接 API URL，自然语言描述会确定性失败，R3-P1-2 契约对齐）：
+     - `world-bank`：World Bank 指标码（点分格式，如 `"NY.GDP.MKTP.CD"`=GDP、
+       `"SP.POP.TOTL"`=总人口；指标语义在 Think 阶段由 LLM 映射，勿凭空构造）
+     - `imf`：IMF WEO 指标码（大写下划线，如 `"NGDP_RPCH"`=实际 GDP 增长率）
+     - `eurostat`：数据集代码（下划线格式，如 `"nama_10_gdp"`=国民账户）
+     - `ipcc`：数据集路径键（如 `"ar6-wg1-spm"`=AR6 WG1 决策者摘要）
+     - `china-nbs`：站点相对路径（如 `"sj/zxfb"`=数据发布/最新发布）
+     - `newsapi` / `tavily`：检索关键词（自然语言关键词为**正确**格式，含行业/地域/年限上下文）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
    - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
      每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
@@ -209,12 +217,12 @@ Think 阶段必须先输出**维度 → 指标 → 数据源**映射计划，再
 采集代码骨架示例：
 
 ```python
-gdp = $DATA_SOURCE("world-bank", "中国 GDP 增速 2020-2025")
-outlook = $DATA_SOURCE("imf", "世界经济展望 中国经济预测")
-eu_stats = $DATA_SOURCE("eurostat", "欧盟 绿色经济 环境统计")
-climate = $DATA_SOURCE("ipcc", "IPCC AR6 排放情景数据")
-news = $DATA_SOURCE("newsapi", "新能源汽车 政策 法规 最新动态")
-cn_stats = $DATA_SOURCE("china-nbs", "中国社会消费品零售 人口统计")
+gdp = $DATA_SOURCE("world-bank", "NY.GDP.MKTP.CD")          # GDP（现价美元）
+outlook = $DATA_SOURCE("imf", "NGDP_RPCH")                  # 实际 GDP 增长率（WEO）
+eu_stats = $DATA_SOURCE("eurostat", "nama_10_gdp")          # 国民账户（按品类支出）
+climate = $DATA_SOURCE("ipcc", "ar6-wg1-spm")               # AR6 WG1 决策者摘要
+news = $DATA_SOURCE("newsapi", "新能源汽车 政策 法规 最新动态")   # 关键词检索源
+cn_stats = $DATA_SOURCE("china-nbs", "sj/zxfb")             # 国家局数据发布
 
 # 采集后通过注入的 DATA_SOURCES dict 防御性读取（失败源键不存在 → None → 按 §7 降级）
 wb_payload = (DATA_SOURCES.get("world-bank") or {}).get("payload")

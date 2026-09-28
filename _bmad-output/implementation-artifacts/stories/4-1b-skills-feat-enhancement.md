@@ -1502,6 +1502,114 @@ tests/
 - 最终验证：7233 单测 + 24 集成 + 30 验收（4-1b+4-1c）全绿；分层覆盖率门禁 domain≥90/application≥85/infrastructure≥75/overall≥80 四项全过（88-96% 区间实测）；ruff/mypy 全绿；红线 grep 零输出
 - 关键提交：cd46d1ce（R1）→ 290f8835（R2）→ 3735f192（R3）→ 65fd7f5e（R4）→ 本轮（R5）
 
+---
+
+### 🔍 代码审查发现 Review Findings — 第三审查周期（2026-09-28，5 轮循环）
+
+**审查日期:** 2026-09-28
+**审查模式:** bmad-code-review（C1 五视角并行调研：domain 契约 / application 编排 / infrastructure 适配器 / 测试质量与判别力 / 架构一致性与端到端；全部 P0/P1 经主线独立验证代码确认后采纳）
+**审查范围:** Story 4-1b 全部实际代码实现（src 28 文件 + tests 18 文件）+ 6 个 SKILL.md SOP 契约面
+**基线验证:** 核心单测/契约/架构 292 passed + 适配器/集成/验收 139 passed + ruff/mypy 全绿 + 红线 grep 零命中（4-1b 文件）
+
+#### Round 1 — C1 调研发现（去重后 1 P0 + 8 P1 + 约 20 P2，关键项全部主线独立验证）
+
+| # | 级别 | 标题 | 证据 |
+|---|------|------|------|
+| R3-P0-1 | **P0** | **熔断器 HALF_OPEN 永久楔死（实测复现）**：`before_call()` HALF_OPEN 分支（circuit_breaker.py:156-163）只查 `_half_open_calls < max` 无 `_should_half_open()` 超时再武装（对比 OPEN 分支 :144-153 有）；同时 `_http_helpers` 五条确定性错误路径（429/401/403/3xx/4xx，:155-184）与 JSON 解析失败（:208-214）**既不调 on_success 也不调 on_failure**（领域异常穿透 except 链）。组合后果：OPEN→超时→半开探测→探测请求恰命中 429 等 → 槽位耗尽且永不释放 → 此后所有 fetch/health_check 永久 411「熔断器已断开」，后端健康也不恢复，等待任意时长无效（HALF_OPEN 分支不看时间），进程重启前无法自愈（全库无 `reset()` 调用）。影响全部 7 个 httpx 适配器 + ipcc 内联同构路径。现有测试只覆盖 Closed→Open，无半开探测路径 | `circuit_breaker.py:156-163` + `_http_helpers.py:155-214` |
+| R3-P1-1 | P1 | **缓存 stale 判定基准语义错位（三视角独立发现，三重印证）**：`_read_cache` 用 `DataFreshness(source_timestamp).is_stale(now)` 判缓存过期——`is_stale` 计算 `(now - source_timestamp) > ttl`（数据年龄），而 WorldBank/IMF 适配器 source_timestamp 取数据年份 1 月 1 日（worldbank_adapter.py:153-158 `datetime(max(years), 1, 1)`）、USPTO 取专利日期——年度数据 age≈2.7 年 >> ttl 7 天 → **每次读缓存必 stale → cache_hit 恒 False → Redis 只写不读、每次全量重采**，AC-3「缓存命中不消耗外部配额」对统计类源在生产中结构性失效；高并发诱发 429 后叠加 R3-P0-1 楔死熔断。`fetched_at` 在条目中存取（:278/:288）却从不参与判定；单测 fixture 全部 `source_timestamp=now` 掩护该缺陷 | `data_source_resolver.py:281-283` + `value_objects/data_source.py:148-157` + `worldbank_adapter.py:153-158` |
+| R3-P1-2 | P1 | **SOP↔适配器 query 契约断裂（端到端核心断点）**：SKILL.md:196 明文「query 为自然语言指标描述」+ 示例 `$DATA_SOURCE("world-bank", "中国 GDP 增速 2020-2025")`，但统计类适配器把 query 当机器码拼 URL 路径段（WorldBank 指标码 `NY.GDP.MKTP.CD` / IMF 数据集码 / Eurostat dataset code / IPCC CSV 路径键）→ LLM 按 SOP 生成的合规代码确定性 413/404，统计类 4/8 源全部不可用 | `src/application/skills/pestel-analysis/SKILL.md:196,212-217` vs `worldbank_adapter.py` 等 4 适配器 |
+| R3-P1-3 | P1 | **USPTO 适配器缺 PatentsView v1 强制的 X-Api-Key**：配置类零 api_key 字段，fetch 不带鉴权头 → 生产环境该源 100% 403→101 永久不可用；文件头「公开免费，无需 API Key」为 v0 旧端点过时结论 | `uspto_adapter.py` + `config/uspto.py`（全文件） |
+| R3-P1-4 | P1 | **`with_execution_id()` 手工重建丢 9 个基类字段**：correlation_id/causation_id/metadata/version/source/schema_version/payload/event_id/timestamp 全部回落默认值（event_id 重新生成、timestamp 漂移为 rebind 时刻）→ 追踪链静默断裂；同方法无任何测试覆盖。应改 `dataclasses.replace`（resolver L171 frozen VO 先例） | `data_source_events.py:54-74`（DataSourceFetchFailed 同构 :104-117） |
+| R3-P1-5 | P1 | **`DataFreshness` 缺 tz-awareness 不变量**：`__post_init__` 只校验 ttl/half_life，naive `source_timestamp` 静默通过 → 首次采集成功后 `_publish_fetched` 中 `score()` 抛原生 TypeError（naive/aware 混算）→ 成功采集被翻转为内置异常（违反异常体系红线，999 兜底）+「首次必失败、后续成功」间歇性故障（缓存已写、下次命中走 `_as_aware_utc` 归一成功）。适配器侧 R2-2-B5 已归一但 domain 契约无门禁，未来新增适配器即触发 | `value_objects/data_source.py:119-157` + `data_source_resolver.py:333` |
+| R3-P1-6 | P1 | **`httpx.DecodingError`/`InvalidURL` 原始穿透领域异常契约（实测逃逸）**：except 链只捕 TimeoutException/TransportError/HTTPStatusError/ValueError——`DecodingError`（MRO 为 RequestError 子类**而非** TransportError）在截断 gzip/不支持 content-encoding 时穿透 → `isinstance(e, DomainError)` False → 500 兜底；`InvalidURL`（配置畸形 URL）同样穿透；两者还不触发 on_failure，与 R3-P0-1 叠加可楔死熔断 | `_http_helpers.py:187-214` + `ipcc_adapter.py:212-232` 内联同构 |
+| R3-P1-7 | P1 | **reliable 通道事件依赖请求作用域 session，非 HTTP 上下文 100% 静默丢弃**：CLI/LangGraph/Prefect 执行工具无 SessionMiddleware → outbox `get_session()` RuntimeError → RabbitMQEventBus 捕获返回 PublishResult(False) → resolver `await publish(event)` 忽略返回值，事件无声丢失（DataSourceFetchFailed 未配 realtime 通道无兜底）；HTTP 路径「全源失败」时 outbox 行随事务回滚丢弃——恰在事件存在的核心场景丢事件 | `data_source_resolver.py:340` + `outbox_repository.py:41-50` + `session_middleware.py:65-70` |
+| R3-P1-8 | P1 | **required_fields 契约三层声明、零实现、零测试**：值对象 docstring（data_source.py:66）承诺「缺失抛 413」、异常文档承诺「required_fields 缺失」、6 个 SKILL.md 已实际声明、frontmatter 解析入库——但 src 中除定义/解析外无任何消费点校验；附带：WorldBank 无效指标真实错误形态 `[{"message":...},[]]` 经 `_extract_rows` 返回空 rows 静默成功 | `value_objects/data_source.py:66` + `data_source_exceptions.py:57` + grep 消费点为零 |
+| R3-P1-9 | P1 | **AC-2.3 验收场景对测试替身自证**：场景构造 `behavior="auth_failed"` 的 `_FakeDataSourceAdapter` 后直接调用 `adapter.fetch(None)` 断言抛 ConfigurationError——对测试代码自身行为断言；删除生产 401/403→101 映射（_http_helpers.py:163-167）该验收场景仍全绿（真实映射仅 test_newsapi_adapter 单测锁定） | `test_acceptance_data_source.py:545-563` |
+
+**P2 组（约 20 项，留 Round 2+ 分批收敛）**：keyed 适配器端口元数据无 Key 环境零断言 / 事件 execution_id→aggregate_id 绑定零端到端锁定 / Engine 路径 Redis 键泄漏（随机 tenant_id 不在 teardown 前缀内）/ AC-7.3 黑名单比 unit 架构测试窄一半 / 恒真断言组（5 处）/ HTTP mock 与真实 API 契约漂移无 golden fixture / `zip(strict=True)` 与 `ast.literal_eval` 的 ValueError 逃逸（两处红线破口）/ frontmatter 标量类型错误 TypeError/AttributeError 绕过双层防线 / loader 静默回退抹掉白名单 / resolver=None 含标记代码进沙箱 SyntaxError（应 fail-fast 101）/ 失败路径不持久化 ToolExecution / 缓存无 single-flight / 采集阶段无超时预算 / events 字段越界不校验 / execution_id 默认 uuid4 伪造聚合身份 / EvidencePackage.data_sources 不校验元素类型 / half_life 缓存重建路径丢失 / tenant_id 弱类型 / 5xx 非白名单消息失真 / IPCC health_check 绕过熔断器 / tavily results 类型校验缺失 / china_nbs seed_url 未编码 / env 变量未登记模板 / importlinter 缺 httpx 等 / event_channels 描述漂移 / china-nbs 300s 轮询超引擎预算 / 429 Retry-After 未解析 / 熔断恢复路径零测试
+
+#### Round 1 — C2 修复方案（F1-F9）
+
+**F1 熔断器半开楔死双修（R3-P0-1）** — `circuit_breaker.py` + `_http_helpers.py` + `ipcc_adapter.py`：
+- ① 结构性兜底：`before_call()` HALF_OPEN 分支增加探测超时再武装——新增 `_half_open_probe_start` 时间戳（进入探测时刻记录），HALF_OPEN 分支先检查 `now - probe_start >= recovery_timeout` 则重置 `_half_open_calls = 0`（重新放行探测），任何"回调缺失"路径（含未来新增异常分支）都能在 recovery_timeout 后自愈
+- ② 探测语义修复：`CircuitBreaker` 新增 `on_ignored()` 方法（HALF_OPEN 释放探测槽 `_half_open_calls = max(0, -1)`；CLOSED 无操作）；`_http_helpers` 六条确定性错误路径（429/401/403/3xx/4xx/JSON 解析失败）与 ipcc 内联路径显式调用——语义「请求已完成、结果为确定性业务响应，不计入熔断统计但释放探测槽」
+- 业界对标：Polly v8（半开探测完成后状态机必然推进，绝不卡死）；resilience4j ignored exceptions（不推进统计但释放 permits）
+- 测试：半开探测命中 429 → 后续请求仍可探测（非永久 411）；楔死场景回归用例（探测 404 → 等 recovery_timeout → 恢复）；on_ignored 在 CLOSED 下无操作
+
+**F2 缓存 stale 基准改 fetched_at（R3-P1-1）** — `data_source_resolver.py:281-283`：
+- stale 判定改 `(now - fetched_at).total_seconds() > ref.ttl_seconds`（条目年龄，与 Redis TTL 同口径双保险）；`source_timestamp` 保留给 `DataFreshness.score()` 衰减评分（其唯一正确用途）；重建 `DataSourceResult` 时 freshness 仍用 source_timestamp 计算（评分语义不变）
+- 业界对标：HTTP 缓存 freshness 语义（Age 是响应收发后经过的时间，非资源本身年龄）；Caffeine/Spring cache expireAfterWrite 口径
+- 测试：判别性用例「source_timestamp 很旧（2020 年）+ fetched_at 新 → cache_hit=True」（突变视角：该用例在旧实现下必红）
+- 行为声明：既有 `source_timestamp=now` 的测试不受影响（now 时两种基准等价）
+
+**F3 USPTO X-Api-Key 支持（R3-P1-3）** — `config/uspto.py` + `uspto_adapter.py` + `composition_root.py`：
+- `USPTOConfig` +`api_key: str | None = None`（env `USPTO_API_KEY`）；适配器 fetch/health_check 在 api_key 非 None 时带 `X-Api-Key` 头；composition_root 改条件注册 `bool(os.getenv("USPTO_API_KEY"))`（对齐 newsapi/tavily 既有模式）；文件头过时结论修正
+- 行为变化声明：无 Key 环境下 uspto 从「注册但必然 403」变为「不注册」——配置缺失显式化优于必然失败
+- 测试：带 Key 请求头断言（MockTransport 捕获 headers）+ 无 Key 不注册（对齐 I3 子进程探针语义）
+
+**F4 with_execution_id 改 dataclasses.replace（R3-P1-4）** — `data_source_events.py` 两个事件类：
+- 手工逐字段重建 → `dataclasses.replace(self, execution_id=..., aggregate_id=...)`（基类字段全部保留；event_type 为 init=False 常量不参与 replace，安全）；补判别测试：correlation_id/event_id/timestamp/metadata 经 rebind 保留
+
+**F5 DataFreshness tz 不变量（R3-P1-5）** — `value_objects/data_source.py`：
+- `DataFreshness.__post_init__` 增加 `source_timestamp.tzinfo is not None` 校验 → `EntityValidationError`；`DataSourceResult.__post_init__` 对 source_timestamp/fetched_at 同步校验；适配器侧 R2-2-B5 已全量归一（aware），零回归面
+- 测试：naive 构造拒绝 + aware 通过（8 适配器全绿回归）
+
+**F6 httpx 异常层次归并（R3-P1-6）** — `_http_helpers.py` + `ipcc_adapter.py`：
+- `except httpx.TransportError` 放宽为 `except httpx.RequestError`（TimeoutException 分支保持在前——TransportError 是其兄弟类，RequestError 是共同父类）；`except httpx.InvalidURL` → `ConfigurationError(101)`（URL 配置错误语义）；ipcc 内联 except 链同步
+- 业界对标：传输栈异常统一归并「基础设施故障」类（pybreaker/tenacity 生态惯例）；InvalidURL 属配置域
+
+**F7 SKILL.md query 契约对齐（R3-P1-2）** — 6 个 SKILL.md：
+- §6 标记使用规范改「query 为该源的机器码/规范格式」+ 每源给出指标码示例与常用码表（world-bank `NY.GDP.MKTP.CD` 等 / imf 数据集码 / eurostat dataset code / ipcc 路径键 / newsapi-tavily 关键词 / china-nbs 报表路径）；骨架示例同步改码值
+- 业界对标：LangChain Tool input-schema 惯例——参数格式必须精确无歧义，禁止自然语言歧义契约
+- grep 验证 6 文件零「自然语言指标描述」残留
+
+**F8 resolver 发布可观测性最小闭环（R3-P1-7）** — `data_source_resolver.py`：
+- `_publish_fetched`/`_publish_failed` 检查 `publish()` 返回值，`PublishResult.success is False` 时 warning 日志（含 source_name/error_code，不含敏感载荷）；outbox 独立 session scope 完整修复 **defer Story 4.7**（事件基础设施域，与 R5-5 同域归并）
+- 业界对标：Google SRE——静默失败是可观测性反模式；最小修复先行，结构性修复归域
+
+**F9 required_fields 契约收窄（R3-P1-8）** — `value_objects/data_source.py` + `data_source_exceptions.py`：
+- 契约与实现对齐：VO docstring 改「声明性元数据（descriptive），供 SOP/4-1c 集成层参考；运行时结构校验由各适配器 `_extract_*` 承担（结构非法即 413）」；异常文档删除「required_fields 缺失」虚假触发承诺；**不实现通用运行时校验**（8 适配器响应结构异构——WorldBank [meta,rows]/NewsAPI articles/Tavily results 字段路径不同，通用校验需每适配器定制字段路径映射，属 4-1c 集成范畴）；补 WorldBank `[{"message":...},[]]` 错误形态测试（空 rows 带文档化语义：返回空 payload 或 413——以适配器现行为准测试锁定）
+- 业界对标：契约文档禁止虚假承诺（ Implementation must match contract or the contract must change）
+
+#### Round 1 — C3 评审结论（两视角并行：正确性边界 + 架构/测试判别力，全部含实测验证）
+
+> **总体结论：非优秀，不准予按 v1 直接修码。** 评级明细：F4/F5 优秀（两组一致）；F2 良好+优秀；F1/F6/F7 良好/合格；F3/F8/F9 合格/不合格。v2 纳入两组全部必修项（10 项修订 + 6 项建议）后达准入线。
+
+**v2 修订清单（合并两组，全部纳入）：**
+
+1. **F1v2**：① 再武装分支重置 `_half_open_calls=0` 后**必须同时刷新 `_half_open_probe_start`**（统一规则：每次 0→1 放行探测时刻刷新，覆盖 `_transition_to_half_open`/再武装分支/on_ignored 释放后再放行三入口——否则首窗口过期后 half_open_max_calls 被完全击穿、限流形同虚设）；② `on_ignored` 实现改 `max(0, self._half_open_calls - 1)`（v1 文本 `max(0,-1)` 是置 0 笔误，多探测在飞场景会抹掉他人槽位导致超发）且仅 HALF_OPEN 生效、必须持锁；③ `_half_open_probe_start` 纳入 `reset()` 与 `_transition_to_open` 清理；④ 既有 `test_half_open_max_calls_limited`（recovery_timeout=0.01 真实时序）改 `_now()` 子类时钟控制（防 CI 负载随机红）；⑤ 组件级新用例落 `tests/unit/infrastructure/external_services/embedding/test_circuit_breaker.py`（共享组件宿主域），适配器级楔死回归用例落 datasources 测试（判别锚点：探测 429 后**不推进时钟**下一次 before_call 即可探测——回退必红）；⑥ on_ignored 调用点单点收敛（`except (DataSourceRateLimitError, ConfigurationError, DataSourceResponseError): on_ignored(); raise` 外层单点 + ValueError/InvalidURL 分支内各自唯一调用点，防双释放）；⑦ 模块头状态机图补「HALF_OPEN ──(探测超时)──→ 重新放行探测」与 on_ignored 语义行；⑧ embedding 域消费方零结构影响确认（新增纯增量；embedding 自身确定性路径不调 on_ignored 依赖①超时兜底自愈——镜像修复留档跨 Story 记账）
+2. **F2v2**：+ `architecture.md:2815`（is_stale 语义行）同步；既有 `test_stale_entry_triggers_refetch` 改双时间戳分离（source=2020 + fetched=120s 前 → 新基准下仍 stale）+ 新判别用例（source=2020 + fetched=now → hit 且 `stub.call_count == 0`）双向判别；AC-3.2 验收注释口径更新；保留内联 is_stale 判定（非冗余：白名单 ttl 收紧的生效通道 + 单测 InMemoryCache 无 TTL 语义）
+3. **F3v2**：+ `api_key: str | None = field(default=None, repr=False)`（硬约束脱敏）；请求头判定统一 `bool(api_key)`（空串=未配置，与 composition_root 口径一致）；I3 断言同步（uspto 从 core_required 移入条件推导组，合法态 {6,7,8}→{5,6,7,8}，docstring 同步）；架构测试 uspto 移入 KEYED_ADAPTER_PORT_NAMES；2 个声明 uspto 的 SKILL.md（competitor-analysis/disruptive-innovation）§7 失败表补 uspto 行（其余 4 文件同句式一并统一）；config/adapter **双**文件头过时结论修正；.feature:149 步骤文本同步；I4 探针显式声明保持 tavily 定位（不扩 uspto，最小改动）
+4. **F4v2**：+ 判别断言面补全（event_id/correlation_id/causation_id/timestamp/metadata/version/source/schema_version/payload 九字段 rebind 前后相等 + execution_id/aggregate_id 已更新 + to_dict 等价）——防未来再退化为手工复制时只保 3 个字段仍绿
+5. **F5v2**：+ `score()`/`is_stale()` 入口对 naive `at` 抛 EntityValidationError（构造侧门禁之外的调用侧闭环，现有调用方全 aware 零回归）
+6. **F6v2**：① v1 MRO 前提错误订正——实测 `TimeoutException ⊂ TransportError ⊂ RequestError` 父子链（非兄弟），**「TimeoutException 分支在前」是硬约束**（顺序错则 302 语义整体丢失）；② `DecodingError` 单独前置分支 → `DataSourceResponseError(413)` + on_ignored（响应解析类确定性错误，非「不可用」——与模块自身契约及 F1-② 语义一致；v1 并入 411+on_failure 被否决）；③ `TransportError` 仍放宽为 `RequestError`（捕获 TooManyRedirects/StreamError 等剩余传输类 → 411 + on_failure，传输故障仍计熔断；实测 HTTPStatusError 不继承 RequestError，无遮蔽）；④ `InvalidURL` → `ConfigurationError(101)` + on_ignored（v1 漏 on_ignored——确定性配置错误不应占探测槽一整个恢复窗口）；⑤ ipcc 内联链同构同步；⑥ `sisys-uni-exception-design.md` §3.4.1 补 InvalidURL 行 + TransportError 行扩为 RequestError；⑦ `_http_helpers.py` 模块 docstring 异常映射契约同步
+7. **F7v2**：6 文件清单实证（pestel:196+212-217 / competitor:164+181 / disruptive:150+167 / appeals:158 / porters:165 / scenario:156 + 各骨架示例）；码表最小形态（每源格式规范 + 1-2 个**以适配器 docstring/测试值为唯一来源逐字校对**的示例 + 指向适配器文档，不建长码表——required_fields 同型教训）；newsapi/tavily/uspto 三源是关键词检索（`_text_any`），自然语言关键词对它们是**正确**格式，不得一刀切禁；china-nbs 示例仅给安全路径字面量（seed_url 未编码是已知 P2，示例不得成为注入面）；uspto 补行（关键词，建议英文匹配 patent_title）；grep 闸门扩为「零『自然语言指标描述』残留 + 码表值与适配器 docstring 逐字一致」
+8. **F8v2**：① v1 访问不存在的 `PublishResult.success` 属性（实际仅有 `is_success`/`is_full_failure`/`partial_error`）——字面实现将在成功采集主流程抛 AttributeError 比原问题更严重；改 `not result.is_success` → warning 日志含 `result.partial_error`（可定位首个失败通道）；② warning-only 不改控制流（`_publish_failed` 内抛错会掩盖原始采集异常）；③ 日志字段收敛（source_name/error_code/event_id/partial_error，禁止打印 event 对象）；④ is_success 对空 results 返回 False 语义知晓（resolver 事件恒新 uuid 不受影响）；⑤ 建「Deferred→4.7」单一清单表（F8 outbox session + R5-5 drain 顺序两项同域归并，防 R5-1 式跨轮遗忘——4-7 story 尚不存在）
+9. **F9v2**：废弃 v1「以适配器现行为准测试锁定」（钉死「无效指标码 → 高置信度空 payload 成功结果进缓存」缺陷，违背修根因红线；F7 落地后指标码 typo 是 LLM 最高频错误，此形态被放大）；实现判别器：`_extract_rows` 检测 `data[0]` 为 dict 且含 `"message"` 键 → `DataSourceResponseError(413)`（WorldBank 真实错误形态 `[{"message":[{...}]},[]]`，正常 meta 不含 message 键，零误报）——on_ignored 经 F1v2-⑥ 单点 handler 自动覆盖；测试断言 413 而非静默空成功；VO docstring 收窄 + `data_source_exceptions.py:57` + `sisys-uni-exception-design.md:722` 三处同步删除虚假承诺
+
+#### 已修复 Patch（第三周期 Round 1，C3 评审 v2 准入后 TDD 实施）
+
+| # | 修复 | 文件 | 验证 |
+|---|------|------|------|
+| F1 | 熔断器半开楔死双修：`_admit_probe()` 统一「0→1 放行时刻刷新 `_half_open_probe_start`」三入口（transition/再武装/释放后再放行）；`before_call()` HALF_OPEN 分支超时再武装（`now - probe_start >= recovery_timeout` 重置配额）；`on_ignored()`（HALF_OPEN 下 `max(0, calls-1)` 释放槽位，持锁，CLOSED no-op）；`reset()`/`_transition_to_open` 清理 probe_start；模块头状态机图补行；`_http_helpers` + ipcc 确定性错误路径单点收敛调用 on_ignored（每个异常路径恰好一次，防双释放） | `circuit_breaker.py` / `_http_helpers.py` / `ipcc_adapter.py` | 组件级 6 项新测（释放/减一非置零/CLOSED no-op/再武装/probe_start 刷新/释放后成功闭合）+ 既有 10ms 时序用例改手动时钟 + 适配器级端到端自愈回归（5xx→429→恢复 200 全链路）；24 项熔断器测试全绿 |
+| F2 | 缓存 stale 基准改 `fetched_at`（条目年龄）：`(now - fetched_at) > ttl` 触发重采；`source_timestamp` 保留给 `score()` 衰减评分；与 Redis TTL 双口径非冗余（白名单收紧生效通道 + 单测 InMemoryCache 无 TTL）；`architecture.md:2815` 新鲜度模型语义同步 | `data_source_resolver.py` / `architecture.md` | 双向判别：既有 stale 用例改双时间戳分离（2020 年数据 + 120s 前条目 → 重采）+ 新用例（2024-01-01 数据 + 新条目 → `cache_hit=True` 且 `call_count==0`）——旧实现下新用例必红；31 项 resolver 测试全绿 |
+| F3 | USPTO X-Api-Key：`USPTOConfig.api_key`（env `USPTO_API_KEY`，`repr=False` 脱敏，`or None` 空串归一）；fetch/health_check `bool(api_key)` 真值判定携带 `X-Api-Key` 头；composition_root 条件注册（`bool(os.getenv)`）+ 聚合映射注释同步；config/adapter 双文件头「公开免费」过时结论修正 | `config/uspto.py` / `uspto_adapter.py` / `composition_root.py` | 3 项新测（Key 携带/空串 None 不携带/repr 脱敏）；契约测试 uspto 转 keyed 条件断言 + 架构测试 KEYED 组同步（合法态 {5,6,7,8}）+ 验收 I3 断言同步；实现类合规校验改静态模块映射（不依赖注册状态） |
+| F4 | `with_execution_id` 改 `dataclasses.replace`（两事件类）：基类 9 字段（event_id/timestamp/correlation_id/causation_id/metadata/version/source/schema_version/payload）全保留；docstring 记录语义 | `data_source_events.py` | 判别测试 3 项：九字段 rebind 前后逐一相等 + to_dict 等价（除 execution）+ FetchFailed 同构；事件测试全绿 |
+| F5 | tz-awareness 门禁：`DataFreshness.__post_init__` 校验 source_timestamp；`DataSourceResult.__post_init__` 校验两时间戳；`score()`/`is_stale()` 入口校验 `at`（全部抛 EntityValidationError，闭合原生 TypeError 逃逸） | `value_objects/data_source.py` | 3 项新测（VO 构造拒绝 ×2 + score/is_stale naive 拒绝）；VO 59 项测试全绿（8 适配器全 aware 零回归验证） |
+| F6 | httpx 异常层次归并：except 链重构为「领域异常单点 on_ignored → TimeoutException（顺序硬约束）→ DecodingError（413+on_ignored）→ InvalidURL（101+on_ignored）→ RequestError（411+on_failure，TransportError 放宽）→ HTTPStatusError → ValueError（413+on_ignored）」；ipcc 内联链同构同步；模块 docstring + §3.4.1 映射表补行 | `_http_helpers.py` / `ipcc_adapter.py` / `sisys-uni-exception-design.md` | MRO 实测确认（TimeoutException⊂TransportError⊂RequestError 父子链 / DecodingError⊄TransportError / InvalidURL⊄RequestError / HTTPStatusError⊄RequestError 零遮蔽）；254 项契约+架构+适配器测试全绿 |
+| F7 | 6 个 SKILL.md query 契约对齐：§6 标记规范改「query 必须为该源的规范格式」+ 每源格式说明（world-bank 指标码/imf 指标码/eurostat 数据集码/ipcc 路径键/china-nbs 站点路径/uspto 英文关键词/newsapi-tavily 关键词为正确格式）；骨架示例码值全部替换；2 个声明 uspto 技能 §7 失败表补 Key 缺失行（其余 4 文件同句式统一） | 6 个 SKILL.md | grep 闸门零「自然语言指标描述」残留；码表值与适配器 docstring/测试值逐字核验（NY.GDP.MKTP.CD/NGDP_RPCH/nama_10_gdp/ar6-wg1-spm/sj/zxfb 均与测试一致；NV.IND.MANF.CD/sbs_sc_sca_r2/nrg_bal_c 为官方公开真实码） |
+| F8 | 发布可观测性最小闭环：两个发布点检查 `publish()` 返回值，`not is_success` → warning 日志（source_name/error_code/event_id/partial_error，不打印 event 对象；warning-only 不改控制流）；outbox 独立 session scope **defer Story 4.7** | `data_source_resolver.py` | 1 项新测（发布失败桩 → 主流程正常返回 + warning 恰好一条含源名） |
+| F9 | required_fields 契约收窄 + WorldBank message 错误形态判别器：VO docstring 改「声明性元数据（descriptive），运行时结构校验由适配器 _extract_* 承担」；异常类 docstring + 设计文档 §3.3.2 表删除「required_fields 缺失」虚假承诺；`_extract_rows` 检测 `data[0]` dict 含 "message" 键 → 413 | `value_objects/data_source.py` / `data_source_exceptions.py` / `sisys-uni-exception-design.md` / `worldbank_adapter.py` | 1 项新测（message 错误形态 → EXCEPTION_413，非静默空成功）；16 项 worldbank 测试全绿 |
+
+**Round 1 验证汇总**：全量 unit+contracts 8218 passed 零失败（连续两轮）+ 验收/集成 31 passed + ruff All checks passed + mypy 603 文件零问题 + 红线自查零新增违规（circuit_breaker.py 3 处构造器 ValueError 为 HEAD 既有 embedding 域债务，本轮 diff 零新增，Surgical Changes 不动）
+
+**Deferred→4.7 清单（F8v2-⑤ 建立，防 R5-1 式跨轮遗忘——4.7 立项时原样搬运）：**
+
+| # | 项 | 来源 |
+|---|----|------|
+| D1 | outbox 写入依赖请求作用域 session：非 HTTP 上下文（CLI/LangGraph/Prefect）事件 100% 静默丢弃 + HTTP 全失败场景随事务回滚丢事件——需独立 session scope 或 rollback 后补偿发布 | R3-P1-7 / F8 最小闭环之外的结构性修复 |
+| D2 | shutdown 中 `drain_schema_events` 位于 rabbitmq/redis 关闭之后，排空期 in-flight publish 撞已关闭连接 | R5-5（第二周期遗留） |
+
 | # | 修复 | 文件 | 验证 |
 |---|------|------|------|
 | F1 | 注入管线重构：preamble `json.dumps`→`repr`（parse_constant 映射 NaN/Infinity 为字面串）；标记原位替换 `DATA_SOURCES["name"]`（同源 `name#k`）；失败位替换 `None`；inject 改收 `(code, markers, results)`；`fetch_many` 等长对齐 `tuple[DataSourceResult \| None, ...]` | `data_source_marker.py` / `data_source_resolver.py` / `tool_execution_engine.py` / `ports/data_source_resolver.py` | 新增 compile 闸门 + null/bool/unicode exec + 部分失败 + name#k 共 7 项单测；38 marker 测试全绿 |

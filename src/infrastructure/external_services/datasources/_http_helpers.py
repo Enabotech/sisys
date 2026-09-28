@@ -6,13 +6,24 @@
 
 异常映射契约（data_source 子域）：
 - httpx.TimeoutException → TimeoutError（EXCEPTION_302，重试耗尽后）
-- httpx.TransportError → DataSourceUnavailableError（EXCEPTION_411，重试耗尽后）
+  （注：TimeoutException 是 TransportError 的子类——TimeoutException 分支必须在前，顺序是硬约束）
+- httpx.DecodingError → DataSourceResponseError（EXCEPTION_413，响应体解码失败属确定性错误，
+  不重试不计熔断——对齐「响应解析类问题不计熔断」契约）
+- httpx.InvalidURL → ConfigurationError（EXCEPTION_101，URL 配置错误属确定性错误，不重试不计熔断）
+- httpx.RequestError（其余传输类：TransportError 子类/TooManyRedirects 等）→
+  DataSourceUnavailableError（EXCEPTION_411，重试耗尽后，计熔断）
 - HTTP 5xx → 可重试，耗尽后 DataSourceUnavailableError（EXCEPTION_411）
 - HTTP 3xx → DataSourceResponseError（EXCEPTION_413，端点迁移/配置漂移，确定性错误不重试不计熔断）
 - HTTP 429 → DataSourceRateLimitError（EXCEPTION_412，不重试）
 - HTTP 其他 4xx → DataSourceResponseError（EXCEPTION_413，确定性错误不重试）
+- 401/403 → ConfigurationError（EXCEPTION_101，API Key 凭证问题）
 - JSON 解析失败 → DataSourceResponseError（EXCEPTION_413，不重试、不计熔断）
 - CircuitBreakerOpenError → DataSourceUnavailableError（EXCEPTION_411，快速失败）
+
+熔断器探测槽位语义（R3-P0-1）：全部确定性错误路径（429/401/403/3xx/4xx/
+DecodingError/InvalidURL/JSON 解析失败）经 on_ignored() 释放半开探测槽位——
+请求已收到确定性结果（服务可连通），不计熔断统计；仅传输类瞬时故障
+（超时/连接失败/5xx）经 on_failure() 推进熔断统计。
 
 安全约束：客户端禁止开启 follow_redirects——newsapi/tavily 等 Key 走 header/body，
 跨域重定向转发会造成 Key 泄露面（httpx 仅对 Authorization 头做跨域降级保护）。
@@ -128,7 +139,8 @@ async def request_json_with_resilience(
         TimeoutError: 请求超时（重试耗尽后，EXCEPTION_302）
         DataSourceUnavailableError: 5xx/连接失败重试耗尽或熔断断开（EXCEPTION_411）
         DataSourceRateLimitError: HTTP 429 限流（EXCEPTION_412，不重试）
-        DataSourceResponseError: 4xx 或 JSON 解析失败（EXCEPTION_413，不重试）
+        DataSourceResponseError: 4xx/3xx/JSON 或响应体解码失败（EXCEPTION_413，不重试）
+        ConfigurationError: 401/403（API Key 凭证问题）或 URL 配置畸形（EXCEPTION_101）
     """
     # 第 1 步：熔断器快速失败
     try:
@@ -184,14 +196,44 @@ async def request_json_with_resilience(
                     )
                 resp.raise_for_status()
                 data = resp.json()
+    except (DataSourceRateLimitError, ConfigurationError, DataSourceResponseError):
+        # 确定性错误路径单点收敛（R3-P0-1）：429/401/403/3xx/4xx 五条状态码路径
+        # 在 with attempt 块内已转换的领域异常在此统一释放半开探测槽位——
+        # 请求已收到确定性响应（服务可连通），不计熔断统计。
+        # 本函数 on_ignored 调用点之一（其余：下方 DecodingError/InvalidURL/ValueError 分支，
+        # 每条异常路径恰好调用一次，无双释放）
+        circuit_breaker.on_ignored()
+        raise
     except httpx.TimeoutException as e:
+        # 注意：TimeoutException 是 TransportError 的子类——本分支必须位于
+        # RequestError/TransportError 分支之前（顺序是硬约束，302 语义依赖此顺序）
         circuit_breaker.on_failure()
         raise TimeoutError(
             message=f"数据源 {source_name} 请求超时",
             context={"source_name": source_name},
             cause=e,
         ) from e
-    except httpx.TransportError as e:
+    except httpx.DecodingError as e:
+        # 响应体解码失败（截断 gzip/不支持的 content-encoding）：确定性错误，
+        # 不计熔断统计，仅释放探测槽位（R3-P1-6 + R3-P0-1）
+        circuit_breaker.on_ignored()
+        raise DataSourceResponseError(
+            message=f"数据源 {source_name} 响应体解码失败（内容编码异常）",
+            context={"source_name": source_name},
+            cause=e,
+        ) from e
+    except httpx.InvalidURL as e:
+        # URL 配置畸形（环境变量/配置类）：确定性配置错误，不计熔断统计（R3-P1-6）
+        circuit_breaker.on_ignored()
+        raise ConfigurationError(
+            message=f"数据源 {source_name} API 地址配置非法（URL 格式错误）",
+            context={"source_name": source_name},
+            cause=e,
+        ) from e
+    except httpx.RequestError as e:
+        # 其余传输类故障（TransportError 子类/TooManyRedirects 等）：瞬时故障，
+        # 重试耗尽后计熔断（R3-P1-6：TransportError 放宽为 RequestError，
+        # 闭合 DecodingError 等非传输 RequestError 子类的穿透缺口）
         circuit_breaker.on_failure()
         raise DataSourceUnavailableError(
             message=f"数据源 {source_name} 连接失败（重试耗尽）",
@@ -206,7 +248,8 @@ async def request_json_with_resilience(
             cause=e,
         ) from e
     except ValueError as e:
-        # JSON 解析失败：不重试，不记熔断器（对端响应格式问题）
+        # JSON 解析失败：不重试，不记熔断器（对端响应格式问题），仅释放探测槽位
+        circuit_breaker.on_ignored()
         raise DataSourceResponseError(
             message=f"数据源 {source_name} 响应 JSON 解析失败",
             context={"source_name": source_name},

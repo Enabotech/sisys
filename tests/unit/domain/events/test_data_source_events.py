@@ -58,6 +58,82 @@ class TestDataSourceFetched:
         assert restored.source_name == "imf"
 
 
+class TestWithExecutionIdFieldPreservation:
+    """with_execution_id 字段保留语义（R3-P1-4 修复）
+
+    修复前手工逐字段重建丢失基类 9 个字段（event_id 重新生成、timestamp 漂移为
+    rebind 时刻、correlation_id/causation_id/metadata/version/source/schema_version/
+    payload 回落默认值）——追踪链静默断裂。判别锚点：回退为手工重建本组用例必红。
+    """
+
+    @staticmethod
+    def _make_fetched() -> DataSourceFetched:
+        """构造带全量基类字段的源事件（rebind 前快照）"""
+        return DataSourceFetched(
+            source_name="world-bank",
+            query="NY.GDP.MKTP.CD",
+            freshness_score=0.9,
+            confidence=0.85,
+            cache_hit=False,
+            latency_ms=42.0,
+            correlation_id=uuid.uuid4(),
+            causation_id=uuid.uuid4(),
+            metadata={"tenant": "t-1"},
+            version=7,
+            source="resolver",
+        )
+
+    def test_base_fields_preserved_after_rebind(self) -> None:
+        """rebind 后基类核心标识字段逐一保留（event_id/timestamp/correlation_id/
+        causation_id/metadata/version/source/schema_version/payload 九字段相等）"""
+        original = self._make_fetched()
+        rebound = original.with_execution_id(uuid.uuid4())
+        assert rebound.event_id == original.event_id  # 修复前：重新生成
+        assert rebound.timestamp == original.timestamp  # 修复前：漂移为 rebind 时刻
+        assert rebound.correlation_id == original.correlation_id
+        assert rebound.causation_id == original.causation_id
+        assert rebound.metadata == original.metadata
+        assert rebound.version == original.version
+        assert rebound.source == original.source
+        assert rebound.schema_version == original.schema_version
+        assert rebound.payload == original.payload
+        # 业务字段与绑定字段
+        assert rebound.execution_id != original.execution_id
+        assert rebound.aggregate_id == rebound.execution_id
+        assert rebound.source_name == original.source_name
+        assert rebound.query == original.query
+
+    def test_to_dict_equivalent_except_execution(self) -> None:
+        """rebind 前后 to_dict() 序列化面等价（execution_id/aggregate_id 除外）——
+        锁定消费方视角的序列化稳定性"""
+        original = self._make_fetched()
+        rebound = original.with_execution_id(uuid.uuid4())
+        raw_o, raw_r = original.to_dict(), rebound.to_dict()
+        payload_o = {k: v for k, v in raw_o["payload"].items() if k != "execution_id"}
+        payload_r = {k: v for k, v in raw_r["payload"].items() if k != "execution_id"}
+        assert payload_o == payload_r
+        assert raw_o["event_id"] == raw_r["event_id"]
+        assert raw_o["timestamp"] == raw_r["timestamp"]
+
+    def test_fetch_failed_base_fields_preserved(self) -> None:
+        """DataSourceFetchFailed.with_execution_id 同样保留基类字段（同构修复）"""
+        original = DataSourceFetchFailed(
+            source_name="newsapi",
+            query="keyword",
+            error_code="EXCEPTION_412",
+            error_message="限流",
+            correlation_id=uuid.uuid4(),
+            metadata={"attempt": 1},
+        )
+        rebound = original.with_execution_id(uuid.uuid4())
+        assert rebound.event_id == original.event_id
+        assert rebound.timestamp == original.timestamp
+        assert rebound.correlation_id == original.correlation_id
+        assert rebound.metadata == original.metadata
+        assert rebound.error_code == original.error_code
+        assert rebound.error_message == original.error_message
+
+
 class TestDataSourceFetchFailed:
     def test_event_type_and_aggregate(self) -> None:
         eid = uuid.uuid4()

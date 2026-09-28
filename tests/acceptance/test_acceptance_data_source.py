@@ -1159,10 +1159,11 @@ def when_extract_data_source_ports(context: dict[str, Any]) -> None:
 
 @then("端口数 = 8 个含 worldbank imf eurostat uspto ipcc newsapi tavily china_nbs")
 def then_eight_data_source_adapters_registered(context: dict[str, Any]) -> None:
-    """R2-2-C4/I3：按进程环境 KEY 确定性推导期望注册集合（兼容 {6,7,8} 态）。
+    """R2-2-C4/I3：按进程环境 KEY 确定性推导期望注册集合（兼容 {5,6,7,8} 态）。
 
-    newsapi/tavily 条件注册独立判定（composition_root `bool(os.getenv(...))`，
-    空串视为未配置），原 `len==8 or len==6` 断言在单 KEY 配置（7 端口）时误失败；
+    uspto/newsapi/tavily 条件注册独立判定（composition_root `bool(os.getenv(...))`，
+    空串视为未配置——uspto 自 R3-P1-3 起条件注册：PatentsView v1 强制 X-Api-Key，
+    无 Key 时注册只会必然 403），原 `len==8 or len==6` 断言在单 KEY 配置时误失败；
     测试进程 env 与 session 级 bootstrap 决策天然一致。
     """
     import os
@@ -1172,13 +1173,13 @@ def then_eight_data_source_adapters_registered(context: dict[str, Any]) -> None:
         "data_source_worldbank",
         "data_source_imf",
         "data_source_eurostat",
-        "data_source_uspto",
         "data_source_ipcc",
         "data_source_china_nbs",
     }
     expected = set(core_required)
     # 判定语义与 composition_root 条件注册逐字一致（bool() 拒 None 与空串）
     for port_name, env_key in (
+        ("data_source_uspto", "USPTO_API_KEY"),
         ("data_source_newsapi", "NEWSAPI_API_KEY"),
         ("data_source_tavily", "TAVILY_API_KEY"),
     ):

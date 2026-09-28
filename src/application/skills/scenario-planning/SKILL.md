@@ -153,7 +153,11 @@ eurostat + 趋势情报 tavily），禁止仅凭单一来源构建情景轴；�
 2. **Think**：输出驱动因素清单与数据源映射（§5），初判影响度 × 不确定性
 3. **Code**：生成含 `$DATA_SOURCE` 标记的采集代码。**标记使用规范**：
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
-   - 每个声明源至少一个标记；query 为自然语言指标描述（含议题/年限上下文）
+   - 每个声明源至少一个标记；**query 必须为该源的规范格式**（统计类适配器将 query
+     作为机器码/路径拼接 API URL，自然语言描述会确定性失败，R3-P1-2 契约对齐）：
+     - `tavily`：检索关键词（自然语言关键词为**正确**格式，含议题/年限上下文）
+     - `ipcc`：数据集路径键（如 `"ar6-wg1-spm"`=AR6 WG1 决策者摘要）
+     - `eurostat`：数据集代码（下划线格式，如 `"nrg_bal_c"`=能源平衡表）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
    - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
      每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
@@ -171,8 +175,8 @@ eurostat + 趋势情报 tavily），禁止仅凭单一来源构建情景轴；�
 
 ```python
 trends = $DATA_SOURCE("tavily", "欧洲能源转型 技术趋势 2035")
-climate = $DATA_SOURCE("ipcc", "IPCC AR6 SSP 排放情景数据")
-eu_energy = $DATA_SOURCE("eurostat", "欧盟 能源结构 可再生能源占比")
+climate = $DATA_SOURCE("ipcc", "ar6-wg1-spm")       # AR6 WG1 决策者摘要
+eu_energy = $DATA_SOURCE("eurostat", "nrg_bal_c")   # 能源平衡表
 
 # 采集后通过注入的 DATA_SOURCES dict 读取
 ipcc_payload = (DATA_SOURCES.get("ipcc") or {}).get("payload")

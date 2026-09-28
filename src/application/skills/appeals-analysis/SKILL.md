@@ -155,7 +155,9 @@ Think 阶段必须先输出**维度 → 顾客洞察指标 → 数据源**映射
 2. **Think**：输出维度 → 指标 → 数据源映射（§5），声明八维度采集目标
 3. **Code**：生成含 `$DATA_SOURCE` 标记的采集代码。**标记使用规范**：
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
-   - 每个声明源恰好一个标记；query 为自然语言指标描述（含产品类别/目标客群/地域上下文）
+   - 每个声明源恰好一个标记；**query 必须为该源的规范格式**（R3-P1-2 契约对齐）：
+     - `tavily` / `newsapi`：检索关键词（自然语言关键词为**正确**格式，含产品类别/目标客群/地域上下文）
+     - `china-nbs`：站点相对路径（如 `"sj/zxfb"`=数据发布；非自然语言描述）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
    - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
      每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
@@ -172,7 +174,7 @@ Think 阶段必须先输出**维度 → 顾客洞察指标 → 数据源**映射
 ```python
 customer_insights = $DATA_SOURCE("tavily", "智能手表 一线城市 25-35 岁运动人群 顾客评价 价格 性能 易用性 售后")
 market_sentiment = $DATA_SOURCE("newsapi", "智能手表 消费者 口碑 舆情 社会接受度")
-cn_consumption = $DATA_SOURCE("china-nbs", "中国居民消费支出结构 智能穿戴 零售统计")
+cn_consumption = $DATA_SOURCE("china-nbs", "sj/zxfb")  # 国家局数据发布
 
 # 采集后通过注入的 DATA_SOURCES dict 读取
 tavily_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")

@@ -63,7 +63,11 @@ class DataSourceRef:
         name: 数据源名称（kebab-case，如 "world-bank"）
         url: 数据源基础 URL（必须 http/https）
         ttl_seconds: 缓存 TTL（秒），∈ [60, 2592000]，默认 86400（1 天）
-        required_fields: 响应必需字段（缺失抛 DataSourceResponseError）
+        required_fields: 声明性元数据（descriptive）——供 SOP/4-1c 集成层声明
+            期望的响应字段，不触发通用运行时校验（8 个适配器响应结构异构——
+            WorldBank [meta,rows]/NewsAPI articles/Tavily results 字段路径不同，
+            通用校验需每适配器定制映射，属 4-1c 集成范畴）；运行时结构校验由
+            各适配器 _extract_* 承担（结构非法即抛 DataSourceResponseError）
         api_type: API 类型（决定适配器解析策略）
     """
 
@@ -122,6 +126,15 @@ class DataFreshness:
 
     def __post_init__(self) -> None:
         """字段不变量校验"""
+        # tz-awareness 门禁（R3-P1-5 修复）：naive 时间戳静默通过会在 score()/
+        # is_stale() 与 aware 时刻比较时抛原生 TypeError——「成功采集被翻转为
+        # 内置异常」+「首次必失败、后续成功」间歇性故障（缓存已写、下次经
+        # _as_aware_utc 归一命中成功），必须在构造侧拦截
+        if self.source_timestamp.tzinfo is None:
+            raise EntityValidationError(
+                message="source_timestamp 必须带时区信息（tz-aware，UTC 推荐）",
+                context={"entity": "DataFreshness", "field": "source_timestamp"},
+            )
         if self.ttl_seconds <= 0:
             raise EntityValidationError(
                 message=f"ttl_seconds 必须 > 0，实际 {self.ttl_seconds}",
@@ -137,11 +150,20 @@ class DataFreshness:
         """计算 at 时刻的新鲜度评分（指数衰减，∈ [0, 1]）
 
         Args:
-            at: 评估时刻
+            at: 评估时刻（必须 tz-aware——naive 输入抛 EntityValidationError，
+                防止与 aware source_timestamp 混算抛原生 TypeError 逃逸领域契约）
 
         Returns:
             新鲜度评分；未来时间戳（age < 0）按满分 1.0 处理（时钟偏移容错）
+
+        Raises:
+            EntityValidationError: at 为 naive datetime
         """
+        if at.tzinfo is None:
+            raise EntityValidationError(
+                message="score() 评估时刻 at 必须带时区信息（tz-aware）",
+                context={"entity": "DataFreshness", "field": "at"},
+            )
         age_seconds = max(0.0, (at - self.source_timestamp).total_seconds())
         return math.pow(0.5, age_seconds / self.half_life_seconds)
 
@@ -149,11 +171,19 @@ class DataFreshness:
         """判定 at 时刻数据是否过期（age > ttl_seconds）
 
         Args:
-            at: 评估时刻
+            at: 评估时刻（必须 tz-aware——naive 输入抛 EntityValidationError）
 
         Returns:
             True 表示已过期（应触发重新采集）
+
+        Raises:
+            EntityValidationError: at 为 naive datetime
         """
+        if at.tzinfo is None:
+            raise EntityValidationError(
+                message="is_stale() 评估时刻 at 必须带时区信息（tz-aware）",
+                context={"entity": "DataFreshness", "field": "at"},
+            )
         return (at - self.source_timestamp).total_seconds() > self.ttl_seconds
 
 
@@ -190,6 +220,18 @@ class DataSourceResult:
             raise EntityValidationError(
                 message="payload 不能为空",
                 context={"entity": "DataSourceResult", "field": "payload"},
+            )
+        # tz-awareness 门禁（R3-P1-5，同 DataFreshness）：两时间戳均须 aware，
+        # naive 输入在下游 score()/is_stale()/事件发布链抛原生 TypeError
+        if self.source_timestamp.tzinfo is None:
+            raise EntityValidationError(
+                message="source_timestamp 必须带时区信息（tz-aware，UTC 推荐）",
+                context={"entity": "DataSourceResult", "field": "source_timestamp"},
+            )
+        if self.fetched_at.tzinfo is None:
+            raise EntityValidationError(
+                message="fetched_at 必须带时区信息（tz-aware，UTC 推荐）",
+                context={"entity": "DataSourceResult", "field": "fetched_at"},
             )
         _validate_score(self.confidence, "confidence", "DataSourceResult")
 

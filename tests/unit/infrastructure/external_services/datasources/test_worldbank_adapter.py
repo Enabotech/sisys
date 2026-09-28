@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import httpx
@@ -198,6 +199,34 @@ class TestWorldBankAdapterFailures:
         await adapter.close()
 
     @pytest.mark.asyncio
+    async def test_message_error_form_raises_413_not_silent_empty_success(self) -> None:
+        """World Bank message 错误形态 `[{"message": [...]}, []]` → 413（R3-P1-8 修复）
+
+        无效指标码的真实 API 错误形态：meta 位是含 "message" 键的 dict（正常 meta
+        含 page/pages 分页字段，永不含 message 键）。修复前该形态经结构校验返回
+        空 rows——产出「高置信度空 payload 成功结果」进缓存（静默数据缺失）。
+        """
+        adapter = _make_adapter(
+            httpx.MockTransport(
+                lambda req: httpx.Response(
+                    200,
+                    json=[
+                        {
+                            "message": [
+                                {"id": "120", "key": "Invalid value", "value": "The provided indicator value is invalid"}
+                            ]
+                        },
+                        [],
+                    ],
+                )
+            )
+        )
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="world-bank", query="INVALID.CODE.X"))
+        assert exc_info.value.code == "EXCEPTION_413"
+        await adapter.close()
+
+    @pytest.mark.asyncio
     async def test_circuit_breaker_opens_after_threshold(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(503, json={})
@@ -210,4 +239,49 @@ class TestWorldBankAdapterFailures:
         # 第三次调用：熔断器已断开，快速失败（不再发起 HTTP）
         with pytest.raises(DataSourceUnavailableError):
             await adapter.fetch(DataSourceQuery(source_name="world-bank", query="GDP"))
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_half_open_probe_with_deterministic_error_recovers(self) -> None:
+        """半开探测命中确定性错误（429）后熔断器不楔死，服务恢复即自愈（R3-P0-1
+        端到端回归：修复前探测槽位耗尽后永久 411，后端健康也不恢复）
+
+        场景：5xx ×2 打开熔断 → recovery 窗口后探测请求恰遇 429（配额限流）→
+        on_ignored 释放探测槽 → 下一次请求作为新探测放行 → 服务已恢复 200 →
+        熔断闭合采集成功。熔断器注入短 recovery_timeout（0.05s + sleep）加速窗口。
+        """
+        from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
+
+        state = {"phase": "down"}  # down → probe_429 → up
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if state["phase"] == "down":
+                return httpx.Response(503, json={})
+            if state["phase"] == "probe_429":
+                return httpx.Response(429, json={})
+            return httpx.Response(
+                200, json=[{"page": 1}, [{"indicator": {"id": "NY.GDP.MKTP.CD"}, "value": 1.0, "date": "2024"}]]
+            )
+
+        config = WorldBankConfig(api_url=_API_URL, timeout=5.0)
+        adapter = WorldBankAdapter(
+            config=config,
+            client=httpx.AsyncClient(base_url=_API_URL, transport=httpx.MockTransport(handler), timeout=5.0),
+            circuit_breaker=CircuitBreaker(failure_threshold=5, recovery_timeout=0.05, name="test-wb"),
+            retry_min_wait=0.01,
+            retry_max_wait=0.02,
+        )
+        # 阶段 1：连续 5xx → 熔断打开
+        for _ in range(2):
+            with pytest.raises(DataSourceUnavailableError):
+                await adapter.fetch(DataSourceQuery(source_name="world-bank", query="GDP"))
+        # 阶段 2：recovery 窗口后探测请求命中 429（确定性错误释放探测槽——修复前此后永久 411）
+        await asyncio.sleep(0.06)
+        state["phase"] = "probe_429"
+        with pytest.raises(DataSourceRateLimitError):
+            await adapter.fetch(DataSourceQuery(source_name="world-bank", query="GDP"))
+        # 阶段 3：服务恢复 → 下一次请求可探测且成功（楔死实现在此抛 411「熔断器已断开」）
+        state["phase"] = "up"
+        result = await adapter.fetch(DataSourceQuery(source_name="world-bank", query="GDP"))
+        assert result.source_name == "world-bank"
         await adapter.close()

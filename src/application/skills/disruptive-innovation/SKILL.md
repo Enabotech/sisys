@@ -147,7 +147,9 @@ Think 阶段必须先输出**颠覆信号 → 数据源**映射计划，再生�
 2. **Think**：输出颠覆信号假设与数据源映射（§5），明确双源互证计划
 3. **Code**：生成含 `$DATA_SOURCE` 标记的采集代码。**标记使用规范**：
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
-   - 每个声明源至少一个标记；query 为自然语言指标描述（含技术领域上下文）
+   - 每个声明源至少一个标记；**query 必须为该源的规范格式**（R3-P1-2 契约对齐）：
+     - `uspto`：**英文**检索关键词（匹配 patent_title 全文，如 `"solid-state battery"`）
+     - `tavily`：检索关键词（自然语言关键词为**正确**格式，含技术领域上下文）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
    - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
      每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
@@ -164,7 +166,7 @@ Think 阶段必须先输出**颠覆信号 → 数据源**映射计划，再生�
 采集代码骨架示例：
 
 ```python
-patents = $DATA_SOURCE("uspto", "固态电池 专利申请趋势 核心专利布局")
+patents = $DATA_SOURCE("uspto", "solid-state battery")   # 英文关键词匹配 patent_title
 market = $DATA_SOURCE("tavily", "固态电池 创业公司 融资 商业化进展")
 
 # 采集后通过注入的 DATA_SOURCES dict 读取
@@ -176,7 +178,7 @@ uspto_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
 | 异常 | 语义 | LLM 应对话术 |
 |------|------|-------------|
 | 411 数据源不可用 | 5xx/连接失败/熔断 | 「数据源 X 暂不可用，颠覆信号仅单源支撑，强度评级封顶 0.5 并显式标注」 |
-| 411 未注册（Key 缺失） | tavily 未配置 API Key，冷启动未注册 | 「数据源 tavily 因 API Key 未配置未注册，市场情报维度缺失，**输出中显式标注数据缺口**：颠覆信号仅专利单源支撑，强度评级封顶 0.5」 |
+| 411 未注册（Key 缺失） | tavily/uspto 未配置 API Key，冷启动未注册（uspto 自 R3 起条件注册） | 「数据源 X 因 API Key 未配置未注册（tavily 缺失→市场情报维度缺失；uspto 缺失→专利维度缺失），**输出中显式标注数据缺口**：仅单源支撑的颠覆信号强度评级封顶 0.5」 |
 | 412 限流 | 429 配额耗尽 | 「数据源 X 触发限流，使用缓存快照（freshness_score 已折算）并标注数据时效」 |
 | 413 解析失败 | 响应格式异常（不可重试） | 「数据源 X 响应解析失败，跳过该源并在 sources 字段中剔除，禁止编造观测值」 |
 | 207 白名单违规 | 标记引用未声明数据源 | 不发生（本 SOP 标记严格使用白名单内 2 源）；若出现说明代码生成偏离 SOP，重新按 §6 生成 |
