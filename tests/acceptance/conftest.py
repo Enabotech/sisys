@@ -3,7 +3,8 @@
 本文件定义 acceptance 测试目录的专属 fixture 和 pytest hook：
 - pytest_collection_modifyitems: 自动标记 @pytest.mark.acceptance 及服务依赖
 - pytest_sessionfinish: session 结束清理遗留的 sisys-sandbox-* 容器
-- acceptance_env_config / acceptance_redis_client: session 级环境配置 + Redis 共享 fixture
+- acceptance_env_config: session 级环境配置（Redis 客户端由各验收文件场景级自建，
+  R2-2-C2/I2 移除共享 fixture——session 客户端 × function 循环跨循环不可用）
 - LLM 端点可达性探测 helper（防止内网不可达 endpoint 导致 fixture 误判可用）
 
 Author:
@@ -91,7 +92,7 @@ def run_with_bdd_timeout(
 
 
 # =============================================================================
-# 共享 Fixtures（Round 1 重构：消除 4-1b / semantic_cache 等 .py 内联 _redis_client 重复）
+# 共享 Fixtures（仅环境配置；Redis 客户端由各验收文件场景级自建——R2-2-C2/I2）
 # =============================================================================
 
 
@@ -103,29 +104,6 @@ def acceptance_env_config() -> TestEnvConfig:
         TestEnvConfig: 测试环境配置实例
     """
     return get_test_env()
-
-
-@pytest.fixture(scope="session")
-def acceptance_redis_client(acceptance_env_config: TestEnvConfig) -> Any:
-    """Acceptance 测试 session 级共享 Redis 客户端（动态 skip）。
-
-    多个验收测试文件（4-1b data_source / semantic_cache 等）原本各自内联同款 fixture，
-    造成每个测试文件重建连接池。本 fixture 提取为 session 级共享，避免 xdist 多 worker 重复建连。
-
-    Returns:
-        aioredis.Redis: 解码响应为字符串的异步 Redis 客户端
-
-    Note:
-        失败时通过 pytest.skip() 动态跳过（符合 CLAUDE.md §5 禁止写死 @pytest.mark.skip 红线）
-    """
-    import redis.asyncio as aioredis
-
-    return aioredis.Redis(
-        host=acceptance_env_config.redis.host,
-        port=acceptance_env_config.redis.port,
-        password=acceptance_env_config.redis.password,
-        decode_responses=True,
-    )
 
 
 # 服务依赖关键词 → marker 映射表
