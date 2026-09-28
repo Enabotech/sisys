@@ -160,6 +160,10 @@ class NewsAPIAdapter:
                     ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
                 except ValueError:
                     continue
+                # naive/aware 双分支归一（R2-2-B5 防御性加固：混合 aware/naive 文章
+                # 比较会抛 TypeError 逃逸；naive 按 UTC 解释，aware 换算到 UTC——
+                # 禁止无条件 astimezone（naive 会按宿主本地时区换算引入偏移）
+                ts = ts.replace(tzinfo=UTC) if ts.tzinfo is None else ts.astimezone(UTC)
                 if latest is None or ts > latest:
                     latest = ts
         return latest or datetime.now(UTC)

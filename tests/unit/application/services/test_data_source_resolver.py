@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -32,6 +33,7 @@ from src.domain.exceptions import (
     BusinessRuleViolationError,
     DataSourceRateLimitError,
     DataSourceUnavailableError,
+    ValidationError,
 )
 from src.domain.ports.data_source import DataSourceQuery
 from src.domain.value_objects.data_source import (
@@ -498,6 +500,128 @@ class TestParameters:
         assert build_data_source_cache_key("t-1", "world-bank", "GDP") == build_data_source_cache_key(
             "t-1", "world-bank", "GDP", ()
         )
+
+
+# ===================================================================
+# H6 ttl 权威统一 / H7 事件脱敏 / H8 失败事件唯一发布 / H9 并发上限
+# ===================================================================
+
+
+class TestFreshnessAuthority:
+    @pytest.mark.asyncio
+    async def test_freshness_ttl_unified_to_whitelist(self) -> None:
+        """R2-2-B8/H6：适配器 config ttl 与白名单 ttl 不一致时，
+        返回结果的 freshness 以白名单为权威（is_stale 判定口径统一）。"""
+        stub = _StubAdapter("world-bank", ttl_seconds=7200)  # 适配器侧 ttl 不同
+        service, _ = _make_service(adapters={"world-bank": stub})
+        metadata = _make_metadata("world-bank", ttl_seconds=3600)
+        result = await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
+        assert result.freshness.ttl_seconds == 3600
+
+
+class TestFailedEventPublication:
+    @pytest.mark.asyncio
+    async def test_single_fetch_failure_publishes_exactly_one_event(self) -> None:
+        """R2-2-C8/H8：直接 fetch 失败也发布 DataSourceFetchFailed（恰好 1 条）。"""
+        stub = _StubAdapter(
+            "world-bank", error=DataSourceUnavailableError(message="down", context={"source_name": "world-bank"})
+        )
+        bus = InMemoryEventBus()
+        service, _ = _make_service(adapters={"world-bank": stub}, event_bus=bus)
+        metadata = _make_metadata("world-bank")
+        with pytest.raises(DataSourceUnavailableError):
+            await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
+        failed = [e for e in bus.published_events if isinstance(e, DataSourceFetchFailed)]
+        assert len(failed) == 1
+        assert failed[0].source_name == "world-bank"
+
+    @pytest.mark.asyncio
+    async def test_fetch_many_partial_failure_no_double_publish(self) -> None:
+        """防双发回归锁：fetch_many 一源失败 → 失败事件总数恰好 1（唯一发布点）。"""
+        ok = _StubAdapter("world-bank")
+        bad = _StubAdapter("eurostat", error=DataSourceUnavailableError(message="down", context={"source_name": "eurostat"}))
+        bus = InMemoryEventBus()
+        service, _ = _make_service(adapters={"world-bank": ok, "eurostat": bad}, event_bus=bus)
+        metadata = _make_metadata("world-bank", "eurostat")
+        await service.fetch_many(
+            metadata,
+            (
+                DataSourceQuery(source_name="world-bank", query="a"),
+                DataSourceQuery(source_name="eurostat", query="b"),
+            ),
+        )
+        failed = [e for e in bus.published_events if isinstance(e, DataSourceFetchFailed)]
+        assert len(failed) == 1
+        assert failed[0].source_name == "eurostat"
+
+    @pytest.mark.asyncio
+    async def test_whitelist_violation_publishes_no_event(self) -> None:
+        """白名单违规非采集失败语义：不发布 DataSourceFetchFailed。"""
+        service, bus = _make_service()
+        metadata = _make_metadata("world-bank")
+        with pytest.raises(BusinessRuleViolationError):
+            await service.fetch(metadata, "newsapi", "q")
+        assert not [e for e in bus.published_events if isinstance(e, DataSourceFetchFailed)]
+
+
+class TestFailedEventRedaction:
+    @pytest.mark.asyncio
+    async def test_error_message_url_api_key_redacted(self) -> None:
+        """R2-2-C7/H7：失败事件 error_message 的 URL API Key 脱敏（先脱敏后截断）。"""
+        leaky = DataSourceUnavailableError(
+            message="采集失败: https://api.example.test/x?api_key=test1234fake&q=gdp",
+            context={"source_name": "world-bank"},
+        )
+        stub = _StubAdapter("world-bank", error=leaky)
+        bus = InMemoryEventBus()
+        service, _ = _make_service(adapters={"world-bank": stub}, event_bus=bus)
+        metadata = _make_metadata("world-bank")
+        with pytest.raises(DataSourceUnavailableError):
+            await service.fetch(metadata, "world-bank", "GDP", tenant_id="t-1")
+        failed = [e for e in bus.published_events if isinstance(e, DataSourceFetchFailed)]
+        assert len(failed) == 1
+        assert "test1234fake" not in failed[0].error_message
+        assert "***REDACTED***" in failed[0].error_message
+        assert "q=gdp" in failed[0].error_message  # 非敏感参数原样保留
+
+
+class _ConcurrencyProbeAdapter(_StubAdapter):
+    """并发探针适配器（记录进入 fetch 的峰值并发数）。"""
+
+    def __init__(self, name: str, tracker: dict[str, int], delay: float = 0.05) -> None:
+        super().__init__(name)
+        self._tracker = tracker
+        self._delay = delay
+
+    async def fetch(self, query: DataSourceQuery) -> DataSourceResult:
+        self._tracker["current"] += 1
+        self._tracker["peak"] = max(self._tracker["peak"], self._tracker["current"])
+        try:
+            await asyncio.sleep(self._delay)
+            return await super().fetch(query)
+        finally:
+            self._tracker["current"] -= 1
+
+
+class TestFetchManyConcurrencyLimit:
+    @pytest.mark.asyncio
+    async def test_peak_concurrency_bounded(self) -> None:
+        """R2-2-C9/H9：fetch_many 峰值并发不超过 max_concurrency。"""
+        tracker = {"current": 0, "peak": 0}
+        adapters = {f"src-{i}": _ConcurrencyProbeAdapter(f"src-{i}", tracker) for i in range(4)}
+        service = DataSourceResolverService(adapters=adapters, cache=_InMemoryCache(), max_concurrency=2)
+        metadata = _make_metadata("src-0", "src-1", "src-2", "src-3")
+        results = await service.fetch_many(
+            metadata, tuple(DataSourceQuery(source_name=f"src-{i}", query="q") for i in range(4))
+        )
+        assert len(results) == 4
+        assert all(r is not None for r in results)
+        assert tracker["peak"] <= 2
+
+    def test_invalid_max_concurrency_raises_201(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            DataSourceResolverService(adapters={}, cache=_InMemoryCache(), max_concurrency=0)
+        assert exc_info.value.code == "EXCEPTION_201"
 
 
 # ===================================================================

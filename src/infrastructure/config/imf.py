@@ -42,6 +42,10 @@ class IMFConfig:
             ttl_seconds = int(ttl_raw)
         except (ValueError, TypeError):
             raise ConfigurationError(message=f"IMF_TTL_SECONDS 值非法: {ttl_raw!r}（需要整数）") from None
+        if timeout <= 0:
+            raise ConfigurationError(message=f"IMF_TIMEOUT 必须为正数，当前值: {timeout}")
+        if ttl_seconds <= 0:
+            raise ConfigurationError(message=f"IMF_TTL_SECONDS 必须为正整数，当前值: {ttl_seconds}")
         return cls(
             api_url=os.getenv("IMF_API_URL", cls.api_url),
             timeout=timeout,

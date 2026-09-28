@@ -79,6 +79,66 @@ class TestWorldBankAdapterSuccess:
         await adapter.close()
 
 
+class TestWorldBankURLAndRedirect:
+    """R2-2-B6/H4 路径段编码 + R2-2-B7/H5 3xx 映射。"""
+
+    @pytest.mark.asyncio
+    async def test_legitimate_indicator_code_url_unchanged(self) -> None:
+        """合法指标代码（NY.GDP.MKTP.CD）经 quote 原样通过（回归保护）。"""
+        captured: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured.append(str(request.url))
+            return _ok_handler(request)
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        await adapter.fetch(DataSourceQuery(source_name="world-bank", query="NY.GDP.MKTP.CD", parameters=(("country", "CN"),)))
+        assert "/country/CN/indicator/NY.GDP.MKTP.CD" in captured[0]
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_special_characters_encoded_in_path(self) -> None:
+        """空格/斜杠/问号注入字符被 percent 编码（URL 语义不被破坏）。"""
+        captured: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured.append(str(request.url))
+            return _ok_handler(request)
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        await adapter.fetch(DataSourceQuery(source_name="world-bank", query="a b/c?d=e"))
+        assert "a%20b%2Fc%3Fd%3De" in captured[0]
+        assert "?d=e" not in captured[0].split("?")[0]  # 未注入查询串
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_dotdot_segment_rejected_413(self) -> None:
+        """路径穿越序列（quote 对点号零防护）显式拒绝 → 413。"""
+        adapter = _make_adapter()
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="world-bank", query="../admin"))
+        assert exc_info.value.code == "EXCEPTION_413"
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_redirect_3xx_raises_413_no_retry(self) -> None:
+        """301 端点迁移 → 413（确定性配置漂移），不重试；location 仅入 context 禁入 message。"""
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(301, headers={"location": "https://api.worldbank.org/v2/new"})
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="world-bank", query="NY.GDP.MKTP.CD"))
+        assert exc_info.value.code == "EXCEPTION_413"
+        assert calls["n"] == 1  # 不重试
+        assert "location" not in exc_info.value.message
+        assert exc_info.value.context.get("location") == "https://api.worldbank.org/v2/new"
+        await adapter.close()
+
+
 class TestWorldBankAdapterFailures:
     @pytest.mark.asyncio
     async def test_5xx_retry_exhausted_raises_unavailable(self) -> None:

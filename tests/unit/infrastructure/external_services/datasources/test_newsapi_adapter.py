@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -86,6 +87,32 @@ class TestNewsAPIAdapterSuccess:
     async def test_health_check(self) -> None:
         adapter = _make_adapter(httpx.MockTransport(_ok_handler))
         assert await adapter.health_check() is True
+        await adapter.close()
+
+
+class TestNewsAPITimestampNormalization:
+    """R2-2-B5/H3 混合 aware/naive publishedAt 归一（TypeError 逃逸闭合）。"""
+
+    @pytest.mark.asyncio
+    async def test_mixed_aware_naive_articles_no_type_error(self) -> None:
+        """aware（带 Z）与 naive（无偏移）文章混合比较不抛 TypeError，取最新值。"""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "status": "ok",
+                    "totalResults": 2,
+                    "articles": [
+                        {"title": "A", "url": "https://n.com/1", "publishedAt": "2026-09-01T08:00:00Z"},
+                        {"title": "B", "url": "https://n.com/2", "publishedAt": "2026-09-01T10:00:00"},  # naive 更新
+                    ],
+                },
+            )
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        result = await adapter.fetch(DataSourceQuery(source_name="newsapi", query="q"))
+        assert result.source_timestamp == datetime(2026, 9, 1, 10, 0, tzinfo=UTC)  # naive 按 UTC 归一后比较
         await adapter.close()
 
 

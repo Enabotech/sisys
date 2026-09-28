@@ -17,6 +17,7 @@ import json
 import logging
 import time
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Mapping
 
@@ -25,6 +26,8 @@ from src.domain.events.data_source_events import DataSourceFetched, DataSourceFe
 from src.domain.exceptions import (
     BusinessRuleViolationError,
     DataSourceUnavailableError,
+    ValidationError,
+    redact_url_sensitive_params,
 )
 from src.domain.ports.data_source import DataSourcePort, DataSourceQuery
 from src.domain.ports.event_publisher import EventPublisher
@@ -90,6 +93,8 @@ class DataSourceResolverService:
         adapters: Mapping[str, DataSourcePort],
         cache: L1CachePort,
         event_publisher: EventPublisher | None = None,
+        *,
+        max_concurrency: int = 4,
     ) -> None:
         """初始化编排服务
 
@@ -97,10 +102,25 @@ class DataSourceResolverService:
             adapters: 数据源适配器映射（name → DataSourcePort）
             cache: L1 缓存端口（Redis KV）
             event_publisher: 事件发布端口（可选）
+            max_concurrency: fetch_many 并发采集上限（默认 4；仅约束 fetch_many 的
+                gather 协程，不影响单源 fetch 语义。8 个外部配额敏感源场景下
+                兼顾并发收益与免费配额突发保护——R2-2-C9/H9）
+
+        Raises:
+            ValidationError: max_concurrency < 1（EXCEPTION_201）
         """
+        if max_concurrency < 1:
+            raise ValidationError(
+                message=f"max_concurrency 必须 >= 1，实际 {max_concurrency}",
+                context={"stage": "init", "field": "max_concurrency"},
+            )
         self._adapters = adapters
         self._cache = cache
         self._event_publisher = event_publisher
+        # 实例属性为正确位置：本服务以 SINGLETON 注册（composition_root），
+        # 全进程唯一实例，实例属性即全局共享；3.10+ Semaphore 首次 acquire 时
+        # 才惰性绑定运行循环，同步 __init__ 创建安全
+        self._fetch_semaphore = asyncio.Semaphore(max_concurrency)
 
     # ===== 公开端口方法 =====
 
@@ -125,15 +145,30 @@ class DataSourceResolverService:
             return cached
 
         # 第 2 步：适配器采集（parameters 透传——R2-P1-1 修复，不再静默丢弃）
+        # 失败事件唯一发布点（R2-2-C8/H8：fetch_many 收敛循环不再发布，结构性防双发；
+        # except Exception 不捕获 CancelledError——3.8+ BaseException，取消语义安全）
         adapter = self._adapters.get(name)
         if adapter is None:
-            raise DataSourceUnavailableError(
+            error = DataSourceUnavailableError(
                 message=f"数据源 {name} 未注册（可能因 API Key 缺失被条件注册排除）",
                 context={"source_name": name},
             )
+            await self._publish_failed(name, query, error, execution_id=execution_id)
+            raise error
         started = time.monotonic()
-        result = await adapter.fetch(DataSourceQuery(source_name=name, query=query, parameters=parameters, tenant_id=tenant_id))
+        try:
+            result = await adapter.fetch(
+                DataSourceQuery(source_name=name, query=query, parameters=parameters, tenant_id=tenant_id)
+            )
+        except Exception as e:
+            await self._publish_failed(name, query, e, execution_id=execution_id)
+            raise
         latency_ms = (time.monotonic() - started) * 1000
+
+        # is_stale 判定权威统一为白名单 ttl（R2-2-B8/H6：消除适配器 config ttl
+        # 与缓存窗口的判定口径分裂；保留适配器 half_life_seconds 扩展面）
+        if result.freshness.ttl_seconds != allowed.ttl_seconds:
+            result = replace(result, freshness=replace(result.freshness, ttl_seconds=allowed.ttl_seconds))
 
         # 第 3 步：写缓存（故障降级：异常仅告警）
         await self._write_cache(cache_key, result, allowed.ttl_seconds)
@@ -163,9 +198,9 @@ class DataSourceResolverService:
         if not requests:
             return ()
 
-        outcomes = await asyncio.gather(
-            *(
-                self.fetch(
+        async def _bounded_fetch(req: DataSourceQuery) -> DataSourceResult:
+            async with self._fetch_semaphore:
+                return await self.fetch(
                     tool_metadata,
                     req.source_name,
                     req.query,
@@ -173,8 +208,9 @@ class DataSourceResolverService:
                     tenant_id=req.tenant_id or tenant_id,
                     execution_id=execution_id,
                 )
-                for req in requests
-            ),
+
+        outcomes = await asyncio.gather(
+            *(_bounded_fetch(req) for req in requests),
             return_exceptions=True,
         )
 
@@ -191,7 +227,7 @@ class DataSourceResolverService:
             error = outcome
             if first_error is None:
                 first_error = error
-            await self._publish_failed(req, error, execution_id=execution_id)
+            # 失败事件由 fetch 内部唯一发布（H8 结构性防双发），此处仅收敛
             results.append(None)
 
         if first_error is not None and not any(results):
@@ -305,20 +341,28 @@ class DataSourceResolverService:
 
     async def _publish_failed(
         self,
-        req: DataSourceQuery,
+        source_name: str,
+        query: str,
         error: Exception,
         execution_id: uuid.UUID | None = None,
     ) -> None:
-        """发布 DataSourceFetchFailed 事件（event_publisher 为 None 时跳过）"""
+        """发布 DataSourceFetchFailed 事件（event_publisher 为 None 时跳过）
+
+        error_message 先脱敏后截断（R2-2-C7/H7：防 URL query 参数中 API Key
+        经事件通道泄露；截断点可能切开密文锚点，故顺序不可调换）。
+        注意取舍：发布异常会掩盖原始采集异常（与既有多源收敛路径一致，
+        事件发布为尽力而为的遥测，不阻断主错误传播）。
+        """
         if self._event_publisher is None:
             return
         error_code = getattr(error, "code", type(error).__name__)
-        error_message = getattr(error, "message", str(error))[:500]
+        raw_message = getattr(error, "message", str(error))
+        error_message = redact_url_sensitive_params(str(raw_message))[:500]
         event = DataSourceFetchFailed(
-            source_name=req.source_name,
-            query=req.query,
+            source_name=source_name,
+            query=query,
             error_code=str(error_code),
-            error_message=str(error_message),
+            error_message=error_message,
         )
         if execution_id is not None:
             event = event.with_execution_id(execution_id)

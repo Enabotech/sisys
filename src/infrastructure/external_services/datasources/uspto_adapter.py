@@ -145,9 +145,11 @@ class USPTOAdapter:
             raw = patent.get("patent_date") if isinstance(patent, dict) else None
             if isinstance(raw, str):
                 try:
-                    ts = datetime.fromisoformat(raw).replace(tzinfo=UTC)
+                    ts = datetime.fromisoformat(raw)
                 except ValueError:
                     continue
+                # naive/aware 双分支归一（R2-2-B5：naive 按 UTC 解释，aware 换算到 UTC）
+                ts = ts.replace(tzinfo=UTC) if ts.tzinfo is None else ts.astimezone(UTC)
                 if latest is None or ts > latest:
                     latest = ts
         return latest or datetime.now(UTC)

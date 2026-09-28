@@ -986,6 +986,7 @@ def with_error_mapping(
 |------|------|------|------|------|----------|
 | HTTP 429 | DataSourceRateLimitError | 412 | ✗ | ✓ | API Key 限流（NewsAPI 免费 100/天 等） |
 | HTTP 401 / 403 | ConfigurationError | 101 | ✗ | ✗ | API Key 无效 / 未授权 / 配额超限（Round 2 修复：明确凭证语义，避免归"响应解析失败"误导运维） |
+| HTTP 3xx | DataSourceResponseError | 413 | ✗ | ✗ | 端点迁移 / 配置漂移（确定性错误；location 仅入 context 经 to_dict 脱敏，禁入 message——R2-2-B7 修复，禁止开启 follow_redirects 防跨域转发泄露 header 内 Key） |
 | HTTP 其他 4xx | DataSourceResponseError | 413 | ✗ | ✗ | 客户端确定性错误（400/404/422 等） |
 | HTTP 5xx（重试耗尽） | DataSourceUnavailableError | 411 | ✓ | ✓ | 服务端瞬时故障（500/502/503/504） |
 | `httpx.TimeoutException` | TimeoutError | 302 | ✓ | ✓ | 网络抖动超时（与全项目 embedding/llm 共用） |

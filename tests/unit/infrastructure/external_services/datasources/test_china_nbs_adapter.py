@@ -16,6 +16,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -31,8 +33,8 @@ from src.infrastructure.config.china_nbs import ChinaNBSConfig
 from src.infrastructure.external_services.datasources.china_nbs_adapter import ChinaNBSAdapter
 
 
-def _make_crawler_mock(status_sequence: list[dict]) -> AsyncMock:
-    """构造 CrawlerClientPort mock（get_task_status 按序返回状态）。"""
+def _make_crawler_mock(status_sequence: Sequence[dict[str, Any] | Exception]) -> AsyncMock:
+    """构造 CrawlerClientPort mock（get_task_status 按序返回状态或抛异常）。"""
     mock = AsyncMock(spec=CrawlerClientPort)
     mock.submit_task = AsyncMock(return_value="task-abc-123")
     mock.get_task_status = AsyncMock(side_effect=status_sequence)
@@ -53,6 +55,68 @@ def _make_adapter(crawler: AsyncMock) -> ChinaNBSAdapter:
         crawler_client=crawler,
         config=ChinaNBSConfig(poll_interval_sec=0.01, poll_timeout_sec=5.0),
     )
+
+
+class TestChinaNBSAdapterPollingResilience:
+    """R2-2-B3/H1 轮询健壮性：已知中间态/取消终态/未知状态容忍/抖动容忍。"""
+
+    @pytest.mark.asyncio
+    async def test_pending_long_resident_not_misjudged(self) -> None:
+        """pending 排队态长驻（crawler 并发常态）不误判失败。"""
+        crawler = _make_crawler_mock([{"status": "pending"}] * 10 + [_completed_status()])
+        adapter = _make_adapter(crawler)
+        result = await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))
+        assert result.source_name == "china-nbs"
+
+    @pytest.mark.asyncio
+    async def test_cancelled_raises_unavailable_411(self) -> None:
+        """cancelled 是对端合法终态（运维主动取消）→ 411 而非 413。"""
+        crawler = _make_crawler_mock([{"status": "cancelled"}])
+        adapter = _make_adapter(crawler)
+        with pytest.raises(DataSourceUnavailableError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))
+        assert exc_info.value.code == "EXCEPTION_411"
+
+    @pytest.mark.asyncio
+    async def test_consecutive_unknown_status_raises_413(self) -> None:
+        """连续 3 次未知状态 → 413（对端契约违反，不再空转满超时）。"""
+        crawler = _make_crawler_mock([{"status": "mystery"}] * 10)
+        adapter = _make_adapter(crawler)
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))
+        assert exc_info.value.code == "EXCEPTION_413"
+        assert crawler.get_task_status.call_count == 3  # 快速失败，未空转
+
+    @pytest.mark.asyncio
+    async def test_unknown_count_reset_by_known_pending(self) -> None:
+        """未知计数遇已知中间态清零：unknown×2 → running → unknown×2 → completed 成功。"""
+        crawler = _make_crawler_mock(
+            [{"status": "mystery"}, {"status": "mystery"}, {"status": "running"}]
+            + [{"status": "mystery"}, {"status": "mystery"}, _completed_status()]
+        )
+        adapter = _make_adapter(crawler)
+        result = await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))
+        assert result.source_name == "china-nbs"
+
+    @pytest.mark.asyncio
+    async def test_status_query_transient_errors_tolerated(self) -> None:
+        """状态查询连续 2 次抖动后成功 → 正常完成（成功清零错误计数）。"""
+        crawler = _make_crawler_mock(
+            [ConnectionError("blip"), ConnectionError("blip"), {"status": "running"}, _completed_status()]
+        )
+        adapter = _make_adapter(crawler)
+        result = await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))
+        assert result.source_name == "china-nbs"
+
+    @pytest.mark.asyncio
+    async def test_status_query_errors_exhausted_raises_411(self) -> None:
+        """状态查询连续 3 次抖动 → 411（容忍耗尽）。"""
+        crawler = _make_crawler_mock([ConnectionError("down")] * 5)
+        adapter = _make_adapter(crawler)
+        with pytest.raises(DataSourceUnavailableError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))
+        assert exc_info.value.code == "EXCEPTION_411"
+        assert crawler.get_task_status.call_count == 3
 
 
 class TestChinaNBSAdapterSuccess:
