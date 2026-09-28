@@ -781,7 +781,7 @@ context = ExecutionContext(
 
 - [x] Subtask 9.1: 创建 `tests/unit/architecture/test_arch_skill_data_collection_4_1c.py`（常量区：6 Skills slug 清单 + SSOT 声明表 + 8 适配器映射）
 - [x] Subtask 9.2: 实现三方一致性校验（SSOT 表 ↔ 6 个 SKILL.md frontmatter data_sources ↔ 适配器 `get_metadata()` name/url/api_type）
-- [x] Subtask 9.3: 实现依赖方向校验（`strategic_analysis.py` 不 import infrastructure；本 Story 零 domain 改动声明校验）+ `ToolExecutionEngine.__init__` 签名锁定（inspect.signature）
+- [x] Subtask 9.3: 实现依赖方向校验（`strategic_analysis.py` 不 import infrastructure；本 Story 零 domain 改动声明校验）+ `ToolExecutionEngine.__init__` 签名锁定（inspect.signature）【注：domain 零改动声明校验项已于代码审查 Round 1 删除（R1-P1-2，git status 工作区检查 CI 恒真无判别力；历史事实由审查取证 + import-linter 持续守护）】
 - [x] Subtask 9.4: 实现 Skills 内容约束校验（6 个 SKILL.md ≤500 行 + frontmatter 必需字段 + 17 个非目标 Skill data_sources 空 tuple）
 - [x] Subtask 9.5: 运行完整测试套件并生成合规报告
 
@@ -849,7 +849,7 @@ context = ExecutionContext(
 | D4: 三角化定义 | ✅ **≥3 源 Skill 全声明源并发覆盖；2 源 Skill 双源交叉验证**（9/10） | 强制 disruptive-innovation 增至 3 源（5/10，无合适第三源） | Epic "每指标 ≥3 源"为质量愿景；disruptive-innovation 数据源选型（USPTO+Tavily）经 4.1b PoC 验证，强行加源降低数据质量 |
 | D5: 新异常/端口/事件 | ✅ **三不新增**（10/10） | 新增 Skill 数据采集异常（2/10） | 全部失败路径已被 201/207/101/302/411/412/413 覆盖；同义异常/端口重复定义是红线 |
 | D6: input_schema 载体 | ✅ **frontmatter `input_schema`/`output_schema` 键（JSON Schema dict）**（9/10） | Pydantic 模型类（3/10） | `normalize_metadata` 已支持该键（`frontmatter.py:238-239`）；运行时 Schema 强制验证属 Story 4.3 范畴；domain 禁 pydantic |
-| D7: 生产链路双 UseCase 同步接线（Round 4 登记） | ✅ **StrategicAnalysisUseCase + RunToolChainUseCase 双入口同步注入 `extensions["tool_metadata"]`（链路共享单 ToolMetadata，非字典）**（10/10） | 仅 StrategicAnalysisUseCase（5/10，run_tool_chain.py 仍抛 207 缺口） / 推迟 RunToolChainUseCase 到 Story 4.2（3/10） | Round 1 D2-A/D2-可行性 + D1-A 三视角独立发现 `RunToolChainUseCase`（`run_tool_chain.py:99-109`）存在同类 wiring 缺口；双入口同步接线避免 Story 完成后多节点链路仍抛 207；节点级 metadata 切换属 Story 4.2 范畴本 Story 显式不收敛 |
+| D7: 生产链路双 UseCase 同步接线（Round 4 登记） | ✅ **StrategicAnalysisUseCase + RunToolChainUseCase 双入口同步注入 `extensions["tool_metadata"]`（链路共享单 ToolMetadata，非字典）**（10/10） | 仅 StrategicAnalysisUseCase（5/10，run_tool_chain.py 仍抛 207 缺口） / 推迟 RunToolChainUseCase 到 Story 4.2（3/10） | Round 1 D2-A/D2-可行性 + D1-A 三视角独立发现 `RunToolChainUseCase`（`run_tool_chain.py:99-109`）存在同类 wiring 缺口；双入口同步接线避免 Story 完成后多节点链路仍抛 207；节点级 metadata 切换属 Story 4.2 范畴本 Story 显式不收敛。**代码审查 Round 1 R1-P1-3 补记已知限制（双向）**：①误拒方向——节点 B 声明源不在共享 metadata 白名单时 B 的标记抛 207；②旁路方向——后续节点可采集仅首节点（`dag.nodes[0]` 声明序）声明、自身未声明的源，「frontmatter 声明即授权」在链级放宽为「首节点声明即全链授权」；两方向均属 Story 4.2 节点级切换收敛范畴 |
 
 ### 项目结构说明 Project Structure（本 Story 新增/修改）
 
@@ -949,7 +949,7 @@ tests/
 - ✅ Task 1：双入口接线 7 场景单测全绿（strategic_analysis 4 场景 + run_tool_chain 3 场景）；既有用例测试 4 项对齐新契约（load_metadata→load_sop；fail-fast→容错 D7 语义变更）；4.1a/4.1b/4.4 验收回归全绿（49+61 passed）；Engine `__init__` 签名锁定不变
 - ✅ Task 2-7：6 个 Skills 成熟化（pestel 6 源/porters 3/appeals 3/competitor 4/scenario 3/disruptive 2），共享断言库 + [C] 跨循环一致性双向断言；23 Skills 回归 + 17 非目标空 tuple 不变量全绿（81 passed）；porters/appeals/competitor 由 3 个并行 Agent 实施，scenario/disruptive 由主会话实施
 - ✅ Task 8：集成测试 11/11（真实 Engine+Resolver+Redis+load_sop；三角化/缓存命中/Key 缺失降级/部分失败收敛）；Marker 字符级扫描专项 8 场景补齐（4-1b 推迟项清零，25/25）
-- ✅ Task 9：架构验证 49 项（三方一致性/依赖方向/签名锁定/行数/空 tuple/domain 零改动）全绿
+- ✅ Task 9：架构验证 49 项（三方一致性/依赖方向/签名锁定/行数/空 tuple/domain 零改动）全绿【Round 1 审查后 47 项：R1-P1-2 删 domain 恒真校验 + R1-P2-1 删合规报告恒真断言】
 - ✅ Task 10：BDD 12/12 全绿；文档同步完成（architecture.md v8.6.0 + 异常设计文档 §3.3.2 复用声明）
 
 **实施期关键决策与偏差登记：**
@@ -1072,7 +1072,50 @@ tests/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-> 待 dev-story 实施后填写。
+> 代码审查周期（5 轮 C1~C5 循环）发现记录。Round 1（2026-09-28）：4 视角并行调研
+> （D1-A 接线正确性 / D1-B Skills 内容契约 / D1-C 测试质量判别力 / D1-D 架构合规红线），
+> 全部结论附文件:行号证据并经主会话独立复核。
+
+#### Round 1 发现（P0 ×1 + P1 ×4 + P2 ×12）
+
+| # | 级别 | 问题 | 证据 | 修复方案 |
+|---|------|------|------|---------|
+| R1-P0-1 | **P0** | 32 处 `# type: ignore` 抑制注释（CLAUDE.md §5 红线：禁止抑制告警，必须修复根因）；31 处 `no-untyped-def` 抑制的是空集（mypy `[tool.mypy]` `disallow_untyped_defs = false`，该错误码不触发），1 处 `attr-defined`（架构测试）实际抑制 pre-commit mypy hook 对暂存测试文件的真实告警（`.pre-commit-config.yaml:82-90` 透传文件名）——无论何种情形，红线均要求根因修复 | 6 个 `test_<slug>_data_collection.py`（31 处 `no-untyped-def`：fixture 与测试参数缺类型注解）+ `test_arch_skill_data_collection.py:153`（1 处 `attr-defined`：`_build_adapters` 返回类型 `dict[str, object]` 掩盖端口契约） | 根因修复：① fixture `-> SkillDocument` 返回注解 + 测试参数 `document: SkillDocument`（6 文件）；② `_build_adapters() -> dict[str, DataSourcePort]`（import `src.domain.ports.data_source.DataSourcePort`，适配器均实现该端口且端口含 `get_metadata()` 契约） |
+| R1-P1-1 | P1 | Key 缺失场景宣称「411 语义」但无 `error_code` 断言——把 Resolver 未注册分支改成抛 412，集成与验收测试照常通过（AC 承诺无守护） | 集成 `test_skill_data_collection.py:232` / 验收 `test_acceptance_skill_data_collection.py:455` 仅 `any(isinstance(evt, DataSourceFetchFailed))`；事件 `error_code` 字段存在（`data_source_events.py:93`）未被断言 | 两处断言补 `evt.error_code == "EXCEPTION_411"`（Key 缺失未注册与源不可用场景均为 `DataSourceUnavailableError` → EXCEPTION_411） |
+| R1-P1-2 | P1 | `test_domain_layer_untouched_by_story` 判别力≈0：`git status --porcelain src/domain/` 只查工作区未提交改动，CI 干净 checkout 上恒真，无法守护「本 Story 零 domain 改动」声明 | `test_arch_skill_data_collection.py:210-219` | 删除该测试方法：「零 domain 改动」是一次性历史事实（已由审查取证：`git show 676f4396 --stat -- src/domain/` 为空），运行时测试无法回溯提交历史（硬编码 commit hash 在 rebase 后脆弱）；domain 依赖方向由 import-linter 持续保护；保留恒真断言是负资产 |
+| R1-P1-3 | P1 | D7 决策只记录了「误拒」方向（B 节点声明源不在 A 白名单 → 207），**「旁路」方向未记录**：链路共享单 metadata 下，后续节点可采集仅首节点声明、自身未声明的源——「frontmatter 声明即授权」治理契约在链级放宽为「首节点声明即全链授权」（改造前链路不注入 metadata，任何标记一律 207，本 Story 接线后此放行面为新引入） | Story D7 行（本文件）+ `architecture.md:2828` D7 行均无旁路风险记录；实现于 `run_tool_chain.py:116`（`dag.nodes[0]` 声明序 metadata）| D7 行（Story + architecture.md）补记旁路方向已知限制 + 显式留项 Story 4.2 节点级切换收敛；不改代码（D7 决策本身有意，风险在治理文档留痕） |
+| R1-P1-4 | P1 | 接线测试场景 1 对两个 slug 返回**同一** SkillDocument（`return_value` 单值 mock）——「注入的是声明序首节点 metadata」这一行为未被钉住（改选 nodes[1] 或 dict 任意序测试仍绿）；且 `_make_dag` 节点 b 用不存在的假 slug `"porters"`（真实 slug 为 `porters-five-forces`） | `test_run_tool_chain_datasource.py:157`（单值 return_value）、`:54`（假 slug） | 场景 1 改 `side_effect` 按 slug 分派两个**不同** data_sources 的 SkillDocument，断言注入集合 == nodes[0]（pestel-analysis）的声明 → 钉住首节点选择；假 slug 改真实 slug |
+
+**Round 1 P2 台账（12 项，逐轮核销）：**
+
+| # | 问题 | 证据 | 处置 |
+|---|------|------|------|
+| R1-P2-1 | `test_all_constraints_checked` 恒真断言（仅 `assert methods`，自证式合规报告） | arch 测试 `:264-273` | 留 Round 2+ 评估删除或改真实清点 |
+| R1-P2-2 | 缓存命中测试检不出「租户键缺失」缺陷（同租户两次执行，删 tenant 键仍绿），需双租户交叉断言 | 集成 `:195-213` / 验收场景 6 | 留 Round 2+ |
+| R1-P2-3 | `captured` 死参数（写入传入但全程无读取断言） | `test_strategic_analysis_datasource.py:183-215,334-339,363-367` | 留 Round 2+ |
+| R1-P2-4 | SOP 成熟化断言裸子串匹配（`"411" in text` 可被 "14112" 伪满足） | `skill_data_collection_contracts.py:132,136-137` | 留 Round 2+（改 `"EXCEPTION_411"` 或词边界正则） |
+| R1-P2-5 | SSOT 常量四处复制（arch/contracts/集成/验收各一份），契约变更需 4 处手改 | 4 文件 `SKILL_DATA_SOURCES` | 留 Round 2+（contracts 模块作唯一来源被其余 3 处 import） |
+| R1-P2-6 | `test_no_eval_no_exec` 是源码文本扫描非行为验证（可被字符串拼接绕过） | `test_data_source_marker.py:292-300` | 留项（纵深绊线可保留，记录局限） |
+| R1-P2-7 | `dag.nodes[0]` 是**声明序**首个而非执行序首个（Kahn 波次独立排序），代码注释「首节点」与 Story「当前节点」措辞均不精确 | `tool_chain.py:135` / `run_tool_chain.py:115` 注释 | 留 Round 2+（注释措辞校正，无行为差异） |
+| R1-P2-8 | `run_tool_chain.py:41` 类 docstring 陈旧（仍写 `load_metadata`，已切换 `load_sop`） | `run_tool_chain.py:41` | 留 Round 2+ |
+| R1-P2-9 | `metadata_tasks_by_slug` 变量名误导（值实为 slug→node_id 但 node_id 从未使用，旧 fail-fast 残留） | `run_tool_chain.py:101` | 留 Round 2+ |
+| R1-P2-10 | frontmatter `required_fields` 无类型校验（YAML 标量静默透传） | `frontmatter.py:195-197` | 留项（4-1b 解析链路既有行为，本 Story 未声明收敛） |
+| R1-P2-11 | `ttl_seconds` 类型级输入（YAML 字符串 `"86400"`）触发内置 `TypeError` 绕过 `FrontmatterParseError` 契约（最终被用例容错，方向 fail-safe） | `data_source.py:76-102` `__post_init__` | 留项（同上，4-1b 既有边界） |
+| R1-P2-12 | File List 未列 `sprint-status.yaml`（commit 含 2 行改动） | 本文件 File List 节 | 留 Round 2+ 补记 |
+| R1-P2-13 | **StrategicAnalysisUseCase 无 composition_root 注册、无接口层调用方**（Round 1 C3 评审补登）：`grep strategic src/composition_root.py` 零命中（仅 `run_tool_chain_use_case` 注册于 :2645），`src/interfaces/` 无构造/resolve 点，`project-context.md:914` 规划的 `sisys tool` CLI 未实现——双入口接线的 strategic 半边暂无生产调用方，接线代码是入口落地后的必要前置但「生产链路生效」对该半边尚未端到端兑现 | `composition_root.py:2645` | P2 已知限制，**显式 Defer 至入口注册 Story**（本轮补 DI+入口属范围蔓延且无法端到端验证），不落码 |
+| R1-P2-14 | 跨 Story 备注：`tests/unit/domain/ports/test_sandbox_session_query.py:1` 存在 1 处既有 `# type: ignore`（Story 4-4 / commit 12740b14 遗留）——本 Story 不越界修，留归属 Story 收敛（防未来「全仓 grep 零输出」声明被证伪） | 该文件 line 1 | 跨 Story 留痕，不在本 Story 收敛 |
+
+**P1/P2 划分标准（Round 1 C3 评审固化）**：守护 AC 运行时行为承诺的判别力缺陷（错误码语义回退静默放行 / 节点选择未钉住）= P1；文档与内容检查的弱判别（子串伪满足 / 恒真合规报告）= P2。
+
+**四视角负向发现登记（调研确认无需修复项）**：
+- **D1-A（接线正确性）**：双入口接线正确实现 D7 三项声明（load_sop→frontmatter 注入 / 链路共享单 metadata / 容错不阻断且不吞 CancelledError）；`with_extension` 不可变复制正确；LRU 缓存跨请求有效（SCOPED 实例进程级共享）；`asyncio.gather` 容错无异常泄漏。D1-A 提及的「loader 回退不一致」（frontmatter 块缺失回退基础 metadata vs data_sources 结构非法整体抛出）判 **P3 不修**：两路径下游同为 207 安全失败，差异仅在异常形态，4-1b 既有行为非本 Story 引入。
+- **D1-B（Skills 内容契约）**：7 项检查（SSOT 逐字对齐/跨循环双向一致/行数 204-257/9 章节齐全/Key 安全/DATA_SOURCES 协议与 marker.py 实现一致/Schema 契约一致）全部 OK 零问题。
+- **D1-C（测试质量）**：三方一致性真实实例化非自证、跨循环真双向、call_count 精确等值、BDD 19 步骤全绑定、Marker 专项 8 场景字符级判别力强；`xdist_group`/租户清理/动态 skip 全合规。
+- **D1-D（架构合规）**：10 项核查 9 项 PASS（异常红线本 Story 零触碰/domain·infrastructure·interfaces 零改动/import-linter/DI/文档同步/事件白名单/Key 安全/File List/sprint-status），1 项 FAIL 即 R1-P0-1。
+
+**验证闭环（变异演示，Round 1 C3 评审要求的判别力实证）**：
+- 变异 1：resolver 未注册分支 `DataSourceUnavailableError(411)` → `DataSourceRateLimitError(412)`，`test_key_missing_partial_failure_convergence`（集成）与验收场景 5 **双双变红**（`AssertionError: 未发布 error_code=EXCEPTION_411 的 DataSourceFetchFailed 事件`）——R1-P1-1 修复前该变异静默通过，判别力实证达成后已还原。
+- 变异 2：`run_tool_chain.py` `dag.nodes[0]` → `dag.nodes[1]`，接线场景 1 精确变红（`assert 'porters-five-forces' == 'pestel-analysis'`）——R1-P1-4 钉住首节点选择实证达成后已还原（`git status src/` 零改动确认）。
 
 #### 需决策 Decision Needed
 
@@ -1080,13 +1123,20 @@ tests/
 
 #### 已修复 Patch
 
-- [ ] 无（待 dev-story 实施）
+- [x] R1-P0-1（32 处 `# type: ignore` 根因修复：6 文件类型注解 + `_build_adapters -> dict[str, DataSourcePort]`；全仓目标文件 grep 零残留）
+- [x] R1-P1-1（411 语义断言 ×3：集成 Key 缺失 + 集成源不可用 + 验收共享步骤；变异演示实证判别力）
+- [x] R1-P1-2（删除 `test_domain_layer_untouched_by_story` + 孤儿 `import subprocess`；架构测试 49→48）
+- [x] R1-P1-3（D7 旁路+误拒双向风险补记：Story 决策表 D7 行 + `architecture.md:2828` + Defer 节）
+- [x] R1-P1-4（接线场景 1 双 slug 分派不同 metadata + `injected.slug` 身份断言 + 假 slug 改 `porters-five-forces`；变异演示实证判别力）
+- [x] R1-P2-1（同文件顺带：删除 `TestComplianceReport` 恒真合规报告，架构测试 48→47）
+- [x] R1-P2-4（同族顺带：contracts 失败处理断言裸子串 → `\b411\b` 词边界正则）
 
 #### 已推迟 Defer
 
 - [ ] P2-domain-1：异常 `to_dict()` 自动脱敏（Story 5.x 安全专项）
 - [x] Marker 字符级扫描专项测试扩展（Task 8.5 收敛）
-- [ ] `ToolChainService.execute_chain` 内部节点级 extensions 注入（Story 4.2 工具链编排范畴）
+- [ ] `ToolChainService.execute_chain` 内部节点级 extensions 注入（Story 4.2 工具链编排范畴）——**Round 1 R1-P1-3 补记**：含白名单旁路方向（后续节点可采集仅首节点声明的源）与误拒方向（B 声明源不在 A 白名单 → 207），两方向均需节点级切换收敛
+- [ ] StrategicAnalysisUseCase 的 composition_root 注册 + 接口层入口（R1-P2-13，入口注册 Story 收敛）
 
 ---
 

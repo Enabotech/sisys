@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pytest
 
+from src.application.ports.skill_loader import SkillDocument
 from src.application.skills.loader import InMemorySkillLoader
 from tests.unit.application.skills.skill_data_collection_contracts import (
     SKILL_DATA_SOURCES,
@@ -49,7 +50,7 @@ NON_TARGET_SLUGS: tuple[str, ...] = (
 
 
 @pytest.fixture
-async def document():  # type: ignore[no-untyped-def]
+async def document() -> SkillDocument:
     """真实加载 pestel-analysis 的 L2 SkillDocument"""
     loader = InMemorySkillLoader()
     return await loader.load_sop(SLUG)
@@ -58,20 +59,20 @@ async def document():  # type: ignore[no-untyped-def]
 class TestFrontmatterDataSources:
     """[A] frontmatter data_sources 白名单声明契约"""
 
-    async def test_data_sources_match_ssot(self, document) -> None:  # type: ignore[no-untyped-def]
+    async def test_data_sources_match_ssot(self, document: SkillDocument) -> None:
         assert_data_sources_contract(SLUG, document.frontmatter)
 
-    async def test_io_schema_match_contract(self, document) -> None:  # type: ignore[no-untyped-def]
+    async def test_io_schema_match_contract(self, document: SkillDocument) -> None:
         assert_io_schema_contract(SLUG, document.frontmatter)
 
 
 class TestSopMaturity:
     """[B] SOP 内容成熟化"""
 
-    async def test_sop_sections_and_resources(self, document) -> None:  # type: ignore[no-untyped-def]
+    async def test_sop_sections_and_resources(self, document: SkillDocument) -> None:
         assert_sop_maturity(SLUG, document)
 
-    async def test_existing_assets_preserved_and_referenced(self, document) -> None:  # type: ignore[no-untyped-def]
+    async def test_existing_assets_preserved_and_referenced(self, document: SkillDocument) -> None:
         """既有资产整合：scoring_matrix.json + aggregate_scores.py 保留且被新 SOP 引用"""
         skill_dir = SKILLS_ROOT / SLUG
         assert (skill_dir / "references" / "scoring_matrix.json").is_file()
@@ -83,7 +84,7 @@ class TestSopMaturity:
 class TestCrossConsistency:
     """[C] 跨循环一致性（白名单 ↔ SOP 标记双向断言）"""
 
-    async def test_markers_match_declared_sources(self, document) -> None:  # type: ignore[no-untyped-def]
+    async def test_markers_match_declared_sources(self, document: SkillDocument) -> None:
         assert_cross_consistency(SLUG, document)
 
 
