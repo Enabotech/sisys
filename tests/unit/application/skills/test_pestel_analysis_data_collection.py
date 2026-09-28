@@ -5,7 +5,9 @@ TDD 循环覆盖（AC-1 / AC-3）：
 - [B] SOP 成熟化：必备章节 / input_examples 非 placeholder / ≤500 行 / references+templates
 - [C] 跨循环一致性：SOP body $DATA_SOURCE 标记集合 == frontmatter 声明集合（双向）
 - 既有资产整合：references/scoring_matrix.json + scripts/aggregate_scores.py 保留并被 SOP 引用
-- 23 Skills 全量解析回归 + 17 个非目标 Skill data_sources 空 tuple 不变量
+- 23 Skills 全量解析回归 + 7 个非目标 Skill data_sources 空 tuple 不变量
+  （4-1d Task 1.4 预调整：10 个混合数据型 Skill 移出非目标清单——4-1d 声明守护
+  由 skill_mixed_data_contracts.py 承载，此处仅守护 4-1e 目标）
 
 真实加载真实 SKILL.md（InMemorySkillLoader，范本 test_skills_loader.py），禁止 mock。
 """
@@ -27,25 +29,16 @@ from tests.unit.application.skills.skill_data_collection_contracts import (
 
 SLUG = "pestel-analysis"
 
-# 17 个非目标 Skill（23 全量 − 6 个本 Story 目标）：data_sources 必须保持空 tuple
+# 7 个非目标 Skill（23 全量 − 6 个 4-1c 目标 − 10 个 4-1d 目标，即 4-1e 目标）：
+# data_sources 必须保持空 tuple（4-1d Task 1.4 预调整 17 → 7）
 NON_TARGET_SLUGS: tuple[str, ...] = (
-    "ansoff-matrix",
-    "bsc-scorecard",
     "business-model-canvas",
-    "change-management",
     "dependency-graph",
     "gantt-chart",
-    "ge-mckinsey-matrix",
-    "kpi-tree",
     "org-design-framework",
     "raci-matrix",
-    "space-matrix",
     "strategy-map",
-    "swot-tows",
-    "value-chain-analysis",
-    "value-curve-analysis",
     "value-proposition-canvas",
-    "vrio-framework",
 )
 
 
@@ -89,7 +82,7 @@ class TestCrossConsistency:
 
 
 class TestAllSkillsRegression:
-    """23 Skills 全量解析回归 + 17 个非目标 Skill 空 tuple 不变量（AC-1）"""
+    """23 Skills 全量解析回归 + 7 个非目标 Skill 空 tuple 不变量（AC-1；4-1d Task 1.4 预调整）"""
 
     async def test_all_23_skills_parse_regression(self) -> None:
         loader = InMemorySkillLoader()

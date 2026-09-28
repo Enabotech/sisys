@@ -120,45 +120,59 @@ class TestFrontmatterDataSourcesParsing:
 
 
 class TestExistingSkillsRegression:
-    """既有 23 个 SKILL.md 解析零回归。
+    """既有 23 个 SKILL.md 解析零回归（4-1d Task 1.4 中间态安全化重构）。
 
     R3-4 K3v2：锚点改 frontmatter/L2 路径（load_metadata 走 L1/TOOLS.md 表，
     结构性不携带 data_sources——原 isinstance 断言恒真且测错层；白名单的真实
     消费链路是 load_sop(slug).frontmatter）。
-    """
 
-    # 已声明 data_sources 的 6 个 Skill（frontmatter 声明清单，与生产 SKILL.md 对齐）
-    DECLARING_SLUGS = (
-        "pestel-analysis",
-        "competitor-analysis",
-        "disruptive-innovation",
-        "appeals-analysis",
-        "porters-five-forces",
-        "scenario-planning",
-    )
+    4-1d Task 1.4 重构（Round 2 设计，替代原「DECLARING_SLUGS 静态清单 +
+    非声明组空 tuple 断言」——静态清单方案在 4-1d 并行实施期存在必红窗口）：
+    - 「凡声明必合法」：物理 data_sources 非空者逐个校验合法性（name/ttl），
+      不绑定静态清单（各 Story 声明进程互不干扰）
+    - 「物理非空者必 ∈ SSOT 并集」：并集 = 4-1c ∪ 4-1d 两契约库动态派生
+      （16 slug）——4-1e 目标误填即 ∉ 并集红，4-1d 目标未填不红（中间态
+      两向安全）；最终态 16 全非空由 4-1d 架构测试闭环
+    """
 
     @pytest.mark.asyncio
     async def test_declaring_skills_frontmatter_carries_data_sources(self) -> None:
-        """声明 data_sources 的 Skill 经 L2 frontmatter 路径携带合法白名单（name/ttl）"""
-        from src.application.skills.loader import InMemorySkillLoader
-
-        loader = InMemorySkillLoader()
-        for slug in self.DECLARING_SLUGS:
-            doc = await loader.load_sop(slug)
-            refs = doc.frontmatter.data_sources
-            assert len(refs) >= 1, f"{slug} 声明的 data_sources 未经 frontmatter 路径解析"
-            for ref in refs:
-                assert ref.name and ref.ttl_seconds >= 60, f"{slug}.{ref.name} 值对象校验失效"
-
-    @pytest.mark.asyncio
-    async def test_all_23_skills_parse_without_data_sources(self) -> None:
-        """未声明的 Skill frontmatter 默认空 tuple（锁死「其余 skill 零误声明」语义）"""
+        """凡物理声明 data_sources 的 Skill，经 L2 frontmatter 路径解析且逐源合法（name/ttl）"""
         from src.application.skills.loader import InMemorySkillLoader
         from src.application.skills.skill_manifest import SLUG_TO_TOOL_ID
 
         loader = InMemorySkillLoader()
-        for tool_name in SLUG_TO_TOOL_ID:
-            doc = await loader.load_sop(tool_name)
-            if tool_name in self.DECLARING_SLUGS:
-                continue  # 已声明组由上一用例覆盖
-            assert doc.frontmatter.data_sources == (), f"{tool_name} 意外携带 data_sources 声明"
+        declared_any = False
+        for slug in SLUG_TO_TOOL_ID:
+            doc = await loader.load_sop(slug)
+            refs = doc.frontmatter.data_sources
+            if not refs:
+                continue  # 未声明 Skill 不在本用例范围（守卫见下一用例）
+            declared_any = True
+            assert len(refs) >= 1, f"{slug} 声明的 data_sources 未经 frontmatter 路径解析"
+            for ref in refs:
+                assert ref.name and ref.ttl_seconds >= 60, f"{slug}.{ref.name} 值对象校验失效"
+        assert declared_any, "4-1c 已交付 6 个声明 Skill，物理非空者至少存在"
+
+    @pytest.mark.asyncio
+    async def test_physical_declaring_slugs_within_ssot_union(self) -> None:
+        """物理 data_sources 非空者必 ∈ SSOT 并集 16（4-1c ∪ 4-1d 契约库动态派生）。
+
+        未声明 Skill 保持空 tuple 不受影响；并集外误填（如 4-1e 目标）即红。
+        4-1d 目标 Skill 填写声明后 ∈ 并集（契约库登记）即绿——中间态两向安全。
+        """
+        from src.application.skills.loader import InMemorySkillLoader
+        from src.application.skills.skill_manifest import SLUG_TO_TOOL_ID
+        from tests.unit.application.skills.skill_data_collection_contracts import SKILL_DATA_SOURCES
+        from tests.unit.application.skills.skill_mixed_data_contracts import MIXED_SKILL_DATA_SOURCES
+
+        ssot_union = set(SKILL_DATA_SOURCES) | set(MIXED_SKILL_DATA_SOURCES)
+        assert len(ssot_union) == 16, f"SSOT 并集应为 16（6 外部 + 10 混合），实际 {len(ssot_union)}"
+
+        loader = InMemorySkillLoader()
+        for slug in SLUG_TO_TOOL_ID:
+            doc = await loader.load_sop(slug)
+            if doc.frontmatter.data_sources:
+                assert slug in ssot_union, (
+                    f"{slug} 物理声明了 data_sources 但不在 SSOT 并集（4-1c ∪ 4-1d）中——误填或契约库未登记"
+                )
