@@ -2852,7 +2852,7 @@ buckets/
 - **数据源口径边界声明（23 Skills 治理基线）**：各 SKILL.md §5 须声明所辖数据源的口径边界——uspto（仅美国专利 + patent_title 关键词匹配，非申请人结构化检索；CNIPA/WIPO 未接入）、china-nbs（宏观/行业总量口径，不提供企业级数据——企业级结论须经「行业→企业」显式映射并标注）、world-bank/imf（国家宏观维度非行业维度）、eurostat（欧盟口径）、newsapi（英文新闻覆盖为主）、tavily（Web 事件级检索非结构化指标级）。跨口径推断（宏观→行业→企业）必须显式登记映射假设，禁止口径直接替代。
 - **三角化独立性纪律**：「独立来源」以**源**为单位计数——同源多 query（`name`/`name#2` 键）不构成独立来源，不得计入印证数；维度级直接映射源数不足时须跨维度关联印证或显式标注「印证不足」并下调置信度。
 - **数据使用合规**：外部数据仅限内部分析用途——新闻内容遵守版权合理使用（摘要引用不整篇转载）、专利数据遵守 USPTO/PatentsView 使用条款、国家统计局数据遵守官方署名要求、Web 检索遵守目标站点 robots.txt；输出中的溯源元数据（source/freshness/confidence）同时是合规审计依据。新增数据源（如 CNIPA/WIPO/财报/行业协会）须配套适配器开发与合规评估（Story 4.3/数据扩展专项承载）。
-- **已知 defer 登记（数据源扩展专项承接——未立项；原指向 Story 4.3 已完成未承载，2026-09-29 勘正；评审强化）**：① DataSourceRef.required_fields 按源定制（现行统一 `[indicator, value]` 为 4-1b 标准化契约残留——newsapi 返回文章/uspto 返回专利/非天然 indicator-value 结构，按源定制须联动 EXPECTED_REQUIRED_FIELDS 契约常量、适配器响应校验与 16 个 SKILL.md frontmatter，属 yaml data_sources.items 字段级化范畴）；② 输出侧时间戳（analysis_date）与溯源 source_id 关联结构（运行时校验行为变更，随 4.3 运行时校验一并设计）；③ token 预算门禁（4-1d R3 既有 defer）。
+- **已知 defer 登记（Story 4.1f 承接——已立项 Skills 数据源扩展：EPO OPS/SEC EDGAR/UN Comtrade 适配器 + required_fields 按源定制 + 声明重分配；原指向 Story 4.3 已完成未承载，2026-09-29 勘正立项）**：① DataSourceRef.required_fields 按源定制（现行统一 `[indicator, value]` 为 4-1b 标准化契约残留——newsapi 返回文章/uspto 返回专利/非天然 indicator-value 结构，按源定制须联动 EXPECTED_REQUIRED_FIELDS 契约常量、适配器响应校验与 16 个 SKILL.md frontmatter，属 yaml data_sources.items 字段级化范畴）；② 输出侧时间戳（analysis_date）与溯源 source_id 关联结构（运行时校验行为变更，随 4.3 运行时校验一并设计）；③ token 预算门禁（4-1d R3 既有 defer）。
 
 
 
