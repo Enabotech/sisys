@@ -118,7 +118,7 @@ output_schema:
               type: object
           sources:
             type: array
-            description: 该维度数据来源（≥3 独立来源三角化）
+            description: 该维度数据来源（实际印证源——直接映射源数不足时跨维间接印证或显式标注缺口）
             items:
               type: string
     weighted_total:
@@ -184,8 +184,15 @@ Think 阶段必须先输出**维度 → 指标 → 数据源**映射计划，再
 | En 环境 | 碳排放、气候情景、环境规制 | ipcc（气候数据）、eurostat（欧盟环境统计） |
 | L 法律 | 法规变更、合规成本 | newsapi（法规新闻）、eurostat（欧盟法规维度） |
 
-**三角化要求**：每个维度的关键指标必须由 ≥3 个独立来源印证（三角化规范见
-`references/triangulation.md`）；6 个声明源全部参与采集，禁止仅用单一来源下结论。
+**源级三角化**：6 个声明源全部参与采集（并发覆盖，见集成测试行为基线）；维度级直接映射
+源数以 §5 映射表为准（多为 2 源）——直接映射不足 3 源的维度，其结论须跨维度关联印证或
+显式标注「印证不足」并下调置信度。**同源多 query（name/name#2 键）不构成独立来源**，
+不得计入印证数（三角化规范见 `references/triangulation.md`），禁止仅用单一来源下结论。
+
+**数据源口径边界**：world-bank/imf 为国家宏观口径（非行业维度，行业结论须经宏观→行业
+显式映射）；eurostat 为欧盟口径（region_scope 非 eu 时仅作全球参照不作主证）；newsapi
+以英文新闻覆盖为主（中文 query 可用但覆盖有限）；china-nbs 为中国行业统计口径；ipcc
+为气候科学口径。每源采集结果量以适配器默认分页为准（SOP 引导代码不得显式请求超量数据）。
 
 ## 6. SOP 执行步骤
 
@@ -201,7 +208,7 @@ Think 阶段必须先输出**维度 → 指标 → 数据源**映射计划，再
      - `eurostat`：数据集代码（下划线格式，如 `"nama_10_gdp"`=国民账户）
      - `ipcc`：数据集路径键（如 `"ar6-wg1-spm"`=AR6 WG1 决策者摘要）
      - `china-nbs`：站点相对路径（如 `"sj/zxfb"`=数据发布/最新发布）
-     - `newsapi` / `tavily`：检索关键词（自然语言关键词为**正确**格式，含行业/地域/年限上下文）
+     - `newsapi`：检索关键词（自然语言关键词为**正确**格式，含行业/地域/年限上下文）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
    - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
      每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
@@ -221,7 +228,8 @@ gdp = $DATA_SOURCE("world-bank", "NY.GDP.MKTP.CD")          # GDP（现价美元
 outlook = $DATA_SOURCE("imf", "NGDP_RPCH")                  # 实际 GDP 增长率（WEO）
 eu_stats = $DATA_SOURCE("eurostat", "nama_10_gdp")          # 国民账户（按品类支出）
 climate = $DATA_SOURCE("ipcc", "ar6-wg1-spm")               # AR6 WG1 决策者摘要
-news = $DATA_SOURCE("newsapi", "新能源汽车 政策 法规 最新动态")   # 关键词检索源
+policy_news = $DATA_SOURCE("newsapi", "新能源汽车 产业政策 补贴 监管 最新动态")  # P 维（键 newsapi）
+regulatory_news = $DATA_SOURCE("newsapi", "新能源汽车 法规 合规 标准 立法动态")  # L 维（同源多 query → 键 newsapi#2）
 cn_stats = $DATA_SOURCE("china-nbs", "sj/zxfb")             # 国家局数据发布
 
 # 采集后通过注入的 DATA_SOURCES dict 防御性读取（失败源键不存在 → None → 按 §7 降级）
@@ -233,7 +241,7 @@ wb_payload = (DATA_SOURCES.get("world-bank") or {}).get("payload")
 | 异常 | 语义 | LLM 应对话术 |
 |------|------|-------------|
 | 411 数据源不可用 | 5xx/连接失败/熔断 | 「数据源 X 暂不可用，本次分析基于其余 N-1 个来源完成，该维度结论置信度下调并标注」 |
-| 411 未注册（Key 缺失） | newsapi/tavily 未配置 API Key，冷启动未注册 | 「数据源 X 因 API Key 未配置未注册，相应维度基于其余来源完成，**输出中显式标注数据缺口**：时政新闻/中国消费维度缺失实时舆情印证」 |
+| 411 未注册（Key 缺失） | newsapi 未配置 API Key，冷启动未注册 | 「数据源 newsapi 因 API Key 未配置未注册，相应维度基于其余来源完成，**输出中显式标注数据缺口**：时政新闻/中国消费维度缺失实时舆情印证」 |
 | 412 限流 | 429 配额耗尽 | 「数据源 X 触发限流，使用缓存快照（freshness_score 已折算）并标注数据时效」 |
 | 413 解析失败 | 响应格式异常（不可重试） | 「数据源 X 响应解析失败，跳过该源并在 sources 字段中剔除，禁止编造观测值」 |
 | 207 白名单违规 | 标记引用未声明数据源 | 不发生（本 SOP 标记严格使用白名单内 6 源）；若出现说明代码生成偏离 SOP，重新按 §6 生成 |
@@ -257,7 +265,7 @@ wb_payload = (DATA_SOURCES.get("world-bank") or {}).get("payload")
 
 ## 9. References 指引
 
-- `references/triangulation.md` — 多源三角化规范（≥3 独立来源印证流程与冲突裁决）
+- `references/triangulation.md` — 多源三角化规范（源级三角化与跨维印证流程、冲突裁决）
 - `references/scoring_anchors.md` — 六维度评分锚点（0-1 分档定义与示例）
 - `references/workshop_guide.md` — PESTEL 工作坊引导方法论（研讨流程/角色/产出物）
 - `references/scoring_matrix.json` — 六维度权重与指标清单（aggregate_scores.py 的权重 SSOT）

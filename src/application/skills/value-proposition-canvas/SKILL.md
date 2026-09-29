@@ -3,7 +3,7 @@ slug: value-proposition-canvas
 name: 价值主张画布
 version: 1.0.0
 tool_name: 价值主张画布
-description: Osterwalder 价值主张画布（客户工作/收益/痛点）
+description: Osterwalder 价值主张画布（客户工作/收益/痛点 × 产品）
 when_to_use:
   - 产品价值定位
   - 客户契合度验证

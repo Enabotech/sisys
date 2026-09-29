@@ -2798,6 +2798,8 @@ buckets/
 
 **关键架构决策（8 项）：**
 
+**Story 4.1e 关键架构决策（13 项追加，引用 Story 4.1e 决策表）：**
+
 | # | 决策点 | 选中方案 | 依据 |
 |---|--------|---------|------|
 | 1 | DataSourcePort 归属层 | domain/ports | LLMClientPort/SandboxExecutor/CrawlerClientPort 外部能力网关均归 domain |
@@ -2845,7 +2847,14 @@ buckets/
 
 **Story 4.1e 集成说明（✅ 已实现 2026-09-29，Skills 成熟化收官）：** 7 个纯内部框架 Skills（value-proposition-canvas / business-model-canvas / org-design-framework / strategy-map / dependency-graph / raci-matrix / gantt-chart）完成内部框架成熟化，**23/23 Skills 三分法终态达成**（4-1c 外部源型 6 + 4-1d 混合型 10 + 4-1e 纯内部型 7）：① SKILL.md frontmatter 填充 `input_schema`/`output_schema`（契约固化于 `tests/acceptance/contracts/skill_io_schemas.yaml`，23 条目单一 SSOT）——**`data_sources` 键不写入**（键缺失解析为空 tuple，是纯内部型的一等不变量而非未成熟化状态）；② 每 Skill 配套分型 `references/` 三件套（评分型 {framework_logic 框架逻辑引导（本 Story 首次引入，替位 4-1d data_fusion 的纯内部语义）/ scoring_anchors 评分锚点 / workshop_guide 工作坊引导} ×3；结构型 {framework_logic / validation_rules 确定性校验规则 / workshop_guide} ×4）与 `templates/` 用户输入模板（四段式微格式——第三段按分型条件化「评分锚点 / 校验规则」，采集字段 == input_schema 递归叶子键双向断言 + 条目编码规范与确定性解析锚点 7/7）；③ 零引擎/接线/端口/异常层改动——空 `data_sources` + 无标记代码走直通路径（`tool_execution_engine.py:329-331` 无标记快速返回），用户内部输入的唯一数据通道 = `ToolCall.arguments` → Think prompt（f-string 注入，本 Story 升格为主通道）；唯一生产 .py 增强 = `strategic_tool_catalog.py` 的 org-design 四维扩展（Galbraith Star 完整性——strategy/processes/rewards/people 四子容器，只加不改删）；④ 存量资产整合（business-model-canvas 的 validate_canvas.py + canvas_template.json 保留并被 SOP 引用，块键名收敛 `key_partnerships`）与工具分工互查（strategy-map ↔ bsc-scorecard 定性因果链 vs 定量计分卡双向跳转 + dependency-graph ↔ gantt-chart 纯拓扑 vs 含时间排程双向跳转）。
 
-**Story 4.1e 关键架构决策（13 项追加，引用 Story 4.1e 决策表）：**
+**Skills 数据合规与口径治理注意事项（2026-09-29 评审推广修订追加）：**
+
+- **数据源口径边界声明（23 Skills 治理基线）**：各 SKILL.md §5 须声明所辖数据源的口径边界——uspto（仅美国专利 + patent_title 关键词匹配，非申请人结构化检索；CNIPA/WIPO 未接入）、china-nbs（宏观/行业总量口径，不提供企业级数据——企业级结论须经「行业→企业」显式映射并标注）、world-bank/imf（国家宏观维度非行业维度）、eurostat（欧盟口径）、newsapi（英文新闻覆盖为主）、tavily（Web 事件级检索非结构化指标级）。跨口径推断（宏观→行业→企业）必须显式登记映射假设，禁止口径直接替代。
+- **三角化独立性纪律**：「独立来源」以**源**为单位计数——同源多 query（`name`/`name#2` 键）不构成独立来源，不得计入印证数；维度级直接映射源数不足时须跨维度关联印证或显式标注「印证不足」并下调置信度。
+- **数据使用合规**：外部数据仅限内部分析用途——新闻内容遵守版权合理使用（摘要引用不整篇转载）、专利数据遵守 USPTO/PatentsView 使用条款、国家统计局数据遵守官方署名要求、Web 检索遵守目标站点 robots.txt；输出中的溯源元数据（source/freshness/confidence）同时是合规审计依据。新增数据源（如 CNIPA/WIPO/财报/行业协会）须配套适配器开发与合规评估（Story 4.3/数据扩展专项承载）。
+- **已知 defer 登记（Story 4.3 承接，2026-09-29 评审强化）**：① DataSourceRef.required_fields 按源定制（现行统一 `[indicator, value]` 为 4-1b 标准化契约残留——newsapi 返回文章/uspto 返回专利/非天然 indicator-value 结构，按源定制须联动 EXPECTED_REQUIRED_FIELDS 契约常量、适配器响应校验与 16 个 SKILL.md frontmatter，属 yaml data_sources.items 字段级化范畴）；② 输出侧时间戳（analysis_date）与溯源 source_id 关联结构（运行时校验行为变更，随 4.3 运行时校验一并设计）；③ token 预算门禁（4-1d R3 既有 defer）。
+
+
 
 | # | 决策点 | 选中方案 | 依据 |
 |---|--------|---------|------|

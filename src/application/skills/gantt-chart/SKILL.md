@@ -3,7 +3,7 @@ slug: gantt-chart
 name: 甘特图
 version: 1.0.0
 tool_name: 甘特图
-description: 项目时间线甘特图（任务 + 起止 + 里程碑）
+description: 项目时间线甘特图（任务 + 时长排程 + 里程碑）
 when_to_use:
   - 项目排期
   - 里程碑规划
@@ -60,7 +60,7 @@ output_schema:
       properties:
         timeline:
           type: array
-          description: 时间线条目清单（前推 ES/EF 与后推 LS/LF——天基准归一后推算）
+          description: 时间线条目清单（每条目含 task 任务名、duration 归一时长（天）、es/ef/ls/lf 四时刻——天基准归一后推算；自由 object，4.3 defer）
           items:
             type: object
         milestones:

@@ -55,10 +55,10 @@ input_schema:
           description: CA 竞争优势评分（内部数据）
         industry_strength:
           type: number
-          description: IS 产业实力评分（外部基准：IMF WEO 产业展望）
+          description: IS 产业实力评分（内部预评，经 IMF 外部基准校准——校准规则见 §5/data_fusion.md）
         environmental_stability:
           type: number
-          description: ES 环境稳定性评分（外部基准：WB 治理/通胀指标）
+          description: ES 环境稳定性评分（内部预评，经 WB 外部基准校准——校准规则见 §5/data_fusion.md）
 output_schema:
   type: object
   required: [space_positioning, data_sources]
@@ -110,8 +110,8 @@ output_schema:
 | strategic_factors | object | ✅ | 四维度因子评分（问卷打分 + 专家访谈） |
 | strategic_factors.financial_strength | number | ✅ | FS 财务实力评分（内部数据） |
 | strategic_factors.competitive_advantage | number | ✅ | CA 竞争优势评分（内部数据） |
-| strategic_factors.industry_strength | number | ✅ | IS 产业实力评分（外部基准：IMF WEO 产业展望） |
-| strategic_factors.environmental_stability | number | ✅ | ES 环境稳定性评分（外部基准：WB 治理/通胀指标） |
+| strategic_factors.industry_strength | number | ✅ | IS 产业实力评分（内部预评，经 IMF 外部基准校准——见 §5） |
+| strategic_factors.environmental_stability | number | ✅ | ES 环境稳定性评分（内部预评，经 WB 外部基准校准——见 §5） |
 
 ## 4. 输出字段（output_schema）
 
@@ -134,7 +134,7 @@ output_schema:
 | ES 环境稳定性（治理/通胀/宏观波动） | world-bank | 点分指标码 + 国家代码（如 "FP.CPI.TOTL.ZG;CHN" / "CC.EST;CHN"） |
 | IS 产业实力（增长展望/需求环境） | imf | 大写下划线指标码 + 国家代码（如 "NGDP_RPCH;CHN" / "PCPIPCH;CHN"） |
 
-**内外交叉验证要求：** IS/ES 评分必须对照 WB/IMF 宏观基准校准（换算档位偏离一档以上需给出内部依据）；FS/CA 为纯内部维度以工作坊共识为准，外部源不评判内部能力；宏观指标为国家维度而非行业维度的粒度边界见 `references/data_fusion.md`（冲突分级处理：方向相反 → 暂停判断列入复议清单；同向幅度存疑 → 双方并列，保守值参与定向；指标缺失 → 沿用内部预评并标注数据缺口）。
+**内外交叉验证要求：** IS/ES 评分必须对照 WB/IMF 宏观基准校准（换算档位偏离一档以上需给出内部依据）；FS/CA 为纯内部维度以工作坊共识为准，外部源不评判内部能力；宏观指标为国家维度而非行业维度的粒度边界见 `references/data_fusion.md`（冲突分级处理：方向相反 → 暂停判断列入复议清单；同向幅度存疑 → 双方并列，保守值参与定向；指标缺失 → 沿用内部预评并标注数据缺口）。**同源多 query（name/name#2 键）不构成独立来源**——双源交叉校准须来自不同源。
 
 ## 6. SOP 执行步骤
 
@@ -158,7 +158,7 @@ imf_payload = (DATA_SOURCES.get("imf") or {}).get("payload")
 6. Validate 阶段：校验定位完备性（坐标定向 + 战略姿态 + 行动建议 + 溯源元数据）
 7. 输出 `space_positioning` + `data_sources`（溯源元数据：source/freshness/confidence）
 
-**标记使用规范：** `$DATA_SOURCE("<数据源名>", "<query>")` 仅写在 Code 产物代码中；**禁止**任何形式的沙箱内网络访问（沙箱 `network_mode="none"` 为领域不变量）；标记数据源名必须在 frontmatter 白名单内（207 策略违规）。
+**标记使用规范：** `$DATA_SOURCE("<数据源名>", "<query>")` 仅写在 Code 产物代码中；**禁止**任何形式的沙箱内网络访问（沙箱 `network_mode="none"` 为领域不变量）；标记数据源名必须在 frontmatter 白名单内（207 策略违规）。每源采集结果量以适配器默认分页为准（SOP 引导代码不得显式请求超量数据）。
 
 ## 7. 失败处理
 

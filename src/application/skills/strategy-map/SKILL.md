@@ -68,7 +68,7 @@ output_schema:
       properties:
         nodes:
           type: array
-          description: 因果链节点清单（维度/指标/主题）
+          description: 因果链节点清单（每节点含 node_id 节点标识、label 节点名称、dimension 所属维度三键——自由 object，4.3 defer）
           items:
             type: object
         causal_arrows:
@@ -78,7 +78,7 @@ output_schema:
             type: string
         theme_cards:
           type: array
-          description: 战略主题卡清单（主题名/涉及维度/假设链）
+          description: 战略主题卡清单（每卡含 theme 主题名、dimensions 涉及维度、hypothesis_chain 假设链三键——自由 object，4.3 defer）
           items:
             type: object
 ---

@@ -280,7 +280,13 @@ def extract_template_fields(template_text: str) -> dict[str, bool]:
 
 
 def _fill_min_instance(schema: dict[str, Any]) -> Any:
-    """按 JSON Schema required 链递归构造最小合法实例（required 字段逐层填充）。"""
+    """按 JSON Schema required 链递归构造最小合法实例（required 字段逐层填充）。
+
+    支持 enum（取首枚举值——自由文本字段的最小合法值须在枚举内）与
+    minItems（按声明的最小元素数填充——如 competitor-analysis 竞品清单 ≥2）。
+    """
+    if "enum" in schema:
+        return schema["enum"][0]
     schema_type = schema.get("type")
     if schema_type == "object":
         required = schema.get("required", [])
@@ -288,8 +294,8 @@ def _fill_min_instance(schema: dict[str, Any]) -> Any:
     if schema_type == "array":
         items = schema.get("items", {})
         if isinstance(items, dict) and items.get("properties"):
-            return [_fill_min_instance(items)]
-        return ["示例"]
+            return [_fill_min_instance(items) for _ in range(max(int(schema.get("minItems", 1)), 1))]
+        return ["示例"] * max(int(schema.get("minItems", 1)), 1)
     if schema_type == "number":
         return 1.0
     if schema_type == "integer":
