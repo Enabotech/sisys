@@ -44,7 +44,7 @@ input_schema:
   properties:
     change_data:
       type: object
-      description: 变革数据（访谈采集：变革内容 + 利益相关者立场，模板 change_stakeholder_assessment.md）
+      description: 变革数据（访谈采集：变革内容 + 利益相关者立场，模板 change_stakeholder_assessment.md）。条目编码（R2-F7）——stakeholders 逐条「姓名/角色（立场：支持/中立/反对；影响力 1-5；阻力 1-5）」（专项转化规则「影响力 ≥4 且反对」依赖分值解析）
       required: [change_content, stakeholders, resistance_analysis]
       properties:
         change_content:
@@ -112,9 +112,9 @@ output_schema:
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| change_data | object | ✅ | 变革数据（访谈采集：变革内容 + 利益相关者立场） |
+| change_data | object | ✅ | 变革数据（访谈采集：变革内容 + 利益相关者立场；条目编码见下行） |
 | change_data.change_content | string | ✅ | 变革内容描述（范围/目标/驱动因素） |
-| change_data.stakeholders | array[string] | ✅ | 利益相关者清单及立场评估 |
+| change_data.stakeholders | array[string] | ✅ | 利益相关者清单（逐条「姓名/角色（立场：支持/中立/反对；影响力 1-5；阻力 1-5）」） |
 | change_data.resistance_analysis | object | ✅ | 阻力分析（阻力来源 → 强度/根因） |
 
 ## 4. 输出字段（output_schema）
@@ -145,7 +145,7 @@ resistance_analysis = 阻力来源 → 强度/根因）。
 
 **内外交叉验证要求：** 变革紧迫性论证与行业趋势判断至少有一条外部基准印证（或显式标注「内部认知，
 未经外部印证」）；外部趋势与内部变革驱动判断矛盾时的处置见 `references/data_fusion.md`
-（冲突处理：外部基准优先修正内部认知，修正前双方并列呈现）。
+（冲突分级处理：内部漏判 → 外部基准优先补正；外部无印证 → 双方并列不下结论；方向相反 → 暂停判断，以最新一手内部数据为准复议）。
 
 ## 6. SOP 执行步骤
 
@@ -193,10 +193,10 @@ practice_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
   "change_data": {
     "change_content": "从职能制转向产品制组织：跨职能产品团队承载端到端损益，2027 年前完成三个试点事业部切换",
     "stakeholders": [
-      "CEO（强力支持：战略转型发起人）",
-      "事业部总经理 A（观望：担心试点失败回摆）",
-      "职能中台负责人 B（反对：权限与编制被稀释）",
-      "一线产品经理群体（支持：授权与成长空间增加）"
+      "CEO（支持；影响力 5；阻力 1：战略转型发起人）",
+      "事业部总经理 A（中立；影响力 4；阻力 3：担心试点失败回摆）",
+      "职能中台负责人 B（反对；影响力 4；阻力 5：权限与编制被稀释）",
+      "一线产品经理群体（支持；影响力 2；阻力 1：授权与成长空间增加）"
     ],
     "resistance_analysis": {
       "职能中台编制焦虑": {"强度": 4, "根因": "岗位重构不确定性"},

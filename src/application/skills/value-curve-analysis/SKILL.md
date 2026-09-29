@@ -44,7 +44,7 @@ input_schema:
   properties:
     competition_data:
       type: object
-      description: 竞争数据（客户调研 + 竞品情报，模板 value_curve_factors_grid.md）
+      description: 竞争数据（客户调研 + 竞品情报，模板 value_curve_factors_grid.md）。条目编码（R2-F7）——competitors 逐条「竞品名 —— 关注理由」；value_factors 键值形态「要素名 → 当前/目标水平（各 1-5，对象键为 当前/目标）」（证据来源留档模板不入参）
       required: [competitors, value_factors]
       properties:
         competitors:
@@ -100,9 +100,9 @@ output_schema:
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| competition_data | object | ✅ | 竞争数据（客户调研 + 竞品情报） |
-| competition_data.competitors | array[string] | ✅ | 竞品清单（行业战略轮廓绘制对象） |
-| competition_data.value_factors | object | ✅ | 价值要素水平（要素名 → 我方当前水平/目标值） |
+| competition_data | object | ✅ | 竞争数据（客户调研 + 竞品情报；条目编码见下两行） |
+| competition_data.competitors | array[string] | ✅ | 竞品清单（逐条「竞品名 —— 关注理由」） |
+| competition_data.value_factors | object | ✅ | 价值要素水平（要素名 → {当前: 1-5, 目标: 1-5}，证据留档模板） |
 
 ## 4. 输出字段（output_schema）
 
@@ -128,8 +128,8 @@ output_schema:
 | 市场动态（要素偏好迁移/新品发布/价格战） | newsapi | 自然语言关键词（如 "智能手表 血压监测 上市"） |
 
 **内外交叉验证要求：** 每个价值要素的行业/竞品水平定位至少有一条外部基准印证（或显式标注「内部认知，未经外部
-印证」）；竞品要素情报与内部调研认知矛盾时的处置见 `references/data_fusion.md`（冲突处理：外部基准优先修正
-内部认知，修正前双方并列呈现）。
+印证」）；竞品要素情报与内部调研认知矛盾时的处置见 `references/data_fusion.md`（冲突分级处理：内部漏判 →
+外部基准优先补正；外部无印证 → 双方并列不下结论；方向相反 → 暂停判断，以最新一手内部数据为准复议）。
 
 ## 6. SOP 执行步骤
 
@@ -174,7 +174,7 @@ news_payload = (DATA_SOURCES.get("newsapi") or {}).get("payload")
 ```json
 {
   "competition_data": {
-    "competitors": ["华为 Watch GT 系列", "小米手环 Pro", "Apple Watch Series"],
+    "competitors": ["华为 Watch GT 系列 —— 行业健康要素押注代表", "小米手环 Pro —— 价格带锚点主体", "Apple Watch Series —— 生态互联标杆"],
     "value_factors": {
       "价格竞争力": {"当前": 3, "目标": 4},
       "健康监测精度": {"当前": 2, "目标": 5},

@@ -181,10 +181,17 @@ def schema_leaf_keys(schema: dict[str, Any]) -> dict[str, bool]:
                 # array of object：展开 items.properties（容器键不进比对集）
                 _walk(sub["items"], key_path)
             else:
-                if sub.get("properties") is not None:
+                if sub.get("properties"):
+                    # 含非空 properties 却非 object 容器（object 容器已在上方分支处理）
                     assert False, (
                         f"Schema 节点 {key_path} 含 properties 但未声明 type: object——"
                         "子键归属无法以扁平微格式表达，须显式声明容器类型或改为叶子"
+                    )
+                if "properties" in sub:
+                    # properties 键存在但为空集——无论 type 均无从承载分区内容
+                    assert False, (
+                        f"Schema 节点 {key_path} 的 properties 为空——"
+                        "须声明子键或删除 properties 改为叶子（R2-F11①：与缺 type 分支分列文案）"
                     )
                 assert key not in leaves, (
                     f"Schema 叶子键跨容器重名: {key_path} 与 {leaf_paths[key]}——"
@@ -217,12 +224,13 @@ def _collection_section(template_text: str) -> str | None:
     """截取「采集表格」区文本（到下一个二级标题为止；缺段返回 None）。
 
     字段提取与分区标题提取共用同一段截取逻辑（R1-F3，防两份区域边界漂移）。
+    正则用 [ \\t] 不用 \\s（后者含换行符，裸「##」行会跨行捕获——R2-F11③）。
     """
-    match = re.search(r"^##\s*采集表格\s*$", template_text, re.MULTILINE)
+    match = re.search(r"^##[ \t]*采集表格[ \t]*$", template_text, re.MULTILINE)
     if match is None:
         return None
     after = template_text[match.end() :]
-    next_section = re.search(r"^##\s", after, re.MULTILINE)
+    next_section = re.search(r"^##[ \t]", after, re.MULTILINE)
     return after[: next_section.start()] if next_section else after
 
 
@@ -438,7 +446,7 @@ def assert_template_schema_alignment(slug: str, document: SkillDocument) -> None
     # 分区标题 ↔ 顶层容器键双向断言（Story「内部数据契约」：分区标题字面值 == 顶层键名）
     collection = _collection_section(template_text)
     assert collection is not None, f"{slug}: 模板缺少「采集表格」区（四段式断言已保证存在，此处防御）"
-    section_titles = re.findall(r"^###\s+(.+?)\s*$", collection, re.MULTILINE)
+    section_titles = re.findall(r"^###[ \t]+(.+?)[ \t]*$", collection, re.MULTILINE)
     container_keys = schema_top_level_container_keys(document.frontmatter.input_schema)
     extra_titles = sorted(set(section_titles) - set(container_keys))
     missing_keys = sorted(set(container_keys) - set(section_titles))

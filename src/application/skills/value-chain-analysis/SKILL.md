@@ -44,7 +44,7 @@ input_schema:
   properties:
     enterprise_data:
       type: object
-      description: 企业内部数据（ERP 导出 + 流程访谈，模板 value_chain_activities_inventory.md）
+      description: 企业内部数据（ERP 导出 + 流程访谈，模板 value_chain_activities_inventory.md）。条目编码（R2-F7）——primary/support_activities 逐条「贡献分值（1-5）—— 活动描述」（优势环节判定阈值 ≥4 依赖分值解析）；cost_structure 键值形态「活动 → 成本金额/占比」（证据来源留档模板）
       required: [primary_activities, support_activities, cost_structure]
       properties:
         primary_activities:
@@ -106,8 +106,8 @@ output_schema:
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| enterprise_data | object | ✅ | 企业内部数据（ERP 导出 + 流程访谈） |
-| enterprise_data.primary_activities | array[string] | ✅ | 主要活动清单（进料储运/生产/发货/营销/服务） |
+| enterprise_data | object | ✅ | 企业内部数据（ERP 导出 + 流程访谈；条目编码见下三行） |
+| enterprise_data.primary_activities | array[string] | ✅ | 主要活动清单（逐条「贡献分值（1-5）—— 活动描述」） |
 | enterprise_data.support_activities | array[string] | ✅ | 支持活动清单（采购/技术开发/人力资源/企业基础设施） |
 | enterprise_data.cost_structure | object | ✅ | 成本归属（活动 → 成本金额/占比） |
 
@@ -136,8 +136,8 @@ output_schema:
 
 **内外交叉验证要求：** 每个活动的价值贡献判断须有至少一条外部基准对照（或显式标注
 「内部判断，未经外部对照」）；成本占比明显高于行业基准的环节须在分析结论中单独列示；
-外部基准与内部成本数据矛盾时的处置见 `references/data_fusion.md`（冲突处理：
-外部基准优先修正内部认知，修正前双方并列呈现）。
+外部基准与内部成本数据矛盾时的处置见 `references/data_fusion.md`（冲突分级处理：
+内部漏判 → 外部基准优先补正；外部无印证 → 双方并列不下结论；方向相反 → 暂停判断，以最新一手内部数据为准复议）。
 
 ## 6. SOP 执行步骤
 
@@ -185,17 +185,17 @@ nbs_payload = (DATA_SOURCES.get("china-nbs") or {}).get("payload")
 {
   "enterprise_data": {
     "primary_activities": [
-      "进料储运：电芯原材料入库与仓储",
-      "生产：电芯组装与化成分容",
-      "发货：整机厂直供物流",
-      "营销：车企大客户拓展",
-      "服务：质保与残值评估"
+      "3 —— 进料储运：电芯原材料入库与仓储",
+      "5 —— 生产：电芯组装与化成分容（直通率行业领先）",
+      "3 —— 发货：整机厂直供物流",
+      "2 —— 营销：车企大客户拓展",
+      "3 —— 服务：质保与残值评估"
     ],
     "support_activities": [
-      "采购：正极材料集中采购",
-      "技术开发：电芯配方研发",
-      "人力资源：产线技师培养",
-      "企业基础设施：财务与合规"
+      "4 —— 采购：正极材料集中采购（议价能力）",
+      "4 —— 技术开发：电芯配方研发",
+      "3 —— 人力资源：产线技师培养",
+      "2 —— 企业基础设施：财务与合规"
     ],
     "cost_structure": {
       "生产": {"成本金额": "3.2 亿元", "占比": "58%"},

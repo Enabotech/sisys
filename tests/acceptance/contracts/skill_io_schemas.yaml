@@ -377,7 +377,7 @@ skills:
       properties:
         internal_factors:
           type: object
-          description: 内部因素（工作坊采集：优势/劣势清单，模板 swot_factors_collection.md）
+          description: 内部因素（工作坊采集：优势/劣势清单，模板 swot_factors_collection.md）。条目编码：强度分值（1-5）—— 因素描述（R2-F7，TOWS 匹配阈值 ≥3 依赖分值解析）
           required: [strengths, weaknesses]
           properties:
             strengths:
@@ -392,7 +392,7 @@ skills:
                 type: string
         external_factors:
           type: object
-          description: 外部因素（机会/威胁，经 NewsAPI/Tavily 外部基准印证）
+          description: 外部因素（机会/威胁，经 NewsAPI/Tavily 外部基准印证）。条目编码：强度分值（1-5）—— 因素描述（R2-F7，与内部象限同格式）
           required: [opportunities, threats]
           properties:
             opportunities:
@@ -456,7 +456,7 @@ skills:
       properties:
         market_product_data:
           type: object
-          description: 市场/产品数据（工作坊采集：产品 × 市场现有位置，模板 ansoff_product_market_matrix.md）
+          description: 市场/产品数据（工作坊采集：产品 × 市场现有位置，模板 ansoff_product_market_matrix.md）。条目编码：风险档（低/中/高）—— 条目描述（R2-F7，象限风险判定与外部增速基准交叉依赖风险档解析）
           required: [existing_products, new_products, existing_markets, new_markets]
           properties:
             existing_products:
@@ -514,7 +514,7 @@ skills:
       properties:
         competition_data:
           type: object
-          description: 竞争数据（客户调研 + 竞品情报，模板 value_curve_factors_grid.md）
+          description: 竞争数据（客户调研 + 竞品情报，模板 value_curve_factors_grid.md）。条目编码（R2-F7）——competitors 逐条「竞品名 —— 关注理由」；value_factors 键值形态「要素名 → 当前/目标水平（各 1-5，对象键为 当前/目标）」（证据来源留档模板不入参）
           required: [competitors, value_factors]
           properties:
             competitors:
@@ -569,10 +569,10 @@ skills:
                 description: 业务单元名称
               industry_attractiveness:
                 type: number
-                description: 行业吸引力评分（1-10，外部基准支撑：WB 宏观指标 + Tavily 市场情报）
+                description: 行业吸引力评分（1-10，0.5 步进；外部基准支撑 WB 宏观指标 + Tavily 市场情报）。取评分表该维度行前缀分值（R2-F7），证据来源列留档模板不入参
               competitive_strength:
                 type: number
-                description: 业务实力评分（1-10，内部数据：市场份额/利润率）
+                description: 业务实力评分（1-10，0.5 步进；内部数据市场份额/利润率）。取评分表该维度行前缀分值（R2-F7），证据来源列留档模板不入参
     output_schema:
       type: object
       required: [portfolio_map, data_sources]
@@ -657,7 +657,7 @@ skills:
       properties:
         enterprise_data:
           type: object
-          description: 企业内部数据（ERP 导出 + 流程访谈，模板 value_chain_activities_inventory.md）
+          description: 企业内部数据（ERP 导出 + 流程访谈，模板 value_chain_activities_inventory.md）。条目编码（R2-F7）——primary/support_activities 逐条「贡献分值（1-5）—— 活动描述」（优势环节判定阈值 ≥4 依赖分值解析）；cost_structure 键值形态「活动 → 成本金额/占比」（证据来源留档模板）
           required: [primary_activities, support_activities, cost_structure]
           properties:
             primary_activities:
@@ -743,7 +743,7 @@ skills:
           properties:
             classification:
               type: object
-              description: 各资源分类结果（竞争优势/暂时优势/竞争均势/竞争劣势）
+              description: 各资源五分类结果（持续竞争优势/暂时竞争优势/未实现潜在优势/竞争均势/竞争劣势，判定链见 scoring_anchors.md）
             sustainability:
               type: string
               description: 持续竞争优势综合判定
@@ -764,7 +764,7 @@ skills:
       properties:
         strategic_objectives:
           type: object
-          description: 战略目标（高管工作坊采集：四维度目标/KPI 现值，模板 bsc_kpi_scorecard.md）
+          description: 战略目标（高管工作坊采集：四维度目标/KPI 现值，模板 bsc_kpi_scorecard.md）。条目编码（R2-F7）——四维清单逐条「目标档位（保守/基准/挑战）—— 目标与 KPI 现值描述」（目标值校准与档位判定依赖档位前缀解析；证据来源留档模板）
           required: [financial, customer, internal_process, learning_growth]
           properties:
             financial:
@@ -829,7 +829,7 @@ skills:
       properties:
         business_objectives:
           type: object
-          description: 业务目标（战略规划文件 + 数据仓库导出，模板 kpi_tree_decomposition.md）
+          description: 业务目标（战略规划文件 + 数据仓库导出，模板 kpi_tree_decomposition.md）。条目编码（R2-F7）——objectives 逐条「目标档位（基准/挑战/突破）—— 目标描述」（档位换算与逐级校验依赖档位前缀解析；baseline_data 键值形态「指标 → 现值」）
           required: [objectives, baseline_data]
           properties:
             objectives:
@@ -880,7 +880,7 @@ skills:
       properties:
         change_data:
           type: object
-          description: 变革数据（访谈采集：变革内容 + 利益相关者立场，模板 change_stakeholder_assessment.md）
+          description: 变革数据（访谈采集：变革内容 + 利益相关者立场，模板 change_stakeholder_assessment.md）。条目编码（R2-F7）——stakeholders 逐条「姓名/角色（立场：支持/中立/反对；影响力 1-5；阻力 1-5）」（专项转化规则「影响力 ≥4 且反对」依赖分值解析）
           required: [change_content, stakeholders, resistance_analysis]
           properties:
             change_content:

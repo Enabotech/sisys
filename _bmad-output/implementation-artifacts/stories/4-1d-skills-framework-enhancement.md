@@ -1280,6 +1280,34 @@ tests/
 
 - [x] R1-F1 ~ R1-F13 全部落码并全量验证：单元+架构 792 passed / 集成 18 passed / 验收 28 passed（两套，真实 Redis）/ unit 全量含覆盖率 7476 passed（整体 89%、应用层 88%，门禁全过）/ ruff check+format 全绿 / mypy 零错误（改动文件）
 
+#### Round 2 审查（回归核查 + 内容质量深挖 + SSOT 全链，commit e2b91441 后）
+
+**三视角结论：** E（Round 1 修复回归核查）——13 项修复 12 项落码/传播/交互三轴全过、实跑 792+28 全绿、零回归破口；唯一实质留项 F5 半修（4-1c 母库断言未同步收紧）。G（SSOT 全链）——6 条数据链 24 项程序化检查全部真实一致（数据零漂移）、92 passed；遗留集中在守护网完备性（identity 自检漏盖 2 常量等）。F（内容质量深挖，10 Skill × 50 文件全文阅读）——**方法论内核全部正确无 P0**（SPACE 符号系/Porter 活动分类/Kotter 步序/ERRC/BSC 因果链/TOWS 配对）；发现内容级 P1×6 + P2×6 + P3×7，短板集中在「工作坊成果 → input_schema → 锚点聚合规则」传递链的最后一公里。
+
+**Round 2 修复方案（C3 双评审员裁决后落码；评审员 3——11 项优秀 3 项修订（F3 扩围 6→8 / F5 补 classification 五类三处同步 / F7 补 §3 同步+ge 改述+vrio 排除登记）；评审员 4——无阻断死锁，4 项修订（F6 非对称映射 / F7 枚举+钉模板现行格式 / F8 钉规范句防「外部优先」还魂 / F4⑤ 同步 §6 §8 示例）+ 8 条落码约束（A5-A12：version 1.0.0 不升 / finally close / 尖括号占位 / 输入侧自由 object defer 补句等）。全部修订与约束已采纳）：**
+
+- [x] **R2-F1 [P2]（E+G）4-1c 版 assert_data_sources_contract 同步收紧**：收紧为逐字断言（兑现 4-1c 故事自身 AC-1「逐字等于」措辞；漂移注入实证由静默变必红）
+- [x] **R2-F2 [P2]（G）identity 自检补盖**：补 `EXPECTED_REQUIRED_FIELDS is` / `SKILLS_ROOT is` 两行 + docstring 七常量（SKILL_MD_MAX_LINES 仍 == 注记 int 语义）
+- [x] **R2-F3 [P1]（F，评审扩围 6→8 Skill）§5 冲突处理摘要分级化**：swot/ge/vrio/change/value-curve/value-chain/space/bsc 全部改为「冲突分级处理：内部漏判 → 外部基准优先补正；外部无印证 → 双方并列不下结论；方向相反 → 暂停判断，以最新一手内部数据为准复议」（与 data_fusion 冲突表逐行对齐；ansoff/kpi-tree 经反向确认无缺陷不入列）
+- [x] **R2-F4 [P1]（F）GE 一揽子修复**：①投资建议映射补全为经典 GE 三带（绿带投资/黄带选择性发展（高吸引弱实力禁收割）/红带收割退出 + 一句话规则）②九宫格切分改 0.5 步进可达网格（≤3/3.5-6.5/≥7，消除 6.0-6.67 双归属）③「一档 = 1.0 分」钉死 ④指标码 NE.GDI.TOTCD.ZS → NE.GDI.TOTL.ZS（真码）⑤query 规范补国家代码 + §6/§8 标记示例同步（A5）；附 §5 证据来源措辞修正（「证据来源列留档模板与定位依据，不进入 arguments 数值字段」）
+- [x] **R2-F5 [P1]（F）VRIO 判定链闭合重写**：经典二叉树逐级下探（五分类：劣势/均势/暂时/未实现潜在/持续；仅 V=R=I=O 全 1 判持续，0.5 档上限暂时优势——Barney 原意）+ classification description 五类三处同步（yaml + frontmatter 双写 + §4 表，闭环 F 视角 P3 的 4vs5 不一致）
+- [x] **R2-F6 [P1]（F，评审修订：非对称映射）BSC/kpi-tree 档位互查映射 + BSC 区间连续化**：BSC 概率档连续化（≥90 保守/60-90 基准/30-60 挑战/<30 不可信目标区禁直接定档）+ 两份 anchors 各增**非对称**互查映射表（BSC 保守无 kpi 对应档、kpi 突破无 BSC 对应档显式标注；冲突取保守侧；两表字面一致双向维护）
+- [x] **R2-F7 [P1]（F，评审修订：枚举+钉模板现行格式+§3 同步+ge 改述）handoff 编码规范声明**：7 个字符串型 Skill（swot 强度 1-5 前缀 / ansoff 风险档前缀 / value-curve 竞品关注理由 + value_factors 键值形态 / value-chain 贡献分值前缀 + cost_structure 键值形态 / bsc 档位前缀 / kpi-tree 档位前缀 + baseline_data 键值形态 / change 立场+影响力+阻力复合编码）+ ge number 字段分解话术（取评分表行前缀分值，证据留档模板）——全部 yaml+frontmatter description 双写 + §3 表同步 + §8 示例改写为携带编码（与模板现行微格式逐字一致）；vrio 分解编码排除登记（随 4.3，A3）；**落码实证：description 含「{当前: 1-5}」形态会触发 frontmatter YAML mapping 解析错误——编码声明文案禁用冒号花括号形态（value-curve 实测红→修复→绿）**
+- [x] **R2-F8 [P2]（F，评审修订：钉规范句）「70/30 权重」定性化（10 处）**：统一句式「内部数据为分析主体，外部基准用于校准印证（非数值加权——本工具不做加权总分，R2-F8）；矛盾处置按冲突表分级裁决」（kpi-tree 主语为官方统计；防「外部(印证)优先」句式从 F3 修复位还魂——A2）
+- [x] **R2-F9 [P2]（F）工作坊时间压缩指引（10 处）**：各 workshop_guide 增「时间压缩指引（2 小时精简变体）」节（按各自议程给环节合并表 + 压缩代价 + 不可压缩项；标题「2-4 小时」保持 AC-2 契约字面）
+- [x] **R2-F10 [P2]（F，采纳评审设计：四维独立阶梯）SPACE 锚点补维**：删除换算括注（三行混用镜像/零点对称两套规则且 +5 无对应）→ 四维独立阶梯 + 补 CA（-1~-7）/IS（+1~+7）锚点示例各 3 条
+- [x] **R2-F11 [P3]（E）三处实现边角**：①守卫拆分「含非空 properties 缺 type」（原文案保留 match 兼容）与「properties 为空」两分支 + 空分支红测 ②F2 teardown 重构为 ping 守卫独立 try（仅 ping 静默合法）+ delete 存活态不吞 + finally 无条件 close（A8）③区域截取与标题正则收紧 `[ \t]`（防跨行捕获）
+- [x] **R2-F12 [P3]（G）EXPECTED_REQUIRED_FIELDS 值级基准锁定**：自检补 `== ("indicator", "value")` 硬编码断言（4.3 改值显式登记绊线）
+- [x] **R2-F13 [P3]（G）4-1c 架构测试常量 import 化**：SKILLS_ROOT/DATA_SOURCE_MARKER_PATTERN/SKILL_MD_MAX_LINES 三常量 import + TARGET_SLUGS 改 `tuple(SKILL_DATA_SOURCES.keys())` 派生 + 删孤儿 `import re`（R1-F9 同款收尾）
+
+**Round 2 defer 增强（并入既有台账）：**
+- 自由 object 输出 schema（ge/ansoff/bsc/kpi-tree/value-chain/change 六处 portfolio_map/risk_assessment/target_values 等无 properties）+ 档位判定不进输出字段 + **输入侧自由 object 三处（value-curve value_factors / kpi-tree baseline_data / change resistance_analysis）字段化** + vrio 复合单元格→结构化数字的分解编码 → **Story 4.3**（与「工具输出 Schema 强制验证（Pydantic 运行时校验）」既定留项合并——先结构定义后运行时验证次序成立，R2-F7 的 description 编码声明为过渡方案；F-P2-12 + A3 + A12）
+- NON_TARGET_SLUGS 三副本互锁、yaml 注释后缀三种混用、Stub payload indicator/value 软副本、newsapi 中文 query 召回、WB 范围语法 §5 未定义、±50% 校准阈值形同虚设等 P3 杂项 → 记录在案（4-1e/4.3 顺手或不再触发；VRIO classification 4vs5 已随 R2-F5 闭环）
+
+#### Round 2 已修复 Patch 回填
+
+- [x] R2-F1 ~ R2-F13 全部落码（四批评审顺序：安全网收紧 → anchors 自包含 → L1/L2 对齐 → F7 双写殿后）并全量验证：单元+架构 794 passed / 集成 18 + 验收 28（真实 Redis）/ ruff 全绿 / mypy 零错误；version 全部保持 1.0.0（A10）；A7 尖括号占位规则全程遵守（§8 标记行名字集合零变化）
+
 #### 已推迟 Defer
 
 - [ ] 节点级注入（旁路+误拒双向）→ Story 4.2（4-1c 既定留项，本 Story 不收敛）
