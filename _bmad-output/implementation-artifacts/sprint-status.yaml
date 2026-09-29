@@ -142,7 +142,7 @@ development_status:
   4-1c-skills-data-collection-integration: done
   4-1d-skills-framework-enhancement: done
   4-1e-skills-internal-framework: done
-  4-1f-skills-datasource-enhancement: backlog
+  4-1f-skills-datasource-enhancement: ready-for-dev
   4-2-toolchain-orchestration-dag: done
   4-3-tool-io-schema-validation: done
   4-4-docker-sandbox-execution: done
