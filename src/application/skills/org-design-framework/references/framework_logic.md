@@ -26,7 +26,8 @@ strategy / processes / rewards / people 四维由子容器承载——根键名�
 - 步骤 5 —— 检验人员维（people.talent_measures）：人才标准与培养举措是否供给
   战略所需能力；与职能清单联动（新职能需要新人才画像）
 - 步骤 6 —— 五维对齐计算：逐维读取条目维度对齐度分值，取各维参与条目的最低分
-  作为该维对齐分值（维度内短板优先）
+  作为该维对齐分值（维度内短板优先；strategy 维条目分值 = 陈述完备性，
+  见 scoring_anchors.md 刻度声明）
 - 步骤 7 —— 失配诊断与建议：对最低分维度（或并列多维）生成
   optimization_suggestions（调整该维或联动维的结构性动作），fit_assessment
   呈现五维分值与依据

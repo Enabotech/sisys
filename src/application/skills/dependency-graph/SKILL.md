@@ -61,7 +61,7 @@ output_schema:
             type: string
         risk_nodes:
           type: array
-          description: 风险节点清单（扇入 ≥3 的汇聚节点与零依赖/零被依赖的孤立节点——机械规则，其余风险为 LLM 分析项）
+          description: 风险节点清单（扇入 ≥3 的汇聚节点、扇出 ≥3 的发散节点与零依赖/零被依赖的孤立节点——机械规则，其余风险为 LLM 分析项）
           items:
             type: string
 ---
@@ -98,8 +98,8 @@ output_schema:
 | --- | --- | --- |
 | dependency_network | object | 依赖关系网络 |
 | dependency_network.dag | object | 有向无环图结构（邻接表——环违规以 cycles 键结构化呈现，不映射运行时异常） |
-| dependency_network.critical_path | array[string] | 关键路径（跳数最长链的无时长结构代理，1-5） |
-| dependency_network.risk_nodes | array[string] | 风险节点清单（扇入 ≥3 汇聚节点与零依赖/零被依赖孤立节点） |
+| dependency_network.critical_path | array[string] | 关键路径（跳数最长链的无时长结构代理） |
+| dependency_network.risk_nodes | array[string] | 风险节点清单（扇入 ≥3 汇聚节点、扇出 ≥3 发散节点与零依赖/零被依赖孤立节点） |
 
 ## 5. 数据采集计划（Think 阶段引导——用户输入采集）
 
@@ -122,7 +122,7 @@ output_schema:
 2. Think 阶段：规划 DAG 构建与拓扑分析的执行步骤（建图 → 校验 → 分层 → 推算）
 3. Code 阶段：生成分析代码（纯内部数据直算——由 task_list 构建邻接表，执行无环校验/拓扑排序/跳数最长链推算，零 `$DATA_SOURCE` 标记）
 4. Execute 阶段：沙箱执行（纯内部型无外部采集）
-5. Observe 阶段：核对拓扑分层与风险节点（扇入/孤立节点机械规则命中情况）
+5. Observe 阶段：核对拓扑分层与风险节点（扇入/扇出/孤立节点机械规则命中情况）
 6. Validate 阶段：校验输出完备性（dag 邻接表 + critical_path 非空 + risk_nodes 列表）
 7. 输出 `dependency_network`（critical_path = 跳数最长链的无时长结构代理）
 

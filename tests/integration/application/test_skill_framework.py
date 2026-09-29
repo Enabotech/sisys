@@ -1,8 +1,8 @@
 """内部框架型 Skills 集成测试（7 个 Skills 无标记全链路 + 207 误用守护 + 缺数据引导面）
 
 真实服务链路：真实 ToolExecutionEngine + 真实 InMemorySkillLoader（load_sop 加载
-真实 SKILL.md frontmatter——含成熟化 schema 双写断言）；Mock 仅限 LLM/Sandbox
-（AsyncMock，LLM 按内容特征分派「生成代码」→ Code 阶段）。
+真实 SKILL.md frontmatter——含成熟化 schema 双写断言）；Mock 仅限 LLM/Sandbox 与
+resolver cache 端口（AsyncMock，LLM 按内容特征分派「生成代码」→ Code 阶段）。
 
 纯内部型链路特点（与 4-1c/4-1d 集成测试的差异，D9 决策）：
 - 无 Redis 依赖：无标记主链路零 resolver 调用（引擎 :329-331 无标记快速返回）；
@@ -216,5 +216,5 @@ class TestInsufficientDataGuidance:
         think_prompt = _think_prompt(execution)
         assert repr({}) in think_prompt, f"Think prompt 未包含空参数字典 repr: {think_prompt[:120]}"
         # 引擎行为基线：ToolResultStatus 生产零 INSUFFICIENT_DATA 设置点（:209 硬编码
-        # SUCCESS）——内部数据不足的引导语义由 SOP 失败处理章节文档级承载（AC-2）
-        assert execution.result.status != "insufficient_data"
+        # SUCCESS），状态恒为 SUCCESS——内部数据不足的引导语义由 SOP 失败处理章节
+        # 文档级承载（AC-2），此处不作运行时状态断言

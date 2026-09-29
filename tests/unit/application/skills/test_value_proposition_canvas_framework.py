@@ -92,7 +92,7 @@ class TestSopMaturity:
         """编码规范四方同步抽查（D10）：§3 输入字段表 + §8 示例均含双侧分值语义与解析锚点"""
         body = document.body
         assert "严重度" in body and "重要性" in body, "§3 缺少 customer 侧分值语义（严重度/重要性）"
-        assert "匹配强度" in body, "§3 缺少 value 侧分值语义（匹配强度——挂 value_map 侧，R2-5 裁定）"
+        assert "匹配强度" in body, "§3 缺少 value 侧分值语义（匹配强度——挂 value_map 侧）"
         assert "首个『 —— 』" in body, "缺少确定性解析锚点半句（首个『 —— 』之前前缀中的独立 1-5 整数）"
         examples_section = body.split("input_examples", 1)[-1]
         assert " —— " in examples_section, "§8 示例缺少「分值 —— 描述」微格式条目"

@@ -116,9 +116,9 @@ output_schema:
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | strategy_visualization | object | 战略地图可视化（定性因果链图） |
-| strategy_visualization.nodes | array[object] | 因果链节点清单（维度/指标/主题） |
+| strategy_visualization.nodes | array[object] | 因果链节点清单（node_id/label/dimension 三键） |
 | strategy_visualization.causal_arrows | array[string] | 因果箭头清单（标准方向自下而上；逆向或同层以 warning 级标记） |
-| strategy_visualization.theme_cards | array[object] | 战略主题卡清单（主题名/涉及维度/假设链） |
+| strategy_visualization.theme_cards | array[object] | 战略主题卡清单（theme/dimensions/hypothesis_chain 三键） |
 
 ## 5. 数据采集计划（Think 阶段引导——用户输入采集）
 
