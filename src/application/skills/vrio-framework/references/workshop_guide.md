@@ -57,4 +57,4 @@
    `resources[].{name, vrio_scores.{value, rarity, imitability, organization}}`
    （逐资源携带判定依据与证据来源，供 Agent 融合外部基准时校准 R/I）
 3. 调用本 Skill 执行：Agent 结合外部基准（USPTO 专利密度 + Tavily 能力情报）完成判定链分类
-4. 结果回传高管确认（重点：R/I 外部印证与内部判定的矛盾项处置、未实现优势的补齐建议）
+4. 结果回传高管确认（重点：R/I 外部印证与内部判定的矛盾项处置、未实现潜在优势的补齐建议）

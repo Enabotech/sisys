@@ -167,7 +167,7 @@ practice_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
 
 4. Execute 阶段：宿主机并发采集（部分失败不中断）→ preamble 注入 → 沙箱执行
 5. Observe 阶段：结合内部数据（立场与阻力评估）与外部基准（DATA_SOURCES）完成变革准备度评估、
-   利益相关者矩阵（影响力 × 立场四象限）与行业变革趋势参照
+   利益相关者矩阵（影响力 × 立场三值分组）与行业变革趋势参照
 6. Validate 阶段：校验路线图完备性（Kotter 8 步路径 + 里程碑 + 沟通计划 + 风险缓解 + 溯源元数据）
 7. 输出 `change_roadmap` + `data_sources`（溯源元数据：source/freshness/confidence）
 
