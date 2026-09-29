@@ -530,15 +530,14 @@ def then_freshness_in_range(context: dict[str, Any]) -> None:
         assert 0.0 <= meta.freshness_score <= 1.0
 
 
-@scenario(FEATURE, "未成熟化 Skill 空白名单安全失败")
+@scenario(FEATURE, "纯内部框架 Skill 空白名单安全失败")
 def test_unmatured_skill_empty_whitelist_safety_failure(context: dict[str, Any]) -> None:
-    """未成熟化 Skill（data_sources 空 tuple）含标记 → 207 安全失败。
+    """纯内部框架 Skill（data_sources 空 tuple）含标记 → 207 安全失败。
 
-    滚动锚点（4-1d 代码审查 R1-F7）：场景 slug 须保持指向未成熟化目标——
-    原 swot-tows 已被 4-1d 成熟化（声明 2 源），场景靠 world-bank ∉ 白名单
-    巧合通过与「白名单外源 207」场景语义重复；现锚 business-model-canvas
-    （4-1e 目标），4-1e 成熟化该 Skill 时须同步迁移（与 4-1d 验收套件
-    test_acceptance_skill_mixed_data.feature 同名场景两处一起改）。
+    永久锚定（4-1e Task 1.4 改名，D8）：空白名单是纯内部框架型的永久设计态
+    ——7 个纯内部框架 Skill 不声明任何外部数据源（一等不变量），
+    锚 business-model-canvas 语义长期成立，无滚动迁移义务（23/23 全部成熟化，
+    滚动锚点规则终点态）。
     """
     pass
 

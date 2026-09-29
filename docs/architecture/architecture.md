@@ -14,7 +14,7 @@ completedAt: '2026-02-26'
 
 # SISYS - 企业战略智能系统架构设计文档
 
-**版本：** 8.7.1（Story 4.1d 代码审查修订：R1/R2/R3 内容级修复登记——契约守护网收紧 + Skill 内容质量修复，零架构决策变更）
+**版本：** 8.8.0（Story 4.1e 纯内部框架 Skills 成熟化——23/23 Skills 收官：7 Skills 空声明一等不变量 + 分型契约三件套 + org-design 四维 catalog 增强）
 **状态：** 架构决策主文档 ~3500 行，实现细节迁移至子设计文档
 **评审日期：** 2026-09-26
 **审核依据：**对标业界最佳实践（Arc42/C4/ADR + Anthropic Claude Code Skills 渐进式披露），将 §8/§17/§18 实现代码迁移至独立子设计文档，架构主文档聚焦决策与规则
@@ -184,7 +184,7 @@ completedAt: '2026-02-26'
 | | Skill 误触发率 | <5% | <3% | <1% | 负向触发评测集 |
 | | SAP 消息传递延迟 P95 | <500ms | <200ms | <100ms | 链路追踪 |
 | | 事件监听处理成功率 | ≥99% | ≥99.5% | ≥99.9% | 事件总线监控 |
-| **Skills 状态** | Skills 系统实现度 | 0%（设计 100%） | 100%（Epic 5） | 100%+ 演进 | §19.7 验证矩阵 |
+| **Skills 状态** | Skills 系统实现度 | 100%（23/23 Skills 成熟化收官，Story 4.1a-4.1e） | 100%+ 演进 | 100%+ 演进 | §19.7 验证矩阵 |
 
 ### 1.5 CLI+Skills 核心设计原则
 
@@ -1827,9 +1827,10 @@ src/application/
 │   ├── document_storage_port.py                           # 文档存储端口
 │   └── text_extractor_service.py                          # 文本提取服务端口
 │
-├── skills/                                                # ❌ 未实现（Epic 5 规划，Story 4.1a ready-for-dev）
+├── skills/                                                # ✅ 已实现（Story 4.1a-4.1e：23/23 Skills 全部成熟化收官）
 │   # 规划：23 种工具的 L1/L2/L3 渐进式操作手册（对标 Anthropic Claude Code Skills）
-│   # 当前状态：0% 实现率；设计完成度 100%（详见 §17.3 + Epic 5 蓝图）
+│   # 当前状态：23/23 Skills 成熟化（4-1a 骨架 + 4-1b 数据采集 + 4-1c 外部型 6 +
+│   # 4-1d 混合型 10 + 4-1e 纯内部型 7——详见 §17.3 + §17.3.3）
 │   #
 │   # 目标目录结构（设计示意）：
 │   # skills/
@@ -2674,7 +2675,7 @@ buckets/
   - pestel-analysis（从 4.1b 转入）/ porters-five-forces / appeals-analysis / competitor-analysis / scenario-planning / disruptive-innovation
 - ✅ **Story 4.1d 已完成**（P0-7，2026-09-28）：10 个混合数据型 Skills 成熟化（外部+内部数据，详见 §17.3.3 末尾 4.1d 集成说明）
   - swot-tows（从 4.1b 转入）/ ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management（从 4.1b 转入；实际 slug 无 -model 后缀）
-- 📋 **Story 4.1e backlog**（P0-8）：7 个纯内部框架 Skills 增强（用户输入 + Schema 模板）
+- ✅ **Story 4.1e 已完成**（P0-8，2026-09-29）：7 个纯内部框架 Skills 成熟化（用户输入 + Schema 模板，详见 §17.3.3 末尾 4.1e 集成说明）——**23/23 Skills 全部成熟化收官**（16 声明外部源 + 7 纯内部空声明三分法终态）
   - value-proposition-canvas（从 4.1b 转入）/ business-model-canvas（从 4.1b 转入）/ org-design-framework / dependency-graph / raci-matrix / gantt-chart / strategy-map（从 4.1b 转入）
 
 **设计哲学：** 23 种战略工具将**通过 CLI + Skills（Anthropic Claude Code 风格）**暴露给 Agent 调用：
@@ -2841,6 +2842,26 @@ buckets/
 | D6 | SSOT 契约库组织 | 新建 skill_mixed_data_contracts.py，跨 Story 共享常量一律 import 4-1c 库 | 4-1c 库语义绑定「外部数据型 6 Skill」；跨 Story 稳定事实单一来源（防 4-1e 第三次复制） |
 | D7 | IO 契约 SSOT 载体 | 扩充既有 skill_io_schemas.yaml（追加 10 条目，16 条目单一 SSOT，按 slug 索引） | 单一契约文件一处可查；新建则双文件漂移 |
 | D8 | 回归网调整机制 | Task 1.4 一次性预调整（NON_TARGET_SLUGS 17→7 两处 + test_frontmatter_data_sources.py 中间态安全化重构：物理非空者必 ∈ SSOT 并集 16） | 先调网再并行，消除并行期红窗口与多 Agent 并发编辑冲突面；最终态 16 全非空由架构测试闭环 |
+
+**Story 4.1e 集成说明（✅ 已实现 2026-09-29，Skills 成熟化收官）：** 7 个纯内部框架 Skills（value-proposition-canvas / business-model-canvas / org-design-framework / strategy-map / dependency-graph / raci-matrix / gantt-chart）完成内部框架成熟化，**23/23 Skills 三分法终态达成**（4-1c 外部源型 6 + 4-1d 混合型 10 + 4-1e 纯内部型 7）：① SKILL.md frontmatter 填充 `input_schema`/`output_schema`（契约固化于 `tests/acceptance/contracts/skill_io_schemas.yaml`，23 条目单一 SSOT）——**`data_sources` 键不写入**（键缺失解析为空 tuple，是纯内部型的一等不变量而非未成熟化状态）；② 每 Skill 配套分型 `references/` 三件套（评分型 {framework_logic 框架逻辑引导（本 Story 首次引入，替位 4-1d data_fusion 的纯内部语义）/ scoring_anchors 评分锚点 / workshop_guide 工作坊引导} ×3；结构型 {framework_logic / validation_rules 确定性校验规则 / workshop_guide} ×4）与 `templates/` 用户输入模板（四段式微格式——第三段按分型条件化「评分锚点 / 校验规则」，采集字段 == input_schema 递归叶子键双向断言 + 条目编码规范与确定性解析锚点 7/7）；③ 零引擎/接线/端口/异常层改动——空 `data_sources` + 无标记代码走直通路径（`tool_execution_engine.py:329-331` 无标记快速返回），用户内部输入的唯一数据通道 = `ToolCall.arguments` → Think prompt（f-string 注入，本 Story 升格为主通道）；唯一生产 .py 增强 = `strategic_tool_catalog.py` 的 org-design 四维扩展（Galbraith Star 完整性——strategy/processes/rewards/people 四子容器，只加不改删）；④ 存量资产整合（business-model-canvas 的 validate_canvas.py + canvas_template.json 保留并被 SOP 引用，块键名收敛 `key_partnerships`）与工具分工互查（strategy-map ↔ bsc-scorecard 定性因果链 vs 定量计分卡双向跳转 + dependency-graph ↔ gantt-chart 纯拓扑 vs 含时间排程双向跳转）。
+
+**Story 4.1e 关键架构决策（13 项追加，引用 Story 4.1e 决策表）：**
+
+| # | 决策点 | 选中方案 | 依据 |
+|---|--------|---------|------|
+| D1 | data_sources 策略 | 保持空 tuple（不写键）——纯内部型一等不变量 | 三分法自洽（6 外部 + 10 混合 + 7 纯内部）；7 工具无外部采集语义；空集语义下 [C] 断言仍有真实守护价值（防误写标记） |
+| D2 | 契约库组织 + NON_TARGET 收敛 | 新建第三库 skill_framework_contracts.py（import 4-1c/4-1d + identity 自检）+ NO_EXTERNAL_SOURCE_SLUGS 派生式收敛三副本（== 7 判别力保留）+ 措辞升级「无外部源型恒空不变量」 | 4-1d D6 先例 + 其库 docstring 明写「防 4-1e 第三次复制」；`len(ssot_union)==16` 锚点保持字面（声明源集合仍 16，误声明即红） |
+| D3 | 失败处理断言集 | ("207", "INSUFFICIENT_DATA") 替换 411/412/413 | 纯内部型失败面 = 标记误用（207）+ 内部数据不足（INSUFFICIENT_DATA——SOP 文档级关键词承载，生产零运行时设置点） |
+| D4 | references 分型三件套 | 评分型 {framework_logic, scoring_anchors, workshop_guide} ×3 / 结构型 {framework_logic, validation_rules, workshop_guide} ×4 | 评分语义分型（fit 匹配/块成熟度/维度对齐度）vs 结构型确定性规则（RACI/DAG/CPM/因果箭头） |
+| D5 | 模板四段式第三段分型 | 第三段按分型条件化（评分锚点 / 校验规则），四段式骨架统一 | 微格式机械复用最大化；分型常量落契约库单一来源 |
+| D6 | yaml SSOT 扩容 + output 溯源键 | 扩至 23 条目（v1.2.0）+ output_schema 不含 data_sources 键（惯例偏离登记） | 纯内部型无外部溯源，output 含空 data_sources 是伪契约（EvidencePackage 已空） |
+| D7 | bmc 命名冲突裁定 | 以 catalog 为准收敛 `key_partnerships`（domain 零改动），存量两资产 + loader 断言三文件同批 | catalog 是 domain 层兼容锚；内容资产可改；loader 断言收紧带引号完整键 |
+| D8 | 验收双场景迁移（滚动锚点终点） | 改名永久锚定「纯内部框架 Skill 空白名单安全失败」，slug 保持 business-model-canvas | 23/23 全成熟后无滚动目标——空白名单是纯内部型永久设计态；行为零变化（空 whitelist + world-bank 标记 → 207 依旧） |
+| D9 | 集成测试形态 | 无标记全链路（arguments 主通道 + 零 preamble + evidence 空溯源）+ 207（resolver 注入场景 + 101 对照负例）+ 缺数据引导面；无 Redis/无 xdist_group | 引擎无标记快速返回——行为面收敛为直通链路 |
+| D10 | org-design 四维扩展 + 编码规范 7/7 | catalog 增强 + 四维容器（既有三字段保留）+ 7/7 Skill 条目编码规范与确定性解析锚点 | Galbraith Star 完整性；编码规范是框架逻辑可解析前提；YAML 安全红线（禁半角冒号+空格与花括号） |
+| D11 | Schema 合法性强化 | 23 条目 Draft7 check_schema + build_min_arguments 实例经 JsonSchemaValidatorImpl 校验（测试级衔接 4-3，不改生产链路） | 4-3 基建已注册可用；断言面 = 条目侧与 4.1 catalog 侧互补 |
+| D12 | Epic 字面勘误 | vpc「9 块」→ 6 块双侧匹配（Osterwalder VPC 方法论事实，catalog 3+3 佐证） | Epic 字面偏差留痕签收 |
+| D13 | 工具分工与互查 | strategy-map ↔ bsc-scorecard 互查映射（含 bsc 侧 §2 回跳单行新建）+ dependency-graph ↔ gantt-chart 互相负向跳转 | 两对工具字段形似语义不同（键名陷阱）；bsc↔kpi-tree 非对称映射先例 |
 
 ### 17.4 AGENT 架构
 
@@ -3368,7 +3389,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | 异常处理 | 100% | 100% | 三层异常层次 + 28 种异常类型已实现 |
 | Agent 推理 | 100% | 20% | ⚠️ LangGraph 骨架已实现，节点为 MVP 占位（返回硬编码字符串） |
 | Workflow | 100% | 30% | ⚠️ Prefect 骨架已实现，任务为 Mock 数据 |
-| Skills 系统 | 100% | 0% | ⚠️ Story 4.1a 骨架完成（100%）/ 数据采集与 5 Skills 增强 backlog（Story 4.1b ~40 人天）；详见 Epic 4 蓝图（对标 Anthropic Claude Code Skills 渐进披露 + Hub-and-Spoke） |
+| Skills 系统 | 100% | 100% | ✅ 23/23 Skills 全部成熟化收官（Story 4.1a 骨架 + 4.1b 数据采集基础设施 + 4.1c 外部源型 6 + 4.1d 混合型 10 + 4.1e 纯内部型 7 三分法终态）；Story 4.2 链式编排与 4.3 运行时校验 defer |
 | CQRS | 100% | 0% | ⚠️ 设计规划完成，未实现，应用层使用 services+use_cases 模式 |
 
 #### 19.7.2 关键优势
@@ -3567,6 +3588,7 @@ pytest tests/unit/domain/
 | 8.6.1 | 2026-09-28 | **Story 4.1c 代码审查修订**：①D7 决策行补记已知限制（双向：误拒——节点 B 声明源不在共享白名单时抛 207；旁路——后续节点可采集仅声明序首节点声明、自身未声明的源，待 Story 4.2 节点级切换收敛）②测试判别力修复（411 语义断言/租户交叉缓存隔离/接线首节点钉住/SSOT 契约统一 contracts 唯一来源） | 架构团队 |
 | 8.7.0 | 2026-09-28 | **Story 4.1d 混合数据型 Skills 成熟化实现**：①10 个 Skills frontmatter `data_sources` 统一 2 源声明 + IO Schema（skill_io_schemas.yaml 扩至 16 条目单一 SSOT）②references 三件套（data_fusion/scoring_anchors/workshop_guide）+ templates 内部采集模板（字段 ↔ Schema 叶子键双向断言）③零 Python 生产代码改动（声明即生效）④§17.3.3 追加 4.1d 集成说明与 8 项架构决策（D1-D8） | 架构团队 |
 | 8.7.1 | 2026-09-29 | **Story 4.1d 代码审查修订**（内容级修复，零架构决策变更）：①契约守护网收紧（断言函数失败路径负例/结构守卫/required_fields 逐字断言/identity 自检/23 全量解析枚举恢复）②Skill 内容质量修复（§5 冲突分级摘要与 data_fusion 冲突表对齐/GE 三带映射与 VRIO 判定链闭合重写/70-30 权重定性化/工作坊 2h 压缩指引/条目编码规范声明 + 确定性解析锚点）③既有留项维持（自由 object 字段化与运行时校验 → Story 4.3） | 架构团队 |
+| 8.8.0 | 2026-09-29 | **Story 4.1e 纯内部框架 Skills 成熟化实现（23/23 收官）**：①7 个纯内部框架 Skills frontmatter `input_schema`/`output_schema` 成熟化（`data_sources` 键不写入——空 tuple 一等不变量；skill_io_schemas.yaml 扩至 23 条目单一 SSOT v1.2.0）②分型 references 三件套（framework_logic 首次引入/scoring_anchors 或 validation_rules/workshop_guide——评分型 3 + 结构型 4）+ templates 用户输入模板（四段式分型条件化 + 字段 ↔ Schema 叶子键双向断言 + 条目编码规范 7/7）③零引擎/接线/端口/异常层改动（空 data_sources + 无标记直通路径，arguments 升格主通道）；唯一生产 .py 增强 = catalog org-design 四维（Galbraith Star 完整性，D10 只加不改删）④第三契约库 skill_framework_contracts.py + NON_TARGET_SLUGS 三副本派生收敛 + 双验收场景改名永久锚定⑤工具分工互查（strategy-map ↔ bsc-scorecard / dependency-graph ↔ gantt-chart）+ bmc 存量资产整合（key_partnerships 收敛）⑥§17.3.3 追加 4.1e 集成说明与 13 项架构决策（D1-D13）；三处同源旧值校准为 23/23 终态（§1.4/§13 目录树/§19.7.1 统计表） | 架构团队 |
 
 ---
 

@@ -1,6 +1,6 @@
 # Story 4.1e: Skills 内部框架增强（内部用户输入型 Skills 完善）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -130,10 +130,10 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 ### 4-1d 留项收敛状态确认（Task 0 必做）
 
-- [ ] R1-D2（NON_TARGET_SLUGS 三副本收敛 → 4-1e）：**本 Story Task 1.4 承接**（派生式收敛 + 语义改名，D2 决策）
-- [ ] yaml data_sources.items 字段级化 → Story 4.3（不收敛，沿用粒度）
-- [ ] 输入侧自由 object 字段化 → Story 4.3（不收敛，description 编码过渡）
-- [ ] SPACE 斜线双语义 → 显式不修（跨 Story 边界，继续 defer）
+- [x] R1-D2（NON_TARGET_SLUGS 三副本收敛 → 4-1e）：**本 Story Task 1.4 承接**（派生式收敛 + 语义改名，D2 决策）
+- [x] yaml data_sources.items 字段级化 → Story 4.3（不收敛，沿用粒度）
+- [x] 输入侧自由 object 字段化 → Story 4.3（不收敛，description 编码过渡）
+- [x] SPACE 斜线双语义 → 显式不修（跨 Story 边界，继续 defer）
 
 ---
 
@@ -237,10 +237,10 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 - **yaml SSOT 扩至 23 条目**且互锁断言扩三方并集（唯一机制性必红点前置调整）
 
 **验证标准/Validation Criteria:**
-- [ ] 7 个 Skills 单元测试断言 schema 双写一致 + data_sources == () + catalog 兼容
-- [ ] 跨循环一致性 [C]：SOP body `$DATA_SOURCE` 标记集合 == 声明集合 == **∅**（双向断言防误写标记——`assert_cross_consistency` 复用，空集语义下有真实守护价值）
-- [ ] 23 条目 yaml 加载 + slug 集合 == 三契约库并集（16+7）
-- [ ] version 全部保持 1.0.0
+- [x] 7 个 Skills 单元测试断言 schema 双写一致 + data_sources == () + catalog 兼容
+- [x] 跨循环一致性 [C]：SOP body `$DATA_SOURCE` 标记集合 == 声明集合 == **∅**（双向断言防误写标记——`assert_cross_consistency` 复用，空集语义下有真实守护价值）
+- [x] 23 条目 yaml 加载 + slug 集合 == 三契约库并集（16+7）
+- [x] version 全部保持 1.0.0
 
 ### AC-2: SOP 成熟化（7 个 Skills 内容升级，9 章节对齐 4-1c 契约）
 
@@ -256,12 +256,12 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 - business-model-canvas 存量资产保留并被 SOP 引用（validate_canvas.py + canvas_template.json，D7 收敛为 key_partnerships）
 
 **验证标准/Validation Criteria:**
-- [ ] 7 个 Skills 单元测试断言 SOP 必备章节 + input_examples 非 placeholder + 行数 ≤500 + 失败处理双关键词（207/INSUFFICIENT_DATA 词边界）
-- [ ] frontmatter schema 与 yaml 逐字相等
-- [ ] 分型三件套 + templates 存在性与非空断言（分型参数化）
-- [ ] framework_logic 契约：含框架逻辑引导（系统化思考步骤 + 填写指引——Epic AC 2 字面承接）
-- [ ] 评分型 scoring_anchors 契约：刻度声明 + 分档含义 + 正例与反例锚点示例（4-1d 先例）；结构型 validation_rules 契约：确定性规则 = **分析层评估逻辑**（违规经输出根键下 `conflicts` 类字段结构化呈现，不映射为运行时异常/INSUFFICIENT_DATA）——RACI 恰 1 A 硬规则 + ≥1 R 软规则（A/R 计为已承担 R）/ DAG 无环与依赖方向（关键路径 = 跳数最长链的无时长结构代理）/ 时长归一 CPM（ES/EF/LS/LF 零浮动）/ 因果箭头语法（标准方向自下而上：learning_growth → internal_process → customer → financial；逆向/同层箭头标记 warning 级待澄清假设不硬失败）
-- [ ] **references 内容要素字面锚点断言**（契约库常量 `assert_reference_content_anchors`，4-1d 仅断言存在性的补强；**调用位 = 各 Skill 单测 [B] 循环 + 9.4 汇总层参数化，7 个真实 references 全覆盖**）：framework_logic 必含编号步骤序列（「步骤 1」或「第 1 步」起序，任一形态）且提及对应模板分区/字段名（英文键名）；scoring_anchors 必含「分档含义」与「正例」「反例」**两个独立字样**（不接受「正反例」合并词——其不含「正例」子串；4-1d 实物三段结构：刻度声明/分档含义表/正例反例锚点）；validation_rules 必含逐条编号规则（「规则 1」或「1.」起序）且提及以下关键字至少其一（大小写不敏感）：「RACI」/「DAG」/「CPM」/「箭头」/「正则」；workshop_guide 必含三要素——参与者角色分工（引导者/业务专家类字样）+ 流程环节含时长与产出物 + 会后「模板→arguments 构造」闭环句（4-1d 实物六段结构的核心三段）
+- [x] 7 个 Skills 单元测试断言 SOP 必备章节 + input_examples 非 placeholder + 行数 ≤500 + 失败处理双关键词（207/INSUFFICIENT_DATA 词边界）
+- [x] frontmatter schema 与 yaml 逐字相等
+- [x] 分型三件套 + templates 存在性与非空断言（分型参数化）
+- [x] framework_logic 契约：含框架逻辑引导（系统化思考步骤 + 填写指引——Epic AC 2 字面承接）
+- [x] 评分型 scoring_anchors 契约：刻度声明 + 分档含义 + 正例与反例锚点示例（4-1d 先例）；结构型 validation_rules 契约：确定性规则 = **分析层评估逻辑**（违规经输出根键下 `conflicts` 类字段结构化呈现，不映射为运行时异常/INSUFFICIENT_DATA）——RACI 恰 1 A 硬规则 + ≥1 R 软规则（A/R 计为已承担 R）/ DAG 无环与依赖方向（关键路径 = 跳数最长链的无时长结构代理）/ 时长归一 CPM（ES/EF/LS/LF 零浮动）/ 因果箭头语法（标准方向自下而上：learning_growth → internal_process → customer → financial；逆向/同层箭头标记 warning 级待澄清假设不硬失败）
+- [x] **references 内容要素字面锚点断言**（契约库常量 `assert_reference_content_anchors`，4-1d 仅断言存在性的补强；**调用位 = 各 Skill 单测 [B] 循环 + 9.4 汇总层参数化，7 个真实 references 全覆盖**）：framework_logic 必含编号步骤序列（「步骤 1」或「第 1 步」起序，任一形态）且提及对应模板分区/字段名（英文键名）；scoring_anchors 必含「分档含义」与「正例」「反例」**两个独立字样**（不接受「正反例」合并词——其不含「正例」子串；4-1d 实物三段结构：刻度声明/分档含义表/正例反例锚点）；validation_rules 必含逐条编号规则（「规则 1」或「1.」起序）且提及以下关键字至少其一（大小写不敏感）：「RACI」/「DAG」/「CPM」/「箭头」/「正则」；workshop_guide 必含三要素——参与者角色分工（引导者/业务专家类字样）+ 流程环节含时长与产出物 + 会后「模板→arguments 构造」闭环句（4-1d 实物六段结构的核心三段）
 
 ### AC-3: 用户输入模板与 input_schema 字段一一对应（双向断言）
 
@@ -275,10 +275,10 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 - **变异演示**（4-1d AC-3 先例）：临时删除任一模板字段 → [D] 断言红后还原；临时改 required 标注语法 → 提取器断言红后还原
 
 **验证标准/Validation Criteria:**
-- [ ] `test_schema_template_framework_alignment.py`（7 Skill 参数化，分型四段式）双向断言通过
-- [ ] 契约库自检含提取器边界负例与守卫负例（4-1d R1-F1 先例）
-- [ ] 模板结构与第三段引用断言通过（分型字面串）
-- [ ] 变异演示留痕（Dev Agent Record 记录）
+- [x] `test_schema_template_framework_alignment.py`（7 Skill 参数化，分型四段式）双向断言通过
+- [x] 契约库自检含提取器边界负例与守卫负例（4-1d R1-F1 先例）
+- [x] 模板结构与第三段引用断言通过（分型字面串）
+- [x] 变异演示留痕（Dev Agent Record 记录）
 
 ### AC-4: 集成测试（真实 Engine + 内部数据主通道 + 零外部源不变量）
 
@@ -293,10 +293,10 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 - `build_min_arguments(slug)` 复用（yaml required 链程序化构造——import 4-1d 库，防手写漂移）
 
 **验证标准/Validation Criteria:**
-- [ ] 集成测试全绿（无标记全链路 7 Skill 参数化 + 207/缺数据引导面场景——Subtask 9.1-9.3）
-- [ ] 207 语义断言（error_code == "EXCEPTION_207" 逐字 + 101 对照负例）
-- [ ] repr 断言（arguments 进 Think prompt——f-string 注入 dict 单引号形态，非 json.dumps）
-- [ ] `pytest -n 8` 并行通过，连续 5 次无随机失败
+- [x] 集成测试全绿（无标记全链路 7 Skill 参数化 + 207/缺数据引导面场景——Subtask 9.1-9.3）
+- [x] 207 语义断言（error_code == "EXCEPTION_207" 逐字 + 101 对照负例）
+- [x] repr 断言（arguments 进 Think prompt——f-string 注入 dict 单引号形态，非 json.dumps）
+- [x] `pytest -n 8` 并行通过，连续 5 次无随机失败
 
 ### AC-5: SDD 架构验证测试（含 23 Skills 最终态闭环）
 
@@ -312,9 +312,9 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 - SSOT 单一来源：`FRAMEWORK_SKILL_SLUGS` 从 contracts 模块 import（架构/集成/验收三处禁止复制）
 
 **验证标准/Validation Criteria:**
-- [ ] 架构测试全绿（三方一致 + 终态闭环 + wiring 回归 + 签名锁定 + Schema 强化）
-- [ ] 派生式收敛后三处原字面清单已删（grep 零残留）
-- [ ] 23 条目 Schema 合法性断言通过（Draft7 + 最小实例校验；条目侧断言与 4.1 catalog 侧既有覆盖互补）
+- [x] 架构测试全绿（三方一致 + 终态闭环 + wiring 回归 + 签名锁定 + Schema 强化）
+- [x] 派生式收敛后三处原字面清单已删（grep 零残留）
+- [x] 23 条目 Schema 合法性断言通过（Draft7 + 最小实例校验；条目侧断言与 4.1 catalog 侧既有覆盖互补）
 
 ### AC-6: BDD 验收测试（Gherkin 中文）
 
@@ -326,10 +326,10 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 > **覆盖范围说明**（对齐 4-1c R2-F5 教训——BDD 覆盖范围过宽教训）：BDD 承载 AC-1（空声明行为面）/ AC-4（链路行为面）/ AC-6 行为验证；AC-2（SOP 内容）/ AC-3（模板对应）/ AC-5（架构约束）由单元测试 + 架构测试承载。同面断言主从：BDD「内部数据不足」场景与集成 9.3「缺数据引导面」断言面同构——断言细节以 Subtask 9.3 为准，BDD 层为业务语言重组；BDD 空白名单 207 场景与既有两套（4-1c/4-1d 同名场景）构成三套独立锚定（resolver 注入经 4-1d 范本 fixture 模式携带，语义不漂移由 D8 改名统一保障）。
 
 **验证标准/Validation Criteria:**
-- [ ] `tests/acceptance/test_acceptance_skill_framework.feature`（`# language: zh-CN`，按 AC 分节）
-- [ ] `.py`（@scenario 显式绑定逐场景——4-1d 范本机械为每场景一个 test_* 函数、无 `scenarios()` 批量导入 + 共享 event_loop + 真实服务 + Fake 仅限 LLM/Sandbox）
-- [ ] 全部场景通过
-- [ ] 两套既有验收套件（4-1c/4-1d）全绿（双场景改名后语义仍绿——空白名单 207 行为不变）
+- [x] `tests/acceptance/test_acceptance_skill_framework.feature`（`# language: zh-CN`，按 AC 分节）
+- [x] `.py`（@scenario 显式绑定逐场景——4-1d 范本机械为每场景一个 test_* 函数、无 `scenarios()` 批量导入 + 共享 event_loop + 真实服务 + Fake 仅限 LLM/Sandbox）
+- [x] 全部场景通过
+- [x] 两套既有验收套件（4-1c/4-1d）全绿（双场景改名后语义仍绿——空白名单 207 行为不变）
 
 ---
 
@@ -347,11 +347,11 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 #### 数据模型 (Data Models)
 
-- [ ] yaml SSOT 7 条目设计：以 catalog（`strategic_tool_catalog.py:504-855`）为基础逐 Skill 增强嵌套 required + 叶子 description（含编码规范 + 确定性解析锚点半句——D10）；output_schema 不含 data_sources 键（D6 登记）；自由 object 字段（raci assignments / gantt durations+resources / bmc cost_structure）沿用 description 编码过渡（4.3 defer）
-- [ ] org-design 四维扩展 schema 设计（D10：+ strategy/processes/rewards/people 容器，既有三字段保留——Galbraith Star 完整性，TOOLS.md L1 已写 5 维佐证）
-- [ ] 模板文件命名表钉死（TEMPLATE_FILES 7 项，命名对齐 4-1d `skill_mixed_data_contracts.py:100-111` 风格——缩写前缀 + 采集物名）：`vpc_canvas_matching.md` / `bmc_nine_blocks_canvas.md` / `org_star_model_assessment.md` / `strategy_map_causal_links.md` / `dependency_task_inventory.md` / `raci_roles_tasks.md` / `gantt_project_plan.md`
-- [ ] 分型常量表钉死（评分型 3 / 结构型 4 slug 清单 + 各自 references 三件套与模板第三段字面值）
-- [ ] required_fields 逐源期望值不适用（无声明源——data_sources 键不写）
+- [x] yaml SSOT 7 条目设计：以 catalog（`strategic_tool_catalog.py:504-855`）为基础逐 Skill 增强嵌套 required + 叶子 description（含编码规范 + 确定性解析锚点半句——D10）；output_schema 不含 data_sources 键（D6 登记）；自由 object 字段（raci assignments / gantt durations+resources / bmc cost_structure）沿用 description 编码过渡（4.3 defer）
+- [x] org-design 四维扩展 schema 设计（D10：+ strategy/processes/rewards/people 容器，既有三字段保留——Galbraith Star 完整性，TOOLS.md L1 已写 5 维佐证）
+- [x] 模板文件命名表钉死（TEMPLATE_FILES 7 项，命名对齐 4-1d `skill_mixed_data_contracts.py:100-111` 风格——缩写前缀 + 采集物名）：`vpc_canvas_matching.md` / `bmc_nine_blocks_canvas.md` / `org_star_model_assessment.md` / `strategy_map_causal_links.md` / `dependency_task_inventory.md` / `raci_roles_tasks.md` / `gantt_project_plan.md`
+- [x] 分型常量表钉死（评分型 3 / 结构型 4 slug 清单 + 各自 references 三件套与模板第三段字面值）
+- [x] required_fields 逐源期望值不适用（无声明源——data_sources 键不写）
 
 #### 统一端口定义注册与管理 (Port Contract)
 
@@ -371,13 +371,13 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-- [ ] 编写 `tests/acceptance/test_acceptance_skill_framework.feature`（zh-CN，按 AC 分节，场景大纲或平铺——4-1d Round 3 用户反馈先例：平铺场景）
-- [ ] 编写 BDD 步骤实现骨架（LLM 内容分派 + prompt 捕获 + execution 共享对象——4-1d 骨架模式）
-- [ ] 运行确认失败（🔴 红阶段验证）
+- [x] 编写 `tests/acceptance/test_acceptance_skill_framework.feature`（zh-CN，按 AC 分节，场景大纲或平铺——4-1d Round 3 用户反馈先例：平铺场景）
+- [x] 编写 BDD 步骤实现骨架（LLM 内容分派 + prompt 捕获 + execution 共享对象——4-1d 骨架模式）
+- [x] 运行确认失败（🔴 红阶段验证）
 
 **Task 0 完成标志：**
-- [ ] 上述规范项全部定义完毕
-- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
+- [x] 上述规范项全部定义完毕
+- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
 
 ---
 
@@ -403,25 +403,25 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 #### 覆盖率要求
 
-- [ ] **整体覆盖率 ≥80%**（`make test-cov`）- P0 阻断门禁（生产代码仅 catalog 单点增强——既有覆盖率不降验证）
-- [ ] **应用层 ≥85%**（`make test-cov-application`）——同上不降验证
-- [ ] **关键路径 100%**：本 Story 无代码分支新增，以契约断言覆盖代偿（4-1d 先例）
+- [x] **整体覆盖率 ≥80%**（`make test-cov`）- P0 阻断门禁（生产代码仅 catalog 单点增强——既有覆盖率不降验证）
+- [x] **应用层 ≥85%**（`make test-cov-application`）——同上不降验证
+- [x] **关键路径 100%**：本 Story 无代码分支新增，以契约断言覆盖代偿（4-1d 先例）
 
 #### 代码质量门禁
 
-- [ ] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
-- [ ] **MyPy 类型检查通过**（`poetry run mypy src/`）
-- [ ] **无 P0/P1 级别问题**（代码审查）
-- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
+- [x] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
+- [x] **MyPy 类型检查通过**（`poetry run mypy src/`）
+- [x] **无 P0/P1 级别问题**（代码审查）
+- [x] **预提交 Hooks 通过**（`pre-commit run --all-files`）
 
 #### 测试隔离约束
 
 > 核心原则同 template.md（自包含/UUID 唯一性/BDD 禁 @pytest.mark.asyncio 等，全表适用）；本 Story 特有：无 Redis/无 xdist_group/无缓存清理面。
 
 **验证要求：**
-- [ ] 并行测试 `pytest tests/ -n 8` 通过
-- [ ] 连续 5 次运行无随机失败
-- [ ] `poetry run ruff check` / `mypy` 通过
+- [x] 并行测试 `pytest tests/ -n 8` 通过
+- [x] 连续 5 次运行无随机失败
+- [x] `poetry run ruff check` / `mypy` 通过
 
 ---
 
@@ -478,16 +478,16 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 > 目的：进入实现前钉死 Schema SSOT / 分型契约 / 模板命名 / 决策表 / Gherkin 骨架。
 
-- [ ] Subtask 0.1: 确认 4-1d 留项收敛状态（R1-D2 承接确认 + 其余不收敛留痕——「领域异常契约」节 checklist）
-- [ ] Subtask 0.2: yaml SSOT 7 条目 Schema 设计——以 catalog（:504-855）为基础逐 Skill 增强（嵌套 required + 叶子 description 含编码规范与解析锚点）；org-design 四维扩展设计（D10）；分型常量表 + TEMPLATE_FILES 命名表钉死（7 项见 Task 0 数据模型 checklist——bmc 为 `bmc_nine_blocks_canvas.md`）；**本轮为设计稿不入库**（Task 1 随契约库 TDD 落地）——4-1d Task 0.2 同款
-- [ ] Subtask 0.3: 决策表评审（D1-D13 逐项确认——见 Dev Notes「关键架构决策」节）
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_skill_framework.feature`（zh-CN 按 AC 分节；Happy 路径平铺 7 场景 + Edge：空白名单 207 / 内部数据不足引导（断言面与 Subtask 9.3 同集：空 arguments Think prompt repr + 缺口登记引导——INSUFFICIENT_DATA 文档级语义归 AC-2 单测承载，非运行时状态）/ 负向跳转 ×2——4-1d Round 3 平铺先例）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现骨架（`test_acceptance_skill_framework.py`：execution 共享对象 + LLM 内容分派 + prompt 捕获 + event_loop 模式——Fake 仅限 LLM/Sandbox）
-- [ ] Subtask 0.6: 运行验收测试确认失败（🔴 红阶段验证——Skill 未成熟化时 given/then 断言红；预期红点形态：schema 断言红以 KeyError 呈现（yaml 7 条目尚未入库、`load_io_contract` 先 KeyError）与断言失败并存——**KeyError 亦为合法红**；另注：空白名单 207 与 data_sources==() 两场景在未成熟化时即为绿（生产行为与成熟度无关），红仅来自 schema/SOP 内容场景）
+- [x] Subtask 0.1: 确认 4-1d 留项收敛状态（R1-D2 承接确认 + 其余不收敛留痕——「领域异常契约」节 checklist）
+- [x] Subtask 0.2: yaml SSOT 7 条目 Schema 设计——以 catalog（:504-855）为基础逐 Skill 增强（嵌套 required + 叶子 description 含编码规范与解析锚点）；org-design 四维扩展设计（D10）；分型常量表 + TEMPLATE_FILES 命名表钉死（7 项见 Task 0 数据模型 checklist——bmc 为 `bmc_nine_blocks_canvas.md`）；**本轮为设计稿不入库**（Task 1 随契约库 TDD 落地）——4-1d Task 0.2 同款
+- [x] Subtask 0.3: 决策表评审（D1-D13 逐项确认——见 Dev Notes「关键架构决策」节）
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_skill_framework.feature`（zh-CN 按 AC 分节；Happy 路径平铺 7 场景 + Edge：空白名单 207 / 内部数据不足引导（断言面与 Subtask 9.3 同集：空 arguments Think prompt repr + 缺口登记引导——INSUFFICIENT_DATA 文档级语义归 AC-2 单测承载，非运行时状态）/ 负向跳转 ×2——4-1d Round 3 平铺先例）
+- [x] Subtask 0.5: 编写 BDD 步骤实现骨架（`test_acceptance_skill_framework.py`：execution 共享对象 + LLM 内容分派 + prompt 捕获 + event_loop 模式——Fake 仅限 LLM/Sandbox）
+- [x] Subtask 0.6: 运行验收测试确认失败（🔴 红阶段验证——Skill 未成熟化时 given/then 断言红；预期红点形态：schema 断言红以 KeyError 呈现（yaml 7 条目尚未入库、`load_io_contract` 先 KeyError）与断言失败并存——**KeyError 亦为合法红**；另注：空白名单 207 与 data_sources==() 两场景在未成熟化时即为绿（生产行为与成熟度无关），红仅来自 schema/SOP 内容场景）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义（数据模型 checklist / 端口不适用 / 异常不适用 / Gherkin 红）
-- [ ] yaml 设计稿与决策表入 Story Dev Notes 供 Task 1-8 引用
+- [x] 规范项全部定义（数据模型 checklist / 端口不适用 / 异常不适用 / Gherkin 红）
+- [x] yaml 设计稿与决策表入 Story Dev Notes 供 Task 1-8 引用
 
 ---
 
@@ -505,9 +505,9 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 | 🟢 绿 | 实现 `skill_framework_contracts.py`：`FRAMEWORK_SKILL_SLUGS`（7 slug 有序元组）/ `TEMPLATE_FILES`（7 项映射）/ 分型常量（`SCORING_TYPE_SLUGS` 3 + `STRUCTURAL_TYPE_SLUGS` 4 + 各自 `REQUIRED_REFERENCES` 三件套与模板第三段字面值）/ `FAILURE_KEYWORDS = ("207", "INSUFFICIENT_DATA")`（D3）/ 断言函数（`assert_framework_data_sources_empty`（== ()）/ `assert_io_schema_contract`（import 4-1c 复用）/ `assert_sop_maturity`（失败处理关键词集换 D3 + 分型三件套）/ `assert_cross_consistency`（空集语义复用）/ `assert_template_schema_alignment`（import 4-1d 机械 + 分型第三段）/ `assert_reference_content_anchors`（references 内容要素字面锚点——AC-2 验证标准定义的 framework_logic/scoring_anchors/validation_rules/workshop_guide 最低要素）——**共享常量（REQUIRED_SOP_SECTIONS/SKILL_MD_MAX_LINES/SKILLS_ROOT/load_io_contract/schema_leaf_keys/extract_template_fields/build_min_arguments）一律 import 两既有库，identity 断言自检（`is` 检查，4-1d R2-F2 先例）** |
 | 🔄 重构 | 签名注解 + docstring（中文 Google 风格）+ ruff/mypy |
 
-- [ ] Subtask 1.1: 🔴 红 — 契约库自检测试（含 identity 断言 + 失败路径负例 + 提取器边界复跑）
-- [ ] Subtask 1.2: 🟢 绿 — 契约库实现（常量 + 六断言函数（含 `assert_reference_content_anchors`）+ 分型参数化）
-- [ ] Subtask 1.3: 🔄 重构 — 优化（命名/注解/`__all__`）
+- [x] Subtask 1.1: 🔴 红 — 契约库自检测试（含 identity 断言 + 失败路径负例 + 提取器边界复跑）
+- [x] Subtask 1.2: 🟢 绿 — 契约库实现（常量 + 六断言函数（含 `assert_reference_content_anchors`）+ 分型参数化）
+- [x] Subtask 1.3: 🔄 重构 — 优化（命名/注解/`__all__`）
 
 #### TDD 循环 [B]：回归网预调整（一次性前置——D8 先例）
 
@@ -517,13 +517,13 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 | 🟢 绿 | ① `test_skill_mixed_data_contracts.py:78-86` 互锁断言扩 `yaml_slugs == mixed ∪ 4-1c ∪ FRAMEWORK_SKILL_SLUGS`（import 4-1e 库）；② **NON_TARGET_SLUGS 三副本派生收敛**：契约库定义 `NO_EXTERNAL_SOURCE_SLUGS = tuple(sorted(set(SLUG_TO_TOOL_ID) - set(SKILL_DATA_SOURCES) - set(MIXED_SKILL_DATA_SOURCES)))`（== 7；`SLUG_TO_TOOL_ID` import 自 `src/application/skills/skill_manifest.py:41`，`SKILL_DATA_SOURCES`/`MIXED_SKILL_DATA_SOURCES` import 自 `skill_data_collection_contracts.py`/`skill_mixed_data_contracts.py` 两既有契约库），三处（`test_pestel_analysis_data_collection.py:34-42` / `test_arch_skill_data_collection.py:53-61` / `test_arch_skill_mixed_data.py:52-60`，字面清单逐字相同）删字面清单改 import + 注释/docstring 措辞升级——**现有措辞是「非目标 Skill / 4-1e 目标 / 未被误改 / 保持空 tuple」（无「未成熟化」字样）**，统一改为「无外部源型 Skill data_sources 恒空不变量」；③ **两套验收双场景改名永久锚定**（D8）：feature 场景名「未成熟化 Skill 空白名单安全失败」→「纯内部框架 Skill 空白名单安全失败」（4-1c feature :91-95 + 4-1d feature :129-133 两处，slug 均 business-model-canvas）+ .py wrapper docstring 同步——**两处实况不同**：4-1c `test_acceptance_skill_data_collection.py:533-543` 含完整「滚动锚点规则」（:537-541，须删规则改永久锚定说明），4-1d `test_acceptance_skill_mixed_data.py:646-649` 仅一行短 docstring（同步改名语义即可）；slug 保持 business-model-canvas（空白名单是纯内部型永久设计态） |
 | 🔄 重构 | grep 验证：`NON_TARGET_SLUGS` 字面清单零残留 / 「未成熟化」场景名零残留；全量 skills+architecture 测试绿 |
 
-- [ ] Subtask 1.4: 🔴→🟢 — 回归网三件套调整（yaml 互锁扩容 + 派生收敛 + 双场景改名；落码后全量回归验证）
-- [ ] Subtask 1.5: 🔄 重构 — 注释同步（三处用例 docstring 语义更新）+ 全量测试 + ruff
+- [x] Subtask 1.4: 🔴→🟢 — 回归网三件套调整（yaml 互锁扩容 + 派生收敛 + 双场景改名；落码后全量回归验证）
+- [x] Subtask 1.5: 🔄 重构 — 注释同步（三处用例 docstring 语义更新）+ 全量测试 + ruff
 
 **完成标准/Definition of Done:**
-- [ ] 契约库 + 自检全绿（负例判别力实证）
-- [ ] 回归网调整落地：唯一必红点消解、三副本收敛、双场景改名
-- [ ] `tests/unit/application/skills/ + tests/unit/architecture/` 全绿——**yaml 7 条目在 Subtask 1.4 一次性落地**（4-1d 先例同款：yaml 扩容与互锁断言扩展同批，落即绿）；frontmatter ↔ yaml 的 dict 相等断言位于各 Skill 单测（Task 2-8 编写时 frontmatter 已填），Task 1 自检不读 SKILL.md frontmatter，无中间红窗口；**Task 2-8 各 Skill Task 零 yaml 触碰**（R4：yaml 单点写入收敛在 Task 1）
+- [x] 契约库 + 自检全绿（负例判别力实证）
+- [x] 回归网调整落地：唯一必红点消解、三副本收敛、双场景改名
+- [x] `tests/unit/application/skills/ + tests/unit/architecture/` 全绿——**yaml 7 条目在 Subtask 1.4 一次性落地**（4-1d 先例同款：yaml 扩容与互锁断言扩展同批，落即绿）；frontmatter ↔ yaml 的 dict 相等断言位于各 Skill 单测（Task 2-8 编写时 frontmatter 已填），Task 1 自检不读 SKILL.md frontmatter，无中间红窗口；**Task 2-8 各 Skill Task 零 yaml 触碰**（R4：yaml 单点写入收敛在 Task 1）
 
 ---
 
@@ -565,11 +565,11 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 | 🟢 绿 | 模板编写（四段式评分型；示例行与 §8/锚点三方一致——R7） |
 | 🔄 重构 | 变异演示（删字段→红→还原；改标注→红→还原——AC-3 验证标准） |
 
-- [ ] Subtask 2.1-2.8: 四循环 [A][B][C][D] 红→绿→重构（范本粒度对齐 4-1d Task 2 的 .1-.8 拆分）
+- [x] Subtask 2.1-2.8: 四循环 [A][B][C][D] 红→绿→重构（范本粒度对齐 4-1d Task 2 的 .1-.8 拆分）
 
 **完成标准/Definition of Done:**
-- [ ] 本 Skill 单测全绿（[A][B][C][D] 四循环）+ yaml 条目已入库（Task 1.4 前置，本 Task 验证双写一致）+ 模板/三件套落地
-- [ ] 覆盖率不降（生产代码仅 catalog 单点增强）
+- [x] 本 Skill 单测全绿（[A][B][C][D] 四循环）+ yaml 条目已入库（Task 1.4 前置，本 Task 验证双写一致）+ 模板/三件套落地
+- [x] 覆盖率不降（生产代码仅 catalog 单点增强）
 
 ---
 
@@ -582,11 +582,11 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 #### TDD 循环 [A]-[D]（同 Task 2 结构）
 
 特有 Subtask：
-- [ ] Subtask 3.3: 🟢 绿 — **D7 命名收敛**：`canvas_template.json` 块名 `key_partners` → `key_partnerships` + `validate_canvas.py` 的 `REQUIRED_BLOCKS` 同步 + `test_skills_loader.py:219-225` 特征串断言更新——原断言 `b"key_partners" in content` 收紧为带引号完整键 `b'"key_partnerships"'`（防旧名残留静默通过，三文件同批）；落码后 `grep -P "key_partners\b"` 验证零残留（词边界防 key_partnerships 前缀误匹配）
-- [ ] Subtask 3.7: 🟢 绿 — SOP §9 References 引用存量资产（validate_canvas.py 校验器 + canvas_template.json 模板基型——pestel scoring_matrix.json 先例）；9 块语义（key_partnerships 为 catalog 锚定名）；cost_structure 自由 object 编码过渡声明（D6/4.3 defer）；**framework_logic 内容要求**：九块联动系统化思考——以「步骤 1」起序的编号步骤呈现（核心匹配：value_propositions↔customer_segments；成本-收入对称：cost_structure↔revenue_streams 双侧对照）+ 分块成熟度评估逻辑 + 填写指引
+- [x] Subtask 3.3: 🟢 绿 — **D7 命名收敛**：`canvas_template.json` 块名 `key_partners` → `key_partnerships` + `validate_canvas.py` 的 `REQUIRED_BLOCKS` 同步 + `test_skills_loader.py:219-225` 特征串断言更新——原断言 `b"key_partners" in content` 收紧为带引号完整键 `b'"key_partnerships"'`（防旧名残留静默通过，三文件同批）；落码后 `grep -P "key_partners\b"` 验证零残留（词边界防 key_partnerships 前缀误匹配）
+- [x] Subtask 3.7: 🟢 绿 — SOP §9 References 引用存量资产（validate_canvas.py 校验器 + canvas_template.json 模板基型——pestel scoring_matrix.json 先例）；9 块语义（key_partnerships 为 catalog 锚定名）；cost_structure 自由 object 编码过渡声明（D6/4.3 defer）；**framework_logic 内容要求**：九块联动系统化思考——以「步骤 1」起序的编号步骤呈现（核心匹配：value_propositions↔customer_segments；成本-收入对称：cost_structure↔revenue_streams 双侧对照）+ 分块成熟度评估逻辑 + 填写指引
 
 **完成标准/Definition of Done:**
-- [ ] 四循环全绿 + 存量资产保留且被引用 + 命名收敛三文件落地 + loader 测试同步绿
+- [x] 四循环全绿 + 存量资产保留且被引用 + 命名收敛三文件落地 + loader 测试同步绿
 
 ---
 
@@ -599,11 +599,11 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 #### TDD 循环 [A]-[D]（同 Task 2 结构）
 
 特有 Subtask：
-- [ ] Subtask 4.2: 🟢 绿 — catalog 增强：`org_structure` 保留既有三字段（functions/reporting_lines/decentralization_level），**新增** strategy/processes/rewards/people 四维容器（嵌套 required + description——Galbraith Star 完整性）；[A] 断言 catalog 兼容（既有 required ⊆ 新 required，R5 缓解）
-- [ ] Subtask 4.6: 🟢 绿 — framework_logic 含 5 维对齐评估逻辑——以「步骤 1」起序的编号步骤呈现（TOOLS.md L1 五维表述为佐证基线，提及 org_structure 等英文键名）；scoring_anchors 维度对齐度 1-5 刻度 + 分档含义 + 正例与反例两个独立小节
+- [x] Subtask 4.2: 🟢 绿 — catalog 增强：`org_structure` 保留既有三字段（functions/reporting_lines/decentralization_level），**新增** strategy/processes/rewards/people 四维容器（嵌套 required + description——Galbraith Star 完整性）；[A] 断言 catalog 兼容（既有 required ⊆ 新 required，R5 缓解）
+- [x] Subtask 4.6: 🟢 绿 — framework_logic 含 5 维对齐评估逻辑——以「步骤 1」起序的编号步骤呈现（TOOLS.md L1 五维表述为佐证基线，提及 org_structure 等英文键名）；scoring_anchors 维度对齐度 1-5 刻度 + 分档含义 + 正例与反例两个独立小节
 
 **完成标准/Definition of Done:**
-- [ ] 四循环全绿 + catalog 增强落地（零删除）+ 五维完整
+- [x] 四循环全绿 + catalog 增强落地（零删除）+ 五维完整
 
 ---
 
@@ -616,12 +616,12 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 #### TDD 循环 [A]-[D]（同 Task 2 结构，分型切换结构型）
 
 特有 Subtask：
-- [ ] Subtask 5.2: 🟢 绿 — schema 锚定 `bsc_indicators`（R9：[A] 断言根键，禁 strategic_objectives）；causal_relationships 因果箭头编码语法声明（「原因维度 → 结果维度：假设描述」——确定性解析锚点）
-- [ ] Subtask 5.6: 🟢 绿 — references 结构型三件套（framework_logic：四层因果假设表述规范 + 战略主题卡设计——以「步骤 1」起序的编号步骤呈现；validation_rules：以「规则 1」起序的逐条编号规则（箭头语法 + 因果链闭合校验——含「箭头」关键字）——**标准方向自下而上（learning_growth → internal_process → customer → financial，Kaplan-Norton）**，逆向/同层箭头标记 warning 级待澄清假设不硬失败，量化验证移交 bsc-scorecard（D13 分工闭环）；workshop_guide）；分型第三件为 **validation_rules.md**（非评分型的 scoring_anchors）；与 bsc-scorecard 互查映射表入 framework_logic（定性因果链 vs 定量计分卡分工 + 键名对照 `bsc_indicators`↔`strategic_objectives` + 传递规则——bsc↔kpi-tree 先例的映射表实位于 bsc 侧 scoring_anchors.md:18-30，结构型无评分锚点故落 framework_logic）
-- [ ] Subtask 5.7: 🟢 绿 — 负向触发双向（本 Skill when_not_to_use「KPI 数值计算」点名补全指向 bsc-scorecard；**bsc-scorecard 侧回跳需本 Story 新建**——调研证实 4-1d 未建：bsc §2（SKILL.md:113-116）现仅指向 swot-tows/space-matrix/ansoff-matrix/kpi-tree，其余 SKILL.md body 对 `strategy-map` 零交叉引用（全目录命中仅 TOOLS.md:24 索引行 / `skill_manifest.py:31,:99` 映射 / strategy-map 自身 slug 行——均非 body 跳转）；在 bsc-scorecard SKILL.md §2 增补一行「定性战略因果链（不含 KPI 量化）：请用 strategy-map」——跨 Story 单行内容增量，D8 改名同类先例，R9 登记，不破坏 4-1d 守护断言（负向触发章节存在性断言不受行级增量影响））
+- [x] Subtask 5.2: 🟢 绿 — schema 锚定 `bsc_indicators`（R9：[A] 断言根键，禁 strategic_objectives）；causal_relationships 因果箭头编码语法声明（「原因维度 → 结果维度：假设描述」——确定性解析锚点）
+- [x] Subtask 5.6: 🟢 绿 — references 结构型三件套（framework_logic：四层因果假设表述规范 + 战略主题卡设计——以「步骤 1」起序的编号步骤呈现；validation_rules：以「规则 1」起序的逐条编号规则（箭头语法 + 因果链闭合校验——含「箭头」关键字）——**标准方向自下而上（learning_growth → internal_process → customer → financial，Kaplan-Norton）**，逆向/同层箭头标记 warning 级待澄清假设不硬失败，量化验证移交 bsc-scorecard（D13 分工闭环）；workshop_guide）；分型第三件为 **validation_rules.md**（非评分型的 scoring_anchors）；与 bsc-scorecard 互查映射表入 framework_logic（定性因果链 vs 定量计分卡分工 + 键名对照 `bsc_indicators`↔`strategic_objectives` + 传递规则——bsc↔kpi-tree 先例的映射表实位于 bsc 侧 scoring_anchors.md:18-30，结构型无评分锚点故落 framework_logic）
+- [x] Subtask 5.7: 🟢 绿 — 负向触发双向（本 Skill when_not_to_use「KPI 数值计算」点名补全指向 bsc-scorecard；**bsc-scorecard 侧回跳需本 Story 新建**——调研证实 4-1d 未建：bsc §2（SKILL.md:113-116）现仅指向 swot-tows/space-matrix/ansoff-matrix/kpi-tree，其余 SKILL.md body 对 `strategy-map` 零交叉引用（全目录命中仅 TOOLS.md:24 索引行 / `skill_manifest.py:31,:99` 映射 / strategy-map 自身 slug 行——均非 body 跳转）；在 bsc-scorecard SKILL.md §2 增补一行「定性战略因果链（不含 KPI 量化）：请用 strategy-map」——跨 Story 单行内容增量，D8 改名同类先例，R9 登记，不破坏 4-1d 守护断言（负向触发章节存在性断言不受行级增量影响））
 
 **完成标准/Definition of Done:**
-- [ ] 四循环全绿（结构型分型）+ 互查映射表 + 负向跳转双向
+- [x] 四循环全绿（结构型分型）+ 互查映射表 + 负向跳转双向
 
 ---
 
@@ -634,10 +634,10 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 #### TDD 循环 [A]-[D]（同 Task 5 结构型结构）
 
 特有 Subtask：
-- [ ] Subtask 6.5: 🟢 绿 — 模板：task_list 分区标题 + name/dependencies 叶子（依赖边编码「任务名 ← 前置任务列表」——前置列表以中文顿号「、」分隔，任务名禁含「、」与「←」；契约表编码列为条目级：前置任务名（模板行内顿号分隔））；**framework_logic 内容要求**：依赖拓扑系统化思考——以「步骤 1」起序的编号步骤呈现（任务穷尽性→依赖方向确认→层级归整→扇入扇出异常识别为四步内涵）+ 填写指引；validation_rules：以「规则 1」起序的逐条编号规则（DAG 无环校验 + 依赖方向规则 + 关键路径推算规则——含「DAG」关键字）（**= 跳数最长链的无时长结构代理指标**——与 gantt 的时长归一 CPM 语义分工：dependency-graph 输入无时长，`dependency_network.critical_path` 是结构代理，gantt `gantt_visualization.critical_path` 是 ES/EF/LS/LF 零浮动的真 CPM，前者为后者的无时长退化形态）+ risk_nodes 判定规则（扇入 ≥3 的汇聚节点与零依赖/零被依赖的孤立节点——机械规则，其余风险判断为 LLM 分析项）；与 gantt-chart 互相负向跳转（纯拓扑 vs 含时间排程——D13）
+- [x] Subtask 6.5: 🟢 绿 — 模板：task_list 分区标题 + name/dependencies 叶子（依赖边编码「任务名 ← 前置任务列表」——前置列表以中文顿号「、」分隔，任务名禁含「、」与「←」；契约表编码列为条目级：前置任务名（模板行内顿号分隔））；**framework_logic 内容要求**：依赖拓扑系统化思考——以「步骤 1」起序的编号步骤呈现（任务穷尽性→依赖方向确认→层级归整→扇入扇出异常识别为四步内涵）+ 填写指引；validation_rules：以「规则 1」起序的逐条编号规则（DAG 无环校验 + 依赖方向规则 + 关键路径推算规则——含「DAG」关键字）（**= 跳数最长链的无时长结构代理指标**——与 gantt 的时长归一 CPM 语义分工：dependency-graph 输入无时长，`dependency_network.critical_path` 是结构代理，gantt `gantt_visualization.critical_path` 是 ES/EF/LS/LF 零浮动的真 CPM，前者为后者的无时长退化形态）+ risk_nodes 判定规则（扇入 ≥3 的汇聚节点与零依赖/零被依赖的孤立节点——机械规则，其余风险判断为 LLM 分析项）；与 gantt-chart 互相负向跳转（纯拓扑 vs 含时间排程——D13）
 
 **完成标准/Definition of Done:**
-- [ ] 四循环全绿 + 顶层 array 形态模板对齐 + 分工跳转
+- [x] 四循环全绿 + 顶层 array 形态模板对齐 + 分工跳转
 
 ---
 
@@ -650,10 +650,10 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 #### TDD 循环 [A]-[D]（同 Task 5 结构型结构）
 
 特有 Subtask：
-- [ ] Subtask 7.5: 🟢 绿 — assignments 自由 object 编码过渡（**双层编码「任务名 → {角色名: 字母组合}」**——外层键为任务名（per-task 规则计算粒度），内层角色→字母组合（单字母或斜线组合如 A/R），D6/4.3 defer）；**framework_logic 内容要求**：职责分配系统化思考——以「步骤 1」起序的编号步骤呈现（任务→角色映射→单点问责检查→负载均衡审视为四步内涵）+ 填写指引；**模板承载形态**：任务为行、角色为列的矩阵表格，单元格填 RACI 字母组合——行首列任务名（双层编码外层键）、表头列角色名（内层键），与 assignments 双层结构一一对应；**description 落码提示**：双层编码记法「任务名 → {角色名: 字母组合}」含花括号+半角冒号，落码 schema description 时按 YAML 安全红线全角化改写（如「任务名→角色名＝字母组合」）；validation_rules：以「规则 1」起序的逐条编号规则（恰 1 个 A（硬规则）+ ≥1 个 R（软规则，A/R 计为已承担 R——业界 A/R 兼任惯例）+ 无空任务（确定性规则集）——含「RACI」关键字）；违规经 `raci_matrix.conflicts` 结构化呈现（catalog 既有 conflicts/suggestions 字段为出口）非整体失败；roles/tasks 编码声明
+- [x] Subtask 7.5: 🟢 绿 — assignments 自由 object 编码过渡（**双层编码「任务名 → {角色名: 字母组合}」**——外层键为任务名（per-task 规则计算粒度），内层角色→字母组合（单字母或斜线组合如 A/R），D6/4.3 defer）；**framework_logic 内容要求**：职责分配系统化思考——以「步骤 1」起序的编号步骤呈现（任务→角色映射→单点问责检查→负载均衡审视为四步内涵）+ 填写指引；**模板承载形态**：任务为行、角色为列的矩阵表格，单元格填 RACI 字母组合——行首列任务名（双层编码外层键）、表头列角色名（内层键），与 assignments 双层结构一一对应；**description 落码提示**：双层编码记法「任务名 → {角色名: 字母组合}」含花括号+半角冒号，落码 schema description 时按 YAML 安全红线全角化改写（如「任务名→角色名＝字母组合」）；validation_rules：以「规则 1」起序的逐条编号规则（恰 1 个 A（硬规则）+ ≥1 个 R（软规则，A/R 计为已承担 R——业界 A/R 兼任惯例）+ 无空任务（确定性规则集）——含「RACI」关键字）；违规经 `raci_matrix.conflicts` 结构化呈现（catalog 既有 conflicts/suggestions 字段为出口）非整体失败；roles/tasks 编码声明
 
 **完成标准/Definition of Done:**
-- [ ] 四循环全绿 + RACI 规则集
+- [x] 四循环全绿 + RACI 规则集
 
 ---
 
@@ -666,10 +666,10 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 #### TDD 循环 [A]-[D]（同 Task 5 结构型结构）
 
 特有 Subtask：
-- [ ] Subtask 8.5: 🟢 绿 — 时长编码声明（「N 天/周/月」格式——正则 `^\d+ *[天周月]$`（单字符类形态——与数据契约表逐字一致；禁「个月」与英文单位），归一基准 = 天（周 = 5 工作日 / 月 = 20 工作日），CPM 前推/后推算术在该单一基准上进行；解析锚点 + 模板示例行↔§8↔正则三方同文本）；**里程碑输入编码 = durations 值「0 天」**（零时长任务即里程碑，ES=EF——Epic「时间线+里程碑」输入侧承接）；durations/resources 编码过渡（D6/4.3 defer）；**framework_logic 内容要求**：排程系统化思考——以「步骤 1」起序的编号步骤呈现（任务拆分粒度→依赖确认→时长估算→里程碑锚定→资源冲突审视为五步内涵）+ 填写指引；validation_rules：以「规则 1」起序的逐条编号规则（前推/后推（ES/EF/LS/LF）+ 里程碑（0 天编码）+ CPM 关键路径推算（时长归一真 CPM——与 dependency-graph 跳数最长链的结构代理语义分工，见 Task 6.5）——含「CPM」关键字）；**零时长裁定**：「0 周/0 月」等非规范零时长值统一归一为 0 天判里程碑（模板规范写法「0 天」）；里程碑节点进入 critical_path 仅当处于零浮动链，否则以里程碑标记承载（不强行入关键路径）；与 dependency-graph 分工跳转核对（Task 6 已建单向，本侧补全双向）
+- [x] Subtask 8.5: 🟢 绿 — 时长编码声明（「N 天/周/月」格式——正则 `^\d+ *[天周月]$`（单字符类形态——与数据契约表逐字一致；禁「个月」与英文单位），归一基准 = 天（周 = 5 工作日 / 月 = 20 工作日），CPM 前推/后推算术在该单一基准上进行；解析锚点 + 模板示例行↔§8↔正则三方同文本）；**里程碑输入编码 = durations 值「0 天」**（零时长任务即里程碑，ES=EF——Epic「时间线+里程碑」输入侧承接）；durations/resources 编码过渡（D6/4.3 defer）；**framework_logic 内容要求**：排程系统化思考——以「步骤 1」起序的编号步骤呈现（任务拆分粒度→依赖确认→时长估算→里程碑锚定→资源冲突审视为五步内涵）+ 填写指引；validation_rules：以「规则 1」起序的逐条编号规则（前推/后推（ES/EF/LS/LF）+ 里程碑（0 天编码）+ CPM 关键路径推算（时长归一真 CPM——与 dependency-graph 跳数最长链的结构代理语义分工，见 Task 6.5）——含「CPM」关键字）；**零时长裁定**：「0 周/0 月」等非规范零时长值统一归一为 0 天判里程碑（模板规范写法「0 天」）；里程碑节点进入 critical_path 仅当处于零浮动链，否则以里程碑标记承载（不强行入关键路径）；与 dependency-graph 分工跳转核对（Task 6 已建单向，本侧补全双向）
 
 **完成标准/Definition of Done:**
-- [ ] 四循环全绿 + 7/7 Skill 完成（23/23 里程碑）
+- [x] 四循环全绿 + 7/7 Skill 完成（23/23 里程碑）
 
 ---
 
@@ -695,16 +695,16 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 | 🟢 绿 | 实现通过 |
 | 🔄 重构 | 参数化收敛 |
 
-- [ ] Subtask 9.1: 🔴 红 — 无标记全链路（7 Skill 参数化：SUCCESS + arguments repr + 零 preamble + evidence 空溯源）
-- [ ] Subtask 9.2: 🔴 红 — 207 误用守护（resolver 注入前提 + error_code 逐字 + 101 对照负例——[B] 循环形态）
-- [ ] Subtask 9.3: 🔴 红 — 缺数据引导面（空 arguments Think prompt repr + 缺口登记引导断言——文档级语义联动）
-- [ ] Subtask 9.4: 🟢 绿 — 汇总层模板对齐测试落地（`tests/unit/application/skills/test_schema_template_framework_alignment.py`——单元测试文件，7 Skill 全就绪（Task 2-8 完）后双向断言全绿；分型四段式参数化 + **references 内容锚点断言参数化**（`assert_reference_content_anchors` 对 7 Skill 全覆盖）——「契约测试文件清单」表定义项）
-- [ ] Subtask 9.5: 🟢 绿 — 集成全链路验证通过（`build_min_arguments` import 4-1d 库构造 arguments——防手写漂移；依赖 yaml 条目已由 Task 1.4 入库）
-- [ ] Subtask 9.6: 🔄 重构 — 参数化收敛 + 断言提取器复用
-- [ ] Subtask 9.7: 🔄 重构 — `pytest -n 8` 并行 + 连续 5 次无随机失败
+- [x] Subtask 9.1: 🔴 红 — 无标记全链路（7 Skill 参数化：SUCCESS + arguments repr + 零 preamble + evidence 空溯源）
+- [x] Subtask 9.2: 🔴 红 — 207 误用守护（resolver 注入前提 + error_code 逐字 + 101 对照负例——[B] 循环形态）
+- [x] Subtask 9.3: 🔴 红 — 缺数据引导面（空 arguments Think prompt repr + 缺口登记引导断言——文档级语义联动）
+- [x] Subtask 9.4: 🟢 绿 — 汇总层模板对齐测试落地（`tests/unit/application/skills/test_schema_template_framework_alignment.py`——单元测试文件，7 Skill 全就绪（Task 2-8 完）后双向断言全绿；分型四段式参数化 + **references 内容锚点断言参数化**（`assert_reference_content_anchors` 对 7 Skill 全覆盖）——「契约测试文件清单」表定义项）
+- [x] Subtask 9.5: 🟢 绿 — 集成全链路验证通过（`build_min_arguments` import 4-1d 库构造 arguments——防手写漂移；依赖 yaml 条目已由 Task 1.4 入库）
+- [x] Subtask 9.6: 🔄 重构 — 参数化收敛 + 断言提取器复用
+- [x] Subtask 9.7: 🔄 重构 — `pytest -n 8` 并行 + 连续 5 次无随机失败
 
 **完成标准/Definition of Done:**
-- [ ] 集成测试全绿（无 Redis 依赖验证）+ 汇总层模板对齐测试全绿
+- [x] 集成测试全绿（无 Redis 依赖验证）+ 汇总层模板对齐测试全绿
 
 ---
 
@@ -714,15 +714,15 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 > 性质：SDD 规范验证（非 TDD 单元测试）。
 
-- [ ] Subtask 10.1: 🔴→🟢 — `tests/unit/architecture/test_arch_skill_framework.py`：三方一致（FRAMEWORK_SKILL_SLUGS ↔ frontmatter ↔ catalog 兼容方向）
-- [ ] Subtask 10.2: 23 Skills 最终态闭环（`SLUG_TO_TOOL_ID` 全集 == 三库并集 6+10+7；16 声明 + 7 空声明分类学终态）
-- [ ] Subtask 10.3: wiring 回归断言（三文件 `tool_metadata` 特征串 + 两 use case 文件 `load_sop`（engine 豁免）+ 零 infrastructure import + `ToolExecutionEngine.__init__` 签名锁定——4-1d wiring 断言先例整类复用，继承既有豁免条件）
-- [ ] Subtask 10.4: 内容约束（7 SKILL.md ≤500 行 + 必需字段 + data_sources 空 tuple 终态 + version 1.0.0）
-- [ ] Subtask 10.5: **Schema 合法性强化**（D11：23 条目 Draft7 check_schema + `build_min_arguments` 实例经 `JsonSchemaValidatorImpl.validate_arguments`（构造 Tool 实体）校验通过——4-3 基建测试级衔接；Draft7 先例实在 4.1 注册验收 `test_acceptance_strategic_tool_registration.py:165-177`（catalog 侧）+ 4.3 `test_jsonschema_validator.py:43`，本条目侧断言与其互补不重复）
-- [ ] Subtask 10.6: 派生收敛验证（三处原字面清单 grep 零残留 + `NO_EXTERNAL_SOURCE_SLUGS` == 7）+ 运行完整套件报告
+- [x] Subtask 10.1: 🔴→🟢 — `tests/unit/architecture/test_arch_skill_framework.py`：三方一致（FRAMEWORK_SKILL_SLUGS ↔ frontmatter ↔ catalog 兼容方向）
+- [x] Subtask 10.2: 23 Skills 最终态闭环（`SLUG_TO_TOOL_ID` 全集 == 三库并集 6+10+7；16 声明 + 7 空声明分类学终态）
+- [x] Subtask 10.3: wiring 回归断言（三文件 `tool_metadata` 特征串 + 两 use case 文件 `load_sop`（engine 豁免）+ 零 infrastructure import + `ToolExecutionEngine.__init__` 签名锁定——4-1d wiring 断言先例整类复用，继承既有豁免条件）
+- [x] Subtask 10.4: 内容约束（7 SKILL.md ≤500 行 + 必需字段 + data_sources 空 tuple 终态 + version 1.0.0）
+- [x] Subtask 10.5: **Schema 合法性强化**（D11：23 条目 Draft7 check_schema + `build_min_arguments` 实例经 `JsonSchemaValidatorImpl.validate_arguments`（构造 Tool 实体）校验通过——4-3 基建测试级衔接；Draft7 先例实在 4.1 注册验收 `test_acceptance_strategic_tool_registration.py:165-177`（catalog 侧）+ 4.3 `test_jsonschema_validator.py:43`，本条目侧断言与其互补不重复）
+- [x] Subtask 10.6: 派生收敛验证（三处原字面清单 grep 零残留 + `NO_EXTERNAL_SOURCE_SLUGS` == 7）+ 运行完整套件报告
 
 **完成标准/Definition of Done:**
-- [ ] 架构测试全绿 + 合规报告输出清晰
+- [x] 架构测试全绿 + 合规报告输出清晰
 
 ---
 
@@ -738,11 +738,11 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 | 🟢 绿 | BDD 步骤实现 + 全场景通过（含既有两套验收套件回归——双场景改名后仍绿） |
 | 🔄 重构 | 场景命名收敛 |
 
-- [ ] Subtask 11.1-11.9: 收尾场景 + 文档同步（architecture.md 四项——见「配套架构文档同步」表 + 异常设计 §3.3.2 零新增声明）+ 完成清单勾选
-- [ ] Subtask 11.10: 收尾校验（`pytest` 全量 + `ruff check` + `mypy` + `make test-cov` 覆盖率不降验证 + pre-commit）
+- [x] Subtask 11.1-11.9: 收尾场景 + 文档同步（architecture.md 四项——见「配套架构文档同步」表 + 异常设计 §3.3.2 零新增声明）+ 完成清单勾选
+- [x] Subtask 11.10: 收尾校验（`pytest` 全量 + `ruff check` + `mypy` + `make test-cov` 覆盖率不降验证 + pre-commit）
 
 **完成标准/Definition of Done:**
-- [ ] 全部完成清单验证确认 + Story 可进入 done
+- [x] 全部完成清单验证确认 + Story 可进入 done
 
 ---
 
@@ -867,12 +867,79 @@ tests/
 - [x] 四视角代码调研结论落入数据契约/决策表/风险表/守护面清单
 - [x] 竞争性质量复核（checklist 模式，四 Agent 独立取证）：4 处 P1 + 7 处 P2 事实修正——Task 1 yaml 落地策略矛盾裁定（一次性落地）、bsc-scorecard 回跳「4-1d 已建」证伪（改本 Story 新建）、ToolResultStatus 路径勘正（value_objects）、滚动锚点规则单侧实况、ToolInputValidator 未注册勘正、`len==16` 锚点处置登记（D2）、loader 断言判别力收紧（带引号完整键）、architecture.md 旧值三处扩充
 
+### 🛠️ Dev Story 实施记录（2026-09-29）
+
+#### Task 0 设计定稿（Subtask 0.2/0.3——Task 1-8 实施输入）
+
+**分型常量表（D4/D5）：**
+
+- 评分型（3）：`value-proposition-canvas` / `business-model-canvas` / `org-design-framework`——references 三件套 {framework_logic.md, scoring_anchors.md, workshop_guide.md}，模板第三段「## 评分锚点」引用 `references/scoring_anchors.md`
+- 结构型（4）：`strategy-map` / `dependency-graph` / `raci-matrix` / `gantt-chart`——references 三件套 {framework_logic.md, validation_rules.md, workshop_guide.md}，模板第三段「## 校验规则」引用 `references/validation_rules.md`
+
+**yaml 7 条目 schema 设计基线（catalog 增强 + 嵌套 required + 编码 description；output_schema 均不含 data_sources——D6）：**
+
+| slug | input 嵌套 required | 条目编码规范（description 声明） |
+|---|---|---|
+| value-proposition-canvas | customer_profile[pains/gains/jobs] + value_map[products/pain_relievers/gain_creators] 双容器各 3 叶子 | customer 侧=严重度/重要性分值（1-5）—— 描述；value 侧=匹配强度分值（1-5）—— 描述；分值=首个『 —— 』前缀中的独立 1-5 整数 |
+| business-model-canvas | business_model 9 叶子全 required | 块成熟度分值（1-5）—— 条目描述（cost_structure 自由 object 编码过渡） |
+| org-design-framework | org_structure[functions/reporting_lines/decentralization_level/strategy/processes/rewards/people]（4 子容器各 required 单叶子） | 维度对齐度分值（1-5）—— 条目描述 |
+| strategy-map | bsc_indicators[financial/customer/internal_process/learning_growth/causal_relationships] 5 键全 | 因果箭头语法「原因维度 → 结果维度：假设描述」（仅 causal_relationships）；四维度清单=指标陈述 |
+| dependency-graph | task_list.items[name/dependencies] | 依赖边语法「任务名 ← 前置任务列表」（模板行内顿号「、」分隔；任务名禁含「、」与「←」） |
+| raci-matrix | roles_tasks[roles/tasks/assignments] | assignments 双层编码「任务名→角色名＝RACI 字母组合」（单字母或斜线组合如 A/R；YAML 安全全角化记法） |
+| gantt-chart | project_plan[tasks/dependencies/durations/resources] | 时长格式「N 天/周/月」（正则 `^\d+ *[天周月]$`，归一基准=天：周=5/月=20 工作日；里程碑=durations 值「0 天」） |
+
+**org-design 四维子容器设计定稿（D10 落实细节——Story 未钉死叶子名，本设计稿裁定）：**
+
+- org_structure 为唯一 input 根键（名实注记：历史根键承载 Galbraith Star 全五维，structure 维由根容器自身三字段承载）
+- 四维子容器各含单一 array 叶子：`strategy.statements`（战略方向陈述）/ `processes.core_processes`（核心流程）/ `rewards.incentive_policies`（激励政策）/ `people.talent_measures`（人才举措）——叶子集 7 项（3 既有 + 4 新），模板单分区 org_structure 7 字段行
+
+**输出侧聚合语义（D10 输出两方同步——yaml + frontmatter output description 双写）：**
+
+- vpc `fit_assessment.fit_score` = 三对匹配分值最小值（木桶原则：jobs↔products / pains↔pain_relievers / gains↔gain_creators）
+- bmc `canvas_assessment.dimension_scores` = 九块成熟度分值聚合（自由 object，4.3 defer）
+- org-design `design_recommendation.fit_assessment` = 五维对齐度评估（自由 object，4.3 defer）
+
+**决策表评审结论（Subtask 0.3）：** D1-D13 全部经四视角调研证实可执行；调研 Agent 两处理解偏差已按 Story 决策纠正——①「7 Skill 成熟化后空 tuple 守护失效」不成立（D1 不声明源，守护语义保留，仅措辞升级 + 派生式收敛）；②「len==16 锚点必改」不成立（D2 保持字面——声明源集合仍 6+10=16，7 误声明即红，判别力保留）。
+
+#### Task 0 红阶段验证（Subtask 0.6）
+
+`pytest tests/acceptance/test_acceptance_skill_framework.py` → **10 failed + 1 passed**：
+
+- 10 红 = 7 happy 场景（KeyError: yaml 7 条目未入库——`build_min_arguments` → `load_io_contract` 先 KeyError，合法红）+ 2 负向跳转场景（SOP §2 占位无对方 slug）+ 1 缺数据引导场景（SOP body 无「数据缺口登记」/「INSUFFICIENT_DATA」）
+- 1 绿 = 纯内部框架 Skill 空白名单安全失败（207——生产行为与成熟度无关，与 Subtask 0.6 预期形态一致）
+
+#### Task 1-11 实施完成总结（2026-09-29）
+
+**Task 1（契约库 + 回归网预调整）：** ① `skill_framework_contracts.py` 第三契约库落地（FRAMEWORK_SKILL_SLUGS / 分型常量 / TEMPLATE_FILES / FAILURE_KEYWORDS / 派生 NO_EXTERNAL_SOURCE_SLUGS + 六断言函数，共享常量与机械一律 import 4-1c/4-1d + identity 自检）；自检 `test_skill_framework_contracts.py` 37 测试全绿（含失败路径负例 ×13 与分型判别力负例）。② 回归网三件套：yaml 7 条目一次性落地（16→23，v1.2.0，round-trip 复验通过 + build_min_arguments 对 7 条目构造验证）+ 互锁断言扩三方并集（唯一必红点消解）+ NON_TARGET_SLUGS 三副本派生收敛（grep 字面清单零残留 + 措辞升级「无外部源型恒空不变量」）+ 两套验收双场景改名永久锚定（D8——4-1c 滚动锚点规则删除改永久锚定说明，4-1d 短 docstring 同步，行为零变化）。
+
+**Task 2-8（7 个 Skill 成熟化，多 Agent 并行——共享文件已前置 Task 1）：** 每 Skill 完整四循环 [A][B][C][D]（红→绿→重构）+ 变异演示（字段全行删除→红 + required 标注漂移→红 + 还原绿）：
+
+| Skill | 单测 | 特有交付 | 行数 |
+|---|---|---|---|
+| value-proposition-canvas（评分型范本，主会话） | 12 绿 | 双侧分值语义（customer 严重度/重要性、value 匹配强度——R2-5）+ fit_score 木桶最小值 + jobs 分析起点 + 见证条目「充电等待」三方一致 | ~170 |
+| business-model-canvas（fork） | 15 绿 | D7 三文件收敛（canvas_template.json + validate_canvas.py REQUIRED_BLOCKS + loader 断言收紧 b'"key_partnerships"'）+ 存量资产 §9 引用 + cost_structure 编码过渡 | ~230 |
+| org-design-framework（fork） | 13 绿 | D10 catalog 四维增强（strategy/processes/rewards/people 子容器——只加不改删，mypy 零问题 + 4.1 注册验收零回归）+ 名实注记 | 200 |
+| strategy-map（fork） | 14 绿 | bsc_indicators 根键锚定（断言禁 strategic_objectives）+ Kaplan-Norton 标准方向 warning 级 + bsc 侧 §2 单行回跳（bsc 4-1d 单测 9 绿零回归）+ 互查映射表入 framework_logic | 186 |
+| dependency-graph（fork） | 12 绿 | 顶层 array-of-objects 模板形态（task_list 分区标题）+ 顿号分隔依赖边编码 + DAG 跳数最长链结构代理（vs gantt 真 CPM 分工） | 159 |
+| raci-matrix（fork） | 12 绿 | assignments 双层编码全角化 + 矩阵速查表放采集区外（提取器污染 4 项变异实证）+ 恰 1 A 硬/≥1 R 软规则经 conflicts 呈现 | 163 |
+| gantt-chart（fork，收官） | 14 绿 | 时长正则 `^\d+ *[天周月]$` 三方同文本 + 归一基准（周=5/月=20 工作日）+ 里程碑「0 天」+ ES/EF/LS/LF 零浮动 + dependency-graph 双向跳转闭环 | 184 |
+
+**Task 9（集成 + 汇总层）：** `test_skill_framework.py` 17 测试全绿（无标记全链路 7 Skill 参数化：真实 Engine + 真实 load_sop（含成熟度敏感断言 schema 双写）+ arguments repr 进 Think prompt + 零 preamble + evidence 空溯源；207 场景 resolver 注入 + EXCEPTION_207 逐字 + 101 对照负例；缺数据引导面空 dict repr）；汇总层 `test_schema_template_framework_alignment.py` 21 测试全绿（双向断言 + references 内容锚点 7 Skill 参数化全覆盖）。
+
+**Task 10（架构验证）：** `test_arch_skill_framework.py` 全绿——三方一致 + org-design 四维断言 + 23 最终态闭环（manifest == 三库并集）+ wiring 回归（engine load_sop 豁免继承）+ 签名锁定 + 内容约束 + Schema 合法性强化（23 条目 Draft7 + JsonSchemaValidatorImpl 实例校验 + D6 output 无溯源键断言）+ 派生收敛验证。
+
+**Task 11（收尾验收 + 文档同步）：** BDD 全场景 11/11 绿（含既有两套验收套件回归 28 绿——双场景改名后语义仍绿）；architecture.md 四项同步（§17.3 状态翻转 23/23 收官 + §17.3.3 集成说明与 D1-D13 决策表 + 修订历史 8.8.0 + 三处旧值校准为 23/23 终态——§1.4/§13 目录树/§19.7.1 统计表）；异常设计 §3.3.2 零新增复用声明（blockquote 先例格式）。
+
+**最终验证（Task 11.10）：** 全量 `pytest tests/ -n 8` = 单元+集成 8313 passed + 验收 985 passed（合计 9298）；4-1e 相关面连续 5 轮并行全绿（1043×3 + 全量×2，随机排序无随机失败）；`ruff check src/ tests/` All checks passed；`mypy src/` Success 603 files；三条 grep 自查——本 Story 改动文件交集为空（既有命中均为历史代码，零新引入）；bandit catalog 零问题；yaml safe_load 复验通过。pre-commit run 命令因会话权限配置被拒，其核心钩子（ruff/mypy/bandit/尾随空格/yaml 检查）已全部以等价命令逐项验证通过，git commit 时 hooks 将再次自动执行完整校验。
+
+**实施过程与 Story 文档的偏差登记：** ① §5 章节标题字面定为「## 5. 数据采集计划（Think 阶段引导——用户输入采集）」+ blockquote 语义说明（既保 REQUIRED_SOP_SECTIONS「数据采集计划」字面，又承载纯内部型语义——AC-2 章节集零新增的落地形态）；② vpc 变异演示首跑「删除单行」未红（gains 双行聚合）——修正为全行删除方红，属 extract_template_fields all 聚合语义的正确行为（同字段多行须全删才构成字段缺失），非缺陷；③ architecture.md 统计表 §19.7.1「Skills 系统 0%」为 Story 同步清单未列的同源旧值（清单只列三处），已一并校准并在修订历史注明。
+
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/4-1e-skills-internal-framework.md`
 
-**待创建的文件/To Be Created (Dev Story 实施):**
+**Dev Story 实施创建的文件/Created by Dev Story（2026-09-29 全部落地）:**
 - `src/application/skills/<7 slug>/SKILL.md` 成熟化 ×7（修改）
 - `src/application/skills/<7 slug>/references/{framework_logic,workshop_guide}.md` ×7 + `{scoring_anchors|validation_rules}.md` ×7
 - `src/application/skills/<7 slug>/templates/<TEMPLATE_FILES[slug]>.md` ×7（命名见 Task 0.2 钉死表——bmc 为 `bmc_nine_blocks_canvas.md`，其余 6 项见「项目结构说明」树）
@@ -998,15 +1065,15 @@ tests/
 
 - [x] Story created with `ready-for-dev` status
 - [ ] 运行 `validate-create-story` 进行质量检查（可选）
-- [ ] 运行 `dev-story` 开始实施（Task 2-8 可多 Agent 并行——共享文件已前置 Task 1）
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `dev-story` 开始实施（Task 2-8 可多 Agent 并行——共享文件已前置 Task 1）
+- [ ] 运行 `code-review` 进行代码审查（下一步——建议换用不同 LLM）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-09-29
-**最后更新/Last Updated:** 2026-09-29
+**最后更新/Last Updated:** 2026-09-29（dev-story 实施完成）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md Story 4.1e + 4-1a/4-1b/4-1c/4-1d 完成资产 + 四视角并行代码调研：7 Skill 现状基线 / 成熟化模式复用盘点 / 回归守护面穷尽 / AC 解析与方法论基线；13 项决策登记；4-1d R1-D2 留项收敛承接；Epic 字面勘误 2 项签收）
 - v1.1.0: 竞争性质量复核定稿（checklist 模式四 Agent 独立取证）：P1×4——Task 1 DoD 与 Subtask 1.4 的 yaml 落地策略自相矛盾裁定（恢复 4-1d 原生「Task 1 一次性落地 7 条目」）/ Subtask 5.7「bsc 回跳 4-1d 已建」证伪（grep 零命中，改本 Story 单行新建）/ ToolResultStatus 路径勘正（value_objects 非 entities）/ 滚动锚点规则仅 4-1c 单侧实况；P2×7——ToolInputValidator 未注册勘正、len(ssot_union)==16 锚点处置登记（保持字面，D2）、D7 loader 断言收紧为带引号完整键、architecture.md 旧值三处（§1.4/§13×2）、NON_TARGET_SLUGS 现有措辞精确化（「非目标」非「未成熟化」）、D4 补 framework_logic.md 首次引入声明、vpc 叶子源码序勘正；另补 4 处入站负向跳转复用清单与 TOOLS.md 零触碰声明

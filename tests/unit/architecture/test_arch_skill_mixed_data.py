@@ -33,6 +33,7 @@ from tests.unit.application.skills.skill_data_collection_contracts import (
     SKILL_MD_MAX_LINES,
     SKILLS_ROOT,
 )
+from tests.unit.application.skills.skill_framework_contracts import NO_EXTERNAL_SOURCE_SLUGS
 from tests.unit.application.skills.skill_mixed_data_contracts import MIXED_SKILL_DATA_SOURCES
 
 # =============================================================================
@@ -47,17 +48,9 @@ SRC_ROOT = REPO_ROOT / "src"
 # 10 个 4-1d 目标（顺序 = 契约库 MIXED_SKILL_DATA_SOURCES key 顺序）
 TARGET_SLUGS: tuple[str, ...] = tuple(MIXED_SKILL_DATA_SOURCES.keys())
 
-# 7 个 4-1e 非目标（23 全量 − 6 个 4-1c − 10 个 4-1d；与 Task 1.4 预调整后
-# test_pestel_analysis_data_collection.py / test_arch_skill_data_collection.py 清单一致）
-NON_TARGET_SLUGS: tuple[str, ...] = (
-    "business-model-canvas",
-    "dependency-graph",
-    "gantt-chart",
-    "org-design-framework",
-    "raci-matrix",
-    "strategy-map",
-    "value-proposition-canvas",
-)
+# 无外部源型 Skill（23 全量 − 4-1c 声明源 − 4-1d 声明源，派生自 4-1e 契约库
+# NO_EXTERNAL_SOURCE_SLUGS——D2 收敛，字面清单零复制）：data_sources 恒空不变量
+NON_TARGET_SLUGS: tuple[str, ...] = NO_EXTERNAL_SOURCE_SLUGS
 
 # 4-1d 涉及源（6 个；world-bank / imf / uspto / newsapi / tavily / china-nbs）
 MIXED_INVOLVED_SOURCES: tuple[str, ...] = tuple({name for sources in MIXED_SKILL_DATA_SOURCES.values() for name in sources})
@@ -223,10 +216,10 @@ class TestSkillContentConstraints:
 
     @pytest.mark.parametrize("slug", NON_TARGET_SLUGS)
     async def test_non_target_skills_untouched(self, slug: str) -> None:
-        """7 个 4-1e 目标 Skill 未被误改（data_sources 保持空 tuple）"""
+        """无外部源型 Skill data_sources 恒空不变量（纯内部框架型分类学守护——D2）。"""
         loader = InMemorySkillLoader()
         document = await loader.load_sop(slug)
-        assert document.frontmatter.data_sources == (), f"非目标 Skill {slug} 的 data_sources 被误填"
+        assert document.frontmatter.data_sources == (), f"无外部源型 Skill {slug} 的 data_sources 恒空不变量被破坏"
 
     async def test_41c_six_skills_declarations_unchanged(self) -> None:
         """4-1c 既有 6 Skill 声明零回归（name 有序集合 == 4-1c SSOT）"""

@@ -80,9 +80,11 @@ class TestMixedSkillDataSources:
         yaml_slugs = set(contracts_41d.load_io_contract_keys())
         mixed_slugs = set(contracts_41d.MIXED_SKILL_DATA_SOURCES)
         assert mixed_slugs <= yaml_slugs, f"契约库 slug 未全部登记 yaml: {mixed_slugs - yaml_slugs}"
-        # yaml = 4-1c 6 条 + 4-1d 10 条
-        assert yaml_slugs == mixed_slugs | set(contracts_41c.SKILL_DATA_SOURCES), (
-            "yaml 条目集合应恰好等于 4-1c ∪ 4-1d 两契约库并集"
+        # yaml = 4-1c 6 条 + 4-1d 10 条 + 4-1e 7 条（三方并集——4-1e Task 1.4 预调整）
+        from tests.unit.application.skills.skill_framework_contracts import FRAMEWORK_SKILL_SLUGS
+
+        assert yaml_slugs == mixed_slugs | set(contracts_41c.SKILL_DATA_SOURCES) | set(FRAMEWORK_SKILL_SLUGS), (
+            "yaml 条目集合应恰好等于 4-1c ∪ 4-1d ∪ 4-1e 三契约库并集"
         )
 
 

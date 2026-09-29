@@ -1,10 +1,12 @@
 # =============================================================================
 # Skills input_schema / output_schema 契约（IO SSOT）
 #
-# 本文件是 16 个 SKILL.md frontmatter `input_schema`/`output_schema` 字段级定义的
+# 本文件是 23 个 SKILL.md frontmatter `input_schema`/`output_schema` 字段级定义的
 # 唯一事实源（Single Source of Truth）：
 #   - Story 4.1c（Task 0.2）：6 个外部数据型 Skills（pestel-analysis 等）
-#   - Story 4.1d（Task 0.2）：10 个混合数据型 Skills（swot-tows 等，本批追加）
+#   - Story 4.1d（Task 0.2）：10 个混合数据型 Skills（swot-tows 等）
+#   - Story 4.1e（Task 0.2）：7 个纯内部框架 Skills（value-proposition-canvas 等，
+#     本批追加——不声明 data_sources，输入主体为用户内部业务信息）
 # TDD 红阶段以本文件为断言输入，实施内容必须与本文件逐字一致
 # （required 集合 / properties 键 / type / description），禁止实施期临时增删字段；
 # 如需变更必须先修订本文件。
@@ -21,10 +23,19 @@
 #   - 模板叶子键展开约定（AC-3）：templates 采集字段 == input_schema 递归展开的
 #     叶子键集合（末端 properties 键；array 展开 items.properties；顶层键以模板
 #     分区标题承载）
+#
+# 4-1e 契约设计基准（Task 0.2，纯内部型差异）：
+#   - input_schema 同以 catalog 为基础增强（嵌套 required + 叶子 description 含
+#     条目编码规范与确定性解析锚点——D10）；org-design 四维扩展为本批唯一预期
+#     catalog 增强（D10 只加不改删）
+#   - output_schema 不含 data_sources 溯源键（D6 惯例偏离登记——纯内部型无外部
+#     采集语义，EvidencePackage.data_sources 恒为空 tuple）
+#   - 7 条目均不写 data_sources 声明（D1——frontmatter 键缺失解析为空 tuple 是
+#     纯内部型一等不变量）
 # =============================================================================
 
-version: "1.1.0"
-story: [4-1c-skills-data-collection-integration, 4-1d-skills-framework-enhancement]
+version: "1.2.0"
+story: [4-1c-skills-data-collection-integration, 4-1d-skills-framework-enhancement, 4-1e-skills-internal-framework]
 
 skills:
 
@@ -926,3 +937,454 @@ skills:
           description: 溯源元数据（source/freshness/confidence）
           items:
             type: object
+
+  # ---------------------------------------------------------------------------
+  # 价值主张画布（纯内部型：6 块双侧匹配——D12 勘误，Epic「9 块」不采）
+  # 模板叶子键（AC-3）：pains / gains / jobs / products / pain_relievers / gain_creators
+  # ---------------------------------------------------------------------------
+  value-proposition-canvas:
+    input_schema:
+      type: object
+      required: [customer_profile, value_map]
+      properties:
+        customer_profile:
+          type: object
+          description: 客户画像（右侧画布三块，工作坊采集，模板 vpc_canvas_matching.md）。条目编码：严重度或重要性分值（1-5）—— 条目描述（分值 = 首个『 —— 』之前前缀中的独立 1-5 整数，前缀不得含其它数字）
+          required: [pains, gains, jobs]
+          properties:
+            pains:
+              type: array
+              description: 客户痛点清单（pains 打严重度分值——5 为最痛）
+              items:
+                type: string
+            gains:
+              type: array
+              description: 客户期望收益清单（gains 打重要性分值——5 为最关键）
+              items:
+                type: string
+            jobs:
+              type: array
+              description: 客户待办任务清单（jobs 打重要性分值——分析起点，jobs→pains→gains 序）
+              items:
+                type: string
+        value_map:
+          type: object
+          description: 价值图（左侧画布三块，产品侧）。条目编码：匹配强度分值（1-5）—— 条目描述（匹配强度属一对条目语义挂 value_map 侧；分值 = 首个『 —— 』之前前缀中的独立 1-5 整数，前缀不得含其它数字）
+          required: [products, pain_relievers, gain_creators]
+          properties:
+            products:
+              type: array
+              description: 产品与服务清单（与 jobs 成对匹配）
+              items:
+                type: string
+            pain_relievers:
+              type: array
+              description: 止痛药清单（与 pains 成对匹配——每条含匹配强度分值）
+              items:
+                type: string
+            gain_creators:
+              type: array
+              description: 收益创造器清单（与 gains 成对匹配——每条含匹配强度分值）
+              items:
+                type: string
+    output_schema:
+      type: object
+      required: [fit_assessment]
+      properties:
+        fit_assessment:
+          type: object
+          description: 匹配度评估（6 块三对匹配）
+          required: [fit_score, improvement_suggestions]
+          properties:
+            fit_score:
+              type: number
+              description: 整体匹配分值 = 三对匹配分值的最小值（木桶原则——jobs↔products、pains↔pain_relievers、gains↔gain_creators 三对中最低者，1-5）
+            improvement_suggestions:
+              type: array
+              description: 改进建议清单（缺口侧补强方向）
+              items:
+                type: string
+
+  # ---------------------------------------------------------------------------
+  # 商业模式画布（纯内部型：9 块业务模型；存量资产 validate_canvas.py +
+  # canvas_template.json 保留并被 SOP 引用——D7 收敛 key_partnerships）
+  # 模板叶子键（AC-3）：customer_segments / value_propositions / channels /
+  #   customer_relationships / revenue_streams / key_resources / key_activities /
+  #   key_partnerships / cost_structure
+  # ---------------------------------------------------------------------------
+  business-model-canvas:
+    input_schema:
+      type: object
+      required: [business_model]
+      properties:
+        business_model:
+          type: object
+          description: 商业模式九宫格（工作坊采集，模板 bmc_nine_blocks_canvas.md）。条目编码：块成熟度分值（1-5）—— 条目描述（分值 = 首个『 —— 』之前前缀中的独立 1-5 整数，前缀不得含其它数字）
+          required: [customer_segments, value_propositions, channels, customer_relationships, revenue_streams, key_resources, key_activities, key_partnerships, cost_structure]
+          properties:
+            customer_segments:
+              type: array
+              description: 客户细分清单
+              items:
+                type: string
+            value_propositions:
+              type: array
+              description: 价值主张清单
+              items:
+                type: string
+            channels:
+              type: array
+              description: 渠道通路清单
+              items:
+                type: string
+            customer_relationships:
+              type: array
+              description: 客户关系清单
+              items:
+                type: string
+            revenue_streams:
+              type: array
+              description: 收入来源清单（与 cost_structure 成本-收入对称）
+              items:
+                type: string
+            key_resources:
+              type: array
+              description: 核心资源清单
+              items:
+                type: string
+            key_activities:
+              type: array
+              description: 关键业务清单
+              items:
+                type: string
+            key_partnerships:
+              type: array
+              description: 重要伙伴清单（catalog 锚定名 key_partnerships——存量资产已按此收敛，D7）
+              items:
+                type: string
+            cost_structure:
+              type: object
+              description: 成本结构（自由 object——外层键为成本项名，值为成本说明；字段化 defer 至 Story 4.3）
+    output_schema:
+      type: object
+      required: [canvas_assessment]
+      properties:
+        canvas_assessment:
+          type: object
+          description: 画布评估结果
+          required: [dimension_scores, consistency_analysis]
+          properties:
+            dimension_scores:
+              type: object
+              description: 九块成熟度分值聚合（外层键为块名，值为 1-5 分值与依据——自由 object，4.3 defer）
+            consistency_analysis:
+              type: object
+              description: 块间一致性分析（核心匹配 value_propositions↔customer_segments 与成本-收入对称 cost_structure↔revenue_streams 双侧对照）
+
+  # ---------------------------------------------------------------------------
+  # 组织设计框架（纯内部型：Galbraith Star Model 五维对齐评估；org_structure
+  # 为历史根键——structure 维由根容器三字段承载，四维子容器为 D10 扩展）
+  # 模板叶子键（AC-3）：functions / reporting_lines / decentralization_level /
+  #   statements / core_processes / incentive_policies / talent_measures
+  # ---------------------------------------------------------------------------
+  org-design-framework:
+    input_schema:
+      type: object
+      required: [org_structure]
+      properties:
+        org_structure:
+          type: object
+          description: 组织架构数据（历史根键，扩展后承载 Galbraith Star Model 全五维——structure 维由本容器三字段承载，strategy/processes/rewards/people 四维由子容器承载）。条目编码：维度对齐度分值（1-5）—— 条目描述（分值 = 首个『 —— 』之前前缀中的独立 1-5 整数，前缀不得含其它数字）
+          required: [functions, reporting_lines, decentralization_level, strategy, processes, rewards, people]
+          properties:
+            functions:
+              type: array
+              description: 职能清单（structure 维）
+              items:
+                type: string
+            reporting_lines:
+              type: array
+              description: 汇报线清单（structure 维）
+              items:
+                type: string
+            decentralization_level:
+              type: string
+              description: 分权程度定性描述（structure 维——如高度集权/中度分权/高度分权）
+            strategy:
+              type: object
+              description: 战略维（方向陈述）
+              required: [statements]
+              properties:
+                statements:
+                  type: array
+                  description: 战略方向陈述清单（业务范围/竞争优势来源/里程碑）
+                  items:
+                    type: string
+            processes:
+              type: object
+              description: 流程维
+              required: [core_processes]
+              properties:
+                core_processes:
+                  type: array
+                  description: 核心流程清单（集成流/管理流）
+                  items:
+                    type: string
+            rewards:
+              type: object
+              description: 奖励维
+              required: [incentive_policies]
+              properties:
+                incentive_policies:
+                  type: array
+                  description: 激励政策清单（薪酬/晋升/认可）
+                  items:
+                    type: string
+            people:
+              type: object
+              description: 人员维
+              required: [talent_measures]
+              properties:
+                talent_measures:
+                  type: array
+                  description: 人才举措清单（人才标准/培养/招聘）
+                  items:
+                    type: string
+    output_schema:
+      type: object
+      required: [design_recommendation]
+      properties:
+        design_recommendation:
+          type: object
+          description: 组织设计建议
+          required: [fit_assessment, optimization_suggestions]
+          properties:
+            fit_assessment:
+              type: object
+              description: 五维对齐度评估（外层键为维度名，值为对齐度分值与依据——自由 object，4.3 defer；与 value-proposition-canvas 输出根 fit_assessment 同名异构，互查时防混淆）
+            optimization_suggestions:
+              type: array
+              description: 组织优化建议清单（维度失配处的调整方向）
+              items:
+                type: string
+
+  # ---------------------------------------------------------------------------
+  # 战略地图（纯内部型：BSC 四维度定性因果链；input 锚定 bsc_indicators——
+  # 禁用 bsc-scorecard 的 strategic_objectives 键名，D13 分工）
+  # 模板叶子键（AC-3）：financial / customer / internal_process / learning_growth /
+  #   causal_relationships
+  # ---------------------------------------------------------------------------
+  strategy-map:
+    input_schema:
+      type: object
+      required: [bsc_indicators]
+      properties:
+        bsc_indicators:
+          type: object
+          description: BSC 四维度指标（内部框架输入，模板 strategy_map_causal_links.md）。四维度清单条目编码：指标陈述（指标名与现状量级，如「营业收入 = 4.2 亿元，年增 12%」）
+          required: [financial, customer, internal_process, learning_growth, causal_relationships]
+          properties:
+            financial:
+              type: array
+              description: 财务维度指标清单
+              items:
+                type: string
+            customer:
+              type: array
+              description: 客户维度指标清单
+              items:
+                type: string
+            internal_process:
+              type: array
+              description: 内部流程维度指标清单
+              items:
+                type: string
+            learning_growth:
+              type: array
+              description: 学习与成长维度指标清单
+              items:
+                type: string
+            causal_relationships:
+              type: array
+              description: 因果关系假设清单。条目编码：因果箭头语法「原因维度 → 结果维度：假设描述」（全角冒号；标准方向自下而上 learning_growth → internal_process → customer → financial——Kaplan-Norton）
+              items:
+                type: string
+    output_schema:
+      type: object
+      required: [strategy_visualization]
+      properties:
+        strategy_visualization:
+          type: object
+          description: 战略地图可视化（定性因果链图——不含 KPI 量化，量化验证移交 bsc-scorecard）
+          required: [nodes, causal_arrows, theme_cards]
+          properties:
+            nodes:
+              type: array
+              description: 因果链节点清单（维度/指标/主题）
+              items:
+                type: object
+            causal_arrows:
+              type: array
+              description: 因果箭头清单（标准方向自下而上；逆向或同层箭头以 warning 级标记待澄清假设，不硬失败）
+              items:
+                type: string
+            theme_cards:
+              type: array
+              description: 战略主题卡清单（主题名/涉及维度/假设链）
+              items:
+                type: object
+
+  # ---------------------------------------------------------------------------
+  # 依赖关系图（纯内部型：DAG 任务依赖拓扑；task_list 顶层对象数组——模板以
+  # task_list 分区标题承载，4-1d vrio 二层嵌套先例）
+  # 模板叶子键（AC-3）：name / dependencies
+  # ---------------------------------------------------------------------------
+  dependency-graph:
+    input_schema:
+      type: object
+      required: [task_list]
+      properties:
+        task_list:
+          type: array
+          description: 任务列表（顶层对象数组，模板 dependency_task_inventory.md）。条目编码：依赖边语法「任务名 ← 前置任务列表」（name 为单任务名，dependencies 为其前置任务名数组；任务名禁含顿号「、」与箭头「←」——模板行内前置列表以顿号分隔）
+          items:
+            type: object
+            required: [name, dependencies]
+            properties:
+              name:
+                type: string
+                description: 任务名（唯一标识，禁含「、」与「←」）
+              dependencies:
+                type: array
+                description: 前置任务名清单（可为空数组——显式空表无依赖）
+                items:
+                  type: string
+    output_schema:
+      type: object
+      required: [dependency_network]
+      properties:
+        dependency_network:
+          type: object
+          description: 依赖关系网络
+          required: [dag, critical_path, risk_nodes]
+          properties:
+            dag:
+              type: object
+              description: 有向无环图结构（邻接表——环违规以 cycles 键结构化呈现于本对象，不映射运行时异常）
+            critical_path:
+              type: array
+              description: 关键路径（跳数最长链的无时长结构代理——与 gantt-chart 的时长归一 CPM 语义分工，输入无时长时的退化形态）
+              items:
+                type: string
+            risk_nodes:
+              type: array
+              description: 风险节点清单（扇入 ≥3 的汇聚节点与零依赖/零被依赖的孤立节点——机械规则，其余风险为 LLM 分析项）
+              items:
+                type: string
+
+  # ---------------------------------------------------------------------------
+  # RACI 矩阵（纯内部型：任务×角色职责分配；assignments 双层编码——外层键为
+  # 任务名（per-task 恰 1 A 规则计算粒度），YAML 安全全角化记法）
+  # 模板叶子键（AC-3）：roles / tasks / assignments
+  # ---------------------------------------------------------------------------
+  raci-matrix:
+    input_schema:
+      type: object
+      required: [roles_tasks]
+      properties:
+        roles_tasks:
+          type: object
+          description: 角色与任务分配（工作坊矩阵采集——任务为行、角色为列，模板 raci_roles_tasks.md）。assignments 条目编码：双层「任务名→角色名＝RACI 字母组合」（值为单字母或斜线组合如 A/R；恰 1 A 硬规则 + ≥1 R 软规则——A/R 计为已承担 R，违规经输出 conflicts 结构化呈现非整体失败）
+          required: [roles, tasks, assignments]
+          properties:
+            roles:
+              type: array
+              description: 角色名清单（矩阵列头）
+              items:
+                type: string
+            tasks:
+              type: array
+              description: 任务名清单（矩阵行首）
+              items:
+                type: string
+            assignments:
+              type: object
+              description: 任务×角色分配（自由 object——外层键为任务名，内层键为角色名，值为 RACI 字母组合；字段化 defer 至 Story 4.3）
+    output_schema:
+      type: object
+      required: [raci_matrix]
+      properties:
+        raci_matrix:
+          type: object
+          description: RACI 分配结果
+          required: [matrix, conflicts, suggestions]
+          properties:
+            matrix:
+              type: object
+              description: 规整化分配矩阵（任务名→角色名→字母组合）
+            conflicts:
+              type: array
+              description: 规则违规清单（恰 1 A 硬规则与 ≥1 R 软规则的逐任务违规——结构化呈现非整体失败）
+              items:
+                type: string
+            suggestions:
+              type: array
+              description: 职责优化建议清单（负载均衡/单点问责）
+              items:
+                type: string
+
+  # ---------------------------------------------------------------------------
+  # 甘特图（纯内部型：CPM 时间排程；时长编码「N 天/周/月」正则 ^\d+ *[天周月]$，
+  # 归一基准＝天（周＝5 工作日/月＝20 工作日），里程碑＝durations 值「0 天」）
+  # 模板叶子键（AC-3）：tasks / dependencies / durations / resources
+  # ---------------------------------------------------------------------------
+  gantt-chart:
+    input_schema:
+      type: object
+      required: [project_plan]
+      properties:
+        project_plan:
+          type: object
+          description: 项目计划（工作坊采集，模板 gantt_project_plan.md）。durations 条目编码：时长格式「N 天/周/月」（正则 ^\d+ *[天周月]$——禁「个月」与英文单位；归一基准＝天，周＝5 工作日、月＝20 工作日；里程碑＝durations 值「0 天」，零时长任务 ES=EF）
+          required: [tasks, dependencies, durations, resources]
+          properties:
+            tasks:
+              type: array
+              description: 任务名清单（与 dependency-graph 任务名规范一致——禁含「、」与「←」）
+              items:
+                type: string
+            dependencies:
+              type: array
+              description: 依赖边清单（条目编码「任务名 ← 前置任务列表」——同 dependency-graph 语法，模板行内前置列表以顿号分隔）
+              items:
+                type: string
+            durations:
+              type: object
+              description: 任务时长（自由 object——外层键为任务名，值为「N 天/周/月」时长串；非规范零时长（0 周/0 月）统一归一为 0 天判里程碑；字段化 defer 至 Story 4.3）
+            resources:
+              type: object
+              description: 资源分配（自由 object——外层键为任务名，值为资源投入描述（人员/设备/预算）；字段化 defer 至 Story 4.3）
+    output_schema:
+      type: object
+      required: [gantt_visualization]
+      properties:
+        gantt_visualization:
+          type: object
+          description: 甘特图可视化
+          required: [timeline, milestones, critical_path]
+          properties:
+            timeline:
+              type: array
+              description: 时间线条目清单（前推 ES/EF 与后推 LS/LF——天基准归一后推算）
+              items:
+                type: object
+            milestones:
+              type: array
+              description: 里程碑清单（durations 值「0 天」的零时长任务——ES=EF）
+              items:
+                type: string
+            critical_path:
+              type: array
+              description: CPM 关键路径（ES/EF/LS/LF 零浮动链——时长归一真 CPM，与 dependency-graph 跳数最长链的结构代理语义分工；里程碑仅当处于零浮动链才进入本字段，否则以 milestones 标记承载）
+              items:
+                type: string

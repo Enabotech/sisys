@@ -718,7 +718,67 @@ TOOL_CATALOG: list[Tool] = [
                         "functions": {"type": "array"},
                         "reporting_lines": {"type": "array"},
                         "decentralization_level": {"type": "string"},
+                        # D10 Galbraith Star 四维扩展（Story 4-1e 唯一预期 catalog 增强，
+                        # 只加不改删——org_structure 为历史根键，扩展后承载全五维：
+                        # structure 维由根容器三字段承载，四维子容器如下）
+                        "strategy": {
+                            "type": "object",
+                            "description": "战略维（方向陈述）",
+                            "required": ["statements"],
+                            "properties": {
+                                "statements": {
+                                    "type": "array",
+                                    "description": "战略方向陈述清单（业务范围/竞争优势来源/里程碑）",
+                                    "items": {"type": "string"},
+                                },
+                            },
+                        },
+                        "processes": {
+                            "type": "object",
+                            "description": "流程维",
+                            "required": ["core_processes"],
+                            "properties": {
+                                "core_processes": {
+                                    "type": "array",
+                                    "description": "核心流程清单（集成流/管理流）",
+                                    "items": {"type": "string"},
+                                },
+                            },
+                        },
+                        "rewards": {
+                            "type": "object",
+                            "description": "奖励维",
+                            "required": ["incentive_policies"],
+                            "properties": {
+                                "incentive_policies": {
+                                    "type": "array",
+                                    "description": "激励政策清单（薪酬/晋升/认可）",
+                                    "items": {"type": "string"},
+                                },
+                            },
+                        },
+                        "people": {
+                            "type": "object",
+                            "description": "人员维",
+                            "required": ["talent_measures"],
+                            "properties": {
+                                "talent_measures": {
+                                    "type": "array",
+                                    "description": "人才举措清单（人才标准/培养/招聘）",
+                                    "items": {"type": "string"},
+                                },
+                            },
+                        },
                     },
+                    "required": [
+                        "functions",
+                        "reporting_lines",
+                        "decentralization_level",
+                        "strategy",
+                        "processes",
+                        "rewards",
+                        "people",
+                    ],
                 },
             },
             "required": ["org_structure"],

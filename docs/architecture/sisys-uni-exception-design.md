@@ -736,6 +736,16 @@ def register_exception_handlers(app: FastAPI) -> None:
 > （`_bmad-output/implementation-artifacts/stories/4-1d-skills-framework-enhancement.md`），
 > 本节仅登记复用事实，不重复列举。data_source 子域 414-419 保持空闲。
 
+> **Story 4.1e 复用声明（2026-09-29）：** Story 4.1e（Skills 内部框架增强，7 个纯内部
+> 框架 Skills 纯内容成熟化——零引擎/接线/端口/异常层改动，唯一生产 .py 增强 =
+> strategic_tool_catalog.py 的 org-design 四维 schema 扩展）**零新增异常**——全部失败
+> 路径复用上表既有编码（207 空白名单标记误用守护 / 101 标记存在但 resolver 未注入 /
+> 387-388 Skill 加载失败），场景↔异常映射表以 Story 文件「🎯 领域异常契约」节为
+> single-source-of-truth
+> （`_bmad-output/implementation-artifacts/stories/4-1e-skills-internal-framework.md`），
+> 本节仅登记复用事实，不重复列举。内部数据不足走 ToolResultStatus.INSUFFICIENT_DATA
+> 状态语义（SOP 文档级关键词承载，非异常）。data_source 子域 414-419 保持空闲。
+
 ### 3.3 编码分配策略：人工编码 + CI 自动校验
 
 #### 3.3.1 设计原则
