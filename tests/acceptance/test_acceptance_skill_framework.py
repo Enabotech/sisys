@@ -9,7 +9,7 @@ BDD 风格（范本 test_acceptance_skill_mixed_data.py）：
     - 步骤产物经场景级共享领域对象 execution 传递（无 target_fixture）
     - 场景级共享 event_loop + run_until_complete（禁止 @pytest.mark.asyncio）
     - LLM 按内容特征分派（prompt 含「生成代码」→ Code 阶段，非序数）
-    - Fake 仅限 LLM/Sandbox（真实 InMemorySkillLoader + 真实 ToolExecutionEngine）
+    - Fake 仅限 LLM/Sandbox 与 resolver cache 端口（真实 InMemorySkillLoader + 真实 ToolExecutionEngine）
 
 纯内部型链路特点（与 4-1c/4-1d 的差异）：
     - 无 Redis 依赖：无标记主链路零 resolver 调用（引擎 :329-331 无标记快速返回）；
@@ -399,5 +399,5 @@ def verify_negative_trigger_cross_reference(execution: _SkillExecution, source: 
     """负向触发双向跳转：source 的 SOP §2 负向触发章节含 target slug 字面串。"""
     document = execution.documents.get(source)
     assert document is not None, f"前置步骤未加载技能 {source} 文档"
-    section = document.body.split("负向触发", 1)[-1]
+    section = document.body.split("负向触发", 1)[-1].split("\n## ", 1)[0]
     assert target in section, f"{source}: 负向触发章节未指向 {target}（分工跳转缺失）"

@@ -138,7 +138,7 @@ output_schema:
 | 痛点对 | pains（严重度分值） | pain_relievers |
 | 收益对 | gains（重要性分值） | gain_creators |
 
-分值语义（R2-5 裁定）：customer 侧评 pains 严重度 / gains 与 jobs 重要性（客户视角事实），value_map 侧评匹配强度（一对条目语义）；匹配逻辑见 `references/framework_logic.md`。
+分值语义：customer 侧评 pains 严重度 / gains 与 jobs 重要性（客户视角事实），value_map 侧评匹配强度（一对条目语义）；匹配逻辑见 `references/framework_logic.md`。
 
 ## 6. SOP 执行步骤
 

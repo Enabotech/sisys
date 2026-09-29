@@ -531,7 +531,7 @@ def then_freshness_in_range(context: dict[str, Any]) -> None:
 
 
 @scenario(FEATURE, "纯内部框架 Skill 空白名单安全失败")
-def test_unmatured_skill_empty_whitelist_safety_failure(context: dict[str, Any]) -> None:
+def test_pure_internal_skill_empty_whitelist_safety_failure(context: dict[str, Any]) -> None:
     """纯内部框架 Skill（data_sources 空 tuple）含标记 → 207 安全失败。
 
     永久锚定（4-1e Task 1.4 改名，D8）：空白名单是纯内部框架型的永久设计态

@@ -644,7 +644,7 @@ def verify_freshness_in_range(execution: _SkillExecution):
 
 
 @scenario("test_acceptance_skill_mixed_data.feature", "纯内部框架 Skill 空白名单安全失败")
-def test_immature_skill_empty_whitelist_safe_failure(execution: _SkillExecution):
+def test_pure_internal_skill_empty_whitelist_safe_failure(execution: _SkillExecution):
     """纯内部框架 Skill 空白名单含标记 → 207 安全失败（永久锚定——D8，空白名单为纯内部型永久设计态）。"""
     pass
 

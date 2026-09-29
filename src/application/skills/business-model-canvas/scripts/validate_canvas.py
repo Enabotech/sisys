@@ -38,7 +38,7 @@ CRITICAL_LINKS = [
 def validate(canvas: dict) -> dict:
     """校验 9 块完整性 + 关键连接关系。"""
     missing = [b for b in REQUIRED_BLOCKS if not canvas.get(b)]
-    empty = [b for b in REQUIRED_BLOCKS if canvas.get(b) == []]
+    empty = [b for b in REQUIRED_BLOCKS if canvas.get(b) == [] or canvas.get(b) == {}]
 
     link_violations = []
     for source, target, desc in CRITICAL_LINKS:

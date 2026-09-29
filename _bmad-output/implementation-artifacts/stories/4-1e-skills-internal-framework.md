@@ -916,10 +916,10 @@ tests/
 
 | Skill | 单测 | 特有交付 | 行数 |
 |---|---|---|---|
-| value-proposition-canvas（评分型范本，主会话） | 12 绿 | 双侧分值语义（customer 严重度/重要性、value 匹配强度——R2-5）+ fit_score 木桶最小值 + jobs 分析起点 + 见证条目「充电等待」三方一致 | ~170 |
-| business-model-canvas（fork） | 15 绿 | D7 三文件收敛（canvas_template.json + validate_canvas.py REQUIRED_BLOCKS + loader 断言收紧 b'"key_partnerships"'）+ 存量资产 §9 引用 + cost_structure 编码过渡 | ~230 |
+| value-proposition-canvas（评分型范本，主会话） | 12 绿 | 双侧分值语义（customer 严重度/重要性、value 匹配强度——R2-5）+ fit_score 木桶最小值 + jobs 分析起点 + 见证条目「充电等待」三方一致 | 185 |
+| business-model-canvas（fork） | 15 绿 | D7 三文件收敛（canvas_template.json + validate_canvas.py REQUIRED_BLOCKS + loader 断言收紧 b'"key_partnerships"'）+ 存量资产 §9 引用 + cost_structure 编码过渡 | 190 |
 | org-design-framework（fork） | 13 绿 | D10 catalog 四维增强（strategy/processes/rewards/people 子容器——只加不改删，mypy 零问题 + 4.1 注册验收零回归）+ 名实注记 | 200 |
-| strategy-map（fork） | 14 绿 | bsc_indicators 根键锚定（断言禁 strategic_objectives）+ Kaplan-Norton 标准方向 warning 级 + bsc 侧 §2 单行回跳（bsc 4-1d 单测 9 绿零回归）+ 互查映射表入 framework_logic | 186 |
+| strategy-map（fork） | 14 绿 | bsc_indicators 根键锚定（断言禁 strategic_objectives）+ Kaplan-Norton 标准方向 warning 级 + bsc 侧 §2 单行回跳（bsc 4-1d 单测 7 绿零回归）+ 互查映射表入 framework_logic | 186 |
 | dependency-graph（fork） | 12 绿 | 顶层 array-of-objects 模板形态（task_list 分区标题）+ 顿号分隔依赖边编码 + DAG 跳数最长链结构代理（vs gantt 真 CPM 分工） | 159 |
 | raci-matrix（fork） | 12 绿 | assignments 双层编码全角化 + 矩阵速查表放采集区外（提取器污染 4 项变异实证）+ 恰 1 A 硬/≥1 R 软规则经 conflicts 呈现 | 163 |
 | gantt-chart（fork，收官） | 14 绿 | 时长正则 `^\d+ *[天周月]$` 三方同文本 + 归一基准（周=5/月=20 工作日）+ 里程碑「0 天」+ ES/EF/LS/LF 零浮动 + dependency-graph 双向跳转闭环 | 184 |
@@ -1039,16 +1039,47 @@ tests/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** （待 dev-story 完成后填写）
-**审查模式:** （待填写）
+**审查日期:** 2026-09-29（Round 1/5）
+**审查模式:** C1~C5 循环——四视角并行调研（AC/Task 完成度 + 契约一致性 + 测试质量判别力 + 内容方法论）+ 主会话技术基线（ruff/mypy/红线 grep/1043 测试）→ C2 修复方案 → C3 双评审员 + 复评门禁（判定「优秀」后落码）→ C4 提交
+
+#### Round 1 发现与修复（编号规则：R<轮>-F<序> = 本节发现修复项，与 Docs Review Fixes 表的 R<轮>-<序号> 命名空间互不相干）
+
+| # | 严重度 | 问题 | 修复 |
+|---|---|---|---|
+| R1-F1 | P1 | RACI 软规则违规出口三方矛盾：validation_rules 规则 2 称「登记建议（suggestions）」，规则 5 + SKILL.md 三处 + framework_logic 均为「确定性规则（含 ≥1 R）违规统一汇入 conflicts」——两字段语义边界被打破 | 规则 2 改「软规则违规同样汇入 conflicts（标注软规则），不阻断输出」——与规则 5/SKILL.md 三处/framework_logic 全链一致；suggestions 保留 LLM 分析层语义 |
+| R1-F2 | P1 | RACI 规则 4 正则 `^[RACI](/[RACI])*$` 放行自身文字明禁的 A/A 与任意三字母组合（文字规则与机器契约背离，A/R 计数随失真） | 显式枚举 `^(R\|A\|C\|I\|R/A\|A/R\|R/C\|C/R\|R/I\|I/R\|A/C\|C/A\|A/I\|I/A\|C/I\|I/C)$`（4 单字母 + 12 有序双字母 = 16 形态，数学完备 C(4,1)+P(4,2)）；文字补「两字母不重复组合、字母次序不限、三字母及以上非法」；全语料实际组合（A/R/C/I/R）∈ 枚举（双评审员证伪 Rev1 漏 A/R 后修订，复评确认） |
+| R1-F3 | P2 | org「区域利润分享计划」同文本异分值：锚点定 4 分正例、§8 与模板写「3 ——」（同文本同分值红线，工作坊拿互斥校准信号） | §8 + 模板两处升「4 ——」（锚点分档「显著支撑」与「牵引双目标」语义匹配；单测 witness 区域总经理不受影响） |
+| R1-F4 | P2 | org strategy 维评分语义自指：「对齐 = 对战略维陈述的支撑程度」对 strategy 维自身空洞（Galbraith 原典战略是设计输入基准非被对齐对象） | scoring_anchors 刻度声明补 strategy 维例外（分值 = 陈述完备性——业务范围+竞争优势来源+时间里程碑三要素覆盖，附 1-5 分档映射）；framework_logic 步骤 6 补括注；§8 + 模板示例两处改三要素齐备陈述（评审员 A 证伪 Rev1 单改 references 会与旧示例冲突后联动） |
+| R1-F5 | P2 | VPC 客户侧分值（严重度/重要性，input 强制采集）在计算中零职能 + 逐条目覆盖缺口无出口（最高严重度痛点无回应不降分也不登记——max 聚合盲区） | framework_logic + scoring_anchors 聚合规则补两条：客户侧分值职能 = 优先级排序（工作坊讨论序 + improvement_suggestions 排序）不参与 fit_score；覆盖缺口出口 + 优先序（空对居首、其次最高严重度未回应缺口）——算法与契约零变更 |
+| R1-F6 | P2 | dependency §4 表 critical_path 说明混入「1-5」分值语（评分型复制残留，critical_path 是任务名数组；全目录唯一残留位） | 删「，1-5」 |
+| R1-F7 | P2 | vpc「R2-5 裁定」评审轮次标记泄漏运行时内容（SKILL.md §5 body + framework_logic 填写指引——4-1d R3-F3 同型；主会话自 P3 升 P2：body/references 是 loader 运行时加载内容） | 两处删标记保语义；test_vpc:95 断言消息串同步清理；修后 grep 全仓 R2-5 零残留 |
+| R1-F8 | P3 | Dev Record「bsc 4-1d 单测 9 绿零回归」计数失准（实际 7 个测试函数 7 passed） | 勘正为 7 绿（零回归结论不变） |
+| R1-F9 | P3 | Dev Record Task 2-8 表行数偏差：vpc 声明 ~170 实 185、bmc 声明 ~230 实 190（其余五处精确） | 按终态勘正（185/190——修复后复核不变） |
+| R1-F10 | P3 | architecture.md 文档统计表版本残留 8.7.1（:3613，头部与修订史均 8.8.0——Story 同步清单外第四处同源旧值） | 整格改「8.8.0（Story 4.1e 纯内部框架 Skills 成熟化 - 23/23 收官）」 |
+| R1-F11 | P3 | D8 改名场景 Python 测试函数名保留旧语义（test_unmatured_…/test_immature_… vs 场景名已统一「纯内部框架」） | 两函数统一 test_pure_internal_skill_empty_whitelist_safety_failure 形态（@scenario 绑定场景名字符串不受影响，collect 验证通过） |
+| R1-F12 | P3 | strategy-map §4 nodes 括注「（维度/指标/主题）」与 schema 节点三键（node_id/label/dimension）错位（输入侧词汇混入输出侧）；theme_cards 行格式不统一 | 两行统一键名格式（node_id/label/dimension 三键；theme/dimensions/hypothesis_chain 三键） |
+| R1-F13 | P3 | 验收「负向触发」步骤切片无上界（split 后取全文，target 出现在 §9 等后文也通过——假阳窗口；单测同款断言有上界先例） | 补 `.split("\n## ", 1)[0]` 封到下一二级标题；四对跳转逐一验证收紧后仍绿 |
+| R1-F14 | P3 | 集成 INSUFFICIENT_DATA 行为面恒真断言（:220 `!= "insufficient_data"` 在 :215 已断言 SUCCESS 前提下零判别力） | 删断言保注释（引擎行为基线说明挂 SUCCESS 断言处，SOP 文档级断言由 AC-2 承载） |
+| R1-F15 | P3 | 「Fake/Mock 仅限 LLM/Sandbox」docstring 与事实不符（207 场景实际构造第三个 fake——resolver 的 AsyncMock cache 端口） | 验收 :12 + 集成 :4 两处补「与 resolver cache 端口」 |
+| R1-F16 | P3 | raci §8「编码实现」assignments 与模板矩阵差一格（模板有 测试负责人:I，§8 缺——同文本同值） | §8 补 `"测试负责人": "I"`（A/R 计数与规则叙事不受影响） |
+| R1-F17 | P3 | bmc canvas_template.json cost_structure 骨架 `[]` 与 schema type: object 类型错位（按骨架预填产出类型错误的 arguments） | 改 `{}` |
+| R1-F18 | P3 | gantt 模板 tasks 行措辞双重否定拗口（「禁含…以外的保留字符冲突」）+ 行内速记「；」「＝」分隔符未入约束提示（任务名混入致现场速记解析歧义） | 措辞改干净表述（与 SKILL.md:126 同款）+ blockquote 补速记分隔符提示（不动 schema description——arguments 层无歧义） |
+| R1-F19 | P3 | validate_canvas.py 空块判定 `== []` 与 object 型块（cost_structure）类型不匹配（F17 改 {} 后空块分类漂移） | 补 `or canvas.get(b) == {}`（D7 例外文件 scripts/ 内容资产） |
+| R1-F20 | P3 | dependency risk_nodes 机械规则只覆盖扇入，高扇出（单一前置阻塞大量后继）是依赖管理经典风险形态且步骤 4 标题已承诺「扇入扇出」——标题与规则体失同步 | 补「扇出 ≥3 发散节点」机械规则 + 7 处同步（validation_rules 规则 4 / framework_logic 步骤 4 body 两类→三类 / SKILL.md frontmatter:64 + §4:102 + §6:125 / yaml:1302 双写逐字 / workshop_guide:30）；模板:55 与步骤 4 标题本含扇出不动 |
+| R1-F21 | P3 | VPC jobs 三类表述「场景 + 功能 + 社会/情感任一层」把 Osterwalder 任务分类学（三类互斥标签）误作逐条叠加要素（诱导改写纯情感/社会任务） | 改「逐条标注任务类型（功能/社会/情感——三类是标签非叠加要求），清单整体宜三类覆盖」 |
+| R1-F22 | P3 | VPC 匹配强度 5/4 分档混入竞争差异化维度（「竞对难以复制/1 年内可跟进」——Osterwalder 体系中 fit 与竞争差异化是独立判据，「回应充分但易复制」在原锚点下无法定档） | 5 分改「直接、充分回应客户条目（回应面完整且强度充分）」；4 分改「明确回应客户条目，覆盖或深度有保留」；4 分正例括注同步（保留「覆盖有保留」要素——复评 N 意见） |
+
+**裁定不修（4 项，均有依据）：** ① bmc §8/模板/锚点文本详略分层（分值三方一致 5/5、4/4，详略是文档职能分层——示例紧凑/模板操作性/锚点校准，红线针对分值矛盾非字面全等）；② schema description 决策号/defer 注记（yaml 头部明示 defer 登记惯例，与 R1-F7 所清「评审轮次标记」的区别 = 设计决策可回查 vs 过程残留，评审确认区别对待可辩护）；③ strategy-map 同层箭头一律 warning（引导纪律可辩护——warning 非错误、标记待澄清复议，三处口径一致）；④ BMC VP 归供给侧导语（分组学简化表述，九块结构与脚本无错）。另：loader.py:56/209「R3-2 G5」评审标记**裁定不修**（4-1c 生产代码，4-1e 硬约束零引擎层改动、唯二例外不含 loader.py——范围纪律优先，留痕待 4-1c 资产下次触碰）。
+
+**评审过程记录：** Round 1 修复方案经双评审员并行评审（A：逐项正确性+最小性；B：组合交互+传播完备性+断言网）判定「合格（有条件放行）」——证伪命中 Rev1 三处（F2 枚举漏 A/R 阻断级 / F4 与既有示例新冲突 / F8l 取向与传播面未声明）+ 5 项实施约束（G2 双写链/G4 括注范围/G5 钉位/G6 悬空引用/G7 钉位）；Rev2 修订后复评判定「优秀（放行）」（16 形态数学完备 + 扇出 7 处同步清单实测无漏 + 双写对当前逐字一致）。修复后验证：4-1e 全测试面 1043 passed（单元 skills 368 + 集成/架构/汇总 636 + 验收三套 39）+ ruff All checks passed + R2-5 零残留。
 
 #### 需决策 Decision Needed
 
-- [ ] （待填写）
+- [ ] （无——Round 1 无需用户决策项）
 
 #### 已修复 Patch
 
-- [ ] （待填写）
+- [x] Round 1：R1-F1 ~ R1-F22 全部修复（22 项：P1×2 + P2×5 + P3×15）+ 裁定不修 5 项留痕——见上表
 
 #### 已推迟 Defer
 
@@ -1072,9 +1103,9 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.6.0
+**故事版本/Story Version:** v1.7.0
 **创建日期/Created:** 2026-09-29
-**最后更新/Last Updated:** 2026-09-29（dev-story 实施完成）
+**最后更新/Last Updated:** 2026-09-29（代码审查 Round 1 完成）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md Story 4.1e + 4-1a/4-1b/4-1c/4-1d 完成资产 + 四视角并行代码调研：7 Skill 现状基线 / 成熟化模式复用盘点 / 回归守护面穷尽 / AC 解析与方法论基线；13 项决策登记；4-1d R1-D2 留项收敛承接；Epic 字面勘误 2 项签收）
 - v1.1.0: 竞争性质量复核定稿（checklist 模式四 Agent 独立取证）：P1×4——Task 1 DoD 与 Subtask 1.4 的 yaml 落地策略自相矛盾裁定（恢复 4-1d 原生「Task 1 一次性落地 7 条目」）/ Subtask 5.7「bsc 回跳 4-1d 已建」证伪（grep 零命中，改本 Story 单行新建）/ ToolResultStatus 路径勘正（value_objects 非 entities）/ 滚动锚点规则仅 4-1c 单侧实况；P2×7——ToolInputValidator 未注册勘正、len(ssot_union)==16 锚点处置登记（保持字面，D2）、D7 loader 断言收紧为带引号完整键、architecture.md 旧值三处（§1.4/§13×2）、NON_TARGET_SLUGS 现有措辞精确化（「非目标」非「未成熟化」）、D4 补 framework_logic.md 首次引入声明、vpc 叶子源码序勘正；另补 4 处入站负向跳转复用清单与 TOOLS.md 零触碰声明
@@ -1083,3 +1114,4 @@ tests/
 - v1.4.0: 文档审查 Round 3（D1/D2 合并单深度评审员：R2 修复回归核查 + 修复组合交叉语义核对；D3 系统修订，8 项登记见修复表）：P1×2——R2-2 传播不完整（`assert_reference_content_anchors` 无调用位，R1-6 同型缺陷复发）/ R2-2 锚点字样与 R2-4 内容行互拆（「步骤 1」全文仅锚点一处——两个 P1 修复组合后互相遮蔽，同轮收敛）；P2×4——「正例」vs「正反例」字样冲突（合并词不含「正例」子串）/ validation_rules 锚点关键字对 strategy-map 不可满足 + 大小写敏感 / raci 模板形态未定义 + 花括号落码 YAML 红线提示缺失 /「§3/§8 为输入侧四方」括注字面错误与四方同步术语统一；P3×2——零时长裁定（0 周/0 月归一 + 里程碑与 critical_path 关系）/ 计数·口径·断言面同集·R 前缀编号规则·11.10 等杂项七点。核心教训：修复组合的交互面是独立审查点——R2 两个 P1 修复各自正确、组合后互相拆台。
 - v1.4.1: 文档审查 Round 4 稳定性验证轮（双视角快扫：R3 修复回归核查 + 全文一致性终扫；R3 八项全部通过、零回归、18 组行号抽查零错位）：P2×1——正则裸管道符 2 处破坏 GFM 表格渲染（v1.2.0 R1-15 遗留）改单字符类形态 `^\d+ *[天周月]$`（语义等价，三处统一）；P3×2——修复表 R2-2 措辞后注 + R3-6 自引改节名。稳定性验证判定：可收敛（剩余风险面已收敛至「实施期才可验证」类，文档级审查边际收益趋零）。
 - v1.5.0: 文档审查 Round 5 收敛终审（独立取证，不轻信文档自报）——**裁定：正式收敛**。43 项修复逐项对照正文全部落地、8 项核心代码声明与约 50 组行号锚点实地验证零错位、留项台账完整；终审记录级瑕疵 3 项（changelog 计数 ×2 / sprint 复选框回勾 / 裸 R1-F1 前缀 ×6）已修毕；收敛声明与交接提示入档（见修复表后节）。
+- v1.7.0: **代码审查 Round 1**（C1~C5 循环第 1 轮）——四视角并行调研（AC/Task 完成度六 AC 全「完成」+ 契约一致性 SSOT 三方逐字一致 + 测试质量负例判别力运行时实验证实 + 内容方法论深挖）+ 双评审员评审与复评门禁（Rev1 证伪 3 处修订后「优秀」放行）。修复 22 项（P1×2——RACI 软规则出口三方矛盾统一 conflicts / 规则 4 正则显式枚举 16 形态封死 A/A 穿透；P2×5——org 同文本异分值与 strategy 维自指 / VPC 客户侧分值职能显式化+覆盖缺口出口 / dependency「1-5」残留 / vpc「R2-5 裁定」评审标记泄漏清理；P3×15——扇出机械规则 7 处同步、双函数名统一、验收切片上界、恒真断言、计数行数勘正等）+ 裁定不修 5 项留痕。修复后 1043 测试全绿 + ruff 通过 + R2-5 零残留。AC-1~AC-6 完成度经四视角独立证实（File List 全部真实、测试计数五组精确吻合、6c72b0f3 评审推广改动不破坏交付语义）。
