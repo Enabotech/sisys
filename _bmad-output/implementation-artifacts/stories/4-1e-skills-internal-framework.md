@@ -1,6 +1,6 @@
 # Story 4.1e: Skills 内部框架增强（内部用户输入型 Skills 完善）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -950,7 +950,7 @@ tests/
 - `tests/unit/architecture/test_arch_skill_framework.py`
 - `tests/integration/application/test_skill_framework.py`
 - `tests/acceptance/test_acceptance_skill_framework.feature` + `.py`
-- 修改：`tests/acceptance/contracts/skill_io_schemas.yaml`（+7 条目）/ `tests/unit/application/skills/test_skill_mixed_data_contracts.py`（互锁断言扩展）/ `test_pestel_analysis_data_collection.py` + `test_arch_skill_data_collection.py` + `test_arch_skill_mixed_data.py`（三副本派生收敛）/ `test_skills_loader.py`（D7 特征串）/ 两套既有验收 feature+py（D8 改名）/ `src/application/skills/bsc-scorecard/SKILL.md`（§2 单行回跳增补——Subtask 5.7，跨 Story 单行内容增量）/ `docs/architecture/architecture.md` + `sisys-uni-exception-design.md`
+- 修改：`tests/acceptance/contracts/skill_io_schemas.yaml`（+7 条目）/ `tests/unit/application/skills/test_skill_mixed_data_contracts.py`（互锁断言扩展）/ `test_pestel_analysis_data_collection.py` + `test_arch_skill_data_collection.py` + `test_arch_skill_mixed_data.py`（三副本派生收敛）/ `test_skills_loader.py`（D7 特征串）/ 两套既有验收 feature+py（D8 改名）/ `src/application/skills/bsc-scorecard/SKILL.md`（§2 单行回跳增补——Subtask 5.7，跨 Story 单行内容增量）/ `docs/architecture/architecture.md` + `sisys-uni-exception-design.md` / `_bmad-output/implementation-artifacts/sprint-status.yaml`（状态同步——R4-F2 补登）
 
 ---
 
@@ -961,7 +961,7 @@ tests/
 | **Story ID** | 4.1e |
 | **Story Key** | 4-1e-skills-internal-framework |
 | **File** | `_bmad-output/implementation-artifacts/stories/4-1e-skills-internal-framework.md` |
-| **Status** | `ready-for-dev` |
+| **Status** | `done`（代码审查五轮收敛——2026-09-29） |
 | **Epic** | Epic 4: 战略工具箱 |
 | **价值组** | Skills 成熟化收官（23/23） |
 | **优先级** | P0-8 |
@@ -1039,8 +1039,8 @@ tests/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 2026-09-29（Round 1-3/5）
-**审查模式:** C1~C5 循环——四视角并行调研（AC/Task 完成度 + 契约一致性 + 测试质量判别力 + 内容方法论）+ 主会话技术基线（ruff/mypy/红线 grep/1043 测试）→ C2 修复方案 → C3 双评审员 + 复评门禁（判定「优秀」后落码）→ C4 提交；R2 起递减投入（双视角调研 + 单评审员快评；R3 单深度评审员 + 全量回归）
+**审查日期:** 2026-09-29（Round 1-5/5，五轮收敛）
+**审查模式:** C1~C5 循环——四视角并行调研（AC/Task 完成度 + 契约一致性 + 测试质量判别力 + 内容方法论）+ 主会话技术基线（ruff/mypy/红线 grep/1043 测试）→ C2 修复方案 → C3 双评审员 + 复评门禁（判定「优秀」后落码）→ C4 提交；R2 起递减投入（双视角调研 + 单评审员快评；R3 单深度评审员 + 全量回归；R4 稳定性快扫；R5 独立收敛终审——裁定收敛，见收敛声明）
 
 #### Round 1 发现与修复（编号规则：R<轮>-F<序> = 本节发现修复项，与 Docs Review Fixes 表的 R<轮>-<序号> 命名空间互不相干）
 
@@ -1126,14 +1126,33 @@ tests/
 - [x] Story created with `ready-for-dev` status
 - [ ] 运行 `validate-create-story` 进行质量检查（可选）
 - [x] 运行 `dev-story` 开始实施（Task 2-8 可多 Agent 并行——共享文件已前置 Task 1）
-- [ ] 运行 `code-review` 进行代码审查（下一步——建议换用不同 LLM）
+- [x] 运行 `code-review` 进行代码审查（C1~C5 五轮：R1 四视角+双评审门禁 22 项 → R2 回归核查+可守护性 7 项 → R3 深度评审+全量回归 4 项 → R4 稳定性快扫 → R5 独立收敛终审——累计修复 33 项，零 P0/P1/P2 残留，正式收敛）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.8.0
+### ✅ 代码审查收敛声明（Round 5 独立终审，2026-09-29）
+
+> 本 Story 代码审查周期（C1~C5 三轮实审 + 稳定性快扫 + 独立终审）正式收敛。周期结构：Round 1 四视角并行调研 + 双评审员评审与复评门禁（22 项：P1×2 + P2×5 + P3×15 + 裁定不修 5 项留痕）→ Round 2 回归核查 + 可守护性双视角（7 项：P2×1 + P3×6，补 5 处定向守护断言 +7 测试——交集断言实装即抓到提取器行级丢条目缺陷，判别力经真实失败实证）→ Round 3 单深度评审员 + 全量回归（4 项 P3 顺手清单 + 19 项失败全数甄别为 benchmark OCR/docker sandbox 环境依赖类，与改动面零交集）→ Round 4 稳定性快扫（R3 零回归 + 全周期台账/数字/checkbox 三面自洽）→ Round 5 独立终审。**累计修复 33 项 + 记录级 3 项（R4-F1~F3 随本轮收尾处理），零 P0/P1/P2 残留。**
+>
+> 终审独立取证（不轻信 Story 自报）：①周期闭合——`765c5d0c`/`6c788e87`/`8437bbbe` 三轮提交文件面与 Findings 表逐项映射，区间内唯一额外提交为 argocd 自动 CI（deploy tag，非代码），无游离提交；②10 项关键修复实地抽验全部证实（16 形态正则数学完备、扇出 7 处含 yaml 双写逐字、R2-5 零残留、D8 三套验收统一、交集判别力独立复算 org 8/8·vpc 12/12 零异分）；③自报数字独立复核全部精确（25/+100/-50、13/+133/-16、5/+29/-9、375/1011/39/7678/1625+1 环境类）；④实跑终验：指定面 1011 绿 + 验收三套 39 绿 + unit 全量 7678 绿 + ruff/mypy 全过；⑤留项台账（Defer 7 项 + 裁定不修 5+2 项）完整、无悬空。
+>
+> **状态流转：`review` → `done`。** 交接提示：Defer 台账中「数据源扩展专项」未立项，涉及 DataSourceRef.required_fields 按源定制的四方联动，立项时须以本 Story defer 节为需求基线。
+
+#### Round 4 + Round 5 记录（稳定性验证与收敛终审）
+
+| # | 严重度 | 问题 | 处置 |
+|---|---|---|---|
+| R4-F1 | P3 | changelog 缺 v1.6.0 条目（dev 提交 590e8655 升版本头但未写说明行——序列 v1.5.0→v1.7.0 有洞） | 本轮补 v1.6.0 条目（dev-story 实施记录一行） |
+| R4-F2 | P3 | File List 未登记 `sprint-status.yaml`（590e8655 实际修改） | 修改清单补登 |
+| R4-F3 | P3 | Next Steps 无审查进度行 + code-review checkbox 未回勾 | 本轮回勾 + 进度行载明五轮结构 |
+| R5-1 | 终审 | 独立取证：周期闭合（4 提交全对账，无游离）/ 10 项关键修复实地证实 / 自报数字 7 组复核全精确 / 实跑终验全过 / 零 P0/P1/P2 残留——**裁定：收敛** | 收敛声明入档（上节）；Story 状态 review → done 同步 sprint-status.yaml |
+
+---
+
+**故事版本/Story Version:** v1.9.0
 **创建日期/Created:** 2026-09-29
-**最后更新/Last Updated:** 2026-09-29（代码审查 Round 1-3 完成）
+**最后更新/Last Updated:** 2026-09-29（代码审查五轮收敛，Story → done）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md Story 4.1e + 4-1a/4-1b/4-1c/4-1d 完成资产 + 四视角并行代码调研：7 Skill 现状基线 / 成熟化模式复用盘点 / 回归守护面穷尽 / AC 解析与方法论基线；13 项决策登记；4-1d R1-D2 留项收敛承接；Epic 字面勘误 2 项签收）
 - v1.1.0: 竞争性质量复核定稿（checklist 模式四 Agent 独立取证）：P1×4——Task 1 DoD 与 Subtask 1.4 的 yaml 落地策略自相矛盾裁定（恢复 4-1d 原生「Task 1 一次性落地 7 条目」）/ Subtask 5.7「bsc 回跳 4-1d 已建」证伪（grep 零命中，改本 Story 单行新建）/ ToolResultStatus 路径勘正（value_objects 非 entities）/ 滚动锚点规则仅 4-1c 单侧实况；P2×7——ToolInputValidator 未注册勘正、len(ssot_union)==16 锚点处置登记（保持字面，D2）、D7 loader 断言收紧为带引号完整键、architecture.md 旧值三处（§1.4/§13×2）、NON_TARGET_SLUGS 现有措辞精确化（「非目标」非「未成熟化」）、D4 补 framework_logic.md 首次引入声明、vpc 叶子源码序勘正；另补 4 处入站负向跳转复用清单与 TOOLS.md 零触碰声明
@@ -1142,5 +1161,9 @@ tests/
 - v1.4.0: 文档审查 Round 3（D1/D2 合并单深度评审员：R2 修复回归核查 + 修复组合交叉语义核对；D3 系统修订，8 项登记见修复表）：P1×2——R2-2 传播不完整（`assert_reference_content_anchors` 无调用位，R1-6 同型缺陷复发）/ R2-2 锚点字样与 R2-4 内容行互拆（「步骤 1」全文仅锚点一处——两个 P1 修复组合后互相遮蔽，同轮收敛）；P2×4——「正例」vs「正反例」字样冲突（合并词不含「正例」子串）/ validation_rules 锚点关键字对 strategy-map 不可满足 + 大小写敏感 / raci 模板形态未定义 + 花括号落码 YAML 红线提示缺失 /「§3/§8 为输入侧四方」括注字面错误与四方同步术语统一；P3×2——零时长裁定（0 周/0 月归一 + 里程碑与 critical_path 关系）/ 计数·口径·断言面同集·R 前缀编号规则·11.10 等杂项七点。核心教训：修复组合的交互面是独立审查点——R2 两个 P1 修复各自正确、组合后互相拆台。
 - v1.4.1: 文档审查 Round 4 稳定性验证轮（双视角快扫：R3 修复回归核查 + 全文一致性终扫；R3 八项全部通过、零回归、18 组行号抽查零错位）：P2×1——正则裸管道符 2 处破坏 GFM 表格渲染（v1.2.0 R1-15 遗留）改单字符类形态 `^\d+ *[天周月]$`（语义等价，三处统一）；P3×2——修复表 R2-2 措辞后注 + R3-6 自引改节名。稳定性验证判定：可收敛（剩余风险面已收敛至「实施期才可验证」类，文档级审查边际收益趋零）。
 - v1.5.0: 文档审查 Round 5 收敛终审（独立取证，不轻信文档自报）——**裁定：正式收敛**。43 项修复逐项对照正文全部落地、8 项核心代码声明与约 50 组行号锚点实地验证零错位、留项台账完整；终审记录级瑕疵 3 项（changelog 计数 ×2 / sprint 复选框回勾 / 裸 R1-F1 前缀 ×6）已修毕；收敛声明与交接提示入档（见修复表后节）。
+- v1.6.0: **dev-story 实施完成**（Task 0-11 全部交付：契约库 + 回归网预调整 + 7 Skill 四循环成熟化 + 集成/汇总层/架构/BDD 测试 + 文档同步——详见「Dev Story 实施记录」节；最终验证全量 9298 passed + ruff/mypy 通过；本条目为 R4-F1 补登——590e8655 提交时升版本头未写说明行）。
+- v1.7.0: **代码审查 Round 1**（C1~C5 循环第 1 轮）——四视角并行调研（AC/Task 完成度六 AC 全「完成」+ 契约一致性 SSOT 三方逐字一致 + 测试质量负例判别力运行时实验证实 + 内容方法论深挖）+ 双评审员评审与复评门禁（Rev1 证伪 3 处修订后「优秀」放行）。修复 22 项（P1×2——RACI 软规则出口三方矛盾统一 conflicts / 规则 4 正则显式枚举 16 形态封死 A/A 穿透；P2×5——org 同文本异分值与 strategy 维自指 / VPC 客户侧分值职能显式化+覆盖缺口出口 / dependency「1-5」残留 / vpc「R2-5 裁定」评审标记泄漏清理；P3×15——扇出机械规则 7 处同步、双函数名统一、验收切片上界、恒真断言、计数行数勘正等）+ 裁定不修 5 项留痕。修复后 1043 测试全绿 + ruff 通过 + R2-5 零残留。AC-1~AC-6 完成度经四视角独立证实（File List 全部真实、测试计数五组精确吻合、6c72b0f3 评审推广改动不破坏交付语义）。
+- v1.8.0: **代码审查 Round 2 + Round 3**——R2（回归核查 + 可守护性双视角 + 单评审员快评「优秀」放行）：R1 修复 22 项逐项零新破口，但守护面滞后（8 项新契约 7 项无断言，两项 P1 级修复回归宽松形态无一测试红）——补 5 处定向断言（+7 测试：正则字面+行为双锁/规则 2 切片锁/扇出三字面锁/org·vpc 交集全量断言——实装抓到提取器行级处理丢 JSON 多条目缺陷，finditer 修复后判别力经真实失败实证）+ 6 项 P3 内容传播缺口；1050 全绿。R3（单深度评审员 + 全量回归）：R2 七项对抗样例证伪不倒、组合交叉五对验证、零 P0/P1/P2 阻断——4 项 P3 顺手清单（单测切片上界/RR 类拒斥/交集消息归因/Story 记录勘正）+ 全量回归甄别（10600 passed + 19 failed 全为 benchmark OCR 与 docker sandbox 环境依赖类，与 4-1e 改动面零交集）。
+- v1.9.0: **代码审查 Round 4 + Round 5 收敛**——R4 稳定性快扫（R3 零回归 + 全周期台账/数字/checkbox 三面自洽，3 项 P3 记录级）；R5 独立收敛终审（不轻信自报：周期闭合 4 提交全对账无游离 / 10 项关键修复实地证实 / 自报数字 7 组复核全精确 / 实跑终验 1011+39+7678+1625 全绿 + ruff/mypy 过 / 交集判别力独立复算零异分）——**裁定：正式收敛，累计修复 33 项 + 记录级 3 项，零 P0/P1/P2 残留**；R4-F1~F3 补登（changelog v1.6.0 条目 / File List 补 sprint-status.yaml / code-review checkbox 回勾 + 进度行）；Story 状态 `review` → `done` 同步 sprint-status.yaml。
 - v1.7.0: **代码审查 Round 1**（C1~C5 循环第 1 轮）——四视角并行调研（AC/Task 完成度六 AC 全「完成」+ 契约一致性 SSOT 三方逐字一致 + 测试质量负例判别力运行时实验证实 + 内容方法论深挖）+ 双评审员评审与复评门禁（Rev1 证伪 3 处修订后「优秀」放行）。修复 22 项（P1×2——RACI 软规则出口三方矛盾统一 conflicts / 规则 4 正则显式枚举 16 形态封死 A/A 穿透；P2×5——org 同文本异分值与 strategy 维自指 / VPC 客户侧分值职能显式化+覆盖缺口出口 / dependency「1-5」残留 / vpc「R2-5 裁定」评审标记泄漏清理；P3×15——扇出机械规则 7 处同步、双函数名统一、验收切片上界、恒真断言、计数行数勘正等）+ 裁定不修 5 项留痕。修复后 1043 测试全绿 + ruff 通过 + R2-5 零残留。AC-1~AC-6 完成度经四视角独立证实（File List 全部真实、测试计数五组精确吻合、6c72b0f3 评审推广改动不破坏交付语义）。
 - v1.8.0: **代码审查 Round 2 + Round 3**——R2（回归核查 + 可守护性双视角 + 单评审员快评「优秀」放行）：R1 修复 22 项逐项零新破口，但守护面滞后（8 项新契约 7 项无断言，两项 P1 级修复回归宽松形态无一测试红）——补 5 处定向断言（+7 测试：正则字面+行为双锁/规则 2 切片锁/扇出三字面锁/org·vpc 交集全量断言——实装抓到提取器行级处理丢 JSON 多条目缺陷，finditer 修复后判别力经真实失败实证）+ 6 项 P3 内容传播缺口；1050 全绿。R3（单深度评审员 + 全量回归）：R2 七项对抗样例证伪不倒、组合交叉五对验证、零 P0/P1/P2 阻断——4 项 P3 顺手清单（单测切片上界/RR 类拒斥/交集消息归因/Story 记录勘正）+ 全量回归甄别（10600 passed + 19 failed 全为 benchmark OCR 与 docker sandbox 环境依赖类，与 4-1e 改动面零交集）。
