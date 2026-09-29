@@ -15,6 +15,8 @@ TDD 循环覆盖（AC-1 / AC-2 / AC-3）：
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from src.application.ports.skill_loader import SkillDocument
@@ -32,6 +34,11 @@ from tests.unit.application.skills.skill_framework_contracts import (
 )
 
 SLUG = "raci-matrix"
+
+# 字母组合正则的 16 合法形态（4 单字母 + 12 有序双字母——显式枚举，与 validation_rules 同文本）
+RACI_COMBO_PATTERN = r"^(R|A|C|I|R/A|A/R|R/C|C/R|R/I|I/R|A/C|C/A|A/I|I/A|C/I|I/C)$"
+# 全部不重复双字母组合（P(4,2)=12——行为锁参数化全集）
+_VALID_DOUBLE_COMBOS = ("R/A", "A/R", "R/C", "C/R", "R/I", "I/R", "A/C", "C/A", "A/I", "I/A", "C/I", "I/C")
 
 
 @pytest.fixture
@@ -103,6 +110,25 @@ class TestSopMaturity:
         assert "A/R" in combined, "缺少斜线组合形态示例（A/R）"
         assert "已承担" in combined, "缺少「A/R 计为已承担 R」说明（业界兼任惯例）"
         assert "conflicts" in combined, "缺少违规经 raci_matrix.conflicts 结构化呈现出口"
+
+    def test_soft_rule_exit_conflicts_locked(self, document: SkillDocument) -> None:
+        """软规则出口守护（R1-F1）：规则 2 声明汇入 conflicts，不得回归 suggestions 出口"""
+        rules = (SKILLS_ROOT / SLUG / "references" / "validation_rules.md").read_text(encoding="utf-8")
+        rule2 = rules.split("规则 2", 1)[1].split("规则 3", 1)[0]
+        assert "conflicts" in rule2, "规则 2 软规则违规出口必须为 conflicts（R1-F1 统一裁定）"
+        assert "suggestions" not in rule2, "规则 2 不得回归 suggestions 出口（R1-F1 矛盾形态）"
+
+    def test_combo_regex_enumeration_locked(self, document: SkillDocument) -> None:
+        """字母组合正则形态锁定（R1-F2 守护）：16 形态显式枚举，拒绝重复字母与三字母组合"""
+        rules = (SKILLS_ROOT / SLUG / "references" / "validation_rules.md").read_text(encoding="utf-8")
+        assert RACI_COMBO_PATTERN in rules, "validation_rules 缺少 16 形态显式枚举正则（R1-F2 守护——字面锁）"
+        for letter in ("R", "A", "C", "I"):
+            assert re.fullmatch(RACI_COMBO_PATTERN, letter), f"正则应接受单字母 {letter}"
+        for combo in _VALID_DOUBLE_COMBOS:
+            assert re.fullmatch(RACI_COMBO_PATTERN, combo), f"正则应接受不重复双字母组合 {combo}"
+        assert re.fullmatch(RACI_COMBO_PATTERN, "A/A") is None, "正则不得放行重复字母（A/A——文字规则明禁）"
+        assert re.fullmatch(RACI_COMBO_PATTERN, "R/A/C") is None, "正则不得放行三字母组合"
+        assert re.fullmatch(RACI_COMBO_PATTERN, "X") is None, "正则不得放行非法字母"
 
     def test_assignment_slash_combination_in_examples(self, document: SkillDocument) -> None:
         """§8 示例含斜线组合（A/R）形态的 assignments 双层 JSON"""

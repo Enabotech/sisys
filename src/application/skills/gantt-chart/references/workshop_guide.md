@@ -52,7 +52,9 @@
 1. 记录员 24h 内回收定稿模板，补齐缺口登记区的替代来源
 2. 按模板「采集表格」字段构造 `ToolCall.arguments` 参数（模板→arguments 构造闭环）：
    `project_plan.{tasks, dependencies, durations, resources}`
-   （durations 含「0 天」里程碑条目；resources 为任务名→资源描述映射）
+   （durations 含「0 天」里程碑条目；resources 为任务名→资源描述映射；
+   dependencies 速记中分号分隔的多条边逐条转写为数组元素，每条保留
+   「任务名 ← 前置任务列表」原样形态）
 3. 调用本 Skill 执行：Agent 按框架逻辑完成时长归一与 CPM 前推/后推，
    生成 gantt_visualization（timeline / milestones / critical_path）
 4. 结果回传项目核心成员确认（重点：关键路径上的任务时长与里程碑归属是否需调整）

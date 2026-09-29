@@ -15,6 +15,8 @@ TDD 循环覆盖（AC-1 / AC-2 / AC-3）：
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from src.application.ports.skill_loader import SkillDocument
@@ -137,6 +139,24 @@ class TestTemplateAlignment:
         body_score = _extract_score(document.body, witness)
         assert template_score == body_score, f"模板与 §8 见证条目分值不一致: {template_score} != {body_score}"
 
+    def test_example_threeway_consistency_intersection(self, document: SkillDocument) -> None:
+        """同文本同分值交集全量（R2 守护·R1-F3 bug 类防线）：§8 与模板全部同文本条目必同分"""
+        template = (SKILLS_ROOT / SLUG / "templates" / "vpc_canvas_matching.md").read_text(encoding="utf-8")
+        examples_section = document.body.split("input_examples", 1)[-1]
+        template_scores = _scored_entries(template)
+        body_scores = _scored_entries(examples_section)
+        common = set(template_scores) & set(body_scores)
+        assert len(common) >= 12, f"§8 与模板同文本条目交集异常（{len(common)} < 12——提取器可能失效）"
+        for desc in sorted(common):
+            assert template_scores[desc] == body_scores[desc], (
+                f"同文本条目分值不一致: {desc!r} 模板 {template_scores[desc]} vs §8 {body_scores[desc]}"
+            )
+
+    def test_customer_side_score_role_documented(self, document: SkillDocument) -> None:
+        """客户侧分值职能守护（R1-F5）：「不参与 fit_score」排序依据职能显式声明"""
+        framework_logic = (SKILLS_ROOT / SLUG / "references" / "framework_logic.md").read_text(encoding="utf-8")
+        assert "不参与 fit_score" in framework_logic, "framework_logic 缺少客户侧分值「不参与 fit_score」职能声明（R1-F5）"
+
 
 def _extract_score(text: str, witness: str) -> str | None:
     """提取见证条目所在行的「N —— 」分值前缀（三方一致比对用）。
@@ -144,8 +164,6 @@ def _extract_score(text: str, witness: str) -> str | None:
     兼容模板表格行（| 字段 | 5 —— 描述 |）与 §8 JSON 行（"5 —— 描述"）两种形态，
     取分隔符前缀中最后一个独立整数。
     """
-    import re
-
     for line in text.splitlines():
         if witness in line and "——" in line:
             prefix = line.split("——", 1)[0]
@@ -153,3 +171,17 @@ def _extract_score(text: str, witness: str) -> str | None:
             if matches:
                 return str(matches[-1])
     return None
+
+
+def _scored_entries(text: str) -> dict[str, str]:
+    """提取全部「N —— 描述」条目为 {描述: 分值}（交集全量比对用）。
+
+    全文匹配（同 JSON 行多条目逐一提取）；模板表格行在闭合 | 处截断（防依据列
+    尾巴污染描述）、§8 JSON 行在闭合引号/方括号处截断。
+    """
+    entries: dict[str, str] = {}
+    for match in re.finditer(r"(\d+)\s*——\s*([^\"|\[\]{}\n]+)", text):
+        desc = match.group(2).strip().strip("，,").strip()
+        if desc:
+            entries.setdefault(desc, match.group(1))
+    return entries
