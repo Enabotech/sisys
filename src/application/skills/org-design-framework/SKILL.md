@@ -133,7 +133,7 @@ output_schema:
 | org_structure.functions | array[string] | ✅ | 职能清单（structure 维） |
 | org_structure.reporting_lines | array[string] | ✅ | 汇报线清单（structure 维） |
 | org_structure.decentralization_level | string | ✅ | 分权程度定性描述（高度集权/中度分权/高度分权） |
-| org_structure.strategy.statements | array[string] | ✅ | 战略方向陈述清单（strategy 维） |
+| org_structure.strategy.statements | array[string] | ✅ | 战略方向陈述清单（strategy 维——条目分值 = 陈述完备性，见 scoring_anchors.md 刻度声明） |
 | org_structure.processes.core_processes | array[string] | ✅ | 核心流程清单（processes 维） |
 | org_structure.rewards.incentive_policies | array[string] | ✅ | 激励政策清单（rewards 维） |
 | org_structure.people.talent_measures | array[string] | ✅ | 人才举措清单（people 维） |
@@ -154,7 +154,7 @@ output_schema:
 
 **内部数据（分析主体，工作坊采集）：** 经 `templates/org_star_model_assessment.md` 五维采集表在工作坊现场填写（会前 T-3 天分发预填指引，见 `references/workshop_guide.md`），会后将模板字段构造为 `ToolCall.arguments` 传入——根键 `org_structure`（三字段 + 四子容器各一叶子，共 7 个采集字段），构造示例见 §8。
 
-**五维采集引导：** structure 维（functions 职能/reporting_lines 汇报线/decentralization_level 分权程度）→ strategy 维（statements）→ processes 维（core_processes）→ rewards 维（incentive_policies）→ people 维（talent_measures）；逐维评维度对齐度分值（1-5），对齐逻辑见 `references/framework_logic.md`。
+**五维采集引导：** structure 维（functions 职能/reporting_lines 汇报线/decentralization_level 分权程度）→ strategy 维（statements）→ processes 维（core_processes）→ rewards 维（incentive_policies）→ people 维（talent_measures）；逐维评维度对齐度分值（1-5——strategy 维条目分值 = 陈述完备性，见 `references/scoring_anchors.md` 刻度声明），对齐逻辑见 `references/framework_logic.md`。
 
 ## 6. SOP 执行步骤
 
@@ -184,7 +184,7 @@ output_schema:
     "functions": ["4 —— 区域销售职能（含大客户拓展）", "3 —— 集中采购职能"],
     "reporting_lines": ["4 —— 区域总经理向销售副总裁汇报", "2 —— 采购经理向区域总经理汇报"],
     "decentralization_level": "中度分权（区域有定价权，预算集权）",
-    "strategy": {"statements": ["5 —— 聚焦区域企业客户市场（业务范围），以本地化服务网络构筑竞争优势，三年内市场份额进入前三（里程碑）"]},
+    "strategy": {"statements": ["5 —— 聚焦区域企业客户市场（业务范围），以本地化服务网络构筑竞争优势（竞争优势来源），三年内市场份额进入前三（里程碑）"]},
     "processes": {"core_processes": ["3 —— 区域订单履约流程"]},
     "rewards": {"incentive_policies": ["4 —— 区域利润分享计划"]},
     "people": {"talent_measures": ["2 —— 区域销售认证培训"]}

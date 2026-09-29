@@ -162,6 +162,24 @@ class TestTemplateAlignment:
         body_score = _extract_score(document.body, witness)
         assert template_score == body_score, f"模板与 §8 见证条目分值不一致: {template_score} != {body_score}"
 
+    def test_example_threeway_consistency_intersection(self, document: SkillDocument) -> None:
+        """同文本同分值交集全量（R2 守护·R1-F3 bug 类防线）：§8 与模板全部同文本条目必同分"""
+        template = (SKILLS_ROOT / SLUG / "templates" / "org_star_model_assessment.md").read_text(encoding="utf-8")
+        examples_section = document.body.split("input_examples", 1)[-1]
+        template_scores = _scored_entries(template)
+        body_scores = _scored_entries(examples_section)
+        common = set(template_scores) & set(body_scores)
+        assert len(common) >= 8, f"§8 与模板同文本条目交集异常（{len(common)} < 8——提取器可能失效）"
+        for desc in sorted(common):
+            assert template_scores[desc] == body_scores[desc], (
+                f"同文本条目分值不一致: {desc!r} 模板 {template_scores[desc]} vs §8 {body_scores[desc]}"
+            )
+
+    def test_strategy_dimension_scoring_semantics(self, document: SkillDocument) -> None:
+        """strategy 维评分语义守护（R1-F4）：刻度声明含「陈述完备性」例外（自身即基准非对齐度）"""
+        anchors = (SKILLS_ROOT / SLUG / "references" / "scoring_anchors.md").read_text(encoding="utf-8")
+        assert "陈述完备性" in anchors, "scoring_anchors 缺少 strategy 维「陈述完备性」例外声明（R1-F4）"
+
 
 def _extract_score(text: str, witness: str) -> str | None:
     """提取见证条目所在行的「N —— 」分值前缀（三方一致比对用）。
@@ -176,3 +194,17 @@ def _extract_score(text: str, witness: str) -> str | None:
             if matches:
                 return str(matches[-1])
     return None
+
+
+def _scored_entries(text: str) -> dict[str, str]:
+    """提取全部「N —— 描述」条目为 {描述: 分值}（交集全量比对用）。
+
+    全文匹配（同 JSON 行多条目逐一提取）；模板表格行在闭合 | 处截断（防依据列
+    尾巴污染描述）、§8 JSON 行在闭合引号/方括号处截断。
+    """
+    entries: dict[str, str] = {}
+    for match in re.finditer(r"(\d+)\s*——\s*([^\"|\[\]{}\n]+)", text):
+        desc = match.group(2).strip().strip("，,").strip()
+        if desc:
+            entries.setdefault(desc, match.group(1))
+    return entries

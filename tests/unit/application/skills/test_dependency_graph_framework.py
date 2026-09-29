@@ -107,6 +107,14 @@ class TestSopMaturity:
         assert "跳数最长链" in validation_rules, "validation_rules 缺少关键路径结构代理规则表述"
         assert "gantt-chart" in validation_rules, "validation_rules 缺少与 gantt-chart 的 CPM 语义分工说明"
 
+    def test_fanout_risk_rule_locked(self, document: SkillDocument) -> None:
+        """扇出机械规则三处字面锁（R1-F20 守护）：规则 4 + 步骤 4 + body §4 同步防漂移"""
+        validation_rules = (SKILLS_ROOT / SLUG / "references" / "validation_rules.md").read_text(encoding="utf-8")
+        framework_logic = (SKILLS_ROOT / SLUG / "references" / "framework_logic.md").read_text(encoding="utf-8")
+        assert "扇出 ≥3" in validation_rules, "validation_rules 规则 4 缺少「扇出 ≥3」发散节点（R1-F20）"
+        assert "扇出 ≥3" in framework_logic, "framework_logic 步骤 4 缺少「扇出 ≥3」发散节点（R1-F20）"
+        assert "扇出 ≥3" in document.body, "body §4 缺少「扇出 ≥3」发散节点（R1-F20 三处同步）"
+
 
 class TestCrossConsistency:
     """[C] 跨循环一致性（空集语义——SOP 标记 == 声明 == ∅）"""
