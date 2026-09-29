@@ -26,20 +26,13 @@ from tests.unit.application.skills.skill_data_collection_contracts import (
     assert_io_schema_contract,
     assert_sop_maturity,
 )
+from tests.unit.application.skills.skill_framework_contracts import NO_EXTERNAL_SOURCE_SLUGS
 
 SLUG = "pestel-analysis"
 
-# 7 个非目标 Skill（23 全量 − 6 个 4-1c 目标 − 10 个 4-1d 目标，即 4-1e 目标）：
-# data_sources 必须保持空 tuple（4-1d Task 1.4 预调整 17 → 7）
-NON_TARGET_SLUGS: tuple[str, ...] = (
-    "business-model-canvas",
-    "dependency-graph",
-    "gantt-chart",
-    "org-design-framework",
-    "raci-matrix",
-    "strategy-map",
-    "value-proposition-canvas",
-)
+# 无外部源型 Skill（23 全量 − 4-1c 声明源 − 4-1d 声明源，派生自 4-1e 契约库
+# NO_EXTERNAL_SOURCE_SLUGS——D2 收敛，字面清单零复制）：data_sources 恒空不变量
+NON_TARGET_SLUGS: tuple[str, ...] = NO_EXTERNAL_SOURCE_SLUGS
 
 
 @pytest.fixture
@@ -94,7 +87,8 @@ class TestAllSkillsRegression:
             assert isinstance(document.frontmatter.data_sources, tuple)
 
     async def test_non_target_skills_empty_data_sources(self) -> None:
+        """无外部源型 Skill data_sources 恒空不变量（纯内部框架型分类学守护——D2）。"""
         loader = InMemorySkillLoader()
         for slug in NON_TARGET_SLUGS:
             document = await loader.load_sop(slug)
-            assert document.frontmatter.data_sources == (), f"非目标 Skill {slug} 的 data_sources 被误填"
+            assert document.frontmatter.data_sources == (), f"无外部源型 Skill {slug} 的 data_sources 恒空不变量被破坏"

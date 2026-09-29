@@ -643,9 +643,9 @@ def verify_freshness_in_range(execution: _SkillExecution):
         assert 0.0 <= meta.freshness_score <= 1.0
 
 
-@scenario("test_acceptance_skill_mixed_data.feature", "未成熟化 Skill 空白名单安全失败")
+@scenario("test_acceptance_skill_mixed_data.feature", "纯内部框架 Skill 空白名单安全失败")
 def test_immature_skill_empty_whitelist_safe_failure(execution: _SkillExecution):
-    """4-1e 目标 Skill 空白名单含标记 → 207 安全失败。"""
+    """纯内部框架 Skill 空白名单含标记 → 207 安全失败（永久锚定——D8，空白名单为纯内部型永久设计态）。"""
     pass
 
 

@@ -114,6 +114,7 @@ output_schema:
 - 战略选择（多战略方案比选）：请用 swot-tows 或 space-matrix
 - 增长路径决策（产品 × 市场四象限）：请用 ansoff-matrix
 - 单一 KPI 分解树（不含四维度因果假设）：请用 kpi-tree
+- 定性战略因果链（不含 KPI 量化）：请用 strategy-map
 
 ## 3. 输入字段（input_schema）
 

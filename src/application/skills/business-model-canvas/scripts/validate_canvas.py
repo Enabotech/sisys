@@ -14,7 +14,7 @@ import json
 import sys
 
 REQUIRED_BLOCKS = (
-    "key_partners",
+    "key_partnerships",
     "key_activities",
     "value_propositions",
     "customer_relationships",

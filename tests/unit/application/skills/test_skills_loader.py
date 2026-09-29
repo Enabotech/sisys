@@ -218,10 +218,10 @@ class TestL3ReferencesLoading:
 
     @pytest.mark.asyncio
     async def test_load_references_business_model_canvas_template(self) -> None:
-        """business-model-canvas canvas_template.json 可加载。"""
+        """business-model-canvas canvas_template.json 可加载（key_partnerships 完整键断言——D7 收敛）。"""
         loader = InMemorySkillLoader()
         content = await loader.load_references("business-model-canvas", "canvas_template.json")
-        assert b"key_partners" in content
+        assert b'"key_partnerships"' in content
         assert b"value_propositions" in content
 
     @pytest.mark.asyncio
