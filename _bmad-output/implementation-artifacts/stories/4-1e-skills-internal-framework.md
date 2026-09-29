@@ -32,7 +32,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 - 7 个 SKILL.md body SOP 成熟化（≤500 行硬约束，9 章节对齐 `REQUIRED_SOP_SECTIONS`）
 - 每个 Skill 配套 `templates/` 用户输入模板（目录新建——当前 7 个目标 Skill 的 templates/ 均不存在；既有 references/ 目录 6 个为空，business-model-canvas 有存量资产）与 `references/` 分型三件套（评分型 {framework_logic / scoring_anchors / workshop_guide} ×3，结构型 {framework_logic / validation_rules / workshop_guide} ×4——决策 D4）
 - 用户输入模板与 `input_schema` 字段一一对应（双向断言，复用 4-1d 模板微格式机械）+ 条目编码规范与确定性解析锚点（7/7 Skill——决策 D10）
-- 共享契约库 `skill_framework_contracts.py`（第三契约库，import 4-1c/4-1d 共享常量与机械，**承接 4-1d R1-D2 defer 的 NON_TARGET_SLUGS 三副本收敛义务**——决策 D2）+ 契约库自检（含失败路径负例，R1-F1 先例）+ 7 个 Skill 单元测试
+- 共享契约库 `skill_framework_contracts.py`（第三契约库，import 4-1c/4-1d 共享常量与机械，**承接 4-1d R1-D2 defer 的 NON_TARGET_SLUGS 三副本收敛义务**——决策 D2）+ 契约库自检（含失败路径负例，4-1d R1-F1 先例）+ 7 个 Skill 单元测试
 - IO 契约 SSOT 扩充：`tests/acceptance/contracts/skill_io_schemas.yaml` 追加 7 个条目（16 → 23，单一 SSOT 文件，不新建；**output_schema 不含 `data_sources` 溯源键**——决策 D6）
 - 既有回归网调整（**一次性前置**，4-1d D8 先例）：yaml 互锁断言扩三方并集（唯一机制性必红点 `test_slug_set_matches_yaml_contracts`）+ NON_TARGET_SLUGS 三副本派生收敛 + 两套验收「未成熟化 Skill 空白名单」场景改名永久锚定（滚动锚点规则终点态——决策 D8）
 - 集成测试（无标记全链路 + 零外部 resolver 触达 + evidence 空溯源 + 207 误用守护（fake resolver 注入场景）+ 缺数据引导面）+ 模板对齐汇总层测试（全 Skill 就绪后落地）+ 架构验证（**23 Skills 最终态闭环** + Schema 合法性强化断言衔接 4-3 基建）+ BDD 验收测试
@@ -100,7 +100,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 - **SOP 引导沙箱代码零 `$DATA_SOURCE` 标记**（纯内部型 SOP 的 Code 阶段引导不含任何标记示例——标记集恒空由 [C] 断言守护，误写标记执行时将因空白名单抛 207）
 - **SOP `input_examples` 章节禁止写入真实 API Key**（本 Story 无 Key 语义，出现即违规）
 - **条目编码规范的 YAML 安全红线**（4-1d R2 实测教训）：schema description 为 yaml plain scalar——**禁止半角冒号+空格「: 」与花括号形态**（`{当前: 1-5}` 触发 mapping 解析错误）；编码声明用全角「：」与「=」；落码后 yaml round-trip 复验
-- **评审/轮次标记零泄漏**（4-1d R3-F3 教训）：schema description 是运行时契约内容，禁止携带任何审查过程标记（如「R1-F1」类）；勘正出处只留本 Story 文档
+- **评审/轮次标记零泄漏**（4-1d R3-F3 教训）：schema description 是运行时契约内容，禁止携带任何审查过程标记（如「4-1d R1-F1」类）；勘正出处只留本 Story 文档
 
 ### 代码质量门禁
 
@@ -213,7 +213,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 | 文件 | 层 | 性质 |
 |---|---|---|
 | `tests/unit/application/skills/skill_framework_contracts.py` | 单元（非测试收集） | 第三契约库（常量 + 断言函数，import 4-1c/4-1d） |
-| `tests/unit/application/skills/test_skill_framework_contracts.py` | 单元 | 契约库自检（含失败路径负例——R1-F1 先例强制） |
+| `tests/unit/application/skills/test_skill_framework_contracts.py` | 单元 | 契约库自检（含失败路径负例——4-1d R1-F1 先例强制） |
 | `tests/unit/application/skills/test_<slug>_framework.py` × 7 | 单元 | 每 Skill 四循环 [A][B][C][D] |
 | `tests/unit/application/skills/test_schema_template_framework_alignment.py` | 单元 | 模板对齐汇总层（分型四段式） |
 | `tests/integration/application/test_skill_framework.py` | 集成 | 无标记全链路 + 207（resolver 注入场景）+ 缺数据引导面 |
@@ -276,7 +276,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 **验证标准/Validation Criteria:**
 - [ ] `test_schema_template_framework_alignment.py`（7 Skill 参数化，分型四段式）双向断言通过
-- [ ] 契约库自检含提取器边界负例与守卫负例（R1-F1 先例）
+- [ ] 契约库自检含提取器边界负例与守卫负例（4-1d R1-F1 先例）
 - [ ] 模板结构与第三段引用断言通过（分型字面串）
 - [ ] 变异演示留痕（Dev Agent Record 记录）
 
@@ -501,7 +501,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_skill_framework_contracts.py` 骨架（常量 SSOT 双向比对 + 断言函数签名 + **失败路径负例**——每断言函数 ≥1 坏数据 `pytest.raises(AssertionError, match=)`，R1-F1 先例强制） |
+| 🔴 红 | 编写 `test_skill_framework_contracts.py` 骨架（常量 SSOT 双向比对 + 断言函数签名 + **失败路径负例**——每断言函数 ≥1 坏数据 `pytest.raises(AssertionError, match=)`，4-1d R1-F1 先例强制） |
 | 🟢 绿 | 实现 `skill_framework_contracts.py`：`FRAMEWORK_SKILL_SLUGS`（7 slug 有序元组）/ `TEMPLATE_FILES`（7 项映射）/ 分型常量（`SCORING_TYPE_SLUGS` 3 + `STRUCTURAL_TYPE_SLUGS` 4 + 各自 `REQUIRED_REFERENCES` 三件套与模板第三段字面值）/ `FAILURE_KEYWORDS = ("207", "INSUFFICIENT_DATA")`（D3）/ 断言函数（`assert_framework_data_sources_empty`（== ()）/ `assert_io_schema_contract`（import 4-1c 复用）/ `assert_sop_maturity`（失败处理关键词集换 D3 + 分型三件套）/ `assert_cross_consistency`（空集语义复用）/ `assert_template_schema_alignment`（import 4-1d 机械 + 分型第三段）/ `assert_reference_content_anchors`（references 内容要素字面锚点——AC-2 验证标准定义的 framework_logic/scoring_anchors/validation_rules/workshop_guide 最低要素）——**共享常量（REQUIRED_SOP_SECTIONS/SKILL_MD_MAX_LINES/SKILLS_ROOT/load_io_contract/schema_leaf_keys/extract_template_fields/build_min_arguments）一律 import 两既有库，identity 断言自检（`is` 检查，4-1d R2-F2 先例）** |
 | 🔄 重构 | 签名注解 + docstring（中文 Google 风格）+ ruff/mypy |
 
@@ -827,7 +827,7 @@ tests/
 
 **应用到本故事/Applied to This Story:**
 - [x] 回归网三件套调整前置 Task 1.4（D8 先例直接复用）
-- [x] 契约库自检失败路径负例强制（R1-F1）
+- [x] 契约库自检失败路径负例强制（4-1d R1-F1）
 - [x] 编码规范 YAML 安全 + 三方一致断言（R2/R3 教训）
 - [x] 分型断言参数化 + 两分型各一负例（R6）
 - [x] 命名冲突一处裁定三文件同批（R1/D7）
@@ -906,7 +906,7 @@ tests/
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1~AC-6）
 3. [x] Architecture constraints extracted 架构约束已提取（六边形/catalog 兼容/catalog 单点增强）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（4-1d 教训清单）
-5. [ ] Sprint status synced to `ready-for-dev`（创建后同步）
+5. [x] Sprint status synced to `ready-for-dev`（创建后同步）
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
@@ -959,6 +959,14 @@ tests/
 | R3-8 | 杂项：Subtask 1.2「五断言函数」计数 stale（实六）；Task 7 特有栏「R/A/C/I 枚举编码」单值口径残留；Subtask 0.4 断言面与 9.3 不同集（SOP 失败处理章节 vs 缺口登记）；R 前缀三命名空间歧义（裸 R1/R5 双义位）+ 修复表缺编号规则；「R3 F1」体例不一；矩阵 AC-6 漏 11.10；R1-20 行自引行号漂移 | P3 | 计数勘正六；改「字母组合编码」；0.4 改与 9.3 同集；修复表头部加编号规则声明 + 「R3 F1」→「4-1d R3-F1」；矩阵补 11.10；自引改节名引用 |
 | R4-1 | 数据契约表 gantt 行与修复表 R1-15 行的正则 `^\d+ *(天\|周\|月)$` 内裸管道符破坏 GFM 表格渲染（该行 10 管 vs 表头 8 管，编码规范列截断、输出根键落错列——v1.2.0 R1-15 引入，R3 未触碰故遗留至本轮） | P2（渲染级） | 正则改单字符类形态 `^\d+ *[天周月]$`（与 alternation 语义等价——渲染安全且源文本复制安全，优于 `\|` 转义）；三处（契约表 / Subtask 8.5 / 修复表 R1-15 行）统一 |
 | R4-2 | 记录级清理两项：修复表 R2-2 行修复方案列「正反例」与 R3-3 勘正措辞不自洽（按行检索者可能复制出合并词）；R3-6 行「:190 括注」自引行号属高漂移风险体例 | P3 | R2-2 行加后注「（措辞经 R3-3 修正为『正例与反例』）」；R3-6 行自引改「『条目编码规范契约』首行括注」节名引用 |
+| R5-1 | 收敛终审独立取证（不轻信文档自报）：43 项修复逐项对照正文全部真实落地；8 项核心代码声明与约 50 组 file:line 锚点向仓库实地验证全部证实、零错位；留项台账完整、无跨轮静默遗忘与活矛盾——**裁定：收敛** | 终审 | 收敛声明见下节 |
+| R5-2 | 终审记录级瑕疵 3 项（P3）：changelog v1.2.0「P2×11」实为 P2×10、v1.3.0「P2×6/P3×4」实为 P2×7/P3×3；「完成总结」第 5 项复选框滞后（sprint-status.yaml 已登记 ready-for-dev）；五处裸「R1-F1」引用不符自设编号规则（所指为 4-1d R1-F1，无碰撞但体例孤例） | P3 | 计数勘正两处；复选框回勾；R1-F1 全部补「4-1d」前缀（replace_all） |
+
+### ✅ 收敛声明（Round 5 独立终审，2026-09-29）
+
+> 本 Story 文档经创建期两轮四视角代码调研（v1.0.0/v1.1.0，4 P1 + 7 P2 竞争性复核）与**四轮独立文档审查**（v1.2.0 ~ v1.4.1）收敛：累计登记修复 **43 项**（R1×20 / R2×13 / R3×8 / R4×2；按表 P0×1、P1×11、P2×22、P3×9），其中 P0 级全称断言矛盾 1 项、P1 级测试不可满足性/照抄必错类 11 项全部消解。终审独立取证（不依赖文档自报）：43 项修复逐项对照正文全部落地，8 项核心代码声明与约 50 组 file:line 锚点向仓库实地验证**全部证实、零错位**；留项台账完整、无跨轮静默遗忘与活矛盾；独立快扫新发现仅 3 项 P3 记录级瑕疵（changelog 统计口径 ×2、sprint 同步复选框未回勾、裸 R1-F1 引用体例 ×6——均已于本轮修毕）。质量判定：**ready-for-dev 状态成立，正式收敛**。
+>
+> **交接提示（dev-story）：** ① 严守 Task 1.4 回归网一次性前置（yaml 7 条目单点写入，Task 2-8 零 yaml 触碰）；② 凡引用 file:line 处先读代码再动手（教训清单既有约定）；③ 剩余风险面为「实施期才可验证」类（yaml 红线 round-trip、RACI 双层模板可采集性、锚点字样断言实跑）——首轮 TDD 红阶段即可闭环验证。
 
 ---
 
@@ -996,13 +1004,14 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.4.1
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-09-29
 **最后更新/Last Updated:** 2026-09-29
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md Story 4.1e + 4-1a/4-1b/4-1c/4-1d 完成资产 + 四视角并行代码调研：7 Skill 现状基线 / 成熟化模式复用盘点 / 回归守护面穷尽 / AC 解析与方法论基线；13 项决策登记；4-1d R1-D2 留项收敛承接；Epic 字面勘误 2 项签收）
 - v1.1.0: 竞争性质量复核定稿（checklist 模式四 Agent 独立取证）：P1×4——Task 1 DoD 与 Subtask 1.4 的 yaml 落地策略自相矛盾裁定（恢复 4-1d 原生「Task 1 一次性落地 7 条目」）/ Subtask 5.7「bsc 回跳 4-1d 已建」证伪（grep 零命中，改本 Story 单行新建）/ ToolResultStatus 路径勘正（value_objects 非 entities）/ 滚动锚点规则仅 4-1c 单侧实况；P2×7——ToolInputValidator 未注册勘正、len(ssot_union)==16 锚点处置登记（保持字面，D2）、D7 loader 断言收紧为带引号完整键、architecture.md 旧值三处（§1.4/§13×2）、NON_TARGET_SLUGS 现有措辞精确化（「非目标」非「未成熟化」）、D4 补 framework_logic.md 首次引入声明、vpc 叶子源码序勘正；另补 4 处入站负向跳转复用清单与 TOOLS.md 零触碰声明
-- v1.2.0: 文档审查 Round 1（D1 四视角代码调研 + D2 双评审员并行审查 + D3 系统修订，20 项登记见 Docs Review Fixes 表）：P0×1——「零生产代码改动」全称断言与 Task 4.2 catalog 增强自相矛盾（8 处统一改为「零引擎层改动 + catalog 单点增强」）；P1×6——INSUFFICIENT_DATA 集成场景测试不可满足（生产零设置点，降格文档级 + 缺数据引导面）/ 207 场景漏 resolver 注入前提（不注入得 101，补 4-1c 验收构造同款 + 101 对照负例）/ wiring load_sop 特征串 engine 豁免（三处修正）/ TEMPLATE_FILES bmc 缺名（定名 bmc_nine_blocks_canvas.md）/ 矩阵 9.6 幻影 + 汇总层无承载（Task 9 重排 9.1-9.7 显式七项）/ File List 漏登 bsc-scorecard；P2×11 与 P3×3——D11 先例归属（实在 4.1/4.3 非 4-1d）、scenarios() 机械失实、数值五组、RACI 口径裁定、因果方向/CPM 分工/时长归一钉死、FrontmatterParseError 范围改写等；另：D1 调研 Agent「14 键」误报经主会话实测定谳为 16 键（含 token_budget_l1/l2 数字键——枚举正则不含数字的伪影，已加防呆枚举）
-- v1.3.0: 文档审查 Round 2（D1 三 Agent 并行：R1 修复回归核查 / 内容质量深挖 / SSOT 全链 + 行号全量复核；D3 系统修订，13 项登记见修复表）：P1×3——references 内容契约无可断言锚点（增 `assert_reference_content_anchors` 字面锚点断言）/ raci assignments 双层编码钉死（任务名→{角色名: 字母组合}）/ 4 Skill framework_logic 内容要求补行；P2×6——19 键勘正 18 键（R1 修复引入矛盾，回归核查命中）/ vpc 分值挂靠侧裁定 + fit_score 木桶聚合 /「紧邻」锚点与 4-1d 空格微格式矛盾（R1 引入）/ gantt 里程碑输入编码（0 天）/ yaml「随 Skill 追加」+ Task 2 [A] 同表矛盾（SSOT 链）/ A7·A10·R2-F5 先例编号可追溯性勘正；P3×4——结构树补 bsc 行、BDD 同构主从注记、超集范围注、九项勘正七项等。行号全量复核 42 组零错位。
+- v1.2.0: 文档审查 Round 1（D1 四视角代码调研 + D2 双评审员并行审查 + D3 系统修订，20 项登记见 Docs Review Fixes 表）：P0×1——「零生产代码改动」全称断言与 Task 4.2 catalog 增强自相矛盾（8 处统一改为「零引擎层改动 + catalog 单点增强」）；P1×6——INSUFFICIENT_DATA 集成场景测试不可满足（生产零设置点，降格文档级 + 缺数据引导面）/ 207 场景漏 resolver 注入前提（不注入得 101，补 4-1c 验收构造同款 + 101 对照负例）/ wiring load_sop 特征串 engine 豁免（三处修正）/ TEMPLATE_FILES bmc 缺名（定名 bmc_nine_blocks_canvas.md）/ 矩阵 9.6 幻影 + 汇总层无承载（Task 9 重排 9.1-9.7 显式七项）/ File List 漏登 bsc-scorecard；P2×10 与 P3×3——D11 先例归属（实在 4.1/4.3 非 4-1d）、scenarios() 机械失实、数值五组、RACI 口径裁定、因果方向/CPM 分工/时长归一钉死、FrontmatterParseError 范围改写等；另：D1 调研 Agent「14 键」误报经主会话实测定谳为 16 键（含 token_budget_l1/l2 数字键——枚举正则不含数字的伪影，已加防呆枚举）
+- v1.3.0: 文档审查 Round 2（D1 三 Agent 并行：R1 修复回归核查 / 内容质量深挖 / SSOT 全链 + 行号全量复核；D3 系统修订，13 项登记见修复表）：P1×3——references 内容契约无可断言锚点（增 `assert_reference_content_anchors` 字面锚点断言）/ raci assignments 双层编码钉死（任务名→{角色名: 字母组合}）/ 4 Skill framework_logic 内容要求补行；P2×7——19 键勘正 18 键（R1 修复引入矛盾，回归核查命中）/ vpc 分值挂靠侧裁定 + fit_score 木桶聚合 /「紧邻」锚点与 4-1d 空格微格式矛盾（R1 引入）/ gantt 里程碑输入编码（0 天）/ yaml「随 Skill 追加」+ Task 2 [A] 同表矛盾（SSOT 链）/ A7·A10·R2-F5 先例编号可追溯性勘正；P3×3——结构树补 bsc 行、BDD 同构主从注记、超集范围注、九项勘正七项等。行号全量复核 42 组零错位。
 - v1.4.0: 文档审查 Round 3（D1/D2 合并单深度评审员：R2 修复回归核查 + 修复组合交叉语义核对；D3 系统修订，8 项登记见修复表）：P1×2——R2-2 传播不完整（`assert_reference_content_anchors` 无调用位，R1-6 同型缺陷复发）/ R2-2 锚点字样与 R2-4 内容行互拆（「步骤 1」全文仅锚点一处——两个 P1 修复组合后互相遮蔽，同轮收敛）；P2×4——「正例」vs「正反例」字样冲突（合并词不含「正例」子串）/ validation_rules 锚点关键字对 strategy-map 不可满足 + 大小写敏感 / raci 模板形态未定义 + 花括号落码 YAML 红线提示缺失 /「§3/§8 为输入侧四方」括注字面错误与四方同步术语统一；P3×2——零时长裁定（0 周/0 月归一 + 里程碑与 critical_path 关系）/ 计数·口径·断言面同集·R 前缀编号规则·11.10 等杂项七点。核心教训：修复组合的交互面是独立审查点——R2 两个 P1 修复各自正确、组合后互相拆台。
 - v1.4.1: 文档审查 Round 4 稳定性验证轮（双视角快扫：R3 修复回归核查 + 全文一致性终扫；R3 八项全部通过、零回归、18 组行号抽查零错位）：P2×1——正则裸管道符 2 处破坏 GFM 表格渲染（v1.2.0 R1-15 遗留）改单字符类形态 `^\d+ *[天周月]$`（语义等价，三处统一）；P3×2——修复表 R2-2 措辞后注 + R3-6 自引改节名。稳定性验证判定：可收敛（剩余风险面已收敛至「实施期才可验证」类，文档级审查边际收益趋零）。
+- v1.5.0: 文档审查 Round 5 收敛终审（独立取证，不轻信文档自报）——**裁定：正式收敛**。43 项修复逐项对照正文全部落地、8 项核心代码声明与约 50 组行号锚点实地验证零错位、留项台账完整；终审记录级瑕疵 3 项（changelog 计数 ×2 / sprint 复选框回勾 / 裸 R1-F1 前缀 ×6）已修毕；收敛声明与交接提示入档（见修复表后节）。
