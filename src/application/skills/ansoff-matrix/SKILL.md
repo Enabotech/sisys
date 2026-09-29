@@ -44,7 +44,7 @@ input_schema:
   properties:
     market_product_data:
       type: object
-      description: 市场/产品数据（工作坊采集：产品 × 市场现有位置，模板 ansoff_product_market_matrix.md）
+      description: 市场/产品数据（工作坊采集：产品 × 市场现有位置，模板 ansoff_product_market_matrix.md）。条目编码：风险档（低/中/高）—— 条目描述（R2-F7，象限风险判定与外部增速基准交叉依赖风险档解析）
       required: [existing_products, new_products, existing_markets, new_markets]
       properties:
         existing_products:
@@ -112,7 +112,7 @@ output_schema:
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| market_product_data | object | ✅ | 市场/产品数据（工作坊采集） |
+| market_product_data | object | ✅ | 市场/产品数据（工作坊采集；条目编码：风险档（低/中/高）—— 条目描述） |
 | market_product_data.existing_products | array[string] | ✅ | 现有产品清单 |
 | market_product_data.new_products | array[string] | ✅ | 拟开发新产品清单 |
 | market_product_data.existing_markets | array[string] | ✅ | 现有市场清单 |
@@ -180,10 +180,10 @@ imf_payload = (DATA_SOURCES.get("imf") or {}).get("payload")
 ```json
 {
   "market_product_data": {
-    "existing_products": ["智能座舱域控制器 Gen2", "车载中控显示屏"],
-    "new_products": ["舱驾一体域控制器 Gen3", "车载软件订阅服务"],
-    "existing_markets": ["国内新能源乘用车", "国内商用车"],
-    "new_markets": ["东南亚乘用车", "欧洲商用车"]
+    "existing_products": ["低 —— 智能座舱域控制器 Gen2（已量产配套）", "低 —— 车载中控显示屏（成熟品类）"],
+    "new_products": ["中 —— 舱驾一体域控制器 Gen3（技术跨度大）", "高 —— 车载软件订阅服务（商业模式未验证）"],
+    "existing_markets": ["低 —— 国内新能源乘用车（在位优势）", "低 —— 国内商用车（渠道成熟）"],
+    "new_markets": ["高 —— 东南亚乘用车（本地化门槛）", "高 —— 欧洲商用车（认证周期长）"]
   }
 }
 ```

@@ -54,10 +54,10 @@ input_schema:
             description: 业务单元名称
           industry_attractiveness:
             type: number
-            description: 行业吸引力评分（1-10，外部基准支撑：WB 宏观指标 + Tavily 市场情报）
+            description: 行业吸引力评分（1-10，0.5 步进；外部基准支撑 WB 宏观指标 + Tavily 市场情报）。取评分表该维度行前缀分值（R2-F7），证据来源列留档模板不入参
           competitive_strength:
             type: number
-            description: 业务实力评分（1-10，内部数据：市场份额/利润率）
+            description: 业务实力评分（1-10，0.5 步进；内部数据市场份额/利润率）。取评分表该维度行前缀分值（R2-F7），证据来源列留档模板不入参
 output_schema:
   type: object
   required: [portfolio_map, data_sources]
@@ -104,8 +104,8 @@ output_schema:
 | --- | --- | --- | --- |
 | business_units | array[object] | ✅ | 业务单元列表（高管访谈评分表采集） |
 | business_units[].name | string | ✅ | 业务单元名称 |
-| business_units[].industry_attractiveness | number | ✅ | 行业吸引力评分（1-10，外部基准支撑：WB 宏观指标 + Tavily 市场情报） |
-| business_units[].competitive_strength | number | ✅ | 业务实力评分（1-10，内部数据：市场份额/利润率） |
+| business_units[].industry_attractiveness | number | ✅ | 行业吸引力评分（1-10，0.5 步进；取评分表行前缀分值，证据留档模板） |
+| business_units[].competitive_strength | number | ✅ | 业务实力评分（1-10，0.5 步进；取评分表行前缀分值，证据留档模板） |
 
 ## 4. 输出字段（output_schema）
 
@@ -120,19 +120,20 @@ output_schema:
 
 **内部数据（分析主体，高管访谈采集）：** 经 `templates/ge_business_unit_scoresheet.md` 业务单元评分表
 由高管访谈现场填写（会前 T-3 天分发预填指引，见 `references/workshop_guide.md`），会后将模板字段构造为
-`ToolCall.arguments` 的 `business_units` 数组传入（每业务单元一项：name / 双维评分 + 证据来源）。
+`ToolCall.arguments` 的 `business_units` 数组传入（每业务单元一项：name / 双维评分——评分表中的
+证据来源列留档模板与定位依据，不进入 arguments 数值字段）。
 
 **外部基准（印证参照，双源交叉，仅支撑行业吸引力维度）：**
 
 | 外部印证目标 | 数据源 | 采集 query 规范 |
 | --- | --- | --- |
-| 行业宏观基本面（市场规模/增速的宏观锚定） | world-bank | 点分指标码（如 "NY.GDP.MKTP.CD"、"NE.GDI.TOTCD.ZS"） |
+| 行业宏观基本面（市场规模/增速的宏观锚定） | world-bank | 点分指标码 + 国家代码（如 "NY.GDP.MKTP.CD;CHN"、"NE.GDI.TOTL.ZS;CHN"） |
 | 市场情报（行业增速/竞争烈度/新兴需求事件） | tavily | 自然语言关键词（如 "动力电池 行业增速 竞争格局"） |
 
 **内外交叉验证要求：** 每个业务单元的 `industry_attractiveness` 评分须有至少一条外部基准印证
 （或显式标注「内部判断，未经外部印证」）；`competitive_strength` 以内部数据为准（外部源不评判内部实力）；
-外部情报与内部评分矛盾时的处置见 `references/data_fusion.md`（冲突处理：外部基准优先修正内部认知，
-修正前双方并列呈现）。
+外部情报与内部评分矛盾时的处置见 `references/data_fusion.md`（冲突分级处理：内部漏判 → 外部基准
+优先补正；外部无印证 → 双方并列不下结论；方向相反 → 暂停判断，以最新一手内部数据为准复议）。
 
 ## 6. SOP 执行步骤
 
@@ -143,7 +144,7 @@ output_schema:
 
 ```python
 # 每源至少一个标记（沙箱无网络，标记由宿主机侧采集后注入）
-macro = $DATA_SOURCE("world-bank", "NY.GDP.MKTP.CD")
+macro = $DATA_SOURCE("world-bank", "NY.GDP.MKTP.CD;CHN")
 web = $DATA_SOURCE("tavily", "动力电池 行业增速 竞争格局 新兴需求")
 
 # 采集结果经注入的 DATA_SOURCES dict 读取（防御性 .get()——失败位为 None）
@@ -195,7 +196,7 @@ web_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
 外部基准 query 独立标记示例（不入 arguments JSON）：
 
 ```python
-macro = $DATA_SOURCE("world-bank", "NY.GDP.MKTP.CD")
+macro = $DATA_SOURCE("world-bank", "NY.GDP.MKTP.CD;CHN")
 web = $DATA_SOURCE("tavily", "动力电池 行业增速 竞争格局")
 ```
 

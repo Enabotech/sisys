@@ -44,7 +44,7 @@ input_schema:
   properties:
     internal_factors:
       type: object
-      description: 内部因素（工作坊采集：优势/劣势清单，模板 swot_factors_collection.md）
+      description: 内部因素（工作坊采集：优势/劣势清单，模板 swot_factors_collection.md）。条目编码：强度分值（1-5）—— 因素描述（R2-F7，TOWS 匹配阈值 ≥3 依赖分值解析）
       required: [strengths, weaknesses]
       properties:
         strengths:
@@ -59,7 +59,7 @@ input_schema:
             type: string
     external_factors:
       type: object
-      description: 外部因素（机会/威胁，经 NewsAPI/Tavily 外部基准印证）
+      description: 外部因素（机会/威胁，经 NewsAPI/Tavily 外部基准印证）。条目编码：强度分值（1-5）—— 因素描述（R2-F7，与内部象限同格式）
       required: [opportunities, threats]
       properties:
         opportunities:
@@ -132,10 +132,10 @@ output_schema:
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| internal_factors | object | ✅ | 内部因素（工作坊采集） |
-| internal_factors.strengths | array[string] | ✅ | 内部优势清单（资源/能力维度） |
-| internal_factors.weaknesses | array[string] | ✅ | 内部劣势清单（短板维度） |
-| external_factors | object | ✅ | 外部因素 |
+| internal_factors | object | ✅ | 内部因素（工作坊采集；条目编码：强度分值（1-5）—— 因素描述） |
+| internal_factors.strengths | array[string] | ✅ | 内部优势清单（资源/能力维度；条目编码：强度分值（1-5）—— 因素描述） |
+| internal_factors.weaknesses | array[string] | ✅ | 内部劣势清单（短板维度；条目编码同上） |
+| external_factors | object | ✅ | 外部因素（条目编码：强度分值（1-5）—— 因素描述） |
 | external_factors.opportunities | array[string] | ✅ | 外部机会清单（经外部基准印证） |
 | external_factors.threats | array[string] | ✅ | 外部威胁清单（经外部基准印证） |
 
@@ -162,7 +162,7 @@ output_schema:
 | 行业时政新闻（机会/威胁的政策与市场动态印证） | newsapi | 自然语言关键词（如 "新能源汽车 补贴政策"） |
 | Web 竞争情报（竞品动向/新进入者威胁印证） | tavily | 自然语言关键词（如 "固态电池 创业公司 融资"） |
 
-**内外交叉验证要求：** 每条机会/威胁至少有一条外部基准印证（或显式标注「内部认知，未经外部印证」）；外部情报与内部认知矛盾时的处置见 `references/data_fusion.md`（冲突处理：外部基准优先修正内部认知，修正前双方并列呈现）。
+**内外交叉验证要求：** 每条机会/威胁至少有一条外部基准印证（或显式标注「内部认知，未经外部印证」）；外部情报与内部认知矛盾时的处置见 `references/data_fusion.md`（冲突分级处理：内部漏判 → 外部基准优先补正；外部无印证 → 双方并列不下结论；方向相反 → 暂停判断，以最新一手内部数据为准复议）。
 
 ## 6. SOP 执行步骤
 
@@ -204,12 +204,12 @@ web_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
 ```json
 {
   "internal_factors": {
-    "strengths": ["固态电池专利储备行业前五", "与头部车企的联合研发关系"],
-    "weaknesses": ["量产良率 65% 低于行业 80% 基准", "品牌认知度不足"]
+    "strengths": ["5 —— 固态电池专利储备行业前五（含 3 项独占许可）", "4 —— 与头部车企联合研发关系"],
+    "weaknesses": ["3 —— 量产良率 65% 低于行业 80% 基准", "2 —— 品牌认知度不足（B 端渗透率 12%）"]
   },
   "external_factors": {
-    "opportunities": ["2027 年补贴政策向高能量密度电池倾斜", "eVTOL 新市场打开"],
-    "threats": ["宁德时代同类路线量产在即", "上游锂价波动"]
+    "opportunities": ["4 —— 2027 年补贴政策向高能量密度电池倾斜", "3 —— eVTOL 新市场打开"],
+    "threats": ["4 —— 宁德时代同类路线量产在即", "3 —— 上游锂价波动"]
   }
 }
 ```

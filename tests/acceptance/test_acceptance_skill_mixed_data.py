@@ -183,13 +183,19 @@ def redis_client(event_loop, acceptance_env_config, tenant_id: uuid.UUID) -> Gen
     )
     yield client
     try:
-        if _run_async(event_loop, client.ping()):
+        try:
+            redis_available = bool(_run_async(event_loop, client.ping()))
+        except Exception:
+            # Redis 不可用：场景已被背景步骤 pytest.skip 跳过，无本租户缓存键可清
+            # （清理对象不存在，非掩盖告警——R2-F11②：仅 ping 守卫允许静默）
+            redis_available = False
+        if redis_available:
+            # Redis 存活态：delete 失败不吞——真实清理缺陷应显式红（禁止掩盖）
             cache = RedisAdapter(redis_client=client)
             _run_async(event_loop, cache.delete_pattern(f"sisys:cache:datasource:{tenant_id}:*"))
-    except Exception:
-        # Redis 不可用：场景已 skip、无本租户缓存键可清（清理对象不存在，非掩盖告警）
-        pass
-    _run_async(event_loop, client.close())
+    finally:
+        # close 无条件执行（不依赖服务端存活；delete 失败也不泄漏连接）
+        _run_async(event_loop, client.close())
 
 
 @pytest.fixture

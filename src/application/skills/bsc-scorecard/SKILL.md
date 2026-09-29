@@ -44,7 +44,7 @@ input_schema:
   properties:
     strategic_objectives:
       type: object
-      description: 战略目标（高管工作坊采集：四维度目标/KPI 现值，模板 bsc_kpi_scorecard.md）
+      description: 战略目标（高管工作坊采集：四维度目标/KPI 现值，模板 bsc_kpi_scorecard.md）。条目编码（R2-F7）——四维清单逐条「目标档位（保守/基准/挑战）—— 目标与 KPI 现值描述」（目标值校准与档位判定依赖档位前缀解析；证据来源留档模板）
       required: [financial, customer, internal_process, learning_growth]
       properties:
         financial:
@@ -119,7 +119,7 @@ output_schema:
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| strategic_objectives | object | ✅ | 战略目标（高管工作坊采集） |
+| strategic_objectives | object | ✅ | 战略目标（高管工作坊采集；条目编码：目标档位（保守/基准/挑战）—— 目标与 KPI 现值描述） |
 | strategic_objectives.financial | array[string] | ✅ | 财务维度目标与 KPI 现值 |
 | strategic_objectives.customer | array[string] | ✅ | 客户维度目标与 KPI 现值 |
 | strategic_objectives.internal_process | array[string] | ✅ | 内部流程维度目标与 KPI 现值 |
@@ -138,7 +138,7 @@ output_schema:
 
 ## 5. 数据采集计划（Think 阶段引导）
 
-**内部数据（设计主体，高管工作坊采集）：** 经 `templates/bsc_kpi_scorecard.md` 在高管工作坊采集四维度战略目标、KPI 现值与战略规划文件要点（会前 T-3 天分发预填指引，见 `references/workshop_guide.md`），会后将模板字段构造为 `ToolCall.arguments` 的 `strategic_objectives` 传入（每条格式建议「目标：KPI = 现值（期间）」）。
+**内部数据（设计主体，高管工作坊采集）：** 经 `templates/bsc_kpi_scorecard.md` 在高管工作坊采集四维度战略目标、KPI 现值与战略规划文件要点（会前 T-3 天分发预填指引，见 `references/workshop_guide.md`），会后将模板字段构造为 `ToolCall.arguments` 的 `strategic_objectives` 传入（每条格式与模板一致：「目标档位 —— 目标：KPI = 现值（期间），目标 X」（档位前缀承载工作坊定档成果，R2-F7）。
 
 **外部基准（仅财务维度对标，双源交叉）：**
 
@@ -147,7 +147,7 @@ output_schema:
 | 行业财务统计对标（行业营收/成本/薪酬水平） | china-nbs | 站点相对路径（如 "sj/zxfb" 最新发布 / "sj/hyf" 分行业数据） |
 | 宏观增长与利率环境（目标值合理性参照） | world-bank | 点分指标码 + 国家代码（如 "NY.GDP.MKTP.KD.ZG;CHN" / "FR.INR.RINR;CHN"） |
 
-**内外交叉验证要求：** 仅财务维度 KPI 目标值对照行业/宏观基准校准（偏离基准需给出份额/结构内部依据）；客户/内部流程/学习成长三维度以历史值/目标值为基准，**禁止伪造外部对标**；粒度边界见 `references/data_fusion.md`（冲突处理：外部基准优先修正内部目标值，修正前双方并列呈现）。
+**内外交叉验证要求：** 仅财务维度 KPI 目标值对照行业/宏观基准校准（偏离基准需给出份额/结构内部依据）；客户/内部流程/学习成长三维度以历史值/目标值为基准，**禁止伪造外部对标**；粒度边界见 `references/data_fusion.md`（冲突分级处理：内部漏判 → 外部基准优先补正；外部无印证 → 双方并列不下结论；方向相反 → 暂停判断，以最新一手内部数据为准复议）。
 
 ## 6. SOP 执行步骤
 
@@ -189,10 +189,10 @@ wb_payload = (DATA_SOURCES.get("world-bank") or {}).get("payload")
 ```json
 {
   "strategic_objectives": {
-    "financial": ["营收增长：年营收 = 4.2 亿元（2026 实际）", "盈利改善：毛利率 = 31%（2026 实际）"],
-    "customer": ["客户留存：大客户续约率 = 78%（2026 实际）", "客户拓展：新行业客户数 = 6 家（2026 实际）"],
-    "internal_process": ["交付提效：准时交付率 = 85%（2026 实际）", "质量提升：批次不良率 = 3.2%（2026 实际）"],
-    "learning_growth": ["人才储备：关键岗位任职率 = 82%（2026 实际）", "能力建设：年度人均培训 = 24 学时（2026 实际）"]
+    "financial": ["基准档 —— 营收增长：年营收 = 4.2 亿元（2026 实际），目标 5.0 亿元", "挑战档 —— 盈利改善：毛利率 = 31%（2026 实际），目标 38%"],
+    "customer": ["基准档 —— 客户留存：大客户续约率 = 78%（2026 实际），目标 85%", "基准档 —— 客户拓展：新行业客户数 = 6 家（2026 实际），目标 10 家"],
+    "internal_process": ["基准档 —— 交付提效：准时交付率 = 85%（2026 实际），目标 92%", "基准档 —— 质量提升：批次不良率 = 3.2%（2026 实际），目标 2.0%"],
+    "learning_growth": ["基准档 —— 人才储备：关键岗位任职率 = 82%（2026 实际），目标 90%", "基准档 —— 能力建设：年度人均培训 = 24 学时（2026 实际），目标 40 学时"]
   }
 }
 ```

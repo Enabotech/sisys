@@ -111,7 +111,9 @@ def assert_data_sources_contract(slug: str, metadata: ToolMetadata) -> None:
         assert ref.api_type.value == api_type, f"{slug}/{ref.name}: api_type 漂移 {ref.api_type.value} != {api_type}"
         assert ref.ttl_seconds == ttl, f"{slug}/{ref.name}: ttl_seconds 漂移 {ref.ttl_seconds} != {ttl}"
         assert 60 <= ref.ttl_seconds <= 2592000
-        assert ref.required_fields, f"{slug}/{ref.name}: required_fields 不能为空（AC-1 全字段断言）"
+        assert tuple(ref.required_fields) == EXPECTED_REQUIRED_FIELDS, (
+            f"{slug}/{ref.name}: required_fields 漂移 {tuple(ref.required_fields)} != {EXPECTED_REQUIRED_FIELDS}"
+        )
 
 
 def assert_io_schema_contract(slug: str, metadata: ToolMetadata) -> None:

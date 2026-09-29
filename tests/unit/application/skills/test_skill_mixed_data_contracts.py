@@ -90,12 +90,26 @@ class TestSharedConstantsSingleSource:
     """跨 Story 共享常量一律 import 4-1c 契约库（R2-F3 单一来源，D6 决策）。"""
 
     def test_shared_constants_are_imported_not_copied(self) -> None:
-        """五共享常量必须与 4-1c 契约库同一对象（identity 断言，防复制漂移）。"""
+        """七共享常量必须与 4-1c 契约库同一对象（identity 断言，防复制漂移）。
+
+        SKILL_MD_MAX_LINES 用 ==（int 无对象同一性语义，R2-F2 注记）；
+        其余六常量为 tuple/Pattern/Path 对象，is 断言成立。
+        """
         assert contracts_41d.ADAPTER_SSOT is contracts_41c.ADAPTER_SSOT
         assert contracts_41d.KEY_SENSITIVE_SOURCES is contracts_41c.KEY_SENSITIVE_SOURCES
         assert contracts_41d.DATA_SOURCE_MARKER_PATTERN is contracts_41c.DATA_SOURCE_MARKER_PATTERN
         assert contracts_41d.REQUIRED_SOP_SECTIONS is contracts_41c.REQUIRED_SOP_SECTIONS
         assert contracts_41d.SKILL_MD_MAX_LINES == contracts_41c.SKILL_MD_MAX_LINES
+        assert contracts_41d.EXPECTED_REQUIRED_FIELDS is contracts_41c.EXPECTED_REQUIRED_FIELDS
+        assert contracts_41d.SKILLS_ROOT is contracts_41c.SKILLS_ROOT
+
+    def test_expected_required_fields_value_locked(self) -> None:
+        """EXPECTED_REQUIRED_FIELDS 值级独立基准（R2-F12，STORY_SSOT 先例）。
+
+        防契约常量与 16 个 SKILL.md 被同步同改时全绿无告警——4.3 字段级化
+        改值时须显式修改本基准（变更登记绊线）。
+        """
+        assert contracts_41c.EXPECTED_REQUIRED_FIELDS == ("indicator", "value")
 
 
 class TestTemplateContract:
@@ -244,6 +258,19 @@ class TestSchemaLeafKeysExtraction:
         }
         with pytest.raises(AssertionError, match=r"container.*含 properties 但未声明 type: object"):
             contracts_41d.schema_leaf_keys(typeless)
+
+    def test_empty_properties_node_rejected(self) -> None:
+        """守卫 1 分支二（R2-F11①）：properties 为空集（无论 type）→ 断言失败。
+
+        空 properties 的节点无从承载分区内容——与「缺 type」分支分列文案，
+        防误导性错误消息（此前两类节点共用同一句「未声明 type: object」）。
+        """
+        empty_props = {
+            "type": "object",
+            "properties": {"container": {"type": "object", "properties": {}}},
+        }
+        with pytest.raises(AssertionError, match=r"container.*的 properties 为空"):
+            contracts_41d.schema_leaf_keys(empty_props)
 
     def test_duplicate_leaf_across_containers_rejected(self) -> None:
         """守卫 2（R1-F4）：跨容器重名叶子 → 断言失败（防 last-wins 覆盖 required 语义）。"""

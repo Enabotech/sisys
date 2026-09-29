@@ -44,7 +44,7 @@ input_schema:
   properties:
     business_objectives:
       type: object
-      description: 业务目标（战略规划文件 + 数据仓库导出，模板 kpi_tree_decomposition.md）
+      description: 业务目标（战略规划文件 + 数据仓库导出，模板 kpi_tree_decomposition.md）。条目编码（R2-F7）——objectives 逐条「目标档位（基准/挑战/突破）—— 目标描述」（档位换算与逐级校验依赖档位前缀解析；baseline_data 键值形态「指标 → 现值」）
       required: [objectives, baseline_data]
       properties:
         objectives:
@@ -107,8 +107,8 @@ output_schema:
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| business_objectives | object | ✅ | 业务目标（战略规划文件 + 数据仓库导出） |
-| business_objectives.objectives | array[string] | ✅ | 战略目标分解链（战略 → 部门 → 个人） |
+| business_objectives | object | ✅ | 业务目标（战略规划文件 + 数据仓库导出；条目编码见下两行） |
+| business_objectives.objectives | array[string] | ✅ | 战略目标分解链（逐条「目标档位（基准/挑战/突破）—— 层级：目标描述」） |
 | business_objectives.baseline_data | object | ✅ | KPI 现值基线（指标 → 现值，数据仓库导出） |
 
 ## 4. 输出字段（output_schema）
@@ -189,10 +189,10 @@ news_payload = (DATA_SOURCES.get("newsapi") or {}).get("payload")
 {
   "business_objectives": {
     "objectives": [
-      "战略：2027 年动力电池业务营收翻番",
-      "部门：销售部——新签车企定点 12 家",
-      "部门：制造部——直通率提升至 92%",
-      "个人：电芯产线组长——化成分容批次合格率 95%"
+      "突破档 —— 战略：2027 年动力电池业务营收翻番（新建产线 + 海外定点支撑）",
+      "基准档 —— 部门：销售部——新签车企定点 12 家",
+      "基准档 —— 部门：制造部——直通率提升至 92%",
+      "基准档 —— 个人：电芯产线组长——化成分容批次合格率 95%"
     ],
     "baseline_data": {
       "营收": {"现值": "18.5 亿元", "口径": "含税营业收入"},

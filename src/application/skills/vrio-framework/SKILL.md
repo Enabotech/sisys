@@ -80,7 +80,7 @@ output_schema:
       properties:
         classification:
           type: object
-          description: 各资源分类结果（竞争优势/暂时优势/竞争均势/竞争劣势）
+          description: 各资源五分类结果（持续竞争优势/暂时竞争优势/未实现潜在优势/竞争均势/竞争劣势，判定链见 scoring_anchors.md）
         sustainability:
           type: string
           description: 持续竞争优势综合判定
@@ -124,7 +124,7 @@ output_schema:
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | vrio_assessment | object | VRIO 评估结果（分类 + 可持续性判定） |
-| vrio_assessment.classification | object | 各资源分类结果（竞争优势/暂时优势/竞争均势/竞争劣势） |
+| vrio_assessment.classification | object | 各资源五分类结果（持续竞争优势/暂时竞争优势/未实现潜在优势/竞争均势/竞争劣势，判定链见 scoring_anchors.md） |
 | vrio_assessment.sustainability | string | 持续竞争优势综合判定 |
 | data_sources | array[object] | 溯源元数据（source/freshness/confidence） |
 
@@ -143,8 +143,8 @@ output_schema:
 | 行业能力情报（竞对能力建设/人才/合作动向印证） | tavily | 自然语言关键词（如 "固态电池 专利布局 产能"） |
 
 **内外交叉验证要求：** 每项稀缺性 R / 可模仿性 I 判定至少有一条外部基准印证（或显式标注「内部认知，
-未经外部印证」）；外部情报与内部审计判定矛盾时的处置见 `references/data_fusion.md`（冲突处理：
-外部基准优先修正内部认知，修正前双方并列呈现）。
+未经外部印证」）；外部情报与内部审计判定矛盾时的处置见 `references/data_fusion.md`（冲突分级处理：
+内部漏判 → 外部基准优先补正；外部无印证 → 双方并列不下结论；方向相反 → 暂停判断，以最新一手内部数据为准复议）。
 
 ## 6. SOP 执行步骤
 
