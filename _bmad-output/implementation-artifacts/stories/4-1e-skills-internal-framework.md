@@ -187,8 +187,8 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 **条目编码规范契约（7/7 Skill，D10）：**
 
-- 每个字符串/自由 object 字段的 schema description 声明编码格式（「匹配强度分值 = 首个『——』（两个 U+2014，前后允许空白——与 4-1d 现行微格式 `5 —— 描述` 带空格形态逐字一致）之前前缀中的独立 1-5 整数（前缀不得含其它数字，防『P1 —— 4』误判）」类确定性解析锚点——4-1d R2-F7/R3-F8 先例）；**输出侧同步载体**：评分型输出聚合语义（fit_score 木桶最小值等）写入 output_schema description，同步面 = yaml + frontmatter 双写（§3/§8 为输入侧四方，输出侧两方）
-- **四方同步**：yaml 条目 + SKILL.md frontmatter description（逐字双写，dict 相等断言锁定）+ §3 表 + §8 示例
+- 每个字符串/自由 object 字段的 schema description 声明编码格式（「匹配强度分值 = 首个『——』（两个 U+2014，前后允许空白——与 4-1d 现行微格式 `5 —— 描述` 带空格形态逐字一致）之前前缀中的独立 1-5 整数（前缀不得含其它数字，防『P1 —— 4』误判）」类确定性解析锚点——4-1d R2-F7/R3-F8 先例）；**输出侧同步载体**：评分型输出聚合语义（fit_score 木桶最小值等）写入 output_schema description，同步面 = yaml + frontmatter 两方（§3/§8 属输入侧四方——见下方「四方同步」定义）
+- **四方同步（输入侧四方 = yaml 条目 + SKILL.md frontmatter description（逐字双写，dict 相等断言锁定）+ §3 表 + §8 示例；输出侧两方 = yaml + frontmatter 的 output_schema description 双写）**：输入侧四方逐字同步，输出侧（评分型聚合语义如 fit_score 木桶最小值等）两方同步——§3 表为设计侧描述非输出同步面
 - 编码格式与模板现行微格式**逐字一致**（4-1d R3 教训：声明钉模板现行格式）
 - **示例三方一致**：模板示例行 ↔ §8 JSON 条目 ↔ framework_logic/scoring_anchors 的分值/枚举（同文本同值——4-1d R3-F5 仲裁先例）
 
@@ -260,8 +260,8 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 - [ ] frontmatter schema 与 yaml 逐字相等
 - [ ] 分型三件套 + templates 存在性与非空断言（分型参数化）
 - [ ] framework_logic 契约：含框架逻辑引导（系统化思考步骤 + 填写指引——Epic AC 2 字面承接）
-- [ ] 评分型 scoring_anchors 契约：刻度声明 + 分档含义 + 锚点示例（4-1d 先例）；结构型 validation_rules 契约：确定性规则 = **分析层评估逻辑**（违规经输出根键下 `conflicts` 类字段结构化呈现，不映射为运行时异常/INSUFFICIENT_DATA）——RACI 恰 1 A 硬规则 + ≥1 R 软规则（A/R 计为已承担 R）/ DAG 无环与依赖方向（关键路径 = 跳数最长链的无时长结构代理）/ 时长归一 CPM（ES/EF/LS/LF 零浮动）/ 因果箭头语法（标准方向自下而上：learning_growth → internal_process → customer → financial；逆向/同层箭头标记 warning 级待澄清假设不硬失败）
-- [ ] **references 内容要素字面锚点断言**（契约库常量，4-1d 仅断言存在性的补强）：framework_logic 必含编号步骤序列（「步骤 1」类字样）且提及对应模板分区/字段名；scoring_anchors 必含「分档含义」与「正例」「反例」字样（4-1d 实物三段结构：刻度声明/分档含义表/正反例锚点）；validation_rules 必含逐条编号规则且提及编码正则或 RACI/DAG/CPM 关键字；workshop_guide 必含三要素——参与者角色分工（引导者/业务专家类字样）+ 流程环节含时长与产出物 + 会后「模板→arguments 构造」闭环句（4-1d 实物六段结构的核心三段）
+- [ ] 评分型 scoring_anchors 契约：刻度声明 + 分档含义 + 正例与反例锚点示例（4-1d 先例）；结构型 validation_rules 契约：确定性规则 = **分析层评估逻辑**（违规经输出根键下 `conflicts` 类字段结构化呈现，不映射为运行时异常/INSUFFICIENT_DATA）——RACI 恰 1 A 硬规则 + ≥1 R 软规则（A/R 计为已承担 R）/ DAG 无环与依赖方向（关键路径 = 跳数最长链的无时长结构代理）/ 时长归一 CPM（ES/EF/LS/LF 零浮动）/ 因果箭头语法（标准方向自下而上：learning_growth → internal_process → customer → financial；逆向/同层箭头标记 warning 级待澄清假设不硬失败）
+- [ ] **references 内容要素字面锚点断言**（契约库常量 `assert_reference_content_anchors`，4-1d 仅断言存在性的补强；**调用位 = 各 Skill 单测 [B] 循环 + 9.4 汇总层参数化，7 个真实 references 全覆盖**）：framework_logic 必含编号步骤序列（「步骤 1」或「第 1 步」起序，任一形态）且提及对应模板分区/字段名（英文键名）；scoring_anchors 必含「分档含义」与「正例」「反例」**两个独立字样**（不接受「正反例」合并词——其不含「正例」子串；4-1d 实物三段结构：刻度声明/分档含义表/正例反例锚点）；validation_rules 必含逐条编号规则（「规则 1」或「1.」起序）且提及以下关键字至少其一（大小写不敏感）：「RACI」/「DAG」/「CPM」/「箭头」/「正则」；workshop_guide 必含三要素——参与者角色分工（引导者/业务专家类字样）+ 流程环节含时长与产出物 + 会后「模板→arguments 构造」闭环句（4-1d 实物六段结构的核心三段）
 
 ### AC-3: 用户输入模板与 input_schema 字段一一对应（双向断言）
 
@@ -434,7 +434,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 | AC-3 | 模板 ↔ schema 叶子键双向 | Task 0 / 1 / 2-8 / 9 | 0.2 / 1.2 / 各 Skill [D] / 9.4 | `test_schema_template_framework_alignment.py` |
 | AC-4 | 集成测试（无标记全链路 + 207 + 缺数据引导面） | Task 9 | 9.1-9.7 | `test_skill_framework.py` |
 | AC-5 | 架构验证 + 23 终态闭环 + Schema 强化 | Task 1 / 10 | 1.4（互锁扩容）/ 10.1-10.6 | `test_arch_skill_framework.py` |
-| AC-6 | BDD 验收 | Task 0 / 11 | 0.4-0.6 / 11.1-11.9 | `test_acceptance_skill_framework.feature` / `.py` |
+| AC-6 | BDD 验收 | Task 0 / 11 | 0.4-0.6 / 11.1-11.10 | `test_acceptance_skill_framework.feature` / `.py` |
 | 全 AC | 回归网收敛（D2/D8 义务） | Task 1 | 1.4 | 三文件派生收敛 + 双场景改名 |
 
 ---
@@ -481,7 +481,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 - [ ] Subtask 0.1: 确认 4-1d 留项收敛状态（R1-D2 承接确认 + 其余不收敛留痕——「领域异常契约」节 checklist）
 - [ ] Subtask 0.2: yaml SSOT 7 条目 Schema 设计——以 catalog（:504-855）为基础逐 Skill 增强（嵌套 required + 叶子 description 含编码规范与解析锚点）；org-design 四维扩展设计（D10）；分型常量表 + TEMPLATE_FILES 命名表钉死（7 项见 Task 0 数据模型 checklist——bmc 为 `bmc_nine_blocks_canvas.md`）；**本轮为设计稿不入库**（Task 1 随契约库 TDD 落地）——4-1d Task 0.2 同款
 - [ ] Subtask 0.3: 决策表评审（D1-D13 逐项确认——见 Dev Notes「关键架构决策」节）
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_skill_framework.feature`（zh-CN 按 AC 分节；Happy 路径平铺 7 场景 + Edge：空白名单 207 / 内部数据不足引导（缺口登记 + INSUFFICIENT_DATA 文档级语义——断言面为 SOP 失败处理章节与 Think prompt 空 arguments repr，非运行时状态）/ 负向跳转 ×2——4-1d Round 3 平铺先例）
+- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_skill_framework.feature`（zh-CN 按 AC 分节；Happy 路径平铺 7 场景 + Edge：空白名单 207 / 内部数据不足引导（断言面与 Subtask 9.3 同集：空 arguments Think prompt repr + 缺口登记引导——INSUFFICIENT_DATA 文档级语义归 AC-2 单测承载，非运行时状态）/ 负向跳转 ×2——4-1d Round 3 平铺先例）
 - [ ] Subtask 0.5: 编写 BDD 步骤实现骨架（`test_acceptance_skill_framework.py`：execution 共享对象 + LLM 内容分派 + prompt 捕获 + event_loop 模式——Fake 仅限 LLM/Sandbox）
 - [ ] Subtask 0.6: 运行验收测试确认失败（🔴 红阶段验证——Skill 未成熟化时 given/then 断言红；预期红点形态：schema 断言红以 KeyError 呈现（yaml 7 条目尚未入库、`load_io_contract` 先 KeyError）与断言失败并存——**KeyError 亦为合法红**；另注：空白名单 207 与 data_sources==() 两场景在未成熟化时即为绿（生产行为与成熟度无关），红仅来自 schema/SOP 内容场景）
 
@@ -506,7 +506,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 | 🔄 重构 | 签名注解 + docstring（中文 Google 风格）+ ruff/mypy |
 
 - [ ] Subtask 1.1: 🔴 红 — 契约库自检测试（含 identity 断言 + 失败路径负例 + 提取器边界复跑）
-- [ ] Subtask 1.2: 🟢 绿 — 契约库实现（常量 + 五断言函数 + 分型参数化）
+- [ ] Subtask 1.2: 🟢 绿 — 契约库实现（常量 + 六断言函数（含 `assert_reference_content_anchors`）+ 分型参数化）
 - [ ] Subtask 1.3: 🔄 重构 — 优化（命名/注解/`__all__`）
 
 #### TDD 循环 [B]：回归网预调整（一次性前置——D8 先例）
@@ -545,8 +545,8 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | [B] 断言：9 章节 / input_examples 非 placeholder / ≤500 行 / 失败处理含 207+INSUFFICIENT_DATA 词边界 / 评分型三件套存在 / 编码规范四方同步抽查 |
-| 🟢 绿 | SOP 编写：§1-§9（§5 = 用户输入采集计划：模板路径 + pains↔pain_relievers/gains↔gain_creators/jobs↔products 三对匹配引导（双侧分值语义：customer 侧严重度/重要性、value 侧匹配强度）+ arguments 构造（文字级根键枚举指向 §8））；§7 失败处理（207 误标记守护 + INSUFFICIENT_DATA 缺字段引导——文档级语义）；§8 含编码前缀真实示例；references 三件套（framework_logic：双侧匹配系统化思考——以 customer jobs 为分析起点（jobs→pains→gains 序，三对匹配为镜像结构非时序）+ fit_score 木桶最小值聚合逻辑 + 填写指引；scoring_anchors：fit 强度 1-5 刻度 + 分档含义 + 正反例；workshop_guide：2-4 小时工作坊或轻量访谈变体——纯内部型无外部数据采集环节，以用户结构化输入工作坊替代，含参与者角色/流程环节产出物/会后模板→arguments 三要素） |
+| 🔴 红 | [B] 断言：9 章节 / input_examples 非 placeholder / ≤500 行 / 失败处理含 207+INSUFFICIENT_DATA 词边界 / 评分型三件套存在 / **references 内容锚点（`assert_reference_content_anchors`——AC-2 验证标准定义的最低要素字样）** / 编码规范四方同步抽查 |
+| 🟢 绿 | SOP 编写：§1-§9（§5 = 用户输入采集计划：模板路径 + pains↔pain_relievers/gains↔gain_creators/jobs↔products 三对匹配引导（双侧分值语义：customer 侧严重度/重要性、value 侧匹配强度）+ arguments 构造（文字级根键枚举指向 §8））；§7 失败处理（207 误标记守护 + INSUFFICIENT_DATA 缺字段引导——文档级语义）；§8 含编码前缀真实示例；references 三件套（framework_logic：双侧匹配系统化思考——**以「步骤 1」起序的编号步骤呈现**（customer jobs 为分析起点（jobs→pains→gains 序，三对匹配为镜像结构非时序）为步骤内涵）+ fit_score 木桶最小值聚合逻辑 + 填写指引；scoring_anchors：fit 强度 1-5 刻度 + 分档含义 + **正例与反例两个独立小节**；workshop_guide：2-4 小时工作坊或轻量访谈变体——纯内部型无外部数据采集环节，以用户结构化输入工作坊替代，含参与者角色/流程环节产出物/会后模板→arguments 三要素） |
 | 🔄 重构 | 章节打磨 + 编码规范四方核对 |
 
 #### TDD 循环 [C]：跨循环一致性（空集语义）
@@ -583,7 +583,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 特有 Subtask：
 - [ ] Subtask 3.3: 🟢 绿 — **D7 命名收敛**：`canvas_template.json` 块名 `key_partners` → `key_partnerships` + `validate_canvas.py` 的 `REQUIRED_BLOCKS` 同步 + `test_skills_loader.py:219-225` 特征串断言更新——原断言 `b"key_partners" in content` 收紧为带引号完整键 `b'"key_partnerships"'`（防旧名残留静默通过，三文件同批）；落码后 `grep -P "key_partners\b"` 验证零残留（词边界防 key_partnerships 前缀误匹配）
-- [ ] Subtask 3.7: 🟢 绿 — SOP §9 References 引用存量资产（validate_canvas.py 校验器 + canvas_template.json 模板基型——pestel scoring_matrix.json 先例）；9 块语义（key_partnerships 为 catalog 锚定名）；cost_structure 自由 object 编码过渡声明（D6/4.3 defer）；**framework_logic 内容要求**：九块联动系统化思考（核心匹配：价值主张↔客户细分；成本-收入对称：成本结构↔收入来源双侧对照）+ 分块成熟度评估逻辑 + 填写指引
+- [ ] Subtask 3.7: 🟢 绿 — SOP §9 References 引用存量资产（validate_canvas.py 校验器 + canvas_template.json 模板基型——pestel scoring_matrix.json 先例）；9 块语义（key_partnerships 为 catalog 锚定名）；cost_structure 自由 object 编码过渡声明（D6/4.3 defer）；**framework_logic 内容要求**：九块联动系统化思考——以「步骤 1」起序的编号步骤呈现（核心匹配：value_propositions↔customer_segments；成本-收入对称：cost_structure↔revenue_streams 双侧对照）+ 分块成熟度评估逻辑 + 填写指引
 
 **完成标准/Definition of Done:**
 - [ ] 四循环全绿 + 存量资产保留且被引用 + 命名收敛三文件落地 + loader 测试同步绿
@@ -600,7 +600,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 特有 Subtask：
 - [ ] Subtask 4.2: 🟢 绿 — catalog 增强：`org_structure` 保留既有三字段（functions/reporting_lines/decentralization_level），**新增** strategy/processes/rewards/people 四维容器（嵌套 required + description——Galbraith Star 完整性）；[A] 断言 catalog 兼容（既有 required ⊆ 新 required，R5 缓解）
-- [ ] Subtask 4.6: 🟢 绿 — framework_logic 含 5 维对齐评估逻辑（TOOLS.md L1 五维表述为佐证基线）；scoring_anchors 维度对齐度 1-5 刻度
+- [ ] Subtask 4.6: 🟢 绿 — framework_logic 含 5 维对齐评估逻辑——以「步骤 1」起序的编号步骤呈现（TOOLS.md L1 五维表述为佐证基线，提及 org_structure 等英文键名）；scoring_anchors 维度对齐度 1-5 刻度 + 分档含义 + 正例与反例两个独立小节
 
 **完成标准/Definition of Done:**
 - [ ] 四循环全绿 + catalog 增强落地（零删除）+ 五维完整
@@ -617,7 +617,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 特有 Subtask：
 - [ ] Subtask 5.2: 🟢 绿 — schema 锚定 `bsc_indicators`（R9：[A] 断言根键，禁 strategic_objectives）；causal_relationships 因果箭头编码语法声明（「原因维度 → 结果维度：假设描述」——确定性解析锚点）
-- [ ] Subtask 5.6: 🟢 绿 — references 结构型三件套（framework_logic：四层因果假设表述规范 + 战略主题卡设计；validation_rules：箭头语法 + 因果链闭合校验——**标准方向自下而上（learning_growth → internal_process → customer → financial，Kaplan-Norton）**，逆向/同层箭头标记 warning 级待澄清假设不硬失败，量化验证移交 bsc-scorecard（D13 分工闭环）；workshop_guide）；分型第三件为 **validation_rules.md**（非评分型的 scoring_anchors）；与 bsc-scorecard 互查映射表入 framework_logic（定性因果链 vs 定量计分卡分工 + 键名对照 `bsc_indicators`↔`strategic_objectives` + 传递规则——bsc↔kpi-tree 先例的映射表实位于 bsc 侧 scoring_anchors.md:18-30，结构型无评分锚点故落 framework_logic）
+- [ ] Subtask 5.6: 🟢 绿 — references 结构型三件套（framework_logic：四层因果假设表述规范 + 战略主题卡设计——以「步骤 1」起序的编号步骤呈现；validation_rules：以「规则 1」起序的逐条编号规则（箭头语法 + 因果链闭合校验——含「箭头」关键字）——**标准方向自下而上（learning_growth → internal_process → customer → financial，Kaplan-Norton）**，逆向/同层箭头标记 warning 级待澄清假设不硬失败，量化验证移交 bsc-scorecard（D13 分工闭环）；workshop_guide）；分型第三件为 **validation_rules.md**（非评分型的 scoring_anchors）；与 bsc-scorecard 互查映射表入 framework_logic（定性因果链 vs 定量计分卡分工 + 键名对照 `bsc_indicators`↔`strategic_objectives` + 传递规则——bsc↔kpi-tree 先例的映射表实位于 bsc 侧 scoring_anchors.md:18-30，结构型无评分锚点故落 framework_logic）
 - [ ] Subtask 5.7: 🟢 绿 — 负向触发双向（本 Skill when_not_to_use「KPI 数值计算」点名补全指向 bsc-scorecard；**bsc-scorecard 侧回跳需本 Story 新建**——调研证实 4-1d 未建：bsc §2（SKILL.md:113-116）现仅指向 swot-tows/space-matrix/ansoff-matrix/kpi-tree，其余 SKILL.md body 对 `strategy-map` 零交叉引用（全目录命中仅 TOOLS.md:24 索引行 / `skill_manifest.py:31,:99` 映射 / strategy-map 自身 slug 行——均非 body 跳转）；在 bsc-scorecard SKILL.md §2 增补一行「定性战略因果链（不含 KPI 量化）：请用 strategy-map」——跨 Story 单行内容增量，D8 改名同类先例，R9 登记，不破坏 4-1d 守护断言（负向触发章节存在性断言不受行级增量影响））
 
 **完成标准/Definition of Done:**
@@ -634,7 +634,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 #### TDD 循环 [A]-[D]（同 Task 5 结构型结构）
 
 特有 Subtask：
-- [ ] Subtask 6.5: 🟢 绿 — 模板：task_list 分区标题 + name/dependencies 叶子（依赖边编码「任务名 ← 前置任务列表」——前置列表以中文顿号「、」分隔，任务名禁含「、」与「←」；契约表编码列为条目级：前置任务名（模板行内顿号分隔））；**framework_logic 内容要求**：依赖拓扑系统化思考（任务穷尽性→依赖方向确认→层级归整→扇入扇出异常识别四步骤）+ 填写指引；validation_rules：DAG 无环校验 + 依赖方向规则 + 关键路径推算规则（**= 跳数最长链的无时长结构代理指标**——与 gantt 的时长归一 CPM 语义分工：dependency-graph 输入无时长，`dependency_network.critical_path` 是结构代理，gantt `gantt_visualization.critical_path` 是 ES/EF/LS/LF 零浮动的真 CPM，前者为后者的无时长退化形态）+ risk_nodes 判定规则（扇入 ≥3 的汇聚节点与零依赖/零被依赖的孤立节点——机械规则，其余风险判断为 LLM 分析项）；与 gantt-chart 互相负向跳转（纯拓扑 vs 含时间排程——D13）
+- [ ] Subtask 6.5: 🟢 绿 — 模板：task_list 分区标题 + name/dependencies 叶子（依赖边编码「任务名 ← 前置任务列表」——前置列表以中文顿号「、」分隔，任务名禁含「、」与「←」；契约表编码列为条目级：前置任务名（模板行内顿号分隔））；**framework_logic 内容要求**：依赖拓扑系统化思考——以「步骤 1」起序的编号步骤呈现（任务穷尽性→依赖方向确认→层级归整→扇入扇出异常识别为四步内涵）+ 填写指引；validation_rules：以「规则 1」起序的逐条编号规则（DAG 无环校验 + 依赖方向规则 + 关键路径推算规则——含「DAG」关键字）（**= 跳数最长链的无时长结构代理指标**——与 gantt 的时长归一 CPM 语义分工：dependency-graph 输入无时长，`dependency_network.critical_path` 是结构代理，gantt `gantt_visualization.critical_path` 是 ES/EF/LS/LF 零浮动的真 CPM，前者为后者的无时长退化形态）+ risk_nodes 判定规则（扇入 ≥3 的汇聚节点与零依赖/零被依赖的孤立节点——机械规则，其余风险判断为 LLM 分析项）；与 gantt-chart 互相负向跳转（纯拓扑 vs 含时间排程——D13）
 
 **完成标准/Definition of Done:**
 - [ ] 四循环全绿 + 顶层 array 形态模板对齐 + 分工跳转
@@ -645,12 +645,12 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 
 **关联 AC:** AC-1, AC-2, AC-3
 
-> 特有：R/A/C/I 枚举编码 + 有效性规则。
+> 特有：R/A/C/I 字母组合编码（单字母或斜线组合）+ 有效性规则。
 
 #### TDD 循环 [A]-[D]（同 Task 5 结构型结构）
 
 特有 Subtask：
-- [ ] Subtask 7.5: 🟢 绿 — assignments 自由 object 编码过渡（**双层编码「任务名 → {角色名: 字母组合}」**——外层键为任务名（per-task 规则计算粒度），内层角色→字母组合（单字母或斜线组合如 A/R），D6/4.3 defer）；**framework_logic 内容要求**：职责分配系统化思考（任务→角色映射→单点问责检查→负载均衡审视四步骤）+ 填写指引；validation_rules：恰 1 个 A（硬规则）+ ≥1 个 R（软规则，A/R 计为已承担 R——业界 A/R 兼任惯例）+ 无空任务（确定性规则集）；违规经 `raci_matrix.conflicts` 结构化呈现（catalog 既有 conflicts/suggestions 字段为出口）非整体失败；roles/tasks 编码声明
+- [ ] Subtask 7.5: 🟢 绿 — assignments 自由 object 编码过渡（**双层编码「任务名 → {角色名: 字母组合}」**——外层键为任务名（per-task 规则计算粒度），内层角色→字母组合（单字母或斜线组合如 A/R），D6/4.3 defer）；**framework_logic 内容要求**：职责分配系统化思考——以「步骤 1」起序的编号步骤呈现（任务→角色映射→单点问责检查→负载均衡审视为四步内涵）+ 填写指引；**模板承载形态**：任务为行、角色为列的矩阵表格，单元格填 RACI 字母组合——行首列任务名（双层编码外层键）、表头列角色名（内层键），与 assignments 双层结构一一对应；**description 落码提示**：双层编码记法「任务名 → {角色名: 字母组合}」含花括号+半角冒号，落码 schema description 时按 YAML 安全红线全角化改写（如「任务名→角色名＝字母组合」）；validation_rules：以「规则 1」起序的逐条编号规则（恰 1 个 A（硬规则）+ ≥1 个 R（软规则，A/R 计为已承担 R——业界 A/R 兼任惯例）+ 无空任务（确定性规则集）——含「RACI」关键字）；违规经 `raci_matrix.conflicts` 结构化呈现（catalog 既有 conflicts/suggestions 字段为出口）非整体失败；roles/tasks 编码声明
 
 **完成标准/Definition of Done:**
 - [ ] 四循环全绿 + RACI 规则集
@@ -666,7 +666,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 #### TDD 循环 [A]-[D]（同 Task 5 结构型结构）
 
 特有 Subtask：
-- [ ] Subtask 8.5: 🟢 绿 — 时长编码声明（「N 天/周/月」格式——正则 `^\d+ *(天|周|月)$`（禁「个月」与英文单位），归一基准 = 天（周 = 5 工作日 / 月 = 20 工作日），CPM 前推/后推算术在该单一基准上进行；解析锚点 + 模板示例行↔§8↔正则三方同文本）；**里程碑输入编码 = durations 值「0 天」**（零时长任务即里程碑，ES=EF——Epic「时间线+里程碑」输入侧承接）；durations/resources 编码过渡（D6/4.3 defer）；**framework_logic 内容要求**：排程系统化思考（任务拆分粒度→依赖确认→时长估算→里程碑锚定→资源冲突审视五步骤）+ 填写指引；validation_rules：前推/后推（ES/EF/LS/LF）+ 里程碑（0 天编码）+ CPM 关键路径推算（时长归一真 CPM——与 dependency-graph 跳数最长链的结构代理语义分工，见 Task 6.5）；与 dependency-graph 分工跳转核对（Task 6 已建单向，本侧补全双向）
+- [ ] Subtask 8.5: 🟢 绿 — 时长编码声明（「N 天/周/月」格式——正则 `^\d+ *(天|周|月)$`（禁「个月」与英文单位），归一基准 = 天（周 = 5 工作日 / 月 = 20 工作日），CPM 前推/后推算术在该单一基准上进行；解析锚点 + 模板示例行↔§8↔正则三方同文本）；**里程碑输入编码 = durations 值「0 天」**（零时长任务即里程碑，ES=EF——Epic「时间线+里程碑」输入侧承接）；durations/resources 编码过渡（D6/4.3 defer）；**framework_logic 内容要求**：排程系统化思考——以「步骤 1」起序的编号步骤呈现（任务拆分粒度→依赖确认→时长估算→里程碑锚定→资源冲突审视为五步内涵）+ 填写指引；validation_rules：以「规则 1」起序的逐条编号规则（前推/后推（ES/EF/LS/LF）+ 里程碑（0 天编码）+ CPM 关键路径推算（时长归一真 CPM——与 dependency-graph 跳数最长链的结构代理语义分工，见 Task 6.5）——含「CPM」关键字）；**零时长裁定**：「0 周/0 月」等非规范零时长值统一归一为 0 天判里程碑（模板规范写法「0 天」）；里程碑节点进入 critical_path 仅当处于零浮动链，否则以里程碑标记承载（不强行入关键路径）；与 dependency-graph 分工跳转核对（Task 6 已建单向，本侧补全双向）
 
 **完成标准/Definition of Done:**
 - [ ] 四循环全绿 + 7/7 Skill 完成（23/23 里程碑）
@@ -698,7 +698,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 - [ ] Subtask 9.1: 🔴 红 — 无标记全链路（7 Skill 参数化：SUCCESS + arguments repr + 零 preamble + evidence 空溯源）
 - [ ] Subtask 9.2: 🔴 红 — 207 误用守护（resolver 注入前提 + error_code 逐字 + 101 对照负例——[B] 循环形态）
 - [ ] Subtask 9.3: 🔴 红 — 缺数据引导面（空 arguments Think prompt repr + 缺口登记引导断言——文档级语义联动）
-- [ ] Subtask 9.4: 🟢 绿 — 汇总层模板对齐测试落地（`tests/unit/application/skills/test_schema_template_framework_alignment.py`——单元测试文件，7 Skill 全就绪（Task 2-8 完）后双向断言全绿；分型四段式参数化——「契约测试文件清单」表定义项）
+- [ ] Subtask 9.4: 🟢 绿 — 汇总层模板对齐测试落地（`tests/unit/application/skills/test_schema_template_framework_alignment.py`——单元测试文件，7 Skill 全就绪（Task 2-8 完）后双向断言全绿；分型四段式参数化 + **references 内容锚点断言参数化**（`assert_reference_content_anchors` 对 7 Skill 全覆盖）——「契约测试文件清单」表定义项）
 - [ ] Subtask 9.5: 🟢 绿 — 集成全链路验证通过（`build_min_arguments` import 4-1d 库构造 arguments——防手写漂移；依赖 yaml 条目已由 Task 1.4 入库）
 - [ ] Subtask 9.6: 🔄 重构 — 参数化收敛 + 断言提取器复用
 - [ ] Subtask 9.7: 🔄 重构 — `pytest -n 8` 并行 + 连续 5 次无随机失败
@@ -815,7 +815,7 @@ tests/
 **来源:** [Story 4.1d](./4-1d-skills-framework-enhancement.md)（五轮代码审查收敛）
 
 **关键学习/Key Learnings:**
-- **判定映射类修复必须枚举验证等价性**（R3 F1 九宫格证伪教训）——4-1e 的 RACI 规则/DAG 环检测/CPM 推算等确定性规则写进 validation_rules 时要自检可枚举闭合
+- **判定映射类修复必须枚举验证等价性**（4-1d R3-F1 九宫格证伪教训）——4-1e 的 RACI 规则/DAG 环检测/CPM 推算等确定性规则写进 validation_rules 时要自检可枚举闭合
 - **schema description YAML 安全红线**：禁半角「: 」与花括号形态（R2 实测红）；全角「：」与「=」安全；落码后 round-trip 复验
 - **编码规范「采集端-解析端」双端验证**（R3 教训）：声明可解析 ≠ 模板可采集——模板必须产得出声明的编码格式（change 阻力列断裂先例）
 - **示例分值三方仲裁**（R3-F5）：模板/§8/锚点同文本必须同分值——以锚点判定标准为仲裁
@@ -911,6 +911,8 @@ tests/
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
 > 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有对故事文件的修复项。
+>
+> **编号规则：** R<轮次>-<序号>（如 R2-3）= 本表修复项；裸 R<n>（如 R4）= 「风险与缓解策略」表行；R<n>-F/P/D（带先例 Story 前缀，如 4-1d R1-D2）= 该 Story 代码审查发现/defer 项——三个命名空间互不相干。
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
@@ -933,7 +935,7 @@ tests/
 | R1-17 | Task 9 粒度与 AC-4 口径矛盾（7 子任务 vs 3 场景类映射未定义；207「任一 Skill」vs「×3 场景类」） | P2 | Task 9 重排为 9.1-9.7 显式七项子任务 + AC-4 验证标准对齐（全链路 ×7 + 207 抽样 + 缺数据引导面） |
 | R1-18 | 评分锚点「首个『——』前的 1-5 整数」存在前缀整数误判（「P1 —— 4」）；依赖边前置列表分隔符未钉死；VPC 未写 jobs 分析起点；org_structure 名实不符未注记；「（改名）」易误读为文件改名；「41c」脱字；汇总层测试名与既有文件近似的防呆 | P3 | 解析锚点收紧（独立整数 + U+2014×2）；顿号分隔 + 禁含字符；jobs 起点入 framework_logic；名实注记入数据契约表；「块键名收敛」措辞；脱字修正；测试名防呆注记（区别于 4-1d `test_schema_template_alignment.py`） |
 | R1-19 | Task 0.6 红阶段形态未注（yaml 未入库时 KeyError 亦为合法红；207/空声明场景未成熟化时即绿） | P3 | Subtask 0.6 补预期红点形态说明 |
-| R1-20 | 分型术语六变体并存无同义声明；16 键 frontmatter 未枚举键名（防数字键误漏——本轮调研 Agent 即因正则不含数字误报 14 键，主会话实测 16 键定谳） | P3 | 命名规范声明节加同义声明；:784 注释落 16 键逐名枚举 + 成熟态对照（19 键系 R1 修复笔误，R2-1 勘正为 18 键） |
+| R1-20 | 分型术语六变体并存无同义声明；16 键 frontmatter 未枚举键名（防数字键误漏——本轮调研 Agent 即因正则不含数字误报 14 键，主会话实测 16 键定谳） | P3 | 命名规范声明节加同义声明；「项目结构说明」目录现状注释落 16 键逐名枚举 + 成熟态对照（19 键系 R1 修复笔误，R2-1 勘正为 18 键） |
 | R2-1 | R1-20 修复自身引入矛盾：「成熟态为 19 键 = 16 + 三键」抵触 D1（本 Story 不写 data_sources 键）——成熟态应为 18 键（16 + input_schema/output_schema）；19 键是 4-1c/4-1d 声明源型形态 | P2（修复引入新矛盾——回归核查视角命中） | 勘正为「本 Story 成熟态 = 18 键（data_sources 不写键，D1）；19 键为声明源型对照形态」 |
 | R2-2 | references 内容契约无可断言锚点：AC-2 验证标准写了内容要求（框架逻辑引导/分档含义等），但 4-1d 先例仅断言文件存在性——三件套可写成存在但要素残缺的文件且全绿（「断言全绿≠方法论正确」敞口） | P1 | AC-2 验证标准新增「references 内容要素字面锚点断言」项 + 契约库增 `assert_reference_content_anchors` 断言函数（framework_logic 编号步骤+模板字段提及 / scoring_anchors 分档含义+正反例 / validation_rules 逐条规则+关键字 / workshop_guide 参与者角色+流程产出物+会后 arguments 三要素） |
 | R2-3 | raci assignments 编码粒度悬空：「角色→RACI 字母组合」单层表述下 per-task「恰 1 A」规则不可计算（RACI 本体是任务×角色二维矩阵，外层键空间未裁定） | P1 | 钉死双层编码「任务名 → {角色名: 字母组合}」（数据契约表 + Subtask 7.5 同步） |
@@ -947,6 +949,14 @@ tests/
 | R2-11 | 先例编号可追溯性：「4-1d A7」（三处）与「4-1d A10」在 4-1d 全文不可追溯（A 系列字面仅 A2/A3/A5/A8/A12）；「对齐 4-1d R2-F5」归属错误（BDD 覆盖范围教训实在 4-1c，4-1d R2-F5 是 VRIO 判定链） | P2 | A7 →「4-1d wiring 断言先例（test_arch_skill_mixed_data.py:170-176）」实名引用；A10 →「4-1d 落码约束先例『version 1.0.0 不升』」；R2-F5 → 4-1c R2-F5 勘正 |
 | R2-12 | BDD 同构断言无分工注记（BDD「内部数据不足」与集成 9.3「缺数据引导面」一字不差重复；新 BDD 207 场景与既有两套三重覆盖） | P3 | AC-6 覆盖范围说明补主从注记（断言细节以 9.3 为准、BDD 为业务语言重组；207 三套独立锚定由 D8 改名统一保障） |
 | R2-13 | 杂项：:200 节标题「零改动声明」无限定残留；skill_manifest :27-35 与 catalog :504-855 超集范围未注（各含 2 个 4-1d 条目）；「4-1d 集成 :177-183」未具名文件（误读为契约库同名文件则完全不成立）；「九项」vs 实际七项（R1-17 登记列 + changelog） | P3 | 节标题加「引擎链路」限定；两处超集加「包含性范围」注；具名 `tests/integration/application/test_skill_mixed_data.py:177-183`；九项勘正七项 |
+| R3-1 | R2-2 传播不完整：`assert_reference_content_anchors` 无调用位（Task 2 [B] 红清单与 9.4 汇总层均未含）——照 Task 清单实施则锚点断言永不作用于 7 个真实 references 文件（R1-6 同型缺陷复发） | P1 | Task 2 [B] 红清单补锚点断言项 + Subtask 9.4 补参数化全覆盖 + AC-2 验证标准写明调用位（三处同轮） |
+| R3-2 | R2-2 锚点字样与 R2-4 内容行措辞互拆：「步骤 1」字样全文仅锚点定义一处、七个 framework_logic 内容行全为箭头序列——按内容行撰写则锚点必红（两个 P1 修复组合后互相遮蔽：锚点既不可达也不可满足） | P1（组合冲突） | 裁定「以锚点为契约单向收敛内容行」：锚点定义可接受集合（「步骤 1」或「第 1 步」/「规则 1」或「1.」任一）；七个内容行统一补「以『步骤 1』/『规则 1』起序编号呈现」半句（箭头链保留为步骤内涵）；bmc 行补英文块键（value_propositions↔customer_segments 等） |
+| R3-3 | 「正例」锚点字样 vs「正反例」合并词：「正反例」不含「正例」子串，按范本行撰写必红；「锚点示例/正反例锚点/正反例」三措辞并存 | P2 | 锚点声明「两个独立字样（不接受合并词）」；Task 2 [B] / AC-2 评分型契约行统一为「正例与反例」；Task 4.6 补分档含义+正例反例显式要求 |
+| R3-4 | validation_rules 锚点关键字（RACI/DAG/CPM/正则）对 strategy-map 不可满足（其规则是箭头语法/因果链）；raci 规则行仅小写 `raci_matrix`（大小写敏感断言即红）；「逐条编号规则」在内容行无指示 | P2 | 锚点关键字扩集为「RACI/DAG/CPM/箭头/正则」并声明大小写不敏感；5.6/6.5/7.5/8.5 内容行补「规则 1 起序 + 对应关键字」 |
+| R3-5 | raci 双层编码的模板承载形态未定义（对照 6.5 有模板形态句，7.5 缺失——模板↔schema 双向断言通过形态悬空）；双层记法「{角色名: 字母组合}」花括号+半角冒号落码 schema description 触发 :102 YAML 红线但未提示改写 | P2 | 7.5 补模板形态句（任务为行、角色为列的矩阵表格——行首/表头与双层外/内层键一一对应）+ description 落码全角化提示（4-1d value-curve 实测红同型） |
+| R3-6 | 「§3/§8 为输入侧四方」括注字面错误（§3/§8 是四方中的两方）；输出两方子句先于四方定义出现；「四方同步」7 处简称无输出侧限定 | P2 | 术语统一「输入四方（yaml/frontmatter/§3/§8）+ 输出两方（yaml/frontmatter output description）」；完整定义上移至「四方同步」定义行；:190 括注改「输出侧同步面 = 两方（§3/§8 属输入侧四方）」 |
+| R3-7 | 里程碑衍生边界：「0 周/0 月」过正则且归一 0 天但非「0 天」规范写法，处置未裁定；0 天节点是否进 critical_path 未裁定（并行实现易分歧） | P3 | 8.5 补零时长裁定（非规范零时长统一归一判里程碑；里程碑入 critical_path 仅当处于零浮动链，否则以里程碑标记承载） |
+| R3-8 | 杂项：Subtask 1.2「五断言函数」计数 stale（实六）；Task 7 特有栏「R/A/C/I 枚举编码」单值口径残留；Subtask 0.4 断言面与 9.3 不同集（SOP 失败处理章节 vs 缺口登记）；R 前缀三命名空间歧义（裸 R1/R5 双义位）+ 修复表缺编号规则；「R3 F1」体例不一；矩阵 AC-6 漏 11.10；R1-20 行自引行号漂移 | P3 | 计数勘正六；改「字母组合编码」；0.4 改与 9.3 同集；修复表头部加编号规则声明 + 「R3 F1」→「4-1d R3-F1」；矩阵补 11.10；自引改节名引用 |
 
 ---
 
@@ -984,7 +994,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-09-29
 **最后更新/Last Updated:** 2026-09-29
 **更新说明/Description:**
@@ -992,3 +1002,4 @@ tests/
 - v1.1.0: 竞争性质量复核定稿（checklist 模式四 Agent 独立取证）：P1×4——Task 1 DoD 与 Subtask 1.4 的 yaml 落地策略自相矛盾裁定（恢复 4-1d 原生「Task 1 一次性落地 7 条目」）/ Subtask 5.7「bsc 回跳 4-1d 已建」证伪（grep 零命中，改本 Story 单行新建）/ ToolResultStatus 路径勘正（value_objects 非 entities）/ 滚动锚点规则仅 4-1c 单侧实况；P2×7——ToolInputValidator 未注册勘正、len(ssot_union)==16 锚点处置登记（保持字面，D2）、D7 loader 断言收紧为带引号完整键、architecture.md 旧值三处（§1.4/§13×2）、NON_TARGET_SLUGS 现有措辞精确化（「非目标」非「未成熟化」）、D4 补 framework_logic.md 首次引入声明、vpc 叶子源码序勘正；另补 4 处入站负向跳转复用清单与 TOOLS.md 零触碰声明
 - v1.2.0: 文档审查 Round 1（D1 四视角代码调研 + D2 双评审员并行审查 + D3 系统修订，20 项登记见 Docs Review Fixes 表）：P0×1——「零生产代码改动」全称断言与 Task 4.2 catalog 增强自相矛盾（8 处统一改为「零引擎层改动 + catalog 单点增强」）；P1×6——INSUFFICIENT_DATA 集成场景测试不可满足（生产零设置点，降格文档级 + 缺数据引导面）/ 207 场景漏 resolver 注入前提（不注入得 101，补 4-1c 验收构造同款 + 101 对照负例）/ wiring load_sop 特征串 engine 豁免（三处修正）/ TEMPLATE_FILES bmc 缺名（定名 bmc_nine_blocks_canvas.md）/ 矩阵 9.6 幻影 + 汇总层无承载（Task 9 重排 9.1-9.7 显式七项）/ File List 漏登 bsc-scorecard；P2×11 与 P3×3——D11 先例归属（实在 4.1/4.3 非 4-1d）、scenarios() 机械失实、数值五组、RACI 口径裁定、因果方向/CPM 分工/时长归一钉死、FrontmatterParseError 范围改写等；另：D1 调研 Agent「14 键」误报经主会话实测定谳为 16 键（含 token_budget_l1/l2 数字键——枚举正则不含数字的伪影，已加防呆枚举）
 - v1.3.0: 文档审查 Round 2（D1 三 Agent 并行：R1 修复回归核查 / 内容质量深挖 / SSOT 全链 + 行号全量复核；D3 系统修订，13 项登记见修复表）：P1×3——references 内容契约无可断言锚点（增 `assert_reference_content_anchors` 字面锚点断言）/ raci assignments 双层编码钉死（任务名→{角色名: 字母组合}）/ 4 Skill framework_logic 内容要求补行；P2×6——19 键勘正 18 键（R1 修复引入矛盾，回归核查命中）/ vpc 分值挂靠侧裁定 + fit_score 木桶聚合 /「紧邻」锚点与 4-1d 空格微格式矛盾（R1 引入）/ gantt 里程碑输入编码（0 天）/ yaml「随 Skill 追加」+ Task 2 [A] 同表矛盾（SSOT 链）/ A7·A10·R2-F5 先例编号可追溯性勘正；P3×4——结构树补 bsc 行、BDD 同构主从注记、超集范围注、九项勘正七项等。行号全量复核 42 组零错位。
+- v1.4.0: 文档审查 Round 3（D1/D2 合并单深度评审员：R2 修复回归核查 + 修复组合交叉语义核对；D3 系统修订，8 项登记见修复表）：P1×2——R2-2 传播不完整（`assert_reference_content_anchors` 无调用位，R1-6 同型缺陷复发）/ R2-2 锚点字样与 R2-4 内容行互拆（「步骤 1」全文仅锚点一处——两个 P1 修复组合后互相遮蔽，同轮收敛）；P2×4——「正例」vs「正反例」字样冲突（合并词不含「正例」子串）/ validation_rules 锚点关键字对 strategy-map 不可满足 + 大小写敏感 / raci 模板形态未定义 + 花括号落码 YAML 红线提示缺失 /「§3/§8 为输入侧四方」括注字面错误与四方同步术语统一；P3×2——零时长裁定（0 周/0 月归一 + 里程碑与 critical_path 关系）/ 计数·口径·断言面同集·R 前缀编号规则·11.10 等杂项七点。核心教训：修复组合的交互面是独立审查点——R2 两个 P1 修复各自正确、组合后互相拆台。
