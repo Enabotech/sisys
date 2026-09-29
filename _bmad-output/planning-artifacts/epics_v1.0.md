@@ -770,6 +770,7 @@ Epic 3 ✅ 已完成，详见[Epic 3: 智能检索与知识发现](epic_3.md)
 | Story 4.1c | Skills 数据采集集成（6 个外部数据型） | pestel-analysis / porters-five-forces / appeals-analysis / competitor-analysis / scenario-planning / disruptive-innovation 复用 4.1b 数据采集 | 依赖 Story 4.1b | P0-6 |
 | Story 4.1d | Skills 混合数据增强（10 个） | swot-tows / ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management-model 达到可实用分析成熟度 | 依赖 Story 4.1b | P0-7 |
 | Story 4.1e | Skills 内部框架增强（7 个） | value-proposition-canvas / business-model-canvas / org-design-framework / dependency-graph / raci-matrix / gantt-chart / strategy-map 达到可实用分析成熟度 | 依赖 Story 4.1a | P0-8 |
+| Story 4.1f | Skills 数据源扩展（专利/财报/行业量化域适配器 + 中文参数验证） | EPO OPS + SEC EDGAR + UN Comtrade 三个零许可成本适配器落地；tavily/newsapi 中文参数扩展验证；required_fields 按源定制；受益 Skill 声明重分配（维度级 ≥3 缺口收敛）| 依赖 Story 4.1b/4.1c/4.1e（✅ done）+ 外部前置（EPO OPS/Comtrade key 免费申请、法务确认）| P1-8（V1）|
 | Story 4.2 | 工具链编排（DAG） | 支持复杂分析任务的自动化执行 | 依赖 Story 4.1a, Story 1.18a（Prefect 工作流引擎） | P0-2 |
 | Story 4.3 | 工具输入/输出 Schema 验证 | 工具输出符合预期格式，防止模型漂移 | 依赖 Story 4.1a | P0-3 |
 | Story 4.4 | Docker 沙箱执行 | 防止代码执行带来的安全风险 | 依赖 Epic 1 Story 1.7, Story 4.1a（替换 mock） | P0-4 |
@@ -1084,6 +1085,67 @@ So that **Agent 调用 Value Proposition Canvas / Business Model Canvas / Org De
 **When** Agent 调用 7 个内部框架 Skills
 **Then** Skills 通过 Schema 模板引导用户输入内部业务信息
 **And** LLM 基于框架逻辑生成结构化分析输出
+
+---
+
+### Story 4.1f: Skills 数据源扩展（专利/财报/行业量化域适配器 + 中文参数验证）
+
+As a **工具工程师**,
+I want **新增 EPO Espacenet OPS / SEC EDGAR / UN Comtrade 三个数据源适配器并完成受益 Skills 的声明重分配，同时对现有 tavily/newsapi 适配器启用官方中文参数**,
+So that **Skills 工具箱的维度级「≥3 独立来源」三角化缺口（专利布局 1 源/市场份额无企业级源/行业量化无商品级源/中文媒体盲区）得到实质收敛，竞品分析与行业分析类工具的实证数据质量达到可交付水准**。
+
+**业务价值：** 4.1c/4.1d/4.1e 完成后 23 Skills 全部成熟化，但 2026-09-29 评审推广调研暴露「源数量充足性」缺口——现有 8 适配器池语义域分布失衡（专利 1/宏观 4/新闻检索 2/气候 1），维度级 ≥3 达成仅 2/29 处。本 Story 依据四域预筛报告（`planning-artifacts/data-source-expansion-prescreening.md`，19 候选源实测裁定：可行 7/有条件 8/不可行 10）落地第一批：三个零许可成本、实测已通的官方源适配器 + 现有源中文参数扩展验证 + 声明重分配联动。**范围边界：** Phase 2（Google Patents BigQuery/巨潮 cninfo/港交所披露易/协会 crawler/PDF→文本管道）登记为后续 Story 4.1g；IDC/Gartner/Euromonitor 商业独家数据确认为不可得（合同与技术双重壁垒），以代理指标组合替代并显式声明能力边界。
+
+**Acceptance Criteria:**
+
+1. **中文参数扩展验证（Phase 0，先行）**
+   - [ ] tavily 适配器启用 `language=zh-cn` / `country=china` / `topic=news|finance` 参数（现 `tavily_adapter.py:104-108` 仅传 `{api_key, query, max_results}`）
+   - [ ] newsapi 适配器启用 `language=zh` / `domains` 参数（现 `newsapi_adapter.py:105` 仅传 `{q, pageSize, sortBy}`）
+   - [ ] 以「比亚迪 战略动态」类中文 query 实测对比扩展前后质量，产出缺口剩余评估（决定是否需百度千帆/东财等专职中文源——本 Story 内闭环判断）
+
+2. **EPO Espacenet OPS 适配器（专利域第一优先）**
+   - [ ] 新增 OAuth2 client-credentials 认证模式（现适配器均为静态 API-Key 头——令牌缓存/刷新为基建新增项）
+   - [ ] 4 GB/周免费配额守卫（按响应体字节计数 + 超限熔断降级话术）
+   - [ ] `pa=` 申请人字段化检索（支持中文名，如 `pa=华为`）+ `ti=/ab=` 关键词检索——直接补齐 uspto 无归因短板
+   - [ ] `Accept: application/json` 官方 JSON 消费
+
+3. **SEC EDGAR 适配器（企业财报域）**
+   - [ ] 强制 `User-Agent: "公司名 邮箱"` 规范 + 客户端限速（官方 Fair Access ≤10 req/s，建议 8）
+   - [ ] XBRL 结构化消费：`companyfacts`/`companyconcept`（指定企业营收时序）+ `frames`（跨公司同周期横截面——份额加总）
+   - [ ] 全文检索（`efts.sec.gov` search-index）支持 "market share" 类叙述性证据采集
+
+4. **UN Comtrade 适配器（行业量化域首选）**
+   - [ ] 免费 key（`Ocp-Apim-Subscription-Key` 头）+ 500 次/天配额守卫
+   - [ ] HS 商品级 query 规范（如 `8703` 整车 / `850760` 锂电池 + reporterCode=156 中国口径）
+
+5. **required_fields 按源定制联动（原 4.3 defer 项承载）**
+   - [ ] DataSourceRef.required_fields 按源定制（EPO OPS=`[title, applicant, filing_date]` 类；EDGAR=`[concept, value, period]` 类；Comtrade=`[cmd_code, trade_value, period]` 类——禁止沿用 `[indicator, value]` 模板残留）
+   - [ ] `EXPECTED_REQUIRED_FIELDS` 契约常量重构（统一断言 → 按源查表断言）+ 16 个既有 SKILL.md frontmatter 的 required_fields 联动核验（零漂移）
+
+6. **受益 Skills 声明重分配（四方联动）**
+   - [ ] competitor-analysis：data_sources 增补 EPO OPS + SEC EDGAR（专利布局维度 1→2 源、市场份额维度获得企业级源）+ §5 映射表/yaml SSOT/frontmatter/契约库四方同步
+   - [ ] disruptive-innovation / vrio-framework：增补 EPO OPS（专利域第二口径，双源互证升级）
+   - [ ] 相关行业分析 Skill（appeals/kpi-tree 等）按 Comtrade 语义匹配度评估增补（评估结论留痕，不强行凑源）
+   - [ ] D2「统一 2 源」决策修订评审（语义强可达的 4-1d Skill 是否放宽至 3 源——产品判断留痕）
+
+7. **能力边界与合规登记**
+   - [ ] architecture.md §17.3.3 增补「商业机构独家份额数据不可得」能力边界声明与代理指标组合说明
+   - [ ] 适配器层合规登记：UA/署名要求（EDGAR/Comtrade）、配额政策（EPO 4GB/周、Comtrade 500 次/天）、法务确认项（若引入东财/千帆类灰区源）
+
+**TDD 测试要求:**
+
+- [ ] 适配器单元测试（`tests/unit/infrastructure/external_services/datasources/`，Mock HTTP 边界——OAuth2 令牌流/配额守卫/限速/UA 规范各负例）
+- [ ] 适配器集成测试（真实服务优先原则：key 就绪时真实端点连通 + TestTenant 隔离；key 未就绪动态 skip）
+- [ ] 契约库联动测试（required_fields 按源查表断言重构 + 失败路径负例）
+- [ ] 受益 Skill 单测/集成/架构断言更新（三方一致链 + 维度级源数断言从「如实声明」升级为「实质收敛」验证）
+- [ ] 中文参数扩展 A/B 实测报告（扩展前后对比证据，归档 planning-artifacts）
+
+**Given** Story 4.1b 数据采集基础设施与 4.1c/4.1e Skills 全量成熟化已完成
+**When** 新适配器注册进组合根且受益 Skills 完成声明重分配
+**Then** Agent 调用 competitor-analysis 等工具时专利/份额维度获得 ≥2 独立源实证
+**And** 中文 query 经参数扩展后的检索质量有实测证据与缺口结论
+
+**外部前置（可先行异步启动）：** EPO OPS Consumer Key（developers.epo.org 免费注册）/ UN Comtrade key（comtradedeveloper.un.org）/ 法务确认单（灰区源引入评估）
 
 ---
 

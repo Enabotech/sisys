@@ -1112,7 +1112,7 @@ tests/
 #### 已推迟 Defer
 
 - [ ] 节点级注入（旁路+误拒双向）→ Story 4.2（4-1c 既定留项）
-- [ ] `skill_io_schemas.yaml` data_sources.items 字段级化 + description 命名对齐 → 数据源扩展专项（未立项——原指向 Story 4.3 但 4.3 已 done 未承载，2026-09-29 台账勘正；4-1c R2-F7 既定留项 + 2026-09-29 评审推广强化：含 **DataSourceRef.required_fields 按源定制**——现行统一 `[indicator, value]` 为 4-1b 标准化契约残留，newsapi 返回文章/uspto 返回专利均非天然 indicator-value 结构，按源定制须联动 EXPECTED_REQUIRED_FIELDS 契约常量 + assert_data_sources_contract 断言 + 适配器响应校验 + 16 个 SKILL.md frontmatter 四方联动）
+- [ ] `skill_io_schemas.yaml` data_sources.items 字段级化 + description 命名对齐 → Story 4.1f（已立项 2026-09-29——Skills 数据源扩展；原指向 Story 4.3 已 done 未承载，台账勘正后正式立项；4-1c R2-F7 既定留项 + 2026-09-29 评审推广强化：含 **DataSourceRef.required_fields 按源定制**——现行统一 `[indicator, value]` 为 4-1b 标准化契约残留，newsapi 返回文章/uspto 返回专利均非天然 indicator-value 结构，按源定制须联动 EXPECTED_REQUIRED_FIELDS 契约常量 + assert_data_sources_contract 断言 + 适配器响应校验 + 16 个 SKILL.md frontmatter 四方联动）
 - [ ] 输出侧时间戳（analysis_date）与溯源 source_id 关联结构 + 数据源扩充（CNIPA/WIPO/财报/行业协会——新适配器开发与合规评估）→ Story 4.3/数据扩展专项（2026-09-29 评审推广登记：运行时校验行为变更须随 4.3 运行时校验一并设计）
 - [ ] 输入侧自由 object 字段化（含本 Story raci assignments / gantt durations+resources / bmc cost_structure）→ Story 4.3（4-1d A12 + 本 Story D6 沿用）
 - [ ] StrategicAnalysisUseCase 的 composition_root 注册 + 接口层入口 → 入口 Story（4-1c R1-P2-13 既定 Defer）
