@@ -151,10 +151,15 @@ Think 阶段必须先输出**五力 → 指标 → 数据源**映射计划，再
 | 供应商议价力 | 上游集中度、原材料价格波动、供应商纵向整合 | newsapi（供应链/涨价新闻）、world-bank（大宗商品与贸易指标） |
 | 购买者议价力 | 下游集中度、转换成本、采购招标动态 | newsapi（大客户/招标新闻）、eurostat（欧盟下游行业采购结构） |
 
-**三角化要求**：本 Skill 声明源共 3 个，三角化 = **全 3 源覆盖**——每个力的关键指标
-须由 newsapi + world-bank + eurostat 三源共同印证（三角化规范见
-`references/triangulation.md`）；任何一力缺失任一来源印证时，必须在 `sources`
-字段如实登记并在 `evidence` 中标注证据强度下调。
+**源级三角化**：3 个声明源全部参与采集；力级直接映射源数以 §5 映射表为准（仅「现有竞争」
+为 3 源直接映射，其余四力为 2 源）——2 源直接映射的力经跨力关联印证后评分上限规则见
+`references/scoring_anchors.md`；**同源多 query（name/name#2 键）不构成独立来源**，不得
+计入印证数（三角化规范见 `references/triangulation.md`）；任何一力缺失来源印证时，必须在
+`sources` 字段如实登记并在 `evidence` 中标注证据强度下调。
+
+**数据源口径边界**：world-bank 为国家宏观口径（行业集中度仅作宏观旁证，非行业级直接
+数据）；eurostat 为欧盟口径（region_scope=china 时仅作全球参照不作主证）；newsapi 以英文
+新闻覆盖为主。每源采集结果量以适配器默认分页为准（SOP 引导代码不得显式请求超量数据）。
 
 ## 6. SOP 执行步骤
 
@@ -162,9 +167,10 @@ Think 阶段必须先输出**五力 → 指标 → 数据源**映射计划，再
 2. **Think**：输出五力 → 指标 → 数据源映射（§5），声明各力采集目标
 3. **Code**：生成含 `$DATA_SOURCE` 标记的采集代码。**标记使用规范**：
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
-   - 每个声明源恰好一个标记；**query 必须为该源的规范格式**（统计类适配器将 query
+   - 每个声明源至少 1 个标记；**query 必须为该源的规范格式**（统计类适配器将 query
      作为机器码拼接 API URL，自然语言描述会确定性失败，R3-P1-2 契约对齐）：
-     - `newsapi`：检索关键词（自然语言关键词为**正确**格式，含行业/地域上下文）
+     - `newsapi`：检索关键词（自然语言关键词为**正确**格式，含行业/地域上下文；
+       `incumbent_players` 传入时 query 应含在位企业名以聚焦采集）
      - `world-bank`：World Bank 指标码（点分格式，如 `"NV.IND.MANF.CD"`=制造业增加值；
        指标语义在 Think 阶段由 LLM 映射，勿凭空构造）
      - `eurostat`：数据集代码（下划线格式，如 `"sbs_sc_sca_r2"`=结构企业统计）
@@ -178,12 +184,16 @@ Think 阶段必须先输出**五力 → 指标 → 数据源**映射计划，再
 5. **Observe/Validate**：基于注入数据完成五力强度评分（评分锚点见 `references/scoring_anchors.md`）
 6. **综合研判**：五力加权汇总得出行业吸引力评级（高/中/低），
    工作坊研讨引导见 `references/workshop_guide.md`
+   （研讨观点须溯源至注入数据或显式标注为待验证假设，禁止生成无出处的专家意见）
 7. **输出**：按 output_schema 组装，每力 `sources` 字段如实登记实际印证来源
 
 采集代码骨架示例：
 
 ```python
-industry_news = $DATA_SOURCE("newsapi", "动力电池 行业竞争 并购 价格战 新进入者 最新动态")
+# 现有竞争维度（键 newsapi）：竞争格局 + 在位企业聚焦（incumbent_players 传入时含企业名）
+rivalry_news = $DATA_SOURCE("newsapi", "动力电池 宁德时代 比亚迪 行业竞争 并购 价格战 最新动态")
+# 新进入者维度（同源多 query → 键 newsapi#2）：进入壁垒与新玩家动态归因独立采集
+entry_news = $DATA_SOURCE("newsapi", "动力电池 新进入者 融资 建厂 进入壁垒 最新动态")
 macro_indicators = $DATA_SOURCE("world-bank", "NV.IND.MANF.CD")  # 制造业增加值（现价美元）
 eu_industry_stats = $DATA_SOURCE("eurostat", "sbs_sc_sca_r2")    # 结构企业统计
 

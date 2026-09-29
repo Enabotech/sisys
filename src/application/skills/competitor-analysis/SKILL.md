@@ -3,9 +3,9 @@ slug: competitor-analysis
 name: 竞争对手分析
 version: 1.0.0
 tool_name: 竞争对手分析
-description: 竞争对手画像 + 战略 + 优势劣势综合分析
+description: 竞争对手画像 + 四维对标（战略动向/专利布局/产品组合/市场份额）矩阵分析
 when_to_use:
-  - 竞争对手识别
+  - 已知竞品系统画像
   - 战略对标
   - 市场份额分析
 when_not_to_use:
@@ -61,7 +61,8 @@ input_schema:
       description: 目标行业
     competitors:
       type: array
-      description: 竞品企业清单（≥1 家）
+      description: 竞品企业清单（≥2 家，推荐 3-5 家——单竞品输入时输出退化为单竞品画像并标注）
+      minItems: 2
       items:
         type: string
     analysis_dimensions:
@@ -69,6 +70,7 @@ input_schema:
       description: 可选对标维度子集（缺省全维度）
       items:
         type: string
+        enum: [战略动向, 专利布局, 产品组合, 市场份额]
 output_schema:
   type: object
   required: [competitor_profiles, benchmark_matrix, data_sources]
@@ -88,17 +90,36 @@ output_schema:
             description: 战略动向摘要
           patent_signals:
             type: array
-            description: 专利技术信号（USPTO）
+            description: 专利技术信号（USPTO 口径——uspto 未注册或采集失败时输出空数组，并在 sources 与数据缺口登记中如实标注）
             items:
               type: string
           sources:
             type: array
-            description: 数据来源
+            description: 实际印证来源（源名与 data_sources 溯源元数据对齐，禁止登记未采集来源）
             items:
               type: string
     benchmark_matrix:
       type: object
       description: 竞品对标矩阵（维度 × 企业评分）
+      properties:
+        dimensions:
+          type: array
+          description: 参与对标的维度清单（战略动向/专利布局/产品组合/市场份额）
+          items:
+            type: string
+        companies:
+          type: array
+          description: 对标企业清单
+          items:
+            type: string
+        scores:
+          type: object
+          description: 评分矩阵（外层键为维度名，内层键为企业名，值为 0-1 评分）
+        data_gaps:
+          type: array
+          description: 数据缺口登记（源缺失或印证不足的维度及影响）
+          items:
+            type: string
     data_sources:
       type: array
       description: 溯源元数据（source/freshness/confidence）
@@ -114,7 +135,7 @@ output_schema:
 
 ## 1. 适用场景
 
-- 竞争对手识别：进入新市场/新产品线前对主要竞品企业的系统性画像
+- 已知竞品系统画像：对已识别竞品企业的系统性画像深化（竞品发现不在本工具范围——无已知竞品清单时先经行业研究建立清单）
 - 战略对标：SP 制定期对竞品战略动向/专利布局/产品组合/市场份额的结构化对标
 - 市场份额分析：为 SWOT-TOWS、战略地图提供竞争格局实证依据（O/T 象限的竞争侧输入）
 
@@ -129,8 +150,8 @@ output_schema:
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `industry` | string | ✅ | 目标行业（如 "新能源汽车"） |
-| `competitors` | array | ✅ | 竞品企业清单（≥1 家，如 ["比亚迪", "特斯拉"]） |
-| `analysis_dimensions` | array | 可选 | 对标维度子集（缺省全维度：战略动向/专利布局/产品组合/市场份额） |
+| `competitors` | array | ✅ | 竞品企业清单（≥2 家，推荐 3-5 家，如 ["比亚迪", "特斯拉"]；minItems 2——单竞品时输出退化并标注） |
+| `analysis_dimensions` | array | 可选 | 对标维度子集（enum 四值：战略动向/专利布局/产品组合/市场份额——缺省全维度） |
 
 ## 4. 输出字段（output_schema）
 
@@ -151,20 +172,29 @@ Think 阶段必须先输出**对标维度 → 关键指标 → 数据源**映射
 | 产品组合 | 产品线结构、新品发布、定价策略 | tavily（官网/评测/电商情报）、newsapi（产品新闻） |
 | 市场份额 | 销量/营收份额、行业排名、区域渗透率 | china-nbs（中国行业对标统计）、newsapi（行业报道） |
 
-**三角化要求**：每个对标维度的关键指标必须由 ≥3 个独立来源印证（三角化规范见
-`references/triangulation.md`）；本 Skill 4 个声明源全部参与采集、全维度覆盖，
-禁止仅用单一来源下结论。
+**源级三角化**：4 个声明源全部参与采集（并发覆盖，三角化规范见
+`references/triangulation.md`）；维度级直接映射源数以上表为准（战略动向/产品组合/
+市场份额为 2 源，专利布局仅 uspto 1 源）——直接映射不足的维度须跨维度关联印证或
+显式标注「印证不足」并下调置信度；**专利维度单源结论必须标注「专利维度未三角化
+（USPTO 单源口径）」**。**同源多 query（name/#2 键）不构成独立来源**，不得计入印证数。
+
+**数据源口径边界**：uspto 仅美国专利口径（不含 CNIPA/WIPO——全球布局画像系统性
+偏低样本，中国竞品尤甚），且检索为 patent_title 标题关键词匹配（非申请人结构化
+检索——归因经返回的 assignees 字段研判）；china-nbs 为宏观/行业总量口径，不提供
+企业级份额数据（份额结论须「行业→企业」显式映射推断并标注，或降级为行业格局
+定性判断）；newsapi 以英文新闻覆盖为主；tavily 为 Web 事件级检索（非结构化指标级）。
 
 ## 6. SOP 执行步骤
 
-1. **解析输入**：校验 `industry` / `competitors` 必填字段（competitors 至少 1 家）
+1. **解析输入**：校验 `industry` / `competitors` 必填字段（competitors 至少 2 家——minItems 2）
 2. **Think**：输出对标维度 → 指标 → 数据源映射（§5），声明各维度采集目标
 3. **Code**：生成含 `$DATA_SOURCE` 标记的采集代码。**标记使用规范**：
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
-   - 每个声明源恰好一个标记；**query 必须为该源的规范格式**（R3-P1-2 契约对齐）：
-     - `newsapi` / `tavily`：检索关键词（自然语言关键词为**正确**格式，含行业/竞品名/时间上下文）
-     - `uspto`：**英文**检索关键词（匹配 patent_title 全文，如 `"electric vehicle battery"`）
+   - 每个声明源至少 1 个标记（同源多 query 依次分配 name/name#2 键——见下方同源多 query 说明）；**query 必须为该源的规范格式**（R3-P1-2 契约对齐）：
+     - `newsapi` / `tavily`：检索关键词（自然语言关键词为**正确**格式，**按竞品逐家拆分 query**——每竞品一查，禁止单 query 混入多家竞品名导致归因混淆）
+     - `uspto`：**英文**检索关键词（匹配 patent_title 全文）——**含竞品英文名 + 技术域词实现标题软归因**（如 `"BYD battery"`）；适配器不支持 assignee 结构化检索，采集后经返回的 assignees 字段做研判归因（口径边界见 §5）
      - `china-nbs`：站点相对路径（如 `"sj/zxfb"`=数据发布；非自然语言描述）
+   - 每源采集结果量以适配器默认分页为准（SOP 引导代码不得显式请求超量数据）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
    - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
      每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
@@ -173,19 +203,24 @@ Think 阶段必须先输出**对标维度 → 关键指标 → 数据源**映射
      **同源多 query**：同一数据源的多个不同 query 依次分配 `"<name>"` / `"<name>#2"` 键
 4. **Execute**：宿主机侧并发采集并注入 preamble，沙箱执行分析代码
 5. **Observe/Validate**：基于注入数据完成竞品画像与维度评分（评分锚点见 `references/scoring_anchors.md`）
-6. **工作坊**：按竞品调研工作坊流程（引导见 `references/workshop_guide.md`）
-   组织专家研判，将对标结论填入矩阵模板 `templates/competitor_benchmark_matrix.md`
+6. **结论研判与工作坊衔接**：本 SOP 生成初步画像、对标矩阵与证据链、待议清单（数据缺口与冲突项）；专家研判由用户侧工作坊进行（引导见 `references/workshop_guide.md`——**所有研讨观点须溯源至注入数据或显式标注为待验证假设，禁止生成无出处的专家意见**），研讨结论回填模板 `templates/competitor_benchmark_matrix.md`
 7. **输出**：按 output_schema 组装，每竞品 `sources` 字段如实登记实际印证来源
 
-采集代码骨架示例：
+采集代码骨架示例（query 按竞品逐家拆分——每竞品一查实现归因）：
 
 ```python
-news = $DATA_SOURCE("newsapi", "新能源汽车 比亚迪 特斯拉 战略动态 市场份额 最新报道")
-patents = $DATA_SOURCE("uspto", "electric vehicle battery")  # 英文关键词匹配 patent_title
-web_intel = $DATA_SOURCE("tavily", "比亚迪 特斯拉 产品组合 定价策略 竞品分析")
-cn_stats = $DATA_SOURCE("china-nbs", "sj/zxfb")              # 国家局数据发布
+# newsapi 按竞品拆分：首 query 为裸 name，第二家竞品为 name#2
+news_byd = $DATA_SOURCE("newsapi", "比亚迪 战略动态 并购 新能源汽车 最新报道")
+news_tesla = $DATA_SOURCE("newsapi#2", "特斯拉 战略动态 市场份额 最新报道")
+# uspto 标题软归因：竞品英文名 + 技术域词（采集后经 assignees 字段研判归因）
+patents_byd = $DATA_SOURCE("uspto", "BYD battery")       # 英文关键词匹配 patent_title
+patents_tesla = $DATA_SOURCE("uspto#2", "Tesla battery")
+# tavily 按竞品拆分
+web_byd = $DATA_SOURCE("tavily", "比亚迪 产品组合 定价策略 竞品情报")
+web_tesla = $DATA_SOURCE("tavily#2", "特斯拉 产品组合 定价 竞品情报")
+cn_stats = $DATA_SOURCE("china-nbs", "sj/zxfb")           # 国家局数据发布（行业总量口径）
 
-# 采集后通过注入的 DATA_SOURCES dict 读取
+# 采集后通过注入的 DATA_SOURCES dict 读取（键含 #2 后缀形态）
 uspto_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
 ```
 
@@ -194,7 +229,7 @@ uspto_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
 | 异常 | 语义 | LLM 应对话术 |
 |------|------|-------------|
 | 411 数据源不可用 | 5xx/连接失败/熔断 | 「数据源 X 暂不可用，本次对标基于其余 N-1 个来源完成，该维度结论置信度下调并标注」 |
-| 411 未注册（Key 缺失） | newsapi/tavily/uspto 未配置 API Key，冷启动未注册（uspto 自 R3 起条件注册） | 「数据源 X 因 API Key 未配置未注册，相应维度基于其余来源完成，**输出中显式标注数据缺口**：竞品舆情/Web 情报/专利维度缺失实时印证」 |
+| 411 未注册（Key 缺失） | newsapi/tavily/uspto 未配置 API Key，冷启动未注册（uspto 自 R3 起条件注册） | 「数据源 X 因 API Key 未配置未注册，相应维度基于其余来源完成，**输出中显式标注数据缺口**：竞品舆情/Web 情报/专利维度缺失实时印证（patent_signals 输出空数组承载缺口——schema 必填指键存在，空数组合法；禁止编造专利信号）」 |
 | 412 限流 | 429 配额耗尽 | 「数据源 X 触发限流，使用缓存快照（freshness_score 已折算）并标注数据时效」 |
 | 413 解析失败 | 响应格式异常（不可重试） | 「数据源 X 响应解析失败，跳过该源并在 sources 字段中剔除，禁止编造观测值」 |
 | 207 白名单违规 | 标记引用未声明数据源 | 不发生（本 SOP 标记严格使用白名单内 4 源）；若出现说明代码生成偏离 SOP，重新按 §6 生成 |
@@ -218,7 +253,7 @@ uspto_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
 
 ## 9. References 指引
 
-- `references/triangulation.md` — 竞品情报三角化规范（≥3 独立来源印证流程与冲突裁决）
+- `references/triangulation.md` — 竞品情报三角化规范（源级三角化印证流程、独立性纪律与冲突裁决）
 - `references/scoring_anchors.md` — 对标矩阵评分锚点（0-1 分档定义与示例）
 - `references/workshop_guide.md` — 竞品调研工作坊引导方法论（研讨流程/角色/产出物）
 - `templates/competitor_benchmark_matrix.md` — 竞品对标矩阵模板（维度 × 企业，工作坊填写用）

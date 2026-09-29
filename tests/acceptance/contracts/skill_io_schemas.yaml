@@ -87,7 +87,7 @@ skills:
                   type: object
               sources:
                 type: array
-                description: 该维度数据来源（≥3 独立来源三角化）
+                description: 该维度数据来源（实际印证源——直接映射源数不足时跨维间接印证或显式标注缺口）
                 items:
                   type: string
         weighted_total:
@@ -227,7 +227,8 @@ skills:
           description: 目标行业
         competitors:
           type: array
-          description: 竞品企业清单（≥1 家）
+          description: 竞品企业清单（≥2 家，推荐 3-5 家——单竞品输入时输出退化为单竞品画像并标注）
+          minItems: 2
           items:
             type: string
         analysis_dimensions:
@@ -235,6 +236,7 @@ skills:
           description: 可选对标维度子集（缺省全维度）
           items:
             type: string
+            enum: [战略动向, 专利布局, 产品组合, 市场份额]
     output_schema:
       type: object
       required: [competitor_profiles, benchmark_matrix, data_sources]
@@ -254,17 +256,36 @@ skills:
                 description: 战略动向摘要
               patent_signals:
                 type: array
-                description: 专利技术信号（USPTO）
+                description: 专利技术信号（USPTO 口径——uspto 未注册或采集失败时输出空数组，并在 sources 与数据缺口登记中如实标注）
                 items:
                   type: string
               sources:
                 type: array
-                description: 数据来源
+                description: 实际印证来源（源名与 data_sources 溯源元数据对齐，禁止登记未采集来源）
                 items:
                   type: string
         benchmark_matrix:
           type: object
           description: 竞品对标矩阵（维度 × 企业评分）
+          properties:
+            dimensions:
+              type: array
+              description: 参与对标的维度清单（战略动向/专利布局/产品组合/市场份额）
+              items:
+                type: string
+            companies:
+              type: array
+              description: 对标企业清单
+              items:
+                type: string
+            scores:
+              type: object
+              description: 评分矩阵（外层键为维度名，内层键为企业名，值为 0-1 评分）
+            data_gaps:
+              type: array
+              description: 数据缺口登记（源缺失或印证不足的维度及影响）
+              items:
+                type: string
         data_sources:
           type: array
           description: 溯源元数据（source/freshness/confidence）
@@ -627,10 +648,10 @@ skills:
               description: CA 竞争优势评分（内部数据）
             industry_strength:
               type: number
-              description: IS 产业实力评分（外部基准：IMF WEO 产业展望）
+              description: IS 产业实力评分（内部预评，经 IMF 外部基准校准——校准规则见 §5/data_fusion.md）
             environmental_stability:
               type: number
-              description: ES 环境稳定性评分（外部基准：WB 治理/通胀指标）
+              description: ES 环境稳定性评分（内部预评，经 WB 外部基准校准——校准规则见 §5/data_fusion.md）
     output_schema:
       type: object
       required: [space_positioning, data_sources]
@@ -1079,7 +1100,7 @@ skills:
               description: 九块成熟度分值聚合（外层键为块名，值为 1-5 分值与依据——自由 object，4.3 defer）
             consistency_analysis:
               type: object
-              description: 块间一致性分析（核心匹配 value_propositions↔customer_segments 与成本-收入对称 cost_structure↔revenue_streams 双侧对照）
+              description: 块间一致性分析（外层键为对照关系名（如 value_propositions_customer_segments、cost_structure_revenue_streams），值为一致性判定与依据——自由 object，4.3 defer；核心匹配 value_propositions↔customer_segments 与成本-收入对称 cost_structure↔revenue_streams 双侧对照）
 
   # ---------------------------------------------------------------------------
   # 组织设计框架（纯内部型：Galbraith Star Model 五维对齐评估；org_structure
@@ -1220,7 +1241,7 @@ skills:
           properties:
             nodes:
               type: array
-              description: 因果链节点清单（维度/指标/主题）
+              description: 因果链节点清单（每节点含 node_id 节点标识、label 节点名称、dimension 所属维度三键——自由 object，4.3 defer）
               items:
                 type: object
             causal_arrows:
@@ -1230,7 +1251,7 @@ skills:
                 type: string
             theme_cards:
               type: array
-              description: 战略主题卡清单（主题名/涉及维度/假设链）
+              description: 战略主题卡清单（每卡含 theme 主题名、dimensions 涉及维度、hypothesis_chain 假设链三键——自由 object，4.3 defer）
               items:
                 type: object
 
@@ -1375,7 +1396,7 @@ skills:
           properties:
             timeline:
               type: array
-              description: 时间线条目清单（前推 ES/EF 与后推 LS/LF——天基准归一后推算）
+              description: 时间线条目清单（每条目含 task 任务名、duration 归一时长（天）、es/ef/ls/lf 四时刻——天基准归一后推算；自由 object，4.3 defer）
               items:
                 type: object
             milestones:

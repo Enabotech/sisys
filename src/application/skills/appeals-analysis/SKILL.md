@@ -3,11 +3,11 @@ slug: appeals-analysis
 name: $APPEALS
 version: 1.0.0
 tool_name: $APPEALS
-description: 顾客价值 8 维度分析（$/A/P/P/E/A/L/S），基于 3 个外部数据源自动采集顾客洞察实证数据
+description: 顾客价值 8 维度分析（$/A/P/P/E/A/L/S），基于 3 个外部数据源自动采集顾客洞察实证数据（事件级检索与宏观统计口径——见 §5 口径边界）
 when_to_use:
   - 顾客需求洞察
   - 产品价值定位
-  - 市场细分
+  - 细分客群偏好分析
 when_not_to_use:
   - 成本结构分析请用 value-chain-analysis
 capabilities:
@@ -107,7 +107,7 @@ output_schema:
 
 - 顾客需求洞察：新产品立项/现有产品迭代前，对目标客群购买决策要素的系统性洞察
 - 产品价值定位：SP/BP 制定期对顾客价值主张的八维度结构化评估与差异化定位
-- 市场细分：基于八维度偏好差异识别细分客群，为价值曲线、VPC 提供顾客侧实证输入
+- 细分客群偏好分析：对已指定目标客群（target_segment）的八维度偏好差异结构化分析，为价值曲线、VPC 提供顾客侧实证输入（客群发现不在本工具范围——细分客群由用户先行指定）
 
 ## 2. 负向触发
 
@@ -146,8 +146,14 @@ Think 阶段必须先输出**维度 → 顾客洞察指标 → 数据源**映射
 | L 生命周期成本 | 使用成本、维护成本、置换成本感知 | tavily（TCO 讨论）、china-nbs（居民消费支出结构） |
 | S 社会接受度 | 社会认同、环保/伦理关注、潮流契合度 | newsapi（社会舆情）、china-nbs（消费倾向统计） |
 
-**三角化要求**：每个维度的关键洞察必须由全 3 个声明源交叉印证（三角化规范见
-`references/triangulation.md`）；3 个声明源全部参与采集，禁止仅用单一来源下结论。
+**源级三角化**：3 个声明源全部参与采集（并发覆盖，三角化规范见
+`references/triangulation.md`）；维度级直接映射源数以上表为准（各维度均为 2 源）——
+结论须跨维度关联印证或显式标注「印证不足」并下调置信度。**同源多 query（name/#2 键）
+不构成独立来源**，不得计入印证数。
+
+**数据源口径边界**：china-nbs 为宏观/住户总量口径（非客群级数据——客群结构结论须经
+「宏观→客群」显式映射并标注假设）；tavily/newsapi 为事件级检索（非结构化指标级）；
+newsapi 以英文新闻覆盖为主（中文 query 可用但覆盖有限）。
 
 ## 6. SOP 执行步骤
 
@@ -155,9 +161,10 @@ Think 阶段必须先输出**维度 → 顾客洞察指标 → 数据源**映射
 2. **Think**：输出维度 → 指标 → 数据源映射（§5），声明八维度采集目标
 3. **Code**：生成含 `$DATA_SOURCE` 标记的采集代码。**标记使用规范**：
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
-   - 每个声明源恰好一个标记；**query 必须为该源的规范格式**（R3-P1-2 契约对齐）：
+   - 每个声明源至少 1 个标记（同源多 query 依次分配 name/name#2 键——见下方同源多 query 说明）；**query 必须为该源的规范格式**（R3-P1-2 契约对齐）：
      - `tavily` / `newsapi`：检索关键词（自然语言关键词为**正确**格式，含产品类别/目标客群/地域上下文）
      - `china-nbs`：站点相对路径（如 `"sj/zxfb"`=数据发布；非自然语言描述）
+   - 每源采集结果量以适配器默认分页为准（SOP 引导代码不得显式请求超量数据）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
    - 采集结果经全局 `DATA_SOURCES` dict 注入读取，**必须使用 `.get()` 防御性读取**，
      每项含 `payload` / `source_timestamp` / `freshness_score` / `confidence` / `cache_hit`。
@@ -172,9 +179,12 @@ Think 阶段必须先输出**维度 → 顾客洞察指标 → 数据源**映射
 采集代码骨架示例：
 
 ```python
-customer_insights = $DATA_SOURCE("tavily", "智能手表 一线城市 25-35 岁运动人群 顾客评价 价格 性能 易用性 售后")
+# tavily 按维度分组拆分（首 query 为裸 name，后续为 name#2/name#3）——消除单 query 跨维归因混淆
+price_tco = $DATA_SOURCE("tavily", "智能手表 运动人群 顾客评价 价格 性价比")  # $ 价格 + L 生命周期成本
+perf_usability = $DATA_SOURCE("tavily#2", "智能手表 评测 性能 易用性 上手体验")  # P 性能 + E 易用性
+packaging_social = $DATA_SOURCE("tavily#3", "智能手表 包装 开箱 社会认同 环保")  # P 包装 + S 社会接受度
 market_sentiment = $DATA_SOURCE("newsapi", "智能手表 消费者 口碑 舆情 社会接受度")
-cn_consumption = $DATA_SOURCE("china-nbs", "sj/zxfb")  # 国家局数据发布
+cn_consumption = $DATA_SOURCE("china-nbs", "sj/zxfb")  # 国家局数据发布（宏观/住户总量口径）
 
 # 采集后通过注入的 DATA_SOURCES dict 读取
 tavily_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
