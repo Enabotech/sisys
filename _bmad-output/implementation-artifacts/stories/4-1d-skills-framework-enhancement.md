@@ -341,7 +341,7 @@ data_sources:
 - 模板四段式结构完整（基本信息区 / 采集表格区 / 评分锚点引用 / 数据缺口登记区，微格式契约见「内部数据契约」节）
 
 **验证标准/Validation Criteria:**
-- [x] `tests/unit/application/skills/test_schema_template_alignment.py`（10 Skill 参数化）双向断言通过
+- [x] `tests/unit/application/skills/test_schema_template_alignment.py`（10 Skill 参数化）双向断言通过（Round 1 R1-F3 追认：断言链已扩至第 6 条——采集表格区 `###` 分区标题集合 ↔ input_schema 顶层容器键集合双向，承载「内部数据契约」节的分区标题契约）
 - [x] 模板字段提取器（Markdown 表格字段列 + 「（必填）」后缀剥离 + 嵌套叶子键递归展开）与 frontmatter Schema 叶子键集合相等断言
 - [x] 模板结构与锚点引用断言通过（四段标题字面值 + `references/scoring_anchors.md` 字面串 + 缺口区表头）
 - [x] **变异演示（Round 1 D2-B 补定，4-1c 判别力先例承接）**：临时删除任一模板字段 → [D] 断言变红后还原；临时改模板 required 标注语法 → 提取器断言变红后还原
@@ -504,8 +504,8 @@ data_sources:
 #### 代码质量门禁
 - [x] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
 - [x] **MyPy 类型检查通过**（`poetry run mypy src/`）
-- [x] **无 P0/P1 级别问题**（代码审查）（Round 1：C1 四视角调研 P0×0、P1×2——R1-F1/F2 已修复并全量验证；ruff check+format 全绿、mypy 零错误独立复跑）
-- [x] **预提交 Hooks 通过**（`pre-commit run --all-files`）（R1-F10 如实注明：本会话授权限制无法独立预跑 `pre-commit run`——以 C4 提交时钩子自动运行实证 Passed + ruff check/format 与 mypy 独立复跑全绿替代，非虚报全仓执行）
+- [x] **无 P0/P1 级别问题**（代码审查）（勾选时效基准 = Round 4 终态：全周期 P0×0；P1 累计 R1×2 / R2×6 / R3×2 共 10 项，均已当轮修复并全量验证（见 Review Findings 三轮记录）；ruff check+format 全绿、mypy 零错误独立复跑）
+- [x] **预提交 Hooks 通过**（`pre-commit run --all-files`）（R1-F10 如实注明：本会话授权限制无法独立预跑 `pre-commit run`——以各轮 C4 提交时钩子自动运行实证全 Passed（e2b91441/e3f0b409/ea10aa1d 及后续提交钩子输出全绿）+ ruff check/format 与 mypy 独立复跑替代，非虚报全仓执行）
 - [x] 测试文件类型注解完备（fixture 返回类型 + 测试参数注解，4-1c R1-P0-1 教训：禁止 `# type: ignore`）
 
 #### 测试隔离约束
@@ -1254,11 +1254,13 @@ tests/
 **审查日期:** 2026-09-29
 **审查模式:** C1~C5 循环审查（Round 1）— C1 四视角并行调研（契约一致性 / 测试有效性 / 回归影响 / AC 符合性，全部结论经主会话独立复核）→ C2 triage 修复方案 → C3 评审门禁后落码
 
+> **计数口径声明（Round 4 补注）：** 各轮 git 提交信息中的严重度计数为**原始发现计数**（triage 去重合并前），本节台账为**合并修复项计数**——两侧口径不同，逐轮对账以本节为准（如 R2 原始 P1×6+P2×7+P3×6=19 项发现，合并为 13 项修复 + 2 defer + 4 dismiss）。
+
 **Round 1 汇总:** P0×0 P1×2 P2×7 P3×11（去重合并后：P1×2 P2×6 P3×9，另 2 项 P3 有据 dismiss、2 项 defer）。四视角实跑全绿（单元 203+113 / 架构 576 / 集成 18 / 验收 16+28，Redis 真实服务）；三方契约本体经生产解析器 + 独立遍历双重复核全部真实成立；AC-1~6 全部满足、File List 75/75 对齐、范围边界全部守住。
 
 #### 需决策 Decision Needed
 
-- [ ] （无——Round 1 无需用户决策项）
+（无——三轮审查均无需用户决策项）
 
 #### Round 1 修复方案（C3 评审通过后落码）
 
@@ -1331,6 +1333,8 @@ tests/
 #### 已推迟 Defer
 
 - [ ] 节点级注入（旁路+误拒双向）→ Story 4.2（4-1c 既定留项，本 Story 不收敛）
+- [ ] 自由 object 字段化（输出侧 6 处 + 输入侧 3 处 value_factors/baseline_data/resistance_analysis）+ vrio 复合单元格分解编码 + §8 编码格式守卫断言 → Story 4.3（Round 2/3 记录，与「工具输出 Schema 强制验证」留项合并）
+- [ ] token 预算无门禁机制（chars/4 中文低估）→ Story 4.3/Epic 5；异常文档 §3.3 重号（2026-06 遗留）→ 文档专项；SPACE 分档含义表斜线双语义 → 4.1e 顺手（Round 3 defer 记录收录）
 - [ ] `skill_io_schemas.yaml` data_sources.items 字段级化 + description 命名对齐 → Story 4.3（4-1c R2-F7 既定留项；本 Story 新增条目沿用现行粒度；**R1-D1 并入**：yaml 各条目头部 data_sources 注释是第三份人工维护副本（当前与 SSOT 逐字一致已核实，无机器校验）——4.3 结构化进 yaml 并让契约库改从 yaml 加载，一并消除注释副本）
 - [ ] `len(ssot_union)==16` 硬编码锚点 + 7 项 4-1e 非目标清单 3 处重复（NON_TARGET_SLUGS ×2 + 架构测试 ×1）→ Story 4-1e 落地时收敛进契约库单一来源（R1-D2，docstring 已注明 4-1e 语义，属有意预置调整点）
 - [ ] StrategicAnalysisUseCase 的 composition_root 注册 + 接口层入口 → 入口 Story（4-1c R1-P2-13 既定留项，FR-IF-01 锚点）
@@ -1349,14 +1353,14 @@ tests/
 - [x] 文档审查 Round 5 完成（收敛终审独立裁定：四轮修复实地在位、残留零活性——**正式收敛，ready-for-dev 确认可交付 dev-story**）
 - [ ] 运行 `validate-create-story` 进行质量检查（可选）
 - [x] 运行 `dev-story` 开始实施（Task 2-11 可多 Agent 并行）
-- [ ] 运行 `code-review` 进行代码审查
+- [ ] 运行 `code-review` 进行代码审查（进行中：C1~C5 循环审查 Round 1/2/3 完成 + Round 4 稳定性验证完成，Round 5 收敛终审待执行——提交链 e2b91441 / e3f0b409 / ea10aa1d / Round 4 提交）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-09-28
-**最后更新/Last Updated:** 2026-09-28
+**最后更新/Last Updated:** 2026-09-29
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics_v1.0.md Story 4.1d + 4-1b/4-1c 完成资产 + 3 视角并行代码调研：Skills 基础设施与 10 Skill 现状 / DataSource 端口与引擎链路 / 4-1c 测试实现模式；8 项决策登记；4-1c 留项 R1-P2-10/11 收敛状态确认）
 - v1.1.0: 文档审查 Round 1 完成（D1 四视角调研 + D2 双视角审查，全部结论附 file:line 证据并经主会话独立复核）：
@@ -1374,3 +1378,9 @@ tests/
 - v1.5.0: 文档审查 Round 5 收敛终审完成（独立裁定）：
   - 提交链完整（创建 + 4 轮修订）；四轮关键修复实地在位抽样全命中；终态字段齐备（sprint-status 同步）；全文残留零活性
   - **正式收敛**：五轮累计 P1×14 + P2×42 + 记录级修复；设计级风险三轮真实消除（独立推演 + 代码实测）；Story v1.4.0 ready-for-dev 确认可交付 dev-story
+- v1.6.0: 代码审查 Round 1~4 完成（C1~C5 循环审查，提交链 e2b91441 / e3f0b409 / ea10aa1d / Round 4）：
+  - Round 1（四视角调研：契约一致性/测试有效性/回归影响/AC 符合性）：P1×2 + P2×6 + P3×4 修复——契约库自检 13 负例、验收租户清理、分区标题断言、结构守卫、required_fields 逐字收紧、23 全量枚举恢复、旧场景迁移、常量收敛
+  - Round 2（回归核查 + 内容质量深挖 + SSOT 全链）：P1×6 + P2×7 修复——4-1c 断言同步收紧、identity 补盖、8 Skill §5 冲突分级化、GE/VRIO/BSC/SPACE 判定体系修复、70-30 定性化、2h 压缩指引、8 Skill 条目编码规范声明
+  - Round 3（回归核查 + 文档运行时 + 可解析性）：P1×2 + P2×6 修复——GE 和值形态一句话规则、change 采集端五方对齐、标记清理零残留、L1/L2 对齐收尾、取值锚点仲裁双侧收敛、确定性解析锚点、architecture.md 8.7.1
+  - Round 4（稳定性验证）：零 P0/P1——R3 修复 9 项全过回归核查（GE 9/9 等价、122 条 description 零漂移）+ 记录级清理（SPACE 双轨矛盾/互查表裁定/记录时效追注/计数口径声明）+ 连续并行稳定性实跑
+  - 三轮评审门禁记录：R1 双评审员（4 项修订）/ R2 双评审员（4 修订 + 8 约束）/ R3 单评审员（F1 证伪换句——9 宫格枚举反例）；全部提交 pre-commit 钩子实证 Passed
