@@ -169,7 +169,9 @@ class TestTemplateAlignment:
         template_scores = _scored_entries(template)
         body_scores = _scored_entries(examples_section)
         common = set(template_scores) & set(body_scores)
-        assert len(common) >= 8, f"§8 与模板同文本条目交集异常（{len(common)} < 8——提取器可能失效）"
+        assert len(common) >= 8, (
+            f"§8 与模板同文本条目交集异常（{len(common)} < 8——单侧删改条目或提取器失效，请核对两侧示例条目）"
+        )
         for desc in sorted(common):
             assert template_scores[desc] == body_scores[desc], (
                 f"同文本条目分值不一致: {desc!r} 模板 {template_scores[desc]} vs §8 {body_scores[desc]}"
