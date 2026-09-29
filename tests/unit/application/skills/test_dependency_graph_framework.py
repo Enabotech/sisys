@@ -97,7 +97,7 @@ class TestSopMaturity:
 
     def test_negative_trigger_to_gantt(self, document: SkillDocument) -> None:
         """负向触发跳转（D13）：含时间排程 → gantt-chart（纯拓扑 vs 含时间分工，本侧单向）"""
-        section = document.body.split("负向触发", 1)[-1]
+        section = document.body.split("负向触发", 1)[-1].split("\n## ", 1)[0]
         assert "gantt-chart" in section, "§2 负向触发未指向 gantt-chart（时间排程分工跳转缺失）"
 
     def test_critical_path_semantics_documented(self, document: SkillDocument) -> None:

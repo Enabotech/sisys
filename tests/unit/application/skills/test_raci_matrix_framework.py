@@ -129,6 +129,8 @@ class TestSopMaturity:
         assert re.fullmatch(RACI_COMBO_PATTERN, "A/A") is None, "正则不得放行重复字母（A/A——文字规则明禁）"
         assert re.fullmatch(RACI_COMBO_PATTERN, "R/A/C") is None, "正则不得放行三字母组合"
         assert re.fullmatch(RACI_COMBO_PATTERN, "X") is None, "正则不得放行非法字母"
+        for repeated in ("RR", "AA", "CC", "II"):
+            assert re.fullmatch(RACI_COMBO_PATTERN, repeated) is None, f"正则不得放行无斜线重复字母（{repeated}）"
 
     def test_assignment_slash_combination_in_examples(self, document: SkillDocument) -> None:
         """§8 示例含斜线组合（A/R）形态的 assignments 双层 JSON"""
