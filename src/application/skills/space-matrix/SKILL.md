@@ -134,7 +134,7 @@ output_schema:
 | ES 环境稳定性（治理/通胀/宏观波动） | world-bank | 点分指标码 + 国家代码（如 "FP.CPI.TOTL.ZG;CHN" / "CC.EST;CHN"） |
 | IS 产业实力（增长展望/需求环境） | imf | 大写下划线指标码 + 国家代码（如 "NGDP_RPCH;CHN" / "PCPIPCH;CHN"） |
 
-**内外交叉验证要求：** IS/ES 评分必须对照 WB/IMF 宏观基准校准（换算档位偏离一档以上需给出内部依据）；FS/CA 为纯内部维度以工作坊共识为准，外部源不评判内部能力；宏观指标为国家维度而非行业维度的粒度边界见 `references/data_fusion.md`（冲突分级处理：内部漏判 → 外部基准优先补正；外部无印证 → 双方并列不下结论；方向相反 → 暂停判断，以最新一手内部数据为准复议）。
+**内外交叉验证要求：** IS/ES 评分必须对照 WB/IMF 宏观基准校准（换算档位偏离一档以上需给出内部依据）；FS/CA 为纯内部维度以工作坊共识为准，外部源不评判内部能力；宏观指标为国家维度而非行业维度的粒度边界见 `references/data_fusion.md`（冲突分级处理：方向相反 → 暂停判断列入复议清单；同向幅度存疑 → 双方并列，保守值参与定向；指标缺失 → 沿用内部预评并标注数据缺口）。
 
 ## 6. SOP 执行步骤
 
@@ -175,10 +175,10 @@ imf_payload = (DATA_SOURCES.get("imf") or {}).get("payload")
 ```json
 {
   "strategic_factors": {
-    "financial_strength": 5.2,
-    "competitive_advantage": -3.4,
-    "industry_strength": 5.8,
-    "environmental_stability": -2.6
+    "financial_strength": 5.0,
+    "competitive_advantage": -3.3,
+    "industry_strength": 5.7,
+    "environmental_stability": -2.7
   }
 }
 ```

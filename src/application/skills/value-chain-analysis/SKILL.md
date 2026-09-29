@@ -44,7 +44,7 @@ input_schema:
   properties:
     enterprise_data:
       type: object
-      description: 企业内部数据（ERP 导出 + 流程访谈，模板 value_chain_activities_inventory.md）。条目编码（R2-F7）——primary/support_activities 逐条「贡献分值（1-5）—— 活动描述」（优势环节判定阈值 ≥4 依赖分值解析）；cost_structure 键值形态「活动 → 成本金额/占比」（证据来源留档模板）
+      description: 企业内部数据（ERP 导出 + 流程访谈，模板 value_chain_activities_inventory.md）。条目编码——primary/support_activities 逐条「贡献分值（1-5）—— 活动描述」（贡献分值 = 首个『 —— 』前的 1-5 整数；优势环节判定阈值 ≥4 依赖分值解析）；cost_structure 键值形态「活动 → 对象（键为 成本金额/占比）」（证据来源留档模板）
       required: [primary_activities, support_activities, cost_structure]
       properties:
         primary_activities:
@@ -188,12 +188,12 @@ nbs_payload = (DATA_SOURCES.get("china-nbs") or {}).get("payload")
       "3 —— 进料储运：电芯原材料入库与仓储",
       "5 —— 生产：电芯组装与化成分容（直通率行业领先）",
       "3 —— 发货：整机厂直供物流",
-      "2 —— 营销：车企大客户拓展",
+      "3 —— 营销：车企大客户拓展",
       "3 —— 服务：质保与残值评估"
     ],
     "support_activities": [
       "4 —— 采购：正极材料集中采购（议价能力）",
-      "4 —— 技术开发：电芯配方研发",
+      "5 —— 技术开发：电芯配方研发",
       "3 —— 人力资源：产线技师培养",
       "2 —— 企业基础设施：财务与合规"
     ],

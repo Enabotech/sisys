@@ -44,7 +44,7 @@ input_schema:
   properties:
     internal_factors:
       type: object
-      description: 内部因素（工作坊采集：优势/劣势清单，模板 swot_factors_collection.md）。条目编码：强度分值（1-5）—— 因素描述（R2-F7，TOWS 匹配阈值 ≥3 依赖分值解析）
+      description: 内部因素（工作坊采集：优势/劣势清单，模板 swot_factors_collection.md）。条目编码：强度分值（1-5）—— 因素描述（强度分值 = 首个『 —— 』前的 1-5 整数；TOWS 匹配阈值 ≥3 依赖分值解析）
       required: [strengths, weaknesses]
       properties:
         strengths:
@@ -59,7 +59,7 @@ input_schema:
             type: string
     external_factors:
       type: object
-      description: 外部因素（机会/威胁，经 NewsAPI/Tavily 外部基准印证）。条目编码：强度分值（1-5）—— 因素描述（R2-F7，与内部象限同格式）
+      description: 外部因素（机会/威胁，经 NewsAPI/Tavily 外部基准印证）。条目编码：强度分值（1-5）—— 因素描述（强度分值 = 首个『 —— 』前的 1-5 整数，与内部象限同格式）
       required: [opportunities, threats]
       properties:
         opportunities:
@@ -204,7 +204,7 @@ web_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
 ```json
 {
   "internal_factors": {
-    "strengths": ["5 —— 固态电池专利储备行业前五（含 3 项独占许可）", "4 —— 与头部车企联合研发关系"],
+    "strengths": ["5 —— 固态电池专利储备行业前五（含 3 项独占许可）", "3 —— 与头部车企联合研发关系（竞对也可建立类似关系）"],
     "weaknesses": ["3 —— 量产良率 65% 低于行业 80% 基准", "2 —— 品牌认知度不足（B 端渗透率 12%）"]
   },
   "external_factors": {
