@@ -54,10 +54,10 @@ input_schema:
             description: 业务单元名称
           industry_attractiveness:
             type: number
-            description: 行业吸引力评分（1-10，0.5 步进；外部基准支撑 WB 宏观指标 + Tavily 市场情报）。取评分表该维度行前缀分值（R2-F7），证据来源列留档模板不入参
+            description: 行业吸引力评分（1-10，0.5 步进；外部基准支撑 WB 宏观指标 + Tavily 市场情报）。取评分表该维度行前缀分值，证据来源列留档模板不入参
           competitive_strength:
             type: number
-            description: 业务实力评分（1-10，0.5 步进；内部数据市场份额/利润率）。取评分表该维度行前缀分值（R2-F7），证据来源列留档模板不入参
+            description: 业务实力评分（1-10，0.5 步进；内部数据市场份额/利润率）。取评分表该维度行前缀分值，证据来源列留档模板不入参
 output_schema:
   type: object
   required: [portfolio_map, data_sources]

@@ -44,7 +44,7 @@ input_schema:
   properties:
     market_product_data:
       type: object
-      description: 市场/产品数据（工作坊采集：产品 × 市场现有位置，模板 ansoff_product_market_matrix.md）。条目编码：风险档（低/中/高）—— 条目描述（R2-F7，象限风险判定与外部增速基准交叉依赖风险档解析）
+      description: 市场/产品数据（工作坊采集：产品 × 市场现有位置，模板 ansoff_product_market_matrix.md）。条目编码：风险档（低/中/高）—— 条目描述（风险档 = 首个『 —— 』前的枚举词；象限风险判定与外部增速基准交叉依赖风险档解析）
       required: [existing_products, new_products, existing_markets, new_markets]
       properties:
         existing_products:
@@ -139,7 +139,7 @@ output_schema:
 | 目标市场 GDP 规模/增长率基准 | world-bank | 点分指标码 + 国家代码（如 "NY.GDP.MKTP.CD" / "NY.GDP.MKTP.KD.ZG;CHN"） |
 | 目标市场中长期增长展望 | imf | 大写下划线指标码 + 国家代码（如 "NGDP_RPCH;CHN"） |
 
-**内外交叉验证要求：** 新市场/新产品的增长预期必须对照 WB/IMF 宏观增长率基准（显著高于基准的预期需给出份额/客单内部依据）；宏观指标为国家维度而非行业维度，行业增长率推断的粒度边界见 `references/data_fusion.md`（冲突处理：宏观基准与内部预期矛盾时双方并列呈现，风险档保守采用）。
+**内外交叉验证要求：** 新市场/新产品的增长预期必须对照 WB/IMF 宏观增长率基准（显著高于基准的预期需给出份额/客单内部依据）；宏观指标为国家维度而非行业维度，行业增长率推断的粒度边界见 `references/data_fusion.md`（冲突分级处理：增长预期高于宏观基准 → 并列呈现、风险档保守采用；方向相反（宏观负增长 vs 内部正增长预期）→ 暂停判断列入工作坊复议清单）。
 
 ## 6. SOP 执行步骤
 
@@ -181,9 +181,9 @@ imf_payload = (DATA_SOURCES.get("imf") or {}).get("payload")
 {
   "market_product_data": {
     "existing_products": ["低 —— 智能座舱域控制器 Gen2（已量产配套）", "低 —— 车载中控显示屏（成熟品类）"],
-    "new_products": ["中 —— 舱驾一体域控制器 Gen3（技术跨度大）", "高 —— 车载软件订阅服务（商业模式未验证）"],
+    "new_products": ["中 —— 舱驾一体域控制器 Gen3（技术跨度大）", "中 —— 车载软件订阅服务（商业模式待验证）"],
     "existing_markets": ["低 —— 国内新能源乘用车（在位优势）", "低 —— 国内商用车（渠道成熟）"],
-    "new_markets": ["高 —— 东南亚乘用车（本地化门槛）", "高 —— 欧洲商用车（认证周期长）"]
+    "new_markets": ["中 —— 东南亚乘用车（宏观增速 5%+ 但渠道待建）", "高 —— 欧洲商用车（认证周期长）"]
   }
 }
 ```

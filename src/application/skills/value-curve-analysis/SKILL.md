@@ -44,7 +44,7 @@ input_schema:
   properties:
     competition_data:
       type: object
-      description: 竞争数据（客户调研 + 竞品情报，模板 value_curve_factors_grid.md）。条目编码（R2-F7）——competitors 逐条「竞品名 —— 关注理由」；value_factors 键值形态「要素名 → 当前/目标水平（各 1-5，对象键为 当前/目标）」（证据来源留档模板不入参）
+      description: 竞争数据（客户调研 + 竞品情报，模板 value_curve_factors_grid.md）。条目编码——competitors 逐条「竞品名 —— 关注理由」（关注理由 = 首个『 —— 』后的文本）；value_factors 键值形态「要素名 → 当前/目标水平（各 1-5，对象键为 当前/目标）」（证据来源留档模板不入参）
       required: [competitors, value_factors]
       properties:
         competitors:

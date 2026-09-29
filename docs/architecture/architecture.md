@@ -14,7 +14,7 @@ completedAt: '2026-02-26'
 
 # SISYS - 企业战略智能系统架构设计文档
 
-**版本：** 8.7.0（Story 4.1d 实现同步：10 个混合数据型 Skills 成熟化——双源外部基准声明 + 内部 Schema 模板 + 工作坊方法论，§17.3.3 追加 4.1d 集成说明与 8 项架构决策）
+**版本：** 8.7.1（Story 4.1d 代码审查修订：R1/R2/R3 内容级修复登记——契约守护网收紧 + Skill 内容质量修复，零架构决策变更）
 **状态：** 架构决策主文档 ~3500 行，实现细节迁移至子设计文档
 **评审日期：** 2026-09-26
 **审核依据：**对标业界最佳实践（Arc42/C4/ADR + Anthropic Claude Code Skills 渐进式披露），将 §8/§17/§18 实现代码迁移至独立子设计文档，架构主文档聚焦决策与规则
@@ -3566,6 +3566,7 @@ pytest tests/unit/domain/
 | 8.6.0 | 2026-09-26 | **Story 4.1c Skills 数据采集集成实现**：①6 个外部数据型 Skills frontmatter `data_sources` 白名单 + IO Schema 成熟化 ②生产链路双入口接线（StrategicAnalysisUseCase + RunToolChainUseCase 注入 `extensions["tool_metadata"]`，load_metadata→load_sop）③§17.3.3 追加 4.1c 集成说明与 6 项架构决策（D1-D4/D6/D7） | 架构团队 |
 | 8.6.1 | 2026-09-28 | **Story 4.1c 代码审查修订**：①D7 决策行补记已知限制（双向：误拒——节点 B 声明源不在共享白名单时抛 207；旁路——后续节点可采集仅声明序首节点声明、自身未声明的源，待 Story 4.2 节点级切换收敛）②测试判别力修复（411 语义断言/租户交叉缓存隔离/接线首节点钉住/SSOT 契约统一 contracts 唯一来源） | 架构团队 |
 | 8.7.0 | 2026-09-28 | **Story 4.1d 混合数据型 Skills 成熟化实现**：①10 个 Skills frontmatter `data_sources` 统一 2 源声明 + IO Schema（skill_io_schemas.yaml 扩至 16 条目单一 SSOT）②references 三件套（data_fusion/scoring_anchors/workshop_guide）+ templates 内部采集模板（字段 ↔ Schema 叶子键双向断言）③零 Python 生产代码改动（声明即生效）④§17.3.3 追加 4.1d 集成说明与 8 项架构决策（D1-D8） | 架构团队 |
+| 8.7.1 | 2026-09-29 | **Story 4.1d 代码审查修订**（内容级修复，零架构决策变更）：①契约守护网收紧（断言函数失败路径负例/结构守卫/required_fields 逐字断言/identity 自检/23 全量解析枚举恢复）②Skill 内容质量修复（§5 冲突分级摘要与 data_fusion 冲突表对齐/GE 三带映射与 VRIO 判定链闭合重写/70-30 权重定性化/工作坊 2h 压缩指引/条目编码规范声明 + 确定性解析锚点）③既有留项维持（自由 object 字段化与运行时校验 → Story 4.3） | 架构团队 |
 
 ---
 
@@ -3578,7 +3579,7 @@ pytest tests/unit/domain/
 | **核心章节** | 20 章（§1-§20） |
 | **附录章节** | 12 章（A-L，§21-§32，详见 arch-appendix.md） |
 | **总章节数** | 32 章 |
-| **版本** | 8.7.0（Story 4.1d 实现同步 - 混合数据型 Skills 成熟化） |
+| **版本** | 8.7.1（Story 4.1d 代码审查修订 - 内容级修复登记） |
 | **最后更新** | 2026-09-28 |
 
 **所有附录 A~L 单独成章节，编号保持不变，作为主架构文档的详细展开。**

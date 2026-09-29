@@ -44,7 +44,7 @@ input_schema:
   properties:
     change_data:
       type: object
-      description: 变革数据（访谈采集：变革内容 + 利益相关者立场，模板 change_stakeholder_assessment.md）。条目编码（R2-F7）——stakeholders 逐条「姓名/角色（立场：支持/中立/反对；影响力 1-5；阻力 1-5）」（专项转化规则「影响力 ≥4 且反对」依赖分值解析）
+      description: 变革数据（访谈采集：变革内容 + 利益相关者立场，模板 change_stakeholder_assessment.md）。条目编码——stakeholders 逐条「姓名/角色（立场：支持/观望/反对；影响力 1-5；阻力 1-5）」（影响力/阻力 = 括注内「影响力/阻力」标签后的 1-5 整数；专项转化规则「影响力 ≥4 且反对/观望」依赖分值解析）
       required: [change_content, stakeholders, resistance_analysis]
       properties:
         change_content:
@@ -114,7 +114,7 @@ output_schema:
 | --- | --- | --- | --- |
 | change_data | object | ✅ | 变革数据（访谈采集：变革内容 + 利益相关者立场；条目编码见下行） |
 | change_data.change_content | string | ✅ | 变革内容描述（范围/目标/驱动因素） |
-| change_data.stakeholders | array[string] | ✅ | 利益相关者清单（逐条「姓名/角色（立场：支持/中立/反对；影响力 1-5；阻力 1-5）」） |
+| change_data.stakeholders | array[string] | ✅ | 利益相关者清单（逐条「姓名/角色（立场：支持/观望/反对；影响力 1-5；阻力 1-5）」） |
 | change_data.resistance_analysis | object | ✅ | 阻力分析（阻力来源 → 强度/根因） |
 
 ## 4. 输出字段（output_schema）
@@ -194,8 +194,8 @@ practice_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
     "change_content": "从职能制转向产品制组织：跨职能产品团队承载端到端损益，2027 年前完成三个试点事业部切换",
     "stakeholders": [
       "CEO（支持；影响力 5；阻力 1：战略转型发起人）",
-      "事业部总经理 A（中立；影响力 4；阻力 3：担心试点失败回摆）",
-      "职能中台负责人 B（反对；影响力 4；阻力 5：权限与编制被稀释）",
+      "事业部总经理 A（观望；影响力 3；阻力 3：担心试点失败回摆）",
+      "职能中台负责人 B（反对；影响力 5；阻力 5：权限与编制被稀释）",
       "一线产品经理群体（支持；影响力 2；阻力 1：授权与成长空间增加）"
     ],
     "resistance_analysis": {

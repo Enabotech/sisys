@@ -44,7 +44,7 @@ input_schema:
   properties:
     business_objectives:
       type: object
-      description: 业务目标（战略规划文件 + 数据仓库导出，模板 kpi_tree_decomposition.md）。条目编码（R2-F7）——objectives 逐条「目标档位（基准/挑战/突破）—— 目标描述」（档位换算与逐级校验依赖档位前缀解析；baseline_data 键值形态「指标 → 现值」）
+      description: 业务目标（战略规划文件 + 数据仓库导出，模板 kpi_tree_decomposition.md）。条目编码——objectives 逐条「目标档位（基准/挑战/突破）—— 层级：目标描述」（档位=首个『 —— 』前的枚举词，层级=其后『：』前的枚举词；档位换算与逐级校验依赖档位前缀解析；baseline_data 键值形态「指标 → 对象（键为 现值/口径）」）
       required: [objectives, baseline_data]
       properties:
         objectives:
@@ -108,7 +108,7 @@ output_schema:
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | business_objectives | object | ✅ | 业务目标（战略规划文件 + 数据仓库导出；条目编码见下两行） |
-| business_objectives.objectives | array[string] | ✅ | 战略目标分解链（逐条「目标档位（基准/挑战/突破）—— 层级：目标描述」） |
+| business_objectives.objectives | array[string] | ✅ | 战略目标分解链（逐条「目标档位（基准/挑战/突破）—— 层级（主体）：目标描述」） |
 | business_objectives.baseline_data | object | ✅ | KPI 现值基线（指标 → 现值，数据仓库导出） |
 
 ## 4. 输出字段（output_schema）
@@ -141,7 +141,7 @@ output_schema:
 **内外交叉验证要求：** 每个战略层 KPI 的目标值设定须有至少一条行业指标参照
 （或显式标注「内部目标，未经行业参照」）；目标值显著偏离行业统计趋势时须在口径定义中
 登记依据；外部参照与内部基线矛盾时的处置见 `references/data_fusion.md`
-（冲突处理：官方统计优先修正内部判断，修正前双方并列呈现）。
+（冲突分级处理：内部定档高于官方统计 → 统计优先修正并要求降档或补强依据；外部无参照 → 双方并列不下结论；口径不一致 → 以官方统计口径为准并列呈报复议清单）。
 
 ## 6. SOP 执行步骤
 
@@ -190,9 +190,9 @@ news_payload = (DATA_SOURCES.get("newsapi") or {}).get("payload")
   "business_objectives": {
     "objectives": [
       "突破档 —— 战略：2027 年动力电池业务营收翻番（新建产线 + 海外定点支撑）",
-      "基准档 —— 部门：销售部——新签车企定点 12 家",
-      "基准档 —— 部门：制造部——直通率提升至 92%",
-      "基准档 —— 个人：电芯产线组长——化成分容批次合格率 95%"
+      "挑战档 —— 部门（销售部）：新签车企定点 12 家",
+      "挑战档 —— 部门（制造部）：直通率提升至 92%",
+      "基准档 —— 个人（电芯产线组长）：化成分容批次合格率 95%"
     ],
     "baseline_data": {
       "营收": {"现值": "18.5 亿元", "口径": "含税营业收入"},
