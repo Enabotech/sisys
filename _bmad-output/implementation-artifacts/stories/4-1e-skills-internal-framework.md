@@ -174,7 +174,7 @@ Story 4.1a 交付 Skills 骨架（23 个 SKILL.md + 五阶段引擎 + frontmatte
 | strategy-map | …0017 | `bsc_indicators`（**锚定此键，禁用 bsc-scorecard 键名**） | 容器 5 叶子（financial/customer/internal_process/learning_growth/causal_relationships） | 结构型 | 因果箭头语法「原因维度 → 结果维度：假设描述」 | `strategy_visualization` |
 | dependency-graph | …0019 | `task_list`（**顶层 array-of-objects**） | items{name, dependencies} 两叶子 | 结构型 | 依赖边语法「任务名 ← 前置任务列表」 | `dependency_network` |
 | raci-matrix | …0020 | `roles_tasks` | 容器 3 叶子（roles/tasks/assignments——assignments 自由 object） | 结构型 | assignments 编码 = **双层**「任务名 → {角色名: 字母组合}」（外层键为任务名——per-task「恰 1 A」规则的计算粒度依据）；角色字母组合（R/A/C/I 单字母或斜线组合如 A/R；恰 1 A 硬规则 + ≥1 R 软规则（A/R 计为已承担 R），违规经 `raci_matrix.conflicts` 结构化呈现非整体失败） | `raci_matrix` |
-| gantt-chart | …0021 | `project_plan` | 容器 4 叶子（tasks/dependencies/durations/resources——后两自由 object） | 结构型 | 时长格式「N 天/周/月」——正则 `^\d+ *[天周月]$`（单字符类形态，与 `(天\|周\|月)` alternation 语义等价——表格内禁裸管道符；禁「个月」与英文单位），归一基准=天（周=5 工作日 / 月=20 工作日）；**里程碑输入编码 = durations 值「0 天」**（零时长任务即里程碑，CPM 中 ES=EF，Epic「时间线+里程碑」输入侧承接） | `gantt_visualization` |
+| gantt-chart | …0021 | `project_plan` | 容器 4 叶子（tasks/dependencies/durations/resources——后两自由 object） | 结构型 | 时长格式「N 天/周/月」——正则 `^\d+ *[天周月]$`（单字符类形态，与三字符 alternation 语义等价——表格内禁裸管道符；禁「个月」与英文单位），归一基准=天（周=5 工作日 / 月=20 工作日）；**里程碑输入编码 = durations 值「0 天」**（零时长任务即里程碑，CPM 中 ES=EF，Epic「时间线+里程碑」输入侧承接） | `gantt_visualization` |
 
 ### 内部数据契约（本 Story 特有）
 
