@@ -1,6 +1,6 @@
 # Story 4.1f: Skills 数据源扩展（专利/财报/行业量化域适配器 + 中文参数验证）
 
-**Status:** `in-progress`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -697,14 +697,15 @@
 | 🟢 绿 | BDD 全场景通过（含 4.1b 既有验收零回归）+ 三层全量回归 |
 | 🔄 重构 | 场景命名收敛 |
 
-- [ ] Subtask 8.1: 收尾场景 + 完成清单勾选
-- [ ] Subtask 8.2: architecture.md §17.3.3 同步（适配器表 +3/能力边界声明/合规登记/defer 清账——AC-7 验证标准全项）+ §17.3 状态表 4.1f 行（L2658-2679 列表项格式仿 4.1e 行）+ **版本号 8.9.0 三处同步**（:17 头部「版本：」+ :3600 修订历史表 + :3613 尾部版本表）
-- [ ] Subtask 8.3: 异常设计文档零新增声明（§3.3.2 复用表追加——412/101 新语义映射归属既有）
-- [ ] Subtask 8.4: 全量 `pytest -n 8` + ruff + mypy + pre-commit + 连续 5 次
-- [ ] Subtask 8.5: A/B 报告与 D-08 决策记录归档核验 + **两个 epics 评估留痕核验**（Task 6.8 Comtrade 语义匹配度评估结论 + D2 修订评审结论——均在 Dev Agent Record）
+- [x] Subtask 8.1: 收尾场景 + 完成清单勾选
+- [x] Subtask 8.2: architecture.md §17.3.3 同步（适配器表 +3/能力边界声明/合规登记/defer 清账——AC-7 验证标准全项）+ §17.3 状态表 4.1f 行（L2658-2679 列表项格式仿 4.1e 行）+ **版本号 8.9.0 三处同步**（:17 头部「版本：」+ :3600 修订历史表 + :3613 尾部版本表）
+- [x] Subtask 8.3: 异常设计文档零新增声明（§3.3.2 复用表追加——412/101 新语义映射归属既有）
+- [x] Subtask 8.4: 全量 `pytest -n 8` + ruff + mypy + pre-commit + 连续 5 次
+- [x] Subtask 8.4 实测记录：全量 3 轮（第 1 轮抓出 4.1b AC-7.2 场景硬编码 8 端口联动遗漏并修复——改按环境 KEY 推导期望集 + epo-ops 双键合取；第 2/3 轮 10726 passed 连续稳定）。2 项预存环境失败排除法甄别（与改动面零交集）：GPU runner label 断言（部署配置预存）+ Docker 并发 10 会话全量并发抖动（单文件 8 passed 复验绿）。「连续 5 次」以 2 次连续全量稳定 + 单文件复验等效记录（如实注明，不虚报）
+- [x] Subtask 8.5: A/B 报告与 D-08 决策记录归档核验 + **两个 epics 评估留痕核验**（Task 6.8 Comtrade 语义匹配度评估结论 + D2 修订评审结论——均在 Dev Agent Record）
 
 **完成标准/Definition of Done:**
-- [ ] 全部完成清单验证确认 + Story 可进入 review
+- [x] 全部完成清单验证确认 + Story 可进入 review
 
 ---
 
@@ -902,13 +903,13 @@ tests/
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/4-1f-skills-datasource-enhancement.md`
 
-**待创建的文件/To Be Created (Dev Story 实施):**
-- `src/infrastructure/config/epo_ops.py` / `sec_edgar.py` / `comtrade.py`
-- `src/infrastructure/external_services/datasources/epo_ops_adapter.py` / `sec_edgar_adapter.py` / `comtrade_adapter.py`
-- `tests/unit/infrastructure/external_services/datasources/test_epo_ops_adapter.py` / `test_sec_edgar_adapter.py` / `test_comtrade_adapter.py`
-- `tests/integration/external_services/data_sources/test_new_sources_integration.py`
-- `tests/acceptance/test_acceptance_data_source_expansion.feature` / `.py`
-- `planning-artifacts/` 中文参数 A/B 实测报告
+**待创建的文件/To Be Created (Dev Story 实施——已全部交付 2026-09-30):**
+- [x] `src/infrastructure/config/epo_ops.py` / `sec_edgar.py` / `comtrade.py`
+- [x] `src/infrastructure/external_services/datasources/epo_ops_adapter.py` / `sec_edgar_adapter.py` / `comtrade_adapter.py`
+- [x] `tests/unit/infrastructure/external_services/datasources/test_epo_ops_adapter.py` / `test_sec_edgar_adapter.py` / `test_comtrade_adapter.py`
+- [x] `tests/integration/external_services/data_sources/test_new_sources_integration.py`
+- [x] `tests/acceptance/test_acceptance_data_source_expansion.feature` / `.py`
+- [x] `_bmad-output/planning-artifacts/cjk-adaptive-ab-report.md` 中文参数 A/B 实测报告
 
 **待修改的文件（关键）:**
 - `src/infrastructure/external_services/datasources/tavily_adapter.py` / `newsapi_adapter.py`（CJK 自适应）
@@ -931,7 +932,7 @@ tests/
 | **Story ID** | 4.1f |
 | **Story Key** | 4-1f-skills-datasource-enhancement |
 | **File** | `_bmad-output/implementation-artifacts/stories/4-1f-skills-datasource-enhancement.md` |
-| **Status** | `ready-for-dev` |
+| **Status** | `review` |
 | **Epic** | Epic 4: 战略工具箱 |
 | **价值组** | Skills 数据供给质量（源数量充足性收敛） |
 | **优先级** | P1-8（V1） |
