@@ -18,7 +18,7 @@
 
 4.1c/4.1d/4.1e 完成后 23 Skills 全部成熟化（2026-09-29 done），但评审推广调研暴露「源数量充足性」缺口——现有 8 适配器池语义域分布失衡（专利 1/宏观 4/新闻检索 2/气候 1），维度级 ≥3 达成仅 2/29 处。本 Story 依据四域预筛报告（`planning-artifacts/data-source-expansion-prescreening.md`——19 候选源实测裁定：可行 7/有条件 8/不可行 10）落地第一批：三个零许可成本、实测已通的官方源适配器 + 现有源中文参数自适应 + 声明重分配联动。
 
-本 Story 是**基础设施层 Story**（R3 主战场）：三个新适配器实现既有 `DataSourcePort`（R1 既有端口零新增），注册进组合根既有聚合链（R2 既有组合注入零改动）；生产代码改动面 = infrastructure 适配器/config + composition_root 注册 + 契约库测试基建（required_fields 按源定制重构）。**唯二内容改动** = 三个受益 Skill 的 SKILL.md 声明/SOP 增补 + tavily/newsapi 适配器 CJK 自适应（~10 行/适配器）。
+本 Story 是**基础设施层 Story**（R3 主战场）：三个新适配器实现既有 `DataSourcePort`（R1 既有端口零新增），注册进组合根既有聚合链（R2 既有组合注入零改动）；生产代码改动面 = infrastructure 适配器/config + composition_root 注册 + 契约库测试基建（required_fields 按源定制重构）。**唯二内容资产改动** = 受益 Skill 内容资产整体（SKILL.md 声明/SOP + references/ 三文件 + yaml 逐字锁死行）+ tavily/newsapi 适配器 CJK 自适应（~10 行/适配器）——注意与「生产链路」节「唯二生产 .py 行为改动」是两个口径（前者内容资产、后者生产代码）。
 
 **来源:** [`epics_v1.0.md`](../../planning-artifacts/epics_v1.0.md) - Epic 4: 战略工具箱，Story 4.1f（P1-8，V1；:1090-1146）
 **前置依赖:** 4.1a/4.1b/4.1c/4.1d/4.1e（✅ 全 done——**4.1d 亦为前置**：本 Story 大改其测试资产 test_skill_mixed_data_contracts.py / test_arch_skill_mixed_data.py / 集成与验收联动）+ 外部前置（EPO OPS Consumer Key / UN Comtrade key 免费注册——**申请可即刻异步启动，等待期不阻塞 Task 0-1 与 EDGAR 全部工作**；SEC EDGAR 免 key）
@@ -57,7 +57,7 @@
 
 **D8 重开的优先级论证（为何 epics 授权不构成隐式重开）：** epics 4.1f 立项（2026-09-29）晚于 D8 签收（2026-09-28）一天且任务 6 已明文授权增补 EPO——但 4-1c Story D8 条目与 architecture.md :2829 D4 行至今仍载「终态，不追加第三源」，**记录层冲突未消除**（epics 立项 diff 未触及这两处留痕）。owner 级签收的重开必须同级显式仪式 + 双文件补记，epics 任务表述不能替代——故 HALT 为必办项，请求时可直接引用 epics 4.1f 任务 6 授权加速签认。
 
-**处理方式（Task 0 决策项 D-08）：** dev-story 执行到 Task 0 时 **HALT 向 Epic owner（用户）显式请求 D8 重开签收**（disruptive 重开 + vrio 知会同点进行）——签收则 disruptive 增源按主线执行并在 4-1c Story 文件 D8 条目 + architecture.md :2829 D4 行补记重开留痕；**未签收则 disruptive 增源子任务跳过**（competitor/vrio 增源不受影响——competitor 无「不追加」签收、vrio 有 epics 授权），AC-6 验证标准中 disruptive 相关项按实际签收结果记录。**HALT 等待期不阻塞**：Task 0.2-0.6 与 Task 1-5、Task 6 循环 A（competitor）+ vrio 循环可先行（适配器交付与 D8 解耦——三个适配器无论如何都交付并注册）。
+**处理方式（Task 0 决策项 D-08）：** dev-story 执行到 Task 0 时 **HALT 向 Epic owner（用户）显式请求 D8 重开签收**（disruptive 重开 + vrio 知会同点进行）——签收则 disruptive 增源按主线执行并在 4-1c Story 文件 D8 条目 + architecture.md :2829 D4 行补记重开留痕；**未签收则 disruptive 增源子任务跳过**（competitor/vrio 增源不受影响——competitor 无「不追加」签收、vrio 有 epics 授权），AC-6 验证标准中 disruptive 相关项按实际签收结果记录。**HALT 等待期不阻塞**：Task 0.2-0.6 与 Task 1-5、Task 6 循环 A-B（competitor/vrio）可先行（适配器交付与 D8 解耦——三个适配器无论如何都交付并注册）。
 
 ### ⚠️ 命名规范声明（强制）
 
@@ -89,7 +89,7 @@
 - **每个新声明源必须在 SKILL.md body 出现 ≥1 个 `$DATA_SOURCE` 标记**（`assert_cross_consistency` 双向断言——标记正则 `[\w-]+` 天然兼容连字符名 `epo-ops`）
 - **源数计数表述全量同步（grep 驱动，SKILL.md 之外还含 references/ 与 templates/ 联动面）**：
   - competitor：「4 个声明源」2 处（SKILL.md L175/L235）+ 维度级计数 L177（「专利布局仅 uspto 1 源」→ 2 源）+ **references/triangulation.md 3 处**（:4「4 个声明源全部参与采集」、:10「4 个声明源中按 §5 维度映射」、:21 标题「## 4 源角色分工」）；「专利维度未三角化」标注撤除 2 处（SKILL.md L178-179 表后段落 + references/triangulation.md:43）
-  - disruptive：「双源」**11 处**（SKILL.md L6/L79/L100/L138/L140/L142/L150/L185/L188/L190/L207）+ L188「白名单内 2 源」+ **references/ 三文件联动**（triangulation.md 全文以「双源交叉验证」为方法论标题与规则——L1 标题/L4/L6「双源角色分工」/L16/L21/L34 等，workshop_guide.md :11/:19，scoring_anchors.md :3/:14——增源后方法论表述升级为「专利双库 + 市场单源互证」需逐处评估改写）
+  - disruptive：「双源」**11 处**（SKILL.md L6/L79/L100/L138/L140/L142/L150/L185/L188/L190/L207）+ L188「白名单内 2 源」+ **references/ 三文件联动**（triangulation.md 全文以「双源交叉验证」为方法论标题与规则——L1 标题/L4/L6「双源角色分工」/L16/L21/L34 等，workshop_guide.md :11/:19，scoring_anchors.md **:3/:14/:20/:33**——增源后方法论表述升级为「专利双库 + 市场单源互证」需逐处评估改写）
   - vrio：SKILL.md L138「双源交叉」1 处 + 引言 L98-99 源名二元组表述（USPTO/Tavily → 增 EPO 提及）
 - **SKILL.md 与 yaml 逐字锁死的 description 双写同步**（disruptive `sources` description「数据来源（双源交叉验证）」与 `skill_io_schemas.yaml:383-385`；competitor `patent_signals` description 与 yaml:257-259——改措辞必须两处同改）
 
@@ -196,13 +196,13 @@
 | vrio-framework | uspto, tavily | + `epo-ops`（3 源：uspto, epo-ops, tavily） | **无签收前提**（4-1d D2「统一 2 源」为 Story 级决策，epics 4.1f 任务 6 :1127 已明文授权 vrio 增源 + :1129 授权 D2 修订——按授权无条件执行，Dev Agent Record 留痕） | 4-1d 侧契约库 `MIXED_SKILL_DATA_SOURCES` 元组 + 测试基准 `STORY_SSOT`（单侧——4-1c 侧 `SKILL_DATA_SOURCES` 不含 vrio）+ frontmatter + §5 表加行（L142 uspto 与 L143 tavily 之间）+ **L138「双源交叉」表述** + 引言 L98-99 源名二元组增 EPO 提及 + `test_unified_two_source_policy` 豁免改写（D2 修订） |
 | disruptive-innovation | uspto, tavily | + `epo-ops`（3 源：uspto, epo-ops, tavily） | **D8 重开签收**（Epic owner 级——4-1c :1180/:1186「不追加第三源」签收重开，Task 0.1 HALT） | 同构 + **「双源」11 处全量改写**（L6/L79/L100/L138/L140/L142/L150/L185/L188/L190/L207 + L188「白名单内 2 源」）+ **references/ 三文件联动**（triangulation.md 方法论表述「双源交叉验证」逐处评估改「专利双库 + 市场单源互证」/workshop_guide.md :11/:19/scoring_anchors.md :3/:14）+ yaml 头注 :349 + sources description :383-385 逐字同步 + D4 表述改「专利双库 + 市场单源，评级互证跨域」 |
 
-**声明重分配断言联动清单（22 项——dev 实施时逐项执行并勾选，Task 6.5 核验对象即本表）：**
+**声明重分配断言联动清单（24 项——dev 实施时逐项执行并勾选，Task 6.5 核验对象即本表）：**
 
 > 竞争源数/表述类（competitor）：
 > 1. `SKILL_DATA_SOURCES["competitor-analysis"]` 4 元组 → 6 元组（`skill_data_collection_contracts.py:50`）
 > 2. competitor frontmatter data_sources +2 块（epo-ops/sec-edgar，required_fields 用契约一定值）
 > 3. competitor §5 映射表专利布局行 2 源 + EDGAR 财报印证新行
-> 4. competitor §5 口径段（EPO 欧洲/仍缺 CNIPA/EDGAR 美股/XBRL 字段差异）
+> 4. competitor §5 口径段（EPO 欧洲/仍缺 CNIPA/EDGAR 美股/XBRL 字段差异 + **412 配额超限降级话术条目**——epics AC-2「超限熔断降级话术」承载：§7 失败处理表 EPO/Comtrade 超限降级引导行）
 > 5. competitor §6 标记 +2（`$DATA_SOURCE("epo-ops", ...)` / `$DATA_SOURCE("sec-edgar", ...)`）
 > 6. competitor §7 计数 2 处（L175/L235）+ 维度级 L177 + 未注册行扩列
 > 7. competitor「未三角化」撤除 2 处（SKILL.md L178-179 + references/triangulation.md:43）
@@ -227,6 +227,8 @@
 >
 > 通用类：
 > 22. `test_skill_mixed_data_contracts.py:54` 断言消息「不在 8 个注册适配器中」→「11 个」（文案同步，ADAPTER_SSOT 11 源后）
+> 23. **4-1c 侧验收场景名「四源」→「六源」**（`test_acceptance_skill_data_collection.feature:38`「competitor-analysis 四源并发采集链路」+ `.py:345` @scenario 绑定串 + `:347` docstring + `:553`「多源三角化」场景 docstring「（competitor-analysis 四源）」——三联动位同步，否则场景绑定断裂）
+> 24. **4-1c 侧验收场景名「双源交叉验证」→「三源」（D-08 签收态）**（同文件 `:52`「disruptive-innovation 双源交叉验证采集链路」+ `.py:357` @scenario 串 + `:359` docstring；未签收则维持不动留痕）
 
 ### 领域事件（本 Story 不新增事件）
 
@@ -245,7 +247,7 @@
 
 **Given** tavily/newsapi 适配器现请求体不含任何语言/区域参数
 **When** fetch 的 query 含 CJK 字符
-**Then** tavily 请求体自动加 `country: "china"`、newsapi params 自动加 `language: "zh"`；query 不含 CJK 时行为与改动前 byte-for-byte 一致
+**Then** tavily 请求体自动加 `country: "china"`、newsapi params 自动加 `language: "zh"`；query 不含 CJK 时请求体 dict 与改动前逐键一致（零新键）
 
 **验证标准/Validation Criteria:**
 - [ ] 两适配器单测：CJK query 断言请求体含新参数（MockTransport capture）/ 非 CJK query 断言请求体 dict 与既有形态逐键一致（回归负例）
@@ -259,8 +261,9 @@
 **Then** OAuth2 令牌自动获取/缓存/刷新；4GB/周配额守卫前置（超限抛 EXCEPTION_412 零请求消耗）；结果结构化为 `{"patents": [{"title","applicant","filing_date"}]}`
 
 **验证标准/Validation Criteria:**
-- [ ] 单测全绿：令牌流（Basic auth 头/缓存命中不重复请求/401 重取一次/令牌端点失败→101 或 411）、检索成功、CQL query 直通断言、配额守卫（注入计数器超限→412 + 消息含已用量）、失败矩阵（201/302/411/412/413/熔断）、config repr 脱敏、`isinstance(adapter, DataSourcePort)`
-- [ ] key 就绪时集成实测 `pa="华为"` 返回真实结果（key 未就绪 skip 留痕）
+- [ ] 单测全绿：令牌流（Basic auth 头/缓存命中不重复请求/401 重取一次/令牌端点失败映射全覆盖——走 helper 后 401/403→101、网络耗尽→411、429→412、超时→302）、检索成功、CQL query 直通断言、配额守卫（注入计数器超限→412 + 消息含已用量）、失败矩阵（201/302/411/412/413/熔断）、config repr 脱敏、`isinstance(adapter, DataSourcePort)`
+- [ ] key 就绪时集成实测 `pa="华为"` 返回真实结果（key 未就绪 skip 留痕——**AC-2 完成判定以单测矩阵为准，集成实测登记 Defer 台账追认（owner 知情），不阻塞 AC-2 勾选**——与 AC-1 的「部分完成」降级不同：AC-2 无缺口结论要下）
+- [ ] **412 超限降级话术**（epics AC-2「超限熔断降级话术」承载）：受益 Skill §5/§7 失败处理表含 EPO 配额超限（EXCEPTION_412）降级引导条目（随 Task 6 清单 4 口径段一并落）
 
 ### AC-3: SEC EDGAR 适配器（UA 规范 + 限速 + 双模式）
 
@@ -294,18 +297,18 @@
 - [ ] 4-1d 库 `__all__` 与 import 链核验（EXPECTED_REQUIRED_FIELDS 常量保留为「legacy 8 源统一值」语义注释更新或移除——Task 0 定稿）
 - [ ] 16 Skill × 41 处 frontmatter 联动核验零漂移（grep 计数 + 契约断言）
 
-### AC-6: 受益 Skill 声明重分配（治理分级 + 断言联动 22 项）
+### AC-6: 受益 Skill 声明重分配（治理分级 + 断言联动 24 项）
 
 **Given** 治理分级已明确（competitor/vrio 无签收前提直接做；disruptive 按 Task 0 HALT 的 D-08 签收结果）
 **When** competitor（无前提）+ vrio（epics 授权留痕）+ disruptive（按签收结果）完成声明重分配
-**Then** SSOT 元组/frontmatter/§5-§7 表述/§6 标记/口径段/references/yaml 逐字锁死行全量同步；断言联动 22 项清单（数据契约六）全绿
+**Then** SSOT 元组/frontmatter/§5-§7 表述/§6 标记/口径段/references/yaml 逐字锁死行全量同步；断言联动 24 项清单（数据契约六）全绿
 
 **验证标准/Validation Criteria:**
 - [ ] `assert_data_sources_contract`（声明序元组相等）+ `assert_cross_consistency`（每新源 ≥1 标记）+ `assert_sop_maturity`（源数计数表述同步后全绿）
 - [ ] `test_triangulation_competitor_four_sources` 改 6 源语义（名/docstring/断言 `>= 3` 升格强断言 `== 6`）；`test_disruptive_innovation_dual_source` 按 D-08 结果（签收→`== 3` + D4 表述同步；未签收→维持 `== 2` 零改动 + 留痕）
 - [ ] `test_unified_two_source_policy` 改「2 源基线 + 4-1f 增补豁免表」（vrio——epics 授权，无签收前提）；`MIXED_SKILL_DATA_SOURCES`（契约库）与 `STORY_SSOT`（测试基准）双侧同步
 - [ ] 4-1d 集成 `len(metas) == 2` 参数化改 `== len(declared)`（`test_skill_mixed_data.py:236`）；4-1d 验收 vrio 场景名「双源」→「三源」（feature L63 + `.py` 三联动位 L450-452：@scenario 串/函数名/docstring）
-- [ ] yaml 头注释源数同步（competitor L218「4 源」→「6 源」/disruptive L349/vrio L732「2 源」→「3 源」）+ 逐字锁死 description 双写同步（disruptive :383-385 含 SKILL.md L79）
+- [ ] yaml 头注释源数同步（competitor L218「4 源」→「6 源」/vrio L732「2 源」→「3 源」/disruptive L349「2 源」→「3 源」**——签收态，未签收不动**）+ 逐字锁死 description 双写同步（vrio 侧 + disruptive :383-385 含 SKILL.md L79**——签收态**）
 - [ ] 受益 Skill references/ 联动（competitor triangulation.md 3 处源数 + :43 未三角化撤除；disruptive 三文件「双源」表述改写——签收态）
 - [ ] **Comtrade 语义匹配度评估留痕**（epics 任务 6 第 3 子项：appeals/kpi-tree 等其余声明 Skill 按语义匹配度评估是否增补——结论与理由留 Dev Agent Record，不强行凑源）+ **D2 修订评审结论留痕**（epics 任务 6 第 4 子项：其余 9 个 4-1d Skill 不放宽的评审结论——产品判断留痕）
 - [ ] **D8 留痕**：签收则 4-1c Story D8 条目（:1186 决策项）+ architecture.md :2829 D4 行补记重开（未签收则本 Story Dev Agent Record 登记决策结果）
@@ -318,9 +321,9 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `test_arch_skill_data_collection.py`：`_build_adapters` 同步后 `set(adapters.keys()) == set(ADAPTER_SSOT.keys())`（:121，8→11 双向）；**:124/:138 两处三元组解包随 Task 5 四元组化改写**（适配器 get_metadata 与 frontmatter 三方一致测试体内）
-- [ ] `test_arch_data_source.py` **四联动点**：`ADAPTER_PORT_NAMES`（:71-77 无条件组）+ EDGAR/comtrade 两端口；`KEYED_ADAPTER_PORT_NAMES`（:81）+ epo-ops；`ADAPTER_IMPL_MODULES`（:85-94 静态映射）+3 条；`test_keyed_adapters_conditional_registration`（:184，参数化元组 :191-195）+ epo-ops 元组——**该文件为静态表驱动，漏改是静默的（parametrize 不含新端口即不检查），逐点核验**
+- [ ] `test_arch_data_source.py` **四联动点**：`ADAPTER_PORT_NAMES`（:71-77 无条件组）+ EDGAR/comtrade 两端口；`KEYED_ADAPTER_PORT_NAMES`（:81）+ epo-ops；`ADAPTER_IMPL_MODULES`（:85-94 静态映射）+3 条；`test_keyed_adapters_conditional_registration`（:184，参数化元组 :191-195）+ epo-ops——**注意该测试现结构为 `(port_name, env_key)` 单键循环，承载 epo-ops 需扩展为多键合取语义**（参数化改为 `(port_name, env_keys: tuple)` + `all(os.getenv(k) for k in env_keys)`——单凭据态（CONSUMER_KEY 有而 SECRET 无）实际不注册，单键断言会假红）；**该文件为静态表驱动，漏改是静默的（parametrize 不含新端口即不检查），逐点核验**
 - [ ] 契约测试 `ADAPTER_PORT_SPECS` +3 条目（env_key：EDGAR 为 None——worldbank 先例；comtrade key 可选语义在 tags/说明标注）
-- [ ] 子进程探针：注册态双向（epo-ops key 有/无；EDGAR/comtrade 恒注册——探针 scrub 全部条件注册数据源 env 键确保「无 key」分支纯净）
+- [ ] 子进程探针：注册态双向（epo-ops 双凭据**成对**有/无——with_key 分支注入 `EPO_OPS_CONSUMER_KEY` + `EPO_OPS_CONSUMER_SECRET` **两个**假常量，单凭据态不注册；EDGAR/comtrade 恒注册——探针 scrub 全部条件注册数据源 env 键确保「无 key」分支纯净）
 - [ ] `__init__.py` docstring 8→11；root `.env` 数据源 key 区段补三源样例（L112 `CLOUD_LLM_API_KEY` 附近；**root 无 `.env.example`**——deploy/*/ 下为基础设施服务模板不涉及应用 key，评估结论留 Dev Agent Record 即可，不新建文件）
 - [ ] architecture.md §17.3.3：适配器表 +3（含注册形态标注）+ 能力边界声明（IDC/Gartner/Euromonitor 独家份额数据不可得——合同与技术双重壁垒，代理指标组合替代）+ 合规登记（EDGAR UA 规范/Comtrade 署名与配额政策/EPO 配额政策）+ defer 清账（4.1f 承载项完成留痕）
 
@@ -403,7 +406,7 @@
 
 #### 覆盖率要求
 
-- [ ] 整体 ≥80% 不降；**基础设施层 ≥75%**（本 Story 主战场——新适配器语句级覆盖由单测矩阵保证）
+- [ ] 整体 ≥80% 不降；**基础设施层 ≥75%**（本 Story 主战场——测量方式：`poetry run pytest tests/unit/infrastructure --cov=src/infrastructure --cov-report=term`（pyproject addopts 仅 `--cov=src` 全局报告无分层门禁，分层值以本命令单独核验；新适配器语句级覆盖由单测矩阵保证——测试分类表五文件全覆盖令牌流/守卫/双模式/解析/失败矩阵））
 - [ ] 关键路径 100%：令牌流三分支（获取/缓存命中/401 重取）+ 配额守卫两分支（放行/超限）+ CJK 两态 + 双模式分派
 
 #### 代码质量门禁
@@ -425,7 +428,7 @@
 | AC-3 | SEC EDGAR 适配器 | Task 3 | 3.1-3.5 | `test_sec_edgar_adapter.py` |
 | AC-4 | UN Comtrade 适配器 | Task 4 | 4.1-4.4 | `test_comtrade_adapter.py` |
 | AC-5 | required_fields 四元组重构 | Task 5 | 5.1-5.5 | `test_skill_mixed_data_contracts.py` 扩展 |
-| AC-6 | 受益 Skill 声明重分配 | Task 6 | 6.1-6.8 | 三 Skill 单测 + 集成/验收联动 22 项 |
+| AC-6 | 受益 Skill 声明重分配 | Task 6 | 6.1-6.8 | 三 Skill 单测 + 集成/验收联动 24 项 |
 | AC-7 | 注册链全触点 + 能力边界 | Task 7 | 7.1-7.6 | `test_port_contract_data_source.py` + 架构测试三文件（`test_arch_skill_data_collection.py`/`test_arch_data_source.py`/`test_arch_skill_mixed_data.py`）扩展 |
 | 全 AC | 收尾验收 + 文档同步 | Task 8 | 8.1-8.5 | BDD 全场景 + architecture.md 同步 |
 
@@ -439,7 +442,7 @@
 | **R2** | EPO OAuth2 令牌流复杂度（缓存/刷新/401 重取三分支） | 中 | 中 | 令牌管理内聚为适配器私有类 `_EpoTokenManager`（构造注入 clock 便于测试；`retry_*` 参数透传防单测退避拖秒）；单测三分支强制；业务 401 重取路径显式（异常契约表——捕获 101 按 `context.status_code` 判别，禁止裸 client 绕行 helper）；不抽共享基类（YAGNI） | Task 2 |
 | **R3** | 配额守卫进程内计数在测试并行下竞态 | 低 | 中 | `asyncio.Lock` 类变量；守卫计数构造可注入 + `now_fn` 时钟注入（周/日窗口重置可测）；单测串行验证 + 并发测试用 `asyncio.gather` 真并发断言 | Task 2/4 |
 | **R4** | required_fields 重构破坏 41 处既有断言链 | 中 | 高 | 四元组扩展向后兼容设计（8 既有源值零漂移）；绊线显式改 + 判别力负例保活；41 处 grep 计数核验；**三元组解包 6 处全量枚举**（两契约库 + 两架构测试文件）；全量回归门禁 | Task 5 |
-| **R5** | 声明重分配断言联动面广（22 项 + references/ 联动）漏改 | 中 | 高 | 数据契约六「断言联动 22 项清单」作为 Task 6 的执行 checklist 逐项勾选；「双源」/源数 grep 全量出现位驱动（SKILL.md + references/ + templates/ + yaml）；每改一处跑对应单测；集成/架构/验收三层回归 | Task 6 |
+| **R5** | 声明重分配断言联动面广（24 项 + references/ 联动）漏改 | 中 | 高 | 数据契约六「断言联动 24 项清单」作为 Task 6 的执行 checklist 逐项勾选；「双源」/源数 grep 全量出现位驱动（SKILL.md + references/ + templates/ + yaml）；每改一处跑对应单测；集成/架构/验收三层回归 | Task 6 |
 | **R6** | EDGAR 双模式分派语法被 LLM 误用（xbrl: 前缀拼写） | 低 | 低 | query 规范写入 SKILL.md §5/§6（结构化语法非自然语言）；非法前缀→201 输入校验负例 | Task 3/6 |
 | **R7** | key 申请周期阻塞集成实测 | 中 | 低 | 单测全 MockTransport 不依赖 key；集成/验收动态 skip 留痕；EDGAR/comtrade 免 key 可全程实测；**key 到位后人工补跑锚点**：AC-2 EPO 集成 + AC-1 A/B 报告实测面——登记 Defer 台账并在 Story 留痕（key 是外部申请，CI 无 secret 恒 skip） | Task 7/8 |
 | **R8** | 中文 A/B 实测被 key 阻塞（newsapi 商用限制） | 中 | 低 | AC-1 验证标准两态设计（断言层验证先行 + 报告标注待补——AC-1 记部分完成，缺口判断 defer 且 owner 知情）；CJK 规则的正确性不依赖实测 | Task 1 |
@@ -462,9 +465,9 @@
 
 > 目的：进入实现前钉死三源元数据/行为契约/重构方案/声明序 + 执行 D8 重开 HALT 决策。
 
-- [ ] Subtask 0.1: **D-08 治理决策执行（HALT）**——向 Epic owner 显式请求 D8 重开签收（disruptive「不追加第三源」owner 级签收重开——请求时引用 epics 4.1f 任务 6 :1127 授权加速签认；vrio 增源 + D2 修订按 epics 授权无签收前提，同点**知会**留痕）；签收结果与两态执行路径留痕 Dev Agent Record；HALT 等待期不阻塞 Task 0.2-0.6 与 Task 1-5/6 循环 A + vrio
+- [ ] Subtask 0.1: **D-08 治理决策执行（HALT）**——向 Epic owner 显式请求 D8 重开签收（disruptive「不追加第三源」owner 级签收重开——请求时引用 epics 4.1f 任务 6 :1127 授权加速签认；vrio 增源 + D2 修订按 epics 授权无签收前提，同点**知会**留痕）；签收结果与两态执行路径留痕 Dev Agent Record；HALT 等待期不阻塞 Task 0.2-0.6 与 Task 1-5/6 循环 A-B
 - [ ] Subtask 0.2: 三源元数据表定稿（数据契约一为基线——url 经实测校准；ttl/required_fields 冻结）；声明序定稿（competitor 6 元组/disruptive/vrio 3 元组）
-- [ ] Subtask 0.3: 行为契约细化定稿（EPO 令牌管理/配额守卫、EDGAR 双模式语法与 UA 常量、Comtrade 管道串语法、CJK 规则）+ required_fields 重构方案（含 EXPECTED_REQUIRED_FIELDS 常量去向三处联动定稿）
+- [ ] Subtask 0.3: 行为契约细化定稿（EPO 令牌管理/配额守卫、EDGAR 双模式语法与 UA 常量、Comtrade 管道串语法与**日配额阈值 + `ComtradeConfig.from_env` key 缺失语义（缺省空串 = 无 key 走 preview 裸模式——newsapi `api_key: str = field(default="", repr=False)` 先例，但构造器不抛）**、CJK 规则）+ required_fields 重构方案（含 EXPECTED_REQUIRED_FIELDS 常量去向三处联动定稿）
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_data_source_expansion.feature`（zh-CN 按 AC 分节——三源 Happy + Edge：key 缺失跳过/配额 412/令牌失效/CJK 双态/EDGAR 直连）
 - [ ] Subtask 0.5: 编写 BDD 步骤实现骨架（`test_acceptance_data_source_expansion.py`——context dict 模式 + 真实适配器实例 MockTransport 注入 + key 动态 skip + xdist_group）
 - [ ] Subtask 0.6: 运行验收测试确认失败（🔴 红阶段——ModuleNotFoundError 合法红）
@@ -512,8 +515,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 守卫两分支（放行累计/超限抛 412 含已用量与重置时间）+ 周窗口重置 + 并发安全（gather 竞态） |
-| 🟢 绿 | 周窗口字节累计（`asyncio.Lock` 类变量 + 可注入初始值） |
+| 🔴 红 | 守卫两分支（放行累计/超限抛 412 含已用量与重置时间）+ 周窗口重置（**注入 `now_fn`** 跨周一 00:00 GMT——契约二设计）+ 并发安全（gather 竞态） |
+| 🟢 绿 | 周窗口字节累计（`asyncio.Lock` 类变量 + 可注入初始值 + `now_fn` 时钟注入） |
 
 #### TDD 循环 [C]：适配器主体
 
@@ -521,7 +524,7 @@
 |------|------|
 | 🔴 红 | fetch 成功（CQL 直通 + Bearer 头 + `Accept: application/json` + Range 分页）+ 结构校验（缺 patents→413）+ get_metadata（四元组对齐 Task 0 冻结值）+ 失败矩阵（201/302/411/412/413/熔断）+ key 缺失构造→101 + repr 脱敏 + isinstance(DataSourcePort) |
 | 🟢 绿 | 适配器实现（复用 `request_json_with_resilience`——令牌获取亦走 resilience） |
-| 🔄 重构 | `src/infrastructure/config/epo_ops.py`（四键 + consumer_key/consumer_secret 双凭据字段）+ docstring 中文注释 + ruff/mypy |
+| 🔄 重构 | `src/infrastructure/config/epo_ops.py`（**5 变量**：API_URL/TIMEOUT/TTL_SECONDS + consumer_key/consumer_secret 双凭据字段——命名规范节口径）+ docstring 中文注释 + ruff/mypy |
 
 - [ ] Subtask 2.1: 🔴 红 — 令牌管理三分支测试
 - [ ] Subtask 2.2: 🟢 绿 — `_EpoTokenManager` 实现
@@ -618,7 +621,7 @@
 
 ---
 
-### Task 6: 受益 Skill 声明重分配（断言联动 22 项）
+### Task 6: 受益 Skill 声明重分配（断言联动 24 项）
 
 **关联 AC:** AC-6
 
@@ -652,14 +655,14 @@
 - [ ] Subtask 6.2: competitor 集成断言 6 源化
 - [ ] Subtask 6.3: 🔴🟢 — vrio（循环 B——无签收前提，epics 授权留痕）
 - [ ] Subtask 6.4: 🔴🟢 — disruptive（循环 C——D-08 签收态；未签收跳过留痕，`test_disruptive_innovation_dual_source` 维持 `== 2` 零改动）
-- [ ] Subtask 6.5: 断言联动 22 项清单逐项勾选核验（**本 Story「数据契约六」内嵌清单**——非外部调研文档）
-- [ ] Subtask 6.6: yaml 头注释源数（L218/L349/L732）+ 逐字锁死 description 双写同步
+- [ ] Subtask 6.5: 断言联动 24 项清单逐项勾选核验（**本 Story「数据契约六」内嵌清单**——非外部调研文档）
+- [ ] Subtask 6.6: yaml 头注释源数（L218/L732 恒改；L349 **disruptive 项签收态**）+ 逐字锁死 description 双写同步（vrio 恒改；disruptive :383-385 签收态）
 - [ ] Subtask 6.7: 三 Skill 全链路（声明/标记/口径/行数 ≤500）全绿
 - [ ] Subtask 6.8: **Comtrade 语义匹配度评估留痕**（epics 任务 6 第 3 子项——appeals/kpi-tree 等其余 13 个声明 Skill 按 Comtrade 商品级语义匹配度逐个评估，增补/不增补结论与理由留 Dev Agent Record，不强行凑源）+ **D2 修订评审结论留痕**（epics 任务 6 第 4 子项——其余 9 个 4-1d Skill 不放宽至 3 源的评审结论留痕）
 - [ ] Subtask 6.9: 全量回归（4-1c/4-1d/4-1e 三层测试零破坏）
 
 **完成标准/Definition of Done:**
-- [ ] 声明重分配全绿 + 22 项清单全勾 + D-08 结果留痕 + 两个 epics 评估留痕
+- [ ] 声明重分配全绿 + 24 项清单全勾 + D-08 结果留痕 + 两个 epics 评估留痕
 
 ---
 
@@ -669,8 +672,8 @@
 
 - [ ] Subtask 7.1: composition_root 三注册块（epo-ops 条件注册——EDGAR/comtrade 无条件 A 组范式，与 worldbank 同构）+ `_build_data_source_adapters` 元组表 8→11 + shutdown 清理列表 +3（自持 httpx——现 7 项→10 项）
 - [ ] Subtask 7.2: `tests/contracts/test_port_contract_data_source.py` 的 `ADAPTER_PORT_SPECS` +3（env_key：EDGAR None；comtrade key 可选语义标注）+ 探针脚本 env 注入行
-- [ ] Subtask 7.3: **架构测试两文件同步**：① `test_arch_skill_data_collection.py`——`_build_adapters` 同步（import + 实例化 + dict 11 键——EDGAR 免 key 直接实例化/EPO+Comtrade 占位 key `NewsAPIConfig(api_key="arch-test-placeholder")` 先例）+ :124/:138 三元组解包四元组化 → `set(keys) == set(ADAPTER_SSOT.keys())`（:121）全绿（Task 5 中间态收口）；② **`test_arch_data_source.py` 四联动点**——`ADAPTER_PORT_NAMES`（:71-77）+ EDGAR/comtrade、`KEYED_ADAPTER_PORT_NAMES`（:81）+ epo-ops、`ADAPTER_IMPL_MODULES`（:85-94）+3 条映射、`test_keyed_adapters_conditional_registration`（:184/:191-195）+ epo-ops 元组（该文件静态表驱动，漏改静默——逐点核验）
-- [ ] Subtask 7.4: 集成实测文件 `tests/integration/external_sources/data_sources/test_new_sources_integration.py`（三源真实端点——EDGAR/comtrade 无条件可测/EPO key 动态 skip；TestTenant 前缀）
+- [ ] Subtask 7.3: **架构测试两文件同步**：① `test_arch_skill_data_collection.py`——`_build_adapters` 同步（import + 实例化 + dict 11 键——EDGAR 免 key 直接实例化/EPO+Comtrade 占位 key `NewsAPIConfig(api_key="arch-test-placeholder")` 先例）+ :124/:138 三元组解包四元组化 → `set(keys) == set(ADAPTER_SSOT.keys())`（:121）全绿（Task 5 中间态收口）；② **`test_arch_data_source.py` 四联动点**——`ADAPTER_PORT_NAMES`（:71-77）+ EDGAR/comtrade、`KEYED_ADAPTER_PORT_NAMES`（:81）+ epo-ops、`ADAPTER_IMPL_MODULES`（:85-94）+3 条映射、`test_keyed_adapters_conditional_registration`（:184/:191-195）+ epo-ops（参数化结构扩展为多键合取——epo-ops 双凭据 `("EPO_OPS_CONSUMER_KEY", "EPO_OPS_CONSUMER_SECRET")` 成对判定，见 AC-7；该文件静态表驱动，漏改静默——逐点核验）
+- [ ] Subtask 7.4: 集成实测文件 `tests/integration/external_services/data_sources/test_new_sources_integration.py`（三源真实端点——EDGAR/comtrade 无条件可测/EPO key 动态 skip；TestTenant 前缀；目录与既有 `tests/integration/external_services/` 结构对齐）
 - [ ] Subtask 7.5: `__init__.py` docstring 8→11 + root `.env` 数据源 key 区段补样例（L112 `CLOUD_LLM_API_KEY` 附近；root 无 `.env.example`，deploy/*/ 模板为基础设施服务不涉及应用 key——评估结论留 Dev Agent Record，不新建文件）
 - [ ] Subtask 7.6: 子进程探针注册态（epo-ops key 有/无双向；EDGAR/comtrade 恒注册单态验证；without 分支 scrub 全部条件注册数据源 env 键——含既有 TAVILY/NEWSAPI/USPTO——先例 `test_acceptance_data_source.py:606-637`）
 
@@ -778,9 +781,9 @@ tests/
 └── acceptance/contracts/skill_io_schemas.yaml            # Task 6：头注释源数（L218/L349/L732）+ 逐字锁死行同步
 ```
 
-### 新增数据源完整触点清单（19 触点——dev 逐项核验）
+### 新增数据源完整触点清单（21 触点——dev 逐项核验）
 
-适配器/config/组合根注册（条件块或无条件块）/组合根 `_build_data_source_adapters` 元组表/组合根 shutdown 清理列表/`__init__.py` docstring/单测/集成测试/ADAPTER_SSOT 四元组/契约断言两库解包（6 处之一）/架构测试 `test_arch_skill_data_collection.py`（`_build_adapters` + :124/:138 解包）/**架构测试 `test_arch_data_source.py` 静态表三常量 + 条件注册测试**/**架构测试 `test_arch_skill_mixed_data.py`（D8 签收态 involved 联动）**/`ADAPTER_PORT_SPECS` 契约表/子进程探针 env 注入行/受益 Skill frontmatter/SOP body 标记/**受益 Skill references/ 表述**/yaml（增源不触发——仅头注释与逐字锁死行）/root `.env` 样例/文档（architecture.md）。（manifest 不涉及——无新 Skill）
+适配器/config/组合根注册（条件块或无条件块）/组合根 `_build_data_source_adapters` 元组表/组合根 shutdown 清理列表/`__init__.py` docstring/单测/集成测试/ADAPTER_SSOT 四元组/契约断言两库解包（6 处之一）/架构测试 `test_arch_skill_data_collection.py`（`_build_adapters` + :124/:138 解包）/**架构测试 `test_arch_data_source.py` 静态表三常量 + 条件注册测试**/**架构测试 `test_arch_skill_mixed_data.py`（vrio 增源 involved 联动——两态均执行，见断言联动清单 16）**/`ADAPTER_PORT_SPECS` 契约表/子进程探针 env 注入行/受益 Skill frontmatter/SOP body 标记/**受益 Skill references/ 表述**/**4-1c 侧验收 feature/.py 场景名（清单 23/24）**/yaml（增源不触发——仅头注释与逐字锁死行）/root `.env` 样例/文档（architecture.md）。（manifest 不涉及——无新 Skill）
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
 
@@ -800,7 +803,7 @@ tests/
 - [x] 绊线显式改 + 负例保活
 - [x] D-08 HALT 治理决策两态设计
 - [x] CJK 回归基线断言（变异演示形态）
-- [x] 断言联动 22 项清单（数据契约六内嵌）作为 Task 6 执行 checklist
+- [x] 断言联动 24 项清单（数据契约六内嵌）作为 Task 6 执行 checklist
 
 ---
 
@@ -857,7 +860,7 @@ tests/
 - `tests/unit/application/skills/skill_data_collection_contracts.py` / `skill_mixed_data_contracts.py` / `test_skill_mixed_data_contracts.py`（四元组 + SSOT + 绊线 + D2 豁免）
 - `tests/unit/architecture/test_arch_skill_data_collection.py`（解包 + _build_adapters）/ **`test_arch_skill_mixed_data.py`**（解包 + involved 联动）/ **`test_arch_data_source.py`**（静态表四联动点）+ `tests/contracts/test_port_contract_data_source.py`（契约表）
 - `tests/integration/application/test_skill_data_collection.py` / `test_skill_mixed_data.py`（6 源/3 源断言）
-- `tests/acceptance/test_acceptance_skill_mixed_data.feature`（vrio 场景名）+ **`tests/acceptance/test_acceptance_skill_mixed_data.py`**（@scenario 串/函数名/docstring 三联动位）+ `tests/acceptance/contracts/skill_io_schemas.yaml`（头注释 + 逐字锁死行）
+- `tests/acceptance/test_acceptance_skill_mixed_data.feature`（vrio 场景名）+ **`tests/acceptance/test_acceptance_skill_mixed_data.py`**（@scenario 串/函数名/docstring 三联动位）+ **`tests/acceptance/test_acceptance_skill_data_collection.feature`/`.py`**（competitor「四源」场景 :38/:345/:347/:553 恒改 + disruptive「双源交叉验证」场景 :52/:357/:359 签收态——清单 23/24）+ `tests/acceptance/contracts/skill_io_schemas.yaml`（头注释 + 逐字锁死行）
 - `src/application/skills/{competitor-analysis,disruptive-innovation,vrio-framework}/SKILL.md`（声明重分配）+ **受益 Skill references/**（competitor `references/triangulation.md` 3 处源数 + :43；disruptive 三文件「双源」表述——签收态）
 - root `.env`（数据源 key 区段样例——本地文件不进 git，留 Dev Agent Record 记录）
 - `docs/architecture/architecture.md`（适配器表 + 能力边界 + defer 清账 + 8.9.0 + :2829 D4 行重开留痕——签收态）+ `sisys-uni-exception-design.md`（零新增声明）
@@ -914,6 +917,16 @@ tests/
 | R1-19 | 风险表遗漏 4 项（preview 样本子集/CJK 混合反效果/EPO 仅 EP 口径代表性/Task 5-7 红窗口 CI 破坏） | P2 | 风险表 +R9~R12（R12 含红窗口两类区分与提交策略） |
 | R1-20 | 「architecture.md D4 行」三处 D4 未钉行号；vrio 引言 L98-99 无数字与 L138「双源交叉」混列；STORY_SSOT「双侧」口径含混；yaml 行号偏移（:347-348→:349、:380-384→:383-385）；EPO env 变量数（5 个非四键）；shutdown 基数（7 项非 8）；`data_source_marker.py` 路径（services/ 非 skills/）；断言消息「8 个」文案；日期不一致；覆盖率 75% 无测量方式；KEY_SENSITIVE_SOURCES 未评估登记 | P2/P3 | 逐处精确化（:2829 钉行/vrio 联动分开表述/单侧双侧澄清/行号校正/5 变量清单/7→10/路径补全/清单 22 项/日期统一 09-30/AC 覆盖率节补测量方式（`--cov=src/infrastructure`）/Task 0 补 KEY_SENSITIVE 评估项） |
 | R1-21 | EPO 令牌端点失败枚举不完整（「101 或 411」漏 412/413/302）；令牌管理器 retry 参数未透传（单测退避拖秒）；令牌桶断言方向未约束（CI flaky）；探针 without 分支 scrub 范围；CJK「byte-for-byte」措辞过强；AC-2 超限降级话术未安排；skip 补跑无锚点 | P3 | 异常表补枚举/契约二 retry 透传/Task 3 断言仅下界/7.6 scrub-all/1.1 措辞改 dict 逐键/R7 补跑锚点（P3 级部分随相关章节改写收口，其余留 Round 2+ 台账） |
+| R2-1 | 19 触点清单将 `test_arch_skill_mixed_data.py` involved 联动误标「D8 签收态」——与断言联动清单 16（vrio 组·无签收前提）矛盾：未签收世界线照做则 `:115` 集合断言必红（R1-4 漏网第 8 处） | P2 | 触点清单改「vrio 增源 involved 联动——两态均执行」；计数 19→21（增 4-1c 验收 feature/.py 与 references 表述后逐段清点校准） |
+| R2-2 | AC-6 第 5 条（yaml 双写）与 Task 6.6 无两态标注——未签收世界线字面执行会把 disruptive yaml 改 3 源，与「维持 2 源」矛盾（同 checkbox 第 6 条有标注，粒度不一致） | P2 | 两处补「disruptive 项签收态」限定（L349/:383-385 与 L732/vrio 侧分开表述） |
+| R2-3 | 4-1c 侧验收场景联动位整体缺席：competitor「四源并发采集链路」（feature :38 + py :345/:347/:553——**无条件漏项**）与 disruptive「双源交叉验证采集链路」（:52 + py :357/:359——签收态）不在 24 项清单，File List 亦漏 feature/.py 两文件 | P2 | 断言联动清单补第 23/24 项 + File List/触点清单/测试分类表联动（vrio 同款有清单 15 三处覆盖，本次消除非对称遗漏） |
+| R2-4 | `test_keyed_adapters_conditional_registration` 现 `(port_name, env_key)` 单键结构承载不了 epo-ops 双门合取——半凭据态（KEY 有 SECRET 无）实际不注册而单键断言「应注册」→ 假红；7.6 with_key 分支双常量未显式 | P2 | AC-7/Task 7.3 注明参数化结构扩展为 `(port_name, env_keys)` 多键合取（`all()`）；探针双凭据**成对**注入显式化 |
+| R2-5 | scoring_anchors.md「双源」实测 4 行（:3/:14/:20/:33）只列 2 行（枚举失真——对照 triangulation/workshop 全对） | P2 | 硬约束节补 :20/:33 |
+| R2-6 | Task 7.4 集成测试目录 `external_sources` 与实际目录结构/测试分类表/项目结构（`external_services`）不一致——按字面执行会建错目录（v1.0.0 遗留） | P3 | 7.4 路径改 `tests/integration/external_services/data_sources/` |
+| R2-7 | 「循环 A（competitor）+ vrio 循环」「循环 A + vrio」与 R1 风险行「循环 A-B」三种写法并存（语义均正确，风格不齐） | P3 | 统一「循环 A-B（competitor/vrio）」 |
+| R2-8 | R1-20 修复表承诺的覆盖率测量方式未落入正文覆盖率节 | P3 | 补 `pytest tests/unit/infrastructure --cov=src/infrastructure` 测量命令与分层说明 |
+| R2-9 | AC-1 Then「byte-for-byte」与 Task 1.1「dict 逐键」措辞不一；AC-2 令牌端点枚举局部矛盾（「101 或 411」vs 后半全枚举）；AC-2 完成态歧义（skip 即完成 vs AC-1 式降级）；epics AC-2「超限熔断降级话术」（epics :1107 明文）无承载位 | P3 | AC-1 Then 改「dict 逐键一致」；AC-2 枚举补全 + 完成判定声明（单测矩阵为准，集成 Defer 追认——与 AC-1 降级的差异理由）+ 412 降级话术挂 Task 6 清单 4 |
+| R2-10 | 「唯二内容改动」粒度滞后 R1-8（仅写 SKILL.md）且与「唯二生产 .py 行为改动」存在同词头混淆风险；Task 2「config 四键 + 双凭据字段」与命名规范「5 变量」有 6 键误读空间；Comtrade from_env key 缺失语义（空串=无 key）未逐字写 | P3 | :21 改「唯二内容资产改动」（SKILL.md + references/ + yaml）+ 两口径区分说明；Task 2 改「5 变量」；Task 0.3 补 from_env 空串语义钉死 |
 
 ---
 
@@ -952,9 +965,10 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-09-30
 **最后更新/Last Updated:** 2026-09-30
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（基于 epics 4.1f 定义 + 四域预筛报告实测裁定 + 三视角代码调研（适配器基建/契约联动/受益面——发现 D8 治理冲突并设计两态处理）+ 4.1e 五轮审查 Lessons；10 项决策登记；8 Task / 7 AC）
 - v1.1.0: **Round 1 文档审查修订**（三视角代码调研复审 + 外部 API 实测 + 三视角并行审查）：P0×2（`test_arch_data_source.py` 四联动点归属与缺席 / 断言联动清单实体化 22 项）+ P1×9（vrio 治理门解绑统一 / Comtrade 配额守卫与无条件注册定稿 / EPO 401 重取路径 / epics 三子项漏承载 / `test_arch_skill_mixed_data.py` 遗漏 / 复制体误述 / 双源 11 处与 references 联动 / 13 Skill 口径 / 验收 .py 三联动位）+ P2/P3 系列精确化——详见 Docs Review Fixes R1-1~R1-21
+- v1.2.0: **Round 2 回归核查 + 组合可达性审查修订**（R1 修复 21 项逐项核验：17 完整/4 部分 + 8 组合场景推演：两态世界线/双门合取/时序闭合）：P2×5（R2-1 触点清单 vrio 联动误标签收态 / R2-2 yaml 双写两态标注缺失 / R2-3 4-1c 验收场景漏项——清单扩至 24 项 / R2-4 双门合取参数化结构 / R2-5 scoring_anchors 枚举补全）+ P3×5（R2-6~R2-10 路径/风格/覆盖率命令/措辞系列收口）——主线组合自洽（R1 五组核心变更互不拆台）
