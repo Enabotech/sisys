@@ -193,3 +193,47 @@ class TestResultsTypeValidation:
             await adapter.fetch(DataSourceQuery(source_name="tavily", query="q"))
         assert exc_info.value.code == "EXCEPTION_413"
         await adapter.close()
+
+
+class TestTavilyCjkAdaptiveParams:
+    """Story 4.1f AC-1：CJK query 自适应注入 country=china（官方全名枚举）。
+
+    双态契约：含 CJK → 请求体加 country；不含 CJK → 请求体与既有形态逐键一致（回归基线）。
+    """
+
+    @staticmethod
+    def _capture_body() -> tuple[list[dict[str, object]], httpx.MockTransport]:
+        bodies: list[dict[str, object]] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            bodies.append(json.loads(request.content.decode()))
+            return httpx.Response(200, json={"results": []})
+
+        return bodies, httpx.MockTransport(handler)
+
+    @pytest.mark.asyncio
+    async def test_cjk_query_adds_country_china(self) -> None:
+        """中文 query → 请求体自动加 country=china。"""
+        bodies, transport = self._capture_body()
+        adapter = _make_adapter(transport)
+        await adapter.fetch(DataSourceQuery(source_name="tavily", query="比亚迪 战略动态 并购 新能源汽车"))
+        assert bodies[0].get("country") == "china"
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_mixed_cjk_english_query_adds_country(self) -> None:
+        """中英混合 query → 同样注入（检测规则为「含任一 CJK 字符」）。"""
+        bodies, transport = self._capture_body()
+        adapter = _make_adapter(transport)
+        await adapter.fetch(DataSourceQuery(source_name="tavily", query="宁德时代 CATL 产能扩张"))
+        assert bodies[0].get("country") == "china"
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_non_cjk_query_body_unchanged_baseline(self) -> None:
+        """英文 query → 请求体与既有形态逐键一致（回归基线——零既有影响）。"""
+        bodies, transport = self._capture_body()
+        adapter = _make_adapter(transport)
+        await adapter.fetch(DataSourceQuery(source_name="tavily", query="BYD strategy news"))
+        assert set(bodies[0]) == {"api_key", "query", "max_results"}, "非 CJK 请求体应零变化"
+        await adapter.close()

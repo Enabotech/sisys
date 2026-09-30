@@ -35,6 +35,11 @@ from src.infrastructure.external_services.embedding.circuit_breaker import Circu
 logger = logging.getLogger(__name__)
 
 
+def _contains_cjk(text: str) -> bool:
+    """检测文本是否含 CJK 统一表意文字（Story 4.1f AC-1 中文参数自适应门控）。"""
+    return any("一" <= ch <= "鿿" for ch in text)
+
+
 class TavilyAdapter:
     """Tavily 数据源适配器（REST_JSON + API Key）"""
 
@@ -106,6 +111,10 @@ class TavilyAdapter:
             "query": query.query,
             "max_results": parse_int_param(params_dict, "max_results", 5, source_name="tavily"),
         }
+        # CJK 自适应（Story 4.1f AC-1）：中文 query 注入 country=china（官方全名枚举，
+        # 仅 topic=general 时生效——本适配器不传 topic 默认 general）；非 CJK 路径零变化
+        if _contains_cjk(query.query):
+            body["country"] = "china"
         data = await request_json_with_resilience(
             self._client,
             "POST",
