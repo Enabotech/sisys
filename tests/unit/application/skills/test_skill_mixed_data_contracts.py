@@ -48,10 +48,22 @@ class TestMixedSkillDataSources:
         assert len(contracts_41d.MIXED_SKILL_DATA_SOURCES) == 10
 
     def test_all_sources_are_registered_adapters(self) -> None:
-        """全部声明源 ∈ 8 个注册适配器集合（合法值约束）。"""
+        """全部声明源 ∈ 11 个注册适配器集合（合法值约束——4-1f 三新源入册）。"""
         for slug, sources in contracts_41d.MIXED_SKILL_DATA_SOURCES.items():
             for name in sources:
-                assert name in contracts_41c.ADAPTER_SSOT, f"{slug}: 源 {name} 不在 8 个注册适配器中"
+                assert name in contracts_41c.ADAPTER_SSOT, f"{slug}: 源 {name} 不在 11 个注册适配器中"
+
+    def test_adapter_ssot_quadruple_structure(self) -> None:
+        """ADAPTER_SSOT 四元组结构基准（4-1f D6）：11 源 × (url, api_type, ttl, required_fields)。"""
+        assert len(contracts_41c.ADAPTER_SSOT) == 11, f"应 11 源（8 既有 + 3 新），实际 {len(contracts_41c.ADAPTER_SSOT)}"
+        for name, entry in contracts_41c.ADAPTER_SSOT.items():
+            assert len(entry) == 4, f"{name}: SSOT 条目应为四元组，实际 {len(entry)} 元: {entry}"
+            url, api_type, ttl, required_fields = entry
+            assert url.startswith("http"), f"{name}: url 非法 {url}"
+            assert api_type in ("rest_json", "sdmx_json", "csv_download", "crawler"), f"{name}: api_type 非法 {api_type}"
+            assert 60 <= ttl <= 2592000, f"{name}: ttl 越界 {ttl}"
+            assert isinstance(required_fields, tuple) and required_fields, f"{name}: required_fields 应为非空 tuple"
+        assert set(contracts_41c.ADAPTER_SSOT) >= {"epo-ops", "sec-edgar", "comtrade"}, "4-1f 三新源应入册 SSOT"
 
     def test_unified_two_source_policy(self) -> None:
         """统一 2 源策略（决策 D2）：每个 Skill 恰好声明 2 个源且不重复。"""
@@ -92,26 +104,41 @@ class TestSharedConstantsSingleSource:
     """跨 Story 共享常量一律 import 4-1c 契约库（R2-F3 单一来源，D6 决策）。"""
 
     def test_shared_constants_are_imported_not_copied(self) -> None:
-        """七共享常量必须与 4-1c 契约库同一对象（identity 断言，防复制漂移）。
+        """六共享常量必须与 4-1c 契约库同一对象（identity 断言，防复制漂移）。
 
         SKILL_MD_MAX_LINES 用 ==（int 无对象同一性语义，R2-F2 注记）；
-        其余六常量为 tuple/Pattern/Path 对象，is 断言成立。
+        其余五常量为 tuple/Pattern/Path 对象，is 断言成立。EXPECTED_REQUIRED_FIELDS
+        已随 4-1f 四元组化移除（D6——查表断言取代统一比对，双真相源漂移风险消除）。
         """
         assert contracts_41d.ADAPTER_SSOT is contracts_41c.ADAPTER_SSOT
         assert contracts_41d.KEY_SENSITIVE_SOURCES is contracts_41c.KEY_SENSITIVE_SOURCES
         assert contracts_41d.DATA_SOURCE_MARKER_PATTERN is contracts_41c.DATA_SOURCE_MARKER_PATTERN
         assert contracts_41d.REQUIRED_SOP_SECTIONS is contracts_41c.REQUIRED_SOP_SECTIONS
         assert contracts_41d.SKILL_MD_MAX_LINES == contracts_41c.SKILL_MD_MAX_LINES
-        assert contracts_41d.EXPECTED_REQUIRED_FIELDS is contracts_41c.EXPECTED_REQUIRED_FIELDS
         assert contracts_41d.SKILLS_ROOT is contracts_41c.SKILLS_ROOT
 
-    def test_expected_required_fields_value_locked(self) -> None:
-        """EXPECTED_REQUIRED_FIELDS 值级独立基准（R2-F12，STORY_SSOT 先例）。
+    def test_required_fields_quadruple_values_locked(self) -> None:
+        """required_fields 四元组第四项值级独立基准（4-1f D6 改写 R2-F12 绊线）。
 
-        防契约常量与 16 个 SKILL.md 被同步同改时全绿无告警——4.3 字段级化
-        改值时须显式修改本基准（变更登记绊线）。
+        8 既有源锁定 ("indicator","value")（零漂移）+ 3 新源锁定定制值——
+        SSOT 与 16 个 SKILL.md frontmatter 被同步同改时全绿无告警的防线；
+        改任一源字段集时须显式修改本基准（变更登记绊线语义延续）。
         """
-        assert contracts_41c.EXPECTED_REQUIRED_FIELDS == ("indicator", "value")
+        legacy_expected = ("indicator", "value")
+        new_source_expected = {
+            "epo-ops": ("title", "applicant", "filing_date"),
+            "sec-edgar": ("company", "form", "filed_at"),
+            "comtrade": ("cmd_code", "trade_value", "period"),
+        }
+        for name, (_, _, _, required_fields) in contracts_41c.ADAPTER_SSOT.items():
+            if name in new_source_expected:
+                assert required_fields == new_source_expected[name], (
+                    f"{name}: 新源 required_fields 应为 {new_source_expected[name]}，实际 {required_fields}"
+                )
+            else:
+                assert required_fields == legacy_expected, (
+                    f"{name}: 既有源 required_fields 应零漂移 {legacy_expected}，实际 {required_fields}"
+                )
 
 
 class TestTemplateContract:

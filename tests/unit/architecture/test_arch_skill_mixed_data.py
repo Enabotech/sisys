@@ -110,12 +110,14 @@ class TestThreeWayConsistency:
     """声明表 SSOT ↔ 10 个 SKILL.md frontmatter ↔ 涉及源适配器元数据三方一致"""
 
     def test_involved_adapter_metadata_matches_ssot(self) -> None:
-        """6 个涉及源适配器 get_metadata() 实测值与 ADAPTER_SSOT 一致（name/url/api_type/ttl）"""
+        """涉及源适配器 get_metadata() 实测值与 ADAPTER_SSOT 一致（name/url/api_type/ttl）"""
         adapters = _build_involved_adapters()
         assert set(adapters.keys()) == set(MIXED_INVOLVED_SOURCES)
         for name, adapter in adapters.items():
             ref = adapter.get_metadata()
-            url, api_type, ttl = ADAPTER_SSOT[name]
+            # 4-1f 定稿：适配器侧解包第 4 项（required_fields）弃用——声明性字段归声明面，
+            # 由 frontmatter↔SSOT 双方断言承载（既有适配器 get_metadata 均不填该字段）
+            url, api_type, ttl, _ = ADAPTER_SSOT[name]
             assert ref.name == name
             assert ref.url == url, f"{name}: 适配器 url 漂移 {ref.url} != {url}"
             assert ref.api_type.value == api_type, f"{name}: 适配器 api_type 漂移"
@@ -129,11 +131,14 @@ class TestThreeWayConsistency:
         refs = document.frontmatter.data_sources
         assert tuple(ref.name for ref in refs) == MIXED_SKILL_DATA_SOURCES[slug]
         for ref in refs:
-            url, api_type, ttl = ADAPTER_SSOT[ref.name]
+            url, api_type, ttl, required_fields = ADAPTER_SSOT[ref.name]
             assert ref.url == url, f"{slug}/{ref.name}: frontmatter url 与适配器不一致"
             assert ref.api_type.value == api_type
             assert ref.ttl_seconds == ttl
             assert 60 <= ref.ttl_seconds <= 2592000
+            assert tuple(ref.required_fields) == required_fields, (
+                f"{slug}/{ref.name}: frontmatter required_fields 与 SSOT 不一致"
+            )
 
     @pytest.mark.parametrize("slug", TARGET_SLUGS)
     async def test_markers_within_whitelist_cross_consistency(self, slug: str) -> None:

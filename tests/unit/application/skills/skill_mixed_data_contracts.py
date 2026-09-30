@@ -22,10 +22,10 @@ from typing import Any
 from src.application.ports.skill_loader import SkillDocument, ToolMetadata
 
 # 跨 Story 共享常量：import 4-1c 契约库唯一来源（D6 决策，禁止复制）
+# 4-1f D6：EXPECTED_REQUIRED_FIELDS 已移除（四元组查表断言取代统一比对——非复制关系不变）
 from tests.unit.application.skills.skill_data_collection_contracts import (
     ADAPTER_SSOT,
     DATA_SOURCE_MARKER_PATTERN,
-    EXPECTED_REQUIRED_FIELDS,
     KEY_SENSITIVE_SOURCES,
     REQUIRED_SOP_SECTIONS,
     SKILL_MD_MAX_LINES,
@@ -36,7 +36,6 @@ from tests.unit.application.skills.skill_data_collection_contracts import (
 __all__ = [
     "ADAPTER_SSOT",
     "DATA_SOURCE_MARKER_PATTERN",
-    "EXPECTED_REQUIRED_FIELDS",
     "KEY_SENSITIVE_SOURCES",
     "REQUIRED_SOP_SECTIONS",
     "SKILLS_ROOT",
@@ -326,8 +325,8 @@ def assert_data_sources_contract(slug: str, metadata: ToolMetadata) -> None:
 
     混合数据语义：声明源查 MIXED_SKILL_DATA_SOURCES（本 Story SSOT），
     逐源 url/api_type/ttl 与 ADAPTER_SSOT（import 4-1c 库）逐字对齐；
-    required_fields 与 EXPECTED_REQUIRED_FIELDS（import 4-1c 库，R1-F5 收紧）
-    逐字对齐——「全字段」断言名实相符。
+    required_fields 按源查 ADAPTER_SSOT 四元组第四项（4-1f D6 查表化——原统一
+    常量比对已随 EXPECTED_REQUIRED_FIELDS 移除而升级）——「全字段」断言名实相符。
     """
     expected_names = MIXED_SKILL_DATA_SOURCES[slug]
     actual = metadata.data_sources
@@ -336,13 +335,13 @@ def assert_data_sources_contract(slug: str, metadata: ToolMetadata) -> None:
         f"{slug}: data_sources name 集合与 SSOT 不一致: {tuple(ref.name for ref in actual)} != {expected_names}"
     )
     for ref in actual:
-        url, api_type, ttl = ADAPTER_SSOT[ref.name]
+        url, api_type, ttl, required_fields = ADAPTER_SSOT[ref.name]
         assert ref.url == url, f"{slug}/{ref.name}: url 漂移 {ref.url} != {url}"
         assert ref.api_type.value == api_type, f"{slug}/{ref.name}: api_type 漂移 {ref.api_type.value} != {api_type}"
         assert ref.ttl_seconds == ttl, f"{slug}/{ref.name}: ttl_seconds 漂移 {ref.ttl_seconds} != {ttl}"
         assert 60 <= ref.ttl_seconds <= 2592000
-        assert tuple(ref.required_fields) == EXPECTED_REQUIRED_FIELDS, (
-            f"{slug}/{ref.name}: required_fields 漂移 {tuple(ref.required_fields)} != {EXPECTED_REQUIRED_FIELDS}"
+        assert tuple(ref.required_fields) == required_fields, (
+            f"{slug}/{ref.name}: required_fields 漂移 {tuple(ref.required_fields)} != {required_fields}"
         )
 
 

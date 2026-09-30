@@ -26,20 +26,27 @@ SKILLS_ROOT = Path(__file__).resolve().parents[4] / "src" / "application" / "ski
 CONTRACTS_FILE = Path(__file__).resolve().parents[3] / "acceptance" / "contracts" / "skill_io_schemas.yaml"
 
 # =============================================================================
-# SSOT：8 个适配器元数据对齐表（name → (url, api_type, ttl_seconds)）
+# SSOT：11 个适配器元数据对齐表（name → (url, api_type, ttl_seconds, required_fields)）
 # 与 Story 「适配器 url/api_type/ttl/confidence 对齐表」逐字一致
-# （4-1b 8 适配器 get_metadata() 实测值）
+# （4-1b 8 适配器 get_metadata() 实测值 + 4-1f 三新源）
+# 4-1f D6：三元组扩四元组——required_fields 按源定制（8 既有源零漂移保持
+# ("indicator","value")；3 新源定制值）。:60 原注释「4.3 字段级化时并入 ADAPTER_SSOT」
+# 预案由此落地；原 EXPECTED_REQUIRED_FIELDS 统一常量移除（查表断言取代统一比对——
+# 双真相源漂移风险消除，值级绊线改写为 test_required_fields_quadruple_values_locked）。
 # =============================================================================
 
-ADAPTER_SSOT: dict[str, tuple[str, str, int]] = {
-    "world-bank": ("https://api.worldbank.org/v2", "rest_json", 604800),
-    "imf": ("https://www.imf.org/external/datamapper/api/v1", "sdmx_json", 604800),
-    "eurostat": ("https://ec.europa.eu/eurostat/api/dissemination", "sdmx_json", 604800),
-    "uspto": ("https://search.patentsview.org", "rest_json", 2592000),
-    "ipcc": ("https://www.ipcc.ch/data", "csv_download", 2592000),
-    "newsapi": ("https://newsapi.org", "rest_json", 21600),
-    "tavily": ("https://api.tavily.com", "rest_json", 86400),
-    "china-nbs": ("https://www.stats.gov.cn", "crawler", 86400),
+ADAPTER_SSOT: dict[str, tuple[str, str, int, tuple[str, ...]]] = {
+    "world-bank": ("https://api.worldbank.org/v2", "rest_json", 604800, ("indicator", "value")),
+    "imf": ("https://www.imf.org/external/datamapper/api/v1", "sdmx_json", 604800, ("indicator", "value")),
+    "eurostat": ("https://ec.europa.eu/eurostat/api/dissemination", "sdmx_json", 604800, ("indicator", "value")),
+    "uspto": ("https://search.patentsview.org", "rest_json", 2592000, ("indicator", "value")),
+    "ipcc": ("https://www.ipcc.ch/data", "csv_download", 2592000, ("indicator", "value")),
+    "newsapi": ("https://newsapi.org", "rest_json", 21600, ("indicator", "value")),
+    "tavily": ("https://api.tavily.com", "rest_json", 86400, ("indicator", "value")),
+    "china-nbs": ("https://www.stats.gov.cn", "crawler", 86400, ("indicator", "value")),
+    "epo-ops": ("https://ops.epo.org", "rest_json", 604800, ("title", "applicant", "filing_date")),
+    "sec-edgar": ("https://efts.sec.gov", "rest_json", 2592000, ("company", "form", "filed_at")),
+    "comtrade": ("https://comtradeapi.un.org", "rest_json", 604800, ("cmd_code", "trade_value", "period")),
 }
 
 # SSOT：6 个 Skills 数据源白名单声明表（slug → 声明源 name 有序元组）
@@ -53,12 +60,9 @@ SKILL_DATA_SOURCES: dict[str, tuple[str, ...]] = {
 }
 
 # 声明含 Key 敏感源（newsapi/tavily）的 Skill —— SOP 失败处理章节必须文档化 Key 缺失降级
+# （4-1f Task 0 定稿：epo-ops/comtrade 不登记——循 uspto 先例，同为 keyed 源但降级语义由
+# Skill §7「未注册行」扩列承载；登记将触发 test_key_sensitive_skills_count 精确集合断言连锁红）
 KEY_SENSITIVE_SOURCES = ("newsapi", "tavily")
-
-# 全部 16 个声明 Skill 的 DataSourceRef.required_fields 统一期望值（源级语义，跨 Story 共享）
-# 4.1b 声明性元数据约定：payload 必含 indicator/value 两字段（16 Skill × 全部声明源实测一致）。
-# 4-1d 代码审查 R1-F5 收紧断言引入（原先仅非空断言）；4.3 data_sources.items 字段级化时并入 ADAPTER_SSOT。
-EXPECTED_REQUIRED_FIELDS: tuple[str, ...] = ("indicator", "value")
 
 # SOP body 中 $DATA_SOURCE 标记提取正则（Task 9.3 跨循环一致性同款）
 DATA_SOURCE_MARKER_PATTERN = re.compile(r"\$DATA_SOURCE\(\s*[\"']([\w-]+)[\"']")
@@ -106,13 +110,13 @@ def assert_data_sources_contract(slug: str, metadata: ToolMetadata) -> None:
         f"{slug}: data_sources name 集合与 SSOT 不一致: {tuple(ref.name for ref in actual)} != {expected_names}"
     )
     for ref in actual:
-        url, api_type, ttl = ADAPTER_SSOT[ref.name]
+        url, api_type, ttl, required_fields = ADAPTER_SSOT[ref.name]
         assert ref.url == url, f"{slug}/{ref.name}: url 漂移 {ref.url} != {url}"
         assert ref.api_type.value == api_type, f"{slug}/{ref.name}: api_type 漂移 {ref.api_type.value} != {api_type}"
         assert ref.ttl_seconds == ttl, f"{slug}/{ref.name}: ttl_seconds 漂移 {ref.ttl_seconds} != {ttl}"
         assert 60 <= ref.ttl_seconds <= 2592000
-        assert tuple(ref.required_fields) == EXPECTED_REQUIRED_FIELDS, (
-            f"{slug}/{ref.name}: required_fields 漂移 {tuple(ref.required_fields)} != {EXPECTED_REQUIRED_FIELDS}"
+        assert tuple(ref.required_fields) == required_fields, (
+            f"{slug}/{ref.name}: required_fields 漂移 {tuple(ref.required_fields)} != {required_fields}"
         )
 
 
