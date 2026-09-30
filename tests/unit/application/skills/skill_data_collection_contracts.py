@@ -54,9 +54,9 @@ SKILL_DATA_SOURCES: dict[str, tuple[str, ...]] = {
     "pestel-analysis": ("world-bank", "imf", "eurostat", "ipcc", "newsapi", "china-nbs"),
     "porters-five-forces": ("newsapi", "world-bank", "eurostat"),
     "appeals-analysis": ("tavily", "newsapi", "china-nbs"),
-    "competitor-analysis": ("newsapi", "uspto", "tavily", "china-nbs"),
+    "competitor-analysis": ("newsapi", "uspto", "epo-ops", "sec-edgar", "tavily", "china-nbs"),
     "scenario-planning": ("tavily", "ipcc", "eurostat"),
-    "disruptive-innovation": ("uspto", "tavily"),
+    "disruptive-innovation": ("uspto", "epo-ops", "tavily"),
 }
 
 # 声明含 Key 敏感源（newsapi/tavily）的 Skill —— SOP 失败处理章节必须文档化 Key 缺失降级

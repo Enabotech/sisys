@@ -29,7 +29,7 @@ STORY_SSOT: dict[str, tuple[str, ...]] = {
     "ge-mckinsey-matrix": ("world-bank", "tavily"),
     "space-matrix": ("world-bank", "imf"),
     "value-chain-analysis": ("tavily", "china-nbs"),
-    "vrio-framework": ("uspto", "tavily"),
+    "vrio-framework": ("uspto", "epo-ops", "tavily"),
     "bsc-scorecard": ("china-nbs", "world-bank"),
     "kpi-tree": ("china-nbs", "newsapi"),
     "change-management": ("newsapi", "tavily"),
@@ -66,10 +66,19 @@ class TestMixedSkillDataSources:
         assert set(contracts_41c.ADAPTER_SSOT) >= {"epo-ops", "sec-edgar", "comtrade"}, "4-1f 三新源应入册 SSOT"
 
     def test_unified_two_source_policy(self) -> None:
-        """统一 2 源策略（决策 D2）：每个 Skill 恰好声明 2 个源且不重复。"""
+        """2 源基线 + 4-1f 增补豁免表（D2 修订——epics 4.1f 任务 6 授权）。
+
+        基线：混合数据 Skill 恰好声明 2 个源且不重复；豁免表逐 Skill 登记显式增补
+        （未登记的增补即红——防漂移语义保留）。vrio-framework 经 epics 授权增补
+        epo-ops（专利域第二口径，3 源）。
+        """
+        exempted_source_counts = {"vrio-framework": 3}
         for slug, sources in contracts_41d.MIXED_SKILL_DATA_SOURCES.items():
-            assert len(sources) == 2, f"{slug}: 声明源数 {len(sources)} != 2（统一 2 源策略 D2）"
-            assert len(set(sources)) == 2, f"{slug}: 声明源重复 {sources}"
+            expected_count = exempted_source_counts.get(slug, 2)
+            assert len(sources) == expected_count, (
+                f"{slug}: 声明源数 {len(sources)} != {expected_count}（2 源基线 D2 / 4-1f 豁免）"
+            )
+            assert len(set(sources)) == len(sources), f"{slug}: 声明源重复 {sources}"
 
     def test_key_sensitive_skills_count(self) -> None:
         """Key 敏感 Skill 恰好 7 个（4 单敏感 + 3 双敏感），交叉核算 SSOT 表。"""
