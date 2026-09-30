@@ -215,7 +215,7 @@
 > 12. `test_unified_two_source_policy` 豁免表改写（`test_skill_mixed_data_contracts.py:56-60`——「2 源基线 + 4-1f 增补豁免表」，未登记增补即红）
 > 13. vrio frontmatter +1 块 + §5 表加行（L142/L143 之间）+ L138「双源交叉」表述 + 引言 L98-99 源名增 EPO
 > 14. vrio 集成 `len(metas) == 2` 参数化改 `== len(declared)`（`test_skill_mixed_data.py:236`——10 Skill 全体，vrio 3 源后其余 9 Skill 仍 2）
-> 15. vrio 验收场景名「双源」→「三源」（feature L63 + `.py` **三联动位**：@scenario 绑定串 L449 / 函数名 `test_vrio_framework_dual_source_chain` L450 / docstring L451——**本项无自动断言红（步骤声明驱动）——grep 核验 + review 保障**）+ feature L5 总述「（双源交叉）」措辞评估
+> 15. vrio 验收场景名「双源」→「三源」（feature L63 + `.py` **三联动位**：@scenario 绑定串 L450 / 函数名 `test_vrio_framework_dual_source_chain` L451 / docstring L452——**本项无自动断言红（步骤声明驱动）——grep 核验 + review 保障**）+ feature L5 总述「（双源交叉）」措辞评估
 > 16. `test_arch_skill_mixed_data.py`：`_build_involved_adapters()` 加 `EpoOpsAdapter`（占位凭据）+ import 行 + docstring/注释「6 个」→「7 个」（:55/:79/:113）——`MIXED_INVOLVED_SOURCES` :56 为派生量自动扩，:115 集合断言驱动同步
 >
 > disruptive 类（D-08 签收前提）：
@@ -307,7 +307,7 @@
 - [ ] `assert_data_sources_contract`（声明序元组相等）+ `assert_cross_consistency`（每新源 ≥1 标记）+ `assert_sop_maturity`（源数计数表述同步后全绿）
 - [ ] `test_triangulation_competitor_four_sources` 改 6 源语义（名/docstring/断言 `>= 3` 升格强断言 `== 6`）；`test_disruptive_innovation_dual_source` 按 D-08 结果（签收→`== 3` + D4 表述同步；未签收→维持 `== 2` 零改动 + 留痕）
 - [ ] `test_unified_two_source_policy` 改「2 源基线 + 4-1f 增补豁免表」（vrio——epics 授权，无签收前提）；`MIXED_SKILL_DATA_SOURCES`（契约库）与 `STORY_SSOT`（测试基准）双侧同步
-- [ ] 4-1d 集成 `len(metas) == 2` 参数化改 `== len(declared)`（`test_skill_mixed_data.py:236`）；4-1d 验收 vrio 场景名「双源」→「三源」（feature L63 + `.py` 三联动位 L449-451：@scenario 串/函数名/docstring）
+- [ ] 4-1d 集成 `len(metas) == 2` 参数化改 `== len(declared)`（`test_skill_mixed_data.py:236`）；4-1d 验收 vrio 场景名「双源」→「三源」（feature L63 + `.py` 三联动位 L450-452：@scenario 串/函数名/docstring）
 - [ ] yaml 头注释源数同步（competitor L218「4 源」→「6 源」/vrio L732「2 源」→「3 源」/disruptive L349「2 源」→「3 源」**——签收态，未签收不动**）+ 逐字锁死 description 双写同步（vrio 侧 + disruptive :383-385 含 SKILL.md L79**——签收态**）
 - [ ] 受益 Skill references/ 联动（competitor triangulation.md 3 处源数 + :43 未三角化撤除；disruptive 三文件「双源」表述改写——签收态）
 - [ ] **Comtrade 语义匹配度评估留痕**（epics 任务 6 第 3 子项：appeals/kpi-tree 等其余声明 Skill 按语义匹配度评估是否增补——结论与理由留 Dev Agent Record，不强行凑源）+ **D2 修订评审结论留痕**（epics 任务 6 第 4 子项：其余 9 个 4-1d Skill 不放宽的评审结论——产品判断留痕）
@@ -641,7 +641,7 @@
 |------|------|
 | 🔴 红 | vrio 单测红（`MIXED_SKILL_DATA_SOURCES`/`STORY_SSOT` 3 化后 frontmatter 仍 2 源） |
 | 🟢 绿 | SKILL.md：frontmatter +1 块 / §5 表加行（L142-143 之间）/ L138「双源交叉」表述 / 引言 L98-99 源名增 EPO / query 规范条目（CQL `pa=` 语法） |
-| 🔄 重构 | D2 断言改写（`test_unified_two_source_policy` 豁免表 + `len(metas)==2` 参数化改 `== len(declared)` + 4-1d feature 场景名「双源」→「三源」+ `.py` 三联动位 L449-451）+ `test_arch_skill_mixed_data.py` involved 联动（断言联动清单 16）+ epics 授权留痕（Dev Agent Record） |
+| 🔄 重构 | D2 断言改写（`test_unified_two_source_policy` 豁免表 + `len(metas)==2` 参数化改 `== len(declared)` + 4-1d feature 场景名「双源」→「三源」+ `.py` 三联动位 L450-452）+ `test_arch_skill_mixed_data.py` involved 联动（断言联动清单 16）+ epics 授权留痕（Dev Agent Record） |
 
 #### TDD 循环 [C]：disruptive-innovation（2→3 源，D-08 签收前提——未签收则跳过并留痕）
 
@@ -933,6 +933,7 @@ tests/
 | R3-4 | EpoOpsAdapter 构造器 config 缺省行为未定稿（uspto 式 `config or Config()` 回退对 EPO 是错误模式——空凭据回退推迟爆炸到首个请求） | P3 | Task 0.3 定稿：config 必填、空凭据构造期即抛 101（fail-fast 优于延迟炸） |
 | R3-5 | architecture.md 版本号 8.9.0 实为三处同步点（:17 头部/:3600 修订表/:3613 尾部表），Story 只列修订历史一处 | P3 | Task 8.2 补三处同步清单 |
 | R3-6 | vrio 验收 .py 三联动位行号实测 L449-451（Story 写 L450-452，±1）；Task 2 DoD 与项目结构两处「四键」残留（4+2=6 键误读——R2-10 修复不彻底）；R12「4-1e D8 先例」归属错（实测源头 4-1d `:611`——「D8」一词三义易混） | P3 | 行号校正（清单 15/AC-6/循环 B）；两处「四键」→「5 变量」；R12 改「4-1d『一次性预调整』先例（彼 Story D8，非本 Story 治理 D8）」 |
+| R4-1 | R3-6 的行号「校正」反向偏移——主会话实测定谳：`@scenario` L450 / `def` L451 / docstring L452（v1.2.0 原行号本正确，R3 终审员误报 ±1）；R3-1 修复方案列「Task 2/3/4 红测试措辞」范围夸大（实测仅 Task 2 红行含「四元组对齐」措辞，Task 3/4 从未含——记录级出入） | P3 | 三处行号回正 L450-452（清单 15/AC-6/Task 6 循环 B）；R3-1 范围夸大作记录级注记不改正文（正文语义无冲突） |
 
 ---
 
@@ -971,7 +972,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-09-30
 **最后更新/Last Updated:** 2026-09-30
 **更新说明/Description:**
@@ -979,3 +980,4 @@ tests/
 - v1.1.0: **Round 1 文档审查修订**（三视角代码调研复审 + 外部 API 实测 + 三视角并行审查）：P0×2（`test_arch_data_source.py` 四联动点归属与缺席 / 断言联动清单实体化 22 项）+ P1×9（vrio 治理门解绑统一 / Comtrade 配额守卫与无条件注册定稿 / EPO 401 重取路径 / epics 三子项漏承载 / `test_arch_skill_mixed_data.py` 遗漏 / 复制体误述 / 双源 11 处与 references 联动 / 13 Skill 口径 / 验收 .py 三联动位）+ P2/P3 系列精确化——详见 Docs Review Fixes R1-1~R1-21
 - v1.2.0: **Round 2 回归核查 + 组合可达性审查修订**（R1 修复 21 项逐项核验：17 完整/4 部分 + 8 组合场景推演：两态世界线/双门合取/时序闭合）：P2×5（R2-1 触点清单 vrio 联动误标签收态 / R2-2 yaml 双写两态标注缺失 / R2-3 4-1c 验收场景漏项——清单扩至 24 项 / R2-4 双门合取参数化结构 / R2-5 scoring_anchors 枚举补全）+ P3×5（R2-6~R2-10 路径/风格/覆盖率命令/措辞系列收口）——主线组合自洽（R1 五组核心变更互不拆台）
 - v1.3.0: **Round 3 dev 执行视角可满足性终审修订**（24 项清单逐项红绿推演 + 关键架构声明实测验证）：**P1×1**（R3-1 Task 5 四元组适配器侧断言语义定稿——既有 8 适配器 get_metadata 不填声明性字段的架构语义显式化，适配器侧第 4 项弃用断言，避免 8 生产文件意外扩面）+ P2×1（R3-2 KEY_SENSITIVE 登记两态连锁红登记）+ P3×4（R3-3~R3-6 无断言项标注/EPO config 必填定稿/8.9.0 三处同步/行号与措辞校正）；「零 domain 改动」声明经 `DataSourceRef.required_fields` 字段（:96）与 frontmatter 加载链（:195-205）实测成立
+- v1.3.1: **Round 4 纯验证轮**（七维度快扫：三轮 37 项修复落地/计数一致性/行号抽查/两态标注 46 处/内部引用闭合/结构完整/格式卫生——全部通过，**零 P0/P1 残留**）+ R4-1 行号回正（R3-6 校正反向偏移，主会话实测定谳 L450-452）
