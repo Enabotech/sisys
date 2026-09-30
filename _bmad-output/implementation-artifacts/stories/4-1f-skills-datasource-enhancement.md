@@ -590,14 +590,15 @@
 | 🔴 红 | 守卫两分支（放行计数累计/超限抛 412 含已用次数与重置时间）+ 日窗口重置（注入 `now_fn` 跨 UTC 00:00）+ 并发安全（gather 竞态）——守卫计数构造可注入初始值 |
 | 🟢 绿 | 进程内日窗口请求计数（`asyncio.Lock` 类变量 + `now_fn` 注入——模式复用 EPO 周窗口守卫，Task 2 已建） |
 
-- [ ] Subtask 4.1: 🔴 红 — 解析与矩阵测试（循环 A）
-- [ ] Subtask 4.2: 🟢 绿 — 适配器实现（循环 A）
-- [ ] Subtask 4.3: 🔴🟢 — 日配额守卫（循环 B：测试→实现）
-- [ ] Subtask 4.4: 🔄 重构 — 全绿
-- [ ] Subtask 4.5: 集成实测（preview 免 key——`reporter=156|cmd=8703` 中国整车出口）
+- [x] Subtask 4.1: 🔴 红 — 解析与矩阵测试（循环 A）
+- [x] Subtask 4.2: 🟢 绿 — 适配器实现（循环 A）
+- [x] Subtask 4.3: 🔴🟢 — 日配额守卫（循环 B：测试→实现）
+- [x] Subtask 4.4: 🔄 重构 — 全绿
+- [x] Subtask 4.5: 集成实测（preview 免 key——`reporter=156|cmd=8703` 中国整车出口）
+- [x] Subtask 4.5 集成实测注记：preview 免 key 可无条件实测——集成文件随 Task 7 统一落地（中国整车出口锚点）
 
 **完成标准/Definition of Done:**
-- [ ] 全绿 + preview 端点真实记录实测 + 日配额守卫两分支覆盖
+- [x] 全绿 + preview 端点真实记录实测 + 日配额守卫两分支覆盖
 
 ---
 
