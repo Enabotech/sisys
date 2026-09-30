@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -44,7 +44,7 @@ from src.application.use_cases.strategic_analysis import (
 )
 from src.domain.entities.tool_execution import ToolExecutionState
 from src.domain.events.tool_events import ToolExecuted
-from src.domain.ports.tool_execution_repository import ToolExecutionRepositoryPort
+from src.domain.ports.tool_execution_repository import ToolExecutionQuery
 from src.domain.value_objects.tool_execution import ToolResultStatus
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.messaging.channel_router import ChannelRouter
@@ -65,13 +65,9 @@ from src.infrastructure.storage.postgresql.repository.tool_execution_repository 
 # 真实服务 Fixtures（CLAUDE.md §5 真实服务优先）
 # =====================================================================
 
-# xdist 串行化（回归修复 2026-09-30）：本文件多测试共享 tool_executions 物理表，
-# pg_tool_execution_repository fixture 以「setup/teardown 全表 DELETE」维持断言基线
-# （len(tenant_executions) == 1，tenant_id 为 TOOL_CATALOG 固定 UUID）。pyproject 配置
-# --dist loadgroup 下，无 group 标记的测试会被动态分发到不同 worker 并发执行——
-# 跨 worker 的全表 DELETE 与插入交叉污染（len==0 或 len>=2 概率性失败）。
-# 同文件测试收敛单 worker 串行（先例：test_acceptance_data_source_expansion 的
-# data-source-cache 组），消除竞态窗口。
+# xdist 串行化（纵深防御——保留）：pg_tool_execution_repository 已切换事务隔离模式
+# （begin + rollback，技术债清偿 2026-09-30），并发竞态根源已消除；但本文件另有三个
+# 测试直接消费 pg_pool（asyncpg 直连池）做表级验证，保守保留单 worker 串行。
 pytestmark = pytest.mark.xdist_group("tool-executions-pg")
 
 
@@ -157,41 +153,24 @@ def real_dual_channel_bus(
 
 
 @pytest.fixture
-async def pg_tool_execution_repository(
-    pg_pool,
-) -> AsyncGenerator[ToolExecutionRepositoryPort, None]:
-    """真实 PostgreSQLToolExecutionRepository(SQLAlchemy ORM 风格, ContextVar 注入)
+def pg_tool_execution_repository(
+    pg_session,
+) -> Generator[PostgreSQLToolExecutionRepository, None, None]:
+    """生产路径 PostgreSQLToolExecutionRepository + 事务隔离（技术债清偿 2026-09-30）
 
-    Story 4.3 后续技术债清理后,SQLAlchemy ORM 通过 ContextVar 获取 AsyncSession。
-
-    关键技术约束:pytest-xdist 多进程测试中,asyncio ContextVar 跨 await 边界会丢失,
-    导致后续 await 操作找不到 session。本 fixture 改用 asyncpg 直连实现(_legacy_asyncpg_*)保证
-    测试稳定性。SQLAlchemy ORM 版本在生产路径通过 composition_root 使用。
+    - 被测对象升级：原 _legacy_asyncpg 直连替身 → 组合根注册的 SQLAlchemy 正式版
+      （乐观锁 CAS/租户隔离语义与生产一致；实现全链 flush 零 commit，事务可整体回收）
+    - 隔离模式：conftest 的 pg_session（begin + rollback）——替代原「setup/teardown
+      全表 DELETE」（违反「集成测试禁止手动 delete/truncate」纪律且是 xdist 并发
+      竞态根源）；rollback 后数据零残留，事务外并行数据不可见，断言基线天然成立
+    - 前提实证：test_contextvar_deep_chain_probe.py——同步 fixture set_session +
+      异步测试深链 await 均存活（原 docstring「ContextVar 跨 await 丢失」判断证伪）
     """
-    import asyncpg
+    from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
-    from src.infrastructure.storage.postgresql.repository._legacy_asyncpg_tool_execution_repository import (  # noqa: E501
-        AsyncpgPostgreSQLToolExecutionRepository as _AsyncpgRepo,
-    )
-
-    # 检查表是否存在(migration 011 是否已应用)
-    async with pg_pool.acquire() as conn:
-        table_exists = await conn.fetchval(
-            "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tool_executions'"
-        )
-        if not table_exists:
-            pytest.skip("PostgreSQL 表 tool_executions 不存在(migration 011 未应用),跳过集成测试")
-        # 强制清理(在 fixture 创建前)
-        await conn.execute("DELETE FROM tool_executions")
-    # 使用 asyncpg 直连的 legacy 实现(测试稳定,SQLAlchemy ORM 通过 ContextVar 在多进程下不稳定)
-    repo = _AsyncpgRepo(pool=pg_pool, schema="public")
-    yield repo  # 类型兼容:asyncpg 实现行为等价 SQLAlchemy ORM
-    # 测试后清理(表存在时才有意义)
-    try:
-        async with pg_pool.acquire() as conn:
-            await conn.execute("DELETE FROM tool_executions")
-    except asyncpg.UndefinedTableError:
-        pass  # 表在测试过程中被删除,忽略清理错误
+    token = set_session(pg_session)
+    yield PostgreSQLToolExecutionRepository()
+    reset_session(token)
 
 
 @pytest.fixture
@@ -386,8 +365,6 @@ class TestStrategicAnalysisEndToEnd:
         # 使用 list_by_query 按 tenant_id 过滤,避免 pytest-xdist 多 worker 并发干扰
         # (其他 worker 测试可能向 tool_executions 表插入记录,list_all() 会泄漏)
         # 注意:StrategicAnalysisUseCase.execute 中 context.tenant_id = tool.tool_id(占位)
-        from src.domain.ports.tool_execution_repository import ToolExecutionQuery
-
         tenant_executions = await pg_tool_execution_repository.list_by_query(
             ToolExecutionQuery(tenant_id=tool.tool_id),
         )
@@ -430,7 +407,6 @@ class TestStrategicAnalysisEndToEnd:
         assert "environment_analysis" in metadata.capabilities
 
         # 8. ToolExecutionQuery 列表查询（PG 真实查询）
-        from src.domain.ports.tool_execution_repository import ToolExecutionQuery
 
         query_result = await pg_tool_execution_repository.list_by_query(ToolExecutionQuery(tenant_id=persisted.tenant_id))
         assert len(query_result) >= 1
