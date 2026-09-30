@@ -33,6 +33,7 @@ from src.infrastructure.external_services.datasources.sec_edgar_adapter import (
     UA_HEADER,
     SecEdgarAdapter,
     _compute_delay,
+    _SlidingWindowRateLimiter,
 )
 from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
 
@@ -149,7 +150,7 @@ class TestSearchMode:
         result = await adapter.fetch(DataSourceQuery(source_name="sec-edgar", query='"market share" forms=10-K'))
         assert "/LATEST/search-index" in str(captured[0].url)
         params = dict(captured[0].url.params)
-        assert params.get("q") == "market share"
+        assert params.get("q") == '"market share"', "双引号短语匹配语法应直达 ES（R2-F3——剥引号退化为散词 AND）"
         assert params.get("forms") == "10-K"
         payload = json.loads(result.payload)
         assert payload["filings"][0]["company"] == "Tesla"
@@ -301,6 +302,50 @@ class TestSecEdgarAdapterPort:
         await adapter.close()
 
     @pytest.mark.asyncio
+    async def test_company_cik_suffix_and_clean_name_forms(self) -> None:
+        """company 字段 CIK 剥离边界（R2-F3）：带尾巴剥离 / 干净名原样 / 合法括号后缀不误吃。"""
+        from src.infrastructure.external_services.datasources.sec_edgar_adapter import _strip_cik_suffix
+
+        assert _strip_cik_suffix("USG CORP  (CIK 0000757011)") == "USG CORP"
+        assert _strip_cik_suffix("Tesla, Inc.") == "Tesla, Inc."
+        assert _strip_cik_suffix("Baoding China (0000000000)") == "Baoding China (0000000000)", (
+            "非 CIK 字面的括号后缀不应误吃（锚定 CIK 关键字）"
+        )
+
+    @pytest.mark.asyncio
+    async def test_retry_attempts_each_acquire_rate_limit(self) -> None:
+        """限速下沉语义锁：每次真实 HTTP 尝试（含 tenacity 重试）都过限速器（R2-F2）。
+
+        计数 fake limiter 替换实例限速器（rate_limited=False 构造后注入）——
+        acquire 次数必须 == transport 实收请求数（重试绕过即红）。
+        """
+
+        class _CountingLimiter(_SlidingWindowRateLimiter):
+            """计数限速器（继承保持类型兼容——覆盖 acquire 只计数不限速）。"""
+
+            def __init__(self) -> None:
+                super().__init__()
+                self.acquire_count = 0
+
+            async def acquire(self) -> None:
+                self.acquire_count += 1
+
+        http_calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            http_calls["n"] += 1
+            return httpx.Response(503)
+
+        adapter = _make_adapter(httpx.MockTransport(handler), rate_limited=False)
+        limiter = _CountingLimiter()
+        adapter._rate_limiter = limiter
+        with pytest.raises(DataSourceUnavailableError):
+            await adapter.fetch(DataSourceQuery(source_name="sec-edgar", query="q"))
+        assert http_calls["n"] == 3, "重试耗尽应为 3 次真实请求"
+        assert limiter.acquire_count == http_calls["n"], "每次真实 HTTP 尝试前都应过限速器（含重试）"
+        await adapter.close()
+
+    @pytest.mark.asyncio
     async def test_circuit_breaker_early_open(self) -> None:
         """熔断差异化配置：注入降阈熔断器（threshold=2），2 次 fetch 失败即断开，断开期间零 HTTP。
 
@@ -357,7 +402,7 @@ class TestSearchModeRealEndpointShape:
         adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json=es_body)), rate_limited=False)
         result = await adapter.fetch(DataSourceQuery(source_name="sec-edgar", query="market share"))
         payload = json.loads(result.payload)
-        assert payload["filings"][0]["company"] == "USG CORP  (CIK 0000757011)"
+        assert payload["filings"][0]["company"] == "USG CORP", "真实端点形态的 CIK 尾巴应剥离（R2-F3）"
         assert payload["filings"][0]["form"] == "10-K"
         assert payload["filings"][0]["filed_at"] == "2013-02-15"
         await adapter.close()

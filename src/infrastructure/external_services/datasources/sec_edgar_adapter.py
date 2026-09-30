@@ -49,6 +49,12 @@ _RATE_WINDOW = 1.0  # 滑动窗口秒数
 _KNOWN_MODE_PREFIXES = ("xbrl",)  # frames 模式（xbrl-frame:）未实现——按非法前缀 201 拦截，Defer 见 Story 4.1f（R1-F2）
 _MODE_PREFIX_PATTERN = re.compile(r"^([a-zA-Z][a-zA-Z-]*):")
 _FORMS_PATTERN = re.compile(r"\s+forms=(\S+)$")
+_CIK_SUFFIX_PATTERN = re.compile(r"\s*\(CIK\s*\d+\)\s*$")  # 真实端点 display_names 的 CIK 尾巴
+
+
+def _strip_cik_suffix(raw_name: str) -> str:
+    """剥离 display_names 尾部的 CIK 括号段（无该形态原样返回）。"""
+    return _CIK_SUFFIX_PATTERN.sub("", raw_name)
 
 
 def _compute_delay(
@@ -72,7 +78,9 @@ def _compute_delay(
 class _SlidingWindowRateLimiter:
     """进程内滑动窗口限速器（8 req/s——Lock 保护 + 时间窗）。"""
 
-    _lock: asyncio.Lock = asyncio.Lock()  # 类变量（协程间共享——单例适配器语义）
+    # 类变量（跨实例互斥需类级共享）。临界区纯同步无 await——单 loop 下恒走 fast path，
+    # 真实竞争后绑定事件循环，跨 loop 复用须 per-loop 分锁（先例 aiodocker_sandbox_adapter）
+    _lock: asyncio.Lock = asyncio.Lock()
 
     def __init__(self) -> None:
         self._timestamps: deque[float] = deque()
@@ -152,8 +160,6 @@ class SecEdgarAdapter:
             DataSourceRateLimitError: HTTP 429
             TimeoutError: 请求超时
         """
-        if self._rate_limiter is not None:
-            await self._rate_limiter.acquire()
         raw = query.query
         prefix_match = _MODE_PREFIX_PATTERN.match(raw)
         if prefix_match and prefix_match.group(1) not in _KNOWN_MODE_PREFIXES:
@@ -185,7 +191,9 @@ class SecEdgarAdapter:
         forms_match = _FORMS_PATTERN.search(raw_query)
         if forms_match:
             forms = forms_match.group(1)
-            q = raw_query[: forms_match.start()].strip().strip('"')
+            # 保留双引号（R2-F3）：EDGAR efts 为 ES query-string 语法，引号 = 短语匹配——
+            # 剥掉将退化为散词 AND 匹配（SKILL.md §5 宣教的规范格式本就是带引号形态）
+            q = raw_query[: forms_match.start()].strip()
         params: dict[str, str] = {"q": q}
         if forms:
             params["forms"] = forms
@@ -218,7 +226,9 @@ class SecEdgarAdapter:
                 ciks = source.get("ciks") or []
                 converted.append(
                     {
-                        "company": display_names[0] if display_names else "",
+                        # 真实端点形态为 "USG CORP  (CIK 0000757011)"——剥 CIK 尾巴（R2-F3：
+                        # 锚定 CIK 字面，避免误吃 "(China)" 类合法括号后缀）
+                        "company": _strip_cik_suffix(display_names[0]) if display_names else "",
                         "cik": str(ciks[0]) if ciks else "",
                         "form": source.get("form", ""),
                         "filed_at": source.get("file_date", ""),
@@ -264,7 +274,11 @@ class SecEdgarAdapter:
         )
 
     async def _request(self, url: str, *, params: dict[str, str] | None = None) -> Any:
-        """经 resilience helper 执行请求（绝对 URL 拼接——双 base 单 client）。"""
+        """经 resilience helper 执行请求（绝对 URL 拼接——双 base 单 client）。
+
+        限速经 pre_request 下沉至每次真实 HTTP 尝试前（R2-F2——fetch 入口单次
+        acquire 会让 tenacity 重试绕过 8 rps 滑动窗；重试同属真实上游请求）。
+        """
         return await request_json_with_resilience(
             self._client,
             "GET",
@@ -276,6 +290,7 @@ class SecEdgarAdapter:
             max_attempts=self._retry_max_attempts,
             min_wait=self._retry_min_wait,
             max_wait=self._retry_max_wait,
+            pre_request=self._rate_limiter.acquire if self._rate_limiter is not None else None,
         )
 
     @staticmethod
@@ -298,8 +313,6 @@ class SecEdgarAdapter:
     async def health_check(self) -> bool:
         """探活（最小检索，单次尝试）。"""
         try:
-            if self._rate_limiter is not None:
-                await self._rate_limiter.acquire()
             await self._request(_SEARCH_ENDPOINT, params={"q": "probe"})
             return True
         except Exception as e:  # 探活失败不抛——健康检查语义

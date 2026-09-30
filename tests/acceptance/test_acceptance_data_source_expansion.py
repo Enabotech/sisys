@@ -144,7 +144,7 @@ def _epo_respond(
     """
 
     def respond(request: httpx.Request) -> httpx.Response:
-        if "/auth/token" in str(request.url):
+        if "/auth/accesstoken" in str(request.url):
             token_calls["n"] += 1
             return httpx.Response(200, json={"access_token": f"fake-token-{token_calls['n']}", "expires_in": 3600})
         request_count["n"] += 1
@@ -307,6 +307,7 @@ def verify_tavily_body_unchanged(ds_context: dict[str, Any]):
 @then("请求体不含国家参数")
 def verify_tavily_no_country(ds_context: dict[str, Any]):
     """Verify the non-CJK request body has no country key."""
+    assert ds_context["query_error"] is None, f"fetch failed: {ds_context['query_error']}"
     body = json.loads(ds_context["captured"][0].content.decode())
     assert "country" not in body
 
@@ -330,6 +331,7 @@ def verify_newsapi_params_unchanged(ds_context: dict[str, Any]):
 @then("请求参数不含语言参数")
 def verify_newsapi_no_language(ds_context: dict[str, Any]):
     """Verify the non-CJK request params have no language key."""
+    assert ds_context["query_error"] is None, f"fetch failed: {ds_context['query_error']}"
     params = dict(ds_context["captured"][0].url.params)
     assert "language" not in params
 
@@ -485,7 +487,7 @@ def bootstrap_and_check_registration(ds_context: dict[str, Any]):
 def verify_epo_basic_token(ds_context: dict[str, Any]):
     """Verify the token endpoint was called with Basic credentials."""
     assert ds_context["query_error"] is None, f"fetch failed: {ds_context['query_error']}"
-    token_requests = [r for r in ds_context["captured"] if "/auth/token" in str(r.url)]
+    token_requests = [r for r in ds_context["captured"] if "/auth/accesstoken" in str(r.url)]
     assert token_requests, "token endpoint request expected"
     assert token_requests[0].headers.get("authorization", "").startswith("Basic "), "Basic credentials expected"
 
@@ -493,7 +495,7 @@ def verify_epo_basic_token(ds_context: dict[str, Any]):
 @then("业务请求携带 Bearer 令牌")
 def verify_epo_bearer(ds_context: dict[str, Any]):
     """Verify the business search request carries the Bearer token."""
-    business = [r for r in ds_context["captured"] if "/auth/token" not in str(r.url)]
+    business = [r for r in ds_context["captured"] if "/auth/accesstoken" not in str(r.url)]
     assert business, "business search request expected"
     assert business[-1].headers.get("authorization", "").startswith("Bearer "), "Bearer token expected"
 
@@ -645,6 +647,7 @@ def verify_edgar_ua_header(ds_context: dict[str, Any]):
 @then("结果结构化为财报列表")
 def verify_edgar_filings_structured(ds_context: dict[str, Any]):
     """Verify the payload is a structured filings list."""
+    assert ds_context["query_error"] is None, f"fetch failed: {ds_context['query_error']}"
     payload = json.loads(ds_context["result"].payload)
     assert isinstance(payload.get("filings"), list) and payload["filings"], "non-empty filings expected"
     assert {"company", "form", "filed_at"} <= set(payload["filings"][0])
@@ -661,6 +664,7 @@ def verify_edgar_xbrl_dispatch(ds_context: dict[str, Any]):
 @then("结果结构化为指标时序")
 def verify_edgar_xbrl_structured(ds_context: dict[str, Any]):
     """Verify the XBRL payload is a concept time series."""
+    assert ds_context["query_error"] is None, f"fetch failed: {ds_context['query_error']}"
     payload = json.loads(ds_context["result"].payload)
     assert {"concept", "unit", "values"} <= set(payload)
 
@@ -774,6 +778,7 @@ def verify_comtrade_no_subscription_header(ds_context: dict[str, Any]):
 @then("结果结构化为贸易记录列表")
 def verify_comtrade_records_structured(ds_context: dict[str, Any]):
     """Verify the payload is a structured trade-records list."""
+    assert ds_context["query_error"] is None, f"fetch failed: {ds_context['query_error']}"
     payload = json.loads(ds_context["result"].payload)
     assert isinstance(payload.get("records"), list) and payload["records"], "non-empty records expected"
     assert {"cmd_code", "trade_value", "period"} <= set(payload["records"][0])

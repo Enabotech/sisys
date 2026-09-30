@@ -919,7 +919,7 @@ tests/
 - `tests/integration/application/test_skill_data_collection.py` / `test_skill_mixed_data.py`（6 源/3 源断言）
 - `tests/acceptance/test_acceptance_skill_mixed_data.feature`（vrio 场景名）+ **`tests/acceptance/test_acceptance_skill_mixed_data.py`**（@scenario 串/函数名/docstring 三联动位）+ **`tests/acceptance/test_acceptance_skill_data_collection.feature`/`.py`**（competitor「四源」场景 :38/:345/:347/:553 恒改 + disruptive「双源交叉验证」场景 :52/:357/:359 签收态——清单 23/24）+ `tests/acceptance/contracts/skill_io_schemas.yaml`（头注释 + 逐字锁死行）
 - `src/application/skills/{competitor-analysis,disruptive-innovation,vrio-framework}/SKILL.md`（声明重分配）+ **受益 Skill references/**（competitor `references/triangulation.md` 3 处源数 + :43；disruptive 三文件「双源」表述——签收态）
-- root `.env`（数据源 key 区段样例——本地文件不进 git，留 Dev Agent Record 记录）
+- root `.env`（数据源 key 区段样例——实际形态：.env 为 git 跟踪文件（历史惯例，R2-F9 留痕），本轮追加空值样例无泄漏；解除跟踪 Defer 至基础设施 owner）
 - `docs/architecture/architecture.md`（适配器表 + 能力边界 + defer 清账 + 8.9.0 + :2829 D4 行重开留痕——签收态）+ `sisys-uni-exception-design.md`（零新增声明）
 - `_bmad-output/implementation-artifacts/stories/4-1c-skills-data-collection-integration.md`（D8 条目 :1186 重开补记——签收态）
 
@@ -1025,6 +1025,32 @@ tests/
 
 **Round 1 留项台账（Round 2+ 逐轮核销）**：A-5 类变量 `asyncio.Lock` 跨 loop 风险（与 CLAUDE.md Gotcha「Lock 必须类变量」直接冲突——留专项评审）；A-8 EDGAR tenacity 重试绕过限速器；C-4 守卫并发测试对 Lock 零判别力（临界区无 await，删 Lock 也绿）；C-5 `pytest.mark.redis` 误标；C-6~C-11 测试卫生项；D-6「双库口径三角化」方法论表述与 disruptive 纪律的对齐（competitor `SKILL.md:193` + triangulation.md:47 vs disruptive「双库互证不构成跨域互证」）；D-7 comtrade 白名单外噪音（competitor §5/§7 两处）；D-8~D-11 P3 内容项；A-9~A-17 P3 适配器项；B-2~B-7 P3 文案/注释项；`.env` 被 git 跟踪的历史结构隐患（Story「不进 git」表述与实施矛盾——既有惯例，解除跟踪属基础设施决策）。
 
+#### Round 2（回归核查 + 留项清偿——编号 `R2-F<n>` 与文档审查 R2-1~R2-10 命名空间区分）
+
+**C1 双视角**：①Round 1 修复回归核查（13 项全过 + 抓出 R2-F1 同族传播缺口）；②留项台账 13 项清偿评估（A-5 三方证据专项：CLAUDE.md Gotcha 语义考据——「协程间共享」表述技术上不成立、有效内核为跨实例互斥；项目用法三足鼎立普查 7 类变量/5 实例变量/1 per-loop；生产零风险实证——SINGLETON 单 loop + 临界区纯同步 fast path，三把锁实质从未上锁）。**C3 单评审员**（良好 B+ → 9 条修订吸收后落码）。
+
+| # | 发现 | 严重度 | 处置 |
+|---|------|--------|------|
+| R2-F1 | **EPO token 端点路径错误**（`/3.2/auth/token` 应为 `/3.2/auth/accesstoken`——官方 Reference Guide v1.3.20 + Go/Python 官方生态客户端库双库逐字定谳；R1-F1 修检索路径时同文件令牌路径未获同级核查——「改一处漏同类处」标准形态） | P1 | ✅ 常量 + docstring + 8 处测试子串匹配同步 + token 路径锁断言；Story :127/:156 旧路径为历史规范文本不改（本表登记取代关系）；**grant_type 传输形态（query params vs form body）挂 R7 锚点实测** |
+| R2-F2 | EDGAR tenacity 重试绕过限速器（fetch 入口单次 acquire，helper 内 3 次尝试只占 1 窗位——重试风暴可超 8 rps 违反 Fair Access）（A-8） | P2 | ✅ `pre_request` 可选参数下沉至 helper 每次 attempt 前（既有 8 适配器零影响）+ fetch/health_check 两处入口 acquire 移除 + 计数 fake limiter 单测锁语义（acquire 次数 == transport 实收请求数） |
+| R2-F3 | EDGAR 检索质量组：`.strip('"')` 剥掉 ES 短语匹配语法退化为散词 AND（SKILL.md 宣教的带引号格式被适配器破坏）+ company 字段拖 CIK 尾巴污染下游（A-9/A-14） | P2 | ✅ 引号保留（docstring 注明语义）+ `_strip_cik_suffix` 锚定 CIK 字面（防误吃 "(China)" 类合法括号）+ 两处既有断言同步 + 边界单测（尾巴剥离/干净名原样/非 CIK 括号不误吃） |
+| R2-F4 | 「双库口径三角化」方法论不自洽（competitor 与 disruptive「双库互证不构成跨域互证」纪律冲突；同为 2 源的战略动向无此待遇）+ scoring_anchors「单源」残留（D-6/D-8） | P2 | ✅ 回诚实框架：三角化成立→专利域内印证成立（域内一致性非跨域互证）+ SKILL.md 区间式表述统一分列式 + scoring_anchors :19「单源」→「单域」+ :5/:26/:30 uspto 单独提及补双库 |
+| R2-F5 | 类变量 Lock 认知未显性化（A-5/C-4——风险实证低于台账记载：临界区纯同步无真实竞争路径） | P2 | ✅ 文档级清偿（不动代码结构）：三处源 docstring 补 fast path 事实 + per-loop 分锁先例指引；两处并发测试 docstring 降格为「行为回归防线，非锁存在性证明」。**CLAUDE.md Gotcha 修订登记为提案**（宪法级文件属用户决策——建议表述「跨实例互斥需类变量；实例生命周期跨多事件循环时参考 per-loop 先例」） |
+| R2-F6 | 测试卫生组（C-5/C-6/C-9/C-10） | P3 | ✅ redis mark 误标移除 + except 空洞改 pytest.raises + 6 个 sync 测试转 async + **5 处** Then 补 query_error 守卫（评审员核出方案原只列 2 处） |
+| R2-F7 | 计数与死键组（B-2/B-3/B-4） | P3 | ✅ docstring 8→11 七处（:136「既有 8 适配器」历史指称辨析保留）+ comtrade spec 死键删除（消费点在未注册分支，无条件注册源永不进入） |
+| R2-F8 | 收尾组（D-7/D-9/D-10 + A-15） | P3 | ✅ comtrade 白名单外噪音两处换声明源举例 + Owner 职责补双库 + A/B 报告计数加注（以 SSOT 为准）+ 行号锚改章节锚 + `DailyQuotaGuard`/`parse_pipeline_query` 私有化（`__all__` 收敛 `["ComtradeAdapter"]`，与 EPO 侧对称） |
+| R2-F9 | .env git 跟踪（root + deploy/app/.env 双处被跟踪——Story「不进 git」表述失实） | P3 | ✅ Story 表述修正为现状如实描述 + **Defer 登记**（解除跟踪牵动 CI/部署拉取路径 + 历史泄漏轮换评估——基础设施 owner 决策） |
+
+**Round 2 维持留项（不修理由逐条留痕——可审计）**：
+- **C-7**（探针 Then 装饰性标志位断言）：真实断言在 When 子进程脚本内经 returncode 传导，功能核验真实——Then 层判别力弱为设计取舍
+- **C-8**（4.1b 验收函数名 `then_eight_*` 残留）：4.1b 资产非本 Story 面，绑定串/断言已是 11 端口态，纯命名债
+- **C-11**（验收/单测 AsyncClient 未 aclose）：注入 client `_owns_client=False` 语义下 adapter.close 本就不关测试 client；20+ 测试点 fixture 化改造 diff 噪声大；MockTransport 无真实资源收益 ResourceWarning 级——**立规：新增测试注入 client 用 try/finally aclose，存量随文件下次整体触碰收口**
+- **B-5**（`__init__.py` USPTO「无 Key」docstring 失真）：预存问题非本 Story 引入，提及不擅删
+- **B-6/B-7**（注释精度/KEY_SENSITIVE 知情决策）：无独立质量收益/已留痕的接受风险
+- **R2-4**（EPO 401 重取分支首响应字节未入账）：「序列化近似是唯一兼容口径」声明下的可接受近似，R7 取样本时顺带核对
+
+**Round 2 回归证据**：三适配器单测 + 契约 + 验收 362 passed + ruff/mypy 全过 + unit 全量 7765 passed（Round 1 后基线）。
+
 #### 需决策 Decision Needed
 
 - [ ] **无 P0/P1 级待决策项**（R1-F6/F7 改判依据已留痕；A-5 类变量 Lock 与 CLAUDE.md Gotcha 的冲突需 Round 2 专项裁定——改实例变量 or 保持类变量 + 测试侧约束）
@@ -1044,7 +1070,8 @@ tests/
 - [ ] token 预算门禁 → Story 4.3/Epic 5（4-1d R3 defer 维持）
 - [ ] **R1-F2：EDGAR frames 模式（`xbrl-frame:` 前缀分派）实现**——契约三 :168/:170 与定稿表 :883 承诺偏差，本轮摘白名单 201 拦截（防静默错数据）；实现随 Phase 2/需求出现（实现前错误消息已不再宣传该前缀）
 - [ ] **R1-F6：EPO 真实响应形态转换（`ops:world-patent-data` → 契约形态）**——R7 真实凭据补跑时取样本实现（锚点见下）
-- [ ] **R7 补跑锚点扩充（R1-F6/F7 合并）**：①search 端点真实连通（rest-services 路径——F1 修复验证）；②token + search 双端点真实响应样本固化（F6 转换实现依据）；③令牌失效真实码型验证（401 vs 400 invalid_access_token——F7 判别条件修正依据）
+- [ ] **R7 补跑锚点扩充（R1-F6/F7 合并）**：①search 端点真实连通（rest-services 路径——F1 修复验证）；②token + search 双端点真实响应样本固化（F6 转换实现依据）+ **token 端点路径 404/200 显式核查与 grant_type 传输形态实测（query params vs form body——R2-F1）**；③令牌失效真实码型验证（401 vs 400 invalid_access_token——F7 判别条件修正依据）
+- [ ] **.env 解除 git 跟踪（root + deploy/app/.env 双处）**——含 .gitignore 生效化 + `git rm --cached` + CI/部署拉取路径依赖面评估 + 历史泄漏轮换评估（R2-F9，基础设施 owner 决策）
 
 ---
 
@@ -1058,10 +1085,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.5.1
 **创建日期/Created:** 2026-09-30
 **最后更新/Last Updated:** 2026-09-30
 **更新说明/Description:**
+- v1.5.1: **代码审查 Round 2**（回归核查 + 留项清偿双视角 + 单评审员）：R2-F1 token 端点路径 P1（R1-F1 同族传播缺口——官方双库定谳 accesstoken）+ P2×4（限速重试下沉 pre_request/检索质量组/三角化用语纪律/锁认知文档清偿）+ P3 收尾组；A-5 三方证据专项（CLAUDE.md Gotcha 语义考据 + 生产零风险实证——文档澄清替代结构变更）；维持留项 6 条逐条留痕；unit 全量 7765 passed
 - v1.5.0: **代码审查 Round 1**（四视角并行调研 + 双评审员方案评审 + 主会话定谳）：P0×1（R1-F1 EPO 检索路径缺 rest-services 段——官方文档定谳，契约 :157 原文即错经单测/集成双层掩盖）+ P1×5（xbrl-frame 宣传未实现/验收恒真断言/vrio references 未同步/维度计数错误/EPO 响应形态——末项改判 R7 锚点）+ P2×10 + P3≈20；落码 13 项 + 改判 2 项（证据不足不落码——写错比不写更糟）；留项台账入 Round 2+
 - v1.0.0: 创建故事文件（基于 epics 4.1f 定义 + 四域预筛报告实测裁定 + 三视角代码调研（适配器基建/契约联动/受益面——发现 D8 治理冲突并设计两态处理）+ 4.1e 五轮审查 Lessons；10 项决策登记；8 Task / 7 AC）
 - v1.1.0: **Round 1 文档审查修订**（三视角代码调研复审 + 外部 API 实测 + 三视角并行审查）：P0×2（`test_arch_data_source.py` 四联动点归属与缺席 / 断言联动清单实体化 22 项）+ P1×9（vrio 治理门解绑统一 / Comtrade 配额守卫与无条件注册定稿 / EPO 401 重取路径 / epics 三子项漏承载 / `test_arch_skill_mixed_data.py` 遗漏 / 复制体误述 / 双源 11 处与 references 联动 / 13 Skill 口径 / 验收 .py 三联动位）+ P2/P3 系列精确化——详见 Docs Review Fixes R1-1~R1-21
