@@ -1,6 +1,6 @@
 # Story 4.1f: Skills 数据源扩展（专利/财报/行业量化域适配器 + 中文参数验证）
 
-**Status:** `ready-for-dev`
+**Status:** `in-progress`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -466,16 +466,16 @@
 
 > 目的：进入实现前钉死三源元数据/行为契约/重构方案/声明序 + 执行 D8 重开 HALT 决策。
 
-- [ ] Subtask 0.1: **D-08 治理决策执行（HALT）**——向 Epic owner 显式请求 D8 重开签收（disruptive「不追加第三源」owner 级签收重开——请求时引用 epics 4.1f 任务 6 :1127 授权加速签认；vrio 增源 + D2 修订按 epics 授权无签收前提，同点**知会**留痕）；签收结果与两态执行路径留痕 Dev Agent Record；HALT 等待期不阻塞 Task 0.2-0.6 与 Task 1-5/6 循环 A-B
-- [ ] Subtask 0.2: 三源元数据表定稿（数据契约一为基线——url 经实测校准；ttl/required_fields 冻结）；声明序定稿（competitor 6 元组/disruptive/vrio 3 元组）
-- [ ] Subtask 0.3: 行为契约细化定稿（EPO 令牌管理/配额守卫、**EpoOpsAdapter 构造器 config 语义（config 必填、空凭据即抛 101——无 uspto 式 `config or USPTOConfig()` 缺省回退：空凭据回退将推迟到首个请求才炸，构造期即炸更符合 fail-fast）**、EDGAR 双模式语法与 UA 常量、Comtrade 管道串语法与**日配额阈值 + `ComtradeConfig.from_env` key 缺失语义（缺省空串 = 无 key 走 preview 裸模式——newsapi `api_key: str = field(default="", repr=False)` 先例，但构造器不抛）**、CJK 规则）+ required_fields 重构方案（含 EXPECTED_REQUIRED_FIELDS 常量去向三处联动定稿）
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_data_source_expansion.feature`（zh-CN 按 AC 分节——三源 Happy + Edge：key 缺失跳过/配额 412/令牌失效/CJK 双态/EDGAR 直连）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现骨架（`test_acceptance_data_source_expansion.py`——context dict 模式 + 真实适配器实例 MockTransport 注入 + key 动态 skip + xdist_group）
-- [ ] Subtask 0.6: 运行验收测试确认失败（🔴 红阶段——ModuleNotFoundError 合法红）
+- [x] Subtask 0.1: **D-08 治理决策执行（HALT）**——向 Epic owner 显式请求 D8 重开签收（disruptive「不追加第三源」owner 级签收重开——请求时引用 epics 4.1f 任务 6 :1127 授权加速签认；vrio 增源 + D2 修订按 epics 授权无签收前提，同点**知会**留痕）；签收结果与两态执行路径留痕 Dev Agent Record；HALT 等待期不阻塞 Task 0.2-0.6 与 Task 1-5/6 循环 A-B
+- [x] Subtask 0.2: 三源元数据表定稿（数据契约一为基线——url 经实测校准；ttl/required_fields 冻结）；声明序定稿（competitor 6 元组/disruptive/vrio 3 元组）
+- [x] Subtask 0.3: 行为契约细化定稿（EPO 令牌管理/配额守卫、**EpoOpsAdapter 构造器 config 语义（config 必填、空凭据即抛 101——无 uspto 式 `config or USPTOConfig()` 缺省回退：空凭据回退将推迟到首个请求才炸，构造期即炸更符合 fail-fast）**、EDGAR 双模式语法与 UA 常量、Comtrade 管道串语法与**日配额阈值 + `ComtradeConfig.from_env` key 缺失语义（缺省空串 = 无 key 走 preview 裸模式——newsapi `api_key: str = field(default="", repr=False)` 先例，但构造器不抛）**、CJK 规则）+ required_fields 重构方案（含 EXPECTED_REQUIRED_FIELDS 常量去向三处联动定稿）
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_data_source_expansion.feature`（zh-CN 按 AC 分节——三源 Happy + Edge：key 缺失跳过/配额 412/令牌失效/CJK 双态/EDGAR 直连）
+- [x] Subtask 0.5: 编写 BDD 步骤实现骨架（`test_acceptance_data_source_expansion.py`——context dict 模式 + 真实适配器实例 MockTransport 注入 + key 动态 skip + xdist_group）
+- [x] Subtask 0.6: 运行验收测试确认失败（🔴 红阶段——ModuleNotFoundError 合法红）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定稿 + D-08 决策留痕
-- [ ] Gherkin 红阶段确认
+- [x] 规范项全部定稿 + D-08 决策留痕（见 Dev Agent Record「D-08 治理决策执行记录」与「Task 0 规范定稿记录」两表）
+- [x] Gherkin 红阶段确认（14 红 + 2 基线绿——AC-1.2/1.4 非 CJK 回归基线在改动前即绿，属设计锁定）
 
 ---
 
@@ -831,6 +831,31 @@ tests/
 | **治理冲突源** | `4-1c-skills-data-collection-integration.md:1180,:1186`（D8 签收） |
 | **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
 | **三视角调研** | 2026-09-30：①适配器基建面（8 适配器范本/注册链/测试模式）②契约联动面（41 处 required_fields/三元组解包 6 处/触点清单）③受益 Skill 与参数面（断言联动清单/D8 冲突发现/parameters 链路约束）——**Round 1 审查（2026-09-30）三视角复审 + 外部 API 实测（EPO 4GB/周与 token 端点/SEC 10 rps 与 UA 规范/Tavily country 枚举/Comtrade preview 端点）校正** |
+
+### D-08 治理决策执行记录（Task 0.1——2026-09-30）
+
+| 决策项 | 结果 | 执行路径 |
+|--------|------|---------|
+| **D8 重开签收（disruptive）** | ✅ **签收重开**（Epic owner 2026-09-30 显式确认） | disruptive-innovation 2→3 源按主线执行（循环 C）；D8 重开留痕在 Task 6 循环 C 重构阶段落地（4-1c Story :1186 决策项 + architecture.md :2829 D4 行补记——引用 epics 4.1f 任务 6 :1127 授权） |
+| **vrio 治理知会** | ✅ **知悉同意**（无条件执行） | vrio-framework 2→3 源按 epics 4.1f 任务 6 :1127/:1129 授权无条件执行（循环 B）+ D2 豁免表修订 + 本表留痕——不依赖 D8 结果 |
+
+### Task 0 规范定稿记录（Subtask 0.2/0.3——2026-09-30）
+
+| 定稿项 | 值 | 依据 |
+|--------|-----|------|
+| 三源元数据（url/ttl/required_fields） | 数据契约一基线值直接冻结（`epo-ops` 604800/`("title","applicant","filing_date")`；`sec-edgar` 2592000/`("company","form","filed_at")`；`comtrade` 604800/`("cmd_code","trade_value","period")`） | 契约一（url 经 Task 2/3/4 get_metadata 实测校准后入 SSOT） |
+| 声明序 | competitor `("newsapi","uspto","epo-ops","sec-edgar","tavily","china-nbs")`；disruptive/vrio `("uspto","epo-ops","tavily")` | 契约六（声明序即断言序） |
+| EPO 令牌管理 | `_EpoTokenManager`：进程内缓存 + 过期提前 60s 刷新 + 401 重取一次（捕获 101 → `context.status_code==401` 判别 → 强制刷新 → 重发 → 仍 401 上抛）+ `now_fn`/`retry_*` 构造注入；与业务请求共用 CircuitBreaker | 契约二/异常契约表 |
+| EPO 配额守卫 | 周窗口（周一 00:00 GMT 重置，`now_fn` 注入）+ 字节口径 = 响应 JSON 序列化字节数 `len(json.dumps(data).encode())`（事后累计）+ `asyncio.Lock` 类变量 + 可注入初始值；阈值 `4 * 1024**3` | 契约二（R1-14 定稿） |
+| EpoOpsAdapter 构造 | config 必填、空凭据构造期抛 101（fail-fast——无 uspto 式缺省回退） | R3-4 定稿 |
+| EDGAR UA 常量 | `sisys-tools/1.0 (contact@sisys.local)`（官方 Fair Access「公司名 邮箱」格式） | 契约三 |
+| EDGAR 双模式 | 检索模式缺省（efts `GET /LATEST/search-index?q=...`）+ `xbrl:`/`xbrl-frame:` 前缀分派（data.sec.gov companyconcept/frames 绝对 URL）；非法前缀→201 | 契约三（R1-13 定稿） |
+| Comtrade 管道串 | `reporter=156|cmd=8703|flow=X|period=2024`（cmd 必填缺失→201；reporter 缺省 156） | 契约四 |
+| Comtrade 日配额阈值 | **有 key 500 次/天 / 无 key preview 100 次/天**（UTC 00:00 重置，`now_fn` 注入，守卫模式复用 EPO） | Task 0 定稿（本表） |
+| ComtradeConfig.from_env | key 缺省空串 = 无 key 走 preview 裸模式（构造器不抛） | R2-10 定稿 |
+| CJK 规则 | `any("一" <= ch <= "鿿" for ch in query.query)` → tavily body +`"country": "china"` / newsapi params +`"language": "zh"`；非 CJK 请求体 dict 逐键零变化 | 契约五 |
+| **EXPECTED_REQUIRED_FIELDS 去向** | **移除常量**（选项 A）——四元组查表断言取代统一比对（双真相源漂移风险消除）；同步：4-1d 库 import 名单删该名 + `__all__` 联动 + 库内 `:344` 断言改查表；绊线 `test_expected_required_fields_value_locked` 改写为「8 既有源四元组第四项值锁定 `("indicator","value")`」（变更登记语义保留）+ identity 绊线删该行 | AC-5（R1-20 框架内定稿） |
+| **KEY_SENSITIVE_SOURCES 评估** | **不登记** epo-ops/comtrade——循 uspto 先例（同为 keyed 条件注册源且不在登记表 `("newsapi","tavily")`）；降级语义由 Skill §7「未注册行」扩列承载（断言联动清单 6/19 项）；登记方向（若未来需要）：`test_key_sensitive_skills_count` :63-75 精确集合断言 + `:380-384` 话术断言连锁红，须同步扩清单 | R3-2 两态决策 |
 
 ### 完成清单 Completion Notes List
 
