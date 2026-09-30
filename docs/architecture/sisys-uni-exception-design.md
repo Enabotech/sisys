@@ -746,6 +746,19 @@ def register_exception_handlers(app: FastAPI) -> None:
 > 本节仅登记复用事实，不重复列举。内部数据不足走 ToolResultStatus.INSUFFICIENT_DATA
 > 状态语义（SOP 文档级关键词承载，非异常）。data_source 子域 414-419 保持空闲。
 
+> **Story 4.1f 复用声明（2026-09-30）：** Story 4.1f（Skills 数据源扩展——EPO OPS/SEC
+> EDGAR/UN Comtrade 三新源适配器 + CJK 自适应 + required_fields 四元组化 + 声明重分配，
+> 生产改动全部位于 infrastructure 层 + composition_root 注册）**零新增异常**——全部失败
+> 路径复用上表既有编码。**两个新语义映射归属既有**（无新码位）：① EPO/Comtrade 配额守卫
+> 前置拦截 → `DataSourceRateLimitError`（EXCEPTION_412，与 HTTP 429 限流同族语义——守卫
+> 在 fetch 前置抛出零请求消耗）；② EPO 业务请求 401 令牌失效重取 → 捕获 `ConfigurationError`
+> （EXCEPTION_101，helper 统一 401/403 映射）按 `context.status_code` 判别刷新重发一次。
+> HTTP 状态码/传输异常映射全部经 `_http_helpers.request_json_with_resilience` 集中点
+> （411/412/413/101/302），适配器仅三类自抛（201 输入前置校验 / 413 结构校验 / 412 配额
+> 守卫）。场景↔异常映射表以 Story 文件「🎯 领域异常契约」节为 single-source-of-truth
+> （`_bmad-output/implementation-artifacts/stories/4-1f-skills-datasource-enhancement.md`），
+> 本节仅登记复用事实，不重复列举。data_source 子域 414-419 保持空闲。
+
 ### 3.3 编码分配策略：人工编码 + CI 自动校验
 
 #### 3.3.1 设计原则

@@ -14,7 +14,7 @@ completedAt: '2026-02-26'
 
 # SISYS - 企业战略智能系统架构设计文档
 
-**版本：** 8.8.0（Story 4.1e 纯内部框架 Skills 成熟化——23/23 Skills 收官：7 Skills 空声明一等不变量 + 分型契约三件套 + org-design 四维 catalog 增强）
+**版本：** 8.9.0（Story 4.1f Skills 数据源扩展——三新源适配器 8→11 + CJK 自适应 + required_fields 四元组化 + 受益 Skill 声明重分配 + 能力边界声明）
 **状态：** 架构决策主文档 ~3500 行，实现细节迁移至子设计文档
 **评审日期：** 2026-09-26
 **审核依据：**对标业界最佳实践（Arc42/C4/ADR + Anthropic Claude Code Skills 渐进式披露），将 §8/§17/§18 实现代码迁移至独立子设计文档，架构主文档聚焦决策与规则
@@ -2676,6 +2676,7 @@ buckets/
 - ✅ **Story 4.1d 已完成**（P0-7，2026-09-28）：10 个混合数据型 Skills 成熟化（外部+内部数据，详见 §17.3.3 末尾 4.1d 集成说明）
   - swot-tows（从 4.1b 转入）/ ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management（从 4.1b 转入；实际 slug 无 -model 后缀）
 - ✅ **Story 4.1e 已完成**（P0-8，2026-09-29）：7 个纯内部框架 Skills 成熟化（用户输入 + Schema 模板，详见 §17.3.3 末尾 4.1e 集成说明）——**23/23 Skills 全部成熟化收官**（16 声明外部源 + 7 纯内部空声明三分法终态）
+- ✅ **Story 4.1f 已完成**（P1-8，2026-09-30）：数据源扩展——EPO OPS/SEC EDGAR/UN Comtrade 三新源适配器（8→11）+ tavily/newsapi CJK 自适应 + required_fields 四元组化 + 受益 Skill 声明重分配（competitor 6 源/vrio 3 源 epics 授权/disruptive 3 源 D8 重开签收——见 D4 行）+ 能力边界声明（IDC/Gartner/Euromonitor 不可得留痕）。源数量充足性缺口实质收敛：专利域 1→3 源（uspto+epo-ops 双库）、企业财报 0→1（EDGAR）、行业量化商品级 0→1（Comtrade）、中文媒体盲区 CJK 自适应验证（A/B 实测面待 key）
   - value-proposition-canvas（从 4.1b 转入）/ business-model-canvas（从 4.1b 转入）/ org-design-framework / dependency-graph / raci-matrix / gantt-chart / strategy-map（从 4.1b 转入）
 
 **设计哲学：** 23 种战略工具将**通过 CLI + Skills（Anthropic Claude Code 风格）**暴露给 Agent 调用：
@@ -2783,7 +2784,7 @@ buckets/
 | infrastructure | 8 个数据源适配器 + 独立配置文件 + 共享 HTTP 韧性纯函数（`_http_helpers.py`） | `src/infrastructure/external_services/datasources/` / `src/infrastructure/config/` |
 | interfaces | `EXCEPTION_HTTP_MAP` +4 映射（410→502/411→503/412→429/413→502），无新 REST 端点 | `src/interfaces/api/exception_handlers.py` |
 
-**8 个数据源适配器（PoC v1/v2 验证选型，Reuters 已替换为 NewsAPI，UNSD/OECD 推迟）：**
+**11 个数据源适配器（PoC v1/v2 验证选型 + Story 4.1f 三新源，Reuters 已替换为 NewsAPI，UNSD/OECD 推迟）：**
 
 | 适配器 | API 类型 | 关键约束 |
 |--------|---------|---------|
@@ -2792,9 +2793,16 @@ buckets/
 | EurostatAdapter | SDMX_JSON（JSON-stat 2.0） | 默认熔断 5/30s |
 | USPTOAdapter | REST_JSON（PatentsView） | 默认熔断 5/30s |
 | IPCCAdapter | CSV_DOWNLOAD | 立即熔断 2/120s（大文件代价高） |
-| NewsAPIAdapter | REST_JSON + Key（X-Api-Key 头） | 早断开 2/600s（免费 100 次/天配额敏感）；条件注册（NEWSAPI_API_KEY） |
-| TavilyAdapter | REST_JSON + Key（请求体） | 默认熔断 5/30s；条件注册（TAVILY_API_KEY） |
+| NewsAPIAdapter | REST_JSON + Key（X-Api-Key 头） | 早断开 2/600s（免费 100 次/天配额敏感）；条件注册（NEWSAPI_API_KEY）；4-1f 起 CJK query 自动注入 language=zh |
+| TavilyAdapter | REST_JSON + Key（请求体） | 默认熔断 5/30s；条件注册（TAVILY_API_KEY）；4-1f 起 CJK query 自动注入 country=china |
 | ChinaNBSAdapter | CRAWLER（复用 CrawlerClientPort） | 禁止直连（PoC v2 验证 403）；熔断放宽语义由轮询超时兜底 |
+| EpoOpsAdapter（4.1f） | REST_JSON + OAuth2 client-credentials（Basic 凭证令牌流） | 令牌进程内缓存（过期提前 60s 刷新/业务 401 重取一次）；4GB/周配额守卫（周窗口字节累计前置抛 412 零请求消耗）；条件注册（EPO_OPS_CONSUMER_KEY/SECRET 双门合取）；`pa=` 申请人结构化检索（支持中文名） |
+| SecEdgarAdapter（4.1f） | REST_JSON（免 key 无条件注册） | 强制 UA「公司名 邮箱」（官方 Fair Access）；滑动窗口限速 8 req/s（官方 10 留余量）；双模式检索（缺省 efts 检索 + `xbrl:CIK:概念` XBRL 时序，双 base 绝对 URL 单 client） |
+| ComtradeAdapter（4.1f） | REST_JSON（key 可选无条件注册） | preview 端点免 key 兜底 + Ocp-Apim-Subscription-Key 增强（500 次/天）；日配额守卫（有 key 500/无 key 100 次/天前置抛 412）；管道串 query（cmd 必填 201 前置校验） |
+
+**能力边界声明（Story 4.1f——预筛报告致命证据留痕，防重复调研）：** IDC/Gartner/Euromonitor 独家市场份额数据**不可得**（合同与技术双重壁垒——IDC ToS §2.2(g) 禁爬 + §2.2(e) 禁输入 AI/分析平台、订阅 $15K-75K+/年；Gartner Cloudflare 技术层全拦截 + 扩展访问须书面批准），行业份额量化以**代理指标组合**逼近（Comtrade 贸易代理 + 统计局行业基准 + EDGAR/XBRL 上市公司营收横截面 + 协会公开产销）。若未来采购 Statista Connect（备选——官方 MCP/SDK 现成，集成成本最低）可 revisit。
+
+**新源合规登记（Story 4.1f）：** SEC EDGAR——UA 规范（sisys-tools/1.0 (contact@sisys.local)）+ 10 req/s 官方限速留余量 8；UN Comtrade——官方署名要求 + 免费 key 配额 500 次/天（preview 免 key 低配额兜底）；EPO OPS——Fair Use Charter 4GB/周免费层（超量联系 patentdata@epo.org）。
 
 **关键架构决策（8 项）：**
 
@@ -2852,7 +2860,7 @@ buckets/
 - **数据源口径边界声明（23 Skills 治理基线）**：各 SKILL.md §5 须声明所辖数据源的口径边界——uspto（仅美国专利 + patent_title 关键词匹配，非申请人结构化检索；CNIPA/WIPO 未接入）、china-nbs（宏观/行业总量口径，不提供企业级数据——企业级结论须经「行业→企业」显式映射并标注）、world-bank/imf（国家宏观维度非行业维度）、eurostat（欧盟口径）、newsapi（英文新闻覆盖为主）、tavily（Web 事件级检索非结构化指标级）。跨口径推断（宏观→行业→企业）必须显式登记映射假设，禁止口径直接替代。
 - **三角化独立性纪律**：「独立来源」以**源**为单位计数——同源多 query（`name`/`name#2` 键）不构成独立来源，不得计入印证数；维度级直接映射源数不足时须跨维度关联印证或显式标注「印证不足」并下调置信度。
 - **数据使用合规**：外部数据仅限内部分析用途——新闻内容遵守版权合理使用（摘要引用不整篇转载）、专利数据遵守 USPTO/PatentsView 使用条款、国家统计局数据遵守官方署名要求、Web 检索遵守目标站点 robots.txt；输出中的溯源元数据（source/freshness/confidence）同时是合规审计依据。新增数据源（如 CNIPA/WIPO/财报/行业协会）须配套适配器开发与合规评估（Story 4.3/数据扩展专项承载）。
-- **已知 defer 登记（Story 4.1f 承接——已立项 Skills 数据源扩展：EPO OPS/SEC EDGAR/UN Comtrade 适配器 + required_fields 按源定制 + 声明重分配；原指向 Story 4.3 已完成未承载，2026-09-29 勘正立项）**：① DataSourceRef.required_fields 按源定制（现行统一 `[indicator, value]` 为 4-1b 标准化契约残留——newsapi 返回文章/uspto 返回专利/非天然 indicator-value 结构，按源定制须联动 EXPECTED_REQUIRED_FIELDS 契约常量、适配器响应校验与 16 个 SKILL.md frontmatter，属 yaml data_sources.items 字段级化范畴）；② 输出侧时间戳（analysis_date）与溯源 source_id 关联结构（运行时校验行为变更，随 4.3 运行时校验一并设计）；③ token 预算门禁（4-1d R3 既有 defer）。
+- **已知 defer 登记（Story 4.1f 已交付清账 2026-09-30——原三项中 ① 已由 4.1f 落地：ADAPTER_SSOT 四元组化（required_fields 按源定制，8 既有源零漂移 + 3 新源定制值）+ EXPECTED_REQUIRED_FIELDS 统一常量移除（查表断言取代）+ 41 处 frontmatter 联动核验零漂移；②③ 维持 defer）**：② 输出侧时间戳（analysis_date）与溯源 source_id 关联结构（运行时校验行为变更，随 4.3 运行时校验一并设计）；③ token 预算门禁（4-1d R3 既有 defer）；④ Phase 2 数据源（Google Patents BigQuery/巨潮 cninfo/港交所披露易/协会 crawler/PDF 管道）→ Story 4.1g（4-1f 立项时划出）。
 
 
 
@@ -3598,6 +3606,7 @@ pytest tests/unit/domain/
 | 8.7.0 | 2026-09-28 | **Story 4.1d 混合数据型 Skills 成熟化实现**：①10 个 Skills frontmatter `data_sources` 统一 2 源声明 + IO Schema（skill_io_schemas.yaml 扩至 16 条目单一 SSOT）②references 三件套（data_fusion/scoring_anchors/workshop_guide）+ templates 内部采集模板（字段 ↔ Schema 叶子键双向断言）③零 Python 生产代码改动（声明即生效）④§17.3.3 追加 4.1d 集成说明与 8 项架构决策（D1-D8） | 架构团队 |
 | 8.7.1 | 2026-09-29 | **Story 4.1d 代码审查修订**（内容级修复，零架构决策变更）：①契约守护网收紧（断言函数失败路径负例/结构守卫/required_fields 逐字断言/identity 自检/23 全量解析枚举恢复）②Skill 内容质量修复（§5 冲突分级摘要与 data_fusion 冲突表对齐/GE 三带映射与 VRIO 判定链闭合重写/70-30 权重定性化/工作坊 2h 压缩指引/条目编码规范声明 + 确定性解析锚点）③既有留项维持（自由 object 字段化与运行时校验 → Story 4.3） | 架构团队 |
 | 8.8.0 | 2026-09-29 | **Story 4.1e 纯内部框架 Skills 成熟化实现（23/23 收官）**：①7 个纯内部框架 Skills frontmatter `input_schema`/`output_schema` 成熟化（`data_sources` 键不写入——空 tuple 一等不变量；skill_io_schemas.yaml 扩至 23 条目单一 SSOT v1.2.0）②分型 references 三件套（framework_logic 首次引入/scoring_anchors 或 validation_rules/workshop_guide——评分型 3 + 结构型 4）+ templates 用户输入模板（四段式分型条件化 + 字段 ↔ Schema 叶子键双向断言 + 条目编码规范 7/7）③零引擎/接线/端口/异常层改动（空 data_sources + 无标记直通路径，arguments 升格主通道）；唯一生产 .py 增强 = catalog org-design 四维（Galbraith Star 完整性，D10 只加不改删）④第三契约库 skill_framework_contracts.py + NON_TARGET_SLUGS 三副本派生收敛 + 双验收场景改名永久锚定⑤工具分工互查（strategy-map ↔ bsc-scorecard / dependency-graph ↔ gantt-chart）+ bmc 存量资产整合（key_partnerships 收敛）⑥§17.3.3 追加 4.1e 集成说明与 13 项架构决策（D1-D13）；三处同源旧值校准为 23/23 终态（§1.4/§13 目录树/§19.7.1 统计表） | 架构团队 |
+| 8.9.0 | 2026-09-30 | **Story 4.1f Skills 数据源扩展实现（源数量充足性收敛）**：①三新源适配器（EpoOpsAdapter OAuth2 令牌流 + 4GB/周配额守卫 / SecEdgarAdapter 免 key 强制 UA + 8rps 滑动窗口 + 双模式检索（efts Elasticsearch + XBRL tag/units 双形态转换）/ ComtradeAdapter key 可选 + 管道串解析 + 日配额守卫 500/100）——适配器池 8→11②tavily/newsapi CJK 自适应（中文 query 自动注入 country=china/language=zh，非 CJK 路径逐键零变化回归基线锁定）③required_fields 四元组化（ADAPTER_SSOT 单表定制，EXPECTED_REQUIRED_FIELDS 统一常量移除，值级绊线改写）④受益 Skill 声明重分配（competitor 4→6 源双库专利 + EDGAR 财报印证；vrio 2→3（epics 授权 + D2 豁免表）；disruptive 2→3（D8 重开签收——专利双库 + 市场单源跨域互证方法论）；24 项断言联动全落地含 references/templates/验收场景名）⑤能力边界声明（IDC/Gartner/Euromonitor 不可得留痕 + 代理指标组合）+ 新源合规登记（EDGAR UA/Comtrade 署名与配额/EPO Fair Use）⑥defer 清账（①required_fields 按源定制已交付） | 架构团队 |
 
 ---
 
@@ -3610,7 +3619,7 @@ pytest tests/unit/domain/
 | **核心章节** | 20 章（§1-§20） |
 | **附录章节** | 12 章（A-L，§21-§32，详见 arch-appendix.md） |
 | **总章节数** | 32 章 |
-| **版本** | 8.8.0（Story 4.1e 纯内部框架 Skills 成熟化 - 23/23 收官） |
-| **最后更新** | 2026-09-29 |
+| **版本** | 8.9.0（Story 4.1f Skills 数据源扩展 - 适配器 8→11 + CJK 自适应 + 声明重分配） |
+| **最后更新** | 2026-09-30 |
 
 **所有附录 A~L 单独成章节，编号保持不变，作为主架构文档的详细展开。**
