@@ -121,7 +121,8 @@ class _WeeklyQuotaGuard:
     """EPO 周配额守卫（4 GB/周——进程内字节累计，周一 00:00 GMT 重置）。
 
     前置拦截（ensure_capacity）零请求消耗；响应字节事后累计（consume）。
-    Lock 为类变量（跨实例互斥需类级共享）。临界区纯同步（无 await）——单 loop 下
+    Lock 为类变量（SINGLETON 单实例语义下的防御性存在——计数状态为实例级，跨实例并不互斥）。
+    临界区纯同步（无 await）——单 loop 下
     acquire 恒走 fast path，锁为临界区未来演化出 await 时的防御性存在；CPython 3.10+
     真实竞争后锁绑定事件循环，跨 loop 复用须 per-loop 分锁（先例 aiodocker_sandbox_adapter）。
     """

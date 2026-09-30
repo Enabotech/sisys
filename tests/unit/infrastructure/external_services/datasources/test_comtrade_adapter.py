@@ -53,6 +53,7 @@ def _make_adapter(
     api_key: str = "",
     quota_requests_used: int = 0,
     now_fn=None,
+    circuit_breaker=None,
 ) -> ComtradeAdapter:
     transport = handler or httpx.MockTransport(lambda req: httpx.Response(200, json=_RECORDS_BODY))
     return ComtradeAdapter(
@@ -62,6 +63,7 @@ def _make_adapter(
         retry_max_wait=0.02,
         quota_requests_used=quota_requests_used,
         now_fn=now_fn,
+        circuit_breaker=circuit_breaker,
     )
 
 
@@ -267,6 +269,35 @@ class TestComtradeAdapterFetch:
         assert await adapter.health_check() is True
         # 探活请求同样计入日配额（探活是真实消耗——R1-F12，防配额旁路）
         assert adapter._quota_guard.used_requests == 1, "探活成功后日配额计数应为 1"
+
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_early_open(self) -> None:
+        """熔断差异化配置：注入降阈熔断器（threshold=2），2 次 fetch 失败即断开，断开期间零 HTTP。
+
+        注：熔断计数按"采集会话"记（每次 fetch 重试耗尽后记 1 次失败——helper 终端
+        except 单点 on_failure）。断言核心 = 断开期间计数器不增（快速失败）——与
+        EPO/EDGAR 同构防线（R3-6 补齐 comtrade 侧守护空缺）。
+        """
+        from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
+
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(503)
+
+        adapter = _make_adapter(
+            httpx.MockTransport(handler),
+            circuit_breaker=CircuitBreaker(failure_threshold=2, recovery_timeout=30.0, name="comtrade-cb-test"),
+        )
+        for _ in range(2):
+            with pytest.raises(DataSourceUnavailableError):
+                await adapter.fetch(DataSourceQuery(source_name="comtrade", query="cmd=8703"))
+        calls_before = calls["n"]
+        with pytest.raises(DataSourceUnavailableError):
+            await adapter.fetch(DataSourceQuery(source_name="comtrade", query="cmd=8703"))
+        assert calls["n"] == calls_before, "熔断器断开后应零 HTTP 快速失败"
+        await adapter.close()
 
 
 class TestComtradeAdapterFailures:

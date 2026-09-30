@@ -36,7 +36,7 @@ from src.domain.value_objects.data_source import (
     DataSourceResult,
 )
 from src.infrastructure.config.sec_edgar import SecEdgarConfig
-from src.infrastructure.external_services.datasources._http_helpers import request_json_with_resilience
+from src.infrastructure.external_services.datasources._http_helpers import quote_path_segment, request_json_with_resilience
 from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,8 @@ def _compute_delay(
 class _SlidingWindowRateLimiter:
     """进程内滑动窗口限速器（8 req/s——Lock 保护 + 时间窗）。"""
 
-    # 类变量（跨实例互斥需类级共享）。临界区纯同步无 await——单 loop 下恒走 fast path，
+    # 类变量（SINGLETON 单实例语义下的防御性存在——计数状态为实例级，跨实例并不互斥）。
+    # 临界区纯同步无 await——单 loop 下恒走 fast path，
     # 真实竞争后绑定事件循环，跨 loop 复用须 per-loop 分锁（先例 aiodocker_sandbox_adapter）
     _lock: asyncio.Lock = asyncio.Lock()
 
@@ -250,7 +251,15 @@ class SecEdgarAdapter:
             )
         cik, concept = parts[0], parts[1]
         taxonomy = parts[2] if len(parts) > 2 else "us-gaap"
-        url = f"{_DATA_BASE}/api/xbrl/companyconcept/{cik}/{taxonomy}/{concept}.json"
+        # CIK 形态归一（R3-2）：真实端点 companyconcept 仅收 CIK########## 前缀形态（三态实测
+        # 404/200/404）——检索模式转换产出裸数字（LLM 按 SOP「CIK 经检索模式获取」回填），归一防 404 误映射 413
+        if cik.isdigit():
+            cik = f"CIK{cik.zfill(10)}"
+        # 路径段消毒（R3-1）：LLM 不可信输入逐段编码 + 显式拒绝 ".." 穿越段（五适配器先例函数）
+        url = (
+            f"{_DATA_BASE}/api/xbrl/companyconcept/"
+            f"{quote_path_segment(cik)}/{quote_path_segment(taxonomy)}/{quote_path_segment(concept)}.json"
+        )
         data = await self._request(url)
         return self._extract_xbrl(data), None
 
@@ -273,7 +282,7 @@ class SecEdgarAdapter:
             context={"source_name": "sec-edgar", "actual_type": type(data).__name__},
         )
 
-    async def _request(self, url: str, *, params: dict[str, str] | None = None) -> Any:
+    async def _request(self, url: str, *, params: dict[str, str] | None = None, max_attempts: int | None = None) -> Any:
         """经 resilience helper 执行请求（绝对 URL 拼接——双 base 单 client）。
 
         限速经 pre_request 下沉至每次真实 HTTP 尝试前（R2-F2——fetch 入口单次
@@ -287,7 +296,7 @@ class SecEdgarAdapter:
             circuit_breaker=self._circuit_breaker,
             params=params,
             headers={"User-Agent": UA_HEADER},
-            max_attempts=self._retry_max_attempts,
+            max_attempts=max_attempts if max_attempts is not None else self._retry_max_attempts,
             min_wait=self._retry_min_wait,
             max_wait=self._retry_max_wait,
             pre_request=self._rate_limiter.acquire if self._rate_limiter is not None else None,
@@ -311,9 +320,9 @@ class SecEdgarAdapter:
         return latest
 
     async def health_check(self) -> bool:
-        """探活（最小检索，单次尝试）。"""
+        """探活（最小检索，单次尝试——R3 修正：显式 max_attempts=1 对齐 EPO/comtrade 范本）。"""
         try:
-            await self._request(_SEARCH_ENDPOINT, params={"q": "probe"})
+            await self._request(_SEARCH_ENDPOINT, params={"q": "probe"}, max_attempts=1)
             return True
         except Exception as e:  # 探活失败不抛——健康检查语义
             logger.warning("SecEdgarAdapter 探活失败: %s", type(e).__name__)

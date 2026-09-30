@@ -400,10 +400,19 @@ class TestEpoOpsAdapterFailures:
 
     @pytest.mark.asyncio
     async def test_missing_patents_field_raises_response_error(self) -> None:
-        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json={"unexpected": 1})))
+        # 双态 handler（R3-4 修正）：token 端点须返回合法令牌——单态 handler 下 fetch 在
+        # 令牌解析阶段即抛 413，从未走到 _extract_patents（旧形态声称的测试目标实际未被执行）
+        adapter = _make_adapter(
+            httpx.MockTransport(
+                lambda req: httpx.Response(200, json=_TOKEN_BODY if "/auth/accesstoken" in str(req.url) else {"unexpected": 1})
+            )
+        )
         with pytest.raises(DataSourceResponseError) as exc_info:
             await adapter.fetch(DataSourceQuery(source_name="epo-ops", query='pa="x"'))
         assert exc_info.value.code == "EXCEPTION_413"
+        assert "patents" in str(exc_info.value), "应是检索响应结构校验的 413（非令牌阶段）"
+        # consume 前移守护（R3-4）：413 结构校验路径的响应字节同样入账（上游 Fair Use 已真实消耗）
+        assert adapter._quota_guard.used_bytes > 0, "413 路径字节应同样计入周配额（consume 须在 extract 之前）"
         await adapter.close()
 
     @pytest.mark.asyncio

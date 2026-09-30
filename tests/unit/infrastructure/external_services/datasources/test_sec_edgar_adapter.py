@@ -313,6 +313,32 @@ class TestSecEdgarAdapterPort:
         )
 
     @pytest.mark.asyncio
+    async def test_xbrl_bare_cik_normalized_to_prefixed_form(self) -> None:
+        """裸数字 CIK 形态归一（R3-2）：真实端点 companyconcept 仅收 CIK########## 前缀形态——
+        检索模式转换产出裸数字，LLM 按 SOP 回填时归一防 404 误映射 413。"""
+        captured: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured.append(request)
+            return httpx.Response(200, json=_XBRL_BODY)
+
+        adapter = _make_adapter(httpx.MockTransport(handler), rate_limited=False)
+        await adapter.fetch(DataSourceQuery(source_name="sec-edgar", query="xbrl:0001318605:Revenues"))
+        assert "companyconcept/CIK0001318605/" in str(captured[0].url), (
+            "裸数字 CIK 应归一为 CIK 前缀 + 10 位零填充形态（真实端点三态实测仅该形态 200）"
+        )
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_xbrl_path_traversal_segment_rejected(self) -> None:
+        """XBRL 路径段消毒（R3-1）：LLM 不可信输入的 '..' 穿越段显式拒绝（quote_path_segment 先例）。"""
+        adapter = _make_adapter(rate_limited=False)
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="sec-edgar", query="xbrl:../../admin:Revenues"))
+        assert exc_info.value.code == "EXCEPTION_413"
+        await adapter.close()
+
+    @pytest.mark.asyncio
     async def test_retry_attempts_each_acquire_rate_limit(self) -> None:
         """限速下沉语义锁：每次真实 HTTP 尝试（含 tenacity 重试）都过限速器（R2-F2）。
 
@@ -390,7 +416,7 @@ class TestSearchModeRealEndpointShape:
                     {
                         "_id": "0000757011-13-000001",
                         "_source": {
-                            "ciks": ["757011"],
+                            "ciks": ["0000757011"],
                             "display_names": ["USG CORP  (CIK 0000757011)"],
                             "form": "10-K",
                             "file_date": "2013-02-15",
