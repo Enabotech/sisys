@@ -193,17 +193,45 @@ class SecEdgarAdapter:
         if forms:
             params["forms"] = forms
         data = await self._request(_SEARCH_ENDPOINT, params=params)
-        if not isinstance(data, dict) or "filings" not in data:
-            raise DataSourceResponseError(
-                message="SEC EDGAR 响应缺少 'filings' 字段",
-                context={"source_name": "sec-edgar", "actual_type": type(data).__name__},
-            )
-        if not isinstance(data["filings"], list):
-            raise DataSourceResponseError(
-                message="SEC EDGAR 响应 'filings' 字段非列表",
-                context={"source_name": "sec-edgar", "actual_type": type(data["filings"]).__name__},
-            )
-        return data, self._latest_filed_at(data["filings"])
+        filings = self._extract_filings(data)
+        return {"filings": filings}, self._latest_filed_at(filings)
+
+    @staticmethod
+    def _extract_filings(data: Any) -> list[dict[str, Any]]:
+        """财报列表提取（双形态：契约直接形态 / 真实端点 Elasticsearch 形态）。
+
+        - 契约形态（单测/规范）：{"filings": [{company, cik, form, filed_at}]}
+        - 真实端点形态（efts Elasticsearch）：{"hits": {"hits": [{"_source": {ciks,
+          display_names, form, file_date}}]}} → 转换为 filings 结构（契约三箭头语义）
+        """
+        if isinstance(data, dict) and "filings" in data:
+            filings = data["filings"]
+            if not isinstance(filings, list):
+                raise DataSourceResponseError(
+                    message="SEC EDGAR 响应 'filings' 字段非列表",
+                    context={"source_name": "sec-edgar", "actual_type": type(filings).__name__},
+                )
+            return filings
+        hits = data.get("hits") if isinstance(data, dict) else None
+        if isinstance(hits, dict) and isinstance(hits.get("hits"), list):
+            converted: list[dict[str, Any]] = []
+            for hit in hits["hits"]:
+                source = hit.get("_source", {}) if isinstance(hit, dict) else {}
+                display_names = source.get("display_names") or []
+                ciks = source.get("ciks") or []
+                converted.append(
+                    {
+                        "company": display_names[0] if display_names else "",
+                        "cik": str(ciks[0]) if ciks else "",
+                        "form": source.get("form", ""),
+                        "filed_at": source.get("file_date", ""),
+                    }
+                )
+            return converted
+        raise DataSourceResponseError(
+            message="SEC EDGAR 响应缺少 'filings'/'hits' 字段",
+            context={"source_name": "sec-edgar", "actual_type": type(data).__name__},
+        )
 
     async def _fetch_xbrl_companyconcept(self, spec: str) -> tuple[dict[str, Any], datetime | None]:
         """XBRL 模式（xbrl:CIK:概念 → data.sec.gov companyconcept 绝对 URL 单指标时序）。"""
@@ -217,12 +245,26 @@ class SecEdgarAdapter:
         taxonomy = parts[2] if len(parts) > 2 else "us-gaap"
         url = f"{_DATA_BASE}/api/xbrl/companyconcept/{cik}/{taxonomy}/{concept}.json"
         data = await self._request(url)
-        if not isinstance(data, dict) or "concept" not in data:
-            raise DataSourceResponseError(
-                message="SEC EDGAR XBRL 响应缺少 'concept' 字段",
-                context={"source_name": "sec-edgar", "actual_type": type(data).__name__},
-            )
-        return data, None
+        return self._extract_xbrl(data), None
+
+    @staticmethod
+    def _extract_xbrl(data: Any) -> dict[str, Any]:
+        """XBRL 概念提取（双形态：契约直接形态 / 真实端点形态）。
+
+        - 契约形态（单测/规范）：{concept, unit, values}
+        - 真实端点形态（companyconcept API）：{tag, units: {<单位>: [时序条目]}} →
+          转换为契约形态（concept=tag，unit=首个单位键，values=该单位时序数组）
+        """
+        if isinstance(data, dict) and "concept" in data:
+            return data
+        if isinstance(data, dict) and "tag" in data and isinstance(data.get("units"), dict) and data["units"]:
+            unit, values = next(iter(data["units"].items()))
+            if isinstance(values, list):
+                return {"concept": str(data["tag"]), "unit": str(unit), "values": values}
+        raise DataSourceResponseError(
+            message="SEC EDGAR XBRL 响应缺少 'concept'/'tag+units' 字段",
+            context={"source_name": "sec-edgar", "actual_type": type(data).__name__},
+        )
 
     async def _request(self, url: str, *, params: dict[str, str] | None = None) -> Any:
         """经 resilience helper 执行请求（绝对 URL 拼接——双 base 单 client）。"""

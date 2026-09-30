@@ -281,7 +281,27 @@ class TestComtradeAdapterFailures:
 
     @pytest.mark.asyncio
     async def test_missing_records_field_raises_response_error(self) -> None:
-        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json={"data": []})))
+        """双形态皆缺（无 records 契约键亦无 data 真实端点键）→ 413（{"data": []} 属真实端点合法空结果）。"""
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json={"unexpected": 1})))
         with pytest.raises(DataSourceResponseError) as exc_info:
             await adapter.fetch(DataSourceQuery(source_name="comtrade", query="cmd=8703"))
         assert exc_info.value.code == "EXCEPTION_413"
+
+
+class TestRealEndpointShapeConversion:
+    """真实端点 data[] 形态转换（契约四「195 条真实记录」锚点形态——cmdCode/primaryValue/refYear）。"""
+
+    @pytest.mark.asyncio
+    async def test_data_list_converted_to_records(self) -> None:
+        real_body = {
+            "elapsedTime": 12,
+            "count": 1,
+            "data": [{"cmdCode": "8703", "flowCode": "X", "primaryValue": 90220553898.0, "refYear": 2024, "period": "2024"}],
+        }
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json=real_body)))
+        result = await adapter.fetch(DataSourceQuery(source_name="comtrade", query="reporter=156|cmd=8703"))
+        payload = json.loads(result.payload)
+        assert payload["records"][0]["cmd_code"] == "8703"
+        assert payload["records"][0]["trade_value"] == 90220553898.0
+        assert payload["records"][0]["period"] == "2024"
+        await adapter.close()

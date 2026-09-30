@@ -77,20 +77,26 @@ def _extract_imports(path: Path) -> set[str]:
 
 
 def _build_adapters() -> dict[str, DataSourcePort]:
-    """实例化 8 个适配器（Key 敏感源用测试占位 Key，禁止真实外网调用）"""
+    """实例化 11 个适配器（Key 敏感源用测试占位 Key/凭据，禁止真实外网调用；4-1f 三新源）"""
     from src.infrastructure.config.china_nbs import ChinaNBSConfig
+    from src.infrastructure.config.comtrade import ComtradeConfig
+    from src.infrastructure.config.epo_ops import EpoOpsConfig
     from src.infrastructure.config.eurostat import EurostatConfig
     from src.infrastructure.config.imf import IMFConfig
     from src.infrastructure.config.ipcc import IPCCConfig
     from src.infrastructure.config.newsapi import NewsAPIConfig
+    from src.infrastructure.config.sec_edgar import SecEdgarConfig
     from src.infrastructure.config.tavily import TavilyConfig
     from src.infrastructure.config.uspto import USPTOConfig
     from src.infrastructure.config.worldbank import WorldBankConfig
     from src.infrastructure.external_services.datasources.china_nbs_adapter import ChinaNBSAdapter
+    from src.infrastructure.external_services.datasources.comtrade_adapter import ComtradeAdapter
+    from src.infrastructure.external_services.datasources.epo_ops_adapter import EpoOpsAdapter
     from src.infrastructure.external_services.datasources.eurostat_adapter import EurostatAdapter
     from src.infrastructure.external_services.datasources.imf_adapter import IMFAdapter
     from src.infrastructure.external_services.datasources.ipcc_adapter import IPCCAdapter
     from src.infrastructure.external_services.datasources.newsapi_adapter import NewsAPIAdapter
+    from src.infrastructure.external_services.datasources.sec_edgar_adapter import SecEdgarAdapter
     from src.infrastructure.external_services.datasources.tavily_adapter import TavilyAdapter
     from src.infrastructure.external_services.datasources.uspto_adapter import USPTOAdapter
     from src.infrastructure.external_services.datasources.worldbank_adapter import WorldBankAdapter
@@ -104,6 +110,11 @@ def _build_adapters() -> dict[str, DataSourcePort]:
         "newsapi": NewsAPIAdapter(config=NewsAPIConfig(api_key="arch-test-placeholder")),
         "tavily": TavilyAdapter(config=TavilyConfig(api_key="arch-test-placeholder")),
         "china-nbs": ChinaNBSAdapter(crawler_client=AsyncMock(), config=ChinaNBSConfig()),
+        "epo-ops": EpoOpsAdapter(
+            config=EpoOpsConfig(consumer_key="arch-test-placeholder", consumer_secret="arch-test-placeholder")
+        ),
+        "sec-edgar": SecEdgarAdapter(config=SecEdgarConfig()),
+        "comtrade": ComtradeAdapter(config=ComtradeConfig()),
     }
 
 

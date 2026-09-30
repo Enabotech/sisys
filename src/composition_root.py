@@ -2497,8 +2497,73 @@ def bootstrap() -> None:
         tags=("data-source", "china-nbs", "crawler"),
     )
 
+    # ===== Story 4.1f：三新源注册（epo-ops 条件双门 / sec-edgar 与 comtrade 无条件） =====
+
+    # EPO OPS 适配器：OAuth2 双凭据门条件注册（Consumer Key/Secret 任一缺失即不注册——
+    # 双门合取，Story 4.1f 数据契约一；构造期 fail-fast 抛 101 由 from_env 后构造器校验）
+    epo_ops_enabled = bool(os.getenv("EPO_OPS_CONSUMER_KEY")) and bool(os.getenv("EPO_OPS_CONSUMER_SECRET"))
+    if epo_ops_enabled:
+        from src.infrastructure.config.epo_ops import EpoOpsConfig
+
+        register_port(
+            name="data_source_epo_ops",
+            version="v1.0.0",
+            interface=DataSourcePort,
+            impl=lambda resolver: __import__(
+                "src.infrastructure.external_services.datasources.epo_ops_adapter",
+                fromlist=["EpoOpsAdapter"],
+            ).EpoOpsAdapter(config=EpoOpsConfig.from_env()),
+            module="src.infrastructure.external_services.datasources.epo_ops_adapter",
+            lifetime=Lifetime.SINGLETON,
+            owner="tool-team",
+            tags=("data-source", "epo-ops", "patent"),
+        )
+
+    # SEC EDGAR 适配器：免 key 无条件注册（官方 Fair Access 免费开放——强制 UA + 限速
+    # 是唯一义务；worldbank A 组范式同构，Story 4.1f 决策 D4）
+    register_port(
+        name="data_source_sec_edgar",
+        version="v1.0.0",
+        interface=DataSourcePort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.datasources.sec_edgar_adapter",
+            fromlist=["SecEdgarAdapter"],
+        ).SecEdgarAdapter(
+            config=__import__(
+                "src.infrastructure.config.sec_edgar",
+                fromlist=["SecEdgarConfig"],
+            ).SecEdgarConfig.from_env(),
+        ),
+        module="src.infrastructure.external_services.datasources.sec_edgar_adapter",
+        lifetime=Lifetime.SINGLETON,
+        owner="tool-team",
+        tags=("data-source", "sec-edgar", "financial-report"),
+    )
+
+    # UN Comtrade 适配器：无条件注册 + key 可选增强（preview 端点免 key 兜底——
+    # 「官方免费通道可达即注册，key 为配额增强」统一逻辑，Story 4.1f 决策 D5；
+    # key 缺失走 preview 裸模式，构造器不抛）
+    register_port(
+        name="data_source_comtrade",
+        version="v1.0.0",
+        interface=DataSourcePort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.datasources.comtrade_adapter",
+            fromlist=["ComtradeAdapter"],
+        ).ComtradeAdapter(
+            config=__import__(
+                "src.infrastructure.config.comtrade",
+                fromlist=["ComtradeConfig"],
+            ).ComtradeConfig.from_env(),
+        ),
+        module="src.infrastructure.external_services.datasources.comtrade_adapter",
+        lifetime=Lifetime.SINGLETON,
+        owner="tool-team",
+        tags=("data-source", "comtrade", "trade-statistics"),
+    )
+
     # 数据源解析编排服务（R2 组合注入：聚合 data_source_* 适配器 + L1 缓存 + 事件发布）
-    # Key 缺失的适配器（uspto/newsapi/tavily）未注册 → resolve_optional 返回 None → 映射中不含（优雅降级）
+    # Key 缺失的适配器（uspto/newsapi/tavily/epo-ops）未注册 → resolve_optional 返回 None → 映射中不含（优雅降级）
     from src.application.ports.data_source_resolver import DataSourceResolverPort
 
     def _build_data_source_adapters(resolver: Any) -> dict[str, Any]:
@@ -2513,6 +2578,9 @@ def bootstrap() -> None:
             ("data_source_newsapi", "newsapi"),
             ("data_source_tavily", "tavily"),
             ("data_source_china_nbs", "china-nbs"),
+            ("data_source_epo_ops", "epo-ops"),
+            ("data_source_sec_edgar", "sec-edgar"),
+            ("data_source_comtrade", "comtrade"),
         ):
             adapter = resolver.resolve_optional(port_name)
             if adapter is not None:
@@ -2739,10 +2807,10 @@ async def shutdown() -> None:
     except Exception as e:
         logger.error("Failed to close llm_client: %s", e)
 
-    # 关闭数据源适配器 httpx 连接池（Story 4.1b R2-2-B1 修复）
+    # 关闭数据源适配器 httpx 连接池（Story 4.1b R2-2-B1 修复；4.1f 追加三新源 7→10）
     # 仅用 peek_singleton 清理**已实例化**的单例——resolve() 会对未使用过的端口
     # 现场懒实例化（在 shutdown 路径是危险副作用：适配器构造读 env 可能抛
-    # ConfigurationError）；未注册（条件注册的 newsapi/tavily）/未实例化统一跳过。
+    # ConfigurationError）；未注册（条件注册的 newsapi/tavily/epo-ops）/未实例化统一跳过。
     # china_nbs 无自持 httpx 客户端（复用 CrawlerClientPort），不在清理列表。
     for port_name in (
         "data_source_worldbank",
@@ -2752,6 +2820,9 @@ async def shutdown() -> None:
         "data_source_ipcc",
         "data_source_newsapi",
         "data_source_tavily",
+        "data_source_epo_ops",
+        "data_source_sec_edgar",
+        "data_source_comtrade",
     ):
         try:
             adapter = resolver.peek_singleton(port_name)

@@ -674,15 +674,16 @@
 
 **关联 AC:** AC-7
 
-- [ ] Subtask 7.1: composition_root 三注册块（epo-ops 条件注册——EDGAR/comtrade 无条件 A 组范式，与 worldbank 同构）+ `_build_data_source_adapters` 元组表 8→11 + shutdown 清理列表 +3（自持 httpx——现 7 项→10 项）
-- [ ] Subtask 7.2: `tests/contracts/test_port_contract_data_source.py` 的 `ADAPTER_PORT_SPECS` +3（env_key：EDGAR None；comtrade key 可选语义标注）+ 探针脚本 env 注入行
-- [ ] Subtask 7.3: **架构测试两文件同步**：① `test_arch_skill_data_collection.py`——`_build_adapters` 同步（import + 实例化 + dict 11 键——EDGAR 免 key 直接实例化/EPO+Comtrade 占位 key `NewsAPIConfig(api_key="arch-test-placeholder")` 先例）+ :124/:138 三元组解包四元组化 → `set(keys) == set(ADAPTER_SSOT.keys())`（:121）全绿（Task 5 中间态收口）；② **`test_arch_data_source.py` 四联动点**——`ADAPTER_PORT_NAMES`（:71-77）+ EDGAR/comtrade、`KEYED_ADAPTER_PORT_NAMES`（:81）+ epo-ops、`ADAPTER_IMPL_MODULES`（:85-94）+3 条映射、`test_keyed_adapters_conditional_registration`（:184/:191-195）+ epo-ops（参数化结构扩展为多键合取——epo-ops 双凭据 `("EPO_OPS_CONSUMER_KEY", "EPO_OPS_CONSUMER_SECRET")` 成对判定，见 AC-7；该文件静态表驱动，漏改静默——逐点核验）
-- [ ] Subtask 7.4: 集成实测文件 `tests/integration/external_services/data_sources/test_new_sources_integration.py`（三源真实端点——EDGAR/comtrade 无条件可测/EPO key 动态 skip；TestTenant 前缀；目录与既有 `tests/integration/external_services/` 结构对齐）
-- [ ] Subtask 7.5: `__init__.py` docstring 8→11 + root `.env` 数据源 key 区段补样例（L113 `CLOUD_LLM_API_KEY` 附近（L112 为 PROVIDER）；root 无 `.env.example`，deploy/*/ 模板为基础设施服务不涉及应用 key——评估结论留 Dev Agent Record，不新建文件）
-- [ ] Subtask 7.6: 子进程探针注册态（epo-ops key 有/无双向；EDGAR/comtrade 恒注册单态验证；without 分支 scrub 全部条件注册数据源 env 键——含既有 TAVILY/NEWSAPI/USPTO——先例 `test_acceptance_data_source.py:606-637`）
+- [x] Subtask 7.1: composition_root 三注册块（epo-ops 条件注册——EDGAR/comtrade 无条件 A 组范式，与 worldbank 同构）+ `_build_data_source_adapters` 元组表 8→11 + shutdown 清理列表 +3（自持 httpx——现 7 项→10 项）
+- [x] Subtask 7.2: `tests/contracts/test_port_contract_data_source.py` 的 `ADAPTER_PORT_SPECS` +3（env_key：EDGAR None；comtrade key 可选语义标注）+ 探针脚本 env 注入行
+- [x] Subtask 7.3: **架构测试两文件同步**：① `test_arch_skill_data_collection.py`——`_build_adapters` 同步（import + 实例化 + dict 11 键——EDGAR 免 key 直接实例化/EPO+Comtrade 占位 key `NewsAPIConfig(api_key="arch-test-placeholder")` 先例）+ :124/:138 三元组解包四元组化 → `set(keys) == set(ADAPTER_SSOT.keys())`（:121）全绿（Task 5 中间态收口）；② **`test_arch_data_source.py` 四联动点**——`ADAPTER_PORT_NAMES`（:71-77）+ EDGAR/comtrade、`KEYED_ADAPTER_PORT_NAMES`（:81）+ epo-ops、`ADAPTER_IMPL_MODULES`（:85-94）+3 条映射、`test_keyed_adapters_conditional_registration`（:184/:191-195）+ epo-ops（参数化结构扩展为多键合取——epo-ops 双凭据 `("EPO_OPS_CONSUMER_KEY", "EPO_OPS_CONSUMER_SECRET")` 成对判定，见 AC-7；该文件静态表驱动，漏改静默——逐点核验）
+- [x] Subtask 7.4: 集成实测文件 `tests/integration/external_services/data_sources/test_new_sources_integration.py`（三源真实端点——EDGAR/comtrade 无条件可测/EPO key 动态 skip；TestTenant 前缀；目录与既有 `tests/integration/external_services/` 结构对齐）
+- [x] Subtask 7.5: `__init__.py` docstring 8→11 + root `.env` 数据源 key 区段补样例（L113 `CLOUD_LLM_API_KEY` 附近（L112 为 PROVIDER）；root 无 `.env.example`，deploy/*/ 模板为基础设施服务不涉及应用 key——评估结论留 Dev Agent Record，不新建文件）
+- [x] Subtask 7.5 实施注记：集成实测发现真实端点形态与契约简化形态差异——EDGAR Elasticsearch hits.hits[]._source 与 Comtrade data[]{cmdCode,primaryValue,refYear}——两适配器 _extract_* 实现双形态转换（契约形态/真实端点形态），补 2 个转换单测；EDGAR XBRL 真实形态 tag+units 同步转换。契约测试 _registration_state 判定改 bool()（对齐组合根空串语义）
+- [x] Subtask 7.6: 子进程探针注册态（epo-ops key 有/无双向；EDGAR/comtrade 恒注册单态验证；without 分支 scrub 全部条件注册数据源 env 键——含既有 TAVILY/NEWSAPI/USPTO——先例 `test_acceptance_data_source.py:606-637`）
 
 **完成标准/Definition of Done:**
-- [ ] 注册链全触点落地 + 三方一致全绿 + 真实端点实测（可测面）
+- [x] 注册链全触点落地 + 三方一致全绿 + 真实端点实测（可测面）
 
 ---
 
