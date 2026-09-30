@@ -342,9 +342,9 @@ def test_appeals_analysis_full_chain(context: dict[str, Any]) -> None:
     pass
 
 
-@scenario(FEATURE, "competitor-analysis 四源并发采集链路")
+@scenario(FEATURE, "competitor-analysis 六源并发采集链路")
 def test_competitor_analysis_full_chain(context: dict[str, Any]) -> None:
-    """competitor-analysis 四源并发采集链路。"""
+    """competitor-analysis 六源并发采集链路。"""
     pass
 
 
@@ -354,9 +354,9 @@ def test_scenario_planning_full_chain(context: dict[str, Any]) -> None:
     pass
 
 
-@scenario(FEATURE, "disruptive-innovation 双源交叉验证采集链路")
+@scenario(FEATURE, "disruptive-innovation 三源采集链路（专利双库 + 市场单源）")
 def test_disruptive_innovation_full_chain(context: dict[str, Any]) -> None:
-    """disruptive-innovation 双源交叉验证采集链路。"""
+    """disruptive-innovation 三源采集链路（专利双库 + 市场单源）。"""
     pass
 
 
@@ -550,7 +550,7 @@ def when_run_generic_marker(context: dict[str, Any]) -> None:
 
 @scenario(FEATURE, "多源三角化全声明源覆盖")
 def test_triangulation_full_coverage(context: dict[str, Any]) -> None:
-    """≥3 源 Skill（competitor-analysis 四源）注入源数 ≥3 且全声明源覆盖。"""
+    """≥3 源 Skill（competitor-analysis 六源）注入源数 ≥3 且全声明源覆盖。"""
     pass
 
 

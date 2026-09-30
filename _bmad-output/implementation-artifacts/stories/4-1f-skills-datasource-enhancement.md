@@ -655,18 +655,18 @@
 | 🟢 绿 | SKILL.md：「双源」11 处 + L188「2 源」全量改写 + yaml 逐字锁死行双写（:383-385 + SKILL.md L79）+ D4 表述改「专利双库 + 市场单源，评级互证跨域」+ **references/ 三文件「双源」表述评估改写** |
 | 🔄 重构 | D8 留痕（4-1c Story D8 条目 :1186 + architecture.md :2829 D4 行补记——签收态） |
 
-- [ ] Subtask 6.1: 🔴🟢 — competitor 声明与内容全量（循环 A）
-- [ ] Subtask 6.2: competitor 集成断言 6 源化
-- [ ] Subtask 6.3: 🔴🟢 — vrio（循环 B——无签收前提，epics 授权留痕）
-- [ ] Subtask 6.4: 🔴🟢 — disruptive（循环 C——D-08 签收态；未签收跳过留痕，`test_disruptive_innovation_dual_source` 维持 `== 2` 零改动）
-- [ ] Subtask 6.5: 断言联动 24 项清单逐项勾选核验（**本 Story「数据契约六」内嵌清单**——非外部调研文档）
-- [ ] Subtask 6.6: yaml 头注释源数（L218/L732 恒改；L349 **disruptive 项签收态**）+ 逐字锁死 description 双写同步（vrio 恒改；disruptive :383-385 签收态）
-- [ ] Subtask 6.7: 三 Skill 全链路（声明/标记/口径/行数 ≤500）全绿
-- [ ] Subtask 6.8: **Comtrade 语义匹配度评估留痕**（epics 任务 6 第 3 子项——appeals/kpi-tree 等其余 13 个声明 Skill 按 Comtrade 商品级语义匹配度逐个评估，增补/不增补结论与理由留 Dev Agent Record，不强行凑源）+ **D2 修订评审结论留痕**（epics 任务 6 第 4 子项——其余 9 个 4-1d Skill 不放宽至 3 源的评审结论留痕）
-- [ ] Subtask 6.9: 全量回归（4-1c/4-1d/4-1e 三层测试零破坏）
+- [x] Subtask 6.1: 🔴🟢 — competitor 声明与内容全量（循环 A）
+- [x] Subtask 6.2: competitor 集成断言 6 源化
+- [x] Subtask 6.3: 🔴🟢 — vrio（循环 B——无签收前提，epics 授权留痕）
+- [x] Subtask 6.4: 🔴🟢 — disruptive（循环 C——D-08 签收态；未签收跳过留痕，`test_disruptive_innovation_dual_source` 维持 `== 2` 零改动）
+- [x] Subtask 6.5: 断言联动 24 项清单逐项勾选核验（**本 Story「数据契约六」内嵌清单**——非外部调研文档）
+- [x] Subtask 6.6: yaml 头注释源数（L218/L732 恒改；L349 **disruptive 项签收态**）+ 逐字锁死 description 双写同步（vrio 恒改；disruptive :383-385 签收态）
+- [x] Subtask 6.7: 三 Skill 全链路（声明/标记/口径/行数 ≤500）全绿
+- [x] Subtask 6.8: **Comtrade 语义匹配度评估留痕**（epics 任务 6 第 3 子项——appeals/kpi-tree 等其余 13 个声明 Skill 按 Comtrade 商品级语义匹配度逐个评估，增补/不增补结论与理由留 Dev Agent Record，不强行凑源）+ **D2 修订评审结论留痕**（epics 任务 6 第 4 子项——其余 9 个 4-1d Skill 不放宽至 3 源的评审结论留痕）
+- [x] Subtask 6.9: 全量回归（4-1c/4-1d/4-1e 三层测试零破坏）
 
 **完成标准/Definition of Done:**
-- [ ] 声明重分配全绿 + 24 项清单全勾 + D-08 结果留痕 + 两个 epics 评估留痕
+- [x] 声明重分配全绿 + 24 项清单全勾 + D-08 结果留痕 + 两个 epics 评估留痕
 
 ---
 
@@ -842,7 +842,33 @@ tests/
 | **D8 重开签收（disruptive）** | ✅ **签收重开**（Epic owner 2026-09-30 显式确认） | disruptive-innovation 2→3 源按主线执行（循环 C）；D8 重开留痕在 Task 6 循环 C 重构阶段落地（4-1c Story :1186 决策项 + architecture.md :2829 D4 行补记——引用 epics 4.1f 任务 6 :1127 授权） |
 | **vrio 治理知会** | ✅ **知悉同意**（无条件执行） | vrio-framework 2→3 源按 epics 4.1f 任务 6 :1127/:1129 授权无条件执行（循环 B）+ D2 豁免表修订 + 本表留痕——不依赖 D8 结果 |
 
-### Task 0 规范定稿记录（Subtask 0.2/0.3——2026-09-30）
+### Task 6.8 epics 评估留痕（epics 4.1f 任务 6 第 3/4 子项——2026-09-30）
+
+**① Comtrade 语义匹配度评估（epics :1128「相关行业分析 Skill 按语义匹配度评估增补——结论留痕，不强行凑源」）**
+
+对其余 13 个声明 Skill（16 声明 − 3 受益者）逐个评估 Comtrade（HS 商品级贸易数据）语义匹配度：
+
+| Skill | 声明源现状 | Comtrade 匹配度 | 结论 |
+|-------|-----------|----------------|------|
+| pestel-analysis | 6 源（宏观全覆盖） | 低——PEST 的 Economic 因子已有 world-bank/imf/eurostat 宏观口径，Comtrade 商品级粒度对 PEST 宏观扫描过细 | **不增补**（宏观口径已冗余覆盖） |
+| porters-five-forces | 3 源 | 中——五力「行业竞争」维度可用商品级进出口代理，但已有 newsapi/world-bank/eurostat 三源三角化 | **不增补**（已达 3 源三角化基线，凑第 4 源违背「不强行凑源」） |
+| appeals-analysis | 3 源 | 低——诉求分析以舆情/统计为主 | **不增补** |
+| scenario-planning | 3 源 | 低——情景规划需宏观趋势非商品流量 | **不增补** |
+| ansoff-matrix / bsc-scorecard / space-matrix / ge-mckinsey-matrix | 2 源（world-bank/imf 或 china-nbs 组合） | 低——矩阵定位类工具以宏观指标为主，商品级贸易数据非直接输入 | **不增补**（2 源基线由 4-1d D2 语义强可达性约束，非数据缺口） |
+| kpi-tree / value-chain-analysis | 2 源 | 低-中——KPI/价值链的供应链维度理论可用商品流代理，但间接推导链长（贸易值→环节价值需行业假设） | **不增补**（间接推导不构成语义强可达，留给 Phase 2 有实测证据再议） |
+| swot-tows / value-curve-analysis / change-management | 2 源 | 低 | **不增补** |
+
+**汇总结论：13 个 Skill 均不增补 Comtrade**——匹配度达「语义强可达」的仅 competitor（已在本 Story 受益面内，6 源含 EDGAR 企业级）；其余 Skill 要么宏观口径已覆盖、要么间接推导链过长。不强行凑源（epics 原文约束遵守）。
+
+**② D2 修订评审结论（epics :1129「语义强可达的 4-1d Skill 是否放宽至 3 源——产品判断留痕」）**
+
+对其余 9 个 4-1d 混合数据 Skill（10 − vrio）评审是否放宽 2 源基线：
+
+- **结论：均不放宽**。理由：4-1d D2「统一 2 源」的设计根基是**混合数据型 Skill 的内部数据主体性**——外部源仅作印证参照（architecture.md :2840 决策依据「混合数据型内部数据是主体、外部源仅行业基准参照」）。该语义在 9 个 Skill 中均未变化：vrio 放宽的动因是**专利域口径缺陷**（uspto 单库标题软归因无法支撑稀缺性/可模仿性判定的行业密度印证——EPO 申请人检索补的是「印证质量」而非「印证数量」），此动因不存在于其余 9 个 Skill（其外部印证目标的语义在既有 2 源下已闭合）。
+- 评审判断：**「放宽至 3 源」不应成为默认演进方向**——2 源基线 + 豁免表（`test_unified_two_source_policy` 改写后语义）保留「未登记增补即红」防漂移闸门；未来放宽必须逐 Skill 论证「语义强可达的口径/归因缺陷」（vrio 先例标准），而非「多多益善」。
+- vrio-framework 增补经 epics 4.1f 任务 6 :1127 明文授权（本表上方 D-08 记录），豁免表登记 `{"vrio-framework": 3}`。
+
+
 
 | 定稿项 | 值 | 依据 |
 |--------|-----|------|

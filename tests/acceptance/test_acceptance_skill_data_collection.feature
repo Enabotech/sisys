@@ -35,7 +35,7 @@
     那么 每个声明数据源恰好采集 1 次
     并且 注入 DATA_SOURCES 字典键集合等于声明数据源集合
 
-  场景: competitor-analysis 四源并发采集链路
+  场景: competitor-analysis 六源并发采集链路
     假如 加载技能 "competitor-analysis" 的 L2 技能元数据
     并且 全部声明数据源适配器行为正常
     当 该技能全部声明数据源标记经 Engine Execute 阶段处理
@@ -49,7 +49,7 @@
     那么 每个声明数据源恰好采集 1 次
     并且 注入 DATA_SOURCES 字典键集合等于声明数据源集合
 
-  场景: disruptive-innovation 双源交叉验证采集链路
+  场景: disruptive-innovation 三源采集链路（专利双库 + 市场单源）
     假如 加载技能 "disruptive-innovation" 的 L2 技能元数据
     并且 全部声明数据源适配器行为正常
     当 该技能全部声明数据源标记经 Engine Execute 阶段处理

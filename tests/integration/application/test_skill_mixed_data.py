@@ -233,7 +233,7 @@ class TestMixedSkillFullChain:
         # 溯源元数据完备（source_name/freshness_score/confidence）
         assert result.evidence_package is not None
         metas = result.evidence_package.data_sources
-        assert len(metas) == 2, f"{slug}: 注入源数 {len(metas)} != 2"
+        assert len(metas) == len(declared), f"{slug}: 注入源数 {len(metas)} != 声明源数 {len(declared)}"
         for meta in metas:
             assert meta.source_name in declared
             assert 0.0 <= meta.freshness_score <= 1.0

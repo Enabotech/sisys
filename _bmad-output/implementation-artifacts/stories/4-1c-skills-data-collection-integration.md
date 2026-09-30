@@ -1184,6 +1184,7 @@ tests/
 
 
 - [x] **Decision D8（已签收 2026-09-28）**：disruptive-innovation 2 源（USPTO + Tavily）与 Epic AC-4 "每个指标 ≥3 独立来源" 字面偏差——本 Story 选择务实双源交叉验证（D4 决策）。**签收结论（路径 A）**：Epic owner（项目负责人）确认 `epics_v1.0.md:971` 的具体源规划（USPTO 专利 + Tavily 颠覆性技术）优先于 AC-4 通用条款（line 987），2 源双源交叉验证为终态，**不追加第三源**（WIPO/EPO 适配器排期取消，Defer 项关闭）；偏差处置与理由链（8 已注册源无第三语义匹配源 / PoC v2 候选统计源实测不可用 / 同质凑数源违背三角化本意）见审查周期答复记录
+- [x] **Decision D8 重开（已签收 2026-09-30——Story 4.1f D-08 治理决策）**：Epic owner 同级显式重开上项 D8 签收——epics 4.1f 任务 6（`epics_v1.0.md:1127`，2026-09-29 立项）授权 disruptive-innovation 增补 **EPO OPS**（专利域第二口径，2→3 源「专利双库 + 市场单源，评级互证跨域」——非同质凑数：EPO `pa=` 申请人结构化检索支持中文企业名直接归因，与 uspto 标题软归因构成 US+EP 双口径互证）；上项「不追加第三源」的约束由本重开签收解除，架构留痕同步 `architecture.md` :2829 D4 行；重开请求与签收记录见 Story 4.1f Dev Agent Record「D-08 治理决策执行记录」
 
 #### 已修复 Patch
 

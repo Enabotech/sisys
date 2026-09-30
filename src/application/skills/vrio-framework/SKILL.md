@@ -31,6 +31,14 @@ data_sources:
     required_fields:
       - indicator
       - value
+  - name: epo-ops
+    url: https://ops.epo.org
+    api_type: rest_json
+    ttl_seconds: 604800
+    required_fields:
+      - title
+      - applicant
+      - filing_date
   - name: tavily
     url: https://api.tavily.com
     api_type: rest_json
@@ -96,7 +104,7 @@ output_schema:
 > Barney VRIO：对内部资源/能力逐项做 价值性 V / 稀缺性 R / 可模仿性 I / 组织利用 O 四维判定，
 > 经判定链输出 竞争劣势 / 竞争均势 / 暂时竞争优势 / 未实现潜在优势 / 持续竞争优势 五类分类。
 > 混合数据型工具：内部数据（内部审计 + 高管访谈的资源清单与判定）是分析主体，外部数据源
-> （USPTO/Tavily）仅提供行业专利密度与能力情报的外部印证基准。
+> （USPTO/EPO OPS/Tavily）仅提供行业专利密度与能力情报的外部印证基准。
 
 ## 1. 适用场景
 - 资源能力评估（SP 前内部能力盘点）
@@ -135,11 +143,12 @@ output_schema:
 内部审计定 V/O 两维（价值判断与组织利用），高管访谈校准组织利用裁定，会后将模板字段构造为
 `ToolCall.arguments` 的 `resources` 传入（逐资源 name + vrio_scores 四维判定）。
 
-**外部基准（印证参照，双源交叉）：**
+**外部基准（印证参照，专利双库 + 市场单源）：**
 
 | 外部印证目标 | 数据源 | 采集 query 规范 |
 | --- | --- | --- |
-| 行业专利密度（稀缺性/可模仿性的专利维度印证） | uspto | 英文关键词（如 "solid-state battery"） |
+| 行业专利密度（稀缺性/可模仿性的专利维度印证——US 口径） | uspto | 英文关键词（如 "solid-state battery"） |
+| 行业专利密度（稀缺性/可模仿性的专利维度印证——EP 口径，`pa=` 申请人归因） | epo-ops | CQL 结构化检索式（如 `pa="宁德时代" and ti="solid-state battery"`） |
 | 行业能力情报（竞对能力建设/人才/合作动向印证） | tavily | 自然语言关键词（如 "固态电池 专利布局 产能"） |
 
 **内外交叉验证要求：** 每项稀缺性 R / 可模仿性 I 判定至少有一条外部基准印证（或显式标注「内部认知，
@@ -156,10 +165,12 @@ output_schema:
 ```python
 # 每源至少一个标记（沙箱无网络，标记由宿主机侧采集后注入）
 patents = $DATA_SOURCE("uspto", "solid-state battery")
+epo_patents = $DATA_SOURCE("epo-ops", 'ti="solid-state battery"')
 intel = $DATA_SOURCE("tavily", "固态电池 专利布局 产能 竞对动向")
 
 # 采集结果经注入的 DATA_SOURCES dict 读取（防御性 .get()——失败位为 None）
 patents_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
+epo_payload = (DATA_SOURCES.get("epo-ops") or {}).get("payload")
 intel_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
 # 同源多 query 时键为 name#2、name#3（首 query 为裸 name）
 ```

@@ -73,7 +73,7 @@ MIXED_SKILL_DATA_SOURCES: dict[str, tuple[str, ...]] = {
     "ge-mckinsey-matrix": ("world-bank", "tavily"),
     "space-matrix": ("world-bank", "imf"),
     "value-chain-analysis": ("tavily", "china-nbs"),
-    "vrio-framework": ("uspto", "tavily"),
+    "vrio-framework": ("uspto", "epo-ops", "tavily"),
     "bsc-scorecard": ("china-nbs", "world-bank"),
     "kpi-tree": ("china-nbs", "newsapi"),
     "change-management": ("newsapi", "tavily"),
