@@ -58,6 +58,7 @@ def _make_adapter(
     config: EpoOpsConfig | None = None,
     quota_bytes_used: int = 0,
     now_fn: Any = None,
+    circuit_breaker: Any = None,
 ) -> EpoOpsAdapter:
     transport = handler or httpx.MockTransport(
         lambda req: httpx.Response(200, json=_TOKEN_BODY if "/auth/token" in str(req.url) else _SEARCH_BODY)
@@ -69,6 +70,7 @@ def _make_adapter(
         retry_max_wait=0.02,
         quota_bytes_used=quota_bytes_used,
         now_fn=now_fn,
+        circuit_breaker=circuit_breaker,
     )
 
 
@@ -230,6 +232,9 @@ class TestEpoOpsAdapterSuccess:
         adapter = _make_adapter(httpx.MockTransport(handler))
         result = await adapter.fetch(DataSourceQuery(source_name="epo-ops", query='pa="华为" and ti="battery"'))
         search = [r for r in captured if "/auth/token" not in str(r.url)][0]
+        assert "rest-services/published-data/search" in str(search.url), (
+            "检索路径须含 rest-services 前缀（官方 Reference Guide v1.3.20——R1-F1 路径契约锁）"
+        )
         assert search.headers.get("authorization") == "Bearer fake-epo-token-1"
         assert search.headers.get("accept") == "application/json"
         assert search.headers.get("range") == "1-25", "应携带 Range 分页头（首页 25 条）"
@@ -298,6 +303,37 @@ class TestEpoOpsAdapterSuccess:
     async def test_health_check(self) -> None:
         adapter = _make_adapter()
         assert await adapter.health_check() is True
+        # 探活响应字节同样入账周配额（探活是真实消耗——R1-F12，防配额旁路）
+        assert adapter._quota_guard.used_bytes > 0, "探活成功后配额计数应大于 0"
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_early_open(self) -> None:
+        """熔断差异化配置：注入降阈熔断器（threshold=2），2 次 fetch 失败即断开，断开期间零 HTTP。
+
+        注：熔断计数按"采集会话"记（每次 fetch 重试耗尽后记 1 次失败——helper 终端
+        except 单点 on_failure）；令牌端点与业务请求共用同一熔断器，503-always handler
+        下失败发生在令牌端点，计数不受影响。断言核心 = 断开期间计数器不增（快速失败）。
+        """
+        from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
+
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(503, json={})
+
+        adapter = _make_adapter(
+            httpx.MockTransport(handler),
+            circuit_breaker=CircuitBreaker(failure_threshold=2, recovery_timeout=30.0, name="epo-ops-cb-test"),
+        )
+        for _ in range(2):
+            with pytest.raises(DataSourceUnavailableError):
+                await adapter.fetch(DataSourceQuery(source_name="epo-ops", query='ti="battery"'))
+        calls_before = calls["n"]
+        with pytest.raises(DataSourceUnavailableError):
+            await adapter.fetch(DataSourceQuery(source_name="epo-ops", query='ti="battery"'))
+        assert calls["n"] == calls_before, "熔断器断开后应零 HTTP 快速失败"
         await adapter.close()
 
 

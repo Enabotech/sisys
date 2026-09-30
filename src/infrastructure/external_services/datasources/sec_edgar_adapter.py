@@ -8,7 +8,7 @@ SEC EDGAR（美国证监会法定披露，免 key 无条件注册）：
     GET {efts}/LATEST/search-index?q=...&forms=...（Elasticsearch 风格 JSON）
   - XBRL 模式：`xbrl:CIK:概念` 前缀 → data.sec.gov/api/xbrl/companyconcept/...（绝对
     URL 拼接——单 httpx client 双 base，httpx 绝对 URL 忽略 base_url）
-  - 非法模式前缀（形如 `xxx:` 但非 xbrl/xbrl-frame）→ ValidationError(201) 输入前置校验
+  - 非法模式前缀（形如 `xxx:` 但非 xbrl）→ ValidationError(201) 输入前置校验（xbrl-frame: 未实现，同样 201 拦截）
 - 响应：检索模式 {"filings": [{company, form, filed_at}]}；XBRL 模式 {concept, unit, values}
 
 实现 DataSourcePort。容错：tenacity + CircuitBreaker（复用 _http_helpers 集中映射）。
@@ -46,7 +46,7 @@ _DATA_BASE = "https://data.sec.gov"  # XBRL 数据域（官方固定域名——
 _SEARCH_ENDPOINT = "/LATEST/search-index"
 _RATE_PER_SECOND = 8.0  # 官方 10 req/s 留余量
 _RATE_WINDOW = 1.0  # 滑动窗口秒数
-_KNOWN_MODE_PREFIXES = ("xbrl", "xbrl-frame")
+_KNOWN_MODE_PREFIXES = ("xbrl",)  # frames 模式（xbrl-frame:）未实现——按非法前缀 201 拦截，Defer 见 Story 4.1f（R1-F2）
 _MODE_PREFIX_PATTERN = re.compile(r"^([a-zA-Z][a-zA-Z-]*):")
 _FORMS_PATTERN = re.compile(r"\s+forms=(\S+)$")
 
@@ -158,10 +158,7 @@ class SecEdgarAdapter:
         prefix_match = _MODE_PREFIX_PATTERN.match(raw)
         if prefix_match and prefix_match.group(1) not in _KNOWN_MODE_PREFIXES:
             raise ValidationError(
-                message=(
-                    f"sec-edgar 检索式含未注册的模式前缀 {prefix_match.group(1)!r}:"
-                    f"（合法前缀 xbrl: / xbrl-frame:，检索模式无需前缀）"
-                ),
+                message=(f"sec-edgar 检索式含未注册的模式前缀 {prefix_match.group(1)!r}:（合法前缀 xbrl:，检索模式无需前缀）"),
                 context={"source_name": "sec-edgar", "field": "query", "value": raw[:100]},
             )
         if raw.startswith("xbrl:"):

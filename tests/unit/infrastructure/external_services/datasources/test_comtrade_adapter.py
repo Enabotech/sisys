@@ -199,6 +199,18 @@ class TestComtradeAdapterFetch:
         assert result.confidence == 0.9
 
     @pytest.mark.asyncio
+    async def test_monthly_period_parsed_to_month_not_year(self) -> None:
+        """月频 period（YYYYMM）时效锚定到月首——截断为年会虚增 age 达 11 个月误判过期（R1-F11）。"""
+        monthly_body = {"records": [{"cmd_code": "8703", "trade_value": 1, "period": "202411"}]}
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json=monthly_body)))
+        result = await adapter.fetch(DataSourceQuery(source_name="comtrade", query="reporter=156|cmd=8703|period=202411"))
+        assert result.freshness.source_timestamp is not None
+        assert (result.freshness.source_timestamp.year, result.freshness.source_timestamp.month) == (2024, 11), (
+            "YYYYMM 形态应解析到该年该月，而非截断为年初"
+        )
+        await adapter.close()
+
+    @pytest.mark.asyncio
     async def test_quota_exhausted_preflight_zero_requests(self) -> None:
         calls = {"n": 0}
 
@@ -248,6 +260,8 @@ class TestComtradeAdapterFetch:
     async def test_health_check(self) -> None:
         adapter = _make_adapter()
         assert await adapter.health_check() is True
+        # 探活请求同样计入日配额（探活是真实消耗——R1-F12，防配额旁路）
+        assert adapter._quota_guard.used_requests == 1, "探活成功后日配额计数应为 1"
 
 
 class TestComtradeAdapterFailures:

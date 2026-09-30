@@ -89,8 +89,8 @@ ADAPTER_PORT_SPECS: tuple[dict[str, Any], ...] = (
     },
     # ===== Story 4.1f 三新源（epo-ops 条件双门 / sec-edgar 与 comtrade 无条件） =====
     {
-        # OAuth2 双凭据门条件注册——env_key 以主凭据（Consumer Key）为探针键；
-        # 双门合取语义由 test_arch_data_source.test_keyed_adapters_conditional_registration 多键断言承载
+        # OAuth2 双凭据门条件注册——主键 + extra_env_keys 合取判定（半凭据态不注册，
+        # 与组合根/架构测试/验收探针三方同语义——4.1f 代码审查 R1-F8 归一）
         "port_name": "data_source_epo_ops",
         "impl_cls_name": "EpoOpsAdapter",
         "module_path": "src.infrastructure.external_services.datasources.epo_ops_adapter",
@@ -172,9 +172,11 @@ class TestDataSourceAdapterPortContract:
         env_key = spec_meta["env_key"]
         spec = _global_registry.get(spec_meta["port_name"])
         # bool() 判定对齐组合根 Twelve-Factor 语义（空串 = 未配置——.env 样例空值
-        # 不构成「Key 存在」；composition_root 注册门同款，4.1f 注记）
-        if env_key is not None and not bool(os.getenv(env_key)):
-            assert spec is None, f"{env_key} 缺失时 {spec_meta['port_name']} 不应注册（条件注册设计）"
+        # 不构成「Key 存在」；composition_root 注册门同款，4.1f 注记）。
+        # 多凭据门（epo-ops）主键 + extra_env_keys 合取——任一缺失即不注册（R1-F8）
+        if env_key is not None and not all(bool(os.getenv(k)) for k in (env_key, *spec_meta.get("extra_env_keys", ()))):
+            missing = [k for k in (env_key, *spec_meta.get("extra_env_keys", ())) if not bool(os.getenv(k))]
+            assert spec is None, f"{missing} 缺失时 {spec_meta['port_name']} 不应注册（条件注册设计）"
             return None
         assert spec is not None, f"端口 {spec_meta['port_name']} 未注册"
         return spec

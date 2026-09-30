@@ -1,7 +1,7 @@
 """基础设施层 EPO OPS 数据源适配器（Story 4.1f）
 
 EPO Espacenet OPS（Open Patent Services，欧洲专利局官方检索）：
-- 端点：POST /3.2/auth/token（OAuth2 client-credentials，Basic 凭证）+ GET /3.2/published-data/search（CQL）
+- 端点：POST /3.2/auth/token（OAuth2 client-credentials，Basic 凭证）+ GET /3.2/rest-services/published-data/search（CQL）
 - 认证：令牌进程内缓存（过期提前 60s 刷新）；业务请求 401 → 捕获 101 按 context.status_code
   判别 → 强制刷新重发一次 → 仍失败上抛（禁止裸 client 绕行 helper）
 - 配额：4 GB/周（官方 Fair Use）——进程内周窗口字节累计（周一 00:00 GMT 重置，
@@ -43,7 +43,8 @@ from src.infrastructure.external_services.embedding.circuit_breaker import Circu
 logger = logging.getLogger(__name__)
 
 _TOKEN_ENDPOINT = "/3.2/auth/token"
-_SEARCH_ENDPOINT = "/3.2/published-data/search"
+# 官方 Reference Guide v1.3.20：检索端点须含 rest-services 前缀（4.1f 代码审查 R1-F1 修正）
+_SEARCH_ENDPOINT = "/3.2/rest-services/published-data/search"
 _TOKEN_EARLY_REFRESH = timedelta(seconds=60)  # 过期提前 60s 刷新
 _WEEKLY_QUOTA_BYTES = 4 * 1024**3  # 官方 Fair Use 免费层：4 GB/周
 
@@ -265,9 +266,10 @@ class EpoOpsAdapter:
         await self._quota_guard.ensure_capacity()
         token = await self._token_manager.get_token()
         data = await self._request_search(token, query.query)
-        items = self._extract_patents(data)
-        # 字节口径 = 响应 JSON 序列化字节数（helper 只返回解析后 JSON，序列化近似是唯一兼容口径）
+        # 字节口径 = 响应 JSON 序列化字节数（helper 只返回解析后 JSON，序列化近似是唯一兼容口径）；
+        # consume 先于 extract——结构校验 413 路径字节同样入账（上游 Fair Use 已真实消耗，R1-F12）
         await self._quota_guard.consume(len(json.dumps(data).encode()))
+        items = self._extract_patents(data)
         now = datetime.now(UTC)
         source_ts = self._latest_filing_date(items) or now
         return DataSourceResult(
@@ -352,11 +354,11 @@ class EpoOpsAdapter:
         return latest
 
     async def health_check(self) -> bool:
-        """探活（最小 CQL 查询，单次尝试）。"""
+        """探活（最小 CQL 查询，单次尝试——响应字节同样入账配额，探活是真实消耗）。"""
         try:
             await self._quota_guard.ensure_capacity()
             token = await self._token_manager.get_token()
-            await request_json_with_resilience(
+            data = await request_json_with_resilience(
                 self._client,
                 "GET",
                 _SEARCH_ENDPOINT,
@@ -368,6 +370,7 @@ class EpoOpsAdapter:
                 min_wait=self._retry_min_wait,
                 max_wait=self._retry_max_wait,
             )
+            await self._quota_guard.consume(len(json.dumps(data).encode()))
             return True
         except Exception as e:  # 探活失败不抛——健康检查语义
             logger.warning("EpoOpsAdapter 探活失败: %s", type(e).__name__)

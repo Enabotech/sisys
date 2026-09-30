@@ -30,10 +30,7 @@ def epo_adapter():
     from src.infrastructure.external_services.datasources.epo_ops_adapter import EpoOpsAdapter
 
     adapter = EpoOpsAdapter(config=EpoOpsConfig.from_env())
-    yield adapter
-    import asyncio
-
-    asyncio.get_event_loop().run_until_complete(adapter.close())
+    return adapter
 
 
 class TestSecEdgarRealEndpoint:
@@ -104,7 +101,12 @@ class TestEpoOpsRealEndpoint:
         """CQL 检索：pa="华为" 真实返回专利列表（含 title/applicant/filing_date）。"""
         import json
 
-        result = await epo_adapter.fetch(DataSourceQuery(source_name="epo-ops", query='pa="华为"'))
-        payload = json.loads(result.payload)
-        assert isinstance(payload.get("patents"), list) and payload["patents"], "pa= 中文申请人检索应返回非空结果"
-        assert {"title", "applicant", "filing_date"} <= set(payload["patents"][0])
+        try:
+            result = await epo_adapter.fetch(DataSourceQuery(source_name="epo-ops", query='pa="华为"'))
+            payload = json.loads(result.payload)
+            assert isinstance(payload.get("patents"), list) and payload["patents"], "pa= 中文申请人检索应返回非空结果"
+            assert {"title", "applicant", "filing_date"} <= set(payload["patents"][0])
+        finally:
+            # in-test 关闭（对齐同文件 EDGAR/Comtrade 先例——同步 fixture teardown 跨事件循环，
+            # 4.1f 代码审查 R1-F9：get_event_loop 在 pytest-asyncio 关闭其 loop 后取到异属 loop）
+            await epo_adapter.close()

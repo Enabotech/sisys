@@ -384,7 +384,7 @@ def test_epo_conditional_registration_probe(ds_context: dict[str, Any]):
     pass
 
 
-def _build_epo_adapter(ds_context: dict[str, Any], expire_first: bool) -> None:
+def _build_epo_adapter(ds_context: dict[str, Any], expire_first: bool, quota_bytes_used: int = 0) -> None:
     """Construct a real EpoOpsAdapter with the EPO dual-endpoint responder."""
     respond = _epo_respond(ds_context["token_calls"], ds_context["request_count"], expire_first)
     client, captured = _capture_client(_EPO_API_URL, respond)
@@ -396,6 +396,7 @@ def _build_epo_adapter(ds_context: dict[str, Any], expire_first: bool) -> None:
             api_url=_EPO_API_URL,
             timeout=5.0,
         ),
+        quota_bytes_used=quota_bytes_used,
         client=client,
         retry_min_wait=0.01,
         retry_max_wait=0.02,
@@ -416,23 +417,12 @@ def epo_adapter_with_expired_token(ds_context: dict[str, Any]):
 
 @given("EPO OPS 适配器已构造并注入已耗尽周配额计数")
 def epo_adapter_with_exhausted_quota(ds_context: dict[str, Any]):
-    """Construct an EpoOpsAdapter with a pre-exhausted weekly quota counter."""
-    ds_context["adapter"] = EpoOpsAdapter(
-        config=EpoOpsConfig(
-            consumer_key=_fake_epo_credential(),
-            consumer_secret=_fake_epo_credential(),
-            api_url=_EPO_API_URL,
-            timeout=5.0,
-        ),
-        quota_bytes_used=4 * 1024**3,
-        client=httpx.AsyncClient(
-            base_url=_EPO_API_URL,
-            transport=httpx.MockTransport(lambda request: httpx.Response(200, json=_EPO_SEARCH_BODY)),
-            timeout=5.0,
-        ),
-        retry_min_wait=0.01,
-        retry_max_wait=0.02,
-    )
+    """Construct an EpoOpsAdapter with a pre-exhausted weekly quota counter.
+
+    经 _build_epo_adapter 单一构造路径（captured 真实接线——零请求断言依赖，R1-F3）；
+    守卫在 fetch 前置拦截，handler 永不被调用。
+    """
+    _build_epo_adapter(ds_context, expire_first=False, quota_bytes_used=4 * 1024**3)
 
 
 @given("子进程环境已清理全部数据源凭据")
@@ -554,9 +544,12 @@ def verify_rate_limit_code(ds_context: dict[str, Any]):
 
 @then("上游零请求消耗")
 def verify_zero_upstream_requests(ds_context: dict[str, Any]):
-    """Verify zero upstream requests (token endpoint included) after guard interception."""
-    total = ds_context["token_calls"]["n"] + ds_context["request_count"]["n"]
-    assert total == 0, f"guard interception expects zero requests, got {total}"
+    """Verify zero upstream requests (token endpoint included) after guard interception.
+
+    断言基于 captured 请求列表（MockTransport 传输层真接线——R1-F3：此前读未接线的
+    计数器导致 4 场景恒真，守卫旁路不会被发现）。
+    """
+    assert not ds_context["captured"], f"guard interception expects zero requests, captured {len(ds_context['captured'])}"
 
 
 @then("EPO 端口未注册")
