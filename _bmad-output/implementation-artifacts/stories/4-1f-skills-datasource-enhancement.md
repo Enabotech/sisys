@@ -1121,6 +1121,7 @@ tests/
 - [ ] **R1-F2：EDGAR frames 模式（`xbrl-frame:` 前缀分派）实现**——契约三 :168/:170 与定稿表 :883 承诺偏差，本轮摘白名单 201 拦截（防静默错数据）；实现随 Phase 2/需求出现（实现前错误消息已不再宣传该前缀）
 - [ ] **R1-F6：EPO 真实响应形态转换（`ops:world-patent-data` → 契约形态）**——R7 真实凭据补跑时取样本实现（锚点见下）
 - [ ] **R7 补跑锚点扩充（R1-F6/F7 合并）**：①search 端点真实连通（rest-services 路径——F1 修复验证）；②token + search 双端点真实响应样本固化（F6 转换实现依据）+ **token 端点路径 404/200 显式核查与 grant_type 传输形态实测（query params vs form body——R2-F1）**；③令牌失效真实码型验证（401 vs 400 invalid_access_token——F7 判别条件修正依据）
+  - **部分预验证已完成（2026-09-30 SKIPPED 根因分析时假凭据演练）**：`/3.2/auth/accesstoken` 端点真实存在（假凭据得 **HTTP 401** ≠ 404——R2-F1 路径修复正确性获真实端点背书；401 → ConfigurationError(101) 异常契约映射在真实端点成立）；带 Authorization 头可穿透 R1 期观测的匿名 403 Fair Use 拦截层（该拦截仅针对匿名请求）。待真 key 完成剩余：grant_type 传输形态 / search 响应样本 / 令牌失效码型
 - [ ] **.env 解除 git 跟踪（root + deploy/app/.env 双处）**——含 .gitignore 生效化 + `git rm --cached` + CI/部署拉取路径依赖面评估 + 历史泄漏轮换评估（R2-F9，基础设施 owner 决策）
 
 ---
