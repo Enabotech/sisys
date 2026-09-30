@@ -527,14 +527,15 @@
 | 🟢 绿 | 适配器实现（复用 `request_json_with_resilience`——令牌获取亦走 resilience） |
 | 🔄 重构 | `src/infrastructure/config/epo_ops.py`（**5 变量**：API_URL/TIMEOUT/TTL_SECONDS + consumer_key/consumer_secret 双凭据字段——命名规范节口径）+ docstring 中文注释 + ruff/mypy |
 
-- [ ] Subtask 2.1: 🔴 红 — 令牌管理三分支测试
-- [ ] Subtask 2.2: 🟢 绿 — `_EpoTokenManager` 实现
-- [ ] Subtask 2.3: 🔴🟢 — 配额守卫（守卫测试→实现）
-- [ ] Subtask 2.4: 🔴🟢 — 适配器主体（全矩阵测试→实现 + config）
-- [ ] Subtask 2.5: 🔄 重构 — 全绿 + key 就绪集成实测（`pa="华为"`）
+- [x] Subtask 2.1: 🔴 红 — 令牌管理三分支测试
+- [x] Subtask 2.2: 🟢 绿 — `_EpoTokenManager` 实现
+- [x] Subtask 2.3: 🔴🟢 — 配额守卫（守卫测试→实现）
+- [x] Subtask 2.4: 🔴🟢 — 适配器主体（全矩阵测试→实现 + config）
+- [x] Subtask 2.5: 🔄 重构 — 全绿 + key 就绪集成实测（`pa="华为"`）
+- [x] Subtask 2.5 集成实测注记：key 未就绪（外部申请资产）——按 AC-2 两态设计登记 Defer（单测矩阵全绿即 AC-2 达成；集成实测 key 到位后人工补跑，R7 锚点）
 
 **完成标准/Definition of Done:**
-- [ ] 三循环全绿 + 关键路径 100%（令牌三分支/守卫两分支）
+- [x] 三循环全绿 + 关键路径 100%（令牌三分支/守卫两分支）
 - [ ] config 5 变量（API_URL/TIMEOUT/TTL_SECONDS + 双凭据）+ 条件注册预备（双凭据门）
 
 ---
