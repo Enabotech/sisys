@@ -87,6 +87,37 @@ ADAPTER_PORT_SPECS: tuple[dict[str, Any], ...] = (
         "tags": ("data-source", "china-nbs", "crawler"),
         "env_key": None,
     },
+    # ===== Story 4.1f 三新源（epo-ops 条件双门 / sec-edgar 与 comtrade 无条件） =====
+    {
+        # OAuth2 双凭据门条件注册——env_key 以主凭据（Consumer Key）为探针键；
+        # 双门合取语义由 test_arch_data_source.test_keyed_adapters_conditional_registration 多键断言承载
+        "port_name": "data_source_epo_ops",
+        "impl_cls_name": "EpoOpsAdapter",
+        "module_path": "src.infrastructure.external_services.datasources.epo_ops_adapter",
+        "tags": ("data-source", "epo-ops", "patent"),
+        "env_key": "EPO_OPS_CONSUMER_KEY",
+        "extra_env_keys": ("EPO_OPS_CONSUMER_SECRET",),
+        "config_module": "src.infrastructure.config.epo_ops",
+        "config_cls": "EpoOpsConfig",
+    },
+    {
+        "port_name": "data_source_sec_edgar",
+        "impl_cls_name": "SecEdgarAdapter",
+        "module_path": "src.infrastructure.external_services.datasources.sec_edgar_adapter",
+        "tags": ("data-source", "sec-edgar", "financial-report"),
+        "env_key": None,
+    },
+    {
+        # key 可选增强（preview 免 key 兜底——无条件注册）；env_key 登记用于 key 语义
+        # 说明（契约面），注册形态断言由 ADAPTER_PORT_NAMES 无条件组承载
+        "port_name": "data_source_comtrade",
+        "impl_cls_name": "ComtradeAdapter",
+        "module_path": "src.infrastructure.external_services.datasources.comtrade_adapter",
+        "tags": ("data-source", "comtrade", "trade-statistics"),
+        "env_key": None,
+        "config_module": "src.infrastructure.config.comtrade",
+        "config_cls": "ComtradeConfig",
+    },
 )
 
 EXPECTED_OWNER = "tool-team"
@@ -140,7 +171,9 @@ class TestDataSourceAdapterPortContract:
         """
         env_key = spec_meta["env_key"]
         spec = _global_registry.get(spec_meta["port_name"])
-        if env_key is not None and os.getenv(env_key) is None:
+        # bool() 判定对齐组合根 Twelve-Factor 语义（空串 = 未配置——.env 样例空值
+        # 不构成「Key 存在」；composition_root 注册门同款，4.1f 注记）
+        if env_key is not None and not bool(os.getenv(env_key)):
             assert spec is None, f"{env_key} 缺失时 {spec_meta['port_name']} 不应注册（条件注册设计）"
             return None
         assert spec is not None, f"端口 {spec_meta['port_name']} 未注册"
@@ -156,6 +189,10 @@ class TestDataSourceAdapterPortContract:
         env_key = spec_meta["env_key"]
         if env_key is not None:
             monkeypatch.setenv(env_key, "contract-test-dummy-key")
+        # 多凭据门源（4.1f epo-ops 双凭据）：补齐同源全部凭据 env——单键注入下
+        # from_env 读到半凭据、构造器 fail-fast 抛 101（双门合取语义）
+        for extra_key in spec_meta.get("extra_env_keys", ()):
+            monkeypatch.setenv(extra_key, "contract-test-dummy-key")
 
         spec = _global_registry.get(spec_meta["port_name"])
         if spec is not None and callable(spec.impl):
@@ -261,9 +298,9 @@ class TestKeyedAdapterMetadataWithKey:
     acceptance AC-2.4 子进程探针模式。
     """
 
-    def test_all_eight_ports_full_metadata_with_keys(self) -> None:
-        """设 3 个 keyed 假 Key 的干净子进程 bootstrap 后：8 端口全注册且
-        全字段（version/interface/lifetime/owner/module/tags）与 SSOT 一致"""
+    def test_all_ports_full_metadata_with_keys(self) -> None:
+        """设全部 keyed 假 Key（含 EPO 双凭据）的干净子进程 bootstrap 后：11 端口
+        全注册且全字段（version/interface/lifetime/owner/module/tags）与 SSOT 一致"""
         import subprocess
         import sys
         from pathlib import Path
@@ -272,13 +309,16 @@ class TestKeyedAdapterMetadataWithKey:
             [{"name": m["port_name"], "module": m["module_path"], "tags": list(m["tags"])} for m in ADAPTER_PORT_SPECS]
         )
         # 低熵假 Key 经 f-string 插值（detect-secrets KeywordDetector 对字面赋值
-        # 形态拦截——对齐 acceptance 子进程探针先例）
+        # 形态拦截——对齐 acceptance 子进程探针先例；EPO 双凭据成对注入——单键
+        # 半凭据态不满足双门合取，4.1f）
         probe_key = "probe" + "-key-contract-test"
         script = (
             "import os; "
             f"os.environ['USPTO_API_KEY'] = {probe_key!r}; "
             f"os.environ['NEWSAPI_API_KEY'] = {probe_key!r}; "
             f"os.environ['TAVILY_API_KEY'] = {probe_key!r}; "
+            f"os.environ['EPO_OPS_CONSUMER_KEY'] = {probe_key!r}; "
+            f"os.environ['EPO_OPS_CONSUMER_SECRET'] = {probe_key!r}; "
             "from src.composition_root import bootstrap; "
             "from src.domain.ports.registry import _global_registry, Lifetime; "
             "from src.domain.ports.data_source import DataSourcePort; "

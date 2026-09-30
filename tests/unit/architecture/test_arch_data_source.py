@@ -67,21 +67,24 @@ FORBIDDEN_IMPORTS = {
     "sqlmodel",  # 防御性条目（ORM 诱惑库，对齐验收侧同集）
 }
 
-# 无条件注册的适配器端口清单（免 Key 统计类）
+# 无条件注册的适配器端口清单（免 Key 统计类 + 4.1f 免 key/免费通道源）
 ADAPTER_PORT_NAMES = (
     "data_source_worldbank",
     "data_source_imf",
     "data_source_eurostat",
     "data_source_ipcc",
     "data_source_china_nbs",
+    "data_source_sec_edgar",  # 4.1f：免 key（官方 Fair Access，强制 UA）
+    "data_source_comtrade",  # 4.1f：key 可选（preview 免 key 兜底——无条件注册）
 )
 
 # 需 API Key 的适配器（条件注册，Key 缺失时不注册——冷启动容错设计；
-# uspto 自 R3-P1-3 起条件注册：PatentsView v1 端点强制 X-Api-Key 鉴权）
-KEYED_ADAPTER_PORT_NAMES = ("data_source_uspto", "data_source_newsapi", "data_source_tavily")
+# uspto 自 R3-P1-3 起条件注册：PatentsView v1 端点强制 X-Api-Key 鉴权；
+# epo-ops 自 4.1f 起条件注册：OAuth2 双凭据门——Consumer Key/Secret 双门合取）
+KEYED_ADAPTER_PORT_NAMES = ("data_source_uspto", "data_source_newsapi", "data_source_tavily", "data_source_epo_ops")
 
 # 端口 → (适配器模块名, 实现类名) 静态映射（条件注册端口无 Key 时不注册——
-# 实现类合规校验不依赖运行时注册状态，R3-P1-3 同步）
+# 实现类合规校验不依赖运行时注册状态，R3-P1-3 同步；4.1f 三新源入册）
 ADAPTER_IMPL_MODULES = {
     "data_source_worldbank": ("worldbank_adapter", "WorldBankAdapter"),
     "data_source_imf": ("imf_adapter", "IMFAdapter"),
@@ -91,6 +94,9 @@ ADAPTER_IMPL_MODULES = {
     "data_source_newsapi": ("newsapi_adapter", "NewsAPIAdapter"),
     "data_source_tavily": ("tavily_adapter", "TavilyAdapter"),
     "data_source_china_nbs": ("china_nbs_adapter", "ChinaNBSAdapter"),
+    "data_source_epo_ops": ("epo_ops_adapter", "EpoOpsAdapter"),
+    "data_source_sec_edgar": ("sec_edgar_adapter", "SecEdgarAdapter"),
+    "data_source_comtrade": ("comtrade_adapter", "ComtradeAdapter"),
 }
 
 # 数据源异常码段（data_source 子域 410-419）
@@ -184,20 +190,24 @@ class TestDataSourcePortRegistry:
     def test_keyed_adapters_conditional_registration(self) -> None:
         """需 Key 的适配器按条件注册（有 Key 注册 / 无 Key 不注册，两者均为合法状态）。
 
-        uspto 自 R3-P1-3 起加入条件注册（PatentsView v1 强制 X-Api-Key）。
+        uspto 自 R3-P1-3 起加入条件注册（PatentsView v1 强制 X-Api-Key）；
+        epo-ops 自 4.1f 起加入（OAuth2 双凭据门——Consumer Key/Secret 多键合取：
+        任一缺失即不注册，单键存在不构成注册条件——半凭据态语义防假阳性）。
         """
         import os
 
-        for port_name, env_key in (
-            ("data_source_uspto", "USPTO_API_KEY"),
-            ("data_source_newsapi", "NEWSAPI_API_KEY"),
-            ("data_source_tavily", "TAVILY_API_KEY"),
+        for port_name, env_keys in (
+            ("data_source_uspto", ("USPTO_API_KEY",)),
+            ("data_source_newsapi", ("NEWSAPI_API_KEY",)),
+            ("data_source_tavily", ("TAVILY_API_KEY",)),
+            ("data_source_epo_ops", ("EPO_OPS_CONSUMER_KEY", "EPO_OPS_CONSUMER_SECRET")),
         ):
             spec = _global_registry.get(port_name)
-            if not bool(os.getenv(env_key)):
-                assert spec is None, f"{env_key} 缺失时 {port_name} 不应注册"
+            all_keys_present = all(bool(os.getenv(key)) for key in env_keys)
+            if not all_keys_present:
+                assert spec is None, f"{env_keys} 任一缺失时 {port_name} 不应注册（多键合取）"
             else:
-                assert spec is not None, f"{env_key} 存在时 {port_name} 应注册"
+                assert spec is not None, f"{env_keys} 全部存在时 {port_name} 应注册"
 
 
 # ============================================================

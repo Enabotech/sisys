@@ -250,19 +250,38 @@ class ComtradeAdapter:
         )
 
     def _extract_records(self, data: Any) -> list[dict[str, Any]]:
-        """二段结构校验：响应须为 dict 且含 records 列表。"""
-        if not isinstance(data, dict) or "records" not in data:
-            raise DataSourceResponseError(
-                message="comtrade 响应缺少 'records' 字段",
-                context={"source_name": "comtrade", "actual_type": type(data).__name__},
-            )
-        records = data["records"]
-        if not isinstance(records, list):
-            raise DataSourceResponseError(
-                message="comtrade 响应 'records' 字段非列表",
-                context={"source_name": "comtrade", "actual_type": type(records).__name__},
-            )
-        return records
+        """贸易记录提取（双形态：契约直接形态 / 真实端点形态）。
+
+        - 契约形态（单测/规范）：{"records": [{cmd_code, trade_value, period}]}
+        - 真实端点形态（preview API）：{"data": [{cmdCode, primaryValue, refYear}]} →
+          转换为 records 结构（契约四「实测无 key 返回 195 条真实记录」锚点形态）
+        """
+        if isinstance(data, dict) and "records" in data:
+            records = data["records"]
+            if not isinstance(records, list):
+                raise DataSourceResponseError(
+                    message="comtrade 响应 'records' 字段非列表",
+                    context={"source_name": "comtrade", "actual_type": type(records).__name__},
+                )
+            return records
+        raw_list = data.get("data") if isinstance(data, dict) else None
+        if isinstance(raw_list, list):
+            converted: list[dict[str, Any]] = []
+            for item in raw_list:
+                if not isinstance(item, dict):
+                    continue
+                converted.append(
+                    {
+                        "cmd_code": str(item.get("cmdCode", "")),
+                        "trade_value": item.get("primaryValue"),
+                        "period": str(item.get("refYear") or item.get("period") or ""),
+                    }
+                )
+            return converted
+        raise DataSourceResponseError(
+            message="comtrade 响应缺少 'records'/'data' 字段",
+            context={"source_name": "comtrade", "actual_type": type(data).__name__},
+        )
 
     @staticmethod
     def _latest_period(records: list[dict[str, Any]]) -> datetime | None:

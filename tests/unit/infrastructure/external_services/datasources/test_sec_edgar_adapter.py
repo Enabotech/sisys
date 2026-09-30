@@ -280,3 +280,34 @@ class TestSecEdgarAdapterPort:
     def test_ua_header_constant_format(self) -> None:
         assert "sisys-tools" in UA_HEADER and "@" in UA_HEADER
         assert re.match(r"^[^()\s]+/[^()\s]+ \([^()]+\)$", UA_HEADER), "官方 Fair Access「公司名 邮箱」格式"
+
+
+class TestSearchModeRealEndpointShape:
+    """真实端点 Elasticsearch 形态转换（契约三箭头语义——hits.hits[]._source → filings）。"""
+
+    @pytest.mark.asyncio
+    async def test_elasticsearch_shape_converted_to_filings(self) -> None:
+        es_body = {
+            "took": 5,
+            "hits": {
+                "total": {"value": 1},
+                "hits": [
+                    {
+                        "_id": "0000757011-13-000001",
+                        "_source": {
+                            "ciks": ["757011"],
+                            "display_names": ["USG CORP  (CIK 0000757011)"],
+                            "form": "10-K",
+                            "file_date": "2013-02-15",
+                        },
+                    }
+                ],
+            },
+        }
+        adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(200, json=es_body)), rate_limited=False)
+        result = await adapter.fetch(DataSourceQuery(source_name="sec-edgar", query="market share"))
+        payload = json.loads(result.payload)
+        assert payload["filings"][0]["company"] == "USG CORP  (CIK 0000757011)"
+        assert payload["filings"][0]["form"] == "10-K"
+        assert payload["filings"][0]["filed_at"] == "2013-02-15"
+        await adapter.close()
