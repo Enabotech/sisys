@@ -100,7 +100,8 @@ class _DailyQuotaGuard:
     （零请求消耗）。守卫模式复用 EPO 周窗口设计（Lock 类变量 + 可注入初始计数）。
     """
 
-    # 类变量（跨实例互斥需类级共享）。临界区纯同步无 await——单 loop 下恒走 fast path，
+    # 类变量（SINGLETON 单实例语义下的防御性存在——计数状态为实例级，跨实例并不互斥）。
+    # 临界区纯同步无 await——单 loop 下恒走 fast path，
     # 真实竞争后绑定事件循环，跨 loop 复用须 per-loop 分锁（先例 aiodocker_sandbox_adapter）
     _lock: asyncio.Lock = asyncio.Lock()
 

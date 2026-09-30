@@ -1051,6 +1051,25 @@ tests/
 
 **Round 2 回归证据**：三适配器单测 + 契约 + 验收 362 passed + ruff/mypy 全过 + unit 全量 7765 passed（Round 1 后基线）。
 
+#### Round 3（深度评审——断言覆盖矩阵 + 残余风险面）
+
+**C1 单深度视角**（断言覆盖矩阵 12 项契约逐项守护核验 + Round 2 修复五面回归核查 + 真实端点三态实测）。**C3 主会话快评**（R3 修复均有先例函数/机械转换支撑 + 实证定谳——按轮次递减由主会话核验先例后落码）。**评级 A-（P0/P1 零）**。
+
+| # | 发现 | 严重度 | 处置 |
+|---|------|--------|------|
+| R3-1 | EDGAR XBRL URL 路径拼接零消毒——`xbrl:CIK../../admin:概念` 穿越段实测逃出 companyconcept 段；`?x=1` query 注入。项目自建 `quote_path_segment`（五适配器先例）未用 | P2 | ✅ cik/taxonomy/concept 逐段过 `quote_path_segment`（".." 段显式拒绝 413）+ 穿越负例单测 |
+| R3-2 | **双模式 CIK 形态断层**：检索模式转换产出裸数字 cik（真实端点形态 10 位零填充），XBRL 端点仅收 `CIK##########` 前缀形态——真实端点三态实测 404/200/404；LLM 按 SOP「CIK 经检索模式获取」逐字回填即 404 误映射 413 | P2 | ✅ `_fetch_xbrl_companyconcept` 裸数字归一 `CIK` + zfill(10) + 归一断言单测 |
+| R3-3 | EDGAR health_check 声称「单次尝试」未传 max_attempts=1（探活失败重试 3 次+退避拖慢健康探测；EPO/comtrade 均为 1 唯 EDGAR 漏） | P3 | ✅ `_request` 加 max_attempts 参数 + 探活传 1 |
+| R3-4 | R1-F12「consume 前移」半项无断言守护——**补断言时抓出该测试自身缺陷**（单态 handler 下 fetch 在令牌解析阶段即抛 413，声称测「缺 patents→413」实际从未走到 _extract_patents） | P3 | ✅ 双态 handler 修正 + 令牌阶段/检索阶段 413 消息区分断言 + 配额入账断言 |
+| R3-5 | EPO get_token 无锁（冷启动并发 herd）+ 令牌响应字节不入周配额账 | P3 | **登记近似口径台账**（冷启动低频场景；与 R2-4 同族——「序列化近似唯一兼容口径」声明下可接受） |
+| R3-6 | comtrade 无熔断守护测试（EPO/EDGAR 各有一，三源同构回归面等价却缺席） | P3 | ✅ 照 EPO 范本补 `test_circuit_breaker_early_open` |
+| R3-7 | 三处锁注释「跨实例互斥需类级共享」与实际状态错配（计数状态实例级——类级锁并不提供跨实例互斥，聚合语义不成立） | P3 | ✅ 注释改如实表述「SINGLETON 单实例语义下的防御性存在——计数状态为实例级，跨实例并不互斥」 |
+| R3-8 | ES 形态 fixture `ciks: ["757011"]`（6 位）与真实端点 10 位零填充形态不符（失真 fixture 掩盖 R3-2 类形态问题） | P3 | ✅ fixture 对齐 `"0000757011"` |
+
+**断言覆盖矩阵结论**：R1/R2 的 12 项行为契约 11 项「回归即红」真断言守护（R1-F9 结构落码属无 key 环境文档级契约可接受）+ R3-4 补齐 consume 前移半项后**全项守护**。Round 2 修复五面（token 子串/限速下沉/私有化/strip 移除/用语改动）实证零回归。
+
+**Round 3 回归证据**：三适配器单测 216 passed + 契约/架构 1628 passed + 验收 34 passed + skills 376 passed + 集成 3 passed/1 skip + ruff/mypy 全过；integration+acceptance 全量 1643 passed（3 failed 为性能基准并发抖动——隔离复验 12 passed 证实，与改动面零交集）。
+
 #### 需决策 Decision Needed
 
 - [ ] **无 P0/P1 级待决策项**（R1-F6/F7 改判依据已留痕；A-5 类变量 Lock 与 CLAUDE.md Gotcha 的冲突需 Round 2 专项裁定——改实例变量 or 保持类变量 + 测试侧约束）
@@ -1085,10 +1104,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.5.1
+**故事版本/Story Version:** v1.5.2
 **创建日期/Created:** 2026-09-30
 **最后更新/Last Updated:** 2026-09-30
 **更新说明/Description:**
+- v1.5.2: **代码审查 Round 3**（深度评审——断言覆盖矩阵）：P0/P1 零；P2×2（EDGAR XBRL 路径消毒缺失（穿越实测）+ 双模式 CIK 形态断层（真实端点三态实测 404/200/404——SOP 回填链路断裂））+ P3×6；12 项契约 11 项已守护核验 + R3-4 补断言时抓出测试自身缺陷（单态 handler 令牌阶段 413 冒充检索阶段）；三适配器 216 passed
 - v1.5.1: **代码审查 Round 2**（回归核查 + 留项清偿双视角 + 单评审员）：R2-F1 token 端点路径 P1（R1-F1 同族传播缺口——官方双库定谳 accesstoken）+ P2×4（限速重试下沉 pre_request/检索质量组/三角化用语纪律/锁认知文档清偿）+ P3 收尾组；A-5 三方证据专项（CLAUDE.md Gotcha 语义考据 + 生产零风险实证——文档澄清替代结构变更）；维持留项 6 条逐条留痕；unit 全量 7765 passed
 - v1.5.0: **代码审查 Round 1**（四视角并行调研 + 双评审员方案评审 + 主会话定谳）：P0×1（R1-F1 EPO 检索路径缺 rest-services 段——官方文档定谳，契约 :157 原文即错经单测/集成双层掩盖）+ P1×5（xbrl-frame 宣传未实现/验收恒真断言/vrio references 未同步/维度计数错误/EPO 响应形态——末项改判 R7 锚点）+ P2×10 + P3≈20；落码 13 项 + 改判 2 项（证据不足不落码——写错比不写更糟）；留项台账入 Round 2+
 - v1.0.0: 创建故事文件（基于 epics 4.1f 定义 + 四域预筛报告实测裁定 + 三视角代码调研（适配器基建/契约联动/受益面——发现 D8 治理冲突并设计两态处理）+ 4.1e 五轮审查 Lessons；10 项决策登记；8 Task / 7 AC）
