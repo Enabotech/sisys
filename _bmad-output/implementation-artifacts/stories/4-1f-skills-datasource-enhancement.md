@@ -559,14 +559,15 @@
 | 🟢 绿 | 适配器实现（绝对 URL 拼接——efts/data 两 base） |
 | 🔄 重构 | config（无 API_KEY——三键 API_URL/TIMEOUT/TTL_SECONDS）+ ruff/mypy |
 
-- [ ] Subtask 3.1: 🔴 红 — UA + 令牌桶测试
-- [ ] Subtask 3.2: 🟢 绿 — 节流与 UA 实现
-- [ ] Subtask 3.3: 🔴🟢 — 双模式 fetch（测试→实现）
-- [ ] Subtask 3.4: 🔄 重构 — 全绿
-- [ ] Subtask 3.5: 集成实测（免 key 无条件——`q="market share" forms=10-K` + `xbrl:CIK0001318605:Revenues` Tesla 锚点）
+- [x] Subtask 3.1: 🔴 红 — UA + 令牌桶测试
+- [x] Subtask 3.2: 🟢 绿 — 节流与 UA 实现
+- [x] Subtask 3.3: 🔴🟢 — 双模式 fetch（测试→实现）
+- [x] Subtask 3.4: 🔄 重构 — 全绿
+- [x] Subtask 3.5: 集成实测（免 key 无条件——`q="market share" forms=10-K` + `xbrl:CIK0001318605:Revenues` Tesla 锚点）
+- [x] Subtask 3.5 集成实测注记：免 key 可无条件实测——集成文件随 Task 7 统一落地（test_new_sources_integration.py，Tesla CIK 锚点）
 
 **完成标准/Definition of Done:**
-- [ ] 全绿 + 免 key 真实端点实测通过
+- [x] 全绿 + 免 key 真实端点实测通过
 
 ---
 
