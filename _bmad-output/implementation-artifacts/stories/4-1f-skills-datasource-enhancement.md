@@ -324,7 +324,7 @@
 - [ ] `test_arch_data_source.py` **四联动点**：`ADAPTER_PORT_NAMES`（:71-77 无条件组）+ EDGAR/comtrade 两端口；`KEYED_ADAPTER_PORT_NAMES`（:81）+ epo-ops；`ADAPTER_IMPL_MODULES`（:85-94 静态映射）+3 条；`test_keyed_adapters_conditional_registration`（:184，参数化元组 :191-195）+ epo-ops——**注意该测试现结构为 `(port_name, env_key)` 单键循环，承载 epo-ops 需扩展为多键合取语义**（参数化改为 `(port_name, env_keys: tuple)` + `all(os.getenv(k) for k in env_keys)`——单凭据态（CONSUMER_KEY 有而 SECRET 无）实际不注册，单键断言会假红）；**该文件为静态表驱动，漏改是静默的（parametrize 不含新端口即不检查），逐点核验**
 - [ ] 契约测试 `ADAPTER_PORT_SPECS` +3 条目（env_key：EDGAR 为 None——worldbank 先例；comtrade key 可选语义在 tags/说明标注）
 - [ ] 子进程探针：注册态双向（epo-ops 双凭据**成对**有/无——with_key 分支注入 `EPO_OPS_CONSUMER_KEY` + `EPO_OPS_CONSUMER_SECRET` **两个**假常量，单凭据态不注册；EDGAR/comtrade 恒注册——探针 scrub 全部条件注册数据源 env 键确保「无 key」分支纯净）
-- [ ] `__init__.py` docstring 8→11；root `.env` 数据源 key 区段补三源样例（L112 `CLOUD_LLM_API_KEY` 附近；**root 无 `.env.example`**——deploy/*/ 下为基础设施服务模板不涉及应用 key，评估结论留 Dev Agent Record 即可，不新建文件）
+- [ ] `__init__.py` docstring 8→11；root `.env` 数据源 key 区段补三源样例（L113 `CLOUD_LLM_API_KEY` 附近（L112 为 PROVIDER）；**root 无 `.env.example`**——deploy/*/ 下为基础设施服务模板不涉及应用 key，评估结论留 Dev Agent Record 即可，不新建文件）
 - [ ] architecture.md §17.3.3：适配器表 +3（含注册形态标注）+ 能力边界声明（IDC/Gartner/Euromonitor 独家份额数据不可得——合同与技术双重壁垒，代理指标组合替代）+ 合规登记（EDGAR UA 规范/Comtrade 署名与配额政策/EPO 配额政策）+ defer 清账（4.1f 承载项完成留痕）
 
 ---
@@ -400,6 +400,7 @@
 | SDD 架构验证 | 适配器注册链（静态表四联动点） | 无条件组/keyed 组/impl 映射/条件注册断言 | `test_arch_data_source.py` 扩展（:71/:81/:85/:184） | Task 7 |
 | SDD 架构验证 | 混合数据三方一致（4-1d 侧） | involved 源集合/适配器实例化 + 三元组解包四元组化 | `test_arch_skill_mixed_data.py` 扩展（:115/:118/:132） | Task 5/6 |
 | 集成测试 | 真实端点 | 三源真实连通（key 门控 skip） | `tests/integration/external_services/data_sources/test_new_sources_integration.py` | Task 7 |
+| TDD 验收测试 | 4-1c 侧场景名联动 | competitor「四源」/disruptive「双源」场景三联动位 | `test_acceptance_skill_data_collection.feature`/`.py`（清单 23/24） | Task 6 |
 | TDD 验收测试 | Gherkin/BDD | AC 全场景 | `test_acceptance_data_source_expansion.feature`/`.py` | Task 0/8 |
 
 ### 测试要求与质量门禁
@@ -674,7 +675,7 @@
 - [ ] Subtask 7.2: `tests/contracts/test_port_contract_data_source.py` 的 `ADAPTER_PORT_SPECS` +3（env_key：EDGAR None；comtrade key 可选语义标注）+ 探针脚本 env 注入行
 - [ ] Subtask 7.3: **架构测试两文件同步**：① `test_arch_skill_data_collection.py`——`_build_adapters` 同步（import + 实例化 + dict 11 键——EDGAR 免 key 直接实例化/EPO+Comtrade 占位 key `NewsAPIConfig(api_key="arch-test-placeholder")` 先例）+ :124/:138 三元组解包四元组化 → `set(keys) == set(ADAPTER_SSOT.keys())`（:121）全绿（Task 5 中间态收口）；② **`test_arch_data_source.py` 四联动点**——`ADAPTER_PORT_NAMES`（:71-77）+ EDGAR/comtrade、`KEYED_ADAPTER_PORT_NAMES`（:81）+ epo-ops、`ADAPTER_IMPL_MODULES`（:85-94）+3 条映射、`test_keyed_adapters_conditional_registration`（:184/:191-195）+ epo-ops（参数化结构扩展为多键合取——epo-ops 双凭据 `("EPO_OPS_CONSUMER_KEY", "EPO_OPS_CONSUMER_SECRET")` 成对判定，见 AC-7；该文件静态表驱动，漏改静默——逐点核验）
 - [ ] Subtask 7.4: 集成实测文件 `tests/integration/external_services/data_sources/test_new_sources_integration.py`（三源真实端点——EDGAR/comtrade 无条件可测/EPO key 动态 skip；TestTenant 前缀；目录与既有 `tests/integration/external_services/` 结构对齐）
-- [ ] Subtask 7.5: `__init__.py` docstring 8→11 + root `.env` 数据源 key 区段补样例（L112 `CLOUD_LLM_API_KEY` 附近；root 无 `.env.example`，deploy/*/ 模板为基础设施服务不涉及应用 key——评估结论留 Dev Agent Record，不新建文件）
+- [ ] Subtask 7.5: `__init__.py` docstring 8→11 + root `.env` 数据源 key 区段补样例（L113 `CLOUD_LLM_API_KEY` 附近（L112 为 PROVIDER）；root 无 `.env.example`，deploy/*/ 模板为基础设施服务不涉及应用 key——评估结论留 Dev Agent Record，不新建文件）
 - [ ] Subtask 7.6: 子进程探针注册态（epo-ops key 有/无双向；EDGAR/comtrade 恒注册单态验证；without 分支 scrub 全部条件注册数据源 env 键——含既有 TAVILY/NEWSAPI/USPTO——先例 `test_acceptance_data_source.py:606-637`）
 
 **完成标准/Definition of Done:**
@@ -934,6 +935,9 @@ tests/
 | R3-5 | architecture.md 版本号 8.9.0 实为三处同步点（:17 头部/:3600 修订表/:3613 尾部表），Story 只列修订历史一处 | P3 | Task 8.2 补三处同步清单 |
 | R3-6 | vrio 验收 .py 三联动位行号实测 L449-451（Story 写 L450-452，±1）；Task 2 DoD 与项目结构两处「四键」残留（4+2=6 键误读——R2-10 修复不彻底）；R12「4-1e D8 先例」归属错（实测源头 4-1d `:611`——「D8」一词三义易混） | P3 | 行号校正（清单 15/AC-6/循环 B）；两处「四键」→「5 变量」；R12 改「4-1d『一次性预调整』先例（彼 Story D8，非本 Story 治理 D8）」 |
 | R4-1 | R3-6 的行号「校正」反向偏移——主会话实测定谳：`@scenario` L450 / `def` L451 / docstring L452（v1.2.0 原行号本正确，R3 终审员误报 ±1）；R3-1 修复方案列「Task 2/3/4 红测试措辞」范围夸大（实测仅 Task 2 红行含「四元组对齐」措辞，Task 3/4 从未含——记录级出入） | P3 | 三处行号回正 L450-452（清单 15/AC-6/Task 6 循环 B）；R3-1 范围夸大作记录级注记不改正文（正文语义无冲突） |
+| R5-1 | **独立收敛终审**（不轻信自报记录，正文与代码双向取证）：①12 项关键修复双向核验全过；②24 项清单全量快扫 + 8 组深验（25+ 个 file:line 实测零实质错位）；③治理链五环闭合（D8 签收源→治理节→HALT→两态→双文件留痕）；④epics 七组 AC 全承载（偏差均显式登记）；⑤可执行性终判通过。**终审结论：五节全过，收敛成立（零 P0/P1/P2 残留）** | 终审 | 记录级瑕疵 3 项顺手收口 2 项：测试分类表补 4-1c 验收 feature 行（信息本由清单 23/24 承载）、`.env` 锚点 L112→L113（L112 为 PROVIDER）；disruptive「双源」11 处枚举中 L188 实为「2 源」字样（第 11 处双源在 L142 二次出现）——枚举为超集且改写 grep 驱动，记录留档不改 |
+
+> **收敛声明（Round 5 独立终审——2026-09-30）**：Story 4.1f（v1.4.0）经四轮文档审查（R1 对抗式 21 项 / R2 回归组合 10 项 / R3 dev 可满足性 6 项 / R4 纯验证 1 项）累计 38 项发现、38 项修复、0 项 P0/P1 残留。Round 5 独立终审对 12 项关键修复做正文与代码双向取证、对 24 项断言联动清单做全量快扫与 8 组深验（25+ 个 file:line 实测零实质错位）、治理链五环闭合、epics 七组 AC 全承载，判定达到 ready-for-dev 收敛标准，可进入 dev-story 执行。
 
 ---
 
@@ -972,7 +976,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-09-30
 **最后更新/Last Updated:** 2026-09-30
 **更新说明/Description:**
@@ -981,3 +985,4 @@ tests/
 - v1.2.0: **Round 2 回归核查 + 组合可达性审查修订**（R1 修复 21 项逐项核验：17 完整/4 部分 + 8 组合场景推演：两态世界线/双门合取/时序闭合）：P2×5（R2-1 触点清单 vrio 联动误标签收态 / R2-2 yaml 双写两态标注缺失 / R2-3 4-1c 验收场景漏项——清单扩至 24 项 / R2-4 双门合取参数化结构 / R2-5 scoring_anchors 枚举补全）+ P3×5（R2-6~R2-10 路径/风格/覆盖率命令/措辞系列收口）——主线组合自洽（R1 五组核心变更互不拆台）
 - v1.3.0: **Round 3 dev 执行视角可满足性终审修订**（24 项清单逐项红绿推演 + 关键架构声明实测验证）：**P1×1**（R3-1 Task 5 四元组适配器侧断言语义定稿——既有 8 适配器 get_metadata 不填声明性字段的架构语义显式化，适配器侧第 4 项弃用断言，避免 8 生产文件意外扩面）+ P2×1（R3-2 KEY_SENSITIVE 登记两态连锁红登记）+ P3×4（R3-3~R3-6 无断言项标注/EPO config 必填定稿/8.9.0 三处同步/行号与措辞校正）；「零 domain 改动」声明经 `DataSourceRef.required_fields` 字段（:96）与 frontmatter 加载链（:195-205）实测成立
 - v1.3.1: **Round 4 纯验证轮**（七维度快扫：三轮 37 项修复落地/计数一致性/行号抽查/两态标注 46 处/内部引用闭合/结构完整/格式卫生——全部通过，**零 P0/P1 残留**）+ R4-1 行号回正（R3-6 校正反向偏移，主会话实测定谳 L450-452）
+- v1.4.0: **Round 5 独立收敛终审**（不轻信自报记录，正文与代码双向取证）：五节终审全过（关键修复双向核验/24 项清单 25+ 锚点实测/治理链五环闭合/epics 七组 AC 全承载/可执行性终判）——**收敛成立**，R5-1 记录级瑕疵 2 项顺手收口；审查周期正式收敛，可进入 dev-story
