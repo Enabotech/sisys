@@ -614,14 +614,14 @@
 | 🟢 绿 | `skill_data_collection_contracts.py`：ADAPTER_SSOT 扩四元组（+3 新源条目——依赖 Task 2/3/4 的 get_metadata 实测值）+ `assert_data_sources_contract` 查表化（:109 解包 + :114-116 统一比对两处改写）；**4-1d 库经 import 自动继承四元组变更（R2-F3 单一来源——非复制体，禁止复制）**，仅需改本库自身断言（`skill_mixed_data_contracts.py:339` 解包 + `:344` required_fields 比对查表化） |
 | 🔄 重构 | 判别力负例保活（漂移副本 match 串同步）+ **三元组解包 6 处全量改写**（两契约库 :109/:339 + `test_arch_skill_data_collection.py:124/:138` + `test_arch_skill_mixed_data.py:118/:132`——后者两处在 Task 6 vrio 增源后另有 involved 适配器联动，见断言联动清单 16）——**适配器侧解包定稿（2 处 :124/:118）**：四元组解包后第 4 项以 `_` 弃用并注释「required_fields 属声明面，由 frontmatter↔SSOT 双方断言承载（既有 8 适配器 get_metadata 均不填该字段——`DataSourceRef` docstring :84 声明性元数据归声明面的既有架构语义；若适配器侧断言第 4 项则 8 既有源 `()` ≠ `("indicator","value")` 必红且需扩 8 个生产文件改动面——显式排除）**；frontmatter 侧解包（:138/:132/:109/:339）第 4 项入断言（查表比对）+ 注册侧 `_build_adapters` 同步依赖 Task 7——**本 Task 先行改契约侧，注册侧 Task 7 收口**；两 Task 间架构测试暂红属预期中间态，Task 7 全绿 |
 
-- [ ] Subtask 5.1: 🔴 红 — 四元组 + 查表 + 绊线新语义测试
-- [ ] Subtask 5.2: 🟢 绿 — 契约库两版重构（4-1c 改值 + 4-1d 断言侧）
-- [ ] Subtask 5.3: 🔄 重构 — 负例保活 + 41 处既有 frontmatter grep 计数核验零漂移
-- [ ] Subtask 5.4: 全量 skills 测试回归（既有 16 Skill 断言零破坏）
-- [ ] Subtask 5.5: EXPECTED_REQUIRED_FIELDS 常量去向落地（Task 0 方案——含 4-1d 库 import 名单与 `__all__` 联动）
+- [x] Subtask 5.1: 🔴 红 — 四元组 + 查表 + 绊线新语义测试
+- [x] Subtask 5.2: 🟢 绿 — 契约库两版重构（4-1c 改值 + 4-1d 断言侧）
+- [x] Subtask 5.3: 🔄 重构 — 负例保活 + 41 处既有 frontmatter grep 计数核验零漂移
+- [x] Subtask 5.4: 全量 skills 测试回归（既有 16 Skill 断言零破坏）
+- [x] Subtask 5.5: EXPECTED_REQUIRED_FIELDS 常量去向落地（Task 0 方案——含 4-1d 库 import 名单与 `__all__` 联动）
 
 **完成标准/Definition of Done:**
-- [ ] 四元组重构全绿（6 处解包改写本 Task 完成；注册侧 set 断言除外——Task 7 收口，见 R12 提交策略）+ 41 处零漂移实证
+- [x] 四元组重构全绿（6 处解包改写本 Task 完成；注册侧 set 断言除外——Task 7 收口，见 R12 提交策略）+ 41 处零漂移实证
 
 ---
 
