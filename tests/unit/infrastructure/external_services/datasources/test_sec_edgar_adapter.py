@@ -34,6 +34,7 @@ from src.infrastructure.external_services.datasources.sec_edgar_adapter import (
     SecEdgarAdapter,
     _compute_delay,
 )
+from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
 
 _EFTS_URL = "https://efts.sec.gov"
 _DATA_URL = "https://data.sec.gov"
@@ -46,7 +47,12 @@ def _make_config() -> SecEdgarConfig:
     return SecEdgarConfig(api_url=_EFTS_URL, timeout=5.0)
 
 
-def _make_adapter(handler: httpx.MockTransport | None = None, *, rate_limited: bool = True) -> SecEdgarAdapter:
+def _make_adapter(
+    handler: httpx.MockTransport | None = None,
+    *,
+    rate_limited: bool = True,
+    circuit_breaker: CircuitBreaker | None = None,
+) -> SecEdgarAdapter:
     transport = handler or httpx.MockTransport(lambda req: httpx.Response(200, json=_FILINGS_BODY))
     return SecEdgarAdapter(
         config=_make_config(),
@@ -54,6 +60,7 @@ def _make_adapter(handler: httpx.MockTransport | None = None, *, rate_limited: b
         retry_min_wait=0.01,
         retry_max_wait=0.02,
         rate_limited=rate_limited,
+        circuit_breaker=circuit_breaker,
     )
 
 
@@ -217,6 +224,22 @@ class TestInvalidPrefix:
         assert exc_info.value.code == "EXCEPTION_201"
         assert calls["n"] == 0, "非法前缀属输入前置校验——零请求消耗"
 
+    @pytest.mark.asyncio
+    async def test_xbrl_frame_prefix_rejected_as_unimplemented(self) -> None:
+        """xbrl-frame: 前缀 201 拦截（frames 模式未实现——R1-F2：此前被白名单放行后静默落入检索模式）。"""
+
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(200, json=_FILINGS_BODY)
+
+        adapter = _make_adapter(httpx.MockTransport(handler), rate_limited=False)
+        with pytest.raises(ValidationError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="sec-edgar", query="xbrl-frame:us-gaap/Revenues/CY2024Q1"))
+        assert exc_info.value.code == "EXCEPTION_201"
+        assert calls["n"] == 0, "xbrl-frame 未实现须前置拦截——禁止静默落入检索模式返回无关结果"
+
 
 class TestSecEdgarAdapterFailures:
     @pytest.mark.asyncio
@@ -275,6 +298,33 @@ class TestSecEdgarAdapterPort:
     async def test_health_check(self) -> None:
         adapter = _make_adapter(rate_limited=False)
         assert await adapter.health_check() is True
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_early_open(self) -> None:
+        """熔断差异化配置：注入降阈熔断器（threshold=2），2 次 fetch 失败即断开，断开期间零 HTTP。
+
+        注：熔断计数按"采集会话"记（每次 fetch 重试耗尽后记 1 次失败——helper 终端
+        except 单点 on_failure）。断言核心 = 断开期间计数器不增（快速失败）。
+        """
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(503)
+
+        adapter = _make_adapter(
+            httpx.MockTransport(handler),
+            rate_limited=False,
+            circuit_breaker=CircuitBreaker(failure_threshold=2, recovery_timeout=30.0, name="sec-edgar-cb-test"),
+        )
+        for _ in range(2):
+            with pytest.raises(DataSourceUnavailableError):
+                await adapter.fetch(DataSourceQuery(source_name="sec-edgar", query="q"))
+        calls_before = calls["n"]
+        with pytest.raises(DataSourceUnavailableError):
+            await adapter.fetch(DataSourceQuery(source_name="sec-edgar", query="q"))
+        assert calls["n"] == calls_before, "熔断器断开后应零 HTTP 快速失败"
         await adapter.close()
 
     def test_ua_header_constant_format(self) -> None:

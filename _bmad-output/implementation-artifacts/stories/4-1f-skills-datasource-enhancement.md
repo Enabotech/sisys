@@ -999,16 +999,39 @@ tests/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** （待 dev-story 完成后填写）
-**审查模式:** （待填写）
+**审查日期:** 2026-09-30
+**审查模式:** C1~C5 循环审查（Round 1：四视角并行调研 A/B/C/D + 双评审员方案评审 + 主会话定谳）
+
+> 编号规则：`R1-F<n>`（Round 1 代码审查 Finding）；四视角调研发现以 `A-/B-/C-/D-<n>` 索引。
+
+#### Round 1 发现汇总（P0×1 / P1×5 / P2×10 / P3≈20；落码 13 项 + 改判 2 项）
+
+| # | 发现 | 严重度 | 处置 |
+|---|------|--------|------|
+| R1-F1 | **EPO 检索端点路径错误**（`/3.2/published-data/search` 缺 `rest-services` 段——数据契约二 :157 原文即错，实现忠实传导；单测 MockTransport 只按 `/auth/token` 区分不校验检索路径，集成 skip 掩盖——「纸面绿」）。主会话以官方 Reference Guide v1.3.20 + Go 官方客户端库 base URL 双重定谳（A 视角的 404 实测证据被主会话复测推翻——本机对 EPO 全局 403 Fair Use 拦截，匿名探测不可区分路径存在性） | **P0** | ✅ 已修复：常量 + docstring + 检索成功测试补 URL 路径断言（契约路径锁，防回归） |
+| R1-F2 | **xbrl-frame: 前缀被 201 错误消息宣传为合法但无分派实现**（`_KNOWN_MODE_PREFIXES` 放行 + `startswith("xbrl:")` 不匹配 `xbrl-frame:` → 静默落入检索模式返回无关结果——「消息教学→用户照做→静默错数据」）。数据契约三 :168/:170 与定稿表 :883 承诺 frames 模式但未实现且无偏差登记（A-4 + D-3 双视角交叉确认） | P1 | ✅ 已修复：移出白名单 → 201 前置拦截 + 错误消息/模块 docstring 同步 + 负例单测；**frames 模式实现登记 Defer**（契约偏差留痕见 Defer 台账） |
+| R1-F3 | **验收层「上游零请求消耗」断言恒真**（`verify_zero_upstream_requests` 读未接线计数器——4 场景中计数器均未接线，适配器真的发请求断言也通过；单测层有真接线兜底故 AC 核验防线单点依赖单测）（C-1） | P1 | ✅ 已修复：Then 改断言 captured 列表（真接线）+ EPO 周配额 Given 收敛 `_build_epo_adapter` 单一构造路径（新增 quota_bytes_used 透传参） |
+| R1-F4 | **vrio references/ 增源后未同步**（data_fusion.md:4 仍「USPTO/Tavily」二元组、workshop_guide.md:59 同款；根因 = Story 数据契约六 vrio 行联动面枚举漏 references/ 条目——契约枚举精度 = 交付精度）（D-1） | P1 | ✅ 已修复：data_fusion.md 四处（:4 头注 / 融合流程 bullet / 粒度声明 / **TTL 30 天事实性错误修正**——epo-ops 实为 7 天）+ workshop_guide.md:59 |
+| R1-F5 | **competitor 维度计数错误**（triangulation.md:5「市场份额/专利布局 3 源」——专利布局实际 2 源，同行括注「双库口径」自相矛盾；本次改写新引入）（D-2） | P1 | ✅ 已修复：「战略动向/产品组合/专利布局 2 源（专利布局为双库口径）、市场份额 3 源」 |
+| R1-F6 | **EPO 真实响应结构与契约形态不匹配**（官方 JSON 输出根键 `ops:world-patent-data`，`_extract_patents` 只认 `{"patents": [...]}`——真实响应必抛 413）（A-2） | P1 | **改判不落码**：深层字段映射（exchange-docs 层级/文本值键形态）经两轮检索无可核查样本——写错比不写更糟（错误数据静默注入 vs fail-loud 413）；处置 = R7 锚点登记（真实凭据取样本后实现，与 EDGAR/Comtrade 当时有实测的先例差异留痕）。**中间态落码**：fetch 的 consume 前移至 extract 之前（413 路径字节同样入账） |
+| R1-F7 | **EPO 令牌失效码型存疑**（A 视角实测无效 Bearer 得 400——若属实则 401 判别分支不可达；但主会话复测本机被全局 403 拦截，观测不可复现；400 亦是 CQL 语法错误码型，盲改会放大错误）（A-3） | P1 | **改判不落码**：码型未经权威证实时任何方向的改码无正期望（评审员 1 补充论据）；处置 = R7 锚点登记「token + search 双端点真实码型与响应形态一次固化」（同时关闭 F6/F7） |
+| R1-F8 | 契约测试 `_registration_state` 未消费 `extra_env_keys`——半凭据态假红（B 视角实测复现；四方注册门语义中掉队的一方）（B-1） | P2 | ✅ 已修复：主键 + extra_env_keys 合取（保留 env_key=None 守卫——7 无条件源不误伤；评审员 2 抓住原方案 None 键会 TypeError 的落码缺陷）+ spec 注释同步改写 |
+| R1-F9 | EPO 集成 fixture teardown 跨事件循环（`get_event_loop` 在 pytest-asyncio 关闭 loop 后取异属 loop；被 key 缺失恒 skip 掩盖，**R7 补跑当天爆雷点**；同文件另两类用正确 in-test try/finally）（C-3） | P2 | ✅ 已修复：改 in-test try/finally 模式（对齐同文件先例） |
+| R1-F10 | 熔断测试声称但不存在（两文件头 docstring + AC-2 验证标准明文列「熔断」，零熔断测试；4 既有适配器均有先例）（C-2） | P2 | ✅ 已修复：EPO/EDGAR 各补 `test_circuit_breaker_early_open`——**照 newsapi 范本**（注入 threshold=2 降阈熔断器 + 断开期间计数器不增断言；评审员 2 抓住 tavily 范本本身恒真——threshold=5 只 fetch 3 次熔断从未开门） |
+| R1-F11 | Comtrade 月频 period（YYYYMM）截断为年——`_latest_period` 时效锚定失真达 11 个月，传导至 DataFreshness 误判过期（A-6） | P2 | ✅ 已修复：YYYYMM 解析到月首 + 单测 |
+| R1-F12 | health_check 消耗上游配额不计入守卫（配额旁路——无 key 模式上游仅 100 次/天）+ EPO fetch 的 consume 在 extract 之后（413 路径字节漏记）（A-7 + 评审员 1 同族发现） | P2 | ✅ 已修复：两适配器探活入账（EPO 字节口径/Comtrade 次数口径）+ consume 前移 + 探活配额断言；**预期语义声明：周期性探活将真实消耗守卫额度（诚实记账非回归）** |
+| R1-F13 | vrio §7 未注册行仅覆盖 Tavily（epo-ops 双凭据门/uspto 缺失）+ 全文无 EPO 配额超限降级话术 + 无口径边界段（风险表 R11 缓解措施「vrio 同款口径声明跟进」未落地）（D-4） | P2 | ✅ 已修复：§7 未注册行扩列三源（保留「未注册」「数据缺口」关键词——`assert_sop_maturity` 断言依赖）+ §5 口径边界段（sibling 句式逐字搬运 + vrio「内部数据主体」框架适配） |
+| 顺手项 | 模块 docstring 残留：集成测试 :12「双源交叉验证（== 2）」（D-5）+ vrio 单测 :4/:46「SSOT 2 源」（评审员 2 新发现） | P3 | ✅ 已修复 |
+
+**Round 1 留项台账（Round 2+ 逐轮核销）**：A-5 类变量 `asyncio.Lock` 跨 loop 风险（与 CLAUDE.md Gotcha「Lock 必须类变量」直接冲突——留专项评审）；A-8 EDGAR tenacity 重试绕过限速器；C-4 守卫并发测试对 Lock 零判别力（临界区无 await，删 Lock 也绿）；C-5 `pytest.mark.redis` 误标；C-6~C-11 测试卫生项；D-6「双库口径三角化」方法论表述与 disruptive 纪律的对齐（competitor `SKILL.md:193` + triangulation.md:47 vs disruptive「双库互证不构成跨域互证」）；D-7 comtrade 白名单外噪音（competitor §5/§7 两处）；D-8~D-11 P3 内容项；A-9~A-17 P3 适配器项；B-2~B-7 P3 文案/注释项；`.env` 被 git 跟踪的历史结构隐患（Story「不进 git」表述与实施矛盾——既有惯例，解除跟踪属基础设施决策）。
 
 #### 需决策 Decision Needed
 
-- [ ] （待填写）
+- [ ] **无 P0/P1 级待决策项**（R1-F6/F7 改判依据已留痕；A-5 类变量 Lock 与 CLAUDE.md Gotcha 的冲突需 Round 2 专项裁定——改实例变量 or 保持类变量 + 测试侧约束）
 
 #### 已修复 Patch
 
-- [ ] （待填写）
+- [x] Round 1：13 项落码（R1-F1/F2/F3/F4/F5/F8/F9/F10/F11/F12/F13 + 顺手 2 项）——相关面回归 1394 passed + 验收 29 passed + ruff/mypy 全过
 
 #### 已推迟 Defer
 
@@ -1019,6 +1042,9 @@ tests/
 - [ ] yaml data_sources.items 字段级化的输出侧描述精化残余 → 随 4.1g/后续（本 Story 承载 required_fields 定制主项）
 - [ ] SPACE 分档斜线双语义 → space-matrix 下次触碰（4-1d 既有 defer 维持）
 - [ ] token 预算门禁 → Story 4.3/Epic 5（4-1d R3 defer 维持）
+- [ ] **R1-F2：EDGAR frames 模式（`xbrl-frame:` 前缀分派）实现**——契约三 :168/:170 与定稿表 :883 承诺偏差，本轮摘白名单 201 拦截（防静默错数据）；实现随 Phase 2/需求出现（实现前错误消息已不再宣传该前缀）
+- [ ] **R1-F6：EPO 真实响应形态转换（`ops:world-patent-data` → 契约形态）**——R7 真实凭据补跑时取样本实现（锚点见下）
+- [ ] **R7 补跑锚点扩充（R1-F6/F7 合并）**：①search 端点真实连通（rest-services 路径——F1 修复验证）；②token + search 双端点真实响应样本固化（F6 转换实现依据）；③令牌失效真实码型验证（401 vs 400 invalid_access_token——F7 判别条件修正依据）
 
 ---
 
@@ -1032,10 +1058,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-09-30
 **最后更新/Last Updated:** 2026-09-30
 **更新说明/Description:**
+- v1.5.0: **代码审查 Round 1**（四视角并行调研 + 双评审员方案评审 + 主会话定谳）：P0×1（R1-F1 EPO 检索路径缺 rest-services 段——官方文档定谳，契约 :157 原文即错经单测/集成双层掩盖）+ P1×5（xbrl-frame 宣传未实现/验收恒真断言/vrio references 未同步/维度计数错误/EPO 响应形态——末项改判 R7 锚点）+ P2×10 + P3≈20；落码 13 项 + 改判 2 项（证据不足不落码——写错比不写更糟）；留项台账入 Round 2+
 - v1.0.0: 创建故事文件（基于 epics 4.1f 定义 + 四域预筛报告实测裁定 + 三视角代码调研（适配器基建/契约联动/受益面——发现 D8 治理冲突并设计两态处理）+ 4.1e 五轮审查 Lessons；10 项决策登记；8 Task / 7 AC）
 - v1.1.0: **Round 1 文档审查修订**（三视角代码调研复审 + 外部 API 实测 + 三视角并行审查）：P0×2（`test_arch_data_source.py` 四联动点归属与缺席 / 断言联动清单实体化 22 项）+ P1×9（vrio 治理门解绑统一 / Comtrade 配额守卫与无条件注册定稿 / EPO 401 重取路径 / epics 三子项漏承载 / `test_arch_skill_mixed_data.py` 遗漏 / 复制体误述 / 双源 11 处与 references 联动 / 13 Skill 口径 / 验收 .py 三联动位）+ P2/P3 系列精确化——详见 Docs Review Fixes R1-1~R1-21
 - v1.2.0: **Round 2 回归核查 + 组合可达性审查修订**（R1 修复 21 项逐项核验：17 完整/4 部分 + 8 组合场景推演：两态世界线/双门合取/时序闭合）：P2×5（R2-1 触点清单 vrio 联动误标签收态 / R2-2 yaml 双写两态标注缺失 / R2-3 4-1c 验收场景漏项——清单扩至 24 项 / R2-4 双门合取参数化结构 / R2-5 scoring_anchors 枚举补全）+ P3×5（R2-6~R2-10 路径/风格/覆盖率命令/措辞系列收口）——主线组合自洽（R1 五组核心变更互不拆台）

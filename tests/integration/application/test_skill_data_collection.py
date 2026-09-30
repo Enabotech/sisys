@@ -9,7 +9,7 @@ Redis（测试端口，real_redis fixture）+ 真实 InMemorySkillLoader（load_
 - 6 个 Skills 全链路：LLM 生成含 $DATA_SOURCE 标记代码 → 并发采集 → preamble 注入
   → EvidencePackage.data_sources 溯源元数据完备
 - 多源三角化：≥3 源 Skill 全声明源并发覆盖（每源 call_count == 1）；
-  disruptive-innovation 双源交叉验证（== 2）
+  disruptive-innovation 专利双库 + 市场单源跨域互证（== 3，4-1f D8 重开升级）
 - 新鲜度评分 ∈ [0,1] + 缓存命中二次执行外部调用不增
 - Key 缺失降级：adapters 缺 newsapi/tavily 时部分失败收敛，其余源正常注入
 

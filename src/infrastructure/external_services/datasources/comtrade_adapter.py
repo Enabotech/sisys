@@ -292,7 +292,9 @@ class ComtradeAdapter:
             if not raw:
                 continue
             try:
-                ts = datetime.fromisoformat(f"{raw[:4]}-01-01").replace(tzinfo=UTC)
+                # 年月形态（YYYYMM，月频 freqCode=M）解析到月首——截断为年会虚增 age 达 11 个月（R1-F11）
+                date_part = f"{raw[:4]}-{raw[4:6]}-01" if len(raw) == 6 else f"{raw[:4]}-01-01"
+                ts = datetime.fromisoformat(date_part).replace(tzinfo=UTC)
             except ValueError:
                 continue
             if latest is None or ts > latest:
@@ -300,7 +302,7 @@ class ComtradeAdapter:
         return latest
 
     async def health_check(self) -> bool:
-        """探活（最小商品码查询，单次尝试）。"""
+        """探活（最小商品码查询，单次尝试——探活请求同样计入日配额，是真实消耗）。"""
         try:
             params = parse_pipeline_query("cmd=8703")
             await self._quota_guard.ensure_capacity()
@@ -316,6 +318,7 @@ class ComtradeAdapter:
                 min_wait=self._retry_min_wait,
                 max_wait=self._retry_max_wait,
             )
+            await self._quota_guard.consume()
             return True
         except Exception as e:  # 探活失败不抛——健康检查语义
             logger.warning("ComtradeAdapter 探活失败: %s", type(e).__name__)
