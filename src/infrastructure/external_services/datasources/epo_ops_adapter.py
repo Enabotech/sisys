@@ -1,7 +1,7 @@
 """基础设施层 EPO OPS 数据源适配器（Story 4.1f）
 
 EPO Espacenet OPS（Open Patent Services，欧洲专利局官方检索）：
-- 端点：POST /3.2/auth/token（OAuth2 client-credentials，Basic 凭证）+ GET /3.2/rest-services/published-data/search（CQL）
+- 端点：POST /3.2/auth/accesstoken（OAuth2 client-credentials，Basic 凭证）+ GET /3.2/rest-services/published-data/search（CQL）
 - 认证：令牌进程内缓存（过期提前 60s 刷新）；业务请求 401 → 捕获 101 按 context.status_code
   判别 → 强制刷新重发一次 → 仍失败上抛（禁止裸 client 绕行 helper）
 - 配额：4 GB/周（官方 Fair Use）——进程内周窗口字节累计（周一 00:00 GMT 重置，
@@ -42,7 +42,9 @@ from src.infrastructure.external_services.embedding.circuit_breaker import Circu
 
 logger = logging.getLogger(__name__)
 
-_TOKEN_ENDPOINT = "/3.2/auth/token"
+# 官方 Reference Guide v1.3.20 + Go/Python 官方生态客户端库同路径（4.1f 代码审查 R2-F1 修正——
+# 原契约 /3.2/auth/token 与 R1-F1 检索路径同族契约错误；grant_type 传输形态待 R7 实测锚定）
+_TOKEN_ENDPOINT = "/3.2/auth/accesstoken"
 # 官方 Reference Guide v1.3.20：检索端点须含 rest-services 前缀（4.1f 代码审查 R1-F1 修正）
 _SEARCH_ENDPOINT = "/3.2/rest-services/published-data/search"
 _TOKEN_EARLY_REFRESH = timedelta(seconds=60)  # 过期提前 60s 刷新
@@ -119,7 +121,9 @@ class _WeeklyQuotaGuard:
     """EPO 周配额守卫（4 GB/周——进程内字节累计，周一 00:00 GMT 重置）。
 
     前置拦截（ensure_capacity）零请求消耗；响应字节事后累计（consume）。
-    Lock 为类变量（协程间共享——单例适配器语义）。
+    Lock 为类变量（跨实例互斥需类级共享）。临界区纯同步（无 await）——单 loop 下
+    acquire 恒走 fast path，锁为临界区未来演化出 await 时的防御性存在；CPython 3.10+
+    真实竞争后锁绑定事件循环，跨 loop 复用须 per-loop 分锁（先例 aiodocker_sandbox_adapter）。
     """
 
     _lock: asyncio.Lock = asyncio.Lock()

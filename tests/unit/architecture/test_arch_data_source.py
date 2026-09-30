@@ -2,7 +2,7 @@
 
 验证：
 1. domain 层零外部依赖（AST 黑名单扫描，显式含 httpx/tenacity——沙箱无网络不变量保护）
-2. 端口注册完整性（PortSpec 10 字段 + 8 适配器 + resolver 全注册 + SINGLETON 生命周期）
+2. 端口注册完整性（PortSpec 10 字段 + 11 适配器 + resolver 全注册 + SINGLETON 生命周期）
 3. 实现类 isinstance Protocol 校验
 4. 依赖方向校验（application 新文件不 import infrastructure，适配器仅经 composition_root 注册）
 5. 异常码段校验（EXCEPTION_410-413 ∈ data_source 子域）
@@ -164,7 +164,7 @@ class TestDomainLayerConstraints:
 
 
 class TestDataSourcePortRegistry:
-    """8 适配器 + resolver 端口注册完整性（PortSpec 10 字段）。"""
+    """11 适配器 + resolver 端口注册完整性（PortSpec 10 字段）。"""
 
     @pytest.mark.parametrize("port_name", ADAPTER_PORT_NAMES)
     def test_adapter_ports_registered(self, port_name: str) -> None:

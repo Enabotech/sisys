@@ -1,7 +1,7 @@
-"""Story 4.1b: 端口契约测试 — 8 个数据源适配器端口
+"""Story 4.1b: 端口契约测试 — 11 个数据源适配器端口
 
 验证 data_source_<name> 端口的注册、版本、接口、生命周期、owner/tags/module 元数据，
-以及 8 个适配器实现类的 required_methods 与 Protocol runtime_checkable 属性。
+以及 11 个适配器实现类的 required_methods 与 Protocol runtime_checkable 属性。
 
 遵循项目标准 11 维度契约测试模式（范本 tests/contracts/test_port_contract_tool.py）。
 
@@ -22,7 +22,7 @@ import pytest
 from src.domain.ports.data_source import DataSourcePort
 from src.domain.ports.registry import Lifetime, _global_registry
 
-# 8 个适配器端口元数据表（Single Source of Truth，与 composition_root 注册保持一致）
+# 11 个适配器端口元数据表（Single Source of Truth，与 composition_root 注册保持一致）
 ADAPTER_PORT_SPECS: tuple[dict[str, Any], ...] = (
     {
         "port_name": "data_source_worldbank",
@@ -108,15 +108,14 @@ ADAPTER_PORT_SPECS: tuple[dict[str, Any], ...] = (
         "env_key": None,
     },
     {
-        # key 可选增强（preview 免 key 兜底——无条件注册）；env_key 登记用于 key 语义
-        # 说明（契约面），注册形态断言由 ADAPTER_PORT_NAMES 无条件组承载
+        # key 可选增强（preview 免 key 兜底——无条件注册）；注册形态断言由
+        # ADAPTER_PORT_NAMES 无条件组承载（R2：删 config_module/config_cls 死键——
+        # 唯一消费点在未注册直构造分支，无条件注册源永不进入）
         "port_name": "data_source_comtrade",
         "impl_cls_name": "ComtradeAdapter",
         "module_path": "src.infrastructure.external_services.datasources.comtrade_adapter",
         "tags": ("data-source", "comtrade", "trade-statistics"),
         "env_key": None,
-        "config_module": "src.infrastructure.config.comtrade",
-        "config_cls": "ComtradeConfig",
     },
 )
 
@@ -154,7 +153,7 @@ class _StubCrawlerClient:
 
 @pytest.mark.parametrize("spec_meta", ADAPTER_PORT_SPECS, ids=[m["port_name"] for m in ADAPTER_PORT_SPECS])
 class TestDataSourceAdapterPortContract:
-    """data_source_<name> 端口契约（11 维度全覆盖，参数化 8 适配器）.
+    """data_source_<name> 端口契约（11 维度全覆盖，参数化 11 适配器）.
 
     根因修复（消灭 Key 缺失 skip）：将"端口注册状态"（环境依赖，条件注册）与
     "实现类契约合规"（静态可验证）解耦——

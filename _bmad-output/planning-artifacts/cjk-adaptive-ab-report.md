@@ -25,7 +25,7 @@
 | newsapi CJK → language=zh | ✅ | `TestNewsAPICjkAdaptiveParams.test_cjk_query_adds_language_zh` |
 | newsapi 中英混合 → 同注入 | ✅ | `test_mixed_cjk_english_query_adds_language` |
 | newsapi 非 CJK → 参数逐键零变化 | ✅ | `test_non_cjk_query_params_unchanged_baseline`（键集 == {q, pageSize, sortBy}） |
-| 既有行为零回归 | ✅ | 受影响 13 个声明 Skill（newsapi 8 ∪ tavily 10 去重）+ 契约/架构三层 1130 passed |
+| 既有行为零回归 | ✅ | 受影响 13 个声明 Skill（newsapi 8 ∪ tavily 10 去重——Task 6 声明重分配**前**口径，计数以契约库 SSOT 为准）+ 契约/架构三层 1130 passed（时点值） |
 | 验收场景（BDD） | ✅ | `test_acceptance_data_source_expansion.py` AC-1.1~1.4 四场景（AC-1.1/1.3 由红转绿） |
 
 ## 三、【实测级】待补项（key 就绪后执行——AC-1 此时方可升级为完整完成）
@@ -36,7 +36,7 @@
 
 ## 四、剩余缺口结论（证据等级：官方文档分析——非实测）
 
-基于官方参数文档覆盖面分析（非实测数据）：`country=china`（地域加权）+ `language=zh`（语言过滤）组合启用后，**预计**中文检索质量的主要缺口（预筛报告 L33：适配器未传中文参数）已被覆盖；但「专职中文源」（百度千帆/东财等）是否仍必要，**依赖第三节实测级验证**——在实测数据就位前**不下否定结论**（AC-1 按两态设计记「部分完成」，缺口判断 defer 至 key 就绪，owner 已知情）。
+基于官方参数文档覆盖面分析（非实测数据）：`country=china`（地域加权）+ `language=zh`（语言过滤）组合启用后，**预计**中文检索质量的主要缺口（预筛报告「中文参数缺口」结论：适配器未传中文参数）预计可覆盖（待实测级验证确认）；但「专职中文源」（百度千帆/东财等）是否仍必要，**依赖第三节实测级验证**——在实测数据就位前**不下否定结论**（AC-1 按两态设计记「部分完成」，缺口判断 defer 至 key 就绪，owner 已知情）。
 
 ## 五、结论
 

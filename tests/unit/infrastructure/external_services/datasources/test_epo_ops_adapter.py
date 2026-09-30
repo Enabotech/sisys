@@ -61,7 +61,7 @@ def _make_adapter(
     circuit_breaker: Any = None,
 ) -> EpoOpsAdapter:
     transport = handler or httpx.MockTransport(
-        lambda req: httpx.Response(200, json=_TOKEN_BODY if "/auth/token" in str(req.url) else _SEARCH_BODY)
+        lambda req: httpx.Response(200, json=_TOKEN_BODY if "/auth/accesstoken" in str(req.url) else _SEARCH_BODY)
     )
     return EpoOpsAdapter(
         config=config or _make_config(),
@@ -129,6 +129,9 @@ class TestEpoTokenManager:
         manager, _ = self._make_manager(httpx.MockTransport(handler))
         token = await manager.get_token()
         assert token == "fake-epo-token-1"
+        assert "/3.2/auth/accesstoken" in str(captured[0].url), (
+            "令牌端点路径契约锁（官方 Reference Guide v1.3.20——R2-F1，防 /3.2/auth/token 旧路径回归）"
+        )
         assert captured[0].headers.get("authorization", "").startswith("Basic "), "令牌请求应携带 Basic 凭证"
         assert "grant_type=client_credentials" in str(captured[0].url)
 
@@ -193,24 +196,28 @@ class TestEpoTokenManager:
 
 
 class TestWeeklyQuotaGuard:
-    def test_guard_preflight_blocks_when_exhausted(self) -> None:
+    @pytest.mark.asyncio
+    async def test_guard_preflight_blocks_when_exhausted(self) -> None:
         guard = _WeeklyQuotaGuard(quota_bytes_used=4 * 1024**3)
         with pytest.raises(DataSourceRateLimitError) as exc_info:
-            asyncio.get_event_loop().run_until_complete(guard.ensure_capacity())
+            await guard.ensure_capacity()
         assert exc_info.value.code == "EXCEPTION_412"
         assert "4294967296" in str(exc_info.value) or "已用" in str(exc_info.value), "消息应含已用量"
 
-    def test_guard_weekly_reset_by_now_fn(self) -> None:
+    @pytest.mark.asyncio
+    async def test_guard_weekly_reset_by_now_fn(self) -> None:
         week1 = datetime(2026, 9, 28, 12, 0, 0, tzinfo=UTC)  # 周一
         week2 = datetime(2026, 10, 5, 12, 0, 0, tzinfo=UTC)  # 下周一（越过重置点）
         guard = _WeeklyQuotaGuard(quota_bytes_used=4 * 1024**3, now_fn=lambda: week1)
         with pytest.raises(DataSourceRateLimitError):
-            asyncio.get_event_loop().run_until_complete(guard.ensure_capacity())
+            await guard.ensure_capacity()
         guard._now_fn = lambda: week2
-        asyncio.get_event_loop().run_until_complete(guard.ensure_capacity())  # 周窗口越过周一 00:00 GMT 应重置（不抛）
+        await guard.ensure_capacity()  # 周窗口越过周一 00:00 GMT 应重置（不抛）
 
     @pytest.mark.asyncio
     async def test_guard_concurrent_consume_under_lock(self) -> None:
+        """并发计数精确性的行为回归防线（非锁存在性证明——当前临界区无 await、
+        单 loop 下天然串行；未来临界区演化出 await 引入竞争丢失更新时本测试变红）。"""
         guard = _WeeklyQuotaGuard()
 
         async def consume_once() -> None:
@@ -227,11 +234,11 @@ class TestEpoOpsAdapterSuccess:
 
         def handler(request: httpx.Request) -> httpx.Response:
             captured.append(request)
-            return httpx.Response(200, json=_TOKEN_BODY if "/auth/token" in str(request.url) else _SEARCH_BODY)
+            return httpx.Response(200, json=_TOKEN_BODY if "/auth/accesstoken" in str(request.url) else _SEARCH_BODY)
 
         adapter = _make_adapter(httpx.MockTransport(handler))
         result = await adapter.fetch(DataSourceQuery(source_name="epo-ops", query='pa="华为" and ti="battery"'))
-        search = [r for r in captured if "/auth/token" not in str(r.url)][0]
+        search = [r for r in captured if "/auth/accesstoken" not in str(r.url)][0]
         assert "rest-services/published-data/search" in str(search.url), (
             "检索路径须含 rest-services 前缀（官方 Reference Guide v1.3.20——R1-F1 路径契约锁）"
         )
@@ -250,7 +257,7 @@ class TestEpoOpsAdapterSuccess:
         token_calls = {"n": 0}
 
         def handler(request: httpx.Request) -> httpx.Response:
-            if "/auth/token" in str(request.url):
+            if "/auth/accesstoken" in str(request.url):
                 token_calls["n"] += 1
                 return httpx.Response(200, json={"access_token": f"t{token_calls['n']}", "expires_in": 3600})
             business_calls["n"] += 1
@@ -382,7 +389,7 @@ class TestEpoOpsAdapterFailures:
             calls["n"] += 1
             return (
                 httpx.Response(200, content=b"### not json")
-                if "/auth/token" not in str(request.url)
+                if "/auth/accesstoken" not in str(request.url)
                 else httpx.Response(200, json=_TOKEN_BODY)
             )
 
@@ -399,13 +406,13 @@ class TestEpoOpsAdapterFailures:
         assert exc_info.value.code == "EXCEPTION_413"
         await adapter.close()
 
-    def test_error_response_zero_credentials_leak(self) -> None:
+    @pytest.mark.asyncio
+    async def test_error_response_zero_credentials_leak(self) -> None:
+        """错误响应零凭据泄漏（R2 修正：pytest.raises 结构——except 空洞形态下行为漂移会静默通过）。"""
         adapter = _make_adapter(httpx.MockTransport(lambda req: httpx.Response(500)))
-        try:
-            import asyncio as _asyncio
-
-            _asyncio.get_event_loop().run_until_complete(adapter.fetch(DataSourceQuery(source_name="epo-ops", query="x")))
-        except DataSourceUnavailableError as exc:
-            key, secret = _fake_credentials()
-            assert key not in json.dumps(exc.to_dict()) and key not in str(exc)
-            assert secret not in str(exc)
+        with pytest.raises(DataSourceUnavailableError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="epo-ops", query="x"))
+        key, secret = _fake_credentials()
+        assert key not in json.dumps(exc_info.value.to_dict()) and key not in str(exc_info.value)
+        assert secret not in str(exc_info.value)
+        await adapter.close()

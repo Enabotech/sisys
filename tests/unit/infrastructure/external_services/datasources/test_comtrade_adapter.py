@@ -32,8 +32,8 @@ from src.domain.ports.data_source import DataSourcePort, DataSourceQuery
 from src.infrastructure.config.comtrade import ComtradeConfig
 from src.infrastructure.external_services.datasources.comtrade_adapter import (
     ComtradeAdapter,
-    DailyQuotaGuard,
-    parse_pipeline_query,
+    _DailyQuotaGuard,
+    _parse_pipeline_query,
 )
 
 _API_URL = "https://comtradeapi.un.org"
@@ -93,22 +93,22 @@ class TestComtradeConfig:
 
 class TestPipelineQueryParsing:
     def test_full_pipeline_with_all_params(self) -> None:
-        params = parse_pipeline_query("reporter=156|cmd=8703|flow=X|period=2024")
+        params = _parse_pipeline_query("reporter=156|cmd=8703|flow=X|period=2024")
         assert params == {"reporterCode": "156", "cmdCode": "8703", "flowCode": "X", "period": "2024"}
 
     def test_reporter_defaults_to_china(self) -> None:
-        params = parse_pipeline_query("cmd=8703")
+        params = _parse_pipeline_query("cmd=8703")
         assert params["reporterCode"] == "156", "reporter 缺省 156（中国口径）"
         assert params["cmdCode"] == "8703"
 
     def test_missing_cmd_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
-            parse_pipeline_query("reporter=156|flow=X")
+            _parse_pipeline_query("reporter=156|flow=X")
         assert exc_info.value.code == "EXCEPTION_201"
 
     def test_empty_query_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
-            parse_pipeline_query("")
+            _parse_pipeline_query("")
 
 
 class TestOcpHeaderDualState:
@@ -152,34 +152,39 @@ class TestOcpHeaderDualState:
 
 
 class TestDailyQuotaGuard:
-    def test_with_key_limit_500_preflight_blocks(self) -> None:
-        guard = DailyQuotaGuard(api_key_present=True, quota_requests_used=500)
+    @pytest.mark.asyncio
+    async def test_with_key_limit_500_preflight_blocks(self) -> None:
+        guard = _DailyQuotaGuard(api_key_present=True, quota_requests_used=500)
         with pytest.raises(DataSourceRateLimitError) as exc_info:
-            asyncio.get_event_loop().run_until_complete(guard.ensure_capacity())
+            await guard.ensure_capacity()
         assert exc_info.value.code == "EXCEPTION_412"
         assert "500" in str(exc_info.value)
 
-    def test_without_key_preview_limit_100(self) -> None:
+    @pytest.mark.asyncio
+    async def test_without_key_preview_limit_100(self) -> None:
         """无 key preview 模式保守值 100 次/天（Task 0 定稿）。"""
-        guard = DailyQuotaGuard(api_key_present=False, quota_requests_used=100)
+        guard = _DailyQuotaGuard(api_key_present=False, quota_requests_used=100)
         with pytest.raises(DataSourceRateLimitError):
-            asyncio.get_event_loop().run_until_complete(guard.ensure_capacity())
+            await guard.ensure_capacity()
         # 99 次未满不抛
-        guard_ok = DailyQuotaGuard(api_key_present=False, quota_requests_used=99)
-        asyncio.get_event_loop().run_until_complete(guard_ok.ensure_capacity())
+        guard_ok = _DailyQuotaGuard(api_key_present=False, quota_requests_used=99)
+        await guard_ok.ensure_capacity()
 
-    def test_daily_reset_by_now_fn(self) -> None:
+    @pytest.mark.asyncio
+    async def test_daily_reset_by_now_fn(self) -> None:
         day1 = datetime(2026, 9, 30, 12, 0, 0, tzinfo=UTC)
         day2 = datetime(2026, 10, 1, 0, 0, 30, tzinfo=UTC)  # 越过 UTC 00:00
-        guard = DailyQuotaGuard(api_key_present=True, quota_requests_used=500, now_fn=lambda: day1)
+        guard = _DailyQuotaGuard(api_key_present=True, quota_requests_used=500, now_fn=lambda: day1)
         with pytest.raises(DataSourceRateLimitError):
-            asyncio.get_event_loop().run_until_complete(guard.ensure_capacity())
+            await guard.ensure_capacity()
         guard._now_fn = lambda: day2
-        asyncio.get_event_loop().run_until_complete(guard.ensure_capacity())  # 日窗口重置（不抛）
+        await guard.ensure_capacity()  # 日窗口重置（不抛）
 
     @pytest.mark.asyncio
     async def test_concurrent_consume_under_lock(self) -> None:
-        guard = DailyQuotaGuard(api_key_present=True)
+        """并发计数精确性的行为回归防线（非锁存在性证明——当前临界区无 await、
+        单 loop 下天然串行；未来临界区演化出 await 引入竞争丢失更新时本测试变红）。"""
+        guard = _DailyQuotaGuard(api_key_present=True)
 
         async def consume_once() -> None:
             await guard.consume()

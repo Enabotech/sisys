@@ -16,7 +16,7 @@ import pytest
 
 from src.domain.ports.data_source import DataSourceQuery
 
-pytestmark = [pytest.mark.integration, pytest.mark.redis]
+pytestmark = [pytest.mark.integration]  # 纯外网 HTTP 零 Redis 依赖（R2 修正误标）
 
 
 @pytest.fixture

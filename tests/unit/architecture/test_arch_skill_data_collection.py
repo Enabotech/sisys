@@ -1,7 +1,7 @@
 """Skills 数据采集集成 — SDD 架构约束验证测试
 
 五类结构（范本 test_arch_data_source.py）：
-1. 常量区：6 Skills slug 清单 + SSOT 声明表 + 8 适配器映射
+1. 常量区：6 Skills slug 清单 + SSOT 声明表 + 11 适配器映射
 2. 三方一致性：SSOT 表 ↔ 6 个 SKILL.md frontmatter data_sources ↔ 适配器 get_metadata()
    （name/url/api_type 逐字一致，防漂移契约）
 3. 依赖方向：strategic_analysis.py / run_tool_chain.py 不 import infrastructure；

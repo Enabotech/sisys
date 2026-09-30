@@ -50,7 +50,7 @@ _PARAM_KEY_MAP = {
 _DEFAULT_REPORTER = "156"  # 中国口径（缺省）
 
 
-def parse_pipeline_query(raw: str) -> dict[str, str]:
+def _parse_pipeline_query(raw: str) -> dict[str, str]:
     """解析管道分隔参数串为 Comtrade API query params（输入前置校验）。
 
     Args:
@@ -93,14 +93,16 @@ def parse_pipeline_query(raw: str) -> dict[str, str]:
     return params
 
 
-class DailyQuotaGuard:
+class _DailyQuotaGuard:
     """Comtrade 日配额守卫（有 key 500 次/天 / 无 key preview 100 次/天）。
 
     进程内日窗口请求计数（UTC 00:00 重置，now_fn 可注入）；超限前置抛 412
     （零请求消耗）。守卫模式复用 EPO 周窗口设计（Lock 类变量 + 可注入初始计数）。
     """
 
-    _lock: asyncio.Lock = asyncio.Lock()  # 类变量（协程间共享——单例适配器语义）
+    # 类变量（跨实例互斥需类级共享）。临界区纯同步无 await——单 loop 下恒走 fast path，
+    # 真实竞争后绑定事件循环，跨 loop 复用须 per-loop 分锁（先例 aiodocker_sandbox_adapter）
+    _lock: asyncio.Lock = asyncio.Lock()
 
     def __init__(
         self,
@@ -183,7 +185,7 @@ class ComtradeAdapter:
         self._retry_max_attempts = retry_max_attempts
         self._retry_min_wait = retry_min_wait
         self._retry_max_wait = retry_max_wait
-        self._quota_guard = DailyQuotaGuard(
+        self._quota_guard = _DailyQuotaGuard(
             api_key_present=bool(self._config.api_key),
             quota_requests_used=quota_requests_used,
             now_fn=now_fn,
@@ -219,7 +221,7 @@ class ComtradeAdapter:
             DataSourceUnavailableError: 5xx/连接失败重试耗尽/熔断
             TimeoutError: 请求超时
         """
-        params = parse_pipeline_query(query.query)  # 输入前置校验（201——零请求消耗）
+        params = _parse_pipeline_query(query.query)  # 输入前置校验（201——零请求消耗）
         await self._quota_guard.ensure_capacity()  # 配额前置拦截（412——零请求消耗）
         headers: dict[str, str] = {}
         if self._config.api_key:
@@ -304,7 +306,7 @@ class ComtradeAdapter:
     async def health_check(self) -> bool:
         """探活（最小商品码查询，单次尝试——探活请求同样计入日配额，是真实消耗）。"""
         try:
-            params = parse_pipeline_query("cmd=8703")
+            params = _parse_pipeline_query("cmd=8703")
             await self._quota_guard.ensure_capacity()
             await request_json_with_resilience(
                 self._client,
@@ -330,4 +332,4 @@ class ComtradeAdapter:
             await self._client.aclose()
 
 
-__all__ = ["ComtradeAdapter", "DailyQuotaGuard", "parse_pipeline_query"]
+__all__ = ["ComtradeAdapter"]

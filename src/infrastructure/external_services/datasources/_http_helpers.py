@@ -34,6 +34,7 @@ DecodingError/InvalidURL/JSON 解析失败）经 on_ignored() 释放半开探测
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 from urllib.parse import quote
 
@@ -160,6 +161,7 @@ async def request_json_with_resilience(
     max_attempts: int = 3,
     min_wait: float = 1.0,
     max_wait: float = 4.0,
+    pre_request: Callable[[], Awaitable[None]] | None = None,
 ) -> Any:
     """带韧性（重试 + 熔断）的 JSON HTTP 请求
 
@@ -175,6 +177,8 @@ async def request_json_with_resilience(
         max_attempts: 最大重试次数（含首次，默认 3）
         min_wait: 最小退避秒数
         max_wait: 最大退避秒数
+        pre_request: 每次真实 HTTP 尝试前的前置动作（限速等；None 不执行——重试同属真实
+            请求，限速语义须覆盖每次 attempt）
 
     Returns:
         解析后的 JSON（dict 或 list）
@@ -206,6 +210,10 @@ async def request_json_with_resilience(
             reraise=True,
         ):
             with attempt:
+                # 每次真实 HTTP 尝试前的挂载点（限速等前置动作——重试同属真实请求，4.1f R2-F2：
+                # sec-edgar 滑动窗限速经此下沉，防 tenacity 重试绕过 8 rps 上限）
+                if pre_request is not None:
+                    await pre_request()
                 resp = await client.request(method, url, params=params, json=json_body, headers=headers)
                 # 429/4xx 在此显式转换（tenacity 白名单不含 → 不重试）
                 if resp.status_code == 429:
