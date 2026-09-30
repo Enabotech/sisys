@@ -1078,6 +1078,16 @@ tests/
 
 > **收敛声明（代码审查周期独立终审——2026-09-30）**：Story 4.1f 代码审查周期经四轮收敛：Round 1（a66f48ae，四视角调研 + 双评审员）P0×1 + P1×5 + P2×10 落码 13 项 + 改判 2 项；Round 2（42fb3a0f，回归核查 + 留项清偿）P1×1 + P2×4 + P3 收尾 9 组；Round 3（d3413dd7，断言覆盖矩阵）P2×2 + P3×6，12 项行为契约全项真断言守护；Round 4 无提交纯验证（七维度评级 A）。周期累计编号发现 33 项（R1 16 + R2 9 + R3 8），修复 29 项，改判 2 项（R1-F6/F7——证据不足不落码，R7 锚点登记），维持留项 8 条（逐条留痕理由），Defer 台账 11 条（含本轮新增 frames 实现/EPO 形态转换/.env 解除跟踪）。独立终审（不采信自报）：周期闭合无游离、双向取证零失实、独立快扫零新 P0/P1、门禁实跑全绿、R7 锚点与 Defer 台账无悬空。**裁定：正式收敛，零 P0/P1/P2 残留，Story 状态 review → done。**
 
+#### 收敛后回归修复（2026-09-30——用户全量回归报告）
+
+**报告**：四目录全量（`tests/unit/ + integration/ + acceptance/ + contracts/`，xdist 8 worker）`test_full_pestel_pipeline_real_services` FAILED（另 1 SKIPPED 为 EPO key 门控动态 skip——R7 锚点设计内预期行为非缺陷）。
+
+**根因（预存结构性竞态，非 4.1f 审查引入）**：`test_integration_strategic_tool_e2e.py` 多测试共享 `tool_executions` 物理表，`pg_tool_execution_repository` fixture 以「setup/teardown 全表 `DELETE FROM tool_executions`」维持断言基线（`len(tenant_executions) == 1`，tenant_id 为 TOOL_CATALOG 固定 UUID `000...001`）；pyproject `--dist loadgroup` 模式下**无 group 标记的测试被动态分发到不同 worker 并发执行**——跨 worker 的全表 DELETE 与插入交叉污染（断言 len==0 或 len≥2 概率性失败）。隔离复跑恒绿（1 passed）+ 同命令复现轮 10420 passed 未触发窗口——概率性实证与机制闭环一致；用户全量并发度（8 worker × 四目录）触发窗口概率最高。
+
+**修复**：文件级 `pytestmark = pytest.mark.xdist_group("tool-executions-pg")`——同文件测试收敛单 worker 串行消除竞态窗口（项目既定先例：`test_acceptance_data_source_expansion.py` 的 data-source-cache 组同款）；文件级回归 8 passed。
+
+**顺带发现（登记不动）**：该 fixture 的 `DELETE FROM tool_executions` 违反 CLAUDE.md「集成测试禁止手动 delete/truncate」纪律——4.1a 时代预存违规；规范化需重构 asyncpg 直连实现为 savepoint rollback/租户隔离模式（涉及 fixture 架构），登记后续技术债，本次聚焦竞态消除最小修复。
+
 #### 需决策 Decision Needed
 
 - [ ] **无 P0/P1 级待决策项**（R1-F6/F7 改判依据已留痕；A-5 类变量 Lock 与 CLAUDE.md Gotcha 的冲突需 Round 2 专项裁定——改实例变量 or 保持类变量 + 测试侧约束）

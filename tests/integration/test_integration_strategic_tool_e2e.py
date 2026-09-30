@@ -65,6 +65,15 @@ from src.infrastructure.storage.postgresql.repository.tool_execution_repository 
 # 真实服务 Fixtures（CLAUDE.md §5 真实服务优先）
 # =====================================================================
 
+# xdist 串行化（回归修复 2026-09-30）：本文件多测试共享 tool_executions 物理表，
+# pg_tool_execution_repository fixture 以「setup/teardown 全表 DELETE」维持断言基线
+# （len(tenant_executions) == 1，tenant_id 为 TOOL_CATALOG 固定 UUID）。pyproject 配置
+# --dist loadgroup 下，无 group 标记的测试会被动态分发到不同 worker 并发执行——
+# 跨 worker 的全表 DELETE 与插入交叉污染（len==0 或 len>=2 概率性失败）。
+# 同文件测试收敛单 worker 串行（先例：test_acceptance_data_source_expansion 的
+# data-source-cache 组），消除竞态窗口。
+pytestmark = pytest.mark.xdist_group("tool-executions-pg")
+
 
 def _require_env(name: str) -> str:
     """从环境变量读取必需配置"""
