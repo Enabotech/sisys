@@ -435,3 +435,102 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             subprocess.run(["docker", "rm", "-f", *container_ids], capture_output=True, timeout=30)
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass  # daemon 不可用静默跳过
+
+
+# =====================================================================
+# 真实 PostgreSQL 事务隔离 fixtures（技术债清偿 2026-09-30——对齐 acceptance 先例）
+#
+# 背景：test_integration_strategic_tool_e2e.py 曾因「xdist 下 ContextVar 跨 await
+# 丢失」的判断弃用 SQLAlchemy ContextVar 模式，改用 asyncpg 直连 + 全表 DELETE
+# （违反「集成测试禁止手动 delete/truncate」纪律，且是并发竞态根源）。经
+# test_contextvar_deep_chain_probe.py 探针实证（同步 fixture set_session + 异步
+# 测试深链 await 均存活），该判断不成立——正式回归事务隔离模式。
+# =====================================================================
+
+_pg_migration_run = False
+
+
+@pytest.fixture
+def pg_config():
+    """真实 PostgreSQL 配置（get_test_env 三层配置覆盖链）."""
+    from src.infrastructure.config.postgresql import PostgreSQLConfig
+    from tests.environments import get_test_env
+
+    env_config = get_test_env()
+    pg = env_config.postgres
+    return PostgreSQLConfig(
+        host=pg.host,
+        port=pg.port,
+        database=pg.database,
+        username=pg.username,
+        password=pg.password,
+    )
+
+
+@pytest.fixture
+def ensure_alembic_migration(pg_config):
+    """确保 schema 存在（alembic 优先，Base.metadata.create_all 兜底）——对齐 acceptance 先例."""
+    import os
+    import subprocess
+    from pathlib import Path
+
+    global _pg_migration_run
+    if _pg_migration_run:
+        yield
+        return
+
+    migration_success = False
+    alembic_ini = Path(__file__).resolve().parents[2] / "deploy/postgresql/alembic/alembic.ini"
+    if alembic_ini.exists():
+        env = {
+            "POSTGRES_HOST": pg_config.host,
+            "POSTGRES_PORT": str(pg_config.port),
+            "POSTGRES_USERNAME": pg_config.username,
+            "POSTGRES_PASSWORD": pg_config.password,
+            "POSTGRES_DATABASE": pg_config.database,
+        }
+        try:
+            result = subprocess.run(
+                ["poetry", "run", "alembic", "-c", str(alembic_ini), "upgrade", "head"],
+                cwd=str(alembic_ini.parents[2]),
+                env={**os.environ, **env},
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode == 0 or "already up to date" in result.stdout:
+                migration_success = True
+            else:
+                print(f"Alembic upgrade warning: {result.stderr}")
+        except Exception as e:
+            print(f"Alembic upgrade failed: {e}")
+
+    if not migration_success:
+        try:
+            from src.infrastructure.storage.postgresql.models import Base
+            from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
+
+            engine = PostgreSQLManager(pg_config)
+            Base.metadata.create_all(engine.get_sync_engine())
+        except Exception as e:
+            pytest.skip(f"Failed to create schema: {e}")
+
+    _pg_migration_run = True
+    yield
+
+
+@pytest.fixture
+async def pg_session(ensure_alembic_migration, pg_config) -> AsyncGenerator[AsyncSession, None]:
+    """事务隔离 session：begin + rollback（替代全表 DELETE——数据零残留、并发安全）."""
+    from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
+
+    async_engine = PostgreSQLManager(pg_config).get_async_engine()
+    session = AsyncSession(async_engine, expire_on_commit=False)
+    await session.begin()
+    yield session
+    await session.rollback()
+    try:
+        await session.close()
+    except Exception:
+        pass
+    await async_engine.dispose()

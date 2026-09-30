@@ -1088,6 +1088,19 @@ tests/
 
 **顺带发现（登记不动）**：该 fixture 的 `DELETE FROM tool_executions` 违反 CLAUDE.md「集成测试禁止手动 delete/truncate」纪律——4.1a 时代预存违规；规范化需重构 asyncpg 直连实现为 savepoint rollback/租户隔离模式（涉及 fixture 架构），登记后续技术债，本次聚焦竞态消除最小修复。
 
+#### 技术债清偿（2026-09-30——收敛后独立任务：tool_executions 集成测试隔离模式规范化）
+
+**债务**：`pg_tool_execution_repository` fixture 以「setup/teardown 全表 `DELETE FROM tool_executions`」维持断言基线——违反 CLAUDE.md「集成测试禁止手动 delete/truncate」纪律，且是 xdist 并发竞态根源（前述回归修复的深层病因）；被测对象为 `_legacy_asyncpg` 直连替身而非生产路径实现。
+
+**清偿路径（三步）**：
+1. **深链探针验证前提**（`test_contextvar_deep_chain_probe.py`，保留为回归防线）：同步 fixture `set_session` + 异步测试 `save → get_by_id → list_by_query` 三段独立 await 深链 + 事务 rollback 零残留——**2 passed，原 fixture docstring「xdist 下 ContextVar 跨 await 丢失」判断被证伪**（acceptance 同款结构长期绿的矛盾以此定谳）。
+2. **fixture 改造**：conftest 新增共享 `pg_config`/`ensure_alembic_migration`/`pg_session`（AsyncSession + begin + rollback，对齐 acceptance 先例）；`pg_tool_execution_repository` 重写为「set_session + 正式版 `PostgreSQLToolExecutionRepository` + reset_session」——**被测对象升级为组合根注册的生产路径实现**（乐观锁 CAS/租户隔离语义与生产一致；其全链 flush 零 commit 的事实在先期分析中确认为事务回收可行的决定性条件）。两处全表 DELETE 移除（全仓测试面 `DELETE FROM tool_executions` 零残留实证）。
+3. **回归验证**：文件级 + 探针 10 passed；四目录全量（用户报障同命令）10420+ passed / 0 failed。
+
+**顺带处理**：`ToolExecutionRepositoryPort` 顶层 import 随 fixture 改写成为孤儿→改 import `ToolExecutionQuery` 并清理函数内两处冗余局部 import（其一为 F823 修复——函数后半局部 import 使名字函数级局部化）；`xdist_group("tool-executions-pg")` 保留为纵深防御（三测试仍直接消费 `pg_pool` 直连池做表级验证）；`_legacy_asyncpg_tool_execution_repository` 生产文件按「向后兼容实现，提及不删」纪律保留（其唯一测试消费者已迁移）。
+
+**收益**：纪律合规（零 DELETE）；竞态根源消除（事务外数据不可见，断言基线天然成立）；测试口径升级（测生产实现而非等价替身）；可复用资产（conftest 三 fixture + 探针文件为后续 integration 测试规范化范本）。
+
 #### 需决策 Decision Needed
 
 - [ ] **无 P0/P1 级待决策项**（R1-F6/F7 改判依据已留痕；A-5 类变量 Lock 与 CLAUDE.md Gotcha 的冲突需 Round 2 专项裁定——改实例变量 or 保持类变量 + 测试侧约束）
