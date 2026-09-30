@@ -491,13 +491,13 @@
 | 🟢 绿 | 两适配器 fetch 加 CJK 检测（`_contains_cjk(query)` 私有函数）与条件参数注入（各 ~10 行） |
 | 🔄 重构 | CJK 检测函数复用（两适配器各自实现 or 提 `_http_helpers` 共享——单行函数倾向各自私有，Task 内裁定）；ruff/mypy |
 
-- [ ] Subtask 1.1: 🔴 红 — CJK 双态 + 回归基线测试（非 CJK 断言请求体 dict 逐键一致——基准即现状三键/四键手写期望，`json.loads(request.content)` capture 先例 `test_tavily_adapter.py:47-48`）
-- [ ] Subtask 1.2: 🟢 绿 — 两适配器自适应实现
-- [ ] Subtask 1.3: 🔄 重构 — 提炼与全量回归（**受影响声明 Skill = 13 个**（newsapi 8 ∪ tavily 10 去重）——appeals-analysis/change-management/competitor-analysis/disruptive-innovation/ge-mckinsey-matrix/kpi-tree/pestel-analysis/porters-five-forces/scenario-planning/swot-tows/value-chain-analysis/value-curve-analysis/vrio-framework 的声明与采集测试零回归）
-- [ ] Subtask 1.4: A/B 实测报告（key 就绪真实对比 / 未就绪断言层验证 + 标注待补——**未就绪态 AC-1 记「部分完成」，缺口判断 defer 至 key 就绪（owner 知情），不得凭零实测下「无需专职中文源」结论**）+ 剩余缺口结论留痕（结论须标注证据等级：实测/官方文档覆盖面分析）+ topic/domains 参数评估项（epics AC-1 偏差登记——见数据契约五）
+- [x] Subtask 1.1: 🔴 红 — CJK 双态 + 回归基线测试（非 CJK 断言请求体 dict 逐键一致——基准即现状三键/四键手写期望，`json.loads(request.content)` capture 先例 `test_tavily_adapter.py:47-48`）
+- [x] Subtask 1.2: 🟢 绿 — 两适配器自适应实现
+- [x] Subtask 1.3: 🔄 重构 — 提炼与全量回归（**受影响声明 Skill = 13 个**（newsapi 8 ∪ tavily 10 去重）——appeals-analysis/change-management/competitor-analysis/disruptive-innovation/ge-mckinsey-matrix/kpi-tree/pestel-analysis/porters-five-forces/scenario-planning/swot-tows/value-chain-analysis/value-curve-analysis/vrio-framework 的声明与采集测试零回归）
+- [x] Subtask 1.4: A/B 实测报告（key 就绪真实对比 / 未就绪断言层验证 + 标注待补——**未就绪态 AC-1 记「部分完成」，缺口判断 defer 至 key 就绪（owner 知情），不得凭零实测下「无需专职中文源」结论**）+ 剩余缺口结论留痕（结论须标注证据等级：实测/官方文档覆盖面分析）+ topic/domains 参数评估项（epics AC-1 偏差登记——见数据契约五）
 
 **完成标准/Definition of Done:**
-- [ ] CJK 双态测试绿 + 既有回归零破坏 + 报告归档
+- [x] CJK 双态测试绿 + 既有回归零破坏 + 报告归档
 
 ---
 

@@ -35,6 +35,11 @@ from src.infrastructure.external_services.embedding.circuit_breaker import Circu
 logger = logging.getLogger(__name__)
 
 
+def _contains_cjk(text: str) -> bool:
+    """检测文本是否含 CJK 统一表意文字（Story 4.1f AC-1 中文参数自适应门控）。"""
+    return any("一" <= ch <= "鿿" for ch in text)
+
+
 class NewsAPIAdapter:
     """NewsAPI 数据源适配器（REST_JSON + API Key，配额敏感早熔断）"""
 
@@ -96,13 +101,18 @@ class NewsAPIAdapter:
         """
         params_dict = dict(query.parameters)
         page_size = parse_int_param(params_dict, "page_size", 10, source_name="newsapi")
+        request_params: dict[str, Any] = {"q": query.query, "pageSize": page_size, "sortBy": "publishedAt"}
+        # CJK 自适应（Story 4.1f AC-1）：中文 query 注入 language=zh（ISO 639-1，
+        # /v2/everything 端点官方支持——country 参数属 top-headlines 端点不适用）；非 CJK 路径零变化
+        if _contains_cjk(query.query):
+            request_params["language"] = "zh"
         data = await request_json_with_resilience(
             self._client,
             "GET",
             "/v2/everything",
             source_name="newsapi",
             circuit_breaker=self._circuit_breaker,
-            params={"q": query.query, "pageSize": page_size, "sortBy": "publishedAt"},
+            params=request_params,
             headers={"X-Api-Key": self._config.api_key},
             max_attempts=self._retry_max_attempts,
             min_wait=self._retry_min_wait,

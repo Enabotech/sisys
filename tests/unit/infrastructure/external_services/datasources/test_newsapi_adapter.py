@@ -225,3 +225,47 @@ class TestNewsAPIAdapterFailures:
             await adapter.fetch(DataSourceQuery(source_name="newsapi", query="q"))
         assert calls["n"] == calls_before
         await adapter.close()
+
+
+class TestNewsAPICjkAdaptiveParams:
+    """Story 4.1f AC-1：CJK query 自适应注入 language=zh（ISO 639-1，/v2/everything 端点）。
+
+    双态契约：含 CJK → params 加 language；不含 CJK → params 与既有形态逐键一致（回归基线）。
+    """
+
+    @staticmethod
+    def _capture_params() -> tuple[list[dict[str, str]], httpx.MockTransport]:
+        captured: list[dict[str, str]] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured.append(dict(request.url.params))
+            return httpx.Response(200, json={"articles": []})
+
+        return captured, httpx.MockTransport(handler)
+
+    @pytest.mark.asyncio
+    async def test_cjk_query_adds_language_zh(self) -> None:
+        """中文 query → 请求参数自动加 language=zh。"""
+        captured, transport = self._capture_params()
+        adapter = _make_adapter(transport)
+        await adapter.fetch(DataSourceQuery(source_name="newsapi", query="宁德时代 产能扩张 最新报道"))
+        assert captured[0].get("language") == "zh"
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_mixed_cjk_english_query_adds_language(self) -> None:
+        """中英混合 query → 同样注入（检测规则为「含任一 CJK 字符」）。"""
+        captured, transport = self._capture_params()
+        adapter = _make_adapter(transport)
+        await adapter.fetch(DataSourceQuery(source_name="newsapi", query="比亚迪 BYD 新能源汽车"))
+        assert captured[0].get("language") == "zh"
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_non_cjk_query_params_unchanged_baseline(self) -> None:
+        """英文 query → 请求参数与既有形态逐键一致（回归基线——零既有影响）。"""
+        captured, transport = self._capture_params()
+        adapter = _make_adapter(transport)
+        await adapter.fetch(DataSourceQuery(source_name="newsapi", query="CATL capacity expansion"))
+        assert set(captured[0]) == {"q", "pageSize", "sortBy"}, "非 CJK 请求参数应零变化"
+        await adapter.close()
