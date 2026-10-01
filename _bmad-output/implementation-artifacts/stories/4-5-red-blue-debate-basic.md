@@ -19,7 +19,7 @@
 架构文档 GAP-CRITICAL-09（辩论质量评估器未实现）与 FR-AC-11（红蓝对抗辩论 → `src/application/services/debate_evaluator.py`，规划值未落地）长期挂账。Story 4.1a~4.4 已交付战略工具注册/执行/编排/校验/沙箱五层能力，但所有分析仍是**单视角输出**——战略规划的本质是"多视角共识构建，而非单点分析优化"（prd.md:157）。Story 4.5 在既有 LLM 基础设施（Story 3.2a `LLMClientPort`）之上补齐多视角能力：
 
 1. **双视角独立生成**：同一 LLM 通过差异化 system prompt + 温度阶梯（红 T=0.8 发散 / 蓝 T=0.5 收敛 / 合成 T=0.2 裁决，与 FR-SP-10 V1 三阶段温度完全一致）扮演激进派与保守派，两视角**互相不可见**（独立生成，避免锚定偏差），`asyncio.gather` 并发调用压缩延迟
-2. **风险全景视图**：合成阶段对比红蓝论点，输出共识区域（consensus_areas）+ 分歧区域（disagreement_areas）+ 整体风险等级 + 分化度
+2. **风险全景视图**：合成阶段对比红蓝论点，输出共识区域（consensus_areas）+ 分歧区域（disagreement_areas）+ 整体风险等级 + 红蓝重叠率（overlap_rate）
 3. **辩论质量评估器落地**：`DebateEvaluator` 领域服务实现增益率/重复率/分化度三算法（architecture.md §7.3 终止条件的算法基础），MVP 调用分化度门控，增益率/重复率为 V1 多轮辩论（Story 10.6）预留——**GAP-CRITICAL-09 就此清偿**
 4. **演进路径锁定**：DebateSession 状态机 / DebateQuality 字段（gain_rate、repetition_rate）/ 温度阶梯常量均按 V1 多轮结构设计，Epic 5（Agent 协作）与 Epic 10（完整辩论）在零破坏性变更下升级
 
@@ -185,8 +185,8 @@
 
 ### Fake LLM 工厂（单元/集成/验收共用模式）
 
-- 单元测试：`AsyncMock(spec=LLMClientPort)` + `structured_generate.side_effect` 按 **response_schema 身份分派**（`response_schema is PerspectiveAnalysisSchema` 时按 `config.temperature` 区分红（0.8）/蓝（0.5），`is RiskViewSchema` 时返回合成结果——`test_summary_generation_service.py:40-50` 按 schema 身份分派先例）。**禁止**按 system_prompt 子串分派：裁判 system_prompt 必然同时描述红蓝双方（同时含"激进派""保守派"标记），子串判定顺序会使合成调用误路由到视角 Schema、Happy path 对正确实现误红（`test_skill_framework.py`（integration 目录）按 user prompt 内容分派的先例不适用于本三角色场景）。system_prompt 角色标记短语保留为**断言物**（断言每次调用的 system_prompt 含对应角色标记），不作为分派依据
-- **温度断言（强制按分派身份记录）**：分派闭包内联按 `(response_schema, temperature)` 联合记录——断言 **PerspectiveAnalysisSchema 调用中 temperature==0.8（红）与 ==0.5（蓝）各至少一次**（红蓝温度互换 0.8↔0.5 时 sorted/集合断言不红、按身份断言必红——判别力更强）、RiskViewSchema 调用 temperature==0.2；`sorted == [0.2, 0.5, 0.8]` 仅作补充全量断言——**CI 可验证的温度阶梯证据**
+- 单元测试：`AsyncMock(spec=LLMClientPort)` + `structured_generate.side_effect` 按 **response_schema 身份分派**（`response_schema is PerspectiveAnalysisSchema` 时按 `config.temperature` 区分红（0.8）/蓝（0.5），`is RiskViewSchema` 时返回合成结果——`test_summary_generation_service.py:40-50` 按 schema 身份分派先例）。**禁止**按 system_prompt 子串分派：裁判 system_prompt 必然同时描述红蓝双方（同时含"激进派""保守派"标记），子串判定顺序会使合成调用误路由到视角 Schema、Happy path 对正确实现误红（`test_skill_framework.py`（integration 目录）按 user prompt 内容分派的先例不适用于本三角色场景）。**记录规格（单测/集成/验收统一六字段元组）**：`(prompt, system_prompt, response_schema, temperature, start_ts, end_ts)`——与 BDD Fake 工厂同构，支撑温度/独立性/并发窗口三类断言。system_prompt 角色标记短语保留为**断言物与视角身份锚点**（见温度断言），不作为分派依据
+- **温度断言（视角身份锚定于 system_prompt 角色标记——独立于 temperature 的信号）**：断言 **system_prompt 含"激进派"的 PerspectiveAnalysisSchema 调用 temperature 必须 ==0.8、含"保守派"==0.5、裁判（RiskViewSchema 调用）==0.2**。禁止以"分派身份"（即 temperature 本身）为锚——红蓝同 Schema、身份由 temperature 决定的分派设计下，红蓝温度互换（红传 0.5/蓝传 0.8）时"0.8 与 0.5 各出现一次"仍成立，循环论证检不出互换；system_prompt 锚点下互换必红（红调用的 system_prompt 是"激进派"而温度是 0.5 → 断言红）。`sorted == [0.2, 0.5, 0.8]` 仅作补充全量断言——**CI 可验证的温度阶梯证据**
 - 返回值构造：`MagicMock(spec=response_schema)` 按字段填充（`test_summary_generation_service.py:29-59` 工厂同款）
 
 ### 真实 LLM 场景（集成 + 验收的 llm 分组）
@@ -308,7 +308,7 @@ class RiskView:
     overall_risk_level: str           # "LOW" | "MEDIUM" | "HIGH"（Literal 校验）
     overlap_rate: float            # 红蓝重叠率 ∈ [0.0, 1.0]
     warnings: tuple[str, ...] = ()    # 质量警告（如重叠率 ≥ 0.80 分化偏弱）
-    # __post_init__: 两组区域非空/risk_level 枚举/divergence 范围 → 242
+    # __post_init__: 两组区域非空/risk_level 枚举/overlap_rate ∈ [0,1] → 242
 
 @dataclass(frozen=True)
 class DebateQuality:
@@ -386,7 +386,7 @@ class DebateCompleted(DomainEvent):
     duration_ms: int
     temperature_profile: dict[str, float]  # {"red": 0.8, "blue": 0.5, "synthesis": 0.2}
     event_type: str = field(default="DebateCompleted", init=False)
-    # __post_init__: aggregate_type="DebateSession"，aggregate_id=debate_id，metadata 透传 tenant_id
+    # __post_init__: aggregate_type="DebateSession"，aggregate_id=debate_id，metadata 透传 tenant_id，topic_title 超 100 字符经 object.__setattr__ 截断（frozen 惯例；roundtrip 测试断言 >100 字符 title 的截断值）
 ```
 
 **双通道登记（新增事件必须同步两处 + CLAUDE.md §4 约定）：**
@@ -480,7 +480,7 @@ class DebateCompleted(DomainEvent):
 - [ ] 3 个异常类 code 无碰撞（`test_error_code_uniqueness.py` 通过）
 - [ ] 子域范围校验通过（`test_code_ranges.py` 通过——子域范围/继承链/注册覆盖维度；debate 3 异常直接继承抽象基类 ExternalException/BusinessException，被 Rule 2 的 abstract_names 跳过，无需扩 `allowed_child_parent_subdomains` 白名单）
 - [ ] `to_dict()` 序列化含全部 context 字段 + cause 链解析
-- [ ] HTTP 映射：3 个异常经 `exception_handler()` 映射 500/500/422（反向验证 `pytest.raises → exception_handler() → assert status`）
+- [ ] HTTP 映射：3 个异常经 `_get_http_status()` 映射 500/500/422（反向验证：构造异常实例 → `from src.interfaces.api.exception_handlers import _get_http_status` → 断言返回值——`exception_handler()` 公共函数不存在，真实可测面是私有纯函数 `_get_http_status(exc) -> int`；acceptance 直接 import 先例：`test_acceptance_strategic_archive.py:559` / `test_acceptance_domain_dictionary.py:429,475`）
 - [ ] 三条 grep 自查零输出（本 Story 范围路径）
 - [ ] `tests/unit/domain/exceptions/test_debate_exceptions.py` 通过
 
@@ -494,7 +494,7 @@ class DebateCompleted(DomainEvent):
 - **三个公开算法**（字符 bigram 集合 Jaccard 相似度族，中文无需分词，标准库实现）：
   - `compute_repetition_rate(current_text: str, previous_text: str) -> float`——相邻轮次重复内容占比（V1 终止条件：>0.50 强制终止）；完全相同文本返回 1.0，无交集返回 0.0；**空文本边界**：两者皆空返回 0.0，一空一非空返回 0.0（空参数列表重复率 bug 是架构 8.0.0 版修正项，此处必须测试覆盖）
   - `compute_gain_rate(current_text: str, previous_text: str) -> float`——新信息量/上轮信息量 = |current_bigrams − previous_bigrams| / max(|previous_bigrams|, 1)（V1 终止条件：<0.10 强制终止）；previous 为空时返回 1.0（全新信息）
-  - `evaluate_overlap(red_analysis: PerspectiveAnalysis, blue_analysis: PerspectiveAnalysis) -> float`——红蓝重叠率 = bigram Jaccard(红论点拼接, 蓝论点拼接)，返回浮点重叠率（`DebateQuality(overlap_rate=...)` 由服务层用返回值组装——评估器不构造质量对象，纯函数单一职责；MVP 编排门控：≥0.95 抛 `DebateLowDivergenceError`；≥0.80 输出 RiskView.warnings 警告）
+  - `evaluate_overlap(red_analysis: PerspectiveAnalysis, blue_analysis: PerspectiveAnalysis) -> float`——红蓝重叠率 = bigram Jaccard(红论点拼接, 蓝论点拼接)，返回浮点重叠率（`DebateQuality(overlap_rate=...)` 由服务层用返回值组装——评估器不构造质量对象，纯函数单一职责；**空 bigram 并集边界**：红蓝论点拼接后 bigram 并集为空（如双方各仅单字论点）时返回 0.0——与 `compute_repetition_rate` 空集规则对齐，防 0/0 未定义；MVP 编排门控：≥0.95 抛 `DebateLowDivergenceError`；≥0.80 输出 RiskView.warnings 警告）
 - **`evaluate_round(rounds: ...)` 不实现**——V1 多轮接口随 Story 10.6 演进（MVP 无轮次序列，禁止过度设计）
 - **确定性**：纯函数无状态，同输入同输出（SINGLETON 注册前提）
 
@@ -565,13 +565,13 @@ class DebateCompleted(DomainEvent):
 **验证标准/Validation Criteria:**
 
 - [ ] Happy path：Fake LLM 三次分派 → `DebateResult` 三段结构完整（red/blue/risk_view）
-- [ ] **温度阶梯断言**：按分派身份强制记录——PerspectiveAnalysisSchema 调用中 temperature==0.8（红）与 ==0.5（蓝）各至少一次（互换即红），RiskViewSchema 调用 temperature==0.2；补充断言三次温度 sorted == [0.2, 0.5, 0.8]
-- [ ] 红蓝并发验证：Fake LLM 记录每次调用 start/end 时间戳，断言红蓝生成窗口重叠（`blue.start < red.end` 且 `red.start < blue.end`——串行实现必不满足该断言）；辅以 sleep 注入 Fake 的单边计时断言 `elapsed < 1.5 × sleep`（串行两次 ≈ 2×sleep 必超标，单边阈值避免 CI 调度抖动假红）
+- [ ] **温度阶梯断言（system_prompt 锚定）**：system_prompt 含"激进派"的调用 temperature==0.8、含"保守派"==0.5、裁判调用==0.2（红蓝温度互换时红视角的 system_prompt 与温度错配即红——独立锚点防循环论证）；补充断言三次温度 sorted == [0.2, 0.5, 0.8]
+- [ ] 红蓝并发验证：Fake side_effect 内**必须 `await asyncio.sleep(0.05~0.15)` 制造事件循环切换点**（零耗时 async side_effect 无挂起点，gather 两协程顺序跑完、窗口不重叠——对正确并发实现假红；零耗时下并发与串行不可判别），记录每次调用 start/end 时间戳，断言红蓝生成窗口重叠（`blue.start < red.end` 且 `red.start < blue.end`——串行实现必不满足该断言）；辅以单边计时断言 `elapsed < 1.5 × sleep`（串行两次 ≈ 2×sleep 必超标，单边阈值避免 CI 调度抖动假红）
 - [ ] 视角独立性（断言范围限定）：仅施加于两次 `PerspectiveAnalysisSchema` 调用——红/蓝的 prompt 与 system_prompt 互不含对方 stance/论点标记（独立立场方法论，防锚定偏差）；**合成调用（RiskViewSchema）豁免**——其 user prompt 按设计必然同时含红蓝双方论点 JSON（对抗发生在合成阶段）
 - [ ] LLM 失败路径：红视角 side_effect 抛 `LLMAPIError` → 断言 `DebateGenerationError` + `context.perspective == "red_aggressive"` + `cause` 链保留；session 终态 FAILED + failure_reason（**蓝视角对称用例**：`context.perspective == "blue_conservative"`）；失败路径经 `repository.get_by_id` 断言终态落库（依赖"每次状态迁移后 save"纪律）
-- [ ] 合成失败路径 → `DebateSynthesisError`；分化度 ≥0.95 → `DebateLowDivergenceError`（Fake 返回红蓝几乎相同的 arguments）
-- [ ] 0.80 ≤ 重叠率 < 0.95 → 不抛异常，`risk_view.warnings` 非空
-- [ ] 事件发布：`AsyncMock(spec=EventPublisher)` 断言 publish(DebateCompleted) 一次 + 字段值；**双形态失败**：Fake publish 返回 `PublishResult(is_success=False)` 时 `run_debate` 仍返回结果（契约内形态，EventPublisher 契约返回 PublishResult 而非抛异常）；Fake publish 直接 raise 时仍返回结果（契约外防御形态）
+- [ ] 合成失败路径 → `DebateSynthesisError`；重叠率 ≥0.95 → `DebateLowDivergenceError`（Fake 红蓝 arguments **完全相同**构造——Jaccard=1.0 稳定触发；"改 1 字"构造在短文本下仅 ~0.93 落警告区，勿用）
+- [ ] 0.80 ≤ 重叠率 < 0.95 → 不抛异常，`risk_view.warnings` 非空（可控构造：单条 36 字论点、蓝=红改第 20 字 1 处 → 交集 33/并集 37 ≈ 0.892 ∈ [0.80, 0.95)；单条论点规避多论点 join 语义分歧）
+- [ ] 事件发布：`AsyncMock(spec=EventPublisher)` 断言 publish(DebateCompleted) 一次（`publish.call_args[0][0]` 取 event 断言 debate_id/consensus_count 等字段值）；**双形态失败**：Fake publish 返回 `PublishResult(event_id="evt-test", results=())` 时 `run_debate` 仍返回结果（契约内形态——注意 `is_success` 是 property 非构造参数，空 `results=()` 即 is_success=False）；Fake publish 直接 raise 时仍返回结果（契约外防御形态）
 - [ ] per-call timeout 传递断言：捕获 `config.timeout == 12.0`（默认构造）
 - [ ] `tests/unit/application/services/test_red_blue_debate_service.py` 通过
 
@@ -632,14 +632,14 @@ class DebateCompleted(DomainEvent):
   - **头部组织（双先例组合）**：第 1 行 `# language: zh-CN` + 第 2 行 Story 注释（`# Story 4.5 — 红蓝辩论机制基础(BDD 验收场景,完整覆盖 10 条 AC)`——此形态先例为 4.1b `test_acceptance_data_source.feature` 与 4.4 `test_acceptance_docker_sandbox.feature`；R6 模板 `test_acceptance_postgresql_relational_layer.feature` 第 2 行直接是 `功能:`，其贡献的是三段式+背景块+`# ====` 横幅形态）+ `功能:` 三段式（角色+需求+目的）+ `背景:` 块（共用前置：辩论服务已初始化）+ 按 AC 编号 `# ====` 注释横幅分组
   - **场景命名**：`场景: AC-N.M - 中文细分描述`（对齐 4.3 编号式样板）
   - **异常断言双行**：`那么 抛出 XXX异常` + `并且 错误码为 EXCEPTION_xxx`
-  - **场景清单**（完整覆盖 10 个 AC 分组，每组 ≥ 1 子场景）：
+  - **场景清单**（完整覆盖 AC-1~AC-9 九个分组 + 收尾验收组，每组 ≥ 1 子场景）：
     - **AC-1 组**（值对象）：AC-1.1 合法构造全字段 / AC-1.2~1.5 四组不变量失败（title 空 / confidence 越界 / RiskView 区域空 / risk_level 非法）
     - **AC-2 组**（状态机）：AC-2.1 合法全路径迁移 + state_version 递增 / AC-2.2 非法迁移抛 243 / AC-2.3 终态不变量
     - **AC-3 组**（异常）：AC-3.1~3.3 三个异常构造 + code 断言 / AC-3.4 HTTP 映射（500/500/422）反向验证
-    - **AC-4 组**（评估器）：AC-4.1 重复率已知值 / AC-4.2 增益率已知值 / AC-4.3 分化度两极值 + 中文用例 / AC-4.4 空文本边界
+    - **AC-4 组**（评估器）：AC-4.1 重复率已知值 / AC-4.2 增益率已知值 / AC-4.3 重叠率两极值（红蓝相同→1.0、完全无关→0.0）+ 中文用例 / AC-4.4 空文本与空 bigram 边界（含 evaluate_overlap 空并集→0.0 用例：红蓝同单字论点 vs 单字/两字论点对）
     - **AC-5 组**（仓储）：AC-5.1 save→get roundtrip / AC-5.2 未知名 None / AC-5.3 并发安全
     - **AC-6 组**（事件）：AC-6.1 事件构造 + to_dict/from_dict roundtrip / AC-6.2 双通道映射一致（YAML == DEFAULT_MAPPINGS + RELIABLE）
-    - **AC-7 组**（服务编排，核心）：AC-7.1 Happy path 三段结构 / AC-7.2 温度阶梯（按分派身份断言红 0.8 蓝 0.5 合成 0.2）/ AC-7.3 红蓝生成时间窗口重叠（Fake 记录 start/end 时间戳断言 `blue.start < red.end` 且 `red.start < blue.end`——串行实现必红）/ AC-7.4 视角互相不可见（限定视角生成两次调用，合成豁免）/ AC-7.5 生成失败→420 / AC-7.6 合成失败→421 / AC-7.7 分化不足→422 / AC-7.8 分化警告不抛异常 / AC-7.9 事件发布字段断言
+    - **AC-7 组**（服务编排，核心）：AC-7.1 Happy path 三段结构 / AC-7.2 温度阶梯（system_prompt 角色标记锚定断言红 0.8 蓝 0.5 合成 0.2——独立锚点防循环论证）/ AC-7.3 红蓝生成时间窗口重叠（Fake side_effect 内 sleep 注入制造切换点 + 记录 start/end 时间戳断言 `blue.start < red.end` 且 `red.start < blue.end`——串行实现必红；零耗时下并发/串行不可判别）/ AC-7.4 视角互相不可见（限定视角生成两次调用，合成豁免）/ AC-7.5 生成失败→420 / AC-7.6 合成失败→421 / AC-7.7 重叠率 ≥0.95→422（Fake 红蓝 arguments **完全相同**构造，J=1.0 最稳——"改 1 字"构造在 <80 字符拼接下仅达 ~0.93 落警告区不抛）/ AC-7.8 分化警告不抛异常（构造示例：单条 36 字论点、蓝=红改第 20 字 1 处 → J=33/37≈0.892 ∈ [0.80, 0.95)）/ AC-7.9 事件发布字段断言
     - **AC-8 组**（端口注册）：AC-8.1 三端口注册 + PortSpec 元数据 / AC-8.2 resolver 解析真实实例
     - **AC-9 组**（集成/架构/性能）：AC-9.1 架构零依赖 + 温度常量 / AC-9.2 编排开销 <1s
     - **收尾验收组**（4.3 固定套路）：`收尾 - 覆盖率门禁达标`（src/tests 完成清单逐项确认）
@@ -647,13 +647,13 @@ class DebateCompleted(DomainEvent):
   - **绑定方式**：`@scenario` 显式逐场景绑定（R6 模板模式）+ `context: dict[str, Any]` fixture 跨步骤传递（4.1a 模式）——两种既有主流模式的组合
   - 文件头 docstring：Story 号 + 真实服务要求 + 运行命令 + **6 项关键约定**（对齐 4.1a 样板：@given/@when/@then 装饰器 + context dict；真实服务实例（真实 `RedBlueDebateService` + `DebateEvaluator` + `InMemoryDebateSessionRepository`，**仅 LLM/EventPublisher 端口适配器 Fake**）；步骤严格按 AC 顺序 `# ====` 分隔；异常 try/except 捕获到 `context["query_error"]` 后 isinstance + code 断言；禁止 mock 核心域服务；LLM 不可用 `pytest.skip()` 动态跳过）
   - **步骤函数形态**：同步 `def` + `event_loop.run_until_complete(coro)`（模块级 event_loop fixture）；**禁止 `@pytest.mark.asyncio`**
-  - **Fake LLM 工厂**：`_make_fake_llm(red: PerspectiveAnalysisSchema, blue: ..., risk: ...) -> AsyncMock`——`structured_generate.side_effect` 按 **response_schema 身份分派**（PerspectiveAnalysisSchema + temperature 0.8→红 / 0.5→蓝；RiskViewSchema→合成；禁止按 system_prompt 子串分派——裁判 prompt 同时含红蓝标记必误路由），闭包内联按分派记录 `(prompt, system_prompt, response_schema, temperature, start_ts, end_ts)` 序列供温度/独立性/并发窗口断言，并断言各调用 system_prompt 含对应角色标记（红"激进派"/蓝"保守派"/裁判"裁判"）
+  - **Fake LLM 工厂**：`_make_fake_llm(red, blue, risk, perspective_delay_sec: float = 0.05) -> AsyncMock`——参数 `red/blue/risk` 为 Schema 实例**或 Exception 实例**（Exception 时对应分派分支 raise——失败注入形态：红失败=传 `LLMAPIError` 实例为 red、蓝正常）；`structured_generate.side_effect` 按 **response_schema 身份分派**（PerspectiveAnalysisSchema + temperature 0.8→红 / 0.5→蓝；RiskViewSchema→合成；禁止按 system_prompt 子串分派——裁判 prompt 同时含红蓝标记必误路由），视角分支内 `await asyncio.sleep(perspective_delay_sec)` 制造事件循环切换点（并发窗口断言依赖；零耗时下并发/串行不可判别），闭包内联按分派记录 `(prompt, system_prompt, response_schema, temperature, start_ts, end_ts)` 序列供温度（system_prompt 锚定）/独立性/并发窗口断言，并断言各调用 system_prompt 含对应角色标记（红"激进派"/蓝"保守派"/裁判"裁判"）
   - 共享 fixtures：`context()` / `debate_session_repository()`（真实 InMemory）/ `event_loop`（module 级）
 
 **验证标准/Validation Criteria:**
 
 - [ ] feature 文件 `# language: zh-CN` 首行 + Story 注释次行 + 功能三段式 + 背景: 块
-- [ ] 完整覆盖 10 个 AC 分组 + 收尾验收（每组 ≥ 1 子场景，场景命名 `AC-N.M - 描述`）
+- [ ] 完整覆盖 AC-1~AC-9 九个分组 + 收尾验收组（每组 ≥ 1 子场景，场景命名 `AC-N.M - 描述`；预计 35±1 个场景——步骤函数同文本跨场景全局复用控文件行数）
 - [ ] 异常场景双断言（抛出 XXX异常 + 错误码为 EXCEPTION_xxx）
 - [ ] step 文件 `@scenario` 显式绑定全部场景 + 6 项关键约定 docstring
 - [ ] 步骤函数同步 def + event_loop.run_until_complete；零 `@pytest.mark.asyncio`
@@ -728,6 +728,8 @@ class DebateCompleted(DomainEvent):
 | `domain/ports/debate_session_repository.py` | 标准库 + `domain/entities` |
 | `domain/events/debate_events.py` | 标准库 + `domain/events/base` |
 | `application/services/red_blue_debate_service.py` | `domain/**`（LLMClientPort/ExecutionContext/EventPublisher）+ `application/services/debate_schemas` + `application/services/debate_prompts` |
+| `application/services/debate_schemas.py` | 标准库 + pydantic（应用层可用）+ `domain/value_objects`（to_domain 返回领域 VO） |
+| `application/services/debate_prompts.py` | 标准库 + typing + `domain/value_objects`（DebatePerspective 枚举键） |
 | `application/ports/red_blue_debate_service.py` | `domain/**` |
 | `infrastructure/storage/inmemory/debate_session_repository.py` | `domain/ports` + `domain/entities` + 标准库 |
 
@@ -772,7 +774,7 @@ class DebateCompleted(DomainEvent):
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | 辩论值对象 | 8 个 VO 构造 + 5 组不变量 | `tests/unit/domain/value_objects/test_debate.py` | Task 1 |
+| **TDD 单元测试** | 辩论值对象 | 8 类型构造（7 VO + 枚举）+ 5 组不变量 | `tests/unit/domain/value_objects/test_debate.py` | Task 1 |
 | **TDD 单元测试** | DebateSession | 状态机迁移/终态不变量/迁移计数 | `tests/unit/domain/entities/test_debate_session.py` | Task 2 |
 | **TDD 单元测试** | 辩论异常 | 构造/to_dict/HTTP 映射/code 唯一性 | `tests/unit/domain/exceptions/test_debate_exceptions.py` | Task 3 |
 | **TDD 单元测试** | DebateEvaluator | 三算法已知值/边界/中文 | `tests/unit/domain/services/test_debate_evaluator.py` | Task 4 |
@@ -1030,7 +1032,7 @@ class DebateCompleted(DomainEvent):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_red_blue_debate_service.py` Happy 组（三段结构 / 温度集合 {0.8,0.5,0.2} / gather 并发性（sleep 注入计时）/ 视角 prompt 互相不可见 / 事件 publish 字段 / per-call timeout 传递 / 仓储状态 IDLE→GENERATING→SYNTHESIZING→COMPLETED） |
+| 🔴 红 | 编写 `tests/unit/application/services/test_red_blue_debate_service.py` Happy 组（三段结构 / 温度阶梯（system_prompt 锚定断言红 0.8 蓝 0.5 合成 0.2）/ gather 并发性（Fake 内 sleep 注入制造切换点 + 窗口重叠断言 + 单边计时 <1.5×sleep）/ 视角独立性（限定两次 PerspectiveAnalysisSchema 调用、合成豁免）/ 事件 publish 字段 / per-call timeout 传递 / 仓储状态 IDLE→GENERATING→SYNTHESIZING→COMPLETED） |
 | 🟢 绿 | 实现 `src/application/services/red_blue_debate_service.py` + `src/application/ports/red_blue_debate_service.py`（编排八步流程，见 AC-7） |
 | 🔄 重构 | 编排步骤方法化（`_generate_perspectives`/`_check_divergence`/`_synthesize_risk_view`/`_publish_completion`）+ TEMPERATURE_PROFILE 等常量模块化 |
 
@@ -1387,7 +1389,7 @@ class DebateCompleted(DomainEvent):
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| R1-F01 | `divergence_rate` 命名与值语义自反（名为分化率、值是重叠率，高值=低分化）——已扩散至 RiskView/DebateQuality/事件/异常 context 四处，V1 消费方必误用 | P1 | 全局改名 `overlap_rate` / `evaluate_overlap` / `OVERLAP_HARD/WARNING_THRESHOLD`（`DebateLowDivergenceError` 类名保留——重叠高→分化低→异常，语义链正确）；改名前后数量守恒核验（9+1+5 处，零残留） |
+| R1-F01 | `divergence_rate` 命名与值语义自反（名为分化率、值是重叠率，高值=低分化）——已扩散至 RiskView/DebateQuality/事件/异常 context 四处，V1 消费方必误用 | P1 | 全局改名 `overlap_rate` / `evaluate_overlap` / `OVERLAP_HARD/WARNING_THRESHOLD`（`DebateLowDivergenceError` 类名保留——重叠高→分化低→异常，语义链正确）；改名前后数量守恒核验（9+1+5 处，零残留）——**R2 勘误**：标识符零残留属实，但中文注释「divergence 范围」漏网 1 处（R2-F08 补改） |
 | R1-F02 | 「`test_code_ranges.py` 含文档同步校验维度」三处失实——该测试 Rule 4 实际只校验 `_CLASS_TO_SUBDOMAIN` 覆盖 `__all__` 类，不读取 sisys-uni-exception-design.md，文档同步纯人工无 CI 强制 | P1 | 三处更正表述（硬约束 Checklist 第 5 项 / 登记确认动作 / AC-3 验证标准）；附主会话定谳：debate 3 异常直接继承抽象基类被 Rule 2 `abstract_names` 跳过，无需扩白名单 |
 | R1-F03 | `compute_gain_rate("ABCD", "ABC") ≈ 0.25` 与公式矛盾——差集 {CD}=1，1/max(2,1)=0.5，照写即错误期望 | P1 | 改为 `== 0.5` 精确断言并附推导 |
 | R1-F04 | 「复用既有 test_arch_* 的 AST 扫描助手」不可行——架构测试目录无共享助手模块，30 个文件均为私有 `_extract_imports` 复制形态 | P1 | Task 9 循环 B 重构阶段与 Subtask 9.6 改为「私有 `_extract_imports` 复制先例（附 file:line）」 |
@@ -1395,15 +1397,15 @@ class DebateCompleted(DomainEvent):
 | R1-F06 | Fake LLM 按 system_prompt 子串分派存在合成误路由——裁判 prompt 必然同时含"激进派""保守派"标记，判定顺序使合成调用误路由到视角 Schema，Happy path 对正确实现误红 | P1 | 分派方案重构为 response_schema 身份分派（+temperature 区分红蓝），角色标记降为断言物；4 处出现位同步（测试隔离约束 / AC-10 Fake 工厂 / 两条测试要求清单 / Task 6 prompts 测试） |
 | R1-F07 | `get_debate_result`「终态重建」对 FAILED 语义不可满足（FAILED 是终态但无 risk_view）且重建公式留白（quality/duration_ms 未写推导） | P1 | 明确仅 COMPLETED 可重建 + 三字段重建公式（title/DebateQuality 推导/completed_at−started_at 毫秒换算，注明测试断言重建语义非全等）；FAILED 及非 COMPLETED 返回 None；Task 7B 测试清单同步 |
 | R1-F08 | `evaluate_overlap` 同一行内签名 `-> float` 与「返回 DebateQuality(...)」自相矛盾，Task 4 测试无从落笔 | P1 | 定谳返回 float（与门控用法/断言一致），DebateQuality 组装归服务层，纯函数单一职责 |
-| R1-F09 | BDD AC-7.3「红蓝并发」Then 断言无观测物（(prompt, temperature) 序列串行实现产出相同，场景空转或无法落笔） | P1 | 观测物落地：Fake 记录每次调用 start/end 时间戳，断言红蓝窗口重叠（`blue.start < red.end` 且 `red.start < blue.end`，串行必红）；单测辅以单边计时阈值 `elapsed < 1.5×sleep`；AC-7.3 场景名与断言物同步 |
+| R1-F09 | BDD AC-7.3「红蓝并发」Then 断言无观测物（(prompt, temperature) 序列串行实现产出相同，场景空转或无法落笔） | P1 | 观测物落地：Fake 记录每次调用 start/end 时间戳，断言红蓝窗口重叠（`blue.start < red.end` 且 `red.start < blue.end`，串行必红）；单测辅以单边计时阈值 `elapsed < 1.5×sleep`；AC-7.3 场景名与断言物同步——**R2 勘误**：漏声明「零耗时 side_effect 无切换点、正确并发实现也假红」，sleep 注入为断言前置条件（R2-F02 补） |
 | R1-F10 | 事件发布失败只测契约外形态（AsyncMock raise）——EventPublisher 契约是返回 PublishResult（is_success 标志，不抛异常），契约内真实可达形态无处理规定无测试，真实全失败被静默吞 | P1 | 双形态处理规定（is_success==False → warning；raise → try/except warning；均不覆写结果）+ AC-7 验证标准与 Task 7B 测试清单双形态用例 |
 | R1-F11 | epics:1288-1290 架构测试三项（红蓝辩论/视角生成/风险视图）无 traceability 映射，验收核对时漏项 | P1 | AC-9 架构验证测试节补三项→具体测试文件/场景映射清单 |
 | R1-F12 | 「第 2 行 Story 注释」归属 R6 模板错误——R6 模板第 2 行直接 `功能:`，Story 注释次行形态属 4.1b/4.4 先例 | P2 | 头部组织改双先例组合表述（4.1b/4.4 贡献 Story 注释行；R6 贡献三段式/背景块/横幅；@scenario 绑定仍 R6 .py 先例不变） |
 | R1-F13 | 4.1a 被引为「模块级 event_loop fixture」样板失实（4.1a 用 scenarios()+_run_async 每次新建 loop）+「52/52 acceptance 文件」过期 | P2 | 先例改指 domain_dictionary/layered_retrieval；4.1a:424-430 标注为 _run_async 变体（同样合法）；52/52→59 |
 | R1-F14 | 仓储 `save -> None` 偏离全部 5 个 InMemory 先例（均返回实体）却自称同款；`state_version`「乐观锁」在全链路无执行点（save 幂等覆盖无 CAS） | P2 | `save -> DebateSession` 对齐先例 + AC-5 补「先 validate 再幂等覆盖（无版本冲突检测，V1 CAS 预留）」；「乐观锁」降格「迁移计数（V1 乐观锁 CAS 预留）」4 处同步 |
-| R1-F15 | 依赖矩阵遗漏 `debate_prompts`（服务必 import PERSPECTIVE_PROMPT_MAP/SYNTHESIS_*，按原矩阵实施即 lint-imports/运行时 ImportError） | P2 | 矩阵行补 `application/services/debate_prompts` |
+| R1-F15 | 依赖矩阵遗漏 `debate_prompts`（服务必 import PERSPECTIVE_PROMPT_MAP/SYNTHESIS_*，按原矩阵实施即 lint-imports/运行时 ImportError） | P2 | 矩阵行补 `application/services/debate_prompts`——**R2 勘误**：实际修复形态是服务行依赖清单追加两模块（非新增行），且两新文件自身缺行，R2-F06 已补 debate_schemas/debate_prompts 两行 |
 | R1-F16 | 测试分类表遗漏 Task 6 两文件（test_debate_schemas.py / test_debate_prompts.py，Task/Subtask/结构树/文件清单四处在唯分类表缺席，Subtask 10.2 按表收尾会漏核） | P2 | 分类表补两行（Task 6 归属） |
-| R1-F17 | 温度断言 sorted/集合写法检不出红蓝温度互换（0.8↔0.5 互换仍过） | P2 | 升级为按分派身份强制记录断言（PerspectiveAnalysisSchema 调用中 0.8/0.5 各至少一次，互换必红），sorted 仅补充；2 处同步 |
+| R1-F17 | 温度断言 sorted/集合写法检不出红蓝温度互换（0.8↔0.5 互换仍过） | P2 | 升级为按分派身份强制记录断言（PerspectiveAnalysisSchema 调用中 0.8/0.5 各至少一次，互换必红），sorted 仅补充；2 处同步——**R2 勘误**：「按分派身份」即 temperature 本身（红蓝同 Schema），循环论证检不出互换，「互换必红」为假声明；已由 R2-F01 重锚 system_prompt 角色标记修正 |
 | R1-F18 | 视角独立性断言未限定调用范围——合成 user prompt 按设计必然同含红蓝论点 JSON，断言若覆盖合成调用必误红 | P2 | 断言范围限定两次 PerspectiveAnalysisSchema 调用，合成调用显式豁免 |
 | R1-F19 | gather 异常语义未规定（默认首异常传播不取消兄弟任务→孤儿任务+never retrieved 警告）；失败路径转 FAILED 后是否 save 未写明；缺蓝视角对称断言；schema→VO 抛 242 的归宿未规定 | P2 | 编排步骤补：异常分支显式取消兄弟任务；「每次状态迁移后均 save」纪律；蓝视角对称用例 + 终态落库断言；242 透传归宿（属数据契约违反不包装 421） |
 | R1-F20 | Task 0 验收 .py 的 collection error 持续到 Task 7 才消失，Task 1~6 期间全量 pytest 带噪——中间态窗口未声明（Lessons Learned 只声明了登记先行窗口） | P2 | Task 0 DoD 补声明（collection error 为预期中间态，任务级验证以目标文件为准） |
@@ -1417,6 +1419,25 @@ class DebateCompleted(DomainEvent):
 | R1-F28 | 编排开销 <1s 断言判别力边界未注明（纯内存微秒~毫秒级，1s 阈值余量千倍，仅 smoke）；并发计时「≈max」双边近似断言 CI 抖动脆弱 | P3 | 判别力边界注明（检出编排内意外混入真实 IO）；计时断言改单边阈值 `elapsed < 1.5×sleep` |
 
 **Round 1 统计：** 调研 Agent ×4 + 审查 Agent ×2 + 主会话实测定谳 ×8；发现 P0×0 + P1×11 + P2×12 + P3×5（R1-F27 为评审员建议被实测改判），修复簇 28 项；改名传播 15 处数量守恒核验、6 组残留 grep 零命中。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R2-F01 | R1-F17 修复的温度断言循环论证——「按分派身份断言温度」中身份由 temperature 决定（红蓝同 Schema），红蓝互换（红 0.5/蓝 0.8）时断言仍「各至少一次」通过，「互换必红」为假声明（扩散 7 处；单测记录规格仅二字段无 system_prompt，正确锚点在单测面无从落笔） | P1 | 视角身份锚点重设为 **system_prompt 角色标记**（独立于 temperature 的信号：含"激进派"的调用必 0.8、含"保守派"必 0.5）；单测记录规格扩为六字段元组（与 BDD 工厂同构）；7 处同步改写 + R1-F17 台账勘误 |
+| R2-F02 | R1-F09 的窗口重叠断言在零耗时 Fake 下对**正确并发实现**假红——async side_effect 无 `await sleep` 即无挂起点，gather 两协程顺序跑完窗口不重叠；BDD 工厂签名无 delay 参数 | P1 | Fake side_effect 内强制 `await asyncio.sleep(0.05~0.15)` 制造切换点（写入断言前置条件）；工厂签名扩 `perspective_delay_sec: float = 0.05`；3 处同步 + R1-F09 台账勘误 |
+| R2-F03 | `PublishResult(is_success=False)` 字面构造 TypeError——`is_success` 是 property 非构造参数（构造签名仅 event_id + results，空 results 即 is_success=False） | P1 | 改正确构造形态 `PublishResult(event_id="evt-test", results=())` 并注明 property 语义 |
+| R2-F04 | `exception_handler()` 公共函数不存在（ExceptionHandlers 类需 FastAPI app 实例不可 BDD 直用）——AC-3 验证标准引导 dev import 不存在的函数 | P1 | 更正为私有纯函数 `_get_http_status(exc) -> int`（exception_handlers.py:247）+ acceptance 三处直接 import 先例（strategic_archive:559 / domain_dictionary:429,475）+ 落笔形态 |
+| R2-F05 | 7.5/7.6/7.7 失败与低分化注入形态未约定（工厂三参均 Schema 实例，「只有红失败」落笔二义） | P2 | 工厂参数约定扩为 `Schema 实例或 Exception 实例`（Exception 时对应分支 raise） |
+| R2-F06 | 依赖矩阵缺 debate_schemas/debate_prompts 两行（矩阵标题「新增文件的合法依赖」下两新文件无行）；R1-F15 台账「矩阵行补」与实际修复形态（服务行依赖清单追加）不符 | P2 | 补两行（schemas：标准库+pydantic+value_objects；prompts：标准库+typing+value_objects）+ R1-F15 台账勘误 |
+| R2-F07 | Task 7 TDD 表 Happy 组残留三项修复前旧表述（温度集合 {0.8,0.5,0.2}/「互相不可见」无限定语/并发仅 sleep 计时无窗口断言） | P2 | 按现行断言设计改写（system_prompt 锚定温度/独立性限定/切换点+窗口重叠） |
+| R2-F08 | R1-F01 改名残留：RiskView 不变量注释仍写「divergence 范围」（中文注释不含标识符，sed 未覆盖） | P2 | 改「overlap_rate ∈ [0,1]」+ R1-F01 台账勘误 |
+| R2-F09 | 验证标准「分化度 ≥0.95 → DebateLowDivergenceError」语义反转（触发条件是重叠率 ≥0.95，高重叠=低分化） | P2 | 改「重叠率 ≥0.95」 |
+| R2-F10 | 7.7 低分化触发构造的阈值数学陷阱：「改 1 字」构造在 <80 字符拼接下 J≈(n−2)/(n+2)<0.95 落警告区不抛 422；7.8 警告区无可控构造法 | P2 | 7.7 定谳「红蓝 arguments 完全相同（J=1.0）最稳」；7.8 给显式构造（单条 36 字论点改第 20 字 1 处 → 33/37≈0.892 ∈ [0.80,0.95)） |
+| R2-F11 | `evaluate_overlap` 空 bigram 并集 0/0 未定义（红蓝各仅单字论点时两 bigram 集皆空）——AC-4.4「单字符」边界用例落笔即撞 | P2 | 定谳空并集返回 0.0（与 repetition_rate 空集规则对齐）；AC-4 组场景补两用例（红蓝同单字 / 单字 vs 两字） |
+| R2-F12 | 旧度量名/旧计数残留三处（业务价值「分化度」值语义/AC-4.3 场景名「分化度两极值」/分类表「8 个 VO 构造」第 4 处） | P3 | 三处分别改「红蓝重叠率（overlap_rate）」「重叠率两极值」「8 类型构造（7 VO + 枚举）」 |
+| R2-F13 | AC-10 分组计数自相矛盾（「10 个 AC 分组」实为 AC-1~9 组+收尾；另一处「10 分组+收尾」读作 11 组） | P3 | 统一「AC-1~AC-9 九个分组 + 收尾验收组」两处 + 场景规模预期（35±1，步骤函数复用控行数） |
+| R2-F14 | `topic_title` 截断 100 字符发生位置未写明（__post_init__ 注释只列 aggregate/metadata），roundtrip 截断断言无从落笔 | P3 | 定谳事件 `__post_init__` 内 `object.__setattr__` 截断（frozen 惯例），注释补列 |
+
+**Round 2 统计：** 回归核查评审员 ×1 + 可满足性复推演评审员 ×1 + 主会话预推演（缺口 A/B 先行确认）；发现 P1×4 + P2×7 + P3×3，修复 14 项 + R1 台账勘误 4 处；核心形态——**修复组合互拆**（R1-F06×F17 循环论证、R1-F09 零耗时假红、R1-F15 台账与实际不符），印证「两个修复组合时必须交叉核对语义」。
 
 ---
 
@@ -1448,9 +1469,10 @@ class DebateCompleted(DomainEvent):
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-10-01
 **最后更新/Last Updated:** 2026-10-01
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（四视角代码调研 + epics/PRD/OR/架构文档提取 + 4-1a/4-4/4-1f 经验整合；debate 子域 420-429 新开；GAP-CRITICAL-09 清偿定位）
 - v1.1.0: Round 1 五维审查修订（科学性/合理性/正确性/一致性/可行性）——28 修复簇：P1×11（divergence→overlap 全局改名 / 文档同步 CI 校验失实×3 / gain_rate 示例值数学错误 / AST 助手复用不可行 / 延迟预算三段式重写 / Fake 分派误路由重构 / get_debate_result FAILED 语义 / evaluate_overlap 返回类型矛盾 / 并发观测物落地 / PublishResult 双形态 / epics 三项映射）+ P2×12 + P3×5；R1-F27 评审员建议经实测定谳改判不落码
+- v1.2.0: Round 2 回归核查 + 可满足性复推演——14 修复簇（P1×4 + P2×7 + P3×3）+ R1 台账勘误 4 处；核心发现：R1 修复组合互拆（温度断言循环论证重锚 system_prompt / 并发窗口零耗时假红补切换点 / PublishResult 构造 TypeError / exception_handler 函数名失实）
