@@ -28,7 +28,7 @@
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md:1277-1316)（Story 4.5 + FR-ST-05）/ [`prd.md:1817`](../../_bmad-output/planning-artifacts/prd.md)（FR-ST-05 P0）/ [`or.md:241`](../../_bmad-output/planning-artifacts/or.md)（三.5.[3]）/ [`architecture.md §7`](../../../docs/architecture/architecture.md)（SYS AGENT 裁决与辩论机制）
 
 **epics BDD 四句 → 测试面映射（traceability）**：epics:1312-1316「Given 分析任务存在争议议题」（→ `DebateTopic`，AC-1；真实 LLM 场景用争议性议题如"是否进入东南亚市场"，AC-9）/「When 执行红蓝辩论（单 Agent 多视角）」（→ `run_debate`，AC-7）/「Then 生成激进派和保守派两种视角的分析」（→ AC-7.1 双视角三段结构 + 温度锚定断言）/「And 输出包含共识与分歧区域的风险视图」（→ `RiskView`，AC-1 不变量 + AC-7 合成场景非空断言）；「高不确定性议题自动启动」已显式出范围（Epic 5/6）。
-**前置依赖:** Story 4.1a（✅ done，`LLMClientPort` 注入模式与 `RetryPolicy` 复用源）/ Story 3.2a（✅ done，`LLMClientPort` + `LitelLLMClient`，含 `LLMConfig.temperature` 分档传参）
+**前置依赖:** Story 4.1a（✅ done，`LLMClientPort` 注入模式与 `RetryPolicy` 复用源）/ Story 3.2a（✅ done，`LLMClientPort` + `LitellmLLMClient`，含 `LLMConfig.temperature` 分档传参）
 **后续依赖:** Story 10.6（红蓝辩论完整实现，复用本 Story 的 DebateSession/DebateEvaluator/温度阶梯）/ Story 5-x（Agent 协作辩论，复用 RiskView 结构）/ Story 5.8（Agent 输出质量评估，承接视角/共识语义准确率量化）
 
 ### ⚠️ Story 范围澄清（重要）
@@ -59,7 +59,7 @@
 
 - **R1 复用**（既有，不修改）：
   - `LLMClientPort`（`src/domain/ports/llm_client.py`）——`structured_generate(prompt, response_schema, config, system_prompt)` 完整覆盖辩论需求（temperature 经 `LLMConfig.temperature` 分档传参、system_prompt 承载视角角色、Pydantic schema 驱动结构化输出），**不扩展端口**（多轮历史拼入 prompt 字符串，`ToolExecutionEngine` 同款做法）
-  - `LitelLLMClient`（基础设施层唯一实现，含熔断器 + 指数退避重试 + 多策略 JSON 解析）
+  - `LitellmLLMClient`（基础设施层唯一实现，含熔断器 + 指数退避重试 + 多策略 JSON 解析）
   - `ExecutionContext`（`src/domain/value_objects/tool_execution.py`，会话/追踪上下文）
   - `EntityValidationError`(EXCEPTION_242) / `EntityStateTransitionError`(EXCEPTION_243)——VO 不变量与状态机守卫，**不新增编码**
   - `DomainEvent` 基类（`src/domain/events/base.py`，`event_type` 自动注册 + `object.__setattr__` 填 aggregate 惯例）
@@ -119,7 +119,7 @@
 - **禁止** 绕过 `LLMClientPort` 直接 import litellm（应用层只依赖端口抽象）
 - **禁止** 辩论 prompt 拼接泄露 system prompt 模板全文以外的内部实现细节（消息安全性：错误消息与 prompt 面向调用方可理解）
 - **温度阶梯三值硬编码为模块常量** `TEMPERATURE_PROFILE = {"red": 0.8, "blue": 0.5, "synthesis": 0.2}`（`red_blue_debate_service.py` 模块级），值与 FR-SP-10 / epics_v1.0.md:165 严格一致，架构验证测试断言对齐——禁止调用方随意传参覆盖（V1 演进时随轮次推进由编排内部计算，不开放外部配置）
-- **per-call timeout 必设**：每次 `structured_generate` 显式传 `LLMConfig(temperature=t, timeout=self._per_call_timeout_sec)`（默认 12.0s）；**禁止**依赖 `LLMConfig.from_env()` 默认 timeout=600.0s（否则单次挂起即冲垮延迟目标）。**延迟预算三段式（诚实声明）**：① 无重试路径上界 = max(红,蓝) 12s + 合成 12s + 编排 <1s ≈ 25s < 30s ✓；② `LitelLLMClient` 内置 tenacity 重试（默认 3 次尝试 + 指数退避 1~4s，构造级参数不可按调用调节且 llm_client 为共享端口零修改），含重试最坏 ≈ 3×12s + 退避 ≈ 39s/调用——超 30s 时表现为 BDD 30s 硬超时（conftest `_BDD_HARD_TIMEOUT`）先行截断而非业务异常，属**已声明的接受风险**（熔断器 failure_threshold=5 / recovery 30s 兜底防雪崩）；③ P95<30s 为分布统计目标，本 Story 以「真实 LLM 单点计时 + 无重试上界论证」交付证据，批量 P95 基准随 Story 5.7 落地
+- **per-call timeout 必设**：每次 `structured_generate` 显式传 `LLMConfig(temperature=t, timeout=self._per_call_timeout_sec)`（默认 12.0s）；**禁止**依赖 `LLMConfig.from_env()` 默认 timeout=600.0s（否则单次挂起即冲垮延迟目标）。**延迟预算三段式（诚实声明）**：① 无重试路径上界 = max(红,蓝) 12s + 合成 12s + 编排 <1s ≈ 25s < 30s ✓；② `LitellmLLMClient` 内置 tenacity 重试（默认 3 次尝试 + 指数退避 1~4s，构造级参数不可按调用调节且 llm_client 为共享端口零修改），含重试最坏 ≈ 3×12s + 退避 ≈ 39s/调用——超 30s 时表现为 BDD 30s 硬超时（conftest `_BDD_HARD_TIMEOUT`）先行截断而非业务异常，属**已声明的接受风险**（熔断器 failure_threshold=5 / recovery 30s 兜底防雪崩）；③ P95<30s 为分布统计目标，本 Story 以「真实 LLM 单点计时 + 无重试上界论证」交付证据，批量 P95 基准随 Story 5.7 落地
 - **红蓝视角互相不可见**：生成阶段双方 prompt 仅含议题与背景，**不含对方输出**（独立立场方法论，防锚定偏差）；对抗发生在合成阶段——禁止把蓝视角生成改为"看到红方再反驳"（那是 V1 多轮对抗的形态）
 
 ### 代码质量门禁（CLAUDE.md §4 第 3 项扩展）
@@ -160,7 +160,7 @@
 - `DebateGenerationError` 与 `DebateSynthesisError` 分立两类（不合并为一个"DebateLLMError"）：监控面需精确区分"视角生成失败"（可定位到红/蓝哪一方）与"合成失败"——对齐 4-4 反模式审查经验"无法精确区分则监控无法精确告警"
 - `DebateLowDivergenceError` 继承 `BusinessException`：分化不足是辩论流程的业务结果违反（LLM 调用本身成功），非外部故障；阈值 0.95 语义 = 两视角论点几乎完全相同
 - **不设 `DebateError` 子域基类**：420/421 继承 ExternalException、422 继承 BusinessException，无法共享同一基类（项目规范必须继承三大抽象分层之一）；`relevance` 子域（360/361）平铺无基类先例支持此设计
-- **结构化输出校验失败的异常包装链（2026-10-01 实测定谳）**：小模型违反 minItems/maxItems 等 json_schema 约束时，`response_schema(**parsed)` 抛 pydantic `ValidationError`（继承 `ValueError`）→ 被 `LitelLLMClient` 外层 `except (…, ValueError, …)` 捕获（litellm_llm_client.py:722）→ 重试耗尽统一抛 `LLMResponseError(cause=…)`（:730-735）→ 服务包装为 420/421——**裸 ValidationError 不会逃逸**，服务 except 面无需（也不应）额外覆盖 ValidationError（会造死代码分支）
+- **结构化输出校验失败的异常包装链（2026-10-01 实测定谳）**：小模型违反 minItems/maxItems 等 json_schema 约束时，`response_schema(**parsed)` 抛 pydantic `ValidationError`（继承 `ValueError`）→ 被 `LitellmLLMClient` 外层 `except (…, ValueError, …)` 捕获（litellm_llm_client.py:723）→ 重试耗尽统一抛 `LLMResponseError(cause=…)`（:731-736）→ 服务包装为 420/421——**裸 ValidationError 不会逃逸**，服务 except 面无需（也不应）额外覆盖 ValidationError（会造死代码分支）
 
 **禁止设计反模式（异常 5 轮审查经验 + 4-4 先例）：**
 
@@ -595,7 +595,7 @@ class DebateCompleted(DomainEvent):
 - [ ] `resolve("debate_evaluator")` 两次 resolve 返回同一实例（SINGLETON 生效）
 - [ ] 契约测试 `tests/contracts/test_port_contract_red_blue_debate_service.py` 11 维度通过（含 `REQUIRED_METHODS = ["run_debate", "get_debate_result"]`）
 - [ ] 契约测试 `tests/contracts/test_port_contract_debate_session_repository.py` 11 维度通过
-- [ ] `poetry run pytest tests/contracts/ -q` 全量通过（既有契约测试零回归——tests/contracts/ 现 76 个测试文件、覆盖 157 个注册端口）
+- [ ] `poetry run pytest tests/contracts/ -q` 全量通过（既有契约测试零回归——tests/contracts/ 现 76 个 .py（含 conftest.py 与 verify_contracts.py，test_*.py 为 74 个）、覆盖 157 个注册端口）
 
 ### AC-9: 集成测试 + 架构验证测试 + 性能验收（epics 硬路径）
 
@@ -657,7 +657,7 @@ class DebateCompleted(DomainEvent):
 **验证标准/Validation Criteria:**
 
 - [ ] feature 文件 `# language: zh-CN` 首行 + Story 注释次行 + 功能三段式 + 背景: 块
-- [ ] 完整覆盖 AC-1~AC-9 九个分组 + 收尾验收组（每组 ≥ 1 子场景，场景命名 `AC-N.M - 描述`；预计 35±1 个场景——步骤函数同文本跨场景全局复用控文件行数）
+- [ ] 完整覆盖 AC-1~AC-9 九个分组 + 收尾验收组（每组 ≥ 1 子场景，场景命名 `AC-N.M - 描述`；预计 36 个场景——6+3+4+4+3+2+9+2+2+1 逐组计数；步骤函数同文本跨场景全局复用控文件行数）
 - [ ] 异常场景双断言（抛出 XXX异常 + 错误码为 EXCEPTION_xxx）
 - [ ] step 文件 `@scenario` 显式绑定全部场景 + 6 项关键约定 docstring
 - [ ] 步骤函数同步 def + event_loop.run_until_complete；零 `@pytest.mark.asyncio`
@@ -1386,7 +1386,7 @@ class DebateCompleted(DomainEvent):
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 至 AC-10，共 10 项 AC）
 3. [x] Architecture constraints extracted 架构约束已提取（六边形 4 层 + R1/R2/R3 复用决策 + LLM 调用安全约束）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（4-1a/4-4/4-1f 一致模式 + GAP-CRITICAL-09 清偿）
-5. [ ] Sprint status synced to `ready-for-dev`（create-story workflow 收尾自动更新）
+5. [x] Sprint status synced to `ready-for-dev`（sprint-status.yaml:149 已更新，随创建提交 3b386d48 入库）
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
@@ -1420,7 +1420,7 @@ class DebateCompleted(DomainEvent):
 | R1-F24 | 「既有 157 端口契约」数字混淆（157 是 register_port 数；tests/contracts/ 实为 76 文件） | P3 | 改「76 个测试文件、覆盖 157 个注册端口」 |
 | R1-F25 | 类型计数三处不一（「8 类型且 frozen」vs「8 个 VO+枚举」=9；枚举非 frozen dataclass） | P3 | 统一「7 个 frozen dataclass VO + 1 个枚举 = 8 类型」3 处同步 |
 | R1-F26 | 三条 grep 自查路径清单漏 `src/application/ports/red_blue_debate_service.py`（R3 新建文件之一） | P3 | 清单补入（10→11 路径） |
-| R1-F27 | 评审员报「裸 pydantic ValidationError 可能逃逸」——主会话实测推翻：ValidationError 继承 ValueError，被 LitelLLMClient 外层 except 捕获→重试耗尽统一抛 LLMResponseError（:722/:730-735），不逃逸 | P3 | 改判不落码（服务 except 面不扩 ValidationError，避免死代码分支）；包装链事实登记入异常契约节，供 dev 免推演 |
+| R1-F27 | 评审员报「裸 pydantic ValidationError 可能逃逸」——主会话实测推翻：ValidationError 继承 ValueError，被 LitellmLLMClient 外层 except 捕获→重试耗尽统一抛 LLMResponseError（:723/:731-736），不逃逸 | P3 | 改判不落码（服务 except 面不扩 ValidationError，避免死代码分支）；包装链事实登记入异常契约节，供 dev 免推演 |
 | R1-F28 | 编排开销 <1s 断言判别力边界未注明（纯内存微秒~毫秒级，1s 阈值余量千倍，仅 smoke）；并发计时「≈max」双边近似断言 CI 抖动脆弱 | P3 | 判别力边界注明（检出编排内意外混入真实 IO）；计时断言改单边阈值 `elapsed < 1.5×sleep` |
 
 **Round 1 统计：** 调研 Agent ×4 + 审查 Agent ×2 + 主会话实测定谳 ×8；发现 P0×0 + P1×11 + P2×12 + P3×5（R1-F27 为评审员建议被实测改判），修复簇 28 项；改名传播 15 处数量守恒核验、6 组残留 grep 零命中。
@@ -1446,7 +1446,7 @@ class DebateCompleted(DomainEvent):
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| R3-F01 | BDD AC-1 组不变量失败场景仅覆盖 3/5 组且「四组」计数失实——组 3（Area 非空）与组 5（质量/结果越界）无场景位，dev 按清单落笔即漏 | P1 | AC-1 组重构为 6 场景覆盖全部 5 组（组 1 议题边界/组 2 视角校验/组 3 区域字段/组 4 视图校验/组 5 质量与结果），场景总数 35→37 |
+| R3-F01 | BDD AC-1 组不变量失败场景仅覆盖 3/5 组且「四组」计数失实——组 3（Area 非空）与组 5（质量/结果越界）无场景位，dev 按清单落笔即漏 | P1 | AC-1 组重构为 6 场景覆盖全部 5 组（组 1 议题边界/组 2 视角校验/组 3 区域字段/组 4 视图校验/组 5 质量与结果），场景总数 35→36（**R5 勘误**：原记 37 系收尾场景重复计数） |
 | R3-F02 | AC-1「每项独立用例」粒度歧义（按组读则长度边界全漏测——title 201/background 8001/arguments 0 与 9 条等 13 条子约束） | P2 | 明确「每条子约束一独立用例」+ 枚举边界清单 |
 | R3-F03 | risks/recommendations 零约束（元素可空串）、Area 描述类字段（description/red_position/blue_position/risk_note）无非空约束、DisagreementArea 无 confidence 未声明是否有意 | P2 | risks/recommendations 声明「允许空 tuple 每条非空」；Area 描述类字段补非空（组 3 扩展）；DisagreementArea 无 confidence 注释声明有意（对立立场无单一置信度） |
 | R3-F04 | DebateSession.validate() 调用时机未写明（__post_init__ 构造即抛 vs 显式调用——两种实现下「终态不变量抛 242」测试形态不同）；AC-2 字面均满足但落笔分歧 | P2 | 写明 validate() 于 __post_init__ 调用（ToolExecution 同构 :117-119）+ 终态不变量测试落笔形态（直接构造终态实体断言构造抛 242） |
@@ -1459,6 +1459,22 @@ class DebateCompleted(DomainEvent):
 | R3-F11 | epics BDD 四句无显式 traceability（内容实质覆盖但无映射行） | P3 | Story 描述节补四句→测试面映射行（含「争议性议题」输入语义落点） |
 
 **Round 3 统计：** 单深度评审员 ×1（三维度：不变量完备性/Task 结构可执行/需求源覆盖）+ 主会话核查（event_publisher 端口名 :594 / 三重门 :50-53 / 字符串 impl 先例——三项 P0 候选全部排除）；发现 P1×1 + P2×5 + P3×5，修复 11 项；Z-8/Z-9 需求覆盖与拆分编号核实零遗漏。
+
+**Round 4（纯验证轮，零修复）：** 主会话七维度快扫——R1/R2/R3 修复锚点 14 组 grep 全部落位、11 Task 结构完整、53 台账行齐、版本链一致；发现 1 个记录级留项（场景计数）移交 R5。按「无 P0 不造提交」纪律无独立提交，与 R5 收尾合并。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R5-F01 | 场景计数三方漂移（行 660「35±1」vs R3-F01 台账「35→37」vs 枚举实数 36——收尾场景被重复计数） | P3 | 定谳 36（6+3+4+4+3+2+9+2+2+1 逐组计数写入）；行 660 改「预计 36 个场景」；R3-F01 台账勘误「35→36」 |
+| R5-F02 | Sprint 同步勾选失实（「[ ] Sprint status synced」未勾，实际 sprint-status.yaml:149 已 ready-for-dev 且随创建提交入库） | P3 | 改 [x] 并注明入库提交 |
+| R5-F03 | LLM 客户端类名拼写错误 5 处（"LitelLLMClient"——实际类名 `LitellmLLMClient`，litellm_llm_client.py:172） | P3 | sed 全局更正 5 处（数量守恒核验） |
+| R5-F04 | 契约文件计数口径不明（「76 个测试文件」——76 为 .py 总数含 conftest/verify_contracts，test_*.py 实为 74） | P3 | 注明口径「76 个 .py（含 conftest 与 verify_contracts，test_*.py 74 个）」 |
+| R5-F05 | litellm 客户端行号偏移 1（「:722/:730-735」——实际 except@723、raise@731-736，R5 终审双向取证发现） | P3 | 两处（异常契约节 + R1-F27 台账）行号 +1 更正 |
+
+**Round 5 统计：** 独立终审评审员 ×1（不轻信自报——周期闭合甄别 / 10 项修复抽验双向取证 / 12 组行号向仓库实地验证（11 组精确命中）/ 独立快扫 / 门禁判据实跑判定）；周期闭合 1:1（git 序列 3b386d48→6281cf7a→4a0c098d→54536f72 与台账轮次严格对应，零游离提交）；发现 P3×5（全记录级，前四轮均漏），随本轮清偿。
+
+### ✅ 审查周期收敛声明（Round 5 终审签署）
+
+> Story 4-5 经 R1~R5 五轮审查：53+5 = 58 修复簇 + 5 勘误。R1 四视角调研+双评审（28 簇，含 divergence→overlap 全局改名、延迟预算三段式诚实声明、Fake 分派误路由重构）；R2 回归核查+可满足性复推演（14 簇 + 4 勘误，核心为 R1 修复组合互拆——温度断言循环论证重锚 system_prompt、并发窗口零耗时假红补切换点）；R3 单深度三维度（11 簇，BDD 五组不变量全覆盖、validate 调用时机定谳）；R4 纯验证轮（零修复，锚点全落位）；R5 独立终审（5 项 P3 清偿，周期闭合 1:1，12 组行号实地验证 11 组精确）。**P0 全周期 ×0，P1 清零，收敛判据达成。** 遗留：无。文档 v1.4.0，可进入 dev-story 实施。
 
 ---
 
@@ -1490,7 +1506,7 @@ class DebateCompleted(DomainEvent):
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-10-01
 **最后更新/Last Updated:** 2026-10-01
 **更新说明/Description:**
@@ -1498,3 +1514,4 @@ class DebateCompleted(DomainEvent):
 - v1.1.0: Round 1 五维审查修订（科学性/合理性/正确性/一致性/可行性）——28 修复簇：P1×11（divergence→overlap 全局改名 / 文档同步 CI 校验失实×3 / gain_rate 示例值数学错误 / AST 助手复用不可行 / 延迟预算三段式重写 / Fake 分派误路由重构 / get_debate_result FAILED 语义 / evaluate_overlap 返回类型矛盾 / 并发观测物落地 / PublishResult 双形态 / epics 三项映射）+ P2×12 + P3×5；R1-F27 评审员建议经实测定谳改判不落码
 - v1.2.0: Round 2 回归核查 + 可满足性复推演——14 修复簇（P1×4 + P2×7 + P3×3）+ R1 台账勘误 4 处；核心发现：R1 修复组合互拆（温度断言循环论证重锚 system_prompt / 并发窗口零耗时假红补切换点 / PublishResult 构造 TypeError / exception_handler 函数名失实）
 - v1.3.0: Round 3 单深度三维度审查——11 修复簇（P1×1 + P2×5 + P3×5）：BDD AC-1 组 5/5 全覆盖重构 / 不变量子约束逐条枚举 / Area 描述字段非空 / validate 调用时机定谳 / session 回填时机 / GAP-CRITICAL-09 登记动作 / epics 四句 traceability；主会话核查排除 3 项 P0 候选（event_publisher 端口名已注册）
+- v1.4.0: Round 4 纯验证轮（零修复，锚点全落位）+ Round 5 独立终审——5 项 P3 清偿（场景计数定谳 36 / Sprint 勾选 / LitellmLLMClient 拼写×5 / 契约计数口径 / 行号偏移）；周期闭合 1:1、12 组行号实地验证、P0 全周期 ×0、P1 清零——**审查周期收敛，可进入 dev-story 实施**
