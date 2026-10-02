@@ -22,6 +22,7 @@ from .compliance_events import (
 )
 from .correction_events import CorrectionApproved
 from .data_source_events import DataSourceFetched, DataSourceFetchFailed
+from .debate_events import DebateCompleted
 from .dictionary_events import DictionaryUpdated
 from .document_events import DocumentProcessed, DocumentUploaded, DocumentVersionSnapshotCreated
 from .entity_extraction_events import EntitiesExtracted
@@ -76,4 +77,5 @@ __all__ = [
     "FactBecameStale",
     "DataSourceFetched",
     "DataSourceFetchFailed",
+    "DebateCompleted",
 ]

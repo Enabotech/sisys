@@ -35,6 +35,9 @@ from src.domain.exceptions import (
     DataSourceRateLimitError,
     DataSourceResponseError,
     DataSourceUnavailableError,
+    DebateGenerationError,
+    DebateLowDivergenceError,
+    DebateSynthesisError,
     DictionaryEntryConflictError,
     DictionaryNotFoundError,
     DictionaryVersionConflictError,
@@ -240,6 +243,10 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     DataSourceUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,  # 411 — 数据源不可用（重试耗尽）
     DataSourceRateLimitError: status.HTTP_429_TOO_MANY_REQUESTS,  # 412 — 数据源 429 限流
     DataSourceResponseError: status.HTTP_502_BAD_GATEWAY,  # 413 — 响应解析失败（不可重试）
+    # 红蓝辩论异常（Story 4.5 — 单 Agent 多视角辩论）
+    DebateGenerationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 420 — 视角生成失败（精确注册，避免回退 502）
+    DebateSynthesisError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 421 — 风险视图合成失败（精确注册，避免回退 502）
+    DebateLowDivergenceError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 422 — 红蓝分化不足（精确注册，避免回退 400）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

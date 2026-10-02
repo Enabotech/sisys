@@ -91,6 +91,14 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # EXCEPTION_413 DataSourceResponseError (Story 4.1b, 响应解析失败，不可重试)
     # 子域语义归属 external（ExternalException 子类），物理段独立于 301-399（external 已满）
     "data_source": (410, 419),
+    # 红蓝辩论子域（420-429）—— Story 4.5 注册 3 个异常:
+    # EXCEPTION_420 DebateGenerationError (Story 4.5, 红/蓝视角 LLM 生成失败)
+    # EXCEPTION_421 DebateSynthesisError (Story 4.5, 风险视图合成 LLM 调用失败)
+    # EXCEPTION_422 DebateLowDivergenceError (Story 4.5, 红蓝重叠率 ≥0.95 分化不足)
+    # 420/421 语义归属 external（ExternalException 子类）、422 语义归属 business（BusinessException 子类），
+    # 物理段独立于 301-399 与 201-209（两段均无整段空位，遵循 data_source 410-419 独立段先例）
+    # EXCEPTION_423-429 预留 V1 多轮辩论（轮次超限/裁决置信度不足/辩论过热等，Story 10.6）
+    "debate": (420, 429),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -232,6 +240,10 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "DataSourceUnavailableError": "data_source",
     "DataSourceRateLimitError": "data_source",
     "DataSourceResponseError": "data_source",
+    # debate_exceptions.py (Story 4.5 新增 3 个异常)
+    "DebateGenerationError": "debate",
+    "DebateSynthesisError": "debate",
+    "DebateLowDivergenceError": "debate",
 }
 
 

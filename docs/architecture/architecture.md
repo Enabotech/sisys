@@ -2719,7 +2719,7 @@ buckets/
 
 | 约束 | 默认值 | 强制要求 |
 |------|--------|---------|
-| **timeout_seconds** | 30 | P95 < 5s，超时抛 `SkillExecutionError`（EXCEPTION_423） |
+| **timeout_seconds** | 30 | P95 < 5s，超时抛 `SkillExecutionError`（编码待 skill 子域注册时在 `_code_ranges.py` 分配，420-429 已分配给 debate 子域） |
 | **max_memory_mb** | 512 | OOM 抛 `SkillPolicyViolationError` |
 | **max_cpu_percent** | 50 | 持续超限自动 kill |
 | **network_whitelist** | [] | 默认无网络（Anthropic 风格），仅允许通过 nsenter 注入白名单 |
@@ -2739,7 +2739,7 @@ buckets/
 **资源加载安全：**
 - 路径白名单：`SAFE_ROOT = "/app/skills/{slug}"`，所有 L3 资源必须在此目录下
 - Path traversal 防护：`safe_join_skill_path(slug, relative)` 中 `Path.resolve() + is_relative_to()` 校验
-- 异常代码：`PathTraversalError`（EXCEPTION_422，skill 子域）
+- 异常代码：`PathTraversalError`（编码待 skill 子域注册时在 `_code_ranges.py` 分配；EXCEPTION_422 已分配给 debate 子域 DebateLowDivergenceError）
 
 #### 17.3.2 工具调用决策原则（Anthropic 风格）
 
@@ -3308,7 +3308,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | **GAP-CRITICAL-08** | Skills SOP 目录未创建 | §17.2 | ❌ 无目录 | Epic 5 Story 5-3（蓝图 85 人天 / 8 周） |
 | **GAP-CRITICAL-08a** | L1 TOOLS.md 元数据聚合文件未创建 | §17.3 | ❌ 无文件 | Epic 5 Story 5-3 |
 | **GAP-CRITICAL-08b** | SkillSelector 硬编码选择器违反 P5（"Less scaffolding"）| §17.3 | ❌ 设计偏差 | Epic 5 Story 5-2（删除硬编码，模型自决） |
-| **GAP-CRITICAL-09** | 辩论质量评估器未实现 | §7.3 | ❌ 无代码 | Epic 4 |
+| **GAP-CRITICAL-09** | 辩论质量评估器未实现 | §7.3 | ✅ 已实现（Story 4.5 清偿：`src/domain/services/debate_evaluator.py` 三算法 + `tests/unit/domain/services/test_debate_evaluator.py`） | Epic 4 |
 
 #### 19.4.2 设计完整性差距（次要）
 

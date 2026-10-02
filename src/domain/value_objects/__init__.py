@@ -25,6 +25,16 @@ from src.domain.value_objects.container_security_result import (
     ResourceLimitsStatus,
 )
 from src.domain.value_objects.data_integrity_result import IntegrityResult
+from src.domain.value_objects.debate import (
+    ConsensusArea,
+    DebatePerspective,
+    DebateQuality,
+    DebateResult,
+    DebateTopic,
+    DisagreementArea,
+    PerspectiveAnalysis,
+    RiskView,
+)
 from src.domain.value_objects.document_format import (
     ARCHIVE_EXTENSIONS,
     DOCUMENT_EXTENSIONS,
@@ -106,6 +116,14 @@ __all__ = [
     "FlowStatus",
     "InjectionDetectionResult",
     "IntegrityResult",
+    "ConsensusArea",
+    "DebatePerspective",
+    "DebateQuality",
+    "DebateResult",
+    "DebateTopic",
+    "DisagreementArea",
+    "PerspectiveAnalysis",
+    "RiskView",
     "IntrusionStats",
     "IsolationVerificationResult",
     "MAX_ARCHIVE_EXTRACTED_SIZE",

@@ -1,6 +1,6 @@
 # Story 4.5: 红蓝辩论机制基础（单 Agent 多视角）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -171,13 +171,13 @@
 
 ### 登记确认动作（Task 0 必做）
 
-- [ ] 新建 `src/domain/exceptions/debate_exceptions.py`（3 个异常类 + 文件头编码分配/继承理由 docstring）
-- [ ] `src/domain/exceptions/_code_ranges.py`：`CODE_RANGES` 增加 `"debate": (420, 429)`（含注释列举 420-422 归属 + 423-429 预留说明）+ `_CLASS_TO_SUBDOMAIN` 增加 3 行
-- [ ] `src/domain/exceptions/__init__.py` 导入并加入 `__all__`
-- [ ] `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 注册 3 条（`# 420`/`# 421`/`# 422` 注释与 code 严格一致）
-- [ ] `docs/architecture/sisys-uni-exception-design.md §3.3.2` 编码分配表增加 debate 子域 3 行
-- [ ] 运行 `poetry run pytest tests/unit/domain/exceptions/test_code_ranges.py -v`（校验子域范围/继承链一致性/注册覆盖三维度；§3.3.2 文档表更新为人工维护，无 CI 强制）
-- [ ] 运行 `poetry run pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v`（无碰撞）
+- [x] 新建 `src/domain/exceptions/debate_exceptions.py`（3 个异常类 + 文件头编码分配/继承理由 docstring）
+- [x] `src/domain/exceptions/_code_ranges.py`：`CODE_RANGES` 增加 `"debate": (420, 429)`（含注释列举 420-422 归属 + 423-429 预留说明）+ `_CLASS_TO_SUBDOMAIN` 增加 3 行
+- [x] `src/domain/exceptions/__init__.py` 导入并加入 `__all__`
+- [x] `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 注册 3 条（`# 420`/`# 421`/`# 422` 注释与 code 严格一致）
+- [x] `docs/architecture/sisys-uni-exception-design.md §3.3.2` 编码分配表增加 debate 子域 3 行（另同步子域范围约束表；并修订 architecture.md §17.3.1 两处文档级预留 422/423 的撞码风险——该两处为未实现的 skill 子域文档预留，改为"待 skill 子域注册时分配"）
+- [x] 运行 `poetry run pytest tests/unit/domain/exceptions/test_code_ranges.py -v`（8 passed——验证 R1-F02 判断：继承抽象基类被 abstract_names 跳过，无需扩白名单）
+- [x] 运行 `poetry run pytest tests/unit/domain/exceptions/test_error_code_uniqueness.py -v`（无碰撞，通过）
 
 ---
 
@@ -857,17 +857,17 @@ class DebateCompleted(DomainEvent):
 
 > **目的：** 在进入代码实现前，明确异常登记、事件登记、Gherkin 验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 完成异常 5 项 Checklist（`debate_exceptions.py` 3 类 + `_code_ranges.py` 两表 + `__init__.py` + `EXCEPTION_HTTP_MAP` 3 条 + `sisys-uni-exception-design.md §3.3.2` 同步；运行 `test_code_ranges.py` + `test_error_code_uniqueness.py` 确认通过——**登记本身即实现，TDD 红绿在 Task 3 展开单测**）
-- [ ] Subtask 0.2: 创建 `src/domain/events/debate_events.py` 空规范骨架（仅 docstring 编码事件字段清单）+ 四处登记中的两处配置（`event_channels.yaml` + `DEFAULT_MAPPINGS` 条目；事件类实现随 Task 5 TDD 落地）
-- [ ] Subtask 0.3: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_red_blue_debate.feature`（R6 模板组织：背景块 + 10 AC 分组 + 收尾场景，场景清单见 AC-10）
-- [ ] Subtask 0.4: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_red_blue_debate.py`（@scenario 显式绑定 + context dict + Fake LLM 工厂 + event_loop fixture；实现步骤对尚不存在的类型将 ImportError——预期红）
-- [ ] Subtask 0.5: 运行验收测试，确认失败（🔴 红阶段验证：失败原因为 `ModuleNotFoundError`/`ImportError`，非语法错误）
+- [x] Subtask 0.1: 完成异常 5 项 Checklist（`debate_exceptions.py` 3 类 + `_code_ranges.py` 两表 + `__init__.py` + `EXCEPTION_HTTP_MAP` 3 条 + `sisys-uni-exception-design.md §3.3.2` 同步；运行 `test_code_ranges.py` + `test_error_code_uniqueness.py` 确认通过——**登记本身即实现，TDD 红绿在 Task 3 展开单测**）
+- [x] Subtask 0.2: 创建 `src/domain/events/debate_events.py` 空规范骨架（仅 docstring 编码事件字段清单）+ 四处登记中的两处配置（`event_channels.yaml` + `DEFAULT_MAPPINGS` 条目；事件类实现随 Task 5 TDD 落地）
+- [x] Subtask 0.3: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_red_blue_debate.feature`（R6 模板组织：背景块 + 10 AC 分组 + 收尾场景，场景清单见 AC-10）
+- [x] Subtask 0.4: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_red_blue_debate.py`（@scenario 显式绑定 + context dict + Fake LLM 工厂 + event_loop fixture；实现步骤对尚不存在的类型将 ImportError——预期红）
+- [x] Subtask 0.5: 运行验收测试，确认失败（🔴 红阶段验证：失败原因为 `ModuleNotFoundError`/`ImportError`，非语法错误）
 
 **完成标准/Definition of Done:**
-- [ ] 异常与事件登记完成且既有异常测试套件通过
-- [ ] Gherkin + BDD 步骤文件就绪，运行确认红
-- [ ] 已声明中间态窗口：Task 1~6 期间本验收 .py 因顶部 import 未落地类型呈 collection error（预期中间态，与 4.1a~4.4 先例的"运行失败即红"口径一致）；任务级验证以目标测试文件为准，全量 `pytest tests/` 到 Task 7 后恢复无噪
-- [ ] 规范文档（本 Story 端口契约/异常契约/依赖矩阵）经 dev 人工复核
+- [x] 异常与事件登记完成且既有异常测试套件通过（8 passed）
+- [x] Gherkin + BDD 步骤文件就绪，运行确认红（ModuleNotFoundError: src.application.services.debate_prompts）
+- [x] 已声明中间态窗口：Task 1~6 期间本验收 .py 因顶部 import 未落地类型呈 collection error（预期中间态，与 4.1a~4.4 先例的"运行失败即红"口径一致）；任务级验证以目标测试文件为准，全量 `pytest tests/` 到 Task 7 后恢复无噪
+- [x] 规范文档（本 Story 端口契约/异常契约/依赖矩阵）经 dev 人工复核
 
 ---
 
@@ -883,14 +883,14 @@ class DebateCompleted(DomainEvent):
 | 🟢 绿 | 实现 `src/domain/value_objects/debate.py`（8 类型 + `__post_init__` 校验，签名见端口契约节） |
 | 🔄 重构 | 类型注解补全 + Google 全中文 docstring + `value_objects/__init__.py` re-export |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写值对象失败测试（含每项不变量的 context 字段断言）
-- [ ] Subtask 1.2: 🟢 绿 — 实现 8 个 frozen dataclass + 枚举最小代码
-- [ ] Subtask 1.3: 🔄 重构 — 优化校验提取（`_validate_non_empty` 等私有助手）、运行 `ruff` + `mypy`
+- [x] Subtask 1.1: 🔴 红 — 编写值对象失败测试（含每项不变量的 context 字段断言）
+- [x] Subtask 1.2: 🟢 绿 — 实现 8 个 frozen dataclass + 枚举最小代码
+- [x] Subtask 1.3: 🔄 重构 — 优化校验提取（`_validate_non_empty` 等私有助手）、运行 `ruff` + `mypy`
 
 **完成标准/Definition of Done:**
-- [ ] 8 类型实现 + `__init__.py` 导出
-- [ ] 不变量 5 组用例全绿
-- [ ] `lint-imports` 零依赖通过
+- [x] 8 类型实现 + `__init__.py` 导出
+- [x] 不变量 5 组用例全绿（63 passed）
+- [x] `lint-imports` 零依赖通过（domain 层契约 KEPT；既有 Interfaces→infrastructure BROKEN 经 stash 对比确认为非本 Story 引入）
 
 ---
 
@@ -914,16 +914,16 @@ class DebateCompleted(DomainEvent):
 | 🟢 绿 | 实现 `src/domain/ports/debate_session_repository.py` + `src/infrastructure/storage/inmemory/debate_session_repository.py`（asyncio.Lock 类变量） |
 | 🔄 重构 | 端口 docstring 异常声明 + `ports`/`storage` `__init__` 导出 |
 
-- [ ] Subtask 2.1: 🔴 红 — 实体状态机失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 `DebateSession`
-- [ ] Subtask 2.3: 🔄 重构 — 优化实体代码
-- [ ] Subtask 2.4: 🔴 红 — 仓储端口/实现失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 实现端口 Protocol + InMemory 仓储
-- [ ] Subtask 2.6: 🔄 重构 — 优化仓储代码
+- [x] Subtask 2.1: 🔴 红 — 实体状态机失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 `DebateSession`
+- [x] Subtask 2.3: 🔄 重构 — 优化实体代码
+- [x] Subtask 2.4: 🔴 红 — 仓储端口/实现失败测试
+- [x] Subtask 2.5: 🟢 绿 — 实现端口 Protocol + InMemory 仓储
+- [x] Subtask 2.6: 🔄 重构 — 优化仓储代码（__init__ 导出遵循既有惯例：entities/ports/inmemory 包级 __init__ 均不导出 Story 新增端口，直接模块路径 import）
 
 **完成标准/Definition of Done:**
-- [ ] 状态机全分支覆盖 + 并发安全验证
-- [ ] 两 TDD 循环全绿
+- [x] 状态机全分支覆盖 + 并发安全验证（实体 26 + 仓储 9 = 35 passed）
+- [x] 两 TDD 循环全绿（ruff + mypy 通过）
 
 ---
 
@@ -941,13 +941,13 @@ class DebateCompleted(DomainEvent):
 | 🟢 绿 | 补齐 `debate_exceptions.py` 3 类完整实现（Task 0 骨架 → 完整构造器与 docstring） |
 | 🔄 重构 | 文件头"继承链选择理由" docstring 终稿 + 与 `relevance_exceptions.py` 格式对齐校对 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 3 类异常失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 完整实现 3 类异常
-- [ ] Subtask 3.3: 🔄 重构 — 优化 docstring 与 context 组装
+- [x] Subtask 3.1: 🔴 红 — 编写 3 类异常失败测试（实现已在 Task 0 登记完成，红以变异验证替代：临时改 420 code → 2 failed → 恢复 → 全绿，证明判别力）
+- [x] Subtask 3.2: 🟢 绿 — 完整实现 3 类异常（Task 0 已写完整构造器，本 Task 校验 cause 链断言形态——LLMAPIError 为 DomainError 子类，cause 递归 to_dict 而非 {"type"} 形态）
+- [x] Subtask 3.3: 🔄 重构 — 优化 docstring 与 context 组装
 
 **完成标准/Definition of Done:**
-- [ ] 异常单测 + 既有 `test_code_ranges.py`/`test_error_code_uniqueness.py` 全绿
-- [ ] 三条 grep 自查零输出（本 Story 路径）
+- [x] 异常单测 + 既有 `test_code_ranges.py`/`test_error_code_uniqueness.py` 全绿（24+8 = 32 passed）
+- [x] 三条 grep 自查零输出（本 Story 路径）
 
 ---
 
@@ -963,13 +963,13 @@ class DebateCompleted(DomainEvent):
 | 🟢 绿 | 实现 `src/domain/services/debate_evaluator.py`（字符 bigram 提取 + Jaccard 集合运算，标准库） |
 | 🔄 重构 | 算法 docstring（公式 + architecture.md §7.3 阈值对应关系）+ 常量提取 |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写三算法失败测试
-- [ ] Subtask 4.2: 🟢 绿 — 实现评估器最小代码
-- [ ] Subtask 4.3: 🔄 重构 — 优化算法与文档
+- [x] Subtask 4.1: 🔴 红 — 编写三算法失败测试
+- [x] Subtask 4.2: 🟢 绿 — 实现评估器最小代码
+- [x] Subtask 4.3: 🔄 重构 — 优化算法与文档（公式 docstring + §7.3 阈值对应）
 
 **完成标准/Definition of Done:**
-- [ ] 三算法全边界用例绿
-- [ ] GAP-CRITICAL-09 清偿登记：`docs/architecture/architecture.md` GAP 表（:3311 附近）该行状态更新为已实现（清偿证据 = `src/domain/services/debate_evaluator.py` + `tests/unit/domain/services/test_debate_evaluator.py`）——文件清单「配置更新」节同步补此登记动作
+- [x] 三算法全边界用例绿（29 passed：已知值/空文本/单字符/Unicode 中文/空 bigram 并集/警告区构造/确定性）
+- [x] GAP-CRITICAL-09 清偿登记：`docs/architecture/architecture.md` GAP 表（:3311）该行状态更新为已实现（清偿证据 = `src/domain/services/debate_evaluator.py` + `tests/unit/domain/services/test_debate_evaluator.py`）
 
 ---
 
@@ -985,13 +985,13 @@ class DebateCompleted(DomainEvent):
 | 🟢 绿 | 实现 `src/domain/events/debate_events.py` 完整事件类 + `events/__init__.py` 导出（Task 0 已登记 yaml/router 两处配置，此处验证一致性测试转绿） |
 | 🔄 重构 | `__post_init__` metadata 透传校对（`sandbox_events.py` 对齐） |
 
-- [ ] Subtask 5.1: 🔴 红 — 编写事件 + 双通道契约失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 实现事件类与四处登记收口
-- [ ] Subtask 5.3: 🔄 重构 — 优化事件代码
+- [x] Subtask 5.1: 🔴 红 — 编写事件 + 双通道契约失败测试
+- [x] Subtask 5.2: 🟢 绿 — 实现事件类与四处登记收口（debate_events.py 完整类 + events/__init__.py 导出 + yaml/DEFAULT_MAPPINGS 已于 Task 0 登记）
+- [x] Subtask 5.3: 🔄 重构 — 优化事件代码（roundtrip 断言对齐项目历史行为：payload 字段保持 str，aggregate_id 保持 UUID）
 
 **完成标准/Definition of Done:**
-- [ ] roundtrip + 双通道一致性契约全绿
-- [ ] `ChannelRouter.get_delivery_mode("DebateCompleted") == RELIABLE`
+- [x] roundtrip + 双通道一致性契约全绿（29 passed）
+- [x] `ChannelRouter.get_delivery_mode("DebateCompleted") == RELIABLE`
 
 ---
 
@@ -1015,16 +1015,16 @@ class DebateCompleted(DomainEvent):
 | 🟢 绿 | 实现 `src/application/services/debate_prompts.py`（红/蓝/裁判三组 system + user 模板，全中文，含角色标记） |
 | 🔄 重构 | prompt 文案评审（立场纪律清晰、无内部实现泄露） |
 
-- [ ] Subtask 6.1: 🔴 红 — Schema 失败测试
-- [ ] Subtask 6.2: 🟢 绿 — 实现 Schema
-- [ ] Subtask 6.3: 🔄 重构 — 优化 Schema
-- [ ] Subtask 6.4: 🔴 红 — prompts 失败测试
-- [ ] Subtask 6.5: 🟢 绿 — 实现 prompts
-- [ ] Subtask 6.6: 🔄 重构 — 优化 prompts
+- [x] Subtask 6.1: 🔴 红 — Schema 失败测试
+- [x] Subtask 6.2: 🟢 绿 — 实现 Schema
+- [x] Subtask 6.3: 🔄 重构 — 优化 Schema（嵌套 Area 的 to_domain_value 为正式类方法）
+- [x] Subtask 6.4: 🔴 红 — prompts 失败测试
+- [x] Subtask 6.5: 🟢 绿 — 实现 prompts
+- [x] Subtask 6.6: 🔄 重构 — 优化 prompts（裁判模板占位收口为 red/blue 双注入）
 
 **完成标准/Definition of Done:**
-- [ ] Schema 约束 + 转换全绿；prompt 映射与占位符全绿
-- [ ] 领域零依赖不受影响（pydantic 仅应用层）
+- [x] Schema 约束 + 转换全绿；prompt 映射与占位符全绿（26+15 = 41 passed）
+- [x] 领域零依赖不受影响（pydantic 仅应用层）
 
 ---
 
@@ -1048,17 +1048,17 @@ class DebateCompleted(DomainEvent):
 | 🟢 绿 | 实现异常包装与门控分支 |
 | 🔄 重构 | 异常 context 组装统一助手 |
 
-- [ ] Subtask 7.1: 🔴 红 — Happy path 失败测试
-- [ ] Subtask 7.2: 🟢 绿 — 实现服务编排主体
-- [ ] Subtask 7.3: 🔄 重构 — 方法化与常量提取
-- [ ] Subtask 7.4: 🔴 红 — 异常路径失败测试
-- [ ] Subtask 7.5: 🟢 绿 — 实现门控与包装
-- [ ] Subtask 7.6: 🔄 重构 — 优化异常处理
+- [x] Subtask 7.1: 🔴 红 — Happy path 失败测试
+- [x] Subtask 7.2: 🟢 绿 — 实现服务编排主体
+- [x] Subtask 7.3: 🔄 重构 — 方法化与常量提取（_generate_perspectives/_synthesize_risk_view/_publish_completion/_fail_session）
+- [x] Subtask 7.4: 🔴 红 — 异常路径失败测试
+- [x] Subtask 7.5: 🟢 绿 — 实现门控与包装
+- [x] Subtask 7.6: 🔄 重构 — 优化异常处理（四段式 except：LLMConfigError 透传→LLM 族包装→CancelledError 透传→兜底；gather 失败显式取消兄弟任务）
 
 **完成标准/Definition of Done:**
-- [ ] 编排全分支覆盖（关键路径 100%）
-- [ ] 应用层覆盖率 ≥85% 贡献达成
-- [ ] BDD AC-7 组场景转绿
+- [x] 编排全分支覆盖（关键路径 100%：Happy/生成失败红蓝对称/合成失败/低分化/警告/事件双形态失败/get_debate_result 重建，28 用例）
+- [x] 应用层覆盖率 ≥85% 贡献达成（全量覆盖率于 Task 10 收尾核验）
+- [x] BDD AC-7 组场景转绿（36 场景中 32 passed，剩余 4 个属 Task 8/9 交付面）
 
 ---
 
@@ -1074,14 +1074,14 @@ class DebateCompleted(DomainEvent):
 | 🟢 绿 | `src/composition_root.py` 注册 3 端口（参数见端口契约节表格；lambda 工厂四依赖 resolve） |
 | 🔄 重构 | 注册块注释（Story 4.5 标注 + 端口用途）与既有 tool 域注册块风格对齐 |
 
-- [ ] Subtask 8.1: 🔴 红 — 编写两件契约失败测试
-- [ ] Subtask 8.2: 🟢 绿 — 组合根注册 3 端口
-- [ ] Subtask 8.3: 🔄 重构 — 注释与风格对齐
-- [ ] Subtask 8.4: 验证 `bootstrap()` 全量注册无回归（`pytest tests/contracts/ -q` + resolver SINGLETON 断言）
+- [x] Subtask 8.1: 🔴 红 — 编写两件契约失败测试
+- [x] Subtask 8.2: 🟢 绿 — 组合根注册 3 端口
+- [x] Subtask 8.3: 🔄 重构 — 注释与风格对齐（Story 4.5 注册块 + 逐端口用途注释）
+- [x] Subtask 8.4: 验证 `bootstrap()` 全量注册无回归（`pytest tests/contracts/ -q` 1047 passed + resolver SINGLETON 断言通过）
 
 **完成标准/Definition of Done:**
-- [ ] 11 维度契约测试 × 2 全绿
-- [ ] 既有契约套件零回归
+- [x] 11 维度契约测试 × 2 全绿（26 passed）
+- [x] 既有契约套件零回归（1047 passed）
 
 ---
 
@@ -1105,18 +1105,18 @@ class DebateCompleted(DomainEvent):
 | 🟢 绿 | 修复架构违规（若有）至全绿 |
 | 🔄 重构 | AST 零依赖扫描沿用既有各文件**私有 `_extract_imports` 复制先例**（`test_docker_sandbox.py:54-71` / `test_arch_strategic_tool_impl.py:74-90`——架构测试目录无共享助手模块，勿寻找不存在的公共件） |
 
-- [ ] Subtask 9.1: 🔴 红 — 集成测试编写
-- [ ] Subtask 9.2: 🟢 绿 — 集成链路全绿
-- [ ] Subtask 9.3: 🔄 重构 — marker 规范化
-- [ ] Subtask 9.4: 🔴 红 — 架构验证测试编写
-- [ ] Subtask 9.5: 🟢 绿 — 架构面全绿（`poetry run pytest tests/unit/architecture/test_red_blue_debate.py -v`）
-- [ ] Subtask 9.6: 🔄 重构 — AST 扫描形态对齐先例（私有 `_extract_imports` 复制式，无共享助手可复用）
-- [ ] Subtask 9.7: 性能验收策略核验（AC-9 三段：CI 代理指标 / 无重试上界论证 / 真实 LLM 单点计时——诚实工程声明留痕；**非 TDD 循环项**，断言本体在循环 A 红清单内，此处为核验留痕）
+- [x] Subtask 9.1: 🔴 红 — 集成测试编写
+- [x] Subtask 9.2: 🟢 绿 — 集成链路全绿（真实服务组装 6 passed；真实 LLM 场景动态 skip——**集成测试捕获真实缺陷 1 项**：per-call LLMConfig 新建丢失连接字段（api_key/endpoint），修复为 base_config 继承 + dataclasses.replace 派生，服务构造签名增加可选 base_config 参数（带默认值不破坏故事签名），composition_root 注册处注入 LLMConfig.from_env()）
+- [x] Subtask 9.3: 🔄 重构 — marker 规范化（pytestmark = pytest.mark.integration；真实 LLM 场景 @pytest.mark.llm）
+- [x] Subtask 9.4: 🔴 红 — 架构验证测试编写
+- [x] Subtask 9.5: 🟢 绿 — 架构面全绿（32 passed：零依赖 AST/温度常量/PortSpec/依赖方向/禁本地 Protocol/码段登记/GAP 清偿）
+- [x] Subtask 9.6: 🔄 重构 — AST 扫描形态对齐先例（私有 `_extract_imports` 复制式；检查面区分 services/ 与 ports/ 目录）
+- [x] Subtask 9.7: 性能验收策略核验（CI 代理指标：结构完整率 + 立场遵循 + 编排开销 <1s（集成 TestOrchestrationOverhead）✓；无重试上界论证：服务 docstring 延迟预算三段式 ✓；真实 LLM 单点计时：分级断言落地——**本机 GLM flash anthropic 通道实测单次结构化调用 26.7s（物理超 per-call 12s 预算），端到端 30s 目标在慢端点环境不可达，耗时断言分级（达标 pass / 不达标 skip 留证据），语义准确率不伪造移交 Story 5.8**；外部端点瞬时 5xx（overloaded_error）动态跳过与实现缺陷区分）
 
 **完成标准/Definition of Done:**
-- [ ] epics 硬路径两文件落地且全绿
-- [ ] `-m "not llm"` 全绿；真实 LLM 环境通过或动态 skip
-- [ ] `ruff` + `mypy` + `lint-imports` 通过
+- [x] epics 硬路径两文件落地且全绿（集成 6 passed + 1 skip / 架构 32 passed）
+- [x] `-m "not llm"` 全绿；真实 LLM 环境通过或动态 skip（本机端点：config 探测通过后服务端持续 500 过载 → 动态 skip 留痕）
+- [x] `ruff` + `mypy` + `lint-imports` 通过（lint-imports 的 Interfaces→infrastructure BROKEN 为既有问题，stash 对比确认非本 Story 引入）
 
 ---
 
@@ -1134,15 +1134,23 @@ class DebateCompleted(DomainEvent):
 | 🟢 绿 | 全量场景运行通过（10 AC 组 + 收尾） |
 | 🔄 重构 | 收敛场景命名、统一断言表达、保持步骤函数可维护性 |
 
-- [ ] Subtask 10.1: 场景 1 — 验证 `src` 完成清单逐项确认（8 类型/聚合根/3 异常/评估器/端口 3/事件 1/服务 1/prompts/schemas/仓储实现）
-- [ ] Subtask 10.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单逐项确认（测试分类表全量文件）
-- [ ] Subtask 10.3: 运行开发结束验收测试并确认通过（`poetry run pytest tests/acceptance/test_acceptance_red_blue_debate.py -v`）
-- [ ] Subtask 10.4: 运行 `pytest tests/ -n 8`、`ruff check`、`mypy`、`lint-imports` 收尾校验 + 三条 grep 自查零输出
+- [x] Subtask 10.1: 场景 1 — 验证 `src` 完成清单逐项确认（8 类型/聚合根/3 异常/评估器/端口 3/事件 1/服务 1/prompts/schemas/仓储实现）
+- [x] Subtask 10.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单逐项确认（测试分类表全量文件）
+- [x] Subtask 10.3: 运行开发结束验收测试并确认通过（`poetry run pytest tests/acceptance/test_acceptance_red_blue_debate.py -v` → 36/36 passed）
+- [x] Subtask 10.4: 运行 `pytest tests/ -n 8`、`ruff check`、`mypy`、`lint-imports` 收尾校验 + 三条 grep 自查零输出（ruff 全仓通过 / mypy 620 文件通过 / 三条 grep 零输出；全量 pytest 结果与既有失败甄别见 Completion Notes——19 个失败中 18 个经 stash 对比确认为 benchmark/deploy/沙箱既有问题，1 个 exception_handlers 期望集合回归已修复并通过）
 
 **完成标准/Definition of Done:**
-- [ ] `src` 与四类测试目录完成清单逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `review`
+- [x] `src` 与四类测试目录完成清单逐项验证确认（收尾场景 36/36 通过）
+- [x] 开发结束验收测试通过（`pytest tests/acceptance/test_acceptance_red_blue_debate.py` → 36/36 passed）
+- [x] Story 可进入 `review`
+
+**收尾全量校验记录（2026-10-01）：**
+- 全量并行（`-n 8 -m "not llm"`，排除 benchmark/deploy 既有失败目录）：**10778 passed / 1 skipped，整体覆盖率 91.37% ≥ 80% 门禁 PASS**
+- 唯一失败 `test_docker_sandbox_integration.py::test_concurrent_10_sessions_functional`：**单独复跑通过（12.89s）**——`-n 8` 并行下 Docker 10 并发容器资源竞争型 flaky，非代码缺陷，与本 Story 零代码路径交集
+- `ruff check src/ tests/` 全仓通过；`ruff format` 全部格式化；`mypy src/` 620 文件零错误
+- `lint-imports`：domain 零依赖契约 KEPT（Interfaces→infrastructure BROKEN 为既有问题，stash 对比确认）
+- 三条 grep 自查（Story 11 路径）零输出
+- 辩论领域六文件覆盖率 98~100%；red_blue_debate_service.py 95%（>85% 应用层门禁）
 
 ---
 
@@ -1307,24 +1315,37 @@ class DebateCompleted(DomainEvent):
 - [x] 温度阶梯 0.8/0.5/0.2 与 FR-SP-10 V1 演进路径锁定（TEMPERATURE_PROFILE 常量 + 架构测试绊线）
 - [x] 性能验收诚实工程策略明确（CI 代理指标 + timeout 上界论证 + 语义准确率移交 Story 5.8，防完成度造假）
 
+### Dev Story 实施记录（2026-10-01，dev-story 执行）
+
+- [x] Task 0~10 全部 11 个 Task 完成（每个含完整 TDD 红→绿→重构循环或声明的登记即实现窗口）
+- [x] **实施期新发现与决策**：
+  - `architecture.md` §17.3.1 两处文档级预留（EXCEPTION_422/423 给未实现的 skill 子域）与 debate 占用撞码——修订为"待 skill 子域注册时分配"（代码层零冲突，`_code_ranges.py` 为 CI 唯一权威）
+  - **集成测试捕获真实缺陷 1 项**：per-call `LLMConfig(temperature=..., timeout=...)` 新建丢失连接字段（api_key/endpoint/model），真实客户端 `cfg = config or self._config` 整体替换语义下触发 LLMConfigError——修复为 `base_config` 继承 + `dataclasses.replace` 派生（服务构造签名增加可选 `base_config: LLMConfig | None = None`，带默认值不破坏故事 R2 签名；composition_root 注册处注入 `LLMConfig.from_env()`）
+  - cause 链序列化形态定谳：LLMAPIError 为 DomainError 子类，`to_dict()["cause"]` 递归为 `{"code": "EXCEPTION_330", ...}` 而非 `{"type": ...}`（测试断言对齐）
+  - from_dict roundtrip 的 payload 字段保持 str（与 ToolExecuted 契约测试注释一致的项目历史行为）
+  - 真实 LLM 场景分级断言：本机 GLM flash anthropic 通道实测单次结构化调用 26.7s（物理超 per-call 12s 预算）+ 服务端瞬时 500 过载——耗时断言分级（达标 pass / 不达标 skip 留证据），外部故障与实现缺陷区分 skip，语义准确率不伪造（移交 Story 5.8）
+  - `lint-imports` 的 Interfaces→infrastructure BROKEN 为既有问题（git stash 对比确认非本 Story 引入，不修改——超范围）
+- [x] **测试资产总量**：单元 6 文件（VO 65 / 实体 26 / 异常 24 / 评估器 29 / 事件 12 / schemas 26 / prompts 15 / 仓储 9 / 服务 34）+ 契约 4 文件（事件契约 10 / 双通道 7 / 端口契约 26）+ 集成 1 文件（6 passed + 1 llm skip）+ 架构 1 文件（32）+ BDD 36 场景全绿
+- [x] **覆盖率**：辩论领域六文件 98~100%（VO 100% / 实体 100% / 评估器 100% / 事件 100% / 异常 100% / 端口 100%）；red_blue_debate_service 95%（>85% 门禁）；全量门禁数字见收尾校验记录
+
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 
 - `_bmad-output/implementation-artifacts/stories/4-5-red-blue-debate-basic.md`（本文件）
 
-**待创建的文件/To Be Created (Dev Story 实施):**
+**Dev Story 实施创建（2026-10-01）：**
 
 **领域层：**
 - `src/domain/value_objects/debate.py` - 7 个辩论值对象 + 视角枚举（共 8 类型，Task 1）
 - `src/domain/entities/debate_session.py` - DebateSession 聚合根 + 状态机（Task 2）
-- `src/domain/services/debate_evaluator.py` - 辩论质量评估器三算法（Task 4）
+- `src/domain/services/debate_evaluator.py` - 辩论质量评估器三算法（Task 4，GAP-CRITICAL-09 清偿）
 - `src/domain/ports/debate_session_repository.py` - 仓储端口（Task 2）
-- `src/domain/exceptions/debate_exceptions.py` - 3 个新异常（Task 0/3）
-- `src/domain/events/debate_events.py` - DebateCompleted 事件（Task 0/5）
+- `src/domain/exceptions/debate_exceptions.py` - 3 个新异常（Task 0 登记 + Task 3 单测闭环）
+- `src/domain/events/debate_events.py` - DebateCompleted 事件（Task 0 骨架 + Task 5 实现）
 
 **应用层：**
-- `src/application/services/red_blue_debate_service.py` - 辩论编排服务（Task 7）
+- `src/application/services/red_blue_debate_service.py` - 辩论编排服务（Task 7；实施期增加可选 `base_config` 参数修复连接字段丢失缺陷）
 - `src/application/services/debate_prompts.py` - 视角/裁判 prompt 映射（Task 6）
 - `src/application/services/debate_schemas.py` - LLM 结构化输出 Schema（Task 6）
 - `src/application/ports/red_blue_debate_service.py` - 服务端口（Task 7）
@@ -1333,33 +1354,36 @@ class DebateCompleted(DomainEvent):
 - `src/infrastructure/storage/inmemory/debate_session_repository.py` - InMemory 仓储（Task 2）
 
 **测试文件：**
-- `tests/unit/domain/value_objects/test_debate.py`（Task 1）
-- `tests/unit/domain/entities/test_debate_session.py`（Task 2）
-- `tests/unit/domain/services/test_debate_evaluator.py`（Task 4）
-- `tests/unit/domain/events/test_debate_events.py`（Task 5）
-- `tests/unit/domain/exceptions/test_debate_exceptions.py`（Task 3）
-- `tests/unit/application/services/test_red_blue_debate_service.py`（Task 7）
-- `tests/unit/application/services/test_debate_prompts.py`（Task 6）
-- `tests/unit/application/services/test_debate_schemas.py`（Task 6）
-- `tests/unit/infrastructure/storage/test_debate_session_repository.py`（Task 2）
-- `tests/unit/architecture/test_red_blue_debate.py`（Task 9，**epics 硬路径无 `_arch_` 前缀**）
-- `tests/integration/test_red_blue_debate_integration.py`（Task 9，epics 硬路径）
-- `tests/contracts/test_port_contract_red_blue_debate_service.py`（Task 8）
-- `tests/contracts/test_port_contract_debate_session_repository.py`（Task 8）
-- `tests/contracts/test_event_contract_debate_events.py`（Task 5）
-- `tests/contracts/test_event_channel_mapping_debate.py`（Task 5）
-- `tests/acceptance/test_acceptance_red_blue_debate.feature`（Task 0 + 10）
-- `tests/acceptance/test_acceptance_red_blue_debate.py`（Task 0 + 10）
+- `tests/unit/domain/value_objects/test_debate.py`（Task 1，65 用例）
+- `tests/unit/domain/entities/test_debate_session.py`（Task 2，26 用例）
+- `tests/unit/domain/services/test_debate_evaluator.py`（Task 4，29 用例）
+- `tests/unit/domain/events/test_debate_events.py`（Task 5，12 用例）
+- `tests/unit/domain/exceptions/test_debate_exceptions.py`（Task 3，24 用例）
+- `tests/unit/application/services/test_red_blue_debate_service.py`（Task 7，34 用例）
+- `tests/unit/application/services/test_debate_prompts.py`（Task 6，15 用例）
+- `tests/unit/application/services/test_debate_schemas.py`（Task 6，26 用例）
+- `tests/unit/infrastructure/storage/test_debate_session_repository.py`（Task 2，9 用例）
+- `tests/unit/architecture/test_red_blue_debate.py`（Task 9，32 用例，**epics 硬路径无 `_arch_` 前缀**）
+- `tests/integration/test_red_blue_debate_integration.py`（Task 9，6+1 用例，epics 硬路径）
+- `tests/contracts/test_port_contract_red_blue_debate_service.py`（Task 8，13 用例）
+- `tests/contracts/test_port_contract_debate_session_repository.py`（Task 8，13 用例）
+- `tests/contracts/test_event_contract_debate_events.py`（Task 5，10 用例）
+- `tests/contracts/test_event_channel_mapping_debate.py`（Task 5，7 用例）
+- `tests/acceptance/test_acceptance_red_blue_debate.feature`（Task 0 + 10，36 场景）
+- `tests/acceptance/test_acceptance_red_blue_debate.py`（Task 0 + 10，36 @scenario 绑定）
 
 **配置更新：**
-- `src/composition_root.py` 注册 3 个端口（debate_session_repository / debate_evaluator / red_blue_debate_service）
-- `configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py` 注册 DebateCompleted 双通道
-- `src/domain/exceptions/_code_ranges.py`（CODE_RANGES + `_CLASS_TO_SUBDOMAIN` 3 行）
-- `src/domain/exceptions/__init__.py` 扩展 `__all__`
-- `src/interfaces/api/exception_handlers.py` 增加 3 条 `EXCEPTION_HTTP_MAP`
-- `docs/architecture/sisys-uni-exception-design.md` §3.3.2 编码分配表 +debate 子域
-- `docs/architecture/architecture.md` GAP 表 GAP-CRITICAL-09 行状态更新为已实现（Task 4 清偿登记）
-- 各层 `__init__.py` 导出（value_objects/entities/events/ports/services）
+- `src/composition_root.py` 注册 3 个端口（debate_session_repository SCOPED / debate_evaluator SINGLETON / red_blue_debate_service SCOPED + base_config 注入）
+- `configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py` 注册 DebateCompleted 双通道（reliable）
+- `src/domain/exceptions/_code_ranges.py`（CODE_RANGES + `"debate": (420, 429)` + `_CLASS_TO_SUBDOMAIN` 3 行）
+- `src/domain/exceptions/__init__.py` 导入 + `__all__`（3 类）
+- `src/domain/events/__init__.py` 导出 DebateCompleted
+- `src/domain/value_objects/__init__.py` re-export 8 类型
+- `src/interfaces/api/exception_handlers.py` 增加 3 条 `EXCEPTION_HTTP_MAP`（import + 映射）
+- `tests/unit/interfaces/api/test_exception_handlers.py` 期望集合同步 3 类（新增异常的完整 Checklist 延伸——全量回归发现并修复）
+- `docs/architecture/sisys-uni-exception-design.md` §3.3.2 编码分配表 + 子域范围表 +debate 子域
+- `docs/architecture/architecture.md` GAP 表 GAP-CRITICAL-09 行状态更新为已实现（Task 4 清偿登记）+ §17.3.1 两处文档级预留 422/423 撞码修订
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`（4-5 状态流转）
 
 **依赖更新：** 无（零新增第三方依赖）
 
@@ -1500,13 +1524,13 @@ class DebateCompleted(DomainEvent):
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
+- [x] 运行 `dev-story` 开始实施（2026-10-01 完成，Task 0~10 全绿，状态 → review）
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.4.1-dev
 **创建日期/Created:** 2026-10-01
 **最后更新/Last Updated:** 2026-10-01
 **更新说明/Description:**
@@ -1515,3 +1539,4 @@ class DebateCompleted(DomainEvent):
 - v1.2.0: Round 2 回归核查 + 可满足性复推演——14 修复簇（P1×4 + P2×7 + P3×3）+ R1 台账勘误 4 处；核心发现：R1 修复组合互拆（温度断言循环论证重锚 system_prompt / 并发窗口零耗时假红补切换点 / PublishResult 构造 TypeError / exception_handler 函数名失实）
 - v1.3.0: Round 3 单深度三维度审查——11 修复簇（P1×1 + P2×5 + P3×5）：BDD AC-1 组 5/5 全覆盖重构 / 不变量子约束逐条枚举 / Area 描述字段非空 / validate 调用时机定谳 / session 回填时机 / GAP-CRITICAL-09 登记动作 / epics 四句 traceability；主会话核查排除 3 项 P0 候选（event_publisher 端口名已注册）
 - v1.4.0: Round 4 纯验证轮（零修复，锚点全落位）+ Round 5 独立终审——5 项 P3 清偿（场景计数定谳 36 / Sprint 勾选 / LitellmLLMClient 拼写×5 / 契约计数口径 / 行号偏移）；周期闭合 1:1、12 组行号实地验证、P0 全周期 ×0、P1 清零——**审查周期收敛，可进入 dev-story 实施**
+- v1.4.1-dev: dev-story 实施完成——Task 0~10 全部落地（11 Task × TDD 循环），BDD 36/36 场景全绿；实施期决策：architecture.md 422/423 文档级撞码修订、base_config 连接字段继承修复（集成测试捕获）、真实 LLM 分级断言（26.7s 慢端点实测留痕）、exception_handlers 期望集合同步；状态 → review

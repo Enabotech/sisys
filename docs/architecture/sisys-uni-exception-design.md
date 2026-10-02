@@ -720,6 +720,10 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_411 | DataSourceUnavailableError | DataSourceError | 503 |（Story 4.1b，数据源 5xx/连接失败/熔断断开，重试耗尽后）|
 | EXCEPTION_412 | DataSourceRateLimitError | DataSourceError | 429 |（Story 4.1b，数据源 429 限流）|
 | EXCEPTION_413 | DataSourceResponseError | DataSourceError | 502 |（Story 4.1b，响应解析失败/结构不符，不可重试）|
+| EXCEPTION_420 | DebateGenerationError | ExternalException | 500 |（Story 4.5，红/蓝视角 LLM 生成失败，精确注册避免回退 502）|
+| EXCEPTION_421 | DebateSynthesisError | ExternalException | 500 |（Story 4.5，风险视图合成 LLM 调用失败，精确注册避免回退 502）|
+| EXCEPTION_422 | DebateLowDivergenceError | BusinessException | 422 |（Story 4.5，红蓝重叠率 ≥0.95 分化不足，精确注册避免回退 400）|
+| EXCEPTION_423~429 | （预留 debate 子域）| — | — |（V1 多轮辩论扩展：轮次超限/裁决置信度不足/辩论过热等，Story 10.6）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——
@@ -794,6 +798,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | `sandbox` | 309–319 | SandboxError 等（嵌套在 external 内） |
 | `tool` | 380–389 | ToolNotFoundError, ToolAlreadyExistsError, ToolExecutionFailedError, ToolExecutionRetryExhaustedError, ToolExecutionTimeoutError, EvidenceValidationFailedError, SkillNotFoundError, SkillLoadError, ToolResultValidationError 等（战略性工具异常，物理范围 380-389 嵌套在 external 301-399 内但语义独立；EXCEPTION_384 保留未占用） |
 | `data_source` | 410–419 | DataSourceError, DataSourceUnavailableError, DataSourceRateLimitError, DataSourceResponseError（Story 4.1b Skills 数据采集；语义归属 external，物理段独立于 301-399——external 已满且 399 预留 Story 4.7） |
+| `debate` | 420–429 | DebateGenerationError, DebateSynthesisError, DebateLowDivergenceError（Story 4.5 红蓝辩论 MVP；420/421 语义归属 external、422 语义归属 business，物理段独立——business 2XX 与 external 3XX 均无整段空位，遵循 data_source 410-419 独立段先例；423-429 预留 V1 多轮辩论 Story 10.6） |
 | `fallback` | 999 | UnknownError（兜底，独立于所有子域） |
 
 #### 3.3.3 CI 校验规则

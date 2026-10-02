@@ -42,6 +42,9 @@ from src.domain.exceptions import (
     DataSourceRateLimitError,
     DataSourceResponseError,
     DataSourceUnavailableError,
+    DebateGenerationError,
+    DebateLowDivergenceError,
+    DebateSynthesisError,
     DictionaryEntryConflictError,
     DictionaryNotFoundError,
     DictionaryVersionConflictError,
@@ -312,6 +315,9 @@ class TestExceptionHttpMap:
             DataSourceUnavailableError,  # 411 — Story 4.1b 数据源不可用
             DataSourceRateLimitError,  # 412 — Story 4.1b 数据源限流
             DataSourceResponseError,  # 413 — Story 4.1b 响应解析失败
+            DebateGenerationError,  # 420 — Story 4.5 辩论视角生成失败
+            DebateSynthesisError,  # 421 — Story 4.5 风险视图合成失败
+            DebateLowDivergenceError,  # 422 — Story 4.5 红蓝分化不足
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types
