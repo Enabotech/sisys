@@ -2730,6 +2730,68 @@ def bootstrap() -> None:
         tags=("tool", "chain", "usecase"),
     )
 
+    # === Story 4.5 — Red/Blue Debate（红蓝辩论机制基础，单 Agent 多视角 MVP）===
+    # 辩论会话仓储（InMemory，PG 持久化随 Epic 10 审计需求落地）
+    register_port(
+        name="debate_session_repository",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.ports.debate_session_repository",
+            fromlist=["DebateSessionRepositoryPort"],
+        ).DebateSessionRepositoryPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.inmemory.debate_session_repository",
+            fromlist=["InMemoryDebateSessionRepository"],
+        ).InMemoryDebateSessionRepository(),
+        module="src.infrastructure.storage.inmemory.debate_session_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("debate", "repository", "inmemory"),
+    )
+
+    # 辩论质量评估器（无状态领域服务，类即接口——context_compressor 先例）
+    register_port(
+        name="debate_evaluator",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.services.debate_evaluator",
+            fromlist=["DebateEvaluator"],
+        ).DebateEvaluator,
+        impl="src.domain.services.debate_evaluator.DebateEvaluator",
+        module="src.domain.services.debate_evaluator",
+        lifetime=Lifetime.SINGLETON,
+        owner="tool-team",
+        tags=("debate", "domain", "service"),
+    )
+
+    # 红蓝辩论编排服务（四依赖注入：LLM/评估器/仓储/事件发布；
+    # base_config 提供连接字段基底，per-call 仅覆写温度阶梯与超时）
+    register_port(
+        name="red_blue_debate_service",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.red_blue_debate_service",
+            fromlist=["RedBlueDebateServicePort"],
+        ).RedBlueDebateServicePort,
+        impl=lambda resolver: __import__(
+            "src.application.services.red_blue_debate_service",
+            fromlist=["RedBlueDebateService"],
+        ).RedBlueDebateService(
+            llm_client=resolver.resolve("llm_client"),
+            evaluator=resolver.resolve("debate_evaluator"),
+            session_repository=resolver.resolve("debate_session_repository"),
+            event_publisher=resolver.resolve("event_publisher"),
+            base_config=__import__(
+                "src.domain.ports.llm_client",
+                fromlist=["LLMConfig"],
+            ).LLMConfig.from_env(),
+        ),
+        module="src.application.services.red_blue_debate_service",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("debate", "service"),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线

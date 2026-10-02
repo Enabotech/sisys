@@ -185,6 +185,14 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="沙箱执行失败",
         ),
+        # DEBATE 事件（Story 4.5 — 红蓝辩论机制基础）
+        "DebateCompleted": ChannelMapping(
+            event_type="DebateCompleted",
+            redis_channel="sisys:rt:debate_completed",
+            rabbitmq_routing_key="sisys.events.reliable.debate_completed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="红蓝辩论完成（双通道：realtime + reliable）",
+        ),
         "AgentDecided": ChannelMapping(
             event_type="AgentDecided",
             rabbitmq_routing_key="sisys.events.reliable.agent_decided",

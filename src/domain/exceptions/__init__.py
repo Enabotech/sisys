@@ -42,6 +42,11 @@ from src.domain.exceptions.data_source_exceptions import (
     DataSourceResponseError,
     DataSourceUnavailableError,
 )
+from src.domain.exceptions.debate_exceptions import (
+    DebateGenerationError,
+    DebateLowDivergenceError,
+    DebateSynthesisError,
+)
 from src.domain.exceptions.dictionary_exceptions import (
     DictionaryEntryConflictError,
     DictionaryNotFoundError,
@@ -264,6 +269,10 @@ __all__ = [
     "DataSourceUnavailableError",
     "DataSourceRateLimitError",
     "DataSourceResponseError",
+    # 红蓝辩论异常（Story 4.5）
+    "DebateGenerationError",
+    "DebateSynthesisError",
+    "DebateLowDivergenceError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",
