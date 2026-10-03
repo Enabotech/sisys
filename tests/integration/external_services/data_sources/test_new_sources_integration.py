@@ -110,3 +110,40 @@ class TestEpoOpsRealEndpoint:
             # in-test 关闭（对齐同文件 EDGAR/Comtrade 先例——同步 fixture teardown 跨事件循环，
             # 4.1f 代码审查 R1-F9：get_event_loop 在 pytest-asyncio 关闭其 loop 后取到异属 loop）
             await epo_adapter.close()
+
+
+class TestGooglePatentsRealEndpoint:
+    """google-patents BigQuery 真实端点（GCP 双门门控——D-09 服务账号 JWT + 管道串检索）。
+
+    GOOGLE_APPLICATION_CREDENTIALS（服务账号 JSON 路径）与 GOOGLE_PATENTS_PROJECT_ID
+    任一缺失即动态 skip——GCP 项目需绑定 Billing（Sandbox 无 API 编程访问——D-09
+    预筛勘误留痕）；免费层 1TiB/月查询字节。
+    """
+
+    @pytest.mark.asyncio
+    async def test_pipeline_query_real_patents(self) -> None:
+        """管道串检索：assignee=华为|country=CN 真实返回专利列表（publication_number/assignee/filing_date）。"""
+        import json
+
+        credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+        project_id = os.getenv("GOOGLE_PATENTS_PROJECT_ID", "")
+        from pathlib import Path
+
+        if not credentials_path or not Path(credentials_path).is_file() or not project_id:
+            pytest.skip(
+                "GOOGLE_APPLICATION_CREDENTIALS（凭据文件存在）+ GOOGLE_PATENTS_PROJECT_ID 未齐备"
+                "（GCP 项目 + 服务账号——D-09 双门）——凭据到位后补跑（Story R7 锚点）"
+            )
+        from src.infrastructure.config.google_patents import GooglePatentsConfig
+        from src.infrastructure.external_services.datasources.google_patents_adapter import GooglePatentsAdapter
+
+        adapter = GooglePatentsAdapter(config=GooglePatentsConfig.from_env())
+        try:
+            result = await adapter.fetch(
+                DataSourceQuery(source_name="google-patents", query="assignee=华为|country=CN|year=2020-2026")
+            )
+            payload = json.loads(result.payload)
+            assert isinstance(payload.get("patents"), list) and payload["patents"], "assignee 检索应返回非空结果"
+            assert {"publication_number", "assignee", "filing_date"} <= set(payload["patents"][0])
+        finally:
+            await adapter.close()

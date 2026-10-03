@@ -38,6 +38,14 @@ data_sources:
     required_fields:
       - indicator
       - value
+  - name: google-patents
+    url: https://bigquery.googleapis.com
+    api_type: rest_json
+    ttl_seconds: 604800
+    required_fields:
+      - publication_number
+      - assignee
+      - filing_date
   - name: epo-ops
     url: https://ops.epo.org
     api_type: rest_json
@@ -106,7 +114,7 @@ output_schema:
             description: 战略动向摘要
           patent_signals:
             type: array
-            description: 专利技术信号（uspto+epo-ops 双库口径——双源均未注册或采集失败时输出空数组，并在 sources 与数据缺口登记中如实标注）
+            description: 专利技术信号（uspto+google-patents+epo-ops 三库口径——三库均未注册或采集失败时输出空数组，并在 sources 与数据缺口登记中如实标注）
             items:
               type: string
           sources:
@@ -184,26 +192,29 @@ Think 阶段必须先输出**对标维度 → 关键指标 → 数据源**映射
 | 对标维度 | 关键指标 | 数据源 |
 |---------|---------|--------|
 | 战略动向 | 竞品战略发布、并购重组、高管言论、舆情倾向 | newsapi（竞品动态舆情）、tavily（竞品 Web 情报） |
-| 专利布局 | 专利申请趋势、技术领域分布、核心专利信号 | uspto（竞品专利，USPTO 技术信号采集引导）+ epo-ops（EPO 申请人结构化检索——`pa=` 支持中文企业名直接归因） |
+| 专利布局 | 专利申请趋势、技术领域分布、核心专利信号 | uspto（US 口径）+ google-patents（BigQuery 全球含 CN 99.96%，assignee 精确聚合）+ epo-ops（EP 口径，`pa=` 申请人归因——专利三库） |
 | 产品组合 | 产品线结构、新品发布、定价策略 | tavily（官网/评测/电商情报）、newsapi（产品新闻） |
 | 市场份额 | 销量/营收份额、行业排名、区域渗透率 | china-nbs（中国行业对标统计）、newsapi（行业报道）、sec-edgar（美股上市竞品法定披露——10-K 全文与 XBRL 营收印证） |
 
-**源级三角化**：6 个声明源全部参与采集（并发覆盖，三角化规范见
-`references/triangulation.md`）；维度级直接映射源数以上表为准（战略动向/产品组合/专利布局
-2 源——专利布局为 uspto+epo-ops 双库口径互证（域内一致性，非跨域互证），市场份额 3 源）——
+**源级三角化**：7 个声明源全部参与采集（并发覆盖，三角化规范见
+`references/triangulation.md`）；维度级直接映射源数以上表为准（战略动向/产品组合 2 源，
+专利布局 3 库（uspto+google-patents+epo-ops——域内一致性互证，非跨域互证），市场份额 3 源）——
 直接映射不足的维度须跨维度关联印证或显式标注「印证不足」并下调置信度。
 **同源多 query（name/#2 键）不构成独立来源**，不得计入印证数。
 
 **数据源口径边界**：uspto 仅美国专利口径，且检索为 patent_title 标题关键词匹配
-（非申请人结构化检索——归因经返回的 assignees 字段研判）；epo-ops 为 EPO 欧洲专利
+（非申请人结构化检索——归因经返回的 assignees 字段研判）；google-patents 为 BigQuery
+公共数据集全球书目口径（CN 覆盖 99.96% SSRN 实证、assignee 精确聚合——月度更新新鲜度
+低于 uspto/epo-ops，趋势结论宜结合源时效评估；月配额 1TiB 扫描字节，耗尽按 §7 降级）；
+epo-ops 为 EPO 欧洲专利
 口径（`pa=` 申请人结构化检索支持中文企业名，100+ 专利局含 CN——但仅 EP 申请视角，
-合并 uspto 后**仍缺 CNIPA 中国本土口径**，全球布局画像按「US+EP 双口径」标注）；
+合并后**仍缺 CNIPA 本土实时口径**（google-patents 补 CN 全景），全球布局画像按「US+全球+EP 三口径」标注）；
 sec-edgar 仅覆盖美股上市公司（非上市/非美竞品无数据——XBRL 模式返回字段为
 concept/unit/values 时序形态，与检索模式 filings 列表不同，营收份额经 values 序列
 计算并标注口径）；china-nbs 为宏观/行业总量口径，不提供企业级份额数据（份额结论须
 「行业→企业」显式映射推断并标注，或降级为行业格局定性判断）；newsapi 以英文新闻
-覆盖为主；tavily 为 Web 事件级检索（非结构化指标级）。epo-ops 周配额（4GB/周）与
-sec-edgar 类限流/配额场景按 §7 降级处理。
+覆盖为主；tavily 为 Web 事件级检索（非结构化指标级）。epo-ops 周配额（4GB/周）、
+google-patents 月配额（1TiB）与 sec-edgar 类限流/配额场景按 §7 降级处理。
 
 ## 6. SOP 执行步骤
 
@@ -214,6 +225,7 @@ sec-edgar 类限流/配额场景按 §7 降级处理。
    - 每个声明源至少 1 个标记（同源多 query 依次分配 name/name#2 键——见下方同源多 query 说明）；**query 必须为该源的规范格式**（R3-P1-2 契约对齐）：
      - `newsapi` / `tavily`：检索关键词（自然语言关键词为**正确**格式，**按竞品逐家拆分 query**——每竞品一查，禁止单 query 混入多家竞品名导致归因混淆）
      - `uspto`：**英文**检索关键词（匹配 patent_title 全文）——**含竞品英文名 + 技术域词实现标题软归因**（如 `"BYD battery"`）；适配器不支持 assignee 结构化检索，采集后经返回的 assignees 字段做研判归因（口径边界见 §5）
+     - `google-patents`：**管道串**（非自然语言）——`assignee=`/`cpc=`/`country=`/`year=`/`keyword=` 至少一项（如 `assignee=比亚迪|keyword=battery`；空条件被适配器拒绝防全表扫描）
      - `epo-ops`：**CQL 结构化检索式**（非自然语言）——`pa=` 申请人（支持中文企业名直接归因）+ `ti=`/`ab=` 关键词（如 `pa="比亚迪" and ti="battery"`；多条件以 and 组合）
      - `sec-edgar`：检索式或 XBRL 前缀——检索模式 `"<关键词> forms=10-K"`（如 `"market share" forms=10-K`）；XBRL 模式 `xbrl:CIK:概念`（如 `xbrl:CIK0001318605:Revenues`——单指标营收时序，CIK 经检索模式获取）
      - `china-nbs`：站点相对路径（如 `"sj/zxfb"`=数据发布；非自然语言描述）
@@ -238,7 +250,10 @@ news_tesla = $DATA_SOURCE("newsapi#2", "特斯拉 战略动态 市场份额 最�
 # uspto 标题软归因：竞品英文名 + 技术域词（采集后经 assignees 字段研判归因）
 patents_byd = $DATA_SOURCE("uspto", "BYD battery")       # 英文关键词匹配 patent_title
 patents_tesla = $DATA_SOURCE("uspto#2", "Tesla battery")
+# google-patents BigQuery 公共数据集（管道串——CN 全景 99.96%，与 uspto 双库口径互补）
+gp_byd = $DATA_SOURCE("google-patents", "assignee=比亚迪|keyword=battery")
 # epo-ops 申请人结构化检索（CQL——pa= 支持中文企业名直接归因，与 uspto 双库口径互证）
+gp_byd = $DATA_SOURCE("google-patents", "assignee=比亚迪|keyword=battery")  # BigQuery 管道串（全球含 CN）
 epo_byd = $DATA_SOURCE("epo-ops", 'pa="比亚迪" and ti="battery"')
 epo_tesla = $DATA_SOURCE("epo-ops#2", 'pa="Tesla" and ti="battery"')
 # sec-edgar 美股上市竞品法定披露（检索模式取 10-K；XBRL 模式取营收时序）
@@ -251,6 +266,8 @@ cn_stats = $DATA_SOURCE("china-nbs", "sj/zxfb")           # 国家局数据发�
 
 # 采集后通过注入的 DATA_SOURCES dict 读取（键含 #2 后缀形态）
 uspto_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
+gp_payload = (DATA_SOURCES.get("google-patents") or {}).get("payload")
+gp_payload = (DATA_SOURCES.get("google-patents") or {}).get("payload")
 epo_payload = (DATA_SOURCES.get("epo-ops") or {}).get("payload")
 ```
 

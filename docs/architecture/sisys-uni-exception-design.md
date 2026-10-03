@@ -750,7 +750,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 > 本节仅登记复用事实，不重复列举。内部数据不足走 ToolResultStatus.INSUFFICIENT_DATA
 > 状态语义（SOP 文档级关键词承载，非异常）。data_source 子域 414-419 保持空闲。
 
-> **Story 4.1f 复用声明（2026-09-30）：** Story 4.1f（Skills 数据源扩展——EPO OPS/SEC
+> **Story 4.1f 复用声明（2026-09-30；D-09 2026-10-02 补充：google-patents 适配器（BigQuery 服务账号 JWT + jobs.query REST 直连 + 月配额守卫）同款零新增异常——412 月配额守卫与 101 令牌重取复用同款既有编码，GCP 双门缺失抛 101）：** Story 4.1f（Skills 数据源扩展——EPO OPS/SEC
 > EDGAR/UN Comtrade 三新源适配器 + CJK 自适应 + required_fields 四元组化 + 声明重分配，
 > 生产改动全部位于 infrastructure 层 + composition_root 注册）**零新增异常**——全部失败
 > 路径复用上表既有编码。**两个新语义映射归属既有**（无新码位）：① EPO/Comtrade 配额守卫

@@ -77,11 +77,16 @@ def _extract_imports(path: Path) -> set[str]:
 
 
 def _build_adapters() -> dict[str, DataSourcePort]:
-    """实例化 11 个适配器（Key 敏感源用测试占位 Key/凭据，禁止真实外网调用；4-1f 三新源）"""
+    """实例化 12 个适配器（Key 敏感源用测试占位 Key/凭据，禁止真实外网调用；4-1f 三新源 + D-09）"""
+    import json as _json
+    import tempfile as _tempfile
+    from pathlib import Path as _Path
+
     from src.infrastructure.config.china_nbs import ChinaNBSConfig
     from src.infrastructure.config.comtrade import ComtradeConfig
     from src.infrastructure.config.epo_ops import EpoOpsConfig
     from src.infrastructure.config.eurostat import EurostatConfig
+    from src.infrastructure.config.google_patents import GooglePatentsConfig
     from src.infrastructure.config.imf import IMFConfig
     from src.infrastructure.config.ipcc import IPCCConfig
     from src.infrastructure.config.newsapi import NewsAPIConfig
@@ -93,6 +98,7 @@ def _build_adapters() -> dict[str, DataSourcePort]:
     from src.infrastructure.external_services.datasources.comtrade_adapter import ComtradeAdapter
     from src.infrastructure.external_services.datasources.epo_ops_adapter import EpoOpsAdapter
     from src.infrastructure.external_services.datasources.eurostat_adapter import EurostatAdapter
+    from src.infrastructure.external_services.datasources.google_patents_adapter import GooglePatentsAdapter
     from src.infrastructure.external_services.datasources.imf_adapter import IMFAdapter
     from src.infrastructure.external_services.datasources.ipcc_adapter import IPCCAdapter
     from src.infrastructure.external_services.datasources.newsapi_adapter import NewsAPIAdapter
@@ -100,6 +106,21 @@ def _build_adapters() -> dict[str, DataSourcePort]:
     from src.infrastructure.external_services.datasources.tavily_adapter import TavilyAdapter
     from src.infrastructure.external_services.datasources.uspto_adapter import USPTOAdapter
     from src.infrastructure.external_services.datasources.worldbank_adapter import WorldBankAdapter
+
+    # google-patents 双门占位凭据（临时 fake 服务账号 JSON——仅 get_metadata 读
+    # config 字段，零网络/零签名调用；仅存在于本函数生命周期内）
+    _tmp_dir = _tempfile.mkdtemp(prefix="arch-test-gcp-")
+    _sa_path = _Path(_tmp_dir) / "fake-sa.json"
+    _sa_path.write_text(
+        _json.dumps(
+            {
+                "type": "service_account",
+                "client_email": "arch-test-placeholder@gcp.test",
+                "private_key": "-----BEGIN " + "PRIVATE KEY-----\nFAKE\n-----END " + "PRIVATE KEY-----",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     return {
         "world-bank": WorldBankAdapter(config=WorldBankConfig()),
@@ -115,6 +136,9 @@ def _build_adapters() -> dict[str, DataSourcePort]:
         ),
         "sec-edgar": SecEdgarAdapter(config=SecEdgarConfig()),
         "comtrade": ComtradeAdapter(config=ComtradeConfig()),
+        "google-patents": GooglePatentsAdapter(
+            config=GooglePatentsConfig(credentials_path=str(_sa_path), project_id="arch-test-project")
+        ),
     }
 
 
@@ -127,7 +151,7 @@ class TestThreeWayConsistency:
     """声明表 SSOT ↔ 6 个 SKILL.md frontmatter ↔ 适配器 get_metadata() 三方一致"""
 
     def test_adapter_metadata_matches_ssot(self) -> None:
-        """11 个适配器 get_metadata() 实测值与 SSOT 对齐表一致（name/url/api_type/ttl）"""
+        """12 个适配器 get_metadata() 实测值与 SSOT 对齐表一致（name/url/api_type/ttl）"""
         adapters = _build_adapters()
         assert set(adapters.keys()) == set(ADAPTER_SSOT.keys())
         for name, adapter in adapters.items():

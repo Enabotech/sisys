@@ -29,7 +29,7 @@ STORY_SSOT: dict[str, tuple[str, ...]] = {
     "ge-mckinsey-matrix": ("world-bank", "tavily"),
     "space-matrix": ("world-bank", "imf"),
     "value-chain-analysis": ("tavily", "china-nbs"),
-    "vrio-framework": ("uspto", "epo-ops", "tavily"),
+    "vrio-framework": ("uspto", "google-patents", "epo-ops", "tavily"),
     "bsc-scorecard": ("china-nbs", "world-bank"),
     "kpi-tree": ("china-nbs", "newsapi"),
     "change-management": ("newsapi", "tavily"),
@@ -48,14 +48,16 @@ class TestMixedSkillDataSources:
         assert len(contracts_41d.MIXED_SKILL_DATA_SOURCES) == 10
 
     def test_all_sources_are_registered_adapters(self) -> None:
-        """全部声明源 ∈ 11 个注册适配器集合（合法值约束——4-1f 三新源入册）。"""
+        """全部声明源 ∈ 12 个注册适配器集合（合法值约束——4-1f 三新源 + D-09 google-patents）。"""
         for slug, sources in contracts_41d.MIXED_SKILL_DATA_SOURCES.items():
             for name in sources:
-                assert name in contracts_41c.ADAPTER_SSOT, f"{slug}: 源 {name} 不在 11 个注册适配器中"
+                assert name in contracts_41c.ADAPTER_SSOT, f"{slug}: 源 {name} 不在 12 个注册适配器中"
 
     def test_adapter_ssot_quadruple_structure(self) -> None:
-        """ADAPTER_SSOT 四元组结构基准（4-1f D6）：11 源 × (url, api_type, ttl, required_fields)。"""
-        assert len(contracts_41c.ADAPTER_SSOT) == 11, f"应 11 源（8 既有 + 3 新），实际 {len(contracts_41c.ADAPTER_SSOT)}"
+        """ADAPTER_SSOT 四元组结构基准（4-1f D6）：12 源 × (url, api_type, ttl, required_fields)。"""
+        assert len(contracts_41c.ADAPTER_SSOT) == 12, (
+            f"应 12 源（8 既有 + 3 新 + D-09），实际 {len(contracts_41c.ADAPTER_SSOT)}"
+        )
         for name, entry in contracts_41c.ADAPTER_SSOT.items():
             assert len(entry) == 4, f"{name}: SSOT 条目应为四元组，实际 {len(entry)} 元: {entry}"
             url, api_type, ttl, required_fields = entry
@@ -63,16 +65,18 @@ class TestMixedSkillDataSources:
             assert api_type in ("rest_json", "sdmx_json", "csv_download", "crawler"), f"{name}: api_type 非法 {api_type}"
             assert 60 <= ttl <= 2592000, f"{name}: ttl 越界 {ttl}"
             assert isinstance(required_fields, tuple) and required_fields, f"{name}: required_fields 应为非空 tuple"
-        assert set(contracts_41c.ADAPTER_SSOT) >= {"epo-ops", "sec-edgar", "comtrade"}, "4-1f 三新源应入册 SSOT"
+        assert set(contracts_41c.ADAPTER_SSOT) >= {"epo-ops", "sec-edgar", "comtrade", "google-patents"}, (
+            "4-1f 三新源 + D-09 google-patents 应入册 SSOT"
+        )
 
     def test_unified_two_source_policy(self) -> None:
-        """2 源基线 + 4-1f 增补豁免表（D2 修订——epics 4.1f 任务 6 授权）。
+        """2 源基线 + 增补豁免表（D2 修订——epics 4.1f 任务 6 授权 + D-09 扩展）。
 
         基线：混合数据 Skill 恰好声明 2 个源且不重复；豁免表逐 Skill 登记显式增补
         （未登记的增补即红——防漂移语义保留）。vrio-framework 经 epics 授权增补
-        epo-ops（专利域第二口径，3 源）。
+        专利域口径（4-1f epo-ops + D-09 google-patents BigQuery——4 源）。
         """
-        exempted_source_counts = {"vrio-framework": 3}
+        exempted_source_counts = {"vrio-framework": 4}
         for slug, sources in contracts_41d.MIXED_SKILL_DATA_SOURCES.items():
             expected_count = exempted_source_counts.get(slug, 2)
             assert len(sources) == expected_count, (
@@ -138,6 +142,7 @@ class TestSharedConstantsSingleSource:
             "epo-ops": ("title", "applicant", "filing_date"),
             "sec-edgar": ("company", "form", "filed_at"),
             "comtrade": ("cmd_code", "trade_value", "period"),
+            "google-patents": ("publication_number", "assignee", "filing_date"),
         }
         for name, (_, _, _, required_fields) in contracts_41c.ADAPTER_SSOT.items():
             if name in new_source_expected:

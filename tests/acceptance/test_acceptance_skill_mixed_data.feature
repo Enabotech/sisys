@@ -60,7 +60,7 @@
     并且 每个声明数据源恰好采集 1 次
     并且 注入 DATA_SOURCES 字典键集合等于声明数据源集合
 
-  场景: vrio-framework 三源采集链路（专利双库 + 市场）
+  场景: vrio-framework 四源采集链路（专利三库 + 市场）
     假如 加载技能 "vrio-framework" 的 L2 技能元数据
     并且 该技能全部声明数据源适配器行为正常
     当 该技能全部声明数据源标记经 Engine Execute 阶段处理

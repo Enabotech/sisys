@@ -52,7 +52,7 @@ TARGET_SLUGS: tuple[str, ...] = tuple(MIXED_SKILL_DATA_SOURCES.keys())
 # NO_EXTERNAL_SOURCE_SLUGS——D2 收敛，字面清单零复制）：data_sources 恒空不变量
 NON_TARGET_SLUGS: tuple[str, ...] = NO_EXTERNAL_SOURCE_SLUGS
 
-# 4-1d 涉及源（7 个；world-bank / imf / uspto / epo-ops / newsapi / tavily / china-nbs——4-1f vrio 增补）
+# 4-1d 涉及源（8 个；world-bank / imf / uspto / google-patents / epo-ops / newsapi / tavily / china-nbs——4-1f vrio + D-09）
 MIXED_INVOLVED_SOURCES: tuple[str, ...] = tuple({name for sources in MIXED_SKILL_DATA_SOURCES.values() for name in sources})
 
 # 生产链路 wiring 文件（零改动回归断言对象）
@@ -76,10 +76,15 @@ def _extract_imports(path: Path) -> set[str]:
 
 
 def _build_involved_adapters() -> dict[str, DataSourcePort]:
-    """实例化 4-1d 涉及的 7 个适配器（Key 敏感源占位 Key/凭据；china-nbs 注入
+    """实例化 4-1d 涉及的 8 个适配器（Key 敏感源占位 Key/凭据；china-nbs 注入
     AsyncMock crawler；仅读取 get_metadata() 元数据，零网络调用）。"""
+    import json as _json
+    import tempfile as _tempfile
+    from pathlib import Path as _Path
+
     from src.infrastructure.config.china_nbs import ChinaNBSConfig
     from src.infrastructure.config.epo_ops import EpoOpsConfig
+    from src.infrastructure.config.google_patents import GooglePatentsConfig
     from src.infrastructure.config.imf import IMFConfig
     from src.infrastructure.config.newsapi import NewsAPIConfig
     from src.infrastructure.config.tavily import TavilyConfig
@@ -87,16 +92,35 @@ def _build_involved_adapters() -> dict[str, DataSourcePort]:
     from src.infrastructure.config.worldbank import WorldBankConfig
     from src.infrastructure.external_services.datasources.china_nbs_adapter import ChinaNBSAdapter
     from src.infrastructure.external_services.datasources.epo_ops_adapter import EpoOpsAdapter
+    from src.infrastructure.external_services.datasources.google_patents_adapter import GooglePatentsAdapter
     from src.infrastructure.external_services.datasources.imf_adapter import IMFAdapter
     from src.infrastructure.external_services.datasources.newsapi_adapter import NewsAPIAdapter
     from src.infrastructure.external_services.datasources.tavily_adapter import TavilyAdapter
     from src.infrastructure.external_services.datasources.uspto_adapter import USPTOAdapter
     from src.infrastructure.external_services.datasources.worldbank_adapter import WorldBankAdapter
 
+    # google-patents 双门占位凭据（临时 fake 服务账号 JSON——仅 get_metadata 读
+    # config 字段，零网络/零签名调用；仅存在于本函数生命周期内）
+    _tmp_dir = _tempfile.mkdtemp(prefix="arch-test-gcp-")
+    _sa_path = _Path(_tmp_dir) / "fake-sa.json"
+    _sa_path.write_text(
+        _json.dumps(
+            {
+                "type": "service_account",
+                "client_email": "arch-test-placeholder@gcp.test",
+                "private_key": "-----BEGIN " + "PRIVATE KEY-----\nFAKE\n-----END " + "PRIVATE KEY-----",
+            }
+        ),
+        encoding="utf-8",
+    )
+
     return {
         "world-bank": WorldBankAdapter(config=WorldBankConfig()),
         "imf": IMFAdapter(config=IMFConfig()),
         "uspto": USPTOAdapter(config=USPTOConfig()),
+        "google-patents": GooglePatentsAdapter(
+            config=GooglePatentsConfig(credentials_path=str(_sa_path), project_id="arch-test-project")
+        ),
         "epo-ops": EpoOpsAdapter(
             config=EpoOpsConfig(consumer_key="arch-test-placeholder", consumer_secret="arch-test-placeholder")
         ),

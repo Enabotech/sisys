@@ -80,8 +80,15 @@ ADAPTER_PORT_NAMES = (
 
 # 需 API Key 的适配器（条件注册，Key 缺失时不注册——冷启动容错设计；
 # uspto 自 R3-P1-3 起条件注册：PatentsView v1 端点强制 X-Api-Key 鉴权；
-# epo-ops 自 4.1f 起条件注册：OAuth2 双凭据门——Consumer Key/Secret 双门合取）
-KEYED_ADAPTER_PORT_NAMES = ("data_source_uspto", "data_source_newsapi", "data_source_tavily", "data_source_epo_ops")
+# epo-ops 自 4.1f 起条件注册：OAuth2 双凭据门——Consumer Key/Secret 双门合取；
+# google-patents 自 4.1f D-09 起条件注册：GCP 双门（凭据文件存在 + 项目 ID））
+KEYED_ADAPTER_PORT_NAMES = (
+    "data_source_uspto",
+    "data_source_newsapi",
+    "data_source_tavily",
+    "data_source_epo_ops",
+    "data_source_google_patents",
+)
 
 # 端口 → (适配器模块名, 实现类名) 静态映射（条件注册端口无 Key 时不注册——
 # 实现类合规校验不依赖运行时注册状态，R3-P1-3 同步；4.1f 三新源入册）
@@ -97,6 +104,7 @@ ADAPTER_IMPL_MODULES = {
     "data_source_epo_ops": ("epo_ops_adapter", "EpoOpsAdapter"),
     "data_source_sec_edgar": ("sec_edgar_adapter", "SecEdgarAdapter"),
     "data_source_comtrade": ("comtrade_adapter", "ComtradeAdapter"),
+    "data_source_google_patents": ("google_patents_adapter", "GooglePatentsAdapter"),
 }
 
 # 数据源异常码段（data_source 子域 410-419）
@@ -192,9 +200,12 @@ class TestDataSourcePortRegistry:
 
         uspto 自 R3-P1-3 起加入条件注册（PatentsView v1 强制 X-Api-Key）；
         epo-ops 自 4.1f 起加入（OAuth2 双凭据门——Consumer Key/Secret 多键合取：
-        任一缺失即不注册，单键存在不构成注册条件——半凭据态语义防假阳性）。
+        任一缺失即不注册，单键存在不构成注册条件——半凭据态语义防假阳性）；
+        google-patents 自 4.1f D-09 起加入（GCP 双门——凭据文件存在 + 项目 ID，
+        文件路径门特殊：env 存在但文件不存在同样不注册）。
         """
         import os
+        from pathlib import Path
 
         for port_name, env_keys in (
             ("data_source_uspto", ("USPTO_API_KEY",)),
@@ -208,6 +219,15 @@ class TestDataSourcePortRegistry:
                 assert spec is None, f"{env_keys} 任一缺失时 {port_name} 不应注册（多键合取）"
             else:
                 assert spec is not None, f"{env_keys} 全部存在时 {port_name} 应注册"
+
+        # google-patents 特殊门：env 双键非空 + 凭据文件实际存在（D-09 双门）
+        gp_spec = _global_registry.get("data_source_google_patents")
+        gp_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+        gp_enabled = bool(gp_credentials) and bool(os.getenv("GOOGLE_PATENTS_PROJECT_ID")) and Path(gp_credentials).is_file()
+        if gp_enabled:
+            assert gp_spec is not None, "GCP 双门齐备时 data_source_google_patents 应注册"
+        else:
+            assert gp_spec is None, "GCP 凭据文件缺失/项目 ID 缺失时 data_source_google_patents 不应注册"
 
 
 # ============================================================

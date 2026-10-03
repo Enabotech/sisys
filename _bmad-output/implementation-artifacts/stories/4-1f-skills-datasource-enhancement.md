@@ -1,6 +1,6 @@
 # Story 4.1f: Skills 数据源扩展（专利/财报/行业量化域适配器 + 中文参数验证）
 
-**Status:** `done`
+**Status:** `review`（D-09 范围扩展 Task 9 完成，2026-10-02）
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -709,6 +709,48 @@
 
 ---
 
+### Task 9: google-patents BigQuery 适配器 + 三 Skill 4 源联动（D-09 范围扩展）
+
+**关联 AC:** AC-2'（google-patents 适配器）/ AC-6'（4 源联动）/ AC-7'（注册链触点）
+
+> D-09 范围扩展（owner 2026-10-02）：EPO key 申请受阻 → google-patents 提前纳入为专利域活跃第二源；**并存 4 源策略**（epo-ops 休眠保留）。技术路线 = BigQuery REST 直连（httpx + pyjwt——零新依赖，复用 `_http_helpers` 全链）。
+
+#### TDD 循环 [A]：服务账号令牌管理器（GoogleTokenManager）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | `_GoogleTokenManager` 测试：服务账号 JSON → RS256 JWT 构造（iss/sub/scope/aud 声言）/ token 端点 POST / 缓存命中 / 过期提前刷新 / 业务 401 判别重取（对齐 EpoTokenManager 模式） |
+| 🟢 绿 | 令牌管理私有类（pyjwt RS256 签名 + `request_json_with_resilience` 调 token 端点 + now_fn/retry_* 注入） |
+
+#### TDD 循环 [B]：月配额守卫（MonthlyQuotaGuard）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 两分支（放行累计/超限抛 412 含已用字节与重置时间）+ 月窗口重置（now_fn 注入，自然月一日 00:00 UTC）+ `totalBytesProcessed` 事后累计 + 并发安全 |
+| 🟢 绿 | 月窗口字节累计（Lock 类变量 + now_fn + 可注入初始值——EPO 周窗口守卫的月窗口变体，上限 1TiB） |
+
+#### TDD 循环 [C]：适配器主体（管道串解析 + 参数化 SQL + jobs.query REST）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 管道串解析（assignee/cpc/country/year/keyword 五参——空条件抛 201 防全表扫描；未知参数 201）/ 参数化 SQL 构造断言（named parameters + 列裁剪三列 + LIMIT）/ Bearer 头 / rows→patents 结构化（schema.fields 名映射 f.v 值）/ totalBytesProcessed 计入守卫 / 失败矩阵（101/302/411/412/413/熔断）/ 双门缺失构造抛 101 / repr 脱敏 / isinstance(DataSourcePort) |
+| 🟢 绿 | GooglePatentsAdapter 实现（复用 `request_json_with_resilience`——REST 直连 jobs.query）+ `GooglePatentsConfig` |
+| 🔄 重构 | ruff/mypy + 中文注释对齐 |
+
+- [x] Subtask 9.1: 🔴 红 — 令牌管理器测试
+- [x] Subtask 9.2: 🟢 绿 — 令牌管理器实现
+- [x] Subtask 9.3: 🔴🟢 — 月配额守卫
+- [x] Subtask 9.4: 🔴🟢 — 适配器主体 + config
+- [x] Subtask 9.5: 注册链全触点（组合根双门条件注册 + 元组表 11→12 + shutdown + ADAPTER_PORT_SPECS +12 + 架构测试三文件 + `__init__` docstring + `.env` 样例 + 子进程探针双门）
+- [x] Subtask 9.6: 契约库 SSOT +google-patents 四元组条目 + 三 Skill 4 源联动（competitor 6→7 / disruptive 3→4 / vrio 3→4——frontmatter/§5 表/口径段/§6 标记/§7 计数/references/yaml/D2 豁免表 vrio 3→4/集成断言/验收场景计数——24 项清单等价扩充为 google-patents 增源版）
+- [x] Subtask 9.7: 🔄 全量回归 + architecture.md 同步（适配器表 11→12 + §17.3 状态表 Task 9 追记 + 版本 8.9.1 三处 + D-09 留痕行）+ 异常文档复用声明补 google-patents 行
+
+**完成标准/Definition of Done:**
+- [x] google-patents 适配器全绿（令牌/守卫/主体三循环）+ 三 Skill 4 源断言全绿 + 全量回归零破坏
+- [x] D-09 留痕完整（本 Task + 决策记录表）+ 预筛勘误留痕
+
+---
+
 ## 📝 Dev Notes 开发笔记
 
 ### 相关架构模式和约束 Architecture Patterns & Constraints
@@ -836,6 +878,32 @@ tests/
 | **治理冲突源** | `4-1c-skills-data-collection-integration.md:1180,:1186`（D8 签收） |
 | **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
 | **三视角调研** | 2026-09-30：①适配器基建面（8 适配器范本/注册链/测试模式）②契约联动面（41 处 required_fields/三元组解包 6 处/触点清单）③受益 Skill 与参数面（断言联动清单/D8 冲突发现/parameters 链路约束）——**Round 1 审查（2026-09-30）三视角复审 + 外部 API 实测（EPO 4GB/周与 token 端点/SEC 10 rps 与 UA 规范/Tavily country 枚举/Comtrade preview 端点）校正** |
+
+### D-09 范围扩展决策记录（owner 2026-10-02——Task 9 google-patents 追加）
+
+| 决策项 | 结果 | 依据与留痕 |
+|--------|------|-----------|
+| **触发背景** | EPO OPS Consumer Key 个人申请受阻（确认邮件延迟/审核不确定） | owner 实际申请反馈（2026-10-02）；预筛「申请周期快」前提现实受阻 |
+| **载体调整** | **google-patents（BigQuery 公共专利数据集）提前纳入本 Story 作为专利域活跃第二源**（原排 4.1g 首项） | 预筛裁定第二优先（CN 覆盖 99.96% SSRN 实证 + assignee 精确聚合 + 1TiB/月免费）；owner 选型确认 |
+| **源组合策略** | **并存 4 源**：uspto + google-patents（活跃）+ epo-ops（**休眠保留**——key 到位自动激活，声明即生效零代码改动）+ tavily | owner 拍板：零回滚（D8 重开留痕/双库方法论/断言联动全保留）；epo-ops 条件注册双门缺失时自动降级不注册（既有设计） |
+| **技术路线** | **REST 直连（httpx）而非 google-cloud-bigquery SDK** | cryptography + pyjwt 已在依赖树（python-jose 附带）→ **零新第三方依赖**；复用 `_http_helpers.request_json_with_resilience` 全链（熔断/重试/异常映射——硬约束「完整复用 helper」天然满足）；MockTransport 测试模式与 11 适配器同款 |
+| **预筛勘误** | BigQuery 行「Sandbox 免信用卡」**证伪**：Sandbox 模式无 API 编程访问（仅 Web 控制台）——程序化访问需绑定 Billing 的 GCP 项目（免费层内 $0 消费 + budget alert 防护） | BigQuery 官方文档实测（docs.cloud.google.com/bigquery/docs/sandbox：API programmatic access unavailable in sandbox）；门槛形态 = 信用卡绑定（确定性流程）vs EPO 审核（不确定性） |
+| **依赖批准** | 零新第三方依赖（pyjwt/cryptography 既有）——owner 经「纳入 4.1f 开发」指令批准 BigQuery 路线 | 本表即批准留痕 |
+| **R7 锚点升级** | EPO key 外部前置从「申请周期」升级为「申请通道受阻」——AC-2 集成面持续 skip 属预期态；epo-ops 休眠运行（三 Skill §7 降级话术生效：专利域 google-patents+uspto 双活跃口径） | 本表 |
+
+**google-patents 数据契约（Task 9 定稿基线）**
+
+| 项 | 值 |
+|---|---|
+| name / 端口名 | `google-patents` / `data_source_google_patents` |
+| 端点 | Token：`POST https://oauth2.googleapis.com/token`（服务账号 JWT RS256 → access_token，scope=bigquery.readonly）；Query：`POST https://bigquery.googleapis.com/bigquery/v2/projects/{project}/queries`（Bearer；jobs.query REST） |
+| 数据集 | `patents-public-data.patents.publications`（IFI CLAIMS 维护——全球书目含 CN 99.96%） |
+| env | `GOOGLE_APPLICATION_CREDENTIALS`（服务账号 JSON 路径）+ `GOOGLE_PATENTS_PROJECT_ID`（GCP 项目 ID）双门合取条件注册 + `GOOGLE_PATENTS_TIMEOUT`/`GOOGLE_PATENTS_TTL_SECONDS` |
+| ttl_seconds | 604800（数据集更新月/周频——7 天保守缓存） |
+| required_fields | `("publication_number", "assignee", "filing_date")` |
+| query 规范 | 管道串 `assignee=华为|cpc=Y02E|country=CN|year=2020-2026|keyword=battery`（至少一项条件——空条件抛 201 防全表扫描；参数化查询防注入） |
+| 配额守卫 | 月窗口字节累计（`totalBytesProcessed` 响应精确值事后累计）+ 1TiB/月前置拦截 412（守卫模式复用 EPO 周窗口——月窗口变体）；SQL 列裁剪（仅 SELECT 三列）+ 强制 LIMIT |
+| confidence | 0.9（Google/IFI CLAIMS 公共数据集——CN 完整性有 SSRN 论文 caveat，口径段如实标注） |
 
 ### D-08 治理决策执行记录（Task 0.1——2026-09-30）
 
@@ -1136,10 +1204,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.6.0
+**故事版本/Story Version:** v1.7.0
 **创建日期/Created:** 2026-09-30
-**最后更新/Last Updated:** 2026-09-30
+**最后更新/Last Updated:** 2026-10-02
 **更新说明/Description:**
+- v1.7.0: **Task 9 D-09 范围扩展实施**：EPO OPS key 个人申请受阻 → google-patents（BigQuery 公共专利数据集，REST 直连零新依赖）提前纳入为专利域活跃第二源——并存 4 源（epo-ops 休眠保留）；适配器池 12 终态；三 Skill 专利域三库（competitor 7 源/disruptive 4 源/vrio 4 源）；注册链全触点（双门条件注册/元组表/契约表/架构三文件/探针）+ 集成实测两态（GCP 凭据动态 skip）；3436 passed 受影响面全绿；预筛勘误留痕（Sandbox 无 API 编程访问）
 - v1.6.0: **代码审查周期正式收敛**：Round 4 纯验证（七维度评级 A）+ Round 5 独立收敛终审（五节全过——周期闭合/10 项双向取证零失实/独立快扫零新 P0-P1/门禁实跑全绿）→ **收敛声明入档，Status review → done**；周期累计发现 33 项、修复 29 项、改判 2 项、维持留项 8 条、Defer 11 条
 - v1.5.2: **代码审查 Round 3**（深度评审——断言覆盖矩阵）：P0/P1 零；P2×2（EDGAR XBRL 路径消毒缺失（穿越实测）+ 双模式 CIK 形态断层（真实端点三态实测 404/200/404——SOP 回填链路断裂））+ P3×6；12 项契约 11 项已守护核验 + R3-4 补断言时抓出测试自身缺陷（单态 handler 令牌阶段 413 冒充检索阶段）；三适配器 216 passed（datasources 目录全量口径）
 - v1.5.1: **代码审查 Round 2**（回归核查 + 留项清偿双视角 + 单评审员）：R2-F1 token 端点路径 P1（R1-F1 同族传播缺口——官方双库定谳 accesstoken）+ P2×4（限速重试下沉 pre_request/检索质量组/三角化用语纪律/锁认知文档清偿）+ P3 收尾组；A-5 三方证据专项（CLAUDE.md Gotcha 语义考据 + 生产零风险实证——文档澄清替代结构变更）；维持留项 6 条逐条留痕；unit 全量 7765 passed

@@ -47,6 +47,12 @@ ADAPTER_SSOT: dict[str, tuple[str, str, int, tuple[str, ...]]] = {
     "epo-ops": ("https://ops.epo.org", "rest_json", 604800, ("title", "applicant", "filing_date")),
     "sec-edgar": ("https://efts.sec.gov", "rest_json", 2592000, ("company", "form", "filed_at")),
     "comtrade": ("https://comtradeapi.un.org", "rest_json", 604800, ("cmd_code", "trade_value", "period")),
+    "google-patents": (
+        "https://bigquery.googleapis.com",
+        "rest_json",
+        604800,
+        ("publication_number", "assignee", "filing_date"),
+    ),
 }
 
 # SSOT：6 个 Skills 数据源白名单声明表（slug → 声明源 name 有序元组）
@@ -54,9 +60,9 @@ SKILL_DATA_SOURCES: dict[str, tuple[str, ...]] = {
     "pestel-analysis": ("world-bank", "imf", "eurostat", "ipcc", "newsapi", "china-nbs"),
     "porters-five-forces": ("newsapi", "world-bank", "eurostat"),
     "appeals-analysis": ("tavily", "newsapi", "china-nbs"),
-    "competitor-analysis": ("newsapi", "uspto", "epo-ops", "sec-edgar", "tavily", "china-nbs"),
+    "competitor-analysis": ("newsapi", "uspto", "google-patents", "epo-ops", "sec-edgar", "tavily", "china-nbs"),
     "scenario-planning": ("tavily", "ipcc", "eurostat"),
-    "disruptive-innovation": ("uspto", "epo-ops", "tavily"),
+    "disruptive-innovation": ("uspto", "google-patents", "epo-ops", "tavily"),
 }
 
 # 声明含 Key 敏感源（newsapi/tavily）的 Skill —— SOP 失败处理章节必须文档化 Key 缺失降级

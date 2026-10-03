@@ -83,7 +83,8 @@ _EDGAR_XBRL_BODY = {"concept": "Revenues", "unit": "USD", "values": [{"end": "20
 _COMTRADE_RECORDS_BODY = {"records": [{"cmd_code": "8703", "trade_value": 1234567, "period": "2024"}]}
 
 # Conditional-registration probe: scrub every keyed data-source env var
-# (existing keyed sources + 4.1f EPO dual credentials + Comtrade optional key)
+# (existing keyed sources + 4.1f EPO dual credentials + Comtrade optional key
+# + D-09 GCP dual gate)
 _PROBE_SCRUB_KEYS = (
     "TAVILY_API_KEY",
     "NEWSAPI_API_KEY",
@@ -91,6 +92,8 @@ _PROBE_SCRUB_KEYS = (
     "EPO_OPS_CONSUMER_KEY",
     "EPO_OPS_CONSUMER_SECRET",
     "COMTRADE_API_KEY",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "GOOGLE_PATENTS_PROJECT_ID",
 )
 
 
@@ -468,6 +471,8 @@ def bootstrap_and_check_registration(ds_context: dict[str, Any]):
         "from src.domain.ports.registry import _global_registry; "
         "bootstrap(); "
         "assert _global_registry.get('data_source_epo_ops') is None, 'EPO must stay unregistered with half credentials'; "
+        "assert _global_registry.get('data_source_google_patents') is None, "
+        "'google-patents must stay unregistered without GCP gate'; "
         "assert _global_registry.get('data_source_sec_edgar') is not None, 'EDGAR must register unconditionally'; "
         "assert _global_registry.get('data_source_comtrade') is not None, 'Comtrade must register unconditionally'; "
         "print('PROBE_OK')"
@@ -554,9 +559,9 @@ def verify_zero_upstream_requests(ds_context: dict[str, Any]):
     assert not ds_context["captured"], f"guard interception expects zero requests, captured {len(ds_context['captured'])}"
 
 
-@then("EPO 端口未注册")
-def verify_epo_port_unregistered(ds_context: dict[str, Any]):
-    """Verify the EPO port stayed unregistered in the subprocess probe."""
+@then("EPO 与 google-patents 端口未注册")
+def verify_epo_and_gp_ports_unregistered(ds_context: dict[str, Any]):
+    """Verify EPO and google-patents ports stayed unregistered in the subprocess probe."""
     assert ds_context.get("probe_verified") is True
 
 

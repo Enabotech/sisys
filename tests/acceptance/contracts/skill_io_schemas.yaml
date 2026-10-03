@@ -215,7 +215,7 @@ skills:
             type: object
 
   # ---------------------------------------------------------------------------
-  # 竞争对手分析（6 源：newsapi / uspto / epo-ops / sec-edgar / tavily / china-nbs）
+  # 竞争对手分析（7 源：newsapi / uspto / google-patents / epo-ops / sec-edgar / tavily / china-nbs）
   # ---------------------------------------------------------------------------
   competitor-analysis:
     input_schema:
@@ -256,7 +256,7 @@ skills:
                 description: 战略动向摘要
               patent_signals:
                 type: array
-                description: 专利技术信号（uspto+epo-ops 双库口径——双源均未注册或采集失败时输出空数组，并在 sources 与数据缺口登记中如实标注）
+                description: 专利技术信号（uspto+google-patents+epo-ops 三库口径——三库均未注册或采集失败时输出空数组，并在 sources 与数据缺口登记中如实标注）
                 items:
                   type: string
               sources:
@@ -346,7 +346,7 @@ skills:
             type: object
 
   # ---------------------------------------------------------------------------
-  # 破坏性创新模型（3 源：uspto / epo-ops / tavily，专利双库 + 市场单源跨域互证——4-1f D8 重开升级）
+  # 破坏性创新模型（4 源：uspto / google-patents / epo-ops / tavily，专利三库 + 市场单源跨域互证——4-1f D8 重开 + D-09）
   # ---------------------------------------------------------------------------
   disruptive-innovation:
     input_schema:
@@ -729,7 +729,7 @@ skills:
             type: object
 
   # ---------------------------------------------------------------------------
-  # VRIO 框架（3 源：uspto / epo-ops / tavily；tavily Key 敏感）
+  # VRIO 框架（4 源：uspto / google-patents / epo-ops / tavily；tavily Key 敏感）
   # 模板叶子键（AC-3）：name / value / rarity / imitability / organization
   # ---------------------------------------------------------------------------
   vrio-framework:
