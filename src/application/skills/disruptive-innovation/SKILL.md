@@ -31,6 +31,14 @@ data_sources:
     required_fields:
       - indicator
       - value
+  - name: google-patents
+    url: https://bigquery.googleapis.com
+    api_type: rest_json
+    ttl_seconds: 604800
+    required_fields:
+      - publication_number
+      - assignee
+      - filing_date
   - name: epo-ops
     url: https://ops.epo.org
     api_type: rest_json
@@ -141,16 +149,16 @@ Think 阶段必须先输出**颠覆信号 → 数据源**映射计划，再生�
 
 | 信号类型 | 观测指标 | 数据源 |
 |---------|---------|--------|
-| 专利信号 | 专利申请趋势、核心专利布局、新进入者专利占比 | uspto（US 口径）+ epo-ops（EP 口径，`pa=` 申请人归因——专利双库） |
+| 专利信号 | 专利申请趋势、核心专利布局、新进入者专利占比 | uspto（US 口径）+ google-patents（BigQuery 全球含 CN 99.96%，assignee 精确聚合）+ epo-ops（EP 口径，`pa=` 申请人归因——专利三库） |
 | 市场信号 | 新创企业融资、低端/边缘市场采纳、价格性能比拐点 | tavily（Web 情报——市场单源） |
-| 技术信号 | 性能提升斜率、关键突破报道、产学研动态 | 专利双库 + tavily 跨域互证 |
+| 技术信号 | 性能提升斜率、关键突破报道、产学研动态 | 专利三库 + tavily 跨域互证 |
 
-**专利双库 + 市场单源，评级互证跨域（决策 D4——4-1f D8 重开后升级）**：
-- **采集分工**：专利信号采自 uspto+epo-ops 专利双库、市场信号采自 tavily（上表采集分工——每源各司其职；专利双库在 US/EP 两口径上互相印证专利域内部一致性）；
-- **评级互证**：颠覆信号强度评级必须跨域互证——仅专利域（双库或单库）或仅市场源支撑的信号强度上限 0.5，专利域 × 市场域跨域互证后方可评级 >0.5（降级语义见 §7）；交叉验证流程见 `references/triangulation.md`；
+**专利三库 + 市场单源，评级互证跨域（决策 D4——4-1f D8 重开 + D-09 扩展）**：
+- **采集分工**：专利信号采自 uspto+google-patents+epo-ops 专利三库、市场信号采自 tavily（上表采集分工——每源各司其职；专利三库在 US/全球 CN/EP 三口径上互相印证专利域内部一致性）；
+- **评级互证**：颠覆信号强度评级必须跨域互证——仅专利域（三库或单库）或仅市场源支撑的信号强度上限 0.5，专利域 × 市场域跨域互证后方可评级 >0.5（降级语义见 §7）；交叉验证流程见 `references/triangulation.md`；
 - **同源多 query（name/#2 键）不构成独立来源**，不得计入互证数。
 
-**数据源口径边界**：uspto 仅美国专利口径（评估中日韩主导技术域时样本系统性偏低，结论须标注口径），检索为 patent_title 标题关键词匹配（非申请人结构化检索——新进入者占比等归因统计经返回的 assignees 字段研判）；epo-ops 为 EPO 欧洲专利口径（`pa=` 申请人结构化检索支持中文企业名直接归因，100+ 专利局含 CN——合并后仍缺 CNIPA 中国本土口径，按「US+EP 双口径」标注；周配额 4GB/周，耗尽时按 §7 限流行降级并回落 uspto 单库）；tavily 为 Web 事件级检索（非结构化指标级；CJK query 自动注入 country=china）。
+**数据源口径边界**：uspto 仅美国专利口径（评估中日韩主导技术域时样本系统性偏低，结论须标注口径），检索为 patent_title 标题关键词匹配（非申请人结构化检索——新进入者占比等归因统计经返回的 assignees 字段研判）；google-patents 为 BigQuery 公共数据集全球书目口径（CN 覆盖 99.96% SSRN 实证、assignee 精确聚合——月度更新新鲜度较低，趋势结论宜结合源时效评估；月配额 1TiB 扫描字节，耗尽按 §7 降级）；epo-ops 为 EPO 欧洲专利口径（`pa=` 申请人结构化检索支持中文企业名直接归因，100+ 专利局含 CN——合并后仍缺 CNIPA 本土实时口径（google-patents 补 CN 全景），按「US+全球+EP 三口径」标注；周配额 4GB/周，耗尽时按 §7 限流行降级并回落可用库）；tavily 为 Web 事件级检索（非结构化指标级；CJK query 自动注入 country=china）。
 
 ## 6. SOP 执行步骤
 
@@ -160,6 +168,7 @@ Think 阶段必须先输出**颠覆信号 → 数据源**映射计划，再生�
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
    - 每个声明源至少一个标记；**query 必须为该源的规范格式**（R3-P1-2 契约对齐）：
      - `uspto`：**英文**检索关键词（匹配 patent_title 全文，如 `"solid-state battery"`）
+     - `google-patents`：**管道串**（非自然语言）——`assignee=`/`cpc=`/`country=`/`year=`/`keyword=` 至少一项（如 `keyword=solid-state battery|year=2020-2026`；空条件被适配器拒绝防全表扫描）
      - `epo-ops`：**CQL 结构化检索式**（非自然语言）——`ti=`/`ab=` 关键词 + 可选 `pa=` 申请人（如 `ti="solid-state battery"`；新进入者归因统计用 `pa=` 申请人检索）
      - `tavily`：检索关键词（自然语言关键词为**正确**格式，含技术领域上下文）
    - 每源采集结果量以适配器默认分页为准（SOP 引导代码不得显式请求超量数据）
@@ -180,11 +189,13 @@ Think 阶段必须先输出**颠覆信号 → 数据源**映射计划，再生�
 
 ```python
 patents = $DATA_SOURCE("uspto", "solid-state battery")   # 英文关键词匹配 patent_title
+gp_patents = $DATA_SOURCE("google-patents", "keyword=solid-state battery|year=2020-2026")  # BigQuery 管道串
 epo_patents = $DATA_SOURCE("epo-ops", 'ti="solid-state battery"')  # CQL 关键词检索（EP 口径）
 market = $DATA_SOURCE("tavily", "固态电池 创业公司 融资 商业化进展")
 
 # 采集后通过注入的 DATA_SOURCES dict 读取
 uspto_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
+gp_payload = (DATA_SOURCES.get("google-patents") or {}).get("payload")
 epo_payload = (DATA_SOURCES.get("epo-ops") or {}).get("payload")
 ```
 

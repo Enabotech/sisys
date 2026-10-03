@@ -14,7 +14,7 @@ completedAt: '2026-02-26'
 
 # SISYS - 企业战略智能系统架构设计文档
 
-**版本：** 8.9.0（Story 4.1f Skills 数据源扩展——三新源适配器 8→11 + CJK 自适应 + required_fields 四元组化 + 受益 Skill 声明重分配 + 能力边界声明）
+**版本：** 8.9.1（Story 4.1f 数据源扩展 + D-09 范围扩展——google-patents BigQuery 适配器（EPO key 受阻替代）+ 三 Skill 专利域三库 + 适配器 12 终态）
 **状态：** 架构决策主文档 ~3500 行，实现细节迁移至子设计文档
 **评审日期：** 2026-09-26
 **审核依据：**对标业界最佳实践（Arc42/C4/ADR + Anthropic Claude Code Skills 渐进式披露），将 §8/§17/§18 实现代码迁移至独立子设计文档，架构主文档聚焦决策与规则
@@ -2677,6 +2677,7 @@ buckets/
   - swot-tows（从 4.1b 转入）/ ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management（从 4.1b 转入；实际 slug 无 -model 后缀）
 - ✅ **Story 4.1e 已完成**（P0-8，2026-09-29）：7 个纯内部框架 Skills 成熟化（用户输入 + Schema 模板，详见 §17.3.3 末尾 4.1e 集成说明）——**23/23 Skills 全部成熟化收官**（16 声明外部源 + 7 纯内部空声明三分法终态）
 - ✅ **Story 4.1f 已完成**（P1-8，2026-09-30）：数据源扩展——EPO OPS/SEC EDGAR/UN Comtrade 三新源适配器（8→11）+ tavily/newsapi CJK 自适应 + required_fields 四元组化 + 受益 Skill 声明重分配（competitor 6 源/vrio 3 源 epics 授权/disruptive 3 源 D8 重开签收——见 D4 行）+ 能力边界声明（IDC/Gartner/Euromonitor 不可得留痕）。源数量充足性缺口实质收敛：专利域 1→3 源（uspto+epo-ops 双库）、企业财报 0→1（EDGAR）、行业量化商品级 0→1（Comtrade）、中文媒体盲区 CJK 自适应验证（A/B 实测面待 key）
+- ✅ **Story 4.1f Task 9 追加已完成**（D-09 范围扩展，2026-10-02）：EPO OPS key 个人申请受阻 → google-patents（BigQuery 公共专利数据集，CN 覆盖 99.96%）提前纳入为专利域活跃第二源——**并存 4 源策略**（epo-ops 休眠保留，key 到位自动激活）；适配器池 11→12；三 Skill 专利维度升三库（competitor 7 源/disruptive 4 源/vrio 4 源）；技术路线 REST 直连（httpx + pyjwt 既有依赖，零新第三方依赖——复用 resilience helper 全链）；预筛勘误留痕（BigQuery Sandbox 免信用卡前提证伪——程序化访问需绑定 Billing 项目）
   - value-proposition-canvas（从 4.1b 转入）/ business-model-canvas（从 4.1b 转入）/ org-design-framework / dependency-graph / raci-matrix / gantt-chart / strategy-map（从 4.1b 转入）
 
 **设计哲学：** 23 种战略工具将**通过 CLI + Skills（Anthropic Claude Code 风格）**暴露给 Agent 调用：
@@ -2784,7 +2785,7 @@ buckets/
 | infrastructure | 8 个数据源适配器 + 独立配置文件 + 共享 HTTP 韧性纯函数（`_http_helpers.py`） | `src/infrastructure/external_services/datasources/` / `src/infrastructure/config/` |
 | interfaces | `EXCEPTION_HTTP_MAP` +4 映射（410→502/411→503/412→429/413→502），无新 REST 端点 | `src/interfaces/api/exception_handlers.py` |
 
-**11 个数据源适配器（PoC v1/v2 验证选型 + Story 4.1f 三新源，Reuters 已替换为 NewsAPI，UNSD/OECD 推迟）：**
+**12 个数据源适配器（PoC v1/v2 验证选型 + Story 4.1f 三新源 + D-09 google-patents，Reuters 已替换为 NewsAPI，UNSD/OECD 推迟）：**
 
 | 适配器 | API 类型 | 关键约束 |
 |--------|---------|---------|
@@ -2799,6 +2800,7 @@ buckets/
 | EpoOpsAdapter（4.1f） | REST_JSON + OAuth2 client-credentials（Basic 凭证令牌流） | 令牌进程内缓存（过期提前 60s 刷新/业务 401 重取一次）；4GB/周配额守卫（周窗口字节累计前置抛 412 零请求消耗）；条件注册（EPO_OPS_CONSUMER_KEY/SECRET 双门合取）；`pa=` 申请人结构化检索（支持中文名） |
 | SecEdgarAdapter（4.1f） | REST_JSON（免 key 无条件注册） | 强制 UA「公司名 邮箱」（官方 Fair Access）；滑动窗口限速 8 req/s（官方 10 留余量）；双模式检索（缺省 efts 检索 + `xbrl:CIK:概念` XBRL 时序，双 base 绝对 URL 单 client） |
 | ComtradeAdapter（4.1f） | REST_JSON（key 可选无条件注册） | preview 端点免 key 兜底 + Ocp-Apim-Subscription-Key 增强（500 次/天）；日配额守卫（有 key 500/无 key 100 次/天前置抛 412）；管道串 query（cmd 必填 201 前置校验） |
+| GooglePatentsAdapter（4.1f D-09） | REST_JSON（BigQuery jobs.query REST 直连 + 服务账号 JWT，零新依赖） | GCP 双门条件注册（GOOGLE_APPLICATION_CREDENTIALS 文件存在 + GOOGLE_PATENTS_PROJECT_ID 合取）；BigQuery 不支持 API key 且 Sandbox 无 API 编程访问——需绑定 Billing 的 GCP 项目（免费层 1TiB/月内 $0 消费）；月配额守卫（totalBytesProcessed 精确累计，超限前置抛 412）；参数化 SQL（列裁剪三列 + 强制 LIMIT + named parameters 防注入） |
 
 **能力边界声明（Story 4.1f——预筛报告致命证据留痕，防重复调研）：** IDC/Gartner/Euromonitor 独家市场份额数据**不可得**（合同与技术双重壁垒——IDC ToS §2.2(g) 禁爬 + §2.2(e) 禁输入 AI/分析平台、订阅 $15K-75K+/年；Gartner Cloudflare 技术层全拦截 + 扩展访问须书面批准），行业份额量化以**代理指标组合**逼近（Comtrade 贸易代理 + 统计局行业基准 + EDGAR/XBRL 上市公司营收横截面 + 协会公开产销）。若未来采购 Statista Connect（备选——官方 MCP/SDK 现成，集成成本最低）可 revisit。
 
@@ -3607,6 +3609,7 @@ pytest tests/unit/domain/
 | 8.7.1 | 2026-09-29 | **Story 4.1d 代码审查修订**（内容级修复，零架构决策变更）：①契约守护网收紧（断言函数失败路径负例/结构守卫/required_fields 逐字断言/identity 自检/23 全量解析枚举恢复）②Skill 内容质量修复（§5 冲突分级摘要与 data_fusion 冲突表对齐/GE 三带映射与 VRIO 判定链闭合重写/70-30 权重定性化/工作坊 2h 压缩指引/条目编码规范声明 + 确定性解析锚点）③既有留项维持（自由 object 字段化与运行时校验 → Story 4.3） | 架构团队 |
 | 8.8.0 | 2026-09-29 | **Story 4.1e 纯内部框架 Skills 成熟化实现（23/23 收官）**：①7 个纯内部框架 Skills frontmatter `input_schema`/`output_schema` 成熟化（`data_sources` 键不写入——空 tuple 一等不变量；skill_io_schemas.yaml 扩至 23 条目单一 SSOT v1.2.0）②分型 references 三件套（framework_logic 首次引入/scoring_anchors 或 validation_rules/workshop_guide——评分型 3 + 结构型 4）+ templates 用户输入模板（四段式分型条件化 + 字段 ↔ Schema 叶子键双向断言 + 条目编码规范 7/7）③零引擎/接线/端口/异常层改动（空 data_sources + 无标记直通路径，arguments 升格主通道）；唯一生产 .py 增强 = catalog org-design 四维（Galbraith Star 完整性，D10 只加不改删）④第三契约库 skill_framework_contracts.py + NON_TARGET_SLUGS 三副本派生收敛 + 双验收场景改名永久锚定⑤工具分工互查（strategy-map ↔ bsc-scorecard / dependency-graph ↔ gantt-chart）+ bmc 存量资产整合（key_partnerships 收敛）⑥§17.3.3 追加 4.1e 集成说明与 13 项架构决策（D1-D13）；三处同源旧值校准为 23/23 终态（§1.4/§13 目录树/§19.7.1 统计表） | 架构团队 |
 | 8.9.0 | 2026-09-30 | **Story 4.1f Skills 数据源扩展实现（源数量充足性收敛）**：①三新源适配器（EpoOpsAdapter OAuth2 令牌流 + 4GB/周配额守卫 / SecEdgarAdapter 免 key 强制 UA + 8rps 滑动窗口 + 双模式检索（efts Elasticsearch + XBRL tag/units 双形态转换）/ ComtradeAdapter key 可选 + 管道串解析 + 日配额守卫 500/100）——适配器池 8→11②tavily/newsapi CJK 自适应（中文 query 自动注入 country=china/language=zh，非 CJK 路径逐键零变化回归基线锁定）③required_fields 四元组化（ADAPTER_SSOT 单表定制，EXPECTED_REQUIRED_FIELDS 统一常量移除，值级绊线改写）④受益 Skill 声明重分配（competitor 4→6 源双库专利 + EDGAR 财报印证；vrio 2→3（epics 授权 + D2 豁免表）；disruptive 2→3（D8 重开签收——专利双库 + 市场单源跨域互证方法论）；24 项断言联动全落地含 references/templates/验收场景名）⑤能力边界声明（IDC/Gartner/Euromonitor 不可得留痕 + 代理指标组合）+ 新源合规登记（EDGAR UA/Comtrade 署名与配额/EPO Fair Use）⑥defer 清账（①required_fields 按源定制已交付） | 架构团队 |
+| 8.9.1 | 2026-10-02 | **Story 4.1f Task 9（D-09 范围扩展）**：EPO OPS key 个人申请受阻 → google-patents（BigQuery `patents-public-data.patents.publications`，CN 覆盖 99.96%）提前纳入为专利域活跃第二源，并存 4 源（epo-ops 休眠保留——key 到位自动激活）：①GooglePatentsAdapter REST 直连（jobs.query + 服务账号 RS256 JWT 令牌流——cryptography/pyjwt 既有依赖零新增，复用 resilience helper 全链）+ 月配额守卫（totalBytesProcessed 精确累计 1TiB/月，超限前置抛 412）+ 管道串参数化 SQL（列裁剪三列 + 强制 LIMIT + named parameters 防注入）②GCP 双门条件注册（凭据文件存在 + 项目 ID 合取）+ 注册链全触点 11→12③三 Skill 专利域升三库（competitor 7 源/disruptive 4 源/vrio 4 源——frontmatter/口径段/标记/references/验收场景名/yaml 头注全联动）④预筛勘误留痕（BigQuery Sandbox 免信用卡前提证伪——程序化访问需绑定 Billing 项目） | 架构团队 |
 
 ---
 
@@ -3619,7 +3622,7 @@ pytest tests/unit/domain/
 | **核心章节** | 20 章（§1-§20） |
 | **附录章节** | 12 章（A-L，§21-§32，详见 arch-appendix.md） |
 | **总章节数** | 32 章 |
-| **版本** | 8.9.0（Story 4.1f Skills 数据源扩展 - 适配器 8→11 + CJK 自适应 + 声明重分配） |
-| **最后更新** | 2026-09-30 |
+| **版本** | 8.9.1（Story 4.1f D-09——google-patents 适配器 + 专利三库 + 适配器 12 终态） |
+| **最后更新** | 2026-10-02 |
 
 **所有附录 A~L 单独成章节，编号保持不变，作为主架构文档的详细展开。**

@@ -447,9 +447,9 @@ def test_value_chain_analysis_dual_source_chain(execution: _SkillExecution):
     pass
 
 
-@scenario("test_acceptance_skill_mixed_data.feature", "vrio-framework 三源采集链路（专利双库 + 市场）")
-def test_vrio_framework_triple_source_chain(execution: _SkillExecution):
-    """vrio-framework 三源采集链路（专利双库 + 市场）。"""
+@scenario("test_acceptance_skill_mixed_data.feature", "vrio-framework 四源采集链路（专利三库 + 市场）")
+def test_vrio_framework_quad_source_chain(execution: _SkillExecution):
+    """vrio-framework 四源采集链路（专利三库 + 市场）。"""
     pass
 
 

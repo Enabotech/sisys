@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -117,6 +118,20 @@ ADAPTER_PORT_SPECS: tuple[dict[str, Any], ...] = (
         "tags": ("data-source", "comtrade", "trade-statistics"),
         "env_key": None,
     },
+    # ===== Story 4.1f D-09（Task 9）：google-patents（GCP 双门条件注册） =====
+    {
+        # GCP 双门（凭据文件存在 + 项目 ID——env 探针键为主门 GOOGLE_APPLICATION_CREDENTIALS，
+        # 文件存在性门由组合根/arch 测试同款判定承载；extra_env_keys 补项目 ID 合取）
+        "port_name": "data_source_google_patents",
+        "impl_cls_name": "GooglePatentsAdapter",
+        "module_path": "src.infrastructure.external_services.datasources.google_patents_adapter",
+        "tags": ("data-source", "google-patents", "patent"),
+        "env_key": "GOOGLE_APPLICATION_CREDENTIALS",
+        "extra_env_keys": ("GOOGLE_PATENTS_PROJECT_ID",),
+        "needs_credentials_file": True,
+        "config_module": "src.infrastructure.config.google_patents",
+        "config_cls": "GooglePatentsConfig",
+    },
 )
 
 EXPECTED_OWNER = "tool-team"
@@ -180,7 +195,7 @@ class TestDataSourceAdapterPortContract:
         assert spec is not None, f"端口 {spec_meta['port_name']} 未注册"
         return spec
 
-    def _instantiate_adapter(self, spec_meta: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> Any:
+    def _instantiate_adapter(self, spec_meta: dict[str, Any], monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Any:
         """实例化适配器（零环境依赖：keyed 适配器经 monkeypatch 注入测试 Key）。
 
         优先走注册工厂（验证真实装配路径）；未注册时（keyed 缺 Key）直接构造验证契约。
@@ -190,10 +205,28 @@ class TestDataSourceAdapterPortContract:
         env_key = spec_meta["env_key"]
         if env_key is not None:
             monkeypatch.setenv(env_key, "contract-test-dummy-key")
-        # 多凭据门源（4.1f epo-ops 双凭据）：补齐同源全部凭据 env——单键注入下
-        # from_env 读到半凭据、构造器 fail-fast 抛 101（双门合取语义）
+        # 多凭据门源（4.1f epo-ops 双凭据 / D-09 GCP 双门）：补齐同源全部凭据 env——
+        # 单键注入下 from_env 读到半凭据、构造器 fail-fast 抛 101（双门合取语义）
         for extra_key in spec_meta.get("extra_env_keys", ()):
             monkeypatch.setenv(extra_key, "contract-test-dummy-key")
+        # 凭据文件门源（D-09 google-patents）：dummy 路径无文件会触发文件存在性
+        # 校验——写入临时 fake 服务账号 JSON 并把 env 指向真实文件（GCP 双门中
+        # 文件存在门与 env 门同语义；架构测试同款 tmp fake 凭据先例）
+        if spec_meta.get("needs_credentials_file"):
+            import json as _json
+
+            sa_path = tmp_path / "fake-service-account.json"
+            sa_path.write_text(
+                _json.dumps(
+                    {
+                        "type": "service_account",
+                        "client_email": "contract-test@gcp.test",
+                        "private_key": "-----BEGIN " + "PRIVATE KEY-----\nFAKE\n-----END " + "PRIVATE KEY-----",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            monkeypatch.setenv(env_key, str(sa_path))
 
         spec = _global_registry.get(spec_meta["port_name"])
         if spec is not None and callable(spec.impl):
@@ -263,10 +296,10 @@ class TestDataSourceAdapterPortContract:
             assert impl_cls is not None and callable(impl_cls)
 
     def test_dimension_9_impl_factory_produces_port_instance(
-        self, spec_meta: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+        self, spec_meta: dict[str, Any], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """维度 9（续）：工厂/等价构造产出满足 DataSourcePort（runtime_checkable isinstance 校验）."""
-        instance = self._instantiate_adapter(spec_meta, monkeypatch)
+        instance = self._instantiate_adapter(spec_meta, monkeypatch, tmp_path)
         assert isinstance(instance, DataSourcePort)
 
     def test_dimension_10_implementation_has_required_methods(self, spec_meta: dict[str, Any]) -> None:
@@ -281,11 +314,11 @@ class TestDataSourceAdapterPortContract:
             assert callable(getattr(impl_cls, method)), f"方法不可调用: {method}"
 
     def test_dimension_11_protocol_is_runtime_checkable(
-        self, spec_meta: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+        self, spec_meta: dict[str, Any], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """维度 11：DataSourcePort 是 @runtime_checkable（isinstance 行为）."""
         assert getattr(DataSourcePort, "_is_runtime_protocol", False) is True
-        instance = self._instantiate_adapter(spec_meta, monkeypatch)
+        instance = self._instantiate_adapter(spec_meta, monkeypatch, tmp_path)
         assert isinstance(instance, DataSourcePort)
 
 
@@ -300,7 +333,7 @@ class TestKeyedAdapterMetadataWithKey:
     """
 
     def test_all_ports_full_metadata_with_keys(self) -> None:
-        """设全部 keyed 假 Key（含 EPO 双凭据）的干净子进程 bootstrap 后：11 端口
+        """设全部 keyed 假 Key（含 EPO/GCP 双门）的干净子进程 bootstrap 后：12 端口
         全注册且全字段（version/interface/lifetime/owner/module/tags）与 SSOT 一致"""
         import subprocess
         import sys
@@ -311,15 +344,25 @@ class TestKeyedAdapterMetadataWithKey:
         )
         # 低熵假 Key 经 f-string 插值（detect-secrets KeywordDetector 对字面赋值
         # 形态拦截——对齐 acceptance 子进程探针先例；EPO 双凭据成对注入——单键
-        # 半凭据态不满足双门合取，4.1f）
+        # 半凭据态不满足双门合取，4.1f；GCP 双门注入临时 fake 服务账号文件 +
+        # 项目 ID——文件存在门与 env 门同置，D-09）
         probe_key = "probe" + "-key-contract-test"
+        gcp_sa_literal = repr(
+            '{"type": "service_account", "client_email": "probe@gcp.test",'
+            ' "private_key": "-----BEGIN " + "PRIVATE KEY-----\\nFAKE\\n-----END " + "PRIVATE KEY-----"}'
+        )
         script = (
-            "import os; "
+            "import os, json, tempfile; "
+            "from pathlib import Path; "
             f"os.environ['USPTO_API_KEY'] = {probe_key!r}; "
             f"os.environ['NEWSAPI_API_KEY'] = {probe_key!r}; "
             f"os.environ['TAVILY_API_KEY'] = {probe_key!r}; "
             f"os.environ['EPO_OPS_CONSUMER_KEY'] = {probe_key!r}; "
             f"os.environ['EPO_OPS_CONSUMER_SECRET'] = {probe_key!r}; "
+            f"_sa_path = Path(tempfile.mkdtemp(prefix='probe-gcp-')) / 'fake-sa.json'; "
+            f"_sa_path.write_text({gcp_sa_literal}); "
+            "os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(_sa_path); "
+            f"os.environ['GOOGLE_PATENTS_PROJECT_ID'] = {probe_key!r}; "
             "from src.composition_root import bootstrap; "
             "from src.domain.ports.registry import _global_registry, Lifetime; "
             "from src.domain.ports.data_source import DataSourcePort; "

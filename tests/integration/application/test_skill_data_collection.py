@@ -268,8 +268,8 @@ class TestSkillDataCollectionIntegration:
             isinstance(evt, DataSourceFetchFailed) and evt.error_code == "EXCEPTION_411" for evt in event_bus.published_events
         )
 
-    async def test_triangulation_competitor_six_sources(self, redis_tenant_cache: Any) -> None:
-        """三角化：competitor-analysis（6 源，4-1f 双库扩充）注入源数 == 6 全声明覆盖（>=3 升格强断言）"""
+    async def test_triangulation_competitor_seven_sources(self, redis_tenant_cache: Any) -> None:
+        """三角化：competitor-analysis（7 源，4-1f + D-09 三库扩充）注入源数 == 7 全声明覆盖（>=3 升格强断言）"""
         cache, tenant, _tenant_b = redis_tenant_cache
         slug = "competitor-analysis"
         declared = SKILL_DATA_SOURCES[slug]
@@ -278,10 +278,10 @@ class TestSkillDataCollectionIntegration:
         result = await _run_skill(slug, _code_with_markers(declared), adapters, cache, tenant, InMemoryEventBus())
 
         assert result.status == ToolResultStatus.SUCCESS
-        assert len(result.evidence_package.data_sources) == 6
+        assert len(result.evidence_package.data_sources) == 7
 
-    async def test_disruptive_innovation_triple_source(self, redis_tenant_cache: Any) -> None:
-        """专利双库 + 市场单源：disruptive-innovation（3 源，4-1f D8 重开升级）注入源数 == 3"""
+    async def test_disruptive_innovation_quad_source(self, redis_tenant_cache: Any) -> None:
+        """专利三库 + 市场单源：disruptive-innovation（4 源，4-1f D8 重开 + D-09）注入源数 == 4"""
         cache, tenant, _tenant_b = redis_tenant_cache
         slug = "disruptive-innovation"
         declared = SKILL_DATA_SOURCES[slug]
@@ -290,7 +290,7 @@ class TestSkillDataCollectionIntegration:
         result = await _run_skill(slug, _code_with_markers(declared), adapters, cache, tenant, InMemoryEventBus())
 
         assert result.status == ToolResultStatus.SUCCESS
-        assert len(result.evidence_package.data_sources) == 3
+        assert len(result.evidence_package.data_sources) == 4
 
     async def test_source_unavailable_partial_convergence(self, redis_tenant_cache: Any) -> None:
         """数据源不可用：porters（3 源）eurostat 故障 → 其余 2 源正常注入 + 失败事件"""

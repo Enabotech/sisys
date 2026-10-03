@@ -2562,6 +2562,36 @@ def bootstrap() -> None:
         tags=("data-source", "comtrade", "trade-statistics"),
     )
 
+    # ===== Story 4.1f Task 9（D-09 范围扩展）：google-patents（BigQuery 公共专利数据集） =====
+
+    # google-patents 适配器：GCP 双门条件注册（服务账号凭据文件存在 + 项目 ID 非空
+    # ——D-09 双门合取；BigQuery 不支持 API key，程序化访问需绑定 Billing 的 GCP 项目）
+    google_patents_enabled = False
+    _gp_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+    if bool(_gp_credentials) and bool(os.getenv("GOOGLE_PATENTS_PROJECT_ID")):
+        from pathlib import Path as _Path
+
+        google_patents_enabled = _Path(_gp_credentials).is_file()
+    if google_patents_enabled:
+        register_port(
+            name="data_source_google_patents",
+            version="v1.0.0",
+            interface=DataSourcePort,
+            impl=lambda resolver: __import__(
+                "src.infrastructure.external_services.datasources.google_patents_adapter",
+                fromlist=["GooglePatentsAdapter"],
+            ).GooglePatentsAdapter(
+                config=__import__(
+                    "src.infrastructure.config.google_patents",
+                    fromlist=["GooglePatentsConfig"],
+                ).GooglePatentsConfig.from_env(),
+            ),
+            module="src.infrastructure.external_services.datasources.google_patents_adapter",
+            lifetime=Lifetime.SINGLETON,
+            owner="tool-team",
+            tags=("data-source", "google-patents", "patent"),
+        )
+
     # 数据源解析编排服务（R2 组合注入：聚合 data_source_* 适配器 + L1 缓存 + 事件发布）
     # Key 缺失的适配器（uspto/newsapi/tavily/epo-ops）未注册 → resolve_optional 返回 None → 映射中不含（优雅降级）
     from src.application.ports.data_source_resolver import DataSourceResolverPort
@@ -2581,6 +2611,7 @@ def bootstrap() -> None:
             ("data_source_epo_ops", "epo-ops"),
             ("data_source_sec_edgar", "sec-edgar"),
             ("data_source_comtrade", "comtrade"),
+            ("data_source_google_patents", "google-patents"),
         ):
             adapter = resolver.resolve_optional(port_name)
             if adapter is not None:
@@ -2885,6 +2916,7 @@ async def shutdown() -> None:
         "data_source_epo_ops",
         "data_source_sec_edgar",
         "data_source_comtrade",
+        "data_source_google_patents",
     ):
         try:
             adapter = resolver.peek_singleton(port_name)

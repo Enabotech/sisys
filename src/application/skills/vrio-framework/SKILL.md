@@ -31,6 +31,14 @@ data_sources:
     required_fields:
       - indicator
       - value
+  - name: google-patents
+    url: https://bigquery.googleapis.com
+    api_type: rest_json
+    ttl_seconds: 604800
+    required_fields:
+      - publication_number
+      - assignee
+      - filing_date
   - name: epo-ops
     url: https://ops.epo.org
     api_type: rest_json
@@ -148,6 +156,7 @@ output_schema:
 | 外部印证目标 | 数据源 | 采集 query 规范 |
 | --- | --- | --- |
 | 行业专利密度（稀缺性/可模仿性的专利维度印证——US 口径） | uspto | 英文关键词（如 "solid-state battery"） |
+| 行业专利密度（稀缺性/可模仿性的专利维度印证——全球含 CN 口径，assignee 精确聚合） | google-patents | 管道串（如 "keyword=solid-state battery|year=2020-2026"） |
 | 行业专利密度（稀缺性/可模仿性的专利维度印证——EP 口径，`pa=` 申请人归因） | epo-ops | CQL 结构化检索式（如 `pa="宁德时代" and ti="solid-state battery"`） |
 | 行业能力情报（竞对能力建设/人才/合作动向印证） | tavily | 自然语言关键词（如 "固态电池 专利布局 产能"） |
 
@@ -155,7 +164,7 @@ output_schema:
 未经外部印证」）；外部情报与内部审计判定矛盾时的处置见 `references/data_fusion.md`（冲突分级处理：
 内部漏判 → 外部基准优先补正；外部无印证 → 双方并列不下结论；方向相反 → 暂停判断，以最新一手内部数据为准复议）。**同源多 query（name/name#2 键）不构成独立来源**——「至少一条外部基准印证」须来自不同源。
 
-**数据源口径边界**：uspto 仅美国专利口径（评估中日韩主导技术域时样本系统性偏低，结论须标注口径），检索为标题关键词匹配（非申请人结构化检索）；epo-ops 为 EPO 欧洲专利口径（`pa=` 申请人结构化检索支持中文企业名直接归因，100+ 专利局含 CN——合并后仍缺 CNIPA 中国本土口径，按「US+EP 双口径」标注；周配额 4GB/周，耗尽时按 §7 限流行降级并回落 uspto 单库口径）；tavily 为 Web 事件级检索（非结构化指标级；CJK query 自动注入 country=china）。
+**数据源口径边界**：uspto 仅美国专利口径（评估中日韩主导技术域时样本系统性偏低，结论须标注口径），检索为标题关键词匹配（非申请人结构化检索）；google-patents 为 BigQuery 公共数据集全球书目口径（CN 覆盖 99.96% SSRN 实证、assignee 精确聚合——月度更新新鲜度较低；月配额 1TiB 扫描字节，耗尽按 §7 降级）；epo-ops 为 EPO 欧洲专利口径（`pa=` 申请人结构化检索支持中文企业名直接归因，100+ 专利局含 CN——合并后仍缺 CNIPA 本土实时口径（google-patents 补 CN 全景），按「US+全球+EP 三口径」标注；周配额 4GB/周，耗尽时按 §7 限流行降级并回落可用库口径）；tavily 为 Web 事件级检索（非结构化指标级；CJK query 自动注入 country=china）。
 
 ## 6. SOP 执行步骤
 
@@ -167,11 +176,13 @@ output_schema:
 ```python
 # 每源至少一个标记（沙箱无网络，标记由宿主机侧采集后注入）
 patents = $DATA_SOURCE("uspto", "solid-state battery")
+gp_patents = $DATA_SOURCE("google-patents", "keyword=solid-state battery|year=2020-2026")
 epo_patents = $DATA_SOURCE("epo-ops", 'ti="solid-state battery"')
 intel = $DATA_SOURCE("tavily", "固态电池 专利布局 产能 竞对动向")
 
 # 采集结果经注入的 DATA_SOURCES dict 读取（防御性 .get()——失败位为 None）
 patents_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
+gp_payload = (DATA_SOURCES.get("google-patents") or {}).get("payload")
 epo_payload = (DATA_SOURCES.get("epo-ops") or {}).get("payload")
 intel_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
 # 同源多 query 时键为 name#2、name#3（首 query 为裸 name）
