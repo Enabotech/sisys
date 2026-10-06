@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.domain.ports.registry import Lifetime, _global_registry
+from src.infrastructure.external_services.datasources.registration import DATA_SOURCE_REGISTRY, is_gate_open
 
 # ============================================================
 # 常量定义
@@ -67,45 +68,19 @@ FORBIDDEN_IMPORTS = {
     "sqlmodel",  # 防御性条目（ORM 诱惑库，对齐验收侧同集）
 }
 
-# 无条件注册的适配器端口清单（免 Key 统计类 + 4.1f 免 key/免费通道源）
-ADAPTER_PORT_NAMES = (
-    "data_source_worldbank",
-    "data_source_imf",
-    "data_source_eurostat",
-    "data_source_ipcc",
-    "data_source_china_nbs",
-    "data_source_sec_edgar",  # 4.1f：免 key（官方 Fair Access，强制 UA）
-    "data_source_comtrade",  # 4.1f：key 可选（preview 免 key 兜底——无条件注册）
-)
+# 适配器端口分组（**注册表派生**——R-REG：原三常量硬编码与注册区是双 SSOT，
+# 4-1f 审查 R1-1 发现漂移静默；现从注册表派生——「注册什么」唯一事实源
+# 在 registration.py；分组语义：无条件组=env_gate_keys 空，keyed 组=门非空）
+ADAPTER_PORT_NAMES = tuple(r.port_name for r in DATA_SOURCE_REGISTRY if not r.env_gate_keys)
+KEYED_ADAPTER_PORT_NAMES = tuple(r.port_name for r in DATA_SOURCE_REGISTRY if r.env_gate_keys)
 
-# 需 API Key 的适配器（条件注册，Key 缺失时不注册——冷启动容错设计；
-# uspto 自 R3-P1-3 起条件注册：PatentsView v1 端点强制 X-Api-Key 鉴权；
-# epo-ops 自 4.1f 起条件注册：OAuth2 双凭据门——Consumer Key/Secret 双门合取；
-# google-patents 自 4.1f D-09 起条件注册：GCP 双门（凭据文件存在 + 项目 ID））
-KEYED_ADAPTER_PORT_NAMES = (
-    "data_source_uspto",
-    "data_source_newsapi",
-    "data_source_tavily",
-    "data_source_epo_ops",
-    "data_source_google_patents",
-)
-
-# 端口 → (适配器模块名, 实现类名) 静态映射（条件注册端口无 Key 时不注册——
-# 实现类合规校验不依赖运行时注册状态，R3-P1-3 同步；4.1f 三新源入册）
+# 端口 → (适配器模块名, 实现类名)（注册表派生——条件注册端口无 Key 时不注册，
+# 实现类合规校验不依赖运行时注册状态，R3-P1-3 语义保持）
 ADAPTER_IMPL_MODULES = {
-    "data_source_worldbank": ("worldbank_adapter", "WorldBankAdapter"),
-    "data_source_imf": ("imf_adapter", "IMFAdapter"),
-    "data_source_eurostat": ("eurostat_adapter", "EurostatAdapter"),
-    "data_source_uspto": ("uspto_adapter", "USPTOAdapter"),
-    "data_source_ipcc": ("ipcc_adapter", "IPCCAdapter"),
-    "data_source_newsapi": ("newsapi_adapter", "NewsAPIAdapter"),
-    "data_source_tavily": ("tavily_adapter", "TavilyAdapter"),
-    "data_source_china_nbs": ("china_nbs_adapter", "ChinaNBSAdapter"),
-    "data_source_epo_ops": ("epo_ops_adapter", "EpoOpsAdapter"),
-    "data_source_sec_edgar": ("sec_edgar_adapter", "SecEdgarAdapter"),
-    "data_source_comtrade": ("comtrade_adapter", "ComtradeAdapter"),
-    "data_source_google_patents": ("google_patents_adapter", "GooglePatentsAdapter"),
+    r.port_name: (r.impl_module.removeprefix("src.infrastructure.external_services.datasources."), r.impl_cls_name)
+    for r in DATA_SOURCE_REGISTRY
 }
+
 
 # 数据源异常码段（data_source 子域 410-419）
 EXPECTED_EXCEPTION_CODES = {
@@ -207,27 +182,25 @@ class TestDataSourcePortRegistry:
         import os
         from pathlib import Path
 
-        for port_name, env_keys in (
-            ("data_source_uspto", ("USPTO_API_KEY",)),
-            ("data_source_newsapi", ("NEWSAPI_API_KEY",)),
-            ("data_source_tavily", ("TAVILY_API_KEY",)),
-            ("data_source_epo_ops", ("EPO_OPS_CONSUMER_KEY", "EPO_OPS_CONSUMER_SECRET")),
-        ):
-            spec = _global_registry.get(port_name)
-            all_keys_present = all(bool(os.getenv(key)) for key in env_keys)
-            if not all_keys_present:
-                assert spec is None, f"{env_keys} 任一缺失时 {port_name} 不应注册（多键合取）"
+        # 注册表派生（R-REG）：keyed 源的门判定与组合根注册同款 is_gate_open——
+        # 逐源逐键合取断言（含双凭据门与凭据文件门，与组合根同款判定语义）
+        for registration in DATA_SOURCE_REGISTRY:
+            if not registration.env_gate_keys:
+                continue
+            spec = _global_registry.get(registration.port_name)
+            if not is_gate_open(registration):
+                assert spec is None, f"{registration.env_gate_keys} 门未全开时 {registration.port_name} 不应注册"
             else:
-                assert spec is not None, f"{env_keys} 全部存在时 {port_name} 应注册"
+                assert spec is not None, f"{registration.env_gate_keys} 门全开时 {registration.port_name} 应注册"
 
-        # google-patents 特殊门：env 双键非空 + 凭据文件实际存在（D-09 双门）
-        gp_spec = _global_registry.get("data_source_google_patents")
+        # 补充：google-patents 文件门边界（env 双键存在但文件不存在时也不注册——
+        # is_gate_open 已含此判定，此处显式断言防注册语义漂移）
+        gp = next(r for r in DATA_SOURCE_REGISTRY if r.source_name == "google-patents")
         gp_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
         gp_enabled = bool(gp_credentials) and bool(os.getenv("GOOGLE_PATENTS_PROJECT_ID")) and Path(gp_credentials).is_file()
-        if gp_enabled:
-            assert gp_spec is not None, "GCP 双门齐备时 data_source_google_patents 应注册"
-        else:
-            assert gp_spec is None, "GCP 凭据文件缺失/项目 ID 缺失时 data_source_google_patents 不应注册"
+        assert (_global_registry.get(gp.port_name) is not None) == gp_enabled, (
+            "google-patents 注册态应与 GCP 双门（env 双键 + 凭据文件存在）严格一致"
+        )
 
 
 # ============================================================

@@ -2351,272 +2351,25 @@ def bootstrap() -> None:
         deprecated=False,
     )
 
-    # === Story 4.1b — Skills 数据采集基础设施：数据源适配器端口（A 组：免 Key 统计类）===
-    from src.domain.ports.data_source import DataSourcePort
-    from src.infrastructure.config.eurostat import EurostatConfig
-    from src.infrastructure.config.imf import IMFConfig
-    from src.infrastructure.config.worldbank import WorldBankConfig
+    # === 数据源适配器端口（Story 4.1b 引入；4.1f R-REG 收敛——注册表派生） ===
+    # 组合根是「组合」边界——「注册哪些数据源」收敛为注册表 SSOT
+    # （src/infrastructure/external_services/datasources/registration.py）；
+    # 12 个适配器的注册语义（A 组无条件 / B 组 env 门 / C 组凭据文件门 /
+    # china_nbs 复用 CrawlerClientPort 特殊工厂）由注册表条目声明式承载，
+    # 本文件仅一行调用。契约测试表与架构测试静态表同样从注册表派生——
+    # 消除多 SSOT 漂移（4-1f 审查 R1-1「静态表漏改静默」问题的结构根治）。
+    from src.infrastructure.external_services.datasources.registration import register_all_data_sources
 
-    register_port(
-        name="data_source_worldbank",
-        version="v1.0.0",
-        interface=DataSourcePort,
-        impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.datasources.worldbank_adapter",
-            fromlist=["WorldBankAdapter"],
-        ).WorldBankAdapter(config=WorldBankConfig.from_env()),
-        module="src.infrastructure.external_services.datasources.worldbank_adapter",
-        lifetime=Lifetime.SINGLETON,
-        owner="tool-team",
-        tags=("data-source", "worldbank", "statistics"),
-    )
-
-    register_port(
-        name="data_source_imf",
-        version="v1.0.0",
-        interface=DataSourcePort,
-        impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.datasources.imf_adapter",
-            fromlist=["IMFAdapter"],
-        ).IMFAdapter(config=IMFConfig.from_env()),
-        module="src.infrastructure.external_services.datasources.imf_adapter",
-        lifetime=Lifetime.SINGLETON,
-        owner="tool-team",
-        tags=("data-source", "imf", "statistics"),
-    )
-
-    register_port(
-        name="data_source_eurostat",
-        version="v1.0.0",
-        interface=DataSourcePort,
-        impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.datasources.eurostat_adapter",
-            fromlist=["EurostatAdapter"],
-        ).EurostatAdapter(config=EurostatConfig.from_env()),
-        module="src.infrastructure.external_services.datasources.eurostat_adapter",
-        lifetime=Lifetime.SINGLETON,
-        owner="tool-team",
-        tags=("data-source", "eurostat", "statistics"),
-    )
-
-    # === Story 4.1b — Skills 数据采集基础设施：数据源适配器端口（B 组）===
-    from src.infrastructure.config.ipcc import IPCCConfig
-
-    # USPTO 条件注册（R3-P1-3）：PatentsView v1 端点强制 X-Api-Key，无 Key 时注册
-    # 只会必然 403——条件注册使配置缺失显式化（对齐下方 newsapi/tavily 模式）
-    uspto_enabled = bool(os.getenv("USPTO_API_KEY"))
-    if uspto_enabled:
-        from src.infrastructure.config.uspto import USPTOConfig
-
-        register_port(
-            name="data_source_uspto",
-            version="v1.0.0",
-            interface=DataSourcePort,
-            impl=lambda resolver: __import__(
-                "src.infrastructure.external_services.datasources.uspto_adapter",
-                fromlist=["USPTOAdapter"],
-            ).USPTOAdapter(config=USPTOConfig.from_env()),
-            module="src.infrastructure.external_services.datasources.uspto_adapter",
-            lifetime=Lifetime.SINGLETON,
-            owner="tool-team",
-            tags=("data-source", "uspto", "patent"),
-        )
-
-    register_port(
-        name="data_source_ipcc",
-        version="v1.0.0",
-        interface=DataSourcePort,
-        impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.datasources.ipcc_adapter",
-            fromlist=["IPCCAdapter"],
-        ).IPCCAdapter(config=IPCCConfig.from_env()),
-        module="src.infrastructure.external_services.datasources.ipcc_adapter",
-        lifetime=Lifetime.SINGLETON,
-        owner="tool-team",
-        tags=("data-source", "ipcc", "environment"),
-    )
-
-    # 需 API Key 的适配器：条件注册（Story 3-4 Reranker 模式），Key 缺失时优雅降级
-    # （Resolver 内 Mapping.get(name) 返回 None；白名单校验以 ToolMetadata.data_sources 为准）
-    # 安全修复：bool() 同时拒绝 None 与空字符串，与 Twelve-Factor App "空串视为未配置" 语义一致
-    # 避免 export VAR="" 时被 is not None 误判为已配置、延迟到首次请求才暴露配置错误
-    newsapi_enabled = bool(os.getenv("NEWSAPI_API_KEY"))
-    if newsapi_enabled:
-        from src.infrastructure.config.newsapi import NewsAPIConfig
-
-        register_port(
-            name="data_source_newsapi",
-            version="v1.0.0",
-            interface=DataSourcePort,
-            impl=lambda resolver: __import__(
-                "src.infrastructure.external_services.datasources.newsapi_adapter",
-                fromlist=["NewsAPIAdapter"],
-            ).NewsAPIAdapter(config=NewsAPIConfig.from_env()),
-            module="src.infrastructure.external_services.datasources.newsapi_adapter",
-            lifetime=Lifetime.SINGLETON,
-            owner="tool-team",
-            tags=("data-source", "newsapi", "news"),
-        )
-
-    tavily_enabled = bool(os.getenv("TAVILY_API_KEY"))
-    if tavily_enabled:
-        from src.infrastructure.config.tavily import TavilyConfig
-
-        register_port(
-            name="data_source_tavily",
-            version="v1.0.0",
-            interface=DataSourcePort,
-            impl=lambda resolver: __import__(
-                "src.infrastructure.external_services.datasources.tavily_adapter",
-                fromlist=["TavilyAdapter"],
-            ).TavilyAdapter(config=TavilyConfig.from_env()),
-            module="src.infrastructure.external_services.datasources.tavily_adapter",
-            lifetime=Lifetime.SINGLETON,
-            owner="tool-team",
-            tags=("data-source", "tavily", "web-search"),
-        )
-
-    # 中国国家统计局适配器：复用 CrawlerClientPort（禁止直连抓取，PoC v2 验证 403）
-    register_port(
-        name="data_source_china_nbs",
-        version="v1.0.0",
-        interface=DataSourcePort,
-        impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.datasources.china_nbs_adapter",
-            fromlist=["ChinaNBSAdapter"],
-        ).ChinaNBSAdapter(
-            crawler_client=resolver.resolve("crawler_client"),
-            config=__import__(
-                "src.infrastructure.config.china_nbs",
-                fromlist=["ChinaNBSConfig"],
-            ).ChinaNBSConfig.from_env(),
-        ),
-        module="src.infrastructure.external_services.datasources.china_nbs_adapter",
-        lifetime=Lifetime.SINGLETON,
-        owner="tool-team",
-        tags=("data-source", "china-nbs", "crawler"),
-    )
-
-    # ===== Story 4.1f：三新源注册（epo-ops 条件双门 / sec-edgar 与 comtrade 无条件） =====
-
-    # EPO OPS 适配器：OAuth2 双凭据门条件注册（Consumer Key/Secret 任一缺失即不注册——
-    # 双门合取，Story 4.1f 数据契约一；构造期 fail-fast 抛 101 由 from_env 后构造器校验）
-    epo_ops_enabled = bool(os.getenv("EPO_OPS_CONSUMER_KEY")) and bool(os.getenv("EPO_OPS_CONSUMER_SECRET"))
-    if epo_ops_enabled:
-        from src.infrastructure.config.epo_ops import EpoOpsConfig
-
-        register_port(
-            name="data_source_epo_ops",
-            version="v1.0.0",
-            interface=DataSourcePort,
-            impl=lambda resolver: __import__(
-                "src.infrastructure.external_services.datasources.epo_ops_adapter",
-                fromlist=["EpoOpsAdapter"],
-            ).EpoOpsAdapter(config=EpoOpsConfig.from_env()),
-            module="src.infrastructure.external_services.datasources.epo_ops_adapter",
-            lifetime=Lifetime.SINGLETON,
-            owner="tool-team",
-            tags=("data-source", "epo-ops", "patent"),
-        )
-
-    # SEC EDGAR 适配器：免 key 无条件注册（官方 Fair Access 免费开放——强制 UA + 限速
-    # 是唯一义务；worldbank A 组范式同构，Story 4.1f 决策 D4）
-    register_port(
-        name="data_source_sec_edgar",
-        version="v1.0.0",
-        interface=DataSourcePort,
-        impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.datasources.sec_edgar_adapter",
-            fromlist=["SecEdgarAdapter"],
-        ).SecEdgarAdapter(
-            config=__import__(
-                "src.infrastructure.config.sec_edgar",
-                fromlist=["SecEdgarConfig"],
-            ).SecEdgarConfig.from_env(),
-        ),
-        module="src.infrastructure.external_services.datasources.sec_edgar_adapter",
-        lifetime=Lifetime.SINGLETON,
-        owner="tool-team",
-        tags=("data-source", "sec-edgar", "financial-report"),
-    )
-
-    # UN Comtrade 适配器：无条件注册 + key 可选增强（preview 端点免 key 兜底——
-    # 「官方免费通道可达即注册，key 为配额增强」统一逻辑，Story 4.1f 决策 D5；
-    # key 缺失走 preview 裸模式，构造器不抛）
-    register_port(
-        name="data_source_comtrade",
-        version="v1.0.0",
-        interface=DataSourcePort,
-        impl=lambda resolver: __import__(
-            "src.infrastructure.external_services.datasources.comtrade_adapter",
-            fromlist=["ComtradeAdapter"],
-        ).ComtradeAdapter(
-            config=__import__(
-                "src.infrastructure.config.comtrade",
-                fromlist=["ComtradeConfig"],
-            ).ComtradeConfig.from_env(),
-        ),
-        module="src.infrastructure.external_services.datasources.comtrade_adapter",
-        lifetime=Lifetime.SINGLETON,
-        owner="tool-team",
-        tags=("data-source", "comtrade", "trade-statistics"),
-    )
-
-    # ===== Story 4.1f Task 9（D-09 范围扩展）：google-patents（BigQuery 公共专利数据集） =====
-
-    # google-patents 适配器：GCP 双门条件注册（服务账号凭据文件存在 + 项目 ID 非空
-    # ——D-09 双门合取；BigQuery 不支持 API key，程序化访问需绑定 Billing 的 GCP 项目）
-    google_patents_enabled = False
-    _gp_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
-    if bool(_gp_credentials) and bool(os.getenv("GOOGLE_PATENTS_PROJECT_ID")):
-        from pathlib import Path as _Path
-
-        google_patents_enabled = _Path(_gp_credentials).is_file()
-    if google_patents_enabled:
-        register_port(
-            name="data_source_google_patents",
-            version="v1.0.0",
-            interface=DataSourcePort,
-            impl=lambda resolver: __import__(
-                "src.infrastructure.external_services.datasources.google_patents_adapter",
-                fromlist=["GooglePatentsAdapter"],
-            ).GooglePatentsAdapter(
-                config=__import__(
-                    "src.infrastructure.config.google_patents",
-                    fromlist=["GooglePatentsConfig"],
-                ).GooglePatentsConfig.from_env(),
-            ),
-            module="src.infrastructure.external_services.datasources.google_patents_adapter",
-            lifetime=Lifetime.SINGLETON,
-            owner="tool-team",
-            tags=("data-source", "google-patents", "patent"),
-        )
+    register_all_data_sources(register_port)
 
     # 数据源解析编排服务（R2 组合注入：聚合 data_source_* 适配器 + L1 缓存 + 事件发布）
     # Key 缺失的适配器（uspto/newsapi/tavily/epo-ops）未注册 → resolve_optional 返回 None → 映射中不含（优雅降级）
     from src.application.ports.data_source_resolver import DataSourceResolverPort
+    from src.infrastructure.external_services.datasources.registration import build_adapters_mapping
 
     def _build_data_source_adapters(resolver: Any) -> dict[str, Any]:
-        """聚合已注册的 data_source_* 适配器（未注册项跳过）"""
-        adapters: dict[str, Any] = {}
-        for port_name, source_name in (
-            ("data_source_worldbank", "world-bank"),
-            ("data_source_imf", "imf"),
-            ("data_source_eurostat", "eurostat"),
-            ("data_source_uspto", "uspto"),
-            ("data_source_ipcc", "ipcc"),
-            ("data_source_newsapi", "newsapi"),
-            ("data_source_tavily", "tavily"),
-            ("data_source_china_nbs", "china-nbs"),
-            ("data_source_epo_ops", "epo-ops"),
-            ("data_source_sec_edgar", "sec-edgar"),
-            ("data_source_comtrade", "comtrade"),
-            ("data_source_google_patents", "google-patents"),
-        ):
-            adapter = resolver.resolve_optional(port_name)
-            if adapter is not None:
-                adapters[source_name] = adapter
-        return adapters
+        """聚合已注册的 data_source_* 适配器（未注册项跳过）——注册表派生"""
+        return build_adapters_mapping(resolver.resolve_optional)
 
     register_port(
         name="data_source_resolver",
@@ -2900,24 +2653,16 @@ async def shutdown() -> None:
     except Exception as e:
         logger.error("Failed to close llm_client: %s", e)
 
-    # 关闭数据源适配器 httpx 连接池（Story 4.1b R2-2-B1 修复；4.1f 追加三新源 7→10）
+    # 关闭数据源适配器 httpx 连接池（Story 4.1b R2-2-B1 修复；4.1f R-REG 收敛——
+    # 注册表派生 httpx_owned_port_names()，新源自动入列）
     # 仅用 peek_singleton 清理**已实例化**的单例——resolve() 会对未使用过的端口
     # 现场懒实例化（在 shutdown 路径是危险副作用：适配器构造读 env 可能抛
-    # ConfigurationError）；未注册（条件注册的 newsapi/tavily/epo-ops）/未实例化统一跳过。
-    # china_nbs 无自持 httpx 客户端（复用 CrawlerClientPort），不在清理列表。
-    for port_name in (
-        "data_source_worldbank",
-        "data_source_imf",
-        "data_source_eurostat",
-        "data_source_uspto",
-        "data_source_ipcc",
-        "data_source_newsapi",
-        "data_source_tavily",
-        "data_source_epo_ops",
-        "data_source_sec_edgar",
-        "data_source_comtrade",
-        "data_source_google_patents",
-    ):
+    # ConfigurationError）；未注册（条件注册的 newsapi/tavily/epo-ops/google-patents）
+    # /未实例化统一跳过。china_nbs 无自持 httpx 客户端（复用 CrawlerClientPort），
+    # 注册表 factory_kind 恒排除。
+    from src.infrastructure.external_services.datasources.registration import httpx_owned_port_names
+
+    for port_name in httpx_owned_port_names():
         try:
             adapter = resolver.peek_singleton(port_name)
             if adapter is not None:

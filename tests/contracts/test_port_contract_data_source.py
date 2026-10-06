@@ -23,116 +23,36 @@ import pytest
 from src.domain.ports.data_source import DataSourcePort
 from src.domain.ports.registry import Lifetime, _global_registry
 
-# 11 个适配器端口元数据表（Single Source of Truth，与 composition_root 注册保持一致）
-ADAPTER_PORT_SPECS: tuple[dict[str, Any], ...] = (
-    {
-        "port_name": "data_source_worldbank",
-        "impl_cls_name": "WorldBankAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.worldbank_adapter",
-        "tags": ("data-source", "worldbank", "statistics"),
-        "env_key": None,
-    },
-    {
-        "port_name": "data_source_imf",
-        "impl_cls_name": "IMFAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.imf_adapter",
-        "tags": ("data-source", "imf", "statistics"),
-        "env_key": None,
-    },
-    {
-        "port_name": "data_source_eurostat",
-        "impl_cls_name": "EurostatAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.eurostat_adapter",
-        "tags": ("data-source", "eurostat", "statistics"),
-        "env_key": None,
-    },
-    {
-        "port_name": "data_source_uspto",
-        "impl_cls_name": "USPTOAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.uspto_adapter",
-        "tags": ("data-source", "uspto", "patent"),
-        # R3-P1-3：PatentsView v1 端点强制 X-Api-Key，uspto 转条件注册（对齐 newsapi/tavily）
-        "env_key": "USPTO_API_KEY",
-        "config_module": "src.infrastructure.config.uspto",
-        "config_cls": "USPTOConfig",
-    },
-    {
-        "port_name": "data_source_ipcc",
-        "impl_cls_name": "IPCCAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.ipcc_adapter",
-        "tags": ("data-source", "ipcc", "environment"),
-        "env_key": None,
-    },
-    {
-        "port_name": "data_source_newsapi",
-        "impl_cls_name": "NewsAPIAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.newsapi_adapter",
-        "tags": ("data-source", "newsapi", "news"),
-        "env_key": "NEWSAPI_API_KEY",
-        "config_module": "src.infrastructure.config.newsapi",
-        "config_cls": "NewsAPIConfig",
-    },
-    {
-        "port_name": "data_source_tavily",
-        "impl_cls_name": "TavilyAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.tavily_adapter",
-        "tags": ("data-source", "tavily", "web-search"),
-        "env_key": "TAVILY_API_KEY",
-        "config_module": "src.infrastructure.config.tavily",
-        "config_cls": "TavilyConfig",
-    },
-    {
-        "port_name": "data_source_china_nbs",
-        "impl_cls_name": "ChinaNBSAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.china_nbs_adapter",
-        "tags": ("data-source", "china-nbs", "crawler"),
-        "env_key": None,
-    },
-    # ===== Story 4.1f 三新源（epo-ops 条件双门 / sec-edgar 与 comtrade 无条件） =====
-    {
-        # OAuth2 双凭据门条件注册——主键 + extra_env_keys 合取判定（半凭据态不注册，
-        # 与组合根/架构测试/验收探针三方同语义——4.1f 代码审查 R1-F8 归一）
-        "port_name": "data_source_epo_ops",
-        "impl_cls_name": "EpoOpsAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.epo_ops_adapter",
-        "tags": ("data-source", "epo-ops", "patent"),
-        "env_key": "EPO_OPS_CONSUMER_KEY",
-        "extra_env_keys": ("EPO_OPS_CONSUMER_SECRET",),
-        "config_module": "src.infrastructure.config.epo_ops",
-        "config_cls": "EpoOpsConfig",
-    },
-    {
-        "port_name": "data_source_sec_edgar",
-        "impl_cls_name": "SecEdgarAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.sec_edgar_adapter",
-        "tags": ("data-source", "sec-edgar", "financial-report"),
-        "env_key": None,
-    },
-    {
-        # key 可选增强（preview 免 key 兜底——无条件注册）；注册形态断言由
-        # ADAPTER_PORT_NAMES 无条件组承载（R2：删 config_module/config_cls 死键——
-        # 唯一消费点在未注册直构造分支，无条件注册源永不进入）
-        "port_name": "data_source_comtrade",
-        "impl_cls_name": "ComtradeAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.comtrade_adapter",
-        "tags": ("data-source", "comtrade", "trade-statistics"),
-        "env_key": None,
-    },
-    # ===== Story 4.1f D-09（Task 9）：google-patents（GCP 双门条件注册） =====
-    {
-        # GCP 双门（凭据文件存在 + 项目 ID——env 探针键为主门 GOOGLE_APPLICATION_CREDENTIALS，
-        # 文件存在性门由组合根/arch 测试同款判定承载；extra_env_keys 补项目 ID 合取）
-        "port_name": "data_source_google_patents",
-        "impl_cls_name": "GooglePatentsAdapter",
-        "module_path": "src.infrastructure.external_services.datasources.google_patents_adapter",
-        "tags": ("data-source", "google-patents", "patent"),
-        "env_key": "GOOGLE_APPLICATION_CREDENTIALS",
-        "extra_env_keys": ("GOOGLE_PATENTS_PROJECT_ID",),
-        "needs_credentials_file": True,
-        "config_module": "src.infrastructure.config.google_patents",
-        "config_cls": "GooglePatentsConfig",
-    },
-)
+# 12 个适配器端口元数据表（Single Source of Truth——**注册表派生**（R-REG：
+# 原 12 条硬编码 dict 与组合根注册区是双 SSOT，4-1f 审查 R1-1 发现漂移静默；
+# 现从注册表派生——「注册什么」的唯一事实源在 registration.py）
+from src.infrastructure.external_services.datasources.registration import DATA_SOURCE_REGISTRY
+
+
+def _adapter_port_spec(registration) -> dict[str, Any]:
+    """注册条目 → 契约表规格（保持既有键形态：env_key 主门 + extra_env_keys 辅门 +
+    keyed 源含 config_module/config_cls（未注册直构造消费点）+ google-patents 的
+    needs_credentials_file（凭据文件门注入））。"""
+    env_keys = registration.env_gate_keys
+    spec: dict[str, Any] = {
+        "port_name": registration.port_name,
+        "impl_cls_name": registration.impl_cls_name,
+        "module_path": registration.impl_module,
+        "tags": registration.tags,
+        "env_key": env_keys[0] if env_keys else None,
+    }
+    if env_keys:
+        spec["config_module"] = registration.config_module
+        spec["config_cls"] = registration.config_cls_name
+        if len(env_keys) > 1:
+            spec["extra_env_keys"] = env_keys[1:]
+    if registration.file_gate:
+        spec["needs_credentials_file"] = True
+    return spec
+
+
+ADAPTER_PORT_SPECS: tuple[dict[str, Any], ...] = tuple(_adapter_port_spec(r) for r in DATA_SOURCE_REGISTRY)
+
 
 EXPECTED_OWNER = "tool-team"
 REQUIRED_METHODS = ["fetch", "get_metadata", "health_check"]
