@@ -2,7 +2,7 @@
 
 12 个数据源适配器（实现 DataSourcePort）：
 - WorldBankAdapter / IMFAdapter / EurostatAdapter（统计类，无 Key）
-- USPTOAdapter / IPCCAdapter（专利/环境，无 Key）
+- USPTOAdapter（专利，需 API Key 条件注册——PatentsView v1 强制 X-Api-Key，R3-P1-3）/ IPCCAdapter（环境，无 Key）
 - NewsAPIAdapter / TavilyAdapter（新闻/搜索，需 API Key，条件注册）
 - ChinaNBSAdapter（中国国家统计局，复用 CrawlerClientPort）
 - EpoOpsAdapter（EPO 专利检索，OAuth2 双凭据门条件注册——Story 4.1f）

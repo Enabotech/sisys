@@ -2676,7 +2676,7 @@ buckets/
 - ✅ **Story 4.1d 已完成**（P0-7，2026-09-28）：10 个混合数据型 Skills 成熟化（外部+内部数据，详见 §17.3.3 末尾 4.1d 集成说明）
   - swot-tows（从 4.1b 转入）/ ansoff-matrix / value-curve-analysis / ge-mckinsey-matrix / space-matrix / value-chain-analysis / vrio-framework / bsc-scorecard / kpi-tree / change-management（从 4.1b 转入；实际 slug 无 -model 后缀）
 - ✅ **Story 4.1e 已完成**（P0-8，2026-09-29）：7 个纯内部框架 Skills 成熟化（用户输入 + Schema 模板，详见 §17.3.3 末尾 4.1e 集成说明）——**23/23 Skills 全部成熟化收官**（16 声明外部源 + 7 纯内部空声明三分法终态）
-- ✅ **Story 4.1f 已完成**（P1-8，2026-09-30）：数据源扩展——EPO OPS/SEC EDGAR/UN Comtrade 三新源适配器（8→11）+ tavily/newsapi CJK 自适应 + required_fields 四元组化 + 受益 Skill 声明重分配（competitor 6 源/vrio 3 源 epics 授权/disruptive 3 源 D8 重开签收——见 D4 行）+ 能力边界声明（IDC/Gartner/Euromonitor 不可得留痕）。源数量充足性缺口实质收敛：专利域 1→3 源（uspto+epo-ops 双库）、企业财报 0→1（EDGAR）、行业量化商品级 0→1（Comtrade）、中文媒体盲区 CJK 自适应验证（A/B 实测面待 key）
+- ✅ **Story 4.1f 已完成**（P1-8，2026-09-30）：数据源扩展——EPO OPS/SEC EDGAR/UN Comtrade 三新源适配器（8→11）+ tavily/newsapi CJK 自适应 + required_fields 四元组化 + 受益 Skill 声明重分配（competitor 6 源/vrio 3 源 epics 授权/disruptive 3 源 D8 重开签收——见 D4 行）+ 能力边界声明（IDC/Gartner/Euromonitor 不可得留痕）。源数量充足性缺口实质收敛：专利域 1→2 源（uspto+epo-ops 双库；D-09 后 3 库——uspto+google-patents+epo-ops）、企业财报 0→1（EDGAR）、行业量化商品级 0→1（Comtrade）、中文媒体盲区 CJK 自适应验证（A/B 实测面待 key）
 - ✅ **Story 4.1f Task 9 追加已完成**（D-09 范围扩展，2026-10-02）：EPO OPS key 个人申请受阻 → google-patents（BigQuery 公共专利数据集，CN 覆盖 99.96%）提前纳入为专利域活跃第二源——**并存 4 源策略**（epo-ops 休眠保留，key 到位自动激活）；适配器池 11→12；三 Skill 专利维度升三库（competitor 7 源/disruptive 4 源/vrio 4 源）；技术路线 REST 直连（httpx + pyjwt 既有依赖，零新第三方依赖——复用 resilience helper 全链）；预筛勘误留痕（BigQuery Sandbox 免信用卡前提证伪——程序化访问需绑定 Billing 项目）
   - value-proposition-canvas（从 4.1b 转入）/ business-model-canvas（从 4.1b 转入）/ org-design-framework / dependency-graph / raci-matrix / gantt-chart / strategy-map（从 4.1b 转入）
 
@@ -2772,7 +2772,7 @@ buckets/
 
 #### 17.3.3 Skills 数据采集基础设施（Story 4.1b ✅ 已实现 2026-09-24）
 
-> **状态：** ✅ 已实现（Story 4.1b，DataSourcePort + 8 适配器 + Redis 缓存 + Engine.Execute `$DATA_SOURCE` 集成）
+> **状态：** ✅ 已实现（Story 4.1b，DataSourcePort + 适配器池（4.1b 时点 8 → 4.1f+D-09 终态 12）+ Redis 缓存 + Engine.Execute `$DATA_SOURCE` 集成）
 
 **设计背景：** 沙箱 `network_mode="none"` 为领域不变量（§17.3.1 / ContainerSpec），沙箱代码无法自行访问外部数据 API——数据采集必须在宿主机侧（应用层/引擎）完成并注入沙箱执行上下文。本节定义 Skills 数据驱动分析的公共底座，供 Story 4.1c/4.1d/4.1e 复用。
 
@@ -2782,7 +2782,7 @@ buckets/
 |------|--------|------|
 | domain | `DataSourcePort`（runtime_checkable Protocol：fetch/get_metadata/health_check）+ `DataSourceQuery`（Query Object）+ 值对象（DataSourceRef/DataFreshness/DataSourceResult/DataSourceMeta/DataSourceApiType）+ 异常（410-413）+ 事件（DataSourceFetched/DataSourceFetchFailed） | `src/domain/ports/data_source.py` / `src/domain/value_objects/data_source.py` / `src/domain/exceptions/data_source_exceptions.py` / `src/domain/events/data_source_events.py` |
 | application | `DataSourceResolverPort`/`DataSourceResolverService`（白名单 + 缓存 + 并发 + 新鲜度 + 事件编排）+ `$DATA_SOURCE` 标记解析器（tokenize 掩码 + ast.literal_eval）+ Engine.Execute 集成 + ToolMetadata.data_sources 扩展 | `src/application/ports|services/data_source_resolver.py` / `src/application/services/data_source_marker.py` |
-| infrastructure | 8 个数据源适配器 + 独立配置文件 + 共享 HTTP 韧性纯函数（`_http_helpers.py`） | `src/infrastructure/external_services/datasources/` / `src/infrastructure/config/` |
+| infrastructure | 12 个数据源适配器 + 独立配置文件 + 共享 HTTP 韧性纯函数（`_http_helpers.py`）+ 声明式注册表（`registration.py`） | `src/infrastructure/external_services/datasources/` / `src/infrastructure/config/` |
 | interfaces | `EXCEPTION_HTTP_MAP` +4 映射（410→502/411→503/412→429/413→502），无新 REST 端点 | `src/interfaces/api/exception_handlers.py` |
 
 **12 个数据源适配器（PoC v1/v2 验证选型 + Story 4.1f 三新源 + D-09 google-patents，Reuters 已替换为 NewsAPI，UNSD/OECD 推迟）：**

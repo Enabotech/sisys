@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -437,7 +438,7 @@ class TestGooglePatentsAdapterSuccess:
         body = json.loads(query_req.content.decode())
         sql = body["query"]
         # SQL 形态锁（schema 事实——Q1-F1 防回归）：
-        assert "UNNEST(assignee)" in sql and "LIKE @assignee" in sql, "REPEATED 列须 UNNEST 逐元素匹配"
+        assert "UNNEST(assignee)" in sql and "a LIKE @assignee" in sql, "REPEATED 列须 UNNEST 逐元素匹配"
         assert "ESCAPE" in sql, "LIKE 通配符转义须有 ESCAPE 子句成对"
         assert "DATE(" not in sql, "filing_date 为 INT64——禁 DATE 函数比较（类型不匹配 400）"
         # 列裁剪 + LIMIT + 参数化占位符（防注入）
@@ -483,7 +484,10 @@ class TestGooglePatentsAdapterSuccess:
         body = json.loads(query_req.content.decode())
         sql = body["query"]
         # 三 REPEATED 通道：UNNEST 逐元素 + LIKE + ESCAPE 成对
-        assert "UNNEST(assignee)" in sql, "assignee 通道须 UNNEST（ARRAY<STRING> 列标量 LIKE 必 400）"
+        assert "UNNEST(assignee)" in sql and "a LIKE @assignee" in sql, (
+            "assignee 通道须 UNNEST（ARRAY<STRING> 列标量 LIKE 必 400）"
+            "且谓词含别名前缀（防 NOT LIKE 否定词突变——与 cpc/keyword 同构）"
+        )
         assert "UNNEST(cpc)" in sql and "c.code LIKE @cpc" in sql, "cpc 通道须 UNNEST 逐元素匹配"
         assert "UNNEST(abstract_localized)" in sql and "a.text LIKE @keyword" in sql, "keyword 通道须 UNNEST"
         like_count = sql.count(" LIKE @")
@@ -497,6 +501,31 @@ class TestGooglePatentsAdapterSuccess:
         params = {p["name"]: p["parameterValue"]["value"] for p in body.get("queryParameters", [])}
         assert params.get("cpc") == "%Y02E%"
         assert params.get("keyword") == "%battery%"
+
+    @pytest.mark.asyncio
+    async def test_timeout_ms_varies_with_config_timeout(self, working_adapter, credentials_file) -> None:
+        """timeoutMs 派生第二数据点（第三周期 T1-F7——原唯一数据点 timeout=5.0→3000，
+        派生公式改错为固定值时其余 timeout 配置全静默）。
+
+        timeout=6.0 → max(1000, int(6000)-2000)=4000——与既有 5.0→3000 点共同
+        锁定线性派生关系。注：max(1000,...) 下限分支在 config timeout≥3.0s 下限
+        校验下结构性不可达（3.0 恰为 1000），属配置不变量保护下的防御性冗余，
+        不为死分支补测。
+        """
+        captured: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured.append(request)
+            if "/token" in str(request.url):
+                return httpx.Response(200, json=_TOKEN_BODY)
+            return httpx.Response(200, json=_QUERY_BODY)
+
+        config = replace(working_adapter._config, timeout=6.0)
+        adapter = _make_adapter(credentials_file, httpx.MockTransport(handler), config=config)
+        await adapter.fetch(DataSourceQuery(source_name="google-patents", query="assignee=华为"))
+        query_req = [r for r in captured if "/queries" in str(r.url)][0]
+        body = json.loads(query_req.content.decode())
+        assert body.get("timeoutMs") == 4000, "timeoutMs 须随 config.timeout 线性派生（6.0s → 4000ms）"
 
     @pytest.mark.asyncio
     async def test_like_wildcard_in_user_value_is_escaped(self, working_adapter, credentials_file, monkeypatch) -> None:
@@ -584,6 +613,37 @@ class TestGooglePatentsAdapterFailures:
             "src.infrastructure.external_services.datasources.google_patents_adapter._sign_jwt_rs256",
             lambda header, claims, key: "fake-signed-jwt",
         )
+
+    @pytest.mark.asyncio
+    async def test_json_body_form_data_mutually_exclusive_raises_validation_error(self) -> None:
+        """helper 请求体互斥防线（第三周期 T1-F8——原为 httpx data 优先静默丢 JSON 体
+        的隐蔽故障面；防线位于熔断统计之前，编程错误零请求消耗）。"""
+        from src.infrastructure.external_services.datasources._http_helpers import request_json_with_resilience
+        from src.infrastructure.external_services.embedding.circuit_breaker import CircuitBreaker
+
+        calls: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(request)
+            return httpx.Response(200, json={})
+
+        adapter_client = httpx.AsyncClient(transport=httpx.MockTransport(handler), timeout=5.0)
+        try:
+            with pytest.raises(ValidationError) as exc_info:
+                await request_json_with_resilience(
+                    client=adapter_client,
+                    method="POST",
+                    url="https://helper-mutex.test/endpoint",
+                    source_name="google-patents",
+                    circuit_breaker=CircuitBreaker(failure_threshold=3, recovery_timeout=30.0, name="mutex-cb-test"),
+                    json_body={"concept": "revenues"},
+                    form_data={"grant_type": "client_credentials"},
+                )
+        finally:
+            await adapter_client.aclose()
+        assert exc_info.value.code == "EXCEPTION_201"
+        assert "互斥" in str(exc_info.value)
+        assert calls == [], "互斥防线须在熔断统计与真实请求之前拦截（零请求消耗）"
 
     def test_missing_both_gates_raises_configuration_error(self, tmp_path: Path) -> None:
         with pytest.raises(ConfigurationError) as exc_info:

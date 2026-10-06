@@ -173,8 +173,9 @@ async def request_json_with_resilience(
         source_name: 数据源名称（异常 context，禁止含敏感信息）
         circuit_breaker: 熔断器实例
         params: URL 查询参数（禁止放入 API Key——Key 走 headers/json_body/form_data）
-        json_body: POST JSON 请求体（与 form_data 互斥——二者仅传其一；同传时 httpx
-            data 优先、json_body 被静默忽略，调用方须自查）
+        json_body: POST JSON 请求体（与 form_data 互斥——二者仅传其一；同传时运行时
+            防线抛 ValidationError 拦截，第三周期 T1-F8 前为 httpx data 优先静默
+            忽略 json_body 的隐蔽故障面）
         form_data: POST form 请求体（application/x-www-form-urlencoded——OAuth2 token
             端点 RFC 7523 形态，assertion 等短时效凭证禁入 URL query 走此通道）
         headers: 请求头（API Key 应走此处，避免 URL 泄露）
@@ -188,12 +189,28 @@ async def request_json_with_resilience(
         解析后的 JSON（dict 或 list）
 
     Raises:
+        ValidationError: json_body 与 form_data 同传（EXCEPTION_201——调用方参数域
+            错误，与 parse_int_param 同族；编程错误在熔断统计前拦截）
         TimeoutError: 请求超时（重试耗尽后，EXCEPTION_302）
         DataSourceUnavailableError: 5xx/连接失败重试耗尽或熔断断开（EXCEPTION_411）
         DataSourceRateLimitError: HTTP 429 限流（EXCEPTION_412，不重试）
         DataSourceResponseError: 4xx/3xx/JSON 或响应体解码失败（EXCEPTION_413，不重试）
         ConfigurationError: 401/403（API Key 凭证问题）或 URL 配置畸形（EXCEPTION_101）
     """
+    # 第 0 步：请求体互斥防线（T1-F8——编程错误不消耗熔断统计，先于 before_call）
+    if form_data is not None and json_body is not None:
+        raise ValidationError(
+            message=(
+                f"数据源 {source_name!r} 请求参数错误：json_body 与 form_data 互斥（二者仅传其一）——"
+                "同传时 httpx data 优先、json_body 会被静默忽略"
+            ),
+            context={
+                "source_name": source_name,
+                "json_body_keys": sorted(json_body),
+                "form_data_keys": sorted(form_data),
+            },
+        )
+
     # 第 1 步：熔断器快速失败
     try:
         circuit_breaker.before_call()

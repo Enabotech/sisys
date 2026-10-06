@@ -1186,7 +1186,7 @@ def given_import_composition_root_registry(context: dict[str, Any]) -> None:
 def when_extract_data_source_ports(context: dict[str, Any]) -> None:
     """Round 3 根因修复：PortRegistry 提供 `list_all()` 方法（不是 dict `values()`）。
 
-    过滤 _global_registry 提取 8 个 data_source 适配器端口名。
+    过滤 _global_registry 提取全部 data_source 适配器端口名（4.1f 终态 12 端口态）。
     """
     registry = context["composition_root_registry"]
     names = {
@@ -1199,38 +1199,22 @@ def when_extract_data_source_ports(context: dict[str, Any]) -> None:
 
 @then("端口注册集合与按环境 KEY 推导的期望一致（无条件 7 + 条件注册逐 KEY 判定，4.1f 终态 12 端口）")
 def then_eight_data_source_adapters_registered(context: dict[str, Any]) -> None:
-    """R2-2-C4/I3：按进程环境 KEY 确定性推导期望注册集合（兼容 {5,6,7,8} 态）。
+    """R2-2-C4/I3（第三周期 T1-F1 改注册表派生）：期望集合从生产注册表单一真相源推导。
 
-    uspto/newsapi/tavily 条件注册独立判定（composition_root `bool(os.getenv(...))`，
-    空串视为未配置——uspto 自 R3-P1-3 起条件注册：PatentsView v1 强制 X-Api-Key，
-    无 Key 时注册只会必然 403），原 `len==8 or len==6` 断言在单 KEY 配置时误失败；
-    测试进程 env 与 session 级 bootstrap 决策天然一致。
+    `DATA_SOURCE_REGISTRY × is_gate_open` 与 bootstrap 注册决策同源（register_all_
+    data_sources 逐条目过同一门判定）——本断言验证「bootstrap 实际注册结果 == 注册表
+    声明预期」（注册未执行/循环中断/接线遗漏即红）。原手写镜像推导（12 端口步骤文本
+    只扩了 4 个 keyed 门、漏 google-patents GCP 双门——GCP 凭据齐备环境假红）已废弃：
+    镜像漂移缺陷类根治；源清单内容与门语义本身由 test_registration 的硬编码 12 名
+    精确集合断言与 TestGateSemantics 注入式全谱系测试独立守护（含 epo-ops 双凭据
+    合取与 google-patents 凭据文件门）。测试进程 env 与 session 级 bootstrap 决策
+    天然一致（本场景不修改环境变量）。
     """
-    import os
+    from src.infrastructure.external_services.datasources.registration import DATA_SOURCE_REGISTRY, is_gate_open
 
     ports_set = set(context["registered_data_source_ports"])
-    core_required = {
-        "data_source_worldbank",
-        "data_source_imf",
-        "data_source_eurostat",
-        "data_source_ipcc",
-        "data_source_china_nbs",
-        # 4.1f 无条件新源（免 key / key 可选——官方免费通道可达即注册）
-        "data_source_sec_edgar",
-        "data_source_comtrade",
-    }
-    expected = set(core_required)
-    # 判定语义与 composition_root 条件注册逐字一致（bool() 拒 None 与空串；
-    # epo-ops 双凭据门——Key/Secret 双键合取，任一缺失即不注册，4.1f）
-    for port_name, env_keys in (
-        ("data_source_uspto", ("USPTO_API_KEY",)),
-        ("data_source_newsapi", ("NEWSAPI_API_KEY",)),
-        ("data_source_tavily", ("TAVILY_API_KEY",)),
-        ("data_source_epo_ops", ("EPO_OPS_CONSUMER_KEY", "EPO_OPS_CONSUMER_SECRET")),
-    ):
-        if all(bool(os.getenv(key)) for key in env_keys):
-            expected.add(port_name)
-    assert ports_set == expected, f"注册集合 {sorted(ports_set)} 与按环境 KEY 推导的期望 {sorted(expected)} 不一致"
+    expected = {r.port_name for r in DATA_SOURCE_REGISTRY if is_gate_open(r)}
+    assert ports_set == expected, f"注册集合 {sorted(ports_set)} 与注册表派生的期望 {sorted(expected)} 不一致"
 
 
 @given("收集 src/domain/{ports,value_objects,events,exceptions} 下 data_source 相关文件")

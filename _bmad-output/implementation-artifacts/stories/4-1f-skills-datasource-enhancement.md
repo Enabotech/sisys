@@ -1210,7 +1210,7 @@ tests/
 | Q2-F10 | 测试卫生组（B-7/C-15/B-8/C-16 清偿）——KEYED_ADAPTER_PORT_NAMES 死常量；叙述计数 11→12 漂移 8 站点（含同文件自相矛盾 2 处）；removeprefix 前缀双写；mkdtemp 三处累积泄漏；装饰性 repr 测试（C-8：config 只持路径无私钥，断言恒真；台账「改测 manager repr」方案经核验同样零判别力——manager 无自定义 repr） | P3 | ✅ 死常量删除 + 计数全站点修正（test_arch:5/:150、契约 :1/:4/:91 后半、skill_contracts:29、test_arch_skill:4、acceptance:1200、Story:889）+ DS_MODULE_PREFIX 公开导出（__all__ 增补）三处硬编码替换 + 两 arch helper return 前 rmtree + 契约子进程重构（_tmp 捕获 + bootstrap 后 rmtree + **C-10 顺带清偿：repr 拼接串产出非法 JSON 改 json.dumps 构造**）+ 装饰性测试删除（模块 docstring「repr 脱敏」短语随删） |
 | Q2-F11 | C-14 销项——台账登记「timeout 单态 handler」与代码不符（实地核验 `:604-611` handler 自始双态：/token 返 200、业务端点抛 ReadTimeout——超时恰落在业务端点，判别力无损失） | 销项 | ✅ 台账改注「核验失实关闭」 |
 
-**Round 2 维持留项**：A-8 jobs.get 补账（R7 真实凭据验证 jobs.get 响应形态）/ A-16 代码修 LOWER 双侧（R7——SQL 语义变化需真实数据验证召回影响）/ B-3 架构测试镜像 is_gate_open（单元级确定性防线已存在 test_registration:95-98，镜像断言 CI 双键皆空环境恒平凡通过，追加价值趋零）。
+**Round 2 维持留项**：A-8 jobs.get 补账（R7 真实凭据验证 jobs.get 响应形态）/ A-16 代码修 LOWER 双侧（R7——SQL 语义变化需真实数据验证召回影响）/ B-3 架构测试镜像 is_gate_open（单元级确定性防线已存在 test_registration 的 `test_dual_key_conjunction_epo`（第三周期 T1-F9 行号校正：实位 :115-118——Q2 新增 file_gate 防线测试后整体下移，原台账 :95-98 引用腐化），镜像断言 CI 双键皆空环境恒平凡通过，追加价值趋零）。
 
 **Round 2 回归证据**：google-patents 49 passed（40→49）+ architecture/contracts 851 passed（含 file_gate 防线新用例）+ skills/datasources/集成 714 passed；ruff/mypy 全过；pyjwt 2.15.1 升级兼容性全量复验绿。
 
@@ -1239,6 +1239,33 @@ tests/
 
 > **收敛声明（第二轮代码审查周期独立终审——2026-10-06）**：Story 4.1f 第二轮代码审查周期（Task 9 google-patents + R-REG 增量面）经五轮收敛：Round 1（c71d172c，四视角调研 + 双评审员 + 21 项修订吸收）P0×1 + P1×6 + P2×5 落码 7 簇；Round 2（720c4c92，回归核查 + 留项清偿 + 单评审员 11 项修订）P2×2 + P3×3 + 台账清偿 8 组 + C-14 销项；Round 3（69cc9e3a，断言覆盖矩阵 + 突变实证）P1×2 + P3×2，14 项行为契约 14 项真断言守护；Round 4 无提交纯验证（七维度评级 A）；Round 5 独立收敛终审（R4Q 微修 + 4-1d 守护加回退闭环 + F-1/F-2/F-4 随收敛清偿）。周期累计发现 33 项（Q1 7 簇 + Q2 11 + Q3 6 + Q4 3 + Q5/终审 5 + 评审修订 21 项吸收），零 P0/P1/P2 残留。独立终审五节全过：周期闭合无游离（三提交 + R4 零提交 + R5 工作区恰文件面，远程零偏移）/ 双向取证 10/10 零失实（2 项经独立突变实验复核）/ 独立快扫零新 P0-P2 / 门禁实跑全绿（ruff/mypy/2382+ 用例/红线零命中）/ 台账无悬空（维持留项 3 项 + R7/Defer 逐条理由留痕，外部凭据依赖项为验证锚点非代码缺陷不阻塞）。**裁定：正式收敛，Story 状态 review → done。**
 
+#### 第三轮代码审查周期 Round 1（2026-10-06——跨周期终局审查）
+
+> **范围声明**：两个收敛周期（第一轮 Task 0-8 面 33 项 / 第二轮 Task 9 + R-REG 面 33+21 项）之后的终局审查——本轮独特价值定位为**跨周期交互面**：第一周期 29 项修复在 HEAD 终态的存续验证、4-1f × 4-5（9a94041b）并行开发交叉甄别、R-REG 重构后架构一致性、内容资产与台账终态。编号 `T1-F<n>`（T = 第三周期 Round，与 R/Q 命名空间区分）。
+> **方法**：四视角并行调研（A 跨周期交互面 / B 架构一致性与交叉污染 / C 测试判别力与台账 / D 内容资产终局）+ 主会话逐项证据定谳 + 独立评审员方案评审（评级「良好——R1~R7 修订清单全数吸收后落码，零设计变更」）。
+
+**C1 四视角结论**：全部「通过」——A：第一周期 29 项修复零破坏（三适配器 + CJK 两周期 diff 为空、R-REG 三面等价逐项成立、form_data 19 处调用点零影响实证）；B：4-5 与 4-1f 文件面交集仅组合根一处且为不同区段纯追加、双向零渗透，R-REG 12 适配器 PortSpec/门判定/shutdown 11 项与重构前逐项等价、24 延迟加载模块路径全部真实存在；C：14 项契约守护抽验 8/8 判别力成立（五通道谓词锁配对计数/401 双计数器/熔断 threshold=2 逐环节核算/目录扫描防线双向闭合），恒真断言零残留，留项/Defer 台账无挂账项；D：源数计数链 8 类触点全闭合（7/4/4）、yaml 逐字锁 4 组 1:1 双写、「双库」仅 2 处合法回落语义。
+
+| # | 发现 | 严重度 | 处置 |
+|---|------|--------|------|
+| T1-F1 | **验收 AC-7.2 期望推导缺 google-patents 门**（第二周期把步骤文本改「12 端口」但推导循环仅 uspto/newsapi/tavily/epo-ops 四门——GCP 凭据齐备环境 `ports_set==expected` 假红；常规环境「12 端口」宣称无验证力。A-1 定谳属实） | P2 | ✅ 改注册表派生：`DATA_SOURCE_REGISTRY × is_gate_open` 与 bootstrap 同源（镜像漂移缺陷类根治——评审定谳结构性优于补镜像条目：乙案保留的两项检测力已被 test_registration 硬编码 12 名严格镜像与 TestGateSemantics 注入式全谱系测试完全取代）；R1 修订：docstring 不写「port_name 错仍红」（同源同错不红——如实表述为接线验证）；R2 修订：步骤文本不动（feature :149 锁步）+ 孤儿 import os 清除 + when-docstring「8 个」更正 |
+| T1-F2 | **注册面 SSOT ↔ 声明面 SSOT 零交叉断言**（registration docstring「四位一体」含 ADAPTER_SSOT 键，但引用 DATA_SOURCE_REGISTRY 与 ADAPTER_SSOT 的测试文件零交集——第 13 源只入注册表时 _build_adapters 硬编码实例表与 set== 断言双侧同滞留自洽全绿，「漏改静默」在声明面的残留。B-4 定谳属实） | P2 | ✅ test_registration 增交叉断言 `set(ADAPTER_SSOT) == {r.source_name}`（双向红）；**突变实证**：注入 world-bank-x 单侧漂移立即 FAILED → 还原零残留——判别力闭环 |
+| T1-F3 | 组合根聚合区注释 keyed 源清单缺 google-patents（同文件 :2660 shutdown 区已含——两处不一致） | P3 | ✅ 注释补齐 |
+| T1-F4 | uspto 条目物理位置滞留 A 组「无条件注册」横幅下（实为 B 组条件注册——docstring 分组与物理摆放矛盾） | P3 | ✅ 移位至 B 组横幅首位（纯移动；test_unconditional_group_has_no_gate 按 source_name 判定零影响——评审核验） |
+| T1-F6 | assignee 谓词断言否定词突变缺口（`"LIKE @assignee" in sql` 为 `"NOT LIKE @assignee"` 子串——否定词突变存活；cpc/keyword 因别名前缀断言无此缺口） | P3 | ✅ 两处断言补别名前缀 `"a LIKE @assignee"`（与 cpc/keyword 同构；评审核验无假阳性——`a.text LIKE` 不含 `a LIKE `） |
+| T1-F7 | timeoutMs 派生单数据点（全部测试 config.timeout 恒 5.0——派生公式改固定值仅单点红） | P3 | ✅ 第二数据点 timeout=6.0→4000（R6 修订：max(1000,...) 下限分支在 config 3.0s 下限校验下结构性不可达，docstring 注明不为死分支补测） |
+| T1-F8 | helper json_body/form_data 互斥仅 docstring 约束无运行时防线（误同传时 JSON 体静默丢弃） | P3 | ✅ 入口防线 `ValidationError(201)`（R3 修订：位于 before_call 之前零熔断消耗 + Raises docstring + context 含 source_name 定位）+ 负例单测（含零请求消耗断言 + try/finally aclose 立规示范）；评审定谳非过度防御（12 适配器共享咽喉点单点拦截） |
+| T1-F9 | B-3 留项台账行号引用腐化（:95-98 现为 test_unconditional_group_has_no_gate，epo 半凭据防线实位 :115-118） | P3 | ✅ 台账改测试名引用 + 行号辅助（R4 修订：行号天然易腐） |
+| T1-F10 | registration docstring「Literal 约束防 typo」易读作运行时防线（dataclass 运行时无 Literal 校验——mypy 编译期唯一实际拦截层） | P3 | ✅ docstring 如实化（拦截层 + 间接运行时防线 = httpx_owned 排除断言） |
+| T1-F11 | architecture.md :2785「8 个数据源适配器」与 :2788「12 个」同节自相矛盾 + :2775 状态行同款滞留 | P3 | ✅ :2785 改 12 + registration.py 补记；:2775 改历史注记形态（R7 修订：:3605 changelog 8.5.0 行为不可变历史记录不改） |
+| T1-F12 | architecture.md :2679「专利域 1→3 源（uspto+epo-ops 双库）」混合快照（数字取 D-09 后态、括注取 4.1f 时态） | P3 | ✅ 改「1→2 源（uspto+epo-ops 双库；D-09 后 3 库）」保持时间线完整 |
+| T1-F13 | R2-C11 aclose 立规后 Task 9 新文件未执行（规则-执行背离——立规实质冻结） | P3 | ✅ 显式 defer 登记（R5 修订：措辞覆盖本周期及后续新增工厂模式测试，直至数据源测试基建整体触碰收口；测试内直接构造 client 的新增测试仍须遵规） |
+| B-6 半项 | 目录扫描 glob 非递归（注册表 impl_module 自由路径结构上允许子目录落子——扫描不可见留绕过缝） | P3 | ✅ rglob 递归扫描 + docstring；另半项（目录外适配器反向扫描）不落码——过度化（hexagonal 矩阵已守关键方向） |
+
+**维持不动项（评审核验通过）**：A-3/B-7（config 导入时序变化——registration.py 时序注在场 + CI 可导入防线兜底）/ B-8（datasources 零 application 依赖为超集口径——.importlinter 实测仅禁 infra→interfaces，不新增防线）/ C-6（Comtrade 集成条件断言已文档化）/ C-7（4-1d 侧标记守护回退已登记取舍）/ :3605 changelog 历史记录。
+
+**Round 1 回归证据**：google-patents + registration 77 passed（含 3 新测试）/ 验收 AC 场景 18 passed / datasources + 架构 369 passed / ruff 全过 / mypy 623 文件零问题；突变实证 1 组（T1-F2 单侧漂移注入即红→还原零残留）；生产面红线自查（_http_helpers/registration/composition_root/__init__ 四变更文件）零命中——新增 raise ValidationError 属适配器三类自抛白名单（输入前置校验）。
+
 #### 需决策 Decision Needed
 
 - [x] **无 P0/P1 级待决策项**（R1-F6/F7 改判依据已留痕；A-5 类变量 Lock 专项裁定已完成——第一周期 v1.5.1「文档澄清替代结构变更」留痕，终审 F-4 勾销陈旧表述）
@@ -1262,6 +1289,7 @@ tests/
   - **部分预验证已完成（2026-09-30 SKIPPED 根因分析时假凭据演练）**：`/3.2/auth/accesstoken` 端点真实存在（假凭据得 **HTTP 401** ≠ 404——R2-F1 路径修复正确性获真实端点背书；401 → ConfigurationError(101) 异常契约映射在真实端点成立）；带 Authorization 头可穿透 R1 期观测的匿名 403 Fair Use 拦截层（该拦截仅针对匿名请求）。待真 key 完成剩余：grant_type 传输形态 / search 响应样本 / 令牌失效码型
 - [ ] **.env 解除 git 跟踪（root + deploy/app/.env 双处）**——含 .gitignore 生效化 + `git rm --cached` + CI/部署拉取路径依赖面评估 + 历史泄漏轮换评估（R2-F9，基础设施 owner 决策）
 - [ ] **jobs.getQueryResults 轮询（google-patents 长查询）**——Q1-F5 最小修复（timeoutMs 派生 + 413 如实消息）后，超时窗口内未完成的查询仍会 413；轮询实现（jobReference → jobs.getQueryResults 有限重试）随 R7 真实端点实测后定（无真实凭据时写轮询属投机——实测前 timeoutMs 已给足窗口）
+- [ ] **适配器测试注入 client 的 aclose 存量收口（第三周期 T1-F13——R2-C11 立规则-执行背离的显式 defer 化）**——第一周期 Round 2 立规「新增测试注入 client 用 try/finally aclose」后，Task 9 新文件 test_google_patents_adapter.py 的 `_make_adapter` 工厂模式全文件零 aclose（本周期实测确认），立规实质冻结。处置：MockTransport 无真实资源（风险为 ResourceWarning 级），**含本周期及后续新增的工厂模式测试在内**，全部存量随数据源测试基建整体触碰时统一收口（避免单文件碎片化改造制造风格分裂——4-1f R4-1 改判同口径）；测试内**直接构造** AsyncClient 的新增测试仍须 try/finally aclose（本周期 T1-F8 互斥负例已遵规示范）。
 - [x] **pyjwt 显式声明 pyproject（Q1 台账 A-10）**——✅ Q2-F5 清偿（2026-10-06：`poetry add "pyjwt@^2.13.0"`，caret 主风格，2.15.1 minor 升级全量复验绿）
 
 ---
@@ -1276,10 +1304,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.7.4
+**故事版本/Story Version:** v1.8.0
 **创建日期/Created:** 2026-09-30
 **最后更新/Last Updated:** 2026-10-06
 **更新说明/Description:**
+- v1.8.0: **第三轮代码审查周期 Round 1（跨周期终局审查）**：四视角并行调研（跨周期交互面/架构一致性与 4-5 交叉甄别/测试判别力与台账/内容资产终局）全部「通过」——第一周期 29 项修复零破坏、R-REG 等价性与 form_data 19 处零影响实证、4-1f×4-5 双向零渗透、14 项契约守护 8/8 抽验成立、源数计数链 8 类触点全闭合；发现 P0×0/P1×0/P2×2 + P3×12，评审（良好——R1~R7 修订全吸收）后落码 14 项：AC-7.2 期望推导改注册表派生（镜像漂移根治）+ 注册面↔声明面 SSOT 交叉断言（突变实证判别力闭环）+ 互斥防线/别名前缀/第二数据点/uspto 移位等纵深与文档组；aclose 立规则-执行背离显式 defer 化；回归 77+18+369 passed 全绿
 - v1.7.4: **第二轮代码审查周期正式收敛**：Round 4 纯验证（七维度评级 A）+ Round 5 独立收敛终审（五节全过——周期闭合/双向取证 10/10 零失实/独立快扫零新 P0-P2/门禁实跑全绿/状态流转判定）→ **收敛声明入档，Status review → done**；R4Q 微修（键形态守护扩宽 + timeout 直构造负例）+ 4-1d 守护加回退闭环（四 Skill 合法双章节形态发现——突变验证驱动）+ 终审条件性建议清偿（F-1 注释失实/F-2 计数勘误/F-4 陈旧表述勾销）；周期累计发现 33 项 + 评审修订 21 项吸收，零 P0/P1/P2 残留
 - v1.7.3: **第二轮代码审查 Round 3**（断言覆盖矩阵 + 残余风险面——突变测试实证 3 轮）：14 项行为契约 14 项真断言守护收口（cpc/keyword/country 三通道谓词形态锁补齐——原 2 弱 1 半守护）；Round 2 feature 提交完整性缺陷补交（BDD 三联动位漏一）+ Q2-F10 台账勘误（9 站点）；timeout 下限上移 __post_init__ 单一来源；标记重复守护（完整标记对层面——突变实证 D-1 残渣红/16 Skill 零误伤）；评级 B→A
 - v1.7.2: **第二轮代码审查 Round 2**（回归核查 + 留项清偿双视角 + 单评审员快评 + 11 项修订吸收）：Round 1 七簇修复回归核查通过（零失实）；P2×2 修复范围内遗漏清偿（rows.f null 穿透 + 文本条件空值 LIKE '%%' 全表扫描）+ P3×3；留项台账清偿 8 组（pyjwt 显式声明/死旋钮删除/registration 加固 ConfigurationError+Literal/测试卫生组含 C-10 非法 JSON 顺带清偿/大小写敏感文档化/双库措辞对齐/totalBytesProcessed 双入口告警观测/mkdtemp 三处清理）+ C-14 销项；主会话全量回归 9795+ passed；留项 3 项（A-8 jobs.get/A-16 LOWER/B-3 镜像断言）

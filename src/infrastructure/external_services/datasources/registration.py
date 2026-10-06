@@ -54,7 +54,9 @@ class AdapterRegistration:
             google-patents GCP 双门专用）
         factory_kind: 工厂形态（"default"=Config.from_env() 单参构造；
             "china_nbs"=resolver.resolve("crawler_client") 特殊工厂——Literal
-            约束防 typo 静默落入 default 分支）
+            约束防 typo 静默落入 default 分支：拦截层为 mypy 编译期（dataclass
+            运行时无 Literal 校验）；间接运行时防线 = test_registration 的
+            httpx_owned 排除断言（china_nbs 的 factory_kind typo 时红））
         tags: 端口 tags（含 data-source 公共标记）
 
     Raises:
@@ -134,6 +136,16 @@ DATA_SOURCE_REGISTRY: tuple[AdapterRegistration, ...] = (
         tags=("data-source", "eurostat", "statistics"),
     ),
     AdapterRegistration(
+        port_name="data_source_ipcc",
+        source_name="ipcc",
+        impl_module=_impl("ipcc_adapter"),
+        impl_cls_name="IPCCAdapter",
+        config_module=_cfg("ipcc"),
+        config_cls_name="IPCCConfig",
+        tags=("data-source", "ipcc", "environment"),
+    ),
+    # ===== B 组：环境变量门条件注册（Key/凭据非空即注册——bool() 拒空串） =====
+    AdapterRegistration(
         port_name="data_source_uspto",
         source_name="uspto",
         impl_module=_impl("uspto_adapter"),
@@ -145,16 +157,6 @@ DATA_SOURCE_REGISTRY: tuple[AdapterRegistration, ...] = (
         env_gate_keys=("USPTO_API_KEY",),
         tags=("data-source", "uspto", "patent"),
     ),
-    AdapterRegistration(
-        port_name="data_source_ipcc",
-        source_name="ipcc",
-        impl_module=_impl("ipcc_adapter"),
-        impl_cls_name="IPCCAdapter",
-        config_module=_cfg("ipcc"),
-        config_cls_name="IPCCConfig",
-        tags=("data-source", "ipcc", "environment"),
-    ),
-    # ===== B 组：环境变量门条件注册（Key/凭据非空即注册——bool() 拒空串） =====
     AdapterRegistration(
         port_name="data_source_newsapi",
         source_name="newsapi",

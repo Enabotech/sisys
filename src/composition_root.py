@@ -2363,7 +2363,8 @@ def bootstrap() -> None:
     register_all_data_sources(register_port)
 
     # 数据源解析编排服务（R2 组合注入：聚合 data_source_* 适配器 + L1 缓存 + 事件发布）
-    # Key 缺失的适配器（uspto/newsapi/tavily/epo-ops）未注册 → resolve_optional 返回 None → 映射中不含（优雅降级）
+    # Key 缺失的适配器（uspto/newsapi/tavily/epo-ops/google-patents）未注册
+    # → resolve_optional 返回 None → 映射中不含（优雅降级）
     from src.application.ports.data_source_resolver import DataSourceResolverPort
     from src.infrastructure.external_services.datasources.registration import build_adapters_mapping
 

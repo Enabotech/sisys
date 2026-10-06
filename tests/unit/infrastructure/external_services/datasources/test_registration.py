@@ -54,13 +54,14 @@ class TestRegistryIntegrity:
 
         新适配器文件落盘但忘记在 DATA_SOURCE_REGISTRY 加条目时，既有测试全静默
         （三常量与契约表均派生自注册表——注册表里没有的源它们看不见）；本测试
-        扫描 datasources 目录全部 *_adapter.py，文件 stem 集合必须是注册表
-        impl_module 名集合的子集（漏登记即红）。
+        递归扫描 datasources 目录（含子目录——注册表 impl_module 为自由路径，
+        结构上允许子目录落子，非递归扫描会留下绕过缝）全部 *_adapter.py，文件
+        stem 集合必须是注册表 impl_module 名集合的子集（漏登记即红）。
         """
         import src.infrastructure.external_services.datasources.registration as registration_module
 
         datasources_dir = Path(registration_module.__file__).resolve().parent
-        adapter_stems = {Path(p).stem for p in glob.glob(str(datasources_dir / "*_adapter.py"))}
+        adapter_stems = {Path(p).stem for p in glob.glob(str(datasources_dir / "**" / "*_adapter.py"), recursive=True)}
         registered_modules = {r.impl_module.rsplit(".", 1)[-1] for r in DATA_SOURCE_REGISTRY}
         assert adapter_stems <= registered_modules, (
             f"存在未登记注册表的适配器文件（新源接入须同步 DATA_SOURCE_REGISTRY）: {sorted(adapter_stems - registered_modules)}"
@@ -92,6 +93,22 @@ class TestRegistryIntegrity:
                 file_gate=True,
             )
         assert exc_info.value.code == "EXCEPTION_101"
+
+    def test_registry_source_names_match_declaration_ssot(self) -> None:
+        """注册面 SSOT ↔ 声明面 SSOT 键集等价（第三周期 T1-F2——「四位一体」可执行化）。
+
+        registration docstring 声称 source_name 与 ADAPTER_SSOT 键四位一体，但两面
+        测试文件此前零交集——第 13 源只入注册表时声明面静默滞留（test_arch_skill_
+        data_collection 的 _build_adapters 硬编码实例表与 set== 断言双侧同滞留自洽
+        全绿）。本断言双向红：任一面增删源即失配（ Skills 声明三方一致性对新源
+        由静默失明转为立即暴露）。
+        """
+        from tests.unit.application.skills.skill_data_collection_contracts import ADAPTER_SSOT
+
+        assert {r.source_name for r in DATA_SOURCE_REGISTRY} == set(ADAPTER_SSOT.keys()), (
+            f"注册面 {sorted({r.source_name for r in DATA_SOURCE_REGISTRY})} 与声明面 "
+            f"{sorted(ADAPTER_SSOT.keys())} 键集不等（新源接入须同步 DATA_SOURCE_REGISTRY 与 ADAPTER_SSOT）"
+        )
 
     def test_unconditional_group_has_no_gate(self) -> None:
         unconditional = {"world-bank", "imf", "eurostat", "ipcc", "china-nbs", "sec-edgar", "comtrade"}
