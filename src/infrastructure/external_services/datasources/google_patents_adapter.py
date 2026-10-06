@@ -4,17 +4,23 @@ Google Patents Public Datasets——BigQuery `patents-public-data.patents.public
 （IFI CLAIMS 维护，全球书目含 CN 99.96%）：
 
 - 技术路线：**BigQuery REST 直连**（jobs.query + OAuth2 服务账号 JWT）而非
-  google-cloud-bigquery SDK——cryptography/pyjwt 已在依赖树（python-jose 附带），
-  零新第三方依赖；完整复用 `_http_helpers.request_json_with_resilience`
+  google-cloud-bigquery SDK——pyjwt 经 redis 5.x 硬依赖链已在锁定依赖树（显式声明
+  pyproject 见审查留项 Q1 台账），零新第三方依赖；完整复用
+  `_http_helpers.request_json_with_resilience`
   （熔断/重试/异常映射全链——本 Story 硬约束天然满足）
 - 认证：服务账号 JSON → RS256 JWT（scope=bigquery.readonly）→ OAuth2 token 端点
   （jwt-bearer grant）→ access_token 进程内缓存（过期提前 60s 刷新）；业务请求
   401 → 捕获 101 按 context.status_code 判别重取一次（对齐 EPO 模式）
 - 配额：1 TiB/月（BigQuery 按 totalBytesProcessed 精确计费口径）——月窗口字节
   累计守卫（自然月一日 00:00 UTC 重置，now_fn 可注入），超限前置抛 412 零请求
-  消耗；SQL 列裁剪（仅三列）+ 强制 LIMIT 控制扫描成本
+  消耗；SQL 列裁剪（仅三列）+ 强制 LIMIT 控制扫描成本；探活扫描字节同样入账
 - 检索式：管道串 `assignee=华为|cpc=Y02E|country=CN|year=2020-2026|keyword=battery`
-  （至少一项条件——空条件 201 防全表扫描；参数化查询 named parameters 防注入）
+  （至少一项条件——空条件 201 防全表扫描；year/country 形态前置校验 201；
+  参数化查询 named parameters 防注入）
+- schema 事实对齐（patents-public-data.patents.publications 真实类型）：
+  assignee 为 REPEATED（ARRAY<STRING>）须 UNNEST 匹配、filing_date 为 INTEGER
+  （YYYYMMDD）整数区间比较、publication_number 前缀即国家码（STARTS_WITH 字面
+  前缀语义）
 
 实现 DataSourcePort。容错：tenacity + CircuitBreaker（复用 _http_helpers 集中映射）。
 安全：服务账号私钥不落 repr/日志/异常消息。
@@ -25,6 +31,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -63,6 +70,30 @@ _KNOWN_PIPELINE_KEYS = ("assignee", "cpc", "country", "year", "keyword")
 _SQL_SELECT = "SELECT publication_number, assignee, filing_date FROM `patents-public-data.patents.publications`"
 _SQL_ORDER = "ORDER BY filing_date DESC LIMIT 25"
 
+# LIKE 谓词模板（REPEATED 列经 UNNEST 逐元素匹配——assignee 为 ARRAY<STRING>，标量
+# LIKE 无函数签名必 400）。raw string：SQL 文本中 ESCAPE '\\' 两反斜杠字符经 BigQuery
+# 词法解析为单反斜杠转义符，与 _escape_like 值侧转义（%/_/反斜杠）严格配对——
+# 三通道（assignee/cpc/keyword）值转义与 ESCAPE 子句必须成对出现，禁止半套
+_ASSIGNEE_PREDICATE = r"EXISTS(SELECT 1 FROM UNNEST(assignee) AS a WHERE a LIKE @assignee ESCAPE '\\')"
+_CPC_PREDICATE = r"EXISTS(SELECT 1 FROM UNNEST(cpc) AS c WHERE c.code LIKE @cpc ESCAPE '\\')"
+_KEYWORD_PREDICATE = r"EXISTS(SELECT 1 FROM UNNEST(abstract_localized) AS a WHERE a.text LIKE @keyword ESCAPE '\\')"
+
+# 服务端 timeoutMs 相对 httpx client 超时的提前量（毫秒）——两层超时约束：httpx
+# 先超时会触发 tenacity 对非幂等 jobs.query 的重试（每次重试各提交新 job 各自计费
+# 扫描字节），故 timeoutMs 必须恒小于 client timeout（派生关系，禁独立配置）
+_QUERY_TIMEOUT_HEADROOM_MS = 2000
+
+_COUNTRY_PATTERN = re.compile(r"[A-Z]{2}")
+
+
+def _escape_like(value: str) -> str:
+    """转义 LIKE 通配符（反斜杠/%/_）——与谓词模板 ESCAPE '\\\\' 成对的值侧半边。
+
+    用户值含 %/_ 时若不转义会意外全匹配（assignee=% 即匹配一切）；转义后经
+    ESCAPE 子句还原为字面字符语义。
+    """
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
 
 def _sign_jwt_rs256(header: dict[str, str], claims: dict[str, Any], private_key_pem: str) -> str:
     """RS256 签名 JWT（服务账号私钥——测试经 monkeypatch 替换，fake 私钥无法真签）。"""
@@ -79,7 +110,7 @@ def parse_patents_pipeline_query(raw: str) -> dict[str, str]:
         条件字典（仅含出现的键）
 
     Raises:
-        ValidationError: 串为空（防全表扫描）或含未知参数键
+        ValidationError: 串为空（防全表扫描）、含未知参数键、year/country 形态非法
     """
     if not raw.strip():
         raise ValidationError(
@@ -106,12 +137,39 @@ def parse_patents_pipeline_query(raw: str) -> dict[str, str]:
                 context={"source_name": "google-patents", "field": "query", "value": key},
             )
         parsed[key] = value
+    _validate_conditions(parsed)
     if not parsed:
         raise ValidationError(
             message="google-patents 检索式无有效条件（防全表扫描）",
             context={"source_name": "google-patents", "field": "query", "value": raw[:100]},
         )
     return parsed
+
+
+def _validate_conditions(parsed: dict[str, str]) -> None:
+    """结构化条件的形态校验（201 前置——零请求消耗，先于令牌获取）。
+
+    - year：YYYY 或 YYYY-YYYY（恰好 1-2 段、每段 4 位数字、起止有序）
+    - country：两位大写字母国家码（GoogleSQL 字符串比较大小写敏感——小写/三位码
+      静默空结果，前置拦截）
+    """
+    if "year" in parsed:
+        parts = parsed["year"].split("-")
+        if not 1 <= len(parts) <= 2 or not all(p.isdigit() and len(p) == 4 for p in parts):
+            raise ValidationError(
+                message=f"google-patents year 形态非法（期望 YYYY 或 YYYY-YYYY）: {parsed['year'][:20]}",
+                context={"source_name": "google-patents", "field": "year", "value": parsed["year"][:20]},
+            )
+        if len(parts) == 2 and parts[0] > parts[1]:
+            raise ValidationError(
+                message=f"google-patents year 起止倒序（start <= end）: {parsed['year'][:20]}",
+                context={"source_name": "google-patents", "field": "year", "value": parsed["year"][:20]},
+            )
+    if "country" in parsed and not _COUNTRY_PATTERN.fullmatch(parsed["country"]):
+        raise ValidationError(
+            message=f"google-patents country 形态非法（期望两位大写字母国家码如 CN/US）: {parsed['country'][:10]}",
+            context={"source_name": "google-patents", "field": "country", "value": parsed["country"][:10]},
+        )
 
 
 class _GoogleTokenManager:
@@ -138,7 +196,21 @@ class _GoogleTokenManager:
                 ),
                 context={"source_name": "google-patents", "field": "credentials_path"},
             )
-        sa = json.loads(Path(credentials_path).read_text(encoding="utf-8"))
+        try:
+            sa = json.loads(Path(credentials_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            # OSError=文件不可读；ValueError 覆盖 JSONDecodeError（非法 JSON）与
+            # UnicodeDecodeError（非 UTF-8 编码）——凭据域故障统一映射 101（异常体系
+            # 契约：库异常禁裸逃逸）；message 不回显文件内容（仅文件名）
+            raise ConfigurationError(
+                message=f"google-patents 服务账号凭据文件不可读或非合法 JSON: {Path(credentials_path).name}",
+                context={"source_name": "google-patents", "field": "credentials_file"},
+            ) from exc
+        if not isinstance(sa, dict):
+            raise ConfigurationError(
+                message="google-patents 服务账号凭据 JSON 顶层须为对象（service account 形态）",
+                context={"source_name": "google-patents", "field": "credentials_json"},
+            )
         self._client_email = sa.get("client_email", "")
         self._private_key = sa.get("private_key", "")
         self._token_uri = sa.get("token_uri", "https://oauth2.googleapis.com/token")
@@ -180,18 +252,24 @@ class _GoogleTokenManager:
             "iat": int(now.timestamp()),
             "exp": int((now + timedelta(seconds=3600)).timestamp()),
         }
-        assertion = _sign_jwt_rs256(header, claims, self._private_key)
+        try:
+            assertion = _sign_jwt_rs256(header, claims, self._private_key)
+        except jwt.PyJWTError as exc:
+            # 私钥无效/已轮换（InvalidKeyError 等）——请求发出前的凭据域故障映射 101
+            raise ConfigurationError(
+                message="google-patents 服务账号私钥无效或已轮换（RS256 签名失败）",
+                context={"source_name": "google-patents", "field": "private_key"},
+            ) from exc
         data = await request_json_with_resilience(
             self._client,
             "POST",
             self._token_uri,
             source_name="google-patents",
             circuit_breaker=self._circuit_breaker,
-            # OAuth2 token 端点要求 form 编码（helper 的 params 走 query 不适用——
-            # 此处为令牌端点特例，json_body 会被端点拒；改用 params + 无 body 的
-            # POST form 由 httpx data 参数承载，helper 不支持 form——用 query 传
-            # grant_type 与 assertion（Google token 端点对 query 传参兼容））
-            params={"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": assertion},
+            # RFC 7523 §2.1：grant_type/assertion 以 application/x-www-form-urlencoded
+            # 置于请求体（assertion 为短时效签名凭证——禁入 URL query，代理/访问日志
+            # 泄露面；helper form_data 通道承载）
+            form_data={"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": assertion},
             max_attempts=self._retry_max_attempts,
             min_wait=self._retry_min_wait,
             max_wait=self._retry_max_wait,
@@ -205,7 +283,8 @@ class _GoogleTokenManager:
         if not isinstance(expires_in, (int, float)):
             expires_in = 3600
         self._token = str(data["access_token"])
-        self._expires_at = now + timedelta(seconds=float(expires_in))
+        # 过期时刻用请求后时钟（对齐 EPO——重试退避期间令牌实际有效期不被高估）
+        self._expires_at = self._now_fn() + timedelta(seconds=float(expires_in))
         return self._token
 
 
@@ -361,14 +440,7 @@ class GooglePatentsAdapter:
         await self._quota_guard.ensure_capacity()  # 412 前置拦截
         token = await self._token_manager.get_token()
         sql, query_params = self._build_sql(conditions)
-        body: dict[str, Any] = {
-            "query": sql,
-            "useLegacySql": False,
-            "parameterMode": "NAMED",
-            "queryParameters": query_params,
-            "maxResults": _QUERY_LIMIT,
-        }
-        data = await self._request_query(token, body)
+        data = await self._request_query(token, self._build_query_body(sql, query_params, max_results=_QUERY_LIMIT))
         await self._quota_guard.consume(self._extract_bytes_processed(data))
         patents = self._extract_patents(data)
         now = datetime.now(UTC)
@@ -386,8 +458,18 @@ class GooglePatentsAdapter:
     def _build_sql(conditions: dict[str, str]) -> tuple[str, list[dict[str, Any]]]:
         """构造参数化 SQL（列裁剪三列 + named parameters 防注入 + 强制 LIMIT）。
 
-        成本控制（BigQuery 按扫描字节计费）：SELECT 仅三列（不 SELECT *）；WHERE
-        至少一项条件由管道串前置校验保证；LIMIT 强制 25。
+        成本控制（BigQuery 按扫描字节计费）：SELECT 仅三列（不 SELECT *，输出字段名
+        与 required_fields 声明面契约一致——UNNEST 仅用于 WHERE 谓词，不改 SELECT
+        输出）；WHERE 至少一项条件由管道串前置校验保证；LIMIT 强制 25。
+
+        schema 事实（Q1-F1 修复）：
+        - assignee 为 REPEATED（ARRAY<STRING>）——EXISTS+UNNEST 逐元素 LIKE
+          （对齐 cpc/keyword 既有形态），标量 LIKE 无函数签名必 400
+        - filing_date 为 INTEGER（YYYYMMDD）——整数闭区间边界（Python 侧算好传入，
+          含首末日），DATE() 函数比较类型不匹配必 400
+        - country 经 STARTS_WITH(publication_number, @country_code) 字面前缀匹配
+          （publication_number 形如 "CN-1234567-A"，前两位即国家码）——参数值不带
+          LIKE 通配符 %（STARTS_WITH 无通配符语义，带 % 恒空结果）
         """
         where_parts: list[str] = []
         params: list[dict[str, Any]] = []
@@ -397,31 +479,58 @@ class GooglePatentsAdapter:
             params.append({"name": name, "parameterType": {"type": "STRING"}, "parameterValue": {"value": value}})
 
         if "assignee" in conditions:
-            add_param("assignee", f"%{conditions['assignee']}%", "assignee LIKE @assignee")
+            add_param("assignee", f"%{_escape_like(conditions['assignee'])}%", _ASSIGNEE_PREDICATE)
         if "cpc" in conditions:
-            add_param("cpc", f"%{conditions['cpc']}%", "EXISTS(SELECT 1 FROM UNNEST(cpc) AS c WHERE c.code LIKE @cpc)")
+            add_param("cpc", f"%{_escape_like(conditions['cpc'])}%", _CPC_PREDICATE)
         if "country" in conditions:
-            add_param("country_code", f"{conditions['country']}%", "STARTS_WITH(publication_number, @country_code)")
+            add_param("country_code", conditions["country"], "STARTS_WITH(publication_number, @country_code)")
         if "year" in conditions:
-            # year=2020-2026 形态解析为闭区间（参数化为两 INT 边界——年份修剪扫描量）
+            # year=2020-2026 形态已在 parse 层校验（4 位数字/1-2 段/起止有序）
             parts = conditions["year"].split("-")
-            start_year = parts[0].strip()
-            end_year = parts[1].strip() if len(parts) > 1 else start_year
-            where_parts.append("filing_date BETWEEN DATE(@year_start, 1, 1) AND DATE(@year_end, 12, 31)")
-            params.append({"name": "year_start", "parameterType": {"type": "INT64"}, "parameterValue": {"value": start_year}})
-            params.append({"name": "year_end", "parameterType": {"type": "INT64"}, "parameterValue": {"value": end_year}})
-        if "keyword" in conditions:
-            add_param(
-                "keyword",
-                f"%{conditions['keyword']}%",
-                "EXISTS(SELECT 1 FROM UNNEST(abstract_localized) AS a WHERE a.text LIKE @keyword)",
+            start_year = int(parts[0])
+            end_year = int(parts[1]) if len(parts) > 1 else start_year
+            # filing_date 为 INTEGER（YYYYMMDD）——Python 侧算整数闭区间边界（含首末日）
+            where_parts.append("filing_date BETWEEN @year_start AND @year_end")
+            params.append(
+                {
+                    "name": "year_start",
+                    "parameterType": {"type": "INT64"},
+                    "parameterValue": {"value": str(start_year * 10000 + 101)},
+                }
             )
+            params.append(
+                {
+                    "name": "year_end",
+                    "parameterType": {"type": "INT64"},
+                    "parameterValue": {"value": str(end_year * 10000 + 1231)},
+                }
+            )
+        if "keyword" in conditions:
+            add_param("keyword", f"%{_escape_like(conditions['keyword'])}%", _KEYWORD_PREDICATE)
 
         # SQL 模板为字面量常量（SELECT/ORDER 固定片段）+ WHERE 模板部件 join——
         # 值一律走 named parameters（不进 SQL 文本）；常量拼接形态（bandit B608 对
         # f-string SQL 启发式会误报参数化模板——常量拼接消除静态分析歧义）
         sql = _SQL_SELECT + " WHERE " + " AND ".join(where_parts) + " " + _SQL_ORDER
         return sql, params
+
+    def _build_query_body(self, sql: str, query_params: list[dict[str, Any]], *, max_results: int) -> dict[str, Any]:
+        """构造 jobs.query 请求体（fetch 与探活共用）。
+
+        两层超时约束（Q1-F5）：服务端 timeoutMs 从 config.timeout 派生（减去固定
+        提前量）——恒小于 httpx client 超时，保证服务端先截断（jobComplete=false
+        → 413 如实上报），杜绝 httpx 先超时触发 tenacity 对非幂等 jobs.query 的
+        重试（每次重试各提交新 job 各自计费扫描字节）。
+        """
+        timeout_ms = max(1000, int(self._config.timeout * 1000) - _QUERY_TIMEOUT_HEADROOM_MS)
+        return {
+            "query": sql,
+            "useLegacySql": False,
+            "parameterMode": "NAMED",
+            "queryParameters": query_params,
+            "maxResults": max_results,
+            "timeoutMs": timeout_ms,
+        }
 
     async def _request_query(self, token: str, body: dict[str, Any]) -> Any:
         """执行 jobs.query REST（401 判别重取一次——对齐 EPO 模式）。"""
@@ -480,10 +589,19 @@ class GooglePatentsAdapter:
             )
         if data.get("jobComplete") is not True:
             raise DataSourceResponseError(
-                message="google-patents 查询未完成（jobComplete != true——长时间查询需 jobs.get 轮询，本适配器仅支持同步查询）",
-                context={"source_name": "google-patents"},
+                message=(
+                    "google-patents 查询在 timeoutMs 服务端窗口内未完成（jobComplete != true）——"
+                    "建议缩小检索条件（追加 year/assignee 等过滤修剪扫描量）；"
+                    "jobs.getQueryResults 轮询支持见 Story Defer 登记（Q1 台账）"
+                ),
+                context={"source_name": "google-patents", "field": "jobComplete"},
             )
-        schema_fields = data.get("schema", {}).get("fields", [])
+        schema_fields = data.get("schema", {}).get("fields") if isinstance(data.get("schema"), dict) else None
+        if not isinstance(schema_fields, list) or not all(isinstance(f, dict) for f in schema_fields):
+            raise DataSourceResponseError(
+                message="google-patents 响应 schema.fields 缺失或形态异常",
+                context={"source_name": "google-patents", "field": "schema.fields"},
+            )
         names = [f.get("name", "") for f in schema_fields]
         if not names:
             raise DataSourceResponseError(
@@ -492,12 +610,39 @@ class GooglePatentsAdapter:
             )
         patents: list[dict[str, Any]] = []
         for row in data.get("rows", []) or []:
+            if not isinstance(row, dict):
+                raise DataSourceResponseError(
+                    message="google-patents 响应 rows 元素非对象形态",
+                    context={"source_name": "google-patents", "field": "rows"},
+                )
             values = row.get("f", [])
             item: dict[str, Any] = {}
             for name, cell in zip(names, values, strict=False):
-                item[name] = cell.get("v", "")
+                if not isinstance(cell, dict):
+                    raise DataSourceResponseError(
+                        message=f"google-patents 响应 rows.f 单元格非对象形态（字段 {name}）",
+                        context={"source_name": "google-patents", "field": name},
+                    )
+                item[name] = GooglePatentsAdapter._normalize_cell_value(name, cell.get("v"))
             patents.append(item)
         return patents
+
+    @staticmethod
+    def _normalize_cell_value(name: str, v: Any) -> Any:
+        """cell 值归一（真实 REST 形态 → 声明面契约形态）。
+
+        BigQuery REST v2 TableRow 编码（Q1-F1 对齐）：
+        - REPEATED 列（assignee 为 ARRAY<STRING>）：v 是 [{"v": 元素}, ...] 列表——
+          逐元素解包 join 为分号分隔字符串（声明面 assignee 为字符串形态）
+        - filing_date（INTEGER YYYYMMDD）：8 位纯数字归一 ISO（与 EPO 契约形态一致）
+        - NULL cell（v 为 None——键存在值 null，dict.get 缺省不生效）：归一空串
+        """
+        if isinstance(v, list):
+            parts = [str(el.get("v", "")) if isinstance(el, dict) else str(el) for el in v]
+            return "；".join(parts)
+        if name == "filing_date" and isinstance(v, str) and len(v) == 8 and v.isdigit():
+            return f"{v[:4]}-{v[4:6]}-{v[6:]}"
+        return "" if v is None else v
 
     @staticmethod
     def _latest_filing_date(patents: list[dict[str, Any]]) -> datetime | None:
@@ -517,29 +662,28 @@ class GooglePatentsAdapter:
         return latest
 
     async def health_check(self) -> bool:
-        """探活（最小条件查询，单次尝试——LIMIT 1 控制扫描成本）。"""
+        """探活（最小条件查询，单次尝试——LIMIT 1 控制扫描成本）。
+
+        探活查询是真实计费消耗（BigQuery 按 totalBytesProcessed 计）——扫描字节
+        同样计入月配额守卫（对齐 EPO 探活入账语义，R1-F12/Q1-F2：防配额旁路）。
+        """
         try:
             await self._quota_guard.ensure_capacity()
             token = await self._token_manager.get_token()
             sql, params = self._build_sql({"assignee": "probe-health-check-zz"})
-            await request_json_with_resilience(
+            data = await request_json_with_resilience(
                 self._client,
                 "POST",
                 self._query_url,
                 source_name="google-patents",
                 circuit_breaker=self._circuit_breaker,
-                json_body={
-                    "query": sql.replace(f"LIMIT {_QUERY_LIMIT}", "LIMIT 1"),
-                    "useLegacySql": False,
-                    "parameterMode": "NAMED",
-                    "queryParameters": params,
-                    "maxResults": 1,
-                },
+                json_body=self._build_query_body(sql.replace(f"LIMIT {_QUERY_LIMIT}", "LIMIT 1"), params, max_results=1),
                 headers={"Authorization": f"Bearer {token}"},
                 max_attempts=1,
                 min_wait=self._retry_min_wait,
                 max_wait=self._retry_max_wait,
             )
+            await self._quota_guard.consume(self._extract_bytes_processed(data))
             return True
         except Exception as e:  # 探活失败不抛——健康检查语义
             logger.warning("GooglePatentsAdapter 探活失败: %s", type(e).__name__)

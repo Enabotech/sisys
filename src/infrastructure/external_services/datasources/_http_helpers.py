@@ -157,6 +157,7 @@ async def request_json_with_resilience(
     circuit_breaker: CircuitBreaker,
     params: dict[str, Any] | None = None,
     json_body: dict[str, Any] | None = None,
+    form_data: dict[str, str] | None = None,
     headers: dict[str, str] | None = None,
     max_attempts: int = 3,
     min_wait: float = 1.0,
@@ -171,8 +172,11 @@ async def request_json_with_resilience(
         url: 请求路径或完整 URL（相对路径走 client.base_url）
         source_name: 数据源名称（异常 context，禁止含敏感信息）
         circuit_breaker: 熔断器实例
-        params: URL 查询参数（禁止放入 API Key——Key 走 headers/json_body）
-        json_body: POST JSON 请求体
+        params: URL 查询参数（禁止放入 API Key——Key 走 headers/json_body/form_data）
+        json_body: POST JSON 请求体（与 form_data 互斥——二者仅传其一；同传时 httpx
+            data 优先、json_body 被静默忽略，调用方须自查）
+        form_data: POST form 请求体（application/x-www-form-urlencoded——OAuth2 token
+            端点 RFC 7523 形态，assertion 等短时效凭证禁入 URL query 走此通道）
         headers: 请求头（API Key 应走此处，避免 URL 泄露）
         max_attempts: 最大重试次数（含首次，默认 3）
         min_wait: 最小退避秒数
@@ -214,7 +218,7 @@ async def request_json_with_resilience(
                 # sec-edgar 滑动窗限速经此下沉，防 tenacity 重试绕过 8 rps 上限）
                 if pre_request is not None:
                     await pre_request()
-                resp = await client.request(method, url, params=params, json=json_body, headers=headers)
+                resp = await client.request(method, url, params=params, json=json_body, data=form_data, headers=headers)
                 # 429/4xx 在此显式转换（tenacity 白名单不含 → 不重试）
                 if resp.status_code == 429:
                     raise DataSourceRateLimitError(

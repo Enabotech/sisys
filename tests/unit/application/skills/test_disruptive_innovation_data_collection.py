@@ -1,7 +1,7 @@
 """Story 4.1c Task 7: disruptive-innovation Skill 成熟化单元测试
 
 TDD 循环覆盖（AC-1 / AC-3）：
-- [A] frontmatter 声明契约：data_sources 全字段 == SSOT 2 源集合（uspto/tavily，双源交叉验证 D4）+ IO Schema 契约
+- [A] frontmatter 声明契约：data_sources 全字段 == SSOT 4 源集合（专利三库 + 市场单源）+ IO Schema 契约
 - [B] SOP 成熟化：必备章节 / input_examples 非 placeholder / ≤500 行 / references+templates
 - [C] 跨循环一致性：SOP body $DATA_SOURCE 标记集合 == frontmatter 声明集合（双向）
 

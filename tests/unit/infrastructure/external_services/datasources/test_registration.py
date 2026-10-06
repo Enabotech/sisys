@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import glob
 import json
 from pathlib import Path
 
@@ -21,8 +22,6 @@ from src.infrastructure.external_services.datasources.registration import (
     httpx_owned_port_names,
     is_gate_open,
 )
-
-_ALL_KEYS = tuple({key for r in DATA_SOURCE_REGISTRY for key in r.env_gate_keys})
 
 
 def _env(values: dict[str, str]):
@@ -47,6 +46,23 @@ class TestRegistryIntegrity:
             "comtrade",
             "google-patents",
         }
+
+    def test_every_adapter_module_file_is_registered(self) -> None:
+        """目录 → 注册表方向防线（Q1-F6——R-REG「漏注册静默」宣称的真闭合）。
+
+        新适配器文件落盘但忘记在 DATA_SOURCE_REGISTRY 加条目时，既有测试全静默
+        （三常量与契约表均派生自注册表——注册表里没有的源它们看不见）；本测试
+        扫描 datasources 目录全部 *_adapter.py，文件 stem 集合必须是注册表
+        impl_module 名集合的子集（漏登记即红）。
+        """
+        import src.infrastructure.external_services.datasources.registration as registration_module
+
+        datasources_dir = Path(registration_module.__file__).resolve().parent
+        adapter_stems = {Path(p).stem for p in glob.glob(str(datasources_dir / "*_adapter.py"))}
+        registered_modules = {r.impl_module.rsplit(".", 1)[-1] for r in DATA_SOURCE_REGISTRY}
+        assert adapter_stems <= registered_modules, (
+            f"存在未登记注册表的适配器文件（新源接入须同步 DATA_SOURCE_REGISTRY）: {sorted(adapter_stems - registered_modules)}"
+        )
 
     def test_fields_nonempty_and_unique(self) -> None:
         port_names = [r.port_name for r in DATA_SOURCE_REGISTRY]

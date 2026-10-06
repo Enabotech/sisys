@@ -3,7 +3,7 @@ slug: disruptive-innovation
 name: 破坏性创新模型
 version: 1.0.0
 tool_name: 破坏性创新模型
-description: Christensen 破坏性创新（低端/新市场颠覆），基于专利双库（USPTO+EPO）与 Web 情报跨域交叉验证颠覆信号
+description: Christensen 破坏性创新（低端/新市场颠覆），基于专利三库（USPTO+Google Patents+EPO）与 Web 情报跨域交叉验证颠覆信号
 when_to_use:
   - 颠覆风险评估
   - 新兴市场识别
@@ -92,7 +92,7 @@ output_schema:
             description: 信号强度（0-1）
           sources:
             type: array
-            description: 数据来源（专利双库 + 市场单源跨域交叉验证）
+            description: 数据来源（专利三库 + 市场单源跨域交叉验证）
             items:
               type: string
     technology_maturity:
@@ -113,7 +113,7 @@ output_schema:
 
 > Christensen 破坏性创新评估工作坊操作手册（低端颠覆 / 新市场颠覆双路径）。
 > 数据采集经 `$DATA_SOURCE` 标记由宿主机侧 DataSourceResolver 完成（沙箱无网络不变量），
-> 本 SOP 引导 LLM 生成正确的采集代码并基于专利双库 + 市场单源跨域交叉验证的真实数据完成颠覆信号识别
+> 本 SOP 引导 LLM 生成正确的采集代码并基于专利三库 + 市场单源跨域交叉验证的真实数据完成颠覆信号识别
 > 与技术成熟度评估。
 
 ## 1. 适用场景
@@ -163,7 +163,7 @@ Think 阶段必须先输出**颠覆信号 → 数据源**映射计划，再生�
 ## 6. SOP 执行步骤
 
 1. **解析输入**：校验 `technology_domain` 必填字段
-2. **Think**：输出颠覆信号假设与数据源映射（§5），明确专利双库 + 市场单源跨域互证计划
+2. **Think**：输出颠覆信号假设与数据源映射（§5），明确专利三库 + 市场单源跨域互证计划
 3. **Code**：生成含 `$DATA_SOURCE` 标记的采集代码。**标记使用规范**：
    - 语法：`$DATA_SOURCE("<name>", "<query>")`，name 仅限 frontmatter `data_sources` 白名单
    - 每个声明源至少一个标记；**query 必须为该源的规范格式**（R3-P1-2 契约对齐）：
@@ -204,10 +204,10 @@ epo_payload = (DATA_SOURCES.get("epo-ops") or {}).get("payload")
 | 异常 | 语义 | LLM 应对话术 |
 |------|------|-------------|
 | 411 数据源不可用 | 5xx/连接失败/熔断 | 「数据源 X 暂不可用，颠覆信号仅单域支撑，强度评级封顶 0.5 并显式标注」 |
-| 411 未注册（Key 缺失） | tavily/uspto/epo-ops 未配置 API Key/凭据，冷启动未注册（uspto 自 R3 起条件注册；epo-ops 双凭据门——Key/Secret 任一缺失即不注册） | 「数据源 X 因 API Key 未配置未注册（tavily 缺失→市场域缺失；uspto/epo-ops 均缺失→专利域缺失，单库缺失→专利域降为单口径），**输出中显式标注数据缺口**：跨域互证前提不成立——strength 按单域封顶 0.5 输出、sources 仅登记实际可用源（禁止登记未采集来源）、technology_maturity 锚点判定标注『单域证据基础』」 |
-| 412 限流 | 429 配额耗尽 | 「数据源 X 触发限流，使用缓存快照（freshness_score 已折算）并标注数据时效」 |
+| 411 未注册（Key 缺失） | tavily/uspto/epo-ops/google-patents 未配置 API Key/凭据，冷启动未注册（uspto 自 R3 起条件注册；epo-ops 双凭据门——Key/Secret 任一缺失即不注册（休眠保留，key 到位自动激活）；google-patents GCP 双门——凭据文件 + 项目 ID 任一缺失即不注册） | 「数据源 X 因 API Key 未配置未注册（tavily 缺失→市场域缺失；专利三库均缺失→专利域缺失，单库缺失→专利域降为双库口径，双库缺失→降为单口径），**输出中显式标注数据缺口**：跨域互证前提不成立——strength 按单域封顶 0.5 输出、sources 仅登记实际可用源（禁止登记未采集来源）、technology_maturity 锚点判定标注『单域证据基础』」 |
+| 412 限流 | 429 配额耗尽 / epo-ops 周配额（4GB/周）前置拦截 / google-patents 月配额（1TiB 扫描字节/月）前置拦截 | 「数据源 X 触发限流或配额耗尽，使用缓存快照（freshness_score 已折算）并标注数据时效；专利库配额耗尽时专利域回落其余可用库并标注『缺失库口径』」 |
 | 413 解析失败 | 响应格式异常（不可重试） | 「数据源 X 响应解析失败，跳过该源并在 sources 字段中剔除，禁止编造观测值」 |
-| 207 白名单违规 | 标记引用未声明数据源 | 不发生（本 SOP 标记严格使用白名单内 3 源）；若出现说明代码生成偏离 SOP，重新按 §6 生成 |
+| 207 白名单违规 | 标记引用未声明数据源 | 不发生（本 SOP 标记严格使用白名单内 4 源）；若出现说明代码生成偏离 SOP，重新按 §6 生成 |
 
 **降级总原则**：单域降级（仅专利域或仅市场域支撑）时所有信号强度评级封顶 0.5（不满足跨域互证前提）；
 所有降级必须在输出 `data_sources` 溯源元数据与信号 `sources` 字段中如实反映。
@@ -226,7 +226,7 @@ epo_payload = (DATA_SOURCES.get("epo-ops") or {}).get("payload")
 
 ## 9. References 指引
 
-- `references/triangulation.md` — 跨域交叉验证规范（专利双库 ↔ 市场情报互证流程）
+- `references/triangulation.md` — 跨域交叉验证规范（专利三库 ↔ 市场情报互证流程）
 - `references/scoring_anchors.md` — 技术成熟度锚点 + 颠覆信号强度分级
 - `references/workshop_guide.md` — 颠覆性创新评估工作坊 + 专家访谈提纲
 - `templates/technology_assessment_matrix.md` — 技术评估矩阵模板

@@ -253,7 +253,6 @@ patents_tesla = $DATA_SOURCE("uspto#2", "Tesla battery")
 # google-patents BigQuery 公共数据集（管道串——CN 全景 99.96%，与 uspto 双库口径互补）
 gp_byd = $DATA_SOURCE("google-patents", "assignee=比亚迪|keyword=battery")
 # epo-ops 申请人结构化检索（CQL——pa= 支持中文企业名直接归因，与 uspto 双库口径互证）
-gp_byd = $DATA_SOURCE("google-patents", "assignee=比亚迪|keyword=battery")  # BigQuery 管道串（全球含 CN）
 epo_byd = $DATA_SOURCE("epo-ops", 'pa="比亚迪" and ti="battery"')
 epo_tesla = $DATA_SOURCE("epo-ops#2", 'pa="Tesla" and ti="battery"')
 # sec-edgar 美股上市竞品法定披露（检索模式取 10-K；XBRL 模式取营收时序）
@@ -267,7 +266,6 @@ cn_stats = $DATA_SOURCE("china-nbs", "sj/zxfb")           # 国家局数据发�
 # 采集后通过注入的 DATA_SOURCES dict 读取（键含 #2 后缀形态）
 uspto_payload = (DATA_SOURCES.get("uspto") or {}).get("payload")
 gp_payload = (DATA_SOURCES.get("google-patents") or {}).get("payload")
-gp_payload = (DATA_SOURCES.get("google-patents") or {}).get("payload")
 epo_payload = (DATA_SOURCES.get("epo-ops") or {}).get("payload")
 ```
 
@@ -276,10 +274,10 @@ epo_payload = (DATA_SOURCES.get("epo-ops") or {}).get("payload")
 | 异常 | 语义 | LLM 应对话术 |
 |------|------|-------------|
 | 411 数据源不可用 | 5xx/连接失败/熔断 | 「数据源 X 暂不可用，本次对标基于其余 N-1 个来源完成，该维度结论置信度下调并标注」 |
-| 411 未注册（Key 缺失） | newsapi/tavily/uspto/epo-ops 未配置 API Key/凭据，冷启动未注册（uspto 自 R3 起条件注册；epo-ops 双凭据门——Consumer Key/Secret 任一缺失即不注册；sec-edgar 免 key 恒注册） | 「数据源 X 因 API Key/凭据未配置未注册，相应维度基于其余来源完成，**输出中显式标注数据缺口**：竞品舆情/Web 情报/专利维度缺失实时印证（patent_signals 输出空数组承载缺口——schema 必填指键存在，空数组合法；禁止编造专利信号）」 |
-| 412 限流 | 429 配额耗尽 / epo-ops 周配额（4GB/周）前置拦截 | 「数据源 X 触发限流或配额耗尽，使用缓存快照（freshness_score 已折算）并标注数据时效；epo-ops 配额耗尽时专利维度回落 uspto 单源口径并标注「EPO 口径缺失」」 |
+| 411 未注册（Key 缺失） | newsapi/tavily/uspto/epo-ops/google-patents 未配置 API Key/凭据，冷启动未注册（uspto 自 R3 起条件注册；epo-ops 双凭据门——Consumer Key/Secret 任一缺失即不注册（休眠保留，key 到位自动激活）；google-patents GCP 双门——GOOGLE_APPLICATION_CREDENTIALS 凭据文件 + GOOGLE_PATENTS_PROJECT_ID 任一缺失即不注册；sec-edgar/china-nbs 免 key 恒注册） | 「数据源 X 因 API Key/凭据未配置未注册，相应维度基于其余来源完成，**输出中显式标注数据缺口**：竞品舆情/Web 情报/专利维度缺失实时印证（patent_signals 输出空数组承载缺口——schema 必填指键存在，空数组合法；禁止编造专利信号）」 |
+| 412 限流 | 429 配额耗尽 / epo-ops 周配额（4GB/周）前置拦截 / google-patents 月配额（1TiB 扫描字节/月）前置拦截 | 「数据源 X 触发限流或配额耗尽，使用缓存快照（freshness_score 已折算）并标注数据时效；专利库配额耗尽时专利维度回落其余可用库（uspto/google-patents/epo-ops 三库中剩余者）并标注「缺失库口径」」 |
 | 413 解析失败 | 响应格式异常（不可重试） | 「数据源 X 响应解析失败，跳过该源并在 sources 字段中剔除，禁止编造观测值」 |
-| 207 白名单违规 | 标记引用未声明数据源 | 不发生（本 SOP 标记严格使用白名单内 6 源）；若出现说明代码生成偏离 SOP，重新按 §6 生成 |
+| 207 白名单违规 | 标记引用未声明数据源 | 不发生（本 SOP 标记严格使用白名单内 7 源）；若出现说明代码生成偏离 SOP，重新按 §6 生成 |
 
 **降级总原则**：部分失败不中断对标；所有降级必须在输出 `data_sources` 溯源元数据与
 竞品 `sources` 字段中如实反映，禁止以估计值冒充采集值。

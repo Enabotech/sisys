@@ -112,7 +112,7 @@ output_schema:
 > Barney VRIO：对内部资源/能力逐项做 价值性 V / 稀缺性 R / 可模仿性 I / 组织利用 O 四维判定，
 > 经判定链输出 竞争劣势 / 竞争均势 / 暂时竞争优势 / 未实现潜在优势 / 持续竞争优势 五类分类。
 > 混合数据型工具：内部数据（内部审计 + 高管访谈的资源清单与判定）是分析主体，外部数据源
-> （USPTO/EPO OPS/Tavily）仅提供行业专利密度与能力情报的外部印证基准。
+> （USPTO/Google Patents/EPO OPS/Tavily）仅提供行业专利密度与能力情报的外部印证基准。
 
 ## 1. 适用场景
 - 资源能力评估（SP 前内部能力盘点）
@@ -151,7 +151,7 @@ output_schema:
 内部审计定 V/O 两维（价值判断与组织利用），高管访谈校准组织利用裁定，会后将模板字段构造为
 `ToolCall.arguments` 的 `resources` 传入（逐资源 name + vrio_scores 四维判定）。
 
-**外部基准（印证参照，专利双库 + 市场单源）：**
+**外部基准（印证参照，专利三库 + 市场单源）：**
 
 | 外部印证目标 | 数据源 | 采集 query 规范 |
 | --- | --- | --- |
@@ -204,8 +204,8 @@ intel_payload = (DATA_SOURCES.get("tavily") or {}).get("payload")
 | 异常场景 | 编码 | 处置 |
 | --- | --- | --- |
 | 数据源不可用（5xx/连接失败） | 411 | 部分失败收敛：基于内部数据 + 其余源继续分析，输出标注数据缺口 |
-| 数据源未注册（Tavily API Key 缺失 `TAVILY_API_KEY` / uspto Key 缺失 `USPTO_API_KEY` / epo-ops 双凭据门任一缺失 `EPO_OPS_CONSUMER_KEY`+`EPO_OPS_CONSUMER_SECRET`） | 411 | **Key 敏感降级**：VRIO 内部审计数据是分析主体——基于内部审计 + 高管访谈完成 V/O 判定与全判定链分类，R/I 两维标注「未经行业基准印证的数据缺口」（专利双库部分缺失时回落单库/内部口径并标注），建议配置 Key 后重跑 |
-| 数据源限流（429） | 412 | 等待退避重试；重试耗尽按 411 降级话术处理 |
+| 数据源未注册（Tavily API Key 缺失 `TAVILY_API_KEY` / uspto Key 缺失 `USPTO_API_KEY` / epo-ops 双凭据门任一缺失 `EPO_OPS_CONSUMER_KEY`+`EPO_OPS_CONSUMER_SECRET`（休眠保留，key 到位自动激活）/ google-patents GCP 双门任一缺失 `GOOGLE_APPLICATION_CREDENTIALS`+`GOOGLE_PATENTS_PROJECT_ID`） | 411 | **Key 敏感降级**：VRIO 内部审计数据是分析主体——基于内部审计 + 高管访谈完成 V/O 判定与全判定链分类，R/I 两维标注「未经行业基准印证的数据缺口」（专利三库部分缺失时回落其余可用库/内部口径并标注），建议配置 Key 后重跑 |
+| 数据源限流（429 / epo-ops 周配额 4GB 前置拦截 / google-patents 月配额 1TiB 扫描字节前置拦截） | 412 | 等待退避重试；重试耗尽按 411 降级话术处理 |
 | 响应解析失败 | 413 | 不可重试：丢弃该源数据，按数据缺口降级 |
 | 标记源不在白名单 | 207 | 立即失败（策略违规），修正代码标记 |
 | 内部数据不足（资源清单缺失/vrio_scores 四维不全） | — | 状态置 `INSUFFICIENT_DATA`，引导补办内部审计采集（模板缺口登记区记录） |

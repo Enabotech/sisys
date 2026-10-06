@@ -886,7 +886,7 @@ tests/
 | **触发背景** | EPO OPS Consumer Key 个人申请受阻（确认邮件延迟/审核不确定） | owner 实际申请反馈（2026-10-02）；预筛「申请周期快」前提现实受阻 |
 | **载体调整** | **google-patents（BigQuery 公共专利数据集）提前纳入本 Story 作为专利域活跃第二源**（原排 4.1g 首项） | 预筛裁定第二优先（CN 覆盖 99.96% SSRN 实证 + assignee 精确聚合 + 1TiB/月免费）；owner 选型确认 |
 | **源组合策略** | **并存 4 源**：uspto + google-patents（活跃）+ epo-ops（**休眠保留**——key 到位自动激活，声明即生效零代码改动）+ tavily | owner 拍板：零回滚（D8 重开留痕/双库方法论/断言联动全保留）；epo-ops 条件注册双门缺失时自动降级不注册（既有设计） |
-| **技术路线** | **REST 直连（httpx）而非 google-cloud-bigquery SDK** | cryptography + pyjwt 已在依赖树（python-jose 附带）→ **零新第三方依赖**；复用 `_http_helpers.request_json_with_resilience` 全链（熔断/重试/异常映射——硬约束「完整复用 helper」天然满足）；MockTransport 测试模式与 11 适配器同款 |
+| **技术路线** | **REST 直连（httpx）而非 google-cloud-bigquery SDK** | cryptography + pyjwt 已在依赖树（python-jose 附带——Q1 勘误：实锚 redis 5.x 硬依赖链，显式声明 pyproject 留 Q1 台账）→ **零新第三方依赖**；复用 `_http_helpers.request_json_with_resilience` 全链（熔断/重试/异常映射——硬约束「完整复用 helper」天然满足）；MockTransport 测试模式与 11 适配器同款 |
 | **预筛勘误** | BigQuery 行「Sandbox 免信用卡」**证伪**：Sandbox 模式无 API 编程访问（仅 Web 控制台）——程序化访问需绑定 Billing 的 GCP 项目（免费层内 $0 消费 + budget alert 防护） | BigQuery 官方文档实测（docs.cloud.google.com/bigquery/docs/sandbox：API programmatic access unavailable in sandbox）；门槛形态 = 信用卡绑定（确定性流程）vs EPO 审核（不确定性） |
 | **依赖批准** | 零新第三方依赖（pyjwt/cryptography 既有）——owner 经「纳入 4.1f 开发」指令批准 BigQuery 路线 | 本表即批准留痕 |
 | **R7 锚点升级** | EPO key 外部前置从「申请周期」升级为「申请通道受阻」——AC-2 集成面持续 skip 属预期态；epo-ops 休眠运行（三 Skill §7 降级话术生效：专利域 google-patents+uspto 双活跃口径） | 本表 |
@@ -1169,6 +1169,29 @@ tests/
 
 **收益**：纪律合规（零 DELETE）；竞态根源消除（事务外数据不可见，断言基线天然成立）；测试口径升级（测生产实现而非等价替身）；可复用资产（conftest 三 fixture + 探针文件为后续 integration 测试规范化范本）。
 
+#### 第二轮代码审查周期 Round 1（2026-10-06——Task 9 + R-REG 增量面）
+
+> **范围声明**：第一轮周期（R1~R5）已收敛 Task 0-8 面；本周期聚焦收敛后新增量——Task 9 google-patents（a7e3d186）+ R-REG 注册表重构（0c980711）。编号 `Q<n>-F<m>`（Q = 第二周期 Round，与第一轮 R<n>-F<m> 命名空间区分）。
+> **方法**：四视角并行调研（A 适配器正确性 / B R-REG 架构一致性 / C 测试判别力 / D 内容资产联动）+ 主会话定谳（关键 P0/P1 证据实地复核）+ 双评审员方案评审（技术正确性 S-1~S-12 / 完备性 T-1~T-9——均「良好·修订全数吸收后落码」）。
+
+**C1 调研汇总**：B 视角 R-REG 等价性成立（12 适配器 × 注册/聚合/shutdown 三面逐项对照通过，无 P0/P1）；A/C/D 三视角发现本次主战场缺陷——**两条 P0 均为第一轮已定谳模式的完整复发**（探活配额不入账 R1-F12 / fixture 形态失真掩盖 R3-8），根因共同指向「范本已给出对应防御、新代码将其丢弃」。
+
+| # | 发现 | 严重度 | 处置 |
+|---|------|--------|------|
+| Q1-F1 | **google-patents SQL 三错配（schema 事实层）**：① country 条件 `STARTS_WITH(publication_number, "CN%")`——STARTS_WITH 为字面前缀语义无通配符，恒空结果（**静默错误数据**）；② `assignee LIKE @assignee` 施于 REPEATED（ARRAY<STRING>）列——标量 LIKE 无函数签名，真实端点必 400（且探活同用 assignee 条件→健康检查恒死）；③ `filing_date BETWEEN DATE(...)` 对 INTEGER(YYYYMMDD) 列做 DATE 比较——类型不匹配必 400。适配器五条检索路径三条不可用一条静默错数据，从未经真实端点验证，单测 fixture（标量 assignee/ISO 日期）编码错误 schema 假设掩盖全部（A-1/A-2/A-3/A-11 = C-2 交叉验证一致） | **P0** | ✅ UNNEST 逐元素匹配（对齐 cpc/keyword 既有形态，raw string ESCAPE 谓词三通道同步 + `_escape_like` 值侧转义成对）/ country 去前缀 % / year 整数闭区间边界（YYYYMMDD 算术）/ year+country 形态校验上移 parse 层 201（零请求消耗语义）/ 出口归一（REPEATED 逐元素 `el.get("v")` 解包 join、YYYYMMDD→ISO、NULL cell→空串）/ fixture 真实形态化 + SQL 形态断言（UNNEST/ESCAPE/无 DATE(/country 无 %/整数边界）+ LIKE 通配注入负例 |
+| Q1-F2 | **探活配额不入账**——health_check 执行真实计费查询但无 `consume`（EPO :378 已修，Google 版漏抄；BigQuery 按扫描字节真实计费，探活旁路 1TiB/月守卫 = 真实账单风险）（A-6 = C-1） | P1 | ✅ 探活成功后 consume（对齐 EPO）+ docstring 声明探活真实消耗 + 测试双断言（quota_used_bytes == totalBytesProcessed / 探活请求体 LIMIT 1——顺带防 `_SQL_ORDER` 改写致 replace 静默失效） |
+| Q1-F3 | **库异常裸逃逸异常体系**——凭据 JSON 畸形（JSONDecodeError）/ 非 UTF-8（UnicodeDecodeError）/ 私钥无效（jwt.InvalidKeyError）/ 文件不可读（OSError）/ rows.f 非对象（AttributeError）全部原样穿透，绕过 domain exceptions 体系与 ExceptionHandlers 自动映射（A-5 + A-15） | P1 | ✅ 凭据读取 catch `(OSError, ValueError)` + 顶层非 dict 校验 → 101；`_sign_jwt_rs256` 调用包 `jwt.PyJWTError` → 101；extract 三处形态防御 → 413；message 不回显凭据内容（仅文件名） |
+| Q1-F4 | **token 端点 query 传参违 RFC 7523**——grant_type/assertion 走 URL query（helper 无 form 通道绕行，注释自陈「Google 兼容」为无证据断言；assertion 短时效凭据入 URL 日志泄露面）（A-4） | P1 | ✅ helper 增 `form_data` 可选通道（对标 R2-F2 pre_request 下沉先例——19 处既有调用点零影响，互斥经 docstring 硬约束防非领域异常）/ google-patents 切 form body + 断言改 body 解析 + 「凭证不入 URL」负断言；EPO 维持 query（R7 锚点既有登记 + 假凭据 401 部分预验证信号，不无证据改动） |
+| Q1-F5 | **无 timeoutMs + jobComplete 误分类**——jobs.query 默认 10s 服务端超时，>10s 查询（大表常态）得 jobComplete=false 被抛 413「响应结构异常」（把慢报成结构错）（A-7） | P1 | ✅ timeoutMs 从 config.timeout 派生（减 2000ms 提前量——两层超时恒自洽，杜绝 httpx 先超时触发非幂等重试三重计费（评审员 S-3 定谳：固定 60000 与默认 30s 冲突是自败改动））+ 413 消息如实化（timeoutMs 窗口未完成 + 缩小条件建议）；jobs.getQueryResults 轮询登记 Defer（R7 实测后定） |
+| Q1-F6 | **测试判别力三缺**——熔断测试缺失（docstring 声称覆盖——R1-F10 复发且加重）/ 业务 401 重取零判别力（删 401 分支测试仍绿）/ R-REG「漏注册静默已解决」宣称无测试强制（新适配器文件忘记入注册表时全库零红）（C-3/C-4/C-5） | P1 | ✅ 熔断测试（EPO 范本 threshold=2）/ 401 双计数器（token==2 + business==2 + 结果返回）/ 注册表目录扫描防线（`*_adapter.py` stem 集 ⊆ 注册表 impl_module 集——漏登记即红） |
+| Q1-F7 | **内容资产联动大面积缺失（R1-F4/R1-F5 模式复发）**——断言绊线内全绿（3436 passed 的原因），绊线外散文层整体漏改：competitor SKILL.md 复制残渣两处（标记重复行 + 注释错挂 + gp_payload 重复行）/ §7 白名单计数残留「6 源」「3 源」/ 三 Skill §7 降级话术全体缺 google-patents（D-09「§7 话术生效」声称当时落空——本轮补齐后成立，登记勘误）/ disruptive「专利双库」散文簇五处（含 frontmatter description）/ yaml:385 逐字锁死行滞留双库且与 :349 头注自相矛盾 / vrio §5 头与表身矛盾 + 引言漏源 / vrio data_fusion.md 整文件未同步 / disruptive references 三文件五处（评审员 T-2 勘误：D 视角「两文件五处」计数失实）/ 两 workshop_guide 双库残留 + 旧 CNIPA 绝对化表述 / mixed feature 头注 + 集成 docstring 滞留 / architecture.md D4 行未按惯例补记 D-09 后继 / competitor+disruptive templates 专利证据栏双库/单源残留（Task 6 时代遗留债，随本轮清偿）（D-1~D-14 + T-1/T-2/T-7） | P1×8 + P2×5 | ✅ 全清单落码（yaml:385 ↔ SKILL.md:95 同提交逐字同步——IO 契约逐字锁断言风险闭合）；三测试模块 docstring 源数陈旧（T-7）一并同步 |
+
+**留项 Round 2+ 台账**：A-10 pyjwt 未显式声明 pyproject（归因勘误：评审员 2 实测锁定 redis 5.3.1 硬依赖 PyJWT>=2.9.0 非 python-jose 附带——被移除概率趋零 + test_registration 可导入防线 CI 兜底，紧迫性下调，Round 2 专项 `poetry add` + lock 重解验证）/ A-8 totalBytesProcessed deprecated 字段（R7 实测锚点——缺失时守卫静默归零的最坏失效模式）/ A-12 `GOOGLE_PATENTS_TOKEN_URL` 死旋钮 / B-3 架构测试镜像 is_gate_open（epo 半凭据态独立断言）/ B-4 file_gate 畸形条目防线 / B-5 factory_kind Literal 类型化 / B-7 KEYED_ADAPTER_PORT_NAMES 死常量 / B-8 removeprefix 前缀双写 / C-8 config repr 脱敏装饰性断言（改测 manager repr）/ C-14 timeout 单态 handler（判别力趋零已定谳）/ C-15 叙述计数 11→12（本文件与两测试 docstring）/ C-16 mkdtemp 泄漏三处 + 集成配额断言 / D-14 成对「双库」措辞（语义可辩护）/ A-16 大小写敏感语义文档化。
+
+**Round 1 回归证据**：google-patents 单测 40 passed（30→40：新增 year/country 校验负例、损坏 JSON/非 dict 顶层/无效私钥 101、通配转义、401 双计数、熔断、探活配额+LIMIT 1）；registration 22 passed（+1 目录扫描）；skills 契约面 376 passed；架构+集成断言 687 passed；datasources 全目录 278 passed（helper form_data 波及面零回归）；验收+契约 161 passed；ruff/mypy 全过；红线自查（ValueError/HTTPException/内置 Exception/noqa）变更文件零命中。
+
+**评审留痕**：双评审员均评「良好——修订吸收后落码」；主会话吸收全部 21 项修订（S-1 REPEATED 解包/S-2 ESCAPE raw string 形态/S-3 timeoutMs 派生关系/S-4 校验上移/S-5 catch 扩面/S-6 token 断言改 body/S-7 互斥 docstring/S-8 三模板同步/S-9 country 校验/S-10 γ 测试/S-11~S-12 与 T-1~T-9 全项）后定谳落码——两评审员对原方案诊断零否定、修订意见全数采纳无未决分歧。
+
 #### 需决策 Decision Needed
 
 - [ ] **无 P0/P1 级待决策项**（R1-F6/F7 改判依据已留痕；A-5 类变量 Lock 与 CLAUDE.md Gotcha 的冲突需 Round 2 专项裁定——改实例变量 or 保持类变量 + 测试侧约束）
@@ -1191,6 +1214,8 @@ tests/
 - [ ] **R7 补跑锚点扩充（R1-F6/F7 合并）**：①search 端点真实连通（rest-services 路径——F1 修复验证）；②token + search 双端点真实响应样本固化（F6 转换实现依据）+ **token 端点路径 404/200 显式核查与 grant_type 传输形态实测（query params vs form body——R2-F1）**；③令牌失效真实码型验证（401 vs 400 invalid_access_token——F7 判别条件修正依据）
   - **部分预验证已完成（2026-09-30 SKIPPED 根因分析时假凭据演练）**：`/3.2/auth/accesstoken` 端点真实存在（假凭据得 **HTTP 401** ≠ 404——R2-F1 路径修复正确性获真实端点背书；401 → ConfigurationError(101) 异常契约映射在真实端点成立）；带 Authorization 头可穿透 R1 期观测的匿名 403 Fair Use 拦截层（该拦截仅针对匿名请求）。待真 key 完成剩余：grant_type 传输形态 / search 响应样本 / 令牌失效码型
 - [ ] **.env 解除 git 跟踪（root + deploy/app/.env 双处）**——含 .gitignore 生效化 + `git rm --cached` + CI/部署拉取路径依赖面评估 + 历史泄漏轮换评估（R2-F9，基础设施 owner 决策）
+- [ ] **jobs.getQueryResults 轮询（google-patents 长查询）**——Q1-F5 最小修复（timeoutMs 派生 + 413 如实消息）后，超时窗口内未完成的查询仍会 413；轮询实现（jobReference → jobs.getQueryResults 有限重试）随 R7 真实端点实测后定（无真实凭据时写轮询属投机——实测前 timeoutMs 已给足窗口）
+- [ ] **pyjwt 显式声明 pyproject（Q1 台账 A-10）**——`poetry add pyjwt` + lock 重解验证（当前经 redis 5.x 硬依赖链锁定，被移除概率趋零 + 可导入防线 CI 兜底——紧迫性低于原判）
 
 ---
 
@@ -1204,10 +1229,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.7.0
+**故事版本/Story Version:** v1.7.1
 **创建日期/Created:** 2026-09-30
-**最后更新/Last Updated:** 2026-10-02
+**最后更新/Last Updated:** 2026-10-06
 **更新说明/Description:**
+- v1.7.1: **第二轮代码审查周期 Round 1**（Task 9 + R-REG 增量面——四视角并行调研 + 双评审员方案评审 + 21 项修订吸收后落码）：P0×1（Q1-F1 SQL schema 三错配——country 前缀恒空/assignee ARRAY LIKE 必 400/filing_date INT64 vs DATE 必 400，fixture 虚构掩盖）+ P1×6（探活配额不入账 R1-F12 复发/库异常裸逃逸/token query 传参违 RFC 7523/timeoutMs 缺失/测试判别力三缺/内容资产联动大面积缺失 R1-F4/R1-F5 复发——§7 话术/双库散文簇/yaml 双写/references/templates）；R-REG 等价性核验通过（无 P0/P1）；helper 增 form_data 通道；回归面 1543+ passed 全绿；留项台账 15 项登记 Round 2+
 - v1.7.0: **Task 9 D-09 范围扩展实施**：EPO OPS key 个人申请受阻 → google-patents（BigQuery 公共专利数据集，REST 直连零新依赖）提前纳入为专利域活跃第二源——并存 4 源（epo-ops 休眠保留）；适配器池 12 终态；三 Skill 专利域三库（competitor 7 源/disruptive 4 源/vrio 4 源）；注册链全触点（双门条件注册/元组表/契约表/架构三文件/探针）+ 集成实测两态（GCP 凭据动态 skip）；3436 passed 受影响面全绿；预筛勘误留痕（Sandbox 无 API 编程访问）
 - v1.6.0: **代码审查周期正式收敛**：Round 4 纯验证（七维度评级 A）+ Round 5 独立收敛终审（五节全过——周期闭合/10 项双向取证零失实/独立快扫零新 P0-P1/门禁实跑全绿）→ **收敛声明入档，Status review → done**；周期累计发现 33 项、修复 29 项、改判 2 项、维持留项 8 条、Defer 11 条
 - v1.5.2: **代码审查 Round 3**（深度评审——断言覆盖矩阵）：P0/P1 零；P2×2（EDGAR XBRL 路径消毒缺失（穿越实测）+ 双模式 CIK 形态断层（真实端点三态实测 404/200/404——SOP 回填链路断裂））+ P3×6；12 项契约 11 项已守护核验 + R3-4 补断言时抓出测试自身缺陷（单态 handler 令牌阶段 413 冒充检索阶段）；三适配器 216 passed（datasources 目录全量口径）

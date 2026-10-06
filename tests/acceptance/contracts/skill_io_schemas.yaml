@@ -382,7 +382,7 @@ skills:
                 description: 信号强度（0-1）
               sources:
                 type: array
-                description: 数据来源（专利双库 + 市场单源跨域交叉验证）
+                description: 数据来源（专利三库 + 市场单源跨域交叉验证）
                 items:
                   type: string
         technology_maturity:
