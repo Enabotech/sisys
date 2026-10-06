@@ -72,10 +72,12 @@ KEY_SENSITIVE_SOURCES = ("newsapi", "tavily")
 
 # SOP body 中 $DATA_SOURCE 标记提取正则（Task 9.3 跨循环一致性同款）
 DATA_SOURCE_MARKER_PATTERN = re.compile(r"\$DATA_SOURCE\(\s*[\"']([\w-]+)[\"']")
-# 完整标记对（name+query）形态——用于重复标记守护（Q3/R3Q-5）：name 捕获组不含
-# #2 后缀（正则天然归一），故重复检测须在完整标记对层面（复制残渣 = name 与
-# query 完全相同的重复行；合法同源多 query 经 name#2 键区分，不触发）
-_MARKER_PAIR_PATTERN = re.compile(r"\$DATA_SOURCE\(\s*[\"'][\w-]+[\"']\s*,\s*[\"'][^\"']*[\"']")
+# 完整标记对（name+query）形态——用于重复标记守护（Q3/R3Q-5 + Q5/R4Q-1）：name
+# 类含 # 号（覆盖 name#2/#3 键形态——键形态标记重复同属复制残渣；base 键重复
+# 亦匹配）；合法同源多 query 的键形态对（name 与 name#2）天然不同不触发。
+# 仅适用于本库（4-1c 侧 6 Skill）——4-1d 侧存在合法双章节标记展示形态，
+# 守护不适用（见 skill_mixed_data_contracts.assert_cross_consistency docstring）
+MARKER_PAIR_PATTERN = re.compile(r"\$DATA_SOURCE\(\s*[\"'][\w#-]+[\"']\s*,\s*[\"'][^\"']*[\"']")
 
 # SOP 必备章节关键字（AC-3）
 REQUIRED_SOP_SECTIONS: tuple[str, ...] = (
@@ -189,7 +191,7 @@ def assert_cross_consistency(slug: str, document: SkillDocument) -> None:
     # 重复标记守护（Q3/R3Q-5）：完全相同的标记对（name+query 同）是复制残渣
     # （集合语义 set(findall) 吸收重复不红——name 捕获组不含 #2 后缀故不能在
     # name 层面去重，须在完整标记对层面）
-    full_markers = _MARKER_PAIR_PATTERN.findall(document.body)
+    full_markers = MARKER_PAIR_PATTERN.findall(document.body)
     assert len(full_markers) == len(set(full_markers)), (
         f"{slug}: SOP body 存在完全重复的 $DATA_SOURCE 标记（复制残渣——同源多 query 应依次分配 name/name#2 键）"
     )

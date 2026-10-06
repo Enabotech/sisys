@@ -162,6 +162,17 @@ class TestGooglePatentsConfig:
         assert exc_info.value.code == "EXCEPTION_101"
         assert "3.0" in str(exc_info.value)
 
+    def test_timeout_below_floor_direct_construction_raises(self, credentials_file) -> None:
+        """直构造路径同守下限（Q5/R4Q-2——__post_init__ 单一来源，防校验回移
+        from_env 时直构造测试红）。"""
+        with pytest.raises(ConfigurationError) as exc_info:
+            GooglePatentsConfig(
+                credentials_path=str(credentials_file),
+                project_id="proj",
+                timeout=2.0,
+            )
+        assert exc_info.value.code == "EXCEPTION_101"
+
 
 class TestPipelineQueryParsing:
     def test_full_pipeline(self) -> None:

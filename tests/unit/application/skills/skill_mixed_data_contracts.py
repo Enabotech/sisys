@@ -399,7 +399,13 @@ def assert_sop_maturity(slug: str, document: SkillDocument) -> None:
 
 
 def assert_cross_consistency(slug: str, document: SkillDocument) -> None:
-    """跨循环一致性 [C]：SOP body $DATA_SOURCE 标记 name 集合 == frontmatter.data_sources name 集合（双向）"""
+    """跨循环一致性 [C]：SOP body $DATA_SOURCE 标记 name 集合 == frontmatter.data_sources name 集合（双向）
+
+    注：4-1c 库的重复标记守护（MARKER_PAIR_PATTERN）**不适用本库**——4-1d 侧至少
+    4 个 Skill（ge-mckinsey/kpi-tree/value-chain/space-matrix）存在合法双章节标记
+    展示形态（§6 采集示例 + 附录完整示例同款标记），跨章节重复非复制残渣（Q5/R4Q-1
+    突变验证发现并回退——内容结构惯例差异登记；4-1d 侧残渣防护由 review 层承载）。
+    """
     declared = {ref.name for ref in document.frontmatter.data_sources}
     markers = set(DATA_SOURCE_MARKER_PATTERN.findall(document.body))
     assert markers == declared, (
