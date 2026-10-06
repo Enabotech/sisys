@@ -1266,7 +1266,21 @@ tests/
 
 **Round 1 回归证据**：google-patents + registration 77 passed（含 3 新测试）/ 验收 AC 场景 18 passed / datasources + 架构 369 passed / ruff 全过 / mypy 623 文件零问题；突变实证 1 组（T1-F2 单侧漂移注入即红→还原零残留）；生产面红线自查（_http_helpers/registration/composition_root/__init__ 四变更文件）零命中——新增 raise ValidationError 属适配器三类自抛白名单（输入前置校验）。
 
+#### 第三轮代码审查周期 Round 2（2026-10-06——回归核查 + 全量验证，无代码改动轮）
+
+**C1 双视角**：①Round 1 修复 14 项双向取证（Story 记录 vs HEAD 代码现实）——**全部成立零失实**：T1-F1 同源推导/孤儿 import 清除/口径一致（registry 不含 resolver 端口）/docstring 如实表述/feature 锁步未动；T1-F2 双向等集断言 + 突变声明自洽；T1-F4 移位干净（12 构造恰数无残留）；T1-F6/F7/F8 三测试断言与生产谓词/派生式/import 链逐一吻合；T1-F8 全仓 23 调用点复扫**零同传零误伤**（form_data 仅 google-patents token 端点 1 处）；B-6 rglob 语义正确（`**` 含零层目录）；文档组 6 项全部落地（:3605 changelog 确认未动）。②主会话全量回归：unit 8120 passed + integration/acceptance/contracts 2746 passed / 3 failed / 3 skipped——3 failed 均为 SEC EDGAR 真实端点集成（**传输层 ConnectTimeout 外网不可达，预存环境问题非回归**：改动面与 sec_edgar_adapter.py 零交集 + 隔离复跑同败形态为连接超时 + 独立旁证 LiteLLM 对 github.com 同报 Connection reset——环境级外网故障）；3 skipped 为 EPO/GCP 凭据门控预期态（R7 锚点设计内）。
+
+**新破口 4 项均 P4 信息级（登记不落码）**：
+- R2T-1：architecture.md:3612（8.9.1 changelog 行）LF→CRLF 字节规约化未记录——该文件 CRLF 惯例下此行为唯一 LF 异常，提交顺带规约化（内容零变化方向良性），此处补记。
+- R2T-2：Round 1 证据「form_data 19 处既有调用点」计数失实——HEAD 实测 src/ 23 处（第二周期口径 19 为当时基线，Task 9 后 google-patents 4 处新增未跟上；实质结论零同传不受影响）。**本行即勘误**。
+- R2T-3：T1-F9 台账新写行号辅助「实位 :115-118」在同一提交内被 T1-F2 新测试（+17 行）下推至实位 :132——行号当轮自腐恰好实证 R4「行号天然易腐」注记；主引用为测试名（test_dual_key_conjunction_epo）持续有效，行号辅助废止不再追改。
+- R2T-4：T1-F1 同源化移除 AC-7.2 对 port_name 拼错的偶发检测力——R1 修订已如实降格为「接线验证」；残留检测网实测 8/12 端口全仓无 port_name 字面量探测器，但功能链（register→resolve_optional→source_name 键映射）使拼错内部自洽且下游近乎惰性——已披露取舍维持。
+
+**Round 2 无代码改动**（14 项修复全数验证通过 + 4 项 P4 台账登记——纯验证轮不强行造代码提交，4-1e/4-1f 先例同款）。
+
 #### 需决策 Decision Needed
+
+
 
 - [x] **无 P0/P1 级待决策项**（R1-F6/F7 改判依据已留痕；A-5 类变量 Lock 专项裁定已完成——第一周期 v1.5.1「文档澄清替代结构变更」留痕，终审 F-4 勾销陈旧表述）
 
@@ -1304,10 +1318,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.8.0
+**故事版本/Story Version:** v1.8.1
 **创建日期/Created:** 2026-09-30
 **最后更新/Last Updated:** 2026-10-06
 **更新说明/Description:**
+- v1.8.1: **第三轮代码审查周期 Round 2（回归核查 + 全量验证，无代码改动轮）**：Round 1 修复 14 项双向取证零失实（T1-F8 全仓 23 调用点复扫零误伤）；全量回归 unit 8120 + integration/acceptance 2746 passed（3 failed 为 EDGAR 真实端点外网不可达预存环境问题——排除法甄别）；新破口 4 项 P4 信息级台账登记（CRLF 规约化补记/19→23 计数勘误/行号自腐实证/检测力残留维持）
 - v1.8.0: **第三轮代码审查周期 Round 1（跨周期终局审查）**：四视角并行调研（跨周期交互面/架构一致性与 4-5 交叉甄别/测试判别力与台账/内容资产终局）全部「通过」——第一周期 29 项修复零破坏、R-REG 等价性与 form_data 19 处零影响实证、4-1f×4-5 双向零渗透、14 项契约守护 8/8 抽验成立、源数计数链 8 类触点全闭合；发现 P0×0/P1×0/P2×2 + P3×12，评审（良好——R1~R7 修订全吸收）后落码 14 项：AC-7.2 期望推导改注册表派生（镜像漂移根治）+ 注册面↔声明面 SSOT 交叉断言（突变实证判别力闭环）+ 互斥防线/别名前缀/第二数据点/uspto 移位等纵深与文档组；aclose 立规则-执行背离显式 defer 化；回归 77+18+369 passed 全绿
 - v1.7.4: **第二轮代码审查周期正式收敛**：Round 4 纯验证（七维度评级 A）+ Round 5 独立收敛终审（五节全过——周期闭合/双向取证 10/10 零失实/独立快扫零新 P0-P2/门禁实跑全绿/状态流转判定）→ **收敛声明入档，Status review → done**；R4Q 微修（键形态守护扩宽 + timeout 直构造负例）+ 4-1d 守护加回退闭环（四 Skill 合法双章节形态发现——突变验证驱动）+ 终审条件性建议清偿（F-1 注释失实/F-2 计数勘误/F-4 陈旧表述勾销）；周期累计发现 33 项 + 评审修订 21 项吸收，零 P0/P1/P2 残留
 - v1.7.3: **第二轮代码审查 Round 3**（断言覆盖矩阵 + 残余风险面——突变测试实证 3 轮）：14 项行为契约 14 项真断言守护收口（cpc/keyword/country 三通道谓词形态锁补齐——原 2 弱 1 半守护）；Round 2 feature 提交完整性缺陷补交（BDD 三联动位漏一）+ Q2-F10 台账勘误（9 站点）；timeout 下限上移 __post_init__ 单一来源；标记重复守护（完整标记对层面——突变实证 D-1 残渣红/16 Skill 零误伤）；评级 B→A
