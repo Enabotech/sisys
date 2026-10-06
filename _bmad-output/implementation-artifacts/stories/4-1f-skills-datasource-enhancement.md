@@ -1214,6 +1214,23 @@ tests/
 
 **Round 2 回归证据**：google-patents 49 passed（40→49）+ architecture/contracts 851 passed（含 file_gate 防线新用例）+ skills/datasources/集成 714 passed；ruff/mypy 全过；pyjwt 2.15.1 升级兼容性全量复验绿。
 
+#### 第二轮代码审查周期 Round 3（2026-10-06——断言覆盖矩阵 + 残余风险面）
+
+**C1 单深度视角**（14 项行为契约逐项「回归即红」守护核验——突变测试实证 3 轮 + Round 2 六面回归 + 残余风险扫描）。**C3 主会话快评**（评审员突变实证 + 机械修复方案支撑——R3Q-1/2 谓词形态锁/R3Q-4 校验上移/R3Q-5 重复守护均有实证定谳）。**评级 B → 清偿 R3Q-1/2/3 后 A**。
+
+| # | 发现 | 严重度 | 处置 |
+|---|------|--------|------|
+| Q3-F1 | **cpc/keyword 通道 SQL 谓词零守护零执行**——突变 `_CPC_PREDICATE/_KEYWORD_PREDICATE` 为标量 LIKE 去 ESCAPE 后 49 单测全绿（全仓无测试 fetch 含 cpc=/keyword= 的 query）；Q1-F1 同类错配（REPEATED 列标量 LIKE）可在 2/5 通道静默复发——「修 assignee 抄漏兄弟通道」三度重演模式（探活入账 EPO→Google 漏抄同款）。country 谓词形态同无文本断言（STARTS_WITH→LIKE 突变绿——LIKE 无通配符 = 精确匹配 = 静默空结果） | P1+P2 | ✅ 五通道谓词形态锁测试（五键全管道 query：UNNEST(cpc)/UNNEST(abstract_localized)/a.text LIKE/STARTS_WITH(publication_number 逐项在场断言 + `sql.count(" LIKE @") == sql.count("ESCAPE") == 3` 配对计数——任一谓词改标量 LIKE/去 ESCAPE/前缀改 LIKE 即红） |
+| Q3-F2 | **Round 2 提交完整性缺陷**——feature 文件「11 端口态」两行未随 py :1200 同步（BDD 三联动位漏一），HEAD 提交态 AC-7.2 场景绑定断裂（checkout 即红）；C-15 计数实为 9 站点非 8（Q2-F10 声明失实——验收全量回归在工作区修复后跑，与提交态不符） | P1 | ✅ feature :146/:149 同步（12 端口态/终态措辞）+ 本轮提交；Q2-F10 台账勘误（第 9 站点） |
+| Q3-F3 | timeout 3.0s 下限仅守 from_env——直构造 `GooglePatentsConfig(timeout=2.0)` 绕过（__post_init__ 只查双门），派生不变量破防（生产走 from_env 已护，纵深缺口） | P3 | ✅ 下限校验上移 `__post_init__`（from_env 重复分支删除——单一来源；两路径统一守护） |
+| Q3-F4 | 「标记无重复」无守护——`assert_cross_consistency` 用 set(findall)，Q1-F7 修过的 competitor 标记重复残渣回归不红；评审原建议 len==len(set) 经核**不可行**（name 捕获组不含 #2 后缀，合法同源多 query name/name#2 天然归一重复——误伤全员） | P3 | ✅ 完整标记对（name+query 双要素）层面去重守护 `_MARKER_PAIR_PATTERN`——**突变实证**：注入 D-1 真实残渣形态（标记行重复）立即红，16 Skill 合法 name#2 形态零误伤（426 passed） |
+| Q3-F5 | 适配器模块 docstring 检索式描述未提 assignee/cpc/keyword 空白值 201（Q2-F2 行为已实现文档滞后） | P4 | ✅ docstring 补句 |
+| Q3-F6 | 三库/双库散文措辞无绊线——data_fusion.md:18 与 SKILL.md:207 的「双库」经核为合法降级阶梯/回落语义（epo 门关时回落两库），非残留错误 | 登记 | 固有散文限制（yaml 内嵌串有逐字锁），无行动项 |
+
+**断言覆盖矩阵终态**：14 项契约 14 项真断言守护（Q3-F1 补齐 cpc/keyword/country 三通道后全覆盖——原 11 真 + 2 弱 + 1 半守护 → 14 真）；突变实证：blank 校验红×3、rows.f None 红、form→params 红、timeoutMs 9999 红、401 分支删除红、consume 删除红、D-1 残渣红（新增）。
+
+**Round 3 回归证据**：skills + google-patents 426 passed；ruff/mypy 全过；突变注入-还原闭环验证。
+
 #### 需决策 Decision Needed
 
 - [ ] **无 P0/P1 级待决策项**（R1-F6/F7 改判依据已留痕；A-5 类变量 Lock 与 CLAUDE.md Gotcha 的冲突需 Round 2 专项裁定——改实例变量 or 保持类变量 + 测试侧约束）
@@ -1251,10 +1268,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.7.2
+**故事版本/Story Version:** v1.7.3
 **创建日期/Created:** 2026-09-30
 **最后更新/Last Updated:** 2026-10-06
 **更新说明/Description:**
+- v1.7.3: **第二轮代码审查 Round 3**（断言覆盖矩阵 + 残余风险面——突变测试实证 3 轮）：14 项行为契约 14 项真断言守护收口（cpc/keyword/country 三通道谓词形态锁补齐——原 2 弱 1 半守护）；Round 2 feature 提交完整性缺陷补交（BDD 三联动位漏一）+ Q2-F10 台账勘误（9 站点）；timeout 下限上移 __post_init__ 单一来源；标记重复守护（完整标记对层面——突变实证 D-1 残渣红/16 Skill 零误伤）；评级 B→A
 - v1.7.2: **第二轮代码审查 Round 2**（回归核查 + 留项清偿双视角 + 单评审员快评 + 11 项修订吸收）：Round 1 七簇修复回归核查通过（零失实）；P2×2 修复范围内遗漏清偿（rows.f null 穿透 + 文本条件空值 LIKE '%%' 全表扫描）+ P3×3；留项台账清偿 8 组（pyjwt 显式声明/死旋钮删除/registration 加固 ConfigurationError+Literal/测试卫生组含 C-10 非法 JSON 顺带清偿/大小写敏感文档化/双库措辞对齐/totalBytesProcessed 双入口告警观测/mkdtemp 三处清理）+ C-14 销项；主会话全量回归 9795+ passed；留项 3 项（A-8 jobs.get/A-16 LOWER/B-3 镜像断言）
 - v1.7.1: **第二轮代码审查周期 Round 1**（Task 9 + R-REG 增量面——四视角并行调研 + 双评审员方案评审 + 21 项修订吸收后落码）：P0×1（Q1-F1 SQL schema 三错配——country 前缀恒空/assignee ARRAY LIKE 必 400/filing_date INT64 vs DATE 必 400，fixture 虚构掩盖）+ P1×6（探活配额不入账 R1-F12 复发/库异常裸逃逸/token query 传参违 RFC 7523/timeoutMs 缺失/测试判别力三缺/内容资产联动大面积缺失 R1-F4/R1-F5 复发——§7 话术/双库散文簇/yaml 双写/references/templates）；R-REG 等价性核验通过（无 P0/P1）；helper 增 form_data 通道；回归面 1543+ passed 全绿；留项台账 15 项登记 Round 2+
 - v1.7.0: **Task 9 D-09 范围扩展实施**：EPO OPS key 个人申请受阻 → google-patents（BigQuery 公共专利数据集，REST 直连零新依赖）提前纳入为专利域活跃第二源——并存 4 源（epo-ops 休眠保留）；适配器池 12 终态；三 Skill 专利域三库（competitor 7 源/disruptive 4 源/vrio 4 源）；注册链全触点（双门条件注册/元组表/契约表/架构三文件/探针）+ 集成实测两态（GCP 凭据动态 skip）；3436 passed 受影响面全绿；预筛勘误留痕（Sandbox 无 API 编程访问）

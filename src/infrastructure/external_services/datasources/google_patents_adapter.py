@@ -15,8 +15,9 @@ Google Patents Public Datasets——BigQuery `patents-public-data.patents.public
   累计守卫（自然月一日 00:00 UTC 重置，now_fn 可注入），超限前置抛 412 零请求
   消耗；SQL 列裁剪（仅三列）+ 强制 LIMIT 控制扫描成本；探活扫描字节同样入账
 - 检索式：管道串 `assignee=华为|cpc=Y02E|country=CN|year=2020-2026|keyword=battery`
-  （至少一项条件——空条件 201 防全表扫描；year/country 形态前置校验 201；
-  参数化查询 named parameters 防注入）
+  （至少一项条件——空条件 201 防全表扫描；year/country 形态与 assignee/cpc/keyword
+  空白值前置校验 201——空值经 %包裹成 LIKE '%%' 匹配一切；参数化查询 named
+  parameters 防注入）
 - schema 事实对齐（patents-public-data.patents.publications 真实类型）：
   assignee 为 REPEATED（ARRAY<STRING>）须 UNNEST 匹配、filing_date 为 INTEGER
   （YYYYMMDD）整数区间比较、publication_number 前缀即国家码（STARTS_WITH 字面

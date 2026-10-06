@@ -446,6 +446,48 @@ class TestGooglePatentsAdapterSuccess:
         assert "华为" not in sql  # 值不进 SQL 文本
 
     @pytest.mark.asyncio
+    async def test_full_pipeline_sql_predicate_shapes_locked(self, working_adapter, credentials_file) -> None:
+        """五通道谓词形态锁（Q3/R3Q-1/R3Q-2——cpc/keyword 通道原零守护，突变实测
+        去掉 UNNEST/ESCAPE 后全绿；REPEATED 列标量 LIKE 错配可静默复发）。
+
+        assignee/cpc/keyword 三 REPEATED 通道 + country 前缀 + year 整数边界
+        全部在场断言——任一谓词改写为标量 LIKE / 去除 ESCAPE / 前缀改 LIKE 即红。
+        """
+        captured: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured.append(request)
+            if "/token" in str(request.url):
+                return httpx.Response(200, json=_TOKEN_BODY)
+            return httpx.Response(200, json=_QUERY_BODY)
+
+        adapter = _make_adapter(credentials_file, httpx.MockTransport(handler), config=working_adapter._config)
+        await adapter.fetch(
+            DataSourceQuery(
+                source_name="google-patents",
+                query="assignee=华为|cpc=Y02E|country=CN|year=2020-2026|keyword=battery",
+            )
+        )
+        query_req = [r for r in captured if "/queries" in str(r.url)][0]
+        body = json.loads(query_req.content.decode())
+        sql = body["query"]
+        # 三 REPEATED 通道：UNNEST 逐元素 + LIKE + ESCAPE 成对
+        assert "UNNEST(assignee)" in sql, "assignee 通道须 UNNEST（ARRAY<STRING> 列标量 LIKE 必 400）"
+        assert "UNNEST(cpc)" in sql and "c.code LIKE @cpc" in sql, "cpc 通道须 UNNEST 逐元素匹配"
+        assert "UNNEST(abstract_localized)" in sql and "a.text LIKE @keyword" in sql, "keyword 通道须 UNNEST"
+        like_count = sql.count(" LIKE @")
+        escape_count = sql.count("ESCAPE")
+        assert like_count == 3, f"恰三个 LIKE 谓词（assignee/cpc/keyword），实际 {like_count}"
+        assert escape_count == 3, f"每个 LIKE 谓词须配对 ESCAPE（值侧 _escape_like 转义才有效），实际 {escape_count}"
+        # country 前缀语义（非 LIKE——LIKE 无通配符 % 时为精确匹配 = 静默空结果）
+        assert "STARTS_WITH(publication_number, @country_code)" in sql, "country 须 STARTS_WITH 前缀谓词"
+        # year 整数边界（INTEGER YYYYMMDD——禁 DATE 函数）
+        assert "filing_date BETWEEN @year_start AND @year_end" in sql
+        params = {p["name"]: p["parameterValue"]["value"] for p in body.get("queryParameters", [])}
+        assert params.get("cpc") == "%Y02E%"
+        assert params.get("keyword") == "%battery%"
+
+    @pytest.mark.asyncio
     async def test_like_wildcard_in_user_value_is_escaped(self, working_adapter, credentials_file, monkeypatch) -> None:
         """LIKE 通配符转义（Q1-F1——用户值含 %/_ 时禁意外全匹配）。"""
         captured: list[httpx.Request] = []

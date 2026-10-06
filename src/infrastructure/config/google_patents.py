@@ -50,7 +50,12 @@ class GooglePatentsConfig:
     ttl_seconds: int = 604800
 
     def __post_init__(self) -> None:
-        """双门校验：凭据路径与项目 ID 任一缺失即抛 101（fail-fast，D-09 双门合取）。"""
+        """构造期校验（101 fail-fast）：双门合取 + timeout 下限。
+
+        timeout 下限校验置于构造层（Q3/R3Q-4——from_env 与直构造两路径统一守护；
+        过小 timeout 破坏「timeoutMs 恒小于 client timeout」派生不变量，httpx 先
+        超时会触发非幂等 jobs.query 重试三重计费）。
+        """
         if not self.credentials_path or not self.project_id:
             raise ConfigurationError(
                 message=(
@@ -60,6 +65,14 @@ class GooglePatentsConfig:
                 ),
                 context={"source_name": "google-patents", "field": "credentials_path"},
             )
+        if self.timeout < _MIN_TIMEOUT_SECONDS:
+            raise ConfigurationError(
+                message=(
+                    f"google-patents timeout 不得低于 {_MIN_TIMEOUT_SECONDS}s，当前值: {self.timeout}"
+                    "（服务端 timeoutMs 从 timeout 派生——过小会破坏两层超时派生不变量）"
+                ),
+                context={"source_name": "google-patents", "field": "timeout"},
+            )
 
     @classmethod
     def from_env(cls) -> GooglePatentsConfig:
@@ -67,7 +80,7 @@ class GooglePatentsConfig:
 
         Raises:
             ConfigurationError: 双门任一缺失 / 凭据文件不存在 / 数值解析失败 /
-                timeout 低于下限（3.0s——保 timeoutMs 派生不变量）
+                timeout 低于下限（3.0s——__post_init__ 构造期统一守护）
         """
         credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
         project_id = os.getenv("GOOGLE_PATENTS_PROJECT_ID", "")
@@ -81,14 +94,6 @@ class GooglePatentsConfig:
             ttl_seconds = int(ttl_raw)
         except (ValueError, TypeError):
             raise ConfigurationError(message=f"GOOGLE_PATENTS_TTL_SECONDS 值非法: {ttl_raw!r}（需要整数）") from None
-        if timeout < _MIN_TIMEOUT_SECONDS:
-            raise ConfigurationError(
-                message=(
-                    f"GOOGLE_PATENTS_TIMEOUT 不得低于 {_MIN_TIMEOUT_SECONDS}s，当前值: {timeout}"
-                    "（服务端 timeoutMs 从 timeout 派生——过小会破坏两层超时派生不变量，"
-                    "httpx 先超时将触发非幂等重试重复计费）"
-                )
-            )
         if ttl_seconds <= 0:
             raise ConfigurationError(message=f"GOOGLE_PATENTS_TTL_SECONDS 必须为正整数，当前值: {ttl_seconds}")
         return cls(

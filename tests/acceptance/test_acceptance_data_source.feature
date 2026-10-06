@@ -143,10 +143,10 @@
 # AC-7 SDD 架构验证测试（六边形约束 + 端口注册 + 域零依赖）
 # =============================================================================
 
-场景: AC-7.2 - 数据源端口全部注册到 composition_root（反射 _global_registry，11 端口态）
+场景: AC-7.2 - 数据源端口全部注册到 composition_root（反射 _global_registry，12 端口态）
   假如 导入 src.composition_root._global_registry 模块级全局注册中心
   当 反射获取所有 name 以 data_source_ 开头且非 data_source_resolver 的端口
-  那么 端口注册集合与按环境 KEY 推导的期望一致（无条件 7 + 条件注册逐 KEY 判定，4.1f 起 11 端口态）
+  那么 端口注册集合与按环境 KEY 推导的期望一致（无条件 7 + 条件注册逐 KEY 判定，4.1f 终态 12 端口）
 
 场景: AC-7.3 - data_source 域层文件零外部依赖（AST 扫描）
   假如 收集 src/domain/{ports,value_objects,events,exceptions} 下 data_source 相关文件
