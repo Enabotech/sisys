@@ -10,8 +10,8 @@
 - 参数化 SQL：named parameters 防注入 + 列裁剪（仅 publication_number/assignee/
   filing_date 三列）+ 强制 LIMIT
 - jobs.query REST：Bearer 头 / rows（f.v）→ patents 结构化 / schema.fields 名映射
-- 失败矩阵：101（双门缺失构造/401/403）/ 302 超时 / 411 5xx 耗尽/熔断 /
-  412 限流 / 413 结构异常；repr 脱敏；isinstance(DataSourcePort)
+- 失败矩阵：101（双门缺失构造/401/403/凭据域）/ 302 超时 / 411 5xx 耗尽/熔断 /
+  412 限流 / 413 结构异常；isinstance(DataSourcePort)
 
 测试模式：httpx.MockTransport 注入（零外网零 GCP）。
 """
@@ -98,7 +98,6 @@ def _make_config(credentials_file: Path) -> GooglePatentsConfig:
         credentials_path=str(credentials_file),
         project_id="test-project",
         api_url="https://bigquery.googleapis.test",
-        token_url=_TOKEN_URL,
         timeout=5.0,
     )
 
@@ -152,10 +151,16 @@ class TestGooglePatentsConfig:
         with pytest.raises(ConfigurationError):
             GooglePatentsConfig.from_env()
 
-    def test_config_repr_masks_credentials(self, credentials_file) -> None:
-        config = _make_config(credentials_file)
-        assert "FAKE" not in repr(config)
-        assert "BEGIN " + "PRIVATE KEY" not in repr(config)
+    def test_timeout_below_floor_raises_configuration_error(self, credentials_file, monkeypatch) -> None:
+        """timeout 下限 3.0s（Q2-F3——保 timeoutMs 派生不变量，httpx 先超时会触发
+        非幂等重试三重计费）。"""
+        monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(credentials_file))
+        monkeypatch.setenv("GOOGLE_PATENTS_PROJECT_ID", "proj")
+        monkeypatch.setenv("GOOGLE_PATENTS_TIMEOUT", "2.0")
+        with pytest.raises(ConfigurationError) as exc_info:
+            GooglePatentsConfig.from_env()
+        assert exc_info.value.code == "EXCEPTION_101"
+        assert "3.0" in str(exc_info.value)
 
 
 class TestPipelineQueryParsing:
@@ -198,6 +203,15 @@ class TestPipelineQueryParsing:
             with pytest.raises(ValidationError) as exc_info:
                 parse_patents_pipeline_query(f"country={bad}")
             assert exc_info.value.code == "EXCEPTION_201"
+
+    @pytest.mark.parametrize("text_key", ["assignee", "cpc", "keyword"])
+    def test_blank_text_condition_raises_validation_error(self, text_key: str) -> None:
+        """文本条件空值前置校验（Q2-F2——空值经 %包裹成 LIKE '%%' 匹配一切，大表
+        全列扫描烧 1TiB 月配额）。"""
+        with pytest.raises(ValidationError) as exc_info:
+            parse_patents_pipeline_query(f"{text_key}= ")
+        assert exc_info.value.code == "EXCEPTION_201"
+        assert text_key in str(exc_info.value)
 
 
 class TestGoogleTokenManager:
@@ -295,6 +309,21 @@ class TestGoogleTokenManager:
 
         bad = tmp_path / "list.json"
         bad.write_text('["not", "an", "object"]', encoding="utf-8")
+        with pytest.raises(ConfigurationError) as exc_info:
+            _GoogleTokenManager(
+                credentials_path=str(bad),
+                client=httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200))),
+            )
+        assert exc_info.value.code == "EXCEPTION_101"
+
+    @pytest.mark.asyncio
+    async def test_non_utf8_credentials_file_raises_configuration_error(self, tmp_path) -> None:
+        """凭据文件非 UTF-8 编码 → 101（Q2-F4——UnicodeDecodeError 属 ValueError 子类，
+        经 (OSError, ValueError) 包裹映射，禁裸逃逸）。"""
+        from src.infrastructure.external_services.datasources.google_patents_adapter import _GoogleTokenManager
+
+        bad = tmp_path / "binary.json"
+        bad.write_bytes(b"\xff\xfe\x00bad-credentials")
         with pytest.raises(ConfigurationError) as exc_info:
             _GoogleTokenManager(
                 credentials_path=str(bad),
@@ -505,7 +534,7 @@ class TestGooglePatentsAdapterFailures:
 
     def test_missing_both_gates_raises_configuration_error(self, tmp_path: Path) -> None:
         with pytest.raises(ConfigurationError) as exc_info:
-            GooglePatentsConfig(credentials_path="", project_id="", api_url="https://x.test", token_url=_TOKEN_URL)
+            GooglePatentsConfig(credentials_path="", project_id="", api_url="https://x.test")
         assert exc_info.value.code == "EXCEPTION_101"
 
     @pytest.mark.asyncio
@@ -633,6 +662,56 @@ class TestGooglePatentsAdapterFailures:
         adapter = _make_adapter(credentials_file, httpx.MockTransport(handler))
         with pytest.raises(DataSourceResponseError):
             await adapter.fetch(DataSourceQuery(source_name="google-patents", query="assignee=华为"))
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("bad_f", [None, "not-a-list", {"v": "dict"}])
+    async def test_rows_f_malformed_raises_response_error(self, signer_patched, credentials_file, bad_f) -> None:
+        """rows.f 键存在但值 null/非列表（Q2-F1——{"f": null} 形态下 dict.get 缺省
+        不生效，zip 迭代 None 抛裸 TypeError 逃逸异常体系——前置拦截 413）。"""
+        bad_body = {
+            "jobComplete": True,
+            "schema": {"fields": [{"name": "publication_number"}, {"name": "assignee"}, {"name": "filing_date"}]},
+            "rows": [{"f": bad_f}],
+        }
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if "/token" in str(request.url):
+                return httpx.Response(200, json=_TOKEN_BODY)
+            return httpx.Response(200, json=bad_body)
+
+        adapter = _make_adapter(credentials_file, httpx.MockTransport(handler))
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="google-patents", query="assignee=华为"))
+        assert exc_info.value.code == "EXCEPTION_413"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "bad_body",
+        [
+            # 缺 totalBytesProcessed 键
+            {"jobComplete": True, "schema": {"fields": [{"name": "publication_number"}]}},
+            # 键存在但值非法
+            {"jobComplete": True, "totalBytesProcessed": "not-a-number", "schema": {"fields": [{"name": "x"}]}},
+        ],
+        ids=["key-missing", "value-invalid"],
+    )
+    async def test_bytes_processed_degradation_warns(
+        self, signer_patched, credentials_file, bad_body, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """totalBytesProcessed 缺键/值非法两入口告警观测（Q2-F7/A-8 半件——deprecated
+        字段静默归零使月配额守卫失效，须可探测）。"""
+        import logging
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if "/token" in str(request.url):
+                return httpx.Response(200, json=_TOKEN_BODY)
+            return httpx.Response(200, json=bad_body)
+
+        adapter = _make_adapter(credentials_file, httpx.MockTransport(handler))
+        with caplog.at_level(logging.WARNING, logger="src.infrastructure.external_services.datasources.google_patents_adapter"):
+            await adapter.fetch(DataSourceQuery(source_name="google-patents", query="assignee=华为"))
+        assert "totalBytesProcessed" in caplog.text, "归零入口必须告警（守卫失效可探测）"
+        assert adapter.quota_used_bytes == 0
 
     @pytest.mark.asyncio
     async def test_empty_pipeline_raises_validation_error_zero_requests(self, signer_patched, credentials_file) -> None:

@@ -16,8 +16,10 @@ from pathlib import Path
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.external_services.datasources.registration import (
     DATA_SOURCE_REGISTRY,
+    DS_MODULE_PREFIX,
     build_adapters_mapping,
     httpx_owned_port_names,
     is_gate_open,
@@ -69,9 +71,27 @@ class TestRegistryIntegrity:
         assert len(port_names) == len(set(port_names)), "port_name 应唯一"
         for r in DATA_SOURCE_REGISTRY:
             assert r.port_name.startswith("data_source_")
-            assert r.impl_module.startswith("src.infrastructure.external_services.datasources.")
+            assert r.impl_module.startswith(DS_MODULE_PREFIX)
             assert r.impl_cls_name and r.config_module and r.config_cls_name
             assert "data-source" in r.tags
+
+    def test_file_gate_without_env_keys_raises_configuration_error(self, tmp_path: Path) -> None:
+        """畸形条目防线（Q2/B-4）——file_gate=True 而 env_gate_keys 为空时，注册期
+        is_gate_open 首键索引会抛裸 IndexError 逃逸异常体系；构造期 101 拦截。"""
+        from src.infrastructure.external_services.datasources.registration import AdapterRegistration
+
+        with pytest.raises(ConfigurationError) as exc_info:
+            AdapterRegistration(
+                port_name="data_source_malformed",
+                source_name="malformed",
+                impl_module=f"{DS_MODULE_PREFIX}nonexistent_adapter",
+                impl_cls_name="NonexistentAdapter",
+                config_module="src.infrastructure.config.nonexistent",
+                config_cls_name="NonexistentConfig",
+                env_gate_keys=(),
+                file_gate=True,
+            )
+        assert exc_info.value.code == "EXCEPTION_101"
 
     def test_unconditional_group_has_no_gate(self) -> None:
         unconditional = {"world-bank", "imf", "eurostat", "ipcc", "china-nbs", "sec-edgar", "comtrade"}

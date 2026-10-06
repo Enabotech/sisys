@@ -26,7 +26,7 @@ SKILLS_ROOT = Path(__file__).resolve().parents[4] / "src" / "application" / "ski
 CONTRACTS_FILE = Path(__file__).resolve().parents[3] / "acceptance" / "contracts" / "skill_io_schemas.yaml"
 
 # =============================================================================
-# SSOT：11 个适配器元数据对齐表（name → (url, api_type, ttl_seconds, required_fields)）
+# SSOT：12 个适配器元数据对齐表（name → (url, api_type, ttl_seconds, required_fields)）
 # 与 Story 「适配器 url/api_type/ttl/confidence 对齐表」逐字一致
 # （4-1b 8 适配器 get_metadata() 实测值 + 4-1f 三新源）
 # 4-1f D6：三元组扩四元组——required_fields 按源定制（8 既有源零漂移保持

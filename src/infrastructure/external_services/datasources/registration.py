@@ -19,6 +19,11 @@
 - C 组「条件注册——凭据文件门」：env 非空且文件存在（google-patents GCP 双门）
   ——env_gate_keys 含 GOOGLE_APPLICATION_CREDENTIALS + GOOGLE_PATENTS_PROJECT_ID
   且凭据文件存在（file_gate=True）
+
+时序注（Q2/B-1）：与组合根原手写注册区相比，config 模块导入统一随工厂延迟到
+首次 resolve 期（原 8 源为注册期 eager）——config 模块为惰性 dataclass 模块无
+导入期副作用，模块级故障从 bootstrap fail-fast 转为 resolve 优雅降级，由
+test_registration 可导入防线在 CI 兜底。
 """
 
 from __future__ import annotations
@@ -27,7 +32,9 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+from src.domain.exceptions import ConfigurationError
 
 
 @dataclass(frozen=True)
@@ -46,8 +53,13 @@ class AdapterRegistration:
         file_gate: 凭据文件门（True 时 env_gate_keys 首键所引路径须实际存在——
             google-patents GCP 双门专用）
         factory_kind: 工厂形态（"default"=Config.from_env() 单参构造；
-            "china_nbs"=resolver.resolve("crawler_client") 特殊工厂）
+            "china_nbs"=resolver.resolve("crawler_client") 特殊工厂——Literal
+            约束防 typo 静默落入 default 分支）
         tags: 端口 tags（含 data-source 公共标记）
+
+    Raises:
+        ConfigurationError: file_gate=True 而 env_gate_keys 为空（畸形条目——
+            文件门依赖首 env 键引路径，空门下注册期裸 IndexError）
     """
 
     port_name: str
@@ -58,12 +70,26 @@ class AdapterRegistration:
     config_cls_name: str
     env_gate_keys: tuple[str, ...] = ()
     file_gate: bool = False
-    factory_kind: str = "default"
+    factory_kind: Literal["default", "china_nbs"] = "default"
     tags: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        """畸形条目防线（Q2/B-4）：file_gate 依赖 env_gate_keys 首键引凭据路径。"""
+        if self.file_gate and not self.env_gate_keys:
+            raise ConfigurationError(
+                message=(
+                    f"数据源注册条目 {self.source_name!r} 畸形：file_gate=True 须至少配置一个"
+                    " env_gate_keys（凭据文件路径取首键环境变量）"
+                ),
+                context={"source_name": self.source_name, "field": "env_gate_keys"},
+            )
 
 
 _DS_MODULE_PREFIX = "src.infrastructure.external_services.datasources."
 _CONFIG_MODULE_PREFIX = "src.infrastructure.config."
+
+# 适配器模块前缀（公开——测试侧 removeprefix/startswith 断言复用，消除双写漂移）
+DS_MODULE_PREFIX = _DS_MODULE_PREFIX
 
 
 def _impl(port_file: str) -> str:
@@ -288,6 +314,7 @@ def httpx_owned_port_names() -> tuple[str, ...]:
 __all__ = [
     "AdapterRegistration",
     "DATA_SOURCE_REGISTRY",
+    "DS_MODULE_PREFIX",
     "build_adapters_mapping",
     "httpx_owned_port_names",
     "is_gate_open",

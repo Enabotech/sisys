@@ -1,7 +1,7 @@
 """Story 4.1d: vrio-framework Skill 成熟化单元测试（结构照抄 swot-tows 范本）
 
 TDD 循环覆盖（AC-1 / AC-2 / AC-3）：
-- [A] frontmatter 声明契约：data_sources 全字段 == SSOT 4 源 + IO Schema 契约（yaml 逐字相等）
+- [A] frontmatter 声明契约：data_sources 全字段 == SSOT 4 源（uspto+google-patents+epo-ops+tavily）
       + IO Schema 契约（yaml 逐字相等）+ domain catalog 兼容（required 零删除）
 - [B] SOP 成熟化：9 章节 / input_examples 非 placeholder / ≤500 行 /
       references 三件套（data_fusion/scoring_anchors/workshop_guide）+ templates

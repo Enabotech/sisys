@@ -109,6 +109,7 @@ lupa = "^2.8"
 tenacity = "^9.1.4"
 pyahocorasick = "^2.1.0"
 aiodocker = "^0.25.0"
+pyjwt = "^2.13.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.0.0"

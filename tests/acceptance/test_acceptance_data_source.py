@@ -1197,7 +1197,7 @@ def when_extract_data_source_ports(context: dict[str, Any]) -> None:
     context["registered_data_source_ports"] = sorted(names)
 
 
-@then("端口注册集合与按环境 KEY 推导的期望一致（无条件 7 + 条件注册逐 KEY 判定，4.1f 起 11 端口态）")
+@then("端口注册集合与按环境 KEY 推导的期望一致（无条件 7 + 条件注册逐 KEY 判定，4.1f 终态 12 端口）")
 def then_eight_data_source_adapters_registered(context: dict[str, Any]) -> None:
     """R2-2-C4/I3：按进程环境 KEY 确定性推导期望注册集合（兼容 {5,6,7,8} 态）。
 

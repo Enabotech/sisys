@@ -1,7 +1,7 @@
 """Skills 数据采集集成 — SDD 架构约束验证测试
 
 五类结构（范本 test_arch_data_source.py）：
-1. 常量区：6 Skills slug 清单 + SSOT 声明表 + 11 适配器映射
+1. 常量区：6 Skills slug 清单 + SSOT 声明表 + 12 适配器映射
 2. 三方一致性：SSOT 表 ↔ 6 个 SKILL.md frontmatter data_sources ↔ 适配器 get_metadata()
    （name/url/api_type 逐字一致，防漂移契约）
 3. 依赖方向：strategic_analysis.py / run_tool_chain.py 不 import infrastructure；
@@ -122,7 +122,7 @@ def _build_adapters() -> dict[str, DataSourcePort]:
         encoding="utf-8",
     )
 
-    return {
+    adapters: dict[str, DataSourcePort] = {
         "world-bank": WorldBankAdapter(config=WorldBankConfig()),
         "imf": IMFAdapter(config=IMFConfig()),
         "eurostat": EurostatAdapter(config=EurostatConfig()),
@@ -140,6 +140,11 @@ def _build_adapters() -> dict[str, DataSourcePort]:
             config=GooglePatentsConfig(credentials_path=str(_sa_path), project_id="arch-test-project")
         ),
     }
+    # 凭据文件内容已在构造期读入（token manager 解析）——临时目录即时清理防累积泄漏（Q2/C-16）
+    import shutil as _shutil
+
+    _shutil.rmtree(_tmp_dir, ignore_errors=True)
+    return adapters
 
 
 # =============================================================================

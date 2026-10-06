@@ -15,28 +15,37 @@ from pathlib import Path
 
 from src.domain.exceptions import ConfigurationError
 
-_DEFAULT_TOKEN_URL = "https://oauth2.googleapis.com/token"
 _DEFAULT_API_URL = "https://bigquery.googleapis.com"
+
+# timeout 下限（秒）——服务端 timeoutMs 从 config.timeout 派生（减提前量），
+# timeout 过小会破坏「timeoutMs 恒小于 client timeout」派生不变量（httpx 先超时
+# 触发非幂等重试三重计费），构造期 fail-fast 拦截
+_MIN_TIMEOUT_SECONDS = 3.0
 
 
 @dataclass(frozen=True)
 class GooglePatentsConfig:
-    """google-patents BigQuery 配置（4 变量 + 双门合取条件注册）
+    """google-patents BigQuery 配置（凭据双门 + 5 变量 + 双门合取条件注册）
 
     Attributes:
         credentials_path: GCP 服务账号 JSON 路径（env: GOOGLE_APPLICATION_CREDENTIALS——
             GCP 标准变量；repr 脱敏 JSON 内容不落 repr，路径本身非密钥）
         project_id: GCP 项目 ID（env: GOOGLE_PATENTS_PROJECT_ID——查询计费归属项目）
-        api_url: BigQuery REST 基础地址
-        token_url: OAuth2 令牌端点（服务账号 JWT bearer grant）
-        timeout: 请求超时秒数
-        ttl_seconds: 缓存 TTL（数据集月/周频更新——7 天保守缓存）
+        api_url: BigQuery REST 基础地址（env: GOOGLE_PATENTS_API_URL）
+        timeout: 请求超时秒数（env: GOOGLE_PATENTS_TIMEOUT——下限 3.0s，保 timeoutMs
+            派生不变量）
+        ttl_seconds: 缓存 TTL（env: GOOGLE_PATENTS_TTL_SECONDS——数据集月/周频更新，
+            7 天保守缓存）
+
+    Note:
+        OAuth2 令牌端点（token_uri）取自服务账号 JSON 内标准字段——GCP 语义上
+        属凭据文件而非环境配置（Q2-F8：原 token_url 环境旋钮从未被适配器消费，
+        已删除防误导排障）。
     """
 
     credentials_path: str = ""
     project_id: str = ""
     api_url: str = _DEFAULT_API_URL
-    token_url: str = _DEFAULT_TOKEN_URL
     timeout: float = 30.0
     ttl_seconds: int = 604800
 
@@ -54,10 +63,11 @@ class GooglePatentsConfig:
 
     @classmethod
     def from_env(cls) -> GooglePatentsConfig:
-        """从环境变量加载配置（GOOGLE_APPLICATION_CREDENTIALS 等 4 变量）。
+        """从环境变量加载配置（GOOGLE_APPLICATION_CREDENTIALS 等 5 变量）。
 
         Raises:
-            ConfigurationError: 双门任一缺失 / 凭据文件不存在 / 数值解析失败
+            ConfigurationError: 双门任一缺失 / 凭据文件不存在 / 数值解析失败 /
+                timeout 低于下限（3.0s——保 timeoutMs 派生不变量）
         """
         credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
         project_id = os.getenv("GOOGLE_PATENTS_PROJECT_ID", "")
@@ -71,15 +81,20 @@ class GooglePatentsConfig:
             ttl_seconds = int(ttl_raw)
         except (ValueError, TypeError):
             raise ConfigurationError(message=f"GOOGLE_PATENTS_TTL_SECONDS 值非法: {ttl_raw!r}（需要整数）") from None
-        if timeout <= 0:
-            raise ConfigurationError(message=f"GOOGLE_PATENTS_TIMEOUT 必须为正数，当前值: {timeout}")
+        if timeout < _MIN_TIMEOUT_SECONDS:
+            raise ConfigurationError(
+                message=(
+                    f"GOOGLE_PATENTS_TIMEOUT 不得低于 {_MIN_TIMEOUT_SECONDS}s，当前值: {timeout}"
+                    "（服务端 timeoutMs 从 timeout 派生——过小会破坏两层超时派生不变量，"
+                    "httpx 先超时将触发非幂等重试重复计费）"
+                )
+            )
         if ttl_seconds <= 0:
             raise ConfigurationError(message=f"GOOGLE_PATENTS_TTL_SECONDS 必须为正整数，当前值: {ttl_seconds}")
         return cls(
             credentials_path=credentials_path,
             project_id=project_id,
             api_url=os.getenv("GOOGLE_PATENTS_API_URL", cls.api_url),
-            token_url=os.getenv("GOOGLE_PATENTS_TOKEN_URL", cls.token_url),
             timeout=timeout,
             ttl_seconds=ttl_seconds,
         )

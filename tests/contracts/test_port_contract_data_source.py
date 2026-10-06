@@ -1,7 +1,7 @@
-"""Story 4.1b: 端口契约测试 — 11 个数据源适配器端口
+"""Story 4.1b: 端口契约测试 — 12 个数据源适配器端口
 
 验证 data_source_<name> 端口的注册、版本、接口、生命周期、owner/tags/module 元数据，
-以及 11 个适配器实现类的 required_methods 与 Protocol runtime_checkable 属性。
+以及 12 个适配器实现类的 required_methods 与 Protocol runtime_checkable 属性。
 
 遵循项目标准 11 维度契约测试模式（范本 tests/contracts/test_port_contract_tool.py）。
 
@@ -88,7 +88,7 @@ class _StubCrawlerClient:
 
 @pytest.mark.parametrize("spec_meta", ADAPTER_PORT_SPECS, ids=[m["port_name"] for m in ADAPTER_PORT_SPECS])
 class TestDataSourceAdapterPortContract:
-    """data_source_<name> 端口契约（11 维度全覆盖，参数化 11 适配器）.
+    """data_source_<name> 端口契约（11 维度全覆盖，参数化 12 适配器）.
 
     根因修复（消灭 Key 缺失 skip）：将"端口注册状态"（环境依赖，条件注册）与
     "实现类契约合规"（静态可验证）解耦——
@@ -267,26 +267,28 @@ class TestKeyedAdapterMetadataWithKey:
         # 半凭据态不满足双门合取，4.1f；GCP 双门注入临时 fake 服务账号文件 +
         # 项目 ID——文件存在门与 env 门同置，D-09）
         probe_key = "probe" + "-key-contract-test"
-        gcp_sa_literal = repr(
-            '{"type": "service_account", "client_email": "probe@gcp.test",'
-            ' "private_key": "-----BEGIN " + "PRIVATE KEY-----\\nFAKE\\n-----END " + "PRIVATE KEY-----"}'
-        )
         script = (
-            "import os, json, tempfile; "
+            "import os, json, shutil, tempfile; "
             "from pathlib import Path; "
             f"os.environ['USPTO_API_KEY'] = {probe_key!r}; "
             f"os.environ['NEWSAPI_API_KEY'] = {probe_key!r}; "
             f"os.environ['TAVILY_API_KEY'] = {probe_key!r}; "
             f"os.environ['EPO_OPS_CONSUMER_KEY'] = {probe_key!r}; "
             f"os.environ['EPO_OPS_CONSUMER_SECRET'] = {probe_key!r}; "
-            f"_sa_path = Path(tempfile.mkdtemp(prefix='probe-gcp-')) / 'fake-sa.json'; "
-            f"_sa_path.write_text({gcp_sa_literal}); "
+            # 凭据 JSON 在子进程内以 json.dumps 构造（Q2/C-10：repr 拼接串会把
+            # 字面 '+ ' 落进 JSON 文本成非法 JSON——当前注册门只查存在性不解析，
+            # 形态仍应正确防探针扩展到工厂实例化时爆雷）
+            "_tmp = tempfile.mkdtemp(prefix='probe-gcp-'); "
+            "_sa_path = Path(_tmp) / 'fake-sa.json'; "
+            "_sa_path.write_text(json.dumps({'type': 'service_account', 'client_email': 'probe@gcp.test', "
+            "'private_key': '-----BEGIN ' + 'PRIVATE KEY-----\\nFAKE\\n-----END ' + 'PRIVATE KEY-----'})); "
             "os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(_sa_path); "
             f"os.environ['GOOGLE_PATENTS_PROJECT_ID'] = {probe_key!r}; "
             "from src.composition_root import bootstrap; "
             "from src.domain.ports.registry import _global_registry, Lifetime; "
             "from src.domain.ports.data_source import DataSourcePort; "
             "bootstrap(); "
+            "shutil.rmtree(_tmp, ignore_errors=True); "
             f"expected = {expected_literal}; "
             "specs = {s.name: s for s in _global_registry.list_all() "
             "         if s.name.startswith('data_source_') and s.name != 'data_source_resolver'}; "

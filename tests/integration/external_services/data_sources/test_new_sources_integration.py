@@ -145,5 +145,8 @@ class TestGooglePatentsRealEndpoint:
             payload = json.loads(result.payload)
             assert isinstance(payload.get("patents"), list) and payload["patents"], "assignee 检索应返回非空结果"
             assert {"publication_number", "assignee", "filing_date"} <= set(payload["patents"][0])
+            # 计费字节入账锚点（Q2/A-8 观测闭环）：真实端点返回 totalBytesProcessed 时
+            # 守卫必须入账 > 0——deprecated 字段若失效此断言即红（与单测 warning 呼应）
+            assert adapter.quota_used_bytes > 0, "真实查询后月配额账应为正（totalBytesProcessed 入账）"
         finally:
             await adapter.close()

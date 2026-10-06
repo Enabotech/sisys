@@ -2,7 +2,7 @@
 
 验证：
 1. domain 层零外部依赖（AST 黑名单扫描，显式含 httpx/tenacity——沙箱无网络不变量保护）
-2. 端口注册完整性（PortSpec 10 字段 + 11 适配器 + resolver 全注册 + SINGLETON 生命周期）
+2. 端口注册完整性（PortSpec 10 字段 + 12 适配器 + resolver 全注册 + SINGLETON 生命周期）
 3. 实现类 isinstance Protocol 校验
 4. 依赖方向校验（application 新文件不 import infrastructure，适配器仅经 composition_root 注册）
 5. 异常码段校验（EXCEPTION_410-413 ∈ data_source 子域）
@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.domain.ports.registry import Lifetime, _global_registry
-from src.infrastructure.external_services.datasources.registration import DATA_SOURCE_REGISTRY, is_gate_open
+from src.infrastructure.external_services.datasources.registration import DATA_SOURCE_REGISTRY, DS_MODULE_PREFIX, is_gate_open
 
 # ============================================================
 # 常量定义
@@ -72,13 +72,11 @@ FORBIDDEN_IMPORTS = {
 # 4-1f 审查 R1-1 发现漂移静默；现从注册表派生——「注册什么」唯一事实源
 # 在 registration.py；分组语义：无条件组=env_gate_keys 空，keyed 组=门非空）
 ADAPTER_PORT_NAMES = tuple(r.port_name for r in DATA_SOURCE_REGISTRY if not r.env_gate_keys)
-KEYED_ADAPTER_PORT_NAMES = tuple(r.port_name for r in DATA_SOURCE_REGISTRY if r.env_gate_keys)
 
 # 端口 → (适配器模块名, 实现类名)（注册表派生——条件注册端口无 Key 时不注册，
 # 实现类合规校验不依赖运行时注册状态，R3-P1-3 语义保持）
 ADAPTER_IMPL_MODULES = {
-    r.port_name: (r.impl_module.removeprefix("src.infrastructure.external_services.datasources."), r.impl_cls_name)
-    for r in DATA_SOURCE_REGISTRY
+    r.port_name: (r.impl_module.removeprefix(DS_MODULE_PREFIX), r.impl_cls_name) for r in DATA_SOURCE_REGISTRY
 }
 
 
@@ -147,7 +145,7 @@ class TestDomainLayerConstraints:
 
 
 class TestDataSourcePortRegistry:
-    """11 适配器 + resolver 端口注册完整性（PortSpec 10 字段）。"""
+    """12 适配器 + resolver 端口注册完整性（PortSpec 10 字段）。"""
 
     @pytest.mark.parametrize("port_name", ADAPTER_PORT_NAMES)
     def test_adapter_ports_registered(self, port_name: str) -> None:
@@ -157,7 +155,7 @@ class TestDataSourcePortRegistry:
         assert spec.version == "v1.0.0"
         assert spec.interface is not None
         assert spec.impl is not None
-        assert spec.module.startswith("src.infrastructure.external_services.datasources.")
+        assert spec.module.startswith(DS_MODULE_PREFIX)
         assert spec.lifetime == Lifetime.SINGLETON
         assert spec.owner == "tool-team"
         assert "data-source" in spec.tags

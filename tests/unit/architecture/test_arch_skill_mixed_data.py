@@ -114,7 +114,7 @@ def _build_involved_adapters() -> dict[str, DataSourcePort]:
         encoding="utf-8",
     )
 
-    return {
+    adapters: dict[str, DataSourcePort] = {
         "world-bank": WorldBankAdapter(config=WorldBankConfig()),
         "imf": IMFAdapter(config=IMFConfig()),
         "uspto": USPTOAdapter(config=USPTOConfig()),
@@ -128,6 +128,11 @@ def _build_involved_adapters() -> dict[str, DataSourcePort]:
         "tavily": TavilyAdapter(config=TavilyConfig(api_key="arch-test-placeholder")),
         "china-nbs": ChinaNBSAdapter(crawler_client=AsyncMock(), config=ChinaNBSConfig()),
     }
+    # 凭据文件内容已在构造期读入（token manager 解析）——临时目录即时清理防累积泄漏（Q2/C-16）
+    import shutil as _shutil
+
+    _shutil.rmtree(_tmp_dir, ignore_errors=True)
+    return adapters
 
 
 # =============================================================================

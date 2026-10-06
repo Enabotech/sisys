@@ -152,7 +152,15 @@ def _validate_conditions(parsed: dict[str, str]) -> None:
     - year：YYYY 或 YYYY-YYYY（恰好 1-2 段、每段 4 位数字、起止有序）
     - country：两位大写字母国家码（GoogleSQL 字符串比较大小写敏感——小写/三位码
       静默空结果，前置拦截）
+    - assignee/cpc/keyword：非空白（空值经 `%值%` 包裹成 `LIKE '%%'` 匹配一切——
+      大表全列扫描烧配额，前置拦截）
     """
+    for text_key in ("assignee", "cpc", "keyword"):
+        if text_key in parsed and not parsed[text_key].strip():
+            raise ValidationError(
+                message=f"google-patents {text_key} 条件值为空（空值 LIKE '%%' 匹配一切——全表扫描计费风险）",
+                context={"source_name": "google-patents", "field": text_key, "value": ""},
+            )
     if "year" in parsed:
         parts = parsed["year"].split("-")
         if not 1 <= len(parts) <= 2 or not all(p.isdigit() and len(p) == 4 for p in parts):
@@ -567,13 +575,22 @@ class GooglePatentsAdapter:
 
     @staticmethod
     def _extract_bytes_processed(data: Any) -> int:
-        """提取 totalBytesProcessed（字符串数字形态——缺省 0 容错）。"""
+        """提取 totalBytesProcessed（字符串数字形态——缺省 0 容错 + 告警观测）。
+
+        观测语义（Q2-F7/A-8 半件）：totalBytesProcessed 是 deprecated 字段，缺失或
+        非法时静默归零会让月配额守卫整体失效且无感知——两个归零入口均告警（真实
+        失效可探测，jobs.get 补账随 R7 凭据锚点实施）。
+        """
         if not isinstance(data, dict):
             return 0
-        raw = data.get("totalBytesProcessed", "0")
+        if "totalBytesProcessed" not in data:
+            logger.warning("google-patents 响应缺 totalBytesProcessed 字段（deprecated）——本次查询字节未入月配额账")
+            return 0
+        raw = data["totalBytesProcessed"]
         try:
             return int(raw)
         except (ValueError, TypeError):
+            logger.warning("google-patents 响应 totalBytesProcessed 值非法 %r——本次查询字节未入月配额账", raw)
             return 0
 
     @staticmethod
@@ -615,7 +632,14 @@ class GooglePatentsAdapter:
                     message="google-patents 响应 rows 元素非对象形态",
                     context={"source_name": "google-patents", "field": "rows"},
                 )
-            values = row.get("f", [])
+            values = row.get("f")
+            if not isinstance(values, list):
+                # f 键缺失/为 null/非列表（{"f": null} 键存在值 null——dict.get 缺省
+                # 不生效）——zip 迭代 None 抛裸 TypeError 逃逸异常体系，前置拦截
+                raise DataSourceResponseError(
+                    message="google-patents 响应 rows.f 缺失或非列表形态",
+                    context={"source_name": "google-patents", "field": "rows.f"},
+                )
             item: dict[str, Any] = {}
             for name, cell in zip(names, values, strict=False):
                 if not isinstance(cell, dict):
