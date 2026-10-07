@@ -133,6 +133,9 @@ def test_subclass_code_in_same_subdomain_as_parent() -> None:
         ("transfer", "business"),
         # 子域 → business 基类（词典管理）
         ("dictionary", "business"),
+        # 子域 → business 基类（工具版本管理——Story 4.6 继承 NotFoundError/
+        # ConflictError/ValidationError/InvalidStateError 具体类）
+        ("tool_version", "business"),
         # 子域 → business 基类（档案管理）
         ("archive", "business"),
         # 子域 → business 基类（分层检索）

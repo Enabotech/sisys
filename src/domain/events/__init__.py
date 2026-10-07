@@ -33,6 +33,11 @@ from .memory_events import MemoryChanged
 from .planning_events import StrategicDeviationWarning
 from .routing_events import RoutingDecided
 from .tool_events import ToolExecuted
+from .tool_version_events import (
+    ToolRolledBack,
+    ToolVersionPublished,
+    ToolVersionRegistered,
+)
 from .workflow_events import RAGIndexed, ReportGenerated, WorkflowSubmitted
 
 __all__ = [
@@ -42,6 +47,9 @@ __all__ = [
     "DocumentUploaded",
     "DocumentVersionSnapshotCreated",
     "ToolExecuted",
+    "ToolVersionRegistered",
+    "ToolVersionPublished",
+    "ToolRolledBack",
     "AgentDecided",
     "CheckpointReached",
     "CheckpointRecovered",

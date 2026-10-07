@@ -113,6 +113,10 @@ from src.domain.exceptions import (
     ToolResultValidationError,
     ToolSchemaCompatibilityError,
     ToolSchemaMissingError,
+    ToolVersionAlreadyExistsError,
+    ToolVersionNotFoundError,
+    ToolVersionRollbackError,
+    ToolVersionTrafficWeightError,
     TraceabilityError,
     TraceabilityNotFoundError,
     TransferNotApprovedError,
@@ -311,6 +315,10 @@ class TestExceptionHttpMap:
             ToolOutputSchemaValidationError,  # 396 — Story 4.3 工具出参 Schema 校验失败
             ToolSchemaCompatibilityError,  # 397 — Story 4.3 Schema 版本兼容性冲突
             ToolSchemaMissingError,  # 398 — Story 4.3 Schema 缺失配置错误
+            ToolVersionNotFoundError,  # 430 — Story 4.6 版本不存在
+            ToolVersionAlreadyExistsError,  # 431 — Story 4.6 重复注册
+            ToolVersionTrafficWeightError,  # 432 — Story 4.6 权重/发布约束/并存冲突族
+            ToolVersionRollbackError,  # 433 — Story 4.6 回滚状态冲突
             DataSourceError,  # 410 — Story 4.1b 数据源通用错误
             DataSourceUnavailableError,  # 411 — Story 4.1b 数据源不可用
             DataSourceRateLimitError,  # 412 — Story 4.1b 数据源限流

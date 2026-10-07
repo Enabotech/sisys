@@ -99,6 +99,15 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # 物理段独立于 301-399 与 201-209（两段均无整段空位，遵循 data_source 410-419 独立段先例）
     # EXCEPTION_423-429 预留 V1 多轮辩论（轮次超限/裁决置信度不足/辩论过热等，Story 10.6）
     "debate": (420, 429),
+    # 工具版本子域（430-439）—— Story 4.6 注册 4 个异常（灰度发布与回滚）:
+    # EXCEPTION_430 ToolVersionNotFoundError (Story 4.6, 版本不存在/回滚目标无记录)
+    # EXCEPTION_431 ToolVersionAlreadyExistsError (Story 4.6, (tool_id,version) 重复注册)
+    # EXCEPTION_432 ToolVersionTrafficWeightError (Story 4.6, 权重非法/canary_only 直接全量/并存冲突族)
+    # EXCEPTION_433 ToolVersionRollbackError (Story 4.6, 无可回滚稳定历史/目标非可回滚态)
+    # 物理段独立（tool 380-389 仅剩 384 保留位、toolchain 390-399 已被 4.7 预占 399——两旧段均不可用，
+    # 遵循 data_source 410-419 / debate 420-429 独立段先例）
+    # EXCEPTION_434-439 暂不分配，保持空段预留
+    "tool_version": (430, 439),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -244,6 +253,11 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "DebateGenerationError": "debate",
     "DebateSynthesisError": "debate",
     "DebateLowDivergenceError": "debate",
+    # tool_version_exceptions.py (Story 4.6 新增 4 个异常)
+    "ToolVersionNotFoundError": "tool_version",
+    "ToolVersionAlreadyExistsError": "tool_version",
+    "ToolVersionTrafficWeightError": "tool_version",
+    "ToolVersionRollbackError": "tool_version",
 }
 
 

@@ -157,6 +157,12 @@ from src.domain.exceptions.tool_schema_exceptions import (
     ToolSchemaCompatibilityError,
     ToolSchemaMissingError,
 )
+from src.domain.exceptions.tool_version_exceptions import (
+    ToolVersionAlreadyExistsError,
+    ToolVersionNotFoundError,
+    ToolVersionRollbackError,
+    ToolVersionTrafficWeightError,
+)
 from src.domain.exceptions.traceability_exceptions import (
     TraceabilityError,
     TraceabilityNotFoundError,
@@ -273,6 +279,11 @@ __all__ = [
     "DebateGenerationError",
     "DebateSynthesisError",
     "DebateLowDivergenceError",
+    # 工具版本异常（Story 4.6）
+    "ToolVersionNotFoundError",
+    "ToolVersionAlreadyExistsError",
+    "ToolVersionTrafficWeightError",
+    "ToolVersionRollbackError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

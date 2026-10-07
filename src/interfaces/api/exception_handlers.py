@@ -107,6 +107,10 @@ from src.domain.exceptions import (
     ToolResultValidationError,
     ToolSchemaCompatibilityError,
     ToolSchemaMissingError,
+    ToolVersionAlreadyExistsError,
+    ToolVersionNotFoundError,
+    ToolVersionRollbackError,
+    ToolVersionTrafficWeightError,
     TraceabilityError,
     TraceabilityNotFoundError,
     TransferNotApprovedError,
@@ -247,6 +251,11 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     DebateGenerationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 420 — 视角生成失败（精确注册，避免回退 502）
     DebateSynthesisError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 421 — 风险视图合成失败（精确注册，避免回退 502）
     DebateLowDivergenceError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 422 — 红蓝分化不足（精确注册，避免回退 400）
+    # 工具版本异常（Story 4.6 — 灰度发布与回滚）
+    ToolVersionNotFoundError: status.HTTP_404_NOT_FOUND,  # 430 — 版本不存在
+    ToolVersionAlreadyExistsError: status.HTTP_409_CONFLICT,  # 431 — (tool_id,version) 重复注册
+    ToolVersionTrafficWeightError: status.HTTP_400_BAD_REQUEST,  # 432 — 权重非法/发布约束/并存冲突族
+    ToolVersionRollbackError: status.HTTP_409_CONFLICT,  # 433 — 回滚状态冲突
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

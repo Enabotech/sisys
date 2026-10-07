@@ -724,6 +724,11 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_421 | DebateSynthesisError | ExternalException | 500 |（Story 4.5，风险视图合成 LLM 调用失败，精确注册避免回退 502）|
 | EXCEPTION_422 | DebateLowDivergenceError | BusinessException | 422 |（Story 4.5，红蓝重叠率 ≥0.95 分化不足，精确注册避免回退 400）|
 | EXCEPTION_423~429 | （预留 debate 子域）| — | — |（V1 多轮辩论扩展：轮次超限/裁决置信度不足/辩论过热等，Story 10.6）|
+| EXCEPTION_430 | ToolVersionNotFoundError | NotFoundError | 404 |（Story 4.6，版本不存在/回滚目标无记录/无活跃版本可路由）|
+| EXCEPTION_431 | ToolVersionAlreadyExistsError | ConflictError | 409 |（Story 4.6，(tool_id,version) 重复注册——并发 IntegrityError 经仓储转换）|
+| EXCEPTION_432 | ToolVersionTrafficWeightError | ValidationError | 400 |（Story 4.6，权重非法/canary_only 直接全量/并存冲突族）|
+| EXCEPTION_433 | ToolVersionRollbackError | InvalidStateError | 409 |（Story 4.6，无可回滚稳定历史/目标非可回滚态）|
+| EXCEPTION_434~439 | （预留 tool_version 子域）| — | — |（后续协调，暂不分配）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——
@@ -799,6 +804,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | `tool` | 380–389 | ToolNotFoundError, ToolAlreadyExistsError, ToolExecutionFailedError, ToolExecutionRetryExhaustedError, ToolExecutionTimeoutError, EvidenceValidationFailedError, SkillNotFoundError, SkillLoadError, ToolResultValidationError 等（战略性工具异常，物理范围 380-389 嵌套在 external 301-399 内但语义独立；EXCEPTION_384 保留未占用） |
 | `data_source` | 410–419 | DataSourceError, DataSourceUnavailableError, DataSourceRateLimitError, DataSourceResponseError（Story 4.1b Skills 数据采集；语义归属 external，物理段独立于 301-399——external 已满且 399 预留 Story 4.7） |
 | `debate` | 420–429 | DebateGenerationError, DebateSynthesisError, DebateLowDivergenceError（Story 4.5 红蓝辩论 MVP；420/421 语义归属 external、422 语义归属 business，物理段独立——business 2XX 与 external 3XX 均无整段空位，遵循 data_source 410-419 独立段先例；423-429 预留 V1 多轮辩论 Story 10.6） |
+| `tool_version` | 430–439 | ToolVersionNotFoundError, ToolVersionAlreadyExistsError, ToolVersionTrafficWeightError, ToolVersionRollbackError（Story 4.6 灰度发布与回滚；语义归属 business——继承 NotFoundError/ConflictError/ValidationError/InvalidStateError 具体类，物理段独立——tool 380-389 仅剩 384 保留位、toolchain 390-399 已被 4.7 预占 399，遵循 data_source/debate 独立段先例；434-439 预留） |
 | `fallback` | 999 | UnknownError（兜底，独立于所有子域） |
 
 #### 3.3.3 CI 校验规则

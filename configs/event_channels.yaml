@@ -110,6 +110,24 @@ event_channels:
     description: "工具 Schema 验证失败（Story 4.3,本期仅 realtime,reliable 4.7 启用）"
 
   # =========================================================================
+  # TOOL_VERSION 事件（Story 4.6 — 灰度发布与回滚，管理类事件仅 realtime）
+  # =========================================================================
+  ToolVersionRegistered:
+    redis_channel: "sisys:rt:tool_version_registered"
+    delivery_mode: "realtime"
+    description: "工具版本注册完成（Story 4.6 兼容性分级结果随附）"
+
+  ToolVersionPublished:
+    redis_channel: "sisys:rt:tool_version_published"
+    delivery_mode: "realtime"
+    description: "工具版本发布状态变更（灰度发起/调档/全量/转正/放弃）"
+
+  ToolRolledBack:
+    redis_channel: "sisys:rt:tool_rolled_back"
+    delivery_mode: "realtime"
+    description: "工具版本一键回滚完成（含被降级清单）"
+
+  # =========================================================================
   # SANDBOX 事件（Story 4.4 — Docker 沙箱执行）
   # =========================================================================
   SandboxSessionStarted:

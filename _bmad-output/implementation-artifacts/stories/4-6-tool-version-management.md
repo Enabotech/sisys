@@ -524,9 +524,9 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 实现 `src/domain/entities/tool_version.py` 最小代码（Tool/ToolExecution 双先例风格：dataclass + `__post_init____ → validate()` + `transition_to()` + `VALID_TRANSITIONS` 模块级矩阵） |
 | 🔄 重构 | 类型注解、中文 docstring（Google 风格）、`__init__.py` 导出（若领域实体有集中导出） |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 ToolVersion 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 ToolVersion 聚合根
-- [ ] Subtask 1.3: 🔄 重构 — 优化 ToolVersion 代码
+- [x] Subtask 1.1: 🔴 红 — 编写 ToolVersion 失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 ToolVersion 聚合根
+- [x] Subtask 1.3: 🔄 重构 — 优化 ToolVersion 代码
 
 #### TDD 循环 B：领域服务三件套
 
@@ -536,14 +536,14 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 实现 `src/domain/services/tool_version_policy.py`（RolloutPolicyService / TrafficRouter（**hashlib 稳定散列，禁内建 hash()**）/ VersionRetentionPlanner + RolloutDecision 值对象） |
 | 🔄 重构 | 纯函数化、类型注解、docstring |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写领域服务失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现三个领域服务
-- [ ] Subtask 1.6: 🔄 重构 — 优化领域服务代码
+- [x] Subtask 1.4: 🔴 红 — 编写领域服务失败测试
+- [x] Subtask 1.5: 🟢 绿 — 实现三个领域服务
+- [x] Subtask 1.6: 🔄 重构 — 优化领域服务代码
 
 **完成标准/Definition of Done:**
-- [ ] ToolVersion + 三服务实现完成，domain 层零外部依赖（AST 验证待 Task 8 统一做）
-- [ ] TDD 循环全部通过
-- [ ] 领域层覆盖率 ≥90%（本 Task 新增代码）
+- [x] ToolVersion + 三服务实现完成，domain 层零外部依赖（AST 验证待 Task 8 统一做）
+- [x] TDD 循环全部通过
+- [x] 领域层覆盖率 ≥90%（本 Task 新增代码）
 
 ---
 
@@ -561,9 +561,9 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 实现 `src/domain/events/tool_version_events.py`（3 事件，继承 DomainEvent）+ `src/domain/events/__init__.py` 导出 |
 | 🔄 重构 | docstring、payload 精简（防撑爆 Redis：列表类字段 ≤10 条，4-3 P0-H 先例） |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写事件失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 3 个事件 + 导出
-- [ ] Subtask 2.3: 🔄 重构 — 优化事件代码
+- [x] Subtask 2.1: 🔴 红 — 编写事件失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 3 个事件 + 导出
+- [x] Subtask 2.3: 🔄 重构 — 优化事件代码
 
 #### TDD 循环 B：异常体系 + 登记
 
@@ -573,9 +573,9 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 实现 `src/domain/exceptions/tool_version_exceptions.py` + 四处登记：`_code_ranges.py`（CODE_RANGES + _CLASS_TO_SUBDOMAIN）+ `src/domain/exceptions/__init__.py` + `exception_handlers.py` EXCEPTION_HTTP_MAP（430→404/431→409/432→400/433→409，**注释与 code 对齐**）+ `sisys-uni-exception-design.md §3.3.2` 分配表；同步扩展 `tests/unit/interfaces/api/test_exception_handlers.py` 期望集合 |
 | 🔄 重构 | 运行异常全量测试（`pytest tests/unit/domain/exceptions/ tests/unit/interfaces/api/test_exception_handlers.py -v`）确认 8 项既有测试仍绿 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写异常失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 实现 4 异常 + 五处登记 + 期望集合同步
-- [ ] Subtask 2.6: 🔄 重构 — 全量异常测试回归
+- [x] Subtask 2.4: 🔴 红 — 编写异常失败测试
+- [x] Subtask 2.5: 🟢 绿 — 实现 4 异常 + 五处登记 + 期望集合同步
+- [x] Subtask 2.6: 🔄 重构 — 全量异常测试回归
 
 #### TDD 循环 C：事件通道双登记
 
@@ -585,14 +585,14 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 两处配置同步新增（realtime 通道，参照 ToolSchemaValidationFailed 条目格式） |
 | 🔄 重构 | yaml 格式与相邻条目一致性检查 |
 
-- [ ] Subtask 2.7: 🔴 红 — 通道同步断言失败确认
-- [ ] Subtask 2.8: 🟢 绿 — 双登记完成
-- [ ] Subtask 2.9: 🔄 重构 — 配置格式统一
+- [x] Subtask 2.7: 🔴 红 — 通道同步断言失败确认
+- [x] Subtask 2.8: 🟢 绿 — 双登记完成
+- [x] Subtask 2.9: 🔄 重构 — 配置格式统一
 
 **完成标准/Definition of Done:**
 - [ ] 事件契约测试 + 异常 8 项既有测试全绿
-- [ ] `grep -r "EXCEPTION_43[0-9]" src/domain/exceptions/` 无碰撞
-- [ ] 事件通道双登记完成
+- [x] `grep -r "EXCEPTION_43[0-9]" src/domain/exceptions/` 无碰撞
+- [x] 事件通道双登记完成
 
 ---
 
