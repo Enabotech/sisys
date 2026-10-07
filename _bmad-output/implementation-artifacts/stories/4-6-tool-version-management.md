@@ -774,15 +774,15 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 
 > **性质说明：** 真实服务集成（PostgreSQL Schema 隔离 + InMemory 全链路）+ epics 硬路径文件 + 性能指标验证。
 
-- [ ] Subtask 7.1: 完成 `tests/integration/test_tool_version_integration.py` PG 部分（Task 3 已建基础用例）：发布/回滚多行状态变更原子性（savepoint 内）、UNIQUE 约束真实生效、版本保留策略真实淘汰、`pytestmark = pytest.mark.xdist_group("tool-versions-pg")`
-- [ ] Subtask 7.2: 全链路集成场景：真实 InMemory 仓储 + JsonSchemaValidatorImpl + ToolRegistryService + ToolVersionService + ToolExecutionService（LLM/Sandbox Mock 适配器）——注册→灰度→执行（命中/未命中）→提升→回滚闭环
-- [ ] Subtask 7.3: 性能基准（AC-7 表格逐项）：50 次 publish+rollback P95（`statistics.quantiles(n=20)[18]`；**构造约束：每轮消耗新版本号**——回滚降级版本为 DEPRECATED 再 publish 会 243，复用版本号第二轮即失败，register 构造开销不计入计时窗口）；50 次发布成功率；回滚 100% 原子；1000 次 resolve P95<5ms（**InMemory 装配断言**；PG 装配 skip 留测量证据并附单次 list_active 往返参考值）；全部采用性能断言分级（不达标 skip 留证据）
-- [ ] Subtask 7.4: 连续运行 5 次无随机失败 + `pytest tests/ -n 8` 并行通过
+- [x] Subtask 7.1: 完成 `tests/integration/test_tool_version_integration.py` PG 部分（Task 3 已建基础用例）：发布/回滚多行状态变更原子性（savepoint 内）、UNIQUE 约束真实生效、版本保留策略真实淘汰、`pytestmark = pytest.mark.xdist_group("tool-versions-pg")`
+- [x] Subtask 7.2: 全链路集成场景：真实 InMemory 仓储 + JsonSchemaValidatorImpl + ToolRegistryService + ToolVersionService + ToolExecutionService（LLM/Sandbox Mock 适配器）——注册→灰度→执行（命中/未命中）→提升→回滚闭环
+- [x] Subtask 7.3: 性能基准（AC-7 表格逐项）：50 次 publish+rollback P95（`statistics.quantiles(n=20)[18]`；**构造约束：每轮消耗新版本号**——回滚降级版本为 DEPRECATED 再 publish 会 243，复用版本号第二轮即失败，register 构造开销不计入计时窗口）；50 次发布成功率；回滚 100% 原子；1000 次 resolve P95<5ms（**InMemory 装配断言**；PG 装配 skip 留测量证据并附单次 list_active 往返参考值）；全部采用性能断言分级（不达标 skip 留证据）
+- [x] Subtask 7.4: 连续运行 5 次无随机失败 + `pytest tests/ -n 8` 并行通过
 
 **完成标准/Definition of Done:**
 - [ ] 集成测试覆盖率 ≥75%（epics 硬指标）
-- [ ] 性能指标全部有测量证据
-- [ ] 无随机失败
+- [x] 性能指标全部有测量证据
+- [x] 无随机失败
 
 ---
 
@@ -794,18 +794,18 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 
 #### 架构验证测试实现
 
-- [ ] Subtask 8.1: 创建 `tests/unit/architecture/test_tool_version_management.py`（**epics 硬路径**，4.4/4.5 先例无 `_arch_` 前缀）
-- [ ] Subtask 8.2: 实现领域零依赖验证器（AST 扫描 tool_version 相关 domain 文件禁止外部 import——pydantic/sqlalchemy/redis/fastapi/pytest/httpx/aiohttp，`test_arch_tool.py` 先例）
-- [ ] Subtask 8.3: 实现端口元数据验证器（`_global_registry.get("tool_version_repository")` / `("tool_version_service")` 的 PortSpec 全字段断言 + tool_execution_service v1.3.0 断言）
-- [ ] Subtask 8.4: 实现事件通道同步验证器（3 事件在 event_channels.yaml 与 ChannelRouter.DEFAULT_MAPPINGS 双登记）
-- [ ] Subtask 8.5: 实现执行链零改动验证（ToolExecutionEngine/ToolOutputValidator/SandboxSecurityDecorator 无版本路由代码——import 检查：不 import tool_version_service）
-- [ ] Subtask 8.6: 运行完整测试套件并生成合规报告（任何违规 pytest.fail）
+- [x] Subtask 8.1: 创建 `tests/unit/architecture/test_tool_version_management.py`（**epics 硬路径**，4.4/4.5 先例无 `_arch_` 前缀）
+- [x] Subtask 8.2: 实现领域零依赖验证器（AST 扫描 tool_version 相关 domain 文件禁止外部 import——pydantic/sqlalchemy/redis/fastapi/pytest/httpx/aiohttp，`test_arch_tool.py` 先例）
+- [x] Subtask 8.3: 实现端口元数据验证器（`_global_registry.get("tool_version_repository")` / `("tool_version_service")` 的 PortSpec 全字段断言 + tool_execution_service v1.3.0 断言）
+- [x] Subtask 8.4: 实现事件通道同步验证器（3 事件在 event_channels.yaml 与 ChannelRouter.DEFAULT_MAPPINGS 双登记）
+- [x] Subtask 8.5: 实现执行链零改动验证（ToolExecutionEngine/ToolOutputValidator/SandboxSecurityDecorator 无版本路由代码——import 检查：不 import tool_version_service）
+- [x] Subtask 8.6: 运行完整测试套件并生成合规报告（任何违规 pytest.fail）
 
 **完成标准/Definition of Done:**
 - [ ] 所有架构/约束测试通过
 - [ ] 每条断言失败消息包含违规文件路径与违规 import/元数据项（pytest.fail 消息可定位到文件）
-- [ ] 任何违规都会导致测试失败
-- [ ] 循环依赖检测使用 ruff/isort（不引入额外工具）
+- [x] 任何违规都会导致测试失败
+- [x] 循环依赖检测使用 ruff/isort（不引入额外工具）
 
 ---
 
