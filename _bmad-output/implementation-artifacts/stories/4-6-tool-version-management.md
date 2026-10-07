@@ -1300,9 +1300,21 @@ src（12 个）+ migration（1 个）:
 | CR1-14 | lint-imports「Interfaces 层不得依赖 infrastructure」2 条链 broken——基线 5b96e75a 逐字节相同，**预存量非 4-6 引入**（main CI 红） | 登记 | deferred-work.md 登记（不动 `.importlinter` 已合入规则） |
 | CR1-15 | 根 `.env.example` 从未被 git 跟踪——`TOOL_VERSION_MAX_RETAINED` 新键无样例同步（4-4 `SANDBOX_*` 同缺口，存量形态） | 登记 | deferred-work.md 登记（跨 Story 文档债） |
 
+#### Round 2 回归核查（CR2——R1 修复回归 + 交互面组合核查）
+
+> 双 Agent（R1 修复回归核查 + 修复交互面/全量回归）——4 组修复组合交互全部通过（副本化×顺序契约 / 事件×432 守卫 / DEPRECATED 守卫×rollback 链 / 认证×AC-6 override）；全量 9473+55 全绿、lint-imports 无新增、事件通道端到端实证闭合（3 事件 realtime 映射双处一致）。修复 3 项 P3 + 1 项补强：
+
+| 编号 | 发现 | 严重度 | 处置 |
+|---|---|---|---|
+| CR2-1 | `test_list_404_380` 因 R1 新测试类插断脱落到 `TestBearerTokenPositivePath`（按类名寻测试扑空） | P3 | 用例归位 `TestListEndpoint` |
+| CR2-2 | 432/243 守卫失败路径缺零事件断言（现有零事件断言仅覆盖 431/397/权重三种失败） | P3 | 两用例补 `assert not publisher.published` |
+| CR2-3 | deferred-work 登记的 lint-imports 链描述与实时输出不符（组合根中转模块随构建漂移：jwt_service/prefect/rabbitmq_publisher 各次不同） | P3 | 勘误为「入口两链稳定 + 中转以实时输出为准，不锁行号」 |
+| CR2-4 | rollback 恢复后立即 republish 双档 243 的语义链由「实体矩阵参数化 + 服务用例」组合保证，无端到端单用例 | 补强 | `test_republish_after_rollback_both_weights_243`（灰度档 STABLE→CANARY + 全量档 STABLE→STABLE 均非法） |
+
 #### 已修复 Patch
 
 - [x] CR1-1 ~ CR1-13（17 项落码：src 6 文件 + tests 8 文件 + docs 2 文件）
+- [x] CR2-1 ~ CR2-4（R2 回归核查）
 
 #### 已推迟 Defer
 

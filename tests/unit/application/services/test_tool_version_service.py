@@ -560,9 +560,13 @@ class TestDeprecatedPublishGuard:
         """全量档 publish DEPRECATED → 243 且仓储零污染（单 STABLE 不变量保持）。"""
         service, repo, tid, _ = _make_service()
         await self._setup_stable_and_deprecated(service, tid)
+        publisher = service._event_publisher
+        assert isinstance(publisher, _RecordingPublisher)
+        publisher.published.clear()
         with pytest.raises(EntityStateTransitionError) as exc_info:
             await service.publish_version(tid, "0.9.0", 100)
         assert exc_info.value.code == "EXCEPTION_243"
+        assert not publisher.published, "守卫失败路径必须零事件发布"
         # 失败后仓储不被污染：仍恰好一个 STABLE、DEPRECATED 保持 DEPRECATED
         all_versions = await repo.list_all()
         stables = [tv for tv in all_versions if tv.status is ToolVersionStatus.STABLE]
@@ -586,6 +590,20 @@ class TestDeprecatedPublishGuard:
         assert tv.version == "0.9.0"
         assert tv.status is ToolVersionStatus.STABLE
 
+    async def test_republish_after_rollback_both_weights_243(self) -> None:
+        """回滚恢复后的版本立即再 publish 双档均 243（语义链端到端闭合——R2 补强）。
+
+        STABLE→CANARY 与 STABLE→STABLE 均为矩阵非法格——恢复版本的唯一
+        演进通道是再次被替代降级或被回滚。
+        """
+        service, _, tid, _ = _make_service()
+        await self._setup_stable_and_deprecated(service, tid)
+        await service.rollback(tid)  # 0.9.0 → STABLE
+        with pytest.raises(EntityStateTransitionError):
+            await service.publish_version(tid, "0.9.0", 30)  # 灰度档 → STABLE→CANARY 非法
+        with pytest.raises(EntityStateTransitionError):
+            await service.publish_version(tid, "0.9.0", 100)  # 全量档 → STABLE→STABLE 非法
+
 
 class TestDirectFullCanaryConflict:
     """直接全量遇活跃 CANARY → 432（先 promote/abort 清场纪律）。"""
@@ -597,9 +615,13 @@ class TestDirectFullCanaryConflict:
         await service.register_version(tid, "1.1.0", dict(BASE), dict(BASE))
         await service.publish_version(tid, "1.1.0", 30)  # 活跃 CANARY
         await service.register_version(tid, "1.2.0", dict(BASE), dict(BASE))
+        publisher = service._event_publisher
+        assert isinstance(publisher, _RecordingPublisher)
+        publisher.published.clear()
         with pytest.raises(ToolVersionTrafficWeightError) as exc_info:
             await service.publish_version(tid, "1.2.0", 100)  # PENDING any 直接全量
         assert exc_info.value.code == "EXCEPTION_432"
+        assert not publisher.published, "守卫失败路径必须零事件发布"
         # 状态零变更：CANARY 仍在灰度、STABLE 不动、1.2.0 仍 PENDING
         canary = await repo.get_by_tool_and_version(tid, "1.1.0")
         assert canary is not None and canary.status is ToolVersionStatus.CANARY

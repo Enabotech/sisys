@@ -44,5 +44,5 @@
 
 ## Deferred from: code review of 4-6-tool-version-management (2026-10-07)
 
-- lint-imports「Interfaces layer must not depend on infrastructure」2 条链 broken（app→composition_root→jwt_service / ocr_cli→composition_root→qdrant_manager） — 经基线 5b96e75a 逐字节比对确认为**预存量**（非 4-6 引入），main 上该 CI 门禁为红。涉及组合根 lazy import 链的架构级重构，需单独立项处置（`.importlinter` 已合入规则禁止改动）。`src/composition_root.py:138,174`
+- lint-imports「Interfaces layer must not depend on infrastructure」broken（入口稳定为 `src.interfaces.api.app -> src.composition_root (l.24)` 与 `src.interfaces.cli.ocr_cli -> src.composition_root (l.39)` 两条链） — 经基线 5b96e75a 比对确认为**预存量**（非 4-6 引入），main 上该 CI 门禁为红。根因：interfaces 层 import 组合根，而组合根内部大量 infrastructure lazy import 被传递检出（组合根具体中转模块随构建漂移——jwt_service/prefect/rabbitmq_publisher 等多次实测各不相同，以 lint-imports 实时输出为准，不锁行号）。涉及组合根 lazy import 链的架构级重构，需单独立项处置（`.importlinter` 已合入规则禁止改动）。
 - 根 `.env.example` 从未被 git 跟踪（git ls-files 仅 deploy/delivery 组件级样例） — 新增环境键 `TOOL_VERSION_MAX_RETAINED`（`src/infrastructure/config/tool_version.py:36`）与 4-4 `SANDBOX_*` 键同样无样例同步。跨 Story 文档债：补根 `.env.example` 时统一收录全部应用配置键。

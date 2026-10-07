@@ -152,6 +152,12 @@ class TestListEndpoint:
         resp = _make_client(auth=False).get(f"/api/v1/tools/{TID}/versions")
         assert resp.status_code == 401
 
+    def test_list_404_380(self) -> None:
+        svc = AsyncMock(spec=ToolVersionServicePort)
+        svc.list_versions = AsyncMock(side_effect=ToolNotFoundError(tool_id=TID))
+        resp = _make_client(svc).get(f"/api/v1/tools/{TID}/versions")
+        assert resp.status_code == 404
+
 
 class TestBearerTokenPositivePath:
     """真实 Authorization 头解析路径（不经 override——锁 Depends(oauth2_scheme) 接线）。
@@ -206,12 +212,6 @@ class TestBearerTokenPositivePath:
         client = self._make_auth_client()
         resp = client.get(f"/api/v1/tools/{TID}/versions")
         assert resp.status_code == 401
-
-    def test_list_404_380(self) -> None:
-        svc = AsyncMock(spec=ToolVersionServicePort)
-        svc.list_versions = AsyncMock(side_effect=ToolNotFoundError(tool_id=TID))
-        resp = _make_client(svc).get(f"/api/v1/tools/{TID}/versions")
-        assert resp.status_code == 404
 
 
 class TestPublishEndpoint:
