@@ -2339,13 +2339,14 @@ def bootstrap() -> None:
 
     register_port(
         name="tool_execution_service",
-        version="v1.2.0",  # 升级:装配 SandboxSecurityDecorator(Story 4.4) + ToolOutputValidator(Story 4.3)
+        version="v1.3.0",  # 升级:版本路由注入(Story 4-6) + Sandbox 装饰器(4.4) + OutputValidator(4.3)
         interface=ToolExecutionServicePort,
         impl=lambda resolver: __import__(
             "src.application.services.tool_execution_service",
             fromlist=["ToolExecutionService"],
         ).ToolExecutionService(
             registry=resolver.resolve("tool_registry_service"),
+            tool_version_service=resolver.resolve("tool_version_service"),
             # Story 4.4 P0 修复:SandboxSecurityDecorator 包裹 ToolOutputValidator 包裹 Engine
             # 装饰器层叠: SandboxSecurityDecorator(最外层,安全防护) > ToolOutputValidator(Schema 校验) > Engine(五阶段)
             # 否则 Story 4.4 核心价值(session_id 注入防御 + 并发配额检查)在生产装配中完全未被启用
@@ -2370,7 +2371,7 @@ def bootstrap() -> None:
         module="src.application.services.tool_execution_service",
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
-        tags=("tool", "execution", "service", "decorated"),
+        tags=("tool", "execution", "service", "decorated", "versioned"),
         compatibility=("v1.0.0",),  # 向后兼容 v1.0.0(ToolExecutionEngine 类仍可传入)
         deprecated=False,
     )

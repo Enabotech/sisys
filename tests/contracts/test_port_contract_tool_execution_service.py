@@ -124,6 +124,18 @@ class _DummyResolver:
             return MagicMock()
         if name == "sandbox_session_reaper":
             return MagicMock()
+        # Story 4-6 新增端口依赖（版本路由）
+        if name == "tool_version_service":
+            from src.application.services.tool_version_service import ToolVersionService
+            from src.infrastructure.storage.inmemory.tool_version_repository import (
+                InMemoryToolVersionRepository,
+            )
+
+            return ToolVersionService(
+                repository=InMemoryToolVersionRepository(),
+                schema_validator=MagicMock(spec=["validate_arguments", "validate_output", "validate_schema_compatibility"]),
+                tool_registry=self._registry,
+            )
         raise KeyError(f"未注册的端口: {name}")
 
 
@@ -133,7 +145,7 @@ class TestToolExecutionServicePortContract:
     PORT_NAME = "tool_execution_service"
     IMPL_CLS_NAME = "ToolExecutionService"
     MODULE_PATH = "src.application.services.tool_execution_service"
-    EXPECTED_TAGS = ("tool", "execution", "service", "decorated")
+    EXPECTED_TAGS = ("tool", "execution", "service", "decorated", "versioned")
     EXPECTED_OWNER = "tool-team"
     REQUIRED_METHODS = ["execute", "get_tool_metadata", "list_tools_metadata"]
 
@@ -157,7 +169,7 @@ class TestToolExecutionServicePortContract:
         """维度 3：端口版本"""
         spec = self._spec()
         assert spec is not None
-        assert spec.version == "v1.2.0"  # Story 4.4 升级: SandboxSecurityDecorator + ToolOutputValidator
+        assert spec.version == "v1.3.0"  # Story 4-6 升级: 版本路由注入（tool_version_service 可选依赖）
 
     def test_dimension_4_port_interface_type(self) -> None:
         """维度 4：端口接口类型"""

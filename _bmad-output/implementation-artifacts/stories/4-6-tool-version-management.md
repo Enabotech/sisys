@@ -708,9 +708,9 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 修改 `src/domain/value_objects/tool_execution.py`（ToolCall 加 `version: str | None = None`，frozen 带默认向后兼容）+ `src/application/services/tool_execution_service.py`（`__init__` 加 `tool_version_service: ToolVersionServicePort | None = None` 可选参数；execute 内 get_tool 后注入路由 + 派生副本） |
 | 🔄 重构 | 派生逻辑提纯为私有方法 `_resolve_execution_tool()` |
 
-- [ ] Subtask 5.1: 🔴 红 — 编写执行链集成失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 实现 ToolCall.version + 服务集成
-- [ ] Subtask 5.3: 🔄 重构 — 路由逻辑提纯
+- [x] Subtask 5.1: 🔴 红 — 编写执行链集成失败测试
+- [x] Subtask 5.2: 🟢 绿 — 实现 ToolCall.version + 服务集成
+- [x] Subtask 5.3: 🔄 重构 — 路由逻辑提纯
 
 #### TDD 循环 B：装配升级 v1.3.0
 
@@ -720,14 +720,14 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | composition_root `tool_execution_service` 条目升级（**L2294 起，终审核准**；终审留项修正：原文档 L2316-2352 系对含临时未提交改动的工作区核验所致漂移——dev 一律以端口名 grep 定位）：工厂追加 `tool_version_service=resolver.resolve("tool_version_service")`，version v1.2.0→v1.3.0，tags += ("versioned",)，compatibility=("v1.2.0",)（4-3 P0-A 修复先例：改装配链必须升级 version 并同步契约测试） |
 | 🔄 重构 | 装配注释更新（链路描述补 version router 层） |
 
-- [ ] Subtask 5.4: 🔴 红 — 契约期望更新后红
-- [ ] Subtask 5.5: 🟢 绿 — 装配升级完成
-- [ ] Subtask 5.6: 🔄 重构 — 注释同步
+- [x] Subtask 5.4: 🔴 红 — 契约期望更新后红
+- [x] Subtask 5.5: 🟢 绿 — 装配升级完成
+- [x] Subtask 5.6: 🔄 重构 — 注释同步
 
 **完成标准/Definition of Done:**
 - [ ] ToolExecutionEngine / ToolOutputValidator / SandboxSecurityDecorator 源码零修改（git diff 验证）
-- [ ] ToolExecutionService 向后兼容回归绿——**真实回归锚**：`tests/acceptance/test_acceptance_tool_io_schema_validation.py:121`（构造真实 `ToolExecutionService(registry, engine)`）+ `test_input_output_validator_chain.py` + `test_port_contract_tool_execution_service.py` 全部仍绿
-- [ ] tool_execution_service v1.3.0 契约测试通过
+- [x] ToolExecutionService 向后兼容回归绿——**真实回归锚**：`tests/acceptance/test_acceptance_tool_io_schema_validation.py:121`（构造真实 `ToolExecutionService(registry, engine)`）+ `test_input_output_validator_chain.py` + `test_port_contract_tool_execution_service.py` 全部仍绿
+- [x] tool_execution_service v1.3.0 契约测试通过
 
 ---
 

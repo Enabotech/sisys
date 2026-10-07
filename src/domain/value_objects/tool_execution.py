@@ -49,11 +49,14 @@ class ToolCall:
         tool_id: 工具唯一标识
         arguments: 调用参数（符合 Tool.input_schema）
         tenant_id: 多租户隔离
+        version: 显式指定执行版本（Story 4-6——None 走流量路由；
+            带默认值后置保证既有位置参数调用零破坏）
     """
 
     tool_id: uuid.UUID
     arguments: dict[str, Any] = field(default_factory=dict)
     tenant_id: uuid.UUID | None = None
+    version: str | None = None
 
 
 @dataclass(frozen=True)
