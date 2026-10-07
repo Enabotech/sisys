@@ -745,9 +745,9 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 实现 `src/interfaces/api/tools.py`（`create_tools_router(tool_version_service=None, auth_service=None, get_current_user_override=None)`，prefix `/api/v1/tools`，tags ["tools"]；Pydantic schema 定义在路由文件内——domain_dictionary 先例（该文件工厂实名 `create_document_dictionary_router`）；三级降级认证；`_to_version_response()` 显式映射 helper）+ `app.py create_app()` 挂载（**挂载漏写无报错**——契约测试须含 6 端点存在性断言兜底，auth.py 等 5 个路由未挂载是既有前车之鉴） |
 | 🔄 重构 | 响应转换统一、状态码语义复查 |
 
-- [ ] Subtask 6.1: 🔴 红 — 编写 API 失败测试
-- [ ] Subtask 6.2: 🟢 绿 — 实现路由工厂 + 挂载
-- [ ] Subtask 6.3: 🔄 重构 — 响应层优化
+- [x] Subtask 6.1: 🔴 红 — 编写 API 失败测试
+- [x] Subtask 6.2: 🟢 绿 — 实现路由工厂 + 挂载
+- [x] Subtask 6.3: 🔄 重构 — 响应层优化
 
 #### TDD 循环 B：API 契约测试转绿
 
@@ -757,14 +757,14 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 路由实现后全部断言通过（openapi 静态断言 + 端点存在性） |
 | 🔄 重构 | 契约断言与 openapi.yaml 的 schema 引用一致性 |
 
-- [ ] Subtask 6.4: 🔴 红 — 契约测试状态确认
-- [ ] Subtask 6.5: 🟢 绿 — 契约测试全绿
-- [ ] Subtask 6.6: 🔄 重构 — 契约断言精炼
+- [x] Subtask 6.4: 🔴 红 — 契约测试状态确认
+- [x] Subtask 6.5: 🟢 绿 — 契约测试全绿
+- [x] Subtask 6.6: 🔄 重构 — 契约断言精炼
 
 **完成标准/Definition of Done:**
 - [ ] 6 端点全部可用且经认证
-- [ ] API 契约测试通过
-- [ ] 接口层覆盖率 ≥85%
+- [x] API 契约测试通过
+- [x] 接口层覆盖率 ≥85%
 
 ---
 
