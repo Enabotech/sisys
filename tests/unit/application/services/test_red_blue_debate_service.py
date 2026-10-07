@@ -778,7 +778,8 @@ class TestEntityValidationErrorNotWrapped:
         session = await repo.get_by_id(topic.debate_id)
         assert session is not None
         assert session.state is DebateSessionState.FAILED
-        assert session.failure_reason is not None
+        # 精确断言分支身份语义（R3-MB 击杀——is not None 对空串恒真，实测存活过）
+        assert session.failure_reason == "视角结构化输出领域不变量校验失败"
 
     async def test_risk_view_to_domain_violation_marks_failed(self) -> None:
         """合成侧 Schema→VO 转换 242：FAILED 落库 + 透传（:170-177 分支首次直接覆盖）
@@ -809,7 +810,8 @@ class TestEntityValidationErrorNotWrapped:
         session = await repo.get_by_id(topic.debate_id)
         assert session is not None
         assert session.state is DebateSessionState.FAILED
-        assert session.failure_reason is not None
+        # 精确断言分支身份语义（R3-MB2 击杀——区分合成侧与视角侧分支）
+        assert session.failure_reason == "风险视图领域不变量校验失败"
 
 
 # ===================================================================

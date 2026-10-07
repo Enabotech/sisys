@@ -1544,6 +1544,21 @@ class DebateCompleted(DomainEvent):
 
 **Round 2 统计：** 回归核查 Agent ×1 + 单快评员 ×1（1 往返）+ 主会话全仓回归；六项 Round 1 修复逐一回归**全部成立零 P1/P2 回归**（上轮修复引入新破口的历史规律未复现）；新发现 P3×2 + 台账清偿 4 项 + Defer×3 + 改判维持×1（全部注释/文档级 + 2 阈值数字，无生产逻辑改动）；改动的 6 文件 223 passed + 1 skipped，ruff/mypy 全过。
 
+#### Round 3 断言覆盖矩阵 + 突变闭环（2026-10-07）
+
+> C1 单深度评审员（测试架构视角）：本周期 10 项修复契约逐项守护矩阵 + 4 项新突变**全部实测**（改坏→跑→还原→基线复绿，工作树零残留）。
+
+**断言覆盖矩阵（10 契约）**：C1 metadata str/可序列化（形态等值+全量 dump+roundtrip，M-D 实测 3 红）✓ / C2 视角 Schema 条目级（逐字段单变量+strip 正向，M-A 实测 6 红）✓ / C3 Area 字段级 ✓ / C4 视角侧 242 FAILED 落库（弱覆盖→已补强）/ C5 合成侧 242（弱覆盖→已补强）/ C6 base_config 继承+覆写（M-C 实测 ≥7 红）✓ / C7 debate_id UUID ✓ / C8 PortSpec 硬编码 ✓ / C9 vo_errors 接线 ✓ / C10 timeout 双层 ✓——**8 项原生已覆盖 + 2 项补强后全守护**。
+
+| # | 问题 | 严重度 | 处置 |
+|---|------|--------|------|
+| R3-F01 | 服务级 242 双用例 `failure_reason is not None` 弱断言——M-B/M-B2 实测存活（空串恒真；深层机理：save 的 validate 对「FAILED+空 reason」抛新 242 **替换**原异常，pytest.raises 照收 + InMemory 引用存储使 get_by_id 返回就地改后的对象——save 契约已破测试无感，PG 仓储下将回滚暴露）；failure_reason 语义是区分 C4/C5 分支身份的唯一观测点 | P2（守护缺口） | 已修（两处精确断言 `== "视角结构化输出领域不变量校验失败"` / `== "风险视图领域不变量校验失败"`；M-B 复验双红击杀，还原后 73 passed） |
+| R3-记录 | base.py:153 序列化探针只覆盖 payload 不含 metadata（R1-F01 逃逸的结构性根因）——全量 dump 测试是唯一补位守护，不可删 | 记录 | 并入 R2-D3 Defer 项（跨事件族技术债） |
+| R3-记录 | BDD timeout 断言块挂在温度 Then 内（:1301-1304），场景拆分搬迁时可能失联——单元层三处独立守护兜底 | 记录 | 维护性备注（不强制） |
+| R3-判定 | Schema 层条目级拒绝用例无 loc 断言——从合法工厂基线单变量偏移使抛错可归因，互换约束各自用例仍红，判定可接受 | 记录 | 不造工作 |
+
+**Round 3 统计：** 单深度评审员 ×1（4 项新突变全实测 + 10 行矩阵全实证）；本周期累计突变 **10 项全部击杀**（R1 六项 M1/M2/M4/M5/M6/M8 + R3 四项 M-A/M-B/M-B2/M-C/M-D，其中 M-B/M-B2 经补强后复验击杀）；修复 1 项（2 行精确断言）+ 记录 3 项。**守护完备性达标：10/10 契约全守护。**
+
 #### Round 1 修复方案（R1-F01/F02/F03/F04/F05/F06）
 
 > **C3 评审往返记录**：双评审员（甲：正确性一致性 / 乙：可行性可满足性）首轮均判「合格（附必改点）」——6 项必改（P1 测试同步两处 / P2④ model_construct 指定 + 合成侧零覆盖补齐 / P6① AC-2.3 接线 / P6② timeout 记录形态 / P2① 排除 Literal + 模块级别名 + 选型 docstring / P5 钉死两文件）+ 4 项建议全部吸收为方案 v2 后，独立复评员锚点核实判定**优秀**（唯一非阻塞瑕疵：字段计数笔误，按枚举执行）。评审员关键实证：`Field(strip_whitespace=True)` 在 pydantic v2 是 deprecated no-op 且泄漏脏键进 LLM JSON Schema（Annotated+StringConstraints 是唯一正确机制）；AC-2.3 `when_construct_terminal_without_fields` 内联循环不经 helper，Then 非空化后必误红（接线修复）；base.py:149-153 metadata 不经 _serialize_value 且 json 校验只覆盖 payload 不覆盖 metadata（基类缺口登记留项）。
@@ -1594,3 +1609,4 @@ class DebateCompleted(DomainEvent):
 - v1.4.1-dev: dev-story 实施完成——Task 0~10 全部落地（11 Task × TDD 循环），BDD 36/36 场景全绿；实施期决策：architecture.md 422/423 文档级撞码修订、base_config 连接字段继承修复（集成测试捕获）、真实 LLM 分级断言（26.7s 慢端点实测留痕）、exception_handlers 期望集合同步；状态 → review
 - v1.5.0: 代码审查 Round 1（四视角调研 + 双评审员方案评审 + 复评优秀落码）——P1×3（metadata UUID 序列化炸裂致双通道事件 100% 静默丢失 / 视角 to_domain 242 逃逸 session 卡死 GENERATING / base_config 继承零 CI 守护）+ P2×3 落码修复 + 突变闭环 6 项全红；P3 台账登记 R2+ 核销
 - v1.5.1: 代码审查 Round 2 回归核查 + 台账清偿——六项 R1 修复零 P1/P2 回归 + 全仓 10882 passed；新发现 P3×2（「重试自纠」失实机理勘正为 fail-fast / Raises 补齐）+ 台账清偿 4 项（取消注释机理 / 计时阈值双侧 1.8× / 「第 20 字」×3 / evaluator docstring×3）；Defer×3（llm skip 分类 / litellm 旧注释 / base.py metadata 基类缺口）
+- v1.5.2: 代码审查 Round 3 断言矩阵 + 突变闭环——10 契约 8 项原生已覆盖；唯一实测存活突变 M-B/M-B2（failure_reason is not None 弱断言，含 save 异常替换+引用存储遮蔽机理）以 2 行精确断言击杀——10/10 全守护；累计 10 突变全部击杀
