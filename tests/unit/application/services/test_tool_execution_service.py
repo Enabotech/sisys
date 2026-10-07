@@ -20,6 +20,7 @@ from src.application.services.tool_execution_engine import ToolExecutionEngine
 from src.application.services.tool_execution_service import ToolExecutionService
 from src.application.services.tool_version_service import ToolVersionService
 from src.domain.entities.tool import Tool, ToolCategory, ToolStatus
+from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.tool_version_repository import ToolVersionQuery
 from src.infrastructure.storage.inmemory.tool_repository import InMemoryToolRepository
 from src.infrastructure.storage.inmemory.tool_version_repository import (
@@ -97,6 +98,7 @@ def _make_stack() -> dict[str, Any]:
         repository=version_repo,
         schema_validator=JsonSchemaValidatorImpl(),
         tool_registry=registry,
+        event_publisher=AsyncMock(spec=EventPublisher),
     )
     engine = _RecordingEngine(llm_client=_make_mock_llm(), sandbox=_make_mock_sandbox())
     service = ToolExecutionService(

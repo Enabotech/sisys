@@ -152,6 +152,61 @@ class TestListEndpoint:
         resp = _make_client(auth=False).get(f"/api/v1/tools/{TID}/versions")
         assert resp.status_code == 401
 
+
+class TestBearerTokenPositivePath:
+    """真实 Authorization 头解析路径（不经 override——锁 Depends(oauth2_scheme) 接线）。
+
+    Round 1 审查 P0 回归防线：修复前 get_current_user 未挂 oauth2_scheme，
+    Bearer 头永不解析，正路径任何 token 均 401。
+    """
+
+    VALID = "valid-bearer-token"
+
+    def _make_auth_client(self) -> TestClient:
+        """构建经 auth_service 二级路径（真实依赖工厂）的客户端。"""
+
+        class _StubAuthService:
+            """认证服务桩（固定 token 通过，其余抛领域认证异常）。"""
+
+            async def verify_token(self, token: str) -> TokenPayload:
+                if token != TestBearerTokenPositivePath.VALID:
+                    from src.domain.ports.auth_service import AuthenticationError
+
+                    raise AuthenticationError(f"无效 token: {token[:8]}")
+                return _make_token()
+
+        app = FastAPI()
+        app.add_middleware(ExceptionContextMiddleware)
+        register_exception_handlers(app)
+        svc = AsyncMock(spec=ToolVersionServicePort)
+        svc.list_versions = AsyncMock(return_value=[_make_tv(version="1.0.0")])
+        app.include_router(
+            create_tools_router(
+                tool_version_service=svc,
+                auth_service=_StubAuthService(),
+            )
+        )
+        return TestClient(app)
+
+    def test_bearer_header_positive_path_200(self) -> None:
+        """合法 Bearer 头 → 认证通过（200/2xx 非 401）。"""
+        client = self._make_auth_client()
+        resp = client.get(f"/api/v1/tools/{TID}/versions", headers={"Authorization": f"Bearer {self.VALID}"})
+        assert resp.status_code != 401, "合法 Bearer 头必须可达认证后端点"
+        assert resp.status_code == 200
+
+    def test_bearer_header_invalid_token_401(self) -> None:
+        """非法 token → 401（Invalid token）。"""
+        client = self._make_auth_client()
+        resp = client.get(f"/api/v1/tools/{TID}/versions", headers={"Authorization": "Bearer wrong-token"})
+        assert resp.status_code == 401
+
+    def test_no_header_401_on_real_dependency(self) -> None:
+        """无 Authorization 头 → 401（真实依赖路径）。"""
+        client = self._make_auth_client()
+        resp = client.get(f"/api/v1/tools/{TID}/versions")
+        assert resp.status_code == 401
+
     def test_list_404_380(self) -> None:
         svc = AsyncMock(spec=ToolVersionServicePort)
         svc.list_versions = AsyncMock(side_effect=ToolNotFoundError(tool_id=TID))

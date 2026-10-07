@@ -41,3 +41,8 @@
 - 内联 import 散落问题 — `create_snapshot` 方法体内有 6 个内联 import 块。预存，当前为规避循环依赖的方案，后续可统一重构。
 
 - ~~InMemoryRoutingDecisionLogRepository 非线程安全~~ — **RESOLVED** (2026-05-25)：引入 asyncio.Lock + max_size(1000) + TTL(24h) 淘汰。`src/infrastructure/messaging/inmemory_routing_decision_log_repository.py`
+
+## Deferred from: code review of 4-6-tool-version-management (2026-10-07)
+
+- lint-imports「Interfaces layer must not depend on infrastructure」2 条链 broken（app→composition_root→jwt_service / ocr_cli→composition_root→qdrant_manager） — 经基线 5b96e75a 逐字节比对确认为**预存量**（非 4-6 引入），main 上该 CI 门禁为红。涉及组合根 lazy import 链的架构级重构，需单独立项处置（`.importlinter` 已合入规则禁止改动）。`src/composition_root.py:138,174`
+- 根 `.env.example` 从未被 git 跟踪（git ls-files 仅 deploy/delivery 组件级样例） — 新增环境键 `TOOL_VERSION_MAX_RETAINED`（`src/infrastructure/config/tool_version.py:36`）与 4-4 `SANDBOX_*` 键同样无样例同步。跨 Story 文档债：补根 `.env.example` 时统一收录全部应用配置键。

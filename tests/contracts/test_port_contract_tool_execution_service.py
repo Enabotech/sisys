@@ -21,11 +21,12 @@ from __future__ import annotations
 import uuid
 from collections.abc import Collection
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from src.application.ports.tool_execution_service import ToolExecutionServicePort
 from src.application.services.tool_execution_engine import ToolExecutionEngine
 from src.application.services.tool_registry_service import ToolRegistryService
+from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.llm_client import LLMConfig, LLMResponse
 from src.domain.ports.registry import Lifetime, PortSpec
 from src.domain.value_objects.container_spec import ContainerSpec
@@ -135,6 +136,7 @@ class _DummyResolver:
                 repository=InMemoryToolVersionRepository(),
                 schema_validator=MagicMock(spec=["validate_arguments", "validate_output", "validate_schema_compatibility"]),
                 tool_registry=self._registry,
+                event_publisher=AsyncMock(spec=EventPublisher),
             )
         raise KeyError(f"未注册的端口: {name}")
 
@@ -166,10 +168,11 @@ class TestToolExecutionServicePortContract:
         assert spec.name == self.PORT_NAME
 
     def test_dimension_3_port_version(self) -> None:
-        """维度 3：端口版本"""
+        """维度 3：端口版本 + compatibility（Story SSOT 表：兼容 v1.2.0）"""
         spec = self._spec()
         assert spec is not None
         assert spec.version == "v1.3.0"  # Story 4-6 升级: 版本路由注入（tool_version_service 可选依赖）
+        assert spec.compatibility == ("v1.2.0",)  # Round 1 审查 F8：SSOT 对齐（新增可选注入不破坏 v1.2.0）
 
     def test_dimension_4_port_interface_type(self) -> None:
         """维度 4：端口接口类型"""

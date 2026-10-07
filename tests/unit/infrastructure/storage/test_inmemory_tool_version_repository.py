@@ -240,3 +240,52 @@ class TestProtocolConformance:
         assert hasattr(ToolVersionRepositoryPort, "_is_runtime_protocol") or hasattr(
             ToolVersionRepositoryPort, "__runtime_protocol__"
         )
+
+
+class TestDetachedCopyIsolation:
+    """双端副本隔离测试（Round 1 审查——读路径返回副本，save 存副本）。
+
+    判别目标：调用方在异常/失败路径上对读出实体的就地改写不得污染仓储
+    持有的共享引用（publish-on-DEPRECATED 失败曾致 InMemory 双 STABLE 污染）。
+    """
+
+    @pytest.mark.asyncio
+    async def test_mutating_read_result_does_not_pollute_store(self) -> None:
+        """改写读出实体（未 save）不影响仓储内部状态。"""
+        repo = InMemoryToolVersionRepository()
+        tid = TID()
+        await repo.save(_make_tv("1.0.0", ToolVersionStatus.STABLE, tool_id=tid))
+        fetched = await repo.get_by_tool_and_version(tid, "1.0.0")
+        assert fetched is not None
+        fetched.status = ToolVersionStatus.DEPRECATED  # 就地改写（模拟失败路径泄漏）
+        reread = await repo.get_by_tool_and_version(tid, "1.0.0")
+        assert reread is not None
+        assert reread.status is ToolVersionStatus.STABLE, "读路径必须返回隔离副本"
+
+    @pytest.mark.asyncio
+    async def test_mutating_saved_entity_after_save_does_not_pollute_store(self) -> None:
+        """save 后改写调用方持有的实体不影响仓储内部状态。"""
+        repo = InMemoryToolVersionRepository()
+        tid = TID()
+        tv = _make_tv("1.0.0", ToolVersionStatus.PENDING, tool_id=tid)
+        await repo.save(tv)
+        tv.status = ToolVersionStatus.STABLE  # save 后改写（模拟并发交错泄漏）
+        fetched = await repo.get_by_tool_and_version(tid, "1.0.0")
+        assert fetched is not None
+        assert fetched.status is ToolVersionStatus.PENDING, "save 必须存副本"
+
+    @pytest.mark.asyncio
+    async def test_list_paths_return_isolated_copies(self) -> None:
+        """list_active/list_by_query/list_all 同样返回隔离副本。"""
+        repo = InMemoryToolVersionRepository()
+        tid = TID()
+        await repo.save(_make_tv("1.0.0", ToolVersionStatus.STABLE, tool_id=tid))
+        for fetched in (
+            *(await repo.list_active(tid)),
+            *(await repo.list_by_query(ToolVersionQuery(tool_id=tid))),
+            *(await repo.list_all()),
+        ):
+            fetched.status = ToolVersionStatus.CANARY
+        reread = await repo.get_by_tool_and_version(tid, "1.0.0")
+        assert reread is not None
+        assert reread.status is ToolVersionStatus.STABLE

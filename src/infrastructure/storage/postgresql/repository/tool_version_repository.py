@@ -84,6 +84,12 @@ class PostgreSQLToolVersionRepository(PostgreSQLAdapter[ToolVersion, ToolVersion
     async def save(self, entity: ToolVersion) -> ToolVersion:
         """保存版本（唯一约束冲突转换为 431/432 领域异常）。
 
+        SAVEPOINT 包裹（begin_nested）：约束冲突时 flush 抛 IntegrityError
+        会将外层事务置为 PendingRollback——不包 savepoint 时，服务层惰性
+        注册的「431 容错重读」在同一 session 上执行 SELECT 将抛
+        PendingRollbackError（非领域异常，打穿执行链）。savepoint 回滚后
+        session 恢复可用，重读得以成立（AC-5 幂等承诺的 PG 实态保障）。
+
         Args:
             entity: 版本实体
 
@@ -96,7 +102,8 @@ class PostgreSQLToolVersionRepository(PostgreSQLAdapter[ToolVersion, ToolVersion
         """
         entity.validate()
         try:
-            return await super().save(entity)
+            async with self._session.begin_nested():
+                return await super().save(entity)
         except IntegrityError as exc:
             error_text = f"{exc.statement or ''} {exc}"
             if _SINGLE_STABLE_INDEX in error_text or "single_stable" in error_text:

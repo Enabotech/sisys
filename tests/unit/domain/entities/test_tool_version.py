@@ -11,7 +11,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from typing import NotRequired, TypedDict, Unpack
 
 import pytest
 
@@ -22,24 +23,38 @@ from src.domain.entities.tool_version import (
 from src.domain.exceptions import EntityStateTransitionError, EntityValidationError
 
 
+class _VersionOverrides(TypedDict):
+    """_make_version 可覆盖字段（TypedDict 类型安全 kwargs——零抑制注释）。"""
+
+    tool_id: NotRequired[str]
+    input_schema: NotRequired[dict]
+    output_schema: NotRequired[dict]
+    traffic_weight: NotRequired[int]
+    required_rollout_mode: NotRequired[str]
+    last_stable_at: NotRequired[datetime | None]
+    created_at: NotRequired[datetime]
+    updated_at: NotRequired[datetime]
+
+
 def _make_version(
     version: str = "1.0.0",
     status: ToolVersionStatus = ToolVersionStatus.PENDING,
-    **kwargs: object,
+    **kwargs: Unpack[_VersionOverrides],
 ) -> ToolVersion:
     """构造测试用 ToolVersion 实体。"""
     now = datetime.now(UTC)
-    defaults: dict[str, object] = {
-        "tool_id": "00000000-0000-0000-0000-000000000001",
-        "version": version,
-        "input_schema": {},
-        "output_schema": {},
-        "status": status,
-        "created_at": now,
-        "updated_at": now,
-    }
-    defaults.update(kwargs)
-    return ToolVersion(**defaults)  # type: ignore[arg-type]
+    return ToolVersion(
+        tool_id=kwargs.get("tool_id", "00000000-0000-0000-0000-000000000001"),
+        version=version,
+        input_schema=kwargs.get("input_schema", {}),
+        output_schema=kwargs.get("output_schema", {}),
+        status=status,
+        traffic_weight=kwargs.get("traffic_weight", 0),
+        required_rollout_mode=kwargs.get("required_rollout_mode", "any"),
+        last_stable_at=kwargs.get("last_stable_at"),
+        created_at=kwargs.get("created_at", now),
+        updated_at=kwargs.get("updated_at", now),
+    )
 
 
 class TestConstructionValidation:
@@ -180,11 +195,11 @@ class TestStateMachine:
         assert exc_info.value.code == "EXCEPTION_243"
 
     def test_transition_updates_updated_at(self) -> None:
-        """合法迁移刷新 updated_at。"""
-        tv = _make_version(status=ToolVersionStatus.PENDING)
+        """合法迁移刷新 updated_at（构造旧时间戳——严格大于断言零时钟抖动）。"""
+        tv = _make_version(status=ToolVersionStatus.PENDING, updated_at=datetime.now(UTC) - timedelta(seconds=1))
         before = tv.updated_at
         tv.transition_to(ToolVersionStatus.CANARY)
-        assert tv.updated_at >= before
+        assert tv.updated_at > before, "迁移必须刷新 updated_at"
 
     def test_transition_no_state_version_lock(self) -> None:
         """与 ToolExecution 先例的差异点：不携带 state_version 乐观锁自增。
@@ -221,8 +236,10 @@ class TestLastStableAtStamps:
         assert tv.last_stable_at is None
 
     def test_clear_semantics_for_rollback_candidate(self) -> None:
-        """清空后的版本退出回滚候选（last_stable_at None = 非候选）。"""
-        tv = _make_version(status=ToolVersionStatus.DEPRECATED, last_stable_at=None)
+        """清空后的版本退出回滚候选（带戳 → clear → None = 非候选）。"""
+        now = datetime.now(UTC)
+        tv = _make_version(status=ToolVersionStatus.DEPRECATED, last_stable_at=now)
+        tv.clear_last_stable()
         assert tv.last_stable_at is None
 
 

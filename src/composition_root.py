@@ -2303,6 +2303,7 @@ def bootstrap() -> None:
             repository=resolver.resolve("tool_version_repository"),
             schema_validator=resolver.resolve("schema_validator"),
             tool_registry=resolver.resolve("tool_registry_service"),
+            event_publisher=resolver.resolve("event_publisher"),
             max_retained_versions=__import__(
                 "src.infrastructure.config.tool_version",
                 fromlist=["ToolVersionConfig"],
@@ -2372,7 +2373,7 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
         tags=("tool", "execution", "service", "decorated", "versioned"),
-        compatibility=("v1.0.0",),  # 向后兼容 v1.0.0(ToolExecutionEngine 类仍可传入)
+        compatibility=("v1.2.0",),  # Story SSOT 表：向后兼容 v1.2.0（新增可选注入 tool_version_service）
         deprecated=False,
     )
 

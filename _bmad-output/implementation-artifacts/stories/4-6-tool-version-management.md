@@ -232,7 +232,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 端口名 | 层 | interface | impl（注册实现） | version | lifetime | owner | tags |
 |--------|---|-----------|-----------------|---------|----------|-------|------|
 | `tool_version_repository` | domain | `ToolVersionRepositoryPort`（继承 `L2RdbPort[ToolVersion]`，async，含 `ToolVersionQuery`） | `src.infrastructure.storage.postgresql.repository.tool_version_repository.PostgreSQLToolVersionRepository` | v1.0.0 | SCOPED | tool-team | (tool, version, repository, postgresql, sqlalchemy) |
-| `tool_version_service` | application | `ToolVersionServicePort` | `src.application.services.tool_version_service.ToolVersionService`（工厂注入 repository + schema_validator + tool_registry + **max_retained_versions 标量**——组合根以 `ToolVersionConfig.from_env().max_retained_versions` 解析后传入） | v1.0.0 | SCOPED | tool-team | (tool, version, service) |
+| `tool_version_service` | application | `ToolVersionServicePort` | `src.application.services.tool_version_service.ToolVersionService`（工厂注入 repository + schema_validator + tool_registry + **event_publisher** + **max_retained_versions 标量**——组合根以 `ToolVersionConfig.from_env().max_retained_versions` 解析后传入；CR1 修复：事件发布端口补入注入清单） | v1.0.0 | SCOPED | tool-team | (tool, version, service) |
 | `tool_execution_service`（升级） | application | `ToolExecutionServicePort` | 同现有，新增可选注入 `tool_version_service` | **v1.2.0 → v1.3.0** | SCOPED | tool-team | 现有 tags + ("versioned",)，compatibility 声明 ("v1.2.0",) |
 
 - [ ] `ToolVersionRepositoryPort` 方法集（对齐 `ToolExecutionRepositoryPort` 先例）：`save` / `get_by_id` / `get_by_tool_and_version(tool_id, version)` / `list_by_query(query)` / `count(query)` / `list_active(tool_id)`（CANARY+STABLE）/ `delete(version_id)`
@@ -910,9 +910,12 @@ publish_version(tool_id, version, traffic_weight=100):   # 状态感知：PENDIN
        tv.status==CANARY: 调档（同态迁移 CANARY→CANARY，仅更新 weight；此时活跃 canary 必 == tv）
        tv.status ∈ {STABLE, DEPRECATED}: transition_to 抛 243（非法迁移）
      weight == 100（全量档）:
+       tv.status==DEPRECATED → 243（唯一恢复通道是 rollback 流程——入口守卫，先于任何实体改写）
        tv.status==PENDING 且 mode=="canary_only" → 432（禁止直接全量）
        tv.status==PENDING 且 mode=="any" → tv.transition_to(STABLE)（直接全量）
        tv.status==CANARY → tv.transition_to(STABLE)（promote 转正——canary_only 灰度毕业通道，放行）
+       tv.status∈{PENDING,CANARY} 且存在活跃 CANARY ≠ tv → 432（直接全量不得残留活跃灰度——
+       旧 CANARY 会继续承接流量造成新旧分流；先 promote/abort 清场再全量；CANARY 自身 promote 不受此限）
        全量档同时：旧 STABLE.transition_to(DEPRECATED) 并记录 last_stable_at（曾全量服务标记）；
        新 STABLE 的 traffic_weight 置 100（数据卫生——与「STABLE 语义恒 100」一致）
   4. repo.save（多行变更在同一 session 事务/savepoint 内；**保存顺序：先 save 降级行（旧 STABLE），
@@ -1103,7 +1106,7 @@ docs/api/openapi.yaml                             # ✏️ +5 path +6 schema
 - [x] 故事需求从 `epics_v1.0.md` 提取（L1318-1358 + FR-ST-06 L517/L1821 + or.md 三.1.(2)/三.工具箱.1[2]）
 - [x] 架构约束从 `architecture.md` + `sisys-core-domain-design.md` 提取
 - [x] 前一个故事学习经验整合（4-1a/4-3/4-4/4-5 四故事 + deferred-work.md 已核查无相关延期项）
-- [x] 状态设置为 `ready-for-dev`
+- [x] 状态设置为 `ready-for-dev`（开发结束后流转为 `review`——CR1 代码审查周期进行中）
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
 - [x] 多 Agent 并行代码调研（领域层/应用+基础设施/接口层/测试模式/前序经验 5 视角，全部结论带文件行号实证）
@@ -1156,7 +1159,6 @@ src（12 个）+ migration（1 个）:
 - `src/domain/events/__init__.py` - 导出 3 事件
 - `src/interfaces/api/exception_handlers.py` - HTTP 映射 +4（注释对齐）
 - `src/interfaces/api/app.py` - 挂载 tools router
-- `src/infrastructure/config/__init__.py` - 导出 ToolVersionConfig
 - `configs/event_channels.yaml` - 3 事件通道
 - `docs/api/openapi.yaml` - 5 path + 6 schema
 - `docs/architecture/sisys-uni-exception-design.md` - §3.3.2 编码分配表
@@ -1190,7 +1192,7 @@ src（12 个）+ migration（1 个）:
 | **Story ID** | 4.6 |
 | **Story Key** | 4-6-tool-version-management |
 | **File** | `_bmad-output/implementation-artifacts/stories/4-6-tool-version-management.md` |
-| **Status** | `backlog` → `ready-for-dev` → `in-progress` → `done` |
+| **Status** | `backlog` → `ready-for-dev` → `in-progress` → `review` |
 | **Epic** | Epic 4: 战略工具箱 |
 | **价值组** | 战略工具执行能力（V1 P1 工具箱增强） |
 | **优先级** | P1-6（V1） |
@@ -1273,18 +1275,42 @@ src（12 个）+ migration（1 个）:
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** [待 code-review]
-**审查模式:** [待 code-review]
+**审查日期:** 2026-10-07（代码审查周期 Round 1）
+**审查模式:** dev-story 后代码审查（范围 `git diff 5b96e75a..HEAD`，9 个 feat(4-6) 提交，58 文件）
 
-#### 需决策 Decision Needed
+#### 代码审查周期 Round 1（编号规则：CR<n>-<序号>，与文档审查周期 R<n>- 命名空间区分）
 
-- [ ] [4-6-P0~2-N][Review][Patch | Defer] [待 code-review 填充] [blind | edge | audit] `[相对路径]:[行号范围]`
+> C1 四视角并行调研（领域正确性/架构合规/测试判别力/API 契约与文档一致性）→ C2 方案 → C3 双评审（配额受限降级主会话评审，裁定「优秀（有条件）」）→ C4 提交。修复明细（P0×2 + P1×4 + P2×6 + P3×5，落码 17 项 + 登记 2 项）：
+
+| 编号 | 发现 | 严重度 | 处置 |
+|---|---|---|---|
+| CR1-1 | **tools 路由认证断链**：`get_current_user` 未挂 `Depends(oauth2_scheme)`（token 裸参数被解析为 query 参数）+ `verify_token` 缺 `await`——生产装配 6 端点全量 401，openapi.yaml 宣称的 bearerAuth 不可达；测试全走 override 旁路致逃逸；运行时 openapi() security=None 与文档静默分叉 | P0 | 两级依赖补 `Depends(oauth2_scheme)` + `await` + DI 降级级改 `get_resolver()`；补真实 Authorization 头正路径三用例（突变验证：移除守卫→红）+ 运行时契约 security 断言（`tests/contracts/test_api_contract_tools.py`） |
+| CR1-2 | **publish DEPRECATED 全量档守卫缺口**：DEPRECATED→STABLE 是矩阵合法格（rollback 专用），publish 全量档 else 分支不拦截→tv 被就地改写后 save 撞 432（语义错报）且 **InMemory 共享引用被污染（双 STABLE 静默并存）**；Story L911/L658 明文要求 243 | P0 | publish 入口单点守卫（任何实体改写前）抛 243 + InMemory 仓储双端 deepcopy 副本（save 存副本/读路径返回副本）根治污染模式；补守卫/零污染/回滚通道不误伤三用例 + 副本隔离三用例 |
+| CR1-3 | **三领域事件零发布点**：ToolVersionRegistered/Published/ToolRolledBack 全 src 无发射方——事件表/编排蓝图（step 5/8）要求 register/publish/abort/rollback 成功发布，端口 SSOT 表漏列 event_publisher 自相矛盾；验收 `AsyncMock(spec=EventPublisher)` 死变量（构造后零引用）掩盖断链 | P1 | 服务注入 `event_publisher`（必填——消灭静默形态）+ 四操作成功路径发布（惰性注册不发）+ fail-soft（PublishResult 失败仅 warning）；组合根注入；端口 SSOT 表补齐；单测 9 事件用例（成功 payload/失败零发布/惰性不发）+ 验收新增事件场景（feature+py 锁步，37→38 场景）+ 死变量改真实 `_RecordingEventPublisher` |
+| CR1-4 | **PG 431 容错重读不可达**：`_do_save`=merge+flush 无 SAVEPOINT，flush 撞 UNIQUE 后 session PendingRollback——惰性注册并发负方重读抛 PendingRollbackError→500（AC-5 幂等承诺 PG 实态失效；InMemory 无毒化故三层测试全绿掩盖） | P1 | `PostgreSQLToolVersionRepository.save` 以 `begin_nested()` 包裹 `super().save()`；补 PG 集成用例（431 后同 session 重读+续写可达） |
+| CR1-5 | **抑制注释 2 处**：`test_tool_version.py:42 # type: ignore[arg-type]`（铁律零豁免）；`acceptance:1290 # noqa: BLE001`（BLE001 未在 ruff select 启用——无效抑制+铁律双重违反） | P1 | `_make_version` 改 TypedDict `Unpack` 类型安全 kwargs；删 noqa（导入聚合场景 `except Exception` 正当，理由移普通注释） |
+| CR1-6 | **集成恒真断言**：`test_rollback_atomicity_no_intermediate_state` 的 `outcomes <= {"success","explicit-failure"}` 恒真（元素仅来自两字面量）——标题宣称「无中间态」实际只验证「不抛非领域异常」 | P1 | 每轮补不变量断言「恰好一个 STABLE」（对齐验收侧同场景 L1204-1207） |
+| CR1-7 | 直接全量不拦截并存活跃 CANARY——旧灰度继续承接流量造成新旧分流（文档空白的语义组合） | P2 | 守卫抛 432（与灰度档并存冲突语义对称；Flagger promote 独立语义——先 promote/abort 清场）；蓝图全量档补条目 + 两用例（含 promote 自身不误伤） |
+| CR1-8 | `tool_execution_service` compatibility `("v1.0.0",)` ≠ Story SSOT 表 `("v1.2.0",)`；契约测试不覆盖 compatibility 维度 | P2 | 组合根改 `("v1.2.0",)` + 契约测试维度 3 补断言 |
+| CR1-9 | 服务单测 `_FakeRepo` 绕过 InMemory 单 STABLE/CANARY 软校验（服务层保存顺序破坏不红）+ docstring 虚假 spec 声明；`_make_registry` 无 spec；rollback 无 STABLE 分支（L253-254）三层零覆盖（Story L658 明文要求） | P2 | `_FakeRepo` 整体替换为真实 `InMemoryToolVersionRepository`；registry 加 `spec=ToolRegistryServicePort`；补无 STABLE→433 用例 + trigger 枚举校验 242 用例 |
+| CR1-10 | 实体测试弱断言：`updated_at >= before` 判别力零（相等也过）；`test_clear_semantics` 同义反复（构造 None 断言 None）；`asyncio_run` 死代码 | P2 | 构造旧时间戳严格 `>` 断言（零时钟抖动）；带戳→clear→None 行为化；删死代码 |
+| CR1-11 | openapi.yaml publish/register 400 描述与实现分层错位（pydantic 边界 201 vs 服务层 432/242，状态码巧合一致错误码语义分叉） | P2 | 两处描述补分层口径 |
+| CR1-12 | 派生副本快捷返回仅比 version+input_schema 漏 output_schema（输出校验背离快照权威语义） | P3 | 补三字段全比 |
+| CR1-13 | `_decide_rollout` 拒绝路径重复调用校验器 2 次（端口不保证无副作用）；Story File List 虚报 `config/__init__.py` 导出行（与 R1-31 SandboxConfig 反例矛盾）；Status 链 `done` 与头部 `review` 不符 | P3 | 返回 `(decision, breaking_summary)` 复用（397 context 与 Registered 事件 payload 同源）；File List 删虚报行；Status 链收敛 `review` |
+| CR1-14 | lint-imports「Interfaces 层不得依赖 infrastructure」2 条链 broken——基线 5b96e75a 逐字节相同，**预存量非 4-6 引入**（main CI 红） | 登记 | deferred-work.md 登记（不动 `.importlinter` 已合入规则） |
+| CR1-15 | 根 `.env.example` 从未被 git 跟踪——`TOOL_VERSION_MAX_RETAINED` 新键无样例同步（4-4 `SANDBOX_*` 同缺口，存量形态） | 登记 | deferred-work.md 登记（跨 Story 文档债） |
 
 #### 已修复 Patch
 
-- [ ] [待 code-review 填充]
+- [x] CR1-1 ~ CR1-13（17 项落码：src 6 文件 + tests 8 文件 + docs 2 文件）
 
 #### 已推迟 Defer
+
+- [x] CR1-14 / CR1-15 → `deferred-work.md`「Deferred from: code review of 4-6-tool-version-management (2026-10-07)」
+
+#### 需决策 Decision Needed
+
+（无——CR1-7 直接全量遇活跃 CANARY 裁定为抛 432【与灰度档并存冲突语义对称 + Flagger promote 独立语义先例】，已同步蓝图；CR1-3 事件接线裁定为「补发射」【蓝图与事件表双重明文要求，端口表漏列为文档内部矛盾，以蓝图为 SSOT】）
 
 - [ ] [待 code-review 填充]
 
@@ -1299,7 +1325,7 @@ src（12 个）+ migration（1 个）:
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-10-07
 **最后更新/Last Updated:** 2026-10-07
 **更新说明/Description:**
@@ -1308,3 +1334,4 @@ src（12 个）+ migration（1 个）:
 - v1.2.0: Round 2 循环审查修订（D1 回归核查视角 + D2 双视角：修复交互面审查 + 全文一致性快扫）——P1×2（R1-5 跨步 ping-pong 修复自拆→裁决业界指针原则「回滚降级不记戳」；R1-8 缺保存顺序约束→先降级后提升）+ P2×4（4 端点 380 前置通用规则 / sha256 升格规范算法 / path 口径 6→5 / 场景计数 27→37）+ P3×15；16 格状态机双向差集验证干净、30+ 行号引用实证吻合
 - v1.3.0: Round 3 循环审查修订（单深度：37 场景期望唯一性推演 + 6 条状态时间线全推演 + Task 0→9 依赖干跑）——P1×2（Task 4 config 注入分层矛盾 CI 必炸→改标量 max_retained_versions 注入[贴合 SandboxConfig 先例]；残留戳两读分歧致第 3 次回滚 ping-pong 复活→裁决 rollback 降级显式清空戳）+ P2×2（保留策略无戳组平局键→两级排序；partial index 冲突异常转换零定义→仓储层 431/432 转换规则）+ P3×7；37 场景无死锁、35 期望唯一、跨任务零倒挂
 - v1.3.1: Round 4 纯验证（多维度快扫零修复）+ Round 5 独立终审五节全过（周期闭合/10/10 修复取证/28+ 锚点吻合/门禁就绪/收敛判定）——终审留项 2 项 P3 随收敛提交清偿（决策表 #4 措辞、组合根行号）；收敛声明入 Story；**审查周期正式收敛，累计 66 项修复，零 P0/P1 残留，维持 ready-for-dev**
+- v1.4.0: dev-story 实施（Task 0-9 九提交，全量 11191 passed）+ **代码审查周期 Round 1（CR1）**：四视角并行调研→方案→评审→落码——修复 P0×2（tools 认证断链生产 6 端点全量 401 / publish DEPRECATED 守卫缺口+InMemory 共享引用污染双 STABLE）+ P1×4（事件零发布点接线 / PG savepoint 431 重读 / 抑制注释 ×2 / 集成恒真断言）+ P2×6 + P3×5；验收场景 37→38（新增领域事件场景）；登记 deferred ×2（lint-imports 预存 broken / 根 .env.example 缺失）

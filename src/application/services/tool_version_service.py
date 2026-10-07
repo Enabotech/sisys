@@ -1,8 +1,8 @@
 """应用层工具版本管理服务（Story 4-6 — 灰度发布与回滚核心编排）
 
-ToolVersionService：R2 组合注入（repository + schema_validator + tool_registry
-三基础端口 + max_retained_versions 标量——禁止注入 infrastructure Config 对象，
-组合根以 ToolVersionConfig.from_env() 解析后传标量）。
+ToolVersionService：R2 组合注入（repository + schema_validator + tool_registry +
+event_publisher 四基础端口 + max_retained_versions 标量——禁止注入 infrastructure
+Config 对象，组合根以 ToolVersionConfig.from_env() 解析后传标量）。
 
 编排蓝图（Story Dev Notes「核心编排流程」的忠实实现）：
 - register：双 Schema 兼容性校验（input≈backward / output≈forward）→
@@ -28,8 +28,15 @@ from src.application.ports.schema_validator import SchemaValidatorPort
 from src.application.ports.tool_registry_service import ToolRegistryServicePort
 from src.domain.entities.tool import Tool
 from src.domain.entities.tool_version import ToolVersion, ToolVersionStatus
+from src.domain.events.base import DomainEvent
+from src.domain.events.tool_version_events import (
+    ToolRolledBack,
+    ToolVersionPublished,
+    ToolVersionRegistered,
+)
 from src.domain.exceptions import (
     EntityStateTransitionError,
+    EntityValidationError,
 )
 from src.domain.exceptions.tool_schema_exceptions import ToolSchemaCompatibilityError
 from src.domain.exceptions.tool_version_exceptions import (
@@ -38,6 +45,7 @@ from src.domain.exceptions.tool_version_exceptions import (
     ToolVersionRollbackError,
     ToolVersionTrafficWeightError,
 )
+from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.tool_version_repository import (
     ToolVersionQuery,
     ToolVersionRepositoryPort,
@@ -67,6 +75,7 @@ class ToolVersionService:
         repository: ToolVersionRepositoryPort,
         schema_validator: SchemaValidatorPort,
         tool_registry: ToolRegistryServicePort,
+        event_publisher: EventPublisher,
         max_retained_versions: int = 10,
     ) -> None:
         """初始化服务。
@@ -75,13 +84,26 @@ class ToolVersionService:
             repository: 工具版本仓储端口
             schema_validator: Schema 兼容性校验端口（4.3 能力复用）
             tool_registry: 工具注册表端口（工具存在性前置 380）
+            event_publisher: 领域事件发布端口（register/publish/abort/rollback
+                成功路径发布对应事件；惰性初始注册不发——审计取舍见 Story 事件表）
             max_retained_versions: 版本保留上限标量（组合根从 ToolVersionConfig
                 解析后传入——应用层禁止 import infrastructure）
         """
         self._repo = repository
         self._validator = schema_validator
         self._registry = tool_registry
+        self._event_publisher = event_publisher
         self._max_retained = max_retained_versions
+
+    async def _publish_event(self, event: DomainEvent) -> None:
+        """发布领域事件（fail-soft：发布失败仅告警，不中断业务主流程）。
+
+        EventPublisher 协议约定错误内部消化并返回 PublishResult——本方法
+        仅对失败结果记 warning 日志（reliable 通道的可靠投递由 Outbox 保证）。
+        """
+        result = await self._event_publisher.publish(event)
+        if not result.is_success:
+            logger.warning("领域事件发布失败: event=%s error=%s", event.event_type, result.partial_error)
 
     # ------------------------------------------------------------------
     # register_version
@@ -103,23 +125,18 @@ class ToolVersionService:
 
         stable = await self._find_stable(tool_id)
         if stable is not None:
-            decision = self._decide_rollout(stable, input_schema, output_schema)
+            decision, breaking_summary = self._decide_rollout(stable, input_schema, output_schema)
             if not decision.allowed:
-                compat_in = self._validator.validate_schema_compatibility(stable.input_schema, input_schema)
-                compat_out = self._validator.validate_schema_compatibility(stable.output_schema, output_schema)
-                merged = [
-                    dataclasses.asdict(b) if dataclasses.is_dataclass(b) else b
-                    for b in (*compat_in.breaking_changes, *compat_out.breaking_changes)
-                ]
                 raise ToolSchemaCompatibilityError(
                     tool_id=str(tool_id),
                     old_version=stable.version,
                     new_version=version,
-                    breaking_changes=merged,
+                    breaking_changes=breaking_summary,
                 )
             mode = decision.mode
         else:
             mode = "any"  # 首版本跳过兼容性校验
+            breaking_summary = []
 
         tv = ToolVersion(
             tool_id=tool_id,
@@ -130,6 +147,14 @@ class ToolVersionService:
         )
         await self._repo.save(tv)
         await self._apply_retention(tool_id)
+        await self._publish_event(
+            ToolVersionRegistered(
+                tool_id=tool_id,
+                tool_version=version,
+                required_rollout_mode=mode,
+                breaking_summary=breaking_summary,
+            )
+        )
         logger.info("工具版本注册完成: tool=%s version=%s mode=%s", tool_id, version, mode)
         return tv
 
@@ -153,6 +178,17 @@ class ToolVersionService:
                 version=version,
                 traffic_weight=traffic_weight,
                 conflict_reason=f"权重域 (0,100]，got {traffic_weight}",
+            )
+        # DEPRECATED 版本唯一恢复通道是 rollback 流程（Story 状态机矩阵约束）——
+        # publish 双档（灰度/全量）均拒绝，且必须在任何实体改写前拦截
+        # （避免失败路径污染仓储持有的共享引用）
+        if tv.status is ToolVersionStatus.DEPRECATED:
+            raise EntityStateTransitionError(
+                from_status=ToolVersionStatus.DEPRECATED.value,
+                to_status=ToolVersionStatus.CANARY.value if traffic_weight < _WEIGHT_MAX else ToolVersionStatus.STABLE.value,
+                entity_type="ToolVersion",
+                entity_id=str(version),
+                message="DEPRECATED 版本禁止 publish（唯一恢复通道是 rollback 流程）",
             )
 
         from_status = tv.status
@@ -178,7 +214,7 @@ class ToolVersionService:
             elif tv.status is ToolVersionStatus.CANARY:
                 pass  # 调档（同态迁移——仅更新权重）
             else:
-                tv.transition_to(ToolVersionStatus.CANARY)  # STABLE/DEPRECATED → 243
+                tv.transition_to(ToolVersionStatus.CANARY)  # STABLE → 243
         else:
             # 全量档（直接全量/promote）
             if tv.status is ToolVersionStatus.PENDING and tv.required_rollout_mode == "canary_only":
@@ -188,6 +224,15 @@ class ToolVersionService:
                     conflict_reason="canary_only 版本禁止 PENDING 直接全量（灰度毕业通道放行）",
                 )
             if tv.status in (ToolVersionStatus.PENDING, ToolVersionStatus.CANARY):
+                # 直接全量时不得残留活跃灰度（另一版本的 CANARY 会继续承接流量，
+                # 造成新旧分流——先 promote/abort 清场再全量）
+                active_canary = await self._find_canary(tool_id)
+                if active_canary is not None and active_canary.version_id != tv.version_id:
+                    raise ToolVersionTrafficWeightError(
+                        tool_id=str(tool_id),
+                        version=version,
+                        conflict_reason=f"活跃 CANARY {active_canary.version} 并存冲突（先 promote/abort 清场）",
+                    )
                 # 先降级旧 STABLE（partial index 逐语句校验的顺序契约）
                 old_stable = await self._find_stable(tool_id)
                 tv.transition_to(ToolVersionStatus.STABLE)
@@ -198,13 +243,22 @@ class ToolVersionService:
                     old_stable.traffic_weight = 0
                     await self._repo.save(old_stable)
             else:
-                tv.transition_to(ToolVersionStatus.STABLE)  # STABLE/DEPRECATED → 243
+                tv.transition_to(ToolVersionStatus.STABLE)  # STABLE → 243
 
         if from_status is ToolVersionStatus.PENDING and traffic_weight < _WEIGHT_MAX:
             tv.traffic_weight = traffic_weight
         elif traffic_weight < _WEIGHT_MAX:
             tv.traffic_weight = traffic_weight  # 调档更新权重
         saved = await self._repo.save(tv)
+        await self._publish_event(
+            ToolVersionPublished(
+                tool_id=tool_id,
+                tool_version=saved.version,
+                from_status=from_status.value,
+                to_status=saved.status.value,
+                traffic_weight=saved.traffic_weight,
+            )
+        )
         logger.info(
             "工具版本发布: tool=%s version=%s %s→%s w=%s",
             tool_id,
@@ -233,6 +287,15 @@ class ToolVersionService:
         canary.transition_to(ToolVersionStatus.DEPRECATED)
         canary.traffic_weight = 0
         saved = await self._repo.save(canary)
+        await self._publish_event(
+            ToolVersionPublished(
+                tool_id=tool_id,
+                tool_version=saved.version,
+                from_status=ToolVersionStatus.CANARY.value,
+                to_status=ToolVersionStatus.DEPRECATED.value,
+                traffic_weight=0,
+            )
+        )
         logger.info("放弃灰度: tool=%s version=%s", tool_id, saved.version)
         return saved
 
@@ -247,6 +310,11 @@ class ToolVersionService:
         trigger: str = "api",
     ) -> ToolVersion:
         """一键回滚（防 ping-pong 缺省目标 + 多行变更先降级后提升）。"""
+        if trigger not in ("api", "manual"):
+            raise EntityValidationError(
+                message=f"trigger must be one of ['api', 'manual']: {trigger!r}",
+                context={"entity": "ToolVersion", "field": "trigger"},
+            )
         self._registry.get_tool(tool_id=tool_id)
 
         current = await self._find_stable(tool_id)
@@ -294,6 +362,15 @@ class ToolVersionService:
         target.transition_to(ToolVersionStatus.STABLE)
         target.traffic_weight = _WEIGHT_MAX
         saved = await self._repo.save(target)
+        await self._publish_event(
+            ToolRolledBack(
+                tool_id=tool_id,
+                from_version=current.version,
+                to_version=saved.version,
+                trigger=trigger,
+                deprecated_versions=deprecated_versions,
+            )
+        )
         logger.info(
             "工具版本回滚: tool=%s %s→%s trigger=%s",
             tool_id,
@@ -381,15 +458,24 @@ class ToolVersionService:
             raise ToolVersionNotFoundError(tool_id=str(tool_id), version=version)
         return tv
 
-    def _decide_rollout(self, stable: ToolVersion, input_schema: dict, output_schema: dict):
-        """双 Schema 兼容性校验 + 分级决策（领域纯函数）。"""
+    def _decide_rollout(self, stable: ToolVersion, input_schema: dict, output_schema: dict) -> tuple[Any, list[dict]]:
+        """双 Schema 兼容性校验 + 分级决策（领域纯函数）。
+
+        Returns:
+            (RolloutDecision, breaking_summary)——决策结果与破坏性变更摘要
+            （拒绝路径 397 context 与 Registered 事件 payload 复用同一份数据）
+        """
         compat_in = self._validator.validate_schema_compatibility(stable.input_schema, input_schema)  # ≈backward
         compat_out = self._validator.validate_schema_compatibility(stable.output_schema, output_schema)  # ≈forward
+        breaking_summary = [
+            dataclasses.asdict(b) if dataclasses.is_dataclass(b) else b
+            for b in (*compat_in.breaking_changes, *compat_out.breaking_changes)
+        ]
         severities = [b.severity for b in (*compat_in.breaking_changes, *compat_out.breaking_changes)]
         order: dict[str, int] = {"critical": 3, "major": 2, "minor": 1}
         max_severity: str | None = max(severities, key=lambda s: order.get(str(s), 0)) if severities else None
         count = len(severities)  # 计数仅作文案——双重上报实态下非稳定契约
-        return RolloutPolicyService.decide(max_severity, count)
+        return RolloutPolicyService.decide(max_severity, count), breaking_summary
 
     async def _apply_retention(self, tool_id: uuid.UUID) -> None:
         """注册触发的保留策略淘汰。"""

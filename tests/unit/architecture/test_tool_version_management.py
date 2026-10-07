@@ -184,7 +184,9 @@ class TestPortRegistryMetadata:
         assert spec is not None
         assert spec.version == "v1.3.0"
         assert "versioned" in spec.tags
-        assert "v1.2.0" not in spec.compatibility  # 替换语义（v1.0.0 保留）
+        assert spec.compatibility == (
+            "v1.2.0",
+        )  # Story SSOT 表：兼容上一版 v1.2.0（CR1-8 对齐——新增可选注入不破坏 v1.2.0 消费者）
 
     def test_port_spec_has_all_10_fields(self) -> None:
         """PortSpec 数据类 10 字段结构完整。"""

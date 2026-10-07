@@ -22,6 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.services.tool_registry_service import ToolRegistryService
 from src.application.services.tool_version_service import ToolVersionService
 from src.domain.entities.tool_version import ToolVersion, ToolVersionStatus
+from src.domain.events.base import DomainEvent
+from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.domain.exceptions.tool_version_exceptions import (
     ToolVersionAlreadyExistsError,
     ToolVersionNotFoundError,
@@ -48,6 +50,26 @@ from tests.environments import get_test_env
 pytestmark = pytest.mark.xdist_group("tool-versions-pg")
 
 _BASE_SCHEMA: dict = {"type": "object", "properties": {"factor": {"type": "string"}}}
+
+
+class _RecordingPublisher:
+    """事件发布记录器（真实类非 Mock——集成测试真实服务优先纪律）。"""
+
+    def __init__(self) -> None:
+        self.published: list[DomainEvent] = []
+
+    async def publish(self, event: DomainEvent) -> PublishResult:
+        """记录事件并返回全通道成功结果。"""
+        self.published.append(event)
+        return PublishResult(
+            event_id=str(uuid.uuid4()),
+            results=(ChannelResult(channel_name="inmemory", success=True),),
+        )
+
+
+def _make_publisher() -> _RecordingPublisher:
+    """构造事件记录发布器。"""
+    return _RecordingPublisher()
 
 
 def _make_tv(
@@ -187,6 +209,27 @@ class TestPostgreSQLRepositoryBasics:
         with pytest.raises(ToolVersionAlreadyExistsError):
             event_loop.run_until_complete(repo.save(_make_tv("1.0.0", tool_id=tid)))
 
+    def test_integrity_error_keeps_session_usable_for_reread(self, repo_session, event_loop) -> None:
+        """431 冲突后 session 未毒化：SAVEPOINT 回滚后同 session 重读/续写可达。
+
+        Round 1 审查 F4：无 begin_nested 时 flush 撞 UNIQUE 将 session 置
+        PendingRollback——服务层惰性注册的「431 容错重读」（AC-5 幂等承诺）
+        会抛 PendingRollbackError 打穿执行链。本用例锁死 savepoint 语义。
+        """
+        repo = PostgreSQLToolVersionRepository()
+        tid = uuid.uuid4()
+        event_loop.run_until_complete(repo.save(_make_tv("1.0.0", tool_id=tid)))
+        with pytest.raises(ToolVersionAlreadyExistsError):
+            event_loop.run_until_complete(repo.save(_make_tv("1.0.0", tool_id=tid)))
+        # 毒化判别：同 session 重读（无 SAVEPOINT 时此处抛 PendingRollbackError）
+        existing = event_loop.run_until_complete(repo.get_by_tool_and_version(tid, "1.0.0"))
+        assert existing is not None
+        assert existing.status is ToolVersionStatus.PENDING
+        # 失败方续写同样可达（并发惰性注册的负方恢复路径）
+        event_loop.run_until_complete(repo.save(_make_tv("1.1.0", tool_id=tid)))
+        follow = event_loop.run_until_complete(repo.get_by_tool_and_version(tid, "1.1.0"))
+        assert follow is not None
+
     def test_single_stable_partial_index_432(self, repo_session, event_loop) -> None:
         """单 STABLE partial unique index 硬守护 → 仓储转换为 432。"""
         repo = PostgreSQLToolVersionRepository()
@@ -276,6 +319,7 @@ def _make_service() -> tuple[ToolVersionService, uuid.UUID]:
         repository=version_repo,
         schema_validator=JsonSchemaValidatorImpl(),
         tool_registry=registry,
+        event_publisher=_make_publisher(),
     )
     from src.domain.entities.tool import Tool, ToolCategory, ToolStatus
 
@@ -388,7 +432,7 @@ class TestPerformanceBenchmarks:
         assert ok / 50 >= 0.95
 
     def test_rollback_atomicity_no_intermediate_state(self) -> None:
-        """回滚成功率 100%：要么成功要么明确失败且无中间态。"""
+        """回滚成功率 100%：要么成功要么明确失败且无中间态（每轮恰一个 STABLE）。"""
         service, tid = _make_service()
         _run(service.register_version(tid, "1.0.0", dict(_BASE_SCHEMA), dict(_BASE_SCHEMA)))
         _run(service.publish_version(tid, "1.0.0", 100))
@@ -402,6 +446,9 @@ class TestPerformanceBenchmarks:
                 outcomes.add("success")
             except ToolVersionRollbackError:
                 outcomes.add("explicit-failure")
+            # 不变量断言（对齐验收侧同场景）：任意轮终点不得出现双 STABLE/零 STABLE
+            stables = [tv for tv in _run(service.list_versions(tid)) if tv.status is ToolVersionStatus.STABLE]
+            assert len(stables) == 1, f"第 {i} 轮出现中间态：{[(t.version) for t in stables]}"
         assert outcomes <= {"success", "explicit-failure"}
 
     def test_resolve_latency_p95_inmemory(self) -> None:

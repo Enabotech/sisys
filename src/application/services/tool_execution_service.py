@@ -140,7 +140,11 @@ class ToolExecutionService:
             requested_version=tool_call.version,
             route_key=context.trace_id,
         )
-        if version_tv.version == tool.version and version_tv.input_schema == tool.input_schema:
+        if (
+            version_tv.version == tool.version
+            and version_tv.input_schema == tool.input_schema
+            and version_tv.output_schema == tool.output_schema
+        ):
             return tool
         return dataclasses.replace(
             tool,

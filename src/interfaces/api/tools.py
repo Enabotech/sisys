@@ -19,9 +19,14 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
 from src.domain.entities.tool_version import ToolVersion
+from src.domain.value_objects.token_payload import TokenPayload
+
+# 认证 Token 提取器（domain_dictionary:21 先例——从 Authorization: Bearer 头解析）
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 # ============================================================================
 # Pydantic Schema（路由文件内定义——domain_dictionary 先例）
@@ -96,9 +101,9 @@ def _to_version_response(tv: ToolVersion) -> ToolVersionResponse:
 
 
 def get_current_user_dependency(auth_service: Any):
-    """认证依赖工厂（domain_dictionary 先例三级降级第二级）。"""
+    """认证依赖工厂（domain_dictionary:146 先例三级降级第二级）。"""
 
-    async def get_current_user(token: str | None = None) -> Any:
+    async def get_current_user(token: str | None = Depends(oauth2_scheme)) -> TokenPayload:
         """校验 Bearer Token 并返回用户 Payload。"""
         if not token:
             raise HTTPException(
@@ -107,7 +112,7 @@ def get_current_user_dependency(auth_service: Any):
                 headers={"WWW-Authenticate": "Bearer"},
             )
         try:
-            payload = auth_service.verify_token(token)
+            payload: TokenPayload = await auth_service.verify_token(token)
         except Exception:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -137,7 +142,8 @@ def create_tools_router(
 ) -> APIRouter:
     """创建工具版本管理路由。
 
-    三级降级认证（domain_dictionary.py:201-227 先例）：
+    三级降级认证（domain_dictionary.py:185-227 先例——依赖工厂内层签名
+    必须挂 Depends(oauth2_scheme) 从 Authorization 头解析 Token）：
     1. override（测试注入）
     2. auth_service 参数（依赖工厂构造）
     3. DI 容器 resolve("auth_service")
@@ -150,22 +156,28 @@ def create_tools_router(
         get_current_user = get_current_user_dependency(auth_service)
     else:
 
-        async def get_current_user() -> Any:
-            """DI 容器降级：resolve auth_service 构造认证依赖。"""
-            from src.domain.ports.resolver import Resolver
+        async def get_current_user(token: str | None = Depends(oauth2_scheme)) -> TokenPayload:
+            """DI 容器降级：resolve auth_service 校验 Token。"""
+            if not token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            from src.domain.ports.resolver import get_resolver
 
-            resolver = Resolver()
-            service = resolver.resolve("auth_service")
+            service = get_resolver().resolve("auth_service")
             dependency = get_current_user_dependency(service)
-            return await dependency()
+            result: TokenPayload = await dependency(token)
+            return result
 
     def _service() -> Any:
         """解析版本服务（参数注入优先，DI 容器降级）。"""
         if tool_version_service is not None:
             return tool_version_service
-        from src.domain.ports.resolver import Resolver
+        from src.domain.ports.resolver import get_resolver
 
-        return Resolver().resolve("tool_version_service")
+        return get_resolver().resolve("tool_version_service")
 
     @router.post(
         "/{tool_id}/versions",

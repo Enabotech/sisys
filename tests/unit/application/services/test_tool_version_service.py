@@ -1,15 +1,19 @@
 """ToolVersionService 单元测试（Story 4-6 Task 4 TDD 红→绿）
 
-Mock 工厂模式（AsyncMock/MagicMock spec=端口）+ 真实领域组件混合：
+Mock 工厂（registry MagicMock spec=端口）+ 真实组件混合（真实 InMemory 仓储
+——单 STABLE/单 CANARY 软校验守护真实生效；真实 JsonSchemaValidator；
+_RecordingPublisher 记录事件发布）：
 - register：431 重复 / 380 工具不存在 / 397 critical 拦截（断言存在性+max
   severity 不断言条数）/ canary_only 标记 / 首版本跳过校验
 - publish 状态感知：PENDING 发起灰度 / 无 STABLE 432 / canary_only 直接全量
   432 / CANARY 调档 / promote 放行 / 权重越界（含 0）/ 并存 432 / 243 非法迁移
+  （STABLE 与 DEPRECATED 双档——DEPRECATED 唯一恢复通道是 rollback）
 - abort_canary：成功清场不记戳 / 无活跃 CANARY 243
 - rollback：缺省目标排除 from_version（防 ping-pong）/ 清空戳 / 430 / 433 /
-  无 STABLE 433 / 清场 CANARY
-- resolve：精确 430 / 规范散列路由 / 惰性三分支
+  无 STABLE 433 / 清场 CANARY / trigger 枚举校验
+- resolve：精确 430 / 规范散列路由 / 惰性三分支（惰性注册不发事件）
 - retention：注册触发两级排序淘汰
+- 事件：四操作成功路径发布对应事件 / 失败路径零发布（Story 单测规范）
 """
 
 from __future__ import annotations
@@ -17,16 +21,24 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import UTC, datetime
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
+from src.application.ports.tool_registry_service import ToolRegistryServicePort
 from src.application.services.tool_version_service import ToolVersionService
 from src.domain.entities.tool import Tool, ToolCategory, ToolStatus
 from src.domain.entities.tool_version import ToolVersion, ToolVersionStatus
+from src.domain.events.base import DomainEvent
+from src.domain.events.publish_result import ChannelResult, PublishResult
+from src.domain.events.tool_version_events import (
+    ToolRolledBack,
+    ToolVersionPublished,
+    ToolVersionRegistered,
+)
 from src.domain.exceptions import (
     EntityStateTransitionError,
+    EntityValidationError,
     ToolNotFoundError,
 )
 from src.domain.exceptions.tool_schema_exceptions import ToolSchemaCompatibilityError
@@ -36,7 +48,7 @@ from src.domain.exceptions.tool_version_exceptions import (
     ToolVersionRollbackError,
     ToolVersionTrafficWeightError,
 )
-from src.domain.ports.tool_version_repository import ToolVersionQuery
+from src.infrastructure.storage.inmemory.tool_version_repository import InMemoryToolVersionRepository
 from src.infrastructure.validation.jsonschema_validator import JsonSchemaValidatorImpl
 
 BASE = {"type": "object", "properties": {"factor": {"type": "string"}}, "required": ["factor"]}
@@ -79,51 +91,24 @@ def _make_tv(
     )
 
 
-class _FakeRepo:
-    """轻量内存仓储替身（spec 语义由 Protocol isinstance 保障，真实校验路径）。"""
+class _RecordingPublisher:
+    """事件发布记录替身（记录全部发布调用，恒返回成功结果）。"""
 
     def __init__(self) -> None:
-        self._by_key: dict[tuple[uuid.UUID, str], ToolVersion] = {}
+        self.published: list[DomainEvent] = []
 
-    async def save(self, entity: ToolVersion) -> ToolVersion:
-        self._by_key[(entity.tool_id, entity.version)] = entity
-        return entity
-
-    async def get_by_id(self, id: uuid.UUID) -> ToolVersion | None:
-        return next((tv for tv in self._by_key.values() if tv.version_id == id), None)
-
-    async def get_by_tool_and_version(self, tool_id: uuid.UUID, version: str) -> ToolVersion | None:
-        return self._by_key.get((tool_id, version))
-
-    async def list_by_query(self, query: ToolVersionQuery) -> list[ToolVersion]:
-        results = [tv for tv in self._by_key.values() if query.tool_id is None or tv.tool_id == query.tool_id]
-        if query.status is not None:
-            results = [tv for tv in results if tv.status == query.status]
-        results.sort(key=lambda tv: tv.created_at)
-        return results[query.offset : query.offset + query.limit]
-
-    async def count(self, query: ToolVersionQuery) -> int:
-        return len(await self.list_by_query(query))
-
-    async def list_active(self, tool_id: uuid.UUID) -> list[ToolVersion]:
-        return [
-            tv
-            for tv in self._by_key.values()
-            if tv.tool_id == tool_id and tv.status in (ToolVersionStatus.CANARY, ToolVersionStatus.STABLE)
-        ]
-
-    async def delete(self, id: uuid.UUID) -> None:
-        for key, tv in list(self._by_key.items()):
-            if tv.version_id == id:
-                del self._by_key[key]
-
-    async def list_all(self) -> list[ToolVersion]:
-        return list(self._by_key.values())
+    async def publish(self, event: DomainEvent) -> PublishResult:
+        """记录事件并返回全通道成功结果。"""
+        self.published.append(event)
+        return PublishResult(
+            event_id=str(uuid.uuid4()),
+            results=(ChannelResult(channel_name="inmemory", success=True),),
+        )
 
 
 def _make_registry(tool: Tool) -> MagicMock:
-    """registry mock（get_tool 返回真实 Tool）。"""
-    registry = MagicMock()
+    """registry mock（spec=端口契约；get_tool 返回真实 Tool）。"""
+    registry = MagicMock(spec=ToolRegistryServicePort)
     registry.get_tool = MagicMock(return_value=tool)
     return registry
 
@@ -131,15 +116,19 @@ def _make_registry(tool: Tool) -> MagicMock:
 def _make_service(
     max_retained: int = 10,
     tool: Tool | None = None,
-) -> tuple[ToolVersionService, _FakeRepo, uuid.UUID, MagicMock]:
-    """构造被测服务（真实校验器 + 轻量仓储 + registry mock）。"""
+) -> tuple[ToolVersionService, InMemoryToolVersionRepository, uuid.UUID, MagicMock]:
+    """构造被测服务（真实 InMemory 仓储 + 真实校验器 + registry mock + 记录发布器）。
+
+    事件断言经 ``service._event_publisher``（_RecordingPublisher）访问。
+    """
     tool = tool or _make_tool()
-    repo = _FakeRepo()
+    repo = InMemoryToolVersionRepository()
     registry = _make_registry(tool)
     service = ToolVersionService(
         repository=repo,
         schema_validator=JsonSchemaValidatorImpl(),
         tool_registry=registry,
+        event_publisher=_RecordingPublisher(),
         max_retained_versions=max_retained,
     )
     return service, repo, tool.tool_id, registry
@@ -183,13 +172,14 @@ class TestRegister:
 
     async def test_register_tool_not_found_380(self) -> None:
         tool = _make_tool()
-        repo = _FakeRepo()
-        registry = MagicMock()
+        repo = InMemoryToolVersionRepository()
+        registry = MagicMock(spec=ToolRegistryServicePort)
         registry.get_tool = MagicMock(side_effect=ToolNotFoundError(tool_id=str(tool.tool_id)))
         service = ToolVersionService(
             repository=repo,
             schema_validator=JsonSchemaValidatorImpl(),
             tool_registry=registry,
+            event_publisher=_RecordingPublisher(),
         )
         with pytest.raises(ToolNotFoundError):
             await service.register_version(tool.tool_id, "1.0.0", {}, {})
@@ -551,12 +541,229 @@ class TestQueries:
         assert view == {"stable_version": None, "canary_version": None, "canary_weight": None}
 
 
-def asyncio_run(coro: Any) -> Any:
-    """同步包装（Given 构造辅助——独立短生命周期循环）。"""
-    import asyncio
+# ============================================================================
+# DEPRECATED 守卫 + 直接全量并存冲突 + 回滚分支补测（Round 1 审查）
+# ============================================================================
 
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+
+class TestDeprecatedPublishGuard:
+    """DEPRECATED 版本 publish 双档拒绝（唯一恢复通道是 rollback）。"""
+
+    async def _setup_stable_and_deprecated(self, service: ToolVersionService, tid: uuid.UUID) -> None:
+        """构造 1.0.0=STABLE + 0.9.0=DEPRECATED（带戳）终态。"""
+        await service.register_version(tid, "0.9.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "0.9.0", 100)
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.0.0", 100)  # 1.0.0 → STABLE，0.9.0 → DEPRECATED（被替代记戳）
+
+    async def test_publish_full_weight_on_deprecated_243(self) -> None:
+        """全量档 publish DEPRECATED → 243 且仓储零污染（单 STABLE 不变量保持）。"""
+        service, repo, tid, _ = _make_service()
+        await self._setup_stable_and_deprecated(service, tid)
+        with pytest.raises(EntityStateTransitionError) as exc_info:
+            await service.publish_version(tid, "0.9.0", 100)
+        assert exc_info.value.code == "EXCEPTION_243"
+        # 失败后仓储不被污染：仍恰好一个 STABLE、DEPRECATED 保持 DEPRECATED
+        all_versions = await repo.list_all()
+        stables = [tv for tv in all_versions if tv.status is ToolVersionStatus.STABLE]
+        assert [tv.version for tv in stables] == ["1.0.0"], "失败路径不得污染仓储（双 STABLE）"
+        deprecated = next(tv for tv in all_versions if tv.version == "0.9.0")
+        assert deprecated.status is ToolVersionStatus.DEPRECATED
+        assert deprecated.traffic_weight == 0
+
+    async def test_publish_canary_weight_on_deprecated_243(self) -> None:
+        """灰度档 publish DEPRECATED → 243（DEPRECATED→CANARY 矩阵非法）。"""
+        service, _, tid, _ = _make_service()
+        await self._setup_stable_and_deprecated(service, tid)
+        with pytest.raises(EntityStateTransitionError):
+            await service.publish_version(tid, "0.9.0", 30)
+
+    async def test_rollback_restores_deprecated(self) -> None:
+        """DEPRECATED→STABLE 唯一合法触发方 rollback 可达（守卫不误伤回滚通道）。"""
+        service, repo, tid, _ = _make_service()
+        await self._setup_stable_and_deprecated(service, tid)
+        tv = await service.rollback(tid)  # 缺省目标 = 0.9.0（最新戳）
+        assert tv.version == "0.9.0"
+        assert tv.status is ToolVersionStatus.STABLE
+
+
+class TestDirectFullCanaryConflict:
+    """直接全量遇活跃 CANARY → 432（先 promote/abort 清场纪律）。"""
+
+    async def test_direct_full_with_active_canary_432(self) -> None:
+        service, repo, tid, _ = _make_service()
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.0.0", 100)
+        await service.register_version(tid, "1.1.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.1.0", 30)  # 活跃 CANARY
+        await service.register_version(tid, "1.2.0", dict(BASE), dict(BASE))
+        with pytest.raises(ToolVersionTrafficWeightError) as exc_info:
+            await service.publish_version(tid, "1.2.0", 100)  # PENDING any 直接全量
+        assert exc_info.value.code == "EXCEPTION_432"
+        # 状态零变更：CANARY 仍在灰度、STABLE 不动、1.2.0 仍 PENDING
+        canary = await repo.get_by_tool_and_version(tid, "1.1.0")
+        assert canary is not None and canary.status is ToolVersionStatus.CANARY
+        stable = await repo.get_by_tool_and_version(tid, "1.0.0")
+        assert stable is not None and stable.status is ToolVersionStatus.STABLE
+
+    async def test_promote_self_not_conflicted(self) -> None:
+        """CANARY 自身 promote（w=100）不受并存守卫误伤。"""
+        service, _, tid, _ = _make_service()
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.0.0", 100)
+        await service.register_version(tid, "1.1.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.1.0", 30)
+        tv = await service.publish_version(tid, "1.1.0", 100)
+        assert tv.status is ToolVersionStatus.STABLE
+
+
+class TestRollbackNoStableBranch:
+    """rollback 无当前 STABLE 分支（L253-254——非「无候选」分支）。"""
+
+    async def test_rollback_without_any_stable_433(self) -> None:
+        """仅 PENDING 版本（从未发布）→ 无 STABLE 可回滚 433。"""
+        service, _, tid, _ = _make_service()
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        with pytest.raises(ToolVersionRollbackError) as exc_info:
+            await service.rollback(tid)
+        assert exc_info.value.code == "EXCEPTION_433"
+
+    async def test_rollback_trigger_invalid_242(self) -> None:
+        """trigger 枚举校验（V1 仅 api/manual）。"""
+        service, _, tid, _ = _make_service()
+        with pytest.raises(EntityValidationError) as exc_info:
+            await service.rollback(tid, trigger="cron")
+        assert exc_info.value.code == "EXCEPTION_242"
+
+
+# ============================================================================
+# 领域事件（成功发布 / 失败零发布 / 惰性不发）
+# ============================================================================
+
+
+class TestDomainEventPublishing:
+    """四操作事件接线（Story 事件表：成功路径发布、失败路径零发布）。"""
+
+    def _publisher(self, service: ToolVersionService) -> _RecordingPublisher:
+        """取服务持有的记录发布器。"""
+        publisher = service._event_publisher
+        assert isinstance(publisher, _RecordingPublisher)
+        return publisher
+
+    async def test_register_publishes_registered_event(self) -> None:
+        service, _, tid, _ = _make_service()
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        events = [e for e in self._publisher(service).published if isinstance(e, ToolVersionRegistered)]
+        assert len(events) == 1
+        assert events[0].tool_version == "1.0.0"
+        assert events[0].required_rollout_mode == "any"
+
+    async def test_register_duplicate_no_event(self) -> None:
+        service, _, tid, _ = _make_service()
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        publisher = self._publisher(service)
+        publisher.published.clear()
+        with pytest.raises(ToolVersionAlreadyExistsError):
+            await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        assert not publisher.published, "失败路径必须零发布"
+
+    async def test_register_critical_rejected_no_event(self) -> None:
+        service, _, tid, _ = _make_service()
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.0.0", 100)
+        publisher = self._publisher(service)
+        publisher.published.clear()
+        critical = {"type": "object", "properties": {"factor": {"type": "integer"}}, "required": ["factor"]}
+        with pytest.raises(ToolSchemaCompatibilityError):
+            await service.register_version(tid, "2.0.0", critical, dict(BASE))
+        assert not publisher.published
+
+    async def test_publish_canary_initiates_published_event(self) -> None:
+        service, _, tid, _ = _make_service()
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.0.0", 100)
+        publisher = self._publisher(service)
+        publisher.published.clear()
+        await service.register_version(tid, "1.1.0", dict(BASE), dict(BASE))
+        publisher.published.clear()  # 只看 publish 事件
+        await service.publish_version(tid, "1.1.0", 30)
+        events = [e for e in publisher.published if isinstance(e, ToolVersionPublished)]
+        assert len(events) == 1
+        assert events[0].from_status == "pending"
+        assert events[0].to_status == "canary"
+        assert events[0].traffic_weight == 30
+
+    async def test_publish_promote_event_from_canary(self) -> None:
+        """promote 转正事件 from_status=canary（审计语义区分直接全量）。"""
+        service, _, tid, _ = _make_service()
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.0.0", 100)
+        await service.register_version(tid, "1.1.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.1.0", 30)
+        publisher = self._publisher(service)
+        publisher.published.clear()
+        await service.publish_version(tid, "1.1.0", 100)
+        events = [e for e in publisher.published if isinstance(e, ToolVersionPublished)]
+        assert len(events) == 1
+        assert events[0].from_status == "canary"
+        assert events[0].to_status == "stable"
+        assert events[0].traffic_weight == 100
+
+    async def test_publish_weight_invalid_no_event(self) -> None:
+        service, _, tid, _ = _make_service()
+        await service.register_version(tid, "1.1.0", dict(BASE), dict(BASE))
+        publisher = self._publisher(service)
+        publisher.published.clear()
+        with pytest.raises(ToolVersionTrafficWeightError):
+            await service.publish_version(tid, "1.1.0", 0)
+        assert not publisher.published
+
+    async def test_abort_publishes_canary_to_deprecated(self) -> None:
+        service, _, tid, _ = _make_service()
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.0.0", 100)
+        await service.register_version(tid, "1.1.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.1.0", 30)
+        publisher = self._publisher(service)
+        publisher.published.clear()
+        await service.abort_canary(tid)
+        events = [e for e in publisher.published if isinstance(e, ToolVersionPublished)]
+        assert len(events) == 1
+        assert (events[0].from_status, events[0].to_status) == ("canary", "deprecated")
+        assert events[0].traffic_weight == 0
+
+    async def test_rollback_publishes_rolled_back_event(self) -> None:
+        service, _, tid, _ = _make_service()
+        for v in ("1.0.0", "1.1.0", "2.0.0"):
+            await service.register_version(tid, v, dict(BASE), dict(BASE))
+            await service.publish_version(tid, v, 100)
+        publisher = self._publisher(service)
+        publisher.published.clear()
+        await service.rollback(tid)
+        events = [e for e in publisher.published if isinstance(e, ToolRolledBack)]
+        assert len(events) == 1
+        assert events[0].from_version == "2.0.0"
+        assert events[0].to_version == "1.1.0"
+        assert events[0].trigger == "api"
+        assert events[0].deprecated_versions == ["2.0.0"]
+
+    async def test_rollback_clearing_canary_records_in_deprecated_versions(self) -> None:
+        """回滚清场 CANARY 计入 deprecated_versions（下游重建状态史）。"""
+        service, _, tid, _ = _make_service()
+        for v in ("1.0.0", "1.1.0", "2.0.0"):
+            await service.register_version(tid, v, dict(BASE), dict(BASE))
+            await service.publish_version(tid, v, 100)
+        await service.register_version(tid, "2.1.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "2.1.0", 30)
+        publisher = self._publisher(service)
+        publisher.published.clear()
+        await service.rollback(tid)
+        events = [e for e in publisher.published if isinstance(e, ToolRolledBack)]
+        assert events[0].deprecated_versions == ["2.0.0", "2.1.0"]
+
+    async def test_lazy_initial_registration_no_event(self) -> None:
+        """惰性初始注册不发 Registered（审计取舍——事件风暴防护）。"""
+        service, _, tid, _ = _make_service()
+        await service.resolve_version(tid, route_key="first-call")
+        registered = [e for e in self._publisher(service).published if isinstance(e, ToolVersionRegistered)]
+        assert not registered

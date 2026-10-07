@@ -2,8 +2,8 @@
 
 BDD 步骤实现（context dict + scenarios() 批量注册 + 真实服务链）：
 - 真实服务：InMemoryToolVersionRepository / JsonSchemaValidatorImpl / ToolRegistryService
-  / InMemoryToolRepository / ToolVersionService / ToolExecutionService
-- 仅 LLM/Sandbox 端口适配器与事件发布器为 AsyncMock（Story 认可形态）
+  / InMemoryToolRepository / ToolVersionService / ToolExecutionService / _RecordingEventPublisher
+- 仅 LLM/Sandbox 端口适配器为 AsyncMock（Story 认可形态）；事件发布器为真实记录器
 - HTTP 级 AC-6 场景：TestClient + 服务 AsyncMock（认可子模式）
 - 模块级 event_loop fixture + run_until_complete（BDD 步骤禁 @pytest.mark.asyncio）
 - 红窗口说明：本文件引用 Task 1-5 产物（实体/仓储/服务/端口），Task 0 阶段
@@ -31,8 +31,10 @@ from src.application.services.tool_execution_service import ToolExecutionService
 from src.application.services.tool_registry_service import ToolRegistryService
 from src.application.services.tool_version_service import ToolVersionService
 from src.domain.entities.tool import Tool, ToolCategory, ToolStatus
+from src.domain.events.base import DomainEvent
+from src.domain.events.publish_result import ChannelResult, PublishResult
+from src.domain.events.tool_version_events import ToolRolledBack, ToolVersionPublished
 from src.domain.exceptions import DomainError
-from src.domain.ports.event_publisher import EventPublisher
 from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall
 from src.infrastructure.storage.inmemory.tool_repository import InMemoryToolRepository
 from src.infrastructure.storage.inmemory.tool_version_repository import (
@@ -185,12 +187,13 @@ def given_services_initialized(context: dict[str, Any]) -> None:
     registry = ToolRegistryService(repository=tool_repo)
     version_repo = InMemoryToolVersionRepository()
     schema_validator = JsonSchemaValidatorImpl()
-    event_publisher = AsyncMock(spec=EventPublisher)
+    event_publisher = _RecordingEventPublisher()
 
     version_service = ToolVersionService(
         repository=version_repo,
         schema_validator=schema_validator,
         tool_registry=registry,
+        event_publisher=event_publisher,
         max_retained_versions=10,
     )
     llm = _make_mock_llm()
@@ -229,6 +232,25 @@ def _run(coro: Any) -> Any:
         return loop.run_until_complete(coro)
     finally:
         loop.close()
+
+
+class _RecordingEventPublisher:
+    """真实事件记录发布器（验收禁 mock 纪律——_RecordingEngine 同款形态）。
+
+    记录全部发布调用并恒返回成功结果，供事件场景断言（成功路径发布 /
+    失败路径零发布）。
+    """
+
+    def __init__(self) -> None:
+        self.published: list[DomainEvent] = []
+
+    async def publish(self, event: DomainEvent) -> PublishResult:
+        """记录事件并返回全通道成功结果。"""
+        self.published.append(event)
+        return PublishResult(
+            event_id=str(uuid.uuid4()),
+            results=(ChannelResult(channel_name="inmemory", success=True),),
+        )
 
 
 def _register(context: dict[str, Any], version: str, kind: str = "minor") -> Any:
@@ -1232,6 +1254,42 @@ def then_p95_resolve(context: dict[str, Any]) -> None:
 
 
 # ============================================================================
+# 领域事件（Round 1 审查：成功操作发布对应事件且失败路径零发布）
+# ============================================================================
+
+
+@when("执行灰度提升转正与二次回滚操作序列")
+def when_promote_then_double_rollback(context: dict[str, Any]) -> None:
+    """promote 1.1.0 → 回滚恢复 1.0.0 → 再回滚（无可回滚目标 433 失败）。"""
+    svc: ToolVersionService = context["version_service"]
+    publisher: _RecordingEventPublisher = context["event_publisher"]
+    publisher.published.clear()
+    _publish(context, "1.1.0", 100)  # promote 转正（1.0.0 被替代记戳）
+    _run(svc.rollback(context["tool_id"]))  # 恢复 1.0.0（1.1.0 清空戳）
+    _capture_error(context, lambda: _run(svc.rollback(context["tool_id"])))  # 433 失败
+    assert context["error"] is not None, "第二次回滚应明确失败（无可回滚目标）"
+
+
+@then("成功操作各发布一个对应领域事件且失败操作零发布")
+def then_events_and_failure_silence(context: dict[str, Any]) -> None:
+    """promote→Published(from=canary)、rollback→RolledBack；失败回滚零事件。"""
+    publisher: _RecordingEventPublisher = context["event_publisher"]
+    events = publisher.published
+    published_events = [e for e in events if isinstance(e, ToolVersionPublished)]
+    rolled_back_events = [e for e in events if isinstance(e, ToolRolledBack)]
+    assert len(published_events) == 1, f"promote 应恰好发布一个 Published 事件，实得 {len(published_events)}"
+    pub = published_events[0]
+    assert (pub.from_status, pub.to_status, pub.traffic_weight) == ("canary", "stable", 100)
+    assert len(rolled_back_events) == 1, f"回滚应恰好发布一个 RolledBack 事件，实得 {len(rolled_back_events)}"
+    rolled = rolled_back_events[0]
+    assert rolled.from_version == "1.1.0"
+    assert rolled.to_version == "1.0.0"
+    assert rolled.deprecated_versions == ["1.1.0"]
+    # 失败回滚零新增事件（published 总数 = 2 个成功事件）
+    assert len(events) == 2, f"失败操作必须零发布，实得 {len(events)} 个事件"
+
+
+# ============================================================================
 # Task 9: 开发结束收尾验收（完成清单逐项确认）
 # ============================================================================
 
@@ -1287,7 +1345,7 @@ def when_check_src_files(context: dict[str, Any]) -> None:
         module = rel.removesuffix(".py").replace("/", ".")
         try:
             importlib.import_module(module)
-        except Exception as exc:  # noqa: BLE001 — 收尾清单聚合全部导入异常
+        except Exception as exc:  # 收尾清单聚合全部导入异常（任何模块级异常都要收集）
             missing.append(f"导入失败: {rel} ({exc})")
     context["src_missing"] = missing
 

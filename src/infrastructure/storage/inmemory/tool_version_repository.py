@@ -12,8 +12,8 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import uuid
-from typing import Dict, List
 
 from src.domain.entities.tool_version import ToolVersion, ToolVersionStatus
 from src.domain.exceptions.tool_version_exceptions import (
@@ -27,6 +27,16 @@ from src.domain.ports.tool_version_repository import (
 
 # 单活跃不变量状态集（软校验范围——与 migration 016 partial unique index 对齐）
 _SINGLETON_STATES = (ToolVersionStatus.STABLE, ToolVersionStatus.CANARY)
+
+
+def _detached(tv: ToolVersion) -> ToolVersion:
+    """返回与仓储内部存储完全隔离的副本。
+
+    双端副本纪律：save 存副本、读路径返回副本——调用方在校验失败等异常
+    路径上对实体的就地改写不会污染仓储持有的共享引用（ToolVersion 字段
+    全部为 deepcopy 安全类型：UUID/datetime/dict/Enum/str/int）。
+    """
+    return copy.deepcopy(tv)
 
 
 class InMemoryToolVersionRepository(ToolVersionRepositoryPort):
@@ -43,15 +53,16 @@ class InMemoryToolVersionRepository(ToolVersionRepositoryPort):
 
     def __init__(self) -> None:
         """初始化内存仓储（主存储 + 复合键索引双结构）。"""
-        self._versions: Dict[uuid.UUID, ToolVersion] = {}
-        self._by_tool_version: Dict[tuple[uuid.UUID, str], ToolVersion] = {}
+        self._versions: dict[uuid.UUID, ToolVersion] = {}
+        self._by_tool_version: dict[tuple[uuid.UUID, str], ToolVersion] = {}
 
     # ---- L2RdbPort 继承方法（async） ----
 
     async def get_by_id(self, id: uuid.UUID) -> ToolVersion | None:
-        """通过 ID 获取版本。"""
+        """通过 ID 获取版本（返回隔离副本）。"""
         async with self._lock:
-            return self._versions.get(id)
+            tv = self._versions.get(id)
+            return _detached(tv) if tv is not None else None
 
     async def save(self, entity: ToolVersion) -> ToolVersion:
         """保存版本（新记录做唯一性与单活跃校验；同 ID 为原地更新）。
@@ -84,8 +95,8 @@ class InMemoryToolVersionRepository(ToolVersionRepositoryPort):
                         version=entity.version,
                         conflict_reason=f"单 {entity.status.value} 不变量破坏（并存冲突族）",
                     )
-            self._versions[entity.version_id] = entity
-            self._by_tool_version[key] = entity
+            self._versions[entity.version_id] = _detached(entity)
+            self._by_tool_version[key] = self._versions[entity.version_id]
             if not is_new and existing is None:
                 # 同 ID 但复合键索引缺失的防御（正常流程不可达）
                 for other_key, other in list(self._by_tool_version.items()):
@@ -100,10 +111,10 @@ class InMemoryToolVersionRepository(ToolVersionRepositoryPort):
             if entity is not None:
                 self._by_tool_version.pop((entity.tool_id, entity.version), None)
 
-    async def list_all(self) -> List[ToolVersion]:
-        """列出全部版本。"""
+    async def list_all(self) -> list[ToolVersion]:
+        """列出全部版本（返回隔离副本）。"""
         async with self._lock:
-            return list(self._versions.values())
+            return [_detached(tv) for tv in self._versions.values()]
 
     # ---- 领域扩展方法 ----
 
@@ -112,14 +123,15 @@ class InMemoryToolVersionRepository(ToolVersionRepositoryPort):
         tool_id: uuid.UUID,
         version: str,
     ) -> ToolVersion | None:
-        """按 (tool_id, version) 精确查找。"""
+        """按 (tool_id, version) 精确查找（返回隔离副本）。"""
         async with self._lock:
-            return self._by_tool_version.get((tool_id, version))
+            tv = self._by_tool_version.get((tool_id, version))
+            return _detached(tv) if tv is not None else None
 
-    async def list_by_query(self, query: ToolVersionQuery) -> List[ToolVersion]:
-        """Query Object 多字段过滤（按注册时间升序 + 分页）。"""
+    async def list_by_query(self, query: ToolVersionQuery) -> list[ToolVersion]:
+        """Query Object 多字段过滤（按注册时间升序 + 分页，返回隔离副本）。"""
         async with self._lock:
-            snapshot = list(self._versions.values())
+            snapshot = [_detached(tv) for tv in self._versions.values()]
         results = snapshot
         if query.tool_id is not None:
             results = [tv for tv in results if tv.tool_id == query.tool_id]
@@ -149,11 +161,11 @@ class InMemoryToolVersionRepository(ToolVersionRepositoryPort):
         )
         return len(results)
 
-    async def list_active(self, tool_id: uuid.UUID) -> List[ToolVersion]:
-        """查询工具的活跃版本（CANARY + STABLE）。"""
+    async def list_active(self, tool_id: uuid.UUID) -> list[ToolVersion]:
+        """查询工具的活跃版本（CANARY + STABLE，返回隔离副本）。"""
         async with self._lock:
             return [
-                tv
+                _detached(tv)
                 for tv in self._versions.values()
                 if tv.tool_id == tool_id and tv.status in (ToolVersionStatus.CANARY, ToolVersionStatus.STABLE)
             ]

@@ -124,3 +124,27 @@ class TestToolVersionAPIContract:
         ):
             security = spec["paths"][path]["post" if "traffic" not in path else "get"].get("security", [])
             assert len(security) > 0, f"{path} 缺少 security 定义"
+
+    def test_runtime_openapi_declares_security_for_tool_paths(self) -> None:
+        """运行时 openapi() 中 6 端点 security 非空（文档↔实现一致性）。
+
+        Round 1 审查 P0 回归防线：修复前路由依赖未挂 Depends(oauth2_scheme)，
+        FastAPI 生成的运行时契约 security=None，与 openapi.yaml 宣称的
+        bearerAuth 静默分叉（文档侧断言无法感知）。
+        """
+        from src.interfaces.api.app import create_app
+
+        runtime_spec = create_app().openapi()
+        runtime_paths = runtime_spec.get("paths", {})
+        expected_runtime_paths = {
+            "/api/v1/tools/{tool_id}/versions": ("post", "get"),
+            "/api/v1/tools/{tool_id}/versions/{version}/publish": ("post",),
+            "/api/v1/tools/{tool_id}/rollback": ("post",),
+            "/api/v1/tools/{tool_id}/abort-canary": ("post",),
+            "/api/v1/tools/{tool_id}/versions/traffic": ("get",),
+        }
+        for path, methods in expected_runtime_paths.items():
+            assert path in runtime_paths, f"运行时契约缺少 {path}"
+            for method in methods:
+                security = runtime_paths[path][method].get("security")
+                assert security, f"运行时契约 {path} {method} security 为空——认证依赖未接线"

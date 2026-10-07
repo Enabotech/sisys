@@ -1213,7 +1213,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ToolVersionResponse"
         "400":
-          description: 版本号或 Schema 校验失败（242）
+          description: 版本号或 Schema 校验失败（REST 入口字段级错误 201 参数校验；领域校验 242）
         "401":
           description: 未认证
         "404":
@@ -1288,7 +1288,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ToolVersionResponse"
         "400":
-          description: 权重非法（432，域 (0,100]）
+          description: 权重越界（REST 入口 201 参数校验；服务层直调口径 432——并存冲突/无前置 STABLE 等 432 场景经 400 分支族返回）
         "401":
           description: 未认证
         "404":
