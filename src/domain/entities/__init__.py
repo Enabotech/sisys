@@ -18,6 +18,7 @@ from .sensitive_data_result import SensitiveDataResult
 from .strategic_archive import ArchiveType, StrategicArchive
 from .strategic_plan import StrategicPlan
 from .tool import Tool
+from .tool_version import ToolVersion, ToolVersionStatus
 
 __all__ = [
     "Agent",
@@ -36,4 +37,6 @@ __all__ = [
     "StrategicArchive",
     "StrategicPlan",
     "Tool",
+    "ToolVersion",
+    "ToolVersionStatus",
 ]
