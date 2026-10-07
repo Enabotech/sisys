@@ -148,7 +148,7 @@ development_status:
   4-4-docker-sandbox-execution: done
   4-5-red-blue-debate-basic: done
   # 价值组扩展: V1 P1 工具箱增强
-  4-6-tool-version-management: review
+  4-6-tool-version-management: done
   4-7-validation-feedback-loop: backlog
   epic-4-retrospective: optional
 

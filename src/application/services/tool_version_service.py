@@ -245,10 +245,8 @@ class ToolVersionService:
             else:
                 tv.transition_to(ToolVersionStatus.STABLE)  # STABLE → 243
 
-        if from_status is ToolVersionStatus.PENDING and traffic_weight < _WEIGHT_MAX:
-            tv.traffic_weight = traffic_weight
-        elif traffic_weight < _WEIGHT_MAX:
-            tv.traffic_weight = traffic_weight  # 调档更新权重
+        if traffic_weight < _WEIGHT_MAX:
+            tv.traffic_weight = traffic_weight  # 灰度发起/调档统一权重赋值（全量档恒 100 已在上方置位）
         saved = await self._repo.save(tv)
         await self._publish_event(
             ToolVersionPublished(

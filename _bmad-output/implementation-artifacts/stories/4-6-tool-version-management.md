@@ -1,6 +1,6 @@
 # Story 4.6: 工具版本管理（灰度发布与回滚）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1106,7 +1106,7 @@ docs/api/openapi.yaml                             # ✏️ +5 path +6 schema
 - [x] 故事需求从 `epics_v1.0.md` 提取（L1318-1358 + FR-ST-06 L517/L1821 + or.md 三.1.(2)/三.工具箱.1[2]）
 - [x] 架构约束从 `architecture.md` + `sisys-core-domain-design.md` 提取
 - [x] 前一个故事学习经验整合（4-1a/4-3/4-4/4-5 四故事 + deferred-work.md 已核查无相关延期项）
-- [x] 状态设置为 `ready-for-dev`（开发结束后流转为 `review`——CR1 代码审查周期进行中）
+- [x] 状态设置为 `ready-for-dev`（开发结束流转 `review`；代码审查周期五轮收敛后流转 `done`——见收敛声明）
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
 - [x] 多 Agent 并行代码调研（领域层/应用+基础设施/接口层/测试模式/前序经验 5 视角，全部结论带文件行号实证）
@@ -1192,7 +1192,7 @@ src（12 个）+ migration（1 个）:
 | **Story ID** | 4.6 |
 | **Story Key** | 4-6-tool-version-management |
 | **File** | `_bmad-output/implementation-artifacts/stories/4-6-tool-version-management.md` |
-| **Status** | `backlog` → `ready-for-dev` → `in-progress` → `review` |
+| **Status** | `backlog` → `ready-for-dev` → `in-progress` → `review` → `done` |
 | **Epic** | Epic 4: 战略工具箱 |
 | **价值组** | 战略工具执行能力（V1 P1 工具箱增强） |
 | **优先级** | P1-6（V1） |
@@ -1280,13 +1280,13 @@ src（12 个）+ migration（1 个）:
 
 #### 代码审查周期 Round 1（编号规则：CR<n>-<序号>，与文档审查周期 R<n>- 命名空间区分）
 
-> C1 四视角并行调研（领域正确性/架构合规/测试判别力/API 契约与文档一致性）→ C2 方案 → C3 双评审（配额受限降级主会话评审，裁定「优秀（有条件）」）→ C4 提交。修复明细（P0×2 + P1×4 + P2×6 + P3×5，落码 17 项 + 登记 2 项）：
+> C1 四视角并行调研（领域正确性/架构合规/测试判别力/API 契约与文档一致性）→ C2 方案 → C3 双评审（配额受限降级主会话评审，裁定「优秀（有条件）」）→ C4 提交。修复明细（P0×2 + P1×4 + P2×6 + P3×5，落码 17 项 + 登记 2 项；**计数口径**：17 为发现条目粒度——多行合并处置多条同族发现，表实为 15 行 = 13 落码行 + 2 登记行）：
 
 | 编号 | 发现 | 严重度 | 处置 |
 |---|---|---|---|
 | CR1-1 | **tools 路由认证断链**：`get_current_user` 未挂 `Depends(oauth2_scheme)`（token 裸参数被解析为 query 参数）+ `verify_token` 缺 `await`——生产装配 6 端点全量 401，openapi.yaml 宣称的 bearerAuth 不可达；测试全走 override 旁路致逃逸；运行时 openapi() security=None 与文档静默分叉 | P0 | 两级依赖补 `Depends(oauth2_scheme)` + `await` + DI 降级级改 `get_resolver()`；补真实 Authorization 头正路径三用例（突变验证：移除守卫→红）+ 运行时契约 security 断言（`tests/contracts/test_api_contract_tools.py`） |
 | CR1-2 | **publish DEPRECATED 全量档守卫缺口**：DEPRECATED→STABLE 是矩阵合法格（rollback 专用），publish 全量档 else 分支不拦截→tv 被就地改写后 save 撞 432（语义错报）且 **InMemory 共享引用被污染（双 STABLE 静默并存）**；Story L911/L658 明文要求 243 | P0 | publish 入口单点守卫（任何实体改写前）抛 243 + InMemory 仓储双端 deepcopy 副本（save 存副本/读路径返回副本）根治污染模式；补守卫/零污染/回滚通道不误伤三用例 + 副本隔离三用例 |
-| CR1-3 | **三领域事件零发布点**：ToolVersionRegistered/Published/ToolRolledBack 全 src 无发射方——事件表/编排蓝图（step 5/8）要求 register/publish/abort/rollback 成功发布，端口 SSOT 表漏列 event_publisher 自相矛盾；验收 `AsyncMock(spec=EventPublisher)` 死变量（构造后零引用）掩盖断链 | P1 | 服务注入 `event_publisher`（必填——消灭静默形态）+ 四操作成功路径发布（惰性注册不发）+ fail-soft（PublishResult 失败仅 warning）；组合根注入；端口 SSOT 表补齐；单测 9 事件用例（成功 payload/失败零发布/惰性不发）+ 验收新增事件场景（feature+py 锁步，37→38 场景）+ 死变量改真实 `_RecordingEventPublisher` |
+| CR1-3 | **三领域事件零发布点**：ToolVersionRegistered/Published/ToolRolledBack 全 src 无发射方——事件表/编排蓝图（step 5/8）要求 register/publish/abort/rollback 成功发布，端口 SSOT 表漏列 event_publisher 自相矛盾；验收 `AsyncMock(spec=EventPublisher)` 死变量（构造后零引用）掩盖断链 | P1 | 服务注入 `event_publisher`（必填——消灭静默形态）+ 四操作成功路径发布（惰性注册不发）+ fail-soft（PublishResult 失败仅 warning）；组合根注入；端口 SSOT 表补齐；单测 9 事件用例（成功 payload/失败零发布/惰性不发）+ 验收新增事件场景（feature+py 锁步，39→40 场景——dev 收尾基线 39 = 37 AC + 2 收尾）+ 死变量改真实 `_RecordingEventPublisher` |
 | CR1-4 | **PG 431 容错重读不可达**：`_do_save`=merge+flush 无 SAVEPOINT，flush 撞 UNIQUE 后 session PendingRollback——惰性注册并发负方重读抛 PendingRollbackError→500（AC-5 幂等承诺 PG 实态失效；InMemory 无毒化故三层测试全绿掩盖） | P1 | `PostgreSQLToolVersionRepository.save` 以 `begin_nested()` 包裹 `super().save()`；补 PG 集成用例（431 后同 session 重读+续写可达） |
 | CR1-5 | **抑制注释 2 处**：`test_tool_version.py:42 # type: ignore[arg-type]`（铁律零豁免）；`acceptance:1290 # noqa: BLE001`（BLE001 未在 ruff select 启用——无效抑制+铁律双重违反） | P1 | `_make_version` 改 TypedDict `Unpack` 类型安全 kwargs；删 noqa（导入聚合场景 `except Exception` 正当，理由移普通注释） |
 | CR1-6 | **集成恒真断言**：`test_rollback_atomicity_no_intermediate_state` 的 `outcomes <= {"success","explicit-failure"}` 恒真（元素仅来自两字面量）——标题宣称「无中间态」实际只验证「不抛非领域异常」 | P1 | 每轮补不变量断言「恰好一个 STABLE」（对齐验收侧同场景 L1204-1207） |
@@ -1322,15 +1322,23 @@ src（12 个）+ migration（1 个）:
 | CR3-F2 | CR1-12 第三字段（output_schema）比较不可红：canary 构造 output 与 tool 相同且仅断言 input_schema | P3 | 补同名版本 output 漂移用例（突变删除比对条件实测红 ✓） |
 | CR3-F3 | CR1-3 fail-soft 契约（发布失败仅告警不中断业务）零覆盖——全部测试替身恒返回成功 | P3 | 补 `_FailingPublisher` 用例（register 主流程失败发布下仍成功返回） |
 | CR3-F5 | Registered 事件 `breaking_summary` 服务接线无断言（突变丢参数无红——下游兼容性审计将静默拿空表） | P3 | canary_only 注册用例补 `breaking_summary` 非空断言 |
-| CR3-F4 | CR1-7 直接全量并存 432 仅单测覆盖，验收层语义契约缺位 | P3 | 验收补 AC-3.8 场景（feature+py 锁步，38→39 场景：活跃灰度下第三版本直接全量→432 + 状态零变更） |
+| CR3-F4 | CR1-7 直接全量并存 432 仅单测覆盖，验收层语义契约缺位 | P3 | 验收补 AC-3.8 场景（feature+py 锁步，40→41 场景：活跃灰度下第三版本直接全量→432 + 状态零变更） |
 | CR3-F6 | CR1-1 DI 第三级（get_resolver 降级闭包）无请求级执行测试（突变闭包内部仅生产 401/500 暴露） | 记录 | 登记不落码（闭包结构与二级同构 + 运行时 openapi 断言锁依赖存在性；补真实 resolver 冒烟依赖组合根初始化顺序，成本高收益低） |
 | CR3-F7 | 时间线 D 交错 (b)：InMemory 双 promote 败方报 243、PG 同交错报 432（错误码分叉）——不变量两实现均保持 | 记录 | 登记不落码（符合 Story R1-8「守护不变量而非串行化服务流」并发契约；统一转译属增强非缺陷） |
 
 #### 已修复 Patch
 
-- [x] CR1-1 ~ CR1-13（17 项落码：src 6 文件 + tests 8 文件 + docs 2 文件）
+- [x] CR1-1 ~ CR1-13（17 项落码【发现条目粒度】：src 6 文件 + tests 11 文件 + docs 3 文件 = 20 文件）
 - [x] CR2-1 ~ CR2-4（R2 回归核查）
 - [x] CR3-CI + CR3-F1/F2/F3/F4/F5（CI 红修复 + 4 项守护缺口 + 1 项断言补强；F6/F7 登记）
+
+#### 代码审查周期收敛声明（Round 5 独立终审签署，2026-10-07）
+
+**周期概览**：Story 4-6 代码审查周期经 5 轮收敛——R1（C1 四视角调研 → C2 方案 → C3 双评审 → C4 提交，2963db06）修复 P0×2（tools 路由认证断链 / publish DEPRECATED 守卫缺口+InMemory 引用污染）+ P1×4（三事件零发布点 / PG 431 容错重读不可达 / 抑制注释 / 集成恒真断言）+ P2×6 + P3×5；R2 回归核查（bffc3b6c）4 组修复组合交互全过，修 P3×3 + 补强×1；R3 断言覆盖矩阵 + 长状态时间线推演（7aee4049）零 P0/P1/P2，补 CI I001 + 守护缺口 P3×5；R4 纯验证零提交零实质发现；R5 独立终审五节取证。**累计修复 26 项**（CR1 17 + CR2 4 + CR3-F1~F5 5；另有 CI 红 1 项、登记不落码 4 项 CR1-14/15 + CR3-F6/F7）。
+
+**R5 独立取证结论（不采信自报，全部实地复核）**：① 周期闭合——9491de17..HEAD 恰 3 笔 fix(4-6) 提交与 CR1/CR2/CR3 台账逐文件对账 1:1，零游离；② 关键修复双向抽验 **10/10 相符**（认证接线 / DEPRECATED 守卫先于改写 / 双端 deepcopy 副本 / 四发布点+惰性不发+fail-soft / begin_nested savepoint / 抑制注释零残留 / 直接全量 432 守卫+AC-3.8 / v1.2.0 三方对齐 / republish 双档 243 / 嵌套变异+output 漂移守护用例）；③ 独立快扫零漏网 P1/P2，仅 2 项 P3 记录级留项随收敛提交清偿（publish 权重赋值冗余等价分支折叠 service:248 / Next Steps 复选框勾选）；④ 门禁实跑全绿——ruff 全过、format 1488 文件、mypy 635 文件零错、验收 **41 passed**、集成 **15 passed**、核心单测+契约 **187 passed**；⑤ 三事件双通道配置双处一致（configs/event_channels.yaml + ChannelRouter.DEFAULT_MAPPINGS）。
+
+**状态流转结论**：零 P0/P1 残留，收敛判据满足；对照 4-5 先例（五轮收敛 → done），**Story 4-6 `review → done` 成立**。R4 移交 3 项 P3 簿记（F-A 场景计数 39→40→41 / F-B CR1 计数口径注记 / F-C 文件数）随收敛提交清偿。
 
 #### 已推迟 Defer
 
@@ -1347,8 +1355,8 @@ src（12 个）+ migration（1 个）:
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `dev-story` 开始实施（Task 0~9 九提交，全量 11191 passed）
+- [x] 运行 `code-review` 进行代码审查（五轮收敛：R1 2963db06 / R2 bffc3b6c / R3 7aee4049 / R4 纯验证 / R5 独立终审——见收敛声明）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
@@ -1363,3 +1371,4 @@ src（12 个）+ migration（1 个）:
 - v1.3.0: Round 3 循环审查修订（单深度：37 场景期望唯一性推演 + 6 条状态时间线全推演 + Task 0→9 依赖干跑）——P1×2（Task 4 config 注入分层矛盾 CI 必炸→改标量 max_retained_versions 注入[贴合 SandboxConfig 先例]；残留戳两读分歧致第 3 次回滚 ping-pong 复活→裁决 rollback 降级显式清空戳）+ P2×2（保留策略无戳组平局键→两级排序；partial index 冲突异常转换零定义→仓储层 431/432 转换规则）+ P3×7；37 场景无死锁、35 期望唯一、跨任务零倒挂
 - v1.3.1: Round 4 纯验证（多维度快扫零修复）+ Round 5 独立终审五节全过（周期闭合/10/10 修复取证/28+ 锚点吻合/门禁就绪/收敛判定）——终审留项 2 项 P3 随收敛提交清偿（决策表 #4 措辞、组合根行号）；收敛声明入 Story；**审查周期正式收敛，累计 66 项修复，零 P0/P1 残留，维持 ready-for-dev**
 - v1.4.0: dev-story 实施（Task 0-9 九提交，全量 11191 passed）+ **代码审查周期 Round 1（CR1）**：四视角并行调研→方案→评审→落码——修复 P0×2（tools 认证断链生产 6 端点全量 401 / publish DEPRECATED 守卫缺口+InMemory 共享引用污染双 STABLE）+ P1×4（事件零发布点接线 / PG savepoint 431 重读 / 抑制注释 ×2 / 集成恒真断言）+ P2×6 + P3×5；验收场景 37→38（新增领域事件场景）；登记 deferred ×2（lint-imports 预存 broken / 根 .env.example 缺失）
+- v1.5.0: 代码审查周期正式收敛（R2 回归核查 P3×3+补强 / R3 断言矩阵+时间线推演零 P0-P2+守护补强 P3×5+CI I001 / R4 纯验证七维度全过 / R5 独立终审五节 10/10 取证）——**累计修复 26 项，零 P0/P1 残留，Story → done**；验收场景终态 41（37 AC + 2 收尾 + 1 事件 + 1 AC-3.8）；收敛声明入 Story；R4/R5 簿记清偿（场景计数 39→40→41 / 计数口径注记 / 文件数 / 冗余分支折叠）
