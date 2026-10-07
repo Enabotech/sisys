@@ -1573,6 +1573,19 @@ class DebateCompleted(DomainEvent):
 
 > Story 4-5 代码审查周期 R1~R5 收敛：R1 清偿 P1×3+P2×3、新增 15 用例、突变 6 项全红；R2 回归零回归+台账清偿+Defer×3；R3 断言矩阵 10/10 全守护、累计突变 10 项全灭；R4 纯验证全过；R5 独立终审五节全过（周期闭合 1:1、修复双向取证 5/5 相符、独立快扫零漏网、门禁 372 全绿+ruff/mypy 零错）。零 P0/P1 残留，Story → done。遗留 Defer×4（llm skip 分类 / litellm 旧注释 / base.py metadata 基类缺口含窄边缘 / temperature_profile 可变性）均登记非阻断。
 
+### 🔧 收敛后技术债清偿（2026-10-07，条件分析 → 批次执行）
+
+> 前置研究（主会话实地调研四项 Defer 的解决条件）：D1/D2/D3 具备清偿条件（cause 链就位/正确表述已定谳/序列化器材料现成+回归面有限）；D4 不具备且不应做（零消费方 + MappingProxyType 非 dict 实例会 miss _serialize_value 分支 / tuple 化破坏 roundtrip 契约——YAGNI 负收益），维持 Defer 并补注触发条件。
+
+| Defer 项 | 清偿内容 | 验证 |
+|----------|----------|------|
+| R2-D2 litellm 失实注释 | `litellm_llm_client.py:656`「（含自动重试修复）」与 `:724`「并尝试修正重试」改为 fail-fast 真实语义（R2-N1 定谳表述；周期内不动他 Story 文件的纪律边界不适用于 main 维护态） | litellm 测试面 67 passed 零行为改动 |
+| R2-D1 llm 场景 skip 分类 | 集成测试 except 分支改造：模块级 `_ENVIRONMENT_CAUSES = (LLMAPIError, LLMResponseError, TimeoutError, ServiceUnavailableError)`（与服务的包装 except 面对齐；domain TimeoutError 非内置需显式 import）→ 环境类 cause skip 带分类消息；其余（None/未知/EntityValidation 数据契约类）`pytest.fail` 暴露疑似实现缺陷 | 分流逻辑实测 4 断言全过（环境类 skip / 数据契约与 None fail / domain TimeoutError 命中） |
+| R2-D3（含窄边缘+R3 记录）base.py metadata 基类缺口 | `to_dict()` 的 metadata 走 `_serialize_value`（UUID/datetime/嵌套 dict 递归转 str——R1-F01 同型根因的**全事件族**级根治，debate_events:74 显式传入窄边缘同步消解）+ JSON 探针扩展到 metadata（不可序列化对象构造期即红） | 事件全族+契约 444 passed 零潜伏违规引爆（佐证调研「当前零活跃违规」）；突变 D3（还原原样透传）→ 新用例 TypeError 红复现 R1-F01 事故形态；新增 2 用例（UUID 嵌套序列化 + Opaque 对象探针绊线） |
+| R2-D4 → 维持 Defer | **触发条件补注**：Epic 5/10 消费方实际出现时评估——MappingProxyType 需同步适配 `_serialize_value` 的 isinstance(dict) 分支（MappingProxyType 非 dict 实例），tuple 化需改 from_dict roundtrip 契约；服务侧防御副本（`dict(TEMPERATURE_PROFILE)`）+ 事件 default_factory 每实例新建已是当前防线 | ——（登记） |
+
+**批次验证**：事件全族+3 契约+通道映射+辩论集成与单测 444 passed + 1 skipped；litellm 面 67 passed；分流实测 4 断言；突变 D3 红→还原→360 passed 复绿；ruff/mypy 全过；全仓回归（排除已知 Docker flaky）见提交记录。
+
 #### Round 1 修复方案（R1-F01/F02/F03/F04/F05/F06）
 
 > **C3 评审往返记录**：双评审员（甲：正确性一致性 / 乙：可行性可满足性）首轮均判「合格（附必改点）」——6 项必改（P1 测试同步两处 / P2④ model_construct 指定 + 合成侧零覆盖补齐 / P6① AC-2.3 接线 / P6② timeout 记录形态 / P2① 排除 Literal + 模块级别名 + 选型 docstring / P5 钉死两文件）+ 4 项建议全部吸收为方案 v2 后，独立复评员锚点核实判定**优秀**（唯一非阻塞瑕疵：字段计数笔误，按枚举执行）。评审员关键实证：`Field(strip_whitespace=True)` 在 pydantic v2 是 deprecated no-op 且泄漏脏键进 LLM JSON Schema（Annotated+StringConstraints 是唯一正确机制）；AC-2.3 `when_construct_terminal_without_fields` 内联循环不经 helper，Then 非空化后必误红（接线修复）；base.py:149-153 metadata 不经 _serialize_value 且 json 校验只覆盖 payload 不覆盖 metadata（基类缺口登记留项）。
@@ -1611,7 +1624,7 @@ class DebateCompleted(DomainEvent):
 
 ---
 
-**故事版本/Story Version:** v1.6.0
+**故事版本/Story Version:** v1.6.1
 **创建日期/Created:** 2026-10-01
 **最后更新/Last Updated:** 2026-10-07
 **更新说明/Description:**
@@ -1625,3 +1638,4 @@ class DebateCompleted(DomainEvent):
 - v1.5.1: 代码审查 Round 2 回归核查 + 台账清偿——六项 R1 修复零 P1/P2 回归 + 全仓 10882 passed；新发现 P3×2（「重试自纠」失实机理勘正为 fail-fast / Raises 补齐）+ 台账清偿 4 项（取消注释机理 / 计时阈值双侧 1.8× / 「第 20 字」×3 / evaluator docstring×3）；Defer×3（llm skip 分类 / litellm 旧注释 / base.py metadata 基类缺口）
 - v1.5.2: 代码审查 Round 3 断言矩阵 + 突变闭环——10 契约 8 项原生已覆盖；唯一实测存活突变 M-B/M-B2（failure_reason is not None 弱断言，含 save 异常替换+引用存储遮蔽机理）以 2 行精确断言击杀——10/10 全守护；累计 10 突变全部击杀
 - v1.6.0: 代码审查 Round 4 纯验证（七维度快扫全过零改动）+ Round 5 独立终审五节全过（周期闭合 1:1 / 修复双向取证 5/5 / 独立快扫零漏网 / 门禁 372 全绿）——收敛声明签署，状态 review → done
+- v1.6.1: 收敛后技术债批次清偿——条件分析（四项 Defer 逐项判定具备度）后执行 D1/D2/D3（litellm 失实注释×2 勘正 / llm 场景 skip 分类分流（环境类 skip·疑似实现缺陷 fail）/ base.py metadata 走 _serialize_value + JSON 探针扩展——R1-F01 同型根因的全事件族级根治含窄边缘消解）；D4 维持 Defer 补注触发条件（Epic 5/10 消费方出现 + MappingProxyType 序列化适配要点）

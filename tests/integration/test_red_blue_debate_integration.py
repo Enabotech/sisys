@@ -38,7 +38,15 @@ from src.application.services.red_blue_debate_service import (
 from src.domain.entities.debate_session import DebateSessionState
 from src.domain.events.debate_events import DebateCompleted
 from src.domain.events.publish_result import ChannelResult, PublishResult
-from src.domain.exceptions import DebateGenerationError, DebateLowDivergenceError, DebateSynthesisError, LLMAPIError
+from src.domain.exceptions import (
+    DebateGenerationError,
+    DebateLowDivergenceError,
+    DebateSynthesisError,
+    LLMAPIError,
+    LLMResponseError,
+    ServiceUnavailableError,
+    TimeoutError,
+)
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.llm_client import LLMClientPort, LLMConfig
 from src.domain.services.debate_evaluator import DebateEvaluator
@@ -52,6 +60,12 @@ pytestmark = pytest.mark.integration
 # ===================================================================
 # 测试数据与 Fake 工厂
 # ===================================================================
+
+
+# 环境类 LLM 异常集合（R2-D1 清偿）：与 RedBlueDebateService 包装 except 面对齐——
+# 这些 cause 属外部因素（服务端故障/超时/模型行为），集成场景动态跳过；
+# 其余 cause（None/未知/数据契约类）疑似实现缺陷，fail 暴露不静默吞掉
+_ENVIRONMENT_CAUSES = (LLMAPIError, LLMResponseError, TimeoutError, ServiceUnavailableError)
 
 
 def _make_topic(title: str = "公司是否应在下一财年进入东南亚市场") -> DebateTopic:
@@ -387,10 +401,16 @@ class TestRealLLMDebate:
                 timeout=180.0,  # 防挂死上限（慢端点 3 次调用 + tenacity 重试余量）
             )
         except (DebateGenerationError, DebateSynthesisError) as exc:
-            # 外部环境故障（服务端 5xx/超时/过载，重试耗尽后包装为 420/421）——
-            # 非实现缺陷，动态跳过与"端点不可达"同置；cause 链保留在消息中供诊断
-            cause_type = type(exc.cause).__name__ if exc.cause else "unknown"
-            pytest.skip(f"LLM 端点瞬时不可用（底层 {cause_type}，外部服务故障非实现缺陷），动态跳过")
+            # cause 分类分流（R2-D1 清偿）：环境类异常（服务端 5xx/超时/过载/模型输出
+            # 不合约束——与服务的包装 except 面对齐）→ 动态跳过与"端点不可达"同置；
+            # 非环境类 cause（None/未知/EntityValidation 等数据契约问题）→ fail 暴露
+            # 疑似实现缺陷，不再被环境故障语义静默吞掉
+            cause = exc.cause
+            if isinstance(cause, _ENVIRONMENT_CAUSES):
+                pytest.skip(f"LLM 端点/模型行为问题（底层 {type(cause).__name__}，外部因素非实现缺陷），动态跳过")
+            pytest.fail(
+                f"辩论失败 cause 非环境类（{type(cause).__name__ if cause else 'None'}），疑似实现缺陷不应静默跳过：{exc}"
+            )
         except DebateLowDivergenceError:
             # 真实模型双视角高度重叠触发 422 门控——门控按设计工作（业务结果非缺陷），
             # 分化度语义评估属 Story 5.8 量化体系，本场景以结构断言为准移交快端点环境

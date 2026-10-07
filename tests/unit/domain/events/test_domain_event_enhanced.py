@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
+
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import EntityValidationError
 
 
 class TestDomainEventEnhancement:
@@ -155,3 +158,32 @@ class TestDomainEventEnhancement:
         assert event.correlation_id is None
         assert event.causation_id is None
         assert event.metadata == {}
+
+    def test_metadata_serialized_and_json_safe_in_to_dict(self) -> None:
+        """metadata 经 _serialize_value 序列化且全量 JSON 可序列化（R2-D3 清偿）
+
+        事故形态：metadata 直塞 UUID 对象时 to_dict 原样透传，json 探针只覆盖
+        payload——UUID 直抵 outbox JSONB/redis/rabbitmq 的 json.dumps 才炸，且被
+        RabbitMQEventBus except 吞为静默发布失败（Story 4-5 R1-F01 同型根因的
+        基类级根治）。
+        """
+        import json
+
+        event = DomainEvent(event_type="TestEvent", metadata={"tenant_id": uuid4(), "nested": {"ref": uuid4()}})
+        data = event.to_dict()
+        # UUID 在源头转为 str（嵌套 dict 递归同治）
+        assert isinstance(data["metadata"]["tenant_id"], str)
+        assert isinstance(data["metadata"]["nested"]["ref"], str)
+        # 全量 JSON 可序列化（探针扩展到 metadata——不可序列化对象构造期即红）
+        json.dumps(data)
+
+    def test_metadata_unserializable_raises_at_to_dict(self) -> None:
+        """metadata 塞不可序列化自定义对象 → to_dict 抛 EntityValidationError（探针绊线）"""
+
+        class Opaque:
+            pass
+
+        event = DomainEvent(event_type="TestEvent", metadata={"bad": Opaque()})
+        with pytest.raises(EntityValidationError) as exc_info:
+            event.to_dict()
+        assert exc_info.value.code == "EXCEPTION_242"

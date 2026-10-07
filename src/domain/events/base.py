@@ -147,13 +147,18 @@ class DomainEvent:
         if self.causation_id is not None:
             result["causation_id"] = str(self.causation_id)
         if self.metadata:
-            result["metadata"] = self.metadata
+            # metadata 走 _serialize_value 序列化（R2-D3 清偿）——UUID/datetime 等
+            # 非原生 JSON 类型在源头转 str，防直透 outbox JSONB/redis/rabbitmq 的
+            # json.dumps 时才炸（曾被 RabbitMQEventBus except 吞为静默发布失败）
+            result["metadata"] = {k: self._serialize_value(v) for k, v in self.metadata.items()}
 
         try:
             json.dumps(merged_payload)
+            json.dumps(result.get("metadata", {}))
         except (TypeError, ValueError) as e:
             raise EntityValidationError(
-                message=f"payload is not JSON serializable: {e}", context={"entity": "DomainEvent", "field": "payload"}
+                message=f"payload or metadata is not JSON serializable: {e}",
+                context={"entity": "DomainEvent", "field": "payload"},
             )
         return result
 

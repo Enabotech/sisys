@@ -653,7 +653,8 @@ class LitellmLLMClient(LLMClientPort):
         # Schema 转换失败是独立的业务逻辑错误，不应回滚 API 调用的成功记录
         self._circuit_breaker.on_success()
 
-        # 第 5 步：尝试将解析结果转换为 Schema 对象（含自动重试修复）
+        # 第 5 步：尝试将解析结果转换为 Schema 对象（校验失败 fail-fast——多策略级联
+        # 解析后仍失败即抛 LLMResponseError，本路径无重试；tenacity 重试仅包裹第 2 步 acompletion）
         try:
             import json
 
@@ -721,7 +722,7 @@ class LitellmLLMClient(LLMClientPort):
             return obj
 
         except (json.JSONDecodeError, TypeError, ValueError, LLMResponseError) as e:
-            # 结构化解析失败：通知熔断器，并尝试修正重试
+            # 结构化解析失败：通知熔断器（API 成功后的解析失败计入熔断统计），fail-fast 无重试
             self._circuit_breaker.on_failure()
 
             # 检测 finish_reason == "length" 导致的截断
