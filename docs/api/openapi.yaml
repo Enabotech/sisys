@@ -1191,6 +1191,14 @@ paths:
       security:
         - OAuth2: []
         - Bearer: []
+      parameters:
+        - name: tool_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 工具唯一标识
       requestBody:
         required: true
         content:
@@ -1220,6 +1228,14 @@ paths:
       security:
         - OAuth2: []
         - Bearer: []
+      parameters:
+        - name: tool_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 工具唯一标识
       responses:
         "200":
           description: 版本列表
@@ -1244,6 +1260,20 @@ paths:
       security:
         - OAuth2: []
         - Bearer: []
+      parameters:
+        - name: tool_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 工具唯一标识
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 目标版本号（SemVer）
       requestBody:
         required: false
         content:
@@ -1278,6 +1308,14 @@ paths:
       security:
         - OAuth2: []
         - Bearer: []
+      parameters:
+        - name: tool_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 工具唯一标识
       requestBody:
         required: false
         content:
@@ -1309,6 +1347,14 @@ paths:
       security:
         - OAuth2: []
         - Bearer: []
+      parameters:
+        - name: tool_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 工具唯一标识
       responses:
         "200":
           description: 放弃灰度结果
@@ -1332,6 +1378,14 @@ paths:
       security:
         - OAuth2: []
         - Bearer: []
+      parameters:
+        - name: tool_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 工具唯一标识
       responses:
         "200":
           description: 流量分布视图

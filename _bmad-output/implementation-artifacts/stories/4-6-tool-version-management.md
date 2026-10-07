@@ -1,6 +1,6 @@
 # Story 4.6: 工具版本管理（灰度发布与回滚）
 
-**Status:** `in-progress`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -823,16 +823,16 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 编写 `.py` 的 BDD 步骤实现（文件存在性 + 导入性断言） |
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 9.1: 场景 1 — 验证 `src` 完成清单的逐项确认（本 Story 文件清单「待创建」全部存在且可导入）
-- [ ] Subtask 9.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
-- [ ] Subtask 9.3: 运行开发结束验收测试并确认通过
-- [ ] Subtask 9.4: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验（三条异常自查 grep 零输出：`grep -rn "raise ValueError" src/`、`grep -rn "HTTPException" src/interfaces/api/tools.py | grep -v "401"`（**可执行豁免口径**：过滤认证 401 行——domain_dictionary 先例 :161/211/223 本就有 3 处认证 HTTPException，其余零输出）、`grep -rn "noqa\|type: ignore\|pylint: disable" src/`）
+- [x] Subtask 9.1: 场景 1 — 验证 `src` 完成清单的逐项确认（本 Story 文件清单「待创建」全部存在且可导入）
+- [x] Subtask 9.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
+- [x] Subtask 9.3: 运行开发结束验收测试并确认通过
+- [x] Subtask 9.4: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验（三条异常自查 grep 零输出：`grep -rn "raise ValueError" src/`、`grep -rn "HTTPException" src/interfaces/api/tools.py | grep -v "401"`（**可执行豁免口径**：过滤认证 401 行——domain_dictionary 先例 :161/211/223 本就有 3 处认证 HTTPException，其余零输出）、`grep -rn "noqa\|type: ignore\|pylint: disable" src/`）
 
 **完成标准/Definition of Done:**
 - [ ] `src` 完成清单已逐项验证确认
-- [ ] `tests` 四目录完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `done`
+- [x] `tests` 四目录完成清单已逐项验证确认
+- [x] 开发结束验收测试通过
+- [x] Story 可进入 `done`
 
 ---
 
@@ -1115,6 +1115,13 @@ docs/api/openapi.yaml                             # ✏️ +5 path +6 schema
 - 0.5 openapi：5 path + 6 schema 落地，契约静态断言 9 项全绿（规范先行模式 B——Task 0 即绿符合预期）
 - 0.6/0.7：feature 37 场景（zh-CN 中文 Gherkin，R6 模板 test_acceptance_postgresql_relational_layer 结构风格 + AC-x.y 前缀）+ .py 完整步骤实现（真实服务链 + _RecordingEngine 子类观测面 + AC-6 TestClient/AsyncMock 子模式）
 - 0.8/0.9：3 契约测试落地；红窗口确认 = 端口契约×2 与验收 collection error（ModuleNotFoundError 预期形态）+ API 静态断言绿（预期中间态）
+
+**Task 1-9 实施总录（2026-10-07，9 commits）：**
+- **实施期发现的文档外事实**：① 事件业务字段命名 `tool_version`（避开 DomainEvent 基类 `version: int` 核心字段冲突——ToolExecuted 先例同款）；② schema 判别性构造中「minor 变体含 optional 字段 + 后续 BASE 注册」会被真实校验器判为破坏性（FIELD_REMOVED）→ canary_only——性能场景初始 STABLE 统一用 base schema；③ 跨子域继承白名单 `(tool_version, business)` 登记（审查轮预警实施期实证）；④ PG 时间戳列须显式 `DateTime(timezone=True)`（asyncpg aware/naive 冲突）
+- **红线修复实录**：`# type: ignore[arg-type]` → 类型收窄（datetime.min 兜底 key）；`# noqa: PLR0913` → 删除（构造器注释化）；HTTPException 仅认证路径（domain_dictionary 先例豁免口径）
+- **回归联动**：既有测试 2 处旧断言同步（composition_root_assembly v1.2.0→v1.3.0、test_arch_strategic_tool tags +versioned）；openapi path parameter 声明补全（UnresolvableParameterError 修复——openapi-spec-validator OK）
+- **最终全量**：`pytest tests/unit tests/contracts tests/integration tests/acceptance` = **11191 passed, 4 skipped**（动态 skip 为环境依赖项）；三条异常 grep 自查本 Story 文件零输出；ruff/mypy 全绿（pre-commit hooks 全 Passed × 9 commits）
+- **AC 覆盖**：AC-1（59 实体+31 仓储测）AC-2（判别构造+397 context）AC-3（规范散列独立重算+统计 30%±5%+调档+abort）AC-4（防 ping-pong 两连回滚+清空戳+两级淘汰+430/433 分立）AC-5（_RecordingEngine 派生副本+惰性三分支+未注入回退）AC-6（6 端点+全错误映射+401）AC-7（P95 切换<500ms/路由<5ms 全达标未触发 skip）——37+2 收尾场景全绿
 - **模块依赖窗口提交策略（4-1f 先例）**：验收 .py 与 2 个端口契约 .py 顶部 import 待建模块会使 mypy hook 挂全仓提交——红窗口确认（0.9）后暂缓入库，随对应模块落地批提交（仓储契约随 Task 3 / 服务契约与验收 .py 随 Task 4/5）；feature 与 openapi/API 契约（已绿）本批入库
 
 ### 文件清单 File List

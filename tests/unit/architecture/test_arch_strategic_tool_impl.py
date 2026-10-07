@@ -160,7 +160,7 @@ class TestStrategicToolPortRegistry:
             "tool_execution_service",
             Lifetime.SCOPED,
             "tool-team",
-            ("tool", "execution", "service", "decorated"),
+            ("tool", "execution", "service", "decorated", "versioned"),
         ),
         (
             "skill_loader",

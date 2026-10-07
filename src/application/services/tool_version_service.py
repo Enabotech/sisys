@@ -21,6 +21,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from src.application.ports.schema_validator import SchemaValidatorPort
@@ -261,7 +262,12 @@ class ToolVersionService:
             candidates = [tv for tv in stamped if tv.version != current.version]
             if not candidates:
                 raise ToolVersionRollbackError(tool_id=str(tool_id), reason="no_stable_history")
-            target = max(candidates, key=lambda tv: tv.last_stable_at)  # type: ignore[arg-type,return-value]
+            # key 兜底 datetime.min：候选集已过滤 last_stable_at 非空，兜底仅为
+            # 类型收窄（datetime | None → datetime），语义上不可达
+            target = max(
+                candidates,
+                key=lambda tv: tv.last_stable_at or datetime.min.replace(tzinfo=UTC),
+            )
         else:
             target = await self._get_version_or_404(tool_id, target_version)
             if target.status is not ToolVersionStatus.DEPRECATED or target.last_stable_at is None:

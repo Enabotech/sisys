@@ -83,7 +83,7 @@ class ToolVersionModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
-    def __init__(  # noqa: PLR0913 — 与既有模型先例一致的显式构造器
+    def __init__(  # 与既有模型先例（schema_validation.py）一致的显式构造器
         self,
         version_id: uuid.UUID | None = None,
         tool_id: uuid.UUID | None = None,

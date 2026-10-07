@@ -1229,3 +1229,85 @@ def then_p95_resolve(context: dict[str, Any]) -> None:
     if p95 >= 5:
         pytest.skip(f"环境不达标：路由开销 P95 = {p95:.2f}ms ≥ 5ms（InMemory 装配测量证据留存）")
     assert p95 < 5
+
+
+# ============================================================================
+# Task 9: 开发结束收尾验收（完成清单逐项确认）
+# ============================================================================
+
+_SRC_DELIVERY_FILES = [
+    "src/domain/entities/tool_version.py",
+    "src/domain/events/tool_version_events.py",
+    "src/domain/exceptions/tool_version_exceptions.py",
+    "src/domain/ports/tool_version_repository.py",
+    "src/domain/services/tool_version_policy.py",
+    "src/application/ports/tool_version_service.py",
+    "src/application/services/tool_version_service.py",
+    "src/infrastructure/storage/inmemory/tool_version_repository.py",
+    "src/infrastructure/storage/postgresql/models/tool_version.py",
+    "src/infrastructure/storage/postgresql/repository/tool_version_repository.py",
+    "src/infrastructure/config/tool_version.py",
+    "src/interfaces/api/tools.py",
+]
+
+_TEST_DELIVERY_FILES = [
+    "tests/acceptance/test_acceptance_tool_version_management.feature",
+    "tests/acceptance/test_acceptance_tool_version_management.py",
+    "tests/unit/architecture/test_tool_version_management.py",
+    "tests/unit/domain/entities/test_tool_version.py",
+    "tests/unit/domain/services/test_tool_version_policy.py",
+    "tests/unit/domain/events/test_tool_version_events.py",
+    "tests/unit/domain/exceptions/test_tool_version_exceptions.py",
+    "tests/unit/application/services/test_tool_version_service.py",
+    "tests/unit/application/services/test_tool_execution_service.py",
+    "tests/unit/infrastructure/storage/test_inmemory_tool_version_repository.py",
+    "tests/unit/infrastructure/config/test_tool_version_config.py",
+    "tests/unit/interfaces/api/test_tools_api.py",
+    "tests/contracts/test_port_contract_tool_version_repository.py",
+    "tests/contracts/test_port_contract_tool_version_service.py",
+    "tests/contracts/test_api_contract_tools.py",
+    "tests/contracts/test_event_contract_tool_version_events.py",
+    "tests/contracts/test_event_channel_mapping_tool_version.py",
+    "tests/integration/test_tool_version_integration.py",
+]
+
+
+@when("检查 src 完成清单的 12 个交付文件")
+def when_check_src_files(context: dict[str, Any]) -> None:
+    """收集 src 交付文件的存在性与可导入性。"""
+    import importlib
+    from pathlib import Path
+
+    missing: list[str] = []
+    for rel in _SRC_DELIVERY_FILES:
+        path = Path(rel)
+        if not path.exists():
+            missing.append(f"缺失: {rel}")
+            continue
+        module = rel.removesuffix(".py").replace("/", ".")
+        try:
+            importlib.import_module(module)
+        except Exception as exc:  # noqa: BLE001 — 收尾清单聚合全部导入异常
+            missing.append(f"导入失败: {rel} ({exc})")
+    context["src_missing"] = missing
+
+
+@then("全部文件存在且模块可导入")
+def then_src_files_ok(context: dict[str, Any]) -> None:
+    """src 完成清单零缺失零导入失败。"""
+    assert not context["src_missing"], "src 完成清单异常:\n" + "\n".join(context["src_missing"])
+
+
+@when("检查 tests 完成清单的 17 个交付文件")
+def when_check_test_files(context: dict[str, Any]) -> None:
+    """收集测试交付文件的存在性。"""
+    from pathlib import Path
+
+    missing = [rel for rel in _TEST_DELIVERY_FILES if not Path(rel).exists()]
+    context["tests_missing"] = missing
+
+
+@then("全部测试文件存在且可收集")
+def then_test_files_ok(context: dict[str, Any]) -> None:
+    """tests 完成清单零缺失。"""
+    assert not context["tests_missing"], f"tests 完成清单缺失: {context['tests_missing']}"
