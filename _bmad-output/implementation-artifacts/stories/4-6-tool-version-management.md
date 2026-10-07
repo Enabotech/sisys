@@ -610,9 +610,9 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 实现 `src/domain/ports/tool_version_repository.py`（端口 + ToolVersionQuery，继承 L2RdbPort[ToolVersion] 先例）+ `src/infrastructure/storage/inmemory/tool_version_repository.py` |
 | 🔄 重构 | 索引结构优化（`_by_id: dict` + `_by_tool_version: dict[tuple]` 双索引，InMemoryToolRepository 先例） |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写端口与 InMemory 失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现端口 + InMemory 仓储
-- [ ] Subtask 3.3: 🔄 重构 — 双索引优化
+- [x] Subtask 3.1: 🔴 红 — 编写端口与 InMemory 失败测试
+- [x] Subtask 3.2: 🟢 绿 — 实现端口 + InMemory 仓储
+- [x] Subtask 3.3: 🔄 重构 — 双索引优化
 
 #### TDD 循环 B：PostgreSQL 实现 + migration 016
 
@@ -622,9 +622,9 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 实现 `src/infrastructure/storage/postgresql/models/tool_version.py`（SQLAlchemy 模型）+ `src/infrastructure/storage/postgresql/repository/tool_version_repository.py`（继承 PostgreSQLAdapter 泛型基类：`pk_column`/`_to_entity`/`_to_model` + list_by_query/_apply_filters 扩展，SchemaValidationRecordRepository 先例）+ `deploy/postgresql/alembic/versions/016_tool_versions.py`（revision="016", down_revision="015"；表结构见 Dev Notes；UNIQUE(tool_id,version) + **2 个 partial unique index（单 STABLE/单 CANARY 并发守护，011 已有 partial index 先例）** + 2 普通索引 + CHECK 约束） |
 | 🔄 重构 | JSONB ↔ dict 转换、时区处理（DateTime(timezone=True)） |
 
-- [ ] Subtask 3.4: 🔴 红 — 编写 PG 仓储集成测试（红：模型/仓储/migration 不存在）
-- [ ] Subtask 3.5: 🟢 绿 — 实现模型 + 仓储 + migration 016
-- [ ] Subtask 3.6: 🔄 重构 — 转换层优化
+- [x] Subtask 3.4: 🔴 红 — 编写 PG 仓储集成测试（红：模型/仓储/migration 不存在）
+- [x] Subtask 3.5: 🟢 绿 — 实现模型 + 仓储 + migration 016
+- [x] Subtask 3.6: 🔄 重构 — 转换层优化
 
 #### TDD 循环 C：组合根注册 + 契约测试转绿
 
@@ -634,14 +634,14 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | `src/composition_root.py` 注册 `tool_version_repository`（v1.0.0, SCOPED, owner="tool-team", tags=(tool,version,repository,postgresql,sqlalchemy)，impl 为 **lambda 工厂**——composition_root 全部条目均为 lambda 而非字符串 impl，契约测试维度 9 的 `callable(spec.impl)` 依赖它；参照 tool_execution_repository 条目 L2259-2271 格式）；端口契约测试转绿 |
 | 🔄 重构 | 注册条目注释与相邻条目风格统一 |
 
-- [ ] Subtask 3.7: 🔴 红 — 契约测试失败确认
-- [ ] Subtask 3.8: 🟢 绿 — 注册完成、契约测试通过
-- [ ] Subtask 3.9: 🔄 重构 — 注册风格统一
+- [x] Subtask 3.7: 🔴 红 — 契约测试失败确认
+- [x] Subtask 3.8: 🟢 绿 — 注册完成、契约测试通过
+- [x] Subtask 3.9
 
 **完成标准/Definition of Done:**
-- [ ] InMemory + PostgreSQL 双实现 + migration 016 就绪
-- [ ] 端口契约测试 11 维度全绿
-- [ ] `poetry run alembic -c deploy/postgresql/alembic/alembic.ini upgrade head` 成功（015→016）
+- [x] InMemory + PostgreSQL 双实现 + migration 016 就绪
+- [x] 端口契约测试 11 维度全绿
+- [x] `poetry run alembic -c deploy/postgresql/alembic/alembic.ini upgrade head` 成功（015→016）
 
 ---
 

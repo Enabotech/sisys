@@ -2269,6 +2269,24 @@ def bootstrap() -> None:
         tags=("tool", "execution", "repository", "postgresql", "sqlalchemy"),
     )
 
+    # === Story 4.6 — 工具版本管理（灰度发布与回滚）===
+    register_port(
+        name="tool_version_repository",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.ports.tool_version_repository",
+            fromlist=["ToolVersionRepositoryPort"],
+        ).ToolVersionRepositoryPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.postgresql.repository.tool_version_repository",
+            fromlist=["PostgreSQLToolVersionRepository"],
+        ).PostgreSQLToolVersionRepository(),
+        module="src.infrastructure.storage.postgresql.repository.tool_version_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "version", "repository", "postgresql", "sqlalchemy"),
+    )
+
     # Story 4.1b：Engine 后注入数据源解析器（set_data_source_resolver 模式，
     # __init__ 签名不变以保护 Story 4.4 AC-7.4 BDD 断言）
     # 组装逻辑（重试白名单收窄 + 后注入）归 engine 域模块公开工厂——组合根纯组合边界

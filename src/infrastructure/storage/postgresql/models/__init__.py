@@ -36,6 +36,7 @@ from src.infrastructure.storage.postgresql.models.schema_validation import (
 )
 from src.infrastructure.storage.postgresql.models.tool_chain import ToolChainModel
 from src.infrastructure.storage.postgresql.models.tool_execution import ToolExecutionModel
+from src.infrastructure.storage.postgresql.models.tool_version import ToolVersionModel
 from src.infrastructure.storage.postgresql.models.user import UserModel
 
 __all__ = [
@@ -58,6 +59,7 @@ __all__ = [
     "LoginAttemptModel",
     "ToolChainModel",
     "ToolExecutionModel",
+    "ToolVersionModel",
     "SchemaValidationRecordModel",
     "SandboxSessionModel",
     "user_roles_table",
