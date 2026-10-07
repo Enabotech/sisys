@@ -35,12 +35,14 @@ def _make_debate_topic(
     tenant_id: uuid.UUID | None = None,
     title: str = "公司是否应在下一财年进入东南亚市场",
     background: str = "",
+    debate_id: uuid.UUID | None = None,
 ) -> DebateTopic:
     """构造 DebateTopic（测试工厂，默认全合法）。"""
     return DebateTopic(
         tenant_id=tenant_id if tenant_id is not None else uuid.uuid4(),
         title=title,
         background=background,
+        debate_id=debate_id if debate_id is not None else uuid.uuid4(),
     )
 
 
@@ -165,6 +167,19 @@ class TestDebateTopic:
             _make_debate_topic(tenant_id=cast(uuid.UUID, "not-a-uuid"))
         assert exc_info.value.code == "EXCEPTION_242"
         assert exc_info.value.context.get("field") == "tenant_id"
+
+    def test_invalid_debate_id_raises(self) -> None:
+        """debate_id 必须 UUID（R1-F04——与 DebateSession/DebateResult 共用主键同款校验）"""
+        with pytest.raises(EntityValidationError) as exc_info:
+            _make_debate_topic(debate_id=cast(uuid.UUID, "not-a-uuid"))
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert exc_info.value.context.get("field") == "debate_id"
+
+    def test_explicit_valid_debate_id_passes(self) -> None:
+        """显式合法 debate_id 通过（与 DebateSession 聚合根共用标识）"""
+        debate_id = uuid.uuid4()
+        topic = _make_debate_topic(debate_id=debate_id)
+        assert topic.debate_id == debate_id
 
     @pytest.mark.parametrize(
         ("bad_title", "case_name"),

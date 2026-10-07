@@ -126,6 +126,7 @@ def _make_fake_llm(
         perspective_delay_sec: 视角分支 sleep（制造切换点，并发断言前置条件）
     """
     calls: list[tuple[str, str | None, type, float | None, float, float]] = []
+    configs: list[Any] = []
     mock: Any = AsyncMock(spec=LLMClientPort)
 
     async def _structured_generate(
@@ -151,9 +152,11 @@ def _make_fake_llm(
         finally:
             end_ts = time.perf_counter()
             calls.append((prompt, system_prompt, response_schema, config.temperature if config else None, start_ts, end_ts))
+            configs.append(config)
 
     mock.structured_generate.side_effect = _structured_generate
     mock._debate_calls = calls
+    mock._debate_configs = configs
     return mock
 
 
@@ -344,6 +347,41 @@ class TestTemperatureProfile:
         for call_args in fake_llm.structured_generate.call_args_list:
             config = call_args.kwargs.get("config") or call_args.args[2]
             assert config.timeout == 5.5
+
+    async def test_base_config_connection_fields_inherited(self) -> None:
+        """base_config 连接字段继承守护（R1-F03）：三次调用的 endpoint/api_key/model 与基底一致
+
+        回归形态：_build_call_config 若改为直接 LLMConfig(temperature, timeout)
+        丢弃 base（集成测试捕获过的真实缺陷形态），生产将静默丢失连接配置——
+        本用例在 CI 可运行面守住 dataclasses.replace 的继承语义。
+        """
+        from src.domain.ports.llm_client import LLMConfig
+
+        fake_llm = _make_fake_llm(_make_red_schema(), _make_blue_schema(), _make_risk_schema())
+        fake_api_key = "test-key"  # pragma: allowlist secret
+        base = LLMConfig(model="test-model", endpoint="http://test-endpoint", api_key=fake_api_key, timeout=99.0)
+        repo = InMemoryDebateSessionRepository()
+        service = RedBlueDebateService(
+            llm_client=fake_llm,
+            evaluator=DebateEvaluator(),
+            session_repository=repo,
+            event_publisher=_make_publisher(),
+            base_config=base,
+        )
+        topic = _make_topic()
+
+        await service.run_debate(topic=topic, context=_make_execution_context(topic))
+
+        configs = list(fake_llm._debate_configs)
+        assert len(configs) == 3
+        for config in configs:
+            # 连接字段继承基底（replace 派生新实例，值相等而非同一性）
+            assert config.endpoint == "http://test-endpoint"
+            assert config.api_key == f"{fake_api_key}"
+            assert config.model == "test-model"
+            # 温度与 timeout 按调用覆写（优先于 base.timeout=99.0）
+            assert config.timeout == 12.0
+        assert {c.temperature for c in configs} == {0.8, 0.5, 0.2}
 
 
 # ===================================================================
@@ -708,11 +746,69 @@ class TestEntityValidationErrorNotWrapped:
         """直接构造领域 VO 失败（242）不被服务吞掉——领域不变量的兜底验证
 
         Schema→VO 转换的 242 理论缝隙（Pydantic 过但 VO 败）由 Pydantic 与 VO
-        约束对齐消解（同为 min_length/ge/le），此处验证 242 的透传形态不经过服务包装。
+        约束对齐消解（NonEmptyStr 条目级校验，R1-F02），此处验证 242 的透传形态不经过服务包装。
         """
         with pytest.raises(EntityValidationError) as exc_info:
             DebateTopic(tenant_id=uuid.uuid4(), title="")
         assert exc_info.value.code == "EXCEPTION_242"
+
+    async def test_perspective_to_domain_violation_marks_failed(self) -> None:
+        """视角 Schema→VO 转换 242：session 转 FAILED 落库 + 透传（R1-F02 防御深度）
+
+        Schema 加严后正常构造无法产生违规实例——用 model_construct（pydantic
+        官方无校验构造 API）绕过 Schema 校验制造「Pydantic 过但 VO 败」形态，
+        防端口实现返回手工构造的非法实例时 session 卡死 GENERATING。
+        """
+        invalid_red = PerspectiveAnalysisSchema.model_construct(
+            stance="  ",  # 纯空白：VO strip 判空必拒
+            arguments=["论点"],
+            risks=[],
+            recommendations=[],
+            confidence=0.8,
+        )
+        fake_llm = _make_fake_llm(invalid_red, _make_blue_schema(), _make_risk_schema())
+        service, repo, _ = _build_service(fake_llm)
+        topic = _make_topic()
+
+        with pytest.raises(EntityValidationError) as exc_info:
+            await service.run_debate(topic=topic, context=_make_execution_context(topic))
+        assert exc_info.value.code == "EXCEPTION_242"
+
+        session = await repo.get_by_id(topic.debate_id)
+        assert session is not None
+        assert session.state is DebateSessionState.FAILED
+        assert session.failure_reason is not None
+
+    async def test_risk_view_to_domain_violation_marks_failed(self) -> None:
+        """合成侧 Schema→VO 转换 242：FAILED 落库 + 透传（:170-177 分支首次直接覆盖）
+
+        同 model_construct 技巧：RiskViewSchema.consensus_areas=[] 绕过 Schema
+        min_length=1，to_domain 构造 RiskView 时「共识区域至少 1 条」VO 不变量必拒。
+        """
+        invalid_risk = RiskViewSchema.model_construct(
+            consensus_areas=[],
+            disagreement_areas=[
+                DisagreementAreaSchema(
+                    area="进入时机",
+                    red_position="立即进入",
+                    blue_position="延后观察",
+                    risk_note="时机误判放大投入风险",
+                )
+            ],
+            overall_risk_level="MEDIUM",
+        )
+        fake_llm = _make_fake_llm(_make_red_schema(), _make_blue_schema(), invalid_risk)
+        service, repo, _ = _build_service(fake_llm)
+        topic = _make_topic()
+
+        with pytest.raises(EntityValidationError) as exc_info:
+            await service.run_debate(topic=topic, context=_make_execution_context(topic))
+        assert exc_info.value.code == "EXCEPTION_242"
+
+        session = await repo.get_by_id(topic.debate_id)
+        assert session is not None
+        assert session.state is DebateSessionState.FAILED
+        assert session.failure_reason is not None
 
 
 # ===================================================================

@@ -227,3 +227,71 @@ class TestToDomainConversion:
         domain = schema.to_domain(DebatePerspective.RED_AGGRESSIVE)
         assert 0.0 <= domain.confidence <= 1.0
         assert 1 <= len(domain.arguments) <= 8
+
+
+# ===================================================================
+# 条目级非空校验（R1-F02 根因修复——NonEmptyStr：strip_whitespace + min_length=1）
+# ===================================================================
+
+
+class TestNonEmptyStrEntryConstraints:
+    """条目级空串/纯空白在 Schema 层即拒（对齐 VO strip 判空语义）
+
+    事故形态：stance='  ' 或 arguments=[''] 通过旧版 min_length=1（列表级），
+    在 to_domain 的 VO 校验抛 242 时服务无 FAILED 处理而逃逸（session 卡死
+    GENERATING）——本层拦截后 LLM 客户端 ValidationError 触发重试自纠。
+    """
+
+    def test_stance_whitespace_only_rejected(self) -> None:
+        """stance 纯空白 strip 后为空 → 拒绝"""
+        with pytest.raises(ValidationError):
+            _make_perspective_schema(stance="   ")
+
+    def test_stance_stripped_positive(self) -> None:
+        """合法值首尾空白被 strip（strip_whitespace 语义正向验证）"""
+        schema = _make_perspective_schema(stance="  立即进入市场  ")
+        assert schema.stance == "立即进入市场"
+
+    def test_arguments_empty_entry_rejected(self) -> None:
+        """arguments 条目为空串 → 拒绝（元素级约束）"""
+        with pytest.raises(ValidationError):
+            _make_perspective_schema(arguments=["窗口期稍纵即逝", ""])
+
+    def test_arguments_whitespace_entry_rejected(self) -> None:
+        """arguments 条目纯空白 → 拒绝"""
+        with pytest.raises(ValidationError):
+            _make_perspective_schema(arguments=["  "])
+
+    def test_risks_empty_entry_rejected(self) -> None:
+        """risks 条目为空串 → 拒绝（允许空列表但条目非空）"""
+        with pytest.raises(ValidationError):
+            _make_perspective_schema(risks=[""])
+
+    def test_recommendations_whitespace_entry_rejected(self) -> None:
+        """recommendations 条目纯空白 → 拒绝"""
+        with pytest.raises(ValidationError):
+            _make_perspective_schema(recommendations=["   "])
+
+    def test_consensus_area_whitespace_rejected(self) -> None:
+        """共识区域字段纯空白 → 拒绝"""
+        with pytest.raises(ValidationError):
+            _make_consensus_schema(area="  ")
+        with pytest.raises(ValidationError):
+            _make_consensus_schema(description="  ")
+
+    def test_disagreement_fields_whitespace_rejected(self) -> None:
+        """分歧区域全部字段纯空白 → 拒绝"""
+        with pytest.raises(ValidationError):
+            _make_disagreement_schema(area="  ")
+        with pytest.raises(ValidationError):
+            _make_disagreement_schema(red_position="  ")
+        with pytest.raises(ValidationError):
+            _make_disagreement_schema(blue_position="  ")
+        with pytest.raises(ValidationError):
+            _make_disagreement_schema(risk_note="  ")
+
+    def test_empty_risks_list_still_allowed(self) -> None:
+        """空 risks 列表（无条目）仍然合法——元素级约束不误伤空集合"""
+        schema = _make_perspective_schema(risks=[], recommendations=[])
+        assert schema.risks == []
+        assert schema.recommendations == []

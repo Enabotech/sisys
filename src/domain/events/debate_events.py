@@ -10,7 +10,8 @@ Story 4.5 — 红蓝辩论机制基础（单 Agent 多视角 MVP）。
 事件聚合根设计（对齐 sandbox_events.py 惯例）：
 - aggregate_type = "DebateSession"
 - aggregate_id = debate_id（UUID）
-- metadata 透传 tenant_id（多租户归属）
+- metadata 透传 tenant_id（多租户归属，**str 形态**——UUID 对象会击穿
+  outbox JSONB / redis / rabbitmq 三处 json.dumps，见 R1-F01 修复）
 - topic_title 超 100 字符经 object.__setattr__ 截断（frozen dataclass 惯例）
 
 双通道登记（两处同步，本文件 > DEFAULT_MAPPINGS 优先级声明见 yaml 文件头）：
@@ -74,7 +75,9 @@ class DebateCompleted(DomainEvent):
             object.__setattr__(
                 self,
                 "metadata",
-                {**self.metadata, "tenant_id": self.tenant_id},
+                # metadata 以 str 形态透传（sandbox_events/tool_schema_events 先例）——
+                # UUID 对象会导致 reliable/realtime 通道 json.dumps 序列化失败（R1-F01）
+                {**self.metadata, "tenant_id": str(self.tenant_id)},
             )
         if len(self.topic_title) > _TOPIC_TITLE_MAX_LENGTH:
             object.__setattr__(

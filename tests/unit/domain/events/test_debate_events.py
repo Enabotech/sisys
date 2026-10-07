@@ -7,6 +7,7 @@ to_dict/from_dict roundtrip（_registry 多态注册生效）与 frozen 不变�
 from __future__ import annotations
 
 import dataclasses
+import json
 import uuid
 
 import pytest
@@ -77,7 +78,7 @@ class TestDebateCompletedConstruction:
             duration_ms=100,
             temperature_profile={"red": 0.8, "blue": 0.5, "synthesis": 0.2},
         )
-        assert event.metadata.get("tenant_id") == tenant_id
+        assert event.metadata.get("tenant_id") == str(tenant_id)  # str 形态（R1-F01）
 
     def test_topic_title_truncated_over_100_chars(self) -> None:
         """topic_title 超 100 字符经 object.__setattr__ 截断（frozen 惯例）"""
@@ -143,8 +144,17 @@ class TestDebateCompletedRoundtrip:
         assert restored.overall_risk_level == event.overall_risk_level
         assert restored.duration_ms == event.duration_ms
         assert restored.temperature_profile == event.temperature_profile
-        # from_dict 后 metadata 保持 tenant_id 透传
-        assert restored.metadata.get("tenant_id") == event.tenant_id
+        # from_dict 后 metadata 保持 tenant_id 透传（str 形态，R1-F01）
+        assert restored.metadata.get("tenant_id") == str(event.tenant_id)
+
+    def test_to_dict_fully_json_serializable(self) -> None:
+        """to_dict 全量 JSON 可序列化（metadata 含 UUID 对象时必红——R1-F01 绊线）
+
+        事故形态：metadata 直塞 UUID 会导致 reliable 通道 outbox JSONB 与
+        realtime 通道 redis_publisher 的 json.dumps 抛 TypeError，事件静默丢失。
+        """
+        event = _make_event()
+        json.dumps(event.to_dict())  # 任何字段不可序列化即抛 TypeError
 
     def test_from_dict_roundtrip_truncated_title(self) -> None:
         """超长 title 的 roundtrip 截断值保持一致"""

@@ -1504,20 +1504,53 @@ class DebateCompleted(DomainEvent):
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 待 dev-story 实施后填写
-**审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+**审查日期:** 2026-10-07（Round 1）
+**审查模式:** C1~C5 循环五轮（四视角并行调研 + 主会话实测定谳 + 双评审员方案评审）
+
+#### Round 1 发现台账（2026-10-07，四视角调研 + 主会话实测定谳）
+
+> 编号规则：`R<轮>-F<序号>`（R1 = Round 1 代码审查）。定谳依据标注「实测」者均经主会话独立复现，非采信评审员自报。
+
+| # | 问题 | 严重度 | 定谳证据 |
+|---|------|--------|----------|
+| R1-F01 | `DebateCompleted` metadata 注入 UUID 对象（`debate_events.py` `__post_init__`）——`to_dict()` 后 `json.dumps` 抛 TypeError，reliable 通道（RabbitMQ outbox payload=JSONB）发布 100% 失败且被 `RabbitMQEventBus.publish` 的 `except Exception` 吞为 `PublishResult(reliable, False)`，服务层仅 warning——下游永远收不到辩论完成事件；sandbox 先例 metadata 值全为 str，debate 是全项目唯一 UUID 直塞违例；既有单测断言 `metadata.get("tenant_id") == tenant_id`（UUID 相等）恰好固化错误行为 | P1 | 主会话实测 `json.dumps(to_dict())` → `TypeError: Object of type UUID is not JSON serializable`；outbox 链路（`sqlalchemy_event_outbox_adapter.py:30` payload=to_dict() → JSONB 列）+ `rabbitmq_event_bus.py:62-65` except 吞噬逐行核验 |
+| R1-F02 | 视角 Schema→VO 转换的 `EntityValidationError`(242) 逃逸：`PerspectiveAnalysisSchema` 无条目级非空校验（`stance='  '`、`arguments=['']` 通过 Pydantic min_length=1），`_generate_perspectives` 的 `to_domain` 调用（:269-272）无 242 处理——异常直接逃逸 run_debate、session 卡死 GENERATING、failure_reason=None 永不落 FAILED；与 risk_view 路径（:170-177 有完整 FAILED+save+透传四步）不对称；端口 docstring Raises 未声明 242。嵌套 Area Schema（合成侧）同族缝隙（合成侧已有 242 处理但 Schema 层同样缺条目校验） | P1 | 主会话端到端复现：Pydantic 放行 `stance='  '` → `to_domain` 抛 242 逃逸 → `session.state=GENERATING, failure_reason=None` |
+| R1-F03 | `base_config` 连接字段继承在 CI 可运行测试中零守护：`_make_fake_llm` 仅记录 temperature，全测试树 grep `base_config` 唯一命中 `@pytest.mark.llm` 动态 skip 场景（CI 无端点必跳）——突变「`_build_call_config` 改为直接 `LLMConfig(temperature, timeout)` 丢弃 base」全测试面无一红，生产静默丢失 endpoint/api_key | P1 | 突变推演矩阵（视角 C）：M8 为 11 个关键突变中唯一无守护项 |
+| R1-F04 | `DebateTopic.__post_init__` 校验 tenant_id 却漏校验同为主键的 debate_id（`DebateTopic(debate_id='not-a-uuid')` 静默放行；DebateResult/DebateSession 均有 debate_id 校验，三聚合共用主键唯独 Topic 缺位） | P2 | 主会话实测放行 |
+| R1-F05 | 契约测试 `test_port_spec_10_fields_complete` 自比较恒真：`fields(PortSpec)` vs `fields(type(spec))`（spec 即 PortSpec 实例）集合与自身比较——两份契约测试各一处死维度（架构测试有真硬编码版本补位，无覆盖净损失但契约层虚假覆盖感） | P2 | 代码实读（两个契约测试 :112-124/:110-121） |
+| R1-F06 | BDD 层恒真/失实断言三处：① `then_entity_validation_error` 断言 `vo_errors == []` 恒真（vo_errors 全程无 append）② `then_error_code_242` 条件跳过（query_error 永不被置）③ timeout 断言注释宣称「per-call timeout 传递断言（默认 12.0）」实际断 `call[3] is not None`（temperature 非 None 近似恒真）——真实 242/timeout 判别力均在 When 助手/单元层，Then 层为装饰 | P2 | 代码实读（acceptance .py :692-703/:1296-1298 + When 助手 :531-544） |
+| R1-F07 | `transition_to` 迁移终态后不重校验终态不变量（SYNTHESIZING→COMPLETED 不回填可自陷非法终态）——与 ToolExecution 严格同构（项目既有惯例），应用层回填顺序安全（先回填四字段再迁移），非法态仅存在误用路径 | P2→记录 | 主会话实测评级：同构惯例 + 缓解在位，改判记录级不落码（Surgical Changes 原则） |
+| R1-F08 | 测试注释机理解释失实：取消测试注释称「兄弟未取消则需等满红方 0.3s」与 gather 文档语义相反（首异常立即传播不等兄弟；计时守护实际依赖第二 gather 的等待效应）；「仅删第二 gather 保留 cancel」突变无守护（后果警告级） | P3 | 登记 R2 处理 |
+| R1-F09 | P3 登记项（Round 1 不修，R2+ 核销）：计时断言抖动余量仅 50ms（高负载 CI 假红风险）；J==0.95 边界值无构造；`test_multi_arguments_joined_semantics` docstring 宣称「论点顺序不改变重叠率」数学不真（junction bigram）；evaluator 两处 docstring 精度（"完全相同返回 1.0"对单字符不成立 + Example 残缺）；SCOPED 隐性依赖 clear_scoped（项目级模式）；per_call_timeout 覆写 LLM_TIMEOUT（已声明设计决策）；`get_debate_result` 裸 assert（防御深度）；llm 场景对 420/421 一律 skip（实现缺陷与环境故障不分）；BDD 覆盖小洞×3（他层补位）；警告区构造注释「第 20 字」实际第 23 字（结果不受影响）；红线 grep 的 docstring 文本假阳性源（合理存在）；AC 勾选未勾为项目跨 Story 惯例（非失实） | P3 | 台账登记 |
+
+**Round 1 统计：** 调研 Agent ×4（领域模型/编排并发/测试判别力/契约合规）+ 主会话实测定谳 ×3（UUID 序列化端到端 / 242 逃逸端到端 / 突变矩阵采信）；发现 P0×0 + P1×3 + P2×5（1 项改判记录级）+ P3×2 簇；视角 D 契约合规零阻断（红线自查 5 项全过、28 文件全在、计数精确一致）。
+
+#### Round 1 修复方案（R1-F01/F02/F03/F04/F05/F06）
+
+> **C3 评审往返记录**：双评审员（甲：正确性一致性 / 乙：可行性可满足性）首轮均判「合格（附必改点）」——6 项必改（P1 测试同步两处 / P2④ model_construct 指定 + 合成侧零覆盖补齐 / P6① AC-2.3 接线 / P6② timeout 记录形态 / P2① 排除 Literal + 模块级别名 + 选型 docstring / P5 钉死两文件）+ 4 项建议全部吸收为方案 v2 后，独立复评员锚点核实判定**优秀**（唯一非阻塞瑕疵：字段计数笔误，按枚举执行）。评审员关键实证：`Field(strip_whitespace=True)` 在 pydantic v2 是 deprecated no-op 且泄漏脏键进 LLM JSON Schema（Annotated+StringConstraints 是唯一正确机制）；AC-2.3 `when_construct_terminal_without_fields` 内联循环不经 helper，Then 非空化后必误红（接线修复）；base.py:149-153 metadata 不经 _serialize_value 且 json 校验只覆盖 payload 不覆盖 metadata（基类缺口登记留项）。
+
+| # | 修复内容 | 文件 | 形态 |
+|---|----------|------|------|
+| P1 | metadata tenant_id 改 `str(self.tenant_id)`（对齐 sandbox/tool_schema_events str 先例；realtime redis_publisher 与 reliable outbox 两通道同病一并根治）；**测试同步两处**（test_debate_events.py:80 断言 + :147 roundtrip 断言均改 str 比较）+ 新增「`json.dumps(to_dict())` 全量可序列化」断言；文件注释注明 metadata str 形态 | `debate_events.py` + `test_debate_events.py` | 生产 1 行 + 注释 + 测试 3 处 |
+| P2 | 双层修复：①Schema 根因——模块级 `NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]` 应用于 7 个 plain str 字段 + 3 个 list 元素级（**排除 overall_risk_level Literal**）；docstring 补选型依据（pydantic v2 唯一正确机制 + minLength 进 LLM 约束解码）；②服务防御——`_generate_perspectives` to_domain 补 242 四步（对称 :170-177）；③端口+服务 docstring Raises 补 242；④测试：条目级拒绝用例 + 正向 strip 用例（"  x  "→"x"）+ 服务级 242 用例（**`model_construct` 绕过 Schema 校验**，标注「Schema 加严后退居防御深度」）+ 同技巧补合成侧 :170-177 零覆盖 | `debate_schemas.py` + `red_blue_debate_service.py` + `ports/red_blue_debate_service.py` + 2 单测文件 | 生产 3 文件 + 测试 |
+| P3 | base_config 继承守护：Fake 工厂闭包增 `mock._debate_configs` 平行列表（六字段元组零改动），新用例以 `base_config=LLMConfig(model/endpoint/api_key)` 构造服务，断言三次调用 config 连接字段值相等（replace 新实例非同一性）+ 顺带断言 temperature 三值与 timeout==12.0（M8 突变闭环） | `test_red_blue_debate_service.py` | 测试 1 文件 |
+| P4 | `DebateTopic.__post_init__` 补 debate_id isinstance UUID 校验（照抄同文件 DebateResult.debate_id :404-408 先例）；VO 模块头不变量清单补条目；测试镜像 test_debate.py:447-460 先例 | `debate.py` + `test_debate.py` | 生产 + 测试 |
+| P5 | **钉死两文件两处** `test_port_spec_10_fields_complete`（test_port_contract_red_blue_debate_service.py + test_port_contract_debate_session_repository.py）自比较恒真改硬编码 10 字段集合（照抄架构测试 :219-230 蓝本；事件契约测试早已硬编码不动） | 两个 port contract 测试 | 测试 2 文件 |
+| P6 | BDD 三处：①helper `_expect_entity_validation_error` append 用例名到 vo_errors + **AC-2.3 的 `when_construct_terminal_without_fields`（:841-847）改调 helper**（用现成 terminal_violations，防 Then 非空化后误红）+ `then_entity_validation_error` 改非空断言；②**平行 `_debate_configs` 列表**（与 P3 同形态，六字段元组与索引消费点零影响）+ timeout Then 改真断言 `== 12.0`；③then_error_code_242 保持条件形态（残余真空性记录在案） | `test_acceptance_red_blue_debate.py` | 测试 1 文件 |
 
 #### 需决策 Decision Needed
 
-- [ ] 待 dev-story 实施后填充
+- [x] R1-F07（transition_to 终态重校验）改判记录级不落码——ToolExecution 同构惯例 + 应用层回填顺序安全，修改将偏离项目既有聚合根模式（R5 终审复核）
 
 #### 已修复 Patch
 
-- [ ] 待 dev-story 实施后填充
+- [x] R1-F01~F06 落码于 Round 1 C4 提交（2026-10-07）：生产 5 文件（debate_events.py metadata str 化 / debate_schemas.py NonEmptyStr 条目级校验（7 plain str + 3 list 元素，排除 Literal）/ red_blue_debate_service.py 视角 242 四步对称处理 + docstring / ports docstring / debate.py debate_id 校验）+ 测试 8 文件（新增 15 用例：Schema 条目级 9 + json.dumps 绊线 1 + base_config 继承 1 + 服务级 242 双用例 2 + debate_id 2，BDD vo_errors 接线 + AC-2.3 改走 helper + timeout 真断言 + 契约硬编码×2）
+- [x] **突变闭环 6 项全红验证**（改坏→红→还原）：M1 UUID 直塞→2 红；M2 删 242 处理→GENERATING vs FAILED 红（缺陷形态精确复现）；M4 base_config 裸构造→连接字段红；M5 删 debate_id 校验→红；M6 删 helper append→6 场景红（AC-1.2~1.6 + AC-2.3）；M8 硬编码删名→契约红
+- [x] 修复后全量：辩论测试面 372 passed + 1 skipped（基线 357 + 新增 15）；ruff 全过；mypy 623 文件零错误
 
 #### 已推迟 Defer
 
-- [ ] 待 dev-story 实施后填充
+- [ ] R1-F08/F09 台账登记，R2+ 轮核销或收敛轮裁定
 
 ---
 
@@ -1530,9 +1563,9 @@ class DebateCompleted(DomainEvent):
 
 ---
 
-**故事版本/Story Version:** v1.4.1-dev
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-10-01
-**最后更新/Last Updated:** 2026-10-01
+**最后更新/Last Updated:** 2026-10-07
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（四视角代码调研 + epics/PRD/OR/架构文档提取 + 4-1a/4-4/4-1f 经验整合；debate 子域 420-429 新开；GAP-CRITICAL-09 清偿定位）
 - v1.1.0: Round 1 五维审查修订（科学性/合理性/正确性/一致性/可行性）——28 修复簇：P1×11（divergence→overlap 全局改名 / 文档同步 CI 校验失实×3 / gain_rate 示例值数学错误 / AST 助手复用不可行 / 延迟预算三段式重写 / Fake 分派误路由重构 / get_debate_result FAILED 语义 / evaluate_overlap 返回类型矛盾 / 并发观测物落地 / PublishResult 双形态 / epics 三项映射）+ P2×12 + P3×5；R1-F27 评审员建议经实测定谳改判不落码
@@ -1540,3 +1573,4 @@ class DebateCompleted(DomainEvent):
 - v1.3.0: Round 3 单深度三维度审查——11 修复簇（P1×1 + P2×5 + P3×5）：BDD AC-1 组 5/5 全覆盖重构 / 不变量子约束逐条枚举 / Area 描述字段非空 / validate 调用时机定谳 / session 回填时机 / GAP-CRITICAL-09 登记动作 / epics 四句 traceability；主会话核查排除 3 项 P0 候选（event_publisher 端口名已注册）
 - v1.4.0: Round 4 纯验证轮（零修复，锚点全落位）+ Round 5 独立终审——5 项 P3 清偿（场景计数定谳 36 / Sprint 勾选 / LitellmLLMClient 拼写×5 / 契约计数口径 / 行号偏移）；周期闭合 1:1、12 组行号实地验证、P0 全周期 ×0、P1 清零——**审查周期收敛，可进入 dev-story 实施**
 - v1.4.1-dev: dev-story 实施完成——Task 0~10 全部落地（11 Task × TDD 循环），BDD 36/36 场景全绿；实施期决策：architecture.md 422/423 文档级撞码修订、base_config 连接字段继承修复（集成测试捕获）、真实 LLM 分级断言（26.7s 慢端点实测留痕）、exception_handlers 期望集合同步；状态 → review
+- v1.5.0: 代码审查 Round 1（四视角调研 + 双评审员方案评审 + 复评优秀落码）——P1×3（metadata UUID 序列化炸裂致双通道事件 100% 静默丢失 / 视角 to_domain 242 逃逸 session 卡死 GENERATING / base_config 继承零 CI 守护）+ P2×3 落码修复 + 突变闭环 6 项全红；P3 台账登记 R2+ 核销

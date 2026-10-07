@@ -11,7 +11,8 @@ Story 4.5 — 红蓝辩论机制基础（单 Agent 多视角 MVP）的输入/输
 
 不变量清单（违反抛 EntityValidationError EXCEPTION_242，context 携带
 entity/field/value/constraint）：
-1. DebateTopic.title 非空且 ≤ 200 字符；background ≤ 8000 字符
+1. DebateTopic.title 非空且 ≤ 200 字符；background ≤ 8000 字符；
+   tenant_id/debate_id 均为合法 UUID
 2. PerspectiveAnalysis.stance 非空；arguments 1~8 条且每条非空；
    confidence ∈ [0.0, 1.0]；perspective 枚举合法
 3. ConsensusArea/DisagreementArea.area 非空；描述类字段非空；
@@ -155,6 +156,11 @@ class DebateTopic:
             raise EntityValidationError(
                 message="DebateTopic.tenant_id must be a valid UUID",
                 context={"entity": "DebateTopic", "field": "tenant_id", "value": self.tenant_id},
+            )
+        if not isinstance(self.debate_id, uuid.UUID):
+            raise EntityValidationError(
+                message="DebateTopic.debate_id must be a valid UUID",
+                context={"entity": "DebateTopic", "field": "debate_id", "value": self.debate_id},
             )
         _validate_non_empty("DebateTopic", "title", self.title)
         if len(self.title) > TITLE_MAX_LENGTH:

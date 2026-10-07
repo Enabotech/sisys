@@ -132,6 +132,10 @@ class RedBlueDebateService:
             DebateGenerationError: 视角 LLM 生成失败（EXCEPTION_420）
             DebateSynthesisError: 合成 LLM 调用失败（EXCEPTION_421）
             DebateLowDivergenceError: 重叠率 ≥ 0.95 分化不足（EXCEPTION_422）
+            EntityValidationError: 结构化输出违反领域不变量时透传
+                （EXCEPTION_242——数据契约违反而非 LLM 调用失败，
+                session 已转 FAILED 落库；Schema 层条目校验加严后
+                该路径退居防御深度，防端口实现返回手工构造的非法实例）
         """
         started = time.perf_counter()
         session = DebateSession(
@@ -266,10 +270,18 @@ class RedBlueDebateService:
             self._fail_session(session, red_task, blue_task)
             await self._session_repository.save(session)
             raise
-        return (
-            red_schema.to_domain(DebatePerspective.RED_AGGRESSIVE),
-            blue_schema.to_domain(DebatePerspective.BLUE_CONSERVATIVE),
-        )
+        try:
+            return (
+                red_schema.to_domain(DebatePerspective.RED_AGGRESSIVE),
+                blue_schema.to_domain(DebatePerspective.BLUE_CONSERVATIVE),
+            )
+        except EntityValidationError:
+            # 数据契约违反（Pydantic 过但领域不变量败）——透传 242，不包装为 420，
+            # 与合成路径（run_debate 风险视图转换）对称的四步归宿（R1-F02）
+            session.failure_reason = "视角结构化输出领域不变量校验失败"
+            self._fail_session(session)
+            await self._session_repository.save(session)
+            raise
 
     async def _generate_single_perspective(
         self,

@@ -110,14 +110,27 @@ class TestRedBlueDebateServicePortContract:
         assert isinstance(_PortStub(), RedBlueDebateServicePort)
 
     def test_port_spec_10_fields_complete(self) -> None:
-        """PortSpec 10 字段元数据完整性。"""
+        """PortSpec 10 字段元数据完整性（硬编码集合绊线，R1-F05）。
+
+        旧形态 fields(PortSpec) vs fields(type(spec)) 是自比较恒真（spec 即
+        PortSpec 实例）——PortSpec 增删字段测试不红；改为硬编码 10 字段集合
+        （与 tests/unit/architecture/test_red_blue_debate.py 同形态）。
+        """
         spec = self._spec()
         from dataclasses import fields
 
-        from src.domain.ports.registry import PortSpec
-
-        expected_fields = {f.name for f in fields(PortSpec)}
         actual_fields = {f.name for f in fields(type(spec))}
-        assert expected_fields == actual_fields
+        assert actual_fields == {
+            "name",
+            "version",
+            "interface",
+            "impl",
+            "module",
+            "lifetime",
+            "owner",
+            "compatibility",
+            "tags",
+            "deprecated",
+        }
         assert spec.compatibility == ()
         assert spec.deprecated is False

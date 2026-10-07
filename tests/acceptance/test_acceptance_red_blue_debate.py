@@ -358,9 +358,12 @@ def _make_fake_llm(
 
     Returns:
         AsyncMock(spec=LLMClientPort)，挂 _debate_calls 属性记录六字段元组
-        (prompt, system_prompt, response_schema, temperature, start_ts, end_ts)
+        (prompt, system_prompt, response_schema, temperature, start_ts, end_ts)；
+        另挂 _debate_configs 平行列表记录完整 config 对象（timeout 断言用，
+        与六字段元组互不影响——R1-F06）
     """
     calls: list[tuple[str, str | None, type, float | None, float, float]] = []
+    configs: list[Any] = []
     mock: Any = AsyncMock(spec=LLMClientPort)
 
     async def _structured_generate(
@@ -387,9 +390,11 @@ def _make_fake_llm(
         finally:
             end_ts = time.perf_counter()
             calls.append((prompt, system_prompt, response_schema, config.temperature if config else None, start_ts, end_ts))
+            configs.append(config)
 
     mock.structured_generate.side_effect = _structured_generate
     mock._debate_calls = calls
+    mock._debate_configs = configs
     return mock
 
 
@@ -534,12 +539,17 @@ def _expect_entity_validation_error(context: dict[str, Any], cases: list[tuple[s
     Args:
         context: BDD 共享状态
         cases: (用例名, 构造 callable) 列表，构造 callable 应抛 EntityValidationError
+
+    Note:
+        每条用例断言通过后 append 用例名到 context["vo_errors"]（R1-F06 接线）——
+        Then「抛出 EntityValidationError」据此断言本场景至少验证 1 条 242 用例。
     """
     for case_name, factory in cases:
         try:
             factory()
         except EntityValidationError as exc:
             assert exc.code == "EXCEPTION_242", f"{case_name}: code={exc.code}"
+            context["vo_errors"].append(case_name)
         else:
             raise AssertionError(f"{case_name}: 应抛 EntityValidationError")
 
@@ -691,8 +701,8 @@ def when_construct_invalid_quality_result(context: dict[str, Any]) -> None:
 
 @then("抛出 EntityValidationError")
 def then_entity_validation_error(context: dict[str, Any]) -> None:
-    """EntityValidationError 已在 when 中逐条断言（242 code 校验），此处确认通过"""
-    assert context.get("vo_errors", []) == []
+    """本场景至少验证 1 条 242 用例（R1-F06 接线后为真断言——旧形态恒真空）"""
+    assert context.get("vo_errors"), "vo_errors 为空：when 步骤未收集任何 242 验证用例"
 
 
 @then("错误码为 EXCEPTION_242")
@@ -838,13 +848,8 @@ def when_construct_terminal_without_fields(context: dict[str, Any]) -> None:
             ),
         ),
     ]
-    for name, factory in context["terminal_violations"]:
-        try:
-            factory()
-        except EntityValidationError as exc:
-            assert exc.code == "EXCEPTION_242", f"{name}: code={exc.code}"
-        else:
-            raise AssertionError(f"{name}: 构造应抛 EntityValidationError（validate 于 __post_init__）")
+    # 复用共用助手断言（R1-F06 接线——同步收集 vo_errors 供 Then 非空断言）
+    _expect_entity_validation_error(context, context["terminal_violations"])
 
 
 # ============================================================================
@@ -1293,9 +1298,10 @@ def then_temperature_profile_assertions(context: dict[str, Any]) -> None:
         assert temperature == TEMPERATURE_PROFILE["synthesis"]
     all_temperatures = sorted(c[3] for c in context["perspective_calls"] + context["synthesis_calls"])
     assert all_temperatures == [0.2, 0.5, 0.8]
-    # per-call timeout 传递断言（默认 12.0）
-    for call in context["perspective_calls"] + context["synthesis_calls"]:
-        assert call[3] is not None
+    # per-call timeout 传递断言（默认 12.0，R1-F06——旧形态误断 temperature 非 None 近似恒真）
+    for config in context["fake_llm"]._debate_configs:
+        assert config is not None
+        assert config.timeout == 12.0
 
 
 @when("执行红蓝辩论并记录调用时间窗口")

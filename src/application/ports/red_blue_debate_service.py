@@ -36,6 +36,8 @@ class RedBlueDebateServicePort(Protocol):
             DebateGenerationError: 视角 LLM 生成失败（EXCEPTION_420）
             DebateSynthesisError: 风险视图合成失败（EXCEPTION_421）
             DebateLowDivergenceError: 红蓝重叠率 ≥ 0.95 分化不足（EXCEPTION_422）
+            EntityValidationError: 结构化输出违反领域不变量时透传（EXCEPTION_242，
+                session 已转 FAILED 落库——数据契约违反不包装为 420/421）
         """
         ...
 

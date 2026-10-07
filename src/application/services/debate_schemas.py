@@ -10,13 +10,19 @@ Story 4.5 — 定义红/蓝视角分析与风险全景视图合成的 Pydantic �
 - to_domain() 承担 list→tuple 转换职责（VO 字段全 tuple，Schema 全 list）
   并以 perspective 参数区分红/蓝（同一 Schema 双视角复用）
 - Pydantic 校验 + 领域 VO 双重不变量（VO __post_init__ 兜底）
+- NonEmptyStr 条目级非空校验（R1-F02 根因修复）：strip_whitespace + min_length=1
+  对齐 VO 的 strip 判空语义，使空串/纯空白条目在 LLM 解析层即拒（客户端
+  ValidationError 触发 tenacity 重试自纠）；选型依据——pydantic v2 的
+  Field(strip_whitespace=True) 是 deprecated no-op 且会泄漏脏键进发给 LLM 的
+  JSON Schema，Annotated+StringConstraints 是唯一正确机制（model_json_schema
+  输出干净携带 minLength，约束解码正确受益）
 """
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from src.domain.value_objects.debate import (
     ConsensusArea,
@@ -26,12 +32,15 @@ from src.domain.value_objects.debate import (
     RiskView,
 )
 
+# 条目级非空字符串约束（strip 后非空）——R1-F02 根因修复的单一事实源
+NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
 
 class ConsensusAreaSchema(BaseModel):
     """共识区域条目 Schema（合成输出嵌套结构）"""
 
-    area: str = Field(..., min_length=1, description="共识主题")
-    description: str = Field(..., min_length=1, description="共识内容")
+    area: NonEmptyStr = Field(..., description="共识主题")
+    description: NonEmptyStr = Field(..., description="共识内容")
     confidence: float = Field(..., ge=0.0, le=1.0, description="共识置信度（0-1）")
 
     def to_domain_value(self) -> ConsensusArea:
@@ -42,10 +51,10 @@ class ConsensusAreaSchema(BaseModel):
 class DisagreementAreaSchema(BaseModel):
     """分歧区域条目 Schema（合成输出嵌套结构）"""
 
-    area: str = Field(..., min_length=1, description="分歧主题")
-    red_position: str = Field(..., min_length=1, description="红方（激进派）立场")
-    blue_position: str = Field(..., min_length=1, description="蓝方（保守派）立场")
-    risk_note: str = Field(..., min_length=1, description="分歧带来的决策风险提示")
+    area: NonEmptyStr = Field(..., description="分歧主题")
+    red_position: NonEmptyStr = Field(..., description="红方（激进派）立场")
+    blue_position: NonEmptyStr = Field(..., description="蓝方（保守派）立场")
+    risk_note: NonEmptyStr = Field(..., description="分歧带来的决策风险提示")
 
     def to_domain_value(self) -> DisagreementArea:
         """转换为 DisagreementArea 领域值对象"""
@@ -63,18 +72,18 @@ class PerspectiveAnalysisSchema(BaseModel):
     LLM 结构化输出契约：stance + arguments（1~8 条）+ risks + recommendations + confidence。
     """
 
-    stance: str = Field(..., min_length=1, description="一句话立场")
-    arguments: list[str] = Field(
+    stance: NonEmptyStr = Field(..., description="一句话立场")
+    arguments: list[NonEmptyStr] = Field(
         ...,
         min_length=1,
         max_length=8,
         description="核心论点（1~8 条，每条非空）",
     )
-    risks: list[str] = Field(
+    risks: list[NonEmptyStr] = Field(
         default_factory=list,
         description="该视角识别的主要风险（允许空）",
     )
-    recommendations: list[str] = Field(
+    recommendations: list[NonEmptyStr] = Field(
         default_factory=list,
         description="该视角建议（允许空）",
     )
