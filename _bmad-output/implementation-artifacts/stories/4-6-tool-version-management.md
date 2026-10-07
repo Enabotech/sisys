@@ -1,6 +1,6 @@
 # Story 4.6: 工具版本管理（灰度发布与回滚）
 
-**Status:** `ready-for-dev`
+**Status:** `in-progress`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -484,12 +484,12 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。这是 SDD 规范驱动的基础。
 
-- [ ] Subtask 0.1: 定义领域事件 Schema —— `ToolVersionRegistered` / `ToolVersionPublished` / `ToolRolledBack`（字段规范见 SDD 节；继承 DomainEvent，aggregate_type="ToolVersion"）
-- [ ] Subtask 0.2: 定义数据模型规范 —— `ToolVersion` 聚合根 + `ToolVersionStatus` 状态机 + `ToolVersionQuery` + `RolloutDecision`（字段与迁移矩阵见 SDD 节）
-- [ ] Subtask 0.3: 端口契约清单定稿 —— 2 个新端口 + 1 个升级端口的 PortSpec 全字段（见端口清单表）
-- [ ] Subtask 0.4: 领域异常契约定稿 —— tool_version 子域 (430,439) + 4 个新异常 + 复用清单（见异常契约节）
-- [ ] Subtask 0.5: 创建/更新 `docs/api/openapi.yaml` —— 新增 5 个 `/tools` path + 6 组 Schema（见 API 契约节）
-- [ ] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_tool_version_management.feature` —— 场景集（AC-x.y 前缀命名）：
+- [x] Subtask 0.1: 定义领域事件 Schema —— `ToolVersionRegistered` / `ToolVersionPublished` / `ToolRolledBack`（字段规范见 SDD 节；继承 DomainEvent，aggregate_type="ToolVersion"）
+- [x] Subtask 0.2: 定义数据模型规范 —— `ToolVersion` 聚合根 + `ToolVersionStatus` 状态机 + `ToolVersionQuery` + `RolloutDecision`（字段与迁移矩阵见 SDD 节）
+- [x] Subtask 0.3: 端口契约清单定稿 —— 2 个新端口 + 1 个升级端口的 PortSpec 全字段（见端口清单表）
+- [x] Subtask 0.4: 领域异常契约定稿 —— tool_version 子域 (430,439) + 4 个新异常 + 复用清单（见异常契约节）
+- [x] Subtask 0.5: 创建/更新 `docs/api/openapi.yaml` —— 新增 5 个 `/tools` path + 6 组 Schema（见 API 契约节）
+- [x] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_tool_version_management.feature` —— 场景集（AC-x.y 前缀命名）：
   - AC-1.1 多版本并存注册可见 / AC-1.2 重复版本号冲突 409 / AC-1.3 工具不存在 404
   - AC-2.1 critical 拒绝注册 409 / AC-2.2 major 强制灰度（PENDING 直接全量被拒 400）/ AC-2.3 minor 直接全量 / AC-2.4 首版本跳过校验（**判别性构造**：新版本 Schema 若经校验必为 critical——以「注册成功」断言「跳过」本身） / AC-2.5 canary_only 灰度毕业（CANARY 提升为 STABLE 放行——无死锁链路验证）
   - AC-3.1 按比例分配流量 / AC-3.2 旧版本服务剩余流量 / AC-3.3 权重非法 400（含 w=0）/ AC-3.4 灰度转全量提升 / AC-3.5 灰度调档（30→50 渐进放量，状态不变）/ AC-3.6 放弃灰度 abort-canary（STABLE 不动）/ AC-3.7 无 STABLE 请求灰度 400
@@ -498,15 +498,15 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
   - AC-6.1~6.6 六端点各一条契约场景（6.1 注册 201 / 6.2 列表 200 / 6.3 发布 200 / 6.4 回滚 200+409 / 6.5 abort-canary 200 / 6.6 traffic 视图 200）+ AC-6.7 无认证 401（201/200/404/409/400 + error.code/message/request_id）
   - AC-7.1 切换延迟 / AC-7.2 灰度发布成功率 / AC-7.3 回滚成功率 / AC-7.4 路由开销——与 AC-7 表四项指标一一对应（分级断言）
   - **场景覆盖分工注记**：SemVer 非法（242）、非法状态迁移（243）由单元测试覆盖（Task 1/4），不入 Gherkin；433 的细分各态（PENDING/CANARY 目标、last_stable_at 为空、目标=当前 STABLE）不入 Gherkin，粗分两码由 AC-4.6 覆盖——避免场景集与单测重复膨胀
-- [ ] Subtask 0.7: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_tool_version_management.py` —— context dict + `scenarios()` + 模块级 event_loop fixture（**先例在 `test_acceptance_domain_dictionary.py:53` 等 11 个验收文件——第一模板 tool_io 自身不定义该 fixture**，靠 pytest-asyncio 已废弃内建机制，不可照抄）+ 真实服务 given（含 `_make_tool(version=...)` / `_make_mock_llm()` / `_make_mock_sandbox()` 工厂；服务级场景真实服务，HTTP 级 AC-6 场景按认可子模式用服务 `AsyncMock`）
-- [ ] Subtask 0.8: 编写契约测试（红）—— `tests/contracts/test_api_contract_tools.py`（openapi 静态断言，**Task 0.5 写完 openapi 后该部分即绿——规范先行模式 B 预期**）+ `test_port_contract_tool_version_repository.py` + `test_port_contract_tool_version_service.py`（11 维度类模板：PORT_NAME/IMPL_CLS_NAME/MODULE_PATH/EXPECTED_TAGS/EXPECTED_OWNER/REQUIRED_METHODS 类常量 + `_DummyResolver`——257 行，参照 `test_port_contract_tool.py`）
-- [ ] Subtask 0.9: 运行验收测试与端口契约测试，确认失败（🔴 红阶段验证；预期失败形态：验收 .py 与端口契约测试 **collection ERROR**（import 的模块不存在）；**API 契约静态断言不在此列**——openapi 已在 0.5 写好，其静态断言 Task 0 即绿属预期中间态，Task 6 路由实现后 TestClient 断言转绿）
-- [ ] Subtask 0.10: **4.3 遗留缺口实地验证**（关键前置）—— 运行 `src/infrastructure/validation/jsonschema_validator.py` 的 `JsonSchemaValidatorImpl.validate_schema_compatibility` 冒烟验证，三分支预期处置：① 嵌套检测**已实现生效**（Round 1 调研实证 `_check_nested_schema_changes` :340-466 真实调用，4-3 文档 P1-12「仅注释占位」表述已过时）——验证记录实态即可；② **顶层变更双重上报**（主循环与嵌套递归对同一顶层 properties 各计 1 条 breaking_change——实测顶层 type 变更产出 2 条）——记录实态并**确认 AC-2 单测按「存在性+max severity」断言而非计数**（计数非本 Story 契约，不修 4.3 已交付行为）；③ 若发现其他占位/死代码路径（预期不会），在 Task 4 接线前先补齐并补测试。同时验证 **397 现状**：`ToolSchemaCompatibilityError` 已定义+已映射 HTTP 但 src 全库无 raise 点（4-3 P1-13 的「死代码注释」在当前代码不存在）——本 Story 由 ToolVersionService 抛出即为其首个 raise 点；验证结论记录进 Dev Agent Record
+- [x] Subtask 0.7: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_tool_version_management.py` —— context dict + `scenarios()` + 模块级 event_loop fixture（**先例在 `test_acceptance_domain_dictionary.py:53` 等 11 个验收文件——第一模板 tool_io 自身不定义该 fixture**，靠 pytest-asyncio 已废弃内建机制，不可照抄）+ 真实服务 given（含 `_make_tool(version=...)` / `_make_mock_llm()` / `_make_mock_sandbox()` 工厂；服务级场景真实服务，HTTP 级 AC-6 场景按认可子模式用服务 `AsyncMock`）
+- [x] Subtask 0.8: 编写契约测试（红）—— `tests/contracts/test_api_contract_tools.py`（openapi 静态断言，**Task 0.5 写完 openapi 后该部分即绿——规范先行模式 B 预期**）+ `test_port_contract_tool_version_repository.py` + `test_port_contract_tool_version_service.py`（11 维度类模板：PORT_NAME/IMPL_CLS_NAME/MODULE_PATH/EXPECTED_TAGS/EXPECTED_OWNER/REQUIRED_METHODS 类常量 + `_DummyResolver`——257 行，参照 `test_port_contract_tool.py`）
+- [x] Subtask 0.9: 运行验收测试与端口契约测试，确认失败（🔴 红阶段验证；预期失败形态：验收 .py 与端口契约测试 **collection ERROR**（import 的模块不存在）；**API 契约静态断言不在此列**——openapi 已在 0.5 写好，其静态断言 Task 0 即绿属预期中间态，Task 6 路由实现后 TestClient 断言转绿）
+- [x] Subtask 0.10: **4.3 遗留缺口实地验证**（关键前置）—— 运行 `src/infrastructure/validation/jsonschema_validator.py` 的 `JsonSchemaValidatorImpl.validate_schema_compatibility` 冒烟验证，三分支预期处置：① 嵌套检测**已实现生效**（Round 1 调研实证 `_check_nested_schema_changes` :340-466 真实调用，4-3 文档 P1-12「仅注释占位」表述已过时）——验证记录实态即可；② **顶层变更双重上报**（主循环与嵌套递归对同一顶层 properties 各计 1 条 breaking_change——实测顶层 type 变更产出 2 条）——记录实态并**确认 AC-2 单测按「存在性+max severity」断言而非计数**（计数非本 Story 契约，不修 4.3 已交付行为）；③ 若发现其他占位/死代码路径（预期不会），在 Task 4 接线前先补齐并补测试。同时验证 **397 现状**：`ToolSchemaCompatibilityError` 已定义+已映射 HTTP 但 src 全库无 raise 点（4-3 P1-13 的「死代码注释」在当前代码不存在）——本 Story 由 ToolVersionService 抛出即为其首个 raise 点；验证结论记录进 Dev Agent Record
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认；Task 0 存在"登记先行/实现滞后"的中间态红窗口，不追求虚假全时绿——4-5 先例）
-- [ ] 4.3 兼容性校验实际行为已验证并记录
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认；Task 0 存在"登记先行/实现滞后"的中间态红窗口，不追求虚假全时绿——4-5 先例）
+- [x] 4.3 兼容性校验实际行为已验证并记录
 
 ---
 
@@ -1082,7 +1082,7 @@ docs/api/openapi.yaml                             # ✏️ +5 path +6 schema
 
 | 配置项 | 值 |
 |--------|-----|
-| **Model** | [待 dev-story 填充] |
+| **Model** | glm-5.3（Claude Code dev-story workflow） |
 | **Version** | create-story workflow v6.3.0 |
 | **Execution Date** | 2026-10-07 |
 
@@ -1107,6 +1107,15 @@ docs/api/openapi.yaml                             # ✏️ +5 path +6 schema
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
 - [x] 多 Agent 并行代码调研（领域层/应用+基础设施/接口层/测试模式/前序经验 5 视角，全部结论带文件行号实证）
+
+### Dev 实施记录（dev-story）
+
+**Task 0（2026-10-07）：**
+- 0.10 冒烟实证三分支：① `_check_nested_schema_changes` 已实现生效（嵌套 type 变更检出 `/properties/user/properties/email/type` severity=critical——4-3 文档 P1-12 表述过时确认）；② **顶层双重上报实态**：顶层 type 变更产出 2 条 breaking_change 且 **path 相同**（`/properties/name/type` ×2，实测比审查轮认知更精确——两条 path 完全一致），AC-2 断言按「存在性+max severity 不断言条数」正确；③ major/minor 判别性构造实证：新增 required=REQUIRED_FIELD_ADDED(major)、新增可选=OPTIONAL_FIELD_ADDED(非破坏)。397 无 raise 点（前轮终审 grep 实证，本 Story ToolVersionService 抛出即首个 raise 点）
+- 0.5 openapi：5 path + 6 schema 落地，契约静态断言 9 项全绿（规范先行模式 B——Task 0 即绿符合预期）
+- 0.6/0.7：feature 37 场景（zh-CN 中文 Gherkin，R6 模板 test_acceptance_postgresql_relational_layer 结构风格 + AC-x.y 前缀）+ .py 完整步骤实现（真实服务链 + _RecordingEngine 子类观测面 + AC-6 TestClient/AsyncMock 子模式）
+- 0.8/0.9：3 契约测试落地；红窗口确认 = 端口契约×2 与验收 collection error（ModuleNotFoundError 预期形态）+ API 静态断言绿（预期中间态）
+- **模块依赖窗口提交策略（4-1f 先例）**：验收 .py 与 2 个端口契约 .py 顶部 import 待建模块会使 mypy hook 挂全仓提交——红窗口确认（0.9）后暂缓入库，随对应模块落地批提交（仓储契约随 Task 3 / 服务契约与验收 .py 随 Task 4/5）；feature 与 openapi/API 契约（已绿）本批入库
 
 ### 文件清单 File List
 

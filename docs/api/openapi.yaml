@@ -1175,8 +1175,284 @@ paths:
         "500":
           description: LLM 评估调用失败
 
+  # =========================================================================
+  # TOOLS 版本管理（Story 4-6 — 灰度发布与回滚，6 端点 / 5 path）
+  # =========================================================================
+  /tools/{tool_id}/versions:
+    post:
+      tags:
+        - tools
+      summary: 注册工具新版本
+      description: |
+        为指定工具注册新版本（input/output Schema 快照）。
+        存在 STABLE 版本时执行兼容性分级决策：critical 拒绝注册（409/397）、
+        major 强制灰度（canary_only）、minor/无破坏可直接全量（any）。
+        首个版本跳过兼容性校验。
+      security:
+        - OAuth2: []
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToolVersionCreate"
+      responses:
+        "201":
+          description: 版本注册成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolVersionResponse"
+        "400":
+          description: 版本号或 Schema 校验失败（242）
+        "401":
+          description: 未认证
+        "404":
+          description: 工具不存在（380）
+        "409":
+          description: 版本号重复（431）或 Schema 不兼容被拒绝（397）
+    get:
+      tags:
+        - tools
+      summary: 查询工具版本列表
+      description: 按注册时间返回该工具的全部版本（含状态与 Schema 快照元数据）。
+      security:
+        - OAuth2: []
+        - Bearer: []
+      responses:
+        "200":
+          description: 版本列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolVersionListResponse"
+        "401":
+          description: 未认证
+        "404":
+          description: 工具不存在（380）
+
+  /tools/{tool_id}/versions/{version}/publish:
+    post:
+      tags:
+        - tools
+      summary: 发布版本（灰度/调档/全量/转正）
+      description: |
+        状态感知发布：PENDING + weight∈(0,100) 发起灰度（前置存在 STABLE）；
+        PENDING + weight=100 直接全量（canary_only 禁止）；
+        CANARY + weight∈(0,100) 灰度调档；CANARY + weight=100 提升转正（promote）。
+      security:
+        - OAuth2: []
+        - Bearer: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishRequest"
+      responses:
+        "200":
+          description: 发布结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolVersionResponse"
+        "400":
+          description: 权重非法（432，域 (0,100]）
+        "401":
+          description: 未认证
+        "404":
+          description: 版本不存在（430）
+        "409":
+          description: 非法状态迁移（243）
+
+  /tools/{tool_id}/rollback:
+    post:
+      tags:
+        - tools
+      summary: 一键回滚至历史稳定版本
+      description: |
+        缺省目标 = last_stable_at 最新的 DEPRECATED 版本（排除本次被降级版本，防 ping-pong）。
+        显式 target_version：记录不存在 404（430）；非可回滚态 409（433）。
+        活跃 CANARY 一并清场降级，流量 100% 回目标版本。
+      security:
+        - OAuth2: []
+        - Bearer: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RollbackRequest"
+      responses:
+        "200":
+          description: 回滚结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolVersionResponse"
+        "401":
+          description: 未认证
+        "404":
+          description: 工具不存在（380）或目标版本记录不存在（430）
+        "409":
+          description: 无可回滚稳定历史或目标非可回滚态（433）
+
+  /tools/{tool_id}/abort-canary:
+    post:
+      tags:
+        - tools
+      summary: 放弃灰度（abort canary）
+      description: |
+        将活跃 CANARY 版本降级 DEPRECATED（不记 last_stable_at——从未稳定），
+        STABLE 不动、流量 100% 回 STABLE（业界 abort 语义）。无活跃 CANARY 时 409（243）。
+      security:
+        - OAuth2: []
+        - Bearer: []
+      responses:
+        "200":
+          description: 放弃灰度结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolVersionResponse"
+        "401":
+          description: 未认证
+        "404":
+          description: 工具不存在（380）
+        "409":
+          description: 无活跃 CANARY 无合法迁移（243）
+
+  /tools/{tool_id}/versions/traffic:
+    get:
+      tags:
+        - tools
+      summary: 查询当前流量分布
+      description: 返回当前 STABLE 与活跃 CANARY 的版本及灰度权重（无活跃版本时三字段为 null）。
+      security:
+        - OAuth2: []
+        - Bearer: []
+      responses:
+        "200":
+          description: 流量分布视图
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficViewResponse"
+        "401":
+          description: 未认证
+        "404":
+          description: 工具不存在（380）
+
 components:
   schemas:
+    # --------------------------------------------------------------------------
+    # 工具版本管理 schemas (Story 4-6)
+    # --------------------------------------------------------------------------
+    ToolVersionCreate:
+      type: object
+      required:
+        - version
+        - input_schema
+        - output_schema
+      properties:
+        version:
+          type: string
+          description: SemVer 版本号（X.Y.Z 强校验，非法 400/242）
+          example: "1.1.0"
+        input_schema:
+          type: object
+          description: 输入 JSON Schema 快照
+        output_schema:
+          type: object
+          description: 输出 JSON Schema 快照
+
+    ToolVersionResponse:
+      type: object
+      required:
+        - version_id
+        - tool_id
+        - version
+        - status
+        - required_rollout_mode
+        - created_at
+      properties:
+        version_id:
+          type: string
+          format: uuid
+        tool_id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        status:
+          type: string
+          enum: [pending, canary, stable, deprecated]
+        traffic_weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: CANARY 灰度权重；PENDING=0、STABLE 语义恒 100
+        required_rollout_mode:
+          type: string
+          enum: [any, canary_only]
+        last_stable_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 曾为 STABLE 的时间戳（回滚候选依据；回滚降级清空）
+        created_at:
+          type: string
+          format: date-time
+
+    ToolVersionListResponse:
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolVersionResponse"
+        total:
+          type: integer
+
+    PublishRequest:
+      type: object
+      properties:
+        traffic_weight:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+          description: 发布权重，域 (0,100]——0 无业务语义（432）
+
+    RollbackRequest:
+      type: object
+      properties:
+        target_version:
+          type: string
+          description: 显式回滚目标（须为曾稳定版本：DEPRECATED 且 last_stable_at 非空）
+
+    TrafficViewResponse:
+      type: object
+      properties:
+        stable_version:
+          type: string
+          nullable: true
+          description: 当前 STABLE 版本号（无活跃版本时 null）
+        canary_version:
+          type: string
+          nullable: true
+          description: 活跃 CANARY 版本号（无灰度时 null）
+        canary_weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: 灰度权重（无灰度时 null）
+
     # --------------------------------------------------------------------------
     # 文档版本快照相关 schemas (Story 2-6)
     # --------------------------------------------------------------------------
