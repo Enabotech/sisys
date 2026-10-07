@@ -717,7 +717,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 更新 `tests/contracts/test_port_contract_tool_execution_service.py` 期望（version v1.3.0 + tags 含 "versioned" + compatibility 含 "v1.2.0"）→ 红 |
-| 🟢 绿 | composition_root `tool_execution_service` 条目升级（L2316-2352）：工厂追加 `tool_version_service=resolver.resolve("tool_version_service")`，version v1.2.0→v1.3.0，tags += ("versioned",)，compatibility=("v1.2.0",)（4-3 P0-A 修复先例：改装配链必须升级 version 并同步契约测试） |
+| 🟢 绿 | composition_root `tool_execution_service` 条目升级（**L2294 起，终审核准**；终审留项修正：原文档 L2316-2352 系对含临时未提交改动的工作区核验所致漂移——dev 一律以端口名 grep 定位）：工厂追加 `tool_version_service=resolver.resolve("tool_version_service")`，version v1.2.0→v1.3.0，tags += ("versioned",)，compatibility=("v1.2.0",)（4-3 P0-A 修复先例：改装配链必须升级 version 并同步契约测试） |
 | 🔄 重构 | 装配注释更新（链路描述补 version router 层） |
 
 - [ ] Subtask 5.4: 🔴 红 — 契约期望更新后红
@@ -859,7 +859,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 |   | hash_router 加权一致性哈希复用 | 现成设施 | 语义是节点路由非版本灰度；引入不必要耦合 | 5/10 |
 | 3 | **指针切换回滚**（状态翻转，非快照重建） | O(1) 操作；无数据复制；last_stable_at 精确候选 | 需要"曾稳定"标记字段 | ✅ 9/10 |
 |   | 词典式快照重建（domain_dictionary 先例） | 全量快照 | 版本本身已是快照，重建冗余；10 版保留语义不匹配 | 5/10 |
-| 4 | **执行链服务层注入 + dataclasses.replace 派生副本** | 引擎/装饰器零改动；ToolExecuted 自动带实际版本；向后兼容（可选注入） | Tool 副本非聚合根身份（仅执行视图，可接受） | ✅ 9/10 |
+| 4 | **执行链服务层注入 + dataclasses.replace 派生副本** | 引擎/装饰器零改动；ToolExecution 聚合快照自动带实际版本（事件字段不自动变——见 AC-5 事件边界）；向后兼容（可选注入） | Tool 副本非聚合根身份（仅执行视图，可接受） | ✅ 9/10 |
 |   | 引擎层改造（execute 接收 ToolVersion） | 类型更显式 | engine + 2 装饰器 + 全部测试连坐改动，违反最小侵入 | 4/10 |
 |   | 新装饰器 ToolVersionRouter 包裹最外层 | 4-4 "就地嵌套"先例 | 装饰器包裹的是 Port 层，需新端口定义，过度设计 | 6/10 |
 | 5 | **PG 为主注册实现 + InMemory 测试直连**（schema_validation_record_repository 先例） | 与 4.1a/4.3 仓储模式一致；灰度配置重启不丢 | bootstrap 时 PG 不可用需惰性兜底（已设计：resolve 惰性注册） | ✅ 8/10 |
@@ -984,7 +984,7 @@ INDEX ix_tool_versions_tool_last_stable (tool_id, last_stable_at DESC)
 3. **内建 `hash()` 禁用**：`TrafficRouter` 若用内建 `hash(str)`，PYTHONHASHSEED 进程盐化使**跨次运行**结果漂移（单次运行内单 worker 结果一致——真实风险是"连续 5 次无随机失败"验收被击穿，而非同次 xdist 多 worker 间歇失败）。**散列算法为规范条款（见 AC-3 验证标准——sha256 + `% 100 < weight` 桶映射，实现与测试共用，非 md5/sha256 任选）**，样本集用固定 `f"key-{i}"` 而非随机生成。
 3a. **并发不变量的双层守护与异常转换**：单 STABLE/单活跃 CANARY 由 PG partial unique index（WHERE status='...'）在存储层硬守护，InMemory 仓储在 save 时软校验（**双 STABLE/双 CANARY 并存破坏抛 432**——并入「并存冲突」族；单测可直连构造）——服务层（SCOPED 每请求一实例）不依赖进程内锁。**仓储层 IntegrityError→领域异常转换规则**（document_repository.py:156 / role_repository.py:225 / domain_dictionary_repository.py:132 先例）：`(tool_id,version)` 唯一冲突 → 431；两个 partial unique index 冲突（并发双 promote/双灰度发起）→ 432（并存冲突族）——并发失败方收到业务 400 而非裸 500，**PG 集成测试断言转换后的领域异常而非原生 IntegrityError**。惰性初始注册必须 catch 431 重读返回（并发首执行竞态），否则 431 会从无辜的 `execute()` 打穿执行链。多行 save 顺序：先降级/清场行、后提升行（partial index 逐语句即时校验，反序在事务内即撞单 STABLE 索引；InMemory 同序）。
 4. **EXCEPTION_HTTP_MAP 注释对齐**：追加 430-433 四条映射时，行内注释的编码必须与常量一致（4.1a 偏移 bug 先例），并同步 `test_exception_handlers.py` 的期望集合（漏同步 = 该文件测试失败）。
-5. **resolve("tool_registry_service") 装配顺序**：`tool_version_service` 工厂 lambda 引用 `resolver.resolve("tool_registry_service")` 与 `resolver.resolve("schema_validator")`——两端口均已注册（composition_root L2238/L2394，已实地核实），但注册条目顺序须在其之前或使用延迟 lambda 求值（现有 tool_registry_service 条目即为 lambda 工厂先例）。
+5. **resolve("tool_registry_service") 装配顺序**：`tool_version_service` 工厂 lambda 引用 `resolver.resolve("tool_registry_service")` 与 `resolver.resolve("schema_validator")`——两端口均已注册（composition_root **L2238 精确 / schema_validator 实为 L2368——终审核准，以端口名 grep 定位**），但注册条目顺序须在其之前或使用延迟 lambda 求值（现有 tool_registry_service 条目即为 lambda 工厂先例）。
 6. **事件 payload 体积**：`ToolVersionRegistered.breaking_summary` 列表字段截断 ≤10 条（4-3 P0-H 先例，防撑爆 Redis pub/sub）。
 
 ### 项目结构说明 Project Structure
@@ -1239,6 +1239,19 @@ src（12 个）+ migration（1 个）:
 | R3-4 | partial unique index 冲突→业务异常转换零定义（并发双 promote 撞索引裸抛 IntegrityError→500；431 转换也仅隐含未落断言口径） | P2 | 仓储层转换规则：(tool_id,version) 冲突→431、partial index 冲突→432 并存冲突族（document_repository:156 等先例）；PG 集成断言转换后领域异常；InMemory 守卫抛 432；异常表 432 场景扩 |
 | R3-5 | Round 3 P3 批（37 场景/6 时间线/Task 干跑产出）：惰性注册不发 ToolVersionRegistered（审计取舍声明）；397 breaking_changes 来源未定义（补合并清单说明）；AC-2.4 判别性构造未指定（补 Given 约束）；rollback 清场 CANARY weight 未置 0（补）；promote 后 STABLE weight 存储值未定义（置 100 数据卫生）；AC-7.1/7.2 每轮需新版本号的构造约束未提示（补）；retention 触发点仅 register 未声明（补口径） | P3 | 7 处逐项补充 |
 | R3-正 | **正向结论**：37 场景无死锁、35 个期望唯一可写、前置全部可达；6 条时间线中 B1 前 13 步/B2/B3/B5/B6 全部走通；Task 0→9 跨任务实质倒挂为零（红窗口均明示）；`.importlinter` 契约/migration 链/异常段/组合根条目全部实测核验 | — | 仅记录 |
+| R5-1 | 终审特权发现：决策表 #4 优点列「ToolExecuted 自动带实际版本」与 AC-5 事件边界权威口径（事件字段不会自动变）矛盾 | P3 | 已修正为「ToolExecution 聚合快照自动带实际版本（事件字段不自动变——见 AC-5 事件边界）」 |
+| R5-2 | 终审核准：组合根 2/4 行号锚点漂移（tool_execution_service 实为 L2294 起、schema_validator 实为 L2368——原文档 L2316-2352/L2394 系对含临时未提交改动的工作区核验所致） | P3 | 两处已按 HEAD 实态修正并注明「以端口名 grep 定位」；L2238/L2259 精确无需改 |
+
+#### 收敛终审（独立取证 · 2026-10-07 · Round 5）
+
+**审查周期概览**：本 Story 经 5 轮收敛——v1.0.0 创建（五视角调研）→ R1 四视角代码调研 + 三视角审查（逻辑自洽性/TDD 可行性/业界对标 Flagger·Argo·Confluent·LaunchDarkly）修 32 项（P0×3/P1×11/P2×15/P3×3）→ R2 回归核查（修复交互面 + 全文一致性）修 21 项（P1×2/P2×4/P3×15）→ R3 单深度推演（37 场景期望唯一性 + 6 条状态时间线 + Task 依赖干跑）修 11 项（P1×2/P2×2/P3×7）→ R4 纯验证轮（多维度快扫零修复）→ R5 独立终审。累计修复 66 项，修订提交 a3144e83/c18eed2a/e50f562e 与台账逐笔对应，无游离提交（交错的 4-5 会话提交经 name-only 核验零 4-6 文件混入）。
+
+**终审判定**：独立取证通过——① 周期闭合（3 笔提交对账 + 零游离）；② 台账抽验 10/10 修复真实且传播完整（含 R2-1/R3-2 两次「修复自拆」后二次裁决链条，最终口径收敛到「回滚降级显式清空戳置 None」强语义）；③ 28+ 行号锚点与 HEAD 代码实态吻合（状态机 7 合法迁移格/8 触发语义全文自洽、异常段 430-439 空闲、397 无 raise 点现状、migration 链 015→016、tool_execution_service v1.2.0 现版本、测试先例 257/680 行）；④ 门禁三项 epics 硬约束齐备（覆盖率应用层 ≥85%/集成 ≥75%、两个 epics 硬路径测试文件逐字一致、性能指标对齐）；⑤ sprint-status:151 ready-for-dev 三处同步。**零 P0/P1 残留，Story 4-6 维持 `ready-for-dev`，可直接进入 dev-story。**
+
+**留项清单（P3 记录级，不阻断实施，已随本收敛提交清偿 2 项）**：
+1. ~~决策表 #4 措辞矛盾~~ → 已修正（R5-1）
+2. ~~组合根行号漂移~~ → 已修正（R5-2）
+3. Dev Agent Record "create-story workflow v6.3.0" 版本号未能在 workflow.md 中定位证实/证伪——纯元数据无实施影响，登记不修
 
 ---
 
@@ -1270,7 +1283,7 @@ src（12 个）+ migration（1 个）:
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-10-07
 **最后更新/Last Updated:** 2026-10-07
 **更新说明/Description:**
@@ -1278,3 +1291,4 @@ src（12 个）+ migration（1 个）:
 - v1.1.0: Round 1 循环审查修订（D1 四视角代码调研 + D2 三视角审查：逻辑自洽性/TDD 可行性/业界对标）——修复 P0×3（rollback 迁移矛盾 / canary_only 死锁 / 调档不可达）+ P1×11 + P2×15 + P3×3 共 32 项；新增 abort_canary 能力（Flagger/Argo abort 语义）、并发守护 partial unique index、防 ping-pong 回滚目标规则；状态机 6→7 条合法迁移（CANARY 调档同态 + DEPRECATED 回滚恢复）；端点 5→6；场景 24→32
 - v1.2.0: Round 2 循环审查修订（D1 回归核查视角 + D2 双视角：修复交互面审查 + 全文一致性快扫）——P1×2（R1-5 跨步 ping-pong 修复自拆→裁决业界指针原则「回滚降级不记戳」；R1-8 缺保存顺序约束→先降级后提升）+ P2×4（4 端点 380 前置通用规则 / sha256 升格规范算法 / path 口径 6→5 / 场景计数 27→37）+ P3×15；16 格状态机双向差集验证干净、30+ 行号引用实证吻合
 - v1.3.0: Round 3 循环审查修订（单深度：37 场景期望唯一性推演 + 6 条状态时间线全推演 + Task 0→9 依赖干跑）——P1×2（Task 4 config 注入分层矛盾 CI 必炸→改标量 max_retained_versions 注入[贴合 SandboxConfig 先例]；残留戳两读分歧致第 3 次回滚 ping-pong 复活→裁决 rollback 降级显式清空戳）+ P2×2（保留策略无戳组平局键→两级排序；partial index 冲突异常转换零定义→仓储层 431/432 转换规则）+ P3×7；37 场景无死锁、35 期望唯一、跨任务零倒挂
+- v1.3.1: Round 4 纯验证（多维度快扫零修复）+ Round 5 独立终审五节全过（周期闭合/10/10 修复取证/28+ 锚点吻合/门禁就绪/收敛判定）——终审留项 2 项 P3 随收敛提交清偿（决策表 #4 措辞、组合根行号）；收敛声明入 Story；**审查周期正式收敛，累计 66 项修复，零 P0/P1 残留，维持 ready-for-dev**
