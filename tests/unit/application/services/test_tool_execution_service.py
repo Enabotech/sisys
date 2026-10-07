@@ -193,6 +193,27 @@ class TestToolVersionIntegration:
         assert received.version == "1.0.0"
 
     @pytest.mark.asyncio
+    async def test_output_schema_drift_replaces_tool(self) -> None:
+        """同名版本 output_schema 漂移 → 快捷返回不触发（版本快照权威）。
+
+        CR1-12 第三字段守护：注册表 Tool 的 output 与版本快照漂移时，
+        引擎必须收到快照的 output_schema（删 output 比对条件的突变必红）。
+        """
+        stack = _make_stack()
+        drifted_output = {"type": "object", "properties": {"report": {"type": "string"}}}
+        vs: ToolVersionService = stack["version_service"]
+        tid = stack["tool"].tool_id
+        await vs.register_version(tid, "1.0.0", dict(BASE), dict(drifted_output))
+        await vs.publish_version(tid, "1.0.0", 100)  # tool.version 同名 STABLE
+        tool_call = MagicMock()
+        tool_call.version = "1.0.0"
+        await stack["service"].execute(tid, tool_call, _make_context("any"))
+        received = stack["engine"].received_tools[-1]
+        assert received.version == "1.0.0"
+        assert received.input_schema == BASE
+        assert received.output_schema == drifted_output, "output 漂移必须派生替换（快照权威）"
+
+    @pytest.mark.asyncio
     async def test_without_version_service_original_behavior(self) -> None:
         """未注入 tool_version_service → 4.1a 原行为（直接 registry Tool）。"""
         tool = _make_tool()

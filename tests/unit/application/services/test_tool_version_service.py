@@ -680,6 +680,35 @@ class TestDomainEventPublishing:
         assert events[0].tool_version == "1.0.0"
         assert events[0].required_rollout_mode == "any"
 
+    async def test_register_major_event_carries_breaking_summary(self) -> None:
+        """canary_only 注册事件携带 breaking_summary（下游兼容性审计依据）。"""
+        service, _, tid, _ = _make_service()
+        await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))
+        await service.publish_version(tid, "1.0.0", 100)
+        await service.register_version(tid, "2.0.0", dict(MAJOR), dict(BASE))
+        events = [e for e in self._publisher(service).published if isinstance(e, ToolVersionRegistered)]
+        target = next(e for e in events if e.tool_version == "2.0.0")
+        assert target.required_rollout_mode == "canary_only"
+        assert target.breaking_summary, "major 注册事件必须携带破坏性变更摘要"
+
+    async def test_publish_failure_is_fail_soft(self) -> None:
+        """发布器失败仅告警不中断主流程（fail-soft 契约）。"""
+        service, _, tid, _ = _make_service()
+
+        class _FailingPublisher(_RecordingPublisher):
+            """恒失败发布器（全通道失败结果）。"""
+
+            async def publish(self, event: DomainEvent) -> PublishResult:
+                self.published.append(event)
+                return PublishResult(
+                    event_id=str(uuid.uuid4()),
+                    results=(ChannelResult(channel_name="inmemory", success=False, error="boom"),),
+                )
+
+        service._event_publisher = _FailingPublisher()
+        tv = await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))  # 不得抛异常
+        assert tv.version == "1.0.0"
+
     async def test_register_duplicate_no_event(self) -> None:
         service, _, tid, _ = _make_service()
         await service.register_version(tid, "1.0.0", dict(BASE), dict(BASE))

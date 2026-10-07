@@ -10,14 +10,13 @@ from typing import Any
 from unittest.mock import MagicMock
 
 from src.application.ports.tool_version_service import ToolVersionServicePort
+from src.application.services.tool_registry_service import ToolRegistryService
 from src.application.services.tool_version_service import ToolVersionService
+from src.domain.ports.registry import Lifetime, PortSpec
+from src.infrastructure.storage.inmemory.tool_repository import InMemoryToolRepository
 from src.infrastructure.storage.inmemory.tool_version_repository import (
     InMemoryToolVersionRepository,
 )
-
-from src.application.services.tool_registry_service import ToolRegistryService
-from src.domain.ports.registry import Lifetime, PortSpec
-from src.infrastructure.storage.inmemory.tool_repository import InMemoryToolRepository
 from src.infrastructure.validation.jsonschema_validator import JsonSchemaValidatorImpl
 
 

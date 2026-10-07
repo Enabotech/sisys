@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.domain.ports.registry import Lifetime, PortSpec
 from src.domain.ports.tool_version_repository import (
     ToolVersionQuery,
     ToolVersionRepositoryPort,
@@ -15,8 +16,6 @@ from src.domain.ports.tool_version_repository import (
 from src.infrastructure.storage.inmemory.tool_version_repository import (
     InMemoryToolVersionRepository,
 )
-
-from src.domain.ports.registry import Lifetime, PortSpec
 
 
 class _DummyResolver:

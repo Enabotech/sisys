@@ -1311,10 +1311,26 @@ src（12 个）+ migration（1 个）:
 | CR2-3 | deferred-work 登记的 lint-imports 链描述与实时输出不符（组合根中转模块随构建漂移：jwt_service/prefect/rabbitmq_publisher 各次不同） | P3 | 勘误为「入口两链稳定 + 中转以实时输出为准，不锁行号」 |
 | CR2-4 | rollback 恢复后立即 republish 双档 243 的语义链由「实体矩阵参数化 + 服务用例」组合保证，无端到端单用例 | 补强 | `test_republish_after_rollback_both_weights_243`（灰度档 STABLE→CANARY + 全量档 STABLE→STABLE 均非法） |
 
+#### Round 3 单深度推演（CR3——断言覆盖矩阵 + 新语义长状态时间线）
+
+> 单深度 Agent：CR1/CR2 共 17 项修复的断言覆盖矩阵（13 项守护有效、2 项文档/重构性合理无自动化面、4 项 P3 守护缺口）+ 四条长状态时间线推演（A 交错发布全路径 / B 残留戳恢复×新守卫组合——证明「陈旧戳 DEPRECATED」不可达、C 直接全量守卫×惰性注册交互、D 并发交错不变量）**全部闭合，零 P0/P1/P2**。修复 4 项守护缺口 + 1 项断言补强 + 1 项 CI 红：
+
+| 编号 | 发现 | 严重度 | 处置 |
+|---|---|---|---|
+| CR3-CI | CI ruff I001：两个契约测试 import 双块未合并（本地 0.15.22 放行、CI 版本报红——版本间 isort 判定差异；repository 版为预存量形态、service 版为 R1 插入保留旧块结构） | CI 红 | 两文件重排为单一字母序块 |
+| CR3-F1 | CR1-2 deepcopy 嵌套真实性不可守护：副本隔离三用例仅顶层属性变异，`deepcopy→copy.copy` 突变零红 | P3 | 补嵌套变异断言（突变注入实测红 ✓——同时证实原三用例对此确实盲） |
+| CR3-F2 | CR1-12 第三字段（output_schema）比较不可红：canary 构造 output 与 tool 相同且仅断言 input_schema | P3 | 补同名版本 output 漂移用例（突变删除比对条件实测红 ✓） |
+| CR3-F3 | CR1-3 fail-soft 契约（发布失败仅告警不中断业务）零覆盖——全部测试替身恒返回成功 | P3 | 补 `_FailingPublisher` 用例（register 主流程失败发布下仍成功返回） |
+| CR3-F5 | Registered 事件 `breaking_summary` 服务接线无断言（突变丢参数无红——下游兼容性审计将静默拿空表） | P3 | canary_only 注册用例补 `breaking_summary` 非空断言 |
+| CR3-F4 | CR1-7 直接全量并存 432 仅单测覆盖，验收层语义契约缺位 | P3 | 验收补 AC-3.8 场景（feature+py 锁步，38→39 场景：活跃灰度下第三版本直接全量→432 + 状态零变更） |
+| CR3-F6 | CR1-1 DI 第三级（get_resolver 降级闭包）无请求级执行测试（突变闭包内部仅生产 401/500 暴露） | 记录 | 登记不落码（闭包结构与二级同构 + 运行时 openapi 断言锁依赖存在性；补真实 resolver 冒烟依赖组合根初始化顺序，成本高收益低） |
+| CR3-F7 | 时间线 D 交错 (b)：InMemory 双 promote 败方报 243、PG 同交错报 432（错误码分叉）——不变量两实现均保持 | 记录 | 登记不落码（符合 Story R1-8「守护不变量而非串行化服务流」并发契约；统一转译属增强非缺陷） |
+
 #### 已修复 Patch
 
 - [x] CR1-1 ~ CR1-13（17 项落码：src 6 文件 + tests 8 文件 + docs 2 文件）
 - [x] CR2-1 ~ CR2-4（R2 回归核查）
+- [x] CR3-CI + CR3-F1/F2/F3/F4/F5（CI 红修复 + 4 项守护缺口 + 1 项断言补强；F6/F7 登记）
 
 #### 已推迟 Defer
 

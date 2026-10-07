@@ -263,6 +263,25 @@ class TestDetachedCopyIsolation:
         assert reread.status is ToolVersionStatus.STABLE, "读路径必须返回隔离副本"
 
     @pytest.mark.asyncio
+    async def test_nested_schema_mutation_does_not_pollute_store(self) -> None:
+        """嵌套结构变异不影响仓储（deepcopy 真实性——copy.copy 突变必红）。"""
+        repo = InMemoryToolVersionRepository()
+        tid = TID()
+        nested_schema = {"type": "object", "properties": {"factor": {"type": "string"}}}
+        tv = ToolVersion(tool_id=tid, version="1.0.0", input_schema=nested_schema, output_schema={})
+        tv.status = ToolVersionStatus.STABLE
+        await repo.save(tv)
+        fetched = await repo.get_by_tool_and_version(tid, "1.0.0")
+        assert fetched is not None
+        # 嵌套 dict 变异（浅拷贝下此写会穿透到仓储持有的同一嵌套对象）
+        fetched.input_schema["properties"]["injected"] = {"type": "string"}
+        fetched.input_schema["extra_list"] = ["leak"]
+        reread = await repo.get_by_tool_and_version(tid, "1.0.0")
+        assert reread is not None
+        assert "injected" not in reread.input_schema["properties"], "嵌套 dict 必须深隔离"
+        assert "extra_list" not in reread.input_schema, "嵌套新增键必须深隔离"
+
+    @pytest.mark.asyncio
     async def test_mutating_saved_entity_after_save_does_not_pollute_store(self) -> None:
         """save 后改写调用方持有的实体不影响仓储内部状态。"""
         repo = InMemoryToolVersionRepository()

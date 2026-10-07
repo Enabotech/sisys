@@ -428,6 +428,16 @@ def then_error_433(context: dict[str, Any]) -> None:
     _assert_error(context, "EXCEPTION_433", 409)
 
 
+@then("版本 1.1.0 状态保持 canary 且版本 1.0.0 状态保持 stable")
+def then_canary_stable_unchanged(context: dict[str, Any]) -> None:
+    """拒绝直接全量后状态零变更（并存守卫不放行、灰度继续）。"""
+    canary = _get_version(context, "1.1.0")
+    stable = _get_version(context, "1.0.0")
+    assert canary.status.value == "canary", "灰度版本不得被清场"
+    assert canary.traffic_weight == 30
+    assert stable.status.value == "stable", "稳定版本不得被动"
+
+
 def _assert_error(context: dict[str, Any], code: str, http: int) -> None:
     """统一异常断言：code + HTTP 映射（EXCEPTION_HTTP_MAP 权威）。"""
     error = context.get("error")
@@ -533,6 +543,11 @@ def given_pending_11(context: dict[str, Any]) -> None:
     _register(context, "1.1.0", "minor")
 
 
+@given("工具已注册待发布版本 1.2.0")
+def given_pending_12(context: dict[str, Any]) -> None:
+    _register(context, "1.2.0", "minor")
+
+
 @when("运维以权重 30 发布版本 2.0.0")
 def when_publish_2_w30(context: dict[str, Any]) -> None:
     _capture_error(context, lambda: _publish(context, "2.0.0", 30))
@@ -566,6 +581,11 @@ def when_publish_w50(context: dict[str, Any]) -> None:
 @when("运维以权重 100 发布版本 1.1.0")
 def when_publish_w100(context: dict[str, Any]) -> None:
     _capture_error(context, lambda: _publish(context, "1.1.0", 100))
+
+
+@when("运维以权重 100 发布版本 1.2.0")
+def when_publish_12_w100(context: dict[str, Any]) -> None:
+    _capture_error(context, lambda: _publish(context, "1.2.0", 100))
 
 
 @when("运维放弃灰度")
