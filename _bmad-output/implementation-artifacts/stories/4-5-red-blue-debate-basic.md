@@ -1,6 +1,6 @@
 # Story 4.5: 红蓝辩论机制基础（单 Agent 多视角）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1559,6 +1559,20 @@ class DebateCompleted(DomainEvent):
 
 **Round 3 统计：** 单深度评审员 ×1（4 项新突变全实测 + 10 行矩阵全实证）；本周期累计突变 **10 项全部击杀**（R1 六项 M1/M2/M4/M5/M6/M8 + R3 四项 M-A/M-B/M-B2/M-C/M-D，其中 M-B/M-B2 经补强后复验击杀）；修复 1 项（2 行精确断言）+ 记录 3 项。**守护完备性达标：10/10 契约全守护。**
 
+#### Round 4 纯验证轮（2026-10-07，零代码改动）
+
+主会话七维度快扫全过：①R1~R3 修复锚点 grep 全落位（NonEmptyStr×12/str 化/UUID 校验/硬编码×2/vo_errors×5/精确断言×2/1.8 阈值×2/242 四步）②红线自查三条 grep 零输出 ③提交链 1:1（039b5915→90c5dee4→6744fcf0 与台账轮次严格对应，4-6 并行插花两提交与 debate 文件面零交集，零游离提交）④lint-imports 辩论契约全 KEPT（Interfaces→infrastructure BROKEN 为既有非本 Story）⑤辩论全量 372 passed + 1 skipped（与 R1 后基线同值）⑥覆盖率 red_blue_debate_service 98% ≥ 85 门禁 ⑦ruff/mypy 全过。零新发现——按「无 P0 不造提交」纪律无独立提交，记录并入 R5 收尾。
+
+#### Round 5 独立终审（2026-10-07，五节全过，总判定：收敛）
+
+> 终审员不采信 Story 自报，全部实地取证：**节 1 周期闭合**（9a94041b 线性祖先、20 提交区间、4-5 提交与台账 1:1、16 测试+11 生产+共享基建区间扫描零游离、4-6 插花零交集、工作树 clean）✓ / **节 2 关键修复双向取证 5/5 相符**（R1-F01/F02/F03、R3-F01、R2-N1 逐项 Story 声明 vs 代码现实）✓ / **节 3 独立快扫零漏网 P1/P2**（四轮未碰面逐检：_publish_completion 双形态异常面/事件构造器 try 外但不可达/gather 兄弟取消无孤儿/format 注入安全——模板无字面花括号且替换值不二次展开/temperature_profile 防御副本）✓ / **节 4 门禁实跑全过**（辩论 16 文件 372 passed+1 skipped、ruff 全过、mypy 623 零错）✓ / **节 5 状态流转判定**（零 P0/P1 残留、Defer 台账完整且均非阻断项、review→done 成立）✓
+
+**终审条件性建议 4 条处置**：①R4 台账条目——本提交已补（上文 Round 4 节）②Next Steps code-review 勾选——本提交勾选 ③metadata 显式传入窄边缘（debate_events.py:74 守卫下显式传含 UUID 的 metadata 仍绕过 str 化，生产不可达）——并入 R2-D3 登记 ④事件 temperature_profile 为 frozen 容器内可变 dict——随 Epic 5/10 消费方落地时评估 MappingProxyType 加固，登记。
+
+### ✅ 代码审查周期收敛声明（Round 5 终审签署，2026-10-07）
+
+> Story 4-5 代码审查周期 R1~R5 收敛：R1 清偿 P1×3+P2×3、新增 15 用例、突变 6 项全红；R2 回归零回归+台账清偿+Defer×3；R3 断言矩阵 10/10 全守护、累计突变 10 项全灭；R4 纯验证全过；R5 独立终审五节全过（周期闭合 1:1、修复双向取证 5/5 相符、独立快扫零漏网、门禁 372 全绿+ruff/mypy 零错）。零 P0/P1 残留，Story → done。遗留 Defer×4（llm skip 分类 / litellm 旧注释 / base.py metadata 基类缺口含窄边缘 / temperature_profile 可变性）均登记非阻断。
+
 #### Round 1 修复方案（R1-F01/F02/F03/F04/F05/F06）
 
 > **C3 评审往返记录**：双评审员（甲：正确性一致性 / 乙：可行性可满足性）首轮均判「合格（附必改点）」——6 项必改（P1 测试同步两处 / P2④ model_construct 指定 + 合成侧零覆盖补齐 / P6① AC-2.3 接线 / P6② timeout 记录形态 / P2① 排除 Literal + 模块级别名 + 选型 docstring / P5 钉死两文件）+ 4 项建议全部吸收为方案 v2 后，独立复评员锚点核实判定**优秀**（唯一非阻塞瑕疵：字段计数笔误，按枚举执行）。评审员关键实证：`Field(strip_whitespace=True)` 在 pydantic v2 是 deprecated no-op 且泄漏脏键进 LLM JSON Schema（Annotated+StringConstraints 是唯一正确机制）；AC-2.3 `when_construct_terminal_without_fields` 内联循环不经 helper，Then 非空化后必误红（接线修复）；base.py:149-153 metadata 不经 _serialize_value 且 json 校验只覆盖 payload 不覆盖 metadata（基类缺口登记留项）。
@@ -1592,12 +1606,12 @@ class DebateCompleted(DomainEvent):
 
 - [x] Story created with `ready-for-dev` status
 - [x] 运行 `dev-story` 开始实施（2026-10-01 完成，Task 0~10 全绿，状态 → review）
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `code-review` 进行代码审查（2026-10-07 完成，C1~C5 五轮收敛，状态 → done）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-10-01
 **最后更新/Last Updated:** 2026-10-07
 **更新说明/Description:**
@@ -1610,3 +1624,4 @@ class DebateCompleted(DomainEvent):
 - v1.5.0: 代码审查 Round 1（四视角调研 + 双评审员方案评审 + 复评优秀落码）——P1×3（metadata UUID 序列化炸裂致双通道事件 100% 静默丢失 / 视角 to_domain 242 逃逸 session 卡死 GENERATING / base_config 继承零 CI 守护）+ P2×3 落码修复 + 突变闭环 6 项全红；P3 台账登记 R2+ 核销
 - v1.5.1: 代码审查 Round 2 回归核查 + 台账清偿——六项 R1 修复零 P1/P2 回归 + 全仓 10882 passed；新发现 P3×2（「重试自纠」失实机理勘正为 fail-fast / Raises 补齐）+ 台账清偿 4 项（取消注释机理 / 计时阈值双侧 1.8× / 「第 20 字」×3 / evaluator docstring×3）；Defer×3（llm skip 分类 / litellm 旧注释 / base.py metadata 基类缺口）
 - v1.5.2: 代码审查 Round 3 断言矩阵 + 突变闭环——10 契约 8 项原生已覆盖；唯一实测存活突变 M-B/M-B2（failure_reason is not None 弱断言，含 save 异常替换+引用存储遮蔽机理）以 2 行精确断言击杀——10/10 全守护；累计 10 突变全部击杀
+- v1.6.0: 代码审查 Round 4 纯验证（七维度快扫全过零改动）+ Round 5 独立终审五节全过（周期闭合 1:1 / 修复双向取证 5/5 / 独立快扫零漏网 / 门禁 372 全绿）——收敛声明签署，状态 review → done
