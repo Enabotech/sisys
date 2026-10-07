@@ -13,7 +13,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, Index, Integer, String, text
+from sqlalchemy import CheckConstraint, DateTime, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -79,9 +79,9 @@ class ToolVersionModel(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     traffic_weight: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     required_rollout_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="any")
-    last_stable_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(nullable=False, default=lambda: datetime.now(UTC))
-    updated_at: Mapped[datetime] = mapped_column(nullable=False, default=lambda: datetime.now(UTC))
+    last_stable_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
     def __init__(  # noqa: PLR0913 — 与既有模型先例一致的显式构造器
         self,

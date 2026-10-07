@@ -2287,6 +2287,35 @@ def bootstrap() -> None:
         tags=("tool", "version", "repository", "postgresql", "sqlalchemy"),
     )
 
+    register_port(
+        name="tool_version_service",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.tool_version_service",
+            fromlist=["ToolVersionServicePort"],
+        ).ToolVersionServicePort,
+        # 标量注入（分层红线：应用层禁止 import infrastructure——
+        # ToolVersionConfig.from_env() 在组合根解析后传 max_retained_versions）
+        impl=lambda resolver: __import__(
+            "src.application.services.tool_version_service",
+            fromlist=["ToolVersionService"],
+        ).ToolVersionService(
+            repository=resolver.resolve("tool_version_repository"),
+            schema_validator=resolver.resolve("schema_validator"),
+            tool_registry=resolver.resolve("tool_registry_service"),
+            max_retained_versions=__import__(
+                "src.infrastructure.config.tool_version",
+                fromlist=["ToolVersionConfig"],
+            )
+            .ToolVersionConfig.from_env()
+            .max_retained_versions,
+        ),
+        module="src.application.services.tool_version_service",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "version", "service"),
+    )
+
     # Story 4.1b：Engine 后注入数据源解析器（set_data_source_resolver 模式，
     # __init__ 签名不变以保护 Story 4.4 AC-7.4 BDD 断言）
     # 组装逻辑（重试白名单收窄 + 后注入）归 engine 域模块公开工厂——组合根纯组合边界

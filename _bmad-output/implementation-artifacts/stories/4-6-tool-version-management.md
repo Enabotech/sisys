@@ -659,9 +659,9 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 实现 `src/application/ports/tool_version_service.py` + `src/application/services/tool_version_service.py`（编排流程见 Dev Notes「核心编排流程」节；schema_validator 调用输入+输出双 Schema） |
 | 🔄 重构 | 决策提纯（severity 摘要提取 → RolloutPolicyService）、类型注解 |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写服务失败测试
-- [ ] Subtask 4.2: 🟢 绿 — 实现端口 + 服务
-- [ ] Subtask 4.3: 🔄 重构 — 编排与决策分离优化
+- [x] Subtask 4.1: 🔴 红 — 编写服务失败测试
+- [x] Subtask 4.2: 🟢 绿 — 实现端口 + 服务
+- [x] Subtask 4.3: 🔄 重构 — 编排与决策分离优化
 
 #### TDD 循环 B：ToolVersionConfig 配置
 
@@ -671,9 +671,9 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | 实现 `src/infrastructure/config/tool_version.py`（frozen dataclass + from_env() 抄 SandboxConfig 形态；**注意 SandboxConfig 本身未走 `__init__.py` 导出**——ToolVersionConfig 按 11 个已导出配置类的多数惯例加入 `__init__.py`） |
 | 🔄 重构 | `__repr__` 脱敏检查 |
 
-- [ ] Subtask 4.4: 🔴 红 — 编写配置失败测试
-- [ ] Subtask 4.5: 🟢 绿 — 实现配置类
-- [ ] Subtask 4.6: 🔄 重构 — 配置代码优化
+- [x] Subtask 4.4: 🔴 红 — 编写配置失败测试
+- [x] Subtask 4.5: 🟢 绿 — 实现配置类
+- [x] Subtask 4.6: 🔄 重构 — 配置代码优化
 
 #### TDD 循环 C：服务注册
 
@@ -683,14 +683,14 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | 🟢 绿 | composition_root 注册 `tool_version_service`（工厂 lambda 注入 resolver.resolve("tool_version_repository") + "schema_validator" + "tool_registry_service" + `max_retained_versions=ToolVersionConfig.from_env().max_retained_versions` 标量——组合根 import infrastructure 配置类合法（组合根是装配层），应用层服务只收 int；tool_registry_service 条目 L2238-2252 格式）；契约测试转绿 |
 | 🔄 重构 | 注册条目风格统一 |
 
-- [ ] Subtask 4.7: 🔴 红 — 契约测试失败确认
-- [ ] Subtask 4.8: 🟢 绿 — 注册完成
-- [ ] Subtask 4.9: 🔄 重构 — 风格统一
+- [x] Subtask 4.7: 🔴 红 — 契约测试失败确认
+- [x] Subtask 4.8: 🟢 绿 — 注册完成
+- [x] Subtask 4.9: 🔄 重构 — 风格统一
 
 **完成标准/Definition of Done:**
-- [ ] ToolVersionService 七方法全部实现且测试通过
-- [ ] 应用层覆盖率 ≥85%（epics 硬指标）
-- [ ] 端口契约测试 11 维度全绿
+- [x] ToolVersionService 七方法全部实现且测试通过
+- [x] 应用层覆盖率 ≥85%（epics 硬指标）
+- [x] 端口契约测试 11 维度全绿
 
 ---
 
