@@ -36,6 +36,8 @@ from src.domain.exceptions import (
     BusinessRuleViolationError,
     ConfigurationError,
     DataSourceError,
+    LLMAPIError,
+    LLMResponseError,
     TimeoutError,
     ToolExecutionFailedError,
     ToolExecutionRetryExhaustedError,
@@ -546,4 +548,38 @@ class ToolExecutionEngine:
         return base
 
 
-__all__ = ["ToolExecutionEngine"]
+def build_tool_execution_engine(resolver: Any) -> ToolExecutionEngine:
+    """从组合根 resolver 组装工具执行引擎（域自身组装知识——组合根零私有函数纪律）。
+
+    原组合根私有函数 `_build_tool_execution_engine` 随「组合根禁止出现子模块子系统
+    私有函数」约束下沉至本域模块（学习 registration.py R-REG 模式：组装逻辑归
+    子模块域，组合根保持纯组合边界一行委托）。
+
+    重试白名单收窄（随迁自组合根 Round 2 审查修订）：默认白名单含 ExecutionError
+    会把沙箱确定性失败（313/316/317）错误重试 3 次，并与「超时即销毁」契约冲突；
+    仅 LLM 瞬时故障（API/响应/领域超时）可重试。
+
+    Args:
+        resolver: 组合根 resolver（Any 注入——避免 application 层反向依赖组合根）
+
+    Returns:
+        组装完成的 ToolExecutionEngine（含数据源解析器后注入——Story 4.1b
+        set_data_source_resolver 模式，__init__ 签名不变以保护 4.4 AC-7.4 断言）
+    """
+    engine = ToolExecutionEngine(
+        llm_client=resolver.resolve("llm_client"),
+        sandbox=resolver.resolve("sandbox_executor"),
+        retry_policy=RetryPolicy(
+            retryable_exceptions=(
+                LLMAPIError,
+                LLMResponseError,
+                TimeoutError,
+            )
+        ),
+        tool_execution_repository=resolver.resolve("tool_execution_repository"),
+    )
+    engine.set_data_source_resolver(resolver.resolve_optional("data_source_resolver"))
+    return engine
+
+
+__all__ = ["ToolExecutionEngine", "build_tool_execution_engine"]

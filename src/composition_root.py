@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
 
 import redis.asyncio as aioredis
 
@@ -2272,32 +2271,7 @@ def bootstrap() -> None:
 
     # Story 4.1b：Engine 后注入数据源解析器（set_data_source_resolver 模式，
     # __init__ 签名不变以保护 Story 4.4 AC-7.4 BDD 断言）
-    def _build_tool_execution_engine(resolver: Any) -> Any:
-        engine_cls_module = __import__(
-            "src.application.services.tool_execution_engine",
-            fromlist=["ToolExecutionEngine", "RetryPolicy"],
-        )
-        engine = engine_cls_module.ToolExecutionEngine(
-            llm_client=resolver.resolve("llm_client"),
-            sandbox=resolver.resolve("sandbox_executor"),
-            # Round 2 审查修订: 注入收窄重试策略 — 默认白名单含 ExecutionError 会把
-            # 沙箱确定性失败(313/316/317)错误重试 3 次并与"超时即销毁"契约冲突;
-            # 仅 LLM 瞬时故障(API/响应/领域超时)可重试
-            retry_policy=__import__(
-                "src.application.services.retry_helpers",
-                fromlist=["RetryPolicy"],
-            ).RetryPolicy(
-                retryable_exceptions=(
-                    __import__("src.domain.exceptions", fromlist=["LLMAPIError"]).LLMAPIError,
-                    __import__("src.domain.exceptions", fromlist=["LLMResponseError"]).LLMResponseError,
-                    __import__("src.domain.exceptions", fromlist=["TimeoutError"]).TimeoutError,
-                )
-            ),
-            tool_execution_repository=resolver.resolve("tool_execution_repository"),
-        )
-        engine.set_data_source_resolver(resolver.resolve_optional("data_source_resolver"))
-        return engine
-
+    # 组装逻辑（重试白名单收窄 + 后注入）归 engine 域模块公开工厂——组合根纯组合边界
     register_port(
         name="tool_execution_engine",
         version="v1.1.0",  # 升级: Story 4.1b 数据源采集后注入（set_data_source_resolver）
@@ -2305,7 +2279,10 @@ def bootstrap() -> None:
             "src.application.ports.tool_execution_engine",
             fromlist=["ToolExecutionEnginePort"],
         ).ToolExecutionEnginePort,
-        impl=_build_tool_execution_engine,
+        impl=lambda resolver: __import__(
+            "src.application.services.tool_execution_engine",
+            fromlist=["build_tool_execution_engine"],
+        ).build_tool_execution_engine(resolver),
         module="src.application.services.tool_execution_engine",
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
@@ -2368,10 +2345,6 @@ def bootstrap() -> None:
     from src.application.ports.data_source_resolver import DataSourceResolverPort
     from src.infrastructure.external_services.datasources.registration import build_adapters_mapping
 
-    def _build_data_source_adapters(resolver: Any) -> dict[str, Any]:
-        """聚合已注册的 data_source_* 适配器（未注册项跳过）——注册表派生"""
-        return build_adapters_mapping(resolver.resolve_optional)
-
     register_port(
         name="data_source_resolver",
         version="v1.0.0",
@@ -2380,7 +2353,7 @@ def bootstrap() -> None:
             "src.application.services.data_source_resolver",
             fromlist=["DataSourceResolverService"],
         ).DataSourceResolverService(
-            adapters=_build_data_source_adapters(resolver),
+            adapters=build_adapters_mapping(resolver.resolve_optional),
             cache=resolver.resolve("redis_adapter"),
             event_publisher=resolver.resolve_optional("event_publisher"),
         ),
