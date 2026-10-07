@@ -76,7 +76,7 @@
 **验证标准/Validation Criteria:**
 - [ ] 1000 个不同 route_key（固定样本集 `f"key-{i}"`，i∈range(1000)——跨次运行/xdist 稳定）的分配比例在 30%±5% 容差内（确定性散列的统计验证）
 - [ ] 同一 route_key 重复解析 100 次结果完全一致（确定性）
-- [ ] 命中/未命中断言**独立判别**：测试内按路由规范独立重算散列（如 `int(hashlib.sha256(key).hexdigest(), 16) % 100 < weight` 得期望桶位）与 `resolve_version` 输出比对——**禁止以 `route()` 探测结果作断言锚点**（同源循环论证无判别力）；另加 weight=100（任意 key 必 canary）/灰度不存在（必 stable）两个零散列依赖的边界探针
+- [ ] 命中/未命中断言**独立判别**：TrafficRouter 的散列算法与桶映射为**规范条款（非实现自由度）**——`int(hashlib.sha256(route_key.encode()).hexdigest(), 16) % 100 < weight` 命中 canary（实现与测试共用此公式）；测试按该公式独立重算期望桶位与 `resolve_version` 输出比对，**禁止以 `route()` 探测结果作断言锚点**（同源循环论证无判别力）；另加 weight=100（任意 key 必 canary）/灰度不存在（必 stable）两个零散列依赖的边界探针
 - [ ] 提升为 STABLE 是原子操作（新 STABLE 写入 + 旧 STABLE 降级在同一事务/savepoint 内——**原子性断言唯一归属 Task 7 集成测试**；单元层仅断言多行 save 全部发生 + 失败不发布事件）
 - [ ] 状态迁移非法路径（如 STABLE→CANARY、DEPRECATED→CANARY）抛 `EntityStateTransitionError`（EXCEPTION_243，复用先例）
 - [ ] CANARY 调档（30→50）不改变版本状态、事件 from_status==to_status=CANARY 且携带新 weight
@@ -85,12 +85,12 @@
 
 **Given** 工具 v2.0.0 为当前 STABLE 且被判定异常，历史存在曾稳定版本 v1.9.0（DEPRECATED，`last_stable_at` 最新）
 **When** 运维执行 `rollback(tool_id)`（不指定目标版本）
-**Then** 系统一键回滚：v2.0.0 → DEPRECATED（记录 last_stable_at），v1.9.0 → STABLE（DEPRECATED→STABLE 回滚恢复迁移，**唯一合法触发方是 rollback 流程**），活跃 CANARY（若有）一并降级 DEPRECATED（不记 last_stable_at），流量 100% 回到 v1.9.0
+**Then** 系统一键回滚：v2.0.0 → DEPRECATED（**不记录 last_stable_at**——业界 stable 指针原则：指针只在成功 promotion 时推进，被回滚放弃的版本天然退出缺省候选与显式目标集），v1.9.0 → STABLE（DEPRECATED→STABLE 回滚恢复迁移，**唯一合法触发方是 rollback 流程**），活跃 CANARY（若有）一并降级 DEPRECATED（不记 last_stable_at），流量 100% 回到 v1.9.0
 **And** 回滚操作原子完成（PostgreSQL 仓储内 savepoint 包裹多行状态变更，参照 domain_dictionary_repository.rollback 先例）
 **And** **缺省目标选取（防 ping-pong）**：`last_stable_at` 非空的 DEPRECATED 版本中取 `last_stable_at` 最大者，但**排除本次被降级的当前 STABLE 版本**（否则连续两次回滚会回到刚因异常被放弃的版本——业界 stable 指针只在成功 promotion 时推进，不因回滚更新）
 **And** 指定 `rollback(tool_id, target_version)` 时：目标版本**记录不存在** → `ToolVersionNotFoundError`（EXCEPTION_430，HTTP 404——资源定位失败）；记录存在但非"曾稳定"版本（非 DEPRECATED 或 last_stable_at 为空）→ `ToolVersionRollbackError`（EXCEPTION_433，HTTP 409——状态不允许）
 **And** 无当前 STABLE 或无任何可回滚的稳定历史版本时抛 `ToolVersionRollbackError`（EXCEPTION_433）
-**And** 版本保留策略：每工具版本**总数**（含 STABLE/CANARY/PENDING/DEPRECATED）不超过 `max_retained_versions`（默认 10，`TOOL_VERSION_MAX_RETAINED` 环境变量可覆盖），超出时**仅淘汰 DEPRECATED**（STABLE/CANARY/PENDING 受保护，永不淘汰）；淘汰顺序：先 `last_stable_at` 为空者（灰度清场产物，非回滚候选），再 `last_stable_at` 最旧者——淘汰键与回滚价值键（last_stable_at）对齐。**审计取舍声明**：物理删除即失去该版本 schema 快照（历史 `ToolExecution.tool_version` 仅存版本号），V1 接受该取舍，4.7 启动前评估是否改为"仅摘路由候选"的软淘汰
+**And** 版本保留策略：每工具版本**总数**（含 STABLE/CANARY/PENDING/DEPRECATED）不超过 `max_retained_versions`（默认 10，`TOOL_VERSION_MAX_RETAINED` 环境变量可覆盖），超出时**仅淘汰 DEPRECATED**（STABLE/CANARY/PENDING 受保护，永不淘汰；**可淘汰 DEPRECATED 不足时上限为软约束——保护态优先于数量上限**，如 11 个全为受保护状态则不淘汰）；淘汰顺序：先 `last_stable_at` 为空者（灰度清场产物，非回滚候选），再 `last_stable_at` 最旧者——淘汰键与回滚价值键（last_stable_at）对齐。**审计取舍声明**：物理删除即失去该版本 schema 快照（历史 `ToolExecution.tool_version` 仅存版本号），V1 接受该取舍，4.7 启动前评估是否改为"仅摘路由候选"的软淘汰
 
 **验证标准/Validation Criteria:**
 - [ ] 缺省回滚目标 = `last_stable_at` 最新的 DEPRECATED 版本，且**排除本次 from_version**（连续两次缺省回滚不 ping-pong）
@@ -137,7 +137,7 @@
 | `/api/v1/tools/{tool_id}/versions/traffic` | GET | 200 流量分布 `{stable_version,canary_version,canary_weight}`（无活跃版本时 200 全 null 字段） | 404(380) |
 
 **And** 路由工厂模式遵循 `domain_dictionary.py` 先例（`create_tools_router(...)` + 三级降级认证：override → 参数注入 → DI 容器——认证是每路由 `Depends(get_current_user)` 依赖注入形态，非全局中间件），并注册进 `app.py create_app()`（漏挂不产生报错，靠契约测试兜底——Task 6 契约测试必须含端点存在性断言）
-**And** `docs/api/openapi.yaml` 同步新增全部端点与 Schema（当前 0 处 tool path，共 6 个 path）
+**And** `docs/api/openapi.yaml` 同步新增全部端点与 Schema（当前 0 处 tool path；6 端点 / **5 个 path**——GET 与 POST 共享 `/versions` 同一 path）
 
 **验证标准/Validation Criteria:**
 - [ ] API 契约测试（`tests/contracts/test_api_contract_tools.py`）通过
@@ -193,7 +193,7 @@
 #### 数据模型 (Data Models)
 - [ ] `ToolVersion` 聚合根定义位于 `src/domain/entities/tool_version.py`
 - [ ] 状态枚举 `ToolVersionStatus(str, Enum)`——**成员显式小写值，与 migration CHECK 值域一一对应**：`PENDING = "pending"`（已注册未发布）/ `CANARY = "canary"`（灰度中）/ `STABLE = "stable"`（当前全量）/ `DEPRECATED = "deprecated"`（已弃用，含"曾稳定"语义）
-- [ ] 状态机迁移矩阵（非法迁移抛 `EntityStateTransitionError` EXCEPTION_243，ToolExecution 先例；**7 条合法迁移**）：
+- [ ] 状态机迁移矩阵（非法迁移抛 `EntityStateTransitionError` EXCEPTION_243，ToolExecution 先例；**7 个合法迁移格 / 8 种触发语义**——STABLE→DEPRECATED 分「被新版本替代」与「被回滚」两支，戳记规则不同）：
 
 ```
 PENDING --publish(0<w<100)--> CANARY（前置：存在 STABLE，否则 432）
@@ -201,7 +201,8 @@ PENDING --publish(w=100, mode=any)--> STABLE（直接全量；canary_only 在此
 CANARY --publish(0<w<100)--> CANARY（调档：渐进放量，同态迁移）
 CANARY --publish(w=100)--> STABLE（promote 转正；any/canary_only 均放行——灰度毕业通道）
 CANARY --abort_canary--> DEPRECATED（放弃灰度；不记 last_stable_at）
-STABLE --被新版本替代/被回滚--> DEPRECATED（记录 last_stable_at）
+STABLE --被新版本替代(promote/直接全量)--> DEPRECATED（记录 last_stable_at——曾全量服务标记，回滚候选依据）
+STABLE --被回滚--> DEPRECATED（不记录——被放弃版本退出候选集，指针原则）
 DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程）
 （STABLE→CANARY、DEPRECATED→CANARY、DEPRECATED→DEPRECATED 等其余路径全部非法）
 ```
@@ -238,6 +239,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 - [ ] `ToolVersionServicePort` 方法集（7 方法）：`register_version(tool_id, version, input_schema, output_schema)` / `publish_version(tool_id, version, traffic_weight=100)` / `abort_canary(tool_id)` / `rollback(tool_id, target_version=None, trigger="api")` / `resolve_version(tool_id, requested_version=None, route_key=None)` / `list_versions(tool_id)` / `get_version_traffic(tool_id)`
   - `publish_version` 按 tv 当前状态分语义：PENDING+0<w<100=发起灰度（需存在 STABLE）/ PENDING+w=100=直接全量（canary_only 禁）/ CANARY+0<w<100=调档 / CANARY+w=100=promote 转正（any/canary_only 均放行）
   - `abort_canary(tool_id)`：无活跃 CANARY 抛 243（无合法迁移）；成功后 STABLE 不动、流量全回 STABLE
+  - **通用前置（AC-6 表 404(380) 的服务层来源）**：除 `resolve_version`（惰性分支内含 get_tool）外，全部公开方法第一步 `tool_registry.get_tool(tool_id=tool_id)` → 380（含 `list_versions` / `get_version_traffic`——不存在的 tool_id 返回 404 而非空列表 200）
   - 初始版本建立**统一走 resolve_version 惰性注册**（无独立 eager 方法——AC-5 三分支规则是唯一入口，避免双初始化策略互竞）
 - [ ] R2 组合注入：`ToolVersionService.__init__(repository, schema_validator: SchemaValidatorPort, tool_registry: ToolRegistryServicePort, config: ToolVersionConfig | None = None)`
 
@@ -263,7 +265,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 |------|--------|-------------|------|---------|
 | EXCEPTION_430 | `ToolVersionNotFoundError` | `NotFoundError` | 404 | 版本不存在（精确查找空 / rollback 显式目标无记录 / 有版本记录但无活跃版本可路由） |
 | EXCEPTION_431 | `ToolVersionAlreadyExistsError` | `ConflictError` | 409 | (tool_id, version) 重复注册 |
-| EXCEPTION_432 | `ToolVersionTrafficWeightError` | `ValidationError` | 400 | 权重非法（<0/>100）、canary_only 版本请求全量、活跃 CANARY 并存冲突 |
+| EXCEPTION_432 | `ToolVersionTrafficWeightError` | `ValidationError` | 400 | 权重非法（<=0 或 >100）、canary_only 版本 PENDING 直接全量、无 STABLE 请求灰度、活跃 CANARY 并存冲突 |
 | EXCEPTION_433 | `ToolVersionRollbackError` | `InvalidStateError` | 409 | 无可回滚稳定历史 / 目标版本非"曾稳定"版本 |
 
 - [ ] **复用清单（禁止重复造轮子）**：兼容性拦截复用 `ToolSchemaCompatibilityError`（EXCEPTION_397，**已存在**于 `src/domain/exceptions/tool_schema_exceptions.py:116`，构造签名已带 tool_id/old_version/new_version/breaking_changes，docstring 明确"用于 Story 4.6 灰度发布拦截破坏性发布"）；状态机守卫复用 `EntityStateTransitionError`（243）；实体不变量复用 `EntityValidationError`（242）；配置校验复用 `ConfigurationError`（101）；工具不存在复用 `ToolNotFoundError`（380）
@@ -273,13 +275,13 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 - [ ] 编码注册 — `_code_ranges.py` 的 `CODE_RANGES` 增加 `tool_version: (430, 439)` + `_CLASS_TO_SUBDOMAIN` 注册 4 类；更新 `sisys-uni-exception-design.md`——**注意该文档存在两个同号 §3.3.2 小节（:649 完整编码分配表 + :781 子域编码范围约束），两表都必须更新**（分配表在 debate 423~429 行后插 430-433 四行 + 434-439 预留行；子域表在 debate 行后加 `tool_version | 430–439` 行），否则 test_code_ranges 与文档漂移
 - [ ] 导出完整性 — 模块 `__all__` + `src/domain/exceptions/__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射（`src/interfaces/api/exception_handlers.py` L125-251，**注释行号必须与 code 严格一致**——4.1a 曾发生注释偏移 bug）
 - [ ] 测试覆盖 — 构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过：
-    - `poetry run pytest tests/unit/domain/exceptions/ -v`（含 `test_error_code_uniqueness.py` + `test_code_ranges.py`）
+    - `poetry run pytest tests/unit/domain/exceptions/ -v`（**「8 项既有测试」口径 = `test_error_code_uniqueness.py` 3 个 + `test_code_ranges.py` 5 个测试函数**；该命令实际运行整个 exceptions 目录 24 文件全量，均须绿）
     - `poetry run pytest tests/unit/interfaces/api/test_exception_handlers.py -v`（**期望集合必须同步扩展**，4-5 教训：新增映射不同步期望集会导致该测试失败）
 - [ ] BDD 验收场景 — 异常路径的 Gherkin 场景纳入 Edge Cases（AC-1/3/4 已覆盖 431/432/433 路径）
 
 #### API 契约 (API Contract)
 - [ ] 遵循 OpenAPI 标准的 API 契约定义位于 `docs/api/openapi.yaml`（当前 0 处 tool path，全新增）
-- [ ] 端点清单见 AC-6 表格（6 个 path）；`servers.url = http://localhost:8000/api/v1`，path key 不带 `/api/v1` 前缀（除历史遗留 3 个外全库一致）
+- [ ] 端点清单见 AC-6 表格（6 端点 / 5 个 path）；`servers.url = http://localhost:8000/api/v1`，path key 不带 `/api/v1` 前缀（除历史遗留 3 个外全库一致）
 - [ ] Schema 定义：`ToolVersionCreate`（version/input_schema/output_schema required）、`ToolVersionResponse`、`ToolVersionListResponse{items,total}`、`PublishRequest{traffic_weight: int, minimum: 1, maximum: 100, default 100}`（发布参数域 (0,100]——0 无业务语义）、`RollbackRequest{target_version?: string}`、`TrafficViewResponse{stable_version,canary_version,canary_weight}`（无活跃版本时三字段为 null）
 - [ ] 参照 `/documents/{document_id}/versions` + `/versions/snapshot`（openapi.yaml L56-129）的 201/401/404/409 响应模式与 OAuth2 security 声明
 - [ ] API 契约测试通过（`tests/contracts/test_api_contract_tools.py`，规范先行模式 B——参照 `test_api_contract_document_version.py` L37-44 注释惯例：路由未实现时先静态断言规范，实现后升级为 TestClient 真实请求）
@@ -318,7 +320,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_acceptance_tool_version_management.feature`（模板：`test_acceptance_postgresql_relational_layer.feature` 的结构风格 + `test_acceptance_tool_io_schema_validation.feature` 的工具系场景组织——`AC-x.y - ` 场景名前缀 + `# ====` AC 分隔注释）
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_tool_version_management.py`（context dict + `scenarios()` 批量注册 + `_make_*()` 工厂 + 模块级 `event_loop` fixture + 真实服务：`InMemoryToolVersionRepository` / `JsonSchemaValidatorImpl` / `ToolRegistryService` / `InMemoryToolRepository` 全真实实例，仅 LLM/Sandbox 端口适配器允许 `AsyncMock`）
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_tool_version_management.py`（context dict + `scenarios()` 批量注册 + `_make_*()` 工厂 + 模块级 `event_loop` fixture + 真实服务：`InMemoryToolVersionRepository` / `JsonSchemaValidatorImpl` / `ToolRegistryService` / `InMemoryToolRepository` 全真实实例——服务级场景仅 LLM/Sandbox 端口适配器允许 `AsyncMock`；HTTP 级 AC-6 场景按认可子模式用服务 `AsyncMock` + TestClient）
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases，AC-1~AC-7 全量场景见 Task 0 Subtask 清单）
 
@@ -396,7 +398,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
   - 基础设施层：≥75%（PG/InMemory 仓储适配——Story 自加指标，加严方向）
 - [ ] **集成测试覆盖率 ≥75%**（epics 硬指标）
 - [ ] **关键路径覆盖率 100%**——三组关键路径就地枚举（可映射到具体测试函数）：
-  - 状态机全 7 条合法迁移 + 全部非法迁移抛 243（`test_tool_version.py`）
+  - 状态机全 7 个合法迁移格（8 种触发语义）+ 全部非法迁移抛 243（`test_tool_version.py`）
   - 灰度决策三分支（critical 拒绝 / major canary_only / minor·无破坏 any）（`test_tool_version_policy.py`）
   - 回滚三路径 = ①缺省目标成功 ②显式目标成功 ③失败路径（430/433 各态）（`test_tool_version_service.py`）
 
@@ -421,7 +423,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | **清理粒度** | 每个测试只清理自己创建的资源；**禁止手动 delete/truncate** | 误删其他测试资源 |
 | **依赖声明** | Fixture 必须显式声明依赖 | 并行时清理顺序不确定 |
 | **asyncio 上下文** | BDD 步骤函数不用 `@pytest.mark.asyncio`，用模块级 `event_loop` fixture + `run_until_complete()` | context 数据丢失 |
-| **确定性路由测试** | TrafficRouter 断言用固定 route_key 样本集（`f"key-{i}"`）；断言锚点=测试内独立重算 sha256（禁 route() 探测同源）；比例统计断言带 ±5% 容差 + weight=100/无灰度边界探针 | 随机散列漂移导致间歇失败；同源断言无判别力 |
+| **确定性路由测试** | TrafficRouter 断言用固定 route_key 样本集（`f"key-{i}"`）；断言锚点=按 AC-3 规范公式独立重算（禁 route() 探测同源）；比例统计断言带 ±5% 容差 + weight=100/无灰度边界探针 | 随机散列漂移导致间歇失败；同源断言无判别力 |
 | **性能断言分级** | 达标 assert pass；环境不达标 `pytest.skip` 留测量证据 | 慢环境假红 |
 | **外部客户端** | LLM/Sandbox Mock 需验证方法存在性（`_make_mock_llm()`/`_make_mock_sandbox()` 工厂先例） | AttributeError |
 
@@ -455,7 +457,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 | AC-3 | 放弃灰度 abort_canary | Task 4 | abort_canary + 端点（Task 6） | `test_tool_version_service.py` + `test_tools_api.py` |
 | AC-3 | 权重校验（432） | Task 2+4 | 异常定义 + 发布校验 | `test_tool_version_exceptions.py` |
 | AC-4 | 一键回滚 | Task 4 | rollback + last_stable_at 语义 | `test_tool_version_service.py` |
-| AC-4 | 原子性（savepoint） | Task 3 | PG 仓储事务边界 | `test_tool_version_integration.py` |
+| AC-4 | 原子性（savepoint） | Task 3→7 | PG 仓储事务边界（Task 3 建能力，Task 7 验证原子性） | `test_tool_version_integration.py` |
 | AC-4 | 保留最近 10 版 | Task 1+4 | VersionRetentionPlanner + 配置 | `test_tool_version_policy.py` + BDD |
 | AC-5 | 执行链透明路由 | Task 5 | resolve + dataclasses.replace 派生 | `test_tool_execution_service.py` 新建 |
 | AC-5 | 惰性初始版本 | Task 5 | resolve_version 兜底注册 | 同上 + BDD |
@@ -491,12 +493,12 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
   - AC-1.1 多版本并存注册可见 / AC-1.2 重复版本号冲突 409 / AC-1.3 工具不存在 404
   - AC-2.1 critical 拒绝注册 409 / AC-2.2 major 强制灰度（PENDING 直接全量被拒 400）/ AC-2.3 minor 直接全量 / AC-2.4 首版本跳过校验 / AC-2.5 canary_only 灰度毕业（CANARY 提升为 STABLE 放行——无死锁链路验证）
   - AC-3.1 按比例分配流量 / AC-3.2 旧版本服务剩余流量 / AC-3.3 权重非法 400（含 w=0）/ AC-3.4 灰度转全量提升 / AC-3.5 灰度调档（30→50 渐进放量，状态不变）/ AC-3.6 放弃灰度 abort-canary（STABLE 不动）/ AC-3.7 无 STABLE 请求灰度 400
-  - AC-4.1 一键回滚至最近稳定 / AC-4.2 回滚后流量全回目标版本 / AC-4.3 无可回滚版本 409 / AC-4.4 保留最近 10 版淘汰最旧 DEPRECATED / AC-4.5 连续两次缺省回滚不 ping-pong / AC-4.6 显式目标不存在 404 与非可回滚态 409 分立
+  - AC-4.1 一键回滚至最近稳定 / AC-4.2 回滚后流量全回目标版本 / AC-4.3 无可回滚版本 409 / AC-4.4 保留策略（先淘汰灰度清场产物[无 last_stable_at]再淘汰最旧曾稳定版）/ AC-4.5 连续两次缺省回滚不 ping-pong / AC-4.6 显式目标不存在 404 与非可回滚态 409 分立
   - AC-5.1 执行命中灰度版本 / AC-5.2 执行路由稳定版本 / AC-5.3 显式指定版本执行 / AC-5.4 执行聚合快照携带实际版本（断言 ToolExecution.tool_version，非 ToolExecuted 事件——见 AC-5 事件边界）/ AC-5.5 惰性初始版本注册（首次执行自动建立 STABLE）
-  - AC-6.1~6.6 HTTP 级端点契约（6 端点 201/200/404/409/400 + error.code/message/request_id + AC-6.6 无认证 401）
-  - AC-7.1~7.3 性能场景（分级断言）
-  - **场景覆盖分工注记**：SemVer 非法（242）、非法状态迁移（243）、显式非法 target（433 细分）由单元测试覆盖（Task 1/4），不入 Gherkin——避免场景集与单测重复膨胀
-- [ ] Subtask 0.7: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_tool_version_management.py` —— context dict + `scenarios()` + 模块级 event_loop fixture（**先例在 `test_acceptance_domain_dictionary.py:53` 等 10 个验收文件——第一模板 tool_io 自身不定义该 fixture**，靠 pytest-asyncio 已废弃内建机制，不可照抄）+ 真实服务 given（含 `_make_tool(version=...)` / `_make_mock_llm()` / `_make_mock_sandbox()` 工厂）
+  - AC-6.1~6.6 六端点各一条契约场景（6.1 注册 201 / 6.2 列表 200 / 6.3 发布 200 / 6.4 回滚 200+409 / 6.5 abort-canary 200 / 6.6 traffic 视图 200）+ AC-6.7 无认证 401（201/200/404/409/400 + error.code/message/request_id）
+  - AC-7.1 切换延迟 / AC-7.2 灰度发布成功率 / AC-7.3 回滚成功率 / AC-7.4 路由开销——与 AC-7 表四项指标一一对应（分级断言）
+  - **场景覆盖分工注记**：SemVer 非法（242）、非法状态迁移（243）由单元测试覆盖（Task 1/4），不入 Gherkin；433 的细分各态（PENDING/CANARY 目标、last_stable_at 为空、目标=当前 STABLE）不入 Gherkin，粗分两码由 AC-4.6 覆盖——避免场景集与单测重复膨胀
+- [ ] Subtask 0.7: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_tool_version_management.py` —— context dict + `scenarios()` + 模块级 event_loop fixture（**先例在 `test_acceptance_domain_dictionary.py:53` 等 11 个验收文件——第一模板 tool_io 自身不定义该 fixture**，靠 pytest-asyncio 已废弃内建机制，不可照抄）+ 真实服务 given（含 `_make_tool(version=...)` / `_make_mock_llm()` / `_make_mock_sandbox()` 工厂；服务级场景真实服务，HTTP 级 AC-6 场景按认可子模式用服务 `AsyncMock`）
 - [ ] Subtask 0.8: 编写契约测试（红）—— `tests/contracts/test_api_contract_tools.py`（openapi 静态断言，**Task 0.5 写完 openapi 后该部分即绿——规范先行模式 B 预期**）+ `test_port_contract_tool_version_repository.py` + `test_port_contract_tool_version_service.py`（11 维度类模板：PORT_NAME/IMPL_CLS_NAME/MODULE_PATH/EXPECTED_TAGS/EXPECTED_OWNER/REQUIRED_METHODS 类常量 + `_DummyResolver`——257 行，参照 `test_port_contract_tool.py`）
 - [ ] Subtask 0.9: 运行验收测试与端口契约测试，确认失败（🔴 红阶段验证；预期失败形态：验收 .py 与端口契约测试 **collection ERROR**（import 的模块不存在）；**API 契约静态断言不在此列**——openapi 已在 0.5 写好，其静态断言 Task 0 即绿属预期中间态，Task 6 路由实现后 TestClient 断言转绿）
 - [ ] Subtask 0.10: **4.3 遗留缺口实地验证**（关键前置）—— 运行 `src/infrastructure/validation/jsonschema_validator.py` 的 `JsonSchemaValidatorImpl.validate_schema_compatibility` 冒烟验证，三分支预期处置：① 嵌套检测**已实现生效**（Round 1 调研实证 `_check_nested_schema_changes` :340-466 真实调用，4-3 文档 P1-12「仅注释占位」表述已过时）——验证记录实态即可；② **顶层变更双重上报**（主循环与嵌套递归对同一顶层 properties 各计 1 条 breaking_change——实测顶层 type 变更产出 2 条）——记录实态并**确认 AC-2 单测按「存在性+max severity」断言而非计数**（计数非本 Story 契约，不修 4.3 已交付行为）；③ 若发现其他占位/死代码路径（预期不会），在 Task 4 接线前先补齐并补测试。同时验证 **397 现状**：`ToolSchemaCompatibilityError` 已定义+已映射 HTTP 但 src 全库无 raise 点（4-3 P1-13 的「死代码注释」在当前代码不存在）——本 Story 由 ToolVersionService 抛出即为其首个 raise 点；验证结论记录进 Dev Agent Record
@@ -518,7 +520,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/entities/test_tool_version.py`（构造校验：SemVer/schema 关键词/weight 范围 [0,100]/required_rollout_mode 枚举/状态枚举小写值；状态机：**7 条合法迁移**全过（含 CANARY→CANARY 调档、DEPRECATED→STABLE 回滚恢复）+ 非法迁移抛 EntityStateTransitionError(EXCEPTION_243)；DEPRECATED 化区分记录/不记录 last_stable_at（被替代/被回滚记，灰度清场不记）） |
+| 🔴 红 | 编写 `tests/unit/domain/entities/test_tool_version.py`（构造校验：SemVer/schema 关键词/weight 范围 [0,100]/required_rollout_mode 枚举/状态枚举小写值；状态机：**7 个合法迁移格全过**（含 CANARY→CANARY 调档、DEPRECATED→STABLE 回滚恢复；STABLE→DEPRECATED 两支触发语义各测一条）+ 非法迁移抛 EntityStateTransitionError(EXCEPTION_243)；DEPRECATED 化三分戳记规则——被新版本替代记 last_stable_at、被回滚不记、灰度清场不记） |
 | 🟢 绿 | 实现 `src/domain/entities/tool_version.py` 最小代码（Tool/ToolExecution 双先例风格：dataclass + `__post_init____ → validate()` + `transition_to()` + `VALID_TRANSITIONS` 模块级矩阵） |
 | 🔄 重构 | 类型注解、中文 docstring（Google 风格）、`__init__.py` 导出（若领域实体有集中导出） |
 
@@ -530,7 +532,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/services/test_tool_version_policy.py`（RolloutPolicyService：critical→allowed=False / major→canary_only / minor·无破坏→any；TrafficRouter：固定 route_key 样本确定性（断言锚点=测试内独立重算 sha256 散列，禁 route() 探测同源）+ 1000 固定样本 `f"key-{i}"` 30%±5% 统计 + weight=100/无灰度两个边界探针 + 无 canary 回 stable；VersionRetentionPlanner：总数>10 仅淘汰 DEPRECATED（先 last_stable_at 为空者再最旧者）+ STABLE/CANARY/PENDING 受保护 + 不足 10 不淘汰） |
+| 🔴 红 | 编写 `tests/unit/domain/services/test_tool_version_policy.py`（RolloutPolicyService：critical→allowed=False / major→canary_only / minor·无破坏→any；TrafficRouter：固定 route_key 样本确定性（断言锚点=按 AC-3 规范公式独立重算，禁 route() 探测同源）+ 1000 固定样本 `f"key-{i}"` 30%±5% 统计 + weight=100/无灰度两个边界探针 + 无 canary 回 stable；VersionRetentionPlanner：总数>10 仅淘汰 DEPRECATED（先 last_stable_at 为空者再最旧者）+ STABLE/CANARY/PENDING 受保护 + 不足 10 不淘汰） |
 | 🟢 绿 | 实现 `src/domain/services/tool_version_policy.py`（RolloutPolicyService / TrafficRouter（**hashlib 稳定散列，禁内建 hash()**）/ VersionRetentionPlanner + RolloutDecision 值对象） |
 | 🔄 重构 | 纯函数化、类型注解、docstring |
 
@@ -653,7 +655,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_tool_version_service.py`（Mock 工厂模式：`MagicMock(spec=ToolVersionRepositoryPort)` + `_make_repo_mock()` + `_make_registry_mock()` + `_make_validator_mock()` 工厂；覆盖：register（431 重复/380 工具不存在/397 critical 拦截且 context 带 breaking_changes——**断言存在性与 max severity，不断言条数**/canary_only 标记/首版本跳过校验）、publish 状态感知（PENDING 发起灰度 w∈(0,100)/PENDING 无 STABLE 灰度 432/PENDING canary_only 直接全量 432/PENDING any 直接全量/CANARY 调档 w∈(0,100) 状态不变/CANARY promote w=100（canary_only 放行——毕业通道）/权重越界含 w=0 → 432/其他版本灰度并存 432/243 非法迁移（STABLE·DEPRECATED 上 publish）/全量档旧 STABLE 降级记录 last_stable_at）、abort_canary（成功清场不记 last_stable_at/无活跃 CANARY 243）、rollback（缺省 target=last_stable_at 最新且排除 from_version——连续两次不 ping-pong/显式目标不存在 430/非可回滚态 433/无 STABLE 433/清场 CANARY）、resolve（精确 430/确定性路由/惰性初始版本三分支：无记录注册、并发 431 容错重读、有记录无活跃 430）、retention（第 11 版仅淘汰 DEPRECATED，先无 last_stable_at 者再最旧者）。**单元层不写"原子"断言**——多行变更原子性唯一归属 Task 7 savepoint 集成测试，单元层仅断言全部 save 调用发生 + 失败路径不发布事件） |
+| 🔴 红 | 编写 `tests/unit/application/services/test_tool_version_service.py`（Mock 工厂模式：`MagicMock(spec=ToolVersionRepositoryPort)` + `_make_repo_mock()` + `_make_registry_mock()` + `_make_validator_mock()` 工厂；覆盖：register（431 重复/380 工具不存在/397 critical 拦截且 context 带 breaking_changes——**断言存在性与 max severity，不断言条数**/canary_only 标记/首版本跳过校验）、publish 状态感知（PENDING 发起灰度 w∈(0,100)/PENDING 无 STABLE 灰度 432/PENDING canary_only 直接全量 432/PENDING any 直接全量/CANARY 调档 w∈(0,100) 状态不变/CANARY promote w=100（canary_only 放行——毕业通道）/权重越界含 w=0 → 432/其他版本灰度并存 432/243 非法迁移（STABLE·DEPRECATED 上 publish）/全量档旧 STABLE 降级记录 last_stable_at）、abort_canary（成功清场不记 last_stable_at/无活跃 CANARY 243）、rollback（缺省 target=last_stable_at 最新且排除 from_version——连续两次不 ping-pong/回滚降级 current **不记戳**（指针原则）/显式目标不存在 430/非可回滚态 433/无 STABLE 433/清场 CANARY 不记戳）、resolve（精确 430/确定性路由/惰性初始版本三分支：无记录注册、并发 431 容错重读、有记录无活跃 430）、retention（第 11 版仅淘汰 DEPRECATED，先无 last_stable_at 者再最旧者）。**单元层不写"原子"断言**——多行变更原子性唯一归属 Task 7 savepoint 集成测试，单元层仅断言全部 save 调用发生 + 失败路径不发布事件） |
 | 🟢 绿 | 实现 `src/application/ports/tool_version_service.py` + `src/application/services/tool_version_service.py`（编排流程见 Dev Notes「核心编排流程」节；schema_validator 调用输入+输出双 Schema） |
 | 🔄 重构 | 决策提纯（severity 摘要提取 → RolloutPolicyService）、类型注解 |
 
@@ -801,7 +803,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 
 **完成标准/Definition of Done:**
 - [ ] 所有架构/约束测试通过
-- [ ] 测试输出清晰的合规报告
+- [ ] 每条断言失败消息包含违规文件路径与违规 import/元数据项（pytest.fail 消息可定位到文件）
 - [ ] 任何违规都会导致测试失败
 - [ ] 循环依赖检测使用 ruff/isort（不引入额外工具）
 
@@ -844,7 +846,7 @@ DEPRECATED --rollback 恢复--> STABLE（唯一合法触发方：rollback 流程
 - **设计约束:** 领域层零依赖（import-linter 强制）；依赖方向 domain ← application ← interfaces/infrastructure；端口统一注册 PortSpec（name/version/interface/impl/module/lifetime/owner/compatibility/tags/deprecated 十字段）；Query Object 模式（多字段+分页查询）
 - **存储架构:** Tool 实体设计为 **L2（PostgreSQL）+ L1（Redis）**（architecture.md §9）——本 Story 落地 L2 持久化（migration 016）；L1 缓存非本 Story 范围（**PG 装配下 resolve_version 每次执行含一次 list_active DB 往返**——有意取舍：路由查询走 (tool_id,status) 索引代价可控，进程内路由快照缓存（事件失效型）留有真实性能诉求时追加；AC-7 路由开销基准相应分层）
 - **接口治理:** 统一端口注册、契约优先、版本化兼容（tool_execution_service 升级示范）、禁止跨模块直接依赖实现类
-- **技术栈:** Python 3.11+ / SQLAlchemy 2.0 async / alembic / FastAPI / pytest-bdd 8.0 / jsonschema Draft 7（复用 4.3 的 JsonSchemaValidatorImpl）
+- **技术栈:** Python 3.11+ / SQLAlchemy 2.0 async / alembic / FastAPI / pytest-bdd 8.1.0（pyproject `^8.0.0`）/ jsonschema Draft 7（复用 4.3 的 JsonSchemaValidatorImpl）
 
 ### 关键架构决策
 
@@ -895,6 +897,7 @@ register_version(tool_id, version, input_schema, output_schema):
   8. publish ToolVersionRegistered
 
 publish_version(tool_id, version, traffic_weight=100):   # 状态感知：PENDING=发起/直接全量；CANARY=调档/转正
+  0. tool_registry.get_tool(tool_id=tool_id)                    # 380 if 不存在
   1. tv = repo.get_by_tool_and_version(...)            # 430 if 不存在
   2. 0 < weight <= 100 else 432
   3. weight < 100（灰度档）:
@@ -906,24 +909,31 @@ publish_version(tool_id, version, traffic_weight=100):   # 状态感知：PENDIN
        tv.status==PENDING 且 mode=="canary_only" → 432（禁止直接全量）
        tv.status==PENDING 且 mode=="any" → tv.transition_to(STABLE)（直接全量）
        tv.status==CANARY → tv.transition_to(STABLE)（promote 转正——canary_only 灰度毕业通道，放行）
-       全量档同时：旧 STABLE.transition_to(DEPRECATED) 并记录 last_stable_at
-  4. repo.save（多行变更在同一 session 事务/savepoint 内）
+       全量档同时：旧 STABLE.transition_to(DEPRECATED) 并记录 last_stable_at（曾全量服务标记）
+  4. repo.save（多行变更在同一 session 事务/savepoint 内；**保存顺序：先 save 降级行（旧 STABLE），
+     后 save 提升行（新 STABLE）——partial unique index 逐语句校验，反序必撞单 STABLE 索引；InMemory 同序**）
   5. publish ToolVersionPublished(from_status, to_status, weight)
 
 abort_canary(tool_id):                                   # 放弃灰度：STABLE 不动、流量全回 STABLE
+  0. tool_registry.get_tool(tool_id=tool_id)                    # 380 if 不存在
   1. active = repo.list_active(tool_id)；canary = status==CANARY 者
   2. canary 不存在 → 243（无合法迁移）
   3. canary.transition_to(DEPRECATED)（不记 last_stable_at）；weight 置 0
   4. repo.save；publish ToolVersionPublished(from=CANARY, to=DEPRECATED, weight=0)
 
 rollback(tool_id, target_version=None, trigger="api"):
+  0. tool_registry.get_tool(tool_id=tool_id)                    # 380 if 不存在
   1. current = repo.list_active(tool_id) 中 STABLE 者；无 STABLE → 433（无可回滚）
   2. target 缺省 = list_by_query(status=DEPRECATED, last_stable_at 非空) 中 last_stable_at 最大者
-     且排除 current.version（防 ping-pong：刚被降级的版本不立即成为回滚目标）；无 → 433
+     且排除 current.version（防御：current 若带历史戳也排除自身）；无 → 433
      target 显式 = repo.get_by_tool_and_version(...)；记录不存在 → 430；非 DEPRECATED 或 last_stable_at 为 None → 433
-  3. current.transition_to(DEPRECATED) 并记录 last_stable_at；活跃 CANARY → DEPRECATED（不记 last_stable_at）
+  3. current.transition_to(DEPRECATED) 不记录 last_stable_at（指针原则：只在成功 promotion 时
+     推进——被回滚放弃的版本退出候选集，跨步 ping-pong 与连按 ping-pong 均不可达）；
+     活跃 CANARY → DEPRECATED（不记 last_stable_at）
      target.transition_to(STABLE)（DEPRECATED→STABLE 回滚恢复迁移，唯一合法触发方）
-  4. repo.save ×N（同一事务/savepoint）；publish ToolRolledBack(trigger, deprecated_versions=[...])
+  4. repo.save ×N（同一事务/savepoint；**保存顺序：先降级/清场行（current、CANARY），后提升行
+     （target）——partial unique index 逐语句即时校验，反序在事务内即撞单 STABLE 索引**）
+  5. publish ToolRolledBack(trigger, deprecated_versions=[...])
 
 resolve_version(tool_id, requested_version=None, route_key=None):
   1. requested_version 指定 → repo.get_by_tool_and_version 精确；不存在 → 430
@@ -932,7 +942,9 @@ resolve_version(tool_id, requested_version=None, route_key=None):
      TrafficRouter.route(route_key, canary.version, canary.traffic_weight, stable.version)
   4. 仅 stable → stable
   5. active 为空 且 未指定版本:
-     无任何版本记录（count==0）→ 惰性：以 tool.version 注册初始 STABLE（幂等：并发撞 431 时捕获重读返回既有）→ 返回
+     无任何版本记录（count==0）→ 惰性：tool = tool_registry.get_tool(tool_id)（380 自然传播）
+       → 以 tool.version / tool.input_schema / tool.output_schema 构造 STABLE 记录
+       （幂等：并发撞 431 时捕获重读返回既有）→ 返回
      有版本记录但全非活跃 → 430（无活跃版本可路由）
 ```
 
@@ -963,7 +975,7 @@ INDEX ix_tool_versions_tool_last_stable (tool_id, last_stable_at DESC)
 
 1. **PG session 上下文前提**：`PostgreSQLAdapter` 经 ContextVar `get_session()` 取会话，未激活时抛 `InvalidStateError`。`resolve_version` 的惰性初始版本注册会走 `repo.save()`——在 PG 仓储装配下，该路径仅在 API 请求上下文（SessionMiddleware）或显式 session fixture 内可用。**集成测试必须复用 `repo_session`/`pg_session` fixture 模式**；单元/验收测试用 InMemory 仓储天然无此约束。
 2. **frozen dataclass 加字段顺序**：`ToolCall` 是 `@dataclass(frozen=True)`，新增 `version: str | None = None` 必须放在已有默认值字段之后（带默认值字段后置规则），保证既有位置参数调用零破坏。
-3. **内建 `hash()` 禁用**：`TrafficRouter` 若用内建 `hash(str)`，PYTHONHASHSEED 进程盐化使**跨次运行**结果漂移（单次运行内单 worker 结果一致——真实风险是"连续 5 次无随机失败"验收被击穿，而非同次 xdist 多 worker 间歇失败）。必须 `hashlib.md5/sha256` 稳定散列，样本集用固定 `f"key-{i}"` 而非随机生成。
+3. **内建 `hash()` 禁用**：`TrafficRouter` 若用内建 `hash(str)`，PYTHONHASHSEED 进程盐化使**跨次运行**结果漂移（单次运行内单 worker 结果一致——真实风险是"连续 5 次无随机失败"验收被击穿，而非同次 xdist 多 worker 间歇失败）。**散列算法为规范条款（见 AC-3 验证标准——sha256 + `% 100 < weight` 桶映射，实现与测试共用，非 md5/sha256 任选）**，样本集用固定 `f"key-{i}"` 而非随机生成。
 3a. **并发不变量的双层守护**：单 STABLE/单活跃 CANARY 由 PG partial unique index（WHERE status='...'）在存储层硬守护，InMemory 仓储在 save 时软校验——服务层（SCOPED 每请求一实例）不依赖进程内锁。惰性初始注册必须 catch 431 重读返回（并发首执行竞态），否则 431 会从无辜的 `execute()` 打穿执行链。
 4. **EXCEPTION_HTTP_MAP 注释对齐**：追加 430-433 四条映射时，行内注释的编码必须与常量一致（4.1a 偏移 bug 先例），并同步 `test_exception_handlers.py` 的期望集合（漏同步 = 该文件测试失败）。
 5. **resolve("tool_registry_service") 装配顺序**：`tool_version_service` 工厂 lambda 引用 `resolver.resolve("tool_registry_service")` 与 `resolver.resolve("schema_validator")`——两端口均已注册（composition_root L2238/L2394，已实地核实），但注册条目顺序须在其之前或使用延迟 lambda 求值（现有 tool_registry_service 条目即为 lambda 工厂先例）。
@@ -1013,7 +1025,7 @@ docs/api/openapi.yaml                             # ✏️ +5 path +6 schema
 | `EXCEPTION_HTTP_MAP` + 统一错误响应 | `src/interfaces/api/exception_handlers.py:125-251`（工具映射已存在至 398） | 只追加 430-433 四条 |
 | `DomainEvent` 基类 | `src/domain/events/base.py:41`（frozen + `__init_subclass__` 自动注册） | 3 事件继承 |
 | `SandboxConfig.from_env()` 配置先例 | `src/infrastructure/config/sandbox.py` | ToolVersionConfig 模板 |
-| 端口契约测试 11 维度模板 | `tests/contracts/test_port_contract_tool.py`（258 行） | 两个新端口契约测试照写 |
+| 端口契约测试 11 维度模板 | `tests/contracts/test_port_contract_tool.py`（257 行） | 两个新端口契约测试照写 |
 | BDD 工具系验收模板 | `tests/acceptance/test_acceptance_tool_io_schema_validation.py`（680 行，context dict + scenarios() + `_make_tool(version=...)`） | 验收测试第一模板 |
 | HTTP 级 BDD/契约 `_make_client()` | `tests/contracts/test_api_contract_document_upload.py:55-73` | AC-6 TestClient 模式 |
 | PG 集成隔离 fixture | `tests/integration/test_integration_domain_dictionary.py`（repo_session：begin+set_session+rollback）+ `tests/integration/conftest.py:522`（pg_session） | Task 3/7 集成测试 |
@@ -1052,6 +1064,7 @@ docs/api/openapi.yaml                             # ✏️ +5 path +6 schema
 - ❌ L1 Redis 缓存/进程内路由快照（PG 装配下 resolve 每执行查一次库是有意取舍，见存储架构）、`validate_compatibility_batch` 批量校验、`dry_run` 标志位（4-3 提议的可选 P2 API）——留待有真实性能/运维诉求时追加
 - ❌ per-version 执行统计视图（执行次数/成功率——数据源 `tool_executions.tool_version` 聚合查询，支撑人工 promote 决策的观测面）——V1 人工决策凭 `GET /versions/traffic` + 日志；4.7 反馈闭环启动时按需实现（业界 promote 前均有 per-version 指标，登记为 4.7 输入）
 - ❌ ToolExecuted 事件 tenant_id 回填（独立决策项）
+- ❌ PENDING 版本主动撤销 API——误注册的版本号永久占用 (tool_id,version) 唯一槽位（重注册同号 431），以换版本号绕行；撤销能力留有真实运维诉求时评估
 - ❌ `ToolExecuted` 事件 `tool_version` 反映实际执行版本——事件发布方（StrategicAnalysisUseCase / auto_execute_completed_handler）持有路由前 Tool 对象；实际版本以 `ToolExecution.tool_version` 快照为权威记录。事件级回填需改造 2 个既有发布方，遗留独立决策项（与 tenant_id 回填同批评估）
 - ❌ tools 表 PG 持久化与 ToolRepositoryPort PostgreSQL 实现（Tool 元数据仍以 TOOL_CATALOG 为 SSOT；migration 011 注释中的"后续补强 FK"继续遗留）
 
@@ -1096,7 +1109,7 @@ docs/api/openapi.yaml                             # ✏️ +5 path +6 schema
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 
-src（13 个）+ migration（1 个）:
+src（12 个）+ migration（1 个）:
 - `src/domain/entities/tool_version.py` - ToolVersion 聚合根 + 状态机
 - `src/domain/events/tool_version_events.py` - 3 领域事件
 - `src/domain/exceptions/tool_version_exceptions.py` - 4 异常（430-433）
@@ -1167,7 +1180,7 @@ src（13 个）+ migration（1 个）:
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1~AC-7 含异常路径与性能指标）
 3. [x] Architecture constraints extracted 架构约束已提取（R1-R4 设计规则显式映射）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（4 故事 + 4.3 演进专章）
-5. [ ] Sprint status synced to `ready-for-dev`（创建流程最后一步执行）
+5. [x] Sprint status synced to `ready-for-dev`（sprint-status.yaml:151 已登记）
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
@@ -1185,7 +1198,7 @@ src（13 个）+ migration（1 个）:
 | R1-8 | 三项并发不变量（单 STABLE/单 CANARY/惰性幂等）无守护机制，SCOPED 实例无锁，并发 publish 可双 STABLE | P1 | migration 补 2 个 partial unique index（WHERE status=...）+ InMemory save 校验；Pitfall 3a |
 | R1-9 | 「CANARY 无 STABLE」可达（首版本 publish(w=30) 全程无拦截），route(stable=None) 未定义 | P1 | publish(w<100) 前置「存在 STABLE」→ 432；AC-3.7 场景 |
 | R1-10 | 缺 abort_canary 操作：灰度失败只能 rollback（无历史时 433 不可用，误伤 STABLE）；CANARY→DEPRECATED 迁移无 API 触发 | P1 | 新增 abort_canary 方法 + `/abort-canary` 端点（Flagger/Argo abort 语义，STABLE 不动）；决策表 #8 |
-| R1-11 | Task 0.10 预期失实：P1-12 嵌套检测实际已实现生效（4-3 文档表述过时）；顶层变更双重上报（同路径 2 条 breaking_change）未在预期内 | P1 | 0.10 改三分支处置；AC-2 断言改「存在性+max severity 不断言条数」；Lessons Learned 按实态更新 |
+| R1-11 | Task 0.10 预期失实：P1-12 嵌套检测实际已实现生效（4-3 文档表述过时）；顶层变更双重上报（**同一顶层字段** 2 条 breaking_change，path 分别为 `/properties/{key}` 与 `/properties/{key}/type`）未在预期内 | P1 | 0.10 改三分支处置；AC-2 断言改「存在性+max severity 不断言条数」；Lessons Learned 按实态更新 |
 | R1-12 | `test_tool_execution_service.py` 不存在，三处按「扩展/修改」表述，File List 分类错误 | P1 | 全部改「新建」；DoD 指认真实回归锚（tool_io 验收 :121 等三处） |
 | R1-13 | AC-5 命中/未命中断言无推导方法，route() 探测同源=循环论证无判别力 | P1 | 验证标准补独立 sha256 重算法 + weight=100/无灰度边界探针；Task 1 同步 |
 | R1-14 | AC-7 路由开销「内存查表」与蓝图每次 list_active 查库矛盾（PG 装配 5ms 物理边缘） | P1 | 基准分层：InMemory 断言 / PG skip 留证据+往返参考值；存储架构与非目标论断同步修正 |
@@ -1207,6 +1220,13 @@ src（13 个）+ migration（1 个）:
 | R1-30 | 文件清单计数与分类错误（src 14 实 13；测试 14 实 18；填充语行会被机械迭代） | P3 | 清单修正 + 填充语删除 |
 | R1-31 | 杂项失实：258→257 行；「impl 模块字符串」实为 lambda；xdist 归因错误（真实风险=跨次运行漂移）；jsonschema_validator 缺目录；SandboxConfig 恰是不导出反例；compatibility 替换语义；event_loop fixture 归属错误；auto_execute_completed_handler tool_version 恒空串论据不精确 | P3 | 逐项修正（7 处） |
 | R1-32 | 「架构层 ≥85%」概念不存在；「全局 70% 标准」无出处 | P3 | 删除架构层行；自加指标标注「Story 自加，加严方向」 |
+| R2-1 | **R1-5 修复自拆（勘误并补修）**：「被回滚记 last_stable_at」+「排除 from_version」组合下跨步 ping-pong 仍复现（回滚#2 候选池 max 恰为回滚#1 放弃的故障版本）——与决策表 #9 自引的业界指针原则矛盾 | P1 | 裁决为指针原则：**回滚降级不记录 last_stable_at**（只在被新版本替代/promotion 时记录），5 处传播位同步（状态机拆两行/AC-4/蓝图/Task 1/Task 4） |
+| R2-2 | **R1-8 修复缺口**：partial unique index 逐语句即时校验，promote/rollback 同事务「先提升后降级」必撞单 STABLE 索引（保存顺序约束缺失） | P1 | 蓝图 publish/rollback 补保存顺序（先降级/清场行后提升行，InMemory 同序）+ Pitfall 3a 补注 |
+| R2-3 | AC-6 表 4 端点（rollback/abort/GET versions/traffic）404(380) 无蓝图抛出点；traffic 行与自身「200 全 null」互斥（双评审员独立发现） | P2 | 端口方法集补通用前置规则（除 resolve 外全部方法第一步 get_tool → 380，含 list/traffic——不存在 tool_id 返回 404 而非空 200）+ 蓝图 publish/rollback/abort 补 step 0 |
+| R2-4 | **R1-13 修复缺口**：sha256 重算示例是示例非规范（算法/桶映射未定为规范，实现自由度使重算断言假红）且示例缺 `.encode()` 不可执行；Pitfall 3「md5/sha256」与 Task 1「sha256」不一致 | P2 | 升格规范条款：`int(sha256(route_key.encode()).hexdigest(),16)%100 < weight` 为 TrafficRouter 规范算法（实现与测试共用）；4 处传播同步 |
+| R2-5 | **R1-10 传播漏网（path 口径）**：AC-6 行/API 契约节写「6 个 path」，实际 GET/POST 共享 path，distinct path=5（Subtask 0.5/结构/清单三处的 5 本正确） | P2 | 统一「6 端点 / 5 个 path」两处 |
+| R2-6 | 场景计数断链：「24→32」漏 AC-7 的 3 个；AC-7 表 4 项指标 vs 3 场景编号；AC-6 六端点 vs 5 场景编号 | P2 | AC-7 扩 7.1~7.4 四条对应四指标；AC-6 扩为 6.1~6.6 六端点各一条 + 6.7 401；总数 27→37 |
+| R2-7 | Round 1 遗留 P3 批：src 计数 13 实为 12（R1-30 修复自身 off-by-one）；258→257 复用清单漏改；AC-4.4 场景名与细化规则口径不一；resolve 惰性分支缺 Tool 来源；433 分工注记与 AC-4.6 表述冲突；保留策略软上限未声明；PENDING 无退场路径未声明；R1-11「同路径」措辞（两条 path 实不同）；追溯矩阵原子性行 Task 归属；验收文件 10→11；8 项测试口径；Task 8 DoD 模糊词；Sprint 勾选失实；pytest-bdd 版本；AsyncMock 限定 | P3 | 15 处逐项修正 |
 
 ---
 
@@ -1238,9 +1258,10 @@ src（13 个）+ migration（1 个）:
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-10-07
 **最后更新/Last Updated:** 2026-10-07
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（多 Agent 五视角并行调研：领域层 / 应用+基础设施 / 接口层 / 测试模式 / 前序经验；设计预留来自 Story 4-3 演进专章）
 - v1.1.0: Round 1 循环审查修订（D1 四视角代码调研 + D2 三视角审查：逻辑自洽性/TDD 可行性/业界对标）——修复 P0×3（rollback 迁移矛盾 / canary_only 死锁 / 调档不可达）+ P1×11 + P2×15 + P3×3 共 32 项；新增 abort_canary 能力（Flagger/Argo abort 语义）、并发守护 partial unique index、防 ping-pong 回滚目标规则；状态机 6→7 条合法迁移（CANARY 调档同态 + DEPRECATED 回滚恢复）；端点 5→6；场景 24→32
+- v1.2.0: Round 2 循环审查修订（D1 回归核查视角 + D2 双视角：修复交互面审查 + 全文一致性快扫）——P1×2（R1-5 跨步 ping-pong 修复自拆→裁决业界指针原则「回滚降级不记戳」；R1-8 缺保存顺序约束→先降级后提升）+ P2×4（4 端点 380 前置通用规则 / sha256 升格规范算法 / path 口径 6→5 / 场景计数 27→37）+ P3×15；16 格状态机双向差集验证干净、30+ 行号引用实证吻合
