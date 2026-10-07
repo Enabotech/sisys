@@ -12,7 +12,8 @@ Story 4.5 — 定义红/蓝视角分析与风险全景视图合成的 Pydantic �
 - Pydantic 校验 + 领域 VO 双重不变量（VO __post_init__ 兜底）
 - NonEmptyStr 条目级非空校验（R1-F02 根因修复）：strip_whitespace + min_length=1
   对齐 VO 的 strip 判空语义，使空串/纯空白条目在 LLM 解析层即拒（客户端
-  ValidationError 触发 tenacity 重试自纠）；选型依据——pydantic v2 的
+  包装为 LLMResponseError → 服务层 420 归口 fail-fast，无重试——R2-N1 勘正）；
+  选型依据——pydantic v2 的
   Field(strip_whitespace=True) 是 deprecated no-op 且会泄漏脏键进发给 LLM 的
   JSON Schema，Annotated+StringConstraints 是唯一正确机制（model_json_schema
   输出干净携带 minLength，约束解码正确受益）

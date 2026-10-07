@@ -256,6 +256,8 @@ class RedBlueDebateService:
 
         Raises:
             DebateGenerationError: 任一视角生成失败（兄弟任务已取消）
+            EntityValidationError: Schema→VO 转换违反领域不变量时透传（R1-F02，
+                session 已转 FAILED 落库——与合成路径对称的四步归宿）
         """
         red_task = asyncio.create_task(self._generate_single_perspective(topic, DebatePerspective.RED_AGGRESSIVE))
         blue_task = asyncio.create_task(self._generate_single_perspective(topic, DebatePerspective.BLUE_CONSERVATIVE))

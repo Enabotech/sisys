@@ -1525,6 +1525,25 @@ class DebateCompleted(DomainEvent):
 
 **Round 1 统计：** 调研 Agent ×4（领域模型/编排并发/测试判别力/契约合规）+ 主会话实测定谳 ×3（UUID 序列化端到端 / 242 逃逸端到端 / 突变矩阵采信）；发现 P0×0 + P1×3 + P2×5（1 项改判记录级）+ P3×2 簇；视角 D 契约合规零阻断（红线自查 5 项全过、28 文件全在、计数精确一致）。
 
+#### Round 2 回归核查 + 台账清偿（2026-10-07）
+
+> C1 回归核查 Agent（六项修复逐一回归 + 跨面影响 + 台账核销评估）+ 主会话全仓回归（10882 passed + 3 skipped，排除 benchmark/deploy/llm/已知 Docker flaky——`test_concurrent_10_sessions_functional` 隔离复跑通过判定为并行资源竞争型，与收尾校验记录一致）；C3 单快评「需修订」→ 吸收 2 必改点（unit :411-422 孪生断言同步 1.8×；litellm 客户端 :656/:724 旧注释矛盾登记 Defer 不改他 Story 文件）→ 复评**优秀**落码。
+
+| # | 问题 | 严重度 | 处置 |
+|---|------|--------|------|
+| R2-N1 | R1-F02 引入的失实机理声明：debate_schemas.py + test_debate_schemas.py 两处「客户端 ValidationError 触发 tenacity 重试自纠」——实证 AsyncRetrying 仅包裹 acompletion（litellm_llm_client.py:619-631），校验失败 :723 捕获后 :731 直接包装 LLMResponseError 无重试；真实语义是服务层 420 归口 fail-fast | P3 | 已修（两处改写为 fail-fast 表述） |
+| R2-N2 | `_generate_perspectives` 新增 242 raise 路径但 docstring Raises 未列（run_debate 已补、私有方法漏） | P3 | 已修（Raises 补 EntityValidationError） |
+| R2-F03 | R1-F08 清偿：取消测试注释机理失实（「兄弟未取消需等满 0.3s」——gather 首异常立即传播；计时守护实际依赖第二 gather 的等待效应） | P3 | 已修（注释勘正 + 阈值 0.25→0.28 留抖动余量） |
+| R2-F04 | 计时断言 CI 抖动余量 50ms 过薄（unit/acceptance 双侧 1.5×delay） | P3 | 已修（双侧同步 1.8×delay，含 docstring 与断言消息字样；快评员抓出 unit 孪生断言遗漏后同步） |
+| R2-F05 | 「第 20 字」注释三处失实（acceptance :289/:292 实改第 23 字「建→变」且注释写错原字 / acceptance :1222 docstring / unit :52-53 实改第 23 字「建→独」）；evaluator :157 确改第 20 字正确不动 | P3 | 已修（三处按实测字位勘正，J=34/38≈0.895 不变） |
+| R2-F06 | evaluator 两处 docstring 精度（:79「完全相同返回 1.0」对单字符不成立 / :133 Example 残缺悬空）+ joined_semantics 测试 docstring「论点顺序不改变重叠率」数学不真（junction bigram） | P3 | 已修（三处 docstring 如实化，Example 补全为可执行形态） |
+| R2-D1 | llm 场景对 420/421 一律 skip（实现缺陷与环境故障不分） | P3 | **Defer**（CI 无端点本必跳，收益/复杂度比差） |
+| R2-D2 | litellm_llm_client.py:656「（含自动重试修复）」与 :724「并尝试修正重试」与 R2-N1 新表述矛盾（Story 3.2a 交付面既有注释，blame 2026-08-08） | P3 | **Defer**（Surgical Changes 不顺手改他 Story 生产文件；留 3.2a 维护或统一注释清扫清偿） |
+| R2-D3 | base.py:149-153 metadata 不经 _serialize_value 且 json 校验仅覆盖 payload——任何事件子类 metadata 塞非序列化对象仍会炸通道（R1-F01 绊线仅护 DebateCompleted 单类） | P3 | **Defer**（跨事件族技术债，独立清偿面；本 Story 仅以 str 注入根治自类） |
+| R2-P1 | BDD 覆盖小洞×3（AC-7.7 无 FAILED 落库步骤 / AC-7.9 无 stance 断言 / 421 Then 无 debate_id）——经核验他层已实补位（单测 :700-723 / :517-518 / :688） | 记录 | **改判维持现状**（登记在案） |
+
+**Round 2 统计：** 回归核查 Agent ×1 + 单快评员 ×1（1 往返）+ 主会话全仓回归；六项 Round 1 修复逐一回归**全部成立零 P1/P2 回归**（上轮修复引入新破口的历史规律未复现）；新发现 P3×2 + 台账清偿 4 项 + Defer×3 + 改判维持×1（全部注释/文档级 + 2 阈值数字，无生产逻辑改动）；改动的 6 文件 223 passed + 1 skipped，ruff/mypy 全过。
+
 #### Round 1 修复方案（R1-F01/F02/F03/F04/F05/F06）
 
 > **C3 评审往返记录**：双评审员（甲：正确性一致性 / 乙：可行性可满足性）首轮均判「合格（附必改点）」——6 项必改（P1 测试同步两处 / P2④ model_construct 指定 + 合成侧零覆盖补齐 / P6① AC-2.3 接线 / P6② timeout 记录形态 / P2① 排除 Literal + 模块级别名 + 选型 docstring / P5 钉死两文件）+ 4 项建议全部吸收为方案 v2 后，独立复评员锚点核实判定**优秀**（唯一非阻塞瑕疵：字段计数笔误，按枚举执行）。评审员关键实证：`Field(strip_whitespace=True)` 在 pydantic v2 是 deprecated no-op 且泄漏脏键进 LLM JSON Schema（Annotated+StringConstraints 是唯一正确机制）；AC-2.3 `when_construct_terminal_without_fields` 内联循环不经 helper，Then 非空化后必误红（接线修复）；base.py:149-153 metadata 不经 _serialize_value 且 json 校验只覆盖 payload 不覆盖 metadata（基类缺口登记留项）。
@@ -1574,3 +1593,4 @@ class DebateCompleted(DomainEvent):
 - v1.4.0: Round 4 纯验证轮（零修复，锚点全落位）+ Round 5 独立终审——5 项 P3 清偿（场景计数定谳 36 / Sprint 勾选 / LitellmLLMClient 拼写×5 / 契约计数口径 / 行号偏移）；周期闭合 1:1、12 组行号实地验证、P0 全周期 ×0、P1 清零——**审查周期收敛，可进入 dev-story 实施**
 - v1.4.1-dev: dev-story 实施完成——Task 0~10 全部落地（11 Task × TDD 循环），BDD 36/36 场景全绿；实施期决策：architecture.md 422/423 文档级撞码修订、base_config 连接字段继承修复（集成测试捕获）、真实 LLM 分级断言（26.7s 慢端点实测留痕）、exception_handlers 期望集合同步；状态 → review
 - v1.5.0: 代码审查 Round 1（四视角调研 + 双评审员方案评审 + 复评优秀落码）——P1×3（metadata UUID 序列化炸裂致双通道事件 100% 静默丢失 / 视角 to_domain 242 逃逸 session 卡死 GENERATING / base_config 继承零 CI 守护）+ P2×3 落码修复 + 突变闭环 6 项全红；P3 台账登记 R2+ 核销
+- v1.5.1: 代码审查 Round 2 回归核查 + 台账清偿——六项 R1 修复零 P1/P2 回归 + 全仓 10882 passed；新发现 P3×2（「重试自纠」失实机理勘正为 fail-fast / Raises 补齐）+ 台账清偿 4 项（取消注释机理 / 计时阈值双侧 1.8× / 「第 20 字」×3 / evaluator docstring×3）；Defer×3（llm skip 分类 / litellm 旧注释 / base.py metadata 基类缺口）

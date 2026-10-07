@@ -239,7 +239,8 @@ class TestNonEmptyStrEntryConstraints:
 
     事故形态：stance='  ' 或 arguments=[''] 通过旧版 min_length=1（列表级），
     在 to_domain 的 VO 校验抛 242 时服务无 FAILED 处理而逃逸（session 卡死
-    GENERATING）——本层拦截后 LLM 客户端 ValidationError 触发重试自纠。
+    GENERATING）——本层拦截后客户端包装 LLMResponseError → 服务层 420 归口
+    fail-fast（R2-N1 勘正：客户端 AsyncRetrying 仅包裹 acompletion，校验失败无重试）。
     """
 
     def test_stance_whitespace_only_rejected(self) -> None:

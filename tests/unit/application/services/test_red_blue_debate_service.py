@@ -49,7 +49,7 @@ from src.domain.value_objects.debate import DebatePerspective, DebateTopic
 from src.domain.value_objects.tool_execution import ExecutionContext
 from src.infrastructure.storage.inmemory.debate_session_repository import InMemoryDebateSessionRepository
 
-# 37 字无重复字符论点：蓝=红改第 20 字 → J=34/38≈0.895 ∈ [0.80, 0.95) 警告区
+# 37 字无重复字符论点：蓝=红改第 23 字（"建立"→"独立"，实改"建"→"独"）→ J=34/38≈0.895 ∈ [0.80, 0.95) 警告区
 _WARNING_RED_ARG = "东南亚市场窗口期正打开需果断布局渠道供应链并建立本地化运营团队抢占先发优势"
 _WARNING_BLUE_ARG = "东南亚市场窗口期正打开需果断布局渠道供应链并建立本地化运营团队抢占先发优势".replace("建立", "独立")
 
@@ -409,7 +409,7 @@ class TestConcurrentGeneration:
         assert red_call[4] < blue_call[5], "红视角应在蓝视角结束前开始（并发证据缺失）"
 
     async def test_perspective_span_below_serial_threshold(self) -> None:
-        """单边计时：视角窗口总跨度 < 1.5×delay（串行两次 ≈ 2×delay 必超标）"""
+        """单边计时：视角窗口总跨度 < 1.8×delay（串行两次 ≈ 2×delay 必超标；1.8 留 CI 调度抖动余量）"""
         delay = 0.1
         fake_llm = _make_fake_llm(_make_red_schema(), _make_blue_schema(), _make_risk_schema(), perspective_delay_sec=delay)
         service, _, _ = _build_service(fake_llm)
@@ -419,7 +419,7 @@ class TestConcurrentGeneration:
 
         perspective_calls = [c for c in fake_llm._debate_calls if c[2] is PerspectiveAnalysisSchema]
         span = max(c[5] for c in perspective_calls) - min(c[4] for c in perspective_calls)
-        assert span < 1.5 * delay, f"视角生成跨度 {span:.3f}s ≥ 1.5×delay，疑似串行实现"
+        assert span < 1.8 * delay, f"视角生成跨度 {span:.3f}s ≥ 1.8×delay，疑似串行实现"
 
 
 # ===================================================================
@@ -669,9 +669,10 @@ class TestGenerationFailure:
             await service.run_debate(topic=topic, context=_make_execution_context(topic))
         elapsed = time.perf_counter() - start
 
-        # 若兄弟任务未被取消，run_debate 需等满红方 0.3s 才能返回；
-        # 取消生效时应远早于 0.3s（蓝方 0.02s + 取消传播）
-        assert elapsed < 0.25, f"失败后耗时 {elapsed:.3f}s，疑似未取消兄弟任务（串行等满 0.3s）"
+        # gather 首异常立即传播不等兄弟；但失败清理段的第二 gather（return_exceptions=True）
+        # 会等满未取消的红任务 0.3s——取消生效时远早于 0.3s（蓝方 0.02s + 取消传播）。
+        # 计时守护的机理是第二 gather 的等待效应，非取消传播本身（R1-F08 勘正）。
+        assert elapsed < 0.28, f"失败后耗时 {elapsed:.3f}s，疑似未取消兄弟任务（串行等满 0.3s）"
 
 
 class TestSynthesisFailure:

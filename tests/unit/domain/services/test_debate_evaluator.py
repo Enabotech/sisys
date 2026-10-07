@@ -174,7 +174,11 @@ class TestEvaluateOverlap:
         assert DebateEvaluator().evaluate_overlap(red, blue) == 0.0
 
     def test_multi_arguments_joined_semantics(self) -> None:
-        """多论点拼接语义：论点顺序不改变重叠率（拼接后整体 bigram）"""
+        """多论点无分隔拼接语义：同序拼接完全相同 → 1.0
+
+        注：无分隔拼接会产生跨论点 junction bigram，红蓝论点**换序**会改变
+        重叠率（非序不变性）——本用例仅断言同序拼接的 J=1.0。
+        """
         red = _make_perspective(("论点甲内容", "论点乙内容"))
         blue = _make_perspective(("论点甲内容", "论点乙内容"), DebatePerspective.BLUE_CONSERVATIVE)
         assert DebateEvaluator().evaluate_overlap(red, blue) == 1.0

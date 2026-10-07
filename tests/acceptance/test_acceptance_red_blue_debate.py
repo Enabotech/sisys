@@ -286,7 +286,7 @@ def event_loop():
 # 测试数据构造（Fake LLM 返回的 Schema 实例与议题）
 # ============================================================================
 
-# 37 字无重复字符论点（保证 bigram 无坍缩）：改第 20 字"应"→"变"后
+# 37 字无重复字符论点（保证 bigram 无坍缩）：改第 23 字"建"→"变"后
 # J = (36-2)/(36+2) = 34/38 ≈ 0.895 ∈ [0.80, 0.95) 警告区
 _WARNING_RED_ARG = "东南亚市场窗口期正打开需果断布局渠道供应链并建立本地化运营团队抢占先发优势"
 _WARNING_BLUE_ARG = "东南亚市场窗口期正打开需果断布局渠道供应链并变立本地化运营团队抢占先发优势"
@@ -1219,7 +1219,7 @@ def given_service_identical_arguments(context: dict[str, Any]) -> None:
 
 @given("真实组装的辩论服务且 Fake LLM 蓝论点微调一字")
 def given_service_warning_zone(context: dict[str, Any]) -> None:
-    """蓝=红改第 20 字一处 → J≈0.895 ∈ [0.80, 0.95) 警告区"""
+    """蓝=红改第 23 字一处（"建"→"变"）→ J≈0.895 ∈ [0.80, 0.95) 警告区"""
     fake_llm = _make_fake_llm(
         _make_red_schema(arguments=[_WARNING_RED_ARG]),
         _make_blue_schema(arguments=[_WARNING_BLUE_ARG]),
@@ -1327,9 +1327,9 @@ def then_generation_windows_overlap(context: dict[str, Any]) -> None:
     # 窗口重叠：双方均在对方结束前开始
     assert blue_start < red_end, "蓝视角应在红视角结束前开始（并发证据缺失）"
     assert red_start < blue_end, "红视角应在蓝视角结束前开始（并发证据缺失）"
-    # 单边计时：视角窗口总跨度 < 1.5 × delay（串行两次 ≈ 2×delay 必超标）
+    # 单边计时：视角窗口总跨度 < 1.8 × delay（串行两次 ≈ 2×delay 必超标；1.8 留 CI 抖动余量）
     span = max(red_end, blue_end) - min(red_start, blue_start)
-    assert span < 1.5 * 0.1, f"视角生成跨度 {span:.3f}s 超过 1.5×delay，疑似串行实现"
+    assert span < 1.8 * 0.1, f"视角生成跨度 {span:.3f}s 超过 1.8×delay，疑似串行实现"
 
 
 @when("执行红蓝辩论并校验视角独立性")

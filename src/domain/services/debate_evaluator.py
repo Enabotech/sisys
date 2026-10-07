@@ -76,7 +76,8 @@ class DebateEvaluator:
             previous_text: 上轮文本
 
         Returns:
-            重复率 ∈ [0.0, 1.0]；完全相同返回 1.0；无交集返回 0.0；
+            重复率 ∈ [0.0, 1.0]；完全相同返回 1.0（单字符除外——bigram 空集按
+            空并集规则返回 0.0）；无交集返回 0.0；
             两者皆空返回 0.0；一空一非空返回 0.0（空参数列表 bug 修正）
 
         Example:
@@ -130,7 +131,17 @@ class DebateEvaluator:
 
         Example:
             >>> evaluator = DebateEvaluator()
-            >>> # 红蓝论点完全相同 → 1.0
+            >>> # 红蓝论点完全相同（非单字符）→ 1.0；完全无关 → 0.0
+            >>> red = PerspectiveAnalysis(
+            ...     perspective=DebatePerspective.RED_AGGRESSIVE,
+            ...     stance="立场", arguments=("进入市场",), confidence=0.5,
+            ... )
+            >>> blue = PerspectiveAnalysis(
+            ...     perspective=DebatePerspective.BLUE_CONSERVATIVE,
+            ...     stance="立场", arguments=("退出市场",), confidence=0.5,
+            ... )
+            >>> evaluator.evaluate_overlap(red, blue) > 0.0
+            True
         """
         red_text = "".join(red_analysis.arguments)
         blue_text = "".join(blue_analysis.arguments)
