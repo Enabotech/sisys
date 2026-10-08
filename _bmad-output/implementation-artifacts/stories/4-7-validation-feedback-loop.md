@@ -16,7 +16,7 @@
 
 ### 业务价值
 
-- 覆盖 **FR-ST-07 (P1)**（prd.md:1822，公理依据 or.md 三.3.(3)「支持 Validation Feedback 闭环：自动捕获代码执行 STDERR，检索错误案例库辅助 LLM 生成修复版本；设定最大重试次数（默认 3 次），失败则标记不可行并记录至演进日志」）。
+- 覆盖 **FR-ST-07 (P1)**（`_bmad-output/planning-artifacts/prd.md:1822`，公理依据 `or.md:233` 三.3.(3)「支持 Validation Feedback 闭环：自动捕获代码执行 STDERR，检索错误案例库辅助 LLM 生成修复版本；设定最大重试次数（默认 3 次），失败则标记不可行并记录至演进日志」）。
 - Epic 4「战略工具箱」V1 P1 扩展（执行优先级 P1-7）：Epic 4 收官故事。4.1a~4.6 已交付五阶段执行引擎、Schema 验证装饰器（含基础重试）、Docker 沙箱、红蓝辩论与工具版本管理——当前失败路径在基础重试耗尽后**直接终结**（`ToolResultValidationError`/`ToolExecutionFailedError` 上抛），既无 STDERR 数据链（适配器捕获后丢弃），也无修复闭环与失败资产沉淀。
 - **在 Epic 中的位置**：Epic 4 最后一个实现故事（4-1~4-6 全部 done）。前序故事在本 Story 处预置了大量契约（详见「已有资产复用清单」）：`EXCEPTION_399` 预留编码、`SandboxExecutionFailed.stderr` 预留字段、`ToolSchemaValidationFailed` reliable 通道"4.7 启用"注释、`ToolResultStatus.INVALID` 的"可重试"语义注释——本 Story 是这些预留债的集中清偿点。
 - **依赖**：Story 4.1a（ToolExecutionEngine 五阶段 + 基础 3 次重试）✅ done + Story 4.3（ToolOutputValidator 装饰器 + `ToolSchemaValidationFailed` 事件 + violations 注入 prompt 自纠反馈）✅ done + Story 4.4（Docker 沙箱 + SandboxSecurityDecorator）✅ done + Story 4.6（工具版本管理，执行链透明路由）✅ done。
@@ -29,32 +29,34 @@
 
 **Given** 沙箱内代码执行失败（非零退出码或 stderr 非空）
 **When** `AioDockerSandboxAdapter.execute_code` 抛出 `ExecutionError`（EXCEPTION_313）
-**Then** 异常 `context` 携带 `stderr`（截断 ≤2000 字符防 DoS）与 `exit_code`（向后兼容：构造器新增可选参数，既有调用零改动）
-**And** `SandboxSecurityDecorator` 发布 `SandboxExecutionFailed` 事件时填充**已预留未用**的 `execution_id` 与 `stderr` 字段（`sandbox_events.py:96` 注释"用于 Story 4.7 Validation Feedback"的清偿）
-**And** 反馈闭环沿异常因果链提取 STDERR（`_unwrap_sandbox_error` 先例，`sandbox_security_decorator.py:100-120`），stderr 进入修复 prompt 与演进日志。
+**Then** 异常 `context` 携带 `stderr`（截断 ≤2000 字符防 DoS）与 `exit_code`（向后兼容：构造器新增可选参数且**透传合并 `context`**——两个既有子类 `SandboxTimeoutError`/`SandboxResourceLimitExceededError` 的 `super().__init__(reason, context=...)` 调用零改动，含子类构造回归）
+**And** `SandboxSecurityDecorator` 发布 `SandboxExecutionFailed` 事件时填充**已预留未用**的 `execution_id` 与 `stderr` 字段（`sandbox_events.py:96` 注释"用于 Story 4.7 Validation Feedback"的清偿）——`execution_id` 从**外层异常 context** 提取（except 块中的 `exc` 即外层 `ToolExecutionFailedError`，其 `context["execution_id"]` 由引擎 `tool_execution_engine.py:261-263` 构造时写入；`stderr` 从解包所得内层 `ExecutionError.context` 提取；`execute_code_with_protection` 直连路径无聚合根，`execution_id` 保持空串）
+**And** 反馈闭环沿异常因果链提取 STDERR（`_unwrap_sandbox_error` 先例，`sandbox_security_decorator.py:100-120`——**同时遍历自定义 `cause` 属性与 `__cause__`**，`base_exceptions.py:62,72` 语义），stderr 进入修复 prompt 与演进日志。
 
 **验证标准/Validation Criteria:**
-- [ ] `ExecutionError` 构造器支持 `stderr`/`exit_code` 可选参数并写入 `context`（默认值不破坏既有 4.4 测试）
+- [ ] `ExecutionError` 构造器支持 `stderr`/`exit_code` 可选参数并合并写入 `context`，**且签名含 `context`/`cause` 透传**（子类 `SandboxTimeoutError`/`SandboxResourceLimitExceededError` 构造回归 + 既有 4.4 测试零破坏）
 - [ ] `aiodocker_sandbox_adapter.py:511-518` 失败路径将 `stderr_str[:2000]` 与 `exit_code` 填入异常 context（当前仅 logger.debug 丢弃）
-- [ ] `sandbox_security_decorator.py:132-137` 事件发布填充 `execution_id` + `stderr`
+- [ ] `sandbox_security_decorator.py:132-137` 事件发布填充 `execution_id`（外层异常 context）+ `stderr`（内层 313 context；helper 签名需能拿到外层异常或其 context）
 - [ ] Schema 校验失败路径（无 STDERR）以 `schema_violations` 提取错误签名（`ToolResultValidationError.context["schema_violations"]`，4.3 已携带）
-- [ ] 单元测试覆盖：adapter 填充 / decorator 事件填充 / cause 链提取三段
+- [ ] 单元测试覆盖：adapter 填充 / decorator 事件填充（含直连路径空 execution_id 分支）/ cause 链提取三段
 
 ### AC-2: Validation Feedback 闭环——增强重试与修复代码生成
 
-**Given** 工具执行结果验证失败且基础重试已耗尽（内层 `ToolOutputValidator` 抛 `ToolResultValidationError` EXCEPTION_389），或执行失败（`ToolExecutionFailedError` EXCEPTION_382，含沙箱 STDERR）
+**Given** 工具执行结果验证失败且基础重试已耗尽（内层 `ToolOutputValidator` 抛 `ToolResultValidationError` EXCEPTION_389），或执行失败（`ToolExecutionFailedError` EXCEPTION_382 且 `stage="EXECUTION"`，cause 链携带沙箱 STDERR——生产装配下 STDERR 的主浮现形态，见 Dev Notes「STDERR 实际浮现路径」）
 **When** `ValidationFeedbackDecorator`（装饰链最外层）捕获触发异常
-**Then** 触发增强反馈循环，每次增强尝试依次执行：提取 STDERR/签名 → 检索错误案例库 → LLM 生成修复代码 → 经 `context.extensions["validation_feedback_hints"]` 注入（P0-D 模式先例）重执行内层链
-**And** 增强重试最大 **3 次**（`RetryPolicy.max_attempts=3` 语义复用，区别于基础重试的两层循环）
-**And** 增强重试期间 Engine 内部重试临时降为 `max_attempts=1`（4.3 P0-1 教训：防 3×3×3×3=81x LLM 调用放大触发 `max_total_duration_sec` 超时），完成后恢复原值（try/finally 防御）
+**Then** 触发增强反馈循环，每次增强尝试依次执行：提取 STDERR/签名 → 查询错误案例库 → LLM 生成**修复建议（suggested_fix 策略/代码草案）** → 经 `context.extensions["validation_feedback_hints"]` 注入（P0-D 模式先例）重执行内层链——**引擎 Code stage 是唯一代码作者**（prompt 指令「优先采纳 hints.suggested_fix，仅做必要适配」），避免 fix-gen 与引擎双作者导致失败不可归因
+**And** 修复 prompt **必须携带跨尝试失败反馈**（Reflexion/Self-Debugging 共识——attempt k 的 prompt 含 attempt 1..k-1 的 stderr_excerpt/detail 与「以下方案已失败，禁止重复」指令；`FixAttempt` 数据结构已备），否则 attempt 2/3 与 attempt 1 独立同分布，确定性采样下重复生成相同失败修复
+**And** 增强尝试总数 **3 次**（attempt 1..3，`RetryPolicy.max_attempts=3` 总尝试语义——非"3 次重试+1 次首试"）
+**And** 防重试放大：增强期间内层重试全部封顶——引擎 `_retry` **与** `ToolOutputValidator` 的校验重试（`retry_policy_for_validation` 动态读 `engine._retry.max_attempts`，`tool_output_validator.py:105`）同为 `max_attempts=1`；实现上 `ValidationFeedbackDecorator` 保存引擎原 `RetryPolicy` 引用 → 整体替换为 `max_attempts=1` 且**保留原 `retryable_exceptions`**（frozen dataclass 禁属性赋值；恢复必须按引用、禁止重建默认对象——默认白名单含 `ExecutionError` 会静默改回生产白名单）→ try/finally 按引用恢复
 **And** 修复成功则返回 `ToolResult(status=SUCCESS, retry_count=增强尝试次数)`。
 
 **验证标准/Validation Criteria:**
-- [ ] 触发条件判定：仅 389（OUTPUT 校验耗尽）与 382（执行失败）两类进入闭环；`ToolExecutionTimeoutError`（385）与数据采集异常组（207/201/410-413 直传语义）**不进入**闭环（超时/策略违规不可修复，直接上抛）
-- [ ] 修复 prompt 组装：原 Code 产物 + STDERR + 案例库检索结果（Top-N 相似案例的 fix_summary）+ schema violations（若有）
-- [ ] `tool_execution_engine.py` `_think_stage`/`_code_stage` prompt 构建读取 `validation_feedback_hints` 扩展键（引擎 `__init__` 签名不变——4.4 AC-7.4 BDD 断言保护）
-- [ ] 防放大：增强重试期间内层 Engine `_retry.max_attempts=1`，finally 恢复
-- [ ] 单元测试：触发判定矩阵 / hint 注入透传 / 防放大恢复 / 成功恢复路径
+- [ ] 触发条件判定：仅 389（OUTPUT 校验耗尽，含 Schema 违规与 LLM 瞬时故障两子路径）与 382 且 `stage="EXECUTION"`（执行失败，含 316/317 经兜底包装的子类）进入闭环；382 且 `stage="SANDBOX_START"`（312/315 沙箱启动失败——基础设施故障非代码缺陷，修复不可归因）、`ToolExecutionTimeoutError`（385）、策略违规（207）、标记语法错误（201）、数据源族（410-413）**不进入**闭环直接上抛
+- [ ] 修复 prompt 组装：STDERR + 案例查询结果（命中 RECOVERED 案例时注入 fix_summary）+ schema violations（若有）+ **前次增强尝试失败反馈（attempt 1..k-1）** + 禁止重复失败方案指令；不含"原 Code 产物"依赖（引擎按 hints 重新生成，见 Then）
+- [ ] hints payload 契约（Task 0 定稿 schema）：`{stderr_excerpt, schema_violations, case_summaries, prior_attempts, suggested_fix}`；`tool_execution_engine.py` `_think_stage`/`_code_stage` prompt 构建读取 `validation_feedback_hints` 扩展键（引擎 `__init__` 签名不变——4.4 AC-7.4 BDD 断言保护）
+- [ ] 防放大：增强期间引擎与 validator 两层重试均封顶 1，finally 按引用恢复（含 retryable_exceptions 保持断言）
+- [ ] 修复生成自身失败（LLMAPIError/LLMResponseError）：fix-gen 调用包 `_call_with_retry(max_attempts=1)`，失败**计为该次增强尝试失败**（`FixAttempt.detail="llm_generation_failed"`），不裸穿 recover()；增强尝试中内层浮出非触发类领域异常（385/207/410-413/398）时中止闭环直传（语义优先级高于闭环）
+- [ ] 单元测试：触发判定矩阵（含 SANDBOX_START 排除行）/ hint 注入透传 / 防放大恢复 / 跨尝试反馈注入 / 修复生成失败处置 / 成功恢复路径
 
 ### AC-3: 不可行标记与领域事件
 
@@ -66,53 +68,54 @@
 **And** 修复成功路径发布 `ToolExecutionRecovered` 领域事件（双通道 reliable）。
 
 **验证标准/Validation Criteria:**
-- [ ] `ToolResultStatus.INFEASIBLE = "infeasible"` 新增；既有不变量不受影响（INVALID 语义不变——`value_objects/tool_execution.py:247-249` 注释契约保持）
-- [ ] `ValidationFeedbackRetryExhaustedError`：code=`EXCEPTION_399`、继承 `BusinessException`、构造器携带 `execution_id`/`tool_id`/`enhanced_retry_count`/`error_signature` context
+- [ ] `ToolResultStatus.INFEASIBLE = "infeasible"` 新增（`(str, Enum)` 加值 additive）；既有语义注释保持（INVALID 语义不变——`value_objects/tool_execution.py:247-249` 注释契约保持）；**既有 4 值边界断言联动**：`tests/unit/domain/value_objects/test_tool_execution_values.py:114-120` 的 `len(statuses)==4`/全值 set 断言与 `tool_execution.py:30` 枚举 docstring「4 值边界」须同步更新为 5 值（Task 1 循环 C 显式包含）
+- [ ] `ValidationFeedbackRetryExhaustedError`：code=`EXCEPTION_399`、继承 `BusinessException`、构造器携带 `execution_id`/`tool_id`/`enhanced_retry_count`/`error_signature` context（execution_id 取自 trigger_error.context——见 AC-1/AC-6 提取机制）
 - [ ] `ToolExecutionState` 6 状态机**不动**（FAILED 终态语义不变，增强重试按"终态反向迁移禁止（重试创建新 attempt）"既有注释语义创建新执行）
-- [ ] 两事件 13 字段对齐 `DomainEvent` 基类 + tenant_id baseline（4-5 R1-F01 教训：metadata 字段一律 `str()` 化防 json 序列化失败）
+- [ ] 两事件字段与 `DomainEvent` 基类 12 核心字段（`base.py:20-35` `_CORE_FIELD_NAMES`）对齐 + 各自自有字段（MarkedInfeasible 8 个 / Recovered 7 个）+ tenant_id baseline（4-5 R1-F01 教训：metadata 字段一律 `str()` 化防 json 序列化失败）
 - [ ] INFEASIBLE 结果不抛异常、不发布 ToolExecuted 成功事件
 
 ### AC-4: 演进日志与持久化可靠性
 
 **Given** 反馈闭环结束（无论恢复或标记不可行）
 **When** 写入演进日志
-**Then** `EvolutionLogEntry` 聚合根落库（PG migration 017），记录 execution_id / tool_id / error_signature / enhanced_retry_count / fix_attempts 摘要 / final_status（RECOVERED | MARKED_INFEASIBLE）
+**Then** `EvolutionLogEntry` 聚合根落库（PG migration 017），记录 execution_id / tool_id / **trigger_code（389|382——失败模式第一维分类，AIOps failure history 基线字段）** / error_signature / enhanced_retry_count / fix_attempts 摘要（含每次 attempt_execution_id 回链） / **duration_sec（闭环时长，MTTR 等价物）** / final_status（RECOVERED | MARKED_INFEASIBLE）
 **And** 失败历史可追溯：按 `tool_id` 查询该工具全部反馈历史（`EvolutionLogQuery` Query Object，多字段+分页），按 `execution_id` 精确定位单次记录
-**And** 清偿 defer 债：**outbox 独立 session 结构性修复**（`tool_execution_engine.py:283-285` 与 `data_source_resolver.py:352` 注释显式 defer 本 Story）——reliable 通道 outbox 写入使用独立 session/事务，不复用请求 ContextVar session；后台/CLI 路径异常回滚后 reliable 事件不丢失。
+**And** 清偿 defer 债：**outbox 后台路径独立 session 修复**（`tool_execution_engine.py:282-284` 与 `data_source_resolver.py:352` 注释显式 defer 本 Story）——设计采用 **fallback 独立 session**：`PostgreSQLOutboxRepository.save` 优先 `get_session()`（HTTP 路径复用请求 session，保持事务性 outbox 原子性——业务状态与事件发布同事务 commit/rollback），捕获 `RuntimeError`（后台/CLI 路径无请求 session——现状事件静默丢失的根因）时经注入的 `session_factory` 走 `session_context` 独立写入（`outbox_processor.py:148-150` 先例同款）。
 
 **验证标准/Validation Criteria:**
-- [ ] `EvolutionLogEntry` 不变量：`enhanced_retry_count ∈ [1,3]`、`final_status` 为枚举、UUID 有效、timezone-aware
+- [ ] `EvolutionLogEntry` 不变量：`enhanced_retry_count ∈ [1,3]`、`final_status` 为枚举、`trigger_code ∈ {"EXCEPTION_389","EXCEPTION_382"}`、UUID 有效、timezone-aware
 - [ ] 按 execution_id 幂等 upsert（同 execution 重复写入不产生重复行）
 - [ ] `EvolutionLogQuery`（frozen dataclass：tool_id/tenant_id/execution_id 可选 + limit/offset）走 Query Object 决策规则（多字段组合+分页）
-- [ ] outbox 修复回归断言：模拟请求 session 异常回滚场景，reliable 事件仍成功投递（正常 HTTP 路径行为零变化）
+- [ ] outbox 修复回归断言：**后台/CLI 路径**（无请求 session——`get_session()` 抛 RuntimeError 场景）reliable 事件经 fallback 独立 session 成功落库（现状该场景事件 100% 静默丢失）；**正常 HTTP 路径行为零变化**（仍走请求 session 同事务，事务性原子性保持）
+- [ ] 后台路径中「业务 session 异常回滚连带丢失已 flush 事件」形态（session_context rollback 连带）为**遗留债**：完整修复需后台路径会话策略重构，超出本 Story 范围——defer 注释清偿时显式登记 `deferred-work.md`
 - [ ] 集成测试覆盖双查询面（list_by_tool / get_by_execution）
 
-### AC-5: 错误案例库（检索辅助 + 案例回填 + 幂等）
+### AC-5: 错误案例库（查询辅助 + 案例回填 + 幂等）
 
 **Given** 反馈循环执行中
 **When** 每次增强尝试前
-**Then** 按 `(tenant_id, tool_id, error_signature)` 检索错误案例库，命中案例的 `fix_summary` 注入修复 prompt（or.md error_db.search 蓝图落地）
-**And** 闭环结束时回填案例：恢复成功记 `RECOVERED` 案例（错误→修复成功对，最高价值）；标记不可行记 `MARKED_INFEASIBLE` 案例
-**And** 案例写入幂等：同 `(tenant_id, tool_id, error_signature)` 重复记录 `occurrence_count += 1` 并刷新 `last_seen_at`，不产生重复行。
+**Then** 按 `(tenant_id, tool_id, error_signature)` **精确查询**错误案例库（V1 语义诚实化：自然键 UNIQUE 下精确匹配至多命中 1 行，即"精确查表"而非多案例检索——`get_by_natural_key` 即查询面），命中且 `outcome=RECOVERED` 且 `fix_summary` 非空时注入修复 prompt（or.md error_db.search 蓝图的 V1 落地形态）；命中 `MARKED_INFEASIBLE` 案例时注入**负样本提示**（"此签名历史 N 次修复均失败"——ExpeL 失败经验模式，infeasible_count 支撑）
+**And** 闭环结束时回填案例：恢复成功回填 `recovered_count += 1` 并**覆写 fix_summary**（仅 RECOVERED 路径覆写——保留最佳已知修复，防不可行写回冲掉修复配方）；标记不可行回填 `infeasible_count += 1`（fix_summary 不动）
+**And** 案例写入幂等：同 `(tenant_id, tool_id, error_signature)` 重复记录 `occurrence_count += 1`（= recovered_count + infeasible_count 合计）并刷新 `last_seen_at`，不产生重复行。
 
 **验证标准/Validation Criteria:**
-- [ ] `ErrorCase` 聚合根 + `ErrorCaseRepositoryPort`（search_by_signature / record_case upsert / get_by_natural_key——单字段检索与命令型操作直接参数，CLAUDE.md 端口参数决策规则）
-- [ ] `ErrorSignatureExtractor` 领域服务（纯函数）：STDERR 归一化（剥离路径/行号/时间戳/内存地址）→ sha256 前 16 hex；schema violations 路径归一化签名——同根因不同表层输出收敛为同一签名（幂等前提）
-- [ ] V1 检索语义：精确签名匹配（确定性可测）；向量相似检索（L3 Qdrant）为非目标
+- [ ] `ErrorCase` 聚合根 + `ErrorCaseRepositoryPort`（get_by_natural_key 精确查询 / record_case upsert——单字段检索与命令型操作直接参数，CLAUDE.md 端口参数决策规则；**不设 search_by_signature**——V1 精确匹配下与 get_by_natural_key 语义重复，多案例加权检索登记 deferred-work）
+- [ ] `ErrorSignatureExtractor` 领域服务（纯函数）：STDERR 归一化（剥离路径/行号/时间戳/内存地址 + **数值→`<N>`、引号串→`<S>` 模板化**——Sentry message templating 对标，防 `KeyError: 'x'` 类消息内插值分裂签名）→ **完整 sha256 hexdigest（64 hex）**；签名计算取**尾部锚定摘录 `stderr[-2000:]`**（traceback 根因行在末尾，头部截断会切掉根因致错误合并；事件/prompt 展示仍可头部截断）；schema violations 路径归一化签名（排序去序）——同根因不同表层输出收敛为同一签名（幂等前提）
+- [ ] V1 查询语义：精确签名匹配（确定性可测）；向量相似检索（L3 Qdrant）与多案例加权检索（签名前缀粗化分组 + occurrence_count DESC——依赖完整摘要保留的前缀派生能力）为非目标并登记 deferred-work
 - [ ] 并发 upsert 冲突容错（4-6 CR1-4 教训：UNIQUE 冲突后 PendingRollback 需 `begin_nested()` SAVEPOINT 包裹重读）
-- [ ] 案例检索结果为空时闭环仍可运行（纯 LLM 修复，`fix_strategy=PURE_LLM`）
+- [ ] 案例查询无命中时闭环仍可运行（纯 LLM 修复，`fix_strategy=PURE_LLM`）；命中不可行案例时 `fix_strategy=CASE_GUIDED` 判定为假（无修复 guidance 不得虚标——负样本提示路径单独断言）
 
 ### AC-6: 幂等性与事件通道补全
 
-**Given** 同一执行重复触发反馈闭环（装饰器重复调用或事件重放）
+**Given** 同一触发异常重复进入反馈闭环（**可达场景界定**：`recover()` 被以同一 `trigger_error`（同 execution_id）重复调用——事件消费侧重放/上游补偿重试形态；注意装饰器层重复调用会因引擎每次 `execute()` 新铸 execution_id（`tool_execution_engine.py:137-138`）而不命中幂等键，此为架构边界非缺陷）
 **When** 闭环各副作用执行
-**Then** 演进日志按 execution_id 幂等（AC-4）、案例库按自然键幂等（AC-5）、`ToolExecutionMarkedInfeasible`/`ToolExecutionRecovered` 事件不重复发布（同 execution 终态判定）
-**And** 清偿 4.3 通道预留债：`ToolSchemaValidationFailed` 补 reliable 通道（`event_channels.yaml` 与 `ChannelRouter.DEFAULT_MAPPINGS` **两处同步**，YAML > DEFAULT_MAPPINGS 优先级注释 `channel_router.py:50-53`）。
+**Then** **副作用去重语义**：演进日志按 execution_id 幂等 upsert（AC-4）、案例库按自然键幂等计数（AC-5）、`ToolExecutionMarkedInfeasible`/`ToolExecutionRecovered` 事件不重复发布（同 execution 终态判定短路）；短路路径返回合成结论——INFEASIBLE 语义完整（output 即失败摘要，日志行可支撑）；RECOVERED 重放返回合成 SUCCESS 摘要（**边界注记**：原成功 ToolResult 的完整 output/evidence_package 不在演进日志中，重放结果不含证据包——下游需证据时应重新执行而非依赖重放）
+**And** 清偿 4.3 通道预留债：`ToolSchemaValidationFailed` 补 reliable 通道（`event_channels.yaml`（顶层键 `event_channels:`）与 `ChannelRouter.DEFAULT_MAPPINGS` **两处同步**，YAML > DEFAULT_MAPPINGS 优先级注释 `channel_router.py:50-53`）。
 
 **验证标准/Validation Criteria:**
-- [ ] 幂等集成测试：同 execution 重复闭环 → 日志 1 行 / 案例计数递增 / 事件 1 次
-- [ ] `ToolSchemaValidationFailed` 通道从 realtime-only 升级为双通道 reliable（两处配置 + 契约测试逐字段断言）
-- [ ] 新事件双通道两处登记（`configs/event_channels.yaml`——注意实际目录为 `configs/` 非 `config/`——+ `channel_router.py` DEFAULT_MAPPINGS）
+- [ ] 幂等集成测试：同 trigger_error 重复调用 `recover()` → 日志 1 行 / 案例计数递增（短路路径显式补记 occurrence）/ 事件 1 次 / 返回合成结论
+- [ ] `ToolSchemaValidationFailed` 通道从 realtime-only 升级为 reliable（两处配置 + 契约测试逐字段断言）
+- [ ] 新事件双通道两处登记（`configs/event_channels.yaml`——注意实际目录为 `configs/` 非 `config/`——+ `channel_router.py` DEFAULT_MAPPINGS）。**「双通道」语义注记**：指配置面双登记（`redis_channel` + `rabbitmq_routing_key` 两键、`delivery_mode: reliable`，与既有 ToolExecuted/Sandbox 三事件同形态）；运行时 `DualChannelEventBus.publish` 对 reliable 事件**仅走 outbox/RabbitMQ 路径不发布 Redis**（`dual_channel_event_bus.py:58-65`，单测 :77 锁死）——契约测试断言对象为两处配置逐字段一致，非双通道投递行为
 - [ ] 事件通道映射契约测试：YAML 与 DEFAULT_MAPPINGS 逐字段一致（4-6 先例 `test_event_channel_mapping_tool_version.py`）
 
 ### AC-7: 装配升级与性能基准
@@ -120,12 +123,12 @@
 **Given** 全部组件实现完成
 **When** 组合根装配与性能基准执行
 **Then** `tool_execution_service` 升级 **v1.3.0 → v1.4.0**，装饰链层叠为 `ValidationFeedbackDecorator > SandboxSecurityDecorator > ToolOutputValidator > Engine`（4.7 最外层），`compatibility=("v1.3.0", "v1.2.0")`，tags += `("feedback",)`
-**And** 性能达标（epics 硬指标可测化口径）：闭环自身开销（错误签名提取 + 案例检索 + 演进日志写入，**不含** LLM 修复生成与沙箱执行时长——二者受 `LLMConfig.timeout`/沙箱 timeout 支配）单次 **P95 < 5s**；增强重试恢复成功率 **≥80%**（20 次可修复故障注入 ≥16 恢复）；不可行标记准确率 **≥95%**（20 次不可修复故障 100% 标记 + 可修复故障 0 误标）。
+**And** 性能达标（epics 硬指标可测化口径，Task 0 与业务方确认留痕）：闭环自身开销（错误签名提取 + 案例查询 + 演进日志写入，**不含** LLM 修复生成与沙箱执行时长——二者受 `LLMConfig.timeout`/沙箱 timeout 支配）单次 **P95 < 5s**（`statistics.quantiles(n=20)[18]` 分位 + 分级断言：达标 assert / 环境不达标 skip 留测量证据——4-6 `test_tool_version_integration.py:398-415` 先例；计时手法 = 端口级计时代理包裹仓储 + LLM/Sandbox AsyncMock `await asyncio.sleep(0)` 真实挂起点）；**闭环机制有效性**（mock LLM 可编程修复序列前提——指标语义注记：mock 化下度量的是编排机制正确性而非真实修复能力，真实修复能力观察基准不进 CI 门禁并登记 deferred-work）：增强重试恢复机制成功率 **≥80%**（20 次可修复故障注入 ≥16 恢复，主断言为内容性断言：修复 prompt 含 stderr/案例 fix_summary/历史反馈、hints 注入透传）；不可行标记机制准确率 **20 次不可修复故障全部标记 + 可修复故障 0 误标**（样本规模下等效 100%；epics 字面 ≥95% 为下限口径，20 样本粒度无法区分 95%/100%）。
 
 **验证标准/Validation Criteria:**
 - [ ] 3 个新端口注册（`error_case_repository` / `evolution_log_repository` / `validation_feedback_service`）+ `tool_execution_service` 升级，PortSpec 10 字段齐备，lambda 工厂注入
 - [ ] 端口契约测试 11 维度 ×3（`test_port_contract_tool.py` 样板：注册/名称/版本/接口类型/生命周期/owner/module/tags/impl callable/方法存在/Protocol runtime_checkable）
-- [ ] 性能基准位于 `tests/integration/test_validation_feedback_integration.py`（epics 硬路径）：P95 开销 / 成功率 / 准确率三组
+- [ ] 性能基准位于 `tests/integration/test_validation_feedback_integration.py`（epics 硬路径）：P95 开销 / 机制成功率 / 机制准确率三组
 - [ ] 全量回归：`poetry run pytest tests/ -n 8` 通过、`ruff check` + `mypy` 通过
 
 ---
@@ -143,17 +146,17 @@
 - [ ] 使用标准库实现领域事件校验（frozen dataclass / Enum / 自定义验证），禁止在领域层依赖 Pydantic
 - [ ] 事件命名符合规范（`[Aggregate][EventName]`，如 `UserCreated`）
 - [ ] 新增 2 事件（`src/domain/events/validation_feedback_events.py`）：
-  - `ToolExecutionMarkedInfeasible`：`execution_id`/`tool_id`/`tenant_id`/`tool_version`/`error_signature`/`enhanced_retry_count`/`failure_summary`/`occurred_at`；`aggregate_type="ToolExecution"`；双通道 reliable
-  - `ToolExecutionRecovered`：`execution_id`/`tool_id`/`tenant_id`/`tool_version`/`error_signature`/`enhanced_retry_count`/`occurred_at`；`aggregate_type="ToolExecution"`；双通道 reliable
-- [ ] `ToolSchemaValidationFailed` 由 realtime-only 升级双通道 reliable（4.3 留项"reliable 4.7 启用"清偿，事件类本身零改动）
+  - `ToolExecutionMarkedInfeasible`：`execution_id`/`tool_id`/`tenant_id`/`tool_version`/`error_signature`/`enhanced_retry_count`/`failure_summary`/`occurred_at`（自有字段 8 个）；`aggregate_type="ToolExecution"`；配置双登记 reliable（运行时仅 outbox 路径，见 AC-6 语义注记）
+  - `ToolExecutionRecovered`：`execution_id`/`tool_id`/`tenant_id`/`tool_version`/`error_signature`/`enhanced_retry_count`/`occurred_at`（自有字段 7 个）；`aggregate_type="ToolExecution"`；配置双登记 reliable；两事件均与 `DomainEvent` 基类 12 核心字段对齐
+- [ ] `ToolSchemaValidationFailed` 由 realtime-only 升级 reliable（4.3 留项"reliable 4.7 启用"清偿，事件类本身零改动）
 
 #### 数据模型 (Data Models)
 - [ ] 模型定义位于 `src/domain/entities/` 或对应层
-- [ ] `ErrorCase` 聚合根（`src/domain/entities/error_case.py`）：`case_id`/`tenant_id`/`tool_id`/`error_signature`(64 hex)/`error_category`/`stderr_excerpt`(≤2000)/`fix_summary`(≤1000)/`outcome`(RECOVERED|MARKED_INFEASIBLE)/`occurrence_count`(≥1)/`last_seen_at`/`created_at`；自然键 `(tenant_id, tool_id, error_signature)`
-- [ ] `EvolutionLogEntry` 聚合根（`src/domain/entities/evolution_log_entry.py`）：`log_id`/`tenant_id`/`tool_id`/`execution_id`/`tool_version`/`error_signature`/`enhanced_retry_count`(1-3)/`fix_attempts: tuple[FixAttempt, ...]`/`final_status`(RECOVERED|MARKED_INFEASIBLE)/`created_at`
-- [ ] `FixAttempt` 值对象（`src/domain/value_objects/validation_feedback.py`）：`attempt_no`(1-based)/`error_signature`/`fix_strategy`(CASE_GUIDED|PURE_LLM)/`stderr_excerpt`/`succeeded`/`detail`
-- [ ] `ToolResultStatus.INFEASIBLE` 新增枚举值（additive；`INVALID`"可重试"语义契约不变）
-- [ ] `ErrorSignatureExtractor` 领域服务（`src/domain/services/error_signature_extractor.py`）：纯函数，STDERR 归一化签名 + violations 归一化签名
+- [ ] `ErrorCase` 聚合根（`src/domain/entities/error_case.py`）：`case_id`/`tenant_id`/`tool_id`/`error_signature`(**64 hex 完整 sha256 hexdigest**——与签名提取器/列宽三者同一口径)/`error_category`/`stderr_excerpt`(≤2000)/`fix_summary`(≤2000，**仅 RECOVERED 路径覆写**)/`outcome`(最近一次：RECOVERED|MARKED_INFEASIBLE)/`recovered_count`(≥0)/`infeasible_count`(≥0)/`occurrence_count`(=recovered+infeasible 合计，≥1)/`last_seen_at`/`created_at`；自然键 `(tenant_id, tool_id, error_signature)`——计数拆分防不可行写回冲掉修复配方
+- [ ] `EvolutionLogEntry` 聚合根（`src/domain/entities/evolution_log_entry.py`）：`log_id`/`tenant_id`/`tool_id`/`execution_id`/`tool_version`/`trigger_code`(EXCEPTION_389|EXCEPTION_382)/`error_signature`/`enhanced_retry_count`(1-3)/`fix_attempts: tuple[FixAttempt, ...]`/`duration_sec`/`final_status`(RECOVERED|MARKED_INFEASIBLE)/`created_at`
+- [ ] `FixAttempt` 值对象（`src/domain/value_objects/validation_feedback.py`）：`attempt_no`(1-based)/`attempt_execution_id`(该次重执行引擎新铸 id——回链增强期间事件)/`error_signature`/`fix_strategy`(CASE_GUIDED|PURE_LLM)/`stderr_excerpt`/`succeeded`/`detail`
+- [ ] `ToolResultStatus.INFEASIBLE` 新增枚举值（`(str, Enum)` 加值 additive；`INVALID`"可重试"语义契约不变；既有 4 值边界断言与 docstring 同步 5 值——AC-3 VC）
+- [ ] `ErrorSignatureExtractor` 领域服务（`src/domain/services/error_signature_extractor.py`）：纯函数，STDERR 归一化签名（剥路径/行号/时间戳/内存地址 + 数值→`<N>`/引号串→`<S>` 模板化 + 尾部锚定 `stderr[-2000:]` 参与哈希）+ violations 归一化签名（排序去序）——均输出 64 hex
 - [ ] `EvolutionLogQuery` Query 值对象（定义在端口文件，多字段+分页决策规则）
 
 #### 统一端口定义注册与管理 (Port Contract)
@@ -179,9 +182,9 @@
 | `tool_execution_service` | application | `ToolExecutionServicePort` | **升级 v1.3.0 → v1.4.0**：装饰链最外层加 `ValidationFeedbackDecorator`；`compatibility=("v1.3.0", "v1.2.0")`；tags += ("feedback",) | v1.4.0 | SCOPED | tool-team | (tool, execution, service, decorated, versioned, feedback) |
 
 **端口方法契约：**
-- `ErrorCaseRepositoryPort`：`search_by_signature(tenant_id, tool_id, error_signature, limit=5) -> tuple[ErrorCase, ...]`；`record_case(case: ErrorCase) -> ErrorCase`（自然键 upsert 幂等计数）；`get_by_natural_key(tenant_id, tool_id, error_signature) -> ErrorCase | None`
+- `ErrorCaseRepositoryPort`：`get_by_natural_key(tenant_id, tool_id, error_signature) -> ErrorCase | None`（V1 精确查询面——自然键 UNIQUE 下精确匹配即全部语义，多案例加权检索登记 deferred-work）；`record_case(case: ErrorCase) -> ErrorCase`（自然键 upsert 幂等计数 + outcome 分类计数）
 - `EvolutionLogRepositoryPort`：`save(entry: EvolutionLogEntry) -> None`（execution_id upsert 幂等）；`list_by_query(query: EvolutionLogQuery) -> tuple[EvolutionLogEntry, ...]`；`get_by_execution(execution_id, tenant_id) -> EvolutionLogEntry | None`
-- `ValidationFeedbackServicePort`：`async recover(tool_id, tool, tool_call, context, trigger_error) -> ToolResult`（编排完整闭环：签名提取→案例检索→LLM 修复→增强重试→演进日志→不可行标记/恢复事件）
+- `ValidationFeedbackServicePort`：`async recover(tool_id, tool, tool_call, context, trigger_error) -> ToolResult`（编排完整闭环：签名提取→案例查询→LLM 修复建议生成→增强重试→演进日志→不可行标记/恢复事件；execution_id 幂等键取自 `trigger_error.context["execution_id"]`）
 
 #### 端口契约清单执行约束（强制）
 - [ ] 本模板中的端口清单是唯一事实源（Single Source of Truth）
@@ -202,7 +205,11 @@
 
 | code | 异常类 | parent class | HTTP | 触发场景 |
 |------|--------|--------------|------|----------|
-| EXCEPTION_399 | `ValidationFeedbackRetryExhaustedError` | `BusinessException`（EXCEPTION_103） | **422** | 3 次增强重试均失败，任务被判定不可行（内部耗尽信号，装饰器捕获转 `ToolResult(INFEASIBLE)`；422 与 396 出参校验失败语义对齐——"语义上不可处理"而非 502"可重试下游故障"，不可行标记恰是"重试无意义"的终态结论） |
+| EXCEPTION_399 | `ValidationFeedbackRetryExhaustedError` | `BusinessException`（EXCEPTION_2XX 业务规则基类——注意 103 是 StorageError，勿混标） | **422** | 3 次增强重试均失败，任务被判定不可行（内部耗尽信号，装饰器捕获转 `ToolResult(INFEASIBLE)`；422 与 396 出参校验失败语义对齐——"语义上不可处理"而非 502"可重试下游故障"，不可行标记恰是"重试无意义"的终态结论） |
+
+#### 修改的既有异常（Task 0 契约——遵守本 Story 自设规则"新增/修改的领域异常必须在 Task 0 完成设计"）
+
+- `ExecutionError`（EXCEPTION_313，`sandbox_exceptions.py:33-37` 现无自定义构造器）构造器增强：`__init__(self, message=None, *, stderr=None, exit_code=None, cause=None, context=None)`——`context` 参数**透传合并**（`merged = {**(context or {}), **new_fields}` 后传 `super().__init__(message, cause=cause, context=merged)`）。**兼容性硬约束**：两个既有子类 `SandboxTimeoutError`/`SandboxResourceLimitExceededError` 的 `super().__init__(reason, context={...})` 调用必须零改动通过（Task 3 测试含子类构造回归）——不透传 `context` 会立即使子类 TypeError 并炸 `test_sandbox_exceptions.py:168-196`
 
 - [ ] **不扩域 400-409（方案 A 触发条件未满足）**：4.3 预测的 `ValidationFeedbackFallbackFailedError`/`HumanReviewTimeoutError`/`CanaryConflictError` 均属降级/人工审核/灰度联动扩展（非本 epic 范围，见非目标），400-409 保持未分配——Story 文件与 `sisys-uni-exception-design.md` 中"扩域至 400-409（方案 A）"的预留注释更新为"按需扩域，触发条件：反馈闭环降级链路立项"
 - [ ] 归属模块：新建 `src/domain/exceptions/validation_feedback_exceptions.py`（4.5 debate 新文件先例）；`_CLASS_TO_SUBDOMAIN` 子域映射注册为 `"toolchain"`（399 物理归属 toolchain 段，语义为反馈闭环——沿用 4.2/4.3 子域嵌套声明惯例）
@@ -213,9 +220,9 @@
   2. **`_code_ranges.py`**：`CODE_RANGES` 注释行 EXCEPTION_399 由"预留"改"已分配" + `_CLASS_TO_SUBDOMAIN` 注册
   3. **`exceptions/__init__.py`**：导入 + `__all__`（按子域分组注释节）
   4. **`EXCEPTION_HTTP_MAP`**：`exception_handlers.py` 精确注册 399→422（注释格式与 4.6 先例一致，注释行内 code 与实际 code 严格对齐——4.1a 偏移 bug 先例）
-  5. **`sisys-uni-exception-design.md §3.3.2` 两表同步**（注意：该文档存在两个同号 §3.3.2 小节，编码分配表与子域范围表**都必须更新**——4-6 踩坑记录）+ `tests/unit/interfaces/api/test_exception_handlers.py` 期望集合同步（4-5 教训）
+  5. **`sisys-uni-exception-design.md §3.3.2` 两表同步**（注意：该文档存在两个同号 §3.3.2 小节（`:649` 编码分配表与 `:786` 子域范围表），**都必须更新**——4-6 踩坑记录；`:786` 子域范围表当前无独立 toolchain 行，需补行或确认 tool 行覆盖口径）+ 同文档 `:805`/`:807` 两行既有「399 预留/预占」表述连带更新 + `tests/unit/interfaces/api/test_exception_handlers.py` 期望集合同步（4-5 教训）
 - [ ] 编码碰撞自查：`grep -rn "EXCEPTION_399" src/` 仅新定义文件与登记处命中
-- [ ] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过（`tests/unit/domain/exceptions/` 8 项既有测试 + 新增 `test_validation_feedback_exceptions.py`）
+- [ ] 测试覆盖：构造/`to_dict()`/HTTP 映射/编码唯一性 + 子域范围测试全部通过（`tests/unit/domain/exceptions/` 全目录既有测试回归（25 个既有文件，不硬编码计数）+ 新增 `test_validation_feedback_exceptions.py`——断言继承关系而非父类具体码号）
 - [ ] BDD 验收场景：异常路径（399 内部转换、385/207 不入闭环直传）纳入 Gherkin Edge Cases
 
 **复用现有异常（禁止同义新增）：**
@@ -264,13 +271,19 @@
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试
 - 同一中文文本可能需要同时支持 given/when 装饰器
 - 不要使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
-- **Edge Cases 必须包含异常路径** — 覆盖：399 耗尽标记、385 超时不入闭环、207/413 数据源异常直传、案例库空命中纯 LLM 修复、幂等重复触发
-- **服务级 BDD 模式（4-6 形态）**：`scenarios()` 批量注册 + `context: dict[str, Any]` fixture + 模块级 `event_loop` fixture + `_run(coro)` helper + `_make_*` 工厂 + `_capture_error`；真实服务链（InMemory 仓储 + 真实 ErrorSignatureExtractor + 真实引擎 + 真实装饰链），仅 LLM/Sandbox 适配器 AsyncMock（可编程失败/修复序列）
-- Fake LLM 分派纪律（4-5 R1-F06 教训）：Mock LLM 按 prompt 中的**结构化角色标记**（如 system_prompt 或修复 prompt 固定前缀）分派响应，禁止按易混淆子串分派
+- **Edge Cases 必须包含异常路径** — 覆盖：399 耗尽标记、385 超时不入闭环、207 策略违规直传、413 数据源异常直传、201 标记语法错误直传（六行矩阵全覆盖）、案例库空命中纯 LLM 修复、幂等重复触发（同 trigger_error 重复 recover()）
+- **Edge Case 构造注入点清单（防走错路径）**：385 超时仅可经引擎 `RetryPolicy(max_total_duration_sec≈0)` 构造（五阶段全部完成后判定 `tool_execution_engine.py:198-204`；靠 sandbox 慢会得 316→382 **进闭环**走错路径）；207/413 需**同时**注入 resolver（`set_data_source_resolver`）且缺 tool_metadata（无 resolver 时含标记代码先触发 101 而非 207）；201 用 LLM code mock 返回含裸 `$` 代码最易构造
+- **服务级 BDD 模式（4-6 形态）**：`scenarios()` 批量注册 + `context: dict[str, Any]` fixture + 模块级 `event_loop` fixture + `_run(coro)` helper + `_make_*` 工厂 + `_capture_error`；真实服务链（InMemory 仓储 + 真实 ErrorSignatureExtractor + 真实引擎 + 真实装饰链），仅 LLM/Sandbox 适配器 AsyncMock（可编程失败/修复序列）；fixture 需暴露上述注入点（引擎 retry_policy 参数 / resolver 注入）
+- Fake LLM 分派纪律（4-5 R1-F06 教训）：Mock LLM 按 prompt 中的**结构化角色标记**（如 system_prompt 或修复 prompt 固定前缀）分派响应，禁止按易混淆子串分派——引擎 Think/Code/Validate 与修复生成走同一 mock 时必须按 prompt 结构分派而非纯调用序号
+
+**模块依赖窗口提交策略（4-6 :1128 先例，强制）：**
+- Task 0.9 红窗口确认后**暂缓入库**，随对应模块落地**批提交**：feature（无 import，Task 0 即可入库）→ 事件契约/通道映射测试随 Task 2 → 双仓储契约随 Task 4 → 验收 .py + 服务契约 + 装饰器测试随 Task 6
+- **对既有文件的"先红"修改**（`test_exception_handlers.py` 期望集合、`test_port_contract_tool_execution_service.py` 版本期望）：红不单独落库（本地观察），与对应实现同 commit 入库——防止单独提交打挂现有绿套件与 mypy pre-commit hook
 
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
 - [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证——预期失败形态：acceptance .py 与契约测试 collection ERROR / ImportError，属预期中间态）
+- [ ] P95 口径重定义（epics「单次重试延迟」→「闭环自身开销」，决策 #11）与业务方确认留痕（Subtask 0.11）
 - [ ] 规范文档通过人工评审或自动化校验
 
 ---
@@ -301,12 +314,13 @@
 | **TDD 单元测试** | ErrorCase 聚合根 | 构造不变量/自然键/occurrence_count | `tests/unit/domain/entities/test_error_case.py` | Task 1 |
 | **TDD 单元测试** | EvolutionLogEntry 聚合根 | 构造不变量/fix_attempts/终态语义 | `tests/unit/domain/entities/test_evolution_log_entry.py` | Task 1 |
 | **TDD 单元测试** | ErrorSignatureExtractor | STDERR 归一化/violations 签名/同根因收敛 | `tests/unit/domain/services/test_error_signature_extractor.py` | Task 1 |
-| **TDD 单元测试** | ToolResultStatus.INFEASIBLE | additive 枚举/INVALID 语义不回归 | `tests/unit/domain/value_objects/test_tool_result_status.py` | Task 1 |
+| **TDD 单元测试** | ToolResultStatus.INFEASIBLE | additive 枚举/INVALID 语义不回归/5 值全集 | `tests/unit/domain/value_objects/test_tool_result_status.py` | Task 1 |
+| **TDD 单元测试** | ToolResultStatus 4→5 值边界（**修改既有**） | 既有边界断言更新（len==4→5）+ docstring 同步 | `tests/unit/domain/value_objects/test_tool_execution_values.py`（修改） | Task 1 |
 | **TDD 单元测试** | 领域事件 ×2 | 字段/序列化 str 化/aggregate 关联 | `tests/unit/domain/events/test_validation_feedback_events.py` | Task 2 |
 | **TDD 领域异常测试** | 399 异常 | 构造/context/继承链/编码 | `tests/unit/domain/exceptions/test_validation_feedback_exceptions.py` | Task 2 |
 | **TDD 单元测试** | ExecutionError 增强 | stderr/exit_code 可选参数向后兼容 | `tests/unit/domain/exceptions/test_sandbox_exceptions.py`（扩展） | Task 3 |
 | **TDD 单元测试** | adapter/装饰器 STDERR 链 | 异常 context 填充/事件字段填充/cause 链提取 | `tests/unit/infrastructure/external_services/sandbox/test_aiodocker_adapter_stderr.py` + `tests/unit/application/services/test_sandbox_security_decorator_events.py` | Task 3 |
-| **TDD 单元测试** | InMemory 双仓储 | upsert 幂等/查询语义 | `tests/unit/infrastructure/storage/inmemory/test_error_case_repository.py`、`test_evolution_log_repository.py` | Task 4 |
+| **TDD 单元测试** | InMemory 双仓储 | upsert 幂等/分类计数/get_by_natural_key 语义 | `tests/unit/infrastructure/storage/inmemory/test_error_case_repository.py`、`test_evolution_log_repository.py` | Task 4 |
 | **TDD 单元测试** | ValidationFeedbackService | 触发判定矩阵/闭环编排/防放大/案例回填 | `tests/unit/application/services/test_validation_feedback_service.py` | Task 5 |
 | **TDD 单元测试** | ValidationFeedbackDecorator | 装饰链集成/hints 注入/INFEASIBLE 转换/事件发布 | `tests/unit/application/services/test_validation_feedback_decorator.py` | Task 6 |
 | **TDD 单元测试** | 引擎 hints prompt | `validation_feedback_hints` 扩展键读取 | `tests/unit/application/services/test_tool_execution_engine_hints.py` | Task 6 |
@@ -316,7 +330,8 @@
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_validation_feedback_loop.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | 同 feature/.py | Task 9 |
 | **SDD 架构验证** | 反馈闭环架构测试（epics 硬路径） | 重试增强/失败标记/幂等性/演进日志四项 | `tests/unit/architecture/test_validation_feedback.py` | Task 8 |
-| **集成测试** | 全链闭环 + PG 双仓储 + outbox 修复 + 性能基准（epics 硬路径） | 真实 PG/Redis + 成功率/准确率/P95 | `tests/integration/test_validation_feedback_integration.py` | Task 7 |
+| **集成测试** | PG 双仓储 + outbox fallback + migration 017 | repo_session 事务 rollback + xdist_group（4-6 样板） | `tests/integration/test_validation_feedback_repositories.py` | Task 4 |
+| **集成测试** | 全链闭环 + 幂等 + outbox 回归 + 性能基准（epics 硬路径） | 真实 PG + 机制成功率/机制准确率/P95 | `tests/integration/test_validation_feedback_integration.py` | Task 7 |
 
 ---
 
@@ -331,7 +346,7 @@
 - [ ] **领域层覆盖率 ≥90%**（关键业务逻辑，不变量验证）
 - [ ] **基础设施层覆盖率 ≥75%**（外部依赖适配，连接测试）
 - [ ] **集成测试覆盖率 ≥75%**（epics 硬指标）
-- [ ] **关键路径覆盖率 100%**：闭环触发判定矩阵（389 入/382 入/385 出/207 出/413 出）、增强重试 1→3 次、耗尽标记、恢复成功、案例回填、幂等 upsert 全分支
+- [ ] **关键路径覆盖率 100%**：闭环触发判定矩阵全八行（389 入两子路径/382 且 EXECUTION 入/382 且 SANDBOX_START 出/385 出/207 出/201 出/410-413 出/398 出）、增强重试 attempt 1→3、耗尽标记、恢复成功、案例回填（recovered/infeasible 分类）、幂等 upsert 全分支
 
 #### 代码质量门禁
 - [ ] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
@@ -351,7 +366,7 @@
 | **事务隔离** | 集成测试使用 transaction rollback（savepoint） | 数据泄漏导致随机失败 |
 | **Schema 自创建** | fixture 内完成 Schema 初始化 | 依赖外部迁移，环境不一致 |
 | **资源唯一性** | 测试数据使用 UUID 前缀隔离（`TestTenant`） | ID 冲突或状态污染 |
-| **外部服务隔离** | PG/Redis 集成测试走独立 schema + 租户隔离 | 真实数据被污染 |
+| **外部服务隔离** | PG 集成测试走 repo_session 事务 rollback + xdist_group 串行 + PG 探活 skip（4-6 `test_tool_version_integration` 样板）；Redis 场景级独立客户端 | 真实数据被污染 |
 | **清理粒度** | 每个测试只清理自己创建的资源 | 误删其他测试资源 |
 | **依赖声明** | Fixture 必须显式声明依赖 | 并行时清理顺序不确定 |
 | **asyncio 上下文** | asyncio.Lock 类变量；BDD 步骤用 `event_loop.run_until_complete()` | 锁失效或 context 丢失 |
@@ -359,7 +374,7 @@
 | **BDD async 配合** | BDD 步骤函数不使用 `@pytest.mark.asyncio` | context 数据丢失 |
 | **Fake LLM 分派** | Mock LLM 按结构化角色标记分派响应，禁止易混淆子串分派（4-5 R1-F06） | 误路由致断言循环论证 |
 | **并发 upsert** | 集成测试覆盖 UNIQUE 冲突 + PendingRollback 容错（begin_nested SAVEPOINT，4-6 CR1-4） | 并发记录案例崩溃 |
-| **时间敏感断言** | 性能基准 P95 阈值断言与计时口径成对出现；CI 慢机器容差（如 1.8× 阈值，4-5 R2-F02 先例） | CI 随机红 |
+| **时间敏感断言** | P95 阈值断言与计时口径成对出现：`statistics.quantiles(n=20)[18]` 分位 + 分级断言（达标 assert / 环境不达标 skip 留测量证据，4-6 AC-7 先例）；mock 替身注入真实挂起点（`await asyncio.sleep(0)`，4-5 R2-F02 原语义） | CI 随机红 |
 
 **禁止行为：**
 - ❌ 集成测试手动 `delete`/`truncate`（应用 transaction rollback）
@@ -380,20 +395,20 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | STDERR 捕获数据链贯通（adapter→异常→事件） | Task 3 | ExecutionError 增强 + adapter 填充 + 装饰器事件填充 + cause 链提取 | `test_aiodocker_adapter_stderr.py` 等 |
+| AC-1 | STDERR 捕获数据链贯通（adapter→异常→事件） | Task 3 | ExecutionError 增强 + adapter 填充 + 装饰器事件填充 + cause 链提取 | `test_aiodocker_adapter_stderr.py` + `test_sandbox_exceptions.py`（扩展）+ `test_sandbox_security_decorator_events.py` |
 | AC-1 | 签名提取（violations 路径） | Task 1 | ErrorSignatureExtractor | `test_error_signature_extractor.py` |
-| AC-2 | 触发判定（389/382 入，385/207 出） | Task 5 | recover 触发判定矩阵 | `test_validation_feedback_service.py` |
-| AC-2 | 案例检索注入修复 prompt | Task 5 | 修复 prompt 组装（CASE_GUIDED/PURE_LLM） | 同上 |
+| AC-2 | 触发判定（矩阵八行） | Task 5 | recover 触发判定矩阵 | `test_validation_feedback_service.py` |
+| AC-2 | 案例查询注入修复 prompt | Task 5 | 修复 prompt 组装（CASE_GUIDED/PURE_LLM/负样本） | 同上 |
 | AC-2 | hints 注入 + 引擎 prompt 读取 | Task 6 | `validation_feedback_hints` 扩展键 | `test_tool_execution_engine_hints.py` |
-| AC-2 | 防放大（max_attempts=1 + finally 恢复） | Task 5 | 增强循环内临时降级 | 同上 |
-| AC-3 | INFEASIBLE 标记 + ToolResult 契约 | Task 1 / Task 5 | 枚举新增 / 耗尽转换 | `test_tool_result_status.py` |
+| AC-2 | 防放大（两层封顶 + 按引用恢复） | Task 5 | 增强循环内临时降级 | 同上 |
+| AC-3 | INFEASIBLE 标记 + ToolResult 契约 | Task 1 / Task 5 / Task 6 | 枚举新增（含 4→5 值边界联动）/ 耗尽转换 | `test_tool_result_status.py` + `test_tool_execution_values.py`（修改）+ `test_validation_feedback_decorator.py` |
 | AC-3 | 399 异常全链路登记 | Task 2 | 5 处登记 Checklist | `test_validation_feedback_exceptions.py` |
-| AC-3 | 两领域事件 + 双通道 | Task 2 | 事件定义 + 两处配置 | `test_validation_feedback_events.py` + 契约 |
-| AC-4 | 演进日志实体 + 双查询面 | Task 1 / Task 4 | 实体 + EvolutionLogQuery + 仓储 | `test_evolution_log_entry.py` + 集成 |
-| AC-4 | outbox 独立 session 修复 | Task 6 | infrastructure/messaging outbox session 独立化 | `test_validation_feedback_integration.py` |
-| AC-5 | 案例库实体 + 端口 + 存储 | Task 1 / Task 4 | ErrorCase + 仓储双实现 + migration 017 | `test_error_case.py` + 集成 |
-| AC-5 | 幂等 upsert + occurrence_count | Task 4 | 自然键 upsert + SAVEPOINT 容错 | 集成测试 |
-| AC-6 | 闭环幂等（日志/案例/事件） | Task 5 | 同 execution 终态判定 | 集成测试 |
+| AC-3 | 两领域事件 + 配置双登记 reliable | Task 2 | 事件定义 + 两处配置 | `test_validation_feedback_events.py` + 契约 |
+| AC-4 | 演进日志实体 + 双查询面 | Task 1 / Task 4 | 实体 + EvolutionLogQuery + 仓储 | `test_evolution_log_entry.py` + `test_validation_feedback_repositories.py`（集成） |
+| AC-4 | outbox 后台路径 fallback 修复 | Task 6 | outbox_repository fallback 独立 session | `test_validation_feedback_repositories.py` + `test_validation_feedback_integration.py` |
+| AC-5 | 案例库实体 + 端口 + 存储 | Task 1 / Task 4 | ErrorCase + 仓储双实现 + migration 017 | `test_error_case.py` + `test_validation_feedback_repositories.py`（集成） |
+| AC-5 | 幂等 upsert + 分类计数 | Task 4 | 自然键 upsert + SAVEPOINT 容错 | 同上 |
+| AC-6 | 闭环幂等（日志/案例/事件） | Task 5 | 同 trigger_error 终态判定短路 | `test_validation_feedback_service.py`（循环 C）+ 集成 |
 | AC-6 | ToolSchemaValidationFailed reliable 启用 | Task 2 | 两处配置 + 契约测试 | `test_event_channel_mapping_validation_feedback.py` |
 | AC-7 | 装配 v1.4.0 + 3 新端口 | Task 6 | 组合根 + 契约测试 ×3 | 契约测试 |
 | AC-7 | 性能基准（P95/成功率/准确率） | Task 7 | 三组基准 | `test_validation_feedback_integration.py` |
@@ -423,8 +438,10 @@
 - [ ] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_validation_feedback_loop.feature`（AC-x.y 场景集全枚举 + 收尾场景）
 - [ ] Subtask 0.7: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_validation_feedback_loop.py`
 - [ ] Subtask 0.8: 编写 3 个端口契约测试 + 事件契约/通道映射契约测试（红）
-- [ ] Subtask 0.9: 红窗口确认——验收 .py 与契约测试运行失败且失败形态符合预期（collection ERROR / ImportError 属预期中间态；Gherkin 场景因步骤未实现跳过不计红）
+- [ ] Subtask 0.9: 红窗口确认——验收 .py 与契约测试运行失败且失败形态符合预期（collection ERROR / ImportError 属预期中间态；Gherkin 场景因步骤未实现跳过不计红）；按「模块依赖窗口提交策略」确定各批次入库时点
 - [ ] Subtask 0.10: 前置依赖实地验证——4.3 装饰器链/4.4 沙箱适配器/`configs/event_channels.yaml` 现状冒烟（确认预留注释与实际一致）
+- [ ] Subtask 0.11: P95 口径重定义（epics「单次重试延迟 P95<5s」→「闭环自身开销 P95<5s，不含 LLM/沙箱时长」，决策 #11）与业务方确认留痕
+- [ ] Subtask 0.12: hints payload 契约定稿（`{stderr_excerpt, schema_violations, case_summaries, prior_attempts, suggested_fix}`）+ 修复建议生成（fix-gen）与引擎 Code stage 的单一作者分工确认（fix-gen 产出 suggested_fix 策略/代码草案，引擎按 hints 重新生成完整代码）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕
@@ -440,7 +457,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_error_case.py` + `test_evolution_log_entry.py`（构造不变量：UUID 有效/签名 64 hex/occurrence_count≥1/enhanced_retry_count∈[1,3]/终态语义/非法构造抛 242） |
+| 🔴 红 | 编写 `test_error_case.py` + `test_evolution_log_entry.py`（构造不变量：UUID 有效/签名 64 hex/occurrence_count=recovered+infeasible 合计≥1/enhanced_retry_count∈[1,3]/trigger_code 枚举/final_status 终态语义/非法构造抛 242） |
 | 🟢 绿 | 实现 `src/domain/entities/error_case.py`、`evolution_log_entry.py`、`src/domain/value_objects/validation_feedback.py` 最小代码 |
 | 🔄 重构 | 类型注解、中文 docstring（Google 风格）、`__all__` |
 
@@ -452,8 +469,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_error_signature_extractor.py`（STDERR 归一化：路径/行号/时间戳/内存地址剥离后同根因收敛同签名；violations 排序归一化；空输入处理） |
-| 🟢 绿 | 实现 `src/domain/services/error_signature_extractor.py`（纯函数，sha256 前 16 hex） |
+| 🔴 红 | 编写 `test_error_signature_extractor.py`（STDERR 归一化：路径/行号/时间戳/内存地址剥离 + 数值→`<N>`/引号串→`<S>` 模板化后同根因收敛同签名——含 `KeyError: 'x'` 不同键名收敛用例；尾部锚定 `stderr[-2000:]`——超长 traceback 末尾根因行保留用例；violations 排序归一化；空输入处理；输出恒 64 hex） |
+| 🟢 绿 | 实现 `src/domain/services/error_signature_extractor.py`（纯函数，完整 sha256 hexdigest 64 hex） |
 | 🔄 重构 | 确认零外部依赖（仅标准库 hashlib/re） |
 
 - [ ] Subtask 1.4: 🔴 红 — 编写签名提取失败测试
@@ -464,11 +481,11 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_tool_result_status.py`（INFEASIBLE 存在/INVALID 既有语义不回归/SUCCESS 不变量不回归） |
-| 🟢 绿 | `src/domain/value_objects/tool_execution.py` 枚举追加 `INFEASIBLE = "infeasible"`（additive，frozen dataclass 加值零风险） |
-| 🔄 重构 | docstring 更新（终态不可行语义 + 与 INVALID"可重试"的区分） |
+| 🔴 红 | 编写 `test_tool_result_status.py`（INFEASIBLE 存在/INVALID 既有语义不回归/SUCCESS 不变量不回归/**5 值全集断言**）+ **修改既有** `tests/unit/domain/value_objects/test_tool_execution_values.py:114-120` 4 值边界断言 → 5 值（先红——既有断言在加值后必红，证明边界断言活着） |
+| 🟢 绿 | `src/domain/value_objects/tool_execution.py` 枚举追加 `INFEASIBLE = "infeasible"`（`(str, Enum)` 加值 additive） |
+| 🔄 重构 | docstring 更新（`:30`「4 值边界」→ 5 值 + 终态不可行语义 + 与 INVALID"可重试"的区分——同步消解 `:34` INVALID「不进入重试」旧注释与 `:247-249`「可重试」的表述张力） |
 
-- [ ] Subtask 1.7: 🔴 红 — 编写枚举扩展失败测试
+- [ ] Subtask 1.7: 🔴 红 — 编写枚举扩展失败测试 + 更新既有 4 值边界断言
 - [ ] Subtask 1.8: 🟢 绿 — 追加枚举值
 - [ ] Subtask 1.9: 🔄 重构 — 更新语义注释
 
@@ -487,7 +504,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_validation_feedback_events.py`（字段默认值/`to_dict()` 序列化 str 化/aggregate_id 关联 execution_id/event_type 注册） |
+| 🔴 红 | 编写 `test_validation_feedback_events.py`（字段默认值/自有字段数边界（8/7）/`to_dict()` 序列化 str 化/aggregate_id 关联 execution_id/event_type 经 `__init_subclass__` 自动注册——`base.py:74-85`） |
 | 🟢 绿 | 实现 `src/domain/events/validation_feedback_events.py` + `events/__init__.py` 导出 |
 | 🔄 重构 | 4-5 R1-F01 教训核查：metadata/字段全 str 化 |
 
@@ -499,9 +516,9 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_validation_feedback_exceptions.py`（code=EXCEPTION_399/继承 BusinessException/context 四字段/子域=toolchain）+ `test_exception_handlers.py` 期望集合更新（先红） |
+| 🔴 红 | 编写 `test_validation_feedback_exceptions.py`（code=EXCEPTION_399/继承 BusinessException（断言继承关系非父类码号）/context 四字段/子域=toolchain）+ `test_exception_handlers.py` 期望集合更新（先红，按提交策略与实现同 commit） |
 | 🟢 绿 | 新建 `validation_feedback_exceptions.py` → `_code_ranges.py` 两处 → `__init__.py` → `EXCEPTION_HTTP_MAP`（399→422）→ 设计文档两表 → 预留注释改已分配 |
-| 🔄 重构 | `grep -rn "EXCEPTION_399" src/` 碰撞自查 + 8 项既有异常测试全绿 |
+| 🔄 重构 | `grep -rn "EXCEPTION_399" src/` 碰撞自查 + `tests/unit/domain/exceptions/` 全目录既有测试回归（25 文件，不硬编码计数） |
 
 - [ ] Subtask 2.4: 🔴 红 — 编写异常失败测试
 - [ ] Subtask 2.5: 🟢 绿 — 五处登记实现
@@ -534,8 +551,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展 `test_sandbox_exceptions.py`（stderr/exit_code 可选参数写入 context/默认 None 不破坏 4.4 既有断言）+ 新建 `test_aiodocker_adapter_stderr.py`（失败路径异常 context 含 stderr[:2000] 与 exit_code） |
-| 🟢 绿 | `sandbox_exceptions.py` ExecutionError 构造器增强 + `aiodocker_sandbox_adapter.py:511-518` 填充 |
+| 🔴 红 | 扩展 `test_sandbox_exceptions.py`（stderr/exit_code 可选参数写入 context/默认 None 不破坏 4.4 既有断言/**子类 `SandboxTimeoutError`/`SandboxResourceLimitExceededError` 构造回归**——`super().__init__(reason, context=...)` 透传兼容）+ 新建 `test_aiodocker_adapter_stderr.py`（失败路径异常 context 含 stderr[:2000] 与 exit_code） |
+| 🟢 绿 | `sandbox_exceptions.py` ExecutionError 构造器增强（签名含 `context`/`cause` 透传合并，Task 0「修改的既有异常」契约）+ `aiodocker_sandbox_adapter.py:511-518` 填充 |
 | 🔄 重构 | 截断常量提取（≤2000） |
 
 - [ ] Subtask 3.1: 🔴 红 — 编写异常增强与适配器填充失败测试
@@ -546,8 +563,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 新建 `test_sandbox_security_decorator_events.py`（SandboxExecutionFailed 事件 execution_id/stderr 填充断言——字段已预留未填）+ cause 链提取 helper 测试（嵌套异常链中定位 ExecutionError 并提取 stderr） |
-| 🟢 绿 | `sandbox_security_decorator.py:132-137` 事件填充 + 新增 cause 链 stderr 提取函数（供 4.7 装饰器复用，放置于该模块导出） |
+| 🔴 红 | 新建 `test_sandbox_security_decorator_events.py`（SandboxExecutionFailed 事件 execution_id/stderr 填充断言——execution_id 取自**外层** 382 异常 context（helper 签名需能拿到外层异常或其 context）；**直连路径**（execute_code_with_protection）execution_id 空串分支）+ cause 链提取 helper 测试（**双分支**：主分支=生产链 382 自定义 `cause` 属性单跳到 313；次分支=389 `__cause__` 链经 383 到 LLM 错误——见 Dev Notes「STDERR 实际浮现路径」） |
+| 🟢 绿 | `sandbox_security_decorator.py:132-137` 事件填充（except 块读外层 `exc.context["execution_id"]`）+ 新增 cause 链 stderr 提取函数（同时遍历自定义 `cause` 属性与 `__cause__`/`__context__`，供 4.7 装饰器复用，放置于该模块导出） |
 | 🔄 重构 | 4.4 既有测试全量回归（事件字段新增不破坏旧断言） |
 
 - [ ] Subtask 3.4: 🔴 红 — 编写事件填充失败测试
@@ -569,7 +586,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_error_case_repository.py` + `test_evolution_log_repository.py`（InMemory：search_by_signature 语义/record_case 自然键 upsert 计数/save 幂等/list_by_query 分页过滤/get_by_*） |
+| 🔴 红 | 编写 `test_error_case_repository.py` + `test_evolution_log_repository.py`（InMemory：get_by_natural_key 精确查询/record_case 自然键 upsert 分类计数（recovered_count/infeasible_count）/save 幂等/list_by_query 分页过滤/get_by_*） |
 | 🟢 绿 | 实现 `src/domain/ports/error_case_repository.py`（含 EvolutionLogQuery 于 evolution_log_repository.py）+ `src/infrastructure/storage/inmemory/` 双实现 |
 | 🔄 重构 | InMemory 深拷贝防共享引用污染（4-6 CR1-2 教训） |
 
@@ -581,7 +598,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | PG 仓储测试（独立 schema + savepoint rollback 模式：upsert 幂等/UNIQUE 冲突 begin_nested 容错重读/JSONB fix_attempts 读写） |
+| 🔴 红 | PG 仓储测试（新建 `tests/integration/test_validation_feedback_repositories.py` 为本循环红/绿载体——repo_session 事务 rollback + `xdist_group` 串行 + PG 探活 skip（4-6 `test_tool_version_integration.py:50,158-183` 样板，**非**独立 schema/TestTenant 模式）：upsert 幂等/UNIQUE 冲突 begin_nested 容错重读/JSONB fix_attempts 读写/outbox fallback 独立 session 行为） |
 | 🟢 绿 | `models/error_case.py` + `models/evolution_log_entry.py` + `repository/` 双实现 + `deploy/postgresql/alembic/versions/017_validation_feedback.py`（表设计见 Dev Notes） |
 | 🔄 重构 | migration 仅新增不修改既有（红线） |
 
@@ -616,7 +633,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_validation_feedback_service.py` 循环 A 组（触发判定矩阵：389 入/382 入/385 出直传/207/413 出直传；增强循环 1→3 次计数；耗尽抛 399） |
+| 🔴 红 | 编写 `test_validation_feedback_service.py` 循环 A 组（触发判定矩阵：389 入（Schema/LLM 瞬时两子路径）/382 且 stage=EXECUTION 入（含 316/317）/382 且 stage=SANDBOX_START 出直传/385 出直传/207、201 出直传/410-413 出直传；增强循环 attempt 1→3 计数（总数 3 非重试 3）；耗尽抛 399） |
 | 🟢 绿 | 实现 `src/application/ports/validation_feedback_service.py` + `src/application/services/validation_feedback_service.py`（recover 编排：提取→检索→修复→重执行→记录）+ `validation_feedback_prompts.py` |
 | 🔄 重构 | 383/399 语义区分注释显式化 |
 
@@ -628,8 +645,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 循环 B 组（LLM 修复 prompt 组装含案例 fix_summary/空案例 PURE_LLM 降级/增强期间 Engine max_attempts=1 且 finally 恢复/恢复成功记 RECOVERED 案例 + ToolExecutionRecovered 事件/耗尽记 MARKED_INFEASIBLE 案例 + ToolExecutionMarkedInfeasible 事件 + 演进日志） |
-| 🟢 绿 | 实现修复循环 + 案例回填 + 演进日志写入 + 事件发布（fire-and-forget，P0-I 模式） |
+| 🔴 红 | 循环 B 组（LLM 修复 prompt 组装含案例 fix_summary（命中 RECOVERED 且非空）/命中 MARKED_INFEASIBLE 注入负样本提示且 fix_strategy 不虚标/空案例 PURE_LLM 降级/**attempt k prompt 含 attempt 1..k-1 失败反馈与禁止重复指令**/fix-gen 自身失败计为该次 attempt 失败/增强期间引擎与 validator 两层重试封顶 1 且按引用恢复（retryable_exceptions 保持）/恢复成功回填 recovered_count + 覆写 fix_summary + ToolExecutionRecovered 事件/耗尽回填 infeasible_count + ToolExecutionMarkedInfeasible 事件 + 演进日志） |
+| 🟢 绿 | 实现修复循环（fix-gen 产出 suggested_fix + 跨尝试反馈）+ 案例回填 + 演进日志写入 + 事件发布（fire-and-forget，P0-I 模式） |
 | 🔄 重构 | Fake LLM 按 system_prompt 角色标记分派（4-5 教训）核查测试自身 |
 
 - [ ] Subtask 5.4: 🔴 红 — 编写修复与回填失败测试
@@ -640,8 +657,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 循环 C 组（同 execution 重复 recover：演进日志单行/事件单次/案例计数递增） |
-| 🟢 绿 | 终态判定短路（已有终态记录直接返回） |
+| 🔴 红 | 循环 C 组（同 trigger_error 重复 recover：演进日志单行/事件单次/案例计数递增（短路路径显式补记）/短路返回合成结论——INFEASIBLE 语义完整、RECOVERED 为不含证据包的摘要（AC-6 边界注记）） |
+| 🟢 绿 | 终态判定短路（execution_id 取自 trigger_error.context；已有终态记录→副作用去重 + 合成结论） |
 | 🔄 重构 | 幂等键统一为 execution_id |
 
 - [ ] Subtask 5.7: 🔴 红 — 编写幂等失败测试
@@ -663,7 +680,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_validation_feedback_decorator.py`（捕获 389/382 委托 service/其他异常透传/INFEASIBLE 结果转换不抛异常）+ `test_tool_execution_engine_hints.py`（`validation_feedback_hints` 扩展键读取并拼入 Think/Code prompt/无 hints 零行为变化） |
+| 🔴 红 | 编写 `test_validation_feedback_decorator.py`（捕获 389/382 且 stage=EXECUTION 委托 service/382 且 stage=SANDBOX_START 透传/其他异常透传/INFEASIBLE 结果转换不抛异常）+ `test_tool_execution_engine_hints.py`（`validation_feedback_hints` 扩展键读取并拼入 Think/Code prompt（含「优先采纳 suggested_fix」指令）/无 hints 零行为变化） |
 | 🟢 绿 | 实现 `src/application/services/validation_feedback_decorator.py` + `tool_execution_engine.py` prompt 构建扩展（`__init__` 签名不变） |
 | 🔄 重构 | 引擎改动面最小化核查（4.4 AC-7.4 BDD 断言保护） |
 
@@ -687,9 +704,9 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写失败场景测试：模拟请求 session 回滚（后台/CLI 路径），断言 reliable 事件 outbox 写入不随回滚丢失（当前行为下红） |
-| 🟢 绿 | `src/infrastructure/messaging/`（outbox 写入路径/dual_channel_event_bus）reliable 写入包裹独立 `session_context`（`outbox_processor.py:148-149` 先例；**修复必须落在 infrastructure 层**——application 禁 import infrastructure） |
-| 🔄 重构 | 正常 HTTP 路径行为零变化回归断言 + `tool_execution_engine.py:283-285` 与 `data_source_resolver.py:352` 两处 defer 注释更新为"已修复" |
+| 🔴 红 | 编写失败场景测试：**后台/CLI 路径**（无请求 session——`get_session()` 抛 RuntimeError 场景，`PostgreSQLAdapter._session` property `repository/postgresql_adapter.py:46-64`）断言 reliable 事件 outbox 写入经 fallback 独立 session 成功落库（现状该场景静默丢失，当前行为下红）；HTTP 路径（有请求 session）行为不变断言 |
+| 🟢 绿 | `src/infrastructure/messaging/outbox/outbox_repository.py`：`save` 优先 `get_session()`，捕获 RuntimeError 时经注入的 `session_factory` 走 `session_context` 独立写入（`outbox_processor.py:148-150` 先例同款；**修复必须落在 infrastructure 层**——application 禁 import infrastructure；HTTP 路径保持请求 session 同事务，事务性原子性不变） |
+| 🔄 重构 | 正常 HTTP 路径行为零变化回归断言 + `tool_execution_engine.py:282-284` 与 `data_source_resolver.py:352` 两处 defer 注释更新（形态① 无 session 场景已修复；形态② session_context 异常回滚连带丢失登记 `deferred-work.md`——AC-4 遗留债） |
 
 - [ ] Subtask 6.7: 🔴 红 — 编写 outbox 独立 session 失败测试
 - [ ] Subtask 6.8: 🟢 绿 — 实现独立 session 修复
@@ -708,12 +725,12 @@
 
 > 无独立 TDD 循环表——本 Task 为真实服务全链验证（epics 硬路径 `tests/integration/test_validation_feedback_integration.py`）。
 
-- [ ] Subtask 7.1: 全链闭环集成测试（真实 PG 独立 schema + savepoint rollback + 租户隔离：模拟沙箱失败→闭环→恢复/耗尽两路径；InMemory→PG 仓储替换真实实现）
-- [ ] Subtask 7.2: 幂等集成测试（重复触发三副作用断言）
-- [ ] Subtask 7.3: 性能基准一——闭环开销 P95<5s（签名提取+检索+日志写入计时，20 次采样，CI 容差 1.8×）
-- [ ] Subtask 7.4: 性能基准二——恢复成功率 ≥80%（20 次可修复故障注入，AsyncMock LLM 可编程修复序列）
-- [ ] Subtask 7.5: 性能基准三——不可行标记准确率 ≥95%（20 次不可修复 100% 标记 + 可修复 0 误标）
-- [ ] Subtask 7.6: outbox 修复集成回归（后台路径事件投递 + HTTP 路径零变化）
+- [ ] Subtask 7.1: 全链闭环集成测试（真实 PG repo_session 事务 rollback + xdist_group 串行 + PG 探活 skip——4-6 `test_tool_version_integration` 样板：模拟沙箱失败→闭环→恢复/耗尽两路径；InMemory→PG 仓储替换真实实现）
+- [ ] Subtask 7.2: 幂等集成测试（同 trigger_error 重复 recover() 三副作用断言 + 合成结论）
+- [ ] Subtask 7.3: 性能基准一——闭环开销 P95<5s（签名提取+查询+日志写入计时，20 次采样，端口级计时代理 + `statistics.quantiles` 分位断言 + 分级 skip 留证）
+- [ ] Subtask 7.4: 性能基准二——闭环机制成功率 ≥80%（20 次可修复故障注入，AsyncMock LLM 可编程修复序列按 prompt 结构分派；主断言为内容性断言——修复 prompt 含 stderr/案例/历史反馈、hints 注入透传）
+- [ ] Subtask 7.5: 性能基准三——不可行标记机制准确率（20 次不可修复全部标记 + 可修复 0 误标，等效 100%）
+- [ ] Subtask 7.6: outbox 修复集成回归（后台路径 fallback 独立 session 投递 + HTTP 路径零变化）
 
 **完成标准/Definition of Done:**
 - [ ] 集成测试全绿（真实服务）
@@ -730,7 +747,7 @@
 
 #### 架构验证测试实现
 
-- [ ] Subtask 8.1: 创建 `tests/unit/architecture/test_validation_feedback.py`（epics 指定硬路径）
+- [ ] Subtask 8.1: 创建 `tests/unit/architecture/test_validation_feedback.py`（epics 指定硬路径——与目录内既有 17 个 `test_arch_*.py` 命名惯例不同，按 epics_v1.0.md:1398 指定名创建，文件头 docstring 注明）
 - [ ] Subtask 8.2: 重试增强验证器——STDERR 捕获与修复建议生成链路断言（触发→prompt 含 STDERR/案例→重执行）
 - [ ] Subtask 8.3: 失败标记验证器——3 次增强失败后 INFEASIBLE + 399 + 事件三联断言
 - [ ] Subtask 8.4: 幂等性验证器——重复执行零副作用（日志/案例/事件）
@@ -791,13 +808,15 @@
 | 2 | 不可行标记载体 | `ToolResultStatus.INFEASIBLE` 新枚举值 + 领域事件 + 演进日志（**不改** ToolExecutionState 6 状态机） | 状态机改动破坏面大（VALID_TRANSITIONS/既有 4.1a 测试）；ToolResult 是调用方契约面（DAG 按 status 分支）；"终态反向迁移禁止（重试创建新 attempt）"注释语义保持 |
 | 3 | 耗尽对外契约 | 返回 `ToolResult(INFEASIBLE)` 不抛异常；399 为内部信号 | ToolChain DAG 后续节点按 status 感知不中断；4.3 蓝图"降级到人工审核"非本 epic 范围 |
 | 4 | 异常编码 | 仅 1 个新异常占 399；**不扩 400-409** | 方案 A 触发条件（≥2 异常）未满足；Fallback/HumanReview/Canary 三预测异常均属非本 epic 的扩展链路（见非目标） |
-| 5 | 错误签名算法 | 领域服务纯函数归一化（剥路径/行号/时间戳/内存地址）→ sha256 前 16 hex | 确定性可测；同根因不同表层输出收敛（幂等前提）；V1 精确匹配，向量检索留 L3 扩展 |
-| 6 | 案例回填时机 | 恢复成功回填 RECOVERED 案例（错误→修复对）+ 耗尽回填 MARKED_INFEASIBLE | 成功案例对后续修复价值最高（Few-Shot 素材）；失败案例支撑准确率统计 |
-| 7 | STDERR 链修复方式 | `ExecutionError` 构造器可选参数（stderr/exit_code 入 context）+ adapter 填充 + 装饰器事件填充 | 向后兼容（默认值零改动既有调用）；事件字段已预留（sandbox_events.py:96/101/104）只欠填充 |
-| 8 | 防重试放大 | 增强循环期间内层 Engine `_retry.max_attempts=1` 临时降级 + try/finally 恢复 | 4.3 P0-1 教训直接复用（3×3×3×3=81x LLM 调用触发超时）；ToolOutputValidator 同款模式先例 |
-| 9 | hints 注入通道 | `context.extensions["validation_feedback_hints"]`（ExecutionContext frozen + with_extension 工厂） | P0-D 模式先例（schema_last_violations 同款）；引擎 `__init__` 签名不变 |
-| 10 | outbox 修复落点 | infrastructure/messaging outbox 写入独立 session_context | 两处 defer 注释显式指派本 Story；outbox_processor.py:148-149 独立 session 先例；application 层禁 import infrastructure 约束 |
-| 11 | 性能指标口径 | P95<5s 限闭环自身开销（签名/检索/日志），LLM 与沙箱时长除外 | epic 字面指标可测化——LLM 生成受 LLMConfig.timeout=600s 支配物理上不可能 <5s；Task 0 与业务确认留痕 |
+| 5 | 错误签名算法 | 领域服务纯函数归一化（剥路径/行号/时间戳/内存地址 + 数值/引号串模板化 + 尾部锚定 `stderr[-2000:]`）→ **完整 sha256 hexdigest（64 hex）** | 确定性可测；同根因不同表层输出收敛（幂等前提）——Sentry message templating 对标防插值分裂、尾部锚定防切根因；完整摘要保留前缀粗化分组派生能力（多案例检索前置）；V1 精确匹配，向量检索留 L3 扩展 |
+| 6 | 案例回填时机 | 恢复成功回填 `recovered_count += 1` 并覆写 fix_summary（仅 RECOVERED 覆写）+ 耗尽回填 `infeasible_count += 1` | 成功案例对后续修复价值最高（Few-Shot 素材）；分类计数防不可行写回冲掉修复配方；失败计数支撑负样本提示与准确率统计 |
+| 7 | STDERR 链修复方式 | `ExecutionError` 构造器可选参数（stderr/exit_code 入 context，**含 context/cause 透传合并**——子类零改动）+ adapter 填充 + 装饰器事件填充（execution_id 取外层 382 context） | 向后兼容（默认值 + 透传保证子类 `super().__init__(reason, context=...)` 零改动）；事件字段已预留（sandbox_events.py:96/101/104）只欠填充 |
+| 8 | 防重试放大 | 增强循环期间内层重试全部封顶：引擎 `_retry` 与 validator 校验重试（动态读 engine._retry）整体替换 `max_attempts=1`（保留原 retryable_exceptions）+ try/finally 按引用恢复 | 4.3 P0-1 教训复用；修正数学：TOV 已无条件封顶 engine 内层（:114-129），防放大的真实对象是增强期间的 TOV 校验重试（未防 3×3×1=9x）；按引用恢复防默认 RetryPolicy（含 ExecutionError）静默改回生产白名单 |
+| 9 | hints 注入通道 | `context.extensions["validation_feedback_hints"]`（ExecutionContext frozen + with_extension 工厂），payload 契约 `{stderr_excerpt, schema_violations, case_summaries, prior_attempts, suggested_fix}` | P0-D 模式先例（schema_last_violations 同款）；引擎 `__init__` 签名不变；引擎 Code stage 唯一代码作者（指令「优先采纳 suggested_fix」）避免双作者不可归因 |
+| 10 | outbox 修复落点 | `messaging/outbox/outbox_repository.py` fallback 独立 session（优先 get_session()，RuntimeError 时经 session_factory 走 session_context） | 两处 defer 注释显式指派本 Story；outbox_processor.py:148-150 独立 session 先例；application 层禁 import infrastructure 约束；HTTP 路径事务性原子性保持（无条件独立 session 会破坏原子性并污染 rollback 隔离测试） |
+| 11 | 性能指标口径 | P95<5s 限闭环自身开销（签名/查询/日志），LLM 与沙箱时长除外；比率指标命名为「闭环机制有效性」（mock LLM 度量编排正确性非修复能力） | epic 字面指标可测化——LLM 生成受 LLMConfig.timeout=600s 支配物理上不可能 <5s；Task 0 与业务确认留痕（Subtask 0.11） |
+| 12 | 修复循环反馈记忆 | attempt k 的修复 prompt 携带 attempt 1..k-1 失败反馈（FixAttempt.stderr_excerpt/detail + 禁止重复指令） | Reflexion/Self-Debugging/ChatRepair 共识——无跨尝试反馈时 attempt 2/3 与 attempt 1 独立同分布，确定性采样下重复生成相同失败修复，3 次尝试退化为同一次的重复采样 |
+| 13 | 幂等语义 | 副作用去重（execution_id 取自 trigger_error.context）+ INFEASIBLE 结论可重放；RECOVERED 重放返回合成摘要（不含证据包） | 引擎每次 execute 新铸 execution_id，「装饰器重复调用」不命中幂等键（架构边界）；日志无 result 载荷故不承诺 RECOVERED 完整重放 |
 
 ### 核心编排流程（ValidationFeedbackDecorator 实现蓝图）
 
@@ -812,32 +831,56 @@ class ValidationFeedbackDecorator:
     async def execute(self, tool_id, tool, tool_call, context) -> ToolResult:
         try:
             return await self._wrapped.execute(tool_id, tool, tool_call, context)
-        except (ToolResultValidationError, ToolExecutionFailedError) as trigger:
-            # 389 = OUTPUT 校验基础重试耗尽（violations 可修复语义）
-            # 382 = 执行失败（cause 链可提取沙箱 STDERR）
-            # 385/207/413 等不在此捕获——超时/策略违规不可修复，直接上抛
+        except ToolResultValidationError as trigger:
+            # 389 = OUTPUT 校验基础重试耗尽（Schema 违规 / LLM 瞬时故障两子路径）
             return await self._feedback.recover(
                 tool_id=tool_id, tool=tool, tool_call=tool_call,
                 context=context, trigger_error=trigger,
             )
-        # ToolExecutionTimeoutError / 领域异常组 / DataSourceError → 不捕获自然上抛
+        except ToolExecutionFailedError as trigger:
+            # 382 且 stage=EXECUTION = 执行失败（cause 链可提取沙箱 STDERR——生产主浮现形态）
+            # 382 且 stage=SANDBOX_START = 沙箱启动失败（infra 故障，代码修复不可归因）→ 直传
+            if trigger.context.get("stage") == "EXECUTION":
+                return await self._feedback.recover(
+                    tool_id=tool_id, tool=tool, tool_call=tool_call,
+                    context=context, trigger_error=trigger,
+                )
+            raise
+        # ToolExecutionTimeoutError(385) / 207 / 201 / 410-413 / 398 → 不捕获自然上抛
+        # 增强尝试中内层浮出上述非触发类异常 → recover() 内中止闭环直传（AC-2 VC）
 
 
 class ValidationFeedbackService:
     async def recover(self, tool_id, tool, tool_call, context, trigger_error) -> ToolResult:
-        # 幂等短路：已有该 execution 终态演进日志 → 直接返回既有结论
-        # 1. 提取错误上下文：cause 链提取 stderr（ExecutionError.context）或 violations（389.context）
+        # 幂等短路：execution_id = trigger_error.context["execution_id"]
+        #   已有该 execution 终态演进日志 → 副作用去重 + 返回合成结论
+        #   （INFEASIBLE 语义完整；RECOVERED 为不含证据包的摘要——AC-6 边界注记）
+        # 1. 提取错误上下文：cause 链提取 stderr（382.cause=ExecutionError.context——生产主路径
+        #    自定义 cause 属性单跳；或 389.__cause__ 经 383 到 LLM 错误——次路径）或 violations（389.context）
         # 2. signature = ErrorSignatureExtractor.extract(stderr) / extract_from_violations(...)
-        # 3. 增强循环 attempt 1..3（RetryPolicy.max_attempts=3 语义）：
-        #    a. cases = error_case_repo.search_by_signature(tenant, tool, signature)
-        #    b. fix_prompt = 组装(原 code + stderr + cases.fix_summary + violations)
-        #       fix_strategy = CASE_GUIDED if cases else PURE_LLM
-        #    c. hints_context = context.with_extension("validation_feedback_hints", {...})
-        #    d. 临时 wrapped._retry.max_attempts=1 → try: 重执行内层链 → finally 恢复
-        #    e. 成功 → 回填 RECOVERED 案例 + 演进日志(RECOVERED) + ToolExecutionRecovered 事件
+        # 3. 增强循环 attempt 1..3（RetryPolicy.max_attempts=3 总尝试语义）：
+        #    a. case = error_case_repo.get_by_natural_key(tenant, tool, signature)
+        #       命中且 outcome=RECOVERED 且 fix_summary 非空 → case_summaries=[fix_summary]
+        #       命中 MARKED_INFEASIBLE → 负样本提示（"此签名历史 N 次修复均失败"）
+        #    b. fix_prompt = 组装(stderr + case_summaries + violations
+        #                       + attempt 1..k-1 失败反馈（stderr_excerpt/detail）
+        #                       + "以下方案已失败，禁止重复" 指令)
+        #       fix_strategy = CASE_GUIDED（命中 RECOVERED 案例时）else PURE_LLM
+        #    c. suggested_fix = fix_gen(fix_prompt)  # 包 _call_with_retry(max_attempts=1)，
+        #       # 失败计为该次 attempt 失败（detail="llm_generation_failed"），不裸穿
+        #    d. hints = {stderr_excerpt, schema_violations, case_summaries,
+        #               prior_attempts, suggested_fix}   # payload 契约（Task 0.12）
+        #       hints_context = context.with_extension("validation_feedback_hints", hints)
+        #    e. 防放大：保存 engine 原 RetryPolicy 引用 → 整体替换
+        #       RetryPolicy(max_attempts=1, retryable_exceptions=原白名单)
+        #       （validator 校验重试动态读 engine._retry.max_attempts，同被封顶）
+        #       → try: 重执行内层链 → finally: 按引用恢复
+        #       注意：wrapped 是 SSD（无 _retry），需经组合根注入 engine 引用穿透
+        #    f. 成功 → recovered_count += 1 + 覆写 fix_summary + 演进日志(RECOVERED, trigger_code,
+        #       duration_sec, fix_attempts[含 attempt_execution_id]) + ToolExecutionRecovered 事件
         #            → return ToolResult(SUCCESS, retry_count=attempt)
         # 4. 耗尽 → 抛/捕获 ValidationFeedbackRetryExhaustedError(399) 内部信号
-        #    → 回填 MARKED_INFEASIBLE 案例 + 演进日志(MARKED_INFEASIBLE)
+        #    → infeasible_count += 1（fix_summary 不动）+ 演进日志(MARKED_INFEASIBLE)
         #       + ToolExecutionMarkedInfeasible 事件
         #    → return ToolResult(INFEASIBLE, output={error_signature, stderr_excerpt, attempts}, retry_count=3)
 ```
@@ -846,14 +889,20 @@ class ValidationFeedbackService:
 
 | 触发异常 | 编码 | 入闭环 | 理由 |
 |---------|------|--------|------|
-| `ToolResultValidationError` | 389 | ✅ | OUTPUT 校验基础重试耗尽，violations 可指导修复 |
-| `ToolExecutionFailedError` | 382 | ✅ | 执行失败（含沙箱启动失败 `stage="SANDBOX_START"` 直抛路径），cause 链可提取 STDERR |
+| `ToolResultValidationError` | 389 | ✅ | OUTPUT 校验基础重试耗尽——两子路径：Schema 违规（violations 直接在 context）/ LLM 瞬时故障（cause 链 389→383→LLM 错误，**violations 为空**，签名走 LLM 错误消息归一化） |
+| `ToolExecutionFailedError` 且 `stage="EXECUTION"` | 382 | ✅ | 执行失败（**生产装配下 STDERR 的主浮现形态**——cause 单跳到 313，见下方浮现路径）；含 316/317（ExecutionError 子类经兜底包装） |
+| `ToolExecutionFailedError` 且 `stage="SANDBOX_START"` | 382 | ❌ 直传 | 沙箱启动失败（312/315 容器/镜像）——基础设施故障非代码缺陷，LLM 修复不可归因（3 次注定失败的修复尝试纯耗 LLM 配额且误标 INFEASIBLE） |
 | `ToolExecutionTimeoutError` | 385 | ❌ 直传 | 超时不可修复（重试同样超时） |
 | `BusinessRuleViolationError` | 207 | ❌ 直传 | 白名单策略违规，非代码缺陷 |
-| `DataSourceError` 族 | 410-413 | ❌ 直传 | 外部数据不可用，4.1b 语义"策略违规 vs 数据不可用"区分 |
 | `ValidationError` | 201 | ❌ 直传 | 标记语法错误，非运行时可修复 |
+| `DataSourceError` 族 | 410-413 | ❌ 直传 | 外部数据不可用，4.1b 语义"策略违规 vs 数据不可用"区分 |
+| `ToolSchemaMissingError` | 398 | ❌ 直传 | required_schema 缺失，配置问题非代码缺陷（4.3 定义、4.7 消费契约） |
 
-> **STDERR 实际浮现路径（防困惑，重要）**：沙箱代码执行失败（`ExecutionError` 313 在引擎 retryable 白名单内）→ 引擎内部重试 3 次耗尽抛 `ToolExecutionRetryExhaustedError`（383）→ `ToolOutputValidator` 的 `retry_policy_for_validation` 含 383（`tool_output_validator.py:201-204`）再重试 3 次耗尽后**转换为 389 抛出**（`:223-229`，`from retry_exc` 保留因果链）。即 STDERR 场景在最外层以 **389 形态浮现**，其 `__cause__` 链为 `389 → 383 → ExecutionError(context.stderr)`；沙箱**启动**失败则经引擎 `SANDBOX_START` 分支以 382 直浮（`tool_execution_engine.py:162-167`）。因此 STDERR 提取 helper 必须同时走 `__cause__` 链**和** 383 的自定义 `cause` 属性（`retry_helpers.py:112-117`）——Task 3 的嵌套链测试必须覆盖这两个分支。
+> **STDERR 实际浮现路径（防困惑，重要——生产装配语义）**：生产装配经 `build_tool_execution_engine`（`tool_execution_engine.py:569-578`，组合根 `:2330-2333`）把引擎重试白名单收窄为 `(LLMAPIError, LLMResponseError, TimeoutError)`——**`ExecutionError`(313) 不在白名单**（`:558-560` 注释：沙箱确定性失败重试无意义）。因此：
+> - **主路径（STDERR 场景）**：313 → 引擎兜底 `except Exception`（`:253-266`）包成 `ToolExecutionFailedError(382, stage="EXECUTION", cause=313)`（自定义 `cause` 属性，非 `raise from`）→ 382 不在 validator 白名单（`tool_output_validator.py:201-204`）直浮 → SandboxSecurityDecorator 解包发事件后原样上浮（`sandbox_security_decorator.py:190-195`）→ VFD 捕获入闭环。STDERR 提取 = `382.cause`（自定义属性单跳）→ `ExecutionError.context["stderr"]`（AC-1 修复后携带）。
+> - **次路径（LLM 瞬时故障）**：LLMAPIError/LLMResponseError/TimeoutError 可重试 → 引擎 3 次耗尽抛 383（`retry_helpers.py:112-117`，`cause=last_exc` 自定义属性）→ validator 白名单含 383 再重试 3 次耗尽 → **转 389 抛出**（`tool_output_validator.py:223-229`，`from retry_exc` 设 `__cause__`）。链形态 `389.__cause__ → 383.cause → LLM 错误`——**无 STDERR 无 violations**，签名走 LLM 错误消息。
+> - **单测直构形态注意**：裸构造 `ToolExecutionEngine()` 用默认 `RetryPolicy`（**含** ExecutionError，`retry_helpers.py:54-59`）时 313 会被引擎重试——单测构造主路径 382 场景须用生产白名单形态或直接构造 382。
+> - 提取 helper 必须**同时遍历自定义 `cause` 属性与 `__cause__`/`__context__`**（`base_exceptions.py:62,72`；`_unwrap_sandbox_error` 的判级顺序 `:113-120`）——Task 3 嵌套链测试覆盖两分支，主分支为 382 形态。
 
 ### 数据库表设计（migration 017: `017_validation_feedback.py`）
 
@@ -863,17 +912,21 @@ CREATE TABLE error_cases (
     id                UUID PRIMARY KEY,
     tenant_id         UUID NOT NULL,
     tool_id           UUID NOT NULL,
-    error_signature   VARCHAR(64) NOT NULL,
-    error_category    VARCHAR(64) NOT NULL,          -- 沙箱 error_code（EXCEPTION_313 等）或 'SCHEMA_VIOLATION'
+    error_signature   VARCHAR(64) NOT NULL,           -- 完整 sha256 hexdigest（64 hex，三处口径同一）
+    error_category    VARCHAR(64) NOT NULL,           -- 沙箱 error_code（EXCEPTION_313 等）或 'SCHEMA_VIOLATION' 或 'LLM_TRANSIENT'
     stderr_excerpt    VARCHAR(2000) NOT NULL DEFAULT '',
-    fix_summary       VARCHAR(1000) NOT NULL DEFAULT '',
-    outcome           VARCHAR(32) NOT NULL,          -- RECOVERED / MARKED_INFEASIBLE
-    occurrence_count  INTEGER NOT NULL DEFAULT 1,
+    fix_summary       VARCHAR(2000) NOT NULL DEFAULT '',  -- 仅 RECOVERED 路径覆写
+    outcome           VARCHAR(32) NOT NULL,           -- 最近一次：RECOVERED / MARKED_INFEASIBLE
+    recovered_count   INTEGER NOT NULL DEFAULT 0,
+    infeasible_count  INTEGER NOT NULL DEFAULT 0,
+    occurrence_count  INTEGER NOT NULL DEFAULT 1,     -- = recovered_count + infeasible_count
     last_seen_at      TIMESTAMPTZ NOT NULL,
     created_at        TIMESTAMPTZ NOT NULL,
     CONSTRAINT uq_error_cases_natural_key UNIQUE (tenant_id, tool_id, error_signature)
 );
-CREATE INDEX ix_error_cases_tool ON error_cases (tenant_id, tool_id, error_signature);
+CREATE INDEX ix_error_cases_tool ON error_cases (tenant_id, tool_id, last_seen_at DESC);
+-- 注：不建 (tenant_id, tool_id, error_signature) 普通索引——与 UNIQUE 约束完全同列属冗余写放大；
+-- 本索引支撑"按工具查最近案例"排序
 
 -- tool_evolution_logs：演进日志（execution_id 幂等）
 CREATE TABLE tool_evolution_logs (
@@ -882,9 +935,11 @@ CREATE TABLE tool_evolution_logs (
     tool_id               UUID NOT NULL,
     execution_id          UUID NOT NULL,
     tool_version          VARCHAR(64) NOT NULL DEFAULT '',
+    trigger_code          VARCHAR(16) NOT NULL,       -- EXCEPTION_389 / EXCEPTION_382（失败模式第一维分类）
     error_signature       VARCHAR(64) NOT NULL,
     enhanced_retry_count  INTEGER NOT NULL,           -- 1-3
-    fix_attempts          JSONB NOT NULL DEFAULT '[]', -- FixAttempt 摘要数组
+    fix_attempts          JSONB NOT NULL DEFAULT '[]', -- FixAttempt 摘要数组（含 attempt_execution_id 回链）
+    duration_sec          NUMERIC(10,3) NOT NULL DEFAULT 0,  -- 闭环时长（MTTR 等价物）
     final_status          VARCHAR(32) NOT NULL,       -- RECOVERED / MARKED_INFEASIBLE
     created_at            TIMESTAMPTZ NOT NULL,
     CONSTRAINT uq_tool_evolution_logs_execution UNIQUE (tenant_id, execution_id)
@@ -896,14 +951,17 @@ CREATE INDEX ix_tool_evolution_logs_tool ON tool_evolution_logs (tenant_id, tool
 
 1. **事件 metadata 序列化**：新事件字段一律 `str()` 化入 metadata/payload（4-5 R1-F01：UUID 对象 → json.dumps TypeError → reliable 通道 100% 静默失败）。
 2. **HTTP_MAP 注释对齐**：`exception_handlers.py` 注释行内 `# 399 — ...` 与实际 code 严格一致（4.1a 偏移 bug 先例）。
-3. **InMemory 仓储深拷贝**：save/search 返回 deepcopy 副本（4-6 CR1-2：共享引用致测试间状态污染）。
+3. **InMemory 仓储深拷贝**：save/get 返回 deepcopy 副本（4-6 CR1-2：共享引用致测试间状态污染；`inmemory/tool_version_repository.py:32-39` `_detached()` 唯一先例）。
 4. **PG upsert 并发**：UNIQUE 冲突 flush 后 session 进 PendingRollback，必须 `begin_nested()` SAVEPOINT 包裹重读（4-6 CR1-4）。
-5. **frozen dataclass 加字段**：新字段必须带默认值且置于既有字段之后（4-6 教训）。
-6. **`configs/event_channels.yaml`**：实际路径是 `configs/`（复数）不是 `config/`；YAML 与 DEFAULT_MAPPINGS 两处必须同步（YAML 优先）。
-7. **设计文档两个 §3.3.2**：`sisys-uni-exception-design.md` 存在同号小节，编码分配表与子域范围表都要更新（4-6 踩坑）。
-8. **装饰器恢复 Engine `_retry`**：临时降级必须 try/finally 防御性恢复（ToolOutputValidator:216-233 同款双保险）。
+5. **frozen dataclass 加字段**：新字段必须带默认值且置于既有字段之后（4-6 教训；`ToolResultStatus` 是 `(str, Enum)` 加枚举值无此约束）。
+6. **`configs/event_channels.yaml`**：实际路径是 `configs/`（复数）不是 `config/`，顶层键是 `event_channels:`；YAML 与 DEFAULT_MAPPINGS 两处必须同步（YAML 优先）。
+7. **设计文档两个 §3.3.2**：`sisys-uni-exception-design.md` 存在同号小节（`:649`/`:786`），编码分配表与子域范围表都要更新；`:805`/`:807` 两行既有 399 表述连带核对（4-6 踩坑）。
+8. **装饰器恢复 Engine `_retry`**：必须按**保存的引用**整体替换/恢复（frozen dataclass 禁属性赋值；恢复时重建默认 `RetryPolicy()` 会把白名单静默改回含 313，闭环后浮现形态漂移）；try/finally 防御性恢复（ToolOutputValidator:114-129 降级 + :230-233 恢复完整模式）。
 9. **禁止 `# noqa`/`# type: ignore`**：三条 grep 自查零输出后才可提交。
-10. **性能计时口径**：P95 基准的计时窗口排除 LLM/沙箱调用（mock 替身注入切换点 `await asyncio.sleep(0)`——4-5 R2-F02）；CI 慢机容差 1.8×。
+10. **性能计时口径**：P95 基准的计时窗口排除 LLM/沙箱调用（端口级计时代理包裹仓储 + mock 替身注入真实挂起点 `await asyncio.sleep(0)`——4-5 R2-F02 原语义为制造挂起点）；P95 分位断言用 `statistics.quantiles` + 分级断言（达标 assert / 不达标 skip 留证据，4-6 `test_tool_version_integration.py:398-415` 先例）。
+11. **ExecutionError 子类兼容**：新构造器必须透传合并 `context`——`SandboxTimeoutError`/`SandboxResourceLimitExceededError` 的 `super().__init__(reason, context={...})` 不改即炸（Task 0「修改的既有异常」契约）。
+12. **既有 4 值边界断言**：`test_tool_execution_values.py:114-120` 在加 INFEASIBLE 后必红——属预期红（证明边界断言活着），与枚举加值同 commit 更新为 5 值。
+13. **单测构造 382 主路径**：裸构造引擎（默认 RetryPolicy 含 313）时 313 被引擎重试不走主路径——单测直接构造 382(stage=EXECUTION, cause=313) 或用生产白名单形态（Dev Notes 浮现路径节）。
 
 ### 项目结构说明 Project Structure
 
@@ -914,10 +972,11 @@ src/
 │   │   ├── error_case.py                    # [新] 错误案例聚合根
 │   │   └── evolution_log_entry.py           # [新] 演进日志聚合根
 │   ├── events/
-│   │   └── validation_feedback_events.py    # [新] 2 领域事件
+│   │   ├── validation_feedback_events.py    # [新] 2 领域事件
+│   │   └── __init__.py                      # [改] 导出
 │   ├── exceptions/
 │   │   ├── validation_feedback_exceptions.py # [新] EXCEPTION_399
-│   │   ├── sandbox_exceptions.py            # [改] ExecutionError stderr/exit_code 参数
+│   │   ├── sandbox_exceptions.py            # [改] ExecutionError stderr/exit_code 参数（context 透传合并）
 │   │   ├── _code_ranges.py                  # [改] 399 登记 + 子域映射
 │   │   └── __init__.py                      # [改] 导出
 │   ├── ports/
@@ -942,7 +1001,8 @@ src/
 │   │   └── aiodocker_sandbox_adapter.py     # [改] stderr 填入异常 context
 │   ├── messaging/
 │   │   ├── channel_router.py                # [改] 新事件 + reliable 升级
-│   │   └── (outbox 写入路径)                 # [改] 独立 session 修复
+│   │   └── outbox/
+│   │       └── outbox_repository.py         # [改] fallback 独立 session（get_session RuntimeError → session_context）
 │   └── storage/
 │       ├── inmemory/
 │       │   ├── error_case_repository.py     # [新]
@@ -972,16 +1032,16 @@ docs/architecture/
 
 | 资产 | 位置 | 复用方式 |
 |------|------|----------|
-| `SandboxExecutionFailed` 事件 `stderr`/`execution_id` 字段 | `src/domain/events/sandbox_events.py:96,101,104` | **已预留无需新建**，仅由发布方填充（Task 3） |
+| `SandboxExecutionFailed` 事件 `stderr`/`execution_id` 字段 | `src/domain/events/sandbox_events.py:96,101,104` | **已预留无需新建**，仅由发布方填充（Task 3——execution_id 取外层 382 context，stderr 取内层 313 context） |
 | `ToolSchemaValidationFailed` 事件 13 字段（is_final/retry_attempt/schema_version） | `src/domain/events/tool_schema_events.py:25` | reliable 通道升级（Task 2），外部消费者面 |
-| `ToolOutputValidator` 耗尽契约 | `src/application/services/tool_output_validator.py:220-229` | 抛 389 即本 Story 触发信号，**禁止改动其语义** |
-| `_call_with_retry` / `RetryPolicy` | `src/application/services/retry_helpers.py:36,62` | 增强循环复用（max_attempts=3 + on_failure_callback） |
-| cause 链解包先例 `_unwrap_sandbox_error` | `src/application/services/sandbox_security_decorator.py:100-120` | stderr 提取 helper 参照实现 |
+| `ToolOutputValidator` 耗尽契约 | `src/application/services/tool_output_validator.py:220-229` | 抛 389 即本 Story 触发信号（Schema 违规 / LLM 瞬时两子路径——Dev Notes 浮现路径），**禁止改动其语义** |
+| `_call_with_retry` / `RetryPolicy` | `src/application/services/retry_helpers.py:36,62` | 增强循环复用（max_attempts=3 总尝试语义 + on_failure_callback **已实现**（`:65,95-99`），纯复用无需增强） |
+| cause 链解包先例 `_unwrap_sandbox_error` | `src/application/services/sandbox_security_decorator.py:100-120` | stderr 提取 helper 参照实现（判级 `cause→__cause__→__context__`；注意其"首中 ExecutionError 即停"——新 helper 需同时取外层异常 context 的 execution_id） |
 | `context.extensions` 注入模式（P0-D） | `tool_output_validator.py:135-141` + `tool_execution_engine.py:446-447` | `validation_feedback_hints` 同款通道 |
 | `with_extension` frozen 工厂 | `src/domain/value_objects/tool_execution.py:95` | hints 上下文透传 |
 | `LLMClientPort.generate` | `src/domain/ports/llm_client.py:137` | 修复代码生成（无需新端口） |
 | `EXCEPTION_399` 预留 | `_code_ranges.py:85` + `sisys-uni-exception-design.md:718` | 直接占用（勿新开码位） |
-| `session_context` 独立会话 | `src/infrastructure/storage/postgresql/session_context.py:100` + outbox_processor.py:148-149 先例 | outbox 修复复用 |
+| `session_context` 独立会话 | `src/infrastructure/storage/postgresql/session_context.py:97-132` + `messaging/outbox/outbox_processor.py:148-150` 先例 | outbox fallback 修复复用（注意实际路径在 `messaging/outbox/` 子目录） |
 | `ToolExecutionQuery` Query Object 先例 | `src/domain/ports/tool_execution_repository.py:24` | EvolutionLogQuery 同款模式 |
 | 4.3 订阅契约设计 | `stories/4-3-tool-io-schema-validation.md:1600-1669`「4.6/4.7 架构演进路径」 | 事件字段消费方式参照（去重键/is_final/schema_version 防漂移） |
 | 端口契约测试 11 维度样板 | `tests/contracts/test_port_contract_tool.py` | 新契约测试同款结构 |
@@ -993,7 +1053,7 @@ docs/architecture/
 **来源:** [Story 4-6](./4-6-tool-version-management.md)（done）+ [Story 4-5](./4-5-red-blue-debate-basic.md)（done）+ [Story 4-3](./4-3-tool-io-schema-validation.md)（done）
 
 **关键学习/Key Learnings:**
-- 4-3 P0-1：装饰器重试与 Engine 内部重试叠加 → 81x LLM 调用放大触发超时——增强循环必须临时降级内层 max_attempts=1
+- 4-3 P0-1：装饰器重试与 Engine 内部重试叠加 → 81x LLM 调用放大触发超时（4.3 时代威胁模型）——增强循环必须封顶内层全部重试（引擎 + validator 两层 max_attempts=1，按引用恢复）
 - 4-5 R1-F01：事件 metadata 携带 UUID 对象 → json 序列化 TypeError → reliable 通道 100% 静默失败——字段一律 str 化
 - 4-6 CR1-4：PG UNIQUE 冲突后 PendingRollback → begin_nested SAVEPOINT 包裹容错重读
 - 4-6 R3-1：应用层禁止 import infrastructure（import-linter 契约）——注入端口/标量，outbox 修复落 infrastructure
@@ -1002,14 +1062,16 @@ docs/architecture/
 - 4-6 留项登记纪律：defer 项显式登记留痕（本 Story 兑现 399/事件字段/reliable 通道/outbox session 四笔预留债）
 
 **应用到本故事/Applied to This Story:**
-- [ ] 增强循环防放大（AC-2 硬性验证项）
+- [ ] 增强循环防放大（两层封顶 + 按引用恢复，AC-2 硬性验证项）
 - [ ] 事件字段 str 化 + InMemory deepcopy + SAVEPOINT 容错（实现陷阱清单）
-- [ ] 触发判定矩阵六行全覆盖测试（回归网先行）
-- [ ] 四笔预留债逐项清偿并在原注释处更新状态
+- [ ] 触发判定矩阵八行全覆盖测试（回归网先行）
+- [ ] 四笔预留债逐项清偿并在原注释处更新状态（outbox defer 注释按形态①已修复/形态②登记 deferred-work 更新）
+- [ ] 既有 4 值边界断言 4→5 联动（证明边界断言活着）
+- [ ] 修复 prompt 跨尝试反馈（决策 #12——防同分布重复失败修复）
 
 ### 非目标（Out of Scope）
 
-- ❌ **工具熔断**（or.md 七.7.(3)"连续 3 次校验失败自动熔断"）——不在本 epic AC 清单，与反馈闭环正交；**登记 `deferred-work.md`**（建议挂 Story 5.x Agent 弹性隔离或独立运维 Story）
+- ❌ **工具熔断**（or.md 四.7.(3)"连续 3 次校验失败自动熔断"——:315，属「四、AGENT」章第 7 节）——不在本 epic AC 清单，与反馈闭环正交；**登记 `deferred-work.md`**（建议挂 Story 5.x Agent 弹性隔离或独立运维 Story）。注：签名级 fast-fail（同签名 infeasible_count 高时注入负样本提示并缩减尝试）**属本 Story AC-5 已含**，与工具级熔断正交、不连带 defer
 - ❌ 向量相似案例检索（L3 Qdrant embedding）——V1 精确签名匹配；签名泛化不足以支撑时再立项
 - ❌ 自动灰度推进（按成功率自动 promote）——4-6 非目标登记"属 4.7/后续"；评估：自动 promote 需 per-version 成功率统计与安全护栏，超出本 Story 反馈闭环边界，**继续 defer 并登记**（演进日志已提供失败历史数据面，未来自动闭环的数据输入已就绪）
 - ❌ per-version 执行统计视图（4-6 登记"4.7 输入"）——演进日志 `tool_evolution_logs` 表 + `list_by_tool` 查询面已覆盖失败侧历史；成功率聚合视图 defer（有真实运维诉求时基于本表实现）
@@ -1058,7 +1120,7 @@ docs/architecture/
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 
-*src 生产代码（16 新 + 14 改）：*
+*src 生产代码（18 新）+ deploy/configs/docs（1 新 + 3 改）+ src 修改（11 改）：*
 - `src/domain/entities/error_case.py` - 错误案例聚合根
 - `src/domain/entities/evolution_log_entry.py` - 演进日志聚合根
 - `src/domain/events/validation_feedback_events.py` - 2 领域事件
@@ -1078,9 +1140,9 @@ docs/architecture/
 - `src/infrastructure/storage/postgresql/repository/error_case_repository.py` - PG 实现
 - `src/infrastructure/storage/postgresql/repository/evolution_log_repository.py` - PG 实现
 - `deploy/postgresql/alembic/versions/017_validation_feedback.py` - migration 017
-- 修改：`value_objects/tool_execution.py`（INFEASIBLE）、`sandbox_exceptions.py`（ExecutionError 增强）、`_code_ranges.py`、`exceptions/__init__.py`、`exception_handlers.py`（399→422）、`events/__init__.py`、`aiodocker_sandbox_adapter.py`（stderr 填充）、`sandbox_security_decorator.py`（事件填充）、`tool_execution_engine.py`（hints + defer 注释清偿）、`channel_router.py`、`composition_root.py`（3 端口 + v1.4.0）、`configs/event_channels.yaml`、`sisys-uni-exception-design.md`、outbox 写入路径（独立 session）
+- 修改：`value_objects/tool_execution.py`（INFEASIBLE + docstring 5 值）、`sandbox_exceptions.py`（ExecutionError 增强）、`_code_ranges.py`、`exceptions/__init__.py`、`exception_handlers.py`（399→422）、`events/__init__.py`、`aiodocker_sandbox_adapter.py`（stderr 填充）、`sandbox_security_decorator.py`（事件填充 + cause 链提取导出）、`tool_execution_engine.py`（hints + defer 注释清偿）、`channel_router.py`、`composition_root.py`（3 端口 + v1.4.0）；configs 改 `configs/event_channels.yaml`；docs 改 `sisys-uni-exception-design.md`（两表 + :805/:807 连带）；infra 改 `messaging/outbox/outbox_repository.py`（fallback 独立 session）
 
-*测试（21 新 + 1 改）：*
+*测试（23 新 + 4 改）：*
 - `tests/acceptance/test_acceptance_validation_feedback_loop.feature` + `.py` - 验收 Gherkin + BDD
 - `tests/unit/architecture/test_validation_feedback.py` - 架构测试四项（epics 硬路径）
 - `tests/integration/test_validation_feedback_integration.py` - 集成 + 性能基准（epics 硬路径）
@@ -1093,7 +1155,8 @@ docs/architecture/
 - `tests/unit/application/services/test_sandbox_security_decorator_events.py`、`test_validation_feedback_service.py`、`test_validation_feedback_decorator.py`、`test_tool_execution_engine_hints.py`
 - `tests/unit/infrastructure/storage/inmemory/test_error_case_repository.py`、`test_evolution_log_repository.py`
 - `tests/contracts/test_port_contract_error_case_repository.py`、`test_port_contract_evolution_log_repository.py`、`test_port_contract_validation_feedback_service.py`、`test_event_contract_validation_feedback_events.py`、`test_event_channel_mapping_validation_feedback.py`
-- 修改：`tests/unit/domain/exceptions/test_sandbox_exceptions.py`（扩展）、`tests/unit/interfaces/api/test_exception_handlers.py`（期望集合）、`tests/contracts/test_port_contract_tool_execution_service.py`（版本 v1.4.0）
+- `tests/integration/test_validation_feedback_repositories.py` - PG 双仓储 + outbox fallback 集成（Task 4 载体）
+- 修改：`tests/unit/domain/exceptions/test_sandbox_exceptions.py`（扩展）、`tests/unit/interfaces/api/test_exception_handlers.py`（期望集合）、`tests/contracts/test_port_contract_tool_execution_service.py`（版本 v1.4.0）、`tests/unit/domain/value_objects/test_tool_execution_values.py`（4→5 值边界断言）
 
 ---
 
@@ -1125,7 +1188,26 @@ docs/architecture/
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| 1 | （待审查后填写） | | |
+| R1-1 | STDERR 浮现路径断言与生产装配相反（声称 313 在引擎白名单→389 形态浮现；实际生产白名单已收窄，313 经兜底包 382(stage=EXECUTION) 直浮；389→383 链仅 LLM 瞬时场景） | P0 | 重写 Dev Notes 浮现路径节为双分支（382 主路径/389 次路径）+ 触发矩阵 8 行化（SANDBOX_START 排除）+ AC-1/2/Task 3/蓝图/资产表全传播（约 13 处） |
+| R1-2 | execution_id 全链悬空（ExecutionContext 无该字段；幂等键不可达；事件填充无来源） | P0 | 定义提取机制（外层 382 context / trigger_error.context）+ 幂等可达场景改写（同 trigger_error 重复 recover）+ 直连路径空串分支 |
+| R1-3 | 签名位数自相矛盾（16 hex vs 64 hex，Task 1 两 TDD 循环不可能同时绿） | P0 | 统一 64 hex 完整 sha256 + 归一化补强（数值/引号串模板化、尾部锚定 stderr[-2000:]）——Sentry 对标 |
+| R1-4 | 修复循环无跨尝试失败反馈（attempt 2/3 与 attempt 1 独立同分布，循环不收敛——违背 Reflexion/Self-Debugging 共识） | P0 | 修复 prompt 注入 attempt 1..k-1 失败反馈 + 禁止重复指令 + hints payload 契约定稿 + 引擎 Code stage 单一作者（决策 #12 新增） |
+| R1-5 | outbox 修复自相矛盾（无条件独立 session 破坏 HTTP 事务原子性 + 污染 rollback 隔离测试；条件式修不了自设验证项） | P0 | 重设计为 fallback 独立 session（get_session RuntimeError 时）；HTTP 零变化；回滚连带形态登记 deferred-work |
+| R1-6 | 防放大不完整且蓝图不可实现（validator 校验重试未封顶 9x；VFD._wrapped 是 SSD 无 _retry；frozen 整体替换/按引用恢复缺失） | P1 | 两层封顶 + 保留原 retryable_exceptions + 按引用恢复 + 组合根注入 engine 引用穿透（决策 #8 改写） |
+| R1-7 | INFEASIBLE 必炸既有 4 值边界测试（test_tool_execution_values.py len==4 硬断言） | P1 | Task 1 循环 C 显式包含 4→5 值联动（先红证明断言活着）+ 文件清单/追溯矩阵登记 |
+| R1-8 | ExecutionError 子类 super() 冲突（316/317 构造器调 super().__init__(reason, context=...)，新签名不透传即 TypeError） | P1 | 签名含 context/cause 透传合并 + Task 0「修改的既有异常」小节 + 子类构造回归 |
+| R1-9 | 检索语义与唯一键矛盾（UNIQUE+精确匹配 ⇒ limit=5 死参数；MARKED_INFEASIBLE 空 fix_summary 注入且虚标 CASE_GUIDED） | P1 | 删 search_by_signature → get_by_natural_key；outcome 过滤；负样本提示；多案例加权 defer |
+| R1-10 | ErrorCase 单值 outcome 覆盖冲掉修复配方 | P1 | recovered_count/infeasible_count 分类计数 + fix_summary 仅 RECOVERED 覆写 |
+| R1-11 | 幂等结论重放不可实现（日志无 result 载荷；「装饰器重复调用」场景引擎新铸 id 不命中） | P1 | 副作用去重语义 + 可达场景界定 + RECOVERED 重放边界注记（决策 #13 新增） |
+| R1-12 | 闭环内 fix-gen 失败/非触发类异常裸穿（破坏 INFEASIBLE 不抛契约） | P1 | fix-gen 失败计为该次 attempt 失败；非触发类异常中止直传 |
+| R1-13 | 389 空 violations 子路径未定义（LLM 瞬时故障时 violations/stderr 双空，签名无输入） | P1 | 触发矩阵补两子路径 + 签名走 LLM 错误消息归一化 |
+| R1-14 | BusinessException 误标 EXCEPTION_103（实为 2XX；103 是 StorageError） | P1 | 改 EXCEPTION_2XX + 测试断言继承关系非父类码号 |
+| R1-15 | 红窗口无合入策略（Task 0→6 期间提交必挂 CI/mypy hook） | P1 | 增补「模块依赖窗口提交策略」小节（4-6 :1128 先例） |
+| R1-16 | 演进日志字段集低于 failure history 基线（缺 trigger_code/duration_sec/attempt 回链） | P2 | migration 017 增列 + FixAttempt.attempt_execution_id（建表前零成本） |
+| R1-17 | SANDBOX_START/infra 故障误入闭环（3 次注定失败修复 + 误标 INFEASIBLE） | P2 | 触发矩阵按 stage 维度排除 |
+| R1-18 | 性能指标循环论证（mock 下"成功率"=编排正确性）+ 准确率 95%/100% 口径矛盾 | P2 | 更名「闭环机制有效性」+ 内容性断言为主 + 准确率口径统一 |
+| R1-19 | 集成测试样板描述错位（4-6 实为 repo_session 事务 rollback 非 schema 隔离）+ 1.8× 容差误引 | P2 | 4 处改样板 + P95 分位断言先例改引 4-6 |
+| R1-20 | 「双通道 reliable」语义误导（运行时 reliable 不发 Redis）+「8 项异常测试」失实 +「13 字段」无依据 + 文件计数错 + 决策 #11 留痕未落 Task 0 + or.md 节号错（七.7→四.7）+ 索引冗余 + 枚举术语 + B 类小项若干 | P2/P3 | 逐项修正（语义注记/全目录表述/12 核心字段口径/计数改实/Subtask 0.11/节号/索引改 last_seen_at/Enum 术语） |
 
 ---
 
@@ -1157,8 +1239,9 @@ docs/architecture/
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-10-08
 **最后更新/Last Updated:** 2026-10-08
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（3 并行调研 Agent 代码实证 + 4 前序故事经验整合 + 4 笔预留债清偿方案）
+- v1.1.0: 文档审查 Round 1——4 调研 Agent + 3 审查 Agent（正确性/一致性 + 可行性/可达性 + 科学性/方法论对标业界）收敛 42 项（P0×5 + P1×10 + P2/P3×27）：重写 STDERR 浮现路径为生产真实形态（382 主路径）、execution_id 全链提取机制定稿、签名统一 64 hex + Sentry 对标归一化、修复循环跨尝试反馈（Reflexion 共识）、outbox fallback 独立 session 重设计、触发矩阵 8 行化、防放大两层封顶、幂等副作用去重语义等
