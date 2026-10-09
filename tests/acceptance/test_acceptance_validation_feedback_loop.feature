@@ -49,7 +49,7 @@
   场景: AC-2.2 - LLM 瞬时故障校验耗尽触发闭环（389-LLM 子路径）
     假如 LLM 瞬时故障经引擎与校验双层重试耗尽转出 389
     当装饰链最外层捕获触发异常
-    那么进入增强反馈闭环且 error_category 为 LLM_TRANSIENT
+    那么进入增强反馈闭环且 LLM 瞬时根因直传原触发异常
 
   场景: AC-2.3 - 沙箱代码执行失败触发闭环（382-EXECUTION 且 cause 属 ExecutionError 族）
     假如沙箱内代码缺陷经引擎兜底包装为 382 且 stage 为 EXECUTION

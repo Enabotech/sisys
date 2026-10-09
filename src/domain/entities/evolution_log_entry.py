@@ -119,6 +119,13 @@ class EvolutionLogEntry:
                 message="error_signature 必须为 64 hex 完整 sha256 hexdigest",
                 context={"entity": "EvolutionLogEntry", "field": "error_signature"},
             )
+        try:
+            int(self.error_signature, 16)
+        except ValueError as exc:
+            raise EntityValidationError(
+                message="error_signature 必须为 hex 字符",
+                context={"entity": "EvolutionLogEntry", "field": "error_signature"},
+            ) from exc
         if not isinstance(self.enhanced_retry_count, int) or not 1 <= self.enhanced_retry_count <= 3:
             raise EntityValidationError(
                 message="enhanced_retry_count 必须在 [1, 3]（总尝试语义）",

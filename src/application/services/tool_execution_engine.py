@@ -25,7 +25,11 @@ from src.application.services.data_source_marker import (
     inject_data_sources,
     parse_data_source_markers,
 )
-from src.application.services.retry_helpers import RetryPolicy, _call_with_retry
+from src.application.services.retry_helpers import (
+    RetryPolicy,
+    _call_with_retry,
+    effective_retry_policy,
+)
 from src.application.services.schema_event_helpers import extract_schema_execution_id
 from src.domain.entities.tool import Tool
 from src.domain.entities.tool_execution import (
@@ -201,6 +205,8 @@ class ToolExecutionEngine:
             execution.validation = validation
 
             elapsed = time.monotonic() - start_time
+            # 刻意读 base（R1-F3）:总时长上限不受 attempts 封顶覆盖影响——覆盖策略
+            # 由 base dataclasses.replace 派生,duration 字段与 base 等值,读 base 即读配置值
             if elapsed > self._retry.max_total_duration_sec:
                 raise ToolExecutionTimeoutError(
                     execution_id=str(execution.execution_id),
@@ -284,8 +290,9 @@ class ToolExecutionEngine:
         均不落库——`list_by_query(state=FAILED)` 永远空集，且 DataSourceFetchFailed
         事件（outbox）的 aggregate_id 指向不存在的聚合行，事件溯源断链。
 
-        事务边界说明：save 为独立 upsert（无 outbox 事务关联）——HTTP 路径经
-        SessionMiddleware commit 存活；后台 session_context 路径随异常回滚丢失
+        事务边界说明：save 为独立 upsert（无 outbox 事务关联）——HTTP 路径在
+        SessionMiddleware 接线（deferred）后经请求 session commit 存活，当前生产
+        全部路径无请求 session；后台 session_context 路径随异常回滚丢失
         （Story 4.7 已修复形态①：outbox save 无请求 session 时经注入的
         session_factory 走独立会话写入；形态②「业务 session 异常回滚连带丢失
         已 flush 事件」为遗留债，登记 deferred-work.md——会话策略重构超出范围）。
@@ -497,7 +504,7 @@ class ToolExecutionEngine:
         """
         return await _call_with_retry(
             fn,
-            self._retry,
+            effective_retry_policy(self._retry),
             on_failure_callback=None,
             execution_id=execution_id,
             tool_id=tool_id,
@@ -508,7 +515,7 @@ class ToolExecutionEngine:
         """计算退避延迟(薄壳,委托给 retry_helpers._compute_backoff 保持 API 兼容)"""
         from src.application.services.retry_helpers import _compute_backoff
 
-        return _compute_backoff(self._retry, attempt)
+        return _compute_backoff(effective_retry_policy(self._retry), attempt)
 
     # ===== 证据包组装 =====
 

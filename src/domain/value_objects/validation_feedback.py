@@ -120,6 +120,13 @@ class FixAttempt:
                 message="error_signature 必须为 64 hex 完整 sha256 hexdigest",
                 context={"entity": "FixAttempt", "field": "error_signature"},
             )
+        try:
+            int(self.error_signature, 16)
+        except ValueError as exc:
+            raise EntityValidationError(
+                message="error_signature 必须为 hex 字符",
+                context={"entity": "FixAttempt", "field": "error_signature"},
+            ) from exc
         if self.attempt_execution_id:
             try:
                 uuid.UUID(self.attempt_execution_id)

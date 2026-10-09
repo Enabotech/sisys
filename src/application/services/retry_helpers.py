@@ -15,8 +15,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Literal, Optional, TypeVar
+from typing import Awaitable, Callable, Iterator, Literal, Optional, TypeVar
 
 from src.domain.exceptions import (
     ExecutionError,
@@ -57,6 +59,41 @@ class RetryPolicy:
         ExecutionError,
         TimeoutError,
     )
+
+
+# 重试策略 per-task 覆盖（Story 4.7 代码审查 R1-F3：防放大封顶的并发安全形态）
+# 旧机制「保存 engine._retry 原引用 → 整体替换 → finally 按引用恢复」在共享引擎上
+# 存在无锁竞态（clear_scoped 生产未接线，SCOPED 实为进程级共享——并发闭环交错
+# 保存/恢复可使 max_attempts 永久停留 1）。ContextVar 按 task 隔离：窗口内本 task
+# 的 awaited 调用链读到覆盖值，并发 task 不受影响，共享状态零写入。
+_RETRY_POLICY_OVERRIDE: ContextVar[Optional[RetryPolicy]] = ContextVar("retry_policy_override", default=None)
+
+
+def effective_retry_policy(base: RetryPolicy) -> RetryPolicy:
+    """取当前 task 语境下的生效重试策略（覆盖值优先，无覆盖时用基础策略）.
+
+    Args:
+        base: 调用方持有的基础策略（如 engine._retry 实例属性）
+
+    Returns:
+        当前 ContextVar 覆盖策略（若设置），否则 base
+    """
+    return _RETRY_POLICY_OVERRIDE.get() or base
+
+
+@contextmanager
+def retry_policy_override(policy: RetryPolicy) -> Iterator[None]:
+    """在 with 作用域内覆盖当前 task 的生效重试策略（退出自动还原）.
+
+    Args:
+        policy: 覆盖策略（应由基础策略 dataclasses.replace 派生——保留
+            retryable_exceptions/backoff/duration 等全部字段，禁用默认值重建）
+    """
+    token = _RETRY_POLICY_OVERRIDE.set(policy)
+    try:
+        yield
+    finally:
+        _RETRY_POLICY_OVERRIDE.reset(token)
 
 
 async def _call_with_retry(

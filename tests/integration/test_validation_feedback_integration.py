@@ -47,7 +47,7 @@ from src.domain.exceptions import (
     ToolResultValidationError,
 )
 from src.domain.ports.evolution_log_repository import EvolutionLogQuery
-from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall
+from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall, ToolResultStatus
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.postgresql.models import Base
 from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
@@ -472,16 +472,18 @@ class TestBenchmarkLoopOverheadP95:
             )
             # Mock 替身注入真实挂起点（4-5 R2-F02 原语义）
             tool_call = ToolCall(tool_id=tool.tool_id, arguments={}, tenant_id=ctx.tenant_id)
-            try:
-                result = await vfd.execute(tool.tool_id, tool, tool_call, ctx)
-            except Exception:
-                result = None
+            result = await vfd.execute(tool.tool_id, tool, tool_call, ctx)
+            # 脚本确定性（3 方案 × BAD 恒败）→ 每次都应终态 INFEASIBLE——
+            # R1-F9：原「except Exception → None + 恒真 status 断言」在闭环整体
+            # 崩溃时仍收集 20 条近零时长样本，基准恒绿
+            assert result.status == ToolResultStatus.INFEASIBLE, (
+                f"采样 {i} 应为 INFEASIBLE 终态（实际 {result.status}）——基准健康度前提"
+            )
             # 闭环自身开销 = 仓储端口计时（排除 LLM mock 与沙箱 mock 时长）
             durations.append(timed_cases.elapsed + timed_logs.elapsed)
             timed_cases.elapsed = 0.0
             timed_logs.elapsed = 0.0
             await asyncio.sleep(0)
-            assert result is None or result.status is not None
 
         p95 = statistics.quantiles(durations, n=20)[18]
         if p95 >= 5.0:

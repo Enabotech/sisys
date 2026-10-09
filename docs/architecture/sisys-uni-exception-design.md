@@ -709,7 +709,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_390 | ToolChainCycleDetectedError | BusinessException | 422 |（Story 4.2，ToolChain DAG 检测到环）|
 | EXCEPTION_391 | ToolChainDuplicateNodeError | BusinessException | 422 |（Story 4.2，ToolChain DAG 重复节点）|
 | EXCEPTION_392 | ToolChainNodeNotFoundError | NotFoundError | 404 |（Story 4.2，ToolChain DAG 节点不存在）|
-| EXCEPTION_393 | ToolChainExecutionFailedError | BusinessException | 500 |（Story 4.2，ToolChain DAG 执行失败）|
+| EXCEPTION_393 | ToolChainExecutionFailedError | BusinessException | 500 |（Story 4.2，ToolChain DAG 执行失败；context 扩展键（error_signature/enhanced_retry_count，4.7）——INFEASIBLE 触发 FAIL_FAST 中断时携带失败签名与尝试次数）|
 | EXCEPTION_394 | ToolChainNotFoundError | NotFoundError | 404 |（Story 4.2，ToolChain 聚合根不存在）|
 | EXCEPTION_395 | ToolInputSchemaValidationError | ValidationError | 400 |（Story 4.3，Tool.arguments 违反 Tool.input_schema）|
 | EXCEPTION_396 | ToolOutputSchemaValidationError | ValidationError | 422 |（Story 4.3，Tool.output 违反 Tool.output_schema，Round 2 文档化保留）|

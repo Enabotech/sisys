@@ -99,9 +99,7 @@ class ToolExecutionService:
         # （R8-16）：已有键不覆盖（防未来 ToolInputValidator 入链时 INPUT/OUTPUT
         # id 分裂——倒退 4.3 P0-F 一致性）
         if "schema_execution_id" not in context.extensions:
-            import uuid as _uuid
-
-            context = context.with_extension("schema_execution_id", _uuid.uuid4())
+            context = context.with_extension("schema_execution_id", uuid.uuid4())
 
         logger.info(
             "开始执行工具: tool_name=%s tool_id=%s tenant_id=%s version=%s",

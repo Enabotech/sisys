@@ -12,9 +12,11 @@ ValidationFeedbackService——反馈闭环编排（蓝图见 Story Dev Notes）
    b. fix-gen（修复建议生成）：prompt 含 STDERR/violations/案例/负样本提示/
       跨尝试失败反馈（R8-1 动作+结果成对）+ 禁止重复指令；失败计为该次
       attempt 失败（非白名单异常收敛——R2-10）
-   c. hints 注入（validation_feedback_hints 扩展键——P0-D 模式）
-   d. 防放大：engine._retry 整体替换 max_attempts=1（保留原 retryable_exceptions）
-      → try/finally 按引用恢复（TOV 校验重试动态读 engine._retry 同被封顶）
+   c. hints 注入（validation_feedback_hints 扩展键——P0-D 模式；格②命中时
+      case_summaries 附带负样本提示——R1-F6）
+   d. 防放大（R1-F3 ContextVar 形态）：封顶策略由引擎原策略 replace 派生
+      （max_attempts=1，保留全部字段）经 retry_policy_override 按 task 覆盖——
+      共享引擎状态零写入（TOV 校验重试经 effective 动态读同被封顶）
    e. 重执行经 inner_chain（SSD>TOV>Engine 完整内层链——R9-14 双句柄）
 4. mid-attempt 异常分类（R9-13 对称立法）：入环谓词内异常计为该次 attempt 失败；
    谓词外异常中止闭环直传（零观测副作用——R3-3）
@@ -32,10 +34,11 @@ from __future__ import annotations
 import logging
 import time
 import uuid as uuid_module
+from dataclasses import replace
 from typing import Any
 
 from src.application.ports.validation_feedback_service import ValidationFeedbackServicePort
-from src.application.services.retry_helpers import RetryPolicy, _call_with_retry
+from src.application.services.retry_helpers import RetryPolicy, _call_with_retry, retry_policy_override
 from src.application.services.sandbox_security_decorator import extract_stderr_from_cause_chain
 from src.application.services.validation_feedback_prompts import FIX_SYSTEM_PROMPT, build_fix_prompt
 from src.domain.entities.error_case import ErrorCase
@@ -72,6 +75,11 @@ logger = logging.getLogger(__name__)
 _LLM_TRANSIENT_ROOTS = (LLMAPIError, LLMResponseError, TimeoutError)
 
 
+# 后台发布任务强引用集合（P0-I 模式关键一半——asyncio 未持引用的 task 可能被
+# GC 中途回收，事件静默丢失；schema_event_helpers._background_tasks 同款）
+_background_tasks: set = set()
+
+
 def _drain_safe_publish(publisher: EventPublisher | None, event: Any) -> None:
     """fire-and-forget 事件发布（P0-I 模式——不阻塞主流程，异常仅日志）."""
     if publisher is None:
@@ -83,40 +91,30 @@ def _drain_safe_publish(publisher: EventPublisher | None, event: Any) -> None:
     import asyncio
 
     task = asyncio.create_task(_publish())
+    _background_tasks.add(task)
     task.add_done_callback(_log_task_exception)
 
 
 def _log_task_exception(task: Any) -> None:
-    """后台任务异常统一日志（不传播）。"""
+    """后台任务完成回调：异常统一日志 + 释放强引用（不传播）."""
     exc = task.exception()
     if exc is not None:
         logger.warning("Validation Feedback 事件发布失败: %s", exc)
-
-
-def _root_cause(exc: BaseException) -> BaseException:
-    """沿异常因果链取根因叶子（自定义 cause 属性与 __cause__/__context__ 双通道）.
-
-    注意：except 块内 raise 的异常其 __context__ 指向外层正在处理的异常
-    （如 recover 在 VFD except 389 块内调用时 fix-gen 异常的 __context__ 链
-    回指触发异常）——叶子判定可能走偏；LLM 瞬时判定应使用
-    _chain_contains_llm_transient 的链上成员语义。
-    """
-    seen: set[int] = set()
-    current: BaseException = exc
-    while id(current) not in seen:
-        seen.add(id(current))
-        nxt = getattr(current, "cause", None) or current.__cause__ or current.__context__
-        if nxt is None:
-            return current
-        current = nxt
-    return current
+    _background_tasks.discard(task)
 
 
 def _chain_contains_llm_transient(exc: BaseException) -> bool:
     """异常因果链上任一节点属 LLM 瞬时族（R10-2 谓词：链中 last_exc ∈ 白名单同集）.
 
-    遍历自定义 cause 属性与 __cause__/__context__ 双通道（环防护）——
-    fix-gen 的 383.cause=LLM 错误 / 重执行的 389←383←LLM 链均命中。
+    仅遍历**显式因果链**（自定义 cause 属性 + ``raise ... from`` 的 __cause__），
+    刻意不遍历 ``__context__`` 隐式链（R1-F2）：recover 在 VFD except 块内被
+    await 时，期间 raise 的任何内层异常其 __context__ 都回指触发异常——389-LLM
+    触发场景下经该通道会扫到触发链自身的 LLM 节点，非 LLM 根因的 attempt 失败
+    被误判为 LLM 瞬时（#17② 误直传、该标的 INFEASIBLE 被放走）。生产链全程
+    显式（引擎 382 ``cause=``、TOV ``raise ... from``、383 ``cause=last_exc``），
+    弃用 __context__ 不丢真信号。与 extract_stderr_from_cause_chain 的三通道
+    宽容语义不对称是刻意的：stderr 提取误报代价低（多提取一段文本），根因判定
+    误报代价高（终态语义反转）。
     """
     seen: set[int] = set()
     current: BaseException | None = exc
@@ -124,7 +122,7 @@ def _chain_contains_llm_transient(exc: BaseException) -> bool:
         seen.add(id(current))
         if isinstance(current, _LLM_TRANSIENT_ROOTS):
             return True
-        current = getattr(current, "cause", None) or current.__cause__ or current.__context__
+        current = getattr(current, "cause", None) or current.__cause__
     return False
 
 
@@ -194,22 +192,25 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
     ) -> ToolResult:
         """执行完整反馈闭环（编排蓝图见模块 docstring）."""
         start_time = time.monotonic()
-        execution_id = str(getattr(trigger_error, "context", {}).get("execution_id", "") or "")
+        # execution_id 入口一次性 UUID 归一（R1-F11）：畸形串按无 id 处理——统一
+        # 短路查询与终态落库两处行为，消除「查询侧有守卫、落库侧裸 UUID() 抛
+        # ValueError 逃逸」的防御不一致
+        raw_execution_id = str(getattr(trigger_error, "context", {}).get("execution_id", "") or "")
+        try:
+            execution_uuid = uuid_module.UUID(raw_execution_id) if raw_execution_id else None
+        except ValueError:
+            execution_uuid = None
+        execution_id = str(execution_uuid) if execution_uuid is not None else ""
         tenant_id = getattr(context, "tenant_id")
-        assert isinstance(tenant_id, uuid_module.UUID), "context.tenant_id 必须为 UUID"
 
         # 1. 幂等短路（同 execution 已有终态 → 副作用去重 + 合成结论 + 观测计数）
-        if execution_id:
-            try:
-                existing = await self._logs.get_by_execution(uuid_module.UUID(execution_id), tenant_id)
-            except (ValueError, TypeError):
-                existing = None
+        if execution_uuid is not None:
+            existing = await self._logs.get_by_execution(execution_uuid, tenant_id)
             if existing is not None:
                 return await self._replay_synthetic(existing, tool_id, tenant_id)
 
         # 2. 错误上下文提取 + 签名
         stderr, violations, trigger_code, error_category = self._extract_error_context(trigger_error)
-        self._current_trigger_code = trigger_code
         if violations:
             signature = self._extractor.extract_from_violations(violations)
         elif stderr:
@@ -272,24 +273,38 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
 
             # c/d/e. hints 注入 + 防放大 + 重执行（经 inner_chain）
             attempt_execution_id = str(uuid_module.uuid4())
+            # 负样本提示并入引擎侧 case_summaries（R1-F6：Subtask 0.12「Think stage
+            # 消费 case_summaries（含负样本提示）」的生产者侧兑现——引擎 Think
+            # prompt 仅读该键）。fix-gen prompt 的 case_summaries 参数仍传原值
+            # （该参数渲染在「历史成功修复案例」标题下，负样本提示混入属语义
+            # 错标；fix-gen 经独立 negative_hint 参数渲染）
+            engine_case_summaries = case_summaries + (
+                [negative_hint] if strategy == FixStrategy.NEGATIVE_CASE_GUIDED and negative_hint else []
+            )
             hints = {
                 "stderr_excerpt": _excerpt(final_stderr),
                 "schema_violations": list(violations),
-                "case_summaries": case_summaries,
+                "case_summaries": engine_case_summaries,
                 "prior_attempts": list(prior_summaries),
                 "suggested_fix": suggested_fix,
             }
             hints_context = context.with_extension("validation_feedback_hints", hints)
             hints_context = hints_context.with_extension("schema_execution_id", uuid_module.UUID(attempt_execution_id))
 
+            # 防放大（R1-F3 ContextVar 形态）：封顶策略由引擎原策略 dataclasses.replace
+            # 派生（保留 retryable_exceptions/backoff/duration 全部字段——旧形态
+            # RetryPolicy(max_attempts=1, ...) 会把 backoff/duration 重置为默认值），
+            # 经 per-task ContextVar 覆盖生效——共享引擎状态零写入，并发 recover
+            # 互不污染（旧「保存→整体替换→finally 按引用恢复」在进程级共享引擎上
+            # 存在交错恢复致 max_attempts 永久=1 的竞态）
             original_retry = getattr(self._engine, "_retry", None)
-            if original_retry is not None:
-                self._engine._retry = RetryPolicy(
-                    max_attempts=1,
-                    retryable_exceptions=original_retry.retryable_exceptions,
-                )
+            capped_retry = replace(original_retry, max_attempts=1) if isinstance(original_retry, RetryPolicy) else None
             try:
-                result = await self._inner_chain.execute(tool_id, tool, tool_call, hints_context)
+                if capped_retry is not None:
+                    with retry_policy_override(capped_retry):
+                        result = await self._inner_chain.execute(tool_id, tool, tool_call, hints_context)
+                else:
+                    result = await self._inner_chain.execute(tool_id, tool, tool_call, hints_context)
                 # 成功 → 回填 + 事件 + 日志(RECOVERED) + 返回
                 attempt = FixAttempt(
                     attempt_no=attempt_no,
@@ -307,8 +322,9 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                     tool_id=tool_id,
                     tool=tool,
                     tenant_id=tenant_id,
-                    execution_id=execution_id,
+                    execution_uuid=execution_uuid,
                     signature=signature,
+                    trigger_code=trigger_code,
                     error_category=error_category,
                     stderr=final_stderr,
                     attempts=attempts,
@@ -356,9 +372,6 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                     continue
                 # 不满足入环谓词 → 中止闭环直传（零观测副作用——R3-3）
                 raise
-            finally:
-                if original_retry is not None:
-                    self._engine._retry = original_retry
 
         # 4. #17②：全 attempt 失败且各次根因均为 LLM 瞬时 → 直传原触发（零观测副作用）
         if self._all_attempts_llm_transient(attempts, attempt_failures):
@@ -377,8 +390,9 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         return await self._finish_infeasible(
             tool_id=tool_id,
             tenant_id=tenant_id,
-            execution_id=execution_id,
+            execution_uuid=execution_uuid,
             signature=signature,
+            trigger_code=trigger_code,
             error_category=error_category,
             stderr=final_stderr,
             attempts=attempts,
@@ -459,8 +473,9 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         tool_id: uuid_module.UUID,
         tool: Any,
         tenant_id: Any,
-        execution_id: str,
+        execution_uuid: uuid_module.UUID | None,
         signature: str,
+        trigger_code: TriggerCode,
         error_category: str,
         stderr: str,
         attempts: list[FixAttempt],
@@ -496,8 +511,8 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         log_entry = EvolutionLogEntry(
             tenant_id=tenant_id,
             tool_id=tool_id,
-            execution_id=uuid_module.UUID(execution_id) if execution_id else uuid_module.uuid4(),
-            trigger_code=self._trigger_code_of(attempts),
+            execution_id=execution_uuid or uuid_module.uuid4(),
+            trigger_code=trigger_code,
             error_signature=signature,
             enhanced_retry_count=len(attempts),
             fix_attempts=tuple(attempts),
@@ -524,8 +539,9 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         *,
         tool_id: uuid_module.UUID,
         tenant_id: Any,
-        execution_id: str,
+        execution_uuid: uuid_module.UUID | None,
         signature: str,
+        trigger_code: TriggerCode,
         error_category: str,
         stderr: str,
         attempts: list[FixAttempt],
@@ -554,8 +570,8 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         log_entry = EvolutionLogEntry(
             tenant_id=tenant_id,
             tool_id=tool_id,
-            execution_id=uuid_module.UUID(execution_id) if execution_id else uuid_module.uuid4(),
-            trigger_code=self._trigger_code_of(attempts),
+            execution_id=execution_uuid or uuid_module.uuid4(),
+            trigger_code=trigger_code,
             error_signature=signature,
             enhanced_retry_count=len(attempts),
             fix_attempts=tuple(attempts),
@@ -591,13 +607,17 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         """幂等短路合成结论（R3-2 定谳：record_case 观测计数同步递增）."""
         if existing.final_status == FeedbackOutcome.RECOVERED:
             # RECOVERED 重放：合成 SUCCESS 摘要 + replayed 标记（无证据包——R8-3 边界）
+            # fix_summary 透传既有行（R1-F1）：record_case 对 RECOVERED 取传入值覆写，
+            # 传空串会把已沉淀修复配方清空（AC-6 短路路径「不覆写 fix_summary」）
+            case = await self._cases.get_by_natural_key(tenant_id, tool_id, existing.error_signature)
+            replay_fix_summary = case.fix_summary if case is not None else ""
             await self._cases.record_case(
                 ErrorCase(
                     tenant_id=tenant_id,
                     tool_id=tool_id,
                     error_signature=existing.error_signature,
                     error_category="LLM_TRANSIENT",  # category 仅占位（首写定格——已有行不受影响）
-                    fix_summary="",
+                    fix_summary=replay_fix_summary,
                     outcome=FeedbackOutcome.RECOVERED,
                     recovered_count=1,
                     infeasible_count=0,
@@ -640,10 +660,6 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
             },
             retry_count=existing.enhanced_retry_count,
         )
-
-    def _trigger_code_of(self, attempts: list[FixAttempt]) -> TriggerCode:
-        """trigger_code 取提取阶段结果（recover 内经实例属性传递）."""
-        return getattr(self, "_current_trigger_code", TriggerCode.EXCEPTION_389)
 
 
 def _excerpt(text: str, limit: int = 2000) -> str:

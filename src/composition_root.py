@@ -2392,7 +2392,9 @@ def bootstrap() -> None:
             # Story 4.7 升级：装饰链层叠为 ValidationFeedbackDecorator(最外层) >
             # SandboxSecurityDecorator > ToolOutputValidator > Engine（链构造上提
             # 共享至 application 域模块工厂——R10-3「组合根零私有函数」纪律，
-            # build_tool_execution_engine 先例同款；双句柄注入见工厂 docstring）
+            # build_tool_execution_engine 先例同款；双句柄注入见工厂 docstring；
+            # R1-F3 后 engine 句柄为只读——防放大封顶策略经 ContextVar per-task
+            # 覆盖传递，engine._retry 零写入、并发安全）
             engine=__import__(
                 "src.application.services.validation_feedback_service",
                 fromlist=["build_tool_execution_chain"],
@@ -2419,10 +2421,11 @@ def bootstrap() -> None:
             "src.application.ports.validation_feedback_service",
             fromlist=["ValidationFeedbackServicePort"],
         ).ValidationFeedbackServicePort,
-        # 双句柄注入（SSOT 表行为准——R9-14）：engine 引用（防放大封顶用，
-        # resolver.resolve("tool_execution_engine")——SCOPED 同上下文与链内
-        # 引擎同实例）+ inner_chain 引用（重执行用完整内层链）；不注入
-        # RetryPolicy（fix-gen 封顶由服务内自建——防「按值恢复」陷阱）
+        # 双句柄注入（SSOT 表行为准——R9-14）：engine 引用（防放大封顶策略的
+        # replace 派生基线来源——只读，resolver.resolve("tool_execution_engine")
+        # SCOPED 同上下文与链内引擎同实例；R1-F3 后封顶经 ContextVar 覆盖传递，
+        # 不再写入 engine._retry）+ inner_chain 引用（重执行用完整内层链）；
+        # 不注入 RetryPolicy（fix-gen 封顶由服务内自建——防「按值恢复」陷阱）
         impl=lambda resolver: __import__(
             "src.application.services.validation_feedback_service",
             fromlist=["build_validation_feedback_service"],

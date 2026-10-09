@@ -150,6 +150,38 @@ class TestRecordCaseUpsert:
         assert second.last_seen_at > first.last_seen_at
 
 
+class TestErrorCategoryFirstWriteFreeze:
+    """error_category 首写定格定向断言（R1-F10——R9-16 category 二次过滤的成立前提）."""
+
+    @pytest.mark.asyncio
+    async def test_second_record_with_different_category_does_not_rewrite(self) -> None:
+        """异 category 二次回填后行上 category 保持首写值（重放占位 LLM_TRANSIENT
+        不翻转生产分类——格②判定的前置不变量）."""
+        tenant, tool = uuid.uuid4(), uuid.uuid4()
+        repo = InMemoryErrorCaseRepository()
+        await repo.record_case(_make_case(tenant, tool))  # 首写 SCHEMA_VIOLATION
+
+        # 二次回填携带异 category（生产重放路径以 LLM_TRANSIENT 占位形态到达）
+        await repo.record_case(
+            ErrorCase(
+                tenant_id=tenant,
+                tool_id=tool,
+                error_signature=_SIG,
+                error_category="LLM_TRANSIENT",
+                stderr_excerpt="err",
+                fix_summary="",
+                outcome=FeedbackOutcome.RECOVERED,
+                recovered_count=1,
+                infeasible_count=0,
+                occurrence_count=1,
+                last_seen_at=datetime.now(UTC),
+            )
+        )
+        case = await repo.get_by_natural_key(tenant, tool, _SIG)
+        assert case is not None
+        assert case.error_category == "SCHEMA_VIOLATION", "category 首写定格——后续回填不覆写"
+
+
 class TestDeepCopyIsolation:
     """深拷贝防护（4-6 CR1-2：双端副本防共享引用污染）."""
 

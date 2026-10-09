@@ -61,6 +61,7 @@ from src.domain.exceptions import (
     ToolSchemaMissingError,
     ValidationError,
 )
+from src.domain.ports.llm_client import LLMClientPort, LLMConfig, LLMResponse
 from src.domain.services.error_signature_extractor import ErrorSignatureExtractor
 from src.domain.value_objects.tool_execution import (
     ExecutionContext,
@@ -182,58 +183,92 @@ def _make_tool(
     )
 
 
-def _make_scripted_llm(
-    fix_responses: list[Any] | None = None,
-    think_side_effect: Exception | None = None,
-    code_outputs: list[str] | None = None,
-) -> AsyncMock:
-    """可编程 LLM 适配器 Mock（按结构化角色标记分派——4-5 R1-F06 纪律）。
+class _ScriptedLLM:
+    """可编程 LLM 适配器（真实包装类——R1-F8：类型化 calls 记录随实例携带，
+    消除 AsyncMock 裸挂属性所需的属性缺失抑制注释）.
 
-    分派键：
+    分派键（按结构化角色标记分派——4-5 R1-F06 纪律）：
     - generate(system_prompt=FIX_GEN_SYSTEM_MARKER) → fix_responses 队列（Exception 项直接抛出）
     - structured_generate(prompt 以 "为工具" 开头) → Think 阶段（think_side_effect 可编程失败）
     - structured_generate(prompt 以 "基于以下计划" 开头) → Code 阶段（code_outputs 队列）
     - structured_generate(prompt 以 "验证工具" 开头) → Validate 阶段
     """
-    fix_queue = list(fix_responses or [])
-    code_queue = list(code_outputs or [])
-    llm = AsyncMock()
-    calls: list[dict[str, Any]] = []
 
-    async def _generate(prompt: str, config: Any = None, system_prompt: str | None = None) -> Any:
-        calls.append({"kind": "generate", "prompt": prompt, "system_prompt": system_prompt})
+    def __init__(
+        self,
+        fix_responses: list[Any] | None = None,
+        think_side_effect: Exception | None = None,
+        code_outputs: list[str] | None = None,
+        structured_side_effect: Any = None,
+    ) -> None:
+        """初始化可编程队列与调用记录.
+
+        Args:
+            fix_responses: fix-gen 通道响应队列（Exception 项直接抛出）
+            think_side_effect: Think 阶段持续异常
+            code_outputs: Code 阶段输出队列
+            structured_side_effect: 结构化通道整体替换（``async def (prompt) -> Any``，
+                Exception 直接抛出——状态化场景（如 fail_remaining 自愈序列）用，
+                替代实例级方法覆写以满足类型检查）
+        """
+        self.calls: list[dict[str, Any]] = []
+        self._fix_queue = list(fix_responses or [])
+        self._think_side_effect = think_side_effect
+        self._code_queue = list(code_outputs or [])
+        self._structured_side_effect = structured_side_effect
+
+    async def generate(self, prompt: str, config: LLMConfig | None = None, system_prompt: str | None = None) -> LLMResponse:
+        """修复建议生成通道（fix-gen）——按 system_prompt 角色标记分派."""
+        self.calls.append({"kind": "generate", "prompt": prompt, "system_prompt": system_prompt})
         if system_prompt and system_prompt.startswith(FIX_GEN_SYSTEM_MARKER):
-            if fix_queue:
-                item = fix_queue.pop(0)
+            if self._fix_queue:
+                item = self._fix_queue.pop(0)
                 if isinstance(item, Exception):
                     raise item
-                return AsyncMock(content=str(item))
-            return AsyncMock(content="修复建议：将结果前缀改为 OK_")
-        return AsyncMock(content="generic")
+                return LLMResponse(content=str(item))
+            return LLMResponse(content="修复建议：将结果前缀改为 OK_")
+        return LLMResponse(content="generic")
 
-    async def _structured(
+    async def structured_generate(
+        self,
         prompt: str,
-        config: Any = None,
+        response_schema: type[Any],
+        config: LLMConfig | None = None,
         system_prompt: str | None = None,
-        response_schema: Any = None,
     ) -> Any:
-        calls.append({"kind": "structured", "prompt": prompt})
+        """五阶段结构化生成通道——按 prompt 固定前缀分派 Think/Code/Validate."""
+        self.calls.append({"kind": "structured", "prompt": prompt})
+        if self._structured_side_effect is not None:
+            return await self._structured_side_effect(prompt)
         if prompt.startswith("为工具"):
-            if think_side_effect is not None:
-                raise think_side_effect
+            if self._think_side_effect is not None:
+                raise self._think_side_effect
             return "plan-1"
         if prompt.startswith("基于以下计划"):
-            if code_queue:
-                return code_queue.pop(0)
+            if self._code_queue:
+                return self._code_queue.pop(0)
             return "print('result')"
         if prompt.startswith("验证工具"):
             return "validation-ok"
         return "generic"
 
-    llm.generate = AsyncMock(side_effect=_generate)
-    llm.structured_generate = AsyncMock(side_effect=_structured)
-    llm.calls = calls  # type: ignore[attr-defined]
-    return llm
+    async def close(self) -> None:
+        """释放资源（协议成员——内存替身无资源，幂等空操作）。"""
+
+
+def _make_scripted_llm(
+    fix_responses: list[Any] | None = None,
+    think_side_effect: Exception | None = None,
+    code_outputs: list[str] | None = None,
+    structured_side_effect: Any = None,
+) -> _ScriptedLLM:
+    """可编程 LLM 适配器工厂（真实包装类——R1-F8 根因消除属性抑制注释）."""
+    return _ScriptedLLM(
+        fix_responses=fix_responses,
+        think_side_effect=think_side_effect,
+        code_outputs=code_outputs,
+        structured_side_effect=structured_side_effect,
+    )
 
 
 def _make_scripted_sandbox(
@@ -314,7 +349,7 @@ class _FailingChain:
 
 def _build_chain(
     context: dict[str, Any],
-    llm: AsyncMock | None = None,
+    llm: LLMClientPort | None = None,
     sandbox: AsyncMock | None = None,
     wrapped_override: Any = None,
     error_case_repo: InMemoryErrorCaseRepository | None = None,
@@ -324,7 +359,7 @@ def _build_chain(
 
     Args:
         context: BDD 状态容器
-        llm: 可编程 LLM（缺省 fresh mock）
+        llm: 可编程 LLM（缺省 fresh 替身——_ScriptedLLM 真实包装类，R1-F8）
         sandbox: 可编程 Sandbox（缺省 fresh mock）
         wrapped_override: 直构异常链替身（触发矩阵直传行——绕过真实链注入异常对象）
         error_case_repo: 复用既有案例仓储（多轮闭环场景保持历史）
@@ -333,11 +368,11 @@ def _build_chain(
     error_case_repo = error_case_repo or InMemoryErrorCaseRepository()
     evolution_repo = evolution_repo or InMemoryEvolutionLogRepository()
     publisher = _RecordingEventPublisher()
-    llm = llm or _make_scripted_llm()
-    sandbox = sandbox or _make_scripted_sandbox()
+    llm_client: LLMClientPort = llm if llm is not None else _make_scripted_llm()
+    sandbox_client: Any = sandbox if sandbox is not None else _make_scripted_sandbox()
     engine = ToolExecutionEngine(
-        llm_client=llm,
-        sandbox=sandbox,
+        llm_client=llm_client,
+        sandbox=sandbox_client,
         retry_policy=_PROD_LIKE_RETRY,
     )
     tov = ToolOutputValidator(
@@ -347,11 +382,11 @@ def _build_chain(
     )
     ssd = SandboxSecurityDecorator(
         wrapped=tov,
-        sandbox=sandbox,
+        sandbox=sandbox_client,
         event_publisher=publisher,
     )
     service = ValidationFeedbackService(
-        llm_client=llm,
+        llm_client=llm_client,
         error_case_repository=error_case_repo,
         evolution_log_repository=evolution_repo,
         event_publisher=publisher,
@@ -364,8 +399,8 @@ def _build_chain(
     tool = _make_tool(output_schema=dict(_SCHEMA_REQUIRE_OK))
     context.update(
         {
-            "llm": llm,
-            "sandbox": sandbox,
+            "llm": llm_client,
+            "sandbox": sandbox_client,
             "engine": engine,
             "error_case_repo": error_case_repo,
             "evolution_repo": evolution_repo,
@@ -439,7 +474,7 @@ def _list_logs(context: dict[str, Any]) -> list[Any]:
 
 def _fix_calls(context: dict[str, Any]) -> list[dict[str, Any]]:
     """取修复生成调用记录（generate 通道）。"""
-    return [c for c in context["llm"].calls if c["kind"] == "generate"]  # type: ignore[attr-defined]
+    return [c for c in context["llm"].calls if c["kind"] == "generate"]
 
 
 def _bad_violation_dicts() -> list[dict[str, Any]]:
@@ -492,6 +527,16 @@ def _make_error_case(
 def _get_case(context: dict[str, Any], signature: str) -> Any:
     """按自然键取案例。"""
     return _run(context["error_case_repo"].get_by_natural_key(context["tenant_id"], context["tool_id"], signature))
+
+
+def _sign_llm_message(context: dict[str, Any]) -> str:
+    """计算 389-LLM 子路径（violations 空）的归一化签名——TOV 389 消息口径.
+
+    该子路径服务侧签名输入为 str(trigger_error)（TOV 类固定消息），与生产
+    抛出位 tool_output_validator 的 message 逐字一致（防签名口径漂移）。
+    """
+    extractor: ErrorSignatureExtractor = context["extractor"]
+    return extractor.extract("Tool output schema validation exhausted retries")
 
 
 def _build_direct_389_trigger(context: dict[str, Any]) -> ToolResultValidationError:
@@ -698,15 +743,19 @@ def given_389_llm_path(context: dict[str, Any]) -> None:
     _build_chain(context, llm=_make_scripted_llm(think_side_effect=LLMAPIError("503 unavailable")))
 
 
-@then("进入增强反馈闭环且 error_category 为 LLM_TRANSIENT")
+@then("进入增强反馈闭环且 LLM 瞬时根因直传原触发异常")
 def then_enter_loop_llm_transient(context: dict[str, Any]) -> None:
-    """断言闭环触发且触发分类为 LLM_TRANSIENT（#17 双保险的前提分类）。"""
+    """断言闭环触发 + #17② 直传形态（LLM_TRANSIENT 分类的可观测终态表现）.
+
+    R1-F9：该场景 3 attempt 全 LLM 根因 → #17② 直传——零观测副作用（无日志/
+    无案例行/无事件），error_category 无记录面载体，朴素断言日志字段不可实现；
+    直传原 389 即分类语义的行为化证明（外部瞬时故障≠任务不可行，不标 INFEASIBLE）。
+    """
     fix_calls = _fix_calls(context)
     assert fix_calls, "389-LLM 子路径应进入闭环"
-    # 分类经演进日志记录面断言：恢复/耗尽后日志 error_category == LLM_TRANSIENT
-    logs = _list_logs(context)
-    if logs:
-        assert logs[0].error_category if hasattr(logs[0], "error_category") else True
+    assert isinstance(context["error"], ToolResultValidationError), "3 attempt 全 LLM 根因应直传原 389 触发异常（决策 #17）"
+    _assert_zero_observation(context)
+    assert _get_case(context, _sign_llm_message(context)) is None, "不应回填案例行"
 
 
 @given("沙箱内代码缺陷经引擎兜底包装为 382 且 stage 为 EXECUTION")
@@ -945,9 +994,14 @@ def given_case_recovered_empty_fix(context: dict[str, Any]) -> None:
 
 @then("修复 prompt 不注入空配方")
 def then_prompt_no_empty_recipe(context: dict[str, Any]) -> None:
-    """空配方跳过注入断言（禁虚标 CASE_GUIDED——策略断言由 PURE_LLM then 覆盖）。"""
+    """空配方跳过注入断言（禁虚标 CASE_GUIDED——策略断言由 PURE_LLM then 覆盖）。
+
+    R1-F9：补内容面断言——格④无可注入配方时「历史成功修复案例」整段不出现
+    （仅断 fix_calls 非空为空壳——注入空串条目也不红）。
+    """
     fix_calls = _fix_calls(context)
     assert fix_calls
+    assert not any("历史成功修复案例" in c["prompt"] for c in fix_calls), "格④不得渲染案例注入段"
 
 
 @given("错误案例库存在同签名案例但 outcome 为 MARKED_INFEASIBLE 且 error_category 不匹配")
@@ -1486,16 +1540,10 @@ def given_recovered_llm_transient(context: dict[str, Any]) -> None:
     （max_attempts=1，4.3 P0-1），故 3 轮 TOV × 1 次 think = 3 次耗尽 → 389；
     闭环内 LLM 恢复（fix-gen 成功 + 重执行 think 成功）。
     """
-    llm = _make_scripted_llm(fix_responses=["方案A"])
     state = {"fail_remaining": 3}
     api_error = LLMAPIError("503")
 
-    async def _structured(
-        prompt: str,
-        config: Any = None,
-        system_prompt: str | None = None,
-        response_schema: Any = None,
-    ) -> Any:
+    async def _structured(prompt: str) -> Any:
         if prompt.startswith("为工具") and state["fail_remaining"] > 0:
             state["fail_remaining"] -= 1
             raise api_error
@@ -1505,7 +1553,7 @@ def given_recovered_llm_transient(context: dict[str, Any]) -> None:
             return "validation-ok"
         return "generic"
 
-    llm.structured_generate = AsyncMock(side_effect=_structured)
+    llm = _make_scripted_llm(fix_responses=["方案A"], structured_side_effect=_structured)
     _build_chain(
         context,
         llm=llm,
@@ -1513,6 +1561,28 @@ def given_recovered_llm_transient(context: dict[str, Any]) -> None:
     )
     # 宽松 schema（触发来自 LLM 瞬时而非违规——389-LLM 子路径）
     context["tool"] = _make_tool(output_schema=dict(_SCHEMA_ALWAYS_VALID))
+    # 预置既有配方（R1-F9）：#17①「不覆写」断言的指涉对象——无预置则退化为
+    # ""=="" 弱断言（恢复前无行 → fix_summary 落空串，恢复后仍空串恒绿）
+    from src.domain.entities.error_case import ErrorCase
+    from src.domain.value_objects.validation_feedback import FeedbackOutcome
+
+    _run(
+        context["error_case_repo"].record_case(
+            ErrorCase(
+                tenant_id=context["tenant_id"],
+                tool_id=context["tool_id"],
+                error_signature=_sign_llm_message(context),
+                error_category="LLM_TRANSIENT",
+                stderr_excerpt="",
+                fix_summary="旧配方：历史退避自愈观察",
+                outcome=FeedbackOutcome.RECOVERED,
+                recovered_count=1,
+                infeasible_count=0,
+                occurrence_count=1,
+                last_seen_at=datetime.now(UTC),
+            )
+        )
+    )
     _execute_vfd(context)
 
 
@@ -1521,6 +1591,10 @@ def then_llm_transient_no_overwrite(context: dict[str, Any]) -> None:
     """#17① 断言（防伪配方污染——恢复归因于退避自愈而非修复方案）。"""
     result = context["result"]
     assert result is not None and result.status == ToolResultStatus.SUCCESS
+    case = _get_case(context, _sign_llm_message(context))
+    assert case is not None, "LLM_TRANSIENT 恢复应回填案例行（观测计数递增）"
+    assert case.recovered_count == 2, "recovered_count 递增（预置 1 + 本次 1）"
+    assert case.fix_summary == "旧配方：历史退避自愈观察", "fix_summary 不覆写（#17①——防伪配方污染）"
 
 
 # ============================================================================
@@ -1589,11 +1663,17 @@ def given_already_recovered_final(context: dict[str, Any]) -> None:
 
 @then("返回合成 SUCCESS 摘要且 output 携带 replayed 为 true 的标记")
 def then_synthetic_success_replayed(context: dict[str, Any]) -> None:
-    """R8-3 可辨识标记断言（重放结果要么等价要么可辨识）。"""
+    """R8-3 可辨识标记断言（重放结果要么等价要么可辨识）+ 案例配方存续
+    （R1-F1：AC-6 短路路径不覆写 fix_summary——重放不得清空已沉淀配方）。"""
     result = context["replay_result"]
     assert result is not None
     assert result.status == ToolResultStatus.SUCCESS
     assert result.output.get("replayed") is True
+    signature = _sign_bad_output(context)
+    case = _get_case(context, signature)
+    assert case is not None, "首次恢复应已沉淀案例行"
+    assert case.fix_summary, "重放前应有非空修复配方（首次恢复派生）"
+    assert case.recovered_count == 2, "重放观测计数同步递增（R3-2）"
 
 
 @then("合成摘要不含证据包")
@@ -1665,9 +1745,38 @@ def when_check_composition_root(context: dict[str, Any]) -> None:
 
 @then("装饰链层叠为 ValidationFeedbackDecorator 最外层")
 def then_vfd_outermost(context: dict[str, Any]) -> None:
-    """装配形态断言（impl 工厂可调用——实例链经契约测试 11 维度守护）。"""
+    """装配形态断言（R1-F9：spec.impl 经替身 resolver 实例化解包——VFD>SSD>TOV>
+    Engine 四层 isinstance 链；避免全组合根 resolve 的环境依赖）。"""
+    from unittest.mock import MagicMock
+
+    from src.application.ports.tool_execution_engine import ToolExecutionEnginePort
+    from src.application.services.sandbox_security_decorator import SandboxSecurityDecorator
+    from src.application.services.tool_execution_service import ToolExecutionService
+    from src.application.services.tool_output_validator import ToolOutputValidator
+
     spec = context["spec"]
-    assert callable(spec.impl)
+
+    class _StubResolver:
+        """替身 resolver：为链构造工厂提供轻量依赖（不触真实外部服务）。"""
+
+        def resolve(self, name: str) -> Any:
+            if name == "tool_version_service":
+                return None
+            if name == "tool_execution_engine":
+                engine = AsyncMock(spec=ToolExecutionEnginePort)
+                engine._retry = MagicMock()
+                return engine
+            return MagicMock()
+
+    service = spec.impl(_StubResolver())
+    assert isinstance(service, ToolExecutionService), "impl 工厂产物应为 ToolExecutionService"
+    vfd = service._engine
+    assert isinstance(vfd, ValidationFeedbackDecorator), "注入 engine 位应为 VFD（最外层）"
+    ssd = vfd._wrapped
+    assert isinstance(ssd, SandboxSecurityDecorator), "VFD 内层应为 SSD"
+    tov = ssd._wrapped
+    assert isinstance(tov, ToolOutputValidator), "SSD 内层应为 TOV"
+    assert isinstance(tov._wrapped, AsyncMock), "TOV 内层应为引擎句柄"
 
 
 @then("tool_execution_service 版本为 v1.4.0 且 tags 含 feedback")

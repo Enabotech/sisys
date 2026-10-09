@@ -22,7 +22,12 @@ import uuid
 
 from src.application.ports.schema_validator import SchemaValidatorPort
 from src.application.ports.tool_execution_engine import ToolExecutionEnginePort
-from src.application.services.retry_helpers import RetryPolicy, _call_with_retry
+from src.application.services.retry_helpers import (
+    RetryPolicy,
+    _call_with_retry,
+    effective_retry_policy,
+    retry_policy_override,
+)
 from src.application.services.schema_event_helpers import (
     EVENT_MAX_PATH_DEPTH_DEFAULT,
     EVENT_MAX_TOTAL_BYTES_DEFAULT,
@@ -55,8 +60,8 @@ class ToolOutputValidator:
     - 调用 _call_with_retry 触发重试(默认沿用 wrapped._retry,可在构造时覆盖)
     - 重试时通过 context.extensions["schema_last_violations"] 注入上轮 violations,
       Engine._validate_stage 读取后拼入 LLM prompt(LLM 自纠反馈)
-    - 重试耗尽 → 设置 ToolResult.status = FAILED + ToolResult.retry_count 填充
-      + 抛 ToolResultValidationError (EXCEPTION_389)
+    - 重试耗尽 → 抛 ToolResultValidationError (EXCEPTION_389,R8-33 docstring
+      漂移修正:不构造 FAILED ToolResult——结果化路径不存在,4.7 VFD 按异常类型订阅)
     - 每次重试失败都通过 event_publisher 发布 ToolSchemaValidationFailed (OUTPUT),
       仅最后一次 is_final=True
     """
@@ -97,12 +102,15 @@ class ToolOutputValidator:
             context: 执行上下文
 
         Returns:
-            ToolResult(校验通过时由被装饰 Engine 返回;重试耗尽时 status=FAILED)
+            ToolResult(校验通过时由被装饰 Engine 返回;重试耗尽时抛 389 不返回结果)
 
         Raises:
             ToolResultValidationError: 重试耗尽后抛出(EXCEPTION_389,符合 AC-3 契约)
         """
-        retry_policy = self._retry_policy or getattr(self._wrapped, "_retry", RetryPolicy())
+        # 动态读引擎策略（4.3 前置条件:构造未显式注入 retry_policy 时生效）——
+        # 经 effective 读取（R1-F3）:VFD 反馈闭环窗口内 ContextVar 覆盖值生效,
+        # 校验重试层随引擎层同被封顶（防放大双层闭环的 TOV 半边）
+        retry_policy = self._retry_policy or effective_retry_policy(getattr(self._wrapped, "_retry", RetryPolicy()))
         if retry_policy is None:
             retry_policy = RetryPolicy()
         retry_count = 0
@@ -116,7 +124,9 @@ class ToolOutputValidator:
         # 加 litellm tenacity 默认 3 次 = 81x LLM 调用,触发 max_total_duration_sec 超时
         # 修复:装饰器重试期间把 Engine 临时改为 max_attempts=1,只重试 Validate 阶段
         # 而非整个 5 阶段,完成后恢复原值
-        original_wrapped_retry = getattr(self._wrapped, "_retry", None)
+        # R1-F3 迁移(ContextVar 形态):封顶经 per-task 覆盖传递,引擎侧 effective
+        # 读取生效——共享 wrapped._retry 零写入(旧「保存→替换→恢复」在进程级共享
+        # 引擎上存在交错恢复致 max_attempts 永久=1 的竞态,与 VFD 侧同源同修)
         retry_policy_for_engine = RetryPolicy(
             max_attempts=1,
             backoff_strategy=retry_policy.backoff_strategy,
@@ -125,8 +135,6 @@ class ToolOutputValidator:
             max_total_duration_sec=retry_policy.max_total_duration_sec,
             retryable_exceptions=retry_policy.retryable_exceptions,
         )
-        if hasattr(self._wrapped, "_retry"):
-            self._wrapped._retry = retry_policy_for_engine
 
         async def execute_with_retry() -> ToolResult:
             """单次执行 + 校验 + 失败时通过异常触发 _call_with_retry 重试"""
@@ -204,33 +212,27 @@ class ToolOutputValidator:
             ),
         )
 
-        try:
-            return await _call_with_retry(
-                execute_with_retry,
-                retry_policy_for_validation,
-                execution_id=str(execution_id),
-                tool_id=tool_id,
-                op_name="tool_output_validator",
-            )
-        except ToolExecutionRetryExhaustedError as retry_exc:
-            # Round 2 P0-1:重试耗尽时,先恢复 Engine 原始 _retry,避免污染 Engine 后续使用
-            if hasattr(self._wrapped, "_retry") and original_wrapped_retry is not None:
-                self._wrapped._retry = original_wrapped_retry
-            # P0-B 修复:_call_with_retry 在重试耗尽时抛 ToolExecutionRetryExhaustedError,
-            # 但 AC-3 + AC-7 契约明确要求装饰器对外抛 ToolResultValidationError(EXCEPTION_389),
-            # 4.7 Validation Feedback 订阅契约按 ToolResultValidationError 类型做处理。
-            # 转换异常类型,保留 last_violations 信息
-            raise ToolResultValidationError(
-                message="Tool output schema validation exhausted retries",
-                tool_id=str(tool_id),
-                execution_id=str(execution_id),
-                reason=f"retries exhausted: {retry_count}; cause: {retry_exc.cause}",
-                schema_violations=[v.to_dict() for v in last_violations],
-            ) from retry_exc
-        finally:
-            # Round 2 P0-1:无论成功或失败,恢复 Engine 原始 _retry(防御性编程)
-            if hasattr(self._wrapped, "_retry") and original_wrapped_retry is not None:
-                self._wrapped._retry = original_wrapped_retry
+        with retry_policy_override(retry_policy_for_engine):
+            try:
+                return await _call_with_retry(
+                    execute_with_retry,
+                    retry_policy_for_validation,
+                    execution_id=str(execution_id),
+                    tool_id=tool_id,
+                    op_name="tool_output_validator",
+                )
+            except ToolExecutionRetryExhaustedError as retry_exc:
+                # P0-B 修复:_call_with_retry 在重试耗尽时抛 ToolExecutionRetryExhaustedError,
+                # 但 AC-3 + AC-7 契约明确要求装饰器对外抛 ToolResultValidationError(EXCEPTION_389),
+                # 4.7 Validation Feedback 订阅契约按 ToolResultValidationError 类型做处理。
+                # 转换异常类型,保留 last_violations 信息(with 退出自动还原覆盖,无残留)
+                raise ToolResultValidationError(
+                    message="Tool output schema validation exhausted retries",
+                    tool_id=str(tool_id),
+                    execution_id=str(execution_id),
+                    reason=f"retries exhausted: {retry_count}; cause: {retry_exc.cause}",
+                    schema_violations=[v.to_dict() for v in last_violations],
+                ) from retry_exc
 
 
 __all__ = ["ToolOutputValidator"]

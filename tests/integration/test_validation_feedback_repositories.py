@@ -299,6 +299,35 @@ class TestErrorCasePGRepository:
         assert found.fix_summary == "旧"  # 不可行回填不动配方
 
     @pytest.mark.asyncio
+    async def test_record_case_category_first_write_freeze(self, repo_session: AsyncSession) -> None:
+        """error_category 首写定格（R1-F10——与 InMemory 同款定向断言）：异 category
+        二次回填后行上 category 保持首写值（重放占位 LLM_TRANSIENT 不翻转生产分类）."""
+        repo = PostgreSQLErrorCaseRepository()
+        tenant, tool = uuid.uuid4(), uuid.uuid4()
+
+        await repo.record_case(_make_case(tenant, tool))  # 首写 SCHEMA_VIOLATION
+        await repo.record_case(
+            ErrorCase(
+                tenant_id=tenant,
+                tool_id=tool,
+                error_signature=_SIG,
+                error_category="LLM_TRANSIENT",
+                stderr_excerpt="err",
+                fix_summary="",
+                outcome=FeedbackOutcome.RECOVERED,
+                recovered_count=1,
+                infeasible_count=0,
+                occurrence_count=1,
+                last_seen_at=datetime.now(UTC),
+            )
+        )
+
+        found = await repo.get_by_natural_key(tenant, tool, _SIG)
+        assert found is not None
+        assert found.error_category == "SCHEMA_VIOLATION", "PG 侧 category 首写定格——后续回填不覆写"
+        assert found.recovered_count == 2, "计数仍正常递增"
+
+    @pytest.mark.asyncio
     async def test_record_case_after_unique_conflict_recovery(self, repo_session: AsyncSession) -> None:
         """UNIQUE 冲突后 record_case 容错（4-6 CR1-4：SAVEPOINT 保护 + 重读合并）.
 
