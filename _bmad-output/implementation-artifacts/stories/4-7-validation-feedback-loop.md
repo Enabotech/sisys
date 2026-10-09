@@ -68,7 +68,7 @@
 **And** 修复成功路径发布 `ToolExecutionRecovered` 领域事件（配置双登记 reliable——运行时仅 outbox 路径，见 AC-6 语义注记）。**两事件 execution_id 定稿 = 主 id**（`trigger_error.context["execution_id"]`——与演进日志幂等键同源；attempt 级引擎事件回链仅经 `fix_attempts.attempt_execution_id`）。**389 子路径 id 同源修复（R2 发现悬空，R7 定稿方案）**：389 的 execution_id 原为 TOV 内 `extract_schema_execution_id(context) or uuid4()` 铸造（`tool_output_validator.py:111`）——生产链无人设置该键时与 ToolExecution 聚合行无对应（「两套 id 空间」，4.1b DataSourceFetchFailed 断链同构）。**修复设计（决策 #16，Task 6 循环 D 实施）**：链入口 `ToolExecutionService.execute`（`tool_execution_service.py:64`，装饰链之外）注入 `context.with_extension("schema_execution_id", uuid.uuid4())`（**条件注入形态（R8-16）**：`if "schema_execution_id" not in context.extensions:` 才注入——无条件覆盖会在未来 `ToolInputValidator` 入链时（TIV 同键 extract→注入先例）使 INPUT 事件 id 与 OUTPUT/聚合 id 分裂，倒退 4.3 P0-F 一致性；当前生产 TIV 未装配无实冲突，条件形态零成本防患）（1 行，沿用 TOV 已读的键名——`schema_event_helpers.py:141-146` 第一优先级）+ 引擎 `:137-138` 聚合 id 改为优先读该键（3 行，无则新铸）+ TOV 零改动自动命中——**聚合 id = 382/389 context id = 演进日志幂等键 = 两事件 id 全链同源**；引擎 `_persist_execution` 用 save（upsert 语义），校验重试多次 execute 同 id 重入无乐观锁冲突（聚合行覆盖为最新次，与 execution_id 幂等语义一致）
 
 **验证标准/Validation Criteria:**
-- [ ] `ToolResultStatus.INFEASIBLE = "infeasible"` 新增（`(str, Enum)` 加值 additive）；既有语义注释保持（INVALID 语义不变——`value_objects/tool_execution.py:247-249` 注释契约保持）；**既有 4 值边界断言联动**：`tests/unit/domain/value_objects/test_tool_execution_values.py:114-121` 的 `len(statuses)==4`/全值 set 断言与 `tool_execution.py:30` 枚举 docstring「4 值边界」须同步更新为 5 值（Task 1 循环 C 显式包含）
+- [ ] `ToolResultStatus.INFEASIBLE = "infeasible"` 新增（`(str, Enum)` 加值 additive）；既有语义注释保持（INVALID 语义不变——`value_objects/tool_execution.py:247-249` 注释契约保持）；**既有 4 值边界断言联动**：`tests/unit/domain/value_objects/test_tool_execution_values.py:114-121` 的 `len(statuses)==4`/全值 set 断言与 `tool_execution.py:30` 枚举 docstring「4 值边界」须同步更新为 5 值（Task 1 循环 C 显式包含。**R4 勘误补联动**：dev 期漏了 4.1a 验收资产 `tests/acceptance/test_acceptance_strategic_tool_impl.py:580` 的 set==4 值断言 + feature「4 值边界」场景文本——dev 全量 21 失败中误判环境性掩盖，R4 全量抓出并已修为 5 值三联动位）
 - [ ] `ValidationFeedbackRetryExhaustedError`：code=`EXCEPTION_399`、继承 `BusinessException`、构造器携带 `execution_id`/`tool_id`/`enhanced_retry_count`/`error_signature` context（execution_id 取自 trigger_error.context——见 AC-1/AC-6 提取机制）
 - [ ] `ToolExecutionState` 6 状态机**不动**（FAILED 终态语义不变，增强重试按"终态反向迁移禁止（重试创建新 attempt）"既有注释语义创建新执行）
 - [ ] 两事件字段与 `DomainEvent` 基类 12 核心字段（`base.py:20-35` `_CORE_FIELD_NAMES`）对齐 + 各自自有字段（MarkedInfeasible 8 个 / Recovered 7 个）+ tenant_id baseline（4-5 R1-F01 教训：metadata 字段一律 `str()` 化防 json 序列化失败）
@@ -1469,7 +1469,15 @@ docs/architecture/
 - [x] [4-7-P3-CR-R2-5][Review][Patch] 决策演进条目 6 漏标 CR-R1-3 / #17② 谓词「链上成员」精度注记（AC-2 VC + Dev Record :1216）/ 测试函数名残留旧机制词（`test_engine_retry_capped_via_contextvar_zero_write` 更名）/ TOV `if retry_policy is None` 不可达分支删除 + 测试 docstring 改实 — 均随本轮清偿
 - [x] [4-7-P3-CR-R2-6][Review][Patch] 台账措辞勘误：CR-R1-8 `_LLMResponse`→端口 VO `LLMResponse`；CR-R1-29 补 `_replay_synthetic` 同款窗口
 
-#### Round 3（单深度推演，2026-10-09）
+#### Round 4（纯验证轮，2026-10-09）
+
+**游离提交甄别**：R2→R3 之间的 `a359205c`（CI ruff I001 修复——契约测试双块 import 合并）系 CI 红灯即时修复，属本审查周期变更，**本轮补登记**（非游离——用户转达 CI 失败后即时处置，根因 = 本地/CI ruff isort 版本判定差异，4-6 周期先例同款；精确扫描 4-7 全部变更文件确认仅此一处双块形态）。
+
+**全量回归**（HEAD `e76b0c21`，tests/ 除 integration）：10880 passed / 5 failed——其中 4 项**隔离复跑全绿**（快照延迟 p95 / Docker 沙箱启动 p95 / 余弦检索×2——并发负载抖动实证，dev 期 21 失败同款环境形态）；**1 项真实缺陷抓出并修复**：
+
+- [x] [4-7-P1-CR-R4-1][Review][Patch] 4.1a 验收资产 4 值边界断言漏联动（`tests/acceptance/test_acceptance_strategic_tool_impl.py:580` `set(ToolResultStatus)==4 值` + feature「AC-3c - 4 值边界」文本——dev 加 INFEASIBLE 后必红；dev 全量 21 失败误判环境性掩盖；4-1f「既有验收资产计数联动」教训同类）— 三联动位修复（断言集合+@then 绑定串+feature 场景文本改 5 值），修后 18/18 绿——**枚举加值类变更须全仓 grep 断言位**（len/set/计数/文档字面）纪律再实证
+
+**锚点存续核验**：R1~R3 台账关键 file:line 抽验（ContextVar 工具位/端口 docstring/陷阱 8/14/蓝图/SSOT :183/399 docstring 两处/Query 校验/次序键双侧）与 HEAD 一致；红线 grep（noqa/type: ignore/pylint）4-7 变更集零命中；lint-imports 维持预存量 BROKEN（CR-R1-30 登记，非本 Story 面）。
 
 单 Agent 深度推演（六条长状态时间线逐字段终态 × 谓词全枚举 21 格/27 组合 × 四组真突变判别力 × 九项证伪探针留痕）。**结论：零 P0/P1/P2**——R1 修复在长状态时间线与并发边界下行为全部符合契约；关键实证：①389-LLM 触发 × mid 代码缺陷正确落 INFEASIBLE（R1-F2 主场景闭环验证）②RECOVERED 重放→再耗尽配方存续（R1-F1 跨终态序列）③DAG 同波 B 节点读 base 不受 A 的 override 连带（三重探针证据——task 创建时 context 快照隔离，R1-F3 连带消除的结构性证明）④四组真突变（防放大 with 删除/TOV 封顶失效/负样本不并入/首写定格破坏）全部红→还原→绿。发现与清偿：
 
@@ -1491,9 +1499,9 @@ docs/architecture/
 
 ---
 
-**故事版本/Story Version:** v1.8.2
+**故事版本/Story Version:** v1.8.3
 **创建日期/Created:** 2026-10-08
-**最后更新/Last Updated:** 2026-10-09（代码审查周期 Round 3）
+**最后更新/Last Updated:** 2026-10-09（代码审查周期 Round 4）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（3 并行调研 Agent 代码实证 + 4 前序故事经验整合 + 4 笔预留债清偿方案）
 - v1.1.0: 文档审查 Round 1——4 调研 Agent + 3 审查 Agent（正确性/一致性 + 可行性/可达性 + 科学性/方法论对标业界）收敛 42 项（P0×5 + P1×10 + P2/P3×27）：重写 STDERR 浮现路径为生产真实形态（382 主路径）、execution_id 全链提取机制定稿、签名统一 64 hex + Sentry 对标归一化、修复循环跨尝试反馈（Reflexion 共识）、outbox fallback 独立 session 重设计、触发矩阵 8 行化、防放大两层封顶、幂等副作用去重语义等
@@ -1510,6 +1518,7 @@ docs/architecture/
 - v1.8.0: **代码审查周期 Round 1**——四视角并行调研（闭环编排正确性/契约一致性/测试判别力/架构合规回归）+ 主会话探针实证 + 双评审员方案评审 + 复评「优秀」后落码：清偿 P1×5（RECOVERED 重放清空配方/#17② `__context__` 假阳性/engine._retry 竞态→ContextVar 根治（VFD+TOV 双侧）/循环 D 五断言补交/trigger_code 竞态）+ P2×8（含 `# type: ignore` 红线×2 根因消除、负样本提示达引擎、BDD 恒真断言四则修正、首写定格定向断言、UUID 归一、陷阱 14 前提修正、393 注记）+ P3×8 随轮清偿 + Defer×9 登记；防放大机制演进为 ContextVar per-task 覆盖（决策 #8/陷阱 8/14/蓝图/SSOT 联动改写）
 - v1.8.1: **代码审查周期 Round 2**——双 Agent 回归核查 + 传播完备性：**R1 修复零 P0/P1/P2 回归**（ContextVar 迁移逐字段推演等价或严格更优 + 8009 单测独立回归）；清偿 P2×2（端口 docstring 旧模式/File List 双漏登+复用表勘误）+ P3×6（回调取消边界/hex 守卫收紧 fullmatch+拒绝向×4/决策演进标注/谓词精度注记/测试更名/TOV 死分支/台账勘误）
 - v1.8.2: **代码审查周期 Round 3**——单深度推演：六条长状态时间线 × 谓词全枚举（21 格唯一/27 组合零偏差）× 四组真突变判别力（全红→还原→绿）× 九项证伪留痕——**零 P0/P1/P2**；关键结构性证明：DAG 同波 task 创建时 context 快照隔离（override 连带消除）；清偿 P3×3（Query 分页校验/次序键决胜/399 docstring 勘误）+ Defer×1（跨循环 task 滞留与先例统一治理）
+- v1.8.3: **代码审查周期 Round 4**——纯验证轮：全量回归 10880 passed + 4 环境项隔离复跑全绿实证 + **1 项真实缺陷抓出**（4.1a 验收资产 4 值边界断言漏联动——dev 全量 21 失败误判掩盖，三联动位修复 18/18 绿）；CI ruff 修复提交补登记；锚点存续/红线/lint-imports 核验
 
 ### 🏁 文档审查周期收敛声明（Round 5 独立终审，2026-10-09）
 

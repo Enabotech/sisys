@@ -83,8 +83,8 @@
     并且 错误码为 EXCEPTION_386
     并且 missing_fields 包含 "plan"
 
-  场景: AC-3c - ToolResultStatus 4 值边界
-    那么 ToolResultStatus 枚举包含 success/failed/invalid/insufficient_data 共 4 值
+  场景: AC-3c - ToolResultStatus 5 值边界
+    那么 ToolResultStatus 枚举包含 success/failed/invalid/insufficient_data/infeasible 共 5 值
 
   # ==========================================================================
   # AC-4: ToolExecutionEngine 五阶段工作流（Mock 端口，验证端口映射）
