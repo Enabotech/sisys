@@ -12,7 +12,6 @@ from __future__ import annotations
 from typing import Any
 
 from src.domain.ports.error_case_repository import ErrorCaseRepositoryPort
-
 from src.domain.ports.registry import Lifetime, _global_registry
 
 
