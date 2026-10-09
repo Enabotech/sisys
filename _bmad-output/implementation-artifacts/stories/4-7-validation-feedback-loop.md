@@ -51,7 +51,7 @@
 **And** 修复成功则返回 `ToolResult(status=SUCCESS, retry_count=增强尝试次数)`。
 
 **验证标准/Validation Criteria:**
-- [ ] 触发条件判定（九行矩阵，R8-4 升级）：仅 389（OUTPUT 校验耗尽，含 Schema 违规与 LLM 瞬时故障两子路径）与 382 且 `stage="EXECUTION"` **且 cause ∈ ExecutionError 族（313/316/317/318——沙箱执行内代码缺陷，修复可归因）**进入闭环；**382 且 `stage="EXECUTION"` 且 cause ∉ ExecutionError 族**（引擎兜底 `except Exception` 宽捕获的混入形态：`LLMConfigError`(332)/`NetworkError`(102)/`StorageError`(103)/引擎自身解析 bug 等裸异常——**基础设施/配置类故障非代码缺陷**，与 SANDBOX_START 排除同理，修复不可归因且误标 INFEASIBLE）、382 且 `stage="SANDBOX_START"`（312/315 沙箱启动失败）、`ToolExecutionTimeoutError`（385）、策略违规（207）、标记语法错误（201）、数据源族（410-413）、required schema 缺失（398——4.3 定义 4.7 消费）**不进入**闭环直接上抛。**机理注记（R8-4）**：引擎兜底 `tool_execution_engine.py:253-266` 是宽捕获——除五族直传组（207/201/410-413/101/302）外的一切异常（含 332 配置类）都被无差别包为 `382(stage="EXECUTION")`，分类边界由 cause 链根因而非 stage 字段决定，故触发判定必须做 cause 族过滤（实测实证：`LLMConfigError(ExternalException)` 不在直传组 `ConfigurationError(SystemException)` 分支）
+- [ ] 触发条件判定（九行矩阵，R8-4 升级）：仅 389（OUTPUT 校验耗尽，含 Schema 违规与 LLM 瞬时故障两子路径）与 382 且 `stage="EXECUTION"` **且 cause ∈ ExecutionError 族（313/316/317——沙箱执行内代码缺陷，修复可归因；**族成员=ExecutionError 子类（R12-F1 校正：318 SandboxQuotaExceededError 继承 SandboxError 非族成员，归 SSD 守卫直传——见 mid-attempt 立法 312/318/319）**）**进入闭环；**382 且 `stage="EXECUTION"` 且 cause ∉ ExecutionError 族**（引擎兜底 `except Exception` 宽捕获的混入形态：`LLMConfigError`(332)/`NetworkError`(102)/`StorageError`(103)/引擎自身解析 bug 等裸异常——**基础设施/配置类故障非代码缺陷**，与 SANDBOX_START 排除同理，修复不可归因且误标 INFEASIBLE）、382 且 `stage="SANDBOX_START"`（312/315 沙箱启动失败）、`ToolExecutionTimeoutError`（385）、策略违规（207）、标记语法错误（201）、数据源族（410-413）、required schema 缺失（398——4.3 定义 4.7 消费）**不进入**闭环直接上抛。**机理注记（R8-4）**：引擎兜底 `tool_execution_engine.py:253-266` 是宽捕获——除五族直传组（207/201/410-413/101/302）外的一切异常（含 332 配置类）都被无差别包为 `382(stage="EXECUTION")`，分类边界由 cause 链根因而非 stage 字段决定，故触发判定必须做 cause 族过滤（实测实证：`LLMConfigError(ExternalException)` 不在直传组 `ConfigurationError(SystemException)` 分支）
 - [ ] 修复 prompt 组装：STDERR + 案例查询结果（命中 RECOVERED 案例时注入 fix_summary）+ schema violations（若有）+ **前次增强尝试失败反馈（attempt 1..k-1 的 stderr_excerpt/detail/suggested_fix_excerpt——动作+结果成对，R8-1）** + 禁止重复失败方案指令；不含"原 Code 产物"依赖（引擎按 hints 重新生成，见 Then）
 - [ ] hints payload 契约（Task 0 定稿 schema）：`{stderr_excerpt, schema_violations, case_summaries, prior_attempts, suggested_fix}`；`tool_execution_engine.py` `_think_stage`/`_code_stage` prompt 构建读取 `validation_feedback_hints` 扩展键（引擎 `__init__` 签名不变——4.4 AC-7.4 BDD 断言保护）
 - [ ] 防放大：增强期间引擎与 validator 两层重试均封顶 1，finally 按引用恢复（含 retryable_exceptions 保持断言）
@@ -73,7 +73,7 @@
 - [ ] `ToolExecutionState` 6 状态机**不动**（FAILED 终态语义不变，增强重试按"终态反向迁移禁止（重试创建新 attempt）"既有注释语义创建新执行）
 - [ ] 两事件字段与 `DomainEvent` 基类 12 核心字段（`base.py:20-35` `_CORE_FIELD_NAMES`）对齐 + 各自自有字段（MarkedInfeasible 8 个 / Recovered 7 个）+ tenant_id baseline（4-5 R1-F01 教训：metadata 字段一律 `str()` 化防 json 序列化失败）
 - [ ] INFEASIBLE 结果不抛异常、不发布 ToolExecuted 成功事件
-- [ ] **LLM 持续故障例外（决策 #17，R8-6）**：3 attempt 全 `llm_generation_failed` 耗尽 → 直传原 389/382 触发异常，**不**返回 INFEASIBLE、**不**写 MARKED_INFEASIBLE 演进日志、**不**回填 infeasible_count（外部瞬时故障≠任务不可行）
+- [ ] **LLM 持续故障例外（决策 #17，R8-6；R12-F2 谓词对齐 R9-15 根因导向）**：3 attempt 全部失败**且各次失败根因均为 LLM 瞬时**（fix-gen `llm_generation_failed` 或重执行 `retry_failed` 且 389←383←last_exc∈{LLMAPIError, LLMResponseError, TimeoutError}——AC-2 VC 谓词同款）→ 直传原 389/382 触发异常，**不**返回 INFEASIBLE、**不**写 MARKED_INFEASIBLE 演进日志、**不**回填 infeasible_count（外部瞬时故障≠任务不可行）
 - [ ] **INFEASIBLE×FAIL_FAST 守护断言面（Task 8.6 验证项，R8-13）**：Task 6 循环 E 交付物（node state 三值判定 / FAIL_FAST 异常 context 含 error_signature 与尝试次数 / SKIP_DOWNSTREAM 下游 SKIPPED）经架构测试守护——见 Task 8 Subtask 8.6 三断言
 
 ### AC-4: 演进日志与持久化可靠性
@@ -111,7 +111,7 @@
 
 **Given** 同一触发异常重复进入反馈闭环（**可达场景界定**：`recover()` 被以同一 `trigger_error`（同 execution_id）重复调用——事件消费侧重放/上游补偿重试形态；注意装饰器层重复调用不命中幂等键——**机制锚点 R8-12 更新（决策 #16 后）**：id 铸造主责移至链入口 `ToolExecutionService.execute` 每次调用注入新 `schema_execution_id`（引擎 `:137-138` 无注入时兜底新铸），装饰器层每次重执行都是新 id，此为架构边界非缺陷）
 **When** 闭环各副作用执行
-**Then** **副作用去重语义**：演进日志按 execution_id 幂等 upsert（AC-4）、案例库按自然键幂等计数（AC-5）、`ToolExecutionMarkedInfeasible`/`ToolExecutionRecovered` 事件不重复发布（同 execution 终态判定短路）；短路路径返回合成结论——INFEASIBLE 语义完整（output 即失败摘要，日志行可支撑；**不对称登记（R9-18）**：INFEASIBLE 重放不加 `replayed` 标记为刻意设计——INFEASIBLE 无 `validate_complete()` 证据包契约（386 仅约束 SUCCESS）、DAG 按 status 分支不消费 output 细节、重放摘要与原次 output 字段同形语义等价，可辨识性无消费方；RECOVERED 加标记因 SUCCESS 有证据包契约与下游校验交互，可辨识性有真实消费方）；RECOVERED 重放返回合成 SUCCESS 摘要（**可辨识标记（R8-3）**：合成结果 output 携带 `"replayed": true` 元数据键——与真实成功下游可区分（Temporal replay 逐字节等价 / HTTP Idempotency-Key Replayed 标识的共识：重放结果要么等价要么可辨识）；**双重边界注记**：①原成功 ToolResult 的完整 output/evidence_package 不在演进日志中，重放结果不含证据包——下游需证据时应重新执行而非依赖重放；②合成 SUCCESS 无 evidence_package，下游调用 `ToolResult.validate_complete()`（`tool_execution.py:271-281`——SUCCESS 必含证据包契约，4.3 立法）将抛 `EvidenceValidationFailedError`(386)——重放语义为**摘要性结论**，不承诺通过完整性校验，消费方按 `replayed` 标记先行分支）
+**Then** **副作用去重语义**：演进日志按 execution_id 幂等 upsert（AC-4）、案例库按自然键幂等计数（AC-5）、`ToolExecutionMarkedInfeasible`/`ToolExecutionRecovered` 事件不重复发布（同 execution 终态判定短路）；短路路径返回合成结论——INFEASIBLE 语义完整（output 即失败摘要，日志行可支撑；**不对称登记（R9-18）**：INFEASIBLE 重放不加 `replayed` 标记为刻意设计——INFEASIBLE 无 `validate_complete()` 证据包契约（386 仅约束 SUCCESS）、DAG 按 status 分支不消费 output 细节、重放摘要与原次 output 字段同形语义等价，可辨识性无消费方；RECOVERED 加标记因 SUCCESS 有证据包契约与下游校验交互，可辨识性有真实消费方）；RECOVERED 重放返回合成 SUCCESS 摘要（**可辨识标记（R8-3）**：合成结果 output 携带 `"replayed": true` 元数据键——与真实成功下游可区分（Temporal replay 逐字节等价 / HTTP Idempotency-Key Replayed 标识的共识：重放结果要么等价要么可辨识）；**双重边界注记**：①原成功 ToolResult 的完整 output/evidence_package 不在演进日志中，重放结果不含证据包——下游需证据时应重新执行而非依赖重放；②合成 SUCCESS 无 evidence_package，下游调用 `ToolResult.validate_complete()`（`tool_execution.py:261-274`——SUCCESS 必含证据包契约，4.3 立法（R12-F3 锚点校准））将抛 `EvidenceValidationFailedError`(386)——重放语义为**摘要性结论**，不承诺通过完整性校验，消费方按 `replayed` 标记先行分支）
 **And** 清偿 4.3 通道预留债：`ToolSchemaValidationFailed` 补 reliable 通道（`event_channels.yaml`（顶层键 `event_channels:`）与 `ChannelRouter.DEFAULT_MAPPINGS` **两处同步**，YAML > DEFAULT_MAPPINGS 优先级注释 `channel_router.py:50-53`）。
 
 **验证标准/Validation Criteria:**
@@ -911,8 +911,9 @@ class ValidationFeedbackService:
         #                    / PURE_LLM（无命中）                          # 三分支，决策 #15
         #    c. suggested_fix = fix_gen(fix_prompt)  # 包 _call_with_retry(max_attempts=1)，
         #       # 失败计为该次 attempt 失败（detail="llm_generation_failed"），不裸穿；
-        #       # 3 attempt 全 llm_generation_failed → 直传原触发异常（决策 #17②，R8-6——
-        #       # LLM 持续故障≠任务不可行，零观测副作用同 abort 路径）
+        #       # 3 attempt 全失败且根因均为 LLM 瞬时（llm_generation_failed 或 retry_failed
+        #       # 且 389←383←LLM 错误——R12-F2 对齐 R9-15 根因导向）→ 直传原触发异常
+        #       # （决策 #17②，R8-6——LLM 持续故障≠任务不可行，零观测副作用同 abort 路径）
         #    d. hints = {stderr_excerpt, schema_violations, case_summaries,
         #               prior_attempts, suggested_fix}   # payload 契约（Task 0.12）
         #       hints_context = context.with_extension("validation_feedback_hints", hints)
@@ -939,7 +940,7 @@ class ValidationFeedbackService:
 | 触发异常 | 编码 | 入闭环 | 理由 |
 |---------|------|--------|------|
 | `ToolResultValidationError` | 389 | ✅ | OUTPUT 校验基础重试耗尽——两子路径：Schema 违规（violations 直接在 context）/ LLM 瞬时故障（cause 链 389→383→LLM 错误，**violations 为空**，签名走 LLM 错误消息归一化；回填受决策 #17 双保险约束） |
-| `ToolExecutionFailedError` 且 `stage="EXECUTION"` 且 **cause ∈ ExecutionError 族** | 382 | ✅ | 沙箱内代码执行失败（**生产装配下 STDERR 的主浮现形态**——cause 单跳到 313，见下方浮现路径）；含 316/317/318（ExecutionError 子类经兜底包装）；**316 可修复性论证（R8-22）**：沙箱超时（单次执行 wall-clock cap）经算法优化/资源调整可恢复，区别于 385（引擎总预算已含全部重试余量耗尽，重试无余量）——两者测量层不同（沙箱 cap vs 引擎总预算），处理差异成立 |
+| `ToolExecutionFailedError` 且 `stage="EXECUTION"` 且 **cause ∈ ExecutionError 族** | 382 | ✅ | 沙箱内代码执行失败（**生产装配下 STDERR 的主浮现形态**——cause 单跳到 313，见下方浮现路径）；含 316/317（ExecutionError 子类经兜底包装；318 非族成员——继承 SandboxError，R12-F1）；**316 可修复性论证（R8-22）**：沙箱超时（单次执行 wall-clock cap）经算法优化/资源调整可恢复，区别于 385（引擎总预算已含全部重试余量耗尽，重试无余量）——两者测量层不同（沙箱 cap vs 引擎总预算），处理差异成立 |
 | `ToolExecutionFailedError` 且 `stage="EXECUTION"` 且 **cause ∉ ExecutionError 族** | 382 | ❌ 直传 | **兜底宽捕获混入形态（R8-4 新增行）**：引擎兜底 `except Exception`（`:253-266`）把五族直传组外的一切异常无差别包为 382-EXECUTION——`LLMConfigError`(332，配置类——实测 `ExternalException` 子类不落直传组 `ConfigurationError` 分支)/`NetworkError`(102)/`StorageError`(103)/引擎自身解析 bug 等裸异常。**基础设施/配置类故障非代码缺陷**（与 SANDBOX_START 排除同理：修复不可归因 + 误标 INFEASIBLE 污染负样本库），且存储类故障时演进日志/案例库同样不可写（闭环对存储故障的响应路径自身不可持久化）——分类边界由 cause 链根因而非 stage 字段决定 |
 | `ToolExecutionFailedError` 且 `stage="SANDBOX_START"` | 382 | ❌ 直传 | 沙箱启动失败（312/315 容器/镜像）——基础设施故障非代码缺陷，LLM 修复不可归因（3 次注定失败的修复尝试纯耗 LLM 配额且误标 INFEASIBLE） |
 | `ToolExecutionTimeoutError` | 385 | ❌ 直传 | 引擎总预算超时不可修复（重试同样超时——预算已含全部重试余量） |
@@ -1360,6 +1361,10 @@ docs/architecture/
 | R10-2 | 决策 #17② 根因判定谓词「LLM 错误形态」类型集合未定稿——链形态 383.cause 可能类型含 TimeoutError(引擎白名单成员)，谓词含否两写行为分叉：不含则 LLM 网络超时持续故障耗尽误标 INFEASIBLE（#17 要防的污染原样发生） | P2 | 谓词定稿 = 引擎生产可重试白名单同集 {LLMAPIError, LLMResponseError, TimeoutError}；BDD 直传场景两类型各构造一种（本轮已修） |
 | R10-3 | R9-14 声称的「Task 6 循环 B 装配断言」未落入循环 B TDD 表——按表执行漏写，双句柄/防裸引擎保护架空；次生：①装配同一性（engine 句柄=inner_chain 内引擎）无断言——契约测试 _DummyResolver 每次新实例 11 维度全绿也不守护；②「链构造上提共享」落点未指明——组合根字面读法撞「组合根零私有函数」纪律（tool_execution_engine.py:553-557 注释） | P2 | 循环 B 红行补装配级断言（录制替身断言重执行到达 SSD/TOV）+ 同一性断言（id 相等）；SSOT 补工厂落点（application 域模块，组合根一行委托，本轮已修） |
 | R10-4 | 零退避约束仅限定 389-LLM 瞬时子路径——389-Schema 子路径 TOV 3 轮校验重试默认退避 1s+2s（继承 delay 参数），7-8 场景累计 ~20s 纯 sleep | P3 | 并入 R10-1 统一 fixture 形态条款（零退避适用于全部子路径，本轮已修） |
+| R12-F1 | ExecutionError 族成员展开错误（终审独立快扫发现）：:54 与 :942 将 318 列入族（「313/316/317/318」）——代码实证 `SandboxQuotaExceededError(SandboxError)`（sandbox_exceptions.py:140）非 ExecutionError 子类；文档内 :157/:642（正确展开 313/316/317）与 :58/:68（318 归 SSD 守卫中止直传）四处正确位与两处错误位自相矛盾——按错误位字面写测试期望将与 isinstance 谓词实现互斥（TDD 红绿冲突） | P2 | 两处删 318 对齐正确口径 + 族成员定义注记（R12 校正）；318 归位 SSD 守卫（312/318/319 直传）语义不变 |
+| R12-F2 | 决策 #17② R8-6 原始谓词（detail 全量合取）残留两处：:76 AC-3 VC 与 :914 蓝图 c——R9-15 根因导向修订声称「蓝图 c 联动」未执行完整；按 :76 字面写断言会漏 retry_failed 形态（约半数保护面，R9-15 要修的漏法原样复发） | P2 | 两处补根因导向谓词对齐 AC-2 VC/决策 #17 定稿口径（本轮已修） |
+| R12-F3 | validate_complete 锚点微偏：:114 引 271-281，实际函数 261-274（raise 块 268-272）——R9 轮锚点校准未覆盖此位 | P3 | 锚点改 261-274（本轮已修） |
+| R12-F4 | 收敛声明统计行/最终状态段未同步 R10/R12 增量（止于 R8×36/R9 21 项）——该节经 R9-5 改写即应对当前状态负责（R8-14 判例） | P3 | 统计行续记 R8~R12 全量 + 最终状态段补全五轮计数与收敛结论（本轮已修） |
 
 ---
 
@@ -1391,9 +1396,9 @@ docs/architecture/
 
 ---
 
-**故事版本/Story Version:** v1.6.2
+**故事版本/Story Version:** v1.6.3
 **创建日期/Created:** 2026-10-08
-**最后更新/Last Updated:** 2026-10-09（第二轮审查周期 R10）
+**最后更新/Last Updated:** 2026-10-09（第二轮审查周期收敛）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（3 并行调研 Agent 代码实证 + 4 前序故事经验整合 + 4 笔预留债清偿方案）
 - v1.1.0: 文档审查 Round 1——4 调研 Agent + 3 审查 Agent（正确性/一致性 + 可行性/可达性 + 科学性/方法论对标业界）收敛 42 项（P0×5 + P1×10 + P2/P3×27）：重写 STDERR 浮现路径为生产真实形态（382 主路径）、execution_id 全链提取机制定稿、签名统一 64 hex + Sentry 对标归一化、修复循环跨尝试反馈（Reflexion 共识）、outbox fallback 独立 session 重设计、触发矩阵 8 行化、防放大两层封顶、幂等副作用去重语义等
@@ -1405,6 +1410,7 @@ docs/architecture/
 - v1.6.0: 第二轮文档审查周期 Round 1（R8）——4 调研 Agent（编排器 R6 面/execution_id 链 R7 面/outbox·session 面/锚点存续 50 点）+ 2 审查 Agent（R6R7 增量一致性/科学性方法论）+ 主会话实测裁定，收敛 36 项（P1×9 + P2×13 + P3×14）：触发矩阵九行化（cause 族过滤防兜底宽捕获混入）、LLM_TRANSIENT 双保险（决策 #17）、跨尝试反馈补动作半边（suggested_fix_excerpt）、RECOVERED 重放可辨识标记（386 契约边界）、编排器修复落点迁移 Task 6 循环 E + 修改面补全两文件（tool_chain_run.py/tool_chain_exceptions.py）、SessionMiddleware 未接线勘误（fallback 覆盖面上调）、决策 #16 条件注入、签名归一化规则完备化（violations 索引模板化）等
 - v1.6.1: 第二轮审查 Round 2（R9）回归核查——双 Agent（R8 修复传播完备性 + 修复组合交互面）+ 主会话裁定，收敛 21 项（P1×2 + P2×4 + P3×15）：attempt 面对称立法（mid-attempt 异常分类定稿——389/382-cause∈族计 attempt 失败，其余中止直传防 infra 侧门误标）、SSOT 双句柄定稿（engine+inner_chain——防重执行绕过 SSD/TOV 架空出参校验）、决策 #17② 根因导向修订（漏半数形态）、fix_strategy 判定五格全枚举（两缺格定稿）、R8 台账执行缺位 12 项勘误补齐（传播漏网/锚点残留/计数）等
 - v1.6.2: 第二轮审查 Round 3（R10）单深度推演——三部分推演（BDD 场景三轴逐场景 + Task 0→9 依赖干跑/提交批次 + 六条长状态时间线逐字段终态）+ 20 余处源码实证，收敛 4 项（P2×3 + P3×1）+ 11 项「推演后不成立」裁定（VFD 递归捕获被 Python except 语义+inner_chain 结构双重排除；382-代码缺陷×LLM-持续故障交叉直传被裁定为唯一正确语义）：BDD fixture 引擎统一形态条款（白名单+零退避——默认白名单含 313 致 382 主路径场景虚过）、#17② 谓词类型集定稿（生产白名单同集——TimeoutError 排除则超时持续故障误标）、循环 B 双句柄装配断言落位（运行面守护+同一性）、SSOT 工厂落点（组合根零私有函数纪律）
+- v1.6.3: 第二轮审查 Round 4/5（R11 纯验证 + R12 独立终审）——R11 零修改零提交（锚点存续 9 组实证 + 结构终验全过）；R12 五节终审（周期闭合/12 项双向取证/独立快扫/门禁/状态流转）发现并清偿 4 项（P2×2 + P3×2）：ExecutionError 族成员经代码继承树校正（318 继承 SandboxError 非族成员——两处误列删除）、#17② 旧谓词残留两处对齐根因导向、validate_complete 锚点校准、统计续记。**第二轮周期正式收敛（零 P0/P1/P2 残留），收敛声明入 Story**
 
 ### 🏁 文档审查周期收敛声明（Round 5 独立终审，2026-10-09）
 
@@ -1422,7 +1428,7 @@ Story 4-7（Validation Feedback 闭环——增强重试与不可行标记，Epi
 
 **修复统计（终审核对口径）**
 
-- 台账合计 46 行：R1×20 + R2×15 + R3×11，编号连续无缺（**R8-14 补记**：另有收敛后延迟项具备度复审增量 R6×2 + R7×2 共 4 行，性质为「收敛后复审的增量修订轮，不重开周期，其 P1/P2 发现已随当轮清偿」；**R8 起进入第二轮审查周期，新增 R8×36 行见修复表**）
+- 台账合计 46 行：R1×20 + R2×15 + R3×11，编号连续无缺（**R8-14 补记**：另有收敛后延迟项具备度复审增量 R6×2 + R7×2 共 4 行，性质为「收敛后复审的增量修订轮，不重开周期，其 P1/P2 发现已随当轮清偿」；**R8 起进入第二轮审查周期，新增 R8×36 + R9×21 + R10×4 + R12 终审 F×4 行见修复表——R12-F4 续记**）
 - 修复点计数：R1 42（P0×5 + P1×10 + P2/P3×27）/ R2 16（P1×4 + P2×8 + P3×4，落 15 台账行——R2-15 为复合行）/ R3 11（P1×3 + P2×3 + P3×5，行点一致）
 - R4 零修复（验证轮）；R5 零新增缺陷，清偿 4 项 P3（V4-1 决策计数 11→15、V4-2 SSOT 表补 engine 引用并消歧 RetryPolicy 语义、F5-1 Last Updated 日期、F5-2 epics 行号 :1398→:1395）
 - 累计：69 个修复点 + 4 项收敛清偿；R5 双向抽验 12 项全部与仓库代码实证吻合
@@ -1447,6 +1453,47 @@ Story 4-7（Validation Feedback 闭环——增强重试与不可行标记，Epi
 **最终状态**
 
 - 周期状态：**收敛（CONVERGED）**——零 P0/P1/P2 残留，4 项 P3 随本提交清偿（第一轮周期截至 v1.3.1；R6/R7 为收敛后延迟项具备度复审的**增量修订轮，不重开周期**，其 P1/P2 发现已随当轮清偿）
-- **第二轮审查周期（R8 起，2026-10-09）**：收敛后复审定位——R6/R7 增量修订质量 + 前周期修复终态存续 + 组合交互面；R8 收敛 36 项（P1×9）、R9 回归核查收敛 21 项（P1×2），以本声明同款纪律续收敛
+- **第二轮审查周期（R8 起，2026-10-09）**：收敛后复审定位——R6/R7 增量修订质量 + 前周期修复终态存续 + 组合交互面；R8 收敛 36 项（P1×9）、R9 回归核查 21 项（P1×2）、R10 单深度推演 4 项（P1×0）、R11 纯验证零项、R12 独立终审 4 项（P2×2+P3×2，随收敛提交清偿）——**R12-F4 续记后周期正式收敛，零 P0/P1/P2 残留**
 - Story 状态：`ready-for-dev` 保持不变（文档审查周期不改里程碑状态）
+- 下一步：运行 `dev-story` 进入实施（10 Task / SDD+TDD 融合 / 预留债 4 笔集中清偿）
+
+### 🏁 第二轮文档审查周期收敛声明（R12 独立终审，2026-10-09）
+
+**周期概况**
+
+Story 4-7 于第一轮周期收敛（v1.3.1）后，因 R6/R7 收敛后增量修订（v1.4.0/v1.5.0）触发第二轮审查周期（R8~R12，v1.5.0→v1.6.3），定位为「收敛后复审：R6/R7 增量修订质量 + 前周期修复终态存续 + 组合交互面」。R12 独立终审以「不轻信 Story 自身记录、仓库实地取证」纪律执行五节核验：周期闭合甄别（3 提交链均仅触碰本文档、R11 零提交、工作区干净、零代码触碰红线守住、提交无 AI 署名）、关键修复双向取证（12 项正文声明 vs HEAD 代码逐条对照全部吻合）、独立新鲜快扫（发现 P2×2+P3×2，随本轮清偿）、三项门禁核验（递减投入/严重度递减/台账连续性全过）、状态流转判定。**结论：四项终审发现随本提交清偿后，第二轮周期正式收敛，零 P0/P1/P2 残留。**
+
+**五轮结构与投入**
+
+- R8：4 并行调研 Agent（编排器 R6 面 / execution_id 链 R7 面 / outbox·session 面 / 锚点存续 50 点）+ 2 审查 Agent（R6R7 增量一致性 / 科学性方法论）+ 主会话实测裁定——36 项
+- R9：双 Agent 回归核查（R8 修复传播完备性 + 修复组合交互面）+ 主会话裁定——21 项
+- R10：单 Agent 单深度推演（BDD 场景三轴逐场景 + Task 0→9 依赖干跑/提交批次 + 六条长状态时间线逐字段终态，20 余处源码实证）——4 项 + 11 项「推演后不成立」裁定留痕
+- R11：纯验证轮（零修改零提交——锚点存续实证 + 结构终验，第一轮 R4 先例）
+- R12：独立终审（五节核验）——新发现 4 项（P2×2+P3×2）随终审轮清偿（第一轮 R5 先例）
+
+**修复统计（终审核对口径）**
+
+- 台账合计 115 行：第一轮 46（R1×20+R2×15+R3×11）+ 收敛后增量 R6×2+R7×2 + 第二轮 R8×36+R9×21+R10×4 + R12 终审 F×4，编号连续无缺
+- 修复点：R8 36（P1×9+P2×13+P3×14）/ R9 21（P1×2+P2×4+P3×15）/ R10 4（P2×3+P3×1）/ R11 零 / R12 4（P2×2+P3×2）
+- P1 递减 9→2→0→0；R12 双向抽验 12 项全部与仓库代码实证吻合；R11 锚点抽验 9 组全部命中 HEAD
+
+**关键设计决策演进（R8-R12 审查驱动，8 条）**
+
+1. 触发矩阵九行化（R8-4/R12-F1）：382-EXECUTION 按 cause ∈/∉ ExecutionError 族细分——判别式从 stage 字段升级为 cause 链根因，防引擎兜底宽捕获把 infra/配置故障混入闭环误标 INFEASIBLE；族成员经代码继承树校正（313/316/317）
+2. 决策 #17 LLM_TRANSIENT 双保险（R8-6→R9-15→R10-2→R12-F2 四轮递进）：成功不覆写 fix_summary 防伪配方 + 全 attempt LLM 瞬时根因直传防负样本库污染，谓词类型集定稿为引擎生产白名单同集
+3. 跨尝试反馈补动作半边（R8-1）：`suggested_fix_excerpt` 使「禁止重复失败方案」指令获得指涉对象（Reflexion 动作+结果成对反馈）+ 空方案条目渲染规则（R9-20）
+4. 编排器修复落点迁移（R8-8）：Task 8.6 → Task 6 循环 E 红绿一体 + 8.6 定稿纯守护——化解「SDD 验证测试 Task 含生产代码修改」与 TDD 顶线的冲突；修改面传导补全（R8-7：tool_chain_run.py Literal + tool_chain_exceptions.py 构造器）
+5. SessionMiddleware 未接线勘误（R8-9）：实测 create_app 零注册——「HTTP 路径事务语义正确」由设计语义降为待接线事实，fallback 覆盖面上调至当前全部生产路径，接线登记 deferred
+6. attempt 面对称立法（R9-13）：mid-attempt 异常分类与触发面九行完全同构（入环谓词内计失败 retry_failed / 谓词外中止直传），堵死 infra 故障经 attempt 侧门误标不可行
+7. SSOT 双句柄（R9-14/R10-3）：engine 引用（封顶用）与 inner_chain 引用（重执行用）分立 + 装配级/同一性断言 + 工厂落点 application 域模块——防重执行走裸引擎静默架空 SSD/TOV 双防护
+8. fix_strategy 五格全枚举（R9-16）与 BDD fixture 引擎统一形态条款（R10-1/R10-4）：消灭判定矩阵缺格虚标与 382 主路径场景虚过（默认白名单含 313）+ 退避累计 ~20s；RECOVERED 重放可辨识标记（R8-3/R9-18）
+
+**deferred 登记（相对第一轮的增量，dev 期落 deferred-work.md）**
+
+SessionMiddleware 生产接线（R8-9，独立技术债）；fast-fail 尝试缩减半边（R8-2，待真实负样本效用对照数据）；修复循环采样多样化/相似度去重（R8-17）；fix_summary 进阶聚合（R8-20）；签名分裂低频形态（R8-30）；其余沿第一轮清单（ABORTED 第三值、outbox 形态②探针、多案例加权/向量检索、工具熔断、自动灰度、真实修复能力观察基准等）不变。
+
+**最终状态**
+
+- 第二轮周期状态：**收敛（CONVERGED）**——零 P0/P1/P2 残留（4 项终审发现随本提交清偿）
+- Story 状态：`ready-for-dev` 保持不变（文档审查周期不改里程碑）
 - 下一步：运行 `dev-story` 进入实施（10 Task / SDD+TDD 融合 / 预留债 4 笔集中清偿）
