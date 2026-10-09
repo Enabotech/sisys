@@ -64,7 +64,7 @@
 **When** 反馈循环耗尽
 **Then** 标记任务不可行：返回 `ToolResult(status=INFEASIBLE)`（`ToolResultStatus` 新增枚举值，additive 向后兼容），`output` 携带失败摘要（error_signature/最终 STDERR 摘要/尝试次数）
 **And** 发布 `ToolExecutionMarkedInfeasible` 领域事件（配置双登记 reliable——运行时仅 outbox 路径，见 AC-6 语义注记），写入演进日志 `final_status=MARKED_INFEASIBLE`
-**And** 闭环内部以 `ValidationFeedbackRetryExhaustedError`（EXCEPTION_399，**4.1b/4.3 两度预留的编码**）作为耗尽信号，由装饰器捕获并转换为 INFEASIBLE 结果（对外不抛异常——ToolChain DAG 编排按 `status` 分支感知，避免中断后续节点；**DAG 策略交互注记（R2 发现）**：既有 FAIL_FAST 策略仅由异常路径触发（`tool_chain_orchestrator.py:668-676` except→raise 取消兄弟节点），结果化后 INFEASIBLE 走结果路径（`:637-645`）不触发 raise——**显式配置 FAIL_FAST 的链语义从「耗尽即取消兄弟」变为「继续执行」**，SKIP_DOWNSTREAM 沿 failed_nodes 自动兼容无需改动。该行为变更属本 Story 既定设计（INFEASIBLE 语义=终态结论而非突发故障），登记为决策 #14 并入 deferred-work（编排层 INFEASIBLE×FAIL_FAST 显式联动留编排 Story）
+**And** 闭环内部以 `ValidationFeedbackRetryExhaustedError`（EXCEPTION_399，**4.1b/4.3 两度预留的编码**）作为耗尽信号，由装饰器捕获并转换为 INFEASIBLE 结果（对外不抛异常——ToolChain DAG 编排按 `status` 分支感知，避免中断后续节点；**DAG 策略交互注记（R2 发现，R6 业界对标勘误与定稿）**：INFEASIBLE 经结果路径计入 `failed_nodes`（`tool_chain_orchestrator.py:643-644`，`!= "success"` 判定）后，**FAIL_FAST 链仍会中断**——波次间检查 `:208-225`（`FAIL_FAST and failed_nodes` → raise）兜底，与业界主流一致（永久性失败 × 显式 fail-fast = 中断：K8s PodFailurePolicy FailJob / Temporal non-retryable / Step Functions 未捕获即 fail）；SKIP_DOWNSTREAM 沿 failed_nodes 自动兼容（下游 SKIPPED）、CONTINUE_ON_ERROR 落 COMPLETED_WITH_ERRORS——三策略语义均正确。真实 delta 为三件工程事（随本 Story 修复，见 Task 8 Subtask 8.6）：①**类型丢失**——`:637` node state 二值 `"FAILED"` 抹掉「不可行」与「故障」区分（Temporal「catch 后 re-wrap 丢失 non-retryable 元数据」同型反模式），修复 = `NodeRunStatus.state` 支持 `"INFEASIBLE"`；②**cause=None**——`:218-224` FAIL_FAST 异常构造无法恢复原始异常，修复 = 从 `ToolResult.output` 取 `error_signature`/尝试次数填充异常 context（K8s JobFailed condition 带 reason 同型，KEP-4443）；③**同波兄弟跑完**（旧异常路径会取消同波）——FAIL_FAST 策略下首个结果失败主动 cancel 同波剩余任务为**可选优化**（纯算力节约，deferred 登记；CONTINUE/SKIP 场景本就不该取消，禁做成无条件）
 **And** 修复成功路径发布 `ToolExecutionRecovered` 领域事件（配置双登记 reliable——运行时仅 outbox 路径，见 AC-6 语义注记）。**两事件 execution_id 定稿 = 主 id**（`trigger_error.context["execution_id"]`——与演进日志幂等键同源；attempt 级引擎事件回链仅经 `fix_attempts.attempt_execution_id`）。**389 子路径 id 空间注记（R2 发现）**：389 的 execution_id 是 TOV 内 `extract_schema_execution_id(context) or uuid4()` 铸造（`tool_output_validator.py:111`）——生产链无人设置 `schema_execution_id`（设置方 ToolInputValidator 不在装配链，非目标已登记）时为随机 UUID/session UUID，**与 ToolExecution 聚合行无对应**（382 路径则真实对应）。该「两套 id 空间」为 4.1b DataSourceFetchFailed 断链同构问题，完整回链需 ToolInputValidator 入链或 ToolResult 增 execution_id 字段——**登记 deferred-work**（超出本 Story 文件面）；演进日志/事件在 389 半边的 aggregate 回链悬空为已知边界。
 
 **验证标准/Validation Criteria:**
@@ -751,7 +751,8 @@
 - [ ] Subtask 8.3: 失败标记验证器——3 次增强失败后 INFEASIBLE + 399 + 事件三联断言
 - [ ] Subtask 8.4: 幂等性验证器——同 trigger_error 重复 recover：日志单行 / 事件单次 / 案例分类计数与 occurrence 同步递增（record_case 幂等路径，AC-6 R3-2 定谳口径）/ 不新建行 / fix_summary 不覆写
 - [ ] Subtask 8.5: 演进日志验证器——失败历史可追溯（双查询面）
-- [ ] Subtask 8.6: 循环依赖检测使用 ruff/isort（不引入 pylint）+ 运行完整测试套件生成报告
+- [ ] Subtask 8.6: INFEASIBLE×FAIL_FAST 语义守护验证器（决策 #14 / R6 业界对标）——①`NodeRunStatus.state` 类型不抹除断言：INFEASIBLE 结果的节点 state 为 `"INFEASIBLE"`（非二值 `"FAILED"`——`tool_chain_orchestrator.py:637` 扩展三值判定）且 `tool_result` 含失败摘要；②FAIL_FAST 中断因果断言：INFEASIBLE 触发 `ToolChainExecutionFailedError` 时异常 context 含 `error_signature` 与尝试次数（`:218-224` cause=None 修复后）；③SKIP_DOWNSTREAM 兼容断言：INFEASIBLE 节点的下游 SKIPPED、独立分支正常执行
+- [ ] Subtask 8.7: 循环依赖检测使用 ruff/isort（不引入 pylint）+ 运行完整测试套件生成报告
 
 **完成标准/Definition of Done:**
 - [ ] 四项架构测试（epics 枚举）全部通过
@@ -816,7 +817,7 @@
 | 11 | 性能指标口径 | P95<5s 限闭环自身开销（签名/查询/日志），LLM 与沙箱时长除外；比率指标命名为「闭环机制有效性」（mock LLM 度量编排正确性非修复能力） | epic 字面指标可测化——LLM 生成受 LLMConfig.timeout=600s 支配物理上不可能 <5s；Task 0 与业务确认留痕（Subtask 0.11） |
 | 12 | 修复循环反馈记忆 | attempt k 的修复 prompt 携带 attempt 1..k-1 失败反馈（FixAttempt.stderr_excerpt/detail + 禁止重复指令） | Reflexion/Self-Debugging/ChatRepair 共识——无跨尝试反馈时 attempt 2/3 与 attempt 1 独立同分布，确定性采样下重复生成相同失败修复，3 次尝试退化为同一次的重复采样 |
 | 13 | 幂等语义 | 副作用去重（execution_id 取自 trigger_error.context）+ INFEASIBLE 结论可重放；RECOVERED 重放返回合成摘要（不含证据包） | 引擎每次 execute 新铸 execution_id，「装饰器重复调用」不命中幂等键（架构边界）；日志无 result 载荷故不承诺 RECOVERED 完整重放 |
-| 14 | INFEASIBLE×FAIL_FAST 行为变更 | 耗尽结果化后 FAIL_FAST 链不再因工具失败取消兄弟节点（异常路径→结果路径）；SKIP_DOWNSTREAM 不受影响 | INFEASIBLE=终态结论而非突发故障，语义上「后续节点可感知 status 并继续」是正确形态；编排层显式联动（INFEASIBLE+FAIL_FAST 等价 raise）登记 deferred-work 留编排 Story；AC-3 注记承载业务确认留痕 |
+| 14 | INFEASIBLE×FAIL_FAST 语义定稿（R6 业界对标勘误） | 耗尽结果化后 FAIL_FAST 链**仍中断**（波次检查 `:208-225` 兜底，R2「变为继续执行」结论系漏看该检查点）；真实 delta = 类型丢失（node state 二值判定）+ cause=None（异常可观测性降级）+ 同波兄弟跑完（算力浪费）——前两者随本 Story 修复（Task 8.6），同波取消为可选优化 deferred | 业界主流一致：永久性失败 × 显式 fail-fast = 中断（K8s PodFailurePolicy FailJob 短路重试立即终止 / Temporal non-retryable 跳过重试 / SF 未捕获即 fail）；「结果化继续」须显式声明而非默认副作用；类型元数据在传播链不可抹除（Temporal re-wrap 反模式）；「业务方确认」阻碍经对标消解——中断语义维持现状即正确立场 |
 | 15 | fix_strategy 三分支 | `FixStrategy` 三值：CASE_GUIDED（命中 RECOVERED 且 fix_summary 非空）/ NEGATIVE_CASE_GUIDED（命中 MARKED_INFEASIBLE——负样本提示形态）/ PURE_LLM（无命中） | 二值枚举会把「负样本命中」虚标为 PURE_LLM（反向虚标，R1-9 同轴）；演进日志失败史需区分「已知不可行签名仍尝试」（AIOps 最有价值信号）与「无案例可查」；新建值对象加值零成本 |
 
 ### 核心编排流程（ValidationFeedbackDecorator 实现蓝图）
@@ -1000,6 +1001,7 @@ src/
 │       ├── validation_feedback_decorator.py # [新] 装饰链最外层
 │       ├── validation_feedback_prompts.py   # [新] 修复 prompt 模板
 │       ├── tool_execution_engine.py         # [改] hints prompt 读取 + defer 注释清偿
+│       ├── tool_chain_orchestrator.py       # [改] node state 三值判定（INFEASIBLE）+ FAIL_FAST cause 填充（Task 8.6/决策 #14）
 │       └── sandbox_security_decorator.py    # [改] 事件 execution_id/stderr 填充
 ├── infrastructure/
 │   ├── external_services/sandbox/
@@ -1125,7 +1127,7 @@ docs/architecture/
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 
-*src 生产代码（18 新 + 12 改）+ deploy/configs/docs（1 新 + 2 改）：*
+*src 生产代码（18 新 + 13 改）+ deploy/configs/docs（1 新 + 2 改）：*
 - `src/domain/entities/error_case.py` - 错误案例聚合根
 - `src/domain/entities/evolution_log_entry.py` - 演进日志聚合根
 - `src/domain/events/validation_feedback_events.py` - 2 领域事件
@@ -1145,7 +1147,7 @@ docs/architecture/
 - `src/infrastructure/storage/postgresql/repository/error_case_repository.py` - PG 实现
 - `src/infrastructure/storage/postgresql/repository/evolution_log_repository.py` - PG 实现
 - `deploy/postgresql/alembic/versions/017_validation_feedback.py` - migration 017
-- 修改：`value_objects/tool_execution.py`（INFEASIBLE + docstring 5 值）、`sandbox_exceptions.py`（ExecutionError 增强）、`_code_ranges.py`、`exceptions/__init__.py`、`exception_handlers.py`（399→422）、`events/__init__.py`、`aiodocker_sandbox_adapter.py`（stderr 填充）、`sandbox_security_decorator.py`（事件填充 + cause 链提取导出）、`tool_execution_engine.py`（hints + defer 注释清偿）、`channel_router.py`、`composition_root.py`（3 端口 + v1.4.0）；configs 改 `configs/event_channels.yaml`；docs 改 `sisys-uni-exception-design.md`（两表 + :805/:807 连带）；infra 改 `messaging/outbox/outbox_repository.py`（fallback 独立 session）
+- 修改：`value_objects/tool_execution.py`（INFEASIBLE + docstring 5 值）、`sandbox_exceptions.py`（ExecutionError 增强）、`_code_ranges.py`、`exceptions/__init__.py`、`exception_handlers.py`（399→422）、`events/__init__.py`、`aiodocker_sandbox_adapter.py`（stderr 填充）、`sandbox_security_decorator.py`（事件填充 + cause 链提取导出）、`tool_execution_engine.py`（hints + defer 注释清偿）、`tool_chain_orchestrator.py`（R6/Task 8.6：`:637` node state 三值判定支持 "INFEASIBLE" + `:218-224` FAIL_FAST 异常 context 填 error_signature——决策 #14 两缺口修复）、`channel_router.py`、`composition_root.py`（3 端口 + v1.4.0）；configs 改 `configs/event_channels.yaml`；docs 改 `sisys-uni-exception-design.md`（两表 + :805/:807 连带）；infra 改 `messaging/outbox/outbox_repository.py`（fallback 独立 session）
 
 *测试（23 新 + 4 改）：*
 - `tests/acceptance/test_acceptance_validation_feedback_loop.feature` + `.py` - 验收 Gherkin + BDD
@@ -1219,7 +1221,7 @@ docs/architecture/
 | R2-4 | Subtask 8.4「重复执行零副作用」与 AC-6「案例计数递增」矛盾 | P2 | 改为 AC-6 口径（日志单行/事件单次/案例仅计数递增） |
 | R2-5 | 389 路径两套 id 空间未注记（TOV 铸造 uuid4 无聚合对应；演进日志/事件 389 半边悬空回链） | P1 | AC-3 注记 + deferred-work 登记（完整回链需 ToolInputValidator 入链或 ToolResult 增 execution_id 字段） |
 | R2-6 | outbox fallback 测试与 rollback 隔离冲突（独立 session 写入即 commit，rollback 够不着；无清理策略） | P1 | Task 6 循环 C 定稿清理策略（不挂 repo_session + try/finally 按自建 event_id 删除）+ 隔离表例外显式声明 + 陷阱 15 |
-| R2-7 | INFEASIBLE 结果化使 FAIL_FAST 策略失效（异常路径→结果路径，兄弟节点照常执行）零登记 | P1 | AC-3 DAG 策略交互注记 + 决策 #14 + deferred-work 登记 |
+| R2-7 | INFEASIBLE 结果化使 FAIL_FAST 策略失效（异常路径→结果路径，兄弟节点照常执行）零登记 | P1 | AC-3 DAG 策略交互注记 + 决策 #14 + deferred-work 登记。**R6 勘误**：本行机理结论漏看波次间检查 `:208-225`——FAIL_FAST 链仍中断，真实 delta 为类型丢失/cause=None/同波跑完三件工程事，R6 业界对标已定稿修复方案（决策 #14 改写 + Task 8.6） |
 | R2-8 | fix_strategy 二值枚举把负样本命中虚标为 PURE_LLM（演进日志失败史不可区分） | P2 | FixStrategy 加第三值 NEGATIVE_CASE_GUIDED（决策 #15）+ 蓝图/AC-5 VC/Task 5 同步 |
 | R2-9 | FixAttempt.attempt_execution_id 在 llm_generation_failed 形态（无重执行）无值可填，Task 1 不变量风险互拆 | P2 | 字段定约空串默认 + Task 1 红补边界形态用例 + 禁立 UUID 不变量 |
 | R2-10 | fix-gen 非白名单异常裸穿（绕过「计为 attempt 失败」打破 INFEASIBLE 不抛契约） | P2 | fix-gen 调用点 except Exception 收敛计为该次 attempt 失败（detail 区分类型） |
@@ -1239,6 +1241,8 @@ docs/architecture/
 | R3-9 | fix_summary 覆写内容来源/error_category 赋值规则/构造默认值三处未定义 | P3 | Task 0 数据模型定稿（error_category 三分支映射 + fix_summary=suggested_fix 截断派生 + 默认空串） |
 | R3-10 | 提交策略未覆盖 Task 7/8/9 批次 + Task 8 import 依赖未明示 | P3 | 补批次与「不得早于 Task 6」约束 |
 | R3-11 | 并发 outcome 次序竞态未登记 + fallback 须直调 get_session()（经 property 得 InvalidStateError，catch 不命中） | P3 | 已知行为登记 + 实现精度注记入 Task 6 循环 C 绿 |
+| R6-1 | R2-7 机理结论漏看波次间检查 `tool_chain_orchestrator.py:208-225`（FAIL_FAST and failed_nodes → raise）——「FAIL_FAST 链变为继续执行」的决策 #14 前提部分失实，实际中断语义维持（INFEASIBLE 经 `:643-644` 已计入 failed_nodes） | P1 | 业界对标（K8s PodFailurePolicy FailJob / Temporal non-retryable / SF Catch）勘误定稿：中断语义维持即业界主流立场，「业务方确认」阻碍消解；AC-3 注记/决策 #14/R2-7 台账/收敛声明×2 五处勘误改写 |
+| R6-2 | 真实 delta 三件工程事：node state 二值判定抹类型（Temporal re-wrap 反模式同型）/ FAIL_FAST 异常 cause=None 可观测性降级（K8s JobFailed reason 同型缺口）/ 同波兄弟跑完算力浪费 | P1 | 前两件升级纳入本 Story 实施（新增 Task 8 Subtask 8.6 守护验证器 + 编排器两处修改入文件清单/结构树）；同波取消为可选优化维持 deferred（禁无条件——CONTINUE/SKIP 场景本就不该取消） |
 
 ---
 
@@ -1270,7 +1274,7 @@ docs/architecture/
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-10-08
 **最后更新/Last Updated:** 2026-10-09
 **更新说明/Description:**
@@ -1279,6 +1283,7 @@ docs/architecture/
 - v1.2.0: 文档审查 Round 2 回归核查——双 Agent（传播完备性 + 修复组合交互面）收敛 16 项（P1×4 + P2×8 + P3×4）+ 2 项 R1 台账勘误：389 两套 id 空间注记、outbox fallback 测试清理策略定稿、INFEASIBLE×FAIL_FAST 行为变更登记（决策 #14）、fix_strategy 三分支（决策 #15）、FixAttempt 边界形态定约、fix-gen 异常收敛、hints per-stage 消费映射、触发矩阵衍生位补齐（八行三处）
 - v1.3.0: 文档审查 Round 3 单深度推演——三轮全推演（Gherkin 场景三轴 + Task 0→9 依赖干跑/提交批次 + 六条长状态时间线）收敛 11 项（P1×3 + P2×3 + P3×5）：幂等短路 record_case 定谳（R2-4 自拆修复）、Task 4/6 批次矛盾化解、abort 观测面立法与构造法、事件断言 drain 纪律、场景全枚举补齐、EXPECTED_TAGS 联动、error_category/fix_summary 来源定稿、提交策略 7/8/9 批次补全
 - v1.3.1: Round 5 独立终审——五节核验全过，周期正式收敛（零 P0/P1/P2 残留）；清偿 V4-1（决策计数 11→15 锚定）/V4-2（SSOT 表补 engine 引用 + RetryPolicy 语义消歧，AC-7 联动）+ F5-1/F5-2 两项 P3 微瑕；追加文档审查周期收敛声明
+- v1.4.0: R6 业界对标修订（INFEASIBLE×FAIL_FAST）——精读编排器勘误 R2-7 机理（漏看波次检查 :208-225，中断语义本就维持且为业界主流立场：K8s PodFailurePolicy FailJob / Temporal non-retryable / Step Functions 未捕获即 fail）；真实 delta 三件中前两件（node state 类型丢失 / FAIL_FAST cause=None）升级纳入实施（新增 Task 8.6 守护验证器 + `tool_chain_orchestrator.py` 两处修改登记），同波取消优化维持 deferred；「业务方确认」阻碍经对标消解
 
 ### 🏁 文档审查周期收敛声明（Round 5 独立终审，2026-10-09）
 
@@ -1309,14 +1314,14 @@ Story 4-7（Validation Feedback 闭环——增强重试与不可行标记，Epi
 4. 修复循环跨尝试失败反馈（Reflexion/Self-Debugging 共识）+ 引擎 Code stage 单一代码作者（R1-4，决策 #9/#12）
 5. outbox 修复重设计为 fallback 独立 session——HTTP 路径事务性原子性保持、后台 RuntimeError 分支经 session_factory 落地（R1-5，决策 #10）
 6. 防放大两层封顶（引擎 + TOV 校验重试）+ RetryPolicy 按引用整体恢复 + engine 引用经组合根注入穿透（R1-6/R2-15，决策 #8；SSOT 表 v1.3.1 补登记）
-7. INFEASIBLE 结果化与 ToolChain FAIL_FAST 策略交互显式登记（R2-7，决策 #14）
+7. INFEASIBLE 结果化与 ToolChain FAIL_FAST 策略交互显式登记（R2-7，决策 #14；**R6 勘误**：漏看波次检查 `:208-225`，中断语义本就维持——经业界对标 K8s PodFailurePolicy/Temporal non-retryable 定稿为正确立场，类型丢失/cause=None 两缺口升级为 Task 8.6 守护验证器随本 Story 实施，同波取消优化维持 deferred）
 8. fix_strategy 三分支 CASE_GUIDED/NEGATIVE_CASE_GUIDED/PURE_LLM（R2-8，决策 #15）
 9. 幂等短路 record_case 分类计数与 occurrence 同步递增定谳（R3-2，化解 R2-4 自拆）
 10. abort 中止路径观测面立法：零观测副作用 + 重放不短路全量重跑 + BDD 构造法禁 385（R3-3）
 
 **deferred 登记（dev 期落 deferred-work.md）**
 
-编排层 INFEASIBLE×FAIL_FAST 显式联动（决策 #14）；389 半边 aggregate 完整回链（ToolInputValidator 入链或 ToolResult 增 execution_id 字段）；中止遥测 ABORTED 第三值；outbox 后台路径「业务 session 异常回滚连带丢失」形态②；多案例加权检索与向量相似检索（L3 Qdrant）；工具熔断（or.md 四.7.(3)，建议挂 5.x）；自动灰度推进与 per-version 统计视图；真实修复能力观察基准（不进 CI 门禁）；400-409 扩域触发条件注释更新。
+编排层 INFEASIBLE×FAIL_FAST 显式联动（决策 #14。**R6 勘误与移出**：R2 机理结论漏看波次检查 `:208-225`——中断语义本就维持且符合业界主流；类型丢失/cause=None 两缺口经对标定稿后**升级纳入本 Story 实施**（Task 8.6），本 deferred 项仅余同波取消可选优化）；389 半边 aggregate 完整回链（ToolInputValidator 入链或 ToolResult 增 execution_id 字段）；中止遥测 ABORTED 第三值；outbox 后台路径「业务 session 异常回滚连带丢失」形态②；多案例加权检索与向量相似检索（L3 Qdrant）；工具熔断（or.md 四.7.(3)，建议挂 5.x）；自动灰度推进与 per-version 统计视图；真实修复能力观察基准（不进 CI 门禁）；400-409 扩域触发条件注释更新。
 
 **最终状态**
 
