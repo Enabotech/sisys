@@ -311,3 +311,79 @@ class TestSandboxExceptionCauseChain:
             except SandboxImagePullError as exc:
                 assert exc.__cause__ is original
                 assert exc.code == "EXCEPTION_315"
+
+
+class TestExecutionErrorStderrEnhancement:
+    """Story 4.7: ExecutionError 构造器增强（stderr/exit_code 可选参数 + context 透传合并）
+
+    兼容性硬约束：两个既有子类 SandboxTimeoutError/SandboxResourceLimitExceededError 的
+    super().__init__(reason, context={...}) 调用必须零改动通过（Task 0「修改的既有异常」契约）。
+    """
+
+    def test_execution_error_with_stderr_and_exit_code(self) -> None:
+        """stderr/exit_code 可选参数写入 context."""
+        exc = ExecutionError(
+            "execution failed (exit_code=1)",
+            stderr="Traceback ... KeyError: 'data'",
+            exit_code=1,
+        )
+        assert exc.context["stderr"] == "Traceback ... KeyError: 'data'"
+        assert exc.context["exit_code"] == 1
+        assert exc.code == "EXCEPTION_313"
+
+    def test_execution_error_defaults_backward_compatible(self) -> None:
+        """无参调用零破坏（既有 adapter 裸抛形态兼容）."""
+        exc = ExecutionError("plain failure")
+        assert exc.code == "EXCEPTION_313"
+        assert exc.context.get("stderr") is None
+        assert exc.context.get("exit_code") is None
+
+    def test_execution_error_stderr_truncated_to_2000(self) -> None:
+        """stderr 截断 ≤2000（防 DoS）."""
+        exc = ExecutionError("fail", stderr="x" * 3000, exit_code=2)
+        assert len(exc.context["stderr"]) == 2000
+
+    def test_execution_error_context_passthrough_merge(self) -> None:
+        """context 参数透传合并（不覆盖既有键）."""
+        exc = ExecutionError(
+            "fail",
+            stderr="err output",
+            exit_code=1,
+            context={"session_id": "sess-1", "custom": "keep"},
+        )
+        assert exc.context["session_id"] == "sess-1"
+        assert exc.context["custom"] == "keep"
+        assert exc.context["stderr"] == "err output"
+        assert exc.context["exit_code"] == 1
+
+    def test_execution_error_cause_passthrough(self) -> None:
+        """cause 透传保留（异常链路）."""
+        root = RuntimeError("docker daemon died")
+        exc = ExecutionError("fail", cause=root, stderr="e", exit_code=1)
+        assert exc.cause is root
+
+    def test_subclass_timeout_constructor_regression(self) -> None:
+        """子类构造回归：SandboxTimeoutError 的 super().__init__(reason, context=...) 零改动通过."""
+        exc = SandboxTimeoutError(
+            "execution timeout",
+            session_id="sess-9",
+            timeout_sec=60.0,
+            execution_id="exec-9",
+            docker_exit_code=124,
+        )
+        assert exc.context["session_id"] == "sess-9"
+        assert exc.context["execution_id"] == "exec-9"
+        assert exc.code == "EXCEPTION_316"
+
+    def test_subclass_resource_limit_constructor_regression(self) -> None:
+        """子类构造回归：SandboxResourceLimitExceededError 零改动通过."""
+        exc = SandboxResourceLimitExceededError(
+            "OOM killed",
+            session_id="sess-8",
+            limit_type="mem",
+            limit_value=1024,
+            actual_value=2048,
+            docker_exit_code=137,
+        )
+        assert exc.context["limit_type"] == "mem"
+        assert exc.code == "EXCEPTION_317"

@@ -119,21 +119,38 @@ class SandboxSecurityDecorator:
             current = getattr(current, "cause", None) or current.__cause__ or current.__context__
         return None
 
-    async def _publish_execution_failed(self, session_id: str, exc: ExecutionError) -> None:
+    async def _publish_execution_failed(
+        self,
+        session_id: str,
+        exc: ExecutionError,
+        outer_exc: Exception | None = None,
+    ) -> None:
         """best-effort 发布 SandboxExecutionFailed 事件(失败仅记日志)
+
+        Story 4.7（AC-1）：填充已预留未用的 execution_id 与 stderr 字段——
+        execution_id 取外层异常 context（引擎 382 构造时写入；直连路径无
+        聚合根保持空串）；stderr 取解包所得内层 ExecutionError context。
 
         Args:
             session_id: 会话 ID
-            exc: 沙箱执行失败异常(313/316/317)
+            exc: 沙箱执行失败异常(313/316/317——_unwrap_sandbox_error 解包所得)
+            outer_exc: 外层异常（引擎兜底 382 等，其 context 携带 execution_id；
+                直连路径 None）
         """
         if self._event_publisher is None:
             return
+        execution_id = ""
+        if outer_exc is not None:
+            outer_ctx = getattr(outer_exc, "context", None) or {}
+            execution_id = str(outer_ctx.get("execution_id", "") or "")
         try:
             await self._event_publisher.publish(
                 SandboxExecutionFailed(
                     session_id=session_id,
+                    execution_id=execution_id,
                     error_code=exc.code,
                     error_message=exc.message,
+                    stderr=str(exc.context.get("stderr", "") or ""),
                 )
             )
         except Exception:
@@ -189,9 +206,10 @@ class SandboxSecurityDecorator:
             return await self._wrapped.execute(tool_id, tool, tool_call, context)
         except Exception as exc:
             # 防护 5: 解包因果链,沙箱执行失败(313/316/317)发布事件后原样上浮
+            # Story 4.7：外层异常透传给事件发布（execution_id 提取——AC-1）
             sandbox_error = self._unwrap_sandbox_error(exc)
             if sandbox_error is not None:
-                await self._publish_execution_failed(session_id or "", sandbox_error)
+                await self._publish_execution_failed(session_id or "", sandbox_error, outer_exc=exc)
             raise
 
     async def execute_code_with_protection(
@@ -260,4 +278,33 @@ class SandboxSecurityDecorator:
             raise
 
 
-__all__ = ["SandboxSecurityDecorator"]
+def extract_stderr_from_cause_chain(exc: BaseException) -> str:
+    """沿异常因果链提取 STDERR（Story 4.7 AC-1——反馈闭环的修复输入）.
+
+    同时遍历自定义 ``cause`` 属性与 ``__cause__``/``__context__``
+    （base_exceptions.py 语义——判级顺序对齐 ``_unwrap_sandbox_error`` 与
+    ``DomainError.to_dict``）；命中首个 ExecutionError 族异常即取其
+    ``context["stderr"]``（无则空串）。
+
+    双分支形态（Dev Notes「STDERR 实际浮现路径」）：
+    - 主分支：382 自定义 cause 属性单跳到 313（生产装配下 STDERR 主浮现形态）
+    - 次分支：389 ``__cause__`` 链经 383 到 LLM 错误（无 STDERR——返回空串，
+      签名走 LLM 错误消息归一化，由调用方处理）
+
+    Args:
+        exc: 待提取异常（触发异常或链上任一节点）
+
+    Returns:
+        STDERR 字符串（链上无 ExecutionError 族或其 context 无 stderr 时空串）
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, ExecutionError):
+            return str(current.context.get("stderr", "") or "")
+        current = getattr(current, "cause", None) or current.__cause__ or current.__context__
+    return ""
+
+
+__all__ = ["SandboxSecurityDecorator", "extract_stderr_from_cause_chain"]

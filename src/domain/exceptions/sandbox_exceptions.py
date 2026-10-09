@@ -31,10 +31,44 @@ class ContainerStartError(SandboxError):
 
 
 class ExecutionError(SandboxError):
-    """代码执行失败异常."""
+    """代码执行失败异常.
+
+    Story 4.7 构造器增强（STDERR 数据链——AC-1）：stderr/exit_code 可选参数
+    写入 context（stderr 截断 ≤2000 防 DoS）；context/cause 透传合并——两个
+    既有子类 SandboxTimeoutError/SandboxResourceLimitExceededError 的
+    super().__init__(reason, context={...}) 调用零改动兼容（Task 0 契约）。
+    """
 
     code = "EXCEPTION_313"
     message = "Execution error"
+
+    # stderr 截断上限（摘录字段统一口径）
+    _STDERR_MAX_LENGTH = 2000
+
+    def __init__(
+        self,
+        message: str | None = None,
+        *,
+        stderr: str | None = None,
+        exit_code: int | None = None,
+        cause: Exception | None = None,
+        context: dict | None = None,
+    ) -> None:
+        """初始化并合并 STDERR 数据链字段.
+
+        Args:
+            message: 错误消息
+            stderr: 标准错误输出（截断 ≤2000——Validation Feedback 闭环的修复输入）
+            exit_code: 容器退出码
+            cause: 原始异常（透传保留链路）
+            context: 附加上下文（透传合并——新字段优先，既有键不被覆盖）
+        """
+        merged: dict = {**(context or {})}
+        if stderr is not None:
+            merged["stderr"] = stderr[: self._STDERR_MAX_LENGTH]
+        if exit_code is not None:
+            merged["exit_code"] = exit_code
+        super().__init__(message=message, cause=cause, context=merged)
 
 
 class ContainerStopError(SandboxError):

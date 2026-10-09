@@ -515,7 +515,14 @@ class AioDockerSandboxAdapter(SandboxExecutor):
                 exit_code,
                 stderr_str[:500],
             )
-            raise ExecutionError(f"execution failed (exit_code={exit_code})")
+            # Story 4.7（AC-1）：STDERR 数据链贯通——stderr（截断 ≤2000）与
+            # exit_code 填入异常 context，供 Validation Feedback 闭环提取（此前仅
+            # logger.debug 后丢弃）；截断由 ExecutionError 构造器统一执行
+            raise ExecutionError(
+                f"execution failed (exit_code={exit_code})",
+                stderr=stderr_str,
+                exit_code=exit_code,
+            )
         return {
             "status": "completed",
             "output": stdout_str,
