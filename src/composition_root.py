@@ -2287,6 +2287,41 @@ def bootstrap() -> None:
         tags=("tool", "version", "repository", "postgresql", "sqlalchemy"),
     )
 
+    # === Story 4.7 — Validation Feedback 闭环（错误案例库 + 演进日志仓储）===
+    register_port(
+        name="error_case_repository",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.ports.error_case_repository",
+            fromlist=["ErrorCaseRepositoryPort"],
+        ).ErrorCaseRepositoryPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.postgresql.repository.error_case_repository",
+            fromlist=["PostgreSQLErrorCaseRepository"],
+        ).PostgreSQLErrorCaseRepository(),
+        module="src.infrastructure.storage.postgresql.repository.error_case_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "repository", "feedback"),
+    )
+
+    register_port(
+        name="evolution_log_repository",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.ports.evolution_log_repository",
+            fromlist=["EvolutionLogRepositoryPort"],
+        ).EvolutionLogRepositoryPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.postgresql.repository.evolution_log_repository",
+            fromlist=["PostgreSQLEvolutionLogRepository"],
+        ).PostgreSQLEvolutionLogRepository(),
+        module="src.infrastructure.storage.postgresql.repository.evolution_log_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "repository", "feedback"),
+    )
+
     register_port(
         name="tool_version_service",
         version="v1.0.0",

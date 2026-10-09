@@ -14,6 +14,10 @@ from src.infrastructure.storage.postgresql.models.document import DocumentModel
 from src.infrastructure.storage.postgresql.models.document_version import (
     DocumentVersionSnapshotModel,
 )
+from src.infrastructure.storage.postgresql.models.error_case import ErrorCaseModel
+from src.infrastructure.storage.postgresql.models.evolution_log_entry import (
+    EvolutionLogEntryModel,
+)
 from src.infrastructure.storage.postgresql.models.login_attempt import LoginAttemptModel
 from src.infrastructure.storage.postgresql.models.memory import (
     MemoryChangeHistoryModel,
@@ -52,6 +56,8 @@ __all__ = [
     "AuditOutboxModel",
     "DocumentModel",
     "DocumentVersionSnapshotModel",
+    "ErrorCaseModel",
+    "EvolutionLogEntryModel",
     "DictionaryEntryModel",
     "DictionarySnapshotModel",
     "MemoryMetadataModel",
