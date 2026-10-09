@@ -150,7 +150,7 @@ async def test_engine_retry_restored_after_exception_path() -> None:
 
 @pytest.mark.asyncio
 async def test_engine_retry_handles_when_wrapped_has_no_retry_attr() -> None:
-    """wrapped 无 _retry 属性时(getattr default None),不抛 AttributeError"""
+    """wrapped 无 _retry 属性时(getattr default 为默认 RetryPolicy),不抛 AttributeError"""
     tool_id = uuid.uuid4()
     tool = _make_tool()
     wrapped = AsyncMock(spec=ToolExecutionEnginePort)

@@ -2,14 +2,16 @@
 
 定义 ValidationFeedbackServicePort——反馈闭环编排端口（recover 单方法）。
 
-注入形态（SSOT 定稿——R9-14 双句柄）：
+注入形态（SSOT 定稿——R9-14 双句柄；CR-R1-3 修订 engine 句柄用途）：
 - llm_client：修复建议生成（fix-gen）
 - error_case_repository / evolution_log_repository：案例库与演进日志
 - event_publisher：领域事件发布（fire-and-forget，None 时跳过）
-- engine：裸引擎引用（防放大封顶/恢复 engine._retry 用——_retry 属性所在）
+- engine：裸引擎引用（防放大封顶策略的 replace 派生基线来源——**只读**；
+  封顶经 ContextVar per-task 覆盖传递，禁直接写入 engine._retry 共享属性）
 - inner_chain：重执行用完整内层链（SSD>TOV>Engine——绕过裸引擎会架空
   SSD 安全防护与 TOV 出参校验，389 闭环被静默架空）
-- 不注入 RetryPolicy（fix-gen 重试封顶由服务内自建——防「按值恢复」陷阱）
+- 不注入 RetryPolicy（fix-gen 重试封顶由服务内自建——注入会诱导封顶值
+  绕过 replace 派生、静默丢失 backoff/duration 等配置字段）
 """
 
 from __future__ import annotations

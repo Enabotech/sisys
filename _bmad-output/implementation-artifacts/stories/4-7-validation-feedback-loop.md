@@ -55,7 +55,7 @@
 - [ ] 修复 prompt 组装：STDERR + 案例查询结果（命中 RECOVERED 案例时注入 fix_summary）+ schema violations（若有）+ **前次增强尝试失败反馈（attempt 1..k-1 的 stderr_excerpt/detail/suggested_fix_excerpt——动作+结果成对，R8-1）** + 禁止重复失败方案指令；不含"原 Code 产物"依赖（引擎按 hints 重新生成，见 Then）
 - [ ] hints payload 契约（Task 0 定稿 schema）：`{stderr_excerpt, schema_violations, case_summaries, prior_attempts, suggested_fix}`；`tool_execution_engine.py` `_think_stage`/`_code_stage` prompt 构建读取 `validation_feedback_hints` 扩展键（引擎 `__init__` 签名不变——4.4 AC-7.4 BDD 断言保护）
 - [ ] 防放大（CR-R1-3 ContextVar 形态）：增强期间引擎与 validator 两层重试均封顶 1（窗口内 `effective_retry_policy` 读到 max_attempts=1，含 retryable_exceptions 保持断言）；`engine._retry` 全程零写入（并发 recover 结束后 `engine._retry is 原对象`——并发回归断言）
-- [ ] 修复生成自身失败：fix-gen 调用包 `_call_with_retry(max_attempts=1)`，LLMAPIError/LLMResponseError 经重试语义耗尽**计为该次增强尝试失败**（`FixAttempt.detail="llm_generation_failed"`）；**fix-gen 调用点以 `except Exception` 收敛**（非白名单异常如响应构造缺陷同样计为该次 attempt 失败，detail 区分类型——防裸穿打破 INFEASIBLE 不抛契约）；增强尝试中内层浮出异常应用**与触发面同构的入环谓词（R9-13 对称立法）**——mid-attempt 异常分类定稿：①浮出 389 / 382-EXECUTION 且 cause∈ExecutionError 族 = **计为该次 attempt 失败**（`FixAttempt.detail="retry_failed"`——提取该次 stderr/violations 填 FixAttempt，进入下一 attempt）；②浮出**任何不满足入环谓词的异常**（385/207/**201**/410-413/398/**382-EXECUTION 且 cause∉族（mid-attempt infra/配置故障——触发前被 cause 过滤直传、闭环内同样不可标 INFEASIBLE）/382-SANDBOX_START/SSD 守卫异常（312/318/319）/101/302）= **中止闭环直传**（语义优先级高于闭环——与触发面九行判定完全对称，防 infra 故障经 attempt 侧门误标不可行）；**LLM 持续故障直传规则（R8-6/决策 #17，R9-15 根因导向修订，R10-2 谓词定稿）**：3 次 attempt 全部失败**且各次失败根因均为 LLM 瞬时**（fix-gen `detail="llm_generation_failed"`，或重执行 `detail="retry_failed"` 且失败异常链 389←383←`last_exc` 中 `last_exc ∈ {LLMAPIError, LLMResponseError, TimeoutError}`——**谓词类型集 = 引擎生产可重试白名单同集（R10-2 定稿：LLM 网络超时属「LLM 瞬时」语义域，排除 TimeoutError 会使 LLM 超时持续故障耗尽误标 INFEASIBLE——#17 要防的污染原样发生）；BDD 直传场景 LLMAPIError/TimeoutError 两类型各构造一种**——LLM API 持续不可用期间两种失败形态同源同频，仅锚定 fix-gen 失败会漏掉约半数目标形态）时**直传原触发异常不标 INFEASIBLE 不写演进日志终态**（外部瞬时故障不可归因为任务不可行，误标 INFEASIBLE 会永久污染负样本库）；**零终态路径重放语义（R9-17 显式化）**：中止与 #17② 直传两条零终态路径重放均不命中幂等短路 → 全量重跑——对 LLM 瞬时故障这是**期望行为而非代价**（LLM 恢复后重放应重试而非返回缓存结论）；成功恢复且 `error_category=LLM_TRANSIENT` 时**不覆写 fix_summary**（恢复归因于退避自愈而非修复方案，防伪配方污染案例库，决策 #17）。**中止路径观测面立法（R3-3）**：中止 = 零观测副作用（不写演进日志——AC-4 Given「闭环结束」不含中止且 final_status 无第三值；不回填案例；不发事件；已耗 attempt 遥测随无日志丢弃）；**连锁语义**：中止后同 trigger_error 重放**不命中幂等短路**（短路依赖已有终态日志）→ 重放全量重跑（LLM 配额放大为已知代价，完整中止遥测需 final_status 第三值 ABORTED——登记 deferred-work）；abort 场景 BDD 构造法 = attempt-k 的 LLM code mock 返回含裸 `$`（201 浮出）或注入 resolver（207）——385 同 RetryPolicy 下需单调钟竞速（首执行 <cap 触发 382、重执行 >cap 浮出 385）CI 必抖动，**385 仅用于直传场景构造**（引擎 `RetryPolicy(max_total_duration_sec≈0)`）
+- [ ] 修复生成自身失败：fix-gen 调用包 `_call_with_retry(max_attempts=1)`，LLMAPIError/LLMResponseError 经重试语义耗尽**计为该次增强尝试失败**（`FixAttempt.detail="llm_generation_failed"`）；**fix-gen 调用点以 `except Exception` 收敛**（非白名单异常如响应构造缺陷同样计为该次 attempt 失败，detail 区分类型——防裸穿打破 INFEASIBLE 不抛契约）；增强尝试中内层浮出异常应用**与触发面同构的入环谓词（R9-13 对称立法）**——mid-attempt 异常分类定稿：①浮出 389 / 382-EXECUTION 且 cause∈ExecutionError 族 = **计为该次 attempt 失败**（`FixAttempt.detail="retry_failed"`——提取该次 stderr/violations 填 FixAttempt，进入下一 attempt）；②浮出**任何不满足入环谓词的异常**（385/207/**201**/410-413/398/**382-EXECUTION 且 cause∉族（mid-attempt infra/配置故障——触发前被 cause 过滤直传、闭环内同样不可标 INFEASIBLE）/382-SANDBOX_START/SSD 守卫异常（312/318/319）/101/302）= **中止闭环直传**（语义优先级高于闭环——与触发面九行判定完全对称，防 infra 故障经 attempt 侧门误标不可行）；**LLM 持续故障直传规则（R8-6/决策 #17，R9-15 根因导向修订，R10-2 谓词定稿）**：3 次 attempt 全部失败**且各次失败根因均为 LLM 瞬时**（fix-gen `detail="llm_generation_failed"`，或重执行 `detail="retry_failed"` 且失败异常链 389←383←`last_exc` 中 `last_exc ∈ {LLMAPIError, LLMResponseError, TimeoutError}`——**谓词类型集 = 引擎生产可重试白名单同集（R10-2 定稿：LLM 网络超时属「LLM 瞬时」语义域，排除 TimeoutError 会使 LLM 超时持续故障耗尽误标 INFEASIBLE——#17 要防的污染原样发生）；**链遍历通道（CR-R1-2 精度注记）= 仅显式因果链（自定义 cause 属性 + `raise ... from` 的 `__cause__`），不含 `__context__` 隐式链**——recover 在 VFD except 块内执行时隐式链回指触发异常，389-LLM 触发下会把非 LLM 根因误判为瞬时；BDD 直传场景 LLMAPIError/TimeoutError 两类型各构造一种**——LLM API 持续不可用期间两种失败形态同源同频，仅锚定 fix-gen 失败会漏掉约半数目标形态）时**直传原触发异常不标 INFEASIBLE 不写演进日志终态**（外部瞬时故障不可归因为任务不可行，误标 INFEASIBLE 会永久污染负样本库）；**零终态路径重放语义（R9-17 显式化）**：中止与 #17② 直传两条零终态路径重放均不命中幂等短路 → 全量重跑——对 LLM 瞬时故障这是**期望行为而非代价**（LLM 恢复后重放应重试而非返回缓存结论）；成功恢复且 `error_category=LLM_TRANSIENT` 时**不覆写 fix_summary**（恢复归因于退避自愈而非修复方案，防伪配方污染案例库，决策 #17）。**中止路径观测面立法（R3-3）**：中止 = 零观测副作用（不写演进日志——AC-4 Given「闭环结束」不含中止且 final_status 无第三值；不回填案例；不发事件；已耗 attempt 遥测随无日志丢弃）；**连锁语义**：中止后同 trigger_error 重放**不命中幂等短路**（短路依赖已有终态日志）→ 重放全量重跑（LLM 配额放大为已知代价，完整中止遥测需 final_status 第三值 ABORTED——登记 deferred-work）；abort 场景 BDD 构造法 = attempt-k 的 LLM code mock 返回含裸 `$`（201 浮出）或注入 resolver（207）——385 同 RetryPolicy 下需单调钟竞速（首执行 <cap 触发 382、重执行 >cap 浮出 385）CI 必抖动，**385 仅用于直传场景构造**（引擎 `RetryPolicy(max_total_duration_sec≈0)`）
 - [ ] 单元测试：触发判定矩阵（含 SANDBOX_START 排除行）/ hint 注入透传 / 防放大恢复 / 跨尝试反馈注入 / 修复生成失败处置 / 成功恢复路径
 
 ### AC-3: 不可行标记与领域事件
@@ -1098,7 +1098,7 @@ docs/architecture/
 | `SandboxExecutionFailed` 事件 `stderr`/`execution_id` 字段 | `src/domain/events/sandbox_events.py:96,101,104` | **已预留无需新建**，仅由发布方填充（Task 3——execution_id 取外层 382 context，stderr 取内层 313 context） |
 | `ToolSchemaValidationFailed` 事件（自有业务字段 10 个：execution_id/tool_id/tenant_id/event_type/validation_phase/schema_violations/retry_attempt/failed_at/schema_version/is_final——源 docstring 自称「13 字段」为 4.3 原文，以字段定义为准） | `src/domain/events/tool_schema_events.py:25` | reliable 通道升级（Task 2），外部消费者面 |
 | `ToolOutputValidator` 耗尽契约 | `src/application/services/tool_output_validator.py:220-229` | 抛 389 即本 Story 触发信号（Schema 违规 / LLM 瞬时两子路径——Dev Notes 浮现路径），**禁止改动其语义** |
-| `_call_with_retry` / `RetryPolicy` | `src/application/services/retry_helpers.py:36,62` | 增强循环复用（max_attempts=3 总尝试语义 + on_failure_callback **已实现**（`:65,95-99`），纯复用无需增强） |
+| `_call_with_retry` / `RetryPolicy` | `src/application/services/retry_helpers.py:36,62` | 增强循环复用（max_attempts=3 总尝试语义 + on_failure_callback **已实现**（`:65,95-99`）。**R2 勘误：CR-R1-3 已增强**——新增 `effective_retry_policy`/`retry_policy_override`/`_RETRY_POLICY_OVERRIDE`（ContextVar per-task 覆盖，防放大封顶的并发安全形态），非「纯复用」） |
 | cause 链解包先例 `_unwrap_sandbox_error` | `src/application/services/sandbox_security_decorator.py:100-120` | stderr 提取 helper 参照实现（判级 `cause→__cause__→__context__`；注意其"首中 ExecutionError 即停"——新 helper 需同时取外层异常 context 的 execution_id） |
 | `context.extensions` 注入模式（P0-D） | `tool_output_validator.py:135-141` + `tool_execution_engine.py:446-447` | `validation_feedback_hints` 同款通道 |
 | `with_extension` frozen 工厂 | `src/domain/value_objects/tool_execution.py:95` | hints 上下文透传 |
@@ -1213,7 +1213,7 @@ docs/architecture/
 - Fake LLM 分派：system_prompt 判定须 `startswith`（FIX_SYSTEM_PROMPT 是完整句子而非裸标记）
 - 签名口径漂移：BDD 预置案例签名须与真实 JsonSchemaValidator violations 同形态计算（否则案例虚不命中）
 - `fail_remaining=3` 非 9：TOV 校验重试期间无条件封顶引擎（4.3 P0-1）→ 每轮 TOV 仅 1 次 think
-- #17② 判定升级：except 块内 raise 的 `__context__` 回指外层触发异常，叶子判定走偏 → 改链上成员判定 `_chain_contains_llm_transient`（R10-2「链中 last_exc」谓词语义的忠实实现）
+- #17② 判定升级：except 块内 raise 的 `__context__` 回指外层触发异常，叶子判定走偏 → 改链上成员判定 `_chain_contains_llm_transient`（R10-2「链中 last_exc」谓词语义的忠实实现。**CR-R1-2 演进注记**：代码审查发现成员判定含 `__context__` 通道时，回指链使 389-LLM 触发场景下**非 LLM 根因**失败必经 trigger 链扫到 LLM 节点——已收窄为**仅显式因果链**（cause 属性 + `__cause__`），生产链全程显式故真信号零丢失）
 
 ### 文件清单 File List
 
@@ -1256,6 +1256,7 @@ docs/architecture/
 - `tests/unit/infrastructure/external_services/sandbox/test_aiodocker_adapter_stderr.py`
 - `tests/unit/application/services/test_sandbox_security_decorator_events.py`、`test_validation_feedback_service.py`、`test_validation_feedback_decorator.py`、`test_tool_execution_engine_hints.py`、`test_tool_chain_orchestrator_infeasible.py`（循环 E 三断言——R8-8）
 - `tests/unit/application/services/test_execution_id_same_source.py` - execution_id 全链同源六断言（**代码审查周期 CR-R1-4 补交**——循环 D 承诺测试 dev 期缺位）
+- 修改（代码审查周期）：`src/application/services/retry_helpers.py`（**R2 补登**——CR-R1-3 ContextVar 覆盖机制：`effective_retry_policy`/`retry_policy_override`/`_RETRY_POLICY_OVERRIDE`）、`tests/unit/application/services/test_output_validator_retry_integration.py`（**R2 补登**——TOV 迁移后的 effective 观测改写）
 - `tests/unit/infrastructure/storage/inmemory/test_error_case_repository.py`、`test_evolution_log_repository.py`
 - `tests/contracts/test_port_contract_error_case_repository.py`、`test_port_contract_evolution_log_repository.py`、`test_port_contract_validation_feedback_service.py`、`test_event_contract_validation_feedback_events.py`、`test_event_channel_mapping_validation_feedback.py`
 - `tests/integration/test_validation_feedback_repositories.py` - PG 双仓储 + outbox fallback 集成（Task 4 载体）
@@ -1427,7 +1428,7 @@ docs/architecture/
 - [x] [4-7-P1-CR-R1-5][Review][Patch] `_current_trigger_code` 实例属性竞态：DAG 同波节点并发穿过同一 SCOPED service 实例（TaskGroup 实证），`:212` 写与 `_finish_*` 读跨 await 交错→演进日志 trigger_code 382/389 串扰（AC-4 基线字段失真）`validation_feedback_service.py:212` — trigger_code 显式传参至 `_finish_recovered`/`_finish_infeasible`，删实例属性与 `_trigger_code_of` [blind]
 - [x] [4-7-P2-CR-R1-6][Review][Patch] 负样本提示未达引擎：Subtask 0.12「Think stage 消费 case_summaries（含负样本提示）」生产者侧未兑现——`_classify_case` 格② 返回 `([], hint)`，引擎 Think prompt 永远收不到（引擎测试手工构造恰证明消费端契约在位）`validation_feedback_service.py:433` — hints 组装处并入（`strategy==NEGATIVE_CASE_GUIDED` 时 case_summaries 追加负样本提示）；fix-gen prompt 的 case_summaries 仍传原值（防「历史成功修复案例」标题语义错标）+ 服务层断言 [edge]
 - [x] [4-7-P2-CR-R1-7][Review][Patch] `_drain_safe_publish` 无强引用：asyncio 未持引用 task 可被 GC 中途回收（两事件静默丢失）`validation_feedback_service.py:75` — 模块级 `_background_tasks` set 持引 + done 回调 discard（schema_event_helpers:206-207 先例同款）[blind]
-- [x] [4-7-P2-CR-R1-8][Review][Patch] `# type: ignore[attr-defined]` ×2（红线）：AsyncMock 裸挂 `calls` 属性所致 `tests/acceptance/test_acceptance_validation_feedback_loop.py:235,:442` — 根因消除：`_ScriptedLLM` 真实包装类（类型化 calls + `_LLMResponse` 轻量响应），26 调用点全量回归绿 [audit]
+- [x] [4-7-P2-CR-R1-8][Review][Patch] `# type: ignore[attr-defined]` ×2（红线）：AsyncMock 裸挂 `calls` 属性所致 `tests/acceptance/test_acceptance_validation_feedback_loop.py:235,:442` — 根因消除：`_ScriptedLLM` 真实包装类（类型化 calls + 领域端口 VO `LLMResponse` 响应——**R2 勘误**：实现直接复用 `llm_client.py` 的 frozen dataclass，非自建轻量类），26 调用点全量回归绿 [audit]
 - [x] [4-7-P2-CR-R1-9][Review][Patch] BDD 恒真/空壳断言四则：AC-2.2（双层恒真——`EvolutionLogEntry` 无 error_category 字段且 #17② 直传零观测使 `if logs:` 不可达）；AC-5.4（then 体只断 status，「不覆写」空壳）；AC-7.1（`callable(spec.impl)` 与层叠零关系）；P95 基准（`except Exception→None`+恒真 status 断言——闭环整体崩溃仍 20 条样本全绿）`tests/acceptance/...:701,:1519,:1666` + `tests/integration/...:475` — AC-2.2 改断 #17② 直传形态（原 389+零观测副作用三断言，feature 文本与绑定串同步改）；AC-5.4 given 预置旧配方+then 断配方原样/计数递增；AC-7.1 改 `spec.impl(替身 resolver)` 解包 VFD>SSD>TOV>Engine 四层 isinstance 链；P95 改 INFEASIBLE 定向断言（脚本确定性）+删恒真；AC-2.14 补「不渲染案例注入段」内容断言 [audit]
 - [x] [4-7-P2-CR-R1-10][Review][Patch] error_category 首写定格无定向断言（格② 判定前置不变量仅靠实现自律；突变改 merge 取传入值全测试面零红）— InMemory+PG 各补「异 category 二次回填后 category 不变」用例 [audit]
 - [x] [4-7-P2-CR-R1-11][Review][Patch] execution_id UUID 防御不一致：`:204` 短路查询有 ValueError 守卫而 `:499/:557` 落库裸 `UUID(execution_id)`——无效串 id 在案例行已写后抛裸 ValueError（红线+INFEASIBLE 不抛双破）`validation_feedback_service.py:197` — 入口一次性归一（try UUID 失败按无 id），删死 except；补「无效串 id 不崩+日志新铸」用例 [edge]
@@ -1454,8 +1455,19 @@ docs/architecture/
 - [x] [4-7-P3-CR-R1-26][Review][Defer] D-P3a 引擎聚合 id 继承 session_id 回退（`extract_schema_execution_id` 三级优先——直连+UUID session_id 时聚合 id=session_id 非「兜底新铸」字面）— 生产全路径经链入口注入不受影响；已在 CR-R1-4 断言④按优先级链钉死并注记
 - [x] [4-7-P3-CR-R1-27][Review][Defer] D-P3b VFD 触发谓词绑定具体类（静态方法 import 而非端口方法——端口实现替换时判定不跟随）— deferred，提端口方法涉及接口契约与契约测试联动
 - [x] [4-7-P3-CR-R1-28][Review][Defer] M4 `validation_feedback_service` 端口与 `tool_execution_service` 双链构造（同 scope 两套 TOV/SSD 实例——「上提共享」原意为共享工厂代码；端口生产零消费方，SSD 并发配额翻倍窗口仅在双链同时执行时存在）— 登记已知形态
-- [x] [4-7-P3-CR-R1-29][Review][Defer] `_finish_recovered` 读-后-记 TOCTOU（fix_summary 快照与 record_case 间并发写窗口极小；计数由 repo 合并保护）— 注记登记
+- [x] [4-7-P3-CR-R1-29][Review][Defer] `_finish_recovered` 读-后-记 TOCTOU（fix_summary 快照与 record_case 间并发写窗口极小；计数由 repo 合并保护）— 注记登记（**R2 补记**：`_replay_synthetic` RECOVERED 分支的 get_by_natural_key→record_case 同款窗口，行为一致合规）
 - [x] [4-7-P3-CR-R1-30][Review][Defer] D-P3c lint-imports 既有 BROKEN（interfaces→composition_root 两处 import，先于 4-7 存在于基线 74fe77c2——非本 Story 变更集）— 独立工程项单独立项，不属本审查周期范围（已向用户报告）
+
+#### Round 2（回归核查 + 传播完备性，2026-10-09）
+
+双 Agent（R1 修复回归核查 / 传播完备性+组合交互面）+ 主会话 8009 单测独立回归。**结论：R1 修复零 P0/P1/P2 回归**（ContextVar 迁移经逐字段推演等价或严格更优；14 声称联动位 12 实勘落地 + 2 漏网位本轮补；五组组合交互推演无互拆）。发现与清偿：
+
+- [x] [4-7-P2-CR-R2-1][Review][Patch] 端口 docstring 教旧模式（`ports/validation_feedback_service.py:9/:12`「封顶/恢复 engine._retry」——与陷阱 8 新立法矛盾）— 改写为「replace 派生基线来源（只读）」口径
+- [x] [4-7-P2-CR-R2-2][Review][Patch] File List 漏登 retry_helpers.py 与 test_output_validator_retry_integration.py + 复用表 :1101「纯复用无需增强」被 CR-R1-3 自身证伪 — 两文件补登 + :1101 勘误
+- [x] [4-7-P3-CR-R2-3][Review][Patch] `_log_task_exception` 回调顺序缺陷（被取消 task 的 `exception()` 抛 CancelledError → discard 永不执行——与声称的先例形态不同款）— 镜像先例：discard 独立回调先注册 + `cancelled()` 前置跳过
+- [x] [4-7-P3-CR-R2-4][Review][Patch] hex 守卫三处收紧为 `re.fullmatch(r"[0-9a-f]{64}")`（int(,16) 宽容「0x」前缀/下划线——与「完整 sha256 hexdigest」文案不一致；零误伤实证）+ 拒绝向用例 ×4（非 hex/0x 前缀，三实体全覆盖）
+- [x] [4-7-P3-CR-R2-5][Review][Patch] 决策演进条目 6 漏标 CR-R1-3 / #17② 谓词「链上成员」精度注记（AC-2 VC + Dev Record :1216）/ 测试函数名残留旧机制词（`test_engine_retry_capped_via_contextvar_zero_write` 更名）/ TOV `if retry_policy is None` 不可达分支删除 + 测试 docstring 改实 — 均随本轮清偿
+- [x] [4-7-P3-CR-R2-6][Review][Patch] 台账措辞勘误：CR-R1-8 `_LLMResponse`→端口 VO `LLMResponse`；CR-R1-29 补 `_replay_synthetic` 同款窗口
 
 ---
 
@@ -1468,9 +1480,9 @@ docs/architecture/
 
 ---
 
-**故事版本/Story Version:** v1.8.0
+**故事版本/Story Version:** v1.8.1
 **创建日期/Created:** 2026-10-08
-**最后更新/Last Updated:** 2026-10-09（代码审查周期 Round 1）
+**最后更新/Last Updated:** 2026-10-09（代码审查周期 Round 2）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（3 并行调研 Agent 代码实证 + 4 前序故事经验整合 + 4 笔预留债清偿方案）
 - v1.1.0: 文档审查 Round 1——4 调研 Agent + 3 审查 Agent（正确性/一致性 + 可行性/可达性 + 科学性/方法论对标业界）收敛 42 项（P0×5 + P1×10 + P2/P3×27）：重写 STDERR 浮现路径为生产真实形态（382 主路径）、execution_id 全链提取机制定稿、签名统一 64 hex + Sentry 对标归一化、修复循环跨尝试反馈（Reflexion 共识）、outbox fallback 独立 session 重设计、触发矩阵 8 行化、防放大两层封顶、幂等副作用去重语义等
@@ -1485,6 +1497,7 @@ docs/architecture/
 - v1.6.3: 第二轮审查 Round 4/5（R11 纯验证 + R12 独立终审）——R11 零修改零提交（锚点存续 9 组实证 + 结构终验全过）；R12 五节终审（周期闭合/12 项双向取证/独立快扫/门禁/状态流转）发现并清偿 4 项（P2×2 + P3×2）：ExecutionError 族成员经代码继承树校正（318 继承 SandboxError 非族成员——两处误列删除）、#17② 旧谓词残留两处对齐根因导向、validate_complete 锚点校准、统计续记。**第二轮周期正式收敛（零 P0/P1/P2 残留），收敛声明入 Story**
 - v1.7.0: **dev-story 实施**——Task 0-9 全部完成（SDD+TDD 十任务批提交：1a51f164/ead48778/f4d6d433/94b903df/bbbbe3c1/59f16d0a/dc953cbe/c35c2c74/5be77ec8 + 收尾提交）；验收 42/42 全绿 + 全量回归 11873 passed（21 失败全部预存量/环境性实证）+ ruff/mypy 全过 + 4.7 变更集红线零命中；Status → review
 - v1.8.0: **代码审查周期 Round 1**——四视角并行调研（闭环编排正确性/契约一致性/测试判别力/架构合规回归）+ 主会话探针实证 + 双评审员方案评审 + 复评「优秀」后落码：清偿 P1×5（RECOVERED 重放清空配方/#17② `__context__` 假阳性/engine._retry 竞态→ContextVar 根治（VFD+TOV 双侧）/循环 D 五断言补交/trigger_code 竞态）+ P2×8（含 `# type: ignore` 红线×2 根因消除、负样本提示达引擎、BDD 恒真断言四则修正、首写定格定向断言、UUID 归一、陷阱 14 前提修正、393 注记）+ P3×8 随轮清偿 + Defer×9 登记；防放大机制演进为 ContextVar per-task 覆盖（决策 #8/陷阱 8/14/蓝图/SSOT 联动改写）
+- v1.8.1: **代码审查周期 Round 2**——双 Agent 回归核查 + 传播完备性：**R1 修复零 P0/P1/P2 回归**（ContextVar 迁移逐字段推演等价或严格更优 + 8009 单测独立回归）；清偿 P2×2（端口 docstring 旧模式/File List 双漏登+复用表勘误）+ P3×6（回调取消边界/hex 守卫收紧 fullmatch+拒绝向×4/决策演进标注/谓词精度注记/测试更名/TOV 死分支/台账勘误）
 
 ### 🏁 文档审查周期收敛声明（Round 5 独立终审，2026-10-09）
 
@@ -1514,7 +1527,7 @@ Story 4-7（Validation Feedback 闭环——增强重试与不可行标记，Epi
 3. 错误签名统一 64 hex 完整 sha256 + Sentry 对标归一化（数值/引号串模板化 + 尾部锚定 stderr[-2000:]），三处口径同一（R1-3）
 4. 修复循环跨尝试失败反馈（Reflexion/Self-Debugging 共识）+ 引擎 Code stage 唯一代码产出作者（R1-4，决策 #9/#12；**R8-1/R8-5 精确化**：反馈为动作+结果成对（suggested_fix_excerpt）/「建议者+作者」两级结构归因局限显式接受）
 5. outbox 修复重设计为 fallback 独立 session——HTTP 路径事务性原子性保持、后台 RuntimeError 分支经 session_factory 落地（R1-5，决策 #10）
-6. 防放大两层封顶（引擎 + TOV 校验重试）+ RetryPolicy 按引用整体恢复 + engine 引用经组合根注入穿透（R1-6/R2-15，决策 #8；SSOT 表 v1.3.1 补登记）
+6. 防放大两层封顶（引擎 + TOV 校验重试）+ RetryPolicy 按引用整体恢复 + engine 引用经组合根注入穿透（R1-6/R2-15，决策 #8；SSOT 表 v1.3.1 补登记。**CR-R1-3 机制演进**：ContextVar per-task 覆盖替代「整体替换+按引用恢复」——进程级共享引擎上的交错恢复竞态根治，VFD+TOV 双侧同源同修）
 7. INFEASIBLE 结果化与 ToolChain FAIL_FAST 策略交互显式登记（R2-7，决策 #14；**R6 勘误**：漏看波次检查 `:208-225`，中断语义本就维持——经业界对标 K8s PodFailurePolicy/Temporal non-retryable 定稿为正确立场，类型丢失/cause=None 两缺口随本 Story 实施（**R8-8 落点定稿：Task 6 循环 E 红绿实施 + 8.6 纯守护**），同波取消优化维持 deferred）
 8. fix_strategy 三分支 CASE_GUIDED/NEGATIVE_CASE_GUIDED/PURE_LLM（R2-8，决策 #15）
 9. 幂等短路 record_case 分类计数与 occurrence 同步递增定谳（R3-2，化解 R2-4 自拆）

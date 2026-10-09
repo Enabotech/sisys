@@ -95,6 +95,16 @@ class TestFixAttemptValueObject:
         with pytest.raises(EntityValidationError):
             _make_attempt(attempt_no=0)
 
+    def test_signature_non_hex_raises(self) -> None:
+        """签名必须为 hex 字符（R2：拒绝向用例——守卫判别力）."""
+        with pytest.raises(EntityValidationError):
+            _make_attempt(error_signature="x" * 64)
+
+    def test_signature_0x_prefix_raises(self) -> None:
+        """「0x」前缀 64 串不是合法 hexdigest（R2 收紧：int(,16) 曾宽容此形态）."""
+        with pytest.raises(EntityValidationError):
+            _make_attempt(error_signature="0x" + "a" * 62)
+
     def test_suggested_fix_excerpt_truncated_to_2000(self) -> None:
         """suggested_fix_excerpt 截断 ≤2000（R8-1 动作半边载荷边界）."""
         attempt = _make_attempt(suggested_fix_excerpt="z" * 3000)
@@ -143,6 +153,16 @@ class TestEvolutionLogEntryInvariants:
         """签名 64 hex."""
         with pytest.raises(EntityValidationError):
             _make_entry(error_signature="b" * 63)
+
+    def test_invalid_signature_non_hex_raises(self) -> None:
+        """签名必须为 hex 字符（R2：拒绝向用例——守卫判别力）."""
+        with pytest.raises(EntityValidationError):
+            _make_entry(error_signature="x" * 64)
+
+    def test_invalid_signature_0x_prefix_raises(self) -> None:
+        """「0x」前缀 64 串不是合法 hexdigest（R2 收紧：int(,16) 曾宽容此形态）."""
+        with pytest.raises(EntityValidationError):
+            _make_entry(error_signature="0x" + "a" * 62)
 
     def test_enhanced_retry_count_below_1_raises(self) -> None:
         """enhanced_retry_count ∈ [1,3]——下界."""

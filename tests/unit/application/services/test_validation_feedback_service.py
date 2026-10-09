@@ -578,7 +578,7 @@ class TestAmplificationGuard:
     """防放大（R1-F3 ContextVar 形态）：窗口内 effective 封顶 1 + 白名单保持 + 引擎零触碰."""
 
     @pytest.mark.asyncio
-    async def test_engine_retry_capped_and_restored_by_reference(self) -> None:
+    async def test_engine_retry_capped_via_contextvar_zero_write(self) -> None:
         """封顶窗口内 effective_retry_policy(engine._retry).max_attempts==1（白名单保持）；
         窗口外覆盖清零；engine._retry 全程未被触碰（共享状态零写入——并发安全形态）."""
         from src.application.services.retry_helpers import RetryPolicy, effective_retry_policy

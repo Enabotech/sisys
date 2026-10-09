@@ -109,10 +109,9 @@ class ToolOutputValidator:
         """
         # 动态读引擎策略（4.3 前置条件:构造未显式注入 retry_policy 时生效）——
         # 经 effective 读取（R1-F3）:VFD 反馈闭环窗口内 ContextVar 覆盖值生效,
-        # 校验重试层随引擎层同被封顶（防放大双层闭环的 TOV 半边）
+        # 校验重试层随引擎层同被封顶（防放大双层闭环的 TOV 半边）。
+        # effective/getattr-default 恒非 None（R2 清偿:旧 None 兜底分支不可达，删除）
         retry_policy = self._retry_policy or effective_retry_policy(getattr(self._wrapped, "_retry", RetryPolicy()))
-        if retry_policy is None:
-            retry_policy = RetryPolicy()
         retry_count = 0
         last_violations: tuple = ()
         # P0-F:与 INPUT 装饰器共享 execution_id,4.7 订阅者可按 execution_id 关联

@@ -72,6 +72,11 @@ class TestErrorCaseInvariants:
         with pytest.raises(EntityValidationError):
             _make_case(error_signature="z" * 64)
 
+    def test_invalid_signature_0x_prefix_raises(self) -> None:
+        """「0x」前缀 64 串不是合法 hexdigest（R2 收紧：int(,16) 曾宽容此形态）."""
+        with pytest.raises(EntityValidationError):
+            _make_case(error_signature="0x" + "a" * 62)
+
     def test_invalid_tenant_id_raises(self) -> None:
         """tenant_id 必须为有效 UUID."""
         with pytest.raises(EntityValidationError):

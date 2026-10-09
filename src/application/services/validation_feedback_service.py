@@ -92,15 +92,20 @@ def _drain_safe_publish(publisher: EventPublisher | None, event: Any) -> None:
 
     task = asyncio.create_task(_publish())
     _background_tasks.add(task)
+    # 释放回调先注册先执行（R2-A：被取消 task 的 exception() 抛 CancelledError，
+    # 若 discard 后置则永不执行——引用滞留 + 回调异常噪音；schema_event_helpers
+    # :206-207 先例同款双回调形态）
+    task.add_done_callback(_background_tasks.discard)
     task.add_done_callback(_log_task_exception)
 
 
 def _log_task_exception(task: Any) -> None:
-    """后台任务完成回调：异常统一日志 + 释放强引用（不传播）."""
+    """后台任务异常统一日志（不传播；被取消的 task 静默跳过）."""
+    if task.cancelled():
+        return
     exc = task.exception()
     if exc is not None:
         logger.warning("Validation Feedback 事件发布失败: %s", exc)
-    _background_tasks.discard(task)
 
 
 def _chain_contains_llm_transient(exc: BaseException) -> bool:
@@ -147,7 +152,7 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
             error_case_repository: 错误案例库端口
             evolution_log_repository: 演进日志端口
             event_publisher: 事件发布端口（None 跳过事件）
-            engine: 裸引擎引用（防放大封顶 engine._retry 用）
+            engine: 裸引擎引用（防放大封顶策略的 replace 派生基线——只读）
             inner_chain: 重执行用完整内层链（SSD>TOV>Engine）
         """
         self._llm = llm_client

@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -143,13 +144,13 @@ class ErrorCase:
                 message="error_signature 必须为 64 hex 完整 sha256 hexdigest",
                 context={"entity": "ErrorCase", "field": "error_signature"},
             )
-        try:
-            int(self.error_signature, 16)
-        except ValueError as exc:
+        # hex 字符集校验（R2 收紧：int(s,16) 宽容「0x」前缀/下划线分隔——
+        # sha256 hexdigest 恒为 64 位小写 hex，fullmatch 与错误文案口径一致）
+        if re.fullmatch(r"[0-9a-f]{64}", self.error_signature) is None:
             raise EntityValidationError(
                 message="error_signature 必须为 hex 字符",
                 context={"entity": "ErrorCase", "field": "error_signature"},
-            ) from exc
+            )
         if not isinstance(self.error_category, str) or not self.error_category.strip():
             raise EntityValidationError(
                 message="error_category 不能为空（首写定格——category 二次过滤前提）",
