@@ -1469,6 +1469,17 @@ docs/architecture/
 - [x] [4-7-P3-CR-R2-5][Review][Patch] 决策演进条目 6 漏标 CR-R1-3 / #17② 谓词「链上成员」精度注记（AC-2 VC + Dev Record :1216）/ 测试函数名残留旧机制词（`test_engine_retry_capped_via_contextvar_zero_write` 更名）/ TOV `if retry_policy is None` 不可达分支删除 + 测试 docstring 改实 — 均随本轮清偿
 - [x] [4-7-P3-CR-R2-6][Review][Patch] 台账措辞勘误：CR-R1-8 `_LLMResponse`→端口 VO `LLMResponse`；CR-R1-29 补 `_replay_synthetic` 同款窗口
 
+#### Round 3（单深度推演，2026-10-09）
+
+单 Agent 深度推演（六条长状态时间线逐字段终态 × 谓词全枚举 21 格/27 组合 × 四组真突变判别力 × 九项证伪探针留痕）。**结论：零 P0/P1/P2**——R1 修复在长状态时间线与并发边界下行为全部符合契约；关键实证：①389-LLM 触发 × mid 代码缺陷正确落 INFEASIBLE（R1-F2 主场景闭环验证）②RECOVERED 重放→再耗尽配方存续（R1-F1 跨终态序列）③DAG 同波 B 节点读 base 不受 A 的 override 连带（三重探针证据——task 创建时 context 快照隔离，R1-F3 连带消除的结构性证明）④四组真突变（防放大 with 删除/TOV 封顶失效/负样本不并入/首写定格破坏）全部红→还原→绿。发现与清偿：
+
+- [x] [4-7-P3-CR-R3-1][Review][Patch] `EvolutionLogQuery` 补 `__post_init__` 分页参数校验（offset≥0 且 limit≥1——双实现行为分歧消除：InMemory 负切片静默空 vs PG OFFSET 负值 DB 报错）+ 拒绝向用例
+- [x] [4-7-P3-CR-R3-2][Review][Patch] 分页次序键补 execution_id 决胜（InMemory/PG 双侧——同 created_at 并列时翻页边界丢/重行消除）+ 并列分页不丢不重用例
+- [x] [4-7-P3-CR-R3-3][Review][Patch] 399 异常 docstring 勘误（「由装饰器捕获转换」→「由闭环服务构造并就地转换，从未被 raise/捕获」——类 docstring 与模块 docstring 两处）
+- [x] [4-7-P3-CR-R3-4][Review][Defer] `_background_tasks` 模块级 set 跨事件循环滞留（pytest 每测试新 loop + 未 drain 形态下 task 闭包延迟 GC；生产单长存 loop 无此形态；`schema_event_helpers` 同款先例同款边界）— deferred 与先例统一治理（勿单侧修）
+- 观察项（立法内非缺陷）：389-LLM 触发混合根因耗尽终态案例行 `category=LLM_TRANSIENT + infeasible=1`——R3-9 触发侧派生立法的忠实结果；叠加 A8 粗签名桶使后续同桶纯 LLM 触发命中格②负样本提示（语义偏弱但全量 3 次不缩减，无误标放大路径）
+- 「推演不成立」留痕 9 项（V1 同波连带/V2 raw 383 浮出/V3 重放再耗尽清配方/V4 混合根因直传/V5 五格缺格/V6 组合偏差/V7 fullmatch 拒提取器输出/V8 跨循环功能故障/V9 finish 误计 attempt——全部证伪，防下轮重推）
+
 ---
 
 ### 下一步 Next Steps
@@ -1480,9 +1491,9 @@ docs/architecture/
 
 ---
 
-**故事版本/Story Version:** v1.8.1
+**故事版本/Story Version:** v1.8.2
 **创建日期/Created:** 2026-10-08
-**最后更新/Last Updated:** 2026-10-09（代码审查周期 Round 2）
+**最后更新/Last Updated:** 2026-10-09（代码审查周期 Round 3）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（3 并行调研 Agent 代码实证 + 4 前序故事经验整合 + 4 笔预留债清偿方案）
 - v1.1.0: 文档审查 Round 1——4 调研 Agent + 3 审查 Agent（正确性/一致性 + 可行性/可达性 + 科学性/方法论对标业界）收敛 42 项（P0×5 + P1×10 + P2/P3×27）：重写 STDERR 浮现路径为生产真实形态（382 主路径）、execution_id 全链提取机制定稿、签名统一 64 hex + Sentry 对标归一化、修复循环跨尝试反馈（Reflexion 共识）、outbox fallback 独立 session 重设计、触发矩阵 8 行化、防放大两层封顶、幂等副作用去重语义等
@@ -1498,6 +1509,7 @@ docs/architecture/
 - v1.7.0: **dev-story 实施**——Task 0-9 全部完成（SDD+TDD 十任务批提交：1a51f164/ead48778/f4d6d433/94b903df/bbbbe3c1/59f16d0a/dc953cbe/c35c2c74/5be77ec8 + 收尾提交）；验收 42/42 全绿 + 全量回归 11873 passed（21 失败全部预存量/环境性实证）+ ruff/mypy 全过 + 4.7 变更集红线零命中；Status → review
 - v1.8.0: **代码审查周期 Round 1**——四视角并行调研（闭环编排正确性/契约一致性/测试判别力/架构合规回归）+ 主会话探针实证 + 双评审员方案评审 + 复评「优秀」后落码：清偿 P1×5（RECOVERED 重放清空配方/#17② `__context__` 假阳性/engine._retry 竞态→ContextVar 根治（VFD+TOV 双侧）/循环 D 五断言补交/trigger_code 竞态）+ P2×8（含 `# type: ignore` 红线×2 根因消除、负样本提示达引擎、BDD 恒真断言四则修正、首写定格定向断言、UUID 归一、陷阱 14 前提修正、393 注记）+ P3×8 随轮清偿 + Defer×9 登记；防放大机制演进为 ContextVar per-task 覆盖（决策 #8/陷阱 8/14/蓝图/SSOT 联动改写）
 - v1.8.1: **代码审查周期 Round 2**——双 Agent 回归核查 + 传播完备性：**R1 修复零 P0/P1/P2 回归**（ContextVar 迁移逐字段推演等价或严格更优 + 8009 单测独立回归）；清偿 P2×2（端口 docstring 旧模式/File List 双漏登+复用表勘误）+ P3×6（回调取消边界/hex 守卫收紧 fullmatch+拒绝向×4/决策演进标注/谓词精度注记/测试更名/TOV 死分支/台账勘误）
+- v1.8.2: **代码审查周期 Round 3**——单深度推演：六条长状态时间线 × 谓词全枚举（21 格唯一/27 组合零偏差）× 四组真突变判别力（全红→还原→绿）× 九项证伪留痕——**零 P0/P1/P2**；关键结构性证明：DAG 同波 task 创建时 context 快照隔离（override 连带消除）；清偿 P3×3（Query 分页校验/次序键决胜/399 docstring 勘误）+ Defer×1（跨循环 task 滞留与先例统一治理）
 
 ### 🏁 文档审查周期收敛声明（Round 5 独立终审，2026-10-09）
 

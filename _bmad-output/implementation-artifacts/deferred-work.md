@@ -69,3 +69,4 @@
 - VFD 触发谓词提为端口方法（代码审查 CR-R1-27/D-P3b） — 现绑定具体类静态方法（端口实现替换时判定不跟随）；涉及接口契约与契约测试联动。
 - `validation_feedback_service` 端口与 `tool_execution_service` 双链构造注记（代码审查 CR-R1-28/M4） — 同 scope 两套 TOV/SSD 实例（「上提共享」原意为共享工厂代码）；端口生产零消费方，SSD 并发配额翻倍窗口仅在双链同时执行时存在。
 - `_finish_recovered` 读-后-记 TOCTOU（代码审查 CR-R1-29） — fix_summary 快照与 record_case 间并发写窗口极小；计数由仓储 merge 保护。
+- 后台发布任务 set 跨事件循环滞留（代码审查 CR-R3-4） — `validation_feedback_service._background_tasks` 模块级 set 在 pytest 每测试新 loop 且未 drain 时滞留 pending task（内存级，loop2 功能正常；生产单长存 loop 无此形态）；`schema_event_helpers._background_tasks` 同款先例同款边界——需统一治理（loop 关闭钩子/atexit 批量取消），勿单侧修。

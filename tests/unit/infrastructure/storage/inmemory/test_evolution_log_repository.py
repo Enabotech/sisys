@@ -148,6 +148,42 @@ class TestListByQuery:
         logs = await repo.list_by_query(EvolutionLogQuery(tool_id=tool))
         assert logs[0].execution_id == second.execution_id
 
+    @pytest.mark.asyncio
+    async def test_same_created_at_tiebreak_by_execution_id(self) -> None:
+        """同 created_at 并列时以 execution_id 决胜（R3——分页边界丢/重行消除）."""
+        tenant, tool = uuid.uuid4(), uuid.uuid4()
+        repo = InMemoryEvolutionLogRepository()
+        same_time = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+        entries = []
+        for _ in range(4):
+            entry = _make_entry(tenant, tool)
+            entry.created_at = same_time
+            entries.append(entry)
+            await repo.save(entry)
+
+        # 双页遍历不丢不重（决胜键唯一保证）
+        seen: set[str] = set()
+        for page in (
+            await repo.list_by_query(EvolutionLogQuery(tool_id=tool, limit=2, offset=0)),
+            await repo.list_by_query(EvolutionLogQuery(tool_id=tool, limit=2, offset=2)),
+        ):
+            for e in page:
+                assert str(e.execution_id) not in seen, "分页边界不得重复"
+                seen.add(str(e.execution_id))
+        assert len(seen) == 4, "分页遍历不得丢行"
+        # 排序确定性：与全量排序一致
+        full = await repo.list_by_query(EvolutionLogQuery(tool_id=tool))
+        assert [str(e.execution_id) for e in full[:2]] == sorted((str(e.execution_id) for e in entries), reverse=True)[:2]
+
+    def test_query_pagination_validation_rejects_negative(self) -> None:
+        """EvolutionLogQuery 分页参数校验（R3——双实现行为分歧消除）."""
+        from src.domain.exceptions import EntityValidationError
+
+        with pytest.raises(EntityValidationError):
+            EvolutionLogQuery(offset=-1)
+        with pytest.raises(EntityValidationError):
+            EvolutionLogQuery(limit=0)
+
 
 class TestGetByExecution:
     """execution_id 精确查询."""

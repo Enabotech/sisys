@@ -52,7 +52,9 @@ class InMemoryEvolutionLogRepository(EvolutionLogRepositoryPort):
             and (query.tenant_id is None or entry.tenant_id == query.tenant_id)
             and (query.execution_id is None or entry.execution_id == query.execution_id)
         ]
-        matched.sort(key=lambda e: e.created_at or _EPOCH, reverse=True)
+        # 次序键：created_at + execution_id（R3 清偿——同时间戳并列时分页边界
+        # 丢/重行消除，PG 侧同款双键保持双实现行为一致）
+        matched.sort(key=lambda e: (e.created_at or _EPOCH, e.execution_id), reverse=True)
         return tuple(_detached(e) for e in matched[query.offset : query.offset + query.limit])
 
     async def get_by_execution(

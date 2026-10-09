@@ -27,8 +27,12 @@ class EvolutionLogQuery:
         tool_id: 按工具 ID 过滤（「按工具查询反馈历史」主查询面，可选）
         tenant_id: 按租户过滤（可选——缺省跨租户聚合运维视图）
         execution_id: 按执行 ID 精确过滤（可选）
-        offset: 分页偏移（默认 0）
-        limit: 分页大小（默认 100）
+        offset: 分页偏移（默认 0，非负）
+        limit: 分页大小（默认 100，≥1）
+
+    Raises:
+        EntityValidationError: offset 为负或 limit < 1（R3 清偿——双实现行为
+            分歧消除：InMemory 负切片静默空 vs PG OFFSET 负值 DB 报错）
     """
 
     tool_id: uuid.UUID | None = None
@@ -36,6 +40,17 @@ class EvolutionLogQuery:
     execution_id: uuid.UUID | None = None
     offset: int = 0
     limit: int = 100
+
+    def __post_init__(self) -> None:
+        """分页参数非负校验（入口归一——双实现行为一致的前提）."""
+        from src.domain.exceptions import EntityValidationError
+
+        if self.offset < 0 or self.limit < 1:
+            raise EntityValidationError(
+                message=f"EvolutionLogQuery 分页参数非法（要求 offset>=0 且 limit>=1，"
+                f"实际 offset={self.offset} limit={self.limit}）",
+                context={"entity": "EvolutionLogQuery", "field": "offset/limit"},
+            )
 
 
 @runtime_checkable

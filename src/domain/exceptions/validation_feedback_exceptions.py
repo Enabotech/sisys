@@ -12,8 +12,9 @@ toolchain 子域 390-399 第 10 个也是最后一个码位）：
 - ValidationFeedbackRetryExhaustedError（EXCEPTION_399）= **增强**重试（反馈
   闭环级）耗尽——终态不可行结论。
 
-对外契约：399 为闭环内部耗尽信号，由 ValidationFeedbackDecorator 捕获并转换为
-ToolResult(INFEASIBLE) 结果返回（对外不抛异常——DAG 编排按 status 分支感知）。
+对外契约：399 为闭环内部耗尽信号，由闭环服务（ValidationFeedbackService）
+构造并就地转换为 ToolResult(INFEASIBLE) 结果返回（对外不抛异常——DAG 编排按
+status 分支感知；R3 勘误：399 从未被 raise/捕获）。
 
 HTTP 映射：422 Unprocessable Entity（与 396 出参校验失败语义对齐——「语义上
 不可处理」而非 502「可重试下游故障」；不可行标记恰是「重试无意义」的终态结论）。
@@ -32,8 +33,9 @@ class ValidationFeedbackRetryExhaustedError(BusinessException):
     """增强重试（反馈闭环级）耗尽——任务终态不可行的内部信号
 
     与 EXCEPTION_383 的语义区分：383 = 基础重试（stage 级 RetryPolicy）耗尽，
-    仍可进入增强闭环；本异常（399）= 增强重试耗尽，为终态结论——由装饰器
-    捕获转换为 ToolResult(status=INFEASIBLE)，对外不抛。
+    仍可进入增强闭环；本异常（399）= 增强重试耗尽，为终态结论——由闭环服务
+    构造并就地转换为 ToolResult(status=INFEASIBLE) 返回（R3 勘误：实现中
+    399 从未被 raise/捕获，耗尽信号经 context 载体携带，对外不抛）。
 
     Attributes:
         code: 错误码 EXCEPTION_399

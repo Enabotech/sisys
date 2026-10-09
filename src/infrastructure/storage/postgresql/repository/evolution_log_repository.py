@@ -150,7 +150,9 @@ class PostgreSQLEvolutionLogRepository(
             stmt = stmt.where(model_cls.tenant_id == query.tenant_id)
         if query.execution_id is not None:
             stmt = stmt.where(model_cls.execution_id == query.execution_id)
-        stmt = stmt.order_by(model_cls.created_at.desc())
+        # 次序键：created_at + execution_id（R3 清偿——同时间戳并列时分页边界
+        # 丢/重行消除，InMemory 侧同款双键保持双实现行为一致）
+        stmt = stmt.order_by(model_cls.created_at.desc(), model_cls.execution_id.desc())
         stmt = stmt.offset(query.offset).limit(query.limit)
         result = await self._session.execute(stmt)
         return tuple(self._to_entity(m) for m in result.scalars().all())
