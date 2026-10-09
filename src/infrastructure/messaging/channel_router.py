@@ -160,8 +160,24 @@ class ChannelRouter:
         "ToolSchemaValidationFailed": ChannelMapping(
             event_type="ToolSchemaValidationFailed",
             redis_channel="sisys:rt:tool_schema_validation_failed",
-            delivery_mode=DeliveryMode.REALTIME,
-            description="工具 Schema 验证失败（Story 4.3,本期仅 realtime,reliable 4.7 启用）",
+            rabbitmq_routing_key="sisys.events.reliable.tool_schema_validation_failed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="工具 Schema 验证失败（Story 4.3 定义，reliable 通道 Story 4.7 启用）",
+        ),
+        # VALIDATION_FEEDBACK 事件（Story 4.7 — 反馈闭环，双通道 reliable 配置面登记）
+        "ToolExecutionMarkedInfeasible": ChannelMapping(
+            event_type="ToolExecutionMarkedInfeasible",
+            redis_channel="sisys:rt:tool_execution_marked_infeasible",
+            rabbitmq_routing_key="sisys.events.reliable.tool_execution_marked_infeasible",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="工具执行不可行标记（3 次增强重试耗尽，Story 4.7）",
+        ),
+        "ToolExecutionRecovered": ChannelMapping(
+            event_type="ToolExecutionRecovered",
+            redis_channel="sisys:rt:tool_execution_recovered",
+            rabbitmq_routing_key="sisys.events.reliable.tool_execution_recovered",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="工具执行恢复成功（增强重试成功，Story 4.7）",
         ),
         # TOOL_VERSION 事件（Story 4.6 — 灰度发布与回滚，管理类事件仅 realtime）
         "ToolVersionRegistered": ChannelMapping(

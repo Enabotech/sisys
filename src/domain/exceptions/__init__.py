@@ -171,6 +171,9 @@ from src.domain.exceptions.transfer_exceptions import (
     TransferNotApprovedError,
     TransferNotFoundError,
 )
+from src.domain.exceptions.validation_feedback_exceptions import (
+    ValidationFeedbackRetryExhaustedError,
+)
 
 __all__ = [
     # 抽象根类
@@ -316,4 +319,6 @@ __all__ = [
     "ToolOutputSchemaValidationError",
     "ToolSchemaCompatibilityError",
     "ToolSchemaMissingError",
+    # Validation Feedback 异常（Story 4.7）
+    "ValidationFeedbackRetryExhaustedError",
 ]

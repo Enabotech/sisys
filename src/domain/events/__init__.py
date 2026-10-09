@@ -38,6 +38,10 @@ from .tool_version_events import (
     ToolVersionPublished,
     ToolVersionRegistered,
 )
+from .validation_feedback_events import (
+    ToolExecutionMarkedInfeasible,
+    ToolExecutionRecovered,
+)
 from .workflow_events import RAGIndexed, ReportGenerated, WorkflowSubmitted
 
 __all__ = [
@@ -47,6 +51,8 @@ __all__ = [
     "DocumentUploaded",
     "DocumentVersionSnapshotCreated",
     "ToolExecuted",
+    "ToolExecutionMarkedInfeasible",
+    "ToolExecutionRecovered",
     "ToolVersionRegistered",
     "ToolVersionPublished",
     "ToolRolledBack",

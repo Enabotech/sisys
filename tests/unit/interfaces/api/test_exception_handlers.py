@@ -124,6 +124,7 @@ from src.domain.exceptions import (
     UnknownError,
     UploadSessionExpiredError,
     ValidationError,
+    ValidationFeedbackRetryExhaustedError,
     ValidityPeriodConflictError,
     VersionError,
 )
@@ -315,6 +316,7 @@ class TestExceptionHttpMap:
             ToolOutputSchemaValidationError,  # 396 — Story 4.3 工具出参 Schema 校验失败
             ToolSchemaCompatibilityError,  # 397 — Story 4.3 Schema 版本兼容性冲突
             ToolSchemaMissingError,  # 398 — Story 4.3 Schema 缺失配置错误
+            ValidationFeedbackRetryExhaustedError,  # 399 — Story 4.7 增强重试耗尽（终态不可行）
             ToolVersionNotFoundError,  # 430 — Story 4.6 版本不存在
             ToolVersionAlreadyExistsError,  # 431 — Story 4.6 重复注册
             ToolVersionTrafficWeightError,  # 432 — Story 4.6 权重/发布约束/并存冲突族

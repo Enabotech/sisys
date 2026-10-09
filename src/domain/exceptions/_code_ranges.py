@@ -82,7 +82,8 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # EXCEPTION_396 ToolOutputSchemaValidationError (Story 4.3)
     # EXCEPTION_397 ToolSchemaCompatibilityError (Story 4.3)
     # EXCEPTION_398 ToolSchemaMissingError (Story 4.3)
-    # 子域物理嵌套于 external (301-399)，但语义独立；EXCEPTION_399 预留供 Story 4.7 扩展
+    # EXCEPTION_399 ValidationFeedbackRetryExhaustedError (Story 4.7——预留码位兑现)
+    # 子域物理嵌套于 external (301-399)，但语义独立；390-399 已全部分配
     "toolchain": (390, 399),
     # 数据源子域（410-419）—— Story 4.1b 注册 4 个异常:
     # EXCEPTION_410 DataSourceError (Story 4.1b, 数据源通用错误基类)
@@ -244,6 +245,8 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ToolOutputSchemaValidationError": "toolchain",
     "ToolSchemaCompatibilityError": "toolchain",
     "ToolSchemaMissingError": "toolchain",
+    # validation_feedback_exceptions.py (Story 4.7 新增 1 个异常——预留码位 399 兑现)
+    "ValidationFeedbackRetryExhaustedError": "toolchain",
     # data_source_exceptions.py (Story 4.1b 新增 4 个异常)
     "DataSourceError": "data_source",
     "DataSourceUnavailableError": "data_source",

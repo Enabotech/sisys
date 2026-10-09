@@ -118,6 +118,7 @@ from src.domain.exceptions import (
     UnknownError,
     UploadSessionExpiredError,
     ValidationError,
+    ValidationFeedbackRetryExhaustedError,
     ValidityPeriodConflictError,
     VersionError,
 )
@@ -242,6 +243,7 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     ToolOutputSchemaValidationError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 396 — 工具出参 Schema 校验失败
     ToolSchemaCompatibilityError: status.HTTP_409_CONFLICT,  # 397 — Schema 版本兼容性冲突
     ToolSchemaMissingError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 398 — Schema 缺失配置错误
+    ValidationFeedbackRetryExhaustedError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 399 — 增强重试耗尽（终态不可行）
     # 数据源异常（Story 4.1b — Skills 数据采集基础设施）
     DataSourceError: status.HTTP_502_BAD_GATEWAY,  # 410 — 数据源通用错误
     DataSourceUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,  # 411 — 数据源不可用（重试耗尽）
