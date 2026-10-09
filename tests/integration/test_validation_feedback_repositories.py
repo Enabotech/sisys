@@ -342,3 +342,117 @@ class TestErrorCasePGRepository:
         assert merged.recovered_count == 1
         assert merged.infeasible_count == 1
         assert merged.occurrence_count == 2
+
+
+# ============================================================================
+# Task 6 循环 C：outbox 后台路径 fallback 独立 session 修复（R3-1 本批追加）
+# ============================================================================
+
+
+class TestOutboxFallbackIndependentSession:
+    """后台/CLI 路径（无请求 session）reliable 事件经 fallback 独立 session 落库.
+
+    隔离纪律（R2-6/陷阱 15）：fallback 走 session_context 独立写入即 commit——
+    不挂 repo_session（否则 ContextVar 有值触发不了 RuntimeError 分支），并在
+    try/finally 中按本测试自建 event_id 集合定向删除自建行（「只清理自己创建
+    的资源」的合规例外——禁令针对 truncate 全表/误删他行）。
+    """
+
+    @pytest.mark.asyncio
+    async def test_background_path_saves_via_fallback(
+        self, db_engine: PostgreSQLManager, pg_available: bool, event_loop
+    ) -> None:
+        """无请求 session → RuntimeError 分支 → fallback 独立写入成功（现状静默丢失）."""
+        import uuid as uuid_lib
+
+        from src.domain.events.validation_feedback_events import ToolExecutionRecovered
+        from src.infrastructure.messaging.outbox.outbox_repository import (
+            PostgreSQLOutboxRepository,
+        )
+        from src.infrastructure.storage.postgresql.session_context import get_session
+
+        if not pg_available:
+            pytest.skip("PostgreSQL not available")
+            return
+
+        from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
+
+        def _factory() -> _AsyncSession:
+            return _AsyncSession(db_engine.get_async_engine())
+
+        event = ToolExecutionRecovered(
+            execution_id=uuid_lib.uuid4(),
+            tool_id=uuid_lib.uuid4(),
+            tenant_id=uuid_lib.uuid4(),
+            error_signature="a" * 64,
+            enhanced_retry_count=1,
+        )
+        repo = PostgreSQLOutboxRepository(session_factory=_factory)
+        try:
+            # 未 set_session——get_session() 抛 RuntimeError → fallback 路径
+            try:
+                get_session()
+                pytest.skip("ContextVar 意外有值（上层 fixture 泄漏）——无法验证 fallback 分支")
+                return
+            except RuntimeError:
+                pass
+            await repo.save(event)
+
+            # 独立会话验证落库
+            async def _verify() -> bool:
+                from sqlalchemy import select
+
+                from src.infrastructure.storage.postgresql.models import OutboxModel
+
+                verify_session = _AsyncSession(db_engine.get_async_engine())
+                try:
+                    result = await verify_session.execute(select(OutboxModel).where(OutboxModel.event_id == event.event_id))
+                    return result.scalar_one_or_none() is not None
+                finally:
+                    await verify_session.close()
+
+            assert await _verify(), "fallback 独立写入应落库"
+        finally:
+            # 定向清理自建行（合规例外显式声明）
+            async def _cleanup() -> None:
+                from sqlalchemy import delete
+
+                from src.infrastructure.storage.postgresql.models import OutboxModel
+
+                cleanup_session = _AsyncSession(db_engine.get_async_engine())
+                try:
+                    await cleanup_session.execute(delete(OutboxModel).where(OutboxModel.event_id == event.event_id))
+                    await cleanup_session.commit()
+                finally:
+                    await cleanup_session.close()
+
+            await _cleanup()
+
+    @pytest.mark.asyncio
+    async def test_http_path_uses_request_session_unchanged(self, repo_session: AsyncSession) -> None:
+        """HTTP 形态（有请求 session）：仍走请求 session 同事务——rollback 后无行
+        （事务性原子性保持；「有请求 session」形态经 set_session fixture 模拟——
+        SessionMiddleware 未接线前生产不可达，验证 fallback 分支语义）."""
+        import uuid as uuid_lib
+
+        from src.domain.events.validation_feedback_events import ToolExecutionRecovered
+        from src.infrastructure.messaging.outbox.outbox_repository import (
+            PostgreSQLOutboxRepository,
+        )
+
+        event = ToolExecutionRecovered(
+            execution_id=uuid_lib.uuid4(),
+            tool_id=uuid_lib.uuid4(),
+            tenant_id=uuid_lib.uuid4(),
+            error_signature="b" * 64,
+            enhanced_retry_count=1,
+        )
+        repo = PostgreSQLOutboxRepository(session_factory=None)
+        await repo.save(event)
+        # 事务内 flush 可见（repo_session 隔离——rollback 由 fixture 收尾）
+        from sqlalchemy import select
+
+        from src.infrastructure.storage.postgresql.models import OutboxModel
+
+        result = await repo_session.execute(select(OutboxModel).where(OutboxModel.event_id == event.event_id))
+        assert result.scalar_one_or_none() is not None

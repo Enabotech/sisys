@@ -178,15 +178,16 @@ class TestPortRegistryMetadata:
         assert spec.module
         assert spec.interface is not None
 
-    def test_tool_execution_service_upgraded_v1_3_0(self) -> None:
-        """tool_execution_service 升级 v1.3.0 + versioned tag（4-3 P0-A 先例）。"""
+    def test_tool_execution_service_upgraded_v1_4_0(self) -> None:
+        """tool_execution_service 升级 v1.4.0 + versioned tag（4-3 P0-A 先例，4-7 再升级）。"""
         spec = _global_registry.get("tool_execution_service")
         assert spec is not None
-        assert spec.version == "v1.3.0"
+        assert spec.version == "v1.4.0"  # Story 4.7：ValidationFeedbackDecorator 最外层 + 链入口 id 注入
         assert "versioned" in spec.tags
         assert spec.compatibility == (
+            "v1.3.0",
             "v1.2.0",
-        )  # Story SSOT 表：兼容上一版 v1.2.0（CR1-8 对齐——新增可选注入不破坏 v1.2.0 消费者）
+        )  # Story SSOT 表：反馈闭环为新增行为不破坏既有版本消费者
 
     def test_port_spec_has_all_10_fields(self) -> None:
         """PortSpec 数据类 10 字段结构完整。"""

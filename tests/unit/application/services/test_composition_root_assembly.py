@@ -57,13 +57,13 @@ def test_schema_validation_record_repository_port_metadata() -> None:
 
 
 def test_tool_execution_service_version_bumped() -> None:
-    """P0-A 修复守护:tool_execution_service 版本号必须 v1.3.0(4-6 版本路由 + 4.4 装饰器装配)"""
+    """P0-A 修复守护:tool_execution_service 版本号必须 v1.4.0(4-7 反馈闭环 + 4-6 版本路由 + 4.4 装饰器装配)"""
     from src.domain.ports.registry import _global_registry
 
     spec = _global_registry.get("tool_execution_service")
     assert spec is not None
-    # 装饰器装配(4.4) + 版本路由注入(4-6)均为行为变更,必须 bump 版本
-    assert spec.version == "v1.3.0"
+    # 装饰器装配(4.4) + 版本路由注入(4-6) + 反馈闭环最外层(4-7)均为行为变更,必须 bump 版本
+    assert spec.version == "v1.4.0"
     # tags 包含 "decorated" 与 "versioned" 标识
     assert "decorated" in spec.tags
     assert "versioned" in spec.tags

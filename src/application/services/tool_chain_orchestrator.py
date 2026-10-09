@@ -111,6 +111,8 @@ class ToolChainOrchestrator:
         dag: ToolChainDag,
         failed_node_id: str,
         cause: BaseException | None,
+        error_signature: str | None = None,
+        enhanced_retry_count: int | None = None,
     ) -> ToolChainExecutionFailedError:
         """统一构造 FAIL_FAST 异常（保留 cause 链 + 完整标识）
 
@@ -136,6 +138,8 @@ class ToolChainOrchestrator:
             original_error_code="WRAPPED_ORCHESTRATOR",
             original_stage="ORCHESTRATION",
             cause=cause_exc,
+            error_signature=error_signature,
+            enhanced_retry_count=enhanced_retry_count,
         )
 
     # ============================================================================
@@ -217,11 +221,18 @@ class ToolChainOrchestrator:
                     logger.warning("ToolChainRun %s 终态提交冲突: %s", run.chain_run_id, transition_err)
                 # Round 1 V2 修复：双路径语义边界
                 # execute_chain 路径：cause=None（node_runs[].error 仅为 str，无法恢复原始异常对象）
+                # Story 4.7（决策 #14②）：结果化失败的 output 携带失败签名与尝试
+                # 次数——从中提取填充异常 context（K8s JobFailed condition reason
+                # 同型的可观测性补全）
+                failed_result = completed_node_results.get(failed_node_id)
+                infeasible_output = (failed_result.output or {}) if failed_result is not None else {}
                 raise self._wrap_fail_fast_exception(
                     run=run,
                     dag=dag,
                     failed_node_id=failed_node_id,
                     cause=None,
+                    error_signature=infeasible_output.get("error_signature"),
+                    enhanced_retry_count=infeasible_output.get("enhanced_retry_count"),
                 )
 
         # 6. 终态判定 + 性能指标（含 critical_path 真实算法）
@@ -634,7 +645,14 @@ class ToolChainOrchestrator:
                     )
                     node_runs[node_id] = NodeRunStatus(
                         node_id=node_id,
-                        state="COMPLETED" if result.status.value == "success" else "FAILED",
+                        # Story 4.7（决策 #14①）：三值判定——INFEASIBLE 结果化失败
+                        # 区分「不可行」与「故障」（类型元数据在传播链不抹除）；
+                        # 其余非 success（invalid/insufficient_data 等）仍折叠 FAILED
+                        state=(
+                            "COMPLETED"
+                            if result.status.value == "success"
+                            else ("INFEASIBLE" if result.status.value == "infeasible" else "FAILED")
+                        ),
                         started_at=started_at,
                         completed_at=completed_at,
                         error=None,

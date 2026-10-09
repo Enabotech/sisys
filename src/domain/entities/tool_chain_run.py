@@ -75,7 +75,9 @@ class NodeRunStatus:
 
     Attributes:
         node_id: 节点标识
-        state: 节点状态（PENDING / RUNNING / COMPLETED / FAILED / SKIPPED）
+        state: 节点状态（PENDING / RUNNING / COMPLETED / FAILED / SKIPPED /
+            INFEASIBLE——Story 4.7 三值化：结果化失败区分「不可行」与「故障」，
+            类型元数据在传播链不抹除）
         started_at: 节点启动时间
         completed_at: 节点完成时间
         error: 错误信息
@@ -83,7 +85,7 @@ class NodeRunStatus:
     """
 
     node_id: str
-    state: Literal["PENDING", "RUNNING", "COMPLETED", "FAILED", "SKIPPED"]
+    state: Literal["PENDING", "RUNNING", "COMPLETED", "FAILED", "SKIPPED", "INFEASIBLE"]
     started_at: datetime | None = None
     completed_at: datetime | None = None
     error: str | None = None

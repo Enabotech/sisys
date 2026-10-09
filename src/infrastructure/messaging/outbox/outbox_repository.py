@@ -4,13 +4,21 @@
 提供公开方法（实现接口）和内部方法（供 AsyncOutboxPoller 使用）
 
 Session 通过 ContextVar 由 middleware 或 test fixture 提供，
-无需构造器注入 session 参数
+无需构造器注入 session 参数。
+
+Story 4.7 fallback 独立 session 修复（defer 债清偿——AC-4）：
+save 优先 get_session()（HTTP 路径复用请求 session，保持事务性 outbox
+原子性——业务状态与事件发布同事务 commit/rollback）；无请求 session 时
+（后台/CLI 路径——现状事件 100% 静默丢失的根因）经注入的 session_factory
+走 session_context 独立写入（outbox_processor.py:146-155 先例同款）。
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -23,7 +31,9 @@ from src.infrastructure.messaging.adapters.sqlalchemy_event_outbox_adapter impor
     SQLAlchemyEventOutboxAdapter,
 )
 from src.infrastructure.storage.postgresql.models import OutboxModel
-from src.infrastructure.storage.postgresql.session_context import get_session
+from src.infrastructure.storage.postgresql.session_context import get_session, session_context
+
+logger = logging.getLogger(__name__)
 
 
 class PostgreSQLOutboxRepository(OutboxRepository):
@@ -33,9 +43,17 @@ class PostgreSQLOutboxRepository(OutboxRepository):
     内部方法（_ 前缀）直接操作 OutboxModel，仅 Poller 使用
     """
 
-    def __init__(self) -> None:
-        """初始化实例级别 Lock（避免类级别共享导致测试间污染）"""
+    def __init__(self, session_factory: Any = None) -> None:
+        """初始化实例级别 Lock 与 fallback 会话工厂.
+
+        Args:
+            session_factory: 独立会话工厂（后台/CLI 路径 fallback 用——无请求
+                session 时经 session_context 独立写入；None 时无 fallback，
+                保持 4.4 既有行为直接抛 RuntimeError。async_sessionmaker 形态
+                ——session_context 类型契约；outbox_processor 先例同款）
+        """
         self._lock = asyncio.Lock()
+        self._session_factory = session_factory
 
     @property
     def _session(self) -> AsyncSession:
@@ -44,10 +62,32 @@ class PostgreSQLOutboxRepository(OutboxRepository):
     # ========== 公开方法（实现领域层接口，async） ==========
 
     async def save(self, event: DomainEvent) -> None:
-        """保存事件至发件箱（与业务操作同事务）"""
+        """保存事件至发件箱（HTTP 路径同事务；后台路径 fallback 独立写入）.
+
+        Raises:
+            RuntimeError: 无请求 session 且未注入 session_factory（无 fallback
+                能力——保持既有行为显式失败而非静默丢失）
+        """
         model = SQLAlchemyEventOutboxAdapter.from_domain_event(event)
-        self._session.add(model)
-        await self._session.flush()
+        try:
+            session = get_session()
+        except RuntimeError:
+            # 后台/CLI 路径（无请求 session）——经注入工厂走独立 session 写入
+            if self._session_factory is None:
+                raise
+            await self._save_via_independent_session(model)
+            return
+        session.add(model)
+        await session.flush()
+
+    async def _save_via_independent_session(self, model: OutboxModel) -> None:
+        """经 session_context 独立会话写入（正常路径 commit——outbox_processor 先例同款）."""
+        event_id = str(model.event_id)  # session 关闭后 detached——提前捕获
+        async with session_context(self._session_factory):
+            session = get_session()
+            session.add(model)
+            await session.flush()
+        logger.info("Outbox 事件经独立会话落库（后台路径 fallback）: event_id=%s", event_id)
 
     async def get_unpublished(self, limit: int) -> list[DomainEvent]:
         """获取未发布的事件列表（FIFO 排序）"""

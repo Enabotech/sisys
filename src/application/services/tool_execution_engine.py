@@ -26,6 +26,7 @@ from src.application.services.data_source_marker import (
     parse_data_source_markers,
 )
 from src.application.services.retry_helpers import RetryPolicy, _call_with_retry
+from src.application.services.schema_event_helpers import extract_schema_execution_id
 from src.domain.entities.tool import Tool
 from src.domain.entities.tool_execution import (
     TERMINAL_STATES,
@@ -134,8 +135,12 @@ class ToolExecutionEngine:
             ToolExecutionTimeoutError: 超过 max_total_duration_sec
         """
         # 创建 ToolExecution 聚合根（IDLE 状态）
+        # Story 4.7（决策 #16）：聚合 id 优先读链入口注入的 schema_execution_id
+        # （经 extract_schema_execution_id 单点归一——非法值静默新铸，禁直读裸值：
+        # 裸 UUID 构造在 try 块外抛 242）；无注入时兜底新铸——聚合 id / 382/389
+        # context / 演进日志幂等键 / 两事件 id 全链同源
         execution = ToolExecution(
-            execution_id=uuid.uuid4(),
+            execution_id=extract_schema_execution_id(context) or uuid.uuid4(),
             tenant_id=context.tenant_id,
             tool_id=tool_id,
             tool_version=tool.version,
@@ -281,7 +286,9 @@ class ToolExecutionEngine:
 
         事务边界说明：save 为独立 upsert（无 outbox 事务关联）——HTTP 路径经
         SessionMiddleware commit 存活；后台 session_context 路径随异常回滚丢失
-        （outbox 独立 session 的结构性修复 defer Story 4.7）。
+        （Story 4.7 已修复形态①：outbox save 无请求 session 时经注入的
+        session_factory 走独立会话写入；形态②「业务 session 异常回滚连带丢失
+        已 flush 事件」为遗留债，登记 deferred-work.md——会话策略重构超出范围）。
 
         异常语义：自吞噬（except Exception → warning）——本方法运行于 except
         分支内，抛出会顶替正在传播的原始领域/执行异常；CancelledError 属
@@ -382,8 +389,13 @@ class ToolExecutionEngine:
 
         Returns:
             plan 字符串
+
+        Story 4.7：读取 context.extensions["validation_feedback_hints"]（P0-D
+        模式同款通道）——Think stage 消费 case_summaries（含负样本提示）与
+        stderr 摘要（Subtask 0.12 per-stage 映射）。
         """
-        prompt = self._build_think_prompt(tool, tool_call)
+        hints = (context.extensions or {}).get("validation_feedback_hints")
+        prompt = self._build_think_prompt(tool, tool_call, hints=hints)
         response = await self._retry_call(
             lambda: self._llm.structured_generate(
                 prompt=prompt,
@@ -400,8 +412,14 @@ class ToolExecutionEngine:
         tool: Tool,
         context: ExecutionContext,
     ) -> str:
-        """Code 阶段：调用 LLMClientPort.structured_generate 产出 code"""
-        prompt = self._build_code_prompt(plan, tool)
+        """Code 阶段：调用 LLMClientPort.structured_generate 产出 code
+
+        Story 4.7：Code stage 是唯一代码产出作者——必消费 suggested_fix（优先
+        采纳指令）+ prior_attempts（含前次方案摘要——R8-1）+ stderr_excerpt +
+        禁止重复失败方案指令 + schema_violations（Subtask 0.12 per-stage 映射）。
+        """
+        hints = (context.extensions or {}).get("validation_feedback_hints")
+        prompt = self._build_code_prompt(plan, tool, hints=hints)
         response = await self._retry_call(
             lambda: self._llm.structured_generate(
                 prompt=prompt,
@@ -520,11 +538,67 @@ class ToolExecutionEngine:
 
     # ===== Prompt 构建 =====
 
-    def _build_think_prompt(self, tool: Tool, tool_call: ToolCall) -> str:
-        return f"为工具 {tool.name} 规划执行步骤。参数: {tool_call.arguments}"
+    def _build_think_prompt(self, tool: Tool, tool_call: ToolCall, hints: dict | None = None) -> str:
+        """构建 Think 阶段 prompt（Story 4.7：可选 hints——case_summaries + stderr 摘要）.
 
-    def _build_code_prompt(self, plan: str, tool: Tool) -> str:
-        return f"基于以下计划生成代码: {plan}"
+        前缀「为工具」保持稳定（Fake LLM 分派契约——BDD/test_tool_execution_engine_hints）。
+        """
+        base = f"为工具 {tool.name} 规划执行步骤。参数: {tool_call.arguments}"
+        if not hints:
+            return base
+        sections = [base]
+        stderr = str(hints.get("stderr_excerpt", "") or "")
+        if stderr:
+            sections.append(f"上次执行失败 STDERR 摘要：\n{stderr[:500]}")
+        case_summaries = hints.get("case_summaries") or []
+        if case_summaries:
+            sections.append("历史案例参考：\n" + "\n".join(f"- {str(s)[:500]}" for s in case_summaries))
+        return "\n\n".join(sections)
+
+    def _build_code_prompt(self, plan: str, tool: Tool, hints: dict | None = None) -> str:
+        """构建 Code 阶段 prompt（Story 4.7：可选 hints——修复反馈注入）.
+
+        前缀「基于以下计划」保持稳定（Fake LLM 分派契约）。
+        """
+        base = f"基于以下计划生成代码: {plan}"
+        if not hints:
+            return base
+        sections = [base]
+        suggested_fix = str(hints.get("suggested_fix", "") or "")
+        if suggested_fix:
+            sections.append(f"修复顾问建议（优先采纳，仅做必要适配）：\n{suggested_fix[:2000]}")
+        stderr = str(hints.get("stderr_excerpt", "") or "")
+        if stderr:
+            sections.append(f"上次执行失败 STDERR：\n{stderr[:500]}")
+        violations = hints.get("schema_violations") or []
+        if violations:
+            lines = []
+            for v in violations:
+                if isinstance(v, dict):
+                    lines.append(
+                        f"- path={v.get('path', '')}, expected={v.get('expected', '')}, message={v.get('message', '')}"
+                    )
+                else:
+                    lines.append(f"- {v}")
+            sections.append("上轮 Schema 校验 violations：\n" + "\n".join(lines))
+        prior_attempts = hints.get("prior_attempts") or []
+        banned: list[str] = []
+        if prior_attempts:
+            lines = []
+            for attempt in prior_attempts:
+                no = attempt.get("attempt_no", "?")
+                fix = str(attempt.get("suggested_fix_excerpt", "") or "")
+                line = f"- attempt {no}（{attempt.get('detail', '')}）"
+                if fix:
+                    line += f"：已试方案 {fix[:500]}"
+                    banned.append(f"attempt {no} 的方案（{fix[:500]}）")
+                else:
+                    line += "：未产出方案（生成失败）"
+                lines.append(line)
+            sections.append("此前增强尝试的失败记录：\n" + "\n".join(lines))
+        if banned:
+            sections.append("以下方案已失败，禁止重复：\n" + "\n".join(f"- {b}" for b in banned))
+        return "\n\n".join(sections)
 
     def _build_observation_code(self, result: str) -> str:
         return f"# Observe\nprint('{result[:100]}')"

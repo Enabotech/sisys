@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-10-08
+last_updated: 2026-10-09
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -149,7 +149,7 @@ development_status:
   4-5-red-blue-debate-basic: done
   # 价值组扩展: V1 P1 工具箱增强
   4-6-tool-version-management: done
-  4-7-validation-feedback-loop: ready-for-dev
+  4-7-validation-feedback-loop: in-progress
   epic-4-retrospective: optional
 
   # ===========================================================================

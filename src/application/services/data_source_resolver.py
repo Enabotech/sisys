@@ -349,7 +349,9 @@ class DataSourceResolverService:
         # PublishResult(False)」——非 HTTP 上下文（CLI/LangGraph/Prefect）无请求
         # session 时 reliable 通道 outbox 写入失败即静默丢弃；此处检查返回值记
         # warning（仅日志，不改变控制流——发布失败不得影响采集主流程）。
-        # outbox 独立 session scope 的结构性修复 defer Story 4.7（事件基础设施域）
+        # Story 4.7 已修复形态①：outbox save 无请求 session 时经注入的 session_factory
+        # 走独立会话写入（PostgreSQLOutboxRepository fallback）；形态②（业务 session
+        # 异常回滚连带丢失）登记 deferred-work.md。
         publish_result = await self._event_publisher.publish(event)
         if not publish_result.is_success:
             logger.warning(

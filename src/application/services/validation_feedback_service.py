@@ -94,7 +94,13 @@ def _log_task_exception(task: Any) -> None:
 
 
 def _root_cause(exc: BaseException) -> BaseException:
-    """沿异常因果链取根因叶子（自定义 cause 属性与 __cause__/__context__ 双通道）."""
+    """沿异常因果链取根因叶子（自定义 cause 属性与 __cause__/__context__ 双通道）.
+
+    注意：except 块内 raise 的异常其 __context__ 指向外层正在处理的异常
+    （如 recover 在 VFD except 389 块内调用时 fix-gen 异常的 __context__ 链
+    回指触发异常）——叶子判定可能走偏；LLM 瞬时判定应使用
+    _chain_contains_llm_transient 的链上成员语义。
+    """
     seen: set[int] = set()
     current: BaseException = exc
     while id(current) not in seen:
@@ -104,6 +110,22 @@ def _root_cause(exc: BaseException) -> BaseException:
             return current
         current = nxt
     return current
+
+
+def _chain_contains_llm_transient(exc: BaseException) -> bool:
+    """异常因果链上任一节点属 LLM 瞬时族（R10-2 谓词：链中 last_exc ∈ 白名单同集）.
+
+    遍历自定义 cause 属性与 __cause__/__context__ 双通道（环防护）——
+    fix-gen 的 383.cause=LLM 错误 / 重执行的 389←383←LLM 链均命中。
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, _LLM_TRANSIENT_ROOTS):
+            return True
+        current = getattr(current, "cause", None) or current.__cause__ or current.__context__
+    return False
 
 
 class ValidationFeedbackService(ValidationFeedbackServicePort):
@@ -226,10 +248,9 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
             except Exception as exc:
                 # 非白名单异常同样计为该次 attempt 失败（R2-10 收敛——防裸穿打破
                 # INFEASIBLE 不抛契约），detail 区分类型
-                root = _root_cause(exc)
                 detail = (
                     "llm_generation_failed"
-                    if isinstance(root, _LLM_TRANSIENT_ROOTS)
+                    if _chain_contains_llm_transient(exc)
                     else f"fix_generation_failed:{type(exc).__name__}"
                 )
                 attempts.append(
@@ -426,8 +447,7 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
             if attempt.detail == "llm_generation_failed":
                 continue  # fix-gen LLM 失败（构造时已判定为 LLM 族）
             if attempt.detail == "retry_failed":
-                root = _root_cause(failure)
-                if not isinstance(root, _LLM_TRANSIENT_ROOTS):
+                if not _chain_contains_llm_transient(failure):
                     return False
                 continue
             return False
@@ -636,3 +656,126 @@ def _now():
     from datetime import UTC, datetime
 
     return datetime.now(UTC)
+
+
+# ============================================================================
+# 组合根链构造工厂（R10-3 落点：「组合根零私有函数」纪律——组装逻辑归域模块，
+# 组合根一行委托；build_tool_execution_engine 先例同款）
+# ============================================================================
+
+
+def build_inner_execution_chain(resolver: Any, *, max_concurrent_containers: int) -> tuple[Any, Any]:
+    """组装内层执行链 SSD > TOV > Engine（重执行用——validation_feedback 双句柄之一）.
+
+    Args:
+        resolver: 组合根 resolver（Any 注入——避免 application 层反向依赖组合根）
+        max_concurrent_containers: 沙箱并发配额（组合根解析配置后传入——分层红线）
+
+    Returns:
+        (ssd_chain, engine) 二元组——engine 为链内最内层引擎实例
+        （SCOPED 生命周期下与 resolver.resolve("tool_execution_engine") 同实例）
+    """
+    from src.application.services.sandbox_security_decorator import SandboxSecurityDecorator
+    from src.application.services.tool_output_validator import ToolOutputValidator
+
+    engine = resolver.resolve("tool_execution_engine")
+    tov = ToolOutputValidator(
+        wrapped=engine,
+        schema_validator=resolver.resolve("schema_validator"),
+        event_publisher=resolver.resolve("event_publisher"),
+    )
+    ssd = SandboxSecurityDecorator(
+        wrapped=tov,
+        sandbox=resolver.resolve("sandbox_executor"),
+        session_repo=resolver.resolve("sandbox_session_repository"),
+        event_publisher=resolver.resolve("event_publisher"),
+        max_concurrent_containers=max_concurrent_containers,
+    )
+    return ssd, engine
+
+
+class _ChainBundle(tuple):
+    """链构造产物三元组（outer/service/engine）——具名访问轻量形态."""
+
+    @property
+    def outer(self) -> Any:
+        """装饰链最外层（VFD）——tool_execution_service 的 engine 注入位."""
+        return self[0]
+
+    @property
+    def service(self) -> "ValidationFeedbackService":
+        """反馈闭环服务（validation_feedback_service 端口产物）."""
+        from typing import cast
+
+        return cast("ValidationFeedbackService", self[1])
+
+    @property
+    def engine(self) -> Any:
+        """链内最内层引擎（双句柄之一——防放大封顶用）."""
+        return self[2]
+
+
+def build_tool_execution_chain(resolver: Any, *, max_concurrent_containers: int) -> _ChainBundle:
+    """组装完整装饰链 VFD > SSD > TOV > Engine + 反馈服务（Story 4.7 装配）.
+
+    双句柄定稿（R9-14）：service 持有 engine 引用（封顶用）与 inner_chain
+    （重执行用＝SSD>TOV>Engine 完整内层链）——重执行禁走裸引擎（绕过 SSD
+    安全防护与 TOV 出参校验会把违规 output 标 RECOVERED）。
+
+    Args:
+        resolver: 组合根 resolver
+        max_concurrent_containers: 沙箱并发配额（组合根解析后传入）
+
+    Returns:
+        _ChainBundle(outer=VFD, service=ValidationFeedbackService, engine=引擎)
+    """
+    from src.application.services.validation_feedback_decorator import ValidationFeedbackDecorator
+
+    ssd, engine = build_inner_execution_chain(resolver, max_concurrent_containers=max_concurrent_containers)
+    service = ValidationFeedbackService(
+        llm_client=resolver.resolve("llm_client"),
+        error_case_repository=resolver.resolve("error_case_repository"),
+        evolution_log_repository=resolver.resolve("evolution_log_repository"),
+        event_publisher=resolver.resolve("event_publisher"),
+        engine=engine,
+        inner_chain=ssd,
+    )
+    return _ChainBundle(
+        (
+            ValidationFeedbackDecorator(wrapped=ssd, feedback_service=service),
+            service,
+            engine,
+        )
+    )
+
+
+__all__ = [
+    "ValidationFeedbackService",
+    "build_inner_execution_chain",
+    "build_tool_execution_chain",
+    "build_validation_feedback_service",
+]
+
+
+def build_validation_feedback_service(resolver: Any, *, max_concurrent_containers: int) -> "ValidationFeedbackService":
+    """组装反馈闭环服务（validation_feedback_service 端口产物——组合根一行委托）.
+
+    与 build_tool_execution_chain 共享 build_inner_execution_chain——双句柄
+    注入清单与 SSOT 表完全一致（engine 引用 + inner_chain 引用）。
+
+    Args:
+        resolver: 组合根 resolver
+        max_concurrent_containers: 沙箱并发配额
+
+    Returns:
+        ValidationFeedbackService 实例
+    """
+    ssd, engine = build_inner_execution_chain(resolver, max_concurrent_containers=max_concurrent_containers)
+    return ValidationFeedbackService(
+        llm_client=resolver.resolve("llm_client"),
+        error_case_repository=resolver.resolve("error_case_repository"),
+        evolution_log_repository=resolver.resolve("evolution_log_repository"),
+        event_publisher=resolver.resolve("event_publisher"),
+        engine=engine,
+        inner_chain=ssd,
+    )

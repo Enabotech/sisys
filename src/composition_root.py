@@ -604,7 +604,13 @@ def bootstrap() -> None:
         name="outbox_repo",
         version="v1.0.0",
         interface=OutboxRepository,
-        impl="src.infrastructure.messaging.outbox.outbox_repository.PostgreSQLOutboxRepository",
+        # Story 4.7：lambda 注入 session_factory（后台/CLI 路径 fallback 独立
+        # session——无请求 session 时事件静默丢失的结构性修复；HTTP 路径仍走
+        # 请求 session 同事务，事务性原子性不变）
+        impl=lambda resolver: __import__(
+            "src.infrastructure.messaging.outbox.outbox_repository",
+            fromlist=["PostgreSQLOutboxRepository"],
+        ).PostgreSQLOutboxRepository(session_factory=resolver.resolve("session_factory")),
         module="src.infrastructure.messaging.outbox.outbox_repository",
         lifetime=Lifetime.SINGLETON,
         owner="messaging-team",
@@ -2375,7 +2381,7 @@ def bootstrap() -> None:
 
     register_port(
         name="tool_execution_service",
-        version="v1.3.0",  # 升级:版本路由注入(Story 4-6) + Sandbox 装饰器(4.4) + OutputValidator(4.3)
+        version="v1.4.0",  # 升级: VFD 最外层(4.7) + 版本路由(4-6) + Sandbox(4.4) + OutputValidator(4.3)
         interface=ToolExecutionServicePort,
         impl=lambda resolver: __import__(
             "src.application.services.tool_execution_service",
@@ -2383,33 +2389,51 @@ def bootstrap() -> None:
         ).ToolExecutionService(
             registry=resolver.resolve("tool_registry_service"),
             tool_version_service=resolver.resolve("tool_version_service"),
-            # Story 4.4 P0 修复:SandboxSecurityDecorator 包裹 ToolOutputValidator 包裹 Engine
-            # 装饰器层叠: SandboxSecurityDecorator(最外层,安全防护) > ToolOutputValidator(Schema 校验) > Engine(五阶段)
-            # 否则 Story 4.4 核心价值(session_id 注入防御 + 并发配额检查)在生产装配中完全未被启用
+            # Story 4.7 升级：装饰链层叠为 ValidationFeedbackDecorator(最外层) >
+            # SandboxSecurityDecorator > ToolOutputValidator > Engine（链构造上提
+            # 共享至 application 域模块工厂——R10-3「组合根零私有函数」纪律，
+            # build_tool_execution_engine 先例同款；双句柄注入见工厂 docstring）
             engine=__import__(
-                "src.application.services.sandbox_security_decorator",
-                fromlist=["SandboxSecurityDecorator"],
-            ).SandboxSecurityDecorator(
-                wrapped=__import__(
-                    "src.application.services.tool_output_validator",
-                    fromlist=["ToolOutputValidator"],
-                ).ToolOutputValidator(
-                    wrapped=resolver.resolve("tool_execution_engine"),
-                    schema_validator=resolver.resolve("schema_validator"),
-                    event_publisher=resolver.resolve("event_publisher"),
-                ),
-                sandbox=resolver.resolve("sandbox_executor"),
-                session_repo=resolver.resolve("sandbox_session_repository"),
-                event_publisher=resolver.resolve("event_publisher"),
+                "src.application.services.validation_feedback_service",
+                fromlist=["build_tool_execution_chain"],
+            )
+            .build_tool_execution_chain(
+                resolver,
                 max_concurrent_containers=SandboxConfig.from_env().max_concurrent_containers,
-            ),
+            )
+            .outer,
         ),
         module="src.application.services.tool_execution_service",
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
-        tags=("tool", "execution", "service", "decorated", "versioned"),
-        compatibility=("v1.2.0",),  # Story SSOT 表：向后兼容 v1.2.0（新增可选注入 tool_version_service）
+        tags=("tool", "execution", "service", "decorated", "versioned", "feedback"),
+        compatibility=("v1.3.0", "v1.2.0"),  # Story SSOT 表：反馈闭环为新增行为不破坏既有版本
         deprecated=False,
+    )
+
+    # === Story 4.7 — Validation Feedback 闭环服务（触发增强重试与不可行标记）===
+    register_port(
+        name="validation_feedback_service",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.validation_feedback_service",
+            fromlist=["ValidationFeedbackServicePort"],
+        ).ValidationFeedbackServicePort,
+        # 双句柄注入（SSOT 表行为准——R9-14）：engine 引用（防放大封顶用，
+        # resolver.resolve("tool_execution_engine")——SCOPED 同上下文与链内
+        # 引擎同实例）+ inner_chain 引用（重执行用完整内层链）；不注入
+        # RetryPolicy（fix-gen 封顶由服务内自建——防「按值恢复」陷阱）
+        impl=lambda resolver: __import__(
+            "src.application.services.validation_feedback_service",
+            fromlist=["build_validation_feedback_service"],
+        ).build_validation_feedback_service(
+            resolver,
+            max_concurrent_containers=SandboxConfig.from_env().max_concurrent_containers,
+        ),
+        module="src.application.services.validation_feedback_service",
+        lifetime=Lifetime.SCOPED,
+        owner="tool-team",
+        tags=("tool", "feedback", "service"),
     )
 
     # === 数据源适配器端口（Story 4.1b 引入；4.1f R-REG 收敛——注册表派生） ===

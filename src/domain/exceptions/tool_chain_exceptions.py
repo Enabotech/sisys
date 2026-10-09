@@ -126,7 +126,23 @@ class ToolChainExecutionFailedError(BusinessException):
         original_error_code: str | None = None,
         original_stage: str | None = None,
         cause: Exception | None = None,
+        error_signature: str | None = None,
+        enhanced_retry_count: int | None = None,
     ) -> None:
+        """初始化并组装 context（仅非 None 字段进 context——既有约定）.
+
+        Args:
+            message: 错误消息
+            chain_run_id: 链执行 ID
+            chain_id: 链定义 ID
+            failed_node_id: 失败节点 ID
+            original_error_code: 原始错误编码
+            original_stage: 原始失败阶段
+            cause: 原始异常（execute_chain 路径 None——诚实声明无法恢复）
+            error_signature: 失败签名（Story 4.7——INFEASIBLE 结果化失败时从
+                节点 output 提取，K8s JobFailed condition reason 同型）
+            enhanced_retry_count: 增强尝试次数（Story 4.7——同上来源）
+        """
         context: dict = {}
         if chain_run_id is not None:
             context["chain_run_id"] = chain_run_id
@@ -138,6 +154,10 @@ class ToolChainExecutionFailedError(BusinessException):
             context["original_error_code"] = original_error_code
         if original_stage is not None:
             context["original_stage"] = original_stage
+        if error_signature is not None:
+            context["error_signature"] = error_signature
+        if enhanced_retry_count is not None:
+            context["enhanced_retry_count"] = enhanced_retry_count
         super().__init__(message=message, cause=cause, context=context)
 
 

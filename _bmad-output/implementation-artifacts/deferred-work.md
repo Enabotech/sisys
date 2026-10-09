@@ -46,3 +46,18 @@
 
 - lint-imports「Interfaces layer must not depend on infrastructure」broken（入口稳定为 `src.interfaces.api.app -> src.composition_root (l.24)` 与 `src.interfaces.cli.ocr_cli -> src.composition_root (l.39)` 两条链） — 经基线 5b96e75a 比对确认为**预存量**（非 4-6 引入），main 上该 CI 门禁为红。根因：interfaces 层 import 组合根，而组合根内部大量 infrastructure lazy import 被传递检出（组合根具体中转模块随构建漂移——jwt_service/prefect/rabbitmq_publisher 等多次实测各不相同，以 lint-imports 实时输出为准，不锁行号）。涉及组合根 lazy import 链的架构级重构，需单独立项处置（`.importlinter` 已合入规则禁止改动）。
 - 根 `.env.example` 从未被 git 跟踪（git ls-files 仅 deploy/delivery 组件级样例） — 新增环境键 `TOOL_VERSION_MAX_RETAINED`（`src/infrastructure/config/tool_version.py:36`）与 4-4 `SANDBOX_*` 键同样无样例同步。跨 Story 文档债：补根 `.env.example` 时统一收录全部应用配置键。
+
+## Deferred from: Story 4-7 Validation Feedback 闭环 (2026-10-09)
+
+- outbox 形态②「业务 session 异常回滚连带丢失已 flush 事件」（session_context rollback 连带） — 完整修复需后台路径会话策略重构，超出本 Story 范围；Story 4.7 已修复形态①（无请求 session 时 fallback 独立写入——`PostgreSQLOutboxRepository._save_via_independent_session`）。fallback 机制可复用扩展至 `_persist_execution`（探针结论：具备——session_factory 注入 + session_context 独立写入形态通用，升级处置待后台会话策略重构立项）。
+- SessionMiddleware 生产接线（独立技术债） — `src/infrastructure/middleware/session_middleware.py` 已实现但未在 `create_app()` 注册（app.py 仅 ExceptionContextMiddleware）——接线后 HTTP 路径方有事务边界；接线前生产全部路径 outbox save 走 RuntimeError fallback。
+- 中止遥测 ABORTED 第三值（R3-3） — abort 路径零观测副作用致已耗 attempt 遥测丢弃；需 final_status 第三值支持完整中止观测。
+- fast-fail 尝试缩减半边（R8-2） — 负样本信息注入已交付（NEGATIVE_CASE_GUIDED）；attempt 上限缩减待真实负样本效用对照数据（R8-32）落地后采纳。
+- 修复循环采样多样化/生成相似度去重（R8-17） — V1 指令级强度 + suggested_fix_excerpt 指涉对象已就位；机制性兜底待真实失败率数据。
+- fix_summary 进阶聚合（R8-20） — V1 为最近一次成功覆写；跨轨迹归纳/多数次验证后覆写待案例库规模支撑。
+- 签名分裂低频形态（R8-30） — dict/set repr 键序不稳定、异常链层数漂移；随真实语料评估。
+- 真实修复能力观察基准（R8-31/R8-32） — mock 基准度量编排机制正确性；真实观测需更大样本/序贯设计 + 按 fix_strategy 分组对照统计。
+- 多案例加权检索与向量相似检索（L3 Qdrant） — V1 精确签名匹配；签名泛化不足时再立项。
+- 工具熔断（or.md 四.7.(3)） — 建议挂 Story 5.x Agent 弹性隔离；ToolExecutionQuery.state 过滤材料已齐备（纯范围决策）。
+- 自动灰度推进与 per-version 统计视图 — 演进日志数据面已就绪（tool_evolution_logs + list_by_tool）。
+- FAIL_FAST 同波取消优化 — 纯算力节约可选优化（CONTINUE/SKIP 场景本不该取消，禁做成无条件）。

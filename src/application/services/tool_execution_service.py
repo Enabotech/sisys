@@ -94,6 +94,15 @@ class ToolExecutionService:
 
         execution_tool = await self._resolve_execution_tool(tool, tool_call, context)
 
+        # Story 4.7（决策 #16）：链入口条件注入 schema_execution_id——聚合 id /
+        # 382/389 context / 演进日志幂等键 / 两事件 id 全链同源。条件注入形态
+        # （R8-16）：已有键不覆盖（防未来 ToolInputValidator 入链时 INPUT/OUTPUT
+        # id 分裂——倒退 4.3 P0-F 一致性）
+        if "schema_execution_id" not in context.extensions:
+            import uuid as _uuid
+
+            context = context.with_extension("schema_execution_id", _uuid.uuid4())
+
         logger.info(
             "开始执行工具: tool_name=%s tool_id=%s tenant_id=%s version=%s",
             tool.name,

@@ -114,6 +114,21 @@ class _DummyResolver:
             return self._engine
         if name == "tool_repository":
             return self._repo
+        # Story 4.7 新增端口依赖（反馈闭环链构造）
+        if name == "llm_client":
+            return _DummyLLM()
+        if name == "error_case_repository":
+            from src.infrastructure.storage.inmemory.error_case_repository import (
+                InMemoryErrorCaseRepository,
+            )
+
+            return InMemoryErrorCaseRepository()
+        if name == "evolution_log_repository":
+            from src.infrastructure.storage.inmemory.evolution_log_repository import (
+                InMemoryEvolutionLogRepository,
+            )
+
+            return InMemoryEvolutionLogRepository()
         if name == "schema_validator":
             return MagicMock(spec=["validate_arguments", "validate_output", "validate_schema_compatibility"])
         if name == "event_publisher":
@@ -147,7 +162,7 @@ class TestToolExecutionServicePortContract:
     PORT_NAME = "tool_execution_service"
     IMPL_CLS_NAME = "ToolExecutionService"
     MODULE_PATH = "src.application.services.tool_execution_service"
-    EXPECTED_TAGS = ("tool", "execution", "service", "decorated", "versioned")
+    EXPECTED_TAGS = ("tool", "execution", "service", "decorated", "versioned", "feedback")
     EXPECTED_OWNER = "tool-team"
     REQUIRED_METHODS = ["execute", "get_tool_metadata", "list_tools_metadata"]
 
@@ -168,11 +183,11 @@ class TestToolExecutionServicePortContract:
         assert spec.name == self.PORT_NAME
 
     def test_dimension_3_port_version(self) -> None:
-        """维度 3：端口版本 + compatibility（Story SSOT 表：兼容 v1.2.0）"""
+        """维度 3：端口版本 + compatibility（Story SSOT 表：兼容 v1.3.0/v1.2.0）"""
         spec = self._spec()
         assert spec is not None
-        assert spec.version == "v1.3.0"  # Story 4-6 升级: 版本路由注入（tool_version_service 可选依赖）
-        assert spec.compatibility == ("v1.2.0",)  # Round 1 审查 F8：SSOT 对齐（新增可选注入不破坏 v1.2.0）
+        assert spec.version == "v1.4.0"  # Story 4-7 升级: ValidationFeedbackDecorator 最外层 + 链入口 schema_execution_id 注入
+        assert spec.compatibility == ("v1.3.0", "v1.2.0")  # SSOT 对齐（反馈闭环为新增可选行为不破坏既有版本）
 
     def test_dimension_4_port_interface_type(self) -> None:
         """维度 4：端口接口类型"""

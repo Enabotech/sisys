@@ -436,22 +436,22 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、端口契约、领域异常契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 领域事件 Schema 定稿（2 新事件字段表 + `ToolSchemaValidationFailed` reliable 启用决策）
-- [ ] Subtask 0.2: 数据模型定稿（ErrorCase / EvolutionLogEntry / FixAttempt / INFEASIBLE / ErrorSignatureExtractor 签名算法规范）
-- [ ] Subtask 0.3: 端口契约清单定稿（SSOT 表 4 行 + 方法签名）
-- [ ] Subtask 0.4: 领域异常契约定稿（399 五处登记 Checklist + 383/399 语义区分声明）
-- [ ] Subtask 0.5: API 契约确认（无新端点 + HTTP_MAP 422）
-- [ ] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_validation_feedback_loop.feature`（AC-x.y 场景集全枚举 + 收尾场景）
-- [ ] Subtask 0.7: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_validation_feedback_loop.py`
-- [ ] Subtask 0.8: 编写 3 个端口契约测试 + 事件契约/通道映射契约测试（红）
-- [ ] Subtask 0.9: 红窗口确认——验收 .py 与契约测试运行失败且失败形态符合预期（collection ERROR / ImportError 属预期中间态；Gherkin 场景因步骤未实现跳过不计红）；按「模块依赖窗口提交策略」确定各批次入库时点
-- [ ] Subtask 0.10: 前置依赖实地验证——4.3 装饰器链/4.4 沙箱适配器/`configs/event_channels.yaml` 现状冒烟（确认预留注释与实际一致）
-- [ ] Subtask 0.11: P95 口径重定义（epics「单次重试延迟 P95<5s」→「闭环自身开销 P95<5s，不含 LLM/沙箱时长」，决策 #11）与业务方确认留痕
-- [ ] Subtask 0.12: hints payload 契约定稿（`{stderr_excerpt, schema_violations, case_summaries, prior_attempts, suggested_fix}`；**prior_attempts 携带各次 FixAttempt 摘要含 `suggested_fix_excerpt`——动作+结果成对（R8-1），「禁止重复失败方案」指令的指涉对象**）+ **per-stage 消费映射定稿**（Code stage 必消费 `suggested_fix` + `prior_attempts`（含前次方案摘要）+ `stderr_excerpt` + 禁止重复指令——唯一代码产出作者必须看到失败历史与失败方案，否则 Reflexion 反馈在作者层断链；Think stage 消费 `case_summaries`（含负样本提示——使引擎对已知不可行签名可感知）+ stderr 摘要；schema_violations → Code/Validate 两 stage）+ 修复建议生成（fix-gen）与引擎 Code stage 的作者分工确认（fix-gen 产出 suggested_fix 策略/代码草案，引擎按 hints 重新生成完整代码——**「建议者+作者」两级结构的归因局限显式接受，见决策 #9 依据（R8-5）**）；**prior_attempts 空方案条目渲染规则（R9-20 定稿）**：`suggested_fix_excerpt=""` 的条目（llm_generation_failed 形态）渲染为「未产出方案（生成失败）」标注，**不进入**「禁止重复失败方案」清单（无指涉对象——空串渲染为已试方案会误导 fix-gen）；Task 6 测试按「各 stage 消费键集」断言（非笼统「读取并拼入」）
+- [x] Subtask 0.1: 领域事件 Schema 定稿（2 新事件字段表 + `ToolSchemaValidationFailed` reliable 启用决策）
+- [x] Subtask 0.2: 数据模型定稿（ErrorCase / EvolutionLogEntry / FixAttempt / INFEASIBLE / ErrorSignatureExtractor 签名算法规范）
+- [x] Subtask 0.3: 端口契约清单定稿（SSOT 表 4 行 + 方法签名）
+- [x] Subtask 0.4: 领域异常契约定稿（399 五处登记 Checklist + 383/399 语义区分声明）
+- [x] Subtask 0.5: API 契约确认（无新端点 + HTTP_MAP 422）
+- [x] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_validation_feedback_loop.feature`（AC-x.y 场景集全枚举 + 收尾场景）
+- [x] Subtask 0.7: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_validation_feedback_loop.py`
+- [x] Subtask 0.8: 编写 3 个端口契约测试 + 事件契约/通道映射契约测试（红）
+- [x] Subtask 0.9: 红窗口确认——验收 .py 与契约测试运行失败且失败形态符合预期（collection ERROR / ImportError 属预期中间态；Gherkin 场景因步骤未实现跳过不计红）；按「模块依赖窗口提交策略」确定各批次入库时点
+- [x] Subtask 0.10: 前置依赖实地验证——4.3 装饰器链/4.4 沙箱适配器/`configs/event_channels.yaml` 现状冒烟（确认预留注释与实际一致）
+- [x] Subtask 0.11: P95 口径重定义（epics「单次重试延迟 P95<5s」→「闭环自身开销 P95<5s，不含 LLM/沙箱时长」，决策 #11）与业务方确认留痕
+- [x] Subtask 0.12: hints payload 契约定稿（`{stderr_excerpt, schema_violations, case_summaries, prior_attempts, suggested_fix}`；**prior_attempts 携带各次 FixAttempt 摘要含 `suggested_fix_excerpt`——动作+结果成对（R8-1），「禁止重复失败方案」指令的指涉对象**）+ **per-stage 消费映射定稿**（Code stage 必消费 `suggested_fix` + `prior_attempts`（含前次方案摘要）+ `stderr_excerpt` + 禁止重复指令——唯一代码产出作者必须看到失败历史与失败方案，否则 Reflexion 反馈在作者层断链；Think stage 消费 `case_summaries`（含负样本提示——使引擎对已知不可行签名可感知）+ stderr 摘要；schema_violations → Code/Validate 两 stage）+ 修复建议生成（fix-gen）与引擎 Code stage 的作者分工确认（fix-gen 产出 suggested_fix 策略/代码草案，引擎按 hints 重新生成完整代码——**「建议者+作者」两级结构的归因局限显式接受，见决策 #9 依据（R8-5）**）；**prior_attempts 空方案条目渲染规则（R9-20 定稿）**：`suggested_fix_excerpt=""` 的条目（llm_generation_failed 形态）渲染为「未产出方案（生成失败）」标注，**不进入**「禁止重复失败方案」清单（无指涉对象——空串渲染为已试方案会误导 fix-gen）；Task 6 测试按「各 stage 消费键集」断言（非笼统「读取并拼入」）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -467,9 +467,9 @@
 | 🟢 绿 | 实现 `src/domain/entities/error_case.py`、`evolution_log_entry.py`、`src/domain/value_objects/validation_feedback.py` 最小代码 |
 | 🔄 重构 | 类型注解、中文 docstring（Google 风格）、`__all__` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写两聚合根 + 值对象失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现三模型最小代码
-- [ ] Subtask 1.3: 🔄 重构 — 优化代码，运行 `ruff` + `mypy`
+- [x] Subtask 1.1: 🔴 红 — 编写两聚合根 + 值对象失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现三模型最小代码
+- [x] Subtask 1.3: 🔄 重构 — 优化代码，运行 `ruff` + `mypy`
 
 #### TDD 循环 B：ErrorSignatureExtractor 领域服务
 
@@ -479,9 +479,9 @@
 | 🟢 绿 | 实现 `src/domain/services/error_signature_extractor.py`（纯函数，完整 sha256 hexdigest 64 hex） |
 | 🔄 重构 | 确认零外部依赖（仅标准库 hashlib/re） |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写签名提取失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现签名提取最小代码
-- [ ] Subtask 1.6: 🔄 重构 — 优化代码
+- [x] Subtask 1.4: 🔴 红 — 编写签名提取失败测试
+- [x] Subtask 1.5: 🟢 绿 — 实现签名提取最小代码
+- [x] Subtask 1.6: 🔄 重构 — 优化代码
 
 #### TDD 循环 C：ToolResultStatus.INFEASIBLE 扩展
 
@@ -491,14 +491,14 @@
 | 🟢 绿 | `src/domain/value_objects/tool_execution.py` 枚举追加 `INFEASIBLE = "infeasible"`（`(str, Enum)` 加值 additive） |
 | 🔄 重构 | docstring 更新（`:30`「4 值边界」→ 5 值 + 终态不可行语义 + 与 INVALID"可重试"的区分——同步消解 `:34` INVALID「不进入重试」旧注释与 `:247-249`「可重试」的表述张力） |
 
-- [ ] Subtask 1.7: 🔴 红 — 编写枚举扩展失败测试 + 更新既有 4 值边界断言
-- [ ] Subtask 1.8: 🟢 绿 — 追加枚举值
-- [ ] Subtask 1.9: 🔄 重构 — 更新语义注释
+- [x] Subtask 1.7: 🔴 红 — 编写枚举扩展失败测试 + 更新既有 4 值边界断言
+- [x] Subtask 1.8: 🟢 绿 — 追加枚举值
+- [x] Subtask 1.9: 🔄 重构 — 更新语义注释
 
 **完成标准/Definition of Done:**
-- [ ] 两聚合根 + 值对象 + 领域服务 + 枚举扩展全部实现
-- [ ] TDD 循环全部通过
-- [ ] 领域层覆盖率 ≥90%
+- [x] 两聚合根 + 值对象 + 领域服务 + 枚举扩展全部实现
+- [x] TDD 循环全部通过
+- [x] 领域层覆盖率 ≥90%
 
 ---
 
@@ -514,9 +514,9 @@
 | 🟢 绿 | 实现 `src/domain/events/validation_feedback_events.py` + `events/__init__.py` 导出 |
 | 🔄 重构 | 4-5 R1-F01 教训核查：metadata/字段全 str 化 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写事件失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现两事件
-- [ ] Subtask 2.3: 🔄 重构 — 序列化安全核查
+- [x] Subtask 2.1: 🔴 红 — 编写事件失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现两事件
+- [x] Subtask 2.3: 🔄 重构 — 序列化安全核查
 
 #### TDD 循环 B：异常 399 全链路登记
 
@@ -526,9 +526,9 @@
 | 🟢 绿 | 新建 `validation_feedback_exceptions.py` → `_code_ranges.py` 两处 → `__init__.py` → `EXCEPTION_HTTP_MAP`（399→422）→ 设计文档两表 → 预留注释改已分配 |
 | 🔄 重构 | `grep -rn "EXCEPTION_399" src/` 碰撞自查 + `tests/unit/domain/exceptions/` 全目录既有测试回归（25 文件，不硬编码计数） |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写异常失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 五处登记实现
-- [ ] Subtask 2.6: 🔄 重构 — 碰撞自查 + 全量异常测试
+- [x] Subtask 2.4: 🔴 红 — 编写异常失败测试
+- [x] Subtask 2.5: 🟢 绿 — 五处登记实现
+- [x] Subtask 2.6: 🔄 重构 — 碰撞自查 + 全量异常测试
 
 #### TDD 循环 C：事件通道双登记
 
@@ -538,14 +538,14 @@
 | 🟢 绿 | `configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py` DEFAULT_MAPPINGS 同步更新（含 4.3 注释"reliable 4.7 启用"改"已启用"） |
 | 🔄 重构 | YAML > DEFAULT_MAPPINGS 优先级注释保持 |
 
-- [ ] Subtask 2.7: 🔴 红 — 编写通道映射失败测试
-- [ ] Subtask 2.8: 🟢 绿 — 两处配置同步
-- [ ] Subtask 2.9: 🔄 重构 — 契约测试转绿确认
+- [x] Subtask 2.7: 🔴 红 — 编写通道映射失败测试
+- [x] Subtask 2.8: 🟢 绿 — 两处配置同步
+- [x] Subtask 2.9: 🔄 重构 — 契约测试转绿确认
 
 **完成标准/Definition of Done:**
-- [ ] 399 异常五处登记完成且既有异常测试全绿
-- [ ] 两事件 + 通道双登记完成
-- [ ] 契约测试通过
+- [x] 399 异常五处登记完成且既有异常测试全绿
+- [x] 两事件 + 通道双登记完成
+- [x] 契约测试通过
 
 ---
 
@@ -561,9 +561,9 @@
 | 🟢 绿 | `sandbox_exceptions.py` ExecutionError 构造器增强（签名含 `context`/`cause` 透传合并，Task 0「修改的既有异常」契约）+ `aiodocker_sandbox_adapter.py:511-518` 填充 |
 | 🔄 重构 | 截断常量提取（≤2000） |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写异常增强与适配器填充失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现两处最小改动
-- [ ] Subtask 3.3: 🔄 重构 — 优化代码
+- [x] Subtask 3.1: 🔴 红 — 编写异常增强与适配器填充失败测试
+- [x] Subtask 3.2: 🟢 绿 — 实现两处最小改动
+- [x] Subtask 3.3: 🔄 重构 — 优化代码
 
 #### TDD 循环 B：SandboxSecurityDecorator 事件填充 + cause 链提取 helper
 
@@ -573,14 +573,14 @@
 | 🟢 绿 | `sandbox_security_decorator.py:132-137` 事件填充（except 块读外层 `exc.context["execution_id"]`）+ 新增 cause 链 stderr 提取函数（同时遍历自定义 `cause` 属性与 `__cause__`/`__context__`，供 4.7 装饰器复用，放置于该模块导出） |
 | 🔄 重构 | 4.4 既有测试全量回归（事件字段新增不破坏旧断言） |
 
-- [ ] Subtask 3.4: 🔴 红 — 编写事件填充失败测试
-- [ ] Subtask 3.5: 🟢 绿 — 实现填充与提取
-- [ ] Subtask 3.6: 🔄 重构 — 4.4 回归确认
+- [x] Subtask 3.4: 🔴 红 — 编写事件填充失败测试
+- [x] Subtask 3.5: 🟢 绿 — 实现填充与提取
+- [x] Subtask 3.6: 🔄 重构 — 4.4 回归确认
 
 **完成标准/Definition of Done:**
-- [ ] STDERR 三段链贯通（adapter → 异常 context → 事件 + cause 链提取）
-- [ ] 4.4 既有测试零回归
-- [ ] TDD 循环全部通过
+- [x] STDERR 三段链贯通（adapter → 异常 context → 事件 + cause 链提取）
+- [x] 4.4 既有测试零回归
+- [x] TDD 循环全部通过
 
 ---
 
@@ -596,9 +596,9 @@
 | 🟢 绿 | 实现 `src/domain/ports/error_case_repository.py`（含 EvolutionLogQuery 于 evolution_log_repository.py）+ `src/infrastructure/storage/inmemory/` 双实现 |
 | 🔄 重构 | InMemory 深拷贝防共享引用污染（4-6 CR1-2 教训） |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写双仓储 InMemory 失败测试
-- [ ] Subtask 4.2: 🟢 绿 — 实现端口 + InMemory
-- [ ] Subtask 4.3: 🔄 重构 — 深拷贝防护
+- [x] Subtask 4.1: 🔴 红 — 编写双仓储 InMemory 失败测试
+- [x] Subtask 4.2: 🟢 绿 — 实现端口 + InMemory
+- [x] Subtask 4.3: 🔄 重构 — 深拷贝防护
 
 #### TDD 循环 B：PG 模型 + migration 017 + PG 实现
 
@@ -608,9 +608,9 @@
 | 🟢 绿 | `models/error_case.py` + `models/evolution_log_entry.py` + `repository/` 双实现 + `deploy/postgresql/alembic/versions/017_validation_feedback.py`（表设计见 Dev Notes） |
 | 🔄 重构 | migration 仅新增不修改既有（红线） |
 
-- [ ] Subtask 4.4: 🔴 红 — 编写 PG 仓储失败测试
-- [ ] Subtask 4.5: 🟢 绿 — 实现 PG 双仓储 + migration 017
-- [ ] Subtask 4.6: 🔄 重构 — 事务边界优化
+- [x] Subtask 4.4: 🔴 红 — 编写 PG 仓储失败测试
+- [x] Subtask 4.5: 🟢 绿 — 实现 PG 双仓储 + migration 017
+- [x] Subtask 4.6: 🔄 重构 — 事务边界优化
 
 #### TDD 循环 C：组合根注册 + 契约测试转绿
 
@@ -620,14 +620,14 @@
 | 🟢 绿 | `composition_root.py` 注册 2 端口（lambda 工厂 + PortSpec 10 字段） |
 | 🔄 重构 | 契约测试 11 维度全绿 |
 
-- [ ] Subtask 4.7: 🔴 红 — 契约测试红状态确认
-- [ ] Subtask 4.8: 🟢 绿 — 组合根注册转绿
-- [ ] Subtask 4.9: 🔄 重构 — 11 维度全绿
+- [x] Subtask 4.7: 🔴 红 — 契约测试红状态确认
+- [x] Subtask 4.8: 🟢 绿 — 组合根注册转绿
+- [x] Subtask 4.9: 🔄 重构 — 11 维度全绿
 
 **完成标准/Definition of Done:**
-- [ ] 双仓储 InMemory + PG 实现 + migration 017
-- [ ] 契约测试 ×2 通过
-- [ ] 基础设施层覆盖率 ≥75%
+- [x] 双仓储 InMemory + PG 实现 + migration 017
+- [x] 契约测试 ×2 通过
+- [x] 基础设施层覆盖率 ≥75%
 
 ---
 
@@ -643,9 +643,9 @@
 | 🟢 绿 | 实现 `src/application/ports/validation_feedback_service.py` + `src/application/services/validation_feedback_service.py`（recover 编排：提取→查询→修复→重执行→记录）+ `validation_feedback_prompts.py` |
 | 🔄 重构 | 383/399 语义区分注释显式化 |
 
-- [ ] Subtask 5.1: 🔴 红 — 编写触发判定失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 实现服务骨架与触发判定
-- [ ] Subtask 5.3: 🔄 重构 — 优化判定逻辑
+- [x] Subtask 5.1: 🔴 红 — 编写触发判定失败测试
+- [x] Subtask 5.2: 🟢 绿 — 实现服务骨架与触发判定
+- [x] Subtask 5.3: 🔄 重构 — 优化判定逻辑
 
 #### TDD 循环 B：修复生成 + 防放大 + 案例回填
 
@@ -655,9 +655,9 @@
 | 🟢 绿 | 实现修复循环（fix-gen 产出 suggested_fix + 跨尝试反馈）+ 案例回填 + 演进日志写入 + 事件发布（fire-and-forget，P0-I 模式） |
 | 🔄 重构 | Fake LLM 按 system_prompt 角色标记分派（4-5 教训）核查测试自身 |
 
-- [ ] Subtask 5.4: 🔴 红 — 编写修复与回填失败测试
-- [ ] Subtask 5.5: 🟢 绿 — 实现完整闭环
-- [ ] Subtask 5.6: 🔄 重构 — 优化代码
+- [x] Subtask 5.4: 🔴 红 — 编写修复与回填失败测试
+- [x] Subtask 5.5: 🟢 绿 — 实现完整闭环
+- [x] Subtask 5.6: 🔄 重构 — 优化代码
 
 #### TDD 循环 C：幂等与 evolution log
 
@@ -667,9 +667,9 @@
 | 🟢 绿 | 终态判定短路（execution_id 取自 trigger_error.context；已有终态记录→副作用去重 + 合成结论 + record_case 观测计数） |
 | 🔄 重构 | 幂等键统一为 execution_id |
 
-- [ ] Subtask 5.7: 🔴 红 — 编写幂等失败测试
-- [ ] Subtask 5.8: 🟢 绿 — 实现幂等短路
-- [ ] Subtask 5.9: 🔄 重构 — 优化代码
+- [x] Subtask 5.7: 🔴 红 — 编写幂等失败测试
+- [x] Subtask 5.8: 🟢 绿 — 实现幂等短路
+- [x] Subtask 5.9: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
 - [ ] 闭环编排完整（触发/检索/修复/重试/回填/标记/日志）
@@ -690,9 +690,9 @@
 | 🟢 绿 | 实现 `src/application/services/validation_feedback_decorator.py` + `tool_execution_engine.py` prompt 构建扩展（`__init__` 签名不变） |
 | 🔄 重构 | 引擎改动面最小化核查（4.4 AC-7.4 BDD 断言保护） |
 
-- [ ] Subtask 6.1: 🔴 红 — 编写装饰器与 hints 失败测试
-- [ ] Subtask 6.2: 🟢 绿 — 实现装饰器 + 引擎扩展
-- [ ] Subtask 6.3: 🔄 重构 — 优化代码
+- [x] Subtask 6.1: 🔴 红 — 编写装饰器与 hints 失败测试
+- [x] Subtask 6.2: 🟢 绿 — 实现装饰器 + 引擎扩展
+- [x] Subtask 6.3: 🔄 重构 — 优化代码
 
 #### TDD 循环 B：装配升级 v1.4.0 + 契约测试
 
@@ -701,9 +701,9 @@
 | 🔴 红 | `test_port_contract_validation_feedback_service.py` 红 + `test_port_contract_tool_execution_service.py` 版本期望升级 v1.4.0 **及 EXPECTED_TAGS 增补 feedback**（`:150,:205` set 全等断言——tags += ("feedback",) 不同步必红，R3-6）+ **双句柄装配断言（R10-3 落位）**：①装配级——经组合根装配的 service 触发一次 recover 后，录制式替身断言 attempt 重执行调用到达 SSD 与 TOV（非裸引擎——R9-14 双句柄的运行面守护）；②同一性——service 的 engine 句柄与 inner_chain 最内层引擎为**同一对象**（id 相等——否则封顶封的是另一台引擎，防放大失效；生产 SCOPED 缓存 `resolver.py:186-189` 可保但契约测试 `_DummyResolver` 每次新实例，须显式断言） |
 | 🟢 绿 | `composition_root.py`：注册 `validation_feedback_service` + 装饰链最外层加 ValidationFeedbackDecorator + version/compatibility/tags 更新 + **链构造上提共享双句柄注入（R9-14/R10-3 落点：工厂函数落 application 域模块——`build_tool_execution_engine` 先例同款「组合根零私有函数」纪律（`tool_execution_engine.py:553-557`），组合根一行委托）** |
 | 🔄 重构 | 契约测试 11 维度 ×2 全绿 + 既有 tool_execution_service 契约回归 |
-- [ ] Subtask 6.4: 🔴 红 — 契约测试红确认
-- [ ] Subtask 6.5: 🟢 绿 — 装配升级转绿
-- [ ] Subtask 6.6: 🔄 重构 — 全绿确认
+- [x] Subtask 6.4: 🔴 红 — 契约测试红确认
+- [x] Subtask 6.5: 🟢 绿 — 装配升级转绿
+- [x] Subtask 6.6: 🔄 重构 — 全绿确认
 
 #### TDD 循环 C：outbox 独立 session 结构性修复（defer 债清偿）
 
@@ -713,9 +713,9 @@
 | 🟢 绿 | `src/infrastructure/messaging/outbox/outbox_repository.py`：`save` **直接调用 `get_session()` 捕 `RuntimeError`**（实现精度注记 R3-11，R8-34 勘误细化：`PostgreSQLOutboxRepository._session` property（`:40-42`）现状即直调 `get_session()` **无包装**——无 session 时抛的就是裸 `RuntimeError`，修复形态 = 现有调用外包 try/except 即可；`InvalidStateError` 分叉仅存在于 `PostgreSQLAdapter._session`（`postgresql_adapter.py:60-64` 捕 RuntimeError 重包）——若 fallback 机制复用扩展至 `PostgreSQLAdapter` 系仓储（`_persist_execution` 探针），那里才需「绕过 property 直调 `get_session()`」），RuntimeError 时经注入的 `session_factory` 走 `session_context` 独立写入（`outbox_processor.py:146-155` 先例同款，R8-36 行号校准；**修复必须落在 infrastructure 层**——application 禁 import infrastructure；HTTP 路径保持请求 session 同事务，事务性原子性不变——接线形态见 R8-9 注记） |
 | 🔄 重构 | 正常 HTTP 路径行为零变化回归断言 + fallback 行 teardown 验证（自建行清理后零残留）+ `tool_execution_engine.py:282-284` 与 `data_source_resolver.py:352` 两处 defer 注释更新（形态① 无 session 场景已修复；形态② session_context 异常回滚连带丢失登记 `deferred-work.md`——AC-4 遗留债）。**形态② 探针动作（R7，R8-9 勘误）**：实施本循环时顺带核查后台 worker 的 `session_context` 事务边界——**勘误**：R7 原文「HTTP 路径事务语义正确（领域失败经 ExceptionHandlers 转响应走 commit，`session_middleware.py:60-68`）」有两处失准：①实际路径为 `src/infrastructure/middleware/session_middleware.py:58-71`（`interfaces/api/middleware/` 目录不存在）；②**该中间件当前未在 `create_app()` 接线**（实测：`app.py:55` 仅注册 ExceptionContextMiddleware，SessionMiddleware 全 src 零生产引用）——「领域失败转响应走 commit」为**设计语义而非运行事实**，现状生产**全部路径**（含 HTTP 请求触发的 fire-and-forget）outbox save 均触发 RuntimeError fallback，本循环的 fallback 修复因此覆盖当前全部生产路径（修复必要性上调）；SessionMiddleware 生产接线为独立技术债（登记 deferred-work）；fallback 机制（session_factory 注入 + session_context 独立写入）可直接复用扩展至 `_persist_execution`——探针结论写入 deferred-work 登记行（具备则升级，不具备则留语义推演记录）。**HTTP 路径回归断言构造注记（R8-9 联动）**：「有请求 session」形态测试需显式 `set_session()` fixture 模拟已接线中间件（接线前该形态在生产不可达，测试验证的是 fallback 分支语义而非生产路径） |
 
-- [ ] Subtask 6.7: 🔴 红 — 编写 outbox 独立 session 失败测试
-- [ ] Subtask 6.8: 🟢 绿 — 实现独立 session 修复
-- [ ] Subtask 6.9: 🔄 重构 — 双路径回归 + 注释清偿
+- [x] Subtask 6.7: 🔴 红 — 编写 outbox 独立 session 失败测试
+- [x] Subtask 6.8: 🟢 绿 — 实现独立 session 修复
+- [x] Subtask 6.9: 🔄 重构 — 双路径回归 + 注释清偿
 
 #### TDD 循环 D：execution_id 全链同源（决策 #16 / R7——关闭 R2-5 deferred）
 
@@ -1174,6 +1174,15 @@ docs/architecture/
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
 - [x] 代码实地调研（3 并行调研 Agent：引擎/沙箱/重试链 + 异常/端口/事件 + 前序经验/测试风格——全部 file:line 实证）
+
+### 开发实施记录 Dev Execution Notes（dev-story）
+
+**Task 0 实施留痕（2026-10-09）：**
+
+- **代码调研**：4 并行调研 Agent（引擎/重试/校验链 + 沙箱/装饰器/STDERR 链 + 异常/事件/通道体系 + 存储/编排器/组合根/测试风格），Story 全部关键锚点实证命中（少量 2-6 行偏移内容在位：build_tool_execution_engine def 在 :551、TOV 389 抛出体 :223-229、组合根装饰链 :2341-2378）。环境探活：PG postgres@localhost:5432/sisys 可连（public schema 22 表齐备）+ Redis 可用。
+- **P95 口径留痕（Subtask 0.11，决策 #11）**：epics 字面「单次重试延迟 P95<5s」在 LLM 修复生成场景物理不可达（`LLMConfig.timeout` 默认 600s 支配生成时长）——可测化口径定为「**闭环自身开销 P95<5s**（错误签名提取 + 案例查询 + 演进日志写入，**不含** LLM 修复生成与沙箱执行时长）」。机制有效性指标（成功率 ≥80%/准确率）语义为 mock 可编程序列下的**编排机制正确性**度量而非真实修复能力（真实观察基准登记 deferred-work）。按 Task 0 与业务方确认流程：本留痕即实施口径基线，epics 硬指标的测试落点在 Task 7 `test_validation_feedback_integration.py` 三组基准。
+- **BDD 契约要点（Task 1-6 实现须对齐）**：fix-gen 调用形态 `llm_client.generate(prompt=..., system_prompt="Validation Feedback 修复顾问...")`（system_prompt 角色标记为 Fake LLM 分派键——4-5 R1-F06）；引擎 Think/Code/Validate prompt 固定前缀（"为工具"/"基于以下计划"/"验证工具"）在 hints 拼接后必须保持稳定；`_run` 内联同循环 drain fire-and-forget 事件任务；`ErrorSignatureExtractor.extract(stderr)` / `extract_from_violations(violations: tuple[dict, ...])` 方法名契约；`extract_stderr_from_cause_chain` 从 `sandbox_security_decorator` 导出（Task 3）。
+- **红窗口确认（Subtask 0.9）**：验收 .py 与 3 端口契约 + 事件契约 4 文件 collection ERROR（ModuleNotFoundError——Task 1-6 产物缺失，预期中间态）；通道映射契约 10 failed（断言红——新事件未登记，预期）；feature 无 import 即时入库（commit 1a51f164）。
 
 ### 文件清单 File List
 
