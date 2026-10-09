@@ -27,18 +27,24 @@ from src.domain.value_objects.data_source import DataSourceMeta
 
 
 class ToolResultStatus(str, Enum):
-    """工具结果状态枚举 — 4 值边界
+    """工具结果状态枚举 — 5 值边界（Story 4.7 增补 INFEASIBLE）
 
     - success: 执行成功且产出完整
     - failed: 执行失败（沙箱/LLM/校验失败，已重试 3 次）
-    - invalid: 输入参数不符合 Tool.input_schema（DDL 校验失败，不进入重试）
+    - invalid: 输出不符合 Tool.output_schema（校验失败）——「可重试」语义：
+      Validation Feedback 闭环将其作为触发信号捕获并增强重试（:247-249 契约），
+      非触发面（如 INPUT 校验）直接上抛不进入重试
     - insufficient_data: 输入数据不充分（可重试）
+    - infeasible: 3 次增强重试均失败后的终态不可行标记（Story 4.7 AC-3——
+      基础重试耗尽 → 反馈闭环增强重试再耗尽 → 明确「重试无意义」结论；
+      与 INVALID 的区分：INVALID 仍处可重试域，INFEASIBLE 为闭环终态）
     """
 
     SUCCESS = "success"
     FAILED = "failed"
     INVALID = "invalid"
     INSUFFICIENT_DATA = "insufficient_data"
+    INFEASIBLE = "infeasible"
 
 
 @dataclass(frozen=True)

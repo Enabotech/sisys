@@ -111,12 +111,12 @@ class TestExecutionContext:
 class TestToolResultStatus:
     """ToolResultStatus 枚举测试"""
 
-    def test_has_four_values(self) -> None:
+    def test_has_five_values(self) -> None:
         statuses = {s.value for s in ToolResultStatus}
-        assert len(statuses) == 4
+        assert len(statuses) == 5
 
     def test_contains_all_statuses(self) -> None:
-        expected = {"success", "failed", "invalid", "insufficient_data"}
+        expected = {"success", "failed", "invalid", "insufficient_data", "infeasible"}
         actual = {s.value for s in ToolResultStatus}
         assert actual == expected
 
