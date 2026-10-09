@@ -126,7 +126,7 @@
 **And** 性能达标（epics 硬指标可测化口径，Task 0 与业务方确认留痕）：闭环自身开销（错误签名提取 + 案例查询 + 演进日志写入，**不含** LLM 修复生成与沙箱执行时长——二者受 `LLMConfig.timeout`/沙箱 timeout 支配）单次 **P95 < 5s**（`statistics.quantiles(n=20)[18]` 分位 + 分级断言：达标 assert / 环境不达标 skip 留测量证据——4-6 `test_tool_version_integration.py:398-415` 先例；计时手法 = 端口级计时代理包裹仓储 + LLM/Sandbox AsyncMock `await asyncio.sleep(0)` 真实挂起点）；**闭环机制有效性**（mock LLM 可编程修复序列前提——指标语义注记：mock 化下度量的是编排机制正确性而非真实修复能力，真实修复能力观察基准不进 CI 门禁并登记 deferred-work）：增强重试恢复机制成功率 **≥80%**（20 次可修复故障注入 ≥16 恢复，主断言为内容性断言：修复 prompt 含 stderr/案例 fix_summary/历史反馈、hints 注入透传）；不可行标记机制准确率 **20 次不可修复故障全部标记 + 可修复故障 0 误标**（样本规模下等效 100%；epics 字面 ≥95% 为下限口径，20 样本粒度无法区分 95%/100%）。
 
 **验证标准/Validation Criteria:**
-- [ ] 3 个新端口注册（`error_case_repository` / `evolution_log_repository` / `validation_feedback_service`）+ `tool_execution_service` 升级，PortSpec 10 字段齐备，lambda 工厂注入
+- [ ] 3 个新端口注册（`error_case_repository` / `evolution_log_repository` / `validation_feedback_service`）+ `tool_execution_service` 升级，PortSpec 10 字段齐备，lambda 工厂注入（`validation_feedback_service` 注入清单以端口 SSOT 表行为准——含 engine 引用、不注入 RetryPolicy）
 - [ ] 端口契约测试 11 维度 ×3（`test_port_contract_tool.py` 样板：注册/名称/版本/接口类型/生命周期/owner/module/tags/impl callable/方法存在/Protocol runtime_checkable）
 - [ ] 性能基准位于 `tests/integration/test_validation_feedback_integration.py`（epics 硬路径）：P95 开销 / 机制成功率 / 机制准确率三组
 - [ ] 全量回归：`poetry run pytest tests/ -n 8` 通过、`ruff check` + `mypy` 通过
@@ -178,7 +178,7 @@
 |--------|----|-----------|--------------|---------|----------|-------|------|
 | `error_case_repository` | domain | `ErrorCaseRepositoryPort`（`src/domain/ports/error_case_repository.py`） | lambda → `PostgreSQLErrorCaseRepository`（InMemory 实现供单测） | v1.0.0 | SCOPED | tool-team | (tool, repository, feedback) |
 | `evolution_log_repository` | domain | `EvolutionLogRepositoryPort`（`src/domain/ports/evolution_log_repository.py`） | lambda → `PostgreSQLEvolutionLogRepository` | v1.0.0 | SCOPED | tool-team | (tool, repository, feedback) |
-| `validation_feedback_service` | application | `ValidationFeedbackServicePort`（`src/application/ports/validation_feedback_service.py`，方法 `recover(...)`） | lambda 工厂注入 llm_client + error_case_repository + evolution_log_repository + event_publisher + RetryPolicy | v1.0.0 | SCOPED | tool-team | (tool, feedback, service) |
+| `validation_feedback_service` | application | `ValidationFeedbackServicePort`（`src/application/ports/validation_feedback_service.py`，方法 `recover(...)`） | lambda 工厂注入 llm_client + error_case_repository + evolution_log_repository + event_publisher + **engine 引用**（`resolver.resolve("tool_execution_engine")`——防放大封顶/恢复 `engine._retry` **原引用**用，决策 #8/AC-2；wrapped 链首是 SSD 无 `_retry`，禁经装饰链推导）；fix-gen 重试封顶 `max_attempts=1` 由服务内自建，**不注入 RetryPolicy**（注入新建 RetryPolicy 会诱导「按值恢复」——恢复必须按 engine 原引用，陷阱 8） | v1.0.0 | SCOPED | tool-team | (tool, feedback, service) |
 | `tool_execution_service` | application | `ToolExecutionServicePort` | **升级 v1.3.0 → v1.4.0**：装饰链最外层加 `ValidationFeedbackDecorator`；`compatibility=("v1.3.0", "v1.2.0")`；tags += ("feedback",) | v1.4.0 | SCOPED | tool-team | (tool, execution, service, decorated, versioned, feedback) |
 
 **端口方法契约：**
@@ -746,7 +746,7 @@
 
 #### 架构验证测试实现
 
-- [ ] Subtask 8.1: 创建 `tests/unit/architecture/test_validation_feedback.py`（epics 指定硬路径——与目录内既有 `test_arch_*.py` 命名惯例（28 个文件）不同，按 epics_v1.0.md:1398 指定名创建，文件头 docstring 注明）
+- [ ] Subtask 8.1: 创建 `tests/unit/architecture/test_validation_feedback.py`（epics 指定硬路径——与目录内既有 `test_arch_*.py` 命名惯例（28 个文件）不同，按 epics_v1.0.md:1395 指定名创建，文件头 docstring 注明）
 - [ ] Subtask 8.2: 重试增强验证器——STDERR 捕获与修复建议生成链路断言（触发→prompt 含 STDERR/案例→重执行）
 - [ ] Subtask 8.3: 失败标记验证器——3 次增强失败后 INFEASIBLE + 399 + 事件三联断言
 - [ ] Subtask 8.4: 幂等性验证器——同 trigger_error 重复 recover：日志单行 / 事件单次 / 案例分类计数与 occurrence 同步递增（record_case 幂等路径，AC-6 R3-2 定谳口径）/ 不新建行 / fix_summary 不覆写
@@ -1183,7 +1183,7 @@ docs/architecture/
 
 1. [x] All tasks defined 所有任务定义完成（Task 0-9，10 个 Task）
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-7）
-3. [x] Architecture constraints extracted 架构约束已提取（含 11 项关键架构决策）
+3. [x] Architecture constraints extracted 架构约束已提取（含 15 项关键架构决策——决策表 #1~#15，其中 #14/#15 为文档审查 R2/R3 增补）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（4-6/4-5/4-3）
 5. [ ] Sprint status synced to `ready-for-dev`
 
@@ -1270,11 +1270,56 @@ docs/architecture/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-10-08
-**最后更新/Last Updated:** 2026-10-08
+**最后更新/Last Updated:** 2026-10-09
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（3 并行调研 Agent 代码实证 + 4 前序故事经验整合 + 4 笔预留债清偿方案）
 - v1.1.0: 文档审查 Round 1——4 调研 Agent + 3 审查 Agent（正确性/一致性 + 可行性/可达性 + 科学性/方法论对标业界）收敛 42 项（P0×5 + P1×10 + P2/P3×27）：重写 STDERR 浮现路径为生产真实形态（382 主路径）、execution_id 全链提取机制定稿、签名统一 64 hex + Sentry 对标归一化、修复循环跨尝试反馈（Reflexion 共识）、outbox fallback 独立 session 重设计、触发矩阵 8 行化、防放大两层封顶、幂等副作用去重语义等
 - v1.2.0: 文档审查 Round 2 回归核查——双 Agent（传播完备性 + 修复组合交互面）收敛 16 项（P1×4 + P2×8 + P3×4）+ 2 项 R1 台账勘误：389 两套 id 空间注记、outbox fallback 测试清理策略定稿、INFEASIBLE×FAIL_FAST 行为变更登记（决策 #14）、fix_strategy 三分支（决策 #15）、FixAttempt 边界形态定约、fix-gen 异常收敛、hints per-stage 消费映射、触发矩阵衍生位补齐（八行三处）
 - v1.3.0: 文档审查 Round 3 单深度推演——三轮全推演（Gherkin 场景三轴 + Task 0→9 依赖干跑/提交批次 + 六条长状态时间线）收敛 11 项（P1×3 + P2×3 + P3×5）：幂等短路 record_case 定谳（R2-4 自拆修复）、Task 4/6 批次矛盾化解、abort 观测面立法与构造法、事件断言 drain 纪律、场景全枚举补齐、EXPECTED_TAGS 联动、error_category/fix_summary 来源定稿、提交策略 7/8/9 批次补全
+- v1.3.1: Round 5 独立终审——五节核验全过，周期正式收敛（零 P0/P1/P2 残留）；清偿 V4-1（决策计数 11→15 锚定）/V4-2（SSOT 表补 engine 引用 + RetryPolicy 语义消歧，AC-7 联动）+ F5-1/F5-2 两项 P3 微瑕；追加文档审查周期收敛声明
+
+### 🏁 文档审查周期收敛声明（Round 5 独立终审，2026-10-09）
+
+**周期概况**
+
+Story 4-7（Validation Feedback 闭环——增强重试与不可行标记，Epic 4 收官故事）创建后进入文档审查周期，采用「多轮多视角审查 + 独立终审」结构。Round 5 独立终审以「不轻信 Story 自身记录、仓库实地取证」为纪律执行五节核验：周期闭合甄别（4 提交链 + 工作区干净 + 零游离变更 + 周期零代码触碰）、关键修复双向取证（12 项 Story 声明 vs 仓库代码逐条对照，含行号级核验）、独立新鲜快扫（零 P0/P1 新发现）、四项门禁核验（全过）、状态流转判定。**结论：周期正式收敛，零 P0/P1/P2 残留。**
+
+**五轮结构与投入**
+
+- R1：4 并行调研 Agent（引擎/沙箱/重试链 + 异常/端口/事件 + 前序经验/测试风格）+ 3 审查 Agent（正确性/一致性 + 可行性/可达性 + 科学性/方法论对标业界）
+- R2：双 Agent 回归核查（传播完备性 + 修复组合交互面）+ 2 项 R1 台账勘误
+- R3：单 Agent 深度推演（Gherkin 场景三轴 + Task 0→9 依赖干跑/提交批次 + 六条长状态时间线）
+- R4：纯验证轮（零修改零提交，2 项 P3 留项交本轮）
+- R5：独立终审（单终审员五节全取证）
+
+**修复统计（终审核对口径）**
+
+- 台账合计 46 行：R1×20 + R2×15 + R3×11，编号连续无缺
+- 修复点计数：R1 42（P0×5 + P1×10 + P2/P3×27）/ R2 16（P1×4 + P2×8 + P3×4，落 15 台账行——R2-15 为复合行）/ R3 11（P1×3 + P2×3 + P3×5，行点一致）
+- R4 零修复（验证轮）；R5 零新增缺陷，清偿 4 项 P3（V4-1 决策计数 11→15、V4-2 SSOT 表补 engine 引用并消歧 RetryPolicy 语义、F5-1 Last Updated 日期、F5-2 epics 行号 :1398→:1395）
+- 累计：69 个修复点 + 4 项收敛清偿；R5 双向抽验 12 项全部与仓库代码实证吻合
+
+**关键设计决策演进（审查驱动）**
+
+1. STDERR 浮现路径从错误断言修正为生产真实形态——382(stage=EXECUTION) 主路径 / 389→383 次路径双分支，触发矩阵 8 行化（SANDBOX_START 等 infra 故障排除出闭环）（R1-1/R1-17）
+2. execution_id 从全链悬空到提取机制定稿：外层 382 context 主 id 与演进日志幂等键同源；389 半边「两套 id 空间」显式登记为已知边界（R1-2/R2-5）
+3. 错误签名统一 64 hex 完整 sha256 + Sentry 对标归一化（数值/引号串模板化 + 尾部锚定 stderr[-2000:]），三处口径同一（R1-3）
+4. 修复循环跨尝试失败反馈（Reflexion/Self-Debugging 共识）+ 引擎 Code stage 单一代码作者（R1-4，决策 #9/#12）
+5. outbox 修复重设计为 fallback 独立 session——HTTP 路径事务性原子性保持、后台 RuntimeError 分支经 session_factory 落地（R1-5，决策 #10）
+6. 防放大两层封顶（引擎 + TOV 校验重试）+ RetryPolicy 按引用整体恢复 + engine 引用经组合根注入穿透（R1-6/R2-15，决策 #8；SSOT 表 v1.3.1 补登记）
+7. INFEASIBLE 结果化与 ToolChain FAIL_FAST 策略交互显式登记（R2-7，决策 #14）
+8. fix_strategy 三分支 CASE_GUIDED/NEGATIVE_CASE_GUIDED/PURE_LLM（R2-8，决策 #15）
+9. 幂等短路 record_case 分类计数与 occurrence 同步递增定谳（R3-2，化解 R2-4 自拆）
+10. abort 中止路径观测面立法：零观测副作用 + 重放不短路全量重跑 + BDD 构造法禁 385（R3-3）
+
+**deferred 登记（dev 期落 deferred-work.md）**
+
+编排层 INFEASIBLE×FAIL_FAST 显式联动（决策 #14）；389 半边 aggregate 完整回链（ToolInputValidator 入链或 ToolResult 增 execution_id 字段）；中止遥测 ABORTED 第三值；outbox 后台路径「业务 session 异常回滚连带丢失」形态②；多案例加权检索与向量相似检索（L3 Qdrant）；工具熔断（or.md 四.7.(3)，建议挂 5.x）；自动灰度推进与 per-version 统计视图；真实修复能力观察基准（不进 CI 门禁）；400-409 扩域触发条件注释更新。
+
+**最终状态**
+
+- 周期状态：**收敛（CONVERGED）**——零 P0/P1/P2 残留，4 项 P3 随本提交清偿
+- Story 状态：`ready-for-dev` 保持不变（文档审查周期不改里程碑状态）
+- 下一步：运行 `dev-story` 进入实施（10 Task / SDD+TDD 融合 / 预留债 4 笔集中清偿）
