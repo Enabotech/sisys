@@ -335,7 +335,6 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                     attempts=attempts,
                     duration_sec=duration,
                     suggested_fix=suggested_fix,
-                    context=context,
                 )
                 return ToolResult(
                     tool_id=tool_id,
@@ -404,7 +403,6 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
             duration_sec=duration,
             tool=tool,
             exhausted=exhausted,
-            context=context,
         )
 
     # ---- 内部编排 ----
@@ -486,7 +484,6 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         attempts: list[FixAttempt],
         duration_sec: float,
         suggested_fix: str,
-        context: Any,
     ) -> None:
         """恢复终态：案例回填 + 演进日志 + 恢复事件."""
         # 回填：recovered_count+1；fix_summary 覆写（仅非 LLM_TRANSIENT——#17①）
@@ -553,7 +550,6 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         duration_sec: float,
         tool: Any,
         exhausted: ValidationFeedbackRetryExhaustedError,
-        context: Any,
     ) -> ToolResult:
         """耗尽终态：399 信号转换 INFEASIBLE + 案例回填 + 演进日志 + 不可行事件."""
         # 回填：infeasible_count+1（fix_summary 不动——repo 端规则）

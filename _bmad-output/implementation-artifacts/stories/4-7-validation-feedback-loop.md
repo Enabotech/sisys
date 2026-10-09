@@ -1,6 +1,6 @@
 # Story 4.7: Validation Feedback 闭环（增强重试与不可行标记）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1469,15 +1469,7 @@ docs/architecture/
 - [x] [4-7-P3-CR-R2-5][Review][Patch] 决策演进条目 6 漏标 CR-R1-3 / #17② 谓词「链上成员」精度注记（AC-2 VC + Dev Record :1216）/ 测试函数名残留旧机制词（`test_engine_retry_capped_via_contextvar_zero_write` 更名）/ TOV `if retry_policy is None` 不可达分支删除 + 测试 docstring 改实 — 均随本轮清偿
 - [x] [4-7-P3-CR-R2-6][Review][Patch] 台账措辞勘误：CR-R1-8 `_LLMResponse`→端口 VO `LLMResponse`；CR-R1-29 补 `_replay_synthetic` 同款窗口
 
-#### Round 4（纯验证轮，2026-10-09）
-
-**游离提交甄别**：R2→R3 之间的 `a359205c`（CI ruff I001 修复——契约测试双块 import 合并）系 CI 红灯即时修复，属本审查周期变更，**本轮补登记**（非游离——用户转达 CI 失败后即时处置，根因 = 本地/CI ruff isort 版本判定差异，4-6 周期先例同款；精确扫描 4-7 全部变更文件确认仅此一处双块形态）。
-
-**全量回归**（HEAD `e76b0c21`，tests/ 除 integration）：10880 passed / 5 failed——其中 4 项**隔离复跑全绿**（快照延迟 p95 / Docker 沙箱启动 p95 / 余弦检索×2——并发负载抖动实证，dev 期 21 失败同款环境形态）；**1 项真实缺陷抓出并修复**：
-
-- [x] [4-7-P1-CR-R4-1][Review][Patch] 4.1a 验收资产 4 值边界断言漏联动（`tests/acceptance/test_acceptance_strategic_tool_impl.py:580` `set(ToolResultStatus)==4 值` + feature「AC-3c - 4 值边界」文本——dev 加 INFEASIBLE 后必红；dev 全量 21 失败误判环境性掩盖；4-1f「既有验收资产计数联动」教训同类）— 三联动位修复（断言集合+@then 绑定串+feature 场景文本改 5 值），修后 18/18 绿——**枚举加值类变更须全仓 grep 断言位**（len/set/计数/文档字面）纪律再实证
-
-**锚点存续核验**：R1~R3 台账关键 file:line 抽验（ContextVar 工具位/端口 docstring/陷阱 8/14/蓝图/SSOT :183/399 docstring 两处/Query 校验/次序键双侧）与 HEAD 一致；红线 grep（noqa/type: ignore/pylint）4-7 变更集零命中；lint-imports 维持预存量 BROKEN（CR-R1-30 登记，非本 Story 面）。
+#### Round 3（单深度推演，2026-10-09）
 
 单 Agent 深度推演（六条长状态时间线逐字段终态 × 谓词全枚举 21 格/27 组合 × 四组真突变判别力 × 九项证伪探针留痕）。**结论：零 P0/P1/P2**——R1 修复在长状态时间线与并发边界下行为全部符合契约；关键实证：①389-LLM 触发 × mid 代码缺陷正确落 INFEASIBLE（R1-F2 主场景闭环验证）②RECOVERED 重放→再耗尽配方存续（R1-F1 跨终态序列）③DAG 同波 B 节点读 base 不受 A 的 override 连带（三重探针证据——task 创建时 context 快照隔离，R1-F3 连带消除的结构性证明）④四组真突变（防放大 with 删除/TOV 封顶失效/负样本不并入/首写定格破坏）全部红→还原→绿。发现与清偿：
 
@@ -1488,20 +1480,54 @@ docs/architecture/
 - 观察项（立法内非缺陷）：389-LLM 触发混合根因耗尽终态案例行 `category=LLM_TRANSIENT + infeasible=1`——R3-9 触发侧派生立法的忠实结果；叠加 A8 粗签名桶使后续同桶纯 LLM 触发命中格②负样本提示（语义偏弱但全量 3 次不缩减，无误标放大路径）
 - 「推演不成立」留痕 9 项（V1 同波连带/V2 raw 383 浮出/V3 重放再耗尽清配方/V4 混合根因直传/V5 五格缺格/V6 组合偏差/V7 fullmatch 拒提取器输出/V8 跨循环功能故障/V9 finish 误计 attempt——全部证伪，防下轮重推）
 
+#### Round 4（纯验证轮，2026-10-09）
+
+**游离提交甄别**：R2→R3 之间的 `a359205c`（CI ruff I001 修复——契约测试双块 import 合并）系 CI 红灯即时修复，属本审查周期变更，**本轮补登记**（非游离——用户转达 CI 失败后即时处置，根因 = 本地/CI ruff isort 版本判定差异，4-6 周期先例同款；精确扫描 4-7 全部变更文件确认仅此一处双块形态）。
+
+**全量回归**（HEAD `e76b0c21`，tests/ 除 integration）：10880 passed / 5 failed——其中 4 项**隔离复跑全绿**（快照延迟 p95 / Docker 沙箱启动 p95 / 余弦检索×2——并发负载抖动实证，dev 期 21 失败同款环境形态）；**1 项真实缺陷抓出并修复**：
+
+- [x] [4-7-P1-CR-R4-1][Review][Patch] 4.1a 验收资产 4 值边界断言漏联动（`tests/acceptance/test_acceptance_strategic_tool_impl.py:580` `set(ToolResultStatus)==4 值` + feature「AC-3c - 4 值边界」文本——dev 加 INFEASIBLE 后必红；dev 全量 21 失败误判环境性掩盖；4-1f「既有验收资产计数联动」教训同类）— 三联动位修复（断言集合+@then 绑定串+feature 场景文本改 5 值），修后 18/18 绿——**枚举加值类变更须全仓 grep 断言位**（len/set/计数/文档字面）纪律再实证
+
+**锚点存续核验**：R1~R3 台账关键 file:line 抽验（ContextVar 工具位/端口 docstring/陷阱 8/14/蓝图/SSOT :183/399 docstring 两处/Query 校验/次序键双侧）与 HEAD 一致；红线 grep（noqa/type: ignore/pylint）4-7 变更集零命中；lint-imports 维持预存量 BROKEN（CR-R1-30 登记，非本 Story 面）。
+
 ---
 
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
 - [x] 运行 `dev-story` 开始实施（Task 0-9 全交付，2026-10-09）
-- [x] 运行 `code-review` 进行代码审查（进行中——代码审查周期 Round 1 已清偿 P1×5 + P2×8 + 红线×1 + P3×8，见 Review Findings；R2~R5 后续轮次执行中）
+- [x] 运行 `code-review` 进行代码审查（**五轮收敛，2026-10-09**——R1 四视角+双评审清偿 P1×5+P2×8；R2 回归核查零 P0/P1/P2 回归；R3 单深度推演零 P0/P1/P2；R4 全量回归抓出 4.1a 边界漏联动；R5 独立终审五节全过 → Status `done`，见收敛声明）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.8.3
+### 🏁 代码审查周期收敛声明（Round 5 独立终审，2026-10-09）
+
+**周期概况**
+
+Story 4-7 dev-story 实施结束（v1.7.0，Status → review）后进入代码审查周期，采用「R1 全量审查 + R2 回归核查/传播完备性 + R3 单深度推演 + R4 纯验证 + R5 独立终审」五轮结构。Round 5 独立终审以「不轻信 Story 自身记录、仓库实地取证」为纪律执行五节核验：周期闭合甄别（5 提交链 92c075bc→fef7c7e0→a359205c→e76b0c21→917b5a43 全部有台账对应、工作区干净、零越界触碰、提交无 AI 署名）、关键修复双向取证（10 项台账声明 vs HEAD 代码逐条实读对照全部吻合——六断言/并发回归/5 值边界/突变验证目标测试存在性与非恒真性均实勘）、独立新鲜快扫（五核心文件高风险面重扫——零 P0/P1/P2 新发现，3 项 P3 随本轮清偿）、四项门禁实跑（ruff 全过 / mypy 653 文件零问题 / 指定五测试文件 122 passed / 红线 grep 本周期变更集零命中）、状态流转判定。**结论：周期正式收敛，零 P0/P1/P2 残留。**
+
+**修复统计（终审核对口径）**
+
+- R1（四视角并行调研 + 双评审员方案评审 + 复评「优秀」门禁）：台账 30 行——清偿 P1×5（CR-R1-1~5）+ P2×8（CR-R1-6~13，含 type:ignore 红线×2 根因消除）+ P3×8 随轮（CR-R1-14~21）+ Defer×9 登记（CR-R1-22~30）
+- CI 即时修复（a359205c）：契约测试双块 import 合并（本地/CI ruff isort 版本判定差异，4-6 先例同款），R4 补登记
+- R2（双 Agent 回归核查 + 传播完备性）：**R1 修复零 P0/P1/P2 回归**（ContextVar 迁移逐字段推演 + 8009 单测独立回归）；清偿 P2×2 + P3×4（CR-R2-1~6）
+- R3（单深度推演）：**零 P0/P1/P2**——六条长状态时间线 × 谓词全枚举 × 四组真突变判别力 × 九项证伪留痕；清偿 P3×3 + Defer×1（CR-R3-1~4）
+- R4（纯验证轮）：全量回归 10880 passed + 4 环境项隔离复跑全绿；**抓出 1 项真实缺陷**——4.1a 验收资产 4 值边界断言漏联动（CR-R4-1，P1，三联动位修复 18/18 绿）
+- R5（独立终审）：双向取证 10 项全部吻合（零虚报零漏报）；新发现 P3×3 随收敛提交清偿——①Round 3 标题行在 R4 编辑中被覆盖（R3 正文悬于 R4 节下，内容无丢失，本轮恢复标题并重排两节）②`_finish_recovered`/`_finish_infeasible` 残留未用 `context` 死参（CR-R1-5 重构遗留，删除）③`then_status_enum_4_values` 函数名残留「4_values」（R4 三联动位未覆盖标识符，更名 `then_status_enum_5_values`）
+- 累计清偿：P1×6 + P2×10 + P3×18（随轮×15 + 终审×3）；Defer 落 deferred-work.md 9 条（CR-R1-22~29 + CR-R3-4），CR-R1-30 基线预存量独立工程项按台账分类不入册
+
+**五轮结构与终审结论**
+
+- 严重度严格递减：R1（P1×5+P2×8）→ R2（零 P0/P1/P2 回归 + P2×2）→ R3（零 P0/P1/P2）→ R4（P1×1——dev 期存量漏联动被全量回归抓出）→ R5（零 P0/P1/P2，P3×3）
+- 关键设计演进（审查驱动）：防放大机制从「保存→整体替换→按引用恢复」根治为 ContextVar per-task 覆盖（VFD+TOV+引擎三侧同源，决策 #8 演进，陷阱 8/14/蓝图/SSOT 联动改写）；#17② 谓词弃 `__context__` 隐式链仅走显式因果；RECOVERED 重放透传既有修复配方；trigger_code 显式传参消实例竞态；execution_id 全链同源六断言补交；EvolutionLogQuery 校验与分页次序键双实现行为对齐
+- 终审结论：三门禁全绿 + 双向取证零偏差 + 独立快扫零 P0/P1/P2——**代码审查周期满足收敛判据，Story 流转 `review → done`**（3 项 P3 终审发现随收敛提交清偿，成本趋零）
+
+---
+
+**故事版本/Story Version:** v1.9.0
 **创建日期/Created:** 2026-10-08
-**最后更新/Last Updated:** 2026-10-09（代码审查周期 Round 4）
+**最后更新/Last Updated:** 2026-10-09（代码审查周期收敛，Status → done）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（3 并行调研 Agent 代码实证 + 4 前序故事经验整合 + 4 笔预留债清偿方案）
 - v1.1.0: 文档审查 Round 1——4 调研 Agent + 3 审查 Agent（正确性/一致性 + 可行性/可达性 + 科学性/方法论对标业界）收敛 42 项（P0×5 + P1×10 + P2/P3×27）：重写 STDERR 浮现路径为生产真实形态（382 主路径）、execution_id 全链提取机制定稿、签名统一 64 hex + Sentry 对标归一化、修复循环跨尝试反馈（Reflexion 共识）、outbox fallback 独立 session 重设计、触发矩阵 8 行化、防放大两层封顶、幂等副作用去重语义等
@@ -1519,6 +1545,7 @@ docs/architecture/
 - v1.8.1: **代码审查周期 Round 2**——双 Agent 回归核查 + 传播完备性：**R1 修复零 P0/P1/P2 回归**（ContextVar 迁移逐字段推演等价或严格更优 + 8009 单测独立回归）；清偿 P2×2（端口 docstring 旧模式/File List 双漏登+复用表勘误）+ P3×6（回调取消边界/hex 守卫收紧 fullmatch+拒绝向×4/决策演进标注/谓词精度注记/测试更名/TOV 死分支/台账勘误）
 - v1.8.2: **代码审查周期 Round 3**——单深度推演：六条长状态时间线 × 谓词全枚举（21 格唯一/27 组合零偏差）× 四组真突变判别力（全红→还原→绿）× 九项证伪留痕——**零 P0/P1/P2**；关键结构性证明：DAG 同波 task 创建时 context 快照隔离（override 连带消除）；清偿 P3×3（Query 分页校验/次序键决胜/399 docstring 勘误）+ Defer×1（跨循环 task 滞留与先例统一治理）
 - v1.8.3: **代码审查周期 Round 4**——纯验证轮：全量回归 10880 passed + 4 环境项隔离复跑全绿实证 + **1 项真实缺陷抓出**（4.1a 验收资产 4 值边界断言漏联动——dev 全量 21 失败误判掩盖，三联动位修复 18/18 绿）；CI ruff 修复提交补登记；锚点存续/红线/lint-imports 核验
+- v1.9.0: **代码审查周期正式收敛**——R5 独立终审五节全过（周期闭合/双向取证 10 项零偏差/独立快扫零 P0/P1/P2/门禁实跑全绿/状态流转判定）+ 终审 P3×3 随收敛清偿（R3 节标题恢复重排/`_finish_*` 死参删除/枚举测试函数更名）；收敛声明入册；**Status `review` → `done`**
 
 ### 🏁 文档审查周期收敛声明（Round 5 独立终审，2026-10-09）
 

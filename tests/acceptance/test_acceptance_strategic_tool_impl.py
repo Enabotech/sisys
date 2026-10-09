@@ -578,7 +578,7 @@ def then_missing_fields_contains_plan(context: dict[str, Any]) -> None:
 
 
 @then("ToolResultStatus 枚举包含 success/failed/invalid/insufficient_data/infeasible 共 5 值")
-def then_status_enum_4_values(context: dict[str, Any]) -> None:
+def then_status_enum_5_values(context: dict[str, Any]) -> None:
     """ToolResultStatus 枚举完整性（4.7 加 INFEASIBLE 后 5 值——既有验收资产联动）。"""
     expected = {
         ToolResultStatus.SUCCESS,
