@@ -420,9 +420,15 @@ class TestTriggerMatrixEnumGuard:
         assert '"EXECUTION"' in source
         assert "ExecutionError" in source
 
-    def test_strategy_three_values(self) -> None:
-        """FixStrategy 三分支（决策 #15）."""
-        assert {s.value for s in FixStrategy} == {"CASE_GUIDED", "NEGATIVE_CASE_GUIDED", "PURE_LLM"}
+    def test_strategy_five_values(self) -> None:
+        """FixStrategy 五值（决策 #15 三分支 + R9-16 格④⑤——CR-R1-24 升格）."""
+        assert {s.value for s in FixStrategy} == {
+            "CASE_GUIDED",
+            "NEGATIVE_CASE_GUIDED",
+            "PURE_LLM",
+            "PURE_LLM_NO_RECIPE",
+            "PURE_LLM_COLLISION",
+        }
 
     def test_trigger_code_two_values(self) -> None:
         """TriggerCode 两值（389/382）."""

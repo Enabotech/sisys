@@ -121,8 +121,14 @@ class TestFixAttemptValueObject:
             _make_attempt(attempt_execution_id="not-an-uuid")
 
     def test_fix_strategy_enum_members(self) -> None:
-        """三分支枚举（决策 #15）：CASE_GUIDED / NEGATIVE_CASE_GUIDED / PURE_LLM."""
-        assert {s.value for s in FixStrategy} == {"CASE_GUIDED", "NEGATIVE_CASE_GUIDED", "PURE_LLM"}
+        """五值枚举（决策 #15 三分支 + R9-16 格④⑤——CR-R1-24 升格）."""
+        assert {s.value for s in FixStrategy} == {
+            "CASE_GUIDED",
+            "NEGATIVE_CASE_GUIDED",
+            "PURE_LLM",
+            "PURE_LLM_NO_RECIPE",
+            "PURE_LLM_COLLISION",
+        }
 
 
 class TestEvolutionLogEntryConstruction:

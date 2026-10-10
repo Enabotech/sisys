@@ -116,17 +116,17 @@
     那么修复 prompt 不包含案例注入
     并且该次尝试的 fix_strategy 为 PURE_LLM
 
-  场景: AC-2.14 - 命中恢复案例但配方为空落 PURE_LLM（LLM_TRANSIENT 首例）
+  场景: AC-2.14 - 命中恢复案例但配方为空落 PURE_LLM_NO_RECIPE（LLM_TRANSIENT 首例）
     假如错误案例库存在同签名的 RECOVERED 案例但 fix_summary 为空
     当闭环组装修复 prompt
     那么修复 prompt 不注入空配方
-    并且该次尝试的 fix_strategy 为 PURE_LLM
+    并且该次尝试的 fix_strategy 为 PURE_LLM_NO_RECIPE
 
   场景: AC-2.15 - 签名碰撞且分类不匹配抑制负样本（碰撞命中已抑制）
     假如错误案例库存在同签名案例但 outcome 为 MARKED_INFEASIBLE 且 error_category 不匹配
     当闭环组装修复 prompt
     那么修复 prompt 不包含负样本提示
-    并且该次尝试的 fix_strategy 为 PURE_LLM
+    并且该次尝试的 fix_strategy 为 PURE_LLM_COLLISION
 
   场景: AC-2.16 - 修复成功返回 SUCCESS 且携带增强尝试次数与恢复事件
     假如第 2 次增强尝试重执行成功

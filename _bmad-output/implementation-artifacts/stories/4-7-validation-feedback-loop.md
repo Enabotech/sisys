@@ -1448,13 +1448,13 @@ docs/architecture/
 
 #### 已推迟 Defer
 
-- [x] [4-7-P3-CR-R1-22][Review][Defer] A5 mid-attempt 389-Schema 新 violations 未进跨尝试反馈（仅 reason 字符串兜底，FixAttempt 无 violations 字段承载）— deferred，值对象扩字段涉及演进日志 schema 联动，随真实反馈质量需求评估
-- [x] [4-7-P3-CR-R1-23][Review][Defer] A6 duration_sec 口径微偏（终态墙钟在副作用前计量，系统性小幅低估）— deferred，口径立法为「recover 进入到终态返回」，重构计量点需改 `_finish_*` 签名族，观测影响微小
-- [x] [4-7-P3-CR-R1-24][Review][Defer] A7 格④⑤「注记」无运行时可观测载体（演进日志中与 PURE_LLM 不可区分）— deferred，fix_strategy 枚举加值涉及 PG enum 迁移
+- [x] [4-7-P3-CR-R1-22][Review][Defer] A5 mid-attempt 389-Schema 新 violations 未进跨尝试反馈（仅 reason 字符串兜底，FixAttempt 无 violations 字段承载）— deferred，值对象扩字段涉及演进日志 schema 联动，随真实反馈质量需求评估。**2026-10-10 技术债清偿**：调查证「schema 联动」DB 层失实（JSONB `.get()` 缺省读零迁移）——`violations_excerpt` 字段 + 捕获/渲染落地
+- [x] [4-7-P3-CR-R1-23][Review][Defer] A6 duration_sec 口径微偏（终态墙钟在副作用前计量，系统性小幅低估）— deferred，口径立法为「recover 进入到终态返回」，重构计量点需改 `_finish_*` 签名族，观测影响微小。**2026-10-10 技术债清偿**：`start_time` 签名族 + 回填后计量落地（物理边界注记）
+- [x] [4-7-P3-CR-R1-24][Review][Defer] A7 格④⑤「注记」无运行时可观测载体（演进日志中与 PURE_LLM 不可区分）— deferred，fix_strategy 枚举加值涉及 PG enum 迁移。**2026-10-10 技术债清偿**：论据失实（JSONB 字符串零迁移）——五值枚举 + 断言面三联动落地
 - [x] [4-7-P3-CR-R1-25][Review][Defer] A8 389-LLM 子路径签名输入为外层 389 消息（口径粗——同工具全部 389-LLM 失败收敛一个签名桶；仅影响 occurrence 聚合粒度）— deferred，随真实语料评估
 - [x] [4-7-P3-CR-R1-26][Review][Defer] D-P3a 引擎聚合 id 继承 session_id 回退（`extract_schema_execution_id` 三级优先——直连+UUID session_id 时聚合 id=session_id 非「兜底新铸」字面）— 生产全路径经链入口注入不受影响；已在 CR-R1-4 断言④按优先级链钉死并注记
-- [x] [4-7-P3-CR-R1-27][Review][Defer] D-P3b VFD 触发谓词绑定具体类（静态方法 import 而非端口方法——端口实现替换时判定不跟随）— deferred，提端口方法涉及接口契约与契约测试联动
-- [x] [4-7-P3-CR-R1-28][Review][Defer] M4 `validation_feedback_service` 端口与 `tool_execution_service` 双链构造（同 scope 两套 TOV/SSD 实例——「上提共享」原意为共享工厂代码；端口生产零消费方，SSD 并发配额翻倍窗口仅在双链同时执行时存在）— 登记已知形态
+- [x] [4-7-P3-CR-R1-27][Review][Defer] D-P3b VFD 触发谓词绑定具体类（静态方法 import 而非端口方法——端口实现替换时判定不跟随）— deferred，提端口方法涉及接口契约与契约测试联动。**2026-10-10 技术债清偿**：端口 staticmethod + VFD 经端口调用落地
+- [x] [4-7-P3-CR-R1-28][Review][Defer] M4 `validation_feedback_service` 端口与 `tool_execution_service` 双链构造（同 scope 两套 TOV/SSD 实例——「上提共享」原意为共享工厂代码；端口生产零消费方，SSD 并发配额翻倍窗口仅在双链同时执行时存在）— 登记已知形态。**2026-10-10 技术债清偿**：工厂改一行委托 `.service`（构造唯一 SSOT；双链实例形态为 SCOPED 语义维持）
 - [x] [4-7-P3-CR-R1-29][Review][Defer] `_finish_recovered` 读-后-记 TOCTOU（fix_summary 快照与 record_case 间并发写窗口极小；计数由 repo 合并保护）— 注记登记（**R2 补记**：`_replay_synthetic` RECOVERED 分支的 get_by_natural_key→record_case 同款窗口，行为一致合规）
 - [x] [4-7-P3-CR-R1-30][Review][Defer] D-P3c lint-imports 既有 BROKEN（interfaces→composition_root 两处 import，先于 4-7 存在于基线 74fe77c2——非本 Story 变更集）— 独立工程项单独立项，不属本审查周期范围（已向用户报告）
 
@@ -1476,7 +1476,7 @@ docs/architecture/
 - [x] [4-7-P3-CR-R3-1][Review][Patch] `EvolutionLogQuery` 补 `__post_init__` 分页参数校验（offset≥0 且 limit≥1——双实现行为分歧消除：InMemory 负切片静默空 vs PG OFFSET 负值 DB 报错）+ 拒绝向用例
 - [x] [4-7-P3-CR-R3-2][Review][Patch] 分页次序键补 execution_id 决胜（InMemory/PG 双侧——同 created_at 并列时翻页边界丢/重行消除）+ 并列分页不丢不重用例
 - [x] [4-7-P3-CR-R3-3][Review][Patch] 399 异常 docstring 勘误（「由装饰器捕获转换」→「由闭环服务构造并就地转换，从未被 raise/捕获」——类 docstring 与模块 docstring 两处）
-- [x] [4-7-P3-CR-R3-4][Review][Defer] `_background_tasks` 模块级 set 跨事件循环滞留（pytest 每测试新 loop + 未 drain 形态下 task 闭包延迟 GC；生产单长存 loop 无此形态；`schema_event_helpers` 同款先例同款边界）— deferred 与先例统一治理（勿单侧修）
+- [x] [4-7-P3-CR-R3-4][Review][Defer] `_background_tasks` 模块级 set 跨事件循环滞留（pytest 每测试新 loop + 未 drain 形态下 task 闭包延迟 GC；生产单长存 loop 无此形态；`schema_event_helpers` 同款先例同款边界）— deferred 与先例统一治理（勿单侧修）。**2026-10-10 技术债清偿**：`drain_background_tasks` 参数化共享 helper + `drain_feedback_events` 薄壳 + shutdown 第二挂点
 - 观察项（立法内非缺陷）：389-LLM 触发混合根因耗尽终态案例行 `category=LLM_TRANSIENT + infeasible=1`——R3-9 触发侧派生立法的忠实结果；叠加 A8 粗签名桶使后续同桶纯 LLM 触发命中格②负样本提示（语义偏弱但全量 3 次不缩减，无误标放大路径）
 - 「推演不成立」留痕 9 项（V1 同波连带/V2 raw 383 浮出/V3 重放再耗尽清配方/V4 混合根因直传/V5 五格缺格/V6 组合偏差/V7 fullmatch 拒提取器输出/V8 跨循环功能故障/V9 finish 误计 attempt——全部证伪，防下轮重推）
 

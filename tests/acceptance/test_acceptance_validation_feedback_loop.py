@@ -974,9 +974,23 @@ def then_prompt_no_case_injection(context: dict[str, Any]) -> None:
 
 @then("该次尝试的 fix_strategy 为 PURE_LLM")
 def then_strategy_pure_llm(context: dict[str, Any]) -> None:
-    """PURE_LLM 断言。"""
+    """PURE_LLM 断言（格③无命中）。"""
     logs = _list_logs(context)
     assert logs[0].fix_attempts[0].fix_strategy == "PURE_LLM"
+
+
+@then("该次尝试的 fix_strategy 为 PURE_LLM_NO_RECIPE")
+def then_strategy_pure_llm_no_recipe(context: dict[str, Any]) -> None:
+    """格④可观测载体断言（CR-R1-24：命中但无可注入配方——与格③可区分）。"""
+    logs = _list_logs(context)
+    assert logs[0].fix_attempts[0].fix_strategy == "PURE_LLM_NO_RECIPE"
+
+
+@then("该次尝试的 fix_strategy 为 PURE_LLM_COLLISION")
+def then_strategy_pure_llm_collision(context: dict[str, Any]) -> None:
+    """格⑤可观测载体断言（CR-R1-24：碰撞命中已抑制——与格③可区分）。"""
+    logs = _list_logs(context)
+    assert logs[0].fix_attempts[0].fix_strategy == "PURE_LLM_COLLISION"
 
 
 @given("错误案例库存在同签名的 RECOVERED 案例但 fix_summary 为空")

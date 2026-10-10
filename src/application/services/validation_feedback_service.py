@@ -108,6 +108,21 @@ def _log_task_exception(task: Any) -> None:
         logger.warning("Validation Feedback 事件发布失败: %s", exc)
 
 
+async def drain_feedback_events(timeout: float = 5.0) -> None:
+    """排空 Validation Feedback 后台发布任务（CR-R3-4 统一治理——与
+    drain_schema_events 共用 drain_background_tasks 参数化实现）.
+
+    在 graceful shutdown / 测试 fixture teardown 时调用——含跨 loop stale
+    task 引用清理（pytest 每测试新 loop 形态下防 set 滞留）。
+
+    Args:
+        timeout: 等待超时秒数（默认 5.0）
+    """
+    from src.application.services.schema_event_helpers import drain_background_tasks
+
+    await drain_background_tasks(_background_tasks, timeout=timeout, op_name="drain_feedback_events")
+
+
 def _chain_contains_llm_transient(exc: BaseException) -> bool:
     """异常因果链上任一节点属 LLM 瞬时族（R10-2 谓词：链中 last_exc ∈ 白名单同集）.
 
@@ -322,7 +337,6 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                     detail="recovered",
                 )
                 attempts.append(attempt)
-                duration = time.monotonic() - start_time
                 await self._finish_recovered(
                     tool_id=tool_id,
                     tool=tool,
@@ -333,7 +347,7 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                     error_category=error_category,
                     stderr=final_stderr,
                     attempts=attempts,
-                    duration_sec=duration,
+                    start_time=start_time,
                     suggested_fix=suggested_fix,
                 )
                 return ToolResult(
@@ -347,9 +361,12 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                 # mid-attempt 分类（R9-13 对称立法——与触发面九行完全同构）
                 if self.should_enter_feedback_loop(exc):
                     # 计为该次 attempt 失败（detail=retry_failed），提取该次 stderr 反馈
+                    # + 该次新 schema violations（CR-R1-22 清偿：mid-attempt 389 的
+                    # 违规详情不再丢弃——进 FixAttempt 与跨尝试反馈通道）
                     attempt_stderr = extract_stderr_from_cause_chain(exc)
                     attempt_violation_ctx = getattr(exc, "context", {}) or {}
                     attempt_stderr = attempt_stderr or str(attempt_violation_ctx.get("reason", ""))
+                    attempt_violations = tuple(attempt_violation_ctx.get("schema_violations", ()) or ())
                     attempts.append(
                         FixAttempt(
                             attempt_no=attempt_no,
@@ -358,6 +375,7 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                             fix_strategy=strategy,
                             stderr_excerpt=_excerpt(attempt_stderr),
                             suggested_fix_excerpt=_excerpt(suggested_fix),
+                            violations_excerpt=attempt_violations,
                             succeeded=False,
                             detail="retry_failed",
                         )
@@ -369,6 +387,7 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                             "detail": "retry_failed",
                             "stderr_excerpt": _excerpt(attempt_stderr),
                             "suggested_fix_excerpt": _excerpt(suggested_fix),
+                            "violations_excerpt": list(attempt_violations[:3]),
                         }
                     )
                     if attempt_stderr:
@@ -382,7 +401,6 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
             raise trigger_error
 
         # 5. 耗尽 → 399 内部信号 → 转换 INFEASIBLE（对外不抛）
-        duration = time.monotonic() - start_time
         last_failure = attempt_failures[-1] if attempt_failures else trigger_error
         exhausted = ValidationFeedbackRetryExhaustedError(
             execution_id=execution_id or None,
@@ -400,7 +418,7 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
             error_category=error_category,
             stderr=final_stderr,
             attempts=attempts,
-            duration_sec=duration,
+            start_time=start_time,
             tool=tool,
             exhausted=exhausted,
         )
@@ -444,15 +462,16 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
             if case.fix_summary:
                 # 格①：命中 RECOVERED 且配方非空 → CASE_GUIDED
                 return FixStrategy.CASE_GUIDED, [case.fix_summary], ""
-            # 格④：命中 RECOVERED 但配方空（LLM_TRANSIENT 首例）→ PURE_LLM（命中但无可注入配方）
-            return FixStrategy.PURE_LLM, [], ""
+            # 格④：命中 RECOVERED 但配方空（LLM_TRANSIENT 首例）→ 可观测载体
+            # PURE_LLM_NO_RECIPE（CR-R1-24 清偿：原注释升格枚举——演进日志可区分）
+            return FixStrategy.PURE_LLM_NO_RECIPE, [], ""
         # MARKED_INFEASIBLE：category 二次过滤（R8-18 升判定前置——over-merging 缓解）
         if case.error_category == error_category:
             # 格②：命中不可行且分类匹配 → 负样本提示（全量 3 次不缩减——R8-2）
             hint = f"此签名已观测到 {case.infeasible_count} 次不可行"
             return FixStrategy.NEGATIVE_CASE_GUIDED, [], hint
-        # 格⑤：签名碰撞 + 分类不匹配 → PURE_LLM（碰撞命中已抑制）
-        return FixStrategy.PURE_LLM, [], ""
+        # 格⑤：签名碰撞 + 分类不匹配 → 可观测载体 PURE_LLM_COLLISION（CR-R1-24 清偿）
+        return FixStrategy.PURE_LLM_COLLISION, [], ""
 
     def _all_attempts_llm_transient(self, attempts: list[FixAttempt], failures: list[BaseException | None]) -> bool:
         """#17② 判定：全部 attempt 失败且各次根因均为 LLM 瞬时（根因导向——R9-15/R10-2）."""
@@ -482,10 +501,13 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         error_category: str,
         stderr: str,
         attempts: list[FixAttempt],
-        duration_sec: float,
+        start_time: float,
         suggested_fix: str,
     ) -> None:
-        """恢复终态：案例回填 + 演进日志 + 恢复事件."""
+        """恢复终态：案例回填 + 演进日志 + 恢复事件.
+
+        duration 在案例回填之后计量（CR-R1-23 清偿——覆盖终态副作用中的回填段；
+        物理边界：日志行自身写库与事件发布时长不可计入本行 duration_sec）。"""
         # 回填：recovered_count+1；fix_summary 覆写（仅非 LLM_TRANSIENT——#17①）
         existing = await self._cases.get_by_natural_key(tenant_id, tool_id, signature)
         if error_category == "LLM_TRANSIENT":
@@ -509,7 +531,7 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                 last_seen_at=_now(),
             )
         )
-        # 演进日志（RECOVERED）
+        # 演进日志（RECOVERED）——duration 含案例回填段（CR-R1-23）
         log_entry = EvolutionLogEntry(
             tenant_id=tenant_id,
             tool_id=tool_id,
@@ -518,7 +540,7 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
             error_signature=signature,
             enhanced_retry_count=len(attempts),
             fix_attempts=tuple(attempts),
-            duration_sec=duration_sec,
+            duration_sec=time.monotonic() - start_time,
             final_status=FeedbackOutcome.RECOVERED,
             tool_version=getattr(tool, "version", "") or "",
         )
@@ -547,11 +569,13 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         error_category: str,
         stderr: str,
         attempts: list[FixAttempt],
-        duration_sec: float,
+        start_time: float,
         tool: Any,
         exhausted: ValidationFeedbackRetryExhaustedError,
     ) -> ToolResult:
-        """耗尽终态：399 信号转换 INFEASIBLE + 案例回填 + 演进日志 + 不可行事件."""
+        """耗尽终态：399 信号转换 INFEASIBLE + 案例回填 + 演进日志 + 不可行事件.
+
+        duration 在案例回填之后计量（CR-R1-23 清偿——同 _finish_recovered 口径）。"""
         # 回填：infeasible_count+1（fix_summary 不动——repo 端规则）
         await self._cases.record_case(
             ErrorCase(
@@ -576,7 +600,7 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
             error_signature=signature,
             enhanced_retry_count=len(attempts),
             fix_attempts=tuple(attempts),
-            duration_sec=duration_sec,
+            duration_sec=time.monotonic() - start_time,  # 含案例回填段（CR-R1-23）
             final_status=FeedbackOutcome.MARKED_INFEASIBLE,
             tool_version=getattr(tool, "version", "") or "",
         )
@@ -777,8 +801,9 @@ __all__ = [
 def build_validation_feedback_service(resolver: Any, *, max_concurrent_containers: int) -> "ValidationFeedbackService":
     """组装反馈闭环服务（validation_feedback_service 端口产物——组合根一行委托）.
 
-    与 build_tool_execution_chain 共享 build_inner_execution_chain——双句柄
-    注入清单与 SSOT 表完全一致（engine 引用 + inner_chain 引用）。
+    技术债清偿（CR-R1-28/M4）：委托 build_tool_execution_chain 取 .service——
+    消除与链内构造块的逐字重复（service 构造唯一 SSOT 在链工厂）；副作用为
+    多构建一个 outer VFD 装饰对象（SCOPED 下双链实例形态不变）。
 
     Args:
         resolver: 组合根 resolver
@@ -787,12 +812,4 @@ def build_validation_feedback_service(resolver: Any, *, max_concurrent_container
     Returns:
         ValidationFeedbackService 实例
     """
-    ssd, engine = build_inner_execution_chain(resolver, max_concurrent_containers=max_concurrent_containers)
-    return ValidationFeedbackService(
-        llm_client=resolver.resolve("llm_client"),
-        error_case_repository=resolver.resolve("error_case_repository"),
-        evolution_log_repository=resolver.resolve("evolution_log_repository"),
-        event_publisher=resolver.resolve("event_publisher"),
-        engine=engine,
-        inner_chain=ssd,
-    )
+    return build_tool_execution_chain(resolver, max_concurrent_containers=max_concurrent_containers).service

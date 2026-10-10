@@ -366,7 +366,8 @@ class TestFixPromptAssembly:
 
     @pytest.mark.asyncio
     async def test_recovered_hit_with_empty_fix_summary_pure_llm(self) -> None:
-        """格④：命中 RECOVERED 但 fix_summary 空（LLM_TRANSIENT 首例）→ PURE_LLM 无注入."""
+        """格④：命中 RECOVERED 但 fix_summary 空（LLM_TRANSIENT 首例）→ PURE_LLM_NO_RECIPE
+        无注入（CR-R1-24：可观测载体——演进日志与格③无命中可区分）."""
         from src.domain.entities.error_case import ErrorCase
         from src.domain.value_objects.validation_feedback import FeedbackOutcome
 
@@ -389,11 +390,12 @@ class TestFixPromptAssembly:
             )
         )
         await service.recover(tool_id=_TOOL, tool=AsyncMock(), tool_call=AsyncMock(), context=_make_ctx(), trigger_error=_389())
-        await _assert_first_strategy(deps, "PURE_LLM")
+        await _assert_first_strategy(deps, "PURE_LLM_NO_RECIPE")
 
     @pytest.mark.asyncio
     async def test_collision_category_mismatch_suppresses_negative(self) -> None:
-        """格⑤：命中 MARKED_INFEASIBLE 但 category 不匹配 → PURE_LLM（碰撞抑制）."""
+        """格⑤：命中 MARKED_INFEASIBLE 但 category 不匹配 → PURE_LLM_COLLISION（碰撞抑制，
+        CR-R1-24：可观测载体——与格③无命中可区分）."""
         from src.domain.entities.error_case import ErrorCase
         from src.domain.value_objects.validation_feedback import FeedbackOutcome
 
@@ -417,7 +419,7 @@ class TestFixPromptAssembly:
         await service.recover(tool_id=_TOOL, tool=AsyncMock(), tool_call=AsyncMock(), context=_make_ctx(), trigger_error=_389())
         prompts = [c.kwargs.get("prompt", "") for c in deps["llm"].generate.await_args_list]
         assert not any("不可行" in p for p in prompts)
-        await _assert_first_strategy(deps, "PURE_LLM")
+        await _assert_first_strategy(deps, "PURE_LLM_COLLISION")
 
     @pytest.mark.asyncio
     async def test_attempt_k_prompt_carries_prior_attempts_feedback(self) -> None:

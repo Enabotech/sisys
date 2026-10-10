@@ -2778,5 +2778,15 @@ async def shutdown() -> None:
     except Exception as e:
         logger.error("Failed to drain schema events: %s", e)
 
+    # CR-R3-4 统一治理:排空 Validation Feedback 后台发布任务(两处模块级
+    # task set 同款治理——与 schema 事件共用 drain_background_tasks 实现)
+    try:
+        from src.application.services.validation_feedback_service import drain_feedback_events
+
+        await drain_feedback_events(timeout=5.0)
+        logger.info("Drained pending validation feedback events")
+    except Exception as e:
+        logger.error("Failed to drain validation feedback events: %s", e)
+
 
 __all__ = ["bootstrap", "shutdown", "_global_registry"]

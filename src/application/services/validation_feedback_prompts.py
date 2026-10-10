@@ -57,9 +57,15 @@ def render_prior_attempts(prior_attempts: list[dict[str, Any]]) -> tuple[str, st
         detail = attempt.get("detail", "")
         stderr = _display(str(attempt.get("stderr_excerpt", "") or ""))
         fix = str(attempt.get("suggested_fix_excerpt", "") or "")
+        violations = attempt.get("violations_excerpt", ()) or ()
         line = f"- attempt {no}（{detail}）"
         if stderr:
             line += f"：{stderr}"
+        # 该次新违规项（CR-R1-22：mid-attempt 389 的违规详情进跨尝试反馈——
+        # path(message) 形态，最多 3 条与 FixAttempt 截断口径一致）
+        for v in list(violations)[:3]:
+            if isinstance(v, dict):
+                line += f"；违规：{v.get('path', '?')}（{v.get('message', '')}）"
         if fix:
             line += f"；已试方案：{fix}"
             banned.append(f"attempt {no} 的方案（{fix}）")

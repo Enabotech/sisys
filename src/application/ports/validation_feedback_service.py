@@ -56,3 +56,18 @@ class ValidationFeedbackServicePort(Protocol):
                 3 attempt 全失败且根因均为 LLM 瞬时（直传原触发——决策 #17②）
         """
         ...
+
+    @staticmethod
+    def should_enter_feedback_loop(trigger_error: BaseException) -> bool:
+        """入环谓词（R8-4 九行矩阵的入环两行——CR-R1-27 清偿提为端口方法）.
+
+        触发面（VFD 捕获判定）与 mid-attempt 面（R9-13 对称立法）共用同一谓词；
+        端口化使端口实现替换时判定逻辑跟随（原绑定具体类静态方法不跟随）。
+
+        Args:
+            trigger_error: 待判定异常
+
+        Returns:
+            389（两子路径）或 382-EXECUTION 且 cause ∈ ExecutionError 族 → True
+        """
+        ...

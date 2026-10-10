@@ -61,12 +61,12 @@
 - 工具熔断（or.md 四.7.(3)） — 建议挂 Story 5.x Agent 弹性隔离；ToolExecutionQuery.state 过滤材料已齐备（纯范围决策）。
 - 自动灰度推进与 per-version 统计视图 — 演进日志数据面已就绪（tool_evolution_logs + list_by_tool）。
 - FAIL_FAST 同波取消优化 — 纯算力节约可选优化（CONTINUE/SKIP 场景本不该取消，禁做成无条件）。
-- mid-attempt 389-Schema 新 violations 进跨尝试反馈（代码审查 CR-R1-22） — 该次失败的 context["schema_violations"] 被丢弃、仅 reason 字符串兜底；FixAttempt 无 violations 字段承载，扩字段涉及演进日志 schema 联动，随真实反馈质量需求评估。
-- duration_sec 计量点覆盖终态副作用（代码审查 CR-R1-23） — 现于 `_finish_*` 前计量（口径立法「recover 进入到终态返回」，系统性小幅低估案例回填+日志写入时长）；重构计量点需改 `_finish_*` 签名族。
-- fix_strategy 格④⑤ 运行时可观测载体（代码审查 CR-R1-24） — 「命中但无可注入配方」「碰撞命中已抑制」仅存于代码注释，演进日志中与 PURE_LLM 不可区分；枚举加值涉及 PG enum 迁移。
+- ~~mid-attempt 389-Schema 新 violations 进跨尝试反馈（代码审查 CR-R1-22）~~ — **RESOLVED**（2026-10-10 技术债清偿）：具备度调查证「演进日志 schema 联动」论据在 DB 层失实（fix_attempts 为 JSONB，`_attempt_from_dict` 全 `.get()` 缺省读，旧行向后兼容零迁移）——FixAttempt 加 `violations_excerpt` 字段（条数≤3/message≤200 截断）+ service mid-attempt 捕获 + prior_summaries/render_prior_attempts 渲染。
+- ~~duration_sec 计量点覆盖终态副作用（代码审查 CR-R1-23）~~ — **RESOLVED**（2026-10-10 技术债清偿）：`_finish_*` 签名族改收 `start_time`、在案例回填之后自算——duration 覆盖回填段；物理边界注记（日志行自身写库与事件发布时长不可计入本行）。
+- ~~fix_strategy 格④⑤ 运行时可观测载体（代码审查 CR-R1-24）~~ — **RESOLVED**（2026-10-10 技术债清偿）：具备度调查证「PG enum 迁移」论据失实（fix_strategy 无列无 enum 类型，JSONB 内字符串前向兼容）——FixStrategy 升格五值（PURE_LLM_NO_RECIPE/PURE_LLM_COLLISION），格③④⑤演进日志可区分；穷举断言×2 + 单测×2 + BDD 三联动位同步。
 - 389-LLM 子路径签名输入细化（代码审查 CR-R1-25） — 现用外层 389 消息（同工具全部 389-LLM 失败收敛一个签名桶）；仅影响 occurrence 聚合粒度，随真实语料评估。
 - 引擎聚合 id 的 session_id 回退语义（代码审查 CR-R1-26/D-P3a） — `extract_schema_execution_id` 三级优先（extensions>session_id>新铸）使直连+UUID session_id 时聚合 id=session_id 非「兜底新铸」字面；生产全路径经链入口注入不受影响，`test_execution_id_same_source.py` 断言④已按优先级链钉死。
-- VFD 触发谓词提为端口方法（代码审查 CR-R1-27/D-P3b） — 现绑定具体类静态方法（端口实现替换时判定不跟随）；涉及接口契约与契约测试联动。
-- `validation_feedback_service` 端口与 `tool_execution_service` 双链构造注记（代码审查 CR-R1-28/M4） — 同 scope 两套 TOV/SSD 实例（「上提共享」原意为共享工厂代码）；端口生产零消费方，SSD 并发配额翻倍窗口仅在双链同时执行时存在。
+- ~~VFD 触发谓词提为端口方法（代码审查 CR-R1-27/D-P3b）~~ — **RESOLVED**（2026-10-10 技术债清偿）：端口 Protocol 增 staticmethod 声明 + VFD 改经 `self._feedback.should_enter_feedback_loop` 调用（删内联 import）+ 契约测试 REQUIRED_METHODS 增项；装饰器测试替身挂真实谓词（AsyncMock 属性恒真陷阱注记）。
+- ~~`validation_feedback_service` 端口与 `tool_execution_service` 双链构造注记（代码审查 CR-R1-28/M4）~~ — **RESOLVED**（2026-10-10 技术债清偿）：`build_validation_feedback_service` 改一行委托 `build_tool_execution_chain(...).service`——service 构造唯一 SSOT 在链工厂（消除逐字重复；双链实例形态为 SCOPED 既有语义维持注记）。
 - `_finish_recovered` 读-后-记 TOCTOU（代码审查 CR-R1-29） — fix_summary 快照与 record_case 间并发写窗口极小；计数由仓储 merge 保护。
-- 后台发布任务 set 跨事件循环滞留（代码审查 CR-R3-4） — `validation_feedback_service._background_tasks` 模块级 set 在 pytest 每测试新 loop 且未 drain 时滞留 pending task（内存级，loop2 功能正常；生产单长存 loop 无此形态）；`schema_event_helpers._background_tasks` 同款先例同款边界——需统一治理（loop 关闭钩子/atexit 批量取消），勿单侧修。
+- ~~后台发布任务 set 跨事件循环滞留（代码审查 CR-R3-4）~~ — **RESOLVED**（2026-10-10 技术债清偿）：统一治理落地——`drain_schema_events` 核心抽参数化 `drain_background_tasks(tasks, timeout, op_name)` 共享 helper（stale task 过滤/跨 loop 丢弃/超时取消原样保留），`drain_feedback_events` 薄壳复用，`composition_root.shutdown()` 增第二挂点。

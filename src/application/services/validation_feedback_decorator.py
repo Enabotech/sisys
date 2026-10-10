@@ -80,9 +80,8 @@ class ValidationFeedbackDecorator:
             # 代码缺陷（STDERR 主浮现形态）→ 委托闭环；cause∉族（LLMConfigError
             # 332 等兜底宽捕获混入形态）与 SANDBOX_START——infra/配置类故障
             # 修复不可归因，直传（R8-4 九行矩阵）
-            from src.application.services.validation_feedback_service import ValidationFeedbackService
-
-            if ValidationFeedbackService.should_enter_feedback_loop(trigger):
+            # 谓词经端口调用（CR-R1-27 清偿——端口实现替换时判定跟随）
+            if self._feedback.should_enter_feedback_loop(trigger):
                 return await self._feedback.recover(
                     tool_id=tool_id,
                     tool=tool,

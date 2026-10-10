@@ -32,7 +32,11 @@ _TENANT = uuid.uuid4()
 def _make_vfd(wrapped: AsyncMock, service: AsyncMock) -> Any:
     """构造被测装饰器."""
     from src.application.services.validation_feedback_decorator import ValidationFeedbackDecorator
+    from src.application.services.validation_feedback_service import ValidationFeedbackService
 
+    # 谓词挂真实实现（CR-R1-27 端口化后 VFD 经端口调用——AsyncMock 任意属性
+    # 调用返回协程恒真，直传行判定需真谓词承载）
+    service.should_enter_feedback_loop = ValidationFeedbackService.should_enter_feedback_loop
     return ValidationFeedbackDecorator(wrapped=wrapped, feedback_service=service)
 
 

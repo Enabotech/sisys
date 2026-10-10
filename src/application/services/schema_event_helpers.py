@@ -216,21 +216,23 @@ def publish_schema_event_async(
     return task
 
 
-async def drain_schema_events(timeout: float = 5.0) -> None:
-    """优雅排空所有挂起的 schema 事件 task(Round 4 P0-3 修复)
+async def drain_background_tasks(
+    tasks: set,
+    timeout: float = 5.0,
+    op_name: str = "drain_background_tasks",
+) -> None:
+    """参数化排空共享 helper（CR-R3-4 统一治理——schema 事件与 Validation Feedback
+    两处模块级后台任务 set 的同款治理抽公共实现，勿单侧修）.
 
-    在 graceful shutdown / 测试 fixture teardown 时调用,
-    等待所有 _background_tasks完成(或超时),避免事件丢失。
-
-    Round 5 根因修复:pyest-asyncio 每个 test 新 event loop,
-    模块级 _background_tasks 中可能含旧 loop 的 task。drain 时需:
-    1. 过滤已 done 的 stale task
-    2. 跨 loop 时优雅跳过(避免 ValueError)
+    语义（Round 5 根因修复原样保留）：过滤已 done 的 stale task + 跨 loop 优雅
+    丢弃引用（pytest-asyncio 每测试新 loop 场景）+ 超时批量取消。
 
     Args:
+        tasks: 待排空的后台任务集合（原地 discard 清理）
         timeout: 等待超时秒数(默认 5.0)
+        op_name: 日志标识（调用方名）
     """
-    if not _background_tasks:
+    if not tasks:
         return
     # 复制当前 loop 引用,过滤跨 loop 的 stale task
     try:
@@ -239,20 +241,20 @@ async def drain_schema_events(timeout: float = 5.0) -> None:
         current_loop = None
 
     pending: list[asyncio.Task[None]] = []
-    for t in list(_background_tasks):
+    for t in list(tasks):
         if t.done():
-            _background_tasks.discard(t)
+            tasks.discard(t)
             continue
         # 检查 task 是否属于当前 event loop
         if current_loop is not None:
             try:
                 if t.get_loop() is not current_loop:
                     # stale task 来自旧 loop,直接丢弃引用
-                    _background_tasks.discard(t)
-                    logger.debug("drain_schema_events: discard stale task from previous loop")
+                    tasks.discard(t)
+                    logger.debug("%s: discard stale task from previous loop", op_name)
                     continue
             except RuntimeError:
-                _background_tasks.discard(t)
+                tasks.discard(t)
                 continue
         pending.append(t)
 
@@ -266,13 +268,31 @@ async def drain_schema_events(timeout: float = 5.0) -> None:
         )
     except asyncio.TimeoutError:
         logger.warning(
-            "drain_schema_events timeout after %.2fs, %d pending tasks cancelled",
+            "%s timeout after %.2fs, %d pending tasks cancelled",
+            op_name,
             timeout,
             len(pending),
         )
         for t in pending:
             if not t.done():
                 t.cancel()
+
+
+async def drain_schema_events(timeout: float = 5.0) -> None:
+    """优雅排空所有挂起的 schema 事件 task(Round 4 P0-3 修复).
+
+    在 graceful shutdown / 测试 fixture teardown 时调用,
+    等待所有 _background_tasks完成(或超时),避免事件丢失。
+
+    Round 5 根因修复:pyest-asyncio 每个 test 新 event loop,
+    模块级 _background_tasks 中可能含旧 loop 的 task。drain 时需:
+    1. 过滤已 done 的 stale task
+    2. 跨 loop 时优雅跳过(避免 ValueError)
+
+    Args:
+        timeout: 等待超时秒数(默认 5.0)
+    """
+    await drain_background_tasks(_background_tasks, timeout=timeout, op_name="drain_schema_events")
 
 
 __all__ = [
@@ -283,5 +303,6 @@ __all__ = [
     "truncate_violations_for_event",
     "extract_schema_execution_id",
     "publish_schema_event_async",
+    "drain_background_tasks",
     "drain_schema_events",
 ]

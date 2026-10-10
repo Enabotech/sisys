@@ -40,6 +40,7 @@ def _attempt_to_dict(attempt: FixAttempt) -> dict:
         "fix_strategy": attempt.fix_strategy.value,
         "stderr_excerpt": attempt.stderr_excerpt,
         "suggested_fix_excerpt": attempt.suggested_fix_excerpt,
+        "violations_excerpt": list(attempt.violations_excerpt),
         "succeeded": attempt.succeeded,
         "detail": attempt.detail,
     }
@@ -54,6 +55,7 @@ def _attempt_from_dict(data: dict) -> FixAttempt:
         fix_strategy=FixStrategy(str(data["fix_strategy"])),
         stderr_excerpt=str(data.get("stderr_excerpt", "") or ""),
         suggested_fix_excerpt=str(data.get("suggested_fix_excerpt", "") or ""),
+        violations_excerpt=tuple(data.get("violations_excerpt", ()) or ()),
         succeeded=bool(data.get("succeeded", False)),
         detail=str(data.get("detail", "") or ""),
     )

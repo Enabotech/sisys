@@ -67,6 +67,7 @@ class TestValidationFeedbackServicePortContract:
     EXPECTED_OWNER = "tool-team"
     REQUIRED_METHODS = [
         "recover",
+        "should_enter_feedback_loop",
     ]
 
     def _spec(self) -> Any:

@@ -1,7 +1,7 @@
 """Validation Feedback 值对象模块
 
 定义 Story 4.7 反馈闭环的值对象与枚举：
-- FixStrategy: 修复策略三分支（决策 #15——二值枚举会把负样本命中虚标为 PURE_LLM）
+- FixStrategy: 修复策略五值枚举（决策 #15 三分支 + R9-16 格④⑤可观测载体——二值枚举会把负样本命中虚标为 PURE_LLM）
 - FeedbackOutcome: 闭环终态（ErrorCase.outcome 与 EvolutionLogEntry.final_status 共用）
 - TriggerCode: 触发异常编码（失败模式第一维分类，AIOps failure history 基线字段）
 - FixAttempt: 单次增强尝试记录（含跨尝试反馈通道的动作半边——R8-1）
@@ -15,6 +15,7 @@ import re
 import uuid
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from src.domain.exceptions import EntityValidationError
 
@@ -30,17 +31,24 @@ _EXCERPT_MAX_LENGTH = 2000
 
 
 class FixStrategy(str, Enum):
-    """修复策略三分支枚举（决策 #15）
+    """修复策略五值枚举（决策 #15 三分支 + R9-16 格④⑤——技术债清偿 CR-R1-24
+    将格④⑤从注释升格为可观测枚举值；PURE_LLM* 前缀统一可过滤「纯 LLM 修复」族）
 
     Attributes:
         CASE_GUIDED: 命中 RECOVERED 案例且 fix_summary 非空——注入修复配方
         NEGATIVE_CASE_GUIDED: 命中 MARKED_INFEASIBLE 案例且 category 匹配——注入负样本提示
-        PURE_LLM: 无命中（或命中但无可注入配方/碰撞抑制——R9-16 格④⑤注记）——纯 LLM 修复
+        PURE_LLM: 无命中——纯 LLM 修复
+        PURE_LLM_NO_RECIPE: 命中 RECOVERED 但 fix_summary 空（LLM_TRANSIENT 首例，
+            R9-16 格④）——无可注入配方，不虚标 CASE_GUIDED
+        PURE_LLM_COLLISION: 命中 MARKED_INFEASIBLE 但 category 不匹配（签名碰撞，
+            R9-16 格⑤）——负样本提示抑制，不同根因不共享失败经验
     """
 
     CASE_GUIDED = "CASE_GUIDED"
     NEGATIVE_CASE_GUIDED = "NEGATIVE_CASE_GUIDED"
     PURE_LLM = "PURE_LLM"
+    PURE_LLM_NO_RECIPE = "PURE_LLM_NO_RECIPE"
+    PURE_LLM_COLLISION = "PURE_LLM_COLLISION"
 
 
 class FeedbackOutcome(str, Enum):
@@ -88,9 +96,11 @@ class FixAttempt:
         attempt_execution_id: 该次重执行的 execution id（入口注入或引擎兜底新铸——决策 #16；
             空串 = 未发生重执行的合法形态（llm_generation_failed 形态），R2-9 禁立 UUID 不变量）
         error_signature: 该次失败的归一化签名
-        fix_strategy: 修复策略三分支
+        fix_strategy: 修复策略五值
         stderr_excerpt: 该次失败 STDERR 摘录（截断 ≤2000；空串 = 无 STDERR 形态合法）
         suggested_fix_excerpt: 该次采纳的修复方案摘要（截断 ≤2000；空串 = fix-gen 未产出合法）
+        violations_excerpt: 该次失败的 schema violations 摘要（mid-attempt 389 新违规
+            反馈通道——CR-R1-22 清偿；条数截 ≤3、message 截 ≤200；空元组 = 无违规形态）
         succeeded: 该次尝试是否成功
         detail: 失败类型描述（retry_failed / llm_generation_failed / 成功形态描述）
     """
@@ -103,6 +113,7 @@ class FixAttempt:
     attempt_execution_id: str = ""
     stderr_excerpt: str = ""
     suggested_fix_excerpt: str = ""
+    violations_excerpt: tuple[dict[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         """构造时校验不变量并截断摘录字段.
@@ -143,3 +154,13 @@ class FixAttempt:
         # frozen 实例的截断经 object.__setattr__（__post_init__ 内合法通道）
         object.__setattr__(self, "stderr_excerpt", _truncate(self.stderr_excerpt))
         object.__setattr__(self, "suggested_fix_excerpt", _truncate(self.suggested_fix_excerpt))
+        # violations 摘要截断（CR-R1-22：条数 ≤3 + 每条 message ≤200——防 prompt 膨胀，
+        # 口径对齐事件路径 P0-H 的条数/尺寸门禁思想）
+        object.__setattr__(
+            self,
+            "violations_excerpt",
+            tuple(
+                {**v, "message": str(v.get("message", ""))[:200]} if isinstance(v, dict) else v
+                for v in self.violations_excerpt[:3]
+            ),
+        )
