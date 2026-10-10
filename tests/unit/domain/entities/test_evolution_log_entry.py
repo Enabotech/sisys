@@ -230,5 +230,58 @@ class TestFeedbackOutcomeEnum:
     """FeedbackOutcome 枚举契约."""
 
     def test_members(self) -> None:
-        """两终态成员."""
-        assert {o.value for o in FeedbackOutcome} == {"RECOVERED", "MARKED_INFEASIBLE"}
+        """三成员（终态二值 + ABORTED 中止——技术债清偿 A 类）."""
+        assert {o.value for o in FeedbackOutcome} == {"RECOVERED", "MARKED_INFEASIBLE", "ABORTED"}
+
+
+class TestAbortedFormInvariants:
+    """ABORTED 中止形态不变量（技术债清偿 A 类——分支化校验）."""
+
+    def _aborted_entry(self, attempts: int) -> EvolutionLogEntry:
+        """构造 ABORTED 形态（已耗 attempts 次——条数 ≤ count）."""
+        return EvolutionLogEntry(
+            tenant_id=uuid.uuid4(),
+            tool_id=uuid.uuid4(),
+            execution_id=uuid.uuid4(),
+            trigger_code=TriggerCode.EXCEPTION_389,
+            error_signature=_SIG_64,
+            enhanced_retry_count=attempts,
+            fix_attempts=tuple(_make_attempt(attempt_no=i) for i in range(1, attempts + 1)),
+            duration_sec=1.0,
+            final_status=FeedbackOutcome.ABORTED,
+            tool_version="1.0.0",
+        )
+
+    def test_aborted_zero_attempts_valid(self) -> None:
+        """ABORTED + 0 次消耗合法（中止可发生在 attempt 1 前——空尝试记录）."""
+        entry = self._aborted_entry(0)
+        assert entry.final_status == FeedbackOutcome.ABORTED
+        assert entry.enhanced_retry_count == 0
+        assert entry.fix_attempts == ()
+
+    def test_aborted_partial_attempts_valid(self) -> None:
+        """ABORTED + 2 次消耗合法（条数 == 已耗数）."""
+        entry = self._aborted_entry(2)
+        assert entry.enhanced_retry_count == 2
+        assert len(entry.fix_attempts) == 2
+
+    def test_aborted_attempts_over_three_rejected(self) -> None:
+        """ABORTED 的 count 上界仍为 3."""
+        with pytest.raises(EntityValidationError):
+            self._aborted_entry(4)
+
+    def test_terminal_zero_attempts_still_rejected(self) -> None:
+        """终态二值维持 [1,3]——0 次耗尽不是合法终态."""
+        with pytest.raises(EntityValidationError):
+            EvolutionLogEntry(
+                tenant_id=uuid.uuid4(),
+                tool_id=uuid.uuid4(),
+                execution_id=uuid.uuid4(),
+                trigger_code=TriggerCode.EXCEPTION_389,
+                error_signature=_SIG_64,
+                enhanced_retry_count=0,
+                fix_attempts=(),
+                duration_sec=1.0,
+                final_status=FeedbackOutcome.MARKED_INFEASIBLE,
+                tool_version="1.0.0",
+            )

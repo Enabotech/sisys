@@ -52,10 +52,17 @@ class FixStrategy(str, Enum):
 
 
 class FeedbackOutcome(str, Enum):
-    """反馈闭环终态枚举（ErrorCase.outcome 最近一次 / EvolutionLogEntry.final_status）"""
+    """反馈闭环终态枚举（EvolutionLogEntry.final_status / ErrorCase.outcome 最近一次）.
+
+    ABORTED（技术债清偿 A 类——中止遥测，重开 R3-3「零观测」立法的中止半边）：
+    仅 mid-attempt 非 LLM 中止路径写演进日志行（观测增强）；ErrorCase.outcome
+    域收窄不含 ABORTED（中止不回填案例库），#17② LLM 瞬时直传维持零终态
+    （重放不短路是刻意设计——R9-17）。
+    """
 
     RECOVERED = "RECOVERED"
     MARKED_INFEASIBLE = "MARKED_INFEASIBLE"
+    ABORTED = "ABORTED"
 
 
 class TriggerCode(str, Enum):

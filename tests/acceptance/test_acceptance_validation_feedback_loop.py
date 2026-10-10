@@ -1114,10 +1114,31 @@ def then_loop_continues_next_attempt(context: dict[str, Any]) -> None:
 
 @given("第 1 次增强尝试重执行浮出标记语法错误 201")
 def given_attempt1_raises_201(context: dict[str, Any]) -> None:
-    """abort 构造：修复后重执行的 Code 产物含裸 $（201 从引擎直传组浮出）。"""
+    """abort 构造：修复后重执行的 Code 产物含裸 $（201 从引擎直传组浮出）.
+
+    状态化结构化通道（ABORTED 清偿修正——AC-5.4 fail_remaining 先例）：Code 产物
+    前 3 次合法（覆盖触发段：TOV 3 轮校验重试各消耗 1 次 code），第 4 次（闭环
+    attempt 1 的重执行）含裸 $ → 201 mid-attempt 中止。旧构造单段队列被首次/重试
+    执行消费，实际测「触发前 201 直传」（两种路径在零观测立法下同绿掩盖走偏；
+    ABORTED 观测面落地后两路径可区分而暴露）。
+    """
+    code_state = {"calls": 0}
+
+    async def _structured(prompt: str) -> Any:
+        if prompt.startswith("为工具"):
+            return "plan-1"
+        if prompt.startswith("基于以下计划"):
+            code_state["calls"] += 1
+            if code_state["calls"] <= 3:
+                return "print('result')"
+            return "x = $\ninvalid"  # 闭环 attempt 1 重执行的 Code 产物 → 201
+        if prompt.startswith("验证工具"):
+            return "validation-ok"
+        return "generic"
+
     _build_chain(
         context,
-        llm=_make_scripted_llm(fix_responses=["方案A"], code_outputs=["x = $\ninvalid"]),
+        llm=_make_scripted_llm(fix_responses=["方案A"], structured_side_effect=_structured),
         sandbox=_make_scripted_sandbox(execute_outputs=["BAD_output"] * 10),
     )
     _execute_vfd(context)
@@ -1138,8 +1159,18 @@ def then_abort_direct_raise(context: dict[str, Any]) -> None:
 
 @then("零观测副作用（无演进日志终态、无事件、无案例回填、重放不短路）")
 def then_abort_zero_side_effects(context: dict[str, Any]) -> None:
-    """中止路径零观测立法（R3-3）。"""
-    _assert_zero_observation(context)
+    """中止路径观测面立法（ABORTED 清偿后——重开 R3-3 中止半边）：
+    演进日志 ABORTED 遥测行 1 条（已耗 attempt 可观测）；无终态行/无事件/
+    无案例回填；重放不短路（ABORTED 非终态——重跑 upsert 覆盖）。"""
+    from src.domain.value_objects.validation_feedback import FeedbackOutcome
+
+    logs = _list_logs(context)
+    assert len(logs) == 1, "中止应写 ABORTED 遥测行（ABORTED 清偿）"
+    assert logs[0].final_status == FeedbackOutcome.ABORTED
+    assert not _published(context, ToolExecutionMarkedInfeasible)
+    assert not _published(context, ToolExecutionRecovered)
+    signature = _sign_bad_output(context)
+    assert _get_case(context, signature) is None, "中止不回填案例库"
 
 
 @given("3 次增强尝试全部因 LLM API 持续故障失败（llm_generation_failed）")

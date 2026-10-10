@@ -179,3 +179,25 @@ class TestSagaStatusChangedPayload:
             step_index=2,
         )
         assert compensated_event.new_status == "COMPENSATED"
+
+
+class TestSagaRoundtrip:
+    """from_dict(to_dict()) roundtrip（技术债清偿——init=False 核心字段过滤修复）."""
+
+    def test_roundtrip_with_init_false_core_fields(self) -> None:
+        """saga 的 source/aggregate_type 声明 init=False——roundtrip 不抛
+        TypeError 且 init=False 成员保持类默认值（修复前无条件传 kwargs 必炸）."""
+        event = SagaStatusChanged(
+            saga_id=uuid.uuid4(),
+            saga_type="OrderProcessing",
+            old_status="RUNNING",
+            new_status="COMPLETED",
+            step_index=1,
+        )
+        restored = SagaStatusChanged.from_dict(event.to_dict())
+        assert isinstance(restored, SagaStatusChanged)
+        assert restored.saga_type == "OrderProcessing"
+        assert restored.new_status == "COMPLETED"
+        assert restored.step_index == 1
+        assert restored.source == "saga", "init=False 成员保持类默认"
+        assert restored.aggregate_type == "Saga", "init=False 成员保持类默认"

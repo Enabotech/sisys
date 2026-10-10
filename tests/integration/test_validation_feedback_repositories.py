@@ -485,3 +485,131 @@ class TestOutboxFallbackIndependentSession:
 
         result = await repo_session.execute(select(OutboxModel).where(OutboxModel.event_id == event.event_id))
         assert result.scalar_one_or_none() is not None
+
+
+class TestToolExecutionSaveFallbackIndependentSession:
+    """ToolExecution save 后台路径 fallback（技术债清偿 A 类——outbox 同构）.
+
+    _persist_execution 失败态持久化在无请求 session 的后台路径此前 RuntimeError
+    被引擎 best-effort 吞掉（聚合行丢失）——经注入 session_factory 走独立会话
+    写入后落库。隔离纪律同 outbox fallback 用例（R2-6/陷阱 15）。
+    """
+
+    @pytest.mark.asyncio
+    async def test_background_path_save_via_fallback(
+        self, db_engine: PostgreSQLManager, pg_available: bool, event_loop
+    ) -> None:
+        """无请求 session → RuntimeError 分支 → fallback 独立写入 FAILED 聚合行."""
+        import uuid as uuid_lib
+        from datetime import UTC, datetime
+
+        from src.domain.entities.tool_execution import ToolExecution, ToolExecutionState
+        from src.infrastructure.storage.postgresql.repository.tool_execution_repository import (
+            PostgreSQLToolExecutionRepository,
+        )
+        from src.infrastructure.storage.postgresql.session_context import get_session
+
+        if not pg_available:
+            pytest.skip("PostgreSQL not available")
+            return
+
+        from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
+
+        def _factory() -> _AsyncSession:
+            return _AsyncSession(db_engine.get_async_engine())
+
+        execution = ToolExecution(
+            execution_id=uuid_lib.uuid4(),
+            tenant_id=uuid_lib.uuid4(),
+            tool_id=uuid_lib.uuid4(),
+            tool_version="1.0.0",
+            state=ToolExecutionState.FAILED,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+        repo = PostgreSQLToolExecutionRepository(session_factory=_factory)
+        try:
+            try:
+                get_session()
+                pytest.skip("ContextVar 意外有值（上层 fixture 泄漏）——无法验证 fallback 分支")
+                return
+            except RuntimeError:
+                pass
+            saved = await repo.save(execution)
+            assert saved.execution_id == execution.execution_id, "fallback 写入应返回保存后实体"
+
+            async def _verify() -> bool:
+                from sqlalchemy import select
+
+                from src.infrastructure.storage.postgresql.models.tool_execution import (
+                    ToolExecutionModel,
+                )
+
+                verify_session = _AsyncSession(db_engine.get_async_engine())
+                try:
+                    result = await verify_session.execute(
+                        select(ToolExecutionModel).where(ToolExecutionModel.execution_id == execution.execution_id)
+                    )
+                    return result.scalar_one_or_none() is not None
+                finally:
+                    await verify_session.close()
+
+            assert await _verify(), "fallback 独立写入应落库"
+        finally:
+
+            async def _cleanup() -> None:
+                from sqlalchemy import delete
+
+                from src.infrastructure.storage.postgresql.models.tool_execution import (
+                    ToolExecutionModel,
+                )
+
+                cleanup_session = _AsyncSession(db_engine.get_async_engine())
+                try:
+                    await cleanup_session.execute(
+                        delete(ToolExecutionModel).where(ToolExecutionModel.execution_id == execution.execution_id)
+                    )
+                    await cleanup_session.commit()
+                finally:
+                    await cleanup_session.close()
+
+            await _cleanup()
+
+    @pytest.mark.asyncio
+    async def test_no_factory_no_session_keeps_runtime_error(self, pg_available: bool, event_loop) -> None:
+        """未注入 session_factory 且无请求 session → RuntimeError 显式失败
+        （与 outbox 同款语义——不静默丢失）。"""
+        from src.infrastructure.storage.postgresql.repository.tool_execution_repository import (
+            PostgreSQLToolExecutionRepository,
+        )
+        from src.infrastructure.storage.postgresql.session_context import get_session
+
+        if not pg_available:
+            pytest.skip("PostgreSQL not available")
+            return
+
+        try:
+            get_session()
+            pytest.skip("ContextVar 意外有值——无法验证无 session 分支")
+            return
+        except RuntimeError:
+            pass
+
+        import uuid as uuid_lib
+        from datetime import UTC, datetime
+
+        from src.domain.entities.tool_execution import ToolExecution, ToolExecutionState
+
+        repo = PostgreSQLToolExecutionRepository()  # 无 factory
+        now = datetime.now(UTC)
+        execution = ToolExecution(
+            execution_id=uuid_lib.uuid4(),
+            tenant_id=uuid_lib.uuid4(),
+            tool_id=uuid_lib.uuid4(),
+            tool_version="1.0.0",
+            state=ToolExecutionState.FAILED,
+            started_at=now,
+            completed_at=now,
+        )
+        with pytest.raises(RuntimeError):
+            await repo.save(execution)

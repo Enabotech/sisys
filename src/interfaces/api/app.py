@@ -12,8 +12,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from src.composition_root import session_middleware_wiring
 from src.interfaces.api.exception_handlers import register_exception_handlers
 from src.interfaces.api.middleware.exception_context import ExceptionContextMiddleware
+from src.interfaces.api.middleware.session import SessionMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,12 @@ def create_app() -> FastAPI:
         带 lifespan 管理的 FastAPI 实例
     """
     app = FastAPI(lifespan=_lifespan)
-    # 注册中间件（顺序：先添加的后执行，ExceptionContextMiddleware 需在最外层）
+    # 注册中间件（Starlette add_middleware 为 insert(0)——user_middleware 列表序
+    # = 外层优先；ExceptionContextMiddleware 后添加保持最外层，SessionMiddleware
+    # 处于其内层管理请求事务边界：成功 commit / 异常 rollback / finally
+    # close+reset（与 UoW 经 in_transaction() 共存）——infra 依赖绑定经组合根
+    # session_middleware_wiring 注入（interfaces→infrastructure 零直接依赖）
+    app.add_middleware(SessionMiddleware, **session_middleware_wiring())
     app.add_middleware(ExceptionContextMiddleware)
     # 注册统一异常处理器
     register_exception_handlers(app)

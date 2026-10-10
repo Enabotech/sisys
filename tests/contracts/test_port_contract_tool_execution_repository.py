@@ -34,6 +34,10 @@ class _DummyResolver:
 
         if name == "tool_execution_repository":
             return InMemoryToolExecutionRepository()
+        if name == "session_factory":
+            # fallback 注入依赖（技术债清偿 A 类）——替身工厂（契约维度仅验证
+            # 实例化与方法面，不触真实会话）
+            return lambda: None
         raise KeyError(f"未注册的端口: {name}")
 
 

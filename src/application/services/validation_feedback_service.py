@@ -223,10 +223,13 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
         execution_id = str(execution_uuid) if execution_uuid is not None else ""
         tenant_id = getattr(context, "tenant_id")
 
-        # 1. 幂等短路（同 execution 已有终态 → 副作用去重 + 合成结论 + 观测计数）
+        # 1. 幂等短路（同 execution 已有**终态** → 副作用去重 + 合成结论 + 观测计数）。
+        # 短路条件收窄（技术债清偿 A 类）：ABORTED 行是中止遥测非终态结论——
+        # 中止后重放应全量重跑（与 #17② 零终态路径同理——R9-17 期望行为），
+        # 重跑成功/耗尽后 save 按 execution_id upsert 覆盖中止行
         if execution_uuid is not None:
             existing = await self._logs.get_by_execution(execution_uuid, tenant_id)
-            if existing is not None:
+            if existing is not None and existing.final_status != FeedbackOutcome.ABORTED:
                 return await self._replay_synthetic(existing, tool_id, tenant_id)
 
         # 2. 错误上下文提取 + 签名
@@ -393,7 +396,19 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                     if attempt_stderr:
                         final_stderr = attempt_stderr
                     continue
-                # 不满足入环谓词 → 中止闭环直传（零观测副作用——R3-3）
+                # 不满足入环谓词 → 中止闭环直传（技术债清偿 A 类：重开 R3-3 的
+                # 中止半边——写 ABORTED 中止遥测行后直传原异常；不回填案例库、
+                # 不发事件、重放不短路（短路条件已收窄为终态行））
+                await self._finish_aborted(
+                    tool_id=tool_id,
+                    tenant_id=tenant_id,
+                    execution_uuid=execution_uuid,
+                    signature=signature,
+                    trigger_code=trigger_code,
+                    attempts=attempts,
+                    start_time=start_time,
+                    tool=tool,
+                )
                 raise
 
         # 4. #17②：全 attempt 失败且各次根因均为 LLM 瞬时 → 直传原触发（零观测副作用）
@@ -626,6 +641,44 @@ class ValidationFeedbackService(ValidationFeedbackServicePort):
                 "enhanced_retry_count": len(attempts),
             },
             retry_count=len(attempts),
+        )
+
+    async def _finish_aborted(
+        self,
+        *,
+        tool_id: uuid_module.UUID,
+        tenant_id: Any,
+        execution_uuid: uuid_module.UUID | None,
+        signature: str,
+        trigger_code: TriggerCode,
+        attempts: list[FixAttempt],
+        start_time: float,
+        tool: Any,
+    ) -> None:
+        """中止遥测（技术债清偿 A 类——ABORTED 第三值）：写 ABORTED 演进日志行
+        后由调用方直传原异常.
+
+        观测面边界（重开 R3-3 的中止半边）：仅演进日志行（已耗 attempt 遥测不再
+        丢弃）；不回填案例库（ErrorCase 域收窄排除 ABORTED）、不发领域事件、
+        重放不短路（全量重跑后 upsert 覆盖本行）。
+        """
+        log_entry = EvolutionLogEntry(
+            tenant_id=tenant_id,
+            tool_id=tool_id,
+            execution_id=execution_uuid or uuid_module.uuid4(),
+            trigger_code=trigger_code,
+            error_signature=signature,
+            enhanced_retry_count=len(attempts),
+            fix_attempts=tuple(attempts),
+            duration_sec=time.monotonic() - start_time,
+            final_status=FeedbackOutcome.ABORTED,
+            tool_version=getattr(tool, "version", "") or "",
+        )
+        await self._logs.save(log_entry)
+        logger.info(
+            "Validation Feedback 闭环中止（ABORTED 遥测）: execution_id=%s 已耗尝试=%d",
+            log_entry.execution_id,
+            len(attempts),
         )
 
     async def _replay_synthetic(self, existing: EvolutionLogEntry, tool_id: uuid_module.UUID, tenant_id: Any) -> ToolResult:

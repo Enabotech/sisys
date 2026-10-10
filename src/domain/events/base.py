@@ -96,7 +96,13 @@ class DomainEvent:
 
     @classmethod
     def reset_registry(cls) -> None:
-        """重置事件注册表（仅用于测试隔离）"""
+        """重置事件注册表（仅用于测试隔离）.
+
+        注意（破坏性语义警示）：清空后**不自动恢复** import 期注册的事件类——
+        跨用例需要注册表稳定时优先使用快照/恢复形态（见
+        tests/unit/domain/events/conftest.py 的 autouse fixture），本方法
+        仅适合「用例内重建注册表」的自包含场景。
+        """
         cls._registry.clear()
 
     # ------------------------------------------------------------------
@@ -258,19 +264,27 @@ class DomainEvent:
         if event_type_field is None or event_type_field.init:
             extra_kwargs["event_type"] = event_type
 
-        return target_class(
-            event_id=eid,
-            timestamp=ts,
-            source=data.get("source", ""),
-            schema_version=data.get("schema_version", DEFAULT_SCHEMA_VERSION),
-            aggregate_id=agg_id,
-            aggregate_type=data.get("aggregate_type", ""),
-            version=data.get("version", 0),
-            payload=payload,
+        # 核心字段按 target_class 的 init=False 声明过滤（saga_events 的
+        # source/aggregate_type 等声明 init=False——无条件传递会使
+        # from_dict(to_dict()) roundtrip 抛 TypeError；过滤后 init=False 成员
+        # 保持类默认值，与「event_type 仅 init=True 时传」同构）
+        non_init_core = {f.name for f in fields(target_class) if not f.init} if is_dataclass(target_class) else set()
+        core_kwargs: dict[str, Any] = {
+            "event_id": eid,
+            "timestamp": ts,
+            "source": data.get("source", ""),
+            "schema_version": data.get("schema_version", DEFAULT_SCHEMA_VERSION),
+            "aggregate_id": agg_id,
+            "aggregate_type": data.get("aggregate_type", ""),
+            "version": data.get("version", 0),
+            "payload": payload,
             # AC-4: Traceability fields
-            correlation_id=uuid.UUID(data["correlation_id"]) if data.get("correlation_id") else None,
-            causation_id=uuid.UUID(data["causation_id"]) if data.get("causation_id") else None,
-            metadata=data.get("metadata", {}),
+            "correlation_id": uuid.UUID(data["correlation_id"]) if data.get("correlation_id") else None,
+            "causation_id": uuid.UUID(data["causation_id"]) if data.get("causation_id") else None,
+            "metadata": data.get("metadata", {}),
+        }
+        return target_class(
+            **{k: v for k, v in core_kwargs.items() if k not in non_init_core},
             **extra_kwargs,
         )
 

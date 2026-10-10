@@ -126,9 +126,16 @@ class EvolutionLogEntry:
                 message="error_signature 必须为 hex 字符",
                 context={"entity": "EvolutionLogEntry", "field": "error_signature"},
             )
-        if not isinstance(self.enhanced_retry_count, int) or not 1 <= self.enhanced_retry_count <= 3:
+        # 不变量按 final_status 分支（技术债清偿 A 类——ABORTED 中止遥测）：
+        # 终态两值（RECOVERED/MARKED_INFEASIBLE）：count ∈ [1,3] + 条数守恒；
+        # ABORTED：中止可发生在任意 attempt 消耗后——count ∈ [0,3]、条数 ≤ count
+        # （0 次消耗的中止 = 空尝试记录合法形态）
+        is_aborted = self.final_status == FeedbackOutcome.ABORTED
+        count_upper_msg = "[0, 3]（ABORTED 中止——0 次消耗合法）" if is_aborted else "[1, 3]（总尝试语义）"
+        count_lower, count_upper = (0, 3) if is_aborted else (1, 3)
+        if not isinstance(self.enhanced_retry_count, int) or not count_lower <= self.enhanced_retry_count <= count_upper:
             raise EntityValidationError(
-                message="enhanced_retry_count 必须在 [1, 3]（总尝试语义）",
+                message=f"enhanced_retry_count 必须在 {count_upper_msg}",
                 context={"entity": "EvolutionLogEntry", "field": "enhanced_retry_count"},
             )
         if not isinstance(self.trigger_code, TriggerCode):
@@ -138,7 +145,7 @@ class EvolutionLogEntry:
             )
         if not isinstance(self.final_status, FeedbackOutcome):
             raise EntityValidationError(
-                message="final_status 必须为 FeedbackOutcome 枚举成员（终态二值）",
+                message="final_status 必须为 FeedbackOutcome 枚举成员（终态二值 + ABORTED 中止）",
                 context={"entity": "EvolutionLogEntry", "field": "final_status"},
             )
         if not isinstance(self.duration_sec, (int, float)) or self.duration_sec < 0:
@@ -146,7 +153,13 @@ class EvolutionLogEntry:
                 message="duration_sec 必须 ≥ 0（闭环墙钟时长）",
                 context={"entity": "EvolutionLogEntry", "field": "duration_sec"},
             )
-        if len(self.fix_attempts) != self.enhanced_retry_count:
+        if is_aborted:
+            if len(self.fix_attempts) > self.enhanced_retry_count:
+                raise EntityValidationError(
+                    message="ABORTED 形态 fix_attempts 条数不得超过 enhanced_retry_count（中止时已耗尝试）",
+                    context={"entity": "EvolutionLogEntry", "field": "fix_attempts"},
+                )
+        elif len(self.fix_attempts) != self.enhanced_retry_count:
             raise EntityValidationError(
                 message="fix_attempts 条数必须等于 enhanced_retry_count（每次尝试一条记录）",
                 context={"entity": "EvolutionLogEntry", "field": "fix_attempts"},

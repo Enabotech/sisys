@@ -1,5 +1,33 @@
 # Deferred Work
 
+## 剩余项触发条件时间线（2026-10-10 具备度评定）
+
+> 判定框架：决策触发（材料已具备只欠立项）/ 路线图触发（等特定 Story）/ 数据触发（等生产流量）。
+> 锚点：Epic 1-4 done、Epic 5 未启动、V1 覆盖 Epic 1-8。A 类 7 项已于 2026-10-10 启动清偿（见各 RESOLVED 行）。
+
+**决策触发型**：
+- ~~SessionMiddleware 接线~~ → **RESOLVED 2026-10-10**（原最佳窗口「Epic 5 启动前」已抓住）
+- ~~outbox fallback 扩展至 _persist_execution~~ → **RESOLVED 2026-10-10**；形态②本体 → 策略注记见下
+- ~~saga roundtrip / reset_registry~~ → **RESOLVED 2026-10-10**
+- ~~ABORTED 第三值~~ → **RESOLVED 2026-10-10**（业务启动指令即触发条件）
+- 灰度推进/per-version 统计视图 → **触发 = 产品立项**（功能型非还债；建议 Epic 6 BLM 流程实施时评估——数据面 `list_by_tool` 已就绪，材料依赖度低，纯缺需求方）
+- lint-imports BROKEN → **触发 = 架构重构专项立项**（组合根 lazy import 链重构，`.importlinter` 已合入规则禁改；CI 长红但稳定不恶化、无时限压力——被动等待需改规则或新增 interfaces→组合根 import 时被迫处理）
+
+**路线图触发型**：
+- langgraph retry/timeout 字段 → **触发 = Story 5.10（CheckpointWithEvaluation）或 6.6（Checkpoint 摘要查看）实施**（epics :2016 规划在案、story 文件未创建——两处是 checkpoint_table/编排引擎行为的规划消费方，届时字段语义定稿）
+- 工具熔断 → **触发 = Epic 5 sprint planning 重估归属**（epics 无直接对应 Story——FR-CP-07 是 Epic 11.3 成本熔断非工具执行域；建议 5.4/5.5 EIP 弹性隔离实施时评估挂点或独立小 Story）
+
+**数据触发型**（共同链：Epic 5-8 交付 → V1 上线 → 真实失败流量 → 案例库积累；**上线前可提前部署观测脚本**——判据全可由 `EvolutionLogQuery.list_by_tool` + `get_by_natural_key` 量化）：
+- fast-fail 尝试缩减 → 就绪判据：每签名 ≥30 次观测且 NEGATIVE_CASE_GUIDED 组样本充足（按 fix_strategy 分组恢复率对照——R8-32）｜上线后 +2~4 周
+- fix_summary 进阶聚合 → 判据：高频签名 top-N occurrence 分布稳定｜+4 周
+- 采样多样化/去重 → 判据：suggested_fix_excerpt 重复率可测量且偏高｜+2~4 周
+- 签名分裂 / 389-LLM 签名细化 → 判据：抽样 stderr_excerpt 人工评估 over-merge/over-split｜+4 周（同窗）
+- 真实修复能力基准 → 判据：生产 LLM 流量 + n≥30/组或序贯设计｜+2~4 周
+- 向量检索/多案例加权 → 双触发：签名泛化不足实证 + L3 材料复用评估｜归入本组
+- N+1（B8）→ 判据：单文档快照数 × 查询延迟超 SLA 的压力实证｜上线后观测
+
+**不应做**（终局判定）：C11/C12（story 1-18b :266 spec 立法两态/不可观察——除非非阻塞执行新 Story 重立语义）；A5 构造期序列化校验（to_dict 探针已是正确失败位置，高频路径负收益）。
+
 ## Resolved in Story 1.10 (2026-05-07)
 
 ### Transaction Outbox Pattern — RESOLVED
@@ -32,8 +60,9 @@
 - aggregate_type 可被覆盖 — `if not self.aggregate_type:` 条件允许调用方传入自定义值。所有事件都有此模式。预存。`src/domain/events/workflow_events.py:35-38`
 - ~~DomainEvent 注册表无隔离~~ — **RESOLVED**（2026-10-10 技术债清偿）：`tests/unit/domain/events/conftest.py` autouse 快照/恢复 fixture（tests/conftest.py 会话 ContextVar 先例同款）；注记——import 期污染源（test_redis_event_bus_subscribe_fix 模块级 register 等 2 处）发生在 fixture 之前，需其文件内自理（附注已写入 conftest docstring）。
 - 不可序列化参数延迟失败 — parameters 包含 Prefect 对象时仅在 `to_dict()` 时报错。预存问题。`src/domain/events/workflow_events.py:31`（**2026-10-10 具备度调查判定：不应做**——to_dict json.dumps 探针（4-5 清偿成果）已是正确失败位置且有绊线钉死；构造期校验是高频路径负收益）
-- 【调查附带发现·2026-10-10】`SagaStatusChanged.from_dict(to_dict())` roundtrip 实测 TypeError — `saga_events.py` `init=False` 字段与 `base.py:261-274` from_dict 无条件传 kwargs 不兼容（saga 先例形态自身缺陷；A3 可变引用/aggregate_type 项若启动须先修此联动）
-- 【调查附带发现·2026-10-10】`DomainEvent.reset_registry()` 零调用且具破坏性（清空后不自动恢复） — 与 A4 fixture 形态重复；处置建议：删除或改造为「快照恢复」语义（随 A1/A3 启动时一并评估）
+- ~~【调查附带发现·2026-10-10】`SagaStatusChanged.from_dict(to_dict())` roundtrip 实测 TypeError~~ — **RESOLVED**（2026-10-10 A 类清偿）：`base.py` from_dict 核心字段按 target_class 的 `init=False` 声明过滤（init=False 成员保持类默认值）+ roundtrip 回归用例。
+- ~~【调查附带发现·2026-10-10】`DomainEvent.reset_registry()` 零调用且具破坏性（清空后不自动恢复）~~ — **勘误 + 处置完毕**（2026-10-10）：「零调用」判定失实（src 零调用但**测试有 2 处消费方**——test_outbox_entity:189/test_event_outbox_adapter:112）；处置改为 docstring 破坏性语义警示 + 指引快照/恢复形态（tests/unit/domain/events/conftest.py），方法保留。
+- 【A 类清偿附带发现·2026-10-10】alembic 全新库链挂在 002 — `WITH CHECK cannot be applied to SELECT or DELETE`（002 audit RLS policy 语句）；本地 dev 库无 alembic_version 表（历史 create_all 建）从未暴露。全新环境初始化（CI 重建/新部署）将无法 `upgrade head`——需专项修复 002（RLS policy 语句语法），建议随下一次 alembic 触达时处理。
 
 ## Deferred from: code review of 2-6-document-version-snapshot (2026-08-02)
 
@@ -51,9 +80,9 @@
 
 ## Deferred from: Story 4-7 Validation Feedback 闭环 (2026-10-09)
 
-- outbox 形态②「业务 session 异常回滚连带丢失已 flush 事件」（session_context rollback 连带） — 完整修复需后台路径会话策略重构，超出本 Story 范围；Story 4.7 已修复形态①（无请求 session 时 fallback 独立写入——`PostgreSQLOutboxRepository._save_via_independent_session`）。fallback 机制可复用扩展至 `_persist_execution`（探针结论：具备——session_factory 注入 + session_context 独立写入形态通用，升级处置待后台会话策略重构立项）。
-- SessionMiddleware 生产接线（独立技术债） — `src/infrastructure/middleware/session_middleware.py` 已实现但未在 `create_app()` 注册（app.py 仅 ExceptionContextMiddleware）——接线后 HTTP 路径方有事务边界；接线前生产全部路径 outbox save 走 RuntimeError fallback。
-- 中止遥测 ABORTED 第三值（R3-3） — abort 路径零观测副作用致已耗 attempt 遥测丢弃；需 final_status 第三值支持完整中止观测。
+- ~~outbox 形态②「业务 session 异常回滚连带丢失已 flush 事件」（session_context rollback 连带）~~ — **部分 RESOLVED**（2026-10-10 A 类清偿）：fallback 扩展至 `_persist_execution` 已落地（`PostgreSQLToolExecutionRepository` 注入 session_factory + 无请求 session 独立写入——outbox 同构，后台路径 FAILED 聚合行不再 RuntimeError 丢失）。**形态②本体（有 session 且回滚连带）策略注记**：SessionMiddleware 接线后 HTTP 失败路径的 FAILED 持久化随主事务回滚——若需「失败观测在回滚后存活」，须决策「失败路径写入一律独立事务」（放弃同事务原子性换取观测存活）——策略级取舍待真实失败观测需求驱动，非材料缺失。
+- ~~SessionMiddleware 生产接线（独立技术债）~~ — **RESOLVED**（2026-10-10 A 类清偿）：`create_app()` 接线落地（lazy `_request_session_factory` 经组合根 SINGLETON 解析；SessionMiddleware 内层/ExceptionContextMiddleware 外层——Starlette insert(0) 语义核验）；接线冒烟 4 用例（中间件链 200/ContextVar reset 无泄漏/层序断言/factory 可解析）；既有 3 个 create_app 测试消费方均零真实请求、零影响；`strategic_archive_service:269` 的事务原子性承诺自此成立。
+- ~~中止遥测 ABORTED 第三值（R3-3）~~ — **RESOLVED**（2026-10-10 A 类清偿，重开 R3-3 中止半边）：FeedbackOutcome 加 ABORTED（ErrorCase 域收窄排除）/ EvolutionLogEntry 不变量分支化（ABORTED count∈[0,3]、条数≤count）/ migration 018（CHECK swap，行为验证①②③④全过）/ `_finish_aborted` 写中止遥测行（不回填案例、不发事件）/ 短路条件收窄为终态行（ABORTED 重放全量重跑、upsert 覆盖——#17② 直传维持零终态）；**附带暴露并修复 BDD AC-2.18 构造缺陷**（code_outputs 队列被触发段消费、实际测「触发前 201 直传」——零观测立法下两路径同绿掩盖走偏 8 个月，ABORTED 观测面使路径可区分；改状态化 side_effect 构造）。
 - fast-fail 尝试缩减半边（R8-2） — 负样本信息注入已交付（NEGATIVE_CASE_GUIDED）；attempt 上限缩减待真实负样本效用对照数据（R8-32）落地后采纳。
 - 修复循环采样多样化/生成相似度去重（R8-17） — V1 指令级强度 + suggested_fix_excerpt 指涉对象已就位；机制性兜底待真实失败率数据。
 - fix_summary 进阶聚合（R8-20） — V1 为最近一次成功覆写；跨轨迹归纳/多数次验证后覆写待案例库规模支撑。

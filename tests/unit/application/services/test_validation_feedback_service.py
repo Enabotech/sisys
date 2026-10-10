@@ -488,7 +488,9 @@ class TestMidAttemptClassification:
 
     @pytest.mark.asyncio
     async def test_mid_attempt_infra_failure_aborts_and_reraises(self) -> None:
-        """②浮出不满足入环谓词的异常（StorageError 形态 382-cause∉族）→ 中止直传零观测副作用."""
+        """②浮出不满足入环谓词的异常（StorageError 形态 382-cause∉族）→ 中止直传；
+        观测面（技术债清偿 A 类后立法）：演进日志 ABORTED 遥测行 1 条（中止可观测），
+        案例库零行/无事件（中止不回填不发）."""
         inner = AsyncMock()
         inner.execute = AsyncMock(side_effect=_382(cause=RuntimeError("disk full")))
         service, deps = _make_service(inner_chain=inner)
@@ -497,9 +499,12 @@ class TestMidAttemptClassification:
                 tool_id=_TOOL, tool=AsyncMock(), tool_call=AsyncMock(), context=_make_ctx(), trigger_error=_389()
             )
         from src.domain.ports.evolution_log_repository import EvolutionLogQuery
+        from src.domain.value_objects.validation_feedback import FeedbackOutcome
 
         logs = await deps["logs"].list_by_query(EvolutionLogQuery(tool_id=_TOOL))
-        assert not logs, "中止路径零观测副作用"
+        assert len(logs) == 1, "中止路径写 ABORTED 遥测行（R3-3 中止半边重开）"
+        assert logs[0].final_status == FeedbackOutcome.ABORTED
+        assert logs[0].enhanced_retry_count == 0, "首个 attempt 即中止——0 次消耗合法形态"
 
     @pytest.mark.asyncio
     async def test_mid_attempt_201_aborts_and_reraises(self) -> None:
@@ -511,6 +516,78 @@ class TestMidAttemptClassification:
             await service.recover(
                 tool_id=_TOOL, tool=AsyncMock(), tool_call=AsyncMock(), context=_make_ctx(), trigger_error=_389()
             )
+
+    @pytest.mark.asyncio
+    async def test_abort_writes_aborted_telemetry_log(self) -> None:
+        """中止写 ABORTED 遥测行（技术债清偿 A 类——重开 R3-3 中止半边）：
+        演进日志 1 行 final_status=ABORTED/已耗 attempt 条数；案例库零行
+        （域收窄排除 ABORTED）；直传原 mid-attempt 异常."""
+        from src.domain.ports.evolution_log_repository import EvolutionLogQuery
+        from src.domain.value_objects.validation_feedback import FeedbackOutcome
+
+        call_state = {"n": 0}
+
+        async def _abort_on_second(*args: Any, **kwargs: Any) -> Any:
+            call_state["n"] += 1
+            if call_state["n"] == 1:
+                raise _389()  # attempt 1 计为失败（retry_failed）
+            raise ValidationError(message="marker syntax")  # attempt 2 中止
+
+        inner = AsyncMock()
+        inner.execute = AsyncMock(side_effect=_abort_on_second)
+        service, deps = _make_service(inner_chain=inner)
+        with pytest.raises(ValidationError):
+            await service.recover(
+                tool_id=_TOOL, tool=AsyncMock(), tool_call=AsyncMock(), context=_make_ctx(), trigger_error=_389()
+            )
+
+        logs = list(await deps["logs"].list_by_query(EvolutionLogQuery(tool_id=_TOOL, tenant_id=_TENANT)))
+        assert len(logs) == 1, "中止应写 ABORTED 遥测行"
+        assert logs[0].final_status == FeedbackOutcome.ABORTED
+        assert logs[0].enhanced_retry_count == 1, "已耗 attempt 数（attempt 1 失败 + attempt 2 中止前 fix-gen 成功不计）"
+        assert len(logs[0].fix_attempts) == 1
+        assert logs[0].fix_attempts[0].detail == "retry_failed"
+        # 案例库零行（ABORTED 不回填——ErrorCase 域收窄）
+        from src.domain.ports.error_case_repository import ErrorCaseRepositoryPort  # noqa: F401 — 类型引用
+
+        assert not hasattr(deps["cases"], "_cases") or not deps["cases"]._cases, "中止不回填案例库"
+
+    @pytest.mark.asyncio
+    async def test_aborted_replay_reruns_full_loop(self) -> None:
+        """ABORTED 行重放不短路（短路条件收窄为终态行）——全量重跑成功后
+        upsert 覆盖中止行为 RECOVERED."""
+        from src.domain.ports.evolution_log_repository import EvolutionLogQuery
+        from src.domain.value_objects.tool_execution import ToolResult, ToolResultStatus
+        from src.domain.value_objects.validation_feedback import FeedbackOutcome
+
+        call_state = {"n": 0}
+
+        async def _abort_then_succeed(*args: Any, **kwargs: Any) -> Any:
+            call_state["n"] += 1
+            if call_state["n"] == 1:
+                raise ValidationError(message="marker syntax")  # 首轮 attempt 1 中止
+            return ToolResult(tool_id=_TOOL, status=ToolResultStatus.SUCCESS, output={"plan": "p", "result": "OK_x"})
+
+        inner = AsyncMock()
+        inner.execute = AsyncMock(side_effect=_abort_then_succeed)
+        service, deps = _make_service(inner_chain=inner)
+        trigger = _389()
+
+        with pytest.raises(ValidationError):
+            await service.recover(
+                tool_id=_TOOL, tool=AsyncMock(), tool_call=AsyncMock(), context=_make_ctx(), trigger_error=trigger
+            )
+        # 同 trigger 重放：ABORTED 行不短路 → 全量重跑（fix-gen 成功 + 重执行成功）
+        replay = await service.recover(
+            tool_id=_TOOL, tool=AsyncMock(), tool_call=AsyncMock(), context=_make_ctx(), trigger_error=trigger
+        )
+        assert replay.status == ToolResultStatus.SUCCESS
+        assert replay.output.get("replayed") is None, "ABORTED 重放不走合成短路（全量重跑）"
+        assert call_state["n"] == 2, "重放应真实重执行（非合成结论）"
+
+        logs = list(await deps["logs"].list_by_query(EvolutionLogQuery(tool_id=_TOOL, tenant_id=_TENANT)))
+        assert len(logs) == 1, "同 execution_id upsert 覆盖中止行"
+        assert logs[0].final_status == FeedbackOutcome.RECOVERED, "中止行被重跑终态覆盖"
 
 
 class TestLlmPersistentDirectRaise:

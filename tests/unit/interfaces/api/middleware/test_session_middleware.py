@@ -9,8 +9,12 @@ from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
 
-from src.infrastructure.middleware.session_middleware import SessionMiddleware
-from src.infrastructure.storage.postgresql.session_context import get_session_optional
+from src.infrastructure.storage.postgresql.session_context import (
+    get_session_optional,
+    reset_session,
+    set_session,
+)
+from src.interfaces.api.middleware.session import SessionMiddleware
 
 
 @pytest.fixture
@@ -34,7 +38,7 @@ def mock_factory(mock_session):
 def _create_app(factory) -> Starlette:
     """Create Starlette app with SessionMiddleware."""
     app = Starlette()
-    app.add_middleware(SessionMiddleware, session_factory=factory)
+    app.add_middleware(SessionMiddleware, session_factory=factory, session_setter=set_session, session_resetter=reset_session)
     return app
 
 

@@ -156,9 +156,10 @@ class ErrorCase:
                 message="error_category 不能为空（首写定格——category 二次过滤前提）",
                 context={"entity": "ErrorCase", "field": "error_category"},
             )
-        if not isinstance(self.outcome, FeedbackOutcome):
+        if not isinstance(self.outcome, FeedbackOutcome) or self.outcome == FeedbackOutcome.ABORTED:
             raise EntityValidationError(
-                message="outcome 必须为 FeedbackOutcome 枚举成员",
+                message="outcome 必须为 FeedbackOutcome 枚举成员且 ∈ {RECOVERED, MARKED_INFEASIBLE}"
+                "（ABORTED 为演进日志中止态——中止不回填案例库，技术债清偿 A 类域收窄）",
                 context={"entity": "ErrorCase", "field": "outcome"},
             )
         if self.recovered_count < 0 or self.infeasible_count < 0:

@@ -43,11 +43,12 @@ class EvolutionLogEntryModel(Base):
             name="ck_tool_evolution_logs_trigger_code",
         ),
         CheckConstraint(
-            "final_status IN ('RECOVERED', 'MARKED_INFEASIBLE')",
+            "final_status IN ('RECOVERED', 'MARKED_INFEASIBLE', 'ABORTED')",
             name="ck_tool_evolution_logs_final_status",
         ),
         CheckConstraint(
-            "enhanced_retry_count BETWEEN 1 AND 3",
+            "(final_status = 'ABORTED' AND enhanced_retry_count BETWEEN 0 AND 3)"
+            " OR (final_status IN ('RECOVERED', 'MARKED_INFEASIBLE') AND enhanced_retry_count BETWEEN 1 AND 3)",
             name="ck_tool_evolution_logs_retry_count_range",
         ),
         CheckConstraint("duration_sec >= 0", name="ck_tool_evolution_logs_duration_nonneg"),

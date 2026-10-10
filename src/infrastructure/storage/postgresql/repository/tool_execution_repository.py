@@ -43,12 +43,60 @@ class PostgreSQLToolExecutionRepository(PostgreSQLAdapter[ToolExecution, ToolExe
     - ContextVar session 自动注入(由 composition_root 配置 session_context)
     - 乐观锁 CAS：save_with_state_version 用 atomic UPDATE 实现 state_version+1
     - ToolExecutionState 枚举 ↔ 字符串值(防 DB 漂移)
+    - save 的后台路径 fallback（技术债清偿 A 类——outbox 同构）：无请求
+      session 时经注入 session_factory 独立会话写入——`_persist_execution`
+      失败态持久化在后台/CLI 路径不再 RuntimeError 丢失（HTTP 失败路径主事务
+      回滚连带的「形态②」见 deferred-work 策略注记）
     """
 
     pk_column: str = "execution_id"
 
-    def __init__(self) -> None:
+    def __init__(self, session_factory: Any | None = None) -> None:
+        """初始化仓储.
+
+        Args:
+            session_factory: 独立会话工厂（后台路径 fallback 用——组合根注入
+                async_sessionmaker；None 保持既有 RuntimeError 显式失败语义）
+        """
         super().__init__(ToolExecutionModel)
+        self._session_factory = session_factory
+
+    async def save(self, entity: ToolExecution) -> ToolExecution:
+        """保存实体（请求 session 优先；无请求 session 时 fallback 独立写入）.
+
+        Raises:
+            RuntimeError: 无请求 session 且未注入 session_factory（无 fallback
+                能力——与 outbox 仓储同款显式失败而非静默丢失）
+        """
+        from src.infrastructure.storage.postgresql.session_context import get_session
+
+        try:
+            get_session()
+        except RuntimeError:
+            # 后台/CLI 路径（无请求 session）——仅捕获此形态，其他 RuntimeError
+            # （连接池等）按原语义传播
+            if self._session_factory is None:
+                raise
+            return await self._save_via_independent_session(entity)
+        return await super().save(entity)
+
+    async def _save_via_independent_session(self, entity: ToolExecution) -> ToolExecution:
+        """经 session_context 独立会话写入（outbox fallback 先例同款）."""
+        from typing import cast
+
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+        from src.infrastructure.storage.postgresql.session_context import session_context
+
+        factory = cast("async_sessionmaker[AsyncSession]", self._session_factory)
+        async with session_context(factory):
+            # session_context 内已 set——基类 save 经 get_session 取到独立会话
+            saved = await PostgreSQLAdapter.save(self, entity)
+        logger.info(
+            "ToolExecution 经独立会话落库（后台路径 fallback）: execution_id=%s",
+            entity.execution_id,
+        )
+        return saved
 
     # ------------------------------------------------------------------
     # 实体/模型转换

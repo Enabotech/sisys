@@ -2265,10 +2265,14 @@ def bootstrap() -> None:
         name="tool_execution_repository",
         version="v1.1.0",  # ← 升级:InMemory → PostgreSQL ORM(SQLAlchemy)
         interface=ToolExecutionRepositoryPort,
+        # session_factory 注入（技术债清偿 A 类）：后台路径 save fallback 独立
+        # 会话写入——_persist_execution 失败态持久化不再 RuntimeError 丢失
         impl=lambda resolver: __import__(
             "src.infrastructure.storage.postgresql.repository.tool_execution_repository",
             fromlist=["PostgreSQLToolExecutionRepository"],
-        ).PostgreSQLToolExecutionRepository(),
+        ).PostgreSQLToolExecutionRepository(
+            session_factory=resolver.resolve("session_factory"),
+        ),
         module="src.infrastructure.storage.postgresql.repository.tool_execution_repository",
         lifetime=Lifetime.SCOPED,
         owner="tool-team",
@@ -2787,6 +2791,30 @@ async def shutdown() -> None:
         logger.info("Drained pending validation feedback events")
     except Exception as e:
         logger.error("Failed to drain validation feedback events: %s", e)
+
+
+def session_middleware_wiring() -> dict:
+    """SessionMiddleware 装配参数（interfaces 层中间件的 infra 依赖绑定——
+    技术债清偿 A 类：ASGI 中间件在 interfaces/api/middleware，set/reset 与
+    工厂的具体绑定经组合根注入，interfaces→infrastructure 零直接依赖）.
+
+    Returns:
+        {"session_factory", "session_setter", "session_resetter"} 三键——工厂
+        惰性经 resolver 解析 SINGLETON session_factory（bootstrap 后可用）
+    """
+    from typing import Any
+
+    from src.domain.ports.resolver import get_resolver
+    from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
+
+    def _factory() -> Any:
+        return get_resolver().resolve("session_factory")()
+
+    return {
+        "session_factory": _factory,
+        "session_setter": set_session,
+        "session_resetter": reset_session,
+    }
 
 
 __all__ = ["bootstrap", "shutdown", "_global_registry"]
