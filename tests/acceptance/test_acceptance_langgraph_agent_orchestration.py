@@ -9,6 +9,7 @@ Run with: poetry run pytest tests/acceptance/test_acceptance_langgraph-agent-orc
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
 from pytest_bdd import given, scenarios, then, when
 
@@ -220,7 +221,7 @@ def verify_event_published() -> None:
 def verify_event_fields() -> None:
     from src.domain.events.agent_events import AgentDecided
 
-    event = AgentDecided()
+    event = AgentDecided(agent_id=uuid4())
     assert hasattr(event, "agent_id")
     assert hasattr(event, "decision_result")
     assert hasattr(event, "confidence")

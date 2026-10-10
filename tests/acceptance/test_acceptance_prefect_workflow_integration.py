@@ -9,6 +9,7 @@ Run with: poetry run pytest tests/acceptance/test_acceptance_prefect-workflow-in
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
 from pytest_bdd import given, scenarios, then, when
 
@@ -219,7 +220,7 @@ def rag_indexed_defined() -> None:
 def verify_rag_indexed_fields() -> None:
     from src.domain.events.workflow_events import RAGIndexed
 
-    event = RAGIndexed()
+    event = RAGIndexed(document_id=uuid4())
     assert hasattr(event, "document_id")
     assert hasattr(event, "index_name")
     assert hasattr(event, "chunk_count")
@@ -229,7 +230,7 @@ def verify_rag_indexed_fields() -> None:
 def verify_report_generated_fields() -> None:
     from src.domain.events.workflow_events import ReportGenerated
 
-    event = ReportGenerated()
+    event = ReportGenerated(report_id=uuid4())
     assert hasattr(event, "report_id")
     assert hasattr(event, "report_type")
     assert hasattr(event, "file_path")

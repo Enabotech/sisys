@@ -6,11 +6,15 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from src.domain.exceptions import ValidationError
+from src.domain.events.document_events import DocumentVersionSnapshotCreated
+from src.domain.exceptions import NotFoundError, ValidationError
+from src.domain.ports.document_repository import DocumentQuery
 from src.domain.services.document_version_diff_service import compute_diff
+from src.domain.value_objects.document_version import DocumentVersionSnapshot
 
 
 def _validate_tenant_id(tenant_id: str) -> None:
@@ -32,7 +36,6 @@ def _validate_tenant_id(tenant_id: str) -> None:
 if TYPE_CHECKING:
     from src.domain.ports.document_repository import DocumentRepositoryPort
     from src.domain.ports.event_publisher import EventPublisher
-    from src.domain.value_objects.document_version import DocumentVersionSnapshot
 
 
 class DocumentVersionService:
@@ -90,16 +93,12 @@ class DocumentVersionService:
         _validate_tenant_id(tenant_id)
 
         # 1. 查询文档实体
-        from src.domain.ports.document_repository import DocumentQuery
-
         query = DocumentQuery(
             document_id=document_id,
             tenant_id=tenant_id,
         )
         document = await self._repository.find(query)
         if document is None:
-            from src.domain.exceptions import NotFoundError
-
             raise NotFoundError(f"Document not found: {document_id}")
 
         current_version = document.version
@@ -128,9 +127,6 @@ class DocumentVersionService:
         )
 
         # 4. 递增版本号并使用 save_with_version_check 保存（乐观锁验证）
-        from datetime import UTC, datetime
-        from uuid import uuid4
-
         new_version = current_version + 1
         document.version = new_version
         document.updated_at = datetime.now(UTC)
@@ -140,8 +136,6 @@ class DocumentVersionService:
         )
 
         # 5. 持久化 DocumentVersionSnapshot
-        from src.domain.value_objects.document_version import DocumentVersionSnapshot
-
         snapshot_id = uuid4()
         diff_json: dict | None = {
             "changed_fields": diff.changed_fields,
@@ -162,8 +156,6 @@ class DocumentVersionService:
         await self._repository.save_version_snapshot(snapshot)
 
         # 6. 发布 DocumentVersionSnapshotCreated 事件
-        from src.domain.events.document_events import DocumentVersionSnapshotCreated
-
         event = DocumentVersionSnapshotCreated(
             document_id=document_id,
             new_version=new_version,

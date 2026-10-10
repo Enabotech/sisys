@@ -20,7 +20,7 @@ class TestRAGIndexedEvent:
         """event_type 应为 RAGIndexed"""
         from src.domain.events.workflow_events import RAGIndexed
 
-        event = RAGIndexed()
+        event = RAGIndexed(document_id=uuid.uuid4())
         assert event.event_type == "RAGIndexed"
 
     def test_has_required_fields(self) -> None:
@@ -48,7 +48,7 @@ class TestRAGIndexedEvent:
         """事件应为不可变"""
         from src.domain.events.workflow_events import RAGIndexed
 
-        event = RAGIndexed()
+        event = RAGIndexed(document_id=uuid.uuid4())
         with pytest.raises(AttributeError):
             cast(Any, event).index_name = "changed"
 
@@ -68,7 +68,7 @@ class TestReportGeneratedEvent:
         """event_type 应为 ReportGenerated"""
         from src.domain.events.workflow_events import ReportGenerated
 
-        event = ReportGenerated()
+        event = ReportGenerated(report_id=uuid.uuid4())
         assert event.event_type == "ReportGenerated"
 
     def test_has_required_fields(self) -> None:
@@ -96,7 +96,7 @@ class TestReportGeneratedEvent:
         """事件应为不可变"""
         from src.domain.events.workflow_events import ReportGenerated
 
-        event = ReportGenerated()
+        event = ReportGenerated(report_id=uuid.uuid4())
         with pytest.raises(AttributeError):
             cast(Any, event).report_type = "changed"
 
@@ -116,7 +116,7 @@ class TestWorkflowSubmittedEvent:
         """event_type 应为 WorkflowSubmitted"""
         from src.domain.events.workflow_events import WorkflowSubmitted
 
-        event = WorkflowSubmitted()
+        event = WorkflowSubmitted(flow_run_id=uuid.uuid4())
         assert event.event_type == "WorkflowSubmitted"
 
     def test_has_required_fields(self) -> None:
@@ -138,7 +138,7 @@ class TestWorkflowSubmittedEvent:
         """aggregate_type 应为 Workflow"""
         from src.domain.events.workflow_events import WorkflowSubmitted
 
-        event = WorkflowSubmitted()
+        event = WorkflowSubmitted(flow_run_id=uuid.uuid4())
         assert event.aggregate_type == "Workflow"
 
     def test_aggregate_id_defaults_to_flow_run_id(self) -> None:
@@ -159,7 +159,7 @@ class TestWorkflowSubmittedEvent:
         """事件应为不可变"""
         from src.domain.events.workflow_events import WorkflowSubmitted
 
-        event = WorkflowSubmitted()
+        event = WorkflowSubmitted(flow_run_id=uuid.uuid4())
         with pytest.raises(AttributeError):
             cast(Any, event).flow_name = "changed"
 

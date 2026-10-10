@@ -27,25 +27,25 @@
 
 ## Deferred from: code review of 20-8-workflow-agent-integration (2026-05-23)
 
-- 可变字典引用 — frozen dataclass 的 `parameters`/`decision_result` 字段存储可变引用，调用方可在构造后修改。AgentDecided 同样有此问题。预存，非本 Story 引入。`src/domain/events/workflow_events.py:31`
-- flow_run_id 默认工厂误导 — 默认 `uuid.uuid4()` 从未被使用，可能掩盖调用方遗漏。RAGIndexed/ReportGenerated 同样有此模式。预存。`src/domain/events/workflow_events.py:29`
+- 可变字典引用 — frozen dataclass 的 `parameters`/`decision_result` 字段存储可变引用，调用方可在构造后修改。AgentDecided 同样有此问题。预存，非本 Story 引入。`src/domain/events/workflow_events.py:31`（**2026-10-10 具备度调查注记**：部分具备维持 deferred——修复形态已实证（`_serialize_value` 增 `isinstance(value, Mapping)` 分支 + `__post_init__` MappingProxyType 包装），但无任何「构造后篡改」真实场景；附带发现 saga_events init=False 形态 `from_dict(to_dict())` roundtrip 实测 TypeError，若启动本项须先修 base.py from_dict 联动）
+- ~~flow_run_id 默认工厂误导~~ — **RESOLVED**（2026-10-10 技术债清偿）：生产 4 构造点（WorkflowSubmitted/RAGIndexed/AgentDecided×2——ReportGenerated 零构造点）全显式传参已实证——4 字段改 `field(kw_only=True)` 必填化，13 处测试无参构造补显式 id；漏传立即 TypeError 不再静默铸造。
 - aggregate_type 可被覆盖 — `if not self.aggregate_type:` 条件允许调用方传入自定义值。所有事件都有此模式。预存。`src/domain/events/workflow_events.py:35-38`
-- DomainEvent 注册表无隔离 — 测试检查 `_registry["WorkflowSubmitted"]` 但未确保清洁状态。预存模式。`tests/unit/domain/events/test_workflow_events.py:61-67`
+- ~~DomainEvent 注册表无隔离~~ — **RESOLVED**（2026-10-10 技术债清偿）：`tests/unit/domain/events/conftest.py` autouse 快照/恢复 fixture（tests/conftest.py 会话 ContextVar 先例同款）；注记——import 期污染源（test_redis_event_bus_subscribe_fix 模块级 register 等 2 处）发生在 fixture 之前，需其文件内自理（附注已写入 conftest docstring）。
 - 不可序列化参数延迟失败 — parameters 包含 Prefect 对象时仅在 `to_dict()` 时报错。预存问题。`src/domain/events/workflow_events.py:31`
 
 ## Deferred from: code review of 2-6-document-version-snapshot (2026-08-02)
 
-- 缺少性能基准测试（P95 指标未验证） — AC-1/AC-2 要求 P95<100ms/<200ms，但无基准测试。后续 Story 补充性能测试时覆盖。
-- 缺少并发版本控制测试（≥10 并发操作） — AC-3 要求 ≥10 并发操作，但测试仅覆盖单次冲突场景。后续 Story 补充并发测试时覆盖。
-- `list_versions`/`get_version` N+1 查询问题 — 先查 documents 验证租户，再查 snapshots，可用 JOIN 优化。预存，当前数据量小，性能影响可接受。
-- 内联 import 散落问题 — `create_snapshot` 方法体内有 6 个内联 import 块。预存，当前为规避循环依赖的方案，后续可统一重构。
+- ~~缺少性能基准测试（P95 指标未验证）~~ — **半数 RESOLVED**（2026-08-03 commit 8bfcc472 已交付 domain 口径 5 项基准——值对象构造/元数据 diff/内容 diff 等；**2026-10-10 技术债清偿补齐残余**：AC-1 create_snapshot 端到端 P95<100ms 基准（4-6/4-7 基准先例同款分级断言形态）。
+- ~~缺少并发版本控制测试（≥10 并发操作）~~ — **RESOLVED**（台账过时勘误）：`tests/integration/test_integration_document_version_concurrent.py:195` 的 `test_10_concurrent_saves_only_one_succeeds`（2026-08-03 commit 8bfcc472 交付）精确覆盖 AC-3「10 并发只有 1 个成功」+ 串行 10 次 + 5 文档并发首快照三用例——登记时点（2026-08-02）早于交付次日。
+- `list_versions`/`get_version` N+1 查询问题 — 先查 documents 验证租户，再查 snapshots，可用 JOIN 优化。预存，当前数据量小，性能影响可接受。（**2026-10-10 具备度调查注记**：实为固定 2 查询非经典 N+1，JOIN 等价改写回归面 32 处——机会性优化维持 deferred）
+- ~~内联 import 散落问题~~ — **RESOLVED**（2026-10-10 技术债清偿）：「规避循环依赖」论据经调查失实（被导入全为 domain 层，六边形契约下结构不可能循环）——6 个内联块全部上提模块顶部并与 TYPE_CHECKING 块去重，12 测试全绿。
 
 - ~~InMemoryRoutingDecisionLogRepository 非线程安全~~ — **RESOLVED** (2026-05-25)：引入 asyncio.Lock + max_size(1000) + TTL(24h) 淘汰。`src/infrastructure/messaging/inmemory_routing_decision_log_repository.py`
 
 ## Deferred from: code review of 4-6-tool-version-management (2026-10-07)
 
 - lint-imports「Interfaces layer must not depend on infrastructure」broken（入口稳定为 `src.interfaces.api.app -> src.composition_root (l.24)` 与 `src.interfaces.cli.ocr_cli -> src.composition_root (l.39)` 两条链） — 经基线 5b96e75a 比对确认为**预存量**（非 4-6 引入），main 上该 CI 门禁为红。根因：interfaces 层 import 组合根，而组合根内部大量 infrastructure lazy import 被传递检出（组合根具体中转模块随构建漂移——jwt_service/prefect/rabbitmq_publisher 等多次实测各不相同，以 lint-imports 实时输出为准，不锁行号）。涉及组合根 lazy import 链的架构级重构，需单独立项处置（`.importlinter` 已合入规则禁止改动）。
-- 根 `.env.example` 从未被 git 跟踪（git ls-files 仅 deploy/delivery 组件级样例） — 新增环境键 `TOOL_VERSION_MAX_RETAINED`（`src/infrastructure/config/tool_version.py:36`）与 4-4 `SANDBOX_*` 键同样无样例同步。跨 Story 文档债：补根 `.env.example` 时统一收录全部应用配置键。
+- ~~根 `.env.example` 从未被 git 跟踪（git ls-files 仅 deploy/delivery 组件级样例）~~ — **RESOLVED**（2026-10-10 技术债清偿）：根 `.env.example` 创建——全仓 `os.getenv` 两轮 grep 提取 163 键按 14 域分组收录（字面默认值与各 from_env 一致；数据源 URL/TTL 类默认在 config/datasources 模块的键留空注记指引；敏感键留空）；`TOOL_VERSION_MAX_RETAINED`/`SANDBOX_*` 同步收录。
 
 ## Deferred from: Story 4-7 Validation Feedback 闭环 (2026-10-09)
 

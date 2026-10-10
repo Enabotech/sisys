@@ -23,7 +23,7 @@ class AgentDecided(DomainEvent):
         confidence: 决策置信度，范围0.0-1.0
     """
 
-    agent_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    agent_id: uuid.UUID = field(kw_only=True)  # kw_only 必填（2-6 系技术债清偿 A2）
     event_type: str = field(default="AgentDecided", init=False)
     decision_result: dict[str, Any] = field(default_factory=dict)
     confidence: float = 0.0

@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import inspect
 import textwrap
+from uuid import uuid4
 
 from pytest_bdd import given, scenarios, then
 
@@ -155,7 +156,7 @@ def workflow_submitted_defined() -> None:
 def verify_workflow_submitted_fields() -> None:
     from src.domain.events.workflow_events import WorkflowSubmitted
 
-    event = WorkflowSubmitted()
+    event = WorkflowSubmitted(flow_run_id=uuid4())
     assert hasattr(event, "flow_run_id")
     assert hasattr(event, "flow_name")
     assert hasattr(event, "parameters")
@@ -165,7 +166,7 @@ def verify_workflow_submitted_fields() -> None:
 def verify_workflow_submitted_event_type() -> None:
     from src.domain.events.workflow_events import WorkflowSubmitted
 
-    event = WorkflowSubmitted()
+    event = WorkflowSubmitted(flow_run_id=uuid4())
     assert event.event_type == "WorkflowSubmitted"
 
 
@@ -173,7 +174,7 @@ def verify_workflow_submitted_event_type() -> None:
 def verify_workflow_submitted_aggregate_type() -> None:
     from src.domain.events.workflow_events import WorkflowSubmitted
 
-    event = WorkflowSubmitted()
+    event = WorkflowSubmitted(flow_run_id=uuid4())
     assert event.aggregate_type == "Workflow"
 
 
