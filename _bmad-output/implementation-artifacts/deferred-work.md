@@ -31,7 +31,9 @@
 - ~~flow_run_id 默认工厂误导~~ — **RESOLVED**（2026-10-10 技术债清偿）：生产 4 构造点（WorkflowSubmitted/RAGIndexed/AgentDecided×2——ReportGenerated 零构造点）全显式传参已实证——4 字段改 `field(kw_only=True)` 必填化，13 处测试无参构造补显式 id；漏传立即 TypeError 不再静默铸造。
 - aggregate_type 可被覆盖 — `if not self.aggregate_type:` 条件允许调用方传入自定义值。所有事件都有此模式。预存。`src/domain/events/workflow_events.py:35-38`
 - ~~DomainEvent 注册表无隔离~~ — **RESOLVED**（2026-10-10 技术债清偿）：`tests/unit/domain/events/conftest.py` autouse 快照/恢复 fixture（tests/conftest.py 会话 ContextVar 先例同款）；注记——import 期污染源（test_redis_event_bus_subscribe_fix 模块级 register 等 2 处）发生在 fixture 之前，需其文件内自理（附注已写入 conftest docstring）。
-- 不可序列化参数延迟失败 — parameters 包含 Prefect 对象时仅在 `to_dict()` 时报错。预存问题。`src/domain/events/workflow_events.py:31`
+- 不可序列化参数延迟失败 — parameters 包含 Prefect 对象时仅在 `to_dict()` 时报错。预存问题。`src/domain/events/workflow_events.py:31`（**2026-10-10 具备度调查判定：不应做**——to_dict json.dumps 探针（4-5 清偿成果）已是正确失败位置且有绊线钉死；构造期校验是高频路径负收益）
+- 【调查附带发现·2026-10-10】`SagaStatusChanged.from_dict(to_dict())` roundtrip 实测 TypeError — `saga_events.py` `init=False` 字段与 `base.py:261-274` from_dict 无条件传 kwargs 不兼容（saga 先例形态自身缺陷；A3 可变引用/aggregate_type 项若启动须先修此联动）
+- 【调查附带发现·2026-10-10】`DomainEvent.reset_registry()` 零调用且具破坏性（清空后不自动恢复） — 与 A4 fixture 形态重复；处置建议：删除或改造为「快照恢复」语义（随 A1/A3 启动时一并评估）
 
 ## Deferred from: code review of 2-6-document-version-snapshot (2026-08-02)
 
