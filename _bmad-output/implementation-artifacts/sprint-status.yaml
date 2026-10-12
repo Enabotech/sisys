@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-10-09
+last_updated: 2026-10-12
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -133,9 +133,9 @@ development_status:
   epic-3-retrospective: done
 
   # ===========================================================================
-  # Epic 4: 战略工具箱 - 📋 待开始
+  # Epic 4: 战略工具箱 - ✅ 已完成
   # ===========================================================================
-  epic-4: in-progress
+  epic-4: done
   4-1-strategic-tool-registration-tools: done
   4-1a-strategic-tool-impl: done
   4-1b-skills-feat-enhancement: done
@@ -150,7 +150,7 @@ development_status:
   # 价值组扩展: V1 P1 工具箱增强
   4-6-tool-version-management: done
   4-7-validation-feedback-loop: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   # ===========================================================================
   # Epic 5: Agent 协作系统（含 EV-01/02 P0 + EV-03/04 P1 扩展）- 📋 待开始
