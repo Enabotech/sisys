@@ -232,16 +232,18 @@ def _make_mock_llm() -> Any:
 
     state = {"count": 0}
 
-    async def mock_structured_generate(*args: Any, **kwargs: Any) -> str:
+    from src.domain.ports.llm_client import LLMResponse
+
+    async def mock_structured_generate(*args: Any, **kwargs: Any) -> LLMResponse:
         # 根据调用次数返回不同阶段产物
         state["count"] += 1
         if state["count"] == 1:
-            return "1. PESTEL 六维度分析\n2. 政治(P)=0.8 经济(E)=0.7 社会(S)=0.6"
+            return LLMResponse(content="1. PESTEL 六维度分析\n2. 政治(P)=0.8 经济(E)=0.7 社会(S)=0.6")
         if state["count"] == 2:
-            return 'print("scores = [0.8, 0.7, 0.6]")'
-        return '{"valid": true, "confidence": 0.92, "issues": []}'
+            return LLMResponse(content='print("scores = [0.8, 0.7, 0.6]")')
+        return LLMResponse(content='{"valid": true, "confidence": 0.92, "issues": []}')
 
-    llm.structured_generate = mock_structured_generate
+    llm.generate = mock_structured_generate
     return llm
 
 
@@ -307,10 +309,12 @@ class TestStrategicAnalysisEndToEnd:
         # 4. Mock LLM（简化测试，避免 LLM API 调用）
         mock_llm = AsyncMock()
 
-        async def mock_generate(*args: Any, **kwargs: Any) -> str:
-            return "1. PESTEL 六维度分析\n2. 输出评分"
+        from src.domain.ports.llm_client import LLMResponse
 
-        mock_llm.structured_generate = mock_generate
+        async def mock_generate(*args: Any, **kwargs: Any) -> LLMResponse:
+            return LLMResponse(content="1. PESTEL 六维度分析\n2. 输出评分")
+
+        mock_llm.generate = mock_generate
 
         # 5. ToolExecutionEngine（注入真实 PG 仓储 + Mock 端口）
         engine = ToolExecutionEngine(
@@ -774,7 +778,7 @@ class TestSevenToolExceptionsIntegration:
 
         # mock 端口：持续抛 LLMAPIError（端口行为 mock，非异常对象 mock）
         flaky_llm = AsyncMock()
-        flaky_llm.structured_generate = AsyncMock(side_effect=LLMAPIError("persistent LLM failure for retry exhaustion test"))
+        flaky_llm.generate = AsyncMock(side_effect=LLMAPIError("persistent LLM failure for retry exhaustion test"))
 
         engine = ToolExecutionEngine(
             llm_client=flaky_llm,
@@ -804,9 +808,7 @@ class TestSevenToolExceptionsIntegration:
 
         assert exc_info.value.code == "EXCEPTION_383"
         # 验证真实重试循环被调用 2 次
-        assert flaky_llm.structured_generate.call_count == 2, (
-            f"期望 2 次重试调用, 实际 {flaky_llm.structured_generate.call_count}"
-        )
+        assert flaky_llm.generate.call_count == 2, f"期望 2 次重试调用, 实际 {flaky_llm.generate.call_count}"
 
 
 def _make_tool_for_engine(tool_id: uuid.UUID) -> Any:
