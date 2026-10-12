@@ -51,7 +51,7 @@ class CrawlTask:
         """从字典创建 CrawlTask
 
         Args:
-            data: 包含任务参数的字典
+            data: 包含任务参数的字典（to_request_dict 的逆序列化）
 
         Returns:
             CrawlTask 实例
@@ -62,6 +62,7 @@ class CrawlTask:
         url_include = tuple(data.get("url_patterns", {}).get("include", []))
         url_exclude = tuple(data.get("url_patterns", {}).get("exclude", []))
         return cls(
+            task_id=data.get("task_id", str(uuid4())),
             domains=domains,
             seed_urls=seed_urls,
             max_depth=data.get("max_depth", 3),
@@ -76,6 +77,31 @@ class CrawlTask:
             auth_storage_state_path=data.get("auth_storage_state_path", ""),
             auth_headers=data.get("auth_headers", {}),
         )
+
+    def to_request_dict(self) -> dict:
+        """转换为请求字典（from_dict 的逆序列化，用于跨进程任务传递）
+
+        Returns:
+            包含任务参数的字典
+        """
+        return {
+            "task_id": self.task_id,
+            "domains": list(self.domains),
+            "seed_urls": list(self.seed_urls),
+            "max_depth": self.max_depth,
+            "allowed_extensions": list(self.allowed_extensions),
+            "follow_subdomains": self.follow_subdomains,
+            "max_files": self.max_files,
+            "max_file_size_mb": self.max_file_size_mb,
+            "download_delay": self.download_delay,
+            "url_patterns": {
+                "include": list(self.url_include),
+                "exclude": list(self.url_exclude),
+            },
+            "use_browser": self.use_browser,
+            "auth_storage_state_path": self.auth_storage_state_path,
+            "auth_headers": dict(self.auth_headers),
+        }
 
 
 @dataclass(frozen=True)

@@ -87,6 +87,31 @@ class TestCrawlTask:
         assert task.url_include == ("/docs/",)
         assert task.url_exclude == ("/login",)
 
+    def test_from_dict_preserves_task_id(self) -> None:
+        """from_dict 应保留 task_id（跨进程任务标识一致性）"""
+        task = CrawlTask(domains=("example.com",))
+        restored = CrawlTask.from_dict(task.to_request_dict())
+        assert restored.task_id == task.task_id
+
+    def test_request_dict_roundtrip(self) -> None:
+        """to_request_dict → from_dict 应无损往返"""
+        task = CrawlTask(
+            domains=("example.com", "docs.example.com"),
+            seed_urls=("https://example.com/docs",),
+            max_depth=2,
+            allowed_extensions=("pdf", "xlsx"),
+            follow_subdomains=False,
+            max_files=10,
+            download_delay=0.5,
+            url_include=("/docs/",),
+            url_exclude=("/login",),
+            use_browser=True,
+            auth_storage_state_path="auth/state.json",
+            auth_headers={"Authorization": "Bearer t"},
+        )
+        restored = CrawlTask.from_dict(task.to_request_dict())
+        assert restored == task
+
 
 class TestCrawledFile:
     """CrawledFile 实体测试"""

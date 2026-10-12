@@ -94,7 +94,7 @@ class HttpCrawlerClient:
             payload["allowed_extensions"] = allowed_extensions
 
         response = await client.post(
-            f"{self._base_url}/api/v1/tasks",
+            f"{self._base_url}/tasks",
             json=payload,
         )
         response.raise_for_status()
@@ -119,7 +119,7 @@ class HttpCrawlerClient:
         client = await self._get_client()
 
         response = await client.get(
-            f"{self._base_url}/api/v1/tasks/{task_id}",
+            f"{self._base_url}/tasks/{task_id}",
         )
         response.raise_for_status()
 
@@ -142,7 +142,7 @@ class HttpCrawlerClient:
         client = await self._get_client()
 
         response = await client.delete(
-            f"{self._base_url}/api/v1/tasks/{task_id}",
+            f"{self._base_url}/tasks/{task_id}",
         )
 
         if response.status_code == 200:
@@ -164,7 +164,7 @@ class HttpCrawlerClient:
         client = await self._get_client()
 
         response = await client.get(
-            f"{self._base_url}/api/v1/formats",
+            f"{self._base_url}/formats",
         )
         response.raise_for_status()
 

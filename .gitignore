@@ -572,3 +572,6 @@ deploy/kubernetes/gitea/config/gitea_v.1.25+_example.app.ini
 # CA 私钥 - 敏感数据
 deploy/kubernetes/harbor/carenewal/internal-ca.key
 deploy/kubernetes/harbor/carenewal/ca-secret.yaml
+
+# Crawler 插件运行时爬取输出（自研 plugins/crawler 落盘目录）
+crawl_output/

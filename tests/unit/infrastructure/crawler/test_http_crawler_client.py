@@ -46,7 +46,7 @@ class TestHttpCrawlerClient:
 
         async def mock_transport(request: httpx.Request) -> httpx.Response:
             assert request.method == "POST"
-            assert str(request.url) == "http://localhost:8900/api/v1/tasks"
+            assert str(request.url) == "http://localhost:8900/tasks"
             assert json.loads(request.content)["domains"] == ["example.com"]
             return mock_response
 
@@ -132,7 +132,7 @@ class TestHttpCrawlerClient:
 
         async def mock_transport(request: httpx.Request) -> httpx.Response:
             assert request.method == "GET"
-            assert str(request.url) == "http://localhost:8900/api/v1/tasks/test-task-123"
+            assert str(request.url) == "http://localhost:8900/tasks/test-task-123"
             return mock_response
 
         transport = httpx.MockTransport(mock_transport)
@@ -171,7 +171,7 @@ class TestHttpCrawlerClient:
 
         async def mock_transport(request: httpx.Request) -> httpx.Response:
             assert request.method == "DELETE"
-            assert str(request.url) == "http://localhost:8900/api/v1/tasks/test-task-123"
+            assert str(request.url) == "http://localhost:8900/tasks/test-task-123"
             return httpx.Response(200, json={"cancelled": True})
 
         transport = httpx.MockTransport(mock_transport)
@@ -212,7 +212,7 @@ class TestHttpCrawlerClient:
 
         async def mock_transport(request: httpx.Request) -> httpx.Response:
             assert request.method == "GET"
-            assert str(request.url) == "http://localhost:8900/api/v1/formats"
+            assert str(request.url) == "http://localhost:8900/formats"
             return mock_response
 
         transport = httpx.MockTransport(mock_transport)
