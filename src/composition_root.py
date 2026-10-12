@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 def _llm_config() -> Any:
-    """组合根一行委托（组合根零私有函数纪律——工厂在 infrastructure/config/udmr.py）."""
-    from src.infrastructure.config.udmr import build_default_llm_config
+    """组合根一行委托（组合根零私有函数纪律——工厂在 infrastructure/config/llm.py）."""
+    from src.infrastructure.config.llm import build_default_llm_config
 
     return build_default_llm_config()
 
