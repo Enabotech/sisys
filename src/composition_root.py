@@ -25,35 +25,11 @@ logger = logging.getLogger(__name__)
 # 组合根仅做装配，不包含业务逻辑
 
 
-def _build_default_llm_config() -> "Any":
-    """构建默认 LLM 配置——UDMR 云端配置优先，回退 LLM_* 环境变量.
+def _llm_config() -> Any:
+    """组合根一行委托（组合根零私有函数纪律——工厂在 infrastructure/config/udmr.py）."""
+    from src.infrastructure.config.udmr import build_default_llm_config
 
-    UDMR SSOT 接线（审计修复 F1，2026-10-11）：当 UDMR_CLOUD_* 配置了至少
-    一个 enabled 云端模型时，取第一个经桥接转换为默认 LLMConfig——消除
-    「配置了 UDMR 却不生效」的双轨误导。UDMR 未配置时保持 4.x 既有行为
-    （LLMConfig.from_env()），零破坏性。
-
-    Returns:
-        LLMConfig 实例（来自 UDMR 云端配置或 LLM_* 环境变量回退）
-    """
-    from src.domain.ports.llm_client import LLMConfig
-    from src.infrastructure.config.udmr import UDMRConfig
-
-    udmr = UDMRConfig.from_env()
-    for cloud in udmr.cloud_configs:
-        if cloud.enabled and cloud.model and cloud.endpoint:
-            logger.info("UDMR SSOT: 使用云端模型 %s 作为默认 LLM 配置", cloud.model)
-            return LLMConfig(
-                api_type=cloud.api_type,
-                model=cloud.model,
-                endpoint=cloud.endpoint,
-                api_key=cloud.api_key,
-                temperature=cloud.temperature,
-                max_tokens=cloud.max_tokens,
-                timeout=float(udmr.llm_timeout),
-            )
-    logger.debug("UDMR SSOT: 无 enabled 云端模型，回退 LLM_* 环境变量")
-    return LLMConfig.from_env()
+    return build_default_llm_config()
 
 
 def bootstrap() -> None:
@@ -2029,7 +2005,7 @@ def bootstrap() -> None:
         name="llm_client",
         version="v1.1.0",  # 升级: UDMR SSOT 接线（审计修复 F1——UDMR 云端配置优先）
         interface=LLMClientPort,
-        impl=lambda resolver: LitellmLLMClient(_build_default_llm_config()),
+        impl=lambda resolver: LitellmLLMClient(_llm_config()),
         module="src.infrastructure.external_services.llm.litellm_llm_client",
         lifetime=Lifetime.SINGLETON,
         owner="foundation-team",
@@ -2687,7 +2663,7 @@ def bootstrap() -> None:
             session_repository=resolver.resolve("debate_session_repository"),
             event_publisher=resolver.resolve("event_publisher"),
             # F1 SSOT：辩论 base_config 也走 UDMR 优先（原 from_env 双轨消除）
-            base_config=_build_default_llm_config(),
+            base_config=_llm_config(),
         ),
         module="src.application.services.red_blue_debate_service",
         lifetime=Lifetime.SCOPED,
