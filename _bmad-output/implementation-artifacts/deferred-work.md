@@ -103,7 +103,7 @@
 - ~~后台发布任务 set 跨事件循环滞留（代码审查 CR-R3-4）~~ — **RESOLVED**（2026-10-10 技术债清偿）：统一治理落地——`drain_schema_events` 核心抽参数化 `drain_background_tasks(tasks, timeout, op_name)` 共享 helper（stale task 过滤/跨 loop 丢弃/超时取消原样保留），`drain_feedback_events` 薄壳复用，`composition_root.shutdown()` 增第二挂点。
 - 【UDMR 审计发现·2026-10-11】UDMR 带外→在环消费方接线 — Story 1-17 交付的 RoutingDecided 事件无 LLM 调用消费方（CostMetricsListener 仅做成本估算）；**F1 已完成配置层 SSOT 接线**（组合根 UDMR 云端配置优先 + F2 激活 handler），但路由决策仍为静态（单指针——StaticUdmrPolicy.route 忽略 UDMRTask.preferred_model/allowed_models），待 Epic 11 Story 11.1 L2 四因子评分实现真正的多模型动态路由。
 - 【UDMR 审计发现·2026-10-11】CloudHealthChecker HEAD 探测 405 问题 — 多数 LLM 网关对 HEAD 返回 405（1-17 review 已 defer）；**F6 已修正超时 600→30s**（对齐 1-17 AC-5），探测方案从 HEAD 换为 GET /models 待 Epic 11 处理。
-- 【数据源可用性核查·2026-10-12】Epic 6 市场洞察前数据源可用性清单 — **A 组 6 源全部 API 可达**（worldbank 200 / imf 200 / eurostat 200 / ipcc 200 / comtrade 200；sec-edgar 403 需 User-Agent 头适配器应已携带，待真实调用验证）；**B 组 5 源全部缺 Key**（uspto/newsapi/tavily/epo-ops/google-patents——免费 Key 申请见各官网）；**china-nbs crawler 未部署**（localhost:8901 不可达）。Epic 6 前置：①B 组按需申请 Key ②crawler 插件部署决策。
+- 【数据源可用性核查·2026-10-12】Epic 6 市场洞察前数据源可用性清单 — **A 组 6 源全部 API 可达**（worldbank 200 / imf 200 / eurostat 200 / ipcc 200 / comtrade 200；sec-edgar 403 需 User-Agent 头适配器应已携带，待真实调用验证）；**B 组 4 源缺 Key**（uspto/newsapi/epo-ops/google-patents）；~~tavily~~ **已配置**（2026-10-12——API 探活 200 + 适配器已注册，key 仅在本地 .env 不入库）；**china-nbs crawler 未部署**（localhost:8901 不可达）。Epic 6 前置：①剩余 4 源按需申请 Key ②crawler 插件部署决策。
 
 ## Deferred from: 技术债扫描——已实现未接线组件普查 (2026-10-12)
 
