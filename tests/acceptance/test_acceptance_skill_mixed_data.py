@@ -62,6 +62,14 @@ from tests.unit.application.skills.skill_mixed_data_contracts import (
     build_min_arguments,
 )
 
+
+def _llm_response(text: str) -> Any:
+    """快速构造 LLMResponse（generate() mock 返回值包装——F3 修复后引擎读 .content）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 # ===================================================================
 # Paths & Constants
 # ===================================================================
@@ -267,14 +275,14 @@ def _run_engine(
     并捕获全部 prompt（Think prompt 的 arguments repr 断言依据）。
     """
 
-    async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
+    async def _llm_dispatch(prompt: str, **_kwargs: Any) -> Any:
         execution.prompts.append(prompt)
         if "生成代码" in prompt:
-            return code
-        return "ok"
+            return _llm_response(code)
+        return _llm_response("ok")
 
     llm = AsyncMock()
-    llm.structured_generate = AsyncMock(side_effect=_llm_dispatch)
+    llm.generate = AsyncMock(side_effect=_llm_dispatch)
 
     async def _sandbox_execute(session_id: str, code_arg: str, **_kwargs: Any) -> dict[str, Any]:
         execution.sandbox_codes.append(code_arg)

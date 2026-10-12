@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 import redis.asyncio as aioredis
 
@@ -22,6 +23,37 @@ logger = logging.getLogger(__name__)
 
 # 工厂函数已迁移至对应 infrastructure/config/ 模块；组合根仅做装配，不包含业务逻辑
 # 组合根仅做装配，不包含业务逻辑
+
+
+def _build_default_llm_config() -> "Any":
+    """构建默认 LLM 配置——UDMR 云端配置优先，回退 LLM_* 环境变量.
+
+    UDMR SSOT 接线（审计修复 F1，2026-10-11）：当 UDMR_CLOUD_* 配置了至少
+    一个 enabled 云端模型时，取第一个经桥接转换为默认 LLMConfig——消除
+    「配置了 UDMR 却不生效」的双轨误导。UDMR 未配置时保持 4.x 既有行为
+    （LLMConfig.from_env()），零破坏性。
+
+    Returns:
+        LLMConfig 实例（来自 UDMR 云端配置或 LLM_* 环境变量回退）
+    """
+    from src.domain.ports.llm_client import LLMConfig
+    from src.infrastructure.config.udmr import UDMRConfig
+
+    udmr = UDMRConfig.from_env()
+    for cloud in udmr.cloud_configs:
+        if cloud.enabled and cloud.model and cloud.endpoint:
+            logger.info("UDMR SSOT: 使用云端模型 %s 作为默认 LLM 配置", cloud.model)
+            return LLMConfig(
+                api_type=cloud.api_type,
+                model=cloud.model,
+                endpoint=cloud.endpoint,
+                api_key=cloud.api_key,
+                temperature=cloud.temperature,
+                max_tokens=cloud.max_tokens,
+                timeout=float(udmr.llm_timeout),
+            )
+    logger.debug("UDMR SSOT: 无 enabled 云端模型，回退 LLM_* 环境变量")
+    return LLMConfig.from_env()
 
 
 def bootstrap() -> None:
@@ -1990,14 +2022,14 @@ def bootstrap() -> None:
     )
 
     # === LLM Client Port ===
-    from src.domain.ports.llm_client import LLMClientPort, LLMConfig
+    from src.domain.ports.llm_client import LLMClientPort
     from src.infrastructure.external_services.llm import LitellmLLMClient
 
     register_port(
         name="llm_client",
-        version="v1.0.0",
+        version="v1.1.0",  # 升级: UDMR SSOT 接线（审计修复 F1——UDMR 云端配置优先）
         interface=LLMClientPort,
-        impl=lambda resolver: LitellmLLMClient(LLMConfig.from_env()),
+        impl=lambda resolver: LitellmLLMClient(_build_default_llm_config()),
         module="src.infrastructure.external_services.llm.litellm_llm_client",
         lifetime=Lifetime.SINGLETON,
         owner="foundation-team",
@@ -2654,10 +2686,8 @@ def bootstrap() -> None:
             evaluator=resolver.resolve("debate_evaluator"),
             session_repository=resolver.resolve("debate_session_repository"),
             event_publisher=resolver.resolve("event_publisher"),
-            base_config=__import__(
-                "src.domain.ports.llm_client",
-                fromlist=["LLMConfig"],
-            ).LLMConfig.from_env(),
+            # F1 SSOT：辩论 base_config 也走 UDMR 优先（原 from_env 双轨消除）
+            base_config=_build_default_llm_config(),
         ),
         module="src.application.services.red_blue_debate_service",
         lifetime=Lifetime.SCOPED,
@@ -2675,6 +2705,10 @@ def bootstrap() -> None:
         "chunk_indexing_handler",
         "semantic_chunking_handler",
         "archive_validity_handler",
+        # UDMR 审计修复 F2（2026-10-11）：激活 1-17/1-19 交付的带外决策流
+        # 与成本追踪（此前注册了端口但未在 bootstrap 订阅——生产休眠）
+        "udmr_handler",
+        "cost_metrics_handler",
     ]
     resolver = get_resolver()
     for handler_name in handler_names:
@@ -2683,9 +2717,21 @@ def bootstrap() -> None:
         except Exception:
             logger.warning("事件处理器未注册，跳过 register_handlers: %s", handler_name)
             continue
+        # 同步 handler（register_handlers 方法——既有 4 个事件处理器）
         register_fn = getattr(handler, "register_handlers", None)
         if callable(register_fn):
             register_fn()
+            continue
+        # 异步 handler（register 方法——UDMR/CostMetrics，需事件循环；
+        # bootstrap 为同步上下文，通过新建事件循环执行异步注册）
+        async_register = getattr(handler, "register", None)
+        if callable(async_register):
+            import asyncio
+
+            try:
+                asyncio.new_event_loop().run_until_complete(async_register())
+            except Exception as e:
+                logger.warning("异步事件处理器注册失败 %s: %s", handler_name, type(e).__name__)
 
 
 async def shutdown() -> None:
@@ -2802,8 +2848,6 @@ def session_middleware_wiring() -> dict:
         {"session_factory", "session_setter", "session_resetter"} 三键——工厂
         惰性经 resolver 解析 SINGLETON session_factory（bootstrap 后可用）
     """
-    from typing import Any
-
     from src.domain.ports.resolver import get_resolver
     from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 

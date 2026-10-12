@@ -39,6 +39,14 @@ from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall, 
 from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 from tests.unit.application.skills.skill_mixed_data_contracts import build_min_arguments
 
+
+def _llm_response(text: str) -> Any:
+    """快速构造 LLMResponse（generate() mock 返回值包装——F3 修复后引擎读 .content）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 FEATURE: str = "test_acceptance_skill_framework.feature"
 
 # 零标记分析代码（纯内部型 Code 阶段产物——SOP 引导沙箱代码不含任何 $DATA_SOURCE 标记）
@@ -95,14 +103,14 @@ def _make_llm(code: str, prompts: list[str]) -> AsyncMock:
     全部 prompt 捕获留存（Think prompt 的 arguments repr 断言依据）。
     """
 
-    async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
+    async def _llm_dispatch(prompt: str, **_kwargs: Any) -> Any:
         prompts.append(prompt)
         if "生成代码" in prompt:
-            return code
-        return "ok"
+            return _llm_response(code)
+        return _llm_response("ok")
 
     llm = AsyncMock()
-    llm.structured_generate = AsyncMock(side_effect=_llm_dispatch)
+    llm.generate = AsyncMock(side_effect=_llm_dispatch)
     return llm
 
 

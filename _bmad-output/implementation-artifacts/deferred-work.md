@@ -101,3 +101,5 @@
 - ~~`validation_feedback_service` 端口与 `tool_execution_service` 双链构造注记（代码审查 CR-R1-28/M4）~~ — **RESOLVED**（2026-10-10 技术债清偿）：`build_validation_feedback_service` 改一行委托 `build_tool_execution_chain(...).service`——service 构造唯一 SSOT 在链工厂（消除逐字重复；双链实例形态为 SCOPED 既有语义维持注记）。
 - `_finish_recovered` 读-后-记 TOCTOU（代码审查 CR-R1-29） — fix_summary 快照与 record_case 间并发写窗口极小；计数由仓储 merge 保护。
 - ~~后台发布任务 set 跨事件循环滞留（代码审查 CR-R3-4）~~ — **RESOLVED**（2026-10-10 技术债清偿）：统一治理落地——`drain_schema_events` 核心抽参数化 `drain_background_tasks(tasks, timeout, op_name)` 共享 helper（stale task 过滤/跨 loop 丢弃/超时取消原样保留），`drain_feedback_events` 薄壳复用，`composition_root.shutdown()` 增第二挂点。
+- 【UDMR 审计发现·2026-10-11】UDMR 带外→在环消费方接线 — Story 1-17 交付的 RoutingDecided 事件无 LLM 调用消费方（CostMetricsListener 仅做成本估算）；**F1 已完成配置层 SSOT 接线**（组合根 UDMR 云端配置优先 + F2 激活 handler），但路由决策仍为静态（单指针——StaticUdmrPolicy.route 忽略 UDMRTask.preferred_model/allowed_models），待 Epic 11 Story 11.1 L2 四因子评分实现真正的多模型动态路由。
+- 【UDMR 审计发现·2026-10-11】CloudHealthChecker HEAD 探测 405 问题 — 多数 LLM 网关对 HEAD 返回 405（1-17 review 已 defer）；**F6 已修正超时 600→30s**（对齐 1-17 AC-5），探测方案从 HEAD 换为 GET /models 待 Epic 11 处理。

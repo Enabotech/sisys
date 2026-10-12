@@ -73,11 +73,11 @@ class ToolExecutionEngine:
     五阶段端口映射：
     | 阶段     | 端口方法                                         | 输入                      | 输出              |
     |----------|--------------------------------------------------|---------------------------|-------------------|
-    | Think    | LLMClientPort.structured_generate                | SKILL.md + arguments      | plan: str         |
-    | Code     | LLMClientPort.structured_generate                | plan + input_schema       | code: str         |
+    | Think    | LLMClientPort.generate                | SKILL.md + arguments      | plan: str         |
+    | Code     | LLMClientPort.generate                | plan + input_schema       | code: str         |
     | Execute  | SandboxExecutor.execute_code                     | session_id + code         | result: str       |
     | Observe  | SandboxExecutor.execute_code                     | result                    | observation: str  |
-    | Validate | LLMClientPort.structured_generate                | result + observation      | validation: str   |
+    | Validate | LLMClientPort.generate                | result + observation      | validation: str   |
     """
 
     def __init__(
@@ -404,14 +404,11 @@ class ToolExecutionEngine:
         hints = (context.extensions or {}).get("validation_feedback_hints")
         prompt = self._build_think_prompt(tool, tool_call, hints=hints)
         response = await self._retry_call(
-            lambda: self._llm.structured_generate(
-                prompt=prompt,
-                response_schema=str,
-            ),
+            lambda: self._llm.generate(prompt=prompt),
             execution_id=context.session_id,
             tool_id=tool.tool_id,
         )
-        return str(response)
+        return str(response.content)
 
     async def _code_stage(
         self,
@@ -428,14 +425,11 @@ class ToolExecutionEngine:
         hints = (context.extensions or {}).get("validation_feedback_hints")
         prompt = self._build_code_prompt(plan, tool, hints=hints)
         response = await self._retry_call(
-            lambda: self._llm.structured_generate(
-                prompt=prompt,
-                response_schema=str,
-            ),
+            lambda: self._llm.generate(prompt=prompt),
             execution_id=context.session_id,
             tool_id=tool.tool_id,
         )
-        return str(response)
+        return str(response.content)
 
     async def _execute_stage(self, session_id: str, code: str, tool: Tool) -> str:
         """Execute 阶段：调用 SandboxExecutor.execute_code 产出 result"""
@@ -470,13 +464,8 @@ class ToolExecutionEngine:
         """
         last_violations = (context.extensions or {}).get("schema_last_violations", ())
         prompt = self._build_validate_prompt(tool, result, observation, last_violations)
-        response = await self._retry_call(
-            lambda: self._llm.structured_generate(
-                prompt=prompt,
-                response_schema=str,
-            )
-        )
-        return str(response)
+        response = await self._retry_call(lambda: self._llm.generate(prompt=prompt))
+        return str(response.content)
 
     # ===== 重试机制 =====
 

@@ -33,6 +33,13 @@ from src.domain.value_objects.tool_execution import (
 )
 
 
+def _llm_response(text: str) -> Any:
+    """快速构造 LLMResponse（generate() mock 返回值包装——F3 修复后引擎读 .content）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 def _make_tool(**kwargs) -> Tool:
     defaults: dict = {
         "tool_id": uuid.uuid4(),
@@ -61,7 +68,7 @@ def _make_context(**kwargs) -> ExecutionContext:
 def _make_llm_mock() -> AsyncMock:
     """构造 LLMClientPort mock"""
     mock = AsyncMock()
-    mock.structured_generate = AsyncMock(return_value="mock_response")
+    mock.generate = AsyncMock(return_value=_llm_response("mock_response"))
     return mock
 
 
@@ -79,7 +86,7 @@ class TestToolExecutionEngineFiveStage:
 
     @pytest.mark.asyncio
     async def test_think_stage_invokes_llm(self) -> None:
-        """Think 阶段调用 LLM.structured_generate"""
+        """Think 阶段调用 LLM.generate（F3 修复：纯文本产出改用 generate）"""
         llm = _make_llm_mock()
         sandbox = _make_sandbox_mock()
         engine = ToolExecutionEngine(llm, sandbox)
@@ -90,8 +97,8 @@ class TestToolExecutionEngineFiveStage:
 
         await engine.execute(tool.tool_id, tool, tool_call, context)
 
-        # 验证 LLM.structured_generate 被调用（Think/Code/Validate 三阶段）
-        assert llm.structured_generate.call_count == 3
+        # 验证 LLM.generate 被调用（Think/Code/Validate 三阶段）
+        assert llm.generate.call_count == 3
 
     @pytest.mark.asyncio
     async def test_execute_and_observe_stage_invoke_sandbox(self) -> None:
@@ -160,9 +167,9 @@ class TestRetryPolicy:
             call_count["n"] += 1
             if call_count["n"] == 1:
                 raise LLMAPIError("api error")
-            return "success_response"
+            return _llm_response("success_response")
 
-        llm.structured_generate = mock_generate
+        llm.generate = mock_generate
         sandbox = _make_sandbox_mock()
         engine = ToolExecutionEngine(
             llm,
@@ -186,7 +193,7 @@ class TestRetryPolicy:
     async def test_retry_exhausted_raises_error(self) -> None:
         """重试耗尽抛 ToolExecutionRetryExhaustedError"""
         llm = _make_llm_mock()
-        llm.structured_generate = AsyncMock(side_effect=LLMAPIError("persistent error"))
+        llm.generate = AsyncMock(side_effect=LLMAPIError("persistent error"))
         sandbox = _make_sandbox_mock()
         engine = ToolExecutionEngine(
             llm,
@@ -287,7 +294,7 @@ class TestFailurePathPersistence:
         from src.domain.entities.tool_execution import ToolExecutionState
 
         llm = _make_llm_mock()
-        llm.structured_generate = AsyncMock(side_effect=LLMAPIError("persistent error"))
+        llm.generate = AsyncMock(side_effect=LLMAPIError("persistent error"))
         sandbox = _make_sandbox_mock()
         repo = self._make_repo()
         engine = ToolExecutionEngine(

@@ -53,6 +53,14 @@ from tests.unit.application.skills.skill_mixed_data_contracts import (
     build_min_arguments,
 )
 
+
+def _llm_response(text: str) -> Any:
+    """LLMResponse 包装（generate() mock 返回值——F3）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cache")]
 
 # 数据契约 SSOT：import contracts 模块唯一来源（R2-F3 统一）
@@ -138,14 +146,14 @@ def _make_engine(
     （Think prompt 的 arguments repr 断言依据——内外融合双通道之一）。
     """
 
-    async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
+    async def _llm_dispatch(prompt: str, **_kwargs: Any) -> Any:
         prompts.append(prompt)
         if "生成代码" in prompt:
-            return code
-        return "ok"
+            return _llm_response(code)
+        return _llm_response("ok")
 
     llm = AsyncMock()
-    llm.structured_generate = AsyncMock(side_effect=_llm_dispatch)
+    llm.generate = AsyncMock(side_effect=_llm_dispatch)
 
     sandbox = AsyncMock()
     sandbox.execute_code = AsyncMock(return_value={"status": "ok", "output": "done"})

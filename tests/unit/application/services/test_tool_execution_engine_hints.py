@@ -23,6 +23,14 @@ from src.application.services.tool_execution_engine import ToolExecutionEngine
 from src.domain.entities.tool import Tool, ToolCategory, ToolStatus
 from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall
 
+
+def _llm_response(text: str) -> Any:
+    """快速构造 LLMResponse（generate() mock 返回值包装——F3 修复后引擎读 .content）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 _TENANT = uuid.uuid4()
 _TOOL_ID = uuid.uuid4()
 
@@ -73,15 +81,15 @@ def _make_llm() -> AsyncMock:
     llm = AsyncMock()
     prompts: list[str] = []
 
-    async def _structured(prompt: str, **kwargs: Any) -> str:
+    async def _structured(prompt: str, **kwargs: Any) -> Any:
         prompts.append(prompt)
         if prompt.startswith("为工具"):
-            return "plan-1"
+            return _llm_response("plan-1")
         if prompt.startswith("基于以下计划"):
-            return "print('result')"
-        return "validation-ok"
+            return _llm_response("print('result')")
+        return _llm_response("validation-ok")
 
-    llm.structured_generate = AsyncMock(side_effect=_structured)
+    llm.generate = AsyncMock(side_effect=_structured)
     llm.prompts = prompts
     return llm
 

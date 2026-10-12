@@ -28,7 +28,7 @@ class CloudHealthChecker:
     def __init__(
         self,
         cloud_configs: list[CloudModelConfig],
-        timeout: int = 600,
+        timeout: int = 30,  # 审计修复 F6：1-17 AC-5 要求 <30s（原 600 是 LLM 调用超时，非探测超时）
         cache_ttl: int = 300,
     ) -> None:
         self._cloud_configs = cloud_configs

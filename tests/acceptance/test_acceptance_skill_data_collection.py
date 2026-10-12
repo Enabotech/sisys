@@ -61,6 +61,14 @@ from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
 from tests.unit.application.skills.skill_data_collection_contracts import SKILL_DATA_SOURCES
 
+
+def _llm_response(text: str) -> Any:
+    """快速构造 LLMResponse（generate() mock 返回值包装——F3 修复后引擎读 .content）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 FEATURE = "test_acceptance_skill_data_collection.feature"
 
 # 全部场景归入 data-source-cache 组: 与共享缓存键的测试在同一 worker 串行执行
@@ -202,14 +210,14 @@ def _make_engine(context: dict[str, Any], code: str) -> ToolExecutionEngine:
     """
     llm_call_count = {"n": 0}
 
-    async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
+    async def _llm_dispatch(prompt: str, **_kwargs: Any) -> Any:
         llm_call_count["n"] += 1
         if llm_call_count["n"] == 2:
-            return code
-        return "ok"
+            return _llm_response(code)
+        return _llm_response("ok")
 
     llm = AsyncMock()
-    llm.structured_generate = AsyncMock(side_effect=_llm_dispatch)
+    llm.generate = AsyncMock(side_effect=_llm_dispatch)
     context["llm_mock"] = llm
 
     async def _sandbox_execute(session_id: str, code_arg: str, **_kwargs: Any) -> dict[str, Any]:

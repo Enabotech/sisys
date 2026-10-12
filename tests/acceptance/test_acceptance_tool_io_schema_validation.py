@@ -87,7 +87,7 @@ def _make_tool(
 
 def _make_mock_llm(output: str = "mock_response") -> AsyncMock:
     mock = AsyncMock()
-    mock.structured_generate = AsyncMock(return_value=output)
+    mock.generate = AsyncMock(return_value=output)
     return mock
 
 

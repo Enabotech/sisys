@@ -37,6 +37,14 @@ from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall, 
 from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
 
+
+def _llm_response(text: str) -> Any:
+    """LLMResponse 包装（generate() mock 返回值——F3）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cache")]
 
 
@@ -99,13 +107,13 @@ def _make_metadata(*names: str) -> ToolMetadata:
 def _make_engine(code: str, sandbox_codes: list[str], resolver: DataSourceResolverService) -> ToolExecutionEngine:
     """真实 Engine（Mock LLM/Sandbox）+ 后注入真实 Resolver"""
 
-    async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
+    async def _llm_dispatch(prompt: str, **_kwargs: Any) -> Any:
         if "生成代码" in prompt:
-            return code
-        return "ok"
+            return _llm_response(code)
+        return _llm_response("ok")
 
     llm = AsyncMock()
-    llm.structured_generate = AsyncMock(side_effect=_llm_dispatch)
+    llm.generate = AsyncMock(side_effect=_llm_dispatch)
 
     async def _sandbox_execute(session_id: str, code_arg: str, **_kwargs: Any) -> dict[str, Any]:
         sandbox_codes.append(code_arg)

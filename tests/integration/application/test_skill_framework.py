@@ -39,6 +39,14 @@ from tests.unit.application.skills.skill_framework_contracts import (
     build_min_arguments,
 )
 
+
+def _llm_response(text: str) -> Any:
+    """LLMResponse 包装（generate() mock 返回值——F3）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 pytestmark = [pytest.mark.integration]
 
 # 零标记分析代码（纯内部型 Code 阶段产物——不含任何 $DATA_SOURCE 标记）
@@ -51,14 +59,14 @@ _MISUSED_MARKER_CODE: str = 'data = $DATA_SOURCE("world-bank", "行业基准查�
 def _make_llm(code: str, prompts: list[str]) -> AsyncMock:
     """Fake LLM：按内容特征分派（prompt 含「生成代码」→ Code 阶段返回注入代码）。"""
 
-    async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
+    async def _llm_dispatch(prompt: str, **_kwargs: Any) -> Any:
         prompts.append(prompt)
         if "生成代码" in prompt:
-            return code
-        return "ok"
+            return _llm_response(code)
+        return _llm_response("ok")
 
     llm = AsyncMock()
-    llm.structured_generate = AsyncMock(side_effect=_llm_dispatch)
+    llm.generate = AsyncMock(side_effect=_llm_dispatch)
     return llm
 
 

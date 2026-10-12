@@ -47,6 +47,14 @@ from src.domain.value_objects.tool_execution import (
 )
 from src.infrastructure.storage.inmemory.tool_repository import InMemoryToolRepository
 
+
+def _llm_response(text: str) -> Any:
+    """快速构造 LLMResponse（generate() mock 返回值包装——F3 修复后引擎读 .content）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 scenarios("test_acceptance_strategic_tool_impl.feature")
 
 
@@ -76,7 +84,7 @@ def tool_registry(tool_repository: InMemoryToolRepository) -> ToolRegistryServic
 def _make_mock_llm() -> AsyncMock:
     """构造 LLMClientPort mock（仅用于 AC-4 五阶段端口映射验证）。"""
     mock = AsyncMock()
-    mock.structured_generate = AsyncMock(return_value="mock_response")
+    mock.generate = AsyncMock(return_value=_llm_response("mock_response"))
     return mock
 
 
@@ -627,13 +635,13 @@ def when_engine_full_pipeline(context: dict[str, Any]) -> None:
 @then("Think 阶段调用 LLMClientPort.structured_generate 产出 plan")
 def then_think_stage_plan(context: dict[str, Any]) -> None:
     """Think 阶段（structured_generate 至少被调用 1 次）。"""
-    assert context["llm_mock"].structured_generate.call_count >= 1
+    assert context["llm_mock"].generate.call_count >= 1
 
 
 @then("Code 阶段调用 LLMClientPort.structured_generate 产出 code")
 def then_code_stage_code(context: dict[str, Any]) -> None:
     """Code 阶段（累计 ≥ 2 次）。"""
-    assert context["llm_mock"].structured_generate.call_count >= 2
+    assert context["llm_mock"].generate.call_count >= 2
 
 
 @then("Execute 阶段调用 SandboxExecutor.execute_code 产出 result")
@@ -651,7 +659,7 @@ def then_observe_stage_observation(context: dict[str, Any]) -> None:
 @then("Validate 阶段调用 LLMClientPort.structured_generate 产出 validation")
 def then_validate_stage_validation(context: dict[str, Any]) -> None:
     """Validate 阶段（累计 ≥ 3 次）。"""
-    assert context["llm_mock"].structured_generate.call_count >= 3
+    assert context["llm_mock"].generate.call_count >= 3
 
 
 @then("执行前调用 SandboxExecutor.start_container")
@@ -677,9 +685,9 @@ def when_llm_first_fails_then_succeeds(context: dict[str, Any]) -> None:
         call_count["n"] += 1
         if call_count["n"] == 1:
             raise LLMAPIError("api error")
-        return "success_response"
+        return _llm_response("success_response")
 
-    llm.structured_generate = mock_generate
+    llm.generate = mock_generate
 
     # 重新构造引擎和 service（使用新 mock）
     new_engine = ToolExecutionEngine(
@@ -726,7 +734,7 @@ def when_llm_always_fails(context: dict[str, Any]) -> None:
     """构造持续失败的 LLM Mock。"""
     llm = context["llm_mock"]
     sandbox = context["sandbox_mock"]
-    llm.structured_generate = AsyncMock(side_effect=LLMAPIError("persistent error"))
+    llm.generate = AsyncMock(side_effect=LLMAPIError("persistent error"))
 
     new_engine = ToolExecutionEngine(
         llm_client=llm,

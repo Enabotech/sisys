@@ -51,6 +51,14 @@ from src.domain.value_objects.tool_execution import (
     ToolResultStatus,
 )
 
+
+def _llm_response(text: str) -> Any:
+    """快速构造 LLMResponse（generate() mock 返回值包装——F3 修复后引擎读 .content）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 # =============================================================================
 # 测试工厂
 # =============================================================================
@@ -188,13 +196,13 @@ def _make_real_engine_side_effect(code: str, adapters: dict[str, _StubDataSource
     """
 
     async def _execute(tool_id: uuid.UUID, tool_call: Any, context: ExecutionContext) -> ToolResult:
-        async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
+        async def _llm_dispatch(prompt: str, **_kwargs: Any) -> Any:
             if "生成代码" in prompt:
-                return code
-            return "ok"
+                return _llm_response(code)
+            return _llm_response("ok")
 
         llm = AsyncMock()
-        llm.structured_generate = AsyncMock(side_effect=_llm_dispatch)
+        llm.generate = AsyncMock(side_effect=_llm_dispatch)
 
         sandbox = AsyncMock()
         sandbox.start_container = AsyncMock()

@@ -42,9 +42,9 @@ class TestCloudHealthCheckerInit:
         assert checker._timeout == 30
 
     def test_init_default_timeout(self) -> None:
-        """默认超时为 600 秒."""
+        """默认超时为 30 秒（F6 修复：对齐 1-17 AC-5）."""
         checker = CloudHealthChecker(cloud_configs=[])
-        assert checker._timeout == 600
+        assert checker._timeout == 30
 
 
 # ===================================================================

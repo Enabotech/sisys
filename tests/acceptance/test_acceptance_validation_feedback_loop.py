@@ -61,7 +61,7 @@ from src.domain.exceptions import (
     ToolSchemaMissingError,
     ValidationError,
 )
-from src.domain.ports.llm_client import LLMClientPort, LLMConfig, LLMResponse
+from src.domain.ports.llm_client import LLMConfig, LLMResponse
 from src.domain.services.error_signature_extractor import ErrorSignatureExtractor
 from src.domain.value_objects.tool_execution import (
     ExecutionContext,
@@ -218,8 +218,10 @@ class _ScriptedLLM:
         self._structured_side_effect = structured_side_effect
 
     async def generate(self, prompt: str, config: LLMConfig | None = None, system_prompt: str | None = None) -> LLMResponse:
-        """修复建议生成通道（fix-gen）——按 system_prompt 角色标记分派."""
+        """统一 LLM 通道（F3 修复后 Think/Code/Validate/fix-gen 全走 generate）——按
+        system_prompt 角色标记与 prompt 固定前缀双维度分派."""
         self.calls.append({"kind": "generate", "prompt": prompt, "system_prompt": system_prompt})
+        # fix-gen 通道：system_prompt 角色标记分派
         if system_prompt and system_prompt.startswith(FIX_GEN_SYSTEM_MARKER):
             if self._fix_queue:
                 item = self._fix_queue.pop(0)
@@ -227,30 +229,22 @@ class _ScriptedLLM:
                     raise item
                 return LLMResponse(content=str(item))
             return LLMResponse(content="修复建议：将结果前缀改为 OK_")
-        return LLMResponse(content="generic")
-
-    async def structured_generate(
-        self,
-        prompt: str,
-        response_schema: type[Any],
-        config: LLMConfig | None = None,
-        system_prompt: str | None = None,
-    ) -> Any:
-        """五阶段结构化生成通道——按 prompt 固定前缀分派 Think/Code/Validate."""
-        self.calls.append({"kind": "structured", "prompt": prompt})
+        # 五阶段通道（F3 修复：原 structured_generate 分派合并入 generate）：
+        # 按 prompt 固定前缀分派 Think/Code/Validate
         if self._structured_side_effect is not None:
-            return await self._structured_side_effect(prompt)
+            result = await self._structured_side_effect(prompt)
+            return LLMResponse(content=str(result))
         if prompt.startswith("为工具"):
             if self._think_side_effect is not None:
                 raise self._think_side_effect
-            return "plan-1"
+            return LLMResponse(content="plan-1")
         if prompt.startswith("基于以下计划"):
             if self._code_queue:
-                return self._code_queue.pop(0)
-            return "print('result')"
+                return LLMResponse(content=self._code_queue.pop(0))
+            return LLMResponse(content="print('result')")
         if prompt.startswith("验证工具"):
-            return "validation-ok"
-        return "generic"
+            return LLMResponse(content="validation-ok")
+        return LLMResponse(content="generic")
 
     async def close(self) -> None:
         """释放资源（协议成员——内存替身无资源，幂等空操作）。"""
@@ -349,7 +343,7 @@ class _FailingChain:
 
 def _build_chain(
     context: dict[str, Any],
-    llm: LLMClientPort | None = None,
+    llm: Any = None,
     sandbox: AsyncMock | None = None,
     wrapped_override: Any = None,
     error_case_repo: InMemoryErrorCaseRepository | None = None,
@@ -368,7 +362,7 @@ def _build_chain(
     error_case_repo = error_case_repo or InMemoryErrorCaseRepository()
     evolution_repo = evolution_repo or InMemoryEvolutionLogRepository()
     publisher = _RecordingEventPublisher()
-    llm_client: LLMClientPort = llm if llm is not None else _make_scripted_llm()
+    llm_client: Any = llm if llm is not None else _make_scripted_llm()
     sandbox_client: Any = sandbox if sandbox is not None else _make_scripted_sandbox()
     engine = ToolExecutionEngine(
         llm_client=llm_client,
@@ -473,8 +467,9 @@ def _list_logs(context: dict[str, Any]) -> list[Any]:
 
 
 def _fix_calls(context: dict[str, Any]) -> list[dict[str, Any]]:
-    """取修复生成调用记录（generate 通道）。"""
-    return [c for c in context["llm"].calls if c["kind"] == "generate"]
+    """取修复生成调用记录（generate 通道中带 fix-gen system_prompt 角色标记的——
+    F3 修复后 Think/Code/Validate 也走 generate，需按 system_prompt 区分）。"""
+    return [c for c in context["llm"].calls if c.get("system_prompt") and c["system_prompt"].startswith(FIX_GEN_SYSTEM_MARKER)]
 
 
 def _bad_violation_dicts() -> list[dict[str, Any]]:

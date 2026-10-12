@@ -47,6 +47,14 @@ from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
 from tests.unit.application.skills.skill_data_collection_contracts import SKILL_DATA_SOURCES
 
+
+def _llm_response(text: str) -> Any:
+    """LLMResponse 包装（generate() mock 返回值——F3）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("data-source-cache")]
 
 # 数据契约 SSOT：import contracts 模块唯一来源（R2-F3 统一，值与 Story 声明表逐字一致）
@@ -123,13 +131,13 @@ def _make_engine(code: str, adapters: dict[str, _StubAdapter], cache: Any, event
     稳健（R2-F1：序数分派依赖「每执行恰好第 2 次调用是 Code」的脆弱假设）。
     """
 
-    async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
+    async def _llm_dispatch(prompt: str, **_kwargs: Any) -> Any:
         if "生成代码" in prompt:
-            return code
-        return "ok"
+            return _llm_response(code)
+        return _llm_response("ok")
 
     llm = AsyncMock()
-    llm.structured_generate = AsyncMock(side_effect=_llm_dispatch)
+    llm.generate = AsyncMock(side_effect=_llm_dispatch)
 
     sandbox = AsyncMock()
     sandbox.start_container = AsyncMock()

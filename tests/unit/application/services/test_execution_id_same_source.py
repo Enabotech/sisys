@@ -32,6 +32,7 @@ from src.application.services.tool_execution_service import ToolExecutionService
 from src.application.services.tool_output_validator import ToolOutputValidator
 from src.domain.entities.tool import Tool, ToolCategory, ToolStatus
 from src.domain.exceptions import ToolResultValidationError
+from src.domain.ports.llm_client import LLMResponse
 from src.domain.services.schema_validator import SchemaValidationResult, SchemaViolation
 from src.domain.value_objects.tool_execution import (
     ExecutionContext,
@@ -62,10 +63,10 @@ def _make_llm() -> AsyncMock:
     """可编程 LLM（structured_generate 三阶段固定返回——Think/Code/Validate）."""
     llm = AsyncMock()
 
-    async def _structured(prompt: str, config: Any = None, **kwargs: Any) -> str:
-        return "ok"
+    async def _structured(prompt: str, config: Any = None, **kwargs: Any) -> Any:
+        return LLMResponse(content="ok")
 
-    llm.structured_generate = AsyncMock(side_effect=_structured)
+    llm.generate = AsyncMock(side_effect=_structured)
     return llm
 
 

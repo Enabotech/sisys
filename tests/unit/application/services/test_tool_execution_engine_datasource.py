@@ -45,6 +45,14 @@ from src.domain.value_objects.data_source import (
 from src.domain.value_objects.tool_execution import ExecutionContext, ToolCall, ToolResultStatus
 from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 
+
+def _llm_response(text: str) -> Any:
+    """快速构造 LLMResponse（generate() mock 返回值包装——F3 修复后引擎读 .content）"""
+    from src.domain.ports.llm_client import LLMResponse
+
+    return LLMResponse(content=text)
+
+
 # ===================================================================
 # 测试替身与工厂
 # ===================================================================
@@ -129,13 +137,13 @@ def _make_engine(
 ) -> ToolExecutionEngine:
     """构建真实 Engine（Mock LLM/Sandbox 端口适配器；仓储可选注入——R3-4 K2）。"""
 
-    async def _llm_dispatch(prompt: str, response_schema: Any) -> str:
+    async def _llm_dispatch(prompt: str, **_kwargs: Any) -> Any:
         if "生成代码" in prompt:
-            return code
-        return "ok"
+            return _llm_response(code)
+        return _llm_response("ok")
 
     llm = AsyncMock()
-    llm.structured_generate = AsyncMock(side_effect=_llm_dispatch)
+    llm.generate = AsyncMock(side_effect=_llm_dispatch)
 
     async def _sandbox_execute(session_id: str, code_arg: str, **_kwargs: Any) -> dict[str, Any]:
         sandbox_codes.append(code_arg)
