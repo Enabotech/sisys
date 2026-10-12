@@ -103,3 +103,33 @@
 - ~~后台发布任务 set 跨事件循环滞留（代码审查 CR-R3-4）~~ — **RESOLVED**（2026-10-10 技术债清偿）：统一治理落地——`drain_schema_events` 核心抽参数化 `drain_background_tasks(tasks, timeout, op_name)` 共享 helper（stale task 过滤/跨 loop 丢弃/超时取消原样保留），`drain_feedback_events` 薄壳复用，`composition_root.shutdown()` 增第二挂点。
 - 【UDMR 审计发现·2026-10-11】UDMR 带外→在环消费方接线 — Story 1-17 交付的 RoutingDecided 事件无 LLM 调用消费方（CostMetricsListener 仅做成本估算）；**F1 已完成配置层 SSOT 接线**（组合根 UDMR 云端配置优先 + F2 激活 handler），但路由决策仍为静态（单指针——StaticUdmrPolicy.route 忽略 UDMRTask.preferred_model/allowed_models），待 Epic 11 Story 11.1 L2 四因子评分实现真正的多模型动态路由。
 - 【UDMR 审计发现·2026-10-11】CloudHealthChecker HEAD 探测 405 问题 — 多数 LLM 网关对 HEAD 返回 405（1-17 review 已 defer）；**F6 已修正超时 600→30s**（对齐 1-17 AC-5），探测方案从 HEAD 换为 GET /models 待 Epic 11 处理。
+- 【数据源可用性核查·2026-10-12】Epic 6 市场洞察前数据源可用性清单 — **A 组 6 源全部 API 可达**（worldbank 200 / imf 200 / eurostat 200 / ipcc 200 / comtrade 200；sec-edgar 403 需 User-Agent 头适配器应已携带，待真实调用验证）；**B 组 5 源全部缺 Key**（uspto/newsapi/tavily/epo-ops/google-patents——免费 Key 申请见各官网）；**china-nbs crawler 未部署**（localhost:8901 不可达）。Epic 6 前置：①B 组按需申请 Key ②crawler 插件部署决策。
+
+## Deferred from: 技术债扫描——已实现未接线组件普查 (2026-10-12)
+
+> Epic 4 回顾行动项 7.1-3 执行。基线 main@cda34bf2，生产路径 = create_app() + sisys-ocr CLI + bootstrap() handler_names。**核心结论：生产活代码约 50/166 端口（三分之一）**。
+
+### 入口面缺口（最高优先）
+- create_app() 仅挂 7 路由，5 个已实现 router 未挂载：**auth（登录端点缺失——最大单点风险）**、audit（1.10 交付）、crawler、monitoring（/metrics）、equilibrium_security — 触发=V1 API 可用性立项时统一接线（auth 建议先行）
+- exception_metrics 端口零消费 + register_exception_handlers(app) 未传 metrics — 异常遥测静默关闭；接线成本一行
+- RabbitMQConsumer/RabbitMQEventListener/EventBusFactory 零接线 — reliable 通道只发不收；触发=首个消费方 Story
+
+### 事件 handler 未激活（注册≠激活——UDMR F2 同款）
+- AutoTriggerHandler 有 register_handlers 但不在 handler_names — Story 1.14 trigger→route→execute 管线三 handler + heartbeat_scheduler + session_namespace_manager 整体生产休眠；触发=Epic 5 Agent 编排
+- MemoryChangedHandler（1.15a）未注册端口零引用；ToolExecutedEventHandler（4.1a AC-5 工具统计投影）零引用 — Tool.reliability_score 生产永不更新
+- CacheInvalidationHandler 构造期自注册+端口惰性实例化=永不注册（结构性陷阱）— Story 3-9 缓存失效失效
+
+### 端口链路休眠（实现完整、无入口）
+- **Epic 4 工具执行链零入口**：tool_execution_service/tool_execution_engine/validation_feedback_service/StrategicAnalysisUseCase/run_tool_chain_use_case/red_blue_debate_service/sandbox 链/12 个 data_source_* 适配器/schema_validation_record_repository — 触发=Epic 5；sandbox_session_reaper 接线时须补启动挂点
+- 等保三级合规 11 端口 + permission/role_repo/password_validation/token_blacklist 休眠（**token_blacklist 死=JWT 吊销不存在**）— 触发=equilibrium_security/auth 路由接线
+- unified_storage + L0/memory 子系统 12 端口休眠 — 触发=Epic 6
+- semantic_cache_middleware/cache_metrics/semantic_cache 休眠 — Story 3-9 缓存整体未运行；触发=检索性能需求
+- orchestration_service/workflow_engine/agent_engine 休眠 — document_tasks.py 随之死链；触发=Epic 5
+- uow_factory/saga_repository 零 resolve — 事务子系统待首个真实事务用例
+- compressor/text_extractor/context_compressor/persistent_note_taker/compression_quality_evaluator — 检索-压缩循环待接线
+
+### 配置类零消费
+- AutoExecuteConfig/AutoTriggerConfig/MetricsConfig from_env 零调用；MemoryConfig 零生产 from_env — 随对应链路接线或确认废弃
+
+### 部署面注记
+- deploy/app/docker-compose.yml 无 sisys-api 服务（create_app 零部署引用）— V1 上线前需补
