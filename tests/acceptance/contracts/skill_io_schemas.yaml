@@ -215,7 +215,7 @@ skills:
             type: object
 
   # ---------------------------------------------------------------------------
-  # 竞争对手分析（7 源：newsapi / uspto / google-patents / epo-ops / sec-edgar / tavily / china-nbs）
+  # 竞争对手分析（8 源：newsapi / uspto / google-patents / epo-ops / sec-edgar / cninfo / tavily / china-nbs——D-10 增 cninfo）
   # ---------------------------------------------------------------------------
   competitor-analysis:
     input_schema:

@@ -1,6 +1,6 @@
 # Story 4.1f: Skills 数据源扩展（专利/财报/行业量化域适配器 + 中文参数验证）
 
-**Status:** `done`（第三轮代码审查周期收敛——独立终审五节全过，2026-10-06）
+**Status:** `review`（D-10 范围扩展 Task 10 实施完成——全量四目录 11634 passed 零回归，2026-10-13）
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -751,6 +751,57 @@
 
 ---
 
+### Task 10: cninfo 巨潮资讯适配器 + competitor 8 源联动（D-10 范围扩展）
+
+**关联 AC:** AC-2''（cninfo 适配器——免 key 两段式公告检索）/ AC-6''（competitor 8 源联动）/ AC-7''（注册链触点）
+
+> D-10 范围扩展（owner 2026-10-13）：Epic 4 专题回顾行动项 #2（P0，Epic 6 Story 6.2 前置）——「目标客户是中国企业但中文源仅 china-nbs 一个」的结构性错配，由 cninfo（预筛 Phase 2 首项提前）清偿。owner 裁定不新建 Story 4.1g，直接在本 Story 增量扩展。技术路线 = 两段式 POST 表单检索（topSearch 公司匹配 → hisAnnouncement 公告查询）——复用 `_http_helpers` form_data 通道（Q1-F4 既有），零新依赖零新异常零新端口。
+
+#### TDD 循环 [A]：管道串解析 + 适配器主体（两段式）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | `test_cninfo_adapter.py`：管道串解析（完整三参/keyword 必填缺失→201/未知参数→201 负例）+ 两段式请求形态断言（topSearch form 体 `keyWord`/公告查询 form 体 `stock=code,orgId` + `column` 沪深判定）+ UA 头断言（capture——浏览器兼容形态常量）+ 公告结构化（`announcementTime` 毫秒→ISO / `adjunctUrl` 相对路径→绝对 PDF URL）+ topSearch 空结果短路（`{"announcements": []}` 正常返回——同 EDGAR 空结果语义）+ 结构校验（缺 announcements 字段→413）+ 失败矩阵（201/302/411/412/413/熔断）+ config 数值非法→101 + get_metadata 对齐 SSOT 四值（required_fields 不在适配器侧断言——Task 5 定稿同款）+ repr 无敏感信息 + isinstance(DataSourcePort) |
+| 🟢 绿 | `CninfoAdapter` 实现（`request_json_with_resilience` form_data 通道——POST 表单两段式；confidence 0.95 证监会指定法定披露平台）+ `CninfoConfig`（3 变量：`CNINFO_API_URL`/`CNINFO_TIMEOUT`/`CNINFO_TTL_SECONDS`——EDGAR 同款无 Key 形态） |
+| 🔄 重构 | ruff/mypy + 中文注释对齐既有适配器范式 |
+
+#### TDD 循环 [B]：注册链全触点 + 集成实测（免 key 无条件）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | `test_registration` 12→13 名镜像 + `ADAPTER_SSOT` 交叉断言自动红（T1-F2 防线：单侧漂移即红）+ `ADAPTER_PORT_SPECS` +1（env_key=None）+ `test_arch_data_source.py` `ADAPTER_PORT_NAMES` +1 + `test_arch_skill_data_collection.py` `_build_adapters` 13 键 |
+| 🟢 绿 | `registration.py` A 组追加 `cninfo` 条目（无条件注册——官方免费通道免 key）；`skill_data_collection_contracts.py` `ADAPTER_SSOT` +1 四元组条目；架构/契约测试表同步 |
+| 🔄 重构 | `__init__.py` docstring 12→13 + root `.env` 样例 + 集成测试 +1 源（`keyword=宁德时代` 真实端点实测锚点——免 key 无条件可测） |
+
+#### TDD 循环 [C]：competitor-analysis 7→8 源声明联动（无治理前提）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | competitor 契约单测红（`SKILL_DATA_SOURCES` 8 化后 frontmatter 仍 7 源——name 集合断言红） |
+| 🟢 绿 | SKILL.md：frontmatter data_sources +1 块（cninfo 定制 required_fields）/ §5 映射表加行（中文财报印证——A 股上市公司口径段）/ §6 标记 +1 / §7 计数与未注册行同步 / references/triangulation.md 源数同步 / yaml 头注释源数同步 |
+| 🔄 重构 | 集成断言 8 源化 + 验收场景计数联动 + 全量回归 |
+
+- [x] Subtask 10.1: 🔴 红 — 管道串解析 + 适配器主体测试（循环 A）
+- [x] Subtask 10.2: 🟢 绿 — `CninfoAdapter` + `CninfoConfig` 实现（循环 A）
+- [x] Subtask 10.3: 🔴🟢 — 注册链全触点（循环 B：测试红→注册表/契约表/架构表同步）
+- [x] Subtask 10.4: 集成实测（免 key 无条件——`keyword=宁德时代` 年报公告真实记录锚点）
+- [x] Subtask 10.5: 🔴🟢 — competitor 7→8 源声明联动（循环 C：SSOT 元组 8 化→frontmatter/§5-§7/references/yaml 全量同步）
+- [x] Subtask 10.6: 🔄 全量回归 + architecture.md 同步（适配器表 12→13 + §17.3 状态表 Task 10 追记 + 版本号三处）+ D-10 留痕核验
+
+**完成标准/Definition of Done:**
+- [x] cninfo 适配器全绿（管道串/两段式/结构化/失败矩阵）+ 集成实测真实记录
+- [x] 注册链 13 触点全绿（交叉断言双向）+ competitor 8 源断言全绿
+- [x] D-10 留痕完整（决策记录表 + 数据契约）
+
+**Task 10 实施记录（2026-10-13）：**
+- 循环 A：单测 32 passed（管道串 6 负例/两段式请求形态 5（含 A 股优先 + 沪市判定 + seDate 直通）/结构化输出 3/空结果语义 2/失败矩阵 10（含熔断 threshold=2 零 HTTP 快速失败）/元数据与 config 8）+ ruff/mypy 全过。**时间戳口径修正**：announcementTime 为北京时间毫秒戳——1773072000000ms = 北京 2026-03-10 00:00 = UTC 2026-03-09T16:00（fixture 期望值经真实换算校准，测试注释留痕）
+- 循环 B：R-REG 注册表派生红利实证——`registration.py` 单条目追加后契约表（ADAPTER_PORT_SPECS）与架构测试（ADAPTER_PORT_NAMES/ADAPTER_IMPL_MODULES）自动扩展；手动联动面仅 4 处（test_registration 镜像 13 名 + A 组集合 + httpx_owned 计数 12 + `_build_adapters` 实例表）；注册面 260 passed
+- 循环 C：competitor 契约红（7 源 vs 8 元组）→ SKILL.md 六处 + triangulation.md 五处 + yaml 头注 + 集成断言 `== 8` + 验收场景名三联动位（feature:38 + @scenario 串 + docstring ×2——Q3-F2 教训执行）+ 4-1d 侧两绊线显式登记（`test_adapter_ssot_quadruple_structure` 12→13 + `test_required_fields_quadruple_values_locked` cninfo 定制值入册——R2-F12 变更登记绊线语义）；单测 4 + 集成 12 + 验收 12 + skills/架构/数据源面 1409 passed
+- 集成实测（Subtask 10.4）：真实端点 2 passed——`keyword=宁德时代|category=category_ndbg_szth` 返回真实年报公告（company=宁德时代 + title 含「年度报告」+ pdf_url static.cninfo.com.cn 前缀）+ 空公司名空列表语义
+- 全量门禁：ruff 全过 + mypy 656 文件零问题 + 全量 pytest -n 8（结果见下方收尾注记）
+
+---
+
 ## 📝 Dev Notes 开发笔记
 
 ### 相关架构模式和约束 Architecture Patterns & Constraints
@@ -905,6 +956,33 @@ tests/
 | 配额守卫 | 月窗口字节累计（`totalBytesProcessed` 响应精确值事后累计）+ 1TiB/月前置拦截 412（守卫模式复用 EPO 周窗口——月窗口变体）；SQL 列裁剪（仅 SELECT 三列）+ 强制 LIMIT |
 | confidence | 0.9（Google/IFI CLAIMS 公共数据集——CN 完整性有 SSRN 论文 caveat，口径段如实标注） |
 
+### D-10 范围扩展决策记录（owner 2026-10-13——Task 10 cninfo 追加）
+
+| 决策项 | 结果 | 依据与留痕 |
+|--------|------|-----------|
+| **触发背景** | Epic 4 专题回顾（2026-10-13 `epic-4-retro-2026-10-13-datasource.md`）行动项 #2：目标客户为中国企业高管但 12 源中中文源仅 china-nbs 一个——看竞争对手的中国上市公司走 sec-edgar 查不到（结构性行动项 P0，Epic 6 Story 6.2 前置） | 专题回顾三项裁定之二（3-body 拍板「Epic 6 前立项 cninfo」）+ 后续指令「不用新建故事，直接在 4-1f 基础上增量开发」 |
+| **载体调整** | **cninfo（巨潮资讯——证监会指定信息披露网站）从预筛 Phase 2（原 Story 4.1g 首项）提前纳入本 Story Task 10**，Story 4.1g 不再新建 | owner「4-1f 增量」指令；预筛报告（2026-09-29）实测裁定：免 key 全通（沪深一号通——300750 宁德时代 + 600519 茅台年报均可查） |
+| **端点形态（2026-10-13 复测全通）** | ①`POST /new/information/topSearch/query`（form: keyWord/maxNum）→ `[{code, orgId, zwjc, category}]`；②`POST /new/hisAnnouncement/query`（form: stock=code,orgId/column/category/seDate）→ `{announcements: [{announcementTitle, announcementTime(ms), adjunctUrl}]}`；③PDF 静态域 `static.cninfo.com.cn/finalpage/...`（MVP 仅返回 URL 不下载内容）。https + 项目 UA（`Mozilla/5.0 (compatible; sisys-tools/1.0; +contact@sisys.local)`）实测 200/0.2-0.3s | 本会话 curl 实测（topSearch「宁德时代」→ GD165627；年报类 totalAnnouncement=16；2025 年报 2026-03-10 发布——数据新鲜在库） |
+| **注册形态** | **A 组无条件注册**（免 key 官方免费通道——EDGAR/comtrade 同款 D4/D5 逻辑）；无配额守卫（cninfo 无官方配额政策文档——非 EDGAR Fair Access 明文义务场景，YAGNI 不预加；TTL 缓存 + tenacity + CircuitBreaker 为既有兜底） | 数据契约七（下方） |
+| **MVP 范围边界** | **公告元数据检索**（title/announcement_time/pdf_url + 公告类别）——PDF→文本拆期（预筛裁定；B2 摄取桥 deferred-work 已登记，Epic 2 解析栈承接）；北交所板块不在 MVP（column 判定仅 szse/sse，口径段声明） | 预筛报告「无结构化财务（需 PDF 解析二期）」 |
+| **合规边界** | 公告元数据 + PDF 内部分析引用、不再分发（预筛外部前置「法务确认转载边界」——按 4-1f「申请先行、等待不阻塞」先例以使用边界自限处理，architecture.md 合规登记同步） | 预筛报告 §三法务确认单映射 |
+| **治理前提** | **无**——competitor-analysis 无「不追加」签收（4-1f Task 0.1 已核实），声明重分配无 HALT | D-08 治理分级（competitor 组） |
+
+**cninfo 数据契约（Task 10 定稿基线）**
+
+| 项 | 值 |
+|---|---|
+| name / 端口名 | `cninfo` / `data_source_cninfo` |
+| 端点 | `https://www.cninfo.com.cn`（topSearch 公司匹配 + hisAnnouncement 公告查询——两段式 POST 表单，EPO「先 token 后查询」同款两段范式） |
+| env | `CNINFO_API_URL` / `CNINFO_TIMEOUT` / `CNINFO_TTL_SECONDS`（3 变量——EDGAR 同款无 Key 形态） |
+| ttl_seconds | 604800（公告日/周频——7 天保守缓存） |
+| required_fields | `("title", "announcement_time", "pdf_url")` |
+| query 规范 | 管道串 `keyword=宁德时代\|category=category_ndbg_szsh\|seDate=2026-01-01~2026-10-13`（keyword 必填缺失→201；category/seDate 可选；未知参数→201——comtrade 管道串范式同款「机器码非自然语言」） |
+| 两段式行为 | ①topSearch 取首个匹配（code+orgId，column 沪深判定：code 6 开头→sse 其余→szse）→②公告查询；topSearch 空结果短路返回 `{"announcements": []}`（EDGAR 空结果同语义——SOP §7 数据缺口话术承接） |
+| 输出结构 | `{"announcements": [{"title", "announcement_time"(ISO), "pdf_url"(绝对)}]}`（announcementTime 毫秒时间戳→ISO UTC；adjunctUrl 相对路径→`https://static.cninfo.com.cn/<adjunctUrl>` 绝对 URL） |
+| UA 常量 | `Mozilla/5.0 (compatible; sisys-tools/1.0; +contact@sisys.local)`（浏览器兼容形态——2026-10-13 实测通过；cninfo 无官方 UA 格式义务，非 EDGAR Fair Access 场景） |
+| confidence | 0.95（证监会指定法定信息披露平台） |
+
 ### D-08 治理决策执行记录（Task 0.1——2026-09-30）
 
 | 决策项 | 结果 | 执行路径 |
@@ -978,6 +1056,25 @@ tests/
 - [x] `tests/integration/external_services/data_sources/test_new_sources_integration.py`
 - [x] `tests/acceptance/test_acceptance_data_source_expansion.feature` / `.py`
 - [x] `_bmad-output/planning-artifacts/cjk-adaptive-ab-report.md` 中文参数 A/B 实测报告
+
+**待创建的文件（Task 10 cninfo 增量——D-10 扩展 2026-10-13）:**
+- [x] `src/infrastructure/config/cninfo.py`（3 变量——EDGAR 同款无 Key 形态）
+- [x] `src/infrastructure/external_services/datasources/cninfo_adapter.py`（两段式 POST 表单公告检索）
+- [x] `tests/unit/infrastructure/external_services/datasources/test_cninfo_adapter.py`
+
+**Task 10 修改的文件（关键）:**
+- `src/infrastructure/external_services/datasources/registration.py`（A 组 +1 条目——R-REG 单点追加）
+- `tests/unit/application/skills/skill_data_collection_contracts.py`（ADAPTER_SSOT +cninfo 四元组 + SKILL_DATA_SOURCES competitor 8 元组）
+- `tests/unit/infrastructure/external_services/datasources/test_registration.py`（镜像 13 名 + A 组集合 + httpx_owned 12）
+- `tests/unit/architecture/test_arch_skill_data_collection.py`（`_build_adapters` +cninfo 实例 + docstring 13）
+- `tests/unit/application/skills/test_skill_mixed_data_contracts.py`（两绊线显式登记——四元组结构 13 + cninfo 定制值入册）
+- `src/application/skills/competitor-analysis/SKILL.md`（frontmatter +1 块 / §5 表 + 口径段 + 计数 8 源 / §6 规范 + 骨架标记 / §7 两处）+ `references/triangulation.md`（头注 + 流程 + 8 源角色表 + 优先级 + 口径边界）
+- `tests/acceptance/contracts/skill_io_schemas.yaml`（competitor 头注 8 源）
+- `tests/integration/application/test_skill_data_collection.py`（competitor 集成断言 `== 8` + 函数名/docstring）
+- `tests/acceptance/test_acceptance_skill_data_collection.py` + `.feature`（场景名「七源」→「八源」三联动位 + docstring ×2）
+- `tests/integration/external_services/data_sources/test_new_sources_integration.py`（TestCninfoRealEndpoint 两场景 + 文件头 docstring）
+- `src/infrastructure/external_services/datasources/__init__.py`（docstring 13 源 + CninfoAdapter 行）+ `.env` / `.env.example`（CNINFO_* 3 变量样例）
+- `docs/architecture/architecture.md`（§17.3.3 适配器表 +CninfoAdapter 行 + 状态行 13 终态 + §17.3 Task 10 追记 + 版本 8.10.0 三处）
 
 **待修改的文件（关键）:**
 - `src/infrastructure/external_services/datasources/tavily_adapter.py` / `newsapi_adapter.py`（CJK 自适应）
@@ -1313,7 +1410,7 @@ tests/
 
 #### 已推迟 Defer
 
-- [ ] Phase 2 适配器（BigQuery/cninfo/HKEX/协会 crawler/PDF 管道）→ Story 4.1g
+- [ ] ~~cninfo~~ **已划出**（D-10——Task 10 于本 Story 承载，2026-10-13）；Phase 2 剩余（HKEX 披露易/协会 crawler/PDF→文本管道——cninfo PDF 内容下载亦归此列）→ 后续 Story
 - [ ] 专职中文源（百度千帆/东财/新浪）→ AC-1 缺口结论后评估
 - [ ] OAuth2 共享抽象 → 第二家 OAuth2 源出现时
 - [ ] 跨进程精确配额计数（Redis）→ 多实例部署需求出现时
@@ -1341,10 +1438,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.9.0
+**故事版本/Story Version:** v2.0.0
 **创建日期/Created:** 2026-09-30
-**最后更新/Last Updated:** 2026-10-06
+**最后更新/Last Updated:** 2026-10-13
 **更新说明/Description:**
+- v2.0.0: **D-10 范围扩展：Task 10 cninfo 巨潮资讯适配器追加并实施完成**（Epic 4 专题回顾行动项 #2 承载——中文源结构性错配清偿，Epic 6 Story 6.2 前置；owner 裁定 4-1f 增量不新建 4.1g）：免 key A 组无条件注册 + 两段式 POST 表单检索（topSearch 公司匹配（A 股优先）→hisAnnouncement 公告查询（column 沪深判定），2026-10-13 端点复测全通）+ 管道串 query 规范（comtrade 范式）+ competitor-analysis 7→8 源声明联动（市场份额 4 源——中文财报印证主源）。**实施结果**：适配器单测 32 passed（TDD 红→绿→重构）+ 真实端点集成 2 passed（宁德时代年报锚点）+ 注册面 260 passed + 声明联动面 1409 passed + **四目录全量 11634 passed / 3 skipped（key 门控动态跳过）/ 0 failed 零回归** + ruff/mypy 全过 + 红线自查零违规；适配器池 13 终态；architecture.md 8.10.0 同步；MVP 范围=公告元数据（PDF 内容拆期归 B2 摄取桥）；Status done → in-progress → review
 - v1.9.0: **第三轮代码审查周期正式收敛**：Round 4 纯验证七维度 A + Round 5 独立终审五节全过（周期闭合/双向取证 8/8 零失实/独立快扫零新 P0-P2/门禁全绿 293 passed/台账无悬空）→ **收敛声明入档，Story 维持 done**；终审双 P4 随收敛清偿（T1-F5 补行勘误——修复自始在提交中仅表漏行；状态行括注更新第三轮）；周期累计 P2×2 + P3×12 + P4×6，修复 14 项 + 评审修订 7 项，突变实证 3 组
 - v1.8.2: **第三轮代码审查周期 Round 3（断言覆盖矩阵 + 突变实证，无代码改动轮）**：本周期全部关键契约真断言守护实证——突变 A（assignee NOT LIKE 注入）双断言红（T1-F6 修复前存活形态闭环）+ 突变 B（headroom 3000）双数据点全红（T1-F7 硬编码类突变锁定）+ 既有 14 项契约零弱化；突变注入-还原闭环 3 组累计；快评 A 级
 - v1.8.1: **第三轮代码审查周期 Round 2（回归核查 + 全量验证，无代码改动轮）**：Round 1 修复 14 项双向取证零失实（T1-F8 全仓 23 调用点复扫零误伤）；全量回归 unit 8120 + integration/acceptance 2746 passed（3 failed 为 EDGAR 真实端点外网不可达预存环境问题——排除法甄别）；新破口 4 项 P4 信息级台账登记（CRLF 规约化补记/19→23 计数勘误/行号自腐实证/检测力残留维持）

@@ -62,6 +62,14 @@ data_sources:
       - company
       - form
       - filed_at
+  - name: cninfo
+    url: https://www.cninfo.com.cn
+    api_type: rest_json
+    ttl_seconds: 604800
+    required_fields:
+      - title
+      - announcement_time
+      - pdf_url
   - name: tavily
     url: https://api.tavily.com
     api_type: rest_json
@@ -194,11 +202,11 @@ Think 阶段必须先输出**对标维度 → 关键指标 → 数据源**映射
 | 战略动向 | 竞品战略发布、并购重组、高管言论、舆情倾向 | newsapi（竞品动态舆情）、tavily（竞品 Web 情报） |
 | 专利布局 | 专利申请趋势、技术领域分布、核心专利信号 | uspto（US 口径）+ google-patents（BigQuery 全球含 CN 99.96%，assignee 精确聚合）+ epo-ops（EP 口径，`pa=` 申请人归因——专利三库） |
 | 产品组合 | 产品线结构、新品发布、定价策略 | tavily（官网/评测/电商情报）、newsapi（产品新闻） |
-| 市场份额 | 销量/营收份额、行业排名、区域渗透率 | china-nbs（中国行业对标统计）、newsapi（行业报道）、sec-edgar（美股上市竞品法定披露——10-K 全文与 XBRL 营收印证） |
+| 市场份额 | 销量/营收份额、行业排名、区域渗透率 | china-nbs（中国行业对标统计）、newsapi（行业报道）、sec-edgar（美股上市竞品法定披露——10-K 全文与 XBRL 营收印证）、cninfo（A 股上市竞品法定披露公告——年报/公告中文口径） |
 
-**源级三角化**：7 个声明源全部参与采集（并发覆盖，三角化规范见
+**源级三角化**：8 个声明源全部参与采集（并发覆盖，三角化规范见
 `references/triangulation.md`）；维度级直接映射源数以上表为准（战略动向/产品组合 2 源，
-专利布局 3 库（uspto+google-patents+epo-ops——域内一致性互证，非跨域互证），市场份额 3 源）——
+专利布局 3 库（uspto+google-patents+epo-ops——域内一致性互证，非跨域互证），市场份额 4 源）——
 直接映射不足的维度须跨维度关联印证或显式标注「印证不足」并下调置信度。
 **同源多 query（name/#2 键）不构成独立来源**，不得计入印证数。
 
@@ -211,7 +219,10 @@ epo-ops 为 EPO 欧洲专利
 合并后**仍缺 CNIPA 本土实时口径**（google-patents 补 CN 全景），全球布局画像按「US+全球+EP 三口径」标注）；
 sec-edgar 仅覆盖美股上市公司（非上市/非美竞品无数据——XBRL 模式返回字段为
 concept/unit/values 时序形态，与检索模式 filings 列表不同，营收份额经 values 序列
-计算并标注口径）；china-nbs 为宏观/行业总量口径，不提供企业级份额数据（份额结论须
+计算并标注口径）；cninfo 为 A 股上市公司法定披露公告口径（证监会指定披露平台——
+年报/公告元数据中文主源，仅覆盖沪深 A 股上市公司，公告正文为 PDF 未结构化——
+元数据级印证，份额经年报检索后按 PDF 溯源深度研判；北交所板块不在覆盖范围）；
+china-nbs 为宏观/行业总量口径，不提供企业级份额数据（份额结论须
 「行业→企业」显式映射推断并标注，或降级为行业格局定性判断）；newsapi 以英文新闻
 覆盖为主；tavily 为 Web 事件级检索（非结构化指标级）。epo-ops 周配额（4GB/周）、
 google-patents 月配额（1TiB）与 sec-edgar 类限流/配额场景按 §7 降级处理。
@@ -228,6 +239,7 @@ google-patents 月配额（1TiB）与 sec-edgar 类限流/配额场景按 §7 �
      - `google-patents`：**管道串**（非自然语言）——`assignee=`/`cpc=`/`country=`/`year=`/`keyword=` 至少一项（如 `assignee=比亚迪|keyword=battery`；空条件被适配器拒绝防全表扫描；assignee/keyword 匹配大小写敏感——英文企业名建议大小写双形态或经 keyword 通道）
      - `epo-ops`：**CQL 结构化检索式**（非自然语言）——`pa=` 申请人（支持中文企业名直接归因）+ `ti=`/`ab=` 关键词（如 `pa="比亚迪" and ti="battery"`；多条件以 and 组合）
      - `sec-edgar`：检索式或 XBRL 前缀——检索模式 `"<关键词> forms=10-K"`（如 `"market share" forms=10-K`）；XBRL 模式 `xbrl:CIK:概念`（如 `xbrl:CIK0001318605:Revenues`——单指标营收时序，CIK 经检索模式获取）
+     - `cninfo`：**管道串**（非自然语言）——`keyword=` 公司名（必填，如宁德时代/300750）+ 可选 `category=` 公告类别码（年报 `category_ndbg_szsh`）+ `seDate=` 日期范围（如 `keyword=比亚迪|category=category_ndbg_szsh`）
      - `china-nbs`：站点相对路径（如 `"sj/zxfb"`=数据发布；非自然语言描述）
    - 每源采集结果量以适配器默认分页为准（SOP 引导代码不得显式请求超量数据）
    - **禁止**在沙箱代码中发起任何网络访问（沙箱 `network_mode="none"` 为领域不变量）
@@ -258,6 +270,8 @@ epo_tesla = $DATA_SOURCE("epo-ops#2", 'pa="Tesla" and ti="battery"')
 # sec-edgar 美股上市竞品法定披露（检索模式取 10-K；XBRL 模式取营收时序）
 edgar_tesla = $DATA_SOURCE("sec-edgar", '"Tesla" forms=10-K')
 edgar_revenue = $DATA_SOURCE("sec-edgar#2", "xbrl:CIK0001318605:Revenues")
+# cninfo A 股上市竞品法定披露公告（管道串——年报类别码过滤，中文财报印证主源）
+cninfo_byd = $DATA_SOURCE("cninfo", "keyword=比亚迪|category=category_ndbg_szsh")
 # tavily 按竞品拆分
 web_byd = $DATA_SOURCE("tavily", "比亚迪 产品组合 定价策略 竞品情报")
 web_tesla = $DATA_SOURCE("tavily#2", "特斯拉 产品组合 定价 竞品情报")
@@ -274,10 +288,10 @@ epo_payload = (DATA_SOURCES.get("epo-ops") or {}).get("payload")
 | 异常 | 语义 | LLM 应对话术 |
 |------|------|-------------|
 | 411 数据源不可用 | 5xx/连接失败/熔断 | 「数据源 X 暂不可用，本次对标基于其余 N-1 个来源完成，该维度结论置信度下调并标注」 |
-| 411 未注册（Key 缺失） | newsapi/tavily/uspto/epo-ops/google-patents 未配置 API Key/凭据，冷启动未注册（uspto 自 R3 起条件注册；epo-ops 双凭据门——Consumer Key/Secret 任一缺失即不注册（休眠保留，key 到位自动激活）；google-patents GCP 双门——GOOGLE_APPLICATION_CREDENTIALS 凭据文件 + GOOGLE_PATENTS_PROJECT_ID 任一缺失即不注册；sec-edgar/china-nbs 免 key 恒注册） | 「数据源 X 因 API Key/凭据未配置未注册，相应维度基于其余来源完成，**输出中显式标注数据缺口**：竞品舆情/Web 情报/专利维度缺失实时印证（patent_signals 输出空数组承载缺口——schema 必填指键存在，空数组合法；禁止编造专利信号）」 |
+| 411 未注册（Key 缺失） | newsapi/tavily/uspto/epo-ops/google-patents 未配置 API Key/凭据，冷启动未注册（uspto 自 R3 起条件注册；epo-ops 双凭据门——Consumer Key/Secret 任一缺失即不注册（休眠保留，key 到位自动激活）；google-patents GCP 双门——GOOGLE_APPLICATION_CREDENTIALS 凭据文件 + GOOGLE_PATENTS_PROJECT_ID 任一缺失即不注册；sec-edgar/cninfo/china-nbs 免 key 恒注册） | 「数据源 X 因 API Key/凭据未配置未注册，相应维度基于其余来源完成，**输出中显式标注数据缺口**：竞品舆情/Web 情报/专利维度缺失实时印证（patent_signals 输出空数组承载缺口——schema 必填指键存在，空数组合法；禁止编造专利信号）」 |
 | 412 限流 | 429 配额耗尽 / epo-ops 周配额（4GB/周）前置拦截 / google-patents 月配额（1TiB 扫描字节/月）前置拦截 | 「数据源 X 触发限流或配额耗尽，使用缓存快照（freshness_score 已折算）并标注数据时效；专利库配额耗尽时专利维度回落其余可用库（uspto/google-patents/epo-ops 三库中剩余者）并标注「缺失库口径」」 |
 | 413 解析失败 | 响应格式异常（不可重试） | 「数据源 X 响应解析失败，跳过该源并在 sources 字段中剔除，禁止编造观测值」 |
-| 207 白名单违规 | 标记引用未声明数据源 | 不发生（本 SOP 标记严格使用白名单内 7 源）；若出现说明代码生成偏离 SOP，重新按 §6 生成 |
+| 207 白名单违规 | 标记引用未声明数据源 | 不发生（本 SOP 标记严格使用白名单内 8 源）；若出现说明代码生成偏离 SOP，重新按 §6 生成 |
 
 **降级总原则**：部分失败不中断对标；所有降级必须在输出 `data_sources` 溯源元数据与
 竞品 `sources` 字段中如实反映，禁止以估计值冒充采集值。

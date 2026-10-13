@@ -2454,7 +2454,7 @@ def bootstrap() -> None:
     # === 数据源适配器端口（Story 4.1b 引入；4.1f R-REG 收敛——注册表派生） ===
     # 组合根是「组合」边界——「注册哪些数据源」收敛为注册表 SSOT
     # （src/infrastructure/external_services/datasources/registration.py）；
-    # 12 个适配器的注册语义（A 组无条件 / B 组 env 门 / C 组凭据文件门 /
+    # 13 个适配器的注册语义（A 组无条件 / B 组 env 门 / C 组凭据文件门 /
     # china_nbs 复用 CrawlerClientPort 特殊工厂）由注册表条目声明式承载，
     # 本文件仅一行调用。契约测试表与架构测试静态表同样从注册表派生——
     # 消除多 SSOT 漂移（4-1f 审查 R1-1「静态表漏改静默」问题的结构根治）。

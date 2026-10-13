@@ -48,15 +48,15 @@ class TestMixedSkillDataSources:
         assert len(contracts_41d.MIXED_SKILL_DATA_SOURCES) == 10
 
     def test_all_sources_are_registered_adapters(self) -> None:
-        """全部声明源 ∈ 12 个注册适配器集合（合法值约束——4-1f 三新源 + D-09 google-patents）。"""
+        """全部声明源 ∈ 13 个注册适配器集合（合法值约束——4-1f 三新源 + D-09 google-patents + D-10 cninfo）。"""
         for slug, sources in contracts_41d.MIXED_SKILL_DATA_SOURCES.items():
             for name in sources:
-                assert name in contracts_41c.ADAPTER_SSOT, f"{slug}: 源 {name} 不在 12 个注册适配器中"
+                assert name in contracts_41c.ADAPTER_SSOT, f"{slug}: 源 {name} 不在 13 个注册适配器中"
 
     def test_adapter_ssot_quadruple_structure(self) -> None:
-        """ADAPTER_SSOT 四元组结构基准（4-1f D6）：12 源 × (url, api_type, ttl, required_fields)。"""
-        assert len(contracts_41c.ADAPTER_SSOT) == 12, (
-            f"应 12 源（8 既有 + 3 新 + D-09），实际 {len(contracts_41c.ADAPTER_SSOT)}"
+        """ADAPTER_SSOT 四元组结构基准（4-1f D6）：13 源 × (url, api_type, ttl, required_fields)。"""
+        assert len(contracts_41c.ADAPTER_SSOT) == 13, (
+            f"应 13 源（8 既有 + 3 新 + D-09 + D-10），实际 {len(contracts_41c.ADAPTER_SSOT)}"
         )
         for name, entry in contracts_41c.ADAPTER_SSOT.items():
             assert len(entry) == 4, f"{name}: SSOT 条目应为四元组，实际 {len(entry)} 元: {entry}"
@@ -65,8 +65,8 @@ class TestMixedSkillDataSources:
             assert api_type in ("rest_json", "sdmx_json", "csv_download", "crawler"), f"{name}: api_type 非法 {api_type}"
             assert 60 <= ttl <= 2592000, f"{name}: ttl 越界 {ttl}"
             assert isinstance(required_fields, tuple) and required_fields, f"{name}: required_fields 应为非空 tuple"
-        assert set(contracts_41c.ADAPTER_SSOT) >= {"epo-ops", "sec-edgar", "comtrade", "google-patents"}, (
-            "4-1f 三新源 + D-09 google-patents 应入册 SSOT"
+        assert set(contracts_41c.ADAPTER_SSOT) >= {"epo-ops", "sec-edgar", "comtrade", "google-patents", "cninfo"}, (
+            "4-1f 三新源 + D-09 google-patents + D-10 cninfo 应入册 SSOT"
         )
 
     def test_unified_two_source_policy(self) -> None:
@@ -143,6 +143,7 @@ class TestSharedConstantsSingleSource:
             "sec-edgar": ("company", "form", "filed_at"),
             "comtrade": ("cmd_code", "trade_value", "period"),
             "google-patents": ("publication_number", "assignee", "filing_date"),
+            "cninfo": ("title", "announcement_time", "pdf_url"),
         }
         for name, (_, _, _, required_fields) in contracts_41c.ADAPTER_SSOT.items():
             if name in new_source_expected:

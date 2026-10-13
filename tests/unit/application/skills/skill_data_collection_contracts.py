@@ -46,6 +46,7 @@ ADAPTER_SSOT: dict[str, tuple[str, str, int, tuple[str, ...]]] = {
     "china-nbs": ("https://www.stats.gov.cn", "crawler", 86400, ("indicator", "value")),
     "epo-ops": ("https://ops.epo.org", "rest_json", 604800, ("title", "applicant", "filing_date")),
     "sec-edgar": ("https://efts.sec.gov", "rest_json", 2592000, ("company", "form", "filed_at")),
+    "cninfo": ("https://www.cninfo.com.cn", "rest_json", 604800, ("title", "announcement_time", "pdf_url")),
     "comtrade": ("https://comtradeapi.un.org", "rest_json", 604800, ("cmd_code", "trade_value", "period")),
     "google-patents": (
         "https://bigquery.googleapis.com",
@@ -60,7 +61,16 @@ SKILL_DATA_SOURCES: dict[str, tuple[str, ...]] = {
     "pestel-analysis": ("world-bank", "imf", "eurostat", "ipcc", "newsapi", "china-nbs"),
     "porters-five-forces": ("newsapi", "world-bank", "eurostat"),
     "appeals-analysis": ("tavily", "newsapi", "china-nbs"),
-    "competitor-analysis": ("newsapi", "uspto", "google-patents", "epo-ops", "sec-edgar", "tavily", "china-nbs"),
+    "competitor-analysis": (
+        "newsapi",
+        "uspto",
+        "google-patents",
+        "epo-ops",
+        "sec-edgar",
+        "cninfo",
+        "tavily",
+        "china-nbs",
+    ),
     "scenario-planning": ("tavily", "ipcc", "eurostat"),
     "disruptive-innovation": ("uspto", "google-patents", "epo-ops", "tavily"),
 }

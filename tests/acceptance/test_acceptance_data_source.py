@@ -1201,7 +1201,7 @@ def given_import_composition_root_registry(context: dict[str, Any]) -> None:
 def when_extract_data_source_ports(context: dict[str, Any]) -> None:
     """Round 3 根因修复：PortRegistry 提供 `list_all()` 方法（不是 dict `values()`）。
 
-    过滤 _global_registry 提取全部 data_source 适配器端口名（4.1f 终态 12 端口态）。
+    过滤 _global_registry 提取全部 data_source 适配器端口名（4.1f+D-10 终态 13 端口态）。
     """
     registry = context["composition_root_registry"]
     names = {
@@ -1212,7 +1212,7 @@ def when_extract_data_source_ports(context: dict[str, Any]) -> None:
     context["registered_data_source_ports"] = sorted(names)
 
 
-@then("端口注册集合与按环境 KEY 推导的期望一致（无条件 7 + 条件注册逐 KEY 判定，4.1f 终态 12 端口）")
+@then("端口注册集合与按环境 KEY 推导的期望一致（无条件 8 + 条件注册逐 KEY 判定，4.1f+D-10 终态 13 端口）")
 def then_eight_data_source_adapters_registered(context: dict[str, Any]) -> None:
     """R2-2-C4/I3（第三周期 T1-F1 改注册表派生）：期望集合从生产注册表单一真相源推导。
 

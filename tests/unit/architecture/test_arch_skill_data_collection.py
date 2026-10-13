@@ -1,7 +1,7 @@
 """Skills 数据采集集成 — SDD 架构约束验证测试
 
 五类结构（范本 test_arch_data_source.py）：
-1. 常量区：6 Skills slug 清单 + SSOT 声明表 + 12 适配器映射
+1. 常量区：6 Skills slug 清单 + SSOT 声明表 + 13 适配器映射
 2. 三方一致性：SSOT 表 ↔ 6 个 SKILL.md frontmatter data_sources ↔ 适配器 get_metadata()
    （name/url/api_type 逐字一致，防漂移契约）
 3. 依赖方向：strategic_analysis.py / run_tool_chain.py 不 import infrastructure；
@@ -77,12 +77,13 @@ def _extract_imports(path: Path) -> set[str]:
 
 
 def _build_adapters() -> dict[str, DataSourcePort]:
-    """实例化 12 个适配器（Key 敏感源用测试占位 Key/凭据，禁止真实外网调用；4-1f 三新源 + D-09）"""
+    """实例化 13 个适配器（Key 敏感源用测试占位 Key/凭据，禁止真实外网调用；4-1f 三新源 + D-09 + D-10）"""
     import json as _json
     import tempfile as _tempfile
     from pathlib import Path as _Path
 
     from src.infrastructure.config.china_nbs import ChinaNBSConfig
+    from src.infrastructure.config.cninfo import CninfoConfig
     from src.infrastructure.config.comtrade import ComtradeConfig
     from src.infrastructure.config.epo_ops import EpoOpsConfig
     from src.infrastructure.config.eurostat import EurostatConfig
@@ -95,6 +96,7 @@ def _build_adapters() -> dict[str, DataSourcePort]:
     from src.infrastructure.config.uspto import USPTOConfig
     from src.infrastructure.config.worldbank import WorldBankConfig
     from src.infrastructure.external_services.datasources.china_nbs_adapter import ChinaNBSAdapter
+    from src.infrastructure.external_services.datasources.cninfo_adapter import CninfoAdapter
     from src.infrastructure.external_services.datasources.comtrade_adapter import ComtradeAdapter
     from src.infrastructure.external_services.datasources.epo_ops_adapter import EpoOpsAdapter
     from src.infrastructure.external_services.datasources.eurostat_adapter import EurostatAdapter
@@ -135,6 +137,7 @@ def _build_adapters() -> dict[str, DataSourcePort]:
             config=EpoOpsConfig(consumer_key="arch-test-placeholder", consumer_secret="arch-test-placeholder")
         ),
         "sec-edgar": SecEdgarAdapter(config=SecEdgarConfig()),
+        "cninfo": CninfoAdapter(config=CninfoConfig()),
         "comtrade": ComtradeAdapter(config=ComtradeConfig()),
         "google-patents": GooglePatentsAdapter(
             config=GooglePatentsConfig(credentials_path=str(_sa_path), project_id="arch-test-project")
@@ -156,7 +159,7 @@ class TestThreeWayConsistency:
     """声明表 SSOT ↔ 6 个 SKILL.md frontmatter ↔ 适配器 get_metadata() 三方一致"""
 
     def test_adapter_metadata_matches_ssot(self) -> None:
-        """12 个适配器 get_metadata() 实测值与 SSOT 对齐表一致（name/url/api_type/ttl）"""
+        """13 个适配器 get_metadata() 实测值与 SSOT 对齐表一致（name/url/api_type/ttl）"""
         adapters = _build_adapters()
         assert set(adapters.keys()) == set(ADAPTER_SSOT.keys())
         for name, adapter in adapters.items():

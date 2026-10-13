@@ -32,8 +32,8 @@ def _env(values: dict[str, str]):
 
 
 class TestRegistryIntegrity:
-    def test_twelve_entries_present(self) -> None:
-        assert len(DATA_SOURCE_REGISTRY) == 12
+    def test_thirteen_entries_present(self) -> None:
+        assert len(DATA_SOURCE_REGISTRY) == 13
         assert {r.source_name for r in DATA_SOURCE_REGISTRY} == {
             "world-bank",
             "imf",
@@ -45,6 +45,7 @@ class TestRegistryIntegrity:
             "china-nbs",
             "epo-ops",
             "sec-edgar",
+            "cninfo",
             "comtrade",
             "google-patents",
         }
@@ -111,7 +112,7 @@ class TestRegistryIntegrity:
         )
 
     def test_unconditional_group_has_no_gate(self) -> None:
-        unconditional = {"world-bank", "imf", "eurostat", "ipcc", "china-nbs", "sec-edgar", "comtrade"}
+        unconditional = {"world-bank", "imf", "eurostat", "ipcc", "china-nbs", "sec-edgar", "cninfo", "comtrade"}
         for r in DATA_SOURCE_REGISTRY:
             if r.source_name in unconditional:
                 assert r.env_gate_keys == (), f"{r.source_name} 应为无条件注册（空门）"
@@ -159,7 +160,7 @@ class TestAdaptersMapping:
     def test_httpx_owned_excludes_china_nbs(self) -> None:
         names = httpx_owned_port_names()
         assert "data_source_china_nbs" not in names, "china_nbs 复用 CrawlerClientPort 无自持 httpx，恒不在清理列表"
-        assert len(names) == 11, f"12 注册源 - china_nbs = 11，实际 {len(names)}"
+        assert len(names) == 12, f"13 注册源 - china_nbs = 12，实际 {len(names)}"
 
 
 @pytest.mark.parametrize("registration", DATA_SOURCE_REGISTRY, ids=[r.source_name for r in DATA_SOURCE_REGISTRY])

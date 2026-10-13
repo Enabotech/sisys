@@ -209,6 +209,16 @@ DATA_SOURCE_REGISTRY: tuple[AdapterRegistration, ...] = (
         config_cls_name="SecEdgarConfig",
         tags=("data-source", "sec-edgar", "financial-report"),
     ),
+    # ===== Task 10（D-10）：cninfo 巨潮资讯（免 key 无条件注册——中文财报公告主源） =====
+    AdapterRegistration(
+        port_name="data_source_cninfo",
+        source_name="cninfo",
+        impl_module=_impl("cninfo_adapter"),
+        impl_cls_name="CninfoAdapter",
+        config_module=_cfg("cninfo"),
+        config_cls_name="CninfoConfig",
+        tags=("data-source", "cninfo", "financial-report"),
+    ),
     AdapterRegistration(
         port_name="data_source_comtrade",
         source_name="comtrade",

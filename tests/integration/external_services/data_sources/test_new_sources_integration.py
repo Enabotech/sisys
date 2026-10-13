@@ -1,7 +1,7 @@
-"""Story 4.1f — 三新源真实端点集成测试（EPO OPS / SEC EDGAR / UN Comtrade）
+"""Story 4.1f — 新源真实端点集成测试（EPO OPS / SEC EDGAR / UN Comtrade / cninfo）
 
 集成纪律（CLAUDE.md/Story 测试隔离约束）：
-- SEC EDGAR / UN Comtrade 免 key 无条件真实连通（官方免费通道——预筛实测锚点）
+- SEC EDGAR / UN Comtrade / cninfo 免 key 无条件真实连通（官方免费通道——预筛实测锚点）
 - EPO OPS 依赖 OAuth2 Consumer Key/Secret（外部申请资产）——key 未就绪时
   pytest.skip() 动态跳过留痕（禁止写死 skip），key 到位后人工补跑（Story R7 锚点）
 - 自包含：创建 → 执行 → 断言 → 关闭；无全局状态污染
@@ -66,6 +66,49 @@ class TestSecEdgarRealEndpoint:
             payload = json.loads(result.payload)
             assert payload.get("concept") == "Revenues", "companyconcept 应返回概念名"
             assert isinstance(payload.get("values"), list) and payload["values"], "营收时序应非空"
+        finally:
+            await adapter.close()
+
+
+class TestCninfoRealEndpoint:
+    """cninfo 巨潮资讯免 key 真实端点（Task 10 D-10——宁德时代年报 2026-10-13 实测锚点：totalAnnouncement=16）。"""
+
+    @pytest.mark.asyncio
+    async def test_company_announcements_real_records(self) -> None:
+        """两段式真实检索：keyword=宁德时代 + 年报类别 → 真实公告列表（title/announcement_time/pdf_url）。"""
+        import json
+
+        from src.infrastructure.external_services.datasources.cninfo_adapter import CninfoAdapter
+
+        adapter = CninfoAdapter()
+        try:
+            result = await adapter.fetch(
+                DataSourceQuery(source_name="cninfo", query="keyword=宁德时代|category=category_ndbg_szsh")
+            )
+            payload = json.loads(result.payload)
+            assert payload.get("company") == "宁德时代", f"topSearch 应匹配宁德时代，实际: {payload.get('company')!r}"
+            announcements = payload.get("announcements")
+            assert isinstance(announcements, list) and announcements, "真实端点应返回非空年报公告列表"
+            first = announcements[0]
+            assert {"title", "announcement_time", "pdf_url"} <= set(first)
+            assert "年度报告" in first["title"], f"年报类别过滤应命中年度报告，实际: {first['title']!r}"
+            assert first["pdf_url"].startswith("https://static.cninfo.com.cn/")
+            assert result.confidence == 0.95
+        finally:
+            await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_unknown_company_empty_semantics(self) -> None:
+        """空结果语义：不存在的公司名 → announcements 空列表正常返回（非异常——SOP 数据缺口话术承接）。"""
+        import json
+
+        from src.infrastructure.external_services.datasources.cninfo_adapter import CninfoAdapter
+
+        adapter = CninfoAdapter()
+        try:
+            result = await adapter.fetch(DataSourceQuery(source_name="cninfo", query="keyword=不存在公司zzz9x8y7"))
+            payload = json.loads(result.payload)
+            assert payload.get("announcements") == []
         finally:
             await adapter.close()
 
