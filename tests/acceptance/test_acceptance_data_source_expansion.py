@@ -29,6 +29,7 @@ Test approach:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -483,6 +484,10 @@ def bootstrap_and_check_registration(ds_context: dict[str, Any]):
         text=True,
         timeout=120,
         cwd=ROOT,
+        # litellm import 期 DEV 模式（默认）无条件 load_dotenv：python -c 子进程按
+        # REPL 语义从 cwd 找到本地 .env，pop 的键会被复活（同 AC-24 根因，
+        # 本地 .env 当前无 EPO/GCP 键故未爆——防未来配置触发同款失真）
+        env={**os.environ, "LITELLM_MODE": "PRODUCTION"},
     )
     assert result.returncode == 0, f"registration probe failed:\n{result.stdout}\n{result.stderr}"
     ds_context["probe_verified"] = True

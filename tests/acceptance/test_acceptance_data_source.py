@@ -607,6 +607,7 @@ def given_tavily_key_unset(context: dict[str, Any]) -> None:
     tavily 未注册且核心适配器已注册；with-Key 阳性对照防探针恒报未注册的假阴性。
     bootstrap 全为惰性 lambda 注册（纯 dict 操作），无 DB/Redis 依赖，秒级完成。
     """
+    import os
     import subprocess
     import sys
     from pathlib import Path
@@ -639,6 +640,12 @@ def given_tavily_key_unset(context: dict[str, Any]) -> None:
             text=True,
             timeout=120,
             cwd=repo_root,
+            # litellm import 期在 DEV 模式（默认）无条件 load_dotenv：python -c 子进程
+            # 的 __main__ 无 __file__，dotenv 按 REPL 语义从 cwd（项目根）向上找到 .env，
+            # 会把本地 .env 的 TAVILY_API_KEY 写回 os.environ——pop 的键被复活，
+            # 「KEY 缺失」场景失真。LITELLM_MODE != DEV 是 litellm 官方关闭该副作用的
+            # 开关，使子进程环境回到「.env 不参与」的本测试原设计假设
+            env={**os.environ, "LITELLM_MODE": "PRODUCTION"},
         )
         assert result.returncode == 0, f"条件注册探针失败:\n{result.stdout}\n{result.stderr}"
         assert "PORTS=" in result.stdout
