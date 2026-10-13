@@ -39,12 +39,29 @@ class CrawlTaskRequest(BaseModel):
         return self
 
 
+class CrawledFileResponse(BaseModel):
+    """爬取文件明细响应（SISYS 摄取链事实源——ChinaNBSAdapter 消费）"""
+
+    url: str
+    file_name: str
+    smart_name: str
+    file_size: int
+    file_extension: str
+    stored_path: str
+    content_type: str = ""
+    parent_url: str = ""
+    page_title: str = ""
+    link_text: str = ""
+    depth: int = 0
+
+
 class CrawlTaskResponse(BaseModel):
     """爬取任务响应"""
 
     task_id: str
     status: str
     domains: list[str]
+    files: list[CrawledFileResponse] = Field(default_factory=list)
     files_crawled: int
     files_failed: int
     total_size_bytes: int
@@ -65,6 +82,22 @@ def _task_to_response(result: Any) -> CrawlTaskResponse:
         task_id=result.task_id,
         status=result.status.value,
         domains=[],
+        files=[
+            CrawledFileResponse(
+                url=f.url,
+                file_name=f.file_name,
+                smart_name=f.smart_name,
+                file_size=f.file_size,
+                file_extension=f.file_extension,
+                stored_path=f.stored_path,
+                content_type=f.content_type,
+                parent_url=f.parent_url,
+                page_title=f.page_title,
+                link_text=f.link_text,
+                depth=f.depth,
+            )
+            for f in result.files
+        ],
         files_crawled=len(result.files),
         files_failed=len(result.failed_urls),
         total_size_bytes=result.total_size_bytes,

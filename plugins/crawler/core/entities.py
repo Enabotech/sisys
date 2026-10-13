@@ -117,6 +117,7 @@ class CrawledFile:
         file_extension: 文件扩展名
         smart_name: 智能命名结果
         naming_strategy: 使用的命名策略名
+        stored_path: 存储后对象路径（SISYS 摄取链事实源）
         task_id: 所属任务 ID
         parent_url: 来源页面 URL
         page_title: 来源页面标题
@@ -141,6 +142,7 @@ class CrawledFile:
     depth: int = 0
     metadata_title: str = ""
     metadata_author: str = ""
+    stored_path: str = ""
 
 
 @dataclass

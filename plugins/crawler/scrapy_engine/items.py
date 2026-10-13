@@ -25,6 +25,7 @@ class CrawledFileItem(scrapy.Item):
         metadata_extra: 额外元数据
         smart_name: 智能命名结果
         naming_strategy_used: 使用的命名策略
+        stored_path: 存储后对象路径（StoragePipeline 写回，SISYS 摄取链事实源）
         parent_url: 来源页面 URL
         page_title: 来源页面标题
         link_text: 链接锚文本
@@ -46,6 +47,7 @@ class CrawledFileItem(scrapy.Item):
     metadata_extra = scrapy.Field()
     smart_name = scrapy.Field()
     naming_strategy_used = scrapy.Field()
+    stored_path = scrapy.Field()
     parent_url = scrapy.Field()
     page_title = scrapy.Field()
     link_text = scrapy.Field()

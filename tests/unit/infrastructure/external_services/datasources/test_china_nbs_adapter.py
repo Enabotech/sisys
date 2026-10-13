@@ -44,9 +44,29 @@ def _make_crawler_mock(status_sequence: Sequence[dict[str, Any] | Exception]) ->
 
 
 def _completed_status() -> dict:
+    """真实 crawler 契约形态（plugins/crawler/api.py CrawlTaskResponse）：
+    files 明细数组是数据本体（stats.gov.cn 数据在 PDF/XLSX 附件，页面仅目录），
+    result.pages 旧契约从未被 crawler 实现过（8 个月 mock 双侧同错掩盖）。"""
     return {
         "status": "completed",
-        "result": {"pages": [{"url": "https://www.stats.gov.cn/sj/zxfb/", "text": "2025年国内生产总值..."}]},
+        "files": [
+            {
+                "url": "https://www.stats.gov.cn/sj/zxfb/P020261012.pdf",
+                "file_name": "P020261012.pdf",
+                "smart_name": "2026年9月份规模以上工业增加值增长.txt".replace(".txt", ".pdf"),
+                "file_size": 1024,
+                "file_extension": "pdf",
+                "stored_path": "/data/crawl_output/2026年9月份规模以上工业增加值增长.pdf",
+                "content_type": "application/pdf",
+                "parent_url": "https://www.stats.gov.cn/sj/zxfb/",
+                "page_title": "最新发布",
+                "link_text": "2026年9月份规模以上工业增加值增长",
+                "depth": 1,
+            }
+        ],
+        "files_crawled": 1,
+        "files_failed": 0,
+        "total_size_bytes": 1024,
     }
 
 
@@ -127,10 +147,26 @@ class TestChinaNBSAdapterSuccess:
         result = await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))
         assert result.source_name == "china-nbs"
         payload = json.loads(result.payload)
-        assert payload["pages"][0]["text"].startswith("2025年")
+        # 文件清单是数据本体（附件即数据，stored_path 供摄取链消费）
+        assert len(payload["files"]) == 1
+        assert payload["files"][0]["smart_name"].startswith("2026年9月份")
+        assert payload["files"][0]["stored_path"].endswith(".pdf")
+        assert payload["files"][0]["page_title"] == "最新发布"
+        assert payload["files_crawled"] == 1
+        assert payload["total_size_bytes"] == 1024
         # 验证经 crawler 插件提交（域名限定 stats.gov.cn）
         submit_kwargs = crawler.submit_task.call_args
         assert "stats.gov.cn" in str(submit_kwargs)
+
+    @pytest.mark.asyncio
+    async def test_fetch_success_empty_files_is_valid(self) -> None:
+        """completed + 空 files 是合法业务状态（该目录无附件/WAF 拦截），不抛 413。"""
+        crawler = _make_crawler_mock([{"status": "completed", "files": [], "files_crawled": 0, "total_size_bytes": 0}])
+        adapter = _make_adapter(crawler)
+        result = await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))
+        payload = json.loads(result.payload)
+        assert payload["files"] == []
+        assert payload["files_crawled"] == 0
 
     @pytest.mark.asyncio
     async def test_implements_port(self) -> None:
@@ -174,7 +210,16 @@ class TestChinaNBSAdapterFailures:
 
     @pytest.mark.asyncio
     async def test_malformed_result_raises_response_error(self) -> None:
-        crawler = _make_crawler_mock([{"status": "completed", "result": None}])
+        crawler = _make_crawler_mock([{"status": "completed"}])
+        adapter = _make_adapter(crawler)
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))
+        assert exc_info.value.code == "EXCEPTION_413"
+
+    @pytest.mark.asyncio
+    async def test_non_list_files_raises_response_error(self) -> None:
+        """files 非 list（None/str/对端契约漂移）→ 413。"""
+        crawler = _make_crawler_mock([{"status": "completed", "files": None}])
         adapter = _make_adapter(crawler)
         with pytest.raises(DataSourceResponseError) as exc_info:
             await adapter.fetch(DataSourceQuery(source_name="china-nbs", query="sj/zxfb"))

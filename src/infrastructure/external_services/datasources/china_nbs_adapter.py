@@ -191,14 +191,27 @@ class ChinaNBSAdapter:
             await asyncio.sleep(self._config.poll_interval_sec)
 
     def _extract_payload(self, status: dict[str, Any]) -> dict[str, Any]:
-        """提取采集结果（结构非法抛 DataSourceResponseError）"""
-        result = status.get("result")
-        if not isinstance(result, dict) or "pages" not in result:
+        """提取采集结果——文件清单契约（B1 路线：附件即数据）
+
+        stats.gov.cn 的数据本体在 PDF/XLSX 附件（页面仅目录），crawler 为文件爬虫；
+        payload 携带文件明细（url/smart_name/stored_path/来源页面元数据），
+        stored_path 是 SISYS 摄取链（文档管道）的事实源。空 files 为合法业务状态。
+
+        Raises:
+            DataSourceResponseError: files 缺失或非 list（对端契约违反，EXCEPTION_413）
+        """
+        files = status.get("files")
+        if not isinstance(files, list):
             raise DataSourceResponseError(
-                message="中国国家统计局采集结果结构非法（缺少 result.pages）",
-                context={"source_name": "china-nbs", "actual_type": type(result).__name__},
+                message="中国国家统计局采集结果结构非法（缺少 files 明细数组）",
+                context={"source_name": "china-nbs", "actual_type": type(files).__name__},
             )
-        return result
+        return {
+            "files": files,
+            "files_crawled": status.get("files_crawled", len(files)),
+            "files_failed": status.get("files_failed", 0),
+            "total_size_bytes": status.get("total_size_bytes", 0),
+        }
 
 
 __all__ = ["ChinaNBSAdapter"]

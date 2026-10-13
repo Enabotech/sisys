@@ -95,6 +95,16 @@ class TestPipelineChain:
         assert item["naming_strategy_used"]
         assert item["smart_name"].endswith(".pdf")
 
+        # Pipeline 5: 存储（stored_path 写回 item——SISYS 摄取链的事实源）
+        import asyncio
+
+        from plugins.crawler.scrapy_engine.pipelines.storage_pipeline import StoragePipeline
+
+        storage_pipeline = StoragePipeline(output_dir=self.temp_dir)
+        item = asyncio.run(storage_pipeline.process_item(item))
+        assert item["stored_path"] == os.path.join(self.temp_dir, item["smart_name"])
+        assert os.path.exists(item["stored_path"])
+
     def test_txt_pipeline_chain(self) -> None:
         """TXT 文件全链路 Pipeline"""
         txt_path = self._create_test_file("年度战略规划报告\n2024年Q4总结".encode("utf-8"), "txt")

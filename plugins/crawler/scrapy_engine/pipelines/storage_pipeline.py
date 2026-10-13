@@ -46,13 +46,13 @@ class StoragePipeline:
         self._storage = LocalStorage(output_dir=self._output_dir)
 
     async def process_item(self, item: CrawledFileItem):
-        """处理 Item：存储文件
+        """处理 Item：存储文件并写回存储路径
 
         Args:
             item: CrawledFileItem
 
         Returns:
-            存储完成的 Item
+            存储完成的 Item（含 stored_path——存储后对象路径，SISYS 摄取链的事实源）
         """
         object_path = await self._storage.store_file(
             file_name=item.get("smart_name", item.get("file_name", "")),
@@ -60,5 +60,6 @@ class StoragePipeline:
             content_type=item.get("content_type", ""),
             metadata={"task_id": item.get("task_id", "")},
         )
+        item["stored_path"] = object_path
         logger.info("文件已存储: %s → %s", item.get("smart_name", ""), object_path)
         return item

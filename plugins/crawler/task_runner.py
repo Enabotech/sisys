@@ -43,6 +43,7 @@ def _crawl_file_fields(item: dict) -> dict:
         "file_extension": item.get("file_extension", ""),
         "smart_name": item.get("smart_name", ""),
         "naming_strategy": item.get("naming_strategy_used", ""),
+        "stored_path": item.get("stored_path", ""),
         "task_id": item.get("task_id", ""),
         "parent_url": item.get("parent_url", ""),
         "page_title": item.get("page_title", ""),

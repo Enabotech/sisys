@@ -164,8 +164,12 @@ class TestDomainSpider:
 
 
 def _collect_start_requests(spider: DomainSpider) -> list:
-    """收集 async start() 方法的全部请求"""
-    return asyncio.get_event_loop().run_until_complete(_alist(spider.start()))
+    """收集 async start() 方法的全部请求
+
+    asyncio.run 独立建/收 loop——xdist worker 内 get_event_loop 复用已关闭
+    loop 会抛 RuntimeError（预存 flaky 根因，测试间零共享状态）
+    """
+    return asyncio.run(_alist(spider.start()))
 
 
 async def _alist(async_gen):

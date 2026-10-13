@@ -2,10 +2,14 @@
 
 使用本地 aiohttp 真实 HTTP 服务器模拟 Crawler Service REST API，
 验证 ChinaNBSAdapter 经真实 HttpCrawlerClient 的完整链路（不 mock 客户端本身）：
-- 真实任务提交（POST /api/v1/tasks，断言域名白名单 stats.gov.cn）
-- 真实状态轮询（GET /api/v1/tasks/{id} 序列：running → completed）
-- 探活（GET /api/v1/formats 轻量调用，不消耗任务配额）
+- 真实任务提交（POST /tasks，断言域名白名单 stats.gov.cn）
+- 真实状态轮询（GET /tasks/{id} 序列：running → completed）
+- 探活（GET /formats 轻量调用，不消耗任务配额）
 - 失败路径：任务 failed → 411 / 轮询超时自动取消（DELETE）→ 302
+
+路由对齐自研 crawler 实际形态（plugins/crawler/api.py——/tasks 无 /api/v1 前缀；
+旧测试 mock 双侧同挂 /api/v1 前缀互相掩盖，2026-10-12 路径修复时暴露）。
+响应契约对齐 CrawlTaskResponse（files 明细数组——B1 文件清单契约）。
 
 Mock 原因：Crawler Service 是有状态微服务（Scrapy 引擎），集成测试不要求常驻；
 使用本地 HTTP 服务器保持可重复性并验证完整 HTTP 交互链路
@@ -38,7 +42,9 @@ class MockCrawlerHandler:
     """模拟 Crawler Service REST API 的处理器（任务状态序列可编程）。"""
 
     def __init__(self) -> None:
-        self._status_sequence: list[dict[str, Any]] = [{"status": "completed", "result": {"pages": []}}]
+        self._status_sequence: list[dict[str, Any]] = [
+            {"status": "completed", "files": [], "files_crawled": 0, "total_size_bytes": 0}
+        ]
         self._call_index = 0
         self.submit_payloads: list[dict[str, Any]] = []
         self.cancelled_task_ids: list[str] = []
@@ -49,24 +55,24 @@ class MockCrawlerHandler:
         self._call_index = 0
 
     async def handle_submit(self, request: web.Request) -> web.Response:
-        """POST /api/v1/tasks → {"task_id": ...}"""
+        """POST /tasks → {"task_id": ...}"""
         payload = await request.json()
         self.submit_payloads.append(payload)
         return web.json_response({"task_id": "task-mock-001"})
 
     async def handle_status(self, request: web.Request) -> web.Response:
-        """GET /api/v1/tasks/{task_id} → 状态字典"""
+        """GET /tasks/{task_id} → 状态字典"""
         idx = min(self._call_index, len(self._status_sequence) - 1)
         self._call_index += 1
         return web.json_response(self._status_sequence[idx])
 
     async def handle_cancel(self, request: web.Request) -> web.Response:
-        """DELETE /api/v1/tasks/{task_id} → 200"""
+        """DELETE /tasks/{task_id} → 200"""
         self.cancelled_task_ids.append(request.match_info["task_id"])
         return web.Response(status=200)
 
     async def handle_formats(self, request: web.Request) -> web.Response:
-        """GET /api/v1/formats → {"formats": [...]}"""
+        """GET /formats → {"formats": [...]}"""
         return web.json_response({"formats": ["html", "pdf", "json"]})
 
 
@@ -75,10 +81,10 @@ async def mock_crawler_server() -> AsyncGenerator[tuple[MockCrawlerHandler, str]
     """启动本地 HTTP 服务器模拟 Crawler Service，返回 (handler, base_url)"""
     handler = MockCrawlerHandler()
     app = web.Application()
-    app.router.add_post("/api/v1/tasks", handler.handle_submit)
-    app.router.add_get("/api/v1/tasks/{task_id}", handler.handle_status)
-    app.router.add_delete("/api/v1/tasks/{task_id}", handler.handle_cancel)
-    app.router.add_get("/api/v1/formats", handler.handle_formats)
+    app.router.add_post("/tasks", handler.handle_submit)
+    app.router.add_get("/tasks/{task_id}", handler.handle_status)
+    app.router.add_delete("/tasks/{task_id}", handler.handle_cancel)
+    app.router.add_get("/formats", handler.handle_formats)
 
     runner = web.AppRunner(app)
     await runner.setup()
@@ -122,12 +128,32 @@ class TestChinaNBSCrawlerChain:
 
     @pytest.mark.asyncio
     async def test_submit_poll_fetch_full_chain(self, mock_crawler_server: tuple[MockCrawlerHandler, str]) -> None:
-        """完整链路：提交（域名白名单断言）→ 轮询 running→completed → 结果解析。"""
+        """完整链路：提交（域名白名单断言）→ 轮询 running→completed → 文件清单解析。"""
         handler, base_url = mock_crawler_server
         handler.set_status_sequence(
             [
                 {"status": "running"},
-                {"status": "completed", "result": {"pages": [{"url": "https://www.stats.gov.cn/sj/zxfb", "text": "统计数据"}]}},
+                {
+                    "status": "completed",
+                    "files": [
+                        {
+                            "url": "https://www.stats.gov.cn/sj/zxfb/P020261012.pdf",
+                            "file_name": "P020261012.pdf",
+                            "smart_name": "2026年9月CPI数据.pdf",
+                            "file_size": 2048,
+                            "file_extension": "pdf",
+                            "stored_path": "/data/crawl_output/2026年9月CPI数据.pdf",
+                            "content_type": "application/pdf",
+                            "parent_url": "https://www.stats.gov.cn/sj/zxfb",
+                            "page_title": "最新发布",
+                            "link_text": "2026年9月CPI数据",
+                            "depth": 1,
+                        }
+                    ],
+                    "files_crawled": 1,
+                    "files_failed": 0,
+                    "total_size_bytes": 2048,
+                },
             ]
         )
         adapter, client = _make_adapter(base_url)
@@ -138,9 +164,11 @@ class TestChinaNBSCrawlerChain:
         payload = handler.submit_payloads[0]
         assert payload["domains"] == ["www.stats.gov.cn"]
         assert payload["seed_urls"] == ["https://www.stats.gov.cn/sj/zxfb"]
-        # 结果解析
+        # 文件清单解析（stored_path 是摄取链事实源）
         body = json.loads(result.payload)
-        assert body["pages"][0]["text"] == "统计数据"
+        assert body["files"][0]["smart_name"] == "2026年9月CPI数据.pdf"
+        assert body["files"][0]["stored_path"] == "/data/crawl_output/2026年9月CPI数据.pdf"
+        assert body["files_crawled"] == 1
         assert result.source_name == "china-nbs"
         assert 0.0 < result.confidence <= 1.0
         await client.close()
