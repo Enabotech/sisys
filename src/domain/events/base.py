@@ -292,15 +292,42 @@ class DomainEvent:
             "aggregate_type": data.get("aggregate_type", ""),
             "version": data.get("version", 0),
             "payload": payload,
-            # AC-4: Traceability fields
-            "correlation_id": uuid.UUID(data["correlation_id"]) if data.get("correlation_id") else None,
-            "causation_id": uuid.UUID(data["causation_id"]) if data.get("causation_id") else None,
+            # AC-4: Traceability fields（可选——None 合法；畸形值与核心字段同构包装 242）
+            "correlation_id": cls._parse_optional_uuid(data.get("correlation_id"), "correlation_id"),
+            "causation_id": cls._parse_optional_uuid(data.get("causation_id"), "causation_id"),
             "metadata": data.get("metadata", {}),
         }
         return target_class(
             **{k: v for k, v in core_kwargs.items() if k not in non_init_core},
             **extra_kwargs,
         )
+
+    @staticmethod
+    def _parse_optional_uuid(value: Any, field_name: str) -> uuid.UUID | None:
+        """解析可选 UUID 追踪字段（None 合法；畸形值包装 242）。
+
+        异常元组取 timestamp 式三元组（ValueError/AttributeError/TypeError）而非
+        event_id 式二元组——`uuid.UUID(非 str)` 走 AttributeError/TypeError 面。
+
+        Args:
+            value: 原始值（None 或 UUID 可解析形态）
+            field_name: 字段名（异常 context 用）
+
+        Returns:
+            UUID 对象或 None
+
+        Raises:
+            EntityValidationError: 值非 None 且不可解析为 UUID（EXCEPTION_242）
+        """
+        if value is None:
+            return None
+        try:
+            return uuid.UUID(value)
+        except (ValueError, AttributeError, TypeError):
+            raise EntityValidationError(
+                message=f"Invalid {field_name}: {value!r}",
+                context={"entity": "DomainEvent", "field": field_name},
+            )
 
     @classmethod
     def _field_type_hints(cls, target_class: type[DomainEvent]) -> dict[str, Any]:
@@ -319,7 +346,15 @@ class DomainEvent:
         """
         hints = _RESOLVED_HINTS.get(target_class)
         if hints is None:
-            hints = get_type_hints(target_class)
+            try:
+                hints = get_type_hints(target_class)
+            except NameError as exc:
+                # 不可解析注解（引用模块命名空间外的名字，如函数内局部类型）包装 242，
+                # 禁裸 NameError 逃逸统一异常体系；解析失败时缓存未写入（赋值在解析后），无毒化
+                raise EntityValidationError(
+                    message=f"Unresolvable type annotations on {target_class.__name__}: {exc}",
+                    context={"entity": target_class.__name__, "field": "<type_hints>"},
+                ) from exc
             _RESOLVED_HINTS[target_class] = hints
         return hints
 
@@ -328,7 +363,12 @@ class DomainEvent:
         """反序列化 payload 值为原始 Python 类型
 
         处理 UUID、datetime、Enum 及容器类型（list、dict），
-        正确处理 uuid.UUID | None 等联合类型
+        正确处理 uuid.UUID | None 等联合类型。
+
+        放行策略（有意宽容）：具体类型分支均有 isinstance(value, str) 守卫——
+        合法往返的序列化值恒为 str（to_dict 保证）；非 str 标量（畸形生产方
+        写入的 int 等）不匹配任何分支时原样透传而非报错，由构造方类型注解
+        与下游消费方兜底。
         """
         if value is None:
             return None

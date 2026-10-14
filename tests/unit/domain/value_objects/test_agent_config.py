@@ -116,7 +116,29 @@ class TestRequiredFieldValidation:
     )
     def test_empty_tuple_raises_440(self, field: str, value: tuple) -> None:
         """空列表（`capabilities.responsibilities: []`）必须拦截——Agent.validate()
-        不校验非空，VO falsy 判空是唯一防线。"""
+        不校验非空，VO falsy 判空是运行时唯一防线。"""
+        with pytest.raises(AgentConfigError) as exc_info:
+            _make_config(**{field: value})
+        assert exc_info.value.code == "EXCEPTION_440"
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("responsibilities", "战略方向"), ("domain_knowledge", "宏观趋势")],
+    )
+    def test_string_scalar_raises_440(self, field: str, value: str) -> None:
+        """字符串标量必须拦截——truthy str 越过 falsy 判空后，用例层 list() 会
+        逐字符静默展开成 ('战','略',...)（静默数据损坏，与加载器标量陷阱同款）。"""
+        with pytest.raises(AgentConfigError) as exc_info:
+            _make_config(**{field: value})
+        assert exc_info.value.code == "EXCEPTION_440"
+        assert "tuple" in exc_info.value.context.get("reason", ""), "reason 须指明 tuple 契约"
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("responsibilities", ["战略方向"]), ("domain_knowledge", ["宏观趋势"])],
+    )
+    def test_list_form_raises_440(self, field: str, value: list) -> None:
+        """list 形态拦截——VO 契约是 tuple（加载器显式转换后的唯一合法形态）。"""
         with pytest.raises(AgentConfigError) as exc_info:
             _make_config(**{field: value})
         assert exc_info.value.code == "EXCEPTION_440"

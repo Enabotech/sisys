@@ -237,8 +237,9 @@ class TestFailurePropagation:
         """持久化失败 → 异常传播且零事件（无持久化即无事件——无幽灵事件）。"""
         use_case, _, _, bus, calls = _make_use_case(save_error=StorageError("redis down"))
         assert isinstance(bus, InMemoryEventBus)
-        with pytest.raises(StorageError):
+        with pytest.raises(StorageError) as exc_info:
             await use_case.execute(role=AgentRole.CEO)
+        assert exc_info.value.code == "EXCEPTION_103"
         assert bus.published_events == [], "持久化失败不得发布事件"
         assert calls == ["load", "save:43200"]
 

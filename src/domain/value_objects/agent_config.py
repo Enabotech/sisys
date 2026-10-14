@@ -66,13 +66,20 @@ class AgentConfig:
             raise AgentConfigError(role=role.value, reason=reason, message=reason)
 
         # 必填非空：falsy 判空（非 is None）——空白串与空 tuple 均拦截；
-        # 空职责/知识清单无下游防线（Agent.validate() 不校验非空），本 VO 是唯一防线
+        # 空职责/知识清单无下游防线（Agent.validate() 不校验非空），本 VO 是运行时
+        # 唯一防线（mypy src 门禁为编译期另一道防线）
         if not self.name or not self.name.strip():
             _fail("name 不能为空")
         if not self.description or not self.description.strip():
             _fail("description 不能为空")
         if not self.version or not self.version.strip():
             _fail("version 不能为空")
+        # tuple 类型守卫先于判空：truthy 标量（如 str）越过 falsy 判空后会被用例层
+        # list() 逐字符静默展开（静默数据损坏——加载器对同款陷阱显式设防，VO 补齐）
+        if not isinstance(self.responsibilities, tuple):
+            _fail("responsibilities 必须为 tuple（字符串元组）")
+        if not isinstance(self.domain_knowledge, tuple):
+            _fail("domain_knowledge 必须为 tuple（字符串元组）")
         if not self.responsibilities:
             _fail("responsibilities 不能为空")
         if not self.domain_knowledge:

@@ -209,6 +209,7 @@ class TestLoadFailures:
         with pytest.raises(AgentConfigError) as exc_info:
             await _load(tmp_path)
         assert exc_info.value.code == "EXCEPTION_440"
+        assert exc_info.value.context["reason"] == "配置文件编码非法（需 UTF-8）", "reason 分级锚定（防解析层行为漂移）"
 
     async def test_preferred_model_non_string_rejected(self, tmp_path: Path) -> None:
         """preferred_model 非字符串标量 → 440（防配置手误被静默吞为 None）。"""
@@ -223,6 +224,31 @@ class TestLoadFailures:
         with pytest.raises(AgentConfigError) as exc_info:
             await _load(tmp_path)
         assert exc_info.value.code == "EXCEPTION_440"
+
+    @pytest.mark.parametrize(
+        ("section", "broken"),
+        [
+            ("llm_config", "llm_config: 123\n"),
+            ("eip_config", "eip_config: []\n"),
+            ("memory_config", 'memory_config: "86400"\n'),
+        ],
+    )
+    async def test_optional_section_non_dict_rejected(self, tmp_path: Path, section: str, broken: str) -> None:
+        """可选段非映射结构（标量/列表/字符串）→ 440（防静默回落默认值掩盖配置错误）。"""
+        head = VALID_YAML.split("llm_config:")[0].rstrip() + "\n"  # 合法头部 + 单坏段（其余可选段合法缺失）
+        _write_config(tmp_path, head + broken)
+        with pytest.raises(AgentConfigError) as exc_info:
+            await _load(tmp_path)
+        assert exc_info.value.code == "EXCEPTION_440"
+        assert section in exc_info.value.context.get("reason", ""), "reason 须指明段名"
+
+    async def test_optional_sections_missing_fall_back_to_defaults(self, tmp_path: Path) -> None:
+        """三可选段整体缺失 → 加载成功且回落默认值（None/L4/86400——可选段契约正向锚定）。"""
+        _write_config(tmp_path, VALID_YAML.split("llm_config:")[0].rstrip() + "\n")
+        config = await _load(tmp_path)
+        assert config.preferred_model is None
+        assert config.default_isolation_level == "L4"
+        assert config.state_ttl == 86400
 
     async def test_error_context_carries_role_and_reason(self, tmp_path: Path) -> None:
         """异常 context 携带 role/config_path/reason（不泄露绝对路径内部细节）。"""

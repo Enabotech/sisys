@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.exceptions import AgentConfigError, AgentRoleNotSupportedError
+from src.domain.exceptions import AgentConfigError, AgentRoleNotSupportedError, DomainError
 from src.domain.exceptions._code_ranges import _CLASS_TO_SUBDOMAIN, CODE_RANGES
 
 # ===================================================================
@@ -152,13 +152,11 @@ class TestSubdomainRegistration:
     def test_code_ranges_contains_agent_segment(self) -> None:
         assert CODE_RANGES["agent"] == (440, 449)
 
-    @pytest.mark.parametrize(
-        ("class_name", "expected_code_num"),
-        [("AgentConfigError", 440), ("AgentRoleNotSupportedError", 441)],
-    )
-    def test_class_registered_in_subdomain(self, class_name: str, expected_code_num: int) -> None:
-        assert _CLASS_TO_SUBDOMAIN[class_name] == "agent"
-        code_num = int(expected_code_num)
+    @pytest.mark.parametrize("error_class", [AgentConfigError, AgentRoleNotSupportedError])
+    def test_class_registered_in_subdomain(self, error_class: type[DomainError]) -> None:
+        """类实际 code 必须落在 agent 子域物理段内（锚定类 code 属性真源，防参数字面量恒真）。"""
+        assert _CLASS_TO_SUBDOMAIN[error_class.__name__] == "agent"
+        code_num = int(error_class.code.removeprefix("EXCEPTION_"))
         low, high = CODE_RANGES["agent"]
         assert low <= code_num <= high
 

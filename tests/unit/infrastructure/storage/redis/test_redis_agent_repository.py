@@ -193,6 +193,8 @@ class TestBasicOperations:
         client.pipeline.assert_called_once_with(transaction=True)
         pipe = state["pipes"][0]
         assert [op for op, _ in pipe.operations] == ["hset", "expire"], "hset 与 expire 必须在同一事务管道内"
+        key = build_key("agent", str(agent.agent_id))
+        assert pipe.operations[0][1][0] == pipe.operations[1][1][0] == key, "hset 与 expire 必须作用于同一键"
         pipe.execute.assert_awaited_once()
 
     async def test_get_by_id_returns_agent(self) -> None:
@@ -359,6 +361,7 @@ class TestConnectionErrorPropagation:
 
         with pytest.raises(StorageError) as exc_info:
             await repo.save(_make_agent(), ttl=86400)
+        assert exc_info.value.code == "EXCEPTION_103"
         assert isinstance(exc_info.value.cause, aioredis.ConnectionError)
 
     async def test_get_by_id_connection_error_wrapped(self) -> None:
@@ -368,8 +371,9 @@ class TestConnectionErrorPropagation:
         client.hget = AsyncMock(side_effect=aioredis.ConnectionError("connection refused"))
         repo = RedisAgentRepository(adapter=RedisAdapter(redis_client=client))
 
-        with pytest.raises(StorageError):
+        with pytest.raises(StorageError) as exc_info:
             await repo.get_by_id(uuid.uuid4())
+        assert exc_info.value.code == "EXCEPTION_103"
 
 
 # ===================================================================

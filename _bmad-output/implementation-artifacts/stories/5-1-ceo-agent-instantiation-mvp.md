@@ -1065,9 +1065,9 @@ tests/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 2026-10-14（Round 1）
-**审查模式:** 5 并行视角调研（正确性契约审计 / 边界缺陷猎手 / 架构规范一致性 / 测试质量审计 / 盲审冷审）+ C3 三视角方案评审（技术方案质量 / 回归风险影响面 / 范围纪律契约，裁定「优秀」后修码）
-**审查范围:** `git diff ed3a2053..HEAD`（实施提交 ea0c0564 + be17899c）
+**审查日期:** 2026-10-14（Round 1 / Round 2）
+**审查模式:** R1=5 并行视角调研（正确性契约审计 / 边界缺陷猎手 / 架构规范一致性 / 测试质量审计 / 盲审冷审）+ C3 三视角方案评审；R2=双视角（R1 修复回归核查 + 科学性复审）+ C3 双视角评审（往返一轮裁定「优秀」）
+**审查范围:** R1=`git diff ed3a2053..1376dd81`（实施提交 ea0c0564 + be17899c）；R2=commit 1376dd81 修复自身的回归面与残留项
 
 #### 已修复 Patch（Round 1 — P0×4 + P1×4，逐项含来源视角/证据/修复）
 
@@ -1081,21 +1081,37 @@ tests/
 - [x] **R1-F8【P2】并发场景失败路径键泄漏**（来源：测试质量+盲审；gather 在 try/登记之外，部分失败时已落库键逃逸 teardown）→ 协程内即时登记 + gather 移入 try（integration+acceptance 两处）；验证性质：结构性加固经代码审查+happy path 实跑（集成层 mock 禁令不做故障注入），与 F3 原子 pipeline 协同兜底
 - 变更文件清单（R1）：`src/domain/events/base.py`（唯一共享代码变更——F4 根因修复）、`src/infrastructure/agent_orch/yaml_agent_config_loader.py`、`src/infrastructure/storage/redis/redis_agent_repository.py`、`src/interfaces/cli/agent_cli.py`、tests 10 文件（含 F4 必红清单 5 文件）、Story 文件本节、deferred-work.md
 
+#### 已修复 Patch（Round 2 — P2×3 + P3×6；R1 修复回归核查零 P0/P1 回归、科学性 9/10）
+
+- [x] **R2-F1【P2】outbox `get_unpublished` 毒消息隔离**（来源：回归核查——R1-F4 使 payload 反序列化 fail-loud（242）后，既有批量裸推导被放大：单条畸形 payload 卡 FIFO 队头每轮重炸、其后全部合法 pending 事件永久阻塞 reliable 通道；R1 前形态（字符串注解静默透传）不可能触发，属 R1 回归面闭环责任；git 历史级因果链证成）→ 逐条 try/except 隔离：未超限毒行 mark_failed 记 error、超限（retry_count ≥ max_retries）降级单行 warning 不写库（毒 payload 静态垃圾 vs 发布失败可恢复的对比论据）；新增毒消息隔离+有界化两用例（红→绿）；**变更 `outbox_repository.py`（第二个共享文件，单方法限定）**；残余写放大登记 D11
+- [x] **R2-F2【P2】AgentConfig VO tuple 类型守卫**（来源：科学性实测——`responsibilities="战略方向"` truthy str 越过 falsy 判空静默通过，用例层 `list()` 逐字符展开为 `['战','略',...]` 静默数据损坏，与加载器标量陷阱同款；VO 是运行时唯一防线）→ `isinstance(tuple)` 守卫（类型错先于空值错）+ str/list 两形态用例（红→绿）；全仓 3 处构造点均传 tuple 零回归（grep 证实）
+- [x] **R2-F3【P2】测试断言活性（D9(a)(b) 核销）**：subdomain 区间断言锚定类 `code` 属性真源（防参数字面量恒真）+ StorageError `code=="EXCEPTION_103"` 断言三位点补齐
+- [x] **R2-F4【P3】correlation_id/causation_id 包装 242**（来源：回归核查——R1「与核心字段同构」宣称不完整，两追踪字段仍裸 `uuid.UUID()` ValueError 逃逸）→ `_parse_optional_uuid` 助手（三元组对齐 timestamp 式）+ 两用例（红→绿）
+- [x] **R2-F5【P3】`get_type_hints` NameError 包装 242**（来源：双视角共同发现——解析调用点在 242 包装圈外；49 事件类实测零失败，防御性闭合）→ `_field_type_hints` 内 except NameError 包装（缓存未写入无毒化）+ 动态类注入字符串注解用例（红→绿；不使用注解字面量语法——静态检查器对字符串注解做未定义名检查）
+- [x] **R2-F6【P3】pipeline 测试补「两命令同 key」断言**（堵「hset A 键 + expire B 键」退化盲点）
+- [x] **R2-F7【P3】GBK 用例补 reason 分级断言**（防 PyYAML 行为漂移致 reason 分级静默劣化）
+- [x] **R2-F8【P3】文档卫生**：`_read_yaml` 删「先于 ValueError 家族」残留措辞（三分支互不相交实测成立）；`_deserialize_value` docstring 注记非 str 标量放行策略（有意宽容非遗漏）
+- [x] **R2-F9【P3】加载器 section 级守卫**（来源：回归核查——F6 只闭合标量面，`llm_config: 123`/`eip_config: []`/`memory_config: "86400"` 仍静默吞）→ 语义表定稿（None/缺失/`{}` 合法回落 vs 非 None 非 dict 440）+ 守卫作用于 `or {}` 之前的 raw 值 + 三形态用例（红→绿）+ **「三可选段缺失→默认值」正向锚定用例**（原验证门盲区——误实现下全门静默绿）
+- 变更文件清单（R2）：`src/infrastructure/messaging/outbox/outbox_repository.py`（共享文件）、`src/domain/events/base.py`、`src/domain/value_objects/agent_config.py`、`src/infrastructure/agent_orch/yaml_agent_config_loader.py`、tests 7 文件、Story 本节
+- **R2 终态**：5-1 自身可处置的 P0/P1/P2 全部清零；跨 Story/治理域留项 D1(P1)/D2(P2) 于 deferred-work.md 登记且带核销触发器
+
 #### 需决策 Decision Needed
 
-- [ ] D4 验收 Background ping 波及纯静态场景（AC-4.2/6.1/6.2 无 Redis 即整批 skip）——拆分 feature 会改动「收集数==13」钉死契约，留 Round 2 权衡
+- [ ] D4 验收 Background ping 波及纯静态场景（AC-4.2/6.1/6.2 无 Redis 即整批 skip）——拆分 feature 会改动「收集数==13」钉死契约，核销轮次 → Round 3（与测试结构一致性同批处置）
 
 #### 已推迟 Defer（留项台账——标注核销轮次或触发 Story）
 
 - [ ] D1【P1】import-linter `interfaces-no-infrastructure` 契约 BROKEN（存量 app/ocr_cli 两链 + agent_cli 新增第三链；未进 CI）→ deferred-work.md 登记（架构治理：entrypoint 层上移或豁免决策；禁止擅改 .importlinter）——核销：架构评审立项
 - [ ] D2【P2】EPO `_parse_biblio_document` 静默空记录 + `_fail` 消息恒定错位（4-1f 域，随 5-1 提交混入）→ deferred-work.md 登记——核销：4-1f 跟进
-- [ ] D3【P3】`get_by_id` 数据损坏误报 StorageError(103) 语义错位 → 本节登记——核销：Story 5.3 消费契约定时
-- [ ] D5【P3】`publish` 返回 None 静默视为成功（现无返回 None 的发布者，死防御）→ Round 2 评估补 warn
-- [ ] D6【P3】AgentConfig 直构造裸 TypeError / isolation 无枚举校验 / 空白串未归一 / `_required_str` 不 strip → 核销：5.3/5.4 消费方 Story 回填
-- [ ] D7【P3】SINGLETON 用例捕获 SCOPED 仓储（captive dependency；clear_scoped 未接线暂无实害）→ 已有 lifetime 注记，5.4 决策回迁时评估
-- [ ] D8【P3】存量技术债汇总（src 12 处 raise ValueError/49 处 HTTPException/noqa 若干/RedisSnapshotStore 非原子，均非 5-1 引入）→ deferred-work.md 登记——核销：专项技术债 Story
-- [ ] D9【P3】测试 P3 群（subdomain 恒真断言、StorageError code 断言缺口、架构验证器 D 子串扫描、FakeRedis 未关闭）→ Round 2 批量修复
+- [ ] D3【P3】`get_by_id` 数据损坏误报 StorageError(103) 语义错位（**R2 补注：现粗粒度包装使内置异常不裸逃逸——红线合规非缺陷；5.3 定的是「损坏 vs 连接」拆分契约而非修复**）→ 本节登记——核销：Story 5.3 消费契约定时
+- [x] D5【P3·已核销】`publish` 返回 None 静默视为成功 → ✅ 核销于 Round 2（裁定：EventPublisher Protocol 返回类型由 mypy src 门禁编译期覆盖，全部 5 个实现均返回 PublishResult；运行时 warn 防御边际价值不足）
+- [ ] D6【P3·R2 收窄】AgentConfig 直构造残余缺口（**R2-F2 已清偿 responsibilities/domain_knowledge tuple 守卫**；残余=标量字段非 str 直构造（name=123 裸 AttributeError）/ isolation 无枚举校验 / 空白串未归一 / `_required_str` 不 strip）→ 核销：5.3/5.4 消费方 Story 回填
+- [ ] D7【P3】SINGLETON 用例捕获 SCOPED 仓储（captive dependency；clear_scoped 未接线暂无实害；R2 科学性复审判明无状态仓储翻 SINGLETON 可廉价消解但属架构级 lifetime 语义决策）→ 已有 lifetime 注记，5.4 决策回迁时评估
+- [ ] D8【P3】存量技术债汇总（src 12 处 raise ValueError/49 处 HTTPException/noqa 若干/RedisSnapshotStore 非原子/存量 FakeRedis 未关闭（test_redis_cache/test_session_storage，**R2 勘误：5-1 自有用法自 ea0c0564 起即 try/finally aclose，原 D9(d) 归类失准**），均非 5-1 引入）→ deferred-work.md 登记——核销：专项技术债 Story（附存量无 TTL 孤儿键一次性 SCAN+TTL==-1 清理建议）
+- [ ] D9【P3】测试 P3 群：**(a)(b) 已于 Round 2 修复核销**（subdomain 恒真断言锚定类 code 真源 + StorageError code==103 断言三位点）；(c) 架构验证器 D 子串扫描（AST 化 ~20 行，当前零实害）→ 留项
+- [ ] D11【P3·R2 新增】outbox 毒消息 failed 后仍被无上限重选（R2-F1 有界化后每毒行每 poll 一条 warning、无 DB 写）→ 后续 dead-letter 终态机制立项时收敛（模型层 archived 状态现无转换路径）
 - [ ] D10【P3·已核销】Story「12 维度」vs 契约测试「11 维度」计数矛盾 → 本轮已统一为「11 维度/12 用例（9a/9b）」（✅ 核销于 Round 1）
+- [ ] 【R2 口径澄清】R1 提交信息「全 tests 树仅 5-1 新增文件存在 type: ignore」经 git 实证**属实**（98f3e742 时点恰 4 文件且全 5-1）；本台账 R1-F1 条在 Hard Constraint 三形态语境下易被扩大解读为「全部抑制注释形态」——补记：tests 树存量 12 文件含 noqa/pylint 形态抑制注释（归 D8 域，非 type: ignore 形态）
 
 ---
 
@@ -1108,7 +1124,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.7.0
+**故事版本/Story Version:** v1.8.0
 **创建日期/Created:** 2026-10-14
 **最后更新/Last Updated:** 2026-10-14
 **更新说明/Description:**
@@ -1120,6 +1136,7 @@ tests/
 - v1.5.0: Round 5 终态收敛（1 竞争性终检 Agent 按 checklist.md 框架以 dev agent 视角终检——无 Critical 缺陷、约 40 处引用抽查仅 1 处歧义、防重复清单完整；1 收敛验证 Agent——台账 #1-32 全部落地无假修复、内部计数终态一致、模板章节零缺失、正文零未决问题；P0 收敛曲线 4→2→4→0，终态「dev agent 可直接实施」；微修 P3×4 见台账 #33。**审查闭环：五轮 34 项修复台账，Story 可进入 dev-story**）
 - v1.6.0: **dev-story 实施完成**（2026-10-14：Task 0-8 全部实施且 DoD 达成——4 并行调研先例核验 → SDD 规范与 Gherkin 13 场景红阶段验证 → 领域层异常子域 440/441 + AgentInstantiated 事件双登记 → AgentConfig/加载器/ceo_agent.yaml → AgentRepository/Redis 仓储 → 实例化用例与发布接线 → sisys-agent CLI 端到端 → 集成与性能（P95<200ms + 10 并发）→ 架构五验证器 → 收尾验收；每个 TDD 循环含变异实证共 9 处；三质量门禁全绿 + 分层覆盖率全过（97/90/86/89%）；13 验收场景全绿；Status → review）
 - v1.7.0: **代码审查 Round 1**（2026-10-14：C1 五视角并行调研——正确性契约/边界缺陷/架构规范/测试质量/盲审冷审；C2-C3 方案经三视角评审往返一轮裁定「优秀」后修码；修复 P0×4（type: ignore 红线×6 处、_read_yaml 契约逃逸、hset/expire 非原子孤儿键、from_dict PEP 563 类型漂移——base.py 根因修复惠及全事件族）+ P1×4 + P2×1 + P3 文档口径（11 维度统一/异常契约表补强/AC-3 pipeline 措辞）；留项 D1-D10 台账；详见 Review Findings 节）
+- v1.8.0: **代码审查 Round 2**（2026-10-14：C1 双视角——R1 修复回归核查（F1-F8 逐项 ✅ 零 P0/P1 回归，redis-py 源码级验证）+ 科学性复审（R1 修复 9/10，缓存 9.6µs/pipeline RTT 2→1 实测背书）；C3 双视角评审往返一轮裁定「优秀」；修复 P2×3（outbox 毒消息隔离——R1-F4 fail-loud 放大的队头阻塞回归面、VO tuple 守卫——str 静默逐字符展开、测试断言活性 D9(a)(b)）+ P3×6（追踪字段/NameError 包装 242、pipeline 同 key 断言、GBK reason 断言、文档卫生、加载器 section 级守卫+正向锚定）；台账勘误五项（D5 核销/D9(d) 归 D8/D3 补注/D6 收窄/口径澄清）+ D11 新增；R2 终态：5-1 可处置的 P0/P1/P2 全部清零）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（5 并行调研 Agent 全仓代码/文档/模板/经验调研 + 人工事实核验；含链路接线断言清单 L1-L8、8 项关键架构决策 DC-1~DC-8、4 项偏离声明 D-1~D-4、deferred-work 分流处置）
 - v1.1.0: Round 1 审查修订（正确性视角：5 并行调研 Agent 代码事实核对 + 3 并行审查 Agent 对抗复核/一致性/遗漏扫描；修复 P0×4（EXCEPTION_HTTP_MAP 定位、YAML 断言误伤、session_storage 缺登记、验收模板指向）+ P1×8 + P2×18，详见「文档审查修复」表）

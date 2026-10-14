@@ -104,22 +104,34 @@ class YamlAgentConfigLoader(AgentConfigLoader):
         responsibilities = self._string_list(capabilities, "responsibilities", role.value, path_display)
         domain_knowledge = self._string_list(capabilities, "domain_knowledge", role.value, path_display)
 
+        # 可选段语义（定稿）：None（YAML null）/ 缺失 / 空 dict → 回落默认值（合法）；
+        # 非 None 非 dict（标量/列表/字符串）→ 440（防配置手误被静默吞为默认值——
+        # 守卫作用于 or {} 归一化之前的 raw 值，防 [] 被 falsy 归一绕过）
+        llm_raw = data.get("llm_config")
+        if llm_raw is not None and not isinstance(llm_raw, dict):
+            _fail("llm_config 段必须为映射结构")
         # llm_config.preferred_model：null/缺失 → None（空串由 VO 归一化）；非字符串标量显式 440
-        llm_config = data.get("llm_config") or {}
+        llm_config = llm_raw or {}
         preferred_model_raw = llm_config.get("preferred_model") if isinstance(llm_config, dict) else None
         if preferred_model_raw is not None and not isinstance(preferred_model_raw, str):
             _fail("llm_config.preferred_model 必须为字符串或 null")
         preferred_model: str | None = preferred_model_raw if isinstance(preferred_model_raw, str) else None
 
+        eip_raw = data.get("eip_config")
+        if eip_raw is not None and not isinstance(eip_raw, dict):
+            _fail("eip_config 段必须为映射结构")
         # eip_config.default_isolation_level：缺失默认 L4（本 Story 仅承载，5.4 消费）；非字符串显式 440
-        eip_config = data.get("eip_config") or {}
+        eip_config = eip_raw or {}
         isolation_raw = eip_config.get("default_isolation_level") if isinstance(eip_config, dict) else None
         if isolation_raw is not None and not isinstance(isolation_raw, str):
             _fail("eip_config.default_isolation_level 必须为字符串")
         default_isolation_level = isolation_raw if isinstance(isolation_raw, str) and isolation_raw else "L4"
 
+        memory_raw = data.get("memory_config")
+        if memory_raw is not None and not isinstance(memory_raw, dict):
+            _fail("memory_config 段必须为映射结构")
         # memory_config.state_ttl：缺失默认 86400；非整数（字符串/浮点/布尔）显式拦截
-        memory_config = data.get("memory_config") or {}
+        memory_config = memory_raw or {}
         state_ttl_raw = memory_config.get("state_ttl") if isinstance(memory_config, dict) else None
         if state_ttl_raw is None:
             state_ttl: int = 86400
@@ -149,8 +161,10 @@ class YamlAgentConfigLoader(AgentConfigLoader):
         逐类包装，禁裸内置异常（OSError/UnicodeDecodeError/ValueError 家族）逃逸：
         - yaml.YAMLError：语法/结构解析失败
         - UnicodeDecodeError：内容非 UTF-8（ValueError 子类——中文配置被错误
-          编码保存即触发，须先于 ValueError 家族显式点名）
+          编码保存即触发）
         - OSError：文件不可读（目录占位/无权限/TOCTOU 删除）
+
+        三类异常互无继承交集（分支顺序无关）。
         """
         try:
             with open(path, encoding="utf-8") as stream:

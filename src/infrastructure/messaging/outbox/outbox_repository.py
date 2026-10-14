@@ -90,7 +90,14 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         logger.info("Outbox 事件经独立会话落库（后台路径 fallback）: event_id=%s", event_id)
 
     async def get_unpublished(self, limit: int) -> list[DomainEvent]:
-        """获取未发布的事件列表（FIFO 排序）"""
+        """获取未发布的事件列表（FIFO 排序，逐条毒消息隔离）。
+
+        单条畸形 payload（反序列化失败）标记 failed 后跳过——防止毒事件卡在
+        FIFO 队头阻塞其后全部合法事件（对齐消费侧 redis_subscriber 逐消息
+        隔离语义）。有界化：重试上限已到的毒行不再写库标记（毒 payload 是
+        静态垃圾永不恢复，区别于可能因故障恢复而重试有意义的发布失败行），
+        降级单行 warning。
+        """
         result = await self._session.execute(
             select(OutboxModel)
             .where(OutboxModel.status.in_(("pending", "failed")))
@@ -98,7 +105,25 @@ class PostgreSQLOutboxRepository(OutboxRepository):
             .limit(limit)
         )
         models = list(result.scalars().all())
-        return [SQLAlchemyEventOutboxAdapter.to_domain_event(m) for m in models]
+        events: list[DomainEvent] = []
+        for model in models:
+            try:
+                events.append(SQLAlchemyEventOutboxAdapter.to_domain_event(model))
+            except Exception as exc:
+                if model.retry_count < model.max_retries:
+                    logger.error(
+                        "Outbox 事件反序列化失败（毒消息隔离，标记失败）: event_id=%s error=%s",
+                        model.event_id,
+                        exc,
+                    )
+                    await self.mark_failed(model.event_id, f"deserialization failed: {exc}")
+                else:
+                    logger.warning(
+                        "Outbox 毒消息已超重试上限（跳过标记）: event_id=%s retry_count=%d",
+                        model.event_id,
+                        model.retry_count,
+                    )
+        return events
 
     async def mark_published(self, event_id: UUID) -> None:
         """标记事件已发布

@@ -81,6 +81,89 @@ class TestPostgreSQLOutboxRepository:
 
         assert len(result) == 2
 
+    async def test_get_unpublished_poison_message_isolated(self, repository, mock_session):
+        """毒消息隔离：单条畸形 payload 标 failed 跳过，不阻塞合法事件返回。"""
+        DomainEvent.register("TestEvent", DomainEvent)
+
+        poison_model = mock.Mock()
+        poison_model.event_type = "TestEvent"
+        poison_model.payload = {
+            "event_id": "not-a-uuid",  # 畸形 UUID → from_dict 242（毒形态）
+            "event_type": "TestEvent",
+            "timestamp": datetime.now(UTC).isoformat(),
+            "source": "test",
+            "payload": {},
+        }
+        poison_model.status = "pending"
+        poison_model.retry_count = 0
+        poison_model.max_retries = 3
+
+        good_model = mock.Mock()
+        good_model.event_type = "TestEvent"
+        good_model.payload = {
+            "event_id": str(uuid4()),
+            "event_type": "TestEvent",
+            "timestamp": datetime.now(UTC).isoformat(),
+            "source": "test",
+            "payload": {},
+        }
+
+        mock_scalars = mock.Mock()
+        mock_scalars.all.return_value = [poison_model, good_model]
+        mock_result = mock.Mock()
+        mock_result.scalars.return_value = mock_scalars
+        # mark_failed 复用同一 execute 返回值——按 event_id 重查命中毒行
+        mock_result.scalar_one_or_none.return_value = poison_model
+        mock_session.execute.return_value = mock_result
+
+        result = await repository.get_unpublished(limit=10)
+
+        assert len(result) == 1, "合法事件必须正常返回（毒消息不得阻塞队列）"
+        assert str(result[0].event_id) == good_model.payload["event_id"]
+        assert poison_model.status == "failed", "毒行必须标记失败"
+        assert poison_model.retry_count == 1
+        assert "deserialization failed" in poison_model.error_message
+
+    async def test_get_unpublished_poison_message_retry_bounded(self, repository, mock_session):
+        """毒消息有界化：重试上限已到的毒行不再写库标记，仍返回合法事件。"""
+        DomainEvent.register("TestEvent", DomainEvent)
+
+        poison_model = mock.Mock()
+        poison_model.event_type = "TestEvent"
+        poison_model.payload = {
+            "event_id": "not-a-uuid",
+            "event_type": "TestEvent",
+            "timestamp": datetime.now(UTC).isoformat(),
+            "source": "test",
+            "payload": {},
+        }
+        poison_model.status = "failed"
+        poison_model.retry_count = 3
+        poison_model.max_retries = 3
+
+        good_model = mock.Mock()
+        good_model.event_type = "TestEvent"
+        good_model.payload = {
+            "event_id": str(uuid4()),
+            "event_type": "TestEvent",
+            "timestamp": datetime.now(UTC).isoformat(),
+            "source": "test",
+            "payload": {},
+        }
+
+        mock_scalars = mock.Mock()
+        mock_scalars.all.return_value = [poison_model, good_model]
+        mock_result = mock.Mock()
+        mock_result.scalars.return_value = mock_scalars
+        mock_result.scalar_one_or_none.return_value = poison_model
+        mock_session.execute.return_value = mock_result
+
+        result = await repository.get_unpublished(limit=10)
+
+        assert len(result) == 1, "合法事件必须正常返回"
+        assert poison_model.retry_count == 3, "超限毒行不得再递增 retry_count（有界化）"
+        assert poison_model.status == "failed"
+
     async def test_mark_published(self, repository, mock_session):
         """测试异步标记已发布"""
         event_id = uuid4()

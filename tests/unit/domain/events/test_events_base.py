@@ -1,5 +1,6 @@
 """Tests for DomainEvent base class."""
 
+import dataclasses
 import uuid
 from datetime import datetime
 
@@ -195,3 +196,56 @@ class TestDomainEventSerialization:
                     "payload": {},
                 }
             )
+
+    def test_from_dict_invalid_correlation_id_raises(self):
+        """追踪字段与核心字段同构：Invalid correlation_id 包装 242（禁裸 ValueError 逃逸）。"""
+        with pytest.raises(EntityValidationError, match="Invalid correlation_id"):
+            DomainEvent.from_dict(
+                {
+                    "event_id": str(uuid.uuid4()),
+                    "event_type": "TestEvent",
+                    "timestamp": "2024-01-01T00:00:00+00:00",
+                    "correlation_id": "not-a-uuid",
+                    "payload": {},
+                }
+            )
+
+    def test_from_dict_invalid_causation_id_raises(self):
+        """追踪字段与核心字段同构：Invalid causation_id 包装 242（禁裸 ValueError 逃逸）。"""
+        with pytest.raises(EntityValidationError, match="Invalid causation_id"):
+            DomainEvent.from_dict(
+                {
+                    "event_id": str(uuid.uuid4()),
+                    "event_type": "TestEvent",
+                    "timestamp": "2024-01-01T00:00:00+00:00",
+                    "causation_id": "not-a-uuid",
+                    "payload": {},
+                }
+            )
+
+    def test_from_dict_unresolvable_annotation_raises(self):
+        """不可解析类型注解（模块命名空间外的名字）包装 242（禁裸 NameError 逃逸）。"""
+        # 经 type() 动态建类 + __annotations__ 字典注入字符串注解：本文件未启用
+        # from __future__ import annotations，注解字面量语法会在类定义期求值为
+        # 类型对象（永不触发 get_type_hints 解析失败）；dict 注入形态使字符串
+        # 注解原样进入 dataclass 字段，get_type_hints 解析时抛 NameError（测试意图）
+        unresolvable_cls = dataclasses.dataclass(frozen=True)(
+            type(
+                "_UnresolvableEventR2",
+                (DomainEvent,),
+                {"__annotations__": {"bad_field": "NameAbsentFromModuleNamespace"}, "bad_field": ""},
+            )
+        )
+        DomainEvent.register("UnresolvableEventR2", unresolvable_cls)
+        try:
+            with pytest.raises(EntityValidationError, match="Unresolvable type annotations"):
+                DomainEvent.from_dict(
+                    {
+                        "event_id": str(uuid.uuid4()),
+                        "event_type": "UnresolvableEventR2",
+                        "timestamp": "2024-01-01T00:00:00+00:00",
+                        "payload": {"bad_field": "x"},
+                    }
+                )
+        finally:
+            DomainEvent._registry.pop("UnresolvableEventR2", None)
