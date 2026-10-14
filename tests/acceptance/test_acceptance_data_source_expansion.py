@@ -78,7 +78,50 @@ _FAKE_EPO_CREDENTIAL_PARTS = ("fake-epo-consumer-", "key-test1234")
 _FAKE_COMTRADE_KEY_PARTS = ("fake-comtrade-", "key-test1234")
 
 _EPO_TOKEN_BODY = {"access_token": "fake-epo-token-1", "expires_in": 3600}
-_EPO_SEARCH_BODY = {"patents": [{"title": "Battery tech", "applicant": "华为", "filing_date": "2026-01-15"}]}
+# search/biblio 端点真实响应结构（R7 实测锚定 2026-10-14）：ops:world-patent-data →
+# ops:biblio-search → ops:search-result → exchange-documents（JSON 化 XML，
+# 单元素折叠容错由适配器 _as_list 归一化）
+_EPO_SEARCH_BODY = {
+    "ops:world-patent-data": {
+        "ops:biblio-search": {
+            "@total-result-count": "2",
+            "ops:search-result": {
+                "exchange-documents": [
+                    {
+                        "exchange-document": {
+                            "@country": "CN",
+                            "@doc-number": "122876861",
+                            "@kind": "A",
+                            "bibliographic-data": {
+                                "invention-title": {"$": "Battery tech", "@lang": "ol"},
+                                "parties": {
+                                    "applicants": {
+                                        "applicant": {
+                                            "@sequence": "1",
+                                            "@data-format": "original",
+                                            "applicant-name": {"name": {"$": "华为"}},
+                                        }
+                                    }
+                                },
+                                "application-reference": {
+                                    "document-id": [
+                                        {
+                                            "@document-id-type": "docdb",
+                                            "country": {"$": "CN"},
+                                            "doc-number": {"$": "202610959049"},
+                                            "kind": {"$": "A"},
+                                            "date": {"$": "20260115"},
+                                        },
+                                    ]
+                                },
+                            },
+                        }
+                    }
+                ]
+            },
+        }
+    }
+}
 _EDGAR_FILINGS_BODY = {"filings": [{"company": "Tesla", "cik": "1318605", "form": "10-K", "filed_at": "2026-01-30"}]}
 _EDGAR_XBRL_BODY = {"concept": "Revenues", "unit": "USD", "values": [{"end": "2024-12-31", "val": 97690}]}
 _COMTRADE_RECORDS_BODY = {"records": [{"cmd_code": "8703", "trade_value": 1234567, "period": "2024"}]}
