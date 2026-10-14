@@ -1136,7 +1136,7 @@ tests/
 
 #### 已推迟 Defer（留项台账——标注核销轮次或触发 Story）
 
-- [ ] D1【P1】import-linter `interfaces-no-infrastructure` 契约 BROKEN（存量 app/ocr_cli 两链 + agent_cli 新增第三链；未进 CI）→ deferred-work.md 登记（架构治理：entrypoint 层上移或豁免决策；禁止擅改 .importlinter）——核销：架构评审立项
+- [x] D1【P1·已核销】import-linter `interfaces-no-infrastructure` 契约 BROKEN → ✅ 核销于 2026-10-15（方案 B：`allow_indirect_imports = True`——直接依赖禁止、间接经组合根合法；3-body 拍板；活体验证直接违规仍捕获；CI non-blocking 观察期至 2026-10-29；proposal 方案 A（entrypoint 层）挂 Epic 7 终态演进）
 - [x] D2【P2·已核销】EPO `_parse_biblio_document` 静默空记录 + `_fail` 消息层名错位 → ✅ 核销于 2026-10-14 留项清偿轮（原触发器「4-1f 跟进」因其 done 悬空改直接处置：`_fail(missing_layer, actual)` 消息点名真实缺失层 + 无 bibliographic-data 文档跳过 + 两用例；EPO 消费方回归绿）
 - [ ] D3【P3】`get_by_id` 数据损坏误报 StorageError(103) 语义错位（**R2 补注：现粗粒度包装使内置异常不裸逃逸——红线合规非缺陷；5.3 定的是「损坏 vs 连接」拆分契约而非修复**）→ 本节登记——核销：Story 5.3 消费契约定时
 - [x] D5【P3·已核销】`publish` 返回 None 静默视为成功 → ✅ 核销于 Round 2（裁定：EventPublisher Protocol 返回类型由 mypy src 门禁编译期覆盖，全部 5 个实现均返回 PublishResult；运行时 warn 防御边际价值不足）

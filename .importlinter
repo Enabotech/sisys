@@ -69,10 +69,19 @@ forbidden_modules =
     src.infrastructure
 
 # Interfaces layer must not depend on infrastructure
+# 语义：直接依赖禁止（间接经 composition_root 合法）——composition_root 是
+# 宪法授权的组装层（Clean Architecture Main 组件：架构圈外的终极细节，不属
+# 于三层任一层），其 import infrastructure 为设计使然。CLI/API 入口经
+# bootstrap()+resolve() 的组合根通道是项目 DI 模式的正路，此契约禁止的是
+# 绕过组合根的直接触碰。allow_indirect_imports 为 forbidden 契约一等选项
+# （exclude_modules 非契约选项，勿用——2026-10-15 源码核查勘正）。
+# 批准：3-body 2026-10-15 拍板（方案 B，见
+# _bmad-output/implementation-artifacts/proposals/proposal-d1-importlinter-governance.md）。
 [importlinter:contract:interfaces-no-infrastructure]
-name = Interfaces layer must not depend on infrastructure
+name = Interfaces layer must not directly depend on infrastructure (indirect via composition root allowed)
 type = forbidden
 source_modules =
     src.interfaces
 forbidden_modules =
     src.infrastructure
+allow_indirect_imports = True

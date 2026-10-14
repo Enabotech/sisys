@@ -1,6 +1,6 @@
 # 方议案 D1：import-linter `interfaces-no-infrastructure` 契约治理
 
-> **状态**：待架构评审决策（决策请求点见 §5）
+> **状态**：✅ 已实施（2026-10-15，3-body 批准方案 B——.importlinter 契约已改直接依赖禁止语义，CI non-blocking 观察期至 2026-10-29；§5 决策请求点 1/3 已裁定，2 按两步节奏执行中）
 > **来源**：Story 5-1 代码审查 R1 留项 D1【P1】；deferred-work.md「Deferred from: code review of 5-1 Round 1」节
 > **作者**：5-1 审查周期（2026-10-14）；事实均经 lint-imports 实测与 git 历史核验
 > **约束**：CLAUDE.md 明令「禁止修改 .importlinter 中已合入的架构依赖规则」——本文档仅为决策材料，任何方案落地均需架构评审批准后实施
@@ -88,7 +88,7 @@ CLI/API 启动器移出 `src/interfaces/`，在 `src/` 根与 composition_root �
 
 | # | 需拍板项 | 选项 |
 |---|---------|------|
-| 1 | 治理方案选型 | A（重组）/ **B（组合根出图，推荐）** / C（白名单）/ D（接受现状） |
+| 1 | 治理方案选型 | A（重组）/ **B（直接依赖禁止，推荐·已裁定实施）** / C（白名单）/ D（接受现状） |
 | 2 | 若选 B：CI 接入节奏 | 立即 blocking / 两周观察期后 blocking（推荐） |
 | 3 | 组合根 infrastructure 边的变更管控 | code review 承接（推荐）/ 另立契约白名单（方案 C 形态） |
 
