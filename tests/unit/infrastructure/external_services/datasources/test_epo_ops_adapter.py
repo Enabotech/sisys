@@ -40,7 +40,61 @@ _FAKE_KEY_PARTS = ("fake-epo-consumer-", "key-test1234")
 _FAKE_SECRET_PARTS = ("fake-epo-secret-", "test4567")
 
 _TOKEN_BODY = {"access_token": "fake-epo-token-1", "expires_in": 3600}
-_SEARCH_BODY = {"patents": [{"title": "Battery tech", "applicant": "华为", "filing_date": "2026-01-15"}]}
+
+
+def _biblio_document(title: str, applicant: str, filing_yyyymmdd: str, doc_number: str) -> dict:
+    """构造真实 search/biblio 响应的单条 exchange-document（R7 实测锚定 2026-10-14）。"""
+    return {
+        "exchange-document": {
+            "@system": "ops.epo.org",
+            "@country": "CN",
+            "@doc-number": doc_number,
+            "@kind": "A",
+            "bibliographic-data": {
+                "invention-title": {"$": title, "@lang": "ol"},
+                "parties": {
+                    "applicants": {
+                        "applicant": {
+                            "@sequence": "1",
+                            "@data-format": "original",
+                            "applicant-name": {"name": {"$": applicant}},
+                        }
+                    }
+                },
+                "application-reference": {
+                    "document-id": [
+                        {
+                            "@document-id-type": "docdb",
+                            "country": {"$": "CN"},
+                            "doc-number": {"$": doc_number},
+                            "kind": {"$": "A"},
+                            "date": {"$": filing_yyyymmdd},
+                        },
+                        {"@document-id-type": "epodoc", "doc-number": {"$": f"CN{doc_number}"}, "date": {"$": filing_yyyymmdd}},
+                    ]
+                },
+            },
+        }
+    }
+
+
+# 真实结构样本：ops:world-patent-data → ops:biblio-search → ops:search-result →
+# exchange-documents（列表，元素为 {exchange-document: {...}} 包装）→ bibliographic-data
+_SEARCH_BODY = {
+    "ops:world-patent-data": {
+        "ops:biblio-search": {
+            "@total-result-count": "110760",
+            "ops:query": {"$": "pa = 华为", "@syntax": "CQL"},
+            "ops:range": {"@begin": "1", "@end": "25"},
+            "ops:search-result": {
+                "exchange-documents": [
+                    _biblio_document("动力总成和电动车辆", "华为技术有限公司", "20260629", "122876861"),
+                    _biblio_document("Battery tech", "华为技术有限公司", "20260115", "122876862"),
+                ]
+            },
+        }
+    }
+}
 
 
 def _fake_credentials() -> tuple[str, str]:
@@ -133,7 +187,11 @@ class TestEpoTokenManager:
             "令牌端点路径契约锁（官方 Reference Guide v1.3.20——R2-F1，防 /3.2/auth/token 旧路径回归）"
         )
         assert captured[0].headers.get("authorization", "").startswith("Basic "), "令牌请求应携带 Basic 凭证"
-        assert "grant_type=client_credentials" in str(captured[0].url)
+        # grant_type 传输形态契约锁（R7 实测锚定 2026-10-14：query params 形态实测 HTTP 400，
+        # form body 形态实测 HTTP 200——官方契约为 application/x-www-form-urlencoded 请求体）
+        assert "grant_type" not in str(captured[0].url), "grant_type 禁止走 query params（实测 HTTP 400）"
+        assert "grant_type=client_credentials" in captured[0].read().decode(), "grant_type 必须走 form body（实测 HTTP 200）"
+        assert captured[0].headers.get("content-type", "").startswith("application/x-www-form-urlencoded")
 
     @pytest.mark.asyncio
     async def test_cache_hit_does_not_refetch(self) -> None:
@@ -239,15 +297,19 @@ class TestEpoOpsAdapterSuccess:
         adapter = _make_adapter(httpx.MockTransport(handler))
         result = await adapter.fetch(DataSourceQuery(source_name="epo-ops", query='pa="华为" and ti="battery"'))
         search = [r for r in captured if "/auth/accesstoken" not in str(r.url)][0]
-        assert "rest-services/published-data/search" in str(search.url), (
-            "检索路径须含 rest-services 前缀（官方 Reference Guide v1.3.20——R1-F1 路径契约锁）"
+        assert "rest-services/published-data/search/biblio" in str(search.url), (
+            "检索路径须为 search/biblio 变体（R7 实测锚定 2026-10-14：纯 search 仅返回"
+            " ops:publication-reference 文档引用无 title/applicant/date，biblio 变体才含"
+            " exchange-documents/bibliographic-data）"
         )
         assert search.headers.get("authorization") == "Bearer fake-epo-token-1"
         assert search.headers.get("accept") == "application/json"
         assert search.headers.get("range") == "1-25", "应携带 Range 分页头（首页 25 条）"
         assert 'pa="华为"' in str(search.url.params.get("q", "")), "CQL 表达式应直通 q 参数（解码形态）"
         payload = json.loads(result.payload)
-        assert payload["patents"][0]["applicant"] == "华为"
+        assert payload["patents"][0]["title"] == "动力总成和电动车辆"
+        assert payload["patents"][0]["applicant"] == "华为技术有限公司"
+        assert payload["patents"][0]["filing_date"] == "2026-06-29", "YYYYMMDD 须归一化为 ISO 日期"
         assert result.confidence == 0.9
         await adapter.close()
 
@@ -410,9 +472,39 @@ class TestEpoOpsAdapterFailures:
         with pytest.raises(DataSourceResponseError) as exc_info:
             await adapter.fetch(DataSourceQuery(source_name="epo-ops", query='pa="x"'))
         assert exc_info.value.code == "EXCEPTION_413"
-        assert "patents" in str(exc_info.value), "应是检索响应结构校验的 413（非令牌阶段）"
+        assert "world-patent-data" in str(exc_info.value), "应是检索响应结构校验的 413（非令牌阶段）"
         # consume 前移守护（R3-4）：413 结构校验路径的响应字节同样入账（上游 Fair Use 已真实消耗）
         assert adapter._quota_guard.used_bytes > 0, "413 路径字节应同样计入周配额（consume 须在 extract 之前）"
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_single_element_dict_folding_tolerated(self) -> None:
+        """JSON 化 XML 单元素折叠容错：exchange-document 为 dict（非 list）时解析单条。
+
+        EPO 真实端点在 Range 单条或多语言场景下会出现经典 dict 折叠形态
+        （R7 实测锚定 2026-10-14——解析器必须归一化 dict|list 两态）。
+        """
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if "/auth/accesstoken" in str(request.url):
+                return httpx.Response(200, json=_TOKEN_BODY)
+            folded = {
+                "ops:world-patent-data": {
+                    "ops:biblio-search": {
+                        "ops:search-result": {
+                            "exchange-documents": _biblio_document("折叠形态标题", "华为技术有限公司", "20260501", "9")
+                        }
+                    }
+                }
+            }
+            return httpx.Response(200, json=folded)
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        result = await adapter.fetch(DataSourceQuery(source_name="epo-ops", query='pa="华为"'))
+        patents = json.loads(result.payload)["patents"]
+        assert len(patents) == 1
+        assert patents[0]["title"] == "折叠形态标题"
+        assert patents[0]["filing_date"] == "2026-05-01"
         await adapter.close()
 
     @pytest.mark.asyncio

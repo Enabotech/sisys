@@ -234,6 +234,12 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="Agent决策完成",
         ),
+        "AgentInstantiated": ChannelMapping(
+            event_type="AgentInstantiated",
+            rabbitmq_routing_key="sisys.events.reliable.agent_instantiated",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="Agent实例化完成",
+        ),
         "CheckpointRecovered": ChannelMapping(
             event_type="CheckpointRecovered",
             rabbitmq_routing_key="sisys.events.reliable.checkpoint_recovered",

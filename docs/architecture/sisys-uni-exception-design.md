@@ -729,6 +729,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_432 | ToolVersionTrafficWeightError | ValidationError | 400 |（Story 4.6，权重非法/canary_only 直接全量/并存冲突族）|
 | EXCEPTION_433 | ToolVersionRollbackError | InvalidStateError | 409 |（Story 4.6，无可回滚稳定历史/目标非可回滚态）|
 | EXCEPTION_434~439 | （预留 tool_version 子域）| — | — |（后续协调，暂不分配）|
+| EXCEPTION_440 | AgentConfigError | SystemException | 500 |（Story 5.1，配置文件缺失/YAML 解析失败/必填字段无效/role 不匹配/state_ttl 越界——配置资产属系统资源，精确注册避免回退歧义）|
+| EXCEPTION_441 | AgentRoleNotSupportedError | BusinessException | 422 |（Story 5.1，MVP 未开放角色实例化请求——阶段性业务能力范围限制，精确注册避免回退 400）|
+| EXCEPTION_442~449 | （预留 agent 子域）| — | — |（5.2 档案加载 / 5.4-5.5 EIP 隔离 / 5.3 工作流异常）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——
@@ -806,6 +809,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | `data_source` | 410–419 | DataSourceError, DataSourceUnavailableError, DataSourceRateLimitError, DataSourceResponseError（Story 4.1b Skills 数据采集；语义归属 external，物理段独立于 301-399——external 已满且 399 已由 Story 4.7 分配） |
 | `debate` | 420–429 | DebateGenerationError, DebateSynthesisError, DebateLowDivergenceError（Story 4.5 红蓝辩论 MVP；420/421 语义归属 external、422 语义归属 business，物理段独立——business 2XX 与 external 3XX 均无整段空位，遵循 data_source 410-419 独立段先例；423-429 预留 V1 多轮辩论 Story 10.6） |
 | `tool_version` | 430–439 | ToolVersionNotFoundError, ToolVersionAlreadyExistsError, ToolVersionTrafficWeightError, ToolVersionRollbackError（Story 4.6 灰度发布与回滚；语义归属 business——继承 NotFoundError/ConflictError/ValidationError/InvalidStateError 具体类，物理段独立——tool 380-389 仅剩 384 保留位、toolchain 390-399 已由 4.7 分配 399（ValidationFeedbackRetryExhaustedError），遵循 data_source/debate 独立段先例；434-439 预留） |
+| `agent` | 440–449 | AgentConfigError, AgentRoleNotSupportedError（Story 5.1 CEO Agent 实例化 MVP；440 语义归属 system（SystemException 子类——配置资产属系统资源）、441 语义归属 business（BusinessException 子类——阶段性业务能力范围限制），物理段独立——遵循 data_source/debate/tool_version 独立段先例；442-449 预留 5.2 档案加载 / 5.4-5.5 EIP 隔离 / 5.3 工作流异常） |
 | `fallback` | 999 | UnknownError（兜底，独立于所有子域） |
 
 #### 3.3.3 CI 校验规则

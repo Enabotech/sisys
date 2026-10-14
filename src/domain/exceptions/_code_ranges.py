@@ -109,6 +109,13 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # 遵循 data_source 410-419 / debate 420-429 独立段先例）
     # EXCEPTION_434-439 暂不分配，保持空段预留
     "tool_version": (430, 439),
+    # Agent 子域（440-449）—— Story 5.1 注册 2 个异常（CEO Agent 实例化 MVP）:
+    # EXCEPTION_440 AgentConfigError (Story 5.1, 配置文件缺失/YAML 解析失败/必填字段无效/role 不匹配/state_ttl 越界)
+    # EXCEPTION_441 AgentRoleNotSupportedError (Story 5.1, MVP 未开放角色实例化请求)
+    # 440 语义归属 system（SystemException 子类——配置资产属系统资源）、441 语义归属 business
+    # （BusinessException 子类——阶段性业务能力范围限制），物理段独立（遵循独立段先例）
+    # EXCEPTION_442-449 预留（5.2 档案加载 / 5.4-5.5 EIP 隔离 / 5.3 工作流异常）
+    "agent": (440, 449),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -261,6 +268,9 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ToolVersionAlreadyExistsError": "tool_version",
     "ToolVersionTrafficWeightError": "tool_version",
     "ToolVersionRollbackError": "tool_version",
+    # agent_exceptions.py (Story 5.1 新增 2 个异常)
+    "AgentConfigError": "agent",
+    "AgentRoleNotSupportedError": "agent",
 }
 
 

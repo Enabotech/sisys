@@ -43,12 +43,34 @@ from src.infrastructure.external_services.embedding.circuit_breaker import Circu
 logger = logging.getLogger(__name__)
 
 # 官方 Reference Guide v1.3.20 + Go/Python 官方生态客户端库同路径（4.1f 代码审查 R2-F1 修正——
-# 原契约 /3.2/auth/token 与 R1-F1 检索路径同族契约错误；grant_type 传输形态待 R7 实测锚定）
+# 原契约 /3.2/auth/token 与 R1-F1 检索路径同族契约错误；grant_type 传输形态已 R7 实测锚定：
+# 2026-10-14 Key 到位后真实端点实证 query params → 400 / form body → 200，采用 form body）
 _TOKEN_ENDPOINT = "/3.2/auth/accesstoken"
-# 官方 Reference Guide v1.3.20：检索端点须含 rest-services 前缀（4.1f 代码审查 R1-F1 修正）
-_SEARCH_ENDPOINT = "/3.2/rest-services/published-data/search"
+# R7 实测锚定（2026-10-14）：biblio 变体——纯 /search 端点仅返回 ops:publication-reference
+# 文档引用（无 title/applicant/date），/search/biblio 才返回 exchange-documents/
+# bibliographic-data 全量著录项
+_SEARCH_ENDPOINT = "/3.2/rest-services/published-data/search/biblio"
 _TOKEN_EARLY_REFRESH = timedelta(seconds=60)  # 过期提前 60s 刷新
 _WEEKLY_QUOTA_BYTES = 4 * 1024**3  # 官方 Fair Use 免费层：4 GB/周
+
+
+def _as_list(value: Any) -> list[Any]:
+    """JSON 化 XML 单元素折叠归一化（dict|list 两态 → list）。
+
+    EPO Accept: application/json 响应的列表字段在单元素时折叠为 dict
+    （R7 实测锚定 2026-10-14）——解析层统一经本 helper 归一化。
+
+    Args:
+        value: 待归一化的字段值（dict/list/其他）
+
+    Returns:
+        list 形态（None → 空列表；dict → 单元素列表；list 原样）
+    """
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
 
 
 class _EpoTokenManager:
@@ -90,7 +112,12 @@ class _EpoTokenManager:
         return await self._fetch_token()
 
     async def _fetch_token(self) -> str:
-        """向令牌端点请求新令牌（Basic 凭证 + grant_type，走 resilience helper）。"""
+        """向令牌端点请求新令牌（Basic 凭证 + grant_type 走 form body，走 resilience helper）。
+
+        grant_type 传输形态（R7 实测锚定 2026-10-14，Key 到位后真实端点实证）：
+        query params 形态 → HTTP 400；form body（application/x-www-form-urlencoded）
+        形态 → HTTP 200 + access_token——官方契约为 form body。
+        """
         basic = base64.b64encode(f"{self._config.consumer_key}:{self._config.consumer_secret}".encode()).decode()
         data = await request_json_with_resilience(
             self._client,
@@ -98,7 +125,7 @@ class _EpoTokenManager:
             _TOKEN_ENDPOINT,
             source_name="epo-ops",
             circuit_breaker=self._circuit_breaker,
-            params={"grant_type": "client_credentials"},
+            form_data={"grant_type": "client_credentials"},
             headers={"Authorization": f"Basic {basic}"},
             max_attempts=self._retry_max_attempts,
             min_wait=self._retry_min_wait,
@@ -327,19 +354,98 @@ class EpoOpsAdapter:
             )
 
     def _extract_patents(self, data: Any) -> list[dict[str, Any]]:
-        """二段结构校验：响应须为 dict 且含 patents 列表。"""
-        if not isinstance(data, dict) or "patents" not in data:
+        """真实响应结构解析（R7 实测锚定 2026-10-14，search/biblio 端点）。
+
+        结构链：ops:world-patent-data → ops:biblio-search → ops:search-result →
+        exchange-documents（列表元素为 {exchange-document: {...}} 包装）→
+        bibliographic-data（invention-title/parties.applicants/
+        application-reference.document-id）。JSON 化 XML 存在单元素 dict 折叠
+        （exchange-document/applicant/invention-title 均可能 dict|list 两态）——
+        统一经 _as_list 归一化。缺失任一结构层 → 413。
+
+        Args:
+            data: 解析后的响应 JSON
+
+        Returns:
+            [{"title", "applicant", "filing_date"}]（filing_date 已归一化 ISO 日期）
+
+        Raises:
+            DataSourceResponseError: 响应结构缺失真实契约层（EXCEPTION_413）
+        """
+
+        def _fail(actual: Any) -> None:
             raise DataSourceResponseError(
-                message="EPO OPS 响应缺少 'patents' 字段",
-                context={"source_name": "epo-ops", "actual_type": type(data).__name__},
+                message="EPO OPS 响应缺少 'ops:world-patent-data' 结构层（真实契约锚定）",
+                context={"source_name": "epo-ops", "actual_type": type(actual).__name__},
             )
-        patents = data["patents"]
-        if not isinstance(patents, list):
-            raise DataSourceResponseError(
-                message="EPO OPS 响应 'patents' 字段非列表",
-                context={"source_name": "epo-ops", "actual_type": type(patents).__name__},
-            )
+
+        if not isinstance(data, dict):
+            _fail(data)
+        world = data.get("ops:world-patent-data")
+        if not isinstance(world, dict):
+            _fail(data)
+        biblio_search = world.get("ops:biblio-search")
+        if not isinstance(biblio_search, dict):
+            _fail(world)
+        search_result = biblio_search.get("ops:search-result")
+        if not isinstance(search_result, dict):
+            _fail(biblio_search)
+        documents_wrapper = search_result.get("exchange-documents")
+        if documents_wrapper is None:
+            _fail(search_result)
+
+        patents: list[dict[str, Any]] = []
+        for wrapper in _as_list(documents_wrapper):
+            if not isinstance(wrapper, dict):
+                continue
+            for document in _as_list(wrapper.get("exchange-document", wrapper)):
+                if isinstance(document, dict):
+                    patents.append(self._parse_biblio_document(document))
         return patents
+
+    @staticmethod
+    def _parse_biblio_document(document: dict[str, Any]) -> dict[str, Any]:
+        """单条 exchange-document → 三字段契约输出（title/applicant/filing_date）。"""
+
+        def _text(value: Any) -> str:
+            """提取 JSON 化 XML 文本（{$: "..."} 或 str；列表取首元素）。"""
+            if isinstance(value, dict):
+                return str(value.get("$", ""))
+            if isinstance(value, list) and value:
+                return _text(value[0])
+            return value if isinstance(value, str) else ""
+
+        biblio = document.get("bibliographic-data")
+        biblio = biblio if isinstance(biblio, dict) else {}
+
+        # title：invention-title（dict|list 两态）
+        title = _text(biblio.get("invention-title"))
+
+        # applicant：parties.applicants.applicant[0].applicant-name.name
+        parties = biblio.get("parties")
+        applicant = ""
+        if isinstance(parties, dict):
+            applicants_holder = parties.get("applicants")
+            if isinstance(applicants_holder, dict):
+                applicants = _as_list(applicants_holder.get("applicant"))
+                if applicants and isinstance(applicants[0], dict):
+                    name = applicants[0].get("applicant-name")
+                    if isinstance(name, dict):
+                        applicant = _text(name.get("name"))
+
+        # filing_date：application-reference.document-id 中 @document-id-type=docdb 的 date
+        # （YYYYMMDD → ISO YYYY-MM-DD，供 _latest_filing_date 的 fromisoformat 消费）
+        filing_date = ""
+        app_ref = biblio.get("application-reference")
+        if isinstance(app_ref, dict):
+            for doc_id in _as_list(app_ref.get("document-id")):
+                if isinstance(doc_id, dict) and doc_id.get("@document-id-type") == "docdb":
+                    raw = _text(doc_id.get("date"))
+                    if len(raw) == 8 and raw.isdigit():
+                        filing_date = f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}"
+                    break
+
+        return {"title": title, "applicant": applicant, "filing_date": filing_date}
 
     @staticmethod
     def _latest_filing_date(items: list[dict[str, Any]]) -> datetime | None:

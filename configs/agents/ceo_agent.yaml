@@ -1,0 +1,27 @@
+# CEO Agent 基础配置（Story 5-1 — CEO Agent 实例化 MVP）
+#
+# 配置资产身份键：identity.role（加载器按 {role}_agent.yaml 寻址）
+# 未知键策略：Schema 外未知键被加载器忽略（前向兼容——DC-3 回填期新旧配置共存）
+# 字段语义与裁剪标准见 Story 5-1 DC-3：保留有近期 Story 消费方的字段，
+# 裁剪无认领方字段（.md 身份档案七件套属 Story 5.2，不在此文件）
+
+agent:
+  name: "CEO Agent"
+  version: "1.0.0"
+  description: "首席执行官 Agent，MVP 单 Agent 方案的战略规划执行者"
+identity:
+  role: "ceo"
+capabilities:
+  # 职责（core-domain §17.3.1 CEO 条目）
+  responsibilities: ["战略方向", "最终决策", "高管协调"]
+  # 领域知识（core-domain §17.3.1 expertise）
+  domain_knowledge: ["宏观趋势", "竞争格局", "战略意图"]
+llm_config:
+  # 留空时 5.3 引擎回退 UDMR 路由；本 Story 不调用 LLM（映射 LLMConfig.model 由 5.3 消费）
+  preferred_model: null
+eip_config:
+  # 5.4 EIP 消费，本 Story 仅承载
+  default_isolation_level: "L4"
+memory_config:
+  # Agent 状态 TTL 秒（闭区间 60~2592000，默认 86400 为值对象唯一默认值真源）
+  state_ttl: 86400

@@ -127,6 +127,7 @@
 - unified_storage + L0/memory 子系统 12 端口休眠 — 触发=Epic 6
 - semantic_cache_middleware/cache_metrics/semantic_cache 休眠 — Story 3-9 缓存整体未运行；触发=检索性能需求
 - orchestration_service/workflow_engine/agent_engine 休眠 — document_tasks.py 随之死链；触发=Epic 5
+- session_storage 端口 + RedisSessionStorage 休眠（2026-10-12 普查遗漏项，Story 5-1 Task 0 补登记）— Story 5.1 Agent 状态持久化用新建 AgentRepository（决策 DC-1：session_id 主键语义不匹配 Agent 聚合仓储，且其吞连接异常的优雅降级语义与状态持久化确定性冲突）；触发=Story 5.3（会话状态消费方）
 - uow_factory/saga_repository 零 resolve — 事务子系统待首个真实事务用例
 - compressor/text_extractor/context_compressor/persistent_note_taker/compression_quality_evaluator — 检索-压缩循环待接线
 
@@ -140,7 +141,7 @@
 
 > 全量取证与裁定见 `epic-4-retro-2026-10-13-datasource.md`。核心结论：tavily 配置后零 Key 全坍塌 Skill 数已降为 0，Epic 5/6 均不阻塞。
 
-- 【行动项#1·3-body】三源 Key 申请（EPO OPS 优先→uspto→GCP） — 异步行政动作，不阻塞任何 Story；google-patents 外部前置显式标注：大陆部署需代理/专线（bigquery.googleapis.com GFW 确定性封锁，配齐凭据连接层仍 411）
+- 【行动项#1·3-body】三源 Key 申请（~~EPO OPS~~ **已配置 2026-10-14** → uspto → GCP） — EPO OPS 部分闭环：Key 配置后首跑暴露两处 R7 待锚定契约并已修复实证（①token 端点 grant_type 走 form body 而非 query params——实测 400 vs 200；②检索端点切 search/biblio 变体 + 响应解析按真实 JSON 化 XML 结构 ops:world-patent-data→ops:biblio-search→exchange-documents 重写，含单元素 dict 折叠容错与 YYYYMMDD→ISO 归一化）——`test_pa_chinese_applicant_real_patents` 真实端点转绿（pa="华为" 命中 110760 条）；uspto/GCP 仍待申请。google-patents 外部前置显式标注：大陆部署需代理/专线（bigquery.googleapis.com GFW 确定性封锁，配齐凭据连接层仍 411）
 - ~~【行动项#2·P0】cninfo 巨潮资讯接入立项（Epic 6 Story 6.2 前置）~~ — **RESOLVED**（2026-10-13 D-10 落地：Story 4-1f Task 10 增量交付——CninfoAdapter 免 key A 组无条件注册 + 两段式公告检索 + 真实端点集成实测 2 passed；competitor-analysis 8 源（市场份额 4 源）；适配器池 13 终态；PDF 内容下载拆期归 B2 摄取桥）
 - 【行动项#3】comtrade 零 Skill 引用（4-1f「受益 Skill 声明重分配」遗漏面） — ansoff-matrix/space-matrix 等行业量化 Skill 补声明 + 四方联动断言；触发= 下一数据源域 Story 或独立微 Story
 - 【行动项#4】fetch_many 执行前预检门 — 「声明源 ∩ 已注册适配器」交集空时输出数据缺口报告（标注休眠源+激活条件）而非 503 硬失败；同步修正 vrio SKILL.md:205「Key 敏感降级」话术与机制落差（话术声称休眠保留、机制实际全败硬失败）

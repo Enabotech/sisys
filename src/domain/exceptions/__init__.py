@@ -11,6 +11,10 @@
 
 from __future__ import annotations
 
+from src.domain.exceptions.agent_exceptions import (
+    AgentConfigError,
+    AgentRoleNotSupportedError,
+)
 from src.domain.exceptions.archive_exceptions import (
     ArchiveConflictError,
     ArchiveNotFoundError,
@@ -287,6 +291,9 @@ __all__ = [
     "ToolVersionAlreadyExistsError",
     "ToolVersionTrafficWeightError",
     "ToolVersionRollbackError",
+    # Agent 子域异常（Story 5.1）
+    "AgentConfigError",
+    "AgentRoleNotSupportedError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

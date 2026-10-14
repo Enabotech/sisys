@@ -1041,6 +1041,12 @@ class AgentIdentity:
 
 **Agent 生命周期状态机**：
 
+> **MVP 实施注记（Story 5-1 偏离声明 D-1，2026-10-14）**：MVP 采用代码现状五态
+> `AgentStatus`（IDLE/RUNNING/WAITING/COMPLETED/FAILED，`src/domain/entities/agent.py`）
+> 作为事实标准——`CHECKPOINTED` 态延至 Story 5.10（CheckpointWithEvaluation 集成）
+> 时随 Checkpoint 机制一并评估引入；现有实体状态机已含守卫且有测试，六态规划
+> 在 5.10 前不构成实施依据。
+
 ```python
 class AgentState(Enum):
     """Agent 生命周期状态 - 与 Checkpoint 机制协同"""
@@ -1377,6 +1383,23 @@ class SYSArbiter:
 #### 17.3.6 Agent 配置格式
 
 **目标：** 定义统一的 Agent 配置格式，支持动态加载和热更新
+
+> **MVP 实施注记（Story 5-1 偏离声明 D-2，2026-10-14）**：
+> ① **层归属修正**——MVP 实现为 domain 纯 dataclass（`AgentConfig`，frozen，
+> `src/domain/value_objects/agent_config.py`）+ application 端口（`AgentConfigLoader`）
+> + infrastructure YAML 解析（`YamlAgentConfigLoader`，`asyncio.to_thread(yaml.safe_load)`）；
+> 本节 `AgentConfig(BaseModel) + from_yaml()` 形态不得照搬入 domain（Pydantic/YAML
+> 入 domain 违反零依赖硬约束，CI 必挂）。
+> ② **字段裁剪与语义改写**（非仅层归属，取舍标准：保留有近期 Story 消费方的
+> 字段、裁剪无认领方字段，回填时机=消费方 Story 立项时回填对应子集）——
+> role 枚举键化（自由文本「战略决策者」→「ceo」，配置身份键为 identity.role）；
+> capabilities 重组为 responsibilities/domain_knowledge（语义取自 §17.3.1）；
+> preferred_models 列表单值化为 preferred_model（5.3 消费时映射 LLMConfig.model）；
+> agent.id/display_name/icon、communication、principles、capabilities.tools/
+> max_context_length/reasoning_mode、llm_config 其余子字段、eip_config 其余子字段、
+> memory_config L0/L2-L5 均裁剪（无认领方，YAGNI）。MVP 实际 Schema 见
+> `configs/agents/ceo_agent.yaml` + Story 5-1 文件「数据模型」节。
+> 未知键策略：加载器忽略 Schema 外未知键（前向兼容，新旧配置共存）。
 
 **配置文件格式 (YAML):**
 ```yaml

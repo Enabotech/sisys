@@ -21,6 +21,8 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError as PydanticValidationError
 
 from src.domain.exceptions import (
+    AgentConfigError,
+    AgentRoleNotSupportedError,
     ArchiveConflictError,
     ArchiveNotFoundError,
     ArchiveStorageError,
@@ -328,6 +330,8 @@ class TestExceptionHttpMap:
             DebateGenerationError,  # 420 — Story 4.5 辩论视角生成失败
             DebateSynthesisError,  # 421 — Story 4.5 风险视图合成失败
             DebateLowDivergenceError,  # 422 — Story 4.5 红蓝分化不足
+            AgentConfigError,  # 440 — Story 5.1 Agent 配置资产无效
+            AgentRoleNotSupportedError,  # 441 — Story 5.1 MVP 未开放角色
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

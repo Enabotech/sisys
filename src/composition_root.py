@@ -2671,6 +2671,70 @@ def bootstrap() -> None:
         tags=("debate", "service"),
     )
 
+    # === Story 5.1 — Agent 协作系统（CEO Agent 实例化 MVP）===
+    # AgentConfigLoader — Agent 基础配置加载端口（YAML 解析在 infrastructure，
+    # SINGLETON 无状态加载器；构造零 IO，目录仓库根锚定不依赖 cwd）
+    register_port(
+        name="agent_config_loader",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.agent_config_loader",
+            fromlist=["AgentConfigLoader"],
+        ).AgentConfigLoader,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.agent_orch.yaml_agent_config_loader",
+            fromlist=["YamlAgentConfigLoader"],
+        ).YamlAgentConfigLoader(),
+        module="src.infrastructure.agent_orch.yaml_agent_config_loader",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "config"),
+    )
+    # AgentRepository — Agent 聚合仓储端口（Redis 实现，键 sisys:agent:{agent_id}；
+    # SCOPED 对齐仓储端口主流惯例与 snapshot_repository 先例——构造零 IO，
+    # adapter 经组合根 SINGLETON redis_adapter 注入）
+    register_port(
+        name="agent_repository",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.ports.agent_repository",
+            fromlist=["AgentRepository"],
+        ).AgentRepository,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.redis.redis_agent_repository",
+            fromlist=["RedisAgentRepository"],
+        ).RedisAgentRepository(
+            adapter=resolver.resolve("redis_adapter"),
+        ),
+        module="src.infrastructure.storage.redis.redis_agent_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="platform",
+        tags=("redis", "agent"),
+    )
+    # InstantiateAgentUseCase — Agent 实例化用例（应用层，interface 绑定自身类型——
+    # 对齐 orchestration_service 先例；SINGLETON，工厂 resolve 三依赖：
+    # agent_config_loader + agent_repository + event_publisher）
+    register_port(
+        name="agent_instantiation_use_case",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.use_cases.agent_instantiation",
+            fromlist=["InstantiateAgentUseCase"],
+        ).InstantiateAgentUseCase,
+        impl=lambda resolver: __import__(
+            "src.application.use_cases.agent_instantiation",
+            fromlist=["InstantiateAgentUseCase"],
+        ).InstantiateAgentUseCase(
+            config_loader=resolver.resolve("agent_config_loader"),
+            repository=resolver.resolve("agent_repository"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.use_cases.agent_instantiation",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent",),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线

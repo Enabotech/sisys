@@ -1,0 +1,182 @@
+"""基础设施层 Agent 配置 YAML 加载器模块（Story 5-1 — CEO Agent 实例化 MVP）
+
+实现应用层 AgentConfigLoader 端口：从 configs/agents/{role}_agent.yaml
+加载 CEO Agent 基础配置并构造领域值对象 AgentConfig。
+
+设计要点：
+- YAML 解析严格限定本模块（domain 层零 yaml 依赖——六边形硬约束）
+- asyncio.to_thread 包装同步 yaml.safe_load（不引入 aiofiles 新依赖）
+- 配置目录仓库根锚定（Path(__file__) 四级上溯，对齐 event_bus_config_loader
+  先例），CLI 任意 cwd 可用；构造注入可覆盖（测试传 tmp_path）
+- 未知键策略（定稿）：忽略 Schema 外未知键（前向兼容——DC-3 回填期新旧
+  配置共存）
+- 全部失败路径统一抛 AgentConfigError(EXCEPTION_440)，消息面向调用方可
+  理解（不泄露 YAML 全文/绝对路径/堆栈）
+"""
+
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+from typing import Any, NoReturn
+
+import yaml
+
+from src.application.ports.agent_config_loader import AgentConfigLoader
+from src.domain.entities.agent import AgentRole
+from src.domain.exceptions import AgentConfigError
+from src.domain.value_objects.agent_config import AgentConfig
+
+# 仓库根锚定的默认配置目录（src/infrastructure/agent_orch/ 上溯 4 级 → 仓库根/configs/agents）
+DEFAULT_CONFIG_DIR = Path(__file__).parent.parent.parent.parent / "configs" / "agents"
+
+
+class YamlAgentConfigLoader(AgentConfigLoader):
+    """Agent 基础配置 YAML 加载器（AgentConfigLoader 端口的 infrastructure 实现）
+
+    配置文件命名：{role.value}_agent.yaml（如 ceo_agent.yaml）。
+    """
+
+    def __init__(self, config_dir: Path | None = None) -> None:
+        """初始化加载器
+
+        Args:
+            config_dir: 配置目录（默认仓库根 configs/agents——锚定不依赖 cwd；
+                测试可注入 tmp_path）
+        """
+        self._config_dir = Path(config_dir) if config_dir is not None else DEFAULT_CONFIG_DIR
+
+    async def load(self, role: AgentRole) -> AgentConfig:
+        """加载指定角色的基础配置并构造值对象
+
+        Args:
+            role: Agent 角色
+
+        Returns:
+            AgentConfig 领域值对象
+
+        Raises:
+            AgentConfigError: 配置文件缺失 / YAML 解析失败 / 空文件 / role
+                不匹配 / 必填字段无效 / capabilities 非列表 / state_ttl 非整数
+                （均 EXCEPTION_440）
+        """
+        config_path = self._config_dir / f"{role.value}_agent.yaml"
+        path_display = f"configs/agents/{config_path.name}"  # 相对路径形态，不泄露绝对路径
+
+        def _fail(reason: str, message: str | None = None) -> NoReturn:
+            raise AgentConfigError(role=role.value, config_path=path_display, reason=reason, message=message or reason)
+
+        if not config_path.exists():
+            _fail("配置文件不存在", f"Agent 配置文件不存在: {path_display}")
+
+        data = await asyncio.to_thread(self._read_yaml, config_path)
+        if not isinstance(data, dict):
+            # 空文件（safe_load 返回 None）或顶层非映射结构
+            _fail("配置文件为空或顶层结构非法", f"Agent 配置文件为空或顶层结构非法: {path_display}")
+
+        # identity.role：字符串 → 枚举（非法值与不匹配统一 440，禁止裸 ValueError 逃逸）
+        identity = self._section(data, "identity", role.value, path_display)
+        role_str = identity.get("role")
+        if not isinstance(role_str, str) or not role_str.strip():
+            _fail("identity.role 缺失或非字符串")
+        try:
+            configured_role = AgentRole(role_str.strip().lower())
+        except ValueError:
+            _fail(f"identity.role 非法枚举值: {role_str}")
+        if configured_role is not role:
+            _fail(f"配置角色 {configured_role.value} 与请求角色 {role.value} 不匹配")
+
+        # agent 段：name/version/description 必填非空字符串
+        agent_section = self._section(data, "agent", role.value, path_display)
+
+        def _required_str(field: str) -> str:
+            value = agent_section.get(field)
+            if not isinstance(value, str) or not value.strip():
+                _fail(f"agent.{field} 缺失或为非空字符串要求不满足")
+            return value
+
+        name = _required_str("name")
+        description = _required_str("description")
+        version = _required_str("version")
+
+        # capabilities.*：isinstance(list) 守卫再转 tuple（禁止 tuple(str) 逐字符静默展开）
+        capabilities = self._section(data, "capabilities", role.value, path_display)
+        responsibilities = self._string_list(capabilities, "responsibilities", role.value, path_display)
+        domain_knowledge = self._string_list(capabilities, "domain_knowledge", role.value, path_display)
+
+        # llm_config.preferred_model：null/缺失 → None（空串由 VO 归一化）
+        llm_config = data.get("llm_config") or {}
+        preferred_model_raw = llm_config.get("preferred_model") if isinstance(llm_config, dict) else None
+        preferred_model: str | None = preferred_model_raw if isinstance(preferred_model_raw, str) else None
+
+        # eip_config.default_isolation_level：缺失默认 L4（本 Story 仅承载，5.4 消费）
+        eip_config = data.get("eip_config") or {}
+        isolation_raw = eip_config.get("default_isolation_level") if isinstance(eip_config, dict) else None
+        default_isolation_level = isolation_raw if isinstance(isolation_raw, str) and isolation_raw else "L4"
+
+        # memory_config.state_ttl：缺失默认 86400；非整数（字符串/浮点/布尔）显式拦截
+        memory_config = data.get("memory_config") or {}
+        state_ttl_raw = memory_config.get("state_ttl") if isinstance(memory_config, dict) else None
+        if state_ttl_raw is None:
+            state_ttl: int = 86400
+        elif isinstance(state_ttl_raw, bool) or not isinstance(state_ttl_raw, int):
+            _fail("memory_config.state_ttl 必须为整数")
+        else:
+            state_ttl = state_ttl_raw
+
+        # 构造值对象（空列表/越界等剩余校验由 VO __post_init__ 兜底，同抛 440）
+        return AgentConfig(
+            role=role,
+            name=name,
+            description=description,
+            version=version,
+            responsibilities=tuple(responsibilities),
+            domain_knowledge=tuple(domain_knowledge),
+            preferred_model=preferred_model,
+            state_ttl=state_ttl,
+            default_isolation_level=default_isolation_level,
+        )
+
+    @staticmethod
+    def _read_yaml(path: Path) -> Any:
+        """同步读取并解析 YAML（经 asyncio.to_thread 调度，避免阻塞事件循环）"""
+        with open(path, encoding="utf-8") as stream:
+            try:
+                return yaml.safe_load(stream)
+            except yaml.YAMLError as exc:
+                raise AgentConfigError(
+                    role="",
+                    config_path=f"configs/agents/{path.name}",
+                    reason="YAML 解析失败",
+                    message=f"Agent 配置 YAML 解析失败: {path.name}",
+                    cause=exc,
+                ) from exc
+
+    @staticmethod
+    def _section(data: dict[str, Any], section: str, role: str, path_display: str) -> dict[str, Any]:
+        """提取顶层子段（缺失/非映射 → 440；未知键不在此校验）"""
+        value = data.get(section)
+        if not isinstance(value, dict):
+            raise AgentConfigError(
+                role=role,
+                config_path=path_display,
+                reason=f"{section} 段缺失或结构非法",
+                message=f"Agent 配置 {section} 段缺失或结构非法",
+            )
+        return value
+
+    @staticmethod
+    def _string_list(section: dict[str, Any], key: str, role: str, path_display: str) -> list[str]:
+        """提取字符串列表字段（isinstance(list) 守卫 + 元素类型校验）"""
+        value = section.get(key)
+        if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+            raise AgentConfigError(
+                role=role,
+                config_path=path_display,
+                reason=f"capabilities.{key} 必须为字符串列表",
+                message=f"Agent 配置 capabilities.{key} 必须为字符串列表",
+            )
+        return value
+
+
+__all__ = ["YamlAgentConfigLoader", "DEFAULT_CONFIG_DIR"]

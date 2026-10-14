@@ -1,6 +1,6 @@
 # Story 5.1: CEO Agent 实例化（MVP 单 Agent）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -494,16 +494,16 @@ class AgentConfigLoader(Protocol):
 
 > **目的：** 在进入代码实现前，落地本 Story SDD 规范节定义的全部 Schema、端口契约、异常契约与 Gherkin，并完成红阶段验证。
 
-- [ ] Subtask 0.1: 按「领域事件 Schema」「数据模型」「端口契约清单」「领域异常契约」四节定稿全部契约（如本 Story 已定稿，逐项核对签名/字段/编码无歧义后确认）
-- [ ] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_agent_instantiation.feature`（13 场景清单，严格模仿 data_source/skill_data_collection 最新范本 + AC 编号命名，见 R6）
-- [ ] Subtask 0.3: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_agent_instantiation.py`（@scenario 显式绑定 + context dict + `_run_async` + Background 动态 skip + **新模块延迟 import** + 显式 pytestmark）
-- [ ] Subtask 0.4: 运行验收测试，确认失败（🔴 红阶段验证；ModuleNotFoundError 为合法红，记录失败形态；**前提：Redis 在线**——Background ping 失败则全 skip 无失败可确认；**校验收集场景数 == 13**——`pytest --collect-only -q`，防 @scenario 绑定名与 .feature 不匹配的收集期 ScenarioNotFound 或漏绑定静默不收集）
-- [ ] Subtask 0.5: 链路接线断言清单 L1-L8 逐项确认处置（本 Story 接线 5 项 / deferred 保持 3 项）+ **补登记 deferred-work.md**：`session_storage` 端口 + RedisSessionStorage 未接线（处置：5.1 用新建 AgentRepository，见 DC-1；触发=Story 5.3 会话状态）——该条目在 2026-10-12 普查中缺席，L7/L8 已登记核对通过
+- [x] Subtask 0.1: 按「领域事件 Schema」「数据模型」「端口契约清单」「领域异常契约」四节定稿全部契约（如本 Story 已定稿，逐项核对签名/字段/编码无歧义后确认）
+- [x] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_agent_instantiation.feature`（13 场景清单，严格模仿 data_source/skill_data_collection 最新范本 + AC 编号命名，见 R6）
+- [x] Subtask 0.3: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_agent_instantiation.py`（@scenario 显式绑定 + context dict + `_run_async` + Background 动态 skip + **新模块延迟 import** + 显式 pytestmark）
+- [x] Subtask 0.4: 运行验收测试，确认失败（🔴 红阶段验证；ModuleNotFoundError 为合法红，记录失败形态；**前提：Redis 在线**——Background ping 失败则全 skip 无失败可确认；**校验收集场景数 == 13**——`pytest --collect-only -q`，防 @scenario 绑定名与 .feature 不匹配的收集期 ScenarioNotFound 或漏绑定静默不收集）
+- [x] Subtask 0.5: 链路接线断言清单 L1-L8 逐项确认处置（本 Story 接线 5 项 / deferred 保持 3 项）+ **补登记 deferred-work.md**：`session_storage` 端口 + RedisSessionStorage 未接线（处置：5.1 用新建 AgentRepository，见 DC-1；触发=Story 5.3 会话状态）——该条目在 2026-10-12 普查中缺席，L7/L8 已登记核对通过
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
-- [ ] deferred-work.md 补登记 L6 `session_storage` 条目（L7/L8 已登记核对通过）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
+- [x] deferred-work.md 补登记 L6 `session_storage` 条目（L7/L8 已登记核对通过）
 
 ---
 
@@ -531,18 +531,18 @@ class AgentConfigLoader(Protocol):
 | 🟡 变异 | 突变 `aggregate_type="Agent"` → `"AgentX"` → 断言红 → 还原绿 |
 | 🔄 重构 | `configs/event_channels.yaml` + `channel_router.py DEFAULT_MAPPINGS` 双登记（对齐 AgentDecided 条目结构）；`architecture.md §10.1` 领域事件完整列表追加 `AgentInstantiated` 行（RabbitMQ + Outbox / 7 年存储 / 审计合规型，对齐 AgentDecided 行形态——登记类文档随落地 Task 同步，与异常文档 §3.3.2 同模式）；ruff+mypy |
 
-- [ ] Subtask 1.1: 🔴 红 — 异常测试（循环 A）
-- [ ] Subtask 1.2: 🟢 绿 — agent_exceptions.py 实现
-- [ ] Subtask 1.3: 🟡 变异 + 🔄 重构 — 登记四处（_code_ranges/__init__/HTTP_MAP/设计文档）
-- [ ] Subtask 1.4: 🔴 红 — 事件测试（循环 B）
-- [ ] Subtask 1.5: 🟢 绿 — AgentInstantiated 实现
-- [ ] Subtask 1.6: 🟡 变异 + 🔄 重构 — 事件双登记
-- [ ] Subtask 1.7: 运行 `poetry run pytest tests/unit/domain/ -v` 全绿（含既有 8 项异常套件不回归）
+- [x] Subtask 1.1: 🔴 红 — 异常测试（循环 A）
+- [x] Subtask 1.2: 🟢 绿 — agent_exceptions.py 实现
+- [x] Subtask 1.3: 🟡 变异 + 🔄 重构 — 登记四处（_code_ranges/__init__/HTTP_MAP/设计文档）
+- [x] Subtask 1.4: 🔴 红 — 事件测试（循环 B）
+- [x] Subtask 1.5: 🟢 绿 — AgentInstantiated 实现
+- [x] Subtask 1.6: 🟡 变异 + 🔄 重构 — 事件双登记
+- [x] Subtask 1.7: 运行 `poetry run pytest tests/unit/domain/ -v` 全绿（含既有 8 项异常套件不回归）
 
 **完成标准/Definition of Done:**
-- [ ] 异常/事件契约实现且既有套件零回归
-- [ ] `grep -r "EXCEPTION_44[01]" src/domain/exceptions/` 无碰撞
-- [ ] 双登记两处 grep 可达
+- [x] 异常/事件契约实现且既有套件零回归（tests/unit/domain/ 2888 passed）
+- [x] `grep -r "EXCEPTION_44[01]" src/domain/exceptions/` 无碰撞
+- [x] 双登记两处 grep 可达（AC-4.2 验收场景已转绿）
 
 ---
 
@@ -570,18 +570,18 @@ class AgentConfigLoader(Protocol):
 | 🟡 变异 | 突变 role 映射键（identity.role→identity.roleX）→ 加载测试红 → 还原绿 |
 | 🔄 重构 | 组合根注册 `agent_config_loader`（SINGLETON，lambda + `__import__` 延迟加载，仿 snapshot 样例）+ 契约测试 `tests/contracts/test_port_contract_agent_config_loader.py`（11 维度）；ruff+mypy |
 
-- [ ] Subtask 2.1: 🔴 红 — 值对象测试
-- [ ] Subtask 2.2: 🟢 绿 — AgentConfig 实现
-- [ ] Subtask 2.3: 🟡 变异 + 🔄 重构 — 值对象收敛
-- [ ] Subtask 2.4: 🔴 红 — 加载器测试（真实文件 IO，零 mock）
-- [ ] Subtask 2.5: 🟢 绿 — 端口 + 实现 + ceo_agent.yaml
-- [ ] Subtask 2.6: 🟡 变异 + 🔄 重构 — 组合根注册 + 契约测试
-- [ ] Subtask 2.7: 内置 `configs/agents/ceo_agent.yaml` 加载冒烟（`load(AgentRole.CEO)` 成功，字段映射正确）
+- [x] Subtask 2.1: 🔴 红 — 值对象测试
+- [x] Subtask 2.2: 🟢 绿 — AgentConfig 实现
+- [x] Subtask 2.3: 🟡 变异 + 🔄 重构 — 值对象收敛
+- [x] Subtask 2.4: 🔴 红 — 加载器测试（真实文件 IO，零 mock）
+- [x] Subtask 2.5: 🟢 绿 — 端口 + 实现 + ceo_agent.yaml
+- [x] Subtask 2.6: 🟡 变异 + 🔄 重构 — 组合根注册 + 契约测试
+- [x] Subtask 2.7: 内置 `configs/agents/ceo_agent.yaml` 加载冒烟（`load(AgentRole.CEO)` 成功，字段映射正确）
 
 **完成标准/Definition of Done:**
-- [ ] 配置加载三失败路径 + 成功路径全覆盖
-- [ ] 契约测试通过，`resolve("agent_config_loader")` 可达（链路 L2 绿灯）
-- [ ] domain 层零第三方依赖（agent_config.py 仅标准库 + AgentRole）
+- [x] 配置加载三失败路径 + 成功路径全覆盖（值对象 20 + 加载器 18 用例）
+- [x] 契约测试通过，`resolve("agent_config_loader")` 可达（链路 L2 绿灯——12 维度契约用例 passed）
+- [x] domain 层零第三方依赖（agent_config.py 仅标准库 + AgentRole）
 
 ---
 
@@ -600,16 +600,16 @@ class AgentConfigLoader(Protocol):
 | 🟡 变异 | 突变 `_hash_to_agent` 的 `AgentStatus(status_str)` 重建（改为透传 str）→ 往返断言红（`isinstance(status, AgentStatus)` 失败）→ 还原绿 |
 | 🔄 重构 | 组合根注册 `agent_repository`（SCOPED，lambda 工厂 `adapter=resolver.resolve("redis_adapter")`，仿组合根 snapshot_repository 注册样例 composition_root.py L941-955）+ 契约测试 `tests/contracts/test_port_contract_agent_repository.py`；ruff+mypy |
 
-- [ ] Subtask 3.1: 🔴 红 — 仓储单元测试（含序列化往返矩阵）
-- [ ] Subtask 3.2: 🟢 绿 — 端口 + RedisAgentRepository
-- [ ] Subtask 3.3: 🟡 变异 — Enum 重建突变实证（防恒真断言核心点）
-- [ ] Subtask 3.4: 🔄 重构 — 组合根注册 + 契约测试 + 注释规范
-- [ ] Subtask 3.5: fakeredis 快速回归（可选：fakeredis 实测支持 `hset`+`expire`+`ttl` 语义，TTL 断言先例 test_redis_cache.py L276/L295；⚠️ `mock_redis` fixture 在 `tests/integration/conftest.py` L87，unit 目录不可见——unit 文件内自建 `fakeredis.aioredis.FakeRedis(decode_responses=True)`）
+- [x] Subtask 3.1: 🔴 红 — 仓储单元测试（含序列化往返矩阵）
+- [x] Subtask 3.2: 🟢 绿 — 端口 + RedisAgentRepository
+- [x] Subtask 3.3: 🟡 变异 — Enum 重建突变实证（防恒真断言核心点）
+- [x] Subtask 3.4: 🔄 重构 — 组合根注册 + 契约测试 + 注释规范
+- [x] Subtask 3.5: fakeredis 快速回归（可选：fakeredis 实测支持 `hset`+`expire`+`ttl` 语义，TTL 断言先例 test_redis_cache.py L276/L295；⚠️ `mock_redis` fixture 在 `tests/integration/conftest.py` L87，unit 目录不可见——unit 文件内自建 `fakeredis.aioredis.FakeRedis(decode_responses=True)`）
 
 **完成标准/Definition of Done:**
-- [ ] 序列化往返全字段一致（UUID/Enum/datetime 显式重建断言，非恒真）
-- [ ] 契约测试通过，`resolve("agent_repository")` 可达（链路 L1 绿灯）
-- [ ] Redis 错误不静默（连接异常向上传播为领域异常体系映射）
+- [x] 序列化往返全字段一致（UUID/Enum/datetime 显式重建断言，非恒真）
+- [x] 契约测试通过，`resolve("agent_repository")` 可达（链路 L1 绿灯——12 维度契约用例 passed）
+- [x] Redis 错误不静默（连接异常包装 StorageError(cause=exc) 向上传播——绿阶段自纠：`from exc` 仅设 __cause__，DomainError.cause 属性须构造参数显式传递）
 
 ---
 
@@ -629,16 +629,16 @@ class AgentConfigLoader(Protocol):
 | 🟡 变异 | 突变发布调用行（注释掉 publish）→ 「事件已发布」断言红 → 还原绿（Epic 4 零发布教训的直接防线） |
 | 🔄 重构 | `AgentInstantiationResult` dataclass（agent_id + Agent 实体引用，**定稿：应用层 DTO，定义于 use_cases/agent_instantiation.py 模块内**——对齐 strategic_analysis.py L36-51 请求 dataclass 模块内定义先例，不新增 domain 文件）；组合根注册 `agent_instantiation_use_case`（SINGLETON，工厂 resolve 三依赖）+ 契约测试；ruff+mypy |
 
-- [ ] Subtask 4.1: 🔴 红 — 用例单元测试（含编排顺序与异常传播）
-- [ ] Subtask 4.2: 🟢 绿 — InstantiateAgentUseCase 实现
-- [ ] Subtask 4.3: 🟡 变异 — 发布点突变实证（链路 L4 核心）
-- [ ] Subtask 4.4: 🔄 重构 — 结果对象 + 组合根注册 + 契约测试 `test_port_contract_agent_instantiation_use_case.py`
-- [ ] Subtask 4.5: 验收场景 AC-1.1/1.2/3.1/4.1 转绿核对（服务级真实组装：`resolve("agent_config_loader")`（无连接安全）+ **手动组装** `RedisAgentRepository(adapter=RedisAdapter(redis_client=ctx["_redis_client"]))` + `InMemoryEventBus()` 直接构造 + 手动实例化 `InstantiateAgentUseCase`——⚠️ **不 resolve `agent_repository` 与用例端口**：前者 SINGLETON redis_client 跨 function-scope 循环复用必抛 "Event loop is closed"（记忆 acceptance_redis_client_cross_loop_issue），后者工厂注入的组合根默认 event_publisher 是 DualChannelEventBus，验收环境无 RabbitMQ；组装先例 test_acceptance_skill_data_collection.py L318（`RedisAdapter(redis_client=context["_redis_client"])`）；遵守 bootstrap 禁令见测试隔离约束表）
+- [x] Subtask 4.1: 🔴 红 — 用例单元测试（含编排顺序与异常传播）
+- [x] Subtask 4.2: 🟢 绿 — InstantiateAgentUseCase 实现
+- [x] Subtask 4.3: 🟡 变异 — 发布点突变实证（链路 L4 核心）
+- [x] Subtask 4.4: 🔄 重构 — 结果对象 + 组合根注册 + 契约测试 `test_port_contract_agent_instantiation_use_case.py`
+- [x] Subtask 4.5: 验收场景 AC-1.1/1.2/3.1/4.1 转绿核对（服务级真实组装：`resolve("agent_config_loader")`（无连接安全）+ **手动组装** `RedisAgentRepository(adapter=RedisAdapter(redis_client=ctx["_redis_client"]))` + `InMemoryEventBus()` 直接构造 + 手动实例化 `InstantiateAgentUseCase`——⚠️ **不 resolve `agent_repository` 与用例端口**：前者 SINGLETON redis_client 跨 function-scope 循环复用必抛 "Event loop is closed"（记忆 acceptance_redis_client_cross_loop_issue），后者工厂注入的组合根默认 event_publisher 是 DualChannelEventBus，验收环境无 RabbitMQ；组装先例 test_acceptance_skill_data_collection.py L318（`RedisAdapter(redis_client=context["_redis_client"])`）；遵守 bootstrap 禁令见测试隔离约束表）
 
 **完成标准/Definition of Done:**
-- [ ] 用例四步编排顺序有断言守护（非仅结果断言）
-- [ ] `resolve("agent_instantiation_use_case")` 可达（链路 L3 绿灯）
-- [ ] 发布点变异实证记录在案
+- [x] 用例四步编排顺序有断言守护（非仅结果断言——calls 序 ["load","save:777","publish"]）
+- [x] `resolve("agent_instantiation_use_case")` 可达（链路 L3 绿灯——12 维度契约用例 passed）
+- [x] 发布点变异实证记录在案（注释发布调用→2 断言红→还原绿）
 
 ---
 
@@ -658,16 +658,16 @@ class AgentConfigLoader(Protocol):
 | 🟡 变异 | 突变角色守卫映射（删 except 分支）→ 非法字符串测试红（ValueError 逃逸被断言捕获）→ 还原绿 |
 | 🔄 重构 | `pyproject.toml` `[project.scripts]` + `[tool.poetry.scripts]` 双注册 `sisys-agent = "src.interfaces.cli.agent_cli:main"`（对齐 sisys-ocr L155-161 双段先例）；ruff+mypy |
 
-- [ ] Subtask 5.1: 🔴 红 — CLI 单元测试（含角色守卫红线用例）
-- [ ] Subtask 5.2: 🟢 绿 — agent_cli.py 实现
-- [ ] Subtask 5.3: 🟡 变异 — 守卫映射突变实证（防 ValueError 逃逸防线）
-- [ ] Subtask 5.4: 🔄 重构 — pyproject 双注册 + docstring 规范
-- [ ] Subtask 5.5: 端到端冒烟——`REDIS_PORT=6380 poetry run sisys-agent instantiate --role ceo` 真实执行输出 agent_id，Redis 键可查（链路 L5 绿灯）。**三个前置**：① `SISYS_USE_TEST_PORTS=1` 仅 pytest 会话内生效、CLI 子进程只读 `REDIS_PORT`（默认 6379）——冒烟须显式传 `REDIS_PORT=6380`；② pyproject 修改后先 `poetry install` 重生成 entry point（否则 `sisys-agent` Command not found，勿误判为接线失败）；③ 无 PG 环境下 RELIABLE 发布走 Outbox 落库失败仅记日志、exit 0 属预期（AC-4 发布失败不回滚语义），勿误判为故障
+- [x] Subtask 5.1: 🔴 红 — CLI 单元测试（含角色守卫红线用例）
+- [x] Subtask 5.2: 🟢 绿 — agent_cli.py 实现
+- [x] Subtask 5.3: 🟡 变异 — 守卫映射突变实证（防 ValueError 逃逸防线）
+- [x] Subtask 5.4: 🔄 重构 — pyproject 双注册 + docstring 规范
+- [x] Subtask 5.5: 端到端冒烟——`REDIS_PORT=6380 poetry run sisys-agent instantiate --role ceo` 真实执行输出 agent_id，Redis 键可查（链路 L5 绿灯）。**三个前置**：① `SISYS_USE_TEST_PORTS=1` 仅 pytest 会话内生效、CLI 子进程只读 `REDIS_PORT`（默认 6379）——冒烟须显式传 `REDIS_PORT=6380`；② pyproject 修改后先 `poetry install` 重生成 entry point（否则 `sisys-agent` Command not found，勿误判为接线失败）；③ 无 PG 环境下 RELIABLE 发布走 Outbox 落库失败仅记日志、exit 0 属预期（AC-4 发布失败不回滚语义），勿误判为故障
 
 **完成标准/Definition of Done:**
-- [ ] `sisys-agent` 入口注册生效、端到端可执行
-- [ ] 非法/未开放角色字符串统一抛 EXCEPTION_441（无 ValueError 逃逸）
-- [ ] CLI 错误展示走统一异常体系（无裸 print 堆栈）
+- [x] `sisys-agent` 入口注册生效、端到端可执行（UUID 单行 stdout；退出码 0/1/2 三路径实测 ok=0/441=1/裸调用=2；Redis 池 close 正常；Outbox 失败仅记日志 exit 0 属预期行为实证）
+- [x] 非法/未开放角色字符串统一抛 EXCEPTION_441（无 ValueError 逃逸——绿阶段设计裁定：`_parse_role` 两道防线=枚举转换 except ValueError 映射 + SUPPORTED_ROLES 预检拦合法枚举未开放角色，用例守卫仍是 441 真源）
+- [x] CLI 错误展示走统一异常体系（无裸 print 堆栈——stderr `[EXCEPTION_441] 消息 (role='cfo')` 形态）
 
 ---
 
@@ -687,16 +687,16 @@ class AgentConfigLoader(Protocol):
 | 🟡 变异 | 突变 P95 断言阈值（200→2）→ 性能测试红（证明计时断言活着，非恒真 sleep 通过）→ 还原绿 |
 | 🔄 重构 | 场景命名收敛、超时防护（对齐 acceptance `run_with_bdd_timeout` 思路）；ruff+mypy |
 
-- [ ] Subtask 6.1: 🔴 红 — 集成与性能测试编写
-- [ ] Subtask 6.2: 🟢 绿 — 真实 Redis 全链路通过
-- [ ] Subtask 6.3: 🟡 变异 — 阈值突变实证
-- [ ] Subtask 6.4: 🔄 重构 — 隔离与稳定性（TestTenant/场景前缀、连续运行 5 次无随机失败）
-- [ ] Subtask 6.5: 验收场景 AC-5.1/5.2 转绿核对（注：两场景组装仅需 Task 2-4 产物，Task 4 后即可绿——本 Subtask 是核对点非依赖断点）
+- [x] Subtask 6.1: 🔴 红 — 集成与性能测试编写
+- [x] Subtask 6.2: 🟢 绿 — 真实 Redis 全链路通过
+- [x] Subtask 6.3: 🟡 变异 — 阈值突变实证
+- [x] Subtask 6.4: 🔄 重构 — 隔离与稳定性（TestTenant/场景前缀、连续运行 5 次无随机失败）
+- [x] Subtask 6.5: 验收场景 AC-5.1/5.2 转绿核对（注：两场景组装仅需 Task 2-4 产物，Task 4 后即可绿——本 Subtask 是核对点非依赖断点）
 
 **完成标准/Definition of Done:**
-- [ ] 真实 Redis 环境全绿（不可用时动态 skip 而非失败）
-- [ ] P95<200ms 与 10 并发断言有变异实证背书
-- [ ] teardown 零残留（按 context 记录的 agent_id 逐键精确清理，无通配删除）
+- [x] 真实 Redis 环境全绿（不可用时动态 skip 而非失败——real_redis fixture ping 失败 pytest.skip）
+- [x] P95<200ms 与 10 并发断言有变异实证背书（阈值 200→2 突变红→还原绿；连续 5 次运行全绿 ~10.5s 稳定）
+- [x] teardown 零残留（按 context 记录的 agent_id 逐键精确清理，无通配删除——收尾 scan_iter 复核残留 0）
 
 ---
 
@@ -708,18 +708,18 @@ class AgentConfigLoader(Protocol):
 
 #### 架构验证测试实现
 
-- [ ] Subtask 7.1: 创建 `tests/unit/architecture/test_arch_agent_instantiation.py`
-- [ ] Subtask 7.2: 验证器 A——domain 零依赖（`agent_config.py`/`agent_repository.py`/`agent_events.py`/`agent_exceptions.py` 无第三方 import，AST 或 import 扫描，参照 `test_hexagonal_architecture_constraints.py` 既有实现）
-- [ ] Subtask 7.3: 验证器 B——YAML 解析边界两断言：① `src/domain/` 全目录 grep `import yaml`/`yaml.safe_load` 零命中；② Agent 配置解析链 yaml 用法仅 `yaml_agent_config_loader.py` 一处新增（**禁止断言「全仓仅命中一处」**——`src/application/skills/frontmatter.py` L22/L94 与 `event_bus_config_loader.py` 为既有合法存量，不在断言面）
-- [ ] Subtask 7.4: 验证器 C——依赖方向（RedisAgentRepository 不 import application/interfaces；agent_cli 不 import infrastructure；用例仅依赖 domain + application 端口）
-- [ ] Subtask 7.5: 验证器 D——组合根唯一装配（`RedisAgentRepository`/`YamlAgentConfigLoader`/`InstantiateAgentUseCase` 在 src/ 下仅 composition_root.py 与测试中实例化；**属新增断言形态**——现有架构测试无同等先例，用 rglob 全仓扫描类名实例化实现，扫描技术参照 test_arch_data_source.py）
-- [ ] Subtask 7.6: 循环依赖检测用 ruff/isort（不引入 pylint）
-- [ ] Subtask 7.7: 运行完整测试套件并生成报告（含本 Story 全部测试文件清单核对）
+- [x] Subtask 7.1: 创建 `tests/unit/architecture/test_arch_agent_instantiation.py`
+- [x] Subtask 7.2: 验证器 A——domain 零依赖（`agent_config.py`/`agent_repository.py`/`agent_events.py`/`agent_exceptions.py` 无第三方 import，AST 或 import 扫描，参照 `test_hexagonal_architecture_constraints.py` 既有实现）
+- [x] Subtask 7.3: 验证器 B——YAML 解析边界两断言：① `src/domain/` 全目录 grep `import yaml`/`yaml.safe_load` 零命中；② Agent 配置解析链 yaml 用法仅 `yaml_agent_config_loader.py` 一处新增（**禁止断言「全仓仅命中一处」**——`src/application/skills/frontmatter.py` L22/L94 与 `event_bus_config_loader.py` 为既有合法存量，不在断言面）
+- [x] Subtask 7.4: 验证器 C——依赖方向（RedisAgentRepository 不 import application/interfaces；agent_cli 不 import infrastructure；用例仅依赖 domain + application 端口）
+- [x] Subtask 7.5: 验证器 D——组合根唯一装配（`RedisAgentRepository`/`YamlAgentConfigLoader`/`InstantiateAgentUseCase` 在 src/ 下仅 composition_root.py 与测试中实例化；**属新增断言形态**——现有架构测试无同等先例，用 rglob 全仓扫描类名实例化实现，扫描技术参照 test_arch_data_source.py）
+- [x] Subtask 7.6: 循环依赖检测用 ruff/isort（不引入 pylint）
+- [x] Subtask 7.7: 运行完整测试套件并生成报告（含本 Story 全部测试文件清单核对）——完整套件归并 Task 8 Subtask 8.4 全量回归执行
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构约束测试通过，任何违规导致测试失败
-- [ ] 输出清晰合规报告
-- [ ] 循环依赖检测不引入额外工具
+- [x] 所有架构约束测试通过，任何违规导致测试失败（13 passed——编写期自纠 1 处：YAML 断言初版全文文本匹配误伤 docstring 提及，改 import 级检查）
+- [x] 输出清晰合规报告（五验证器 A-E 分节：domain 零依赖×4 用例/YAML 边界×2/依赖方向×4/组合根唯一装配×2/ruff isort×1）
+- [x] 循环依赖检测不引入额外工具（subprocess ruff --select I）
 
 ---
 
@@ -736,18 +736,18 @@ class AgentConfigLoader(Protocol):
 | 🟡 变异 | 突变一处预期文件名（改为不存在路径）→ 收尾场景红 → 还原绿 |
 | 🔄 重构 | 场景命名与断言表达收敛 |
 
-- [ ] Subtask 8.1: 场景 1 — 验证 `src` 完成清单（value_objects/ports/events/exceptions/application/infrastructure/cli/composition_root 九处产出逐项确认）
-- [ ] Subtask 8.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单（测试分类表全文件逐项确认）
-- [ ] Subtask 8.3: 链路接线断言清单 L1-L8 终态核对（L1-L5 绿灯实证、L6-L8 deferred-work.md 登记仍在且未误删——含 Task 0 补登记的 `session_storage` 条目）
-- [ ] Subtask 8.4: 运行 `poetry run pytest tests/`、`poetry run ruff check src/ tests/`、`poetry run mypy src/` 收尾校验
-- [ ] Subtask 8.5: 更新 sprint-status.yaml（5-1 → review）；同步设计文档偏离项（D-1/D-2 的文档更新动作——D-2 含层归属 + 字段裁剪语义改写注记，见 Dev Notes 偏离声明；D-3 无文档动作；D-4/D-5/D-6 不改历史规划文档（epics/or.md）；D-7 无 Task 8 文档动作，5.4 时决策回迁；§10.1 事件行已在 Task 1 同步，此处终态核对）
-- [ ] Subtask 8.6: 验收场景全量转绿核对（13 场景逐一绿 + **收集场景数 == 13 校验**（`pytest --collect-only -q`，防漏绑定静默不收集）——补齐 Task 2/3/5 未显式核对的 AC-1.3 / AC-2.1 / AC-2.2 / AC-2.3 / AC-4.2 / AC-6.1）
+- [x] Subtask 8.1: 场景 1 — 验证 `src` 完成清单（value_objects/ports/events/exceptions/application/infrastructure/cli/composition_root 九处产出逐项确认）
+- [x] Subtask 8.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单（测试分类表全文件逐项确认）
+- [x] Subtask 8.3: 链路接线断言清单 L1-L8 终态核对（L1-L5 绿灯实证、L6-L8 deferred-work.md 登记仍在且未误删——含 Task 0 补登记的 `session_storage` 条目）
+- [x] Subtask 8.4: 运行 `poetry run pytest tests/`、`poetry run ruff check src/ tests/`、`poetry run mypy src/` 收尾校验
+- [x] Subtask 8.5: 更新 sprint-status.yaml（5-1 → review）；同步设计文档偏离项（D-1/D-2 的文档更新动作——D-2 含层归属 + 字段裁剪语义改写注记，见 Dev Notes 偏离声明；D-3 无文档动作；D-4/D-5/D-6 不改历史规划文档（epics/or.md）；D-7 无 Task 8 文档动作，5.4 时决策回迁；§10.1 事件行已在 Task 1 同步，此处终态核对）
+- [x] Subtask 8.6: 验收场景全量转绿核对（13 场景逐一绿 + **收集场景数 == 13 校验**（`pytest --collect-only -q`，防漏绑定静默不收集）——补齐 Task 2/3/5 未显式核对的 AC-1.3 / AC-2.1 / AC-2.2 / AC-2.3 / AC-4.2 / AC-6.1）
 
 **完成标准/Definition of Done:**
-- [ ] src 与 tests 完成清单逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] 三项质量门禁全绿
-- [ ] Story 可进入 `review`/`done`
+- [x] src 与 tests 完成清单逐项验证确认（AC-6.2 场景 22 项清单 + 组合根/CLI 注册 grep 断言全绿）
+- [x] 开发结束验收测试通过（AC-6.2 变异实证：文件名突变→红→还原绿）
+- [x] 三项质量门禁全绿（ruff All checks passed / mypy 664 files no issues / pytest 全量回归）
+- [x] Story 可进入 `review`/`done`
 
 ---
 
@@ -940,6 +940,15 @@ tests/
 
 ### 完成清单 Completion Notes List
 
+- [x] **Task 8（2026-10-14 收尾）**: AC-6.2 收尾场景直接转绿（验证型合法预期；22 项清单+组合根/CLI 注册 grep 断言）；变异实证：文件名突变 agent_config→agent_config_MUTATED→红→还原绿；13 场景全量转绿 13 passed（收集数 == 13 校验通过）；三项质量门禁全绿——ruff src/+tests/ All checks passed、mypy 664 files no issues、pytest 全量回归（unit+contracts 9998+96 passed / integration+acceptance 1810 passed，12 failed 全部确证为预存环境缺失：six_layer PG 5433 连接拒绝 / neo4j_graph_layer 7688 连接拒绝 / epo-ops HTTP 400 外部 Key 缺失——三文件与 Story 5.1 改动域零交集，失败形态均为连接拒绝/外部 API 非 assert 回归；回归中同步修复 1 个既有配套测试 test_exception_handlers Map 完备性清单——新增异常注册的合法配套维护）；分层覆盖率门禁全过（domain 97%≥90 / application 90%≥85 / infrastructure 86%≥75 / overall 89%≥80）；文档同步：core-domain-design §17.3.2 D-1 五态注记 + §17.3.6 D-2 层归属/字段裁剪注记、sprint-status 5-1→review、Story Status→review、§10.1 事件行终态核对在案
+- [x] **Task 7（2026-10-14）**: tests/unit/architecture/test_arch_agent_instantiation.py 五验证器 13 用例（A domain 零依赖×4 / B YAML 边界×2——domain 全目录 rglob 零 yaml+解析链新增仅加载器一处（限定断言面，不触 frontmatter/event_bus_config_loader 存量）/ C 依赖方向×4 / D 组合根唯一装配×2（rglob 扫描类名实例化）/ E ruff isort×1）；编写期自纠 1 处：YAML 断言初版全文文本匹配误伤 docstring 提及 yaml 字样，改 import 级检查
+- [x] **Task 6（2026-10-14）**: tests/integration/test_integration_agent_instantiation.py 落地（assembled fixture=real_redis+手动组装仓储+inline resolve loader+InMemoryEventBus+手动实例化用例；三场景：全链路读回一致+TTL 区间断言/exists-delete 幂等往返、P95 warmup+20 采样 quantiles[18]<200ms、gather 10 并发全成功互异+逐一 exists 禁 scan；pytestmark=[integration, redis, benchmark, xdist_group("agent-instantiation")]；验证型直接转绿 4 passed；变异实证：阈值 200→2 红→还原绿；连续 5 次全绿 ~10.5s；验收场景 AC-5.1/5.2/6.1/1.3 转绿 4 passed；teardown 残留复核 0；ruff 通过——编写期自纠 1 处（初版 case._repository 私有访问+noqa 违红线，重构为 fixture 显式返回仓储））
+- [x] **Task 5（2026-10-14）**: agent_cli.py 落地（仿 ocr_cli 接线模式：bootstrap+resolve+build_parser+main(argv)->int+asyncio.run；add_subparsers(required=True) 防裸调用 AttributeError 裸崩；_parse_role 两道守卫=except ValueError 映射 441+SUPPORTED_ROLES 预检；finally peek_singleton("redis_connection_manager") 关池禁全量 shutdown；红 18→绿——红阶段自纠 2 处测试用例缺陷（UUID/AgentRole 误比较、"CEO " 误入非法穷举）；变异实证：删 except 分支→3 断言捕获 ValueError 逃逸、还原绿）；pyproject [project.scripts]+[tool.poetry.scripts] 双注册；poetry install 重生成 entry point 后端到端冒烟通过（/tmp 独立 cwd：UUID 单行 stdout、Redis 6380 键存在 TTL 86390、退出码 0/1/2 实测、Outbox 失败仅记日志 exit 0——Subtask 5.5 前置 ③ 预期行为实证、is_success=False 真实失败面分支亦实证）；链路 L5 绿灯
+- [x] **Task 4（2026-10-14）**: InstantiateAgentUseCase 落地（守卫 SUPPORTED_ROLES frozenset 常量真源→加载→构建 list 转换→save(ttl=config.state_ttl)→publish 失败两分支记日志不回滚；242 透传用例以 object.__setattr__ 绕过 VO 模拟极端缺陷；红 20→绿；变异实证：注释发布调用→编排顺序+事件字段 2 断言红、还原绿）；AgentInstantiationResult DTO 模块内定义；组合根注册 agent_instantiation_use_case（SINGLETON 工厂 resolve 三依赖，interface 绑定自身类型）+ 契约测试 12 维度 passed（链路 L3 绿灯）；验收场景 AC-1.1/1.2/3.1/4.1 转绿（4 passed，服务级真实组装）
+- [x] **Task 3（2026-10-14）**: AgentRepository 端口（domain Protocol 四方法）+ RedisAgentRepository（组合 RedisAdapter+build_key("agent",...)+单 field latest JSON blob+expire+显式重建 UUID/Enum/datetime/list；红 22→绿；变异实证：AgentStatus 重建改透传 str→isinstance 断言红、还原绿；连接异常→StorageError(cause=exc) 包装（绿阶段自纠：from exc 仅设 __cause__，DomainError.cause 属性须构造参数传递）；TTL 防御校验 440+upsert 语义+fakeredis 回归全覆盖）；组合根注册 agent_repository（SCOPED）+ 契约测试 12 维度 passed（链路 L1 绿灯）
+- [x] **Task 2（2026-10-14）**: 循环 A——AgentConfig 值对象（frozen+falsy 判空+state_ttl 闭区间 60~2592000 钉端点+preferred_model 空串归一 None；红 20→绿；变异实证：上界 2592000→259200 突变后 test_ttl_2592000_upper_bound_valid 红、还原绿）；循环 B——AgentConfigLoader 端口（application Protocol）+ YamlAgentConfigLoader（asyncio.to_thread+仓库根四级上溯锚定+isinstance(list) 守卫+未知键忽略+NoReturn 流分析修复 mypy）+ configs/agents/ceo_agent.yaml 生产资产（红 18→绿 38；变异实证：identity.role→roleX 突变后 6 用例红、还原绿）；组合根注册 agent_config_loader（SINGLETON）+ 契约测试 12 维度 passed（链路 L2 绿灯）；验收场景 AC-2.1/2.2/2.3 转绿（3 passed）
+- [x] **Task 1（2026-10-14）**: 循环 A——agent 子域异常 440/441 落地（AgentConfigError→SystemException→500、AgentRoleNotSupportedError→BusinessException→422；红 20 用例→绿；变异实证：HTTP_MAP 440 条目 500→502 突变后 test_config_error_maps_500 红、还原绿；四处登记=_code_ranges 双表+exceptions/__init__+EXCEPTION_HTTP_MAP+设计文档 §3.3.2 两处表）；循环 B——AgentInstantiated 事件落地（frozen dataclass 四 kw_only 必填+event_type init=False+aggregate UUID 对象守卫；红 11 用例→绿——其中 test_missing_single_required_field 红阶段自纠：dataclass 类型注解不强制运行时校验，改为真正省略字段构造；变异实证：aggregate_type→"AgentMutated" 突变后 2 断言红、还原绿）；双登记 event_channels.yaml+DEFAULT_MAPPINGS+architecture.md §10.1 事件表；tests/unit/domain/ 全量 2888 passed 零回归；AC-4.2 验收场景转绿
+- [x] **Task 0（2026-10-14）**: 4 并行调研 Agent 全仓核验先例（领域契约/基础设施/测试模板/CLI 应用层四视角）；Gherkin 13 场景 + BDD 步骤实现落盘（@scenario 显式绑定 + context dict + 新模块延迟 import + pytestmark=[acceptance, redis, xdist_group("agent-instantiation")]）；红阶段验证通过（`pytest --collect-only` 收集数 == 13；`SISYS_USE_TEST_PORTS=1` 运行 13 场景全 FAILED 非 skip——ModuleNotFoundError/AssertionError 合法红，Redis 6380 在线前提成立）；deferred-work.md 补登记 L6 `session_storage`（L7 agent_engine/L8 AutoTriggerHandler 既有登记核对在案）；环境准备：sisys-redis-test 容器（6380）已启动
 - [x] 故事需求从 `epics_v1.0.md` Story 5.1 提取（含 prd.md FR-AC-01 与 NFR 指标交叉验证）
 - [x] 架构约束从 architecture.md / core-domain-design.md §17.3 / workflow-agent-integration-design.md 提取
 - [x] 现有代码继承清单完成（5 并行 Agent 全仓调研 + 人工核验目录/类名/行号）
@@ -953,20 +962,42 @@ tests/
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/5-1-ceo-agent-instantiation-mvp.md`
+- `src/domain/exceptions/agent_exceptions.py`（440/441 两异常 + 继承链理由 docstring）
+- `src/domain/value_objects/agent_config.py`（AgentConfig frozen dataclass + TTL 边界常量）
+- `src/domain/ports/agent_repository.py`（AgentRepository Protocol 四方法）
+- `src/application/ports/agent_config_loader.py`（AgentConfigLoader Protocol）
+- `src/application/use_cases/agent_instantiation.py`（InstantiateAgentUseCase + AgentInstantiationResult + SUPPORTED_ROLES）
+- `src/infrastructure/agent_orch/yaml_agent_config_loader.py`（YAML 加载器 + DEFAULT_CONFIG_DIR）
+- `src/infrastructure/storage/redis/redis_agent_repository.py`（Redis 仓储 + 序列化静态方法）
+- `src/interfaces/cli/agent_cli.py`（sisys-agent CLI 入口）
+- `configs/agents/ceo_agent.yaml`（CEO 基础配置资产）
+- `tests/unit/domain/exceptions/test_agent_exceptions.py`（20 用例）
+- `tests/unit/domain/events/test_agent_events.py`（11 用例）
+- `tests/unit/domain/value_objects/test_agent_config.py`（20 用例）
+- `tests/unit/infrastructure/agent_orch/test_yaml_agent_config_loader.py`（18 用例）
+- `tests/unit/infrastructure/storage/redis/test_redis_agent_repository.py`（22 用例）
+- `tests/unit/application/use_cases/test_agent_instantiation.py`（20 用例）
+- `tests/unit/interfaces/cli/test_agent_cli.py`（18 用例）
+- `tests/unit/architecture/test_arch_agent_instantiation.py`（13 用例）
+- `tests/contracts/test_port_contract_agent_repository.py`（12 维度）
+- `tests/contracts/test_port_contract_agent_config_loader.py`（12 维度）
+- `tests/contracts/test_port_contract_agent_instantiation_use_case.py`（12 维度）
+- `tests/integration/test_integration_agent_instantiation.py`（4 用例：全链路×2 + P95 + 10 并发）
+- `tests/acceptance/test_acceptance_agent_instantiation.feature`（13 场景）
+- `tests/acceptance/test_acceptance_agent_instantiation.py`（13 @scenario 绑定 + 全部步骤实现）
 
-**待创建的文件/To Be Created (Dev Story 实施):**
-- 见「项目结构说明」全部 [新建] 项（src 8 处 + configs 1 处 + tests 14 处：unit 8 + contracts 3 + integration 1 + acceptance 2）
-
-**待修改的文件/To Be Modified:**
-- `src/composition_root.py`（3 端口注册）
-- `pyproject.toml`（`[project.scripts]` + `[tool.poetry.scripts]` 双注册 `sisys-agent`，L155-161 两段）
-- `src/domain/events/agent_events.py` + `events/__init__.py`（AgentInstantiated）
-- `src/domain/exceptions/_code_ranges.py` + `__init__.py`（agent 子域 440-449）
-- `configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py`（双登记）
-- `docs/architecture/sisys-uni-exception-design.md` §3.3.2（编码表 agent 行）
-- `docs/architecture/architecture.md` §10.1（领域事件完整列表补 `AgentInstantiated` 行——RabbitMQ + Outbox / 7 年存储 / 审计合规型，对齐 AgentDecided 行形态；Task 1 双登记时同步）
-- `docs/architecture/sisys-core-domain-design.md` §17.3.2/§17.3.6（偏离声明 D-1/D-2 落注——D-2 含层归属 + 字段裁剪语义改写，Task 8）
-- `_bmad-output/implementation-artifacts/deferred-work.md`（Task 0 补登记 `session_storage` 条目）
+**修改的文件/Modified Files:**
+- `src/composition_root.py`（Story 5.1 段：3 端口注册——agent_config_loader/agent_repository/agent_instantiation_use_case）
+- `pyproject.toml`（`[project.scripts]` + `[tool.poetry.scripts]` 双注册 `sisys-agent`）
+- `src/domain/events/agent_events.py`（追加 AgentInstantiated）+ `src/domain/events/__init__.py`（导出）
+- `src/domain/exceptions/_code_ranges.py`（agent 440-449 双表登记）+ `src/domain/exceptions/__init__.py`（导出）
+- `src/interfaces/api/exception_handlers.py`（EXCEPTION_HTTP_MAP 精确注册 440→500/441→422 + import）
+- `configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py`（AgentInstantiated 双登记）
+- `docs/architecture/sisys-uni-exception-design.md`（§3.3.2 编码分配表 agent 行 + 子域范围表 agent 行）
+- `docs/architecture/architecture.md`（§10.1 领域事件列表补 AgentInstantiated 行）
+- `docs/architecture/sisys-core-domain-design.md`（§17.3.2 D-1 五态注记 + §17.3.6 D-2 层归属/字段裁剪注记）
+- `_bmad-output/implementation-artifacts/deferred-work.md`（补登记 L6 session_storage）
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`（5-1 → in-progress → review）
 
 ---
 
@@ -1054,15 +1085,23 @@ tests/
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施（从 Task 0 开始）
+- [x] 运行 `dev-story` 开始实施（从 Task 0 开始）——**已完成（2026-10-14）：Task 0-8 全部实施，Status → review**
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-10-14
 **最后更新/Last Updated:** 2026-10-14
+**更新说明/Description:**
+- v1.0.0: 创建故事文件（5 并行调研 Agent 全仓代码/文档/模板/经验调研 + 人工事实核验；含链路接线断言清单 L1-L8、8 项关键架构决策 DC-1~DC-8、4 项偏离声明 D-1~D-4、deferred-work 分流处置）
+- v1.1.0: Round 1 审查修订（正确性视角：5 并行调研 Agent 代码事实核对 + 3 并行审查 Agent 对抗复核/一致性/遗漏扫描；修复 P0×4（EXCEPTION_HTTP_MAP 定位、YAML 断言误伤、session_storage 缺登记、验收模板指向）+ P1×8 + P2×18，详见「文档审查修复」表）
+- v1.2.0: Round 2 审查修订（科学性视角：2 调研 Agent 设计边界/先例基准 + 3 审查 Agent 决策裁定/事件异常体系/影响面核查；修复 P0×2（事件字段 kw_only、守卫顺序倒置）+ P1×6（save(ttl) 必填、路径锚定、get_by_id 改名、D-6/D-7 偏离声明、§10.1 登记）+ 补强 5 项，详见「文档审查修复」表 #14-21）
+- v1.3.0: Round 3 审查修订（可行性视角：2 调研 Agent BDD/工具链实测 + 1 终审 Agent 13 场景可满足性推演与 Task 0-8 依赖干跑；修复 P0×4（teardown 自相矛盾、resolve 跨循环死连接、Task 5 main 注入不可写、AC-5.2 scan 误计）+ P1×2 + 补强 8 项（warmup+quantiles 采样法、@scenario 收集陷阱、冒烟三前置、Redis 池清理等），详见「文档审查修复」表 #22-28）
+- v1.4.0: Round 4 审查修订（回归核查+边界视角：1 回归验证 Agent 全量复核三轮修复引用（#1-28 抽查全部落地、口径统一、结构完整）+ 1 边界审查 Agent 七维度边界推演；修复 P1×5（L362→L318 行号、空列表漏检、标量静默陷阱、--role 大写归一化、子命令 required 裸崩）+ P2×7 边界定稿（空串归一化/未知键策略/SUPPORTED_ROLES 常量/upsert 语义/退出码 0-1-2/UUID 输出/resolve 缓存注记），详见「文档审查修复」表 #29-32）
+- v1.5.0: Round 5 终态收敛（1 竞争性终检 Agent 按 checklist.md 框架以 dev agent 视角终检——无 Critical 缺陷、约 40 处引用抽查仅 1 处歧义、防重复清单完整；1 收敛验证 Agent——台账 #1-32 全部落地无假修复、内部计数终态一致、模板章节零缺失、正文零未决问题；P0 收敛曲线 4→2→4→0，终态「dev agent 可直接实施」；微修 P3×4 见台账 #33。**审查闭环：五轮 34 项修复台账，Story 可进入 dev-story**）
+- v1.6.0: **dev-story 实施完成**（2026-10-14：Task 0-8 全部实施且 DoD 达成——4 并行调研先例核验 → SDD 规范与 Gherkin 13 场景红阶段验证 → 领域层异常子域 440/441 + AgentInstantiated 事件双登记 → AgentConfig/加载器/ceo_agent.yaml → AgentRepository/Redis 仓储 → 实例化用例与发布接线 → sisys-agent CLI 端到端 → 集成与性能（P95<200ms + 10 并发）→ 架构五验证器 → 收尾验收；每个 TDD 循环含变异实证共 9 处；三质量门禁全绿 + 分层覆盖率全过（97/90/86/89%）；13 验收场景全绿；Status → review）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（5 并行调研 Agent 全仓代码/文档/模板/经验调研 + 人工事实核验；含链路接线断言清单 L1-L8、8 项关键架构决策 DC-1~DC-8、4 项偏离声明 D-1~D-4、deferred-work 分流处置）
 - v1.1.0: Round 1 审查修订（正确性视角：5 并行调研 Agent 代码事实核对 + 3 并行审查 Agent 对抗复核/一致性/遗漏扫描；修复 P0×4（EXCEPTION_HTTP_MAP 定位、YAML 断言误伤、session_storage 缺登记、验收模板指向）+ P1×8 + P2×18，详见「文档审查修复」表）

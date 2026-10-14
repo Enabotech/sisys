@@ -827,6 +827,7 @@ BLM/BEM 阶段完成 → 持久化笔记（必须先执行）→ 上下文压缩
 | **DocumentProcessed** | 文档处理完成 | Redis + RabbitMQ | WORM 归档 | 双通道：Redis 实时通知 + RabbitMQ 审计归档 |
 | **ToolExecuted** | 工具执行完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
 | **AgentDecided** | Agent 决策完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
+| **AgentInstantiated** | Agent 实例化完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型（Story 5.1，携带 config_version 供 5.6/5.7 追溯） |
 | **RoutingDecided** | 路由决策完成 | Redis Pub/Sub + RabbitMQ + WORM | Redis 实时通知 / RabbitMQ 7 年归档（与 §8.5 路由决策日志 WORM 一致） | 审计合规型（双通道） |
 | **CheckpointReached** | 检查点到达 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
 | **CorrectionApproved** | 修正审批完成 | RabbitMQ + Outbox | 7 年存储 | 业务状态型（已实现） |

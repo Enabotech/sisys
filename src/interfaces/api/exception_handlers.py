@@ -15,6 +15,8 @@ from pydantic import ValidationError as PydanticValidationError
 
 from src.application.ports.exception_metrics_port import ExceptionMetricsPort
 from src.domain.exceptions import (
+    AgentConfigError,
+    AgentRoleNotSupportedError,
     ArchiveConflictError,
     ArchiveNotFoundError,
     ArchiveStorageError,
@@ -258,6 +260,9 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     ToolVersionAlreadyExistsError: status.HTTP_409_CONFLICT,  # 431 — (tool_id,version) 重复注册
     ToolVersionTrafficWeightError: status.HTTP_400_BAD_REQUEST,  # 432 — 权重非法/发布约束/并存冲突族
     ToolVersionRollbackError: status.HTTP_409_CONFLICT,  # 433 — 回滚状态冲突
+    # Agent 子域异常（Story 5.1 — CEO Agent 实例化 MVP）
+    AgentConfigError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 440 — 配置资产无效（系统资源缺陷，精确注册避免回退歧义）
+    AgentRoleNotSupportedError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 441 — MVP 未开放角色（精确注册，避免回退 400）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
