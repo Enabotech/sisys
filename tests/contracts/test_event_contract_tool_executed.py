@@ -103,9 +103,8 @@ class TestToolExecutedEventSerialization:
     def test_from_dict_roundtrip(self) -> None:
         """to_dict -> from_dict -> to_dict 应等值。
 
-        注：与项目历史行为对齐（tests/unit/domain/events/test_archive_events.py），
-        from_dict 不会把字符串 payload 字段反序列化为 UUID/dict，
-        保持字符串/dict 原样，断言使用 str() 比较。
+        注：from_dict 按字段声明类型还原 payload（UUID 字段还原为 UUID 对象），
+        与 aggregate_id 核心字段行为一致（Story 5-1 R1 F4 修复后契约）。
         """
         event = self._make_event()
         data = event.to_dict()
@@ -113,8 +112,9 @@ class TestToolExecutedEventSerialization:
         assert isinstance(restored, ToolExecuted), f"from_dict 应返回 ToolExecuted 实例，实际: {type(restored).__name__}"
         # aggregate_id 在反序列化后仍为 UUID（DomainEvent 基类核心字段）
         assert restored.aggregate_id == event.execution_id
-        # 子类 payload 字段保持原样（字符串/dict），不强制类型还原
-        assert restored.tool_id == str(event.tool_id)
+        # 子类 payload UUID 字段按声明还原（dict 字段原样透传）
+        assert restored.tool_id == event.tool_id
+        assert isinstance(restored.tool_id, uuid.UUID)
         assert restored.execution_result == event.execution_result
         assert restored.cost_audit == event.cost_audit
 

@@ -69,7 +69,7 @@ class YamlAgentConfigLoader(AgentConfigLoader):
         if not config_path.exists():
             _fail("配置文件不存在", f"Agent 配置文件不存在: {path_display}")
 
-        data = await asyncio.to_thread(self._read_yaml, config_path)
+        data = await asyncio.to_thread(self._read_yaml, config_path, role.value, path_display)
         if not isinstance(data, dict):
             # 空文件（safe_load 返回 None）或顶层非映射结构
             _fail("配置文件为空或顶层结构非法", f"Agent 配置文件为空或顶层结构非法: {path_display}")
@@ -104,14 +104,18 @@ class YamlAgentConfigLoader(AgentConfigLoader):
         responsibilities = self._string_list(capabilities, "responsibilities", role.value, path_display)
         domain_knowledge = self._string_list(capabilities, "domain_knowledge", role.value, path_display)
 
-        # llm_config.preferred_model：null/缺失 → None（空串由 VO 归一化）
+        # llm_config.preferred_model：null/缺失 → None（空串由 VO 归一化）；非字符串标量显式 440
         llm_config = data.get("llm_config") or {}
         preferred_model_raw = llm_config.get("preferred_model") if isinstance(llm_config, dict) else None
+        if preferred_model_raw is not None and not isinstance(preferred_model_raw, str):
+            _fail("llm_config.preferred_model 必须为字符串或 null")
         preferred_model: str | None = preferred_model_raw if isinstance(preferred_model_raw, str) else None
 
-        # eip_config.default_isolation_level：缺失默认 L4（本 Story 仅承载，5.4 消费）
+        # eip_config.default_isolation_level：缺失默认 L4（本 Story 仅承载，5.4 消费）；非字符串显式 440
         eip_config = data.get("eip_config") or {}
         isolation_raw = eip_config.get("default_isolation_level") if isinstance(eip_config, dict) else None
+        if isolation_raw is not None and not isinstance(isolation_raw, str):
+            _fail("eip_config.default_isolation_level 必须为字符串")
         default_isolation_level = isolation_raw if isinstance(isolation_raw, str) and isolation_raw else "L4"
 
         # memory_config.state_ttl：缺失默认 86400；非整数（字符串/浮点/布尔）显式拦截
@@ -138,19 +142,43 @@ class YamlAgentConfigLoader(AgentConfigLoader):
         )
 
     @staticmethod
-    def _read_yaml(path: Path) -> Any:
-        """同步读取并解析 YAML（经 asyncio.to_thread 调度，避免阻塞事件循环）"""
-        with open(path, encoding="utf-8") as stream:
-            try:
+    def _read_yaml(path: Path, role: str, path_display: str) -> Any:
+        """同步读取并解析 YAML（经 asyncio.to_thread 调度，避免阻塞事件循环）。
+
+        全部失败路径统一抛 AgentConfigError(440)——open/read/parse 三阶段异常
+        逐类包装，禁裸内置异常（OSError/UnicodeDecodeError/ValueError 家族）逃逸：
+        - yaml.YAMLError：语法/结构解析失败
+        - UnicodeDecodeError：内容非 UTF-8（ValueError 子类——中文配置被错误
+          编码保存即触发，须先于 ValueError 家族显式点名）
+        - OSError：文件不可读（目录占位/无权限/TOCTOU 删除）
+        """
+        try:
+            with open(path, encoding="utf-8") as stream:
                 return yaml.safe_load(stream)
-            except yaml.YAMLError as exc:
-                raise AgentConfigError(
-                    role="",
-                    config_path=f"configs/agents/{path.name}",
-                    reason="YAML 解析失败",
-                    message=f"Agent 配置 YAML 解析失败: {path.name}",
-                    cause=exc,
-                ) from exc
+        except yaml.YAMLError as exc:
+            raise AgentConfigError(
+                role=role,
+                config_path=path_display,
+                reason="YAML 解析失败",
+                message=f"Agent 配置 YAML 解析失败: {path.name}",
+                cause=exc,
+            ) from exc
+        except UnicodeDecodeError as exc:
+            raise AgentConfigError(
+                role=role,
+                config_path=path_display,
+                reason="配置文件编码非法（需 UTF-8）",
+                message=f"Agent 配置文件编码非法（需 UTF-8）: {path.name}",
+                cause=exc,
+            ) from exc
+        except OSError as exc:
+            raise AgentConfigError(
+                role=role,
+                config_path=path_display,
+                reason="配置文件不可读",
+                message=f"Agent 配置文件不可读: {path.name}",
+                cause=exc,
+            ) from exc
 
     @staticmethod
     def _section(data: dict[str, Any], section: str, role: str, path_display: str) -> dict[str, Any]:

@@ -1068,7 +1068,7 @@ def then_roundtrip_consistent(context: dict[str, Any]) -> None:
     event = context.get("roundtrip_event")
     if event is not None:
         restored = context["restored_event"]
-        assert restored.debate_id == str(event.debate_id)  # payload 字段保持 str（项目历史行为）
+        assert restored.debate_id == event.debate_id  # payload UUID 字段按声明还原（Story 5-1 R1 F4 修复后契约）
         assert restored.topic_title == event.topic_title
         assert restored.consensus_count == event.consensus_count
         assert restored.disagreement_count == event.disagreement_count

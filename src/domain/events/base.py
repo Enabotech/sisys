@@ -11,7 +11,7 @@ import uuid
 from dataclasses import MISSING, dataclass, field, fields, is_dataclass
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, ClassVar, get_args, get_origin
+from typing import Any, ClassVar, get_args, get_origin, get_type_hints
 
 from src.domain.exceptions import EntityValidationError
 
@@ -36,6 +36,11 @@ _CORE_FIELD_NAMES = frozenset(
 
 # Default schema version for all events
 DEFAULT_SCHEMA_VERSION = "1.0.0"
+
+# 字段名 → 已解析类型注解的类级缓存（from_dict 消费）。
+# 并发性质：CPython GIL 下 dict 读写原子，最坏并发是重复解析（良性竞争、
+# 结果幂等），无需锁；缓存按事件类为键，上界 = 事件类数量。
+_RESOLVED_HINTS: dict[type, dict[str, Any]] = {}
 
 
 @dataclass(frozen=True)
@@ -250,6 +255,7 @@ class DomainEvent:
         extra_kwargs: dict[str, Any] = {}
         event_type_field: Any = None
         if target_class is not DomainEvent and is_dataclass(target_class):
+            hints = cls._field_type_hints(target_class)
             for f in fields(target_class):
                 if f.name == "event_type":
                     event_type_field = f
@@ -257,7 +263,15 @@ class DomainEvent:
                 if f.name in _CORE_FIELD_NAMES or not f.init:
                     continue
                 if f.name in payload:
-                    value = cls._deserialize_value(payload[f.name], f.type)
+                    try:
+                        value = cls._deserialize_value(payload[f.name], hints.get(f.name, f.type))
+                    except (ValueError, TypeError) as exc:
+                        # 畸形 payload（非法 UUID/datetime/Enum 值）统一包装 242，
+                        # 禁裸内置异常逃逸（与 event_id/aggregate_id 核心字段同构）
+                        raise EntityValidationError(
+                            message=f"Invalid payload field '{f.name}': {payload[f.name]!r}",
+                            context={"entity": target_class.__name__, "field": f.name},
+                        ) from exc
                     extra_kwargs[f.name] = value
 
         # 仅当 event_type 字段的 init=True 时才传入构造函数
@@ -287,6 +301,27 @@ class DomainEvent:
             **{k: v for k, v in core_kwargs.items() if k not in non_init_core},
             **extra_kwargs,
         )
+
+    @classmethod
+    def _field_type_hints(cls, target_class: type[DomainEvent]) -> dict[str, Any]:
+        """解析目标事件类的字段类型注解（PEP 563 字符串注解 → 类型对象，按类缓存）。
+
+        事件模块均启用 ``from __future__ import annotations``，dataclasses.fields()
+        返回的 f.type 是字符串注解（如 "uuid.UUID"），直接与类型对象做 is 比较
+        恒为 False——必须经 get_type_hints 解析为真实类型后才能驱动
+        _deserialize_value 的 UUID/datetime/Enum/容器还原分支。
+
+        Args:
+            target_class: 目标事件类（含继承链全字段）
+
+        Returns:
+            字段名 → 已解析类型对象的映射
+        """
+        hints = _RESOLVED_HINTS.get(target_class)
+        if hints is None:
+            hints = get_type_hints(target_class)
+            _RESOLVED_HINTS[target_class] = hints
+        return hints
 
     @classmethod
     def _deserialize_value(cls, value: Any, target_type: Any) -> Any:

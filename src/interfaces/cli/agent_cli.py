@@ -108,16 +108,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 async def _close_redis_pool() -> None:
-    """关闭已实例化的 Redis 连接池（若存在）。
+    """关闭已实例化的 Redis 连接池（若存在）——关闭失败仅记日志不抛。
 
     agent_cli 是首个打开 Redis 池的 CLI（ocr_cli 不触碰 Redis）——退出不关池
     留 ResourceWarning。仅关闭已实例化的 redis_connection_manager（peek 不触发
     懒实例化）；禁用全量 shutdown()——它会在退出路径惰性实例化 PG/Qdrant/Neo4j
     manager。
+
+    本方法在 finally 中调用：关闭异常（如断连超时）若上抛会反噬主结果——
+    实例化成功被误报 exit 1、失败路径丢失根因异常，故内部消化记 warning
+    （对齐 run_tool_chain 发布失败「记日志不回滚」先例的防御面收窄）。
     """
-    manager = get_resolver().peek_singleton("redis_connection_manager")
-    if manager is not None:
-        await manager.close()
+    try:
+        manager = get_resolver().peek_singleton("redis_connection_manager")
+        if manager is not None:
+            await manager.close()
+    except Exception as exc:
+        logger.warning("Redis 连接池关闭失败（忽略，不影响主结果）: %s: %s", type(exc).__name__, exc)
 
 
 async def _instantiate(role: AgentRole) -> object:
@@ -155,10 +162,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[{error.code}] {error.message} (role={error.context.get('role')!r})", file=sys.stderr)
         return 1
 
-    # 初始化端口注册表（独立进程内 bootstrap 合法）
-    bootstrap()
-
+    # 初始化端口注册表（独立进程内 bootstrap 合法）——纳入统一异常处理：
+    # bootstrap 失败（依赖缺失/二次注册冲突）同样遵守「编码输出 + 退出码」契约，
+    # 禁裸 traceback 逃逸（成功后路径行为不变）
     try:
+        bootstrap()
         result = asyncio.run(_instantiate(role))
         # 输出格式定稿：纯 UUID 单行 stdout（日志走 stderr，供脚本消费）
         print(getattr(result, "agent_id"))

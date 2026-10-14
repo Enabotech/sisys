@@ -18,6 +18,7 @@ Run with:
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -216,3 +217,52 @@ class TestMainErrorPaths:
         _patch_entry(monkeypatch, stub)
         agent_cli.main(["instantiate", "--role", "cfo"])
         assert stub.calls == []
+
+
+# ===================================================================
+# bootstrap/清理路径健壮性（统一退出码契约 + finally 防御）
+# ===================================================================
+
+
+class TestBootstrapAndCleanupRobustness:
+    """bootstrap 失败统一退出码 + 关池失败不反噬主结果。"""
+
+    def test_bootstrap_failure_exit_1(self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+        """bootstrap 抛异常 → 退出码 1 + 错误日志记录（禁裸 traceback 逃逸统一退出码契约）。
+
+        该路径经 logger.error 输出（生产环境 stderr；pytest 下经 caplog 断言——
+        捕获插件接管 root logger 后 capsys 不可见）。
+        """
+
+        def _boom() -> None:
+            raise RuntimeError("composition root broken")
+
+        monkeypatch.setattr(agent_cli, "bootstrap", _boom)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: _StubUseCase())
+        monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolver())
+        with caplog.at_level(logging.ERROR, logger="src.interfaces.cli.agent_cli"):
+            exit_code = agent_cli.main(["instantiate", "--role", "ceo"])
+        assert exit_code == 1
+        assert "composition root broken" in caplog.text
+
+    def test_close_pool_failure_does_not_mask_success(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Redis 池关闭失败不得反噬实例化成功结果（finally 防御——记 warning 返回 0）。"""
+        stub = _StubUseCase()
+
+        class _FailingManager:
+            async def close(self) -> None:
+                raise TimeoutError("close timeout")
+
+        class _StubResolverWithManager:
+            def peek_singleton(self, name: str) -> Any:
+                return _FailingManager()
+
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolverWithManager())
+        exit_code = agent_cli.main(["instantiate", "--role", "ceo"])
+        assert exit_code == 0, "关池失败不得反噬成功结果"
+        assert stub.last_result is not None
+        assert uuid.UUID(capsys.readouterr().out.strip()) == stub.last_result.agent_id

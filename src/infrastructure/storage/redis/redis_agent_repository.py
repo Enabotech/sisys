@@ -4,14 +4,14 @@
 
 存储形态（对齐 RedisSnapshotStore 先例）：
 - 键 sisys:agent:{agent_id}（build_key("agent", ...)）
-- Redis Hash 单 field `latest` 承载全字段 JSON blob（hset + expire），
-  非逐 field Hash
+- Redis Hash 单 field `latest` 承载全字段 JSON blob——hset 与 expire 经
+  MULTI/EXEC pipeline 原子提交（非逐 field Hash，亦非两条独立命令）
 - 序列化：json_dumps（UUID→str、Enum→value、datetime→ISO）；
   json_loads 不还原类型——_hash_to_agent 显式重建 AgentRole/AgentStatus/
   datetime/list[str]（调用方重建责任）
 
 错误契约：
-- TTL 防御性校验 60~2592000（含端点），越界抛 AgentConfigError(440)——
+- TTL 防御性校验：整数 + 闭区间 60~2592000，违规抛 AgentConfigError(440)——
   范围数字对齐 RedisSnapshotStore.set_ttl，异常类型按 AC-3 语义为 440
 - 连接/写入故障包装 StorageError 向上传播（对齐 RedisSnapshotStore.save
   先例，禁静默吞异常——与 RedisSessionStorage 优雅降级语义刻意区分）
@@ -58,14 +58,24 @@ class RedisAgentRepository(AgentRepository):
     async def save(self, agent: Agent, ttl: int) -> None:
         """保存 Agent 实体（upsert 语义，单 field latest JSON blob + TTL）
 
+        hset 与 expire 经 MULTI/EXEC pipeline 原子提交——两命令分离时进程在
+        两者之间崩溃会留下永不过期的孤儿键，击穿「非幂等 + TTL 自然回收」
+        设计假设（对齐 semantic_cache pipeline 先例）。
+
         Args:
             agent: Agent 聚合根实体
-            ttl: 状态 TTL 秒（防御性校验闭区间 60~2592000）
+            ttl: 状态 TTL 秒（防御性校验：整数 + 闭区间 60~2592000）
 
         Raises:
-            AgentConfigError: TTL 越界（EXCEPTION_440）
+            AgentConfigError: TTL 非整数或越界（EXCEPTION_440）
             StorageError: Redis 连接/写入故障（不静默）
         """
+        if isinstance(ttl, bool) or not isinstance(ttl, int):
+            raise AgentConfigError(
+                role=agent.role.value if isinstance(agent.role, AgentRole) else str(agent.role),
+                config_path="",
+                reason=f"state_ttl 必须为整数（实际类型 {type(ttl).__name__}）",
+            )
         if not STATE_TTL_MIN_SECONDS <= ttl <= STATE_TTL_MAX_SECONDS:
             raise AgentConfigError(
                 role=agent.role.value if isinstance(agent.role, AgentRole) else str(agent.role),
@@ -76,11 +86,11 @@ class RedisAgentRepository(AgentRepository):
         key = build_key(self._AGENT_NAMESPACE, str(agent.agent_id))
         try:
             hash_data = self._agent_to_hash(agent)
-            await self._adapter.raw_client.hset(key, "latest", json_dumps(hash_data))
-            await self._adapter.raw_client.expire(key, ttl)
+            async with self._adapter.raw_client.pipeline(transaction=True) as pipe:
+                pipe.hset(key, "latest", json_dumps(hash_data))
+                pipe.expire(key, ttl)
+                await pipe.execute()
             logger.debug("Saved agent state: agent_id=%s ttl=%d", agent.agent_id, ttl)
-        except AgentConfigError:
-            raise
         except Exception as exc:
             logger.error("Failed to save agent state: agent_id=%s error=%s", agent.agent_id, exc)
             raise StorageError(f"Failed to save agent state: {exc}", cause=exc) from exc

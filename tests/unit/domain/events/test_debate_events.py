@@ -127,8 +127,8 @@ class TestDebateCompletedRoundtrip:
     def test_from_dict_roundtrip(self) -> None:
         """to_dict → from_dict roundtrip（_registry 多态注册生效）
 
-        注：与项目历史行为对齐（test_event_contract_tool_executed.py），
-        from_dict 不把 payload 字符串还原为 UUID，断言使用 str() 比较。
+        注：from_dict 按字段声明类型还原 payload（UUID 字段还原为 UUID 对象），
+        与 aggregate_id 核心字段行为一致（Story 5-1 R1 F4 修复后契约）。
         """
         event = _make_event()
         data = event.to_dict()
@@ -137,7 +137,8 @@ class TestDebateCompletedRoundtrip:
         assert restored.event_type == "DebateCompleted"
         assert restored.aggregate_type == "DebateSession"
         assert restored.aggregate_id == event.debate_id  # 核心字段保持 UUID
-        assert restored.debate_id == str(event.debate_id)  # payload 字段保持字符串
+        assert restored.debate_id == event.debate_id  # payload UUID 字段按声明还原
+        assert isinstance(restored.debate_id, uuid.UUID)
         assert restored.consensus_count == event.consensus_count
         assert restored.disagreement_count == event.disagreement_count
         assert restored.overlap_rate == event.overlap_rate

@@ -21,7 +21,6 @@ Run with:
 from __future__ import annotations
 
 import uuid
-from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -34,6 +33,7 @@ from src.application.use_cases.agent_instantiation import (
 )
 from src.domain.entities.agent import Agent, AgentRole, AgentStatus
 from src.domain.events.agent_events import AgentInstantiated
+from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.domain.exceptions import (
     AgentConfigError,
@@ -45,6 +45,28 @@ from src.domain.ports.agent_repository import AgentRepository
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.value_objects.agent_config import AgentConfig
 from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+
+
+class _TracingEventBus(InMemoryEventBus):
+    """记录发布调用序的 InMemoryEventBus 子类（编排顺序断言用）。
+
+    子类化而非实例方法赋值（method-assign 抑制注释红线——以类型安全的
+    override 记录调用序，published_events/isinstance 语义完整继承）。
+    """
+
+    def __init__(self, calls: list[str]) -> None:
+        """初始化追踪总线。
+
+        Args:
+            calls: 共享调用序列（与 loader/save 闭包写入同一清单）
+        """
+        super().__init__()
+        self._traced_calls = calls
+
+    async def publish(self, event: DomainEvent) -> PublishResult:
+        """发布事件并先记录调用序（对齐 InMemoryEventBus.publish 签名）。"""
+        self._traced_calls.append("publish")
+        return await super().publish(event)
 
 
 def _make_config(**overrides) -> AgentConfig:
@@ -94,15 +116,7 @@ def _make_use_case(
 
     repository.save = AsyncMock(side_effect=_save)
 
-    event_bus = publisher if publisher is not None else InMemoryEventBus()
-    if isinstance(event_bus, InMemoryEventBus):
-        original_publish = event_bus.publish
-
-        async def _traced_publish(event: Any) -> PublishResult:
-            calls.append("publish")
-            return await original_publish(event)
-
-        event_bus.publish = _traced_publish  # type: ignore[method-assign]
+    event_bus = publisher if publisher is not None else _TracingEventBus(calls)
 
     use_case = InstantiateAgentUseCase(
         config_loader=loader,
@@ -145,8 +159,8 @@ class TestSuccessfulOrchestration:
         use_case, _, repository, _, _ = _make_use_case(config=_make_config(state_ttl=777))
         await use_case.execute(role=AgentRole.CEO)
         repository.save.assert_awaited_once()
-        saved_agent, saved_kwargs = repository.save.await_args.args, repository.save.await_args.kwargs
-        assert saved_kwargs.get("ttl") == 777 or saved_agent[1] == 777
+        save_args, save_kwargs = repository.save.await_args.args, repository.save.await_args.kwargs
+        assert save_kwargs.get("ttl") == 777 or save_args[1] == 777
 
     async def test_orchestration_order_load_save_publish(self) -> None:
         """编排顺序：load → save → publish（守卫先于 load 由非 CEO 用例钉死）。"""
@@ -253,7 +267,7 @@ class TestPublishFailureDoesNotRollback:
         use_case, _, repository, _, _ = _make_use_case(publisher=publisher)
         result = await use_case.execute(role=AgentRole.CEO)  # 不抛
         assert isinstance(result, AgentInstantiationResult)
-        repository.save.assert_awaited_once(), "发布失败不得回滚持久化"
+        assert repository.save.await_count == 1, "发布失败不得回滚持久化"
 
     async def test_publish_is_success_false_path_returns_result(self) -> None:
         """is_success=False 路径（真实失败面：PublishResult 空 results → False）。"""

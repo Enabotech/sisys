@@ -196,6 +196,34 @@ class TestLoadFailures:
             await _load(tmp_path)
         assert exc_info.value.code == "EXCEPTION_440"
 
+    async def test_config_path_occupied_by_directory(self, tmp_path: Path) -> None:
+        """配置路径被目录占位 → 440（OSError 家族统一包装，禁裸 IsADirectoryError 逃逸）。"""
+        (tmp_path / "ceo_agent.yaml").mkdir()
+        with pytest.raises(AgentConfigError) as exc_info:
+            await _load(tmp_path)
+        assert exc_info.value.code == "EXCEPTION_440"
+
+    async def test_non_utf8_encoding_rejected(self, tmp_path: Path) -> None:
+        """GBK 编码内容 → 440（UnicodeDecodeError 家族统一包装——中文配置被错误编码保存即触发）。"""
+        (tmp_path / "ceo_agent.yaml").write_bytes('agent:\n  name: "首席执行官"\n'.encode("gbk"))
+        with pytest.raises(AgentConfigError) as exc_info:
+            await _load(tmp_path)
+        assert exc_info.value.code == "EXCEPTION_440"
+
+    async def test_preferred_model_non_string_rejected(self, tmp_path: Path) -> None:
+        """preferred_model 非字符串标量 → 440（防配置手误被静默吞为 None）。"""
+        _write_config(tmp_path, VALID_YAML.replace("preferred_model: null", "preferred_model: 123"))
+        with pytest.raises(AgentConfigError) as exc_info:
+            await _load(tmp_path)
+        assert exc_info.value.code == "EXCEPTION_440"
+
+    async def test_isolation_level_non_string_rejected(self, tmp_path: Path) -> None:
+        """default_isolation_level 非字符串 → 440（防静默回落 L4 掩盖配置错误）。"""
+        _write_config(tmp_path, VALID_YAML.replace('default_isolation_level: "L4"', "default_isolation_level: 5"))
+        with pytest.raises(AgentConfigError) as exc_info:
+            await _load(tmp_path)
+        assert exc_info.value.code == "EXCEPTION_440"
+
     async def test_error_context_carries_role_and_reason(self, tmp_path: Path) -> None:
         """异常 context 携带 role/config_path/reason（不泄露绝对路径内部细节）。"""
         with pytest.raises(AgentConfigError) as exc_info:

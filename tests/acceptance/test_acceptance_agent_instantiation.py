@@ -490,12 +490,16 @@ def when_10_concurrent(context: dict[str, Any]) -> None:
     """asyncio.gather 10 并发实例化（NFR-PERF-04 MVP 档）。"""
 
     async def _instantiate_all() -> list[Any]:
-        return await asyncio.gather(*(context["use_case"].execute(role=AgentRole.CEO) for _ in range(10)))
+        # 协程内即时登记 agent_id：gather 部分失败时已落库键仍可被 teardown 精确清理
+        async def _instantiate_one() -> Any:
+            result = await context["use_case"].execute(role=AgentRole.CEO)
+            context["_agent_ids"].append(result.agent_id)
+            return result
+
+        return await asyncio.gather(*(_instantiate_one() for _ in range(10)))
 
     results = _run_async(context["_loop"], _instantiate_all())
     context["results"] = results
-    for result in results:
-        context["_agent_ids"].append(result.agent_id)
 
 
 @then("全部实例化成功且 agent_id 互异")

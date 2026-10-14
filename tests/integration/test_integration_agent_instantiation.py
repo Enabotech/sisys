@@ -165,9 +165,16 @@ class TestTenConcurrentInstantiations:
         self, assembled: tuple[InstantiateAgentUseCase, RedisAgentRepository, Any]
     ) -> None:
         case, _, client = assembled
-        results = await asyncio.gather(*(case.execute(role=AgentRole.CEO) for _ in range(10)))
-        agent_ids = [result.agent_id for result in results]
+        # 协程内即时登记 agent_id：gather 部分失败时已落库键仍可被 finally 精确清理
+        agent_ids: list[uuid.UUID] = []
+
+        async def _instantiate_one() -> Any:
+            result = await case.execute(role=AgentRole.CEO)
+            agent_ids.append(result.agent_id)
+            return result
+
         try:
+            results = await asyncio.gather(*(_instantiate_one() for _ in range(10)))
             assert len(results) == 10
             assert all(isinstance(agent_id, uuid.UUID) for agent_id in agent_ids)
             assert len(set(agent_ids)) == 10, "10 个 agent_id 必须全部互异"

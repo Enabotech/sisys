@@ -65,7 +65,7 @@ class TestAgentConfigCreation:
     def test_frozen_immutable(self) -> None:
         config = _make_config()
         with pytest.raises(dataclasses.FrozenInstanceError):
-            config.name = "mutated"  # type: ignore[misc]
+            setattr(config, "name", "mutated")  # 内建 setattr 触发 frozen __setattr__（静态检查不误报）
 
     def test_tuple_fields(self) -> None:
         """responsibilities/domain_knowledge 为 tuple（YAML list 由加载器显式转换）。"""
@@ -168,5 +168,5 @@ class TestRoleValidation:
 
     def test_non_enum_role_raises_440(self) -> None:
         with pytest.raises(AgentConfigError) as exc_info:
-            _make_config(role="ceo")  # type: ignore[arg-type]
+            _make_config(role="ceo")  # 工厂 **overrides 未注解参数按 Any 透传（VO 校验是测试意图）
         assert exc_info.value.code == "EXCEPTION_440"

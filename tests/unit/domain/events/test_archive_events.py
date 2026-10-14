@@ -113,8 +113,9 @@ class TestArchiveCreated:
         data = event.to_dict()
         restored = DomainEvent.from_dict(data)
         assert isinstance(restored, ArchiveCreated)
-        assert restored.archive_id == str(archive_id)
-        assert str(restored.plan_id) == str(plan_id)
+        assert restored.archive_id == archive_id  # from_dict 按字段声明还原 UUID 对象
+        assert isinstance(restored.archive_id, uuid.UUID)
+        assert restored.plan_id == plan_id
         assert restored.plan_type == "BP"
         assert restored.archive_type == ArchiveType.DEVIATION
         assert restored.has_embedding is True
@@ -222,9 +223,9 @@ class TestValidityPeriodSet:
         data = event.to_dict()
         restored = DomainEvent.from_dict(data)
         assert isinstance(restored, ValidityPeriodSet)
-        assert restored.archive_id == str(archive_id)
+        assert restored.archive_id == archive_id  # from_dict 按字段声明还原 UUID 对象
         assert restored.archive_type == ArchiveType.DEVIATION
-        assert restored.valid_from == "2026-06-01T00:00:00+00:00"
+        assert restored.valid_from == datetime(2026, 6, 1, tzinfo=UTC)  # datetime 字段按声明还原
         assert restored.valid_until is None
 
     def test_frozen(self) -> None:
@@ -328,7 +329,7 @@ class TestFactBecameStale:
         data = event.to_dict()
         restored = DomainEvent.from_dict(data)
         assert isinstance(restored, FactBecameStale)
-        assert restored.archive_id == str(archive_id)
+        assert restored.archive_id == archive_id  # from_dict 按字段声明还原 UUID 对象
         assert restored.archive_type == ArchiveType.DEVIATION
         assert restored.stale_reason == "archived_too_long"
         assert restored.valid_until is None

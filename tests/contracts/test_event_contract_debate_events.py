@@ -102,16 +102,16 @@ class TestDebateCompletedEventSerialization:
     def test_from_dict_roundtrip(self) -> None:
         """to_dict → from_dict roundtrip 应等值（_registry 多态注册生效）。
 
-        注：与项目历史行为对齐（tests/unit/domain/events/test_archive_events.py），
-        from_dict 不会把字符串 payload 字段反序列化为 UUID，
-        保持字符串原样，断言使用 str() 比较。
+        注：from_dict 按字段声明类型还原 payload（UUID 字段还原为 UUID 对象），
+        与 aggregate_id 核心字段行为一致（Story 5-1 R1 F4 修复后契约）。
         """
         event = _make_event()
         data = event.to_dict()
         restored = DebateCompleted.from_dict(data)
         assert isinstance(restored, DebateCompleted), f"from_dict 应返回 DebateCompleted 实例，实际: {type(restored).__name__}"
         assert restored.aggregate_id == event.debate_id
-        assert restored.debate_id == str(event.debate_id)
+        assert restored.debate_id == event.debate_id
+        assert isinstance(restored.debate_id, uuid.UUID)
         assert restored.consensus_count == event.consensus_count
         assert restored.disagreement_count == event.disagreement_count
         assert restored.overlap_rate == event.overlap_rate
