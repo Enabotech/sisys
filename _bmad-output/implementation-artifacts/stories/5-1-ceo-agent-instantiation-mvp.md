@@ -56,7 +56,7 @@
 | `EntityValidationError`(EXCEPTION_242)/`EntityStateTransitionError`(EXCEPTION_243) | `src/domain/exceptions/business_exceptions.py` | **直接复用**（实体校验/状态迁移守卫） |
 | CLI 独立入口模式（`bootstrap()` + `resolve()` + `build_parser()` + `main(argv)->int` + `asyncio.run()` + pyproject `[project.scripts]` 注册 + docstring 架构约束声明） | `src/interfaces/cli/ocr_cli.py`（注册样例 `pyproject.toml` L155-161） | **参考照抄**（agent_cli.py 结构模板）。⚠️ **勿效仿** `commands/document_commands.py`——其 `build_version_parser` 无任何挂载点（未接线资产），不存在集中式 CLI 主入口可挂载 |
 | 测试基建：`get_test_env()`/`SISYS_USE_TEST_PORTS=1`（Redis 6380）、`TestTenant.redis_key_prefix`、`real_redis` fixture（**仅 integration conftest 有**——acceptance 侧刻意不提供共享 fixture，验收文件内自建场景级异步客户端模板 = skill_data_collection L82-113 context fixture：`aioredis.Redis(decode_responses=True)` + Background ping+skip + 同循环 close）、acceptance conftest 自动 marker | `tests/environments.py`、`tests/isolation.py`、`tests/integration/conftest.py`、`tests/acceptance/conftest.py`、`tests/acceptance/test_acceptance_skill_data_collection.py` | **直接复用** |
-| 值对象内抛子域异常先例（校验方法 raise 领域异常，非 ValueError） | `src/domain/value_objects/document_metadata.py` L100-103（MetadataValidationError 217） | **参考**（AgentConfig `__post_init__` 抛 AgentConfigError 440 同款路线；VO 主流是 242，见领域异常契约节边界说明） |
+| 值对象内抛子域异常先例（校验方法 raise 领域异常，非 ValueError） | `src/domain/value_objects/document_metadata.py` L100-104（MetadataValidationError 217） | **参考**（AgentConfig `__post_init__` 抛 AgentConfigError 440 同款路线；VO 主流是 242，见领域异常契约节边界说明） |
 
 **明确不存在、本 Story 需新建**（已全仓 grep 验证零先例）：
 
@@ -130,7 +130,7 @@
 
 **Given** 真实 Redis 服务可用（`SISYS_USE_TEST_PORTS=1` → 6380 端口）
 **When** 执行实例化全链路（配置加载 → 实体构造 → Redis 持久化 → 事件发布）
-**Then** 实例化延迟 **P95 < 200ms**（≥20 次采样取 P95，`time.perf_counter` 计时 + **warmup 剔除 1 次** + `statistics.quantiles(latencies, n=20)[18]` 取 P95——docker_sandbox L1001-1012 先例；本 Story 对 epics L1472「P95<200ms」门禁的采样方法细化，epics 原文未规定采样法；200ms 对典型 <20ms 链路约 10 倍余量）
+**Then** 实例化延迟 **P95 < 200ms**（≥20 次采样取 P95，`time.perf_counter` 计时 + **warmup 剔除 1 次** + `statistics.quantiles(latencies, n=20)[18]` 取 P95——先例 `tests/acceptance/test_acceptance_docker_sandbox.py` L1001-1012（⚠️ 与 `tests/benchmark/test_performance_docker_sandbox.py` 是两个文件，后者 L71-85 亦有同款方法可参照）；本 Story 对 epics L1472「P95<200ms」门禁的采样方法细化，epics 原文未规定采样法；200ms 对典型 <20ms 链路约 10 倍余量）
 **And** **并发 ≥10** 个 Agent 同时实例化全部成功且互不干扰（NFR-PERF-04 MVP 档：asyncio.gather 10 并发，键天然隔离）
 **And** 配置加载成功率 100%（AC-2 确定性）
 
@@ -595,7 +595,7 @@ class AgentConfigLoader(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/storage/redis/test_redis_agent_repository.py`（Mock 工厂模式：`AsyncMock(spec=...)` raw_client + `_make_agent()` 工厂；save/get_by_id/exists/delete；**同 agent_id 二次 save（不同实体/ttl）→ get_by_id 读回第二实体、TTL 重置为第二次值（save 的 upsert 语义契约）**；`_agent_to_hash`/`_hash_to_agent` 往返：UUID/AgentRole/AgentStatus/datetime 重建；TTL 必填传递（缺参 TypeError 契约）；ttl 越界（<60 或 >2592000）抛 AgentConfigError(EXCEPTION_440)） |
+| 🔴 红 | 编写 `tests/unit/infrastructure/storage/redis/test_redis_agent_repository.py`（Mock 工厂模式：`AsyncMock(spec=...)` raw_client + `_make_agent()` 工厂；save/get_by_id/exists/delete；**同 agent_id 二次 save（不同实体/ttl）→ get_by_id 读回第二实体、TTL 重置为第二次值（save 的 upsert 语义契约）**；`_agent_to_hash`/`_hash_to_agent` 往返：UUID/AgentRole/AgentStatus/datetime 重建；TTL 必填传递（缺参 TypeError 契约）；ttl 越界（<60 或 >2592000）抛 AgentConfigError(EXCEPTION_440)；**Redis 连接异常（raw_client 抛 aioredis.ConnectionError——AsyncMock side_effect 模拟）→ save 包装 `StorageError` 向上传播不静默**——对齐 RedisSnapshotStore.save L126-128 先例，AC-3 第 4 条验证标准与追溯矩阵的落点用例） |
 | 🟢 绿 | 实现 `src/domain/ports/agent_repository.py`（Protocol，签名见 Task 0）+ `src/infrastructure/storage/redis/redis_agent_repository.py`（组合 RedisAdapter、`build_key("agent", str(agent_id))`、Hash 读写走 `raw_client`、静态转换方法仿 RedisSnapshotStore） |
 | 🟡 变异 | 突变 `_hash_to_agent` 的 `AgentStatus(status_str)` 重建（改为透传 str）→ 往返断言红（`isinstance(status, AgentStatus)` 失败）→ 还原绿 |
 | 🔄 重构 | 组合根注册 `agent_repository`（SCOPED，lambda 工厂 `adapter=resolver.resolve("redis_adapter")`，仿组合根 snapshot_repository 注册样例 composition_root.py L941-955）+ 契约测试 `tests/contracts/test_port_contract_agent_repository.py`；ruff+mypy |
@@ -994,6 +994,7 @@ tests/
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
 > 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有对故事文件的修复项。
+> （本节与版本历史为审查追溯记录，dev agent 实施时无需阅读。）
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
@@ -1029,6 +1030,7 @@ tests/
 | 30 | 【Round 4】边界缺口 P1×4：①`capabilities.responsibilities: []` 空列表漏检风险（Agent.validate() 不校验非空，VO falsy 判空是唯一防线）；②`capabilities.*` 标量字符串静默陷阱（`tuple("战略方向")` 逐字符展开无异常）；③`--role CEO` 大写归一化无测试（漏 `.lower()` 时合法输入误报 441，现有用例无法暴露）；④argparse `add_subparsers` 默认非必选，裸调用 `sisys-agent` 取 args.role 抛 AttributeError 裸崩逃逸统一异常体系 | P1 | Task 2 红行补空列表/标量/state_ttl 非整数/YAML 空文件/未知键五类用例 + 绿行补 isinstance(list) 守卫与 falsy 判空；Task 5 红行补 "CEO" 大写与 main([]) 裸调用用例 + 绿行补 `add_subparsers(required=True)`；Task 2 值对象红行补 TTL 端点值（60/2592000 合法、59/2592001 抛） |
 | 31 | 【Round 4】边界补强 P2×7：preferred_model 空串语义未定稿；YAML 未知键策略未定义；supported_roles 真源未指定（V1 扩展维护性）；二次 save upsert 语义无测试；CLI 退出码未定值（0/1/2 契约）；输出格式未定形（UUID 单行 stdout）；组合根 resolve 缓存跨测试文件残留无注记 | P2 | preferred_model 空串归一化 None 定稿（Schema 注释+VO 测试）；未知键策略定稿「忽略」（Task 0 YAML 块下声明+Task 2 用例）；SUPPORTED_ROLES frozenset 常量真源（Task 4 绿行+异常契约节）；Task 3 红行补 upsert 用例；退出码 0/1/2 与 UUID 单行输出定稿（Task 5 红绿行）；已知下游风险补第 3 条 resolve 缓存注记 |
 | 32 | 【Round 4】回归修正：「integration 目录零 resolve() 先例」言过其实（traceability L171-174 与 session_middleware_wiring L75 有 inline 先例）；「11 个仓储端口」计数口径不唯一（10 直写/12-13 含继承）；document_metadata raise 闭合行 L104 | P2 | 措辞收敛「无共享 resolve() fixture 基建 + inline 用例见 traceability」；改「10+ 端口直接定义」；L100-104 |
+| 33 | 【Round 5】终态微修 4 项：复用表 document_metadata 行号传播不全（L100-103→L100-104）；AC-5 docker_sandbox 引用未指明文件（acceptance 版 L1001-1012 与 benchmark 版 L71-85 是两个文件）；Task 3 红行缺「连接异常→StorageError 包装」用例（AC-3 第 4 条/追溯矩阵/DoD 三处要求但红行漏列，dev 照红行实现会漏测）；修复台账对 dev agent 无实施价值未标注 | P3 | L59 行号补传播；AC-5 补完整路径消除歧义；Task 3 红行补 StorageError 用例（AsyncMock side_effect 模拟连接异常）；台账节加「dev agent 实施时无需阅读」标注 |
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
@@ -1058,7 +1060,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-10-14
 **最后更新/Last Updated:** 2026-10-14
 **更新说明/Description:**
@@ -1067,3 +1069,4 @@ tests/
 - v1.2.0: Round 2 审查修订（科学性视角：2 调研 Agent 设计边界/先例基准 + 3 审查 Agent 决策裁定/事件异常体系/影响面核查；修复 P0×2（事件字段 kw_only、守卫顺序倒置）+ P1×6（save(ttl) 必填、路径锚定、get_by_id 改名、D-6/D-7 偏离声明、§10.1 登记）+ 补强 5 项，详见「文档审查修复」表 #14-21）
 - v1.3.0: Round 3 审查修订（可行性视角：2 调研 Agent BDD/工具链实测 + 1 终审 Agent 13 场景可满足性推演与 Task 0-8 依赖干跑；修复 P0×4（teardown 自相矛盾、resolve 跨循环死连接、Task 5 main 注入不可写、AC-5.2 scan 误计）+ P1×2 + 补强 8 项（warmup+quantiles 采样法、@scenario 收集陷阱、冒烟三前置、Redis 池清理等），详见「文档审查修复」表 #22-28）
 - v1.4.0: Round 4 审查修订（回归核查+边界视角：1 回归验证 Agent 全量复核三轮修复引用（#1-28 抽查全部落地、口径统一、结构完整）+ 1 边界审查 Agent 七维度边界推演；修复 P1×5（L362→L318 行号、空列表漏检、标量静默陷阱、--role 大写归一化、子命令 required 裸崩）+ P2×7 边界定稿（空串归一化/未知键策略/SUPPORTED_ROLES 常量/upsert 语义/退出码 0-1-2/UUID 输出/resolve 缓存注记），详见「文档审查修复」表 #29-32）
+- v1.5.0: Round 5 终态收敛（1 竞争性终检 Agent 按 checklist.md 框架以 dev agent 视角终检——无 Critical 缺陷、约 40 处引用抽查仅 1 处歧义、防重复清单完整；1 收敛验证 Agent——台账 #1-32 全部落地无假修复、内部计数终态一致、模板章节零缺失、正文零未决问题；P0 收敛曲线 4→2→4→0，终态「dev agent 可直接实施」；微修 P3×4 见台账 #33。**审查闭环：五轮 34 项修复台账，Story 可进入 dev-story**）
