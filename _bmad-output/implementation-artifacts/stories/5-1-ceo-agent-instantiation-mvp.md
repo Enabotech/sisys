@@ -1,6 +1,6 @@
 # Story 5.1: CEO Agent 实例化（MVP 单 Agent）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -273,7 +273,7 @@ class AgentConfigLoader(Protocol):
 #### 领域异常契约 (Domain Exception Contract)
 
 > **原则**：异常是领域契约的一部分。本 Story 新增异常在 Task 0 完成设计，Task 1 实现。
-> **禁止 `raise ValueError`**；完整清单见 [`sisys-uni-exception-design.md §3.12`](../../../docs/architecture/sisys-uni-exception-design.md)。
+> **禁止 `raise ValueError`**；完整清单见 [`sisys-uni-exception-design.md §3.3.2`](../../../docs/architecture/sisys-uni-exception-design.md)。
 
 **新建 `agent` 子域，编码段 EXCEPTION_440 ~ 449**（440-449 当前空闲，全仓 grep 验证无碰撞；遵循 data_source(410-419)/debate(420-429)/tool_version(430-439) 独立物理段先例）。定义文件：`src/domain/exceptions/agent_exceptions.py`（对齐 `debate_exceptions.py`/`data_source_exceptions.py` 独立子域文件先例）。
 
@@ -992,6 +992,7 @@ tests/
 - `src/domain/events/agent_events.py`（追加 AgentInstantiated）+ `src/domain/events/__init__.py`（导出）
 - `src/domain/exceptions/_code_ranges.py`（agent 440-449 双表登记）+ `src/domain/exceptions/__init__.py`（导出）
 - `src/interfaces/api/exception_handlers.py`（EXCEPTION_HTTP_MAP 精确注册 440→500/441→422 + import）
+- `tests/unit/interfaces/api/test_exception_handlers.py`（Map 完备性清单配套维护 +4 行——Task 8 完成清单有记录，R5 终审补列 File List）
 - `configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py`（AgentInstantiated 双登记）
 - `docs/architecture/sisys-uni-exception-design.md`（§3.3.2 编码分配表 agent 行 + 子域范围表 agent 行）
 - `docs/architecture/architecture.md`（§10.1 领域事件列表补 AgentInstantiated 行）
@@ -1079,7 +1080,7 @@ tests/
 - [x] **R1-F6【P1】加载器可选字段静默类型收编**（来源：三视角；`preferred_model: 123` 静默变 None、`default_isolation_level: 5` 静默回落 L4，配置手误无感知）→ 非 null 非 str 显式 440 + 两用例
 - [x] **R1-F7【P1】测试断言卫生**（来源：测试质量审计；:256 死消息裸元组、:148 命名对调）→ `await_count == 1` 活断言 + 更名
 - [x] **R1-F8【P2】并发场景失败路径键泄漏**（来源：测试质量+盲审；gather 在 try/登记之外，部分失败时已落库键逃逸 teardown）→ 协程内即时登记 + gather 移入 try（integration+acceptance 两处）；验证性质：结构性加固经代码审查+happy path 实跑（集成层 mock 禁令不做故障注入），与 F3 原子 pipeline 协同兜底
-- 变更文件清单（R1）：`src/domain/events/base.py`（唯一共享代码变更——F4 根因修复）、`src/infrastructure/agent_orch/yaml_agent_config_loader.py`、`src/infrastructure/storage/redis/redis_agent_repository.py`、`src/interfaces/cli/agent_cli.py`、tests 10 文件（含 F4 必红清单 5 文件）、Story 文件本节、deferred-work.md
+- 变更文件清单（R1）：`src/domain/events/base.py`（唯一共享代码变更——F4 根因修复）、`src/infrastructure/agent_orch/yaml_agent_config_loader.py`、`src/infrastructure/storage/redis/redis_agent_repository.py`、`src/interfaces/cli/agent_cli.py`、tests 13 文件（含 F4 必红清单 5 文件——R5 终审计数勘正）、Story 文件本节、deferred-work.md
 
 #### 已修复 Patch（Round 2 — P2×3 + P3×6；R1 修复回归核查零 P0/P1 回归、科学性 9/10）
 
@@ -1117,6 +1118,18 @@ tests/
 - 变更文件清单（R4）：README.md、Story 本节 + deferred-work.md——**生产代码与测试零变更**（HEAD 代码 bef902ad 经 R4 双视角实测 10083 passed + 双态验收 + CLI 冒烟全绿）
 - **R4 终态**：运维就绪总评通过（P95 独立复测 3.57ms 远优 200ms 门限、退出码/错误码/可观测性实跑验证）；5-1 可处置项保持全清；新增 D12/D13 均带核销触发器
 
+#### 收敛声明（Round 5 终审 · 2026-10-14 · 独立取证）
+
+> **Story 5-1 代码审查收敛声明**
+>
+> 五轮审查闭环：**实施（ea0c0564，Task 0-8 + 9 处变异实证）→ R1（1376dd81，P0×4/P1×3/P2×1——事件类型漂移根因修复/管道原子化/440 契约闭合/红线清除）→ R2（cc0a25f1，P2×3/P3×6——outbox 毒隔离/VO tuple 守卫）→ R3（bef902ad，P1×1/P2×1/P3×4——重试耗尽过滤/错误串截断/D4 核销）→ R4（e60844d3，纯文档台账轮——D12/D13 登记+运维就绪落账）→ R5（终审，独立取证零 P0/P1/P2 新发现）**。P0 曲线 4→0→0→0→0，R2 起自身可处置 P0/P1/P2 持续清零，四轮修复无回归（终审全量实跑 10030+53 passed、CLI 冒烟退出码 0/1 实证、red_blue 回归面 36 用例全绿）。
+>
+> **残留清单（全部带核销触发器，非 5-1 可处置）**：D1（import-linter BROKEN，架构评审立项）、D2（EPO 4-1f 域）、D3（StorageError 语义拆分，5.3）、D6（VO 直构造残余，5.3/5.4）、D7（captive dependency，5.4）、D8（存量技术债，专项）、D9(c)（验证器 AST 化，下次触碰）、D11（outbox 终态六项，dead-letter 专项）、D12（wheel configs 分发，发布专项）、D13（CLI bootstrap 10.4s，5.3 批量消费前）；已核销 D4/D5/D10 无残留；F7 疑似泄漏观察项终审未复现（3 键全带 24h TTL），随收敛关闭。
+>
+> **终审遗留微修（本轮落账时已处置）**：R1 文件计数 10→13 勘正；File List 补 test_exception_handlers.py；终审发现 #3（§3.12 引用）经复核为**误报**（L276 原文已是 §3.3.2，如实记录不盲改）。
+>
+> **Story 状态处置：review → done**。依据：六项终审取证全部通过——周期五提交闭合无游离、关键修复逐项重取证成立、全量实跑零失败、留项台账 D1-D13 完整带核销触发器、文档终态与仓库事实一致；无任何需要代码变更的残留。
+
 #### 需决策 Decision Needed
 
 - [x] D4【P2·已核销】验收 Background ping 波及纯静态场景 → ✅ 核销于 Round 3（方案②背景下沉：删全 feature 背景块，7 个含服务组装场景（AC-1.1/1.2/1.3/3.1/4.1/5.1/5.2）各前置「假如 Redis 缓存服务可用」，静态 6 场景（AC-2.1/2.2/2.3/4.2/6.1/6.2——**勘正：原条目低估为 3 个**）脱离门控；收集数 13 不变（计数对象是 @scenario 函数非 feature 文件）；双态实证：有 Redis 13 passed / 无 Redis 6 passed + 7 skipped；.py 零改动）。**R6 模板级观察提炼（非 5-1 义务）**：零外部服务依赖的接线/登记类场景不应与服务可用性门控背景同 feature
@@ -1143,12 +1156,12 @@ tests/
 
 - [x] Story created with `ready-for-dev` status
 - [x] 运行 `dev-story` 开始实施（从 Task 0 开始）——**已完成（2026-10-14）：Task 0-8 全部实施，Status → review**
-- [ ] 运行 `code-review` 进行代码审查——**Round 1 已完成（2026-10-14，5 视角调研 + C3 评审门禁 + P0×4/P1×3/P2×1 修复，见 Review Findings）**；Round 2-5 循环审查进行中
+- [x] 运行 `code-review` 进行代码审查——**五轮循环审查闭环（2026-10-14）：R1 五视角调研（P0×4/P1×3/P2×1）→ R2 回归核查+科学性（P2×3/P3×6）→ R3 一致性+D4 核销（P1×1/P2×1/P3×4）→ R4 运维就绪落账（纯文档）→ R5 独立收敛终审（裁定收敛达成），每轮 C3 评审门禁「优秀」后修码、逐轮提交推送；见 Review Findings 四轮台账 + 收敛声明**
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.10.0
+**故事版本/Story Version:** v1.11.0
 **创建日期/Created:** 2026-10-14
 **最后更新/Last Updated:** 2026-10-14
 **更新说明/Description:**
@@ -1163,3 +1176,4 @@ tests/
 - v1.8.0: **代码审查 Round 2**（2026-10-14：C1 双视角——R1 修复回归核查（F1-F8 逐项 ✅ 零 P0/P1 回归，redis-py 源码级验证）+ 科学性复审（R1 修复 9/10，缓存 9.6µs/pipeline RTT 2→1 实测背书）；C3 双视角评审往返一轮裁定「优秀」；修复 P2×3（outbox 毒消息隔离——R1-F4 fail-loud 放大的队头阻塞回归面、VO tuple 守卫——str 静默逐字符展开、测试断言活性 D9(a)(b)）+ P3×6（追踪字段/NameError 包装 242、pipeline 同 key 断言、GBK reason 断言、文档卫生、加载器 section 级守卫+正向锚定）；台账勘误五项（D5 核销/D9(d) 归 D8/D3 补注/D6 收窄/口径澄清）+ D11 新增；R2 终态：5-1 可处置的 P0/P1/P2 全部清零）
 - v1.9.0: **代码审查 Round 3**（2026-10-14：C1 双视角——R2 修复回归核查（揪出 R2-F1 两处新破口：超限毒行永不退出 SELECT 致队头阻塞隐蔽复发 P1、mark_failed 无界错误串 VARCHAR 溢出活锁 P2）+ R1/R2 累计一致性终查（from_dict 全消费方自洽/17 项修复宣称落点全部实证/D4 三候选方案设计）；C3 合并评审实测修订（F2 isinstance 收窄过 mypy/F3 红测形态勘正——int 注入不抛异常改裸特殊形式）；修复 P1×1+P2×1（outbox SELECT 过滤/错误消息截断）+ P3×4（病态注解三形态扩捕/空串容忍恢复/D4 核销——验收 Background 下沉双态实证 13 passed 与 6+7/文档卫生六项）；D11 收敛+补登记；v1.7.0 计数勘正；R3 终态：R2 回归面清零、可处置项累计全清）
 - v1.10.0: **代码审查 Round 4**（2026-10-14：C1 双视角——R3 修复回归核查（零 P0/P1/P2 新破口，10083 passed 实测+双态验收+CLI 冒烟）+ 可行性/运维审计（运维就绪总评通过，P95 独立复测 3.57ms 远优门限）；C3 轻量评审纠错一处（RDB 窗口按实测改写 ≤60 分钟）；纯文档/台账轮代码零变更：P2×2 留项登记（D12 wheel configs 分发缺口——裁定不冒改打包配置、D13 CLI bootstrap 10.4s 开销——组合根瘦身架构决策 5.3 前核销）+ P3×4（D11 扩为六项收敛范围、README 补 Agent CLI 小节、下游风险 #2 补持久化丢失窗口、三项观察登记））
+- v1.11.0: **代码审查 Round 5 收敛终审**（2026-10-14：独立收敛终审 Agent 不轻信台账全量重取证——周期闭合（5 提交无游离）/关键修复抽验（R1-F4 往返 UUID·R1-F3 pipeline·R2/R3 outbox 过滤与隔离·R2-F2 VO 守卫，代码形态+行为实测双确认）/全量实跑（10030+53 passed·CLI 退出码 0/1 实证·收集数 13）/台账 D1-D13 完整带核销触发器/文档终态一致——**裁定收敛达成**；终审新发现 P3×3（R1 文件计数勘正+File List 补列已处置；§3.12 引用经复核为误报如实记录）；收敛声明入账；**Status: review → done**）

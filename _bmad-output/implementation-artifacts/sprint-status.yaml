@@ -156,7 +156,7 @@ development_status:
   # Epic 5: Agent 协作系统（含 EV-01/02 P0 + EV-03/04 P1 扩展）- 🚧 进行中
   # ===========================================================================
   epic-5: in-progress
-  5-1-ceo-agent-instantiation-mvp: review
+  5-1-ceo-agent-instantiation-mvp: done
   5-2-agent-identity-profile-loading: backlog
   5-3-single-agent-workflow: backlog
   5-4-eip-basic-elastic-isolation: backlog
