@@ -279,7 +279,7 @@ class AgentConfigLoader(Protocol):
 
 | 异常类 | 编码 | 基类 | 触发场景 | HTTP 映射 |
 |--------|------|------|---------|-----------|
-| `AgentConfigError` | EXCEPTION_440 | `SystemException` | 配置文件缺失 / YAML 解析失败 / 配置文件不可读（目录占位、权限、TOCTOU）/ 编码非法（非 UTF-8）/ 必填字段无效 / role 与配置不匹配 / 可选字段类型非法（preferred_model、default_isolation_level 非 null 非 str）/ state_ttl 非整数或越界（R1 审查补强：全部失败路径统一 440，禁裸内置异常逃逸）（配置资产属系统资源，同 ConfigurationError(101) 继承链；HTTP 500） | 500 |
+| `AgentConfigError` | EXCEPTION_440 | `SystemException` | 配置文件缺失 / YAML 解析失败 / 配置文件不可读（目录占位、权限、TOCTOU）/ 编码非法（非 UTF-8）/ 必填字段无效 / role 与配置不匹配 / 可选字段类型非法（preferred_model、default_isolation_level 非 null 非 str）/ 可选段非映射结构（llm_config/eip_config/memory_config 非 dict，R2-F9）/ VO 字段类型非法（responsibilities/domain_knowledge 非 tuple，R2-F2）/ state_ttl 非整数或越界（R1 审查补强：全部失败路径统一 440，禁裸内置异常逃逸）（配置资产属系统资源，同 ConfigurationError(101) 继承链；HTTP 500） | 500 |
 | `AgentRoleNotSupportedError` | EXCEPTION_441 | `BusinessException` | 请求实例化 MVP 未开放角色（非 CEO）——业务能力范围规则违反（同 DebateLowDivergenceError(422)→422 先例） | 422 |
 | （预留） | EXCEPTION_442~449 | — | 预留给 5.2 档案加载 / 5.4-5.5 EIP 隔离 / 5.3 工作流异常 | — |
 
@@ -1065,11 +1065,11 @@ tests/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 2026-10-14（Round 1 / Round 2）
-**审查模式:** R1=5 并行视角调研（正确性契约审计 / 边界缺陷猎手 / 架构规范一致性 / 测试质量审计 / 盲审冷审）+ C3 三视角方案评审；R2=双视角（R1 修复回归核查 + 科学性复审）+ C3 双视角评审（往返一轮裁定「优秀」）
-**审查范围:** R1=`git diff ed3a2053..1376dd81`（实施提交 ea0c0564 + be17899c）；R2=commit 1376dd81 修复自身的回归面与残留项
+**审查日期:** 2026-10-14（Round 1 / Round 2 / Round 3）
+**审查模式:** R1=5 并行视角调研（正确性契约审计 / 边界缺陷猎手 / 架构规范一致性 / 测试质量审计 / 盲审冷审）+ C3 三视角方案评审；R2=双视角（R1 修复回归核查 + 科学性复审）+ C3 双视角评审（往返一轮裁定「优秀」）；R3=双视角（R2 修复回归核查 + R1/R2 累计一致性/D4 设计）+ C3 合并评审（合格+实测修订指令，明示修订后可直接实施）
+**审查范围:** R1=`git diff ed3a2053..1376dd81`（实施提交 ea0c0564 + be17899c）；R2=commit 1376dd81 修复自身的回归面与残留项；R3=commit cc0a25f1 修复自身的回归面 + 累计一致性终查
 
-#### 已修复 Patch（Round 1 — P0×4 + P1×4，逐项含来源视角/证据/修复）
+#### 已修复 Patch（Round 1 — P0×4 + P1×3 + P2×1，逐项含来源视角/证据/修复）
 
 - [x] **R1-F1【P0·红线】测试文件 6 处 `# type: ignore` 抑制注释**（来源：盲审+测试质量审计；grep 证实全 tests/ 树仅 5-1 新增 4 文件存在，违反 Hard Constraint 且与 Story 自身 Task 6 自纠 noqa 先例矛盾）→ 六种等价重构消除：`_TracingEventBus` 子类替代实例方法赋值（+删孤儿 `Any` import+补 `DomainEvent` import）、空 dict 动态解包 ×2、内建 `setattr` ×2、纯删死注释 ×1；mypy 四文件基线全绿验证
 - [x] **R1-F2【P0·契约逃逸】`_read_yaml` 未捕获 OSError/UnicodeDecodeError**（来源：边界猎手+盲审+正确性审计三视角独立实测——目录占位抛裸 `IsADirectoryError`、GBK 内容抛裸 `UnicodeDecodeError`（ValueError 子类），打破「全部失败路径统一 440」成文承诺且零测试覆盖）→ `open()` 移入 try + 三异常类逐类包装 440（reason 分列「YAML 解析失败/编码非法/不可读」），role 上下文透传（顺带修复 P3「440 丢失 role」）；新增目录占位+GBK 两用例（红→绿）
@@ -1095,9 +1095,20 @@ tests/
 - 变更文件清单（R2）：`src/infrastructure/messaging/outbox/outbox_repository.py`（共享文件）、`src/domain/events/base.py`、`src/domain/value_objects/agent_config.py`、`src/infrastructure/agent_orch/yaml_agent_config_loader.py`、tests 7 文件、Story 本节
 - **R2 终态**：5-1 自身可处置的 P0/P1/P2 全部清零；跨 Story/治理域留项 D1(P1)/D2(P2) 于 deferred-work.md 登记且带核销触发器
 
+#### 已修复 Patch（Round 3 — P1×1 + P2×1 + P3×4；R2 修复回归核查揪出 R2-F1 两处新破口并闭环）
+
+- [x] **R3-F1【P1】outbox SELECT 增加 retry_count < max_retries 过滤**（来源：回归核查——R2-F1 隔离意图落地但未闭合：超限毒行永不退出选择集（无终态迁移路径：mark_pending 前置封死/cleanup 只清 published/DLQ 仅消费侧调用），累积至 batch_size 后 get_unpublished 恒返回空批、合法事件静默停发——队头阻塞以隐蔽形态复发；测试盲区：SELECT WHERE 语义全 mock）→ 列比较过滤 + 白盒语句构造断言（compile 文本锚定列比较，mock 模式可达）；超限 Python 分支防御性保留（注释勘正：非竞态防御，真实流程经 SELECT 物化不可达）；D11 随之收敛为惰性滞留形态
+- [x] **R3-F2【P2】mark_failed 错误消息按列宽截断**（来源：回归核查——R2 新调用内嵌任意长 payload repr，error_message VARCHAR(1000) PG 超长抛错不截断 → 整周期事务失败回滚 → 毒标记丢弃 + 下轮同形失败 = 永久活锁；既有 poller 路径同款暴露 R2 结构性加宽）→ `error[:_ERROR_MESSAGE_MAX_LENGTH]`（isinstance(String) 收窄取列宽，mypy 零告警形态经评审实测验证；一处收口覆盖新旧调用点）+ 超长截断用例
+- [x] **R3-F3【P3】get_type_hints 病态注解扩捕**（来源：回归核查+主审/评审双实测——R2-F5 只捕 NameError；裸 TypeError（字符串注解求值为裸特殊形式如 Optional 漏 [None]）会击穿 redis_subscriber 逐消息隔离（仅捕 ValueError/DomainError）；主审另实测 SyntaxError 形态（畸形表达式如 list[int[））→ `except (NameError, SyntaxError, TypeError)` 三形态均实测锚定 + 两红用例（裸特殊形式/畸形表达式，动态类 __annotations__ 注入——注解字面量语法会在类定义期求值不触发解析）
+- [x] **R3-F4【P3】correlation_id/causation_id 空串容忍恢复**（来源：回归核查——R2-F4 把 "" 从「视同未提供」变为 242 拒收，外部生产方写 "" 的互操作事件将被消费侧隔离静默丢弃（比容忍更糟））→ `if not value: return None`（falsy 家族等价旧语义，fail-loud 收缩至非空畸形）+ ""→None 锚定用例；裁定理由入 docstring
+- [x] **R3-F5【P3·D4 核销】验收 Background 下沉**（方案②——一致性 Agent 三候选对比推荐：删背景块 + 7 组装场景各前置 ping 行；.py 零改动/收集数 13 不变/Gherkin 文本与实际依赖一一对应；双态实证：有 Redis 13 passed、无 Redis 6 passed + 7 skipped——静态 6 场景脱离门控，验收信号恢复 ~46%）+ R6 模板级观察提炼
+- [x] **R3-F6【P3】文档卫生**：v1.7.0 计数勘正三处（P1×4→P1×3，防 P2 双计）；尾部重复「更新说明」残块删除；440 触发面全子集回填（Story 异常契约表 + sisys-uni-exception-design.md §3.3.2——后者补齐 R1 起累计四批触发面）；D9(c) 补核销触发器；D11 重写（R3-F1 后形态）+ 补登记 deferred-work.md（含 InMemory 分叉/DLQ dequeue/process_one 伪 mark_pending/max_retries=0 病态参考）
+- 变更文件清单（R3）：`src/infrastructure/messaging/outbox/outbox_repository.py`（共享文件）、`src/domain/events/base.py`（共享文件）、`tests/acceptance/test_acceptance_agent_instantiation.feature`、tests 2 文件、Story 本节 + sisys-uni-exception-design.md + deferred-work.md
+- **R3 终态**：R2 引入的回归面（P1×1/P2×1）清零；5-1 可处置项累计全清；留项 D1/D2/D3/D6 残余/D7/D8/D9(c)/D11 均带核销触发器
+
 #### 需决策 Decision Needed
 
-- [ ] D4 验收 Background ping 波及纯静态场景（AC-4.2/6.1/6.2 无 Redis 即整批 skip）——拆分 feature 会改动「收集数==13」钉死契约，核销轮次 → Round 3（与测试结构一致性同批处置）
+- [x] D4【P2·已核销】验收 Background ping 波及纯静态场景 → ✅ 核销于 Round 3（方案②背景下沉：删全 feature 背景块，7 个含服务组装场景（AC-1.1/1.2/1.3/3.1/4.1/5.1/5.2）各前置「假如 Redis 缓存服务可用」，静态 6 场景（AC-2.1/2.2/2.3/4.2/6.1/6.2——**勘正：原条目低估为 3 个**）脱离门控；收集数 13 不变（计数对象是 @scenario 函数非 feature 文件）；双态实证：有 Redis 13 passed / 无 Redis 6 passed + 7 skipped；.py 零改动）。**R6 模板级观察提炼（非 5-1 义务）**：零外部服务依赖的接线/登记类场景不应与服务可用性门控背景同 feature
 
 #### 已推迟 Defer（留项台账——标注核销轮次或触发 Story）
 
@@ -1108,8 +1119,8 @@ tests/
 - [ ] D6【P3·R2 收窄】AgentConfig 直构造残余缺口（**R2-F2 已清偿 responsibilities/domain_knowledge tuple 守卫**；残余=标量字段非 str 直构造（name=123 裸 AttributeError）/ isolation 无枚举校验 / 空白串未归一 / `_required_str` 不 strip）→ 核销：5.3/5.4 消费方 Story 回填
 - [ ] D7【P3】SINGLETON 用例捕获 SCOPED 仓储（captive dependency；clear_scoped 未接线暂无实害；R2 科学性复审判明无状态仓储翻 SINGLETON 可廉价消解但属架构级 lifetime 语义决策）→ 已有 lifetime 注记，5.4 决策回迁时评估
 - [ ] D8【P3】存量技术债汇总（src 12 处 raise ValueError/49 处 HTTPException/noqa 若干/RedisSnapshotStore 非原子/存量 FakeRedis 未关闭（test_redis_cache/test_session_storage，**R2 勘误：5-1 自有用法自 ea0c0564 起即 try/finally aclose，原 D9(d) 归类失准**），均非 5-1 引入）→ deferred-work.md 登记——核销：专项技术债 Story（附存量无 TTL 孤儿键一次性 SCAN+TTL==-1 清理建议）
-- [ ] D9【P3】测试 P3 群：**(a)(b) 已于 Round 2 修复核销**（subdomain 恒真断言锚定类 code 真源 + StorageError code==103 断言三位点）；(c) 架构验证器 D 子串扫描（AST 化 ~20 行，当前零实害）→ 留项
-- [ ] D11【P3·R2 新增】outbox 毒消息 failed 后仍被无上限重选（R2-F1 有界化后每毒行每 poll 一条 warning、无 DB 写）→ 后续 dead-letter 终态机制立项时收敛（模型层 archived 状态现无转换路径）
+- [ ] D9【P3】测试 P3 群：**(a)(b) 已于 Round 2 修复核销**（subdomain 恒真断言锚定类 code 真源 + StorageError code==103 断言三位点）；(c) 架构验证器 D 子串扫描（AST 化 ~20 行，当前零实害）→ 留项——核销触发：tests/unit/architecture/ 下次触碰该文件时 AST 化
+- [ ] D11【P3·R2 新增，R3 收敛】outbox 毒消息终态机制（**R3-F1 后收敛为惰性滞留**：SELECT 已过滤 retry_count ≥ max_retries 行，超限毒行不再重选/不再写库；但其无终态迁移——archived 状态无转换路径、cleanup 只清 published、DLQ enqueue 仅消费侧调用）→ 后续 dead-letter 终态立项时统一处置，同批收敛范围：①超限行的 archived/DLQ 终态迁移；②InMemory 侧 `get_unpublished` 无毒隔离的同名端口语义分叉；③PostgresDeadLetterQueue.dequeue 同款队头阻塞形态；④既有病态参考：poller `process_one` 对全新 pending 行 attempt 0 无条件 mark_pending 必抛 InvalidStateTransitionError（每新事件浪费一次尝试+伪 warning）；`max_retries=0` 行自出生即被排除——核销：dead-letter/轮询语义专项 Story（deferred-work.md 已登记）
 - [ ] D10【P3·已核销】Story「12 维度」vs 契约测试「11 维度」计数矛盾 → 本轮已统一为「11 维度/12 用例（9a/9b）」（✅ 核销于 Round 1）
 - [ ] 【R2 口径澄清】R1 提交信息「全 tests 树仅 5-1 新增文件存在 type: ignore」经 git 实证**属实**（98f3e742 时点恰 4 文件且全 5-1）；本台账 R1-F1 条在 Hard Constraint 三形态语境下易被扩大解读为「全部抑制注释形态」——补记：tests 树存量 12 文件含 noqa/pylint 形态抑制注释（归 D8 域，非 type: ignore 形态）
 
@@ -1119,12 +1130,12 @@ tests/
 
 - [x] Story created with `ready-for-dev` status
 - [x] 运行 `dev-story` 开始实施（从 Task 0 开始）——**已完成（2026-10-14）：Task 0-8 全部实施，Status → review**
-- [ ] 运行 `code-review` 进行代码审查——**Round 1 已完成（2026-10-14，5 视角调研 + C3 评审门禁 + P0×4/P1×4 修复，见 Review Findings）**；Round 2-5 循环审查进行中
+- [ ] 运行 `code-review` 进行代码审查——**Round 1 已完成（2026-10-14，5 视角调研 + C3 评审门禁 + P0×4/P1×3/P2×1 修复，见 Review Findings）**；Round 2-5 循环审查进行中
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.8.0
+**故事版本/Story Version:** v1.9.0
 **创建日期/Created:** 2026-10-14
 **最后更新/Last Updated:** 2026-10-14
 **更新说明/Description:**
@@ -1135,12 +1146,6 @@ tests/
 - v1.4.0: Round 4 审查修订（回归核查+边界视角：1 回归验证 Agent 全量复核三轮修复引用（#1-28 抽查全部落地、口径统一、结构完整）+ 1 边界审查 Agent 七维度边界推演；修复 P1×5（L362→L318 行号、空列表漏检、标量静默陷阱、--role 大写归一化、子命令 required 裸崩）+ P2×7 边界定稿（空串归一化/未知键策略/SUPPORTED_ROLES 常量/upsert 语义/退出码 0-1-2/UUID 输出/resolve 缓存注记），详见「文档审查修复」表 #29-32）
 - v1.5.0: Round 5 终态收敛（1 竞争性终检 Agent 按 checklist.md 框架以 dev agent 视角终检——无 Critical 缺陷、约 40 处引用抽查仅 1 处歧义、防重复清单完整；1 收敛验证 Agent——台账 #1-32 全部落地无假修复、内部计数终态一致、模板章节零缺失、正文零未决问题；P0 收敛曲线 4→2→4→0，终态「dev agent 可直接实施」；微修 P3×4 见台账 #33。**审查闭环：五轮 34 项修复台账，Story 可进入 dev-story**）
 - v1.6.0: **dev-story 实施完成**（2026-10-14：Task 0-8 全部实施且 DoD 达成——4 并行调研先例核验 → SDD 规范与 Gherkin 13 场景红阶段验证 → 领域层异常子域 440/441 + AgentInstantiated 事件双登记 → AgentConfig/加载器/ceo_agent.yaml → AgentRepository/Redis 仓储 → 实例化用例与发布接线 → sisys-agent CLI 端到端 → 集成与性能（P95<200ms + 10 并发）→ 架构五验证器 → 收尾验收；每个 TDD 循环含变异实证共 9 处；三质量门禁全绿 + 分层覆盖率全过（97/90/86/89%）；13 验收场景全绿；Status → review）
-- v1.7.0: **代码审查 Round 1**（2026-10-14：C1 五视角并行调研——正确性契约/边界缺陷/架构规范/测试质量/盲审冷审；C2-C3 方案经三视角评审往返一轮裁定「优秀」后修码；修复 P0×4（type: ignore 红线×6 处、_read_yaml 契约逃逸、hset/expire 非原子孤儿键、from_dict PEP 563 类型漂移——base.py 根因修复惠及全事件族）+ P1×4 + P2×1 + P3 文档口径（11 维度统一/异常契约表补强/AC-3 pipeline 措辞）；留项 D1-D10 台账；详见 Review Findings 节）
+- v1.7.0: **代码审查 Round 1**（2026-10-14：C1 五视角并行调研——正确性契约/边界缺陷/架构规范/测试质量/盲审冷审；C2-C3 方案经三视角评审往返一轮裁定「优秀」后修码；修复 P0×4（type: ignore 红线×6 处、_read_yaml 契约逃逸、hset/expire 非原子孤儿键、from_dict PEP 563 类型漂移——base.py 根因修复惠及全事件族）+ P1×3 + P2×1 + P3 文档口径（11 维度统一/异常契约表补强/AC-3 pipeline 措辞）；留项 D1-D10 台账；详见 Review Findings 节）
 - v1.8.0: **代码审查 Round 2**（2026-10-14：C1 双视角——R1 修复回归核查（F1-F8 逐项 ✅ 零 P0/P1 回归，redis-py 源码级验证）+ 科学性复审（R1 修复 9/10，缓存 9.6µs/pipeline RTT 2→1 实测背书）；C3 双视角评审往返一轮裁定「优秀」；修复 P2×3（outbox 毒消息隔离——R1-F4 fail-loud 放大的队头阻塞回归面、VO tuple 守卫——str 静默逐字符展开、测试断言活性 D9(a)(b)）+ P3×6（追踪字段/NameError 包装 242、pipeline 同 key 断言、GBK reason 断言、文档卫生、加载器 section 级守卫+正向锚定）；台账勘误五项（D5 核销/D9(d) 归 D8/D3 补注/D6 收窄/口径澄清）+ D11 新增；R2 终态：5-1 可处置的 P0/P1/P2 全部清零）
-**更新说明/Description:**
-- v1.0.0: 创建故事文件（5 并行调研 Agent 全仓代码/文档/模板/经验调研 + 人工事实核验；含链路接线断言清单 L1-L8、8 项关键架构决策 DC-1~DC-8、4 项偏离声明 D-1~D-4、deferred-work 分流处置）
-- v1.1.0: Round 1 审查修订（正确性视角：5 并行调研 Agent 代码事实核对 + 3 并行审查 Agent 对抗复核/一致性/遗漏扫描；修复 P0×4（EXCEPTION_HTTP_MAP 定位、YAML 断言误伤、session_storage 缺登记、验收模板指向）+ P1×8 + P2×18，详见「文档审查修复」表）
-- v1.2.0: Round 2 审查修订（科学性视角：2 调研 Agent 设计边界/先例基准 + 3 审查 Agent 决策裁定/事件异常体系/影响面核查；修复 P0×2（事件字段 kw_only、守卫顺序倒置）+ P1×6（save(ttl) 必填、路径锚定、get_by_id 改名、D-6/D-7 偏离声明、§10.1 登记）+ 补强 5 项，详见「文档审查修复」表 #14-21）
-- v1.3.0: Round 3 审查修订（可行性视角：2 调研 Agent BDD/工具链实测 + 1 终审 Agent 13 场景可满足性推演与 Task 0-8 依赖干跑；修复 P0×4（teardown 自相矛盾、resolve 跨循环死连接、Task 5 main 注入不可写、AC-5.2 scan 误计）+ P1×2 + 补强 8 项（warmup+quantiles 采样法、@scenario 收集陷阱、冒烟三前置、Redis 池清理等），详见「文档审查修复」表 #22-28）
-- v1.4.0: Round 4 审查修订（回归核查+边界视角：1 回归验证 Agent 全量复核三轮修复引用（#1-28 抽查全部落地、口径统一、结构完整）+ 1 边界审查 Agent 七维度边界推演；修复 P1×5（L362→L318 行号、空列表漏检、标量静默陷阱、--role 大写归一化、子命令 required 裸崩）+ P2×7 边界定稿（空串归一化/未知键策略/SUPPORTED_ROLES 常量/upsert 语义/退出码 0-1-2/UUID 输出/resolve 缓存注记），详见「文档审查修复」表 #29-32）
-- v1.5.0: Round 5 终态收敛（1 竞争性终检 Agent 按 checklist.md 框架以 dev agent 视角终检——无 Critical 缺陷、约 40 处引用抽查仅 1 处歧义、防重复清单完整；1 收敛验证 Agent——台账 #1-32 全部落地无假修复、内部计数终态一致、模板章节零缺失、正文零未决问题；P0 收敛曲线 4→2→4→0，终态「dev agent 可直接实施」；微修 P3×4 见台账 #33。**审查闭环：五轮 34 项修复台账，Story 可进入 dev-story**）
+- v1.9.0: **代码审查 Round 3**（2026-10-14：C1 双视角——R2 修复回归核查（揪出 R2-F1 两处新破口：超限毒行永不退出 SELECT 致队头阻塞隐蔽复发 P1、mark_failed 无界错误串 VARCHAR 溢出活锁 P2）+ R1/R2 累计一致性终查（from_dict 全消费方自洽/17 项修复宣称落点全部实证/D4 三候选方案设计）；C3 合并评审实测修订（F2 isinstance 收窄过 mypy/F3 红测形态勘正——int 注入不抛异常改裸特殊形式）；修复 P1×1+P2×1（outbox SELECT 过滤/错误消息截断）+ P3×4（病态注解三形态扩捕/空串容忍恢复/D4 核销——验收 Background 下沉双态实证 13 passed 与 6+7/文档卫生六项）；D11 收敛+补登记；v1.7.0 计数勘正；R3 终态：R2 回归面清零、可处置项累计全清）

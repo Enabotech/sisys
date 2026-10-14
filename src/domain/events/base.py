@@ -304,22 +304,24 @@ class DomainEvent:
 
     @staticmethod
     def _parse_optional_uuid(value: Any, field_name: str) -> uuid.UUID | None:
-        """解析可选 UUID 追踪字段（None 合法；畸形值包装 242）。
+        """解析可选 UUID 追踪字段（falsy 等价未提供；非空畸形值包装 242）。
 
-        异常元组取 timestamp 式三元组（ValueError/AttributeError/TypeError）而非
-        event_id 式二元组——`uuid.UUID(非 str)` 走 AttributeError/TypeError 面。
+        空串等 falsy 值视同「未提供」返回 None（互操作宽容——外部生产方写 ""
+        若被拒收，消费侧隔离会把消息静默丢弃，比容忍更糟）；fail-loud 收缩
+        至非空畸形值。异常元组取 timestamp 式三元组（ValueError/AttributeError/
+        TypeError）——`uuid.UUID(非 str)` 走 AttributeError/TypeError 面。
 
         Args:
-            value: 原始值（None 或 UUID 可解析形态）
+            value: 原始值（None/空串 或 UUID 可解析形态）
             field_name: 字段名（异常 context 用）
 
         Returns:
             UUID 对象或 None
 
         Raises:
-            EntityValidationError: 值非 None 且不可解析为 UUID（EXCEPTION_242）
+            EntityValidationError: 值非 falsy 且不可解析为 UUID（EXCEPTION_242）
         """
-        if value is None:
+        if not value:
             return None
         try:
             return uuid.UUID(value)
@@ -348,9 +350,14 @@ class DomainEvent:
         if hints is None:
             try:
                 hints = get_type_hints(target_class)
-            except NameError as exc:
-                # 不可解析注解（引用模块命名空间外的名字，如函数内局部类型）包装 242，
-                # 禁裸 NameError 逃逸统一异常体系；解析失败时缓存未写入（赋值在解析后），无毒化
+            except (NameError, SyntaxError, TypeError) as exc:
+                # 不可解析/病态注解统一包装 242，禁裸内置异常逃逸统一异常体系
+                # （消费侧 redis_subscriber 仅捕 ValueError/DomainError，裸
+                # TypeError/SyntaxError 会击穿逐消息隔离直冲订阅循环）。
+                # 三形态均经实测锚定：NameError=引用模块命名空间外的名字；
+                # SyntaxError=畸形表达式字符串注解（如 list[int[）；
+                # TypeError=字符串注解求值为裸特殊形式（如 Optional 漏 [None]）。
+                # 解析失败时缓存未写入（赋值在解析后），无毒化。
                 raise EntityValidationError(
                     message=f"Unresolvable type annotations on {target_class.__name__}: {exc}",
                     context={"entity": target_class.__name__, "field": "<type_hints>"},

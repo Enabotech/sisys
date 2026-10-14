@@ -223,6 +223,68 @@ class TestDomainEventSerialization:
                 }
             )
 
+    def test_from_dict_empty_correlation_id_treated_as_absent(self):
+        """空串追踪字段等价「未提供」→ None（恢复 R2 前互操作宽容语义——外部生产方写 ""
+        拒收会在消费侧被静默丢弃，比容忍更糟；fail-loud 收缩至非空畸形）。"""
+        event = DomainEvent.from_dict(
+            {
+                "event_id": str(uuid.uuid4()),
+                "event_type": "Test",
+                "timestamp": "2024-01-01T00:00:00+00:00",
+                "correlation_id": "",
+                "payload": {},
+            }
+        )
+        assert event.correlation_id is None
+
+    def test_from_dict_bare_special_form_annotation_raises(self):
+        """字符串注解求值为非类型（如元组）→ TypeError 包装 242
+        （redis_subscriber 只捕 ValueError/DomainError，裸 TypeError 击穿逐消息隔离；
+        同族形态：求值为裸特殊形式如 Optional 漏 [None]）。"""
+        bare_special_cls = dataclasses.dataclass(frozen=True)(
+            type(
+                "_BareSpecialEventR3",
+                (DomainEvent,),
+                {"__annotations__": {"bad_field": "('int', 'str')"}, "bad_field": None},
+            )
+        )
+        DomainEvent.register("BareSpecialEventR3", bare_special_cls)
+        try:
+            with pytest.raises(EntityValidationError, match="Unresolvable type annotations"):
+                DomainEvent.from_dict(
+                    {
+                        "event_id": str(uuid.uuid4()),
+                        "event_type": "BareSpecialEventR3",
+                        "timestamp": "2024-01-01T00:00:00+00:00",
+                        "payload": {"bad_field": "x"},
+                    }
+                )
+        finally:
+            DomainEvent._registry.pop("BareSpecialEventR3", None)
+
+    def test_from_dict_malformed_annotation_raises(self):
+        """畸形表达式字符串注解（如 list[int[）→ SyntaxError 包装 242（禁裸逃逸）。"""
+        malformed_cls = dataclasses.dataclass(frozen=True)(
+            type(
+                "_MalformedEventR3",
+                (DomainEvent,),
+                {"__annotations__": {"bad_field": "list[int["}, "bad_field": None},
+            )
+        )
+        DomainEvent.register("MalformedEventR3", malformed_cls)
+        try:
+            with pytest.raises(EntityValidationError, match="Unresolvable type annotations"):
+                DomainEvent.from_dict(
+                    {
+                        "event_id": str(uuid.uuid4()),
+                        "event_type": "MalformedEventR3",
+                        "timestamp": "2024-01-01T00:00:00+00:00",
+                        "payload": {"bad_field": "x"},
+                    }
+                )
+        finally:
+            DomainEvent._registry.pop("MalformedEventR3", None)
+
     def test_from_dict_unresolvable_annotation_raises(self):
         """不可解析类型注解（模块命名空间外的名字）包装 242（禁裸 NameError 逃逸）。"""
         # 经 type() 动态建类 + __annotations__ 字典注入字符串注解：本文件未启用

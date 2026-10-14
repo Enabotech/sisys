@@ -164,6 +164,24 @@ class TestPostgreSQLOutboxRepository:
         assert poison_model.retry_count == 3, "超限毒行不得再递增 retry_count（有界化）"
         assert poison_model.status == "failed"
 
+    async def test_get_unpublished_excludes_retry_exhausted_rows(self, repository, mock_session):
+        """SELECT 语句含 retry_count < max_retries 过滤（白盒断言——mock 模式测不到 WHERE 语义）。
+
+        超限毒行/发布失败行必须退出选择集：否则累积至 batch_size 后
+        get_unpublished 恒返回空批、合法事件静默停发（队头阻塞隐蔽复发形态）。
+        """
+        mock_scalars = mock.Mock()
+        mock_scalars.all.return_value = []
+        mock_result = mock.Mock()
+        mock_result.scalars.return_value = mock_scalars
+        mock_session.execute.return_value = mock_result
+
+        await repository.get_unpublished(limit=10)
+
+        stmt = mock_session.execute.call_args_list[0][0][0]  # 首次调用（mark_failed 可能追加调用）
+        compiled = str(stmt.compile())
+        assert "retry_count < event_outbox.max_retries" in compiled, "SELECT 必须以列比较过滤重试耗尽行"
+
     async def test_mark_published(self, repository, mock_session):
         """测试异步标记已发布"""
         event_id = uuid4()
@@ -193,6 +211,22 @@ class TestPostgreSQLOutboxRepository:
         assert mock_model.status == "failed"
         assert mock_model.retry_count == 1
         assert mock_model.error_message == "Test error"
+
+    async def test_mark_failed_truncates_long_error(self, repository, mock_session):
+        """超长错误消息按列宽截断——error_message VARCHAR(1000) 超长 PG 抛错不截断，
+        未截断将使整周期事务失败（毒标记丢弃 → 永久活锁）。"""
+        event_id = uuid4()
+        mock_model = mock.Mock()
+        mock_model.status = "pending"
+        mock_model.retry_count = 0
+        mock_result = mock.Mock()
+        mock_result.scalar_one_or_none.return_value = mock_model
+        mock_session.execute.return_value = mock_result
+
+        long_error = "x" * 2500
+        await repository.mark_failed(event_id, long_error)
+
+        assert len(mock_model.error_message) == 1000, "错误消息必须截断至列宽（防 VARCHAR 溢出炸事务）"
 
     async def test_internal_get_unpublished(self, repository, mock_session):
         """测试内部方法获取未发布实体"""

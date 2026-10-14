@@ -21,7 +21,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import String, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events.base import DomainEvent
@@ -34,6 +34,13 @@ from src.infrastructure.storage.postgresql.models import OutboxModel
 from src.infrastructure.storage.postgresql.session_context import get_session, session_context
 
 logger = logging.getLogger(__name__)
+
+# 错误消息列宽上界（与 OutboxModel.error_message 的 VARCHAR(1000) 对齐；
+# isinstance 收窄使 mypy 可达 .length，or 兜底覆盖无长度声明的方言形态）
+_ERROR_MESSAGE_COLUMN_TYPE = OutboxModel.__table__.columns["error_message"].type
+if not isinstance(_ERROR_MESSAGE_COLUMN_TYPE, String):
+    raise AssertionError("OutboxModel.error_message 列类型须为 String（列定义漂移）")
+_ERROR_MESSAGE_MAX_LENGTH: int = _ERROR_MESSAGE_COLUMN_TYPE.length or 1000
 
 
 class PostgreSQLOutboxRepository(OutboxRepository):
@@ -94,13 +101,16 @@ class PostgreSQLOutboxRepository(OutboxRepository):
 
         单条畸形 payload（反序列化失败）标记 failed 后跳过——防止毒事件卡在
         FIFO 队头阻塞其后全部合法事件（对齐消费侧 redis_subscriber 逐消息
-        隔离语义）。有界化：重试上限已到的毒行不再写库标记（毒 payload 是
-        静态垃圾永不恢复，区别于可能因故障恢复而重试有意义的发布失败行），
-        降级单行 warning。
+        隔离语义）。SELECT 以 retry_count < max_retries 过滤重试耗尽行——
+        超限行不退出选择集会在累积至 batch_size 后恒返回空批，合法事件
+        静默停发（队头阻塞隐蔽复发形态）。
         """
         result = await self._session.execute(
             select(OutboxModel)
-            .where(OutboxModel.status.in_(("pending", "failed")))
+            .where(
+                OutboxModel.status.in_(("pending", "failed")),
+                OutboxModel.retry_count < OutboxModel.max_retries,
+            )
             .order_by(OutboxModel.created_at.asc())
             .limit(limit)
         )
@@ -118,6 +128,9 @@ class PostgreSQLOutboxRepository(OutboxRepository):
                     )
                     await self.mark_failed(model.event_id, f"deserialization failed: {exc}")
                 else:
+                    # 防御性保留（真实流程经 SELECT 过滤后不可达；防御行属性与
+                    # SELECT 物化值不一致的极端形态）：超限毒行降级单行 warning
+                    # 不写库（毒 payload 静态垃圾永不恢复，重试标记纯写放大）
                     logger.warning(
                         "Outbox 毒消息已超重试上限（跳过标记）: event_id=%s retry_count=%d",
                         model.event_id,
@@ -154,7 +167,11 @@ class PostgreSQLOutboxRepository(OutboxRepository):
             await self._session.flush()
 
     async def mark_failed(self, event_id: UUID, error: str) -> None:
-        """标记事件发布失败
+        """标记事件发布失败（错误消息按列宽截断）
+
+        error_message 列为 VARCHAR(1000)，PG 对超长值抛错不截断——未截断的
+        超长错误串（如内嵌任意长 payload repr 的反序列化消息）会使整周期
+        事务失败，毒标记随回滚丢弃形成永久活锁。
 
         Raises:
             InvalidStateTransitionError: 当当前状态不是 pending 或 failed 时
@@ -166,7 +183,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
                 raise InvalidStateTransitionError(model.status, "failed")
             model.status = "failed"
             model.retry_count += 1
-            model.error_message = error
+            model.error_message = error[:_ERROR_MESSAGE_MAX_LENGTH]
             await self._session.flush()
 
     async def cleanup_old_published_records(self, older_than_days: int = 30) -> int:

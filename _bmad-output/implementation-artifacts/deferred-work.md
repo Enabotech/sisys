@@ -157,3 +157,7 @@
 - 【D1·P1】import-linter `interfaces-no-infrastructure` 契约 BROKEN（存量 `app.py`/`ocr_cli.py` 两链 + `agent_cli.py` 同构新增第三链，均为「CLI/API 入口 → composition_root → infrastructure」传递性触达；该契约未进 CI/pre-commit 门禁） — 处置需架构级决策：CLI 接线模块上移独立 entrypoint 层，或经治理流程为组合根接线路径增加 sanctioned 豁免声明（禁止擅改 .importlinter 已合入规则）；触发=架构评审立项
 - 【D2·P2】EPO `_parse_biblio_document` 对无 bibliographic-data 的 document 静默产出空记录（上游契约漂移被吞成空串行）；`_extract_patents._fail` 消息恒写「缺少 world-patent-data 结构层」与真实缺失层错位 — 属 Story 4-1f 域（随 5-1 提交混入的附带修复面）；触发=4-1f 跟进（建议 `_fail` 接收缺失层名 + 空 document 跳过或超阈值报 413）
 - 【D8·P3】存量技术债汇总（均非 5-1 引入，5-1 新增文件零命中）：src 12 处 `raise ValueError`（ocr_cli×6/strategic_archive×2/circuit_breaker×3/schema_validation_record_repository 注释×1）、49 处裸 HTTPException（旧路由族）、若干 `# noqa`（saga_status/inmemory_event_listener/otel_config）、`RedisSnapshotStore.save` hset+expire 非原子（与 5-1 R1-F3 同款缺陷，可参照其 pipeline 修法） — 触发=专项技术债 Story 或随各文件所属 Story 顺带清偿
+
+## Deferred from: code review of 5-1-ceo-agent-instantiation-mvp Round 2/3 (2026-10-14)
+
+- 【D11·P3】outbox 毒消息终态机制 — R3-F1 后超限毒行不再重选（SELECT 过滤 retry_count < max_retries）但无终态迁移（archived 状态无转换路径/cleanup 只清 published/DLQ enqueue 仅消费侧调用）。dead-letter 终态专项立项时统一处置：①超限行终态迁移；②InMemory 侧 get_unpublished 无毒隔离的同名端口语义分叉；③PostgresDeadLetterQueue.dequeue 同款队头阻塞形态；④既有病态参考（poller process_one 对全新 pending 行 attempt 0 无条件 mark_pending 必抛 InvalidStateTransitionError；max_retries=0 行自出生即被排除）

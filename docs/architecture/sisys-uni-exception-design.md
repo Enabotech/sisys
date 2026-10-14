@@ -729,7 +729,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_432 | ToolVersionTrafficWeightError | ValidationError | 400 |（Story 4.6，权重非法/canary_only 直接全量/并存冲突族）|
 | EXCEPTION_433 | ToolVersionRollbackError | InvalidStateError | 409 |（Story 4.6，无可回滚稳定历史/目标非可回滚态）|
 | EXCEPTION_434~439 | （预留 tool_version 子域）| — | — |（后续协调，暂不分配）|
-| EXCEPTION_440 | AgentConfigError | SystemException | 500 |（Story 5.1，配置文件缺失/YAML 解析失败/必填字段无效/role 不匹配/state_ttl 越界——配置资产属系统资源，精确注册避免回退歧义）|
+| EXCEPTION_440 | AgentConfigError | SystemException | 500 |（Story 5.1，配置文件缺失/YAML 解析失败/配置文件不可读（目录占位、权限、TOCTOU）/编码非法（非 UTF-8）/必填字段无效/role 不匹配/可选字段类型非法（preferred_model、default_isolation_level 非 null 非 str）/可选段非映射结构（llm_config/eip_config/memory_config 非 dict）/VO 字段类型非法（responsibilities/domain_knowledge 非 tuple）/state_ttl 非整数或越界——全部失败路径统一 440 禁裸内置异常逃逸（R1-R3 审查补强）；配置资产属系统资源，精确注册避免回退歧义）|
 | EXCEPTION_441 | AgentRoleNotSupportedError | BusinessException | 422 |（Story 5.1，MVP 未开放角色实例化请求——阶段性业务能力范围限制，精确注册避免回退 400）|
 | EXCEPTION_442~449 | （预留 agent 子域）| — | — |（5.2 档案加载 / 5.4-5.5 EIP 隔离 / 5.3 工作流异常）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
