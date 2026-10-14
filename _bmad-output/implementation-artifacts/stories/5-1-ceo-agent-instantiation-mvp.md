@@ -780,7 +780,7 @@ class AgentConfigLoader(Protocol):
 ### 已知下游风险（本 Story 不处置，消费方 Story 决策）
 
 1. **双 agent_id 轨道**：`LangGraphEngine`（`src/infrastructure/agent_orch/langgraph_engine.py` L71-72）执行时自铸 `agent_id = uuid.uuid4()` 并据此发布 AgentDecided——与本 Story 用例 `uuid.uuid4()` 生成的实体 agent_id（Redis 键 `sisys:agent:{agent_id}`）是两条互不相通的轨道。若 5.3 不收敛，`AgentDecided`（引擎铸 ID）与 `AgentInstantiated`（实体 ID）将无法按 aggregate_id 关联，5.6/5.7 观测链路断裂——5.3 引擎消费 Agent 实例时必须决策收敛方案（复用实例化产出的 agent_id 或显式桥接映射）。
-2. **`AgentRepository.get_by_id` 消费契约未定**：5.1 仅有实例化写入 + 验收读回；`Agent | None` 的 None 语义（键不存在 vs TTL 过期失效）与读回契约的消费方（预计 5.3 工作流加载 Agent）尚未定义，5.3 立项时定契约。
+2. **`AgentRepository.get_by_id` 消费契约未定**：5.1 仅有实例化写入 + 验收读回；`Agent | None` 的 None 语义（键不存在 vs TTL 过期失效）与读回契约的消费方（预计 5.3 工作流加载 Agent）尚未定义，5.3 立项时定契约。**（R4 补）持久化丢失窗口**：测试实例实测 `appendonly no` + `save 3600 1 300 100 60 10000`（Redis 默认策略，无配置挂载）——MVP 演示稀疏写入下 Redis 重启最坏丢失 ≤60 分钟键；生产配置以部署 redis.conf 为准（部署文件为 `save 900 1` 形态——两者不一致属部署配置治理项）。TTL 到期/重启丢失后重跑 `sisys-agent instantiate` 即恢复（单次用例 ~2.5ms）。
 3. **组合根 resolve 缓存残留**：AC-6.1 的 resolve 将 `redis_adapter`（SINGLETON）、`agent_repository`（SCOPED）、`agent_instantiation_use_case`（SINGLETON，含 DualChannelEventBus→RabbitMQEventBus/Outbox 链）钉入全局 Resolver 的 `_instances`/`_scoped_context`，在同一 xdist worker 进程内跨测试文件存活（四构造器均零 IO 已核验，仅首次发命令时绑定事件循环）。后续 Story 测试若 resolve 同名端口需沿用「手动组装」纪律，或届时经 `clear_singleton()`+`clear_scoped()` 显式清理——本 Story「resolve 产物禁发命令」约束已闭环，无需额外处理。
 
 ### 设计文档偏离声明
@@ -1106,6 +1106,17 @@ tests/
 - 变更文件清单（R3）：`src/infrastructure/messaging/outbox/outbox_repository.py`（共享文件）、`src/domain/events/base.py`（共享文件）、`tests/acceptance/test_acceptance_agent_instantiation.feature`、tests 2 文件、Story 本节 + sisys-uni-exception-design.md + deferred-work.md
 - **R3 终态**：R2 引入的回归面（P1×1/P2×1）清零；5-1 可处置项累计全清；留项 D1/D2/D3/D6 残余/D7/D8/D9(c)/D11 均带核销触发器
 
+#### 已修复 Patch（Round 4 — 纯文档/台账轮：P2×2 留项登记 + P3×4 文档处置；代码零变更）
+
+- [x] **R4-F1【P2→D12】wheel 形态 configs/ 分发缺口**（来源：运维审计 F1——pyproject packages 不含 configs/，wheel/pip 形态 CLI 必现 440；Docker/k8s/源码树三形态自洽、全仓无 wheel 消费方证实）→ 登记留项 D12（核销触发：发布/打包专项 或 首个 wheel 消费方）；README Agent CLI 小节声明部署形态——**裁定不冒改打包配置**（改错形态比不改糟）
+- [x] **R4-F2【P2→D13】CLI 全量 bootstrap 启动开销 10.4s**（来源：运维审计 F2——import 0.2s + bootstrap 7.7s≈157 端口注册 + litellm 出网拉取 + BGE tokenizer；实际用例 2.5ms；非 5-1 引入）→ 登记留项 D13（短期缓解 LITELLM_LOCAL_MODEL_COST_MAP=1 入条目；根治属组合根瘦身架构决策）——核销触发：5.3 批量消费前
+- [x] **R4-F3【P3】D11 台账补强四处**（来源：回归核查 P3-1/P3-5 + 运维 F3——`_mark_failed_entity` :258 未截断（零生产调用方潜伏）、AuditOutboxModel.mark_failed 同款、运维 SQL 唯一恢复路径+零日志监控盲区、InMemory 分叉保持）→ D11 条目扩为六项收敛范围（①-⑥），Story 与 deferred-work 双同步
+- [x] **R4-F4【P3】README 补「Agent 实例化 CLI」小节**（来源：运维审计 F6——README/部署指南零 sisys-agent 覆盖）→ 快速开始追加已交付命令块（UUID stdout/退出码 0-1-2/REDIS_PORT 前置/440·441·103 错误码速查/部署形态声明）+ 区分「路线图命令 vs 已交付入口」注记
+- [x] **R4-F5【P3】下游风险 #2 补持久化丢失窗口**（来源：运维审计 F5；**C3 评审纠错**：原拟「RDB 900s/≤15 分钟」为部署配置文件值非测试实例实测——实测 `save 3600 1 300 100 60 10000` + `appendonly no`）→ 按实测写入（稀疏写入最坏丢失 ≤60 分钟；生产以部署 redis.conf 为准；两者不一致属部署配置治理项；重跑 instantiate 2.5ms 即恢复）
+- [x] **R4-F6【P3】观察项登记**：F7 验收首跑疑似单键泄漏（未复现/差集=0/24h TTL 兜底——Round 5 收敛评审复现则升级）；F4 outbox 无 poller 宿主（RELIABLE 事件 pending 累积实证——deferred-work 部署面注记点名 CLI 路径）；F8 引导噪声（cost_metrics_handler 未注册 WARNING 预存 + litellm 价目表——归 D13/D8 相邻）
+- 变更文件清单（R4）：README.md、Story 本节 + deferred-work.md——**生产代码与测试零变更**（HEAD 代码 bef902ad 经 R4 双视角实测 10083 passed + 双态验收 + CLI 冒烟全绿）
+- **R4 终态**：运维就绪总评通过（P95 独立复测 3.57ms 远优 200ms 门限、退出码/错误码/可观测性实跑验证）；5-1 可处置项保持全清；新增 D12/D13 均带核销触发器
+
 #### 需决策 Decision Needed
 
 - [x] D4【P2·已核销】验收 Background ping 波及纯静态场景 → ✅ 核销于 Round 3（方案②背景下沉：删全 feature 背景块，7 个含服务组装场景（AC-1.1/1.2/1.3/3.1/4.1/5.1/5.2）各前置「假如 Redis 缓存服务可用」，静态 6 场景（AC-2.1/2.2/2.3/4.2/6.1/6.2——**勘正：原条目低估为 3 个**）脱离门控；收集数 13 不变（计数对象是 @scenario 函数非 feature 文件）；双态实证：有 Redis 13 passed / 无 Redis 6 passed + 7 skipped；.py 零改动）。**R6 模板级观察提炼（非 5-1 义务）**：零外部服务依赖的接线/登记类场景不应与服务可用性门控背景同 feature
@@ -1120,7 +1131,9 @@ tests/
 - [ ] D7【P3】SINGLETON 用例捕获 SCOPED 仓储（captive dependency；clear_scoped 未接线暂无实害；R2 科学性复审判明无状态仓储翻 SINGLETON 可廉价消解但属架构级 lifetime 语义决策）→ 已有 lifetime 注记，5.4 决策回迁时评估
 - [ ] D8【P3】存量技术债汇总（src 12 处 raise ValueError/49 处 HTTPException/noqa 若干/RedisSnapshotStore 非原子/存量 FakeRedis 未关闭（test_redis_cache/test_session_storage，**R2 勘误：5-1 自有用法自 ea0c0564 起即 try/finally aclose，原 D9(d) 归类失准**），均非 5-1 引入）→ deferred-work.md 登记——核销：专项技术债 Story（附存量无 TTL 孤儿键一次性 SCAN+TTL==-1 清理建议）
 - [ ] D9【P3】测试 P3 群：**(a)(b) 已于 Round 2 修复核销**（subdomain 恒真断言锚定类 code 真源 + StorageError code==103 断言三位点）；(c) 架构验证器 D 子串扫描（AST 化 ~20 行，当前零实害）→ 留项——核销触发：tests/unit/architecture/ 下次触碰该文件时 AST 化
-- [ ] D11【P3·R2 新增，R3 收敛】outbox 毒消息终态机制（**R3-F1 后收敛为惰性滞留**：SELECT 已过滤 retry_count ≥ max_retries 行，超限毒行不再重选/不再写库；但其无终态迁移——archived 状态无转换路径、cleanup 只清 published、DLQ enqueue 仅消费侧调用）→ 后续 dead-letter 终态立项时统一处置，同批收敛范围：①超限行的 archived/DLQ 终态迁移；②InMemory 侧 `get_unpublished` 无毒隔离的同名端口语义分叉；③PostgresDeadLetterQueue.dequeue 同款队头阻塞形态；④既有病态参考：poller `process_one` 对全新 pending 行 attempt 0 无条件 mark_pending 必抛 InvalidStateTransitionError（每新事件浪费一次尝试+伪 warning）；`max_retries=0` 行自出生即被排除——核销：dead-letter/轮询语义专项 Story（deferred-work.md 已登记）
+- [ ] D11【P3·R2 新增，R3 收敛，R4 补强】outbox 毒消息终态机制（**R3-F1 后收敛为惰性滞留**：SELECT 已过滤 retry_count ≥ max_retries 行，超限毒行不再重选/不再写库；但其无终态迁移——archived 状态无转换路径、cleanup 只清 published、DLQ enqueue 仅消费侧调用）→ 后续 dead-letter 终态立项时统一处置，同批收敛范围：①超限行的 archived/DLQ 终态迁移（**R4 补：超限行恢复唯一路径=运维 SQL 重置 retry_count/状态；且 SELECT 过滤后超限行零日志——监控盲区，专项需提供 pending 滞留巡检面**）；②InMemory 侧 `get_unpublished` 无毒隔离的同名端口语义分叉；③PostgresDeadLetterQueue.dequeue 同款队头阻塞形态；④既有病态参考：poller `process_one` 对全新 pending 行 attempt 0 无条件 mark_pending 必抛 InvalidStateTransitionError（每新事件浪费一次尝试+伪 warning）；`max_retries=0` 行自出生即被排除；⑤`_mark_failed_entity`（outbox_repository.py:258，零生产调用方）未截断 error_message 与 mark_failed 不称；⑥`AuditOutboxModel.mark_failed`（audit_outbox.py:104-111）同款 VARCHAR(1000) 未截断暴露面——核销：dead-letter/轮询语义专项 Story（deferred-work.md 已登记）
+- [ ] D12【P2·R4 新增】wheel 形态 configs/ 分发缺口：pyproject `packages=[{include="src"}]` 不含 configs/（configs 非 Python 包），wheel/pip 安装形态 CLI 必现 440「配置文件不存在」；源码树/Docker（dockerfile COPY configs/）/k8s（挂载 /app/configs）三形态自洽，全仓无 wheel 消费方（CI 零 poetry build 环节）——裁定不冒改打包配置（非包数据分发细节+构建验证成本，改错比不改糟）→ 核销触发：发布/打包专项立项 或 首个 wheel 消费方出现（README 已声明部署形态）
+- [ ] D13【P2·R4 新增】CLI 全量 bootstrap 启动开销：单次调用墙钟 10.4s（import 0.2s + bootstrap 7.7s≈157 端口注册 + litellm import 触发远端价目表拉取出网 + BGE tokenizer 加载），实际用例 ~2.5ms（2026-10-14 本机实测，环境限定）；非 5-1 引入（组合根预存成本，agent_cli 是首个全量付费的 Redis CLI）——短期缓解：部署环境设 `LITELLM_LOCAL_MODEL_COST_MAP=1` 防出网阻塞；根治（组合根瘦身/lazy 化）属架构级决策 → 核销触发：5.3 批量实例化消费前
 - [ ] D10【P3·已核销】Story「12 维度」vs 契约测试「11 维度」计数矛盾 → 本轮已统一为「11 维度/12 用例（9a/9b）」（✅ 核销于 Round 1）
 - [ ] 【R2 口径澄清】R1 提交信息「全 tests 树仅 5-1 新增文件存在 type: ignore」经 git 实证**属实**（98f3e742 时点恰 4 文件且全 5-1）；本台账 R1-F1 条在 Hard Constraint 三形态语境下易被扩大解读为「全部抑制注释形态」——补记：tests 树存量 12 文件含 noqa/pylint 形态抑制注释（归 D8 域，非 type: ignore 形态）
 
@@ -1135,7 +1148,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.9.0
+**故事版本/Story Version:** v1.10.0
 **创建日期/Created:** 2026-10-14
 **最后更新/Last Updated:** 2026-10-14
 **更新说明/Description:**
@@ -1149,3 +1162,4 @@ tests/
 - v1.7.0: **代码审查 Round 1**（2026-10-14：C1 五视角并行调研——正确性契约/边界缺陷/架构规范/测试质量/盲审冷审；C2-C3 方案经三视角评审往返一轮裁定「优秀」后修码；修复 P0×4（type: ignore 红线×6 处、_read_yaml 契约逃逸、hset/expire 非原子孤儿键、from_dict PEP 563 类型漂移——base.py 根因修复惠及全事件族）+ P1×3 + P2×1 + P3 文档口径（11 维度统一/异常契约表补强/AC-3 pipeline 措辞）；留项 D1-D10 台账；详见 Review Findings 节）
 - v1.8.0: **代码审查 Round 2**（2026-10-14：C1 双视角——R1 修复回归核查（F1-F8 逐项 ✅ 零 P0/P1 回归，redis-py 源码级验证）+ 科学性复审（R1 修复 9/10，缓存 9.6µs/pipeline RTT 2→1 实测背书）；C3 双视角评审往返一轮裁定「优秀」；修复 P2×3（outbox 毒消息隔离——R1-F4 fail-loud 放大的队头阻塞回归面、VO tuple 守卫——str 静默逐字符展开、测试断言活性 D9(a)(b)）+ P3×6（追踪字段/NameError 包装 242、pipeline 同 key 断言、GBK reason 断言、文档卫生、加载器 section 级守卫+正向锚定）；台账勘误五项（D5 核销/D9(d) 归 D8/D3 补注/D6 收窄/口径澄清）+ D11 新增；R2 终态：5-1 可处置的 P0/P1/P2 全部清零）
 - v1.9.0: **代码审查 Round 3**（2026-10-14：C1 双视角——R2 修复回归核查（揪出 R2-F1 两处新破口：超限毒行永不退出 SELECT 致队头阻塞隐蔽复发 P1、mark_failed 无界错误串 VARCHAR 溢出活锁 P2）+ R1/R2 累计一致性终查（from_dict 全消费方自洽/17 项修复宣称落点全部实证/D4 三候选方案设计）；C3 合并评审实测修订（F2 isinstance 收窄过 mypy/F3 红测形态勘正——int 注入不抛异常改裸特殊形式）；修复 P1×1+P2×1（outbox SELECT 过滤/错误消息截断）+ P3×4（病态注解三形态扩捕/空串容忍恢复/D4 核销——验收 Background 下沉双态实证 13 passed 与 6+7/文档卫生六项）；D11 收敛+补登记；v1.7.0 计数勘正；R3 终态：R2 回归面清零、可处置项累计全清）
+- v1.10.0: **代码审查 Round 4**（2026-10-14：C1 双视角——R3 修复回归核查（零 P0/P1/P2 新破口，10083 passed 实测+双态验收+CLI 冒烟）+ 可行性/运维审计（运维就绪总评通过，P95 独立复测 3.57ms 远优门限）；C3 轻量评审纠错一处（RDB 窗口按实测改写 ≤60 分钟）；纯文档/台账轮代码零变更：P2×2 留项登记（D12 wheel configs 分发缺口——裁定不冒改打包配置、D13 CLI bootstrap 10.4s 开销——组合根瘦身架构决策 5.3 前核销）+ P3×4（D11 扩为六项收敛范围、README 补 Agent CLI 小节、下游风险 #2 补持久化丢失窗口、三项观察登记））

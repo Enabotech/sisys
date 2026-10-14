@@ -161,3 +161,7 @@
 ## Deferred from: code review of 5-1-ceo-agent-instantiation-mvp Round 2/3 (2026-10-14)
 
 - 【D11·P3】outbox 毒消息终态机制 — R3-F1 后超限毒行不再重选（SELECT 过滤 retry_count < max_retries）但无终态迁移（archived 状态无转换路径/cleanup 只清 published/DLQ enqueue 仅消费侧调用）。dead-letter 终态专项立项时统一处置：①超限行终态迁移；②InMemory 侧 get_unpublished 无毒隔离的同名端口语义分叉；③PostgresDeadLetterQueue.dequeue 同款队头阻塞形态；④既有病态参考（poller process_one 对全新 pending 行 attempt 0 无条件 mark_pending 必抛 InvalidStateTransitionError；max_retries=0 行自出生即被排除）
+- 【D12·P2】wheel 形态 configs/ 分发缺口 — pyproject packages=[{include="src"}] 不含 configs/（非 Python 包），wheel/pip 安装形态 agent CLI 必现 440；源码树/Docker/k8s 三形态自洽，CI 零 wheel 构建环节无消费方 — 核销触发：发布/打包专项立项 或 首个 wheel 消费方出现（README 已声明部署形态限定）
+- 【D13·P2】CLI 全量 bootstrap 启动开销 — 单次调用墙钟 10.4s（bootstrap 7.7s≈157 端口注册 + litellm import 出网拉取价目表 + BGE tokenizer 加载；实际用例 ~2.5ms；2026-10-14 本机实测）——agent_cli 是首个全量付费的 Redis CLI，组合根瘦身/lazy 化属架构级决策；短期缓解：部署环境设 LITELLM_LOCAL_MODEL_COST_MAP=1 — 核销触发：5.3 批量实例化消费前
+- 【D11 补强】超限毒行恢复唯一路径=运维 SQL 重置（mark_pending >=max 硬抛 + 无终态迁移）；SELECT 过滤后超限行零日志为监控盲区（专项需提供 pending 滞留巡检面）；另 `_mark_failed_entity`/`AuditOutboxModel.mark_failed` 两处 error_message VARCHAR(1000) 未截断潜伏面同批收敛
+- 【部署面注记补充】outbox 无 poller 宿主叠加 CLI 路径：sisys-agent 产出的 AgentInstantiated RELIABLE 事件在 event_outbox 持续 pending 累积（sisys-api 服务缺失既有登记）——短期 ops 可用 SQL 巡检 pending 数
