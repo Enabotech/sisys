@@ -130,6 +130,36 @@ class TestAsyncOutboxPoller:
         mock_publisher.async_publish.assert_awaited_once()
         mock_repo.mark_published.assert_awaited_once_with(event.event_id)
 
+    async def test_poll_once_pending_row_recovery_call_is_idempotent(
+        self,
+        mock_repo: MagicMock,
+        mock_publisher: MagicMock,
+        mock_router: MagicMock,
+    ) -> None:
+        """D11④ 清偿：全新 pending 行的 attempt-0 恢复调用（严格状态机拒绝 pending→pending）
+        不计为发布失败——不消耗重试预算、发布一次成功。"""
+        from src.domain.exceptions import InvalidStateTransitionError
+        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
+
+        event = _make_domain_event()
+        mock_repo.get_unpublished.return_value = [event]
+        mock_repo.mark_pending = AsyncMock(side_effect=InvalidStateTransitionError("pending", "pending"))
+        poller = AsyncOutboxPoller(
+            outbox_repository=mock_repo,
+            publisher=mock_publisher,
+            router=mock_router,
+            poll_interval=0.01,
+            batch_size=5,
+            retry_policy=RetryPolicy(base_delay=0.001, max_delay=0.01, max_retries=1),
+        )
+
+        await poller.poll_once()
+
+        mock_repo.mark_pending.assert_awaited_once_with(event.event_id)
+        assert mock_publisher.async_publish.await_count == 1, "恢复调用被拒不得触发重试消耗"
+        mock_repo.mark_published.assert_awaited_once_with(event.event_id)
+        mock_repo.mark_failed.assert_not_called()
+
     async def test_poll_once_marks_failed_on_error(
         self,
         poller: AsyncOutboxPoller,
@@ -458,3 +488,12 @@ class TestInvalidStateTransitionError:
 
         error = InvalidStateTransitionError("failed", "pending", "Max retries exceeded")
         assert "Max retries exceeded" in str(error)
+
+    def test_mark_pending_idempotent_for_pending_entity(self) -> None:
+        """严格状态机契约锚定（D11④ 修复边界）：pending → pending 迁移非法由实体层钉死，
+        poller 层负责幂等（见 test_poll_once_pending_row_recovery_call_is_idempotent）。"""
+        from src.domain.exceptions import InvalidStateTransitionError
+
+        entity = OutboxEntity(event_id=uuid.uuid4(), event_type="Test", status="pending", retry_count=0)
+        with pytest.raises(InvalidStateTransitionError):
+            entity.mark_pending()

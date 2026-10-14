@@ -306,3 +306,21 @@ class TestInMemoryOutboxRepositoryCleanup:
 
         assert removed == 0
         assert len(repository._entities) == 1
+
+    async def test_get_unpublished_poison_message_isolated(self, repository: InMemoryOutboxRepository) -> None:
+        """毒消息隔离（R5 留项 D11② 清偿）：单条畸形 payload 跳过不阻塞整批——对齐 PG 侧语义。"""
+        from src.infrastructure.messaging.outbox.outbox import OutboxEntity
+
+        DomainEvent.register("TestEventForOutbox", _TestEventForOutbox)
+        good = DomainEvent(event_type="TestEventForOutbox", source="test")
+        await repository.save(good)
+        poison = OutboxEntity(
+            event_type="TestEventForOutbox",
+            payload={"event_id": "not-a-uuid", "event_type": "TestEventForOutbox", "timestamp": "2026-01-01T00:00:00+00:00"},
+        )
+        repository._entities.insert(0, poison)  # 毒行置于队头
+
+        events = await repository.get_unpublished(limit=10)
+
+        assert len(events) == 1, "毒消息必须被跳过，合法事件正常返回"
+        assert events[0].event_id == good.event_id

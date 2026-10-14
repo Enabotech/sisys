@@ -155,13 +155,13 @@
 > 审查台账见 Story 5-1「Review Findings」节（5 并行视角调研 + C3 三视角评审，P0×4/P1×4 已当轮修复，以下为留项分流）。
 
 - 【D1·P1】import-linter `interfaces-no-infrastructure` 契约 BROKEN（存量 `app.py`/`ocr_cli.py` 两链 + `agent_cli.py` 同构新增第三链，均为「CLI/API 入口 → composition_root → infrastructure」传递性触达；该契约未进 CI/pre-commit 门禁） — 处置需架构级决策：CLI 接线模块上移独立 entrypoint 层，或经治理流程为组合根接线路径增加 sanctioned 豁免声明（禁止擅改 .importlinter 已合入规则）；触发=架构评审立项
-- 【D2·P2】EPO `_parse_biblio_document` 对无 bibliographic-data 的 document 静默产出空记录（上游契约漂移被吞成空串行）；`_extract_patents._fail` 消息恒写「缺少 world-patent-data 结构层」与真实缺失层错位 — 属 Story 4-1f 域（随 5-1 提交混入的附带修复面）；触发=4-1f 跟进（建议 `_fail` 接收缺失层名 + 空 document 跳过或超阈值报 413）
+- ~~【D2·P2】EPO `_parse_biblio_document` 静默空记录 + `_fail` 消息层名错位~~ — **RESOLVED**（2026-10-14 留项清偿轮：`_fail(missing_layer, actual)` 消息点名真实缺失层 + NoReturn 注解 + 无 bibliographic-data 文档跳过（返回 None 过滤）；新增层名准确化与毒文档跳过两用例；EPO 全消费方回归绿——原触发器「4-1f 跟进」因 4-1f 已 done 悬空，改由清偿轮直接处置）
 - 【D8·P3】存量技术债汇总（均非 5-1 引入，5-1 新增文件零命中）：src 12 处 `raise ValueError`（ocr_cli×6/strategic_archive×2/circuit_breaker×3/schema_validation_record_repository 注释×1）、49 处裸 HTTPException（旧路由族）、若干 `# noqa`（saga_status/inmemory_event_listener/otel_config）、`RedisSnapshotStore.save` hset+expire 非原子（与 5-1 R1-F3 同款缺陷，可参照其 pipeline 修法） — 触发=专项技术债 Story 或随各文件所属 Story 顺带清偿
 
 ## Deferred from: code review of 5-1-ceo-agent-instantiation-mvp Round 2/3 (2026-10-14)
 
-- 【D11·P3】outbox 毒消息终态机制 — R3-F1 后超限毒行不再重选（SELECT 过滤 retry_count < max_retries）但无终态迁移（archived 状态无转换路径/cleanup 只清 published/DLQ enqueue 仅消费侧调用）。dead-letter 终态专项立项时统一处置：①超限行终态迁移；②InMemory 侧 get_unpublished 无毒隔离的同名端口语义分叉；③PostgresDeadLetterQueue.dequeue 同款队头阻塞形态；④既有病态参考（poller process_one 对全新 pending 行 attempt 0 无条件 mark_pending 必抛 InvalidStateTransitionError；max_retries=0 行自出生即被排除）
+- 【D11·P3·范围收窄至①③】outbox 毒消息终态机制 — 2026-10-14 清偿轮已清偿四子项：②InMemory get_unpublished 毒隔离对齐（逐条 try/except 跳过+warning）；④process_one attempt-0 伪 mark_pending（poller 层幂等——严格状态机契约保留，InvalidStateTransitionError 在调用方消化不计重试预算）；⑤_mark_failed_entity 截断；⑥AuditOutboxModel.mark_failed 截断。**剩余①③归 dead-letter 专项**：①超限行终态迁移（archived）+ requeue 入口 + count_by_status 巡检面；③DLQ dequeue 毒隔离——设计方案见 proposals/proposal-d11-outbox-dead-letter.md（含微 Story D11-a/D11-b 切分与 PG 环境前置）
 - 【D12·P2】wheel 形态 configs/ 分发缺口 — pyproject packages=[{include="src"}] 不含 configs/（非 Python 包），wheel/pip 安装形态 agent CLI 必现 440；源码树/Docker/k8s 三形态自洽，CI 零 wheel 构建环节无消费方 — 核销触发：发布/打包专项立项 或 首个 wheel 消费方出现（README 已声明部署形态限定）
-- 【D13·P2】CLI 全量 bootstrap 启动开销 — 单次调用墙钟 10.4s（bootstrap 7.7s≈157 端口注册 + litellm import 出网拉取价目表 + BGE tokenizer 加载；实际用例 ~2.5ms；2026-10-14 本机实测）——agent_cli 是首个全量付费的 Redis CLI，组合根瘦身/lazy 化属架构级决策；短期缓解：部署环境设 LITELLM_LOCAL_MODEL_COST_MAP=1 — 核销触发：5.3 批量实例化消费前
+- 【D13·P2】CLI 全量 bootstrap 启动开销 — 单次调用墙钟 10.4s（bootstrap 7.7s≈157 端口注册 + litellm import 出网拉取价目表 + BGE tokenizer 加载；实际用例 ~2.5ms；2026-10-14 本机实测）——agent_cli 是首个全量付费的 Redis CLI，组合根瘦身/lazy 化属架构级决策；短期缓解已落地（2026-10-14）：.env.example 增 LITELLM_LOCAL_MODEL_COST_MAP=1 样例项 — 核销触发：5.3 批量实例化消费前
 - 【D11 补强】超限毒行恢复唯一路径=运维 SQL 重置（mark_pending >=max 硬抛 + 无终态迁移）；SELECT 过滤后超限行零日志为监控盲区（专项需提供 pending 滞留巡检面）；另 `_mark_failed_entity`/`AuditOutboxModel.mark_failed` 两处 error_message VARCHAR(1000) 未截断潜伏面同批收敛
 - 【部署面注记补充】outbox 无 poller 宿主叠加 CLI 路径：sisys-agent 产出的 AgentInstantiated RELIABLE 事件在 event_outbox 持续 pending 累积（sisys-api 服务缺失既有登记）——短期 ops 可用 SQL 巡检 pending 数

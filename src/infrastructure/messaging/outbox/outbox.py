@@ -75,7 +75,7 @@ class OutboxEntity:
         self.error_message = error
 
     def mark_pending(self) -> None:
-        """重置为 pending（用于重试）
+        """重置为 pending（用于重试——严格状态机，pending → pending 非法）
 
         Raises:
             InvalidStateTransitionError: 当当前状态不是 failed 或超过最大重试次数时

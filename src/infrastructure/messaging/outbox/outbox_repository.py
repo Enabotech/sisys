@@ -241,7 +241,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
             model.published_at = datetime.now(UTC)
 
     async def _mark_failed_entity(self, model: OutboxModel, error: str) -> None:
-        """内部方法: 标记 OutboxModel 为 failed，递增 retry_count
+        """内部方法: 标记 OutboxModel 为 failed，递增 retry_count（错误消息按列宽截断，与公开 mark_failed 对称）
 
         Args:
             model: 要标记的 OutboxModel 实例
@@ -255,4 +255,4 @@ class PostgreSQLOutboxRepository(OutboxRepository):
                 raise InvalidStateTransitionError(model.status, "failed")
             model.status = "failed"
             model.retry_count += 1
-            model.error_message = error
+            model.error_message = error[:_ERROR_MESSAGE_MAX_LENGTH]

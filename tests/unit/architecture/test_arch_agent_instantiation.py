@@ -208,13 +208,26 @@ class TestCompositionRootOnlyAssembly:
         assert composition.exists()
         for cls_name, definition in IMPL_CLASSES.items():
             assert definition.exists(), f"实现文件不存在: {definition}"
-            # 全 src 扫描类名实例化（`Cls(` 形态——覆盖直接调用与 __import__(...).Cls( 形态）
+            # 全 src 扫描类名实例化（AST Call 扫描——func 名或属性名命中类名；
+            # 覆盖直接调用 Cls(...) 与 __import__(...).Cls(...) 形态，且不受
+            # docstring/注释文本与前缀同类名（FakeXxx(Cls)）的子串误报影响）
             offenders: list[str] = []
             for py_file in SRC_ROOT.rglob("*.py"):
                 if py_file == definition or py_file == composition:
                     continue
-                if f"{cls_name}(" in py_file.read_text(encoding="utf-8"):
-                    offenders.append(str(py_file.relative_to(SRC_ROOT)))
+                tree = ast.parse(py_file.read_text(encoding="utf-8"))
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Call):
+                        func = node.func
+                        if isinstance(func, ast.Name):
+                            target = func.id
+                        elif isinstance(func, ast.Attribute):
+                            target = func.attr
+                        else:
+                            target = None
+                        if target == cls_name:
+                            offenders.append(str(py_file.relative_to(SRC_ROOT)))
+                            break
             assert not offenders, f"{cls_name} 在组合根外被实例化: {offenders}"
 
     def test_composition_root_registers_all_three(self) -> None:

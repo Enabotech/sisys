@@ -20,7 +20,7 @@ import json
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, NoReturn
 
 import httpx
 
@@ -373,26 +373,26 @@ class EpoOpsAdapter:
             DataSourceResponseError: 响应结构缺失真实契约层（EXCEPTION_413）
         """
 
-        def _fail(actual: Any) -> None:
+        def _fail(missing_layer: str, actual: Any) -> NoReturn:
             raise DataSourceResponseError(
-                message="EPO OPS 响应缺少 'ops:world-patent-data' 结构层（真实契约锚定）",
-                context={"source_name": "epo-ops", "actual_type": type(actual).__name__},
+                message=f"EPO OPS 响应缺少 '{missing_layer}' 结构层（真实契约锚定）",
+                context={"source_name": "epo-ops", "missing_layer": missing_layer, "actual_type": type(actual).__name__},
             )
 
         if not isinstance(data, dict):
-            _fail(data)
+            _fail("ops:world-patent-data", data)
         world = data.get("ops:world-patent-data")
         if not isinstance(world, dict):
-            _fail(data)
+            _fail("ops:world-patent-data", data)
         biblio_search = world.get("ops:biblio-search")
         if not isinstance(biblio_search, dict):
-            _fail(world)
+            _fail("ops:biblio-search", world)
         search_result = biblio_search.get("ops:search-result")
         if not isinstance(search_result, dict):
-            _fail(biblio_search)
+            _fail("ops:search-result", biblio_search)
         documents_wrapper = search_result.get("exchange-documents")
         if documents_wrapper is None:
-            _fail(search_result)
+            _fail("exchange-documents", search_result)
 
         patents: list[dict[str, Any]] = []
         for wrapper in _as_list(documents_wrapper):
@@ -400,12 +400,22 @@ class EpoOpsAdapter:
                 continue
             for document in _as_list(wrapper.get("exchange-document", wrapper)):
                 if isinstance(document, dict):
-                    patents.append(self._parse_biblio_document(document))
+                    parsed = self._parse_biblio_document(document)
+                    if parsed is not None:
+                        patents.append(parsed)
         return patents
 
     @staticmethod
-    def _parse_biblio_document(document: dict[str, Any]) -> dict[str, Any]:
-        """单条 exchange-document → 三字段契约输出（title/applicant/filing_date）。"""
+    def _parse_biblio_document(document: dict[str, Any]) -> dict[str, Any] | None:
+        """单条 exchange-document → 三字段契约输出（title/applicant/filing_date）。
+
+        无 bibliographic-data 的文档返回 None（调用方跳过）——静默产出
+        {"title": "", "applicant": "", "filing_date": ""} 空记录会掩盖上游
+        契约漂移（D2 清偿：跳过优于垃圾行，整层缺失仍由 _fail 报 413）。
+
+        Returns:
+            三字段契约字典；文档缺 bibliographic-data 时为 None（跳过）
+        """
 
         def _text(value: Any) -> str:
             """提取 JSON 化 XML 文本（{$: "..."} 或 str；列表取首元素）。"""
@@ -416,7 +426,8 @@ class EpoOpsAdapter:
             return value if isinstance(value, str) else ""
 
         biblio = document.get("bibliographic-data")
-        biblio = biblio if isinstance(biblio, dict) else {}
+        if not isinstance(biblio, dict):
+            return None
 
         # title：invention-title（dict|list 两态）
         title = _text(biblio.get("invention-title"))

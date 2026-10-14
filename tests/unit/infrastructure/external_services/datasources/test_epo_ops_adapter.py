@@ -517,3 +517,54 @@ class TestEpoOpsAdapterFailures:
         assert key not in json.dumps(exc_info.value.to_dict()) and key not in str(exc_info.value)
         assert secret not in str(exc_info.value)
         await adapter.close()
+
+
+class TestEpoOpsContractHardening:
+    """R5 留项 D2 清偿：结构错误消息层名准确化 + 无 bibliographic-data 文档跳过。"""
+
+    @pytest.mark.asyncio
+    async def test_structure_error_message_names_missing_layer(self) -> None:
+        """深层结构缺失时错误消息必须点名真实缺失层（非恒定 world-patent-data）。"""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if "/auth/accesstoken" in str(request.url):
+                return httpx.Response(200, json=_TOKEN_BODY)
+            broken = {"ops:world-patent-data": {"ops:biblio-search": {"@total-result-count": "1"}}}
+            return httpx.Response(200, json=broken)
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        with pytest.raises(DataSourceResponseError) as exc_info:
+            await adapter.fetch(DataSourceQuery(source_name="epo-ops", query='pa="华为"'))
+        message = str(exc_info.value.message)
+        assert "ops:search-result" in message, f"错误消息须点名真实缺失层 ops:search-result: {message}"
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_document_without_bibliographic_data_skipped(self) -> None:
+        """无 bibliographic-data 的文档跳过——静默产出空记录会掩盖上游契约漂移。"""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if "/auth/accesstoken" in str(request.url):
+                return httpx.Response(200, json=_TOKEN_BODY)
+            body = {
+                "ops:world-patent-data": {
+                    "ops:biblio-search": {
+                        "ops:search-result": {
+                            "exchange-documents": [
+                                # 队头毒文档：缺 bibliographic-data（上游契约漂移形态）
+                                {"exchange-document": {"@country": "CN", "@doc-number": "BAD1"}},
+                                _biblio_document("有效文档", "华为技术有限公司", "20260629", "122876861"),
+                            ]
+                        }
+                    }
+                }
+            }
+            return httpx.Response(200, json=body)
+
+        adapter = _make_adapter(httpx.MockTransport(handler))
+        result = await adapter.fetch(DataSourceQuery(source_name="epo-ops", query='pa="华为"'))
+        patents = json.loads(result.payload)["patents"]
+        assert len(patents) == 1, f"缺 bibliographic-data 的文档必须跳过而非产出空记录: {patents}"
+        assert patents[0]["title"] == "有效文档"
+        assert all(p["title"] for p in patents), "不得出现空字段垃圾行"
+        await adapter.close()

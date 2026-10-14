@@ -21,6 +21,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.infrastructure.storage.postgresql.models.outbox import Base
 
+# 错误消息截断上界——对齐 AuditOutboxModel.error_message 列 String(1000) 宽度
+# （列宽变更时同步修改；PG 对超长 VARCHAR 抛错不截断，未截断会炸发布周期事务——
+# 与 event_outbox 侧 R3-F2 修复同款对称防御）
+_ERROR_MESSAGE_MAX_LENGTH = 1000
+
 
 class AuditOutboxModel(Base):
     """审计发件箱 SQLAlchemy 模型，对应 audit_outbox 表
@@ -102,13 +107,13 @@ class AuditOutboxModel(Base):
         self.processed_at = datetime.now(UTC)
 
     def mark_failed(self, error: str) -> None:
-        """标记此条目为失败并记录错误消息
+        """标记此条目为失败并记录错误消息（按列宽截断——防 VARCHAR 溢出炸事务）
 
         Args:
             error: 描述失败的错误消息
         """
         self.status = "failed"
-        self.error_message = error
+        self.error_message = error[:_ERROR_MESSAGE_MAX_LENGTH]
         self.retry_count += 1
 
     def can_retry(self) -> bool:

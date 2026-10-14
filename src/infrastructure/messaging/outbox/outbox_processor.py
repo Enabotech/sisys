@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import InvalidStateTransitionError
 from src.domain.ports.outbox import OutboxRepository
 from src.infrastructure.messaging.channel_router import ChannelRouter
 from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
@@ -88,12 +89,17 @@ class AsyncOutboxPoller:
                 for attempt in range(self._retry_policy.max_retries + 1):
                     try:
                         if attempt == 0:
-                            # failed 状态必须先通过状态机恢复为 pending；旧版测试桩可能未提供该方法。
+                            # failed 状态必须先经严格状态机恢复为 pending（pending → pending
+                            # 迁移非法）；全新 pending 行的恢复调用属正常形态——在此层实现
+                            # 幂等：拒绝冗余迁移不视为失败（不计入发布尝试、不消耗重试预算）
                             mark_pending = getattr(self._repo, "mark_pending", None)
                             if callable(mark_pending):
-                                result = mark_pending(event.event_id)
-                                if inspect.isawaitable(result):
-                                    await result
+                                try:
+                                    result = mark_pending(event.event_id)
+                                    if inspect.isawaitable(result):
+                                        await result
+                                except InvalidStateTransitionError:
+                                    pass  # 行已处于 pending（状态机拒绝冗余迁移）——恢复语义已满足
                         await self._publisher.async_publish(
                             event,
                             routing_key=routing_key,

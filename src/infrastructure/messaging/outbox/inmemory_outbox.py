@@ -7,6 +7,7 @@ MVP 阶段使用内存列表存储 OutboxEntity，公开方法实现领域层接
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -14,6 +15,8 @@ from src.domain.events.base import DomainEvent
 from src.domain.ports.outbox import OutboxRepository
 from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
 from src.infrastructure.messaging.outbox.outbox import OutboxEntity
+
+logger = logging.getLogger(__name__)
 
 
 class InMemoryOutboxRepository(OutboxRepository):
@@ -40,11 +43,25 @@ class InMemoryOutboxRepository(OutboxRepository):
             self._entities.append(entity)
 
     async def get_unpublished(self, limit: int) -> list[DomainEvent]:
-        """获取未发布的事件列表（FIFO 排序）"""
+        """获取未发布的事件列表（FIFO 排序，逐条毒消息隔离）
+
+        单条畸形 payload（反序列化失败）跳过并记日志——对齐 PG 侧 get_unpublished
+        的毒隔离语义（单条不阻塞整批）；内存实现无 retry 持久化面，跳过即隔离。
+        """
         async with self._lock:
             unpublished = [e for e in self._entities if e.status == "pending"]
             unpublished.sort(key=lambda e: e.created_at)
-            return [EventOutboxAdapter.to_domain_event(e) for e in unpublished[:limit]]
+            events: list[DomainEvent] = []
+            for entity in unpublished[:limit]:
+                try:
+                    events.append(EventOutboxAdapter.to_domain_event(entity))
+                except Exception as exc:
+                    logger.warning(
+                        "InMemory Outbox 事件反序列化失败（毒消息隔离，跳过）: event_id=%s error=%s",
+                        entity.event_id,
+                        exc,
+                    )
+            return events
 
     async def mark_published(self, event_id: UUID) -> None:
         """标记事件已发布"""

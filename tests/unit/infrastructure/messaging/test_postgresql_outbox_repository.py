@@ -262,3 +262,13 @@ class TestPostgreSQLOutboxRepository:
         assert model.status == "failed"
         assert model.retry_count == 1
         assert model.error_message == "Error"
+
+    async def test_internal_mark_failed_entity_truncates_long_error(self, repository):
+        """_mark_failed_entity 截断（R5 留项 D11⑤ 清偿）：与公开 mark_failed 对称。"""
+        model = mock.Mock()
+        model.status = "pending"
+        model.retry_count = 0
+
+        await repository._mark_failed_entity(model, "x" * 2500)
+
+        assert len(model.error_message) == 1000, "内部方法同样必须按列宽截断（防 VARCHAR 溢出）"

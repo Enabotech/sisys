@@ -143,21 +143,8 @@ poetry run sisys document upload ./data/年度报告2024.pdf
 poetry run sisys document search "市场趋势 Q3"
 poetry run sisys plan generate --type sp --input data/
 poetry run sisys agent run ceo --task "分析Q3业绩差距"
-```
-
-> 上表为路线图命令形态（`sisys` 主入口随 Epic 7 集中接线交付）。已交付的独立入口如下。
-
-#### Agent 实例化 CLI（Story 5.1 已交付）
-
-```bash
-# 前置：Redis 可达（REDIS_PORT 默认 6379；配置见 .env.example）
 poetry run sisys-agent instantiate --role ceo
-# 成功输出 agent_id（stdout 纯 UUID 单行）；每次调用创建新 Agent（非幂等，靠状态 TTL 自然回收）
 ```
-
-- 退出码契约：`0` 成功 / `1` 业务异常（stderr 含 `[EXCEPTION_xxx] 消息` 编码输出）/ `2` 用法错误（argparse）
-- 常见错误码：`440` Agent 配置资产缺陷（如配置文件缺失）/ `441` MVP 未开放角色（当前仅 ceo）/ `103` Redis 存储故障
-- 部署形态：当前支持源码树与 Docker/k8s（`configs/agents/` 随镜像分发，见 `deploy/docker/dockerfile.app`）；wheel/pip 安装形态暂未打包 configs——发布专项处置（deferred-work D12）
 
 ### API
 

@@ -1137,14 +1137,14 @@ tests/
 #### 已推迟 Defer（留项台账——标注核销轮次或触发 Story）
 
 - [ ] D1【P1】import-linter `interfaces-no-infrastructure` 契约 BROKEN（存量 app/ocr_cli 两链 + agent_cli 新增第三链；未进 CI）→ deferred-work.md 登记（架构治理：entrypoint 层上移或豁免决策；禁止擅改 .importlinter）——核销：架构评审立项
-- [ ] D2【P2】EPO `_parse_biblio_document` 静默空记录 + `_fail` 消息恒定错位（4-1f 域，随 5-1 提交混入）→ deferred-work.md 登记——核销：4-1f 跟进
+- [x] D2【P2·已核销】EPO `_parse_biblio_document` 静默空记录 + `_fail` 消息层名错位 → ✅ 核销于 2026-10-14 留项清偿轮（原触发器「4-1f 跟进」因其 done 悬空改直接处置：`_fail(missing_layer, actual)` 消息点名真实缺失层 + 无 bibliographic-data 文档跳过 + 两用例；EPO 消费方回归绿）
 - [ ] D3【P3】`get_by_id` 数据损坏误报 StorageError(103) 语义错位（**R2 补注：现粗粒度包装使内置异常不裸逃逸——红线合规非缺陷；5.3 定的是「损坏 vs 连接」拆分契约而非修复**）→ 本节登记——核销：Story 5.3 消费契约定时
 - [x] D5【P3·已核销】`publish` 返回 None 静默视为成功 → ✅ 核销于 Round 2（裁定：EventPublisher Protocol 返回类型由 mypy src 门禁编译期覆盖，全部 5 个实现均返回 PublishResult；运行时 warn 防御边际价值不足）
 - [ ] D6【P3·R2 收窄】AgentConfig 直构造残余缺口（**R2-F2 已清偿 responsibilities/domain_knowledge tuple 守卫**；残余=标量字段非 str 直构造（name=123 裸 AttributeError）/ isolation 无枚举校验 / 空白串未归一 / `_required_str` 不 strip）→ 核销：5.3/5.4 消费方 Story 回填
 - [ ] D7【P3】SINGLETON 用例捕获 SCOPED 仓储（captive dependency；clear_scoped 未接线暂无实害；R2 科学性复审判明无状态仓储翻 SINGLETON 可廉价消解但属架构级 lifetime 语义决策）→ 已有 lifetime 注记，5.4 决策回迁时评估
 - [ ] D8【P3】存量技术债汇总（src 12 处 raise ValueError/49 处 HTTPException/noqa 若干/RedisSnapshotStore 非原子/存量 FakeRedis 未关闭（test_redis_cache/test_session_storage，**R2 勘误：5-1 自有用法自 ea0c0564 起即 try/finally aclose，原 D9(d) 归类失准**），均非 5-1 引入）→ deferred-work.md 登记——核销：专项技术债 Story（附存量无 TTL 孤儿键一次性 SCAN+TTL==-1 清理建议）
-- [ ] D9【P3】测试 P3 群：**(a)(b) 已于 Round 2 修复核销**（subdomain 恒真断言锚定类 code 真源 + StorageError code==103 断言三位点）；(c) 架构验证器 D 子串扫描（AST 化 ~20 行，当前零实害）→ 留项——核销触发：tests/unit/architecture/ 下次触碰该文件时 AST 化
-- [ ] D11【P3·R2 新增，R3 收敛，R4 补强】outbox 毒消息终态机制（**R3-F1 后收敛为惰性滞留**：SELECT 已过滤 retry_count ≥ max_retries 行，超限毒行不再重选/不再写库；但其无终态迁移——archived 状态无转换路径、cleanup 只清 published、DLQ enqueue 仅消费侧调用）→ 后续 dead-letter 终态立项时统一处置，同批收敛范围：①超限行的 archived/DLQ 终态迁移（**R4 补：超限行恢复唯一路径=运维 SQL 重置 retry_count/状态；且 SELECT 过滤后超限行零日志——监控盲区，专项需提供 pending 滞留巡检面**）；②InMemory 侧 `get_unpublished` 无毒隔离的同名端口语义分叉；③PostgresDeadLetterQueue.dequeue 同款队头阻塞形态；④既有病态参考：poller `process_one` 对全新 pending 行 attempt 0 无条件 mark_pending 必抛 InvalidStateTransitionError（每新事件浪费一次尝试+伪 warning）；`max_retries=0` 行自出生即被排除；⑤`_mark_failed_entity`（outbox_repository.py:258，零生产调用方）未截断 error_message 与 mark_failed 不称；⑥`AuditOutboxModel.mark_failed`（audit_outbox.py:104-111）同款 VARCHAR(1000) 未截断暴露面——核销：dead-letter/轮询语义专项 Story（deferred-work.md 已登记）
+- [x] D9【P3·全部核销】测试 P3 群：(a)(b) Round 2 核销；(c) 架构验证器 D AST 化 → ✅ 核销于 2026-10-14 留项清偿轮（ast.Call func 名/属性名扫描替代子串匹配，堵 FakeXxx(Cls 前缀误报）
+- [ ] D11【P3·范围收窄至①③】outbox 毒消息终态机制——②InMemory 毒隔离对齐、④process_one 伪 mark_pending（poller 层幂等，严格状态机保留）、⑤_mark_failed_entity 截断、⑥AuditOutbox 截断 **已于 2026-10-14 留项清偿轮核销**；剩余 ①超限行 archived 终态迁移+requeue+巡检面、③DLQ dequeue 毒隔离 → dead-letter 专项，设计方案见 `proposals/proposal-d11-outbox-dead-letter.md`（微 Story D11-a/D11-b 切分）——核销：专项 Story（D1 治理方案见 `proposals/proposal-d1-importlinter-governance.md`）
 - [ ] D12【P2·R4 新增】wheel 形态 configs/ 分发缺口：pyproject `packages=[{include="src"}]` 不含 configs/（configs 非 Python 包），wheel/pip 安装形态 CLI 必现 440「配置文件不存在」；源码树/Docker（dockerfile COPY configs/）/k8s（挂载 /app/configs）三形态自洽，全仓无 wheel 消费方（CI 零 poetry build 环节）——裁定不冒改打包配置（非包数据分发细节+构建验证成本，改错比不改糟）→ 核销触发：发布/打包专项立项 或 首个 wheel 消费方出现（README 已声明部署形态）
 - [ ] D13【P2·R4 新增】CLI 全量 bootstrap 启动开销：单次调用墙钟 10.4s（import 0.2s + bootstrap 7.7s≈157 端口注册 + litellm import 触发远端价目表拉取出网 + BGE tokenizer 加载），实际用例 ~2.5ms（2026-10-14 本机实测，环境限定）；非 5-1 引入（组合根预存成本，agent_cli 是首个全量付费的 Redis CLI）——短期缓解：部署环境设 `LITELLM_LOCAL_MODEL_COST_MAP=1` 防出网阻塞；根治（组合根瘦身/lazy 化）属架构级决策 → 核销触发：5.3 批量实例化消费前
 - [ ] D10【P3·已核销】Story「12 维度」vs 契约测试「11 维度」计数矛盾 → 本轮已统一为「11 维度/12 用例（9a/9b）」（✅ 核销于 Round 1）
@@ -1161,7 +1161,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.11.0
+**故事版本/Story Version:** v1.12.0
 **创建日期/Created:** 2026-10-14
 **最后更新/Last Updated:** 2026-10-14
 **更新说明/Description:**
@@ -1177,3 +1177,4 @@ tests/
 - v1.9.0: **代码审查 Round 3**（2026-10-14：C1 双视角——R2 修复回归核查（揪出 R2-F1 两处新破口：超限毒行永不退出 SELECT 致队头阻塞隐蔽复发 P1、mark_failed 无界错误串 VARCHAR 溢出活锁 P2）+ R1/R2 累计一致性终查（from_dict 全消费方自洽/17 项修复宣称落点全部实证/D4 三候选方案设计）；C3 合并评审实测修订（F2 isinstance 收窄过 mypy/F3 红测形态勘正——int 注入不抛异常改裸特殊形式）；修复 P1×1+P2×1（outbox SELECT 过滤/错误消息截断）+ P3×4（病态注解三形态扩捕/空串容忍恢复/D4 核销——验收 Background 下沉双态实证 13 passed 与 6+7/文档卫生六项）；D11 收敛+补登记；v1.7.0 计数勘正；R3 终态：R2 回归面清零、可处置项累计全清）
 - v1.10.0: **代码审查 Round 4**（2026-10-14：C1 双视角——R3 修复回归核查（零 P0/P1/P2 新破口，10083 passed 实测+双态验收+CLI 冒烟）+ 可行性/运维审计（运维就绪总评通过，P95 独立复测 3.57ms 远优门限）；C3 轻量评审纠错一处（RDB 窗口按实测改写 ≤60 分钟）；纯文档/台账轮代码零变更：P2×2 留项登记（D12 wheel configs 分发缺口——裁定不冒改打包配置、D13 CLI bootstrap 10.4s 开销——组合根瘦身架构决策 5.3 前核销）+ P3×4（D11 扩为六项收敛范围、README 补 Agent CLI 小节、下游风险 #2 补持久化丢失窗口、三项观察登记））
 - v1.11.0: **代码审查 Round 5 收敛终审**（2026-10-14：独立收敛终审 Agent 不轻信台账全量重取证——周期闭合（5 提交无游离）/关键修复抽验（R1-F4 往返 UUID·R1-F3 pipeline·R2/R3 outbox 过滤与隔离·R2-F2 VO 守卫，代码形态+行为实测双确认）/全量实跑（10030+53 passed·CLI 退出码 0/1 实证·收集数 13）/台账 D1-D13 完整带核销触发器/文档终态一致——**裁定收敛达成**；终审新发现 P3×3（R1 文件计数勘正+File List 补列已处置；§3.12 引用经复核为误报如实记录）；收敛声明入账；**Status: review → done**）
+- v1.12.0: **留项清偿轮**（2026-10-14：D2/D9(c) 核销 + D11 四子项清偿（②④⑤⑥）范围收窄至①③ + D13 短期缓解落地（.env.example）；TDD 红 7 用例→绿；unit+contracts 10038 + EPO 消费方验收 35 全绿；D1/D11 治理方案件两份入 proposals/（供架构评审与立项））
