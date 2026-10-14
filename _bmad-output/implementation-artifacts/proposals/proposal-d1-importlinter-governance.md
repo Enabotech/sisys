@@ -33,14 +33,16 @@ CLI/API 启动器移出 `src/interfaces/`，在 `src/` 根与 composition_root �
 - ❌ 历史成本：`ocr_cli`/`app` 为存量结构，迁移属架构级重构，收益/风险比在 MVP 阶段不占优
 - 适用：若未来要求「interfaces 层可独立于进程入口复用」（如 API 挂多宿主）时再启动
 
-### 方案 B：组合根出图（`exclude_modules`，**推荐**）
+### 方案 B：契约语义改为「直接依赖禁止」（`allow_indirect_imports = True`，**推荐**）
 
-契约保持 `forbidden` 类型，为该契约增加 `exclude_modules = src.composition_root`——组合根从本契约的依赖图中排除。
+> **勘正（2026-10-15 对标分析轮）**：本方案初稿机制为 `exclude_modules = src.composition_root`——经 import-linter v2.13 源码核查与最小实验双重证实，**`exclude_modules` 并非 forbidden 契约的配置选项**（置于契约节内为惰性配置，契约行为不变）；正确机制是一等公民选项 `allow_indirect_imports`。
 
-- **语义正当性**：composition_root 本就不属于三层中任何一层（`dependency-direction` layers 契约也未包含它），它是宪法授权的**组装层**——其 import infrastructure 是设计使然而非违规。把它排除出「interfaces 不得触达 infrastructure」的传导图，正是把「经组合根的间接依赖合法、绕过组合根的直接依赖非法」这一真实架构规则编码进契约
-- ✅ 改动面最小：`.importlinter` 该契约节 +3 行（`exclude_modules` 配置 + 注释）
-- ✅ 保护力不降：`src.interfaces → src.infrastructure` 的**直接** import 仍被捕获（该链不经组合根）；三层其余四契约不动
-- ⚠️ 副作用：任何模块经 composition_root 传递触达 infrastructure 的链均不再报——这是本方案意图（组合根是唯一 sanctioned 通道），但意味着「composition_root 意外引入的错误边」不再由此契约兜底（可由 code review 承接）
+契约保持 `forbidden` 类型，增加 `allow_indirect_imports = True`——语义从「传导性禁止」收窄为「**直接**依赖禁止」：interfaces 直接 `import src.infrastructure` 仍违规，经 composition_root 的间接链合法。
+
+- **语义正当性**：composition_root 本就不属于三层中任何一层（`dependency-direction` layers 契约也未包含它），它是 Clean Architecture 所述 Main 组件（"the dirtiest, lowest-level component"，架构圈外的终极细节）——其 import infrastructure 是设计使然而非违规。「interfaces 不得**直接**触碰 infrastructure、必须经组合根」正是项目的真实架构规则，`allow_indirect_imports = True` 是该规则的一等编码（非豁免 hack）
+- ✅ 改动面最小：`.importlinter` 该契约节 +2 行（选项 + 注释）
+- ✅ 保护力实证（最小实验 /tmp 三模块对照，2026-10-15）：开启后经组合根的间接链不再报、`interfaces → infrastructure` **直接** import 仍被捕获（`app.direct -> infra` 形态在开启状态下依然 broken）
+- ⚠️ 语义代价：任何经 composition_root 传递触达 infrastructure 的链均放行——组合根自身引入错误边的检测由此契约让渡给 code review 承接
 - 配套：lint-imports 纳入 CI（先 non-blocking 报告两周后转 blocking），让 4 kept 契约获得持续执行
 
 ### 方案 C：显式白名单（`ignore_imports` 逐边豁免）
@@ -62,13 +64,15 @@ CLI/API 启动器移出 `src/interfaces/`，在 `src/` 根与 composition_root �
 
 1. `.importlinter` `interfaces-no-infrastructure` 契约节增加：
    ```ini
-   # composition_root 是宪法授权的组装层（不属于三层任一层）——其 import
-   # infrastructure 为设计使然。将其排除出传导图 = 「经组合根间接依赖合法、
-   # 直接依赖非法」的真实架构规则编码。架构评审批准（2026-XX-XX）。
-   exclude_modules =
-       src.composition_root
+   # 语义：直接依赖禁止（间接经 composition_root 合法）。composition_root 是
+   # 宪法授权的组装层（Clean Architecture Main 组件——架构圈外的终极细节，
+   # 不属于三层任一层），其 import infrastructure 为设计使然。开启本选项 =
+   # 「interfaces 不得直接 import infrastructure、必须经组合根」的真实规则编码。
+   # 注：exclude_modules 非 forbidden 契约选项（2026-10-15 源码核查勘正）。
+   # 架构评审批准（2026-XX-XX）。
+   allow_indirect_imports = True
    ```
-2. 本地验证：`poetry run lint-imports` → 5 kept / 0 broken
+2. 本地验证：`poetry run lint-imports` → 5 kept / 0 broken；再加临时直接违规用例验证直接依赖仍被捕获（同 /tmp 实验形态）
 3. CI 接入（分两步）：
    - 第一步：`.gitea/workflows/ci.yml` 增加 `poetry run lint-imports`（non-blocking / allow-failure，观察期两周）
    - 第二步：观察期满转 blocking（同时给 pre-commit 增加同款本地钩子）
