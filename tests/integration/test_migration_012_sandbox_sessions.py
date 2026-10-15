@@ -1,7 +1,7 @@
-"""Story 4.4: Alembic migration 015 sandbox_sessions 静态断言测试
+"""Story 4.4: Alembic migration 012 sandbox_sessions 静态断言测试
 
 对齐 001 先例(test_integration_postgresql.py)的静态文本断言形态。
-完整执行型 round-trip(upgrade 015 → downgrade 014)登记为后续改进项,
+完整执行型 round-trip(upgrade 012 → downgrade 011)登记为后续改进项,
 可复用 tests/acceptance/test_acceptance_postgresql_relational_layer.py 的
 ensure_alembic_migration fixture(subprocess alembic + 测试 schema 隔离)。
 """
@@ -10,21 +10,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
-_MIGRATION = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "versions" / "015_sandbox_sessions.py"
+_MIGRATION = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "versions" / "012_sandbox_sessions.py"
 
 
-class TestMigration015SandboxSessions:
-    """migration 015 静态断言(AC-4 验证项)"""
+class TestMigration012SandboxSessions:
+    """migration 012 静态断言(AC-4 验证项)"""
 
     def test_migration_file_exists(self) -> None:
-        """015_sandbox_sessions.py 应存在"""
+        """012_sandbox_sessions.py 应存在"""
         assert _MIGRATION.exists()
 
     def test_revision_chain(self) -> None:
-        """revision=015 + down_revision=014(数字 ID 链)"""
+        """revision=012 + down_revision=011(数字 ID 链)"""
         content = _MIGRATION.read_text()
-        assert 'revision = "015"' in content or "revision = '015'" in content
-        assert 'down_revision = "014"' in content or "down_revision = '014'" in content
+        assert 'revision = "012"' in content or "revision = '012'" in content
+        assert 'down_revision = "011"' in content or "down_revision = '011'" in content
 
     def test_upgrade_creates_sandbox_sessions_table(self) -> None:
         """upgrade 应创建 sandbox_sessions 表 + 3 索引"""
