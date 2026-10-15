@@ -610,7 +610,7 @@ docker-push-l3: docker-build-l3
 
 run-server:
 	@echo "🚀 启动开发服务器..."
-	$(POETRY) run uvicorn src.interfaces.api.main:app --reload --host 0.0.0.0 --port 8000
+	$(POETRY) run uvicorn src.entrypoints.api_app:app --reload --host 0.0.0.0 --port 8000
 
 run-worker:
 	@echo "👷 启动工作进程..."

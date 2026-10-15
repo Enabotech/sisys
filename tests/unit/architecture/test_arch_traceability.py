@@ -261,7 +261,7 @@ class TestInterfaceLayerRegistration:
 
     def test_app_includes_trace_router(self) -> None:
         """app.py include_router 注册 trace_router"""
-        app_file = _SRC_ROOT / "interfaces" / "api" / "app.py"
+        app_file = _SRC_ROOT / "entrypoints" / "api_app.py"
         assert app_file.exists()
         content = app_file.read_text(encoding="utf-8")
         assert "trace_router" in content

@@ -149,7 +149,7 @@ poetry run sisys-agent instantiate --role ceo
 ### API
 
 ```bash
-poetry run uvicorn src.interfaces.api.main:app --reload --port 8000
+poetry run uvicorn src.entrypoints.api_app:app --reload --port 8000
 ```
 
 ---

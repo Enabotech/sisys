@@ -1136,7 +1136,7 @@ tests/
 
 #### 已推迟 Defer（留项台账——标注核销轮次或触发 Story）
 
-- [x] D1【P1·已核销】import-linter `interfaces-no-infrastructure` 契约 BROKEN → ✅ 核销于 2026-10-15（方案 B：`allow_indirect_imports = True`——直接依赖禁止、间接经组合根合法；3-body 拍板；活体验证直接违规仍捕获；CI non-blocking 观察期至 2026-10-29；proposal 方案 A（entrypoint 层）挂 Epic 7 终态演进）
+- [x] D1【P1·已核销】import-linter `interfaces-no-infrastructure` 契约 BROKEN → ✅ 核销于 2026-10-15（**方案 A**：入口上移 `src/entrypoints/` 组装层——agent_cli/ocr_cli/api_app 迁移、interfaces 组合根引用清零、契约还原严格传导禁止；3-body 拍板（B 曾同日早间落地后被撤销，完整决策链见 proposal）；活体验证直接违规仍捕获；CI 直接 blocking + pre-commit 钩子）
 - [x] D2【P2·已核销】EPO `_parse_biblio_document` 静默空记录 + `_fail` 消息层名错位 → ✅ 核销于 2026-10-14 留项清偿轮（原触发器「4-1f 跟进」因其 done 悬空改直接处置：`_fail(missing_layer, actual)` 消息点名真实缺失层 + 无 bibliographic-data 文档跳过 + 两用例；EPO 消费方回归绿）
 - [ ] D3【P3】`get_by_id` 数据损坏误报 StorageError(103) 语义错位（**R2 补注：现粗粒度包装使内置异常不裸逃逸——红线合规非缺陷；5.3 定的是「损坏 vs 连接」拆分契约而非修复**）→ 本节登记——核销：Story 5.3 消费契约定时
 - [x] D5【P3·已核销】`publish` 返回 None 静默视为成功 → ✅ 核销于 Round 2（裁定：EventPublisher Protocol 返回类型由 mypy src 门禁编译期覆盖，全部 5 个实现均返回 PublishResult；运行时 warn 防御边际价值不足）
@@ -1161,7 +1161,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.12.0
+**故事版本/Story Version:** v1.13.0
 **创建日期/Created:** 2026-10-14
 **最后更新/Last Updated:** 2026-10-14
 **更新说明/Description:**
@@ -1178,3 +1178,4 @@ tests/
 - v1.10.0: **代码审查 Round 4**（2026-10-14：C1 双视角——R3 修复回归核查（零 P0/P1/P2 新破口，10083 passed 实测+双态验收+CLI 冒烟）+ 可行性/运维审计（运维就绪总评通过，P95 独立复测 3.57ms 远优门限）；C3 轻量评审纠错一处（RDB 窗口按实测改写 ≤60 分钟）；纯文档/台账轮代码零变更：P2×2 留项登记（D12 wheel configs 分发缺口——裁定不冒改打包配置、D13 CLI bootstrap 10.4s 开销——组合根瘦身架构决策 5.3 前核销）+ P3×4（D11 扩为六项收敛范围、README 补 Agent CLI 小节、下游风险 #2 补持久化丢失窗口、三项观察登记））
 - v1.11.0: **代码审查 Round 5 收敛终审**（2026-10-14：独立收敛终审 Agent 不轻信台账全量重取证——周期闭合（5 提交无游离）/关键修复抽验（R1-F4 往返 UUID·R1-F3 pipeline·R2/R3 outbox 过滤与隔离·R2-F2 VO 守卫，代码形态+行为实测双确认）/全量实跑（10030+53 passed·CLI 退出码 0/1 实证·收集数 13）/台账 D1-D13 完整带核销触发器/文档终态一致——**裁定收敛达成**；终审新发现 P3×3（R1 文件计数勘正+File List 补列已处置；§3.12 引用经复核为误报如实记录）；收敛声明入账；**Status: review → done**）
 - v1.12.0: **留项清偿轮**（2026-10-14：D2/D9(c) 核销 + D11 四子项清偿（②④⑤⑥）范围收窄至①③ + D13 短期缓解落地（.env.example）；TDD 红 7 用例→绿；unit+contracts 10038 + EPO 消费方验收 35 全绿；D1/D11 治理方案件两份入 proposals/（供架构评审与立项））
+- v1.13.0: **D1 方案 A 落地**（2026-10-15：3-body 拍板——同日决策链 B 落地→用户撤销→A 终态实施。入口上移 src/entrypoints/ 组装层（agent_cli/ocr_cli/api_app git mv，interfaces 组合根引用清零）+ 契约还原严格传导禁止（5 kept，注入直接违规仍捕获）+ CI 直接 blocking + pre-commit 钩子 + 12 测试引用面更新 + CLAUDE.md 目录树同步；受影响面 798 passed）

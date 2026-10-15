@@ -90,6 +90,23 @@ repos:
         args: [--pretty, --show-error-codes]
 
   # =========================================
+  # Import Linter - 架构层依赖契约 (使用本地安装)
+  #
+  # 五契约（domain 零外部依赖 / 三层方向 / infrastructure↔interfaces 隔离 /
+  # application-no-infrastructure / interfaces-no-infrastructure 严格传导禁止）
+  # D1 方案 A 落地（入口上移 src/entrypoints/）后全绿接入——
+  # 全项目级检查（非按文件），确定性静态分析，与 CI 同款
+  # =========================================
+  - repo: local
+    hooks:
+      - id: import-linter
+        name: "架构依赖契约 ( import-linter )"
+        entry: poetry run lint-imports
+        language: system
+        pass_filenames: false
+        verbose: true
+
+  # =========================================
   # Security - Bandit (使用本地安装)
   # =========================================
   - repo: local

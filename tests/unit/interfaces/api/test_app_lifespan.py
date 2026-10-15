@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.interfaces.api.app import _lifespan, create_app
+from src.entrypoints.api_app import _lifespan, create_app
 
 
 class TestLifespanStartup:

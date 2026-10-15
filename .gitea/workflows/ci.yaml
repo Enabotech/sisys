@@ -189,12 +189,11 @@ jobs:
           mkdir -p reports/mypy
           poetry run mypy src/ tests/ --pretty --show-error-codes --txt-report reports/mypy/mypy-report.txt
 
-      # 架构依赖契约 (import-linter)——观察期 non-blocking（2026-10-15 起）：
-      # 方案 B 落地（interfaces-no-infrastructure 改直接依赖禁止）后接入；
-      # 观察期两周（至 2026-10-29），期满无误报转 blocking 并同步加 pre-commit 钩子。
-      # 决策与方案对比见 _bmad-output/implementation-artifacts/proposals/proposal-d1-importlinter-governance.md
+      # 架构依赖契约 (import-linter)——blocking（2026-10-15 起）：
+      # D1 方案 A 落地（入口上移 src/entrypoints/，interfaces 组合根引用清零）
+      # 后五契约严格形态全绿，直接接入。lint-imports 为确定性静态分析，
+      # 无观察期必要。决策见 proposals/proposal-d1-importlinter-governance.md
       - name: 架构依赖契约 ( import-linter )
-        continue-on-error: true
         run: |
           mkdir -p reports/importlinter
           poetry run lint-imports | tee reports/importlinter/lint-imports.txt

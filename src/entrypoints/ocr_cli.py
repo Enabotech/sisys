@@ -4,7 +4,7 @@
 使用 argparse 标准库（零额外依赖），通过 pyproject.toml 注册为 sisys-ocr 入口点。
 
 架构约束：
-- 位于 interfaces 层，不得直接 import infrastructure 层
+- 位于 entrypoints 组装层（进程入口，D1 方案 A 上移自 interfaces/cli）
 - 通过 composition_root 的 resolve("ocr") 获取适配器实例
 - 适配器参数通过环境变量传递（RAPIDOCR_MODEL_DIR / RAPIDOCR_MAX_CONCURRENCY）
 

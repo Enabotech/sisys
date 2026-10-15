@@ -26,7 +26,7 @@ import pytest
 
 from src.domain.entities.agent import Agent, AgentRole
 from src.domain.exceptions import AgentRoleNotSupportedError
-from src.interfaces.cli import agent_cli
+from src.entrypoints import agent_cli
 
 
 class _StubResult:
@@ -240,7 +240,7 @@ class TestBootstrapAndCleanupRobustness:
         monkeypatch.setattr(agent_cli, "bootstrap", _boom)
         monkeypatch.setattr(agent_cli, "resolve", lambda name: _StubUseCase())
         monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolver())
-        with caplog.at_level(logging.ERROR, logger="src.interfaces.cli.agent_cli"):
+        with caplog.at_level(logging.ERROR, logger="src.entrypoints.agent_cli"):
             exit_code = agent_cli.main(["instantiate", "--role", "ceo"])
         assert exit_code == 1
         assert "composition root broken" in caplog.text

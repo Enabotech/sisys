@@ -1,9 +1,10 @@
 # 方议案 D1：import-linter `interfaces-no-infrastructure` 契约治理
 
-> **状态**：✅ 已实施（2026-10-15，3-body 批准方案 B——.importlinter 契约已改直接依赖禁止语义，CI non-blocking 观察期至 2026-10-29；§5 决策请求点 1/3 已裁定，2 按两步节奏执行中）
+> **状态**：✅ 已实施——**方案 A**（2026-10-15，3-body 拍板）
+> **实施记录**：同日决策链——B 方案早间先行落地（契约改 `allow_indirect_imports = True` + CI non-blocking 观察期）→ 用户复核后**撤销 B**（观察期流程价值低 + A 实测改动面可控），改由 A 实施：入口上移 `src/entrypoints/` 组装层 → 契约还原**严格传导禁止**（B 痕迹随 A 提交完整回退）→ CI 直接 blocking + pre-commit 钩子。A 改动面经实测推翻初稿高估（deploy 零引用 / src 零反向依赖 app.py / 真实测试引用 12 文件而非 60）。
 > **来源**：Story 5-1 代码审查 R1 留项 D1【P1】；deferred-work.md「Deferred from: code review of 5-1 Round 1」节
 > **作者**：5-1 审查周期（2026-10-14）；事实均经 lint-imports 实测与 git 历史核验
-> **约束**：CLAUDE.md 明令「禁止修改 .importlinter 中已合入的架构依赖规则」——本文档仅为决策材料，任何方案落地均需架构评审批准后实施
+> **约束**：CLAUDE.md 明令「禁止修改 .importlinter 中已合入的架构依赖规则」——落地经 3-body 批准（本文件即决策记录）
 
 ---
 
@@ -24,14 +25,13 @@
 
 ## 2. 方案对比
 
-### 方案 A：entrypoint 层上移（结构重组）
+### 方案 A：entrypoint 层上移（结构重组）——**已实施（2026-10-15）**
 
 CLI/API 启动器移出 `src/interfaces/`，在 `src/` 根与 composition_root 同层新建 `entrypoints/`（或 `src/main.py` 形态），层规则将 entrypoints 视为与 composition_root 同级的「组装层」。
 
 - ✅ 语义最彻底：interfaces 层回归「纯适配器」（FastAPI 路由/Typer 命令定义），进程入口与组装职责独立成层
-- ❌ 改动面大：`app.py`/`ocr_cli.py`/`agent_cli.py` 迁移 + pyproject scripts 双注册改写 + 全部引用测试路径更新 + `.importlinter` 层定义扩充——预计 15+ 文件
-- ❌ 历史成本：`ocr_cli`/`app` 为存量结构，迁移属架构级重构，收益/风险比在 MVP 阶段不占优
-- 适用：若未来要求「interfaces 层可独立于进程入口复用」（如 API 挂多宿主）时再启动
+- ~~❌ 改动面大（初稿估计 15+ 文件）~~ **实测修正（2026-10-15）**：deploy 零引用（compose 的 uvicorn 属 embedding 服务）、src 内部零反向依赖 `app.py`、tests 真实引用 12 文件（非 60）——实际改动面：3 个入口 `git mv` + 12 测试 import + pyproject 4 处 + Makefile/README 各 1 处 + 契约还原，半天内完成，无部署变更
+- ✅ 实施终态：契约保持**严格传导禁止**（interfaces 组合根引用清零后传导链消失，5 kept）；Epic 7 集中 CLI 时入口在层内合并即可，不再涉及层位置迁移
 
 ### 方案 B：契约语义改为「直接依赖禁止」（`allow_indirect_imports = True`，**推荐**）
 

@@ -26,7 +26,7 @@ from src.domain.ports.resolver import get_resolver
 @pytest.fixture
 def app() -> Any:
     """真实 create_app 产物（conftest 会话级 bootstrap 已就绪 resolver）."""
-    from src.interfaces.api.app import create_app
+    from src.entrypoints.api_app import create_app
 
     return create_app()
 

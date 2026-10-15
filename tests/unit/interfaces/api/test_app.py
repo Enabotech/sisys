@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from src.interfaces.api.app import create_app
+from src.entrypoints.api_app import create_app
 
 
 class TestCreateApp:

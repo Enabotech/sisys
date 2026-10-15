@@ -154,7 +154,7 @@
 
 > 审查台账见 Story 5-1「Review Findings」节（5 并行视角调研 + C3 三视角评审，P0×4/P1×4 已当轮修复，以下为留项分流）。
 
-- ~~【D1·P1】import-linter `interfaces-no-infrastructure` 契约 BROKEN~~ — **RESOLVED**（2026-10-15 方案 B 落地，3-body 拍板：契约增 `allow_indirect_imports = True` 改「直接依赖禁止、间接经组合根合法」语义——Clean Architecture Main 组件圈外定位的契约编码；活体验证三段论（5 kept→注入直接违规 broken→还原 kept）；CI 接入 non-blocking 观察期至 2026-10-29 后转 blocking；决策材料见 proposals/proposal-d1-importlinter-governance.md（方案 A entrypoint 层上移挂 Epic 7 集中 CLI 时点作终态演进））
+- ~~【D1·P1】import-linter `interfaces-no-infrastructure` 契约 BROKEN~~ — **RESOLVED**（2026-10-15 **方案 A** 落地，3-body 拍板；同日决策链：B 早间先行落地（契约改 `allow_indirect_imports = True` + CI 观察期）后被用户撤销——观察期流程价值低 + A 实测改动面可控（deploy 零引用/src 零反向依赖/测试真实引用 12 文件），改由 A 终态实施：入口上移 `src/entrypoints/` 组装层（agent_cli/ocr_cli/api_app 三文件 git mv，interfaces 组合根引用清零）→ 契约还原**严格传导禁止**（5 kept；注入直接违规仍捕获）→ CI 直接 blocking + pre-commit 钩子；Epic 7 集中 CLI 时入口在 entrypoints 层内合并即可；决策全记录见 proposals/proposal-d1-importlinter-governance.md）
 - ~~【D2·P2】EPO `_parse_biblio_document` 静默空记录 + `_fail` 消息层名错位~~ — **RESOLVED**（2026-10-14 留项清偿轮：`_fail(missing_layer, actual)` 消息点名真实缺失层 + NoReturn 注解 + 无 bibliographic-data 文档跳过（返回 None 过滤）；新增层名准确化与毒文档跳过两用例；EPO 全消费方回归绿——原触发器「4-1f 跟进」因 4-1f 已 done 悬空，改由清偿轮直接处置）
 - 【D8·P3】存量技术债汇总（均非 5-1 引入，5-1 新增文件零命中）：src 12 处 `raise ValueError`（ocr_cli×6/strategic_archive×2/circuit_breaker×3/schema_validation_record_repository 注释×1）、49 处裸 HTTPException（旧路由族）、若干 `# noqa`（saga_status/inmemory_event_listener/otel_config）、`RedisSnapshotStore.save` hset+expire 非原子（与 5-1 R1-F3 同款缺陷，可参照其 pipeline 修法） — 触发=专项技术债 Story 或随各文件所属 Story 顺带清偿
 

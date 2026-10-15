@@ -4,7 +4,7 @@
 通过 pyproject.toml 注册为 sisys-agent 入口点。
 
 架构约束：
-- 位于 interfaces 层，不得直接 import infrastructure 层
+- 位于 entrypoints 组装层（进程入口，D1 方案 A 上移自 interfaces/cli）
 - 通过 composition_root 的 bootstrap() + resolve("agent_instantiation_use_case")
   获取应用层用例（与 ocr_cli 同款接线模式）
 - 角色字符串 → 枚举转换必须守卫（禁止裸 AgentRole(value)——Enum 原生抛

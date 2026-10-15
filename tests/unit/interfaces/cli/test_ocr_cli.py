@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.interfaces.cli.ocr_cli import _format_as_markdown, build_parser, parse_page_spec
+from src.entrypoints.ocr_cli import _format_as_markdown, build_parser, parse_page_spec
 
 
 class TestParsePageSpec:

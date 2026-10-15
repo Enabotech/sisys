@@ -1,12 +1,8 @@
-"""接口层 CLI 模块
+"""接口层 CLI 命令适配器模块
 
-CLI 适配器，基于 argparse 框架提供命令行接口。
-当前提供：
-- sisys-ocr: OCR 识别命令行工具（支持指定页数、输出到指定位置）
+命令定义适配器（argparse/Typer）。进程入口（bootstrap 装配与 main()）
+已上移 src/entrypoints/ 组装层（D1 方案 A）；本包承载命令解析与
+业务转发。document_commands 为未接线存量（无挂载点，勿仿）。
 """
 
-from src.interfaces.cli.ocr_cli import main as ocr_main
-
-__all__ = [
-    "ocr_main",
-]
+__all__: list[str] = []

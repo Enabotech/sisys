@@ -551,7 +551,7 @@ def then_completion_checklist(context: dict[str, Any]) -> None:
         "src/application/use_cases/agent_instantiation.py",
         "src/infrastructure/agent_orch/yaml_agent_config_loader.py",
         "src/infrastructure/storage/redis/redis_agent_repository.py",
-        "src/interfaces/cli/agent_cli.py",
+        "src/entrypoints/agent_cli.py",
         "configs/agents/ceo_agent.yaml",
         # tests 产出（unit 8 + contracts 3 + integration 1 + acceptance 2）
         "tests/unit/domain/events/test_agent_events.py",
@@ -575,7 +575,7 @@ def then_completion_checklist(context: dict[str, Any]) -> None:
     for port_name in ('"agent_repository"', '"agent_config_loader"', '"agent_instantiation_use_case"'):
         assert port_name in composition, f"组合根未注册 {port_name}"
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'sisys-agent = "src.interfaces.cli.agent_cli:main"' in pyproject, "pyproject 未注册 sisys-agent"
+    assert 'sisys-agent = "src.entrypoints.agent_cli:main"' in pyproject, "pyproject 未注册 sisys-agent"
 
 
 @then("链路接线断言清单 L1-L8 终态符合预期")

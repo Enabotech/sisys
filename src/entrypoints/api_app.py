@@ -1,7 +1,8 @@
-"""接口层 FastAPI 应用工厂模块
+"""FastAPI 应用工厂（entrypoints 组装层——D1 方案 A 上移自 interfaces/api）
 
 提供 FastAPI 应用实例创建，包含 lifecycle 管理，
-在 startup/shutdown 事件中管理后台轮询器生命周期
+在 startup/shutdown 事件中管理后台轮询器生命周期（bootstrap 装配 + outbox 轮询器）。
+路由/中间件适配器仍位于 src/interfaces/api/，经本工厂装配成进程应用
 """
 
 from __future__ import annotations

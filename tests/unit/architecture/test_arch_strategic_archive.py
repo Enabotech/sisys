@@ -104,9 +104,11 @@ class TestInterfaceLayer:
         for filepath in api_files:
             imports = _get_all_imports(filepath)
             infra_imports = {i for i in imports if i.startswith("src.infrastructure")}
-            # exception_handlers.py 和 app.py 可能导入基础设施，那是例外
+            # exception_handlers.py（HTTP 映射注册）可能导入基础设施配置，那是例外；
+            # app.py 例外已随 D1 方案 A 移除（进程入口上移 src/entrypoints/，
+            # interfaces/api 不再允许任何 app.py 形态的基础设施豁免）
             basename = os.path.basename(filepath)
-            if basename in ("exception_handlers.py", "app.py", "__init__.py"):
+            if basename in ("exception_handlers.py", "__init__.py"):
                 continue
             assert not infra_imports, f"{filepath} 直接引入了基础设施层: {infra_imports}"
 

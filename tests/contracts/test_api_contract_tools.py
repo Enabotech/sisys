@@ -132,7 +132,7 @@ class TestToolVersionAPIContract:
         FastAPI 生成的运行时契约 security=None，与 openapi.yaml 宣称的
         bearerAuth 静默分叉（文档侧断言无法感知）。
         """
-        from src.interfaces.api.app import create_app
+        from src.entrypoints.api_app import create_app
 
         runtime_spec = create_app().openapi()
         runtime_paths = runtime_spec.get("paths", {})

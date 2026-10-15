@@ -154,7 +154,7 @@ class TestYamlBoundary:
         # 提及 yaml 字样不构成违规）
         for py_file in [
             SRC_ROOT / "infrastructure" / "storage" / "redis" / "redis_agent_repository.py",
-            SRC_ROOT / "interfaces" / "cli" / "agent_cli.py",
+            SRC_ROOT / "entrypoints" / "agent_cli.py",
             SRC_ROOT / "application" / "use_cases" / "agent_instantiation.py",
             SRC_ROOT / "application" / "ports" / "agent_config_loader.py",
         ]:
@@ -183,7 +183,7 @@ class TestDependencyDirection:
             assert _top_layer(imp) != "interfaces", f"YamlAgentConfigLoader 违规导入 interfaces: {imp}"
 
     def test_agent_cli_no_infrastructure(self) -> None:
-        imports = _extract_imports(SRC_ROOT / "interfaces" / "cli" / "agent_cli.py")
+        imports = _extract_imports(SRC_ROOT / "entrypoints" / "agent_cli.py")
         for imp in imports:
             assert _top_layer(imp) != "infrastructure", f"agent_cli 违规导入 infrastructure: {imp}"
 
@@ -247,7 +247,7 @@ class TestNoCircularImports:
     """ruff isort 规则（I）对 Story 5.1 全部新文件的 import 排序/可解析性检查。"""
 
     def test_ruff_isort_on_new_files(self) -> None:
-        targets = [str(path) for path in [*IMPL_CLASSES.values(), SRC_ROOT / "interfaces" / "cli" / "agent_cli.py"]]
+        targets = [str(path) for path in [*IMPL_CLASSES.values(), SRC_ROOT / "entrypoints" / "agent_cli.py"]]
         result = subprocess.run(
             [sys.executable, "-m", "ruff", "check", "--select", "I", *targets],
             capture_output=True,

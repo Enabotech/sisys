@@ -37,7 +37,8 @@ src/
 ├── domain/          # 实体、值对象、领域事件、端口接口（Protocol）、领域服务
 ├── application/     # 用例、应用服务、事件处理器、应用层端口
 ├── infrastructure/  # 五层存储实现、RabbitMQ/Redis 事件总线、LangGraph/Prefect 引擎
-└── interfaces/      # FastAPI 路由、Typer CLI、SAP 适配器
+├── interfaces/      # FastAPI 路由、Typer CLI 命令、SAP 适配器
+└── entrypoints/     # 进程入口与组装层（CLI main/uvicorn app 工厂，经组合根装配；D1 方案 A）
 ```
 
 ## 4. Conventions
