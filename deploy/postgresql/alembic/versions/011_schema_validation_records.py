@@ -1,7 +1,7 @@
 """Add schema_validation_records table for Story 4.3 Schema validation history persistence.
 
-Revision ID: 013
-Revises: 012
+Revision ID: 011
+Revises: 010
 Create Date: 2026-09-10
 
 Story 4.3: 工具输入/输出 Schema 验证（AC-5 SchemaValidationRecord 聚合根持久化）
@@ -27,8 +27,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision = "013"
-down_revision = "012"
+revision = "011"
+down_revision = "010"
 
 
 def upgrade() -> None:
@@ -86,6 +86,15 @@ def upgrade() -> None:
         "ix_schema_validation_records_tenant_valid_time",
         "schema_validation_records",
         ["tenant_id", "is_valid", sa.text("validated_at DESC")],
+    )
+    # GIN 索引（原 014 补丁并入——jsonb_path_ops 支持 @@ jsonpath match 加速
+    # violations JSONB 查询；不支持 ?/?? 存在性操作符，本 Story 不需要）
+    op.create_index(
+        "ix_schema_validation_records_violations_gin",
+        "schema_validation_records",
+        ["violations"],
+        postgresql_using="gin",
+        postgresql_ops={"violations": "jsonb_path_ops"},
     )
 
 

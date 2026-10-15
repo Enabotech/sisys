@@ -1,7 +1,7 @@
 """Add tool_chains table for ToolChainDag aggregate persistence.
 
-Revision ID: 012
-Revises: 011
+Revision ID: 010
+Revises: 009
 Create Date: 2026-09-10
 
 Story 4.2: 工具链编排（DAG 工具链持久化）
@@ -21,8 +21,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision = "012"
-down_revision = "011"
+revision = "010"
+down_revision = "009"
 
 
 def upgrade() -> None:

@@ -1,7 +1,7 @@
 """Story 4.4: Sandbox sessions table
 
-Revision ID: 015
-Revises: 014
+Revision ID: 012
+Revises: 011
 Create Date: 2026-09-16
 
 记录沙箱会话（便于审计 + 配额统计）。
@@ -29,8 +29,8 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 # revision identifiers, used by Alembic.
-revision = "015"
-down_revision = "014"
+revision = "012"
+down_revision = "011"
 branch_labels = None
 depends_on = None
 

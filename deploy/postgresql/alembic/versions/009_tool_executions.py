@@ -1,7 +1,7 @@
 """Add tool_executions table for Tool execution aggregate persistence.
 
-Revision ID: 011
-Revises: 010
+Revision ID: 009
+Revises: 008
 Create Date: 2026-09-07
 
 Story 4.1a: 战略工具实现（ToolExecution 聚合根持久化）
@@ -23,8 +23,8 @@ CLAUDE.md §5 硬约束：已合入 migration 禁止修改，本期只允许新�
 import sqlalchemy as sa
 from alembic import op
 
-revision = "011"
-down_revision = "010"
+revision = "009"
+down_revision = "008"
 
 
 def upgrade() -> None:

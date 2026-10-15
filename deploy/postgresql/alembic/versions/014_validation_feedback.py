@@ -1,7 +1,10 @@
 """Story 4.7: Validation Feedback 双表（错误案例库 + 演进日志）
 
-Revision ID: 017
-Revises: 016
+合并注记（2026-10-16 重构）：吸收原 018（ABORTED 中止态 CHECK）——建表直接含
+ABORTED 终态集（enhanced_retry_count 0-3 仅限 ABORTED，其余终态 1-3）。
+
+Revision ID: 014
+Revises: 013
 Create Date: 2026-10-09
 
 - error_cases：自然键 (tenant_id, tool_id, error_signature) UNIQUE——精确查表；
@@ -22,8 +25,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision = "017"
-down_revision = "016"
+revision = "014"
+down_revision = "013"
 
 
 def upgrade() -> None:
@@ -96,11 +99,12 @@ def upgrade() -> None:
             name="ck_tool_evolution_logs_trigger_code",
         ),
         sa.CheckConstraint(
-            "final_status IN ('RECOVERED', 'MARKED_INFEASIBLE')",
+            "final_status IN ('RECOVERED', 'MARKED_INFEASIBLE', 'ABORTED')",
             name="ck_tool_evolution_logs_final_status",
         ),
         sa.CheckConstraint(
-            "enhanced_retry_count BETWEEN 1 AND 3",
+            "(final_status = 'ABORTED' AND enhanced_retry_count BETWEEN 0 AND 3)"
+            " OR (final_status IN ('RECOVERED', 'MARKED_INFEASIBLE') AND enhanced_retry_count BETWEEN 1 AND 3)",
             name="ck_tool_evolution_logs_retry_count_range",
         ),
         sa.CheckConstraint("duration_sec >= 0", name="ck_tool_evolution_logs_duration_nonneg"),

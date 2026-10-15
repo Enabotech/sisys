@@ -1,7 +1,7 @@
 """Story 4.6: tool_versions table（工具版本管理——灰度发布与回滚）
 
-Revision ID: 016
-Revises: 015
+Revision ID: 013
+Revises: 012
 Create Date: 2026-10-07
 
 - (tool_id, version) 复合唯一；平台级资源无 tenant_id（TOOL_CATALOG 语义一致）
@@ -20,8 +20,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision = "016"
-down_revision = "015"
+revision = "013"
+down_revision = "012"
 
 
 def upgrade() -> None:
