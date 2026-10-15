@@ -11,7 +11,7 @@
 - ~~saga roundtrip / reset_registry~~ → **RESOLVED 2026-10-10**
 - ~~ABORTED 第三值~~ → **RESOLVED 2026-10-10**（业务启动指令即触发条件）
 - 灰度推进/per-version 统计视图 → **触发 = 产品立项**（功能型非还债；建议 Epic 6 BLM 流程实施时评估——数据面 `list_by_tool` 已就绪，材料依赖度低，纯缺需求方）
-- lint-imports BROKEN → **触发 = 架构重构专项立项**（组合根 lazy import 链重构，`.importlinter` 已合入规则禁改；CI 长红但稳定不恶化、无时限压力——被动等待需改规则或新增 interfaces→组合根 import 时被迫处理）
+- ~~lint-imports BROKEN~~ → **RESOLVED 2026-10-15**（D1 方案 A 落地，3-body 拍板：入口上移 src/entrypoints/ 组装层，interfaces 组合根引用清零；契约还原严格传导禁止 5 kept + CI 直接 blocking + pre-commit 钩子——「CI 长红」前提已消除；决策全记录见 proposals/proposal-d1-importlinter-governance.md，同日决策链含 B 落地后被撤销的过程）
 
 **路线图触发型**：
 - langgraph retry/timeout 字段 → **触发 = Story 5.10（CheckpointWithEvaluation）或 6.6（Checkpoint 摘要查看）实施**（epics :2016 规划在案、story 文件未创建——两处是 checkpoint_table/编排引擎行为的规划消费方，届时字段语义定稿）
@@ -55,14 +55,14 @@
 
 ## Deferred from: code review of 20-8-workflow-agent-integration (2026-05-23)
 
-- 可变字典引用 — frozen dataclass 的 `parameters`/`decision_result` 字段存储可变引用，调用方可在构造后修改。AgentDecided 同样有此问题。预存，非本 Story 引入。`src/domain/events/workflow_events.py:31`（**2026-10-10 具备度调查注记**：部分具备维持 deferred——修复形态已实证（`_serialize_value` 增 `isinstance(value, Mapping)` 分支 + `__post_init__` MappingProxyType 包装），但无任何「构造后篡改」真实场景；附带发现 saga_events init=False 形态 `from_dict(to_dict())` roundtrip 实测 TypeError，若启动本项须先修 base.py from_dict 联动）
+- 可变字典引用 — frozen dataclass 的 `parameters`/`decision_result` 字段存储可变引用，调用方可在构造后修改。AgentDecided 同样有此问题。预存，非本 Story 引入。`src/domain/events/workflow_events.py:31`（**2026-10-10 具备度调查注记**：部分具备维持 deferred——修复形态已实证（`_serialize_value` 增 `isinstance(value, Mapping)` 分支 + `__post_init__` MappingProxyType 包装），但无任何「构造后篡改」真实场景~~；附带发现 saga_events init=False 形态 `from_dict(to_dict())` roundtrip 实测 TypeError，若启动本项须先修 base.py from_dict 联动~~（**2026-10-15 全量台账审查勘误**：该附带发现已被消解——2026-10-10 A 类清偿修了 base.py from_dict 的 init=False 过滤（本文件 20-8 节 L63 条目 RESOLVED），且 5-1 R1-F4 类型还原进一步增强；实测 `SagaStatusChanged.from_dict(to_dict())` roundtrip OK、saga_id 正确还原 UUID——本项启动的联动前提不复存在，维持 deferred 仅为「无真实篡改场景」单一理由）
 - ~~flow_run_id 默认工厂误导~~ — **RESOLVED**（2026-10-10 技术债清偿）：生产 4 构造点（WorkflowSubmitted/RAGIndexed/AgentDecided×2——ReportGenerated 零构造点）全显式传参已实证——4 字段改 `field(kw_only=True)` 必填化，13 处测试无参构造补显式 id；漏传立即 TypeError 不再静默铸造。
 - aggregate_type 可被覆盖 — `if not self.aggregate_type:` 条件允许调用方传入自定义值。所有事件都有此模式。预存。`src/domain/events/workflow_events.py:35-38`
 - ~~DomainEvent 注册表无隔离~~ — **RESOLVED**（2026-10-10 技术债清偿）：`tests/unit/domain/events/conftest.py` autouse 快照/恢复 fixture（tests/conftest.py 会话 ContextVar 先例同款）；注记——import 期污染源（test_redis_event_bus_subscribe_fix 模块级 register 等 2 处）发生在 fixture 之前，需其文件内自理（附注已写入 conftest docstring）。
 - 不可序列化参数延迟失败 — parameters 包含 Prefect 对象时仅在 `to_dict()` 时报错。预存问题。`src/domain/events/workflow_events.py:31`（**2026-10-10 具备度调查判定：不应做**——to_dict json.dumps 探针（4-5 清偿成果）已是正确失败位置且有绊线钉死；构造期校验是高频路径负收益）
 - ~~【调查附带发现·2026-10-10】`SagaStatusChanged.from_dict(to_dict())` roundtrip 实测 TypeError~~ — **RESOLVED**（2026-10-10 A 类清偿）：`base.py` from_dict 核心字段按 target_class 的 `init=False` 声明过滤（init=False 成员保持类默认值）+ roundtrip 回归用例。
 - ~~【调查附带发现·2026-10-10】`DomainEvent.reset_registry()` 零调用且具破坏性（清空后不自动恢复）~~ — **勘误 + 处置完毕**（2026-10-10）：「零调用」判定失实（src 零调用但**测试有 2 处消费方**——test_outbox_entity:189/test_event_outbox_adapter:112）；处置改为 docstring 破坏性语义警示 + 指引快照/恢复形态（tests/unit/domain/events/conftest.py），方法保留。
-- 【A 类清偿附带发现·2026-10-10】alembic 全新库链挂在 002 — `WITH CHECK cannot be applied to SELECT or DELETE`（002 audit RLS policy 语句）；本地 dev 库无 alembic_version 表（历史 create_all 建）从未暴露。全新环境初始化（CI 重建/新部署）将无法 `upgrade head`——需专项修复 002（RLS policy 语句语法），建议随下一次 alembic 触达时处理。
+- ~~【A 类清偿附带发现·2026-10-10】alembic 全新库链挂在 002~~ — **RESOLVED 2026-10-15**（全量台账审查轮提前处置，一次性 PG 容器实证三炸点后修复 002 本体而非新增 fixup——fixup 救不了全新库（002 先炸），唯一有效修法是改 002。**红线豁免论证**：002 在任何全新库必然炸=从未被任何环境成功应用（修改零影响）+ alembic 无 checksum 机制 + 删除的 WITH CHECK 子句本就被 PG 拒绝（零语义变化），红线「禁改已合入 migration」的保护对象（已应用环境一致性）在本例为零。三处修正：①②两条 deny_delete policy 去 WITH CHECK（DELETE policy 仅允许 USING）；③update_status policy 的 old.status/NEW.status 改裸列名（PG policy 单行作用域不支持 OLD/NEW 限定引用——USING 裸列名=旧行、WITH CHECK 裸列名=新行；精确状态迁移由应用层 InvalidStateTransitionError 守卫承担，RLS 保底「非终态行可更新+新值合法集」）。实证：全新库 001→018 全链跑通 + 8 policy 建成 + downgrade/upgrade 双向可重放）。
 
 ## Deferred from: code review of 2-6-document-version-snapshot (2026-08-02)
 
@@ -75,7 +75,7 @@
 
 ## Deferred from: code review of 4-6-tool-version-management (2026-10-07)
 
-- lint-imports「Interfaces layer must not depend on infrastructure」broken（入口稳定为 `src.interfaces.api.app -> src.composition_root (l.24)` 与 `src.interfaces.cli.ocr_cli -> src.composition_root (l.39)` 两条链） — 经基线 5b96e75a 比对确认为**预存量**（非 4-6 引入），main 上该 CI 门禁为红。根因：interfaces 层 import 组合根，而组合根内部大量 infrastructure lazy import 被传递检出（组合根具体中转模块随构建漂移——jwt_service/prefect/rabbitmq_publisher 等多次实测各不相同，以 lint-imports 实时输出为准，不锁行号）。涉及组合根 lazy import 链的架构级重构，需单独立项处置（`.importlinter` 已合入规则禁止改动）。
+- ~~lint-imports「Interfaces layer must not depend on infrastructure」broken~~ — **RESOLVED 2026-10-15**（与时间线节同项：D1 方案 A 落地——app/ocr_cli/agent_cli 三入口上移 src/entrypoints/，本条所记两条链的入口文件已不在 interfaces 层，传导链消失；契约 5 kept + CI blocking。决策记录见 proposals/proposal-d1-importlinter-governance.md）
 - ~~根 `.env.example` 从未被 git 跟踪（git ls-files 仅 deploy/delivery 组件级样例）~~ — **RESOLVED**（2026-10-10 技术债清偿）：根 `.env.example` 创建——全仓 `os.getenv` 两轮 grep 提取 163 键按 14 域分组收录（字面默认值与各 from_env 一致；数据源 URL/TTL 类默认在 config/datasources 模块的键留空注记指引；敏感键留空）；`TOOL_VERSION_MAX_RETAINED`/`SANDBOX_*` 同步收录。
 
 ## Deferred from: Story 4-7 Validation Feedback 闭环 (2026-10-09)
@@ -89,7 +89,7 @@
 - 签名分裂低频形态（R8-30） — dict/set repr 键序不稳定、异常链层数漂移；随真实语料评估。
 - 真实修复能力观察基准（R8-31/R8-32） — mock 基准度量编排机制正确性；真实观测需更大样本/序贯设计 + 按 fix_strategy 分组对照统计。
 - 多案例加权检索与向量相似检索（L3 Qdrant） — V1 精确签名匹配；签名泛化不足时再立项。
-- 工具熔断（or.md 四.7.(3)） — 建议挂 Story 5.x Agent 弹性隔离；ToolExecutionQuery.state 过滤材料已齐备（纯范围决策）。
+- 工具熔断（or.md 四.7.(3)） — 建议挂 Story 5.x Agent 弹性隔离；ToolExecutionQuery.state 过滤材料已齐备（纯范围决策）。（**2026-10-15 全量台账审查去重注记**：与时间线节 L18 同项重复登记——触发「Epic 5 sprint planning 重估」已到期（Epic 5 已启动、5.1 done），评估窗口=5.2+ create-story 时随行；主登记位定为时间线节 L18）
 - 自动灰度推进与 per-version 统计视图 — 演进日志数据面已就绪（tool_evolution_logs + list_by_tool）。
 - FAIL_FAST 同波取消优化 — 纯算力节约可选优化（CONTINUE/SKIP 场景本不该取消，禁做成无条件）。
 - ~~mid-attempt 389-Schema 新 violations 进跨尝试反馈（代码审查 CR-R1-22）~~ — **RESOLVED**（2026-10-10 技术债清偿）：具备度调查证「演进日志 schema 联动」论据在 DB 层失实（fix_attempts 为 JSONB，`_attempt_from_dict` 全 `.get()` 缺省读，旧行向后兼容零迁移）——FixAttempt 加 `violations_excerpt` 字段（条数≤3/message≤200 截断）+ service mid-attempt 捕获 + prior_summaries/render_prior_attempts 渲染。

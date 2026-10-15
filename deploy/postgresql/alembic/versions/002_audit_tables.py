@@ -122,12 +122,15 @@ def upgrade() -> None:
     )
 
     # Deny DELETE operations explicitly
+    # （2026-10-15 语法修正豁免：DELETE policy 仅允许 USING 子句——WITH CHECK 不能
+    #  应用于 SELECT/DELETE（PG 语法错误，全新库 upgrade head 必炸且本 migration
+    #  因此从未被任何环境成功应用，修改零影响；删除该子句无语义变化——它本就被
+    #  PG 拒绝而非被忽略。登记：deferred-work.md 20-8 节 alembic 条目）
     op.execute(
         """
         CREATE POLICY audit_log_deny_delete ON audit_log
         FOR DELETE
         USING (false)
-        WITH CHECK (false)
     """
     )
 
@@ -151,42 +154,35 @@ def upgrade() -> None:
     )
 
     # Allow UPDATE only for status transitions (retry logic)
-    # Valid transitions:
-    #   pending  -> published (after successful processing)
-    #   pending  -> failed    (after processing error)
-    #   failed   -> pending   (retry after cooldown)
-    # Terminal state 'published' cannot transition to any other state
+    # （2026-10-15 语法修正豁免：PG policy 表达式为单行作用域——USING 中裸列名
+    #  解析为旧行值、WITH CHECK 中解析为新行值，不支持 OLD/NEW 限定引用（触发器
+    #  语法）。原写法 old.status/NEW.status 双重语法错（全新库必炸，本 migration
+    #  从未成功应用，修改零影响）。精确状态迁移（pending→published/failed、
+    #  failed→pending）在 policy 层不可表达，由应用层状态机守卫承担
+    #  （mark_published/mark_failed 的 InvalidStateTransitionError 已实现）；
+    #  RLS 层保底语义：USING=仅非终态行可被更新，WITH CHECK=新值须为合法状态集）
     op.execute(
         """
         CREATE POLICY audit_outbox_update_status ON audit_outbox
         FOR UPDATE
         USING (
-            -- Only rows in non-terminal state can be updated
-            -- AND the transition must be valid
-            CASE
-                WHEN old.status = 'pending' THEN NEW.status IN ('published', 'failed')
-                WHEN old.status = 'failed' THEN NEW.status = 'pending'
-                ELSE FALSE
-            END
+            -- 仅非终态行可被更新（裸列名 = 旧行值）
+            status IN ('pending', 'failed')
         )
         WITH CHECK (
-            -- The new status must be a valid transition from old status
-            CASE
-                WHEN old.status = 'pending' THEN NEW.status IN ('published', 'failed')
-                WHEN old.status = 'failed' THEN NEW.status = 'pending'
-                ELSE FALSE
-            END
+            -- 新值须为合法状态集（裸列名 = 新行值）
+            status IN ('pending', 'published', 'failed')
         )
     """
     )
 
     # Deny DELETE (outbox entries should be retained for audit)
+    # （2026-10-15 语法修正豁免：同上——DELETE policy 不允许 WITH CHECK 子句）
     op.execute(
         """
         CREATE POLICY audit_outbox_deny_delete ON audit_outbox
         FOR DELETE
         USING (false)
-        WITH CHECK (false)
     """
     )
 
